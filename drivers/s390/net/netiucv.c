@@ -1,5 +1,5 @@
 /*
- * $Id: netiucv.c,v 1.45 2004/03/15 08:48:48 braunu Exp $
+ * $Id: netiucv.c,v 1.47 2004/03/22 07:41:42 braunu Exp $
  *
  * IUCV network driver
  *
@@ -30,7 +30,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: IUCV network driver $Revision: 1.45 $
+ * RELEASE-TAG: IUCV network driver $Revision: 1.47 $
  *
  */
 
@@ -764,7 +764,7 @@ conn_action_start(fsm_instance *fi, int event, void *arg)
 {
 	struct iucv_event *ev = (struct iucv_event *)arg;
 	struct iucv_connection *conn = ev->conn;
-
+	__u16 msglimit;
 	int rc;
 
 	pr_debug("%s() called\n", __FUNCTION__);
@@ -793,10 +793,11 @@ conn_action_start(fsm_instance *fi, int event, void *arg)
 
 	fsm_newstate(fi, CONN_STATE_SETUPWAIT);
 	rc = iucv_connect(&(conn->pathid), NETIUCV_QUEUELEN_DEFAULT, iucvMagic,
-			  conn->userid, iucv_host, 0, NULL, NULL, conn->handle,
+			  conn->userid, iucv_host, 0, NULL, &msglimit, conn->handle,
 			  conn);
 	switch (rc) {
 		case 0:
+			conn->netdev->tx_queue_len = msglimit;
 			return;
 		case 11:
 			printk(KERN_NOTICE
@@ -1911,7 +1912,7 @@ static struct device_driver netiucv_driver = {
 static void
 netiucv_banner(void)
 {
-	char vbuf[] = "$Revision: 1.45 $";
+	char vbuf[] = "$Revision: 1.47 $";
 	char *version = vbuf;
 
 	if ((version = strchr(version, ':'))) {

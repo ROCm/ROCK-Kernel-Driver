@@ -256,7 +256,7 @@ acpi_ns_get_type (
 
 
 	if (!node) {
-		ACPI_REPORT_WARNING (("ns_get_type: Null Node ptr"));
+		ACPI_REPORT_WARNING (("ns_get_type: Null Node input pointer\n"));
 		return_VALUE (ACPI_TYPE_ANY);
 	}
 

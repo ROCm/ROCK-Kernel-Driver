@@ -64,7 +64,10 @@
 
 #ifndef __s390x__
 #define __LC_KERNEL_STACK               0xC40
-#define __LC_ASYNC_STACK                0xC44
+#define __LC_THREAD_INFO		0xC44
+#define __LC_ASYNC_STACK                0xC48
+#define __LC_KERNEL_ASCE		0xC4C
+#define __LC_USER_ASCE			0xC50
 #define __LC_CPUID                      0xC60
 #define __LC_CPUADDR                    0xC68
 #define __LC_IPLDEV                     0xC7C
@@ -73,13 +76,16 @@
 #define __LC_INT_CLOCK			0xC98
 #else /* __s390x__ */
 #define __LC_KERNEL_STACK               0xD40
-#define __LC_ASYNC_STACK                0xD48
+#define __LC_THREAD_INFO		0xD48
+#define __LC_ASYNC_STACK                0xD50
+#define __LC_KERNEL_ASCE		0xD58
+#define __LC_USER_ASCE			0xD60
 #define __LC_CPUID                      0xD90
 #define __LC_CPUADDR                    0xD98
 #define __LC_IPLDEV                     0xDB8
 #define __LC_JIFFY_TIMER		0xDC0
 #define __LC_CURRENT			0xDD8
-#define __LC_INT_CLOCK			0xDE8
+#define __LC_INT_CLOCK			0xDe8
 #endif /* __s390x__ */
 
 #define __LC_PANIC_MAGIC                0xE00
@@ -99,7 +105,6 @@
 #include <linux/config.h>
 #include <asm/processor.h>
 #include <linux/types.h>
-#include <asm/atomic.h>
 #include <asm/sigp.h>
 
 void restart_int_handler(void);
@@ -167,9 +172,12 @@ struct _lowcore
         /* System info area */
 	__u32        save_area[16];            /* 0xc00 */
 	__u32        kernel_stack;             /* 0xc40 */
-	__u32        async_stack;              /* 0xc44 */
+	__u32        thread_info;              /* 0xc44 */
+	__u32        async_stack;              /* 0xc48 */
+	__u32        kernel_asce;              /* 0xc4c */
+	__u32        user_asce;                /* 0xc50 */
+	__u8         pad10[0xc60-0xc54];       /* 0xc54 */
 	/* entry.S sensitive area start */
-	__u8         pad10[0xc60-0xc48];       /* 0xc5c */
 	struct       cpuinfo_S390 cpu_data;    /* 0xc60 */
 	__u32        ipl_device;               /* 0xc7c */
 	/* entry.S sensitive area end */
@@ -245,9 +253,12 @@ struct _lowcore
 	__u64        save_area[16];            /* 0xc00 */
         __u8         pad9[0xd40-0xc80];        /* 0xc80 */
  	__u64        kernel_stack;             /* 0xd40 */
-	__u64        async_stack;              /* 0xd48 */
+	__u64        thread_info;              /* 0xd48 */
+	__u64        async_stack;              /* 0xd50 */
+	__u64        kernel_asce;              /* 0xd58 */
+	__u64        user_asce;                /* 0xd60 */
+	__u8         pad10[0xd80-0xd68];       /* 0xd68 */
 	/* entry.S sensitive area start */
-	__u8         pad10[0xd80-0xd50];       /* 0xd64 */
 	struct       cpuinfo_S390 cpu_data;    /* 0xd80 */
 	__u32        ipl_device;               /* 0xdb8 */
 	__u32        pad11;                    /* 0xdbc */

@@ -179,7 +179,7 @@ int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 	memset(&regs, 0, sizeof(regs));
 	regs.psw.mask = PSW_KERNEL_BITS;
 	regs.psw.addr = (unsigned long) kernel_thread_starter | PSW_ADDR_AMODE;
-	regs.gprs[7] = STACK_FRAME_OVERHEAD;
+	regs.gprs[7] = STACK_FRAME_OVERHEAD + sizeof(struct pt_regs);
 	regs.gprs[8] = __LC_KERNEL_STACK;
 	regs.gprs[9] = (unsigned long) fn;
 	regs.gprs[10] = (unsigned long) arg;
@@ -230,6 +230,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long new_stackp,
 		 (THREAD_SIZE + (unsigned long) p->thread_info)) - 1;
         p->thread.ksp = (unsigned long) frame;
 	p->set_child_tid = p->clear_child_tid = NULL;
+	/* Store access registers to kernel stack of new process. */
         frame->childregs = *regs;
 	frame->childregs.gprs[2] = 0;	/* child returns 0 on fork. */
         frame->childregs.gprs[15] = new_stackp;
@@ -240,6 +241,10 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long new_stackp,
 
         /* fake return stack for resume(), don't go back to schedule */
         frame->gprs[9] = (unsigned long) frame;
+
+	/* Save access registers to new thread structure. */
+	save_access_regs(&p->thread.acrs[0]);
+
 #ifndef CONFIG_ARCH_S390X
         /*
 	 * save fprs to current->thread.fp_regs to merge them with
@@ -251,7 +256,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long new_stackp,
         p->thread.user_seg = __pa((unsigned long) p->mm->pgd) | _SEGMENT_TABLE;
 	/* Set a new TLS ?  */
 	if (clone_flags & CLONE_SETTLS)
-		frame->childregs.acrs[0] = regs->gprs[6];
+		p->thread.acrs[0] = regs->gprs[6];
 #else /* CONFIG_ARCH_S390X */
 	/* Save the fpu registers to new thread structure. */
 	save_fp_regs(&p->thread.fp_regs);
@@ -259,30 +264,27 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long new_stackp,
 	/* Set a new TLS ?  */
 	if (clone_flags & CLONE_SETTLS) {
 		if (test_thread_flag(TIF_31BIT)) {
-			frame->childregs.acrs[0] =
-				(unsigned int) regs->gprs[6];
+			p->thread.acrs[0] = (unsigned int) regs->gprs[6];
 		} else {
-			frame->childregs.acrs[0] =
-				(unsigned int)(regs->gprs[6] >> 32);
-			frame->childregs.acrs[1] =
-				(unsigned int) regs->gprs[6];
+			p->thread.acrs[0] = (unsigned int)(regs->gprs[6] >> 32);
+			p->thread.acrs[1] = (unsigned int) regs->gprs[6];
 		}
 	}
 #endif /* CONFIG_ARCH_S390X */
 	/* start new process with ar4 pointing to the correct address space */
-	p->thread.ar4 = get_fs().ar4;
+	p->thread.mm_segment = get_fs();
         /* Don't copy debug registers */
         memset(&p->thread.per_info,0,sizeof(p->thread.per_info));
 
         return 0;
 }
 
-asmlinkage int sys_fork(struct pt_regs regs)
+asmlinkage long sys_fork(struct pt_regs regs)
 {
 	return do_fork(SIGCHLD, regs.gprs[15], &regs, 0, NULL, NULL);
 }
 
-asmlinkage int sys_clone(struct pt_regs regs)
+asmlinkage long sys_clone(struct pt_regs regs)
 {
         unsigned long clone_flags;
         unsigned long newsp;
@@ -308,7 +310,7 @@ asmlinkage int sys_clone(struct pt_regs regs)
  * do not have enough call-clobbered registers to hold all
  * the information you need.
  */
-asmlinkage int sys_vfork(struct pt_regs regs)
+asmlinkage long sys_vfork(struct pt_regs regs)
 {
 	return do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD,
 		       regs.gprs[15], &regs, 0, NULL, NULL);
@@ -317,7 +319,7 @@ asmlinkage int sys_vfork(struct pt_regs regs)
 /*
  * sys_execve() executes a new program.
  */
-asmlinkage int sys_execve(struct pt_regs regs)
+asmlinkage long sys_execve(struct pt_regs regs)
 {
         int error;
         char * filename;

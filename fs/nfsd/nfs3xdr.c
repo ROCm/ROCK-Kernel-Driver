@@ -884,10 +884,11 @@ encode_entry(struct readdir_cd *ccd, const char *name,
 		if (plus) {
 			struct svc_fh	fh;
 
-			if (compose_entry_fh(cd, &fh, name, namlen) > 0)
-				goto noexec;
-
-			p = encode_entryplus_baggage(cd, p, &fh);
+			if (compose_entry_fh(cd, &fh, name, namlen) > 0) {
+				*p++ = 0;
+				*p++ = 0;
+			} else
+				p = encode_entryplus_baggage(cd, p, &fh);
 		}
 		num_entry_words = p - cd->buffer;
 	} else if (cd->rqstp->rq_respages[pn+1] != NULL) {
@@ -916,7 +917,7 @@ encode_entry(struct readdir_cd *ccd, const char *name,
 		/* determine entry word length and lengths to go in pages */
 		num_entry_words = p1 - tmp;
 		len1 = curr_page_addr + PAGE_SIZE - (caddr_t)cd->buffer;
-		if ((num_entry_words << 2) <= len1) {
+		if ((num_entry_words << 2) < len1) {
 			/* the actual number of words in the entry is less
 			 * than elen and can still fit in the current page
 			 */
@@ -945,16 +946,11 @@ encode_entry(struct readdir_cd *ccd, const char *name,
 		return -EINVAL;
 	}
 
-out:
 	cd->buflen -= num_entry_words;
 	cd->buffer = p;
 	cd->common.err = nfs_ok;
 	return 0;
 
-noexec:
-	*p++ = 0;
-	*p++ = 0;
-	goto out;
 }
 
 int

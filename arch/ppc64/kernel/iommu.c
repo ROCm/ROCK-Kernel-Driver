@@ -100,12 +100,13 @@ static unsigned long iommu_range_alloc(struct iommu_table *tbl, unsigned long np
 	end = n + npages;
 
 	if (unlikely(end >= limit)) {
-		if (likely(pass++ < 2)) {
+		if (likely(pass < 2)) {
 			/* First failure, just rescan the half of the table.
 			 * Second failure, rescan the other half of the table.
 			 */
 			start = (largealloc ^ pass) ? tbl->it_halfpoint : 0;
 			limit = pass ? tbl->it_mapsize : limit;
+			pass++;
 			goto again;
 		} else {
 			/* Third failure, give up */

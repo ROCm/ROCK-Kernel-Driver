@@ -3070,6 +3070,20 @@ static int do_wireless_ioctl(unsigned int fd, unsigned int cmd, unsigned long ar
 	return sys_ioctl(fd, cmd, (unsigned long) iwr);
 }
 
+/* Emulate old style bridge ioctls */
+static int do_bridge_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
+{
+	u32 tmp;
+	unsigned long *argbuf = compat_alloc_user_space(3 * sizeof(unsigned long)); 
+	int i;	
+	for (i = 0; i < 3; i++) {
+		if (get_user(tmp, i + ((u32 *)arg)) ||
+		    put_user(tmp, i + argbuf))
+			return -EFAULT;
+	}
+	return sys_ioctl(fd, cmd, (unsigned long)argbuf);
+}
+
 #undef CODE
 #endif
 
@@ -3247,6 +3261,8 @@ HANDLE_IOCTL(SIOCSIWNICKN, do_wireless_ioctl)
 HANDLE_IOCTL(SIOCGIWNICKN, do_wireless_ioctl)
 HANDLE_IOCTL(SIOCSIWENCODE, do_wireless_ioctl)
 HANDLE_IOCTL(SIOCGIWENCODE, do_wireless_ioctl)
+HANDLE_IOCTL(SIOCSIFBR, do_bridge_ioctl)
+HANDLE_IOCTL(SIOCGIFBR, do_bridge_ioctl)
 
 #undef DECLARES
 #endif

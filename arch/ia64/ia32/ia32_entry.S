@@ -229,7 +229,7 @@ ia32_syscall_table:
 	data8 sys_ni_syscall
 	data8 sys32_lseek
 	data8 sys_getpid	  /* 20 */
-	data8 sys_mount
+	data8 compat_sys_mount
 	data8 sys_oldumount
 	data8 sys_setuid	/* 16-bit version */
 	data8 sys_getuid	/* 16-bit version */

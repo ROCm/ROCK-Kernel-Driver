@@ -138,6 +138,7 @@ acpi_ex_resolve_object (
 
 
 	case ACPI_TYPE_LOCAL_ALIAS:
+	case ACPI_TYPE_LOCAL_METHOD_ALIAS:
 
 		/*
 		 * Aliases are resolved by acpi_ex_prep_operands

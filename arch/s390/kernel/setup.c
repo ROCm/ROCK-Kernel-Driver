@@ -492,26 +492,27 @@ void __init setup_arch(char **cmdline_p)
 #endif /* CONFIG_ARCH_S390X */
 	lc->restart_psw.mask = PSW_BASE_BITS;
 	lc->restart_psw.addr =
-		PSW_ADDR_AMODE + (unsigned long) restart_int_handler;
+		PSW_ADDR_AMODE | (unsigned long) restart_int_handler;
 	lc->external_new_psw.mask = PSW_KERNEL_BITS;
 	lc->external_new_psw.addr =
-		PSW_ADDR_AMODE + (unsigned long) ext_int_handler;
-	lc->svc_new_psw.mask = PSW_KERNEL_BITS;
-	lc->svc_new_psw.addr = PSW_ADDR_AMODE + (unsigned long) system_call;
+		PSW_ADDR_AMODE | (unsigned long) ext_int_handler;
+	lc->svc_new_psw.mask = PSW_KERNEL_BITS | PSW_MASK_IO | PSW_MASK_EXT;
+	lc->svc_new_psw.addr = PSW_ADDR_AMODE | (unsigned long) system_call;
 	lc->program_new_psw.mask = PSW_KERNEL_BITS;
 	lc->program_new_psw.addr =
-		PSW_ADDR_AMODE + (unsigned long)pgm_check_handler;
+		PSW_ADDR_AMODE | (unsigned long)pgm_check_handler;
 	lc->mcck_new_psw.mask = PSW_KERNEL_BITS;
 	lc->mcck_new_psw.addr =
-		PSW_ADDR_AMODE + (unsigned long) mcck_int_handler;
+		PSW_ADDR_AMODE | (unsigned long) mcck_int_handler;
 	lc->io_new_psw.mask = PSW_KERNEL_BITS;
-	lc->io_new_psw.addr = PSW_ADDR_AMODE + (unsigned long) io_int_handler;
+	lc->io_new_psw.addr = PSW_ADDR_AMODE | (unsigned long) io_int_handler;
 	lc->ipl_device = S390_lowcore.ipl_device;
 	lc->jiffy_timer = -1LL;
 	lc->kernel_stack = ((unsigned long) &init_thread_union) + THREAD_SIZE;
 	lc->async_stack = (unsigned long)
 		__alloc_bootmem(ASYNC_SIZE, ASYNC_SIZE, 0) + ASYNC_SIZE;
 	lc->current_task = (unsigned long) init_thread_union.thread_info.task;
+	lc->thread_info = (unsigned long) &init_thread_union;
 #ifdef CONFIG_ARCH_S390X
 	if (MACHINE_HAS_DIAG44)
 		lc->diag44_opcode = 0x83000044;

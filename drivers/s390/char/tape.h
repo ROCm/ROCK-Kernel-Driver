@@ -198,6 +198,7 @@ struct tape_device {
 	/* entry in tape_device_list */
 	struct list_head		node;
 
+	int				cdev_id;
 	struct ccw_device *		cdev;
 	struct tape_class_device *	nt;
 	struct tape_class_device *	rt;
@@ -263,8 +264,8 @@ extern int tape_release(struct tape_device *);
 extern int tape_mtop(struct tape_device *, int, int);
 extern void tape_state_set(struct tape_device *, enum tape_state);
 
-extern int tape_enable_device(struct tape_device *, struct tape_discipline *);
-extern void tape_disable_device(struct tape_device *device);
+extern int tape_generic_online(struct tape_device *, struct tape_discipline *);
+extern int tape_generic_offline(struct tape_device *device);
 
 /* Externals from tape_devmap.c */
 extern int tape_generic_probe(struct ccw_device *);

@@ -302,7 +302,7 @@ static int sunos_filldir(void * __buf, const char * name, int namlen,
 	put_user(reclen, &dirent->d_reclen);
 	copy_to_user(dirent->d_name, name, namlen);
 	put_user(0, dirent->d_name + namlen);
-	((char *) dirent) += reclen;
+	dirent = (void *) dirent + reclen;
 	buf->curr = dirent;
 	buf->count -= reclen;
 	return 0;
@@ -382,7 +382,7 @@ static int sunos_filldirentry(void * __buf, const char * name, int namlen,
 	put_user(reclen, &dirent->d_reclen);
 	copy_to_user(dirent->d_name, name, namlen);
 	put_user(0, dirent->d_name + namlen);
-	((char *) dirent) += reclen;
+	dirent = (void *) dirent + reclen;
 	buf->curr = dirent;
 	buf->count -= reclen;
 	return 0;
@@ -1276,10 +1276,12 @@ asmlinkage int sunos_sigaction (int sig, u32 act, u32 oact)
 
 	if (act) {
 		compat_old_sigset_t mask;
+		u32 u_handler;
 
-		if (get_user((long)new_ka.sa.sa_handler, &((struct old_sigaction32 *)A(act))->sa_handler) ||
+		if (get_user(u_handler, &((struct old_sigaction32 *)A(act))->sa_handler) ||
 		    __get_user(new_ka.sa.sa_flags, &((struct old_sigaction32 *)A(act))->sa_flags))
 			return -EFAULT;
+		new_ka.sa.sa_handler = (void *) (long) u_handler;
 		__get_user(mask, &((struct old_sigaction32 *)A(act))->sa_mask);
 		new_ka.sa.sa_restorer = NULL;
 		new_ka.ka_restorer = NULL;

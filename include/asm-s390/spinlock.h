@@ -35,13 +35,8 @@
  */
 
 typedef struct {
-#ifndef __s390x__
-	volatile unsigned long lock;
-} spinlock_t;
-#else /* __s390x__ */
 	volatile unsigned int lock;
 } __attribute__ ((aligned (4))) spinlock_t;
-#endif /* __s390x__ */
 
 #define SPIN_LOCK_UNLOCKED (spinlock_t) { 0 }
 #define spin_lock_init(lp) do { (lp)->lock = 0; } while(0)
@@ -80,11 +75,10 @@ extern inline int _raw_spin_trylock(spinlock_t *lp)
 #else /* __s390x__ */
 	unsigned int result, reg;
 #endif /* __s390x__ */
-	__asm__ __volatile("    slr   %0,%0\n"
-			   "    basr  %1,0\n"
+	__asm__ __volatile("    basr  %1,0\n"
 			   "0:  cs    %0,%1,0(%3)"
-			   : "=&d" (result), "=&d" (reg), "=m" (lp->lock)
-			   : "a" (&lp->lock), "m" (lp->lock)
+			   : "=d" (result), "=&d" (reg), "=m" (lp->lock)
+			   : "a" (&lp->lock), "m" (lp->lock), "0" (0)
 			   : "cc", "memory" );
 	return !result;
 }
@@ -224,17 +218,15 @@ extern inline int _raw_write_trylock(rwlock_t *rw)
 	
 	__asm__ __volatile__(
 #ifndef __s390x__
-			     "   slr  %0,%0\n"
 			     "   lhi  %1,1\n"
 			     "   sll  %1,31\n"
 			     "   cs   %0,%1,0(%3)"
 #else /* __s390x__ */
-			     "   slgr  %0,%0\n"
 			     "   llihh %1,0x8000\n"
 			     "0: csg %0,%1,0(%3)\n"
 #endif /* __s390x__ */
-			     : "=&d" (result), "=&d" (reg), "=m" (rw->lock)
-			     : "a" (&rw->lock), "m" (rw->lock)
+			     : "=d" (result), "=&d" (reg), "=m" (rw->lock)
+			     : "a" (&rw->lock), "m" (rw->lock), "0" (0)
 			     : "cc", "memory" );
 	return result == 0;
 }

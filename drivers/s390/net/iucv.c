@@ -1,5 +1,5 @@
 /* 
- * $Id: iucv.c,v 1.26 2004/03/10 11:55:31 braunu Exp $
+ * $Id: iucv.c,v 1.27 2004/03/22 07:43:43 braunu Exp $
  *
  * IUCV network driver
  *
@@ -29,7 +29,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: IUCV lowlevel driver $Revision: 1.26 $
+ * RELEASE-TAG: IUCV lowlevel driver $Revision: 1.27 $
  *
  */
 
@@ -351,7 +351,7 @@ do { \
 static void
 iucv_banner(void)
 {
-	char vbuf[] = "$Revision: 1.26 $";
+	char vbuf[] = "$Revision: 1.27 $";
 	char *version = vbuf;
 
 	if ((version = strchr(version, ':'))) {
@@ -374,13 +374,13 @@ iucv_init(void)
 {
 	int ret;
 
+	if (iucv_external_int_buffer)
+		return 0;
+
 	if (!MACHINE_IS_VM) {
 		printk(KERN_ERR "IUCV: IUCV connection needs VM as base\n");
 		return -EPROTONOSUPPORT;
 	}
-
-	if (iucv_external_int_buffer)
-		return 0;
 
 	ret = bus_register(&iucv_bus);
 	if (ret != 0) {
@@ -830,7 +830,7 @@ iucv_register_program (__u8 pgmname[16],
 			memset (new_handler->id.mask, 0xFF,
 				sizeof (new_handler->id.mask));
 		}
-		memset (new_handler->id.mask, 0x00,
+		memset (new_handler->id.userid, 0x00,
 			sizeof (new_handler->id.userid));
 	}
 	/* fill in the rest of handler */

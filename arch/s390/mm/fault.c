@@ -87,12 +87,12 @@ static int __check_access_register(struct pt_regs *regs, int error_code)
 	if (areg == 0)
 		/* Access via access register 0 -> kernel address */
 		return 0;
-	if (regs && areg < NUM_ACRS && regs->acrs[areg] <= 1)
+	if (regs && areg < NUM_ACRS && current->thread.acrs[areg] <= 1)
 		/*
 		 * access register contains 0 -> kernel address,
 		 * access register contains 1 -> user space address
 		 */
-		return regs->acrs[areg];
+		return current->thread.acrs[areg];
 
 	/* Something unhealthy was done with the access registers... */
 	die("page fault via unknown access register", regs, error_code);
@@ -115,8 +115,10 @@ static inline int check_user_space(struct pt_regs *regs, int error_code)
 	 *   3: Home Segment Table Descriptor
 	 */
 	int descriptor = S390_lowcore.trans_exc_code & 3;
-	if (descriptor == 1)
+	if (descriptor == 1) {
+		save_access_regs(current->thread.acrs);
 		return __check_access_register(regs, error_code);
+	}
 	return descriptor >> 1;
 }
 

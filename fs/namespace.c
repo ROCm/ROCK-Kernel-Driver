@@ -694,7 +694,7 @@ out:
 	return err;
 }
 
-static int copy_mount_options (const void __user *data, unsigned long *where)
+int copy_mount_options (const void __user *data, unsigned long *where)
 {
 	int i;
 	unsigned long page;
