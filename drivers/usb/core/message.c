@@ -566,22 +566,19 @@ void usb_sg_cancel (struct usb_sg_request *io)
  */
 int usb_get_descriptor(struct usb_device *dev, unsigned char type, unsigned char index, void *buf, int size)
 {
-	int i = 5;
+	int i;
 	int result;
 	
 	memset(buf,0,size);	// Make sure we parse really received data
 
-	while (i--) {
+	for (i = 0; i < 3; ++i) {
 		/* retry on length 0 or stall; some devices are flakey */
-		if ((result = usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
-				    USB_REQ_GET_DESCRIPTOR, USB_DIR_IN,
-				    (type << 8) + index, 0, buf, size,
-				    HZ * USB_CTRL_GET_TIMEOUT)) > 0
-				|| result != -EPIPE)
+		result = usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
+				USB_REQ_GET_DESCRIPTOR, USB_DIR_IN,
+				(type << 8) + index, 0, buf, size,
+				HZ * USB_CTRL_GET_TIMEOUT);
+		if (!(result == 0 || result == -EPIPE))
 			break;
-
-		dev_dbg (&dev->dev, "RETRY descriptor, result %d\n", result);
-		result = -ENOMSG;
 	}
 	return result;
 }
@@ -830,6 +827,7 @@ void usb_disable_device(struct usb_device *dev, int skip_ep0)
 			interface = dev->actconfig->interface[i];
 			dev_dbg (&dev->dev, "unregistering interface %s\n",
 				interface->dev.bus_id);
+			usb_remove_sysfs_intf_files(interface);
 			device_del (&interface->dev);
 		}
 
@@ -842,7 +840,7 @@ void usb_disable_device(struct usb_device *dev, int skip_ep0)
 		}
 		dev->actconfig = 0;
 		if (dev->state == USB_STATE_CONFIGURED)
-			dev->state = USB_STATE_ADDRESS;
+			usb_set_device_state(dev, USB_STATE_ADDRESS);
 	}
 }
 
@@ -1047,7 +1045,7 @@ int usb_reset_configuration(struct usb_device *dev)
 			config->desc.bConfigurationValue, 0,
 			NULL, 0, HZ * USB_CTRL_SET_TIMEOUT);
 	if (retval < 0) {
-		dev->state = USB_STATE_ADDRESS;
+		usb_set_device_state(dev, USB_STATE_ADDRESS);
 		return retval;
 	}
 
@@ -1185,9 +1183,9 @@ free_interfaces:
 
 	dev->actconfig = cp;
 	if (!cp)
-		dev->state = USB_STATE_ADDRESS;
+		usb_set_device_state(dev, USB_STATE_ADDRESS);
 	else {
-		dev->state = USB_STATE_CONFIGURED;
+		usb_set_device_state(dev, USB_STATE_CONFIGURED);
 
 		/* Initialize the new interface structures and the
 		 * hc/hcd/usbcore interface/endpoint state.
@@ -1322,7 +1320,7 @@ int usb_string(struct usb_device *dev, int index, char *buf, size_t size)
 	 */
 
 	err = usb_get_string(dev, dev->string_langid, index, tbuf, 2);
-	if (err == -EPIPE) {
+	if (err == -EPIPE || err == 0) {
 		dev_dbg(&dev->dev, "RETRY string %d read/%d\n", index, 2);
 		err = usb_get_string(dev, dev->string_langid, index, tbuf, 2);
 	}
@@ -1331,7 +1329,7 @@ int usb_string(struct usb_device *dev, int index, char *buf, size_t size)
 	len=tbuf[0];	
 	
 	err = usb_get_string(dev, dev->string_langid, index, tbuf, len);
-	if (err == -EPIPE) {
+	if (err == -EPIPE || err == 0) {
 		dev_dbg(&dev->dev, "RETRY string %d read/%d\n", index, len);
 		err = usb_get_string(dev, dev->string_langid, index, tbuf, len);
 	}

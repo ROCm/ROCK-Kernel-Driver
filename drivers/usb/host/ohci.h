@@ -429,3 +429,22 @@ static inline void periodic_reinit (struct ohci_hcd *ohci)
 #	define ohci_vdbg(ohci, fmt, args...) do { } while (0)
 #endif
 
+#ifdef CONFIG_ARCH_LH7A404
+	/* Marc Singer: at the time this code was written, the LH7A404
+	 * had a problem reading the USB host registers.  This
+	 * implementation of the ohci_readl function performs the read
+	 * twice as a work-around.
+	 */
+static inline unsigned int ohci_readl (void* regs)
+{
+	*(volatile unsigned int*) regs;
+	return *(volatile unsigned int*) regs;
+}
+#else
+	/* Standard version of ohci_readl uses standard, platform
+	 * specific implementation. */
+static inline unsigned int ohci_readl (void* regs)
+{
+	return readl (regs);
+}
+#endif

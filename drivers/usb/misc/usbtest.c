@@ -459,8 +459,8 @@ static int perform_sglist (
  * or remote wakeup (which needs human interaction).
  */
 
-static int realworld = 1;
-MODULE_PARM (realworld, "i");
+static unsigned realworld = 1;
+module_param (realworld, uint, 0);
 MODULE_PARM_DESC (realworld, "clear to demand stricter ch9 compliance");
 
 static int get_altsetting (struct usbtest_dev *dev)
@@ -1808,17 +1808,17 @@ usbtest_ioctl (struct usb_interface *intf, unsigned int code, void *buf)
 
 /*-------------------------------------------------------------------------*/
 
-static int force_interrupt = 0;
-MODULE_PARM (force_interrupt, "i");
+static unsigned force_interrupt = 0;
+module_param (force_interrupt, uint, 0);
 MODULE_PARM_DESC (force_interrupt, "0 = test default; else interrupt");
 
 #ifdef	GENERIC
-static int vendor;
-MODULE_PARM (vendor, "h");
+static unsigned short vendor;
+module_param(vendor, ushort, 0);
 MODULE_PARM_DESC (vendor, "vendor code (from usb-if)");
 
-static int product;
-MODULE_PARM (product, "h");
+static unsigned short product;
+module_param(product, ushort, 0);
 MODULE_PARM_DESC (product, "product code (from vendor)");
 #endif
 

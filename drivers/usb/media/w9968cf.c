@@ -388,7 +388,7 @@ MODULE_PARM_DESC(specific_debug,
 static struct file_operations w9968cf_fops;
 static int w9968cf_open(struct inode*, struct file*);
 static int w9968cf_release(struct inode*, struct file*);
-static ssize_t w9968cf_read(struct file*, char*, size_t, loff_t*);
+static ssize_t w9968cf_read(struct file*, char __user *, size_t, loff_t*);
 static int w9968cf_mmap(struct file*, struct vm_area_struct*);
 static int w9968cf_ioctl(struct inode*, struct file*, unsigned, unsigned long);
 static int w9968cf_v4l_ioctl(struct inode*, struct file*, unsigned int, void*);
@@ -444,8 +444,8 @@ static inline unsigned long w9968cf_get_max_bufsize(struct w9968cf_device*);
 /* High-level CMOS sensor control functions */
 static int w9968cf_sensor_set_control(struct w9968cf_device*,int cid,int val);
 static int w9968cf_sensor_get_control(struct w9968cf_device*,int cid,int *val);
-static inline int w9968cf_sensor_cmd(struct w9968cf_device*, 
-                                     unsigned int cmd, void *arg);
+static int w9968cf_sensor_cmd(struct w9968cf_device*, 
+                              unsigned int cmd, void *arg);
 static int w9968cf_sensor_init(struct w9968cf_device*);
 static int w9968cf_sensor_update_settings(struct w9968cf_device*);
 static int w9968cf_sensor_get_picture(struct w9968cf_device*);
@@ -461,7 +461,7 @@ static int w9968cf_init_chip(struct w9968cf_device*);
 static int w9968cf_set_picture(struct w9968cf_device*, struct video_picture);
 static int w9968cf_set_window(struct w9968cf_device*, struct video_window);
 static inline u16 w9968cf_valid_palette(u16 palette);
-static inline u16 w9968cf_valid_depth(u16 palette);
+static u16 w9968cf_valid_depth(u16 palette);
 static inline u8 w9968cf_need_decompression(u16 palette);
 static int w9968cf_postprocess_frame(struct w9968cf_device*, 
                                      struct w9968cf_frame_t*);
@@ -1959,7 +1959,7 @@ static inline u16 w9968cf_valid_palette(u16 palette)
   Return the depth corresponding to the given palette.
   Palette _must_ be supported !
   --------------------------------------------------------------------------*/
-static inline u16 w9968cf_valid_depth(u16 palette)
+static u16 w9968cf_valid_depth(u16 palette)
 {
 	u8 i=0;
 	while (w9968cf_formatlist[i].palette != palette)
@@ -2178,7 +2178,7 @@ w9968cf_sensor_get_control(struct w9968cf_device* cam, int cid, int* val)
 }
 
 
-static inline int
+static int
 w9968cf_sensor_cmd(struct w9968cf_device* cam, unsigned int cmd, void* arg)
 {
 	struct i2c_client* c = cam->sensor_client;
@@ -2770,7 +2770,7 @@ static int w9968cf_release(struct inode* inode, struct file* filp)
 
 
 static ssize_t
-w9968cf_read(struct file* filp, char* buf, size_t count, loff_t* f_pos)
+w9968cf_read(struct file* filp, char __user * buf, size_t count, loff_t* f_pos)
 {
 	struct w9968cf_device* cam;
 	struct w9968cf_frame_t* fr;
@@ -2915,6 +2915,7 @@ w9968cf_v4l_ioctl(struct inode* inode, struct file* filp,
                   unsigned int cmd, void* arg)
 {
 	struct w9968cf_device* cam;
+	void __user *user_arg = (void __user *)arg;
 	const char* v4l1_ioctls[] = {
 		"?", "CGAP", "GCHAN", "SCHAN", "GTUNER", "STUNER", 
 		"GPICT", "SPICT", "CCAPTURE", "GWIN", "SWIN", "GFBUF",
@@ -2948,7 +2949,7 @@ w9968cf_v4l_ioctl(struct inode* inode, struct file* filp,
 		cap.maxheight = (cam->upscaling && w9968cf_vppmod_present)
 		                ? W9968CF_MAX_HEIGHT : cam->maxheight;
 
-		if (copy_to_user(arg, &cap, sizeof(cap)))
+		if (copy_to_user(user_arg, &cap, sizeof(cap)))
 			return -EFAULT;
 
 		DBG(5, "VIDIOCGCAP successfully called.")
@@ -2958,7 +2959,7 @@ w9968cf_v4l_ioctl(struct inode* inode, struct file* filp,
 	case VIDIOCGCHAN: /* get video channel informations */
 	{
 		struct video_channel chan;
-		if (copy_from_user(&chan, arg, sizeof(chan)))
+		if (copy_from_user(&chan, user_arg, sizeof(chan)))
 			return -EFAULT;
 
 		if (chan.channel != 0)
@@ -2970,7 +2971,7 @@ w9968cf_v4l_ioctl(struct inode* inode, struct file* filp,
 		chan.type = VIDEO_TYPE_CAMERA;
 		chan.norm = VIDEO_MODE_AUTO;
 
-		if (copy_to_user(arg, &chan, sizeof(chan)))
+		if (copy_to_user(user_arg, &chan, sizeof(chan)))
 			return -EFAULT;
 
 		DBG(5, "VIDIOCGCHAN successfully called.")
@@ -2981,7 +2982,7 @@ w9968cf_v4l_ioctl(struct inode* inode, struct file* filp,
 	{
 		struct video_channel chan;
 
-		if (copy_from_user(&chan, arg, sizeof(chan)))
+		if (copy_from_user(&chan, user_arg, sizeof(chan)))
 			return -EFAULT;
 
 		if (chan.channel != 0)
@@ -2996,7 +2997,7 @@ w9968cf_v4l_ioctl(struct inode* inode, struct file* filp,
 		if (w9968cf_sensor_get_picture(cam))
 			return -EIO;
 
-		if (copy_to_user(arg, &cam->picture, sizeof(cam->picture)))
+		if (copy_to_user(user_arg, &cam->picture, sizeof(cam->picture)))
 			return -EFAULT;
 
 		DBG(5, "VIDIOCGPICT successfully called.")
@@ -3008,7 +3009,7 @@ w9968cf_v4l_ioctl(struct inode* inode, struct file* filp,
 		struct video_picture pict;
 		int err = 0;
 
-		if (copy_from_user(&pict, arg, sizeof(pict)))
+		if (copy_from_user(&pict, user_arg, sizeof(pict)))
 			return -EFAULT;
 
 		if ( (cam->force_palette || !w9968cf_vppmod_present) 
@@ -3087,7 +3088,7 @@ w9968cf_v4l_ioctl(struct inode* inode, struct file* filp,
 		struct video_window win;
 		int err = 0;
 
-		if (copy_from_user(&win, arg, sizeof(win)))
+		if (copy_from_user(&win, user_arg, sizeof(win)))
 			return -EFAULT;
 
 		DBG(6, "VIDIOCSWIN called: clipcount=%d, flags=%d, "
@@ -3141,7 +3142,7 @@ w9968cf_v4l_ioctl(struct inode* inode, struct file* filp,
 
 	case VIDIOCGWIN: /* get current window properties */
 	{
-		if (copy_to_user(arg,&cam->window,sizeof(struct video_window)))
+		if (copy_to_user(user_arg, &cam->window, sizeof(struct video_window)))
 			return -EFAULT;
 
 		DBG(5, "VIDIOCGWIN successfully called.")
@@ -3159,7 +3160,7 @@ w9968cf_v4l_ioctl(struct inode* inode, struct file* filp,
 			mbuf.offsets[i] = (unsigned long)cam->frame[i].buffer -
 			                  (unsigned long)cam->frame[0].buffer;
 
-		if (copy_to_user(arg, &mbuf, sizeof(mbuf)))
+		if (copy_to_user(user_arg, &mbuf, sizeof(mbuf)))
 			return -EFAULT;
 
 		DBG(5, "VIDIOCGMBUF successfully called.")
@@ -3172,7 +3173,7 @@ w9968cf_v4l_ioctl(struct inode* inode, struct file* filp,
 		struct w9968cf_frame_t* fr;
 		int err = 0;
 
-		if (copy_from_user(&mmap, arg, sizeof(mmap)))
+		if (copy_from_user(&mmap, user_arg, sizeof(mmap)))
 			return -EFAULT;
 
 		DBG(6, "VIDIOCMCAPTURE called: frame #%d, format=%s, %dx%d",
@@ -3295,7 +3296,7 @@ w9968cf_v4l_ioctl(struct inode* inode, struct file* filp,
 		struct w9968cf_frame_t* fr;
 		int err = 0;
 
-		if (copy_from_user(&f_num, arg, sizeof(f_num)))
+		if (copy_from_user(&f_num, user_arg, sizeof(f_num)))
 			return -EFAULT;
 
 		if (f_num >= cam->nbuffers) {
@@ -3348,7 +3349,7 @@ w9968cf_v4l_ioctl(struct inode* inode, struct file* filp,
 			.teletext = VIDEO_NO_UNIT,
 		};
 
-		if (copy_to_user(arg, &unit, sizeof(unit)))
+		if (copy_to_user(user_arg, &unit, sizeof(unit)))
 			return -EFAULT;
 
 		DBG(5, "VIDIOCGUNIT successfully called.")
@@ -3360,7 +3361,7 @@ w9968cf_v4l_ioctl(struct inode* inode, struct file* filp,
 
 	case VIDIOCGFBUF:
 	{
-		if (clear_user(arg, sizeof(struct video_buffer)))
+		if (clear_user(user_arg, sizeof(struct video_buffer)))
 			return -EFAULT;
 
 		DBG(5, "VIDIOCGFBUF successfully called.")
@@ -3370,7 +3371,7 @@ w9968cf_v4l_ioctl(struct inode* inode, struct file* filp,
 	case VIDIOCGTUNER:
 	{
 		struct video_tuner tuner;
-		if (copy_from_user(&tuner, arg, sizeof(tuner)))
+		if (copy_from_user(&tuner, user_arg, sizeof(tuner)))
 			return -EFAULT;
 
 		if (tuner.tuner != 0)
@@ -3383,7 +3384,7 @@ w9968cf_v4l_ioctl(struct inode* inode, struct file* filp,
 		tuner.mode = VIDEO_MODE_AUTO;
 		tuner.signal = 0xffff;
 
-		if (copy_to_user(arg, &tuner, sizeof(tuner)))
+		if (copy_to_user(user_arg, &tuner, sizeof(tuner)))
 			return -EFAULT;
 
 		DBG(5, "VIDIOCGTUNER successfully called.")
@@ -3393,7 +3394,7 @@ w9968cf_v4l_ioctl(struct inode* inode, struct file* filp,
 	case VIDIOCSTUNER:
 	{
 		struct video_tuner tuner;
-		if (copy_from_user(&tuner, arg, sizeof(tuner)))
+		if (copy_from_user(&tuner, user_arg, sizeof(tuner)))
 			return -EFAULT;
 
 		if (tuner.tuner != 0)

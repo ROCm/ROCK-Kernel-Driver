@@ -643,6 +643,7 @@ static int  kobil_ioctl(struct usb_serial_port *port, struct file *file,
 	unsigned char *transfer_buffer;
 	int transfer_buffer_length = 8;
 	char *settings;
+	void __user *user_arg = (void __user *)arg;
 
 	priv = usb_get_serial_port_data(port);
 	if ((priv->device_type == KOBIL_USBTWIN_PRODUCT_ID) || (priv->device_type == KOBIL_KAAN_SIM_PRODUCT_ID)) {
@@ -652,12 +653,12 @@ static int  kobil_ioctl(struct usb_serial_port *port, struct file *file,
 
 	switch (cmd) {
 	case TCGETS:   // 0x5401
-		result = verify_area(VERIFY_WRITE, (void *)arg, sizeof(struct termios));
+		result = verify_area(VERIFY_WRITE, user_arg, sizeof(struct termios));
 		if (result) {
 			dbg("%s - port %d Error in verify_area", __FUNCTION__, port->number);
 			return(result);
 		}
-		if (kernel_termios_to_user_termios((struct termios *)arg,
+		if (kernel_termios_to_user_termios((struct termios __user *)arg,
 						   &priv->internal_termios))
 			return -EFAULT;
 		return 0;
@@ -667,13 +668,13 @@ static int  kobil_ioctl(struct usb_serial_port *port, struct file *file,
 			dbg("%s - port %d Error: port->tty->termios is NULL", __FUNCTION__, port->number);
 			return -ENOTTY;
 		}
-		result = verify_area(VERIFY_READ, (void *)arg, sizeof(struct termios));
+		result = verify_area(VERIFY_READ, user_arg, sizeof(struct termios));
 		if (result) {
 			dbg("%s - port %d Error in verify_area", __FUNCTION__, port->number);
 			return result;
 		}
 		if (user_termios_to_kernel_termios(&priv->internal_termios,
-						   (struct termios *)arg))
+						   (struct termios __user *)arg))
 			return -EFAULT;
 		
 		settings = (unsigned char *) kmalloc(50, GFP_KERNEL);  

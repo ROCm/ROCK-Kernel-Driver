@@ -202,11 +202,13 @@ struct usb_hub {
 	int			error;		/* last reported error */
 	int			nerrors;	/* track consecutive errors */
 
-	struct list_head	hub_list;	/* all hubs */
 	struct list_head	event_list;	/* hubs w/data or errs ready */
+	unsigned long		event_bits[1];	/* status change bitmask */
+#if USB_MAXCHILDREN > 31 /* 8*sizeof(unsigned long) - 1 */
+#error event_bits[] is too short!
+#endif
 
 	struct usb_hub_descriptor *descriptor;	/* class descriptor */
-	struct semaphore	khubd_sem;
 	struct usb_tt		tt;		/* Transaction Translator */
 
 	u8			power_budget;	/* in 2mA units; or zero */
@@ -215,5 +217,16 @@ struct usb_hub {
 	enum hub_led_mode	indicator[USB_MAXCHILDREN];
 	struct work_struct	leds;
 };
+
+/* use this for low-powered root hubs */
+static inline void
+hub_set_power_budget (struct usb_device *hubdev, unsigned mA)
+{
+	struct usb_hub	*hub;
+
+	hub = (struct usb_hub *)
+		usb_get_intfdata (hubdev->actconfig->interface[0]);
+	hub->power_budget = min(mA,(unsigned)500)/2;
+}
 
 #endif /* __LINUX_HUB_H */

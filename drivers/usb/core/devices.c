@@ -589,6 +589,8 @@ static ssize_t usb_device_read(struct file *file, char __user *buf, size_t nbyte
 		bus = list_entry(buslist, struct usb_bus, bus_list);
 
 		/* recurse through all children of the root hub */
+		if (!bus->root_hub)
+			continue;
 		down(&bus->root_hub->serialize);
 		ret = usb_device_dump(&buf, &nbytes, &skip_bytes, ppos, bus->root_hub, bus, 0, 0, 0);
 		up(&bus->root_hub->serialize);

@@ -926,6 +926,7 @@ static int klsi_105_ioctl (struct usb_serial_port *port, struct file * file,
 			   unsigned int cmd, unsigned long arg)
 {
 	struct klsi_105_private *priv = usb_get_serial_port_data(port);
+	void __user *user_arg = (void __user *)arg;
 	
 	dbg("%scmd=0x%x", __FUNCTION__, cmd);
 
@@ -948,13 +949,12 @@ static int klsi_105_ioctl (struct usb_serial_port *port, struct file * file,
 
 	     dbg("%s - TCGETS data faked/incomplete", __FUNCTION__);
 
-	     retval = verify_area(VERIFY_WRITE, (void *)arg,
+	     retval = verify_area(VERIFY_WRITE, user_arg,
 				  sizeof(struct termios));
-
 	     if (retval)
-			 return(retval);
+			 return retval;
 
-	     if (kernel_termios_to_user_termios((struct termios *)arg,  
+	     if (kernel_termios_to_user_termios((struct termios __user *)arg,
 						&priv->termios))
 		     return -EFAULT;
 	     return(0);
@@ -965,14 +965,13 @@ static int klsi_105_ioctl (struct usb_serial_port *port, struct file * file,
 
 		dbg("%s - TCSETS not handled", __FUNCTION__);
 
-		retval = verify_area(VERIFY_READ, (void *)arg,
+		retval = verify_area(VERIFY_READ, user_arg,
 				     sizeof(struct termios));
-
 		if (retval)
-			    return(retval);
+			    return retval;
 
 		if (user_termios_to_kernel_termios(&priv->termios,
-						  (struct termios *)arg))
+						  (struct termios __user *)arg))
 			return -EFAULT;
 		klsi_105_set_termios(port, &priv->termios);
 		return(0);

@@ -134,13 +134,13 @@ ohci_dump_status (struct ohci_hcd *controller, char **next, unsigned *size)
 	struct ohci_regs	*regs = controller->regs;
 	u32			temp;
 
-	temp = readl (&regs->revision) & 0xff;
+	temp = ohci_readl (&regs->revision) & 0xff;
 	ohci_dbg_sw (controller, next, size,
 		"OHCI %d.%d, %s legacy support registers\n",
 		0x03 & (temp >> 4), (temp & 0x0f),
 		(temp & 0x10) ? "with" : "NO");
 
-	temp = readl (&regs->control);
+	temp = ohci_readl (&regs->control);
 	ohci_dbg_sw (controller, next, size,
 		"control 0x%03x%s%s%s HCFS=%s%s%s%s%s CBSR=%d\n",
 		temp,
@@ -155,7 +155,7 @@ ohci_dump_status (struct ohci_hcd *controller, char **next, unsigned *size)
 		temp & OHCI_CTRL_CBSR
 		);
 
-	temp = readl (&regs->cmdstatus);
+	temp = ohci_readl (&regs->cmdstatus);
 	ohci_dbg_sw (controller, next, size,
 		"cmdstatus 0x%05x SOC=%d%s%s%s%s\n", temp,
 		(temp & OHCI_SOC) >> 16,
@@ -166,26 +166,26 @@ ohci_dump_status (struct ohci_hcd *controller, char **next, unsigned *size)
 		);
 
 	ohci_dump_intr_mask (controller, "intrstatus",
-			readl (&regs->intrstatus), next, size);
+			ohci_readl (&regs->intrstatus), next, size);
 	ohci_dump_intr_mask (controller, "intrenable",
-			readl (&regs->intrenable), next, size);
+			ohci_readl (&regs->intrenable), next, size);
 	// intrdisable always same as intrenable
 
 	maybe_print_eds (controller, "ed_periodcurrent",
-			readl (&regs->ed_periodcurrent), next, size);
+			ohci_readl (&regs->ed_periodcurrent), next, size);
 
 	maybe_print_eds (controller, "ed_controlhead",
-			readl (&regs->ed_controlhead), next, size);
+			ohci_readl (&regs->ed_controlhead), next, size);
 	maybe_print_eds (controller, "ed_controlcurrent",
-			readl (&regs->ed_controlcurrent), next, size);
+			ohci_readl (&regs->ed_controlcurrent), next, size);
 
 	maybe_print_eds (controller, "ed_bulkhead",
-			readl (&regs->ed_bulkhead), next, size);
+			ohci_readl (&regs->ed_bulkhead), next, size);
 	maybe_print_eds (controller, "ed_bulkcurrent",
-			readl (&regs->ed_bulkcurrent), next, size);
+			ohci_readl (&regs->ed_bulkcurrent), next, size);
 
 	maybe_print_eds (controller, "donehead",
-			readl (&regs->donehead), next, size);
+			ohci_readl (&regs->donehead), next, size);
 }
 
 #define dbg_port_sw(hc,num,value,next,size) \
@@ -637,7 +637,7 @@ show_registers (struct class_device *class_dev, char *buf)
 			"hcca frame 0x%04x\n", OHCI_FRAME_NO(ohci->hcca));
 
 	/* other registers mostly affect frame timings */
-	rdata = readl (&regs->fminterval);
+	rdata = ohci_readl (&regs->fminterval);
 	temp = scnprintf (next, size,
 			"fmintvl 0x%08x %sFSMPS=0x%04x FI=0x%04x\n",
 			rdata, (rdata >> 31) ? " FIT" : "",
@@ -645,20 +645,20 @@ show_registers (struct class_device *class_dev, char *buf)
 	size -= temp;
 	next += temp;
 
-	rdata = readl (&regs->fmremaining);
+	rdata = ohci_readl (&regs->fmremaining);
 	temp = scnprintf (next, size, "fmremaining 0x%08x %sFR=0x%04x\n",
 			rdata, (rdata >> 31) ? " FRT" : "",
 			rdata & 0x3fff);
 	size -= temp;
 	next += temp;
 
-	rdata = readl (&regs->periodicstart);
+	rdata = ohci_readl (&regs->periodicstart);
 	temp = scnprintf (next, size, "periodicstart 0x%04x\n",
 			rdata & 0x3fff);
 	size -= temp;
 	next += temp;
 
-	rdata = readl (&regs->lsthresh);
+	rdata = ohci_readl (&regs->lsthresh);
 	temp = scnprintf (next, size, "lsthresh 0x%04x\n",
 			rdata & 0x3fff);
 	size -= temp;

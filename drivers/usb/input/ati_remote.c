@@ -16,6 +16,12 @@
  *
  *  Feb 2004: Torrey Hoffman <thoffman@arnor.net>
  *            Version 2.2.0
+ *  Jun 2004: Torrey Hoffman <thoffman@arnor.net>
+ *            Version 2.2.1
+ *            Added key repeat support contributed by:
+ *                Vincent Vanackere <vanackere@lif.univ-mrs.fr>
+ *            Added support for the "Lola" remote contributed by:
+ *                Seth Cohn <sethcohn@yahoo.com>
  *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * 
  *
@@ -40,6 +46,11 @@
  * These remote controls are distributed by ATI as part of their 
  * "All-In-Wonder" video card packages.  The receiver self-identifies as a 
  * "USB Receiver" with manufacturer "X10 Wireless Technology Inc".
+ *
+ * The "Lola" remote is available from X10.  See: 
+ *    http://www.x10.com/products/lola_sg1.htm
+ * The Lola is similar to the ATI remote but has no mouse support, and slightly
+ * different keys.
  *
  * It is possible to use multiple receivers and remotes on multiple computers 
  * simultaneously by configuring them to use specific channels.
@@ -90,8 +101,9 @@
  
 #define ATI_REMOTE_VENDOR_ID 	0x0bc7
 #define ATI_REMOTE_PRODUCT_ID 	0x004
+#define LOLA_REMOTE_PRODUCT_ID 	0x002
 
-#define DRIVER_VERSION 	        "2.2.0"
+#define DRIVER_VERSION 	        "2.2.1"
 #define DRIVER_AUTHOR           "Torrey Hoffman <thoffman@arnor.net>"
 #define DRIVER_DESC             "ATI/X10 RF USB Remote Control"
 
@@ -113,6 +125,7 @@ MODULE_PARM_DESC(debug, "Enable extra debug messages and information");
  
 static struct usb_device_id ati_remote_table[] = {
 	{ USB_DEVICE(ATI_REMOTE_VENDOR_ID, ATI_REMOTE_PRODUCT_ID) },
+	{ USB_DEVICE(ATI_REMOTE_VENDOR_ID, LOLA_REMOTE_PRODUCT_ID) },
 	{}	/* Terminating entry */
 };
 
@@ -134,10 +147,13 @@ static char accel[] = { 1, 2, 4, 6, 9, 13, 20 };
 
 /* Duplicate event filtering time. 
  * Sequential, identical KIND_FILTERED inputs with less than
- * FILTER_TIME jiffies between them are dropped.  
- * (HZ >> 4) == 1/16th of a second and works well for me.
+ * FILTER_TIME jiffies between them are considered as repeat
+ * events. The hardware generates 5 events for the first keypress
+ * and we have to take this into account for an accurate repeat
+ * behaviour.
+ * (HZ / 20) == 50 ms and works well for me.
  */
-#define FILTER_TIME (HZ >> 4)
+#define FILTER_TIME (HZ / 20)
 
 static DECLARE_MUTEX(disconnect_sem);
 
@@ -161,6 +177,7 @@ struct ati_remote {
 	unsigned char old_data[2];  /* Detect duplicate events */
 	unsigned long old_jiffies;
 	unsigned long acc_jiffies;  /* handle acceleration */
+	unsigned int repeat_count;
 	
 	char name[NAME_BUFSIZE];
 	char phys[NAME_BUFSIZE];
@@ -256,6 +273,12 @@ static struct
 	{KIND_FILTERED, 0xeb, 0x26, EV_KEY, KEY_FORWARD, 1},    /* (>>) */
 	{KIND_FILTERED, 0xed, 0x28, EV_KEY, KEY_STOP, 1},       /* ([]) */ 
 	{KIND_FILTERED, 0xee, 0x29, EV_KEY, KEY_PAUSE, 1},      /* ('') */
+	{KIND_FILTERED, 0xf0, 0x2b, EV_KEY, KEY_PREVIOUS, 1},   /* (<-) */
+	{KIND_FILTERED, 0xef, 0x2a, EV_KEY, KEY_NEXT, 1},       /* (>+) */
+	{KIND_FILTERED, 0xf2, 0x2D, EV_KEY, KEY_INFO, 1},       /* PLAYING */
+	{KIND_FILTERED, 0xf3, 0x2E, EV_KEY, KEY_HOME, 1},       /* TOP */
+	{KIND_FILTERED, 0xf4, 0x2F, EV_KEY, KEY_END, 1},        /* END */
+	{KIND_FILTERED, 0xf5, 0x30, EV_KEY, KEY_SELECT, 1},     /* SELECT */	
 	
 	{KIND_END, 0x00, 0x00, EV_MAX + 1, 0, 0}
 };
@@ -483,9 +506,20 @@ static void ati_remote_input_report(struct urb *urb, struct pt_regs *regs)
 		if ((ati_remote->old_data[0] == data[1]) && 
 	 		(ati_remote->old_data[1] == data[2]) && 
 	 		((ati_remote->old_jiffies + FILTER_TIME) > jiffies)) {
-			ati_remote->old_jiffies = jiffies;			
+			ati_remote->repeat_count++;
+		} 
+		else {
+			ati_remote->repeat_count = 0;
+		}
+		
+		ati_remote->old_data[0] = data[1];
+		ati_remote->old_data[1] = data[2];
+		ati_remote->old_jiffies = jiffies;
+
+		if ((ati_remote->repeat_count > 0)
+		    && (ati_remote->repeat_count < 5))
 			return;
-		}		
+		
 
 		input_regs(dev, regs);
 		input_event(dev, ati_remote_tbl[index].type,
@@ -494,9 +528,6 @@ static void ati_remote_input_report(struct urb *urb, struct pt_regs *regs)
 			ati_remote_tbl[index].code, 0);
 		input_sync(dev);
 
-		ati_remote->old_data[0] = data[1];
-		ati_remote->old_data[1] = data[2];
-		ati_remote->old_jiffies = jiffies;
 		return;
 	}			
 	
@@ -697,9 +728,9 @@ static int ati_remote_probe(struct usb_interface *interface, const struct usb_de
 
 	/* See if the offered device matches what we can accept */
 	if ((udev->descriptor.idVendor != ATI_REMOTE_VENDOR_ID) ||
-	    (udev->descriptor.idProduct != ATI_REMOTE_PRODUCT_ID)) {
+		( (udev->descriptor.idProduct != ATI_REMOTE_PRODUCT_ID) &&
+		  (udev->descriptor.idProduct != LOLA_REMOTE_PRODUCT_ID) ))
 		return -ENODEV;
-	}
 
 	/* Allocate and clear an ati_remote struct */
 	if (!(ati_remote = kmalloc(sizeof (struct ati_remote), GFP_KERNEL)))
@@ -856,4 +887,3 @@ module_exit(ati_remote_exit);
 MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
-

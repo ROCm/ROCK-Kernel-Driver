@@ -1324,12 +1324,14 @@ void hid_init_reports(struct hid_device *hid)
 	}
 
 	err = 0;
-	while ((ret = hid_wait_io(hid))) {
+	ret = hid_wait_io(hid);
+	while (ret) {
 		err |= ret;
 		if (test_bit(HID_CTRL_RUNNING, &hid->iofl))
 			usb_unlink_urb(hid->urbctrl);
 		if (test_bit(HID_OUT_RUNNING, &hid->iofl))
 			usb_unlink_urb(hid->urbout);
+		ret = hid_wait_io(hid);
 	}
 
 	if (err)

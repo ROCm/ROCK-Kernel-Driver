@@ -558,7 +558,7 @@ static int proc_control(struct dev_state *ps, void __user *arg)
 			if (usbfs_snoop) {
 				dev_info(&dev->dev, "control read: data ");
 				for (j = 0; j < ctrl.wLength; ++j)
-					printk ("%02x ", (unsigned char)((char *)ctrl.data)[j]);
+					printk ("%02x ", (unsigned char)(tbuf)[j]);
 				printk("\n");
 			}
 			if (copy_to_user(ctrl.data, tbuf, ctrl.wLength)) {
@@ -578,7 +578,7 @@ static int proc_control(struct dev_state *ps, void __user *arg)
 		if (usbfs_snoop) {
 			dev_info(&dev->dev, "control write: data: ");
 			for (j = 0; j < ctrl.wLength; ++j)
-				printk ("%02x ", (unsigned char)((char *)ctrl.data)[j]);
+				printk ("%02x ", (unsigned char)(tbuf)[j]);
 			printk("\n");
 		}
 		i = usb_control_msg(dev, usb_sndctrlpipe(dev, 0), ctrl.bRequest, ctrl.bRequestType,
