@@ -304,32 +304,22 @@ exit:
 	return retval;
 }
 
-/*
- * init_slots - initialize 'struct slot' structures for each slot
- *
- */
-static void init_slots(void)
+static int __init init_rpa(void)
 {
 	struct device_node *dn;
-
-	for (dn = find_all_nodes(); dn; dn = dn->next)
-		rpaphp_add_slot(dn);
-}
-
-static int init_rpa(void)
-{
 
 	init_MUTEX(&rpaphp_sem);
 
 	/* initialize internal data structure etc. */
-	init_slots();
+	for (dn = find_all_nodes(); dn; dn = dn->next)
+		rpaphp_add_slot(dn);
 	if (!num_slots)
 		return -ENODEV;
 
 	return 0;
 }
 
-static void cleanup_slots(void)
+static void __exit cleanup_slots(void)
 {
 	struct list_head *tmp, *n;
 	struct slot *slot;
