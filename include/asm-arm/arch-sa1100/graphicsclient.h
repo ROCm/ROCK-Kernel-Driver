@@ -63,7 +63,7 @@
 #define _ADS_UARTC		0x10140000	/* UART C */
 #define _ADS_UARTD		0x10160000	/* UART D */
 
-/* UART controll lines GPIOs */
+/* UART control lines GPIOs */
 #define GPIO_GC_UART0_RTS       GPIO_GPIO15
 #define GPIO_GC_UART1_RTS	    GPIO_GPIO17
 #define GPIO_GC_UART2_RTS	    GPIO_GPIO19
@@ -71,7 +71,7 @@
 #define GPIO_GC_UART1_CTS       GPIO_GPIO16
 #define GPIO_GC_UART2_CTS       GPIO_GPIO17
 
-/* UART controll lines IRQs */
+/* UART control lines IRQs */
 #define IRQ_GC_UART0_CTS       IRQ_GPIO14
 #define IRQ_GC_UART1_CTS       IRQ_GPIO16
 #define IRQ_GC_UART2_CTS       IRQ_GPIO17

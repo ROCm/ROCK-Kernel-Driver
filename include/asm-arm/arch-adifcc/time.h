@@ -4,6 +4,6 @@
  */
 
 /*
- * No on board timer, implemenation @ arch/arm/kernel/xscale-time.c
+ * No on board timer, implementation @ arch/arm/kernel/xscale-time.c
  */
 
