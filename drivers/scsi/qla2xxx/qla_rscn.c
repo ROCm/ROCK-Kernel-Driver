@@ -16,8 +16,6 @@
  * General Public License for more details.
  *
  */
-#include "qla_os.h"
-
 #include "qla_def.h"
 
 /**

@@ -20,6 +20,24 @@
 #ifndef __QLA_DEF_H
 #define __QLA_DEF_H
 
+#include <linux/kernel.h>
+#include <linux/init.h>
+#include <linux/types.h>
+#include <linux/module.h>
+#include <linux/list.h>
+#include <linux/pci.h>
+#include <linux/sched.h>
+#include <linux/slab.h>
+#include <linux/mempool.h>
+#include <linux/spinlock.h>
+#include <linux/completion.h>
+#include <asm/semaphore.h>
+
+#include <scsi/scsi.h>
+#include <scsi/scsi_host.h>
+#include <scsi/scsi_device.h>
+#include <scsi/scsi_cmnd.h>
+
 /* XXX(hch): move to pci_ids.h */
 #ifndef PCI_DEVICE_ID_QLOGIC_ISP2300
 #define PCI_DEVICE_ID_QLOGIC_ISP2300	0x2300
@@ -2419,5 +2437,18 @@ struct _qla2x00stats  {
 #include "qla_dbg.h"
 #include "qla_inline.h"
 #include "qla_listops.h"
+
+/*
+* String arrays
+*/
+#define LINESIZE    256
+#define MAXARGS      26
+
+#define CMD_SP(Cmnd)		((Cmnd)->SCp.ptr)
+#define CMD_COMPL_STATUS(Cmnd)  ((Cmnd)->SCp.this_residual)
+#define CMD_RESID_LEN(Cmnd)	((Cmnd)->SCp.buffers_residual)
+#define CMD_SCSI_STATUS(Cmnd)	((Cmnd)->SCp.Status)
+#define CMD_ACTUAL_SNSLEN(Cmnd)	((Cmnd)->SCp.Message)
+#define CMD_ENTRY_STATUS(Cmnd)	((Cmnd)->SCp.have_data_in)
 
 #endif

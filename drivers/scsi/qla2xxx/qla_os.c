@@ -16,9 +16,16 @@
  * General Public License for more details.
  *
  */
-
-#include "qla_os.h"
 #include "qla_def.h"
+
+#include <linux/moduleparam.h>
+#include <linux/vmalloc.h>
+#include <linux/smp_lock.h>
+
+#include <scsi/scsi_tcq.h>
+#include <scsi/scsicam.h>
+#include <scsi/scsi_transport.h>
+#include <scsi/scsi_transport_fc.h>
 
 /*
  * Driver version

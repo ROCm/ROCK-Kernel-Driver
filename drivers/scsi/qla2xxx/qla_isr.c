@@ -16,9 +16,6 @@
  * General Public License for more details.
  *
  */
-
-#include "qla_os.h"
-
 #include "qla_def.h"
 
 static void qla2x00_mbx_completion(scsi_qla_host_t *, uint16_t);

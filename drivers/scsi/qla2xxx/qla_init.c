@@ -16,8 +16,10 @@
  * General Public License for more details.
  *
  */
-#include "qla_os.h"
 #include "qla_def.h"
+
+#include <linux/delay.h>
+
 #include "qla_devtbl.h"
 
 /* XXX(hch): this is ugly, but we don't want to pull in exioctl.h */

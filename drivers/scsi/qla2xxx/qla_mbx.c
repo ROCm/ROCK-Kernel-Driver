@@ -16,11 +16,9 @@
  * General Public License for more details.
  *
  */
-
-#include "qla_os.h"
-
 #include "qla_def.h"
 
+#include <linux/delay.h>
 
 static void
 qla2x00_mbx_sem_timeout(unsigned long data)

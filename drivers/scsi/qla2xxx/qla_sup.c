@@ -17,8 +17,10 @@
  *
  ******************************************************************************/
 
-#include "qla_os.h"
 #include "qla_def.h"
+
+#include <linux/delay.h>
+#include <asm/uaccess.h>
 
 static uint16_t qla2x00_nvram_request(scsi_qla_host_t *, uint32_t);
 static void qla2x00_nv_deselect(scsi_qla_host_t *);
