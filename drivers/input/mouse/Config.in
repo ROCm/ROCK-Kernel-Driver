@@ -20,5 +20,5 @@ if [ "$CONFIG_AMIGA" = "y" ]; then
    dep_tristate '  Amiga mouse' CONFIG_MOUSE_AMIGA $CONFIG_INPUT $CONFIG_INPUT_MOUSE
 fi
 if [ "$CONFIG_ARCH_ACORN" = "y" ]; then
-   dep_tristate '  Acorn RiscPC mouse' CONFIG_MOUSE_ACORN $CONFIG_INPUT $CONFIG_INPUT_MOUSE
+   dep_tristate '  Acorn RiscPC mouse' CONFIG_MOUSE_RISCPC $CONFIG_INPUT $CONFIG_INPUT_MOUSE
 fi
