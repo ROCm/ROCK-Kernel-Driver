@@ -1854,32 +1854,31 @@ nfsd4_encode_dirent(struct readdir_cd *ccd, const char *name, int namlen,
 	 * Now we come to the ugly part: writing the fattr for this entry.
 	 */
 	nfserr = nfsd4_encode_dirent_fattr(cd, name, namlen, p, &buflen);
-	if (!nfserr) {
+	switch (nfserr) {
+	case nfs_ok:
 		p += buflen;
-		goto out;
-	}
-	if (nfserr == nfserr_resource) {
+		break;
+	case nfserr_resource:
 		nfserr = nfserr_toosmall;
 		goto fail;
+	default:
+		/*
+		 * If we get here, we experienced a miscellaneous
+		 * failure while writing the attributes.  If the
+		 * client requested the RDATTR_ERROR attribute,
+		 * we stuff the error code into this attribute
+		 * and continue.  If this attribute was not requested,
+		 * then in accordance with the spec, we fail the
+		 * entire READDIR operation(!)
+		 */
+		if (!(cd->rd_bmval[0] & FATTR4_WORD0_RDATTR_ERROR))
+			goto fail;
+		nfserr = nfserr_toosmall;
+		p = nfsd4_encode_rdattr_error(p, buflen, nfserr);
+		if (p == NULL)
+			goto fail;
 	}
 
-	/*
-	 * If we get here, we experienced a miscellaneous
-	 * failure while writing the attributes.  If the
-	 * client requested the RDATTR_ERROR attribute,
-	 * we stuff the error code into this attribute
-	 * and continue.  If this attribute was not requested,
-	 * then in accordance with the spec, we fail the
-	 * entire READDIR operation(!)
-	 */
-	if (!(cd->rd_bmval[0] & FATTR4_WORD0_RDATTR_ERROR))
-		goto fail;
-	nfserr = nfserr_toosmall;
-	p = nfsd4_encode_rdattr_error(p, buflen, nfserr);
-	if (p == NULL)
-		goto fail;
-
-out:
 	cd->buflen -= (p - cd->buffer);
 	cd->buffer = p;
 	cd->common.err = nfs_ok;
