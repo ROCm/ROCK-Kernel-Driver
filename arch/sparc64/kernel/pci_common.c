@@ -686,7 +686,7 @@ static void __init pdev_fixup_irq(struct pci_dev *pdev)
 	struct pcidev_cookie *pcp = pdev->sysdata;
 	struct pci_pbm_info *pbm = pcp->pbm;
 	struct pci_controller_info *p = pbm->parent;
-	unsigned int portid = p->portid;
+	unsigned int portid = pbm->portid;
 	unsigned int prom_irq;
 	int prom_node = pcp->prom_node;
 	int err;

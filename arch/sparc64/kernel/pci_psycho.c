@@ -348,7 +348,6 @@ static unsigned int __init psycho_irq_build(struct pci_pbm_info *pbm,
 					    struct pci_dev *pdev,
 					    unsigned int ino)
 {
-	struct pci_controller_info *p = pbm->parent;
 	struct ino_bucket *bucket;
 	unsigned long imap, iclr;
 	unsigned long imap_off, iclr_off;
@@ -373,11 +372,11 @@ static unsigned int __init psycho_irq_build(struct pci_pbm_info *pbm,
 	if (PIL_RESERVED(pil))
 		BUG();
 
-	imap = p->controller_regs + imap_off;
+	imap = pbm->controller_regs + imap_off;
 	imap += 4;
 
 	iclr_off = psycho_iclr_offset(ino);
-	iclr = p->controller_regs + iclr_off;
+	iclr = pbm->controller_regs + iclr_off;
 	iclr += 4;
 
 	if ((ino & 0x20) == 0)
@@ -444,7 +443,7 @@ static void __psycho_check_one_stc(struct pci_controller_info *p,
 				   int is_pbm_a)
 {
 	struct pci_strbuf *strbuf = &pbm->stc;
-	unsigned long regbase = p->controller_regs;
+	unsigned long regbase = p->pbm_A.controller_regs;
 	unsigned long err_base, tag_base, line_base;
 	u64 control;
 	int i;
@@ -639,7 +638,7 @@ static void psycho_check_iommu_error(struct pci_controller_info *p,
 		psycho_write(iommu->iommu_control,
 			     control | PSYCHO_IOMMU_CTRL_DENAB);
 		for (i = 0; i < 16; i++) {
-			unsigned long base = p->controller_regs;
+			unsigned long base = p->pbm_A.controller_regs;
 
 			iommu_tag[i] =
 				psycho_read(base + PSYCHO_IOMMU_TAG + (i * 8UL));
@@ -716,8 +715,8 @@ static void psycho_check_iommu_error(struct pci_controller_info *p,
 static irqreturn_t psycho_ue_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct pci_controller_info *p = dev_id;
-	unsigned long afsr_reg = p->controller_regs + PSYCHO_UE_AFSR;
-	unsigned long afar_reg = p->controller_regs + PSYCHO_UE_AFAR;
+	unsigned long afsr_reg = p->pbm_A.controller_regs + PSYCHO_UE_AFSR;
+	unsigned long afar_reg = p->pbm_A.controller_regs + PSYCHO_UE_AFAR;
 	unsigned long afsr, afar, error_bits;
 	int reported;
 
@@ -793,8 +792,8 @@ static irqreturn_t psycho_ue_intr(int irq, void *dev_id, struct pt_regs *regs)
 static irqreturn_t psycho_ce_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct pci_controller_info *p = dev_id;
-	unsigned long afsr_reg = p->controller_regs + PSYCHO_CE_AFSR;
-	unsigned long afar_reg = p->controller_regs + PSYCHO_CE_AFAR;
+	unsigned long afsr_reg = p->pbm_A.controller_regs + PSYCHO_CE_AFSR;
+	unsigned long afar_reg = p->pbm_A.controller_regs + PSYCHO_CE_AFAR;
 	unsigned long afsr, afar, error_bits;
 	int reported;
 
@@ -885,11 +884,11 @@ static irqreturn_t psycho_pcierr_intr(int irq, void *dev_id, struct pt_regs *reg
 
 	is_pbm_a = (pbm == &pbm->parent->pbm_A);
 	if (is_pbm_a) {
-		afsr_reg = p->controller_regs + PSYCHO_PCI_AFSR_A;
-		afar_reg = p->controller_regs + PSYCHO_PCI_AFAR_A;
+		afsr_reg = p->pbm_A.controller_regs + PSYCHO_PCI_AFSR_A;
+		afar_reg = p->pbm_A.controller_regs + PSYCHO_PCI_AFAR_A;
 	} else {
-		afsr_reg = p->controller_regs + PSYCHO_PCI_AFSR_B;
-		afar_reg = p->controller_regs + PSYCHO_PCI_AFAR_B;
+		afsr_reg = p->pbm_A.controller_regs + PSYCHO_PCI_AFSR_B;
+		afar_reg = p->pbm_A.controller_regs + PSYCHO_PCI_AFAR_B;
 	}
 
 	/* Latch error status. */
@@ -988,8 +987,8 @@ static irqreturn_t psycho_pcierr_intr(int irq, void *dev_id, struct pt_regs *reg
 static void __init psycho_register_error_handlers(struct pci_controller_info *p)
 {
 	struct pci_pbm_info *pbm = &p->pbm_A; /* arbitrary */
-	unsigned long base = p->controller_regs;
-	unsigned int irq, portid = p->portid;
+	unsigned long base = p->pbm_A.controller_regs;
+	unsigned int irq, portid = pbm->portid;
 	u64 tmp;
 
 	/* Build IRQs and register handlers. */
@@ -1174,26 +1173,26 @@ static void __init psycho_iommu_init(struct pci_controller_info *p)
 	iommu->iommu_cur_ctx = 0;
 
 	/* Register addresses. */
-	iommu->iommu_control  = p->controller_regs + PSYCHO_IOMMU_CONTROL;
-	iommu->iommu_tsbbase  = p->controller_regs + PSYCHO_IOMMU_TSBBASE;
-	iommu->iommu_flush    = p->controller_regs + PSYCHO_IOMMU_FLUSH;
+	iommu->iommu_control  = p->pbm_A.controller_regs + PSYCHO_IOMMU_CONTROL;
+	iommu->iommu_tsbbase  = p->pbm_A.controller_regs + PSYCHO_IOMMU_TSBBASE;
+	iommu->iommu_flush    = p->pbm_A.controller_regs + PSYCHO_IOMMU_FLUSH;
 	/* PSYCHO's IOMMU lacks ctx flushing. */
 	iommu->iommu_ctxflush = 0;
 
 	/* We use the main control register of PSYCHO as the write
 	 * completion register.
 	 */
-	iommu->write_complete_reg = p->controller_regs + PSYCHO_CONTROL;
+	iommu->write_complete_reg = p->pbm_A.controller_regs + PSYCHO_CONTROL;
 
 	/*
 	 * Invalidate TLB Entries.
 	 */
-	control = psycho_read(p->controller_regs + PSYCHO_IOMMU_CONTROL);
+	control = psycho_read(p->pbm_A.controller_regs + PSYCHO_IOMMU_CONTROL);
 	control |= PSYCHO_IOMMU_CTRL_DENAB;
-	psycho_write(p->controller_regs + PSYCHO_IOMMU_CONTROL, control);
+	psycho_write(p->pbm_A.controller_regs + PSYCHO_IOMMU_CONTROL, control);
 	for(i = 0; i < 16; i++) {
-		psycho_write(p->controller_regs + PSYCHO_IOMMU_TAG + (i * 8UL), 0);
-		psycho_write(p->controller_regs + PSYCHO_IOMMU_DATA + (i * 8UL), 0);
+		psycho_write(p->pbm_A.controller_regs + PSYCHO_IOMMU_TAG + (i * 8UL), 0);
+		psycho_write(p->pbm_A.controller_regs + PSYCHO_IOMMU_DATA + (i * 8UL), 0);
 	}
 
 	/* Leave diag mode enabled for full-flushing done
@@ -1224,16 +1223,16 @@ static void __init psycho_iommu_init(struct pci_controller_info *p)
 		iommu->alloc_info[i].next = 0;
 	}
 
-	psycho_write(p->controller_regs + PSYCHO_IOMMU_TSBBASE, __pa(tsbbase));
+	psycho_write(p->pbm_A.controller_regs + PSYCHO_IOMMU_TSBBASE, __pa(tsbbase));
 
-	control = psycho_read(p->controller_regs + PSYCHO_IOMMU_CONTROL);
+	control = psycho_read(p->pbm_A.controller_regs + PSYCHO_IOMMU_CONTROL);
 	control &= ~(PSYCHO_IOMMU_CTRL_TSBSZ | PSYCHO_IOMMU_CTRL_TBWSZ);
 	control |= (PSYCHO_IOMMU_TSBSZ_128K | PSYCHO_IOMMU_CTRL_ENAB);
-	psycho_write(p->controller_regs + PSYCHO_IOMMU_CONTROL, control);
+	psycho_write(p->pbm_A.controller_regs + PSYCHO_IOMMU_CONTROL, control);
 
 	/* If necessary, hook us up for starfire IRQ translations. */
 	if(this_is_starfire)
-		p->starfire_cookie = starfire_hookup(p->portid);
+		p->starfire_cookie = starfire_hookup(p->pbm_A.portid);
 	else
 		p->starfire_cookie = NULL;
 }
@@ -1255,28 +1254,28 @@ static void psycho_controller_hwinit(struct pci_controller_info *p)
 	u64 tmp;
 
 	/* PROM sets the IRQ retry value too low, increase it. */
-	psycho_write(p->controller_regs + PSYCHO_IRQ_RETRY, 0xff);
+	psycho_write(p->pbm_A.controller_regs + PSYCHO_IRQ_RETRY, 0xff);
 
 	/* Enable arbiter for all PCI slots. */
-	tmp = psycho_read(p->controller_regs + PSYCHO_PCIA_CTRL);
+	tmp = psycho_read(p->pbm_A.controller_regs + PSYCHO_PCIA_CTRL);
 	tmp |= PSYCHO_PCICTRL_AEN;
-	psycho_write(p->controller_regs + PSYCHO_PCIA_CTRL, tmp);
+	psycho_write(p->pbm_A.controller_regs + PSYCHO_PCIA_CTRL, tmp);
 
-	tmp = psycho_read(p->controller_regs + PSYCHO_PCIB_CTRL);
+	tmp = psycho_read(p->pbm_A.controller_regs + PSYCHO_PCIB_CTRL);
 	tmp |= PSYCHO_PCICTRL_AEN;
-	psycho_write(p->controller_regs + PSYCHO_PCIB_CTRL, tmp);
+	psycho_write(p->pbm_A.controller_regs + PSYCHO_PCIB_CTRL, tmp);
 
 	/* Disable DMA write / PIO read synchronization on
 	 * both PCI bus segments.
 	 * [ U2P Erratum 1243770, STP2223BGA data sheet ]
 	 */
-	tmp = psycho_read(p->controller_regs + PSYCHO_PCIA_DIAG);
+	tmp = psycho_read(p->pbm_A.controller_regs + PSYCHO_PCIA_DIAG);
 	tmp |= PSYCHO_PCIDIAG_DDWSYNC;
-	psycho_write(p->controller_regs + PSYCHO_PCIA_DIAG, tmp);
+	psycho_write(p->pbm_A.controller_regs + PSYCHO_PCIA_DIAG, tmp);
 
-	tmp = psycho_read(p->controller_regs + PSYCHO_PCIB_DIAG);
+	tmp = psycho_read(p->pbm_A.controller_regs + PSYCHO_PCIB_DIAG);
 	tmp |= PSYCHO_PCIDIAG_DDWSYNC;
-	psycho_write(p->controller_regs + PSYCHO_PCIB_DIAG, tmp);
+	psycho_write(p->pbm_A.controller_regs + PSYCHO_PCIB_DIAG, tmp);
 }
 
 static void __init pbm_register_toplevel_resources(struct pci_controller_info *p,
@@ -1299,7 +1298,7 @@ static void psycho_pbm_strbuf_init(struct pci_controller_info *p,
 				   struct pci_pbm_info *pbm,
 				   int is_pbm_a)
 {
-	unsigned long base = p->controller_regs;
+	unsigned long base = pbm->controller_regs;
 	u64 control;
 
 	if (is_pbm_a) {
@@ -1364,14 +1363,21 @@ static void psycho_pbm_init(struct pci_controller_info *p,
 	if (is_pbm_a) {
 		pbm = &p->pbm_A;
 		pbm->pci_first_slot = 1;
-		pbm->io_space.start = p->controller_regs + PSYCHO_IOSPACE_A;
-		pbm->mem_space.start = p->controller_regs + PSYCHO_MEMSPACE_A;
+		pbm->io_space.start = pbm->controller_regs + PSYCHO_IOSPACE_A;
+		pbm->mem_space.start = pbm->controller_regs + PSYCHO_MEMSPACE_A;
 	} else {
 		pbm = &p->pbm_B;
 		pbm->pci_first_slot = 2;
-		pbm->io_space.start = p->controller_regs + PSYCHO_IOSPACE_B;
-		pbm->mem_space.start = p->controller_regs + PSYCHO_MEMSPACE_B;
+		pbm->io_space.start = pbm->controller_regs + PSYCHO_IOSPACE_B;
+		pbm->mem_space.start = pbm->controller_regs + PSYCHO_MEMSPACE_B;
 	}
+
+	pbm->chip_type = PBM_CHIP_TYPE_PSYCHO;
+	pbm->chip_version =
+		prom_getintdefault(prom_node, "version#", 0);
+	pbm->chip_revision =
+		prom_getintdefault(prom_node, "module-revision#", 0);
+
 	pbm->io_space.end = pbm->io_space.start + PSYCHO_IOSPACE_SIZE;
 	pbm->io_space.flags = IORESOURCE_IO;
 	pbm->mem_space.end = pbm->mem_space.start + PSYCHO_MEMSPACE_SIZE;
@@ -1439,7 +1445,7 @@ void __init psycho_init(int node, char *model_name)
 
 	spin_lock_irqsave(&pci_controller_lock, flags);
 	for(p = pci_controller_root; p; p = p->next) {
-		if (p->portid == upa_portid) {
+		if (p->pbm_A.portid == upa_portid) {
 			spin_unlock_irqrestore(&pci_controller_lock, flags);
 			is_pbm_a = (p->pbm_A.prom_node == 0);
 			psycho_pbm_init(p, node, is_pbm_a);
@@ -1467,7 +1473,8 @@ void __init psycho_init(int node, char *model_name)
 	pci_controller_root = p;
 	spin_unlock_irqrestore(&pci_controller_lock, flags);
 
-	p->portid = upa_portid;
+	p->pbm_A.portid = upa_portid;
+	p->pbm_B.portid = upa_portid;
 	p->index = pci_num_controllers++;
 	p->pbms_same_domain = 0;
 	p->scan_bus = psycho_scan_bus;
@@ -1484,9 +1491,10 @@ void __init psycho_init(int node, char *model_name)
 		prom_halt();
 	}
 
-	p->controller_regs = pr_regs[2].phys_addr;
+	p->pbm_A.controller_regs = pr_regs[2].phys_addr;
+	p->pbm_B.controller_regs = pr_regs[2].phys_addr;
 	printk("PCI: Found PSYCHO, control regs at %016lx\n",
-	       p->controller_regs);
+	       p->pbm_A.controller_regs);
 
 	p->pbm_A.config_space = p->pbm_B.config_space =
 		(pr_regs[2].phys_addr + PSYCHO_CONFIGSPACE);

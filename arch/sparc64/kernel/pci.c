@@ -185,6 +185,7 @@ void pci_config_write32(u32 *addr, u32 val)
 extern void sabre_init(int, char *);
 extern void psycho_init(int, char *);
 extern void schizo_init(int, char *);
+extern void schizo_plus_init(int, char *);
 extern void tomatillo_init(int, char *);
 
 static struct {
@@ -198,6 +199,8 @@ static struct {
 	{ "pci108e,8000", psycho_init },
 	{ "SUNW,schizo", schizo_init },
 	{ "pci108e,8001", schizo_init },
+	{ "SUNW,schizo+", schizo_plus_init },
+	{ "pci108e,8002", schizo_plus_init },
 	{ "SUNW,tomatillo", tomatillo_init },
 	{ "pci108e,a801", tomatillo_init },
 };
