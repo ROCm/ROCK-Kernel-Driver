@@ -138,6 +138,7 @@ OBJDUMP		= $(CROSS_COMPILE)objdump
 MAKEFILES	= $(TOPDIR)/.config
 GENKSYMS	= /sbin/genksyms
 DEPMOD		= /sbin/depmod
+KALLSYMS	= /sbin/kallsyms
 PERL		= perl
 MODFLAGS	= -DMODULE
 CFLAGS_MODULE   = $(MODFLAGS)
@@ -291,32 +292,64 @@ boot: vmlinux
 vmlinux-objs := $(HEAD) $(INIT) $(CORE_FILES) $(LIBS) $(DRIVERS) $(NETWORKS)
 
 quiet_cmd_link_vmlinux = LD      $@
-cmd_link_vmlinux = $(LD) $(LDFLAGS) $(LDFLAGS_$(@F)) $(HEAD) $(INIT) \
-		--start-group \
-		$(CORE_FILES) \
-		$(LIBS) \
-		$(DRIVERS) \
-		$(NETWORKS) \
-		--end-group \
-		-o vmlinux
+define cmd_link_vmlinux
+	$(LD) $(LDFLAGS) $(LDFLAGS_vmlinux) $(HEAD) $(INIT) \
+	--start-group \
+	$(CORE_FILES) \
+	$(LIBS) \
+	$(DRIVERS) \
+	$(NETWORKS) \
+	--end-group \
+	$(filter $(kallsyms.o),$^) \
+	-o $@
+endef
 
 #	set -e makes the rule exit immediately on error
 
-define rule_link_vmlinux
+define rule_vmlinux
 	set -e
 	echo '  Generating build number'
-	. scripts/mkversion > .tmpversion
-	mv -f .tmpversion .version
+	. scripts/mkversion > .tmp_version
+	mv -f .tmp_version .version
 	+$(MAKE) -C init
 	$(call cmd,link_vmlinux)
 	echo 'cmd_$@ := $(cmd_link_vmlinux)' > $(@D)/.$(@F).cmd
-	$(NM) vmlinux | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > System.map
+	$(NM) $@ | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > System.map
 endef
 
 LDFLAGS_vmlinux += -T arch/$(ARCH)/vmlinux.lds.s
 
-vmlinux: $(vmlinux-objs) arch/$(ARCH)/vmlinux.lds.s FORCE
-	$(call if_changed_rule,link_vmlinux)
+#	Generate section listing all symbols and add it into vmlinux
+
+ifdef CONFIG_KALLSYMS
+
+kallsyms.o := .tmp_kallsyms.o
+
+quiet_cmd_kallsyms = KSYM    $@
+cmd_kallsyms = $(KALLSYMS) $< > $@
+
+.tmp_kallsyms.o: .tmp_vmlinux
+	$(call cmd,kallsyms)
+
+# 	After generating .tmp_vmlinux just like vmlinux, decrement the version
+#	number again, so the final vmlinux gets the same one.
+#	Ignore return value of 'expr'.
+
+define rule_.tmp_vmlinux
+	$(rule_vmlinux)
+	if expr 0`cat .version` - 1 > .tmp_version; then true; fi
+	mv -f .tmp_version .version
+endef
+
+.tmp_vmlinux: $(vmlinux-objs) arch/$(ARCH)/vmlinux.lds.s FORCE
+	$(call if_changed_rule,.tmp_vmlinux)
+
+endif
+
+#	Finally the vmlinux rule
+
+vmlinux: $(vmlinux-objs) $(kallsyms.o) arch/$(ARCH)/vmlinux.lds.s FORCE
+	$(call if_changed_rule,vmlinux)
 
 #	The actual objects are generated when descending, 
 #	make sure no implicit rule kicks in
@@ -820,7 +853,7 @@ endif # ifeq ($(filter $(noconfig_targets),$(MAKECMDGOALS)),)
 
 # FIXME Should go into a make.lib or something 
 # ===========================================================================
-echo_target = $(RELDIR)/$@
+echo_target = $@
 
 a_flags = -Wp,-MD,$(depfile) $(AFLAGS) $(NOSTDINC_FLAGS) \
 	  $(modkern_aflags) $(EXTRA_AFLAGS) $(AFLAGS_$(*F).o)

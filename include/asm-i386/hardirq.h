@@ -97,6 +97,4 @@ do {									\
   extern void synchronize_irq(unsigned int irq);
 #endif /* CONFIG_SMP */
 
-extern void show_stack(unsigned long * esp);
-
 #endif /* __ASM_HARDIRQ_H */
