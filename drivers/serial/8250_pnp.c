@@ -42,6 +42,8 @@ static const struct pnp_device_id pnp_dev_table[] = {
 	{	"ADC0001",		0	},
 	/* SXPro 288 External Data Fax Modem Plug & Play */
 	{	"ADC0002",		0	},
+	/* PROLiNK 1456VH ISA PnP K56flex Fax Modem */
+	{	"AEI0250",		0	},
 	/* Actiontec ISA PNP 56K X2 Fax Modem */
 	{	"AEI1240",		0	},
 	/* Rockwell 56K ACF II Fax+Data+Voice Modem */
