@@ -225,7 +225,6 @@ static int i2ob_install_device(struct i2o_controller *, struct i2o_device *, int
 static void i2ob_end_request(struct request *);
 static void i2ob_request(request_queue_t *);
 static int i2ob_init_iop(unsigned int);
-static request_queue_t* i2ob_get_queue(kdev_t);
 static int i2ob_query_device(struct i2ob_device *, int, int, void*, int);
 static int i2ob_evt(void *);
 
@@ -1284,14 +1283,6 @@ static int i2ob_init_iop(unsigned int unit)
 }
 
 /*
- * Get the request queue for the given device.
- */	
-static request_queue_t* i2ob_get_queue(kdev_t dev)
-{
-	return I2O_UNIT(dev).req_queue;
-}
-
-/*
  * Probe the I2O subsytem for block class devices
  */
 static void i2ob_scan(int bios)
@@ -1551,10 +1542,9 @@ void i2ob_del_device(struct i2o_controller *c, struct i2o_device *d)
 /*
  *	Have we seen a media change ?
  */
-static int i2ob_media_change(kdev_t dev)
+static int i2ob_media_change(struct gendisk *disk)
 {
-	int i=minor(dev);
-	i>>=4;
+	int i = (int)disk->private_data;
 	if(i2ob_media_change_flag[i])
 	{
 		i2ob_media_change_flag[i]=0;
@@ -1563,11 +1553,11 @@ static int i2ob_media_change(kdev_t dev)
 	return 0;
 }
 
-static int i2ob_revalidate(kdev_t dev)
+static int i2ob_revalidate(struct gendisk *disk)
 {
-	int minor = minor(dev) & ~15;
-	return i2ob_install_device(i2ob_dev[minor].controller, i2ob_dev[minor].i2odev,
-		minor);
+	int i = (int)disk->private_data;
+	return i2ob_install_device(i2ob_dev[i<<4].controller,
+				   i2ob_dev[i<<4].i2odev, i<<4);
 }
 
 /*
@@ -1616,12 +1606,12 @@ static void i2ob_reboot_event(void)
 
 static struct block_device_operations i2ob_fops =
 {
-	owner:			THIS_MODULE,
-	open:			i2ob_open,
-	release:		i2ob_release,
-	ioctl:			i2ob_ioctl,
-	check_media_change:	i2ob_media_change,
-	revalidate:		i2ob_revalidate,
+	.owner		= THIS_MODULE,
+	.open		= i2ob_open,
+	.release	= i2ob_release,
+	.ioctl		= i2ob_ioctl,
+	.media_changed	= i2ob_media_change,
+	.revalidate_disk= i2ob_revalidate,
 };
 
 /*
@@ -1650,6 +1640,9 @@ static int i2o_block_init(void)
 		struct gendisk *disk = alloc_disk(16);
 		if (!disk)
 			goto oom;
+		/* to be cleaned up */
+		disk->private_data = (void*)i;
+		disk->queue = i2ob_dev[i<<4].req_queue;
 		i2o_disk[i] = disk;
 	}
 #ifdef MODULE
@@ -1660,8 +1653,6 @@ static int i2o_block_init(void)
 	 *	Now fill in the boiler plate
 	 */
 	 
-	blk_dev[MAJOR_NR].queue = i2ob_get_queue;
-
 	for (i = 0; i < MAX_I2OB << 4; i++) {
 		i2ob_dev[i].refcnt = 0;
 		i2ob_dev[i].flags = 0;
