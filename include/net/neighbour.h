@@ -47,6 +47,7 @@
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>
 #include <linux/rcupdate.h>
+#include <linux/seq_file.h>
 
 #include <linux/err.h>
 #include <linux/sysctl.h>
@@ -139,9 +140,6 @@ struct pneigh_entry
 	u8			key[0];
 };
 
-#define NEIGH_HASHMASK		0x1F
-#define PNEIGH_HASHMASK		0xF
-
 /*
  *	neighbour table manipulation
  */
@@ -175,8 +173,11 @@ struct neigh_table
 	struct neigh_parms	*parms_list;
 	kmem_cache_t		*kmem_cachep;
 	struct neigh_statistics	stats;
-	struct neighbour	*hash_buckets[NEIGH_HASHMASK+1];
-	struct pneigh_entry	*phash_buckets[PNEIGH_HASHMASK+1];
+	struct neighbour	**hash_buckets;
+	unsigned int		hash_mask;
+	__u32			hash_rnd;
+	unsigned int		hash_chain_gc;
+	struct pneigh_entry	**phash_buckets;
 };
 
 /* flags for neigh_update() */
@@ -191,6 +192,8 @@ extern int			neigh_table_clear(struct neigh_table *tbl);
 extern struct neighbour *	neigh_lookup(struct neigh_table *tbl,
 					     const void *pkey,
 					     struct net_device *dev);
+extern struct neighbour *	neigh_lookup_nodev(struct neigh_table *tbl,
+						   const void *pkey);
 extern struct neighbour *	neigh_create(struct neigh_table *tbl,
 					     const void *pkey,
 					     struct net_device *dev);
@@ -223,6 +226,24 @@ extern int neigh_dump_info(struct sk_buff *skb, struct netlink_callback *cb);
 extern int neigh_add(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg);
 extern int neigh_delete(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg);
 extern void neigh_app_ns(struct neighbour *n);
+
+extern void neigh_for_each(struct neigh_table *tbl, void (*cb)(struct neighbour *, void *), void *cookie);
+extern void __neigh_for_each_release(struct neigh_table *tbl, int (*cb)(struct neighbour *));
+extern void pneigh_for_each(struct neigh_table *tbl, void (*cb)(struct pneigh_entry *));
+
+struct neigh_seq_state {
+	struct neigh_table *tbl;
+	void *(*neigh_sub_iter)(struct neigh_seq_state *state,
+				struct neighbour *n, loff_t *pos);
+	unsigned int bucket;
+	unsigned int flags;
+#define NEIGH_SEQ_NEIGH_ONLY	0x00000001
+#define NEIGH_SEQ_IS_PNEIGH	0x00000002
+#define NEIGH_SEQ_SKIP_NOARP	0x00000004
+};
+extern void *neigh_seq_start(struct seq_file *, loff_t *, struct neigh_table *, unsigned int);
+extern void *neigh_seq_next(struct seq_file *, void *, loff_t *);
+extern void neigh_seq_stop(struct seq_file *, void *);
 
 extern int			neigh_sysctl_register(struct net_device *dev, 
 						      struct neigh_parms *p,

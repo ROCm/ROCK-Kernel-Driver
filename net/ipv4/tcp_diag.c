@@ -68,8 +68,8 @@ void tcp_get_info(struct sock *sk, struct tcp_info *info)
 	if (tp->ecn_flags&TCP_ECN_OK)
 		info->tcpi_options |= TCPI_OPT_ECN;
 
-	info->tcpi_rto = (1000000*tp->rto)/HZ;
-	info->tcpi_ato = (1000000*tp->ack.ato)/HZ;
+	info->tcpi_rto = jiffies_to_usecs(tp->rto);
+	info->tcpi_ato = jiffies_to_usecs(tp->ack.ato);
 	info->tcpi_snd_mss = tp->mss_cache_std;
 	info->tcpi_rcv_mss = tp->ack.rcv_mss;
 
@@ -79,20 +79,20 @@ void tcp_get_info(struct sock *sk, struct tcp_info *info)
 	info->tcpi_retrans = tcp_get_pcount(&tp->retrans_out);
 	info->tcpi_fackets = tcp_get_pcount(&tp->fackets_out);
 
-	info->tcpi_last_data_sent = ((now - tp->lsndtime)*1000)/HZ;
-	info->tcpi_last_data_recv = ((now - tp->ack.lrcvtime)*1000)/HZ;
-	info->tcpi_last_ack_recv = ((now - tp->rcv_tstamp)*1000)/HZ;
+	info->tcpi_last_data_sent = jiffies_to_msecs(now - tp->lsndtime);
+	info->tcpi_last_data_recv = jiffies_to_msecs(now - tp->ack.lrcvtime);
+	info->tcpi_last_ack_recv = jiffies_to_msecs(now - tp->rcv_tstamp);
 
 	info->tcpi_pmtu = tp->pmtu_cookie;
 	info->tcpi_rcv_ssthresh = tp->rcv_ssthresh;
-	info->tcpi_rtt = ((1000000*tp->srtt)/HZ)>>3;
-	info->tcpi_rttvar = ((1000000*tp->mdev)/HZ)>>2;
+	info->tcpi_rtt = jiffies_to_usecs(tp->srtt)>>3;
+	info->tcpi_rttvar = jiffies_to_usecs(tp->mdev)>>2;
 	info->tcpi_snd_ssthresh = tp->snd_ssthresh;
 	info->tcpi_snd_cwnd = tp->snd_cwnd;
 	info->tcpi_advmss = tp->advmss;
 	info->tcpi_reordering = tp->reordering;
 
-	info->tcpi_rcv_rtt = ((1000000*tp->rcv_rtt_est.rtt)/HZ)>>3;
+	info->tcpi_rcv_rtt = jiffies_to_usecs(tp->rcv_rtt_est.rtt)>>3;
 	info->tcpi_rcv_space = tp->rcvq_space.space;
 }
 
@@ -116,7 +116,8 @@ static int tcpdiag_fill(struct sk_buff *skb, struct sock *sk,
 		if (ext & (1<<(TCPDIAG_INFO-1)))
 			info = TCPDIAG_PUT(skb, TCPDIAG_INFO, sizeof(*info));
 		
-		if (tcp_is_vegas(tp) && (ext & (1<<(TCPDIAG_VEGASINFO-1))))
+		if ((tcp_is_westwood(tp) || tcp_is_vegas(tp))
+		    && (ext & (1<<(TCPDIAG_VEGASINFO-1))))
 			vinfo = TCPDIAG_PUT(skb, TCPDIAG_VEGASINFO, sizeof(*vinfo));
 	}
 	r->tcpdiag_family = sk->sk_family;
@@ -209,10 +210,17 @@ static int tcpdiag_fill(struct sk_buff *skb, struct sock *sk,
 		tcp_get_info(sk, info);
 
 	if (vinfo) {
-		vinfo->tcpv_enabled = tp->vegas.doing_vegas_now;
-		vinfo->tcpv_rttcnt = tp->vegas.cntRTT;
-		vinfo->tcpv_rtt = tp->vegas.baseRTT;
-		vinfo->tcpv_minrtt = tp->vegas.minRTT;
+		if (tcp_is_vegas(tp)) {
+			vinfo->tcpv_enabled = tp->vegas.doing_vegas_now;
+			vinfo->tcpv_rttcnt = tp->vegas.cntRTT;
+			vinfo->tcpv_rtt = jiffies_to_usecs(tp->vegas.baseRTT);
+			vinfo->tcpv_minrtt = jiffies_to_usecs(tp->vegas.minRTT);
+		} else {
+			vinfo->tcpv_enabled = 0;
+			vinfo->tcpv_rttcnt = 0;
+			vinfo->tcpv_rtt = jiffies_to_usecs(tp->westwood.rtt);
+			vinfo->tcpv_minrtt = jiffies_to_usecs(tp->westwood.rtt_min);
+		}
 	}
 
 	nlh->nlmsg_len = skb->tail - b;

@@ -36,6 +36,7 @@
 #include <linux/spinlock.h>
 #include <linux/seq_file.h>
 #include <linux/rcupdate.h>
+#include <linux/jhash.h>
 #include <asm/atomic.h>
 #include <net/neighbour.h>
 #include <net/dst.h>
@@ -122,13 +123,7 @@ struct neigh_table dn_neigh_table = {
 
 static u32 dn_neigh_hash(const void *pkey, const struct net_device *dev)
 {
-	u32 hash_val;
-
-	hash_val = *(dn_address *)pkey;
-	hash_val ^= (hash_val >> 10);
-	hash_val ^= (hash_val >> 3);
-
-	return hash_val & NEIGH_HASHMASK;
+	return jhash_2words(*(dn_address *)pkey, 0, dn_neigh_table.hash_rnd);
 }
 
 static int dn_neigh_construct(struct neighbour *neigh)
@@ -359,27 +354,6 @@ static int dn_phase3_output(struct sk_buff *skb)
  * basically does a neigh_lookup(), but without comparing the device
  * field. This is required for the On-Ethernet cache
  */
-struct neighbour *dn_neigh_lookup(struct neigh_table *tbl, const void *ptr)
-{
-	struct neighbour *neigh;
-	u32 hash_val;
-
-	hash_val = tbl->hash(ptr, NULL);
-
-	read_lock_bh(&tbl->lock);
-	for(neigh = tbl->hash_buckets[hash_val]; neigh != NULL; neigh = neigh->next) {
-		if (memcmp(neigh->primary_key, ptr, tbl->key_len) == 0) {
-			atomic_inc(&neigh->refcnt);
-			read_unlock_bh(&tbl->lock);
-			return neigh;
-		}
-	}
-	read_unlock_bh(&tbl->lock);
-
-	return NULL;
-}
-
-
 /*
  * Any traffic on a pointopoint link causes the timer to be reset
  * for the entry in the neighbour table.
@@ -514,141 +488,66 @@ static char *dn_find_slot(char *base, int max, int priority)
 	return (*min < priority) ? (min - 6) : NULL;
 }
 
+struct elist_cb_state {
+	struct net_device *dev;
+	unsigned char *ptr;
+	unsigned char *rs;
+	int t, n;
+};
+
+static void neigh_elist_cb(struct neighbour *neigh, void *_info)
+{
+	struct elist_cb_state *s = _info;
+	struct dn_dev *dn_db;
+	struct dn_neigh *dn;
+
+	if (neigh->dev != s->dev)
+		return;
+
+	dn = (struct dn_neigh *) neigh;
+	if (!(dn->flags & (DN_NDFLAG_R1|DN_NDFLAG_R2)))
+		return;
+
+	dn_db = (struct dn_dev *) s->dev->dn_ptr;
+	if (dn_db->parms.forwarding == 1 && (dn->flags & DN_NDFLAG_R2))
+		return;
+
+	if (s->t == s->n)
+		s->rs = dn_find_slot(s->ptr, s->n, dn->priority);
+	else
+		s->t++;
+	if (s->rs == NULL)
+		return;
+
+	dn_dn2eth(s->rs, dn->addr);
+	s->rs += 6;
+	*(s->rs) = neigh->nud_state & NUD_CONNECTED ? 0x80 : 0x0;
+	*(s->rs) |= dn->priority;
+	s->rs++;
+}
+
 int dn_neigh_elist(struct net_device *dev, unsigned char *ptr, int n)
 {
-	int t = 0;
-	int i;
-	struct neighbour *neigh;
-	struct dn_neigh *dn;
-	struct neigh_table *tbl = &dn_neigh_table;
-	unsigned char *rs = ptr;
-	struct dn_dev *dn_db = (struct dn_dev *)dev->dn_ptr;
+	struct elist_cb_state state;
 
-	read_lock_bh(&tbl->lock);
+	state.dev = dev;
+	state.t = 0;
+	state.n = n;
+	state.ptr = ptr;
+	state.rs = ptr;
 
-	for(i = 0; i < NEIGH_HASHMASK; i++) {
-		for(neigh = tbl->hash_buckets[i]; neigh != NULL; neigh = neigh->next) {
-			if (neigh->dev != dev)
-				continue;
-			dn = (struct dn_neigh *)neigh;
-			if (!(dn->flags & (DN_NDFLAG_R1|DN_NDFLAG_R2)))
-				continue;
-			if (dn_db->parms.forwarding == 1 && (dn->flags & DN_NDFLAG_R2))
-				continue;
-			if (t == n)
-				rs = dn_find_slot(ptr, n, dn->priority);
-			else
-				t++;
-			if (rs == NULL)
-				continue;
-			dn_dn2eth(rs, dn->addr);
-			rs += 6;
-			*rs = neigh->nud_state & NUD_CONNECTED ? 0x80 : 0x0;
-			*rs |= dn->priority;
-			rs++;
-		}
-	}
+	neigh_for_each(&dn_neigh_table, neigh_elist_cb, &state);
 
-	read_unlock_bh(&tbl->lock);
-
-	return t;
+	return state.t;
 }
 
 
 #ifdef CONFIG_PROC_FS
 
-struct dn_neigh_iter_state {
-	int bucket;
-};
-
-static struct neighbour *neigh_get_first(struct seq_file *seq)
-{
-	struct dn_neigh_iter_state *state = seq->private;
-	struct neighbour *n = NULL;
-
-	for(state->bucket = 0;
-	    state->bucket <= NEIGH_HASHMASK;
-	    ++state->bucket) {
-		n = dn_neigh_table.hash_buckets[state->bucket];
-		if (n)
-			break;
-	}
-
-	return n;
-}
-
-static struct neighbour *neigh_get_next(struct seq_file *seq,
-					struct neighbour *n)
-{
-	struct dn_neigh_iter_state *state = seq->private;
-
-	n = n->next;
-try_again:
-	if (n)
-		goto out;
-	if (++state->bucket > NEIGH_HASHMASK)
-		goto out;
-	n = dn_neigh_table.hash_buckets[state->bucket];
-	goto try_again;
-out:
-	return n;
-}
-
-static struct neighbour *neigh_get_idx(struct seq_file *seq, loff_t *pos)
-{
-	struct neighbour *n = neigh_get_first(seq);
-
-	if (n)
-		while(*pos && (n = neigh_get_next(seq, n)))
-			--*pos;
-	return *pos ? NULL : n;
-}
-
-static void *dn_neigh_get_idx(struct seq_file *seq, loff_t pos)
-{
-	void *rc;
-	read_lock_bh(&dn_neigh_table.lock);
-	rc = neigh_get_idx(seq, &pos);
-	if (!rc) {
-		read_unlock_bh(&dn_neigh_table.lock);
-	}
-	return rc;
-}
-
-static void *dn_neigh_seq_start(struct seq_file *seq, loff_t *pos)
-{
-	return *pos ? dn_neigh_get_idx(seq, *pos - 1) : SEQ_START_TOKEN;
-}
-
-static void *dn_neigh_seq_next(struct seq_file *seq, void *v, loff_t *pos)
-{
-	void *rc;
-
-
-	if (v == SEQ_START_TOKEN) {
-		rc = dn_neigh_get_idx(seq, 0);
-		goto out;
-	}
-
-	rc = neigh_get_next(seq, v);
-	if (rc)
-		goto out;
-	read_unlock_bh(&dn_neigh_table.lock);
-out:
-	++*pos;
-	return rc;
-}
-
-static void dn_neigh_seq_stop(struct seq_file *seq, void *v)
-{
-	if (v && v != SEQ_START_TOKEN)
-		read_unlock_bh(&dn_neigh_table.lock);
-}
-
 static inline void dn_neigh_format_entry(struct seq_file *seq,
 					 struct neighbour *n)
 {
-	struct dn_neigh *dn = (struct dn_neigh *)n;
+	struct dn_neigh *dn = (struct dn_neigh *) n;
 	char buf[DN_ASCBUF_LEN];
 
 	read_lock(&n->lock);
@@ -675,10 +574,16 @@ static int dn_neigh_seq_show(struct seq_file *seq, void *v)
 	return 0;
 }
 
+static void *dn_neigh_seq_start(struct seq_file *seq, loff_t *pos)
+{
+	return neigh_seq_start(seq, pos, &dn_neigh_table,
+			       NEIGH_SEQ_NEIGH_ONLY);
+}
+
 static struct seq_operations dn_neigh_seq_ops = {
 	.start = dn_neigh_seq_start,
-	.next  = dn_neigh_seq_next,
-	.stop  = dn_neigh_seq_stop,
+	.next  = neigh_seq_next,
+	.stop  = neigh_seq_stop,
 	.show  = dn_neigh_seq_show,
 };
 
@@ -686,11 +591,12 @@ static int dn_neigh_seq_open(struct inode *inode, struct file *file)
 {
 	struct seq_file *seq;
 	int rc = -ENOMEM;
-	struct dn_neigh_iter_state *s = kmalloc(sizeof(*s), GFP_KERNEL);
+	struct neigh_seq_state *s = kmalloc(sizeof(*s), GFP_KERNEL);
 
 	if (!s)
 		goto out;
 
+	memset(s, 0, sizeof(*s));
 	rc = seq_open(file, &dn_neigh_seq_ops);
 	if (rc)
 		goto out_kfree;
