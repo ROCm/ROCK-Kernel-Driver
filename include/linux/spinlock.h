@@ -204,7 +204,7 @@ do { \
 
 #else
 
-#define preempt_get_count()	do { } while (0)
+#define preempt_get_count()	(0)
 #define preempt_disable()	do { } while (0)
 #define preempt_enable_no_resched()	do {} while(0)
 #define preempt_enable()	do { } while (0)
