@@ -1277,6 +1277,18 @@ static void release_dev(struct file * filp)
 #endif
 
 	/*
+	 * Prevent flush_to_ldisc() from rescheduling the work for later.  Then
+	 * kill any delayed work.
+	 */
+	clear_bit(TTY_DONT_FLIP, &tty->flags);
+	cancel_delayed_work(&tty->flip.work);
+
+	/*
+	 * Wait for ->hangup_work and ->flip.work handlers to terminate
+	 */
+	flush_scheduled_work();
+
+	/*
 	 * Shutdown the current line discipline, and reset it to N_TTY.
 	 * N.B. why reset ldisc when we're releasing the memory??
 	 */
@@ -1291,19 +1303,7 @@ static void release_dev(struct file * filp)
 			(o_tty->ldisc.close)(o_tty);
 		module_put(o_tty->ldisc.owner);
 		o_tty->ldisc = ldiscs[N_TTY];
-	}
-	
-	/*
-	 * Prevent flush_to_ldisc() from rescheduling the work for later.  Then
-	 * kill any delayed work.
-	 */
-	clear_bit(TTY_DONT_FLIP, &tty->flags);
-	cancel_delayed_work(&tty->flip.work);
-
-	/*
-	 * Wait for ->hangup_work and ->flip.work handlers to terminate
-	 */
-	flush_scheduled_work();
+	}	
 
 	/* 
 	 * The release_mem function takes care of the details of clearing
