@@ -67,14 +67,14 @@ avmcard *b1_alloc_card(int nr_controllers)
 
 	card = kmalloc(sizeof(*card), GFP_KERNEL);
 	if (!card)
-		return 0;
+		return NULL;
 
 	memset(card, 0, sizeof(*card));
 
         cinfo = kmalloc(sizeof(*cinfo) * nr_controllers, GFP_KERNEL);
 	if (!cinfo) {
 		kfree(card);
-		return 0;
+		return NULL;
 	}
 	memset(cinfo, 0, sizeof(*cinfo) * nr_controllers);
 
@@ -753,7 +753,7 @@ avmcard_dma_alloc(char *name, struct pci_dev *pdev, long rsize, long ssize)
  err_kfree:
 	kfree(p);
  err:
-	return 0;
+	return NULL;
 }
 
 void avmcard_dma_free(avmcard_dmainfo *p)
