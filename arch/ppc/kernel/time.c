@@ -91,7 +91,7 @@ extern unsigned long wall_jiffies;
 
 static long time_offset;
 
-spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(rtc_lock);
 
 EXPORT_SYMBOL(rtc_lock);
 

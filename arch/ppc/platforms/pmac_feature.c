@@ -63,7 +63,7 @@ extern struct device_node *k2_skiplist[2];
  * We use a single global lock to protect accesses. Each driver has
  * to take care of its own locking
  */
-static spinlock_t feature_lock  __pmacdata = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(feature_lock  __pmacdata);
 
 #define LOCK(flags)	spin_lock_irqsave(&feature_lock, flags);
 #define UNLOCK(flags)	spin_unlock_irqrestore(&feature_lock, flags);
