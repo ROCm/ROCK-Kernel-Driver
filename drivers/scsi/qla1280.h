@@ -158,6 +158,9 @@ typedef struct srb {
 	uint8_t dir;		/* direction of transfer */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,18)
 	dma_addr_t saved_dma_handle;	/* for unmap of single transfers */
+	/* NOTE: the sp->cmd will be NULL when this completion is
+	 * called, so you should know the scsi_cmnd when using this */
+	struct completion *wait;
 #endif
 
 } srb_t;

@@ -1258,280 +1258,36 @@ qla1280_queuecommand(Scsi_Cmnd * cmd, void (*fn) (Scsi_Cmnd *))
 	return 0;
 }
 
-/**************************************************************************
- *   qla1200_abort
- *     Abort the speciifed SCSI command(s).
- **************************************************************************/
-int
-qla1280_abort(Scsi_Cmnd * cmd)
+typedef enum {
+	ABORT_COMMAND,
+	ABORT_DEVICE,
+	DEVICE_RESET,
+	BUS_RESET,
+	ADAPTER_RESET,
+	FAIL
+} action_t;
+
+/* timer action for error action processor */
+static void qla1280_error_wait_timeout(unsigned long __data)
 {
-	struct scsi_qla_host *ha;
-	srb_t *sp;
-	struct Scsi_Host *host;
-	unsigned int bus, target, lun;
-	scsi_lu_t *q;
-	int return_status = SCSI_ABORT_SUCCESS;
-	int found = 0;
-	int i;
-	unsigned char *handle;
-	u16 data;
+	struct scsi_cmnd *cmd = (struct scsi_cmnd *)__data;
+	srb_t *sp = (srb_t *)CMD_SP(cmd);
 
-	ENTER("qla1280_abort");
-	ha = (struct scsi_qla_host *)cmd->device->host->hostdata;
-	host = cmd->device->host;
-
-	/* Get the SCSI request ptr */
-	sp = (srb_t *)CMD_SP(cmd);
-	handle = CMD_HANDLE(cmd);
-	if (qla1280_verbose)
-		printk(KERN_ERR "scsi(%li): ABORT Command=0x%p, handle=0x%p\n",
-		       ha->host_no, (void *) cmd, (void *) handle);
-
-	/* Check for pending interrupts. */
-	if (handle == NULL) {
-		/* we never got this command */
-		printk(KERN_INFO "qla1280: Aborting a NULL handle\n");
-		return SCSI_ABORT_NOT_RUNNING;	/* no action - we don't have command */
-	}
-	data = qla1280_debounce_register(&ha->iobase->istatus);
-	/*
-	 * The io_request_lock is held when the reset handler is called, hence
-	 * the interrupt handler cannot be running in parallel as it also
-	 * grabs the lock. No reason to play funny games with set_bit() in
-	 * order to test for interrupt handler entry as the driver used to
-	 * do here.
-	 * /Jes
-	 */
-	if (data & RISC_INT) {
-		/* put any pending command in done queue */
-		qla1280_isr(ha, &ha->done_q_first, &ha->done_q_last);
-	}
-
-	/*
-	 * This seems unnecessary, it's not used below! / Jes
-	 */
-#ifdef UNUSED
-	handle = CMD_HANDLE(cmd);
-#endif
-
-	/* Generate LU queue on bus, target, LUN */
-	bus = SCSI_BUS_32(cmd);
-	target = SCSI_TCN_32(cmd);
-	lun = SCSI_LUN_32(cmd);
-	if ((q = LU_Q(ha, bus, target, lun)) == NULL) {
-		/* No lun queue -- command must not be active */
-		printk(KERN_WARNING "qla1280 (%d:%d:%d): No LUN queue for the "
-		       "specified device\n", bus, target, lun);
-		return SCSI_ABORT_NOT_RUNNING;	/* no action - we don't have command */
-	}
-#if AUTO_ESCALATE_ABORT
-	if ((sp->flags & SRB_ABORTED)) {
-		dprintk(1, "qla1280_abort: Abort escalayted - returning "
-			"SCSI_ABORT_SNOOZE.\n");
-		return SCSI_ABORT_SNOOZE;
-	}
-#endif
-
-	if ((sp->flags & SRB_ABORT_PENDING)) {
-		if (qla1280_verbose)
-			printk(KERN_WARNING
-			       "scsi(): Command has a pending abort "
-			       "message - ABORT_PENDING.\n");
-
-		return SCSI_ABORT_PENDING;
-	}
-#if STOP_ON_ABORT
-	printk(KERN_WARNING "Scsi layer issued a ABORT command= 0x%p\n", cmd);
-	qla1280_print_scsi_cmd(2, cmd);
-#endif
-
-	/*
-	 * Normally, would would need to search our queue for the specified command
-	 * but; since our sp contains the cmd ptr, we can just remove it from our
-	 * LUN queue.
-	 */
-	if (!(sp->flags & SRB_SENT)) {
-		found++;
-		if (qla1280_verbose)
-			printk(KERN_WARNING
-			       "scsi(): Command returned from queue "
-			       "aborted.\n");
-
-		/* Remove srb from SCSI LU queue. */
-		qla1280_removeq(q, sp);
-		sp->flags |= SRB_ABORTED;
-		CMD_RESULT(cmd) = DID_ABORT << 16;
-		qla1280_done_q_put(sp, &ha->done_q_first, &ha->done_q_last);
-		return_status = SCSI_ABORT_SUCCESS;
-	} else {		/* find the command in our active list */
-		for (i = 1; i < MAX_OUTSTANDING_COMMANDS; i++) {
-			if (sp == ha->outstanding_cmds[i]) {
-				found++;
-				dprintk(1,
-					"qla1280: RISC aborting command.\n");
-				qla1280_abort_command(ha, sp);
-				return_status = SCSI_ABORT_PENDING;
-				break;
-			}
-		}
-	}
-
-#if STOP_ON_ABORT
-	qla1280_panic("qla1280_abort", ha->host);
-#endif
-	if (found == 0)
-		return_status = SCSI_ABORT_NOT_RUNNING;	/* no action - we don't have command */
-
-	dprintk(1, "qla1280_abort: Aborted status returned = 0x%x.\n",
-		return_status);
-
-	if (ha->done_q_first)
-		qla1280_done(ha, &ha->done_q_first, &ha->done_q_last);
-	if (found)
-		qla1280_restart_queues(ha);
-
-	LEAVE("qla1280_abort");
-	return return_status;
-}
-
-int
-qla1280_new_abort(Scsi_Cmnd * cmd)
-{
-	struct scsi_qla_host *ha;
-	srb_t *sp;
-	struct Scsi_Host *host;
-	int bus, target, lun;
-	scsi_lu_t *q;
-	unsigned long cpu_flags;
-	int return_status = SCSI_ABORT_SUCCESS;
-	int found = 0;
-	int i;
-	unsigned char *handle;
-	u16 data;
-
-	ENTER("qla1280_abort");
-	host = cmd->device->host;
-	ha = (struct scsi_qla_host *)host->hostdata;
-
-	/* Get the SCSI request ptr */
-	sp = (srb_t *) CMD_SP(cmd);
-	handle = CMD_HANDLE(cmd);
-	if (qla1280_verbose)
-		printk(KERN_ERR "scsi(%li): ABORT Command=0x%p, handle=0x%p\n",
-		       ha->host_no, cmd, handle);
-
-	/* Check for pending interrupts. */
-	if (handle == NULL) {
-		/* we never got this command */
-		printk(KERN_INFO "qla1280: Aborting a NULL handle\n");
-		return SUCCESS;	/* no action - we don't have command */
-	}
-
-	spin_lock_irqsave (ha->host->host_lock, cpu_flags);
-	data = qla1280_debounce_register(&ha->iobase->istatus);
-	/*
-	 * We grab the host lock in the interrupt handler to
-	 * prevent racing here.
-	 *
-	 * Then again, running the interrupt handler from here is somewhat
-	 * questionable.
-	 * /Jes
-	 */
-	if (data & RISC_INT) {
-		/* put any pending command in done queue */
-		qla1280_isr(ha, &ha->done_q_first, &ha->done_q_last);
-	}
-
-	/* Generate LU queue on bus, target, LUN */
-	bus = SCSI_BUS_32(cmd);
-	target = SCSI_TCN_32(cmd);
-	lun = SCSI_LUN_32(cmd);
-	if ((q = LU_Q(ha, bus, target, lun)) == NULL) {
-		/* No lun queue -- command must not be active */
-		printk(KERN_WARNING "qla1280 (%d:%d:%d): No LUN queue for the "
-		       "specified device\n", bus, target, lun);
-		return_status = SUCCESS;	/* no action - we don't have command */
-		goto out;
-	}
-
-	if ((sp->flags & SRB_ABORT_PENDING)) {
-		if (qla1280_verbose)
-			printk(KERN_WARNING
-			       "scsi(): Command has a pending abort "
-			       "message - ABORT_PENDING.\n");
-
-		return_status = SCSI_ABORT_PENDING;
-		goto out;
-	}
-#if STOP_ON_ABORT
-	printk(KERN_WARNING "Scsi layer issued a ABORT command= 0x%p\n", cmd);
-	qla1280_print_scsi_cmd(2, cmd);
-#endif
-
-	/*
-	 * Normally, would would need to search our queue for the specified command
-	 * but; since our sp contains the cmd ptr, we can just remove it from our
-	 * LUN queue.
-	 */
-	if (!(sp->flags & SRB_SENT)) {
-		found++;
-		if (qla1280_verbose)
-			printk(KERN_WARNING
-			       "scsi(): Command returned from queue "
-			       "aborted.\n");
-
-		/* Remove srb from SCSI LU queue. */
-		qla1280_removeq(q, sp);
-		sp->flags |= SRB_ABORTED;
-		CMD_RESULT(cmd) = DID_ABORT << 16;
-		qla1280_done_q_put(sp, &ha->done_q_first, &ha->done_q_last);
-		return_status = SUCCESS;
-	} else {		/* find the command in our active list */
-		for (i = 1; i < MAX_OUTSTANDING_COMMANDS; i++) {
-			if (sp == ha->outstanding_cmds[i]) {
-				found++;
-				dprintk(1,
-					"qla1280: RISC aborting command.\n");
-				qla1280_abort_command(ha, sp);
-				return_status = SCSI_ABORT_PENDING;
-				break;
-			}
-		}
-	}
-
-#if STOP_ON_ABORT
-	qla1280_panic("qla1280_abort", ha->host);
-#endif
-	if (found == 0)
-		return_status = SUCCESS;	/* no action - we don't have the command */
-
-	dprintk(1, "qla1280_abort: Aborted status returned = 0x%x.\n",
-		return_status);
-
-	if (ha->done_q_first)
-		qla1280_done(ha, &ha->done_q_first, &ha->done_q_last);
-	if (found)
-		qla1280_restart_queues(ha);
-
- out:
-	spin_unlock_irqrestore(ha->host->host_lock, cpu_flags);
-
-	LEAVE("qla1280_abort");
-	return return_status;
+	complete(sp->wait);
 }
 
 /**************************************************************************
- * qla1200_reset
- *    The reset function will reset the SCSI bus and abort any executing
- *    commands.
+ * qla1200_error_action
+ *    The function will attempt to perform a specified error action and
+ *    wait for the results (or time out).
  *
  * Input:
  *      cmd = Linux SCSI command packet of the command that cause the
  *            bus reset.
- *      flags = SCSI bus reset option flags (see scsi.h)
+ *      action = error action to take (see action_t)
  *
  * Returns:
- *      DID_RESET in cmd.host_byte of aborted command(s)
+ *      SUCCESS or FAIL
  *
  * Note:
  *      Resetting the bus always succeeds - is has to, otherwise the
@@ -1540,36 +1296,34 @@ qla1280_new_abort(Scsi_Cmnd * cmd)
  *      the SCSI bus reset line.
  **************************************************************************/
 int
-qla1280_reset(Scsi_Cmnd * cmd, unsigned int flags)
+qla1280_error_action(Scsi_Cmnd * cmd, action_t action)
 {
 	struct scsi_qla_host *ha;
 	int bus, target, lun;
 	srb_t *sp;
-	typedef enum {
-		ABORT_DEVICE = 1,
-		DEVICE_RESET = 2,
-		BUS_RESET = 3,
-		ADAPTER_RESET = 4,
-		RESET_DELAYED = 5,
-		FAIL = 6
-	} action_t;
-	action_t action = ADAPTER_RESET;
-	u16 data;
+	uint16_t data;
+	unsigned char *handle;
 	scsi_lu_t *q;
 	int result;
+	DECLARE_COMPLETION(wait);
+	struct timer_list timer;
 
-	ENTER("qla1280_reset");
+	ENTER("qla1280_error_action");
 	if (qla1280_verbose)
 		printk(KERN_INFO "scsi(): Resetting Cmnd=0x%p, Handle=0x%p, "
-		       "flags=0x%x\n", cmd, CMD_HANDLE(cmd), flags);
+		       "action=0x%x\n", cmd, CMD_HANDLE(cmd), action);
+
 	if (cmd == NULL) {
 		printk(KERN_WARNING
 		       "(scsi?:?:?:?) Reset called with NULL Scsi_Cmnd "
 		       "pointer, failing.\n");
-		return SCSI_RESET_SNOOZE;
+		LEAVE("qla1280_error_action");
+		return FAIL;
 	}
+
 	ha = (struct scsi_qla_host *)cmd->device->host->hostdata;
 	sp = (srb_t *)CMD_SP(cmd);
+	handle = CMD_HANDLE(cmd);
 
 #if STOP_ON_RESET
 	qla1280_panic("qla1280_reset", ha->host);
@@ -1589,27 +1343,14 @@ qla1280_reset(Scsi_Cmnd * cmd, unsigned int flags)
 	 * Determine the suggested action that the mid-level driver wants
 	 * us to perform.
 	 */
-	if (CMD_HANDLE(cmd) == NULL) {
-		/*
-		 * if mid-level driver called reset with a orphan SCSI_Cmnd
-		 * (i.e. a command that's not pending), so perform the
-		 * function specified.
-		 */
-		if (flags & SCSI_RESET_SUGGEST_HOST_RESET)
-			action = ADAPTER_RESET;
-		else
-			action = BUS_RESET;
+	if (handle == NULL) {
+		if(action == ABORT_COMMAND) {
+			/* we never got this command */
+			printk(KERN_INFO "qla1280: Aborting a NULL handle\n");
+			return SUCCESS;	/* no action - we don't have command */
+		}
 	} else {
-		/*
-		 * Mid-level driver has called reset with this SCSI_Cmnd and
-		 * its pending.
-		 */
-		if (flags & SCSI_RESET_SUGGEST_HOST_RESET)
-			action = ADAPTER_RESET;
-		else if (flags & SCSI_RESET_SUGGEST_BUS_RESET)
-			action = BUS_RESET;
-		else
-			action = DEVICE_RESET;
+		sp->wait = &wait;
 	}
 
 	bus = SCSI_BUS_32(cmd);
@@ -1617,35 +1358,66 @@ qla1280_reset(Scsi_Cmnd * cmd, unsigned int flags)
 	lun = SCSI_LUN_32(cmd);
 	q = LU_Q(ha, bus, target, lun);
 
-#if AUTO_ESCALATE_RESET
-	if ((action & DEVICE_RESET) && (q->q_flag & QLA1280_QRESET)) {
-		printk(KERN_INFO
-		       "qla1280(%ld): Bus device reset already sent to "
-		       "device, escalating.\n", ha->host_no);
-		action = BUS_RESET;
-	}
-	if ((action & DEVICE_RESET) && (sp->flags & SRB_ABORT_PENDING)) {
-		printk(KERN_INFO
-		       "qla1280(%ld):Have already attempted to reach "
-		       "device with abort device\n", ha->host_no);
-		printk(KERN_INFO "qla1280(%ld):message, will escalate to BUS "
-		       "RESET.\n", ha->host_no);
-		action = BUS_RESET;
-	}
-#endif
-
-	/*
-	 *  By this point, we want to already know what we are going to do,
-	 *  so we only need to perform the course of action.
-	 */
-	result = SCSI_RESET_ERROR;
+	/* Overloading result.  Here it means the success or fail of the
+	 * *issue* of the action.  When we return from the routine, it must
+	 * mean the actual success or fail of the action */
+	result = FAIL;
 	switch (action) {
 	case FAIL:
 		break;
 
-	case RESET_DELAYED:
-		result = SCSI_RESET_PENDING;
+	case ABORT_COMMAND:
+		if (q == NULL) {
+			/* No lun queue -- command must not be active */
+			printk(KERN_WARNING "qla1280 (%d:%d:%d): No LUN queue for the "
+			       "specified device\n", bus, target, lun);
+			break;
+		}
+		if ((sp->flags & SRB_ABORT_PENDING)) {
+			printk(KERN_WARNING
+			       "scsi(): Command has a pending abort "
+			       "message - ABORT_PENDING.\n");
+			/* This should technically be impossible since we
+			 * now wait for abort completion */
+			break;
+		}
+
+		/*
+		 * Normally, would would need to search our queue for
+		 * the specified command but; since our sp contains
+		 * the cmd ptr, we can just remove it from our LUN
+		 * queue.
+		 */
+		if (!(sp->flags & SRB_SENT)) {
+			if (qla1280_verbose)
+				printk(KERN_WARNING
+				       "scsi(): Command returned from queue "
+				       "aborted.\n");
+			
+			/* Remove srb from SCSI LU queue. */
+			qla1280_removeq(q, sp);
+			sp->flags |= SRB_ABORTED;
+			CMD_RESULT(cmd) = DID_ABORT << 16;
+			qla1280_done_q_put(sp, &ha->done_q_first, &ha->done_q_last);
+			if (ha->done_q_first)
+				qla1280_done(ha, &ha->done_q_first, &ha->done_q_last);
+			
+			qla1280_restart_queues(ha);
+			
+		} else {	/* find the command in our active list */
+			int i;
+
+			for (i = 1; i < MAX_OUTSTANDING_COMMANDS; i++) {
+				if (sp == ha->outstanding_cmds[i]) {
+					dprintk(1,
+						"qla1280: RISC aborting command.\n");
+					qla1280_abort_command(ha, sp);
+				}
+			}
+		}
 		break;
+
+
 
 	case ABORT_DEVICE:
 		ha->flags.in_reset = TRUE;
@@ -1655,7 +1427,7 @@ qla1280_reset(Scsi_Cmnd * cmd, unsigned int flags)
 			       "command.\n", ha->host_no, bus, target, lun);
 		qla1280_abort_queue_single(ha, bus, target, lun, DID_ABORT);
 		if (qla1280_abort_device(ha, bus, target, lun) == 0)
-			result = SCSI_RESET_PENDING;
+			result = SUCCESS;
 		break;
 
 	case DEVICE_RESET:
@@ -1668,7 +1440,7 @@ qla1280_reset(Scsi_Cmnd * cmd, unsigned int flags)
 			qla1280_abort_queue_single(ha, bus, target, lun,
 						   DID_ABORT);
 		if (qla1280_device_reset(ha, bus, target) == 0)
-			result = SCSI_RESET_PENDING;
+			result = SUCCESS;
 		q->q_flag |= QLA1280_QRESET;
 		break;
 
@@ -1683,24 +1455,12 @@ qla1280_reset(Scsi_Cmnd * cmd, unsigned int flags)
 				qla1280_abort_queue_single(ha, bus, target,
 							   lun, DID_RESET);
 		qla1280_bus_reset(ha, bus);
-		/*
-		 * The bus reset routine returns all the outstanding commands
-		 * back with "DID_RESET" in the status field after a short
-		 * delay by the firmware. If the mid-level time out the SCSI
-		 * reset before our delay we may need to ignore it.
-		 */
-		/* result = SCSI_RESET_PENDING | SCSI_RESET_BUS_RESET; */
-		result = SCSI_RESET_SUCCESS | SCSI_RESET_BUS_RESET;
-		/*
-		 * Wheeeee!!!
-		 */
-		mdelay(4 * 1000);
-		barrier();
-		if (flags & SCSI_RESET_SYNCHRONOUS) {
-			CMD_RESULT(cmd) = DID_BUS_BUSY << 16;
-			(*(cmd)->scsi_done)(cmd);
-		}
-		/* ha->reset_start = jiffies; */
+
+		/* wait 4 seconds */
+		schedule_timeout(4*HZ);
+
+		result = SUCCESS;
+
 		break;
 
 	case ADAPTER_RESET:
@@ -1720,7 +1480,7 @@ qla1280_reset(Scsi_Cmnd * cmd, unsigned int flags)
 		 * mid-level code can expect completions momentitarily.
 		 */
 		if (qla1280_abort_isp(ha) == 0)
-			result = SCSI_RESET_SUCCESS | SCSI_RESET_HOST_RESET;
+			result = SUCCESS;
 
 		ha->flags.reset_active = FALSE;
 	}
@@ -1730,10 +1490,78 @@ qla1280_reset(Scsi_Cmnd * cmd, unsigned int flags)
 	qla1280_restart_queues(ha);
 	ha->flags.in_reset = FALSE;
 
+	/* If we didn't manage to issue the action, or we have no
+	 * command to wait for, exit here */
+	if(result == FAIL || handle == NULL)
+		goto leave;
+
+	/* set up a timer just in case we're really jammed */
+	init_timer(&timer);
+	timer.expires = jiffies + 4*HZ;
+	timer.data = (unsigned long)cmd;
+	timer.function = qla1280_error_wait_timeout;
+	add_timer(&timer);
+
+	/* wait for the action to complete (or the timer to expire) */
+	spin_unlock_irq(ha->host->host_lock);
+	wait_for_completion(&wait);
+	del_timer_sync(&timer);
+	spin_lock_irq(ha->host->host_lock);
+	sp->wait = NULL;
+	
+	/* the only action we might get a fail for is abort */
+	if(action == ABORT_COMMAND) {
+		if(sp->flags & SRB_ABORTED)
+			result = SUCCESS;
+		else
+			result = FAILED;
+	}
+
+ leave:
 	dprintk(1, "RESET returning %d\n", result);
 
-	LEAVE("qla1280_reset");
+	LEAVE("qla1280_error_action");
 	return result;
+}
+
+/**************************************************************************
+ *   qla1200_abort
+ *     Abort the specified SCSI command(s).
+ **************************************************************************/
+int
+qla1280_eh_abort(struct scsi_cmnd * cmd)
+{
+	return qla1280_error_action(cmd, ABORT_COMMAND);
+}
+
+/**************************************************************************
+ *   qla1200_device_reset
+ *     Reset the specified SCSI device
+ **************************************************************************/
+int
+qla1280_eh_device_reset(struct scsi_cmnd *cmd)
+{
+	return qla1280_error_action(cmd, DEVICE_RESET);
+}
+
+/**************************************************************************
+ *   qla1200_bus_reset
+ *     Reset the specified bus.
+ **************************************************************************/
+int
+qla1280_eh_bus_reset(struct scsi_cmnd *cmd)
+{
+	return qla1280_error_action(cmd, BUS_RESET);
+}
+
+/**************************************************************************
+ *   qla1200_adapter_reset
+ *     Reset the specified adapter (both channels)
+ **************************************************************************/
+int
+qla1280_eh_adapter_reset(struct scsi_cmnd *cmd)
+{
+	return qla1280_error_action(cmd, ADAPTER_RESET);
 }
 
 /**************************************************************************
@@ -1965,6 +1793,9 @@ qla1280_done(struct scsi_qla_host *ha, srb_t ** done_q_first,
 		ha->actthreads--;
 
 		(*(cmd)->scsi_done)(cmd);
+
+		if(sp->wait != NULL)
+			complete(sp->wait);
 
 		qla1280_next(ha, q, bus);
 	}
@@ -4390,9 +4221,9 @@ qla1280_32bit_start_scsi(struct scsi_qla_host *ha, srb_t * sp)
 				}
 			} else {	/* No data transfer at all */
 
-				dword_ptr = (uint32_t *)(pkt + 1);
-				*dword_ptr++ = 0;
-				*dword_ptr = 0;
+				//dword_ptr = (uint32_t *)(pkt + 1);
+				//*dword_ptr++ = 0;
+				//*dword_ptr = 0;
 				dprintk(5,
 					"qla1280_32bit_start_scsi: No data, command "
 					"packet data - \n");
@@ -5972,8 +5803,10 @@ static Scsi_Host_Template driver_template = {
 	.release		= qla1280_release,
 	.info			= qla1280_info,
 	.queuecommand		= qla1280_queuecommand,
-	.abort			= qla1280_abort,
-	.reset			= qla1280_reset,
+	.eh_abort_handler	= qla1280_eh_abort,
+	.eh_device_reset_handler = qla1280_eh_device_reset,
+	.eh_bus_reset_handler	= qla1280_eh_bus_reset,
+	.eh_host_reset_handler	= qla1280_eh_adapter_reset,
 	.slave_configure	= qla1280_slave_configure,
 	.bios_param		= qla1280_biosparam,
 	.can_queue		= 255,
