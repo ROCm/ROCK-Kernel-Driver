@@ -2,7 +2,7 @@
  * File:	mca.h
  * Purpose:	Machine check handling specific defines
  *
- * Copyright (C) 1999 Silicon Graphics, Inc.
+ * Copyright (C) 1999, 2004 Silicon Graphics, Inc.
  * Copyright (C) Vijay Chander (vijay@engr.sgi.com)
  * Copyright (C) Srinivasa Thirumalachar (sprasad@engr.sgi.com)
  */
@@ -142,12 +142,6 @@ extern void ia64_os_mca_dispatch_end(void);
 extern void ia64_mca_ucmc_handler(void);
 extern void ia64_monarch_init_handler(void);
 extern void ia64_slave_init_handler(void);
-extern irqreturn_t ia64_mca_rendez_int_handler(int,void *,struct pt_regs *);
-extern irqreturn_t ia64_mca_wakeup_int_handler(int,void *,struct pt_regs *);
-extern irqreturn_t ia64_mca_cmc_int_handler(int,void *,struct pt_regs *);
-extern irqreturn_t ia64_mca_cmc_int_caller(int,void *,struct pt_regs *);
-extern irqreturn_t ia64_mca_cpe_int_handler(int,void *,struct pt_regs *);
-extern irqreturn_t ia64_mca_cpe_int_caller(int,void *,struct pt_regs *);
 extern void ia64_mca_cmc_vector_setup(void);
 extern int  ia64_mca_check_errors(void);
 
