@@ -726,7 +726,7 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes,
 		req->errors = result;
 		if (result) {
 			clear_errors = 0;
-			if (sense_valid) {
+			if (sense_valid && req->sense) {
 				/*
 				 * SG_IO wants current and deferred errors
 				 */
