@@ -1313,7 +1313,7 @@ int get_signal_to_deliver(siginfo_t *info, struct pt_regs *regs)
 			case SIGQUIT: case SIGILL: case SIGTRAP:
 			case SIGABRT: case SIGFPE: case SIGSEGV:
 			case SIGBUS: case SIGSYS: case SIGXCPU: case SIGXFSZ:
-				if (do_coredump(signr, regs))
+				if (do_coredump(signr, exit_code, regs))
 					exit_code |= 0x80;
 				/* FALLTHRU */
 
