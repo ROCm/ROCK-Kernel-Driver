@@ -140,7 +140,7 @@ static void pi_claim(PIA * pi)
 #endif
 }
 
-static void pi_unclaim(PIA * pi)
+void pi_unclaim(PIA * pi)
 {
 	pi->claimed = 0;
 #ifdef CONFIG_PARPORT
@@ -148,6 +148,8 @@ static void pi_unclaim(PIA * pi)
 		parport_release((struct pardevice *) (pi->pardev));
 #endif
 }
+
+EXPORT_SYMBOL(pi_unclaim);
 
 void pi_connect(PIA * pi)
 {

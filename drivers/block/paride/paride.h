@@ -88,6 +88,8 @@ extern void pi_write_block(PIA *pi, char * buf, int count);
 
 extern void pi_read_block(PIA *pi, char * buf, int count);
 
+extern void pi_unclaim(PIA *pi);
+
 extern void pi_connect(PIA *pi);
 
 extern void pi_disconnect(PIA *pi);

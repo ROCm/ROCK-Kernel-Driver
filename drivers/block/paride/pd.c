@@ -744,30 +744,13 @@ static int pd_ready(void)
 
 static void do_pd_request1(request_queue_t * q)
 {
-repeat:
 	pd_req = elv_next_request(q);
 	if (!pd_req)
 		return;
 
-	pd_block = pd_req->sector;
-	pd_run = pd_req->nr_sectors;
-	pd_count = pd_req->current_nr_sectors;
 	pd_current = pd_req->rq_disk->private_data;
-	if (pd_block + pd_count > get_capacity(pd_req->rq_disk)) {
-		end_request(pd_req, 0);
-		goto repeat;
-	}
 
-	pd_cmd = rq_data_dir(pd_req);
-	pd_buf = pd_req->buffer;
-	pd_retries = 0;
-
-	if (pd_cmd == READ || pd_cmd == WRITE)
-		pi_do_claimed(pd_current->pi, do_pd_io);
-	else {
-		end_request(pd_req, 0);
-		goto repeat;
-	}
+	pi_do_claimed(pd_current->pi, do_pd_io);
 }
 
 static void do_pd_request(request_queue_t * q)
@@ -815,10 +798,26 @@ static void do_pd_io(void)
 
 static void do_pd_io_start(void)
 {
+	pd_block = pd_req->sector;
+	pd_run = pd_req->nr_sectors;
+	pd_count = pd_req->current_nr_sectors;
+	if (pd_block + pd_count > get_capacity(pd_req->rq_disk)) {
+		pi_unclaim(pd_current->pi);
+		next_request(0);
+		return;
+	}
+
+	pd_cmd = rq_data_dir(pd_req);
+	pd_buf = pd_req->buffer;
+	pd_retries = 0;
+
 	if (pd_cmd == READ) {
 		do_pd_read_start();
-	} else {
+	} else if (pd_cmd == WRITE) {
 		do_pd_write_start();
+	} else {
+		pi_unclaim(pd_current->pi);
+		next_request(0);
 	}
 }
 
