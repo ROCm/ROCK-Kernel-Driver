@@ -78,6 +78,7 @@ typedef struct idescsi_pc_s {
 #define PC_DMA_IN_PROGRESS		0	/* 1 while DMA in progress */
 #define PC_WRITING			1	/* Data direction */
 #define PC_TRANSFORM			2	/* transform SCSI commands */
+#define PC_DMA_OK			4	/* Use DMA */
 
 /*
  *	SCSI command transformation layer
@@ -494,6 +495,10 @@ static ide_startstop_t idescsi_transfer_pc(ide_drive_t *drive)
 	ide_set_handler(drive, &idescsi_pc_intr, get_timeout(pc), NULL);
 	/* Send the actual packet */
 	atapi_output_bytes(drive, scsi->pc->c, 12);
+	if (test_bit (PC_DMA_OK, &pc->flags)) {
+		set_bit (PC_DMA_IN_PROGRESS, &pc->flags);
+		(void) (HWIF(drive)->ide_dma_begin(drive));
+	}
 	return ide_started;
 }
 
@@ -527,10 +532,9 @@ static ide_startstop_t idescsi_issue_pc (ide_drive_t *drive, idescsi_pc_t *pc)
 	HWIF(drive)->OUTB(bcount.b.high, IDE_BCOUNTH_REG);
 	HWIF(drive)->OUTB(bcount.b.low, IDE_BCOUNTL_REG);
 
-	if (feature.b.dma) {
-		set_bit(PC_DMA_IN_PROGRESS, &pc->flags);
-		(void) (HWIF(drive)->ide_dma_begin(drive));
-	}
+	if (feature.b.dma)
+		set_bit(PC_DMA_OK, &pc->flags);
+
 	if (test_bit(IDESCSI_DRQ_INTERRUPT, &scsi->flags)) {
 		if (HWGROUP(drive)->handler != NULL)
 			BUG();
