@@ -40,23 +40,21 @@ asmlinkage void inthandler(void);
 
 extern void *_ramvec[];
 
+/* The number of spurious interrupts */
+volatile unsigned int num_spurious;
+unsigned int local_irq_count[NR_CPUS];
+
 /* irq node variables for the 32 (potential) on chip sources */
-static irq_node_t *int_irq_list[INTERNAL_IRQS];
+static irq_node_t int_irq_list[INTERNAL_IRQS];
 
-static int int_irq_count[INTERNAL_IRQS];
 static short int_irq_ablecount[INTERNAL_IRQS];
-
-static void int_badint(int irq, void *dev_id, struct pt_regs *fp)
-{
-	num_spurious += 1;
-}
 
 /*
  * This function should be called during kernel startup to initialize
  * IRQ handling routines.
  */
 
-void M68360_init_IRQ(void)
+void init_IRQ(void)
 {
 	int i;
 	int vba = (CPM_VECTOR_BASE<<4);
@@ -128,13 +126,14 @@ void M68360_init_IRQ(void)
 
 	/* initialize handlers */
 	for (i = 0; i < INTERNAL_IRQS; i++) {
-		int_irq_list[i] = NULL;
-
-		int_irq_ablecount[i] = 0;
-		int_irq_count[i] = 0;
+		int_irq_list[i].handler = NULL;
+		int_irq_list[i].flags   = IRQ_FLG_STD;
+		int_irq_list[i].dev_id  = NULL;
+		int_irq_list[i].devname = NULL;
 	}
 }
 
+#if 0
 void M68360_insert_irq(irq_node_t **list, irq_node_t *node)
 {
 	unsigned long flags;
@@ -178,9 +177,10 @@ void M68360_delete_irq(irq_node_t **list, void *dev_id)
 	local_irq_restore(flags);
 	printk ("%s: tried to remove invalid irq\n", __FUNCTION__);
 }
+#endif
 
-int M68360_request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *),
-                         unsigned long flags, const char *devname, void *dev_id)
+int request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *),
+                unsigned long flags, const char *devname, void *dev_id)
 {
 	int mask = (1<<irq);
 
@@ -191,27 +191,22 @@ int M68360_request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_
 		return -ENXIO;
 	}
 
-	if (!int_irq_list[irq]) {
-		int_irq_list[irq] = new_irq_node();
-		int_irq_list[irq]->flags   = IRQ_FLG_STD;
-	}
-
-	if (!(int_irq_list[irq]->flags & IRQ_FLG_STD)) {
-		if (int_irq_list[irq]->flags & IRQ_FLG_LOCK) {
+	if (!(int_irq_list[irq].flags & IRQ_FLG_STD)) {
+		if (int_irq_list[irq].flags & IRQ_FLG_LOCK) {
 			printk("%s: IRQ %d from %s is not replaceable\n",
-			       __FUNCTION__, irq, int_irq_list[irq]->devname);
+			       __FUNCTION__, irq, int_irq_list[irq].devname);
 			return -EBUSY;
 		}
 		if (flags & IRQ_FLG_REPLACE) {
 			printk("%s: %s can't replace IRQ %d from %s\n",
-			       __FUNCTION__, devname, irq, int_irq_list[irq]->devname);
+			       __FUNCTION__, devname, irq, int_irq_list[irq].devname);
 			return -EBUSY;
 		}
 	}
-	int_irq_list[irq]->handler = handler;
-	int_irq_list[irq]->flags   = flags;
-	int_irq_list[irq]->dev_id  = dev_id;
-	int_irq_list[irq]->devname = devname;
+	int_irq_list[irq].handler = handler;
+	int_irq_list[irq].flags   = flags;
+	int_irq_list[irq].dev_id  = dev_id;
+	int_irq_list[irq].devname = devname;
 
 	/* enable in the CIMR */
 	if (!int_irq_ablecount[irq])
@@ -221,24 +216,25 @@ int M68360_request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_
 	return 0;
 }
 
-void M68360_free_irq(unsigned int irq, void *dev_id)
+void free_irq(unsigned int irq, void *dev_id)
 {
 	if (irq >= INTERNAL_IRQS) {
 		printk ("%s: Unknown IRQ %d\n", __FUNCTION__, irq);
 		return;
 	}
 
-	if (int_irq_list[irq]->dev_id != dev_id)
+	if (int_irq_list[irq].dev_id != dev_id)
 		printk("%s: removing probably wrong IRQ %d from %s\n",
-		       __FUNCTION__, irq, int_irq_list[irq]->devname);
-	int_irq_list[irq]->handler = int_badint;
-	int_irq_list[irq]->flags   = IRQ_FLG_STD;
-	int_irq_list[irq]->dev_id  = NULL;
-	int_irq_list[irq]->devname = NULL;
+		       __FUNCTION__, irq, int_irq_list[irq].devname);
+	int_irq_list[irq].handler = NULL;
+	int_irq_list[irq].flags   = IRQ_FLG_STD;
+	int_irq_list[irq].dev_id  = NULL;
+	int_irq_list[irq].devname = NULL;
 
 	*(volatile unsigned long *)0xfffff304 |= 1<<irq;
 }
 
+#if 0
 /*
  * Enable/disable a particular machine specific interrupt source.
  * Note that this may affect other interrupts in case of a shared interrupt.
@@ -273,6 +269,27 @@ void M68360_disable_irq(unsigned int irq)
 	/* disable the interrupt */
 	*(volatile unsigned long *)0xfffff304 |= 1<<irq;
 }
+#endif
+
+int show_interrupts(struct seq_file *p, void *v)
+{
+	int i;
+
+	for (i = 0; i < NR_IRQS; i++) {
+		if (int_irq_list[i].flags & IRQ_FLG_STD)
+			continue;
+
+		seq_printf(p, "%3d: %10u ", i, kstat_cpu(0).irqs[i]);
+		if (int_irq_list[i].flags & IRQ_FLG_LOCK)
+			seq_printf(p, "L ");
+		else
+			seq_printf(p, "  ");
+		seq_printf(p, "%s\n", int_irq_list[i].devname);
+	}
+	seq_printf(p, "   : %10u   spurious\n", num_spurious);
+
+	return 0;
+}
 
 /* The 68k family did not have a good way to determine the source
  * of interrupts until later in the family.  The EC000 core does
@@ -280,7 +297,7 @@ void M68360_disable_irq(unsigned int irq)
  * into one vector and look in the blasted mask register...
  * This code is designed to be fast, almost constant time, not clean!
  */
-void M68360_do_irq(int vec, struct pt_regs *fp)
+void process_int(int vec, struct pt_regs *fp)
 {
 	int irq;
 	int mask;
@@ -295,25 +312,14 @@ void M68360_do_irq(int vec, struct pt_regs *fp)
 	/* Bugger all that weirdness. For the moment, I seem to know where I came from;
 	 * vec is passed from a specific ISR, so I'll use it. */
 
-	if (int_irq_list[irq] && int_irq_list[irq]->handler) {
-		int_irq_list[irq]->handler(irq , int_irq_list[irq]->dev_id, fp);
-		int_irq_count[irq]++;
+	if (int_irq_list[irq].handler) {
+		int_irq_list[irq].handler(irq , int_irq_list[irq].dev_id, fp);
+		kstat_cpu(0).irqs[irq]++;
 		pquicc->intr_cisr = (1 << vec); /* indicate that irq has been serviced */
 	} else {
 		printk("unregistered interrupt %d!\nTurning it off in the CIMR...\n", irq);
 		/* *(volatile unsigned long *)0xfffff304 |= mask; */
 		pquicc->intr_cimr &= ~(1 << vec);
+		num_spurious += 1;
 	}
 }
-
-void config_M68360_irq(void)
-{
-	mach_default_handler = NULL;
-	mach_init_IRQ        = M68360_init_IRQ;
-	mach_request_irq     = M68360_request_irq;
-	mach_free_irq        = M68360_free_irq;
-	mach_enable_irq      = M68360_enable_irq;
-	mach_disable_irq     = M68360_disable_irq;
-	mach_process_int     = M68360_do_irq;
-}
-
