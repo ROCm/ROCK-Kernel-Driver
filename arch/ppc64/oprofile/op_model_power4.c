@@ -17,7 +17,7 @@
 #include <asm/systemcfg.h>
 #include <asm/rtas.h>
 
-#define dbg(args...) printk(args)
+#define dbg(args...)
 
 #include "op_impl.h"
 
