@@ -71,6 +71,8 @@
  *   - make device locking interruptible
  * 2004-04-30 - 0.95 Juergen Stuber <starblue@users.sourceforge.net>
  *   - check for valid udev on resubmitting and unlinking urbs
+ * 2004-08-03 - 0.96 Juergen Stuber <starblue@users.sourceforge.net>
+ *   - move reset into open to clean out spurious data
  */
 
 #include <linux/config.h>
@@ -98,7 +100,7 @@
 
 
 /* Version Information */
-#define DRIVER_VERSION "v0.95"
+#define DRIVER_VERSION "v0.96"
 #define DRIVER_AUTHOR "Juergen Stuber <starblue@sourceforge.net>"
 #define DRIVER_DESC "LEGO USB Tower Driver"
 
@@ -341,6 +343,8 @@ static int tower_open (struct inode *inode, struct file *file)
 	int subminor;
 	int retval = 0;
 	struct usb_interface *interface;
+	struct tower_reset_reply reset_reply;
+	int result;
 
 	dbg(2, "%s: enter", __FUNCTION__);
 
@@ -376,6 +380,22 @@ static int tower_open (struct inode *inode, struct file *file)
 		goto unlock_exit;
 	}
 	dev->open_count = 1;
+
+	/* reset the tower */
+	result = usb_control_msg (dev->udev,
+				  usb_rcvctrlpipe(dev->udev, 0),
+				  LEGO_USB_TOWER_REQUEST_RESET,
+				  USB_TYPE_VENDOR | USB_DIR_IN | USB_RECIP_DEVICE,
+				  0,
+				  0,
+				  &reset_reply,
+				  sizeof(reset_reply),
+				  HZ);
+	if (result < 0) {
+		err("LEGO USB Tower reset control request failed");
+		retval = result;
+		goto unlock_exit;
+	}
 
 	/* initialize in direction */
 	dev->read_buffer_length = 0;
@@ -827,7 +847,6 @@ static int tower_probe (struct usb_interface *interface, const struct usb_device
 	struct lego_usb_tower *dev = NULL;
 	struct usb_host_interface *iface_desc;
 	struct usb_endpoint_descriptor* endpoint;
-	struct tower_reset_reply reset_reply;
 	struct tower_get_version_reply get_version_reply;
 	int i;
 	int retval = -ENOMEM;
@@ -949,22 +968,6 @@ static int tower_probe (struct usb_interface *interface, const struct usb_device
 
 	/* let the user know what node this device is now attached to */
 	info ("LEGO USB Tower #%d now attached to major %d minor %d", (dev->minor - LEGO_USB_TOWER_MINOR_BASE), USB_MAJOR, dev->minor);
-
-	/* reset the tower */
-	result = usb_control_msg (udev,
-				  usb_rcvctrlpipe(udev, 0),
-				  LEGO_USB_TOWER_REQUEST_RESET,
-				  USB_TYPE_VENDOR | USB_DIR_IN | USB_RECIP_DEVICE,
-				  0,
-				  0,
-				  &reset_reply,
-				  sizeof(reset_reply),
-				  HZ);
-	if (result < 0) {
-		err("LEGO USB Tower reset control request failed");
-		retval = result;
-		goto error;
-	}
 
 	/* get the firmware version and log it */
 	result = usb_control_msg (udev,
