@@ -84,27 +84,6 @@ unsigned long usbvideo_uvirt_to_kva(pgd_t *pgd, unsigned long adr)
 	return ret;
 }
 
-unsigned long usbvideo_uvirt_to_bus(unsigned long adr)
-{
-	unsigned long kva, ret;
-
-	kva = usbvideo_uvirt_to_kva(pgd_offset(current->mm, adr), adr);
-	ret = virt_to_bus((void *)kva);
-	MDEBUG(printk("uv2b(%lx-->%lx)", adr, ret));
-	return ret;
-}
-
-unsigned long usbvideo_kvirt_to_bus(unsigned long adr)
-{
-	unsigned long va, kva, ret;
-
-	va = VMALLOC_VMADDR(adr);
-	kva = usbvideo_uvirt_to_kva(pgd_offset_k(va), va);
-	ret = virt_to_bus((void *)kva);
-	MDEBUG(printk("kv2b(%lx-->%lx)", adr, ret));
-	return ret;
-}
-
 /*
  * Here we want the physical address of the memory.
  * This is used when initializing the contents of the

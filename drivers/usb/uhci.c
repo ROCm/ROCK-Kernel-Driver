@@ -1594,9 +1594,7 @@ out:
 	}
 
 	uhci_unlink_generic(uhci, urb);
-	uhci_destroy_urb_priv(urb);
-
-	usb_dec_dev_use(urb->dev);
+	uhci_call_completion(urb);
 
 	return ret;
 }

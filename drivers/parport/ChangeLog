@@ -1,3 +1,23 @@
+2001-10-10  Tim Waugh  <twaugh@redhat.com>
+
+	* parport_pc.c: Support for OX16PCI954 PCI card.
+
+2001-10-10  Tim Waugh  <twaugh@redhat.com>
+
+	* parport_pc.c: Support for OX12PCI840 PCI card (reported by
+	mk@daveg.com).  Lock-ups diagnosed by Ronnie Arosa (and now we
+	just don't trust its ECR).
+
+2001-10-10  Gunther Mayer  <gunther.mayer@braunschweig.okersurf.de>
+
+	* parport_pc.c: Support for AVLAB cards.
+
+2001-10-10  Tim Waugh  <twaugh@redhat.com>
+
+	* ieee1284_ops.c (ecp_forward_to_reverse, ecp_reverse_to_forward):
+	Remember to retry direction switch if it fails.  Patch from David
+	Lambert.
+
 2001-10-08  David C. Hansen  <haveblue@us.ibm.com>
 
 	* share.c: Make driverlist_lock and parportlist_lock static.

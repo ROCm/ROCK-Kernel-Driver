@@ -1,4 +1,4 @@
-/* $Id: riowatchdog.c,v 1.2 2001/03/26 23:47:18 davem Exp $
+/* $Id: riowatchdog.c,v 1.3 2001/10/08 22:19:51 davem Exp $
  * riowatchdog.c - driver for hw watchdog inside Super I/O of RIO
  *
  * Copyright (C) 2001 David S. Miller (davem@redhat.com)
@@ -47,6 +47,7 @@
 MODULE_AUTHOR("David S. Miller <davem@redhat.com>");
 MODULE_DESCRIPTION("Hardware watchdog driver for Sun RIO");
 MODULE_SUPPORTED_DEVICE("watchdog");
+MODULE_LICENSE("GPL");
 
 #define RIOWD_NAME	"pmc"
 #define RIOWD_MINOR	215

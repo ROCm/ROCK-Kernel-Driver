@@ -1,4 +1,4 @@
-/* $Id: rtc.c,v 1.27 2001/08/13 14:40:08 davem Exp $
+/* $Id: rtc.c,v 1.28 2001/10/08 22:19:51 davem Exp $
  *
  * Linux/SPARC Real Time Clock Driver
  * Copyright (C) 1996 Thomas K. Dyas (tdyas@eden.rutgers.edu)
@@ -174,3 +174,4 @@ static void __exit rtc_sun_cleanup(void)
 
 module_init(rtc_sun_init);
 module_exit(rtc_sun_cleanup);
+MODULE_LICENSE("GPL");

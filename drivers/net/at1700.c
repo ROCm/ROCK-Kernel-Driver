@@ -158,7 +158,7 @@ struct net_local {
 extern int at1700_probe(struct net_device *dev);
 
 static int at1700_probe1(struct net_device *dev, int ioaddr);
-static int read_eeprom(int ioaddr, int location);
+static int read_eeprom(long ioaddr, int location);
 static int net_open(struct net_device *dev);
 static int	net_send_packet(struct sk_buff *skb, struct net_device *dev);
 static void net_interrupt(int irq, void *dev_id, struct pt_regs *regs);

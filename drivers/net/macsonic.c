@@ -168,6 +168,8 @@ int __init macsonic_init(struct net_device* dev)
 	if ((lp->rba = (char *)
 	     kmalloc(SONIC_NUM_RRS * SONIC_RBSIZE, GFP_KERNEL | GFP_DMA)) == NULL) {
 		printk(KERN_ERR "%s: couldn't allocate receive buffers\n", dev->name);
+		kfree(lp->sonic_desc);
+		lp->sonic_desc = NULL;
 		return -ENOMEM;
 	}
 
@@ -322,7 +324,7 @@ int __init mac_onboard_sonic_probe(struct net_device* dev)
 		/* methinks this will always be true but better safe than sorry */
 		if (dev->priv == NULL) {
 			dev->priv = kmalloc(sizeof(struct sonic_local), GFP_KERNEL);
-			if (!dev->priv) /* FIXME: kfree dev if necessary */
+			if (!dev->priv)
 				return -ENOMEM;
 		}
 	} else {
@@ -518,9 +520,14 @@ int __init mac_nubus_sonic_probe(struct net_device* dev)
 
 	if (dev) {
 		dev = init_etherdev(dev, sizeof(struct sonic_local));
+		if (!dev)
+			return -ENOMEM;
 		/* methinks this will always be true but better safe than sorry */
-		if (dev->priv == NULL)
+		if (dev->priv == NULL) {
 			dev->priv = kmalloc(sizeof(struct sonic_local), GFP_KERNEL);
+			if (!dev->priv) /* FIXME: kfree dev if necessary */
+				return -ENOMEM;
+		}
 	} else {
 		dev = init_etherdev(NULL, sizeof(struct sonic_local));
 	}

@@ -1,4 +1,4 @@
-/* $Id: dbri.c,v 1.26 2001/05/21 01:25:22 davem Exp $
+/* $Id: dbri.c,v 1.27 2001/10/08 22:19:50 davem Exp $
  * drivers/sbus/audio/dbri.c
  *
  * Copyright (C) 1997 Rudolf Koenig (rfkoenig@immd4.informatik.uni-erlangen.de)
@@ -2377,6 +2377,8 @@ static void __exit dbri_exit(void)
 
 module_init(dbri_init);
 module_exit(dbri_exit);
+MODULE_LICENSE("GPL");
+
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.
  * Emacs will notice this stuff at the end of the file and automatically

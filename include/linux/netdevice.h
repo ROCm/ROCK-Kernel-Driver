@@ -636,6 +636,41 @@ static inline void netif_device_attach(struct net_device *dev)
 	}
 }
 
+/*
+ * Network interface message level settings
+ */
+#define HAVE_NETIF_MSG 1
+
+enum {
+	NETIF_MSG_DRV		= 0x0001,
+	NETIF_MSG_PROBE		= 0x0002,
+	NETIF_MSG_LINK		= 0x0004,
+	NETIF_MSG_TIMER		= 0x0008,
+	NETIF_MSG_IFDOWN	= 0x0010,
+	NETIF_MSG_IFUP		= 0x0020,
+	NETIF_MSG_RX_ERR	= 0x0040,
+	NETIF_MSG_TX_ERR	= 0x0080,
+	NETIF_MSG_TX_QUEUED	= 0x0100,
+	NETIF_MSG_INTR		= 0x0200,
+	NETIF_MSG_TX_DONE	= 0x0400,
+	NETIF_MSG_RX_STATUS	= 0x0800,
+	NETIF_MSG_PKTDATA	= 0x1000,
+};
+
+#define netif_msg_drv(p)	((p)->msg_enable & NETIF_MSG_DRV)
+#define netif_msg_probe(p)	((p)->msg_enable & NETIF_MSG_PROBE)
+#define netif_msg_link(p)	((p)->msg_enable & NETIF_MSG_LINK)
+#define netif_msg_timer(p)	((p)->msg_enable & NETIF_MSG_TIMER)
+#define netif_msg_ifdown(p)	((p)->msg_enable & NETIF_MSG_IFDOWN)
+#define netif_msg_ifup(p)	((p)->msg_enable & NETIF_MSG_IFUP)
+#define netif_msg_rx_err(p)	((p)->msg_enable & NETIF_MSG_RX_ERR)
+#define netif_msg_tx_err(p)	((p)->msg_enable & NETIF_MSG_TX_ERR)
+#define netif_msg_tx_queued(p)	((p)->msg_enable & NETIF_MSG_TX_QUEUED)
+#define netif_msg_intr(p)	((p)->msg_enable & NETIF_MSG_INTR)
+#define netif_msg_tx_done(p)	((p)->msg_enable & NETIF_MSG_TX_DONE)
+#define netif_msg_rx_status(p)	((p)->msg_enable & NETIF_MSG_RX_STATUS)
+#define netif_msg_pktdata(p)	((p)->msg_enable & NETIF_MSG_PKTDATA)
+
 /* These functions live elsewhere (drivers/net/net_init.c, but related) */
 
 extern void		ether_setup(struct net_device *dev);

@@ -743,13 +743,15 @@ static void keyspan_pda_close(struct usb_serial_port *port, struct file *filp)
 	--port->open_count;
 
 	if (port->open_count <= 0) {
-		/* the normal serial device seems to always shut off DTR and RTS now */
-		if (port->tty->termios->c_cflag & HUPCL)
-			keyspan_pda_set_modem_info(serial, 0);
+		if (serial->dev) {
+			/* the normal serial device seems to always shut off DTR and RTS now */
+			if (port->tty->termios->c_cflag & HUPCL)
+				keyspan_pda_set_modem_info(serial, 0);
 
-		/* shutdown our bulk reads and writes */
-		usb_unlink_urb (port->write_urb);
-		usb_unlink_urb (port->interrupt_in_urb);
+			/* shutdown our bulk reads and writes */
+			usb_unlink_urb (port->write_urb);
+			usb_unlink_urb (port->interrupt_in_urb);
+		}
 		port->active = 0;
 		port->open_count = 0;
 	}

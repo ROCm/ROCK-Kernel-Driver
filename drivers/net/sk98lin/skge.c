@@ -228,7 +228,7 @@
  *		<linux/string.h>
  *		<linux/errno.h>
  *		<linux/ioport.h>
- *		<linux/malloc.h>
+ *		<linux/slab.h>
  *		<linux/interrupt.h>
  *		<linux/pci.h>
  *		<asm/byteorder.h>

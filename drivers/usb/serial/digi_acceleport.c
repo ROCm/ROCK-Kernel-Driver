@@ -1591,53 +1591,55 @@ dbg( "digi_close: TOP: port=%d, active=%d, open_count=%d", priv->dp_port_num, po
 	if( tty->ldisc.flush_buffer )
 		tty->ldisc.flush_buffer( tty );
 
-	/* wait for transmit idle */
-	if( (filp->f_flags&(O_NDELAY|O_NONBLOCK)) == 0 ) {
-		digi_transmit_idle( port, DIGI_CLOSE_TIMEOUT );
+	if (port->serial->dev) {
+		/* wait for transmit idle */
+		if( (filp->f_flags&(O_NDELAY|O_NONBLOCK)) == 0 ) {
+			digi_transmit_idle( port, DIGI_CLOSE_TIMEOUT );
+		}
+
+		/* drop DTR and RTS */
+		digi_set_modem_signals( port, 0, 0 );
+
+		/* disable input flow control */
+		buf[0] = DIGI_CMD_SET_INPUT_FLOW_CONTROL;
+		buf[1] = priv->dp_port_num;
+		buf[2] = DIGI_DISABLE;
+		buf[3] = 0;
+
+		/* disable output flow control */
+		buf[4] = DIGI_CMD_SET_OUTPUT_FLOW_CONTROL;
+		buf[5] = priv->dp_port_num;
+		buf[6] = DIGI_DISABLE;
+		buf[7] = 0;
+
+		/* disable reading modem signals automatically */
+		buf[8] = DIGI_CMD_READ_INPUT_SIGNALS;
+		buf[9] = priv->dp_port_num;
+		buf[10] = DIGI_DISABLE;
+		buf[11] = 0;
+
+		/* disable receive */
+		buf[12] = DIGI_CMD_RECEIVE_ENABLE;
+		buf[13] = priv->dp_port_num;
+		buf[14] = DIGI_DISABLE;
+		buf[15] = 0;
+
+		/* flush fifos */
+		buf[16] = DIGI_CMD_IFLUSH_FIFO;
+		buf[17] = priv->dp_port_num;
+		buf[18] = DIGI_FLUSH_TX | DIGI_FLUSH_RX;
+		buf[19] = 0;
+
+		if( (ret=digi_write_oob_command( port, buf, 20, 0 )) != 0 )
+			dbg( "digi_close: write oob failed, ret=%d", ret );
+
+		/* wait for final commands on oob port to complete */
+		interruptible_sleep_on_timeout( &priv->dp_flush_wait,
+			DIGI_CLOSE_TIMEOUT );
+
+		/* shutdown any outstanding bulk writes */
+		usb_unlink_urb (port->write_urb);
 	}
-
-	/* drop DTR and RTS */
-	digi_set_modem_signals( port, 0, 0 );
-
-	/* disable input flow control */
-	buf[0] = DIGI_CMD_SET_INPUT_FLOW_CONTROL;
-	buf[1] = priv->dp_port_num;
-	buf[2] = DIGI_DISABLE;
-	buf[3] = 0;
-
-	/* disable output flow control */
-	buf[4] = DIGI_CMD_SET_OUTPUT_FLOW_CONTROL;
-	buf[5] = priv->dp_port_num;
-	buf[6] = DIGI_DISABLE;
-	buf[7] = 0;
-
-	/* disable reading modem signals automatically */
-	buf[8] = DIGI_CMD_READ_INPUT_SIGNALS;
-	buf[9] = priv->dp_port_num;
-	buf[10] = DIGI_DISABLE;
-	buf[11] = 0;
-
-	/* disable receive */
-	buf[12] = DIGI_CMD_RECEIVE_ENABLE;
-	buf[13] = priv->dp_port_num;
-	buf[14] = DIGI_DISABLE;
-	buf[15] = 0;
-
-	/* flush fifos */
-	buf[16] = DIGI_CMD_IFLUSH_FIFO;
-	buf[17] = priv->dp_port_num;
-	buf[18] = DIGI_FLUSH_TX | DIGI_FLUSH_RX;
-	buf[19] = 0;
-
-	if( (ret=digi_write_oob_command( port, buf, 20, 0 )) != 0 )
-		dbg( "digi_close: write oob failed, ret=%d", ret );
-
-	/* wait for final commands on oob port to complete */
-	interruptible_sleep_on_timeout( &priv->dp_flush_wait,
-		DIGI_CLOSE_TIMEOUT );
-
-	/* shutdown any outstanding bulk writes */
-	usb_unlink_urb (port->write_urb);
 
 	tty->closing = 0;
 

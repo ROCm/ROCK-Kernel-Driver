@@ -1,4 +1,4 @@
-/* $Id: systbls.S,v 1.99 2000/08/12 20:49:49 jj Exp $
+/* $Id: systbls.S,v 1.100 2001/10/09 10:54:38 davem Exp $
  * systbls.S: System call entry point tables for OS compatibility.
  *            The native Linux system call table lives here also.
  *
@@ -46,7 +46,7 @@ sys_call_table:
 /*125*/	.long sys_nis_syscall, sys_setreuid16, sys_setregid16, sys_rename, sys_truncate
 /*130*/	.long sys_ftruncate, sys_flock, sys_lstat64, sys_nis_syscall, sys_nis_syscall
 /*135*/	.long sys_nis_syscall, sys_mkdir, sys_rmdir, sys_utimes, sys_stat64
-/*140*/	.long sys_nis_syscall, sys_nis_syscall, sys_nis_syscall, sys_nis_syscall, sys_getrlimit
+/*140*/	.long sys_nis_syscall, sys_nis_syscall, sys_nis_syscall, sys_gettid, sys_getrlimit
 /*145*/	.long sys_setrlimit, sys_pivot_root, sys_prctl, sys_pciconfig_read, sys_pciconfig_write
 /*150*/	.long sys_nis_syscall, sys_nis_syscall, sys_nis_syscall, sys_poll, sys_getdents64
 /*155*/	.long sys_fcntl64, sys_nis_syscall, sys_statfs, sys_fstatfs, sys_oldumount

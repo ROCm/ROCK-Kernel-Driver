@@ -1,4 +1,4 @@
-/* $Id: audio.c,v 1.61 2001/08/13 14:40:12 davem Exp $
+/* $Id: audio.c,v 1.62 2001/10/08 22:19:50 davem Exp $
  * drivers/sbus/audio/audio.c
  *
  * Copyright 1996 Thomas K. Dyas (tdyas@noc.rutgers.edu)
@@ -2138,8 +2138,9 @@ static void __exit sparcaudio_exit(void)
 	devfs_unregister (devfs_handle);
 }
 
-module_init(sparcaudio_init)
-module_exit(sparcaudio_exit)
+module_init(sparcaudio_init);
+module_exit(sparcaudio_exit);
+MODULE_LICENSE("GPL");
 
 /*
  * Code from Linux Streams, Copyright 1995 by

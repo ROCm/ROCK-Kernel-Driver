@@ -1,4 +1,4 @@
-/* $Id: pci.c,v 1.35 2001/06/13 06:34:30 davem Exp $
+/* $Id: pci.c,v 1.36 2001/10/06 00:38:25 davem Exp $
  * pci.c: UltraSparc PCI controller support.
  *
  * Copyright (C) 1997, 1998, 1999 David S. Miller (davem@redhat.com)
@@ -317,6 +317,7 @@ static int __pci_mmap_make_offset_bus(struct pci_dev *pdev, struct vm_area_struc
 {
 	struct pcidev_cookie *pcp = pdev->sysdata;
 	struct pci_pbm_info *pbm;
+	struct pci_controller_info *p;
 	unsigned long space_size, user_offset, user_size;
 
 	if (!pcp)
@@ -325,12 +326,44 @@ static int __pci_mmap_make_offset_bus(struct pci_dev *pdev, struct vm_area_struc
 	if (!pbm)
 		return -ENXIO;
 
-	if (mmap_state == pci_mmap_io) {
-		space_size = (pbm->io_space.end -
-			      pbm->io_space.start) + 1;
+	p = pbm->parent;
+	if (p->pbms_same_domain) {
+		unsigned long lowest, highest;
+
+		lowest = ~0UL; highest = 0UL;
+		if (mmap_state == pci_mmap_io) {
+			if (p->pbm_A.io_space.flags) {
+				lowest = p->pbm_A.io_space.start;
+				highest = p->pbm_A.io_space.end + 1;
+			}
+			if (p->pbm_B.io_space.flags) {
+				if (lowest > p->pbm_B.io_space.start)
+					lowest = p->pbm_B.io_space.start;
+				if (highest < p->pbm_B.io_space.end + 1)
+					highest = p->pbm_B.io_space.end + 1;
+			}
+			space_size = highest - lowest;
+		} else {
+			if (p->pbm_A.mem_space.flags) {
+				lowest = p->pbm_A.mem_space.start;
+				highest = p->pbm_A.mem_space.end + 1;
+			}
+			if (p->pbm_B.mem_space.flags) {
+				if (lowest > p->pbm_B.mem_space.start)
+					lowest = p->pbm_B.mem_space.start;
+				if (highest < p->pbm_B.mem_space.end + 1)
+					highest = p->pbm_B.mem_space.end + 1;
+			}
+			space_size = highest - lowest;
+		}
 	} else {
-		space_size = (pbm->mem_space.end -
-			      pbm->mem_space.start) + 1;
+		if (mmap_state == pci_mmap_io) {
+			space_size = (pbm->io_space.end -
+				      pbm->io_space.start) + 1;
+		} else {
+			space_size = (pbm->mem_space.end -
+				      pbm->mem_space.start) + 1;
+		}
 	}
 
 	/* Make sure the request is in range. */
@@ -341,12 +374,31 @@ static int __pci_mmap_make_offset_bus(struct pci_dev *pdev, struct vm_area_struc
 	    (user_offset + user_size) > space_size)
 		return -EINVAL;
 
-	if (mmap_state == pci_mmap_io) {
-		vma->vm_pgoff = (pbm->io_space.start +
-				 user_offset) >> PAGE_SHIFT;
+	if (p->pbms_same_domain) {
+		unsigned long lowest = ~0UL;
+
+		if (mmap_state == pci_mmap_io) {
+			if (p->pbm_A.io_space.flags)
+				lowest = p->pbm_A.io_space.start;
+			if (p->pbm_B.io_space.flags &&
+			    lowest > p->pbm_B.io_space.start)
+				lowest = p->pbm_B.io_space.start;
+		} else {
+			if (p->pbm_A.mem_space.flags)
+				lowest = p->pbm_A.mem_space.start;
+			if (p->pbm_B.mem_space.flags &&
+			    lowest > p->pbm_B.mem_space.start)
+				lowest = p->pbm_B.mem_space.start;
+		}
+		vma->vm_pgoff = (lowest + user_offset) >> PAGE_SHIFT;
 	} else {
-		vma->vm_pgoff = (pbm->mem_space.start +
-				 user_offset) >> PAGE_SHIFT;
+		if (mmap_state == pci_mmap_io) {
+			vma->vm_pgoff = (pbm->io_space.start +
+					 user_offset) >> PAGE_SHIFT;
+		} else {
+			vma->vm_pgoff = (pbm->mem_space.start +
+					 user_offset) >> PAGE_SHIFT;
+		}
 	}
 
 	return 0;

@@ -1241,42 +1241,45 @@ static void edge_close (struct usb_serial_port *port, struct file * filp)
 	--port->open_count;
 
 	if (port->open_count <= 0) {
-		// block until tx is empty
-		block_until_tx_empty(edge_port);
-	
-		edge_port->closePending = TRUE;
-	
-		/* flush and chase */
-		edge_port->chaseResponsePending = TRUE;
-	
-		dbg(__FUNCTION__" - Sending IOSP_CMD_CHASE_PORT");
-		status = send_iosp_ext_cmd (edge_port, IOSP_CMD_CHASE_PORT, 0);
-		if (status == 0) {
-			// block until chase finished
-			block_until_chase_response(edge_port);
-		} else {
-			edge_port->chaseResponsePending = FALSE;
+		if (serial->dev) {
+			// block until tx is empty
+			block_until_tx_empty(edge_port);
+
+			edge_port->closePending = TRUE;
+
+			/* flush and chase */
+			edge_port->chaseResponsePending = TRUE;
+
+			dbg(__FUNCTION__" - Sending IOSP_CMD_CHASE_PORT");
+			status = send_iosp_ext_cmd (edge_port, IOSP_CMD_CHASE_PORT, 0);
+			if (status == 0) {
+				// block until chase finished
+				block_until_chase_response(edge_port);
+			} else {
+				edge_port->chaseResponsePending = FALSE;
+			}
+
+			/* close the port */
+			dbg(__FUNCTION__" - Sending IOSP_CMD_CLOSE_PORT");
+			send_iosp_ext_cmd (edge_port, IOSP_CMD_CLOSE_PORT, 0);
+
+			//port->close = TRUE;
+			edge_port->closePending = FALSE;
+			edge_port->open = FALSE;
+			edge_port->openPending = FALSE;
+
+			if (edge_port->write_urb) {
+				usb_unlink_urb (edge_port->write_urb);
+			}
 		}
-	
-		/* close the port */
-		dbg(__FUNCTION__" - Sending IOSP_CMD_CLOSE_PORT");
-		send_iosp_ext_cmd (edge_port, IOSP_CMD_CLOSE_PORT, 0);
-	
-		//port->close = TRUE;
-		edge_port->closePending = FALSE;
-		edge_port->open = FALSE;
-		edge_port->openPending = FALSE;
 	
 		if (edge_port->write_urb) {
 			/* if this urb had a transfer buffer already (old transfer) free it */
 			if (edge_port->write_urb->transfer_buffer != NULL) {
 				kfree(edge_port->write_urb->transfer_buffer);
 			}
-	
-			usb_unlink_urb (edge_port->write_urb);
 			usb_free_urb   (edge_port->write_urb);
 		}
-	
 		if (edge_port->txfifo.fifo) {
 			kfree(edge_port->txfifo.fifo);
 		}

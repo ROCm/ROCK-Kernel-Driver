@@ -3,7 +3,7 @@ Devfs (Device File System) FAQ
 
 Linux Devfs (Device File System) FAQ
 Richard Gooch
-23-AUG-2001
+29-SEP-2001
 
 -----------------------------------------------------------------------------
 
@@ -1753,7 +1753,7 @@ discusses the scsihosts= boot option
 
 Douglas Gilbert has written yet another useful document at
 
-http://www.torque.net/scsi/linux_scsi_24/ which
+http://www.torque.net/scsi/SCSI-2.4-HOWTO/ which
 discusses the Linux SCSI subsystem in 2.4.
 
 

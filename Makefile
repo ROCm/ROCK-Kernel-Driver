@@ -1,6 +1,6 @@
 VERSION = 2
 PATCHLEVEL = 4
-SUBLEVEL = 11
+SUBLEVEL = 12
 EXTRAVERSION =
 
 KERNELRELEASE=$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)
@@ -300,7 +300,8 @@ $(TOPDIR)/include/linux/version.h: include/linux/version.h
 $(TOPDIR)/include/linux/compile.h: include/linux/compile.h
 
 newversion:
-	. scripts/mkversion > .version
+	. scripts/mkversion > .tmpversion
+	@mv -f .tmpversion .version
 
 include/linux/compile.h: $(CONFIGURATION) include/linux/version.h newversion
 	@echo -n \#define UTS_VERSION \"\#`cat .version` > .ver

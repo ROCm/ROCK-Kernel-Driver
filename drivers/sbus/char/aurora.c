@@ -1,4 +1,4 @@
-/*	$Id: aurora.c,v 1.15 2001/08/13 14:40:08 davem Exp $
+/*	$Id: aurora.c,v 1.16 2001/10/08 22:19:51 davem Exp $
  *	linux/drivers/sbus/char/aurora.c -- Aurora multiport driver
  *
  *	Copyright (c) 1999 by Oliver Aldulea (oli at bv dot ro)
@@ -2482,3 +2482,4 @@ printk("cleanup_module: aurora_release_drivers\n");
 
 module_init(aurora_init);
 module_exit(aurora_cleanup);
+MODULE_LICENSE("GPL");

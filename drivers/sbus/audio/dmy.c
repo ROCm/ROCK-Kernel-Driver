@@ -1,4 +1,4 @@
-/* $Id: dmy.c,v 1.9 2001/05/22 23:16:10 davem Exp $
+/* $Id: dmy.c,v 1.10 2001/10/08 22:19:50 davem Exp $
  * drivers/sbus/audio/dummy.c
  *
  * Copyright 1998 Derrick J Brashear (shadow@andrew.cmu.edu)
@@ -783,6 +783,8 @@ static void __exit dummy_exit(void)
 
 module_init(dummy_init);
 module_exit(dummy_exit);
+MODULE_LICENSE("GPL");
+
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.
  * Emacs will notice this stuff at the end of the file and automatically

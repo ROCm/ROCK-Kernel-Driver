@@ -475,11 +475,12 @@ static void mct_u232_close (struct usb_serial_port *port, struct file *filp)
 	--port->open_count;
 
 	if (port->open_count <= 0) {
-		/* shutdown our bulk reads and writes */
-		usb_unlink_urb (port->write_urb);
-		usb_unlink_urb (port->read_urb);
-		/* wgg - do I need this? I think so. */
-		usb_unlink_urb (port->interrupt_in_urb);
+		if (port->serial->dev) {
+			/* shutdown our urbs */
+			usb_unlink_urb (port->write_urb);
+			usb_unlink_urb (port->read_urb);
+			usb_unlink_urb (port->interrupt_in_urb);
+		}
 		port->active = 0;
 	}
 	

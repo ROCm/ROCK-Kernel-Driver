@@ -359,6 +359,10 @@ int ecp_forward_to_reverse (struct parport *port)
 		DPRINTK (KERN_DEBUG "%s: ECP direction: reverse\n",
 			 port->name);
 		port->ieee1284.phase = IEEE1284_PH_REV_IDLE;
+	} else {
+		DPRINTK (KERN_DEBUG "%s: ECP direction: failed to reverse\n",
+			 port->name);
+		port->ieee1284.phase = IEEE1284_PH_DIR_UNKNOWN;
 	}
 
 	return retval;
@@ -386,7 +390,13 @@ int ecp_reverse_to_forward (struct parport *port)
 		DPRINTK (KERN_DEBUG "%s: ECP direction: forward\n",
 			 port->name);
 		port->ieee1284.phase = IEEE1284_PH_FWD_IDLE;
+	} else {
+		DPRINTK (KERN_DEBUG
+			 "%s: ECP direction: failed to switch forward\n",
+			 port->name);
+		port->ieee1284.phase = IEEE1284_PH_DIR_UNKNOWN;
 	}
+
 
 	return retval;
 }

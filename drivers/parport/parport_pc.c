@@ -2528,7 +2528,6 @@ enum parport_pc_pci_cards {
 	lava_parallel_dual_b,
 	boca_ioppar,
 	plx_9050,
-	afavlab_tk9902,
 	timedia_4078a,
 	timedia_4079h,
 	timedia_4085h,
@@ -2556,6 +2555,10 @@ enum parport_pc_pci_cards {
 	syba_1p_ecp,
 	titan_010l,
 	titan_1284p2,
+	avlab_1p,
+	avlab_2p,
+	oxsemi_954,
+	oxsemi_840,
 };
 
 
@@ -2594,7 +2597,6 @@ static struct parport_pc_pci {
 	/* lava_parallel_dual_b */	{ 1, { { 0, -1 }, } },
 	/* boca_ioppar */		{ 1, { { 0, -1 }, } },
 	/* plx_9050 */			{ 2, { { 4, -1 }, { 5, -1 }, } },
-	/* afavlab_tk9902 */		{ 1, { { 0, 1 }, } },
 	/* timedia_4078a */		{ 1, { { 2, -1 }, } },
 	/* timedia_4079h */             { 1, { { 2, 3 }, } },
 	/* timedia_4085h */             { 2, { { 2, -1 }, { 4, -1 }, } },
@@ -2624,6 +2626,12 @@ static struct parport_pc_pci {
 	/* syba_1p_ecp W83787 */	{ 1, { { 0, 0x078 }, } },
 	/* titan_010l */		{ 1, { { 3, -1 }, } },
 	/* titan_1284p2 */		{ 2, { { 0, 1 }, { 2, 3 }, } },
+	/* avlab_1p		*/	{ 1, { { 0, 1}, } },
+	/* avlab_2p		*/	{ 2, { { 0, 1}, { 2, 3 },} },
+	/* The Oxford Semi cards are unusual: 954 doesn't support ECP,
+	 * and 840 locks up if you write 1 to bit 2! */
+	/* oxsemi_954 */		{ 1, { { 0, -1 }, } },
+	/* oxsemi_840 */		{ 1, { { 0, -1 }, } },
 };
 
 static struct pci_device_id parport_pc_pci_tbl[] __devinitdata = {
@@ -2679,8 +2687,6 @@ static struct pci_device_id parport_pc_pci_tbl[] __devinitdata = {
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, boca_ioppar },
 	{ PCI_VENDOR_ID_PLX, PCI_DEVICE_ID_PLX_9050,
 	  PCI_SUBVENDOR_ID_EXSYS, PCI_SUBDEVICE_ID_EXSYS_4014, 0,0, plx_9050 },
-	{ PCI_VENDOR_ID_AFAVLAB, PCI_DEVICE_ID_AFAVLAB_TK9902,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, afavlab_tk9902 },
 	/* PCI_VENDOR_ID_TIMEDIA/SUNIX has many differing cards ...*/
 	{ 0x1409, 0x7168, 0x1409, 0x4078, 0, 0, timedia_4078a },
 	{ 0x1409, 0x7168, 0x1409, 0x4079, 0, 0, timedia_4079h },
@@ -2712,6 +2718,13 @@ static struct pci_device_id parport_pc_pci_tbl[] __devinitdata = {
 	{ PCI_VENDOR_ID_TITAN, PCI_DEVICE_ID_TITAN_010L,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, titan_010l },
 	{ 0x9710, 0x9815, 0x1000, 0x0020, 0, 0, titan_1284p2 },
+	/* PCI_VENDOR_ID_AVLAB/Intek21 has another bunch of cards ...*/
+	{ 0x14db, 0x2120, PCI_ANY_ID, PCI_ANY_ID, 0, 0, avlab_1p}, /* AFAVLAB_TK9902 */
+	{ 0x14db, 0x2121, PCI_ANY_ID, PCI_ANY_ID, 0, 0, avlab_2p},
+	{ PCI_VENDOR_ID_OXSEMI, PCI_DEVICE_ID_OXSEMI_16PCI954PP,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, oxsemi_954 },
+	{ PCI_VENDOR_ID_OXSEMI, PCI_DEVICE_ID_OXSEMI_12PCI840,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, oxsemi_840 },
 	{ 0, } /* terminate list */
 };
 MODULE_DEVICE_TABLE(pci,parport_pc_pci_tbl);

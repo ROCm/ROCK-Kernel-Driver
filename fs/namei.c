@@ -325,9 +325,7 @@ static struct dentry * real_lookup(struct dentry * parent, struct qstr * name, i
 }
 
 /*
- * Yes, this really increments the link_count by 5, and
- * decrements it by 4. Together with checking against 40,
- * this limits recursive symlink follows to 8, while
+ * This limits recursive symlink follows to 8, while
  * limiting consecutive symlinks to 40.
  *
  * Without that kind of total limit, nasty chains of consecutive
@@ -336,16 +334,19 @@ static struct dentry * real_lookup(struct dentry * parent, struct qstr * name, i
 static inline int do_follow_link(struct dentry *dentry, struct nameidata *nd)
 {
 	int err;
-	if (current->link_count >= 40)
+	if (current->link_count >= 5)
+		goto loop;
+	if (current->total_link_count >= 40)
 		goto loop;
 	if (current->need_resched) {
 		current->state = TASK_RUNNING;
 		schedule();
 	}
-	current->link_count += 5;
+	current->link_count++;
+	current->total_link_count++;
 	UPDATE_ATIME(dentry->d_inode);
 	err = dentry->d_inode->i_op->follow_link(dentry, nd);
-	current->link_count -= 4;
+	current->link_count--;
 	return err;
 loop:
 	path_release(nd);
@@ -636,7 +637,7 @@ return_err:
 
 int path_walk(const char * name, struct nameidata *nd)
 {
-	current->link_count = 0;
+	current->total_link_count = 0;
 	return link_path_walk(name, nd);
 }
 

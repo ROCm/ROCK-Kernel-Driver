@@ -369,7 +369,7 @@ struct task_struct {
 	unsigned short used_math;
 	char comm[16];
 /* file system info */
-	int link_count;
+	int link_count, total_link_count;
 	struct tty_struct *tty; /* NULL if no tty */
 	unsigned int locks; /* How many file locks are being held */
 /* ipc stuff */

@@ -548,6 +548,13 @@
     20010927   Richard Gooch <rgooch@atnf.csiro.au>
 	       Went back to global rwsem for symlinks (refcount scheme no good)
   v0.117
+    20011008   Richard Gooch <rgooch@atnf.csiro.au>
+	       Fixed overrun in <devfs_link> by removing function (not needed).
+  v0.118
+    20011009   Richard Gooch <rgooch@atnf.csiro.au>
+	       Fixed buffer underrun in <try_modload>.
+	       Moved down_read() from <search_for_entry_in_dir> to <find_entry>
+  v0.119
 */
 #include <linux/types.h>
 #include <linux/errno.h>
@@ -580,7 +587,7 @@
 #include <asm/bitops.h>
 #include <asm/atomic.h>
 
-#define DEVFS_VERSION            "0.117 (20010927)"
+#define DEVFS_VERSION            "0.119 (20011009)"
 
 #define DEVFS_NAME "devfs"
 
@@ -810,12 +817,10 @@ static struct devfs_entry *search_for_entry_in_dir (struct devfs_entry *parent,
     if (curr == NULL) return NULL;
     if (!S_ISLNK (curr->mode) || !traverse_symlink) return curr;
     /*  Need to follow the link: this is a stack chomper  */
-    down_read (&symlink_rwsem);
     retval = curr->registered ?
 	search_for_entry (parent, curr->u.symlink.linkname,
 			  curr->u.symlink.length, FALSE, FALSE, NULL,
 			  TRUE) : NULL;
-    up_read (&symlink_rwsem);
     return retval;
 }   /*  End Function search_for_entry_in_dir  */
 
@@ -1085,8 +1090,10 @@ static struct devfs_entry *find_entry (devfs_handle_t dir,
 	    ++name;
 	    --namelen;
 	}
+	if (traverse_symlink) down_read (&symlink_rwsem);
 	entry = search_for_entry (dir, name, namelen, FALSE, FALSE, NULL,
 				  traverse_symlink);
+	if (traverse_symlink) up_read (&symlink_rwsem);
 	if (entry != NULL) return entry;
     }
     /*  Have to search by major and minor: slow  */
@@ -1647,8 +1654,7 @@ devfs_handle_t devfs_find_handle (devfs_handle_t dir, const char *name,
     devfs_handle_t de;
 
     if ( (name != NULL) && (name[0] == '\0') ) name = NULL;
-    de = find_entry (dir, name, 0, major, minor, type,
-		     traverse_symlinks);
+    de = find_entry (dir, name, 0, major, minor, type, traverse_symlinks);
     if (de == NULL) return NULL;
     if (!de->registered) return NULL;
     return de;
@@ -2138,7 +2144,7 @@ static int try_modload (struct devfs_entry *parent, struct fs_info *fs_info,
     if ( !( fs_info->devfsd_event_mask & (1 << DEVFSD_NOTIFY_LOOKUP) ) )
 	return -ENOENT;
     if ( is_devfsd_or_child (fs_info) ) return -ENOENT;
-    if (namelen >= STRING_LENGTH) return -ENAMETOOLONG;
+    if (namelen >= STRING_LENGTH - 1) return -ENAMETOOLONG;
     memcpy (buf + pos, name, namelen);
     buf[STRING_LENGTH - 1] = '\0';
     if (parent->parent != NULL) pos = devfs_generate_path (parent, buf, pos);
@@ -2781,19 +2787,6 @@ static struct dentry *devfs_lookup (struct inode *dir, struct dentry *dentry)
     return NULL;
 }   /*  End Function devfs_lookup  */
 
-static int devfs_link (struct dentry *old_dentry, struct inode *dir,
-		       struct dentry *dentry)
-{
-    /*struct inode *inode = old_dentry->d_inode;*/
-    char txt[STRING_LENGTH];
-
-    memset (txt, 0, STRING_LENGTH);
-    memcpy (txt, old_dentry->d_name.name, old_dentry->d_name.len);
-    txt[STRING_LENGTH - 1] = '\0';
-    printk ("%s: link of \"%s\"\n", DEVFS_NAME, txt);
-    return -EPERM;
-}   /*  End Function devfs_link  */
-
 static int devfs_unlink (struct inode *dir, struct dentry *dentry)
 {
     struct devfs_entry *de;
@@ -3054,7 +3047,6 @@ static struct inode_operations devfs_iops =
 static struct inode_operations devfs_dir_iops =
 {
     lookup:         devfs_lookup,
-    link:           devfs_link,
     unlink:         devfs_unlink,
     symlink:        devfs_symlink,
     mkdir:          devfs_mkdir,

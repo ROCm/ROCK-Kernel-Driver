@@ -1,4 +1,4 @@
-/* $Id: dtlb_base.S,v 1.14 2001/09/11 02:20:23 kanoj Exp $
+/* $Id: dtlb_base.S,v 1.16 2001/10/09 04:02:11 davem Exp $
  * dtlb_base.S:	Front end to DTLB miss replacement strategy.
  *              This is included directly into the trap table.
  *
@@ -65,27 +65,28 @@
 /* DTLB ** ICACHE line 1: Quick user TLB misses		*/
 	ldxa		[%g1 + %g1] ASI_DMMU, %g4	! Get TAG_ACCESS
 	andcc		%g4, TAG_CONTEXT_BITS, %g0	! From Nucleus?
+	mov		1, %g5				! For TL==3 test
 from_tl1_trap:
 	CREATE_VPTE_OFFSET1(%g4, %g6)			! Create VPTE offset
 	be,pn		%xcc, 3f			! Yep, special processing
 	 CREATE_VPTE_OFFSET2(%g4, %g6)			! Create VPTE offset
-	ldxa		[%g3 + %g6] ASI_S, %g5		! Load VPTE
-1:	brlz,pt		%g5, 9f				! Valid, load into TLB
-	 nop						! Delay-slot
-	ba,a,pt		%xcc, longpath			! Invalid, branch out
+	cmp		%g5, 3				! Last trap level?
+	be,a,pn		%xcc, 1f			! Yep, use non-faulting load
+	 ldxa		[%g3 + %g6] ASI_SNF, %g5	! Load VPTE (no-VPTE-fault)
 
-/* DTLB ** ICACHE line 2: Quick kernel TLB misses	*/
-3:	brlz,pt		%g4, 9f				! Kernel virtual map?
-	 xor		%g2, %g4, %g5			! Finish bit twiddles
-	ba,pt		%xcc, kvmap			! Yep, go check for obp/vmalloc
-	 nop
-	nop
+/* DTLB ** ICACHE line 2: User finish + quick kernel TLB misses	*/
+	ldxa		[%g3 + %g6] ASI_S, %g5		! Load VPTE
+1:	brgez,pn	%g5, longpath			! Invalid, branch out
+	 nop						! Delay-slot
 9:	stxa		%g5, [%g0] ASI_DTLB_DATA_IN	! Reload TLB
 	retry						! Trap return
-longpath:
-	rdpr		%pstate, %g5			! Move into alternate globals
+3:	brlz,pt		%g4, 9b				! Kernel virtual map?
+	 xor		%g2, %g4, %g5			! Finish bit twiddles
+	ba,a,pt		%xcc, kvmap			! Yep, go check for obp/vmalloc
 
 /* DTLB ** ICACHE line 3: winfixups+real_faults		*/
+longpath:
+	rdpr		%pstate, %g5			! Move into alternate globals
 	wrpr		%g5, PSTATE_AG|PSTATE_MG, %pstate
 	rdpr		%tl, %g4			! See where we came from.
 	cmp		%g4, 1				! Is etrap/rtrap window fault?
@@ -93,10 +94,9 @@ longpath:
 	ldxa		[%g4] ASI_DMMU, %g5		! Load faulting VA page
 	be,pt		%xcc, sparc64_realfault_common	! Jump to normal fault handling
 	 mov		FAULT_CODE_DTLB, %g4		! It was read from DTLB
-	ba,a,pt		%xcc, winfix_trampoline		! Call window fixup code
 
 /* DTLB ** ICACHE line 4: Unused...	*/
-	nop
+	ba,a,pt		%xcc, winfix_trampoline		! Call window fixup code
 	nop
 	nop
 	nop

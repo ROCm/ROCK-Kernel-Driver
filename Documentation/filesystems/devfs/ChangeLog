@@ -1759,3 +1759,15 @@ Changes for patch v192
 Changes for patch v193
 
 - Went back to global rwsem for symlinks (refcount scheme no good)
+===============================================================================
+Changes for patch v194
+
+- Fixed overrun in <devfs_link> by removing function (not needed)
+
+- Updated README from master HTML file
+===============================================================================
+Changes for patch v195
+
+- Fixed buffer underrun in <try_modload>
+
+- Moved down_read() from <search_for_entry_in_dir> to <find_entry>

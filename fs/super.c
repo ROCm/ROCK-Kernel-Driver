@@ -443,7 +443,7 @@ static struct super_block *alloc_super(void)
 
 static struct super_block * read_super(kdev_t dev, struct block_device *bdev,
 				       struct file_system_type *type, int flags,
-				       void *data, int silent)
+				       void *data)
 {
 	struct super_block * s;
 	s = alloc_super();
@@ -460,7 +460,7 @@ static struct super_block * read_super(kdev_t dev, struct block_device *bdev,
 	spin_unlock(&sb_lock);
 	down_write(&s->s_umount);
 	lock_super(s);
-	if (!type->read_super(s, data, silent))
+	if (!type->read_super(s, data, flags & MS_VERBOSE ? 1 : 0))
 		goto out_fail;
 	unlock_super(s);
 	/* tell bdcache that we are going to keep this one */
@@ -612,7 +612,7 @@ restart:
 
 	error = -EINVAL;
 	lock_super(s);
-	if (!fs_type->read_super(s, data, 0))
+	if (!fs_type->read_super(s, data, flags & MS_VERBOSE ? 1 : 0))
 		goto out_fail;
 	unlock_super(s);
 	get_filesystem(fs_type);
@@ -646,7 +646,7 @@ static struct super_block *get_sb_nodev(struct file_system_type *fs_type,
 	if (dev) {
 		struct super_block * sb;
 		error = -EINVAL;
-		sb = read_super(dev, NULL, fs_type, flags, data, 0);
+		sb = read_super(dev, NULL, fs_type, flags, data);
 		if (sb) {
 			get_filesystem(fs_type);
 			return sb;
@@ -692,7 +692,7 @@ retry:
 		s->s_count += S_BIAS;
 		spin_unlock(&sb_lock);
 		lock_super(s);
-		if (!fs_type->read_super(s, data, 0))
+		if (!fs_type->read_super(s, data, flags & MS_VERBOSE ? 1 : 0))
 			goto out_fail;
 		unlock_super(s);
 		get_filesystem(fs_type);
@@ -865,10 +865,45 @@ struct vfsmount *kern_mount(struct file_system_type *type)
 	return do_kern_mount((char *)type->name, 0, (char *)type->name, NULL);
 }
 
+static char * __initdata root_fs_names;
+static int __init fs_names_setup(char *str)
+{
+	root_fs_names = str;
+	return 0;
+}
+
+__setup("rootfstype=", fs_names_setup);
+
+static void __init get_fs_names(char *page)
+{
+	char *s = page;
+
+	if (root_fs_names) {
+		strcpy(page, root_fs_names);
+		while (*s++) {
+			if (s[-1] == ',')
+				s[-1] = '\0';
+		}
+	} else {
+		int len = get_filesystem_list(page);
+		char *p, *next;
+
+		page[len] = '\0';
+		for (p = page-1; p; p = next) {
+			next = strchr(++p, '\n');
+			if (*p++ != '\t')
+				continue;
+			while ((*s++ = *p++) != '\n')
+				;
+			s[-1] = '\0';
+		}
+	}
+	*s = '\0';
+}
+
 void __init mount_root(void)
 {
 	struct nameidata root_nd;
-	struct file_system_type * fs_type;
 	struct super_block * sb;
 	struct vfsmount *vfsmnt;
 	struct block_device *bdev = NULL;
@@ -878,36 +913,24 @@ void __init mount_root(void)
 	char path[64];
 	int path_start = -1;
 	char *name = "/dev/root";
-
+	char *fs_names, *p;
 #ifdef CONFIG_ROOT_NFS
 	void *data;
+#endif
+	root_mountflags |= MS_VERBOSE;
+
+#ifdef CONFIG_ROOT_NFS
 	if (MAJOR(ROOT_DEV) != UNNAMED_MAJOR)
 		goto skip_nfs;
-	fs_type = get_fs_type("nfs");
-	if (!fs_type)
-		goto no_nfs;
-	ROOT_DEV = get_unnamed_dev();
-	if (!ROOT_DEV)
-		/*
-		 * Your /linuxrc sucks worse than MSExchange - that's the
-		 * only way you could run out of anon devices at that point.
-		 */
-		goto no_anon;
 	data = nfs_root_data();
 	if (!data)
-		goto no_server;
-	sb = read_super(ROOT_DEV, NULL, fs_type, root_mountflags, data, 1);
-	if (sb)
-		/*
-		 * We _can_ fail there, but if that will happen we have no
-		 * chance anyway (no memory for vfsmnt and we _will_ need it,
-		 * no matter which fs we try to mount).
-		 */
-		goto mount_it;
-no_server:
-	put_unnamed_dev(ROOT_DEV);
-no_anon:
-	put_filesystem(fs_type);
+		goto no_nfs;
+	vfsmnt = do_kern_mount("nfs", root_mountflags, "/dev/root", data);
+	if (!IS_ERR(vfsmnt)) {
+		printk ("VFS: Mounted root (%s filesystem).\n", "nfs");
+		ROOT_DEV = vfsmnt->mnt_sb->s_dev;
+		goto attach_it;
+	}
 no_nfs:
 	printk(KERN_ERR "VFS: Unable to mount root fs via NFS, trying floppy.\n");
 	ROOT_DEV = MKDEV(FLOPPY_MAJOR, 0);
@@ -935,6 +958,9 @@ skip_nfs:
 		}
 	}
 #endif
+
+	fs_names = __getname();
+	get_fs_names(fs_names);
 
 	devfs_make_root (root_device_name);
 	handle = devfs_find_handle (NULL, ROOT_DEVICE_NAME,
@@ -985,35 +1011,30 @@ retry:
 	sb = get_super(ROOT_DEV);
 	if (sb) {
 		/* FIXME */
-		fs_type = sb->s_type;
+		p = (char *)sb->s_type->name;
 		atomic_inc(&sb->s_active);
 		up_read(&sb->s_umount);
 		down_write(&sb->s_umount);
 		goto mount_it;
 	}
 
-	read_lock(&file_systems_lock);
-	for (fs_type = file_systems ; fs_type ; fs_type = fs_type->next) {
-  		if (!(fs_type->fs_flags & FS_REQUIRES_DEV))
+	for (p = fs_names; *p; p += strlen(p)+1) {
+		struct file_system_type * fs_type = get_fs_type(p);
+		if (!fs_type)
   			continue;
-		if (!try_inc_mod_count(fs_type->owner))
-			continue;
-		read_unlock(&file_systems_lock);
-  		sb = read_super(ROOT_DEV,bdev,fs_type,root_mountflags,NULL,1);
+  		sb = read_super(ROOT_DEV,bdev,fs_type,root_mountflags,NULL);
 		if (sb) 
 			goto mount_it;
-		read_lock(&file_systems_lock);
 		put_filesystem(fs_type);
 	}
-	read_unlock(&file_systems_lock);
 	panic("VFS: Unable to mount root fs on %s", kdevname(ROOT_DEV));
 
 mount_it:
 	/* FIXME */
 	up_write(&sb->s_umount);
-	printk ("VFS: Mounted root (%s filesystem)%s.\n",
-		fs_type->name,
+	printk ("VFS: Mounted root (%s filesystem)%s.\n", p,
 		(sb->s_flags & MS_RDONLY) ? " readonly" : "");
+	putname(fs_names);
 	if (path_start >= 0) {
 		name = path + path_start;
 		devfs_mk_symlink (NULL, "root", DEVFS_FL_DEFAULT,
@@ -1027,18 +1048,15 @@ mount_it:
 	set_devname(vfsmnt, name);
 	vfsmnt->mnt_sb = sb;
 	vfsmnt->mnt_root = dget(sb->s_root);
+	bdput(bdev); /* sb holds a reference */
 
+attach_it:
 	root_nd.mnt = root_vfsmnt;
 	root_nd.dentry = root_vfsmnt->mnt_sb->s_root;
 	graft_tree(vfsmnt, &root_nd);
-	mntput(vfsmnt);
 
-	/* FIXME: if something will try to umount us right now... */
-	if (vfsmnt) {
-		set_fs_root(current->fs, vfsmnt, sb->s_root);
-		set_fs_pwd(current->fs, vfsmnt, sb->s_root);
-		if (bdev)
-			bdput(bdev); /* sb holds a reference */
-		return;
-	}
+	set_fs_root(current->fs, vfsmnt, vfsmnt->mnt_root);
+	set_fs_pwd(current->fs, vfsmnt, vfsmnt->mnt_root);
+
+	mntput(vfsmnt);
 }

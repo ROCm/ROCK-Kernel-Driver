@@ -124,6 +124,8 @@ extern int e1355fb_init(void);
 extern int e1355fb_setup(char*);
 extern int pvr2fb_init(void);
 extern int pvr2fb_setup(char*);
+extern int sstfb_init(void);
+extern int sstfb_setup(char*);
 
 static struct {
 	const char *name;
@@ -274,7 +276,9 @@ static struct {
 #ifdef CONFIG_FB_PVR2
 	{ "pvr2", pvr2fb_init, pvr2fb_setup },
 #endif
-
+#ifdef CONFIG_FB_VOODOO1
+	{ "sst", sstfb_init, sstfb_setup },
+#endif
 	/*
 	 * Generic drivers that don't use resource management (yet)
 	 */

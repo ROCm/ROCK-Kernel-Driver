@@ -371,29 +371,31 @@ static void ftdi_sio_close (struct usb_serial_port *port, struct file *filp)
 	--port->open_count;
 
 	if (port->open_count <= 0) {
-		if (c_cflag & HUPCL){
-			/* Disable flow control */
-			if (usb_control_msg(serial->dev, usb_sndctrlpipe(serial->dev, 0),
-					    FTDI_SIO_SET_FLOW_CTRL_REQUEST, 
-					    FTDI_SIO_SET_FLOW_CTRL_REQUEST_TYPE,
-					    0, 0, 
-					    buf, 0, WDR_TIMEOUT) < 0) {
-				err("error from flowcontrol urb");
-			}	    
+		if (serial->dev) {
+			if (c_cflag & HUPCL){
+				/* Disable flow control */
+				if (usb_control_msg(serial->dev, 
+						    usb_sndctrlpipe(serial->dev, 0),
+						    FTDI_SIO_SET_FLOW_CTRL_REQUEST,
+						    FTDI_SIO_SET_FLOW_CTRL_REQUEST_TYPE,
+						    0, 0, buf, 0, WDR_TIMEOUT) < 0) {
+					err("error from flowcontrol urb");
+				}	    
 
-			/* drop DTR */
-			if (set_dtr(serial->dev, usb_sndctrlpipe(serial->dev, 0), LOW) < 0){
-				err("Error from DTR LOW urb");
-			}
-			/* drop RTS */
-			if (set_rts(serial->dev, usb_sndctrlpipe(serial->dev, 0),LOW) < 0) {
-				err("Error from RTS LOW urb");
-			}	
-		} /* Note change no line is hupcl is off */
+				/* drop DTR */
+				if (set_dtr(serial->dev, usb_sndctrlpipe(serial->dev, 0), LOW) < 0){
+					err("Error from DTR LOW urb");
+				}
+				/* drop RTS */
+				if (set_rts(serial->dev, usb_sndctrlpipe(serial->dev, 0),LOW) < 0) {
+					err("Error from RTS LOW urb");
+				}	
+			} /* Note change no line is hupcl is off */
 
-		/* shutdown our bulk reads and writes */
-		usb_unlink_urb (port->write_urb);
-		usb_unlink_urb (port->read_urb);
+			/* shutdown our bulk reads and writes */
+			usb_unlink_urb (port->write_urb);
+			usb_unlink_urb (port->read_urb);
+		}
 		port->active = 0;
 		port->open_count = 0;
 	} else {  

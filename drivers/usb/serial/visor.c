@@ -380,21 +380,26 @@ static void visor_close (struct usb_serial_port *port, struct file * filp)
 	--port->open_count;
 
 	if (port->open_count <= 0) {
-		transfer_buffer =  kmalloc (0x12, GFP_KERNEL);
-		if (!transfer_buffer) {
-			err(__FUNCTION__ " - kmalloc(%d) failed.", 0x12);
-		} else {
-			/* send a shutdown message to the device */
-			usb_control_msg (serial->dev, usb_rcvctrlpipe(serial->dev, 0), VISOR_CLOSE_NOTIFICATION,
-					0xc2, 0x0000, 0x0000, transfer_buffer, 0x12, 300);
-			kfree (transfer_buffer);
+		if (serial->dev) {
+			/* only send a shutdown message if the 
+			 * device is still here */
+			transfer_buffer =  kmalloc (0x12, GFP_KERNEL);
+			if (!transfer_buffer) {
+				err(__FUNCTION__ " - kmalloc(%d) failed.", 0x12);
+			} else {
+				/* send a shutdown message to the device */
+				usb_control_msg (serial->dev,
+						 usb_rcvctrlpipe(serial->dev, 0),
+						 VISOR_CLOSE_NOTIFICATION, 0xc2,
+						 0x0000, 0x0000, 
+						 transfer_buffer, 0x12, 300);
+				kfree (transfer_buffer);
+			}
+			/* shutdown our bulk read */
+			usb_unlink_urb (port->read_urb);
 		}
-
-		/* shutdown our bulk read */
-		usb_unlink_urb (port->read_urb);
 		port->active = 0;
 		port->open_count = 0;
-
 	}
 	up (&port->sem);
 

@@ -1531,7 +1531,6 @@ extern void 		awc_tx_timeout(struct net_device *dev);
 extern int 		awc_start_xmit(struct sk_buff *, struct net_device *);
 extern void 		awc_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 extern struct net_device_stats *	awc_get_stats(struct net_device *dev);
-extern int 		awc_rx(struct net_device *dev, struct awc_fid * rx_fid);
 extern void		awc_set_multicast_list(struct net_device *dev);
 extern int awc_change_mtu(struct net_device *dev, int new_mtu);  
 extern int 		awc_close(struct net_device *dev);

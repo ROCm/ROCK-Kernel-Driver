@@ -17,14 +17,18 @@ typedef struct {
 	unsigned long val;
 } swp_entry_t;
 
+extern atomic_t shmem_nrpages;
+
 struct shmem_inode_info {
-	spinlock_t	lock;
-	unsigned long	max_index;
-	swp_entry_t	i_direct[SHMEM_NR_DIRECT]; /* for the first blocks */
-	swp_entry_t   **i_indirect; /* doubly indirect blocks */
-	unsigned long	swapped;
-	int		locked;     /* into memory */
+	spinlock_t		lock;
+	struct semaphore 	sem;
+	unsigned long		next_index;
+	swp_entry_t		i_direct[SHMEM_NR_DIRECT]; /* for the first blocks */
+	void		      **i_indirect; /* indirect blocks */
+	unsigned long		swapped;
+	int			locked;     /* into memory */
 	struct list_head	list;
+	struct inode	       *inode;
 };
 
 struct shmem_sb_info {
@@ -34,5 +38,7 @@ struct shmem_sb_info {
 	unsigned long free_inodes;  /* How many are left for allocation */
 	spinlock_t    stat_lock;
 };
+
+#define SHMEM_I(inode)  (&inode->u.shmem_i)
 
 #endif

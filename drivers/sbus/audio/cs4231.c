@@ -1,4 +1,4 @@
-/* $Id: cs4231.c,v 1.46 2001/05/21 01:25:22 davem Exp $
+/* $Id: cs4231.c,v 1.47 2001/10/08 22:19:50 davem Exp $
  * drivers/sbus/audio/cs4231.c
  *
  * Copyright 1996, 1997, 1998, 1999 Derrick J Brashear (shadow@andrew.cmu.edu)
@@ -2443,6 +2443,7 @@ static void __exit cs4231_exit(void)
 
 module_init(cs4231_init);
 module_exit(cs4231_exit);
+MODULE_LICENSE("GPL");
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.
  * Emacs will notice this stuff at the end of the file and automatically

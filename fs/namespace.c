@@ -336,9 +336,6 @@ void umount_tree(struct vfsmount *mnt)
 	struct vfsmount *p;
 	LIST_HEAD(kill);
 
-	if (list_empty(&mnt->mnt_list))
-		return;
-
 	for (p = mnt; p; p = next_mnt(p, mnt)) {
 		list_del(&p->mnt_list);
 		list_add(&p->mnt_list, &kill);
@@ -418,7 +415,8 @@ static int do_umount(struct vfsmount *mnt, int flags)
 	}
 	retval = -EBUSY;
 	if (atomic_read(&mnt->mnt_count) == 2 || flags & MNT_DETACH) {
-		umount_tree(mnt);
+		if (!list_empty(&mnt->mnt_list))
+			umount_tree(mnt);
 		retval = 0;
 	}
 	spin_unlock(&dcache_lock);
@@ -592,9 +590,10 @@ static int do_loopback(struct nameidata *nd, char *old_name, int recurse)
 
 	if (mnt) {
 		err = graft_tree(mnt, nd);
-		if (err && recurse)
+		if (err)
 			umount_tree(mnt);
-		mntput(mnt);
+		else
+			mntput(mnt);
 	}
 
 	up(&mount_sem);

@@ -582,28 +582,21 @@ struct ace_info {
 	aceaddr	stats2_ptr;
 };
 
-#if defined(CONFIG_X86) || defined(CONFIG_PPC)
-/* Intel has null pci_unmap_single, no reasons to remember mapping. */
-#define DUMMY_PCI_UNMAP
-#endif
 
 struct ring_info {
 	struct sk_buff		*skb;
-#ifndef DUMMY_PCI_UNMAP
 	dma_addr_t		mapping;
-#endif
 };
 
-/* Funny... As soon as we add maplen on alpha, it starts to work
+/*
+ * Funny... As soon as we add maplen on alpha, it starts to work
  * much slower. Hmm... is it because struct does not fit to one cacheline?
  * So, split tx_ring_info.
  */
 struct tx_ring_info {
 	struct sk_buff		*skb;
-#ifndef DUMMY_PCI_UNMAP
 	dma_addr_t		mapping;
 	int			maplen;
-#endif
 };
 
 /*

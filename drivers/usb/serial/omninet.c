@@ -216,14 +216,15 @@ static void omninet_close (struct usb_serial_port *port, struct file * filp)
 	--port->open_count;
 
 	if (port->open_count <= 0) {
-		od = (struct omninet_data *)port->private;
-		wport = &serial->port[1];
-
-		usb_unlink_urb (wport->write_urb);
-		usb_unlink_urb (port->read_urb);
+		if (serial->dev) {
+			wport = &serial->port[1];
+			usb_unlink_urb (wport->write_urb);
+			usb_unlink_urb (port->read_urb);
+		}
 
 		port->active = 0;
 		port->open_count = 0;
+		od = (struct omninet_data *)port->private;
 		if (od)
 			kfree(od);
 	}

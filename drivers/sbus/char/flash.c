@@ -1,4 +1,4 @@
-/* $Id: flash.c,v 1.23 2001/03/02 06:32:40 davem Exp $
+/* $Id: flash.c,v 1.24 2001/10/08 22:19:51 davem Exp $
  * flash.c: Allow mmap access to the OBP Flash, for OBP updates.
  *
  * Copyright (C) 1997  Eddie C. Dost  (ecd@skynet.be)
@@ -247,3 +247,4 @@ static void __exit flash_cleanup(void)
 
 module_init(flash_init);
 module_exit(flash_cleanup);
+MODULE_LICENSE("GPL");

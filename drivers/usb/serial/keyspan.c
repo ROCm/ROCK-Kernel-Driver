@@ -920,9 +920,13 @@ static inline void stop_urb(urb_t *urb)
 static void keyspan_close(struct usb_serial_port *port, struct file *filp)
 {
 	int			i;
-	struct usb_serial	*serial = port->serial; /* FIXME should so sanity check */
+	struct usb_serial	*serial;
 	struct keyspan_serial_private 	*s_priv;
 	struct keyspan_port_private 	*p_priv;
+
+	serial = get_usb_serial (port, __FUNCTION__);
+	if (!serial)
+		return;
 
 	dbg("keyspan_close called\n");
 	s_priv = (struct keyspan_serial_private *)(serial->private);
@@ -931,7 +935,8 @@ static void keyspan_close(struct usb_serial_port *port, struct file *filp)
 	p_priv->rts_state = 0;
 	p_priv->dtr_state = 0;
 	
-	keyspan_send_setup(port, 1);
+	if (serial->dev)
+		keyspan_send_setup(port, 1);
 
 	/*while (p_priv->outcont_urb->status == -EINPROGRESS) {
 		dbg("close - urb in progress\n");
@@ -944,18 +949,15 @@ static void keyspan_close(struct usb_serial_port *port, struct file *filp)
 
 	if (--port->open_count <= 0) {
 		if (port->active) {
-			/* Stop reading/writing urbs */
-			stop_urb(p_priv->inack_urb);
-			stop_urb(p_priv->outcont_urb);
-			for (i = 0; i < 2; i++) {
-				stop_urb(p_priv->in_urbs[i]);
-				stop_urb(p_priv->out_urbs[i]);
+			if (serial->dev) {
+				/* Stop reading/writing urbs */
+				stop_urb(p_priv->inack_urb);
+				stop_urb(p_priv->outcont_urb);
+				for (i = 0; i < 2; i++) {
+					stop_urb(p_priv->in_urbs[i]);
+					stop_urb(p_priv->out_urbs[i]);
+				}
 			}
-			/* Now done in shutdown 
-			if (atomic_dec_return(&s_priv->active_count) <= 0) {
-				stop_urb(s_priv->instat_urb);
-				stop_urb(s_priv->glocont_urb);
-			} */
 		}
 		port->active = 0;
 		port->open_count = 0;

@@ -219,9 +219,7 @@
  * #define AIC7XXX_VERBOSE_DEBUGGING
  */
  
-#if defined(MODULE) || defined(PCMCIA)
 #include <linux/module.h>
-#endif
 
 #if defined(PCMCIA)
 #  undef MODULE

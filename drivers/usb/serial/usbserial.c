@@ -14,7 +14,12 @@
  * based on a driver by Brad Keryan)
  *
  * See Documentation/usb/usb-serial.txt for more information on using this driver
- * 
+ *
+ * (10/10/2001) gkh
+ *	usb_serial_disconnect() now sets the serial->dev pointer is to NULL to
+ *	help prevent child drivers from accessing the device since it is now
+ *	gone.
+ *
  * (09/13/2001) gkh
  *	Moved generic driver initialize after we have registered with the USB
  *	core.  Thanks to Randy Dunlap for pointing this problem out.
@@ -344,9 +349,9 @@ static struct usb_serial_device_type generic_device = {
 	shutdown:		generic_shutdown,
 };
 
-#define if_generic_do(x)					\
-	if ((serial->dev->descriptor.idVendor == vendor) &&	\
-	    (serial->dev->descriptor.idProduct == product))	\
+#define if_generic_do(x)			\
+	if ((serial->vendor == vendor) &&	\
+	    (serial->product == product))	\
 	                x
 #else
 #define if_generic_do(x)
@@ -462,10 +467,15 @@ static void return_serial (struct usb_serial *serial)
 int ezusb_writememory (struct usb_serial *serial, int address, unsigned char *data, int length, __u8 bRequest)
 {
 	int result;
-	unsigned char *transfer_buffer =  kmalloc (length, GFP_KERNEL);
+	unsigned char *transfer_buffer;
 
-//	dbg("ezusb_writememory %x, %d", address, length);
+	/* dbg("ezusb_writememory %x, %d", address, length); */
+	if (!serial->dev) {
+		dbg(__FUNCTION__ " - no physical device present, failing.");
+		return -ENODEV;
+	}
 
+	transfer_buffer =  kmalloc (length, GFP_KERNEL);
 	if (!transfer_buffer) {
 		err(__FUNCTION__ " - kmalloc(%d) failed.", length);
 		return -ENOMEM;
@@ -821,11 +831,13 @@ static void generic_close (struct usb_serial_port *port, struct file * filp)
 	--port->open_count;
 
 	if (port->open_count <= 0) {
-		/* shutdown any bulk reads that might be going on */
-		if (serial->num_bulk_out)
-			usb_unlink_urb (port->write_urb);
-		if (serial->num_bulk_in)
-			usb_unlink_urb (port->read_urb);
+		if (serial->dev) {
+			/* shutdown any bulk reads that might be going on */
+			if (serial->num_bulk_out)
+				usb_unlink_urb (port->write_urb);
+			if (serial->num_bulk_in)
+				usb_unlink_urb (port->read_urb);
+		}
 		
 		port->active = 0;
 		port->open_count = 0;
@@ -1186,6 +1198,8 @@ static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 	serial->num_bulk_in = num_bulk_in;
 	serial->num_bulk_out = num_bulk_out;
 	serial->num_interrupt_in = num_interrupt_in;
+	serial->vendor = dev->descriptor.idVendor;
+	serial->product = dev->descriptor.idProduct;
 
 	/* if this device type has a startup function, call it */
 	if (type->startup) {
@@ -1338,6 +1352,7 @@ static void usb_serial_disconnect(struct usb_device *dev, void *ptr)
 				serial->port[i].tty->driver_data = NULL;
 		}
 
+		serial->dev = NULL;
 		serial_shutdown (serial);
 
 		for (i = 0; i < serial->num_ports; ++i)

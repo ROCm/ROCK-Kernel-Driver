@@ -653,3 +653,4 @@ static void __exit openprom_cleanup(void)
 
 module_init(openprom_init);
 module_exit(openprom_cleanup);
+MODULE_LICENSE("GPL");

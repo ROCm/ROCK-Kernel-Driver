@@ -14,6 +14,10 @@
  * please use the usb-irda driver, as it contains the proper error checking and
  * other goodness of a full IrDA stack.
  *
+ * Portions of this driver were taken from drivers/net/irda/irda-usb.c, which
+ * was written by Roman Weissgaerber <weissg@vienna.at>, Dag Brattli
+ * <dag@brattli.net>, and Jean Tourrilhes <jt@hpl.hp.com>
+
  * See Documentation/usb/usb-serial.txt for more information on using this driver
  * 
  * 2001_Oct_07	greg kh
@@ -112,7 +116,7 @@ static inline void irda_usb_dump_class_desc(struct irda_class_desc *desc)
  * offer to us, describing their IrDA characteristics. We will use that in
  * irda_usb_init_qos()
  */
-static inline struct irda_class_desc *irda_usb_find_class_desc(struct usb_device *dev, unsigned int ifnum)
+static struct irda_class_desc *irda_usb_find_class_desc(struct usb_device *dev, unsigned int ifnum)
 {
 	struct usb_interface_descriptor *interface;
 	struct irda_class_desc *desc;
@@ -229,8 +233,10 @@ static void ir_close (struct usb_serial_port *port, struct file * filp)
 	--port->open_count;
 
 	if (port->open_count <= 0) {
-		/* shutdown our bulk read */
-		usb_unlink_urb (port->read_urb);
+		if (serial->dev) {
+			/* shutdown our bulk read */
+			usb_unlink_urb (port->read_urb);
+		}
 		port->active = 0;
 		port->open_count = 0;
 

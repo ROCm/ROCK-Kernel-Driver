@@ -1,4 +1,4 @@
-/* $Id: unistd.h,v 1.70 2000/08/14 05:39:07 jj Exp $ */
+/* $Id: unistd.h,v 1.71 2001/10/09 10:54:39 davem Exp $ */
 #ifndef _SPARC_UNISTD_H
 #define _SPARC_UNISTD_H
 
@@ -158,7 +158,7 @@
 /* #define __NR_adjtime         140    SunOS Specific                              */
 #define __NR_getpeername        141 /* Common                                      */
 /* #define __NR_gethostid       142    SunOS Specific                              */
-/* #define __NR_ni_syscall      143    ENOSYS under SunOS                          */
+#define __NR_gettid             143 /* ENOSYS under SunOS                          */
 #define __NR_getrlimit          144 /* Common                                      */
 #define __NR_setrlimit          145 /* Common                                      */
 #define __NR_pivot_root		146 /* Linux Specific, killpg under SunOS          */

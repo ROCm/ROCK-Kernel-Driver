@@ -193,6 +193,7 @@ MODULE_AUTHOR
 	("Eric Brower <ebrower@usa.net>");
 MODULE_DESCRIPTION
 	("Hardware watchdog driver for Sun Microsystems CP1400/1500");
+MODULE_LICENSE("GPL");
 MODULE_SUPPORTED_DEVICE
 	("watchdog");
 #endif /* ifdef MODULE */

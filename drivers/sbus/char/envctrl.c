@@ -1,4 +1,4 @@
-/* $Id: envctrl.c,v 1.23 2001/08/09 23:42:09 davem Exp $
+/* $Id: envctrl.c,v 1.24 2001/10/08 22:19:51 davem Exp $
  * envctrl.c: Temperature and Fan monitoring on Machines providing it.
  *
  * Copyright (C) 1998  Eddie C. Dost  (ecd@skynet.be)
@@ -1175,3 +1175,4 @@ static void __exit envctrl_cleanup(void)
 
 module_init(envctrl_init);
 module_exit(envctrl_cleanup);
+MODULE_LICENSE("GPL");

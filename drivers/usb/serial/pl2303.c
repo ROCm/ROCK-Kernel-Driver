@@ -434,40 +434,53 @@ static int pl2303_open (struct usb_serial_port *port, struct file *filp)
 
 static void pl2303_close (struct usb_serial_port *port, struct file *filp)
 {
+	struct usb_serial *serial;
 	struct pl2303_private *priv;
 	unsigned int c_cflag;
 	int result;
 
 	if (port_paranoia_check (port, __FUNCTION__))
 		return;
-
+	serial = get_usb_serial (port, __FUNCTION__);
+	if (!serial)
+		return;
+	
 	dbg (__FUNCTION__ " - port %d", port->number);
 
 	down (&port->sem);
 
 	--port->open_count;
 	if (port->open_count <= 0) {
-		c_cflag = port->tty->termios->c_cflag;
-		if (c_cflag & HUPCL) {
-			/* drop DTR and RTS */
-			priv = port->private;
-			priv->line_control = 0;
-			set_control_lines (port->serial->dev, priv->line_control);
+		if (serial->dev) {
+			c_cflag = port->tty->termios->c_cflag;
+			if (c_cflag & HUPCL) {
+				/* drop DTR and RTS */
+				priv = port->private;
+				priv->line_control = 0;
+				set_control_lines (port->serial->dev,
+						   priv->line_control);
+			}
+
+			/* shutdown our urbs */
+			dbg (__FUNCTION__ " - shutting down urbs");
+			result = usb_unlink_urb (port->write_urb);
+			if (result)
+				dbg (__FUNCTION__ " - usb_unlink_urb "
+				     "(write_urb) failed with reason: %d",
+				     result);
+
+			result = usb_unlink_urb (port->read_urb);
+			if (result)
+				dbg (__FUNCTION__ " - usb_unlink_urb "
+				     "(read_urb) failed with reason: %d",
+				     result);
+
+			result = usb_unlink_urb (port->interrupt_in_urb);
+			if (result)
+				dbg (__FUNCTION__ " - usb_unlink_urb "
+				     "(interrupt_in_urb) failed with reason: %d",
+				     result);
 		}
-
-		/* shutdown our urbs */
-		dbg (__FUNCTION__ " - shutting down urbs");
-		result = usb_unlink_urb (port->write_urb);
-		if (result)
-			dbg (__FUNCTION__ " - usb_unlink_urb (write_urb) failed with reason: %d", result);
-
-		result = usb_unlink_urb (port->read_urb);
-		if (result)
-			dbg (__FUNCTION__ " - usb_unlink_urb (read_urb) failed with reason: %d", result);
-
-		result = usb_unlink_urb (port->interrupt_in_urb);
-		if (result)
-			dbg (__FUNCTION__ " - usb_unlink_urb (interrupt_in_urb) failed with reason: %d", result);
 
 		port->active = 0;
 		port->open_count = 0;

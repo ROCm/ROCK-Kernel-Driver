@@ -23,8 +23,8 @@
  *    framework in, but haven't analyzed the "tty_flip" interface yet.
  * -- Add support for flush commands
  * -- Add everything that is missing :)
- * 
- * (30-May-2001 gkh
+ *
+ * 30-May-2001 gkh
  *	switched from using spinlock to a semaphore, which fixes lots of problems.
  *
  * 08-Apr-2001 gb
@@ -350,6 +350,15 @@ exit:
 
 static void belkin_sa_close (struct usb_serial_port *port, struct file *filp)
 {
+	struct usb_serial *serial;
+
+	if (port_paranoia_check (port, __FUNCTION__))
+		return;
+
+	serial = get_usb_serial (port, __FUNCTION__);
+	if (!serial)
+		return;
+
 	dbg(__FUNCTION__" port %d", port->number);
 
 	down (&port->sem);
@@ -357,10 +366,12 @@ static void belkin_sa_close (struct usb_serial_port *port, struct file *filp)
 	--port->open_count;
 
 	if (port->open_count <= 0) {
-		/* shutdown our bulk reads and writes */
-		usb_unlink_urb (port->write_urb);
-		usb_unlink_urb (port->read_urb);
-		usb_unlink_urb (port->interrupt_in_urb);	/* wgg - do I need this? I think so. */
+		if (serial->dev) {
+			/* shutdown our bulk reads and writes */
+			usb_unlink_urb (port->write_urb);
+			usb_unlink_urb (port->read_urb);
+			usb_unlink_urb (port->interrupt_in_urb);
+		}
 		port->active = 0;
 	}
 	
@@ -636,7 +647,7 @@ static int __init belkin_sa_init (void)
 	usb_serial_register (&belkin_old_device);
 	usb_serial_register (&peracom_device);
 	usb_serial_register (&gocom232_device);
-	info(DRIVER_VERSION ":" DRIVER_DESC);
+	info(DRIVER_DESC " " DRIVER_VERSION);
 	return 0;
 }
 

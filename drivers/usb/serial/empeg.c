@@ -217,8 +217,10 @@ static void empeg_close (struct usb_serial_port *port, struct file * filp)
 	--port->open_count;
 
 	if (port->open_count <= 0) {
-		/* shutdown our bulk read */
-		usb_unlink_urb (port->read_urb);
+		if (serial->dev) {
+			/* shutdown our bulk read */
+			usb_unlink_urb (port->read_urb);
+		}
 		port->active = 0;
 		port->open_count = 0;
 	}
