@@ -15,7 +15,9 @@ static inline void mpc_oem_pci_bus(struct mpc_config_bus *m,
 static inline void mps_oem_check(struct mp_config_table *mpc, char *oem, 
 		char *productid)
 {
-	if (!strncmp(oem, "IBM ENSW", 8) && !strncmp(str, "VIGIL SMP", 9))
+	if (!strncmp(oem, "IBM ENSW", 8) && 
+			(!strncmp(productid, "VIGIL SMP", 9) 
+			 || !strncmp(productid, "RUTHLESS SMP", 12)))
 		x86_summit = 1;
 }
 

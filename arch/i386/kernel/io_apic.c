@@ -1763,7 +1763,7 @@ late_initcall(io_apic_bug_finalize);
 
 #ifdef CONFIG_ACPI_BOOT
 
-#define IO_APIC_MAX_ID		15
+#define IO_APIC_MAX_ID APIC_BROADCAST_ID
 
 int __init io_apic_get_unique_id (int ioapic, int apic_id)
 {
