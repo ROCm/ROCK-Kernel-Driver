@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbexec - debugger control method execution
- *              $Revision: 42 $
+ *              $Revision: 44 $
  *
  ******************************************************************************/
 
@@ -27,9 +27,9 @@
 #include "acpi.h"
 #include "acdebug.h"
 
-#ifdef ENABLE_DEBUGGER
+#ifdef ACPI_DEBUGGER
 
-#define _COMPONENT          ACPI_DEBUGGER
+#define _COMPONENT          ACPI_CA_DEBUGGER
 	 ACPI_MODULE_NAME    ("dbexec")
 
 
@@ -209,7 +209,7 @@ acpi_db_execute (
 	acpi_buffer             return_obj;
 
 
-#ifdef ACPI_DEBUG
+#ifdef ACPI_DEBUG_OUTPUT
 	u32                     previous_allocations;
 	u32                     allocations;
 
@@ -236,7 +236,7 @@ acpi_db_execute (
 	acpi_os_sleep (0, 10);
 
 
-#ifdef ACPI_DEBUG
+#ifdef ACPI_DEBUG_OUTPUT
 
 	/* Memory allocation tracking */
 
@@ -400,6 +400,6 @@ acpi_db_create_execution_threads (
 }
 
 
-#endif /* ENABLE_DEBUGGER */
+#endif /* ACPI_DEBUGGER */
 
 

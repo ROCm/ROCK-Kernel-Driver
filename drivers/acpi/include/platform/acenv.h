@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acenv.h - Generation environment specific items
- *       $Revision: 99 $
+ *       $Revision: 101 $
  *
  *****************************************************************************/
 
@@ -33,7 +33,7 @@
 
 #ifdef _ACPI_DUMP_APP
 #ifndef MSDOS
-#define ACPI_DEBUG
+#define ACPI_DEBUG_OUTPUT
 #endif
 #define ACPI_APPLICATION
 #define ACPI_DISASSEMBLER
@@ -44,15 +44,15 @@
 #ifdef _ACPI_EXEC_APP
 #undef DEBUGGER_THREADING
 #define DEBUGGER_THREADING      DEBUGGER_SINGLE_THREADED
-#define ACPI_DEBUG
+#define ACPI_DEBUG_OUTPUT
 #define ACPI_APPLICATION
-#define ENABLE_DEBUGGER
+#define ACPI_DEBUGGER
 #define ACPI_DISASSEMBLER
 #define ACPI_USE_SYSTEM_CLIBRARY
 #endif
 
 #ifdef _ACPI_ASL_COMPILER
-#define ACPI_DEBUG
+#define ACPI_DEBUG_OUTPUT
 #define ACPI_APPLICATION
 #define ACPI_DISASSEMBLER
 #define ACPI_CONSTANT_EVAL_ONLY
@@ -149,7 +149,7 @@
  * 1) This is the debug version
  * 2) This is NOT a 16-bit version of the code (not enough real-mode memory)
  */
-#ifdef ACPI_DEBUG
+#ifdef ACPI_DEBUG_OUTPUT
 #if ACPI_MACHINE_WIDTH != 16
 #define ACPI_DBG_TRACK_ALLOCATIONS
 #endif

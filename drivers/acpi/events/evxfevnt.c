@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: evxfevnt - External Interfaces, ACPI event disable/enable
- *              $Revision: 55 $
+ *              $Revision: 57 $
  *
  *****************************************************************************/
 
@@ -52,16 +52,14 @@ acpi_enable (void)
 	ACPI_FUNCTION_TRACE ("Acpi_enable");
 
 
-	/* Make sure we have ACPI tables */
+	/* Make sure we have the FADT*/
 
-	if (!acpi_gbl_DSDT) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "No ACPI tables present!\n"));
+	if (!acpi_gbl_FADT) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "No FADT information present!\n"));
 		return_ACPI_STATUS (AE_NO_ACPI_TABLES);
 	}
 
-	acpi_gbl_original_mode = acpi_hw_get_mode ();
-
-	if (acpi_gbl_original_mode == ACPI_SYS_MODE_ACPI) {
+	if (acpi_hw_get_mode() == ACPI_SYS_MODE_ACPI) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_OK, "Already in ACPI mode.\n"));
 	}
 	else {
@@ -88,8 +86,7 @@ acpi_enable (void)
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Returns the system to original ACPI/legacy mode, and
- *              uninstalls the SCI interrupt handler.
+ * DESCRIPTION: Transfers the system into LEGACY mode.
  *
  ******************************************************************************/
 
@@ -101,20 +98,26 @@ acpi_disable (void)
 
 	ACPI_FUNCTION_TRACE ("Acpi_disable");
 
-
-	if (acpi_hw_get_mode () != acpi_gbl_original_mode) {
-		/* Restore original mode  */
-
-		status = acpi_hw_set_mode (acpi_gbl_original_mode);
-		if (ACPI_FAILURE (status)) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unable to transition to original mode"));
-			return_ACPI_STATUS (status);
-		}
+	if (!acpi_gbl_FADT) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "No FADT information present!\n"));
+		return_ACPI_STATUS (AE_NO_ACPI_TABLES);
 	}
 
-	/* Unload the SCI interrupt handler  */
+	if (acpi_hw_get_mode() == ACPI_SYS_MODE_LEGACY) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_OK, "Already in LEGACY mode.\n"));
+	}
+	else {
+		/* Transition to LEGACY mode */
+		status = acpi_hw_set_mode (ACPI_SYS_MODE_LEGACY);
 
-	status = acpi_ev_remove_sci_handler ();
+		if (ACPI_FAILURE (status)) {
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Could not transition to LEGACY mode."));
+			return_ACPI_STATUS (status);
+		}
+
+		ACPI_DEBUG_PRINT ((ACPI_DB_OK, "Transition to LEGACY mode successful\n"));
+	}
+
 	return_ACPI_STATUS (status);
 }
 

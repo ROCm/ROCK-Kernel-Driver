@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: evevent - Fixed and General Purpose Even handling and dispatch
- *              $Revision: 88 $
+ *              $Revision: 90 $
  *
  *****************************************************************************/
 
@@ -104,7 +104,7 @@ acpi_ev_handler_initialize (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Ev_initialize");
+	ACPI_FUNCTION_TRACE ("Ev_handler_initialize");
 
 
 	/* Install the SCI handler */

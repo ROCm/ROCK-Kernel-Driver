@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dbhistry - debugger HISTORY command
- *              $Revision: 24 $
+ *              $Revision: 25 $
  *
  *****************************************************************************/
 
@@ -27,9 +27,9 @@
 #include "acpi.h"
 #include "acdebug.h"
 
-#ifdef ENABLE_DEBUGGER
+#ifdef ACPI_DEBUGGER
 
-#define _COMPONENT          ACPI_DEBUGGER
+#define _COMPONENT          ACPI_CA_DEBUGGER
 	 ACPI_MODULE_NAME    ("dbhistry")
 
 
@@ -185,5 +185,5 @@ acpi_db_get_from_history (
 }
 
 
-#endif /* ENABLE_DEBUGGER */
+#endif /* ACPI_DEBUGGER */
 

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbutils - Table manipulation utilities
- *              $Revision: 55 $
+ *              $Revision: 56 $
  *
  *****************************************************************************/
 
@@ -135,7 +135,7 @@ acpi_tb_validate_table_header (
 			table_header, (char *) &signature));
 
 		ACPI_REPORT_WARNING (("Invalid table header length (0x%X) found\n",
-			table_header->length));
+			(u32) table_header->length));
 		ACPI_DUMP_BUFFER (table_header, sizeof (acpi_table_header));
 		return (AE_BAD_HEADER);
 	}
@@ -176,7 +176,7 @@ acpi_tb_verify_table_checksum (
 
 	if (checksum) {
 		ACPI_REPORT_WARNING (("Invalid checksum (%X) in table %4.4s\n",
-			checksum, table_header->signature));
+			(u32) checksum, table_header->signature));
 
 		status = AE_BAD_CHECKSUM;
 	}

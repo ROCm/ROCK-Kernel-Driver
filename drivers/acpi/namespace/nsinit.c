@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: nsinit - namespace initialization
- *              $Revision: 47 $
+ *              $Revision: 49 $
  *
  *****************************************************************************/
 
@@ -369,7 +369,7 @@ acpi_ns_init_one_device (
 		if (status != AE_NOT_FOUND) {
 			/* Ignore error and move on to next device */
 
-	#ifdef ACPI_DEBUG
+	#ifdef ACPI_DEBUG_OUTPUT
 			NATIVE_CHAR *scope_name = acpi_ns_get_external_pathname (obj_handle);
 
 			ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "%s._INI failed: %s\n",

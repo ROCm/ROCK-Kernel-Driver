@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbutils - AML debugger utilities
- *              $Revision: 55 $
+ *              $Revision: 56 $
  *
  ******************************************************************************/
 
@@ -32,9 +32,9 @@
 #include "acdispat.h"
 
 
-#ifdef ENABLE_DEBUGGER
+#ifdef ACPI_DEBUGGER
 
-#define _COMPONENT          ACPI_DEBUGGER
+#define _COMPONENT          ACPI_CA_DEBUGGER
 	 ACPI_MODULE_NAME    ("dbutils")
 
 
@@ -375,6 +375,6 @@ acpi_db_local_ns_lookup (
 }
 
 
-#endif /* ENABLE_DEBUGGER */
+#endif /* ACPI_DEBUGGER */
 
 

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utxface - External interfaces for "global" ACPI functions
- *              $Revision: 97 $
+ *              $Revision: 100 $
  *
  *****************************************************************************/
 
@@ -159,6 +159,8 @@ acpi_enable_subsystem (
 	if (!(flags & ACPI_NO_ACPI_ENABLE)) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[Init] Going into ACPI mode\n"));
 
+		acpi_gbl_original_mode = acpi_hw_get_mode();
+
 		status = acpi_enable ();
 		if (ACPI_FAILURE (status)) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Acpi_enable failed.\n"));
@@ -291,7 +293,7 @@ acpi_terminate (void)
 	acpi_ut_mutex_terminate ();
 
 
-#ifdef ENABLE_DEBUGGER
+#ifdef ACPI_DEBUGGER
 
 	/* Shut down the debugger */
 

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dswload - Dispatcher namespace load callbacks
- *              $Revision: 69 $
+ *              $Revision: 70 $
  *
  *****************************************************************************/
 
@@ -296,7 +296,7 @@ acpi_ds_load2_begin_op (
 	NATIVE_CHAR             *buffer_ptr;
 
 
-	ACPI_FUNCTION_NAME ("Ds_load2_begin_op");
+	ACPI_FUNCTION_TRACE ("Ds_load2_begin_op");
 
 
 	op = walk_state->op;
@@ -307,7 +307,7 @@ acpi_ds_load2_begin_op (
 
 		if ((!(walk_state->op_info->flags & AML_NSOPCODE) && (walk_state->opcode != AML_INT_NAMEPATH_OP)) ||
 			(!(walk_state->op_info->flags & AML_NAMED))) {
-			return (AE_OK);
+			return_ACPI_STATUS (AE_OK);
 		}
 
 		/*
@@ -320,7 +320,7 @@ acpi_ds_load2_begin_op (
 			if (!buffer_ptr) {
 				/* No name, just exit */
 
-				return (AE_OK);
+				return_ACPI_STATUS (AE_OK);
 			}
 		}
 		else {
@@ -368,11 +368,11 @@ acpi_ds_load2_begin_op (
 			if (acpi_ns_opens_scope (object_type)) {
 				status = acpi_ds_scope_stack_push (node, object_type, walk_state);
 				if (ACPI_FAILURE (status)) {
-					return (status);
+					return_ACPI_STATUS (status);
 				}
 
 			}
-			return (AE_OK);
+			return_ACPI_STATUS (AE_OK);
 		}
 
 		/*
@@ -390,7 +390,7 @@ acpi_ds_load2_begin_op (
 
 			op = acpi_ps_alloc_op (walk_state->opcode);
 			if (!op) {
-				return (AE_NO_MEMORY);
+				return_ACPI_STATUS (AE_NO_MEMORY);
 			}
 
 			/* Initialize the new op */
@@ -410,7 +410,7 @@ acpi_ds_load2_begin_op (
 		op->common.node = node;
 	}
 
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -444,7 +444,7 @@ acpi_ds_load2_end_op (
 #endif
 
 
-	ACPI_FUNCTION_NAME ("Ds_load2_end_op");
+	ACPI_FUNCTION_TRACE ("Ds_load2_end_op");
 
 	op = walk_state->op;
 	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH, "Opcode [%s] Op %p State %p\n",
@@ -453,7 +453,7 @@ acpi_ds_load2_end_op (
 	/* Only interested in opcodes that have namespace objects */
 
 	if (!(walk_state->op_info->flags & AML_NSOBJECT)) {
-		return (AE_OK);
+		return_ACPI_STATUS (AE_OK);
 	}
 
 	if (op->common.aml_opcode == AML_SCOPE_OP) {
@@ -479,13 +479,13 @@ acpi_ds_load2_end_op (
 
 	/* Pop the scope stack */
 
-	if (acpi_ns_opens_scope (object_type)) {
+	if (acpi_ns_opens_scope (object_type) && (op->common.aml_opcode != AML_INT_METHODCALL_OP)) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH, "(%s) Popping scope for Op %p\n",
 			acpi_ut_get_type_name (object_type), op));
 
 		status = acpi_ds_scope_stack_pop (walk_state);
 		if (ACPI_FAILURE (status)) {
-			return (status);
+			return_ACPI_STATUS (status);
 		}
 	}
 
@@ -730,7 +730,7 @@ cleanup:
 
 	walk_state->operands[0] = NULL;
 	walk_state->num_operands = 0;
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acglobal.h - Declarations for global variables
- *       $Revision: 128 $
+ *       $Revision: 130 $
  *
  *****************************************************************************/
 
@@ -152,8 +152,12 @@ extern const NATIVE_CHAR               *acpi_gbl_region_types[ACPI_NUM_PREDEFINE
  ****************************************************************************/
 
 #define NUM_NS_TYPES                    INTERNAL_TYPE_INVALID+1
-#define NUM_PREDEFINED_NAMES            9
 
+#if defined (ACPI_NO_METHOD_EXECUTION) || defined (ACPI_CONSTANT_EVAL_ONLY)
+#define NUM_PREDEFINED_NAMES            10
+#else
+#define NUM_PREDEFINED_NAMES            9
+#endif
 
 ACPI_EXTERN acpi_namespace_node         acpi_gbl_root_node_struct;
 ACPI_EXTERN acpi_namespace_node        *acpi_gbl_root_node;
@@ -161,7 +165,7 @@ ACPI_EXTERN acpi_namespace_node        *acpi_gbl_root_node;
 extern const u8                         acpi_gbl_ns_properties[NUM_NS_TYPES];
 extern const acpi_predefined_names      acpi_gbl_pre_defined_names [NUM_PREDEFINED_NAMES];
 
-#ifdef ACPI_DEBUG
+#ifdef ACPI_DEBUG_OUTPUT
 ACPI_EXTERN u32                         acpi_gbl_current_node_count;
 ACPI_EXTERN u32                         acpi_gbl_current_node_size;
 ACPI_EXTERN u32                         acpi_gbl_max_concurrent_node_count;
@@ -245,7 +249,7 @@ ACPI_EXTERN u8                          acpi_gbl_db_opt_verbose;
 #endif
 
 
-#ifdef ENABLE_DEBUGGER
+#ifdef ACPI_DEBUGGER
 
 extern      u8                          acpi_gbl_method_executing;
 extern      u8                          acpi_gbl_db_terminate_threads;
@@ -287,7 +291,7 @@ ACPI_EXTERN u32                         acpi_gbl_size_of_method_trees;
 ACPI_EXTERN u32                         acpi_gbl_size_of_node_entries;
 ACPI_EXTERN u32                         acpi_gbl_size_of_acpi_objects;
 
-#endif /* ENABLE_DEBUGGER */
+#endif /* ACPI_DEBUGGER */
 
 
 #endif /* __ACGLOBAL_H__ */

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acmacros.h - C macros for the entire subsystem.
- *       $Revision: 126 $
+ *       $Revision: 128 $
  *
  *****************************************************************************/
 
@@ -287,7 +287,7 @@
 /*
  * Macros for the master AML opcode table
  */
-#if defined(ACPI_DISASSEMBLER) || defined (ACPI_DEBUG)
+#if defined(ACPI_DISASSEMBLER) || defined (ACPI_DEBUG_OUTPUT)
 #define ACPI_OP(name,Pargs,Iargs,obj_type,class,type,flags)    {name,Pargs,Iargs,flags,obj_type,class,type}
 #else
 #define ACPI_OP(name,Pargs,Iargs,obj_type,class,type,flags)    {Pargs,Iargs,flags,obj_type,class,type}
@@ -353,11 +353,11 @@
 
 /*
  * Error reporting.  These versions add callers module and line#.  Since
- * _THIS_MODULE gets compiled out when ACPI_DEBUG isn't defined, only
+ * _THIS_MODULE gets compiled out when ACPI_DEBUG_OUTPUT isn't defined, only
  * use it in debug mode.
  */
 
-#ifdef ACPI_DEBUG
+#ifdef ACPI_DEBUG_OUTPUT
 
 #define ACPI_REPORT_INFO(fp)                {acpi_ut_report_info(_THIS_MODULE,__LINE__,_COMPONENT); \
 												acpi_os_printf ACPI_PARAM_LIST(fp);}
@@ -390,7 +390,7 @@
  * Debug macros that are conditionally compiled
  */
 
-#ifdef ACPI_DEBUG
+#ifdef ACPI_DEBUG_OUTPUT
 
 #define ACPI_MODULE_NAME(name)               static char *_THIS_MODULE = name;
 
@@ -525,9 +525,9 @@
 /*
  * Some code only gets executed when the debugger is built in.
  * Note that this is entirely independent of whether the
- * DEBUG_PRINT stuff (set by ACPI_DEBUG) is on, or not.
+ * DEBUG_PRINT stuff (set by ACPI_DEBUG_OUTPUT) is on, or not.
  */
-#ifdef ENABLE_DEBUGGER
+#ifdef ACPI_DEBUGGER
 #define ACPI_DEBUGGER_EXEC(a)           a
 #else
 #define ACPI_DEBUGGER_EXEC(a)
@@ -536,7 +536,7 @@
 
 /*
  * For 16-bit code, we want to shrink some things even though
- * we are using ACPI_DEBUG to get the debug output
+ * we are using ACPI_DEBUG_OUTPUT to get the debug output
  */
 #if ACPI_MACHINE_WIDTH == 16
 #undef ACPI_DEBUG_ONLY_MEMBERS
@@ -545,7 +545,7 @@
 #endif
 
 
-#ifdef ACPI_DEBUG
+#ifdef ACPI_DEBUG_OUTPUT
 /*
  * 1) Set name to blanks
  * 2) Copy the object name

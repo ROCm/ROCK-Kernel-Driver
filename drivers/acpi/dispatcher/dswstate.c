@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dswstate - Dispatcher parse tree walk management routines
- *              $Revision: 67 $
+ *              $Revision: 68 $
  *
  *****************************************************************************/
 
@@ -835,6 +835,8 @@ acpi_ds_create_walk_state (
 	walk_state->method_desc     = mth_desc;
 	walk_state->thread          = thread;
 
+	walk_state->parser_state.start_op = origin;
+
 	/* Init the method args/local */
 
 #if (!defined (ACPI_NO_METHOD_EXECUTION) && !defined (ACPI_CONSTANT_EVAL_ONLY))
@@ -883,6 +885,7 @@ acpi_ds_init_aml_walk (
 {
 	acpi_status             status;
 	acpi_parse_state        *parser_state = &walk_state->parser_state;
+	acpi_parse_object       *extra_op;
 
 
 	ACPI_FUNCTION_TRACE ("Ds_init_aml_walk");
@@ -925,9 +928,23 @@ acpi_ds_init_aml_walk (
 		}
 	}
 	else {
-		/* Setup the current scope */
+		/*
+		 * Setup the current scope.
+		 * Find a Named Op that has a namespace node associated with it.
+		 * search upwards from this Op.  Current scope is the first
+		 * Op with a namespace node.
+		 */
+		extra_op = parser_state->start_op;
+		while (extra_op && !extra_op->common.node) {
+			extra_op = extra_op->common.parent;
+		}
+		if (!extra_op) {
+			parser_state->start_node = NULL;
+		}
+		else {
+			parser_state->start_node = extra_op->common.node;
+		}
 
-		parser_state->start_node = parser_state->start_op->common.node;
 		if (parser_state->start_node) {
 			/* Push start scope on scope stack and make it current  */
 
