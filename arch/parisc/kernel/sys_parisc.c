@@ -93,7 +93,7 @@ static unsigned long get_shared_area(struct address_space *mapping,
 		unsigned long addr, unsigned long len, unsigned long pgoff)
 {
 	struct vm_area_struct *vma;
-	int offset = get_offset(mapping);
+	int offset = mapping ? get_offset(mapping) : 0;
 
 	addr = DCACHE_ALIGN(addr - offset) + offset;
 
@@ -117,8 +117,10 @@ unsigned long arch_get_unmapped_area(struct file *filp, unsigned long addr,
 	if (!addr)
 		addr = TASK_UNMAPPED_BASE;
 
-	if (filp && (flags & MAP_SHARED)) {
+	if (filp) {
 		addr = get_shared_area(filp->f_mapping, addr, len, pgoff);
+	} else if(flags & MAP_SHARED) {
+		addr = get_shared_area(NULL, addr, len, pgoff);
 	} else {
 		addr = get_unshared_area(addr, len);
 	}

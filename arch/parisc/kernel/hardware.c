@@ -1273,8 +1273,8 @@ static struct hp_cpu_type_mask {
 	{ 0x05e6, 0x0ffe, pcxw2  },  /* 0x05e6 - 0x05e7 */
 	{ 0x05e8, 0x0ff8, pcxw2  },  /* 0x05e8 - 0x05ef */
 	{ 0x05f0, 0x0ff0, pcxw2  },  /* 0x05f0 - 0x05ff */
-	{ 0x0600, 0x0ff0, pcxl   },  /* 0x0600 - 0x060f */
-	{ 0x0610, 0x0ff0, pcxl   },  /* 0x0610 - 0x061f */
+	{ 0x0600, 0x0fe0, pcxl   },  /* 0x0600 - 0x061f */
+	{ 0x0880, 0x0ff0, mako   },  /* 0x0880 - 0x088f */
 	{ 0x0000, 0x0000, pcx    }	/* terminate table */
 };
 
@@ -1289,7 +1289,8 @@ char *cpu_name_version[][2] = {
 	[pcxu_]	{ "PA8200 (PCX-U+)",	"2.0" },
 	[pcxw]	{ "PA8500 (PCX-W)",	"2.0" },
 	[pcxw_]	{ "PA8600 (PCX-W+)",	"2.0" },
-	[pcxw2]	{ "PA8700 (PCX-W2)",	"2.0" }
+	[pcxw2]	{ "PA8700 (PCX-W2)",	"2.0" },
+	[mako]	{ "PA8800 (MAKO)",	"2.0" }
 };
 
 const char * __init

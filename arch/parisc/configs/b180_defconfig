@@ -121,6 +121,7 @@ CONFIG_PARPORT_GSC=y
 CONFIG_BLK_DEV_LOOP=y
 CONFIG_BLK_DEV_CRYPTOLOOP=y
 # CONFIG_BLK_DEV_NBD is not set
+CONFIG_BLK_DEV_CARMEL=y
 # CONFIG_BLK_DEV_RAM is not set
 
 #
@@ -151,6 +152,12 @@ CONFIG_CHR_DEV_SG=y
 # CONFIG_SCSI_REPORT_LUNS is not set
 # CONFIG_SCSI_CONSTANTS is not set
 # CONFIG_SCSI_LOGGING is not set
+
+#
+# SCSI Transport Attributes
+#
+CONFIG_SCSI_SPI_ATTRS=y
+# CONFIG_SCSI_FC_ATTRS is not set
 
 #
 # SCSI low-level drivers
@@ -245,10 +252,6 @@ CONFIG_MD_RAID5=y
 # CONFIG_I2O is not set
 
 #
-# Macintosh device drivers
-#
-
-#
 # Networking support
 #
 CONFIG_NET=y
@@ -271,7 +274,6 @@ CONFIG_IP_PNP_BOOTP=y
 # CONFIG_NET_IPIP is not set
 # CONFIG_NET_IPGRE is not set
 # CONFIG_IP_MROUTE is not set
-CONFIG_INET_ECN=y
 # CONFIG_SYN_COOKIES is not set
 # CONFIG_INET_AH is not set
 # CONFIG_INET_ESP is not set
@@ -376,6 +378,10 @@ CONFIG_NET_RADIO=y
 #
 # CONFIG_AIRO is not set
 # CONFIG_HERMES is not set
+
+#
+# Prism GT/Duette 802.11(a/b/g) PCI/Cardbus support
+#
 CONFIG_NET_WIRELESS=y
 
 #
@@ -403,6 +409,8 @@ CONFIG_NET_WIRELESS=y
 # Bluetooth support
 #
 # CONFIG_BT is not set
+# CONFIG_NETPOLL is not set
+# CONFIG_NET_POLL_CONTROLLER is not set
 
 #
 # ISDN subsystem
@@ -449,6 +457,7 @@ CONFIG_SERIO_GSCPS2=y
 CONFIG_INPUT_KEYBOARD=y
 # CONFIG_KEYBOARD_ATKBD is not set
 # CONFIG_KEYBOARD_SUNKBD is not set
+# CONFIG_KEYBOARD_LKKBD is not set
 # CONFIG_KEYBOARD_XTKBD is not set
 # CONFIG_KEYBOARD_NEWTON is not set
 # CONFIG_KEYBOARD_HIL_OLD is not set
@@ -459,6 +468,7 @@ CONFIG_INPUT_MOUSE=y
 # CONFIG_MOUSE_INPORT is not set
 # CONFIG_MOUSE_LOGIBM is not set
 # CONFIG_MOUSE_PC110PAD is not set
+# CONFIG_MOUSE_VSXXXAA is not set
 # CONFIG_MOUSE_HIL is not set
 # CONFIG_INPUT_JOYSTICK is not set
 # CONFIG_INPUT_TOUCHSCREEN is not set
@@ -502,11 +512,6 @@ CONFIG_PRINTER=y
 # CONFIG_LP_CONSOLE is not set
 # CONFIG_PPDEV is not set
 # CONFIG_TIPAR is not set
-
-#
-# Mice
-#
-# CONFIG_BUSMOUSE is not set
 # CONFIG_QIC02_TAPE is not set
 
 #
@@ -518,7 +523,6 @@ CONFIG_PRINTER=y
 # Watchdog Cards
 #
 # CONFIG_WATCHDOG is not set
-# CONFIG_NVRAM is not set
 CONFIG_GEN_RTC=y
 # CONFIG_GEN_RTC_X is not set
 # CONFIG_DTLK is not set
@@ -768,6 +772,7 @@ CONFIG_CRYPTO=y
 # CONFIG_CRYPTO_CAST6 is not set
 # CONFIG_CRYPTO_ARC4 is not set
 # CONFIG_CRYPTO_DEFLATE is not set
+# CONFIG_CRYPTO_MICHAEL_MIC is not set
 # CONFIG_CRYPTO_TEST is not set
 
 #

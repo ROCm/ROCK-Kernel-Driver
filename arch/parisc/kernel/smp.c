@@ -3,7 +3,7 @@
 **
 ** Copyright (C) 1999 Walt Drummond <drummond@valinux.com>
 ** Copyright (C) 1999 David Mosberger-Tang <davidm@hpl.hp.com>
-** Copyright (C) 2001 Grant Grundler <grundler@parisc-linux.org>
+** Copyright (C) 2001,2004 Grant Grundler <grundler@parisc-linux.org>
 ** 
 ** Lots of stuff stolen from arch/alpha/kernel/smp.c
 ** ...and then parisc stole from arch/ia64/kernel/smp.c. Thanks David! :^)
@@ -60,20 +60,16 @@ spinlock_t smp_lock = SPIN_LOCK_UNLOCKED;
 
 volatile struct task_struct *smp_init_current_idle_task;
 
-static volatile int smp_commenced = 0;   /* Set when the idlers are all forked */
-static volatile int cpu_now_booting = 0;      /* track which CPU is booting */
-cpumask_t cpu_online_map = CPU_MASK_NONE;   /* Bitmap of online CPUs */
-#define IS_LOGGED_IN(cpunum) (cpu_isset(cpunum, cpu_online_map))
+static volatile int cpu_now_booting = 0;	/* track which CPU is booting */
+static int parisc_max_cpus = -1;		/* Command line */
+
+unsigned long cache_decay_ticks;	/* declared by include/linux/sched.h */
+cpumask_t cpu_online_map = CPU_MASK_NONE;	/* Bitmap of online CPUs */
+cpumask_t cpu_possible_map = CPU_MASK_NONE;	/* Bitmap of Present CPUs */
 
 EXPORT_SYMBOL(cpu_online_map);
+EXPORT_SYMBOL(cpu_possible_map);
 
-int smp_num_cpus = 1;
-int smp_threads_ready = 0;
-unsigned long cache_decay_ticks;
-static int max_cpus = -1;			     /* Command line */
-cpumask_t cpu_present_mask;
-
-EXPORT_SYMBOL(cpu_present_mask);
 
 struct smp_call_struct {
 	void (*func) (void *info);
@@ -114,7 +110,7 @@ ipi_init(int cpuid)
 
 #error verify IRQ_OFFSET(IPI_IRQ) is ipi_interrupt() in new IRQ region
 
-	if(IS_LOGGED_IN(cpuid) )
+	if(cpu_online(cpuid) )
 	{
 		switch_to_idle_task(current);
 	}
@@ -293,11 +289,12 @@ send_IPI_allbutself(enum ipi_message_type op)
 {
 	int i;
 	
-	for (i = 0; i < smp_num_cpus; i++) {
-		if (i != smp_processor_id())
+	for (i = 0; i < parisc_max_cpus; i++) {
+		if (cpu_online(i) && i != smp_processor_id())
 			send_IPI_single(i, op);
 	}
 }
+
 
 inline void 
 smp_send_stop(void)	{ send_IPI_allbutself(IPI_CPU_STOP); }
@@ -334,8 +331,8 @@ smp_call_function (void (*func) (void *info), void *info, int retry, int wait)
 	data.func = func;
 	data.info = info;
 	data.wait = wait;
-	atomic_set(&data.unstarted_count, smp_num_cpus - 1);
-	atomic_set(&data.unfinished_count, smp_num_cpus - 1);
+	atomic_set(&data.unstarted_count, num_online_cpus() - 1);
+	atomic_set(&data.unfinished_count, num_online_cpus() - 1);
 
 	if (retry) {
 		spin_lock (&lock);
@@ -395,7 +392,7 @@ EXPORT_SYMBOL(smp_call_function);
 
 static int __init nosmp(char *str)
 {
-	max_cpus = 0;
+	parisc_max_cpus = 0;
 	return 1;
 }
 
@@ -403,7 +400,7 @@ __setup("nosmp", nosmp);
 
 static int __init maxcpus(char *str)
 {
-	get_option(&str, &max_cpus);
+	get_option(&str, &parisc_max_cpus);
 	return 1;
 }
 
@@ -499,17 +496,13 @@ void __init smp_callin(void)
 
 	local_irq_enable();  /* Interrupts have been off until now */
 
-	/* Slaves wait here until Big Poppa daddy say "jump" */
-	mb();	/* PARANOID */
-	while (!smp_commenced) ;
-	mb();	/* PARANOID */
-
 	cpu_idle();      /* Wait for timer to schedule some work */
 
 	/* NOTREACHED */
 	panic("smp_callin() AAAAaaaaahhhh....\n");
 }
 
+#if 0
 /*
  * Create the idle task for a new Slave CPU.  DO NOT use kernel_thread()
  * because that could end up calling schedule(). If it did, the new idle
@@ -531,7 +524,7 @@ static struct task_struct *fork_by_hand(void)
 /*
  * Bring one cpu online.
  */
-static int __init smp_boot_one_cpu(int cpuid, int cpunum)
+int __init smp_boot_one_cpu(int cpuid, int cpunum)
 {
 	struct task_struct *idle;
 	long timeout;
@@ -576,12 +569,11 @@ static int __init smp_boot_one_cpu(int cpuid, int cpunum)
 
 	/* 
 	 * OK, wait a bit for that CPU to finish staggering about. 
-	 * Slave will set a bit when it reaches smp_cpu_init() and then
-	 * wait for smp_commenced to be 1.
-	 * Once we see the bit change, we can move on.
+	 * Slave will set a bit when it reaches smp_cpu_init().
+	 * Once the "monarch CPU" sees the bit change, it can move on.
 	 */
 	for (timeout = 0; timeout < 10000; timeout++) {
-		if(IS_LOGGED_IN(cpunum)) {
+		if(cpu_online(cpunum)) {
 			/* Which implies Slave has started up */
 			cpu_now_booting = 0;
 			smp_init_current_idle_task = NULL;
@@ -608,120 +600,56 @@ alive:
 #endif
 	return 0;
 }
+#endif
 
 
-
-
-/*
-** inventory.c:do_inventory() has already 'discovered' the additional CPU's.
-** We are ready to wrest them from PDC's control now.
-** Called by smp_init bring all the secondaries online and hold them.  
-**
-** o Setup of the IPI irq handler is done in irq.c.
-** o MEM_RENDEZ is initialzed in head.S:stext()
-**
-*/
-void __init smp_boot_cpus(void)
+void __devinit smp_prepare_boot_cpu(void)
 {
-	int i, cpu_count = 1;
-	unsigned long bogosum = cpu_data[0].loops_per_jiffy; /* Count Monarch */
-
-	/* REVISIT - assumes first CPU reported by PAT PDC is BSP */
 	int bootstrap_processor=cpu_data[0].cpuid;	/* CPU ID of BSP */
+
+#ifdef ENTRY_SYS_CPUS
+	cpu_data[0].state = STATE_RUNNING;
+#endif
 
 	/* Setup BSP mappings */
 	printk(KERN_DEBUG "SMP: bootstrap CPU ID is %d\n",bootstrap_processor);
 	init_task.thread_info->cpu = bootstrap_processor; 
 	current->thread_info->cpu = bootstrap_processor;
+
+	cpu_set(bootstrap_processor, cpu_online_map);
+	cpu_set(bootstrap_processor, cpu_possible_map);
+
 	/* Mark Boostrap processor as present */
-	cpu_online_map = cpumask_of_cpu(bootstrap_processor);
 	current->active_mm = &init_mm;
 
-#ifdef ENTRY_SYS_CPUS
-	cpu_data[0].state = STATE_RUNNING;
-#endif
-	cpu_present_mask = cpumask_of_cpu(bootstrap_processor);
-
-	/* Nothing to do when told not to.  */
-	if (max_cpus == 0) {
-		printk(KERN_INFO "SMP mode deactivated.\n");
-		return;
-	}
-
-	if (max_cpus != -1) 
-		printk(KERN_INFO "Limiting CPUs to %d\n", max_cpus);
-
-	/* We found more than one CPU.... */
-	if (boot_cpu_data.cpu_count > 1) {
-
-		for (i = 0; i < NR_CPUS; i++) {
-			if (cpu_data[i].cpuid == NO_PROC_ID || 
-			    cpu_data[i].cpuid == bootstrap_processor)
-				continue;
-
-			if (smp_boot_one_cpu(cpu_data[i].cpuid, cpu_count) < 0)
-				continue;
-
-			bogosum += cpu_data[i].loops_per_jiffy;
-			cpu_count++; /* Count good CPUs only... */
-			
-			cpu_present_mask |= 1UL << i;
-			
-			/* Bail when we've started as many CPUS as told to */
-			if (cpu_count == max_cpus)
-				break;
-		}
-	}
-	if (cpu_count == 1) {
-		printk(KERN_INFO "SMP: Bootstrap processor only.\n");
-	}
-
-	/*
-	 * FIXME very rough.
-	 */
-	cache_decay_ticks = HZ/100;
-
-	printk(KERN_INFO "SMP: Total %d of %d processors activated "
-	       "(%lu.%02lu BogoMIPS noticed) (Present Mask: %lu).\n",
-	       cpu_count, boot_cpu_data.cpu_count, (bogosum + 25) / 5000,
-	       ((bogosum + 25) / 50) % 100, cpu_present_mask);
-
-	smp_num_cpus = cpu_count;
-#ifdef PER_CPU_IRQ_REGION
-	ipi_init();
-#endif
-	return;
+	cache_decay_ticks = HZ/100;	/* FIXME very rough.  */
 }
 
-/* 
- * Called from main.c by Monarch Processor.
- * After this, any CPU can schedule any task.
- */
-void smp_commence(void)
-{
-	smp_commenced = 1;
-	mb();
-	return;
-}
+
 
 /*
- * XXX FIXME : do nothing
- */
-void smp_cpus_done(unsigned int cpu_max)
-{
-	smp_threads_ready = 1;
-}
-
+** inventory.c:do_inventory() hasn't yet been run and thus we
+** don't 'discover' the additional CPU's until later.
+*/
 void __init smp_prepare_cpus(unsigned int max_cpus)
 {
-	smp_boot_cpus();
+
+	if (max_cpus != -1) 
+		printk(KERN_INFO "SMP: Limited to %d CPUs\n", max_cpus);
+
+	printk(KERN_INFO "SMP: Monarch CPU activated (%lu.%02lu BogoMIPS)\n",
+	       (cpu_data[0].loops_per_jiffy + 25) / 5000,
+	       ((cpu_data[0].loops_per_jiffy + 25) / 50) % 100);
+
+	return;
 }
 
-void __devinit smp_prepare_boot_cpu(void)
+
+void smp_cpus_done(unsigned int cpu_max)
 {
-	cpu_set(smp_processor_id(), cpu_online_map);
-	cpu_set(smp_processor_id(), cpu_present_mask);
+	return;
 }
+
 
 int __devinit __cpu_up(unsigned int cpu)
 {
@@ -748,7 +676,7 @@ int sys_cpus(int argc, char **argv)
 #ifdef DUMP_MORE_STATE
 		for(i=0; i<NR_CPUS; i++) {
 			int cpus_per_line = 4;
-			if(IS_LOGGED_IN(i)) {
+			if(cpu_online(i)) {
 				if (j++ % cpus_per_line)
 					printk(" %3d",i);
 				else
@@ -763,7 +691,7 @@ int sys_cpus(int argc, char **argv)
 		printk("\nCPUSTATE  TASK CPUNUM CPUID HARDCPU(HPA)\n");
 #ifdef DUMP_MORE_STATE
 		for(i=0;i<NR_CPUS;i++) {
-			if (!IS_LOGGED_IN(i))
+			if (!cpu_online(i))
 				continue;
 			if (cpu_data[i].cpuid != NO_PROC_ID) {
 				switch(cpu_data[i].state) {
@@ -783,7 +711,7 @@ int sys_cpus(int argc, char **argv)
 						printk("%08x?", cpu_data[i].state);
 						break;
 				}
-				if(IS_LOGGED_IN(i)) {
+				if(cpu_online(i)) {
 					printk(" %4d",current_pid(i));
 				}	
 				printk(" %6d",cpu_number_map(i));
@@ -799,7 +727,7 @@ int sys_cpus(int argc, char **argv)
 #ifdef DUMP_MORE_STATE
      		printk("\nCPUSTATE   CPUID\n");
 		for (i=0;i<NR_CPUS;i++) {
-			if (!IS_LOGGED_IN(i))
+			if (!cpu_online(i))
 				continue;
 			if (cpu_data[i].cpuid != NO_PROC_ID) {
 				switch(cpu_data[i].state) {

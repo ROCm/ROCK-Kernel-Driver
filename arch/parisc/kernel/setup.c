@@ -121,8 +121,11 @@ void __init setup_arch(char **cmdline_p)
 
 	pdc_console_init();
 
-#ifdef CONFIG_PDC_NARROW
-	printk(KERN_INFO "Kernel is using PDC in 32-bit mode.\n");
+#ifdef __LP64__
+	extern int parisc_narrow_firmware;
+	if(parisc_narrow_firmware) {
+		printk(KERN_INFO "Kernel is using PDC in 32-bit mode.\n");
+	}
 #endif
 	setup_pdc();
 	setup_cmdline(cmdline_p);
@@ -204,6 +207,7 @@ static void __init parisc_proc_mkdir(void)
         case pcxw:
         case pcxw_:
         case pcxw2:
+	case mako:	/* XXX : this is really mckinley bus */
                 if (NULL == proc_runway_root)
                 {
                         proc_runway_root = proc_mkdir("bus/runway", 0);

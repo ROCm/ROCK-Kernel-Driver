@@ -2,18 +2,22 @@
 #define _ASM_FIXMAP_H
 
 /*
- * Allocate a 8 Mb temporary mapping area for copy_user_page/clear_user_page.
- * This area needs to be aligned on a 8 Mb boundary.
+ * This file defines the locations of the fixed mappings on parisc.
  *
- * FIXME:
+ * All of the values in this file are machine virtual addresses.
  *
- * For PA-RISC, this has no meaning.  It is starting to be used on x86
- * for vsyscalls.  PA will probably do this using space registers.
- */
+ * All of the values in this file must be <4GB (because of assembly
+ * loading restrictions).  If you place this region anywhere above
+ * __PAGE_OFFSET, you must adjust the memory map accordingly */
 
-/* This TMPALIAS_MAP_START reserves some of the memory where the
- * FIXMAP region is on x86.  It's only real use is to constrain
- * VMALLOC_END (see pktable.h) */
-#define TMPALIAS_MAP_START (__PAGE_OFFSET - 0x01000000)
+/* The alias region is used in kernel space to do copy/clear to or
+ * from areas congruently mapped with user space.  It is 8MB large
+ * and must be 16MB aligned */
+#define TMPALIAS_MAP_START	((__PAGE_OFFSET) - 16*1024*1024)
+/* This is the kernel area for all maps (vmalloc, dma etc.)  most
+ * usually, it extends up to TMPALIAS_MAP_START.  Virtual addresses
+ * 0..GATEWAY_PAGE_SIZE are reserved for the gateway page */
+#define KERNEL_MAP_START	(GATEWAY_PAGE_SIZE)
+#define KERNEL_MAP_END		(TMPALIAS_MAP_START)
 
 #endif

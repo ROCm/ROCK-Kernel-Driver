@@ -38,9 +38,9 @@ static __inline__ void set_bit(int nr, void * address)
 
 	addr += (nr >> SHIFT_PER_LONG);
 	mask = 1L << CHOP_SHIFTCOUNT(nr);
-	SPIN_LOCK_IRQSAVE(ATOMIC_HASH(addr), flags);
+	atomic_spin_lock_irqsave(ATOMIC_HASH(addr), flags);
 	*addr |= mask;
-	SPIN_UNLOCK_IRQRESTORE(ATOMIC_HASH(addr), flags);
+	atomic_spin_unlock_irqrestore(ATOMIC_HASH(addr), flags);
 }
 
 static __inline__ void __set_bit(int nr, void * address)
@@ -61,9 +61,9 @@ static __inline__ void clear_bit(int nr, void * address)
 
 	addr += (nr >> SHIFT_PER_LONG);
 	mask = 1L << CHOP_SHIFTCOUNT(nr);
-	SPIN_LOCK_IRQSAVE(ATOMIC_HASH(addr), flags);
+	atomic_spin_lock_irqsave(ATOMIC_HASH(addr), flags);
 	*addr &= ~mask;
-	SPIN_UNLOCK_IRQRESTORE(ATOMIC_HASH(addr), flags);
+	atomic_spin_unlock_irqrestore(ATOMIC_HASH(addr), flags);
 }
 
 static __inline__ void __clear_bit(unsigned long nr, volatile void * address)
@@ -84,9 +84,9 @@ static __inline__ void change_bit(int nr, void * address)
 
 	addr += (nr >> SHIFT_PER_LONG);
 	mask = 1L << CHOP_SHIFTCOUNT(nr);
-	SPIN_LOCK_IRQSAVE(ATOMIC_HASH(addr), flags);
+	atomic_spin_lock_irqsave(ATOMIC_HASH(addr), flags);
 	*addr ^= mask;
-	SPIN_UNLOCK_IRQRESTORE(ATOMIC_HASH(addr), flags);
+	atomic_spin_unlock_irqrestore(ATOMIC_HASH(addr), flags);
 }
 
 static __inline__ void __change_bit(int nr, void * address)
@@ -108,10 +108,10 @@ static __inline__ int test_and_set_bit(int nr, void * address)
 
 	addr += (nr >> SHIFT_PER_LONG);
 	mask = 1L << CHOP_SHIFTCOUNT(nr);
-	SPIN_LOCK_IRQSAVE(ATOMIC_HASH(addr), flags);
+	atomic_spin_lock_irqsave(ATOMIC_HASH(addr), flags);
 	oldbit = (*addr & mask) ? 1 : 0;
 	*addr |= mask;
-	SPIN_UNLOCK_IRQRESTORE(ATOMIC_HASH(addr), flags);
+	atomic_spin_unlock_irqrestore(ATOMIC_HASH(addr), flags);
 
 	return oldbit;
 }
@@ -139,10 +139,10 @@ static __inline__ int test_and_clear_bit(int nr, void * address)
 
 	addr += (nr >> SHIFT_PER_LONG);
 	mask = 1L << CHOP_SHIFTCOUNT(nr);
-	SPIN_LOCK_IRQSAVE(ATOMIC_HASH(addr), flags);
+	atomic_spin_lock_irqsave(ATOMIC_HASH(addr), flags);
 	oldbit = (*addr & mask) ? 1 : 0;
 	*addr &= ~mask;
-	SPIN_UNLOCK_IRQRESTORE(ATOMIC_HASH(addr), flags);
+	atomic_spin_unlock_irqrestore(ATOMIC_HASH(addr), flags);
 
 	return oldbit;
 }
@@ -170,10 +170,10 @@ static __inline__ int test_and_change_bit(int nr, void * address)
 
 	addr += (nr >> SHIFT_PER_LONG);
 	mask = 1L << CHOP_SHIFTCOUNT(nr);
-	SPIN_LOCK_IRQSAVE(ATOMIC_HASH(addr), flags);
+	atomic_spin_lock_irqsave(ATOMIC_HASH(addr), flags);
 	oldbit = (*addr & mask) ? 1 : 0;
 	*addr ^= mask;
-	SPIN_UNLOCK_IRQRESTORE(ATOMIC_HASH(addr), flags);
+	atomic_spin_unlock_irqrestore(ATOMIC_HASH(addr), flags);
 
 	return oldbit;
 }
@@ -426,6 +426,17 @@ found_first:
 found_middle:
 	return result + __ffs(tmp);
 }
+
+/**
+ * find_first_bit - find the first set bit in a memory region
+ * @addr: The address to start the search at
+ * @size: The maximum size to search
+ *
+ * Returns the bit-number of the first set bit, not the number of the byte
+ * containing a bit.
+ */
+#define find_first_bit(addr, size) \
+        find_next_bit((addr), (size), 0)
 
 #define _EXT2_HAVE_ASM_BITOPS_
 

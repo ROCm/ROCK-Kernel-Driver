@@ -82,19 +82,21 @@ $bss_loop:
 	ldo		R%PA(swapper_pg_dir)(%r4),%r4
 	mtctl		%r4,%cr24	/* Initialize kernel root pointer */
 	mtctl		%r4,%cr25	/* Initialize user root pointer */
+	ldi		ASM_PT_INITIAL,%r1
+	ldo		ASM_PGD_ENTRY*ASM_PGD_ENTRY_SIZE(%r4),%r4
+1:
+	stw             %r3,0(%r4)
+	ldo		ASM_PAGE_SIZE(%r3),%r3
+	addib,>		-1,%r1,1b
+	ldo		ASM_PGD_ENTRY_SIZE(%r4),%r4
 
-#if (__PAGE_OFFSET != 0x10000000UL)
-Error! Code below (the next two stw's) needs to be changed
-#endif
-
-	stw             %r3,0x100(%r4)  /* Hardwired 0x1... kernel Vaddr start*/
-	ldo		0x1000(%r3),%r3
-	stw             %r3,0x104(%r4)
 	ldo		_PAGE_KERNEL(%r0),%r3 /* Hardwired 0 phys addr start */
+	ldil		L%PA(pg0),%r1
+	ldo		R%PA(pg0)(%r1),%r1
 $pgt_fill_loop:
-	stwm		%r3,4(%r1)
-	ldo		0x1000(%r3),%r3
-	bb,>=		%r3,8,$pgt_fill_loop
+	stwm		%r3,ASM_PTE_ENTRY_SIZE(%r1)
+	ldo		ASM_PAGE_SIZE(%r3),%r3
+	bb,>=		%r3,31-KERNEL_INITIAL_ORDER,$pgt_fill_loop
 	nop
 
 
