@@ -1,7 +1,7 @@
 Linux* Base Driver for the Intel(R) PRO/100 Family of Adapters
 ==============================================================
 
-September 16, 2002
+November 19, 2002
 
 
 Contents
@@ -19,7 +19,7 @@ In This Release
 ===============
 
 This file describes the Linux* Base Driver for the Intel(R) PRO/100 Family of
-Adapters, version 2.1.x.  This driver includes support for Itanium(TM)-based 
+Adapters, version 2.2.x.  This driver includes support for Itanium(TM)-based 
 systems.
 
 
@@ -94,8 +94,9 @@ For the latest Intel PRO/100 network driver for Linux, see:
 Command Line Parameters
 =======================
 
-The following optional parameters are used by entering them on the command 
-line with the modprobe or insmod command using this syntax:
+If the driver is built as a module, the  following optional parameters are 
+used by entering them on the command line with the modprobe or insmod command
+using this syntax:
 
      modprobe e100 [<option>=<VAL1>,<VAL2>,...]
 
