@@ -100,31 +100,38 @@ int init_private_file(struct file *filp, struct dentry *dentry, int mode)
 
 void fput(struct file * file)
 {
+	if (atomic_dec_and_test(&file->f_count))
+		__fput(file);
+}
+
+/* __fput is called from task context when aio completion releases the last
+ * last use of a struct file *.  Do not use otherwise.
+ */
+void __fput(struct file * file)
+{
 	struct dentry * dentry = file->f_dentry;
 	struct vfsmount * mnt = file->f_vfsmnt;
 	struct inode * inode = dentry->d_inode;
 
-	if (atomic_dec_and_test(&file->f_count)) {
-		locks_remove_flock(file);
+	locks_remove_flock(file);
 
-		if (file->f_iobuf)
-			free_kiovec(1, &file->f_iobuf);
+	if (file->f_iobuf)
+		free_kiovec(1, &file->f_iobuf);
 
-		if (file->f_op && file->f_op->release)
-			file->f_op->release(inode, file);
-		fops_put(file->f_op);
-		if (file->f_mode & FMODE_WRITE)
-			put_write_access(inode);
-		file_list_lock();
-		file->f_dentry = NULL;
-		file->f_vfsmnt = NULL;
-		list_del(&file->f_list);
-		list_add(&file->f_list, &free_list);
-		files_stat.nr_free_files++;
-		file_list_unlock();
-		dput(dentry);
-		mntput(mnt);
-	}
+	if (file->f_op && file->f_op->release)
+		file->f_op->release(inode, file);
+	fops_put(file->f_op);
+	if (file->f_mode & FMODE_WRITE)
+		put_write_access(inode);
+	file_list_lock();
+	file->f_dentry = NULL;
+	file->f_vfsmnt = NULL;
+	list_del(&file->f_list);
+	list_add(&file->f_list, &free_list);
+	files_stat.nr_free_files++;
+	file_list_unlock();
+	dput(dentry);
+	mntput(mnt);
 }
 
 struct file * fget(unsigned int fd)

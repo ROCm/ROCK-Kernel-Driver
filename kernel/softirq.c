@@ -363,8 +363,7 @@ void __run_task_queue(task_queue *list)
 
 static int ksoftirqd(void * __bind_cpu)
 {
-	int bind_cpu = (int) (long) __bind_cpu;
-	int cpu = cpu_logical_map(bind_cpu);
+	int cpu = (int) (long) __bind_cpu;
 
 	daemonize();
 	set_user_nice(current, 19);
@@ -376,7 +375,7 @@ static int ksoftirqd(void * __bind_cpu)
 	if (smp_processor_id() != cpu)
 		BUG();
 
-	sprintf(current->comm, "ksoftirqd_CPU%d", bind_cpu);
+	sprintf(current->comm, "ksoftirqd_CPU%d", cpu);
 
 	__set_current_state(TASK_INTERRUPTIBLE);
 	mb();
@@ -402,13 +401,16 @@ static __init int spawn_ksoftirqd(void)
 {
 	int cpu;
 
-	for (cpu = 0; cpu < smp_num_cpus; cpu++)
+	for (cpu = 0; cpu < NR_CPUS; cpu++) {
+		if (!cpu_online(cpu))
+			continue;
 		if (kernel_thread(ksoftirqd, (void *) (long) cpu,
 				  CLONE_FS | CLONE_FILES | CLONE_SIGNAL) < 0)
 			printk("spawn_ksoftirqd() failed for cpu %d\n", cpu);
 		else
-			while (!ksoftirqd_task(cpu_logical_map(cpu)))
+			while (!ksoftirqd_task(cpu))
 				yield();
+	}
 	return 0;
 }
 

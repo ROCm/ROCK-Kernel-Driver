@@ -63,9 +63,10 @@ smp_chrp_setup_cpu(int cpu_nr)
 	static atomic_t ready = ATOMIC_INIT(1);
 	static volatile int frozen = 0;
 
+	/* FIXME: Hotplug cpu breaks all this --RR */
 	if (cpu_nr == 0) {
 		/* wait for all the others */
-		while (atomic_read(&ready) < smp_num_cpus)
+		while (atomic_read(&ready) < num_online_cpus())
 			barrier();
 		atomic_set(&ready, 1);
 		/* freeze the timebase */
@@ -75,7 +76,7 @@ smp_chrp_setup_cpu(int cpu_nr)
 		/* XXX assumes this is not a 601 */
 		set_tb(0, 0);
 		last_jiffy_stamp(0) = 0;
-		while (atomic_read(&ready) < smp_num_cpus)
+		while (atomic_read(&ready) < num_online_cpus())
 			barrier();
 		/* thaw the timebase again */
 		call_rtas("thaw-time-base", 0, 1, NULL);

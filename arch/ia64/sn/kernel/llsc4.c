@@ -1005,14 +1005,15 @@ int_test() {
 
 	printk("Testing cross interrupts\n");
 	
-	while (control_cpu != smp_num_cpus) {
-		if (mycpu == cpu_logical_map(control_cpu)) {
-			for (cpu=0; cpu<smp_num_cpus; cpu++) {
-				printk("Sending interrupt from %d to %d\n", mycpu, cpu_logical_map(cpu));
+	while (control_cpu != NR_CPUS) {
+		if (mycpu == control_cpu) {
+			for (cpu=0; cpu<NR_CPUS; cpu++) {
+				if (!cpu_online(cpu)) continue;
+				printk("Sending interrupt from %d to %d\n", mycpu, cpu);
 				udelay(IS_RUNNING_ON_SIMULATOR ? 10000 : 400000);
-				smp_send_reschedule(cpu_logical_map(cpu));
+				smp_send_reschedule(cpu);
 				udelay(IS_RUNNING_ON_SIMULATOR ? 10000 : 400000);
-				smp_send_reschedule(cpu_logical_map(cpu));
+				smp_send_reschedule(cpu);
 				udelay(IS_RUNNING_ON_SIMULATOR ? 10000 : 400000);
 			}
 			control_cpu++;
@@ -1021,7 +1022,7 @@ int_test() {
 
 	zzzprint_resched = 1;
 
-	if (mycpu == cpu_logical_map(smp_num_cpus-1)) {
+	if (mycpu == NR_CPUS-1) {
 		printk("\nTight loop of cpu %d sending ints to cpu 0 (every 100 us)\n", mycpu);
 		udelay(IS_RUNNING_ON_SIMULATOR ? 1000 : 1000000);
 		__cli();

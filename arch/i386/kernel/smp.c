@@ -247,18 +247,16 @@ static inline void send_IPI_allbutself(int vector)
 	 * we get an APIC send error if we try to broadcast.
 	 * thus we have to avoid sending IPIs in this case.
 	 */
-	if (!(smp_num_cpus > 1))
+	if (!(num_online_cpus() > 1))
 		return;
 
 	if (clustered_apic_mode) {
 		// Pointless. Use send_IPI_mask to do this instead
 		int cpu;
 
-		if (smp_num_cpus > 1) {
-			for (cpu = 0; cpu < smp_num_cpus; ++cpu) {
-				if (cpu != smp_processor_id())
-					send_IPI_mask(1 << cpu, vector);
-			}
+		for (cpu = 0; cpu < NR_CPUS; ++cpu) {
+			if (cpu_online(cpu) && cpu != smp_processor_id())
+				send_IPI_mask(1 << cpu, vector);
 		}
 	} else {
 		__send_IPI_shortcut(APIC_DEST_ALLBUT, vector);
@@ -272,7 +270,9 @@ static inline void send_IPI_all(int vector)
 		// Pointless. Use send_IPI_mask to do this instead
 		int cpu;
 
-		for (cpu = 0; cpu < smp_num_cpus; ++cpu) {
+		for (cpu = 0; cpu < NR_CPUS; ++cpu) {
+			if (!cpu_online(cpu))
+				continue;
 			send_IPI_mask(1 << cpu, vector);
 		}
 	} else {
@@ -567,7 +567,7 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
  */
 {
 	struct call_data_struct data;
-	int cpus = smp_num_cpus-1;
+	int cpus = num_online_cpus()-1;
 
 	if (!cpus)
 		return 0;
@@ -617,7 +617,6 @@ static void stop_this_cpu (void * dummy)
 void smp_send_stop(void)
 {
 	smp_call_function(stop_this_cpu, NULL, 1, 0);
-	smp_num_cpus = 1;
 
 	__cli();
 	disable_local_APIC();

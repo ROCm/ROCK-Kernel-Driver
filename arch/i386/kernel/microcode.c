@@ -188,7 +188,7 @@ static int do_microcode_update(void)
 	}
 	do_update_one(NULL);
 
-	for (i=0; i<smp_num_cpus; i++) {
+	for (i=0; i<NR_CPUS; i++) {
 		err = update_req[i].err;
 		error += err;
 		if (!err) {
@@ -343,8 +343,8 @@ static ssize_t microcode_write(struct file *file, const char *buf, size_t len, l
 	}
 	down_write(&microcode_rwsem);
 	if (!mc_applied) {
-		mc_applied = kmalloc(smp_num_cpus*sizeof(struct microcode),
-				GFP_KERNEL);
+		mc_applied = kmalloc(NR_CPUS*sizeof(struct microcode),
+				     GFP_KERNEL);
 		if (!mc_applied) {
 			up_write(&microcode_rwsem);
 			printk(KERN_ERR "microcode: out of memory for saved microcode\n");
@@ -368,7 +368,7 @@ static ssize_t microcode_write(struct file *file, const char *buf, size_t len, l
 		ret = -EIO;
 		goto out_fsize;
 	} else {
-		mc_fsize = smp_num_cpus * sizeof(struct microcode);
+		mc_fsize = NR_CPUS * sizeof(struct microcode);
 		ret = (ssize_t)len;
 	}
 out_fsize:
@@ -386,7 +386,7 @@ static int microcode_ioctl(struct inode *inode, struct file *file,
 		case MICROCODE_IOCFREE:
 			down_write(&microcode_rwsem);
 			if (mc_applied) {
-				int bytes = smp_num_cpus * sizeof(struct microcode);
+				int bytes = NR_CPUS * sizeof(struct microcode);
 
 				devfs_set_file_size(devfs_handle, 0);
 				kfree(mc_applied);

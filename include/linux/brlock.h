@@ -28,13 +28,15 @@
  * load-locked/store-conditional cpus (ALPHA/MIPS/PPC) and
  * compare-and-swap cpus (Sparc64).  So we control which
  * implementation to use with a __BRLOCK_USE_ATOMICS define. -DaveM
+ *
+ * Added BR_LLC_LOCK for use in net/core/ext8022.c -acme
  */
 
 /* Register bigreader lock indices here. */
 enum brlock_indices {
 	BR_GLOBALIRQ_LOCK,
 	BR_NETPROTO_LOCK,
-
+	BR_LLC_LOCK,
 	__BR_END
 };
 

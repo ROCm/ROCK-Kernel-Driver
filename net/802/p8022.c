@@ -11,11 +11,10 @@
  *		matches. The control byte is ignored and handling of such items
  *		is up to the routine passed the frame.
  *
- *		Unlike the 802.3 datalink we have a list of 802.2 entries as there
- *		are multiple protocols to demux. The list is currently short (3 or
- *		4 entries at most). The current demux assumes this.
+ *		Unlike the 802.3 datalink we have a list of 802.2 entries as
+ *		there are multiple protocols to demux. The list is currently
+ *		short (3 or 4 entries at most). The current demux assumes this.
  */
-
 #include <linux/module.h>
 #include <linux/netdevice.h>
 #include <linux/skbuff.h>
@@ -25,8 +24,13 @@
 #include <linux/init.h>
 #include <net/p8022.h>
 
-static struct datalink_proto *p8022_list = NULL;
+extern void llc_register_sap(unsigned char sap,
+			       int (*rcvfunc)(struct sk_buff *,
+					      struct net_device *,
+					       struct packet_type *));
+extern void llc_unregister_sap(unsigned char sap);
 
+static struct datalink_proto *p8022_list;
 /*
  *	We don't handle the loopback SAP stuff, the extended
  *	802.2 command set, multicast SAP identifiers and non UI
@@ -34,91 +38,68 @@ static struct datalink_proto *p8022_list = NULL;
  *	IP and Appletalk phase 2. See the llc_* routines for
  *	support libraries if your protocol needs these.
  */
-
 static struct datalink_proto *find_8022_client(unsigned char type)
 {
-	struct datalink_proto	*proto;
+	struct datalink_proto *proto = p8022_list;
 
-	for (proto = p8022_list;
-		((proto != NULL) && (*(proto->type) != type));
-		proto = proto->next)
-		;
-
+	while (proto && *(proto->type) != type)
+		proto = proto->next;
 	return proto;
 }
 
-int p8022_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt)
+int p8022_rcv(struct sk_buff *skb, struct net_device *dev,
+	      struct packet_type *pt)
 {
-	struct datalink_proto	*proto;
+	struct datalink_proto *proto;
+	int rc = 0;
 
 	proto = find_8022_client(*(skb->h.raw));
-	if (proto != NULL) 
-	{
-		skb->h.raw += 3;
-		skb->nh.raw += 3;
-		skb_pull(skb,3);
-		return proto->rcvfunc(skb, dev, pt);
+	if (!proto) {
+		skb->sk = NULL;
+		kfree_skb(skb);
+		goto out;
 	}
-
-	skb->sk = NULL;
-	kfree_skb(skb);
-	return 0;
+	skb->h.raw += 3;
+	skb->nh.raw += 3;
+	skb_pull(skb, 3);
+	rc = proto->rcvfunc(skb, dev, pt);
+out:	return rc;
 }
 
 static void p8022_datalink_header(struct datalink_proto *dl,
-		struct sk_buff *skb, unsigned char *dest_node)
+				  struct sk_buff *skb, unsigned char *dest_node)
 {
-	struct net_device	*dev = skb->dev;
-	unsigned char	*rawp;
+	struct net_device *dev = skb->dev;
+	unsigned char *rawp = skb_push(skb, 3);
 
-	rawp = skb_push(skb,3);
 	*rawp++ = dl->type[0];
 	*rawp++ = dl->type[0];
-	*rawp = 0x03;	/* UI */
+	*rawp	= 0x03;	/* UI */
 	dev->hard_header(skb, dev, ETH_P_802_3, dest_node, NULL, skb->len);
 }
 
-static struct packet_type p8022_packet_type =
+struct datalink_proto *register_8022_client(unsigned char type,
+					    int (*rcvfunc)(struct sk_buff *,
+						    	   struct net_device *,
+							  struct packet_type *))
 {
-	0,	/* MUTTER ntohs(ETH_P_8022),*/
-	NULL,		/* All devices */
-	p8022_rcv,
-	NULL,
-	NULL,
-};
+	struct datalink_proto *proto = NULL;
 
-EXPORT_SYMBOL(register_8022_client);
-EXPORT_SYMBOL(unregister_8022_client);
-
-static int __init p8022_init(void)
-{
-	p8022_packet_type.type=htons(ETH_P_802_2);
-	dev_add_pack(&p8022_packet_type);
-	return 0;
-}
-
-module_init(p8022_init);
-
-struct datalink_proto *register_8022_client(unsigned char type, int (*rcvfunc)(struct sk_buff *, struct net_device *, struct packet_type *))
-{
-	struct datalink_proto	*proto;
-
-	if (find_8022_client(type) != NULL)
-		return NULL;
-
-	proto = (struct datalink_proto *) kmalloc(sizeof(*proto), GFP_ATOMIC);
-	if (proto != NULL) {
-		proto->type[0] = type;
-		proto->type_len = 1;
-		proto->rcvfunc = rcvfunc;
-		proto->header_length = 3;
-		proto->datalink_header = p8022_datalink_header;
-		proto->string_name = "802.2";
-		proto->next = p8022_list;
-		p8022_list = proto;
+	if (find_8022_client(type))
+		goto out;
+	proto = kmalloc(sizeof(*proto), GFP_ATOMIC);
+	if (proto) {
+		proto->type[0]		= type;
+		proto->type_len		= 1;
+		proto->rcvfunc		= rcvfunc;
+		proto->header_length	= 3;
+		proto->datalink_header	= p8022_datalink_header;
+		proto->string_name	= "802.2";
+		proto->next		= p8022_list;
+		p8022_list		= proto;
+		llc_register_sap(type, p8022_rcv);
 	}
-
-	return proto;
+out:	return proto;
 }
 
 void unregister_8022_client(unsigned char type)
@@ -128,17 +109,18 @@ void unregister_8022_client(unsigned char type)
 
 	save_flags(flags);
 	cli();
-
-	while ((tmp = *clients) != NULL)
-	{
+	while (*clients) {
+		tmp = *clients;
 		if (tmp->type[0] == type) {
 			*clients = tmp->next;
 			kfree(tmp);
+			llc_unregister_sap(type);
 			break;
-		} else {
-			clients = &tmp->next;
 		}
+		clients = &tmp->next;
 	}
-
 	restore_flags(flags);
 }
+
+EXPORT_SYMBOL(register_8022_client);
+EXPORT_SYMBOL(unregister_8022_client);

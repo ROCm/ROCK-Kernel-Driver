@@ -693,9 +693,8 @@ struct task_struct *do_fork(unsigned long clone_flags,
 		int i;
 
 		/* ?? should we just memset this ?? */
-		for(i = 0; i < smp_num_cpus; i++)
-			p->per_cpu_utime[cpu_logical_map(i)] =
-				p->per_cpu_stime[cpu_logical_map(i)] = 0;
+		for(i = 0; i < NR_CPUS; i++)
+			p->per_cpu_utime[i] = p->per_cpu_stime[i] = 0;
 		spin_lock_init(&p->sigmask_lock);
 	}
 #endif

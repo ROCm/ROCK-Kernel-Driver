@@ -23,7 +23,7 @@ SVGA_MODE := -DSVGA_MODE=NORMAL_VGA
 
 # If you want the RAM disk device, define this to be the size in blocks.
 
-RAMDISK := -DRAMDISK=512
+#RAMDISK := -DRAMDISK=512
 
 # ---------------------------------------------------------------------------
 

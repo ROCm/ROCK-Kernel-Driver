@@ -98,7 +98,7 @@ static void ipi_handler(void *null)
 
 static void smp_flush_cache(void)
 {
-	atomic_set(&cpus_waiting, smp_num_cpus - 1);
+	atomic_set(&cpus_waiting, num_online_cpus() - 1);
 	if (smp_call_function(ipi_handler, NULL, 1, 0) != 0)
 		panic(PFX "timed out waiting for the other CPUs!\n");
 	flush_cache();

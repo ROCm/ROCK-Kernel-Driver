@@ -168,8 +168,8 @@ send_IPI_allbutself (int op)
 {
 	int i;
 
-	for (i = 0; i < smp_num_cpus; i++) {
-		if (i != smp_processor_id())
+	for (i = 0; i < NR_CPUS; i++) {
+		if (cpu_online(i) && i != smp_processor_id())
 			send_IPI_single(i, op);
 	}
 }
@@ -179,8 +179,9 @@ send_IPI_all (int op)
 {
 	int i;
 
-	for (i = 0; i < smp_num_cpus; i++)
-		send_IPI_single(i, op);
+	for (i = 0; i < NR_CPUS; i++)
+		if (cpu_online(i))
+			send_IPI_single(i, op);
 }
 
 static inline void
@@ -205,8 +206,8 @@ smp_send_reschedule_all (void)
 {
 	int i;
 
-	for (i = 0; i < smp_num_cpus; i++)
-		if (i != smp_processor_id())
+	for (i = 0; i < NR_CPUS; i++)
+		if (cpu_online(i) && i != smp_processor_id())
 			smp_send_reschedule(i);
 }
 
@@ -290,7 +291,7 @@ int
 smp_call_function (void (*func) (void *info), void *info, int nonatomic, int wait)
 {
 	struct call_data_struct data;
-	int cpus = smp_num_cpus-1;
+	int cpus = num_online_cpus()-1;
 
 	if (!cpus)
 		return 0;
@@ -339,7 +340,6 @@ void
 smp_send_stop (void)
 {
 	send_IPI_allbutself(IPI_CPU_STOP);
-	smp_num_cpus = 1;
 }
 
 int __init
