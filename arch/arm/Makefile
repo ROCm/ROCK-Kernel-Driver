@@ -7,7 +7,7 @@
 #
 # Copyright (C) 1995-2001 by Russell King
 
-LDFLAGS_vmlinux	:=-p -X -T arch/arm/vmlinux.lds
+LDFLAGS_vmlinux	:=-p -X -T arch/arm/vmlinux.lds.s
 OBJCOPYFLAGS	:=-O binary -R .note -R .comment -S
 GZFLAGS		:=-9
 #CFLAGS		+=-pipe
@@ -57,21 +57,11 @@ AFLAGS		+=$(apcs-y) $(arch-y) -mno-fpu -msoft-float
 ifeq ($(CONFIG_CPU_26),y)
 PROCESSOR	:= armo
 HEAD		:= arch/arm/mach-arc/head.o arch/arm/kernel/init_task.o
-  ifeq ($(CONFIG_ROM_KERNEL),y)
-    DATAADDR	 = 0x02080000
-    TEXTADDR	 = 0x03800000
-    LDSCRIPT	 = arch/arm/vmlinux-armo-rom.lds.in
-  else
-    TEXTADDR	 = 0x02080000
-    LDSCRIPT	 = arch/arm/vmlinux-armo.lds.in
-  endif
 endif
 
 ifeq ($(CONFIG_CPU_32),y)
 PROCESSOR	 = armv
 HEAD		:= arch/arm/kernel/head.o arch/arm/kernel/init_task.o
-TEXTADDR	 = 0xC0008000
-LDSCRIPT	 = arch/arm/vmlinux-armv.lds.in
 endif
 
 ifeq ($(CONFIG_ARCH_ARCA5K),y)
@@ -225,20 +215,10 @@ maketools: include/asm-arm/.arch include/asm-arm/.proc \
 	 include/asm-arm/constants.h include/linux/version.h FORCE
 	@$(MAKETOOLS)
 
-vmlinux: arch/arm/vmlinux.lds
-
-arch/arm/vmlinux.lds: arch/arm/Makefile $(LDSCRIPT) \
-	$(wildcard include/config/cpu/32.h) \
-	$(wildcard include/config/cpu/26.h) \
-	$(wildcard include/config/arch/*.h)
-	@echo '  Generating $@'
-	@sed 's/TEXTADDR/$(TEXTADDR)/;s/DATAADDR/$(DATAADDR)/' $(LDSCRIPT) >$@
+vmlinux: arch/arm/vmlinux.lds.s
 
 bzImage zImage zinstall Image bootpImage install: vmlinux
 	@$(MAKEBOOT) $@
-
-CLEAN_FILES	+= \
-	arch/arm/vmlinux.lds
 
 MRPROPER_FILES	+= \
 	include/asm-arm/arch include/asm-arm/.arch \
