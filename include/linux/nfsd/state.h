@@ -95,6 +95,27 @@ update_stateid(stateid_t *stateid)
 	stateid->si_generation++;
 }
 
+/* A reasonable value for REPLAY_ISIZE was estimated as follows:  
+ * The OPEN response, typically the largest, requires 
+ *   4(status) + 8(stateid) + 20(changeinfo) + 4(rflags) +  8(verifier) + 
+ *   4(deleg. type) + 8(deleg. stateid) + 4(deleg. recall flag) + 
+ *   20(deleg. space limit) + ~32(deleg. ace) = 112 bytes 
+ */
+
+#define NFSD4_REPLAY_ISIZE       112 
+
+/*
+ * Replay buffer, where the result of the last seqid-mutating operation 
+ * is cached. 
+ */
+struct nfs4_replay {
+	u32			rp_status;
+	unsigned int		rp_buflen;
+	char			*rp_buf;
+	unsigned		intrp_allocated;
+	char			rp_ibuf[NFSD4_REPLAY_ISIZE];
+};
+
 /*
 * nfs4_stateowner can either be an open_owner, or (eventually) a lock_owner
 *
@@ -111,6 +132,7 @@ struct nfs4_stateowner {
 	u32                     so_seqid;    
 	struct xdr_netobj       so_owner;     /* open owner name */
 	int                     so_confirmed; /* successful OPEN_CONFIRM? */
+	struct nfs4_replay	so_replay;
 };
 
 /*

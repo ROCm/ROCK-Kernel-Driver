@@ -759,6 +759,7 @@ free_stateowner(struct nfs4_stateowner *sop) {
 static struct nfs4_stateowner *
 alloc_init_stateowner(unsigned int strhashval, struct nfs4_client *clp, struct nfsd4_open *open) {
 	struct nfs4_stateowner *sop;
+	struct nfs4_replay *rp;
 	unsigned int idhashval;
 
 	if (!(sop = alloc_stateowner(&open->op_owner)))
@@ -776,6 +777,10 @@ alloc_init_stateowner(unsigned int strhashval, struct nfs4_client *clp, struct n
 	sop->so_client = clp;
 	sop->so_seqid = open->op_seqid;
 	sop->so_confirmed = 0;
+	rp = &sop->so_replay;
+	rp->rp_status = NFSERR_SERVERFAULT;
+	rp->rp_buflen = 0;
+	rp->rp_buf = rp->rp_ibuf;
 	alloc_sowner++;
 	return sop;
 }
@@ -1019,9 +1024,22 @@ nfsd4_process_open1(struct nfsd4_open *open)
 	strhashval = ownerstr_hashval(clientid->cl_id, open->op_owner);
 	if (find_stateowner_str(strhashval, open, &sop)) {
 		open->op_stateowner = sop;
+		/* check for replay */
 		if (open->op_seqid == sop->so_seqid){
-			/* XXX retplay: for now, return bad seqid */
-			status = nfserr_bad_seqid;
+			if (!sop->so_replay.rp_buflen) {
+			/*
+			* The original OPEN failed in so spectacularly that we
+			* don't even have replay data saved!  Therefore, we
+			* have no choice but to continue processing
+			* this OPEN; presumably, we'll fail again for the same
+			* reason.
+			*/
+				dprintk("nfsd4_process_open1: replay with no replay cache\n");
+				status = NFS_OK;
+				goto renew;
+			}
+			/* replay: indicate to calling function */
+			status = NFSERR_REPLAY_ME;
 			goto out;
 		}
 		if (sop->so_confirmed) {
@@ -1033,9 +1051,8 @@ nfsd4_process_open1(struct nfsd4_open *open)
 			goto out;
 		}
 		/* If we get here, we received and OPEN for an unconfirmed
-		 * nfs4_stateowner. If seqid's are the same then this 
-		 * is a replay.
-		 * If the sequid's are different, then purge the 
+		 * nfs4_stateowner. 
+		 * Since the sequid's are different, purge the 
 		 * existing nfs4_stateowner, and instantiate a new one.
 		 */
 		clp = sop->so_client;
@@ -1367,8 +1384,6 @@ out:
 
 /* 
  * Checks for sequence id mutating operations. 
- *
- * XXX need to code replay cache logic
  */
 int
 nfs4_preprocess_seqid_op(struct svc_fh *current_fh, u32 seqid, stateid_t *stateid, int flags, struct nfs4_stateowner **sopp, struct nfs4_stateid **stpp)
@@ -1466,13 +1481,14 @@ no_nfs4_stateid:
 	}
 
 check_replay:
-	status = nfserr_bad_seqid;
 	if (seqid == sop->so_seqid) {
 		printk("NFSD: preprocess_seqid_op: retransmission?\n");
-		/* XXX will need to indicate replay to calling function here */
+		/* indicate replay to calling function */
+		status = NFSERR_REPLAY_ME;
 	} else 
 		printk("NFSD: preprocess_seqid_op: bad seqid (expected %d, got %d\n", sop->so_seqid +1, seqid);
 
+		status = nfserr_bad_seqid;
 	goto out;
 }
 
@@ -1499,7 +1515,6 @@ nfsd4_open_confirm(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfs
 	sop->so_confirmed = 1;
 	update_stateid(&stp->st_stateid);
 	memcpy(&oc->oc_resp_stateid, &stp->st_stateid, sizeof(stateid_t));
-	/* XXX renew the client lease here */
 	dprintk("NFSD: nfsd4_open_confirm: success, seqid=%d " 
 		"stateid=(%08x/%08x/%08x/%08x)\n", oc->oc_seqid,
 		         stp->st_stateid.si_boot,

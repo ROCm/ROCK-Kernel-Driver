@@ -664,6 +664,7 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 			break;
 		case OP_CLOSE:
 			op->status = nfsd4_close(rqstp, &current_fh, &op->u.close);
+			op->replay = &op->u.close.cl_stateowner->so_replay;
 			break;
 		case OP_COMMIT:
 			op->status = nfsd4_commit(rqstp, &current_fh, &op->u.commit);
@@ -693,12 +694,15 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 			break;
 		case OP_OPEN:
 			op->status = nfsd4_open(rqstp, &current_fh, &op->u.open);
+			op->replay = &op->u.open.op_stateowner->so_replay;
 			break;
 		case OP_OPEN_CONFIRM:
 			op->status = nfsd4_open_confirm(rqstp, &current_fh, &op->u.open_confirm);
+			op->replay = &op->u.open_confirm.oc_stateowner->so_replay;
 			break;
 		case OP_OPEN_DOWNGRADE:
 			op->status = nfsd4_open_downgrade(rqstp, &current_fh, &op->u.open_downgrade);
+			op->replay = &op->u.open_downgrade.od_stateowner->so_replay;
 			break;
 		case OP_PUTFH:
 			op->status = nfsd4_putfh(rqstp, &current_fh, &op->u.putfh);
@@ -753,8 +757,13 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 		}
 
 encode_op:
-		nfsd4_encode_operation(resp, op);
-		status = op->status;
+		if (op->status == NFSERR_REPLAY_ME) {
+			nfsd4_encode_replay(resp, op);
+			status = op->status = NFS_OK;
+		} else {
+			nfsd4_encode_operation(resp, op);
+			status = op->status;
+		}
 	}
 
 out:

@@ -932,6 +932,7 @@ nfsd4_decode_compound(struct nfsd4_compoundargs *argp)
 
 	for (i = 0; i < argp->opcnt; i++) {
 		op = &argp->ops[i];
+		op->replay = NULL;
 
 		/*
 		 * We can't use READ_BUF() here because we need to handle
@@ -1111,18 +1112,31 @@ nfsd4_decode_compound(struct nfsd4_compoundargs *argp)
 #define ADJUST_ARGS()		resp->p = p
 
 /*
+ * Header routine to setup seqid operation replay cache
+ */
+#define ENCODE_SEQID_OP_HEAD					\
+	u32 *p;							\
+	u32 *save;						\
+								\
+	save = resp->p;
+
+/*
  * Routine for encoding the result of a
  * "seqid-mutating" NFSv4 operation.  This is
- * where seqids are incremented
+ * where seqids are incremented, and the
+ * replay cache is filled.
  */
 
-#define ENCODE_SEQID_OP_TAIL(stateowner) do {		\
-	BUG_ON(!stateowner);				\
-	if (seqid_mutating_err(nfserr) && stateowner) {	\
-		if (stateowner->so_confirmed)		\
-			stateowner->so_seqid++;		\
-	}						\
-} while(0)
+#define ENCODE_SEQID_OP_TAIL(stateowner) do {			\
+	if (seqid_mutating_err(nfserr) && stateowner) {		\
+		if (stateowner->so_confirmed)			\
+			stateowner->so_seqid++;			\
+		stateowner->so_replay.rp_status = nfserr;   	\
+		stateowner->so_replay.rp_buflen = 		\
+			  (((char *)(resp)->p - (char *)save)); \
+		memcpy(stateowner->so_replay.rp_buf, save,      \
+ 			stateowner->so_replay.rp_buflen); 	\
+	} } while(0)
 
 
 static u32 nfs4_ftypes[16] = {
@@ -1623,7 +1637,7 @@ nfsd4_encode_access(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_acc
 static void
 nfsd4_encode_close(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_close *close)
 {
-	ENCODE_HEAD;
+	ENCODE_SEQID_OP_HEAD;
 
 	if (!nfserr) {
 		RESERVE_SPACE(sizeof(stateid_t));
@@ -1631,8 +1645,7 @@ nfsd4_encode_close(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_clos
 		WRITEMEM(&close->cl_stateid.si_opaque, sizeof(stateid_opaque_t));
 		ADJUST_ARGS();
 	}
-	if ((close->cl_stateowner) && (close->cl_stateowner->so_confirmed))
-		close->cl_stateowner->so_seqid++;
+	ENCODE_SEQID_OP_TAIL(close->cl_stateowner);
 }
 
 
@@ -1712,7 +1725,7 @@ nfsd4_encode_link(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_link 
 static void
 nfsd4_encode_open(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_open *open)
 {
-	ENCODE_HEAD;
+	ENCODE_SEQID_OP_HEAD;
 
 	if (nfserr)
 		return;
@@ -1776,7 +1789,7 @@ nfsd4_encode_open(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_open 
 static void
 nfsd4_encode_open_confirm(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_open_confirm *oc)
 {
-	ENCODE_HEAD;
+	ENCODE_SEQID_OP_HEAD;
 				        
 	if (!nfserr) {
 		RESERVE_SPACE(sizeof(stateid_t));
@@ -1791,7 +1804,7 @@ nfsd4_encode_open_confirm(struct nfsd4_compoundres *resp, int nfserr, struct nfs
 static void
 nfsd4_encode_open_downgrade(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_open_downgrade *od)
 {
-	ENCODE_HEAD;
+	ENCODE_SEQID_OP_HEAD;
 				        
 	if (!nfserr) {
 		RESERVE_SPACE(sizeof(stateid_t));
@@ -2168,6 +2181,30 @@ nfsd4_encode_operation(struct nfsd4_compoundres *resp, struct nfsd4_op *op)
 	 * since it is already in network byte order.
 	 */
 	*statp = op->status;
+}
+
+/* 
+ * Encode the reply stored in the stateowner reply cache 
+ * 
+ * XDR note: do not encode rp->rp_buflen: the buffer contains the
+ * previously sent already encoded operation.
+ */
+void
+nfsd4_encode_replay(struct nfsd4_compoundres *resp, struct nfsd4_op *op)
+{
+	ENCODE_HEAD;
+	struct nfs4_replay *rp = op->replay;
+
+	BUG_ON(!rp);
+
+	RESERVE_SPACE(8);
+	WRITE32(op->opnum);
+	WRITE32(NFS_OK);
+	ADJUST_ARGS();
+
+	RESERVE_SPACE(rp->rp_buflen);
+	WRITEMEM(rp->rp_buf, rp->rp_buflen);
+	ADJUST_ARGS();
 }
 
 /*

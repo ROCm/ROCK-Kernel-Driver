@@ -284,6 +284,7 @@ struct nfsd4_op {
 		struct nfsd4_verify		verify;
 		struct nfsd4_write		write;
 	} u;
+	struct nfs4_replay *			replay;
 };
 
 struct nfsd4_compoundargs {
@@ -339,6 +340,7 @@ int nfs4svc_decode_compoundargs(struct svc_rqst *, u32 *,
 int nfs4svc_encode_compoundres(struct svc_rqst *, u32 *, 
 		struct nfsd4_compoundres *);
 void nfsd4_encode_operation(struct nfsd4_compoundres *, struct nfsd4_op *);
+void nfsd4_encode_replay(struct nfsd4_compoundres *resp, struct nfsd4_op *op);
 int nfsd4_encode_fattr(struct svc_fh *fhp, struct svc_export *exp,
 		       struct dentry *dentry, u32 *buffer, int *countp, 
 		       u32 *bmval);
