@@ -3,7 +3,7 @@
  *
  * Copyright (c) 2002-3 Patrick Mochel
  * Copyright (c) 2002-3 Open Source Development Labs
- * 
+ *
  * This file is released under the GPLv2
  *
  */
@@ -28,8 +28,8 @@ int (*platform_notify_remove)(struct device * dev) = NULL;
  * sysfs bindings for devices.
  */
 
-#define to_dev(obj) container_of(obj,struct device,kobj)
-#define to_dev_attr(_attr) container_of(_attr,struct device_attribute,attr)
+#define to_dev(obj) container_of(obj, struct device, kobj)
+#define to_dev_attr(_attr) container_of(_attr, struct device_attribute, attr)
 
 extern struct attribute * dev_default_attrs[];
 
@@ -41,12 +41,12 @@ dev_attr_show(struct kobject * kobj, struct attribute * attr, char * buf)
 	ssize_t ret = 0;
 
 	if (dev_attr->show)
-		ret = dev_attr->show(dev,buf);
+		ret = dev_attr->show(dev, buf);
 	return ret;
 }
 
 static ssize_t
-dev_attr_store(struct kobject * kobj, struct attribute * attr, 
+dev_attr_store(struct kobject * kobj, struct attribute * attr,
 	       const char * buf, size_t count)
 {
 	struct device_attribute * dev_attr = to_dev_attr(attr);
@@ -54,7 +54,7 @@ dev_attr_store(struct kobject * kobj, struct attribute * attr,
 	ssize_t ret = 0;
 
 	if (dev_attr->store)
-		ret = dev_attr->store(dev,buf,count);
+		ret = dev_attr->store(dev, buf, count);
 	return ret;
 }
 
@@ -153,7 +153,7 @@ int device_create_file(struct device * dev, struct device_attribute * attr)
 {
 	int error = 0;
 	if (get_device(dev)) {
-		error = sysfs_create_file(&dev->kobj,&attr->attr);
+		error = sysfs_create_file(&dev->kobj, &attr->attr);
 		put_device(dev);
 	}
 	return error;
@@ -168,7 +168,7 @@ int device_create_file(struct device * dev, struct device_attribute * attr)
 void device_remove_file(struct device * dev, struct device_attribute * attr)
 {
 	if (get_device(dev)) {
-		sysfs_remove_file(&dev->kobj,&attr->attr);
+		sysfs_remove_file(&dev->kobj, &attr->attr);
 		put_device(dev);
 	}
 }
@@ -179,7 +179,7 @@ void device_remove_file(struct device * dev, struct device_attribute * attr)
  *	@dev:	device.
  *
  *	This prepares the device for use by other layers,
- *	including adding it to the device hierarchy. 
+ *	including adding it to the device hierarchy.
  *	It is the first half of device_register(), if called by
  *	that, though it can also be called separately, so one
  *	may use @dev's fields (e.g. the refcount).
@@ -187,7 +187,7 @@ void device_remove_file(struct device * dev, struct device_attribute * attr)
 
 void device_initialize(struct device *dev)
 {
-	kobj_set_kset_s(dev,devices_subsys);
+	kobj_set_kset_s(dev, devices_subsys);
 	kobject_init(&dev->kobj);
 	INIT_LIST_HEAD(&dev->node);
 	INIT_LIST_HEAD(&dev->children);
@@ -200,7 +200,7 @@ void device_initialize(struct device *dev)
  *	device_add - add device to device hierarchy.
  *	@dev:	device.
  *
- *	This is part 2 of device_register(), though may be called 
+ *	This is part 2 of device_register(), though may be called
  *	separately _iff_ device_initialize() has been called separately.
  *
  *	This adds it to the kobject hierarchy via kobject_add(), adds it
@@ -221,7 +221,7 @@ int device_add(struct device *dev)
 	pr_debug("DEV: registering device: ID = '%s'\n", dev->bus_id);
 
 	/* first, register with generic layer. */
-	kobject_set_name(&dev->kobj,dev->bus_id);
+	kobject_set_name(&dev->kobj, dev->bus_id);
 	if (parent)
 		dev->kobj.parent = &parent->kobj;
 
@@ -233,7 +233,7 @@ int device_add(struct device *dev)
 		goto BusError;
 	down_write(&devices_subsys.rwsem);
 	if (parent)
-		list_add_tail(&dev->node,&parent->children);
+		list_add_tail(&dev->node, &parent->children);
 	up_write(&devices_subsys.rwsem);
 
 	/* notify platform of device entry */
@@ -258,9 +258,9 @@ int device_add(struct device *dev)
  *	@dev:	pointer to the device structure
  *
  *	This happens in two clean steps - initialize the device
- *	and add it to the system. The two steps can be called 
- *	separately, but this is the easiest and most common. 
- *	I.e. you should only call the two helpers separately if 
+ *	and add it to the system. The two steps can be called
+ *	separately, but this is the easiest and most common.
+ *	I.e. you should only call the two helpers separately if
  *	have a clearly defined need to use and refcount the device
  *	before it is added to the hierarchy.
  */
@@ -301,13 +301,13 @@ void put_device(struct device * dev)
  *	device_del - delete device from system.
  *	@dev:	device.
  *
- *	This is the first part of the device unregistration 
+ *	This is the first part of the device unregistration
  *	sequence. This removes the device from the lists we control
- *	from here, has it removed from the other driver model 
+ *	from here, has it removed from the other driver model
  *	subsystems it was added to in device_add(), and removes it
  *	from the kobject hierarchy.
  *
- *	NOTE: this should be called manually _iff_ device_add() was 
+ *	NOTE: this should be called manually _iff_ device_add() was
  *	also called manually.
  */
 
@@ -340,7 +340,7 @@ void device_del(struct device * dev)
  *	we remove it from all the subsystems with device_del(), then
  *	we decrement the reference count via put_device(). If that
  *	is the final reference count, the device will be cleaned up
- *	via device_release() above. Otherwise, the structure will 
+ *	via device_release() above. Otherwise, the structure will
  *	stick around until the final reference to the device is dropped.
  */
 void device_unregister(struct device * dev)
@@ -358,7 +358,7 @@ void device_unregister(struct device * dev)
  *	@fn:	function to be called for each device.
  *
  *	Iterate over @dev's child devices, and call @fn for each,
- *	passing it @data. 
+ *	passing it @data.
  *
  *	We check the return of @fn each time. If it returns anything
  *	other than 0, we break out and return that value.
@@ -370,8 +370,8 @@ int device_for_each_child(struct device * dev, void * data,
 	int error = 0;
 
 	down_read(&devices_subsys.rwsem);
-	list_for_each_entry(child,&dev->children,node) {
-		if((error = fn(child,data)))
+	list_for_each_entry(child, &dev->children, node) {
+		if((error = fn(child, data)))
 			break;
 	}
 	up_read(&devices_subsys.rwsem);

@@ -3,7 +3,7 @@
  *
  * Copyright (c) 2002-3 Patrick Mochel
  * Copyright (c) 2002-3 Open Source Development Labs
- * 
+ *
  * This file is released under the GPLv2
  *
  * Please see Documentation/driver-model/platform.txt for more
@@ -116,14 +116,14 @@ int platform_device_register(struct platform_device * pdev)
 		pdev->dev.parent = &platform_bus;
 
 	pdev->dev.bus = &platform_bus_type;
-	
+
 	if (pdev->id != -1)
 		snprintf(pdev->dev.bus_id, BUS_ID_SIZE, "%s%u", pdev->name, pdev->id);
 	else
 		strlcpy(pdev->dev.bus_id, pdev->name, BUS_ID_SIZE);
 
 	pr_debug("Registering platform device '%s'. Parent at %s\n",
-		 pdev->dev.bus_id,pdev->dev.parent->bus_id);
+		 pdev->dev.bus_id, pdev->dev.parent->bus_id);
 	return device_register(&pdev->dev);
 }
 
@@ -139,13 +139,13 @@ void platform_device_unregister(struct platform_device * pdev)
  *	@dev:	device.
  *	@drv:	driver.
  *
- *	Platform device IDs are assumed to be encoded like this: 
- *	"<name><instance>", where <name> is a short description of the 
- *	type of device, like "pci" or "floppy", and <instance> is the 
+ *	Platform device IDs are assumed to be encoded like this:
+ *	"<name><instance>", where <name> is a short description of the
+ *	type of device, like "pci" or "floppy", and <instance> is the
  *	enumerated instance of the device, like '0' or '42'.
- *	Driver IDs are simply "<name>". 
- *	So, extract the <name> from the platform_device structure, 
- *	and compare it against the name of the driver. Return whether 
+ *	Driver IDs are simply "<name>".
+ *	So, extract the <name> from the platform_device structure,
+ *	and compare it against the name of the driver. Return whether
  *	they match or not.
  */
 
