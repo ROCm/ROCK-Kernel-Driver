@@ -160,6 +160,12 @@ int DRM(addmap)( struct inode *inode, struct file *filp,
 		}
 		map->offset = (unsigned long)map->handle;
 		if ( map->flags & _DRM_CONTAINS_LOCK ) {
+			/* Prevent a 2nd X Server from creating a 2nd lock */
+			if (dev->lock.hw_lock != NULL) {
+				vfree( map->handle );
+				DRM(free)( map, sizeof(*map), DRM_MEM_MAPS );
+				return -EBUSY;
+			}
 			dev->sigdata.lock =
 			dev->lock.hw_lock = map->handle; /* Pointer to lock */
 		}
