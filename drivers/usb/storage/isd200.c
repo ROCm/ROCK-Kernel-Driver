@@ -1,9 +1,15 @@
 /* Transport & Protocol Driver for In-System Design, Inc. ISD200 ASIC
  *
- * First release
+ * $Id: isd200.c,v 1.16 2002/04/22 03:39:43 mdharm Exp $
  *
- * Current development and maintenance by:
- *   (c) 2000 In-System Design, Inc. (support@in-system.com)
+ * Current development and maintenance:
+ *   (C) 2001-2002 Björn Stenberg (bjorn@haxx.se)
+ *
+ * Developed with the assistance of:
+ *   (C) 2002 Alan Stern <stern@rowland.org>
+ *
+ * Initial work:
+ *   (C) 2000 In-System Design, Inc. (support@in-system.com)
  *
  * The ISD200 ASIC does not natively support ATA devices.  The chip
  * does implement an interface, the ATA Command Block (ATACB) which provides
@@ -27,6 +33,10 @@
  *
  *  2001-02-24: Removed lots of duplicate code and simplified the structure.
  *              (bjorn@haxx.se)
+ *  2002-01-16: Fixed endianness bug so it works on the ppc arch.
+ *              (Luc Saillard <luc@saillard.org>)
+ *  2002-01-17: All bitfields removed.
+ *              (bjorn@haxx.se)
  */
 
 
@@ -44,15 +54,6 @@
 #include <linux/slab.h>
 #include <linux/hdreg.h>
 #include <linux/ide.h>
-
-/*
- * Inquiry defines. Used to interpret data returned from target as result
- * of inquiry command.
- *
- * DeviceType field
- */
-
-#define DIRECT_ACCESS_DEVICE            0x00    /* disks */
 
 /* Timeout defines (in Seconds) */
 
@@ -87,6 +88,19 @@
 #define ACTION_SELECT_5             0x20
 #define ACTION_SELECT_6             0x40
 #define ACTION_SELECT_7             0x80
+
+/* Register Select bits */
+#define REG_ALTERNATE_STATUS 0x01
+#define REG_DEVICE_CONTROL   0x01
+#define REG_ERROR            0x02
+#define REG_FEATURES         0x02
+#define REG_SECTOR_COUNT     0x04
+#define REG_SECTOR_NUMBER    0x08
+#define REG_CYLINDER_LOW     0x10
+#define REG_CYLINDER_HIGH    0x20
+#define REG_DEVICE_HEAD      0x40
+#define REG_STATUS           0x80
+#define REG_COMMAND          0x80
 
 /* ATA error definitions not in <linux/hdreg.h> */
 #define ATA_ERROR_MEDIA_CHANGE       0x20
@@ -152,20 +166,8 @@ union ata_cdb {
 	struct {
 		unsigned char SignatureByte0;
 		unsigned char SignatureByte1;
-		unsigned char ReadRegisterAccessBit : 1;
-		unsigned char NoDeviceSelectionBit : 1;
-		unsigned char NoBSYPollBit : 1;
-		unsigned char IgnorePhaseErrorBit : 1;
-		unsigned char IgnoreDeviceErrorBit : 1;
-		unsigned char Reserved0Bit : 3;
-		unsigned char SelectAlternateStatus : 1;
-		unsigned char SelectError : 1;
-		unsigned char SelectSectorCount : 1;
-		unsigned char SelectSectorNumber : 1;
-		unsigned char SelectCylinderLow : 1;
-		unsigned char SelectCylinderHigh : 1;
-		unsigned char SelectDeviceHead : 1;
-		unsigned char SelectStatus : 1;
+		unsigned char ActionSelect;
+		unsigned char RegisterSelect;
 		unsigned char TransferBlockSize;
 		unsigned char AlternateStatusByte;
 		unsigned char ErrorByte;
@@ -181,20 +183,8 @@ union ata_cdb {
         struct {
 		unsigned char SignatureByte0;
 		unsigned char SignatureByte1;
-		unsigned char ReadRegisterAccessBit : 1;
-		unsigned char NoDeviceSelectionBit : 1;
-		unsigned char NoBSYPollBit : 1;
-		unsigned char IgnorePhaseErrorBit : 1;
-		unsigned char IgnoreDeviceErrorBit : 1;
-		unsigned char Reserved0Bit : 3;
-		unsigned char SelectDeviceControl : 1;
-		unsigned char SelectFeatures : 1;
-		unsigned char SelectSectorCount : 1;
-		unsigned char SelectSectorNumber : 1;
-		unsigned char SelectCylinderLow : 1;
-		unsigned char SelectCylinderHigh : 1;
-		unsigned char SelectDeviceHead : 1;
-		unsigned char SelectCommand : 1;
+		unsigned char ActionSelect;
+		unsigned char RegisterSelect;
 		unsigned char TransferBlockSize;
 		unsigned char DeviceControlByte;
 		unsigned char FeaturesByte;
@@ -218,27 +208,20 @@ union ata_cdb {
  * includes fields through ProductRevisionLevel.
  */
 
+/*
+ * DeviceType field
+ */
+#define DIRECT_ACCESS_DEVICE            0x00    /* disks */
+#define DEVICE_REMOVABLE                0x80
+
 struct inquiry_data {
-	unsigned char DeviceType : 5;
-	unsigned char DeviceTypeQualifier : 3;
-	unsigned char DeviceTypeModifier : 7;
-	unsigned char RemovableMedia : 1;
+   	unsigned char DeviceType;
+	unsigned char DeviceTypeModifier;
 	unsigned char Versions;
-	unsigned char ResponseDataFormat : 4;
-	unsigned char HiSupport : 1;
-	unsigned char NormACA : 1;
-	unsigned char ReservedBit : 1;
-	unsigned char AERC : 1;
+	unsigned char Format; 
 	unsigned char AdditionalLength;
 	unsigned char Reserved[2];
-	unsigned char SoftReset : 1;
-	unsigned char CommandQueue : 1;
-	unsigned char Reserved2 : 1;
-	unsigned char LinkedCommands : 1;
-	unsigned char Synchronous : 1;
-	unsigned char Wide16Bit : 1;
-	unsigned char Wide32Bit : 1;
-	unsigned char RelativeAddressing : 1;
+	unsigned char Capability;
 	unsigned char VendorId[8];
 	unsigned char ProductId[16];
 	unsigned char ProductRevisionLevel[4];
@@ -257,25 +240,30 @@ struct inquiry_data {
  * ISD200 CONFIG data struct
  */
 
+#define ATACFG_TIMING          0x0f
+#define ATACFG_ATAPI_RESET     0x10
+#define ATACFG_MASTER          0x20
+#define ATACFG_BLOCKSIZE       0xa0
+
+#define ATACFGE_LAST_LUN       0x07
+#define ATACFGE_DESC_OVERRIDE  0x08
+#define ATACFGE_STATE_SUSPEND  0x10
+#define ATACFGE_SKIP_BOOT      0x20
+#define ATACFGE_CONF_DESC2     0x40
+#define ATACFGE_INIT_STATUS    0x80
+
+#define CFG_CAPABILITY_SRST    0x01
+
 struct isd200_config {
         unsigned char EventNotification;
         unsigned char ExternalClock;
         unsigned char ATAInitTimeout;
-        unsigned char ATATiming : 4;
-        unsigned char ATAPIReset : 1;
-        unsigned char MasterSlaveSelection : 1;
-        unsigned char ATAPICommandBlockSize : 2;
+	unsigned char ATAConfig;
         unsigned char ATAMajorCommand;
         unsigned char ATAMinorCommand;
-        unsigned char LastLUNIdentifier : 3;
-        unsigned char DescriptOverride : 1;
-        unsigned char ATA3StateSuspend : 1;
-        unsigned char SkipDeviceBoot : 1;
-        unsigned char ConfigDescriptor2 : 1;
-        unsigned char InitStatus : 1;
-        unsigned char SRSTEnable : 1;
-        unsigned char Reserved0 : 7;
-};
+	unsigned char ATAExtraConfig;
+	unsigned char Capability;
+}__attribute__ ((packed));
 
 
 /*
@@ -321,15 +309,16 @@ struct read_block_limits {
  * Sense Data Format
  */
 
+#define SENSE_ERRCODE           0x7f
+#define SENSE_ERRCODE_VALID     0x80
+#define SENSE_FLAG_SENSE_KEY    0x0f
+#define SENSE_FLAG_BAD_LENGTH   0x20
+#define SENSE_FLAG_END_OF_MEDIA 0x40
+#define SENSE_FLAG_FILE_MARK    0x80
 struct sense_data {
-        unsigned char ErrorCode:7;
-        unsigned char Valid:1;
-        unsigned char SegmentNumber;
-        unsigned char SenseKey:4;
-        unsigned char Reserved:1;
-        unsigned char IncorrectLength:1;
-        unsigned char EndOfMedia:1;
-        unsigned char FileMark:1;
+	unsigned char ErrorCode;
+	unsigned char SegmentNumber;
+	unsigned char Flags;
         unsigned char Information[4];
         unsigned char AdditionalSenseLength;
         unsigned char CommandSpecificInformation[4];
@@ -349,7 +338,6 @@ struct sense_data {
  * Helper routines
  ***********************************************************************/
 
-
 /**************************************************************************
  * isd200_build_sense
  *                                                                         
@@ -366,38 +354,33 @@ void isd200_build_sense(struct us_data *us, Scsi_Cmnd *srb)
         unsigned char error = info->ATARegs[IDE_ERROR_OFFSET];
 
 	if(error & ATA_ERROR_MEDIA_CHANGE) {
-		buf->ErrorCode = 0x70;
-		buf->Valid     = 1;
+		buf->ErrorCode = 0x70 | SENSE_ERRCODE_VALID;
 		buf->AdditionalSenseLength = 0xb;
-		buf->SenseKey =  UNIT_ATTENTION;
+		buf->Flags = UNIT_ATTENTION;
 		buf->AdditionalSenseCode = 0;
 		buf->AdditionalSenseCodeQualifier = 0;
         } else if(error & MCR_ERR) {
-		buf->ErrorCode = 0x70;
-		buf->Valid     = 1;
+		buf->ErrorCode = 0x70 | SENSE_ERRCODE_VALID;
 		buf->AdditionalSenseLength = 0xb;
-		buf->SenseKey =  UNIT_ATTENTION;
+		buf->Flags =  UNIT_ATTENTION;
 		buf->AdditionalSenseCode = 0;
 		buf->AdditionalSenseCodeQualifier = 0;
         } else if(error & TRK0_ERR) {
-		buf->ErrorCode = 0x70;
-		buf->Valid     = 1;
+		buf->ErrorCode = 0x70 | SENSE_ERRCODE_VALID;
 		buf->AdditionalSenseLength = 0xb;
-		buf->SenseKey =  NOT_READY;
+		buf->Flags =  NOT_READY;
 		buf->AdditionalSenseCode = 0;
 		buf->AdditionalSenseCodeQualifier = 0;
         } else if(error & ECC_ERR) {
-		buf->ErrorCode = 0x70;
-		buf->Valid     = 1;
+		buf->ErrorCode = 0x70 | SENSE_ERRCODE_VALID;
 		buf->AdditionalSenseLength = 0xb;
-		buf->SenseKey =  DATA_PROTECT;
+		buf->Flags =  DATA_PROTECT;
 		buf->AdditionalSenseCode = 0;
 		buf->AdditionalSenseCodeQualifier = 0;
         } else {
 		buf->ErrorCode = 0;
-		buf->Valid     = 0;
 		buf->AdditionalSenseLength = 0;
-		buf->SenseKey =  0;
+		buf->Flags =  0;
 		buf->AdditionalSenseCode = 0;
 		buf->AdditionalSenseCodeQualifier = 0;
         }
@@ -442,7 +425,7 @@ static int isd200_transfer_partial( struct us_data *us,
         /* if we stall, we need to clear it before we go on */
         if (result == -EPIPE) {
                 US_DEBUGP("clearing endpoint halt for pipe 0x%x\n", pipe);
-                usb_stor_clear_halt(us->pusb_dev, pipe);
+                usb_stor_clear_halt(us, pipe);
         }
     
         /* did we send all the data? */
@@ -524,7 +507,7 @@ static void isd200_transfer( struct us_data *us, Scsi_Cmnd *srb )
                         } else
                                 result = isd200_transfer_partial(us, 
                                                                  srb->sc_data_direction,                            
-                                                                 page_address(sg[i].page) + sg[i].offset,
+                                                                 page_address(sg[i].page) + sg[i].offset, 
                                                                  transfer_amount - total_transferred);
 
                         /* if we get an error, end the loop here */
@@ -593,7 +576,7 @@ int isd200_Bulk_transport( struct us_data *us, Scsi_Cmnd *srb,
         US_DEBUGP("Bulk command S 0x%x T 0x%x Trg %d LUN %d L %d F %d CL %d\n",
                   le32_to_cpu(bcb.Signature), bcb.Tag,
                   (bcb.Lun >> 4), (bcb.Lun & 0xFF), 
-                  bcb.DataTransferLength, bcb.Flags, bcb.Length);
+                  le32_to_cpu(bcb.DataTransferLength), bcb.Flags, bcb.Length);
         result = usb_stor_bulk_msg(us, &bcb, pipe, US_BULK_CB_WRAP_LEN, 
 				   &partial);
         US_DEBUGP("Bulk command transfer result=%d\n", result);
@@ -603,7 +586,7 @@ int isd200_Bulk_transport( struct us_data *us, Scsi_Cmnd *srb,
 	else if (result == -EPIPE) {
 		/* if we stall, we need to clear it before we go on */
                 US_DEBUGP("clearing endpoint halt for pipe 0x%x\n", pipe);
-                usb_stor_clear_halt(us->pusb_dev, pipe);
+                usb_stor_clear_halt(us, pipe);
 	} else if (result)  
                 return ISD200_TRANSPORT_ERROR;
     
@@ -633,7 +616,7 @@ int isd200_Bulk_transport( struct us_data *us, Scsi_Cmnd *srb,
         /* did the attempt to read the CSW fail? */
         if (result == -EPIPE) {
                 US_DEBUGP("clearing endpoint halt for pipe 0x%x\n", pipe);
-                usb_stor_clear_halt(us->pusb_dev, pipe);
+                usb_stor_clear_halt(us, pipe);
            
                 /* get the status again */
                 US_DEBUGP("Attempting to get CSW (2nd try)...\n");
@@ -647,7 +630,7 @@ int isd200_Bulk_transport( struct us_data *us, Scsi_Cmnd *srb,
                 /* if it fails again, we need a reset and return an error*/
                 if (result == -EPIPE) {
                         US_DEBUGP("clearing halt for pipe 0x%x\n", pipe);
-                        usb_stor_clear_halt(us->pusb_dev, pipe);
+                        usb_stor_clear_halt(us, pipe);
                         return ISD200_TRANSPORT_ERROR;
                 }
         }
@@ -716,10 +699,9 @@ static int isd200_action( struct us_data *us, int action,
 	case ACTION_READ_STATUS:
 		US_DEBUGP("   isd200_action(READ_STATUS)\n");
 		ata.generic.ActionSelect = ACTION_SELECT_0|ACTION_SELECT_2;
-		ata.read.SelectStatus = 1;
-		ata.read.SelectError = 1;
-		ata.read.SelectCylinderHigh = 1;
-		ata.read.SelectCylinderLow = 1;
+		ata.generic.RegisterSelect =
+		  REG_CYLINDER_LOW | REG_CYLINDER_HIGH |
+		  REG_STATUS | REG_ERROR;
 		srb.sc_data_direction = SCSI_DATA_READ;
 		srb.request_buffer = pointer;
 		srb.request_bufflen = value;
@@ -730,7 +712,7 @@ static int isd200_action( struct us_data *us, int action,
 		ata.generic.ActionSelect = ACTION_SELECT_1|ACTION_SELECT_2|
 			                   ACTION_SELECT_3|ACTION_SELECT_4|
 		                           ACTION_SELECT_5;
-		ata.write.SelectDeviceHead = 1;
+		ata.generic.RegisterSelect = REG_DEVICE_HEAD;
 		ata.write.DeviceHeadByte = value;
 		srb.sc_data_direction = SCSI_DATA_NONE;
 		break;
@@ -739,7 +721,7 @@ static int isd200_action( struct us_data *us, int action,
 		US_DEBUGP("   isd200_action(RESET)\n");
 		ata.generic.ActionSelect = ACTION_SELECT_1|ACTION_SELECT_2|
 			                   ACTION_SELECT_3|ACTION_SELECT_4;
-		ata.write.SelectDeviceControl = 1;
+		ata.generic.RegisterSelect = REG_DEVICE_CONTROL;
 		ata.write.DeviceControlByte = ATA_DC_RESET_CONTROLLER;
 		srb.sc_data_direction = SCSI_DATA_NONE;
 		break;
@@ -748,7 +730,7 @@ static int isd200_action( struct us_data *us, int action,
 		US_DEBUGP("   isd200_action(REENABLE)\n");
 		ata.generic.ActionSelect = ACTION_SELECT_1|ACTION_SELECT_2|
 			                   ACTION_SELECT_3|ACTION_SELECT_4;
-		ata.write.SelectDeviceControl = 1;
+		ata.generic.RegisterSelect = REG_DEVICE_CONTROL;
 		ata.write.DeviceControlByte = ATA_DC_REENABLE_CONTROLLER;
 		srb.sc_data_direction = SCSI_DATA_NONE;
 		break;
@@ -756,16 +738,15 @@ static int isd200_action( struct us_data *us, int action,
 	case ACTION_SOFT_RESET:
 		US_DEBUGP("   isd200_action(SOFT_RESET)\n");
 		ata.generic.ActionSelect = ACTION_SELECT_1|ACTION_SELECT_5;
-		ata.write.SelectDeviceHead = 1;
+		ata.generic.RegisterSelect = REG_DEVICE_HEAD | REG_COMMAND;
 		ata.write.DeviceHeadByte = info->DeviceHead;
-		ata.write.SelectCommand = 1;
 		ata.write.CommandByte = WIN_SRST;
 		srb.sc_data_direction = SCSI_DATA_NONE;
 		break;
 
 	case ACTION_IDENTIFY:
 		US_DEBUGP("   isd200_action(IDENTIFY)\n");
-		ata.write.SelectCommand = 1;
+		ata.generic.RegisterSelect = REG_COMMAND;
 		ata.write.CommandByte = WIN_IDENTIFY;
 		srb.sc_data_direction = SCSI_DATA_READ;
 		srb.request_buffer = (void *)&info->drive;
@@ -883,9 +864,46 @@ void isd200_invoke_transport( struct us_data *us,
 	 * condition, show that in the result code
 	 */
 	if (transferStatus == ISD200_TRANSPORT_FAILED)
-		srb->result = CHECK_CONDITION;
+		srb->result = CHECK_CONDITION << 1;
 }
 
+#ifdef CONFIG_USB_STORAGE_DEBUG
+static void isd200_log_config( struct isd200_info* info )
+{
+	US_DEBUGP("      Event Notification: 0x%x\n", 
+		  info->ConfigData.EventNotification);
+	US_DEBUGP("      External Clock: 0x%x\n", 
+		  info->ConfigData.ExternalClock);
+	US_DEBUGP("      ATA Init Timeout: 0x%x\n", 
+		  info->ConfigData.ATAInitTimeout);
+	US_DEBUGP("      ATAPI Command Block Size: 0x%x\n", 
+		  (info->ConfigData.ATAConfig & ATACFG_BLOCKSIZE) >> 6);
+	US_DEBUGP("      Master/Slave Selection: 0x%x\n", 
+		  info->ConfigData.ATAConfig & ATACFG_MASTER);
+	US_DEBUGP("      ATAPI Reset: 0x%x\n",
+		  info->ConfigData.ATAConfig & ATACFG_ATAPI_RESET);
+	US_DEBUGP("      ATA Timing: 0x%x\n",
+		  info->ConfigData.ATAConfig & ATACFG_TIMING);
+	US_DEBUGP("      ATA Major Command: 0x%x\n", 
+		  info->ConfigData.ATAMajorCommand);
+	US_DEBUGP("      ATA Minor Command: 0x%x\n", 
+		  info->ConfigData.ATAMinorCommand);
+	US_DEBUGP("      Init Status: 0x%x\n", 
+		  info->ConfigData.ATAExtraConfig & ATACFGE_INIT_STATUS);
+	US_DEBUGP("      Config Descriptor 2: 0x%x\n", 
+		  info->ConfigData.ATAExtraConfig & ATACFGE_CONF_DESC2);
+	US_DEBUGP("      Skip Device Boot: 0x%x\n",
+		  info->ConfigData.ATAExtraConfig & ATACFGE_SKIP_BOOT);
+	US_DEBUGP("      ATA 3 State Supsend: 0x%x\n",
+		  info->ConfigData.ATAExtraConfig & ATACFGE_STATE_SUSPEND);
+	US_DEBUGP("      Descriptor Override: 0x%x\n", 
+		  info->ConfigData.ATAExtraConfig & ATACFGE_DESC_OVERRIDE);
+	US_DEBUGP("      Last LUN Identifier: 0x%x\n",
+		  info->ConfigData.ATAExtraConfig & ATACFGE_LAST_LUN);
+	US_DEBUGP("      SRST Enable: 0x%x\n", 
+		  info->ConfigData.ATAExtraConfig & CFG_CAPABILITY_SRST);
+}
+#endif
 
 /**************************************************************************
  * isd200_write_config
@@ -901,26 +919,11 @@ int isd200_write_config( struct us_data *us )
 	int retStatus = ISD200_GOOD;
 	int result;
 
-
+#ifdef CONFIG_USB_STORAGE_DEBUG
 	US_DEBUGP("Entering isd200_write_config\n");
-
 	US_DEBUGP("   Writing the following ISD200 Config Data:\n");
-	US_DEBUGP("      Event Notification: 0x%x\n", info->ConfigData.EventNotification);
-	US_DEBUGP("      External Clock: 0x%x\n", info->ConfigData.ExternalClock);
-	US_DEBUGP("      ATA Init Timeout: 0x%x\n", info->ConfigData.ATAInitTimeout);
-	US_DEBUGP("      ATAPI Command Block Size: 0x%x\n", info->ConfigData.ATAPICommandBlockSize);
-	US_DEBUGP("      Master/Slave Selection: 0x%x\n", info->ConfigData.MasterSlaveSelection);
-	US_DEBUGP("      ATAPI Reset: 0x%x\n", info->ConfigData.ATAPIReset);
-	US_DEBUGP("      ATA Timing: 0x%x\n", info->ConfigData.ATATiming);
-	US_DEBUGP("      ATA Major Command: 0x%x\n", info->ConfigData.ATAMajorCommand);
-	US_DEBUGP("      ATA Minor Command: 0x%x\n", info->ConfigData.ATAMinorCommand);
-	US_DEBUGP("      Init Status: 0x%x\n", info->ConfigData.InitStatus);
-	US_DEBUGP("      Config Descriptor 2: 0x%x\n", info->ConfigData.ConfigDescriptor2);
-	US_DEBUGP("      Skip Device Boot: 0x%x\n", info->ConfigData.SkipDeviceBoot);
-	US_DEBUGP("      ATA 3 State Supsend: 0x%x\n", info->ConfigData.ATA3StateSuspend);
-	US_DEBUGP("      Descriptor Override: 0x%x\n", info->ConfigData.DescriptOverride);
-	US_DEBUGP("      Last LUN Identifier: 0x%x\n", info->ConfigData.LastLUNIdentifier);
-	US_DEBUGP("      SRST Enable: 0x%x\n", info->ConfigData.SRSTEnable);
+	isd200_log_config(info);
+#endif
 
 	/* let's send the command via the control pipe */
 	result = usb_stor_control_msg(
@@ -941,8 +944,8 @@ int isd200_write_config( struct us_data *us )
 		/* STALL must be cleared when they are detected */
 		if (result == -EPIPE) {
 			US_DEBUGP("-- Stall on control pipe. Clearing\n");
-			result = usb_stor_clear_halt(us->pusb_dev,
-						     usb_sndctrlpipe(us->pusb_dev, 0));
+			result = usb_stor_clear_halt(us,
+					usb_sndctrlpipe(us->pusb_dev, 0));
 			US_DEBUGP("-- usb_stor_clear_halt() returns %d\n", result);
 
 		}
@@ -986,30 +989,17 @@ int isd200_read_config( struct us_data *us )
 
 	if (result >= 0) {
 		US_DEBUGP("   Retrieved the following ISD200 Config Data:\n");
-		US_DEBUGP("      Event Notification: 0x%x\n", info->ConfigData.EventNotification);
-		US_DEBUGP("      External Clock: 0x%x\n", info->ConfigData.ExternalClock);
-		US_DEBUGP("      ATA Init Timeout: 0x%x\n", info->ConfigData.ATAInitTimeout);
-		US_DEBUGP("      ATAPI Command Block Size: 0x%x\n", info->ConfigData.ATAPICommandBlockSize);
-		US_DEBUGP("      Master/Slave Selection: 0x%x\n", info->ConfigData.MasterSlaveSelection);
-		US_DEBUGP("      ATAPI Reset: 0x%x\n", info->ConfigData.ATAPIReset);
-		US_DEBUGP("      ATA Timing: 0x%x\n", info->ConfigData.ATATiming);
-		US_DEBUGP("      ATA Major Command: 0x%x\n", info->ConfigData.ATAMajorCommand);
-		US_DEBUGP("      ATA Minor Command: 0x%x\n", info->ConfigData.ATAMinorCommand);
-		US_DEBUGP("      Init Status: 0x%x\n", info->ConfigData.InitStatus);
-		US_DEBUGP("      Config Descriptor 2: 0x%x\n", info->ConfigData.ConfigDescriptor2);
-		US_DEBUGP("      Skip Device Boot: 0x%x\n", info->ConfigData.SkipDeviceBoot);
-		US_DEBUGP("      ATA 3 State Supsend: 0x%x\n", info->ConfigData.ATA3StateSuspend);
-		US_DEBUGP("      Descriptor Override: 0x%x\n", info->ConfigData.DescriptOverride);
-		US_DEBUGP("      Last LUN Identifier: 0x%x\n", info->ConfigData.LastLUNIdentifier);
-		US_DEBUGP("      SRST Enable: 0x%x\n", info->ConfigData.SRSTEnable);
+#ifdef CONFIG_USB_STORAGE_DEBUG
+		isd200_log_config(info);
+#endif
         } else {
 		US_DEBUGP("   Request to get ISD200 Config Data failed!\n");
 
 		/* STALL must be cleared when they are detected */
 		if (result == -EPIPE) {
 			US_DEBUGP("-- Stall on control pipe. Clearing\n");
-			result = usb_stor_clear_halt(us->pusb_dev,   
-						     usb_sndctrlpipe(us->pusb_dev, 0));
+			result = usb_stor_clear_halt(us,   
+					usb_sndctrlpipe(us->pusb_dev, 0));
 			US_DEBUGP("-- usb_stor_clear_halt() returns %d\n", result);
 
 		}
@@ -1175,11 +1165,12 @@ static int isd200_try_enum(struct us_data *us, unsigned char master_slave,
 				break;
 			}
 		} else {
-			US_DEBUGP("   Not ATA, not ATAPI. Weird.\n");
+ 			US_DEBUGP("   Not ATA, not ATAPI. Weird.\n");
+			break;
 		}
 
 		/* check for timeout on this request */
-		if (jiffies >= endTime) {
+		if (time_after_eq(jiffies, endTime)) {
 			if (!detect)
 				US_DEBUGP("   BSY check timeout, just continue with next operation...\n");
 			else
@@ -1223,9 +1214,10 @@ int isd200_manual_enum(struct us_data *us)
 		}
 
 		isslave = (info->DeviceHead & ATA_ADDRESS_DEVHEAD_SLAVE) ? 1 : 0;
-		if (info->ConfigData.MasterSlaveSelection != isslave) {
+		if (!(info->ConfigData.ATAConfig & ATACFG_MASTER)) {
 			US_DEBUGP("   Setting Master/Slave selection to %d\n", isslave);
-			info->ConfigData.MasterSlaveSelection = isslave;
+			info->ConfigData.ATAConfig &= 0x3f;
+			info->ConfigData.ATAConfig |= (isslave<<6);
 			retStatus = isd200_write_config(us);
 		}
 	}
@@ -1272,6 +1264,8 @@ int isd200_get_inquiry_data( struct us_data *us )
 			} else {
 				/* ATA Command Identify successful */
 				int i;
+				__u16 *src, *dest;
+				ide_fix_driveid(&info->drive);
 
 				US_DEBUGP("   Identify Data Structure:\n");
 				US_DEBUGP("      config = 0x%x\n", info->drive.config);
@@ -1317,31 +1311,25 @@ int isd200_get_inquiry_data( struct us_data *us )
 
 				if (info->drive.command_set_1 & COMMANDSET_MEDIA_STATUS) {
 					/* set the removable bit */
-					info->InquiryData.RemovableMedia = 1;
+					info->InquiryData.DeviceTypeModifier = DEVICE_REMOVABLE;
 					info->DeviceFlags |= DF_REMOVABLE_MEDIA;
 				}
 
 				/* Fill in vendor identification fields */
-				for (i = 0; i < 20; i += 2) {
-					info->InquiryData.VendorId[i] = 
-						info->drive.model[i + 1];
-					info->InquiryData.VendorId[i+1] = 
-						info->drive.model[i];
-				}
+				src = (__u16*)info->drive.model;
+				dest = (__u16*)info->InquiryData.VendorId;
+				for (i=0;i<4;i++)
+					dest[i] = be16_to_cpu(src[i]);
 
-				/* Initialize unused portion of product id */
-				for (i = 0; i < 4; i++) {
-					info->InquiryData.ProductId[12+i] = ' ';
-				}
+				src = (__u16*)(info->drive.model+8);
+				dest = (__u16*)info->InquiryData.ProductId;
+				for (i=0;i<8;i++)
+					dest[i] = be16_to_cpu(src[i]);
 
-				/* Move firmware revision from IDENTIFY data to */
-				/* product revision in INQUIRY data             */
-				for (i = 0; i < 4; i += 2) {
-					info->InquiryData.ProductRevisionLevel[i] =
-						info->drive.fw_rev[i+1];
-					info->InquiryData.ProductRevisionLevel[i+1] =
-						info->drive.fw_rev[i];
-				}
+				src = (__u16*)info->drive.fw_rev;
+				dest = (__u16*)info->InquiryData.ProductRevisionLevel;
+				for (i=0;i<2;i++)
+					dest[i] = be16_to_cpu(src[i]);
 
 				/* determine if it supports Media Status Notification */
 				if (info->drive.command_set_2 & COMMANDSET_MEDIA_STATUS) {
@@ -1483,7 +1471,7 @@ int isd200_scsi_to_ata(Scsi_Cmnd *srb, struct us_data *us,
 			ataCdb->generic.SignatureByte0 = info->ConfigData.ATAMajorCommand;
 			ataCdb->generic.SignatureByte1 = info->ConfigData.ATAMinorCommand;
 			ataCdb->generic.TransferBlockSize = 1;
-			ataCdb->write.SelectCommand = 1;
+			ataCdb->generic.RegisterSelect = REG_COMMAND;
 			ataCdb->write.CommandByte = ATA_COMMAND_GET_MEDIA_STATUS;
 			srb->request_bufflen = 0;
 		} else {
@@ -1504,7 +1492,7 @@ int isd200_scsi_to_ata(Scsi_Cmnd *srb, struct us_data *us,
 			ataCdb->generic.SignatureByte0 = info->ConfigData.ATAMajorCommand;
 			ataCdb->generic.SignatureByte1 = info->ConfigData.ATAMinorCommand;
 			ataCdb->generic.TransferBlockSize = 1;
-			ataCdb->write.SelectCommand = 1;
+			ataCdb->generic.RegisterSelect = REG_COMMAND;
 			ataCdb->write.CommandByte = ATA_COMMAND_GET_MEDIA_STATUS;
 			srb->request_bufflen = 0;
 		} else {
@@ -1561,17 +1549,15 @@ int isd200_scsi_to_ata(Scsi_Cmnd *srb, struct us_data *us,
 		ataCdb->generic.SignatureByte0 = info->ConfigData.ATAMajorCommand;
 		ataCdb->generic.SignatureByte1 = info->ConfigData.ATAMinorCommand;
 		ataCdb->generic.TransferBlockSize = 1;
-		ataCdb->write.SelectSectorCount = 1;
+		ataCdb->generic.RegisterSelect =
+		  REG_SECTOR_COUNT | REG_SECTOR_NUMBER |
+		  REG_CYLINDER_LOW | REG_CYLINDER_HIGH |
+		  REG_DEVICE_HEAD  | REG_COMMAND;
 		ataCdb->write.SectorCountByte = (unsigned char)blockCount;
-		ataCdb->write.SelectSectorNumber = 1;
 		ataCdb->write.SectorNumberByte = sectnum;
-		ataCdb->write.SelectCylinderHigh = 1;
 		ataCdb->write.CylinderHighByte = (unsigned char)(cylinder>>8);
-		ataCdb->write.SelectCylinderLow = 1;
 		ataCdb->write.CylinderLowByte = (unsigned char)cylinder;
-		ataCdb->write.SelectDeviceHead = 1;
 		ataCdb->write.DeviceHeadByte = (head | ATA_ADDRESS_DEVHEAD_STD);
-		ataCdb->write.SelectCommand = 1;
 		ataCdb->write.CommandByte = WIN_READ;
 		break;
 
@@ -1594,17 +1580,15 @@ int isd200_scsi_to_ata(Scsi_Cmnd *srb, struct us_data *us,
 		ataCdb->generic.SignatureByte0 = info->ConfigData.ATAMajorCommand;
 		ataCdb->generic.SignatureByte1 = info->ConfigData.ATAMinorCommand;
 		ataCdb->generic.TransferBlockSize = 1;
-		ataCdb->write.SelectSectorCount = 1;
+		ataCdb->generic.RegisterSelect =
+		  REG_SECTOR_COUNT | REG_SECTOR_NUMBER |
+		  REG_CYLINDER_LOW | REG_CYLINDER_HIGH |
+		  REG_DEVICE_HEAD  | REG_COMMAND;
 		ataCdb->write.SectorCountByte = (unsigned char)blockCount;
-		ataCdb->write.SelectSectorNumber = 1;
 		ataCdb->write.SectorNumberByte = sectnum;
-		ataCdb->write.SelectCylinderHigh = 1;
 		ataCdb->write.CylinderHighByte = (unsigned char)(cylinder>>8);
-		ataCdb->write.SelectCylinderLow = 1;
 		ataCdb->write.CylinderLowByte = (unsigned char)cylinder;
-		ataCdb->write.SelectDeviceHead = 1;
 		ataCdb->write.DeviceHeadByte = (head | ATA_ADDRESS_DEVHEAD_STD);
-		ataCdb->write.SelectCommand = 1;
 		ataCdb->write.CommandByte = WIN_WRITE;
 		break;
 
@@ -1617,7 +1601,7 @@ int isd200_scsi_to_ata(Scsi_Cmnd *srb, struct us_data *us,
 			ataCdb->generic.SignatureByte0 = info->ConfigData.ATAMajorCommand;
 			ataCdb->generic.SignatureByte1 = info->ConfigData.ATAMinorCommand;
 			ataCdb->generic.TransferBlockSize = 1;
-			ataCdb->write.SelectCommand = 1;
+			ataCdb->generic.RegisterSelect = REG_COMMAND;
 			ataCdb->write.CommandByte = (srb->cmnd[4] & 0x1) ?
 				WIN_DOORLOCK : WIN_DOORUNLOCK;
 			srb->request_bufflen = 0;
@@ -1640,14 +1624,14 @@ int isd200_scsi_to_ata(Scsi_Cmnd *srb, struct us_data *us,
 			ataCdb->generic.SignatureByte0 = info->ConfigData.ATAMajorCommand;
 			ataCdb->generic.SignatureByte1 = info->ConfigData.ATAMinorCommand;
 			ataCdb->generic.TransferBlockSize = 0;
-			ataCdb->write.SelectCommand = 1;
+			ataCdb->generic.RegisterSelect = REG_COMMAND;
 			ataCdb->write.CommandByte = ATA_COMMAND_MEDIA_EJECT;
 		} else if ((srb->cmnd[4] & 0x3) == 0x1) {
 			US_DEBUGP("   Get Media Status\n");
 			ataCdb->generic.SignatureByte0 = info->ConfigData.ATAMajorCommand;
 			ataCdb->generic.SignatureByte1 = info->ConfigData.ATAMinorCommand;
 			ataCdb->generic.TransferBlockSize = 1;
-			ataCdb->write.SelectCommand = 1;
+			ataCdb->generic.RegisterSelect = REG_COMMAND;
 			ataCdb->write.CommandByte = ATA_COMMAND_GET_MEDIA_STATUS;
 			srb->request_bufflen = 0;
 		} else {

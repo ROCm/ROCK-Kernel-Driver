@@ -144,13 +144,12 @@ static inline void qtd_copy_status (struct urb *urb, size_t length, u32 token)
 					usb_pipeendpoint (pipe),
 					usb_pipeout (pipe));
 			if (urb->dev->tt && !usb_pipeint (pipe)) {
-err ("must CLEAR_TT_BUFFER, hub port %d%s addr %d ep %d",
-    urb->dev->ttport, /* devpath */
-    urb->dev->tt->multi ? "" : " (all-ports TT)",
-    urb->dev->devnum, usb_pipeendpoint (urb->pipe));
-				// FIXME something (khubd?) should make the hub
-				// CLEAR_TT_BUFFER ASAP, it's blocking other
-				// fs/ls requests... hub_tt_clear_buffer() ?
+				struct usb_device *tt = urb->dev->tt->hub;
+				dbg ("clear tt %s-%s p%d buffer, a%d ep%d",
+					tt->bus->bus_name, tt->devpath,
+    					urb->dev->ttport, urb->dev->devnum,
+    					usb_pipeendpoint (pipe));
+				usb_hub_tt_clear_buffer (urb->dev, pipe);
 			}
 		}
 	}
@@ -817,9 +816,9 @@ submit_async (
 		} else {
 			// dbg_qh ("empty qh", ehci, qh);
 
-// FIXME:  how handle usb_clear_halt() for an EP with queued URBs?
-// usbcore may not let us handle that cleanly...
-// likely must cancel them all first!
+			/* NOTE: we already canceled any queued URBs
+			 * when the endpoint halted.
+			 */
 
 			/* usb_clear_halt() means qh data toggle gets reset */
 			if (usb_pipebulk (urb->pipe)

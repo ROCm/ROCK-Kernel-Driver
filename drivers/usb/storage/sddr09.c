@@ -1,7 +1,10 @@
 /* Driver for SanDisk SDDR-09 SmartMedia reader
  *
+ * $Id: sddr09.c,v 1.24 2002/04/22 03:39:43 mdharm Exp $
  *   (c) 2000, 2001 Robert Baruch (autophile@starband.net)
  *   (c) 2002 Andries Brouwer (aeb@cwi.nl)
+ * Developed with the assistance of:
+ *   (c) 2002 Alan Stern <stern@rowland.org>
  *
  * The SanDisk SDDR-09 SmartMedia reader uses the Shuttle EUSB-01 chip.
  * This chip is a programmable USB controller. In the SDDR-09, it has
@@ -262,8 +265,8 @@ sddr09_send_control(struct us_data *us,
 		/* a stall is a fatal condition from the device */
 		if (result == -EPIPE) {
 			US_DEBUGP("-- Stall on control pipe. Clearing\n");
-			result = usb_clear_halt(us->pusb_dev, pipe);
-			US_DEBUGP("-- usb_clear_halt() returns %d\n", result);
+			result = usb_stor_clear_halt(us, pipe);
+			US_DEBUGP("-- usb_stor_clear_halt() returns %d\n", result);
 			return USB_STOR_TRANSPORT_FAILED;
 		}
 
@@ -317,13 +320,13 @@ sddr09_raw_bulk(struct us_data *us, int direction,
 
 	result = usb_stor_bulk_msg(us, data, pipe, len, &act_len);
 
-	/* if we stall, we need to clear it before we go on */
-	if (result == -EPIPE) {
-		US_DEBUGP("EPIPE: clearing endpoint halt for"
-			  " pipe 0x%x, stalled at %d bytes\n",
-			  pipe, act_len);
-		usb_clear_halt(us->pusb_dev, pipe);
-	}
+        /* if we stall, we need to clear it before we go on */
+        if (result == -EPIPE) {
+       	        US_DEBUGP("EPIPE: clearing endpoint halt for"
+			" pipe 0x%x, stalled at %d bytes\n",
+			pipe, act_len);
+               	usb_stor_clear_halt(us, pipe);
+        }
 
 	if (result) {
 		/* -ENOENT -- we canceled this transfer */
@@ -1386,15 +1389,6 @@ sddr09_read_map(struct us_data *us) {
 	// Each block is 64 bytes of control data, so block i is located in
 	// scatterlist block i*64/128k = i*(2^6)*(2^-17) = i*(2^-11)
 
-#if 0
-	/* No translation */
-	for (i=0; i<numblocks; i++) {
-		lba = i;
-		info->pba_to_lba[i] = lba;
-		info->lba_to_pba[lba] = i;
-	}
-	printk("sddr09: no translation today\n");
-#else
 	for (i=0; i<numblocks; i++) {
 		ptr = page_address(sg[i>>11].page) +
 			sg[i>>11].offset + ((i&0x7ff)<<6);
@@ -1482,7 +1476,6 @@ sddr09_read_map(struct us_data *us) {
 		info->pba_to_lba[i] = lba;
 		info->lba_to_pba[lba] = i;
 	}
-#endif
 
 	/*
 	 * Approximate capacity. This is not entirely correct yet,
@@ -1508,7 +1501,7 @@ sddr09_read_map(struct us_data *us) {
 	US_DEBUGP("Found %d LBA's\n", lbact);
 
 	for (i=0; i<alloc_blocks; i++)
-		kfree(page_address(sg[i].page)+sg[i].offset);
+		kfree(page_address(sg[i].page) + sg[i].offset);
 	kfree(sg);
 	return 0;
 }

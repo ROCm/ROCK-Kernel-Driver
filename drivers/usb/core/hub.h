@@ -136,6 +136,34 @@ struct usb_hub_descriptor {
 
 struct usb_device;
 
+/*
+ * As of USB 2.0, full/low speed devices are segregated into trees.
+ * One type grows from USB 1.1 host controllers (OHCI, UHCI etc).
+ * The other type grows from high speed hubs when they connect to
+ * full/low speed devices using "Transaction Translators" (TTs).
+ *
+ * TTs should only be known to the hub driver, and high speed bus
+ * drivers (only EHCI for now).  They affect periodic scheduling and
+ * sometimes control/bulk error recovery.
+ */
+struct usb_tt {
+	struct usb_device	*hub;	/* upstream highspeed hub */
+	int			multi;	/* true means one TT per port */
+
+	/* for control/bulk error recovery (CLEAR_TT_BUFFER) */
+	spinlock_t		lock;
+	struct list_head	clear_list;	/* of usb_tt_clear */
+	struct tq_struct	kevent;
+};
+
+struct usb_tt_clear {
+	struct list_head	clear_list;
+	unsigned		tt;
+	u16			devinfo;
+};
+
+extern void usb_hub_tt_clear_buffer (struct usb_device *dev, int pipe);
+
 struct usb_hub {
 	struct usb_device	*dev;		/* the "real" device */
 	struct urb		*urb;		/* for interrupt polling pipe */

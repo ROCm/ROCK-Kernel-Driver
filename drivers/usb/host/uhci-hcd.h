@@ -1,5 +1,5 @@
-#ifndef __LINUX_UHCI_H
-#define __LINUX_UHCI_H
+#ifndef __LINUX_UHCI_HCD_H
+#define __LINUX_UHCI_HCD_H
 
 #include <linux/list.h>
 #include <linux/usb.h>
@@ -58,10 +58,10 @@
 
 #define UHCI_NULL_DATA_SIZE	0x7FF	/* for UHCI controller TD */
 
-#define UHCI_PTR_BITS		0x000F
-#define UHCI_PTR_TERM		0x0001
-#define UHCI_PTR_QH		0x0002
-#define UHCI_PTR_DEPTH		0x0004
+#define UHCI_PTR_BITS		cpu_to_le32(0x000F)
+#define UHCI_PTR_TERM		cpu_to_le32(0x0001)
+#define UHCI_PTR_QH		cpu_to_le32(0x0002)
+#define UHCI_PTR_DEPTH		cpu_to_le32(0x0004)
 
 #define UHCI_NUMFRAMES		1024	/* in the frame list [array] */
 #define UHCI_MAX_SOF_NUMBER	2047	/* in an SOF packet */
@@ -95,6 +95,7 @@ struct uhci_qh {
 /*
  * for TD <status>:
  */
+#define td_status(td)		le32_to_cpu((td)->status)
 #define TD_CTRL_SPD		(1 << 29)	/* Short Packet Detect */
 #define TD_CTRL_C_ERR_MASK	(3 << 27)	/* Error Counter bits */
 #define TD_CTRL_C_ERR_SHIFT	27
@@ -108,28 +109,33 @@ struct uhci_qh {
 #define TD_CTRL_NAK		(1 << 19)	/* NAK Received */
 #define TD_CTRL_CRCTIMEO	(1 << 18)	/* CRC/Time Out Error */
 #define TD_CTRL_BITSTUFF	(1 << 17)	/* Bit Stuff Error */
-#define TD_CTRL_ACTLEN_MASK	0x7FF		/* actual length, encoded as n - 1 */
+#define TD_CTRL_ACTLEN_MASK	0x7FF	/* actual length, encoded as n - 1 */
 
 #define TD_CTRL_ANY_ERROR	(TD_CTRL_STALLED | TD_CTRL_DBUFERR | \
 				 TD_CTRL_BABBLE | TD_CTRL_CRCTIME | TD_CTRL_BITSTUFF)
 
-#define uhci_status_bits(ctrl_sts)	(ctrl_sts & 0xFE0000)
-#define uhci_actual_length(ctrl_sts)	((ctrl_sts + 1) & TD_CTRL_ACTLEN_MASK) /* 1-based */
+#define uhci_maxerr(err)		((err) << TD_CTRL_C_ERR_SHIFT)
+#define uhci_status_bits(ctrl_sts)	((ctrl_sts) & 0xFE0000)
+#define uhci_actual_length(ctrl_sts)	(((ctrl_sts) + 1) & TD_CTRL_ACTLEN_MASK) /* 1-based */
 
 /*
  * for TD <info>: (a.k.a. Token)
  */
+#define td_token(td)		le32_to_cpu((td)->token)
+#define TD_TOKEN_DEVADDR_SHIFT	8
 #define TD_TOKEN_TOGGLE_SHIFT	19
 #define TD_TOKEN_TOGGLE		(1 << 19)
-#define TD_TOKEN_PID_MASK	0xFF
+#define TD_TOKEN_EXPLEN_SHIFT	21
 #define TD_TOKEN_EXPLEN_MASK	0x7FF		/* expected length, encoded as n - 1 */
+#define TD_TOKEN_PID_MASK	0xFF
 
-#define uhci_maxlen(token)	((token) >> 21)
-#define uhci_expected_length(info) (((info >> 21) + 1) & TD_TOKEN_EXPLEN_MASK) /* 1-based */
+#define uhci_explen(len)	((len) << TD_TOKEN_EXPLEN_SHIFT)
+
+#define uhci_expected_length(token) ((((token) >> 21) + 1) & TD_TOKEN_EXPLEN_MASK)
 #define uhci_toggle(token)	(((token) >> TD_TOKEN_TOGGLE_SHIFT) & 1)
 #define uhci_endpoint(token)	(((token) >> 15) & 0xf)
-#define uhci_devaddr(token)	(((token) >> 8) & 0x7f)
-#define uhci_devep(token)	(((token) >> 8) & 0x7ff)
+#define uhci_devaddr(token)	(((token) >> TD_TOKEN_DEVADDR_SHIFT) & 0x7f)
+#define uhci_devep(token)	(((token) >> TD_TOKEN_DEVADDR_SHIFT) & 0x7ff)
 #define uhci_packetid(token)	((token) & TD_TOKEN_PID_MASK)
 #define uhci_packetout(token)	(uhci_packetid(token) != USB_PID_IN)
 #define uhci_packetin(token)	(uhci_packetid(token) == USB_PID_IN)
@@ -152,7 +158,7 @@ struct uhci_td {
 	/* Hardware fields */
 	__u32 link;
 	__u32 status;
-	__u32 info;
+	__u32 token;
 	__u32 buffer;
 
 	/* Software fields */
@@ -266,17 +272,7 @@ static inline int __interval_to_skel(int interval)
 	return 7;				/* int128 for 128-255 ms (Max.) */
 }
 
-struct virt_root_hub {
-	struct usb_device *dev;
-	int devnum;		/* Address of Root Hub endpoint */
-	struct urb *urb;
-	void *int_addr;
-	int send;
-	int interval;
-	int numports;
-	int c_p_r[8];
-	struct timer_list rh_int_timer;
-};
+#define hcd_to_uhci(hcd_ptr) list_entry(hcd_ptr, struct uhci_hcd, hcd)
 
 /*
  * This describes the full uhci information.
@@ -284,7 +280,9 @@ struct virt_root_hub {
  * Note how the "proper" USB information is just
  * a subset of what the full implementation needs.
  */
-struct uhci {
+struct uhci_hcd {
+	struct usb_hcd hcd;
+
 	struct pci_dev *dev;
 
 #ifdef CONFIG_PROC_FS
@@ -328,10 +326,15 @@ struct uhci {
 	spinlock_t complete_list_lock;
 	struct list_head complete_list;		/* P: uhci->complete_list_lock */
 
-	struct virt_root_hub rh;	/* private data of the virtual root hub */
+	struct usb_device *rh_dev;		/* Root hub */
+	int rh_numports;
+
+	struct timer_list stall_timer;
 };
 
 struct urb_priv {
+	struct list_head urb_list;
+
 	struct urb *urb;
 	struct usb_device *dev;
 
@@ -381,61 +384,6 @@ struct urb_priv {
  * 
  * So, if you need uhci->urb_list_lock, grab it before you grab urb->lock
  */
-
-/* -------------------------------------------------------------------------
-   Virtual Root HUB
-   ------------------------------------------------------------------------- */
-/* destination of request */
-#define RH_DEVICE		0x00
-#define RH_INTERFACE		0x01
-#define RH_ENDPOINT		0x02
-#define RH_OTHER		0x03
-
-#define RH_CLASS		0x20
-#define RH_VENDOR		0x40
-
-/* Requests: bRequest << 8 | bmRequestType */
-#define RH_GET_STATUS		0x0080
-#define RH_CLEAR_FEATURE	0x0100
-#define RH_SET_FEATURE		0x0300
-#define RH_SET_ADDRESS		0x0500
-#define RH_GET_DESCRIPTOR	0x0680
-#define RH_SET_DESCRIPTOR	0x0700
-#define RH_GET_CONFIGURATION	0x0880
-#define RH_SET_CONFIGURATION	0x0900
-#define RH_GET_STATE		0x0280
-#define RH_GET_INTERFACE	0x0A80
-#define RH_SET_INTERFACE	0x0B00
-#define RH_SYNC_FRAME		0x0C80
-/* Our Vendor Specific Request */
-#define RH_SET_EP		0x2000
-
-/* Hub port features */
-#define RH_PORT_CONNECTION	0x00
-#define RH_PORT_ENABLE		0x01
-#define RH_PORT_SUSPEND		0x02
-#define RH_PORT_OVER_CURRENT	0x03
-#define RH_PORT_RESET		0x04
-#define RH_PORT_POWER		0x08
-#define RH_PORT_LOW_SPEED	0x09
-#define RH_C_PORT_CONNECTION	0x10
-#define RH_C_PORT_ENABLE	0x11
-#define RH_C_PORT_SUSPEND	0x12
-#define RH_C_PORT_OVER_CURRENT	0x13
-#define RH_C_PORT_RESET		0x14
-
-/* Hub features */
-#define RH_C_HUB_LOCAL_POWER	0x00
-#define RH_C_HUB_OVER_CURRENT	0x01
-#define RH_DEVICE_REMOTE_WAKEUP	0x00
-#define RH_ENDPOINT_STALL	0x01
-
-/* Our Vendor Specific feature */
-#define RH_REMOVE_EP		0x00
-
-#define RH_ACK			0x01
-#define RH_REQ_ERR		-1
-#define RH_NACK			0x00
 
 #endif
 

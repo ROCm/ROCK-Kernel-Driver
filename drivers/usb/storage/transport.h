@@ -1,7 +1,7 @@
 /* Driver for USB Mass Storage compliant devices
  * Transport Functions Header File
  *
- * $Id: transport.h,v 1.15 2001/03/17 20:06:23 jrmayfield Exp $
+ * $Id: transport.h,v 1.18 2002/04/21 02:57:59 mdharm Exp $
  *
  * Current development and maintenance by:
  *   (c) 1999, 2000 Matthew Dharm (mdharm-usb@one-eyed-alien.net)
@@ -57,6 +57,9 @@
 #ifdef CONFIG_USB_STORAGE_SDDR09
 #define US_PR_EUSB_SDDR09	0x81	/* SCM-SCSI bridge for
 						SDDR-09 */
+#endif
+#ifdef CONFIG_USB_STORAGE_SDDR55
+#define US_PR_SDDR55	0x82		/* SDDR-55 (made up) */
 #endif
 #define US_PR_DPCM_USB  0xf0		/* Combination CB/SDDR09 */
 
@@ -146,11 +149,12 @@ extern int usb_stor_Bulk_reset(struct us_data*);
 
 extern unsigned int usb_stor_transfer_length(Scsi_Cmnd*);
 extern void usb_stor_invoke_transport(Scsi_Cmnd*, struct us_data*);
+extern void usb_stor_abort_transport(struct us_data*);
 extern int usb_stor_transfer_partial(struct us_data*, char*, int);
 extern int usb_stor_bulk_msg(struct us_data*, void*, int, unsigned int,
 		unsigned int*);
 extern int usb_stor_control_msg(struct us_data*, unsigned int, u8, u8,
 		u16, u16, void*, u16);
+extern int usb_stor_clear_halt(struct us_data*, int );
 extern void usb_stor_transfer(Scsi_Cmnd*, struct us_data*);
-extern int usb_stor_clear_halt(struct usb_device*, int );
 #endif

@@ -1,12 +1,13 @@
 /* Driver for USB Mass Storage compliant devices
  *
- * $Id: protocol.c,v 1.11 2002/01/13 06:40:25 mdharm Exp $
+ * $Id: protocol.c,v 1.14 2002/04/22 03:39:43 mdharm Exp $
  *
  * Current development and maintenance by:
- *   (c) 1999, 2000 Matthew Dharm (mdharm-usb@one-eyed-alien.net)
+ *   (c) 1999-2002 Matthew Dharm (mdharm-usb@one-eyed-alien.net)
  *
  * Developed with the assistance of:
  *   (c) 2000 David L. Brown, Jr. (usb-storage@davidb.org)
+ *   (c) 2002 Alan Stern (stern@rowland.org)
  *
  * Initial work by:
  *   (c) 1999 Michael Gee (michael@linuxspecific.com)
@@ -67,10 +68,16 @@ void fix_inquiry_data(Scsi_Cmnd *srb)
 	US_DEBUGP("Fixing INQUIRY data to show SCSI rev 2\n");
 
 	/* find the location of the data */
-	if (srb->use_sg)
-		BUG();
+	if (srb->use_sg) {
+		/* this piece of code only works if the first page is big enough to
+		 * hold more than 3 bytes -- which is _very_ likely
+		 */
+		struct scatterlist *sg;
 
-	data_ptr = (unsigned char *) srb->request_buffer;
+		sg = (struct scatterlist *) srb->request_buffer;
+		data_ptr = (unsigned char *) page_address(sg[0].page) + sg[0].offset;
+	} else
+		data_ptr = (unsigned char *)srb->request_buffer;
 
 	/* Change the SCSI revision number */
 	data_ptr[2] = (data_ptr[2] & ~7) | 2;
@@ -94,9 +101,11 @@ void usb_stor_qic157_command(Scsi_Cmnd *srb, struct us_data *us)
 
 	/* send the command to the transport layer */
 	usb_stor_invoke_transport(srb, us);
+	if (srb->result == GOOD << 1) {
 
-	/* fix the INQUIRY data if necessary */
-	fix_inquiry_data(srb);
+		/* fix the INQUIRY data if necessary */
+		fix_inquiry_data(srb);
+	}
 }
 
 void usb_stor_ATAPI_command(Scsi_Cmnd *srb, struct us_data *us)
@@ -165,13 +174,15 @@ void usb_stor_ATAPI_command(Scsi_Cmnd *srb, struct us_data *us)
 
 	/* send the command to the transport layer */
 	usb_stor_invoke_transport(srb, us);
+	if (srb->result == GOOD << 1) {
 
-	/* Fix the MODE_SENSE data if we translated the command */
-	if ((old_cmnd == MODE_SENSE) && (status_byte(srb->result) == GOOD))
-		usb_stor_scsiSense10to6(srb);
+		/* Fix the MODE_SENSE data if we translated the command */
+		if (old_cmnd == MODE_SENSE)
+			usb_stor_scsiSense10to6(srb);
 
-	/* fix the INQUIRY data if necessary */
-	fix_inquiry_data(srb);
+		/* fix the INQUIRY data if necessary */
+		fix_inquiry_data(srb);
+	}
 }
 
 
@@ -260,13 +271,15 @@ void usb_stor_ufi_command(Scsi_Cmnd *srb, struct us_data *us)
 
 	/* send the command to the transport layer */
 	usb_stor_invoke_transport(srb, us);
+	if (srb->result == GOOD << 1) {
 
-	/* Fix the MODE_SENSE data if we translated the command */
-	if ((old_cmnd == MODE_SENSE) && (status_byte(srb->result) == GOOD))
-		usb_stor_scsiSense10to6(srb);
+		/* Fix the MODE_SENSE data if we translated the command */
+		if (old_cmnd == MODE_SENSE)
+			usb_stor_scsiSense10to6(srb);
 
-	/* Fix the data for an INQUIRY, if necessary */
-	fix_inquiry_data(srb);
+		/* Fix the data for an INQUIRY, if necessary */
+		fix_inquiry_data(srb);
+	}
 }
 
 void usb_stor_transparent_scsi_command(Scsi_Cmnd *srb, struct us_data *us)
@@ -327,13 +340,14 @@ void usb_stor_transparent_scsi_command(Scsi_Cmnd *srb, struct us_data *us)
 
 	/* send the command to the transport layer */
 	usb_stor_invoke_transport(srb, us);
+	if (srb->result == GOOD << 1) {
 
-	/* Fix the MODE_SENSE data if we translated the command */
-	if ((us->flags & US_FL_MODE_XLATE) && (old_cmnd == MODE_SENSE)
-			&& (status_byte(srb->result) == GOOD))
-		usb_stor_scsiSense10to6(srb);
+		/* Fix the MODE_SENSE data if we translated the command */
+		if ((us->flags & US_FL_MODE_XLATE) && (old_cmnd == MODE_SENSE))
+			usb_stor_scsiSense10to6(srb);
 
-	/* fix the INQUIRY data if necessary */
-	fix_inquiry_data(srb);
+		/* fix the INQUIRY data if necessary */
+		fix_inquiry_data(srb);
+	}
 }
 
