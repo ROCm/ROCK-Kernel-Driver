@@ -16,20 +16,72 @@
 #include <linux/pm.h>
 
 
-int (*pm_power_down)(u32 state) = NULL;
-
-
 static DECLARE_MUTEX(pm_sem);
 
+static struct pm_ops * pm_ops = NULL;
+
+/**
+ *	pm_set_ops - Set the global power method table. 
+ *	@ops:	Pointer to ops structure.
+ */
+
+void pm_set_ops(struct pm_ops * ops)
+{
+	down(&pm_sem);
+	pm_ops = ops;
+	up(&pm_sem);
+}
+
+
+/**
+ *	pm_suspend_standby - Enter 'standby' state.
+ *	
+ *	'standby' is also known as 'Power-On Suspend'. Here, we power down
+ *	devices, disable interrupts, and enter the state.
+ */
 
 static int pm_suspend_standby(void)
 {
-	return 0;
+	int error = 0;
+	unsigned long flags;
+
+	if (!pm_ops || !pm_ops->enter)
+		return -EPERM;
+
+	if ((error = device_pm_power_down(PM_SUSPEND_STANDBY)))
+		goto Done;
+	local_irq_save(flags);
+	error = pm_ops->enter(PM_SUSPEND_STANDBY);
+	local_irq_restore(flags);
+	device_pm_power_up();
+ Done:
+	return error;
 }
+
+
+/**
+ *	pm_suspend_mem - Enter suspend-to-RAM state.
+ *
+ *	Identical to pm_suspend_standby() - we power down devices, disable 
+ *	interrupts, and enter the low-power state.
+ */
 
 static int pm_suspend_mem(void)
 {
-	return 0;
+	int error = 0;
+	unsigned long flags;
+
+	if (!pm_ops || !pm_ops->enter)
+		return -EPERM;
+
+	if ((error = device_pm_power_down(PM_SUSPEND_STANDBY)))
+		goto Done;
+	local_irq_save(flags);
+	error = pm_ops->enter(PM_SUSPEND_STANDBY);
+	local_irq_restore(flags);
+	device_pm_power_up();
+ Done:
+	return error;
 }
 
 static int pm_suspend_disk(void)
@@ -51,25 +103,51 @@ struct pm_state {
 };
 
 
-static int suspend_prepare(void)
+/**
+ *	suspend_prepare - Do prep work before entering low-power state.
+ *	@state:		State we're entering.
+ *
+ *	This is common code that is called for each state that we're 
+ *	entering. Allocate a console, stop all processes, then make sure
+ *	the platform can enter the requested state.
+ */
+
+static int suspend_prepare(u32 state)
 {
 	int error = 0;
 
 	pm_prepare_console();
 
 	if (freeze_processes()) {
-		thaw_processes();
 		error = -EAGAIN;
-		goto Done;
+		goto Thaw;
 	}
 
+	if (pm_ops && pm_ops->prepare) {
+		if ((error = pm_ops->prepare(state)))
+			goto Thaw;
+	}
  Done:
 	pm_restore_console();
 	return error;
+ Thaw:
+	thaw_processes();
+	goto Done;
 }
 
-static void suspend_finish(void)
+
+/**
+ *	suspend_finish - Do final work before exiting suspend sequence.
+ *	@state:		State we're coming out of.
+ *
+ *	Call platform code to clean up, restart processes, and free the 
+ *	console that we've allocated.
+ */
+
+static void suspend_finish(u32 state)
 {
+	if (pm_ops && pm_ops->finish)
+		pm_ops->finish(state);
 	thaw_processes();
 	pm_restore_console();
 }
@@ -86,23 +164,25 @@ static void suspend_finish(void)
  *	we've woken up).
  */
 
-static int enter_state(struct pm_state * state)
+static int enter_state(u32 state)
 {
 	int error;
+	struct pm_state * s = &pm_states[state];
 
 	if (down_trylock(&pm_sem))
 		return -EBUSY;
 
-	if (!pm_power_down) {
-		error = -EPERM;
+	if ((error = suspend_prepare(state)))
 		goto Unlock;
-	}
 
-	if ((error = suspend_prepare()))
-		return error;
+	if ((error = device_pm_suspend(state)))
+		goto Finish;
 
-	error = state->fn();
-	suspend_finish();
+	error = s->fn();
+
+	device_pm_resume();
+ Finish:
+	suspend_finish(state);
  Unlock:
 	up(&pm_sem);
 	return error;
@@ -120,7 +200,7 @@ static int enter_state(struct pm_state * state)
 int pm_suspend(u32 state)
 {
 	if (state > PM_SUSPEND_ON && state < PM_SUSPEND_MAX)
-		return enter_state(&pm_states[state]);
+		return enter_state(state);
 	return -EINVAL;
 }
 
@@ -160,20 +240,22 @@ static ssize_t state_show(struct subsystem * subsys, char * buf)
 	return (s - buf);
 }
 
-static ssize_t state_store(struct subsystem * s, const char * buf, size_t n)
+static ssize_t state_store(struct subsystem * subsys, const char * buf, size_t n)
 {
-	struct pm_state * state;
+	u32 state;
+	struct pm_state * s;
 	int error;
 	char * end = strchr(buf,'\n');
 	
 	if (end)
 		*end = '\0';
 
-	for (state = &pm_states[0]; state; state++) {
-		if (state->name && !strcmp(buf,state->name))
+	for (state = 0; state < PM_SUSPEND_MAX; state++) {
+		s = &pm_states[state];
+		if (s->name && !strcmp(buf,s->name))
 			break;
 	}
-	if (state)
+	if (s)
 		error = enter_state(state);
 	else
 		error = -EINVAL;

@@ -201,8 +201,13 @@ enum {
 	PM_SUSPEND_MAX,
 };
 
-extern int (*pm_power_down)(u32 state);
+struct pm_ops {
+	int (*prepare)(u32 state);
+	int (*enter)(u32 state);
+	int (*finish)(u32 state);
+};
 
+extern void pm_set_ops(struct pm_ops *);
 
 extern int pm_suspend(u32 state);
 
