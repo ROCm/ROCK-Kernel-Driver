@@ -79,7 +79,7 @@
 static struct ipc_ids sem_ids;
 
 static int newary (key_t, int, int);
-static void freeary (int id);
+static void freeary (struct sem_array *sma, int id);
 #ifdef CONFIG_PROC_FS
 static int sysvipc_sem_read_proc(char *buffer, char **start, off_t offset, int length, int *eof, void *data);
 #endif
@@ -405,15 +405,15 @@ static int count_semzcnt (struct sem_array * sma, ushort semnum)
 	return semzcnt;
 }
 
-/* Free a semaphore set. */
-static void freeary (int id)
+/* Free a semaphore set. freeary() is called with sem_ids.sem down and
+ * the spinlock for this semaphore set hold. sem_ids.sem remains locked
+ * on exit.
+ */
+static void freeary (struct sem_array *sma, int id)
 {
-	struct sem_array *sma;
 	struct sem_undo *un;
 	struct sem_queue *q;
 	int size;
-
-	sma = sem_rmid(id);
 
 	/* Invalidate the existing undo structures for this semaphore set.
 	 * (They will be freed without any further action in sem_exit()
@@ -428,6 +428,9 @@ static void freeary (int id)
 		q->prev = NULL;
 		wake_up_process(q->sleeper); /* doesn't sleep */
 	}
+
+	/* Remove the semaphore set from the ID array*/
+	sma = sem_rmid(id);
 	sem_unlock(sma);
 
 	used_sems -= sma->sem_nsems;
@@ -764,7 +767,7 @@ static int semctl_down(int semid, int semnum, int cmd, int version, union semun 
 
 	switch(cmd){
 	case IPC_RMID:
-		freeary(semid);
+		freeary(sma, semid);
 		err = 0;
 		break;
 	case IPC_SET:
