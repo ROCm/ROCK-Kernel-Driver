@@ -715,14 +715,18 @@ static void uhci_destroy_urb_priv(struct urb *urb)
 		uhci_free_td(uhci, td);
 	}
 
-	if (urbp->setup_packet_dma_handle)
+	if (urbp->setup_packet_dma_handle) {
 		pci_unmap_single(uhci->dev, urbp->setup_packet_dma_handle,
 			sizeof(struct usb_ctrlrequest), PCI_DMA_TODEVICE);
+		urbp->setup_packet_dma_handle = 0;
+	}
 
-	if (urbp->transfer_buffer_dma_handle)
+	if (urbp->transfer_buffer_dma_handle) {
 		pci_unmap_single(uhci->dev, urbp->transfer_buffer_dma_handle,
 			urb->transfer_buffer_length, usb_pipein(urb->pipe) ?
 			PCI_DMA_FROMDEVICE : PCI_DMA_TODEVICE);
+		urbp->transfer_buffer_dma_handle = 0;
+	}
 
 	urb->hcpriv = NULL;
 	kmem_cache_free(uhci_up_cachep, urbp);
@@ -2288,14 +2292,6 @@ static void uhci_call_completion(struct urb *urb)
 		is_ring = (nurb == urb);
 	}
 
-	status = urbp->status;
-	if (!resubmit_interrupt || killed)
-		/* We don't need urb_priv anymore */
-		uhci_destroy_urb_priv(urb);
-
-	if (!killed)
-		urb->status = status;
-
 	if (urbp->transfer_buffer_dma_handle)
 		pci_dma_sync_single(uhci->dev, urbp->transfer_buffer_dma_handle,
 			urb->transfer_buffer_length, usb_pipein(urb->pipe) ?
@@ -2304,6 +2300,14 @@ static void uhci_call_completion(struct urb *urb)
 	if (urbp->setup_packet_dma_handle)
 		pci_dma_sync_single(uhci->dev, urbp->setup_packet_dma_handle,
 			sizeof(struct usb_ctrlrequest), PCI_DMA_TODEVICE);
+
+	status = urbp->status;
+	if (!resubmit_interrupt || killed)
+		/* We don't need urb_priv anymore */
+		uhci_destroy_urb_priv(urb);
+
+	if (!killed)
+		urb->status = status;
 
 	urb->dev = NULL;
 	if (urb->complete) {
