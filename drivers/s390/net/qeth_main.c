@@ -6710,19 +6710,28 @@ static int
 qeth_arp_constructor(struct neighbour *neigh)
 {
 	struct net_device *dev = neigh->dev;
-	struct in_device *in_dev = in_dev_get(dev);
+	struct in_device *in_dev;
+	struct neigh_parms *parms;
 
-	if (in_dev == NULL)
-		return -EINVAL;
 	if (!qeth_verify_dev(dev)) {
-		in_dev_put(in_dev);
 		return qeth_old_arp_constructor(neigh);
 	}
 
+	rcu_read_lock();
+	in_dev = __in_dev_get(dev);
+	if (in_dev == NULL) {
+		rcu_read_unlock();
+		return -EINVAL;
+	}
+
+	parms = in_dev->arp_parms;
+	if (parms) {
+		__neigh_parms_put(neigh->parms);
+		neigh->parms = neigh_parms_clone(parms);
+	}
+	rcu_read_unlock();
+
 	neigh->type = inet_addr_type(*(u32 *) neigh->primary_key);
-	if (in_dev->arp_parms)
-		neigh->parms = in_dev->arp_parms;
-	in_dev_put(in_dev);
 	neigh->nud_state = NUD_NOARP;
 	neigh->ops = arp_direct_ops;
 	neigh->output = neigh->ops->queue_xmit;

@@ -1215,6 +1215,7 @@ static void dn_dev_delete(struct net_device *dev)
 	dev->dn_ptr = NULL;
 
 	neigh_parms_release(&dn_neigh_table, dn_db->neigh_parms);
+	neigh_ifdown(&dn_neigh_table, dev);
 
 	if (dn_db->router)
 		neigh_release(dn_db->router);

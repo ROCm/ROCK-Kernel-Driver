@@ -58,6 +58,7 @@
 #include <linux/in6.h>
 #include <linux/route.h>
 #include <linux/init.h>
+#include <linux/rcupdate.h>
 #ifdef CONFIG_SYSCTL
 #include <linux/sysctl.h>
 #endif
@@ -284,14 +285,23 @@ static int ndisc_constructor(struct neighbour *neigh)
 {
 	struct in6_addr *addr = (struct in6_addr*)&neigh->primary_key;
 	struct net_device *dev = neigh->dev;
-	struct inet6_dev *in6_dev = in6_dev_get(dev);
+	struct inet6_dev *in6_dev;
+	struct neigh_parms *parms;
 	int is_multicast = ipv6_addr_is_multicast(addr);
 
-	if (in6_dev == NULL)
+	rcu_read_lock();
+	in6_dev = in6_dev_get(dev);
+	if (in6_dev == NULL) {
+		rcu_read_unlock();
 		return -EINVAL;
+	}
 
-	if (in6_dev->nd_parms)
-		neigh->parms = in6_dev->nd_parms;
+	parms = in6_dev->nd_parms;
+	if (parms) {
+		__neigh_parms_put(neigh->parms);
+		neigh->parms = neigh_parms_clone(parms);
+	}
+	rcu_read_unlock();
 
 	neigh->type = is_multicast ? RTN_MULTICAST : RTN_UNICAST;
 	if (dev->hard_header == NULL) {
