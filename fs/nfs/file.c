@@ -347,8 +347,10 @@ static int do_unlk(struct file *filp, int cmd, struct file_lock *fl)
 static int do_setlk(struct file *filp, int cmd, struct file_lock *fl)
 {
 	struct inode *inode = filp->f_mapping->host;
+	sigset_t oldset;
 	int status;
 
+	rpc_clnt_sigmask(NFS_CLIENT(inode), &oldset);
 	/*
 	 * Flush all pending writes before doing anything
 	 * with locks..
@@ -362,7 +364,7 @@ static int do_setlk(struct file *filp, int cmd, struct file_lock *fl)
 			status = filemap_fdatawait(filp->f_mapping);
 	}
 	if (status < 0)
-		return status;
+		goto out;
 
 	lock_kernel();
 	/* Use local locking if mounted with "-onolock" */
@@ -375,12 +377,12 @@ static int do_setlk(struct file *filp, int cmd, struct file_lock *fl)
 		 * the process exits.
 		 */
 		if (status == -EINTR || status == -ERESTARTSYS)
-			posix_lock_file(filp, fl);
+			posix_lock_file_wait(filp, fl);
 	} else
 		status = posix_lock_file_wait(filp, fl);
 	unlock_kernel();
 	if (status < 0)
-		return status;
+		goto out;
 	/*
 	 * Make sure we clear the cache whenever we try to get the lock.
 	 * This makes locking act as a cache coherency point.
@@ -391,7 +393,9 @@ static int do_setlk(struct file *filp, int cmd, struct file_lock *fl)
 	up(&inode->i_sem);
 	filemap_fdatawait(filp->f_mapping);
 	nfs_zap_caches(inode);
-	return 0;
+out:
+	rpc_clnt_sigunmask(NFS_CLIENT(inode), &oldset);
+	return status;
 }
 
 /*
