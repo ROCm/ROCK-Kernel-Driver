@@ -2114,6 +2114,12 @@ static ssize_t show_dev(struct class_device *class_dev, char *buf)
 }
 static CLASS_DEVICE_ATTR(dev, S_IRUGO, show_dev, NULL);
 
+static void release_tty_dev(struct class_device *class_dev)
+{
+	struct tty_dev *tty_dev = to_tty_dev(class_dev);
+	kfree(tty_dev);
+}
+
 static void tty_add_class_device(char *name, dev_t dev, struct device *device)
 {
 	struct tty_dev *tty_dev = NULL;
@@ -2134,6 +2140,7 @@ static void tty_add_class_device(char *name, dev_t dev, struct device *device)
 
 	tty_dev->class_dev.dev = device;
 	tty_dev->class_dev.class = &tty_class;
+	tty_dev->class_dev.release = &release_tty_dev;
 	snprintf(tty_dev->class_dev.class_id, BUS_ID_SIZE, "%s", temp);
 	retval = class_device_register(&tty_dev->class_dev);
 	if (retval)
@@ -2167,7 +2174,6 @@ void tty_remove_class_device(dev_t dev)
 		list_del(&tty_dev->node);
 		spin_unlock(&tty_dev_list_lock);
 		class_device_unregister(&tty_dev->class_dev);
-		kfree(tty_dev);
 	} else {
 		spin_unlock(&tty_dev_list_lock);
 	}
