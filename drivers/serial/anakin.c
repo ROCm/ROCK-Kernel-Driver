@@ -502,10 +502,10 @@ static struct console anakin_console = {
 	.index		= -1,
 };
 
-static void __init
-anakin_console_init(void)
+static int __init anakin_console_init(void)
 {
 	register_console(&anakin_console);
+	return 0;
 }
 console_initcall(anakin_console_init);
 

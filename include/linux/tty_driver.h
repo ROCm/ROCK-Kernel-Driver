@@ -172,6 +172,9 @@ struct tty_driver {
 			  int count, int *eof, void *data);
 	int (*write_proc)(struct file *file, const char *buffer,
 			  unsigned long count, void *data);
+	int (*tiocmget)(struct tty_struct *tty, struct file *file);
+	int (*tiocmset)(struct tty_struct *tty, struct file *file,
+			unsigned int set, unsigned int clear);
 	struct list_head tty_drivers;
 };
 
