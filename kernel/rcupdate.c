@@ -121,9 +121,8 @@ static void rcu_check_quiescent_state(void)
 {
 	int cpu = smp_processor_id();
 
-	if (!test_bit(cpu, &rcu_ctrlblk.rcu_cpu_mask)) {
+	if (!test_bit(cpu, &rcu_ctrlblk.rcu_cpu_mask))
 		return;
-	}
 
 	/* 
 	 * Races with local timer interrupt - in the worst case
@@ -134,23 +133,22 @@ static void rcu_check_quiescent_state(void)
 		RCU_last_qsctr(cpu) = RCU_qsctr(cpu);
 		return;
 	}
-	if (RCU_qsctr(cpu) == RCU_last_qsctr(cpu)) {
+	if (RCU_qsctr(cpu) == RCU_last_qsctr(cpu))
 		return;
-	}
 
 	spin_lock(&rcu_ctrlblk.mutex);
-	if (!test_bit(cpu, &rcu_ctrlblk.rcu_cpu_mask)) {
-		spin_unlock(&rcu_ctrlblk.mutex);
-		return;
-	}
+	if (!test_bit(cpu, &rcu_ctrlblk.rcu_cpu_mask))
+		goto out_unlock;
+
 	clear_bit(cpu, &rcu_ctrlblk.rcu_cpu_mask);
 	RCU_last_qsctr(cpu) = RCU_QSCTR_INVALID;
-	if (rcu_ctrlblk.rcu_cpu_mask != 0) {
-		spin_unlock(&rcu_ctrlblk.mutex);
-		return;
-	}
+	if (rcu_ctrlblk.rcu_cpu_mask != 0)
+		goto out_unlock;
+
 	rcu_ctrlblk.curbatch++;
 	rcu_start_batch(rcu_ctrlblk.maxbatch);
+
+out_unlock:
 	spin_unlock(&rcu_ctrlblk.mutex);
 }
 
