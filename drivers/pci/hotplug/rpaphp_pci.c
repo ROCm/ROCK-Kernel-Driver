@@ -117,33 +117,40 @@ static int rpaphp_get_sensor_state(struct slot *slot, int *state)
 int rpaphp_get_pci_adapter_status(struct slot *slot, int is_init, u8 * value)
 {
 	int state, rc;
-	*value = NOT_VALID;
+ 	struct device_node *child_dn;
+ 	struct pci_dev *child_dev;
 
+	*value = NOT_VALID;
 	rc = rpaphp_get_sensor_state(slot, &state);
 	if (rc)
 		goto exit;
-	if (state == PRESENT) {
+
+ 	if ((state == EMPTY) || (slot->type == PHB)) {
+ 		dbg("slot is empty\n");
+ 		*value = EMPTY;
+ 	}
+ 	else if (state == PRESENT) {
 		if (!is_init)
 			/* at run-time slot->state can be changed by */
 			/* config/unconfig adapter */
 			*value = slot->state;
 		else {
-			if (!slot->dn->child)
+ 			child_dn = slot->dn->child;
+ 			if (child_dn)
+ 				child_dev = rpaphp_find_pci_dev(child_dn);
+
+ 			if (child_dev)
+ 				*value = CONFIGURED;
+ 			else if (!child_dn)
 				dbg("%s: %s is not valid OFDT node\n",
 				    __FUNCTION__, slot->dn->full_name);
-			else if (rpaphp_find_pci_dev(slot->dn->child))
-				*value = CONFIGURED;
 			else {
 				err("%s: can't find pdev of adapter in slot[%s]\n", 
 					__FUNCTION__, slot->dn->full_name);
 				*value = NOT_CONFIGURED;
 			}
 		}
-	} else if (state == EMPTY) {
-		dbg("slot is empty\n");
-		*value = state;
 	}
-
 exit:
 	return rc;
 }
