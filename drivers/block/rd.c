@@ -144,6 +144,7 @@ static int rd_blkdev_pagecache_IO(int rw, struct bio_vec *vec,
 {
 	struct address_space * mapping;
 	unsigned long index;
+	unsigned int vec_offset;
 	int offset, size, err;
 
 	err = 0;
@@ -152,6 +153,7 @@ static int rd_blkdev_pagecache_IO(int rw, struct bio_vec *vec,
 	index = sector >> (PAGE_CACHE_SHIFT - 9);
 	offset = (sector << 9) & ~PAGE_CACHE_MASK;
 	size = vec->bv_len;
+	vec_offset = vec->bv_offset;
 
 	do {
 		int count;
@@ -186,13 +188,14 @@ static int rd_blkdev_pagecache_IO(int rw, struct bio_vec *vec,
 		if (rw == READ) {
 			src = kmap(page);
 			src += offset;
-			dst = kmap(vec->bv_page) + vec->bv_offset;
+			dst = kmap(vec->bv_page) + vec_offset;
 		} else {
 			dst = kmap(page);
 			dst += offset;
-			src = kmap(vec->bv_page) + vec->bv_offset;
+			src = kmap(vec->bv_page) + vec_offset;
 		}
 		offset = 0;
+		vec_offset += count;
 
 		memcpy(dst, src, count);
 

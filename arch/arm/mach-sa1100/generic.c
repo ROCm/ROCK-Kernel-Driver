@@ -134,8 +134,6 @@ EXPORT_SYMBOL(sa1100fb_lcd_power);
  *
  * Typically, static virtual address mappings are as follow:
  *
- * 0xe8000000-0xefffffff:	flash memory (especially when multiple flash
- * 				banks need to be mapped contigously)
  * 0xf0000000-0xf3ffffff:	miscellaneous stuff (CPLDs, etc.)
  * 0xf4000000-0xf4ffffff:	SA-1111
  * 0xf5000000-0xf5ffffff:	reserved (used by cache flushing area)
@@ -150,17 +148,16 @@ EXPORT_SYMBOL(sa1100fb_lcd_power);
  */
 
 static struct map_desc standard_io_desc[] __initdata = {
- /* virtual     physical    length      domain     r  w  c  b */
-  { 0xf8000000, 0x80000000, 0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* PCM */
-  { 0xfa000000, 0x90000000, 0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* SCM */
-  { 0xfc000000, 0xa0000000, 0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* MER */
-  { 0xfe000000, 0xb0000000, 0x00200000, DOMAIN_IO, 0, 1, 0, 0 }, /* LCD + DMA */
-  LAST_DESC
+ /* virtual     physical    length      type */
+  { 0xf8000000, 0x80000000, 0x00100000, MT_DEVICE }, /* PCM */
+  { 0xfa000000, 0x90000000, 0x00100000, MT_DEVICE }, /* SCM */
+  { 0xfc000000, 0xa0000000, 0x00100000, MT_DEVICE }, /* MER */
+  { 0xfe000000, 0xb0000000, 0x00200000, MT_DEVICE }  /* LCD + DMA */
 };
 
 void __init sa1100_map_io(void)
 {
-	iotable_init(standard_io_desc);
+	iotable_init(standard_io_desc, ARRAY_SIZE(standard_io_desc));
 }
 
 /*
@@ -203,3 +200,4 @@ void __init sa1110_mb_enable(void)
 
 	local_irq_restore(flags);
 }
+

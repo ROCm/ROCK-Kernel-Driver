@@ -16,15 +16,14 @@
 #include "generic.h"
 
 static struct map_desc pangolin_io_desc[] __initdata = {
- /* virtual     physical    length      domain     r  w  c  b */
-  { 0xf2800000, 0x4b800000, 0x00800000, DOMAIN_IO, 0, 1, 0, 0 }, /* MQ200 */
-  LAST_DESC
+ /* virtual     physical    length      type */
+  { 0xf2800000, 0x4b800000, 0x00800000, MT_DEVICE } /* MQ200 */
 };
 
 static void __init pangolin_map_io(void)
 {
 	sa1100_map_io();
-	iotable_init(pangolin_io_desc);
+	iotable_init(pangolin_io_desc, ARRAY_SIZE(pangolin_io_desc));
 
 	sa1100_register_uart(0, 1);
 	sa1100_register_uart(1, 3);

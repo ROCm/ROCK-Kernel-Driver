@@ -2,6 +2,7 @@
  * numa.c - Low-level PCI access for NUMA-Q machines
  */
 #include <linux/pci.h>
+#include <linux/init.h>
 
 #include "pci.h"
 

@@ -121,7 +121,7 @@ static struct super_operations proc_sops = {
 	alloc_inode:	proc_alloc_inode,
 	destroy_inode:	proc_destroy_inode,
 	read_inode:	proc_read_inode,
-	put_inode:	force_delete,
+	drop_inode:	generic_delete_inode,
 	delete_inode:	proc_delete_inode,
 	statfs:		simple_statfs,
 };

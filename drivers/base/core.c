@@ -5,6 +5,8 @@
  *		 2002 Open Source Development Lab
  */
 
+#define DEBUG 0
+
 #include <linux/device.h>
 #include <linux/module.h>
 #include <linux/slab.h>
@@ -118,9 +120,8 @@ int driver_bind(struct device_driver * drv)
 	return bus_for_each_dev(drv->bus,drv,do_driver_bind);
 }
 
-static int do_driver_unbind(struct device * dev, void * data)
+static int do_driver_unbind(struct device * dev, struct device_driver * drv)
 {
-	struct device_driver * drv = (struct device_driver *)data;
 	lock_device(dev);
 	if (dev->driver == drv) {
 		dev->driver = NULL;
@@ -134,7 +135,31 @@ static int do_driver_unbind(struct device * dev, void * data)
 
 void driver_unbind(struct device_driver * drv)
 {
-	driver_for_each_dev(drv,drv,do_driver_unbind);
+	struct device * next;
+	struct device * dev = NULL;
+	struct list_head * node;
+	int error = 0;
+
+	read_lock(&drv->lock);
+	node = drv->devices.next;
+	while (node != &drv->devices) {
+		next = list_entry(node,struct device,driver_list);
+		get_device(next);
+		read_unlock(&drv->lock);
+
+		if (dev)
+			put_device(dev);
+		dev = next;
+		if ((error = do_driver_unbind(dev,drv))) {
+			put_device(dev);
+			break;
+		}
+		read_lock(&drv->lock);
+		node = dev->driver_list.next;
+	}
+	read_unlock(&drv->lock);
+	if (dev)
+		put_device(dev);
 }
 
 /**
@@ -178,8 +203,8 @@ int device_register(struct device *dev)
 	}
 	spin_unlock(&device_lock);
 
-	DBG("DEV: registering device: ID = '%s', name = %s\n",
-	    dev->bus_id, dev->name);
+	pr_debug("DEV: registering device: ID = '%s', name = %s\n",
+		 dev->bus_id, dev->name);
 
 	if ((error = device_make_dir(dev)))
 		goto register_done;
@@ -212,8 +237,8 @@ void put_device(struct device * dev)
 	list_del_init(&dev->g_list);
 	spin_unlock(&device_lock);
 
-	DBG("DEV: Unregistering device. ID = '%s', name = '%s'\n",
-	    dev->bus_id,dev->name);
+	pr_debug("DEV: Unregistering device. ID = '%s', name = '%s'\n",
+		 dev->bus_id,dev->name);
 
 	/* Notify the platform of the removal, in case they
 	 * need to do anything...

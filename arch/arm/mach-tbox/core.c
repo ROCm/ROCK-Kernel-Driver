@@ -6,6 +6,7 @@
  *
  *  Extra MM routines for the Tbox architecture
  */
+#include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/mm.h>
 #include <linux/init.h>
@@ -57,13 +58,12 @@ static void tbox_init_irq(void)
 
 static struct map_desc tbox_io_desc[] __initdata = {
 	/* See hardware.h for details */
-	{ IO_BASE,	IO_START,	0x00100000, DOMAIN_IO, 0, 1, 0, 0 },
-	LAST_DESC
+	{ IO_BASE,	IO_START,	0x00100000, MT_DEVICE }
 };
 
 static void __init tbox_map_io(void)
 {
-	iotable_init(tbox_io_desc);
+	iotable_init(tbox_io_desc, ARRAY_SIZE(tbox_io_desc));
 }
 
 MACHINE_START(TBOX, "unknown-TBOX")

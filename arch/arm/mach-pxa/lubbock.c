@@ -11,6 +11,7 @@
  *  it under the terms of the GNU General Public License version 2 as
  *  published by the Free Software Foundation.
  */
+#include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/major.h>
 #include <linux/fs.h>
@@ -120,18 +121,17 @@ static int __init lubbock_init(void)
 __initcall(lubbock_init);
 
 static struct map_desc lubbock_io_desc[] __initdata = {
- /* virtual     physical    length      domain     r  w  c  b */
-  { 0xf0000000, 0x08000000, 0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* CPLD */
-  { 0xf1000000, 0x0c000000, 0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* LAN91C96 IO */
-  { 0xf1100000, 0x0e000000, 0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* LAN91C96 Attr */
-  { 0xf4000000, 0x10000000, 0x00400000, DOMAIN_IO, 0, 1, 0, 0 }, /* SA1111 */
-  LAST_DESC
+ /* virtual     physical    length      type */
+  { 0xf0000000, 0x08000000, 0x00100000, MT_DEVICE }, /* CPLD */
+  { 0xf1000000, 0x0c000000, 0x00100000, MT_DEVICE }, /* LAN91C96 IO */
+  { 0xf1100000, 0x0e000000, 0x00100000, MT_DEVICE }, /* LAN91C96 Attr */
+  { 0xf4000000, 0x10000000, 0x00400000, MT_DEVICE }  /* SA1111 */
 };
 
 static void __init lubbock_map_io(void)
 {
 	pxa_map_io();
-	iotable_init(lubbock_io_desc);
+	iotable_init(lubbock_io_desc, ARRAY_SIZE(lubbock_io_desc));
 
 	/* This enables the BTUART */
 	CKEN |= CKEN7_BTUART;

@@ -253,9 +253,8 @@ restore_sigcontext(struct sigcontext *sc, struct pt_regs *regs,
 		   struct switch_stack *sw)
 {
 	unsigned long usp;
-	long i, err = 0;
+	long i, err = __get_user(regs->pc, &sc->sc_pc);
 
-	err |= __get_user(regs->pc, &sc->sc_pc);
 	sw->r26 = (unsigned long) ret_from_sys_call;
 
 	err |= __get_user(regs->r0, sc->sc_regs+0);

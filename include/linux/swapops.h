@@ -10,7 +10,7 @@
  * swp_entry_t's are *never* stored anywhere in their arch-dependent format.
  */
 #define SWP_TYPE_SHIFT(e)	(sizeof(e.val) * 8 - MAX_SWAPFILES_SHIFT)
-#define SWP_OFFSET_MASK(e)	((1 << SWP_TYPE_SHIFT(e)) - 1)
+#define SWP_OFFSET_MASK(e)	((1UL << SWP_TYPE_SHIFT(e)) - 1)
 
 /*
  * Store a type+offset into a swp_entry_t in an arch-independent format
@@ -19,7 +19,7 @@ static inline swp_entry_t swp_entry(unsigned type, pgoff_t offset)
 {
 	swp_entry_t ret;
 
-	ret.val = (type << SWP_TYPE_SHIFT(ret)) |
+	ret.val = ((unsigned long)type << SWP_TYPE_SHIFT(ret)) |
 			(offset & SWP_OFFSET_MASK(ret));
 	return ret;
 }

@@ -152,18 +152,17 @@ __initcall(flexanet_init);
 
 
 static struct map_desc flexanet_io_desc[] __initdata = {
- /* virtual     physical    length      domain     r  w  c  b */
-  { 0xf0000000, 0x10000000, 0x00001000, DOMAIN_IO, 0, 1, 0, 0 }, /* Board Control Register */
-  { 0xf1000000, 0x18000000, 0x01000000, DOMAIN_IO, 0, 1, 0, 0 }, /* Ethernet controller */
-  { 0xD0000000, 0x40000000, 0x01000000, DOMAIN_IO, 0, 1, 0, 0 }, /* Instrument boards */
-  { 0xD8000000, 0x48000000, 0x01000000, DOMAIN_IO, 0, 1, 0, 0 }, /* External peripherals */
-  LAST_DESC
+ /* virtual     physical    length      type */
+  { 0xf0000000, 0x10000000, 0x00001000, MT_DEVICE }, /* Board Control Register */
+  { 0xf1000000, 0x18000000, 0x01000000, MT_DEVICE }, /* Ethernet controller */
+  { 0xD0000000, 0x40000000, 0x01000000, MT_DEVICE }, /* Instrument boards */
+  { 0xD8000000, 0x48000000, 0x01000000, MT_DEVICE }  /* External peripherals */
 };
 
 static void __init flexanet_map_io(void)
 {
 	sa1100_map_io();
-	iotable_init(flexanet_io_desc);
+	iotable_init(flexanet_io_desc, ARRAY_SIZE(flexanet_io_desc));
 	flexanet_serial_init();
 
 	/* wakeup source is GPIO-0 only */

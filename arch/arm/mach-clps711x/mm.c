@@ -19,6 +19,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+#include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/mm.h>
 #include <linux/init.h>
@@ -31,40 +32,14 @@
 #include <asm/mach/map.h>
 #include <asm/hardware/clps7111.h>
 
-#if 0 //def CONFIG_DISCONTIGMEM
-  
-/*
- * The assumption of maximum 4 discontiguous memory banks is present
- * in several places in the ARM kernel, including the parameter block
- * (this affects boot loaders, too).  Banks do not necessarily
- * correspond 1:1 with NUMA nodes, although they usually will,
- * especially if they are widely discontiguous.
- *
- *  - note that the parameter block is depreciated for new implementations
- *  - also note that discontig_node_data is actually used
- *    -- rmk 
- */
-
-static bootmem_data_t node_bootmem_data[4];
-
-pg_data_t clps711x_node_data[4] = {
-        { bdata: &node_bootmem_data[0] },
-        { bdata: &node_bootmem_data[1] },
-        { bdata: &node_bootmem_data[2] },
-        { bdata: &node_bootmem_data[3] },
-};
-
-#endif
-
 /*
  * This maps the generic CLPS711x registers
  */
 static struct map_desc clps711x_io_desc[] __initdata = {
- { CLPS7111_VIRT_BASE,	CLPS7111_PHYS_BASE,	1048576, DOMAIN_IO, 0, 1 },
- LAST_DESC
+ { CLPS7111_VIRT_BASE,	CLPS7111_PHYS_BASE,	1048576, MT_DEVICE }
 };
 
 void __init clps711x_map_io(void)
 {
-	iotable_init(clps711x_io_desc);
+	iotable_init(clps711x_io_desc, ARRAY_SIZE(clps711x_io_desc));
 }

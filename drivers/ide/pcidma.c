@@ -58,18 +58,19 @@ ide_startstop_t ide_dma_intr(struct ata_device *drive, struct request *rq)
  * FIXME: taskfiles should be a map of pages, not a long virt address... /jens
  * FIXME: I agree with Jens --mdcki!
  */
-static int build_sglist(struct ata_channel *ch, struct request *rq)
+static int build_sglist(struct ata_device *drive, struct request *rq)
 {
+	struct ata_channel *ch = drive->channel;
 	struct scatterlist *sg = ch->sg_table;
 	int nents = 0;
 
-	if (rq->flags & REQ_DRIVE_ACB) {
+	if (rq->flags & REQ_SPECIAL) {
 		struct ata_taskfile *args = rq->special;
 #if 1
 		unsigned char *virt_addr = rq->buffer;
 		int sector_count = rq->nr_sectors;
 #else
-		nents = blk_rq_map_sg(rq->q, rq, ch->sg_table);
+		nents = blk_rq_map_sg(&drive->queue, rq, ch->sg_table);
 
 		if (nents > rq->nr_segments)
 			printk("ide-dma: received %d segments, build %d\n", rq->nr_segments, nents);
@@ -99,7 +100,7 @@ static int build_sglist(struct ata_channel *ch, struct request *rq)
 		sg[nents].length =  sector_count  * SECTOR_SIZE;
 		++nents;
 	} else {
-		nents = blk_rq_map_sg(rq->q, rq, ch->sg_table);
+		nents = blk_rq_map_sg(&drive->queue, rq, ch->sg_table);
 
 		if (rq->q && nents > rq->nr_phys_segments)
 			printk("ide-dma: received %d phys segments, build %d\n", rq->nr_phys_segments, nents);
@@ -150,7 +151,7 @@ int ata_start_dma(struct ata_device *drive, struct request *rq)
 		reading = 1 << 3;
 
 	/* try PIO instead of DMA */
-	if (!udma_new_table(ch, rq))
+	if (!udma_new_table(drive, rq))
 		return 1;
 
 	outl(ch->dmatable_dma, dma_base + 4); /* PRD table */
@@ -306,8 +307,9 @@ void udma_pci_enable(struct ata_device *drive, int on, int verbose)
  * This prepares a dma request.  Returns 0 if all went okay, returns 1
  * otherwise.  May also be invoked from trm290.c
  */
-int udma_new_table(struct ata_channel *ch, struct request *rq)
+int udma_new_table(struct ata_device *drive, struct request *rq)
 {
+	struct ata_channel *ch = drive->channel;
 	unsigned int *table = ch->dmatable_cpu;
 #ifdef CONFIG_BLK_DEV_TRM290
 	unsigned int is_trm290_chipset = (ch->chipset == ide_trm290);
@@ -318,7 +320,7 @@ int udma_new_table(struct ata_channel *ch, struct request *rq)
 	int i;
 	struct scatterlist *sg;
 
-	ch->sg_nents = i = build_sglist(ch, rq);
+	ch->sg_nents = i = build_sglist(drive, rq);
 	if (!i)
 		return 0;
 
@@ -523,6 +525,7 @@ int udma_pci_init(struct ata_device *drive, struct request *rq)
 	if (ata_start_dma(drive, rq))
 		return 1;
 
+	/* No DMA transfers on ATAPI devices. */
 	if (drive->type != ATA_DISK)
 		return 0;
 
@@ -531,13 +534,8 @@ int udma_pci_init(struct ata_device *drive, struct request *rq)
 	else
 		cmd = 0x00;
 
-	ide_set_handler(drive, ide_dma_intr, WAIT_CMD, dma_timer_expiry);	/* issue cmd to drive */
-	if ((rq->flags & REQ_DRIVE_ACB) && (drive->addressing == 1)) {
-		/* FIXME: this should never happen */
-		struct ata_taskfile *args = rq->special;
-
-		outb(args->cmd, IDE_COMMAND_REG);
-	} else if (drive->addressing)
+	ide_set_handler(drive, ide_dma_intr, WAIT_CMD, dma_timer_expiry);
+	if (drive->addressing)
 		outb(cmd ? WIN_READDMA_EXT : WIN_WRITEDMA_EXT, IDE_COMMAND_REG);
 	else
 		outb(cmd ? WIN_READDMA : WIN_WRITEDMA, IDE_COMMAND_REG);

@@ -60,7 +60,9 @@ static ide_startstop_t tcq_nop_handler(struct ata_device *drive, struct request 
 	struct ata_taskfile *args = rq->special;
 
 	ide__sti();
-	ide_end_drive_cmd(drive, rq);
+	blkdev_dequeue_request(rq);
+	drive->rq = NULL;
+	end_that_request_last(rq);
 	kfree(args);
 
 	return ide_stopped;
@@ -247,8 +249,7 @@ static ide_startstop_t service(struct ata_device *drive, struct request *rq)
 	OUT_BYTE(WIN_QUEUED_SERVICE, IDE_COMMAND_REG);
 
 	if (wait_altstat(drive, &stat, BUSY_STAT)) {
-		printk(KERN_ERR"%s: BUSY clear took too long\n", __FUNCTION__);
-		ide_dump_status(drive, rq, __FUNCTION__, stat);
+		ata_dump(drive, rq, "BUSY clear took too long");
 		tcq_invalidate_queue(drive);
 
 		return ide_stopped;
@@ -262,7 +263,7 @@ static ide_startstop_t service(struct ata_device *drive, struct request *rq)
 	 * FIXME, invalidate queue
 	 */
 	if (stat & ERR_STAT) {
-		ide_dump_status(drive, rq, __FUNCTION__, stat);
+		ata_dump(drive, rq, "ERR condition");
 		tcq_invalidate_queue(drive);
 
 		return ide_stopped;
@@ -328,8 +329,7 @@ static ide_startstop_t dmaq_complete(struct ata_device *drive, struct request *r
 	 * must be end of I/O, check status and complete as necessary
 	 */
 	if (!ata_status(drive, READY_STAT, drive->bad_wstat | DRQ_STAT)) {
-		printk(KERN_ERR "%s: %s: error status %x\n", __FUNCTION__, drive->name, drive->status);
-		ide_dump_status(drive, rq, __FUNCTION__, drive->status);
+		ata_dump(drive, rq, __FUNCTION__);
 		tcq_invalidate_queue(drive);
 
 		return ide_stopped;
@@ -404,17 +404,14 @@ static int check_autopoll(struct ata_device *drive)
 	if (drives <= 1)
 		return 0;
 
-	memset(&args, 0, sizeof(args));
-
-	args.taskfile.feature = 0x01;
-	args.cmd = WIN_NOP;
-	ide_cmd_type_parser(&args);
-
 	/*
 	 * do taskfile and check ABRT bit -- intelligent adapters will not
 	 * pass NOP with sub-code 0x01 to device, so the command will not
 	 * fail there
 	 */
+	memset(&args, 0, sizeof(args));
+	args.taskfile.feature = 0x01;
+	args.cmd = WIN_NOP;
 	ide_raw_taskfile(drive, &args);
 	if (args.taskfile.feature & ABRT_ERR)
 		return 1;
@@ -443,8 +440,6 @@ static int configure_tcq(struct ata_device *drive)
 	memset(&args, 0, sizeof(args));
 	args.taskfile.feature = SETFEATURES_EN_WCACHE;
 	args.cmd = WIN_SETFEATURES;
-	ide_cmd_type_parser(&args);
-
 	if (ide_raw_taskfile(drive, &args)) {
 		printk("%s: failed to enable write cache\n", drive->name);
 		return 1;
@@ -457,8 +452,6 @@ static int configure_tcq(struct ata_device *drive)
 	memset(&args, 0, sizeof(args));
 	args.taskfile.feature = SETFEATURES_DIS_RI;
 	args.cmd = WIN_SETFEATURES;
-	ide_cmd_type_parser(&args);
-
 	if (ide_raw_taskfile(drive, &args)) {
 		printk("%s: disabling release interrupt fail\n", drive->name);
 		return 1;
@@ -471,8 +464,6 @@ static int configure_tcq(struct ata_device *drive)
 	memset(&args, 0, sizeof(args));
 	args.taskfile.feature = SETFEATURES_EN_SI;
 	args.cmd = WIN_SETFEATURES;
-	ide_cmd_type_parser(&args);
-
 	if (ide_raw_taskfile(drive, &args)) {
 		printk("%s: enabling service interrupt fail\n", drive->name);
 		return 1;
@@ -557,7 +548,7 @@ ide_startstop_t udma_tcq_taskfile(struct ata_device *drive, struct request *rq)
 	OUT_BYTE(args->cmd, IDE_COMMAND_REG);
 
 	if (wait_altstat(drive, &stat, BUSY_STAT)) {
-		ide_dump_status(drive, rq, "queued start", stat);
+		ata_dump(drive, rq, "queued start");
 		tcq_invalidate_queue(drive);
 		return ide_stopped;
 	}
@@ -567,7 +558,7 @@ ide_startstop_t udma_tcq_taskfile(struct ata_device *drive, struct request *rq)
 #endif
 
 	if (stat & ERR_STAT) {
-		ide_dump_status(drive, rq, "tcq_start", stat);
+		ata_dump(drive, rq, "tcq_start");
 		return ide_stopped;
 	}
 

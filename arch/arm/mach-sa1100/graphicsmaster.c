@@ -7,7 +7,7 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
-
+#include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/sched.h>
 #include <linux/interrupt.h>
@@ -153,11 +153,10 @@ static void __init graphicsmaster_init_irq(void)
 
 
 static struct map_desc graphicsmaster_io_desc[] __initdata = {
- /* virtual     physical    length      domain     r  w  c  b */
-  { 0xf0000000, 0x10000000, 0x00400000, DOMAIN_IO, 0, 1, 0, 0 }, /* CPLD */
-  { 0xf1000000, 0x40000000, 0x00400000, DOMAIN_IO, 0, 1, 0, 0 }, /* CAN */
-  { 0xf4000000, 0x18000000, 0x00800000, DOMAIN_IO, 0, 1, 0, 0 }, /* SA-1111 */
-  LAST_DESC
+ /* virtual     physical    length      type */
+  { 0xf0000000, 0x10000000, 0x00400000, MT_DEVICE }, /* CPLD */
+  { 0xf1000000, 0x40000000, 0x00400000, MT_DEVICE }, /* CAN */
+  { 0xf4000000, 0x18000000, 0x00800000, MT_DEVICE }  /* SA-1111 */
 };
 
 #error Old code.  Someone needs to decide what to do about this.
@@ -244,7 +243,7 @@ static struct sa1100_port_fns graphicsmaster_port_fns __initdata = {
 static void __init graphicsmaster_map_io(void)
 {
 	sa1100_map_io();
-	iotable_init(graphicsmaster_io_desc);
+	iotable_init(graphicsmaster_io_desc, ARRAY_SIZE(graphicsmaster_io_desc));
 
 	sa1100_register_uart_fns(&graphicsmaster_port_fns);
 	sa1100_register_uart(0, 3);

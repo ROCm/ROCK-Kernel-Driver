@@ -18,12 +18,14 @@
  * 2001-08-29:	Nicolas Pitre <nico@cam.org>
  * 			Cleaned up, pushed platform dependent stuff
  * 			in the platform specific files.
+ *
+ * 2002-05-27:	Nicolas Pitre	Killed sleep.h and the kmalloced save array.
+ * 				Storage is local on the stack now.
  */
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/pm.h>
-#include <linux/slab.h>
 #include <linux/sched.h>
 #include <linux/interrupt.h>
 #include <linux/sysctl.h>
@@ -35,7 +37,6 @@
 #include <asm/system.h>
 #include <asm/leds.h>
 
-#include "sleep.h"
 
 /*
  * Debug macros
@@ -45,20 +46,32 @@
 extern void sa1100_cpu_suspend(void);
 extern void sa1100_cpu_resume(void);
 
-extern unsigned long *sleep_save;	/* virtual address */
-extern unsigned long  sleep_save_p;	/* physical address */
-
 #define SAVE(x)		sleep_save[SLEEP_SAVE_##x] = x
 #define RESTORE(x)	x = sleep_save[SLEEP_SAVE_##x]
 
+/*
+ * List of global SA11x0 peripheral registers to preserve.
+ * More ones like CP and general purpose register values are preserved
+ * on the stack and then the stack pointer is stored last in sleep.S.
+ */
+enum {	SLEEP_SAVE_SP = 0,
+
+	SLEEP_SAVE_OSCR, SLEEP_SAVE_OIER,
+	SLEEP_SAVE_OSMR0, SLEEP_SAVE_OSMR1, SLEEP_SAVE_OSMR2, SLEEP_SAVE_OSMR3,
+
+	SLEEP_SAVE_GPDR, SLEEP_SAVE_GRER, SLEEP_SAVE_GFER, SLEEP_SAVE_GAFR,
+	SLEEP_SAVE_PPDR, SLEEP_SAVE_PPSR, SLEEP_SAVE_PPAR, SLEEP_SAVE_PSDR,
+
+	SLEEP_SAVE_ICMR,
+	SLEEP_SAVE_Ser1SDCR0,
+
+	SLEEP_SAVE_SIZE
+};
+
+
 int pm_do_suspend(void)
 {
-	/* set up pointer to sleep parameters */
-	sleep_save = kmalloc(SLEEP_SAVE_SIZE*sizeof(long), GFP_ATOMIC);
-	if (!sleep_save)
-		return -ENOMEM;
-
-	sleep_save_p = virt_to_phys(sleep_save);
+	unsigned long sleep_save[SLEEP_SAVE_SIZE];
 
 	cli();
 
@@ -146,8 +159,6 @@ int pm_do_suspend(void)
 
 	sti();
 
-	kfree (sleep_save);
-
 	/*
 	 * Restore the CPU frequency settings.
 	 */
@@ -156,6 +167,11 @@ int pm_do_suspend(void)
 #endif
 
 	return 0;
+}
+
+unsigned long sleep_phys_sp(void *sp)
+{
+	return virt_to_phys(sp);
 }
 
 #ifdef CONFIG_SYSCTL

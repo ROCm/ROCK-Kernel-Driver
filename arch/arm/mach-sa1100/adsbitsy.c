@@ -9,7 +9,7 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
-
+#include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/sched.h>
 #include <linux/interrupt.h>
@@ -77,9 +77,8 @@ static void __init adsbitsy_init_irq(void)
 }
 
 static struct map_desc adsbitsy_io_desc[] __initdata = {
- /* virtual     physical    length      domain     r  w  c  b */
-  { 0xf4000000, 0x18000000, 0x00800000, DOMAIN_IO, 0, 1, 0, 0 }, /* SA1111 */
-  LAST_DESC
+ /* virtual     physical    length      type */
+  { 0xf4000000, 0x18000000, 0x00800000, MT_DEVICE }  /* SA1111 */
 };
 
 static int adsbitsy_uart_open(struct uart_port *port, struct uart_info *info)
@@ -106,7 +105,7 @@ static struct sa1100_port_fns adsbitsy_port_fns __initdata = {
 static void __init adsbitsy_map_io(void)
 {
 	sa1100_map_io();
-	iotable_init(adsbitsy_io_desc);
+	iotable_init(adsbitsy_io_desc, ARRAY_SIZE(adsbitsy_io_desc));
 
 	sa1100_register_uart_fns(&adsbitsy_port_fns);
 	sa1100_register_uart(0, 3);

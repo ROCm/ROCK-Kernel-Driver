@@ -223,7 +223,8 @@ return_string:
 		n = strlen(buffer) - *ppos;
 	if (n > count)
 		n = count;
-	copy_to_user(buf, buffer + *ppos, n);
+	if (copy_to_user(buf, buffer + *ppos, n))
+		return -EFAULT;
 	*ppos += n;
 	return n;
 }

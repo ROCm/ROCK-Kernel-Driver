@@ -201,15 +201,30 @@ MAKETOOLS	 =$(MAKE) -C arch/$(ARCH)/tools
 $(patsubst %,_dir_%, $(SUBDIRS)): maketools
 $(patsubst %,_modsubdir_%,$(MOD_DIRS)): maketools
 
-symlinks: archsymlinks
+#	Update machine arch and proc symlinks if something which affects
+#	them changed.  We use .arch and .proc to indicate when they were
+#	updated last, otherwise make uses the target directory mtime.
 
-archsymlinks:
-	$(RM) include/asm-arm/arch include/asm-arm/proc
-	(cd include/asm-arm; ln -sf arch-$(INCDIR) arch; ln -sf proc-$(PROCESSOR) proc)
+include/asm-arm/.arch: $(wildcard include/config/arch/*.h)
+	@echo 'Making asm-arm/arch -> asm-arm/arch-$(INCDIR) symlink'
+	@rm -f include/asm-arm/arch
+	@ln -sf arch-$(INCDIR) include/asm-arm/arch
+	@touch $@
+
+include/asm-arm/.proc: $(wildcard include/config/cpu/32.h) $(wildcard include/config/cpu/26.h)
+	@echo 'Making asm-arm/proc -> asm-arm/proc-$(PROCESSOR) symlink'
+	@rm -f include/asm-arm/proc
+	@ln -sf proc-$(PROCESSOR) include/asm-arm/proc
+	@touch $@
+
+.hdepend: include/asm-arm/.arch include/asm-arm/.proc
 
 vmlinux: arch/arm/vmlinux.lds
 
-arch/arm/vmlinux.lds: $(LDSCRIPT) FORCE
+arch/arm/vmlinux.lds: arch/arm/Makefile $(LDSCRIPT) \
+	$(wildcard include/config/cpu/32.h) \
+	$(wildcard include/config/cpu/26.h) \
+	$(wildcard include/config/arch/*.h)
 	@sed 's/TEXTADDR/$(TEXTADDR)/;s/DATAADDR/$(DATAADDR)/' $(LDSCRIPT) >$@
 
 bzImage zImage zinstall Image bootpImage install: vmlinux
@@ -220,38 +235,25 @@ CLEAN_FILES	+= \
 
 MRPROPER_FILES	+= \
 	arch/arm/tools/constants.h* \
-	include/asm-arm/arch \
-	include/asm-arm/proc \
+	include/asm-arm/arch include/asm-arm/.arch \
+	include/asm-arm/proc include/asm-arm/.proc \
 	include/asm-arm/constants.h* \
 	include/asm-arm/mach-types.h
 
 # We use MRPROPER_FILES and CLEAN_FILES now
-archmrproper:
+archmrproper: FORCE
 	@/bin/true
 
-archclean:
+archclean: FORCE
 	@$(MAKEBOOT) clean
 
-archdep: scripts/mkdep archsymlinks
+archdep: FORCE
 	@$(MAKETOOLS) dep
 	@$(MAKEBOOT) dep
 
 # we need version.h
-maketools: checkbin include/linux/version.h
+maketools: include/linux/version.h FORCE
 	@$(MAKETOOLS) all
-
-# Ensure this is ld "2.9.4" or later
-NEW_LINKER	:= $(shell $(LD) --gc-sections --version >/dev/null 2>&1; echo $$?)
-
-ifneq ($(NEW_LINKER),0)
-checkbin:
-	@echo '*** ${VERSION}.${PATCHLEVEL} kernels no longer build correctly with old versions of binutils.'
-	@echo '*** Please upgrade your binutils to 2.9.5.'
-	@false
-else
-checkbin:
-	@true
-endif
 
 # My testing targets (that short circuit a few dependencies)
 zImg:;	@$(MAKEBOOT) zImage

@@ -66,6 +66,8 @@
 #include <asm/io.h>
 #include <linux/swapops.h>
 
+extern void signal_wake_up(struct task_struct *t);
+
 unsigned char software_suspend_enabled = 0;
 
 /* #define SUSPEND_CONSOLE	(MAX_NR_CONSOLES-1) */
@@ -118,7 +120,7 @@ static int pm_suspend_state = 0;
    collide with anything.
  */
 static suspend_pagedir_t *pagedir_nosave __nosavedata = NULL;
-static unsigned long pagedir_save;
+static suspend_pagedir_t *pagedir_save;
 static int pagedir_order __nosavedata = 0;
 
 struct link {
@@ -282,7 +284,7 @@ static __inline__ int fill_suspend_header(struct suspend_header *sh)
 	strncpy(sh->version, system_utsname.version, 20);
 	sh->num_cpus = smp_num_cpus;
 	sh->page_size = PAGE_SIZE;
-	sh->suspend_pagedir = (unsigned long)pagedir_nosave;
+	sh->suspend_pagedir = pagedir_nosave;
 	if (pagedir_save != pagedir_nosave)
 		panic("Must not happen");
 	sh->num_pbes = nr_copy_pages;
@@ -298,15 +300,10 @@ static __inline__ int fill_suspend_header(struct suspend_header *sh)
  * but that should not be a problem since tasks are stopped..
  */
 
-static void do_suspend_sync(void)
+static inline void do_suspend_sync(void)
 {
-	while (1) {
-		blk_run_queues();
-#error this is broken, FIXME
-		if (!TQ_ACTIVE(tq_disk))
-			break;
-		printk(KERN_ERR "Hm, tq_disk is not empty after run_task_queue\n");
-	}
+	blk_run_queues();
+#warning This might be broken. We need to somehow wait for data to reach the disk
 }
 
 /* We memorize in swapfile_used what swap devices are used for suspension */
@@ -412,7 +409,6 @@ static int write_suspend_image(void)
 	int nr_pgdir_pages = SUSPEND_PD_PAGES(nr_copy_pages);
 	union diskpage *cur,  *buffer = (union diskpage *)get_free_page(GFP_ATOMIC);
 	unsigned long address;
-	kdev_t suspend_device;
 
 	PRINTS( "Writing data to swap (%d pages): ", nr_copy_pages );
 	for (i=0; i<nr_copy_pages; i++) {
@@ -427,8 +423,9 @@ static int write_suspend_image(void)
 		address = (pagedir_nosave+i)->address;
 		lock_page(virt_to_page(address));
 		{
-			long dummy1, dummy2;
-			get_swaphandle_info(entry, &dummy1, &suspend_device);
+			long dummy1;
+			struct inode *suspend_file;
+			get_swaphandle_info(entry, &dummy1, &suspend_file);
 		}
 		rw_swap_page_nolock(WRITE, entry, (char *) address);
 		(pagedir_nosave+i)->swap_address = entry;
@@ -806,7 +803,7 @@ static void do_magic_resume_2(void)
 		panic("pagedir_order changed?!");
 
 	PRINTR( "Freeing prev allocated pagedir\n" );
-	free_suspend_pagedir(pagedir_save);
+	free_suspend_pagedir((unsigned long) pagedir_save);
 	__flush_tlb_global();		/* Even mappings of "global" things (vmalloc) need to be fixed */
 	drivers_resume(RESUME_ALL_PHASES);
 	spin_unlock_irq(&suspend_pagedir_lock);
@@ -1047,7 +1044,7 @@ static int bdev_read_page(kdev_t dev, long pos, void *buf)
 	return 0;
 } 
 
-extern kdev_t __init name_to_kdev_t(char *line);
+extern kdev_t __init name_to_kdev_t(const char *line);
 
 static int resume_try_to_read(const char * specialfile, int noresume)
 {
@@ -1064,7 +1061,7 @@ static int resume_try_to_read(const char * specialfile, int noresume)
 		goto resume_read_error;
 	}
 
-	printk("Resuming from device %x\n", resume_device);
+	printk("Resuming from device %x\n", kdev_t_to_nr(resume_device));
 
 #define READTO(pos, ptr) \
 	if (bdev_read_page(resume_device, pos, ptr)) { error = -EIO; goto resume_read_error; }

@@ -60,16 +60,15 @@ __initcall(init_huw_cs3);
    area size = 288 kByte (0x48000 Bytes)
 **/
 static struct map_desc huw_webpanel_io_desc[] __initdata = {
- /* virtual     physical    length      domain     r  w  c  b */
-  { 0xf0000000, 0xc1fb8000, 0x00048000, DOMAIN_IO, 0, 1, 0, 0 }, /* Parameter */
-  { 0xf1000000, 0x18000000, 0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* Paules CS3, write only */
-  LAST_DESC
+ /* virtual     physical    length      type */
+  { 0xf0000000, 0xc1fb8000, 0x00048000, MT_DEVICE }, /* Parameter */
+  { 0xf1000000, 0x18000000, 0x00100000, MT_DEVICE }  /* Paules CS3, write only */
 };
 
 static void __init huw_webpanel_map_io(void)
 {
 	sa1100_map_io();
-	iotable_init(huw_webpanel_io_desc);
+	iotable_init(huw_webpanel_io_desc, ARRAY_SIZE(huw_webpanel_io_desc));
 
 	sa1100_register_uart(0, 3);
 	sa1100_register_uart(1, 1);

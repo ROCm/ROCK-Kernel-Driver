@@ -338,7 +338,14 @@ asmlinkage long sys_access(const char * filename, int mode)
 	current->fsuid = current->uid;
 	current->fsgid = current->gid;
 
-	/* Clear the capabilities if we switch to a non-root user */
+	/*
+	 * Clear the capabilities if we switch to a non-root user
+	 *
+	 * FIXME: There is a race here against sys_capset.  The
+	 * capabilities can change yet we will restore the old
+	 * value below.  We should hold task_capabilities_lock,
+	 * but we cannot because user_path_walk can sleep.
+	 */
 	if (current->uid)
 		cap_clear(current->cap_effective);
 	else

@@ -294,3 +294,27 @@ static void do_magic(int resume)
 }
 #endif 
 
+#ifdef CONFIG_ACPI_SLEEP
+extern unsigned long saved_eip;
+extern unsigned long saved_esp;
+extern unsigned long saved_ebp;
+extern unsigned long saved_ebx;
+extern unsigned long saved_esi;
+extern unsigned long saved_edi;
+
+static inline void acpi_save_register_state(unsigned long return_point)
+{
+	saved_eip = return_point;
+	asm volatile ("movl %%esp,(%0)" : "=m" (saved_esp));
+	asm volatile ("movl %%ebp,(%0)" : "=m" (saved_ebp));
+	asm volatile ("movl %%ebx,(%0)" : "=m" (saved_ebx));
+	asm volatile ("movl %%edi,(%0)" : "=m" (saved_edi));
+	asm volatile ("movl %%esi,(%0)" : "=m" (saved_esi));
+}
+
+#define acpi_restore_register_state()  do {} while (0)
+
+/* routines for saving/restoring kernel state */
+extern int acpi_save_state_mem(void);
+extern int acpi_save_state_disk(void);
+#endif

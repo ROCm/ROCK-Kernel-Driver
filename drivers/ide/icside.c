@@ -275,12 +275,13 @@ static void icside_maskproc(struct ata_device *drive)
 #define NR_ENTRIES 256
 #define TABLE_SIZE (NR_ENTRIES * 8)
 
-static int ide_build_sglist(struct ata_channel *ch, struct request *rq)
+static int ide_build_sglist(struct ata_device *drive, struct request *rq)
 {
+	struct ata_channel *ch = drive->channel;
 	struct scatterlist *sg = ch->sg_table;
 	int nents;
 
-	if (rq->flags & REQ_DRIVE_ACB) {
+	if (rq->flags & REQ_SPECIAL) {
 		struct ata_taskfile *args = rq->special;
 
 		if (args->command_type == IDE_DRIVE_TASK_RAW_WRITE)
@@ -294,7 +295,7 @@ static int ide_build_sglist(struct ata_channel *ch, struct request *rq)
 		sg->length = rq->nr_sectors * SECTOR_SIZE;
 		nents = 1;
 	} else {
-		nents = blk_rq_map_sg(rq->q, rq, sg);
+		nents = blk_rq_map_sg(&drive->queue, rq, sg);
 
 		if (rq->q && nents > rq->nr_phys_segments)
 			printk("icside: received %d segments, build %d\n",
@@ -390,7 +391,7 @@ static void icside_dma_enable(struct ata_device *drive, int on, int verbose)
 		udma_tcq_enable(drive, 0);
 #endif
 	}
-	
+
 	/*
 	 * We don't need any bouncing.  Yes, this looks the
 	 * wrong way around, but it is correct.
@@ -491,7 +492,7 @@ icside_dma_common(struct ata_device *drive, struct request *rq,
 	 */
 	BUG_ON(dma_channel_active(ch->hw.dma));
 
-	count = ch->sg_nents = ide_build_sglist(ch, rq);
+	count = ch->sg_nents = ide_build_sglist(drive, rq);
 	if (!count)
 		return 1;
 
@@ -517,33 +518,6 @@ icside_dma_common(struct ata_device *drive, struct request *rq,
 	return 0;
 }
 
-static int icside_dma_read(struct ata_device *drive, struct request *rq)
-{
-	struct ata_channel *ch = drive->channel;
-	unsigned int cmd;
-
-	if (icside_dma_common(drive, rq, DMA_MODE_READ))
-		return 1;
-
-	if (drive->type != ATA_DISK)
-		return 0;
-
-	ide_set_handler(drive, icside_dmaintr, WAIT_CMD, NULL);
-
-	if ((rq->flags & REQ_DRIVE_ACB) && drive->addressing == 1) {
-		struct ata_taskfile *args = rq->special;
-		cmd = args->taskfile.command;
-	} else if (drive->addressing) {
-		cmd = WIN_READDMA_EXT;
-	} else {
-		cmd = WIN_READDMA;
-	}
-
-	OUT_BYTE(cmd, IDE_COMMAND_REG);
-	enable_dma(ch->hw.dma);
-	return 0;
-}
-
 static int icside_dma_init(struct ata_device *drive, struct request *rq)
 {
 	struct ata_channel *ch = drive->channel;
@@ -557,13 +531,13 @@ static int icside_dma_init(struct ata_device *drive, struct request *rq)
 
 	ide_set_handler(drive, icside_dmaintr, WAIT_CMD, NULL);
 
-	if ((rq->flags & REQ_DRIVE_ACB) && drive->addressing == 1) {
+	if ((rq->flags & REQ_SPECIAL) && drive->addressing == 1) {
 		struct ata_taskfile *args = rq->special;
-		cmd = args->taskfile.command;
+		cmd = args->cmd;
 	} else if (drive->addressing) {
-		cmd = WIN_WRITEDMA_EXT;
+		cmd = rq_data_dir(rq) == WRITE ? WIN_WRITEDMA_EXT : WIN_READDMA_EXT;
 	} else {
-		cmd = WIN_WRITEDMA;
+		cmd = rq_data_dir(rq) == WRITE ? WIN_WRITEDMA : WIN_READDMA;
 	}
 	OUT_BYTE(cmd, IDE_COMMAND_REG);
 
@@ -586,7 +560,7 @@ static void icside_dma_timeout(struct ata_device *drive)
 {
 	printk(KERN_ERR "ATA: %s: UDMA timeout occured:", drive->name);
 	ata_status(drive, 0, 0);
-	ide_dump_status(drive, NULL, "UDMA timeout", drive->status);
+	ata_dump(drive, NULL, "UDMA timeout");
 }
 
 static void icside_irq_lost(struct ata_device *drive)

@@ -220,15 +220,8 @@ static inline void clear_mapping(unsigned long virt)
 static void __init create_mapping(struct map_desc *md)
 {
 	unsigned long virt, length;
-	int prot_sect, prot_pte;
+	int prot_sect, prot_pte, domain;
 	long off;
-
-	if (md->prot_read && md->prot_write &&
-	    !md->cacheable && !md->bufferable) {
-		printk(KERN_WARNING "Security risk: creating user "
-		       "accessible mapping for 0x%08lx at 0x%08lx\n",
-		       md->physical, md->virtual);
-	}
 
 	if (md->virtual != vectors_base() && md->virtual < PAGE_OFFSET) {
 		printk(KERN_WARNING "MM: not creating mapping for "
@@ -237,24 +230,49 @@ static void __init create_mapping(struct map_desc *md)
 		return;
 	}
 
-	prot_pte = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
-		   (md->prot_read  ? L_PTE_USER       : 0) |
-		   (md->prot_write ? L_PTE_WRITE      : 0) |
-		   (md->cacheable  ? L_PTE_CACHEABLE  : 0) |
-		   (md->bufferable ? L_PTE_BUFFERABLE : 0);
+	prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY;
+	prot_sect = PMD_TYPE_SECT;
 
-	prot_sect = PMD_TYPE_SECT | PMD_DOMAIN(md->domain) |
-		    (md->prot_read  ? PMD_SECT_AP_READ    : 0) |
-		    (md->prot_write ? PMD_SECT_AP_WRITE   : 0) |
-		    (md->cacheable  ? PMD_SECT_CACHEABLE  : 0) |
-		    (md->bufferable ? PMD_SECT_BUFFERABLE : 0);
+	switch (md->type) {
+	case MT_DEVICE:
+		prot_pte  |= L_PTE_WRITE;
+		prot_sect |= PMD_SECT_AP_WRITE;
+		domain     = DOMAIN_IO;
+		break;
+
+	case MT_CACHECLEAN:
+		prot_pte  |= L_PTE_CACHEABLE | L_PTE_BUFFERABLE;
+		prot_sect |= PMD_SECT_CACHEABLE | PMD_SECT_BUFFERABLE;
+		domain     = DOMAIN_KERNEL;
+		break;
+
+	case MT_MINICLEAN:
+		prot_pte  |= L_PTE_CACHEABLE;
+		prot_sect |= PMD_SECT_CACHEABLE;
+		domain     = DOMAIN_KERNEL;
+		break;
+
+	case MT_VECTORS:
+		prot_pte  |= L_PTE_EXEC | L_PTE_CACHEABLE | L_PTE_BUFFERABLE;
+		prot_sect |= PMD_SECT_CACHEABLE | PMD_SECT_BUFFERABLE;
+		domain     = DOMAIN_USER;
+		break;
+
+	case MT_MEMORY:
+		prot_pte  |= L_PTE_WRITE | L_PTE_EXEC | L_PTE_CACHEABLE | L_PTE_BUFFERABLE;
+		prot_sect |= PMD_SECT_AP_WRITE | PMD_SECT_CACHEABLE | PMD_SECT_BUFFERABLE;
+		domain     = DOMAIN_KERNEL;
+		break;
+	}
+
+	prot_sect |= PMD_DOMAIN(domain);
 
 	virt   = md->virtual;
 	off    = md->physical - virt;
 	length = md->length;
 
 	while ((virt & 0xfffff || (virt + off) & 0xfffff) && length >= PAGE_SIZE) {
-		alloc_init_page(virt, virt + off, md->domain, prot_pte);
+		alloc_init_page(virt, virt + off, domain, prot_pte);
 
 		virt   += PAGE_SIZE;
 		length -= PAGE_SIZE;
@@ -268,7 +286,7 @@ static void __init create_mapping(struct map_desc *md)
 	}
 
 	while (length >= PAGE_SIZE) {
-		alloc_init_page(virt, virt + off, md->domain, prot_pte);
+		alloc_init_page(virt, virt + off, domain, prot_pte);
 
 		virt   += PAGE_SIZE;
 		length -= PAGE_SIZE;
@@ -319,12 +337,7 @@ void __init memtable_init(struct meminfo *mi)
 		p->physical   = mi->bank[i].start;
 		p->virtual    = __phys_to_virt(p->physical);
 		p->length     = mi->bank[i].size;
-		p->domain     = DOMAIN_KERNEL;
-		p->prot_read  = 0;
-		p->prot_write = 1;
-		p->cacheable  = 1;
-		p->bufferable = 1;
-
+		p->type       = MT_MEMORY;
 		p ++;
 	}
 
@@ -332,12 +345,7 @@ void __init memtable_init(struct meminfo *mi)
 	p->physical   = FLUSH_BASE_PHYS;
 	p->virtual    = FLUSH_BASE;
 	p->length     = PGDIR_SIZE;
-	p->domain     = DOMAIN_KERNEL;
-	p->prot_read  = 1;
-	p->prot_write = 0;
-	p->cacheable  = 1;
-	p->bufferable = 1;
-
+	p->type       = MT_CACHECLEAN;
 	p ++;
 #endif
 
@@ -345,12 +353,7 @@ void __init memtable_init(struct meminfo *mi)
 	p->physical   = FLUSH_BASE_PHYS + PGDIR_SIZE;
 	p->virtual    = FLUSH_BASE_MINICACHE;
 	p->length     = PGDIR_SIZE;
-	p->domain     = DOMAIN_KERNEL;
-	p->prot_read  = 1;
-	p->prot_write = 0;
-	p->cacheable  = 1;
-	p->bufferable = 0;
-
+	p->type       = MT_MINICLEAN;
 	p ++;
 #endif
 
@@ -380,25 +383,22 @@ void __init memtable_init(struct meminfo *mi)
 	init_maps->physical   = virt_to_phys(init_maps);
 	init_maps->virtual    = vectors_base();
 	init_maps->length     = PAGE_SIZE;
-	init_maps->domain     = DOMAIN_USER;
-	init_maps->prot_read  = 0;
-	init_maps->prot_write = 0;
-	init_maps->cacheable  = 1;
-	init_maps->bufferable = 0;
+	init_maps->type       = MT_VECTORS;
 
 	create_mapping(init_maps);
 
 	flush_cache_all();
+	flush_tlb_all();
 }
 
 /*
  * Create the architecture specific mappings
  */
-void __init iotable_init(struct map_desc *io_desc)
+void __init iotable_init(struct map_desc *io_desc, int nr)
 {
 	int i;
 
-	for (i = 0; io_desc[i].last == 0; i++)
+	for (i = 0; i < nr; i++)
 		create_mapping(io_desc + i);
 }
 

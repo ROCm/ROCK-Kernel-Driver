@@ -19,14 +19,11 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-#include <linux/sched.h>
-#include <linux/mm.h>
+#include <linux/kernel.h>
 #include <linux/init.h>
 
 #include <asm/hardware.h>
 #include <asm/io.h>
-#include <asm/pgtable.h>
-#include <asm/page.h>
 #include <asm/sizes.h>
  
 #include <asm/mach/map.h>
@@ -34,16 +31,15 @@
 /* Page table mapping for I/O region */
  
 static struct map_desc epxa10db_io_desc[] __initdata = {
- { IO_ADDRESS(EXC_REGISTERS_BASE),   EXC_REGISTERS_BASE,   SZ_16K     , DOMAIN_IO, 0, 1}, 
-{IO_ADDRESS(EXC_PLD_BLOCK0_BASE),   EXC_PLD_BLOCK0_BASE,   SZ_16K     , DOMAIN_IO, 0, 1}, 
-{IO_ADDRESS(EXC_PLD_BLOCK1_BASE),   EXC_PLD_BLOCK1_BASE,   SZ_16K     , DOMAIN_IO, 0, 1}, 
-{IO_ADDRESS(EXC_PLD_BLOCK2_BASE),   EXC_PLD_BLOCK2_BASE,   SZ_16K     , DOMAIN_IO, 0, 1}, 
-{IO_ADDRESS(EXC_PLD_BLOCK3_BASE),   EXC_PLD_BLOCK3_BASE,   SZ_16K     , DOMAIN_IO, 0, 1}, 
-{ FLASH_VADDR(EXC_EBI_BLOCK0_BASE),   EXC_EBI_BLOCK0_BASE,   SZ_16M     , DOMAIN_IO, 0, 1},
- LAST_DESC
+ { IO_ADDRESS(EXC_REGISTERS_BASE),   EXC_REGISTERS_BASE,    SZ_16K, MT_DEVICE }, 
+ { IO_ADDRESS(EXC_PLD_BLOCK0_BASE),  EXC_PLD_BLOCK0_BASE,   SZ_16K, MT_DEVICE }, 
+ { IO_ADDRESS(EXC_PLD_BLOCK1_BASE),  EXC_PLD_BLOCK1_BASE,   SZ_16K, MT_DEVICE }, 
+ { IO_ADDRESS(EXC_PLD_BLOCK2_BASE),  EXC_PLD_BLOCK2_BASE,   SZ_16K, MT_DEVICE }, 
+ { IO_ADDRESS(EXC_PLD_BLOCK3_BASE),  EXC_PLD_BLOCK3_BASE,   SZ_16K, MT_DEVICE }, 
+ { FLASH_VADDR(EXC_EBI_BLOCK0_BASE), EXC_EBI_BLOCK0_BASE,   SZ_16M, MT_DEVICE }
 };
 
 void __init epxa10db_map_io(void)
 {
-	iotable_init(epxa10db_io_desc);
+	iotable_init(epxa10db_io_desc, ARRAY_SIZE(epxa10db_io_desc));
 }

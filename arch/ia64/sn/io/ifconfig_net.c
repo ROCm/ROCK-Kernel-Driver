@@ -202,16 +202,30 @@ static int ifconfig_net_ioctl(struct inode * inode, struct file * file,
 	 * Read in the header and see how big of a buffer we really need to 
 	 * allocate.
 	 */
-	ifname_num = (struct ifname_num *) kmalloc(sizeof(struct ifname_num), 
-			GFP_KERNEL);
-	copy_from_user( ifname_num, (char *) arg, sizeof(struct ifname_num));
+	ifname_num = kmalloc(sizeof(struct ifname_num), GFP_KERNEL);
+	if (!ifname_num)
+		return -ENOMEM;
+	if (copy_from_user(ifname_num, (char *)arg,
+			   sizeof(struct ifname_num))) {
+		kfree(ifname_num);
+		return -EFAULT;
+	}
 	size = ifname_num->size;
 	kfree(ifname_num);
-	ifname_num = (struct ifname_num *) kmalloc(size, GFP_KERNEL);
+	ifname_num = kmalloc(size, GFP_KERNEL);
+	if (!ifname_num)
+		return -ENOMEM;
 	ifname_MAC = (struct ifname_MAC *) ((char *)ifname_num + (sizeof(struct ifname_num)) );
 
-	copy_from_user( ifname_num, (char *) arg, size);
+	if (copy_from_user(ifname_num, (char *)arg, size)) {
+		kfree(ifname_num);
+		return -EFAULT;
+	}
 	new_devices =  kmalloc(size - sizeof(struct ifname_num), GFP_KERNEL);
+	if (!new_devices) {
+		kfree(ifname_num);
+		return -EFAULT;
+	}
 	temp_new_devices = new_devices;
 
 	memset(new_devices, 0, size - sizeof(struct ifname_num));
@@ -257,9 +271,9 @@ static int ifconfig_net_ioctl(struct inode * inode, struct file * file,
 	/*
 	 * Copy back to the User Buffer area any new devices encountered.
 	 */
-	copy_to_user((char *)arg + (sizeof(struct ifname_num)), new_devices, 
-			size - sizeof(struct ifname_num));
-
+	if (copy_to_user((char *)arg + (sizeof(struct ifname_num)),
+			 new_devices, size - sizeof(struct ifname_num)))
+		return -EFAULT;
 	return(0);
 
 }

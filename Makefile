@@ -369,7 +369,7 @@ checkincludes:
 TAGS: FORCE
 	{ find include/asm-${ARCH} -name '*.h' -print ; \
 	find include -type d \( -name "asm-*" -o -name config \) -prune -o -name '*.h' -print ; \
-	find $(SUBDIRS) init -name '*.[ch]' ; } | grep -v SCCS | etags -
+	find $(SUBDIRS) init arch/${ARCH} -name '*.[chS]' ; } | grep -v SCCS | etags -
 
 # 	Exuberant ctags works better with -I
 tags: FORCE

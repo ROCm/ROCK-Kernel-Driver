@@ -10,6 +10,7 @@
  *  2001-09-13: Cliff Brake <cbrake@accelent.com>
  *              Initial code
  */
+#include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/major.h>
 #include <linux/fs.h>
@@ -69,45 +70,38 @@ static void __init idp_init_irq(void)
 }
 
 static struct map_desc idp_io_desc[] __initdata = {
- /* virtual     physical    length      domain     r  w  c  b */
+ /* virtual     physical    length      type */
 
 
 #ifndef PXA_IDP_REV02
   { IDP_CTRL_PORT_BASE,
     IDP_CTRL_PORT_PHYS,
     IDP_CTRL_PORT_SIZE,
-    DOMAIN_IO,
-    0, 1, 0, 0 },
+    MT_DEVICE },
 #endif
 
   { IDP_IDE_BASE,
     IDP_IDE_PHYS,
     IDP_IDE_SIZE,
-    DOMAIN_IO,
-    0, 1, 0, 0 },
+    MT_DEVICE },
   { IDP_ETH_BASE,
     IDP_ETH_PHYS,
     IDP_ETH_SIZE,
-    DOMAIN_IO,
-    0, 1, 0, 0 },
+    MT_DEVICE },
   { IDP_COREVOLT_BASE,
     IDP_COREVOLT_PHYS,
     IDP_COREVOLT_SIZE,
-    DOMAIN_IO,
-    0, 1, 0, 0 },
+    MT_DEVICE },
   { IDP_CPLD_BASE,
     IDP_CPLD_PHYS,
     IDP_CPLD_SIZE,
-    DOMAIN_IO,
-    0, 1, 0, 0 },
-
-  LAST_DESC
+    MT_DEVICE }
 };
 
 static void __init idp_map_io(void)
 {
 	pxa_map_io();
-	iotable_init(idp_io_desc);
+	iotable_init(idp_io_desc, ARRAY_SIZE(idp_io_desc));
 
 	set_GPIO_IRQ_edge(IRQ_TO_GPIO_2_80(TOUCH_PANEL_IRQ), TOUCH_PANEL_IRQ_EDGE);
 }

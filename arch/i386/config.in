@@ -209,9 +209,26 @@ fi
 endmenu
 
 mainmenu_option next_comment
-comment 'General options'
+comment 'Power management options (ACPI, APM)'
 
 source drivers/acpi/Config.in
+bool 'Power Management support' CONFIG_PM
+
+dep_tristate '  Advanced Power Management BIOS support' CONFIG_APM $CONFIG_PM
+if [ "$CONFIG_APM" != "n" ]; then
+   bool '    Ignore USER SUSPEND' CONFIG_APM_IGNORE_USER_SUSPEND
+   bool '    Enable PM at boot time' CONFIG_APM_DO_ENABLE
+   bool '    Make CPU Idle calls when idle' CONFIG_APM_CPU_IDLE
+   bool '    Enable console blanking using APM' CONFIG_APM_DISPLAY_BLANK
+   bool '    RTC stores time in GMT' CONFIG_APM_RTC_IS_GMT
+   bool '    Allow interrupts during APM BIOS calls' CONFIG_APM_ALLOW_INTS
+   bool '    Use real mode APM BIOS call to power off' CONFIG_APM_REAL_MODE_POWER_OFF
+fi
+
+endmenu
+
+mainmenu_option next_comment
+comment 'Bus options (PCI, PCMCIA, EISA, MCA, ISA)'
 
 # Visual Workstation support is utterly broken.
 # If you want to see it working mail an VW540 to hch@infradead.org 8)
@@ -260,6 +277,11 @@ else
    define_bool CONFIG_HOTPLUG_PCI n
 fi
 
+endmenu
+
+mainmenu_option next_comment
+comment 'Executable file formats'
+
 if [ "$CONFIG_PROC_FS" = "y" ]; then
    choice 'Kernel core (/proc/kcore) format' \
 	"ELF		CONFIG_KCORE_ELF	\
@@ -268,19 +290,6 @@ fi
 tristate 'Kernel support for a.out binaries' CONFIG_BINFMT_AOUT
 tristate 'Kernel support for ELF binaries' CONFIG_BINFMT_ELF
 tristate 'Kernel support for MISC binaries' CONFIG_BINFMT_MISC
-
-bool 'Power Management support' CONFIG_PM
-
-dep_tristate '  Advanced Power Management BIOS support' CONFIG_APM $CONFIG_PM
-if [ "$CONFIG_APM" != "n" ]; then
-   bool '    Ignore USER SUSPEND' CONFIG_APM_IGNORE_USER_SUSPEND
-   bool '    Enable PM at boot time' CONFIG_APM_DO_ENABLE
-   bool '    Make CPU Idle calls when idle' CONFIG_APM_CPU_IDLE
-   bool '    Enable console blanking using APM' CONFIG_APM_DISPLAY_BLANK
-   bool '    RTC stores time in GMT' CONFIG_APM_RTC_IS_GMT
-   bool '    Allow interrupts during APM BIOS calls' CONFIG_APM_ALLOW_INTS
-   bool '    Use real mode APM BIOS call to power off' CONFIG_APM_REAL_MODE_POWER_OFF
-fi
 
 endmenu
 

@@ -1209,7 +1209,8 @@ int i810_ov0_info(struct inode *inode, struct file *filp,
 
 	data.offset = dev_priv->overlay_offset;
 	data.physical = dev_priv->overlay_physical;
-	copy_to_user((drm_i810_overlay_t *)arg,&data,sizeof(data));
+	if (copy_to_user((drm_i810_overlay_t *)arg,&data,sizeof(data)))
+		return -EFAULT;
 	return 0;
 }
 

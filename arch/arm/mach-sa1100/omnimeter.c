@@ -41,15 +41,14 @@ static int __init omnimeter_init(void)
 __initcall(omnimeter_init);
 
 static struct map_desc omnimeter_io_desc[] __initdata = {
- /* virtual     physical    length      domain     r  w  c  b */
-  { 0xd2000000, 0x10000000, 0x02000000, DOMAIN_IO, 0, 1, 0, 0 }, /* TS */
-  LAST_DESC
+ /* virtual     physical    length      type */
+  { 0xd2000000, 0x10000000, 0x02000000, MT_DEVICE } /* TS */
 };
 
 static void __init omnimeter_map_io(void)
 {
 	sa1100_map_io();
-	iotable_init(omnimeter_io_desc);
+	iotable_init(omnimeter_io_desc, ARRAY_SIZE(omnimeter_io_desc));
 
 	sa1100_register_uart(0, 3);
 	sa1100_register_uart(1, 1);

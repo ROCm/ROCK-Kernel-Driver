@@ -610,11 +610,7 @@ extern int ide_end_request(struct ata_device *drive, struct request *, int);
 extern void ide_set_handler(struct ata_device *drive, ata_handler_t handler,
 		unsigned long timeout, ata_expiry_t expiry);
 
-/*
- * Error reporting, in human readable form (luxurious, but a memory hog).
- */
-extern u8 ide_dump_status(struct ata_device *, struct request *rq, const char *, u8);
-
+extern u8 ata_dump(struct ata_device *, struct request *, const char *);
 extern ide_startstop_t ata_error(struct ata_device *, struct request *rq, const char *);
 
 extern void ide_fixstring(char *s, const int bytecount, const int byteswap);
@@ -658,17 +654,11 @@ typedef enum {
 
 extern int ide_do_drive_cmd(struct ata_device *, struct request *, ide_action_t);
 
-/*
- * Clean up after success/failure of an explicit drive cmd.
- */
-extern void ide_end_drive_cmd(struct ata_device *, struct request *);
-
 struct ata_taskfile {
 	struct hd_drive_task_hdr taskfile;
 	struct hd_drive_task_hdr  hobfile;
 	u8 cmd;					/* actual ATA command */
 	int command_type;
-	ide_startstop_t (*prehandler)(struct ata_device *, struct request *);
 	ide_startstop_t (*handler)(struct ata_device *, struct request *);
 };
 
@@ -682,16 +672,30 @@ extern ide_startstop_t ata_taskfile(struct ata_device *,
  * Special Flagged Register Validation Caller
  */
 
-extern ide_startstop_t recal_intr(struct ata_device *, struct request *);
-extern ide_startstop_t task_no_data_intr(struct ata_device *, struct request *);
+/*
+ * for now, taskfile requests are special :/
+ */
+static inline char *ide_map_rq(struct request *rq, unsigned long *flags)
+{
+	if (rq->bio)
+		return bio_kmap_irq(rq->bio, flags) + ide_rq_offset(rq);
+	else
+		return rq->buffer + ((rq)->nr_sectors - (rq)->current_nr_sectors) * SECTOR_SIZE;
+}
 
-extern void ide_cmd_type_parser(struct ata_taskfile *args);
+static inline void ide_unmap_rq(struct request *rq, char *to,
+				unsigned long *flags)
+{
+	if (rq->bio)
+		bio_kunmap_irq(to, flags);
+}
+
+extern ide_startstop_t ata_special_intr(struct ata_device *, struct request *);
 extern int ide_raw_taskfile(struct ata_device *, struct ata_taskfile *);
 
 extern void ide_fix_driveid(struct hd_driveid *id);
 extern int ide_config_drive_speed(struct ata_device *, byte);
 extern byte eighty_ninty_three(struct ata_device *);
-
 
 extern void ide_stall_queue(struct ata_device *, unsigned long);
 
@@ -799,7 +803,7 @@ extern void udma_pci_timeout(struct ata_device *drive);
 extern void udma_pci_irq_lost(struct ata_device *);
 extern int udma_pci_setup(struct ata_device *);
 
-extern int udma_new_table(struct ata_channel *, struct request *);
+extern int udma_new_table(struct ata_device *, struct request *);
 extern void udma_destroy_table(struct ata_channel *);
 extern void udma_print(struct ata_device *);
 
@@ -834,5 +838,6 @@ extern int ata_status(struct ata_device *, u8, u8);
 extern int ata_irq_enable(struct ata_device *, int);
 extern void ata_reset(struct ata_channel *);
 extern void ata_out_regfile(struct ata_device *, struct hd_drive_task_hdr *);
+extern void ata_in_regfile(struct ata_device *, struct hd_drive_task_hdr *);
 
 #endif

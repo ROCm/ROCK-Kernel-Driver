@@ -1,6 +1,7 @@
 /*
  * legacy.c - traditional, old school PCI bus probing
  */
+#include <linux/init.h>
 #include <linux/pci.h>
 #include "pci.h"
 

@@ -67,9 +67,6 @@
 #include "pcihost.h"
 #include "ioctl.h"
 
-/* default maximum number of failures */
-#define IDE_DEFAULT_MAX_FAILURES	1
-
 /*
  * CompactFlash cards and their relatives pretend to be removable hard disks, except:
  *	(1) they never have a slave unit, and
@@ -392,43 +389,6 @@ static inline u32 read_24(struct ata_device *drive)
 		 IN_BYTE(IDE_SECTOR_REG);
 }
 
-/*
- * Clean up after success/failure of an explicit drive cmd
- *
- * Should be called under lock held.
- */
-void ide_end_drive_cmd(struct ata_device *drive, struct request *rq)
-{
-	if (rq->flags & REQ_DRIVE_ACB) {
-		struct ata_taskfile *ar = rq->special;
-
-		rq->errors = !ata_status(drive, READY_STAT, BAD_STAT);
-		if (ar) {
-			ar->taskfile.feature = IN_BYTE(IDE_ERROR_REG);
-			ar->taskfile.sector_count = IN_BYTE(IDE_NSECTOR_REG);
-			ar->taskfile.sector_number = IN_BYTE(IDE_SECTOR_REG);
-			ar->taskfile.low_cylinder = IN_BYTE(IDE_LCYL_REG);
-			ar->taskfile.high_cylinder = IN_BYTE(IDE_HCYL_REG);
-			ar->taskfile.device_head = IN_BYTE(IDE_SELECT_REG);
-			if ((drive->id->command_set_2 & 0x0400) &&
-			    (drive->id->cfs_enable_2 & 0x0400) &&
-			    (drive->addressing == 1)) {
-				/* The following command goes to the hob file! */
-				OUT_BYTE(0x80, drive->channel->io_ports[IDE_CONTROL_OFFSET]);
-				ar->hobfile.feature = IN_BYTE(IDE_FEATURE_REG);
-				ar->hobfile.sector_count = IN_BYTE(IDE_NSECTOR_REG);
-				ar->hobfile.sector_number = IN_BYTE(IDE_SECTOR_REG);
-				ar->hobfile.low_cylinder = IN_BYTE(IDE_LCYL_REG);
-				ar->hobfile.high_cylinder = IN_BYTE(IDE_HCYL_REG);
-			}
-		}
-	}
-
-	blkdev_dequeue_request(rq);
-	drive->rq = NULL;
-	end_that_request_last(rq);
-}
-
 #if FANCY_STATUS_DUMPS
 struct ata_bit_messages {
 	u8 mask;
@@ -437,46 +397,46 @@ struct ata_bit_messages {
 };
 
 static struct ata_bit_messages ata_status_msgs[] = {
-	{ BUSY_STAT,  BUSY_STAT,  "Busy"           },
-	{ READY_STAT, READY_STAT, "DriveReady"     },
-	{ WRERR_STAT, WRERR_STAT, "DeviceFault"    },
-	{ SEEK_STAT,  SEEK_STAT,  "SeekComplete"   },
-	{ DRQ_STAT,   DRQ_STAT,   "DataRequest"    },
-	{ ECC_STAT,   ECC_STAT,   "CorrectedError" },
-	{ INDEX_STAT, INDEX_STAT, "Index"          },
-	{ ERR_STAT,   ERR_STAT,   "Error"          }
+	{ BUSY_STAT,  BUSY_STAT,  "busy"            },
+	{ READY_STAT, READY_STAT, "drive ready"     },
+	{ WRERR_STAT, WRERR_STAT, "device fault"    },
+	{ SEEK_STAT,  SEEK_STAT,  "seek complete"   },
+	{ DRQ_STAT,   DRQ_STAT,   "data request"    },
+	{ ECC_STAT,   ECC_STAT,   "corrected error" },
+	{ INDEX_STAT, INDEX_STAT, "index"           },
+	{ ERR_STAT,   ERR_STAT,   "error"           }
 };
 
 static struct ata_bit_messages ata_error_msgs[] = {
-	{ ICRC_ERR|ABRT_ERR,	ABRT_ERR,		"DriveStatusError"   },
-	{ ICRC_ERR|ABRT_ERR,	ICRC_ERR,		"BadSector"	     },
-	{ ICRC_ERR|ABRT_ERR,	ICRC_ERR|ABRT_ERR,	"BadCRC"	     },
-	{ ECC_ERR,		ECC_ERR,		"UncorrectableError" },
-	{ ID_ERR,		ID_ERR,			"SectorIdNotFound"   },
-	{ TRK0_ERR,		TRK0_ERR,		"TrackZeroNotFound"  },
-	{ MARK_ERR,		MARK_ERR,		"AddrMarkNotFound"   }
+	{ ICRC_ERR|ABRT_ERR,	ABRT_ERR,		"drive status error"	},
+	{ ICRC_ERR|ABRT_ERR,	ICRC_ERR,		"bad sectorr"		},
+	{ ICRC_ERR|ABRT_ERR,	ICRC_ERR|ABRT_ERR,	"invalid checksum"	},
+	{ ECC_ERR,		ECC_ERR,		"uncorrectable error"	},
+	{ ID_ERR,		ID_ERR,			"sector id not found"   },
+	{ TRK0_ERR,		TRK0_ERR,		"track zero not found"	},
+	{ MARK_ERR,		MARK_ERR,		"addr mark not found"   }
 };
 
-static void ata_dump_bits(struct ata_bit_messages *msgs, int nr, byte bits)
+static void dump_bits(struct ata_bit_messages *msgs, int nr, byte bits)
 {
 	int i;
 
-	printk(" { ");
+	printk(" [ ");
 
 	for (i = 0; i < nr; i++, msgs++)
 		if ((bits & msgs->mask) == msgs->match)
 			printk("%s ", msgs->msg);
 
-	printk("} ");
+	printk("] ");
 }
 #else
-# define ata_dump_bits(msgs,nr,bits) do { } while (0)
+# define dump_bits(msgs,nr,bits) do { } while (0)
 #endif
 
 /*
  * Error reporting, in human readable form (luxurious, but a memory hog).
  */
-u8 ide_dump_status(struct ata_device *drive, struct request * rq, const char *msg, u8 stat)
+u8 ata_dump(struct ata_device *drive, struct request * rq, const char *msg)
 {
 	unsigned long flags;
 	u8 err = 0;
@@ -484,16 +444,16 @@ u8 ide_dump_status(struct ata_device *drive, struct request * rq, const char *ms
 	__save_flags (flags);	/* local CPU only */
 	ide__sti();		/* local CPU only */
 
-	printk("%s: %s: status=0x%02x", drive->name, msg, stat);
-	ata_dump_bits(ata_status_msgs, ARRAY_SIZE(ata_status_msgs), stat);
+	printk("%s: %s: status=0x%02x", drive->name, msg, drive->status);
+	dump_bits(ata_status_msgs, ARRAY_SIZE(ata_status_msgs), drive->status);
 	printk("\n");
 
-	if ((stat & (BUSY_STAT|ERR_STAT)) == ERR_STAT) {
+	if ((drive->status & (BUSY_STAT|ERR_STAT)) == ERR_STAT) {
 		err = GET_ERR();
 		printk("%s: %s: error=0x%02x", drive->name, msg, err);
 #if FANCY_STATUS_DUMPS
 		if (drive->type == ATA_DISK) {
-			ata_dump_bits(ata_error_msgs, ARRAY_SIZE(ata_error_msgs), err);
+			dump_bits(ata_error_msgs, ARRAY_SIZE(ata_error_msgs), err);
 
 			if ((err & (BBD_ERR | ABRT_ERR)) == BBD_ERR || (err & (ECC_ERR|ID_ERR|MARK_ERR))) {
 				if ((drive->id->command_set_2 & 0x0400) &&
@@ -566,7 +526,6 @@ static void try_to_flush_leftover_data(struct ata_device *drive)
  */
 static int do_recalibrate(struct ata_device *drive)
 {
-	printk(KERN_INFO "%s: recalibrating!\n", drive->name);
 
 	if (drive->type != ATA_DISK)
 		return ide_stopped;
@@ -574,11 +533,12 @@ static int do_recalibrate(struct ata_device *drive)
 	if (!IS_PDC4030_DRIVE) {
 		struct ata_taskfile args;
 
+		printk(KERN_INFO "%s: recalibrating...\n", drive->name);
 		memset(&args, 0, sizeof(args));
 		args.taskfile.sector_count = drive->sect;
 		args.cmd = WIN_RESTORE;
-		args.handler = recal_intr;
-		ata_taskfile(drive, &args, NULL);
+		ide_raw_taskfile(drive, &args);
+		printk(KERN_INFO "%s: done!\n", drive->name);
 	}
 
 	return IS_PDC4030_DRIVE ? ide_stopped : ide_started;
@@ -592,14 +552,13 @@ ide_startstop_t ata_error(struct ata_device *drive, struct request *rq,	const ch
 	u8 err;
 	u8 stat = drive->status;
 
-	err = ide_dump_status(drive, rq, msg, stat);
+	err = ata_dump(drive, rq, msg);
 	if (!drive || !rq)
 		return ide_stopped;
 
 	/* retry only "normal" I/O: */
 	if (!(rq->flags & REQ_CMD)) {
 		rq->errors = 1;
-		ide_end_drive_cmd(drive, rq);
 
 		return ide_stopped;
 	}
@@ -628,6 +587,7 @@ ide_startstop_t ata_error(struct ata_device *drive, struct request *rq,	const ch
 		OUT_BYTE(WIN_IDLEIMMEDIATE, IDE_COMMAND_REG);	/* force an abort */
 
 	if (rq->errors >= ERROR_MAX) {
+		printk(KERN_ERR "%s: max number of retries exceeded!\n", drive->name);
 		if (ata_ops(drive) && ata_ops(drive)->end_request)
 			ata_ops(drive)->end_request(drive, rq, 0);
 		else
@@ -724,10 +684,10 @@ static ide_startstop_t start_request(struct ata_device *drive, struct request *r
 
 	/* Strange disk manager remap.
 	 */
-	if ((rq->flags & REQ_CMD) &&
-	    (drive->type == ATA_DISK || drive->type == ATA_FLOPPY)) {
-		block += drive->sect0;
-	}
+	if (rq->flags & REQ_CMD)
+		if (drive->type == ATA_DISK || drive->type == ATA_FLOPPY)
+			block += drive->sect0;
+
 
 	/* Yecch - this will shift the entire interval, possibly killing some
 	 * innocent following sector.
@@ -748,14 +708,8 @@ static ide_startstop_t start_request(struct ata_device *drive, struct request *r
 
 	/* This issues a special drive command.
 	 */
-	if (rq->flags & REQ_DRIVE_ACB) {
-		struct ata_taskfile *ar = rq->special;
-
-		if (!(ar))
-			goto args_error;
-
-		return ata_taskfile(drive, ar, NULL);
-	}
+	if (rq->flags & REQ_SPECIAL)
+		return ata_taskfile(drive, rq->special, NULL);
 
 	/* The normal way of execution is to pass and execute the request
 	 * handler down to the device type driver.
@@ -782,19 +736,6 @@ kill_rq:
 		ata_ops(drive)->end_request(drive, rq, 0);
 	else
 		ide_end_request(drive, rq, 0);
-
-	return ide_stopped;
-
-args_error:
-
-	/* NULL as arguemnt is used by ioctls as a way of waiting for all
-	 * current requests to be flushed from the queue.
-	 */
-
-#ifdef DEBUG
-	printk("%s: DRIVE_CMD (null)\n", drive->name);
-#endif
-	ide_end_drive_cmd(drive, rq);
 
 	return ide_stopped;
 }
@@ -1476,12 +1417,12 @@ EXPORT_SYMBOL(ide_timer_expiry);
 EXPORT_SYMBOL(do_ide_request);
 
 EXPORT_SYMBOL(ide_set_handler);
-EXPORT_SYMBOL(ide_dump_status);
+EXPORT_SYMBOL(ata_dump);
 EXPORT_SYMBOL(ata_error);
 
 EXPORT_SYMBOL(ide_wait_stat);
+/* FIXME: this is a trully bad name */
 EXPORT_SYMBOL(restart_request);
-EXPORT_SYMBOL(ide_end_drive_cmd);
 EXPORT_SYMBOL(__ide_end_request);
 EXPORT_SYMBOL(ide_end_request);
 EXPORT_SYMBOL(ide_stall_queue);

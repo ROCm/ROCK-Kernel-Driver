@@ -159,4 +159,18 @@ void ata_out_regfile(struct ata_device *drive, struct hd_drive_task_hdr *rf)
 	OUT_BYTE(rf->high_cylinder, ch->io_ports[IDE_HCYL_OFFSET]);
 }
 
+/*
+ * Output a complete register file.
+ */
+void ata_in_regfile(struct ata_device *drive, struct hd_drive_task_hdr *rf)
+{
+	struct ata_channel *ch = drive->channel;
+
+	rf->sector_count = IN_BYTE(ch->io_ports[IDE_NSECTOR_OFFSET]);
+	rf->sector_number = IN_BYTE(ch->io_ports[IDE_SECTOR_OFFSET]);
+	rf->low_cylinder = IN_BYTE(ch->io_ports[IDE_LCYL_OFFSET]);
+	rf->high_cylinder = IN_BYTE(ch->io_ports[IDE_HCYL_OFFSET]);
+}
+
+
 MODULE_LICENSE("GPL");

@@ -1,11 +1,12 @@
 /*
- *  linux/arch/arm/mm/mm-cl7500.c
+ *  linux/arch/arm/mach-clps7500/core.c
  *
  *  Copyright (C) 1998 Russell King
  *  Copyright (C) 1999 Nexus Electronics Ltd
  *
  * Extra MM routines for CL7500 architecture
  */
+#include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/init.h>
 
@@ -215,16 +216,15 @@ static void __init clps7500_init_irq(void)
 }
 
 static struct map_desc cl7500_io_desc[] __initdata = {
-	{ IO_BASE,	IO_START,	IO_SIZE	 , DOMAIN_IO, 0, 1 },	/* IO space	*/
-	{ ISA_BASE,	ISA_START,	ISA_SIZE , DOMAIN_IO, 0, 1 },	/* ISA space	*/
-	{ FLASH_BASE,	FLASH_START,	FLASH_SIZE, DOMAIN_IO, 0, 1 },	/* Flash	*/
-	{ LED_BASE,	LED_START,	LED_SIZE , DOMAIN_IO, 0, 1 },	/* LED		*/
-	LAST_DESC
+	{ IO_BASE,	IO_START,	IO_SIZE,    MT_DEVICE },	/* IO space	*/
+	{ ISA_BASE,	ISA_START,	ISA_SIZE,   MT_DEVICE },	/* ISA space	*/
+	{ FLASH_BASE,	FLASH_START,	FLASH_SIZE, MT_DEVICE },	/* Flash	*/
+	{ LED_BASE,	LED_START,	LED_SIZE,   MT_DEVICE } 	/* LED		*/
 };
 
 static void __init clps7500_map_io(void)
 {
-	iotable_init(cl7500_io_desc);
+	iotable_init(cl7500_io_desc, ARRAY_SIZE(cl7500_io_desc));
 }
 
 MACHINE_START(CLPS7500, "CL-PS7500")
