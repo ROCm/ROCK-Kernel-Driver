@@ -1681,7 +1681,7 @@ static int sdebug_driver_probe(struct device * dev)
 
 	sdbg_host = to_sdebug_host(dev);
 
-        hpnt = scsi_register(&sdebug_driver_template, sizeof(sdbg_host));
+        hpnt = scsi_host_alloc(&sdebug_driver_template, sizeof(sdbg_host));
         if (NULL == hpnt) {
                 printk(KERN_ERR "%s: scsi_register failed\n", __FUNCTION__);
                 error = -ENODEV;
@@ -1700,7 +1700,7 @@ static int sdebug_driver_probe(struct device * dev)
         if (error) {
                 printk(KERN_ERR "%s: scsi_add_host failed\n", __FUNCTION__);
                 error = -ENODEV;
-		scsi_unregister(hpnt);
+		scsi_host_put(hpnt);
         }
 
 
@@ -1726,8 +1726,6 @@ static int sdebug_driver_remove(struct device * dev)
                 return -EBUSY;
         }
 
-        scsi_unregister(sdbg_host->shost);
-
         list_for_each_safe(lh, lh_sf, &sdbg_host->dev_info_list) {
                 sdbg_devinfo = list_entry(lh, struct sdebug_dev_info,
                                           dev_list);
@@ -1735,5 +1733,6 @@ static int sdebug_driver_remove(struct device * dev)
                 kfree(sdbg_devinfo);
         }
 
+        scsi_host_put(sdbg_host->shost);
         return 0;
 }

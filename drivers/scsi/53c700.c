@@ -293,7 +293,8 @@ NCR_700_detect(Scsi_Host_Template *tpnt,
 		tpnt->proc_name = "53c700";
 	
 
-	if((host = scsi_register(tpnt, 4)) == NULL)
+	host = scsi_host_alloc(tpnt, 4);
+	if (!host)
 		return NULL;
 	memset(hostdata->slots, 0, sizeof(struct NCR_700_command_slot)
 	       * NCR_700_COMMAND_SLOTS_PER_HOST);

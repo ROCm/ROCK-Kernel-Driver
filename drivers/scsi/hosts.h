@@ -560,23 +560,20 @@ extern int scsi_register_interface(struct class_interface *);
 #define scsi_unregister_interface(intf) \
 	class_interface_unregister(intf)
 
-/*
- * HBA allocation/freeing.
- */
-extern struct Scsi_Host * scsi_register(Scsi_Host_Template *, int);
-extern void scsi_unregister(struct Scsi_Host *);
 
-/*
- * HBA registration/unregistration.
- */
+extern struct Scsi_Host *scsi_host_alloc(Scsi_Host_Template *, int);
 extern int scsi_add_host(struct Scsi_Host *, struct device *);
 extern int scsi_remove_host(struct Scsi_Host *);
+extern void scsi_host_get(struct Scsi_Host *);
+extern void scsi_host_put(struct Scsi_Host *t);
+extern struct Scsi_Host *scsi_host_lookup(unsigned short);
 
-/*
- * Legacy HBA template registration/unregistration.
- */
+/* legacy interfaces */
 extern int scsi_register_host(Scsi_Host_Template *);
 extern int scsi_unregister_host(Scsi_Host_Template *);
+extern struct Scsi_Host *scsi_register(Scsi_Host_Template *, int);
+extern void scsi_unregister(struct Scsi_Host *);
+
 
 /**
  * scsi_find_device - find a device given the host

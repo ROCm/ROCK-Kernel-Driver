@@ -186,7 +186,7 @@ lasi700_driver_callback(struct parisc_device *dev)
 	if(request_irq(dev->irq, NCR_700_intr, SA_SHIRQ, driver_name, host)) {
 		printk(KERN_ERR "%s: irq problem, detaching\n",
 		       driver_name);
-		scsi_unregister(host);
+		scsi_host_put(host);
 		NCR_700_release(host);
 		return 1;
 	}

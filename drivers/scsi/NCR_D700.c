@@ -223,7 +223,7 @@ NCR_D700_probe_one(struct NCR_D700_private *p, int siop,
 	return 0;
 
  irq_failed:
-	scsi_unregister(host);
+	scsi_host_put(host);
 	NCR_700_release(host);
  detect_failed:
 	release_region(host->base, 64);

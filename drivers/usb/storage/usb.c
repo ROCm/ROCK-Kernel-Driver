@@ -874,7 +874,7 @@ static int storage_probe(struct usb_interface *intf,
 	up(&(us->dev_semaphore));
 
 	/* now register	*/
-	us->host = scsi_register(&usb_stor_host_template, sizeof(us));
+	us->host = scsi_host_alloc(&usb_stor_host_template, sizeof(us));
 	if (!us->host) {
 		printk(KERN_WARNING USB_STORAGE
 			"Unable to register the scsi host\n");
@@ -965,7 +965,7 @@ static void storage_disconnect(struct usb_interface *intf)
 	};
 
 	/* finish SCSI host removal sequence */
-	scsi_unregister(us->host);
+	scsi_host_put(us->host);
 
 	/* Kill the control threads
 	 *

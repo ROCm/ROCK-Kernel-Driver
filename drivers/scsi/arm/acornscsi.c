@@ -2993,7 +2993,7 @@ acornscsi_probe(struct expansion_card *ec, const struct ecard_id *id)
 	AS_Host *ashost;
 	int ret = -ENOMEM;
 
-	host = scsi_register(&acornscsi_template, sizeof(AS_Host));
+	host = scsi_host_alloc(&acornscsi_template, sizeof(AS_Host));
 	if (!host)
 		goto out;
 
@@ -3060,7 +3060,7 @@ acornscsi_probe(struct expansion_card *ec, const struct ecard_id *id)
  err_2:
 	release_region(host->io_port + 0x800, 2);
  err_1:
-	scsi_unregister(host);
+	scsi_host_put(host);
  out:
 	return ret;
 }
@@ -3089,6 +3089,7 @@ static void __devexit acornscsi_remove(struct expansion_card *ec)
 	msgqueue_free(&ashost->scsi.msgs);
 	queue_free(&ashost->queues.disconnected);
 	queue_free(&ashost->queues.issue);
+	scsi_host_put(host);
 }
 
 static const struct ecard_id acornscsi_cids[] = {

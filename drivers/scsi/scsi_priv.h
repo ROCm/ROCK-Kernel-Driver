@@ -55,9 +55,6 @@ struct scsi_target {
 /* hosts.c */
 extern void scsi_host_busy_inc(struct Scsi_Host *, Scsi_Device *);
 extern void scsi_host_busy_dec_and_test(struct Scsi_Host *, Scsi_Device *);
-extern struct Scsi_Host *scsi_host_lookup(unsigned short);
-extern void scsi_host_put(struct Scsi_Host *);
-extern void scsi_host_init(void);
 
 /* scsi.c */
 extern int scsi_dispatch_cmd(struct scsi_cmnd *cmd);
@@ -107,12 +104,11 @@ extern void scsi_exit_procfs(void);
 #endif /* CONFIG_PROC_FS */
 
 /* scsi_scan.c */
-extern void scsi_scan_host(struct Scsi_Host *shost);
-extern void scsi_forget_host(struct Scsi_Host *shost);
+extern void scsi_scan_host(struct Scsi_Host *);
+extern void scsi_forget_host(struct Scsi_Host *);
 extern void scsi_free_sdev(struct scsi_device *);
 extern void scsi_free_shost(struct Scsi_Host *);
-extern void scsi_host_get(struct Scsi_Host *);
-extern void scsi_rescan_device(struct device *dev);
+extern void scsi_rescan_device(struct device *);
 
 /* scsi_sysfs.c */
 extern int scsi_device_register(struct scsi_device *);

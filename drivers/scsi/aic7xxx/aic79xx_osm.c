@@ -2098,7 +2098,7 @@ ahd_linux_register_host(struct ahd_softc *ahd, Scsi_Host_Template *template)
 	u_long	target;
 
 	template->name = ahd->description;
-	host = scsi_register(template, sizeof(struct ahd_softc *));
+	host = scsi_host_alloc(template, sizeof(struct ahd_softc *));
 	if (host == NULL)
 		return (ENOMEM);
 
@@ -2308,7 +2308,7 @@ ahd_platform_free(struct ahd_softc *ahd)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 			scsi_remove_host(ahd->platform_data->host);
 #endif
-			scsi_unregister(ahd->platform_data->host);
+			scsi_host_put(ahd->platform_data->host);
 		}
 
 		/* destroy all of the device and target objects */

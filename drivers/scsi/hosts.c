@@ -135,15 +135,6 @@ int scsi_add_host(struct Scsi_Host *shost, struct device *dev)
 }
 
 /**
- * scsi_unregister - unregister a scsi host
- * @shost:	scsi host to be unregistered
- **/
-void scsi_unregister(struct Scsi_Host *shost)
-{
-	scsi_host_put(shost);
-}
-
-/**
  * scsi_free_sdev - free a scsi hosts resources
  * @shost:	scsi host to free 
  **/
@@ -172,60 +163,59 @@ void scsi_free_shost(struct Scsi_Host *shost)
 }
 
 /**
- * scsi_register - register a scsi host adapter instance.
- * @shost_tp:	pointer to scsi host template
- * @xtr_bytes:	extra bytes to allocate for driver
+ * scsi_host_alloc - register a scsi host adapter instance.
+ * @sht:	pointer to scsi host template
+ * @privsize:	extra bytes to allocate for driver
  *
  * Note:
- * 	We call this when we come across a new host adapter. We only do
- * 	this once we are 100% sure that we want to use this host adapter -
- * 	it is a pain to reverse this, so we try to avoid it 
+ * 	Allocate a new Scsi_Host and perform basic initialization.
+ * 	The host is not published to the scsi midlayer until scsi_add_host
+ * 	is called.
  *
  * Return value:
  * 	Pointer to a new Scsi_Host
  **/
-extern int blk_nohighio;
-struct Scsi_Host * scsi_register(Scsi_Host_Template *shost_tp, int xtr_bytes)
+struct Scsi_Host *scsi_host_alloc(Scsi_Host_Template *sht, int privsize)
 {
-	struct Scsi_Host *shost, *shost_scr;
-	int gfp_mask, rval;
-	DECLARE_COMPLETION(sem);
+	extern int blk_nohighio;
+	struct Scsi_Host *shost;
+	int gfp_mask = GFP_KERNEL, rval;
+	DECLARE_COMPLETION(complete);
 
-        /* Check to see if this host has any error handling facilities */
-        if(shost_tp->eh_strategy_handler == NULL &&
-           shost_tp->eh_abort_handler == NULL &&
-           shost_tp->eh_device_reset_handler == NULL &&
-           shost_tp->eh_bus_reset_handler == NULL &&
-           shost_tp->eh_host_reset_handler == NULL) {
-		printk(KERN_ERR "ERROR: SCSI host `%s' has no error handling\nERROR: This is not a safe way to run your SCSI host\nERROR: The error handling must be added to this driver\n", shost_tp->proc_name);
-		dump_stack();
-        }
-	if(shost_tp->shost_attrs == NULL)
-		/* if its not set in the template, use the default */
-		 shost_tp->shost_attrs = scsi_sysfs_shost_attrs;
-	if(shost_tp->sdev_attrs == NULL)
-		 shost_tp->sdev_attrs = scsi_sysfs_sdev_attrs;
-	gfp_mask = GFP_KERNEL;
-	if (shost_tp->unchecked_isa_dma && xtr_bytes)
+	if (sht->unchecked_isa_dma && privsize)
 		gfp_mask |= __GFP_DMA;
 
-	shost = kmalloc(sizeof(struct Scsi_Host) + xtr_bytes, gfp_mask);
-	if (!shost) {
-		printk(KERN_ERR "%s: out of memory.\n", __FUNCTION__);
+        /* Check to see if this host has any error handling facilities */
+        if (!sht->eh_strategy_handler && !sht->eh_abort_handler &&
+	    !sht->eh_device_reset_handler && !sht->eh_bus_reset_handler &&
+            !sht->eh_host_reset_handler) {
+		printk(KERN_ERR "ERROR: SCSI host `%s' has no error handling\n"
+				"ERROR: This is not a safe way to run your "
+				        "SCSI host\n"
+				"ERROR: The error handling must be added to "
+				"this driver\n", sht->proc_name);
+		dump_stack();
+        }
+
+	/* if its not set in the template, use the default */
+	if (!sht->shost_attrs)
+		 sht->shost_attrs = scsi_sysfs_shost_attrs;
+	if (!sht->sdev_attrs)
+		 sht->sdev_attrs = scsi_sysfs_sdev_attrs;
+
+	shost = kmalloc(sizeof(struct Scsi_Host) + privsize, gfp_mask);
+	if (!shost)
 		return NULL;
-	}
-
-	memset(shost, 0, sizeof(struct Scsi_Host) + xtr_bytes);
-
-	shost->host_no = scsi_host_next_hn++; /* XXX(hch): still racy */
+	memset(shost, 0, sizeof(struct Scsi_Host) + privsize);
 
 	spin_lock_init(&shost->default_lock);
 	scsi_assign_lock(shost, &shost->default_lock);
 	INIT_LIST_HEAD(&shost->my_devices);
 	INIT_LIST_HEAD(&shost->eh_cmd_q);
 	INIT_LIST_HEAD(&shost->starved_list);
-
 	init_waitqueue_head(&shost->host_wait);
+
+	shost->host_no = scsi_host_next_hn++; /* XXX(hch): still racy */
 	shost->dma_channel = 0xff;
 
 	/* These three are default values which can be overridden */
@@ -240,53 +230,33 @@ struct Scsi_Host * scsi_register(Scsi_Host_Template *shost_tp, int xtr_bytes)
 	 * they actually do something sensible with such commands.
 	 */
 	shost->max_cmd_len = 12;
-	shost->hostt = shost_tp;
-	shost->host_blocked = 0;
-	shost->host_self_blocked = FALSE;
-	shost->max_host_blocked = shost_tp->max_host_blocked ? shost_tp->max_host_blocked : SCSI_DEFAULT_HOST_BLOCKED;
+	shost->hostt = sht;
+	shost->this_id = sht->this_id;
+	shost->can_queue = sht->can_queue;
+	shost->sg_tablesize = sht->sg_tablesize;
+	shost->cmd_per_lun = sht->cmd_per_lun;
+	shost->unchecked_isa_dma = sht->unchecked_isa_dma;
+	shost->use_clustering = sht->use_clustering;
+	shost->use_blk_tcq = sht->use_blk_tcq;
+	if (!blk_nohighio)
+		shost->highmem_io = sht->highmem_io;
 
-#ifdef DEBUG
-	printk("%s: %x %x: %d\n", __FUNCTION_ (int)shost,
-	       (int)shost->hostt, xtr_bytes);
-#endif
+	if (!sht->max_host_blocked)
+		shost->max_host_blocked = sht->max_host_blocked;
+	else
+		shost->max_host_blocked = SCSI_DEFAULT_HOST_BLOCKED;
 
 	/*
-	 * The next six are the default values which can be overridden if
-	 * need be
+	 * If the driver imposes no hard sector transfer limit, start at
+	 * machine infinity initially.
 	 */
-	shost->this_id = shost_tp->this_id;
-	shost->can_queue = shost_tp->can_queue;
-	shost->sg_tablesize = shost_tp->sg_tablesize;
-	shost->cmd_per_lun = shost_tp->cmd_per_lun;
-	shost->unchecked_isa_dma = shost_tp->unchecked_isa_dma;
-	shost->use_clustering = shost_tp->use_clustering;
-	if (!blk_nohighio)
-		shost->highmem_io = shost_tp->highmem_io;
-	if (!shost_tp->max_sectors) {
-		/*
-		 * Driver imposes no hard sector transfer limit.
-		 * start at machine infinity initially.
-		 */
+	if (sht->max_sectors)
+		shost->max_sectors = sht->max_sectors;
+	else
 		shost->max_sectors = SCSI_DEFAULT_MAX_SECTORS;
-	} else
-		shost->max_sectors = shost_tp->max_sectors;
-	shost->use_blk_tcq = shost_tp->use_blk_tcq;
 
 	spin_lock(&scsi_host_list_lock);
-	/*
-	 * FIXME When device naming is complete remove this step that
-	 * orders the scsi_host_list by host number and just do a
-	 * list_add_tail.
-	 */
-	list_for_each_entry(shost_scr, &scsi_host_list, sh_list) {
-		if (shost->host_no < shost_scr->host_no) {
-			__list_add(&shost->sh_list, shost_scr->sh_list.prev,
-				   &shost_scr->sh_list);
-			goto found;
-		}
-	}
 	list_add_tail(&shost->sh_list, &scsi_host_list);
-found:
 	spin_unlock(&scsi_host_list_lock);
 
 	rval = scsi_setup_command_freelist(shost);
@@ -295,23 +265,29 @@ found:
 
 	scsi_sysfs_init_host(shost);
 
-	shost->eh_notify = &sem;
-	kernel_thread((int (*)(void *)) scsi_error_handler, (void *) shost, 0);
-	/*
-	 * Now wait for the kernel error thread to initialize itself
-	 * as it might be needed when we scan the bus.
-	 */
-	wait_for_completion(&sem);
+	shost->eh_notify = &complete;
+	/* XXX(hch): handle error return */
+	kernel_thread((int (*)(void *))scsi_error_handler, shost, 0);
+	wait_for_completion(&complete);
 	shost->eh_notify = NULL;
 	shost->hostt->present++;
 	return shost;
-
-fail:
+ fail:
 	spin_lock(&scsi_host_list_lock);
 	list_del(&shost->sh_list);
 	spin_unlock(&scsi_host_list_lock);
 	kfree(shost);
 	return NULL;
+}
+
+struct Scsi_Host *scsi_register(Scsi_Host_Template *sht, int privsize)
+{
+	return scsi_host_alloc(sht, privsize);
+}
+
+void scsi_unregister(struct Scsi_Host *shost)
+{
+	scsi_host_put(shost);
 }
 
 /**

@@ -2942,6 +2942,7 @@ void fas216_remove(struct Scsi_Host *host)
 	scsi_remove_host(host);
 
 	fas216_writeb(info, REG_CMD, CMD_RESETCHIP);
+	scsi_host_put(host);
 }
 
 /**
