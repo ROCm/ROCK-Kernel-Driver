@@ -415,6 +415,7 @@ static int llc_ui_connect(struct socket *sock, struct sockaddr *uaddr,
 			goto out;
 	}
 	if (!llc->dev) {
+		rc = -ENODEV;
 		rtnl_lock();
 		dev = dev_getbyhwaddr(addr->sllc_arphrd, addr->sllc_smac);
 		rtnl_unlock();
