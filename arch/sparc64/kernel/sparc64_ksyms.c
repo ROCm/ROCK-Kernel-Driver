@@ -55,6 +55,7 @@
 #endif
 #include <asm/a.out.h>
 #include <asm/ns87303.h>
+#include <asm/timer.h>
 
 struct poll {
 	int fd;
@@ -159,11 +160,7 @@ EXPORT_SYMBOL(_do_write_unlock);
 EXPORT_SYMBOL(smp_call_function);
 #endif /* CONFIG_SMP */
 
-/* Uniprocessor clock frequency */
-#ifndef CONFIG_SMP
-extern unsigned long up_clock_tick;
-EXPORT_SYMBOL(up_clock_tick);
-#endif
+EXPORT_SYMBOL(sparc64_get_clock_tick);
 
 /* semaphores */
 EXPORT_SYMBOL(down);
