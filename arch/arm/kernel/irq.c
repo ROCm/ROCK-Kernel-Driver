@@ -18,12 +18,12 @@
  *  Naturally it's not a 1:1 relation, but there are similarities.
  */
 #include <linux/config.h>
-#include <linux/ptrace.h>
 #include <linux/kernel_stat.h>
 #include <linux/signal.h>
 #include <linux/sched.h>
 #include <linux/ioport.h>
 #include <linux/interrupt.h>
+#include <linux/ptrace.h>
 #include <linux/slab.h>
 #include <linux/random.h>
 #include <linux/smp.h>
@@ -268,7 +268,7 @@ do_edge_IRQ(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 		}
 
 		__do_irq(irq, action, regs);
-	} while (desc->pending);
+	} while (desc->pending && desc->enabled);
 
 	desc->running = 0;
 
