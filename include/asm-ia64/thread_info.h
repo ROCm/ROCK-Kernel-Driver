@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2002 Hewlett-Packard Co
+ * Copyright (C) 2002-2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 #ifndef _ASM_IA64_THREAD_INFO_H
@@ -51,6 +51,7 @@ struct thread_info {
 
 /* how to get the thread information struct from C */
 #define current_thread_info() ((struct thread_info *) ((char *) current + IA64_TASK_SIZE))
+#define free_thread_info(ti)	/* nothing */
 
 #endif /* !__ASSEMBLY */
 

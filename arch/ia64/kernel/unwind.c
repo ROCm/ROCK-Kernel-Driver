@@ -242,7 +242,7 @@ get_scratch_regs (struct unw_frame_info *info)
 		info->pt = info->sp - 16;
 	}
 	UNW_DPRINT(3, "unwind.%s: sp 0x%lx pt 0x%lx\n", __FUNCTION__, info->sp, info->pt);
-	return info->pt;
+	return (struct pt_regs *) info->pt;
 }
 
 int
@@ -1641,7 +1641,6 @@ run_script (struct unw_script *script, struct unw_frame_info *state)
 	struct unw_insn *ip, *limit, next_insn;
 	unsigned long opc, dst, val, off;
 	unsigned long *s = (unsigned long *) state;
-	struct pt_regs *pt;
 	STAT(unsigned long start;)
 
 	STAT(++unw.stat.script.runs; start = ia64_get_itc());
@@ -1677,8 +1676,7 @@ run_script (struct unw_script *script, struct unw_frame_info *state)
 
 		      case UNW_INSN_MOVE_SCRATCH:
 			if (state->pt) {
-				pt = get_scratch_regs(state);
-				s[dst] = pt + val;
+				s[dst] = (unsigned long) get_scratch_regs(state) + val;
 			} else {
 				s[dst] = 0;
 				UNW_DPRINT(0, "unwind.%s: no state->pt, dst=%ld, val=%ld\n",
