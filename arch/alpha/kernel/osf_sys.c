@@ -948,14 +948,7 @@ osf_setitimer(int which, struct itimerval32 __user *in, struct itimerval32 __use
 asmlinkage int
 osf_utimes(char __user *filename, struct timeval32 __user *tvs)
 {
-	char *kfilename;
 	struct timeval ktvs[2];
-	mm_segment_t old_fs;
-	int ret;
-
-	kfilename = getname(filename);
-	if (IS_ERR(kfilename))
-		return PTR_ERR(kfilename);
 
 	if (tvs) {
 		if (get_tv32(&ktvs[0], &tvs[0]) ||
@@ -963,14 +956,7 @@ osf_utimes(char __user *filename, struct timeval32 __user *tvs)
 			return -EFAULT;
 	}
 
-	old_fs = get_fs();
-	set_fs(KERNEL_DS);
-	ret = sys_utimes(kfilename, tvs ? ktvs : 0);
-	set_fs(old_fs);
-
-	putname(kfilename);
-
-	return ret;
+	return do_utimes(filename, tvs ? ktvs : 0);
 }
 
 #define MAX_SELECT_SECONDS \
