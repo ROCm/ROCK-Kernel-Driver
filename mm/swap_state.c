@@ -17,8 +17,16 @@
 
 #include <asm/pgtable.h>
 
+/*
+ * We may have stale swap cache pages in memory: notice
+ * them here and get rid of the unnecessary final write.
+ */
 static int swap_writepage(struct page *page)
 {
+	if (remove_exclusive_swap_page(page)) {
+		UnlockPage(page);
+		return 0;
+	}
 	rw_swap_page(WRITE, page);
 	return 0;
 }

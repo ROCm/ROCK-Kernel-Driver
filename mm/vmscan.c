@@ -74,6 +74,9 @@ static inline int try_to_swap_out(struct mm_struct * mm, struct vm_area_struct* 
 	pte = ptep_get_and_clear(page_table);
 	flush_tlb_page(vma, address);
 
+	if (pte_dirty(pte))
+		set_page_dirty(page);
+
 	/*
 	 * Is the page already in the swap cache? If so, then
 	 * we can just drop our reference to it without doing
@@ -81,8 +84,6 @@ static inline int try_to_swap_out(struct mm_struct * mm, struct vm_area_struct* 
 	 */
 	if (PageSwapCache(page)) {
 		entry.val = page->index;
-		if (pte_dirty(pte))
-			set_page_dirty(page);
 		swap_duplicate(entry);
 set_swap_pte:
 		set_pte(page_table, swp_entry_to_pte(entry));
@@ -110,16 +111,9 @@ drop_pte:
 	 * Basically, this just makes it possible for us to do
 	 * some real work in the future in "refill_inactive()".
 	 */
-	if (page->mapping) {
-		if (pte_dirty(pte))
-			set_page_dirty(page);
+	if (page->mapping)
 		goto drop_pte;
-	}
-	/*
-	 * Check PageDirty as well as pte_dirty: page may
-	 * have been brought back from swap by swapoff.
-	 */
-	if (!pte_dirty(pte) && !PageDirty(page))
+	if (!PageDirty(page))
 		goto drop_pte;
 
 	/*
@@ -132,7 +126,10 @@ drop_pte:
 		entry = get_swap_page();
 		if (!entry.val)
 			break;
-		/* Add it to the swap cache and mark it dirty */
+		/* Add it to the swap cache and mark it dirty
+		 * (adding to the page cache will clear the dirty
+		 * and uptodate bits, so we need to do it again)
+		 */
 		if (add_to_swap_cache(page, entry) == 0) {
 			SetPageUptodate(page);
 			set_page_dirty(page);

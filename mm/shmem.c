@@ -212,9 +212,7 @@ static int shmem_free_swp(swp_entry_t *dir, unsigned int count)
 		entry = *ptr;
 		*ptr = (swp_entry_t){0};
 		freed++;
-
-		/* vmscan will do the actual page freeing later.. */
-		swap_free (entry);
+		free_swap_and_cache(entry);
 	}
 	return freed;
 }

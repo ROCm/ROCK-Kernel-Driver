@@ -78,15 +78,8 @@ void __free_pte(pte_t pte)
 	struct page *page = pte_page(pte);
 	if ((!VALID_PAGE(page)) || PageReserved(page))
 		return;
-	/*
-	 * free_page() used to be able to clear swap cache
-	 * entries.  We may now have to do it manually.
-	 */
-	if (page->mapping) {
-		if (pte_dirty(pte))
-			set_page_dirty(page);
-	}
-		
+	if (pte_dirty(pte))
+		set_page_dirty(page);		
 	free_page_and_swap_cache(page);
 }
 
@@ -917,36 +910,8 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 	old_page = pte_page(pte);
 	if (!VALID_PAGE(old_page))
 		goto bad_wp_page;
-	
-	/*
-	 * We can avoid the copy if:
-	 * - we're the only user (count == 1)
-	 * - the only other user is the swap cache,
-	 *   and the only swap cache user is itself,
-	 *   in which case we can just continue to
-	 *   use the same swap cache (it will be
-	 *   marked dirty).
-	 */
-	switch (page_count(old_page)) {
-	int can_reuse;
-	case 3:
-		if (!old_page->buffers)
-			break;
-		/* FallThrough */
-	case 2:
-		if (!PageSwapCache(old_page))
-			break;
-		if (TryLockPage(old_page))
-			break;
-		/* Recheck swapcachedness once the page is locked */
-		can_reuse = remove_exclusive_swap_page(old_page);
-		UnlockPage(old_page);
-		if (!can_reuse)
-			break;
-		/* FallThrough */
-	case 1:
-		if (PageReserved(old_page))
-			break;
+
+	if (can_share_swap_page(old_page)) {	
 		flush_cache_page(vma, address);
 		establish_pte(vma, address, page_table, pte_mkyoung(pte_mkdirty(pte_mkwrite(pte))));
 		spin_unlock(&mm->page_table_lock);
@@ -1152,12 +1117,20 @@ static int do_swap_page(struct mm_struct * mm,
 		spin_unlock(&mm->page_table_lock);
 		return 1;
 	}
-		
+
 	/* The page isn't present yet, go ahead with the fault. */
+		
+	swap_free(entry);
+	if (vm_swap_full()) {
+		lock_page(page);
+		remove_exclusive_swap_page(page);
+		UnlockPage(page);
+	}
+
 	mm->rss++;
 	pte = mk_pte(page, vma->vm_page_prot);
-
-	swap_free(entry);
+	if (write_access && can_share_swap_page(page))
+		pte = pte_mkdirty(pte_mkwrite(pte));
 
 	flush_page_to_ram(page);
 	flush_icache_page(vma, page);

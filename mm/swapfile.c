@@ -224,6 +224,64 @@ void swap_free(swp_entry_t entry)
 }
 
 /*
+ * Check if we're the only user of a swap page,
+ * when the page is locked.
+ */
+static int exclusive_swap_page(struct page *page)
+{
+	int retval = 0;
+	struct swap_info_struct * p;
+	swp_entry_t entry;
+
+	entry.val = page->index;
+	p = swap_info_get(entry);
+	if (p) {
+		/* Is the only swap cache user the cache itself? */
+		if (p->swap_map[SWP_OFFSET(entry)] == 1) {
+			/* Recheck the page count with the pagecache lock held.. */
+			spin_lock(&pagecache_lock);
+			if (page_count(page) - !!page->buffers == 2)
+				retval = 1;
+			spin_unlock(&pagecache_lock);
+		}
+		swap_info_put(p);
+	}
+	return retval;
+}
+
+/*
+ * We can use this swap cache entry directly
+ * if there are no other references to it.
+ *
+ * Here "exclusive_swap_page()" does the real
+ * work, but we opportunistically check whether
+ * we need to get all the locks first..
+ */
+int can_share_swap_page(struct page *page)
+{
+	int retval = 0;
+	switch (page_count(page)) {
+	case 3:
+		if (!page->buffers)
+			break;
+		/* Fallthrough */
+	case 2:
+		if (!PageSwapCache(page))
+			break;
+		if (TryLockPage(page))
+			break;
+		retval = exclusive_swap_page(page);
+		UnlockPage(page);
+		break;
+	case 1:
+		if (PageReserved(page))
+			break;
+		retval = 1;
+	}
+	return retval;
+}
+
+/*
  * Work out if there are any other processes sharing this
  * swap cache page. Free it if you can. Return success.
  */
@@ -252,6 +310,7 @@ int remove_exclusive_swap_page(struct page *page)
 		spin_lock(&pagecache_lock);
 		if (page_count(page) - !!page->buffers == 2) {
 			__delete_from_swap_cache(page);
+			SetPageDirty(page);
 			retval = 1;
 		}
 		spin_unlock(&pagecache_lock);

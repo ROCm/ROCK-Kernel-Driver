@@ -361,7 +361,7 @@ void __run_task_queue(task_queue *list)
 
 static int ksoftirqd(void * __bind_cpu)
 {
-	int bind_cpu = *(int *) __bind_cpu;
+	int bind_cpu = (int) (long) __bind_cpu;
 	int cpu = cpu_logical_map(bind_cpu);
 
 	daemonize();
@@ -401,7 +401,7 @@ static __init int spawn_ksoftirqd(void)
 	int cpu;
 
 	for (cpu = 0; cpu < smp_num_cpus; cpu++) {
-		if (kernel_thread(ksoftirqd, (void *) &cpu,
+		if (kernel_thread(ksoftirqd, (void *) (long) cpu,
 				  CLONE_FS | CLONE_FILES | CLONE_SIGNAL) < 0)
 			printk("spawn_ksoftirqd() failed for cpu %d\n", cpu);
 		else {

@@ -137,14 +137,10 @@ static void __free_pages_ok (struct page *page, unsigned int order)
 	return;
 
  local_freelist:
-	/*
-	 * This is a little subtle: if the allocation order
-	 * wanted is major than zero we'd better take all the pages
-	 * local since we must deal with fragmentation too and we
-	 * can't rely on the nr_local_pages information.
-	 */
-	if (current->nr_local_pages && !current->allocation_order)
+	if (current->nr_local_pages)
 		goto back_local_freelist;
+	if (in_interrupt())
+		goto back_local_freelist;		
 
 	list_add(&page->list, &current->local_pages);
 	page->index = order;

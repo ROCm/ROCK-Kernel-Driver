@@ -141,17 +141,21 @@ static inline int sync_page(struct page *page)
 /*
  * Add a page to the dirty page list.
  */
-void __set_page_dirty(struct page *page)
+void set_page_dirty(struct page *page)
 {
-	struct address_space *mapping = page->mapping;
+	if (!test_and_set_bit(PG_dirty, &page->flags)) {
+		struct address_space *mapping = page->mapping;
 
-	spin_lock(&pagecache_lock);
-	list_del(&page->list);
-	list_add(&page->list, &mapping->dirty_pages);
-	spin_unlock(&pagecache_lock);
+		if (mapping) {
+			spin_lock(&pagecache_lock);
+			list_del(&page->list);
+			list_add(&page->list, &mapping->dirty_pages);
+			spin_unlock(&pagecache_lock);
 
-	if (mapping->host)
-		mark_inode_dirty_pages(mapping->host);
+			if (mapping->host)
+				mark_inode_dirty_pages(mapping->host);
+		}
+	}
 }
 
 /**
@@ -769,6 +773,17 @@ void ___wait_on_page(struct page *page)
 	} while (PageLocked(page));
 	tsk->state = TASK_RUNNING;
 	remove_wait_queue(&page->wait, &wait);
+}
+
+void unlock_page(struct page *page)
+{
+	clear_bit(PG_launder, &(page)->flags);
+	smp_mb__before_clear_bit();
+	if (!test_and_clear_bit(PG_locked, &(page)->flags))
+		BUG();
+	smp_mb__after_clear_bit(); 
+	if (waitqueue_active(&(page)->wait))
+	wake_up(&(page)->wait);
 }
 
 /*
@@ -1837,8 +1852,7 @@ static inline int filemap_sync_pte(pte_t * ptep, struct vm_area_struct *vma,
 		struct page *page = pte_page(pte);
 		if (VALID_PAGE(page) && !PageReserved(page) && ptep_test_and_clear_dirty(ptep)) {
 			flush_tlb_page(vma, address);
-			if (page->mapping)
-				set_page_dirty(page);
+			set_page_dirty(page);
 		}
 	}
 	return 0;
