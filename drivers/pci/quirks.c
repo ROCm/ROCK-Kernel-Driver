@@ -219,7 +219,7 @@ static void __devinit quirk_io_region(struct pci_dev *dev, unsigned region, unsi
 	if (region) {
 		struct resource *res = dev->resource + nr;
 
-		res->name = dev->dev.name;
+		res->name = pci_name(dev);
 		res->start = region;
 		res->end = region + size - 1;
 		res->flags = IORESOURCE_IO;
