@@ -64,5 +64,5 @@ int cpu_idle(void)
 			ppc_md.idle();
 		else
 			default_idle();
-	return 0; 
+	return 0;
 }

@@ -1,7 +1,7 @@
 /*
  * This file contains the routines setting up the linux page tables.
  *  -- paulus
- * 
+ *
  *  Derived from arch/ppc/mm/init.c:
  *    Copyright (C) 1995-1996 Gary Thomas (gdt@linuxppc.org)
  *
@@ -189,7 +189,7 @@ __ioremap(phys_addr_t addr, unsigned long size, unsigned long flags)
 	 */
 	if ((v = p_mapped_by_bats(p)) /*&& p_mapped_by_bats(p+size-1)*/ )
 		goto out;
-	
+
 	if (mem_init_done) {
 		struct vm_struct *area;
 		area = get_vm_area(size, VM_IOREMAP);
@@ -366,7 +366,7 @@ unsigned long iopa(unsigned long addr)
 		mm = current->mm;
 	else
 		mm = &init_mm;
-	
+
 	pa = 0;
 	if (get_pteptr(mm, addr, &pte)) {
 		pa = (pte_val(*pte) & PAGE_MASK) | (addr & ~PAGE_MASK);
@@ -401,7 +401,7 @@ mm_ptov (unsigned long paddr)
 				goto exit;
 			}
 		}
-		
+	
 		ret = (unsigned long) __va(paddr);
 	}
 exit:

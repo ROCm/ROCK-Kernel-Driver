@@ -1,6 +1,6 @@
 /*
  * arch/ppc/platforms/mcpn765.h
- * 
+ *
  * Definitions for Motorola MCG MCPN765 cPCI Board.
  *
  * Author: Mark A. Greer

@@ -181,7 +181,7 @@ struct cpu_spec	cpu_specs[] = {
 	32, 32,
 	__setup_cpu_750fx
     },
- 
+
     {	/* 740/750 (L2CR bit need fixup for 740) */
     	0xffff0000, 0x00080000, "740/750",
     	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_CAN_DOZE | CPU_FTR_USE_TB |
@@ -298,7 +298,7 @@ struct cpu_spec	cpu_specs[] = {
 	32, 32,
 	__setup_cpu_generic
     },
-#endif /* CLASSIC_PPC */    
+#endif /* CLASSIC_PPC */
 #ifdef CONFIG_PPC64BRIDGE
     {	/* Power3 */
     	0xffff0000, 0x00400000, "Power3 (630)",
@@ -328,7 +328,7 @@ struct cpu_spec	cpu_specs[] = {
 		128, 128,
 		__setup_cpu_power3
 	},
-#endif /* CONFIG_PPC64BRIDGE */    
+#endif /* CONFIG_PPC64BRIDGE */
 #ifdef CONFIG_8xx
     {	/* 8xx */
     	0xffff0000, 0x00500000, "8xx",

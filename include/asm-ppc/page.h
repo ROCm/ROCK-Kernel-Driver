@@ -106,27 +106,27 @@ extern unsigned long ppc_memoffset;
 #if defined(CONFIG_APUS) && !defined(MODULE)
 /* map phys->virtual and virtual->phys for RAM pages */
 static inline unsigned long ___pa(unsigned long v)
-{ 
+{
 	unsigned long p;
-	asm volatile ("1: addis %0, %1, %2;" 
+	asm volatile ("1: addis %0, %1, %2;"
 		      ".section \".vtop_fixup\",\"aw\";"
 		      ".align  1;"
 		      ".long   1b;"
 		      ".previous;"
-		      : "=r" (p) 
+		      : "=r" (p)
 		      : "b" (v), "K" (((-PAGE_OFFSET) >> 16) & 0xffff));
 
 	return p;
 }
 static inline void* ___va(unsigned long p)
-{ 
+{
 	unsigned long v;
-	asm volatile ("1: addis %0, %1, %2;" 
+	asm volatile ("1: addis %0, %1, %2;"
 		      ".section \".ptov_fixup\",\"aw\";"
 		      ".align  1;"
 		      ".long   1b;"
 		      ".previous;"
-		      : "=r" (v) 
+		      : "=r" (v)
 		      : "b" (p), "K" (((PAGE_OFFSET) >> 16) & 0xffff));
 
 	return (void*) v;

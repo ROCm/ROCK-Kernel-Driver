@@ -46,13 +46,13 @@ extern unsigned long pci_resource_to_bus(struct pci_dev *pdev, struct resource *
  * The PCI bus bridge can translate addresses issued by the processor(s)
  * into a different address on the PCI bus.  On 32-bit cpus, we assume
  * this mapping is 1-1, but on 64-bit systems it often isn't.
- * 
+ *
  * Obsolete ! Drivers should now use pci_resource_to_bus
  */
 extern unsigned long phys_to_bus(unsigned long pa);
 extern unsigned long pci_phys_to_bus(unsigned long pa, int busnr);
 extern unsigned long pci_bus_to_phys(unsigned int ba, int busnr);
-    
+
 /*
  * Dynamic DMA Mapping stuff
  * Originally stolen from i386 by ajoshi and updated by paulus
@@ -64,7 +64,7 @@ extern unsigned long pci_bus_to_phys(unsigned int ba, int busnr);
  * this boolean for bounce buffer decisions.
  */
 #define PCI_DMA_BUS_IS_PHYS	(1)
-	
+
 /* Allocate and map kernel buffer using consistent mode DMA for a device.
  * hwdev should be valid struct pci_dev pointer for PCI devices,
  * NULL for PCI-like buses (ISA, EISA).

@@ -67,7 +67,7 @@ ev64260_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin)
 	if (hose->index == 0) {
 		static char pci_irq_table[][4] =
 		/*
-		 *	PCI IDSEL/INTPIN->INTLINE 
+		 *	PCI IDSEL/INTPIN->INTLINE
 		 * 	   A   B   C   D
 		 */
 		{
@@ -81,7 +81,7 @@ ev64260_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin)
 	else {
 		static char pci_irq_table[][4] =
 		/*
-		 *	PCI IDSEL/INTPIN->INTLINE 
+		 *	PCI IDSEL/INTPIN->INTLINE
 		 * 	   A   B   C   D
 		 */
 		{

@@ -11,9 +11,9 @@
  * of_match structure
  * @ids: array of of device match structures to search in
  * @dev: the of device structure to match against
- * 
+ *
  * Used by a driver to check whether an of_device present in the
- * system is in its list of supported devices. 
+ * system is in its list of supported devices.
  */
 const struct of_match * of_match_device(const struct of_match *matches,
 					const struct of_device *dev)
@@ -38,13 +38,13 @@ const struct of_match * of_match_device(const struct of_match *matches,
 	return NULL;
 }
 
-static int of_platform_bus_match(struct device *dev, struct device_driver *drv) 
+static int of_platform_bus_match(struct device *dev, struct device_driver *drv)
 {
 	struct of_device * of_dev = to_of_device(dev);
 	struct of_platform_driver * of_drv = to_of_platform_driver(drv);
 	const struct of_match * matches = of_drv->match_table;
 
-	if (!matches) 
+	if (!matches)
 		return 0;
 
 	return of_match_device(matches, of_dev) != NULL;
@@ -192,11 +192,11 @@ int of_device_register(struct of_device *ofdev)
 	struct of_device **odprop;
 
 	BUG_ON(ofdev->node == NULL);
-	
+
 	odprop = (struct of_device **)get_property(ofdev->node, "linux,device", NULL);
 	if (!odprop) {
 		struct property *new_prop;
-		
+	
 		new_prop = kmalloc(sizeof(struct property) + sizeof(struct of_device *),
 			GFP_KERNEL);
 		if (new_prop == NULL)
@@ -236,7 +236,7 @@ struct of_device* of_platform_device_create(struct device_node *np, const char *
 {
 	struct of_device *dev;
 	u32 *reg;
-	
+
 	dev = kmalloc(sizeof(*dev), GFP_KERNEL);
 	if (!dev)
 		return NULL;

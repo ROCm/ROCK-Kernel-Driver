@@ -23,7 +23,7 @@
  * IBM Research, Austin Center for Low-Power Computing
  * bcbrock@us.ibm.com
  * March, 2002
- * 
+ *
  */
 
 #ifdef __KERNEL__
@@ -38,7 +38,7 @@
  * Data structure defining board information maintained by the standard boot
  * ROM on the IBM Beech board. An effort has been made to
  * keep the field names consistent with the 8xx 'bd_t' board info
- * structures.  
+ * structures.
  */
 
 typedef struct board_info {
@@ -146,7 +146,7 @@ typedef struct board_info {
    bank. The lower 16 MB are available for expansion devices.  The upper 16 MB
    are used for the "Linux" flash.
 
-   Partitioning information is for the benefit of the MTD driver.  See 
+   Partitioning information is for the benefit of the MTD driver.  See
    drivers/mtd/maps/ibm4xx.c. We currently allocate the lower 1 MB for a
    kernel, and the other 15 MB for a filesystem.
 

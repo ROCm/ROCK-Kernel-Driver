@@ -1,8 +1,8 @@
 /*
- * md.h: High speed xor_block operation for RAID4/5 
+ * md.h: High speed xor_block operation for RAID4/5
  *
  */
- 
+
 #ifdef __KERNEL__
 #ifndef __ASM_MD_H
 #define __ASM_MD_H

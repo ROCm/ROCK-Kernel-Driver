@@ -1,6 +1,6 @@
 /*
  * Multidata HERMES-PRO ( / SL ) board specific definitions
- * 
+ *
  * Copyright (c) 2000, 2001 Wolfgang Denk (wd@denx.de)
  */
 
@@ -8,7 +8,7 @@
 #define __MACH_HERMES_H
 
 #include <linux/config.h>
- 
+
 #include <asm/ppcboot.h>
 
 #define	HERMES_IMMR_BASE    0xFF000000	/* phys. addr of IMMR			*/

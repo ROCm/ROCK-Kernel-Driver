@@ -4,14 +4,14 @@
 #include <linux/device.h>
 #include <asm/prom.h>
 
-/* 
+/*
  * The of_platform_bus_type is a bus type used by drivers that do not
  * attach to a macio or similar bus but still use OF probing
  * mecanism
  */
 extern struct bus_type of_platform_bus_type;
 
-/* 
+/*
  * The of_device is a kind of "base class" that is a superset of
  * struct device for use by devices attached to an OF node and
  * probed using OF properties

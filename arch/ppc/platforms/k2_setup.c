@@ -148,7 +148,7 @@ k2_show_cpuinfo(struct seq_file *m)
 
 	k2_geo_bits = readb(K2_MSIZ_GEO_REG) & K2_GEO_ADR_MASK;
 	k2_system_slot = !(readb(K2_MISC_REG) & K2_SYS_SLOT_MASK);
-	seq_printf(m, "backplane\t: %s slot board", 
+	seq_printf(m, "backplane\t: %s slot board",
 		k2_system_slot ? "System" : "Non system");
 	seq_printf(m, "with geographical address %x\n",	k2_geo_bits);
 

@@ -1,6 +1,6 @@
 /*
  * arch/ppc/syslib/gt64260_common.c
- * 
+ *
  * Common routines for the Marvell/Galileo GT64260 (Discovery) host bridge,
  * interrupt controller, memory controller, serial controller, enet controller,
  * etc.
@@ -352,14 +352,14 @@ gt64260_bridge_init(gt64260_bridge_info_t *info)
 
 	/* Disable all the access control windows */
 	for (window=0; window<GT64260_PCI_ACC_CNTL_WINDOWS; window++) {
-		gt64260_pci_acc_cntl_set_window(0, window, 0, 0, 0, 0); 
-		gt64260_pci_acc_cntl_set_window(1, window, 0, 0, 0, 0); 
+		gt64260_pci_acc_cntl_set_window(0, window, 0, 0, 0, 0);
+		gt64260_pci_acc_cntl_set_window(1, window, 0, 0, 0, 0);
 	}
 
 	/* Disable all the PCI snoop regions */
 	for (window=0; window<GT64260_PCI_SNOOP_WINDOWS; window++) {
-		gt64260_pci_snoop_set_window(0, window, 0, 0, 0, 0); 
-		gt64260_pci_snoop_set_window(1, window, 0, 0, 0, 0); 
+		gt64260_pci_snoop_set_window(0, window, 0, 0, 0, 0);
+		gt64260_pci_snoop_set_window(1, window, 0, 0, 0, 0);
 	}
 
 	gt64260_pci_acc_cntl_set_window(0,
@@ -386,7 +386,7 @@ gt64260_bridge_init(gt64260_bridge_info_t *info)
 				     0x00000000,
 				     info->mem_size,
 				     GT64260_PCI_SNOOP_WB);
-					
+				
 	gt64260_pci_snoop_set_window(1,
 				     0,
 				     0x00000000,
@@ -1084,7 +1084,7 @@ gt64260_pci_slave_p2p_mem_set_window(struct pci_controller *hose,
 				     u32 other_bus_base_addr,
 				     u32 size)
 {
-	static u32 
+	static u32
 	pci_p2p_mem_windows[GT64260_PCI_BUSES][GT64260_PCI_P2P_MEM_WINDOWS][4]={
 		{ /* PCI 0 */
 			{ 2, 0x10,
@@ -1151,7 +1151,7 @@ gt64260_pci_slave_dac_scs_set_window(struct pci_controller *hose,
 				     u32 cpu_base_addr,
 				     u32 size)
 {
-	static u32 
+	static u32
 	pci_dac_scs_windows[GT64260_PCI_BUSES][GT64260_PCI_DAC_SCS_WINDOWS][5]={
 		{ /* PCI 0 */
 			{ 4, 0x10, 0x14,
@@ -1217,7 +1217,7 @@ gt64260_pci_slave_dac_cs_set_window(struct pci_controller *hose,
 				    u32 cpu_base_addr,
 				    u32 size)
 {
-	static u32 
+	static u32
 	pci_dac_cs_windows[GT64260_PCI_BUSES][GT64260_PCI_DAC_CS_WINDOWS][5] = {
 		{ /* PCI 0 */
 			{ 6, 0x10, 0x14,
@@ -1310,7 +1310,7 @@ gt64260_pci_slave_dac_p2p_mem_set_window(struct pci_controller *hose,
 				         u32 other_bus_base_addr,
 				         u32 size)
 {
-	static u32 
+	static u32
 	pci_dac_p2p_mem_windows[GT64260_PCI_BUSES][GT64260_PCI_DAC_P2P_MEM_WINDOWS][5] = {
 		{ /* PCI 0 */
 			{ 4, 0x20, 0x24,
@@ -1616,7 +1616,7 @@ gt64260_pci_exclude_device(u8 bus, u8 devfn)
  * gt64260_putc()
  *
  * Dump a character out the MPSC port for gt64260_mpsc_progress
- * this assumes the baud rate has already been set up and the 
+ * this assumes the baud rate has already been set up and the
  * MPSC initialized by the bootloader or firmware.
  */
 
@@ -1641,19 +1641,19 @@ puthex(unsigned long val){
 		val <<= 4;
 	}
 	gt_putc('\r');
-	gt_putc('\n');	
-	
+	gt_putc('\n');
+
 }
 
 
 void
 gt64260_mpsc_progress(char *s, unsigned short hex){
 	/* spit stuff out the 64260 mpsc */
-	
+
 	volatile char	c;
 	while ((c = *s++) != 0){
 		gt_putc(c);
-		if ( c == '\n' ) gt_putc('\r');	
+		if ( c == '\n' ) gt_putc('\r');
 	}
 	gt_putc('\n');
 	gt_putc('\r');

@@ -1,7 +1,7 @@
 #ifndef _PPC_MSGBUF_H
 #define _PPC_MSGBUF_H
 
-/* 
+/*
  * The msqid64_ds structure for the PPC architecture.
  */
 

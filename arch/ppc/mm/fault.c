@@ -1,7 +1,7 @@
 /*
  *  arch/ppc/mm/fault.c
  *
- *  PowerPC version 
+ *  PowerPC version
  *    Copyright (C) 1995-1996 Gary Thomas (gdt@linuxppc.org)
  *
  *  Derived from "arch/i386/mm/fault.c"
@@ -201,7 +201,7 @@ good_area:
                 /* Guarded storage error. */
 		goto bad_area;
 #endif /* CONFIG_8xx */
-	
+
 	/* a write */
 	if (is_write) {
 		if (!(vma->vm_flags & VM_WRITE))
@@ -281,7 +281,7 @@ good_area:
 
 bad_area:
 	up_read(&mm->mmap_sem);
-	pte_errors++;	
+	pte_errors++;
 
 	/* User mode accesses cause a SIGSEGV */
 	if (user_mode(regs)) {
@@ -379,7 +379,7 @@ pte_t *va_to_pte(unsigned long address)
 unsigned long va_to_phys(unsigned long address)
 {
 	pte_t *pte;
-	
+
 	pte = va_to_pte(address);
 	if (pte)
 		return(((unsigned long)(pte_val(*pte)) & PAGE_MASK) | (address & ~(PAGE_MASK)));
@@ -402,7 +402,7 @@ print_8xx_pte(struct mm_struct *mm, unsigned long addr)
                         if (pte) {
                                 printk(" (0x%08lx)->(0x%08lx)->0x%08lx\n",
                                         (long)pgd, (long)pte, (long)pte_val(*pte));
-#define pp ((long)pte_val(*pte))				
+#define pp ((long)pte_val(*pte))			
 				printk(" RPN: %05lx PP: %lx SPS: %lx SH: %lx "
 				       "CI: %lx v: %lx\n",
 				       pp>>12,    /* rpn */
@@ -412,7 +412,7 @@ print_8xx_pte(struct mm_struct *mm, unsigned long addr)
 				       (pp>>1)&1, /* cache inhibit */
 				       pp&1       /* valid */
 				       );
-#undef pp				
+#undef pp			
                         }
                         else {
                                 printk("no pte\n");

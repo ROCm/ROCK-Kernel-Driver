@@ -75,7 +75,7 @@ static __inline__ void __FD_CLR(unsigned long fd, __kernel_fd_set *fdsetp)
 
 #undef __FD_ISSET
 static __inline__ int __FD_ISSET(unsigned long fd, __kernel_fd_set *p)
-{ 
+{
 	unsigned long _tmp = fd / __NFDBITS;
 	unsigned long _rem = fd % __NFDBITS;
 	return (p->fds_bits[_tmp] & (1UL<<_rem)) != 0;

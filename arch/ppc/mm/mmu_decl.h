@@ -1,7 +1,7 @@
 /*
  * Declarations of procedures and variables shared between files
  * in arch/ppc/mm/.
- * 
+ *
  *  Derived from arch/ppc/mm/init.c:
  *    Copyright (C) 1995-1996 Gary Thomas (gdt@linuxppc.org)
  *

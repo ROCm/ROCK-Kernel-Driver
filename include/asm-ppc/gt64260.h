@@ -1,6 +1,6 @@
 /*
  * include/asm-ppc/gt64260.h
- * 
+ *
  * Prototypes, etc. for the Marvell/Galileo GT64260 host bridge routines.
  *
  * Author: Mark A. Greer <mgreer@mvista.com>
@@ -206,7 +206,7 @@ extern inline void gt_modify(uint32_t offs, uint32_t data, uint32_t mask)
 	gt_write(offs, reg);
 }
 #endif
-#define	gt_set_bits(offs, bits) gt_modify(offs, ~0, bits) 
+#define	gt_set_bits(offs, bits) gt_modify(offs, ~0, bits)
 
 #define	gt_clr_bits(offs, bits) gt_modify(offs, 0, bits)
 

@@ -1,7 +1,7 @@
 #ifndef _PPC_SEMBUF_H
 #define _PPC_SEMBUF_H
 
-/* 
+/*
  * The semid64_ds structure for PPC architecture.
  */
 

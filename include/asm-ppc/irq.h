@@ -48,7 +48,7 @@ extern void enable_irq(unsigned int);
  *
  */
 
-#define	NR_AIC_IRQS 32 
+#define	NR_AIC_IRQS 32
 #define	NR_IRQS	 (NR_AIC_IRQS + NR_BOARD_IRQS)
 
 #elif !defined (CONFIG_403)
@@ -89,7 +89,7 @@ irq_canonicalize(int irq)
  * possible level sensitive interrupts assigned and generated internally
  * from such devices as CPM, PCMCIA, RTC, PIT, TimeBase and Decrementer.
  * There are eight external interrupts (IRQs) that can be configured
- * as either level or edge sensitive. 
+ * as either level or edge sensitive.
  *
  * On some implementations, there is also the possibility of an 8259
  * through the PCI and PCI-ISA bridges.

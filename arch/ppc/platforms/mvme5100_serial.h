@@ -1,6 +1,6 @@
 /*
  * include/asm-ppc/mvme5100_serial.h
- * 
+ *
  * Definitions for Motorola MVME5100 support
  *
  * Author: Matt Porter <mporter@mvista.com>

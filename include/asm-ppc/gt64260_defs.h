@@ -1,6 +1,6 @@
 /*
  * include/asm-ppc/gt64260_defs.h
- * 
+ *
  * Register definitions for the Marvell/Galileo GT64260 host bridge.
  *
  * Author: Mark A. Greer <mgreer@mvista.com>

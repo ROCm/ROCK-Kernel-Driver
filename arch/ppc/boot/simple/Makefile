@@ -122,7 +122,7 @@ LD_ARGS				:= -T $(boot)/ld.script \
 OBJCOPY_ARGS			:= -O elf32-powerpc
 
 # head.o and relocate.o must be at the start.
-boot-y				:= head.o relocate.o $(extra.o-y) $(misc-y) 
+boot-y				:= head.o relocate.o $(extra.o-y) $(misc-y)
 boot-$(CONFIG_40x)		+= embed_config.o
 boot-$(CONFIG_8xx)		+= embed_config.o
 boot-$(CONFIG_8260)		+= embed_config.o

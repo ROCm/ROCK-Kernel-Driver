@@ -3,7 +3,7 @@
  *
  *  $Id: hashtable.S,v 1.6 1999/10/08 01:56:15 paulus Exp $
  *
- *  PowerPC version 
+ *  PowerPC version
  *    Copyright (C) 1995-1996 Gary Thomas (gdt@linuxppc.org)
  *  Rewritten by Cort Dougan (cort@cs.nmt.edu) for PReP
  *    Copyright (C) 1996 Cort Dougan <cort@cs.nmt.edu>
@@ -20,7 +20,7 @@
  *  modify it under the terms of the GNU General Public License
  *  as published by the Free Software Foundation; either version
  *  2 of the License, or (at your option) any later version.
- *	
+ *
  */
 
 #include <linux/config.h>
@@ -150,7 +150,7 @@ retry:
 	lwz	r7,GPR7(r11)
 	lwz	r8,GPR8(r11)
 	b	fast_exception_return
-	
+
 #ifdef CONFIG_SMP
 hash_page_out:
 	eieio
