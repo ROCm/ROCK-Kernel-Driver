@@ -2406,11 +2406,16 @@ static irqreturn_t s2io_isr(int irq, void *dev_id, struct pt_regs *regs)
  * reallocate the buffers.
  */
 #if 1
+	{
+	int i;
+
 	for (i = 0; i < config->RxRingNum; i++) {
 		int rxb_size = atomic_read(&sp->rx_bufs_left[i]);
 		int level = rx_buffer_level(sp, rxb_size, i);
 
 		if ((level == PANIC) && (!TASKLET_IN_USE)) {
+			int ret;
+
 			DBG_PRINT(ERR_DBG, "%s: Rx BD hit ", dev->name);
 			DBG_PRINT(ERR_DBG, "PANIC levels\n");
 			if ((ret = fill_rx_buffers(sp, i)) == -ENOMEM) {
@@ -2428,6 +2433,8 @@ static irqreturn_t s2io_isr(int irq, void *dev_id, struct pt_regs *regs)
 			   && (!atomic_read(&sp->tasklet_status))) {
 			tasklet_schedule(&sp->task);
 		}
+
+	}
 
 	}
 #else
