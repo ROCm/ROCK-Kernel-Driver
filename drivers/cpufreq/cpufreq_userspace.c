@@ -498,9 +498,9 @@ static int cpufreq_governor_userspace(struct cpufreq_policy *policy,
 	unsigned int cpu = policy->cpu;
 	switch (event) {
 	case CPUFREQ_GOV_START:
-		if ((!cpu_online(cpu)) || (!try_module_get(THIS_MODULE)) ||
-		    !policy->cur)
+		if ((!cpu_online(cpu)) || (!try_module_get(THIS_MODULE)))
 			return -EINVAL;
+		BUG_ON(!policy->cur);
 		down(&userspace_sem);
 		cpu_is_managed[cpu] = 1;		
 		cpu_min_freq[cpu] = policy->min;
@@ -551,7 +551,7 @@ static void cpufreq_sa11x0_compat(void)
 #endif
 
 
-static struct cpufreq_governor cpufreq_gov_userspace = {
+struct cpufreq_governor cpufreq_gov_userspace = {
 	.name		= "userspace",
 	.governor	= cpufreq_governor_userspace,
 	.owner		= THIS_MODULE,
@@ -587,5 +587,5 @@ MODULE_AUTHOR ("Dominik Brodowski <linux@brodo.de>, Russell King <rmk@arm.linux.
 MODULE_DESCRIPTION ("CPUfreq policy governor 'userspace'");
 MODULE_LICENSE ("GPL");
 
-module_init(cpufreq_gov_userspace_init);
+fs_initcall(cpufreq_gov_userspace_init);
 module_exit(cpufreq_gov_userspace_exit);
