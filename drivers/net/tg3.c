@@ -149,6 +149,8 @@ static struct pci_device_id tg3_pci_tbl[] __devinitdata = {
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
 	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5703,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5704,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
 	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5702FE,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
 	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5702X,
@@ -407,7 +409,6 @@ static int tg3_set_power_state(struct tg3 *tp, int state)
 		tr32(GRC_LOCAL_CTRL);
 		udelay(100);
 
-		tg3_writephy(tp, MII_TG3_AUX_CTRL, 0x02);
 		return 0;
 
 	case 1:
@@ -872,6 +873,8 @@ static int tg3_setup_copper_phy(struct tg3 *tp)
 	tw32(MAC_MI_MODE, tp->mi_mode);
 	tr32(MAC_MI_MODE);
 	udelay(40);
+
+	tg3_writephy(tp, MII_TG3_AUX_CTRL, 0x02);
 
 	if ((tp->phy_id & PHY_ID_MASK) == PHY_ID_BCM5401) {
 		tg3_readphy(tp, MII_BMSR, &bmsr);
@@ -3111,9 +3114,11 @@ static void tg3_chip_reset(struct tg3 *tp)
 			       tp->misc_host_ctrl);
 
 	/* Set MAX PCI retry to zero. */
-	pci_write_config_dword(tp->pdev, TG3PCI_PCISTATE,
-			       (PCISTATE_ROM_ENABLE |
-				PCISTATE_ROM_RETRY_ENABLE));
+	val = (PCISTATE_ROM_ENABLE | PCISTATE_ROM_RETRY_ENABLE);
+	if (tp->pci_chip_rev_id == CHIPREV_ID_5704_A0 &&
+	    (tp->tg3_flags & TG3_FLAG_PCIX_MODE))
+		val |= PCISTATE_RETRY_SAME_DMA;
+	pci_write_config_dword(tp->pdev, TG3PCI_PCISTATE, val);
 
 	pci_restore_state(tp->pdev, tp->pci_cfg_state);
 
@@ -3128,11 +3133,33 @@ static void tg3_chip_reset(struct tg3 *tp)
 }
 
 /* tp->lock is held. */
+static void tg3_stop_fw(struct tg3 *tp)
+{
+	if (tp->tg3_flags & TG3_FLAG_ENABLE_ASF) {
+		u32 val;
+		int i;
+
+		tg3_write_mem(tp, NIC_SRAM_FW_CMD_MBOX, FWCMD_NICDRV_PAUSE_FW);
+		val = tr32(GRC_RX_CPU_EVENT);
+		val |= (1 << 14);
+		tw32(GRC_RX_CPU_EVENT, val);
+
+		/* Wait for RX cpu to ACK the event.  */
+		for (i = 0; i < 100; i++) {
+			if (!(tr32(GRC_RX_CPU_EVENT) & (1 << 14)))
+				break;
+			udelay(1);
+		}
+	}
+}
+
+/* tp->lock is held. */
 static int tg3_halt(struct tg3 *tp)
 {
 	u32 val;
 	int i;
 
+	tg3_stop_fw(tp);
 	tg3_abort_hw(tp);
 	tg3_chip_reset(tp);
 	tg3_write_mem(tp,
@@ -3151,6 +3178,17 @@ static int tg3_halt(struct tg3 *tp)
 		       tp->dev->name, val);
 		return -ENODEV;
 	}
+
+	if (tp->tg3_flags & TG3_FLAG_ENABLE_ASF) {
+		if (tp->tg3_flags & TG3_FLAG_WOL_ENABLE)
+			tg3_write_mem(tp, NIC_SRAM_FW_DRV_STATE_MBOX,
+				      DRV_STATE_WOL);
+		else
+			tg3_write_mem(tp, NIC_SRAM_FW_DRV_STATE_MBOX,
+				      DRV_STATE_UNLOAD);
+	} else
+		tg3_write_mem(tp, NIC_SRAM_FW_DRV_STATE_MBOX,
+			      DRV_STATE_SUSPEND);
 
 	return 0;
 }
@@ -3849,6 +3887,8 @@ static int tg3_reset_hw(struct tg3 *tp)
 
 	tg3_disable_ints(tp);
 
+	tg3_stop_fw(tp);
+
 	if (tp->tg3_flags & TG3_FLAG_INIT_COMPLETE) {
 		err = tg3_abort_hw(tp);
 		if (err)
@@ -3883,6 +3923,13 @@ static int tg3_reset_hw(struct tg3 *tp)
 		return -ENODEV;
 	}
 
+	if (tp->tg3_flags & TG3_FLAG_ENABLE_ASF)
+		tg3_write_mem(tp, NIC_SRAM_FW_DRV_STATE_MBOX,
+			      DRV_STATE_START);
+	else
+		tg3_write_mem(tp, NIC_SRAM_FW_DRV_STATE_MBOX,
+			      DRV_STATE_SUSPEND);
+
 	/* This works around an issue with Athlon chipsets on
 	 * B3 tigon3 silicon.  This bit has no effect on any
 	 * other revision.
@@ -3891,6 +3938,13 @@ static int tg3_reset_hw(struct tg3 *tp)
 	val |= CLOCK_CTRL_DELAY_PCI_GRANT;
 	tw32(TG3PCI_CLOCK_CTRL, val);
 	tr32(TG3PCI_CLOCK_CTRL);
+
+	if (tp->pci_chip_rev_id == CHIPREV_ID_5704_A0 &&
+	    (tp->tg3_flags & TG3_FLAG_PCIX_MODE)) {
+		val = tr32(TG3PCI_PCISTATE);
+		val |= PCISTATE_RETRY_SAME_DMA;
+		tw32(TG3PCI_PCISTATE, val);
+	}
 
 	/* Clear statistics/status block in chip, and status block in ram. */
 	for (i = NIC_SRAM_STATS_BLK;
@@ -3929,7 +3983,10 @@ static int tg3_reset_hw(struct tg3 *tp)
 
 	/* Initialize MBUF/DESC pool. */
 	tw32(BUFMGR_MB_POOL_ADDR, NIC_SRAM_MBUF_POOL_BASE);
-	tw32(BUFMGR_MB_POOL_SIZE, NIC_SRAM_MBUF_POOL_SIZE);
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704)
+		tw32(BUFMGR_MB_POOL_SIZE, NIC_SRAM_MBUF_POOL_SIZE64);
+	else
+		tw32(BUFMGR_MB_POOL_SIZE, NIC_SRAM_MBUF_POOL_SIZE96);
 	tw32(BUFMGR_DMA_DESC_POOL_ADDR, NIC_SRAM_DMA_DESC_POOL_BASE);
 	tw32(BUFMGR_DMA_DESC_POOL_SIZE, NIC_SRAM_DMA_DESC_POOL_SIZE);
 
@@ -4195,11 +4252,25 @@ static int tg3_reset_hw(struct tg3 *tp)
 	tr32(WDMAC_MODE);
 	udelay(40);
 
-	tw32(RDMAC_MODE, (RDMAC_MODE_ENABLE | RDMAC_MODE_TGTABORT_ENAB |
-			  RDMAC_MODE_MSTABORT_ENAB | RDMAC_MODE_PARITYERR_ENAB |
-			  RDMAC_MODE_ADDROFLOW_ENAB | RDMAC_MODE_FIFOOFLOW_ENAB |
-			  RDMAC_MODE_FIFOURUN_ENAB | RDMAC_MODE_FIFOOREAD_ENAB |
-			  RDMAC_MODE_LNGREAD_ENAB));
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704 &&
+	    (tp->tg3_flags & TG3_FLAG_PCIX_MODE)) {
+		val = tr32(TG3PCI_X_CAPS);
+		val &= ~(PCIX_CAPS_SPLIT_MASK | PCIX_CAPS_BURST_MASK);
+		val |= (PCIX_CAPS_MAX_BURST_5704 << PCIX_CAPS_BURST_SHIFT);
+		if (tp->tg3_flags & TG3_FLAG_SPLIT_MODE)
+			val |= (tp->split_mode_max_reqs <<
+				PCIX_CAPS_SPLIT_SHIFT);
+		tw32(TG3PCI_X_CAPS, val);
+	}
+
+	val = (RDMAC_MODE_ENABLE | RDMAC_MODE_TGTABORT_ENAB |
+	       RDMAC_MODE_MSTABORT_ENAB | RDMAC_MODE_PARITYERR_ENAB |
+	       RDMAC_MODE_ADDROFLOW_ENAB | RDMAC_MODE_FIFOOFLOW_ENAB |
+	       RDMAC_MODE_FIFOURUN_ENAB | RDMAC_MODE_FIFOOREAD_ENAB |
+	       RDMAC_MODE_LNGREAD_ENAB);
+	if (tp->tg3_flags & TG3_FLAG_SPLIT_MODE)
+		val |= RDMAC_MODE_SPLIT_ENABLE;
+	tw32(RDMAC_MODE, val);
 	tr32(RDMAC_MODE);
 	udelay(40);
 
@@ -4392,6 +4463,21 @@ static void tg3_timer(unsigned long __opaque)
 		tp->timer_counter = tp->timer_multiplier;
 	}
 
+	/* Heartbeat is only sent once every 120 seconds.  */
+	if (!--tp->asf_counter) {
+		if (tp->tg3_flags & TG3_FLAG_ENABLE_ASF) {
+			u32 val;
+
+			tg3_write_mem(tp, NIC_SRAM_FW_CMD_MBOX, FWCMD_NICDRV_ALIVE);
+			tg3_write_mem(tp, NIC_SRAM_FW_CMD_LEN_MBOX, 4);
+			tg3_write_mem(tp, NIC_SRAM_FW_CMD_DATA_MBOX, 3);
+			val = tr32(GRC_RX_CPU_EVENT);
+			val |= (1 << 14);
+			tw32(GRC_RX_CPU_EVENT, val);
+		}
+		tp->asf_counter = tp->asf_multiplier;
+	}
+
 	spin_unlock(&tp->tx_lock);
 	spin_unlock_irq(&tp->lock);
 
@@ -4440,6 +4526,7 @@ static int tg3_open(struct net_device *dev)
 	} else {
 		tp->timer_offset = HZ / 10;
 		tp->timer_counter = tp->timer_multiplier = 10;
+		tp->asf_counter = tp->asf_multiplier = (10 * 120);
 
 		init_timer(&tp->timer);
 		tp->timer.expires = jiffies + tp->timer_offset;
@@ -5703,6 +5790,9 @@ static int __devinit tg3_phy_probe(struct tg3 *tp)
 		     tp->pci_chip_rev_id == CHIPREV_ID_5703_A2) &&
 		    (nic_cfg & NIC_SRAM_DATA_CFG_EEPROM_WP))
 			tp->tg3_flags |= TG3_FLAG_EEPROM_WRITE_PROT;
+
+		if (nic_cfg & NIC_SRAM_DATA_CFG_ASF_ENABLE)
+			tp->tg3_flags |= TG3_FLAG_ENABLE_ASF;
 	}
 
 	/* Now read the physical PHY_ID from the chip and verify
@@ -5768,6 +5858,11 @@ static int __devinit tg3_phy_probe(struct tg3 *tp)
 		tg3_writephy(tp, MII_TG3_AUX_CTRL, 0x0c00);
 		tg3_writephy(tp, MII_TG3_DSP_ADDRESS, 0x201f);
 		tg3_writephy(tp, MII_TG3_DSP_RW_PORT, 0x2aaa);
+	}
+
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704) {
+		tg3_writephy(tp, 0x1c, 0x8d68);
+		tg3_writephy(tp, 0x1c, 0x8d68);
 	}
 
 	/* Enable Ethernet@WireSpeed */
@@ -6085,8 +6180,15 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 	    grc_misc_cfg != GRC_MISC_CFG_BOARD_ID_5702FE &&
 	    grc_misc_cfg != GRC_MISC_CFG_BOARD_ID_5703 &&
 	    grc_misc_cfg != GRC_MISC_CFG_BOARD_ID_5703S &&
+	    grc_misc_cfg != GRC_MISC_CFG_BOARD_ID_5704 &&
 	    grc_misc_cfg != GRC_MISC_CFG_BOARD_ID_AC91002A1)
 		return -ENODEV;
+
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704 &&
+	    grc_misc_cfg == GRC_MISC_CFG_BOARD_ID_5704CIOBE) {
+		tp->tg3_flags |= TG3_FLAG_SPLIT_MODE;
+		tp->split_mode_max_reqs = SPLIT_MODE_5704_MAX_REQ;
+	}
 
 	/* ROFL, you should see Broadcom's driver code implementing
 	 * this, stuff like "if (a || b)" where a and b are always
@@ -6177,7 +6279,12 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 static int __devinit tg3_get_device_address(struct tg3 *tp)
 {
 	struct net_device *dev = tp->dev;
-	u32 hi, lo;
+	u32 hi, lo, mac_offset;
+
+	if (PCI_FUNC(tp->pdev->devfn) == 0)
+		mac_offset = 0x7c;
+	else
+		mac_offset = 0xcc;
 
 	/* First try to get it from MAC address mailbox. */
 	tg3_read_mem(tp, NIC_SRAM_MAC_ADDR_HIGH_MBOX, &hi);
@@ -6192,8 +6299,8 @@ static int __devinit tg3_get_device_address(struct tg3 *tp)
 		dev->dev_addr[5] = (lo >>  0) & 0xff;
 	}
 	/* Next, try NVRAM. */
-	else if (!tg3_nvram_read(tp, 0x7c, &hi) &&
-		 !tg3_nvram_read(tp, 0x80, &lo)) {
+	else if (!tg3_nvram_read(tp, mac_offset + 0, &hi) &&
+		 !tg3_nvram_read(tp, mac_offset + 4, &lo)) {
 		dev->dev_addr[0] = ((hi >> 16) & 0xff);
 		dev->dev_addr[1] = ((hi >> 24) & 0xff);
 		dev->dev_addr[2] = ((lo >>  0) & 0xff);
@@ -6321,16 +6428,26 @@ static int __devinit tg3_test_dma(struct tg3 *tp)
 			(0x7 << DMA_RWCTRL_READ_WATER_SHIFT) |
 			(0x0f << DMA_RWCTRL_MIN_DMA_SHIFT);
 	} else {
-		tp->dma_rwctrl =
-			(0x7 << DMA_RWCTRL_PCI_WRITE_CMD_SHIFT) |
-			(0x6 << DMA_RWCTRL_PCI_READ_CMD_SHIFT) |
-			(0x3 << DMA_RWCTRL_WRITE_WATER_SHIFT) |
-			(0x3 << DMA_RWCTRL_READ_WATER_SHIFT) |
-			(0x0f << DMA_RWCTRL_MIN_DMA_SHIFT);
+		if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704)
+			tp->dma_rwctrl =
+				(0x7 << DMA_RWCTRL_PCI_WRITE_CMD_SHIFT) |
+				(0x6 << DMA_RWCTRL_PCI_READ_CMD_SHIFT) |
+				(0x3 << DMA_RWCTRL_WRITE_WATER_SHIFT) |
+				(0x7 << DMA_RWCTRL_READ_WATER_SHIFT) |
+				(0x00 << DMA_RWCTRL_MIN_DMA_SHIFT);
+		else
+			tp->dma_rwctrl =
+				(0x7 << DMA_RWCTRL_PCI_WRITE_CMD_SHIFT) |
+				(0x6 << DMA_RWCTRL_PCI_READ_CMD_SHIFT) |
+				(0x3 << DMA_RWCTRL_WRITE_WATER_SHIFT) |
+				(0x3 << DMA_RWCTRL_READ_WATER_SHIFT) |
+				(0x0f << DMA_RWCTRL_MIN_DMA_SHIFT);
 
 		/* Wheee, some more chip bugs... */
 		if (tp->pci_chip_rev_id == CHIPREV_ID_5703_A1 ||
-		    tp->pci_chip_rev_id == CHIPREV_ID_5703_A2)
+		    tp->pci_chip_rev_id == CHIPREV_ID_5703_A2 ||
+		    tp->pci_chip_rev_id == CHIPREV_ID_5703_A3 ||
+		    tp->pci_chip_rev_id == CHIPREV_ID_5704_A0)
 			tp->dma_rwctrl |= DMA_RWCTRL_ONE_DMA;
 	}
 
@@ -6505,6 +6622,7 @@ static char * __devinit tg3_phy_string(struct tg3 *tp)
 	case PHY_ID_BCM5411:	return "5411";
 	case PHY_ID_BCM5701:	return "5701";
 	case PHY_ID_BCM5703:	return "5703";
+	case PHY_ID_BCM5704:	return "5704";
 	case PHY_ID_BCM8002:	return "8002";
 	case PHY_ID_SERDES:	return "serdes";
 	default:		return "unknown";

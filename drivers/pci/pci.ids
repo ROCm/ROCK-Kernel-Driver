@@ -5053,6 +5053,7 @@
 		14e4 000b  BCM5703 1000BaseTX
 		14e4 8009  BCM5703 1000BaseTX
 		14e4 800a  BCM5703 1000BaseTX
+	1648  NetXtreme BCM5704 Gigabit Ethernet
 	164d  NetXtreme BCM5702FE Gigabit Ethernet
 	16a6  NetXtreme BCM5702X Gigabit Ethernet
 	16a7  NetXtreme BCM5703X Gigabit Ethernet
