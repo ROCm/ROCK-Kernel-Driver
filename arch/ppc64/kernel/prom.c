@@ -1055,7 +1055,7 @@ void __init early_init_devtree(void *params)
 			rnd_mem_size <<= 1;
 
 		/* # pages / 2 */
-		pteg_count = (rnd_mem_size >> (12 + 1));
+		pteg_count = max(rnd_mem_size >> (12 + 1), 1UL << 11);
 
 		ppc64_pft_size = __ilog2(pteg_count << 7);
 	}
