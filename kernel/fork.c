@@ -1146,7 +1146,8 @@ fork_out:
 bad_fork_cleanup_namespace:
 	exit_namespace(p);
 bad_fork_cleanup_mm:
-	mmput(p->mm);
+	if (p->mm)
+		mmput(p->mm);
 bad_fork_cleanup_signal:
 	exit_signal(p);
 bad_fork_cleanup_sighand:
