@@ -1,10 +1,9 @@
 #
-# Makefile for BNEP protocol
+# Makefile for the Linux Bluetooth BNEP layer.
 #
 
-O_TARGET := bnep.o
+obj-$(CONFIG_BLUEZ_BNEP) += bnep.o
 
-obj-y	 := core.o sock.o netdev.o crc32.o
-obj-m    += $(O_TARGET)
+bnep-objs := core.o sock.o netdev.o crc32.o
 
 include $(TOPDIR)/Rules.make

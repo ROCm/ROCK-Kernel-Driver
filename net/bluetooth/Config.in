@@ -1,8 +1,9 @@
 #
-# Bluetooth configuration
+# Bluetooth subsystem configuration
 #
 
 if [ "$CONFIG_NET" != "n" ]; then
+
    mainmenu_option next_comment
    comment 'Bluetooth support'
    dep_tristate 'Bluetooth subsystem support' CONFIG_BLUEZ $CONFIG_NET
@@ -14,6 +15,7 @@ if [ "$CONFIG_NET" != "n" ]; then
       source net/bluetooth/bnep/Config.in
       source drivers/bluetooth/Config.in
    fi
+
    endmenu
 fi
 
