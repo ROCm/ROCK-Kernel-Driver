@@ -29,7 +29,6 @@
 
 #ifdef CONFIG_INET
 #include <net/inet_common.h>
-#include <linux/inet.h>
 #if defined(CONFIG_INET_AH) || defined(CONFIG_INET_AH_MODULE) || defined(CONFIG_INET6_AH) || defined(CONFIG_INET6_AH_MODULE)
 #include <net/ah.h>
 #endif
@@ -60,7 +59,6 @@ EXPORT_SYMBOL(destroy_EII_client);
 #endif
 
 #ifdef CONFIG_INET
-EXPORT_SYMBOL(in_aton);
 EXPORT_SYMBOL(ip_defrag);
 EXPORT_SYMBOL(inet_peer_idlock);
 
