@@ -72,19 +72,24 @@ MODULE_PARM(radio_nr, "i");
 #define BITS2FREQ(x)	((x) * FREQ_STEP - FREQ_IF)
 
 
-static int radio_open(struct video_device *, int);
-static int radio_ioctl(struct video_device *, unsigned int, void *);
-static void radio_close(struct video_device *);
+static int radio_ioctl(struct inode *inode, struct file *file,
+		       unsigned int cmd, void *arg);
 
-static struct video_device maxiradio_radio=
+static struct file_operations maxiradio_fops = {
+	owner:		THIS_MODULE,
+	open:           video_exclusive_open,
+	release:        video_exclusive_release,
+	ioctl:		video_generic_ioctl,
+	llseek:         no_llseek,
+};
+static struct video_device maxiradio_radio =
 {
 	owner:		THIS_MODULE,
 	name:		"Maxi Radio FM2000 radio",
 	type:		VID_TYPE_TUNER,
 	hardware:	VID_HARDWARE_SF16MI,
-	open:		radio_open,
-	close:		radio_close,
-	ioctl:		radio_ioctl,
+	fops:           &maxiradio_fops,
+	kernel_ioctl:	radio_ioctl,
 };
 
 static struct radio_device
@@ -169,149 +174,109 @@ static int get_tune(__u16 io)
 }
 
 
-inline static int radio_function(struct video_device *dev, 
+inline static int radio_function(struct video_device *dev,
 				 unsigned int cmd, void *arg)
 {
 	struct radio_device *card=dev->priv;
+
 	switch(cmd) {
 		case VIDIOCGCAP: {
-			struct video_capability v;
+			struct video_capability *v = arg;
 			
-			strcpy(v.name, "Maxi Radio FM2000 radio");
-			v.type=VID_TYPE_TUNER;
-			v.channels=v.audios=1;
-			v.maxwidth=v.maxheight=v.minwidth=v.minheight=0;
-			
-			if(copy_to_user(arg,&v,sizeof(v)))
-				return -EFAULT;
-				
+			memset(v,0,sizeof(*v));
+			strcpy(v->name, "Maxi Radio FM2000 radio");
+			v->type=VID_TYPE_TUNER;
+			v->channels=v->audios=1;
 			return 0;
 		}
 		case VIDIOCGTUNER: {
-			struct video_tuner v;
+			struct video_tuner *v = arg;
 			
-			if(copy_from_user(&v, arg,sizeof(v))!=0)
-				return -EFAULT;
-				
-			if(v.tuner)
+			if(v->tuner)
 				return -EINVAL;
 				
 			card->stereo = 0xffff * get_stereo(card->io);
 			card->tuned = 0xffff * get_tune(card->io);
 			
-			v.flags = VIDEO_TUNER_LOW | card->stereo;
-			v.signal = card->tuned;
+			v->flags = VIDEO_TUNER_LOW | card->stereo;
+			v->signal = card->tuned;
 			
-			strcpy(v.name, "FM");
+			strcpy(v->name, "FM");
 			
-			v.rangelow = FREQ_LO;
-			v.rangehigh = FREQ_HI;
-			v.mode = VIDEO_MODE_AUTO;
+			v->rangelow = FREQ_LO;
+			v->rangehigh = FREQ_HI;
+			v->mode = VIDEO_MODE_AUTO;
 			
-			if(copy_to_user(arg,&v, sizeof(v)))
-				return -EFAULT;
-				
-		  return 0;
+			return 0;
 		}
 		case VIDIOCSTUNER: {
-			struct video_tuner v;
-			
-			if(copy_from_user(&v, arg, sizeof(v)))
-				return -EFAULT;
-				
-			if(v.tuner!=0)
+			struct video_tuner *v = arg;
+			if(v->tuner!=0)
 				return -EINVAL;
-				
 			return 0;
 		}
 		case VIDIOCGFREQ: {
-			unsigned long tmp=card->freq;
+			unsigned long *freq = arg;
 			
-			if(copy_to_user(arg, &tmp, sizeof(tmp)))
-				return -EFAULT;
-				
+			*freq = card->freq;
 			return 0;
 		}
-		
 		case VIDIOCSFREQ: {
-			unsigned long tmp;
+			unsigned long *freq = arg;
 			
-			if(copy_from_user(&tmp, arg, sizeof(tmp)))
-				return -EFAULT;
-				
-			if ( tmp<FREQ_LO || tmp>FREQ_HI )
+			if (*freq < FREQ_LO || *freq > FREQ_HI)
 				return -EINVAL;
-				
-			card->freq = tmp;
-			
+			card->freq = *freq;
 			set_freq(card->io, FREQ2BITS(card->freq));
 			sleep_125ms();
-
 			return 0;
 		}
 		case VIDIOCGAUDIO: {	
-			struct video_audio v;
-			strcpy(v.name, "Radio");
-			v.audio=v.volume=v.bass=v.treble=v.balance=v.step=0;
-			v.flags=VIDEO_AUDIO_MUTABLE | card->muted;
-			v.mode=VIDEO_SOUND_STEREO;
-			if(copy_to_user(arg,&v, sizeof(v)))
-				return -EFAULT;
+			struct video_audio *v = arg;
+			memset(v,0,sizeof(*v));
+			strcpy(v->name, "Radio");
+			v->flags=VIDEO_AUDIO_MUTABLE | card->muted;
+			v->mode=VIDEO_SOUND_STEREO;
 			return 0;		
 		}
 		
 		case VIDIOCSAUDIO: {
-			struct video_audio v;
+			struct video_audio *v = arg;
 			
-			if(copy_from_user(&v, arg, sizeof(v)))
-				return -EFAULT;
-				
-			if(v.audio)
+			if(v->audio)
 				return -EINVAL;
-				
-			
-			card->muted = v.flags & VIDEO_AUDIO_MUTE;
-				
+			card->muted = v->flags & VIDEO_AUDIO_MUTE;
 			if(card->muted)
 				turn_power(card->io, 0);
 			else
 				set_freq(card->io, FREQ2BITS(card->freq));
-				
 			return 0;
 		}
-		
 		case VIDIOCGUNIT: {
-			struct video_unit v;
-			v.video=VIDEO_NO_UNIT;
-			v.vbi=VIDEO_NO_UNIT;
-			v.radio=dev->minor;
-			v.audio=0;
-			v.teletext=VIDEO_NO_UNIT;
-			if(copy_to_user(arg, &v, sizeof(v)))
-				return -EFAULT;
+			struct video_unit *v = arg;
+			
+			v->video=VIDEO_NO_UNIT;
+			v->vbi=VIDEO_NO_UNIT;
+			v->radio=dev->minor;
+			v->audio=0;
+			v->teletext=VIDEO_NO_UNIT;
 			return 0;		
 		}
 		default: return -ENOIOCTLCMD;
 	}
 }
 
-static int radio_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
+static int radio_ioctl(struct inode *inode, struct file *file,
+		       unsigned int cmd, void *arg)
 {
+	struct video_device *dev = video_devdata(file);
 	struct radio_device *card=dev->priv;
 	int ret;
+	
 	down(&card->lock);
 	ret = radio_function(dev, cmd, arg);
 	up(&card->lock);
 	return ret;
-}
-
-static int radio_open(struct video_device *dev, int flags)
-{
-	return 0;
-}
-
-static void radio_close(struct video_device *dev)
-{
 }
 
 MODULE_AUTHOR("Dimitromanolakis Apostolos, apdim@grecian.net");
