@@ -233,14 +233,7 @@ static const lookup_t service_table[] = {
 
 static int register_callback(struct pcmcia_socket *s, void (*handler)(void *, unsigned int), void * info)
 {
-	int error;
-
-	if (handler && !try_module_get(s->owner))
-		return -ENODEV;
-	error = s->ss_entry->register_callback(s, handler, info);
-	if (!handler)
-		module_put(s->owner);
-	return error;
+	return s->ss_entry->register_callback(s, handler, info);
 }
 
 static int get_socket_status(struct pcmcia_socket *s, int *val)
