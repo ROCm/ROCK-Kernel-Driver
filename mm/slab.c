@@ -2950,3 +2950,60 @@ void ptrinfo(unsigned long addr)
 
 	}
 }
+
+void *kzmalloc(size_t size, int gfp_flags)
+{
+	void *ret = kmalloc(size, gfp_flags);
+	if (ret)
+		memset(ret, 0, size);
+	return ret;
+}
+EXPORT_SYMBOL(kzmalloc);
+
+char *kstrdup(const char *p, int gfp_flags)
+{
+	char *ret = kmalloc(strlen(p) + 1, gfp_flags);
+	if (ret)
+		strcpy(ret, p);
+	return ret;
+}
+EXPORT_SYMBOL(kstrdup);
+
+char **kstrdup_vec(char **vec, int gfp_flags)
+{
+	char **ret;
+	int nr_strings;
+	int i;
+
+	for (nr_strings = 0; vec[nr_strings]; nr_strings++)
+		;
+	ret = kzmalloc((nr_strings + 1) * sizeof(*ret), gfp_flags);
+	if (ret == NULL)
+		goto enomem;
+	for (i = 0; i < nr_strings; i++) {
+		ret[i] = kstrdup(vec[i], gfp_flags);
+		if (ret[i] == NULL)
+			goto enomem;
+	}
+	ret[i] = NULL;
+	return ret;
+enomem:
+	kfree_strvec(ret);
+	return NULL;
+}
+EXPORT_SYMBOL(kstrdup_vec);
+
+void kfree_strvec(char **vec)
+{
+	char **p;
+
+	if (vec == NULL)
+		return;
+	p = vec;
+	while (*p) {
+		kfree(*p);
+		p++;
+	}
+	kfree(vec);
+}
+EXPORT_SYMBOL(kfree_strvec);

@@ -117,6 +117,11 @@ void ptrinfo(unsigned long addr);
 
 extern atomic_t slab_reclaim_pages;
 
+void *kzmalloc(size_t size, int gfp_flags);
+char *kstrdup(const char *p, int gfp_flags);
+char **kstrdup_vec(char **vec, int gfp_flags);
+void kfree_strvec(char **vec);
+
 #endif	/* __KERNEL__ */
 
 #endif	/* _LINUX_SLAB_H */
