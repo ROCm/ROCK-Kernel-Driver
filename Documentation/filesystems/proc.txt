@@ -948,120 +948,43 @@ program to load modules on demand.
 -----------------------------------------------
 
 The files  in  this directory can be used to tune the operation of the virtual
-memory (VM)  subsystem  of  the  Linux  kernel.  In addition, one of the files
-(bdflush) has some influence on disk usage.
+memory (VM)  subsystem  of  the  Linux  kernel.
 
-bdflush
--------
+dirty_background_ratio
+----------------------
 
-This file  controls  the  operation of the bdflush kernel daemon. It currently
-contains nine  integer  values,  six of which are actually used by the kernel.
-They are listed in table 2-2.
+Contains, as a percentage of total system memory, the number of pages at which
+the pdflush background writeback daemon will start writing out dirty data.
 
+dirty_async_ratio
+-----------------
 
-Table 2-2: Parameters in /proc/sys/vm/bdflush 
-..............................................................................
- Value      Meaning                                                            
- nfract     Percentage of buffer cache dirty to  activate bdflush              
- ndirty     Maximum number of dirty blocks to  write out per wake-cycle        
- nrefill    Number of clean buffers to try to obtain  each time we call refill 
- nref_dirt  buffer threshold for activating bdflush when trying to refill
-            buffers. 
- dummy      Unused                                                             
- age_buffer Time for normal buffer to age before we flush it                   
- age_super  Time for superblock to age before we flush it                      
- dummy      Unused                                                             
- dummy      Unused                                                             
-..............................................................................
+Contains, as a percentage of total system memory, the number of pages at which
+a process which is generating disk writes will itself start writing out dirty
+data.
 
-nfract
-------
+dirty_sync_ratio
+----------------
 
-This parameter  governs  the  maximum  number  of  dirty buffers in the buffer
-cache. Dirty means that the contents of the buffer still have to be written to
-disk (as  opposed  to  a  clean  buffer,  which  can just be forgotten about).
-Setting this  to  a  higher value means that Linux can delay disk writes for a
-long time, but it also means that it will have to do a lot of I/O at once when
-memory becomes short. A lower value will spread out disk I/O more evenly.
+Contains, as a percentage of total system memory, the number of pages at which
+a process which is generating disk writes will itself start writing out dirty
+data and waiting upon completion of that writeout.
 
-ndirty
-------
+dirty_writeback_centisecs
+-------------------------
 
-Ndirty gives the maximum number of dirty buffers that bdflush can write to the
-disk at  one  time.  A high value will mean delayed, bursty I/O, while a small
-value can lead to memory shortage when bdflush isn't woken up often enough.
+The pdflush writeback daemons will periodically wake up and write `old' data
+out to disk.  This tunable expresses the interval between those wakeups, in
+100'ths of a second.
 
-nrefill
--------
+dirty_expire_centisecs
+----------------------
 
-This is  the  number  of  buffers  that  bdflush  will add to the list of free
-buffers when  refill_freelist()  is  called.  It is necessary to allocate free
-buffers beforehand,  since  the  buffers  are  often  different sizes than the
-memory pages  and some bookkeeping needs to be done beforehand. The higher the
-number, the  more  memory  will be wasted and the less often refill_freelist()
-will need to run.
+This tunable is used to define when dirty data is old enough to be eligible
+for writeout by the pdflush daemons.  It is expressed in 100'ths of a second. 
+Data which has been dirty in-memory for longer than this interval will be
+written out next time a pdflush daemon wakes up.
 
-nref_dirt
----------
-
-When refill_freelist() comes across more than nref_dirt dirty buffers, it will
-wake up bdflush.
-
-age_buffer and age_super
-------------------------
-
-Finally, the age_buffer and age_super parameters govern the maximum time Linux
-waits before  writing  out  a  dirty buffer to disk. The value is expressed in
-jiffies (clockticks),  the  number of jiffies per second is 100. Age_buffer is
-the maximum age for data blocks, while age_super is for filesystems meta data.
-
-buffermem
----------
-
-The three  values  in  this  file  control  how much memory should be used for
-buffer memory.  The  percentage  is calculated as a percentage of total system
-memory.
-
-The values are:
-
-min_percent
------------
-
-This is  the  minimum  percentage  of  memory  that  should be spent on buffer
-memory.
-
-borrow_percent
---------------
-
-When Linux is short on memory, and the buffer cache uses more than it has been
-allotted, the  memory  management  (MM)  subsystem will prune the buffer cache
-more heavily than other memory to compensate.
-
-max_percent
------------
-
-This is the maximum amount of memory that can be used for buffer memory.
-
-freepages
----------
-
-This file contains three values: min, low and high:
-
-min
----
-When the  number  of  free  pages  in the system reaches this number, only the
-kernel can allocate more memory.
-
-low
----
-If the number of free pages falls below this point, the kernel starts swapping
-aggressively.
-
-high
-----
-The kernel  tries  to  keep  up to this amount of memory free; if memory falls
-below this point, the kernel starts gently swapping in the hopes that it never
-has to do really aggressive swapping.
 
 kswapd
 ------
@@ -1112,79 +1035,6 @@ malloc(), when in fact the system has enough memory for the program to run.
 On the  other  hand,  enabling this feature can cause you to run out of memory
 and thrash the system to death, so large and/or important servers will want to
 set this value to 0.
-
-pagecache
----------
-
-This file  does exactly the same job as buffermem, only this file controls the
-amount of memory allowed for memory mapping and generic caching of files.
-
-You don't  want  the  minimum level to be too low, otherwise your system might
-thrash when memory is tight or fragmentation is high.
-
-pagetable_cache
----------------
-
-The kernel  keeps a number of page tables in a per-processor cache (this helps
-a lot  on  SMP systems). The cache size for each processor will be between the
-low and the high value.
-
-On a  low-memory,  single  CPU system, you can safely set these values to 0 so
-you don't  waste  memory.  It  is  used  on SMP systems so that the system can
-perform fast  pagetable allocations without having to acquire the kernel memory
-lock.
-
-For large  systems,  the  settings  are probably fine. For normal systems they
-won't hurt  a  bit.  For  small  systems  (  less  than  16MB ram) it might be
-advantageous to set both values to 0.
-
-swapctl
--------
-
-This file  contains  no less than 8 variables. All of these values are used by
-kswapd.
-
-The first four variables
-* sc_max_page_age,
-* sc_page_advance,
-* sc_page_decline and
-* sc_page_initial_age
-are used  to  keep  track  of  Linux's page aging. Page aging is a bookkeeping
-method to  track  which pages of memory are often used, and which pages can be
-swapped out without consequences.
-
-When a  page  is  swapped in, it starts at sc_page_initial_age (default 3) and
-when the  page  is  scanned  by  kswapd,  its age is adjusted according to the
-following scheme:
-
-* If  the  page  was used since the last time we scanned, its age is increased
-  by sc_page_advance  (default  3).  Where  the  maximum  value  is  given  by
-  sc_max_page_age (default 20).
-* Otherwise  (meaning  it wasn't used) its age is decreased by sc_page_decline
-  (default 1).
-
-When a page reaches age 0, it's ready to be swapped out.
-
-The variables  sc_age_cluster_fract, sc_age_cluster_min, sc_pageout_weight and
-sc_bufferout_weight, can  be  used  to  control  kswapd's  aggressiveness  in
-swapping out pages.
-
-Sc_age_cluster_fract is used to calculate how many pages from a process are to
-be scanned by kswapd. The formula used is
-
-(sc_age_cluster_fract divided by 1024) times resident set size
-
-So if you want kswapd to scan the whole process, sc_age_cluster_fract needs to
-have a  value  of  1024.  The  minimum  number  of  pages  kswapd will scan is
-represented by sc_age_cluster_min, which is done so that kswapd will also scan
-small processes.
-
-The values  of  sc_pageout_weight  and sc_bufferout_weight are used to control
-how many  tries  kswapd  will make in order to swap out one page/buffer. These
-values can  be used to fine-tune the ratio between user pages and buffer/cache
-memory. When  you find that your Linux system is swapping out too many process
-pages in  order  to  satisfy  buffer  memory  demands,  you may want to either
-increase sc_bufferout_weight, or decrease the value of sc_pageout_weight.
 
 2.5 /proc/sys/dev - Device specific parameters
 ----------------------------------------------

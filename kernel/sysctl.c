@@ -31,6 +31,7 @@
 #include <linux/init.h>
 #include <linux/sysrq.h>
 #include <linux/highuid.h>
+#include <linux/writeback.h>
 
 #include <asm/uaccess.h>
 
@@ -264,6 +265,19 @@ static ctl_table vm_table[] = {
 	 &pager_daemon, sizeof(pager_daemon_t), 0644, NULL, &proc_dointvec},
 	{VM_PAGE_CLUSTER, "page-cluster", 
 	 &page_cluster, sizeof(int), 0644, NULL, &proc_dointvec},
+	{VM_DIRTY_BACKGROUND, "dirty_background_ratio",
+	&dirty_background_ratio, sizeof(dirty_background_ratio),
+	0644, NULL, &proc_dointvec},
+	{VM_DIRTY_ASYNC, "dirty_async_ratio", &dirty_async_ratio,
+	sizeof(dirty_async_ratio), 0644, NULL, &proc_dointvec},
+	{VM_DIRTY_SYNC, "dirty_sync_ratio", &dirty_sync_ratio,
+	sizeof(dirty_sync_ratio), 0644, NULL, &proc_dointvec},
+	{VM_DIRTY_WB_CS, "dirty_writeback_centisecs",
+	&dirty_writeback_centisecs, sizeof(dirty_writeback_centisecs), 0644,
+	NULL, &proc_dointvec},
+	{VM_DIRTY_EXPIRE_CS, "dirty_expire_centisecs",
+	&dirty_expire_centisecs, sizeof(dirty_expire_centisecs), 0644,
+	NULL, &proc_dointvec},
 	{0}
 };
 
