@@ -1669,16 +1669,15 @@ toshoboe_open (struct pci_dev *pci_dev, const struct pci_device_id *pdid)
 
   /*We need to align the taskfile on a taskfile size boundary */
   {
-    __u32 addr;
+    unsigned long addr;
 
-    addr = (__u32) self->ringbuf;
-    addr &= ~(OBOE_RING_LEN - 1);
+    addr = (unsigned long) self->ringbuf;
+    addr &= ~((unsigned long)OBOE_RING_LEN - 1);
     addr += OBOE_RING_LEN;
     self->ring = (struct OboeRing *) addr;
   }
 
   memset (self->ring, 0, OBOE_RING_LEN);
-  self->io.mem_base = (__u32) self->ring;
 
   ok = 1;
   for (i = 0; i < TX_SLOTS; ++i)
