@@ -825,7 +825,6 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 		init_completion(&(ss->notify));
 		init_MUTEX_LOCKED(&(ss->ip_waitq));
 		init_MUTEX(&(ss->irq_urb_sem));
-		init_MUTEX(&(ss->current_urb_sem));
 		init_MUTEX_LOCKED(&(ss->dev_semaphore));
 
 		/* copy over the subclass and protocol data */
