@@ -1535,8 +1535,11 @@ static int ub_bd_revalidate(struct gendisk *disk)
 
 	ub_revalidate(sc);
 	/* This is pretty much a long term P3 */
-	printk(KERN_INFO "%s: device %u capacity nsec %ld bsize %u\n",
-	    sc->name, sc->dev->devnum, sc->capacity.nsec, sc->capacity.bsize);
+	if (!atomic_read(&sc->poison)) {		/* Cover sc->dev */
+		printk(KERN_INFO "%s: device %u capacity nsec %ld bsize %u\n",
+		    sc->name, sc->dev->devnum,
+		    sc->capacity.nsec, sc->capacity.bsize);
+	}
 
 	/* XXX Support sector size switching like in sr.c */
 	blk_queue_hardsect_size(disk->queue, sc->capacity.bsize);
