@@ -9,11 +9,11 @@
 #define OV511_DEBUG	/* Turn on debug messages */
 
 #ifdef OV511_DEBUG
-#  define PDEBUG(level, fmt, args...) \
-if (debug >= (level)) info("[" __PRETTY_FUNCTION__ ":%d] " fmt, __LINE__ , \
-	## args)
+	#define PDEBUG(level, fmt, args...) \
+		if (debug >= (level)) info("[" __PRETTY_FUNCTION__ ":%d] " fmt,\
+		__LINE__ , ## args)
 #else
-#  define PDEBUG(level, fmt, args...) do {} while(0)
+	#define PDEBUG(level, fmt, args...) do {} while(0)
 #endif
 
 /* This macro restricts an int variable to an inclusive range */
@@ -36,98 +36,105 @@ if (debug >= (level)) info("[" __PRETTY_FUNCTION__ ":%d] " fmt, __LINE__ , \
 #define VEND_MATTEL	0x0813
 #define PROD_ME2CAM	0x0002
 
+/* --------------------------------- */
+/*     OV51x REGISTER MNEMONICS      */
+/* --------------------------------- */
+
 /* Camera interface register numbers */
-#define OV511_REG_CAMERA_DELAY_MODE		0x10
-#define OV511_REG_CAMERA_EDGE_MODE		0x11
-#define OV511_REG_CAMERA_CLAMPED_PIXEL_NUM	0x12
-#define OV511_REG_CAMERA_CLAMPED_LINE_NUM	0x13
-#define OV511_REG_CAMERA_PIXEL_DIVISOR		0x14
-#define OV511_REG_CAMERA_LINE_DIVISOR		0x15
-#define OV511_REG_CAMERA_DATA_INPUT_SELECT	0x16
-#define OV511_REG_CAMERA_RESERVED_LINE_MODE	0x17
-#define OV511_REG_CAMERA_BITMASK		0x18
+#define R511_CAM_DELAY		0x10
+#define R511_CAM_EDGE		0x11
+#define R511_CAM_PXCNT		0x12
+#define R511_CAM_LNCNT		0x13
+#define R511_CAM_PXDIV		0x14
+#define R511_CAM_LNDIV		0x15
+#define R511_CAM_UV_EN		0x16
+#define R511_CAM_LINE_MODE	0x17
+#define R511_CAM_OPTS		0x18
 
 /* Snapshot mode camera interface register numbers */
-#define OV511_REG_SNAP_CAPTURED_FRAME		0x19
-#define OV511_REG_SNAP_CLAMPED_PIXEL_NUM	0x1A
-#define OV511_REG_SNAP_CLAMPED_LINE_NUM		0x1B
-#define OV511_REG_SNAP_PIXEL_DIVISOR		0x1C
-#define OV511_REG_SNAP_LINE_DIVISOR		0x1D
-#define OV511_REG_SNAP_DATA_INPUT_SELECT	0x1E
-#define OV511_REG_SNAP_BITMASK			0x1F
+#define R511_SNAP_FRAME		0x19
+#define R511_SNAP_PXCNT		0x1A
+#define R511_SNAP_LNCNT		0x1B
+#define R511_SNAP_PXDIV		0x1C
+#define R511_SNAP_LNDIV		0x1D
+#define R511_SNAP_UV_EN		0x1E
+#define R511_SNAP_OPTS		0x1F
 
 /* DRAM register numbers */
-#define OV511_REG_DRAM_ENABLE_FLOW_CONTROL	0x20
-#define OV511_REG_DRAM_READ_CYCLE_PREDICT	0x21
-#define OV511_REG_DRAM_MANUAL_READ_CYCLE	0x22
-#define OV511_REG_DRAM_REFRESH_COUNTER		0x23
+#define R511_DRAM_FLOW_CTL	0x20
+#define R511_DRAM_ARCP		0x21
+#define R511_DRAM_MRC		0x22
+#define R511_DRAM_RFC		0x23
 
 /* ISO FIFO register numbers */
-#define OV511_REG_FIFO_PACKET_SIZE		0x30
-#define OV511_REG_FIFO_BITMASK			0x31
+#define R51x_FIFO_PSIZE		0x30	/* 2 bytes wide w/ OV518(+) */
+#define R511_FIFO_OPTS		0x31
 
-/* PIO register numbers */
-#define OV511_REG_PIO_BITMASK			0x38
-#define OV511_REG_PIO_DATA_PORT			0x39
-#define OV511_REG_PIO_BIST			0x3E
+/* Parallel IO register numbers */
+#define R511_PIO_OPTS		0x38
+#define R511_PIO_DATA		0x39
+#define R511_PIO_BIST		0x3E
+#define R518_GPIO_IN		0x55	/* OV518(+) only */
+#define R518_GPIO_OUT		0x56	/* OV518(+) only */
+#define R518_GPIO_CTL		0x57	/* OV518(+) only */
+#define R518_GPIO_PULSE_IN	0x58	/* OV518(+) only */
+#define R518_GPIO_PULSE_CLEAR	0x59	/* OV518(+) only */
+#define R518_GPIO_PULSE_POL	0x5a	/* OV518(+) only */
+#define R518_GPIO_PULSE_EN	0x5b	/* OV518(+) only */
+#define R518_GPIO_RESET		0x5c	/* OV518(+) only */
 
-/* I2C register numbers */
-#define OV511_REG_I2C_CONTROL			0x40
-#define OV518_REG_I2C_CONTROL			0x47	/* OV518(+) only */
-#define OV511_REG_I2C_SLAVE_ID_WRITE		0x41
-#define OV511_REG_I2C_SUB_ADDRESS_3_BYTE	0x42
-#define OV511_REG_I2C_SUB_ADDRESS_2_BYTE	0x43
-#define OV511_REG_I2C_SLAVE_ID_READ		0x44
-#define OV511_REG_I2C_DATA_PORT			0x45
-#define OV511_REG_I2C_CLOCK_PRESCALER		0x46
-#define OV511_REG_I2C_TIME_OUT_COUNTER		0x47
+/* I2C registers */
+#define R511_I2C_CTL		0x40
+#define R518_I2C_CTL		0x47	/* OV518(+) only */
+#define R51x_I2C_W_SID		0x41
+#define R51x_I2C_SADDR_3	0x42
+#define R51x_I2C_SADDR_2	0x43
+#define R51x_I2C_R_SID		0x44
+#define R51x_I2C_DATA		0x45
+#define R51x_I2C_CLOCK		0x46
+#define R51x_I2C_TIMEOUT	0x47
 
-/* I2C snapshot register numbers */
-#define OV511_REG_I2C_SNAP_SUB_ADDRESS		0x48
-#define OV511_REG_I2C_SNAP_DATA_PORT		0x49
+/* I2C snapshot registers */
+#define R511_SI2C_SADDR_3	0x48
+#define R511_SI2C_DATA		0x49
 
-/* System control register numbers */
-#define OV511_REG_SYSTEM_RESET			0x50
-#define 	OV511_RESET_UDC			0x01
-#define 	OV511_RESET_I2C			0x02
-#define 	OV511_RESET_FIFO		0x04
-#define 	OV511_RESET_OMNICE		0x08
-#define 	OV511_RESET_DRAM_INTF		0x10
-#define 	OV511_RESET_CAMERA_INTF		0x20
-#define 	OV511_RESET_OV511		0x40
-#define 	OV511_RESET_NOREGS		0x3F /* All but OV511 & regs */
-#define 	OV511_RESET_ALL			0x7F
-#define OV511_REG_SYSTEM_CLOCK_DIVISOR		0x51
-#define OV511_REG_SYSTEM_SNAPSHOT		0x52
-#define OV511_REG_SYSTEM_INIT         		0x53
-#define OV511_REG_SYSTEM_PWR_CLK		0x54 /* OV511+/OV518(+) only */
-#define OV511_REG_SYSTEM_LED_CTL		0x55	/* OV511+ only */
-#define OV518_REG_GPIO_IN			0x55	/* OV518(+) only */
-#define OV518_REG_GPIO_OUT			0x56	/* OV518(+) only */
-#define OV518_REG_GPIO_CTL			0x57	/* OV518(+) only */
-#define OV518_REG_GPIO_PULSE_IN			0x58	/* OV518(+) only */
-#define OV518_REG_GPIO_PULSE_CLEAR		0x59	/* OV518(+) only */
-#define OV518_REG_GPIO_PULSE_POLARITY		0x5a	/* OV518(+) only */
-#define OV518_REG_GPIO_PULSE_EN			0x5b	/* OV518(+) only */
-#define OV518_REG_GPIO_RESET			0x5c	/* OV518(+) only */
-#define OV511_REG_SYSTEM_USER_DEFINED		0x5E
-#define OV511_REG_SYSTEM_CUSTOM_ID		0x5F
+/* System control registers */
+#define R51x_SYS_RESET		0x50
+		/* Reset type definitions */
+#define 	OV511_RESET_UDC		0x01
+#define 	OV511_RESET_I2C		0x02
+#define 	OV511_RESET_FIFO	0x04
+#define 	OV511_RESET_OMNICE	0x08
+#define 	OV511_RESET_DRAM	0x10
+#define 	OV511_RESET_CAM_INT	0x20
+#define 	OV511_RESET_OV511	0x40
+#define 	OV511_RESET_NOREGS	0x3F /* All but OV511 & regs */
+#define 	OV511_RESET_ALL		0x7F
 
-/* OmniCE register numbers */
-#define OV511_OMNICE_PREDICTION_HORIZ_Y		0x70
-#define OV511_OMNICE_PREDICTION_HORIZ_UV	0x71
-#define OV511_OMNICE_PREDICTION_VERT_Y		0x72
-#define OV511_OMNICE_PREDICTION_VERT_UV		0x73
-#define OV511_OMNICE_QUANTIZATION_HORIZ_Y	0x74
-#define OV511_OMNICE_QUANTIZATION_HORIZ_UV	0x75
-#define OV511_OMNICE_QUANTIZATION_VERT_Y	0x76
-#define OV511_OMNICE_QUANTIZATION_VERT_UV	0x77
-#define OV511_OMNICE_ENABLE			0x78
-#define OV511_OMNICE_LUT_ENABLE			0x79		
-#define OV511_OMNICE_Y_LUT_BEGIN		0x80
-#define OV511_OMNICE_Y_LUT_END			0x9F
-#define OV511_OMNICE_UV_LUT_BEGIN		0xA0
-#define OV511_OMNICE_UV_LUT_END			0xBF
+#define R511_SYS_CLOCK_DIV	0x51
+#define R51x_SYS_SNAP		0x52
+#define R51x_SYS_INIT         	0x53
+#define R511_SYS_PWR_CLK	0x54 /* OV511+/OV518(+) only */
+#define R511_SYS_LED_CTL	0x55 /* OV511+ only */
+#define R511_SYS_USER		0x5E
+#define R511_SYS_CUST_ID	0x5F
+
+/* OmniCE (compression) registers */
+#define R511_COMP_PHY		0x70
+#define R511_COMP_PHUV		0x71
+#define R511_COMP_PVY		0x72
+#define R511_COMP_PVUV		0x73
+#define R511_COMP_QHY		0x74
+#define R511_COMP_QHUV		0x75
+#define R511_COMP_QVY		0x76
+#define R511_COMP_QVUV		0x77
+#define R511_COMP_EN		0x78
+#define R511_COMP_LUT_EN	0x79		
+#define R511_COMP_LUT_BEGIN	0x80
+
+/* --------------------------------- */
+/*         ALTERNATE NUMBERS         */
+/* --------------------------------- */
 
 /* Alternate numbers for various max packet sizes (OV511 only) */
 #define OV511_ALT_SIZE_992	0
@@ -158,6 +165,10 @@ if (debug >= (level)) info("[" __PRETTY_FUNCTION__ ":%d] " fmt, __LINE__ , \
 #define OV518_ALT_SIZE_640	5
 #define OV518_ALT_SIZE_768	6
 #define OV518_ALT_SIZE_896	7
+
+/* --------------------------------- */
+/*     OV7610 REGISTER MNEMONICS     */
+/* --------------------------------- */
 
 /* OV7610 registers */
 #define OV7610_REG_GAIN          0x00	/* gain setting (5:0) */
@@ -210,26 +221,27 @@ if (debug >= (level)) info("[" __PRETTY_FUNCTION__ ":%d] " fmt, __LINE__ , \
 					/* 36-37 reserved */
 #define OV7610_REG_COM_K         0x38	/* misc registers */
 
+/* --------------------------------- */
+/*           I2C ADDRESSES           */
+/* --------------------------------- */
+
+#define OV7xx0_SID   0x42
+#define OV6xx0_SID   0xC0
+#define OV8xx0_SID   0xA0
+#define KS0127_SID   0xD8
+#define SAA7111A_SID 0x48
+
+/* --------------------------------- */
+/*       MISCELLANEOUS DEFINES       */
+/* --------------------------------- */
+
+#define I2C_CLOCK_PRESCALER 	0x03
+
 #define FRAMES_PER_DESC		10	/* FIXME - What should this be? */
-#define FRAME_SIZE_PER_DESC	993	/* FIXME - Deprecated */
 #define MAX_FRAME_SIZE_PER_DESC	993	/* For statically allocated stuff */
 #define PIXELS_PER_SEG		256	/* Pixels per segment */
 
-#define OV511_ENDPOINT_ADDRESS 1	/* Isoc endpoint number */
-
-/* I2C addresses */
-#define OV7xx0_I2C_WRITE_ID   0x42
-#define OV7xx0_I2C_READ_ID    0x43
-#define OV6xx0_I2C_WRITE_ID   0xC0
-#define OV6xx0_I2C_READ_ID    0xC1
-#define OV8xx0_I2C_WRITE_ID   0xA0
-#define OV8xx0_I2C_READ_ID    0xA1
-#define KS0127_I2C_WRITE_ID   0xD8
-#define KS0127_I2C_READ_ID    0xD9
-#define SAA7111A_I2C_WRITE_ID 0x48
-#define SAA7111A_I2C_READ_ID  0x49
-
-#define OV511_I2C_CLOCK_PRESCALER 0x03
+#define OV511_ENDPOINT_ADDRESS	1	/* Isoc endpoint number */
 
 /* Bridge types */
 enum {
@@ -429,10 +441,13 @@ struct ov51x_decomp_ops {
 
 #define OV511_NUMFRAMES	2
 #if OV511_NUMFRAMES > VIDEO_MAX_FRAME
-#error "OV511_NUMFRAMES is too high"
+	#error "OV511_NUMFRAMES is too high"
 #endif
 
 #define OV511_NUMSBUF		2
+
+/* Control transfers use up to 4 bytes */
+#define OV511_CBUF_SIZE		4
 
 struct usb_ov511 {
 	struct video_device vdev;
@@ -535,6 +550,10 @@ struct usb_ov511 {
 	/* I2C interface to kernel */
 	struct semaphore i2c_lock;	  /* Protect I2C controller regs */
 	unsigned char primary_i2c_slave;  /* I2C write id of sensor */
+
+	/* Control transaction stuff */
+	unsigned char *cbuf;		/* Buffer for payload */
+	struct semaphore cbuf_lock;
 };
 
 struct cam_list {
