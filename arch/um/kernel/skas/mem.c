@@ -13,8 +13,13 @@ unsigned long set_task_sizes_skas(int arg, unsigned long *host_size_out,
 	/* Round up to the nearest 4M */
 	unsigned long top = ROUND_4M((unsigned long) &arg);
 
+#ifdef CONFIG_HOST_TASK_SIZE
+	*host_size_out = CONFIG_HOST_TASK_SIZE;
+	*task_size_out = CONFIG_HOST_TASK_SIZE;
+#else
 	*host_size_out = top;
 	*task_size_out = top;
+#endif
 	return(((unsigned long) set_task_sizes_skas) & ~0xffffff);
 }
 
