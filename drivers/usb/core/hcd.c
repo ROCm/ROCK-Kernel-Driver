@@ -418,9 +418,14 @@ static int rh_call_control (struct usb_hcd *hcd, struct urb *urb)
 
 	default:
 		/* non-generic request */
-		urb->status = hcd->driver->hub_control (hcd,
-			typeReq, wValue, wIndex,
-			ubuf, wLength);
+		if (HCD_IS_SUSPENDED (hcd->state))
+			urb->status = -EAGAIN;
+		else if (!HCD_IS_RUNNING (hcd->state))
+			urb->status = -ENODEV;
+		else
+			urb->status = hcd->driver->hub_control (hcd,
+				typeReq, wValue, wIndex,
+				ubuf, wLength);
 		break;
 error:
 		/* "protocol stall" on error */
