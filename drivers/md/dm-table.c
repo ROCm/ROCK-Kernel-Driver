@@ -78,22 +78,33 @@ static unsigned int int_log(unsigned long n, unsigned long base)
 	return result;
 }
 
-#define __HIGH(l, r) if (*(l) < (r)) *(l) = (r)
-#define __LOW(l, r) if (*(l) == 0 || *(l) > (r)) *(l) = (r)
+/*
+ * Returns the minimum that is _not_ zero, unless both are zero.
+ */
+#define min_not_zero(l, r) (l == 0) ? r : ((r == 0) ? l : min(l, r))
 
 /*
  * Combine two io_restrictions, always taking the lower value.
  */
-
 static void combine_restrictions_low(struct io_restrictions *lhs,
 				     struct io_restrictions *rhs)
 {
-	__LOW(&lhs->max_sectors, rhs->max_sectors);
-	__LOW(&lhs->max_phys_segments, rhs->max_phys_segments);
-	__LOW(&lhs->max_hw_segments, rhs->max_hw_segments);
-	__HIGH(&lhs->hardsect_size, rhs->hardsect_size);
-	__LOW(&lhs->max_segment_size, rhs->max_segment_size);
-	__LOW(&lhs->seg_boundary_mask, rhs->seg_boundary_mask);
+	lhs->max_sectors =
+		min_not_zero(lhs->max_sectors, rhs->max_sectors);
+
+	lhs->max_phys_segments =
+		min_not_zero(lhs->max_phys_segments, rhs->max_phys_segments);
+
+	lhs->max_hw_segments =
+		min_not_zero(lhs->max_hw_segments, rhs->max_hw_segments);
+
+	lhs->hardsect_size = max(lhs->hardsect_size, rhs->hardsect_size);
+
+	lhs->max_segment_size =
+		min_not_zero(lhs->max_segment_size, rhs->max_segment_size);
+
+	lhs->seg_boundary_mask =
+		min_not_zero(lhs->seg_boundary_mask, rhs->seg_boundary_mask);
 }
 
 /*
@@ -481,13 +492,31 @@ int dm_get_device(struct dm_target *ti, const char *path, sector_t start,
 		request_queue_t *q = bdev_get_queue((*result)->bdev);
 		struct io_restrictions *rs = &ti->limits;
 
-		/* combine the device limits low */
-		__LOW(&rs->max_sectors, q->max_sectors);
-		__LOW(&rs->max_phys_segments, q->max_phys_segments);
-		__LOW(&rs->max_hw_segments, q->max_hw_segments);
-		__HIGH(&rs->hardsect_size, q->hardsect_size);
-		__LOW(&rs->max_segment_size, q->max_segment_size);
-		__LOW(&rs->seg_boundary_mask, q->seg_boundary_mask);
+		/*
+		 * Combine the device limits low.
+		 *
+		 * FIXME: if we move an io_restriction struct
+		 *        into q this would just be a call to
+		 *        combine_restrictions_low()
+		 */
+		rs->max_sectors =
+			min_not_zero(rs->max_sectors, q->max_sectors);
+
+		rs->max_phys_segments =
+			min_not_zero(rs->max_phys_segments,
+				     q->max_phys_segments);
+
+		rs->max_hw_segments =
+			min_not_zero(rs->max_hw_segments, q->max_hw_segments);
+
+		rs->hardsect_size = max(rs->hardsect_size, q->hardsect_size);
+
+		rs->max_segment_size =
+			min_not_zero(rs->max_segment_size, q->max_segment_size);
+
+		rs->seg_boundary_mask =
+			min_not_zero(rs->seg_boundary_mask,
+				     q->seg_boundary_mask);
 	}
 
 	return r;
