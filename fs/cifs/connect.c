@@ -67,7 +67,7 @@ struct smb_vol {
 };
 
 int ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket);
-int ipv6_connect(struct sockaddr_in6 *psin_server, struct socket **csocket)
+int ipv6_connect(struct sockaddr_in6 *psin_server, struct socket **csocket);
 
 
 	/* 
@@ -146,9 +146,9 @@ cifs_reconnect(struct TCP_Server_Info *server)
 	while ((server->tcpStatus != CifsExiting) && (server->tcpStatus != CifsGood))
 	{
 		if(server->protocolType == IPV6) {
-			rc = ipv6_connect(&server->sockAddr,&server->ssocket);
+			rc = ipv6_connect(&server->addr.sockAddr6,&server->ssocket);
 		} else {
-			rc = ipv4_connect(&server->sockAddr, &server->ssocket);
+			rc = ipv4_connect(&server->addr.sockAddr, &server->ssocket);
 		}
 		if(rc) {
 			set_current_state(TASK_INTERRUPTIBLE);
@@ -670,7 +670,7 @@ cifs_find_tcp_session(__u32 new_target_ip_addr,
 	list_for_each(tmp, &GlobalSMBSessionList) {
 		ses = list_entry(tmp, struct cifsSesInfo, cifsSessionList);
 		if (ses->server) {
-			if (ses->server->sockAddr.sin_addr.s_addr ==
+			if (ses->server->addr.sockAddr.sin_addr.s_addr ==
 			    new_target_ip_addr) {
 				/* BB lock server and tcp session and increment use count here?? */
 				*psrvTcp = ses->server;	/* found a match on the TCP session */
@@ -703,9 +703,9 @@ find_unc(__u32 new_target_ip_addr, char *uncName, char *userName)
 			if (tcon->ses->server) {
 				cFYI(1,
 				     (" old ip addr: %x == new ip %x ?",
-				      tcon->ses->server->sockAddr.sin_addr.
+				      tcon->ses->server->addr.sockAddr.sin_addr.
 				      s_addr, new_target_ip_addr));
-				if (tcon->ses->server->sockAddr.sin_addr.
+				if (tcon->ses->server->addr.sockAddr.sin_addr.
 				    s_addr == new_target_ip_addr) {
 	/* BB lock tcon and server and tcp session and increment use count here? */
 					/* found a match on the TCP session */
@@ -927,7 +927,7 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 	int xid;
 	struct socket *csocket = NULL;
 	struct sockaddr_in sin_server;
-/*	struct sockaddr_in6 sin_server6; */
+	struct sockaddr_in6 sin_server6;
 	struct smb_vol volume_info;
 	struct cifsSesInfo *pSesInfo = NULL;
 	struct cifsSesInfo *existingCifsSes = NULL;
@@ -958,11 +958,13 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 		return -EINVAL;
 	}
 
-	if (volume_info.UNCip) {
+	if (volume_info.UNCip && volume_info.UNC) {
 		sin_server.sin_addr.s_addr = cifs_inet_addr(volume_info.UNCip);
-		cFYI(1, ("UNC: %s  ", volume_info.UNCip));
-	} else {
-		/* BB we could connect to the DFS root? but which server do we ask? */
+		cFYI(1, ("UNC: %s ip: %s  ", volume_info.UNC, volume_info.UNCip));
+	} else if (volume_info.UNCip){
+		/* BB using ip addr as server name connect to the DFS root below */
+		cERROR(1,("Connecting to DFS root not implemented yet"));
+	} else /* which servers DFS root would we conect to */ {
 		cERROR(1,
 		       ("CIFS mount error: No UNC path (e.g. -o unc=//192.168.1.100/public) specified  "));
 		FreeXid(xid);
@@ -1014,7 +1016,7 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 			return rc;
 		} else {
 			memset(srvTcp, 0, sizeof (struct TCP_Server_Info));
-			memcpy(&srvTcp->sockAddr, &sin_server, sizeof (struct sockaddr_in));	
+			memcpy(&srvTcp->addr.sockAddr, &sin_server, sizeof (struct sockaddr_in));	
             /* BB Add code for ipv6 case too */
 			srvTcp->ssocket = csocket;
 			srvTcp->protocolType = IPV4;
