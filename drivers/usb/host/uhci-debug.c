@@ -552,7 +552,8 @@ static ssize_t uhci_proc_read(struct file *file, char *buf, size_t nbytes,
 	if (!access_ok(VERIFY_WRITE, buf, nbytes))
 		return -EINVAL;
 
-	copy_to_user(buf, up->data + pos, nbytes);
+	if (copy_to_user(buf, up->data + pos, nbytes))
+		return -EFAULT;
 
 	*ppos += nbytes;
 

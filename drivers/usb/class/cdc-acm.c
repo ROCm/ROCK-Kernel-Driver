@@ -367,9 +367,10 @@ static int acm_tty_write(struct tty_struct *tty, int from_user, const unsigned c
 
 	count = (count > acm->writesize) ? acm->writesize : count;
 
-	if (from_user)
-		copy_from_user(acm->writeurb->transfer_buffer, buf, count);
-	else
+	if (from_user) {
+		if (copy_from_user(acm->writeurb->transfer_buffer, buf, count))
+			return -EFAULT;
+	} else
 		memcpy(acm->writeurb->transfer_buffer, buf, count);
 
 	acm->writeurb->transfer_buffer_length = count;
