@@ -511,6 +511,32 @@ AltivecAssistException(struct pt_regs *regs)
 }
 #endif /* CONFIG_ALTIVEC */
 
+/*
+ * We enter here if we get an unrecoverable exception, that is, one
+ * that happened at a point where the RI (recoverable interrupt) bit
+ * in the MSR is 0.  This indicates that SRR0/1 are live, and that
+ * we therefore lost state by taking this exception.
+ */
+void unrecoverable_exception(struct pt_regs *regs)
+{
+	printk(KERN_EMERG "Unrecoverable exception %lx at %lx\n",
+	       regs->trap, regs->nip);
+	debugger(regs);
+	die("Unrecoverable exception", regs, SIGABRT);
+}
+
+/*
+ * We enter here if we discover during exception entry that we are
+ * running in supervisor mode with a userspace value in the stack pointer.
+ */
+void kernel_bad_stack(struct pt_regs *regs)
+{
+	printk(KERN_EMERG "Bad kernel stack pointer %lx at %lx\n",
+	       regs->gpr[1], regs->nip);
+	debugger(regs);
+	die("Bad kernel stack pointer", regs, SIGABRT);
+}
+
 void __init trap_init(void)
 {
 }
