@@ -218,13 +218,17 @@ xfs_errortag_clearall(xfs_mount_t *mp)
 static void
 xfs_fs_vcmn_err(int level, xfs_mount_t *mp, char *fmt, va_list ap)
 {
-	char	*newfmt;
-	int	len = 16 + mp->m_fsname_len + strlen(fmt);
+	if (mp != NULL) {
+		char	*newfmt;
+		int	len = 16 + mp->m_fsname_len + strlen(fmt);
 
-	newfmt = kmem_alloc(len, KM_SLEEP);
-	sprintf(newfmt, "Filesystem \"%s\": %s", mp->m_fsname, fmt);
-	icmn_err(level, newfmt, ap);
-	kmem_free(newfmt, len);
+		newfmt = kmem_alloc(len, KM_SLEEP);
+		sprintf(newfmt, "Filesystem \"%s\": %s", mp->m_fsname, fmt);
+		icmn_err(level, newfmt, ap);
+		kmem_free(newfmt, len);
+	} else {
+		icmn_err(level, fmt, ap);
+	}
 }
 
 void
@@ -267,16 +271,10 @@ xfs_error_report(
 	inst_t		*ra)
 {
 	if (level <= xfs_error_level) {
-		if (mp != NULL) {
-			xfs_cmn_err(XFS_PTAG_ERROR_REPORT,
-				    CE_ALERT, mp,
+		xfs_cmn_err(XFS_PTAG_ERROR_REPORT,
+			    CE_ALERT, mp,
 		"XFS internal error %s at line %d of file %s.  Caller 0x%p\n",
-				    tag, linenum, fname, ra);
-		} else {
-			cmn_err(CE_ALERT,
-		"XFS internal error %s at line %d of file %s.  Caller 0x%p\n",
-				tag, linenum, fname, ra);
-		}
+			    tag, linenum, fname, ra);
 
 		xfs_stack_trace();
 	}
