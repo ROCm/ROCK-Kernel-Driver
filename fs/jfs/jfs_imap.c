@@ -429,6 +429,7 @@ int diRead(struct inode *ip)
 
 	/* set the ag for the inode */
 	JFS_IP(ip)->agno = BLKTOAG(agstart, sbi);
+	JFS_IP(ip)->active_ag = -1;
 
 	return (rc);
 }
@@ -1358,6 +1359,7 @@ diInitInode(struct inode *ip, int iagno, int ino, int extno, struct iag * iagp)
 	DBG_DIALLOC(JFS_IP(ipimap)->i_imap, ip->i_ino);
 	jfs_ip->ixpxd = iagp->inoext[extno];
 	jfs_ip->agno = BLKTOAG(le64_to_cpu(iagp->agstart), sbi);
+	jfs_ip->active_ag = -1;
 }
 
 
@@ -1413,15 +1415,27 @@ int diAlloc(struct inode *pip, boolean_t dir, struct inode *ip)
 	 * moving backward on the disk.)  compute the hint within the
 	 * file system and the iag.
 	 */
+
+	/* get the ag number of this iag */
+	agno = JFS_IP(pip)->agno;
+
+	if (atomic_read(&JFS_SBI(pip->i_sb)->bmap->db_active[agno])) {
+		/*
+		 * There is an open file actively growing.  We want to
+		 * allocate new inodes from a different ag to avoid
+		 * fragmentation problems.
+		 */
+		agno = dbNextAG(JFS_SBI(pip->i_sb)->ipbmap);
+		AG_LOCK(imap, agno);
+		goto tryag;
+	}
+
 	inum = pip->i_ino + 1;
 	ino = inum & (INOSPERIAG - 1);
 
 	/* back off the the hint if it is outside of the iag */
 	if (ino == 0)
 		inum = pip->i_ino;
-
-	/* get the ag number of this iag */
-	agno = JFS_IP(pip)->agno;
 
 	/* lock the AG inode map information */
 	AG_LOCK(imap, agno);
