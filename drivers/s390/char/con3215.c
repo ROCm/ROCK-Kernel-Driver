@@ -455,7 +455,7 @@ static void raw3215_irq(int irq, void *int_parm, struct pt_regs *regs)
                 if ((raw = req->info) == NULL)
                         return;              /* That shouldn't happen ... */
 		if (req->type == RAW3215_READ && raw->tty != NULL) {
-			char *cchar;
+			unsigned int cchar;
 
 			tty = raw->tty;
                         count = 160 - req->residual;
@@ -467,14 +467,19 @@ static void raw3215_irq(int irq, void *int_parm, struct pt_regs *regs)
 			if (count >= TTY_FLIPBUF_SIZE - tty->flip.count)
 				count = TTY_FLIPBUF_SIZE - tty->flip.count - 1;
 			EBCASC(raw->inbuf, count);
-			if ((cchar = ctrlchar_handle(raw->inbuf, count, tty))) {
-				if (cchar == (char *)-1)
-					goto in_out;
+			cchar = ctrlchar_handle(raw->inbuf, count, tty);
+			switch (cchar & CTRLCHAR_MASK) {
+			case CTRLCHAR_SYSRQ:
+				break;
+
+			case CTRLCHAR_CTRL:
 				tty->flip.count++;
 				*tty->flip.flag_buf_ptr++ = TTY_NORMAL;
-				*tty->flip.char_buf_ptr++ = *cchar;
+				*tty->flip.char_buf_ptr++ = cchar;
 				tty_flip_buffer_push(raw->tty);
-			} else {
+				break;
+
+			case CTRLCHAR_NONE:
 				memcpy(tty->flip.char_buf_ptr,
 				       raw->inbuf, count);
 				if (count < 2 ||
@@ -491,12 +496,13 @@ static void raw3215_irq(int irq, void *int_parm, struct pt_regs *regs)
 				tty->flip.flag_buf_ptr += count;
 				tty->flip.count += count;
 				tty_flip_buffer_push(raw->tty);
+				break;
 			}
 		} else if (req->type == RAW3215_WRITE) {
 			raw->count -= req->len;
                         raw->written -= req->len;
 		} 
-in_out:
+
 		raw->flags &= ~RAW3215_WORKING;
 		raw3215_free_req(req);
 		/* check for empty wait */
@@ -1094,8 +1100,6 @@ void __init con3215_init(void)
 		req->next = raw3215_freelist;
 		raw3215_freelist = req;
 	}
-
-	ctrlchar_init();
 
 #ifdef CONFIG_TN3215_CONSOLE
         raw3215[0] = raw = (raw3215_info *)
