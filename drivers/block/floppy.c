@@ -1009,8 +1009,7 @@ static struct tq_struct floppy_tq;
 static void schedule_bh( void (*handler)(void*) )
 {
 	floppy_tq.routine = (void *)(void *) handler;
-	queue_task(&floppy_tq, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
+	schedule_task(&floppy_tq);
 }
 
 static struct timer_list fd_timer;
@@ -4361,7 +4360,7 @@ int __init floppy_init(void)
 	if (have_no_fdc) 
 	{
 		DPRINT("no floppy controllers found\n");
-		run_task_queue(&tq_immediate);
+		flush_scheduled_tasks();
 		if (usage_count)
 			floppy_release_irq_and_dma();
 		blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));

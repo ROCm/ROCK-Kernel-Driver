@@ -14,26 +14,317 @@
  *                              Copyright (C) 1998  Andrea Arcangeli
  *  1999-03-10  Improved NTP compatibility by Ulrich Windl
  *  2002-05-31	Move sys_sysinfo here and make its locking sane, Robert Love
+ *  2000-10-05  Implemented scalable SMP per-CPU timer handling.
+ *                              Copyright (C) 2000, 2001, 2002  Ingo Molnar
+ *              Designed by David S. Miller, Alexey Kuznetsov and Ingo Molnar
  */
 
-#include <linux/config.h>
-#include <linux/mm.h>
-#include <linux/timex.h>
-#include <linux/delay.h>
-#include <linux/smp_lock.h>
-#include <linux/interrupt.h>
-#include <linux/tqueue.h>
 #include <linux/kernel_stat.h>
+#include <linux/interrupt.h>
+#include <linux/percpu.h>
+#include <linux/init.h>
+#include <linux/mm.h>
 
 #include <asm/uaccess.h>
 
-struct kernel_stat kstat;
+/*
+ * per-CPU timer vector definitions:
+ */
+#define TVN_BITS 6
+#define TVR_BITS 8
+#define TVN_SIZE (1 << TVN_BITS)
+#define TVR_SIZE (1 << TVR_BITS)
+#define TVN_MASK (TVN_SIZE - 1)
+#define TVR_MASK (TVR_SIZE - 1)
+
+typedef struct tvec_s {
+	int index;
+	struct list_head vec[TVN_SIZE];
+} tvec_t;
+
+typedef struct tvec_root_s {
+	int index;
+	struct list_head vec[TVR_SIZE];
+} tvec_root_t;
+
+struct tvec_t_base_s {
+	spinlock_t lock;
+	unsigned long timer_jiffies;
+	volatile timer_t * volatile running_timer;
+	tvec_root_t tv1;
+	tvec_t tv2;
+	tvec_t tv3;
+	tvec_t tv4;
+	tvec_t tv5;
+} ____cacheline_aligned_in_smp;
+
+typedef struct tvec_t_base_s tvec_base_t;
+
+static tvec_base_t tvec_bases[NR_CPUS] __cacheline_aligned;
+
+/* Fake initialization needed to avoid compiler breakage */
+static DEFINE_PER_CPU(struct tasklet_struct, timer_tasklet) = { NULL };
+
+static inline void internal_add_timer(tvec_base_t *base, timer_t *timer)
+{
+	unsigned long expires = timer->expires;
+	unsigned long idx = expires - base->timer_jiffies;
+	struct list_head * vec;
+
+	if (idx < TVR_SIZE) {
+		int i = expires & TVR_MASK;
+		vec = base->tv1.vec + i;
+	} else if (idx < 1 << (TVR_BITS + TVN_BITS)) {
+		int i = (expires >> TVR_BITS) & TVN_MASK;
+		vec = base->tv2.vec + i;
+	} else if (idx < 1 << (TVR_BITS + 2 * TVN_BITS)) {
+		int i = (expires >> (TVR_BITS + TVN_BITS)) & TVN_MASK;
+		vec = base->tv3.vec + i;
+	} else if (idx < 1 << (TVR_BITS + 3 * TVN_BITS)) {
+		int i = (expires >> (TVR_BITS + 2 * TVN_BITS)) & TVN_MASK;
+		vec = base->tv4.vec + i;
+	} else if ((signed long) idx < 0) {
+		/*
+		 * Can happen if you add a timer with expires == jiffies,
+		 * or you set a timer to go off in the past
+		 */
+		vec = base->tv1.vec + base->tv1.index;
+	} else if (idx <= 0xffffffffUL) {
+		int i = (expires >> (TVR_BITS + 3 * TVN_BITS)) & TVN_MASK;
+		vec = base->tv5.vec + i;
+	} else {
+		/* Can only get here on architectures with 64-bit jiffies */
+		INIT_LIST_HEAD(&timer->list);
+		return;
+	}
+	/*
+	 * Timers are FIFO:
+	 */
+	list_add_tail(&timer->list, vec);
+}
+
+void add_timer(timer_t *timer)
+{
+	int cpu = get_cpu();
+	tvec_base_t *base = tvec_bases + cpu;
+  	unsigned long flags;
+  
+  	BUG_ON(timer_pending(timer));
+
+	spin_lock_irqsave(&base->lock, flags);
+	internal_add_timer(base, timer);
+	timer->base = base;
+	spin_unlock_irqrestore(&base->lock, flags);
+	put_cpu();
+}
+
+static inline int detach_timer (timer_t *timer)
+{
+	if (!timer_pending(timer))
+		return 0;
+	list_del(&timer->list);
+	return 1;
+}
+
+/*
+ * mod_timer() has subtle locking semantics because parallel
+ * calls to it must happen serialized.
+ */
+int mod_timer(timer_t *timer, unsigned long expires)
+{
+	tvec_base_t *old_base, *new_base;
+	unsigned long flags;
+	int ret;
+
+	if (timer_pending(timer) && timer->expires == expires)
+		return 1;
+
+	local_irq_save(flags);
+	new_base = tvec_bases + smp_processor_id();
+repeat:
+	old_base = timer->base;
+
+	/*
+	 * Prevent deadlocks via ordering by old_base < new_base.
+	 */
+	if (old_base && (new_base != old_base)) {
+		if (old_base < new_base) {
+			spin_lock(&new_base->lock);
+			spin_lock(&old_base->lock);
+		} else {
+			spin_lock(&old_base->lock);
+			spin_lock(&new_base->lock);
+		}
+		/*
+		 * Subtle, we rely on timer->base being always
+		 * valid and being updated atomically.
+		 */
+		if (timer->base != old_base) {
+			spin_unlock(&new_base->lock);
+			spin_unlock(&old_base->lock);
+			goto repeat;
+		}
+	} else
+		spin_lock(&new_base->lock);
+
+	timer->expires = expires;
+	ret = detach_timer(timer);
+	internal_add_timer(new_base, timer);
+	timer->base = new_base;
+
+	if (old_base && (new_base != old_base))
+		spin_unlock(&old_base->lock);
+	spin_unlock_irqrestore(&new_base->lock, flags);
+
+	return ret;
+}
+
+int del_timer(timer_t * timer)
+{
+	unsigned long flags;
+	tvec_base_t * base;
+	int ret;
+
+	if (!timer->base)
+		return 0;
+repeat:
+ 	base = timer->base;
+	spin_lock_irqsave(&base->lock, flags);
+	if (base != timer->base) {
+		spin_unlock_irqrestore(&base->lock, flags);
+		goto repeat;
+	}
+	ret = detach_timer(timer);
+	timer->list.next = timer->list.prev = NULL;
+	spin_unlock_irqrestore(&base->lock, flags);
+
+	return ret;
+}
+
+#ifdef CONFIG_SMP
+/*
+ * SMP specific function to delete periodic timer.
+ * Caller must disable by some means restarting the timer
+ * for new. Upon exit the timer is not queued and handler is not running
+ * on any CPU. It returns number of times, which timer was deleted
+ * (for reference counting).
+ */
+
+int del_timer_sync(timer_t * timer)
+{
+	tvec_base_t * base;
+	int ret = 0;
+
+	if (!timer->base)
+		return 0;
+	for (;;) {
+		unsigned long flags;
+		int running;
+
+repeat:
+	 	base = timer->base;
+		spin_lock_irqsave(&base->lock, flags);
+		if (base != timer->base) {
+			spin_unlock_irqrestore(&base->lock, flags);
+			goto repeat;
+		}
+		ret += detach_timer(timer);
+		timer->list.next = timer->list.prev = 0;
+		running = timer_is_running(base, timer);
+		spin_unlock_irqrestore(&base->lock, flags);
+
+		if (!running)
+			break;
+
+		timer_synchronize(base, timer);
+	}
+
+	return ret;
+}
+#endif
+
+
+static void cascade(tvec_base_t *base, tvec_t *tv)
+{
+	/* cascade all the timers from tv up one level */
+	struct list_head *head, *curr, *next;
+
+	head = tv->vec + tv->index;
+	curr = head->next;
+	/*
+	 * We are removing _all_ timers from the list, so we don't  have to
+	 * detach them individually, just clear the list afterwards.
+	 */
+	while (curr != head) {
+		timer_t *tmp;
+
+		tmp = list_entry(curr, timer_t, list);
+		if (tmp->base != base)
+			BUG();
+		next = curr->next;
+		list_del(curr); // not needed
+		internal_add_timer(base, tmp);
+		curr = next;
+	}
+	INIT_LIST_HEAD(head);
+	tv->index = (tv->index + 1) & TVN_MASK;
+}
+
+static void __run_timers(tvec_base_t *base)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&base->lock, flags);
+	while ((long)(jiffies - base->timer_jiffies) >= 0) {
+		struct list_head *head, *curr;
+
+		/*
+		 * Cascade timers:
+		 */
+		if (!base->tv1.index) {
+			cascade(base, &base->tv2);
+			if (base->tv2.index == 1) {
+				cascade(base, &base->tv3);
+				if (base->tv3.index == 1) {
+					cascade(base, &base->tv4);
+					if (base->tv4.index == 1)
+						cascade(base, &base->tv5);
+				}
+			}
+		}
+repeat:
+		head = base->tv1.vec + base->tv1.index;
+		curr = head->next;
+		if (curr != head) {
+			void (*fn)(unsigned long);
+			unsigned long data;
+			timer_t *timer;
+
+			timer = list_entry(curr, timer_t, list);
+ 			fn = timer->function;
+ 			data = timer->data;
+
+			detach_timer(timer);
+			timer->list.next = timer->list.prev = NULL;
+			timer_enter(base, timer);
+			spin_unlock_irq(&base->lock);
+			fn(data);
+			spin_lock_irq(&base->lock);
+			timer_exit(base);
+			goto repeat;
+		}
+		++base->timer_jiffies; 
+		base->tv1.index = (base->tv1.index + 1) & TVR_MASK;
+	}
+	spin_unlock_irqrestore(&base->lock, flags);
+}
+
+/******************************************************************/
 
 /*
  * Timekeeping variables
  */
-
-unsigned long tick_usec = TICK_USEC; 		/* ACTHZ          period (usec) */
+unsigned long tick_usec = TICK_USEC; 		/* ACTHZ   period (usec) */
 unsigned long tick_nsec = TICK_NSEC(TICK_USEC);	/* USER_HZ period (nsec) */
 
 /* The current time */
@@ -42,8 +333,7 @@ struct timespec xtime __attribute__ ((aligned (16)));
 /* Don't completely fail for HZ > 500.  */
 int tickadj = 500/HZ ? : 1;		/* microsecs */
 
-DECLARE_TASK_QUEUE(tq_timer);
-DECLARE_TASK_QUEUE(tq_immediate);
+struct kernel_stat kstat;
 
 /*
  * phase-lock loop variables
@@ -62,282 +352,11 @@ long time_freq = ((1000000 + HZ/2) % HZ - HZ/2) << SHIFT_USEC;
 					/* frequency offset (scaled ppm)*/
 long time_adj;				/* tick adjust (scaled 1 / HZ)	*/
 long time_reftime;			/* time at last adjustment (s)	*/
-
 long time_adjust;
-
-unsigned long event;
-
-extern int do_setitimer(int, struct itimerval *, struct itimerval *);
-
-/*
- * The 64-bit jiffies value is not atomic - you MUST NOT read it
- * without holding read_lock_irq(&xtime_lock).
- * jiffies is defined in the linker script...
- */
-
 
 unsigned int * prof_buffer;
 unsigned long prof_len;
 unsigned long prof_shift;
-
-/*
- * Event timer code
- */
-#define TVN_BITS 6
-#define TVR_BITS 8
-#define TVN_SIZE (1 << TVN_BITS)
-#define TVR_SIZE (1 << TVR_BITS)
-#define TVN_MASK (TVN_SIZE - 1)
-#define TVR_MASK (TVR_SIZE - 1)
-
-struct timer_vec {
-	int index;
-	struct list_head vec[TVN_SIZE];
-};
-
-struct timer_vec_root {
-	int index;
-	struct list_head vec[TVR_SIZE];
-};
-
-static struct timer_vec tv5;
-static struct timer_vec tv4;
-static struct timer_vec tv3;
-static struct timer_vec tv2;
-static struct timer_vec_root tv1;
-
-static struct timer_vec * const tvecs[] = {
-	(struct timer_vec *)&tv1, &tv2, &tv3, &tv4, &tv5
-};
-
-#define NOOF_TVECS (sizeof(tvecs) / sizeof(tvecs[0]))
-
-void init_timervecs (void)
-{
-	int i;
-
-	for (i = 0; i < TVN_SIZE; i++) {
-		INIT_LIST_HEAD(tv5.vec + i);
-		INIT_LIST_HEAD(tv4.vec + i);
-		INIT_LIST_HEAD(tv3.vec + i);
-		INIT_LIST_HEAD(tv2.vec + i);
-	}
-	for (i = 0; i < TVR_SIZE; i++)
-		INIT_LIST_HEAD(tv1.vec + i);
-}
-
-static unsigned long timer_jiffies;
-
-static inline void internal_add_timer(struct timer_list *timer)
-{
-	/*
-	 * must be cli-ed when calling this
-	 */
-	unsigned long expires = timer->expires;
-	unsigned long idx = expires - timer_jiffies;
-	struct list_head * vec;
-
-	if (idx < TVR_SIZE) {
-		int i = expires & TVR_MASK;
-		vec = tv1.vec + i;
-	} else if (idx < 1 << (TVR_BITS + TVN_BITS)) {
-		int i = (expires >> TVR_BITS) & TVN_MASK;
-		vec = tv2.vec + i;
-	} else if (idx < 1 << (TVR_BITS + 2 * TVN_BITS)) {
-		int i = (expires >> (TVR_BITS + TVN_BITS)) & TVN_MASK;
-		vec =  tv3.vec + i;
-	} else if (idx < 1 << (TVR_BITS + 3 * TVN_BITS)) {
-		int i = (expires >> (TVR_BITS + 2 * TVN_BITS)) & TVN_MASK;
-		vec = tv4.vec + i;
-	} else if ((signed long) idx < 0) {
-		/* can happen if you add a timer with expires == jiffies,
-		 * or you set a timer to go off in the past
-		 */
-		vec = tv1.vec + tv1.index;
-	} else if (idx <= 0xffffffffUL) {
-		int i = (expires >> (TVR_BITS + 3 * TVN_BITS)) & TVN_MASK;
-		vec = tv5.vec + i;
-	} else {
-		/* Can only get here on architectures with 64-bit jiffies */
-		INIT_LIST_HEAD(&timer->list);
-		return;
-	}
-	/*
-	 * Timers are FIFO!
-	 */
-	list_add(&timer->list, vec->prev);
-}
-
-/* Initialize both explicitly - let's try to have them in the same cache line */
-spinlock_t timerlist_lock ____cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
-
-#ifdef CONFIG_SMP
-volatile struct timer_list * volatile running_timer;
-#define timer_enter(t) do { running_timer = t; mb(); } while (0)
-#define timer_exit() do { running_timer = NULL; } while (0)
-#define timer_is_running(t) (running_timer == t)
-#define timer_synchronize(t) while (timer_is_running(t)) barrier()
-#else
-#define timer_enter(t)		do { } while (0)
-#define timer_exit()		do { } while (0)
-#endif
-
-void add_timer(struct timer_list *timer)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&timerlist_lock, flags);
-	if (unlikely(timer_pending(timer)))
-		goto bug;
-	internal_add_timer(timer);
-	spin_unlock_irqrestore(&timerlist_lock, flags);
-	return;
-bug:
-	spin_unlock_irqrestore(&timerlist_lock, flags);
-	printk(KERN_ERR "BUG: kernel timer added twice at %p.\n",
-			__builtin_return_address(0));
-}
-
-static inline int detach_timer (struct timer_list *timer)
-{
-	if (!timer_pending(timer))
-		return 0;
-	list_del(&timer->list);
-	return 1;
-}
-
-int mod_timer(struct timer_list *timer, unsigned long expires)
-{
-	int ret;
-	unsigned long flags;
-
-	spin_lock_irqsave(&timerlist_lock, flags);
-	timer->expires = expires;
-	ret = detach_timer(timer);
-	internal_add_timer(timer);
-	spin_unlock_irqrestore(&timerlist_lock, flags);
-	return ret;
-}
-
-int del_timer(struct timer_list * timer)
-{
-	int ret;
-	unsigned long flags;
-
-	spin_lock_irqsave(&timerlist_lock, flags);
-	ret = detach_timer(timer);
-	timer->list.next = timer->list.prev = NULL;
-	spin_unlock_irqrestore(&timerlist_lock, flags);
-	return ret;
-}
-
-#ifdef CONFIG_SMP
-/*
- * SMP specific function to delete periodic timer.
- * Caller must disable by some means restarting the timer
- * for new. Upon exit the timer is not queued and handler is not running
- * on any CPU. It returns number of times, which timer was deleted
- * (for reference counting).
- */
-
-int del_timer_sync(struct timer_list * timer)
-{
-	int ret = 0;
-
-	for (;;) {
-		unsigned long flags;
-		int running;
-
-		spin_lock_irqsave(&timerlist_lock, flags);
-		ret += detach_timer(timer);
-		timer->list.next = timer->list.prev = 0;
-		running = timer_is_running(timer);
-		spin_unlock_irqrestore(&timerlist_lock, flags);
-
-		if (!running)
-			break;
-
-		timer_synchronize(timer);
-	}
-
-	return ret;
-}
-#endif
-
-
-static inline void cascade_timers(struct timer_vec *tv)
-{
-	/* cascade all the timers from tv up one level */
-	struct list_head *head, *curr, *next;
-
-	head = tv->vec + tv->index;
-	curr = head->next;
-	/*
-	 * We are removing _all_ timers from the list, so we don't  have to
-	 * detach them individually, just clear the list afterwards.
-	 */
-	while (curr != head) {
-		struct timer_list *tmp;
-
-		tmp = list_entry(curr, struct timer_list, list);
-		next = curr->next;
-		list_del(curr); // not needed
-		internal_add_timer(tmp);
-		curr = next;
-	}
-	INIT_LIST_HEAD(head);
-	tv->index = (tv->index + 1) & TVN_MASK;
-}
-
-static inline void run_timer_list(void)
-{
-	spin_lock_irq(&timerlist_lock);
-	while ((long)(jiffies - timer_jiffies) >= 0) {
-		struct list_head *head, *curr;
-		if (!tv1.index) {
-			int n = 1;
-			do {
-				cascade_timers(tvecs[n]);
-			} while (tvecs[n]->index == 1 && ++n < NOOF_TVECS);
-		}
-repeat:
-		head = tv1.vec + tv1.index;
-		curr = head->next;
-		if (curr != head) {
-			struct timer_list *timer;
-			void (*fn)(unsigned long);
-			unsigned long data;
-
-			timer = list_entry(curr, struct timer_list, list);
- 			fn = timer->function;
- 			data= timer->data;
-
-			detach_timer(timer);
-			timer->list.next = timer->list.prev = NULL;
-			timer_enter(timer);
-			spin_unlock_irq(&timerlist_lock);
-			fn(data);
-			spin_lock_irq(&timerlist_lock);
-			timer_exit();
-			goto repeat;
-		}
-		++timer_jiffies; 
-		tv1.index = (tv1.index + 1) & TVR_MASK;
-	}
-	spin_unlock_irq(&timerlist_lock);
-}
-
-spinlock_t tqueue_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
-
-void tqueue_bh(void)
-{
-	run_task_queue(&tq_timer);
-}
-
-void immediate_bh(void)
-{
-	run_task_queue(&tq_immediate);
-}
 
 /*
  * this routine handles the overflow of the microsecond field
@@ -638,16 +657,32 @@ unsigned long wall_jiffies;
 rwlock_t xtime_lock __cacheline_aligned_in_smp = RW_LOCK_UNLOCKED;
 unsigned long last_time_offset;
 
+/*
+ * This function runs timers and the timer-tq in softirq context.
+ */
+static void run_timer_tasklet(unsigned long data)
+{
+	tvec_base_t *base = tvec_bases + smp_processor_id();
+
+	if ((long)(jiffies - base->timer_jiffies) >= 0)
+		__run_timers(base);
+}
+
+/*
+ * Called by the local, per-CPU timer interrupt on SMP.
+ */
+void run_local_timers(void)
+{
+	tasklet_hi_schedule(&per_cpu(timer_tasklet, smp_processor_id()));
+}
+
+/*
+ * Called by the timer interrupt. xtime_lock must already be taken
+ * by the timer IRQ!
+ */
 static inline void update_times(void)
 {
 	unsigned long ticks;
-
-	/*
-	 * update_times() is run from the raw timer_bh handler so we
-	 * just know that the irqs are locally enabled and so we don't
-	 * need to save/restore the flags of the local CPU here. -arca
-	 */
-	write_lock_irq(&xtime_lock);
 
 	ticks = jiffies - wall_jiffies;
 	if (ticks) {
@@ -656,14 +691,13 @@ static inline void update_times(void)
 	}
 	last_time_offset = 0;
 	calc_load(ticks);
-	write_unlock_irq(&xtime_lock);
 }
-
-void timer_bh(void)
-{
-	update_times();
-	run_timer_list();
-}
+  
+/*
+ * The 64-bit jiffies value is not atomic - you MUST NOT read it
+ * without holding read_lock_irq(&xtime_lock).
+ * jiffies is defined in the linker script...
+ */
 
 void do_timer(struct pt_regs *regs)
 {
@@ -673,12 +707,12 @@ void do_timer(struct pt_regs *regs)
 
 	update_process_times(user_mode(regs));
 #endif
-	mark_bh(TIMER_BH);
-	if (TQ_ACTIVE(tq_timer))
-		mark_bh(TQUEUE_BH);
+	update_times();
 }
 
 #if !defined(__alpha__) && !defined(__ia64__)
+
+extern int do_setitimer(int, struct itimerval *, struct itimerval *);
 
 /*
  * For backwards compatibility?  This can be done in libc so Alpha
@@ -821,7 +855,7 @@ static void process_timeout(unsigned long __data)
  */
 signed long schedule_timeout(signed long timeout)
 {
-	struct timer_list timer;
+	timer_t timer;
 	unsigned long expire;
 
 	switch (timeout)
@@ -973,4 +1007,25 @@ out:
 		return -EFAULT;
 
 	return 0;
+}
+
+void __init init_timers(void)
+{
+	int i, j;
+
+	for (i = 0; i < NR_CPUS; i++) {
+		tvec_base_t *base;
+	       
+		base = tvec_bases + i;
+		spin_lock_init(&base->lock);
+		for (j = 0; j < TVN_SIZE; j++) {
+			INIT_LIST_HEAD(base->tv5.vec + j);
+			INIT_LIST_HEAD(base->tv4.vec + j);
+			INIT_LIST_HEAD(base->tv3.vec + j);
+			INIT_LIST_HEAD(base->tv2.vec + j);
+		}
+		for (j = 0; j < TVR_SIZE; j++)
+			INIT_LIST_HEAD(base->tv1.vec + j);
+		tasklet_init(&per_cpu(timer_tasklet, i), run_timer_tasklet, 0);
+	}
 }

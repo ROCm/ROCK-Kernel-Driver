@@ -28,6 +28,60 @@ static DECLARE_WAIT_QUEUE_HEAD(context_task_done);
 static int keventd_running;
 static struct task_struct *keventd_task;
 
+static spinlock_t tqueue_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
+
+typedef struct list_head task_queue;
+
+/*
+ * Queue a task on a tq.  Return non-zero if it was successfully
+ * added.
+ */
+static inline int queue_task(struct tq_struct *tq, task_queue *list)
+{
+	int ret = 0;
+	unsigned long flags;
+
+	if (!test_and_set_bit(0, &tq->sync)) {
+		spin_lock_irqsave(&tqueue_lock, flags);
+		list_add_tail(&tq->list, list);
+		spin_unlock_irqrestore(&tqueue_lock, flags);
+		ret = 1;
+	}
+	return ret;
+}
+
+#define TQ_ACTIVE(q)	(!list_empty(&q))
+
+static inline void run_task_queue(task_queue *list)
+{
+	struct list_head head, *next;
+	unsigned long flags;
+
+	if (!TQ_ACTIVE(*list))
+		return;
+
+	spin_lock_irqsave(&tqueue_lock, flags);
+	list_add(&head, list);
+	list_del_init(list);
+	spin_unlock_irqrestore(&tqueue_lock, flags);
+
+	next = head.next;
+	while (next != &head) {
+		void (*f) (void *);
+		struct tq_struct *p;
+		void *data;
+
+		p = list_entry(next, struct tq_struct, list);
+		next = next->next;
+		f = p->routine;
+		data = p->data;
+		wmb();
+		p->sync = 0;
+		if (f)
+			f(data);
+	}
+}
+
 static int need_keventd(const char *who)
 {
 	if (keventd_running == 0)

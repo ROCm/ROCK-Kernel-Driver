@@ -420,12 +420,9 @@ EXPORT_SYMBOL(probe_irq_off);
 EXPORT_SYMBOL(del_timer_sync);
 #endif
 EXPORT_SYMBOL(mod_timer);
-EXPORT_SYMBOL(tq_timer);
-EXPORT_SYMBOL(tq_immediate);
+EXPORT_SYMBOL(tvec_bases);
 
 #ifdef CONFIG_SMP
-/* Various random spinlocks we want to export */
-EXPORT_SYMBOL(tqueue_lock);
 
 /* Big-Reader lock implementation */
 EXPORT_SYMBOL(__brlock_array);

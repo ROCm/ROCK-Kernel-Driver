@@ -649,7 +649,7 @@ static int __init batch_entropy_init(int size, struct entropy_store *r)
  * Changes to the entropy data is put into a queue rather than being added to
  * the entropy counts directly.  This is presumably to avoid doing heavy
  * hashing calculations during an interrupt in add_timer_randomness().
- * Instead, the entropy is only added to the pool once per timer tick.
+ * Instead, the entropy is only added to the pool by keventd.
  */
 void batch_entropy_store(u32 a, u32 b, int num)
 {
@@ -664,7 +664,8 @@ void batch_entropy_store(u32 a, u32 b, int num)
 
 	new = (batch_head+1) & (batch_max-1);
 	if (new != batch_tail) {
-		queue_task(&batch_tqueue, &tq_timer);
+		// FIXME: is this correct?
+		schedule_task(&batch_tqueue);
 		batch_head = new;
 	} else {
 		DEBUG_ENT("batch entropy buffer full\n");
