@@ -808,7 +808,8 @@ static void sbp2_host_reset(struct hpsb_host *host)
 
 	hi = hpsb_get_hostinfo(&sbp2_highlevel, host);
 
-	scsi_block_requests(hi->scsi_host);
+	if (hi)
+		scsi_block_requests(hi->scsi_host);
 }
 
 
