@@ -384,6 +384,7 @@ add_header(struct buffer *b)
 {
 	buf_printf(b, "#include <linux/module.h>\n");
 	buf_printf(b, "#include <linux/vermagic.h>\n");
+	buf_printf(b, "#include <linux/compiler.h>\n");
 	buf_printf(b, "\n");
 	buf_printf(b, "const char vermagic[]\n");
 	buf_printf(b, "__attribute__((section(\"__vermagic\"))) =\n");
@@ -449,6 +450,7 @@ add_depends(struct buffer *b, struct module *mod, struct module *modules)
 
 	buf_printf(b, "\n");
 	buf_printf(b, "static const char __module_depends[]\n");
+	buf_printf(b, "__attribute_used__\n");
 	buf_printf(b, "__attribute__((section(\".modinfo\"))) =\n");
 	buf_printf(b, "\"depends=");
 	for (s = mod->unres; s; s = s->next) {
