@@ -689,7 +689,7 @@ void sun_do_break(void)
 	if (!stop_a_enabled)
 		return;
 
-	printk("\n");
+	prom_printf("\n");
 	flush_user_windows();
 
 	prom_cmdline();
