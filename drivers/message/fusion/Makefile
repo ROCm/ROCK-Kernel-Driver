@@ -2,7 +2,7 @@
 # Makefile for the LSI Logic Fusion MPT (Message Passing Technology) drivers.
 #
 # Note! If you want to turn on various debug defines for an extended period of
-# time but don't want them lingering around in the Makefile when you pass it on 
+# time but don't want them lingering around in the Makefile when you pass it on
 # to someone else, use the MPT_CFLAGS env variable (thanks Steve). -nromer
 
 #=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-{ LSI_LOGIC
@@ -48,6 +48,5 @@ EXTRA_CFLAGS += ${MPT_CFLAGS}
 #=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-} LSI_LOGIC
 
 obj-$(CONFIG_FUSION)		+= mptbase.o mptscsih.o
-obj-$(CONFIG_FUSION_ISENSE)	+= isense.o
 obj-$(CONFIG_FUSION_CTL)	+= mptctl.o
 obj-$(CONFIG_FUSION_LAN)	+= mptlan.o

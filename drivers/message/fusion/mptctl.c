@@ -447,7 +447,7 @@ static int mptctl_bus_reset(MPT_IOCTL *ioctl)
 
 		mptctl_free_tm_flags(ioctl->ioc);
 		del_timer(&ioctl->TMtimer);
-		mpt_free_msg_frame(mptctl_id, ioctl->ioc, mf);
+		mpt_free_msg_frame(ioctl->ioc, mf);
 		ioctl->tmPtr = NULL;
 	}
 
@@ -522,7 +522,7 @@ mptctl_ioc_reset(MPT_ADAPTER *ioc, int reset_phase)
 		if (ioctl && (ioctl->status & MPT_IOCTL_STATUS_TMTIMER_ACTIVE)){
 			ioctl->status &= ~MPT_IOCTL_STATUS_TMTIMER_ACTIVE;
 			del_timer(&ioctl->TMtimer);
-			mpt_free_msg_frame(mptctl_id, ioc, ioctl->tmPtr);
+			mpt_free_msg_frame(ioc, ioctl->tmPtr);
 		}
 
 	} else {
@@ -1808,7 +1808,6 @@ mptctl_do_mpt_command (struct mpt_ioctl_command karg, void __user *mfPtr)
 	struct buflist	bufOut; /* data Out buffer */
 	dma_addr_t	dma_addr_in;
 	dma_addr_t	dma_addr_out;
-	int		dir;	/* PCI data direction */
 	int		sgSize = 0;	/* Num SG elements */
 	int		iocnum, flagsLength;
 	int		sz, rc = 0;
@@ -2118,9 +2117,9 @@ mptctl_do_mpt_command (struct mpt_ioctl_command karg, void __user *mfPtr)
 
 		/* Set up the dataOut memory allocation */
 		if (karg.dataOutSize > 0) {
-			dir = PCI_DMA_TODEVICE;
 			if (karg.dataInSize > 0) {
 				flagsLength = ( MPI_SGE_FLAGS_SIMPLE_ELEMENT |
+						MPI_SGE_FLAGS_END_OF_BUFFER |
 						MPI_SGE_FLAGS_DIRECTION |
 						mpt_addr_size() )
 						<< MPI_SGE_FLAGS_SHIFT;
@@ -2159,7 +2158,6 @@ mptctl_do_mpt_command (struct mpt_ioctl_command karg, void __user *mfPtr)
 		}
 
 		if (karg.dataInSize > 0) {
-			dir = PCI_DMA_FROMDEVICE;
 			flagsLength = MPT_SGE_FLAGS_SSIMPLE_READ;
 			flagsLength |= karg.dataInSize;
 
@@ -2207,7 +2205,7 @@ mptctl_do_mpt_command (struct mpt_ioctl_command karg, void __user *mfPtr)
 			del_timer(&ioc->ioctl->timer);
 			ioc->ioctl->status &= ~MPT_IOCTL_STATUS_TIMER_ACTIVE;
 			ioc->ioctl->status |= MPT_IOCTL_STATUS_TM_FAILED;
-			mpt_free_msg_frame(mptctl_id, ioc, mf);
+			mpt_free_msg_frame(ioc, mf);
 		}
 	} else {
 		mpt_put_msg_frame(mptctl_id, ioc, mf);
@@ -2325,7 +2323,7 @@ done_free_mem:
 	 * otherwise, failure occured after mf acquired.
 	 */
 	if (mf)
-		mpt_free_msg_frame(mptctl_id, ioc, mf);
+		mpt_free_msg_frame(ioc, mf);
 
 	return rc;
 }

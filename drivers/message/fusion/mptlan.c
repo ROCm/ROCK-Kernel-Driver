@@ -1332,7 +1332,7 @@ mpt_lan_post_receive_buckets(void *dev_id)
 		if (pSimple == NULL) {
 /**/			printk (KERN_WARNING MYNAM "/%s: No buckets posted\n",
 /**/				__FUNCTION__);
-			mpt_free_msg_frame(LanCtx, mpt_dev, mf);
+			mpt_free_msg_frame(mpt_dev, mf);
 			goto out;
 		}
 
