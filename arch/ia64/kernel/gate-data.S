@@ -1,3 +1,3 @@
-	.section .data.gate, "ax"
+	.section .data.gate, "aw"
 
 	.incbin "arch/ia64/kernel/gate.so"
