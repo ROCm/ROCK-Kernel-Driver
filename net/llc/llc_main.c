@@ -181,22 +181,22 @@ int llc_sk_init(struct sock* sk)
 	llc->inc_cntr = llc->dec_cntr = 2;
 	llc->dec_step = llc->connect_step = 1;
 
-	init_timer(&llc->ack_timer);
+	init_timer(&llc->ack_timer.timer);
 	llc->ack_timer.expire	      = LLC_ACK_TIME;
 	llc->ack_timer.timer.data     = (unsigned long)sk;
 	llc->ack_timer.timer.function = llc_conn_ack_tmr_cb;
 
-	init_timer(&llc->pf_cycle_timer);
+	init_timer(&llc->pf_cycle_timer.timer);
 	llc->pf_cycle_timer.expire	   = LLC_P_TIME;
 	llc->pf_cycle_timer.timer.data     = (unsigned long)sk;
 	llc->pf_cycle_timer.timer.function = llc_conn_pf_cycle_tmr_cb;
 
-	init_timer(&llc->rej_sent_timer);
+	init_timer(&llc->rej_sent_timer.timer);
 	llc->rej_sent_timer.expire	   = LLC_REJ_TIME;
 	llc->rej_sent_timer.timer.data     = (unsigned long)sk;
 	llc->rej_sent_timer.timer.function = llc_conn_rej_tmr_cb;
 
-	init_timer(&llc->busy_state_timer);
+	init_timer(&llc->busy_state_timer.timer);
 	llc->busy_state_timer.expire	     = LLC_BUSY_TIME;
 	llc->busy_state_timer.timer.data     = (unsigned long)sk;
 	llc->busy_state_timer.timer.function = llc_conn_busy_tmr_cb;

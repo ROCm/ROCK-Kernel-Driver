@@ -1,39 +1,39 @@
 /* SCTP kernel reference Implementation
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
- * Copyright (c) 2001 International Business Machines Corp.
+ * Copyright (c) 2001-2002 International Business Machines Corp.
  * Copyright (c) 2001 Intel Corp.
  * Copyright (c) 2001 La Monte H.P. Yarroll
- * 
+ *
  * This file is part of the SCTP kernel reference Implementation
- * 
+ *
  * This module provides the abstraction for an SCTP association.
- * 
- * The SCTP reference implementation is free software; 
- * you can redistribute it and/or modify it under the terms of 
+ *
+ * The SCTP reference implementation is free software;
+ * you can redistribute it and/or modify it under the terms of
  * the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
  * any later version.
- * 
- * The SCTP reference implementation is distributed in the hope that it 
+ *
+ * The SCTP reference implementation is distributed in the hope that it
  * will be useful, but WITHOUT ANY WARRANTY; without even the implied
  *                 ************************
  * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
  * See the GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with GNU CC; see the file COPYING.  If not, write to
  * the Free Software Foundation, 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.  
- * 
+ * Boston, MA 02111-1307, USA.
+ *
  * Please send any bug reports or fixes you make to the
  * email address(es):
  *    lksctp developers <lksctp-developers@lists.sourceforge.net>
- * 
+ *
  * Or submit a bug report through the following website:
  *    http://www.sf.net/projects/lksctp
  *
- * Written or modified by: 
+ * Written or modified by:
  *    La Monte H.P. Yarroll <piggy@acm.org>
  *    Karl Knutson          <karl@athena.chicago.il.us>
  *    Jon Grimm             <jgrimm@us.ibm.com>
@@ -41,7 +41,7 @@
  *    Hui Huang             <hui.huang@nokia.com>
  *    Sridhar Samudrala	    <sri@us.ibm.com>
  *    Daisy Chang	    <daisyc@us.ibm.com>
- * 
+ *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
  */
@@ -92,7 +92,7 @@ fail:
 sctp_association_t *sctp_association_init(sctp_association_t *asoc,
 					  const sctp_endpoint_t *ep,
 					  const struct sock *sk,
-					  sctp_scope_t scope, 
+					  sctp_scope_t scope,
 					  int priority)
 {
 	sctp_opt_t *sp;
@@ -363,34 +363,20 @@ static void sctp_association_destroy(sctp_association_t *asoc)
 
 /* Add a transport address to an association.  */
 sctp_transport_t *sctp_assoc_add_peer(sctp_association_t *asoc,
-				      const sockaddr_storage_t *addr,
+				      const union sctp_addr *addr,
 				      int priority)
 {
 	sctp_transport_t *peer;
 	sctp_opt_t *sp;
-	const __u16 *port;
+	unsigned short port;
 
-	switch (addr->sa.sa_family) {
-	case AF_INET:
-		port = &addr->v4.sin_port;
-		break;
-
-	case AF_INET6:
-		SCTP_V6(
-			port = &addr->v6.sin6_port;
-			break;
-		);
-
-	default:
-		return NULL;
-	};
+	/* AF_INET and AF_INET6 share common port field. */
+	port = addr->v4.sin_port;
 
 	/* Set the port if it has not been set yet.  */
 	if (0 == asoc->peer.port) {
-		asoc->peer.port = *port;
+		asoc->peer.port = port;
 	}
-
-	SCTP_ASSERT(*port == asoc->peer.port, ":Invalid port\n", return NULL);
 
 	/* Check to see if this is a duplicate. */
 	peer = sctp_assoc_lookup_paddr(asoc, addr);
@@ -398,13 +384,13 @@ sctp_transport_t *sctp_assoc_add_peer(sctp_association_t *asoc,
 		return peer;
 
 	peer = sctp_transport_new(addr, priority);
-	if (NULL == peer)
+	if (!peer)
 		return NULL;
 
 	sctp_transport_set_owner(peer, asoc);
 
 	/* Cache a route for the transport. */
-	sctp_transport_route(peer, NULL);
+	sctp_transport_route(peer, NULL, sctp_sk(asoc->base.sk));
 
 	/* If this is the first transport addr on this association,
 	 * initialize the association PMTU to the peer's PMTU.
@@ -423,7 +409,7 @@ sctp_transport_t *sctp_assoc_add_peer(sctp_association_t *asoc,
 	asoc->frag_point = asoc->pmtu -
 		(SCTP_IP_OVERHEAD + sizeof(sctp_data_chunk_t));
 
-	/* The asoc->peer.port might not be meaningful as of now, but
+	/* The asoc->peer.port might not be meaningful yet, but
 	 * initialize the packet structure anyway.
 	 */
 	(asoc->outqueue.init_output)(&peer->packet,
@@ -460,6 +446,9 @@ sctp_transport_t *sctp_assoc_add_peer(sctp_association_t *asoc,
 		min(asoc->overall_error_threshold + peer->error_threshold,
 		    asoc->max_retrans);
 
+	/* By default, enable heartbeat for peer address. */
+	peer->hb_allowed = 1;
+
 	/* Initialize the peer's heartbeat interval based on the
 	 * sock configured value.
 	 */
@@ -474,7 +463,7 @@ sctp_transport_t *sctp_assoc_add_peer(sctp_association_t *asoc,
 		asoc->peer.primary_path = peer;
 		/* Set a default msg_name for events. */
 		memcpy(&asoc->peer.primary_addr, &peer->ipaddr,
-		       sizeof(sockaddr_storage_t));
+		       sizeof(union sctp_addr));
 		asoc->peer.active_path = peer;
 		asoc->peer.retran_path = peer;
 	}
@@ -487,7 +476,7 @@ sctp_transport_t *sctp_assoc_add_peer(sctp_association_t *asoc,
 
 /* Lookup a transport by address. */
 sctp_transport_t *sctp_assoc_lookup_paddr(const sctp_association_t *asoc,
-					  const sockaddr_storage_t *address)
+					  const union sctp_addr *address)
 {
 	sctp_transport_t *t;
 	struct list_head *pos;
@@ -522,12 +511,12 @@ void sctp_assoc_control_transport(sctp_association_t *asoc,
 	/* Record the transition on the transport.  */
 	switch (command) {
 	case SCTP_TRANSPORT_UP:
-		transport->state.active = 1;
+		transport->active = 1;
 		spc_state = ADDRESS_AVAILABLE;
 		break;
 
 	case SCTP_TRANSPORT_DOWN:
-		transport->state.active = 0;
+		transport->active = 0;
 		spc_state = ADDRESS_UNREACHABLE;
 		break;
 
@@ -557,7 +546,7 @@ void sctp_assoc_control_transport(sctp_association_t *asoc,
 	list_for_each(pos, &asoc->peer.transport_addr_list) {
 		t = list_entry(pos, sctp_transport_t, transports);
 
-		if (!t->state.active)
+		if (!t->active)
 			continue;
 		if (!first || t->last_time_heard > first->last_time_heard) {
 			second = first;
@@ -577,7 +566,7 @@ void sctp_assoc_control_transport(sctp_association_t *asoc,
 	 * [If the primary is active but not most recent, bump the most
 	 * recently used transport.]
 	 */
-	if (asoc->peer.primary_path->state.active &&
+	if (asoc->peer.primary_path->active &&
 	    first != asoc->peer.primary_path) {
 		second = first;
 		first = asoc->peer.primary_path;
@@ -646,101 +635,20 @@ __u16 __sctp_association_get_next_ssn(sctp_association_t *asoc, __u16 sid)
 }
 
 /* Compare two addresses to see if they match.  Wildcard addresses
- * always match within their address family.
- *
- * FIXME: We do not match address scopes correctly.
- */
-int sctp_cmp_addr(const sockaddr_storage_t *ss1, const sockaddr_storage_t *ss2)
-{
-	int len;
-	const void *base1;
-	const void *base2;
-
-	if (ss1->sa.sa_family != ss2->sa.sa_family)
-		return 0;
-	if (ss1->v4.sin_port != ss2->v4.sin_port)
-		return 0;
-
-	switch (ss1->sa.sa_family) {
-	case AF_INET:
-		if (INADDR_ANY == ss1->v4.sin_addr.s_addr ||
-		    INADDR_ANY == ss2->v4.sin_addr.s_addr)
-			goto match;
-
-		len = sizeof(struct in_addr);
-		base1 = &ss1->v4.sin_addr;
-		base2 = &ss2->v4.sin_addr;
-		break;
-
-	case AF_INET6:
-		SCTP_V6(
-			if (IPV6_ADDR_ANY ==
-			    sctp_ipv6_addr_type(&ss1->v6.sin6_addr))
-				    goto match;
-
-			if (IPV6_ADDR_ANY ==
-			    sctp_ipv6_addr_type(&ss2->v6.sin6_addr))
-				goto match;
-
-			len = sizeof(struct in6_addr);
-			base1 = &ss1->v6.sin6_addr;
-			base2 = &ss2->v6.sin6_addr;
-			break;
-		)
-
-	default:
-		printk(KERN_WARNING
-		       "WARNING, bogus socket address family %d\n",
-		       ss1->sa.sa_family);
-		return 0;
-	};
-
-	return (0 == memcmp(base1, base2, len));
-
-match:
-	return 1;
-}
-
-/* Compare two addresses to see if they match.  Wildcard addresses
  * only match themselves.
  *
  * FIXME: We do not match address scopes correctly.
  */
-int sctp_cmp_addr_exact(const sockaddr_storage_t *ss1,
-			const sockaddr_storage_t *ss2)
+int sctp_cmp_addr_exact(const union sctp_addr *ss1,
+			const union sctp_addr *ss2)
 {
-	int len;
-	const void *base1;
-	const void *base2;
+	struct sctp_func *af;
 
-	if (ss1->sa.sa_family != ss2->sa.sa_family)
-		return 0;
-	if (ss1->v4.sin_port != ss2->v4.sin_port)
+	af = sctp_get_af_specific(ss1->sa.sa_family);
+	if (!af)
 		return 0;
 
-	switch (ss1->sa.sa_family) {
-	case AF_INET:
-		len = sizeof(struct in_addr);
-		base1 = &ss1->v4.sin_addr;
-		base2 = &ss2->v4.sin_addr;
-		break;
-
-	case AF_INET6:
-		SCTP_V6(
-			len = sizeof(struct in6_addr);
-			base1 = &ss1->v6.sin6_addr;
-			base2 = &ss2->v6.sin6_addr;
-			break;
-		)
-
-	default:
-		printk(KERN_WARNING
-		       "WARNING, bogus socket address family %d\n",
-		       ss1->sa.sa_family);
-		return 0;
-	};
-
-	return (0 == memcmp(base1, base2, len));
+	return af->cmp_addr(ss1, ss2);
 }
 
 /* Return an ecne chunk to get prepended to a packet.
@@ -842,8 +750,8 @@ out:
 
 /* Is this the association we are looking for? */
 sctp_transport_t *sctp_assoc_is_match(sctp_association_t *asoc,
-				      const sockaddr_storage_t *laddr,
-				      const sockaddr_storage_t *paddr)
+				      const union sctp_addr *laddr,
+				      const union sctp_addr *paddr)
 {
 	sctp_transport_t *transport;
 
@@ -855,7 +763,8 @@ sctp_transport_t *sctp_assoc_is_match(sctp_association_t *asoc,
 		if (!transport)
 			goto out;
 
-		if (sctp_bind_addr_has_addr(&asoc->base.bind_addr, laddr))
+		if (sctp_bind_addr_match(&asoc->base.bind_addr, laddr,
+					 sctp_sk(asoc->base.sk)))
 			goto out;
 	}
 	transport = NULL;
@@ -898,21 +807,17 @@ static void sctp_assoc_bh_rcv(sctp_association_t *asoc)
 		error = sctp_do_sm(SCTP_EVENT_T_CHUNK, SCTP_ST_CHUNK(subtype),
 				   state, ep, asoc, chunk, GFP_ATOMIC);
 
-		/* Check to see if the association is freed in response to 
+		/* Check to see if the association is freed in response to
 		 * the incoming chunk.  If so, get out of the while loop.
 		 */
 		if (!sctp_id2assoc(sk, associd))
-			goto out;
+			break;
 
-		if (error != 0)
-			goto err_out;
+		/* If there is an error on chunk, discard this packet. */
+		if (error && chunk)
+			chunk->pdiscard = 1;
 	}
 
-err_out:
-	/* Is this the right way to pass errors up to the ULP?  */
-	if (error)
-		sk->err = -error;
-out:
 }
 
 /* This routine moves an association from its old sk to a new sk.  */
@@ -1017,7 +922,7 @@ sctp_transport_t *sctp_assoc_choose_shutdown_transport(sctp_association_t *asoc)
 
 		/* Try to find an active transport. */
 
-		if (t->state.active) {
+		if (t->active) {
 			break;
 		} else {
 			/* Keep track of the next transport in case
