@@ -207,7 +207,7 @@ int msnd_wait_TXDE(multisound_dev_t *dev)
 	register int timeout = 1000;
     
 	while(timeout-- > 0)
-		if (inb(io + HP_ISR) & HPISR_TXDE)
+		if (msnd_inb(io + HP_ISR) & HPISR_TXDE)
 			return 0;
 
 	return -EIO;
@@ -219,7 +219,7 @@ int msnd_wait_HC0(multisound_dev_t *dev)
 	register int timeout = 1000;
 
 	while(timeout-- > 0)
-		if (!(inb(io + HP_CVR) & HPCVR_HC))
+		if (!(msnd_inb(io + HP_CVR) & HPCVR_HC))
 			return 0;
 
 	return -EIO;
@@ -231,7 +231,7 @@ int msnd_send_dsp_cmd(multisound_dev_t *dev, BYTE cmd)
 
 	spin_lock_irqsave(&dev->lock, flags);
 	if (msnd_wait_HC0(dev) == 0) {
-		outb(cmd, dev->io + HP_CVR);
+		msnd_outb(cmd, dev->io + HP_CVR);
 		spin_unlock_irqrestore(&dev->lock, flags);
 		return 0;
 	}
@@ -248,9 +248,9 @@ int msnd_send_word(multisound_dev_t *dev, unsigned char high,
 	register unsigned int io = dev->io;
 
 	if (msnd_wait_TXDE(dev) == 0) {
-		outb(high, io + HP_TXH);
-		outb(mid, io + HP_TXM);
-		outb(low, io + HP_TXL);
+		msnd_outb(high, io + HP_TXH);
+		msnd_outb(mid, io + HP_TXM);
+		msnd_outb(low, io + HP_TXL);
 		return 0;
 	}
 
@@ -272,8 +272,8 @@ int msnd_upload_host(multisound_dev_t *dev, char *bin, int len)
 		if (msnd_send_word(dev, bin[i], bin[i + 1], bin[i + 2]) != 0)
 			return -EIO;
 
-	inb(dev->io + HP_RXL);
-	inb(dev->io + HP_CVR);
+	msnd_inb(dev->io + HP_RXL);
+	msnd_inb(dev->io + HP_CVR);
 
 	return 0;
 }
@@ -289,11 +289,11 @@ int msnd_enable_irq(multisound_dev_t *dev)
 
 	spin_lock_irqsave(&dev->lock, flags);
 	if (msnd_wait_TXDE(dev) == 0) {
-		outb(inb(dev->io + HP_ICR) | HPICR_TREQ, dev->io + HP_ICR);
+		msnd_outb(msnd_inb(dev->io + HP_ICR) | HPICR_TREQ, dev->io + HP_ICR);
 		if (dev->type == msndClassic)
-			outb(dev->irqid, dev->io + HP_IRQM);
-		outb(inb(dev->io + HP_ICR) & ~HPICR_TREQ, dev->io + HP_ICR);
-		outb(inb(dev->io + HP_ICR) | HPICR_RREQ, dev->io + HP_ICR);
+			msnd_outb(dev->irqid, dev->io + HP_IRQM);
+		msnd_outb(msnd_inb(dev->io + HP_ICR) & ~HPICR_TREQ, dev->io + HP_ICR);
+		msnd_outb(msnd_inb(dev->io + HP_ICR) | HPICR_RREQ, dev->io + HP_ICR);
 		enable_irq(dev->irq);
 		msnd_init_queue(dev->DSPQ, dev->dspq_data_buff, dev->dspq_buff_size);
 		spin_unlock_irqrestore(&dev->lock, flags);
@@ -320,9 +320,9 @@ int msnd_disable_irq(multisound_dev_t *dev)
 
 	spin_lock_irqsave(&dev->lock, flags);
 	if (msnd_wait_TXDE(dev) == 0) {
-		outb(inb(dev->io + HP_ICR) & ~HPICR_RREQ, dev->io + HP_ICR);
+		msnd_outb(msnd_inb(dev->io + HP_ICR) & ~HPICR_RREQ, dev->io + HP_ICR);
 		if (dev->type == msndClassic)
-			outb(HPIRQ_NONE, dev->io + HP_IRQM);
+			msnd_outb(HPIRQ_NONE, dev->io + HP_IRQM);
 		disable_irq(dev->irq);
 		spin_unlock_irqrestore(&dev->lock, flags);
 		return 0;

@@ -136,9 +136,9 @@ static void reset_record_queue(void)
 
 	/* Critical section: bank 1 access */
 	spin_lock_irqsave(&dev.lock, flags);
-	outb(HPBLKSEL_1, dev.io + HP_BLKS);
+	msnd_outb(HPBLKSEL_1, dev.io + HP_BLKS);
 	isa_memset_io(dev.base, 0, DAR_BUFF_SIZE * 3);
-	outb(HPBLKSEL_0, dev.io + HP_BLKS);
+	msnd_outb(HPBLKSEL_0, dev.io + HP_BLKS);
 	spin_unlock_irqrestore(&dev.lock, flags);
 
 	for (n = 0, lpDAQ = dev.base + DARQ_DATA_BUFF; n < 3; ++n, lpDAQ += DAQDS__size) {
@@ -830,12 +830,12 @@ static __inline__ int pack_DARQ_to_DARF(register int bank)
 
 	/* Read data from the head (unprotected bank 1 access okay
            since this is only called inside an interrupt) */
-	outb(HPBLKSEL_1, dev.io + HP_BLKS);
+	msnd_outb(HPBLKSEL_1, dev.io + HP_BLKS);
 	msnd_fifo_write(
 		&dev.DARF,
 		(char *)(dev.base + bank * DAR_BUFF_SIZE),
 		size);
-	outb(HPBLKSEL_0, dev.io + HP_BLKS);
+	msnd_outb(HPBLKSEL_0, dev.io + HP_BLKS);
 
 	return 1;
 }
@@ -1091,7 +1091,7 @@ static __inline__ void eval_dsp_msg(register WORD wMessage)
 static irqreturn_t intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	/* Send ack to DSP */
-	inb(dev.io + HP_RXL);
+	msnd_inb(dev.io + HP_RXL);
 
 	/* Evaluate queued DSP messages */
 	while (isa_readw(dev.DSPQ + JQS_wTail) != isa_readw(dev.DSPQ + JQS_wHead)) {
@@ -1120,15 +1120,15 @@ static int reset_dsp(void)
 {
 	int timeout = 100;
 
-	outb(HPDSPRESET_ON, dev.io + HP_DSPR);
+	msnd_outb(HPDSPRESET_ON, dev.io + HP_DSPR);
 	mdelay(1);
 #ifndef MSND_CLASSIC
-	dev.info = inb(dev.io + HP_INFO);
+	dev.info = msnd_inb(dev.io + HP_INFO);
 #endif
-	outb(HPDSPRESET_OFF, dev.io + HP_DSPR);
+	msnd_outb(HPDSPRESET_OFF, dev.io + HP_DSPR);
 	mdelay(1);
 	while (timeout-- > 0) {
-		if (inb(dev.io + HP_CVR) == HP_CVR_DEF)
+		if (msnd_inb(dev.io + HP_CVR) == HP_CVR_DEF)
 			return 0;
 		mdelay(1);
 	}
@@ -1202,9 +1202,9 @@ static int init_sma(void)
 	unsigned long flags;
 
 #ifdef MSND_CLASSIC
-	outb(dev.memid, dev.io + HP_MEMM);
+	msnd_outb(dev.memid, dev.io + HP_MEMM);
 #endif
-	outb(HPBLKSEL_0, dev.io + HP_BLKS);
+	msnd_outb(HPBLKSEL_0, dev.io + HP_BLKS);
 	if (initted) {
 		mastVolLeft = isa_readw(dev.SMA + SMA_wCurrMastVolLeft);
 		mastVolRight = isa_readw(dev.SMA + SMA_wCurrMastVolRight);
@@ -1214,9 +1214,9 @@ static int init_sma(void)
 
 	/* Critical section: bank 1 access */
 	spin_lock_irqsave(&dev.lock, flags);
-	outb(HPBLKSEL_1, dev.io + HP_BLKS);
+	msnd_outb(HPBLKSEL_1, dev.io + HP_BLKS);
 	isa_memset_io(dev.base, 0, 0x8000);
-	outb(HPBLKSEL_0, dev.io + HP_BLKS);
+	msnd_outb(HPBLKSEL_0, dev.io + HP_BLKS);
 	spin_unlock_irqrestore(&dev.lock, flags);
 
 	dev.pwDSPQData = (dev.base + DSPQ_DATA_BUFF);
@@ -1289,7 +1289,7 @@ static int __init calibrate_adc(WORD srate)
 
 static int upload_dsp_code(void)
 {
-	outb(HPBLKSEL_0, dev.io + HP_BLKS);
+	msnd_outb(HPBLKSEL_0, dev.io + HP_BLKS);
 #ifndef HAVE_DSPCODEH
 	INITCODESIZE = mod_firmware_load(INITCODEFILE, &INITCODE);
 	if (!INITCODE) {
@@ -1326,9 +1326,9 @@ static int upload_dsp_code(void)
 #ifdef MSND_CLASSIC
 static void reset_proteus(void)
 {
-	outb(HPPRORESET_ON, dev.io + HP_PROR);
+	msnd_outb(HPPRORESET_ON, dev.io + HP_PROR);
 	mdelay(TIME_PRO_RESET);
-	outb(HPPRORESET_OFF, dev.io + HP_PROR);
+	msnd_outb(HPPRORESET_OFF, dev.io + HP_PROR);
 	mdelay(TIME_PRO_RESET_DONE);
 }
 #endif
@@ -1338,8 +1338,8 @@ static int initialize(void)
 	int err, timeout;
 
 #ifdef MSND_CLASSIC
-	outb(HPWAITSTATE_0, dev.io + HP_WAIT);
-	outb(HPBITMODE_16, dev.io + HP_BITM);
+	msnd_outb(HPWAITSTATE_0, dev.io + HP_WAIT);
+	msnd_outb(HPBITMODE_16, dev.io + HP_BITM);
 
 	reset_proteus();
 #endif
@@ -1455,9 +1455,9 @@ static void __exit unload_multisound(void)
 
 static int __init msnd_write_cfg(int cfg, int reg, int value)
 {
-	outb(reg, cfg);
-	outb(value, cfg + 1);
-	if (value != inb(cfg + 1)) {
+	msnd_outb(reg, cfg);
+	msnd_outb(value, cfg + 1);
+	if (value != msnd_inb(cfg + 1)) {
 		printk(KERN_ERR LOGNAME ": msnd_write_cfg: I/O error\n");
 		return -EIO;
 	}

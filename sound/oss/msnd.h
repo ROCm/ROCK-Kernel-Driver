@@ -154,10 +154,11 @@
 #define DSPTOPC_BASED(w)	(((w) - DSP_BASE_ADDR) * 2)
 
 #ifdef SLOWIO
-#  undef outb
-#  undef inb
-#  define outb			outb_p
-#  define inb			inb_p
+#define msnd_outb			outb_p
+#define msnd_inb			inb_p
+#else
+#define msnd_outb			outb
+#define msnd_inb			inb
 #endif
 
 /* JobQueueStruct */
