@@ -75,7 +75,7 @@ static inline int page_mapping_inuse(struct page * page)
 	struct address_space *mapping = page->mapping;
 
 	/* Page is in somebody's page tables. */
-	if (page->pte.chain)
+	if (page_mapped(page))
 		return 1;
 
 	/* XXX: does this happen ? */
@@ -140,7 +140,7 @@ shrink_list(struct list_head *page_list, int nr_pages,
 		 *
 		 * XXX: implement swap clustering ?
 		 */
-		if (page->pte.chain && !mapping && !PagePrivate(page)) {
+		if (page_mapped(page) && !mapping && !PagePrivate(page)) {
 			pte_chain_unlock(page);
 			if (!add_to_swap(page))
 				goto activate_locked;
@@ -151,7 +151,7 @@ shrink_list(struct list_head *page_list, int nr_pages,
 		 * The page is mapped into the page tables of one or more
 		 * processes. Try to unmap it here.
 		 */
-		if (page->pte.chain && mapping) {
+		if (page_mapped(page) && mapping) {
 			switch (try_to_unmap(page)) {
 			case SWAP_ERROR:
 			case SWAP_FAIL:
@@ -208,7 +208,7 @@ shrink_list(struct list_head *page_list, int nr_pages,
 		 * Otherwise, leave the page on the LRU so it is swappable.
 		 */
 		if (PagePrivate(page)) {
-			if (!try_to_release_page(page, 0))
+			if (!try_to_release_page(page, gfp_mask))
 				goto keep_locked;
 			if (!mapping && page_count(page) == 1)
 				goto free_it;
@@ -408,9 +408,9 @@ refill_inactive_zone(struct zone *zone, const int nr_pages_in)
 	while (!list_empty(&l_hold)) {
 		page = list_entry(l_hold.prev, struct page, lru);
 		list_del(&page->lru);
-		if (page->pte.chain) {
+		if (page_mapped(page)) {
 			pte_chain_lock(page);
-			if (page->pte.chain && page_referenced(page)) {
+			if (page_mapped(page) && page_referenced(page)) {
 				pte_chain_unlock(page);
 				list_add(&page->lru, &l_active);
 				continue;
@@ -433,9 +433,16 @@ refill_inactive_zone(struct zone *zone, const int nr_pages_in)
 		list_move(&page->lru, &zone->inactive_list);
 		if (!pagevec_add(&pvec, page)) {
 			spin_unlock_irq(&zone->lru_lock);
+			if (buffer_heads_over_limit)
+				pagevec_strip(&pvec);
 			__pagevec_release(&pvec);
 			spin_lock_irq(&zone->lru_lock);
 		}
+	}
+	if (buffer_heads_over_limit) {
+		spin_unlock_irq(&zone->lru_lock);
+		pagevec_strip(&pvec);
+		spin_lock_irq(&zone->lru_lock);
 	}
 	while (!list_empty(&l_active)) {
 		page = list_entry(l_active.prev, struct page, lru);

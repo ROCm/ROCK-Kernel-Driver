@@ -724,7 +724,7 @@ static struct rpc_procinfo	nfs_procedures[18] = {
 };
 
 struct rpc_version		nfs_version2 = {
-	number:			2,
-	nrprocs:		sizeof(nfs_procedures)/sizeof(nfs_procedures[0]),
-	procs:			nfs_procedures
+	.number			= 2,
+	.nrprocs		= sizeof(nfs_procedures)/sizeof(nfs_procedures[0]),
+	.procs			= nfs_procedures
 };

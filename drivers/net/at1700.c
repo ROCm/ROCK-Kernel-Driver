@@ -310,7 +310,6 @@ static int __init at1700_probe1(struct net_device *dev, int ioaddr)
 		&& inb(ioaddr + SAPROM + 2) == 0x0e)
 		is_fmv18x = 1;
 	else {
-		ret = -ENODEV;
 		goto err_out;
 	}
 			
@@ -335,11 +334,10 @@ found:
 			}
 			if (i == 8) {
 				goto err_out;
-				ret = -ENODEV;
 			}
 		} else {
 			if (fmv18x_probe_list[inb(ioaddr + IOCONFIG) & 0x07] != ioaddr)
-				return -ENODEV;
+				goto err_out;
 			irq = fmv_irqmap[(inb(ioaddr + IOCONFIG)>>6) & 0x03];
 		}
 	}
@@ -810,7 +808,7 @@ set_rx_mode(struct net_device *dev)
 	int ioaddr = dev->base_addr;
 	struct net_local *lp = (struct net_local *)dev->priv;
 	unsigned char mc_filter[8];		 /* Multicast hash filter */
-	long flags;
+       unsigned long flags;
 	int i;
 
 	if (dev->flags & IFF_PROMISC) {

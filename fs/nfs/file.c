@@ -41,21 +41,21 @@ static int  nfs_file_flush(struct file *);
 static int  nfs_fsync(struct file *, struct dentry *dentry, int datasync);
 
 struct file_operations nfs_file_operations = {
-	llseek:		remote_llseek,
-	read:		nfs_file_read,
-	write:		nfs_file_write,
-	mmap:		nfs_file_mmap,
-	open:		nfs_open,
-	flush:		nfs_file_flush,
-	release:	nfs_release,
-	fsync:		nfs_fsync,
-	lock:		nfs_lock,
+	.llseek		= remote_llseek,
+	.read		= nfs_file_read,
+	.write		= nfs_file_write,
+	.mmap		= nfs_file_mmap,
+	.open		= nfs_open,
+	.flush		= nfs_file_flush,
+	.release	= nfs_release,
+	.fsync		= nfs_fsync,
+	.lock		= nfs_lock,
 };
 
 struct inode_operations nfs_file_inode_operations = {
-	permission:	nfs_permission,
-	getattr:	nfs_getattr,
-	setattr:	nfs_setattr,
+	.permission	= nfs_permission,
+	.getattr	= nfs_getattr,
+	.setattr	= nfs_setattr,
 };
 
 /* Hack for future NFS swap support */
@@ -195,11 +195,11 @@ static int nfs_sync_page(struct page *page)
 }
 
 struct address_space_operations nfs_file_aops = {
-	readpage: nfs_readpage,
-	sync_page: nfs_sync_page,
-	writepage: nfs_writepage,
-	prepare_write: nfs_prepare_write,
-	commit_write: nfs_commit_write
+	.readpage = nfs_readpage,
+	.sync_page = nfs_sync_page,
+	.writepage = nfs_writepage,
+	.prepare_write = nfs_prepare_write,
+	.commit_write = nfs_commit_write
 };
 
 /* 

@@ -326,6 +326,8 @@ extern inline void update_mmu_cache(struct vm_area_struct * vma,
 
 #include <asm-generic/pgtable.h>
 
+typedef pte_t *pte_addr_t;
+
 #endif /* !__ASSEMBLY__ */
 
 #define io_remap_page_range remap_page_range

@@ -179,21 +179,7 @@ if [ "$CONFIG_FTAPE" != "n" ]; then
 fi
 endmenu
 
-dep_tristate '/dev/agpgart (AGP Support)' CONFIG_AGP $CONFIG_DRM_AGP
-if [ "$CONFIG_AGP" != "n" ]; then
-   bool '  Intel 440LX/BX/GX and I815/I820/I830M/I830MP/I840/I845/I850/I860 support' CONFIG_AGP_INTEL
-   bool '  Intel I810/I815/I830M (on-board) support' CONFIG_AGP_I810
-   bool '  VIA chipset support' CONFIG_AGP_VIA
-   bool '  AMD Irongate, 761, and 762 support' CONFIG_AGP_AMD
-   bool '  Generic SiS support' CONFIG_AGP_SIS
-   bool '  ALI chipset support' CONFIG_AGP_ALI
-   bool '  Serverworks LE/HE support' CONFIG_AGP_SWORKS
-   if [ "$CONFIG_IA64" = "y" ]; then
-     bool '  Intel 460GX support' CONFIG_AGP_I460
-     bool '  HP ZX1 AGP support' CONFIG_AGP_HP_ZX1
-   fi
-fi
-
+source drivers/char/agp/Config.in
 source drivers/char/drm/Config.in
 
 if [ "$CONFIG_HOTPLUG" = "y" -a "$CONFIG_PCMCIA" != "n" ]; then

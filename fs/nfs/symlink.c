@@ -103,8 +103,8 @@ static int nfs_follow_link(struct dentry *dentry, struct nameidata *nd)
  * symlinks can't do much...
  */
 struct inode_operations nfs_symlink_inode_operations = {
-	readlink:	nfs_readlink,
-	follow_link:	nfs_follow_link,
-	getattr:	nfs_getattr,
-	setattr:	nfs_setattr,
+	.readlink	= nfs_readlink,
+	.follow_link	= nfs_follow_link,
+	.getattr	= nfs_getattr,
+	.setattr	= nfs_setattr,
 };

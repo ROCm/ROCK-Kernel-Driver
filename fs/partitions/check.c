@@ -327,7 +327,7 @@ static void devfs_create_partitions(struct gendisk *dev)
 	devfs_auto_unregister(dev->disk_de, slave);
 	if (!(dev->flags & GENHD_FL_DEVFS))
 		devfs_auto_unregister (slave, dir);
-	for (part = 1, p++; part < max_p; part++, p++)
+	for (part = 1; part < max_p; part++, p++)
 		if (p->nr_sects)
 			devfs_register_partition(dev, part);
 #endif

@@ -507,7 +507,7 @@ struct pci_driver {
 	for(dev = pci_dev_g(pci_devices.next); dev != pci_dev_g(&pci_devices); dev = pci_dev_g(dev->global_list.next))
 
 void pcibios_fixup_bus(struct pci_bus *);
-int pcibios_enable_device(struct pci_dev *);
+int pcibios_enable_device(struct pci_dev *, int mask);
 char *pcibios_setup (char *str);
 
 /* Used only when drivers/pci/setup.c is used */
@@ -600,6 +600,7 @@ static int inline pci_write_config_dword(struct pci_dev *dev, int where, u32 val
 extern spinlock_t pci_lock;
 
 int pci_enable_device(struct pci_dev *dev);
+int pci_enable_device_bars(struct pci_dev *dev, int mask);
 void pci_disable_device(struct pci_dev *dev);
 void pci_set_master(struct pci_dev *dev);
 #define HAVE_PCI_SET_MWI
@@ -623,9 +624,11 @@ void pdev_enable_device(struct pci_dev *);
 void pdev_sort_resources(struct pci_dev *, struct resource_list *);
 void pci_fixup_irqs(u8 (*)(struct pci_dev *, u8 *),
 		    int (*)(struct pci_dev *, u8, u8));
-#define HAVE_PCI_REQ_REGIONS
+#define HAVE_PCI_REQ_REGIONS	2
 int pci_request_regions(struct pci_dev *, char *);
 void pci_release_regions(struct pci_dev *);
+int pci_request_region(struct pci_dev *, int, char *);
+void pci_release_region(struct pci_dev *, int);
 
 /* New-style probing supporting hot-pluggable devices */
 int pci_register_driver(struct pci_driver *);

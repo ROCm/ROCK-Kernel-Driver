@@ -51,7 +51,6 @@ Qua Jun 27 15:02:26 BRT 2001
 
 #include <linux/tty.h>
 #include <linux/tty_flip.h>
-#include <linux/serial.h>
 
 #include <asm/uaccess.h>
 #include <asm/irq.h>

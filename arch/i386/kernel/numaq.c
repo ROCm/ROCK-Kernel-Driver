@@ -29,8 +29,11 @@
 #include <linux/mmzone.h>
 #include <asm/numaq.h>
 
-u64 nodes_mem_start[MAX_NUMNODES];
-u64 nodes_mem_size[MAX_NUMNODES];
+/* These are needed before the pgdat's are created */
+unsigned long node_start_pfn[MAX_NUMNODES];
+unsigned long node_end_pfn[MAX_NUMNODES];
+
+#define	MB_TO_PAGES(addr) ((addr) << (20 - PAGE_SHIFT))
 
 /*
  * Function: smp_dump_qct()
@@ -46,17 +49,16 @@ static void __init smp_dump_qct(void)
 	struct sys_cfg_data *scd =
 		(struct sys_cfg_data *)__va(SYS_CFG_DATA_PRIV_ADDR);
 
-#define	MB_TO_B(addr) ((addr) << 20)
 	numnodes = 0;
 	for(node = 0; node < MAX_NUMNODES; node++) {
 		if(scd->quads_present31_0 & (1 << node)) {
 			numnodes++;
 			eq = &scd->eq[node];
-			/* Convert to bytes */
-			nodes_mem_start[node] = MB_TO_B((u64)eq->hi_shrd_mem_start -
-							(u64)eq->priv_mem_size);
-			nodes_mem_size[node] = MB_TO_B((u64)eq->hi_shrd_mem_size +
-						       (u64)eq->priv_mem_size);
+			/* Convert to pages */
+			node_start_pfn[node] = MB_TO_PAGES(
+				eq->hi_shrd_mem_start - eq->priv_mem_size);
+			node_end_pfn[node] = MB_TO_PAGES(
+				eq->hi_shrd_mem_start + eq->hi_shrd_mem_size);
 		}
 	}
 }
@@ -83,7 +85,7 @@ int physnode_map[MAX_ELEMENTS] = { [0 ... (MAX_ELEMENTS - 1)] = -1};
 #define MB_TO_ELEMENT(x) (x >> ELEMENT_REPRESENTS)
 #define PA_TO_MB(pa) (pa >> 20) 	/* assumption: a physical address is in bytes */
 
-int numaqpa_to_nid(u64 pa)
+int pa_to_nid(u64 pa)
 {
 	int nid;
 	
@@ -96,9 +98,9 @@ int numaqpa_to_nid(u64 pa)
 	return nid;
 }
 
-int numaqpfn_to_nid(unsigned long pfn)
+int pfn_to_nid(unsigned long pfn)
 {
-	return numaqpa_to_nid(((u64)pfn) << PAGE_SHIFT);
+	return pa_to_nid(((u64)pfn) << PAGE_SHIFT);
 }
 
 /*

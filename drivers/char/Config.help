@@ -16,57 +16,6 @@ CONFIG_SERIAL_NONSTANDARD
 
   Most people can say N here.
 
-CONFIG_SERIAL_EXTENDED
-  If you wish to use any non-standard features of the standard "dumb"
-  driver, say Y here. This includes HUB6 support, shared serial
-  interrupts, special multiport support, support for more than the
-  four COM 1/2/3/4 boards, etc.
-
-  Note that the answer to this question won't directly affect the
-  kernel: saying N will just cause the configurator to skip all
-  the questions about serial driver options. If unsure, say N.
-
-CONFIG_SERIAL_MANY_PORTS
-  Say Y here if you have dumb serial boards other than the four
-  standard COM 1/2/3/4 ports. This may happen if you have an AST
-  FourPort, Accent Async, Boca (read the Boca mini-HOWTO, available
-  from <http://www.linuxdoc.org/docs.html#howto>), or other custom
-  serial port hardware which acts similar to standard serial port
-  hardware. If you only use the standard COM 1/2/3/4 ports, you can
-  say N here to save some memory. You can also say Y if you have an
-  "intelligent" multiport card such as Cyclades, Digiboards, etc.
-
-CONFIG_SERIAL_ACPI
-  Legacy free machines may not have serial ports at the legacy COM1, 
-  COM2 etc addresses. Serial ports on such machines are described by
-  the ACPI tables SPCR (Serial Port Console Redirection) table and 
-  DBGP (Debug Port) table. Say Y here if you want to include support
-  for these serial ports.
-
-CONFIG_SERIAL_SHARE_IRQ
-  Some serial boards have hardware support which allows multiple dumb
-  serial ports on the same board to share a single IRQ. To enable
-  support for this in the serial driver, say Y here.
-
-CONFIG_SERIAL_DETECT_IRQ
-  Say Y here if you want the kernel to try to guess which IRQ
-  to use for your serial port.
-
-  This is considered unsafe; it is far better to configure the IRQ in
-  a boot script using the setserial command.
-
-  If unsure, say N.
-
-CONFIG_SERIAL_MULTIPORT
-  Some multiport serial ports have special ports which are used to
-  signal when there are any serial ports on the board which need
-  servicing. Say Y here to enable the serial driver to take advantage
-  of those special I/O ports.
-
-CONFIG_HUB6
-  Say Y here to enable support in the dumb serial driver to support
-  the HUB6 card.
-
 CONFIG_MWAVE
   The ACP modem (Mwave) for Linux is a WinModem. It is composed of a
   kernel driver and a user level application. Together these components
@@ -240,54 +189,6 @@ CONFIG_VT_CONSOLE
   loadlin) about how to pass options to the kernel at boot time.)
 
   If unsure, say Y.
-
-CONFIG_SERIAL
-  This selects whether you want to include the driver for the standard
-  serial ports.  The standard answer is Y.  People who might say N
-  here are those that are setting up dedicated Ethernet WWW/FTP
-  servers, or users that have one of the various bus mice instead of a
-  serial mouse and don't intend to use their machine's standard serial
-  port for anything.  (Note that the Cyclades and Stallion multi
-  serial port drivers do not need this driver built in for them to
-  work.)
-
-  If you want to compile this driver as a module, say M here and read
-  <file:Documentation/modules.txt>.  The module will be called
-  serial.o.
-  [WARNING: Do not compile this driver as a module if you are using
-  non-standard serial ports, since the configuration information will
-  be lost when the driver is unloaded.  This limitation may be lifted
-  in the future.]
-
-  BTW1: If you have a mouseman serial mouse which is not recognized by
-  the X window system, try running gpm first.
-
-  BTW2: If you intend to use a software modem (also called Winmodem)
-  under Linux, forget it.  These modems are crippled and require
-  proprietary drivers which are only available under Windows.
-
-  Most people will say Y or M here, so that they can use serial mice,
-  modems and similar devices connecting to the standard serial ports.
-
-CONFIG_SERIAL_CONSOLE
-  If you say Y here, it will be possible to use a serial port as the
-  system console (the system console is the device which receives all
-  kernel messages and warnings and which allows logins in single user
-  mode). This could be useful if some terminal or printer is connected
-  to that serial port.
-
-  Even if you say Y here, the currently visible virtual console
-  (/dev/tty0) will still be used as the system console by default, but
-  you can alter that using a kernel command line option such as
-  "console=ttyS1". (Try "man bootparam" or see the documentation of
-  your boot loader (lilo or loadlin) about how to pass options to the
-  kernel at boot time.)
-
-  If you don't have a VGA card installed and you say Y here, the
-  kernel will automatically use the first serial line, /dev/ttyS0, as
-  system console.
-
-  If unsure, say N.
 
 CONFIG_ROCKETPORT
   This is a driver for the Comtrol Rocketport cards which provide
@@ -1007,15 +908,6 @@ CONFIG_NVRAM
   The module will be called nvram.o. If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.
 
-CONFIG_ATOMWIDE_SERIAL
-  If you have an Atomwide Serial card for an Acorn system, say Y to
-  this option.  The driver can handle 1, 2, or 3 port cards.
-  If unsure, say N.
-
-CONFIG_DUALSP_SERIAL
-  If you have the Serial Port's dual serial card for an Acorn system,
-  say Y to this option.  If unsure, say N.
-
 CONFIG_NWBUTTON
   If you say Y here and create a character device node /dev/nwbutton
   with major and minor numbers 10 and 158 ("man mknod"), then every
@@ -1071,15 +963,6 @@ CONFIG_DS1620
   It is also possible to say M here to build it as a module (ds1620.o)
   It is recommended to be used on a NetWinder, but it is not a
   necessity.
-
-CONFIG_SERIAL_21285
-  If you have a machine based on a 21285 (Footbridge) StrongARM(R)/
-  PCI bridge you can enable its onboard serial port by enabling this
-  option. The device has major ID 4, minor 64.
-
-CONFIG_SERIAL_21285_CONSOLE
-  If you have enabled the serial port on the 21285 footbridge you can
-  make it the console by answering Y to this option.
 
 CONFIG_NWFLASH
   If you say Y here and create a character device /dev/flash with

@@ -32,6 +32,7 @@
 #include <linux/namei.h>
 #include <linux/module.h>
 #include <linux/slab.h>
+#include <linux/backing-dev.h>
 #include <linux/driverfs_fs.h>
 
 #include <asm/uaccess.h>
@@ -55,6 +56,11 @@ static struct address_space_operations driverfs_aops;
 static struct vfsmount *driverfs_mount;
 static spinlock_t mount_lock = SPIN_LOCK_UNLOCKED;
 static int mount_count = 0;
+
+static struct backing_dev_info driverfs_backing_dev_info = {
+	.ra_pages	= 0,	/* No readahead */
+	.memory_backed	= 1,	/* Does not contribute to dirty memory */
+};
 
 static int driverfs_readpage(struct file *file, struct page * page)
 {
@@ -108,6 +114,7 @@ struct inode *driverfs_get_inode(struct super_block *sb, int mode, int dev)
 		inode->i_rdev = NODEV;
 		inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
 		inode->i_mapping->a_ops = &driverfs_aops;
+		inode->i_mapping->backing_dev_info = &driverfs_backing_dev_info;
 		switch (mode & S_IFMT) {
 		default:
 			init_special_inode(inode, mode, dev);

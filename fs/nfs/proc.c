@@ -82,8 +82,8 @@ nfs_proc_setattr(struct inode *inode, struct nfs_fattr *fattr,
 		 struct iattr *sattr)
 {
 	struct nfs_sattrargs	arg = { 
-		fh:	NFS_FH(inode),
-		sattr:	sattr
+		.fh	= NFS_FH(inode),
+		.sattr	= sattr
 	};
 	int	status;
 
@@ -99,13 +99,13 @@ nfs_proc_lookup(struct inode *dir, struct qstr *name,
 		struct nfs_fh *fhandle, struct nfs_fattr *fattr)
 {
 	struct nfs_diropargs	arg = {
-		fh:		NFS_FH(dir),
-		name:		name->name,
-		len:		name->len
+		.fh		= NFS_FH(dir),
+		.name		= name->name,
+		.len		= name->len
 	};
 	struct nfs_diropok	res = {
-		fh:		fhandle,
-		fattr:		fattr
+		.fh		= fhandle,
+		.fattr		= fattr
 	};
 	int			status;
 
@@ -120,9 +120,9 @@ static int
 nfs_proc_readlink(struct inode *inode, struct page *page)
 {
 	struct nfs_readlinkargs	args = {
-		fh:		NFS_FH(inode),
-		count:		PAGE_CACHE_SIZE,
-		pages:		&page
+		.fh		= NFS_FH(inode),
+		.count		= PAGE_CACHE_SIZE,
+		.pages		= &page
 	};
 	int			status;
 
@@ -140,21 +140,21 @@ nfs_proc_read(struct inode *inode, struct rpc_cred *cred,
 {
 	u64			offset = page_offset(page) + base;
 	struct nfs_readargs	arg = {
-		fh:		NFS_FH(inode),
-		offset:		offset,
-		count:		count,
-		pgbase:		base,
-		pages:		&page
+		.fh		= NFS_FH(inode),
+		.offset		= offset,
+		.count		= count,
+		.pgbase		= base,
+		.pages		= &page
 	};
 	struct nfs_readres	res = {
-		fattr:		fattr,
-		count:		count
+		.fattr		= fattr,
+		.count		= count
 	};
 	struct rpc_message	msg = {
-		rpc_proc:	NFSPROC_READ,
-		rpc_argp:	&arg,
-		rpc_resp:	&res,
-		rpc_cred:	cred
+		.rpc_proc	= NFSPROC_READ,
+		.rpc_argp	= &arg,
+		.rpc_resp	= &res,
+		.rpc_cred	= cred
 	};
 	int			status;
 
@@ -175,23 +175,23 @@ nfs_proc_write(struct inode *inode, struct rpc_cred *cred,
 {
 	u64			offset = page_offset(page) + base;
 	struct nfs_writeargs	arg = {
-		fh:		NFS_FH(inode),
-		offset:		offset,
-		count:		count,
-		stable:		NFS_FILE_SYNC,
-		pgbase:		base,
-		pages:		&page
+		.fh		= NFS_FH(inode),
+		.offset		= offset,
+		.count		= count,
+		.stable		= NFS_FILE_SYNC,
+		.pgbase		= base,
+		.pages		= &page
 	};
 	struct nfs_writeres     res = {
-		fattr:		fattr,
-		verf:		verf,
-		count:		count
+		.fattr		= fattr,
+		.verf		= verf,
+		.count		= count
 	};
 	struct rpc_message	msg = {
-		rpc_proc:	NFSPROC_WRITE,
-		rpc_argp:	&arg,
-		rpc_resp:	&res,
-		rpc_cred:	cred
+		.rpc_proc	= NFSPROC_WRITE,
+		.rpc_argp	= &arg,
+		.rpc_resp	= &res,
+		.rpc_cred	= cred
 	};
 	int			status, flags = 0;
 
@@ -211,14 +211,14 @@ nfs_proc_create(struct inode *dir, struct qstr *name, struct iattr *sattr,
 		int flags, struct nfs_fh *fhandle, struct nfs_fattr *fattr)
 {
 	struct nfs_createargs	arg = {
-		fh:		NFS_FH(dir),
-		name:		name->name,
-		len:		name->len,
-		sattr:		sattr
+		.fh		= NFS_FH(dir),
+		.name		= name->name,
+		.len		= name->len,
+		.sattr		= sattr
 	};
 	struct nfs_diropok	res = {
-		fh:		fhandle,
-		fattr:		fattr
+		.fh		= fhandle,
+		.fattr		= fattr
 	};
 	int			status;
 
@@ -237,14 +237,14 @@ nfs_proc_mknod(struct inode *dir, struct qstr *name, struct iattr *sattr,
 	       dev_t rdev, struct nfs_fh *fhandle, struct nfs_fattr *fattr)
 {
 	struct nfs_createargs	arg = {
-		fh:		NFS_FH(dir),
-		name:		name->name,
-		len:		name->len,
-		sattr:		sattr
+		.fh		= NFS_FH(dir),
+		.name		= name->name,
+		.len		= name->len,
+		.sattr		= sattr
 	};
 	struct nfs_diropok	res = {
-		fh:		fhandle,
-		fattr:		fattr
+		.fh		= fhandle,
+		.fattr		= fattr
 	};
 	int			status, mode;
 
@@ -275,15 +275,15 @@ static int
 nfs_proc_remove(struct inode *dir, struct qstr *name)
 {
 	struct nfs_diropargs	arg = {
-		fh:		NFS_FH(dir),
-		name:		name->name,
-		len:		name->len
+		.fh		= NFS_FH(dir),
+		.name		= name->name,
+		.len		= name->len
 	};
 	struct rpc_message	msg = { 
-		rpc_proc:	NFSPROC_REMOVE,
-		rpc_argp:	&arg,
-		rpc_resp:	NULL,
-		rpc_cred:	NULL
+		.rpc_proc	= NFSPROC_REMOVE,
+		.rpc_argp	= &arg,
+		.rpc_resp	= NULL,
+		.rpc_cred	= NULL
 	};
 	int			status;
 
@@ -324,12 +324,12 @@ nfs_proc_rename(struct inode *old_dir, struct qstr *old_name,
 		struct inode *new_dir, struct qstr *new_name)
 {
 	struct nfs_renameargs	arg = {
-		fromfh:		NFS_FH(old_dir),
-		fromname:	old_name->name,
-		fromlen:	old_name->len,
-		tofh:		NFS_FH(new_dir),
-		toname:		new_name->name,
-		tolen:		new_name->len
+		.fromfh		= NFS_FH(old_dir),
+		.fromname	= old_name->name,
+		.fromlen	= old_name->len,
+		.tofh		= NFS_FH(new_dir),
+		.toname		= new_name->name,
+		.tolen		= new_name->len
 	};
 	int			status;
 
@@ -343,10 +343,10 @@ static int
 nfs_proc_link(struct inode *inode, struct inode *dir, struct qstr *name)
 {
 	struct nfs_linkargs	arg = {
-		fromfh:		NFS_FH(inode),
-		tofh:		NFS_FH(dir),
-		toname:		name->name,
-		tolen:		name->len
+		.fromfh		= NFS_FH(inode),
+		.tofh		= NFS_FH(dir),
+		.toname		= name->name,
+		.tolen		= name->len
 	};
 	int			status;
 
@@ -362,12 +362,12 @@ nfs_proc_symlink(struct inode *dir, struct qstr *name, struct qstr *path,
 		 struct nfs_fattr *fattr)
 {
 	struct nfs_symlinkargs	arg = {
-		fromfh:		NFS_FH(dir),
-		fromname:	name->name,
-		fromlen:	name->len,
-		topath:		path->name,
-		tolen:		path->len,
-		sattr:		sattr
+		.fromfh		= NFS_FH(dir),
+		.fromname	= name->name,
+		.fromlen	= name->len,
+		.topath		= path->name,
+		.tolen		= path->len,
+		.sattr		= sattr
 	};
 	int			status;
 
@@ -383,14 +383,14 @@ nfs_proc_mkdir(struct inode *dir, struct qstr *name, struct iattr *sattr,
 	       struct nfs_fh *fhandle, struct nfs_fattr *fattr)
 {
 	struct nfs_createargs	arg = {
-		fh:		NFS_FH(dir),
-		name:		name->name,
-		len:		name->len,
-		sattr:		sattr
+		.fh		= NFS_FH(dir),
+		.name		= name->name,
+		.len		= name->len,
+		.sattr		= sattr
 	};
 	struct nfs_diropok	res = {
-		fh:		fhandle,
-		fattr:		fattr
+		.fh		= fhandle,
+		.fattr		= fattr
 	};
 	int			status;
 
@@ -405,9 +405,9 @@ static int
 nfs_proc_rmdir(struct inode *dir, struct qstr *name)
 {
 	struct nfs_diropargs	arg = {
-		fh:		NFS_FH(dir),
-		name:		name->name,
-		len:		name->len
+		.fh		= NFS_FH(dir),
+		.name		= name->name,
+		.len		= name->len
 	};
 	int			status;
 
@@ -429,16 +429,16 @@ nfs_proc_readdir(struct inode *dir, struct rpc_cred *cred,
 		 u64 cookie, struct page *page, unsigned int count, int plus)
 {
 	struct nfs_readdirargs	arg = {
-		fh:		NFS_FH(dir),
-		cookie:		cookie,
-		count:		count,
-		pages:		&page
+		.fh		= NFS_FH(dir),
+		.cookie		= cookie,
+		.count		= count,
+		.pages		= &page
 	};
 	struct rpc_message	msg = {
-		rpc_proc:	NFSPROC_READDIR,
-		rpc_argp:	&arg,
-		rpc_resp:	NULL,
-		rpc_cred:	cred
+		.rpc_proc	= NFSPROC_READDIR,
+		.rpc_argp	= &arg,
+		.rpc_resp	= NULL,
+		.rpc_cred	= cred
 	};
 	int			status;
 
@@ -468,27 +468,27 @@ nfs_proc_statfs(struct nfs_server *server, struct nfs_fh *fhandle,
 extern u32 * nfs_decode_dirent(u32 *, struct nfs_entry *, int);
 
 struct nfs_rpc_ops	nfs_v2_clientops = {
-	version:	2,		       /* protocol version */
-	getroot:	nfs_proc_get_root,
-	getattr:	nfs_proc_getattr,
-	setattr:	nfs_proc_setattr,
-	lookup:		nfs_proc_lookup,
-	access:		NULL,		       /* access */
-	readlink:	nfs_proc_readlink,
-	read:		nfs_proc_read,
-	write:		nfs_proc_write,
-	commit:		NULL,		       /* commit */
-	create:		nfs_proc_create,
-	remove:		nfs_proc_remove,
-	unlink_setup:	nfs_proc_unlink_setup,
-	unlink_done:	nfs_proc_unlink_done,
-	rename:		nfs_proc_rename,
-	link:		nfs_proc_link,
-	symlink:	nfs_proc_symlink,
-	mkdir:		nfs_proc_mkdir,
-	rmdir:		nfs_proc_rmdir,
-	readdir:	nfs_proc_readdir,
-	mknod:		nfs_proc_mknod,
-	statfs:		nfs_proc_statfs,
-	decode_dirent:	nfs_decode_dirent,
+	.version	= 2,		       /* protocol version */
+	.getroot	= nfs_proc_get_root,
+	.getattr	= nfs_proc_getattr,
+	.setattr	= nfs_proc_setattr,
+	.lookup		= nfs_proc_lookup,
+	.access		= NULL,		       /* access */
+	.readlink	= nfs_proc_readlink,
+	.read		= nfs_proc_read,
+	.write		= nfs_proc_write,
+	.commit		= NULL,		       /* commit */
+	.create		= nfs_proc_create,
+	.remove		= nfs_proc_remove,
+	.unlink_setup	= nfs_proc_unlink_setup,
+	.unlink_done	= nfs_proc_unlink_done,
+	.rename		= nfs_proc_rename,
+	.link		= nfs_proc_link,
+	.symlink	= nfs_proc_symlink,
+	.mkdir		= nfs_proc_mkdir,
+	.rmdir		= nfs_proc_rmdir,
+	.readdir	= nfs_proc_readdir,
+	.mknod		= nfs_proc_mknod,
+	.statfs		= nfs_proc_statfs,
+	.decode_dirent	= nfs_decode_dirent,
 };

@@ -32,7 +32,7 @@
 #define ECC_STAT		0x04	/* Corrected error */
 #define DRQ_STAT		0x08
 #define SEEK_STAT		0x10
-#define SERVICE_STAT		SEEK_STAT
+#define SRV_STAT		0x10
 #define WRERR_STAT		0x20
 #define READY_STAT		0x40
 #define BUSY_STAT		0x80
@@ -47,6 +47,13 @@
 #define ECC_ERR			0x40	/* Uncorrectable ECC error */
 #define BBD_ERR			0x80	/* pre-EIDE meaning:  block marked bad */
 #define ICRC_ERR		0x80	/* new meaning:  CRC error during transfer */
+
+/* Bits of HD_NSECTOR */
+#define CD			0x01
+#define IO			0x02
+#define REL			0x04
+#define TAG_MASK		0xf8
+
 
 /*
  * Command Header sizes for IOCTL commands
@@ -70,10 +77,11 @@
  */
 #define IDE_TASKFILE_STD_OUT_FLAGS	0xFE
 #define IDE_TASKFILE_STD_IN_FLAGS	0xFE
-#define IDE_HOB_STD_OUT_FLAGS		0x3C     /* sector, nsector lcyl and hcyl */
+#define IDE_HOB_STD_OUT_FLAGS		0x3C
 #define IDE_HOB_STD_IN_FLAGS		0x3C
 
 typedef unsigned char task_ioreg_t;
+typedef unsigned long sata_ioreg_t;
 
 typedef union ide_reg_valid_s {
 	unsigned all				: 16;
@@ -170,38 +178,83 @@ typedef struct hd_drive_hob_hdr {
 
 /* ATA/ATAPI Commands pre T13 Spec */
 #define WIN_NOP				0x00
+/*
+ *	0x01->0x02 Reserved
+ */
 #define CFA_REQ_EXT_ERROR_CODE		0x03 /* CFA Request Extended Error Code */
+/*
+ *	0x04->0x07 Reserved
+ */
 #define WIN_SRST			0x08 /* ATAPI soft reset command */
 #define WIN_DEVICE_RESET		0x08
+/*
+ *	0x09->0x0F Reserved
+ */
 #define WIN_RECAL			0x10
-#define WIN_RESTORE			0x10
+#define WIN_RESTORE			WIN_RECAL
+/*
+ *	0x10->0x1F Reserved
+ */
 #define WIN_READ			0x20 /* 28-Bit */
+#define WIN_READ_ONCE			0x21 /* 28-Bit without retries */
+#define WIN_READ_LONG			0x22 /* 28-Bit */
+#define WIN_READ_LONG_ONCE		0x23 /* 28-Bit without retries */
 #define WIN_READ_EXT			0x24 /* 48-Bit */
 #define WIN_READDMA_EXT			0x25 /* 48-Bit */
 #define WIN_READDMA_QUEUED_EXT		0x26 /* 48-Bit */
 #define WIN_READ_NATIVE_MAX_EXT		0x27 /* 48-Bit */
+/*
+ *	0x28
+ */
 #define WIN_MULTREAD_EXT		0x29 /* 48-Bit */
+/*
+ *	0x2A->0x2F Reserved
+ */
 #define WIN_WRITE			0x30 /* 28-Bit */
+#define WIN_WRITE_ONCE			0x31 /* 28-Bit without retries */
+#define WIN_WRITE_LONG			0x32 /* 28-Bit */
+#define WIN_WRITE_LONG_ONCE		0x33 /* 28-Bit without retries */
 #define WIN_WRITE_EXT			0x34 /* 48-Bit */
 #define WIN_WRITEDMA_EXT		0x35 /* 48-Bit */
 #define WIN_WRITEDMA_QUEUED_EXT		0x36 /* 48-Bit */
 #define WIN_SET_MAX_EXT			0x37 /* 48-Bit */
 #define CFA_WRITE_SECT_WO_ERASE		0x38 /* CFA Write Sectors without erase */
 #define WIN_MULTWRITE_EXT		0x39 /* 48-Bit */
+/*
+ *	0x3A->0x3B Reserved
+ */
 #define WIN_WRITE_VERIFY		0x3C /* 28-Bit */
+/*
+ *	0x3D->0x3F Reserved
+ */
 #define WIN_VERIFY			0x40 /* 28-Bit - Read Verify Sectors */
+#define WIN_VERIFY_ONCE			0x41 /* 28-Bit - without retries */
 #define WIN_VERIFY_EXT			0x42 /* 48-Bit */
+/*
+ *	0x43->0x4F Reserved
+ */
 #define WIN_FORMAT			0x50
+/*
+ *	0x51->0x5F Reserved
+ */
 #define WIN_INIT			0x60
-#define WIN_SEEK			0x70
+/*
+ *	0x61->0x5F Reserved
+ */
+#define WIN_SEEK			0x70 /* 0x70-0x7F Reserved */
+
 #define CFA_TRANSLATE_SECTOR		0x87 /* CFA Translate Sector */
 #define WIN_DIAGNOSE			0x90
 #define WIN_SPECIFY			0x91 /* set drive geometry translation */
 #define WIN_DOWNLOAD_MICROCODE		0x92
 #define WIN_STANDBYNOW2			0x94
+#define WIN_STANDBY2			0x96
 #define WIN_SETIDLE2			0x97
 #define WIN_CHECKPOWERMODE2		0x98
 #define WIN_SLEEPNOW2			0x99
+/*
+ *	0x9A VENDOR
+ */
 #define WIN_PACKETCMD			0xA0 /* Send a packet command. */
 #define WIN_PIDENTIFY			0xA1 /* identify ATAPI device	*/
 #define WIN_QUEUED_SERVICE		0xA2
@@ -212,10 +265,15 @@ typedef struct hd_drive_hob_hdr {
 #define WIN_SETMULT			0xC6 /* enable/disable multiple mode */
 #define WIN_READDMA_QUEUED		0xC7 /* read sectors using Queued DMA transfers */
 #define WIN_READDMA			0xC8 /* read sectors using DMA transfers */
+#define WIN_READDMA_ONCE		0xC9 /* 28-Bit - without retries */
 #define WIN_WRITEDMA			0xCA /* write sectors using DMA transfers */
+#define WIN_WRITEDMA_ONCE		0xCB /* 28-Bit - without retries */
 #define WIN_WRITEDMA_QUEUED		0xCC /* write sectors using Queued DMA transfers */
 #define CFA_WRITE_MULTI_WO_ERASE	0xCD /* CFA Write multiple without erase */
 #define WIN_GETMEDIASTATUS		0xDA
+#define WIN_ACKMEDIACHANGE		0xDB /* ATA-1, ATA-2 vendor */
+#define WIN_POSTBOOT			0xDC
+#define WIN_PREBOOT 			0xDD
 #define WIN_DOORLOCK			0xDE /* lock door on removable drives */
 #define WIN_DOORUNLOCK			0xDF /* unlock door on removable drives */
 #define WIN_STANDBYNOW1			0xE0
@@ -227,6 +285,8 @@ typedef struct hd_drive_hob_hdr {
 #define WIN_SLEEPNOW1			0xE6
 #define WIN_FLUSH_CACHE			0xE7
 #define WIN_WRITE_BUFFER		0xE8 /* force write only 1 sector */
+#define WIN_WRITE_SAME			0xE9 /* read ata-2 to use */
+	/* SET_FEATURES 0x22 or 0xDD */
 #define WIN_FLUSH_CACHE_EXT		0xEA /* 48-Bit */
 #define WIN_IDENTIFY			0xEC /* ask drive to identify itself	*/
 #define WIN_MEDIAEJECT			0xED
@@ -289,6 +349,7 @@ typedef struct hd_drive_hob_hdr {
 #	define XFER_PIO_SLOW	0x00	/* 0000|0000 */
 #define SETFEATURES_DIS_DEFECT	0x04	/* Disable Defect Management */
 #define SETFEATURES_EN_APM	0x05	/* Enable advanced power management */
+#define SETFEATURES_EN_SAME_R	0x22	/* for a region ATA-1 */
 #define SETFEATURES_DIS_MSN	0x31	/* Disable Media Status Notification */
 #define SETFEATURES_DIS_RETRY	0x33	/* Disable Retry */
 #define SETFEATURES_EN_AAM	0x42	/* Enable Automatic Acoustic Management */
@@ -308,11 +369,13 @@ typedef struct hd_drive_hob_hdr {
 #define SETFEATURES_EN_RETRY	0x99	/* Enable Retry */
 #define SETFEATURES_EN_RLA	0xAA	/* Enable read look-ahead feature */
 #define SETFEATURES_PREFETCH	0xAB	/* Sets drive prefetch value */
+#define SETFEATURES_EN_REST	0xAC	/* ATA-1 */
 #define SETFEATURES_4B_RW_LONG	0xBB	/* Set Lenght of 4 bytes */
 #define SETFEATURES_DIS_AAM	0xC2	/* Disable Automatic Acoustic Management */
 #define SETFEATURES_EN_RPOD	0xCC	/* Enable reverting to power on defaults */
-#define SETFEATURES_DIS_RI	0xDD	/* Disable release interrupt */
-#define SETFEATURES_DIS_SI	0xDE	/* Disable SERVICE interrupt */
+#define SETFEATURES_DIS_RI	0xDD	/* Disable release interrupt ATAPI */
+#define SETFEATURES_EN_SAME_M	0xDD	/* for a entire device ATA-1 */
+#define SETFEATURES_DIS_SI	0xDE	/* Disable SERVICE interrupt ATAPI */
 
 /* WIN_SECURITY sub-commands */
 
@@ -343,6 +406,9 @@ struct hd_big_geometry {
 #define HDIO_GET_UNMASKINTR	0x0302	/* get current unmask setting */
 #define HDIO_GET_MULTCOUNT	0x0304	/* get current IDE blockmode setting */
 #define HDIO_GET_QDMA		0x0305	/* get use-qdma flag */
+
+#define HDIO_SET_XFER		0x0306  /* set transfer rate via proc */
+
 #define HDIO_OBSOLETE_IDENTITY	0x0307	/* OBSOLETE, DO NOT USE: returns 142 bytes */
 #define HDIO_GET_KEEPSETTINGS	0x0308	/* get keep-settings-on-reset flag */
 #define HDIO_GET_32BIT		0x0309	/* get current io_32bit setting */
@@ -389,6 +455,9 @@ enum {
 /* hd/ide ctl's that pass (arg) ptrs to user space are numbered 0x033n/0x033n */
 /* 0x330 is reserved - used to be HDIO_GETGEO_BIG */
 #define HDIO_GETGEO_BIG_RAW	0x0331	/* */
+
+#define HDIO_SET_IDE_SCSI      0x0338
+#define HDIO_SET_SCSI_IDE      0x0339
 
 #define __NEW_HD_DRIVE_ID
 
@@ -506,7 +575,10 @@ struct hd_driveid {
 					 * cmd set-feature supported extensions
 					 * 15:	Shall be ZERO
 					 * 14:	Shall be ONE
-					 * 13:3	reserved
+					 * 13:6	reserved
+					 *  5:	General Purpose Logging
+					 *  4:	Streaming Feature Set
+					 *  3:	Media Card Pass Through
 					 *  2:	Media Serial Number Valid
 					 *  1:	SMART selt-test supported
 					 *  0:	SMART error logging
@@ -553,19 +625,22 @@ struct hd_driveid {
 					 * command set-feature default
 					 * 15:	Shall be ZERO
 					 * 14:	Shall be ONE
-					 * 13:3	reserved
+					 * 13:6	reserved
+					 *  5:	General Purpose Logging enabled
+					 *  4:	Valid CONFIGURE STREAM executed
+					 *  3:	Media Card Pass Through enabled
 					 *  2:	Media Serial Number Valid
 					 *  1:	SMART selt-test supported
 					 *  0:	SMART error logging
 					 */
 	unsigned short  dma_ultra;	/* (word 88) */
-	unsigned short	word89;		/* reserved (word 89) */
-	unsigned short	word90;		/* reserved (word 90) */
+	unsigned short	trseuc;		/* time required for security erase */
+	unsigned short	trsEuc;		/* time required for enhanced erase */
 	unsigned short	CurAPMvalues;	/* current APM values */
-	unsigned short	word92;		/* reserved (word 92) */
+	unsigned short	mprc;		/* master password revision code */
 	unsigned short	hw_config;	/* hardware config (word 93)
-					 * 15:
-					 * 14:
+					 * 15:	Shall be ZERO
+					 * 14:	Shall be ONE
 					 * 13:
 					 * 12:
 					 * 11:
@@ -579,13 +654,16 @@ struct hd_driveid {
 					 *  3:
 					 *  2:
 					 *  1:
-					 *  0:
+					 *  0:	Shall be ONE
 					 */
 	unsigned short	acoustic;	/* (word 94)
 					 * 15:8	Vendor's recommended value
 					 *  7:0	current value
 					 */
-	unsigned short	words95_99[5];	/* reserved words 95-99 */
+	unsigned short	msrqs;		/* min stream request size */
+	unsigned short	sxfert;		/* stream transfer time */
+	unsigned short	sal;		/* stream access latency */
+	unsigned int	spg;		/* stream performance granularity */
 	unsigned long long lba_capacity_2;/* 48-bit total number of sectors */
 	unsigned short	words104_125[22];/* reserved words 104-125 */
 	unsigned short	last_lun;	/* (word 126) */
@@ -634,7 +712,7 @@ struct hd_driveid {
 					 * 15:8 Checksum
 					 *  7:0 Signature
 					 */
-} __attribute__((packed));
+};
 
 /*
  * IDE "nice" flags. These are used on a per drive basis to determine

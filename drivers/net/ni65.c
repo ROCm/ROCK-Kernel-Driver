@@ -1108,7 +1108,7 @@ static int ni65_send_packet(struct sk_buff *skb, struct net_device *dev)
 	{
 		short len = ETH_ZLEN < skb->len ? skb->len : ETH_ZLEN;
 		struct tmd *tmdp;
-		long flags;
+               unsigned long flags;
 
 #ifdef XMT_VIA_SKB
 		if( (unsigned long) (skb->data + skb->len) > 0x1000000) {

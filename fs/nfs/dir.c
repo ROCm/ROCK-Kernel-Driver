@@ -50,25 +50,25 @@ static int nfs_rename(struct inode *, struct dentry *,
 		      struct inode *, struct dentry *);
 
 struct file_operations nfs_dir_operations = {
-	read:		generic_read_dir,
-	readdir:	nfs_readdir,
-	open:		nfs_open,
-	release:	nfs_release,
+	.read		= generic_read_dir,
+	.readdir	= nfs_readdir,
+	.open		= nfs_open,
+	.release	= nfs_release,
 };
 
 struct inode_operations nfs_dir_inode_operations = {
-	create:		nfs_create,
-	lookup:		nfs_lookup,
-	link:		nfs_link,
-	unlink:		nfs_unlink,
-	symlink:	nfs_symlink,
-	mkdir:		nfs_mkdir,
-	rmdir:		nfs_rmdir,
-	mknod:		nfs_mknod,
-	rename:		nfs_rename,
-	permission:	nfs_permission,
-	getattr:	nfs_getattr,
-	setattr:	nfs_setattr,
+	.create		= nfs_create,
+	.lookup		= nfs_lookup,
+	.link		= nfs_link,
+	.unlink		= nfs_unlink,
+	.symlink	= nfs_symlink,
+	.mkdir		= nfs_mkdir,
+	.rmdir		= nfs_rmdir,
+	.mknod		= nfs_mknod,
+	.rename		= nfs_rename,
+	.permission	= nfs_permission,
+	.getattr	= nfs_getattr,
+	.setattr	= nfs_setattr,
 };
 
 typedef u32 * (*decode_dirent_t)(u32 *, struct nfs_entry *, int);
@@ -607,9 +607,9 @@ static void nfs_dentry_iput(struct dentry *dentry, struct inode *inode)
 }
 
 struct dentry_operations nfs_dentry_operations = {
-	d_revalidate:	nfs_lookup_revalidate,
-	d_delete:	nfs_dentry_delete,
-	d_iput:		nfs_dentry_iput,
+	.d_revalidate	= nfs_lookup_revalidate,
+	.d_delete	= nfs_dentry_delete,
+	.d_iput		= nfs_dentry_iput,
 };
 
 static struct dentry *nfs_lookup(struct inode *dir, struct dentry * dentry)
