@@ -78,11 +78,6 @@ void con_protect_unimap(int currcons, int rdonly);
 int con_copy_unimap(int dstcons, int srccons);
 
 /* vt.c */
-
-extern unsigned int video_font_height;
-extern unsigned int default_font_height;
-extern unsigned int video_scan_lines;
-
 void complete_change_console(unsigned int new_console);
 int vt_waitactive(int vt);
 void change_console(unsigned int);

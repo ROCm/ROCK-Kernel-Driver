@@ -91,24 +91,25 @@ static unsigned long vgacon_uni_pagedir[2];
 
 
 /* Description of the hardware situation */
-static unsigned long vga_vram_base;	/* Base of video memory */
-static unsigned long vga_vram_end;	/* End of video memory */
-static u16 vga_video_port_reg;		/* Video register select port */
-static u16 vga_video_port_val;		/* Video register value port */
-static unsigned int vga_video_num_columns;	/* Number of text columns */
-static unsigned int vga_video_num_lines;	/* Number of text lines */
-static int vga_can_do_color = 0;	/* Do we support colors? */
-static unsigned int vga_default_font_height;	/* Height of default screen font */
-static unsigned char vga_video_type;	/* Card type */
-static unsigned char vga_hardscroll_enabled;
-static unsigned char vga_hardscroll_user_enable = 1;
-static unsigned char vga_font_is_default = 1;
-static int vga_vesa_blanked;
-static int vga_palette_blanked;
-static int vga_is_gfx;
-static int vga_512_chars;
-static int vga_video_font_height;
-static unsigned int vga_rolled_over = 0;
+static unsigned long	vga_vram_base;		/* Base of video memory */
+static unsigned long	vga_vram_end;		/* End of video memory */
+static u16		vga_video_port_reg;	/* Video register select port */
+static u16		vga_video_port_val;	/* Video register value port */
+static unsigned int	vga_video_num_columns;	/* Number of text columns */
+static unsigned int	vga_video_num_lines;	/* Number of text lines */
+static int		vga_can_do_color = 0;	/* Do we support colors? */
+static unsigned int	vga_default_font_height;/* Height of default screen font */
+static unsigned char	vga_video_type;		/* Card type */
+static unsigned char	vga_hardscroll_enabled;
+static unsigned char	vga_hardscroll_user_enable = 1;
+static unsigned char	vga_font_is_default = 1;
+static int		vga_vesa_blanked;
+static int 		vga_palette_blanked;
+static int 		vga_is_gfx;
+static int 		vga_512_chars;
+static int 		vga_video_font_height;
+static int 		vga_scan_lines;
+static unsigned int 	vga_rolled_over = 0;
 
 static int __init no_scroll(char *str)
 {
@@ -317,11 +318,9 @@ static const char __init *vgacon_startup(void)
 		vga_default_font_height = ORIG_VIDEO_POINTS;
 		vga_video_font_height = ORIG_VIDEO_POINTS;
 		/* This may be suboptimal but is a safe bet - go with it */
-		video_scan_lines =
+		vga_scan_lines =
 		    vga_video_font_height * vga_video_num_lines;
 	}
-	video_font_height = vga_video_font_height;
-
 	return display_desc;
 }
 
@@ -333,6 +332,8 @@ static void vgacon_init(struct vc_data *c, int init)
 	c->vc_can_do_color = vga_can_do_color;
 	c->vc_cols = vga_video_num_columns;
 	c->vc_rows = vga_video_num_lines;
+	c->vc_scan_lines = vga_scan_lines;
+	c->vc_font.height = vga_video_font_height;
 	c->vc_complement_mask = 0x7700;
 	p = *c->vc_uni_pagedir_loc;
 	if (c->vc_uni_pagedir_loc == &c->vc_uni_pagedir ||
@@ -451,32 +452,32 @@ static void vgacon_cursor(struct vc_data *c, int mode)
 		switch (c->vc_cursor_type & 0x0f) {
 		case CUR_UNDERLINE:
 			vgacon_set_cursor_size(c->vc_x,
-					       video_font_height -
-					       (video_font_height <
+					       c->vc_font.height -
+					       (c->vc_font.height <
 						10 ? 2 : 3),
-					       video_font_height -
-					       (video_font_height <
+					       c->vc_font.height -
+					       (c->vc_font.height <
 						10 ? 1 : 2));
 			break;
 		case CUR_TWO_THIRDS:
 			vgacon_set_cursor_size(c->vc_x,
-					       video_font_height / 3,
-					       video_font_height -
-					       (video_font_height <
+					       c->vc_font.height / 3,
+					       c->vc_font.height -
+					       (c->vc_font.height <
 						10 ? 1 : 2));
 			break;
 		case CUR_LOWER_THIRD:
 			vgacon_set_cursor_size(c->vc_x,
-					       (video_font_height * 2) / 3,
-					       video_font_height -
-					       (video_font_height <
+					       (c->vc_font.height * 2) / 3,
+					       c->vc_font.height -
+					       (c->vc_font.height <
 						10 ? 1 : 2));
 			break;
 		case CUR_LOWER_HALF:
 			vgacon_set_cursor_size(c->vc_x,
-					       video_font_height / 2,
-					       video_font_height -
-					       (video_font_height <
+					       c->vc_font.height / 2,
+					       c->vc_font.height -
+					       (c->vc_font.height <
 						10 ? 1 : 2));
 			break;
 		case CUR_NONE:
@@ -484,7 +485,7 @@ static void vgacon_cursor(struct vc_data *c, int mode)
 			break;
 		default:
 			vgacon_set_cursor_size(c->vc_x, 1,
-					       video_font_height);
+					       c->vc_font.height);
 			break;
 		}
 		break;
@@ -856,17 +857,17 @@ static int vgacon_do_font_op(struct vgastate *state,char *arg,int set,int ch512)
 /*
  * Adjust the screen to fit a font of a certain height
  */
-static int vgacon_adjust_height(unsigned fontheight)
+static int vgacon_adjust_height(struct vc_data *vc, unsigned fontheight)
 {
 	unsigned char ovr, vde, fsr;
 	int rows, maxscan, i;
 
-	if (fontheight == vga_video_font_height)
+	if (fontheight == vc->vc_font.height)
 		return 0;
 
-	vga_video_font_height = video_font_height = fontheight;
+	vc->vc_font.height = fontheight;
 
-	rows = video_scan_lines / fontheight;	/* Number of video rows we end up with */
+	rows = vc->vc_scan_lines / fontheight;	/* Number of video rows we end up with */
 	maxscan = rows * fontheight - 1;	/* Scan lines to actually display-1 */
 
 	/* Reprogram the CRTC for the new font size
@@ -922,10 +923,10 @@ static int vgacon_font_op(struct vc_data *c, struct console_font_op *op)
 			return -EINVAL;
 		rc = vgacon_do_font_op(&state, op->data, 1, op->charcount == 512);
 		if (!rc && !(op->flags & KD_FONT_FLAG_DONT_RECALC))
-			rc = vgacon_adjust_height(op->height);
+			rc = vgacon_adjust_height(c, op->height);
 	} else if (op->op == KD_FONT_OP_GET) {
 		op->width = 8;
-		op->height = vga_video_font_height;
+		op->height = c->vc_font.height;
 		op->charcount = vga_512_chars ? 512 : 256;
 		if (!op->data)
 			return 0;
