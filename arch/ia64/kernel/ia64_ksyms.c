@@ -127,6 +127,8 @@ EXPORT_SYMBOL(ia64_pal_call_phys_stacked);
 EXPORT_SYMBOL(ia64_pal_call_phys_static);
 EXPORT_SYMBOL(ia64_pal_call_stacked);
 EXPORT_SYMBOL(ia64_pal_call_static);
+EXPORT_SYMBOL(ia64_load_scratch_fpregs);
+EXPORT_SYMBOL(ia64_save_scratch_fpregs);
 
 extern struct efi efi;
 EXPORT_SYMBOL(efi);

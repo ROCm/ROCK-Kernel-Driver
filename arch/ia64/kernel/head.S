@@ -13,6 +13,8 @@
  * Copyright (C) 1999 Intel Corp.
  * Copyright (C) 1999 Asit Mallick <Asit.K.Mallick@intel.com>
  * Copyright (C) 1999 Don Dugger <Don.Dugger@intel.com>
+ * Copyright (C) 2002 Fenghua Yu <fenghua.yu@intel.com>
+ *   -Optimize __ia64_save_fpu() and __ia64_load_fpu() for Itanium 2.
  */
 
 #include <linux/config.h>
@@ -260,302 +262,297 @@ GLOBAL_ENTRY(ia64_load_debug_regs)
 END(ia64_load_debug_regs)
 
 GLOBAL_ENTRY(__ia64_save_fpu)
-	alloc r2=ar.pfs,1,0,0,0
-	adds r3=16,in0
+	alloc r2=ar.pfs,1,4,0,0
+	adds loc0=96*16-16,in0
+	adds loc1=96*16-16-128,in0
 	;;
-	stf.spill.nta [in0]=f32,32
-	stf.spill.nta [ r3]=f33,32
+	stf.spill.nta [loc0]=f127,-256
+	stf.spill.nta [loc1]=f119,-256
 	;;
-	stf.spill.nta [in0]=f34,32
-	stf.spill.nta [ r3]=f35,32
+	stf.spill.nta [loc0]=f111,-256
+	stf.spill.nta [loc1]=f103,-256
 	;;
-	stf.spill.nta [in0]=f36,32
-	stf.spill.nta [ r3]=f37,32
+	stf.spill.nta [loc0]=f95,-256
+	stf.spill.nta [loc1]=f87,-256
 	;;
-	stf.spill.nta [in0]=f38,32
-	stf.spill.nta [ r3]=f39,32
+	stf.spill.nta [loc0]=f79,-256
+	stf.spill.nta [loc1]=f71,-256
 	;;
-	stf.spill.nta [in0]=f40,32
-	stf.spill.nta [ r3]=f41,32
+	stf.spill.nta [loc0]=f63,-256
+	stf.spill.nta [loc1]=f55,-256
+	adds loc2=96*16-32,in0
 	;;
-	stf.spill.nta [in0]=f42,32
-	stf.spill.nta [ r3]=f43,32
+	stf.spill.nta [loc0]=f47,-256
+	stf.spill.nta [loc1]=f39,-256
+	adds loc3=96*16-32-128,in0
 	;;
-	stf.spill.nta [in0]=f44,32
-	stf.spill.nta [ r3]=f45,32
+	stf.spill.nta [loc2]=f126,-256
+	stf.spill.nta [loc3]=f118,-256
 	;;
-	stf.spill.nta [in0]=f46,32
-	stf.spill.nta [ r3]=f47,32
+	stf.spill.nta [loc2]=f110,-256
+	stf.spill.nta [loc3]=f102,-256
 	;;
-	stf.spill.nta [in0]=f48,32
-	stf.spill.nta [ r3]=f49,32
+	stf.spill.nta [loc2]=f94,-256
+	stf.spill.nta [loc3]=f86,-256
 	;;
-	stf.spill.nta [in0]=f50,32
-	stf.spill.nta [ r3]=f51,32
+	stf.spill.nta [loc2]=f78,-256
+	stf.spill.nta [loc3]=f70,-256
 	;;
-	stf.spill.nta [in0]=f52,32
-	stf.spill.nta [ r3]=f53,32
+	stf.spill.nta [loc2]=f62,-256
+	stf.spill.nta [loc3]=f54,-256
+	adds loc0=96*16-48,in0
 	;;
-	stf.spill.nta [in0]=f54,32
-	stf.spill.nta [ r3]=f55,32
+	stf.spill.nta [loc2]=f46,-256
+	stf.spill.nta [loc3]=f38,-256
+	adds loc1=96*16-48-128,in0
 	;;
-	stf.spill.nta [in0]=f56,32
-	stf.spill.nta [ r3]=f57,32
+	stf.spill.nta [loc0]=f125,-256
+	stf.spill.nta [loc1]=f117,-256
 	;;
-	stf.spill.nta [in0]=f58,32
-	stf.spill.nta [ r3]=f59,32
+	stf.spill.nta [loc0]=f109,-256
+	stf.spill.nta [loc1]=f101,-256
 	;;
-	stf.spill.nta [in0]=f60,32
-	stf.spill.nta [ r3]=f61,32
+	stf.spill.nta [loc0]=f93,-256
+	stf.spill.nta [loc1]=f85,-256
 	;;
-	stf.spill.nta [in0]=f62,32
-	stf.spill.nta [ r3]=f63,32
+	stf.spill.nta [loc0]=f77,-256
+	stf.spill.nta [loc1]=f69,-256
 	;;
-	stf.spill.nta [in0]=f64,32
-	stf.spill.nta [ r3]=f65,32
+	stf.spill.nta [loc0]=f61,-256
+	stf.spill.nta [loc1]=f53,-256
+	adds loc2=96*16-64,in0
 	;;
-	stf.spill.nta [in0]=f66,32
-	stf.spill.nta [ r3]=f67,32
+	stf.spill.nta [loc0]=f45,-256
+	stf.spill.nta [loc1]=f37,-256
+	adds loc3=96*16-64-128,in0
 	;;
-	stf.spill.nta [in0]=f68,32
-	stf.spill.nta [ r3]=f69,32
+	stf.spill.nta [loc2]=f124,-256
+	stf.spill.nta [loc3]=f116,-256
 	;;
-	stf.spill.nta [in0]=f70,32
-	stf.spill.nta [ r3]=f71,32
+	stf.spill.nta [loc2]=f108,-256
+	stf.spill.nta [loc3]=f100,-256
 	;;
-	stf.spill.nta [in0]=f72,32
-	stf.spill.nta [ r3]=f73,32
+	stf.spill.nta [loc2]=f92,-256
+	stf.spill.nta [loc3]=f84,-256
 	;;
-	stf.spill.nta [in0]=f74,32
-	stf.spill.nta [ r3]=f75,32
+	stf.spill.nta [loc2]=f76,-256
+	stf.spill.nta [loc3]=f68,-256
 	;;
-	stf.spill.nta [in0]=f76,32
-	stf.spill.nta [ r3]=f77,32
+	stf.spill.nta [loc2]=f60,-256
+	stf.spill.nta [loc3]=f52,-256
+	adds loc0=96*16-80,in0
 	;;
-	stf.spill.nta [in0]=f78,32
-	stf.spill.nta [ r3]=f79,32
+	stf.spill.nta [loc2]=f44,-256
+	stf.spill.nta [loc3]=f36,-256
+	adds loc1=96*16-80-128,in0
 	;;
-	stf.spill.nta [in0]=f80,32
-	stf.spill.nta [ r3]=f81,32
+	stf.spill.nta [loc0]=f123,-256
+	stf.spill.nta [loc1]=f115,-256
 	;;
-	stf.spill.nta [in0]=f82,32
-	stf.spill.nta [ r3]=f83,32
+	stf.spill.nta [loc0]=f107,-256
+	stf.spill.nta [loc1]=f99,-256
 	;;
-	stf.spill.nta [in0]=f84,32
-	stf.spill.nta [ r3]=f85,32
+	stf.spill.nta [loc0]=f91,-256
+	stf.spill.nta [loc1]=f83,-256
 	;;
-	stf.spill.nta [in0]=f86,32
-	stf.spill.nta [ r3]=f87,32
+	stf.spill.nta [loc0]=f75,-256
+	stf.spill.nta [loc1]=f67,-256
 	;;
-	stf.spill.nta [in0]=f88,32
-	stf.spill.nta [ r3]=f89,32
+	stf.spill.nta [loc0]=f59,-256
+	stf.spill.nta [loc1]=f51,-256
+	adds loc2=96*16-96,in0
 	;;
-	stf.spill.nta [in0]=f90,32
-	stf.spill.nta [ r3]=f91,32
+	stf.spill.nta [loc0]=f43,-256
+	stf.spill.nta [loc1]=f35,-256
+	adds loc3=96*16-96-128,in0
 	;;
-	stf.spill.nta [in0]=f92,32
-	stf.spill.nta [ r3]=f93,32
+	stf.spill.nta [loc2]=f122,-256
+	stf.spill.nta [loc3]=f114,-256
 	;;
-	stf.spill.nta [in0]=f94,32
-	stf.spill.nta [ r3]=f95,32
+	stf.spill.nta [loc2]=f106,-256
+	stf.spill.nta [loc3]=f98,-256
 	;;
-	stf.spill.nta [in0]=f96,32
-	stf.spill.nta [ r3]=f97,32
+	stf.spill.nta [loc2]=f90,-256
+	stf.spill.nta [loc3]=f82,-256
 	;;
-	stf.spill.nta [in0]=f98,32
-	stf.spill.nta [ r3]=f99,32
+	stf.spill.nta [loc2]=f74,-256
+	stf.spill.nta [loc3]=f66,-256
 	;;
-	stf.spill.nta [in0]=f100,32
-	stf.spill.nta [ r3]=f101,32
+	stf.spill.nta [loc2]=f58,-256
+	stf.spill.nta [loc3]=f50,-256
+	adds loc0=96*16-112,in0
 	;;
-	stf.spill.nta [in0]=f102,32
-	stf.spill.nta [ r3]=f103,32
+	stf.spill.nta [loc2]=f42,-256
+	stf.spill.nta [loc3]=f34,-256
+	adds loc1=96*16-112-128,in0
 	;;
-	stf.spill.nta [in0]=f104,32
-	stf.spill.nta [ r3]=f105,32
+	stf.spill.nta [loc0]=f121,-256
+	stf.spill.nta [loc1]=f113,-256
 	;;
-	stf.spill.nta [in0]=f106,32
-	stf.spill.nta [ r3]=f107,32
+	stf.spill.nta [loc0]=f105,-256
+	stf.spill.nta [loc1]=f97,-256
 	;;
-	stf.spill.nta [in0]=f108,32
-	stf.spill.nta [ r3]=f109,32
+	stf.spill.nta [loc0]=f89,-256
+	stf.spill.nta [loc1]=f81,-256
 	;;
-	stf.spill.nta [in0]=f110,32
-	stf.spill.nta [ r3]=f111,32
+	stf.spill.nta [loc0]=f73,-256
+	stf.spill.nta [loc1]=f65,-256
 	;;
-	stf.spill.nta [in0]=f112,32
-	stf.spill.nta [ r3]=f113,32
+	stf.spill.nta [loc0]=f57,-256
+	stf.spill.nta [loc1]=f49,-256
+	adds loc2=96*16-128,in0
 	;;
-	stf.spill.nta [in0]=f114,32
-	stf.spill.nta [ r3]=f115,32
+	stf.spill.nta [loc0]=f41,-256
+	stf.spill.nta [loc1]=f33,-256
+	adds loc3=96*16-128-128,in0
 	;;
-	stf.spill.nta [in0]=f116,32
-	stf.spill.nta [ r3]=f117,32
+	stf.spill.nta [loc2]=f120,-256
+	stf.spill.nta [loc3]=f112,-256
 	;;
-	stf.spill.nta [in0]=f118,32
-	stf.spill.nta [ r3]=f119,32
+	stf.spill.nta [loc2]=f104,-256
+	stf.spill.nta [loc3]=f96,-256
 	;;
-	stf.spill.nta [in0]=f120,32
-	stf.spill.nta [ r3]=f121,32
+	stf.spill.nta [loc2]=f88,-256
+	stf.spill.nta [loc3]=f80,-256
 	;;
-	stf.spill.nta [in0]=f122,32
-	stf.spill.nta [ r3]=f123,32
+	stf.spill.nta [loc2]=f72,-256
+	stf.spill.nta [loc3]=f64,-256
 	;;
-	stf.spill.nta [in0]=f124,32
-	stf.spill.nta [ r3]=f125,32
+	stf.spill.nta [loc2]=f56,-256
+	stf.spill.nta [loc3]=f48,-256
 	;;
-	stf.spill.nta [in0]=f126,32
-	stf.spill.nta [ r3]=f127,32
+	stf.spill.nta [loc2]=f40
+	stf.spill.nta [loc3]=f32
 	br.ret.sptk.many rp
 END(__ia64_save_fpu)
 
 GLOBAL_ENTRY(__ia64_load_fpu)
-	alloc r2=ar.pfs,1,0,0,0
-	adds r3=16,in0
+	alloc r2=ar.pfs,1,2,0,0
+	adds r3=128,in0
+	adds r14=256,in0
+	adds r15=384,in0
+	mov loc0=512
+	mov loc1=-1024+16
 	;;
-	ldf.fill.nta f32=[in0],32
-	ldf.fill.nta f33=[ r3],32
+	ldf.fill.nta f32=[in0],loc0
+	ldf.fill.nta f40=[ r3],loc0
+	ldf.fill.nta f48=[r14],loc0
+	ldf.fill.nta f56=[r15],loc0
 	;;
-	ldf.fill.nta f34=[in0],32
-	ldf.fill.nta f35=[ r3],32
+	ldf.fill.nta f64=[in0],loc0
+	ldf.fill.nta f72=[ r3],loc0
+	ldf.fill.nta f80=[r14],loc0
+	ldf.fill.nta f88=[r15],loc0
 	;;
-	ldf.fill.nta f36=[in0],32
-	ldf.fill.nta f37=[ r3],32
+	ldf.fill.nta f96=[in0],loc1
+	ldf.fill.nta f104=[ r3],loc1
+	ldf.fill.nta f112=[r14],loc1
+	ldf.fill.nta f120=[r15],loc1
 	;;
-	ldf.fill.nta f38=[in0],32
-	ldf.fill.nta f39=[ r3],32
+	ldf.fill.nta f33=[in0],loc0
+	ldf.fill.nta f41=[ r3],loc0
+	ldf.fill.nta f49=[r14],loc0
+	ldf.fill.nta f57=[r15],loc0
 	;;
-	ldf.fill.nta f40=[in0],32
-	ldf.fill.nta f41=[ r3],32
+	ldf.fill.nta f65=[in0],loc0
+	ldf.fill.nta f73=[ r3],loc0
+	ldf.fill.nta f81=[r14],loc0
+	ldf.fill.nta f89=[r15],loc0
 	;;
-	ldf.fill.nta f42=[in0],32
-	ldf.fill.nta f43=[ r3],32
+	ldf.fill.nta f97=[in0],loc1
+	ldf.fill.nta f105=[ r3],loc1
+	ldf.fill.nta f113=[r14],loc1
+	ldf.fill.nta f121=[r15],loc1
 	;;
-	ldf.fill.nta f44=[in0],32
-	ldf.fill.nta f45=[ r3],32
+	ldf.fill.nta f34=[in0],loc0
+	ldf.fill.nta f42=[ r3],loc0
+	ldf.fill.nta f50=[r14],loc0
+	ldf.fill.nta f58=[r15],loc0
 	;;
-	ldf.fill.nta f46=[in0],32
-	ldf.fill.nta f47=[ r3],32
+	ldf.fill.nta f66=[in0],loc0
+	ldf.fill.nta f74=[ r3],loc0
+	ldf.fill.nta f82=[r14],loc0
+	ldf.fill.nta f90=[r15],loc0
 	;;
-	ldf.fill.nta f48=[in0],32
-	ldf.fill.nta f49=[ r3],32
+	ldf.fill.nta f98=[in0],loc1
+	ldf.fill.nta f106=[ r3],loc1
+	ldf.fill.nta f114=[r14],loc1
+	ldf.fill.nta f122=[r15],loc1
 	;;
-	ldf.fill.nta f50=[in0],32
-	ldf.fill.nta f51=[ r3],32
+	ldf.fill.nta f35=[in0],loc0
+	ldf.fill.nta f43=[ r3],loc0
+	ldf.fill.nta f51=[r14],loc0
+	ldf.fill.nta f59=[r15],loc0
 	;;
-	ldf.fill.nta f52=[in0],32
-	ldf.fill.nta f53=[ r3],32
+	ldf.fill.nta f67=[in0],loc0
+	ldf.fill.nta f75=[ r3],loc0
+	ldf.fill.nta f83=[r14],loc0
+	ldf.fill.nta f91=[r15],loc0
 	;;
-	ldf.fill.nta f54=[in0],32
-	ldf.fill.nta f55=[ r3],32
+	ldf.fill.nta f99=[in0],loc1
+	ldf.fill.nta f107=[ r3],loc1
+	ldf.fill.nta f115=[r14],loc1
+	ldf.fill.nta f123=[r15],loc1
 	;;
-	ldf.fill.nta f56=[in0],32
-	ldf.fill.nta f57=[ r3],32
+	ldf.fill.nta f36=[in0],loc0
+	ldf.fill.nta f44=[ r3],loc0
+	ldf.fill.nta f52=[r14],loc0
+	ldf.fill.nta f60=[r15],loc0
 	;;
-	ldf.fill.nta f58=[in0],32
-	ldf.fill.nta f59=[ r3],32
+	ldf.fill.nta f68=[in0],loc0
+	ldf.fill.nta f76=[ r3],loc0
+	ldf.fill.nta f84=[r14],loc0
+	ldf.fill.nta f92=[r15],loc0
 	;;
-	ldf.fill.nta f60=[in0],32
-	ldf.fill.nta f61=[ r3],32
+	ldf.fill.nta f100=[in0],loc1
+	ldf.fill.nta f108=[ r3],loc1
+	ldf.fill.nta f116=[r14],loc1
+	ldf.fill.nta f124=[r15],loc1
 	;;
-	ldf.fill.nta f62=[in0],32
-	ldf.fill.nta f63=[ r3],32
+	ldf.fill.nta f37=[in0],loc0
+	ldf.fill.nta f45=[ r3],loc0
+	ldf.fill.nta f53=[r14],loc0
+	ldf.fill.nta f61=[r15],loc0
 	;;
-	ldf.fill.nta f64=[in0],32
-	ldf.fill.nta f65=[ r3],32
+	ldf.fill.nta f69=[in0],loc0
+	ldf.fill.nta f77=[ r3],loc0
+	ldf.fill.nta f85=[r14],loc0
+	ldf.fill.nta f93=[r15],loc0
 	;;
-	ldf.fill.nta f66=[in0],32
-	ldf.fill.nta f67=[ r3],32
+	ldf.fill.nta f101=[in0],loc1
+	ldf.fill.nta f109=[ r3],loc1
+	ldf.fill.nta f117=[r14],loc1
+	ldf.fill.nta f125=[r15],loc1
 	;;
-	ldf.fill.nta f68=[in0],32
-	ldf.fill.nta f69=[ r3],32
+	ldf.fill.nta f38 =[in0],loc0
+	ldf.fill.nta f46 =[ r3],loc0
+	ldf.fill.nta f54 =[r14],loc0
+	ldf.fill.nta f62 =[r15],loc0
 	;;
-	ldf.fill.nta f70=[in0],32
-	ldf.fill.nta f71=[ r3],32
+	ldf.fill.nta f70 =[in0],loc0
+	ldf.fill.nta f78 =[ r3],loc0
+	ldf.fill.nta f86 =[r14],loc0
+	ldf.fill.nta f94 =[r15],loc0
 	;;
-	ldf.fill.nta f72=[in0],32
-	ldf.fill.nta f73=[ r3],32
+	ldf.fill.nta f102=[in0],loc1
+	ldf.fill.nta f110=[ r3],loc1
+	ldf.fill.nta f118=[r14],loc1
+	ldf.fill.nta f126=[r15],loc1
 	;;
-	ldf.fill.nta f74=[in0],32
-	ldf.fill.nta f75=[ r3],32
+	ldf.fill.nta f39 =[in0],loc0
+	ldf.fill.nta f47 =[ r3],loc0
+	ldf.fill.nta f55 =[r14],loc0
+	ldf.fill.nta f63 =[r15],loc0
 	;;
-	ldf.fill.nta f76=[in0],32
-	ldf.fill.nta f77=[ r3],32
+	ldf.fill.nta f71 =[in0],loc0
+	ldf.fill.nta f79 =[ r3],loc0
+	ldf.fill.nta f87 =[r14],loc0
+	ldf.fill.nta f95 =[r15],loc0
 	;;
-	ldf.fill.nta f78=[in0],32
-	ldf.fill.nta f79=[ r3],32
-	;;
-	ldf.fill.nta f80=[in0],32
-	ldf.fill.nta f81=[ r3],32
-	;;
-	ldf.fill.nta f82=[in0],32
-	ldf.fill.nta f83=[ r3],32
-	;;
-	ldf.fill.nta f84=[in0],32
-	ldf.fill.nta f85=[ r3],32
-	;;
-	ldf.fill.nta f86=[in0],32
-	ldf.fill.nta f87=[ r3],32
-	;;
-	ldf.fill.nta f88=[in0],32
-	ldf.fill.nta f89=[ r3],32
-	;;
-	ldf.fill.nta f90=[in0],32
-	ldf.fill.nta f91=[ r3],32
-	;;
-	ldf.fill.nta f92=[in0],32
-	ldf.fill.nta f93=[ r3],32
-	;;
-	ldf.fill.nta f94=[in0],32
-	ldf.fill.nta f95=[ r3],32
-	;;
-	ldf.fill.nta f96=[in0],32
-	ldf.fill.nta f97=[ r3],32
-	;;
-	ldf.fill.nta f98=[in0],32
-	ldf.fill.nta f99=[ r3],32
-	;;
-	ldf.fill.nta f100=[in0],32
-	ldf.fill.nta f101=[ r3],32
-	;;
-	ldf.fill.nta f102=[in0],32
-	ldf.fill.nta f103=[ r3],32
-	;;
-	ldf.fill.nta f104=[in0],32
-	ldf.fill.nta f105=[ r3],32
-	;;
-	ldf.fill.nta f106=[in0],32
-	ldf.fill.nta f107=[ r3],32
-	;;
-	ldf.fill.nta f108=[in0],32
-	ldf.fill.nta f109=[ r3],32
-	;;
-	ldf.fill.nta f110=[in0],32
-	ldf.fill.nta f111=[ r3],32
-	;;
-	ldf.fill.nta f112=[in0],32
-	ldf.fill.nta f113=[ r3],32
-	;;
-	ldf.fill.nta f114=[in0],32
-	ldf.fill.nta f115=[ r3],32
-	;;
-	ldf.fill.nta f116=[in0],32
-	ldf.fill.nta f117=[ r3],32
-	;;
-	ldf.fill.nta f118=[in0],32
-	ldf.fill.nta f119=[ r3],32
-	;;
-	ldf.fill.nta f120=[in0],32
-	ldf.fill.nta f121=[ r3],32
-	;;
-	ldf.fill.nta f122=[in0],32
-	ldf.fill.nta f123=[ r3],32
-	;;
-	ldf.fill.nta f124=[in0],32
-	ldf.fill.nta f125=[ r3],32
-	;;
-	ldf.fill.nta f126=[in0],32
-	ldf.fill.nta f127=[ r3],32
+	ldf.fill.nta f103=[in0]
+	ldf.fill.nta f111=[ r3]
+	ldf.fill.nta f119=[r14]
+	ldf.fill.nta f127=[r15]
 	br.ret.sptk.many rp
 END(__ia64_load_fpu)
 
