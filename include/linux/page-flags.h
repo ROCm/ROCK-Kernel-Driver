@@ -318,4 +318,6 @@ static inline void clear_page_dirty(struct page *page)
 	test_clear_page_dirty(page);
 }
 
+int __clear_page_dirty(struct page *page);
+
 #endif	/* PAGE_FLAGS_H */

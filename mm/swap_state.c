@@ -149,7 +149,7 @@ int add_to_swap(struct page * page)
 		switch (err) {
 		case 0:				/* Success */
 			SetPageUptodate(page);
-			ClearPageDirty(page);
+			__clear_page_dirty(page);
 			set_page_dirty(page);
 			INC_CACHE_INFO(add_total);
 			return 1;
@@ -246,7 +246,7 @@ int move_from_swap_cache(struct page *page, unsigned long index,
 	if (!err) {
 		swap_free(entry);
 		/* shift page from clean_pages to dirty_pages list */
-		ClearPageDirty(page);
+		__clear_page_dirty(page);
 		set_page_dirty(page);
 	}
 	return err;

@@ -522,6 +522,8 @@ int __set_page_dirty_nobuffers(struct page *page)
 					inc_page_state(nr_dirty);
 				list_del(&page->list);
 				list_add(&page->list, &mapping->dirty_pages);
+				radix_tree_tag_set(&mapping->page_tree,
+					page->index, PAGECACHE_TAG_DIRTY);
 			}
 			spin_unlock_irq(&mapping->tree_lock);
 			if (!PageSwapCache(page))
@@ -560,13 +562,45 @@ EXPORT_SYMBOL(set_page_dirty_lock);
  */
 int test_clear_page_dirty(struct page *page)
 {
-	if (TestClearPageDirty(page)) {
-		struct address_space *mapping = page->mapping;
+	struct address_space *mapping = page->mapping;
+	unsigned long flags;
 
-		if (mapping && !mapping->backing_dev_info->memory_backed)
-			dec_page_state(nr_dirty);
-		return 1;
+	if (mapping) {
+		spin_lock_irqsave(&mapping->tree_lock, flags);
+		if (TestClearPageDirty(page)) {
+			radix_tree_tag_clear(&mapping->page_tree, page->index,
+						PAGECACHE_TAG_DIRTY);
+			spin_unlock_irqrestore(&mapping->tree_lock, flags);
+			if (!mapping->backing_dev_info->memory_backed)
+				dec_page_state(nr_dirty);
+			return 1;
+		}
+		spin_unlock_irqrestore(&mapping->tree_lock, flags);
+		return 0;
 	}
-	return 0;
+	return TestClearPageDirty(page);
 }
 EXPORT_SYMBOL(test_clear_page_dirty);
+
+/*
+ * Clear a page's dirty flag while ignoring dirty memory accounting
+ */
+int __clear_page_dirty(struct page *page)
+{
+	struct address_space *mapping = page->mapping;
+
+	if (mapping) {
+		unsigned long flags;
+
+		spin_lock_irqsave(&mapping->tree_lock, flags);
+		if (TestClearPageDirty(page)) {
+			radix_tree_tag_clear(&mapping->page_tree, page->index,
+						PAGECACHE_TAG_DIRTY);
+			spin_unlock_irqrestore(&mapping->tree_lock, flags);
+			return 1;
+		}
+		spin_unlock_irqrestore(&mapping->tree_lock, flags);
+		return 0;
+	}
+	return TestClearPageDirty(page);
+}

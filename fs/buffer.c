@@ -873,6 +873,8 @@ int __set_page_dirty_buffers(struct page *page)
 				inc_page_state(nr_dirty);
 			list_del(&page->list);
 			list_add(&page->list, &mapping->dirty_pages);
+			radix_tree_tag_set(&mapping->page_tree, page->index,
+						PAGECACHE_TAG_DIRTY);
 		}
 		spin_unlock_irq(&mapping->tree_lock);
 		__mark_inode_dirty(mapping->host, I_DIRTY_PAGES);

@@ -365,6 +365,13 @@ struct block_device {
 };
 
 /*
+ * Radix-tre tags, for tagging dirty and writeback pages within the pagecache
+ * radix trees
+ */
+#define PAGECACHE_TAG_DIRTY	0
+#define PAGECACHE_TAG_WRITEBACK	1
+
+/*
  * Use sequence counter to get consistent i_size on 32-bit processors.
  */
 #if BITS_PER_LONG==32 && defined(CONFIG_SMP)
