@@ -153,7 +153,7 @@ void __lockfunc unlock_kernel(void)
  *
  * Don't use in new code.
  */
-static spinlock_t kernel_flag __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
+static  __cacheline_aligned_in_smp DEFINE_SPINLOCK(kernel_flag);
 
 
 /*
