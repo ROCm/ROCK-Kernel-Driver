@@ -397,7 +397,6 @@ EXPORT_SYMBOL(tcp_v4_send_check);
 EXPORT_SYMBOL(tcp_v4_conn_request);
 EXPORT_SYMBOL(tcp_create_openreq_child);
 EXPORT_SYMBOL(tcp_bucket_create);
-EXPORT_SYMBOL(__tcp_put_port);
 EXPORT_SYMBOL(tcp_put_port);
 EXPORT_SYMBOL(tcp_inherit_port);
 EXPORT_SYMBOL(tcp_v4_syn_recv_sock);
