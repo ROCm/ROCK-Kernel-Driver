@@ -1836,7 +1836,6 @@ static void net_rx_action(struct softirq_action *h)
 	int budget = netdev_max_backlog;
 
 	
-	preempt_disable();
 	local_irq_disable();
 
 	while (!list_empty(&queue->poll_list)) {
@@ -1865,7 +1864,6 @@ static void net_rx_action(struct softirq_action *h)
 	}
 out:
 	local_irq_enable();
-	preempt_enable();
 	return;
 
 softnet_break:
