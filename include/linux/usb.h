@@ -88,6 +88,7 @@ struct usb_host_interface {
  *	function of the driver, after it has been assigned a minor
  *	number from the USB core by calling usb_register_dev().
  * @dev: driver model's view of this device
+ * @class_dev: driver model's class view of this device.
  *
  * USB device drivers attach to interfaces on a physical device.  Each
  * interface encapsulates a single high level function, such as feeding
@@ -121,8 +122,10 @@ struct usb_interface {
 	struct usb_driver *driver;	/* driver */
 	int minor;			/* minor number this interface is bound to */
 	struct device dev;		/* interface specific device info */
+	struct class_device class_dev;
 };
 #define	to_usb_interface(d) container_of(d, struct usb_interface, dev)
+#define class_dev_to_usb_interface(d) container_of(d, struct usb_interface, class_dev)
 #define	interface_to_usbdev(intf) \
 	container_of(intf->dev.parent, struct usb_device, dev)
 
@@ -441,6 +444,25 @@ struct usb_driver {
 
 extern struct bus_type usb_bus_type;
 
+/**
+ * struct usb_class_driver - identifies a USB driver that wants to use the USB major number
+ * @name: devfs name for this driver.  Will also be used by the driver
+ *	class code to create a usb class device.
+ * @fops: pointer to the struct file_operations of this driver.
+ * @mode: the mode for the devfs file to be created for this driver.
+ * @minor_base: the start of the minor range for this driver.
+ *
+ * This structure is used for the usb_register_dev() and
+ * usb_unregister_dev() functions, to consolodate a number of the
+ * paramaters used for them.
+ */
+struct usb_class_driver {
+	char *name;
+	struct file_operations *fops;
+	mode_t mode;
+	int minor_base;	
+};
+
 /*
  * use these in module_init()/module_exit()
  * and don't forget MODULE_DEVICE_TABLE(usb, ...)
@@ -448,8 +470,10 @@ extern struct bus_type usb_bus_type;
 extern int usb_register(struct usb_driver *);
 extern void usb_deregister(struct usb_driver *);
 
-extern int usb_register_dev(struct file_operations *fops, int minor, int num_minors, int *start_minor);
-extern void usb_deregister_dev(int num_minors, int start_minor);
+extern int usb_register_dev(struct usb_interface *intf,
+			    struct usb_class_driver *class_driver);
+extern void usb_deregister_dev(struct usb_interface *intf,
+			       struct usb_class_driver *class_driver);
 
 extern int usb_device_probe(struct device *dev);
 extern int usb_device_remove(struct device *dev);
