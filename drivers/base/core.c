@@ -98,7 +98,7 @@ static void device_unbind(struct device * dev)
 {
 	/* unbind from driver */
 	if (dev->driver && dev->driver->remove)
-		dev->driver->remove(dev,REMOVE_NOTIFY);
+		dev->driver->remove(dev);
 }
 
 static int do_driver_bind(struct device * dev, void * data)
@@ -126,7 +126,7 @@ static int do_driver_unbind(struct device * dev, void * data)
 		dev->driver = NULL;
 		unlock_device(dev);
 		if (drv->remove)
-			drv->remove(dev,REMOVE_NOTIFY);
+			drv->remove(dev);
 	} else
 		unlock_device(dev);
 	return 0;
@@ -134,7 +134,7 @@ static int do_driver_unbind(struct device * dev, void * data)
 
 void driver_unbind(struct device_driver * drv)
 {
-//	driver_for_each_dev(drv,drv,do_driver_unbind);
+	driver_for_each_dev(drv,drv,do_driver_unbind);
 }
 
 /**
