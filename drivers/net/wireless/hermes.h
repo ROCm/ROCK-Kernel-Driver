@@ -250,7 +250,6 @@ struct hermes_scan_frame {
 	u16 scanreason;             /* ??? */
 	struct hermes_scan_apinfo aps[35];        /* Scan result */
 } __attribute__ ((packed));
-
 #define HERMES_LINKSTATUS_NOT_CONNECTED   (0x0000)  
 #define HERMES_LINKSTATUS_CONNECTED       (0x0001)
 #define HERMES_LINKSTATUS_DISCONNECTED    (0x0002)
@@ -278,7 +277,7 @@ struct hermes_debug_entry {
 
 /* Basic control structure */
 typedef struct hermes {
-	ulong iobase;
+	unsigned long iobase;
 	int io_space; /* 1 if we IO-mapped IO, 0 for memory-mapped IO? */
 #define HERMES_IO	1
 #define HERMES_MEM	0
@@ -316,11 +315,11 @@ int hermes_init(hermes_t *hw);
 int hermes_docmd_wait(hermes_t *hw, u16 cmd, u16 parm0, hermes_response_t *resp);
 int hermes_allocate(hermes_t *hw, u16 size, u16 *fid);
 
-int hermes_bap_pread(hermes_t *hw, int bap, void *buf, int len,
+int hermes_bap_pread(hermes_t *hw, int bap, void *buf, unsigned len,
 		       u16 id, u16 offset);
-int hermes_bap_pwrite(hermes_t *hw, int bap, const void *buf, int len,
+int hermes_bap_pwrite(hermes_t *hw, int bap, const void *buf, unsigned len,
 			u16 id, u16 offset);
-int hermes_read_ltv(hermes_t *hw, int bap, u16 rid, int buflen,
+int hermes_read_ltv(hermes_t *hw, int bap, u16 rid, unsigned buflen,
 		    u16 *length, void *buf);
 int hermes_write_ltv(hermes_t *hw, int bap, u16 rid,
 		      u16 length, const void *value);
@@ -361,39 +360,58 @@ static inline int hermes_inquire(hermes_t *hw, u16 rid)
 #define HERMES_RECLEN_TO_BYTES(n) ( ((n)-1) * 2 )
 
 /* Note that for the next two, the count is in 16-bit words, not bytes */
-static inline void hermes_read_words(struct hermes *hw, int off, void *buf, int count)
+static inline void hermes_read_words(struct hermes *hw, int off, void *buf, unsigned count)
 {
 	off = off << hw->reg_spacing;;
 
 	if (hw->io_space) {
 		insw(hw->iobase + off, buf, count);
 	} else {
-		int i;
+		unsigned i;
 		u16 *p;
 
-		/* This need to *not* byteswap (like insw()) but
-		 * readw() does byteswap hence the conversion */
+		/* This needs to *not* byteswap (like insw()) but
+		 * readw() does byteswap hence the conversion.  I hope
+		 * gcc is smart enough to fold away the two swaps on
+		 * big-endian platforms. */
 		for (i = 0, p = buf; i < count; i++) {
 			*p++ = cpu_to_le16(readw(hw->iobase + off));
 		}
 	}
 }
 
-static inline void hermes_write_words(struct hermes *hw, int off, const void *buf, int count)
+static inline void hermes_write_words(struct hermes *hw, int off, const void *buf, unsigned count)
 {
 	off = off << hw->reg_spacing;;
 
 	if (hw->io_space) {
 		outsw(hw->iobase + off, buf, count);
 	} else {
-		int i;
+		unsigned i;
 		const u16 *p;
 
-		/* This need to *not* byteswap (like outsw()) but
-		 * writew() does byteswap hence the conversion */
+		/* This needs to *not* byteswap (like outsw()) but
+		 * writew() does byteswap hence the conversion.  I
+		 * hope gcc is smart enough to fold away the two swaps
+		 * on big-endian platforms. */
 		for (i = 0, p = buf; i < count; i++) {
 			writew(le16_to_cpu(*p++), hw->iobase + off);
 		}
+	}
+}
+
+static inline void hermes_clear_words(struct hermes *hw, int off, unsigned count)
+{
+	unsigned i;
+
+	off = off << hw->reg_spacing;;
+
+	if (hw->io_space) {
+		for (i = 0; i < count; i++)
+			outw(0, hw->iobase + off);
+	} else {
+		for (i = 0; i < count; i++)
+			writew(0, hw->iobase + off);
 	}
 }
 

@@ -52,7 +52,6 @@
 
 #include "hermes.h"
 
-static char version[] __initdata = "hermes.c: 4 Jul 2002 David Gibson <hermes@gibson.dropbear.id.au>";
 MODULE_DESCRIPTION("Low-level driver helper for Lucent Hermes chipset and Prism II HFA384x wireless MAC controller");
 MODULE_AUTHOR("David Gibson <hermes@gibson.dropbear.id.au>");
 #ifdef MODULE_LICENSE
@@ -226,7 +225,8 @@ int hermes_init(hermes_t *hw)
  * Returns: < 0 on internal error, 0 on success, > 0 on error returned by the firmware
  *
  * Callable from any context, but locking is your problem. */
-int hermes_docmd_wait(hermes_t *hw, u16 cmd, u16 parm0, hermes_response_t *resp)
+int hermes_docmd_wait(hermes_t *hw, u16 cmd, u16 parm0,
+		      hermes_response_t *resp)
 {
 	int err;
 	int k;
@@ -402,7 +402,7 @@ static int hermes_bap_seek(hermes_t *hw, int bap, u16 id, u16 offset)
  *
  * Returns: < 0 on internal failure (errno), 0 on success, > 0 on error from firmware
  */
-int hermes_bap_pread(hermes_t *hw, int bap, void *buf, int len,
+int hermes_bap_pread(hermes_t *hw, int bap, void *buf, unsigned len,
 		     u16 id, u16 offset)
 {
 	int dreg = bap ? HERMES_DATA1 : HERMES_DATA0;
@@ -428,7 +428,7 @@ int hermes_bap_pread(hermes_t *hw, int bap, void *buf, int len,
  *
  * Returns: < 0 on internal failure (errno), 0 on success, > 0 on error from firmware
  */
-int hermes_bap_pwrite(hermes_t *hw, int bap, const void *buf, int len,
+int hermes_bap_pwrite(hermes_t *hw, int bap, const void *buf, unsigned len,
 		      u16 id, u16 offset)
 {
 	int dreg = bap ? HERMES_DATA1 : HERMES_DATA0;
@@ -456,26 +456,30 @@ int hermes_bap_pwrite(hermes_t *hw, int bap, const void *buf, int len,
  * practice.
  *
  * Callable from user or bh context.  */
-int hermes_read_ltv(hermes_t *hw, int bap, u16 rid, int bufsize,
+int hermes_read_ltv(hermes_t *hw, int bap, u16 rid, unsigned bufsize,
 		    u16 *length, void *buf)
 {
 	int err = 0;
 	int dreg = bap ? HERMES_DATA1 : HERMES_DATA0;
 	u16 rlength, rtype;
-	int nwords;
+	unsigned nwords;
 
 	if ( (bufsize < 0) || (bufsize % 2) )
 		return -EINVAL;
 
 	err = hermes_docmd_wait(hw, HERMES_CMD_ACCESS, rid, NULL);
 	if (err)
-		goto out;
+		return err;
 
 	err = hermes_bap_seek(hw, bap, rid, 0);
 	if (err)
-		goto out;
+		return err;
 
 	rlength = hermes_read_reg(hw, dreg);
+
+	if (! rlength)
+		return -ENOENT;
+
 	rtype = hermes_read_reg(hw, dreg);
 
 	if (length)
@@ -492,11 +496,10 @@ int hermes_read_ltv(hermes_t *hw, int bap, u16 rid, int bufsize,
 		       IO_TYPE(hw), hw->iobase,
 		       HERMES_RECLEN_TO_BYTES(rlength), bufsize, rid, rlength);
 
-	nwords = min_t(int, rlength - 1, bufsize / 2);
+	nwords = min((unsigned)rlength - 1, bufsize / 2);
 	hermes_read_words(hw, dreg, buf, nwords);
 
- out:
-	return err;
+	return 0;
 }
 
 int hermes_write_ltv(hermes_t *hw, int bap, u16 rid, 
@@ -504,11 +507,14 @@ int hermes_write_ltv(hermes_t *hw, int bap, u16 rid,
 {
 	int dreg = bap ? HERMES_DATA1 : HERMES_DATA0;
 	int err = 0;
-	int count;
-	
+	unsigned count;
+
+	if (length == 0)
+		return -EINVAL;
+
 	err = hermes_bap_seek(hw, bap, rid, 0);
 	if (err)
-		goto out;
+		return err;
 
 	hermes_write_reg(hw, dreg, length);
 	hermes_write_reg(hw, dreg, rid);
@@ -520,7 +526,6 @@ int hermes_write_ltv(hermes_t *hw, int bap, u16 rid,
 	err = hermes_docmd_wait(hw, HERMES_CMD_ACCESS | HERMES_CMD_WRITE, 
 				rid, NULL);
 
- out:
 	return err;
 }
 
@@ -536,9 +541,12 @@ EXPORT_SYMBOL(hermes_write_ltv);
 
 static int __init init_hermes(void)
 {
-	printk(KERN_DEBUG "%s\n", version);
-
 	return 0;
 }
 
+static void __exit exit_hermes(void)
+{
+}
+
 module_init(init_hermes);
+module_exit(exit_hermes);
