@@ -40,9 +40,6 @@ endif
 
 ifeq ($(CONFIG_ARCH_SA1100),y)
 OBJS		+= head-sa1100.o
-ifeq ($(CONFIG_SA1100_NANOENGINE),y)
-  OBJS += hw-bse.o
-endif
 endif
 
 ifeq ($(CONFIG_CPU_XSCALE),y)

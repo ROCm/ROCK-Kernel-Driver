@@ -39,11 +39,7 @@
  * Define your architecture specific bus configuration parameters here.
  */
 
-#if	defined(CONFIG_SA1100_GRAPHICSCLIENT) || \
-	defined(CONFIG_SA1100_PFS168) || \
-	defined(CONFIG_SA1100_FLEXANET) || \
-	defined(CONFIG_SA1100_GRAPHICSMASTER) || \
-	defined(CONFIG_ARCH_LUBBOCK)
+#if	defined(CONFIG_ARCH_LUBBOCK)
 
 /* We can only do 16-bit reads and writes in the static memory space. */
 #define SMC_CAN_USE_8BIT	0
