@@ -49,11 +49,11 @@
 #include "zoran.h"
 #include "zoran_procfs.h"
 
-extern int debug;
+extern int *zr_debug;
 
 #define dprintk(num, format, args...) \
 	do { \
-		if (debug >= num) \
+		if (*zr_debug >= num) \
 			printk(format, ##args); \
 	} while (0)
 

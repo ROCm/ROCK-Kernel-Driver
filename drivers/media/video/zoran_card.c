@@ -136,7 +136,8 @@ MODULE_PARM(pass_through, "i");
 MODULE_PARM_DESC(pass_through,
 		 "Pass TV signal through to TV-out when idling");
 
-int debug = 1;
+static int debug = 1;
+int *zr_debug = &debug;
 MODULE_PARM(debug, "i");
 MODULE_PARM_DESC(debug, "Debug level (0-4)");
 
@@ -153,7 +154,7 @@ MODULE_DEVICE_TABLE(pci, zr36067_pci_tbl);
 
 #define dprintk(num, format, args...) \
 	do { \
-		if (debug >= num) \
+		if (*zr_debug >= num) \
 			printk(format, ##args); \
 	} while (0)
 
@@ -977,7 +978,7 @@ test_interrupts (struct zoran *zr)
 	if (timeout) {
 		dprintk(1, ": time spent: %d\n", 1 * HZ - timeout);
 	}
-	if (debug > 1)
+	if (*zr_debug > 1)
 		print_interrupts(zr);
 	btwrite(icr, ZR36057_ICR);
 }
@@ -1066,7 +1067,7 @@ zr36057_init (struct zoran *zr)
 	}
 
 	zoran_init_hardware(zr);
-	if (debug > 2)
+	if (*zr_debug > 2)
 		detect_guest_activity(zr);
 	test_interrupts(zr);
 	if (!pass_through) {

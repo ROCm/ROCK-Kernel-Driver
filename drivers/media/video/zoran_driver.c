@@ -187,11 +187,11 @@ const int zoran_num_formats =
 #   include <linux/bigphysarea.h>
 #endif
 
-extern int debug;
+extern int *zr_debug;
 
 #define dprintk(num, format, args...) \
 	do { \
-		if (debug >= num) \
+		if (*zr_debug >= num) \
 			printk(format, ##args);	\
 	} while (0)
 
@@ -1144,7 +1144,7 @@ jpg_sync (struct file       *file,
 		frame = zr->jpg_pend[zr->jpg_que_tail & BUZ_MASK_FRAME];
 
 	/* buffer should now be in BUZ_STATE_DONE */
-	if (debug > 0)
+	if (*zr_debug > 0)
 		if (zr->jpg_buffers.buffer[frame].state != BUZ_STATE_DONE)
 			dprintk(2,
 				KERN_ERR
@@ -1424,7 +1424,7 @@ zoran_close (struct inode *inode,
 		/* disable interrupts */
 		btand(~ZR36057_ICR_IntPinEn, ZR36057_ICR);
 
-		if (debug > 1)
+		if (*zr_debug > 1)
 			print_interrupts(zr);
 
 		/* Overlay off */
