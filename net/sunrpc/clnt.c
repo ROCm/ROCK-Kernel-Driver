@@ -57,8 +57,7 @@ static void	call_refresh(struct rpc_task *task);
 static void	call_refreshresult(struct rpc_task *task);
 static void	call_timeout(struct rpc_task *task);
 static void	call_connect(struct rpc_task *task);
-static void	child_connect(struct rpc_task *task);
-static void	child_connect_status(struct rpc_task *task);
+static void	call_connect_status(struct rpc_task *task);
 static u32 *	call_header(struct rpc_task *task);
 static u32 *	call_verify(struct rpc_task *task);
 
@@ -602,40 +601,48 @@ static void
 call_connect(struct rpc_task *task)
 {
 	struct rpc_clnt *clnt = task->tk_client;
-	struct rpc_task *child;
 
 	dprintk("RPC: %4d call_connect status %d\n",
 				task->tk_pid, task->tk_status);
 
-	task->tk_action = call_transmit;
-	if (task->tk_status < 0 || !clnt->cl_xprt->stream)
+	if (xprt_connected(clnt->cl_xprt)) {
+		task->tk_action = call_transmit;
 		return;
-
-	/* Run as a child to ensure it runs as an rpciod task.  Rpciod
-	 * guarantees we have the correct capabilities for socket bind
-	 * to succeed. */
-	child = rpc_new_child(clnt, task);
-	if (child) {
-		child->tk_action = child_connect;
-		rpc_run_child(task, child, NULL);
 	}
-}
-
-static void
-child_connect(struct rpc_task *task)
-{
-	task->tk_status = 0;
-	task->tk_action = child_connect_status;
+	task->tk_action = call_connect_status;
+	if (task->tk_status < 0)
+		return;
 	xprt_connect(task);
 }
 
+/*
+ * 4b. Sort out connect result
+ */
 static void
-child_connect_status(struct rpc_task *task)
+call_connect_status(struct rpc_task *task)
 {
-	if (task->tk_status == -EAGAIN)
-		task->tk_action = child_connect;
-	else
-		task->tk_action = NULL;
+	struct rpc_clnt *clnt = task->tk_client;
+	int status = task->tk_status;
+
+	task->tk_status = 0;
+	if (status >= 0) {
+		clnt->cl_stats->netreconn++;
+		task->tk_action = call_transmit;
+		return;
+	}
+
+	/* Something failed: we may have to rebind */
+	if (clnt->cl_autobind)
+		clnt->cl_port = 0;
+	switch (status) {
+	case -ENOTCONN:
+	case -ETIMEDOUT:
+	case -EAGAIN:
+		task->tk_action = (clnt->cl_port == 0) ? call_bind : call_connect;
+		break;
+	default:
+		rpc_exit(task, -EIO);
+	}
 }
 
 /*
@@ -696,6 +703,7 @@ call_status(struct rpc_task *task)
 		break;
 	case -ECONNREFUSED:
 	case -ENOTCONN:
+		req->rq_bytes_sent = 0;
 		if (clnt->cl_autobind)
 			clnt->cl_port = 0;
 		task->tk_action = call_bind;

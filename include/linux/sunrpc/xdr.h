@@ -157,6 +157,11 @@ typedef size_t (*skb_read_actor_t)(skb_reader_t *desc, void *to, size_t len);
 extern void xdr_partial_copy_from_skb(struct xdr_buf *, unsigned int,
 		skb_reader_t *, skb_read_actor_t);
 
+struct socket;
+struct sockaddr;
+extern int xdr_sendpages(struct socket *, struct sockaddr *, int,
+		struct xdr_buf *, unsigned int, int);
+
 /*
  * Provide some simple tools for XDR buffer overflow-checking etc.
  */

@@ -83,7 +83,7 @@ nfs_opendir(struct inode *inode, struct file *filp)
 
 	lock_kernel();
 	/* Do cto revalidation */
-	if (server->flags & NFS_MOUNT_NOCTO)
+	if (!(server->flags & NFS_MOUNT_NOCTO))
 		res = __nfs_revalidate_inode(server, inode);
 	/* Call generic open code in order to cache credentials */
 	if (!res)
