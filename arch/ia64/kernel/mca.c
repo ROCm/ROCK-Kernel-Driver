@@ -130,6 +130,8 @@ static int cpe_poll_enabled = 1;
 
 extern void salinfo_log_wakeup(int type, u8 *buffer, u64 size, int irqsafe);
 
+static int mca_init;
+
 /*
  * IA64_MCA log support
  */
@@ -1317,6 +1319,7 @@ ia64_mca_init(void)
 	ia64_log_init(SAL_INFO_TYPE_CMC);
 	ia64_log_init(SAL_INFO_TYPE_CPE);
 
+	mca_init = 1;
 	printk(KERN_INFO "MCA related initialization done\n");
 }
 
@@ -1333,6 +1336,9 @@ ia64_mca_init(void)
 static int __init
 ia64_mca_late_init(void)
 {
+	if (!mca_init)
+		return 0;
+
 	/* Setup the CMCI/P vector and handler */
 	init_timer(&cmc_poll_timer);
 	cmc_poll_timer.function = ia64_mca_cmc_poll;
