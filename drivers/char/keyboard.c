@@ -204,13 +204,13 @@ int setkeycode(unsigned int scancode, unsigned int keycode)
 	oldkey = INPUT_KEYCODE(dev, scancode);
 	INPUT_KEYCODE(dev, scancode) = keycode;
 
-	for (i = 0; i < dev->keycodemax; i++)
-		if(keycode == oldkey)
-			break;
-	if (i == dev->keycodemax)
-		clear_bit(oldkey, dev->keybit);
+	clear_bit(oldkey, dev->keybit);
 	set_bit(keycode, dev->keybit);
-	
+
+	for (i = 0; i < dev->keycodemax; i++)
+		if (INPUT_KEYCODE(dev,i) == oldkey)
+			set_bit(oldkey, dev->keybit);
+
 	return 0;
 }
 
