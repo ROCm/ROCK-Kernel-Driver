@@ -1,0 +1,349 @@
+# Descriptions of SMP packet payloads, used to generate get/set functions
+# automatically.
+#
+# $Id: smp_packet.desc 32 2004-04-09 03:57:42Z roland $
+#
+# $Log: smp_packet.desc,v $
+# Revision 1.3  2004/01/27 04:10:39  ted
+# Add notice packet to smp description file.
+#
+# Revision 1.2  2003/12/04 22:28:23  ted
+# - Have packet generator script declare an enum type for the attributes defined.
+# - Make auto-generated Port Info SMP struct use defined TS type for
+#   port_state member.
+#
+# Revision 1.1  2003/12/02 03:44:19  ted
+# Initial checkin of auto-generated packet library and of SMA provider
+# interface.
+#
+#
+
+# Packet definition fields:
+#
+#   Name
+#   Attribute ID (hex)
+#
+
+# Element definition fields:
+#
+#   Name
+#   Offset (bits)
+#   Size (bits)
+#   TS type name ("no" if none exists)
+#   Converter (copy or conv -- applies to 16- to 64-bit types)
+#   print (special handling of field when printing)
+#
+
+%CLASS smp 64
+
+#
+# NOTICE support
+#
+
+%PACKET notice      0002
+
+# Name                    offset   size ts_type      conv/copy   print
+# ----                    ------   ---- -------      ---------   -----
+
+is_generic                    0      1  no                conv      no
+type                          1      7  no                conv      no
+producer_type_vendor_id       8     24  no                conv      no
+trap_number_device_id        32     16  no                conv      no
+issuer_lid                   48     16  no                conv      no
+notice_toggle                64      1  no                conv      no
+notice_count                 65     15  no                conv      no
+data_details                 80    432  no                copy      no
+issuer_gid                  512    128  no                copy      no
+
+%END_PACKET
+
+#
+# NODE DESCRIPTION support
+#
+
+%PACKET node_desc   0010
+
+# Name                offset   size ts_type      conv/copy   print
+# ----                ------   ---- -------      ---------   -----
+
+node_string               0    512  no                copy   string
+
+%END_PACKET
+
+#
+# NODE INFO support
+#
+
+%PACKET node_info   0011
+
+# Name                offset   size ts_type      conv/copy   print
+# ----                ------   ---- -------      ---------   -----
+
+base_version              0      8  no                conv      no
+class_version             8      8  no                conv      no
+node_type                16      8  no                conv      no
+num_ports                24      8  no                conv      no
+system_image_guid        32     64  tTS_IB_GUID       copy      no
+node_guid                96     64  tTS_IB_GUID       copy      no
+port_guid               160     64  tTS_IB_GUID       copy      no
+partition_cap           224     16  no                conv      no
+dev_id                  240     16  no                conv      no
+dev_rev                 256     32  no                conv      no
+local_port_num          288      8  tTS_IB_PORT       conv      no
+vendor_id               296     24  no                conv      no
+
+%END_PACKET
+
+#
+# SWITCH INFO support
+#
+
+%PACKET switch_info 0012
+
+# Name                     offset   size ts_type      conv/copy   print
+# ----                     ------   ---- -------      ---------   -----
+linear_fdb_cap                  0     16  no                conv      no
+random_fdb_cap                 16     16  no                conv      no
+mcast_fdb_cap                  32     16  no                conv      no
+linear_fdb_top                 48     16  no                conv      no
+default_port                   64      8  tTS_IB_PORT       conv      no
+default_mcast_primary_port     72      8  tTS_IB_PORT       conv      no
+default_mcast_not_primary_port 80      8  tTS_IB_PORT       conv      no
+lifetime_val                   88      5  no                conv      no
+port_state_change              93      1  no                conv      no
+lids_per_port                  96     16  no                conv      no
+partition_enf_cap             112     16  no                conv      no
+inbound_enf_cap               128      1  no                conv      no
+outbound_enf_cap              129      1  no                conv      no
+filter_raw_inbound_cap        130      1  no                conv      no
+filter_raw_outbound_cap       131      1  no                conv      no
+enhanced_port_0               132      1  no                conv      no
+
+%END_PACKET
+
+#
+# GUID INFO support
+#
+
+%PACKET guid_info   0014
+
+# Name                offset   size ts_type      conv/copy   print
+# ----                ------   ---- -------      ---------   -----
+%ARRAY_ITEM 8 guid        0     64  tTS_IB_GUID       copy      no
+
+%END_PACKET
+
+#
+# PORT INFO support
+#
+
+%PACKET port_info  0015
+
+# Name                offset   size ts_type      conv/copy   print
+# ----                ------   ---- -------      ---------   -----
+
+m_key                     0     64  tTS_IB_MKEY       copy      no
+gid_prefix               64     64  no                copy      no
+lid                     128     16  tTS_IB_LID        conv      no
+master_sm_lid           144     16  tTS_IB_LID        conv      no
+capability_mask         160     32  no                conv      no
+diag_code               192     16  no                conv      no
+m_key_lease_period      208     16  no                conv      no
+local_port_num          224      8  tTS_IB_PORT       conv      no
+link_width_enabled      232      8  no                conv      no
+link_width_supported    240      8  no                conv      no
+link_width_active       248      8  no                conv      no
+link_speed_supported    256      4  no                conv      no
+port_state              260      4  tTS_IB_PORT_STATE conv      no
+port_physical_state     264      4  no                conv      no
+link_down_default_state 268      4  no                conv      no
+m_key_protect_bits      272      2  no                conv      no
+lmc                     277      3  no                conv      no
+link_speed_active       280      4  no                conv      no
+link_speed_enabled      284      4  no                conv      no
+neighbor_mtu            288      4  no                conv      no
+master_sm_sl            292      4  no                conv      no
+vl_cap                  296      4  no                conv      no
+init_type               300      4  no                conv      no
+vl_high_limit           304      8  no                conv      no
+vl_arb_hi_cap           312      8  no                conv      no
+vl_arb_low_cap          320      8  no                conv      no
+init_type_reply         328      4  no                conv      no
+mtu_cap                 332      4  no                conv      no
+vl_stall_count          336      3  no                conv      no
+hoq_life                339      5  no                conv      no
+operational_vls         344      4  no                conv      no
+partition_enf_inbound   348      1  no                conv      no
+partition_enf_outbound  349      1  no                conv      no
+filter_raw_inbound      350      1  no                conv      no
+filter_raw_outbound     351      1  no                conv      no
+m_key_violations        352     16  no                conv      no
+p_key_violations        368     16  no                conv      no
+q_key_violations        384     16  no                conv      no
+guid_cap                400      8  no                conv      no
+subnet_timeout          411      5  no                conv      no
+resp_time_value         419      5  no                conv      no
+local_phy_errors        424      4  no                conv      no
+overrun_errors          428      4  no                conv      no
+
+%END_PACKET
+
+#
+# PKEY support
+#
+
+%PACKET pkey_table  0016
+
+# Name                offset   size ts_type      conv/copy   print
+# ----                ------   ---- -------      ---------   -----
+
+%ARRAY_ITEM 32 pkey       0     16  tTS_IB_PKEY       conv      no
+
+%END_PACKET
+
+#
+# SL TO VL MAP support
+#
+
+%PACKET sl_vl_map  0017
+
+# Name                offset   size ts_type      conv/copy   print
+# ----                ------   ---- -------      ---------   -----
+
+sl0_to_vl                 0      4  no                conv      no
+sl1_to_vl                 4      4  no                conv      no
+sl2_to_vl                 8      4  no                conv      no
+sl3_to_vl                12      4  no                conv      no
+sl4_to_vl                16      4  no                conv      no
+sl5_to_vl                20      4  no                conv      no
+sl6_to_vl                24      4  no                conv      no
+sl7_to_vl                28      4  no                conv      no
+sl8_to_vl                32      4  no                conv      no
+sl9_to_vl                36      4  no                conv      no
+sl10_to_vl               40      4  no                conv      no
+sl11_to_vl               44      4  no                conv      no
+sl12_to_vl               48      4  no                conv      no
+sl13_to_vl               52      4  no                conv      no
+sl14_to_vl               56      4  no                conv      no
+sl15_to_vl               60      4  no                conv      no
+
+%END_PACKET
+
+#
+# VL ARBITRATION support
+#
+
+%ENTRY vl_arb_entry
+
+# Name                offset   size ts_type      conv/copy   print
+# ----                ------   ---- -------      ---------   -----
+
+vl                        4      4  no                conv      no
+weight                    8      8  no                conv      no
+
+%END_ENTRY               16
+
+%PACKET vl_arb_table  0018
+
+#          num_entries    entry_type         name       offset    size
+#          -----------    ----------         ----       ------    ----
+%ARRAY_ENTRY    32      vl_arb_entry        vl_arb         0       16
+
+%END_PACKET
+
+#
+# LINEAR FORWARDING TABLE support
+#
+
+%PACKET linear_fwd_table  0019
+
+# Name                    offset   size ts_type      conv/copy   print
+# ----                    ------   ---- -------      ---------   -----
+
+%ARRAY_ITEM 64 linear_fwd     0      8  no                conv      no
+
+%END_PACKET
+
+#
+# Random Forwarding Table Support
+#
+
+%ENTRY  random_fwd_entry
+
+# Name                offset   size ts_type      conv/copy   print
+# ----                ------   ---- -------      ---------   -----
+lid                       0     16  tTS_IB_LID        conv      no
+valid                    16      1  no                conv      no
+lmc                      17      3  no                conv      no
+port                     24      8  tTS_IB_PORT       conv      no
+
+%END_ENTRY               32
+
+
+%PACKET random_fwd_table  001A
+
+#          num_entries    entry_type         name       offset    size
+#          -----------    ----------         ----       ------    ----
+%ARRAY_ENTRY    16      random_fwd_entry    random_fwd     0       32
+
+%END_PACKET
+
+#
+# MULTICAST FORWARDING TABLE support
+#
+
+%PACKET mcast_fwd_table  001B
+
+# Name                    offset   size ts_type      conv/copy   print
+# ----                    ------   ---- -------      ---------   -----
+
+%ARRAY_ITEM 32 mcast_fwd     0      16   no            conv      no
+
+%END_PACKET
+
+#
+# SM INFO support
+#
+
+%PACKET sm_info   0020
+
+# Name                offset   size ts_type      conv/copy   print
+# ----                ------   ---- -------      ---------   -----
+
+guid                      0     64  tTS_IB_GUID       copy   no
+sm_key                   64     64  no                copy   no
+act_count               128     32  no                conv   no
+priority                160      4  no                conv   no
+sm_state                164      4  no                conv   no
+
+
+%END_PACKET
+
+#
+# VENDOR DIAG support
+#
+
+%PACKET vendor_diag   0030
+
+# Name                offset   size ts_type      conv/copy   print
+# ----                ------   ---- -------      ---------   -----
+
+next_index                0     16  no                conv   no
+diag_data                16    496  no                copy   no
+
+
+%END_PACKET
+
+#
+# LED INFO support
+#
+
+%PACKET led_info   0031
+
+# Name                offset   size ts_type      conv/copy   print
+# ----                ------   ---- -------      ---------   -----
+
+led_mask                  0      1  no                conv   no
+
+
+%END_PACKET

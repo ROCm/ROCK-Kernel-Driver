@@ -1,0 +1,7 @@
+../../../../../common/hw/mellanox-hca/HCA/hcahal/hh.c
+../../../../../common/hw/mellanox-hca/HCA/hcahal/hh_common.c
+../../../../../common/hw/mellanox-hca/HCA/hcahal/os_dep/linux/hhklsyms.c
+../../../../../common/hw/mellanox-hca/HCA/hcahal/hh_init.h
+../../../../../common/hw/mellanox-hca/HCA/hcahal/invalid.ic
+../../../../../common/hw/mellanox-hca/HCA/hcahal/zombie.ic
+../../../../../common/hw/mellanox-hca/HCA/hcahal/hhenosys.ic

@@ -1,0 +1,159 @@
+# Descriptions of CM packets, used to generate getter/setter functions
+# automatically.
+#
+# $Id: cm_packet_type.desc 32 2004-04-09 03:57:42Z roland $
+#
+# $Log: cm_packet_type.desc,v $
+# Revision 1.1  2003/10/06 20:01:07  roland
+# Initial checkin of NG communication manager
+#
+# Revision 1.5  2003/07/22 17:36:42  roland
+# Add local_guid field to REP for 1.1 spec (CM version 2) compliance.
+# Bugzilla number: 2234
+#
+# Revision 1.4  2003/06/20 15:43:19  roland
+# Rearrange code so that on creation, service structure is locked before tree is unlocked.  Also other minor cleanups
+#
+# Revision 1.3  2003/02/04 01:04:08  roland
+# Update CM to handle provider/consumer qp creation policy and APM
+#
+# Revision 1.2  2002/04/25 23:44:28  libor
+# more cm fields
+#
+# Revision 1.1  2002/02/22 21:08:18  roland
+# Initial checkin of TS API reorganization
+#
+# Revision 1.6  2001/11/27 05:24:10  roland
+# Make REP private data settable per connection
+#
+# Revision 1.5  2001/10/18 01:58:59  roland
+# Add support for private data and callback after REQ is received
+#
+# Revision 1.4  2001/10/15 22:08:11  roland
+# Align address struct internals more compactly
+#
+# Revision 1.3  2001/10/12 22:41:22  roland
+# Add first cut at active side of CM
+#
+# Revision 1.2  2001/10/09 02:43:54  roland
+# Most IB midlayer needed for CM complete; passive CM state machine approaching done
+#
+# Revision 1.1  2001/10/05 05:51:15  roland
+# Check in description of basic CM MAD types
+#
+
+REQ
+local_comm_id 0 32
+service_id 8 64
+local_guid 16 64
+local_cm_qkey 24 32
+local_qkey 28 32
+local_qpn 32 24
+target_max 35 8
+local_eecn 36 32
+initiator_max 39 8
+remote_eecn 40 32
+remote_cm_timeout 43 5
+transport_service_type 43[5] 2
+end_to_end_fc 43[7] 1
+starting_psn 44 24
+local_cm_timeout 47 5
+retry_count 47[5] 3
+pkey 48 16
+path_mtu 50 4
+rdc_exists      50[4] 1
+rnr_retry_count 50[5] 3
+max_cm_retries 51 4
+primary_local_lid 52 16
+primary_remote_lid 54 16
+primary_local_gid 56 128
+primary_remote_gid 72 128
+primary_flow_label 88 20
+primary_pkt_rate 91[2] 6
+primary_traffic 92 8
+primary_hop_limit 93 8
+primary_sl 94 4
+primary_subnet_local 94[4] 1
+primary_local_ack_timeout 95 5
+alternate_local_lid 96 16
+alternate_remote_lid 98 16
+alternate_local_gid 100 128
+alternate_remote_gid 116 128
+alternate_flow_label 132 20
+alternate_pkt_rate 135[2] 6
+alternate_traffic 136 8
+alternate_hop_limit 137 8
+alternate_sl 138 4
+alternate_subnet_local 138[4] 1
+alternate_local_ack_timeout 139 5
+private_data 140 736
+
+MRA
+local_comm_id 0 32
+remote_comm_id 4 32
+message 8 2
+service_timeout 9 5
+private_data 10 1776
+
+REP
+local_comm_id 0 32
+remote_comm_id 4 32
+local_qkey 8 32
+local_qpn 12 24
+local_eecn 16 24
+starting_psn 20 24
+target_max 24 8
+initiator_max 25 8
+target_ack_delay 26 5
+failover_accepted 26[5] 2
+end_to_end_fc 26[7] 1
+rnr_retry_count 27 3
+local_guid 28 64
+private_data 36 1568
+
+REJ
+local_comm_id 0 32
+remote_comm_id 4 32
+message 8 2
+info_length 9 4
+reason 10 16
+additional_info 12 128
+private_data 28 1632
+
+RTU
+local_comm_id 0 32
+remote_comm_id 4 32
+
+DREQ
+local_comm_id 0 32
+remote_comm_id 4 32
+remote_qpn 8 24
+
+DREP
+local_comm_id 0 32
+remote_comm_id 4 32
+
+LAP
+local_comm_id 0 32
+remote_comm_id 4 32
+remote_qpn 12 24
+remote_cm_timeout 15 5
+alternate_local_lid 20 16
+alternate_remote_lid 22 16
+alternate_local_gid 24 128
+alternate_remote_gid 40 128
+alternate_flow_label 56 20
+alternate_traffic 59 8
+alternate_hop_limit 60 8
+alternate_sl 62 4
+alternate_subnet_local 62[4] 1
+alternate_local_ack_timeout 63 5
+private_data 64 1344
+
+APR
+local_comm_id 0 32
+remote_comm_id 4 32
+info_length 8 8
+ap_status 9 8
+additional_info 12 576
+private_data 84 1184

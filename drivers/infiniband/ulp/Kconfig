@@ -1,0 +1,34 @@
+config INFINIBAND_IPOIB
+       tristate "IP-over-InfiniBand"
+       depends on INFINIBAND
+       ---help---
+         Support for the IP-over-InfiniBand protocol (IPoIB).  This
+         transports IP packets over InfiniBand so you can use your IB
+         device as a fancy NIC.  To configure interfaces on multiple
+         InfiniBand partitions (P_Keys) you will need the ipoibcfg
+         utility from <http://openib.org>.
+
+config INFINIBAND_SDP
+       tristate "Sockets Direct Protocol"
+       depends on INFINIBAND && INFINIBAND_IPOIB
+       ---help---
+         Support for Sockets Direct Protocol (SDP).  This provides
+         sockets semantics over InfiniBand via address family
+         AF_INET_SDP (address family 26).  You can also LD_PRELOAD the
+         libsdp library from <http://openib.org> to have standard
+         sockets applications use SDP.
+
+config INFINIBAND_SRP
+       tristate "SCSI RDMA Protocol"
+       depends on INFINIBAND && SCSI
+       ---help---
+         Support for SCSI RDMA Protocol (SRP).  This transports SCSI
+	 commands over InfiniBand and allows you to access storage
+	 connected via IB.
+
+config INFINIBAND_UDAPL_HELPER
+       tristate "uDAPL helper"
+       depends on INFINIBAND
+       ---help---
+         Kernel space helper for uDAPL.  Select this and use the uDAPL
+         library from <http://openib.org> to run uDAPL applications.
