@@ -268,7 +268,7 @@ acpi_system_suspend(
 
 	case ACPI_STATE_S2:
 	case ACPI_STATE_S3:
-		do_suspend_magic(0);
+		do_suspend_lowlevel(0);
 		break;
 	}
 
