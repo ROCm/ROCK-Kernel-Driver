@@ -526,8 +526,6 @@ int check_disk_change(struct block_device *bdev)
 {
 	struct block_device_operations * bdops = bdev->bd_op;
 	kdev_t dev = to_kdev_t(bdev->bd_dev);
-	struct gendisk *disk;
-	int part;
 
 	if (bdops->check_media_change == NULL)
 		return 0;
@@ -537,26 +535,21 @@ int check_disk_change(struct block_device *bdev)
 	if (invalidate_device(dev, 0))
 		printk("VFS: busy inodes on changed media.\n");
 
-	disk = get_gendisk(bdev->bd_dev, &part);
 	if (bdops->revalidate)
 		bdops->revalidate(dev);
-	if (disk && disk->minors > 1)
+	if (bdev->bd_disk->minors > 1)
 		bdev->bd_invalidated = 1;
-	put_disk(disk);
 	return 1;
 }
 
 int full_check_disk_change(struct block_device *bdev)
 {
 	int res = 0;
-	int n;
 	if (bdev->bd_contains != bdev)
 		BUG();
 	down(&bdev->bd_sem);
 	if (check_disk_change(bdev)) {
-		struct gendisk *disk = get_gendisk(bdev->bd_dev, &n);
-		rescan_partitions(disk, bdev);
-		put_disk(disk);
+		rescan_partitions(bdev->bd_disk, bdev);
 		res = 1;
 	}
 	up(&bdev->bd_sem);
@@ -598,6 +591,8 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 	kdev_t dev = to_kdev_t(bdev->bd_dev);
 	struct module *owner = NULL;
 	struct block_device_operations *ops, *old;
+	struct gendisk *disk;
+	int part;
 
 	lock_kernel();
 	ops = get_blkfops(major(dev));
@@ -617,53 +612,41 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 		if (owner)
 			__MOD_DEC_USE_COUNT(owner);
 	}
+	disk = get_gendisk(bdev->bd_dev, &part);
+	if (!disk)
+		goto out1;
 	if (!bdev->bd_contains) {
-		int part;
-		struct gendisk *g = get_gendisk(bdev->bd_dev, &part);
 		bdev->bd_contains = bdev;
-		if (g && part) {
-			struct block_device *disk;
-			disk = bdget(MKDEV(g->major, g->first_minor));
+		if (part) {
+			struct block_device *whole;
+			whole = bdget(MKDEV(disk->major, disk->first_minor));
 			ret = -ENOMEM;
-			if (!disk) {
-				put_disk(g);
+			if (!whole)
 				goto out1;
-			}
-			ret = blkdev_get(disk, file->f_mode, file->f_flags, BDEV_RAW);
-			if (ret) {
-				put_disk(g);
+			ret = blkdev_get(whole, file->f_mode, file->f_flags, BDEV_RAW);
+			if (ret)
 				goto out1;
-			}
-			bdev->bd_contains = disk;
+			bdev->bd_contains = whole;
 		}
-		put_disk(g);
 	}
 	if (bdev->bd_contains == bdev) {
-		int part;
-		struct gendisk *g = get_gendisk(bdev->bd_dev, &part);
-
+		if (!bdev->bd_openers)
+			bdev->bd_disk = disk;
 		if (!bdev->bd_queue) {
 			struct blk_dev_struct *p = blk_dev + major(dev);
 			bdev->bd_queue = &p->request_queue;
 			if (p->queue)
 				bdev->bd_queue =  p->queue(dev);
 		}
-
 		if (bdev->bd_op->open) {
 			ret = bdev->bd_op->open(inode, file);
-			if (ret) {
-				put_disk(g);
+			if (ret)
 				goto out2;
-			}
 		}
 		if (!bdev->bd_openers) {
 			struct backing_dev_info *bdi;
-			sector_t sect = 0;
-
 			bdev->bd_offset = 0;
-			if (g)
-				sect = get_capacity(g);
-			bd_set_size(bdev, (loff_t)sect << 9);
+			bd_set_size(bdev, (loff_t)get_capacity(disk) << 9);
 			bdi = blk_get_backing_dev_info(bdev);
 			if (bdi == NULL)
 				bdi = &default_backing_dev_info;
@@ -671,34 +654,31 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 			bdev->bd_inode->i_data.backing_dev_info = bdi;
 		}
 		if (bdev->bd_invalidated)
-			rescan_partitions(g, bdev);
-		put_disk(g);
+			rescan_partitions(disk, bdev);
 	} else {
 		down(&bdev->bd_contains->bd_sem);
 		bdev->bd_contains->bd_part_count++;
 		if (!bdev->bd_openers) {
-			int part;
-			struct gendisk *g = get_gendisk(bdev->bd_dev, &part);
 			struct hd_struct *p;
-			p = g->part + part - 1;
+			p = disk->part + part - 1;
 			inode->i_data.backing_dev_info =
 			   bdev->bd_inode->i_data.backing_dev_info =
 			   bdev->bd_contains->bd_inode->i_data.backing_dev_info;
-			if (!(g->flags & GENHD_FL_UP) || !p->nr_sects) {
+			if (!(disk->flags & GENHD_FL_UP) || !p->nr_sects) {
 				bdev->bd_contains->bd_part_count--;
 				up(&bdev->bd_contains->bd_sem);
-				put_disk(g);
 				ret = -ENXIO;
 				goto out2;
 			}
 			bdev->bd_queue = bdev->bd_contains->bd_queue;
 			bdev->bd_offset = p->start_sect;
 			bd_set_size(bdev, (loff_t) p->nr_sects << 9);
-			put_disk(g);
+			bdev->bd_disk = disk;
 		}
 		up(&bdev->bd_contains->bd_sem);
 	}
-	bdev->bd_openers++;
+	if (bdev->bd_openers++)
+		put_disk(disk);
 	up(&bdev->bd_sem);
 	unlock_kernel();
 	return 0;
@@ -712,6 +692,7 @@ out2:
 		}
 	}
 out1:
+	put_disk(disk);
 	if (!old) {
 		bdev->bd_op = NULL;
 		if (owner)
@@ -785,15 +766,18 @@ int blkdev_put(struct block_device *bdev, int kind)
 		up(&bdev->bd_contains->bd_sem);
 	}
 	if (!bdev->bd_openers) {
+		struct gendisk *disk = bdev->bd_disk;
 		if (bdev->bd_op->owner)
 			__MOD_DEC_USE_COUNT(bdev->bd_op->owner);
 		bdev->bd_op = NULL;
 		bdev->bd_queue = NULL;
+		bdev->bd_disk = NULL;
 		bdev->bd_inode->i_data.backing_dev_info = &default_backing_dev_info;
 		if (bdev != bdev->bd_contains) {
 			blkdev_put(bdev->bd_contains, BDEV_RAW);
 			bdev->bd_contains = NULL;
 		}
+		put_disk(disk);
 	}
 	unlock_kernel();
 	up(&bdev->bd_sem);

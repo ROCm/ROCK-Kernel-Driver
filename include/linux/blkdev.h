@@ -34,6 +34,7 @@ struct request {
 
 	int rq_status;	/* should split this into a few status bits */
 	kdev_t rq_dev;
+	struct gendisk *rq_disk;
 	int errors;
 	sector_t sector;
 	unsigned long nr_sectors;

@@ -359,6 +359,7 @@ struct block_device {
 	sector_t		bd_offset;
 	unsigned		bd_part_count;
 	int			bd_invalidated;
+	struct gendisk *	bd_disk;
 };
 
 struct inode {

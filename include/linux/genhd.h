@@ -90,6 +90,10 @@ struct gendisk {
 	devfs_handle_t disk_de;		/* piled higher and deeper */
 	struct device *driverfs_dev;
 	struct device disk_dev;
+
+	unsigned sync_io;		/* RAID */
+	unsigned reads, writes;
+	unsigned rio, wio;
 };
 
 /* drivers/block/genhd.c */
@@ -271,15 +275,6 @@ extern void put_disk(struct gendisk *disk);
 
 /* will go away */
 extern void blk_set_probe(int major, struct gendisk *(p)(int));
-
-static inline unsigned int disk_index (kdev_t dev)
-{
-	int part, res;
-	struct gendisk *g = get_gendisk(kdev_t_to_nr(dev), &part);
-	res = g ? (minor(dev) >> g->minor_shift) : 0;
-	put_disk(g);
-	return res;
-}
 
 #endif
 

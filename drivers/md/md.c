@@ -2731,18 +2731,9 @@ int unregister_md_personality(int pnum)
 	return 0;
 }
 
-static unsigned int sync_io[DK_MAX_MAJOR][DK_MAX_DISK];
 void md_sync_acct(mdk_rdev_t *rdev, unsigned long nr_sectors)
 {
-	kdev_t dev = to_kdev_t(rdev->bdev->bd_dev);
-	unsigned int major = major(dev);
-	unsigned int index;
-
-	index = disk_index(dev);
-	if ((index >= DK_MAX_DISK) || (major >= DK_MAX_MAJOR))
-		return;
-
-	sync_io[major][index] += nr_sectors;
+	rdev->bdev->bd_disk->sync_io += nr_sectors;
 }
 
 static int is_mddev_idle(mddev_t *mddev)
@@ -2754,16 +2745,8 @@ static int is_mddev_idle(mddev_t *mddev)
 
 	idle = 1;
 	ITERATE_RDEV(mddev,rdev,tmp) {
-		kdev_t dev = to_kdev_t(rdev->bdev->bd_dev);
-		int major = major(dev);
-		int idx = disk_index(dev);
-
-		if ((idx >= DK_MAX_DISK) || (major >= DK_MAX_MAJOR))
-			continue;
-
-		curr_events = kstat.dk_drive_rblk[major][idx] +
-						kstat.dk_drive_wblk[major][idx] ;
-		curr_events -= sync_io[major][idx];
+		struct gendisk *disk = rdev->bdev->bd_disk;
+		curr_events = disk->reads + disk->writes - disk->sync_io;
 		if ((curr_events - rdev->last_events) > 32) {
 			rdev->last_events = curr_events;
 			idle = 0;

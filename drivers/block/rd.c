@@ -381,6 +381,7 @@ static int rd_open(struct inode * inode, struct file * filp)
 		rd_bdev[unit]->bd_inode->i_mapping->a_ops = &ramdisk_aops;
 		rd_bdev[unit]->bd_inode->i_size = rd_length[unit];
 		rd_bdev[unit]->bd_queue = &blk_dev[MAJOR_NR].request_queue;
+		rd_bdev[unit]->bd_disk = get_disk(rd_disks[unit]);
 	}
 
 	return 0;

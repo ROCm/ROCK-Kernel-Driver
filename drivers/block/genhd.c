@@ -61,10 +61,7 @@ void add_disk(struct gendisk *disk)
 {
 	write_lock(&gendisk_lock);
 	list_add(&disk->list, &gendisks[disk->major].list);
-	if (disk->minors > 1)
-		list_add_tail(&disk->full_list, &gendisk_list);
-	else
-		INIT_LIST_HEAD(&disk->full_list);
+	list_add_tail(&disk->full_list, &gendisk_list);
 	write_unlock(&gendisk_lock);
 	disk->flags |= GENHD_FL_UP;
 	register_disk(disk);
@@ -120,8 +117,6 @@ get_gendisk(dev_t dev, int *part)
 	return NULL;
 }
 
-EXPORT_SYMBOL(get_gendisk);
-
 #ifdef CONFIG_PROC_FS
 /* iterator */
 static void *part_start(struct seq_file *part, loff_t *pos)
@@ -158,7 +153,7 @@ static int show_partition(struct seq_file *part, void *v)
 		seq_puts(part, "major minor  #blocks  name\n\n");
 
 	/* Don't show non-partitionable devices or empty devices */
-	if (!get_capacity(sgp))
+	if (!get_capacity(sgp) || sgp->minors == 1)
 		return 0;
 
 	/* show the full disk and all non-0 size partitions of it */
@@ -239,6 +234,7 @@ struct gendisk *alloc_disk(int minors)
 		disk->minors = minors;
 		while (minors >>= 1)
 			disk->minor_shift++;
+		INIT_LIST_HEAD(&disk->full_list);
 		disk->disk_dev.bus = &disk_bus;
 		disk->disk_dev.release = disk_release;
 		disk->disk_dev.driver_data = disk;
