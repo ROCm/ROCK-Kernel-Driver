@@ -512,24 +512,33 @@ nfsd_close(struct file *filp)
  * As this calls fsync (not fdatasync) there is no need for a write_inode
  * after it.
  */
+inline void nfsd_dosync(struct file *filp, struct dentry *dp, 
+			struct file_operations *fop)
+{
+	struct inode *inode = dp->d_inode;
+	int (*fsync) (struct file *, struct dentry *, int);
+
+	filemap_fdatasync(inode->i_mapping);
+	if (fop && (fsync = fop->fsync))
+		fsync(filp, dp, 0);
+	filemap_fdatawait(inode->i_mapping);
+}
+	
+
 void
 nfsd_sync(struct file *filp)
 {
+	struct inode *inode = filp->f_dentry->d_inode;
 	dprintk("nfsd: sync file %s\n", filp->f_dentry->d_name.name);
-	down(&filp->f_dentry->d_inode->i_sem);
-	filp->f_op->fsync(filp, filp->f_dentry, 0);
-	up(&filp->f_dentry->d_inode->i_sem);
+	down(&inode->i_sem);
+	nfsd_dosync(filp, filp->f_dentry, filp->f_op);
+	up(&inode->i_sem);
 }
 
 void
 nfsd_sync_dir(struct dentry *dp)
 {
-	struct inode *inode = dp->d_inode;
-	int (*fsync) (struct file *, struct dentry *, int);
-	
-	if (inode->i_fop && (fsync = inode->i_fop->fsync)) {
-		fsync(NULL, dp, 0);
-	}
+	nfsd_dosync(NULL, dp, dp->d_inode->i_fop);
 }
 
 /*
@@ -1383,7 +1392,6 @@ int
 nfsd_readdir(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset, 
              encode_dent_fn func, u32 *buffer, int *countp, u32 *verf)
 {
-	struct inode	*inode;
 	u32		*p;
 	int		oldlen, eof, err;
 	struct file	file;
@@ -1395,9 +1403,6 @@ nfsd_readdir(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset,
 	if (offset > ~(u32) 0)
 		goto out_close;
 
-	err = nfserr_notdir;
-	if (!file.f_op->readdir)
-		goto out_close;
 	file.f_pos = offset;
 
 	/* Set up the readdir context */
@@ -1412,25 +1417,16 @@ nfsd_readdir(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset,
 	 * readdir() is not guaranteed to fill up the entire buffer, but
 	 * may choose to do less.
 	 */
-	inode = file.f_dentry->d_inode;
-	down(&inode->i_sem);
-	while (1) {
+
+	do {
 		oldlen = cd.buflen;
 
-		/*
-		dprintk("nfsd: f_op->readdir(%s/%ld @ %d) buflen = %d (%d)\n",
-			file.f_inode->i_sb->s_id, file.f_inode->i_ino,
-			(int) file.f_pos, (int) oldlen, (int) cd.buflen);
-		 */
-		err = file.f_op->readdir(&file, &cd, (filldir_t) func);
+		err = vfs_readdir(&file, (filldir_t) func, &cd);
+
 		if (err < 0)
 			goto out_nfserr;
-		if (oldlen == cd.buflen)
-			break;
-		if (cd.eob)
-			break;
-	}
-	up(&inode->i_sem);
+
+	} while (oldlen != cd.buflen && !cd.eob);
 
 	/* If we didn't fill the buffer completely, we're at EOF */
 	eof = !cd.eob;
@@ -1457,7 +1453,6 @@ out:
 	return err;
 
 out_nfserr:
-	up(&inode->i_sem);
 	err = nfserrno(err);
 	goto out_close;
 }
