@@ -12,7 +12,7 @@
  * The size of struct machine_desc
  *   (for assembler code)
  */
-#define SIZEOF_MACHINE_DESC	48
+#define SIZEOF_MACHINE_DESC	52
 
 #ifndef __ASSEMBLY__
 
@@ -45,6 +45,7 @@ struct machine_desc {
 					 struct meminfo *);
 	void			(*map_io)(void);/* IO mapping function	*/
 	void			(*init_irq)(void);
+	void			(*init_machine)(void);
 };
 
 /*
@@ -85,6 +86,9 @@ const struct machine_desc __mach_desc_##_type	\
 
 #define INITIRQ(_func)				\
 	.init_irq	= _func,
+
+#define INIT_MACHINE(_func)			\
+	.init_machine	= _func,
 
 #define MACHINE_END				\
 };
