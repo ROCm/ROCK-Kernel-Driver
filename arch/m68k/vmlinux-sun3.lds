@@ -43,6 +43,9 @@ __init_begin = .;
 	__setup_start = .;
 	.init.setup : { *(.init.setup) }
 	__setup_end = .;
+	__start___param = .;
+	__param : { *(__param) }
+	__stop___param = .;
 	__initcall_start = .;
 	.initcall.init : {
 		*(.initcall1.init) 
