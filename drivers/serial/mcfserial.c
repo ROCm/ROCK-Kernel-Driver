@@ -1643,7 +1643,6 @@ mcfrs_init(void)
 }
 
 module_init(mcfrs_init);
-/* DAVIDM module_exit(mcfrs_fini); */
 
 /****************************************************************************/
 /*                          Serial Console                                  */
