@@ -343,9 +343,12 @@
 #define  LED_CTRL_100MBPS_STATUS	 0x00000100
 #define  LED_CTRL_10MBPS_STATUS		 0x00000200
 #define  LED_CTRL_TRAFFIC_STATUS	 0x00000400
-#define  LED_CTRL_MAC_MODE		 0x00000000
-#define  LED_CTRL_PHY_MODE_1		 0x00000800
-#define  LED_CTRL_PHY_MODE_2		 0x00001000
+#define  LED_CTRL_MODE_MAC		 0x00000000
+#define  LED_CTRL_MODE_PHY_1		 0x00000800
+#define  LED_CTRL_MODE_PHY_2		 0x00001000
+#define  LED_CTRL_MODE_SHASTA_MAC	 0x00002000
+#define  LED_CTRL_MODE_SHARED		 0x00004000
+#define  LED_CTRL_MODE_COMBO		 0x00008000
 #define  LED_CTRL_BLINK_RATE_MASK	 0x7ff80000
 #define  LED_CTRL_BLINK_RATE_SHIFT	 19
 #define  LED_CTRL_BLINK_PER_OVERRIDE	 0x00080000
@@ -1367,11 +1370,9 @@
 
 #define NIC_SRAM_DATA_CFG			0x00000b58
 #define  NIC_SRAM_DATA_CFG_LED_MODE_MASK	 0x0000000c
-#define  NIC_SRAM_DATA_CFG_LED_MODE_UNKNOWN	 0x00000000
-#define  NIC_SRAM_DATA_CFG_LED_TRIPLE_SPD	 0x00000004
-#define  NIC_SRAM_DATA_CFG_LED_OPEN_DRAIN	 0x00000004
-#define  NIC_SRAM_DATA_CFG_LED_LINK_SPD		 0x00000008
-#define  NIC_SRAM_DATA_CFG_LED_OUTPUT		 0x00000008
+#define  NIC_SRAM_DATA_CFG_LED_MODE_MAC		 0x00000000
+#define  NIC_SRAM_DATA_CFG_LED_MODE_PHY_1	 0x00000004
+#define  NIC_SRAM_DATA_CFG_LED_MODE_PHY_2	 0x00000008
 #define  NIC_SRAM_DATA_CFG_PHY_TYPE_MASK	 0x00000030
 #define  NIC_SRAM_DATA_CFG_PHY_TYPE_UNKNOWN	 0x00000000
 #define  NIC_SRAM_DATA_CFG_PHY_TYPE_COPPER	 0x00000010
@@ -1406,6 +1407,14 @@
 
 #define NIC_SRAM_MAC_ADDR_HIGH_MBOX	0x00000c14
 #define NIC_SRAM_MAC_ADDR_LOW_MBOX	0x00000c18
+
+#define NIC_SRAM_DATA_CFG_2		0x00000d38
+
+#define  SHASTA_EXT_LED_MODE_MASK	 0x00018000
+#define  SHASTA_EXT_LED_LEGACY		 0x00000000
+#define  SHASTA_EXT_LED_SHARED		 0x00008000
+#define  SHASTA_EXT_LED_MAC		 0x00010000
+#define  SHASTA_EXT_LED_COMBO		 0x00018000
 
 #define NIC_SRAM_RX_MINI_BUFFER_DESC	0x00001000
 
@@ -1768,12 +1777,6 @@ struct tg3_hw_stats {
 	u8				__reserved4[0xb00-0x9c0];
 };
 
-enum phy_led_mode {
-	led_mode_auto,
-	led_mode_three_link,
-	led_mode_link10
-};
-
 /* 'mapping' is superfluous as the chip does not write into
  * the tx/rx post rings so we could just fetch it from there.
  * But the cache behavior is better how we are doing it now.
@@ -2032,7 +2035,7 @@ struct tg3 {
 #define PHY_REV_BCM5401_C0		0x6
 #define PHY_REV_BCM5411_X0		0x1 /* Found on Netgear GA302T */
 
-	enum phy_led_mode		led_mode;
+	u32				led_ctrl;
 
 	char				board_part_number[24];
 	u32				nic_sram_data_cfg;
