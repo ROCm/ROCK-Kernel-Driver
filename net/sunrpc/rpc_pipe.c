@@ -324,6 +324,7 @@ static struct file_operations rpc_info_operations = {
 enum {
 	RPCAUTH_Root = 1,
 	RPCAUTH_lockd,
+	RPCAUTH_mount,
 	RPCAUTH_nfs,
 	RPCAUTH_portmap,
 	RPCAUTH_statd,
@@ -342,6 +343,10 @@ struct rpc_filelist {
 static struct rpc_filelist files[] = {
 	[RPCAUTH_lockd] = {
 		.name = "lockd",
+		.mode = S_IFDIR | S_IRUGO | S_IXUGO,
+	},
+	[RPCAUTH_mount] = {
+		.name = "mount",
 		.mode = S_IFDIR | S_IRUGO | S_IXUGO,
 	},
 	[RPCAUTH_nfs] = {
