@@ -300,8 +300,8 @@ static void devfs_register_disc(struct gendisk *dev)
 	}
 	if (!devfs_handle)
 		devfs_handle = devfs_mk_dir(NULL, "discs", NULL);
-	p[0].number = devfs_alloc_unique_number (&disc_numspace);
-	sprintf(symlink, "disc%d", p[0].number);
+	dev->number = devfs_alloc_unique_number (&disc_numspace);
+	sprintf(symlink, "disc%d", dev->number);
 	devfs_mk_symlink (devfs_handle, symlink, DEVFS_FL_DEFAULT,
 			  dirname + pos, &slave, NULL);
 	p[0].de = devfs_register (dir, "disc", devfs_flags,
@@ -333,7 +333,7 @@ void devfs_register_partitions (struct gendisk *dev, int unregister)
 	if (unregister) {
 		devfs_unregister(p[0].de);
 		p[0].de = NULL;
-		devfs_dealloc_unique_number(&disc_numspace, p[0].number);
+		devfs_dealloc_unique_number(&disc_numspace, dev->number);
 	}
 #endif  /*  CONFIG_DEVFS_FS  */
 }

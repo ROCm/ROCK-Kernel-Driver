@@ -62,7 +62,6 @@ struct hd_struct {
 	unsigned long start_sect;
 	unsigned long nr_sects;
 	devfs_handle_t de;              /* primary (master) devfs entry  */
-	int number;                     /* stupid old code wastes space  */
 	struct device hd_driverfs_dev;  /* support driverfs hiearchy     */
 };
 
@@ -83,6 +82,7 @@ struct gendisk {
 	devfs_handle_t *de_arr;         /* one per physical disc */
 	struct device *driverfs_dev;
 	int flags;
+	int number;			/* devfs crap */
 };
 
 /* drivers/block/genhd.c */
