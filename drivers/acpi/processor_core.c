@@ -106,7 +106,6 @@ static struct acpi_driver acpi_processor_driver = {
 #define UNINSTALL_NOTIFY_HANDLER	2
 
 
-
 struct file_operations acpi_processor_info_fops = {
 	.open 		= acpi_processor_info_open_fs,
 	.read		= seq_read,
@@ -168,8 +167,8 @@ acpi_processor_errata_piix4 (
 		/*
 		 * See specification changes #13 ("Manual Throttle Duty Cycle")
 		 * and #14 ("Enabling and Disabling Manual Throttle"), plus
-		 * erratum #5 ("STPCLK# Deassertion Time") from the January 
-		 * 2002 PIIX4 specification update.  Applies to only older 
+		 * erratum #5 ("STPCLK# Deassertion Time") from the January
+		 * 2002 PIIX4 specification update.  Applies to only older
 		 * PIIX4 models.
 		 */
 		errata.piix4.throttle = 1;
@@ -177,38 +176,38 @@ acpi_processor_errata_piix4 (
 	case 2:		/* PIIX4E */
 	case 3:		/* PIIX4M */
 		/*
-		 * See erratum #18 ("C3 Power State/BMIDE and Type-F DMA 
+		 * See erratum #18 ("C3 Power State/BMIDE and Type-F DMA
 		 * Livelock") from the January 2002 PIIX4 specification update.
 		 * Applies to all PIIX4 models.
 		 */
 
-		/* 
+		/*
 		 * BM-IDE
 		 * ------
-		 * Find the PIIX4 IDE Controller and get the Bus Master IDE 
-		 * Status register address.  We'll use this later to read 
+		 * Find the PIIX4 IDE Controller and get the Bus Master IDE
+		 * Status register address.  We'll use this later to read
 		 * each IDE controller's DMA status to make sure we catch all
 		 * DMA activity.
 		 */
 		dev = pci_get_subsys(PCI_VENDOR_ID_INTEL,
-		           PCI_DEVICE_ID_INTEL_82371AB, 
+		           PCI_DEVICE_ID_INTEL_82371AB,
                            PCI_ANY_ID, PCI_ANY_ID, NULL);
 		if (dev) {
 			errata.piix4.bmisx = pci_resource_start(dev, 4);
 			pci_dev_put(dev);
 		}
 
-		/* 
+		/*
 		 * Type-F DMA
 		 * ----------
 		 * Find the PIIX4 ISA Controller and read the Motherboard
 		 * DMA controller's status to see if Type-F (Fast) DMA mode
-		 * is enabled (bit 7) on either channel.  Note that we'll 
-		 * disable C3 support if this is enabled, as some legacy 
+		 * is enabled (bit 7) on either channel.  Note that we'll
+		 * disable C3 support if this is enabled, as some legacy
 		 * devices won't operate well if fast DMA is disabled.
 		 */
-		dev = pci_get_subsys(PCI_VENDOR_ID_INTEL, 
-			PCI_DEVICE_ID_INTEL_82371AB_0, 
+		dev = pci_get_subsys(PCI_VENDOR_ID_INTEL,
+			PCI_DEVICE_ID_INTEL_82371AB_0,
 			PCI_ANY_ID, PCI_ANY_ID, NULL);
 		if (dev) {
 			pci_read_config_byte(dev, 0x76, &value1);
@@ -222,10 +221,10 @@ acpi_processor_errata_piix4 (
 	}
 
 	if (errata.piix4.bmisx)
-		ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO,
 			"Bus master activity detection (BM-IDE) erratum enabled\n"));
 	if (errata.piix4.fdma)
-		ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO,
 			"Type-F DMA livelock erratum (C3 disabled)\n"));
 
 	return_VALUE(0);
@@ -247,7 +246,7 @@ acpi_processor_errata (
 	/*
 	 * PIIX4
 	 */
-	dev = pci_get_subsys(PCI_VENDOR_ID_INTEL, 
+	dev = pci_get_subsys(PCI_VENDOR_ID_INTEL,
 		PCI_DEVICE_ID_INTEL_82371AB_3, PCI_ANY_ID, PCI_ANY_ID, NULL);
 	if (dev) {
 		result = acpi_processor_errata_piix4(dev);
@@ -409,7 +408,7 @@ static u8 convert_acpiid_to_cpu(u8 acpi_id)
 {
 	u16 apic_id;
 	int i;
-	
+
 	apic_id = arch_acpiid_to_apicid[acpi_id];
 	if (apic_id == ARCH_BAD_APICID)
 		return -1;
@@ -502,8 +501,8 @@ acpi_processor_get_info (
    			return_VALUE(-ENODEV);
    		}
     	}
- 
-	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Processor [%d:%d]\n", pr->id, 
+
+	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Processor [%d:%d]\n", pr->id,
 		pr->acpi_id));
 
 	if (!object.processor.pblk_address)
@@ -576,7 +575,7 @@ acpi_processor_start(
 
 	/*
 	 * Install the idle handler if processor power management is supported.
-	 * Note that we use previously set idle handler will be used on 
+	 * Note that we use previously set idle handler will be used on
 	 * platforms that only support C1.
 	 */
 	if ((pr->flags.power) && (!boot_option_idle_override)) {
@@ -591,7 +590,7 @@ acpi_processor_start(
 			pm_idle = acpi_processor_idle;
 		}
 	}
-	
+
 	if (pr->flags.throttling) {
 		printk(KERN_INFO PREFIX "%s [%s] (supports",
 			acpi_device_name(device), acpi_device_bid(device));
@@ -626,7 +625,7 @@ acpi_processor_notify (
 	switch (event) {
 	case ACPI_PROCESSOR_NOTIFY_PERFORMANCE:
 		acpi_processor_ppc_has_changed(pr);
-		acpi_bus_generate_event(device, event, 
+		acpi_bus_generate_event(device, event,
 			pr->performance_platform_limit);
 		break;
 	case ACPI_PROCESSOR_NOTIFY_POWER:
@@ -704,10 +703,10 @@ acpi_processor_remove (
 		synchronize_kernel();
 	}
 
-	status = acpi_remove_notify_handler(pr->handle, ACPI_DEVICE_NOTIFY, 
+	status = acpi_remove_notify_handler(pr->handle, ACPI_DEVICE_NOTIFY,
 		acpi_processor_notify);
 	if (ACPI_FAILURE(status)) {
-		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, 
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
 			"Error removing notify handler\n"));
 	}
 
@@ -828,7 +827,7 @@ acpi_processor_hotplug_notify (
 				"Driver data is NULL\n"));
 			break;
 		}
-		
+
 		if (pr->id >= 0 && (pr->id < NR_CPUS)) {
 			kobject_hotplug(&device->kobj, KOBJ_OFFLINE);
 			break;
@@ -911,7 +910,7 @@ acpi_processor_hotadd_init(
 	int			*p_cpu)
 {
 	ACPI_FUNCTION_TRACE("acpi_processor_hotadd_init");
-	
+
 	if (!is_processor_present(handle)) {
 		return_VALUE(AE_ERROR);
 	}
@@ -982,7 +981,7 @@ void acpi_processor_uninstall_hotplug_notify(void)
 }
 
 /*
- * We keep the driver loaded even when ACPI is not running. 
+ * We keep the driver loaded even when ACPI is not running.
  * This is needed for the powernow-k8 driver, that works even without
  * ACPI, but needs symbols from this driver
  */
@@ -1015,7 +1014,6 @@ acpi_processor_init (void)
 	acpi_processor_ppc_init();
 
 	dmi_check_system(processor_dmi_table);
-
 	if (max_cstate < ACPI_C_STATES_MAX)
 		printk(KERN_NOTICE "ACPI: processor limited to max C-state %d\n", max_cstate);
 
