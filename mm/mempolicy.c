@@ -901,7 +901,7 @@ sp_lookup(struct shared_policy *sp, unsigned long start, unsigned long end)
 		struct sp_node *p = rb_entry(n, struct sp_node, nd);
 		if (start >= p->end) {
 			n = n->rb_right;
-		} else if (end < p->start) {
+		} else if (end <= p->start) {
 			n = n->rb_left;
 		} else {
 			break;
@@ -1009,11 +1009,10 @@ static int shared_policy_replace(struct shared_policy *sp, unsigned long start,
 					up(&sp->sem);
 					return -ENOMEM;
 				}
-				n->end = end;
+				n->end = start;
 				sp_insert(sp, new2);
-			}
-			/* Old crossing beginning, but not end (easy) */
-			if (n->start < start && n->end > start)
+				break;
+			} else
 				n->end = start;
 		}
 		if (!next)
@@ -1060,11 +1059,11 @@ void mpol_free_shared_policy(struct shared_policy *p)
 	while (next) {
 		n = rb_entry(next, struct sp_node, nd);
 		next = rb_next(&n->nd);
-		rb_erase(&n->nd, &p->root);
 		mpol_free(n->policy);
 		kmem_cache_free(sn_cache, n);
 	}
 	up(&p->sem);
+	p->root = RB_ROOT;
 }
 
 /* assumes fs == KERNEL_DS */
