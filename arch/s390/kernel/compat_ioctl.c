@@ -23,6 +23,7 @@
 #include <asm/types.h>
 #include <asm/uaccess.h>
 
+#include <linux/blkdev.h>
 #include <linux/blkpg.h>
 #include <linux/cdrom.h>
 #include <linux/dm-ioctl.h>
