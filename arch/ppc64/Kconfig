@@ -87,6 +87,7 @@ config ALTIVEC
 config PPC_PMAC
 	depends on PPC_PSERIES
 	bool "Apple PowerMac G5 support"
+	select ADB_PMU
 
 config PPC_PMAC64
 	bool
