@@ -141,4 +141,10 @@ static inline unsigned int cpu_mask_to_apicid(cpumask_const_t cpumask)
 	return (int) 0xF;
 }
 
+/* No NUMA-Q box has a HT CPU, but it can't hurt to use the default code. */
+static inline u32 phys_pkg_id(u32 cpuid_apic, int index_msb)
+{
+	return cpuid_apic >> index_msb;
+}
+
 #endif /* __ASM_MACH_APIC_H */
