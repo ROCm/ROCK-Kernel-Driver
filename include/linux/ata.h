@@ -42,6 +42,7 @@ enum {
 	ATA_ID_SERNO_OFS	= 10,
 	ATA_ID_MAJOR_VER	= 80,
 	ATA_ID_PIO_MODES	= 64,
+	ATA_ID_MWDMA_MODES	= 63,
 	ATA_ID_UDMA_MODES	= 88,
 	ATA_ID_PIO4		= (1 << 1),
 
@@ -133,8 +134,14 @@ enum {
 	XFER_UDMA_2		= 0x42,
 	XFER_UDMA_1		= 0x41,
 	XFER_UDMA_0		= 0x40,
+	XFER_MW_DMA_2		= 0x22,
+	XFER_MW_DMA_1		= 0x21,
+	XFER_MW_DMA_0		= 0x20,
 	XFER_PIO_4		= 0x0C,
 	XFER_PIO_3		= 0x0B,
+	XFER_PIO_2		= 0x0A,
+	XFER_PIO_1		= 0x09,
+	XFER_PIO_0		= 0x08,
 
 	/* ATAPI stuff */
 	ATAPI_PKT_DMA		= (1 << 0),
