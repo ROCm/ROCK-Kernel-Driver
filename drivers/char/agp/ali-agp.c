@@ -9,6 +9,14 @@
 #include <linux/agp_backend.h>
 #include "agp.h"
 
+#define ALI_AGPCTRL	0xb8
+#define ALI_ATTBASE	0xbc
+#define ALI_TLBCTRL	0xc0
+#define ALI_TAGCTRL	0xc4
+#define ALI_CACHE_FLUSH_CTRL	0xD0
+#define ALI_CACHE_FLUSH_ADDR_MASK	0xFFFFF000
+#define ALI_CACHE_FLUSH_EN	0x100
+
 static int ali_fetch_size(void)
 {
 	int i;

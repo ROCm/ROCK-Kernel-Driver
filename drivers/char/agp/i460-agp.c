@@ -14,6 +14,13 @@
 
 #include "agp.h"
 
+#define INTEL_I460_BAPBASE		0x98
+#define INTEL_I460_GXBCTL		0xa0
+#define INTEL_I460_AGPSIZ		0xa2
+#define INTEL_I460_ATTBASE		0xfe200000
+#define INTEL_I460_GATT_VALID		(1UL << 24)
+#define INTEL_I460_GATT_COHERENT	(1UL << 25)
+
 /*
  * The i460 can operate with large (4MB) pages, but there is no sane way to support this
  * within the current kernel/DRM environment, so we disable the relevant code for now.
