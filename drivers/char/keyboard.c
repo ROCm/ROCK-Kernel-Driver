@@ -40,7 +40,6 @@
 #include <linux/kbd_diacr.h>
 #include <linux/vt_kern.h>
 #include <linux/sysrq.h>
-#include <linux/pm.h>
 #include <linux/input.h>
 
 static void kbd_disconnect(struct input_handle *handle);
@@ -49,6 +48,22 @@ extern void ctrl_alt_del(void);
 /*
  * Exported functions/variables
  */
+
+#ifndef KBD_DEFMODE
+#define KBD_DEFMODE ((1 << VC_REPEAT) | (1 << VC_META))
+#endif
+
+#ifndef KBD_DEFLEDS
+/*
+ * Some laptops take the 789uiojklm,. keys as number pad when NumLock is on.
+ * This seems a good reason to start with NumLock off.
+ */
+#define KBD_DEFLEDS 0
+#endif
+
+#ifndef KBD_DEFLOCK
+#define KBD_DEFLOCK 0
+#endif
 
 struct pt_regs *kbd_pt_regs;
 void compute_shiftstate(void);
@@ -94,6 +109,7 @@ const int NR_TYPES = ARRAY_SIZE(max_vals);
 
 struct kbd_struct kbd_table[MAX_NR_CONSOLES];
 static struct kbd_struct *kbd = kbd_table;
+static struct kbd_struct kbd0;
 
 int spawnpid, spawnsig;
 
@@ -123,6 +139,21 @@ static struct ledptr {
 	unsigned int mask;
 	unsigned char valid:1;
 } ledptrs[3];
+
+/* Simple translation table for the SysRq keys */
+
+#ifdef CONFIG_MAGIC_SYSRQ
+unsigned char kbd_sysrq_xlate[128] =
+        "\000\0331234567890-=\177\t"                    /* 0x00 - 0x0f */
+        "qwertyuiop[]\r\000as"                          /* 0x10 - 0x1f */
+        "dfghjkl;'`\000\\zxcv"                          /* 0x20 - 0x2f */
+        "bnm,./\000*\000 \000\201\202\203\204\205"      /* 0x30 - 0x3f */
+        "\206\207\210\211\212\000\000789-456+1"         /* 0x40 - 0x4f */
+        "230\177\000\000\213\214\000\000\000\000\000\000\000\000\000\000" /* 0x50 - 0x5f */
+        "\r\000/";                                      /* 0x60 - 0x6f */
+static int sysrq_down;
+#endif
+static int sysrq_alt;
 
 /*
  * Translation of scancodes to keycodes. We set them on only the first attached
@@ -314,7 +345,7 @@ void compute_shiftstate(void)
 		if (!key_down[i])
 			continue;
 
-		k = i*BITS_PER_LONG;
+		k = i * BITS_PER_LONG;
 
 		for (j = 0; j < BITS_PER_LONG; j++, k++) {
 
@@ -861,8 +892,6 @@ DECLARE_TASKLET_DISABLED(keyboard_tasklet, kbd_bh, 0);
 
 #if defined(CONFIG_X86) || defined(CONFIG_IA64) || defined(CONFIG_ALPHA) || defined(CONFIG_MIPS) || defined(CONFIG_PPC) || defined(CONFIG_SPARC32) || defined(CONFIG_SPARC64)
 
-static int x86_sysrq_alt = 0;
-
 static unsigned short x86_keycodes[256] =
 	{ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15,
 	 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31,
@@ -907,17 +936,10 @@ static int emulate_raw(struct vc_data *vc, unsigned int keycode,
 		return 0;
 	} 
 
-	if (keycode == KEY_SYSRQ && x86_sysrq_alt) {
+	if (keycode == KEY_SYSRQ && sysrq_alt) {
 		put_queue(vc, 0x54 | up_flag);
 		return 0;
 	}
-
-#if defined(CONFIG_SPARC32) || defined(CONFIG_SPARC64)
-	if (keycode == KEY_A && sparc_l1_a_state) {
-		sparc_l1_a_state = 0;
-		sun_do_break();
-	}
-#endif
 
 	if (x86_keycodes[keycode] & 0x100)
 		put_queue(vc, 0xe0);
@@ -928,14 +950,6 @@ static int emulate_raw(struct vc_data *vc, unsigned int keycode,
 		put_queue(vc, 0xe0);
 		put_queue(vc, 0x37 | up_flag);
 	}
-
-	if (keycode == KEY_LEFTALT || keycode == KEY_RIGHTALT)
-		x86_sysrq_alt = !up_flag;
-
-#if defined(CONFIG_SPARC32) || defined(CONFIG_SPARC64)
-	if (keycode == KEY_STOP)
-		sparc_l1_a_state = ! up_flag;
-#endif
 
 	return 0;
 }
@@ -974,9 +988,35 @@ void kbd_keycode(unsigned int keycode, int down)
 
 	kbd = kbd_table + fg_console;
 
+	if (keycode == KEY_LEFTALT || keycode == KEY_RIGHTALT)
+		sysrq_alt = down;
+#if defined(CONFIG_SPARC32) || defined(CONFIG_SPARC64)
+	if (keycode == KEY_STOP)
+		sparc_l1_a_state = down;
+#endif
+
+	rep = (down == 2);
+
 	if ((raw_mode = (kbd->kbdmode == VC_RAW)))
 		if (emulate_raw(vc, keycode, !down << 7))
 			printk(KERN_WARNING "keyboard.c: can't emulate rawmode for keycode %d\n", keycode);
+
+#ifdef CONFIG_MAGIC_SYSRQ	       /* Handle the SysRq Hack */
+	if (keycode == KEY_SYSRQ && !rep) {
+		sysrq_down = sysrq_alt && down;
+		return;
+	}
+	if (sysrq_down && down && !rep) {
+		handle_sysrq(kbd_sysrq_xlate[keycode], kbd_pt_regs, tty);
+		return;
+	}
+#endif
+#if defined(CONFIG_SPARC32) || defined(CONFIG_SPARC64)
+	if (keycode == KEY_A && sparc_l1_a_state) {
+		sparc_l1_a_state = 0;
+		sun_do_break();
+	}
+#endif
 
 	if (kbd->kbdmode == VC_MEDIUMRAW) {
 		/*
@@ -998,7 +1038,10 @@ void kbd_keycode(unsigned int keycode, int down)
 		raw_mode = 1;
 	}
 
-	rep = (down == 2);
+	if (down)
+		set_bit(keycode, key_down);
+	else
+		clear_bit(keycode, key_down);
 
 	if (rep && (!vc_kbd_mode(kbd, VC_REPEAT) || (tty && 
 		(!L_ECHO(tty) && tty->driver.chars_in_buffer(tty))))) {
@@ -1054,6 +1097,8 @@ static void kbd_event(struct input_handle *handle, unsigned int event_type,
 		return;
 	kbd_keycode(keycode, down);
 	tasklet_schedule(&keyboard_tasklet);
+	do_poke_blanked_console = 1;
+	schedule_console_callback();
 }
 
 static char kbd_name[] = "kbd";
@@ -1122,6 +1167,18 @@ static struct input_handler kbd_handler = {
 
 int __init kbd_init(void)
 {
+	int i;
+
+        kbd0.ledflagstate = kbd0.default_ledflagstate = KBD_DEFLEDS;
+        kbd0.ledmode = LED_SHOW_FLAGS;
+        kbd0.lockstate = KBD_DEFLOCK;
+        kbd0.slockstate = 0;
+        kbd0.modeflags = KBD_DEFMODE;
+        kbd0.kbdmode = VC_XLATE;
+
+        for (i = 0 ; i < MAX_NR_CONSOLES ; i++)
+                kbd_table[i] = kbd0;
+
 	tasklet_enable(&keyboard_tasklet);
 	tasklet_schedule(&keyboard_tasklet);
 	input_register_handler(&kbd_handler);
