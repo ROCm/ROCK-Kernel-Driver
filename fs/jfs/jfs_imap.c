@@ -2966,7 +2966,6 @@ static void duplicateIXtree(struct super_block *sb, s64 blkno,
 	struct buffer_head *bh;
 	struct inode *ip;
 	tid_t tid;
-	int rc;
 
 	/* if AIT2 ipmap2 is bad, do not try to update it */
 	if (JFS_SBI(sb)->mntflag & JFS_BAD_SAIT)	/* s_flag */
@@ -2974,7 +2973,7 @@ static void duplicateIXtree(struct super_block *sb, s64 blkno,
 	ip = diReadSpecial(sb, FILESYSTEM_I, 1);
 	if (ip == NULL) {
 		JFS_SBI(sb)->mntflag |= JFS_BAD_SAIT;
-		if ((rc = readSuper(sb, &bh)))
+		if (readSuper(sb, &bh))
 			return;
 		j_sb = (struct jfs_superblock *)bh->b_data;
 		j_sb->s_flag |= JFS_BAD_SAIT;
@@ -2988,7 +2987,7 @@ static void duplicateIXtree(struct super_block *sb, s64 blkno,
 	/* start transaction */
 	tid = txBegin(sb, COMMIT_FORCE);
 	/* update the inode map addressing structure to point to it */
-	if ((rc = xtInsert(tid, ip, 0, blkno, xlen, xaddr, 0))) {
+	if (xtInsert(tid, ip, 0, blkno, xlen, xaddr, 0)) {
 		JFS_SBI(sb)->mntflag |= JFS_BAD_SAIT;
 		txAbort(tid, 1);
 		goto cleanup;
@@ -2997,7 +2996,7 @@ static void duplicateIXtree(struct super_block *sb, s64 blkno,
 	/* update the inode map's inode to reflect the extension */
 	ip->i_size += PSIZE;
 	ip->i_blocks += LBLK2PBLK(sb, xlen);
-	rc = txCommit(tid, 1, &ip, COMMIT_FORCE);
+	txCommit(tid, 1, &ip, COMMIT_FORCE);
       cleanup:
 	txEnd(tid);
 	diFreeSpecial(ip);
