@@ -350,27 +350,8 @@
    #define IPS_SCSI_MP3_AllocateSurface 0x08
 
    /*
-    * Configuration Structure Flags
-    */
-   #define IPS_CFG_USEROPT_UPDATECOUNT(cfg)   (((cfg)->UserOpt & 0xffff000) >> 16)
-   #define IPS_CFG_USEROPT_CONCURSTART(cfg)   (((cfg)->UserOpt & 0xf000) >> 12)
-   #define IPS_CFG_USEROPT_STARTUPDELAY(cfg)  (((cfg)->UserOpt & 0xf00) >> 8)
-   #define IPS_CFG_USEROPT_REARRANGE(cfg)     ((cfg)->UserOpt & 0x80)
-   #define IPS_CFG_USEROPT_CDBOOT(cfg)        ((cfg)->UserOpt & 0x40)
-   #define IPS_CFG_USEROPT_CLUSTER(cfg)       ((cfg)->UserOpt & 0x20)
-
-   /*
-    * Host adapter Flags (bit numbers)
-    */
-   #define IPS_IN_INTR                  0
-   #define IPS_IN_ABORT                 1
-   #define IPS_IN_RESET                 2
-
-   /*
     * SCB Flags
     */
-   #define IPS_SCB_ACTIVE               0x00001
-   #define IPS_SCB_WAITING              0x00002
    #define IPS_SCB_MAP_SG               0x00008
    #define IPS_SCB_MAP_SINGLE           0X00010
 
@@ -381,7 +362,6 @@
    #define IPS_COPPIOCCMD              (('C'<<8) | 66)
    #define IPS_NUMCTRLS                (('C'<<8) | 68)
    #define IPS_CTRLINFO                (('C'<<8) | 69)
-   #define IPS_FLASHBIOS               (('C'<<8) | 70)
 
    /* flashing defines */
    #define IPS_FW_IMAGE                0x00
@@ -975,19 +955,6 @@ typedef struct {
    int  *option_flag;
    int   option_value;
 } IPS_OPTION;
-
-typedef struct {
-   void             *userbuffer;
-   uint32_t          usersize;
-   void             *kernbuffer;
-   uint32_t          kernsize;
-   void             *ha;
-   void             *SC;
-   void             *pt;
-   struct semaphore *sem;
-   uint32_t          offset;
-   uint32_t          retcode;
-} IPS_FLASH_DATA;
 
 /*
  * Status Info

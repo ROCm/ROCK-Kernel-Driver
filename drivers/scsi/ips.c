@@ -456,6 +456,7 @@ static void ips_done(ips_ha_t *, ips_scb_t *);
 static void ips_free(ips_ha_t *);
 static void ips_init_scb(ips_ha_t *, ips_scb_t *);
 static void ips_freescb(ips_ha_t *, ips_scb_t *);
+static void ips_setup_funclist(ips_ha_t *);
 static void ips_statinit(ips_ha_t *);
 static void ips_statinit_memio(ips_ha_t *);
 static void ips_fix_ffdc_time(ips_ha_t *, ips_scb_t *, time_t);
@@ -602,6 +603,64 @@ ips_detect(Scsi_Host_Template *SHT) {
       register_reboot_notifier(&ips_notifier);
 
    return (ips_num_controllers);
+}
+
+
+/****************************************************************************/
+/*   configure the function pointers to use the functions that will work    */
+/*   with the found version of the adapter                                  */
+/****************************************************************************/
+static void ips_setup_funclist(ips_ha_t *ha){
+
+   /*                                
+    * Setup Functions
+    */
+   if (IPS_IS_MORPHEUS(ha)) {
+      /* morpheus / marco / sebring */
+      ha->func.isintr = ips_isintr_morpheus;
+      ha->func.isinit = ips_isinit_morpheus;
+      ha->func.issue = ips_issue_i2o_memio;
+      ha->func.init = ips_init_morpheus;
+      ha->func.statupd = ips_statupd_morpheus;
+      ha->func.reset = ips_reset_morpheus;
+      ha->func.intr = ips_intr_morpheus;
+      ha->func.enableint = ips_enable_int_morpheus;
+   } else if (IPS_USE_MEMIO(ha)) {
+      /* copperhead w/MEMIO */
+      ha->func.isintr = ips_isintr_copperhead_memio;
+      ha->func.isinit = ips_isinit_copperhead_memio;
+      ha->func.init = ips_init_copperhead_memio;
+      ha->func.statupd = ips_statupd_copperhead_memio;
+      ha->func.statinit = ips_statinit_memio;
+      ha->func.reset = ips_reset_copperhead_memio;
+      ha->func.intr = ips_intr_copperhead;
+      ha->func.erasebios = ips_erase_bios_memio;
+      ha->func.programbios = ips_program_bios_memio;
+      ha->func.verifybios = ips_verify_bios_memio;
+      ha->func.enableint = ips_enable_int_copperhead_memio;
+      if (IPS_USE_I2O_DELIVER(ha))
+         ha->func.issue = ips_issue_i2o_memio;
+      else
+         ha->func.issue = ips_issue_copperhead_memio;
+   } else {
+      /* copperhead */
+      ha->func.isintr = ips_isintr_copperhead;
+      ha->func.isinit = ips_isinit_copperhead;
+      ha->func.init = ips_init_copperhead;
+      ha->func.statupd = ips_statupd_copperhead;
+      ha->func.statinit = ips_statinit;
+      ha->func.reset = ips_reset_copperhead;
+      ha->func.intr = ips_intr_copperhead;
+      ha->func.erasebios = ips_erase_bios;
+      ha->func.programbios = ips_program_bios;
+      ha->func.verifybios = ips_verify_bios;
+      ha->func.enableint = ips_enable_int_copperhead;
+
+      if (IPS_USE_I2O_DELIVER(ha))
+         ha->func.issue = ips_issue_i2o;
+      else
+         ha->func.issue = ips_issue_copperhead;
+   }
 }
 
 /****************************************************************************/
@@ -2645,7 +2704,7 @@ ips_next(ips_ha_t *ha, int intr) {
 
          sg = SC->request_buffer;
          scb->sg_count = pci_map_sg(ha->pcidev, sg, SC->use_sg,
-                                    IPS_DMA_DIR(scb));
+                                    scsi_to_pci_dma_dir(SC->sc_data_direction));
          scb->flags |= IPS_SCB_MAP_SG;
          if (scb->sg_count == 1) {
             if (sg_dma_len(sg) > ha->max_xfer) {
@@ -2705,7 +2764,8 @@ ips_next(ips_ha_t *ha, int intr) {
 
             scb->dcdb.transfer_length = scb->data_len;
             scb->data_busaddr = pci_map_single(ha->pcidev, SC->request_buffer,
-                                               scb->data_len, IPS_DMA_DIR(scb));
+                                               scb->data_len,
+                                               scsi_to_pci_dma_dir(SC->sc_data_direction));
             scb->flags |= IPS_SCB_MAP_SINGLE;
             scb->sg_len = 0;
          } else {
@@ -6820,53 +6880,7 @@ static int ips_init_phase1( struct pci_dev *pci_dev, int *indexPtr )
     /*
      * Setup Functions
      */
-    if (IPS_IS_MORPHEUS(ha)) {
-       /* morpheus */
-       ha->func.isintr = ips_isintr_morpheus;
-       ha->func.isinit = ips_isinit_morpheus;
-       ha->func.issue = ips_issue_i2o_memio;
-       ha->func.init = ips_init_morpheus;
-       ha->func.statupd = ips_statupd_morpheus;
-       ha->func.reset = ips_reset_morpheus;
-       ha->func.intr = ips_intr_morpheus;
-       ha->func.enableint = ips_enable_int_morpheus;
-    } else if (IPS_USE_MEMIO(ha)) {
-       /* copperhead w/MEMIO */
-       ha->func.isintr = ips_isintr_copperhead_memio;
-       ha->func.isinit = ips_isinit_copperhead_memio;
-       ha->func.init = ips_init_copperhead_memio;
-       ha->func.statupd = ips_statupd_copperhead_memio;
-       ha->func.statinit = ips_statinit_memio;
-       ha->func.reset = ips_reset_copperhead_memio;
-       ha->func.intr = ips_intr_copperhead;
-       ha->func.erasebios = ips_erase_bios_memio;
-       ha->func.programbios = ips_program_bios_memio;
-       ha->func.verifybios = ips_verify_bios_memio;
-       ha->func.enableint = ips_enable_int_copperhead_memio;
-
-       if (IPS_USE_I2O_DELIVER(ha))
-          ha->func.issue = ips_issue_i2o_memio;
-       else
-          ha->func.issue = ips_issue_copperhead_memio;
-    } else {
-       /* copperhead */
-       ha->func.isintr = ips_isintr_copperhead;
-       ha->func.isinit = ips_isinit_copperhead;
-       ha->func.init = ips_init_copperhead;
-       ha->func.statupd = ips_statupd_copperhead;
-       ha->func.statinit = ips_statinit;
-       ha->func.reset = ips_reset_copperhead;
-       ha->func.intr = ips_intr_copperhead;
-       ha->func.erasebios = ips_erase_bios;
-       ha->func.programbios = ips_program_bios;
-       ha->func.verifybios = ips_verify_bios;
-       ha->func.enableint = ips_enable_int_copperhead;
-
-       if (IPS_USE_I2O_DELIVER(ha))
-          ha->func.issue = ips_issue_i2o;
-       else
-          ha->func.issue = ips_issue_copperhead;
-    }
+    ips_setup_funclist(ha);
 
     if ( IPS_IS_MORPHEUS( ha ) ) {
         /* If Morpheus appears dead, reset it */
