@@ -798,7 +798,7 @@ static int e100_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 	 * not a diskdrive.
 	 */
 
-        if (drive->media != ide_disk)
+        if (drive->type != ATA_DISK)
                 return 0;
 
  dma_begin:
@@ -809,7 +809,7 @@ static int e100_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 		WAIT_DMA(ATA_RX_DMA_NBR);
 
 		/* set up the Etrax DMA descriptors */
-		
+
 		if(e100_ide_build_dmatable (drive))
 			return 1;
 

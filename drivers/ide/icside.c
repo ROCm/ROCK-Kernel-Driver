@@ -441,9 +441,10 @@ icside_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 			     : DMA_MODE_WRITE);
 
 		drive->waiting_for_dma = 1;
-		if (drive->media != ide_disk)
+		if (drive->type != ATA_DISK)
 			return 0;
 
+		BUG_ON(HWGROUP(drive)->handler);
 		ide_set_handler(drive, &icside_dmaintr, WAIT_CMD, NULL);
 		OUT_BYTE(reading ? WIN_READDMA : WIN_WRITEDMA,
 			 IDE_COMMAND_REG);

@@ -323,7 +323,7 @@ static ide_startstop_t idedisk_do_request(ide_drive_t *drive, struct request *rq
 
 	while (drive->blocked) {
 		yield();
-		// panic("ide: Request while drive blocked?");
+		printk("ide: Request while drive blocked?");
 	}
 
 	if (!(rq->flags & REQ_CMD)) {
@@ -380,12 +380,14 @@ static int idedisk_flushcache(ide_drive_t *drive)
 {
 	struct hd_drive_task_hdr taskfile;
 	struct hd_drive_hob_hdr hobfile;
+
 	memset(&taskfile, 0, sizeof(struct hd_drive_task_hdr));
 	memset(&hobfile, 0, sizeof(struct hd_drive_hob_hdr));
 	if (drive->id->cfs_enable_2 & 0x2400)
 		taskfile.command = WIN_FLUSH_CACHE_EXT;
 	else
 		taskfile.command = WIN_FLUSH_CACHE;
+
 	return ide_wait_taskfile(drive, &taskfile, &hobfile, NULL);
 }
 
@@ -504,7 +506,7 @@ static unsigned long idedisk_set_max_address(ide_drive_t *drive, unsigned long a
 
 	args.taskfile.device_head = ((addr_req >> 24) & 0x0f) | 0x40;
 	args.taskfile.command = WIN_SET_MAX;
-	args.handler				= task_no_data_intr;
+	args.handler = task_no_data_intr;
 	/* submit command request */
 	ide_raw_taskfile(drive, &args, NULL);
 	/* if OK, read new maximum address value */
@@ -540,7 +542,7 @@ static unsigned long long idedisk_set_max_address_ext(ide_drive_t *drive, unsign
 	args.hobfile.device_head = 0x40;
 	args.hobfile.control = (drive->ctl | 0x80);
 
-        args.handler				= task_no_data_intr;
+        args.handler = task_no_data_intr;
 	/* submit command request */
 	ide_raw_taskfile(drive, &args, NULL);
 	/* if OK, compute maximum address value */
@@ -611,10 +613,10 @@ static void init_idedisk_capacity (ide_drive_t  *drive)
 				drive->select.b.lba = 1;
 				drive->id->lba_capacity_2 = capacity_2;
                         }
-#else /* !CONFIG_IDEDISK_STROKE */
+#else
 			printk("%s: setmax_ext LBA %llu, native  %llu\n",
 				drive->name, set_max_ext, capacity_2);
-#endif /* CONFIG_IDEDISK_STROKE */
+#endif
 		}
 		drive->bios_cyl		= drive->cyl;
 		drive->capacity48	= capacity_2;
@@ -637,10 +639,10 @@ static void init_idedisk_capacity (ide_drive_t  *drive)
 			drive->select.b.lba = 1;
 			drive->id->lba_capacity = capacity;
 		}
-#else /* !CONFIG_IDEDISK_STROKE */
+#else
 		printk("%s: setmax LBA %lu, native  %lu\n",
 			drive->name, set_max, capacity);
-#endif /* CONFIG_IDEDISK_STROKE */
+#endif
 	}
 
 	drive->capacity = capacity;
@@ -954,6 +956,9 @@ static int idedisk_suspend(struct device *dev, u32 state, u32 level)
 	 * already been done...
 	 */
 
+	if (level != SUSPEND_SAVE_STATE)
+		return 0;
+
 	/* wait until all commands are finished */
 	printk("ide_disk_suspend()\n");
 	while (HWGROUP(drive)->handler)
@@ -973,6 +978,9 @@ static int idedisk_suspend(struct device *dev, u32 state, u32 level)
 static int idedisk_resume(struct device *dev, u32 level)
 {
 	ide_drive_t *drive = dev->driver_data;
+
+	if (level != RESUME_RESTORE_STATE)
+		return 0;
 	if (!drive->blocked)
 		panic("ide: Resume but not suspended?\n");
 
@@ -1113,8 +1121,11 @@ static void idedisk_setup(ide_drive_t *drive)
 	(void) probe_lba_addressing(drive, 1);
 }
 
-static int idedisk_cleanup (ide_drive_t *drive)
+static int idedisk_cleanup(ide_drive_t *drive)
 {
+	if (!drive)
+	    return 0;
+
 	put_device(&drive->device);
 	if ((drive->id->cfs_enable_2 & 0x3000) && drive->wcache)
 		if (idedisk_flushcache(drive))

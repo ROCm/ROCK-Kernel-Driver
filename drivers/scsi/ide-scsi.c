@@ -508,7 +508,7 @@ static void idescsi_add_settings(ide_drive_t *drive)
  */
 static void idescsi_setup (ide_drive_t *drive, idescsi_scsi_t *scsi, int id)
 {
-	ata_ops(drive)->busy++;
+	MOD_INC_USE_COUNT;
 
 	idescsi_drives[id] = drive;
 	drive->driver_data = scsi;
@@ -629,8 +629,9 @@ int idescsi_release (struct Scsi_Host *host)
 
 	for (id = 0; id < MAX_HWIFS * MAX_DRIVES; id++) {
 		drive = idescsi_drives[id];
-		if (drive)
-			ata_ops(drive)->busy--;
+		if (drive) {
+			MOD_DEC_USE_COUNT;
+		}
 	}
 	return 0;
 }

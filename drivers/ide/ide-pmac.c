@@ -931,12 +931,12 @@ pmac_ide_check_dma(ide_drive_t *drive)
 	int enable = 1;
 
 	drive->using_dma = 0;
-	
+
 	idx = pmac_ide_find(drive);
 	if (idx < 0)
 		return 0;
-		
-	if (drive->media == ide_floppy)
+
+	if (drive->type == ATA_FLOPPY)
 		enable = 0;
 	if (((id->capability & 1) == 0) && !check_drive_lists(drive, GOOD_DMA_DRIVE))
 		enable = 0;
@@ -945,9 +945,9 @@ pmac_ide_check_dma(ide_drive_t *drive)
 
 	udma = 0;
 	ata4 = (pmac_ide[idx].kind == controller_kl_ata4);
-			
+
 	if(enable) {
-		if (ata4 && (drive->media == ide_disk) &&
+		if (ata4 && (drive->type == ATA_DISK) &&
 		    (id->field_valid & 0x0004) && (id->dma_ultra & 0x17)) {
 			/* UltraDMA modes. */
 			drive->using_dma = pmac_ide_udma_enable(drive, idx);
@@ -994,8 +994,9 @@ int pmac_ide_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 		if (!pmac_ide_build_dmatable(drive, ix, func==ide_dma_write))
 			return 1;
 		drive->waiting_for_dma = 1;
-		if (drive->media != ide_disk)
+		if (drive->type != ATA_DISK)
 			return 0;
+		BUG_ON(HWGROUP(drive)->handler);
 		ide_set_handler(drive, &ide_dma_intr, WAIT_CMD, NULL);
 		OUT_BYTE(func==ide_dma_write? WIN_WRITEDMA: WIN_READDMA,
 			 IDE_COMMAND_REG);
@@ -1054,12 +1055,12 @@ int pmac_ide_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 static void idepmac_sleep_device(ide_drive_t *drive, int i, unsigned base)
 {
 	int j;
-	
+
 	/* FIXME: We only handle the master IDE disk, we shoud
 	 *        try to fix CD-ROMs here
 	 */
-	switch (drive->media) {
-	case ide_disk:
+	switch (drive->type) {
+	case ATA_DISK:
 		/* Spin down the drive */
 		outb(0xa0, base+0x60);
 		outb(0x0, base+0x30);
@@ -1067,7 +1068,7 @@ static void idepmac_sleep_device(ide_drive_t *drive, int i, unsigned base)
 		outb(0x0, base+0x40);
 		outb(0x0, base+0x50);
 		outb(0xe0, base+0x70);
-		outb(0x2, base+0x160);   
+		outb(0x2, base+0x160);
 		for (j = 0; j < 10; j++) {
 			int status;
 			mdelay(100);
@@ -1076,10 +1077,10 @@ static void idepmac_sleep_device(ide_drive_t *drive, int i, unsigned base)
 				break;
 		}
 		break;
-	case ide_cdrom:
+	case ATA_ROM:
 		// todo
 		break;
-	case ide_floppy:
+	case ATA_FLOPPY:
 		// todo
 		break;
 	}

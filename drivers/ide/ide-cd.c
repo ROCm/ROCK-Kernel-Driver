@@ -740,11 +740,12 @@ static ide_startstop_t cdrom_start_packet_command(ide_drive_t *drive,
 	OUT_BYTE (xferlen >> 8  , IDE_HCYL_REG);
 	if (IDE_CONTROL_REG)
 		OUT_BYTE (drive->ctl, IDE_CONTROL_REG);
- 
+
 	if (info->dma)
 		(void) drive->channel->dmaproc(ide_dma_begin, drive);
 
 	if (CDROM_CONFIG_FLAGS (drive)->drq_interrupt) {
+		BUG_ON(HWGROUP(drive)->handler);
 		ide_set_handler (drive, handler, WAIT_CMD, cdrom_timer_expiry);
 		OUT_BYTE (WIN_PACKETCMD, IDE_COMMAND_REG); /* packet command */
 		return ide_started;
@@ -787,6 +788,7 @@ static ide_startstop_t cdrom_transfer_packet_command (ide_drive_t *drive,
 	}
 
 	/* Arm the interrupt handler. */
+	BUG_ON(HWGROUP(drive)->handler);
 	ide_set_handler (drive, handler, timeout, cdrom_timer_expiry);
 
 	/* Send the command to the device. */
@@ -1005,7 +1007,9 @@ static ide_startstop_t cdrom_read_intr (ide_drive_t *drive)
 
 	/* Done moving data!
 	   Wait for another interrupt. */
+	BUG_ON(HWGROUP(drive)->handler);
 	ide_set_handler(drive, &cdrom_read_intr, WAIT_CMD, NULL);
+
 	return ide_started;
 }
 
@@ -1335,6 +1339,8 @@ static ide_startstop_t cdrom_pc_intr (ide_drive_t *drive)
 	}
 
 	/* Now we wait for another interrupt. */
+
+	BUG_ON(HWGROUP(drive)->handler);
 	ide_set_handler (drive, &cdrom_pc_intr, WAIT_CMD, cdrom_timer_expiry);
 	return ide_started;
 }
@@ -1559,6 +1565,7 @@ static ide_startstop_t cdrom_write_intr(ide_drive_t *drive)
 	}
 
 	/* re-arm handler */
+	BUG_ON(HWGROUP(drive)->handler);
 	ide_set_handler(drive, &cdrom_write_intr, 5 * WAIT_CMD, NULL);
 	return ide_started;
 }
@@ -2984,15 +2991,14 @@ int ide_cdrom_init(void)
 		memset (info, 0, sizeof (struct cdrom_info));
 		drive->driver_data = info;
 
-		/* ATA-PATTERN */
-		ata_ops(drive)->busy++;
+		MOD_INC_USE_COUNT;
 		if (ide_cdrom_setup (drive)) {
-			ata_ops(drive)->busy--;
+			MOD_DEC_USE_COUNT;
 			if (ide_cdrom_cleanup (drive))
 				printk ("%s: ide_cdrom_cleanup failed in ide_cdrom_init\n", drive->name);
 			continue;
 		}
-		ata_ops(drive)->busy--;
+		MOD_DEC_USE_COUNT;
 
 		failed--;
 	}

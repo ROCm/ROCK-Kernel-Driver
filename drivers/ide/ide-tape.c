@@ -2155,7 +2155,8 @@ static ide_startstop_t idetape_pc_intr (ide_drive_t *drive)
 			if (temp > pc->buffer_size) {
 				printk (KERN_ERR "ide-tape: The tape wants to send us more data than expected - discarding data\n");
 				idetape_discard_data (drive, bcount.all);
-				ide_set_handler (drive, &idetape_pc_intr, IDETAPE_WAIT_CMD, NULL);
+				BUG_ON(HWGROUP(drive)->handler);
+				ide_set_handler(drive, &idetape_pc_intr, IDETAPE_WAIT_CMD, NULL);
 				return ide_started;
 			}
 #if IDETAPE_DEBUG_LOG
@@ -2181,7 +2182,8 @@ static ide_startstop_t idetape_pc_intr (ide_drive_t *drive)
 	if (tape->debug_level >= 2)
 		printk(KERN_INFO "ide-tape: [cmd %x] transferred %d bytes on that interrupt\n", pc->c[0], bcount.all);
 #endif
-	ide_set_handler (drive, &idetape_pc_intr, IDETAPE_WAIT_CMD, NULL);	/* And set the interrupt handler again */
+	BUG_ON(HWGROUP(drive)->handler);
+	ide_set_handler(drive, &idetape_pc_intr, IDETAPE_WAIT_CMD, NULL);	/* And set the interrupt handler again */
 	return ide_started;
 }
 
@@ -2255,6 +2257,7 @@ static ide_startstop_t idetape_transfer_pc(ide_drive_t *drive)
 		return ide_stopped;
 	}
 	tape->cmd_start_time = jiffies;
+	BUG_ON(HWGROUP(drive)->handler);
 	ide_set_handler(drive, &idetape_pc_intr, IDETAPE_WAIT_CMD, NULL);	/* Set the interrupt routine */
 	atapi_output_bytes (drive,pc->c,12);			/* Send the actual packet */
 	return ide_started;
@@ -2328,6 +2331,7 @@ static ide_startstop_t idetape_issue_packet_command (ide_drive_t *drive, idetape
 	}
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 	if (test_bit(IDETAPE_DRQ_INTERRUPT, &tape->flags)) {
+		BUG_ON(HWGROUP(drive)->handler);
 		ide_set_handler(drive, &idetape_transfer_pc, IDETAPE_WAIT_CMD, NULL);
 		OUT_BYTE(WIN_PACKETCMD, IDE_COMMAND_REG);
 		return ide_started;
@@ -6099,8 +6103,7 @@ static int idetape_cleanup (ide_drive_t *drive)
 	idetape_chrdevs[minor].drive = NULL;
 	restore_flags (flags);	/* all CPUs (overkill?) */
 
-	/* FIXME: this appears to be totally wrong! */
-	ata_ops(drive)->busy = 0;
+	MOD_DEC_USE_COUNT;
 
 	ide_unregister_subdriver (drive);
 	drive->driver_data = NULL;

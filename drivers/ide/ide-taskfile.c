@@ -33,7 +33,7 @@
 #define DEBUG_TASKFILE	0	/* unset when fixed */
 
 #if DEBUG_TASKFILE
-#define DTF(x...) printk(##x)
+#define DTF(x...) printk(x)
 #else
 #define DTF(x...)
 #endif
@@ -55,7 +55,7 @@ static inline void ide_unmap_rq(struct request *rq, char *to,
 				unsigned long *flags)
 {
 	if (rq->bio)
-	    bio_kunmap_irq(to, flags);
+		bio_kunmap_irq(to, flags);
 }
 
 static void bswap_data (void *buffer, int wcount)
@@ -288,73 +288,104 @@ void ata_poll_drive_ready(ide_drive_t *drive)
 			break;
 	}
 }
-static ide_startstop_t bio_mulout_intr(ide_drive_t *drive);
 
-/*
- * Handler for command write multiple
- * Called directly from execute_drive_cmd for the first bunch of sectors,
- * afterwards only by the ISR
- */
-static ide_startstop_t task_mulout_intr(ide_drive_t *drive)
+static ide_startstop_t pre_task_mulout_intr(ide_drive_t *drive, struct request *rq)
 {
-	unsigned int		msect, nsect;
+	ide_task_t *args = rq->special;
+	ide_startstop_t startstop;
+
+	/*
+	 * assign private copy for multi-write
+	 */
+	memcpy(&HWGROUP(drive)->wrq, rq, sizeof(struct request));
+
+	if (ide_wait_stat(&startstop, drive, DATA_READY, drive->bad_wstat, WAIT_DRQ))
+		return startstop;
+
+	ata_poll_drive_ready(drive);
+	return args->handler(drive);
+}
+
+static ide_startstop_t task_mulout_intr (ide_drive_t *drive)
+{
 	byte stat		= GET_STAT();
 	byte io_32bit		= drive->io_32bit;
-	struct request *rq	= HWGROUP(drive)->rq;
+	struct request *rq	= &HWGROUP(drive)->wrq;
 	ide_hwgroup_t *hwgroup	= HWGROUP(drive);
-	char *pBuf		= NULL;
-	unsigned long flags;
+	int mcount		= drive->mult_count;
+	ide_startstop_t startstop;
 
 	/*
 	 * (ks/hs): Handle last IRQ on multi-sector transfer,
 	 * occurs after all data was sent in this chunk
 	 */
-	if (rq->current_nr_sectors == 0) {
-		if (stat & (ERR_STAT|DRQ_STAT))
-			return ide_error(drive, "task_mulout_intr", stat);
+	if (!rq->nr_sectors) {
+		if (stat & (ERR_STAT|DRQ_STAT)) {
+			startstop = ide_error(drive, "task_mulout_intr", stat);
+			memcpy(rq, HWGROUP(drive)->rq, sizeof(struct request));
+			return startstop;
+		}
 
-		/*
-		 * there may be more, ide_do_request will restart it if
-		 * necessary
-		 */
-		ide_end_request(drive, 1);
+		__ide_end_request(drive, 1, rq->hard_nr_sectors);
+		rq->bio = NULL;
 
 		return ide_stopped;
 	}
 
-	if (!OK_STAT(stat,DATA_READY,BAD_R_STAT)) {
-		if (stat & (ERR_STAT|DRQ_STAT)) {
-			return ide_error(drive, "task_mulout_intr", stat);
+	if (!OK_STAT(stat, DATA_READY, BAD_R_STAT)) {
+		if (stat & (ERR_STAT | DRQ_STAT)) {
+			startstop = ide_error(drive, "task_mulout_intr", stat);
+			memcpy(rq, HWGROUP(drive)->rq, sizeof(struct request));
+			return startstop;
 		}
+
 		/* no data yet, so wait for another interrupt */
 		if (hwgroup->handler == NULL)
-			ide_set_handler(drive, &task_mulout_intr, WAIT_CMD, NULL);
+			ide_set_handler(drive, task_mulout_intr, WAIT_CMD, NULL);
+
 		return ide_started;
 	}
 
-	/* (ks/hs): See task_mulin_intr */
-	msect = drive->mult_count;
-	nsect = rq->current_nr_sectors;
-	if (nsect > msect)
-		nsect = msect;
+	do {
+		char *buffer;
+		int nsect = rq->current_nr_sectors;
+		unsigned long flags;
 
-	pBuf = ide_map_rq(rq, &flags);
-	DTF("Multiwrite: %p, nsect: %d , rq->current_nr_sectors: %ld\n",
-		pBuf, nsect, rq->current_nr_sectors);
+		if (nsect > mcount)
+			nsect = mcount;
+		mcount -= nsect;
 
-	drive->io_32bit = 0;
-	taskfile_output_data(drive, pBuf, nsect * SECTOR_WORDS);
+		buffer = bio_kmap_irq(rq->bio, &flags) + ide_rq_offset(rq);
+		rq->sector += nsect;
+		rq->nr_sectors -= nsect;
+		rq->current_nr_sectors -= nsect;
 
-	ide_unmap_rq(rq, pBuf, &flags);
+		/* Do we move to the next bio after this? */
+		if (!rq->current_nr_sectors) {
+			/* remember to fix this up /jens */
+			struct bio *bio = rq->bio->bi_next;
+
+			/* end early if we ran out of requests */
+			if (!bio) {
+				mcount = 0;
+			} else {
+				rq->bio = bio;
+				rq->current_nr_sectors = bio_iovec(bio)->bv_len >> 9;
+			}
+		}
+
+		/*
+		 * Ok, we're all setup for the interrupt
+		 * re-entering us on the last transfer.
+		 */
+		taskfile_output_data(drive, buffer, nsect * SECTOR_WORDS);
+		bio_kunmap_irq(buffer, &flags);
+	} while (mcount);
 
 	drive->io_32bit = io_32bit;
-
 	rq->errors = 0;
-	/* Are we sure that this as all been already transfered? */
-	rq->current_nr_sectors -= nsect;
-
 	if (hwgroup->handler == NULL)
-		ide_set_handler(drive, &task_mulout_intr, WAIT_CMD, NULL);
+		ide_set_handler(drive, task_mulout_intr, WAIT_CMD, NULL);
 
 	return ide_started;
 }
@@ -371,7 +402,7 @@ ide_startstop_t ata_taskfile(ide_drive_t *drive,
 	u8 HIHI = (drive->addressing) ? 0xE0 : 0xEF;
 
 	/* (ks/hs): Moved to start, do not use for multiple out commands */
-	if (handler != task_mulout_intr && handler != bio_mulout_intr) {
+	if (handler != task_mulout_intr) {
 		if (IDE_CONTROL_REG)
 			OUT_BYTE(drive->ctl, IDE_CONTROL_REG);	/* clear nIEN */
 		SELECT_MASK(drive->channel, drive, 0);
@@ -583,107 +614,6 @@ static ide_startstop_t task_out_intr(ide_drive_t *drive)
 	return ide_started;
 }
 
-static ide_startstop_t pre_bio_out_intr(ide_drive_t *drive, struct request *rq)
-{
-	ide_task_t *args = rq->special;
-	ide_startstop_t startstop;
-
-	/*
-	 * assign private copy for multi-write
-	 */
-	memcpy(&HWGROUP(drive)->wrq, rq, sizeof(struct request));
-
-	if (ide_wait_stat(&startstop, drive, DATA_READY, drive->bad_wstat, WAIT_DRQ))
-		return startstop;
-
-	ata_poll_drive_ready(drive);
-	return args->handler(drive);
-}
-
-
-static ide_startstop_t bio_mulout_intr (ide_drive_t *drive)
-{
-	byte stat		= GET_STAT();
-	byte io_32bit		= drive->io_32bit;
-	struct request *rq	= &HWGROUP(drive)->wrq;
-	ide_hwgroup_t *hwgroup	= HWGROUP(drive);
-	int mcount		= drive->mult_count;
-	ide_startstop_t startstop;
-
-	/*
-	 * (ks/hs): Handle last IRQ on multi-sector transfer,
-	 * occurs after all data was sent in this chunk
-	 */
-	if (!rq->nr_sectors) {
-		if (stat & (ERR_STAT|DRQ_STAT)) {
-			startstop = ide_error(drive, "bio_mulout_intr", stat);
-			memcpy(rq, HWGROUP(drive)->rq, sizeof(struct request));
-			return startstop;
-		}
-
-		__ide_end_request(drive, 1, rq->hard_nr_sectors);
-		HWGROUP(drive)->wrq.bio = NULL;
-		return ide_stopped;
-	}
-
-	if (!OK_STAT(stat, DATA_READY, BAD_R_STAT)) {
-		if (stat & (ERR_STAT | DRQ_STAT)) {
-			startstop = ide_error(drive, "bio_mulout_intr", stat);
-			memcpy(rq, HWGROUP(drive)->rq, sizeof(struct request));
-			return startstop;
-		}
-
-		/* no data yet, so wait for another interrupt */
-		if (hwgroup->handler == NULL)
-			ide_set_handler(drive, bio_mulout_intr, WAIT_CMD, NULL);
-
-		return ide_started;
-	}
-
-	do {
-		char *buffer;
-		int nsect = rq->current_nr_sectors;
-		unsigned long flags;
-
-		if (nsect > mcount)
-			nsect = mcount;
-		mcount -= nsect;
-
-		buffer = bio_kmap_irq(rq->bio, &flags) + ide_rq_offset(rq);
-		rq->sector += nsect;
-		rq->nr_sectors -= nsect;
-		rq->current_nr_sectors -= nsect;
-
-		/* Do we move to the next bio after this? */
-		if (!rq->current_nr_sectors) {
-			/* remember to fix this up /jens */
-			struct bio *bio = rq->bio->bi_next;
-
-			/* end early early we ran out of requests */
-			if (!bio) {
-				mcount = 0;
-			} else {
-				rq->bio = bio;
-				rq->current_nr_sectors = bio_iovec(bio)->bv_len >> 9;
-			}
-		}
-
-		/*
-		 * Ok, we're all setup for the interrupt
-		 * re-entering us on the last transfer.
-		 */
-		taskfile_output_data(drive, buffer, nsect * SECTOR_WORDS);
-		bio_kunmap_irq(buffer, &flags);
-	} while (mcount);
-
-	drive->io_32bit = io_32bit;
-	rq->errors = 0;
-	if (hwgroup->handler == NULL)
-		ide_set_handler(drive, bio_mulout_intr, WAIT_CMD, NULL);
-
-	return ide_started;
-}
-
 /*
  * Handler for command with Read Multiple
  */
@@ -781,8 +711,8 @@ void ide_cmd_type_parser(ide_task_t *args)
 		case CFA_WRITE_MULTI_WO_ERASE:
 		case WIN_MULTWRITE:
 		case WIN_MULTWRITE_EXT:
-			args->prehandler = pre_bio_out_intr;
-			args->handler = bio_mulout_intr;
+			args->prehandler = pre_task_mulout_intr;
+			args->handler = task_mulout_intr;
 			args->command_type = IDE_DRIVE_TASK_RAW_WRITE;
 			return;
 
@@ -989,7 +919,7 @@ int ide_raw_taskfile(ide_drive_t *drive, ide_task_t *args, byte *buf)
  *
  * The caller has to make sure buf is never NULL!
  */
-static int ide_wait_cmd(ide_drive_t *drive, int cmd, int nsect, int feature, int sectors, byte *argbuf)
+static int ide_wait_cmd(ide_drive_t *drive, u8 cmd, u8 nsect, u8 feature, u8 sectors, u8 *argbuf)
 {
 	struct request rq;
 
@@ -998,10 +928,10 @@ static int ide_wait_cmd(ide_drive_t *drive, int cmd, int nsect, int feature, int
 	memset(argbuf, 0, 4 + SECTOR_WORDS * 4 * sectors);
 	ide_init_drive_cmd(&rq);
 	rq.buffer = argbuf;
-	*argbuf++ = cmd;
-	*argbuf++ = nsect;
-	*argbuf++ = feature;
-	*argbuf++ = sectors;
+	argbuf[0] = cmd;
+	argbuf[1] = nsect;
+	argbuf[2] = feature;
+	argbuf[3] = sectors;
 
 	return ide_do_drive_cmd(drive, &rq, ide_wait);
 }
@@ -1009,7 +939,8 @@ static int ide_wait_cmd(ide_drive_t *drive, int cmd, int nsect, int feature, int
 int ide_cmd_ioctl(ide_drive_t *drive, struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
 {
 	int err = 0;
-	byte args[4], *argbuf = args;
+	u8 args[4];
+	u8 *argbuf = args;
 	byte xfer_rate = 0;
 	int argsize = 4;
 	ide_task_t tfargs;

@@ -548,7 +548,8 @@ static ide_startstop_t atapi_reset_pollfunc (ide_drive_t *drive)
 	if (OK_STAT(stat=GET_STAT(), 0, BUSY_STAT)) {
 		printk("%s: ATAPI reset complete\n", drive->name);
 	} else {
-		if (0 < (signed long)(hwgroup->poll_timeout - jiffies)) {
+		if (time_before(jiffies, hwgroup->poll_timeout)) {
+			BUG_ON(HWGROUP(drive)->handler);
 			ide_set_handler (drive, &atapi_reset_pollfunc, HZ/20, NULL);
 			return ide_started;	/* continue polling */
 		}
@@ -573,7 +574,8 @@ static ide_startstop_t reset_pollfunc (ide_drive_t *drive)
 	byte tmp;
 
 	if (!OK_STAT(tmp=GET_STAT(), 0, BUSY_STAT)) {
-		if (0 < (signed long)(hwgroup->poll_timeout - jiffies)) {
+		if (time_before(jiffies, hwgroup->poll_timeout)) {
+			BUG_ON(HWGROUP(drive)->handler);
 			ide_set_handler (drive, &reset_pollfunc, HZ/20, NULL);
 			return ide_started;	/* continue polling */
 		}
@@ -645,6 +647,7 @@ static ide_startstop_t do_reset1 (ide_drive_t *drive, int do_not_try_atapi)
 		udelay (20);
 		OUT_BYTE (WIN_SRST, IDE_COMMAND_REG);
 		hwgroup->poll_timeout = jiffies + WAIT_WORSTCASE;
+		BUG_ON(HWGROUP(drive)->handler);
 		ide_set_handler (drive, &atapi_reset_pollfunc, HZ/20, NULL);
 		__restore_flags (flags);	/* local CPU only */
 		return ide_started;
@@ -679,7 +682,8 @@ static ide_startstop_t do_reset1 (ide_drive_t *drive, int do_not_try_atapi)
 	}
 	udelay(10);			/* more than enough time */
 	hwgroup->poll_timeout = jiffies + WAIT_WORSTCASE;
-	ide_set_handler (drive, &reset_pollfunc, HZ/20, NULL);
+	BUG_ON(HWGROUP(drive)->handler);
+	ide_set_handler(drive, &reset_pollfunc, HZ/20, NULL);
 
 	/*
 	 * Some weird controller like resetting themselves to a strange
@@ -931,6 +935,7 @@ ide_startstop_t ide_error (ide_drive_t *drive, const char *msg, byte stat)
  */
 void ide_cmd (ide_drive_t *drive, byte cmd, byte nsect, ide_handler_t *handler)
 {
+	BUG_ON(HWGROUP(drive)->handler);
 	ide_set_handler (drive, handler, WAIT_CMD, NULL);
 	if (IDE_CONTROL_REG)
 		OUT_BYTE(drive->ctl,IDE_CONTROL_REG);	/* clear nIEN */
@@ -1553,7 +1558,7 @@ static void unexpected_intr(int irq, ide_hwgroup_t *hwgroup)
 /*
  * entry point for all interrupts, caller does __cli() for us
  */
-void ide_intr (int irq, void *dev_id, struct pt_regs *regs)
+void ide_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned long flags;
 	ide_hwgroup_t *hwgroup = (ide_hwgroup_t *)dev_id;
@@ -1596,7 +1601,7 @@ void ide_intr (int irq, void *dev_id, struct pt_regs *regs)
 			 * Whack the status register, just in case we have a leftover pending IRQ.
 			 */
 			IN_BYTE(hwif->io_ports[IDE_STATUS_OFFSET]);
-#endif /* CONFIG_BLK_DEV_IDEPCI */
+#endif
 		}
 		goto out_lock;
 	}
@@ -3175,10 +3180,19 @@ int ide_unregister_subdriver(ide_drive_t *drive)
 
 	save_flags(flags);		/* all CPUs */
 	cli();				/* all CPUs */
-	if (drive->usage || drive->busy || !ata_ops(drive) || ata_ops(drive)->busy) {
+
+#if 0
+	if (__MOD_IN_USE(ata_ops(drive)->owner)) {
+		restore_flags(flags);
+		return 1;
+	}
+#endif
+
+	if (drive->usage || drive->busy || !ata_ops(drive)) {
 		restore_flags(flags);	/* all CPUs */
 		return 1;
 	}
+
 #if defined(CONFIG_BLK_DEV_ISAPNP) && defined(CONFIG_ISAPNP) && defined(MODULE)
 	pnpide_init(0);
 #endif
@@ -3189,7 +3203,10 @@ int ide_unregister_subdriver(ide_drive_t *drive)
 #endif
 	auto_remove_settings(drive);
 	drive->driver = NULL;
+	drive->present = 0;
+
 	restore_flags(flags);		/* all CPUs */
+
 	return 0;
 }
 
@@ -3298,6 +3315,7 @@ static int ide_notify_reboot (struct notifier_block *this, unsigned long event, 
 		hwif = &ide_hwifs[i];
 		if (!hwif->present)
 			continue;
+
 		for (unit = 0; unit < MAX_DRIVES; ++unit) {
 			drive = &hwif->drives[unit];
 			if (!drive->present)
