@@ -639,7 +639,7 @@ static void sppp_channel_delete(struct channel_data *chan)
 
 static int cosa_sppp_open(struct net_device *d)
 {
-	struct channel_data *chan = netdev_priv(d);
+	struct channel_data *chan = d->priv;
 	int err;
 	unsigned long flags;
 
@@ -679,7 +679,7 @@ static int cosa_sppp_open(struct net_device *d)
 
 static int cosa_sppp_tx(struct sk_buff *skb, struct net_device *dev)
 {
-	struct channel_data *chan = netdev_priv(dev);
+	struct channel_data *chan = dev->priv;
 
 	netif_stop_queue(dev);
 
@@ -690,7 +690,7 @@ static int cosa_sppp_tx(struct sk_buff *skb, struct net_device *dev)
 
 static void cosa_sppp_timeout(struct net_device *dev)
 {
-	struct channel_data *chan = netdev_priv(dev);
+	struct channel_data *chan = dev->priv;
 
 	if (test_bit(RXBIT, &chan->cosa->rxtx)) {
 		chan->stats.rx_errors++;
@@ -709,7 +709,7 @@ static void cosa_sppp_timeout(struct net_device *dev)
 
 static int cosa_sppp_close(struct net_device *d)
 {
-	struct channel_data *chan = netdev_priv(d);
+	struct channel_data *chan = d->priv;
 	unsigned long flags;
 
 	netif_stop_queue(d);
@@ -789,7 +789,7 @@ static int sppp_tx_done(struct channel_data *chan, int size)
 
 static struct net_device_stats *cosa_net_stats(struct net_device *dev)
 {
-	struct channel_data *chan = netdev_priv(dev);
+	struct channel_data *chan = dev->priv;
 	return &chan->stats;
 }
 
@@ -1205,7 +1205,7 @@ static int cosa_sppp_ioctl(struct net_device *dev, struct ifreq *ifr,
 	int cmd)
 {
 	int rv;
-	struct channel_data *chan = netdev_priv(dev);
+	struct channel_data *chan = dev->priv;
 	rv = cosa_ioctl_common(chan->cosa, chan, cmd, (unsigned long)ifr->ifr_data);
 	if (rv == -ENOIOCTLCMD) {
 		return sppp_do_ioctl(dev, ifr, cmd);

@@ -426,7 +426,7 @@ static inline void CA(struct net_device *dev)
 
 static inline void MPU_PORT(struct net_device *dev, int c, dma_addr_t x)
 {
-	struct i596_private *lp = netdev_priv(dev);
+	struct i596_private *lp = dev->priv;
 
 	u32 v = (u32) (c) | (u32) (x);
 	u16 a, b;
@@ -481,7 +481,7 @@ static inline int wait_cmd(struct net_device *dev, struct i596_private *lp, int 
 
 static void i596_display_data(struct net_device *dev)
 {
-	struct i596_private *lp = netdev_priv(dev);
+	struct i596_private *lp = dev->priv;
 	struct i596_cmd *cmd;
 	struct i596_rfd *rfd;
 	struct i596_rbd *rbd;
@@ -541,7 +541,7 @@ static void i596_error(int irq, void *dev_id, struct pt_regs *regs)
 
 static inline void init_rx_bufs(struct net_device *dev)
 {
-	struct i596_private *lp = netdev_priv(dev);
+	struct i596_private *lp = dev->priv;
 	int i;
 	struct i596_rfd *rfd;
 	struct i596_rbd *rbd;
@@ -595,7 +595,7 @@ static inline void init_rx_bufs(struct net_device *dev)
 
 static inline void remove_rx_bufs(struct net_device *dev)
 {
-	struct i596_private *lp = netdev_priv(dev);
+	struct i596_private *lp = dev->priv;
 	struct i596_rbd *rbd;
 	int i;
 
@@ -612,7 +612,7 @@ static inline void remove_rx_bufs(struct net_device *dev)
 
 static void rebuild_rx_bufs(struct net_device *dev)
 {
-	struct i596_private *lp = netdev_priv(dev);
+	struct i596_private *lp = dev->priv;
 	int i;
 
 	/* Ensure rx frame/buffer descriptors are tidy */
@@ -633,7 +633,7 @@ static void rebuild_rx_bufs(struct net_device *dev)
 
 static int init_i596_mem(struct net_device *dev)
 {
-	struct i596_private *lp = netdev_priv(dev);
+	struct i596_private *lp = dev->priv;
 	unsigned long flags;
 
 	disable_irq(dev->irq);	/* disable IRQs from LAN */
@@ -727,7 +727,7 @@ failed:
 
 static inline int i596_rx(struct net_device *dev)
 {
-	struct i596_private *lp = netdev_priv(dev);
+	struct i596_private *lp = dev->priv;
 	struct i596_rfd *rfd;
 	struct i596_rbd *rbd;
 	int frames = 0;
@@ -940,7 +940,7 @@ static inline void i596_reset(struct net_device *dev, struct i596_private *lp)
 
 static void i596_add_cmd(struct net_device *dev, struct i596_cmd *cmd)
 {
-	struct i596_private *lp = netdev_priv(dev);
+	struct i596_private *lp = dev->priv;
 	unsigned long flags;
 
 	DEB(DEB_ADDCMD,printk("i596_add_cmd cmd_head %p\n", lp->cmd_head));
@@ -988,7 +988,7 @@ static void i596_add_cmd(struct net_device *dev, struct i596_cmd *cmd)
    device list */
 static int i596_test(struct net_device *dev)
 {
-	struct i596_private *lp = netdev_priv(dev);
+	struct i596_private *lp = dev->priv;
 	volatile int *tint;
 	u32 data;
 
@@ -1042,7 +1042,7 @@ out:
 
 static void i596_tx_timeout (struct net_device *dev)
 {
-	struct i596_private *lp = netdev_priv(dev);
+	struct i596_private *lp = dev->priv;
 
 	/* Transmitter timeout, serious problems. */
 	DEB(DEB_ERRORS,printk("%s: transmit timed out, status resetting.\n",
@@ -1071,7 +1071,7 @@ static void i596_tx_timeout (struct net_device *dev)
 
 static int i596_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	struct i596_private *lp = netdev_priv(dev);
+	struct i596_private *lp = dev->priv;
 	struct tx_cmd *tx_cmd;
 	struct i596_tbd *tbd;
 	short length = skb->len;
@@ -1220,7 +1220,7 @@ static int __devinit i82596_probe(struct net_device *dev,
 
 	dev->priv = (void *)(dev->mem_start);
 
-	lp = netdev_priv(dev);
+	lp = dev->priv;
 	DEB(DEB_INIT,printk ("%s: lp at 0x%08lx (%d bytes), lp->scb at 0x%08lx\n",
 		dev->name, (unsigned long)lp,
 		sizeof(struct i596_private), (unsigned long)&lp->scb));
@@ -1250,7 +1250,7 @@ static irqreturn_t i596_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		return IRQ_NONE;
 	}
 
-	lp = netdev_priv(dev);
+	lp = dev->priv;
 
 	spin_lock (&lp->lock);
 
@@ -1396,7 +1396,7 @@ static irqreturn_t i596_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 static int i596_close(struct net_device *dev)
 {
-	struct i596_private *lp = netdev_priv(dev);
+	struct i596_private *lp = dev->priv;
 	unsigned long flags;
 
 	netif_stop_queue(dev);
@@ -1430,7 +1430,7 @@ static int i596_close(struct net_device *dev)
 static struct net_device_stats *
  i596_get_stats(struct net_device *dev)
 {
-	struct i596_private *lp = netdev_priv(dev);
+	struct i596_private *lp = dev->priv;
 
 	return &lp->stats;
 }
@@ -1441,7 +1441,7 @@ static struct net_device_stats *
 
 static void set_multicast_list(struct net_device *dev)
 {
-	struct i596_private *lp = netdev_priv(dev);
+	struct i596_private *lp = dev->priv;
 	int config = 0, cnt;
 
 	DEB(DEB_MULTI,printk("%s: set multicast list, %d entries, promisc %s, allmulti %s\n", dev->name, dev->mc_count, dev->flags & IFF_PROMISC ? "ON" : "OFF", dev->flags & IFF_ALLMULTI ? "ON" : "OFF"));
@@ -1541,7 +1541,7 @@ lan_init_chip(struct parisc_device *dev)
 
 	retval = register_netdev(netdevice);
 	if (retval) {
-		struct i596_private *lp = netdev_priv(netdevice);
+		struct i596_private *lp = netdevice->priv;
 		printk(KERN_WARNING __FILE__ ": register_netdevice ret'd %d\n", retval);
 		dma_free_noncoherent(lp->dev, sizeof(struct i596_private), 
 				    (void *)netdevice->mem_start, lp->dma_addr);
@@ -1595,7 +1595,7 @@ static void __exit lasi_82596_exit(void)
 		
 		unregister_netdev(netdevice);
 
-		lp = netdev_priv(netdevice);
+		lp = netdevice->priv;
 		dma_free_noncoherent(lp->dev, sizeof(struct i596_private), 
 				       (void *)netdevice->mem_start, lp->dma_addr);
 		free_netdev(netdevice);
