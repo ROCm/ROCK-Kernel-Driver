@@ -900,6 +900,24 @@ do_register_isdn(struct IsdnCardState *cs)
 	       "NONE", cs->iif.id, cs->myid);
 }
 
+static int
+do_init(struct IsdnCardState *cs)
+{
+	int ret;
+	
+	init_tei(cs, cs->protocol);
+	ret = CallcNewChan(cs);
+	if (ret)
+		return -EIO;
+	
+	/* ISAR needs firmware download first */
+	if (!test_bit(HW_ISAR, &cs->HW_Flags))
+		ll_run(cs, 0);
+	
+	return 0;
+}
+
+
 static int __devinit checkcard(int cardnr, char *id, int *busy_flag)
 {
 	int ret = 0;
@@ -1125,17 +1143,11 @@ static int __devinit checkcard(int cardnr, char *id, int *busy_flag)
 		ret = 0;
 		goto outf_cs;
 	}
-	init_tei(cs, cs->protocol);
-	ret = CallcNewChan(cs);
-	if (ret) {
+	if (do_init(cs)) {
 		closecard(cardnr);
 		ret = 0;
 		goto outf_cs;
 	}
-	/* ISAR needs firmware download first */
-	if (!test_bit(HW_ISAR, &cs->HW_Flags))
-		ll_run(cs, 0);
-
 	ret = 1;
 	goto out;
 
