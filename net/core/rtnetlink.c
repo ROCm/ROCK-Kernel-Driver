@@ -335,7 +335,6 @@ rtnetlink_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh, int *errp)
 	struct rtnetlink_link *link_tab;
 	struct rtattr	*rta[RTATTR_MAX];
 
-	int exclusive = 0;
 	int sz_idx, kind;
 	int min_len;
 	int family;
@@ -401,9 +400,6 @@ rtnetlink_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh, int *errp)
 		skb_pull(skb, rlen);
 		return -1;
 	}
-
-	if (kind != 2) 
-		exclusive = 1;
 
 	memset(&rta, 0, sizeof(rta));
 
