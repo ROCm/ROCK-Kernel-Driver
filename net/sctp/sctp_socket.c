@@ -7,7 +7,7 @@
  * 
  * This file is part of the SCTP kernel reference Implementation
  * 
- * $Header: /cvsroot/lksctp/lksctp/sctp_cvs/net/sctp/sctp_socket.c,v 1.63 2002/08/21 18:34:04 jgrimm Exp $
+ * $Header: /cvsroot/lksctp/lksctp/sctp_cvs/net/sctp/sctp_socket.c,v 1.64 2002/08/21 23:06:28 jgrimm Exp $
  * 
  * These functions interface with the sockets layer to implement the
  * SCTP Extensions for the Sockets API.
@@ -53,7 +53,7 @@
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
  */
-static char *cvs_id __attribute__ ((unused)) = "$Id: sctp_socket.c,v 1.63 2002/08/21 18:34:04 jgrimm Exp $";
+static char *cvs_id __attribute__ ((unused)) = "$Id: sctp_socket.c,v 1.64 2002/08/21 23:06:28 jgrimm Exp $";
 
 #include <linux/config.h>
 #include <linux/types.h>
@@ -837,9 +837,8 @@ sctp_sendmsg(struct sock *sk, struct msghdr *msg, int size)
 	SCTP_DEBUG_PRINTK("msg_len: %d, sinfo_flags: 0x%x\n", 
 			  msg_len, sinfo_flags);
 
-	/* FIXME: Support MSG_ABORT. */
-	/* If MSG_EOF|MSG_ABORT is set, no data can be sent.  Disallow sending 0-length
-	 * messages when MSG_EOF|MSG_ABORT is not set.
+	/* If MSG_EOF|MSG_ABORT is set, no data can be sent.  Disallow 
+	 * sending 0-length messages when MSG_EOF|MSG_ABORT is not set.
 	 */
         if (((sinfo_flags & (MSG_EOF|MSG_ABORT)) && (msg_len > 0))
 	    || (!(sinfo_flags & (MSG_EOF|MSG_ABORT)) && (msg_len == 0))) {
