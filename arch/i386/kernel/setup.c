@@ -65,9 +65,9 @@ unsigned long mmu_cr4_features;
 EXPORT_SYMBOL_GPL(mmu_cr4_features);
 
 #ifdef	CONFIG_ACPI_INTERPRETER
-	int acpi_disabled __initdata = 0;
+	int acpi_disabled = 0;
 #else
-	int acpi_disabled __initdata = 1;
+	int acpi_disabled = 1;
 #endif
 EXPORT_SYMBOL(acpi_disabled);
 
