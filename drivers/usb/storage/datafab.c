@@ -520,7 +520,6 @@ int datafab_transport(Scsi_Cmnd * srb, struct us_data *us)
 		0x00, 0x80, 0x00, 0x01, 0x1F, 0x00, 0x00, 0x00
 	};
 
-	srb->resid = 0;
 	if (!us->extra) {
 		us->extra = kmalloc(sizeof(struct datafab_info), GFP_NOIO);
 		if (!us->extra) {

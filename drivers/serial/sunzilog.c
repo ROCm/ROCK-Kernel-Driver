@@ -7,7 +7,7 @@
  * This is based on the old drivers/sbus/char/zs.c code.  A lot
  * of code has been simply moved over directly from there but
  * much has been rewritten.  Credits therefore go out to Eddie
- * C. Dost, Peter Zaitcev, Ted Ts'o and Alex Buell for their
+ * C. Dost, Pete Zaitcev, Ted Ts'o and Alex Buell for their
  * work there.
  *
  *  Copyright (C) 2002 David S. Miller (davem@redhat.com)
@@ -714,7 +714,7 @@ static void sunzilog_start_tx(struct uart_port *port, unsigned int tty_start)
 		port->icount.tx++;
 
 		if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
-			uart_event(&up->port, EVT_WRITE_WAKEUP);
+			uart_write_wakeup(&up->port);
 	}
 }
 
@@ -992,7 +992,6 @@ static struct uart_ops sunzilog_pops = {
 
 static struct uart_sunzilog_port *sunzilog_port_table;
 static struct zilog_layout **sunzilog_chip_regs;
-static int *sunzilog_nodes;
 
 static struct uart_sunzilog_port *sunzilog_irq_chain;
 static int zilog_irq = -1;
@@ -1025,12 +1024,8 @@ static void __init sunzilog_alloc_tables(void)
 		alloc_one_table(NUM_CHANNELS * sizeof(struct uart_sunzilog_port));
 	sunzilog_chip_regs = (struct zilog_layout **)
 		alloc_one_table(NUM_SUNZILOG * sizeof(struct zilog_layout *));
-	sunzilog_nodes = (int *)
-		alloc_one_table(NUM_SUNZILOG * sizeof(int));
 
-	if (sunzilog_port_table == NULL ||
-	    sunzilog_chip_regs == NULL ||
-	    sunzilog_nodes == NULL) {
+	if (sunzilog_port_table == NULL || sunzilog_chip_regs == NULL) {
 		prom_printf("sunzilog_init: Cannot alloc SunZilog tables.\n");
 		prom_halt();
 	}
@@ -1041,24 +1036,13 @@ static void __init sunzilog_alloc_tables(void)
 /* We used to attempt to use the address property of the Zilog device node
  * but that totally is not necessary on sparc64.
  */
-static struct zilog_layout * __init get_zs_sun4u(int chip)
+static struct zilog_layout * __init get_zs_sun4u(int chip, int node)
 {
 	unsigned long mapped_addr = 0xdeadbeefUL;
 	unsigned int sun4u_ino;
-	int busnode, zsnode, seen;
+	int zsnode, seen;
 
-	if (central_bus)
-		busnode = central_bus->child->prom_node;
-	else
-		busnode = prom_searchsiblings(prom_getchild(prom_root_node), "sbus");
-
-	if (busnode == 0 || busnode == -1) {
-		prom_printf("SunZilog: Cannot find bus of Zilog %d in get_zs_sun4u.\n",
-			    chip);
-		prom_halt();
-	}
-
-	zsnode = prom_getchild(busnode);
+	zsnode = node;
 	seen = 0;
 	while (zsnode) {
 		int slave;
@@ -1111,7 +1095,6 @@ static struct zilog_layout * __init get_zs_sun4u(int chip)
 					((u64)zsregs[0].phys_addr);
 			}
 
-			sunzilog_nodes[chip] = zsnode;
 			if (zilog_irq == -1) {
 				if (central_bus) {
 					unsigned long iclr, imap;
@@ -1142,31 +1125,35 @@ static struct zilog_layout * __init get_zs_sun4u(int chip)
 	return (struct zilog_layout *) mapped_addr;
 }
 #else /* CONFIG_SPARC64 */
-static struct zilog_layout * __init get_zs_sun4cmd(int chip)
+
+/*
+ * XXX The sun4d case is utterly screwed: it tries to re-walk the tree
+ * (for the 3rd time) in order to find bootbus and cpu. Streamline it.
+ */
+static struct zilog_layout * __init get_zs_sun4cmd(int chip, int node)
 {
 	struct linux_prom_irqs irq_info[2];
 	unsigned long mapped_addr = 0;
-	int zsnode, chipid, cpunode, bbnode;
+	int zsnode, cpunode, bbnode;
+	struct linux_prom_registers zsreg[4];
+	struct resource res;
 
 	if (sparc_cpu_model == sun4d) {
-		int walk, no;
+		int walk;
 
 		zsnode = 0;
 		bbnode = 0;
-		no = 0;
+		cpunode = 0;
 		for (walk = prom_getchild(prom_root_node);
 		     (walk = prom_searchsiblings(walk, "cpu-unit")) != 0;
 		     walk = prom_getsibling(walk)) {
 			bbnode = prom_getchild(walk);
 			if (bbnode &&
 			    (bbnode = prom_searchsiblings(bbnode, "bootbus"))) {
-				if (no == (chip / 2)) {
+				if ((zsnode = prom_getchild(bbnode)) == node) {
 					cpunode = walk;
-					zsnode = prom_getchild(bbnode);
-					chipid = (chip & 1);
 					break;
 				}
-				no++;
 			}
 		}
 		if (!walk) {
@@ -1174,80 +1161,61 @@ static struct zilog_layout * __init get_zs_sun4cmd(int chip)
 				    (chip / 2));
 			prom_halt();
 		}
-	} else {
-		int tmp;
 
-		zsnode = prom_getchild(prom_root_node);
-		if ((tmp = prom_searchsiblings(zsnode, "obio"))) {
-			zsnode = prom_getchild(tmp);
-			if (!zsnode) {
-				prom_printf("SunZilog: Child of obio node does "
-					    "not exist.\n");
-				prom_halt();
-			}
+		if (prom_getproperty(zsnode, "reg",
+				     (char *) zsreg, sizeof(zsreg)) == -1) {
+			prom_printf("SunZilog: Cannot map Zilog %d\n", chip);
+			prom_halt();
 		}
-		chipid = 0;
-	}
+		/* XXX Looks like an off by one? */
+		prom_apply_generic_ranges(bbnode, cpunode, zsreg, 1);
+		res.start = zsreg[0].phys_addr;
+		res.end = res.start + (8 - 1);
+		res.flags = zsreg[0].which_io | IORESOURCE_IO;
+		mapped_addr = sbus_ioremap(&res, 0, 8, "Zilog Serial");
 
-	while (zsnode) {
-		struct linux_prom_registers zsreg[4];
-		struct resource res;
+	} else {
+		zsnode = node;
 
-		zsnode = prom_searchsiblings(zsnode, "zs");
-		if (zsnode == 0 || zsnode == -1)
-			break;
-
+#if 0 /* XXX When was this used? */
 		if (prom_getintdefault(zsnode, "slave", -1) != chipid) {
 			zsnode = prom_getsibling(zsnode);
 			continue;
 		}
+#endif
 
-		if (sparc_cpu_model == sun4d) {
-			/* Sun4d Zilog nodes lack the address property, so just
-			 * map it like a normal device.
-			 */
-			if (prom_getproperty(zsnode, "reg",
-					     (char *) zsreg, sizeof(zsreg)) == -1) {
-				prom_printf("SunZilog: Cannot map Zilog %d "
-					    "regs on sun4c.\n", chip);
-				prom_halt();
-			}
-			prom_apply_generic_ranges(bbnode, cpunode, zsreg, 1);
-			res.start = zsreg[0].phys_addr;
-			res.end = res.start + (8 - 1);
-			res.flags = zsreg[0].which_io | IORESOURCE_IO;
-			mapped_addr = sbus_ioremap(&res, 0, 8, "Zilog Serial");
-		} else {
-			unsigned int vaddr[2];
+		/*
+		 * "address" is only present on ports that OBP opened
+		 * (from Mitch Bradley's "Hitchhiker's Guide to OBP").
+		 * We do not use it.
+		 */
 
-			if (prom_getproperty(zsnode, "address",
-					     (void *) vaddr, sizeof(vaddr))
-			    % sizeof(unsigned int)) {
-				prom_printf("SunZilog: Cannot get address property for "
-					    "Zilog %d.\n", chip);
-				prom_halt();
-			}
-			mapped_addr = (unsigned long) vaddr[0];
-		}
-		sunzilog_nodes[chip] = zsnode;
-		if (prom_getproperty(zsnode, "intr",
-				     (char *) irq_info, sizeof(irq_info))
-		    % sizeof(struct linux_prom_irqs)) {
-			prom_printf("SunZilog: Cannot get IRQ property for "
-				    "Zilog %d.\n", chip);
+		if (prom_getproperty(zsnode, "reg",
+				     (char *) zsreg, sizeof(zsreg)) == -1) {
+			prom_printf("SunZilog: Cannot map Zilog %d\n", chip);
 			prom_halt();
 		}
-		if (zilog_irq == -1) {
-			zilog_irq = irq_info[0].pri;
-		} else if (zilog_irq != irq_info[0].pri) {
-			prom_printf("SunZilog: Inconsistent IRQ layout for Zilog %d.\n",
-				    chip);
-			prom_halt();
-		}
-		break;
+		if (sparc_cpu_model == sun4m)	/* Crude. Pass parent. XXX */
+			prom_apply_obio_ranges(zsreg, 1);
+		res.start = zsreg[0].phys_addr;
+		res.end = res.start + (8 - 1);
+		res.flags = zsreg[0].which_io | IORESOURCE_IO;
+		mapped_addr = sbus_ioremap(&res, 0, 8, "Zilog Serial");
 	}
-	if (!zsnode) {
-		prom_printf("SunZilog: OBP node for Zilog %d not found.\n", chip);
+
+	if (prom_getproperty(zsnode, "intr",
+			     (char *) irq_info, sizeof(irq_info))
+		    % sizeof(struct linux_prom_irqs)) {
+		prom_printf("SunZilog: Cannot get IRQ property for Zilog %d.\n",
+			    chip);
+		prom_halt();
+	}
+	if (zilog_irq == -1) {
+		zilog_irq = irq_info[0].pri;
+	} else if (zilog_irq != irq_info[0].pri) {
+		/* XXX. Dumb. Should handle per-chip IRQ, for add-ons. */
+		prom_printf("SunZilog: Inconsistent IRQ layout for Zilog %d.\n",
+			    chip);
 		prom_halt();
 	}
 
@@ -1256,7 +1224,7 @@ static struct zilog_layout * __init get_zs_sun4cmd(int chip)
 #endif /* !(CONFIG_SPARC64) */
 
 /* Get the address of the registers for SunZilog instance CHIP.  */
-static struct zilog_layout * __init get_zs(int chip)
+static struct zilog_layout * __init get_zs(int chip, int node)
 {
 	if (chip < 0 || chip >= NUM_SUNZILOG) {
 		prom_printf("SunZilog: Illegal chip number %d in get_zs.\n", chip);
@@ -1264,7 +1232,7 @@ static struct zilog_layout * __init get_zs(int chip)
 	}
 
 #ifdef CONFIG_SPARC64
-	return get_zs_sun4u(chip);
+	return get_zs_sun4u(chip, node);
 #else
 
 	if (sparc_cpu_model == sun4) {
@@ -1279,14 +1247,13 @@ static struct zilog_layout * __init get_zs(int chip)
 			res.start = 0xf0000000;
 			break;
 		};
-		sunzilog_nodes[chip] = 0;
 		zilog_irq = 12;
 		res.end = (res.start + (8 - 1));
 		res.flags = IORESOURCE_IO;
 		return (struct zilog_layout *) sbus_ioremap(&res, 0, 8, "SunZilog");
 	}
 
-	return get_zs_sun4cmd(chip);
+	return get_zs_sun4cmd(chip, node);
 #endif
 }
 
@@ -1459,6 +1426,52 @@ static int __init sunzilog_console_init(void)
 	return 0;
 }
 
+/*
+ * We scan the PROM tree recursively. This is the most reliable way
+ * to find Zilog nodes on various platforms. However, we face an extreme
+ * shortage of kernel stack, so we must be very careful. To that end,
+ * we scan only to a certain depth, and we use a common property buffer
+ * in the scan structure.
+ */
+#define ZS_PROPSIZE  128
+#define ZS_SCAN_DEPTH	5
+
+struct zs_probe_scan {
+	int depth;
+	void (*scanner)(struct zs_probe_scan *t, int node);
+
+	int devices;
+	char prop[ZS_PROPSIZE];
+};
+
+static int __inline__ sunzilog_node_ok(int node, const char *name, int len)
+{
+	if (strncmp(name, "zs", len) == 0)
+		return 1;
+	/* Don't fold this procedure just yet. Compare to su_node_ok(). */
+	return 0;
+}
+
+static void __init sunzilog_scan(struct zs_probe_scan *t, int node)
+{
+	int len;
+
+	for (; node != 0; node = prom_getsibling(node)) {
+		len = prom_getproperty(node, "name", t->prop, ZS_PROPSIZE);
+		if (len <= 1)
+			continue;		/* Broken PROM node */
+		if (sunzilog_node_ok(node, t->prop, len)) {
+			(*t->scanner)(t, node);
+		} else {
+			if (t->depth < ZS_SCAN_DEPTH) {
+				t->depth++;
+				sunzilog_scan(t, prom_getchild(node));
+				--t->depth;
+			}
+		}
+	}
+}
+
 static void __init sunzilog_prepare(void)
 {
 	struct uart_sunzilog_port *up;
@@ -1471,12 +1484,9 @@ static void __init sunzilog_prepare(void)
 	up[channel].next = NULL;
 
 	for (chip = 0; chip < NUM_SUNZILOG; chip++) {
-		if (!sunzilog_chip_regs[chip]) {
-			sunzilog_chip_regs[chip] = rp = get_zs(chip);
-
-			up[(chip * 2) + 0].port.membase = (char *) &rp->channelA;
-			up[(chip * 2) + 1].port.membase = (char *) &rp->channelB;
-		}
+		rp = sunzilog_chip_regs[chip];
+		up[(chip * 2) + 0].port.membase = (char *) &rp->channelA;
+		up[(chip * 2) + 1].port.membase = (char *) &rp->channelB;
 
 		/* Channel A */
 		up[(chip * 2) + 0].port.iotype = SERIAL_IO_MEM;
@@ -1593,11 +1603,25 @@ static void __init sunzilog_init_hw(void)
 	}
 }
 
+static struct zilog_layout * __init get_zs(int chip, int node);
+
+static void __init sunzilog_scan_probe(struct zs_probe_scan *t, int node)
+{
+	sunzilog_chip_regs[t->devices] = get_zs(t->devices, node);
+	t->devices++;
+}
+
 static int __init sunzilog_ports_init(void)
 {
+	struct zs_probe_scan scan;
 	int ret;
 
-	printk(KERN_INFO "Serial: Sun Zilog driver.\n");
+	printk(KERN_INFO "Serial: Sun Zilog driver (%d chips).\n", NUM_SUNZILOG);
+
+	scan.scanner = sunzilog_scan_probe;
+	scan.depth = 0;
+	scan.devices = 0;
+	sunzilog_scan(&scan, prom_getchild(prom_root_node));
 
 	sunzilog_prepare();
 
@@ -1635,56 +1659,34 @@ static int __init sunzilog_ports_init(void)
 	return ret;
 }
 
-static int __init sunzilog_init(void)
+static void __init sunzilog_scan_count(struct zs_probe_scan *t, int node)
 {
-	int node;
+	t->devices++;
+}
+
+static int __init sunzilog_ports_count(void)
+{
+	struct zs_probe_scan scan;
 
 	/* Sun4 Zilog setup is hard coded, no probing to do.  */
-	if (sparc_cpu_model == sun4) {
-		NUM_SUNZILOG = 2;
-	} else if (sparc_cpu_model == sun4d) {
-		int bbnode;
+	if (sparc_cpu_model == sun4)
+		return 2;
 
-		node = prom_getchild(prom_root_node);
-		NUM_SUNZILOG = 0;
-		while (node &&
-		       (node = prom_searchsiblings(node, "cpu-unit"))) {
-			bbnode = prom_getchild(node);
-			if (bbnode && prom_searchsiblings(bbnode, "bootbus"))
-				NUM_SUNZILOG += 2;
-			node = prom_getsibling(node);
-		}
-	} else if (sparc_cpu_model == sun4u) {
-		int central_node;
+	scan.scanner = sunzilog_scan_count;
+	scan.depth = 0;
+	scan.devices = 0;
 
-		/* Central bus zilogs must be checked for first,
-		 * since Enterprise boxes might have SBUSes as well.
-		 */
-		central_node = prom_finddevice("/central");
-		if (central_node != 0 && central_node != -1)
-			node = prom_searchsiblings(prom_getchild(central_node), "fhc");
-		else
-			node = prom_searchsiblings(prom_getchild(prom_root_node), "sbus");
-		if (node != 0 && node != -1)
-			node = prom_getchild(node);
-		if (node == 0 || node == -1)
-			return -ENODEV;
+	sunzilog_scan(&scan, prom_getchild(prom_root_node));
 
-		node = prom_searchsiblings(node, "zs");
-		if (!node)
-			return -ENODEV;
-		
-		NUM_SUNZILOG = 2;
-	} else {
-		node = prom_getchild(prom_root_node);
-		node = prom_searchsiblings(node, "obio");
-		if (node)
-			node = prom_getchild(node);
-		if (!node)
-			return -ENODEV;
+	return scan.devices;
+}
 
-		NUM_SUNZILOG = 2;
-	}
+static int __init sunzilog_init(void)
+{
+
+	NUM_SUNZILOG = sunzilog_ports_count();
+	if (NUM_SUNZILOG == 0)
+		return -ENODEV;
 
 	sunzilog_alloc_tables();
 

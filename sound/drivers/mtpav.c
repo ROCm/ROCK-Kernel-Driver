@@ -683,6 +683,7 @@ static mtpav_t *new_mtpav(void)
 	if (ncrd != NULL) {
 		spin_lock_init(&ncrd->spinlock);
 
+		init_timer(&ncrd->timer);
 		ncrd->card = NULL;
 		ncrd->irq = -1;
 		ncrd->share_irq = 0;

@@ -138,8 +138,11 @@ svc_release_buffer(struct svc_rqst *rqstp)
 {
 	while (rqstp->rq_arghi)
 		put_page(rqstp->rq_argpages[--rqstp->rq_arghi]);
-	while (rqstp->rq_resused)
-		put_page(rqstp->rq_respages[--rqstp->rq_resused]);
+	while (rqstp->rq_resused) {
+		if (rqstp->rq_respages[--rqstp->rq_resused] == NULL)
+			continue;
+		put_page(rqstp->rq_respages[rqstp->rq_resused]);
+	}
 	rqstp->rq_argused = 0;
 }
 
@@ -264,13 +267,14 @@ svc_process(struct svc_serv *serv, struct svc_rqst *rqstp)
 	/* setup response xdr_buf.
 	 * Initially it has just one page 
 	 */
-	take_page(rqstp); /* must succeed */
+	svc_take_page(rqstp); /* must succeed */
 	resv->iov_base = page_address(rqstp->rq_respages[0]);
 	resv->iov_len = 0;
 	rqstp->rq_res.pages = rqstp->rq_respages+1;
 	rqstp->rq_res.len = 0;
 	rqstp->rq_res.page_base = 0;
 	rqstp->rq_res.page_len = 0;
+	rqstp->rq_res.tail[0].iov_len = 0;
 	/* tcp needs a space for the record length... */
 	if (rqstp->rq_prot == IPPROTO_TCP)
 		svc_putu32(resv, 0);
@@ -362,8 +366,12 @@ svc_process(struct svc_serv *serv, struct svc_rqst *rqstp)
 		}
 	} else {
 		dprintk("svc: calling dispatcher\n");
-		if (!versp->vs_dispatch(rqstp, statp))
+		if (!versp->vs_dispatch(rqstp, statp)) {
+			/* Release reply info */
+			if (procp->pc_release)
+				procp->pc_release(rqstp, NULL, rqstp->rq_resp);
 			goto dropit;
+		}
 	}
 
 	/* Check RPC status result */

@@ -193,7 +193,7 @@ static int mcd_audio_ioctl(struct cdrom_device_info *cdi, unsigned int cmd,
 		    void *arg);
 static int mcd_drive_status(struct cdrom_device_info *cdi, int slot_nr);
 
-static struct timer_list mcd_timer;
+static struct timer_list mcd_timer = TIMER_INITIALIZER(NULL, 0, 0);
 
 static struct cdrom_device_ops mcd_dops = {
 	.open			= mcd_open,

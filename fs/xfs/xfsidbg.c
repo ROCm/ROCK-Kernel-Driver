@@ -3725,8 +3725,8 @@ xfsidbg_xdastate(xfs_da_state_t *s)
 {
 	xfs_da_state_blk_t *eblk;
 
-	kdb_printf("args 0x%p mp 0x%p blocksize %d inleaf %d\n",
-		s->args, s->mp, s->blocksize, s->inleaf);
+	kdb_printf("args 0x%p mp 0x%p blocksize %u node_ents %u inleaf %u\n",
+		s->args, s->mp, s->blocksize, s->node_ents, s->inleaf);
 	if (s->args)
 		xfsidbg_xdaargs(s->args);
 
@@ -4637,9 +4637,10 @@ xfsidbg_xmount(xfs_mount_t *mp)
 	printflags(mp->m_flags, xmount_flags,"flags");
 	kdb_printf("ialloc_inos %d ialloc_blks %d litino %d\n",
 		mp->m_ialloc_inos, mp->m_ialloc_blks, mp->m_litino);
-	kdb_printf("attroffset %d da_node_ents %d maxicount %Ld inoalign_mask %d\n",
-		mp->m_attroffset, mp->m_da_node_ents, mp->m_maxicount,
-		mp->m_inoalign_mask);
+	kdb_printf("dir_node_ents %u attr_node_ents %u\n",
+		mp->m_dir_node_ents, mp->m_attr_node_ents);
+	kdb_printf("attroffset %d maxicount %Ld inoalign_mask %d\n",
+		mp->m_attroffset, mp->m_maxicount, mp->m_inoalign_mask);
 	kdb_printf("resblks %Ld resblks_avail %Ld\n", mp->m_resblks,
 		mp->m_resblks_avail);
 #if XFS_BIG_FILESYSTEMS

@@ -297,7 +297,7 @@ struct address_space_operations {
 	/* Set a page dirty */
 	int (*set_page_dirty)(struct page *page);
 
-	int (*readpages)(struct address_space *mapping,
+	int (*readpages)(struct file *filp, struct address_space *mapping,
 			struct list_head *pages, unsigned nr_pages);
 
 	/*

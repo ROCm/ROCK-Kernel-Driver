@@ -77,6 +77,7 @@ struct usb_hcd {	/* usb_bus.hcpriv points to this */
 
 	/* a few non-PCI controllers exist, mostly for OHCI */
 	struct pci_dev		*pdev;		/* pci is typical */
+	struct device		*parent;	/* parent device driver */
 #ifdef	CONFIG_PCI
 	int			region;		/* pci region for regs */
 	u32			pci_state [16];	/* for PM state save */

@@ -81,10 +81,10 @@ ext2_xattr_user_set(struct inode *inode, const char *name,
 }
 
 struct ext2_xattr_handler ext2_xattr_user_handler = {
-	prefix:	XATTR_USER_PREFIX,
-	list:	ext2_xattr_user_list,
-	get:	ext2_xattr_user_get,
-	set:	ext2_xattr_user_set,
+	.prefix	= XATTR_USER_PREFIX,
+	.list	= ext2_xattr_user_list,
+	.get	= ext2_xattr_user_get,
+	.set	= ext2_xattr_user_set,
 };
 
 int __init

@@ -123,8 +123,10 @@ int xfrm4_rcv(struct sk_buff *skb)
 	skb->sp->len += xfrm_nr;
 
 	if (decaps) {
-		dst_release(skb->dst);
-		skb->dst = NULL;
+		if (!(skb->dev->flags&IFF_LOOPBACK)) {
+			dst_release(skb->dst);
+			skb->dst = NULL;
+		}
 		netif_rx(skb);
 		return 0;
 	} else {

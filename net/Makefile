@@ -16,6 +16,7 @@ obj-$(CONFIG_INET)		+= ipv4/
 obj-$(CONFIG_UNIX)		+= unix/
 obj-$(CONFIG_IPV6)		+= ipv6/
 obj-$(CONFIG_PACKET)		+= packet/
+obj-$(CONFIG_NET_KEY)		+= key/
 obj-$(CONFIG_NET_SCHED)		+= sched/
 obj-$(CONFIG_BRIDGE)		+= bridge/
 obj-$(CONFIG_IPX)		+= ipx/

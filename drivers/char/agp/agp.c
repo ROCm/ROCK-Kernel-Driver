@@ -1150,6 +1150,14 @@ static struct {
 		.chipset_setup	= via_generic_setup
 	},
 	{
+		.device_id	= PCI_DEVICE_ID_VIA_8653_0,
+		.vendor_id	= PCI_VENDOR_ID_VIA,
+		.chipset	= VIA_APOLLO_PRO,
+		.vendor_name	= "Via",
+		.chipset_name	= "Apollo Pro266T",
+		.chipset_setup	= via_generic_setup
+	},
+	{
 		.device_id	= 0,
 		.vendor_id	= PCI_VENDOR_ID_VIA,
 		.chipset	= VIA_GENERIC,

@@ -25,6 +25,7 @@
 #include <linux/smp_lock.h>
 #include <linux/string.h>
 #include <linux/list.h>
+#include <linux/hash.h>
 #include <linux/spinlock.h>
 #include <linux/wait.h>
 #include <asm/bitops.h>
@@ -58,11 +59,12 @@
 #endif /* #if DEBUG_DPI != 0 */
 
 
-/* Maximum storage for the eventpoll interest set */
-#define EP_MAX_FDS_SIZE (1024 * 128)
+/* Maximum size of the hash in bits ( 2^N ) */
+#define EP_MAX_HASH_BITS 17
 
-/* We don't want the hash to be smaller than this */
-#define EP_MIN_HASH_SIZE 101
+/* Minimum size of the hash in bits ( 2^N ) */
+#define EP_MIN_HASH_BITS 9
+
 /*
  * Event buffer dimension used to cache events before sending them in
  * userspace with a __copy_to_user(). The event buffer is in stack,
@@ -77,7 +79,7 @@
 #define EP_HENTRY_X_PAGE (PAGE_SIZE / sizeof(struct list_head))
 
 /* Maximum size of the hash in pages */
-#define EP_MAX_HPAGES (EP_MAX_FDS_SIZE / EP_HENTRY_X_PAGE + 1)
+#define EP_MAX_HPAGES ((1 << EP_MAX_HASH_BITS) / EP_HENTRY_X_PAGE + 1)
 
 /* Macro to allocate a "struct epitem" from the slab cache */
 #define DPI_MEM_ALLOC()	(struct epitem *) kmem_cache_alloc(dpi_cache, SLAB_KERNEL)
@@ -127,7 +129,7 @@ struct eventpoll {
 	struct list_head rdllist;
 
 	/* Size of the hash */
-	int hsize;
+	unsigned int hashbits;
 
 	/* Number of pages currently allocated for the hash */
 	int nhpages;
@@ -186,22 +188,20 @@ struct epitem {
 
 
 
-
-static int ep_is_prime(int n);
+static unsigned int ep_get_hash_bits(unsigned int hintsize);
 static int ep_getfd(int *efd, struct inode **einode, struct file **efile);
 static int ep_alloc_pages(char **pages, int numpages);
 static int ep_free_pages(char **pages, int numpages);
-static int ep_file_init(struct file *file, int hsize);
-static int ep_hash_index(struct eventpoll *ep, struct file *file);
-static struct list_head *ep_hash_entry(struct eventpoll *ep, int index);
-static int ep_init(struct eventpoll *ep, int hsize);
+static int ep_file_init(struct file *file, unsigned int hashbits);
+static unsigned int ep_hash_index(struct eventpoll *ep, struct file *file);
+static struct list_head *ep_hash_entry(struct eventpoll *ep, unsigned int index);
+static int ep_init(struct eventpoll *ep, unsigned int hashbits);
 static void ep_free(struct eventpoll *ep);
 static struct epitem *ep_find(struct eventpoll *ep, struct file *file);
 static void ep_use_epitem(struct epitem *dpi);
 static void ep_release_epitem(struct epitem *dpi);
 static void ep_ptable_queue_proc(void *priv, wait_queue_head_t *whead);
 static int ep_insert(struct eventpoll *ep, struct pollfd *pfd, struct file *tfile);
-static unsigned int ep_get_file_events(struct file *file);
 static int ep_modify(struct eventpoll *ep, struct epitem *dpi, unsigned int events);
 static int ep_unlink(struct eventpoll *ep, struct epitem *dpi);
 static int ep_remove(struct eventpoll *ep, struct epitem *dpi);
@@ -215,6 +215,7 @@ static int eventpollfs_delete_dentry(struct dentry *dentry);
 static struct inode *ep_eventpoll_inode(void);
 static struct super_block *eventpollfs_get_sb(struct file_system_type *fs_type,
 					      int flags, char *dev_name, void *data);
+
 
 
 /* Use to link togheter all the "struct eventpoll" */
@@ -252,21 +253,17 @@ static struct dentry_operations eventpollfs_dentry_operations = {
 
 
 
-/* Report if the number is prime. Needed to correctly size the hash  */
-static int ep_is_prime(int n)
+/*
+ * Calculate the size of the hash in bits. The returned size will be
+ * bounded between EP_MIN_HASH_BITS and EP_MAX_HASH_BITS.
+ */
+static unsigned int ep_get_hash_bits(unsigned int hintsize)
 {
+	unsigned int i, val;
 
-	if (n > 3) {
-		if (n & 1) {
-			int i, hn = n / 2;
-
-			for (i = 3; i < hn; i += 2)
-				if (!(n % i))
-					return 0;
-		} else
-			return 0;
-	}
-	return 1;
+	for (i = 0, val = 1; val < hintsize && i < 8 * sizeof(int); i++, val <<= 1);
+	return i <  EP_MIN_HASH_BITS ?  EP_MIN_HASH_BITS:
+		(i > EP_MAX_HASH_BITS ? EP_MAX_HASH_BITS: i);
 }
 
 
@@ -298,21 +295,23 @@ void ep_notify_file_close(struct file *file)
 
 /*
  * It opens an eventpoll file descriptor by suggesting a storage of "size"
- * file descriptors. It is the kernel part of the userspace epoll_create(2).
+ * file descriptors. The size parameter is just an hint about how to size
+ * data structures. It won't prevent the user to store more than "size"
+ * file descriptors inside the epoll interface. It is the kernel part of
+ * the userspace epoll_create(2).
  */
 asmlinkage int sys_epoll_create(int size)
 {
 	int error, fd;
+	unsigned int hashbits;
 	struct inode *inode;
 	struct file *file;
 
 	DNPRINTK(3, (KERN_INFO "[%p] eventpoll: sys_epoll_create(%d)\n",
 		     current, size));
 
-	/* Search the nearest prime number higher than "size" */
-	for (; !ep_is_prime(size); size++);
-	if (size < EP_MIN_HASH_SIZE)
-		size = EP_MIN_HASH_SIZE;
+	/* Correctly size the hash */
+	hashbits = ep_get_hash_bits((unsigned int) size);
 
 	/*
 	 * Creates all the items needed to setup an eventpoll file. That is,
@@ -323,7 +322,7 @@ asmlinkage int sys_epoll_create(int size)
 		goto eexit_1;
 
 	/* Setup the file internal data structure ( "struct eventpoll" ) */
-	error = ep_file_init(file, size);
+	error = ep_file_init(file, hashbits);
 	if (error)
 		goto eexit_2;
 
@@ -456,6 +455,10 @@ asmlinkage int sys_epoll_wait(int epfd, struct pollfd *events, int maxevents,
 
 	DNPRINTK(3, (KERN_INFO "[%p] eventpoll: sys_epoll_wait(%d, %p, %d, %d)\n",
 		     current, epfd, events, maxevents, timeout));
+
+	/* The maximum number of event must be greater than zero */
+	if (maxevents <= 0)
+		return -EINVAL;
 
 	/* Verify that the area passed by the user is writeable */
 	if ((error = verify_area(VERIFY_WRITE, events, maxevents * sizeof(struct pollfd))))
@@ -602,7 +605,7 @@ static int ep_free_pages(char **pages, int numpages)
 }
 
 
-static int ep_file_init(struct file *file, int hsize)
+static int ep_file_init(struct file *file, unsigned int hashbits)
 {
 	int error;
 	unsigned long flags;
@@ -613,7 +616,7 @@ static int ep_file_init(struct file *file, int hsize)
 
 	memset(ep, 0, sizeof(*ep));
 
-	error = ep_init(ep, hsize);
+	error = ep_init(ep, hashbits);
 	if (error) {
 		kfree(ep);
 		return error;
@@ -635,17 +638,17 @@ static int ep_file_init(struct file *file, int hsize)
 /*
  * Calculate the index of the hash relative to "file".
  */
-static int ep_hash_index(struct eventpoll *ep, struct file *file)
+static unsigned int ep_hash_index(struct eventpoll *ep, struct file *file)
 {
 
-	return (int) ((((unsigned long) file) / sizeof(struct file)) % ep->hsize);
+	return (unsigned int) hash_ptr(file, ep->hashbits);
 }
 
 
 /*
  * Returns the hash entry ( struct list_head * ) of the passed index.
  */
-static struct list_head *ep_hash_entry(struct eventpoll *ep, int index)
+static struct list_head *ep_hash_entry(struct eventpoll *ep, unsigned int index)
 {
 
 	return (struct list_head *) (ep->hpages[index / EP_HENTRY_X_PAGE] +
@@ -653,9 +656,10 @@ static struct list_head *ep_hash_entry(struct eventpoll *ep, int index)
 }
 
 
-static int ep_init(struct eventpoll *ep, int hsize)
+static int ep_init(struct eventpoll *ep, unsigned int hashbits)
 {
-	int error, i;
+	int error;
+	unsigned int i, hsize;
 
 	INIT_LIST_HEAD(&ep->llink);
 	rwlock_init(&ep->lock);
@@ -664,14 +668,15 @@ static int ep_init(struct eventpoll *ep, int hsize)
 	INIT_LIST_HEAD(&ep->rdllist);
 
 	/* Hash allocation and setup */
-	ep->hsize = hsize;
-	ep->nhpages = hsize / EP_HENTRY_X_PAGE + (hsize % EP_HENTRY_X_PAGE ? 1: 0);
+	hsize = 1 << hashbits;
+	ep->hashbits = hashbits;
+	ep->nhpages = (int) (hsize / EP_HENTRY_X_PAGE + (hsize % EP_HENTRY_X_PAGE ? 1: 0));
 	error = ep_alloc_pages(ep->hpages, ep->nhpages);
 	if (error)
 		goto eexit_1;
 
 	/* Initialize hash buckets */
-	for (i = 0; i < ep->hsize; i++)
+	for (i = 0; i < hsize; i++)
 		INIT_LIST_HEAD(ep_hash_entry(ep, i));
 
 	return 0;
@@ -682,7 +687,7 @@ eexit_1:
 
 static void ep_free(struct eventpoll *ep)
 {
-	int i;
+	unsigned int i, hsize;
 	unsigned long flags;
 	struct list_head *lsthead;
 
@@ -690,7 +695,7 @@ static void ep_free(struct eventpoll *ep)
 	 * Walks through the whole hash by unregistering file callbacks and
 	 * freeing each "struct epitem".
 	 */
-	for (i = 0; i < ep->hsize; i++) {
+	for (i = 0, hsize = 1 << ep->hashbits; i < hsize; i++) {
 		lsthead = ep_hash_entry(ep, i);
 
 		/*
@@ -723,8 +728,7 @@ static void ep_free(struct eventpoll *ep)
 	write_unlock_irqrestore(&eplock, flags);
 
 	/* Free hash pages */
-	if (ep->nhpages > 0)
-		ep_free_pages(ep->hpages, ep->nhpages);
+	ep_free_pages(ep->hpages, ep->nhpages);
 }
 
 
@@ -827,21 +831,25 @@ static int ep_insert(struct eventpoll *ep, struct pollfd *pfd, struct file *tfil
 		dpi->wait[i].base = dpi;
 	}
 
-	/* Attach the item to the poll hooks */
+	/* Initialize the poll table using the queue callback */
 	poll_initwait_ex(&pt, 1, ep_ptable_queue_proc, dpi);
-	revents = tfile->f_op->poll(tfile, &pt);
-	poll_freewait(&pt);
 
 	/* We have to drop the new item inside our item list to keep track of it */
 	write_lock_irqsave(&ep->lock, flags);
 
+	/* Add the current item to the hash table */
 	list_add(&dpi->llink, ep_hash_entry(ep, ep_hash_index(ep, tfile)));
+
+	/* Attach the item to the poll hooks and get current event bits */
+	revents = tfile->f_op->poll(tfile, &pt);
 
 	/* If the file is already "ready" we drop it inside the ready list */
 	if ((revents & pfd->events) && !EP_IS_LINKED(&dpi->rdllink))
 		list_add(&dpi->rdllink, &ep->rdllist);
 
 	write_unlock_irqrestore(&ep->lock, flags);
+
+	poll_freewait(&pt);
 
 	DNPRINTK(3, (KERN_INFO "[%p] eventpoll: ep_insert(%p, %d)\n",
 		     current, ep, pfd->fd));
@@ -854,12 +862,13 @@ eexit_1:
 
 
 /*
- * Returns the current events of the given file. It uses the special
- * poll table initialization to avoid any poll queue insertion.
+ * Modify the interest event mask by dropping an event if the new mask
+ * has a match in the current file status.
  */
-static unsigned int ep_get_file_events(struct file *file)
+static int ep_modify(struct eventpoll *ep, struct epitem *dpi, unsigned int events)
 {
 	unsigned int revents;
+	unsigned long flags;
 	poll_table pt;
 
 	/*
@@ -870,26 +879,12 @@ static unsigned int ep_get_file_events(struct file *file)
 	 */
 	poll_initwait_ex(&pt, 0, NULL, NULL);
 
-	revents = file->f_op->poll(file, &pt);
-
-	poll_freewait(&pt);
-	return revents;
-}
-
-
-/*
- * Modify the interest event mask by dropping an event if the new mask
- * has a match in the current file status.
- */
-static int ep_modify(struct eventpoll *ep, struct epitem *dpi, unsigned int events)
-{
-	unsigned int revents;
-	unsigned long flags;
-
-	revents = ep_get_file_events(dpi->file);
-
 	write_lock_irqsave(&ep->lock, flags);
 
+	/* Get current event bits */
+	revents = dpi->file->f_op->poll(dpi->file, &pt);
+
+	/* Set the new event interest mask */
 	dpi->pfd.events = events;
 
 	/* If the file is already "ready" we drop it inside the ready list */
@@ -897,6 +892,8 @@ static int ep_modify(struct eventpoll *ep, struct epitem *dpi, unsigned int even
 		list_add(&dpi->rdllink, &ep->rdllist);
 
 	write_unlock_irqrestore(&ep->lock, flags);
+
+	poll_freewait(&pt);
 
 	return 0;
 }
@@ -1068,11 +1065,19 @@ static int ep_events_transfer(struct eventpoll *ep, struct pollfd *events, int m
 
 	write_lock_irqsave(&ep->lock, flags);
 
-	for (eventcnt = 0, ebufcnt = 0; eventcnt < maxevents && !list_empty(lsthead);) {
+	for (eventcnt = 0, ebufcnt = 0; (eventcnt + ebufcnt) < maxevents && !list_empty(lsthead);) {
 		struct epitem *dpi = list_entry(lsthead->next, struct epitem, rdllink);
 
 		/* Remove the item from the ready list */
 		EP_LIST_DEL(&dpi->rdllink);
+
+		/*
+		 * If the item is not linked to the main has table this means that
+		 * it's on the way to be removed and we don't want to send events
+		 * to such file descriptor.
+		 */
+		if (!EP_IS_LINKED(&dpi->llink))
+			continue;
 
 		/* Fetch event bits from the signaled file */
 		revents = dpi->file->f_op->poll(dpi->file, &pt);
@@ -1126,12 +1131,10 @@ static int ep_poll(struct eventpoll *ep, struct pollfd *events, int maxevents,
 	wait_queue_t wait;
 
 	/*
-	 * Calculate the timeout by checking for the "infinite" value ( -1 )
-	 * and the overflow condition ( > MAX_SCHEDULE_TIMEOUT / HZ ). The
-	 * passed timeout is in milliseconds, that why (t * HZ) / 1000.
+	 * Calculate the timeout by checking for the "infinite" value ( -1 ).
+	 * The passed timeout is in milliseconds, that why (t * HZ) / 1000.
 	 */
-	jtimeout = timeout == -1 || timeout > MAX_SCHEDULE_TIMEOUT / HZ ?
-		MAX_SCHEDULE_TIMEOUT: (timeout * HZ) / 1000;
+	jtimeout = timeout == -1 ? MAX_SCHEDULE_TIMEOUT: (timeout * HZ) / 1000;
 
 retry:
 	write_lock_irqsave(&ep->lock, flags);

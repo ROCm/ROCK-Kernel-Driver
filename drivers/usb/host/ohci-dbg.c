@@ -394,15 +394,14 @@ show_list (struct ohci_hcd *ohci, char *buf, size_t count, struct ed *ed)
 static ssize_t
 show_async (struct device *dev, char *buf, size_t count, loff_t off)
 {
-	struct pci_dev		*pdev;
 	struct ohci_hcd		*ohci;
 	size_t			temp;
 	unsigned long		flags;
 
 	if (off != 0)
 		return 0;
-	pdev = container_of (dev, struct pci_dev, dev);
-	ohci = container_of (pci_get_drvdata (pdev), struct ohci_hcd, hcd);
+
+	ohci = dev_to_ohci(dev);
 
 	/* display control and bulk lists together, for simplicity */
 	spin_lock_irqsave (&ohci->lock, flags);
@@ -420,7 +419,6 @@ static DEVICE_ATTR (async, S_IRUGO, show_async, NULL);
 static ssize_t
 show_periodic (struct device *dev, char *buf, size_t count, loff_t off)
 {
-	struct pci_dev		*pdev;
 	struct ohci_hcd		*ohci;
 	struct ed		**seen, *ed;
 	unsigned long		flags;
@@ -434,8 +432,7 @@ show_periodic (struct device *dev, char *buf, size_t count, loff_t off)
 		return 0;
 	seen_count = 0;
 
-	pdev = container_of (dev, struct pci_dev, dev);
-	ohci = container_of (pci_get_drvdata (pdev), struct ohci_hcd, hcd);
+	ohci = dev_to_ohci(dev);
 	next = buf;
 	size = count;
 
@@ -513,16 +510,16 @@ static DEVICE_ATTR (periodic, S_IRUGO, show_periodic, NULL);
 
 static inline void create_debug_files (struct ohci_hcd *bus)
 {
-	device_create_file (&bus->hcd.pdev->dev, &dev_attr_async);
-	device_create_file (&bus->hcd.pdev->dev, &dev_attr_periodic);
+	device_create_file (bus->hcd.parent, &dev_attr_async);
+	device_create_file (bus->hcd.parent, &dev_attr_periodic);
 	// registers
 	dbg ("%s: created debug files", bus->hcd.self.bus_name);
 }
 
 static inline void remove_debug_files (struct ohci_hcd *bus)
 {
-	device_remove_file (&bus->hcd.pdev->dev, &dev_attr_async);
-	device_remove_file (&bus->hcd.pdev->dev, &dev_attr_periodic);
+	device_remove_file (bus->hcd.parent, &dev_attr_async);
+	device_remove_file (bus->hcd.parent, &dev_attr_periodic);
 }
 
 #else /* empty stubs for creating those files */

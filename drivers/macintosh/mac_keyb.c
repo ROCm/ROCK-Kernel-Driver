@@ -229,7 +229,7 @@ static u_short macctrl_alt_map[NR_KEYS] __initdata = {
 
 
 static void kbd_repeat(unsigned long);
-static struct timer_list repeat_timer = { function: kbd_repeat };
+static struct timer_list repeat_timer = TIMER_INITIALIZER(kbd_repeat, 0, 0);
 static int last_keycode;
 
 static void mackeyb_probe(void);

@@ -1,0 +1,4 @@
+SECTIONS
+{
+	.init.ramfs : { *(.data) }
+}

@@ -64,6 +64,7 @@
 #include <net/raw.h>
 #include <net/inet_common.h>
 #include <net/checksum.h>
+#include <net/xfrm.h>
 #include <linux/netfilter_ipv4.h>
 
 struct sock *raw_v4_htable[RAWV4_HTABLE_SIZE];
@@ -237,6 +238,11 @@ static int raw_rcv_skb(struct sock * sk, struct sk_buff * skb)
 
 int raw_rcv(struct sock *sk, struct sk_buff *skb)
 {
+	if (!xfrm_policy_check(sk, XFRM_POLICY_IN, skb)) {
+		kfree_skb(skb);
+		return NET_RX_DROP;
+	}
+
 	skb_push(skb, skb->data - skb->nh.raw);
 
 	raw_rcv_skb(sk, skb);
@@ -425,7 +431,7 @@ static int raw_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 						.saddr = saddr,
 						.tos = tos } },
 				    .proto = IPPROTO_RAW };
-		err = ip_route_output_key(&rt, &fl);
+		err = ip_route_output_flow(&rt, &fl, sk, msg->msg_flags&MSG_DONTWAIT);
 	}
 	if (err)
 		goto done;

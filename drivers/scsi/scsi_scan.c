@@ -1322,7 +1322,6 @@ static int scsi_add_lun(Scsi_Device *sdevscan, Scsi_Device **sdevnew,
 			Scsi_Request *sreq, char *inq_result, int *bflags)
 {
 	Scsi_Device *sdev;
-	struct Scsi_Device_Template *sdt;
 	char devname[64];
 	extern devfs_handle_t scsi_devfs_handle;
 
@@ -1479,18 +1478,7 @@ static int scsi_add_lun(Scsi_Device *sdevscan, Scsi_Device **sdevnew,
 	 * function */
 	sdev->max_device_blocked = SCSI_DEFAULT_DEVICE_BLOCKED;
 
-	for (sdt = scsi_devicelist; sdt; sdt = sdt->next)
-		if (sdt->detect)
-			sdev->attached += (*sdt->detect) (sdev);
-
-	if (sdev->host->hostt->slave_attach != NULL) {
-		if (sdev->host->hostt->slave_attach(sdev) != 0) {
-			printk(KERN_INFO "%s: scsi_add_lun: failed low level driver attach, setting device offline", devname);
-			sdev->online = FALSE;
-		}
-	} else if(sdev->host->cmd_per_lun) {
-		scsi_adjust_queue_depth(sdev, 0, sdev->host->cmd_per_lun);
-	}
+	scsi_detect_device(sdev);
 
 	if (sdevnew != NULL)
 		*sdevnew = sdev;
@@ -2010,7 +1998,6 @@ static void scsi_scan_selected_lun(struct Scsi_Host *shost, uint channel,
 				   uint id, uint lun)
 {
 	Scsi_Device *sdevscan, *sdev = NULL;
-	struct Scsi_Device_Template *sdt;
 	int res;
 
 	if ((channel > shost->max_channel) || (id >= shost->max_id) ||
@@ -2028,24 +2015,7 @@ static void scsi_scan_selected_lun(struct Scsi_Host *shost, uint channel,
 	if (res != SCSI_SCAN_LUN_PRESENT) 
 		return;
 
-	BUG_ON(sdev == NULL);
-
-	scsi_build_commandblocks(sdev);
-	if (sdev->current_queue_depth == 0) {
-		printk(ALLOC_FAILURE_MSG, __FUNCTION__);
-		return;
-	}
-
-	for (sdt = scsi_devicelist; sdt; sdt = sdt->next)
-		if (sdt->init && sdt->dev_noticed)
-			(*sdt->init) ();
-
-	for (sdt = scsi_devicelist; sdt; sdt = sdt->next)
-		if (sdt->attach)
-			(*sdt->attach) (sdev);
-
-	if (!sdev->attached)
-		scsi_release_commandblocks(sdev);
+	scsi_attach_device(sdev);
 }
 
 /**

@@ -557,8 +557,12 @@ struct pci_dev *pci_find_subsys (unsigned int vendor, unsigned int device,
 				 unsigned int ss_vendor, unsigned int ss_device,
 				 const struct pci_dev *from);
 struct pci_dev *pci_find_class (unsigned int class, const struct pci_dev *from);
+struct pci_bus *pci_find_bus(unsigned char busnr);
 struct pci_dev *pci_find_slot (unsigned int bus, unsigned int devfn);
+unsigned char pci_bus_max_busnr(struct pci_bus* bus);
+unsigned char pci_max_busnr(void);
 int pci_find_capability (struct pci_dev *dev, int cap);
+int pci_bus_find_capability (struct pci_bus *bus, unsigned int devfn, int cap);
 
 int pci_bus_read_config_byte (struct pci_bus *bus, unsigned int devfn, int where, u8 *val);
 int pci_bus_read_config_word (struct pci_bus *bus, unsigned int devfn, int where, u16 *val);
@@ -613,6 +617,8 @@ int pci_enable_wake(struct pci_dev *dev, u32 state, int enable);
 
 /* Helper functions for low-level code (drivers/pci/setup-[bus,res].c) */
 
+void pbus_assign_resources(struct pci_bus *bus);
+void pbus_size_bridges(struct pci_bus *bus);
 int pci_claim_resource(struct pci_dev *, int);
 void pci_assign_unassigned_resources(void);
 void pdev_enable_device(struct pci_dev *);
@@ -634,6 +640,7 @@ struct pci_driver *pci_dev_driver(const struct pci_dev *);
 const struct pci_device_id *pci_match_device(const struct pci_device_id *ids, const struct pci_dev *dev);
 unsigned int pci_do_scan_bus(struct pci_bus *bus);
 struct pci_bus * pci_add_new_bus(struct pci_bus *parent, struct pci_dev *dev, int busnr);
+int pci_scan_bridge(struct pci_bus *bus, struct pci_dev * dev, int max, int pass);
 
 /* kmem_cache style wrapper around pci_alloc_consistent() */
 struct pci_pool *pci_pool_create (const char *name, struct pci_dev *dev,

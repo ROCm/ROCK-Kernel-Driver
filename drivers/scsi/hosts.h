@@ -57,9 +57,6 @@ typedef struct scsi_disk Disk;
 
 typedef struct	SHT
 {
-
-    struct list_head	shtp_list;
-
     /* Used with loadable modules so that we know when it is safe to unload */
     struct module * module;
 
@@ -95,12 +92,6 @@ typedef struct	SHT
      * especially that scsi_malloc/scsi_free must not be called.
      */
     int (* detect)(struct SHT *);
-
-    /*
-     * This function is only used by one driver and will be going away
-     * once it switches over to using the slave_detach() function instead.
-     */
-    int (*revoke)(Scsi_Device *);
 
     /* Used with loadable modules to unload the host structures.  Note:
      * there is a default action built into the modules code which may
@@ -192,7 +183,7 @@ typedef struct	SHT
 
     /*
      * Old EH handlers, no longer used. Make them warn the user of old
-     * drivers by using a wrogn type
+     * drivers by using a wrong type
      */
     int (*abort)(int);
     int (*reset)(int,int);
@@ -520,8 +511,6 @@ typedef struct SHN
 	unsigned short host_registered;
 } Scsi_Host_Name;
 	
-extern struct Scsi_Device_Template * scsi_devicelist;
-
 extern void scsi_proc_host_mkdir(Scsi_Host_Template *);
 extern void scsi_proc_host_add(struct Scsi_Host *);
 extern void scsi_proc_host_rm(struct Scsi_Host *);
@@ -533,8 +522,6 @@ extern void scsi_proc_host_rm(struct Scsi_Host *);
 extern int next_scsi_host;
 
 unsigned int scsi_init(void);
-extern struct Scsi_Host * scsi_register(Scsi_Host_Template *, int);
-extern void scsi_unregister(struct Scsi_Host *);
 extern void scsi_register_blocked_host(struct Scsi_Host *);
 extern void scsi_deregister_blocked_host(struct Scsi_Host *);
 
@@ -567,13 +554,7 @@ struct Scsi_Device_Template
     const char * tag;
     struct module * module;	  /* Used for loadable modules */
     unsigned char scsi_type;
-    unsigned int nr_dev;	  /* Number currently attached */
-    unsigned int dev_noticed;	  /* Number of devices detected. */
-    unsigned int dev_max;	  /* Current size of arrays */
-    unsigned blk:1;		  /* 0 if character device */
     int (*detect)(Scsi_Device *); /* Returns 1 if we can attach this device */
-    int (*init)(void);		  /* Sizes arrays based upon number of devices
-		   *  detected */
     int (*attach)(Scsi_Device *); /* Attach devices to arrays */
     void (*detach)(Scsi_Device *);
     int (*init_command)(Scsi_Cmnd *);     /* Used by new queueing code. 
@@ -585,10 +566,26 @@ void  scsi_initialize_queue(Scsi_Device *, struct Scsi_Host *);
 
 
 /*
- * Driver registration/unregistration.
+ * Highlevel driver registration/unregistration.
  */
 extern int scsi_register_device(struct Scsi_Device_Template *);
 extern int scsi_unregister_device(struct Scsi_Device_Template *);
+
+/*
+ * HBA allocation/freeing.
+ */
+extern struct Scsi_Host * scsi_register(Scsi_Host_Template *, int);
+extern void scsi_unregister(struct Scsi_Host *);
+
+/*
+ * HBA registration/unregistration.
+ */
+extern int scsi_add_host(struct Scsi_Host *);
+extern int scsi_remove_host(struct Scsi_Host *);
+
+/*
+ * Legacy HBA template registration/unregistration.
+ */
 extern int scsi_register_host(Scsi_Host_Template *);
 extern int scsi_unregister_host(Scsi_Host_Template *);
 
@@ -604,28 +601,6 @@ extern void scsi_host_hn_release(void);
 extern void scsi_host_busy_inc(struct Scsi_Host *, Scsi_Device *);
 extern void scsi_host_busy_dec_and_test(struct Scsi_Host *, Scsi_Device *);
 extern void scsi_host_failed_inc_and_test(struct Scsi_Host *);
-
-/*
- * This is an ugly hack.  If we expect to be able to load devices at run time,
- * we need to leave extra room in some of the data structures.	Doing a
- * realloc to enlarge the structures would be riddled with race conditions,
- * so until a better solution is discovered, we use this crude approach
- *
- * Even bigger hack for SparcSTORAGE arrays. Those are at least 6 disks, but
- * usually up to 30 disks, so everyone would need to change this. -jj
- *
- * Note: These things are all evil and all need to go away.  My plan is to
- * tackle the character devices first, as there aren't any locking implications
- * in the block device layer.   The block devices will require more work.
- *
- * The generics driver has been updated to resize as required.  So as the tape
- * driver. Two down, two more to go.
- */
-#ifndef CONFIG_SR_EXTRA_DEVS
-#define CONFIG_SR_EXTRA_DEVS 2
-#endif
-#define SR_EXTRA_DEVS CONFIG_SR_EXTRA_DEVS
-
 
 /**
  * scsi_find_device - find a device given the host

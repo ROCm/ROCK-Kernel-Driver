@@ -26,6 +26,14 @@
 # endif
 #endif
 
+/*
+ * We have mapped the sa1101 depending on the value of SA1101_BASE.
+ * It then appears from 0xf4000000.
+ */
+
+#define SA1101_p2v( x )         ((x) - SA1101_BASE + 0xf4000000)
+#define SA1101_v2p( x )         ((x) - 0xf4000000  + SA1101_BASE)
+
 #ifndef SA1101_p2v
 #define SA1101_p2v(PhAdd)  (PhAdd)
 #endif

@@ -337,7 +337,6 @@ config PREEMPT
 
 config X86_UP_APIC
 	bool "Local APIC support on uniprocessors" if !SMP
-	default y if SMP
 	---help---
 	  A local APIC (Advanced Programmable Interrupt Controller) is an
 	  integrated interrupt controller in the CPU. If you have a single-CPU
@@ -447,7 +446,7 @@ config X86_MCE
 	  the 386 and 486, so nearly everyone can say Y here.
 
 config X86_MCE_NONFATAL
-	bool "Check for non-fatal errors on Athlon/Duron"
+	bool "Check for non-fatal errors on AMD Athlon/Duron / Intel Pentium 4"
 	depends on X86_MCE
 	help
 	  Enabling this feature starts a timer that triggers every 5 seconds which
@@ -456,12 +455,12 @@ config X86_MCE_NONFATAL
 	  Disable this if you don't want to see these messages.
 	  Seeing the messages this option prints out may be indicative of dying hardware,
 	  or out-of-spec (ie, overclocked) hardware.
-	  This option only does something on hardware with Intel P6 style MCE.
-	  (Pentium Pro and above, AMD Athlon/Duron)
+	  This option only does something on certain CPUs.
+	  (AMD Athlon/Duron and Intel Pentium 4)
 
 config X86_MCE_P4THERMAL
 	bool "check for P4 thermal throttling interrupt."
-	depends on X86_MCE && X86_UP_APIC
+	depends on X86_MCE && (X86_UP_APIC || SMP)
 	help
 	  Enabling this feature will cause a message to be printed when the P4
 	  enters thermal throttling.

@@ -515,6 +515,8 @@ static void tc574_config(dev_link_t *link)
 		lp->autoselect = config.u.autoselect;
 	}
 
+	init_timer(&lp->media);
+
 	{
 		int phy;
 		

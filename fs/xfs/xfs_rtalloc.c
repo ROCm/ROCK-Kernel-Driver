@@ -2264,9 +2264,9 @@ xfs_rtmount_init(
 	sbp = &mp->m_sb;
 	if (sbp->sb_rblocks == 0)
 		return 0;
-	if (mp->m_rtdev_targp != NULL) {
-		printk(KERN_WARNING
-		"XFS: This FS has an RT subvol - specify -o rtdev on mount\n");
+	if (mp->m_rtdev_targp == NULL) {
+		cmn_err(CE_WARN,
+	"XFS: This filesystem has a realtime volume, use rtdev=device option");
 		return XFS_ERROR(ENODEV);
 	}
 	mp->m_rsumlevels = sbp->sb_rextslog + 1;
@@ -2280,15 +2280,15 @@ xfs_rtmount_init(
 	 */
 	d = (xfs_daddr_t)XFS_FSB_TO_BB(mp, mp->m_sb.sb_rblocks);
 	if (XFS_BB_TO_FSB(mp, d) != mp->m_sb.sb_rblocks) {
-		printk(KERN_WARNING "XFS: RT mount - %llu != %llu\n",
+		cmn_err(CE_WARN, "XFS: realtime mount -- %llu != %llu",
 			(unsigned long long) XFS_BB_TO_FSB(mp, d),
 			(unsigned long long) mp->m_sb.sb_rblocks);
 		return XFS_ERROR(E2BIG);
 	}
 	error = xfs_read_buf(mp, mp->m_rtdev_targp, d - 1, 1, 0, &bp);
 	if (error) {
-		printk(KERN_WARNING
-			"XFS: RT mount - xfs_read_buf returned %d\n", error);
+		cmn_err(CE_WARN,
+	"XFS: realtime mount -- xfs_read_buf failed, returned %d", error);
 		if (error == ENOSPC)
 			return XFS_ERROR(E2BIG);
 		return error;

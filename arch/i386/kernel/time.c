@@ -61,6 +61,7 @@
 #include <asm/arch_hooks.h>
 
 extern spinlock_t i8259A_lock;
+int pit_latch_buggy;              /* extern */
 
 #include "do_timer.h"
 

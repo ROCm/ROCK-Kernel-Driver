@@ -29,9 +29,15 @@
  *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-
 #ifndef __XFS_LRW_H__
 #define __XFS_LRW_H__
+
+struct vnode;
+struct bhv_desc;
+struct xfs_mount;
+struct xfs_iocore;
+struct page_buf_s;
+struct page_buf_bmap_s;
 
 #define XFS_IOMAP_READ_ENTER	3
 /*
@@ -39,31 +45,23 @@
  */
 #define XFS_MAX_RW_NBMAPS	4
 
-extern int xfs_bmap (bhv_desc_t *, xfs_off_t, ssize_t, int, page_buf_bmap_t *, int *);
-extern int xfsbdstrat (struct xfs_mount *, struct xfs_buf *);
-extern int xfs_bdstrat_cb (struct xfs_buf *);
+extern int xfs_bmap (struct bhv_desc *, xfs_off_t, ssize_t, int,
+			struct page_buf_bmap_s *, int *);
+extern int xfsbdstrat (struct xfs_mount *, struct page_buf_s *);
+extern int xfs_bdstrat_cb (struct page_buf_s *);
 
-extern int xfs_zero_eof (vnode_t *, struct xfs_iocore *, xfs_off_t,
+extern int xfs_zero_eof (struct vnode *, struct xfs_iocore *, xfs_off_t,
 				xfs_fsize_t, xfs_fsize_t);
-extern ssize_t xfs_read (
-	struct bhv_desc		*bdp,
-	struct file		*filp,
-	const struct iovec	*iovp,
-	unsigned long		segs,
-	loff_t			*offp,
-	struct cred		*credp);
+extern ssize_t xfs_read (struct bhv_desc *, struct file *,
+				const struct iovec *, unsigned long,
+				loff_t *, struct cred *);
+extern ssize_t xfs_write (struct bhv_desc *, struct file *,
+				const struct iovec *, unsigned long,
+				loff_t *, struct cred *);
 
-extern ssize_t xfs_write (
-	struct bhv_desc		*bdp,
-	struct file		*filp,
-	const struct iovec	*iovp,
-	unsigned long		segs,
-	loff_t			*offp,
-	struct cred		*credp);
+extern int xfs_dev_is_read_only (struct xfs_mount *, char *);
 
-extern int xfs_dev_is_read_only(xfs_mount_t *, char *);
-
-extern void XFS_log_write_unmount_ro (bhv_desc_t *);
+extern void XFS_log_write_unmount_ro (struct bhv_desc *);
 
 #define XFS_FSB_TO_DB_IO(io,fsb) \
 		(((io)->io_flags & XFS_IOCORE_RT) ? \

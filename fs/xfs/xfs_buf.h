@@ -203,7 +203,6 @@ extern inline xfs_caddr_t xfs_buf_offset(page_buf_t *bp, off_t offset)
 
 static inline int	xfs_bawrite(void *mp, page_buf_t *bp)
 {
-	extern int	xfs_bdstrat_cb(struct xfs_buf *);
 	int ret;
 
 	bp->pb_fspriv3 = mp;
@@ -278,8 +277,6 @@ static inline int	XFS_bwrite(page_buf_t *pb)
 
 static inline int xfs_bdwrite(void *mp, page_buf_t *bp)
 {
-	extern int	xfs_bdstrat_cb(struct xfs_buf *);
-
 	bp->pb_strat = xfs_bdstrat_cb;
 	bp->pb_fspriv3 = mp;
 

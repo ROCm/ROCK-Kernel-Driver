@@ -11,7 +11,7 @@
 
     Copyright (C) 1999 David A. Hinds -- dahinds@users.sourceforge.net
 
-    pcnet_cs.c 1.144 2001/11/07 04:06:56
+    pcnet_cs.c 1.149 2002/06/29 06:27:37
     
     The network driver code is based on Donald Becker's NE2000 code:
 
@@ -75,7 +75,7 @@ static int pc_debug = PCMCIA_DEBUG;
 MODULE_PARM(pc_debug, "i");
 #define DEBUG(n, args...) if (pc_debug>(n)) printk(KERN_DEBUG args)
 static char *version =
-"pcnet_cs.c 1.144 2001/11/07 04:06:56 (David Hinds)";
+"pcnet_cs.c 1.149 2002/06/29 06:27:37 (David Hinds)";
 #else
 #define DEBUG(n, args...)
 #endif
@@ -765,12 +765,13 @@ static void pcnet_config(dev_link_t *link)
 
     strcpy(info->node.dev_name, dev->name);
     link->dev = &info->node;
-    link->state &= ~DEV_CONFIG_PENDING;
 
     if (info->flags & (IS_DL10019|IS_DL10022)) {
 	u_char id = inb(dev->base_addr + 0x1a);
 	dev->do_ioctl = &ei_ioctl;
 	mii_phy_probe(dev);
+	if ((id == 0x30) && !info->pna_phy && (info->eth_phy == 4))
+	    info->eth_phy = 0;
 	printk(KERN_INFO "%s: NE2000 (DL100%d rev %02x): ",
 	       dev->name, ((info->flags & IS_DL10022) ? 22 : 19), id);
 	if (info->pna_phy)
@@ -787,12 +788,14 @@ static void pcnet_config(dev_link_t *link)
     printk(" hw_addr ");
     for (i = 0; i < 6; i++)
 	printk("%02X%s", dev->dev_addr[i], ((i<5) ? ":" : "\n"));
+    link->state &= ~DEV_CONFIG_PENDING;
     return;
 
 cs_failed:
     cs_error(link->handle, last_fn, last_ret);
 failed:
     pcnet_release((u_long)link);
+    link->state &= ~DEV_CONFIG_PENDING;
     return;
 } /* pcnet_config */
 
@@ -856,7 +859,7 @@ static int pcnet_event(event_t event, int priority,
 	}
 	break;
     case CS_EVENT_CARD_INSERTION:
-	link->state |= DEV_PRESENT;
+	link->state |= DEV_PRESENT | DEV_CONFIG_PENDING;
 	pcnet_config(link);
 	break;
     case CS_EVENT_PM_SUSPEND:
@@ -1034,6 +1037,7 @@ static int pcnet_open(struct net_device *dev)
 
     info->phy_id = info->eth_phy;
     info->link_status = 0x00;
+    init_timer(&info->watchdog);
     info->watchdog.function = &ei_watchdog;
     info->watchdog.data = (u_long)info;
     info->watchdog.expires = jiffies + HZ;
@@ -1051,6 +1055,7 @@ static int pcnet_close(struct net_device *dev)
 
     DEBUG(2, "pcnet_close('%s')\n", dev->name);
 
+    ei_close(dev);
     free_irq(dev->irq, dev);
     
     link->open--;
@@ -1620,7 +1625,7 @@ static int __init init_pcnet_cs(void)
     if (serv.Revision != CS_RELEASE_CODE) {
 	printk(KERN_NOTICE "pcnet_cs: Card Services release "
 	       "does not match!\n");
-	return -1;
+	return -EINVAL;
     }
     register_pccard_driver(&dev_info, &pcnet_attach, &pcnet_detach);
     return 0;

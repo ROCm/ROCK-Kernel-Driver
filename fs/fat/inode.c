@@ -119,7 +119,7 @@ struct inode *fat_build_inode(struct super_block *sb,
 	if (!inode)
 		goto out;
 	inode->i_ino = iunique(sb, MSDOS_ROOT_INO);
-	inode->i_version = 0;
+	inode->i_version = 1;
 	*res = fat_fill_inode(inode, de);
 	if (*res < 0) {
 		iput(inode);
@@ -970,7 +970,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	if (!root_inode)
 		goto out_fail;
 	root_inode->i_ino = MSDOS_ROOT_INO;
-	root_inode->i_version = 0;
+	root_inode->i_version = 1;
 	error = fat_read_root(root_inode);
 	if (error < 0)
 		goto out_fail;

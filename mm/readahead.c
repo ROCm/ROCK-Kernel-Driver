@@ -42,6 +42,46 @@ static inline unsigned long get_min_readahead(struct file_ra_state *ra)
 	return (VM_MIN_READAHEAD * 1024) / PAGE_CACHE_SIZE;
 }
 
+/**
+ * read_cache_pages - populate an address space with some pages, and
+ * 			start reads against them.
+ * @mapping: the address_space
+ * @pages: The address of a list_head which contains the target pages.  These
+ *   pages have their ->index populated and are otherwise uninitialised.
+ * @filler: callback routine for filling a single page.
+ * @data: private data for the callback routine.
+ *
+ * Hides the details of the LRU cache etc from the filesystems.
+ */
+int
+read_cache_pages(struct address_space *mapping,
+		 struct list_head *pages,
+		 int (*filler)(void *, struct page *),
+		 void *data)
+{
+	struct page *page;
+	struct pagevec lru_pvec;
+	int ret = 0;
+
+	pagevec_init(&lru_pvec, 0);
+
+	while (!list_empty(pages)) {
+		page = list_entry(pages->prev, struct page, list);
+		list_del(&page->list);
+		if (add_to_page_cache(page, mapping, page->index)) {
+			page_cache_release(page);
+			continue;
+		}
+		ret = filler(data, page);
+		if (!pagevec_add(&lru_pvec, page))
+			__pagevec_lru_add(&lru_pvec);
+		if (ret)
+			break;
+	}
+	pagevec_lru_add(&lru_pvec);
+	return ret;
+}
+
 static int
 read_pages(struct address_space *mapping, struct file *filp,
 		struct list_head *pages, unsigned nr_pages)
@@ -52,7 +92,7 @@ read_pages(struct address_space *mapping, struct file *filp,
 	pagevec_init(&lru_pvec, 0);
 
 	if (mapping->a_ops->readpages)
-		return mapping->a_ops->readpages(mapping, pages, nr_pages);
+		return mapping->a_ops->readpages(filp, mapping, pages, nr_pages);
 
 	for (page_idx = 0; page_idx < nr_pages; page_idx++) {
 		struct page *page = list_entry(pages->prev, struct page, list);
