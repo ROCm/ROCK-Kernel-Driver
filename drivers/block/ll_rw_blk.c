@@ -149,8 +149,8 @@ static int __blk_cleanup_queue(struct list_head *head)
 		return 0;
 
 	do {
-		rq = list_entry(head->next, struct request, table);
-		list_del(&rq->table);
+		rq = list_entry(head->next, struct request, queue);
+		list_del(&rq->queue);
 		kmem_cache_free(request_cachep, rq);
 		i++;
 	} while (!list_empty(head));
@@ -349,7 +349,7 @@ static void blk_init_free_list(request_queue_t *q)
 		}
 		memset(rq, 0, sizeof(struct request));
 		rq->rq_status = RQ_INACTIVE;
-		list_add(&rq->table, &q->request_freelist[i & 1]);
+		list_add(&rq->queue, &q->request_freelist[i & 1]);
 	}
 
 	init_waitqueue_head(&q->wait_for_request);
@@ -415,7 +415,7 @@ void blk_init_queue(request_queue_t * q, request_fn_proc * rfn)
 	q->head_active    	= 1;
 }
 
-#define blkdev_free_rq(list) list_entry((list)->next, struct request, table);
+#define blkdev_free_rq(list) list_entry((list)->next, struct request, queue);
 /*
  * Get a free request. io_request_lock must be held and interrupts
  * disabled on the way in.
@@ -426,7 +426,7 @@ static inline struct request *get_request(request_queue_t *q, int rw)
 
 	if (!list_empty(&q->request_freelist[rw])) {
 		rq = blkdev_free_rq(&q->request_freelist[rw]);
-		list_del(&rq->table);
+		list_del(&rq->queue);
 		rq->rq_status = RQ_ACTIVE;
 		rq->special = NULL;
 		rq->q = q;
@@ -570,7 +570,7 @@ inline void blkdev_release_request(struct request *req)
 		/*
 		 * Add to pending free list and batch wakeups
 		 */
-		list_add(&req->table, &q->pending_freelist[rw]);
+		list_add(&req->queue, &q->pending_freelist[rw]);
 
 		if (++q->pending_free[rw] >= batch_requests) {
 			int wake_up = q->pending_free[rw];

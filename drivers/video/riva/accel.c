@@ -207,10 +207,11 @@ static void fbcon_riva8_putcs(struct vc_data *conp, struct display *p,
 	xx *= fontwidth(p);
 	yy *= fontheight(p);
 
+	c = scr_readw(s);
+	fgx = attr_fgcol(p, c);
+	bgx = attr_bgcol(p, c);
 	while (count--) {
 		c = scr_readw(s++);
-		fgx = attr_fgcol(p,c);
-		bgx = attr_bgcol(p,c);
 		fbcon_riva_writechr(conp, p, c, fgx, bgx, yy, xx);
 		xx += fontwidth(p);
 	}
@@ -321,12 +322,13 @@ static void fbcon_riva16_putcs(struct vc_data *conp, struct display *p,
 	xx *= fontwidth(p);
 	yy *= fontheight(p);
 
+	c = scr_readw(s);
+	fgx = ((u16 *)p->dispsw_data)[attr_fgcol(p, c)];
+	bgx = ((u16 *)p->dispsw_data)[attr_bgcol(p, c)];
+	if (p->var.green.length == 6)
+		convert_bgcolor_16(&bgx);
 	while (count--) {
 		c = scr_readw(s++);
-		fgx = ((u16 *)p->dispsw_data)[attr_fgcol(p,c)];
-		bgx = ((u16 *)p->dispsw_data)[attr_bgcol(p,c)];
-		if (p->var.green.length == 6)
-			convert_bgcolor_16(&bgx);
 		fbcon_riva_writechr(conp, p, c, fgx, bgx, yy, xx);
 		xx += fontwidth(p);
 	}
@@ -396,10 +398,11 @@ static void fbcon_riva32_putcs(struct vc_data *conp, struct display *p,
 	xx *= fontwidth(p);
 	yy *= fontheight(p);
 
+	c = scr_readw(s);
+	fgx = ((u32 *)p->dispsw_data)[attr_fgcol(p, c)];
+	bgx = ((u32 *)p->dispsw_data)[attr_bgcol(p, c)];
 	while (count--) {
 		c = scr_readw(s++);
-		fgx = ((u32 *)p->dispsw_data)[attr_fgcol(p,c)];
-		bgx = ((u32 *)p->dispsw_data)[attr_bgcol(p,c)];
 		fbcon_riva_writechr(conp, p, c, fgx, bgx, yy, xx);
 		xx += fontwidth(p);
 	}

@@ -19,7 +19,6 @@ typedef struct elevator_s elevator_t;
 struct request {
 	struct list_head queue;
 	int elevator_sequence;
-	struct list_head table;
 
 	volatile int rq_status;	/* should split this into a few status bits */
 #define RQ_INACTIVE		(-1)

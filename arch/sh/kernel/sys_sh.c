@@ -68,7 +68,10 @@ unsigned long arch_get_unmapped_area(struct file *filp, unsigned long addr,
 	if (!addr)
 		addr = TASK_UNMAPPED_BASE;
 
-	addr = COLOUR_ALIGN(addr);
+	if (flags & MAP_PRIVATE)
+		addr = PAGE_ALIGN(addr);
+	else
+		addr = COLOUR_ALIGN(addr);
 
 	for (vma = find_vma(current->mm, addr); ; vma = vma->vm_next) {
 		/* At this point:  (!vma || addr < vma->vm_end). */
@@ -77,7 +80,8 @@ unsigned long arch_get_unmapped_area(struct file *filp, unsigned long addr,
 		if (!vma || addr + len <= vma->vm_start)
 			return addr;
 		addr = vma->vm_end;
-		addr = COLOUR_ALIGN(addr);
+		if (!(flags & MAP_PRIVATE))
+			addr = COLOUR_ALIGN(addr);
 	}
 }
 #endif

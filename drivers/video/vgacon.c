@@ -487,7 +487,7 @@ static int vgacon_switch(struct vc_data *c)
 	vga_video_num_columns = c->vc_cols;
 	vga_video_num_lines = c->vc_rows;
 	if (!vga_is_gfx)
-		scr_memcpyw_to((u16 *) c->vc_origin, (u16 *) c->vc_screenbuf, c->vc_screenbuf_size);
+		scr_memcpyw((u16 *) c->vc_origin, (u16 *) c->vc_screenbuf, c->vc_screenbuf_size);
 	return 0;	/* Redrawing not needed */
 }
 
@@ -978,7 +978,7 @@ static void vgacon_save_screen(struct vc_data *c)
 		c->vc_y = ORIG_Y;
 	}
 	if (!vga_is_gfx)
-		scr_memcpyw_from((u16 *) c->vc_screenbuf, (u16 *) c->vc_origin, c->vc_screenbuf_size);
+		scr_memcpyw((u16 *) c->vc_screenbuf, (u16 *) c->vc_origin, c->vc_screenbuf_size);
 }
 
 static int vgacon_scroll(struct vc_data *c, int t, int b, int dir, int lines)

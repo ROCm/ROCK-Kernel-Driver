@@ -764,6 +764,7 @@ void free_ring(struct net_device* dev)
 			    RX_RING_SIZE * sizeof(struct rx_desc) +
 			    TX_RING_SIZE * sizeof(struct tx_desc),
 			    np->rx_ring, np->rx_ring_dma);
+	np->tx_ring = NULL;
 
 	if (np->tx_bufs)
 		pci_free_consistent(np->pdev, PKT_BUF_SZ * TX_RING_SIZE,
@@ -1595,11 +1596,6 @@ static void __devexit via_rhine_remove_one (struct pci_dev *pdev)
 #ifndef USE_IO
 	iounmap((char *)(dev->base_addr));
 #endif
-
-	pci_free_consistent(pdev, 
-			    RX_RING_SIZE * sizeof(struct rx_desc) +
-			    TX_RING_SIZE * sizeof(struct tx_desc),
-			    np->rx_ring, np->rx_ring_dma);
 
 	kfree(dev);
 

@@ -1555,7 +1555,7 @@ static int fd_ioctl(struct inode *inode, struct file *filp,
 			return -EFAULT;
 		break;
 	case BLKGETSIZE:
-		return put_user(unit[drive].blocks,(long *)param);
+		return put_user(unit[drive].blocks,(unsigned long *)param);
 		break;
 	case BLKGETSIZE64:
 		return put_user((u64)unit[drive].blocks << 9, (u64 *)param);

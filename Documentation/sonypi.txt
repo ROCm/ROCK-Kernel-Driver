@@ -55,7 +55,9 @@ where:
 			in order to let the driver access to the camera
 
 	fnkeyinit:	on some Vaios (C1VE, C1VR etc), the Fn key events don't
-			get enabled unless you set this parameter to 1
+			get enabled unless you set this parameter to 1.
+			Do not use this option unless it's actually necessary,
+			some Vaio models don't deal well with this option.
 
 	verbose:	print unknown events from the sonypi device
 
@@ -71,7 +73,7 @@ In order to automatically load the sonypi module on use, you can put those
 lines in your /etc/modules.conf file:
 
 	alias char-major-10-250 sonypi
-	options sonypi minor=250 fnkeyinit=1
+	options sonypi minor=250
 
 This supposes the use of minor 250 for the sonypi device:
 

@@ -1604,7 +1604,7 @@ static void __init init_centaur(struct cpuinfo_x86 *c)
 
 		case 6:
 			switch (c->x86_model) {
-				case 6 ... 7:		/* Cyrix III or C3 */
+				case 6 ... 8:		/* Cyrix III family */
 					rdmsr (MSR_VIA_FCR, lo, hi);
 					lo |= (1<<1 | 1<<7);	/* Report CX8 & enable PGE */
 					wrmsr (MSR_VIA_FCR, lo, hi);

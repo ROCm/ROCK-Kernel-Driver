@@ -889,7 +889,7 @@ static void init_inode (struct inode * inode, struct path * path)
 	inode->i_ctime = sd_v1_ctime(sd);
 
 	inode->i_blocks = sd_v1_blocks(sd);
-	inode->i_generation = INODE_PKEY (inode)->k_dir_id;
+	inode->i_generation = le32_to_cpu (INODE_PKEY (inode)->k_dir_id);
 	blocks = (inode->i_size + 511) >> 9;
 	blocks = _ROUND_UP (blocks, inode->i_blksize >> 9);
 	if (inode->i_blocks > blocks) {
@@ -922,7 +922,7 @@ static void init_inode (struct inode * inode, struct path * path)
 	inode->i_blocks = sd_v2_blocks(sd);
         rdev            = sd_v2_rdev(sd);
 	if( S_ISCHR( inode -> i_mode ) || S_ISBLK( inode -> i_mode ) )
-	    inode->i_generation = INODE_PKEY (inode)->k_dir_id;
+	    inode->i_generation = le32_to_cpu (INODE_PKEY (inode)->k_dir_id);
 	else
             inode->i_generation = sd_v2_generation(sd);
 
@@ -1459,7 +1459,7 @@ struct inode * reiserfs_new_inode (struct reiserfs_transaction_handle *th,
       ** note that the private part of inode isn't filled in yet, we have
       ** to use the directory.
       */
-      inode->i_generation = INODE_PKEY (dir)->k_objectid;
+      inode->i_generation = le32_to_cpu (INODE_PKEY (dir)->k_objectid);
     else
 #if defined( USE_INODE_GENERATION_COUNTER )
       inode->i_generation = 

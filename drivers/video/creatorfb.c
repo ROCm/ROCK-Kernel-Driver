@@ -475,11 +475,13 @@ static void ffb_putcs(struct vc_data *conp, struct display *p, const unsigned sh
 	unsigned long flags;
 	int i, xy;
 	u8 *fd1, *fd2, *fd3, *fd4;
+	u16 c;
 	u64 fgbg;
 
 	spin_lock_irqsave(&fb->lock, flags);
-	fgbg = (((u64)(((u32 *)p->dispsw_data)[attr_fgcol(p,scr_readw(s))])) << 32) |
-	       ((u32 *)p->dispsw_data)[attr_bgcol(p,scr_readw(s))];
+	c = scr_readw(s);
+	fgbg = (((u64)(((u32 *)p->dispsw_data)[attr_fgcol(p, c)])) << 32) |
+	       ((u32 *)p->dispsw_data)[attr_bgcol(p, c)];
 	if (fgbg != *(u64 *)&fb->s.ffb.fg_cache) {
 		FFBFifo(fb, 2);
 		upa_writeq(fgbg, &fbc->fg);

@@ -386,10 +386,10 @@ static int shmem_unuse_inode (struct shmem_inode_info *info, swp_entry_t entry, 
 	spin_unlock (&info->lock);
 	return 0;
 found:
+	delete_from_swap_cache(page);
 	add_to_page_cache(page, info->inode->i_mapping, offset + idx);
 	SetPageDirty(page);
 	SetPageUptodate(page);
-	UnlockPage(page);
 	info->swapped--;
 	spin_unlock(&info->lock);
 	return 1;
@@ -531,10 +531,8 @@ repeat:
 		if (!page) {
 			swp_entry_t swap = *entry;
 			spin_unlock (&info->lock);
-			lock_kernel();
 			swapin_readahead(*entry);
 			page = read_swap_cache_async(*entry);
-			unlock_kernel();
 			if (!page) {
 				if (entry->val != swap.val)
 					goto repeat;

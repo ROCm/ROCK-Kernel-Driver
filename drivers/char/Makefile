@@ -229,8 +229,13 @@ obj-$(CONFIG_21285_WATCHDOG) += wdt285.o
 obj-$(CONFIG_977_WATCHDOG) += wdt977.o
 obj-$(CONFIG_I810_TCO) += i810-tco.o
 obj-$(CONFIG_MACHZ_WDT) += machzwd.o
+obj-$(CONFIG_SH_WDT) += shwdt.o
 obj-$(CONFIG_SOFT_WATCHDOG) += softdog.o
 
+subdir-$(CONFIG_MWAVE) += mwave
+ifeq ($(CONFIG_MWAVE),y)
+  obj-y += mwave/mwave.o
+endif
 
 include $(TOPDIR)/Rules.make
 

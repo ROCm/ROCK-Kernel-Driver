@@ -579,6 +579,7 @@ CONFIG_DRM_RADEON=y
 # PCMCIA character devices
 #
 # CONFIG_PCMCIA_SERIAL_CS is not set
+# CONFIG_MWAVE is not set
 
 #
 # Multimedia devices

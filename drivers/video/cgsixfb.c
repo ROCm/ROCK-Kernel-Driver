@@ -364,13 +364,15 @@ static void cg6_putcs(struct vc_data *conp, struct display *p, const unsigned sh
 	unsigned long flags;
 	int i, x, y;
 	u8 *fd1, *fd2, *fd3, *fd4;
+	u16 c;
 
 	spin_lock_irqsave(&fb->lock, flags);
 	do {
 		i = sbus_readl(&fbc->s);
 	} while (i & 0x10000000);
-	sbus_writel(attr_fgcol(p, scr_readw(s)), &fbc->fg);
-	sbus_writel(attr_bgcol(p, scr_readw(s)), &fbc->bg);
+	c = scr_readw(s);
+	sbus_writel(attr_fgcol(p, c), &fbc->fg);
+	sbus_writel(attr_bgcol(p, c), &fbc->bg);
 	sbus_writel(0x140000, &fbc->mode);
 	sbus_writel(0xe880fc30, &fbc->alu);
 	sbus_writel(~0, &fbc->pixelm);

@@ -1600,7 +1600,7 @@ static int fd_ioctl(struct inode *inode, struct file *filp,
 				dtp = UDT;
 		}
 		if (cmd == BLKGETSIZE)
-			return put_user(dtp->blocks, (long *)param);
+			return put_user(dtp->blocks, (unsigned long *)param);
 
 		memset((void *)&getprm, 0, sizeof(getprm));
 		getprm.size = dtp->blocks;

@@ -1131,7 +1131,7 @@ static void sci_free_irq(struct sci_port *port)
 	}
 }
 
-static char banner[] __initdata[] =
+static char banner[] __initdata =
 	KERN_INFO "SuperH SCI(F) driver initialized\n";
 
 int __init sci_init(void)

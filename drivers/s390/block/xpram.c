@@ -171,7 +171,7 @@ static int hardsect = XPRAM_HARDSECT;
 int xpram_devs, xpram_rahead;
 int xpram_blksize, xpram_hardsect;
 int xpram_mem_avail = 0;
-int xpram_sizes[XPRAM_MAX_DEVS];
+unsigned long xpram_sizes[XPRAM_MAX_DEVS];
 
 
 MODULE_PARM(devs,"i");
@@ -649,7 +649,7 @@ int xpram_ioctl (struct inode *inode, struct file *filp,
 		/* Return the device size, expressed in sectors */
 		return put_user( 1024* xpram_sizes[MINOR(inode->i_rdev)]
                            / XPRAM_SOFTSECT,
-			   (long *) arg);
+			   (unsigned long *) arg);
 
 	case BLKGETSIZE64:
 		return put_user( (u64)(1024* xpram_sizes[MINOR(inode->i_rdev)]

@@ -1,5 +1,5 @@
 /*
- *	drivers/i2o/i2o_lan.c
+ *	drivers/message/i2o/i2o_lan.c
  *
  * 	I2O LAN CLASS OSM 		May 26th 2000
  *

@@ -236,8 +236,9 @@ void fbcon_vga_planes_putc(struct vc_data *conp, struct display *p, int c, int y
 void fbcon_ega_planes_putcs(struct vc_data *conp, struct display *p, const unsigned short *s,
 		   int count, int yy, int xx)
 {
-	int fg = attr_fgcol(p,scr_readw(s));
-	int bg = attr_bgcol(p,scr_readw(s));
+	u16 c = scr_readw(s);
+	int fg = attr_fgcol(p, c);
+	int bg = attr_bgcol(p, c);
 
 	char *where;
 	int n;
@@ -274,8 +275,9 @@ void fbcon_ega_planes_putcs(struct vc_data *conp, struct display *p, const unsig
 void fbcon_vga_planes_putcs(struct vc_data *conp, struct display *p, const unsigned short *s,
 		   int count, int yy, int xx)
 {
-	int fg = attr_fgcol(p,*s);
-	int bg = attr_bgcol(p,*s);
+	u16 c = scr_readw(s);
+	int fg = attr_fgcol(p, c);
+	int bg = attr_bgcol(p, c);
 
 	char *where;
 	int n;
@@ -295,7 +297,7 @@ void fbcon_vga_planes_putcs(struct vc_data *conp, struct display *p, const unsig
 	wmb();
 	for (n = 0; n < count; n++) {
 		int y;
-		int c = *s++ & p->charmask;
+		int c = scr_readw(s++) & p->charmask;
 		u8 *cdat = p->fontdata + (c & p->charmask) * fontheight(p);
 
 		for (y = 0; y < fontheight(p); y++, cdat++) {

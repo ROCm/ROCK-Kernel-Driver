@@ -1,4 +1,4 @@
-/* $Id: ptrace.c,v 1.12 2001/07/23 00:00:56 gniibe Exp $
+/* $Id: ptrace.c,v 1.13 2001/10/01 02:21:50 gniibe Exp $
  *
  * linux/arch/sh/kernel/ptrace.c
  *

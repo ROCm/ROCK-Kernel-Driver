@@ -135,9 +135,6 @@ if [ "$CONFIG_FB" = "y" ]; then
 	 if [ "$CONFIG_FB_ATY" != "n" ]; then
 	    bool '    Mach64 GX support (EXPERIMENTAL)' CONFIG_FB_ATY_GX
 	    bool '    Mach64 CT/VT/GT/LT (incl. 3D RAGE) support' CONFIG_FB_ATY_CT
-	       if [ "$CONFIG_FB_ATY_CT" = "y" ]; then
-	          bool '      Sony Vaio C1VE 1024x480 LCD support' CONFIG_FB_ATY_CT_VAIO_LCD
-	       fi
 	 fi
  	 tristate '  ATI Radeon display support (EXPERIMENTAL)' CONFIG_FB_RADEON
 	 tristate '  ATI Rage128 display support (EXPERIMENTAL)' CONFIG_FB_ATY128
@@ -198,13 +195,6 @@ if [ "$CONFIG_FB" = "y" ]; then
    fi
    if [ "$CONFIG_NINO" = "y" ]; then
       bool '  TMPTX3912/PR31700 frame buffer support' CONFIG_FB_TX3912
-   fi
-   if [ "$CONFIG_DECSTATION" = "y" ]; then
-     if [ "$CONFIG_TC" = "y" ]; then
-       bool '  PMAG-BA TURBOchannel framebuffer support' CONFIG_FB_PMAG_BA
-       bool '  PMAGB-B TURBOchannel framebuffer spport' CONFIG_FB_PMAGB_B
-       bool '  Maxine (Personal DECstation) onboard framebuffer spport' CONFIG_FB_MAXINE
-     fi
    fi
    if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
       tristate '  Virtual Frame Buffer support (ONLY FOR TESTING!)' CONFIG_FB_VIRTUAL

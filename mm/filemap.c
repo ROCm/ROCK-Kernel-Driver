@@ -1591,9 +1591,10 @@ struct page * filemap_nopage(struct vm_area_struct * area,
 	struct address_space *mapping = file->f_dentry->d_inode->i_mapping;
 	struct inode *inode = mapping->host;
 	struct page *page, **hash, *old_page;
-	unsigned long size, pgoff;
+	unsigned long size, pgoff, endoff;
 
 	pgoff = ((address - area->vm_start) >> PAGE_CACHE_SHIFT) + area->vm_pgoff;
+	endoff = ((area->vm_end - area->vm_start) >> PAGE_CACHE_SHIFT) + area->vm_pgoff;
 
 retry_all:
 	/*
@@ -1603,6 +1604,10 @@ retry_all:
 	size = (inode->i_size + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
 	if ((pgoff >= size) && (area->vm_mm == current->mm))
 		return NULL;
+
+	/* The "size" of the file, as far as mmap is concerned, isn't bigger than the mapping */
+	if (size > endoff)
+		size = endoff;
 
 	/*
 	 * Do we have something in the page cache already?
@@ -2307,7 +2312,7 @@ static unsigned char mincore_page(struct vm_area_struct * vma,
 	unsigned long pgoff)
 {
 	unsigned char present = 0;
-	struct address_space * as = &vma->vm_file->f_dentry->d_inode->i_data;
+	struct address_space * as = &vma->vm_file->f_dentry->d_inode->i_mapping;
 	struct page * page, ** hash = page_hash(as, pgoff);
 
 	spin_lock(&pagecache_lock);

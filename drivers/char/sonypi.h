@@ -35,7 +35,7 @@
 #ifdef __KERNEL__
 
 #define SONYPI_DRIVER_MAJORVERSION	1
-#define SONYPI_DRIVER_MINORVERSION	6
+#define SONYPI_DRIVER_MINORVERSION	7
 
 #include <linux/types.h>
 #include <linux/pci.h>

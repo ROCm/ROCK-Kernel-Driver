@@ -111,8 +111,8 @@ static int pdcraid_ioctl(struct inode *inode, struct file *file, unsigned int cm
  			if (!arg)  return -EINVAL;
 			sectors = ataraid_gendisk.part[MINOR(inode->i_rdev)].nr_sects;
 			if (MINOR(inode->i_rdev)&15)
-				return put_user(sectors, (long *) arg);
-			return put_user(raid[minor].sectors , (long *) arg);
+				return put_user(sectors, (unsigned long *) arg);
+			return put_user(raid[minor].sectors , (unsigned long *) arg);
 			break;
 			
 

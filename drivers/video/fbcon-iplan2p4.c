@@ -374,8 +374,9 @@ void fbcon_iplan2p4_putcs(struct vc_data *conp, struct display *p,
     else
 	dest0 = (p->screen_base + yy * bytes * fontheight(p) +
 		 (xx>>1)*8 + (xx & 1));
-    fgx = expand4l(attr_fgcol(p,scr_readw(s)));
-    bgx = expand4l(attr_bgcol(p,scr_readw(s)));
+    c = scr_readw(s);
+    fgx = expand4l(attr_fgcol(p, c));
+    bgx = expand4l(attr_bgcol(p, c));
     eorx = fgx ^ bgx;
 
     while (count--) {

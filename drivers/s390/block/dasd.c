@@ -2295,9 +2295,9 @@ do_dasd_ioctl (struct inode *inp, /* unsigned */ int no, unsigned long data)
 			break;
         }
 	case BLKGETSIZE:{	/* Return device size */
-			long blocks = major_info->gendisk.sizes 
-                                      [MINOR (inp->i_rdev)] << 1;
-			rc = put_user(blocks, (long *) data);
+			unsigned long blocks = major_info->gendisk.sizes
+						[MINOR (inp->i_rdev)] << 1;
+			rc = put_user(blocks, (unsigned long *) data);
 			break;
 		}
 	case BLKGETSIZE64:{

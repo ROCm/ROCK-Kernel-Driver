@@ -364,8 +364,9 @@ void fbcon_iplan2p2_putcs(struct vc_data *conp, struct display *p,
     else
 	dest0 = (p->screen_base + yy * bytes * fontheight(p) +
 		 (xx>>1)*4 + (xx & 1));
-    fgx = expand2w(COLOR_2P(attr_fgcol(p,scr_readw(s))));
-    bgx = expand2w(COLOR_2P(attr_bgcol(p,scr_readw(s))));
+    c = scr_readw(s);
+    fgx = expand2w(COLOR_2P(attr_fgcol(p, c)));
+    bgx = expand2w(COLOR_2P(attr_bgcol(p, c)));
     eorx = fgx ^ bgx;
 
     while (count--) {

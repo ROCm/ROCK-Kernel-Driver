@@ -640,7 +640,7 @@ static int hd_ioctl(struct inode * inode, struct file * file,
 
          	case BLKGETSIZE:   /* Return device size */
 			return put_user(hd[MINOR(inode->i_rdev)].nr_sects, 
-					(long *) arg);
+					(unsigned long *) arg);
          	case BLKGETSIZE64:
 			return put_user((u64)hd[MINOR(inode->i_rdev)].nr_sects << 9, 
 					(u64 *) arg);

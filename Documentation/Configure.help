@@ -2568,6 +2568,31 @@ CONFIG_PCMCIA_SERIAL_CS
   a module, say M here and read Documentation/modules.txt. If unsure,
   say N.
 
+ACP Modem (Mwave) support
+CONFIG_MWAVE
+  The ACP modem (Mwave) for Linux is a WinModem. It is composed of a
+  kernel driver and a user level application. Together these components
+  support direct attachment to public switched telephone networks (PSTNs)
+  and support selected world wide countries.
+
+  This version of the ACP Modem driver supports the IBM Thinkpad 600E,
+  600, and 770 that include on board ACP modem hardware.
+
+  The modem also supports the standard communications port interface
+  (ttySx) and is compatible with the Hayes AT Command Set.
+
+  The user level application needed to use this driver can be found at
+  the IBM Linux Technology Center (LTC) web site:
+  http://www.ibm.com/linux/ltc/
+
+  If you own one of the above IBM Thinkpads which has the Mwave chipset
+  in it, say Y.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called mwave.o. If you want to compile it as
+  a module, say M here and read Documentation/modules.txt.
+
 /dev/agpgart (AGP Support) (EXPERIMENTAL)
 CONFIG_AGP
   AGP (Accelerated Graphics Port) is a bus system mainly used to
@@ -14851,6 +14876,17 @@ CONFIG_MACHZ_WDT
   The module is called machzwd.o. If you want to compile it as a module,
   say M here and read Documentation/modules.txt.
 
+SuperH 3/4 Watchdog
+CONFIG_SH_WDT
+  This driver adds watchdog support for the integrated watchdog in the
+  SuperH 3 and 4 processors. If you have one of these processors, say Y,
+  otherwise say N.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module is called shwdt.o. If you want to compile it as a module,
+  say M here and read Documentation/modules.txt.
+	      
 Toshiba Laptop support
 CONFIG_TOSHIBA
   This adds a driver to safely access the System Management Mode
@@ -16635,6 +16671,121 @@ CONFIG_PARPORT_SUNBPP
   This driver provides support for the bidirectional parallel port
   found on many Sun machines. Note that many of the newer Ultras
   actually have pc style hardware instead.
+
+# The following options are for Linux when running on the Hitachi
+# SuperH family of RISC microprocessors.
+
+CPU Selection
+CONFIG_CPU_SUBTYPE_SH7707
+  This is the type of your Hitachi SuperH processor. This information is
+  used for optimizing and configuration purposes.
+
+  - "SH7707" for SH7707
+  - "SH7708" for SH7708, SH7708S, SH7708R
+  - "SH7709" for SH7707, SH7709, SH7709A, and SH7729.
+  - "SH7750" for SH7750, SH7750S
+  - "SH7751" for SH7751
+  - "ST40STB1" for ST40STB1
+
+Target machine selection
+CONFIG_SH_GENERIC
+  This is machine type of your target.
+
+  - "Generic" for Generic kernel which might support all of them
+  - "SolutionEngine" for Hitachi SolutionEngine (7709A, 7750, 7750S)
+  - "SolutionEngine7751" for Hitachi SolutionEngine (7751)
+  - "STB1_Harp" for STMicroelectronics HARP
+  - "STB1_Overdrive" for STMicroelectronics Overdrive
+  - "HP620" for HP 'Jornada' 620
+  - "HP680" for HP 'Jornada' 680
+  - "HP690" for HP 'Jornada' 690
+  - "CqREEK" for CQ Publishing CqREEK SH-4
+  - "DMIDA" for DMIDA, industrial data assistant
+  - "EC3104" for Compaq Aero 8000
+  - "Dreamcast" for SEGA Dreamcast
+  - "CAT68701" for CAT 68701 Evaluation Board (SH7708)
+  - "BigSur" for Big Sur Evaluation Board
+  - "SH2000" for SH2000 Evaluation Board (SH7709A)
+  - "ADX" for A&D ADX
+  - "BareCPU" for Bare CPU board such as CqREEK SH-3
+
+  If unsure, select "BareCPU".
+
+Physical memory start address
+CONFIG_MEMORY_START
+  Computers built with Hitachi SuperH processors always
+  map the ROM starting at address zero.  But the processor
+  does not specify the range that RAM takes.  RAM is usually
+  mapped starting at 0c000000, but it may be elsewhere.
+
+  You should set this value to the address of the lowest
+  RAM location.
+
+  A value of 0c000000 will work for most boards.
+
+Directly Connected Compact Flash support
+CONFIG_CF_ENABLER
+  If your board has "Directly Connected" CompactFlash at area 5 or 6, 
+  you may want to enable this option.  Then, you can use CF as
+  primary IDE drive (only tested for SanDisk).
+
+  If in doubt, press "n".
+
+SuperH RTC support
+CONFIG_SH_RTC
+  Selecting this option will allow the Linux kernel to emulate
+  PC's RTC.
+
+  If unsure, say N.
+
+SuperH DMAC support
+CONFIG_SH_DMA
+  Selecting this option will provide same API as PC's Direct Memory
+  Access Controller(8237A) for SuperH DMAC.
+
+  If unsure, say N.
+
+SuperH SCI (serial) support
+CONFIG_SH_SCI
+  Selecting this option will allow the Linux kernel to transfer
+  data over SCI (Serial Communication Interface) and/or SCIF
+  which are built into the Hitachi SuperH processor.
+
+  If unsure, say N.
+
+Use LinuxSH standard BIOS
+CONFIG_SH_STANDARD_BIOS
+  Say Y here if your target has the gdb-sh-stub package from
+  www.m17n.org (or any conforming standard LinuxSH BIOS) in FLASH
+  or EPROM.  The kernel will use standard BIOS calls during boot
+  for various housekeeping tasks.  Note this does not work with
+  WindowsCE machines.  If unsure, say N.
+
+Early printk support
+CONFIG_SH_EARLY_PRINTK
+  If you say Y here, the kernel printk routine will begin output to
+  the console much earlier in the boot process, before the serial
+  console is initialised, instead of buffering output.  Standard
+  LinuxSH BIOS calls are used for the output.  This helps when
+  debugging fatal problems early in the boot sequence.  This is only
+  useful for kernel hackers.  If unsure, say N.
+  
+National Semiconductor DP83902AV 'ST-NIC' support
+CONFIG_STNIC
+  If you have a network adaptor with National Semiconductor DP83902AV, 
+  say Y or M (for module).
+
+  If unsure, say N.
+
+CompactFlash Connection Area
+CONFIG_CF_AREA5
+  If your board has "Directly Connected" CompactFlash, You should
+  select the area where your CF is connected to.
+  
+  - "Area5" if CompactFlash is connected to Area 5 (0x14000000)
+  - "Area6" if it is connected to Area 6 (0x18000000)
+
+  "Area6" will work for most boards. For ADX, select "Area5".
 
 #
 # m68k-specific kernel options

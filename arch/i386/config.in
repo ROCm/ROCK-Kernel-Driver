@@ -315,7 +315,7 @@ source drivers/message/fusion/Config.in
 
 source drivers/ieee1394/Config.in
 
-source drivers/i2o/Config.in
+source drivers/message/i2o/Config.in
 
 if [ "$CONFIG_NET" = "y" ]; then
    mainmenu_option next_comment

@@ -1122,10 +1122,8 @@ static int do_swap_page(struct mm_struct * mm,
 	spin_unlock(&mm->page_table_lock);
 	page = lookup_swap_cache(entry);
 	if (!page) {
-		lock_kernel();
 		swapin_readahead(entry);
 		page = read_swap_cache_async(entry);
-		unlock_kernel();
 		if (!page) {
 			spin_lock(&mm->page_table_lock);
 			/*

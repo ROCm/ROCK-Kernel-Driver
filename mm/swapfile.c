@@ -209,7 +209,7 @@ bad_free:
  * share this swap entry, so be cautious and let do_wp_page work out
  * what to do if a write is requested later.
  */
-/* BKL, mmlist_lock and vma->vm_mm->page_table_lock are held */
+/* mmlist_lock and vma->vm_mm->page_table_lock are held */
 static inline void unuse_pte(struct vm_area_struct * vma, unsigned long address,
 	pte_t *dir, swp_entry_t entry, struct page* page)
 {
@@ -225,7 +225,7 @@ static inline void unuse_pte(struct vm_area_struct * vma, unsigned long address,
 	++vma->vm_mm->rss;
 }
 
-/* BKL, mmlist_lock and vma->vm_mm->page_table_lock are held */
+/* mmlist_lock and vma->vm_mm->page_table_lock are held */
 static inline void unuse_pmd(struct vm_area_struct * vma, pmd_t *dir,
 	unsigned long address, unsigned long size, unsigned long offset,
 	swp_entry_t entry, struct page* page)
@@ -253,7 +253,7 @@ static inline void unuse_pmd(struct vm_area_struct * vma, pmd_t *dir,
 	} while (address && (address < end));
 }
 
-/* BKL, mmlist_lock and vma->vm_mm->page_table_lock are held */
+/* mmlist_lock and vma->vm_mm->page_table_lock are held */
 static inline void unuse_pgd(struct vm_area_struct * vma, pgd_t *dir,
 	unsigned long address, unsigned long size,
 	swp_entry_t entry, struct page* page)
@@ -284,7 +284,7 @@ static inline void unuse_pgd(struct vm_area_struct * vma, pgd_t *dir,
 	} while (address && (address < end));
 }
 
-/* BKL, mmlist_lock and vma->vm_mm->page_table_lock are held */
+/* mmlist_lock and vma->vm_mm->page_table_lock are held */
 static void unuse_vma(struct vm_area_struct * vma, pgd_t *pgdir,
 			swp_entry_t entry, struct page* page)
 {
@@ -424,10 +424,6 @@ static int try_to_unuse(unsigned int type)
 
 		/*
 		 * Don't hold on to start_mm if it looks like exiting.
-		 * Can mmput ever block? if so, then we cannot risk
-		 * it between deleting the page from the swap cache,
-		 * and completing the search through mms (and cannot
-		 * use it to avoid the long hold on mmlist_lock there).
 		 */
 		if (atomic_read(&start_mm->mm_users) == 1) {
 			mmput(start_mm);
@@ -436,18 +432,15 @@ static int try_to_unuse(unsigned int type)
 		}
 
 		/*
-		 * Wait for and lock page.  Remove it from swap cache
-		 * so try_to_swap_out won't bump swap count.  Mark dirty
-		 * so try_to_swap_out will preserve it without us having
-		 * to mark any present ptes as dirty: so we can skip
-		 * searching processes once swap count has all gone.
+		 * Wait for and lock page.  When do_swap_page races with
+		 * try_to_unuse, do_swap_page can handle the fault much
+		 * faster than try_to_unuse can locate the entry.  This
+		 * apparently redundant "wait_on_page" lets try_to_unuse
+		 * defer to do_swap_page in such a case - in some tests,
+		 * do_swap_page and try_to_unuse repeatedly compete.
 		 */
+		wait_on_page(page);
 		lock_page(page);
-		if (PageSwapCache(page))
-			delete_from_swap_cache(page);
-		SetPageDirty(page);
-		UnlockPage(page);
-		flush_page_to_ram(page);
 
 		/*
 		 * Remove all references to entry, without blocking.
@@ -455,20 +448,22 @@ static int try_to_unuse(unsigned int type)
 		 * to search, but use it as a reminder to search shmem.
 		 */
 		swcount = *swap_map;
-		if (swcount) {
+		if (swcount > 1) {
+			flush_page_to_ram(page);
 			if (start_mm == &init_mm)
 				shmem_unuse(entry, page);
 			else
 				unuse_process(start_mm, entry, page);
 		}
-		if (*swap_map) {
+		if (*swap_map > 1) {
 			int set_start_mm = (*swap_map >= swcount);
 			struct list_head *p = &start_mm->mmlist;
 			struct mm_struct *new_start_mm = start_mm;
 			struct mm_struct *mm;
 
 			spin_lock(&mmlist_lock);
-			while (*swap_map && (p = p->next) != &start_mm->mmlist) {
+			while (*swap_map > 1 &&
+					(p = p->next) != &start_mm->mmlist) {
 				mm = list_entry(p, struct mm_struct, mmlist);
 				swcount = *swap_map;
 				if (mm == &init_mm) {
@@ -486,7 +481,6 @@ static int try_to_unuse(unsigned int type)
 			mmput(start_mm);
 			start_mm = new_start_mm;
 		}
-		page_cache_release(page);
 
 		/*
 		 * How could swap count reach 0x7fff when the maximum
@@ -505,11 +499,44 @@ static int try_to_unuse(unsigned int type)
 			swap_list_lock();
 			swap_device_lock(si);
 			nr_swap_pages++;
-			*swap_map = 0;
+			*swap_map = 1;
 			swap_device_unlock(si);
 			swap_list_unlock();
 			reset_overflow = 1;
 		}
+
+		/*
+		 * If a reference remains (rare), we would like to leave
+		 * the page in the swap cache; but try_to_swap_out could
+		 * then re-duplicate the entry once we drop page lock,
+		 * so we might loop indefinitely; also, that page could
+		 * not be swapped out to other storage meanwhile.  So:
+		 * delete from cache even if there's another reference,
+		 * after ensuring that the data has been saved to disk -
+		 * since if the reference remains (rarer), it will be
+		 * read from disk into another page.  Splitting into two
+		 * pages would be incorrect if swap supported "shared
+		 * private" pages, but they are handled by tmpfs files.
+		 * Note shmem_unuse already deleted its from swap cache.
+		 */
+		swcount = *swap_map;
+		if ((swcount > 0) != PageSwapCache(page))
+			BUG();
+		if ((swcount > 1) && PageDirty(page)) {
+			rw_swap_page(WRITE, page);
+			lock_page(page);
+		}
+		if (PageSwapCache(page))
+			delete_from_swap_cache(page);
+
+		/*
+		 * So we could skip searching mms once swap count went
+		 * to 1, we did not mark any present ptes as dirty: must
+		 * mark page dirty so try_to_swap_out will preserve it.
+		 */
+		SetPageDirty(page);
+		UnlockPage(page);
+		page_cache_release(page);
 
 		/*
 		 * Make sure that we aren't completely killing
@@ -518,10 +545,6 @@ static int try_to_unuse(unsigned int type)
 		 */
 		if (current->need_resched)
 			schedule();
-		else {
-			unlock_kernel();
-			lock_kernel();
-		}
 	}
 
 	mmput(start_mm);
@@ -577,7 +600,9 @@ asmlinkage long sys_swapoff(const char * specialfile)
 	total_swap_pages -= p->pages;
 	p->flags = SWP_USED;
 	swap_list_unlock();
+	unlock_kernel();
 	err = try_to_unuse(type);
+	lock_kernel();
 	if (err) {
 		/* re-insert swap space back into swap_list */
 		swap_list_lock();

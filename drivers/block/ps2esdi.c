@@ -1107,9 +1107,9 @@ static int ps2esdi_ioctl(struct inode *inode,
 
 		case BLKGETSIZE:
 			if (arg) {
-				if ((err = verify_area(VERIFY_WRITE, (long *) arg, sizeof(long))))
+				if ((err = verify_area(VERIFY_WRITE, (unsigned long *) arg, sizeof(unsigned long))))
 					 return (err);
-				put_user(ps2esdi[MINOR(inode->i_rdev)].nr_sects, (long *) arg);
+				put_user(ps2esdi[MINOR(inode->i_rdev)].nr_sects, (unsigned long *) arg);
 
 				return (0);
 			}

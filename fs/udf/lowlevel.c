@@ -67,7 +67,7 @@ udf_get_last_session(struct super_block *sb)
 	return vol_desc_start;
 }
 
-unsigned int
+unsigned long
 udf_get_last_block(struct super_block *sb)
 {
 	struct block_device *bdev = sb->s_bdev;

@@ -550,23 +550,20 @@ struct miscdevice sonypi_misc_device = {
 	-1, "sonypi", &sonypi_misc_fops
 };
 
-static int __devinit sonypi_probe(struct pci_dev *pcidev, 
-		                  const struct pci_device_id *ent) {
+static int __devinit sonypi_probe(struct pci_dev *pcidev) {
 	int i, ret;
 	struct sonypi_ioport_list *ioport_list;
 	struct sonypi_irq_list *irq_list;
 
-	if (sonypi_device.dev) {
-		printk(KERN_ERR "sonypi: only one device allowed!\n"),
-		ret = -EBUSY;
-		goto out1;
-	}
 	sonypi_device.dev = pcidev;
-	sonypi_device.model = (int)ent->driver_data;
+	if (pcidev)
+		sonypi_device.model = SONYPI_DEVICE_MODEL_TYPE1;
+	else
+		sonypi_device.model = SONYPI_DEVICE_MODEL_TYPE2;
 	sonypi_initq();
 	init_MUTEX(&sonypi_device.lock);
 	
-	if (pci_enable_device(pcidev)) {
+	if (pcidev && pci_enable_device(pcidev)) {
 		printk(KERN_ERR "sonypi: pci_enable_device failed\n");
 		ret = -EIO;
 		goto out1;
@@ -638,11 +635,10 @@ static int __devinit sonypi_probe(struct pci_dev *pcidev,
 	printk(KERN_INFO "sonypi: Sony Programmable I/O Controller Driver v%d.%d.\n",
 	       SONYPI_DRIVER_MAJORVERSION,
 	       SONYPI_DRIVER_MINORVERSION);
-	printk(KERN_INFO "sonypi: detected %s model (%04x:%04x), "
+	printk(KERN_INFO "sonypi: detected %s model, "
 	       "camera = %s, compat = %s\n",
 	       (sonypi_device.model == SONYPI_DEVICE_MODEL_TYPE1) ?
 			"type1" : "type2",
-	       sonypi_device.dev->vendor, sonypi_device.dev->device,
 	       camera ? "on" : "off",
 	       compat ? "on" : "off");
 	printk(KERN_INFO "sonypi: enabled at irq=%d, port1=0x%x, port2=0x%x\n",
@@ -662,7 +658,7 @@ out1:
 	return ret;
 }
 
-static void __devexit sonypi_remove(struct pci_dev *pcidev) {
+static void __devexit sonypi_remove(void) {
 	sonypi_call2(0x81, 0); /* make sure we don't get any more events */
 	if (camera)
 		sonypi_camera_off();
@@ -676,37 +672,21 @@ static void __devexit sonypi_remove(struct pci_dev *pcidev) {
 	printk(KERN_INFO "sonypi: removed.\n");
 }
 
-static struct pci_device_id sonypi_id_tbl[] __devinitdata = {
-	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82371AB_3, 
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 
-	  (unsigned long) SONYPI_DEVICE_MODEL_TYPE1 },
-	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801BA_10,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 
-	  (unsigned long) SONYPI_DEVICE_MODEL_TYPE2 },
-	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801CA_12,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 
-	  (unsigned long) SONYPI_DEVICE_MODEL_TYPE2 },
-	{ }
-};
-
-MODULE_DEVICE_TABLE(pci, sonypi_id_tbl);
-
-static struct pci_driver sonypi_driver = {
-	name:		"sonypi",
-	id_table:	sonypi_id_tbl,
-	probe:		sonypi_probe,
-	remove:		sonypi_remove,
-};
-
 static int __init sonypi_init_module(void) {
-	if (is_sony_vaio_laptop)
-		return pci_module_init(&sonypi_driver);
+	struct pci_dev *pcidev = NULL;
+
+	if (is_sony_vaio_laptop) {
+		pcidev = pci_find_device(PCI_VENDOR_ID_INTEL, 
+					 PCI_DEVICE_ID_INTEL_82371AB_3, 
+					 NULL);
+		return sonypi_probe(pcidev);
+	}
 	else
 		return -ENODEV;
 }
 
 static void __exit sonypi_cleanup_module(void) {
-	pci_unregister_driver(&sonypi_driver);
+	sonypi_remove();
 }
 
 #ifndef MODULE

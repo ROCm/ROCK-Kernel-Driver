@@ -220,4 +220,7 @@ source drivers/char/drm/Config.in
 if [ "$CONFIG_HOTPLUG" = "y" -a "$CONFIG_PCMCIA" != "n" ]; then
    source drivers/char/pcmcia/Config.in
 fi
+
+tristate 'ACP Modem (Mwave) support' CONFIG_MWAVE
+
 endmenu

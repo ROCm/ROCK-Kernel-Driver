@@ -377,7 +377,7 @@ endmenu
 
 if [ "$CONFIG_DECSTATION" != "y" -a \
      "$CONFIG_SGI_IP22" != "y" ]; then
-   source drivers/i2o/Config.in
+   source drivers/message/i2o/Config.in
 fi
 
 if [ "$CONFIG_NET" = "y" ]; then

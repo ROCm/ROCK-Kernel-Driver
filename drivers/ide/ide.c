@@ -2661,7 +2661,7 @@ static int ide_ioctl (struct inode *inode, struct file *file,
 		}
 
 	 	case BLKGETSIZE:   /* Return device size */
-			return put_user(drive->part[MINOR(inode->i_rdev)&PARTN_MASK].nr_sects, (long *) arg);
+			return put_user(drive->part[MINOR(inode->i_rdev)&PARTN_MASK].nr_sects, (unsigned long *) arg);
 	 	case BLKGETSIZE64:
 			return put_user((u64)drive->part[MINOR(inode->i_rdev)&PARTN_MASK].nr_sects << 9, (u64 *) arg);
 

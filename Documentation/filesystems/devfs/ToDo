@@ -32,7 +32,7 @@ list (preferably with your name attached to them:-).
 
 - MFM hard drive (drivers/acorn/block/mfmhd.c)
 
-- I2O block device (drivers/i2o/i2o_block.c)
+- I2O block device (drivers/message/i2o/i2o_block.c)
 
 - ST-RAM device (arch/m68k/atari/stram.c)
 

@@ -90,8 +90,17 @@ if [ "$CONFIG_CPU_SUBTYPE_ST40STB1" = "y" ]; then
 fi
 bool 'Little Endian' CONFIG_CPU_LITTLE_ENDIAN
 # Platform-specific memory start and size definitions
-if [ "$CONFIG_SH_SOLUTION_ENGINE" = "y" -o "$CONFIG_SH_HP600" = "y" -o \
-     "$CONFIG_SH_BIGSUR" = "y" -o "$CONFIG_SH_7751_SOLUTION_ENGINE" = "y" -o \
+if [ "$CONFIG_SH_SOLUTION_ENGINE" = "y" ]; then
+   define_hex CONFIG_MEMORY_START 0c000000
+   define_hex CONFIG_MEMORY_SIZE 02000000
+   define_bool CONFIG_MEMORY_SET y
+fi
+if [ "$CONFIG_SH_7751_SOLUTION_ENGINE" = "y" ]; then
+   define_hex CONFIG_MEMORY_START 0c000000
+   define_hex CONFIG_MEMORY_SIZE 04000000
+   define_bool CONFIG_MEMORY_SET y
+fi
+if [ "$CONFIG_SH_HP600" = "y" -o "$CONFIG_SH_BIGSUR" = "y" -o \
      "$CONFIG_SH_DREAMCAST" = "y" -o "$CONFIG_SH_SH2000" = "y" ]; then
    define_hex CONFIG_MEMORY_START 0c000000
    define_hex CONFIG_MEMORY_SIZE 00400000
@@ -326,6 +335,16 @@ if [ "$CONFIG_PARPORT" != "n" ]; then
    dep_tristate 'Support for user-space parallel port device drivers' CONFIG_PPDEV $CONFIG_PARPORT
 fi
 bool 'PS/2 mouse (aka "auxiliary device") support' CONFIG_PSMOUSE
+
+mainmenu_option next_comment
+comment 'Watchdog Cards'
+bool 'Watchdog Timer Support' CONFIG_WATCHDOG
+if [ "$CONFIG_WATCHDOG" != "n" ]; then
+   bool '  Disable watchdog shutdown on close' CONFIG_WATCHDOG_NOWAYOUT
+   dep_tristate '  SH 3/4 Watchdog' CONFIG_SH_WDT $CONFIG_SUPERH
+fi
+endmenu
+
 tristate 'Enhanced Real Time Clock Support' CONFIG_RTC
 if [ "$CONFIG_HOTPLUG" = "y" -a "$CONFIG_PCMCIA" != "n" ]; then
    source drivers/char/pcmcia/Config.in

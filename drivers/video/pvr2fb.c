@@ -286,7 +286,7 @@ static struct fb_videomode pvr2_modedb[] __initdata = {
 
     {
 	/* 640x480 @ 60hz (VGA) */
-	"vga_640x480", 60, 640, 480, 38, 33, 0, 18, 146, 26,
+	"vga_640x480", 60, 640, 480, VGA_CLK, 38, 33, 0, 18, 146, 26,
 	0, FB_VMODE_YWRAP
     },
 
@@ -382,6 +382,7 @@ static int pvr2fb_set_var(struct fb_var_screeninfo *var, int con,
 
 			pvr2_encode_fix(&fix, &par);
 			display->screen_base = (char *)fix.smem_start;
+			display->scrollmode = SCROLL_YREDRAW;
 			display->visual = fix.visual;
 			display->type = fix.type;
 			display->type_aux = fix.type_aux;
@@ -589,7 +590,7 @@ static int pvr2_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 #ifdef FBCON_HAS_CFB16
 		    case 16: /* RGB 565 */
 			fbcon_cmap.cfb16[regno] = (red & 0xf800) |
-			                          ((green & 0xf800) >> 6) |
+			                          ((green & 0xfc00) >> 5) |
 						  ((blue & 0xf800) >> 11);
 			break;
 #endif
@@ -1076,8 +1077,8 @@ int __init pvr2fb_init(void)
 	printk("fb%d: Mode %dx%d-%d pitch = %ld cable: %s video output: %s\n", 
 	       GET_FB_IDX(fb_info.node), var.xres, var.yres, var.bits_per_pixel, 
 	       get_line_length(var.xres, var.bits_per_pixel),
-	       (char *)pvr2_get_param(cables, NULL, cable_type, 6),
-	       (char *)pvr2_get_param(outputs, NULL, video_output, 6));
+	       (char *)pvr2_get_param(cables, NULL, cable_type, 3),
+	       (char *)pvr2_get_param(outputs, NULL, video_output, 3));
 
 	return 0;
 }
@@ -1155,10 +1156,10 @@ int __init pvr2fb_setup(char *options)
 	}
 
 	if (*cable_arg)
-		cable_type = pvr2_get_param(cables, cable_arg, 0, 6);
+		cable_type = pvr2_get_param(cables, cable_arg, 0, 3);
 
 	if (*output_arg)
-		video_output = pvr2_get_param(outputs, output_arg, 0, 6);
+		video_output = pvr2_get_param(outputs, output_arg, 0, 3);
 
 	return 0;
 }

@@ -664,7 +664,7 @@ static void fbcon_setup(int con, int init, int logo)
     	    	scr_memsetw(save, conp->vc_video_erase_char, logo_lines * nr_cols * 2);
     	    	r = q - step;
     	    	for (cnt = 0; cnt < logo_lines; cnt++, r += i)
-    	    		scr_memcpyw_from(save + cnt * nr_cols, r, 2 * i);
+    	    		scr_memcpyw(save + cnt * nr_cols, r, 2 * i);
     	    	r = q;
     	    }
     	}
@@ -682,7 +682,7 @@ static void fbcon_setup(int con, int init, int logo)
     	}
     	scr_memsetw((unsigned short *)conp->vc_origin,
 		    conp->vc_video_erase_char, 
-    		conp->vc_size_row * logo_lines);
+		    conp->vc_size_row * logo_lines);
     }
     
     /*
@@ -2010,17 +2010,14 @@ static unsigned long fbcon_getxy(struct vc_data *conp, unsigned long pos, int *p
 static void fbcon_invert_region(struct vc_data *conp, u16 *p, int cnt)
 {
     while (cnt--) {
+	u16 a = scr_readw(p);
 	if (!conp->vc_can_do_color)
-	    *p++ ^= 0x0800;
-	else if (conp->vc_hi_font_mask == 0x100) {
-	    u16 a = *p;
+	    a ^= 0x0800;
+	else if (conp->vc_hi_font_mask == 0x100)
 	    a = ((a) & 0x11ff) | (((a) & 0xe000) >> 4) | (((a) & 0x0e00) << 4);
-	    *p++ = a;
-	} else {
-	    u16 a = *p;
+	else
 	    a = ((a) & 0x88ff) | (((a) & 0x7000) >> 4) | (((a) & 0x0700) << 4);
-	    *p++ = a;
-	}
+	scr_writew(a, p++);
 	if (p == (u16 *)softback_end)
 	    p = (u16 *)softback_buf;
 	if (p == (u16 *)softback_in)

@@ -1,4 +1,4 @@
-/* $Id: cache-sh4.c,v 1.15 2001/08/10 14:13:13 gniibe Exp $
+/* $Id: cache-sh4.c,v 1.16 2001/09/10 11:06:35 dwmw2 Exp $
  *
  *  linux/arch/sh/mm/cache.c
  *
@@ -22,9 +22,21 @@
 #include <asm/mmu_context.h>
 
 #define CCR		 0xff00001c	/* Address of Cache Control Register */
-#define CCR_CACHE_VAL	 0x00000105	/* 8k+16k-byte cache,P1-wb,enable */
-#define CCR_CACHE_INIT	 0x0000090d	/* ICI,ICE(8k), OCI,P1-wb,OCE(16k) */
-#define CCR_CACHE_ENABLE 0x00000101
+
+#define CCR_CACHE_OCE	0x0001	/* Operand Cache Enable */
+#define CCR_CACHE_WT	0x0002	/* Write-Through (for P0,U0,P3) (else writeback)*/
+#define CCR_CACHE_CB	0x0004	/* Copy-Back (for P1) (else writethrough) */
+#define CCR_CACHE_OCI	0x0008	/* OC Invalidate */
+#define CCR_CACHE_ORA	0x0020	/* OC RAM Mode */
+#define CCR_CACHE_OIX	0x0080	/* OC Index Enable */
+#define CCR_CACHE_ICE	0x0100	/* Instruction Cache Enable */
+#define CCR_CACHE_ICI	0x0800	/* IC Invalidate */
+#define CCR_CACHE_IIX	0x8000	/* IC Index Enable */
+
+/* Default CCR setup: 8k+16k-byte cache,P1-wb,enable */
+#define CCR_CACHE_VAL	(CCR_CACHE_ICE|CCR_CACHE_CB|CCR_CACHE_OCE)
+#define CCR_CACHE_INIT	(CCR_CACHE_VAL|CCR_CACHE_OCI|CCR_CACHE_ICI)
+#define CCR_CACHE_ENABLE (CCR_CACHE_OCE|CCR_CACHE_ICE)
 
 #define CACHE_IC_ADDRESS_ARRAY 0xf0000000
 #define CACHE_OC_ADDRESS_ARRAY 0xf4000000

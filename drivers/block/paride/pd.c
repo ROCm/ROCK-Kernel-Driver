@@ -478,9 +478,9 @@ static int pd_ioctl(struct inode *inode,struct file *file,
                 return 0;
             case BLKGETSIZE:
                 if (!arg) return -EINVAL;
-                err = verify_area(VERIFY_WRITE,(long *) arg,sizeof(long));
+                err = verify_area(VERIFY_WRITE,(unsigned long *) arg,sizeof(unsigned long));
                 if (err) return (err);
-                put_user(pd_hd[dev].nr_sects,(long *) arg);
+                put_user(pd_hd[dev].nr_sects,(unsigned long *) arg);
                 return (0);
             case BLKGETSIZE64:
                 return put_user((u64)pd_hd[dev].nr_sects << 9, (u64 *)arg);

@@ -1088,27 +1088,27 @@ static void tdfx_cfb8_putcs(struct vc_data* conp,
 			    struct display* p,
 			    const unsigned short *s,int count,int yy,int xx)
 {
-   u32 fgx,bgx;
-   fgx=attr_fgcol(p, *s);
-   bgx=attr_bgcol(p, *s);
+   u16 c = scr_readw(s);
+   u32 fgx = attr_fgcol(p, c);
+   u32 bgx = attr_bgcol(p, c);
    do_putcs( fgx,bgx,p,s,count,yy,xx );
 }
 static void tdfx_cfb16_putcs(struct vc_data* conp,
 			    struct display* p,
 			    const unsigned short *s,int count,int yy,int xx)
 {
-   u32 fgx,bgx;
-   fgx=((u16*)p->dispsw_data)[attr_fgcol(p,*s)];
-   bgx=((u16*)p->dispsw_data)[attr_bgcol(p,*s)];
+   u16 c = scr_readw(s);
+   u32 fgx = ((u16*)p->dispsw_data)[attr_fgcol(p, c)];
+   u32 bgx = ((u16*)p->dispsw_data)[attr_bgcol(p, c)];
    do_putcs( fgx,bgx,p,s,count,yy,xx );
 }
 static void tdfx_cfb32_putcs(struct vc_data* conp,
 			    struct display* p,
 			    const unsigned short *s,int count,int yy,int xx)
 {
-   u32 fgx,bgx;
-   fgx=((u32*)p->dispsw_data)[attr_fgcol(p,*s)];
-   bgx=((u32*)p->dispsw_data)[attr_bgcol(p,*s)];
+   u16 c = scr_readw(s);
+   u32 fgx = ((u32*)p->dispsw_data)[attr_fgcol(p, c)];
+   u32 bgx = ((u32*)p->dispsw_data)[attr_bgcol(p, c)];
    do_putcs( fgx,bgx,p,s,count,yy,xx );
 }
 

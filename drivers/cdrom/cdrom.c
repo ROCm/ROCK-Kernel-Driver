@@ -2659,3 +2659,4 @@ static void __exit cdrom_exit(void)
 
 module_init(cdrom_init);
 module_exit(cdrom_exit);
+MODULE_LICENSE("GPL");

@@ -1,4 +1,4 @@
-/* $Id: io_generic.c,v 1.3 2000/05/07 23:31:58 gniibe Exp $
+/* $Id: io_generic.c,v 1.12 2000/11/14 16:45:11 sugioka Exp $
  *
  * linux/arch/sh/kernel/io_generic.c
  *

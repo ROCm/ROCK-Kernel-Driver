@@ -384,7 +384,7 @@ static int rd_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
          	case BLKGETSIZE:   /* Return device size */
 			if (!arg)
 				break;
-			error = put_user(rd_kbsize[minor] << 1, (long *) arg);
+			error = put_user(rd_kbsize[minor] << 1, (unsigned long *) arg);
 			break;
          	case BLKGETSIZE64:
 			error = put_user((u64)rd_kbsize[minor]<<10, (u64*)arg);

@@ -86,7 +86,7 @@ static void sticon_putcs(struct vc_data *conp, const unsigned short *s,
 	int count, int ypos, int xpos)
 {
 	while(count--) {
-		sti_putc(&default_sti, *s++, ypos, xpos++);
+		sti_putc(&default_sti, scr_readw(s++), ypos, xpos++);
 	}
 }
 
@@ -170,16 +170,6 @@ static int sticon_set_origin(struct vc_data *conp)
 	return 0;
 }
 
-static u16 *sticon_screen_pos(struct vc_data *conp, int offset)
-{
-	return NULL;
-}
-
-static unsigned long sticon_getxy(struct vc_data *conp, unsigned long pos, int *px, int *py)
-{
-	return 0;
-}
-
 static u8 sticon_build_attr(struct vc_data *conp, u8 color, u8 intens, u8 blink, u8 underline, u8 reverse)
 {
 	u8 attr = ((color & 0x70) >> 1) | ((color & 7));
@@ -208,11 +198,7 @@ struct consw sti_con = {
 	con_set_palette:	sticon_set_palette,
 	con_scrolldelta:	sticon_scrolldelta,
 	con_set_origin: 	sticon_set_origin,
-	con_save_screen:	NULL,
 	con_build_attr:		sticon_build_attr,
-	con_invert_region:	NULL,
-	con_screen_pos:		sticon_screen_pos,
-	con_getxy:		sticon_getxy,
 };
 
 static int __init sti_init(void)

@@ -1140,7 +1140,7 @@ static int i2ob_ioctl(struct inode *inode, struct file *file,
 	dev = &i2ob_dev[minor];
 	switch (cmd) {
 		case BLKGETSIZE:
-			return put_user(i2ob[minor].nr_sects, (long *) arg);
+			return put_user(i2ob[minor].nr_sects, (unsigned long *) arg);
 		case BLKGETSIZE64:
 			return put_user((u64)i2ob[minor].nr_sects << 9, (u64 *)arg);
 

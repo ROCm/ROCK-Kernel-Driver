@@ -477,14 +477,14 @@ int reiserfs_new_unf_blocknrs2 (struct reiserfs_transaction_handle *th,
     ** highest allocated oid, it is far from perfect, and files will tend
     ** to be grouped towards the start of the border
     */
-    border = (INODE_PKEY(p_s_inode)->k_dir_id) % (SB_BLOCK_COUNT(th->t_super) - bstart - 1) ;
+    border = le32_to_cpu(INODE_PKEY(p_s_inode)->k_dir_id) % (SB_BLOCK_COUNT(th->t_super) - bstart - 1) ;
   } else {
     /* why would we want to delcare a local variable to this if statement
     ** name border????? -chris
     ** unsigned long border = 0;
     */
     if (!reiserfs_hashed_relocation(th->t_super)) {
-      hash_in = (INODE_PKEY(p_s_inode))->k_dir_id;
+      hash_in = le32_to_cpu((INODE_PKEY(p_s_inode))->k_dir_id);
 				/* I wonder if the CPU cost of the
                                    hash will obscure the layout
                                    effect? Of course, whether that

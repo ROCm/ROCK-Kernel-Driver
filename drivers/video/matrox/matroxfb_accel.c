@@ -654,13 +654,15 @@ static void matrox_cfbX_putcs(u_int32_t fgx, u_int32_t bgx, struct display* p, c
 
 #ifdef FBCON_HAS_CFB8
 static void matrox_cfb8_putcs(struct vc_data* conp, struct display* p, const unsigned short* s, int count, int yy, int xx) {
+	u_int16_t c;
 	u_int32_t fgx, bgx;
 	MINFO_FROM_DISP(p);
 
 	DBG_HEAVY("matroxfb_cfb8_putcs");
 
-	fgx = attr_fgcol(p, scr_readw(s));
-	bgx = attr_bgcol(p, scr_readw(s));
+	c = scr_readw(s);
+	fgx = attr_fgcol(p, c);
+	bgx = attr_bgcol(p, c);
 	fgx |= (fgx << 8);
 	fgx |= (fgx << 16);
 	bgx |= (bgx << 8);
@@ -671,13 +673,15 @@ static void matrox_cfb8_putcs(struct vc_data* conp, struct display* p, const uns
 
 #ifdef FBCON_HAS_CFB16
 static void matrox_cfb16_putcs(struct vc_data* conp, struct display* p, const unsigned short* s, int count, int yy, int xx) {
+	u_int16_t c;
 	u_int32_t fgx, bgx;
 	MINFO_FROM_DISP(p);
 
 	DBG_HEAVY("matroxfb_cfb16_putcs");
 
-	fgx = ((u_int16_t*)p->dispsw_data)[attr_fgcol(p, scr_readw(s))];
-	bgx = ((u_int16_t*)p->dispsw_data)[attr_bgcol(p, scr_readw(s))];
+	c = scr_readw(s);
+	fgx = ((u_int16_t*)p->dispsw_data)[attr_fgcol(p, c)];
+	bgx = ((u_int16_t*)p->dispsw_data)[attr_bgcol(p, c)];
 	fgx |= (fgx << 16);
 	bgx |= (bgx << 16);
 	ACCESS_FBINFO(curr.putcs)(fgx, bgx, p, s, count, yy, xx);
@@ -686,13 +690,15 @@ static void matrox_cfb16_putcs(struct vc_data* conp, struct display* p, const un
 
 #if defined(FBCON_HAS_CFB32) || defined(FBCON_HAS_CFB24)
 static void matrox_cfb32_putcs(struct vc_data* conp, struct display* p, const unsigned short* s, int count, int yy, int xx) {
+	u_int16_t c;
 	u_int32_t fgx, bgx;
 	MINFO_FROM_DISP(p);
 
 	DBG_HEAVY("matroxfb_cfb32_putcs");
 
-	fgx = ((u_int32_t*)p->dispsw_data)[attr_fgcol(p, scr_readw(s))];
-	bgx = ((u_int32_t*)p->dispsw_data)[attr_bgcol(p, scr_readw(s))];
+	c = scr_readw(s);
+	fgx = ((u_int32_t*)p->dispsw_data)[attr_fgcol(p, c)];
+	bgx = ((u_int32_t*)p->dispsw_data)[attr_bgcol(p, c)];
 	ACCESS_FBINFO(curr.putcs)(fgx, bgx, p, s, count, yy, xx);
 }
 #endif
@@ -900,12 +906,14 @@ static void matrox_text_putcs(struct vc_data* conp, struct display* p, const uns
 	unsigned int offs;
 	unsigned int attr;
 	unsigned int step;
+	u_int16_t c;
 	CRITFLAGS
 	MINFO_FROM_DISP(p);
 
 	step = ACCESS_FBINFO(devflags.textstep);
 	offs = yy * p->next_line + xx * step;
-	attr = attr_fgcol(p, scr_readw(s)) | (attr_bgcol(p, scr_readw(s)) << 4);
+	c = scr_readw(s);
+	attr = attr_fgcol(p, c) | (attr_bgcol(p, c) << 4);
 
 	CRITBEGIN
 

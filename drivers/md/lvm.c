@@ -877,7 +877,7 @@ static int lvm_blk_ioctl(struct inode *inode, struct file *file,
 		/* return device size */
 		P_IOCTL("%s -- lvm_blk_ioctl -- BLKGETSIZE: %u\n",
 			lvm_name, lv_ptr->lv_size);
-		if (put_user(lv_ptr->lv_size, (long *)arg))
+		if (put_user(lv_ptr->lv_size, (unsigned long *)arg))
 			return -EFAULT;
 		break;
 

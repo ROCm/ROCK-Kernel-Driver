@@ -163,8 +163,9 @@ void fbcon_cfb8_putcs(struct vc_data *conp, struct display *p,
     u32 eorx, fgx, bgx;
 
     dest0 = p->screen_base + yy * fontheight(p) * bytes + xx * fontwidth(p);
-    fgx=attr_fgcol(p,scr_readw(s));
-    bgx=attr_bgcol(p,scr_readw(s));
+    c = scr_readw(s);
+    fgx = attr_fgcol(p, c);
+    bgx = attr_bgcol(p, c);
     fgx |= (fgx << 8);
     fgx |= (fgx << 16);
     bgx |= (bgx << 8);

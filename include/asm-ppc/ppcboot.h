@@ -69,7 +69,7 @@ typedef struct bd_info {
 	unsigned long	bi_vco;		/* VCO Out from PLL, in MHz		*/
 #endif
 	unsigned long	bi_baudrate;	/* Console Baudrate			*/
-#if defined(CONFIG_PPC405)
+#if defined(CONFIG_405GP)
 	unsigned char	bi_s_version[4];  /* Version of this structure		*/
 	unsigned char	bi_r_version[32]; /* Version of the ROM (IBM)		*/
 	unsigned int	bi_procfreq;	/* CPU (Internal) Freq, in Hz		*/

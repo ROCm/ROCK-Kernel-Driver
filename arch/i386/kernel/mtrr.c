@@ -2126,10 +2126,8 @@ static int __init mtrr_setup(void)
 		break;
 
 	case X86_VENDOR_CENTAUR:
-		/* Cyrix III has Intel style MTRRs, but doesn't support PAE */
-		if (boot_cpu_data.x86 == 6 &&
-			(boot_cpu_data.x86_model == 6 ||
-			 boot_cpu_data.x86_model == 7)) {
+		/* VIA Cyrix family have Intel style MTRRs, but don't support PAE */
+		if (boot_cpu_data.x86 == 6) {
 			size_or_mask  = 0xfff00000; /* 32 bits */
 			size_and_mask = 0;
 		}

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.prep_pci.c 1.26 09/08/01 15:47:42 paulus
+ * BK Id: SCCS/s.prep_pci.c 1.31 10/05/01 17:48:18 trini
  */
 /*
  * PReP pci functions.
@@ -33,15 +33,15 @@
 
 /* Which PCI interrupt line does a given device [slot] use? */
 /* Note: This really should be two dimensional based in slot/pin used */
-unsigned char *Motherboard_map;
+static unsigned char *Motherboard_map;
 unsigned char *Motherboard_map_name;
 
 /* How is the 82378 PIRQ mapping setup? */
-unsigned char *Motherboard_routes;
+static unsigned char *Motherboard_routes;
 
-void (*Motherboard_non0)(struct pci_dev *);
+static void (*Motherboard_non0)(struct pci_dev *);
 
-void Powerplus_Map_Non0(struct pci_dev *);
+static void Powerplus_Map_Non0(struct pci_dev *);
 
 /* Used for Motorola to store system config register */
 static unsigned long	*ProcInfo;
@@ -474,16 +474,17 @@ static char ibm6015_pci_IRQ_map[23] __prepdata = {
         0, /* Slot 21 -  */
         2, /* Slot 22 -  */
 };
+
 static char ibm6015_pci_IRQ_routes[] __prepdata = {
         0,      /* Line 0 - unused */
         13,     /* Line 1 */
-        10,     /* Line 2 */
+        15,     /* Line 2 */
         15,     /* Line 3 */
         15,     /* Line 4 */
 };
 
 
-/* IBM Nobis and 850 */
+/* IBM Nobis and Thinkpad 850 */
 static char Nobis_pci_IRQ_map[23] __prepdata ={
         0, /* Slot 0  - unused */
         0, /* Slot 1  - unused */
@@ -564,7 +565,7 @@ struct powerplus_irq_list
  * are routed to OpenPIC inputs 5-8.  These values are offset by
  * 16 in the table to reflect the Linux kernel interrupt value.
  */
-struct powerplus_irq_list Powerplus_pci_IRQ_list =
+struct powerplus_irq_list Powerplus_pci_IRQ_list __prepdata =
 {
 	{25, 26, 27, 28},
 	{21, 22, 23, 24}
@@ -577,7 +578,7 @@ struct powerplus_irq_list Powerplus_pci_IRQ_list =
  * are routed to OpenPIC inputs 12-15. These values are offset by
  * 16 in the table to reflect the Linux kernel interrupt value.
  */
-struct powerplus_irq_list Mesquite_pci_IRQ_list =
+struct powerplus_irq_list Mesquite_pci_IRQ_list __prepdata =
 {
 	{24, 25, 26, 27},
 	{28, 29, 30, 31}
@@ -587,7 +588,7 @@ struct powerplus_irq_list Mesquite_pci_IRQ_list =
  * This table represents the standard PCI swizzle defined in the
  * PCI bus specification.
  */
-static unsigned char prep_pci_intpins[4][4] =
+static unsigned char prep_pci_intpins[4][4] __prepdata =
 {
 	{ 1, 2, 3, 4},  /* Buses 0, 4, 8, ... */
 	{ 2, 3, 4, 1},  /* Buses 1, 5, 9, ... */
@@ -600,8 +601,6 @@ static unsigned char prep_pci_intpins[4][4] =
  * other than hard-coded as well... IRQ's are individually mappable
  * to either edge or level.
  */
-#define CAROLINA_IRQ_EDGE_MASK_LO   0x00  /* IRQ's 0-7  */
-#define CAROLINA_IRQ_EDGE_MASK_HI   0xA4  /* IRQ's 8-15 [10,13,15] */
 
 /*
  * 8259 edge/level control definitions
@@ -694,7 +693,8 @@ int prep_keybd_present = 1;
 int MotMPIC;
 int mot_multi;
 
-int __init raven_init(void)
+int __init
+raven_init(void)
 {
 	unsigned int	devid;
 	unsigned int	pci_membase;
@@ -776,7 +776,7 @@ struct mot_info {
 	void            (*map_non0_bus)(struct pci_dev *);      /* For boards with more than bus 0 devices. */
 	struct powerplus_irq_list *pci_irq_list; /* List of PCI MPIC inputs */
 	unsigned char   secondary_bridge_devfn; /* devfn of secondary bus transparent bridge */
-} mot_info[] = {
+} mot_info[] __prepdata = {
 	{0x300, 0x00, 0x00, "MVME 2400",			Genesis2_pci_IRQ_map,	Raven_pci_IRQ_routes, Powerplus_Map_Non0, &Powerplus_pci_IRQ_list, 0xFF},
 	{0x010, 0x00, 0x00, "Genesis",				Genesis_pci_IRQ_map,	Genesis_pci_IRQ_routes, Powerplus_Map_Non0, &Powerplus_pci_IRQ_list, 0x00},
 	{0x020, 0x00, 0x00, "Powerstack (Series E)",		Comet_pci_IRQ_map,	Comet_pci_IRQ_routes, NULL, NULL, 0x00},
@@ -805,7 +805,8 @@ struct mot_info {
 	{0x000, 0x00, 0x00, "",					NULL,			NULL, NULL, NULL, 0x00}
 };
 
-void ibm_prep_init(void)
+void __init
+ibm_prep_init(void)
 {
 	u32 addr;
 #ifdef CONFIG_PREP_RESIDUAL
@@ -828,13 +829,12 @@ void ibm_prep_init(void)
 #ifdef CONFIG_PREP_RESIDUAL
 	mpic = residual_find_device(-1, NULL, SystemPeripheral,
 				    ProgrammableInterruptController, MPIC, 0);
-	if (mpic != NULL) {
+	if (mpic != NULL)
 		printk("mpic = %p\n", mpic);
-	}
 #endif
 }
 
-void
+static void __init
 ibm43p_pci_map_non0(struct pci_dev *dev)
 {
 	unsigned char intpin;
@@ -850,7 +850,8 @@ ibm43p_pci_map_non0(struct pci_dev *dev)
 	pci_write_config_byte(dev, PCI_INTERRUPT_LINE, dev->irq);
 }
 
-void __init prep_route_pci_interrupts(void)
+void __init
+prep_route_pci_interrupts(void)
 {
 	unsigned char *ibc_pirq = (unsigned char *)0x80800860;
 	unsigned char *ibc_pcicon = (unsigned char *)0x80800840;
@@ -913,68 +914,65 @@ void __init prep_route_pci_interrupts(void)
 			/* AJF adjust level/edge control according to routes */
 			irq_mode = 0;
 			for (i = 1;  i <= 4;  i++)
-			{
 				irq_mode |= ( 1 << Motherboard_routes[i] );
-			}
 			outb( irq_mode & 0xff, 0x4d0 );
 			outb( (irq_mode >> 8) & 0xff, 0x4d1 );
 		}
-	} else if ( _prep_type == _PREP_IBM )
-	{
-		unsigned char pl_id;
-		/*
-		 * my carolina is 0xf0
-		 * 6015 has 0xfc
-		 * -- Cort
-		 */
-		printk("IBM ID: %08x\n", inb(0x0852));
-		switch(inb(0x0852))
-		{
+	} else if ( _prep_type == _PREP_IBM ) {
+		unsigned char planar_id = inb(0x0852);
+		unsigned char irq_edge_mask_lo, irq_edge_mask_hi;
+
+		printk("IBM ID: %08x\n", planar_id);
+		switch(planar_id) {
 		case 0xff:
-			Motherboard_map_name = "IBM 850/860 Portable";
+			Motherboard_map_name = "IBM Thinkpad 850/860";
 			Motherboard_map = Nobis_pci_IRQ_map;
 			Motherboard_routes = Nobis_pci_IRQ_routes;
+			irq_edge_mask_lo = 0x00; /* irq's 0-7 all edge-triggered */
+			irq_edge_mask_hi = 0xA0; /* irq's 13, 15 level-triggered */
 			break;
 		case 0xfc:
-			Motherboard_map_name = "IBM 6015";
+			Motherboard_map_name = "IBM 6015/7020 (Sandalfoot/Sandalbow)";
 			Motherboard_map = ibm6015_pci_IRQ_map;
 			Motherboard_routes = ibm6015_pci_IRQ_routes;
+			irq_edge_mask_lo = 0x00; /* irq's 0-7 all edge-triggered */
+			irq_edge_mask_hi = 0xA0; /* irq's 13, 15 level-triggered */
 			break;
 		case 0xd5:
-			Motherboard_map_name = "IBM 43p/140";
+			Motherboard_map_name = "IBM 43P-140 (Tiger1)";
 			Motherboard_map = ibm43p_pci_IRQ_map;
 			Motherboard_routes = ibm43p_pci_IRQ_routes;
 			Motherboard_non0 = ibm43p_pci_map_non0;
+			irq_edge_mask_lo = 0x00; /* irq's 0-7 all edge-triggered */
+			irq_edge_mask_hi = 0xA0; /* irq's 13, 15 level-triggered */
 			break;
 		default:
-			Motherboard_map_name = "IBM 8xx (Carolina)";
+			printk(KERN_ERR "Unknown IBM motherboard! Defaulting to Carolina.\n");
+		case 0xf0: /* PowerSeries 830/850 */
+		case 0xf1: /* PowerSeries 830/850 */
+		case 0xf2: /* PowerSeries 830/850 */
+		case 0xf4: /* 7248-43P */
+		case 0xf5: /* 7248-43P */
+		case 0xf6: /* 7248-43P */
+		case 0xf7: /* 7248-43P (missing from Carolina Tech Spec) */
+			Motherboard_map_name = "IBM PS830/PS850/7248 (Carolina)";
 			Motherboard_map = ibm8xx_pci_IRQ_map;
 			Motherboard_routes = ibm8xx_pci_IRQ_routes;
+			irq_edge_mask_lo = 0x00; /* irq's 0-7 all edge-triggered */
+			irq_edge_mask_hi = 0xA4; /* irq's 10, 13, 15 level-triggered */
 			break;
 		}
 
-		/*printk("Changing IRQ mode\n");*/
-		pl_id=inb(0x04d0);
-		/*printk("Low mask is %#0x\n", pl_id);*/
-		outb(pl_id|CAROLINA_IRQ_EDGE_MASK_LO, 0x04d0);
-		
-		pl_id=inb(0x04d1);
-		/*printk("Hi mask is  %#0x\n", pl_id);*/
-		outb(pl_id|CAROLINA_IRQ_EDGE_MASK_HI, 0x04d1);
-		pl_id=inb(0x04d1);
-		/*printk("Hi mask now %#0x\n", pl_id);*/
-	}
-	else
-	{
+		outb(inb(0x04d0)|irq_edge_mask_lo, 0x04d0); /* primary 8259 */
+		outb(inb(0x04d1)|irq_edge_mask_hi, 0x04d1); /* cascaded 8259 */
+	} else {
 		printk("No known machine pci routing!\n");
 		return;
 	}
 	
 	/* Set up mapping from slots */
 	for (i = 1;  i <= 4;  i++)
-	{
 		ibc_pirq[i-1] = Motherboard_routes[i];
-	}
 	/* Enable PCI interrupts */
 	*ibc_pcicon |= 0x20;
 }
@@ -1039,14 +1037,14 @@ prep_pib_init(void)
 			pci_write_config_byte(dev,
 					PCI_INTERRUPT_LINE,
 					dev->irq);
-		}else{
+		} else {
 			/* Enable LEGIRQ for PCI INT -> 8259 IRQ routing */
 			pci_write_config_dword(dev, 0x40, 0x10ff08a1);
 		}
 	}
 }
 
-void
+static void __init
 Powerplus_Map_Non0(struct pci_dev *dev)
 {
 	struct pci_bus  *pbus;          /* Parent bus structure pointer */
@@ -1092,23 +1090,19 @@ Powerplus_Map_Non0(struct pci_dev *dev)
 	 * Otherwise, assume it's a PMC site and get the interrupt line
 	 * value from the interrupt routing table.
 	 */ 
-	if (mot_info[mot_entry].secondary_bridge_devfn)
-	{
+	if (mot_info[mot_entry].secondary_bridge_devfn) {
 		pbus = dev->bus;
 
 		while (pbus->primary != 0)
 			pbus = pbus->parent;
 
-		if ((pbus->self)->devfn != 0xA0)
-		{
+		if ((pbus->self)->devfn != 0xA0) {
 			if ((pbus->self)->devfn == mot_info[mot_entry].secondary_bridge_devfn)
 				intline = mot_info[mot_entry].pci_irq_list->secondary[intpin];
-			else
-			{
+			else {
 				if ((char *)(mot_info[mot_entry].map) == (char *)Mesquite_pci_IRQ_map)
 					intline = mot_info[mot_entry].map[((pbus->self)->devfn)/8] + 16;
-				else
-				{
+				else {
 					int i;
 					for (i=0;i<3;i++)
 						intpin = (prep_pci_intpins[devnum % 4][intpin]) - 1;
@@ -1137,13 +1131,10 @@ prep_pcibios_fixup(void)
 	if (OpenPIC_Addr) {
 		/* PCI interrupts are controlled by the OpenPIC */
 		pci_for_each_dev(dev) {
-			if (dev->bus->number == 0)
-			{
+			if (dev->bus->number == 0) {
                        		dev->irq = openpic_to_irq(Motherboard_map[PCI_SLOT(dev->devfn)]);
 				pcibios_write_config_byte(dev->bus->number, dev->devfn, PCI_INTERRUPT_LINE, dev->irq);
-			}
-			else
-			{
+			} else {
 				if (Motherboard_non0 != NULL)
 					Motherboard_non0(dev);
 			}
@@ -1164,26 +1155,26 @@ prep_pcibios_fixup(void)
 		unsigned char d = PCI_SLOT(dev->devfn);
 		dev->irq = Motherboard_routes[Motherboard_map[d]];
 
-		for ( i = 0 ; i <= 5 ; i++ )
-		{
+		for ( i = 0 ; i <= 5 ; i++ ) {
 			/*
 			 * Relocate PCI I/O resources if necessary so the
 			 * standard 256MB BAT covers them.
 			 */
 			if ( (pci_resource_flags(dev, i) & IORESOURCE_IO) &&
-				(dev->resource[i].start > 0x10000000) ) 
-		        {
-		                printk("Relocating PCI address %lx -> %lx\n",
-		                       dev->resource[i].start,
-		                       (dev->resource[i].start & 0x00FFFFFF)
-		                       | 0x01000000);
-		                dev->resource[i].start =
-		                  (dev->resource[i].start & 0x00FFFFFF) | 0x01000000;
+				      (dev->resource[i].start > 0x10000000))  {
+				printk("Relocating PCI address %lx -> %lx\n",
+						dev->resource[i].start,
+						(dev->resource[i].start & 
+						 0x00FFFFFF)| 0x01000000);
+				dev->resource[i].start =
+					(dev->resource[i].start & 0x00FFFFFF)
+					| 0x01000000;
 		                pci_write_config_dword(dev,
-		                        PCI_BASE_ADDRESS_0+(i*0x4),
-		                       dev->resource[i].start );
-				dev->resource[i].end =
-					(dev->resource[i].end & 0x00FFFFFF) | 0x01000000;
+						PCI_BASE_ADDRESS_0 + (i*0x4),
+						dev->resource[i].start);
+				dev->resource[i].end = 
+					(dev->resource[i].end & 0x00FFFFFF)
+					| 0x01000000;
 		        }
 		}
 #if 0
@@ -1223,7 +1214,8 @@ prep_find_bridges(void)
 	hose->first_busno = 0;
 	hose->last_busno = 0xff;
 	hose->pci_mem_offset = PREP_ISA_MEM_BASE;
-	hose->io_base_virt = (void *)PREP_ISA_IO_BASE;
+	hose->io_base_phys = PREP_ISA_IO_BASE;
+	hose->io_base_virt = (void *)0x80000000; /* see prep_map_io() */
 	prep_init_resource(&hose->io_resource, 0, 0x0fffffff, IORESOURCE_IO);
 	prep_init_resource(&hose->mem_resources[0], 0xc0000000, 0xfeffffff,
 			   IORESOURCE_MEM);
@@ -1241,25 +1233,17 @@ prep_find_bridges(void)
 			pkt = PnP_find_large_vendor_packet(
 				res->DevicePnPHeap+hostbridge->AllocatedOffset,
 				3, 0);
-			if(pkt)
-			{
+			if(pkt) {
 #define p pkt->L4_Pack.L4_Data.L4_PPCPack
 				setup_indirect_pci(hose, 
 					ld_le32((unsigned *) (p.PPCData)),
 					ld_le32((unsigned *) (p.PPCData+8)));
-			}
-			else
-			{
+			} else
 				setup_indirect_pci(hose, 0x80000cf8, 0x80000cfc);
-			}
-		}
-		else
+		} else
 #endif /* CONFIG_PREP_RESIDUAL */
-		{
 			hose->ops = &prep_pci_ops;
-		}
 	}
 
 	ppc_md.pcibios_fixup = prep_pcibios_fixup;
 }
-

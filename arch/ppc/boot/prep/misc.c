@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.misc.c 1.18 07/30/01 17:19:40 trini
+ * BK Id: SCCS/s.misc.c 1.20 09/24/01 18:42:54 trini
  *
  * arch/ppc/boot/prep/misc.c
  *
@@ -47,6 +47,15 @@ int keyb_present = 1;	/* keyboard controller is present by default */
 RESIDUAL hold_resid_buf;
 RESIDUAL *hold_residual = &hold_resid_buf;
 unsigned long initrd_start = 0, initrd_end = 0;
+
+/* These values must be variables.  If not, the compiler optimizer
+ * will remove some code, causing the size of the code to vary
+ * when these values are zero.  This is bad because we first
+ * compile with these zero to determine the size and offsets
+ * in an image, than compile again with these set to the proper
+ * discovered value.
+ */
+unsigned int initrd_offset, initrd_size;
 char *zimage_start;
 int zimage_size;
 
@@ -302,12 +311,14 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum,
 	   size of the elf header which we strip -- Cort */
 	zimage_start = (char *)(load_addr - 0x10000 + ZIMAGE_OFFSET);
 	zimage_size = ZIMAGE_SIZE;
+	initrd_offset = INITRD_OFFSET;
+	initrd_size = INITRD_SIZE;
 
-	if ( INITRD_OFFSET )
-		initrd_start = load_addr - 0x10000 + INITRD_OFFSET;
+	if ( initrd_offset )
+		initrd_start = load_addr - 0x10000 + initrd_offset;
 	else
 		initrd_start = 0;
-	initrd_end = INITRD_SIZE + initrd_start;
+	initrd_end = initrd_size + initrd_start;
 
 	/*
 	 * Find a place to stick the zimage and initrd and 
@@ -332,9 +343,9 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum,
 			puts(" "); puthex(initrd_end); puts("\n");
 			avail_ram = (char *)PAGE_ALIGN(
 				(unsigned long)zimage_size+(unsigned long)zimage_start);
-			memcpy ((void *)avail_ram, (void *)initrd_start, INITRD_SIZE );
+			memcpy ((void *)avail_ram, (void *)initrd_start, initrd_size );
 			initrd_start = (unsigned long)avail_ram;
-			initrd_end = initrd_start + INITRD_SIZE;
+			initrd_end = initrd_start + initrd_size;
 			puts("relocated to:  "); puthex(initrd_start);
 			puts(" "); puthex(initrd_end); puts("\n");
 		}

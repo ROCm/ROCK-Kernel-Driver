@@ -379,7 +379,7 @@ static void newport_putcs(struct vc_data *vc, const unsigned short *s,
 	int charattr;
 	unsigned char *p;
 
-	charattr = (*s >> 8) & 0xff;
+	charattr = (scr_readw(s) >> 8) & 0xff;
 
 	xpos <<= 3;
 	ypos <<= 4;
@@ -399,7 +399,7 @@ static void newport_putcs(struct vc_data *vc, const unsigned short *s,
 				 NPORT_DMODE0_L32);
 
 	for (i = 0; i < count; i++, xpos += 8) {
-		p = &font_data[vc->vc_num][(s[i] & 0xff) << 4];
+		p = &font_data[vc->vc_num][(scr_readw(s++) & 0xff) << 4];
 
 		newport_wait();
 

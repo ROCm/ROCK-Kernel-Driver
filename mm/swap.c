@@ -130,11 +130,17 @@ void lru_cache_del(struct page * page)
  */
 void __init swap_setup(void)
 {
-	/* Use a smaller cluster for memory <16MB or <32MB */
-	if (num_physpages < ((16 * 1024 * 1024) >> PAGE_SHIFT))
+	unsigned long megs = num_physpages >> (20 - PAGE_SHIFT);
+
+	/* Use a smaller cluster for small-memory machines */
+	if (megs < 16)
 		page_cluster = 2;
-	else if (num_physpages < ((32 * 1024 * 1024) >> PAGE_SHIFT))
+	else if (megs < 32)
 		page_cluster = 3;
-	else
+	else if (megs < 64)
 		page_cluster = 4;
+	else if (megs < 128)
+		page_cluster = 5;
+	else
+		page_cluster = 6;
 }

@@ -1,4 +1,4 @@
-/* $Id: memchr.S,v 1.1 1999/10/17 11:32:38 gniibe Exp $
+/* $Id: memchr.S,v 1.1 2000/04/14 16:49:01 mjd Exp $
  *
  * "memchr" implementation of SuperH
  *

@@ -242,10 +242,10 @@ int blk_ioctl(kdev_t dev, unsigned int cmd, unsigned long arg)
 			/* add BLKGETSIZE64 too */
 			g = get_gendisk(dev);
 			if (!g)
-				longval = 0;
+				ulongval = 0;
 			else
-				longval = g->part[MINOR(dev)].nr_sects;
-			return put_user(longval, (long *) arg);
+				ulongval = g->part[MINOR(dev)].nr_sects;
+			return put_user(ulongval, (unsigned long *) arg);
 #endif
 #if 0
 		case BLKRRPART: /* Re-read partition tables */

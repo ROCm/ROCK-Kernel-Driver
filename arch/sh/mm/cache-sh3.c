@@ -1,4 +1,4 @@
-/* $Id: cache-sh3.c,v 1.5 2001/08/24 15:31:41 dwmw2 Exp $
+/* $Id: cache-sh3.c,v 1.6 2001/09/10 08:59:59 dwmw2 Exp $
  *
  *  linux/arch/sh/mm/cache-sh3.c
  *
@@ -20,10 +20,17 @@
 #include <asm/pgalloc.h>
 #include <asm/mmu_context.h>
 
+
 #define CCR		0xffffffec	/* Address of Cache Control Register */
-#define CCR_CACHE_VAL	0x00000005	/* 8k-byte cache, P1-wb, enable */
-#define CCR_CACHE_INIT	0x0000000d	/* 8k-byte cache, CF, P1-wb, enable */
-#define CCR_CACHE_ENABLE	 1
+
+#define CCR_CACHE_CE	0x01	/* Cache Enable */
+#define CCR_CACHE_WT	0x02	/* Write-Through (for P0,U0,P3) (else writeback) */
+#define CCR_CACHE_CB	0x04	/* Write-Back (for P1) (else writethrough) */
+#define CCR_CACHE_CF	0x08	/* Cache Flush */
+#define CCR_CACHE_RA	0x20	/* RAM mode */
+
+#define CCR_CACHE_VAL	(CCR_CACHE_CB|CCR_CACHE_CE)	/* 8k-byte cache, P1-wb, enable */
+#define CCR_CACHE_INIT	(CCR_CACHE_CF|CCR_CACHE_VAL)	/* 8k-byte cache, CF, P1-wb, enable */
 
 #define CACHE_OC_ADDRESS_ARRAY 0xf0000000
 #define CACHE_VALID	  1
@@ -131,7 +138,7 @@ void __init cache_init(void)
 
 	jump_to_P2();
 	ccr = ctrl_inl(CCR);
-	if (ccr & CCR_CACHE_ENABLE)
+	if (ccr & CCR_CACHE_CE)
 		/*
 		 * XXX: Should check RA here. 
 		 * If RA was 1, we only need to flush the half of the caches.

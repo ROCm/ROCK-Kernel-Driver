@@ -1,4 +1,4 @@
-/* $Id: fault.c,v 1.48 2001/08/09 00:27:04 gniibe Exp $
+/* $Id: fault.c,v 1.49 2001/10/06 19:46:00 lethal Exp $
  *
  *  linux/arch/sh/mm/fault.c
  *  Copyright (C) 1999  Niibe Yutaka
@@ -134,6 +134,7 @@ good_area:
 	 * make sure we exit gracefully rather than endlessly redo
 	 * the fault.
 	 */
+survive:
 	switch (handle_mm_fault(mm, vma, address, writeaccess)) {
 	case 1:
 		tsk->min_flt++;
@@ -205,6 +206,12 @@ no_context:
  */
 out_of_memory:
 	up_read(&mm->mmap_sem);
+	if (current->pid == 1) {
+		current->policy |= SCHED_YIELD;
+		schedule();
+		down_read(&mm->mmap_sem);
+		goto survive;
+	}
 	printk("VM: killing process %s\n", tsk->comm);
 	if (user_mode(regs))
 		do_exit(SIGKILL);

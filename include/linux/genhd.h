@@ -58,8 +58,8 @@ struct partition {
 #  include <linux/devfs_fs_kernel.h>
 
 struct hd_struct {
-	long start_sect;
-	long nr_sects;
+	unsigned long start_sect;
+	unsigned long nr_sects;
 	devfs_handle_t de;              /* primary (master) devfs entry  */
 	int number;                     /* stupid old code wastes space  */
 };

@@ -117,9 +117,10 @@ void fbcon_mfb_putcs(struct vc_data *conp, struct display *p,
     u16 c;
 
     dest0 = p->screen_base+yy*fontheight(p)*p->next_line+xx;
-    bold = attr_bold(p,scr_readw(s));
-    revs = attr_reverse(p,scr_readw(s));
-    underl = attr_underline(p,scr_readw(s));
+    c = scr_readw(s);
+    bold = attr_bold(p, c);
+    revs = attr_reverse(p, c);
+    underl = attr_underline(p, c);
 
     while (count--) {
 	c = scr_readw(s++) & p->charmask;

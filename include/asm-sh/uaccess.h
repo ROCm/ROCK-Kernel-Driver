@@ -1,4 +1,4 @@
-/* $Id: uaccess.h,v 1.12 2001/07/27 06:09:47 gniibe Exp $
+/* $Id: uaccess.h,v 1.13 2001/10/01 02:22:01 gniibe Exp $
  *
  * User space memory access functions
  *
@@ -150,6 +150,7 @@ switch (size) { \
 case 1: __put_user_asm("b"); break; \
 case 2: __put_user_asm("w"); break; \
 case 4: __put_user_asm("l"); break; \
+case 8: __put_user_u64(__pu_val,__pu_addr,__pu_err); break; \
 default: __put_user_unknown(); break; \
 } __pu_err; })
 
@@ -165,6 +166,7 @@ switch (size) { \
 case 1: __put_user_asm("b"); break; \
 case 2: __put_user_asm("w"); break; \
 case 4: __put_user_asm("l"); break; \
+case 8: __put_user_u64(__pu_val,__pu_addr,__pu_err); break; \
 default: __put_user_unknown(); break; \
 } } __pu_err; })
 
@@ -189,6 +191,53 @@ __asm__ __volatile__( \
 	:"=&r" (__pu_err) \
 	:"r" (__pu_val), "m" (__m(__pu_addr)), "i" (-EFAULT) \
         :"memory"); })
+
+#if defined(__LITTLE_ENDIAN__)
+#define __put_user_u64(val,addr,retval) \
+({ \
+__asm__ __volatile__( \
+	"1:\n\t" \
+	"mov.l	%R1,%2\n\t" \
+	"mov.l	%S1,%T2\n\t" \
+	"mov	#0,%0\n" \
+	"2:\n" \
+	".section	.fixup,\"ax\"\n" \
+	"3:\n\t" \
+	"nop\n\t" \
+	"mov.l	4f,%0\n\t" \
+	"jmp	@%0\n\t" \
+	" mov	%3,%0\n" \
+	"4:	.long	2b\n\t" \
+	".previous\n" \
+	".section	__ex_table,\"a\"\n\t" \
+	".long	1b, 3b\n\t" \
+	".previous" \
+	: "=r" (retval) \
+	: "r" (val), "m" (__m(addr)), "i" (-EFAULT) \
+        : "memory"); })
+#else
+({ \
+__asm__ __volatile__( \
+	"1:\n\t" \
+	"mov.l	%S1,%2\n\t" \
+	"mov.l	%R1,%T2\n\t" \
+	"mov	#0,%0\n" \
+	"2:\n" \
+	".section	.fixup,\"ax\"\n" \
+	"3:\n\t" \
+	"nop\n\t" \
+	"mov.l	4f,%0\n\t" \
+	"jmp	@%0\n\t" \
+	" mov	%3,%0\n" \
+	"4:	.long	2b\n\t" \
+	".previous\n" \
+	".section	__ex_table,\"a\"\n\t" \
+	".long	1b, 3b\n\t" \
+	".previous" \
+	: "=r" (retval) \
+	: "r" (val), "m" (__m(addr)), "i" (-EFAULT) \
+        : "memory"); })
+#endif
 
 extern void __put_user_unknown(void);
 

@@ -495,19 +495,6 @@ static int print_leaf (struct buffer_head * bh, int print_mode, int first, int l
     return 0;
 }
 
-static char * reiserfs_version (char * buf)
-{
-    __u16 * pversion;
-
-    pversion = (__u16 *)(buf) + 36;
-    if (*pversion == 0)
-	return "0";
-    if (*pversion == 2)
-	return "2";
-    return "Unknown";
-}
-
-
 /* return 1 if this is not super block */
 static int print_super_block (struct buffer_head * bh)
 {

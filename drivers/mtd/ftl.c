@@ -1174,7 +1174,7 @@ static int ftl_ioctl(struct inode *inode, struct file *file,
 	put_user(ftl_hd[minor].start_sect, (u_long *)&geo->start);
 	break;
     case BLKGETSIZE:
-	ret = put_user(ftl_hd[minor].nr_sects, (long *)arg);
+	ret = put_user(ftl_hd[minor].nr_sects, (unsigned long *)arg);
 	break;
     case BLKGETSIZE64:
 	ret = put_user((u64)ftl_hd[minor].nr_sects << 9, (u64 *)arg);

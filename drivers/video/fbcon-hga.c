@@ -148,9 +148,10 @@ void fbcon_hga_putcs(struct vc_data *conp, struct display *p,
 	u8 d;
 	u16 c;
 	
-	bold = attr_bold(p,scr_readw(s));
-	revs = attr_reverse(p,scr_readw(s));
-	underl = attr_underline(p,scr_readw(s));
+	c = scr_readw(s);
+	bold = attr_bold(p, c);
+	revs = attr_reverse(p, c);
+	underl = attr_underline(p, c);
 	y0 = yy*fontheight(p);
 
 	while (count--) {

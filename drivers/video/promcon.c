@@ -51,27 +51,30 @@ promcon_start(struct vc_data *conp, char *b)
 {
 	unsigned short *s = (unsigned short *)
 			(conp->vc_origin + py * conp->vc_size_row + (px << 1));
+	u16 cs;
 
+	cs = scr_readw(s);
 	if (px == pw) {
 		unsigned short *t = s - 1;
+		u16 ct = scr_readw(t);
 
-		if (inverted(*s) && inverted(*t))
-			return sprintf(b, "\b\033[7m%c\b\033[@%c\033[m",
-				       *s, *t);
-		else if (inverted(*s))
-			return sprintf(b, "\b\033[7m%c\033[m\b\033[@%c",
-				       *s, *t);
-		else if (inverted(*t))
-			return sprintf(b, "\b%c\b\033[@\033[7m%c\033[m",
-				       *s, *t);
+		if (inverted(cs) && inverted(ct))
+			return sprintf(b, "\b\033[7m%c\b\033[@%c\033[m", cs,
+				       ct);
+		else if (inverted(cs))
+			return sprintf(b, "\b\033[7m%c\033[m\b\033[@%c", cs,
+				       ct);
+		else if (inverted(ct))
+			return sprintf(b, "\b%c\b\033[@\033[7m%c\033[m", cs,
+				       ct);
 		else
-			return sprintf(b, "\b%c\b\033[@%c", *s, *t);
+			return sprintf(b, "\b%c\b\033[@%c", cs, ct);
 	}
 
-	if (inverted(*s))
-		return sprintf(b, "\033[7m%c\033[m\b", *s);
+	if (inverted(cs))
+		return sprintf(b, "\033[7m%c\033[m\b", cs);
 	else
-		return sprintf(b, "%c\b", *s);
+		return sprintf(b, "%c\b", cs);
 }
 
 static int
@@ -80,27 +83,30 @@ promcon_end(struct vc_data *conp, char *b)
 	unsigned short *s = (unsigned short *)
 			(conp->vc_origin + py * conp->vc_size_row + (px << 1));
 	char *p = b;
+	u16 cs;
 
 	b += sprintf(b, "\033[%d;%dH", py + 1, px + 1);
 
+	cs = scr_readw(s);
 	if (px == pw) {
 		unsigned short *t = s - 1;
+		u16 ct = scr_readw(t);
 
-		if (inverted(*s) && inverted(*t))
-			b += sprintf(b, "\b%c\b\033[@\033[7m%c\033[m", *s, *t);
-		else if (inverted(*s))
-			b += sprintf(b, "\b%c\b\033[@%c", *s, *t);
-		else if (inverted(*t))
-			b += sprintf(b, "\b\033[7m%c\b\033[@%c\033[m", *s, *t);
+		if (inverted(cs) && inverted(ct))
+			b += sprintf(b, "\b%c\b\033[@\033[7m%c\033[m", cs, ct);
+		else if (inverted(cs))
+			b += sprintf(b, "\b%c\b\033[@%c", cs, ct);
+		else if (inverted(ct))
+			b += sprintf(b, "\b\033[7m%c\b\033[@%c\033[m", cs, ct);
 		else
-			b += sprintf(b, "\b\033[7m%c\033[m\b\033[@%c", *s, *t);
+			b += sprintf(b, "\b\033[7m%c\033[m\b\033[@%c", cs, ct);
 		return b - p;
 	}
 
-	if (inverted(*s))
-		b += sprintf(b, "%c\b", *s);
+	if (inverted(cs))
+		b += sprintf(b, "%c\b", cs);
 	else
-		b += sprintf(b, "\033[7m%c\033[m\b", *s);
+		b += sprintf(b, "\033[7m%c\033[m\b", cs);
 	return b - p;
 }
 
@@ -206,8 +212,9 @@ promcon_repaint_line(unsigned short *s, unsigned char *buf, unsigned char **bp)
 	unsigned char *b = *bp;
 
 	while (cnt--) {
-		if (attr != inverted(*s)) {
-			attr = inverted(*s);
+		u16 c = scr_readw(s);
+		if (attr != inverted(c)) {
+			attr = inverted(c);
 			if (attr) {
 				strcpy (b, "\033[7m");
 				b += 4;
@@ -216,7 +223,8 @@ promcon_repaint_line(unsigned short *s, unsigned char *buf, unsigned char **bp)
 				b += 3;
 			}
 		}
-		*b++ = *s++;
+		*b++ = c;
+		s++;
 		if (b - buf >= 224) {
 			promcon_puts(buf, b - buf);
 			b = buf;
@@ -246,9 +254,9 @@ promcon_putcs(struct vc_data *conp, const unsigned short *s,
 	if (x + count >= pw + 1) {
 		if (count == 1) {
 			x -= 1;
-			save = *(unsigned short *)(conp->vc_origin
+			save = scr_readw((unsigned short *)(conp->vc_origin
 						   + y * conp->vc_size_row
-						   + (x << 1));
+						   + (x << 1)));
 
 			if (px != x || py != y) {
 				b += sprintf(b, "\033[%d;%dH", y + 1, x + 1);

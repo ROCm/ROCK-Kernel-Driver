@@ -681,6 +681,7 @@ retry:
 	} else {
 		kdev_t dev = get_unnamed_dev();
 		if (!dev) {
+			spin_unlock(&sb_lock);
 			put_super(s);
 			return ERR_PTR(-EMFILE);
 		}

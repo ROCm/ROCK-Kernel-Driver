@@ -2409,7 +2409,7 @@ int ide_cdrom_drive_status (struct cdrom_device_info *cdi, int slot_nr)
 		 * any other way to detect this...
 		 */
 		if (sense.sense_key == NOT_READY) {
-			if (sense.asc == 0x3a && (!sense.ascq||sense.ascq == 1))
+			if (sense.asc == 0x3a && sense.ascq == 1)
 				return CDS_NO_DISC;
 			else
 				return CDS_TRAY_OPEN;
@@ -3059,3 +3059,4 @@ int ide_cdrom_init(void)
 
 module_init(ide_cdrom_init);
 module_exit(ide_cdrom_exit);
+MODULE_LICENSE("GPL");

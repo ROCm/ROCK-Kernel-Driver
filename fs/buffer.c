@@ -480,10 +480,12 @@ static inline void __insert_into_hash_list(struct buffer_head *bh)
 
 static __inline__ void __hash_unlink(struct buffer_head *bh)
 {
-	if (bh->b_pprev) {
-		if (bh->b_next)
-			bh->b_next->b_pprev = bh->b_pprev;
-		*(bh->b_pprev) = bh->b_next;
+	struct buffer_head **pprev = bh->b_pprev;
+	if (pprev) {
+		struct buffer_head *next = bh->b_next;
+		if (next)
+			next->b_pprev = pprev;
+		*pprev = next;
 		bh->b_pprev = NULL;
 	}
 }
@@ -508,14 +510,18 @@ static void __insert_into_lru_list(struct buffer_head * bh, int blist)
 
 static void __remove_from_lru_list(struct buffer_head * bh, int blist)
 {
-	if (bh->b_prev_free || bh->b_next_free) {
-		bh->b_prev_free->b_next_free = bh->b_next_free;
-		bh->b_next_free->b_prev_free = bh->b_prev_free;
-		if (lru_list[blist] == bh)
-			lru_list[blist] = bh->b_next_free;
-		if (lru_list[blist] == bh)
-			lru_list[blist] = NULL;
-		bh->b_next_free = bh->b_prev_free = NULL;
+	struct buffer_head *next = bh->b_next_free;
+	if (next) {
+		struct buffer_head *prev = bh->b_prev_free;
+		prev->b_next_free = next;
+		next->b_prev_free = prev;
+		if (lru_list[blist] == bh) {
+			if (next == bh)
+				next = NULL;
+			lru_list[blist] = next;
+		}
+		bh->b_next_free = NULL;
+		bh->b_prev_free = NULL;
 		nr_buffers_type[blist]--;
 		size_buffers_type[blist] -= bh->b_size;
 	}

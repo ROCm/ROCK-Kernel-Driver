@@ -545,7 +545,7 @@ int sr_dev_ioctl(struct cdrom_device_info *cdi,
 
 	switch (cmd) {
 	case BLKGETSIZE:
-		return put_user(scsi_CDs[target].capacity, (long *) arg);
+		return put_user(scsi_CDs[target].capacity, (unsigned long *) arg);
 	case BLKGETSIZE64:
 		return put_user((u64)scsi_CDs[target].capacity << 9, (u64 *)arg);
 	case BLKROSET:

@@ -12,11 +12,6 @@
 # this architecture
 #
 
-#
-# Select the object file format to substitute into the linker script.
-#
-tool_prefix	= sh-linux-gnu-
-
 ifdef CONFIG_CPU_LITTLE_ENDIAN
 CFLAGS		+= -ml
 AFLAGS		+= -ml
@@ -28,10 +23,6 @@ AFLAGS		+= -mb
 # LINKFLAGS	+= -EB
 LDFLAGS		:= -EB
 endif
-
-# ifdef CONFIG_CROSSCOMPILE
-CROSS_COMPILE  = $(tool_prefix)
-# endif
 
 LD	=$(CROSS_COMPILE)ld $(LDFLAGS)
 OBJCOPY=$(CROSS_COMPILE)objcopy -O binary -R .note -R .comment -R .stab -R .stabstr -S
@@ -46,8 +37,8 @@ CFLAGS		+= -m3
 AFLAGS		+= -m3
 endif
 ifdef CONFIG_CPU_SH4
-CFLAGS		+= -m4-nofpu
-AFLAGS		+= -m4-nofpu
+CFLAGS		+= -m4 -mno-implicit-fp
+AFLAGS		+= -m4 -mno-implicit-fp
 endif
 
 #

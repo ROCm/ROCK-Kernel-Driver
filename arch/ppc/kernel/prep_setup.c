@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.prep_setup.c 1.36 09/08/01 15:47:42 paulus
+ * BK Id: SCCS/s.prep_setup.c 1.38 09/15/01 09:13:52 trini
  */
 /*
  *  linux/arch/ppc/kernel/setup.c
@@ -840,8 +840,8 @@ unsigned long __init prep_find_end_of_memory(void)
  */
 void __init prep_map_io(void)
 {
-	io_block_mapping(0x80000000, 0x80000000, 0x10000000, _PAGE_IO);
-	io_block_mapping(0xf0000000, 0xc0000000, 0x08000000, _PAGE_IO);
+	io_block_mapping(0x80000000, PREP_ISA_IO_BASE, 0x10000000, _PAGE_IO);
+	io_block_mapping(0xf0000000, PREP_ISA_MEM_BASE, 0x08000000, _PAGE_IO);
 }
 
 void __init

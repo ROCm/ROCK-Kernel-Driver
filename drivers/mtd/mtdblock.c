@@ -539,7 +539,7 @@ static int mtdblock_ioctl(struct inode * inode, struct file * file,
 
 	switch (cmd) {
 	case BLKGETSIZE:   /* Return device size */
-		return put_user((mtdblk->mtd->size >> 9), (long *) arg);
+		return put_user((mtdblk->mtd->size >> 9), (unsigned long *) arg);
 	case BLKGETSIZE64:
 		return put_user((u64)mtdblk->mtd->size, (u64 *)arg);
 		
