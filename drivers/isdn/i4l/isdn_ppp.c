@@ -99,7 +99,7 @@ isdn_ppp_frame_log(char *info, char *data, int len, int maxlen,int unit,int slot
  * note: it can happen, that we hangup/free the master before the slaves
  *       in this case we bind another lp to the master device
  */
-void
+static void
 isdn_ppp_free(isdn_net_local * lp)
 {
 	unsigned long flags;
@@ -2927,6 +2927,7 @@ isdn_ppp_setup(isdn_net_dev *p)
 	p->dev.do_ioctl = isdn_ppp_dev_ioctl;
 	p->local.receive = isdn_ppp_receive;
 	p->local.connected = isdn_ppp_wakeup_daemon;
+	p->local.disconnected = isdn_ppp_free;
 
 	return 0;
 }

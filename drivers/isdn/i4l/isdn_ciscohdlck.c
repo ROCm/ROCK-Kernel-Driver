@@ -217,7 +217,7 @@ isdn_ciscohdlck_connected(isdn_net_local *lp)
 	isdn_net_device_wake_queue(lp);
 }
 
-void 
+static void 
 isdn_ciscohdlck_disconnected(isdn_net_local *lp)
 {
 	if (lp->p_encap == ISDN_NET_ENCAP_CISCOHDLCK) {
@@ -400,6 +400,7 @@ isdn_ciscohdlck_setup(isdn_net_dev *p)
 	p->dev.do_ioctl = isdn_ciscohdlck_dev_ioctl;
 	p->local.receive = isdn_ciscohdlck_receive;
 	p->local.connected = isdn_ciscohdlck_connected;
+	p->local.disconnected = isdn_ciscohdlck_disconnected;
 
 	return 0;
 }

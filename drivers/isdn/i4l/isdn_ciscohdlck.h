@@ -12,6 +12,5 @@
 #define ISDN_CISCOHDLCK_H
 
 int  isdn_ciscohdlck_setup(isdn_net_dev *p);
-void isdn_ciscohdlck_disconnected(isdn_net_local *lp);
 
 #endif

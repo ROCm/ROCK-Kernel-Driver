@@ -548,26 +548,19 @@ isdn_net_handle_event(isdn_net_local *lp, int pr, void *arg)
 			}
 			break;
 		case ISDN_STAT_DHUP:
-			/* Either D-Channel-hangup or error during dialout */
-			isdn_x25_dhup(lp);
-			if (lp->flags & ISDN_NET_CONNECTED) {
-				if (lp->p_encap == ISDN_NET_ENCAP_CISCOHDLCK)
-					isdn_ciscohdlck_disconnected(lp);
-				if (lp->p_encap == ISDN_NET_ENCAP_SYNCPPP)
-					isdn_ppp_free(lp);
+			if (!(lp->flags & ISDN_NET_CONNECTED))
+				break;
 
-				isdn_net_lp_disconnected(lp);
-				isdn_slot_all_eaz(lp->isdn_slot);
-				printk(KERN_INFO "%s: remote hangup\n", lp->name);
-				printk(KERN_INFO "%s: Chargesum is %d\n", lp->name,
-				       lp->charge);
-				isdn_net_unbind_channel(lp);
-				return 1;
-			}
-			break;
-		case ISDN_STAT_BHUP:
-			isdn_x25_bhup(lp);
-			break;
+			if (lp->disconnected)
+				lp->disconnected(lp);
+
+			isdn_net_lp_disconnected(lp);
+			isdn_slot_all_eaz(lp->isdn_slot);
+			printk(KERN_INFO "%s: remote hangup\n", lp->name);
+			printk(KERN_INFO "%s: Chargesum is %d\n", lp->name,
+			       lp->charge);
+			isdn_net_unbind_channel(lp);
+			return 1;
 		case ISDN_STAT_CINF:
 			/* Charge-info from TelCo. Calculate interval between
 			 * charge-infos and set timestamp for last info for
@@ -713,10 +706,10 @@ isdn_net_hangup(isdn_net_local *lp)
 			}
 		}
 		printk(KERN_INFO "isdn_net: local hangup %s\n", lp->name);
-		if (lp->p_encap == ISDN_NET_ENCAP_SYNCPPP)
-			isdn_ppp_free(lp);
+		if (lp->disconnected)
+			lp->disconnected(lp);
+
 		isdn_net_lp_disconnected(lp);
-		isdn_x25_hangup(lp);
 
 		isdn_slot_command(lp->isdn_slot, ISDN_CMD_HANGUP, &cmd);
 		printk(KERN_INFO "%s: Chargesum is %d\n", lp->name, lp->charge);
@@ -1622,8 +1615,9 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 				/* if this interface is dialing, it does it probably on a different
 				   device, so free this device */
 				if (lp->dialstate == ST_OUT_WAIT_DCONN) {
-					if (lp->p_encap == ISDN_NET_ENCAP_SYNCPPP)
-						isdn_ppp_free(lp);
+					if (lp->disconnected)
+						lp->disconnected(lp);
+
 					isdn_net_lp_disconnected(lp);
 					isdn_slot_free(lp->isdn_slot,
 						       ISDN_USAGE_NET);
@@ -1651,14 +1645,12 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 				add_timer(&lp->dial_timer);
 				lp->dialstate = ST_IN_WAIT_DCONN;
 				
-#ifdef CONFIG_ISDN_PPP
 				if (lp->p_encap == ISDN_NET_ENCAP_SYNCPPP)
 					if (isdn_ppp_bind(lp) < 0) {
 						isdn_net_unbind_channel(lp);
 						restore_flags(flags);
 						return 0;
 					}
-#endif
 				restore_flags(flags);
 				return 1;
 			}
@@ -2465,6 +2457,7 @@ isdn_iptyp_setup(isdn_net_dev *p)
 	p->dev.flags = IFF_NOARP|IFF_POINTOPOINT;
 	p->local.receive = isdn_iptyp_receive;
 	p->local.connected = isdn_net_device_wake_queue;
+	p->local.disconnected = NULL;
 
 	return 0;
 }
@@ -2503,6 +2496,7 @@ isdn_uihdlc_setup(isdn_net_dev *p)
 	p->dev.flags = IFF_NOARP|IFF_POINTOPOINT;
 	p->local.receive = isdn_uihdlc_receive;
 	p->local.connected = isdn_net_device_wake_queue;
+	p->local.disconnected = NULL;
 
 	return 0;
 }
@@ -2531,6 +2525,7 @@ isdn_rawip_setup(isdn_net_dev *p)
 	p->dev.flags = IFF_NOARP|IFF_POINTOPOINT;
 	p->local.receive = isdn_rawip_receive;
 	p->local.connected = isdn_net_device_wake_queue;
+	p->local.disconnected = NULL;
 
 	return 0;
 }
@@ -2613,6 +2608,7 @@ isdn_ether_setup(isdn_net_dev *p)
 	p->dev.flags = IFF_BROADCAST | IFF_MULTICAST;
 	p->local.receive = isdn_ether_receive;
 	p->local.connected = isdn_net_device_wake_queue;
+	p->local.disconnected = NULL;
 
 	return 0;
 }

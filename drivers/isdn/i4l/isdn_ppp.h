@@ -23,7 +23,6 @@ extern int isdn_ppp_hangup_slave(char *);
 
 int  isdn_ppp_setup(isdn_net_dev *p);
 int  isdn_ppp_bind(isdn_net_local *);
-void isdn_ppp_free(isdn_net_local *);
 int  isdn_ppp_xmit(struct sk_buff *, struct net_device *);
 
 #else
@@ -39,11 +38,6 @@ static inline int
 isdn_ppp_bind(isdn_net_local *)
 {
 	return 0;
-}
-
-static inline void
-isdn_ppp_free(isdn_net_local *lp)
-{
 }
 
 static inline int

@@ -160,43 +160,15 @@ static void isdn_x25_connected(isdn_net_local *lp)
 	isdn_net_device_wake_queue(lp);
 }
 
-void isdn_x25_dhup(isdn_net_local *lp)
+static void isdn_x25_disconnected(isdn_net_local *lp)
 {
 	struct concap_proto *cprot = lp -> netdev -> cprot;
 	struct concap_proto_ops *pops = cprot ? cprot -> pops : 0;
 
-	/* If we are not connected then dialing had
-	   failed. If there are generic encap protocol
-	   receiver routines signal the closure of
-	   the link */
-	
-	if (!(lp->flags & ISDN_NET_CONNECTED)
-	    && pops && pops->disconn_ind)
-		pops -> disconn_ind(cprot);
-}
-
-void isdn_x25_bhup(isdn_net_local *lp)
-{
-	struct concap_proto *cprot = lp -> netdev -> cprot;
-	struct concap_proto_ops *pops = cprot ? cprot -> pops : 0;
-
-	/* B-Channel-hangup */
 	/* try if there are generic encap protocol
 	   receiver routines and signal the closure of
 	   the link */
 	if( pops  &&  pops -> disconn_ind )
-		pops -> disconn_ind(cprot);
-}
-
-void isdn_x25_hangup(isdn_net_local *lp)
-{
-	struct concap_proto *cprot = lp -> netdev -> cprot;
-	struct concap_proto_ops *pops = cprot ? cprot -> pops : 0;
-
-	/* try if there are generic encap protocol
-	   receiver routines and signal the closure of
-	   the link */
-	if( pops && pops -> disconn_ind )
 		pops -> disconn_ind(cprot);
 }
 
@@ -267,6 +239,7 @@ int isdn_x25_setup(isdn_net_dev *p, int encap)
 	p->dev.header_cache_update = NULL;
 	p->local.receive = isdn_x25_receive;
 	p->local.connected = isdn_x25_connected;
+	p->local.disconnected = isdn_x25_disconnected;
 
 	/* the protocol is not configured yet; this will
 	   happen later when isdn_x25_open() is called */
