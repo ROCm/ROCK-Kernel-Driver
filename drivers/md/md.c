@@ -3230,7 +3230,7 @@ static void md_do_sync(void *data)
 					flush_curr_signals();
 					err = -EINTR;
 					mddev_put(mddev2);
-					goto out;
+					goto skip;
 				}
 			}
 		}
@@ -3331,11 +3331,11 @@ static void md_do_sync(void *data)
 	/*
 	 * this also signals 'finished resyncing' to md_stop
 	 */
-out:
+ out:
 	wait_event(mddev->recovery_wait, !atomic_read(&mddev->recovery_active));
 	/* tell personality that we are finished */
 	mddev->pers->sync_request(mddev, max_sectors, 1);
-
+ skip:
 	mddev->curr_resync = 0;
 	if (err)
 		mddev->recovery_running = err;
