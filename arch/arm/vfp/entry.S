@@ -17,6 +17,7 @@
  */
 #include <linux/linkage.h>
 #include <linux/init.h>
+#include <asm/constants.h>
 #include <asm/thread_info.h>
 #include <asm/vfpmacros.h>
 
