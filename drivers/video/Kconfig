@@ -196,11 +196,11 @@ config FB_CYBER
 	  you have any questions, be sure to ask!). Say N unless you have a
 	  Cybervision 64 or plan to get one before you next recompile the
 	  kernel. Please note that this driver DOES NOT support the
-	  Cybervision 64 3D card, as they use incompatible video chips.
+	  Cybervision 64/3D card, as they use incompatible video chips.
 
 config FB_VIRGE
-	bool "Amiga CyberVision3D support "
-	depends on FB && ZORRO
+	bool "Amiga CyberVision 64/3D support "
+	depends on FB && ZORRO && BROKEN
 	help
 	  This enables support for the Cybervision 64/3D graphics card from
 	  Phase5. Please note that its use is not all that intuitive (i.e. if
