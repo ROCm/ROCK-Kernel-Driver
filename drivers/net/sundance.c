@@ -84,13 +84,14 @@
 	- Fix bug of custom mac address 
 	(StationAddr register only accept word write) 
 
-	Version LK1.09 (D-Link);
+	Version LK1.09 (D-Link):
 	- Fix the flowctrl bug.	
+	- Set Pause bit in MII ANAR if flow control enabled.	
 */
 
 #define DRV_NAME	"sundance"
-#define DRV_VERSION	"1.01+LK1.09"
-#define DRV_RELDATE	"8-May-2003"
+#define DRV_VERSION	"1.01+LK1.09a"
+#define DRV_RELDATE	"16-May-2003"
 
 
 /* The user-configurable values.
@@ -689,6 +690,9 @@ static int __devinit sundance_probe1 (struct pci_dev *pdev,
 	/* Reset PHY */
 	mdio_write (dev, np->phys[0], MII_BMCR, BMCR_RESET);
 	mdelay (300);
+	/* If flow control enabled, we need to advertise it.*/
+	if (np->flowctrl)
+		mdio_write (dev, np->phys[0], MII_ADVERTISE, np->mii_if.advertising | 0x0400);
 	mdio_write (dev, np->phys[0], MII_BMCR, BMCR_ANENABLE|BMCR_ANRESTART);
 	/* Force media type */
 	if (!np->an_enable) {
