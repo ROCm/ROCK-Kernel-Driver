@@ -304,19 +304,27 @@ extern void setup_per_zone_pages_min(void);
 #define numa_node_id()		(cpu_to_node(smp_processor_id()))
 
 #ifndef CONFIG_DISCONTIGMEM
+
 extern struct pglist_data contig_page_data;
 #define NODE_DATA(nid)		(&contig_page_data)
 #define NODE_MEM_MAP(nid)	mem_map
-#define MAX_NR_NODES		1
+#define MAX_NODES_SHIFT		0
+
 #else /* CONFIG_DISCONTIGMEM */
 
 #include <asm/mmzone.h>
-
-/* page->zone is currently 8 bits ... */
-#define MAX_NR_NODES		(255 / MAX_NR_ZONES)
+/*
+ * page->zone is currently 8 bits
+ * there are 3 zones (2 bits)
+ * this leaves 8-2=6 bits for nodes
+ */
+#define MAX_NODES_SHIFT		6
 
 #endif /* !CONFIG_DISCONTIGMEM */
 
+#if NODES_SHIFT > MAX_NODES_SHIFT
+#error NODES_SHIFT > MAX_NODES_SHIFT
+#endif
 
 extern DECLARE_BITMAP(node_online_map, MAX_NUMNODES);
 extern DECLARE_BITMAP(memblk_online_map, MAX_NR_MEMBLKS);
