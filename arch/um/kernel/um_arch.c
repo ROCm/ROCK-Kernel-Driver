@@ -44,11 +44,6 @@ struct cpuinfo_um boot_cpu_data = {
 	.ipi_pipe		= { -1, -1 }
 };
 
-/* Placeholder to make UML link until the vsyscall stuff is actually
- * implemented
- */
-void *__kernel_vsyscall;
-
 unsigned long thread_saved_pc(struct task_struct *task)
 {
 	return(os_process_pc(CHOOSE_MODE_PROC(thread_pid_tt, thread_pid_skas,

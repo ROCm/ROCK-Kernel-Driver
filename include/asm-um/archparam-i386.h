@@ -10,7 +10,8 @@
 
 #include "user.h"
 
-#define ELF_PLATFORM "i586"
+extern char * elf_aux_platform;
+#define ELF_PLATFORM (elf_aux_platform)
 
 #define ELF_ET_DYN_BASE (2 * TASK_SIZE / 3)
 
@@ -56,15 +57,13 @@ typedef elf_greg_t elf_gregset_t[ELF_NGREG];
 	pr_reg[16] = PT_REGS_SS(regs);		\
 } while(0);
 
-#if 0 /* Turn this back on when UML has VSYSCALL working */
-#define VSYSCALL_BASE	(__fix_to_virt(FIX_VSYSCALL))
-#else
-#define VSYSCALL_BASE	0
-#endif
 
-#define VSYSCALL_EHDR	((const struct elfhdr *) VSYSCALL_BASE)
-#define VSYSCALL_ENTRY	((unsigned long) &__kernel_vsyscall)
-extern void *__kernel_vsyscall;
+extern long vsyscall_ehdr;
+extern long vsyscall_end;
+extern long __kernel_vsyscall;
+
+#define VSYSCALL_BASE vsyscall_ehdr
+#define VSYSCALL_END vsyscall_end
 
 /*
  * Architecture-neutral AT_ values in 0-17, leave some room
@@ -75,8 +74,10 @@ extern void *__kernel_vsyscall;
 
 #define ARCH_DLINFO						\
 do {								\
-		NEW_AUX_ENT(AT_SYSINFO,	VSYSCALL_ENTRY);	\
-		NEW_AUX_ENT(AT_SYSINFO_EHDR, VSYSCALL_BASE);	\
+	if ( vsyscall_ehdr ) {					\
+		NEW_AUX_ENT(AT_SYSINFO,	__kernel_vsyscall);	\
+		NEW_AUX_ENT(AT_SYSINFO_EHDR, vsyscall_ehdr);	\
+	}							\
 } while (0)
 
 /*

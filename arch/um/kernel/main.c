@@ -81,6 +81,8 @@ static void last_ditch_exit(int sig)
 
 extern int uml_exitcode;
 
+extern void scan_elf_aux( char **envp);
+
 int main(int argc, char **argv, char **envp)
 {
 	char **new_argv;
@@ -146,6 +148,8 @@ int main(int argc, char **argv, char **envp)
 	set_handler(SIGINT, last_ditch_exit, SA_ONESHOT | SA_NODEFER, -1);
 	set_handler(SIGTERM, last_ditch_exit, SA_ONESHOT | SA_NODEFER, -1);
 	set_handler(SIGHUP, last_ditch_exit, SA_ONESHOT | SA_NODEFER, -1);
+
+	scan_elf_aux( envp);
 
 	do_uml_initcalls();
 	ret = linux_main(argc, argv);
