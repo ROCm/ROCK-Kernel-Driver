@@ -56,14 +56,12 @@ static struct hl_host_info *hl_get_hostinfo(struct hpsb_highlevel *hl,
 					      struct hpsb_host *host)
 {
 	struct hl_host_info *hi = NULL;
-	struct list_head *lh;
 
 	if (!hl || !host)
 		return NULL;
 
 	read_lock(&hl->host_info_lock);
-	list_for_each (lh, &hl->host_info_list) {
-		hi = list_entry(lh, struct hl_host_info, list);
+	list_for_each_entry(hi, &hl->host_info_list, list) {
 		if (hi->host == host)
 			break;
 		hi = NULL;
@@ -188,7 +186,6 @@ unsigned long hpsb_get_hostinfo_key(struct hpsb_highlevel *hl, struct hpsb_host 
 
 void *hpsb_get_hostinfo_bykey(struct hpsb_highlevel *hl, unsigned long key)
 {
-	struct list_head *lh;
 	struct hl_host_info *hi;
 	void *data = NULL;
 
@@ -196,8 +193,7 @@ void *hpsb_get_hostinfo_bykey(struct hpsb_highlevel *hl, unsigned long key)
 		return NULL;
 
 	read_lock(&hl->host_info_lock);
-	list_for_each (lh, &hl->host_info_list) {
-		hi = list_entry(lh, struct hl_host_info, list);
+	list_for_each_entry(hi, &hl->host_info_list, list) {
 		if (hi->key == key) {
 			data = hi->data;
 			break;
@@ -211,7 +207,6 @@ void *hpsb_get_hostinfo_bykey(struct hpsb_highlevel *hl, unsigned long key)
 
 struct hpsb_host *hpsb_get_host_bykey(struct hpsb_highlevel *hl, unsigned long key)
 {
-	struct list_head *lh;
 	struct hl_host_info *hi;
 	struct hpsb_host *host = NULL;
 
@@ -219,8 +214,7 @@ struct hpsb_host *hpsb_get_host_bykey(struct hpsb_highlevel *hl, unsigned long k
 		return NULL;
 
 	read_lock(&hl->host_info_lock);
-	list_for_each (lh, &hl->host_info_list) {
-		hi = list_entry(lh, struct hl_host_info, list);
+	list_for_each_entry(hi, &hl->host_info_list, list) {
 		if (hi->key == key) {
 			host = hi->host;
 			break;

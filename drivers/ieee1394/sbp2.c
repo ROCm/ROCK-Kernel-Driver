@@ -470,14 +470,12 @@ static void sbp2util_remove_command_orb_pool(struct scsi_id_instance_data *scsi_
 static struct sbp2_command_info *sbp2util_find_command_for_orb(
 		struct scsi_id_instance_data *scsi_id, dma_addr_t orb)
 {
-	struct list_head *lh;
 	struct sbp2_command_info *command;
 	unsigned long flags;
 
 	spin_lock_irqsave(&scsi_id->sbp2_command_orb_lock, flags);
 	if (!list_empty(&scsi_id->sbp2_command_orb_inuse)) {
-		list_for_each(lh, &scsi_id->sbp2_command_orb_inuse) {
-			command = list_entry(lh, struct sbp2_command_info, list);
+		list_for_each_entry(command, &scsi_id->sbp2_command_orb_inuse, list) {
 			if (command->command_orb_dma == orb) {
 				spin_unlock_irqrestore(&scsi_id->sbp2_command_orb_lock, flags);
 				return (command);
@@ -497,14 +495,12 @@ static struct sbp2_command_info *sbp2util_find_command_for_orb(
  */
 static struct sbp2_command_info *sbp2util_find_command_for_SCpnt(struct scsi_id_instance_data *scsi_id, void *SCpnt)
 {
-	struct list_head *lh;
 	struct sbp2_command_info *command;
 	unsigned long flags;
 
 	spin_lock_irqsave(&scsi_id->sbp2_command_orb_lock, flags);
 	if (!list_empty(&scsi_id->sbp2_command_orb_inuse)) {
-		list_for_each(lh, &scsi_id->sbp2_command_orb_inuse) {
-			command = list_entry(lh, struct sbp2_command_info, list);
+		list_for_each_entry(command, &scsi_id->sbp2_command_orb_inuse, list) {
 			if (command->Current_SCpnt == SCpnt) {
 				spin_unlock_irqrestore(&scsi_id->sbp2_command_orb_lock, flags);
 				return (command);
@@ -1563,7 +1559,6 @@ static void sbp2_parse_unit_directory(struct scsi_id_group *scsi_group,
 	struct csr1212_keyval *kv;
 	struct csr1212_dentry *dentry;
 	struct scsi_id_instance_data *scsi_id;
-	struct list_head *lh;
 	u64 management_agent_addr;
 	u32 command_set_spec_id, command_set, unit_characteristics,
 		firmware_revision, workarounds;
@@ -1706,9 +1701,7 @@ static void sbp2_parse_unit_directory(struct scsi_id_group *scsi_group,
 		}
 
 		/* Update the generic fields in all the LUN's */
-		list_for_each (lh, &scsi_group->scsi_id_list) {
-			scsi_id = list_entry(lh, struct scsi_id_instance_data, list);
-
+		list_for_each_entry(scsi_id, &scsi_group->scsi_id_list, list) {
 			scsi_id->sbp2_management_agent_addr = management_agent_addr;
 			scsi_id->sbp2_command_set_spec_id = command_set_spec_id;
 			scsi_id->sbp2_command_set = command_set;

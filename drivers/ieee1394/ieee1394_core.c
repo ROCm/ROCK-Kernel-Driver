@@ -935,8 +935,7 @@ void hpsb_packet_received(struct hpsb_host *host, quadlet_t *data, size_t size,
 void abort_requests(struct hpsb_host *host)
 {
         unsigned long flags;
-        struct hpsb_packet *packet;
-        struct list_head *lh, *tlh;
+        struct hpsb_packet *packet, *packet_next;
         LIST_HEAD(llist);
 
         host->driver->devctl(host, CANCEL_REQUESTS, 0);
@@ -946,8 +945,7 @@ void abort_requests(struct hpsb_host *host)
         INIT_LIST_HEAD(&host->pending_packets);
         spin_unlock_irqrestore(&host->pending_pkt_lock, flags);
 
-        list_for_each_safe(lh, tlh, &llist) {
-                packet = list_entry(lh, struct hpsb_packet, list);
+        list_for_each_entry_safe(packet, packet_next, &llist, list) {
                 list_del(&packet->list);
                 packet->state = hpsb_complete;
                 packet->ack_code = ACKX_ABORTED;
@@ -959,9 +957,8 @@ void abort_timedouts(unsigned long __opaque)
 {
 	struct hpsb_host *host = (struct hpsb_host *)__opaque;
         unsigned long flags;
-        struct hpsb_packet *packet;
+        struct hpsb_packet *packet, *packet_next;
         unsigned long expire;
-        struct list_head *lh, *tlh;
         LIST_HEAD(expiredlist);
 
         spin_lock_irqsave(&host->csr.lock, flags);
@@ -970,8 +967,7 @@ void abort_timedouts(unsigned long __opaque)
 
         spin_lock_irqsave(&host->pending_pkt_lock, flags);
 
-	list_for_each_safe(lh, tlh, &host->pending_packets) {
-                packet = list_entry(lh, struct hpsb_packet, list);
+	list_for_each_entry_safe(packet, packet_next, &host->pending_packets, list) {
                 if (time_before(packet->sendtime + expire, jiffies)) {
                         list_del(&packet->list);
                         list_add(&packet->list, &expiredlist);
@@ -983,8 +979,7 @@ void abort_timedouts(unsigned long __opaque)
 
         spin_unlock_irqrestore(&host->pending_pkt_lock, flags);
 
-        list_for_each_safe(lh, tlh, &expiredlist) {
-                packet = list_entry(lh, struct hpsb_packet, list);
+        list_for_each_entry_safe(packet, packet_next, &expiredlist, list) {
                 list_del(&packet->list);
                 packet->state = hpsb_complete;
                 packet->ack_code = ACKX_TIMEOUT;

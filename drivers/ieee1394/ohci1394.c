@@ -2207,14 +2207,12 @@ static void ohci_schedule_iso_tasklets(struct ti_ohci *ohci,
 				       quadlet_t rx_event,
 				       quadlet_t tx_event)
 {
-	struct list_head *lh;
 	struct ohci1394_iso_tasklet *t;
 	unsigned long mask;
 
 	spin_lock(&ohci->iso_tasklet_list_lock);
 
-	list_for_each(lh, &ohci->iso_tasklet_list) {
-		t = list_entry(lh, struct ohci1394_iso_tasklet, link);
+	list_for_each_entry(t, &ohci->iso_tasklet_list, link) {
 		mask = 1 << t->context;
 
 		if (t->type == OHCI_ISO_TRANSMIT && tx_event & mask)

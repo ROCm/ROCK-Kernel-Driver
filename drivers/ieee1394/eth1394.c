@@ -946,12 +946,9 @@ static inline u16 ether1394_parse_encap(struct sk_buff *skb,
 
 static inline int fragment_overlap(struct list_head *frag_list, int offset, int len)
 {
-	struct list_head *lh;
 	struct fragment_info *fi;
 
-	list_for_each(lh, frag_list) {
-		fi = list_entry(lh, struct fragment_info, list);
-
+	list_for_each_entry(fi, frag_list, list) {
 		if ( ! ((offset > (fi->offset + fi->len - 1)) ||
 		       ((offset + len - 1) < fi->offset)))
 			return 1;
@@ -961,13 +958,11 @@ static inline int fragment_overlap(struct list_head *frag_list, int offset, int 
 
 static inline struct list_head *find_partial_datagram(struct list_head *pdgl, int dgl)
 {
-	struct list_head *lh;
 	struct partial_datagram *pd;
 
-	list_for_each(lh, pdgl) {
-		pd = list_entry(lh, struct partial_datagram, list);
+	list_for_each_entry(pd, pdgl, list) {
 		if (pd->dgl == dgl)
-			return lh;
+			return &pd->list;
 	}
 	return NULL;
 }

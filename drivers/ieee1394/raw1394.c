@@ -215,15 +215,11 @@ static void add_host(struct hpsb_host *host)
 
 static struct host_info *find_host_info(struct hpsb_host *host)
 {
-        struct list_head *lh;
         struct host_info *hi;
 
-        list_for_each(lh, &host_info_list) {
-                hi = list_entry(lh, struct host_info, list);
-                if (hi->host == host) {
+        list_for_each_entry(hi, &host_info_list, list)
+                if (hi->host == host)
                         return hi;
-                }
-        }
 
         return NULL;
 }
@@ -262,7 +258,6 @@ static void remove_host(struct hpsb_host *host)
 static void host_reset(struct hpsb_host *host)
 {
         unsigned long flags;
-        struct list_head *lh;
         struct host_info *hi;
         struct file_info *fi;
         struct pending_request *req;
@@ -271,8 +266,7 @@ static void host_reset(struct hpsb_host *host)
         hi = find_host_info(host);
 
         if (hi != NULL) {
-                list_for_each(lh, &hi->file_info_list) {
-                        fi = list_entry(lh, struct file_info, list);
+                list_for_each_entry(fi, &hi->file_info_list, list) {
                         if (fi->notification == RAW1394_NOTIFY_ON) {
                                 req = __alloc_pending_request(SLAB_ATOMIC);
 
@@ -299,7 +293,6 @@ static void iso_receive(struct hpsb_host *host, int channel, quadlet_t *data,
                         size_t length)
 {
         unsigned long flags;
-        struct list_head *lh;
         struct host_info *hi;
         struct file_info *fi;
         struct pending_request *req;
@@ -315,12 +308,9 @@ static void iso_receive(struct hpsb_host *host, int channel, quadlet_t *data,
         hi = find_host_info(host);
 
         if (hi != NULL) {
-		list_for_each(lh, &hi->file_info_list) {
-                        fi = list_entry(lh, struct file_info, list);
-
-                        if (!(fi->listen_channels & (1ULL << channel))) {
+		list_for_each_entry(fi, &hi->file_info_list, list) {
+                        if (!(fi->listen_channels & (1ULL << channel)))
                                 continue;
-                        }
 
                         req = __alloc_pending_request(SLAB_ATOMIC);
                         if (!req) break;
@@ -355,20 +345,14 @@ static void iso_receive(struct hpsb_host *host, int channel, quadlet_t *data,
         }
         spin_unlock_irqrestore(&host_info_lock, flags);
 
-        lh = reqs.next;
-        while (lh != &reqs) {
-                req = list_entry(lh, struct pending_request, list);
-                lh = lh->next;
-
+	list_for_each_entry(req, &reqs, list)
                 queue_complete_req(req);
-        }
 }
 
 static void fcp_request(struct hpsb_host *host, int nodeid, int direction,
 			int cts, u8 *data, size_t length)
 {
         unsigned long flags;
-        struct list_head *lh;
         struct host_info *hi;
         struct file_info *fi;
         struct pending_request *req;
@@ -384,12 +368,9 @@ static void fcp_request(struct hpsb_host *host, int nodeid, int direction,
         hi = find_host_info(host);
 
         if (hi != NULL) {
-		list_for_each(lh, &hi->file_info_list) {
-                        fi = list_entry(lh, struct file_info, list);
-
-                        if (!fi->fcp_buffer) {
+		list_for_each_entry(fi, &hi->file_info_list, list) {
+                        if (!fi->fcp_buffer)
                                 continue;
-                        }
 
                         req = __alloc_pending_request(SLAB_ATOMIC);
                         if (!req) break;
@@ -424,13 +405,8 @@ static void fcp_request(struct hpsb_host *host, int nodeid, int direction,
         }
         spin_unlock_irqrestore(&host_info_lock, flags);
 
-        lh = reqs.next;
-        while (lh != &reqs) {
-                req = list_entry(lh, struct pending_request, list);
-                lh = lh->next;
-
+	list_for_each_entry(req, &reqs, list)
                 queue_complete_req(req);
-        }
 }
 
 
@@ -506,7 +482,6 @@ static int state_opened(struct file_info *fi, struct pending_request *req)
 
 static int state_initialized(struct file_info *fi, struct pending_request *req)
 {
-        struct list_head *lh;
         struct host_info *hi;
         struct raw1394_khost_list *khl;
 
@@ -528,12 +503,9 @@ static int state_initialized(struct file_info *fi, struct pending_request *req)
                         req->req.misc = host_count;
                         req->data = (quadlet_t *)khl;
                         
-                        list_for_each(lh, &host_info_list) {
-                                hi = list_entry(lh, struct host_info, list);
-
+                        list_for_each_entry(hi, &host_info_list, list) {
                                 khl->nodes = hi->host->node_count;
                                 strcpy(khl->name, hi->host->driver->name);
-
                                 khl++;
                         }
                 }
@@ -551,23 +523,17 @@ static int state_initialized(struct file_info *fi, struct pending_request *req)
                 break;
 
         case RAW1394_REQ_SET_CARD:
-                lh = NULL;
-
                 spin_lock_irq(&host_info_lock);
                 if (req->req.misc < host_count) {
-                        lh = host_info_list.next;
-                        while (req->req.misc--) {
-                                lh = lh->next;
-                        }
-                        hi = list_entry(lh, struct host_info, list);
+			list_for_each_entry(hi, &host_info_list, list) {
+				if (!req->req.misc--)
+					break;
+			}
 			get_device(&hi->host->device); // XXX Need to handle failure case
                         list_add_tail(&fi->list, &hi->file_info_list);
                         fi->host = hi->host;
                         fi->state = connected;
-                }
-                spin_unlock_irq(&host_info_lock);
 
-                if (lh != NULL) {
                         req->req.error = RAW1394_ERROR_NONE;
                         req->req.generation = get_hpsb_generation(fi->host);
                         req->req.misc = (fi->host->node_id << 16) 
@@ -578,6 +544,7 @@ static int state_initialized(struct file_info *fi, struct pending_request *req)
                 } else {
                         req->req.error = RAW1394_ERROR_INVALID_ARG;
                 }
+		spin_unlock_irq(&host_info_lock);
 
                 req->req.length = 0;
                 break;
@@ -899,7 +866,6 @@ static int arm_read (struct hpsb_host *host, int nodeid, quadlet_t *buffer,
 		     u64 addr, size_t length, u16 flags)
 {
         struct pending_request *req;
-        struct list_head *lh;
         struct host_info *hi;
         struct file_info *fi = NULL;
         struct list_head *entry;
@@ -916,8 +882,7 @@ static int arm_read (struct hpsb_host *host, int nodeid, quadlet_t *buffer,
         spin_lock(&host_info_lock);
         hi = find_host_info(host); /* search address-entry */
         if (hi != NULL) {
-                list_for_each(lh, &hi->file_info_list) {
-                        fi = list_entry(lh, struct file_info, list);
+                list_for_each_entry(fi, &hi->file_info_list, list) {
                         entry = fi->addr_list.next;
                         while (entry != &(fi->addr_list)) {
                                 arm_addr = list_entry(entry, struct arm_addr, addr_list);
@@ -1035,7 +1000,6 @@ static int arm_write (struct hpsb_host *host, int nodeid, int destid,
 		      quadlet_t *data, u64 addr, size_t length, u16 flags)
 {
         struct pending_request *req;
-        struct list_head *lh;
         struct host_info *hi;
         struct file_info *fi = NULL;
         struct list_head *entry;
@@ -1052,8 +1016,7 @@ static int arm_write (struct hpsb_host *host, int nodeid, int destid,
         spin_lock(&host_info_lock);
         hi = find_host_info(host); /* search address-entry */
         if (hi != NULL) {
-                list_for_each(lh, &hi->file_info_list) {
-                        fi = list_entry(lh, struct file_info, list);
+                list_for_each_entry(fi, &hi->file_info_list, list) {
                         entry = fi->addr_list.next;
                         while (entry != &(fi->addr_list)) {
                                 arm_addr = list_entry(entry, struct arm_addr, addr_list);
@@ -1162,7 +1125,6 @@ static int arm_lock (struct hpsb_host *host, int nodeid, quadlet_t *store,
              u64 addr, quadlet_t data, quadlet_t arg, int ext_tcode, u16 flags)
 {
         struct pending_request *req;
-        struct list_head *lh;
         struct host_info *hi;
         struct file_info *fi = NULL;
         struct list_head *entry;
@@ -1188,8 +1150,7 @@ static int arm_lock (struct hpsb_host *host, int nodeid, quadlet_t *store,
         spin_lock(&host_info_lock);
         hi = find_host_info(host); /* search address-entry */
         if (hi != NULL) {
-                list_for_each(lh, &hi->file_info_list) {
-                        fi = list_entry(lh, struct file_info, list);
+                list_for_each_entry(fi, &hi->file_info_list, list) {
                         entry = fi->addr_list.next;
                         while (entry != &(fi->addr_list)) {
                                 arm_addr = list_entry(entry, struct arm_addr, addr_list);
@@ -1360,7 +1321,6 @@ static int arm_lock64 (struct hpsb_host *host, int nodeid, octlet_t *store,
                u64 addr, octlet_t data, octlet_t arg, int ext_tcode, u16 flags)
 {
         struct pending_request *req;
-        struct list_head *lh;
         struct host_info *hi;
         struct file_info *fi = NULL;
         struct list_head *entry;
@@ -1395,8 +1355,7 @@ static int arm_lock64 (struct hpsb_host *host, int nodeid, octlet_t *store,
         spin_lock(&host_info_lock);
         hi = find_host_info(host); /* search addressentry in file_info's for host */
         if (hi != NULL) {
-                list_for_each(lh, &hi->file_info_list) {
-                        fi = list_entry(lh, struct file_info, list);
+                list_for_each_entry(fi, &hi->file_info_list, list) {
                         entry = fi->addr_list.next;
                         while (entry != &(fi->addr_list)) {
                                 arm_addr = list_entry(entry, struct arm_addr, addr_list);
@@ -1567,7 +1526,6 @@ static int arm_register(struct file_info *fi, struct pending_request *req)
 {
         int retval;
         struct arm_addr *addr;
-        struct list_head *lh, *lh_1, *lh_2;
         struct host_info *hi;
         struct file_info *fi_hlp = NULL;
         struct list_head *entry;
@@ -1631,8 +1589,7 @@ static int arm_register(struct file_info *fi, struct pending_request *req)
         same_host = 0;
         another_host = 0;
         /* same host with address-entry containing same addressrange ? */
-        list_for_each(lh, &hi->file_info_list) {
-                fi_hlp = list_entry(lh, struct file_info, list);
+        list_for_each_entry(fi_hlp, &hi->file_info_list, list) {
                 entry = fi_hlp->addr_list.next;
                 while (entry != &(fi_hlp->addr_list)) {
                         arm_addr = list_entry(entry, struct arm_addr, addr_list);
@@ -1657,11 +1614,9 @@ static int arm_register(struct file_info *fi, struct pending_request *req)
                 return (-EALREADY);
         }
         /* another host with valid address-entry containing same addressrange */
-        list_for_each(lh_1, &host_info_list) {
-                hi = list_entry(lh_1, struct host_info, list);
+        list_for_each_entry(hi, &host_info_list, list) {
                 if (hi->host != fi->host) {
-                        list_for_each(lh_2, &hi->file_info_list) {
-                                fi_hlp = list_entry(lh_2, struct file_info, list);
+                        list_for_each_entry(fi_hlp, &hi->file_info_list, list) {
                                 entry = fi_hlp->addr_list.next;
                                 while (entry != &(fi_hlp->addr_list)) {
                                         arm_addr = list_entry(entry, struct arm_addr, addr_list);
@@ -1720,7 +1675,6 @@ static int arm_unregister(struct file_info *fi, struct pending_request *req)
         int retval = 0;
         struct list_head *entry;
         struct arm_addr  *addr = NULL;
-        struct list_head *lh_1, *lh_2;
         struct host_info *hi;
         struct file_info *fi_hlp = NULL;
         struct arm_addr  *arm_addr = NULL;
@@ -1751,11 +1705,9 @@ static int arm_unregister(struct file_info *fi, struct pending_request *req)
         another_host = 0;
         /* another host with valid address-entry containing 
            same addressrange */
-        list_for_each(lh_1, &host_info_list) {
-                hi = list_entry(lh_1, struct host_info, list);
+        list_for_each_entry(hi, &host_info_list, list) {
                 if (hi->host != fi->host) {
-                        list_for_each(lh_2, &hi->file_info_list) {
-                                fi_hlp = list_entry(lh_2, struct file_info, list);
+                        list_for_each_entry(fi_hlp, &hi->file_info_list, list) {
                                 entry = fi_hlp->addr_list.next;
                                 while (entry != &(fi_hlp->addr_list)) {
                                         arm_addr = list_entry(entry, 
@@ -2244,15 +2196,11 @@ static ssize_t raw1394_write(struct file *file, const char *buffer, size_t count
  * completion queue (reqlists_lock must be taken) */
 static inline int __rawiso_event_in_queue(struct file_info *fi)
 {
-	struct list_head *lh;
 	struct pending_request *req;
 
-	list_for_each(lh, &fi->req_complete) {
-		req = list_entry(lh, struct pending_request, list);
-		if (req->req.type == RAW1394_REQ_RAWISO_ACTIVITY) {
+	list_for_each_entry(req, &fi->req_complete, list)
+		if (req->req.type == RAW1394_REQ_RAWISO_ACTIVITY)
 			return 1;
-		}
-	}
 
 	return 0;
 }
@@ -2286,15 +2234,14 @@ static void queue_rawiso_event(struct file_info *fi)
 static void rawiso_activity_cb(struct hpsb_iso *iso)
 {
 	unsigned long flags;
-        struct list_head *lh;
         struct host_info *hi;
+	struct file_info *fi;
 
         spin_lock_irqsave(&host_info_lock, flags);
         hi = find_host_info(iso->host);
 
 	if (hi != NULL) {
-		list_for_each(lh, &hi->file_info_list) {
-			struct file_info *fi = list_entry(lh, struct file_info, list);
+		list_for_each_entry(fi, &hi->file_info_list, list) {
 			if (fi->iso_handle == iso)
 				queue_rawiso_event(fi);
 		}
@@ -2614,7 +2561,6 @@ static int raw1394_release(struct inode *inode, struct file *file)
         int retval = 0;
         struct list_head *entry;
         struct arm_addr  *addr = NULL;
-        struct list_head *lh_1, *lh_2;
         struct host_info *hi;
         struct file_info *fi_hlp = NULL;
         struct arm_addr  *arm_addr = NULL;
@@ -2644,11 +2590,9 @@ static int raw1394_release(struct inode *inode, struct file *file)
                 addr = list_entry(lh, struct arm_addr, addr_list);
                 /* another host with valid address-entry containing 
                    same addressrange? */
-                list_for_each(lh_1, &host_info_list) {
-                        hi = list_entry(lh_1, struct host_info, list);
+                list_for_each_entry(hi, &host_info_list, list) {
                         if (hi->host != fi->host) {
-                                list_for_each(lh_2, &hi->file_info_list) {
-                                        fi_hlp = list_entry(lh_2, struct file_info, list);
+                                list_for_each_entry(fi_hlp, &hi->file_info_list, list) {
                                         entry = fi_hlp->addr_list.next;
                                         while (entry != &(fi_hlp->addr_list)) {
                                                 arm_addr = list_entry(entry, 
