@@ -1808,7 +1808,7 @@ extern int ali14xx_init(void);
 #endif
 #ifdef CONFIG_BLK_DEV_UMC8672
 static int __initdata probe_umc8672;
-extern void init_umc8672(void);
+extern int umc8672_init(void);
 #endif
 #ifdef CONFIG_BLK_DEV_DTC2278
 static int __initdata probe_dtc2278;
@@ -2605,7 +2605,7 @@ int __init ide_init (void)
 #endif
 #ifdef CONFIG_BLK_DEV_UMC8672
 	if (probe_umc8672)
-		init_umc8672();
+		(void)umc8672_init();
 #endif
 #ifdef CONFIG_BLK_DEV_DTC2278
 	if (probe_dtc2278)
