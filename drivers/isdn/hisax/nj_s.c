@@ -18,7 +18,7 @@
 const char *NETjet_S_revision = "$Revision: 2.7.6.6 $";
 
 static void
-netjet_s_interrupt(int intno, void *dev_id, struct pt_regs *regs)
+nj_s_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
 	u8 val, sval;
@@ -72,8 +72,8 @@ netjet_s_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	spin_unlock(&cs->lock);
 }
 
-static void
-reset_netjet_s(struct IsdnCardState *cs)
+static int
+nj_s_reset(struct IsdnCardState *cs)
 {
 	cs->hw.njet.ctrl_reg = 0xff;  /* Reset On */
 	byteout(cs->hw.njet.base + NETJET_CTRL, cs->hw.njet.ctrl_reg);
@@ -89,27 +89,28 @@ reset_netjet_s(struct IsdnCardState *cs)
 	byteout(cs->hw.njet.base + NETJET_AUXCTRL, ~NETJET_ISACIRQ);
 	byteout(cs->hw.njet.base + NETJET_IRQMASK1, NETJET_ISACIRQ);
 	byteout(cs->hw.njet.auxa, cs->hw.njet.auxd);
+	return 0;
 }
 
 static int
 NETjet_S_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 {
-	switch (mt) {
-		case CARD_RESET:
-			reset_netjet_s(cs);
-			return(0);
-		case CARD_RELEASE:
-			release_io_netjet(cs);
-			return(0);
-		case CARD_INIT:
-			inittiger(cs);
-			initisac(cs);
-			return(0);
-		case CARD_TEST:
-			return(0);
-	}
 	return(0);
 }
+
+static void
+nj_s_init(struct IsdnCardState *cs)
+{
+	inittiger(cs);
+	initisac(cs);
+}
+
+static struct card_ops nj_s_ops = {
+	.init     = nj_s_init,
+	.reset    = nj_s_reset,
+	.release  = netjet_release,
+	.irq_func = nj_s_interrupt,
+};
 
 static struct pci_dev *dev_netjet __initdata = NULL;
 
@@ -225,11 +226,11 @@ setup_netjet_s(struct IsdnCard *card)
 	} else {
 		request_region(cs->hw.njet.base, bytecnt, "netjet-s isdn");
 	}
-	reset_netjet_s(cs);
+	nj_s_reset(cs);
 	cs->dc_hw_ops = &netjet_dc_ops;
 	cs->cardmsg = &NETjet_S_card_msg;
-	cs->irq_func = &netjet_s_interrupt;
 	cs->irq_flags |= SA_SHIRQ;
+	cs->card_ops = &nj_s_ops;
 	ISACVersion(cs, "NETjet-S:");
 	return (1);
 }

@@ -937,6 +937,8 @@ setstack_tiger(struct PStack *st, struct BCState *bcs)
  
 static struct bc_l1_ops netjet_l1_ops = {
 	.fill_fifo = netjet_fill_dma,
+	.open      = setstack_tiger,
+	.close     = close_tigerstate,
 };
 
 void __init
@@ -994,13 +996,9 @@ inittiger(struct IsdnCardState *cs)
 		inl(cs->hw.njet.base + NETJET_DMA_READ_ADR),
 		bytein(cs->hw.njet.base + NETJET_PULSE_CNT));
 	cs->hw.njet.last_is0 = 0;
-	cs->bcs[0].BC_SetStack = setstack_tiger;
-	cs->bcs[1].BC_SetStack = setstack_tiger;
-	cs->bcs[0].BC_Close = close_tigerstate;
-	cs->bcs[1].BC_Close = close_tigerstate;
 }
 
-void
+static void
 releasetiger(struct IsdnCardState *cs)
 {
 	if (cs->bcs[0].hw.tiger.send) {
@@ -1026,7 +1024,7 @@ releasetiger(struct IsdnCardState *cs)
 }
 
 void
-release_io_netjet(struct IsdnCardState *cs)
+netjet_release(struct IsdnCardState *cs)
 {
 	byteout(cs->hw.njet.base + NETJET_IRQMASK0, 0);
 	byteout(cs->hw.njet.base + NETJET_IRQMASK1, 0);

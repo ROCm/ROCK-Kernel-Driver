@@ -358,8 +358,6 @@ init_bcstate(struct IsdnCardState *cs,
 	bcs->cs = cs;
 	bcs->channel = bc;
 	INIT_WORK(&bcs->work, BChannel_bh, bcs);
-	bcs->BC_SetStack = NULL;
-	bcs->BC_Close = NULL;
 	bcs->Flag = 0;
 }
 
@@ -907,8 +905,18 @@ setstack_HiSax(struct PStack *st, struct IsdnCardState *cs)
 	setstack_manager(st);
 	st->l1.stlistp = &(cs->stlist);
 	st->l1.l2l1  = dch_l2l1;
-	if (cs->setstack_d)
-		cs->setstack_d(st, cs);
+	if (cs->dc_l1_ops->open)
+		cs->dc_l1_ops->open(st, cs);
+}
+
+void
+dc_l1_init(struct IsdnCardState *cs, struct dc_l1_ops *ops)
+{
+	cs->dc_l1_ops = ops;
+	INIT_WORK(&cs->work, ops->bh_func, cs);
+	init_timer(&cs->dbusytimer);
+	cs->dbusytimer.function = (void *)(unsigned long) ops->dbusy_func;
+	cs->dbusytimer.data = (unsigned long) cs;
 }
 
 void

@@ -1605,7 +1605,7 @@ static void __devexit hfcpci_remove(struct pci_dev *pdev)
 static struct pci_driver hfcpci_driver = {
 	.name     = "hfcpci",
 	.probe    = hfcpci_probe,
-	.remove   = hfcpci_remove,
+	.remove   = __devexit_p(hfcpci_remove),
 	.id_table = hfcpci_ids,
 };
 

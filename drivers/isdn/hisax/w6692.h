@@ -18,9 +18,6 @@
 
 /* B-channel FIFO read/write routines */
 
-#define READW6692BFIFO(cs,bchan,ptr,count) \
-	insb(cs->hw.w6692.iobase+W_B_RFIFO+(bchan?0x40:0),ptr,count)
-
 #define WRITEW6692BFIFO(cs,bchan,ptr,count) \
 	outsb(cs->hw.w6692.iobase+W_B_XFIFO+(bchan?0x40:0),ptr,count)
 
