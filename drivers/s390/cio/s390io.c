@@ -991,9 +991,6 @@ s390_validate_subchannel (int irq, int enable)
 	int ccode2;		/* condition code for other I/O routines */
 	schib_t *p_schib;
 	int ret;
-	int      chp = 0;
-	int      mask;
-
 	char dbf_txt[15];
 
 	sprintf (dbf_txt, "valsch%x", irq);
@@ -1115,17 +1112,7 @@ s390_validate_subchannel (int irq, int enable)
 	ioinfo[irq]->opm = ioinfo[irq]->schib.pmcw.pim
 	    & ioinfo[irq]->schib.pmcw.pam & ioinfo[irq]->schib.pmcw.pom;
 
-	if (ioinfo[irq]->opm) {
-		for (chp=0;chp<=7;chp++) {
-			mask = 0x80 >> chp;
-			if (ioinfo[irq]->opm & mask) {
-				if (!chsc_chpid_logical (irq, chp)) {
-					/* disable using this path */
-					ioinfo[irq]->opm &= ~mask;
-				}
-			}
-		}
-	}
+	chsc_validate_chpids(irq);
 
 	CIO_DEBUG_IFMSG(KERN_INFO, 0,
 			"Detected device %04X "
@@ -1690,8 +1677,6 @@ s390_DevicePathVerification (int irq, __u8 usermask)
 	int ccode;
 	__u8 pathmask;
 	__u8 domask;
-	int chp;
-	int mask;
 	int old_opm = 0;
 
 	int ret = 0;
@@ -1772,18 +1757,8 @@ s390_DevicePathVerification (int irq, __u8 usermask)
 	ioinfo[irq]->opm = ioinfo[irq]->schib.pmcw.pim
 	    & ioinfo[irq]->schib.pmcw.pam & ioinfo[irq]->schib.pmcw.pom;
 
-	if (ioinfo[irq]->opm) {
-		for (chp=0;chp<=7;chp++) {
-			mask = 0x80 >> chp;
-			if (ioinfo[irq]->opm & mask) {
-				if (!chsc_chpid_logical (irq, chp)) {
-					/* disable using this path */
-					ioinfo[irq]->opm &= ~mask;
-				}
-			}
-		}
-	}
-	
+	chsc_validate_chpids(irq);
+
 	if ((ioinfo[irq]->opm == 0) && (old_opm)) {
 		not_oper_handler_func_t nopfunc=ioinfo[irq]->nopfunc;
 		int was_oper = ioinfo[irq]->ui.flags.ready;
@@ -1815,7 +1790,7 @@ s390_DevicePathVerification (int irq, __u8 usermask)
 	}
 
 	if ( ioinfo[irq]->ui.flags.pgid_supp == 0 )
-		return( 0);	/* just exit ... */
+		return 0;	/* just exit ... */
 
 	if (usermask) {
 		dev_path = usermask;
@@ -2229,8 +2204,8 @@ s390_SensePGID (int irq, __u8 lpm, pgid_t * pgid)
 				 *  Sense Path Group ID command
 				 *  further retries wouldn't help ...
 				 */
-				if (pdevstat->ii.sense.
-				    data[0] & SNS0_CMD_REJECT) {
+				if (pdevstat->ii.sense.data[0] & 
+				    (SNS0_CMD_REJECT | SNS0_INTERVENTION_REQ)) {
 					retry = 0;
 					irq_ret = -EOPNOTSUPP;
 				} else {

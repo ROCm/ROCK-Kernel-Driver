@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/cio.c
  *   S/390 common I/O routines -- low level i/o calls
- *   $Revision: 1.25 $
+ *   $Revision: 1.26 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *                            IBM Corporation
@@ -342,6 +342,7 @@ s390_start_IO_handle_notoper(int irq,
 
 	if (valid_lpm) {
 		ioinfo[irq]->opm &= ~lpm;
+		switch_off_chpids(irq, lpm);
 	} else {
 		ioinfo[irq]->opm = 0;
 		
@@ -1386,7 +1387,7 @@ s390_process_IRQ_notoper(unsigned int irq)
 	
 	ioinfo[irq]->devstat.intparm = 0;
 	
-	if (!ioinfo[irq]->ui.flags.s_pend) 
+	if (!(ioinfo[irq]->ui.flags.s_pend || ioinfo[irq]->ui.flags.repnone))
 		ioinfo[irq]->irq_desc.handler (irq, udp, NULL);
 	
 	return 1;
