@@ -250,6 +250,10 @@ int pcmcia_register_socket(struct pcmcia_socket *socket)
 	socket->cis_mem.flags = 0;
 	socket->cis_mem.speed = cis_speed;
 
+	/* init resource database */
+	socket->mem_db.next = &socket->mem_db;
+	socket->io_db.next = &socket->io_db;
+
 	INIT_LIST_HEAD(&socket->cis_cache);
 	spin_lock_init(&socket->lock);
 
@@ -305,6 +309,7 @@ void pcmcia_unregister_socket(struct pcmcia_socket *socket)
 	up_write(&pcmcia_socket_list_rwsem);
 
 	/* wait for sysfs to drop all references */
+	release_resource_db(socket);
 	wait_for_completion(&socket->socket_released);
 } /* pcmcia_unregister_socket */
 EXPORT_SYMBOL(pcmcia_unregister_socket);
@@ -1879,7 +1884,6 @@ static int __init init_pcmcia_cs(void)
 static void __exit exit_pcmcia_cs(void)
 {
     printk(KERN_INFO "unloading Kernel Card Services\n");
-    release_resource_db();
     class_interface_unregister(&pccard_sysfs_interface);
     class_unregister(&pcmcia_socket_class);
 }

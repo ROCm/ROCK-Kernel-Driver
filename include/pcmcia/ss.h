@@ -146,6 +146,12 @@ struct config_t;
 struct region_t;
 struct pcmcia_callback;
 
+/* for io_db and mem_db */
+struct resource_map_t {
+	u_long			base, num;
+	struct resource_map_t	*next;
+};
+
 struct pcmcia_socket {
 	struct module			*owner;
 	spinlock_t			lock;
@@ -169,6 +175,10 @@ struct pcmcia_socket {
 
 	struct list_head		socket_list;
 	struct completion		socket_released;
+
+	struct resource_map_t		mem_db;
+	struct resource_map_t		io_db;
+	unsigned int			rsrc_mem_probe;
 
  	/* deprecated */
 	unsigned int			sock;		/* socket number */

@@ -143,7 +143,7 @@ struct resource *find_mem_region(u_long base, u_long num, u_long align,
 int try_irq(u_int Attributes, int irq, int specific);
 void undo_irq(u_int Attributes, int irq);
 int adjust_resource_info(client_handle_t handle, adjust_t *adj);
-void release_resource_db(void);
+void release_resource_db(struct pcmcia_socket *s);
 
 /* In socket_sysfs.c */
 extern struct class_interface pccard_sysfs_interface;
