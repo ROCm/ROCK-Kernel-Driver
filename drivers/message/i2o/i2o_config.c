@@ -891,12 +891,14 @@ static int ioctl_passthru(unsigned long arg)
 
 	memset(sg_list,0, sizeof(sg_list[0])*SG_TABLESIZE);
 	if(sg_offset) {
+		struct sg_simple_element *sg;
+
 		if(sg_offset * 4 >= size) {
 			rcode = -EFAULT;
 			goto cleanup;
 		}
 		// TODO 64bit fix
-		struct sg_simple_element *sg = (struct sg_simple_element*) (msg+sg_offset);
+		sg = (struct sg_simple_element*) (msg+sg_offset);
 		sg_count = (size - sg_offset*4) / sizeof(struct sg_simple_element);
 		if (sg_count > SG_TABLESIZE) {
 			printk(KERN_DEBUG"%s:IOCTL SG List too large (%u)\n", c->name,sg_count);
