@@ -220,19 +220,25 @@ int proc_mf_dump_side
 
 int proc_mf_change_side(struct file *file, const char *buffer, unsigned long count, void *data)
 {
+	char stkbuf[10];
 	if (!capable(CAP_SYS_ADMIN))
 		return -EACCES;
 
-	if ((*buffer != 'A') &&
-	    (*buffer != 'B') &&
-	    (*buffer != 'C') &&
-	    (*buffer != 'D'))
+	if (count > 9) count = 9;
+	if (copy_from_user (stkbuf, buffer, count)) {
+		return -EFAULT;
+	}
+	stkbuf[count] = 0;
+	if ((*stkbuf != 'A') &&
+	    (*stkbuf != 'B') &&
+	    (*stkbuf != 'C') &&
+	    (*stkbuf != 'D'))
 	{
 		printk(KERN_ERR "mf_proc.c: proc_mf_change_side: invalid side\n");
 		return -EINVAL;
 	}
 
-	mf_setSide(*buffer);
+	mf_setSide(*stkbuf);
 
 	return count;			
 }
@@ -256,6 +262,7 @@ int proc_mf_dump_src
 
 int proc_mf_change_src(struct file *file, const char *buffer, unsigned long count, void *data)
 {
+	char stkbuf[10];
 	if (!capable(CAP_SYS_ADMIN))
 		return -EACCES;
 
@@ -265,11 +272,16 @@ int proc_mf_change_src(struct file *file, const char *buffer, unsigned long coun
 		return -EINVAL;
 	}
 
-	if ((count == 1) && ((*buffer) == '\0'))
+	if (count > 9) count = 9;
+	if (copy_from_user (stkbuf, buffer, count)) {
+		return -EFAULT;
+	}
+
+	if ((count == 1) && ((*stkbuf) == '\0'))
 	{
 		mf_clearSrc();
 	} else {
-		mf_displaySrc(*(u32 *)buffer);
+		mf_displaySrc(*(u32 *)stkbuf);
 	}
 
 	return count;			

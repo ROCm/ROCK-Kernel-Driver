@@ -127,7 +127,7 @@ void proc_ppc64_init(void)
 			ent->nlink = 1;
 			ent->data = (void *)proc_ppc64_pmc_cpu_root[i];
 			ent->read_proc = (void *)proc_ppc64_pmc_stab_read;
-			ent->write_proc = (void *)proc_ppc64_pmc_stab_read;
+			ent->write_proc = NULL;
 		}
 
 		ent = create_proc_entry("htab", S_IRUGO | S_IWUSR, 
@@ -136,7 +136,7 @@ void proc_ppc64_init(void)
 			ent->nlink = 1;
 			ent->data = (void *)proc_ppc64_pmc_cpu_root[i];
 			ent->read_proc = (void *)proc_ppc64_pmc_htab_read;
-			ent->write_proc = (void *)proc_ppc64_pmc_htab_read;
+			ent->write_proc = NULL;
 		}
 	}
 
@@ -146,7 +146,7 @@ void proc_ppc64_init(void)
 		ent->nlink = 1;
 		ent->data = (void *)proc_ppc64_pmc_system_root;
 		ent->read_proc = (void *)proc_ppc64_pmc_stab_read;
-		ent->write_proc = (void *)proc_ppc64_pmc_stab_read;
+		ent->write_proc = NULL;
 	}
 
 	ent = create_proc_entry("htab", S_IRUGO | S_IWUSR, 
@@ -155,7 +155,7 @@ void proc_ppc64_init(void)
 		ent->nlink = 1;
 		ent->data = (void *)proc_ppc64_pmc_system_root;
 		ent->read_proc = (void *)proc_ppc64_pmc_htab_read;
-		ent->write_proc = (void *)proc_ppc64_pmc_htab_read;
+		ent->write_proc = NULL;
 	}
 
 	/* Create directories for the hardware counters. */
@@ -168,7 +168,7 @@ void proc_ppc64_init(void)
 			ent->nlink = 1;
 			ent->data = (void *)proc_ppc64_pmc_cpu_root[i];
 			ent->read_proc = (void *)proc_ppc64_pmc_hw_read;
-			ent->write_proc = (void *)proc_ppc64_pmc_hw_read;
+			ent->write_proc = NULL;
 		}
 	}
 
@@ -178,7 +178,7 @@ void proc_ppc64_init(void)
 		ent->nlink = 1;
 		ent->data = (void *)proc_ppc64_pmc_system_root;
 		ent->read_proc = (void *)proc_ppc64_pmc_hw_read;
-		ent->write_proc = (void *)proc_ppc64_pmc_hw_read;
+		ent->write_proc = NULL;
 	}
 }
 
@@ -676,15 +676,22 @@ static inline void proc_pmc_tlb(void)
 
 int proc_pmc_set_control( struct file *file, const char *buffer, unsigned long count, void *data )
 {
-	if      ( ! strncmp( buffer, "stop", 4 ) )
+	char stkbuf[10];
+	if (count > 9) count = 9;
+	if (copy_from_user (stkbuf, buffer, count)) {
+		return -EFAULT;
+	}
+	stkbuf[count] = 0;
+
+	if      ( ! strncmp( stkbuf, "stop", 4 ) )
 		proc_pmc_stop();
-	else if ( ! strncmp( buffer, "start", 5 ) )
+	else if ( ! strncmp( stkbuf, "start", 5 ) )
 		proc_pmc_start();
-	else if ( ! strncmp( buffer, "reset", 5 ) )
+	else if ( ! strncmp( stkbuf, "reset", 5 ) )
 		proc_pmc_reset();
-	else if ( ! strncmp( buffer, "cpi", 3 ) )
+	else if ( ! strncmp( stkbuf, "cpi", 3 ) )
 		proc_pmc_cpi();
-	else if ( ! strncmp( buffer, "tlb", 3 ) )
+	else if ( ! strncmp( stkbuf, "tlb", 3 ) )
 		proc_pmc_tlb();
 	
 	/* IMPLEMENT ME */
