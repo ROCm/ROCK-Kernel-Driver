@@ -363,7 +363,18 @@
 #define __NR_stat64			425
 #define __NR_lstat64			426
 #define __NR_fstat64			427
-#define NR_SYSCALLS			428
+#define __NR_vserver			428
+#define __NR_mbind			429
+#define __NR_get_mempolicy		430
+#define __NR_set_mempolicy		431
+#define __NR_mq_open			432
+#define __NR_mq_unlink			433
+#define __NR_mq_timedsend		434
+#define __NR_mq_timedreceive		435
+#define __NR_mq_notify			436
+#define __NR_mq_getsetattr		437
+
+#define NR_SYSCALLS			438
 
 #if defined(__GNUC__)
 
