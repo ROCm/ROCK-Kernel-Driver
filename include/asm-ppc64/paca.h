@@ -37,6 +37,8 @@ extern struct paca_struct paca[];
 register struct paca_struct *local_paca asm("r13");
 #define get_paca()	local_paca
 
+struct task_struct;
+
 /*============================================================================
  * Name_______:	paca
  *
@@ -59,7 +61,7 @@ struct paca_struct {
  */
 	struct ItLpPaca *xLpPacaPtr;	/* Pointer to LpPaca for PLIC		0x00 */
 	struct ItLpRegSave *xLpRegSavePtr; /* Pointer to LpRegSave for PLIC	0x08 */
-	u64 xCurrent;  		        /* Pointer to current			0x10 */
+	struct task_struct *xCurrent;	/* Pointer to current			0x10 */
 	/* Note: the spinlock functions in arch/ppc64/lib/locks.c load lock_token and
 	   xPacaIndex with a single lwz instruction, using the constant offset 24.
 	   If you move either field, fix the spinlocks and rwlocks. */
