@@ -264,8 +264,6 @@ int class_device_add(struct class_device *class_dev)
 		return -EINVAL;
 
 	parent = class_get(class_dev->class);
-	if (class_dev->dev)
-		get_device(class_dev->dev);
 
 	pr_debug("CLASS: registering class device: ID = '%s'\n",
 		 class_dev->class_id);

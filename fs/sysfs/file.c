@@ -109,7 +109,7 @@ static int fill_read_buffer(struct file * file, struct sysfs_buffer * buffer)
  *	the amount they specify each time.
  *	This may be called continuously until the buffer is empty.
  */
-static int flush_read_buffer(struct sysfs_buffer * buffer, char * buf, 
+static int flush_read_buffer(struct sysfs_buffer * buffer, char __user * buf,
 			     size_t count, loff_t * ppos)
 {
 	int error;
@@ -143,7 +143,7 @@ static int flush_read_buffer(struct sysfs_buffer * buffer, char * buf,
  */
 
 static ssize_t
-sysfs_read_file(struct file *file, char *buf, size_t count, loff_t *ppos)
+sysfs_read_file(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 {
 	struct sysfs_buffer * buffer = file->private_data;
 	ssize_t retval = 0;
@@ -169,7 +169,7 @@ sysfs_read_file(struct file *file, char *buf, size_t count, loff_t *ppos)
  */
 
 static int 
-fill_write_buffer(struct sysfs_buffer * buffer, const char * buf, size_t count)
+fill_write_buffer(struct sysfs_buffer * buffer, const char __user * buf, size_t count)
 {
 	int error;
 
@@ -224,7 +224,7 @@ flush_write_buffer(struct file * file, struct sysfs_buffer * buffer, size_t coun
  */
 
 static ssize_t
-sysfs_write_file(struct file *file, const char *buf, size_t count, loff_t *ppos)
+sysfs_write_file(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
 {
 	struct sysfs_buffer * buffer = file->private_data;
 
