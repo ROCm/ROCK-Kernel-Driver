@@ -90,6 +90,8 @@ int sysctl_tcp_nometrics_save;
 int sysctl_tcp_westwood;
 int sysctl_tcp_vegas_cong_avoid;
 
+int sysctl_tcp_moderate_rcvbuf;
+
 /* Default values of the Vegas variables, in fixed-point representation
  * with V_PARAM_SHIFT bits to the right of the binary point.
  */
@@ -460,19 +462,21 @@ void tcp_rcv_space_adjust(struct sock *sk)
 
 		tp->rcvq_space.space = space;
 
-		/* Receive space grows, normalize in order to
-		 * take into account packet headers and sk_buff
-		 * structure overhead.
-		 */
-		space /= tp->advmss;
-		if (!space)
-			space = 1;
-		rcvmem = (tp->advmss + MAX_TCP_HEADER +
-			  16 + sizeof(struct sk_buff));
-		space *= rcvmem;
-		space = min(space, sysctl_tcp_rmem[2]);
-		if (space > sk->sk_rcvbuf)
-			sk->sk_rcvbuf = space;
+		if (sysctl_tcp_moderate_rcvbuf) {
+			/* Receive space grows, normalize in order to
+			 * take into account packet headers and sk_buff
+			 * structure overhead.
+			 */
+			space /= tp->advmss;
+			if (!space)
+				space = 1;
+			rcvmem = (tp->advmss + MAX_TCP_HEADER +
+				  16 + sizeof(struct sk_buff));
+			space *= rcvmem;
+			space = min(space, sysctl_tcp_rmem[2]);
+			if (space > sk->sk_rcvbuf)
+				sk->sk_rcvbuf = space;
+		}
 	}
 	
 new_measure:
