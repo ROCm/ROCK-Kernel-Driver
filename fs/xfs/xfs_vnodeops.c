@@ -1946,8 +1946,6 @@ xfs_ctrunc_trace(
 
 /*
  * xfs_create (create a new file).
- *   It might still find name exists out there, though.
- *	But vpp, doens't point at a vnode.
  */
 STATIC int
 xfs_create(
@@ -1968,7 +1966,6 @@ xfs_create(
 	xfs_bmap_free_t		free_list;
 	xfs_fsblock_t		first_block;
 	boolean_t		dp_joined_to_trans;
-	int			dm_event_sent = 0;
 	uint			cancel_flags;
 	int			committed;
 	xfs_prid_t		prid;
@@ -1989,8 +1986,10 @@ xfs_create(
 		return XFS_ERROR(ENAMETOOLONG);
 
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_EVENT_CREATE)) {
-		error = xfs_dm_send_create_event(dir_bdp, name,
-				dm_di_mode, &dm_event_sent);
+		error = dm_send_namesp_event(DM_EVENT_CREATE,
+				dir_bdp, DM_RIGHT_NULL, NULL,
+				DM_RIGHT_NULL, name, NULL,
+				dm_di_mode, 0, 0);
 		if (error)
 			return error;
 	}
@@ -2161,7 +2160,7 @@ xfs_create(
 	/* Fallthrough to std_return with error = 0  */
 
 std_return:
-	if ((error != 0 && dm_event_sent != 0) &&
+	if ((error != 0) &&
 			DM_EVENT_ENABLED(dir_vp->v_vfsp, XFS_BHVTOI(dir_bdp),
 							DM_EVENT_POSTCREATE)) {
 		(void) dm_send_namesp_event(DM_EVENT_POSTCREATE,
@@ -2938,7 +2937,6 @@ xfs_mkdir(
 	vnode_t			*dir_vp;
 	boolean_t		dp_joined_to_trans;
 	boolean_t		created = B_FALSE;
-	int			dm_event_sent = 0;
 	xfs_prid_t		prid;
 	xfs_dquot_t		*udqp, *gdqp;
 	uint			resblks;
@@ -2961,8 +2959,10 @@ xfs_mkdir(
 	dm_di_mode = vap->va_mode|VTTOIF(vap->va_type);
 
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_EVENT_CREATE)) {
-		error = xfs_dm_send_create_event(dir_bdp, dir_name,
-					dm_di_mode, &dm_event_sent);
+		error = dm_send_namesp_event(DM_EVENT_CREATE,
+					dir_bdp, DM_RIGHT_NULL, NULL,
+					DM_RIGHT_NULL, dir_name, NULL,
+					dm_di_mode, 0, 0);
 		if (error)
 			return error;
 	}
@@ -3127,7 +3127,7 @@ xfs_mkdir(
 	 * xfs_trans_commit. */
 
 std_return:
-	if ( (created || (error != 0 && dm_event_sent != 0)) &&
+	if ( (created || (error != 0)) &&
 			DM_EVENT_ENABLED(dir_vp->v_vfsp, XFS_BHVTOI(dir_bdp),
 						DM_EVENT_POSTCREATE)) {
 		(void) dm_send_namesp_event(DM_EVENT_POSTCREATE,

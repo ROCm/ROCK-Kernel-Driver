@@ -165,13 +165,6 @@ xfs_dm_send_data_event(
 	vrwlock_t	*locktype);
 
 extern int
-xfs_dm_send_create_event(
-	bhv_desc_t	*dir_bdp,
-	char		*name,
-	mode_t		new_mode,
-	int		*good_event_sent);
-
-extern int
 xfs_dm_send_mmap_event(
 	struct vm_area_struct *vma,
 	unsigned int	wantflag);
@@ -248,16 +241,6 @@ typedef enum {
 /*
  *	Stubs for XFS DMAPI utility routines.
  */
-
-static __inline int
-xfs_dm_send_create_event(
-	bhv_desc_t	*dir_bdp,
-	char		*name,
-	mode_t		new_mode,
-	int		*good_event_sent)
-{
-	return 0;
-}
 
 static __inline int
 xfs_dm_send_data_event(
