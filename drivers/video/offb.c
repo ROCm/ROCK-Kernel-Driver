@@ -32,7 +32,7 @@
 #include <asm/bootx.h>
 #endif
 
-#include <video/macmodes.h>
+#include "macmodes.h"
 
 /* Supported palette hacks */
 enum {

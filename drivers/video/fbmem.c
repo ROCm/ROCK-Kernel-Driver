@@ -43,7 +43,7 @@
 #include <linux/fb.h>
 #ifdef CONFIG_VT
 #include <linux/console.h>
-#include <video/fbcon.h>
+#include "console/fbcon.h"
 #endif
 
     /*

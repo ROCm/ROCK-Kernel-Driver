@@ -20,7 +20,7 @@
 #include <linux/fb.h>
 #include <linux/string.h>
 
-#include <video/macmodes.h>
+#include "macmodes.h"
 
     /*
      *  MacOS video mode definitions

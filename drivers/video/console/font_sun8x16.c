@@ -1,4 +1,4 @@
-#include <video/font.h>
+#include "font.h"
 
 #define FONTDATAMAX 4096
 

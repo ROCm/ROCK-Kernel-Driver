@@ -30,7 +30,7 @@
 #define INCLUDE_LINUX_LOGO_DATA
 #include <asm/linux_logo.h>
 
-#include <video/font.h>
+#include "font.h"
 
 #define LOGO_W		80
 #define LOGO_H		80

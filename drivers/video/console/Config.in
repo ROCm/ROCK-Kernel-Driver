@@ -17,7 +17,7 @@ if [ "$CONFIG_VT" != "n" ]; then
 #        fi
 #     fi
    fi
-   tristate 'MDA text console (dual-headed) ' CONFIG_MDA_CONSOLE
+   tristate 'MDA text console ' CONFIG_MDA_CONSOLE
    if [ "$CONFIG_SGI_IP22" = "y" ]; then
       tristate 'SGI Newport Console support' CONFIG_SGI_NEWPORT_CONSOLE
       if [ "$CONFIG_SGI_NEWPORT_CONSOLE" != "y" ]; then

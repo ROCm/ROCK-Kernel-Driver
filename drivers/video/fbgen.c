@@ -86,6 +86,7 @@ int cfb_cursor(struct fb_info *info, struct fbcursor *cursor)
 		if (info->fbops->fb_imageblit)
 			info->fbops->fb_imageblit(info, &image);
 	}
+	return 0;
 }
 
 int fb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)

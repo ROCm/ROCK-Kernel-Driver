@@ -99,11 +99,11 @@
 #define INCLUDE_LINUX_LOGO_DATA
 #include <asm/linux_logo.h>
 
-#include <video/fbcon.h>
+#include "fbcon.h"
 #ifdef CONFIG_FBCON_ACCEL
 #include "fbcon-accel.h"
 #endif
-#include <video/font.h>
+#include "font.h"
 
 #ifdef FBCONDEBUG
 #  define DPRINTK(fmt, args...) printk(KERN_DEBUG "%s: " fmt, __FUNCTION__ , ## args)

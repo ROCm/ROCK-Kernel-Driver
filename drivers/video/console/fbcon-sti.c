@@ -17,42 +17,18 @@
 #include <linux/string.h>
 #include <linux/fb.h>
 #include <linux/delay.h>
+#include <asm/gsc.h>		/* for gsc_read/write */
 #include <asm/types.h>
 
-#include "fbcon.h"
-#include "fbcon-mfb.h"
+#include <video/fbcon.h>
+#include <video/fbcon-mfb.h>
 
-#include "sti.h"
-
-/* Translate an address as it would be found in a 2048x2048x1 bit frame
- * buffer into a logical address Artist actually expects.  Addresses fed
- * into Artist look like this:
- *  fixed          Y               X
- * FFFF FFFF LLLL LLLL LLLC CCCC CCCC CC00
- *
- * our "RAM" addresses look like this:
- * 
- * FFFF FFFF 0000 0LLL LLLL LLLL CCCC CCCC [CCC]
- *
- * */
+#include "../sticore.h"
 
 static inline u32
 ram2log(void * addr)
 {
-	u32 a = (unsigned long) addr;
-	u32 r;
-
-#if 0
-	r  =   a & 0xff000000;		/* fixed part */
-	r += ((a & 0x000000ff) << 5);
-	r += ((a & 0x00ffff00) << 3);
-#else
-	r  =   a & 0xff000000;		/* fixed part */
-	r += ((a & 0x000000ff) << 5);
-	r += ((a & 0x0007ff00) << 5);
-#endif
-
-	return r;
+	return (unsigned long) addr;
 }
 
 /* All those functions need better names. */
@@ -74,30 +50,6 @@ memcpy_fromhp_tohp(void *dest, void *src, int count)
 	}
 }
 
-static void
-memcpy_tohp(void *dest, void *src, int count)
-{
-	unsigned long d = (unsigned long) dest;
-	u32 *s = (u32 *)src;
-
-	count += 3;
-	count &= ~3; /* XXX */
-
-	d = ram2log(dest);
-
-	while(count) {
-		count--;
-		gsc_writel(*s++, d);
-		d += 32*4;
-	}
-}
-
-static void
-memcopy_fromhp(void *dest, void *src, int count)
-{
-	/* FIXME */
-	printk("uhm ...\n");
-}
 
 static void
 memset_tohp(void *dest, u32 word, int count)
@@ -139,10 +91,11 @@ writeb_hp(u8 b, void *dst)
 static void
 fbcon_sti_setup(struct display *p)
 {
-	if (p->line_length)
-		p->next_line = p->line_length;
-	else
+	/* in kernel 2.5 the value of sadly line_length disapeared */
+	if (p->var.xres_virtual /*line_length*/)
 		p->next_line = p->var.xres_virtual>>3;
+	else
+		p->next_line = 2048; /* default STI value */
 	p->next_plane = 0;
 }
 
@@ -152,7 +105,7 @@ fbcon_sti_bmove(struct display *p, int sy, int sx,
 		int height, int width)
 {
 #if 0 /* Unfortunately, still broken */
-	sti_bmove(&default_sti /* FIXME */, sy, sx, dy, dx, height, width);
+	sti_bmove(default_sti /* FIXME */, sy, sx, dy, dx, height, width);
 #else
 	u8 *src, *dest;
 	u_int rows;
@@ -284,7 +237,6 @@ static void fbcon_sti_revc(struct display *p,
 {
 	u8 *dest, d;
 	u_int rows;
-
 
 	dest = p->fb_info->screen_base+yy*fontheight(p)*p->next_line+xx;
 	for (rows = fontheight(p); rows--; dest += p->next_line) {

@@ -39,7 +39,7 @@ __END__;
    MSBit to LSBit = left to right.
  */
 
-#include <video/font.h>
+#include "font.h"
 
 #define FONTDATAMAX 1536
 
