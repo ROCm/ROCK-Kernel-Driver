@@ -681,7 +681,6 @@ int ip6ip6_tnl_xmit(struct sk_buff *skb, struct net_device *dev)
 		icmpv6_send(skb, ICMPV6_PKT_TOOBIG, 0, mtu, dev);
 		goto tx_err_dst_release;
 	}
-	skb->h.raw = skb->nh.raw;
 
 	/*
 	 * Okay, now see if we can stuff it in the buffer as-is.
@@ -702,6 +701,8 @@ int ip6ip6_tnl_xmit(struct sk_buff *skb, struct net_device *dev)
 	}
 	dst_release(skb->dst);
 	skb->dst = dst_clone(dst);
+
+	skb->h.raw = skb->nh.raw;
 
 	if (opt)
 		ipv6_push_nfrag_opts(skb, opt, &proto, NULL);
