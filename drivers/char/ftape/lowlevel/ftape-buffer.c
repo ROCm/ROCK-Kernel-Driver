@@ -50,7 +50,7 @@ static inline void *dmaalloc(size_t size)
 		struct page *page;
 
 		for (page = virt_to_page(addr); page < virt_to_page(addr+size); page++)
-			mem_map_reserve(page);
+			SetPageReserved(page);
 	}
 	return (void *)addr;
 }
@@ -62,7 +62,7 @@ static inline void dmafree(void *addr, size_t size)
 
 		for (page = virt_to_page((unsigned long)addr);
 		     page < virt_to_page((unsigned long)addr+size); page++)
-			mem_map_unreserve(page);
+			ClearPageReserved(page);
 		free_pages((unsigned long) addr, get_order(size));
 	}
 }

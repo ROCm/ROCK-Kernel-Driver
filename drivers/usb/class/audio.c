@@ -450,7 +450,7 @@ static void dmabuf_release(struct dmabuf *db)
 	for(nr = 0; nr < NRSGBUF; nr++) {
 		if (!(p = db->sgbuf[nr]))
 			continue;
-		mem_map_unreserve(virt_to_page(p));
+		ClearPageReserved(virt_to_page(p));
 		free_page((unsigned long)p);
 		db->sgbuf[nr] = NULL;
 	}
@@ -492,7 +492,7 @@ static int dmabuf_init(struct dmabuf *db)
 			if (!p)
 				return -ENOMEM;
 			db->sgbuf[nr] = p;
-			mem_map_reserve(virt_to_page(p));
+			SetPageReserved(virt_to_page(p));
 		}
 		memset(db->sgbuf[nr], AFMT_ISUNSIGNED(db->format) ? 0x80 : 0, PAGE_SIZE);
 		if ((nr << PAGE_SHIFT) >= db->dmasize)

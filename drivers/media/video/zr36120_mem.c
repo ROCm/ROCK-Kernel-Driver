@@ -51,7 +51,7 @@ void* bmalloc(unsigned long size)
 	if (mem) {
 		unsigned long adr = (unsigned long)mem;
 		while (size > 0) {
-			mem_map_reserve(virt_to_page(phys_to_virt(adr)));
+			SetPageReserved(virt_to_page(phys_to_virt(adr)));
 			adr += PAGE_SIZE;
 			size -= PAGE_SIZE;
 		}
@@ -65,7 +65,7 @@ void bfree(void* mem, unsigned long size)
 		unsigned long adr = (unsigned long)mem;
 		unsigned long siz = size;
 		while (siz > 0) {
-			mem_map_unreserve(virt_to_page(phys_to_virt(adr)));
+			ClearPageReserved(virt_to_page(phys_to_virt(adr)));
 			adr += PAGE_SIZE;
 			siz -= PAGE_SIZE;
 		}

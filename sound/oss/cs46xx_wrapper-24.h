@@ -31,9 +31,6 @@
 #define CS_OWNER owner:
 #define CS_THIS_MODULE THIS_MODULE,
 void cs46xx_null(struct pci_dev *pcidev) { return; }
-#define cs4x_mem_map_reserve(page) mem_map_reserve(page)
-#define cs4x_mem_map_unreserve(page) mem_map_unreserve(page)
-
 #define free_dmabuf(card, dmabuf) \
 	pci_free_consistent((card)->pci_dev, \
 			    PAGE_SIZE << (dmabuf)->buforder, \
