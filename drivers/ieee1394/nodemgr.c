@@ -1286,18 +1286,19 @@ static void nodemgr_resume_ne(struct node_entry *ne)
 }
 
 
-static void nodemgr_ud_update_pdrv(struct unit_directory *ud)
+static void nodemgr_update_pdrv(struct node_entry *ne)
 {
-	struct device *dev;
+	struct unit_directory *ud;
 	struct hpsb_protocol_driver *pdrv;
+	struct class *class = &nodemgr_ud_class;
+	struct class_device *cdev;
 
-	if (!get_device(&ud->device))
-		return;
+	down_read(&class->subsys.rwsem);
+	list_for_each_entry(cdev, &class->children, node) {
+		ud = container_of(cdev, struct unit_directory, class_dev);
+		if (ud->ne != ne || !ud->device.driver)
+			continue;
 
-	list_for_each_entry(dev, &ud->device.children, node)
-		nodemgr_ud_update_pdrv(container_of(dev, struct unit_directory, device));
-
-	if (ud->device.driver) {
 		pdrv = container_of(ud->device.driver, struct hpsb_protocol_driver, driver);
 
 		if (pdrv->update && pdrv->update(ud)) {
@@ -1306,14 +1307,13 @@ static void nodemgr_ud_update_pdrv(struct unit_directory *ud)
 			up_write(&ud->device.bus->subsys.rwsem);
 		}
 	}
-
-	put_device(&ud->device);
+	up_read(&class->subsys.rwsem);
 }
 
 
 static void nodemgr_probe_ne(struct host_info *hi, struct node_entry *ne, int generation)
 {
-	struct device *dev, *udev;
+	struct device *dev;
 
 	if (ne->host != hi->host || ne->in_limbo)
 		return;
@@ -1330,8 +1330,7 @@ static void nodemgr_probe_ne(struct host_info *hi, struct node_entry *ne, int ge
 	if (ne->needs_probe)
 		nodemgr_process_root_directory(hi, ne);
 	else if (ne->generation == generation)
-		list_for_each_entry(udev, &dev->children, node)
-			nodemgr_ud_update_pdrv(container_of(udev, struct unit_directory, device));
+		nodemgr_update_pdrv(ne);
 	else
 		nodemgr_suspend_ne(ne);
 
