@@ -1342,15 +1342,12 @@ syscall_trace (void)
 	 * The 0x80 provides a way for the tracing parent to distinguish between a syscall
 	 * stop and SIGTRAP delivery.
 	 */
-	current->exit_code = SIGTRAP | ((current->ptrace & PT_TRACESYSGOOD)
-					? 0x80 : 0);
-	set_current_state(TASK_STOPPED);
-	notify_parent(current, SIGCHLD);
-	schedule();
+	ptrace_notify(SIGTRAP | ((current->ptrace & PT_TRACESYSGOOD) ? 0x80 : 0));
+
 	/*
-	 * This isn't the same as continuing with a signal, but it
-	 * will do for normal use.  strace only continues with a
-	 * signal if the stopping signal is not SIGTRAP.  -brl
+	 * This isn't the same as continuing with a signal, but it will do for normal use.
+	 * strace only continues with a signal if the stopping signal is not SIGTRAP.
+	 * -brl
 	 */
 	if (current->exit_code) {
 		send_sig(current->exit_code, current, 1);
