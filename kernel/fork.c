@@ -679,6 +679,13 @@ static inline void copy_flags(unsigned long clone_flags, struct task_struct *p)
 	p->flags = new_flags;
 }
 
+asmlinkage int sys_set_tid_address(int *user_tid)
+{
+	current->user_tid = user_tid;
+
+	return current->pid;
+}
+
 /*
  * This creates a new process as a copy of the old one,
  * but does not actually start it yet.

@@ -767,6 +767,7 @@ ENTRY(sys_call_table)
 	.long sys_epoll_ctl	/* 255 */
 	.long sys_epoll_wait
  	.long sys_remap_file_pages
+ 	.long sys_set_tid_address
 
 
 	.rept NR_syscalls-(.-sys_call_table)/4
