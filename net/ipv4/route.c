@@ -86,6 +86,7 @@
 #include <linux/mroute.h>
 #include <linux/netfilter_ipv4.h>
 #include <linux/random.h>
+#include <linux/jhash.h>
 #include <linux/rcupdate.h>
 #include <net/protocol.h>
 #include <net/ip.h>
@@ -120,13 +121,14 @@ int ip_rt_gc_elasticity		= 8;
 int ip_rt_mtu_expires		= 10 * 60 * HZ;
 int ip_rt_min_pmtu		= 512 + 20 + 20;
 int ip_rt_min_advmss		= 256;
-
+int ip_rt_secret_interval	= 10 * 60 * HZ;
 static unsigned long rt_deadline;
 
 #define RTprint(a...)	printk(KERN_DEBUG a)
 
 static struct timer_list rt_flush_timer;
 static struct timer_list rt_periodic_timer;
+static struct timer_list rt_secret_timer;
 
 /*
  *	Interface to generic destination cache.
@@ -196,19 +198,17 @@ struct rt_hash_bucket {
 static struct rt_hash_bucket 	*rt_hash_table;
 static unsigned			rt_hash_mask;
 static int			rt_hash_log;
+static unsigned int		rt_hash_rnd;
 
 struct rt_cache_stat *rt_cache_stat;
 
 static int rt_intern_hash(unsigned hash, struct rtable *rth,
 				struct rtable **res);
 
-static unsigned rt_hash_code(u32 daddr, u32 saddr, u8 tos)
+static unsigned int rt_hash_code(u32 daddr, u32 saddr, u8 tos)
 {
-	unsigned hash = ((daddr & 0xF0F0F0F0) >> 4) |
-			((daddr & 0x0F0F0F0F) << 4);
-	hash ^= saddr ^ tos;
-	hash ^= (hash >> 16);
-	return (hash ^ (hash >> 8)) & rt_hash_mask;
+	return (jenkins_hash_3words(daddr, saddr, (u32) tos, rt_hash_rnd)
+		& rt_hash_mask);
 }
 
 #ifdef CONFIG_PROC_FS
@@ -564,6 +564,15 @@ void rt_cache_flush(int delay)
 
 	mod_timer(&rt_flush_timer, now+delay);
 	spin_unlock_bh(&rt_flush_lock);
+}
+
+static void rt_secret_rebuild(unsigned long dummy)
+{
+	unsigned long now = jiffies;
+
+	get_random_bytes(&rt_hash_rnd, 4);
+	rt_cache_flush(0);
+	mod_timer(&rt_secret_timer, now + ip_rt_secret_interval);
 }
 
 /*
@@ -2553,9 +2562,21 @@ ctl_table ipv4_route_table[] = {
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec,
 	},
+	{
+		.ctl_name	= NET_IPV4_ROUTE_SECRET_INTERVAL,
+		.procname	= "secret_interval",
+		.data		= &ip_rt_secret_interval,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec_jiffies,
+		.strategy	= &sysctl_jiffies,
+	},
 	{ .ctl_name = 0 }
 };
 #endif
+
+	rt_hash_rnd = (int) ((num_physpages ^ (num_physpages>>8)) ^
+			     (jiffies ^ (jiffies >> 7)));
 
 #ifdef CONFIG_NET_CLS_ROUTE
 struct ip_rt_acct *ip_rt_acct;
@@ -2674,6 +2695,7 @@ int __init ip_rt_init(void)
 	rt_flush_timer.function = rt_run_flush;
 	init_timer(&rt_periodic_timer);
 	rt_periodic_timer.function = rt_check_expire;
+	rt_secret_timer.function = rt_secret_rebuild;
 
 	/* All the timers, started at system startup tend
 	   to synchronize. Perturb it a bit.
@@ -2681,6 +2703,10 @@ int __init ip_rt_init(void)
 	rt_periodic_timer.expires = jiffies + net_random() % ip_rt_gc_interval +
 					ip_rt_gc_interval;
 	add_timer(&rt_periodic_timer);
+
+	rt_secret_timer.expires = jiffies + net_random() % ip_rt_secret_interval +
+		ip_rt_secret_interval;
+	add_timer(&rt_secret_timer);
 
 #ifdef CONFIG_PROC_FS
 	if (rt_cache_proc_init())
