@@ -450,10 +450,10 @@ cifs_rename(struct inode *source_inode, struct dentry *source_direntry,
 	cifs_sb_source = CIFS_SB(source_inode->i_sb);
 	pTcon = cifs_sb_source->tcon;
 
-	if (pTcon != cifs_sb_target->tcon) {    
+	if (pTcon != cifs_sb_target->tcon) {
+		FreeXid(xid);    
 		return -EXDEV;	/* BB actually could be allowed if same server, but
                      different share. Might eventually add support for this */
-        	FreeXid(xid);
 	}
 
 	fromName = build_path_from_dentry(source_direntry);
@@ -471,7 +471,7 @@ cifs_rename(struct inode *source_inode, struct dentry *source_direntry,
 	if (toName)
 		kfree(toName);
 
-    FreeXid(xid);
+	FreeXid(xid);
 	return rc;
 }
 
@@ -500,15 +500,15 @@ cifs_revalidate(struct dentry *direntry)
 
 	if (time_before(jiffies, cifsInode->time + HZ)) {
 	    if((S_ISREG(direntry->d_inode->i_mode) == 0) || 
-              (direntry->d_inode->i_nlink == 1)) {
-		    if (full_path)
-			    kfree(full_path);
-		    FreeXid(xid);
-		    return rc;
-        } else {
-            cFYI(1,("Have to revalidate file due to hardlinks"));
-        }
-            
+			(direntry->d_inode->i_nlink == 1) || 
+			(lookupCacheEnabled == 0)) {
+			if (full_path)
+				kfree(full_path);
+			FreeXid(xid);
+			return rc;
+		} else {
+			cFYI(1,("Have to revalidate file due to hardlinks"));
+		}            
 	}
 
 	if (cifs_sb->tcon->ses->capabilities & CAP_UNIX)
