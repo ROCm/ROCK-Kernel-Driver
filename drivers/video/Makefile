@@ -6,7 +6,7 @@
 # This list comes from 'grep -l EXPORT_SYMBOL *.[hc]'.
 
 export-objs    	:= fbmem.o fbcmap.o fbmon.o modedb.o softcursor.o cfbfillrect.o \
-		   cfbcopyarea.o cfbimgblt.o cyber2000fb.o 
+		   cfbcopyarea.o cfbimgblt.o cyber2000fb.o vgastate.o
 
 # Each configuration option enables a list of files.
 
@@ -50,7 +50,8 @@ obj-$(CONFIG_FB_TRIDENT)	  += tridentfb.o
 obj-$(CONFIG_FB_S3TRIO)           += S3triofb.o
 obj-$(CONFIG_FB_TGA)              += tgafb.o
 obj-$(CONFIG_FB_VESA)             += vesafb.o cfbfillrect.o cfbcopyarea.o cfbimgblt.o 
-obj-$(CONFIG_FB_VGA16)            += vga16fb.o cfbfillrect.o cfbcopyarea.o cfbimgblt.o 
+obj-$(CONFIG_FB_VGA16)            += vga16fb.o cfbfillrect.o cfbcopyarea.o \
+	                             cfbimgblt.o vgastate.o 
 obj-$(CONFIG_FB_VIRGE)            += virgefb.o
 obj-$(CONFIG_FB_G364)             += g364fb.o cfbfillrect.o cfbcopyarea.o cfbimgblt.o
 obj-$(CONFIG_FB_FM2)              += fm2fb.o cfbfillrect.o cfbcopyarea.o cfbimgblt.o
@@ -69,7 +70,8 @@ obj-$(CONFIG_FB_MAXINE)           += maxinefb.o cfbfillrect.o cfbcopyarea.o cfbi
 obj-$(CONFIG_FB_TX3912)           += tx3912fb.o cfbfillrect.o cfbcopyarea.o cfbimgblt.o
 
 obj-$(CONFIG_FB_MATROX)		  += matrox/
-obj-$(CONFIG_FB_RIVA)		  += riva/ cfbfillrect.o cfbcopyarea.o cfbimgblt.o
+obj-$(CONFIG_FB_RIVA)		  += riva/ cfbfillrect.o cfbcopyarea.o \
+	                             cfbimgblt.o vgastate.o
 obj-$(CONFIG_FB_SIS)		  += sis/
 obj-$(CONFIG_FB_ATY)		  += aty/ cfbimgblt.o
 

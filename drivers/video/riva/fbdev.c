@@ -42,6 +42,7 @@
 #ifdef CONFIG_MTRR
 #include <asm/mtrr.h>
 #endif
+
 #include "rivafb.h"
 #include "nvreg.h"
 
@@ -246,15 +247,12 @@ struct riva_cursor {
 
 /* command line data, set in rivafb_setup() */
 static u32  pseudo_palette[17];
-static char nomove = 0;
 #ifdef CONFIG_MTRR
 static char nomtrr __initdata = 0;
 #endif
 
 #ifndef MODULE
 static char *mode_option __initdata = NULL;
-#else
-static char *font = NULL;
 #endif
 
 static struct fb_fix_screeninfo rivafb_fix = {
@@ -428,7 +426,7 @@ static void rivafb_load_cursor_image(u8 *data, u8 *mask, struct riva_par *par,
 		m = *((u32 *)mask)++;
 		for (j = 0; j < w/2; j++) {
 			tmp = 0;
-#if defined (__BIG_ENDIAN) 
+#if defined (__BIG_ENDIAN__) 
 			if (m & (1 << 31))
 				tmp = (b & (1 << 31)) ? fg << 16 : bg << 16;
 			b <<= 1;
@@ -1162,6 +1160,46 @@ static int riva_get_cmap_len(const struct fb_var_screeninfo *var)
  * framebuffer operations
  *
  * ------------------------------------------------------------------------- */
+static int rivafb_open(struct fb_info *info, int user)
+{
+	struct riva_par *par = (struct riva_par *) info->par;
+	int cnt = atomic_read(&par->ref_count);
+
+	if (!cnt) {
+		memset(&par->state, 0, sizeof(struct fb_vgastate));
+		par->state.flags = VGA_SAVE_MODE  | VGA_SAVE_FONTS;
+		/* save the DAC for Riva128 */
+		if (par->riva.Architecture == NV_ARCH_03)
+			par->state.flags |= VGA_SAVE_CMAP;
+		fb_save_vga(&par->state);
+
+		RivaGetConfig(&par->riva);
+		riva_save_state(par, &par->initial_state);
+	}
+	
+	atomic_inc(&par->ref_count);
+	return 0;
+}
+
+static int rivafb_release(struct fb_info *info, int user)
+{
+	struct riva_par *par = (struct riva_par *) info->par;
+	int cnt = atomic_read(&par->ref_count);
+
+	if (!cnt)
+		return -EINVAL;
+	if (cnt == 1) {
+		par->riva.LockUnlock(&par->riva, 0);
+		par->riva.LoadStateExt(&par->riva, &par->initial_state.ext);
+
+		fb_restore_vga(&par->state);
+		par->riva.LockUnlock(&par->riva, 1);
+	}
+
+	atomic_dec(&par->ref_count);
+
+	return 0;
+}
 
 static int rivafb_check_var(struct fb_var_screeninfo *var,
                             struct fb_info *info)
@@ -1493,6 +1531,8 @@ static int rivafb_setcolreg(unsigned regno, unsigned red, unsigned green,
 /* kernel interface */
 static struct fb_ops riva_fb_ops = {
 	.owner =	THIS_MODULE,
+	.fb_open =      rivafb_open,
+	.fb_release =   rivafb_release,
 	.fb_check_var =	rivafb_check_var,
 	.fb_set_par =	rivafb_set_par,
 	.fb_setcolreg =	rivafb_setcolreg,
@@ -1534,6 +1574,106 @@ static int __devinit riva_set_fbinfo(struct fb_info *info)
  * PCI bus
  *
  * ------------------------------------------------------------------------- */
+
+static void __devinit rivafb_get_mem_len(struct riva_par *par,
+					 struct fb_fix_screeninfo *fix)
+{
+	RIVA_HW_INST *chip = &par->riva;
+
+	switch (chip->Architecture) {
+	case NV_ARCH_03:
+		if (chip->PFB[0x00000000/4] & 0x00000020) {
+			if (((chip->PMC[0x00000000/4] & 0xF0) == 0x20)
+			    && ((chip->PMC[0x00000000/4] & 0x0F) >= 0x02)) {   
+				/*
+				 * SDRAM 128 ZX.
+				 */
+				switch (chip->PFB[0x00000000/4] & 0x03) {
+				case 2:
+					fix->smem_len = 1024 * 1024 * 4;
+					break;
+				case 1:
+					fix->smem_len = 1024 * 1024 * 2;
+					break;
+				default:
+					fix->smem_len = 1024 * 1024 * 8;
+					break;
+				}
+			}            
+			else  {
+				fix->smem_len = 1024 * 1024 * 8;
+			}            
+		}
+		else {
+			/*
+			 * SGRAM 128.
+			 */
+			switch (chip->PFB[0x00000000/4] & 0x00000003) {
+			case 0:
+				fix->smem_len = 1024 * 1024 * 8;
+				break;
+			case 2:
+				fix->smem_len = 1024 * 1024 * 4;
+				break;
+			default:
+				fix->smem_len = 1024 * 1024 * 2;
+				break;
+			}
+		}
+		break;
+	case NV_ARCH_04:
+		if (chip->PFB[0x00000000/4] & 0x00000100) {
+			fix->smem_len = (((chip->PFB[0x00000000/4] >> 12)
+					 & 0x0F) * 1024 * 2 + 1024 * 2) * 1024;
+		}
+		else {
+			switch (chip->PFB[0x00000000/4] & 0x00000003) {
+			case 0:
+				fix->smem_len = 1024 * 1024 * 32;
+				break;
+			case 1:
+				fix->smem_len = 1024 * 1024 * 4;
+				break;
+			case 2:
+				fix->smem_len = 1024 * 1024 * 8;
+				break;
+			case 3:
+			default:
+				fix->smem_len = 1024 * 1024 * 16;
+				break;
+			}
+		}
+		break;
+	case NV_ARCH_10:
+	case NV_ARCH_20:
+		switch ((chip->PFB[0x0000020C/4] >> 20) & 0x000000FF) {
+		case 0x02:
+			fix->smem_len = 1024 * 1024 * 2;
+			break;
+		case 0x04:
+			fix->smem_len = 1024 * 1024 * 4;
+			break;
+		case 0x08:
+			fix->smem_len = 1024 * 1024 * 8;
+			break;
+		case 0x10:
+			fix->smem_len = 1024 * 1024 * 16;
+			break;
+		case 0x20:
+			fix->smem_len = 1024 * 1024 * 32;
+			break;
+		case 0x40:
+			fix->smem_len = 1024 * 1024 * 64;
+			break;
+		case 0x80:
+			fix->smem_len = 1024 * 1024 * 128;
+			break;
+		default:
+			fix->smem_len = 1024 * 1024 * 16;
+			break;
+		}
+	}
+}
 
 static int __devinit rivafb_init_one(struct pci_dev *pd,
 				     const struct pci_device_id *ent)
@@ -1586,14 +1726,22 @@ static int __devinit rivafb_init_one(struct pci_dev *pd,
 	}
 	
 	default_par->riva.EnableIRQ = 0;
-	default_par->riva.PRAMDAC = (unsigned *)(default_par->ctrl_base + 0x00680000);
-	default_par->riva.PFB = (unsigned *)(default_par->ctrl_base + 0x00100000);
-	default_par->riva.PFIFO = (unsigned *)(default_par->ctrl_base + 0x00002000);
-	default_par->riva.PGRAPH = (unsigned *)(default_par->ctrl_base + 0x00400000);
-	default_par->riva.PEXTDEV = (unsigned *)(default_par->ctrl_base + 0x00101000);
-	default_par->riva.PTIMER = (unsigned *)(default_par->ctrl_base + 0x00009000);
-	default_par->riva.PMC = (unsigned *)(default_par->ctrl_base + 0x00000000);
-	default_par->riva.FIFO = (unsigned *)(default_par->ctrl_base + 0x00800000);
+	default_par->riva.PRAMDAC = (unsigned *)(default_par->ctrl_base + 
+						 0x00680000);
+	default_par->riva.PFB = (unsigned *)(default_par->ctrl_base + 
+					     0x00100000);
+	default_par->riva.PFIFO = (unsigned *)(default_par->ctrl_base + 
+					       0x00002000);
+	default_par->riva.PGRAPH = (unsigned *)(default_par->ctrl_base + 
+						0x00400000);
+	default_par->riva.PEXTDEV = (unsigned *)(default_par->ctrl_base +
+						 0x00101000);
+	default_par->riva.PTIMER = (unsigned *)(default_par->ctrl_base + 
+						0x00009000);
+	default_par->riva.PMC = (unsigned *)(default_par->ctrl_base + 
+					     0x00000000);
+	default_par->riva.FIFO = (unsigned *)(default_par->ctrl_base + 
+					      0x00800000);
 
 	default_par->riva.PCIO = (U008 *)(default_par->ctrl_base + 0x00601000);
 	default_par->riva.PDIO = (U008 *)(default_par->ctrl_base + 0x00681000);
@@ -1603,22 +1751,26 @@ static int __devinit rivafb_init_one(struct pci_dev *pd,
 
 	switch (default_par->riva.Architecture) {
 	case NV_ARCH_03:
-		default_par->riva.PRAMIN = (unsigned *)(info->screen_base + 0x00C00000);
+		default_par->riva.PRAMIN = (unsigned *)(info->screen_base + 
+							0x00C00000);
+		default_par->dclk_max = 256000000;
 		rivafb_fix.accel = FB_ACCEL_NV3;
 		break;
 	case NV_ARCH_04:
 	case NV_ARCH_10:
 	case NV_ARCH_20:
-		default_par->riva.PCRTC = (unsigned *)(default_par->ctrl_base + 0x00600000);
-		default_par->riva.PRAMIN = (unsigned *)(default_par->ctrl_base + 0x00710000);
+		default_par->riva.PCRTC = (unsigned *)(default_par->ctrl_base 
+						       + 0x00600000);
+		default_par->riva.PRAMIN = (unsigned *)(default_par->ctrl_base
+							+ 0x00710000);
+		default_par->dclk_max = 250000000;
 		rivafb_fix.accel = FB_ACCEL_NV4;
 		break;
 	}
 
-	RivaGetConfig(&default_par->riva);
+	rivafb_get_mem_len(default_par, &rivafb_fix);
 
-	rivafb_fix.smem_len = default_par->riva.RamAmountKBytes * 1024;
-	default_par->dclk_max = default_par->riva.MaxVClockFreqKHz * 1000;
+	info->par = default_par;
 
 	if (!request_mem_region(rivafb_fix.smem_start,
 				rivafb_fix.smem_len, "rivafb")) {
@@ -1648,14 +1800,6 @@ static int __devinit rivafb_init_one(struct pci_dev *pd,
 	}
 #endif /* CONFIG_MTRR */
 
-	/* unlock io */
-	CRTCout(default_par, 0x11, 0xFF);/* vgaHWunlock() + riva unlock(0x7F) */
-	default_par->riva.LockUnlock(&default_par->riva, 0);
-	
-	info->par = default_par;
-
-	riva_save_state(default_par, &default_par->initial_state);
-
 	if (riva_set_fbinfo(info) < 0) {
 		printk(KERN_ERR PFX "error setting initial video mode\n");
 		goto err_out_cursor;
@@ -1680,7 +1824,6 @@ static int __devinit rivafb_init_one(struct pci_dev *pd,
 	return 0;
 
 err_out_load_state:
-	riva_load_state(default_par, &default_par->initial_state);
 err_out_cursor:
 /* err_out_iounmap_fb: */
 	iounmap(info->screen_base);
@@ -1703,8 +1846,6 @@ static void __devexit rivafb_remove_one(struct pci_dev *pd)
 	
 	if (!info)
 		return;
-
-	riva_load_state(par, &par->initial_state);
 
 	unregister_framebuffer(info);
 
@@ -1742,13 +1883,11 @@ int __init rivafb_setup(char *options)
 	while ((this_opt = strsep(&options, ",")) != NULL) {
 		if (!*this_opt)
 			continue;
-		if (!strncmp(this_opt, "nomove", 6)) {
-			nomove = 1;
 #ifdef CONFIG_MTRR
-		} else if (!strncmp(this_opt, "nomtrr", 6)) {
+		if (!strncmp(this_opt, "nomtrr", 6)) {
 			nomtrr = 1;
-#endif
 		} else
+#endif
 			mode_option = this_opt;
 	}
 	return 0;
@@ -1773,9 +1912,7 @@ static struct pci_driver rivafb_driver = {
 int __init rivafb_init(void)
 {
 	int err;
-#ifdef MODULE
-	if (font) strncpy(fontname, font, sizeof(fontname)-1);
-#endif
+
 	err = pci_module_init(&rivafb_driver);
 	if (err)
 		return err;
@@ -1796,8 +1933,6 @@ MODULE_PARM(font, "s");
 MODULE_PARM_DESC(font, "Specifies one of the compiled-in fonts (default=none)");
 MODULE_PARM(noaccel, "i");
 MODULE_PARM_DESC(noaccel, "Disables hardware acceleration (0 or 1=disabled) (default=0)");
-MODULE_PARM(nomove, "i");
-MODULE_PARM_DESC(nomove, "Enables YSCROLL_NOMOVE (0 or 1=enabled) (default=0)");
 #ifdef CONFIG_MTRR
 MODULE_PARM(nomtrr, "i");
 MODULE_PARM_DESC(nomtrr, "Disables MTRR support (0 or 1=disabled) (default=0)");

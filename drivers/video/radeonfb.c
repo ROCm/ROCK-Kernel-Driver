@@ -42,8 +42,6 @@
 #include <linux/slab.h>
 #include <linux/delay.h>
 #include <linux/fb.h>
-#include <linux/console.h>
-#include <linux/selection.h>
 #include <linux/ioport.h>
 #include <linux/init.h>
 #include <linux/pci.h>
@@ -54,7 +52,7 @@
 #if defined(__powerpc__)
 #include <asm/prom.h>
 #include <asm/pci-bridge.h>
-#include <video/macmodes.h>
+#include "macmodes.h"
 
 #ifdef CONFIG_NVRAM
 #include <linux/nvram.h>
@@ -80,9 +78,7 @@
 #endif
 
 #include <video/radeon.h>
-
 #include <linux/radeonfb.h>
-
 
 #define DEBUG	1
 
@@ -681,7 +677,6 @@ static __inline__ int _max(int val1, int val2)
  * globals
  */
         
-static char fontname[40] __initdata;
 static char *mode_option __initdata;
 static char noaccel = 1;
 static char mirror = 0;
@@ -1295,7 +1290,6 @@ static int __devinit radeon_init_disp (struct radeonfb_info *rinfo)
 
 	var.activate = FB_ACTIVATE_NOW;
 	gen_set_var(&var, -1, info);
-
         return 0;
 }
 
@@ -1495,7 +1489,7 @@ static int radeonfb_check_var (struct fb_var_screeninfo *var, struct fb_info *in
 }
 
 
-static int radeonfb_pan_display (struct fb_var_screeninfo *var, int con,
+static int radeonfb_pan_display (struct fb_var_screeninfo *var,
                                  struct fb_info *info)
 {
         struct radeonfb_info *rinfo = (struct radeonfb_info *) info;
@@ -1509,7 +1503,6 @@ static int radeonfb_pan_display (struct fb_var_screeninfo *var, int con,
 
         OUTREG(CRTC_OFFSET, ((var->yoffset * var->xres_virtual + var->xoffset)
 			     * var->bits_per_pixel / 8) & ~7);
-        
         return 0;
 }
 
@@ -2188,11 +2181,8 @@ static void radeon_write_mode (struct radeonfb_info *rinfo,
 
 static struct fb_ops radeonfb_ops = {
 	.owner			= THIS_MODULE,
-	.fb_set_var		= gen_set_var,
 	.fb_check_var		= radeonfb_check_var,
 	.fb_set_par		= radeonfb_set_par,
-	.fb_get_cmap		= gen_get_cmap,
-	.fb_set_cmap		= gen_set_cmap,
 	.fb_setcolreg		= radeonfb_setcolreg,
 	.fb_pan_display 	= radeonfb_pan_display,
 	.fb_blank		= radeonfb_blank,
@@ -2228,11 +2218,6 @@ static int __devinit radeon_set_fbinfo (struct radeonfb_info *rinfo)
         info->fbops = &radeonfb_ops;
         info->display_fg = NULL;
         info->screen_base = (char *)rinfo->fb_base;
-        strncpy (info->fontname, fontname, sizeof (info->fontname));
-        info->fontname[sizeof (info->fontname) - 1] = 0;
-	info->changevar  = NULL;
-	info->switch_con = gen_switch;
-	info->updatevar  = gen_update_var;
 
 	/* Fill fix common fields */
 	strncpy(info->fix.id, rinfo->name, sizeof(info->fix.id));
@@ -3138,16 +3123,7 @@ int __init radeonfb_setup (char *options)
 	while ((this_opt = strsep (&options, ",")) != NULL) {
 		if (!*this_opt)
 			continue;
-                if (!strncmp (this_opt, "font:", 5)) {
-                        char *p;
-                        int i;
-        
-                        p = this_opt + 5;
-                        for (i=0; i<sizeof (fontname) - 1; i++)
-                                if (!*p || *p == ' ' || *p == ',')
-                                        break;
-                        memcpy(fontname, this_opt + 5, i);
-                } else if (!strncmp(this_opt, "noaccel", 7)) {
+                if (!strncmp(this_opt, "noaccel", 7)) {
 			noaccel = 1;
                 } else if (!strncmp(this_opt, "mirror", 6)) {
 			mirror = 1;

@@ -1770,9 +1770,12 @@ static char * __init aty128find_ROM(void)
 	char *rom_base;
 	char *rom;
 	int  stage;
-	int  i;
+	int  i, j;
 	char aty_rom_sig[] = "761295520";   /* ATI ROM Signature      */
-	char R128_sig[] = "R128";           /* Rage128 ROM identifier */
+	char *R128_sig[] = {
+		"R128",		/* Rage128 ROM identifier */
+		"128b"
+	};
 
 	for (segstart=0x000c0000; segstart<0x000f0000; segstart+=0x00001000) {
         	stage = 1;
@@ -1803,10 +1806,14 @@ static char * __init aty128find_ROM(void)
 
 		/* ATI signature found.  Let's see if it's a Rage128 */
 		for (i = 0; (i < 512) && (stage != 4); i++) {
-			if (R128_sig[0] == *rom)
-				if (strncmp(R128_sig, rom, 
-						strlen(R128_sig)) == 0)
-					stage = 4;
+			for (j = 0; j < sizeof(R128_sig)/sizeof(char *);j++) {
+				if (R128_sig[j][0] == *rom)
+					if (strncmp(R128_sig[j], rom, 
+					    strlen(R128_sig[j])) == 0) {
+						stage = 4;
+						break;
+					}
+			}
 			rom++;
 		}
 		if (stage != 4) {

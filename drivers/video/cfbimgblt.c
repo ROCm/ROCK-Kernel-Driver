@@ -123,11 +123,11 @@ static inline void color_imageblit(struct fb_image *image, struct fb_info *p, u8
 			shift = start_index;
 		}
 		while (n--) {
-			if (p->fix.visual == FB_VISUAL_PSEUDOCOLOR)
-				color = *src & bitmask; 
 			if (p->fix.visual == FB_VISUAL_TRUECOLOR ||
 			    p->fix.visual == FB_VISUAL_DIRECTCOLOR )
 				color = palette[*src] & bitmask;
+			else
+				color = *src & bitmask;	
 			val |= SHIFT_HIGH(color, shift);
 			if (shift >= null_bits) {
 				FB_WRITEL(val, dst++);

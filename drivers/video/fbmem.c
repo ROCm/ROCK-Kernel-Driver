@@ -730,12 +730,12 @@ fb_open(struct inode *inode, struct file *file)
 #endif /* CONFIG_KMOD */
 	if (!(info = registered_fb[fbidx]))
 		return -ENODEV;
-	if (info->fbops->owner)
-		__MOD_INC_USE_COUNT(info->fbops->owner);
+	if (!try_module_get(info->fbops->owner))
+		return -ENODEV;
 	if (info->fbops->fb_open) {
 		res = info->fbops->fb_open(info,1);
-		if (res && info->fbops->owner)
-			__MOD_DEC_USE_COUNT(info->fbops->owner);
+		if (res)
+			module_put(info->fbops->owner);
 	}
 	return res;
 }
@@ -750,8 +750,7 @@ fb_release(struct inode *inode, struct file *file)
 	info = registered_fb[fbidx];
 	if (info->fbops->fb_release)
 		info->fbops->fb_release(info,1);
-	if (info->fbops->owner)
-		__MOD_DEC_USE_COUNT(info->fbops->owner);
+	module_put(info->fbops->owner);
 	unlock_kernel();
 	return 0;
 }

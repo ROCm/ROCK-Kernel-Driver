@@ -7,7 +7,8 @@
  *
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file COPYING in the main directory of this
- * archive for more details.  */
+ * archive for more details.  
+ */
 
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -69,6 +70,8 @@ static struct vga16fb_par {
 		unsigned char	ModeControl;		/* CRT-Controller:17h */
 		unsigned char	ClockingMode;		/* Seq-Controller:01h */
 	} vga_state;
+	struct fb_vgastate state;
+	atomic_t ref_count;
 	int palette_blanked, vesa_blanked, mode, isVGA;
 	u8 misc, pel_msk, vss, clkdiv;
 	u8 crtc[VGA_CRT_C];
@@ -294,6 +297,34 @@ static void vga16fb_clock_chip(struct vga16fb_par *par,
 }
 			       
 #define FAIL(X) return -EINVAL
+
+static int vga16fb_open(struct fb_info *info, int user)
+{
+	struct vga16fb_par *par = (struct vga16fb_par *) info->par;
+	int cnt = atomic_read(&par->ref_count);
+
+	if (!cnt) {
+		memset(&par->state, 0, sizeof(struct fb_vgastate));
+		par->state.flags = 8;
+		fb_save_vga(&par->state);
+	}
+	atomic_inc(&par->ref_count);
+	return 0;
+}
+
+static int vga16fb_release(struct fb_info *info, int user)
+{
+	struct vga16fb_par *par = (struct vga16fb_par *) info->par;
+	int cnt = atomic_read(&par->ref_count);
+
+	if (!cnt)
+		return -EINVAL;
+	if (cnt == 1)
+		fb_restore_vga(&par->state);
+	atomic_dec(&par->ref_count);
+
+	return 0;
+}
 
 static int vga16fb_check_var(struct fb_var_screeninfo *var,
 			     struct fb_info *info)
@@ -1346,6 +1377,8 @@ void vga16fb_imageblit(struct fb_info *info, struct fb_image *image)
 
 static struct fb_ops vga16fb_ops = {
 	.owner		= THIS_MODULE,
+	.fb_open        = vga16fb_open,
+	.fb_release     = vga16fb_release,
 	.fb_check_var	= vga16fb_check_var,
 	.fb_set_par	= vga16fb_set_par,
 	.fb_setcolreg 	= vga16fb_setcolreg,
