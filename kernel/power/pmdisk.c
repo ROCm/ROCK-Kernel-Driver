@@ -74,10 +74,6 @@ struct link {
 	swp_entry_t next;
 };
 
-union diskpage {
-	struct link link;
-};
-
 
 struct pmdisk_info {
 	u32		version_code;
@@ -291,13 +287,13 @@ static int write_data(void)
 static void free_pagedir_entries(void)
 {
 	int num = SUSPEND_PD_PAGES(pmdisk_pages);
-	union diskpage * cur;
+	struct link * link;
 	swp_entry_t entry;
 	int i;
 
 	for (i = 0; i < num; i++) {
-		cur = (union diskpage *)((char *) pm_pagedir_nosave)+i;
-		entry = cur->link.next;
+		link = (struct link *)((char *) pm_pagedir_nosave)+i;
+		entry = link->next;
 		if (entry.val)
 			swap_free(entry);
 	}
@@ -312,19 +308,17 @@ static void free_pagedir_entries(void)
 static int write_pagedir(swp_entry_t * last)
 {
 	int nr_pgdir_pages = SUSPEND_PD_PAGES(pmdisk_pages);
-	union diskpage *cur;
+	struct link * link;
 	swp_entry_t prev = {0};
 	int error = 0;
 	int i;
 
 	printk( "Writing pagedir (%d pages): ", nr_pgdir_pages);
 	for (i = 0; i < nr_pgdir_pages && !error; i++) {
-		cur = (union diskpage *)((char *) pm_pagedir_nosave)+i;
-		BUG_ON ((char *) cur != (((char *) pm_pagedir_nosave) + i*PAGE_SIZE));
+		link = (struct link *)((char *) pm_pagedir_nosave + i * PAGE_SIZE);
 		printk( "." );
-
-		cur->link.next = prev;
-		error = write_swap_page((unsigned long)cur,&prev);
+		link->next = prev;
+		error = write_swap_page((unsigned long)link,&prev);
 	}
 	*last = prev;
 	return error;
@@ -931,7 +925,7 @@ write_page(pgoff_t page_off, void * page)
 extern dev_t __init name_to_dev_t(const char *line);
 
 
-#define next_entry(diskpage)	(diskpage)->link.next
+#define next_entry(link)	(link)->next
 
 
 static int __init check_sig(swp_entry_t * next)
@@ -1038,7 +1032,7 @@ static int __init read_pagedir(swp_entry_t start)
 
 		if (offset) {
 			if (!(error = read_page(offset, data)))
-				entry = next_entry((union diskpage *)data);
+				entry = next_entry((struct link *)data);
 		} else
 			error = -EFAULT;
 	}
