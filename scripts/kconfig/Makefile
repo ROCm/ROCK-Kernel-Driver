@@ -67,7 +67,7 @@ help:
 
 libkconfig-objs := zconf.tab.o
 
-host-progs	:= conf mconf qconf gconf
+hostprogs-y	:= conf mconf qconf gconf
 conf-objs	:= conf.o  libkconfig.so
 mconf-objs	:= mconf.o libkconfig.so
 

@@ -294,8 +294,12 @@ AFLAGS_KERNEL	=
 
 NOSTDINC_FLAGS  = -nostdinc -iwithprefix include
 
-CPPFLAGS        := -D__KERNEL__ -Iinclude \
-		   $(if $(KBUILD_SRC),-Iinclude2 -I$(srctree)/include)
+# Use LINUXINCLUDE when you must reference the include/ directory.
+# Needed to be compatible with the O= option
+LINUXINCLUDE    := -Iinclude \
+                   $(if $(KBUILD_SRC),-Iinclude2 -I$(srctree)/include)
+
+CPPFLAGS        := -D__KERNEL__ $(LINUXINCLUDE)
 
 CFLAGS 		:= -Wall -Wstrict-prototypes -Wno-trigraphs \
 	  	   -fno-strict-aliasing -fno-common
@@ -306,7 +310,7 @@ export	VERSION PATCHLEVEL SUBLEVEL EXTRAVERSION KERNELRELEASE ARCH \
 	CPP AR NM STRIP OBJCOPY OBJDUMP MAKE AWK GENKSYMS PERL UTS_MACHINE \
 	HOSTCXX HOSTCXXFLAGS LDFLAGS_BLOB LDFLAGS_MODULE CHECK
 
-export CPPFLAGS NOSTDINC_FLAGS OBJCOPYFLAGS LDFLAGS
+export CPPFLAGS NOSTDINC_FLAGS LINUXINCLUDE OBJCOPYFLAGS LDFLAGS
 export CFLAGS CFLAGS_KERNEL CFLAGS_MODULE 
 export AFLAGS AFLAGS_KERNEL AFLAGS_MODULE
 
@@ -538,8 +542,9 @@ define rule_vmlinux__
 	echo 'cmd_$@ := $(cmd_vmlinux__)' > $(@D)/.$(@F).cmd
 endef
 
-do_system_map = $(NM) $(1) | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > $(2)
-
+quiet_cmd_sysmap = SYSMAP 
+      cmd_sysmap = $(CONFIG_SHELL) $(srctree)/scripts/mksysmap
+		   
 LDFLAGS_vmlinux += -T arch/$(ARCH)/kernel/vmlinux.lds.s
 
 #	Generate section listing all symbols and add it into vmlinux
@@ -570,8 +575,10 @@ endif
 kallsyms.o := .tmp_kallsyms$(last_kallsyms).o
 
 define rule_verify_kallsyms
-	@$(call do_system_map, .tmp_vmlinux$(last_kallsyms), .tmp_System.map)
-	@cmp -s System.map .tmp_System.map || \
+	$(Q)$(if $($(quiet)cmd_sysmap),                       \
+	  echo '  $($(quiet)cmd_sysmap) .tmp_System.map' &&)  \
+	  $(cmd_sysmap) .tmp_vmlinux$(last_kallsyms) .tmp_System.map
+	$(Q)cmp -s System.map .tmp_System.map || \
 		(echo Inconsistent kallsyms data, try setting CONFIG_KALLSYMS_EXTRA_PASS ; rm .tmp_kallsyms* ; false)
 endef
 
@@ -581,7 +588,7 @@ cmd_kallsyms = $(NM) -n $< | $(KALLSYMS) $(foreach x,$(CONFIG_KALLSYMS_ALL),--al
 .tmp_kallsyms1.o .tmp_kallsyms2.o .tmp_kallsyms3.o: %.o: %.S scripts FORCE
 	$(call if_changed_dep,as_o_S)
 
-.tmp_kallsyms%.S: .tmp_vmlinux%
+.tmp_kallsyms%.S: .tmp_vmlinux% $(KALLSYMS)
 	$(call cmd,kallsyms)
 
 .tmp_vmlinux1: $(vmlinux-objs) arch/$(ARCH)/kernel/vmlinux.lds.s FORCE
@@ -595,11 +602,19 @@ cmd_kallsyms = $(NM) -n $< | $(KALLSYMS) $(foreach x,$(CONFIG_KALLSYMS_ALL),--al
 
 endif
 
-#	Finally the vmlinux rule
+# Finally the vmlinux rule
+# This rule is also used to generate System.map
+# and to verify that the content of kallsyms are consistent
 
 define rule_vmlinux
-	$(rule_vmlinux__); \
-	$(call do_system_map, $@, System.map)
+	$(rule_vmlinux__);
+	$(Q)$(if $($(quiet)cmd_sysmap),                  \
+	  echo '  $($(quiet)cmd_sysmap) System.map' &&)  \
+	$(cmd_sysmap) $@ System.map;                     \
+	if [ $$? -ne 0 ]; then                           \
+		rm -f $@;                                \
+		/bin/false;                              \
+	fi;
 	$(rule_verify_kallsyms)
 endef
 

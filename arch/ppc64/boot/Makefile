@@ -25,7 +25,7 @@ CROSS32_COMPILE ?=
 
 BOOTCC		:= $(CROSS32_COMPILE)gcc
 HOSTCC		:= gcc
-BOOTCFLAGS	:= $(HOSTCFLAGS) -Iinclude -fno-builtin 
+BOOTCFLAGS	:= $(HOSTCFLAGS) $(LINUXINCLUDE) -fno-builtin 
 BOOTAS		:= $(CROSS32_COMPILE)as
 BOOTAFLAGS	:= -D__ASSEMBLY__ $(BOOTCFLAGS) -traditional
 BOOTLD		:= $(CROSS32_COMPILE)ld
@@ -58,7 +58,7 @@ obj-sec = $(foreach section, $(1), $(patsubst %,$(obj)/kernel-%.o, $(section)))
 src-sec = $(foreach section, $(1), $(patsubst %,$(obj)/kernel-%.c, $(section)))
 gz-sec  = $(foreach section, $(1), $(patsubst %,$(obj)/kernel-%.gz, $(section)))
 
-host-progs		:= piggy addnote addSystemMap addRamDisk
+hostprogs-y		:= piggy addnote addSystemMap addRamDisk
 targets 		+= zImage zImage.initrd imagesize.c \
 			   $(patsubst $(obj)/%,%, $(call obj-sec, $(required) $(initrd))) \
 			   $(patsubst $(obj)/%,%, $(call src-sec, $(required) $(initrd))) \

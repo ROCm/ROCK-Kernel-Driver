@@ -60,40 +60,10 @@ subdir-obj-y := $(foreach o,$(obj-y),$(if $(filter-out $(o),$(notdir $(o))),$(o)
 
 # $(obj-dirs) is a list of directories that contain object files
 obj-dirs := $(dir $(multi-objs) $(subdir-obj-y))
-obj-dirs += $(foreach f,$(host-progs), $(if $(dir $(f)),$(dir $(f))))
-obj-dirs := $(strip $(sort $(filter-out ./,$(obj-dirs))))
 
 # Replace multi-part objects by their individual parts, look at local dir only
 real-objs-y := $(foreach m, $(filter-out $(subdir-obj-y), $(obj-y)), $(if $(strip $($(m:.o=-objs)) $($(m:.o=-y))),$($(m:.o=-objs)) $($(m:.o=-y)),$(m))) $(extra-y)
 real-objs-m := $(foreach m, $(obj-m), $(if $(strip $($(m:.o=-objs)) $($(m:.o=-y))),$($(m:.o=-objs)) $($(m:.o=-y)),$(m)))
-
-# C code
-# Executables compiled from a single .c file
-host-csingle	:= $(foreach m,$(host-progs),$(if $($(m)-objs),,$(m)))
-
-# C executables linked based on several .o files
-host-cmulti	:= $(foreach m,$(host-progs),\
-		   $(if $($(m)-cxxobjs),,$(if $($(m)-objs),$(m))))
-
-# Object (.o) files compiled from .c files
-host-cobjs	:= $(sort $(foreach m,$(host-progs),$($(m)-objs)))
-
-# C++ code
-# C++ executables compiled from at least on .cc file
-# and zero or more .c files
-host-cxxmulti	:= $(foreach m,$(host-progs),$(if $($(m)-cxxobjs),$(m)))
-
-# C++ Object (.o) files compiled from .cc files
-host-cxxobjs	:= $(sort $(foreach m,$(host-cxxmulti),$($(m)-cxxobjs)))
-
-# Shared libaries (only .c supported)
-# Shared libraries (.so) - all .so files referenced in "xxx-objs"
-host-cshlib	:= $(sort $(filter %.so, $(host-cobjs)))
-# Remove .so files from "xxx-objs"
-host-cobjs	:= $(filter-out %.so,$(host-cobjs))
-
-#Object (.o) files used by the shared libaries
-host-cshobjs	:= $(sort $(foreach m,$(host-cshlib),$($(m:.so=-objs))))
 
 # Add subdir path
 
@@ -113,14 +83,6 @@ multi-objs-y	:= $(addprefix $(obj)/,$(multi-objs-y))
 multi-objs-m	:= $(addprefix $(obj)/,$(multi-objs-m))
 subdir-ym	:= $(addprefix $(obj)/,$(subdir-ym))
 obj-dirs	:= $(addprefix $(obj)/,$(obj-dirs))
-host-progs      := $(addprefix $(obj)/,$(host-progs))
-host-csingle	:= $(addprefix $(obj)/,$(host-csingle))
-host-cmulti	:= $(addprefix $(obj)/,$(host-cmulti))
-host-cobjs	:= $(addprefix $(obj)/,$(host-cobjs))
-host-cxxmulti	:= $(addprefix $(obj)/,$(host-cxxmulti))
-host-cxxobjs	:= $(addprefix $(obj)/,$(host-cxxobjs))
-host-cshlib	:= $(addprefix $(obj)/,$(host-cshlib))
-host-cshobjs	:= $(addprefix $(obj)/,$(host-cshobjs))
 
 # The temporary file to save gcc -MD generated dependencies must not
 # contain a comma
@@ -136,12 +98,8 @@ depfile = $(subst $(comma),_,$(@D)/.$(@F).d)
 basename_flags = -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F)))
 modname_flags  = $(if $(filter 1,$(words $(modname))),-DKBUILD_MODNAME=$(subst $(comma),_,$(subst -,_,$(modname))))
 
-
 _c_flags       = $(CFLAGS) $(EXTRA_CFLAGS) $(CFLAGS_$(*F).o)
 _a_flags       = $(AFLAGS) $(EXTRA_AFLAGS) $(AFLAGS_$(*F).o)
-_hostc_flags   = $(HOSTCFLAGS)   $(HOST_EXTRACFLAGS)   $(HOSTCFLAGS_$(*F).o)
-_hostcxx_flags = $(HOSTCXXFLAGS) $(HOST_EXTRACXXFLAGS) $(HOSTCXXFLAGS_$(*F).o)
-
 
 # If building the kernel in a separate objtree expand all occurrences
 # of -Idir to -I$(srctree)/dir except for absolute paths (starting with '/').
@@ -149,8 +107,6 @@ _hostcxx_flags = $(HOSTCXXFLAGS) $(HOST_EXTRACXXFLAGS) $(HOSTCXXFLAGS_$(*F).o)
 ifeq ($(KBUILD_SRC),)
 __c_flags	= $(_c_flags)
 __a_flags	= $(_a_flags)
-__hostc_flags	= $(_hostc_flags)
-__hostcxx_flags	= $(_hostcxx_flags)
 else
 
 # Prefix -I with $(srctree) if it is not an absolute path
@@ -164,8 +120,6 @@ flags = $(foreach o,$($(1)),$(if $(filter -I%,$(o)),$(call addtree,$(o)),$(o)))
 # FIXME: Replace both with specific CFLAGS* statements in the makefiles
 __c_flags	= $(call addtree,-I$(obj)) $(call flags,_c_flags)
 __a_flags	=                          $(call flags,_a_flags)
-__hostc_flags	= -I$(obj)                 $(call flags,_hostc_flags)
-__hostcxx_flags	= -I$(obj)                 $(call flags,_hostcxx_flags)
 endif
 
 c_flags        = -Wp,-MD,$(depfile) $(NOSTDINC_FLAGS) $(CPPFLAGS) \
@@ -174,9 +128,6 @@ c_flags        = -Wp,-MD,$(depfile) $(NOSTDINC_FLAGS) $(CPPFLAGS) \
 
 a_flags        = -Wp,-MD,$(depfile) $(NOSTDINC_FLAGS) $(CPPFLAGS) \
 		 $(__a_flags) $(modkern_aflags)
-
-hostc_flags    = -Wp,-MD,$(depfile) $(__hostc_flags)
-hostcxx_flags  = -Wp,-MD,$(depfile) $(__hostcxx_flags)
 
 ld_flags       = $(LDFLAGS) $(EXTRA_LDFLAGS)
 
