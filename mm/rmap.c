@@ -395,6 +395,9 @@ int page_referenced(struct page *page, int is_locked, int ignore_token)
 {
 	int referenced = 0;
 
+	if (!swap_token_default_timeout)
+		ignore_token = 1;
+
 	if (page_test_and_clear_young(page))
 		referenced++;
 
