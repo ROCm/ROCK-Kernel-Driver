@@ -464,7 +464,7 @@ u16 ClockSourceSelector[] = {0x8000,   // selects source as ADAT at 44.1 kHz
                              0x0002    // selects source as local clock at 48 kHz
                             };
 
-snd_korg1212rc rc;
+static snd_korg1212rc rc;
 
 
 MODULE_DEVICE_TABLE(pci, snd_korg1212_ids);
