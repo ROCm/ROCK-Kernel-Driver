@@ -2161,6 +2161,7 @@ generic_file_write_nolock(struct file *file, const struct iovec *iov,
 			break;
 		}
 		page_fault = filemap_copy_from_user(page, offset, buf, bytes);
+		flush_dcache_page(page);
 		status = a_ops->commit_write(file, page, offset, offset+bytes);
 		if (unlikely(page_fault)) {
 			status = -EFAULT;
