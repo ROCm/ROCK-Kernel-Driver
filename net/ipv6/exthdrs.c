@@ -709,8 +709,16 @@ int ipv6_skip_exthdr(struct sk_buff *skb, int start, u8 *nexthdrp, int len)
 		if (skb_copy_bits(skb, start, &hdr, sizeof(hdr)))
 			BUG();
 		if (nexthdr == NEXTHDR_FRAGMENT) {
-			struct frag_hdr *fhdr = (struct frag_hdr *) &hdr;
-			if (ntohs(fhdr->frag_off) & ~0x7)
+			unsigned short frag_off;
+			if (skb_copy_bits(skb,
+					  start+offsetof(struct frag_hdr,
+							 frag_off),
+					  &frag_off,
+					  sizeof(frag_off))) {
+				return -1;
+			}
+
+			if (ntohs(frag_off) & ~0x7)
 				break;
 			hdrlen = 8;
 		} else if (nexthdr == NEXTHDR_AUTH)
