@@ -224,7 +224,7 @@ static struct acpi_driver i8042_acpi_kbd_driver = {
 
 static struct acpi_driver i8042_acpi_aux_driver = {
 	.name		= "i8042",
-	.ids		= "PNP0F13,SYN0801",
+	.ids		= "PNP0F03,PNP0F0B,PNP0F0E,PNP0F12,PNP0F13,SYN0801",
 	.ops		= {
 		.add		= i8042_acpi_aux_add,
 	},
