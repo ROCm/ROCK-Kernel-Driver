@@ -327,11 +327,6 @@ void ide_config(dev_link_t *link)
     CS_CHECK(RequestIRQ, pcmcia_request_irq(handle, &link->irq));
     CS_CHECK(RequestConfiguration, pcmcia_request_configuration(handle, &link->conf));
 
-    /* deal with brain dead IDE resource management */
-    release_region(link->io.BasePort1, link->io.NumPorts1);
-    if (link->io.NumPorts2)
-	release_region(link->io.BasePort2, link->io.NumPorts2);
-
     /* disable drive interrupts during IDE probe */
     outb(0x02, ctl_base);
 
