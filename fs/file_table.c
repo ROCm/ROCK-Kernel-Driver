@@ -169,11 +169,9 @@ void __fput(struct file *file)
 	fops_put(file->f_op);
 	if (file->f_mode & FMODE_WRITE)
 		put_write_access(inode);
-	file_list_lock();
 	file->f_dentry = NULL;
 	file->f_vfsmnt = NULL;
-	list_del(&file->f_list);
-	file_list_unlock();
+	file_kill(file);
 	file_free(file);
 	dput(dentry);
 	mntput(mnt);
@@ -196,9 +194,7 @@ void put_filp(struct file *file)
 {
 	if (atomic_dec_and_test(&file->f_count)) {
 		security_file_free(file);
-		file_list_lock();
-		list_del(&file->f_list);
-		file_list_unlock();
+		file_kill(file);
 		file_free(file);
 	}
 }
@@ -214,9 +210,11 @@ void file_move(struct file *file, struct list_head *list)
 
 void file_kill(struct file *file)
 {
-	file_list_lock();
-	list_del_init(&file->f_list);
-	file_list_unlock();
+	if (!list_empty(&file->f_list)) {
+		file_list_lock();
+		list_del_init(&file->f_list);
+		file_list_unlock();
+	}
 }
 
 int fs_may_remount_ro(struct super_block *sb)
