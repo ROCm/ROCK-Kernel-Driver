@@ -22,6 +22,7 @@
 #include <sound/driver.h>
 #include <linux/threads.h>
 #include <linux/interrupt.h>
+#include <linux/smp_lock.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <linux/time.h>
@@ -1020,8 +1021,8 @@ static int snd_ctl_set_power_state(snd_card_t *card, unsigned int power_state)
 }
 #endif
 
-static int snd_ctl_ioctl(struct inode *inode, struct file *file,
-			 unsigned int cmd, unsigned long arg)
+static inline int _snd_ctl_ioctl(struct inode *inode, struct file *file,
+				 unsigned int cmd, unsigned long arg)
 {
 	snd_ctl_file_t *ctl;
 	snd_card_t *card;
@@ -1092,6 +1093,17 @@ static int snd_ctl_ioctl(struct inode *inode, struct file *file,
 	up_read(&snd_ioctl_rwsem);
 	snd_printd("unknown ioctl = 0x%x\n", cmd);
 	return -ENOTTY;
+}
+
+/* FIXME: need to unlock BKL to allow preemption */
+static int snd_ctl_ioctl(struct inode *inode, struct file *file,
+			 unsigned int cmd, unsigned long arg)
+{
+	int err;
+	unlock_kernel();
+	err = _snd_ctl_ioctl(inode, file, cmd, arg);
+	lock_kernel();
+	return err;
 }
 
 static ssize_t snd_ctl_read(struct file *file, char __user *buffer, size_t count, loff_t * offset)

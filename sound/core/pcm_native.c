@@ -21,6 +21,7 @@
 
 #include <sound/driver.h>
 #include <linux/mm.h>
+#include <linux/smp_lock.h>
 #include <linux/file.h>
 #include <linux/slab.h>
 #include <linux/time.h>
@@ -2616,26 +2617,36 @@ static int snd_pcm_playback_ioctl(struct inode *inode, struct file *file,
 				  unsigned int cmd, unsigned long arg)
 {
 	snd_pcm_file_t *pcm_file;
+	int err;
 
 	pcm_file = file->private_data;
 
 	if (((cmd >> 8) & 0xff) != 'A')
 		return -ENOTTY;
 
-	return snd_pcm_playback_ioctl1(pcm_file->substream, cmd, (void __user *)arg);
+	/* FIXME: need to unlock BKL to allow preemption */
+	unlock_kernel();
+	err = snd_pcm_playback_ioctl1(pcm_file->substream, cmd, (void __user *)arg);
+	lock_kernel();
+	return err;
 }
 
 static int snd_pcm_capture_ioctl(struct inode *inode, struct file *file,
 				 unsigned int cmd, unsigned long arg)
 {
 	snd_pcm_file_t *pcm_file;
+	int err;
 
 	pcm_file = file->private_data;
 
 	if (((cmd >> 8) & 0xff) != 'A')
 		return -ENOTTY;
 
-	return snd_pcm_capture_ioctl1(pcm_file->substream, cmd, (void __user *)arg);
+	/* FIXME: need to unlock BKL to allow preemption */
+	unlock_kernel();
+	err = snd_pcm_capture_ioctl1(pcm_file->substream, cmd, (void __user *)arg);
+	lock_kernel();
+	return err;
 }
 
 int snd_pcm_kernel_playback_ioctl(snd_pcm_substream_t *substream,

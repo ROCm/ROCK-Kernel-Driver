@@ -21,6 +21,7 @@
 
 #include <sound/driver.h>
 #include <linux/init.h>
+#include <linux/smp_lock.h>
 #include <linux/slab.h>
 #include <linux/time.h>
 #include <sound/core.h>
@@ -358,10 +359,16 @@ static int snd_mixer_oss_ioctl1(snd_mixer_oss_file_t *fmixer, unsigned int cmd, 
 	return -ENXIO;
 }
 
+/* FIXME: need to unlock BKL to allow preemption */
 int snd_mixer_oss_ioctl(struct inode *inode, struct file *file,
 			unsigned int cmd, unsigned long arg)
 {
-	return snd_mixer_oss_ioctl1((snd_mixer_oss_file_t *) file->private_data, cmd, arg);
+	int err;
+	/* FIXME: need to unlock BKL to allow preemption */
+	unlock_kernel();
+	err = snd_mixer_oss_ioctl1((snd_mixer_oss_file_t *) file->private_data, cmd, arg);
+	lock_kernel();
+	return err;
 }
 
 int snd_mixer_oss_ioctl_card(snd_card_t *card, unsigned int cmd, unsigned long arg)

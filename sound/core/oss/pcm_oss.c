@@ -28,6 +28,7 @@
 
 #include <sound/driver.h>
 #include <linux/init.h>
+#include <linux/smp_lock.h>
 #include <linux/slab.h>
 #include <linux/time.h>
 #include <linux/vmalloc.h>
@@ -1910,8 +1911,8 @@ static int snd_pcm_oss_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static int snd_pcm_oss_ioctl(struct inode *inode, struct file *file,
-                             unsigned int cmd, unsigned long arg)
+static inline int _snd_pcm_oss_ioctl(struct inode *inode, struct file *file,
+				     unsigned int cmd, unsigned long arg)
 {
 	snd_pcm_oss_file_t *pcm_oss_file;
 	int __user *p = (int __user *)arg;
@@ -2068,6 +2069,17 @@ static int snd_pcm_oss_ioctl(struct inode *inode, struct file *file,
 		snd_printd("pcm_oss: unknown command = 0x%x\n", cmd);
 	}
 	return -EINVAL;
+}
+
+/* FIXME: need to unlock BKL to allow preemption */
+static int snd_pcm_oss_ioctl(struct inode *inode, struct file *file,
+			     unsigned int cmd, unsigned long arg)
+{
+	int err;
+	unlock_kernel();
+	err = snd_pcm_oss_ioctl(inode, file, cmd, arg);
+	lock_kernel();
+	return err;
 }
 
 static ssize_t snd_pcm_oss_read(struct file *file, char __user *buf, size_t count, loff_t *offset)
