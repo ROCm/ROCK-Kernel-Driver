@@ -59,8 +59,6 @@ unsigned long cache_decay_ticks;
 
 cpumask_t cpu_possible_map = CPU_MASK_NONE;
 cpumask_t cpu_online_map = CPU_MASK_NONE;
-cpumask_t cpu_available_map = CPU_MASK_NONE;
-cpumask_t cpu_present_at_boot = CPU_MASK_NONE;
 
 EXPORT_SYMBOL(cpu_online_map);
 EXPORT_SYMBOL(cpu_possible_map);
@@ -124,9 +122,7 @@ static int smp_iSeries_numProcs(void)
 	np = 0;
         for (i=0; i < NR_CPUS; ++i) {
                 if (paca[i].lppaca.xDynProcStatus < 2) {
-			cpu_set(i, cpu_available_map);
 			cpu_set(i, cpu_possible_map);
-			cpu_set(i, cpu_present_at_boot);
 			cpu_set(i, cpu_present_map);
                         ++np;
                 }
@@ -879,7 +875,7 @@ int __devinit __cpu_up(unsigned int cpu)
 	int c;
 
 	/* At boot, don't bother with non-present cpus -JSCHOPP */
-	if (system_state == SYSTEM_BOOTING && !cpu_present_at_boot(cpu))
+	if (system_state == SYSTEM_BOOTING && !cpu_present(cpu))
 		return -ENOENT;
 
 	paca[cpu].prof_counter = 1;

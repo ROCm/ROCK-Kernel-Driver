@@ -36,23 +36,6 @@ extern void smp_message_recv(int, struct pt_regs *);
 #define smp_processor_id() (get_paca()->paca_index)
 #define hard_smp_processor_id() (get_paca()->hw_cpu_id)
 
-/*
- * Retrieve the state of a CPU:
- * online:          CPU is in a normal run state
- * possible:        CPU is a candidate to be made online
- * available:       CPU is candidate for the 'possible' pool
- *                  Used to get SMT threads started at boot time.
- * present_at_boot: CPU was available at boot time.  Used in DLPAR
- *                  code to handle special cases for processor start up.
- */
-extern cpumask_t cpu_present_at_boot;
-extern cpumask_t cpu_online_map;
-extern cpumask_t cpu_possible_map;
-extern cpumask_t cpu_available_map;
-
-#define cpu_present_at_boot(cpu) cpu_isset(cpu, cpu_present_at_boot)
-#define cpu_available(cpu)       cpu_isset(cpu, cpu_available_map) 
-
 /* Since OpenPIC has only 4 IPIs, we use slightly different message numbers.
  *
  * Make sure this matches openpic_request_IPIs in open_pic.c, or what shows up

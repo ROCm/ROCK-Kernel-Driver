@@ -940,9 +940,7 @@ static void __init prom_hold_cpus(unsigned long mem)
 			lpaca[cpuid].hw_cpu_id = reg;
 
 #ifdef CONFIG_SMP
-			cpu_set(cpuid, RELOC(cpu_available_map));
 			cpu_set(cpuid, RELOC(cpu_possible_map));
-			cpu_set(cpuid, RELOC(cpu_present_at_boot));
 			cpu_set(cpuid, RELOC(cpu_present_map));
 			if (reg == 0)
 				cpu_set(cpuid, RELOC(cpu_online_map));
@@ -1043,9 +1041,7 @@ static void __init prom_hold_cpus(unsigned long mem)
 #ifdef CONFIG_SMP
 				/* Set the number of active processors. */
 				_systemcfg->processorCount++;
-				cpu_set(cpuid, RELOC(cpu_available_map));
 				cpu_set(cpuid, RELOC(cpu_possible_map));
-				cpu_set(cpuid, RELOC(cpu_present_at_boot));
 				cpu_set(cpuid, RELOC(cpu_present_map));
 #endif
 			} else {
@@ -1055,10 +1051,8 @@ static void __init prom_hold_cpus(unsigned long mem)
 #ifdef CONFIG_SMP
 		else {
 			prom_printf("%x : booting  cpu %s\n", cpuid, path);
-			cpu_set(cpuid, RELOC(cpu_available_map));
 			cpu_set(cpuid, RELOC(cpu_possible_map));
 			cpu_set(cpuid, RELOC(cpu_online_map));
-			cpu_set(cpuid, RELOC(cpu_present_at_boot));
 			cpu_set(cpuid, RELOC(cpu_present_map));
 		}
 #endif
@@ -1073,8 +1067,6 @@ next:
 			prom_printf("%x : preparing thread ... ",
 				    interrupt_server[i]);
 			if (_naca->smt_state) {
-				cpu_set(cpuid, RELOC(cpu_available_map));
-				cpu_set(cpuid, RELOC(cpu_present_at_boot));
 				cpu_set(cpuid, RELOC(cpu_present_map));
 				cpu_set(cpuid, RELOC(cpu_possible_map));
 				_systemcfg->processorCount++;
