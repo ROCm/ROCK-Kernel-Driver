@@ -50,8 +50,8 @@ static int awacs_freqs[8] = {
 	44100, 29400, 22050, 17640, 14700, 11025, 8820, 7350
 };
 /* fixed frequency table for tumbler */
-static int tumbler_freqs[2] = {
-	48000, 44100
+static int tumbler_freqs[1] = {
+	44100
 };
 
 /*
@@ -488,14 +488,12 @@ static int snd_pmac_pcm_open(pmac_t *chip, pmac_stream_t *rec, snd_pcm_substream
 	snd_pcm_runtime_t *runtime = subs->runtime;
 	int i, j, fflags;
 	static int typical_freqs[] = {
-		48000,
 		44100,
 		22050,
 		11025,
 		0,
 	};
 	static int typical_freq_flags[] = {
-		SNDRV_PCM_RATE_48000,
 		SNDRV_PCM_RATE_44100,
 		SNDRV_PCM_RATE_22050,
 		SNDRV_PCM_RATE_11025,
@@ -891,7 +889,7 @@ static int __init snd_pmac_detect(pmac_t *chip)
 	chip->can_byte_swap = 1;
 	chip->can_duplex = 1;
 	chip->can_capture = 1;
-	chip->num_freqs = 8;
+	chip->num_freqs = ARRAY_SIZE(awacs_freqs);
 	chip->freq_table = awacs_freqs;
 
 	chip->control_mask = MASK_IEPC | MASK_IEE | 0x11; /* default */
@@ -949,14 +947,14 @@ static int __init snd_pmac_detect(pmac_t *chip)
 		chip->can_capture = 0;  /* no capture */
 		chip->can_duplex = 0;
 		// chip->can_byte_swap = 0; /* FIXME: check this */
-		chip->num_freqs = 2;
+		chip->num_freqs = ARRAY_SIZE(tumbler_freqs);
 		chip->freq_table = tumbler_freqs;
 		chip->control_mask = MASK_IEPC | 0x11; /* disable IEE */
 	}
 	if (device_is_compatible(sound, "snapper")) {
 		chip->model = PMAC_SNAPPER;
 		// chip->can_byte_swap = 0; /* FIXME: check this */
-		chip->num_freqs = 2;
+		chip->num_freqs = ARRAY_SIZE(tumbler_freqs);
 		chip->freq_table = tumbler_freqs;
 		chip->control_mask = MASK_IEPC | 0x11; /* disable IEE */
 	}
