@@ -1241,6 +1241,17 @@ static int drain_dac(struct i810_state *state, int signals_allowed)
 		spin_lock_irqsave(&state->card->lock, flags);
 		i810_update_ptr(state);
 		count = dmabuf->count;
+
+		/* It seems that we have to set the current state to
+		 * TASK_INTERRUPTIBLE every time to make the process
+		 * really go to sleep.  This also has to be *after* the
+		 * update_ptr() call because update_ptr is likely to
+		 * do a wake_up() which will unset this before we ever
+		 * try to sleep, resuling in a tight loop in this code
+		 * instead of actually sleeping and waiting for an
+		 * interrupt to wake us up!
+		 */
+		__set_current_state(TASK_INTERRUPTIBLE);
 		spin_unlock_irqrestore(&state->card->lock, flags);
 
 		if (count <= 0)
@@ -1260,16 +1271,6 @@ static int drain_dac(struct i810_state *state, int signals_allowed)
                         break;
                 }
 
-		/* It seems that we have to set the current state to
-		 * TASK_INTERRUPTIBLE every time to make the process
-		 * really go to sleep.  This also has to be *after* the
-		 * update_ptr() call because update_ptr is likely to
-		 * do a wake_up() which will unset this before we ever
-		 * try to sleep, resuling in a tight loop in this code
-		 * instead of actually sleeping and waiting for an
-		 * interrupt to wake us up!
-		 */
-		set_current_state(TASK_INTERRUPTIBLE);
 		/*
 		 * set the timeout to significantly longer than it *should*
 		 * take for the DAC to drain the DMA buffer
