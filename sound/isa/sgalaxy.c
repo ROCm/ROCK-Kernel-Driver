@@ -26,7 +26,7 @@
 #include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/time.h>
-#include <linux/irq.h>
+#include <linux/interrupt.h>
 #include <linux/moduleparam.h>
 #include <sound/core.h>
 #include <sound/sb.h>
