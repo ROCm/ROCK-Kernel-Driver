@@ -362,10 +362,7 @@ struct cp_private {
 
 	struct pci_dev		*pdev;
 	u32			rx_config;
-
-	struct sk_buff		*frag_skb;
-	unsigned		dropping_frag : 1;
-	unsigned		pci_using_dac : 1;
+	u16			cpcmd;
 
 	unsigned int		wol_enabled : 1; /* Is Wake-on-LAN enabled? */
 	u32			power_state[16];
@@ -431,7 +428,8 @@ static void cp_vlan_rx_register(struct net_device *dev, struct vlan_group *grp)
 
 	spin_lock_irq(&cp->lock);
 	cp->vlgrp = grp;
-	cpw16(CpCmd, cpr16(CpCmd) | RxVlanOn);
+	cp->cpcmd |= RxVlanOn;
+	cpw16(CpCmd, cp->cpcmd);
 	spin_unlock_irq(&cp->lock);
 }
 
@@ -440,7 +438,8 @@ static void cp_vlan_rx_kill_vid(struct net_device *dev, unsigned short vid)
 	struct cp_private *cp = dev->priv;
 
 	spin_lock_irq(&cp->lock);
-	cpw16(CpCmd, cpr16(CpCmd) & ~RxVlanOn);
+	cp->cpcmd &= ~RxVlanOn;
+	cpw16(CpCmd, cp->cpcmd);
 	if (cp->vlgrp)
 		cp->vlgrp->vlan_devices[vid] = NULL;
 	spin_unlock_irq(&cp->lock);
@@ -997,8 +996,7 @@ static void cp_reset_hw (struct cp_private *cp)
 
 static inline void cp_start_hw (struct cp_private *cp)
 {
-	u16 pci_dac = cp->pci_using_dac ? PCIDAC : 0;
-	cpw16(CpCmd, pci_dac | PCIMulRW | RxChkSum | CpRxOn | CpTxOn);
+	cpw16(CpCmd, cp->cpcmd);
 	cpw8(Cmd, RxOn | TxOn);
 }
 
@@ -1387,7 +1385,7 @@ static u32 cp_get_rx_csum(struct net_device *dev)
 static int cp_set_rx_csum(struct net_device *dev, u32 data)
 {
 	struct cp_private *cp = dev->priv;
-	u16 cmd = cpr16(CpCmd), newcmd;
+	u16 cmd = cp->cpcmd, newcmd;
 
 	newcmd = cmd;
 
@@ -1398,6 +1396,7 @@ static int cp_set_rx_csum(struct net_device *dev, u32 data)
 
 	if (newcmd != cmd) {
 		spin_lock_irq(&cp->lock);
+		cp->cpcmd = newcmd;
 		cpw16_f(CpCmd, newcmd);
 		spin_unlock_irq(&cp->lock);
 	}
@@ -1617,7 +1616,7 @@ static int cp_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	int rc;
 	void *regs;
 	long pciaddr;
-	unsigned int addr_len, i;
+	unsigned int addr_len, i, pci_using_dac;
 	u8 pci_rev, cache_size;
 
 #ifndef MODULE
@@ -1684,8 +1683,9 @@ static int cp_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	}
 
 	/* Configure DMA attributes. */
-	if (!pci_set_dma_mask(pdev, 0xffffffffffffffffULL)) {
-		cp->pci_using_dac = 1;
+	if ((sizeof(dma_addr_t) > 32) &&
+	    !pci_set_dma_mask(pdev, 0xffffffffffffffffULL)) {
+		pci_using_dac = 1;
 	} else {
 		rc = pci_set_dma_mask(pdev, 0xffffffffULL);
 		if (rc) {
@@ -1693,8 +1693,11 @@ static int cp_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 			       "aborting.\n");
 			goto err_out_res;
 		}
-		cp->pci_using_dac = 0;
+		pci_using_dac = 0;
 	}
+
+	cp->cpcmd = (pci_using_dac ? PCIDAC : 0) |
+		    PCIMulRW | RxChkSum | CpRxOn | CpTxOn;
 
 	regs = ioremap_nocache(pciaddr, CP_REGS_SIZE);
 	if (!regs) {
