@@ -405,9 +405,10 @@ static int ehci_start (struct usb_hcd *hcd)
 	 * streaming mappings for I/O buffers, like pci_map_single(),
 	 * can return segments above 4GB, if the device allows.
 	 *
-	 * NOTE:  layered drivers can't yet tell when we enable that,
-	 * so they can't pass this info along (like NETIF_F_HIGHDMA)
-	 * (or like Scsi_Host.highmem_io) ... usb_bus.flags?
+	 * NOTE:  the dma mask is visible through dma_supported(), so
+	 * drivers can pass this info along ... like NETIF_F_HIGHDMA,
+	 * Scsi_Host.highmem_io, and so forth.  It's readonly to all
+	 * host side drivers though.
 	 */
 	if (HCC_64BIT_ADDR (hcc_params)) {
 		writel (0, &ehci->regs->segment);
@@ -475,7 +476,7 @@ done2:
 			ehci_ready (ehci);
 		ehci_reset (ehci);
 		bus->root_hub = 0;
-		usb_free_dev (udev); 
+		usb_put_dev (udev); 
 		retval = -ENODEV;
 		goto done2;
 	}

@@ -27,6 +27,12 @@
 #include <asm/io.h>
 #include <asm/pgalloc.h>
 
+#ifdef CONFIG_I2C_MAINBOARD
+extern void i2c_mainboard_init_all(void);
+#endif
+#ifdef CONFIG_SENSORS
+extern void sensors_init_all(void);
+#endif
 #ifdef CONFIG_I2C
 extern int i2c_init_all(void);
 #endif
@@ -705,6 +711,9 @@ int __init chr_dev_init(void)
 #ifdef CONFIG_I2C
 	i2c_init_all();
 #endif
+#ifdef CONFIG_I2C_MAINBOARD
+	i2c_mainboard_init_all();
+#endif
 #if defined (CONFIG_FB)
 	fbmem_init();
 #endif
@@ -719,6 +728,10 @@ int __init chr_dev_init(void)
 #if defined(CONFIG_S390_TAPE) && defined(CONFIG_S390_TAPE_CHAR)
 	tapechar_init();
 #endif
+#ifdef CONFIG_SENSORS
+	sensors_init_all();
+#endif
+
 	return 0;
 }
 

@@ -193,5 +193,8 @@ config I2C_PROC
 	  it as a module, say M here and read <file:Documentation/modules.txt>.
 	  The module will be called i2c-proc.o.
 
+	source drivers/i2c/busses/Kconfig
+	source drivers/i2c/chips/Kconfig
+
 endmenu
 

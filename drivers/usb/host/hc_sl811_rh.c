@@ -566,7 +566,7 @@ static int rh_connect_rh (hci_t * hci)
 	hci->bus->root_hub = usb_dev;
 	usb_connect (usb_dev);
 	if (usb_new_device (usb_dev) != 0) {
-		usb_free_dev (usb_dev);
+		usb_put_dev (usb_dev);
 		return -ENODEV;
 	}
 

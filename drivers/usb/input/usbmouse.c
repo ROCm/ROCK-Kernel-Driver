@@ -211,15 +211,15 @@ static int usb_mouse_probe(struct usb_interface * intf, const struct usb_device_
 	input_register_device(&mouse->dev);
 	printk(KERN_INFO "input: %s on %s\n", mouse->name, path);
 
-	dev_set_drvdata(&intf->dev, mouse);
+	usb_set_intfdata(intf, mouse);
 	return 0;
 }
 
 static void usb_mouse_disconnect(struct usb_interface *intf)
 {
-	struct usb_mouse *mouse = dev_get_drvdata(&intf->dev);
+	struct usb_mouse *mouse = usb_get_intfdata (intf);
 	
-	dev_set_drvdata(&intf->dev, NULL);
+	usb_set_intfdata(intf, NULL);
 	if (mouse) {
 		usb_unlink_urb(mouse->irq);
 		input_unregister_device(&mouse->dev);

@@ -774,11 +774,11 @@ static Scsi_Host_Template mts_scsi_host_template = {
 
 static void mts_usb_disconnect (struct usb_interface *intf)
 {
-	struct mts_desc* to_remove = dev_get_drvdata(&intf->dev);
+	struct mts_desc* to_remove = usb_get_intfdata(intf);
 
 	MTS_DEBUG_GOT_HERE();
 
-	dev_set_drvdata(&intf->dev, NULL);
+	usb_set_intfdata(intf, NULL);
 	if (to_remove) {
 		/* leave the list - lock it */
 		down(&mts_list_semaphore);
@@ -1007,7 +1007,7 @@ static int mts_usb_probe (struct usb_interface *intf,
 
 	MTS_DEBUG("completed probe and exiting happily\n");
 
-	dev_set_drvdata(&intf->dev, new_desc);
+	usb_set_intfdata(intf, new_desc);
 	return 0;
 }
 

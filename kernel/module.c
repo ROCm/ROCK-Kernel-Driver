@@ -405,7 +405,8 @@ sys_delete_module(const char *name_user, unsigned int flags)
 		}
 	}
 
-	if (!mod->exit || mod->unsafe) {
+	/* If it has an init func, it must have an exit func to unload */
+	if ((mod->init && !mod->exit) || mod->unsafe) {
 		forced = try_force(flags);
 		if (!forced) {
 			/* This module can't be removed */
@@ -473,7 +474,7 @@ static void print_unload_info(struct seq_file *m, struct module *mod)
 	if (mod->unsafe)
 		seq_printf(m, " [unsafe]");
 
-	if (!mod->exit)
+	if (mod->init && !mod->exit)
 		seq_printf(m, " [permanent]");
 
 	seq_printf(m, "\n");

@@ -91,27 +91,27 @@ HandSpring Visor, Palm USB, and Clié USB driver
   Kroah-Hartman at greg@kroah.com
 
 
-Compaq iPAQ, HP Jornada and Casio EM500 driver
+PocketPC PDA Driver
 
-  This driver can be used to connect to Compaq iPAQ, HP Jornada and Casio EM500
-  PDAs running Windows CE 3.0 or PocketPC 2002 using a USB cable/cradle.
-  It's very likely that every device supported by ActiveSync USB works with this
-  driver. The driver supports the Compaq iPAQ, Jornada 548/568 and the Casio
-  EM500 out of the box. For others, please use module parameters to specify
-  the product and vendor id. e.g. modprobe ipaq vendor=0x3f0 product=0x1125
+  This driver can be used to connect to Compaq iPAQ, HP Jornada, Casio EM500
+  and other PDAs running Windows CE 3.0 or PocketPC 2002 using a USB
+  cable/cradle.
+  Most devices supported by ActiveSync are supported out of the box.
+  For others, please use module parameters to specify the product and vendor
+  id. e.g. modprobe ipaq vendor=0x3f0 product=0x1125
 
   The driver presents a serial interface (usually on /dev/ttyUSB0) over
-  which one may run ppp and establish a TCP/IP link to the iPAQ. Once this
+  which one may run ppp and establish a TCP/IP link to the PDA. Once this
   is done, you can transfer files, backup, download email etc. The most
-  significant advantage of using USB is speed - you can get 73 to 113
-  kbytes/sec for download/upload to the iPAQ.
+  significant advantage of using USB is speed - I can get 73 to 113
+  kbytes/sec for download/upload to my iPAQ.
 
   This driver is only one of a set of components required to utilize
   the USB connection. Please visit http://synce.sourceforge.net which
   contains the necessary packages and a simple step-by-step howto.
 
   Once connected, you can use Win CE programs like ftpView, Pocket Outlook
-  from the iPAQ and xcerdisp, synce utilities from the Linux side.
+  from the PDA and xcerdisp, synce utilities from the Linux side.
 
   To use Pocket IE, follow the instructions given at
   http://www.tekguru.co.uk/EM500/usbtonet.htm to achieve the same thing
@@ -126,8 +126,18 @@ Compaq iPAQ, HP Jornada and Casio EM500 driver
 
   If it doesn't work for some reason, load both the usbserial and ipaq module
   with the module parameter "debug" set to 1 and examine the system log.
-  You can also try soft-resetting your iPAQ before attempting a connection.
+  You can also try soft-resetting your PDA before attempting a connection.
 
+  Other functionality may be possible depending on your PDA. According to
+  Wes Cilldhaire <billybobjoehenrybob@hotmail.com>, with the Toshiba E570,
+  ...if you boot into the bootloader (hold down the power when hitting the
+  reset button, continuing to hold onto the power until the bootloader screen
+  is displayed), then put it in the cradle with the ipaq driver loaded, open
+  a terminal on /dev/ttyUSB0, it gives you a "USB Reflash" terminal, which can
+  be used to flash the ROM, as well as the microP code..  so much for needing
+  Toshiba's $350 serial cable for flashing!! :D
+  NOTE: This has NOT been tested. Use at your own risk.
+ 
   For any questions or problems with the driver, please contact Ganesh
   Varadarajan <ganesh@veritas.com>
 

@@ -28,7 +28,7 @@
 /* The devfs code is contributed by Philipp Matthias Hahn 
    <pmhahn@titan.lahn.de> */
 
-/* $Id: i2c-dev.c,v 1.46 2002/07/06 02:07:39 mds Exp $ */
+/* $Id: i2c-dev.c,v 1.48 2002/10/01 14:10:04 ac9410 Exp $ */
 
 #include <linux/config.h>
 #include <linux/kernel.h>
@@ -47,6 +47,10 @@
 #include <asm/uaccess.h>
 #include <linux/i2c.h>
 #include <linux/i2c-dev.h>
+
+int __init i2c_dev_init(void);
+void __exit i2c_dev_exit(void);
+static int dev_cleanup(void);
 
 /* struct file_operations changed too often in the 2.1 series for nice code */
 
@@ -433,7 +437,7 @@ static int i2cdev_command(struct i2c_client *client, unsigned int cmd,
 	return -1;
 }
 
-static void i2cdev_cleanup(void)
+static int dev_cleanup(void)
 {
 	int res;
 
@@ -467,6 +471,11 @@ int __init i2c_dev_init(void)
 	return 0;
 }
 
+void __exit i2c_dev_exit(void)
+{
+	dev_cleanup();
+}
+
 EXPORT_NO_SYMBOLS;
 
 MODULE_AUTHOR("Frodo Looijaard <frodol@dds.nl> and Simon G. Vogl <simon@tk.uni-linz.ac.at>");
@@ -474,4 +483,4 @@ MODULE_DESCRIPTION("I2C /dev entries driver");
 MODULE_LICENSE("GPL");
 
 module_init(i2c_dev_init);
-module_exit(i2cdev_cleanup);
+module_exit(i2c_dev_exit);

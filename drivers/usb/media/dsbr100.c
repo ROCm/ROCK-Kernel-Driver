@@ -190,15 +190,15 @@ static int usb_dsbr100_probe(struct usb_interface *intf,
 	usb_dsbr100_radio.priv = radio;
 	radio->dev = interface_to_usbdev (intf);
 	radio->curfreq = 1454000;
-	dev_set_drvdata (&intf->dev, radio);
+	usb_set_intfdata (intf, radio);
 	return 0;
 }
 
 static void usb_dsbr100_disconnect(struct usb_interface *intf)
 {
-	usb_dsbr100 *radio = dev_get_drvdata (&intf->dev);
+	usb_dsbr100 *radio = usb_get_intfdata (intf);
 
-	dev_set_drvdata (&intf->dev, NULL);
+	usb_set_intfdata (intf, NULL);
 
 	if (radio) {
 		lock_kernel();

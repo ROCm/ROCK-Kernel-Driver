@@ -168,7 +168,7 @@ static int omninet_open (struct usb_serial_port *port, struct file *filp)
 		return -ENOMEM;
 	}
 
-	port->private = od;
+	usb_set_serial_port_data(port, od);
 	wport = &serial->port[1];
 	wport->tty = port->tty;
 
@@ -205,7 +205,7 @@ static void omninet_close (struct usb_serial_port *port, struct file * filp)
 		usb_unlink_urb (port->read_urb);
 	}
 
-	od = (struct omninet_data *)port->private;
+	od = usb_get_serial_port_data(port);
 	if (od)
 		kfree(od);
 }
@@ -272,7 +272,7 @@ static int omninet_write (struct usb_serial_port *port, int from_user, const uns
 	struct usb_serial 	*serial	= port->serial;
 	struct usb_serial_port 	*wport	= &serial->port[1];
 
-	struct omninet_data 	*od 	= (struct omninet_data   *) port->private;
+	struct omninet_data 	*od 	= usb_get_serial_port_data(port);
 	struct omninet_header	*header = (struct omninet_header *) wport->write_urb->transfer_buffer;
 
 	int			result;

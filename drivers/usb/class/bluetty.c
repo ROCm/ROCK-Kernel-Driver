@@ -1207,7 +1207,7 @@ static int usb_bluetooth_probe (struct usb_interface *intf,
 	bluetooth_table[minor] = bluetooth;
 
 	/* success */
-	dev_set_drvdata (&intf->dev, bluetooth);
+	usb_set_intfdata (intf, bluetooth);
 	return 0;
 
 probe_error:
@@ -1243,10 +1243,10 @@ probe_error:
 
 static void usb_bluetooth_disconnect(struct usb_interface *intf)
 {
-	struct usb_bluetooth *bluetooth = dev_get_drvdata (&intf->dev);
+	struct usb_bluetooth *bluetooth = usb_get_intfdata (intf);
 	int i;
 
-	dev_set_drvdata (&intf->dev, NULL);
+	usb_set_intfdata (intf, NULL);
 	if (bluetooth) {
 		if ((bluetooth->open_count) && (bluetooth->tty))
 			tty_hangup(bluetooth->tty);

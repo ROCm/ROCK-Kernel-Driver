@@ -1498,7 +1498,7 @@ static int stv680_probe (struct usb_interface *intf, const struct usb_device_id 
 #endif
 	PDEBUG (0, "STV(i): registered new video device: video%d", stv680->vdev.minor);
 
-	dev_set_drvdata (&intf->dev, stv680);
+	usb_set_intfdata (intf, stv680);
 	return 0;
 }
 
@@ -1535,9 +1535,9 @@ static inline void usb_stv680_remove_disconnected (struct usb_stv *stv680)
 
 static void stv680_disconnect (struct usb_interface *intf)
 {
-	struct usb_stv *stv680 = dev_get_drvdata (&intf->dev);
+	struct usb_stv *stv680 = usb_get_intfdata (intf);
 
-	dev_set_drvdata (&intf->dev, NULL);
+	usb_set_intfdata (intf, NULL);
 
 	if (stv680) {
 		/* We don't want people trying to open up the device */
