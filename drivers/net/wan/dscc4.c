@@ -402,24 +402,32 @@ static inline void dscc4_do_tx(struct dscc4_dev_priv *dpriv,
 	readl(dev->base_addr + CH0LTDA + dpriv->dev_id*4);
 }
 
-int state_check(u32 state, struct dscc4_dev_priv *dpriv, 
-	struct net_device *dev, const char *msg)
+static inline void dscc4_rx_update(struct dscc4_dev_priv *dpriv,
+				   struct net_device *dev)
 {
-#ifdef DEBUG_PARANOIA
+	dpriv->lrda = dpriv->rx_fd_dma +
+		      ((dpriv->rx_dirty - 1)%RX_RING_SIZE)*sizeof(struct RxFD);
+	writel(dpriv->lrda, dev->base_addr + CH0LRDA + dpriv->dev_id*4);
+}
+
+int state_check(u32 state, struct dscc4_dev_priv *dpriv, struct net_device *dev,
+		const char *msg)
+{
+	int ret = 0;
+
+	if (debug > 1) {
 	if (SOURCE_ID(state) != dpriv->dev_id) {
 		printk(KERN_DEBUG "%s (%s): Source Id=%d, state=%08x\n",
 		       dev->name, msg, SOURCE_ID(state), state );
-		return -1;
+			ret = -1;
 	}
 	if (state & 0x0df80c00) {
 		printk(KERN_DEBUG "%s (%s): state=%08x (UFO alert)\n",
 		       dev->name, msg, state);
-		return -1;
+			ret = -1;
 	}
-	return 0;
-#else
-	return 1;
-#endif
+	}
+	return ret;
 }
 
 void inline reset_TxFD(struct TxFD *tx_fd) {
@@ -464,40 +472,49 @@ static void dscc4_release_ring(struct dscc4_dev_priv *dpriv)
 	}
 }
 
-void inline try_get_rx_skb(struct dscc4_dev_priv *priv, int cur, struct net_device *dev)
+inline int try_get_rx_skb(struct dscc4_dev_priv *dpriv, struct net_device *dev)
 {
+	unsigned int dirty = dpriv->rx_dirty%RX_RING_SIZE;
+	struct RxFD *rx_fd = dpriv->rx_fd + dirty;
 	struct sk_buff *skb;
+	int ret = 0;
 
 	skb = dev_alloc_skb(RX_MAX(HDLC_MAX_MRU));
-	priv->rx_skbuff[cur] = skb;
-	if (!skb) {
-		priv->rx_fd[cur--].data = (u32) NULL;
-		priv->rx_fd[cur%RX_RING_SIZE].state1 |= Hold;
-		return;
-	}
+	dpriv->rx_skbuff[dirty] = skb;
+	if (skb) {
 	skb->dev = dev;
 	skb->protocol = htons(ETH_P_IP);
 	skb->mac.raw = skb->data;
-	priv->rx_fd[cur].data = pci_map_single(priv->pci_priv->pdev, skb->data,
+		rx_fd->data = pci_map_single(dpriv->pci_priv->pdev, skb->data,
 					       skb->len, PCI_DMA_FROMDEVICE);
+	} else {
+		rx_fd->data = (u32) NULL;
+		ret = -1;
+	}
+	return ret;
 }
 
 /*
  * IRQ/thread/whatever safe
  */
-static int dscc4_wait_ack_cec(u32 ioaddr, struct net_device *dev, char *msg)
+static int dscc4_wait_ack_cec(struct dscc4_dev_priv *dpriv,
+			      struct net_device *dev, char *msg)
 {
-	s16 i = 0;
+	s8 i = 0;
 
-	while (readl(ioaddr + STAR) & SccBusy) {
-		if (i++ < 0)  {
-			printk(KERN_ERR "%s: %s timeout\n", dev->name, msg);
-			return -1;
+	do {
+		if (!(scc_readl_star(dpriv, dev) & SccBusy)) {
+			printk(KERN_DEBUG "%s: %s ack (%d try)\n", dev->name,
+			       msg, i);
+			goto done;
 		}
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_timeout(10);
 		rmb();
-	}
-	printk(KERN_DEBUG "%s: %s ack (%d try)\n", dev->name, msg, i);
-	return 0;
+	} while (++i > 0);
+	printk(KERN_ERR "%s: %s timeout\n", dev->name, msg);
+done:
+	return (i >= 0) ? i : -EAGAIN;
 }
 
 static int dscc4_do_action(struct net_device *dev, char *msg)
@@ -542,19 +559,24 @@ static inline int dscc4_xpr_ack(struct dscc4_dev_priv *dpriv)
 	return (i >= 0 ) ? i : -EAGAIN;
 }
 
-static inline void dscc4_rx_skb(struct dscc4_dev_priv *dpriv, int cur,
-	struct RxFD *rx_fd, struct net_device *dev)
+static inline void dscc4_rx_skb(struct dscc4_dev_priv *dpriv,
+				struct net_device *dev)
 {
-	struct net_device_stats *stats = &dev_to_hdlc(dev)->stats;
+	struct RxFD *rx_fd = dpriv->rx_fd + dpriv->rx_current%RX_RING_SIZE;
+	struct net_device_stats *stats = &dpriv->hdlc.stats;
 	struct pci_dev *pdev = dpriv->pci_priv->pdev;
 	struct sk_buff *skb;
 	int pkt_len;
 
-	skb = dpriv->rx_skbuff[cur];
+	skb = dpriv->rx_skbuff[dpriv->rx_current++%RX_RING_SIZE];
+	if (!skb) {
+		printk(KERN_DEBUG "%s: skb=0 (%s)\n", dev->name, __FUNCTION__);
+		goto refill;
+	}
 	pkt_len = TO_SIZE(rx_fd->state2);
 	pci_dma_sync_single(pdev, rx_fd->data, pkt_len, PCI_DMA_FROMDEVICE);
+	pci_unmap_single(pdev, rx_fd->data, pkt_len, PCI_DMA_FROMDEVICE);
 	if ((skb->data[--pkt_len] & FrameOk) == FrameOk) {
-		pci_unmap_single(pdev, rx_fd->data, skb->len, PCI_DMA_FROMDEVICE);
 		stats->rx_packets++;
 		stats->rx_bytes += pkt_len;
 		skb->tail += pkt_len;
@@ -563,7 +585,6 @@ static inline void dscc4_rx_skb(struct dscc4_dev_priv *dpriv, int cur,
 			skb->protocol = htons(ETH_P_HDLC);
 		skb->dev->last_rx = jiffies;
 		netif_rx(skb);
-		try_get_rx_skb(dpriv, cur, dev);
 	} else {
 		if (skb->data[pkt_len] & FrameRdo)
 			stats->rx_fifo_errors++;
@@ -573,19 +594,20 @@ static inline void dscc4_rx_skb(struct dscc4_dev_priv *dpriv, int cur,
 			stats->rx_length_errors++;
 		else
 			stats->rx_errors++;
+		dev_kfree_skb_irq(skb);
 	}
-	rx_fd->state1 |= Hold;
+refill:
+	while ((dpriv->rx_dirty - dpriv->rx_current) % RX_RING_SIZE) {
+		if (try_get_rx_skb(dpriv, dev) < 0)
+			break;
+		dpriv->rx_dirty++;
+	}
+	dscc4_rx_update(dpriv, dev);
 	rx_fd->state2 = 0x00000000;
 	rx_fd->end = 0xbabeface;
-	if (!rx_fd->data)
-		return;
-	rx_fd--;
-	if (!cur)
-		rx_fd += RX_RING_SIZE;
-	rx_fd->state1 &= ~Hold;
 }
 
-static int __init dscc4_init_one (struct pci_dev *pdev,
+static int __init dscc4_init_one(struct pci_dev *pdev,
 				  const struct pci_device_id *ent)
 {
 	struct dscc4_pci_priv *priv;
@@ -731,8 +753,11 @@ static void dscc4_init_registers(struct dscc4_dev_priv *dpriv,
 
 	scc_writel(LengthCheck | (HDLC_MAX_MRU >> 5), dpriv, dev, RLCR);
 
-	/* Shared flags transmission disabled - cf errata DS5 p.11 */
-	/* Carrier detect disabled - cf errata p.14 */
+	/*
+	 * No address recognition/crc-CCITT/cts enabled 
+	 * Shared flags transmission disabled - cf errata DS5 p.11 
+	 * Carrier detect disabled - cf errata p.14
+	 */
 	scc_writel(0x021c8000, dpriv, dev, CCR1);
 
 	/* crc not forwarded - Cf errata DS5 p.11 */
@@ -933,7 +958,7 @@ static int dscc4_open(struct net_device *dev)
 	/* Posted write is flushed in the busy-waiting loop */
 	scc_writel(TxSccRes | RxSccRes, dpriv, dev, CMDR);
 
-	if (dscc4_wait_ack_cec(ioaddr, dev, "Cec"))
+	if (dscc4_wait_ack_cec(dpriv, dev, "Cec"))
 		goto err_free_ring;
 
 	/* 
@@ -1528,20 +1553,17 @@ try:
 						rx_fd = dpriv->rx_fd;
 				}
 				//dpriv->rx_needs_refill--;
-				try_get_rx_skb(dpriv, cur, dev);
+				try_get_rx_skb(dpriv, dev);
 				if (!rx_fd->data)
 					goto try;
 				rx_fd->state1 &= ~Hold;
 				rx_fd->state2 = 0x00000000;
 				rx_fd->end = 0xbabeface;
-			//}
+			}
 			goto try;
 		}
 		if (state & Fi) {
-			cur = dpriv->rx_current%RX_RING_SIZE;
-			rx_fd = dpriv->rx_fd + cur;
-			dscc4_rx_skb(dpriv, cur, rx_fd, dev);
-			dpriv->rx_current++;
+			dscc4_rx_skb(dpriv, dev);
 			goto try;
 		}
 		if (state & Hi ) { /* HI bit */
@@ -1614,7 +1636,7 @@ try:
 					rx_fd->state2 = 0x00000000;
 					rx_fd->end = 0xbabeface;
 				} else 
-					dscc4_rx_skb(dpriv, cur, rx_fd, dev);
+					dscc4_rx_skb(dpriv, dev);
 			} while (1);
 
 			if (debug) {
@@ -1728,7 +1750,8 @@ static int dscc4_init_ring(struct net_device *dev)
 	        rx_fd->state2 = 0x00000000;
 	        rx_fd->end = 0xbabeface;
 	        rx_fd->state1 |= (RX_MAX(HDLC_MAX_MRU) << 16);
-		try_get_rx_skb(dpriv, i, dev);
+		if (try_get_rx_skb(dpriv, dev) >= 0)
+			dpriv->rx_dirty++;
 		i++;
 		rx_fd->next = (u32)(dpriv->rx_fd_dma + i*sizeof(struct RxFD));
 		rx_fd++;
