@@ -401,13 +401,11 @@ struct lock_manager_operations lease_manager_ops = {
 	.fl_break = lease_break_callback,
 };
 
-/* Allocate a file_lock initialised to this type of lease */
-static int lease_alloc(struct file *filp, int type, struct file_lock **flp)
-{
-	struct file_lock *fl = locks_alloc_lock();
-	if (fl == NULL)
-		return -ENOMEM;
-
+/*
+ * Initialize a lease, use the default lock manager operations
+ */
+static int lease_init(struct file *filp, int type, struct file_lock *fl)
+ {
 	fl->fl_owner = current->files;
 	fl->fl_pid = current->tgid;
 
@@ -420,8 +418,22 @@ static int lease_alloc(struct file *filp, int type, struct file_lock **flp)
 	fl->fl_start = 0;
 	fl->fl_end = OFFSET_MAX;
 	fl->fl_ops = NULL;
-	fl->fl_lmops = NULL;
+	fl->fl_lmops = &lease_manager_ops;
+	return 0;
+}
 
+/* Allocate a file_lock initialised to this type of lease */
+static int lease_alloc(struct file *filp, int type, struct file_lock **flp)
+{
+	struct file_lock *fl = locks_alloc_lock();
+	int error;
+
+	if (fl == NULL)
+		return -ENOMEM;
+
+	error = lease_init(filp, type, fl);
+	if (error)
+		return error;
 	*flp = fl;
 	return 0;
 }
