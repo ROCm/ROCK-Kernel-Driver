@@ -250,6 +250,32 @@ config SHARED_KERNEL
 	  You should only select this option if you know what you are
 	  doing and want to exploit this feature.
 
+config CMM
+	tristate "Cooperative memory management"
+	help
+	  Select this option, if you want to enable the kernel interface
+	  to reduce the memory size of the system. This is accomplished
+	  by allocating pages of memory and put them "on hold". This only
+	  makes sense for a system running under VM where the unused pages
+	  will be reused by VM for other guest systems. The interface
+	  allows an external monitor to balance memory of many systems.
+	  Everybody who wants to run Linux under VM should select this
+	  option.
+
+config CMM_PROC
+	bool "/proc interface to cooperative memory management"
+	depends on CMM
+	help
+	  Select this option to enable the /proc interface to the
+	  cooperative memory management.
+
+config CMM_IUCV
+	bool "IUCV special message interface to cooperative memory management"
+	depends on CMM && (SMSGIUCV=y || CMM=SMSGIUCV)
+	help
+	  Select this option to enable the special message interface to
+	  the cooperative memory management.
+
 config VIRT_TIMER
 	bool "Virtual CPU timer support"
 	help

@@ -3,3 +3,5 @@
 #
 
 obj-y	 := init.o fault.o ioremap.o
+obj-$(CONFIG_CMM) += cmm.o
+
