@@ -499,7 +499,7 @@ smp_prepare_cpus (unsigned int max_cpus)
 	/*
 	 * If SMP should be disabled, then really disable it!
 	 */
-	if (!max_cpus || (max_cpus < -1)) {
+	if (!max_cpus) {
 		printk(KERN_INFO "SMP mode deactivated.\n");
 		cpu_online_map = phys_cpu_present_map = 1;
 		return;
