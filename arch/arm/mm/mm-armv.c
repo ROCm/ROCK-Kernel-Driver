@@ -24,29 +24,81 @@
 
 #include <asm/mach/map.h>
 
+static unsigned int cachepolicy __initdata = PMD_SECT_WB;
+static unsigned int ecc_mask __initdata = 0;
+
+struct cachepolicy {
+	char		*policy;
+	unsigned int	cr_mask;
+	unsigned int	pmd;
+};
+
+static struct cachepolicy cache_policies[] __initdata = {
+	{ "uncached",		CR1_W|CR1_C,	PMD_SECT_UNCACHED },
+	{ "buffered",		CR1_C,		PMD_SECT_BUFFERED },
+	{ "writethrough",	0,		PMD_SECT_WT       },
+#ifndef CONFIG_CPU_DCACHE_WRITETHROUGH
+	{ "writeback",		0,		PMD_SECT_WB       },
+	{ "writealloc",		0,		PMD_SECT_WBWA     }
+#endif
+};
+
 /*
  * These are useful for identifing cache coherency
  * problems by allowing the cache or the cache and
  * writebuffer to be turned off.  (Note: the write
  * buffer should not be on and the cache off).
  */
-static int __init nocache_setup(char *__unused)
+static void __init early_cachepolicy(char **p)
 {
-	cr_alignment &= ~CR1_C;
-	cr_no_alignment &= ~CR1_C;
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(cache_policies); i++) {
+		int len = strlen(cache_policies[i].policy);
+
+		if (memcmp(*p, cache_policies[i].policy, len) == 0) {
+			cachepolicy = cache_policies[i].pmd;
+			cr_alignment &= ~cache_policies[i].cr_mask;
+			cr_no_alignment &= ~cache_policies[i].cr_mask;
+			*p += len;
+			break;
+		}
+	}
+	if (i == ARRAY_SIZE(cache_policies))
+		printk(KERN_ERR "ERROR: unknown or unsupported cache policy\n");
 	flush_cache_all();
 	set_cr(cr_alignment);
-	return 1;
 }
 
-static int __init nowrite_setup(char *__unused)
+static void __init early_nocache(char **__unused)
 {
-	cr_alignment &= ~(CR1_W|CR1_C);
-	cr_no_alignment &= ~(CR1_W|CR1_C);
-	flush_cache_all();
-	set_cr(cr_alignment);
-	return 1;
+	char *p = "buffered";
+	printk(KERN_WARNING "nocache is deprecated; use cachepolicy=%s\n", p);
+	early_cachepolicy(&p);
 }
+
+static void __init early_nowrite(char **__unused)
+{
+	char *p = "uncached";
+	printk(KERN_WARNING "nowb is deprecated; use cachepolicy=%s\n", p);
+	early_cachepolicy(&p);
+}
+
+static void __init early_ecc(char **p)
+{
+	if (memcmp(*p, "on", 2) == 0) {
+		ecc_mask = PMD_PROTECTION;
+		*p += 2;
+	} else if (memcmp(*p, "off", 3) == 0) {
+		ecc_mask = 0;
+		*p += 3;
+	}
+}
+
+__early_param("nocache", early_nocache);
+__early_param("nowb", early_nowrite);
+__early_param("cachepolicy=", early_cachepolicy);
+__early_param("ecc=", early_ecc);
 
 static int __init noalign_setup(char *__unused)
 {
@@ -57,8 +109,6 @@ static int __init noalign_setup(char *__unused)
 }
 
 __setup("noalign", noalign_setup);
-__setup("nocache", nocache_setup);
-__setup("nowb", nowrite_setup);
 
 #define FIRST_KERNEL_PGD_NR	(FIRST_USER_PGD_NR + USER_PTRS_PER_PGD)
 
@@ -231,32 +281,20 @@ static struct mem_types mem_types[] __initdata = {
 		.domain    = DOMAIN_IO,
 	},
 	[MT_CACHECLEAN] = {
-		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
-				L_PTE_CACHEABLE | L_PTE_BUFFERABLE,
-		.prot_l1   = PMD_TYPE_TABLE | PMD_BIT4,
 		.prot_sect = PMD_TYPE_SECT | PMD_BIT4,
 		.domain    = DOMAIN_KERNEL,
 	},
 	[MT_MINICLEAN] = {
-		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
-				L_PTE_CACHEABLE,
-		.prot_l1   = PMD_TYPE_TABLE | PMD_BIT4,
 		.prot_sect = PMD_TYPE_SECT | PMD_BIT4 | PMD_SECT_MINICACHE,
 		.domain    = DOMAIN_KERNEL,
 	},
 	[MT_VECTORS] = {
 		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
-				L_PTE_CACHEABLE | L_PTE_BUFFERABLE |
 				L_PTE_EXEC,
 		.prot_l1   = PMD_TYPE_TABLE | PMD_BIT4,
-		.prot_sect = PMD_TYPE_SECT | PMD_BIT4,
 		.domain    = DOMAIN_USER,
 	},
 	[MT_MEMORY] = {
-		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
-				L_PTE_CACHEABLE | L_PTE_BUFFERABLE |
-				L_PTE_EXEC | L_PTE_WRITE,
-		.prot_l1   = PMD_TYPE_TABLE | PMD_BIT4,
 		.prot_sect = PMD_TYPE_SECT | PMD_BIT4 | PMD_SECT_AP_WRITE,
 		.domain    = DOMAIN_KERNEL,
 	}
@@ -268,37 +306,50 @@ static struct mem_types mem_types[] __initdata = {
 static void __init build_mem_type_table(void)
 {
 	int cpu_arch = cpu_architecture();
-#ifdef CONFIG_CPU_DCACHE_WRITETHROUGH
-	int writethrough = 1;
-#else
-	int writethrough = 0;
-#endif
-	int writealloc = 0, ecc = 0;
+	const char *policy;
 
-	if (cpu_arch < CPU_ARCH_ARMv5) {
-		writealloc = 0;
-		ecc = 0;
-		mem_types[MT_MINICLEAN].prot_sect &= ~PMD_SECT_TEX(1);
-	}
-
-	if (writethrough) {
-		mem_types[MT_CACHECLEAN].prot_sect |= PMD_SECT_WT;
-		mem_types[MT_VECTORS].prot_sect |= PMD_SECT_WT;
-		mem_types[MT_MEMORY].prot_sect |= PMD_SECT_WT;
+	/*
+	 * ARMv5 can use ECC memory.
+	 */
+	if (cpu_arch == CPU_ARCH_ARMv5) {
+		mem_types[MT_VECTORS].prot_l1 |= ecc_mask;
+		mem_types[MT_MEMORY].prot_sect |= ecc_mask;
 	} else {
+		mem_types[MT_MINICLEAN].prot_sect &= ~PMD_SECT_TEX(1);
+		if (cachepolicy == PMD_SECT_WBWA)
+			cachepolicy = PMD_SECT_WB;
+		ecc_mask = 0;
+	}
+
+	mem_types[MT_MEMORY].prot_sect |= cachepolicy;
+
+	switch (cachepolicy) {
+	default:
+	case PMD_SECT_UNCACHED:
+		policy = "uncached";
+		break;
+	case PMD_SECT_BUFFERED:
+		mem_types[MT_VECTORS].prot_pte |= PTE_BUFFERABLE;
+		policy = "buffered";
+		break;
+	case PMD_SECT_WT:
+		mem_types[MT_VECTORS].prot_pte |= PTE_BUFFERABLE|PTE_CACHEABLE;
+		mem_types[MT_CACHECLEAN].prot_sect |= PMD_SECT_WT;
+		policy = "write through";
+		break;
+	case PMD_SECT_WB:
+		mem_types[MT_VECTORS].prot_pte |= PTE_BUFFERABLE|PTE_CACHEABLE;
 		mem_types[MT_CACHECLEAN].prot_sect |= PMD_SECT_WB;
-		mem_types[MT_VECTORS].prot_sect |= PMD_SECT_WB;
-
-		if (writealloc)
-			mem_types[MT_MEMORY].prot_sect |= PMD_SECT_WBWA;
-		else
-			mem_types[MT_MEMORY].prot_sect |= PMD_SECT_WB;
+		policy = "write back";
+		break;
+	case PMD_SECT_WBWA:
+		mem_types[MT_VECTORS].prot_pte |= PTE_BUFFERABLE|PTE_CACHEABLE;
+		mem_types[MT_CACHECLEAN].prot_sect |= PMD_SECT_WB;
+		policy = "write back, write allocate";
+		break;
 	}
-
-	if (ecc) {
-		mem_types[MT_VECTORS].prot_sect |= PMD_PROTECTION;
-		mem_types[MT_MEMORY].prot_sect |= PMD_PROTECTION;
-	}
+	printk("Memory policy: ECC %sabled, Data cache %s\n",
+		ecc_mask ? "en" : "dis", policy);
 }
 
 /*
@@ -329,6 +380,14 @@ static void __init create_mapping(struct map_desc *md)
 	virt   = md->virtual;
 	off    = md->physical - virt;
 	length = md->length;
+
+	if (mem_types[md->type].prot_l1 == 0 &&
+	    (virt & 0xfffff || (virt + off) & 0xfffff || (virt + length) & 0xfffff)) {
+		printk(KERN_WARNING "MM: map for 0x%08lx at 0x%08lx can not "
+		       "be mapped using pages, ignoring.\n",
+		       md->physical, md->virtual);
+		return;
+	}
 
 	while ((virt & 0xfffff || (virt + off) & 0xfffff) && length >= PAGE_SIZE) {
 		alloc_init_page(virt, virt + off, prot_l1, prot_pte);
