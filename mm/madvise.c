@@ -32,7 +32,6 @@ static long madvise_behavior(struct vm_area_struct * vma, unsigned long start,
 	}
 
 	spin_lock(&mm->page_table_lock);
-	vma->vm_raend = 0;
 	VM_ClearReadHint(vma);
 
 	switch (behavior) {

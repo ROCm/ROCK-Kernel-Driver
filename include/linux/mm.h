@@ -70,7 +70,6 @@ struct vm_area_struct {
 	unsigned long vm_pgoff;		/* Offset (within vm_file) in PAGE_SIZE
 					   units, *not* PAGE_CACHE_SIZE */
 	struct file * vm_file;		/* File we map to (can be NULL). */
-	unsigned long vm_raend;		/* XXX: put full readahead info here. */
 	void * vm_private_data;		/* was vm_pte (shared mem) */
 };
 
