@@ -50,15 +50,9 @@ struct raw_opt {
 	struct icmp_filter filter;
 };
 
-struct ipv6_pinfo;
-
 /* WARNING: don't change the layout of the members in raw_sock! */
 struct raw_sock {
-	struct sock	  sk;
-#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
-	struct ipv6_pinfo *pinet6;
-#endif
-	struct inet_opt	  inet;
+	struct inet_sock  inet;
 	struct raw_opt	  raw4;
 };
 

@@ -124,7 +124,7 @@ static int udp_v4_get_port(struct sock *sk, unsigned short snum)
 {
 	struct hlist_node *node;
 	struct sock *sk2;
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 
 	write_lock_bh(&udp_hash_lock);
 	if (snum == 0) {
@@ -171,7 +171,7 @@ gotit:
 	} else {
 		sk_for_each(sk2, node,
 			    &udp_hash[snum & (UDP_HTABLE_SIZE - 1)]) {
-			struct inet_opt *inet2 = inet_sk(sk2);
+			struct inet_sock *inet2 = inet_sk(sk2);
 
 			if (inet2->num == snum &&
 			    sk2 != sk &&
@@ -227,7 +227,7 @@ struct sock *udp_v4_lookup_longway(u32 saddr, u16 sport, u32 daddr, u16 dport, i
 	int badness = -1;
 
 	sk_for_each(sk, node, &udp_hash[hnum & (UDP_HTABLE_SIZE - 1)]) {
-		struct inet_opt *inet = inet_sk(sk);
+		struct inet_sock *inet = inet_sk(sk);
 
 		if (inet->num == hnum && !ipv6_only_sock(sk)) {
 			int score = (sk->sk_family == PF_INET ? 1 : 0);
@@ -285,7 +285,7 @@ static inline struct sock *udp_v4_mcast_next(struct sock *sk,
 	unsigned short hnum = ntohs(loc_port);
 
 	sk_for_each_from(s, node) {
-		struct inet_opt *inet = inet_sk(s);
+		struct inet_sock *inet = inet_sk(s);
 
 		if (inet->num != hnum					||
 		    (inet->daddr && inet->daddr != rmt_addr)		||
@@ -316,7 +316,7 @@ found:
 
 void udp_err(struct sk_buff *skb, u32 info)
 {
-	struct inet_opt *inet;
+	struct inet_sock *inet;
 	struct iphdr *iph = (struct iphdr*)skb->data;
 	struct udphdr *uh = (struct udphdr*)(skb->data+(iph->ihl<<2));
 	int type = skb->h.icmph->type;
@@ -398,7 +398,7 @@ static void udp_flush_pending_frames(struct sock *sk)
  */
 static int udp_push_pending_frames(struct sock *sk, struct udp_opt *up)
 {
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	struct flowi *fl = &inet->cork.fl;
 	struct sk_buff *skb;
 	struct udphdr *uh;
@@ -480,7 +480,7 @@ static unsigned short udp_check(struct udphdr *uh, int len, unsigned long saddr,
 int udp_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 		size_t len)
 {
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	struct udp_opt *up = udp_sk(sk);
 	int ulen = len;
 	struct ipcm_cookie ipc;
@@ -773,7 +773,7 @@ static __inline__ int udp_checksum_complete(struct sk_buff *skb)
 int udp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 		size_t len, int noblock, int flags, int *addr_len)
 {
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
   	struct sockaddr_in *sin = (struct sockaddr_in *)msg->msg_name;
   	struct sk_buff *skb;
   	int copied, err;
@@ -864,7 +864,7 @@ csum_copy_err:
 
 int udp_disconnect(struct sock *sk, int flags)
 {
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	/*
 	 *	1003.1g - break association.
 	 */
@@ -1503,7 +1503,7 @@ void udp_proc_unregister(struct udp_seq_afinfo *afinfo)
 /* ------------------------------------------------------------------------ */
 static void udp4_format_sock(struct sock *sp, char *tmpbuf, int bucket)
 {
-	struct inet_opt *inet = inet_sk(sp);
+	struct inet_sock *inet = inet_sk(sp);
 	unsigned int dest = inet->daddr;
 	unsigned int src  = inet->rcv_saddr;
 	__u16 destp	  = ntohs(inet->dport);

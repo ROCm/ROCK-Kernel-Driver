@@ -115,7 +115,7 @@ static __inline__ int tcp_hashfn(__u32 laddr, __u16 lport,
 
 static __inline__ int tcp_sk_hashfn(struct sock *sk)
 {
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	__u32 laddr = inet->rcv_saddr;
 	__u16 lport = inet->num;
 	__u32 faddr = inet->daddr;
@@ -300,7 +300,7 @@ fail:
  */
 static void __tcp_put_port(struct sock *sk)
 {
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	struct tcp_bind_hashbucket *head = &tcp_bhash[tcp_bhashfn(inet->num)];
 	struct tcp_bind_bucket *tb;
 
@@ -420,7 +420,7 @@ static struct sock *__tcp_v4_lookup_listener(struct hlist_head *head, u32 daddr,
 
 	hiscore=-1;
 	sk_for_each(sk, node, head) {
-		struct inet_opt *inet = inet_sk(sk);
+		struct inet_sock *inet = inet_sk(sk);
 
 		if (inet->num == hnum && !ipv6_only_sock(sk)) {
 			__u32 rcv_saddr = inet->rcv_saddr;
@@ -457,7 +457,7 @@ static inline struct sock *tcp_v4_lookup_listener(u32 daddr,
 	read_lock(&tcp_lhash_lock);
 	head = &tcp_listening_hash[tcp_lhashfn(hnum)];
 	if (!hlist_empty(head)) {
-		struct inet_opt *inet = inet_sk((sk = __sk_head(head)));
+		struct inet_sock *inet = inet_sk((sk = __sk_head(head)));
 
 		if (inet->num == hnum && !sk->sk_node.next &&
 		    (!inet->rcv_saddr || inet->rcv_saddr == daddr) &&
@@ -549,7 +549,7 @@ static inline __u32 tcp_v4_init_sequence(struct sock *sk, struct sk_buff *skb)
 static int __tcp_v4_check_established(struct sock *sk, __u16 lport,
 				      struct tcp_tw_bucket **twp)
 {
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	u32 daddr = inet->rcv_saddr;
 	u32 saddr = inet->daddr;
 	int dif = sk->sk_bound_dev_if;
@@ -638,7 +638,7 @@ not_unique:
 
 static inline u32 connect_port_offset(const struct sock *sk)
 {
-	const struct inet_opt *inet = inet_sk(sk);
+	const struct inet_sock *inet = inet_sk(sk);
 
 	return secure_tcp_port_ephemeral(inet->rcv_saddr, inet->daddr, 
 					 inet->dport);
@@ -743,7 +743,7 @@ out:
 /* This will initiate an outgoing connection. */
 int tcp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 {
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	struct tcp_opt *tp = tcp_sk(sk);
 	struct sockaddr_in *usin = (struct sockaddr_in *)uaddr;
 	struct rtable *rt;
@@ -917,7 +917,7 @@ static inline void do_pmtu_discovery(struct sock *sk, struct iphdr *iph,
 				     u32 mtu)
 {
 	struct dst_entry *dst;
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	struct tcp_opt *tp = tcp_sk(sk);
 
 	/* We are not interested in TCP_LISTEN and open_requests (SYN-ACKs
@@ -980,7 +980,7 @@ void tcp_v4_err(struct sk_buff *skb, u32 info)
 	struct iphdr *iph = (struct iphdr *)skb->data;
 	struct tcphdr *th = (struct tcphdr *)(skb->data + (iph->ihl << 2));
 	struct tcp_opt *tp;
-	struct inet_opt *inet;
+	struct inet_sock *inet;
 	int type = skb->h.icmph->type;
 	int code = skb->h.icmph->code;
 	struct sock *sk;
@@ -1127,7 +1127,7 @@ out:
 void tcp_v4_send_check(struct sock *sk, struct tcphdr *th, int len,
 		       struct sk_buff *skb)
 {
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 
 	if (skb->ip_summed == CHECKSUM_HW) {
 		th->check = ~tcp_v4_check(th, len, inet->saddr, inet->daddr, 0);
@@ -1549,7 +1549,7 @@ struct sock *tcp_v4_syn_recv_sock(struct sock *sk, struct sk_buff *skb,
 				  struct open_request *req,
 				  struct dst_entry *dst)
 {
-	struct inet_opt *newinet;
+	struct inet_sock *newinet;
 	struct tcp_opt *newtp;
 	struct sock *newsk;
 
@@ -1856,7 +1856,7 @@ static void __tcp_v4_rehash(struct sock *sk)
 
 static int tcp_v4_reselect_saddr(struct sock *sk)
 {
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	int err;
 	struct rtable *rt;
 	__u32 old_saddr = inet->saddr;
@@ -1907,7 +1907,7 @@ static int tcp_v4_reselect_saddr(struct sock *sk)
 
 int tcp_v4_rebuild_header(struct sock *sk)
 {
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	struct rtable *rt = (struct rtable *)__sk_dst_check(sk, 0);
 	u32 daddr;
 	int err;
@@ -1956,7 +1956,7 @@ int tcp_v4_rebuild_header(struct sock *sk)
 static void v4_addr2sockaddr(struct sock *sk, struct sockaddr * uaddr)
 {
 	struct sockaddr_in *sin = (struct sockaddr_in *) uaddr;
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 
 	sin->sin_family		= AF_INET;
 	sin->sin_addr.s_addr	= inet->daddr;
@@ -1971,7 +1971,7 @@ static void v4_addr2sockaddr(struct sock *sk, struct sockaddr * uaddr)
 
 int tcp_v4_remember_stamp(struct sock *sk)
 {
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	struct tcp_opt *tp = tcp_sk(sk);
 	struct rtable *rt = (struct rtable *)__sk_dst_get(sk);
 	struct inet_peer *peer = NULL;
@@ -2474,7 +2474,7 @@ static void get_tcp4_sock(struct sock *sp, char *tmpbuf, int i)
 	int timer_active;
 	unsigned long timer_expires;
 	struct tcp_opt *tp = tcp_sk(sp);
-	struct inet_opt *inet = inet_sk(sp);
+	struct inet_sock *inet = inet_sk(sp);
 	unsigned int dest = inet->daddr;
 	unsigned int src = inet->rcv_saddr;
 	__u16 destp = ntohs(inet->dport);

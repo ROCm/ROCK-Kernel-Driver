@@ -809,7 +809,7 @@ int ip6_append_data(struct sock *sk, int getfrag(void *from, char *to, int offse
 		    int hlimit, struct ipv6_txoptions *opt, struct flowi *fl, struct rt6_info *rt,
 		    unsigned int flags)
 {
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	struct ipv6_pinfo *np = inet6_sk(sk);
 	struct sk_buff *skb;
 	unsigned int maxfraglen, fragheaderlen;
@@ -1087,7 +1087,7 @@ int ip6_push_pending_frames(struct sock *sk)
 	struct sk_buff *skb, *tmp_skb;
 	struct sk_buff **tail_skb;
 	struct in6_addr final_dst_buf, *final_dst = &final_dst_buf;
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	struct ipv6_pinfo *np = inet6_sk(sk);
 	struct ipv6hdr *hdr;
 	struct ipv6_txoptions *opt = np->cork.opt;
@@ -1165,7 +1165,7 @@ error:
 
 void ip6_flush_pending_frames(struct sock *sk)
 {
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	struct ipv6_pinfo *np = inet6_sk(sk);
 	struct sk_buff *skb;
 

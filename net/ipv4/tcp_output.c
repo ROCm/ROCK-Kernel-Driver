@@ -266,7 +266,7 @@ static __inline__ u16 tcp_select_window(struct sock *sk)
 static int tcp_transmit_skb(struct sock *sk, struct sk_buff *skb)
 {
 	if (skb != NULL) {
-		struct inet_opt *inet = inet_sk(sk);
+		struct inet_sock *inet = inet_sk(sk);
 		struct tcp_opt *tp = tcp_sk(sk);
 		struct tcp_skb_cb *tcb = TCP_SKB_CB(skb);
 		int tcp_header_size = tp->tcp_header_len;

@@ -337,7 +337,7 @@ void tcp_time_wait(struct sock *sk, int state, int timeo)
 		tw = kmem_cache_alloc(tcp_timewait_cachep, SLAB_ATOMIC);
 
 	if(tw != NULL) {
-		struct inet_opt *inet = inet_sk(sk);
+		struct inet_sock *inet = inet_sk(sk);
 		int rto = (tp->rto<<2) - (tp->rto>>1);
 
 		/* Give us an identity. */

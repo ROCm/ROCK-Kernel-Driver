@@ -1229,7 +1229,7 @@ ip_ct_selective_cleanup(int (*kill)(const struct ip_conntrack *i, void *data),
 static int
 getorigdst(struct sock *sk, int optval, void __user *user, int *len)
 {
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	struct ip_conntrack_tuple_hash *h;
 	struct ip_conntrack_tuple tuple;
 	

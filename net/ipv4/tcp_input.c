@@ -1647,7 +1647,7 @@ static __inline__ int tcp_packet_delayed(struct tcp_opt *tp)
 #if FASTRETRANS_DEBUG > 1
 static void DBGUNDO(struct sock *sk, struct tcp_opt *tp, const char *msg)
 {
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	printk(KERN_DEBUG "Undo %s %u.%u.%u.%u/%u c%u l%u ss%u/%u p%u\n",
 	       msg,
 	       NIPQUAD(inet->daddr), ntohs(inet->dport),

@@ -1617,7 +1617,7 @@ int ip_mc_join_group(struct sock *sk , struct ip_mreqn *imr)
 	u32 addr = imr->imr_multiaddr.s_addr;
 	struct ip_mc_socklist *iml, *i;
 	struct in_device *in_dev;
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	int count = 0;
 
 	if (!MULTICAST(addr))
@@ -1691,7 +1691,7 @@ int ip_mc_leave_src(struct sock *sk, struct ip_mc_socklist *iml,
 
 int ip_mc_leave_group(struct sock *sk, struct ip_mreqn *imr)
 {
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	struct ip_mc_socklist *iml, **imlp;
 
 	rtnl_lock();
@@ -1734,7 +1734,7 @@ int ip_mc_source(int add, int omode, struct sock *sk, struct
 	u32 addr = mreqs->imr_multiaddr;
 	struct ip_mc_socklist *pmc;
 	struct in_device *in_dev = NULL;
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	struct ip_sf_socklist *psl;
 	int i, j, rv;
 
@@ -1852,7 +1852,7 @@ int ip_mc_msfilter(struct sock *sk, struct ip_msfilter *msf, int ifindex)
 	u32 addr = msf->imsf_multiaddr;
 	struct ip_mc_socklist *pmc;
 	struct in_device *in_dev;
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	struct ip_sf_socklist *newpsl, *psl;
 
 	if (!MULTICAST(addr))
@@ -1922,7 +1922,7 @@ int ip_mc_msfget(struct sock *sk, struct ip_msfilter *msf,
 	u32 addr = msf->imsf_multiaddr;
 	struct ip_mc_socklist *pmc;
 	struct in_device *in_dev;
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	struct ip_sf_socklist *psl;
 
 	if (!MULTICAST(addr))
@@ -1980,7 +1980,7 @@ int ip_mc_gsfget(struct sock *sk, struct group_filter *gsf,
 	struct sockaddr_in *psin;
 	u32 addr;
 	struct ip_mc_socklist *pmc;
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	struct ip_sf_socklist *psl;
 
 	psin = (struct sockaddr_in *)&gsf->gf_group;
@@ -2033,7 +2033,7 @@ done:
  */
 int ip_mc_sf_allow(struct sock *sk, u32 loc_addr, u32 rmt_addr, int dif)
 {
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	struct ip_mc_socklist *pmc;
 	struct ip_sf_socklist *psl;
 	int i;
@@ -2069,7 +2069,7 @@ int ip_mc_sf_allow(struct sock *sk, u32 loc_addr, u32 rmt_addr, int dif)
 
 void ip_mc_drop_socket(struct sock *sk)
 {
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	struct ip_mc_socklist *iml;
 
 	if (inet->mc_list == NULL)

@@ -440,11 +440,7 @@ struct tcp_opt {
 
 /* WARNING: don't change the layout of the members in tcp_sock! */
 struct tcp_sock {
-	struct sock	  sk;
-#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
-	struct ipv6_pinfo *pinet6;
-#endif
-	struct inet_opt	  inet;
+	struct inet_sock  inet;
 	struct tcp_opt	  tcp;
 };
 

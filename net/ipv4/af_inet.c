@@ -131,7 +131,7 @@ static spinlock_t inetsw_lock = SPIN_LOCK_UNLOCKED;
 
 void inet_sock_destruct(struct sock *sk)
 {
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 
 	__skb_queue_purge(&sk->sk_receive_queue);
 	__skb_queue_purge(&sk->sk_error_queue);
@@ -173,7 +173,7 @@ void inet_sock_destruct(struct sock *sk)
 
 static int inet_autobind(struct sock *sk)
 {
-	struct inet_opt *inet;
+	struct inet_sock *inet;
 	/* We may need to bind the socket. */
 	lock_sock(sk);
 	inet = inet_sk(sk);
@@ -232,7 +232,7 @@ static int inet_create(struct socket *sock, int protocol)
 	struct sock *sk;
 	struct list_head *p;
 	struct inet_protosw *answer;
-	struct inet_opt *inet;
+	struct inet_sock *inet;
 	struct proto *answer_prot;
 	unsigned char answer_flags;
 	char answer_no_check;
@@ -389,7 +389,7 @@ int inet_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 {
 	struct sockaddr_in *addr = (struct sockaddr_in *)uaddr;
 	struct sock *sk = sock->sk;
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	unsigned short snum;
 	int chk_addr_ret;
 	int err;
@@ -623,7 +623,7 @@ int inet_getname(struct socket *sock, struct sockaddr *uaddr,
 			int *uaddr_len, int peer)
 {
 	struct sock *sk		= sock->sk;
-	struct inet_opt *inet	= inet_sk(sk);
+	struct inet_sock *inet	= inet_sk(sk);
 	struct sockaddr_in *sin	= (struct sockaddr_in *)uaddr;
 
 	sin->sin_family = AF_INET;

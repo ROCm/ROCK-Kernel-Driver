@@ -196,7 +196,7 @@ struct tcp_tw_bucket {
 	unsigned char		tw_rcv_wscale;
 	__u16			tw_sport;
 	/* Socket demultiplex comparisons on incoming packets. */
-	/* these five are in inet_opt */
+	/* these five are in inet_sock */
 	__u32			tw_daddr
 		__attribute__((aligned(TCP_ADDRCMP_ALIGN_BYTES)));
 	__u32			tw_rcv_saddr;
