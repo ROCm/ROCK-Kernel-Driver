@@ -8,6 +8,10 @@
 
 #define TH_SYN 0x02
 
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Marc Boucher <marc@mbsi.ca>");
+MODULE_DESCRIPTION("iptables TCP MSS match module");
+
 /* Returns 1 if the mss option is set and matched by the range, 0 otherwise */
 static inline int
 mssoption_match(u_int16_t min, u_int16_t max,
@@ -117,4 +121,3 @@ static void __exit fini(void)
 
 module_init(init);
 module_exit(fini);
-MODULE_LICENSE("GPL");

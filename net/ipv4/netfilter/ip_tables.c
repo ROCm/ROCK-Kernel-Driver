@@ -25,6 +25,10 @@
 
 #include <linux/netfilter_ipv4/ip_tables.h>
 
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Netfilter Core Team <coreteam@netfilter.org>");
+MODULE_DESCRIPTION("IPv4 packet filter");
+
 /*#define DEBUG_IP_FIREWALL*/
 /*#define DEBUG_ALLOW_ALL*/ /* Useful for remote debugging */
 /*#define DEBUG_IP_FIREWALL_USER*/
@@ -1845,4 +1849,3 @@ EXPORT_SYMBOL(ipt_unregister_target);
 
 module_init(init);
 module_exit(fini);
-MODULE_LICENSE("GPL");

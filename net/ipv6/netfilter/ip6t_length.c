@@ -5,6 +5,10 @@
 #include <linux/netfilter_ipv6/ip6t_length.h>
 #include <linux/netfilter_ipv6/ip6_tables.h>
 
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("James Morris <jmorris@intercode.com.au>");
+MODULE_DESCRIPTION("IPv6 packet length match");
+
 static int
 match(const struct sk_buff *skb,
       const struct net_device *in,

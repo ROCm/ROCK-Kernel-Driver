@@ -26,6 +26,10 @@
 
 #include <linux/netfilter_ipv6/ip6_tables.h>
 
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Netfilter Core Team <coreteam@netfilter.org>");
+MODULE_DESCRIPTION("IPv6 packet filter");
+
 #define IPV6_HDR_LEN	(sizeof(struct ipv6hdr))
 #define IPV6_OPTHDR_LEN	(sizeof(struct ipv6_opt_hdr))
 
@@ -1923,4 +1927,3 @@ EXPORT_SYMBOL(ip6t_ext_hdr);
 
 module_init(init);
 module_exit(fini);
-MODULE_LICENSE("GPL");

@@ -134,6 +134,7 @@
 #include <linux/version.h>
 
 MODULE_LICENSE("Dual BSD/GPL");
+MODULE_DESCRIPTION("ipfwadm backwards compatibility layer");
 
 /*
  *	Implement IP packet firewall

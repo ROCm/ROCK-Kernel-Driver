@@ -10,6 +10,10 @@
 #include <linux/netfilter_ipv4/ip_conntrack_ftp.h>
 #include <linux/netfilter_ipv4/ip_conntrack_helper.h>
 
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Rusty Russell <rusty@rustcorp.com.au>");
+MODULE_DESCRIPTION("ftp NAT helper");
+
 #if 0
 #define DEBUGP printk
 #else
@@ -342,4 +346,3 @@ NEEDS_CONNTRACK(ftp);
 
 module_init(init);
 module_exit(fini);
-MODULE_LICENSE("GPL");

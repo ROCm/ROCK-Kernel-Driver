@@ -8,6 +8,10 @@
 #include <linux/module.h>
 #include <linux/netfilter_arp/arp_tables.h>
 
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("David S. Miller <davem@redhat.com>");
+MODULE_DESCRIPTION("arptables filter table");
+
 #define FILTER_VALID_HOOKS ((1 << NF_ARP_IN) | (1 << NF_ARP_OUT) | \
 			   (1 << NF_ARP_FORWARD))
 
@@ -209,4 +213,3 @@ static void __exit fini(void)
 
 module_init(init);
 module_exit(fini);
-MODULE_LICENSE("GPL");

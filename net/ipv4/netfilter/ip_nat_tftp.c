@@ -30,7 +30,7 @@
 #include <linux/netfilter_ipv4/ip_nat_rule.h>
 
 MODULE_AUTHOR("Magnus Boden <mb@ozaba.mine.nu>");
-MODULE_DESCRIPTION("Netfilter NAT helper for tftp");
+MODULE_DESCRIPTION("tfpt NAT helper");
 MODULE_LICENSE("GPL");
 
 #define MAX_PORTS 8

@@ -7,6 +7,8 @@
 #include <linux/netfilter_ipv4/ip_tables.h>
 
 MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Yon Uriarte <yon@astaro.de>");
+MODULE_DESCRIPTION("iptables AH SPI match module");
 
 #ifdef DEBUG_CONNTRACK
 #define duprintf(format, args...) printk(format , ## args)

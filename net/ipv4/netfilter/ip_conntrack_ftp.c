@@ -11,6 +11,10 @@
 #include <linux/netfilter_ipv4/ip_conntrack_helper.h>
 #include <linux/netfilter_ipv4/ip_conntrack_ftp.h>
 
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Rusty Russell <rusty@rustcorp.com.au>");
+MODULE_DESCRIPTION("ftp connection tracking helper");
+
 /* This is slow, but it's simple. --RR */
 static char ftp_buffer[65536];
 
@@ -439,6 +443,5 @@ static int __init init(void)
 PROVIDES_CONNTRACK(ftp);
 EXPORT_SYMBOL(ip_ftp_lock);
 
-MODULE_LICENSE("GPL");
 module_init(init);
 module_exit(fini);

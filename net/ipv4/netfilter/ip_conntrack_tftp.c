@@ -17,7 +17,7 @@
 #include <linux/netfilter_ipv4/ip_conntrack_tftp.h>
 
 MODULE_AUTHOR("Magnus Boden <mb@ozaba.mine.nu>");
-MODULE_DESCRIPTION("Netfilter connection tracking module for tftp");
+MODULE_DESCRIPTION("tftp connection tracking helper");
 MODULE_LICENSE("GPL");
 
 #define MAX_PORTS 8

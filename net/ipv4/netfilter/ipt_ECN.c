@@ -17,6 +17,8 @@
 #include <linux/netfilter_ipv4/ipt_ECN.h>
 
 MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Harald Welte <laforge@netfilter.org>");
+MODULE_DESCRIPTION("iptables ECN modification module");
 
 /* set ECT codepoint from IP header.
  * 	return 0 if there was an error. */

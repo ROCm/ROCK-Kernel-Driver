@@ -5,6 +5,10 @@
 #include <linux/netfilter_ipv4/ipt_mark.h>
 #include <linux/netfilter_ipv4/ip_tables.h>
 
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Marc Boucher <marc@mbsi.ca>");
+MODULE_DESCRIPTION("iptables mark matching module");
+
 static int
 match(const struct sk_buff *skb,
       const struct net_device *in,
@@ -50,4 +54,3 @@ static void __exit fini(void)
 
 module_init(init);
 module_exit(fini);
-MODULE_LICENSE("GPL");
