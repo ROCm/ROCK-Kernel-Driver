@@ -1160,7 +1160,7 @@ int __init isapnp_init(void)
 	return 0;
 }
 
-fs_initcall(isapnp_init);
+device_initcall(isapnp_init);
 
 /* format is: noisapnp */
 
