@@ -70,6 +70,10 @@ SECTIONS
   __ksymtab : { *(__ksymtab) }
   __stop___ksymtab = .;
 
+  __start___ftr_fixup = .;
+  __ftr_fixup : { *(__ftr_fixup) }
+  __stop___ftr_fixup = .;
+
   . = ALIGN(32);
   .data.cacheline_aligned : { *(.data.cacheline_aligned) }
 

@@ -307,8 +307,6 @@
 #define DRIVER_AUTHOR "Greg Kroah-Hartman, greg@kroah.com, http://www.kroah.com/linux-usb/"
 #define DRIVER_DESC "USB Serial Driver core"
 
-#define MAX(a,b)	(((a)>(b))?(a):(b))
-
 /* function prototypes for a "generic" type serial converter (no flow control, not all endpoints needed) */
 /* need to always compile these in, as some of the other devices use these functions as their own. */
 /* if a driver does not provide a function pointer, the generic function will be called. */
@@ -852,7 +850,8 @@ static int generic_write (struct usb_serial_port *port, int from_user, const uns
 		count = (count > port->bulk_out_size) ? port->bulk_out_size : count;
 
 		if (from_user) {
-			copy_from_user(port->write_urb->transfer_buffer, buf, count);
+			if (copy_from_user(port->write_urb->transfer_buffer, buf, count))
+				return -EFAULT;
 		}
 		else {
 			memcpy (port->write_urb->transfer_buffer, buf, count);
@@ -1260,9 +1259,9 @@ static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 
 	/* initialize some parts of the port structures */
 	/* we don't use num_ports here cauz some devices have more endpoint pairs than ports */
-	max_endpoints = MAX(num_bulk_in, num_bulk_out);
-	max_endpoints = MAX(max_endpoints, num_interrupt_in);
-	max_endpoints = MAX(max_endpoints, serial->num_ports);
+	max_endpoints = max(int, num_bulk_in, num_bulk_out);
+	max_endpoints = max(int, max_endpoints, num_interrupt_in);
+	max_endpoints = max(int, max_endpoints, serial->num_ports);
 	dbg (__FUNCTION__ " - setting up %d port structures for this device", max_endpoints);
 	for (i = 0; i < max_endpoints; ++i) {
 		port = &serial->port[i];

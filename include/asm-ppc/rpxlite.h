@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.rpxlite.h 1.8 05/17/01 18:14:25 cort
+ * BK Id: SCCS/s.rpxlite.h 1.11 08/17/01 15:23:17 paulus
  */
 
 /*
@@ -79,10 +79,6 @@ extern bd_t m8xx_board_info;
 /* We don't use the 8259.
 */
 #define NR_8259_INTS	0
-
-/* Machine type
-*/
-#define _MACH_8xx (_MACH_rpxlite)
 
 #endif
 #endif /* __KERNEL__ */

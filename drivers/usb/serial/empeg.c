@@ -85,8 +85,6 @@
 #define EMPEG_VENDOR_ID			0x084f
 #define EMPEG_PRODUCT_ID		0x0001
 
-#define MIN(a,b)		(((a)<(b))?(a):(b))
-
 /* function prototypes for an empeg-car player */
 static int  empeg_open			(struct usb_serial_port *port, struct file *filp);
 static void empeg_close			(struct usb_serial_port *port, struct file *filp);
@@ -278,10 +276,13 @@ static int empeg_write (struct usb_serial_port *port, int from_user, const unsig
 			}
 		}
 
-		transfer_size = MIN (count, URB_TRANSFER_BUFFER_SIZE);
+		transfer_size = min (int, count, URB_TRANSFER_BUFFER_SIZE);
 
 		if (from_user) {
-			copy_from_user (urb->transfer_buffer, current_position, transfer_size);
+			if (copy_from_user (urb->transfer_buffer, current_position, transfer_size)) {
+				bytes_sent = -EFAULT;
+				break;
+			}
 		} else {
 			memcpy (urb->transfer_buffer, current_position, transfer_size);
 		}
@@ -301,8 +302,11 @@ static int empeg_write (struct usb_serial_port *port, int from_user, const unsig
 
 		/* send it down the pipe */
 		status = usb_submit_urb(urb);
-		if (status)
-			dbg(__FUNCTION__ " - usb_submit_urb(write bulk) failed with status = %d", status);
+		if (status) {
+			err(__FUNCTION__ " - usb_submit_urb(write bulk) failed with status = %d", status);
+			bytes_sent = status;
+			break;
+		}
 
 		current_position += transfer_size;
 		bytes_sent += transfer_size;

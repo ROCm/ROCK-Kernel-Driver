@@ -12,8 +12,8 @@
 
 GZIP_FLAGS = -v9f
 
-CFLAGS	:= $(CPPFLAGS) -O2 -DSTDC_HEADERS -fno-builtin -D__BOOTER__ \
-		-I$(TOPDIR)/arch/$(ARCH)/boot/include
+CFLAGS	+= -fno-builtin -D__BOOTER__ -I$(TOPDIR)/arch/$(ARCH)/boot/include
+
 AFLAGS	+= -D__BOOTER__
 OBJCOPY_ARGS = -O elf32-powerpc
 

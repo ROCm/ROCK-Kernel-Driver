@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.pmac_time.c 1.11 07/06/01 15:46:39 trini
+ * BK Id: SCCS/s.pmac_time.c 1.14 08/19/01 22:23:04 paulus
  */
 /*
  * Support for periodic interrupts (100 per second) and for getting
@@ -260,8 +260,13 @@ pmac_calibrate_decr(void)
 	pmu_register_sleep_notifier(&time_sleep_notifier);
 #endif /* CONFIG_PMAC_PBOOK */
 
-	if (via_calibrate_decr())
-		return;
+	/* We assume MacRISC2 machines have correct device-tree
+	 * calibration. That's better since the VIA itself seems
+	 * to be slightly off. --BenH
+	 */
+	if (!machine_is_compatible("MacRISC2"))
+		if (via_calibrate_decr())
+			return;
 
 	/*
 	 * The cpu node should have a timebase-frequency property

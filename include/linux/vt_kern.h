@@ -8,6 +8,7 @@
 
 #include <linux/config.h>
 #include <linux/vt.h>
+#include <linux/kd.h>
 
 /*
  * Presently, a lot of graphics programs do not restore the contents of
@@ -31,6 +32,7 @@ extern struct vt_struct {
 } *vt_cons[MAX_NR_CONSOLES];
 
 extern void (*kd_mksound)(unsigned int hz, unsigned int ticks);
+extern int (*kbd_rate)(struct kbd_repeat *rep);
 
 /* console.c */
 

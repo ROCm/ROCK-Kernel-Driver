@@ -470,8 +470,9 @@ static int ftdi_sio_write (struct usb_serial_port *port, int from_user,
 
 		/* Copy in the data to send */
 		if (from_user) {
-			copy_from_user(port->write_urb->transfer_buffer + data_offset , 
-				       buf, count - data_offset );
+			if (copy_from_user(port->write_urb->transfer_buffer + data_offset,
+					   buf, count - data_offset ))
+				return -EFAULT;
 		}
 		else {
 			memcpy(port->write_urb->transfer_buffer + data_offset,

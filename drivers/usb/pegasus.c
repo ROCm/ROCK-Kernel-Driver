@@ -1,7 +1,7 @@
 /*
 **	Pegasus: USB 10/100Mbps/HomePNA (1Mbps) Controller
 **
-**	Copyright (c) 1999,2000 Petko Manolov - Petkan (petkan@dce.bg)
+**	Copyright (c) 1999-2001 Petko Manolov (pmanolov@lnxw.com)
 **	
 **
 **	ChangeLog:
@@ -53,9 +53,9 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v0.4.19 2001/06/07 (C) 1999-2001"
+#define DRIVER_VERSION "v0.4.21 (2001/08/27)"
 #define DRIVER_AUTHOR "Petko Manolov <pmanolov@lnxw.com>"
-#define DRIVER_DESC "ADMtek AN986 Pegasus USB Ethernet driver"
+#define DRIVER_DESC "Pegasus/Pegasus II USB Ethernet driver"
 
 #define	PEGASUS_USE_INTR
 #define	PEGASUS_WRITE_EEPROM
@@ -117,9 +117,7 @@ static void ctrl_callback( urb_t *urb )
 			warn( __FUNCTION__ " status %d", urb->status);
 	}
 	pegasus->flags &= ~ETH_REGS_CHANGED;
-	if ( waitqueue_active(&pegasus->ctrl_wait) ) {
-		wake_up_interruptible( &pegasus->ctrl_wait );
-	}
+	wake_up(&pegasus->ctrl_wait );
 }
 
 
@@ -135,9 +133,13 @@ static int get_registers(pegasus_t *pegasus, __u16 indx, __u16 size, void *data)
 		return 0;
 	}
 	memcpy(buffer,data,size);
-	
+
+	add_wait_queue(&pegasus->ctrl_wait, &wait);
+	set_current_state(TASK_UNINTERRUPTIBLE);
 	while ( pegasus->flags & ETH_REGS_CHANGED )
-		interruptible_sleep_on( &pegasus->ctrl_wait );
+		schedule();
+	remove_wait_queue(&pegasus->ctrl_wait, &wait);
+	set_current_state(TASK_RUNNING);
 
 	pegasus->dr.requesttype = PEGASUS_REQT_READ;
 	pegasus->dr.request = PEGASUS_REQ_GET_REGS;
@@ -152,7 +154,7 @@ static int get_registers(pegasus_t *pegasus, __u16 indx, __u16 size, void *data)
 			  buffer, size, ctrl_callback, pegasus );
 
 	add_wait_queue( &pegasus->ctrl_wait, &wait );
-	set_current_state( TASK_INTERRUPTIBLE );
+	set_current_state( TASK_UNINTERRUPTIBLE );
 
 	if ( (ret = usb_submit_urb( &pegasus->ctrl_urb )) ) {
 		err( __FUNCTION__ " BAD CTRLs %d", ret);
@@ -182,8 +184,12 @@ static int set_registers(pegasus_t *pegasus, __u16 indx, __u16 size, void *data)
 	}
 	memcpy(buffer, data, size);
 
+	add_wait_queue(&pegasus->ctrl_wait, &wait);
+	set_current_state(TASK_UNINTERRUPTIBLE);
 	while ( pegasus->flags & ETH_REGS_CHANGED )
-		interruptible_sleep_on( &pegasus->ctrl_wait );
+		schedule();
+	remove_wait_queue(&pegasus->ctrl_wait, &wait);
+	set_current_state(TASK_RUNNING);
 
 	pegasus->dr.requesttype = PEGASUS_REQT_WRITE;
 	pegasus->dr.request = PEGASUS_REQ_SET_REGS;
@@ -198,7 +204,7 @@ static int set_registers(pegasus_t *pegasus, __u16 indx, __u16 size, void *data)
 			  buffer, size, ctrl_callback, pegasus );
 			  
 	add_wait_queue( &pegasus->ctrl_wait, &wait );
-	set_current_state( TASK_INTERRUPTIBLE );
+	set_current_state( TASK_UNINTERRUPTIBLE );
 
 	if ( (ret = usb_submit_urb( &pegasus->ctrl_urb )) ) {
 		err( __FUNCTION__ " BAD CTRL %d", ret);
@@ -228,8 +234,12 @@ static int set_register( pegasus_t *pegasus, __u16 indx, __u8 data )
 	}
 	memcpy(buffer, &data, 1);
 
+	add_wait_queue(&pegasus->ctrl_wait, &wait);
+	set_current_state(TASK_UNINTERRUPTIBLE);
 	while ( pegasus->flags & ETH_REGS_CHANGED )
-		interruptible_sleep_on( &pegasus->ctrl_wait );
+		schedule();
+	remove_wait_queue(&pegasus->ctrl_wait, &wait);
+	set_current_state(TASK_RUNNING);
 
 	pegasus->dr.requesttype = PEGASUS_REQT_WRITE;
 	pegasus->dr.request = PEGASUS_REQ_SET_REG;
@@ -244,7 +254,7 @@ static int set_register( pegasus_t *pegasus, __u16 indx, __u8 data )
 			  buffer, 1, ctrl_callback, pegasus );
 
 	add_wait_queue( &pegasus->ctrl_wait, &wait );
-	set_current_state( TASK_INTERRUPTIBLE );
+	set_current_state( TASK_UNINTERRUPTIBLE );
 
 	if ( (ret = usb_submit_urb( &pegasus->ctrl_urb )) ) {
 		err( __FUNCTION__ " BAD CTRL %d", ret);
@@ -620,7 +630,6 @@ static void intr_callback( struct urb *urb )
 }
 #endif
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,3,48)
 static void pegasus_tx_timeout( struct net_device *net )
 {
 	pegasus_t *pegasus = net->priv;
@@ -633,7 +642,6 @@ static void pegasus_tx_timeout( struct net_device *net )
 	usb_unlink_urb( &pegasus->tx_urb );
 	pegasus->stats.tx_errors++;
 }
-#endif
 
 
 static int pegasus_start_xmit( struct sk_buff *skb, struct net_device *net )
@@ -861,10 +869,8 @@ static void * pegasus_probe( struct usb_device *dev, unsigned int ifnum,
 	net->priv = pegasus;
 	net->open = pegasus_open;
 	net->stop = pegasus_close;
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,3,48)
 	net->watchdog_timeo = PEGASUS_TX_TIMEOUT;
 	net->tx_timeout = pegasus_tx_timeout;
-#endif
 	net->do_ioctl = pegasus_ioctl;
 	net->hard_start_xmit = pegasus_start_xmit;
 	net->set_multicast_list = pegasus_set_multicast;

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.irq.c 1.30 07/19/01 16:51:32 paulus
+ * BK Id: SCCS/s.irq.c 1.32 08/24/01 20:07:37 paulus
  */
 /*
  *  arch/ppc/kernel/irq.c
@@ -92,6 +92,11 @@ atomic_t ppc_n_lost_interrupts;
 static int cache_bitmask = 0;
 static struct irqaction malloc_cache[IRQ_KMALLOC_ENTRIES];
 extern int mem_init_done;
+
+#if defined(CONFIG_TAU_INT)
+extern int tau_interrupts(unsigned long cpu);
+extern int tau_initialized;
+#endif
 
 void *irq_kmalloc(size_t size, int pri)
 {
@@ -402,12 +407,14 @@ int get_irq_list(char *buf)
 		}
 		len += sprintf(buf+len, "\n");
 	}
-#ifdef CONFIG_TAU
-	len += sprintf(buf+len, "TAU: ");
-	for (j = 0; j < smp_num_cpus; j++)
-		len += sprintf(buf+len, "%10u ",
-				tau_interrupts(j));
-	len += sprintf(buf+len, "\n");
+#ifdef CONFIG_TAU_INT
+	if (tau_initialized){
+		len += sprintf(buf+len, "TAU: ");
+		for (j = 0; j < smp_num_cpus; j++)
+			len += sprintf(buf+len, "%10u ",
+					tau_interrupts(j));
+		len += sprintf(buf+len, "  PowerPC             Thermal Assist (cpu temp)\n");
+	}
 #endif
 #ifdef CONFIG_SMP
 	/* should this be per processor send/receive? */

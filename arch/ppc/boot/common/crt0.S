@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.crt0.S 1.10 05/21/01 00:49:49 cort
+ * BK Id: SCCS/s.crt0.S 1.12 08/09/01 17:09:10 paulus
  */
 /*    Copyright (c) 1997 Paul Mackerras <paulus@cs.anu.edu.au>
  *      Initial Power Macintosh COFF version.
@@ -34,7 +34,21 @@ _start:
 	.globl	__start
 __start:
 #endif
-#ifdef CONFIG_4xx
+
+	## Flush and invalidate the caches for the range in memory covering
+	## the .text section of the boot loader
+	
+	lis	r9,_start@h		# r9 = &_start
+	lis	r8,_etext@ha		# 
+	addi	r8,r8,_etext@l		# r8 = &_etext
+3:	dcbf	r0,r9			# Flush the data cache
+	icbi	r0,r9			# Invalidate the instruction cache
+	addi	r9,r9,0x10		# Increment by one cache line
+	cmplw	cr0,r9,r8		# Are we at the end yet?
+	blt	3b			# No, keep flushing and invalidating
+	sync				# sync ; isync after flushing the icache
+	isync
+
 	## Clear out the BSS as per ANSI C requirements
 
 	lis	r7,_end@ha
@@ -53,21 +67,7 @@ __start:
 	li	r0,0			# r0 = 0
 1:	stwu	r0,4(r8)		# Clear out a word
 	bdnz	1b			# If we are not done yet, keep clearing
-#endif
-
-	## Flush and invalidate the caches for the range in memory covering
-	## the .text section of the boot loader
-	
-2:	lis	r9,_start@h		# r9 = &_start
-	lis	r8,_etext@ha		# 
-	addi	r8,r8,_etext@l		# r8 = &_etext
-3:	dcbf	r0,r9			# Flush the data cache
-	icbi	r0,r9			# Invalidate the instruction cache
-	addi	r9,r9,0x10		# Increment by one cache line
-	cmplw	cr0,r9,r8		# Are we at the end yet?
-	blt	3b			# No, keep flushing and invalidating
-	sync				# sync ; isync after flushing the icache
-	isync
+2:
 
 #ifdef CONFIG_4xx
 	## Set up the stack

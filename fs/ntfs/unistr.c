@@ -1,6 +1,4 @@
 /*
- * $Id: unistr.c,v 1.4 2001/04/08 03:02:55 antona Exp $
- *
  * unistr.c - Unicode string handling. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2000,2001 Anton Altaparmakov.
@@ -22,7 +20,6 @@
  */
 
 #include <linux/string.h>
-#include <linux/kernel.h>
 #include <asm/byteorder.h>
 
 #include "unistr.h"
@@ -94,11 +91,13 @@ int ntfs_collate_names(wchar_t *upcase, __u32 upcase_len,
 		       wchar_t *name2, __u32 name2_len,
 		       int ic, int err_val)
 {
-	__u32 cnt;
+	__u32 cnt, min_len;
 	wchar_t c1, c2;
 
-	for (cnt = 0; cnt < min(unsigned int, name1_len, name2_len); ++cnt)
-	{
+	min_len = name1_len;
+	if (min_len > name2_len)
+		min_len = name2_len;
+	for (cnt = 0; cnt < min_len; ++cnt) {
 		c1 = le16_to_cpu(*name1++);
 		c2 = le16_to_cpu(*name2++);
 		if (ic) {
@@ -107,7 +106,7 @@ int ntfs_collate_names(wchar_t *upcase, __u32 upcase_len,
 			if (c2 < upcase_len)
 				c2 = le16_to_cpu(upcase[c2]);
 		}
-		if (c1 < 64 && legal_ansi_char_array[c1] & 8);
+		if (c1 < 64 && legal_ansi_char_array[c1] & 8)
 			return err_val;
 		if (c1 < c2)
 			return -1;

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.io.h 1.7 05/17/01 18:14:24 cort
+ * BK Id: SCCS/s.io.h 1.11 08/28/01 15:48:26 paulus
  */
 #ifdef __KERNEL__
 #ifndef _PPC_IO_H
@@ -24,7 +24,7 @@
 #define PREP_PCI_DRAM_OFFSET 	0x80000000
 
 #if defined(CONFIG_4xx)
-#include <asm/board.h>
+#include <asm/ppc4xx.h>
 #elif defined(CONFIG_8xx)
 #include <asm/mpc8xx.h>
 #elif defined(CONFIG_8260)
@@ -185,15 +185,13 @@ extern void _outsl_ns(volatile u32 *port, const void *buf, int nl);
  */
 extern void *__ioremap(unsigned long address, unsigned long size,
 		       unsigned long flags);
-extern void *__ioremap_at(unsigned long phys, unsigned long size,
-			  unsigned long flags);
 extern void *ioremap(unsigned long address, unsigned long size);
 #define ioremap_nocache(addr, size)	ioremap((addr), (size))
 extern void iounmap(void *addr);
 extern unsigned long iopa(unsigned long addr);
-#ifdef CONFIG_APUS
 extern unsigned long mm_ptov(unsigned long addr) __attribute__ ((const));
-#endif
+extern void io_block_mapping(unsigned long virt, unsigned long phys,
+			     unsigned int size, int flags);
 
 /*
  * The PCI bus is inherently Little-Endian.  The PowerPC is being
@@ -245,6 +243,12 @@ extern inline void * phys_to_virt(unsigned long address)
 	return (void*) mm_ptov (address);
 #endif
 }
+
+/*
+ * Change "struct page" to physical address.
+ */
+#define page_to_phys(page)	((page - mem_map) << PAGE_SHIFT)
+#define page_to_bus(page)	(page_to_phys(page) + PCI_DRAM_OFFSET)
 
 #endif /* __KERNEL__ */
 

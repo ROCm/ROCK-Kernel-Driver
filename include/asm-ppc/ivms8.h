@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.ivms8.h 1.5 05/17/01 18:14:24 cort
+ * BK Id: SCCS/s.ivms8.h 1.6 08/17/01 15:23:17 paulus
  */
 /*
  * A collection of structures, addresses, and values associated with
@@ -87,9 +87,4 @@ typedef struct bd_info {
 */
 #define NR_8259_INTS	0
 
-/* Generic 8xx type
-*/
-#define _MACH_8xx (_MACH_ivms8)
-
 #endif	/* __MACH_IVMS8_DEFS */
-

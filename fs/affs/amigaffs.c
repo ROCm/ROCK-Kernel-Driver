@@ -311,7 +311,7 @@ affs_remove_header(struct dentry *dentry)
 		goto done_unlock;
 	mark_buffer_dirty_inode(bh, inode);
 
-	affs_lock_dir(dir);
+	affs_unlock_dir(dir);
 
 	if (inode->i_nlink > 1)
 		retval = affs_remove_link(dentry);

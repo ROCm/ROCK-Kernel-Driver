@@ -230,7 +230,7 @@ static int usblp_open(struct inode *inode, struct file *file)
 		goto out;
 	}
 #else
-	retval = 0;	
+	retval = 0;
 #endif
 
 	usblp->used = 1;
@@ -242,7 +242,11 @@ static int usblp_open(struct inode *inode, struct file *file)
 	if (usblp->bidir) {
 		usblp->readcount = 0;
 		usblp->readurb.dev = usblp->dev;
-		usb_submit_urb(&usblp->readurb);
+		if (usb_submit_urb(&usblp->readurb) < 0) {
+			retval = -EIO;
+			usblp->used = 0;
+			file->private_data = NULL;
+		}
 	}
 out:
 	unlock_kernel();
@@ -299,7 +303,7 @@ static int usblp_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	}
 
 	if (_IOC_TYPE(cmd) == 'P')	/* new-style ioctl number */
-	
+
 		switch (_IOC_NR(cmd)) {
 
 			case IOCNR_GET_DEVICE_ID: /* get the DEVICE_ID string */
@@ -658,7 +662,7 @@ static void *usblp_probe(struct usb_device *dev, unsigned int ifnum,
 #endif
 
 	sprintf(name, "lp%d", minor);
-	
+
 	/* if we have devfs, create with perms=660 */
 	usblp->devfs = devfs_register(usb_devfs_handle, name,
 				      DEVFS_FL_DEFAULT, USB_MAJOR,
@@ -681,8 +685,11 @@ static void usblp_disconnect(struct usb_device *dev, void *ptr)
 		BUG ();
 	}
 
+
 	down (&usblp->sem);
+	lock_kernel();
 	usblp->dev = NULL;
+	unlock_kernel();
 
 	usb_unlink_urb(&usblp->writeurb);
 	if (usblp->bidir)

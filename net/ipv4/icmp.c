@@ -3,7 +3,7 @@
  *	
  *		Alan Cox, <alan@redhat.com>
  *
- *	Version: $Id: icmp.c,v 1.79 2001/08/03 22:20:39 davem Exp $
+ *	Version: $Id: icmp.c,v 1.80 2001/08/22 20:38:41 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License
@@ -16,6 +16,9 @@
  *	Other than that this module is a complete rewrite.
  *
  *	Fixes:
+ *	Clemens Fruhwirth	:	introduce global icmp rate limiting
+ *					with icmp type masking ability instead
+ *					of broken per type icmp timeouts.
  *		Mike Shaver	:	RFC1122 checks.
  *		Alan Cox	:	Multicast ping reply as self.
  *		Alan Cox	:	Fix atomicity lockup in ip_build_xmit 
@@ -143,6 +146,21 @@ int sysctl_icmp_echo_ignore_broadcasts;
 /* Control parameter - ignore bogus broadcast responses? */
 int sysctl_icmp_ignore_bogus_error_responses;
 
+/* 
+ * 	Configurable global rate limit.
+ *
+ *	ratelimit defines tokens/packet consumed for dst->rate_token bucket
+ *	ratemask defines which icmp types are ratelimited by setting
+ * 	it's bit position.
+ *
+ *	default: 
+ *	dest unreachable (0x03), source quench (0x04),
+ *	time exceeded (0x11), parameter problem (0x12)
+ */
+
+int sysctl_icmp_ratelimit = 1*HZ;
+int sysctl_icmp_ratemask = 0x1818;
+
 /*
  *	ICMP control array. This specifies what to do with each ICMP.
  */
@@ -153,7 +171,6 @@ struct icmp_control
 	unsigned long *input;		/* Address to increment on input */
 	void (*handler)(struct sk_buff *skb);
 	short	error;		/* This ICMP is classed as an error message */
-	int *timeout; /* Rate limit */
 };
 
 static struct icmp_control icmp_pointers[NR_ICMP_TYPES+1];
@@ -221,11 +238,6 @@ static __inline__ void icmp_xmit_unlock(void)
  *	Note that the same dst_entry fields are modified by functions in 
  *	route.c too, but these work for packet destinations while xrlim_allow
  *	works for icmp destinations. This means the rate limiting information
- *	for one "ip object" is shared.
- *
- *	Note that the same dst_entry fields are modified by functions in 
- *	route.c too, but these work for packet destinations while xrlim_allow
- *	works for icmp destinations. This means the rate limiting information
  *	for one "ip object" is shared - and these ICMPs are twice limited:
  *	by source and by destination.
  *
@@ -238,15 +250,12 @@ static __inline__ void icmp_xmit_unlock(void)
 int xrlim_allow(struct dst_entry *dst, int timeout)
 {
 	unsigned long now;
-	static int burst = HZ;
 
 	now = jiffies;
 	dst->rate_tokens += now - dst->rate_last;
 	dst->rate_last = now;
-	if (burst < XRLIM_BURST_FACTOR*timeout)
-		burst = XRLIM_BURST_FACTOR*timeout;
-	if (dst->rate_tokens > burst)
-		dst->rate_tokens = burst;
+	if (dst->rate_tokens > XRLIM_BURST_FACTOR*timeout)
+        	dst->rate_tokens = XRLIM_BURST_FACTOR*timeout;
 	if (dst->rate_tokens >= timeout) {
 		dst->rate_tokens -= timeout;
 		return 1;
@@ -258,22 +267,22 @@ static inline int icmpv4_xrlim_allow(struct rtable *rt, int type, int code)
 {
 	struct dst_entry *dst = &rt->u.dst; 
 
-	if (type > NR_ICMP_TYPES || !icmp_pointers[type].timeout)
+	if (type > NR_ICMP_TYPES)
 		return 1;
 
 	/* Don't limit PMTU discovery. */
 	if (type == ICMP_DEST_UNREACH && code == ICMP_FRAG_NEEDED)
 		return 1;
 
-	/* Redirect has its own rate limit mechanism */
-	if (type == ICMP_REDIRECT)
-		return 1;
-
 	/* No rate limit on loopback */
 	if (dst->dev && (dst->dev->flags&IFF_LOOPBACK))
  		return 1;
 
-	return xrlim_allow(dst, *(icmp_pointers[type].timeout));
+	/* Limit if icmp type is enabled in ratemask. */
+	if((1 << type) & sysctl_icmp_ratemask)
+		return xrlim_allow(dst, sysctl_icmp_ratelimit);
+	else
+		return 1;
 }
 
 /*
@@ -929,57 +938,43 @@ error:
 	goto drop;
 }
 
-
-/* 
- * 	Configurable rate limits.
- *	Someone should check if these default values are correct.
- *	Note that these values interact with the routing cache GC timeout.
- *	If you chose them too high they won't take effect, because the
- *	dst_entry gets expired too early. The same should happen when
- *	the cache grows too big.
- */
-int sysctl_icmp_destunreach_time = 1*HZ;
-int sysctl_icmp_timeexceed_time = 1*HZ;
-int sysctl_icmp_paramprob_time = 1*HZ;
-int sysctl_icmp_echoreply_time; /* don't limit it per default. */
-
 /*
  *	This table is the definition of how we handle ICMP.
  */
  
 static struct icmp_control icmp_pointers[NR_ICMP_TYPES+1] = {
 /* ECHO REPLY (0) */
- { &icmp_statistics[0].IcmpOutEchoReps, &icmp_statistics[0].IcmpInEchoReps, icmp_discard, 0, &sysctl_icmp_echoreply_time},
- { &icmp_statistics[0].dummy, &icmp_statistics[0].IcmpInErrors, icmp_discard, 1, },
- { &icmp_statistics[0].dummy, &icmp_statistics[0].IcmpInErrors, icmp_discard, 1, },
+ { &icmp_statistics[0].IcmpOutEchoReps, &icmp_statistics[0].IcmpInEchoReps, icmp_discard, 0 },
+ { &icmp_statistics[0].dummy, &icmp_statistics[0].IcmpInErrors, icmp_discard, 1 },
+ { &icmp_statistics[0].dummy, &icmp_statistics[0].IcmpInErrors, icmp_discard, 1 },
 /* DEST UNREACH (3) */
- { &icmp_statistics[0].IcmpOutDestUnreachs, &icmp_statistics[0].IcmpInDestUnreachs, icmp_unreach, 1, &sysctl_icmp_destunreach_time },
+ { &icmp_statistics[0].IcmpOutDestUnreachs, &icmp_statistics[0].IcmpInDestUnreachs, icmp_unreach, 1 },
 /* SOURCE QUENCH (4) */
- { &icmp_statistics[0].IcmpOutSrcQuenchs, &icmp_statistics[0].IcmpInSrcQuenchs, icmp_unreach, 1, },
+ { &icmp_statistics[0].IcmpOutSrcQuenchs, &icmp_statistics[0].IcmpInSrcQuenchs, icmp_unreach, 1 },
 /* REDIRECT (5) */
- { &icmp_statistics[0].IcmpOutRedirects, &icmp_statistics[0].IcmpInRedirects, icmp_redirect, 1, },
- { &icmp_statistics[0].dummy, &icmp_statistics[0].IcmpInErrors, icmp_discard, 1, },
- { &icmp_statistics[0].dummy, &icmp_statistics[0].IcmpInErrors, icmp_discard, 1, },
+ { &icmp_statistics[0].IcmpOutRedirects, &icmp_statistics[0].IcmpInRedirects, icmp_redirect, 1 },
+ { &icmp_statistics[0].dummy, &icmp_statistics[0].IcmpInErrors, icmp_discard, 1 },
+ { &icmp_statistics[0].dummy, &icmp_statistics[0].IcmpInErrors, icmp_discard, 1 },
 /* ECHO (8) */
- { &icmp_statistics[0].IcmpOutEchos, &icmp_statistics[0].IcmpInEchos, icmp_echo, 0, },
- { &icmp_statistics[0].dummy, &icmp_statistics[0].IcmpInErrors, icmp_discard, 1, },
- { &icmp_statistics[0].dummy, &icmp_statistics[0].IcmpInErrors, icmp_discard, 1, },
+ { &icmp_statistics[0].IcmpOutEchos, &icmp_statistics[0].IcmpInEchos, icmp_echo, 0 },
+ { &icmp_statistics[0].dummy, &icmp_statistics[0].IcmpInErrors, icmp_discard, 1 },
+ { &icmp_statistics[0].dummy, &icmp_statistics[0].IcmpInErrors, icmp_discard, 1 },
 /* TIME EXCEEDED (11) */
- { &icmp_statistics[0].IcmpOutTimeExcds, &icmp_statistics[0].IcmpInTimeExcds, icmp_unreach, 1, &sysctl_icmp_timeexceed_time },
+ { &icmp_statistics[0].IcmpOutTimeExcds, &icmp_statistics[0].IcmpInTimeExcds, icmp_unreach, 1 },
 /* PARAMETER PROBLEM (12) */
- { &icmp_statistics[0].IcmpOutParmProbs, &icmp_statistics[0].IcmpInParmProbs, icmp_unreach, 1, &sysctl_icmp_paramprob_time },
+ { &icmp_statistics[0].IcmpOutParmProbs, &icmp_statistics[0].IcmpInParmProbs, icmp_unreach, 1 },
 /* TIMESTAMP (13) */
- { &icmp_statistics[0].IcmpOutTimestamps, &icmp_statistics[0].IcmpInTimestamps, icmp_timestamp, 0,  },
+ { &icmp_statistics[0].IcmpOutTimestamps, &icmp_statistics[0].IcmpInTimestamps, icmp_timestamp, 0  },
 /* TIMESTAMP REPLY (14) */
- { &icmp_statistics[0].IcmpOutTimestampReps, &icmp_statistics[0].IcmpInTimestampReps, icmp_discard, 0, },
+ { &icmp_statistics[0].IcmpOutTimestampReps, &icmp_statistics[0].IcmpInTimestampReps, icmp_discard, 0 },
 /* INFO (15) */
- { &icmp_statistics[0].dummy, &icmp_statistics[0].dummy, icmp_discard, 0, },
+ { &icmp_statistics[0].dummy, &icmp_statistics[0].dummy, icmp_discard, 0 },
 /* INFO REPLY (16) */
- { &icmp_statistics[0].dummy, &icmp_statistics[0].dummy, icmp_discard, 0, },
+ { &icmp_statistics[0].dummy, &icmp_statistics[0].dummy, icmp_discard, 0 },
 /* ADDR MASK (17) */
- { &icmp_statistics[0].IcmpOutAddrMasks, &icmp_statistics[0].IcmpInAddrMasks, icmp_address, 0,  },
+ { &icmp_statistics[0].IcmpOutAddrMasks, &icmp_statistics[0].IcmpInAddrMasks, icmp_address, 0  },
 /* ADDR MASK REPLY (18) */
- { &icmp_statistics[0].IcmpOutAddrMaskReps, &icmp_statistics[0].IcmpInAddrMaskReps, icmp_address_reply, 0, }
+ { &icmp_statistics[0].IcmpOutAddrMaskReps, &icmp_statistics[0].IcmpInAddrMaskReps, icmp_address_reply, 0 }
 };
 
 void __init icmp_init(struct net_proto_family *ops)

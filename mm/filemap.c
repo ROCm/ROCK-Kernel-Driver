@@ -2541,6 +2541,7 @@ generic_file_write(struct file *file,const char *buf,size_t count,loff_t *ppos)
 
 	while (count) {
 		unsigned long index, offset;
+		long page_fault;
 		char *kaddr;
 
 		/*
@@ -2574,15 +2575,15 @@ generic_file_write(struct file *file,const char *buf,size_t count,loff_t *ppos)
 			PAGE_BUG(page);
 		}
 
+		kaddr = kmap(page);
 		status = mapping->a_ops->prepare_write(file, page, offset, offset+bytes);
 		if (status)
 			goto unlock;
-		kaddr = page_address(page);
-		status = __copy_from_user(kaddr+offset, buf, bytes);
+		page_fault = __copy_from_user(kaddr+offset, buf, bytes);
 		flush_dcache_page(page);
-		if (status)
-			goto fail_write;
 		status = mapping->a_ops->commit_write(file, page, offset, offset+bytes);
+		if (page_fault)
+			goto fail_write;
 		if (!status)
 			status = bytes;
 
@@ -2593,6 +2594,7 @@ generic_file_write(struct file *file,const char *buf,size_t count,loff_t *ppos)
 			buf += status;
 		}
 unlock:
+		kunmap(page);
 		/* Mark it unlocked again and drop the page.. */
 		UnlockPage(page);
 		check_used_once(page);
@@ -2618,8 +2620,6 @@ out:
 	return err;
 fail_write:
 	status = -EFAULT;
-	ClearPageUptodate(page);
-	kunmap(page);
 	goto unlock;
 }
 

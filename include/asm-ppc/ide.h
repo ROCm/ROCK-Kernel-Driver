@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.ide.h 1.10 05/17/01 18:14:24 cort
+ * BK Id: SCCS/s.ide.h 1.13 08/20/01 15:25:16 paulus
  */
 /*
  *  linux/include/asm-ppc/ide.h
@@ -29,22 +29,9 @@
 #include <linux/ioport.h>
 #include <asm/io.h>
 
-extern int pmac_ide_ports_known;
-extern ide_ioreg_t pmac_ide_regbase[MAX_HWIFS];
-extern int pmac_ide_irq[MAX_HWIFS];
-extern void pmac_ide_probe(void);
-
-extern int chrp_ide_ports_known;
-extern ide_ioreg_t chrp_ide_regbase[MAX_HWIFS];
-extern ide_ioreg_t chrp_idedma_regbase; /* one for both channels */
-extern unsigned int chrp_ide_irq;
-extern void chrp_ide_probe(void);
-
 extern void ppc_generic_ide_fix_driveid(struct hd_driveid *id);
 
 struct ide_machdep_calls {
-        void        (*insw)(ide_ioreg_t port, void *buf, int ns);
-        void        (*outsw)(ide_ioreg_t port, void *buf, int ns);
         int         (*default_irq)(ide_ioreg_t base);
         ide_ioreg_t (*default_io_base)(int index);
         int         (*ide_check_region)(ide_ioreg_t from, unsigned int extent);
@@ -53,30 +40,16 @@ struct ide_machdep_calls {
                                       const char *name);
         void        (*ide_release_region)(ide_ioreg_t from,
                                       unsigned int extent);
-        void        (*fix_driveid)(struct hd_driveid *id);
         void        (*ide_init_hwif)(hw_regs_t *hw,
                                      ide_ioreg_t data_port,
                                      ide_ioreg_t ctrl_port,
                                      int *irq);
-
-        int io_base;
 };
 
 extern struct ide_machdep_calls ppc_ide_md;
 
-void ide_insw(ide_ioreg_t port, void *buf, int ns);
-void ide_outsw(ide_ioreg_t port, void *buf, int ns);
 void ppc_generic_ide_fix_driveid(struct hd_driveid *id);
-
-#undef insw
-#define insw(port, buf, ns) 	do {				\
-	ppc_ide_md.insw((port), (buf), (ns));			\
-} while (0)
-     
-#undef outsw
-#define outsw(port, buf, ns) 	do {				\
-	ppc_ide_md.outsw((port), (buf), (ns));			\
-} while (0)
+#define ide_fix_driveid(id)	ppc_generic_ide_fix_driveid((id))
 
 #undef	SUPPORT_SLOW_DATA_PORTS
 #define	SUPPORT_SLOW_DATA_PORTS	0
@@ -87,10 +60,9 @@ void ppc_generic_ide_fix_driveid(struct hd_driveid *id);
 
 static __inline__ int ide_default_irq(ide_ioreg_t base)
 {
-	if ( ppc_ide_md.default_irq )
+	if (ppc_ide_md.default_irq)
 		return ppc_ide_md.default_irq(base);
-	else
-		return -1;
+	return 0;
 }
 
 static __inline__ ide_ioreg_t ide_default_io_base(int index)
@@ -100,7 +72,7 @@ static __inline__ ide_ioreg_t ide_default_io_base(int index)
 	return 0;
 }
 
-static __inline__ void  ide_init_hwif_ports(hw_regs_t *hw,
+static __inline__ void ide_init_hwif_ports(hw_regs_t *hw,
 					   ide_ioreg_t data_port,
 					   ide_ioreg_t ctrl_port, int *irq)
 {
@@ -135,20 +107,14 @@ static __inline__ int ide_check_region (ide_ioreg_t from, unsigned int extent)
 
 static __inline__ void ide_request_region (ide_ioreg_t from, unsigned int extent, const char *name)
 {
-	if ( ppc_ide_md.ide_request_region )
+	if (ppc_ide_md.ide_request_region)
 		ppc_ide_md.ide_request_region(from, extent, name);
 }
 
 static __inline__ void ide_release_region (ide_ioreg_t from, unsigned int extent)
 {
-	if ( ppc_ide_md.ide_release_region )
+	if (ppc_ide_md.ide_release_region)
 		ppc_ide_md.ide_release_region(from, extent);
-}
-
-static __inline__ void ide_fix_driveid (struct hd_driveid *id)
-{
-        if ( ppc_ide_md.fix_driveid )
-		ppc_ide_md.fix_driveid(id);
 }
 
 typedef union {

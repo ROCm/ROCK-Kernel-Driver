@@ -45,67 +45,22 @@ static char* part_names[] = {   [ibm_partition_lnx1] = "LNX1",
 static int
 get_drive_geometry(int kdev,struct hd_geometry *geo) 
 {
-	int rc = 0;
-	mm_segment_t old_fs;
-	struct file *filp;
-	struct inode *inode;
-        /* find out offset of volume label (partn table) */
-        filp = (struct file *)kmalloc (sizeof(struct file),GFP_KERNEL);
-        if ( filp == NULL ) {
-                printk (KERN_WARNING __FILE__ " ibm_partition: kmalloc failed fo
-r filp\n");
-                return -ENOMEM;
-        }
-        memset(filp,0,sizeof(struct file));
-        filp ->f_mode = 1; /* read only */
-        inode = get_empty_inode();
-	if ( inode == NULL )
-		return -ENOMEM;
-        inode -> i_rdev = kdev;
-	inode -> i_bdev = bdget(kdev_t_to_nr(kdev));
-	rc = blkdev_open(inode,filp);
-        if ( rc == 0 ) {
-		old_fs=get_fs();
-		set_fs(KERNEL_DS);
-		rc = inode-> i_bdev -> bd_op->ioctl (inode, filp, HDIO_GETGEO, 
-						     (unsigned long)(geo))
-			;
-		set_fs(old_fs);
-	}
-	blkdev_put(inode->i_bdev,BDEV_FILE);
+	struct block_device *bdev = bdget(kdev_t_to_nr(kdev));
+	int rc = blkdev_get(bdev, 0, 1, BDEV_FILE);
+        if ( rc == 0 )
+		rc = ioctl_by_bdev(bdev, HDIO_GETGEO, (unsigned long)geo);
+	blkdev_put(bdev,BDEV_FILE);
 	return rc;
 }
 
 static int
 get_drive_info(int kdev,dasd_information_t *info) 
 {
-	int rc = 0;
-	mm_segment_t old_fs;
-	struct file *filp;
-	struct inode *inode;
-        /* find out offset of volume label (partn table) */
-        filp = (struct file *)kmalloc (sizeof(struct file),GFP_KERNEL);
-        if ( filp == NULL ) {
-                printk (KERN_WARNING __FILE__ " ibm_partition: kmalloc failed fo
-r filp\n");
-                return -ENOMEM;
-        }
-        memset(filp,0,sizeof(struct file));
-        filp ->f_mode = 1; /* read only */
-        inode = get_empty_inode();
-	if ( inode == NULL )
-		return -ENOMEM;
-        inode -> i_rdev = kdev;
-	inode -> i_bdev = bdget(kdev_t_to_nr(kdev));
-        rc = blkdev_open(inode,filp);
-        if ( rc == 0 ) {
-		old_fs=get_fs();
-		set_fs(KERNEL_DS);
-		rc = inode-> i_bdev -> bd_op->ioctl (inode, filp, BIODASDINFO, 
-						     (unsigned long)(info));
-		set_fs(old_fs);
-	}
-	blkdev_put(inode->i_bdev,BDEV_FILE);
+	struct block_device *bdev = bdget(kdev_t_to_nr(kdev));
+	int rc = blkdev_get(bdev, 0, 1, BDEV_FILE);
+        if ( rc == 0 )
+		rc = ioctl_by_bdev(bdev, BIODASDINFO, (unsigned long)(info));
+	blkdev_put(bdev,BDEV_FILE);
 	return rc;
 }
 

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.smp.h 1.9 05/17/01 18:14:25 cort
+ * BK Id: SCCS/s.smp.h 1.12 08/16/01 07:49:31 paulus
  */
 /* smp.h: PPC specific SMP stuff.
  *
@@ -32,12 +32,14 @@ extern struct cpuinfo_PPC cpu_data[NR_CPUS];
 extern unsigned long cpu_online_map;
 extern unsigned long smp_proc_in_lock[NR_CPUS];
 extern volatile unsigned long cpu_callin_map[NR_CPUS];
+extern int smp_tb_synchronized;
 
 extern void smp_store_cpu_info(int id);
 extern void smp_send_tlb_invalidate(int);
 extern void smp_send_xmon_break(int cpu);
 struct pt_regs;
 extern void smp_message_recv(int, struct pt_regs *);
+extern void smp_local_timer_interrupt(struct pt_regs *);
 
 #define NO_PROC_ID		0xFF            /* No processor magic marker */
 #define PROC_CHANGE_PENALTY	20

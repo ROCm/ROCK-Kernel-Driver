@@ -11673,6 +11673,23 @@ CONFIG_USB_DABUSB
   The module will be called dabusb.o. If you want to compile it as a
   module, say M here and read Documentation/modules.txt.
 
+Host-to-Host USB networking
+CONFIG_USB_USBNET
+  This driver supports network links over USB with USB "Network"
+  or "data transfer" cables, often used to network laptops to PCs.
+  Such cables have chips from suppliers such as NetChip and Prolific.
+  Intelligent USB devices could also use this approach to provide
+  Internet access, using standard USB cabling.
+
+  These links will have names like "usb0", "usb1", etc.  They act
+  like two-node Ethernets, so you can use 802.1d Ethernet Bridging
+  (CONFIG_BRIDGE) to simplify your network routing.
+
+  This code is also available as a kernel module (code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called usbnet.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
 PLUSB driver
 CONFIG_USB_PLUSB
   A driver for the Prolific PL-2302 USB-to-USB network device. This
@@ -17060,11 +17077,75 @@ Machine Type
 CONFIG_ALL_PPC
   Linux currently supports several different kinds of PowerPC-based
   machines: Apple Power Macintoshes and clones (such as the Motorola
-  Starmax series), PReP (PowerPC Reference Platform) machines such as
-  the Motorola PowerStack, CHRP (Common Hardware Reference Platform), 
-  the embedded MBX boards from Motorola and many others. Currently, 
-  the default option is to build a kernel which works on the first 
-  three.  Support for other machines is currently incomplete.
+  Starmax series), PReP (PowerPC Reference Platform) machines (such
+  as the Motorola PowerStacks, Motorola cPCI/VME embedded systems,
+  and some IBM RS/6000 systems), CHRP (Common Hardware Reference
+  Platform), and several embedded PowerPC systems containing 4xx, 6xx,
+  7xx, 8xx, 74xx, and 82xx processors.  Currently, the default option
+  is to build a kernel which works on the first three. 
+
+AltiVec Kernel Support
+CONFIG_ALTIVEC
+  This option enables kernel support for the Altivec extensions to the
+  PowerPC processor. The kernel currently supports saving and restoring
+  altivec registers, and turning on the 'altivec enable' bit so user
+  processes can execute altivec instructions.
+
+  This option is only usefully if you have a processor that supports 
+  altivec (G4, otherwise known as 74xx series), but does not have
+  any affect on a non-altivec cpu (it does, however add code to the
+  kernel).
+
+  If in doubt, say Y here.
+
+Thermal Management Support
+CONFIG_TAU
+  G3 and G4 processors have an on-chip temperature sensor called the
+  'Thermal Assist Unit (TAU)', which, in theory, can measure the on-die
+  temperature within 2-4 degrees celcius. This option shows the current
+  on-die temperature in /proc/cpuinfo if the cpu supports it.
+
+  Unfortunately, on some chip revisions, this sensor is very inaccurate
+  and in some cases, does not work at all, so don't assume the cpu
+  temp is actually what /proc/cpuinfo says it is.
+
+Interrupt driven TAU driver
+CONFIG_TAU_INT
+  The TAU supports an interrupt driven mode which causes an interrupt
+  whenever the temperature goes out of range. This is the fastest way
+  to get notified the temp has exceeded a range. With this option off,
+  a timer is used to re-check the temperature periodically.
+
+  However, on some cpus it appears that the TAU interrupt hardware
+  is buggy and can cause a situation which would lead unexplained hard
+  lockups.
+
+  Unless you are extending the TAU driver, or enjoy kernel/hardware
+  debugging, leave this option off.
+
+Average high and low temp
+CONFIG_TAU_AVERAGE
+  The TAU hardware can compare the temperature to an upper and lower bound.
+  The default behavior is to show both the upper and lower bound in 
+  /proc/cpuinfo. If the range is large, the temperature is either changing
+  a lot, or the TAU hardware is broken (likely on some G4's). If the range
+  is small (around 4 degrees), the temperature is relatively stable.
+
+Support for CUDA based PowerMacs
+CONFIG_ADB_CUDA
+  This provides support for CUDA based Power Macintosh systems.  This
+  includes most OldWorld PowerMacs, the first generation iMacs, the
+  Blue&White G3 and the Yikes G4 (PCI Graphics).  All later models
+  should use CONFIG_ADB_PMU instead.
+
+  If unsure say Y.
+
+Support for PMU based PowerMacs
+CONFIG_ADB_PMU
+  This provides support for PMU based Power Macintosh systems.  This
+  includes all PowerBooks and all AGP-based machines.
+  
+  If unsure say Y.
 
 Power management support for PowerBooks
 CONFIG_PMAC_PBOOK
@@ -17081,13 +17162,6 @@ CONFIG_PMAC_PBOOK
   You may also want to compile the dma sound driver as a module and
   have it autoloaded. The act of removing the module shuts down the
   sound hardware for more power savings.
-
-Mac-on-Linux support
-CONFIG_MOL
-  This option enables low-level support for Mac-on-Linux.
-  MOL lets you run MacOS and Linux simultaneously. Please
-  visit <http://www.maconlinux.org> for more information.
-  If unsure, say Y.
 
 ADB raw keycode support
 CONFIG_MAC_ADBKEYCODES

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.gemini_setup.c 1.7 05/17/01 18:14:21 cort
+ * BK Id: SCCS/s.gemini_setup.c 1.11 08/20/01 14:34:41 paulus
  */
 /*
  *  linux/arch/ppc/kernel/setup.c
@@ -53,17 +53,6 @@ static unsigned int cpu_7xx[16] = {
 static unsigned int cpu_6xx[16] = {
 	0, 0, 14, 0, 0, 13, 5, 9, 6, 11, 8, 10, 0, 12, 7, 0
 };
-
-int chrp_get_irq(struct pt_regs *);
-void chrp_post_irq(struct pt_regs* regs, int);
-
-static inline unsigned long _get_HID1(void)
-{
-	unsigned long val;
-
-	__asm__ __volatile__("mfspr %0,1009" : "=r" (val));
-	return val;
-}
 
 /*
  * prom_init is the Gemini version of prom.c:prom_init.  We only need
@@ -208,10 +197,11 @@ void __init gemini_setup_arch(void)
 int
 gemini_get_clock_speed(void)
 {
-	unsigned long hid1, pvr = _get_PVR();
+	unsigned long hid1, pvr;
 	int clock;
 
-	hid1 = (_get_HID1() >> 28) & 0xf;
+	pvr = mfspr(PVR);
+	hid1 = (mfspr(HID1) >> 28) & 0xf;
 	if (PVR_VER(pvr) == 8 ||
 	    PVR_VER(pvr) == 12)
 		hid1 = cpu_7xx[hid1];
@@ -241,11 +231,12 @@ void __init gemini_init_l2(void)
 {
         unsigned char reg, brev, fam, creg;
         unsigned long cache;
-        unsigned long pvr = _get_PVR();
+        unsigned long pvr;
 
         reg = readb(GEMINI_L2CFG);
         brev = readb(GEMINI_BREV);
         fam = readb(GEMINI_FEAT);
+        pvr = mfspr(PVR);
 
         switch(PVR_VER(pvr)) {
 
@@ -486,11 +477,60 @@ unsigned long __init gemini_find_end_of_memory(void)
 	return total;
 }
 
-void __init gemini_init(unsigned long r3, unsigned long r4, unsigned long r5,
-			unsigned long r6, unsigned long r7)
+static void __init
+gemini_map_io(void)
+{
+	io_block_mapping(0xf0000000, 0xf0000000, 0x10000000, _PAGE_IO);
+	io_block_mapping(0x80000000, 0x80000000, 0x10000000, _PAGE_IO);
+}
+
+#ifdef CONFIG_SMP
+static int
+smp_gemini_probe(void)
+{
+	int i, nr;
+
+        nr = (readb(GEMINI_CPUSTAT) & GEMINI_CPU_COUNT_MASK) >> 2;
+	if (nr == 0)
+		nr = 4;
+
+	if (nr > 1) {
+		openpic_request_IPIs();
+		for (i = 1; i < nr; ++i)
+			smp_hw_index[i] = i;
+	}
+
+	return nr;
+}
+
+static void
+smp_gemini_kick_cpu(int nr)
+{
+	openpic_init_processor( 1<<nr );
+	openpic_init_processor( 0 );
+}
+
+static void
+smp_gemini_setup_cpu(int cpu_nr)
+{
+	if (OpenPIC_Addr)
+		do_openpic_setup_cpu();
+	if (cpu_nr > 0)
+		gemini_init_l2();
+}
+
+static struct smp_ops_t gemini_smp_ops = {
+	smp_openpic_message_pass,
+	smp_gemini_probe,
+	smp_gemini_kick_cpu,
+	smp_gemini_setup_cpu,
+};
+#endif /* CONFIG_SMP */
+
+void __init platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
+			  unsigned long r6, unsigned long r7)
 {
 	int i;
-	int chrp_get_irq( struct pt_regs * );
 
 	for(i = 0; i < GEMINI_LEDS; i++)
 		gemini_led_off(i);
@@ -525,6 +565,7 @@ void __init gemini_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.calibrate_decr = gemini_calibrate_decr;
 
 	ppc_md.find_end_of_memory = gemini_find_end_of_memory;
+	ppc_md.setup_io_mappings = gemini_map_io;
 
 	/* no keyboard/mouse/video stuff yet.. */
 	ppc_md.kbd_setkeycode = NULL;
@@ -537,4 +578,8 @@ void __init gemini_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.ppc_kbd_sysrq_xlate = NULL;
 #endif
 	ppc_md.pcibios_fixup_bus = gemini_pcibios_fixup;
+
+#ifdef CONFIG_SMP
+	ppc_md.smp_ops = &gemini_smp_ops;
+#endif /* CONFIG_SMP */
 }

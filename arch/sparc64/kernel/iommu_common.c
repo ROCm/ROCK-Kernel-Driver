@@ -1,4 +1,4 @@
-/* $Id: iommu_common.c,v 1.4 2000/06/04 21:50:23 anton Exp $
+/* $Id: iommu_common.c,v 1.5 2001/08/24 17:57:51 kanoj Exp $
  * iommu_common.c: UltraSparc SBUS/PCI common iommu code.
  *
  * Copyright (C) 1999 David S. Miller (davem@redhat.com)
@@ -36,12 +36,12 @@ int verify_lengths(struct scatterlist *sg, int nents, int npages)
 		unsigned long start, end;
 
 		start = sg[i].dvma_address;
-		start = start & PAGE_MASK;
+		start = start & IO_PAGE_MASK;
 
 		end = sg[i].dvma_address + sg[i].dvma_length;
-		end = (end + (PAGE_SIZE - 1)) & PAGE_MASK;
+		end = (end + (IO_PAGE_SIZE - 1)) & IO_PAGE_MASK;
 
-		pgcount += ((end - start) >> PAGE_SHIFT);
+		pgcount += ((end - start) >> IO_PAGE_SHIFT);
 	}
 
 	if (pgcount != npages) {
@@ -70,7 +70,7 @@ int verify_one_map(struct scatterlist *dma_sg, struct scatterlist **__sg, int ne
 		unsigned long paddr;
 
 		/* SG and DMA_SG must begin at the same sub-page boundary. */
-		if ((sgaddr & ~PAGE_MASK) != (daddr & ~PAGE_MASK)) {
+		if ((sgaddr & ~IO_PAGE_MASK) != (daddr & ~IO_PAGE_MASK)) {
 			printk("verify_one_map: Wrong start offset "
 			       "sg[%08lx] dma[%08x]\n",
 			       sgaddr, daddr);
@@ -80,10 +80,10 @@ int verify_one_map(struct scatterlist *dma_sg, struct scatterlist **__sg, int ne
 
 		/* Verify the IOPTE points to the right page. */
 		paddr = iopte_val(*iopte) & IOPTE_PAGE;
-		if ((paddr + PAGE_OFFSET) != (sgaddr & PAGE_MASK)) {
+		if ((paddr + PAGE_OFFSET) != (sgaddr & IO_PAGE_MASK)) {
 			printk("verify_one_map: IOPTE[%08lx] maps the "
 			       "wrong page, should be [%08lx]\n",
-			       iopte_val(*iopte), (sgaddr & PAGE_MASK) - PAGE_OFFSET);
+			       iopte_val(*iopte), (sgaddr & IO_PAGE_MASK) - PAGE_OFFSET);
 			nents = -1;
 			goto out;
 		}
@@ -91,10 +91,10 @@ int verify_one_map(struct scatterlist *dma_sg, struct scatterlist **__sg, int ne
 		/* If this SG crosses a page, adjust to that next page
 		 * boundary and loop.
 		 */
-		if ((sgaddr & PAGE_MASK) ^ ((sgaddr + sglen - 1) & PAGE_MASK)) {
+		if ((sgaddr & IO_PAGE_MASK) ^ ((sgaddr + sglen - 1) & IO_PAGE_MASK)) {
 			unsigned long next_page, diff;
 
-			next_page = (sgaddr + PAGE_SIZE) & PAGE_MASK;
+			next_page = (sgaddr + IO_PAGE_SIZE) & IO_PAGE_MASK;
 			diff = next_page - sgaddr;
 			sgaddr += diff;
 			daddr += diff;
@@ -109,7 +109,7 @@ int verify_one_map(struct scatterlist *dma_sg, struct scatterlist **__sg, int ne
 		daddr += sglen;
 		dlen -= sglen;
 
-		if (dlen > 0 && ((daddr & ~PAGE_MASK) == 0))
+		if (dlen > 0 && ((daddr & ~IO_PAGE_MASK) == 0))
 			iopte++;
 
 		sg++;
@@ -175,7 +175,7 @@ void verify_sglist(struct scatterlist *sg, int nents, iopte_t *iopte, int npages
 		int i;
 
 		printk("verify_sglist: Crap, messed up mappings, dumping, iodma at %08x.\n",
-		       (u32) (sg->dvma_address & PAGE_MASK));
+		       (u32) (sg->dvma_address & IO_PAGE_MASK));
 		for (i = 0; i < nents; i++) {
 			printk("sg(%d): address(%p) length(%x) "
 			       "dma_address[%08x] dma_length[%08x]\n",
@@ -189,13 +189,6 @@ void verify_sglist(struct scatterlist *sg, int nents, iopte_t *iopte, int npages
 }
 #endif
 
-/* Two addresses are "virtually contiguous" if and only if:
- * 1) They are equal, or...
- * 2) They are both on a page boundry
- */
-#define VCONTIG(__X, __Y)	(((__X) == (__Y)) || \
-				 (((__X) | (__Y)) << (64UL - PAGE_SHIFT)) == 0UL)
-
 unsigned long prepare_sg(struct scatterlist *sg, int nents)
 {
 	struct scatterlist *dma_sg = sg;
@@ -204,7 +197,7 @@ unsigned long prepare_sg(struct scatterlist *sg, int nents)
 
 	prev  = (unsigned long) sg->address;
 	prev += (unsigned long) (dent_len = sg->length);
-	dent_addr = (u32) ((unsigned long)sg->address & (PAGE_SIZE - 1UL));
+	dent_addr = (u32) ((unsigned long)sg->address & (IO_PAGE_SIZE - 1UL));
 	while (--nents) {
 		unsigned long addr;
 
@@ -217,9 +210,9 @@ unsigned long prepare_sg(struct scatterlist *sg, int nents)
 
 			dent_addr = ((dent_addr +
 				      dent_len +
-				      (PAGE_SIZE - 1UL)) >> PAGE_SHIFT);
-			dent_addr <<= PAGE_SHIFT;
-			dent_addr += addr & (PAGE_SIZE - 1UL);
+				      (IO_PAGE_SIZE - 1UL)) >> IO_PAGE_SHIFT);
+			dent_addr <<= IO_PAGE_SHIFT;
+			dent_addr += addr & (IO_PAGE_SIZE - 1UL);
 			dent_len = 0;
 		}
 		dent_len += sg->length;
@@ -230,5 +223,5 @@ unsigned long prepare_sg(struct scatterlist *sg, int nents)
 
 	return ((unsigned long) dent_addr +
 		(unsigned long) dent_len +
-		(PAGE_SIZE - 1UL)) >> PAGE_SHIFT;
+		(IO_PAGE_SIZE - 1UL)) >> IO_PAGE_SHIFT;
 }

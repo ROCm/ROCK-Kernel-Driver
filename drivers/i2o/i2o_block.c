@@ -1195,9 +1195,6 @@ static int i2ob_release(struct inode *inode, struct file *file)
 	if(!dev->i2odev)
 		return 0;
 
-	/* Sync the device so we don't get errors */
-	fsync_dev(inode->i_rdev);
-
 	if (dev->refcnt <= 0)
 		printk(KERN_ALERT "i2ob_release: refcount(%d) <= 0\n", dev->refcnt);
 	dev->refcnt--;

@@ -321,7 +321,7 @@ struct page *alloc_bounce_page (void)
 	struct page *page;
 
 repeat_alloc:
-	page = alloc_page(GFP_NOIO);
+	page = alloc_page(GFP_NOHIGHIO);
 	if (page)
 		return page;
 	/*
@@ -359,7 +359,7 @@ struct buffer_head *alloc_bounce_bh (void)
 	struct buffer_head *bh;
 
 repeat_alloc:
-	bh = kmem_cache_alloc(bh_cachep, SLAB_NOIO);
+	bh = kmem_cache_alloc(bh_cachep, SLAB_NOHIGHIO);
 	if (bh)
 		return bh;
 	/*

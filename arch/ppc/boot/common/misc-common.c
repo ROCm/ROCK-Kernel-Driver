@@ -31,9 +31,10 @@
  * 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#include <stdarg.h>	/* for va_ bits */
 #include <linux/config.h>
 #include "zlib.h"
-#include <linux/pci.h>
+#include "nonstdio.h"
 
 /* If we're on a ALL_PPC, assume we have a keyboard controller
  * Also note, if we're not ALL_PPC, we assume you are a serial
@@ -71,14 +72,15 @@ void _bcopy(char *src, char *dst, int len);
 void gunzip(void *, int, unsigned char *, int *);
 static int _cvt(unsigned long val, char *buf, long radix, char *digits);
 
-void _vprintk(void(*)(const char), const char *, va_list);
+void _vprintk(void(*putc)(const char), const char *fmt0, va_list ap);
+unsigned char *ISA_io = NULL;
 
 #if defined(CONFIG_SERIAL_CONSOLE)
 extern unsigned long com_port;
 
-extern int serial_tstc(volatile unsigned long com_port);
-extern unsigned char serial_getc(volatile unsigned long com_port);
-extern void serial_putc(volatile unsigned long com_port, unsigned char c);
+extern int serial_tstc(unsigned long com_port);
+extern unsigned char serial_getc(unsigned long com_port);
+extern void serial_putc(unsigned long com_port, unsigned char c);
 #endif
 
 void pause(void)
@@ -301,7 +303,6 @@ puthex(unsigned long val)
 
 #define FALSE 0
 #define TRUE  1
-#include <stdarg.h>
 
 void
 _printk(char const *fmt, ...)
@@ -528,6 +529,28 @@ _dump_buf(unsigned char *p, int s)
 {
 	_printk("\n");
 	_dump_buf_with_offset(p, s, 0);
+}
+
+/* Very simple inb/outb routines.  We declare ISA_io to be 0 above, and
+ * then modify it on platforms which need to.  We do it like this
+ * because on some platforms we give inb/outb an exact location, and
+ * on others it's an offset from a given location. -- Tom
+ */
+
+void
+outb(int port, unsigned char val)
+{
+	/* Ensure I/O operations complete */
+	__asm__ volatile("eieio");
+	ISA_io[port] = val;
+}
+
+unsigned char
+inb(int port)
+{
+	/* Ensure I/O operations complete */
+	__asm__ volatile("eieio");
+	return (ISA_io[port]);
 }
 
 /*

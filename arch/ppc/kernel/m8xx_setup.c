@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.m8xx_setup.c 1.23 07/18/01 22:56:39 paulus
+ * BK Id: SCCS/s.m8xx_setup.c 1.27 08/20/01 15:25:16 paulus
  */
 /*
  *  linux/arch/ppc/kernel/setup.c
@@ -358,26 +358,6 @@ void ide_interrupt_handler (void *dev)
 }
 #endif
 
-void
-m8xx_ide_insw(ide_ioreg_t port, void *buf, int ns)
-{
-#ifdef CONFIG_BLK_DEV_MPC8xx_IDE
-	ide_insw(port, buf, ns);
-#else
-	_insw_ns((unsigned short *)(port+_IO_BASE), buf, ns);
-#endif
-}
-
-void
-m8xx_ide_outsw(ide_ioreg_t port, void *buf, int ns)
-{
-#ifdef CONFIG_BLK_DEV_MPC8xx_IDE
-	ide_outsw(port, buf, ns);
-#else
-	_outsw_ns((unsigned short *)(port+_IO_BASE), buf, ns);
-#endif
-}
-
 int
 m8xx_ide_default_irq(ide_ioreg_t base)
 {
@@ -479,7 +459,7 @@ void m8xx_ide_init_hwif_ports(hw_regs_t *hw,
 # endif	/* CONFIG_SPD823TS, CONFIG_IVMS8 */
 
 	for (i = 0; i < IDE_NR_PORTS; ++i) {
-	 	*p++ = base + ioport_dsc[data_port].reg_off[i];
+		*p++ = base + ioport_dsc[data_port].reg_off[i] - _IO_BASE;
 	}
 
 	if (irq) {
@@ -595,9 +575,45 @@ unsigned long __init m8xx_find_end_of_memory(void)
 	return binfo->bi_memsize;
 }
 
+/*
+ * Now map in some of the I/O space that is generically needed
+ * or shared with multiple devices.
+ * All of this fits into the same 4Mbyte region, so it only
+ * requires one page table page.  (or at least it used to  -- paulus)
+ */
+void __init m8xx_map_io(void)
+{
+        io_block_mapping(IMAP_ADDR, IMAP_ADDR, IMAP_SIZE, _PAGE_IO);
+#ifdef CONFIG_MBX
+        io_block_mapping(NVRAM_ADDR, NVRAM_ADDR, NVRAM_SIZE, _PAGE_IO);
+        io_block_mapping(MBX_CSR_ADDR, MBX_CSR_ADDR, MBX_CSR_SIZE, _PAGE_IO);
+        io_block_mapping(PCI_CSR_ADDR, PCI_CSR_ADDR, PCI_CSR_SIZE, _PAGE_IO);
+
+	/* Map some of the PCI/ISA I/O space to get the IDE interface.
+	*/
+        io_block_mapping(PCI_ISA_IO_ADDR, PCI_ISA_IO_ADDR, 0x4000, _PAGE_IO);
+        io_block_mapping(PCI_IDE_ADDR, PCI_IDE_ADDR, 0x4000, _PAGE_IO);
+#endif
+#if defined(CONFIG_RPXLITE) || defined(CONFIG_RPXCLASSIC)
+	io_block_mapping(RPX_CSR_ADDR, RPX_CSR_ADDR, RPX_CSR_SIZE, _PAGE_IO);
+#if !defined(CONFIG_PCI)
+	io_block_mapping(_IO_BASE,_IO_BASE,_IO_BASE_SIZE, _PAGE_IO);
+#endif
+#endif
+#ifdef CONFIG_HTDMSOUND
+	io_block_mapping(HIOX_CSR_ADDR, HIOX_CSR_ADDR, HIOX_CSR_SIZE, _PAGE_IO);
+#endif
+#ifdef CONFIG_FADS
+	io_block_mapping(BCSR_ADDR, BCSR_ADDR, BCSR_SIZE, _PAGE_IO);
+#endif
+#ifdef CONFIG_PCI
+        io_block_mapping(PCI_CSR_ADDR, PCI_CSR_ADDR, PCI_CSR_SIZE, _PAGE_IO);
+#endif
+}
+
 void __init
-m8xx_init(unsigned long r3, unsigned long r4, unsigned long r5,
-	 unsigned long r6, unsigned long r7)
+platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
+	      unsigned long r6, unsigned long r7)
 {
 
 	if ( r3 )
@@ -641,6 +657,7 @@ m8xx_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.calibrate_decr = m8xx_calibrate_decr;
 
 	ppc_md.find_end_of_memory = m8xx_find_end_of_memory;
+	ppc_md.setup_io_mappings = m8xx_map_io;
 
 	ppc_md.kbd_setkeycode    = NULL;
 	ppc_md.kbd_getkeycode    = NULL;
@@ -653,13 +670,8 @@ m8xx_init(unsigned long r3, unsigned long r4, unsigned long r5,
 #endif
 
 #if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
-        ppc_ide_md.insw = m8xx_ide_insw;
-        ppc_ide_md.outsw = m8xx_ide_outsw;
         ppc_ide_md.default_irq = m8xx_ide_default_irq;
         ppc_ide_md.default_io_base = m8xx_ide_default_io_base;
-        ppc_ide_md.fix_driveid = ppc_generic_ide_fix_driveid;
         ppc_ide_md.ide_init_hwif = m8xx_ide_init_hwif_ports;
-
-        ppc_ide_md.io_base = _IO_BASE;
 #endif		
 }

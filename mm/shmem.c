@@ -1158,6 +1158,7 @@ static DECLARE_FSTYPE(tmpfs_fs_type, "tmpfs", shmem_read_super, FS_LITTER);
 #else
 static DECLARE_FSTYPE(tmpfs_fs_type, "tmpfs", shmem_read_super, FS_LITTER|FS_NOMOUNT);
 #endif
+static struct vfsmount *shm_mnt;
 
 static int __init init_shmem_fs(void)
 {
@@ -1181,6 +1182,7 @@ static int __init init_shmem_fs(void)
 		unregister_filesystem(&tmpfs_fs_type);
 		return PTR_ERR(res);
 	}
+	shm_mnt = res;
 
 	/* The internal instance should not do size checking */
 	if ((error = shmem_set_size(&res->mnt_sb->u.shmem_sb, ULONG_MAX, ULONG_MAX)))
@@ -1195,6 +1197,7 @@ static void __exit exit_shmem_fs(void)
 	unregister_filesystem(&shmem_fs_type);
 #endif
 	unregister_filesystem(&tmpfs_fs_type);
+	mntput(shm_mnt);
 }
 
 module_init(init_shmem_fs)
@@ -1292,7 +1295,7 @@ struct file *shmem_file_setup(char * name, loff_t size)
 	this.name = name;
 	this.len = strlen(name);
 	this.hash = 0; /* will go */
-	root = tmpfs_fs_type.kern_mnt->mnt_root;
+	root = shm_mnt->mnt_root;
 	dentry = d_alloc(root, &this);
 	if (!dentry)
 		return ERR_PTR(-ENOMEM);
@@ -1310,7 +1313,7 @@ struct file *shmem_file_setup(char * name, loff_t size)
 	d_instantiate(dentry, inode);
 	dentry->d_inode->i_size = size;
 	shmem_truncate(inode);
-	file->f_vfsmnt = mntget(tmpfs_fs_type.kern_mnt);
+	file->f_vfsmnt = mntget(shm_mnt);
 	file->f_dentry = dentry;
 	file->f_op = &shmem_file_operations;
 	file->f_mode = FMODE_WRITE | FMODE_READ;

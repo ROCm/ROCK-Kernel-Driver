@@ -1,4 +1,4 @@
-# BK Id: SCCS/s.Makefile 1.18 07/07/01 13:37:26 paulus
+# BK Id: SCCS/s.Makefile 1.21 08/19/01 20:06:47 paulus
 #
 # This file is included by the global makefile so that you can add your own
 # architecture-specific flags and dependencies. Remember to do have actions
@@ -14,6 +14,7 @@
 # Rewritten by Cort Dougan and Paul Mackerras
 #
 
+# Be sure to change PAGE_OFFSET in include/asm-ppc/page.h to match
 KERNELLOAD	=0xc0000000
 
 ifeq ($(shell uname -m),ppc)
@@ -99,5 +100,5 @@ archclean:
 
 archmrproper:
 
-archdep:
+archdep: scripts/mkdep
 	$(MAKEBOOT) fastdep

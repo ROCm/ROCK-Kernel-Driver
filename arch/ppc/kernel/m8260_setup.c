@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.m8260_setup.c 1.20 07/18/01 22:56:39 paulus
+ * BK Id: SCCS/s.m8260_setup.c 1.24 08/20/01 15:25:16 paulus
  */
 /*
  *  linux/arch/ppc/kernel/setup.c
@@ -52,17 +52,6 @@ static int m8260_set_rtc_time(unsigned long time);
 unsigned long m8260_get_rtc_time(void);
 void m8260_calibrate_decr(void);
 
-#if 0
-extern int mackbd_setkeycode(unsigned int scancode, unsigned int keycode);
-extern int mackbd_getkeycode(unsigned int scancode);
-extern int mackbd_pretranslate(unsigned char scancode, char raw_mode);
-extern int mackbd_translate(unsigned char scancode, unsigned char *keycode,
-			   char raw_mode);
-extern char mackbd_unexpected_up(unsigned char keycode);
-extern void mackbd_leds(unsigned char leds);
-extern void mackbd_init_hw(void);
-#endif
-
 extern unsigned long loops_per_jiffy;
 
 unsigned char __res[sizeof(bd_t)];
@@ -71,10 +60,6 @@ extern char saved_command_line[256];
 
 extern unsigned long find_available_memory(void);
 extern void m8260_cpm_reset(void);
-
-void __init adbdev_init(void)
-{
-}
 
 void __init
 m8260_setup_arch(void)
@@ -102,7 +87,7 @@ void __init m8260_calibrate_decr(void)
 	bd_t	*binfo = (bd_t *)__res;
 	int freq, divisor;
 
-	freq = (binfo->bi_busfreq * 1000000);
+	freq = binfo->bi_busfreq;
         divisor = 4;
         tb_ticks_per_jiffy = freq / HZ / divisor;
 	tb_to_us = mulhwu_scale_factor(freq / divisor, 1000000);
@@ -111,7 +96,8 @@ void __init m8260_calibrate_decr(void)
 /* The 8260 has an internal 1-second timer update register that
  * we should use for this purpose.
  */
-static uint	rtc_time;
+static uint rtc_time;
+
 static int
 m8260_set_rtc_time(unsigned long time)
 {
@@ -145,7 +131,7 @@ m8260_restart(char *cmd)
 			startaddr = simple_strtoul(&cmd[10], NULL, 0);
 	}
 
-	m8260_gorom((uint)__pa(__res), startaddr);
+	m8260_gorom((unsigned int)__pa(__res), startaddr);
 }
 
 void
@@ -171,9 +157,9 @@ int m8260_setup_residual(char *buffer)
 	len += sprintf(len+buffer,"core clock\t: %d MHz\n"
 		       "CPM  clock\t: %d MHz\n"
 		       "bus  clock\t: %d MHz\n",
-		       bp->bi_intfreq /*/ 1000000*/,
-		       bp->bi_cpmfreq /*/ 1000000*/,
-		       bp->bi_busfreq /*/ 1000000*/);
+		       bp->bi_intfreq / 1000000,
+		       bp->bi_cpmfreq / 1000000,
+		       bp->bi_busfreq / 1000000);
 
 	return len;
 }
@@ -219,9 +205,21 @@ unsigned long __init m8260_find_end_of_memory(void)
 	return binfo->bi_memsize;
 }
 
+/* Map the IMMR, plus anything else we can cover
+ * in that upper space according to the memory controller
+ * chip select mapping.  Grab another bunch of space
+ * below that for stuff we can't cover in the upper.
+ */
+static void __init
+m8260_map_io(void)
+{
+	io_block_mapping(0xf0000000, 0xf0000000, 0x10000000, _PAGE_IO);
+	io_block_mapping(0xe0000000, 0xe0000000, 0x10000000, _PAGE_IO);
+}
+
 void __init
-m8260_init(unsigned long r3, unsigned long r4, unsigned long r5,
-	 unsigned long r6, unsigned long r7)
+platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
+	      unsigned long r6, unsigned long r7)
 {
 
 	if ( r3 )
@@ -261,6 +259,7 @@ m8260_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.calibrate_decr = m8260_calibrate_decr;
 
 	ppc_md.find_end_of_memory = m8260_find_end_of_memory;
+	ppc_md.setup_io_mappings = m8260_map_io;
 
 	ppc_md.kbd_setkeycode    = NULL;
 	ppc_md.kbd_getkeycode    = NULL;
@@ -273,51 +272,11 @@ m8260_init(unsigned long r3, unsigned long r4, unsigned long r5,
 #endif
 
 #if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
-        ppc_ide_md.insw = m8xx_ide_insw;
-        ppc_ide_md.outsw = m8xx_ide_outsw;
         ppc_ide_md.default_irq = m8xx_ide_default_irq;
         ppc_ide_md.default_io_base = m8xx_ide_default_io_base;
-        ppc_ide_md.fix_driveid = ppc_generic_ide_fix_driveid;
         ppc_ide_md.ide_init_hwif = m8xx_ide_init_hwif_ports;
         ppc_ide_md.ide_request_irq = m8xx_ide_request_irq;
-
-        ppc_ide_md.io_base = _IO_BASE;
 #endif		
-}
-
-/*
- * Copied from prom.c so I don't have include all of that crap.
- *				-- Dan
- *
- * prom_init() is called very early on, before the kernel text
- * and data have been mapped to KERNELBASE.  At this point the code
- * is running at whatever address it has been loaded at, so
- * references to extern and static variables must be relocated
- * explicitly.  The procedure reloc_offset() returns the address
- * we're currently running at minus the address we were linked at.
- * (Note that strings count as static variables.)
- */
-extern unsigned long reloc_offset(void);
-#define PTRRELOC(x)	((typeof(x))((unsigned long)(x) + offset))
-
-__init
-unsigned long
-prom_init(uint r3, uint r4, uint r5, uint r6)
-{
-	unsigned long offset = reloc_offset();
- 	unsigned long phys;
-	extern char __bss_start, _end;
-
-	/* First zero the BSS -- use memset, some arches don't have
-	 * caches on yet */
-	memset_io(PTRRELOC(&__bss_start),0 , &_end - &__bss_start);
-
- 	/* Default */
- 	phys = offset + KERNELBASE;
-
-	/* We are done.
-	*/
-	return phys;
 }
 
 /* Mainly for ksyms.

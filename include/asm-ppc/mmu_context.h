@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.mmu_context.h 1.12 06/28/01 15:50:17 paulus
+ * BK Id: SCCS/s.mmu_context.h 1.15 08/16/01 23:00:17 paulus
  */
 #ifdef __KERNEL__
 #ifndef __PPC_MMU_CONTEXT_H
@@ -58,16 +58,19 @@ static inline void enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk,
 #ifdef CONFIG_8xx
 #define NO_CONTEXT      	16
 #define LAST_CONTEXT    	15
+#define FIRST_CONTEXT    	0
 
 #elif CONFIG_4xx
 #define NO_CONTEXT      	256
 #define LAST_CONTEXT    	255
+#define FIRST_CONTEXT    	1
 
 #else
 
 /* PPC 6xx, 7xx CPUs */
 #define NO_CONTEXT      	((mm_context_t) -1)
 #define LAST_CONTEXT    	32767
+#define FIRST_CONTEXT    	1
 #endif
 
 /*
@@ -75,11 +78,12 @@ static inline void enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk,
  * On 32-bit PowerPCs (other than the 8xx embedded chips), this is done by
  * loading up the segment registers for the user part of the address space.
  *
- * On the 8xx parts, the context currently includes the page directory,
- * and once I implement a real TLB context manager this will disappear.
- * The PGD is ignored on other processors. - Dan
+ * Since the PGD is immediately available, it is much faster to simply
+ * pass this along as a second parameter, which is required for 8xx and
+ * can be used for debugging on all processors (if you happen to have
+ * an Abatron).
  */
-extern void set_context(mm_context_t context);
+extern void set_context(mm_context_t context, pgd_t *pgd);
 
 /*
  * Bitmap of contexts in use.
@@ -156,7 +160,7 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 {
 	tsk->thread.pgdir = next->pgd;
 	get_mmu_context(next);
-	set_context(next->context);
+	set_context(next->context, next->pgd);
 }
 
 /*
@@ -167,8 +171,10 @@ static inline void activate_mm(struct mm_struct *active_mm, struct mm_struct *mm
 {
 	current->thread.pgdir = mm->pgd;
 	get_mmu_context(mm);
-	set_context(mm->context);
+	set_context(mm->context, mm->pgd);
 }
+
+extern void mmu_context_init(void);
 
 #endif /* __PPC_MMU_CONTEXT_H */
 #endif /* __KERNEL__ */

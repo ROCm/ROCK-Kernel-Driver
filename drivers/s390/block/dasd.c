@@ -2140,13 +2140,7 @@ dasd_revalidate (dasd_device_t * device)
 	}
 	for (i = (1 << DASD_PARTN_BITS) - 1; i >= 0; i--) {
                 int major = device->major_info->gendisk.major;
-		int minor = start + i;
-		kdev_t devi = MKDEV (major, minor);
-		struct super_block *sb = get_super (devi);
-		sync_dev (devi);
-		if (sb)
-			invalidate_inodes (sb);
-		invalidate_buffers (devi);
+		invalidate_device(MKDEV (major, start+i), 1);
 	}
         dasd_destroy_partitions(device);
         dasd_setup_partitions(device);
@@ -2517,7 +2511,6 @@ dasd_release (struct inode *inp, struct file *filp)
 		rc = -ENODEV;
                 goto out;
 	}
-	fsync_dev (inp->i_rdev);	/* sync the device */
         count = atomic_dec_return (&device->open_count);
         if ( count == 0) {
                 invalidate_buffers (inp->i_rdev);

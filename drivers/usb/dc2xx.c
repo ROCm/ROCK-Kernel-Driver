@@ -63,6 +63,7 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/module.h>
+#include <linux/devfs_fs_kernel.h>
 
 #ifdef CONFIG_USB_DEBUG
 	#define DEBUG
@@ -71,6 +72,9 @@
 #endif
 #include <linux/usb.h>
 
+
+/* /dev/usb dir. */
+extern devfs_handle_t usb_devfs_handle;			
 
 /*
  * Version Information
@@ -137,10 +141,11 @@ struct camera_state {
 	/* this is non-null iff the device is open */
 	char			*buf;		/* buffer for I/O */
 
+	devfs_handle_t		devfs;		/* devfs device */
+
 	/* always valid */
 	wait_queue_head_t	wait;		/* for timed waits */
 };
-
 
 /* Support multiple cameras, possibly of different types.  */
 static struct camera_state *minor_data [MAX_CAMERAS];
@@ -368,7 +373,9 @@ camera_probe (struct usb_device *dev, unsigned int ifnum, const struct usb_devic
 	struct usb_interface_descriptor	*interface;
 	struct usb_endpoint_descriptor	*endpoint;
 	int				direction, ep;
+	char name[8];
 	struct camera_state		*camera = NULL;
+
 
 	/* these have one config, one interface */
 	if (dev->descriptor.bNumConfigurations != 1
@@ -446,6 +453,15 @@ camera_probe (struct usb_device *dev, unsigned int ifnum, const struct usb_devic
 
 	camera->dev = dev;
 	usb_inc_dev_use (dev);
+
+	/* If we have devfs, register the device */
+	sprintf(name, "dc2xx%d", camera->subminor);
+	camera->devfs = devfs_register(usb_devfs_handle, name,
+				       DEVFS_FL_DEFAULT, USB_MAJOR,
+				       USB_CAMERA_MINOR_BASE + camera->subminor,
+				       S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP |
+				       S_IWGRP, &usb_camera_fops, NULL);
+
 	goto bye;
 
 error:
@@ -464,6 +480,8 @@ static void camera_disconnect(struct usb_device *dev, void *ptr)
 
 	down (&state_table_mutex);
 	down (&camera->sem);
+
+	devfs_unregister(camera->devfs); 
 
 	/* If camera's not opened, we can clean up right away.
 	 * Else apps see a disconnect on next I/O; the release cleans.

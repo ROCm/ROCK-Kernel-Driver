@@ -1,7 +1,7 @@
 /*
  * sysctl_net_ipv4.c: sysctl interface to net IPV4 subsystem.
  *
- * $Id: sysctl_net_ipv4.c,v 1.48 2001/02/23 01:39:05 davem Exp $
+ * $Id: sysctl_net_ipv4.c,v 1.49 2001/08/22 20:38:41 davem Exp $
  *
  * Begun April 1, 1996, Mike Shaver.
  * Added /proc/sys/net/ipv4 directory entry (empty =) ). [MS]
@@ -32,10 +32,8 @@ extern int sysctl_ipfrag_time;
 extern int sysctl_ip_dynaddr;
 
 /* From icmp.c */
-extern int sysctl_icmp_destunreach_time;
-extern int sysctl_icmp_timeexceed_time;
-extern int sysctl_icmp_paramprob_time;
-extern int sysctl_icmp_echoreply_time;
+extern int sysctl_icmp_ratelimit;
+extern int sysctl_icmp_ratemask;
 
 /* From igmp.c */
 extern int sysctl_igmp_max_memberships;
@@ -178,14 +176,6 @@ ctl_table ipv4_table[] = {
 	{NET_IPV4_ICMP_IGNORE_BOGUS_ERROR_RESPONSES, "icmp_ignore_bogus_error_responses",
 	 &sysctl_icmp_ignore_bogus_error_responses, sizeof(int), 0644, NULL,
 	 &proc_dointvec},
-	{NET_IPV4_ICMP_DESTUNREACH_RATE, "icmp_destunreach_rate",
-	 &sysctl_icmp_destunreach_time, sizeof(int), 0644, NULL, &proc_dointvec},
-	{NET_IPV4_ICMP_TIMEEXCEED_RATE, "icmp_timeexceed_rate",
-	 &sysctl_icmp_timeexceed_time, sizeof(int), 0644, NULL, &proc_dointvec},
-	{NET_IPV4_ICMP_PARAMPROB_RATE, "icmp_paramprob_rate",
-	 &sysctl_icmp_paramprob_time, sizeof(int), 0644, NULL, &proc_dointvec},
-	{NET_IPV4_ICMP_ECHOREPLY_RATE, "icmp_echoreply_rate",
-	 &sysctl_icmp_echoreply_time, sizeof(int), 0644, NULL, &proc_dointvec},
 	{NET_IPV4_ROUTE, "route", NULL, 0, 0555, ipv4_route_table},
 #ifdef CONFIG_IP_MULTICAST
 	{NET_IPV4_IGMP_MAX_MEMBERSHIPS, "igmp_max_memberships",
@@ -227,6 +217,10 @@ ctl_table ipv4_table[] = {
 	 &sysctl_tcp_app_win, sizeof(int), 0644, NULL, &proc_dointvec},
 	{NET_TCP_ADV_WIN_SCALE, "tcp_adv_win_scale",
 	 &sysctl_tcp_adv_win_scale, sizeof(int), 0644, NULL, &proc_dointvec},
+	{NET_IPV4_ICMP_RATELIMIT, "icmp_ratelimit",
+	 &sysctl_icmp_ratelimit, sizeof(int), 0644, NULL, &proc_dointvec},
+	{NET_IPV4_ICMP_RATEMASK, "icmp_ratemask",
+	 &sysctl_icmp_ratemask, sizeof(int), 0644, NULL, &proc_dointvec},
 	{0}
 };
 

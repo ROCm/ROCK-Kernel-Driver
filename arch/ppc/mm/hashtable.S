@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.hashtable.S 1.16 06/29/01 08:51:52 paulus
+ * BK Id: SCCS/s.hashtable.S 1.18 08/15/01 22:43:07 paulus
  */
 /*
  *  arch/ppc/kernel/hashtable.S
@@ -31,6 +31,7 @@
 #include <asm/processor.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
+#include <asm/cputable.h>
 
 #ifdef CONFIG_SMP
 	.comm	hash_table_lock,4

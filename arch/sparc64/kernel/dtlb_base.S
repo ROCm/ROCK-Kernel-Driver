@@ -1,15 +1,10 @@
-/* $Id: dtlb_base.S,v 1.10 2001/08/13 20:41:54 kanoj Exp $
+/* $Id: dtlb_base.S,v 1.12 2001/08/17 04:55:09 kanoj Exp $
  * dtlb_base.S:	Front end to DTLB miss replacement strategy.
  *              This is included directly into the trap table.
  *
  * Copyright (C) 1996,1998 David S. Miller (davem@redhat.com)
  * Copyright (C) 1997,1998 Jakub Jelinek   (jj@ultra.linux.cz)
  */
-
-#define TAG_CONTEXT_BITS	0x3ff
-#define VPTE_SHIFT		(PAGE_SHIFT - 3)
-#define KERN_HIGHBITS		((_PAGE_VALID | _PAGE_SZ4MB) ^ 0xfffff80000000000)
-#define KERN_LOWBITS		(_PAGE_CP | _PAGE_CV | _PAGE_P | _PAGE_W)
 
 /* %g1	TLB_SFSR	(%g1 + %g1 == TLB_TAG_ACCESS)
  * %g2	(KERN_HIGHBITS | KERN_LOWBITS)
@@ -48,26 +43,47 @@
  * 4) User space accesses by nucleus at tl0
  */
 
+#if PAGE_SHIFT == 13
+/*
+ * To compute vpte offset, we need to do ((addr >> 13) << 3),
+ * which can be optimized to (addr >> 10) if bits 10/11/12 can
+ * be guaranteed to be 0 ... mmu_context.h does guarantee this
+ * by only using 10 bits in the hwcontext value.
+ */
+#define CREATE_VPTE_OFFSET1(r1, r2)
+#define CREATE_VPTE_OFFSET2(r1, r2) \
+				srax	r1, 10, r2
+#define CREATE_VPTE_NOP		nop
+#else
+#define CREATE_VPTE_OFFSET1(r1, r2) \
+				srax	r1, PAGE_SHIFT, r2
+#define CREATE_VPTE_OFFSET2(r1, r2) \
+				sllx	r2, 3, r2
+#define CREATE_VPTE_NOP
+#endif
+
 /* DTLB ** ICACHE line 1: Quick user TLB misses		*/
 	ldxa		[%g1 + %g1] ASI_DMMU, %g4	! Get TAG_ACCESS
 	andcc		%g4, TAG_CONTEXT_BITS, %g0	! From Nucleus?
 from_tl1_trap:
+	CREATE_VPTE_OFFSET1(%g4, %g6)			! Create VPTE offset
 	be,pn		%xcc, 3f			! Yep, special processing
-	 srax		%g4, VPTE_SHIFT, %g6		! Create VPTE offset
+	 CREATE_VPTE_OFFSET2(%g4, %g6)			! Create VPTE offset
 	ldxa		[%g3 + %g6] ASI_S, %g5		! Load VPTE
 1:	brlz,pt		%g5, 9f				! Valid, load into TLB
 	 nop						! Delay-slot
-	ba,a,pt		%xcc, 4f			! Invalid, branch out
+	ba,a,pt		%xcc, longpath			! Invalid, branch out
 
 /* DTLB ** ICACHE line 2: Quick kernel TLB misses	*/
 3:	brlz,pt		%g4, 9f				! Kernel virtual map?
 	 xor		%g2, %g4, %g5			! Finish bit twiddles
-	ldxa		[%g3 + %g6] ASI_N, %g5		! Yep, load k-vpte
-	ba,pt		%xcc, 1b			! Continue tlb reload
+	ba,pt		%xcc, kvmap			! Yep, go check for obp/vmalloc
 	 nop
+	nop
 9:	stxa		%g5, [%g0] ASI_DTLB_DATA_IN	! Reload TLB
 	retry						! Trap return
-4:	rdpr		%pstate, %g5			! Move into alternate globals
+longpath:
+	rdpr		%pstate, %g5			! Move into alternate globals
 
 /* DTLB ** ICACHE line 3: winfixups+real_faults		*/
 	wrpr		%g5, PSTATE_AG|PSTATE_MG, %pstate
@@ -87,9 +103,8 @@ from_tl1_trap:
 	nop
 	nop
 	nop
-	nop
+	CREATE_VPTE_NOP
 
-#undef TAG_CONTEXT_BITS
-#undef VPTE_SHIFT
-#undef KERN_HIGHBITS
-#undef KERN_LOWBITS
+#undef CREATE_VPTE_OFFSET1
+#undef CREATE_VPTE_OFFSET2
+#undef CREATE_VPTE_NOP

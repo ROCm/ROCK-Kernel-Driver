@@ -459,7 +459,7 @@ void usb_deregister_bus(struct usb_bus *bus)
 	list_del(&bus->bus_list);
 	write_unlock_irq (&usb_bus_list_lock);
 
-       usbdevfs_remove_bus(bus);
+	usbdevfs_remove_bus(bus);
 
 	clear_bit(bus->busnum, busmap.busmap);
 
@@ -707,7 +707,6 @@ static int usb_find_interface_driver(struct usb_device *dev, unsigned ifnum)
 
 	private = NULL;
 	for (tmp = usb_driver_list.next; tmp != &usb_driver_list;) {
-
 		driver = list_entry(tmp, struct usb_driver, driver_list);
 		tmp = tmp->next;
 
@@ -725,16 +724,18 @@ static int usb_find_interface_driver(struct usb_device *dev, unsigned ifnum)
 						break;
 				}
 			}
+
 			/* if driver not bound, leave defaults unchanged */
 			if (private == NULL)
 				interface->act_altsetting = 0;
-		}
-		else /* "old style" driver */
-		{
+		} else { /* "old style" driver */
 			down(&driver->serialize);
 			private = driver->probe(dev, ifnum, NULL);
 			up(&driver->serialize);
 		}
+
+		/* probe() may have changed the config on us */
+		interface = dev->actconfig->interface + ifnum;
 
 		if (private) {
 			usb_driver_claim_interface(driver, interface, private);
@@ -1178,7 +1179,7 @@ int usb_control_msg(struct usb_device *dev, unsigned int pipe, __u8 request, __u
  *	@pipe: endpoint "pipe" to send the message to
  *	@data: pointer to the data to send
  *	@len: length in bytes of the data to send
- *	@actual_length: pointer to a location to put the actual length transfered in bytes
+ *	@actual_length: pointer to a location to put the actual length transferred in bytes
  *	@timeout: time to wait for the message to complete before timing out (if 0 the wait is forever)
  *
  *	This function sends a simple bulk message to a specified endpoint
@@ -1222,7 +1223,7 @@ int usb_get_current_frame_number(struct usb_device *usb_dev)
 }
 /*-------------------------------------------------------------------*/
 
-static int usb_parse_endpoint(struct usb_device *dev, struct usb_endpoint_descriptor *endpoint, unsigned char *buffer, int size)
+static int usb_parse_endpoint(struct usb_endpoint_descriptor *endpoint, unsigned char *buffer, int size)
 {
 	struct usb_descriptor_header *header;
 	unsigned char *begin;
@@ -1266,8 +1267,7 @@ static int usb_parse_endpoint(struct usb_device *dev, struct usb_endpoint_descri
 			return -1;
 		}
 
-		/* If we find another descriptor which is at or below us */
-		/*  in the descriptor heirarchy then we're done  */
+		/* If we find another "proper" descriptor then we're done  */
 		if ((header->bDescriptorType == USB_DT_ENDPOINT) ||
 		    (header->bDescriptorType == USB_DT_INTERFACE) ||
 		    (header->bDescriptorType == USB_DT_CONFIG) ||
@@ -1308,7 +1308,7 @@ static int usb_parse_endpoint(struct usb_device *dev, struct usb_endpoint_descri
 	return parsed;
 }
 
-static int usb_parse_interface(struct usb_device *dev, struct usb_interface *interface, unsigned char *buffer, int size)
+static int usb_parse_interface(struct usb_interface *interface, unsigned char *buffer, int size)
 {
 	int i, len, numskipped, retval, parsed = 0;
 	struct usb_descriptor_header *header;
@@ -1373,8 +1373,7 @@ static int usb_parse_interface(struct usb_device *dev, struct usb_interface *int
 				return -1;
 			}
 
-			/* If we find another descriptor which is at or below */
-			/*  us in the descriptor heirarchy then return */
+			/* If we find another "proper" descriptor then we're done  */
 			if ((header->bDescriptorType == USB_DT_INTERFACE) ||
 			    (header->bDescriptorType == USB_DT_ENDPOINT) ||
 			    (header->bDescriptorType == USB_DT_CONFIG) ||
@@ -1440,7 +1439,7 @@ static int usb_parse_interface(struct usb_device *dev, struct usb_interface *int
 				return -1;
 			}
 		
-			retval = usb_parse_endpoint(dev, ifp->endpoint + i, buffer, size);
+			retval = usb_parse_endpoint(ifp->endpoint + i, buffer, size);
 			if (retval < 0)
 				return retval;
 
@@ -1460,7 +1459,7 @@ static int usb_parse_interface(struct usb_device *dev, struct usb_interface *int
 	return parsed;
 }
 
-int usb_parse_configuration(struct usb_device *dev, struct usb_config_descriptor *config, char *buffer)
+int usb_parse_configuration(struct usb_config_descriptor *config, char *buffer)
 {
 	int i, retval, size;
 	struct usb_descriptor_header *header;
@@ -1489,6 +1488,9 @@ int usb_parse_configuration(struct usb_device *dev, struct usb_config_descriptor
 	buffer += config->bLength;
 	size -= config->bLength;
 	
+	config->extra = NULL;
+	config->extralen = 0;
+
 	for (i = 0; i < config->bNumInterfaces; i++) {
 		int numskipped, len;
 		char *begin;
@@ -1505,8 +1507,7 @@ int usb_parse_configuration(struct usb_device *dev, struct usb_config_descriptor
 				return -1;
 			}
 
-			/* If we find another descriptor which is at or below */
-			/*  us in the descriptor heirarchy then we're done  */
+			/* If we find another "proper" descriptor then we're done  */
 			if ((header->bDescriptorType == USB_DT_ENDPOINT) ||
 			    (header->bDescriptorType == USB_DT_INTERFACE) ||
 			    (header->bDescriptorType == USB_DT_CONFIG) ||
@@ -1525,22 +1526,23 @@ int usb_parse_configuration(struct usb_device *dev, struct usb_config_descriptor
 		/* Copy any unknown descriptors into a storage area for */
 		/*  drivers to later parse */
 		len = (int)(buffer - begin);
-		if (!len) {
-			config->extra = NULL;
-			config->extralen = 0;
-		} else {
-			config->extra = kmalloc(len, GFP_KERNEL);
-			if (!config->extra) {
-				err("couldn't allocate memory for config extra descriptors");
-				config->extralen = 0;
-				return -1;
-			}
+		if (len) {
+			if (config->extralen) {
+				warn("extra config descriptor");
+			} else {
+				config->extra = kmalloc(len, GFP_KERNEL);
+				if (!config->extra) {
+					err("couldn't allocate memory for config extra descriptors");
+					config->extralen = 0;
+					return -1;
+				}
 
-			memcpy(config->extra, begin, len);
-			config->extralen = len;
+				memcpy(config->extra, begin, len);
+				config->extralen = len;
+			}
 		}
 
-		retval = usb_parse_interface(dev, config->interface + i, buffer, size);
+		retval = usb_parse_interface(config->interface + i, buffer, size);
 		if (retval < 0)
 			return retval;
 
@@ -2081,7 +2083,7 @@ int usb_get_configuration(struct usb_device *dev)
 
 		dev->rawdescriptors[cfgno] = bigbuffer;
 
-		result = usb_parse_configuration(dev, &dev->config[cfgno], bigbuffer);
+		result = usb_parse_configuration(&dev->config[cfgno], bigbuffer);
 		if (result > 0)
 			dbg("descriptor data left");
 		else if (result < 0) {

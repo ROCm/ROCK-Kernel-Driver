@@ -630,8 +630,7 @@ static struct super_block * pipefs_read_super(struct super_block *sb, void *data
 	return sb;
 }
 
-static DECLARE_FSTYPE(pipe_fs_type, "pipefs", pipefs_read_super,
-	FS_NOMOUNT|FS_SINGLE);
+static DECLARE_FSTYPE(pipe_fs_type, "pipefs", pipefs_read_super, FS_NOMOUNT);
 
 static int __init init_pipe_fs(void)
 {
@@ -650,7 +649,7 @@ static int __init init_pipe_fs(void)
 static void __exit exit_pipe_fs(void)
 {
 	unregister_filesystem(&pipe_fs_type);
-	kern_umount(pipe_mnt);
+	mntput(pipe_mnt);
 }
 
 module_init(init_pipe_fs)

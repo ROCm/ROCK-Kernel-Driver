@@ -7,16 +7,18 @@
  * Copyright (C) 2000-2001 Anton Altparmakov (AIA)
  */
 
+#include <linux/ntfs_fs.h>
+#include <linux/errno.h>
+#include <linux/bitops.h>
+#include <linux/module.h>
 #include "ntfstypes.h"
 #include "struct.h"
 #include "super.h"
-
-#include <linux/errno.h>
-#include <linux/bitops.h>
 #include "macros.h"
 #include "inode.h"
 #include "support.h"
 #include "util.h"
+#include <linux/smp_lock.h>
 
 /* All important structures in NTFS use 2 consistency checks:
  * . a magic structure identifier (FILE, INDX, RSTR, RCRD...)
@@ -24,14 +26,18 @@
  *   structure's record should end with the word at offset <n> of the first
  *   sector, and if it is the case, must be replaced with the words following
  *   <n>. The value of <n> and the number of fixups is taken from the fields
- *   at the offsets 4 and 6.
+ *   at the offsets 4 and 6. Note that the sector size is defined as
+ *   NTFS_SECTOR_SIZE and not as the hardware sector size (this is concordant
+ *   with what the Windows NTFS driver does).
  *
- * This function perform these 2 checks, and _fails_ if :
+ * This function perform these 2 checks, and _fails_ if:
+ * . the input size is invalid
+ * . the fixup header is invalid
+ * . the size does not match the number of sectors
  * . the magic identifier is wrong
- * . the size is given and does not match the number of sectors
  * . a fixup is invalid
  */
-int ntfs_fixup_record(ntfs_volume *vol, char *record, char *magic, int size)
+int ntfs_fixup_record(char *record, char *magic, int size)
 {
 	int start, count, offset;
 	ntfs_u16 fixup;
@@ -39,19 +45,24 @@ int ntfs_fixup_record(ntfs_volume *vol, char *record, char *magic, int size)
 	if (!IS_MAGIC(record, magic))
 		return 0;
 	start = NTFS_GETU16(record + 4);
-	count = NTFS_GETU16(record + 6);
-	count--;
-	if(size && vol->sector_size * count != size)
+	count = NTFS_GETU16(record + 6) - 1;
+	if (size & (NTFS_SECTOR_SIZE - 1) || start & 1 ||
+			start + count * 2 > size || size >> 9 != count) {
+		if (size <= 0)
+			printk(KERN_ERR "NTFS: BUG: ntfs_fixup_record() got "
+					"zero size! Please report this to "
+					"linux-ntfs-dev@lists.sf.net\n");
 		return 0;
+	}
 	fixup = NTFS_GETU16(record + start);
 	start += 2;
-	offset = vol->sector_size - 2;
-	while (count--){
+	offset = NTFS_SECTOR_SIZE - 2;
+	while (count--) {
 		if (NTFS_GETU16(record + offset) != fixup)
 			return 0;
 		NTFS_PUTU16(record + offset, NTFS_GETU16(record + start));
 		start += 2;
-		offset += vol->sector_size;
+		offset += NTFS_SECTOR_SIZE;
 	}
 	return 1;
 }
@@ -63,8 +74,9 @@ int ntfs_fixup_record(ntfs_volume *vol, char *record, char *magic, int size)
 int ntfs_init_volume(ntfs_volume *vol, char *boot)
 {
 	int sectors_per_cluster_bits;
+	__s64 ll;
 
-	/* Historical default values, in case we don't load $AttrDef. */
+	/* System defined default values, in case we don't load $AttrDef. */
 	vol->at_standard_information = 0x10;
 	vol->at_attribute_list = 0x20;
 	vol->at_file_name = 0x30;
@@ -77,7 +89,7 @@ int ntfs_init_volume(ntfs_volume *vol, char *boot)
 	vol->at_index_allocation = 0xA0;
 	vol->at_bitmap = 0xB0;
 	vol->at_symlink = 0xC0;
-	/* Sector size */
+	/* Sector size. */
 	vol->sector_size = NTFS_GETU16(boot + 0xB);
 	ntfs_debug(DEBUG_FILE3, "ntfs_init_volume: vol->sector_size = 0x%x\n",
 				vol->sector_size);
@@ -127,22 +139,49 @@ int ntfs_init_volume(ntfs_volume *vol, char *boot)
 		vol->index_record_size = 1 << -vol->index_clusters_per_record;
 	vol->index_record_size_bits = ffs(vol->index_record_size) - 1;
 	ntfs_debug(DEBUG_FILE3, "ntfs_init_volume: vol->index_record_size = "
-				"0x%x\n", vol->index_record_size); 
+				"0x%x\n", vol->index_record_size);
 	ntfs_debug(DEBUG_FILE3, "ntfs_init_volume: vol->index_record_size_bits "
-				"= 0x%x\n", vol->index_record_size_bits); 
+				"= 0x%x\n", vol->index_record_size_bits);
 	/*
-	 * Check mft and mftmirr locations for 64-bit-ness. NOTE: This is a
-	 * crude check only as many other things could be out of bounds later
-	 * on, but it will catch at least some of the cases, since the mftmirr
-	 * is located in the middle of the volume so if the volume is very
-	 * large the mftmirr probably will be out of 32-bit bounds.
+	 * Get the size of the volume in clusters (ofs 0x28 is nr_sectors) and
+	 * check for 64-bit-ness. Windows currently only uses 32 bits to save
+	 * the clusters so we do the same as it is much faster on 32-bit CPUs.
 	 */
-	vol->mft_lcn = NTFS_GETS64(boot + 0x30);
-	if (vol->mft_lcn >= (__s64)1 << 31 ||
-	    NTFS_GETS64(boot + 0x38) >= (__s64)1 << 31) {
-		ntfs_error("Cannot handle 64-bit clusters yet.\n");
+	ll = NTFS_GETS64(boot + 0x28) >> sectors_per_cluster_bits;
+	if (ll >= (__s64)1 << 31) {
+		ntfs_error("Cannot handle 64-bit clusters. Please inform "
+				"linux-ntfs-dev@lists.sf.net that you got this "
+				"error.\n");
 		return -1;
 	}
+	vol->nr_clusters = (ntfs_cluster_t)ll;
+	ntfs_debug(DEBUG_FILE3, "ntfs_init_volume: vol->nr_clusters = 0x%x\n",
+			vol->nr_clusters);
+	/*
+	 * Determine MFT zone size. FIXME: Need to take into consideration
+	 * where the mft zone starts (at vol->mft_lcn) as vol->mft_zone_end
+	 * needs to be relative to that.
+	 */
+	vol->mft_zone_end = vol->nr_clusters;
+	switch (vol->mft_zone_multiplier) {  /* % of volume size in clusters */
+	case 4:
+		vol->mft_zone_end = vol->mft_zone_end >> 1;	/* 50%   */
+		break;
+	case 3:
+		vol->mft_zone_end = vol->mft_zone_end * 3 >> 3;	/* 37.5% */
+		break;
+	case 2:
+		vol->mft_zone_end = vol->mft_zone_end >> 2;	/* 25%   */
+		break;
+	/* case 1: */
+	default:
+		vol->mft_zone_end = vol->mft_zone_end >> 3;	/* 12.5% */
+		break;
+	}
+	ntfs_debug(DEBUG_FILE3, "ntfs_init_volume: vol->mft_zone_end = %x\n",
+			vol->mft_zone_end);
+	vol->mft_lcn = (ntfs_cluster_t)NTFS_GETS64(boot + 0x30);
+	vol->mft_mirr_lcn = (ntfs_cluster_t)NTFS_GETS64(boot + 0x38);
 	/* This will be initialized later. */
 	vol->upcase = 0;
 	vol->upcase_length = 0;
@@ -304,8 +343,7 @@ int ntfs_load_special_files(ntfs_volume *vol)
 	error = -ENOMEM;
 	ntfs_debug(DEBUG_BSD, "Going to load MFT\n");
 	if (!vol->mft_ino || (error = ntfs_init_inode(vol->mft_ino, vol,
-						      FILE_$Mft)))
-	{
+			FILE_$Mft))) {
 		ntfs_error("Problem loading MFT\n");
 		return error;
 	}
@@ -443,26 +481,48 @@ int ntfs_get_free_cluster_count(ntfs_inode *bitmap)
 	return clusters;
 }
 
-/* Insert the fixups for the record. The number and location of the fixes
- * is obtained from the record header */
-void ntfs_insert_fixups(unsigned char *rec, int secsize)
+/*
+ * Insert the fixups for the record. The number and location of the fixes
+ * is obtained from the record header but we double check with @rec_size and
+ * use that as the upper boundary, if necessary overwriting the count value in
+ * the record header.
+ *
+ * We return 0 on success or -1 if fixup header indicated the beginning of the
+ * update sequence array to be beyond the valid limit.
+ */
+int ntfs_insert_fixups(unsigned char *rec, int rec_size)
 {
-	int first = NTFS_GETU16(rec + 4);
-	int count = NTFS_GETU16(rec + 6);
+	int first;
+	int count;
 	int offset = -2;
-	ntfs_u16 fix = NTFS_GETU16(rec + first);
+	ntfs_u16 fix;
 	
-	fix++;
+	first = NTFS_GETU16(rec + 4);
+	count = (rec_size >> NTFS_SECTOR_BITS) + 1;
+	if (first + count * 2 > NTFS_SECTOR_SIZE - 2) {
+		printk(KERN_CRIT "NTFS: ntfs_insert_fixups() detected corrupt "
+				"NTFS record update sequence array position. - "
+				"Cannot hotfix.\n");
+		return -1;
+	}
+	if (count != NTFS_GETU16(rec + 6)) {
+		printk(KERN_ERR "NTFS: ntfs_insert_fixups() detected corrupt "
+				"NTFS record update sequence array size. - "
+				"Applying hotfix.\n");
+		NTFS_PUTU16(rec + 6, count);
+	}
+	fix = (NTFS_GETU16(rec + first) + 1) & 0xffff;
 	if (fix == 0xffff || !fix)
 		fix = 1;
 	NTFS_PUTU16(rec + first, fix);
 	count--;
 	while (count--) {
 		first += 2;
-		offset += secsize;
+		offset += NTFS_SECTOR_SIZE;
 		NTFS_PUTU16(rec + first, NTFS_GETU16(rec + offset));
 		NTFS_PUTU16(rec + offset, fix);
-	};
+	}
+	return 0;
 }
 
 /* Search the bitmap bits of l bytes for *cnt zero bits. Return the bit number
@@ -475,7 +535,7 @@ static int search_bits(unsigned char* bits, ntfs_cluster_t *loc, int *cnt,int l)
 	int bc = 0;
 	int bstart = 0, bstop = 0, found = 0;
 	int start, stop = 0, in = 0;
-	/* special case searching for a single block */
+	/* Special case searching for a single block. */
 	if (*cnt == 1) {
 		while (l && *bits == 0xFF) {
 			bits++;
@@ -501,7 +561,7 @@ static int search_bits(unsigned char* bits, ntfs_cluster_t *loc, int *cnt,int l)
 		if (in) {
 			if ((c & 1) == 0)
 				stop++;
-			else { /* end of sequence of zeroes */
+			else { /* End of sequence of zeroes. */
 				in = 0;
 				if (!found || bstop-bstart < stop-start) {
 					bstop = stop; bstart = start;
@@ -514,7 +574,7 @@ static int search_bits(unsigned char* bits, ntfs_cluster_t *loc, int *cnt,int l)
 		} else {
 			if (c & 1)
 				start++;
-			else { /*start of sequence*/
+			else { /* Start of sequence. */
 				in = 1;
 				stop = start + 1;
 			}
@@ -523,7 +583,9 @@ static int search_bits(unsigned char* bits, ntfs_cluster_t *loc, int *cnt,int l)
 		c >>= 1;
 	}
 	if (in && (!found || bstop - bstart < stop - start)) {
-		bstop = stop; bstart = start; found = 1;
+		bstop = stop;
+		bstart = start;
+		found = 1;
 	}
 	if (!found)
 		return -ENOSPC;
@@ -541,21 +603,21 @@ int ntfs_set_bitrange(ntfs_inode* bitmap, ntfs_cluster_t loc, int cnt, int bit)
 
 	io.fn_put = ntfs_put;
 	io.fn_get = ntfs_get;
-	bsize = (cnt + (loc & 7) + 7) >> 3; /* round up to multiple of 8*/
+	bsize = (cnt + (loc & 7) + 7) >> 3; /* Round up to multiple of 8. */
 	bits = ntfs_malloc(bsize);
 	if (!bits)
 		return -ENOMEM;
 	io.param = bits;
 	io.size = bsize;
 	error = ntfs_read_attr(bitmap, bitmap->vol->at_data, 0, loc >> 3, &io);
-	if (error || io.size != bsize){
+	if (error || io.size != bsize) {
 		ntfs_free(bits);
 		return error ? error : -EIO;
 	}
 	/* Now set the bits. */
 	it = bits;
 	locit = loc;
-	while (locit % 8 && cnt) { /* process first byte */
+	while (locit % 8 && cnt) { /* Process first byte. */
 		if (bit)
 			*it |= 1 << (locit % 8);
 		else
@@ -565,13 +627,13 @@ int ntfs_set_bitrange(ntfs_inode* bitmap, ntfs_cluster_t loc, int cnt, int bit)
 		if (locit % 8 == 0)
 			it++;
 	}
-	while (cnt > 8) { /*process full bytes */
+	while (cnt > 8) { /* Process full bytes. */
 		*it = bit ? 0xFF : 0;
 		cnt -= 8;
 		locit += 8;
 		it++;
 	}
-	while (cnt) { /*process last byte */
+	while (cnt) { /* Process last byte. */
 		if (bit)
 			*it |= 1 << (locit % 8);
 		else
@@ -579,7 +641,7 @@ int ntfs_set_bitrange(ntfs_inode* bitmap, ntfs_cluster_t loc, int cnt, int bit)
 		cnt--;
 		locit++;
 	}
-	/* reset to start */
+	/* Reset to start. */
 	io.param = bits;
 	io.size = bsize;
 	error = ntfs_write_attr(bitmap, bitmap->vol->at_data, 0, loc >> 3, &io);

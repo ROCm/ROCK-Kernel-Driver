@@ -83,8 +83,8 @@ extern int sysctl_ieee_emulation_warnings;
 extern int sysctl_userprocess_debug;
 #endif
 
-#ifdef __powerpc__
-extern unsigned long htab_reclaim_on, zero_paged_on, powersave_nap;
+#ifdef CONFIG_PPC32
+extern unsigned long zero_paged_on, powersave_nap;
 int proc_dol2crvec(ctl_table *table, int write, struct file *filp,
 		  void *buffer, size_t *lenp);
 #endif
@@ -178,9 +178,7 @@ static ctl_table kern_table[] = {
 	{KERN_SPARC_STOP_A, "stop-a", &stop_a_enabled, sizeof (int),
 	 0644, NULL, &proc_dointvec},
 #endif
-#ifdef __powerpc__
-	{KERN_PPC_HTABRECLAIM, "htab-reclaim", &htab_reclaim_on, sizeof(int),
-	 0644, NULL, &proc_dointvec},
+#ifdef CONFIG_PPC32
 	{KERN_PPC_ZEROPAGED, "zero-paged", &zero_paged_on, sizeof(int),
 	 0644, NULL, &proc_dointvec},
 	{KERN_PPC_POWERSAVE_NAP, "powersave-nap", &powersave_nap, sizeof(int),

@@ -1,4 +1,4 @@
-# BK Id: SCCS/s.Makefile 1.19 07/19/01 09:11:28 trini
+# BK Id: SCCS/s.Makefile 1.24 08/01/01 13:25:40 trini
 #
 # arch/ppc/boot/Makefile
 #
@@ -17,8 +17,6 @@
 
 USE_STANDARD_AS_RULE		:= true
 
-CFLAGS				+= -fno-builtin
-
 ifeq ($(CONFIG_SMP),y)
 TFTPIMAGE			= /tftpboot/zImage.prep.smp
 else
@@ -32,7 +30,7 @@ obj-y				:= head.o misc.o ../common/misc-common.o \
 OBJCOPY_ARGS			= -O elf32-powerpc
 LIBS 				= ../lib/zlib.a
 
-obj-$(CONFIG_SERIAL_CONSOLE)	+= ns16550.o
+obj-$(CONFIG_SERIAL_CONSOLE)	+= ../common/ns16550.o
 obj-$(CONFIG_VGA_CONSOLE)	+= vreset.o kbd.o
 
 # Tools
@@ -45,9 +43,6 @@ all:	zImage
 misc.o: misc.c
 	$(CC) $(CFLAGS) -DINITRD_OFFSET=0 -DINITRD_SIZE=0 -DZIMAGE_OFFSET=0 \
 		-DZIMAGE_SIZE=0 -c -o $@ $*.c
-
-ns16550.o: ../common/ns16550.c
-	$(CC) $(CFLAGS) -DIOOFFSET=0x80000000 -c -o $@ ../common/$*.c
 
 zvmlinux.initrd: zvmlinux ../images/vmlinux.gz
 	$(LD) $(ZLINKFLAGS) -o $@.tmp $(obj-y) $(LIBS)

@@ -300,7 +300,7 @@ affs_new_inode(struct inode *dir)
 	u32			 block;
 	struct buffer_head	*bh;
 
-	if (!dir || !(inode = get_empty_inode()))
+	if (!(inode = get_empty_inode()))
 		goto err_inode;
 
 	if (!(block = affs_alloc_block(dir, dir->i_ino)))

@@ -1059,7 +1059,6 @@ static int lvm_blk_close(struct inode *inode, struct file *file)
 	       lvm_name, minor, VG_BLK(minor), LV_BLK(minor));
 #endif
 
-	sync_dev(inode->i_rdev);
 	if (lv_ptr->lv_open == 1) vg_ptr->lv_open--;
 	lv_ptr->lv_open--;
 

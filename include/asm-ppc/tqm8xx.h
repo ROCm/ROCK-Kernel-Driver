@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.tqm8xx.h 1.6 05/17/01 18:14:26 cort
+ * BK Id: SCCS/s.tqm8xx.h 1.7 08/17/01 15:23:17 paulus
  */
 /*
  * A collection of structures, addresses, and values associated with
@@ -68,14 +68,5 @@ typedef struct bd_info {
 /* We don't use the 8259.
 */
 #define NR_8259_INTS	0
-
-/* Generic 8xx type
-*/
-#if defined(CONFIG_TQM8xxL)
-#define _MACH_8xx (_MACH_tqm8xxL)
-#endif
-#if defined(CONFIG_TQM860)
-#define _MACH_8xx (_MACH_tqm860)
-#endif
 
 #endif	/* __MACH_TQM8xx_DEFS */

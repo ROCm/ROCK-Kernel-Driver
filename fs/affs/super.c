@@ -355,16 +355,16 @@ got_root:
 	switch (chksum) {
 		case MUFS_FS:
 		case MUFS_INTLFFS:
+		case MUFS_DCFFS:
 			AFFS_SB->s_flags |= SF_MUFS;
 			/* fall thru */
 		case FS_INTLFFS:
+		case FS_DCFFS:
 			AFFS_SB->s_flags |= SF_INTL;
 			break;
-		case MUFS_DCFFS:
 		case MUFS_FFS:
 			AFFS_SB->s_flags |= SF_MUFS;
 			break;
-		case FS_DCFFS:
 		case FS_FFS:
 			break;
 		case MUFS_OFS:

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.apus_setup.c 1.14 07/06/01 09:19:28 trini
+ * BK Id: SCCS/s.apus_setup.c 1.18 08/20/01 15:25:16 paulus
  */
 /*
  *  linux/arch/ppc/kernel/apus_setup.c
@@ -611,32 +611,8 @@ apus_halt(void)
 /*
  * IDE stuff.
  */
-void ide_insw(ide_ioreg_t port, void *buf, int ns);
-void ide_outsw(ide_ioreg_t port, void *buf, int ns);
-void
-apus_ide_insw(ide_ioreg_t port, void *buf, int ns)
-{
-	ide_insw(port, buf, ns);
-}
 
-void
-apus_ide_outsw(ide_ioreg_t port, void *buf, int ns)
-{
-	ide_outsw(port, buf, ns);
-}
-
-int
-apus_ide_default_irq(ide_ioreg_t base)
-{
-        return 0;
-}
-
-ide_ioreg_t
-apus_ide_default_io_base(int index)
-{
-        return 0;
-}
-
+#if 0	/* no longer used  -- paulus */
 void
 apus_ide_fix_driveid(struct hd_driveid *id)
 {
@@ -682,6 +658,7 @@ apus_ide_fix_driveid(struct hd_driveid *id)
       }
    }
 }
+#endif /* 0 */
 
 __init
 void apus_ide_init_hwif_ports (hw_regs_t *hw, ide_ioreg_t data_port, 
@@ -1039,6 +1016,15 @@ unsigned long __init apus_find_end_of_memory(void)
 	return total;
 }
 
+static void __init
+apus_map_io(void)
+{
+	/* Map PPC exception vectors. */
+	io_block_mapping(0xfff00000, 0xfff00000, 0x00020000, _PAGE_KERNEL);
+	/* Map chip and ZorroII memory */
+	io_block_mapping(zTwoBase,   0x00000000, 0x01000000, _PAGE_IO);
+}
+
 __init
 void apus_init_IRQ(void)
 {
@@ -1061,8 +1047,8 @@ void apus_init_IRQ(void)
 }
 
 __init
-void apus_init(unsigned long r3, unsigned long r4, unsigned long r5,
-	       unsigned long r6, unsigned long r7)
+void platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
+		   unsigned long r6, unsigned long r7)
 {
 	extern int parse_bootinfo(const struct bi_record *);
 	extern char _end[];
@@ -1113,6 +1099,7 @@ void apus_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.calibrate_decr = apus_calibrate_decr;
 
 	ppc_md.find_end_of_memory = apus_find_end_of_memory;
+	ppc_md.setup_io_mappings = apus_map_io;
 
 	ppc_md.nvram_read_val = NULL;
 	ppc_md.nvram_write_val = NULL;
@@ -1130,14 +1117,7 @@ void apus_init(unsigned long r3, unsigned long r4, unsigned long r5,
 #endif
 
 #if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
-        ppc_ide_md.insw = apus_ide_insw;
-        ppc_ide_md.outsw = apus_ide_outsw;
-        ppc_ide_md.default_irq = apus_ide_default_irq;
-        ppc_ide_md.default_io_base = apus_ide_default_io_base;
-        ppc_ide_md.fix_driveid = apus_ide_fix_driveid;
         ppc_ide_md.ide_init_hwif = apus_ide_init_hwif_ports;
-
-        ppc_ide_md.io_base = _IO_BASE;
 #endif		
 }
 

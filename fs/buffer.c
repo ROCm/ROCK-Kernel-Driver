@@ -796,7 +796,7 @@ void set_blocksize(kdev_t dev, int size)
 
 static void free_more_memory(void)
 {
-	balance_dirty(NODEV);
+	balance_dirty();
 	page_launder(GFP_NOFS, 0);		
 	wakeup_bdflush();
 	wakeup_kswapd();
@@ -1086,7 +1086,7 @@ repeat:
 /* -1 -> no need to flush
     0 -> async flush
     1 -> sync flush (wait for I/O completion) */
-int balance_dirty_state(kdev_t dev)
+static int balance_dirty_state(void)
 {
 	unsigned long dirty, tot, hard_dirty_limit, soft_dirty_limit;
 
@@ -1114,16 +1114,16 @@ int balance_dirty_state(kdev_t dev)
  * pressures on different devices - thus the (currently unused)
  * 'dev' parameter.
  */
-void balance_dirty(kdev_t dev)
+void balance_dirty(void)
 {
-	int state = balance_dirty_state(dev);
+	int state = balance_dirty_state();
 
 	if (state < 0)
 		return;
 
 	/* If we're getting into imbalance, start write-out */
 	spin_lock(&lru_list_lock);
-	write_some_buffers(dev);
+	write_some_buffers(NODEV);
 
 	/*
 	 * And if we're _really_ out of balance, wait for
@@ -1132,7 +1132,7 @@ void balance_dirty(kdev_t dev)
 	 * This will throttle heavy writers.
 	 */
 	if (state > 0) {
-		wait_for_some_buffers(dev);
+		wait_for_some_buffers(NODEV);
 		wakeup_bdflush();
 	}
 }
@@ -1155,7 +1155,7 @@ void mark_buffer_dirty(struct buffer_head *bh)
 {
 	if (!atomic_set_buffer_dirty(bh)) {
 		__mark_dirty(bh);
-		balance_dirty(bh->b_dev);
+		balance_dirty();
 	}
 }
 
@@ -1712,7 +1712,7 @@ static int __block_commit_write(struct inode *inode, struct page *page,
 	}
 
 	if (need_balance_dirty)
-		balance_dirty(bh->b_dev);
+		balance_dirty();
 	/*
 	 * is this a partial write that happened to make all buffers
 	 * uptodate then we can optimize away a bogus readpage() for
@@ -2448,6 +2448,8 @@ busy_buffer_page:
 	write_unlock(&hash_table_lock);
 	spin_unlock(&lru_list_lock);
 	if (gfp_mask & __GFP_IO) {
+		if (!(gfp_mask & __GFP_HIGHIO) && PageHighMem(page))
+			return 0;
 		sync_page_buffers(bh, gfp_mask);
 		/* We waited synchronously, so we can free the buffers. */
 		if (gfp_mask & __GFP_WAIT) {
@@ -2706,7 +2708,7 @@ int bdflush(void *startup)
 		CHECK_EMERGENCY_SYNC
 
 		spin_lock(&lru_list_lock);
-		if (!write_some_buffers(NODEV) || balance_dirty_state(NODEV) < 0) {
+		if (!write_some_buffers(NODEV) || balance_dirty_state() < 0) {
 			wait_for_some_buffers(NODEV);
 			interruptible_sleep_on(&bdflush_wait);
 		}

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.open_pic.c 1.20 05/17/01 18:14:21 cort
+ * BK Id: SCCS/s.open_pic.c 1.26 08/20/01 22:33:28 paulus
  */
 /*
  *  arch/ppc/kernel/open_pic.c -- OpenPIC Interrupt Handling
@@ -17,11 +17,13 @@
 #include <linux/sched.h>
 #include <linux/init.h>
 #include <linux/irq.h>
+#include <linux/init.h>
 #include <asm/ptrace.h>
 #include <asm/signal.h>
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/prom.h>
+#include <asm/init.h>
 
 #include "local_irq.h"
 #include "open_pic.h"
@@ -47,8 +49,6 @@ OpenPIC_SourcePtr ISU[OPENPIC_MAX_ISU];
 
 /* Global Operations */
 static void openpic_disable_8259_pass_through(void);
-static u_int openpic_irq(void);
-static void openpic_eoi(void);
 static void openpic_set_priority(u_int pri);
 static void openpic_set_spurious(u_int vector);
 
@@ -73,8 +73,8 @@ static void openpic_mapirq(u_int irq, u_int cpumask);
  * These functions are not used but the code is kept here
  * for completeness and future reference.
  */
-#ifdef notused
 static void openpic_reset(void);
+#ifdef notused
 static void openpic_enable_8259_pass_through(void);
 static u_int openpic_get_priority(void);
 static u_int openpic_get_spurious(void);
@@ -412,13 +412,16 @@ void find_ISUs(void)
 #endif
 }
 
-#ifdef notused
 static void openpic_reset(void)
 {
 	openpic_setfield(&OpenPIC->Global.Global_Configuration0,
 			 OPENPIC_CONFIG_RESET);
+	while (openpic_readfield(&OpenPIC->Global.Global_Configuration0,
+				 OPENPIC_CONFIG_RESET))
+		mb();
 }
 
+#ifdef notused
 static void openpic_enable_8259_pass_through(void)
 {
 	openpic_clearfield(&OpenPIC->Global.Global_Configuration0,
@@ -435,7 +438,7 @@ static void openpic_disable_8259_pass_through(void)
 /*
  *  Find out the current interrupt
  */
-static u_int openpic_irq(void)
+u_int openpic_irq(void)
 {
 	u_int vec;
 	DECL_THIS_CPU;
@@ -446,7 +449,7 @@ static u_int openpic_irq(void)
 	return vec;
 }
 
-static void openpic_eoi(void)
+void openpic_eoi(void)
 {
 	DECL_THIS_CPU;
 
@@ -518,6 +521,8 @@ void openpic_init_processor(u_int cpumask)
 		      physmask(cpumask));
 }
 
+static spinlock_t openpic_setup_lock = SPIN_LOCK_UNLOCKED;
+
 #ifdef CONFIG_SMP
 /*
  *  Initialize an interprocessor interrupt (and disable it)
@@ -583,7 +588,6 @@ void openpic_request_IPIs(void)
  * Get IPI's working and start taking interrupts.
  *   -- Cort
  */
-static spinlock_t openpic_setup_lock __initdata = SPIN_LOCK_UNLOCKED;
 
 void __init do_openpic_setup_cpu(void)
 {
@@ -802,11 +806,87 @@ openpic_get_irq(struct pt_regs *regs)
 #endif
 		openpic_eoi();
         }
-	if (irq == OPENPIC_VEC_SPURIOUS + open_pic_irq_offset) {
+	if (irq == OPENPIC_VEC_SPURIOUS + open_pic_irq_offset)
 		irq = -1;
-		/* That's not SMP safe ... but who cares ? */
-		ppc_spurious_interrupts++;
-	}
 	return irq;
 }
 
+#ifdef CONFIG_SMP
+void
+smp_openpic_message_pass(int target, int msg, unsigned long data, int wait)
+{
+	/* make sure we're sending something that translates to an IPI */
+	if (msg > 0x3) {
+		printk("SMP %d: smp_message_pass: unknown msg %d\n",
+		       smp_processor_id(), msg);
+		return;
+	}
+	switch (target) {
+	case MSG_ALL:
+		openpic_cause_IPI(msg, 0xffffffff);
+		break;
+	case MSG_ALL_BUT_SELF:
+		openpic_cause_IPI(msg,
+				  0xffffffff & ~(1 << smp_processor_id()));
+		break;
+	default:
+		openpic_cause_IPI(msg, 1<<target);
+		break;
+	}
+}
+#endif /* CONFIG_SMP */
+
+#ifdef CONFIG_PMAC_PBOOK
+static u32 save_ipi_vp[OPENPIC_NUM_IPI];
+static u32 save_irq_src_vp[OPENPIC_MAX_SOURCES];
+static u32 save_irq_src_dest[OPENPIC_MAX_SOURCES];
+static u32 save_cpu_task_pri[OPENPIC_MAX_PROCESSORS];
+
+void __pmac
+openpic_sleep_save_intrs(void)
+{
+	int	i;
+	unsigned long flags;
+	
+	spin_lock_irqsave(&openpic_setup_lock, flags);
+
+	for (i=0; i<NumProcessors; i++) {
+		save_cpu_task_pri[i] = openpic_read(&OpenPIC->Processor[i].Current_Task_Priority);
+		openpic_writefield(&OpenPIC->Processor[i].Current_Task_Priority,
+				   OPENPIC_CURRENT_TASK_PRIORITY_MASK, 0xf);
+	}
+
+	for (i=0; i<OPENPIC_NUM_IPI; i++)
+		save_ipi_vp[i] = openpic_read(&OpenPIC->Global.IPI_Vector_Priority(i));
+	for (i=0; i<NumSources; i++) {
+		save_irq_src_vp[i] = openpic_read(&OpenPIC->Source[i].Vector_Priority)
+			& ~OPENPIC_ACTIVITY;
+		save_irq_src_dest[i] = openpic_read(&OpenPIC->Source[i].Destination);
+	}
+	spin_unlock_irqrestore(&openpic_setup_lock, flags);
+}
+
+void __pmac
+openpic_sleep_restore_intrs(void)
+{
+	int		i;
+	unsigned long	flags;
+
+	spin_lock_irqsave(&openpic_setup_lock, flags);
+	
+	openpic_reset();
+
+	for (i=0; i<OPENPIC_NUM_IPI; i++)
+		openpic_write(&OpenPIC->Global.IPI_Vector_Priority(i), save_ipi_vp[i]);
+	for (i=0; i<NumSources; i++) {
+		openpic_write(&OpenPIC->Source[i].Vector_Priority, save_irq_src_vp[i]);
+		openpic_write(&OpenPIC->Source[i].Destination, save_irq_src_dest[i]);
+	}
+	openpic_set_spurious(OPENPIC_VEC_SPURIOUS+open_pic_irq_offset);
+	openpic_disable_8259_pass_through();
+	for (i=0; i<NumProcessors; i++)
+		openpic_write(&OpenPIC->Processor[i].Current_Task_Priority, save_cpu_task_pri[i]);
+
+	spin_unlock_irqrestore(&openpic_setup_lock, flags);
+}
+#endif /* CONFIG_PMAC_PBOOK */

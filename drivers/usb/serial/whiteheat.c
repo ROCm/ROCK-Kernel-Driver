@@ -412,12 +412,19 @@ static int whiteheat_ioctl (struct usb_serial_port *port, struct file * file, un
 
 static void whiteheat_set_termios (struct usb_serial_port *port, struct termios *old_termios)
 {
-	unsigned int cflag = port->tty->termios->c_cflag;
+	unsigned int cflag;
 	struct whiteheat_port_settings port_settings;
 
 	dbg(__FUNCTION__ " -port %d", port->number);
 
 	down (&port->sem);
+
+	if ((!port->tty) || (!port->tty->termios)) {
+		dbg(__FUNCTION__" - no tty structures");
+		goto exit;
+	}
+	
+	cflag = port->tty->termios->c_cflag;
 	/* check that they really want us to change something */
 	if (old_termios) {
 		if ((cflag == old_termios->c_cflag) &&
@@ -427,11 +434,6 @@ static void whiteheat_set_termios (struct usb_serial_port *port, struct termios 
 		}
 	}
 
-	if ((!port->tty) || (!port->tty->termios)) {
-		dbg(__FUNCTION__" - no tty structures");
-		goto exit;
-	}
-	
 	/* set the port number */
 	/* firmware uses 1 based port numbering */
 	port_settings.port = port->number + 1;

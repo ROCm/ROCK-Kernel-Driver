@@ -1,4 +1,4 @@
-/* $Id: pgtable.h,v 1.141 2001/08/13 20:24:34 kanoj Exp $
+/* $Id: pgtable.h,v 1.143 2001/08/22 22:16:56 kanoj Exp $
  * pgtable.h: SpitFire page table operations.
  *
  * Copyright 1996,1997 David S. Miller (davem@caip.rutgers.edu)
@@ -17,16 +17,6 @@
 #include <asm/mmu_context.h>
 #include <asm/system.h>
 #include <asm/page.h>
-
-#ifndef __ASSEMBLY__
-
-#define PG_dcache_dirty		PG_arch_1
-
-/* Certain architectures need to do special things when pte's
- * within a page table are directly modified.  Thus, the following
- * hook is made available.
- */
-#define set_pte(pteptr, pteval) ((*(pteptr)) = (pteval))
 
 /* XXX All of this needs to be rethought so we can take advantage
  * XXX cheetah's full 64-bit virtual address space, ie. no more hole
@@ -55,6 +45,16 @@
 #define PGDIR_SIZE	(1UL << PGDIR_SHIFT)
 #define PGDIR_MASK	(~(PGDIR_SIZE-1))
 
+#ifndef __ASSEMBLY__
+
+#define PG_dcache_dirty		PG_arch_1
+
+/* Certain architectures need to do special things when pte's
+ * within a page table are directly modified.  Thus, the following
+ * hook is made available.
+ */
+#define set_pte(pteptr, pteval) ((*(pteptr)) = (pteval))
+
 /* Entries per page directory level. */
 #define PTRS_PER_PTE		(1UL << (PAGE_SHIFT-3))
 
@@ -72,9 +72,6 @@
 #define USER_PTRS_PER_PGD	((const int)((current->thread.flags & SPARC_FLAG_32BIT) ? \
 				 (1) : (PTRS_PER_PGD)))
 #define FIRST_USER_PGD_NR	0
-
-#define PTE_TABLE_SIZE	0x2000	/* 1024 entries 8 bytes each */
-#define PMD_TABLE_SIZE	0x2000	/* 2048 entries 4 bytes each */
 
 /* NOTE: TLB miss handlers depend heavily upon where this is. */
 #define VMALLOC_START		0x0000000140000000UL

@@ -11,7 +11,7 @@
  */
 
 #include <linux/config.h>
-
+#include <linux/errno.h>
 #include "ntfstypes.h"
 #include "struct.h"
 #include "util.h"
@@ -27,10 +27,8 @@
 #include <linux/init.h>
 #include <linux/smp_lock.h>
 #include <asm/page.h>
-
-#ifndef NLS_MAX_CHARSET_SIZE
 #include <linux/nls.h>
-#endif
+#include <linux/ntfs_fs.h>
 
 /* Forward declarations. */
 static struct inode_operations ntfs_dir_inode_operations;
@@ -67,6 +65,7 @@ static ssize_t ntfs_read(struct file *filp, char *buf, size_t count,loff_t *off)
 {
 	int error;
 	ntfs_io io;
+	ntfs_attribute *attr;
 	ntfs_inode *ino = NTFS_LINO2NINO(filp->f_dentry->d_inode);
 
 	/* Inode is not properly initialized. */
@@ -75,11 +74,14 @@ static ssize_t ntfs_read(struct file *filp, char *buf, size_t count,loff_t *off)
 	ntfs_debug(DEBUG_OTHER, "ntfs_read %x, %Lx, %x ->",
 		   (unsigned)ino->i_number, (unsigned long long)*off,
 		   (unsigned)count);
+	attr = ntfs_find_attr(ino, ino->vol->at_data, NULL);
 	/* Inode has no unnamed data attribute. */
-	if(!ntfs_find_attr(ino, ino->vol->at_data, NULL)) {
+	if (!attr) {
 		ntfs_debug(DEBUG_OTHER, "ntfs_read: $DATA not found!\n");
 		return -EINVAL;
 	}
+	if (attr->flags & ATTR_IS_ENCRYPTED)
+		return -EACCES;
 	/* Read the data. */
 	io.fn_put = ntfs_putuser;
 	io.fn_get = 0;
@@ -285,8 +287,21 @@ static int simple_getbool(char *s, int *setval)
 	return 1;
 }
 
+/*
+ * This needs to be outside parse_options() otherwise a remount will reset
+ * these unintentionally.
+ */
+static void init_ntfs_super_block(ntfs_volume* vol)
+{
+	vol->uid = vol->gid = 0;
+	vol->umask = 0077;
+	vol->ngt = ngt_nt;
+	vol->nls_map = (void*)-1;
+	vol->mft_zone_multiplier = -1;
+}
+
 /* Parse the (re)mount options. */
-static int parse_options(ntfs_volume *vol, char *opt, int remount)
+static int parse_options(ntfs_volume *vol, char *opt)
 {
 	char *value;		/* Defaults if not specified and !remount. */
 	ntfs_uid_t uid = -1;	/* 0, root user only */
@@ -296,6 +311,8 @@ static int parse_options(ntfs_volume *vol, char *opt, int remount)
 	void *nls_map = NULL;	/* Try to load the default NLS. */
 	int use_utf8 = -1;	/* If no NLS specified and loading the default
 				   NLS failed use utf8. */
+	int mft_zone_mul = -1;	/* 1 */
+
 	if (!opt)
 		goto done;
 	for (opt = strtok(opt, ","); opt; opt = strtok(NULL, ",")) {
@@ -325,6 +342,24 @@ static int parse_options(ntfs_volume *vol, char *opt, int remount)
 				printk(KERN_ERR "NTFS: umask invalid "
 						"argument\n");
 				return 0;
+			}
+		} else if (strcmp(opt, "mft_zone_multiplier") == 0) {
+			unsigned long ul;
+
+			if (!value || !*value)
+				goto needs_arg;
+			ul = simple_strtoul(value, &value, 0);
+			if (*value) {
+				printk(KERN_ERR "NTFS: mft_zone_multiplier "
+						"invalid argument\n");
+				return 0;
+			}
+			if (ul >= 1 && ul <= 4)
+				mft_zone_mul = ul;
+			else {
+				mft_zone_mul = 1;
+				printk(KERN_WARNING "NTFS: mft_zone_multiplier "
+					      "out of range. Setting to 1.\n");
 			}
 		} else if (strcmp(opt, "posix") == 0) {
 			int val;
@@ -361,40 +396,69 @@ static int parse_options(ntfs_volume *vol, char *opt, int remount)
 		}
 	}
 done:
-	if (use_utf8 != -1 && use_utf8) {
-		if (nls_map) {
+	if (use_utf8 == -1) {
+		/* utf8 was not specified at all. */
+		if (!nls_map) {
+			/*
+			 * No NLS was specified. If first mount, load the
+			 * default NLS, otherwise don't change the NLS setting.
+			 */
+			if (vol->nls_map == (void*)-1)
+				vol->nls_map = load_nls_default();
+		} else {
+			/* If an NLS was already loaded, unload it first. */
+			if (vol->nls_map && vol->nls_map != (void*)-1)
+				unload_nls(vol->nls_map);
+			/* Use the specified NLS. */
+			vol->nls_map = nls_map;
+		}
+	} else {
+		/* utf8 was specified. */
+		if (use_utf8 && nls_map) {
 			unload_nls(nls_map);
 			printk(KERN_ERR "NTFS: utf8 cannot be combined with "
 					"iocharset.\n");
 			return 0;
 		}
-		if (remount && vol->nls_map)
+		/* If an NLS was already loaded, unload it first. */
+		if (vol->nls_map && vol->nls_map != (void*)-1)
 			unload_nls(vol->nls_map);
-		vol->nls_map = NULL;
-	} else {
-		if (nls_map) {
-			if (remount && vol->nls_map)
-				unload_nls(vol->nls_map);
-			vol->nls_map = nls_map;
-		} else if (!remount || (remount && !use_utf8 && !vol->nls_map))
-			vol->nls_map = load_nls_default();
+		if (!use_utf8) {
+			/* utf8 was specified as false. */
+			if (!nls_map)
+				/* No NLS was specified, load the default. */
+				vol->nls_map = load_nls_default();
+			else
+				/* Use the specified NLS. */
+				vol->nls_map = nls_map;
+		} else
+			/* utf8 was specified as true. */
+			vol->nls_map = NULL;
 	}
 	if (uid != -1)
 		vol->uid = uid;
-	else if (!remount)
-		vol->uid = 0;
 	if (gid != -1)
 		vol->gid = gid;
-	else if (!remount)
-		vol->gid = 0;
 	if (umask != -1)
 		vol->umask = (ntmode_t)umask;
-	else if (!remount)
-		vol->umask = 0077;
 	if (ngt != -1)
 		vol->ngt = ngt;
-	else if (!remount)
-		vol->ngt = ngt_nt;
+	if (mft_zone_mul != -1) {
+		/* mft_zone_multiplier was specified. */
+		if (vol->mft_zone_multiplier != -1) {
+			/* This is a remount, ignore a change and warn user. */
+			if (vol->mft_zone_multiplier != mft_zone_mul)
+				printk(KERN_WARNING "NTFS: Ignoring changes in "
+						"mft_zone_multiplier on "
+						"remount. If you want to "
+						"change this you need to "
+						"umount and mount again.\n");
+		} else
+			/* Use the specified multiplier. */
+			vol->mft_zone_multiplier = mft_zone_mul;
+	} else if (vol->mft_zone_multiplier == -1)
+		/* No multiplier specified and first mount, so set default. */
+		vol->mft_zone_multiplier = 1;
 	return 1;
 needs_arg:
 	printk(KERN_ERR "NTFS: %s needs an argument", opt);
@@ -436,10 +500,12 @@ static struct dentry *ntfs_lookup(struct inode *dir, struct dentry *d)
 }
 
 static struct file_operations ntfs_file_operations_nommap = {
+	llseek:		generic_file_llseek,
 	read:		ntfs_read,
 #ifdef CONFIG_NTFS_RW
 	write:		ntfs_write,
 #endif
+	open:		generic_file_open,
 };
 
 static struct inode_operations ntfs_inode_operations_nobmap;
@@ -556,18 +622,8 @@ static int _linux_ntfs_mkdir(struct inode *dir, struct dentry* d, int mode)
 }
 #endif
 
-#if 0
-static int ntfs_bmap(struct inode *ino, int block)
-{
-	int ret = ntfs_vcn_to_lcn(NTFS_LINO2NINO(ino), block);
-	ntfs_debug(DEBUG_OTHER, "bmap of %lx, block %x is %x\n", ino->i_ino,
-		   block, ret);
-	return (ret == -1) ? 0 : ret;
-}
-#endif
-
 /* It's fscking broken. */
-/* FIXME: [bm]map code is disabled until ntfs_get_block() gets sorted! */
+/* FIXME: mmap code is disabled until ntfs_get_block() gets sorted! */
 /*
 static int ntfs_get_block(struct inode *inode, long block, struct buffer_head *bh, int create)
 {
@@ -576,11 +632,13 @@ static int ntfs_get_block(struct inode *inode, long block, struct buffer_head *b
 }
 
 static struct file_operations ntfs_file_operations = {
+	llseek:		generic_file_llseek,
 	read:		ntfs_read,
 	mmap:		generic_file_mmap,
 #ifdef CONFIG_NTFS_RW
 	write:		ntfs_write,
 #endif
+	open:		generic_file_open,
 };
 
 static struct inode_operations ntfs_inode_operations;
@@ -646,19 +704,10 @@ static void ntfs_read_inode(struct inode* inode)
 
 	vol = NTFS_INO2VOL(inode);
 	inode->i_mode = 0;
-	ntfs_debug(DEBUG_OTHER, "ntfs_read_inode 0x%x\n", (unsigned)inode->i_ino);
-	/*
-	 * This kills all accesses to system files (except $Extend directory).
-	 * The driver can bypass this by calling ntfs_init_inode() directly.
-	 * Only if ngt is ngt_full do we allow access to the system files.
-	 */
+	ntfs_debug(DEBUG_OTHER, "ntfs_read_inode 0x%lx\n", inode->i_ino);
 	switch (inode->i_ino) {
 		/* Those are loaded special files. */
 	case FILE_$Mft:
-		if (vol->ngt != ngt_full) {
-			ntfs_error("Trying to open $MFT!\n");
-			return;
-		}
 		if (!vol->mft_ino || ((vol->ino_flags & 1) == 0))
 			goto sys_file_error;
 		ntfs_memcpy(&inode->u.ntfs_i, vol->mft_ino, sizeof(ntfs_inode));
@@ -670,10 +719,6 @@ static void ntfs_read_inode(struct inode* inode)
 		ntfs_debug(DEBUG_OTHER, "Opening $MFT!\n");
 		break;
 	case FILE_$MftMirr:
-		if (vol->ngt != ngt_full) {
-			ntfs_error("Trying to open $MFTMirr!\n");
-			return;
-		}
 		if (!vol->mftmirr || ((vol->ino_flags & 2) == 0))
 			goto sys_file_error;
 		ntfs_memcpy(&inode->u.ntfs_i, vol->mftmirr, sizeof(ntfs_inode));
@@ -685,10 +730,6 @@ static void ntfs_read_inode(struct inode* inode)
 		ntfs_debug(DEBUG_OTHER, "Opening $MFTMirr!\n");
 		break;
 	case FILE_$BitMap:
-		if (vol->ngt != ngt_full) {
-			ntfs_error("Trying to open $Bitmap!\n");
-			return;
-		}
 		if (!vol->bitmap || ((vol->ino_flags & 4) == 0))
 			goto sys_file_error;
 		ntfs_memcpy(&inode->u.ntfs_i, vol->bitmap, sizeof(ntfs_inode));
@@ -700,14 +741,10 @@ static void ntfs_read_inode(struct inode* inode)
 		ntfs_debug(DEBUG_OTHER, "Opening $Bitmap!\n");
 		break;
 	case FILE_$LogFile ... FILE_$AttrDef:
-	/* We need to allow reading the root directory. */
+	/* No need to log root directory accesses. */
 	case FILE_$Boot ... FILE_$UpCase:
-		if (vol->ngt != ngt_full) {
-			ntfs_error("Trying to open system file %i!\n",
-								inode->i_ino);
-	 		return;
-		} /* Do the default for ngt_full. */
-		ntfs_debug(DEBUG_OTHER, "Opening system file %i!\n", inode->i_ino);
+		ntfs_debug(DEBUG_OTHER, "Opening system file %i!\n",
+				inode->i_ino);
 	default:
 		ino = &inode->u.ntfs_i;
 		if (!ino || ntfs_init_inode(ino, NTFS_INO2VOL(inode),
@@ -731,7 +768,8 @@ static void ntfs_read_inode(struct inode* inode)
 		inode->i_size = data->size;
 		/* FIXME: once ntfs_get_block is implemented, uncomment the
 		 * next line and remove the "can_mmap = 0;". (AIA) */
-		/* can_mmap = !data->resident && !data->compressed; */
+		/* can_mmap = !data->resident && !(data->flags &
+		 * 		(ATTR_IS_COMPRESSED | ATTR_IS_ENCRYPTED)); */
 		can_mmap = 0;
 	}
 	/* Get the file modification times from the standard information. */
@@ -768,7 +806,7 @@ static void ntfs_read_inode(struct inode* inode)
 		inode->i_mode = S_IFREG | S_IRUGO;
 	}
 #ifdef CONFIG_NTFS_RW
-	if (!data || !data->compressed)
+	if (!data || !(data->flags & (ATTR_IS_COMPRESSED | ATTR_IS_ENCRYPTED)))
 		inode->i_mode |= S_IWUGO;
 #endif
 	inode->i_mode &= ~vol->umask;
@@ -798,13 +836,10 @@ static void _ntfs_clear_inode(struct inode *inode)
 	ntfs_debug(DEBUG_OTHER, "_ntfs_clear_inode 0x%x\n", inode->i_ino);
 	vol = NTFS_INO2VOL(inode);
 	if (!vol)
-		ntfs_error("_ntfs_clear_inode: vol = NTFS_INO2VOL(inode) is NULL.\n");
+		ntfs_error("_ntfs_clear_inode: vol = NTFS_INO2VOL(inode) is "
+				"NULL.\n");
 	switch (inode->i_ino) {
 	case FILE_$Mft:
-		if (vol->ngt != ngt_full) {
-			ntfs_error("Trying to _clear_inode of $MFT!\n");
-			goto unl_out;
-		}
 		if (vol->mft_ino && ((vol->ino_flags & 1) == 0)) {
 			ino = (ntfs_inode*)ntfs_malloc(sizeof(ntfs_inode));
 			ntfs_memcpy(ino, &inode->u.ntfs_i, sizeof(ntfs_inode));
@@ -814,10 +849,6 @@ static void _ntfs_clear_inode(struct inode *inode)
 		}
 		break;
 	case FILE_$MftMirr:
-		if (vol->ngt != ngt_full) {
-			ntfs_error("Trying to _clear_inode of $MFTMirr!\n");
-			goto unl_out;
-		}
 		if (vol->mftmirr && ((vol->ino_flags & 2) == 0)) {
 			ino = (ntfs_inode*)ntfs_malloc(sizeof(ntfs_inode));
 			ntfs_memcpy(ino, &inode->u.ntfs_i, sizeof(ntfs_inode));
@@ -827,10 +858,6 @@ static void _ntfs_clear_inode(struct inode *inode)
 		}
 		break;
 	case FILE_$BitMap:
-		if (vol->ngt != ngt_full) {
-			ntfs_error("Trying to _clear_inode of $Bitmap!\n");
-			goto unl_out;
-		}
 		if (vol->bitmap && ((vol->ino_flags & 4) == 0)) {
 			ino = (ntfs_inode*)ntfs_malloc(sizeof(ntfs_inode));
 			ntfs_memcpy(ino, &inode->u.ntfs_i, sizeof(ntfs_inode));
@@ -839,13 +866,6 @@ static void _ntfs_clear_inode(struct inode *inode)
 			goto unl_out;
 		}
 		break;
-	case FILE_$LogFile ... FILE_$AttrDef:
-	case FILE_$Boot ... FILE_$UpCase:
-		if (vol->ngt != ngt_full) {
-			ntfs_error("Trying to _clear_inode of system file %i! "
-					"Shouldn't happen.\n", inode->i_ino);
-			goto unl_out;
-		} /* Do the default for ngt_full. */
 	default:
 		/* Nothing. Just clear the inode and exit. */
 	}
@@ -905,7 +925,7 @@ static int ntfs_statfs(struct super_block *sb, struct statfs *sf)
 /* Called when remounting a filesystem by do_remount_sb() in fs/super.c. */
 static int ntfs_remount_fs(struct super_block *sb, int *flags, char *options)
 {
-	if (!parse_options(NTFS_SB2VOL(sb), options, 1))
+	if (!parse_options(NTFS_SB2VOL(sb), options))
 		return -EINVAL;
 	return 0;
 }
@@ -1006,11 +1026,12 @@ struct super_block * ntfs_read_super(struct super_block *sb, void *options,
 {
 	ntfs_volume *vol;
 	struct buffer_head *bh;
-	int i;
+	int i, to_read;
 
 	ntfs_debug(DEBUG_OTHER, "ntfs_read_super\n");
 	vol = NTFS_SB2VOL(sb);
-	if (!parse_options(vol, (char*)options, 0))
+	init_ntfs_super_block(vol);
+	if (!parse_options(vol, (char*)options))
 		goto ntfs_read_super_vol;
 	/* Assume a 512 bytes block device for now. */
 	set_blocksize(sb->s_dev, 512);
@@ -1048,12 +1069,17 @@ struct super_block * ntfs_read_super(struct super_block *sb, void *options,
 	set_blocksize(sb->s_dev, sb->s_blocksize);
 	ntfs_debug(DEBUG_OTHER, "set_blocksize\n");
 	/* Allocate an MFT record (MFT record can be smaller than a cluster). */
-	if (!(vol->mft = ntfs_malloc(max(int, vol->mft_record_size,
-					 vol->cluster_size))))
+	i = vol->cluster_size;
+	if (i < vol->mft_record_size)
+		i = vol->mft_record_size;
+	if (!(vol->mft = ntfs_malloc(i)))
 		goto ntfs_read_super_unl;
 
 	/* Read at least the MFT record for $Mft. */
-	for (i = 0; i < max(int, vol->mft_clusters_per_record, 1); i++) {
+	to_read = vol->mft_clusters_per_record;
+	if (to_read < 1)
+		to_read = 1;
+	for (i = 0; i < to_read; i++) {
 		if (!(bh = bread(sb->s_dev, vol->mft_lcn + i,
 							  vol->cluster_size))) {
 			ntfs_error("Could not read $Mft record 0\n");

@@ -28,6 +28,14 @@ Known bugs:
 
 Please direct bug reports to: zippel@linux-m68k.org
 
+Version 3.17
+------------
+
+- locking fixes
+- wrong sign in __affs_hash_dentry
+- remove unnecessary check in affs_new_inode
+- enable international mode for dircache fs
+
 Version 3.16
 ------------
 

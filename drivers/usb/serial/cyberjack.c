@@ -241,7 +241,8 @@ static int cyberjack_write (struct usb_serial_port *port, int from_user, const u
 
 	/* Copy data */
 	if (from_user) {
-		copy_from_user(priv->wrbuf+priv->wrfilled, buf, count);
+		if (copy_from_user(priv->wrbuf+priv->wrfilled, buf, count))
+			return -EFAULT;
 	} else {
 		memcpy (priv->wrbuf+priv->wrfilled, buf, count);
 	}  

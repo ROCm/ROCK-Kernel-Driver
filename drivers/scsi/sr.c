@@ -101,7 +101,6 @@ static void sr_release(struct cdrom_device_info *cdi)
 {
 	if (scsi_CDs[MINOR(cdi->dev)].device->sector_size > 2048)
 		sr_set_blocklength(MINOR(cdi->dev), 2048);
-	sync_dev(cdi->dev);
 	scsi_CDs[MINOR(cdi->dev)].device->access_count--;
 	if (scsi_CDs[MINOR(cdi->dev)].device->host->hostt->module)
 		__MOD_DEC_USE_COUNT(scsi_CDs[MINOR(cdi->dev)].device->host->hostt->module);

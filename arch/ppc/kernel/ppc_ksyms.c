@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.ppc_ksyms.c 1.38 07/23/01 15:35:53 trini
+ * BK Id: SCCS/s.ppc_ksyms.c 1.51 08/24/01 17:05:47 paulus
  */
 #include <linux/config.h>
 #include <linux/module.h>
@@ -48,6 +48,8 @@
 #include <asm/smp.h>
 #endif /* CONFIG_SMP */
 #include <asm/time.h>
+#include <asm/cputable.h>
+#include <asm/btext.h>
 
 #ifdef  CONFIG_8xx
 #include "../8xx_io/commproc.h"
@@ -72,6 +74,8 @@ long long __ashldi3(long long, int);
 long long __lshrdi3(long long, int);
 int abs(int);
 extern unsigned long ret_to_user_hook;
+
+extern unsigned long mm_ptov (unsigned long paddr);
 
 EXPORT_SYMBOL(clear_page);
 EXPORT_SYMBOL(do_signal);
@@ -157,16 +161,10 @@ EXPORT_SYMBOL(_outsl_ns);
 EXPORT_SYMBOL(ioremap);
 EXPORT_SYMBOL(__ioremap);
 EXPORT_SYMBOL(iounmap);
+EXPORT_SYMBOL(iopa);
+EXPORT_SYMBOL(mm_ptov);
 
-EXPORT_SYMBOL(ide_insw);
-EXPORT_SYMBOL(ide_outsw);
 EXPORT_SYMBOL(ppc_ide_md);
-#ifdef CONFIG_BLK_DEV_IDE_MODULE
-EXPORT_SYMBOL(chrp_ide_irq);
-EXPORT_SYMBOL(chrp_ide_ports_known);
-EXPORT_SYMBOL(chrp_ide_regbase);
-EXPORT_SYMBOL(chrp_ide_probe);
-#endif
 
 #ifdef CONFIG_PCI
 EXPORT_SYMBOL_NOVERS(isa_io_base);
@@ -183,10 +181,10 @@ EXPORT_SYMBOL(kernel_thread);
 /*EXPORT_SYMBOL(_disable_interrupts);
   EXPORT_SYMBOL(_enable_interrupts);*/
 EXPORT_SYMBOL(flush_instruction_cache);
-EXPORT_SYMBOL(_get_PVR);
 EXPORT_SYMBOL(giveup_fpu);
 EXPORT_SYMBOL(enable_kernel_fp);
 EXPORT_SYMBOL(flush_icache_range);
+EXPORT_SYMBOL(flush_dcache_range);
 EXPORT_SYMBOL(xchg_u32);
 #ifdef CONFIG_ALTIVEC
 EXPORT_SYMBOL(last_task_used_altivec);
@@ -200,6 +198,7 @@ EXPORT_SYMBOL(__global_cli);
 EXPORT_SYMBOL(__global_sti);
 EXPORT_SYMBOL(__global_save_flags);
 EXPORT_SYMBOL(__global_restore_flags);
+#ifdef SPINLOCK_DEBUG
 EXPORT_SYMBOL(_spin_lock);
 EXPORT_SYMBOL(_spin_unlock);
 EXPORT_SYMBOL(spin_trylock);
@@ -207,6 +206,7 @@ EXPORT_SYMBOL(_read_lock);
 EXPORT_SYMBOL(_read_unlock);
 EXPORT_SYMBOL(_write_lock);
 EXPORT_SYMBOL(_write_unlock);
+#endif
 EXPORT_SYMBOL(smp_call_function);
 EXPORT_SYMBOL(smp_hw_index);
 EXPORT_SYMBOL(smp_num_cpus);
@@ -226,17 +226,6 @@ EXPORT_SYMBOL(adb_try_handler_change);
 EXPORT_SYMBOL(cuda_request);
 EXPORT_SYMBOL(cuda_poll);
 #endif /* CONFIG_ADB_CUDA */
-#ifdef CONFIG_ADB_PMU
-EXPORT_SYMBOL(pmu_request);
-EXPORT_SYMBOL(pmu_poll);
-EXPORT_SYMBOL(pmu_suspend);
-EXPORT_SYMBOL(pmu_resume);
-#endif /* CONFIG_ADB_PMU */
-#ifdef CONFIG_PMAC_PBOOK
-EXPORT_SYMBOL(pmu_register_sleep_notifier);
-EXPORT_SYMBOL(pmu_unregister_sleep_notifier);
-EXPORT_SYMBOL(pmu_enable_irled);
-#endif /* CONFIG_PMAC_PBOOK */
 #ifdef CONFIG_PMAC_BACKLIGHT
 EXPORT_SYMBOL(get_backlight_level);
 EXPORT_SYMBOL(set_backlight_level);
@@ -245,7 +234,6 @@ EXPORT_SYMBOL(register_backlight_controller);
 #endif /* CONFIG_PMAC_BACKLIGHT */
 #if defined(CONFIG_ALL_PPC)
 EXPORT_SYMBOL(_machine);
-EXPORT_SYMBOL_NOVERS(have_of);
 EXPORT_SYMBOL_NOVERS(sys_ctrler);
 EXPORT_SYMBOL(find_devices);
 EXPORT_SYMBOL(find_type_devices);
@@ -273,10 +261,11 @@ EXPORT_SYMBOL(feature_gmac_phy_reset);
 EXPORT_SYMBOL(feature_set_usb_power);
 EXPORT_SYMBOL(feature_set_firewire_power);
 EXPORT_SYMBOL(feature_set_firewire_cable_power);
+EXPORT_SYMBOL(feature_set_modem_power);
 EXPORT_SYMBOL(feature_set_airport_power);
 #endif /* defined(CONFIG_ALL_PPC) */
 #if defined(CONFIG_BOOTX_TEXT)
-EXPORT_SYMBOL(bootx_update_display);
+EXPORT_SYMBOL(btext_update_display);
 #endif
 #if defined(CONFIG_SCSI) && defined(CONFIG_ALL_PPC)
 EXPORT_SYMBOL(note_scsi_host);
@@ -303,7 +292,7 @@ EXPORT_SYMBOL_NOVERS(memcmp);
 
 EXPORT_SYMBOL(abs);
 
-#ifdef CONFIG_VT
+#ifdef CONFIG_VGA_CONSOLE
 EXPORT_SYMBOL(screen_info);
 #endif
 
@@ -367,3 +356,4 @@ EXPORT_SYMBOL(intercept_table);
 #endif
 extern long *ret_from_intercept;
 EXPORT_SYMBOL(ret_from_intercept);
+EXPORT_SYMBOL(cur_cpu_spec);

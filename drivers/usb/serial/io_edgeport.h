@@ -25,16 +25,6 @@
 #ifndef FALSE
 	#define FALSE		(0)
 #endif
-#ifndef MIN
-	#define MIN(a,b)	(((a)<(b))?(a):(b))
-#endif
-#ifndef MAX
-	#define MAX(a,b)	(((a)>(b))?(a):(b))
-#endif
-#ifndef max
-	#define max		MAX
-#endif
-
 #ifndef LOW8
 	#define LOW8(a)		((unsigned char)(a & 0xff))
 #endif

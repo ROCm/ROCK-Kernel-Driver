@@ -1,6 +1,8 @@
 #ifndef _LINUX_NTFS_FS_I_H
 #define _LINUX_NTFS_FS_I_H
 
+#include <linux/types.h>
+
 /* Forward declarations, to keep number of mutual includes low */
 struct ntfs_attribute;
 struct ntfs_sb_info;

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.checksum.S 1.5 05/17/01 18:14:22 cort
+ * BK Id: SCCS/s.checksum.S 1.8 08/20/01 22:09:34 paulus
  */
 /*
  * This file contains assembly-language implementations
@@ -122,12 +122,30 @@ _GLOBAL(csum_partial_copy_generic)
 	addc	r0,r0,r6
 	srwi.	r6,r5,2		/* # words to do */
 	beq	3f
-1:	mtctr	r6
-82:	lwzu	r6,4(r3)	/* the bdnz has zero overhead, so it should */
-92:	stwu	r6,4(r4)	/* be unnecessary to unroll this loop */
+1:	srwi.	r6,r5,4		/* # groups of 4 words to do */
+	beq	10f
+	mtctr	r6
+71:	lwz	r6,4(r3)
+72:	lwz	r9,8(r3)
+73:	lwz	r10,12(r3)
+74:	lwzu	r11,16(r3)
 	adde	r0,r0,r6
+75:	stw	r6,4(r4)
+	adde	r0,r0,r9
+76:	stw	r9,8(r4)
+	adde	r0,r0,r10
+77:	stw	r10,12(r4)
+	adde	r0,r0,r11
+78:	stwu	r11,16(r4)
+	bdnz	71b
+10:	rlwinm.	r6,r5,30,30,31	/* # words left to do */
+	beq	13f
+	mtctr	r6
+82:	lwzu	r9,4(r3)
+92:	stwu	r9,4(r4)
+	adde	r0,r0,r9
 	bdnz	82b
-	andi.	r5,r5,3
+13:	andi.	r5,r5,3
 3:	cmpi	0,r5,2
 	blt+	4f
 83:	lhz	r6,4(r3)
@@ -148,12 +166,16 @@ _GLOBAL(csum_partial_copy_generic)
 /* These shouldn't go in the fixup section, since that would
    cause the ex_table addresses to get out of order. */
 
+src_error_4:
+	mfctr	r6		/* update # bytes remaining from ctr */
+	rlwimi	r5,r6,4,0,27
+	b	79f
 src_error_1:
 	li	r6,0
 	subi	r5,r5,2
 95:	sth	r6,4(r4)
 	addi	r4,r4,2
-	srwi.	r6,r5,2
+79:	srwi.	r6,r5,2
 	beq	3f
 	mtctr	r6
 src_error_2:
@@ -187,6 +209,14 @@ dst_error:
 .section __ex_table,"a"
 	.long	81b,src_error_1
 	.long	91b,dst_error
+	.long	71b,src_error_4
+	.long	72b,src_error_4
+	.long	73b,src_error_4
+	.long	74b,src_error_4
+	.long	75b,dst_error
+	.long	76b,dst_error
+	.long	77b,dst_error
+	.long	78b,dst_error
 	.long	82b,src_error_2
 	.long	92b,dst_error
 	.long	83b,src_error_3

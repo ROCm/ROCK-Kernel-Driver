@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.smp.c 1.25 05/23/01 00:38:42 cort
+ * BK Id: SCCS/s.smp.c 1.29 08/20/01 21:35:14 paulus
  */
 /*
  * Smp support for ppc.
@@ -9,11 +9,6 @@
  *
  * Copyright (C) 1999 Cort Dougan <cort@cs.nmt.edu>
  *
- * Support for PReP (Motorola MTX/MVME) and Macintosh G4 SMP 
- * by Troy Benjegerdes (hozer@drgw.net)
- *
- * Support for DayStar quad CPU cards
- * Copyright (C) XLR8, Inc. 1994-2000
  */
 
 #include <linux/config.h>
@@ -43,9 +38,9 @@
 #include <asm/residual.h>
 #include <asm/feature.h>
 #include <asm/time.h>
-#include <asm/gemini.h>
 
 #include "open_pic.h"
+
 int smp_threads_ready;
 volatile int smp_commenced;
 int smp_num_cpus = 1;
@@ -54,13 +49,14 @@ struct cpuinfo_PPC cpu_data[NR_CPUS];
 struct klock_info_struct klock_info = { KLOCK_CLEAR, 0 };
 atomic_t ipi_recv;
 atomic_t ipi_sent;
-spinlock_t kernel_flag = SPIN_LOCK_UNLOCKED;
+spinlock_t kernel_flag __cacheline_aligned = SPIN_LOCK_UNLOCKED;
 unsigned int prof_multiplier[NR_CPUS];
 unsigned int prof_counter[NR_CPUS];
 cycles_t cacheflush_time;
 static int max_cpus __initdata = NR_CPUS;
 unsigned long cpu_online_map;
 int smp_hw_index[NR_CPUS];
+static struct smp_ops_t *smp_ops;
 
 /* all cpu mappings are 1-1 -- Cort */
 volatile unsigned long cpu_callin_map[NR_CPUS];
@@ -74,60 +70,6 @@ extern int cpu_idle(void *unused);
 void smp_call_function_interrupt(void);
 void smp_message_pass(int target, int msg, unsigned long data, int wait);
 
-extern void __secondary_start_psurge(void);
-extern void __secondary_start_psurge2(void);	/* Temporary horrible hack */
-extern void __secondary_start_psurge3(void);	/* Temporary horrible hack */
-
-/* Addresses for powersurge registers */
-#define HAMMERHEAD_BASE		0xf8000000
-#define HHEAD_CONFIG		0x90
-#define HHEAD_SEC_INTR		0xc0
-
-/* register for interrupting the primary processor on the powersurge */
-/* N.B. this is actually the ethernet ROM! */
-#define PSURGE_PRI_INTR		0xf3019000
-
-/* register for storing the start address for the secondary processor */
-/* N.B. this is the PCI config space address register for the 1st bridge */
-#define PSURGE_START		0xf2800000
-
-/* Daystar/XLR8 4-CPU card */
-#define PSURGE_QUAD_REG_ADDR	0xf8800000
-
-#define PSURGE_QUAD_IRQ_SET	0
-#define PSURGE_QUAD_IRQ_CLR	1
-#define PSURGE_QUAD_IRQ_PRIMARY	2
-#define PSURGE_QUAD_CKSTOP_CTL	3
-#define PSURGE_QUAD_PRIMARY_ARB	4
-#define PSURGE_QUAD_BOARD_ID	6
-#define PSURGE_QUAD_WHICH_CPU	7
-#define PSURGE_QUAD_CKSTOP_RDBK	8
-#define PSURGE_QUAD_RESET_CTL	11
-
-#define PSURGE_QUAD_OUT(r, v)	(out_8(quad_base + ((r) << 4) + 4, (v)))
-#define PSURGE_QUAD_IN(r)	(in_8(quad_base + ((r) << 4) + 4) & 0x0f)
-#define PSURGE_QUAD_BIS(r, v)	(PSURGE_QUAD_OUT((r), PSURGE_QUAD_IN(r) | (v)))
-#define PSURGE_QUAD_BIC(r, v)	(PSURGE_QUAD_OUT((r), PSURGE_QUAD_IN(r) & ~(v)))
-
-/* virtual addresses for the above */
-static volatile u8 *hhead_base;
-static volatile u8 *quad_base;
-static volatile u32 *psurge_pri_intr;
-static volatile u8 *psurge_sec_intr;
-static volatile u32 *psurge_start;
-
-/* what sort of powersurge board we have */
-static int psurge_type;
-
-/* values for psurge_type */
-#define PSURGE_DUAL		0
-#define PSURGE_QUAD_OKEE	1
-#define PSURGE_QUAD_COTTON	2
-#define PSURGE_QUAD_ICEGRASS	3
-
-/* l2 cache stuff for dual G4 macs */
-extern void core99_init_l2(void);
-
 /* Since OpenPIC has only 4 IPIs, we use slightly different message numbers.
  * 
  * Make sure this matches openpic_request_IPIs in open_pic.c, or what shows up
@@ -137,620 +79,11 @@ extern void core99_init_l2(void);
 #define PPC_MSG_INVALIDATE_TLB	2
 #define PPC_MSG_XMON_BREAK	3
 
-static inline void set_tb(unsigned int upper, unsigned int lower)
-{
-	mtspr(SPRN_TBWL, 0);
-	mtspr(SPRN_TBWU, upper);
-	mtspr(SPRN_TBWL, lower);
-}
-
-/*
- * Set and clear IPIs for powersurge.
- */
-static inline void psurge_set_ipi(int cpu)
-{
-	if (cpu == 0)
-		in_be32(psurge_pri_intr);
-	else if (psurge_type == PSURGE_DUAL)
-		out_8(psurge_sec_intr, 0);
-	else
-		PSURGE_QUAD_OUT(PSURGE_QUAD_IRQ_SET, 1 << cpu);
-}
-
-static inline void psurge_clr_ipi(int cpu)
-{
-	if (cpu > 0) {
-		if (psurge_type == PSURGE_DUAL)
-			out_8(psurge_sec_intr, ~0);
-		else
-			PSURGE_QUAD_OUT(PSURGE_QUAD_IRQ_CLR, 1 << cpu);
-	}
-}
-
-/*
- * On powersurge (old SMP powermac architecture) we don't have
- * separate IPIs for separate messages like openpic does.  Instead
- * we have a bitmap for each processor, where a 1 bit means that
- * the corresponding message is pending for that processor.
- * Ideally each cpu's entry would be in a different cache line.
- *  -- paulus.
- */
-static unsigned long psurge_smp_message[NR_CPUS];
-
-void psurge_smp_message_recv(struct pt_regs *regs)
-{
-	int cpu = smp_processor_id();
-	int msg;
-
-	/* clear interrupt */
-	psurge_clr_ipi(cpu);
-
-	if (smp_num_cpus < 2)
-		return;
-
-	/* make sure there is a message there */
-	for (msg = 0; msg < 4; msg++)
-		if (test_and_clear_bit(msg, &psurge_smp_message[cpu]))
-			smp_message_recv(msg, regs);
-}
-
-void
-psurge_primary_intr(int irq, void *d, struct pt_regs *regs)
-{
-	psurge_smp_message_recv(regs);
-}
-
-static void
-smp_psurge_message_pass(int target, int msg, unsigned long data, int wait)
-{
-	int i;
-
-	if (smp_num_cpus < 2)
-		return;
-
-	for (i = 0; i < smp_num_cpus; i++) {
-		if (target == MSG_ALL
-		    || (target == MSG_ALL_BUT_SELF && i != smp_processor_id())
-		    || target == i) {
-			set_bit(msg, &psurge_smp_message[i]);
-			psurge_set_ipi(i);
-		}
-	}
-}
-
-/*
- * Determine a quad card presence. We read the board ID register, we
- * force the data bus to change to something else, and we read it again.
- * It it's stable, then the register probably exist (ugh !)
- */
-static int __init psurge_quad_probe(void)
-{
-	int type;
-	unsigned int i;
-
-	type = PSURGE_QUAD_IN(PSURGE_QUAD_BOARD_ID);
-	if (type < PSURGE_QUAD_OKEE || type > PSURGE_QUAD_ICEGRASS
-	    || type != PSURGE_QUAD_IN(PSURGE_QUAD_BOARD_ID))
-		return PSURGE_DUAL;
-
-	/* looks OK, try a slightly more rigorous test */
-	/* bogus is not necessarily cacheline-aligned,
-	   though I don't suppose that really matters.  -- paulus */
-	for (i = 0; i < 100; i++) {
-		volatile u32 bogus[8];
-		bogus[(0+i)%8] = 0x00000000;
-		bogus[(1+i)%8] = 0x55555555;
-		bogus[(2+i)%8] = 0xFFFFFFFF;
-		bogus[(3+i)%8] = 0xAAAAAAAA;
-		bogus[(4+i)%8] = 0x33333333;
-		bogus[(5+i)%8] = 0xCCCCCCCC;
-		bogus[(6+i)%8] = 0xCCCCCCCC;
-		bogus[(7+i)%8] = 0x33333333;
-		wmb();
-		asm volatile("dcbf 0,%0" : : "r" (bogus) : "memory");
-		mb();
-		if (type != PSURGE_QUAD_IN(PSURGE_QUAD_BOARD_ID))
-			return PSURGE_DUAL;
-	}
-	return type;
-}
-
-static void __init psurge_quad_init(void)
-{
-	int procbits;
-
-	if (ppc_md.progress) ppc_md.progress("psurge_quad_init", 0x351);
-	procbits = ~PSURGE_QUAD_IN(PSURGE_QUAD_WHICH_CPU);
-	if (psurge_type == PSURGE_QUAD_ICEGRASS)
-		PSURGE_QUAD_BIS(PSURGE_QUAD_RESET_CTL, procbits);
-	else
-		PSURGE_QUAD_BIC(PSURGE_QUAD_CKSTOP_CTL, procbits);
-	mdelay(33);
-	out_8(psurge_sec_intr, ~0);
-	PSURGE_QUAD_OUT(PSURGE_QUAD_IRQ_CLR, procbits);
-	PSURGE_QUAD_BIS(PSURGE_QUAD_RESET_CTL, procbits);
-	if (psurge_type != PSURGE_QUAD_ICEGRASS)
-		PSURGE_QUAD_BIS(PSURGE_QUAD_CKSTOP_CTL, procbits);
-	PSURGE_QUAD_BIC(PSURGE_QUAD_PRIMARY_ARB, procbits);
-	mdelay(33);
-	PSURGE_QUAD_BIC(PSURGE_QUAD_RESET_CTL, procbits);
-	mdelay(33);
-	PSURGE_QUAD_BIS(PSURGE_QUAD_PRIMARY_ARB, procbits);
-	mdelay(33);
-}
-
-static int __init smp_psurge_probe(void)
-{
-	int i, ncpus;
-
-	/* We don't do SMP on the PPC601 -- paulus */
-	if ((_get_PVR() >> 16) == 1)
-		return 1;
-
-	/*
-	 * The powersurge cpu board can be used in the generation
-	 * of powermacs that have a socket for an upgradeable cpu card,
-	 * including the 7500, 8500, 9500, 9600.
-	 * The device tree doesn't tell you if you have 2 cpus because
-	 * OF doesn't know anything about the 2nd processor.
-	 * Instead we look for magic bits in magic registers,
-	 * in the hammerhead memory controller in the case of the
-	 * dual-cpu powersurge board.  -- paulus.
-	 */
-	if (find_devices("hammerhead") == NULL)
-		return 1;
-
-	hhead_base = ioremap(HAMMERHEAD_BASE, 0x800);
-	quad_base = ioremap(PSURGE_QUAD_REG_ADDR, 1024);
-	psurge_sec_intr = hhead_base + HHEAD_SEC_INTR;
-
-	psurge_type = psurge_quad_probe();
-	if (psurge_type != PSURGE_DUAL) {
-		psurge_quad_init();
-		/* All released cards using this HW design have 4 CPUs */
-		ncpus = 4;
-	} else {
-		iounmap((void *) quad_base);
-		if ((in_8(hhead_base + HHEAD_CONFIG) & 0x02) == 0) {
-			/* not a dual-cpu card */
-			iounmap((void *) hhead_base);
-			return 1;
-		}
-		ncpus = 2;
-	}
-
-	psurge_start = ioremap(PSURGE_START, 4);
-	psurge_pri_intr = ioremap(PSURGE_PRI_INTR, 4);
-
-	/* this is not actually strictly necessary -- paulus. */
-	for (i = 1; i < ncpus; ++i)
-		smp_hw_index[i] = i;
-
-	if (ppc_md.progress) ppc_md.progress("smp_psurge_probe - done", 0x352);
-
-	return ncpus;
-}
-
-static void __init smp_psurge_kick_cpu(int nr)
-{
-	void (*start)(void) = __secondary_start_psurge;
-
-	if (ppc_md.progress) ppc_md.progress("smp_psurge_kick_cpu", 0x353);
-
-	/* setup entry point of secondary processor */
-	switch (nr) {
-	case 2:
-		start = __secondary_start_psurge2;
-		break;
-	case 3:
-		start = __secondary_start_psurge3;
-		break;
-	}
-
-	out_be32(psurge_start, __pa(start));
-	mb();
-
-	psurge_set_ipi(nr);
-	udelay(10);
-	psurge_clr_ipi(nr);
-
-	if (ppc_md.progress) ppc_md.progress("smp_psurge_kick_cpu - done", 0x354);
-}
-
-/*
- * With the dual-cpu powersurge board, the decrementers and timebases
- * of both cpus are frozen after the secondary cpu is started up,
- * until we give the secondary cpu another interrupt.  This routine
- * uses this to get the timebases synchronized.
- *  -- paulus.
- */
-static void __init psurge_dual_sync_tb(int cpu_nr)
-{
-	static volatile int sec_tb_reset = 0;
-	int t;
-
-	set_dec(tb_ticks_per_jiffy);
-	set_tb(0, 0);
-	last_jiffy_stamp(cpu_nr) = 0;
-
-	if (cpu_nr > 0) {
-		mb();
-		sec_tb_reset = 1;
-		return;
-	}
-
-	/* wait for the secondary to have reset its TB before proceeding */
-	for (t = 10000000; t > 0 && !sec_tb_reset; --t)
-		;
-
-	/* now interrupt the secondary, starting both TBs */
-	psurge_set_ipi(1);
-
-	smp_tb_synchronized = 1;
-}
-
-static void
-smp_psurge_setup_cpu(int cpu_nr)
-{
-
-	if (cpu_nr == 0) {
-		if (smp_num_cpus < 2)
-			return;
-		/* reset the entry point so if we get another intr we won't
-		 * try to startup again */
-		out_be32(psurge_start, 0x100);
-		if (request_irq(30, psurge_primary_intr, 0, "primary IPI", 0))
-			printk(KERN_ERR "Couldn't get primary IPI interrupt");
-	}
-
-	if (psurge_type == PSURGE_DUAL)
-		psurge_dual_sync_tb(cpu_nr);
-}
-
-
-static void
-smp_openpic_message_pass(int target, int msg, unsigned long data, int wait)
-{
-	/* make sure we're sending something that translates to an IPI */
-	if ( msg > 0x3 ){
-		printk("SMP %d: smp_message_pass: unknown msg %d\n",
-		       smp_processor_id(), msg);
-		return;
-	}
-	switch ( target )
-	{
-	case MSG_ALL:
-		openpic_cause_IPI(msg, 0xffffffff);
-		break;
-	case MSG_ALL_BUT_SELF:
-		openpic_cause_IPI(msg,
-				  0xffffffff & ~(1 << smp_processor_id()));
-		break;
-	default:
-		openpic_cause_IPI(msg, 1<<target);
-		break;
-	}
-}
-
-static int
-smp_core99_probe(void)
-{
-	struct device_node *cpus;
-	int i, ncpus = 1;
-
-	if (ppc_md.progress) ppc_md.progress("smp_core99_probe", 0x345);
-	cpus = find_type_devices("cpu");
-	if (cpus)
-		while ((cpus = cpus->next) != NULL)
-			++ncpus;
-	printk("smp_core99_probe: found %d cpus\n", ncpus);
-	if (ncpus > 1) {
-		openpic_request_IPIs();
-		for (i = 1; i < ncpus; ++i)
-			smp_hw_index[i] = i;
-	}
-
-	return ncpus;
-}
-
-static void
-smp_core99_kick_cpu(int nr)
-{
-	unsigned long save_vector, new_vector;
-	unsigned long flags;
-#if 1 /* New way... */
-	volatile unsigned long *vector
-		 = ((volatile unsigned long *)(KERNELBASE+0x100));
-	if (nr < 1 || nr > 3)
-		return;
-#else
-	volatile unsigned long *vector
-		 = ((volatile unsigned long *)(KERNELBASE+0x500));
-	if (nr != 1)
-		return;
-#endif
-	if (ppc_md.progress) ppc_md.progress("smp_core99_kick_cpu", 0x346);
-
-	local_irq_save(flags);
-	local_irq_disable();
-	
-	/* Save reset vector */
-	save_vector = *vector;
-	
-	/* Setup fake reset vector that does	  
-	 *   b __secondary_start_psurge - KERNELBASE
-	 */  
-	switch(nr) {
-		case 1:
-			new_vector = (unsigned long)__secondary_start_psurge;
-			break;
-		case 2:
-			new_vector = (unsigned long)__secondary_start_psurge2;
-			break;
-		case 3:
-			new_vector = (unsigned long)__secondary_start_psurge3;
-			break;
-	}
-	*vector = 0x48000002 + new_vector - KERNELBASE;
-	
-	/* flush data cache and inval instruction cache */
-	flush_icache_range((unsigned long) vector, (unsigned long) vector + 4);
-	
-	/* Put some life in our friend */
-	feature_core99_kick_cpu(nr);
-	
-	/* FIXME: We wait a bit for the CPU to take the exception, I should
-	 * instead wait for the entry code to set something for me. Well,
-	 * ideally, all that crap will be done in prom.c and the CPU left
-	 * in a RAM-based wait loop like CHRP.
-	 */
-	mdelay(1);
-	
-	/* Restore our exception vector */
-	*vector = save_vector;
-	flush_icache_range((unsigned long) vector, (unsigned long) vector + 4);
-	
-	local_irq_restore(flags);
-	if (ppc_md.progress) ppc_md.progress("smp_core99_kick_cpu done", 0x347);
-}
-
-static void
-smp_core99_setup_cpu(int cpu_nr)
-{
-	/* Setup openpic */
-	do_openpic_setup_cpu();
-
-	/* Setup L2 */
-	if (cpu_nr != 0)
-		core99_init_l2();
-	else
-		if (ppc_md.progress) ppc_md.progress("core99_setup_cpu 0 done", 0x349);
-}
-
-static int
-smp_chrp_probe(void)
-{
-	extern unsigned long smp_chrp_cpu_nr;
-
-	if (smp_chrp_cpu_nr > 1)
-		openpic_request_IPIs();
-
-	return smp_chrp_cpu_nr;
-}
-
-static void
-smp_chrp_kick_cpu(int nr)
-{
-	*(unsigned long *)KERNELBASE = nr;
-	asm volatile("dcbf 0,%0"::"r"(KERNELBASE):"memory");
-}
-
-static void
-smp_chrp_setup_cpu(int cpu_nr)
-{
-	static atomic_t ready = ATOMIC_INIT(1);
-	static volatile int frozen = 0;
-
-	if (cpu_nr == 0) {
-		/* wait for all the others */
-		while (atomic_read(&ready) < smp_num_cpus)
-			barrier();
-		atomic_set(&ready, 1);
-		/* freeze the timebase */
-		call_rtas("freeze-time-base", 0, 1, NULL);
-		mb();
-		frozen = 1;
-		/* XXX assumes this is not a 601 */
-		set_tb(0, 0);
-		last_jiffy_stamp(0) = 0;
-		while (atomic_read(&ready) < smp_num_cpus)
-			barrier();
-		/* thaw the timebase again */
-		call_rtas("thaw-time-base", 0, 1, NULL);
-		mb();
-		frozen = 0;
-		smp_tb_synchronized = 1;
-	} else {
-		atomic_inc(&ready);
-		while (!frozen)
-			barrier();
-		set_tb(0, 0);
-		last_jiffy_stamp(0) = 0;
-		mb();
-		atomic_inc(&ready);
-		while (frozen)
-			barrier();
-	}
-
-	if (OpenPIC_Addr)
-		do_openpic_setup_cpu();
-}
-
-#ifdef CONFIG_POWER4
-static void
-smp_xics_message_pass(int target, int msg, unsigned long data, int wait)
-{
-	/* for now, only do reschedule messages
-	   since we only have one IPI */
-	if (msg != PPC_MSG_RESCHEDULE)
-		return;
-	for (i = 0; i < smp_num_cpus; ++i) {
-		if (target == MSG_ALL || target == i
-		    || (target == MSG_ALL_BUT_SELF
-			&& i != smp_processor_id()))
-			xics_cause_IPI(i);
-	}
-}
-
-static int
-smp_xics_probe(void)
-{
-	return smp_chrp_cpu_nr;
-}
-
-static void
-smp_xics_setup_cpu(int cpu_nr)
-{
-	if (cpu_nr > 0)
-		xics_setup_cpu();
-}
-#endif /* CONFIG_POWER4 */
-
-static int
-smp_prep_probe(void)
-{
-	extern int mot_multi;
-
-	if (mot_multi) {
-		openpic_request_IPIs();
-		smp_hw_index[1] = 1;
-		return 2;
-	}
-
-	return 1;
-}
-
-static void
-smp_prep_kick_cpu(int nr)
-{
-	extern unsigned long *MotSave_SmpIar;
-	extern unsigned char *MotSave_CpusState[2];
-
-	*MotSave_SmpIar = (unsigned long)__secondary_start_psurge - KERNELBASE;
-	*MotSave_CpusState[1] = CPU_GOOD;
-	printk("CPU1 reset, waiting\n");
-}
-
-static void
-smp_prep_setup_cpu(int cpu_nr)
-{
-	if (OpenPIC_Addr)
-		do_openpic_setup_cpu();
-}
-
-#ifdef CONFIG_GEMINI	
-static int
-smp_gemini_probe(void)
-{
-	int i, nr;
-
-        nr = (readb(GEMINI_CPUSTAT) & GEMINI_CPU_COUNT_MASK) >> 2;
-	if (nr == 0)
-		nr = 4;
-
-	if (nr > 1) {
-		openpic_request_IPIs();
-		for (i = 1; i < nr; ++i)
-			smp_hw_index[i] = i;
-	}
-
-	return nr;
-}
-
-static void
-smp_gemini_kick_cpu(int nr)
-{
-	openpic_init_processor( 1<<nr );
-	openpic_init_processor( 0 );
-}
-
-static void
-smp_gemini_setup_cpu(int cpu_nr)
-{
-	if (OpenPIC_Addr)
-		do_openpic_setup_cpu();
-	if (cpu_nr > 0)
-		gemini_init_l2();
-}
-#endif /* CONFIG_GEMINI */
-
-
-static struct smp_ops_t {
-	void  (*message_pass)(int target, int msg, unsigned long data, int wait);
-	int   (*probe)(void);
-	void  (*kick_cpu)(int nr);
-	void  (*setup_cpu)(int nr);
-
-} *smp_ops;
-
 #define smp_message_pass(t,m,d,w) \
     do { if (smp_ops) \
 	     atomic_inc(&ipi_sent); \
 	     smp_ops->message_pass((t),(m),(d),(w)); \
        } while(0)
-
-
-/* PowerSurge-style Macs */
-static struct smp_ops_t psurge_smp_ops = {
-	smp_psurge_message_pass,
-	smp_psurge_probe,
-	smp_psurge_kick_cpu,
-	smp_psurge_setup_cpu,
-};
-
-/* Core99 Macs (dual G4s) */
-static struct smp_ops_t core99_smp_ops = {
-	smp_openpic_message_pass,
-	smp_core99_probe,
-	smp_core99_kick_cpu,
-	smp_core99_setup_cpu,
-};
-
-/* CHRP with openpic */
-static struct smp_ops_t chrp_smp_ops = {
-	smp_openpic_message_pass,
-	smp_chrp_probe,
-	smp_chrp_kick_cpu,
-	smp_chrp_setup_cpu,
-};
-
-#ifdef CONFIG_POWER4
-/* CHRP with new XICS interrupt controller */
-static struct smp_ops_t xics_smp_ops = {
-	smp_xics_message_pass,
-	smp_xics_probe,
-	smp_chrp_kick_cpu,
-	smp_xics_setup_cpu,
-};
-#endif /* CONFIG_POWER4 */
-
-/* PReP (MTX) */
-static struct smp_ops_t prep_smp_ops = {
-	smp_openpic_message_pass,
-	smp_prep_probe,
-	smp_prep_kick_cpu,
-	smp_prep_setup_cpu,
-};
-
-#ifdef CONFIG_GEMINI	
-/* Gemini */
-static struct smp_ops_t gemini_smp_ops = {
-	smp_openpic_message_pass,
-	smp_gemini_probe,
-	smp_gemini_kick_cpu,
-	smp_gemini_setup_cpu,
-};
-#endif /* CONFIG_GEMINI	*/
 
 /* 
  * Common functions
@@ -798,7 +131,7 @@ void smp_message_recv(int msg, struct pt_regs *regs)
  */
 void smp_send_tlb_invalidate(int cpu)
 {
-	if ( (_get_PVR()>>16) == 8 )
+	if ( PVR_VER(mfspr(PVR)) == 8 )
 		smp_message_pass(MSG_ALL_BUT_SELF, PPC_MSG_INVALIDATE_TLB, 0, 0);
 }
 
@@ -947,7 +280,6 @@ void __init smp_boot_cpus(void)
 	extern struct task_struct *current_set[NR_CPUS];
 	int i, cpu_nr;
 	struct task_struct *p;
-	unsigned long a;
 
 	printk("Entering SMP Mode...\n");
 	smp_num_cpus = 1;
@@ -973,35 +305,12 @@ void __init smp_boot_cpus(void)
 	 */
 	cacheflush_time = 5 * 1024;
 
-	/* To be later replaced by some arch-specific routine */
-	switch(_machine) {
-	case _MACH_Pmac:
-		/* Check for Core99 */
-		if (find_devices("uni-n"))
-			smp_ops = &core99_smp_ops;
-		else
-			smp_ops = &psurge_smp_ops;
-		break;
-	case _MACH_chrp:
-#ifndef CONFIG_POWER4
-		smp_ops = &chrp_smp_ops;
-#else
-		smp_ops = &xics_smp_ops;
-#endif /* CONFIG_POWER4 */
-		break;
-	case _MACH_prep:
-		smp_ops = &prep_smp_ops;
-		break;
-#ifdef CONFIG_GEMINI		
-	case _MACH_gemini:
-		smp_ops = &gemini_smp_ops;
-		break;
-#endif /* CONFIG_GEMINI	*/
-	default:
+	smp_ops = ppc_md.smp_ops;
+	if (smp_ops == NULL) {
 		printk("SMP not supported on this machine.\n");
 		return;
 	}
-	
+
 	/* Probe arch for CPUs */
 	cpu_nr = smp_ops->probe();
 
@@ -1044,10 +353,12 @@ void __init smp_boot_cpus(void)
 		p->has_cpu = 1;
 		current_set[i] = p;
 
-		/* need to flush here since secondary bats aren't setup */
-		for (a = KERNELBASE; a < KERNELBASE + 0x800000; a += 32)
-			asm volatile("dcbf 0,%0" : : "r" (a) : "memory");
-		asm volatile("sync");
+		/*
+		 * There was a cache flush loop here to flush the cache
+		 * to memory for the first 8MB of RAM.  The cache flush
+		 * has been pushed into the kick_cpu function for those
+		 * platforms that need it.
+		 */
 
 		/* wake up cpus */
 		smp_ops->kick_cpu(i);
@@ -1155,7 +466,6 @@ void __init smp_software_tb_sync(int cpu)
 	/* so time.c doesn't get confused */
 	set_dec(tb_ticks_per_jiffy);
 	last_jiffy_stamp(cpu) = 0;
-	cpu_callin_map[cpu] = 1;
 }
 
 void __init smp_commence(void)
@@ -1247,7 +557,7 @@ void __init smp_store_cpu_info(int id)
 
 	/* assume bogomips are same for everything */
         c->loops_per_jiffy = loops_per_jiffy;
-        c->pvr = _get_PVR();
+        c->pvr = mfspr(PVR);
 }
 
 static int __init maxcpus(char *str)

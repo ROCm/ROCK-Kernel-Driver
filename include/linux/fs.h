@@ -89,12 +89,7 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 #define FS_NO_PRELIM	4 /* prevent preloading of dentries, even if
 			   * FS_NO_DCACHE is not set.
 			   */
-#define FS_SINGLE	8 /*
-			   * Filesystem that can have only one superblock;
-			   * kernel-wide vfsmnt is placed in ->kern_mnt by
-			   * kern_mount() which must be called _after_
-			   * register_filesystem().
-			   */
+#define FS_SINGLE	8 /* Filesystem that can have only one superblock */
 #define FS_NOMOUNT	16 /* Never mount from userland */
 #define FS_LITTER	32 /* Keeps the tree in dcache */
 #define FS_ODD_RENAME	32768	/* Temporary stuff; will go away as soon
@@ -665,6 +660,7 @@ extern struct list_head super_blocks;
 extern spinlock_t sb_lock;
 
 #define sb_entry(list)	list_entry((list), struct super_block, s_list)
+#define S_BIAS (1<<30)
 struct super_block {
 	struct list_head	s_list;		/* Keep this first */
 	kdev_t			s_dev;
@@ -688,6 +684,7 @@ struct super_block {
 	struct list_head	s_files;
 
 	struct block_device	*s_bdev;
+	struct list_head	s_instances;
 	struct quota_mount_options s_dquot;	/* Diskquota specific options */
 
 	union {
@@ -913,8 +910,8 @@ struct file_system_type {
 	int fs_flags;
 	struct super_block *(*read_super) (struct super_block *, void *, int);
 	struct module *owner;
-	struct vfsmount *kern_mnt; /* For kernel mount, if it's FS_SINGLE fs */
 	struct file_system_type * next;
+	struct list_head fs_supers;
 };
 
 #define DECLARE_FSTYPE(var,type,read,flags) \
@@ -1147,7 +1144,7 @@ static inline void mark_buffer_dirty_inode(struct buffer_head *bh, struct inode 
 	buffer_insert_inode_queue(bh, inode);
 }
 
-extern void balance_dirty(kdev_t);
+extern void balance_dirty(void);
 extern int check_disk_change(kdev_t);
 extern int invalidate_inodes(struct super_block *);
 extern int invalidate_device(kdev_t, int);

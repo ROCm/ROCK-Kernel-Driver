@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.keylargo.h 1.9 05/17/01 18:14:24 cort
+ * BK Id: SCCS/s.keylargo.h 1.13 08/19/01 22:23:04 paulus
  */
 /*
  * keylargo.h: definitions for using the "KeyLargo" I/O controller chip.
@@ -35,7 +35,12 @@
 #define KL_GPIO_MODEM_RESET		(KEYLARGO_GPIO_0+0x03) /* Pangea */
 #define KL_GPIO_MODEM_POWER		(KEYLARGO_GPIO_0+0x02) /* Pangea */
 
+/* Hrm... this one is only to be used on Pismo. It seeem to also
+ * control the timebase enable on other machines. Still to be
+ * experimented... --BenH.
+ */
 #define KL_GPIO_FW_CABLE_POWER		(KEYLARGO_GPIO_0+0x09)
+#define KL_GPIO_TB_ENABLE		(KEYLARGO_GPIO_0+0x09)
 
 #define KL_GPIO_ETH_PHY_RESET		(KEYLARGO_GPIO_0+0x10)
 

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.bootinfo.h 1.9 06/13/01 15:28:43 paulus
+ * BK Id: SCCS/s.bootinfo.h 1.11 08/17/01 15:23:17 paulus
  */
 /*
  * Non-machine dependent bootinfo structure.  Basic idea
@@ -31,6 +31,7 @@ struct bi_record {
 #define BI_INITRD		0x1014
 #define BI_SYSMAP		0x1015
 #define BI_MACHTYPE		0x1016
+#define BI_MEMSIZE		0x1017
 
 #endif /* CONFIG_APUS */
 

@@ -722,8 +722,6 @@ static void kaweth_tx_timeout(struct net_device *net)
 	net->trans_start = jiffies;
 
 	usb_unlink_urb(kaweth->tx_urb);
-
-	netif_wake_queue(net);
 }
 
 /****************************************************************
@@ -882,6 +880,10 @@ static void *kaweth_probe(
 	kaweth->rx_urb = usb_alloc_urb(0);
 
 	kaweth->net = init_etherdev(0, 0);
+	if (!kaweth->net) {
+		kaweth_err("Error calling init_etherdev.");
+		return kaweth;
+	}
 
 	memcpy(kaweth->net->broadcast, &bcast_addr, sizeof(bcast_addr));
 	memcpy(kaweth->net->dev_addr, 

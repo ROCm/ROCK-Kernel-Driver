@@ -21,18 +21,23 @@ CONFIG_KMOD=y
 # Platform support
 #
 CONFIG_PPC=y
+CONFIG_PPC32=y
 CONFIG_6xx=y
 # CONFIG_4xx is not set
 # CONFIG_POWER3 is not set
 # CONFIG_POWER4 is not set
 # CONFIG_8xx is not set
 # CONFIG_8260 is not set
+CONFIG_PPC_STD_MMU=y
 # CONFIG_ALL_PPC is not set
 # CONFIG_APUS is not set
 CONFIG_GEMINI=y
 # CONFIG_PPC601_SYNC_FIX is not set
 # CONFIG_SMP is not set
 CONFIG_ALTIVEC=y
+CONFIG_TAU=y
+# CONFIG_TAU_INT is not set
+# CONFIG_TAU_AVERAGE is not set
 
 #
 # General setup

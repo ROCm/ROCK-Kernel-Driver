@@ -236,7 +236,7 @@
 #include <linux/errno.h>
 #include <linux/poll.h>
 #include <linux/init.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/fcntl.h>
 #include <linux/tty.h>
 #include <linux/tty_driver.h>
@@ -1311,7 +1311,7 @@ static int edge_write (struct usb_serial_port *port, int from_user, const unsign
 	fifo = &edge_port->txfifo;
 
 	// calculate number of bytes to put in fifo
-	copySize = MIN(count, (edge_port->txCredits - fifo->count));
+	copySize = min (int, count, (edge_port->txCredits - fifo->count));
 
 	dbg(__FUNCTION__"(%d) of %d byte(s) Fifo room  %d -- will copy %d bytes", 
 	    port->number, count, edge_port->txCredits - fifo->count, copySize);
@@ -1329,12 +1329,13 @@ static int edge_write (struct usb_serial_port *port, int from_user, const unsign
 	// then copy the reset from the start of the buffer 
 
 	bytesleft = fifo->size - fifo->head;
-	firsthalf = MIN(bytesleft,copySize);
+	firsthalf = min (int, bytesleft, copySize);
 	dbg (__FUNCTION__" - copy %d bytes of %d into fifo ", firsthalf, bytesleft);
 
 	/* now copy our data */
 	if (from_user) {
-		copy_from_user(&fifo->fifo[fifo->head], data, firsthalf);
+		if (copy_from_user(&fifo->fifo[fifo->head], data, firsthalf))
+			return -EFAULT;
 	} else {
 		memcpy(&fifo->fifo[fifo->head], data, firsthalf);
 	}  
@@ -1353,7 +1354,8 @@ static int edge_write (struct usb_serial_port *port, int from_user, const unsign
 	if (secondhalf) {
 		dbg (__FUNCTION__" - copy rest of data %d", secondhalf);
 		if (from_user) {
-			copy_from_user(&fifo->fifo[fifo->head], &data[firsthalf], secondhalf);
+			if (copy_from_user(&fifo->fifo[fifo->head], &data[firsthalf], secondhalf))
+				return -EFAULT;
 		} else {
 			memcpy(&fifo->fifo[fifo->head], &data[firsthalf], secondhalf);
 		}
@@ -1452,7 +1454,7 @@ static void send_more_port_data(struct edgeport_serial *edge_serial, struct edge
 
 	/* now copy our data */
 	bytesleft =  fifo->size - fifo->tail;
-	firsthalf = MIN(bytesleft,count);
+	firsthalf = min (int, bytesleft, count);
 	memcpy(&buffer[2], &fifo->fifo[fifo->tail], firsthalf);
 	fifo->tail  += firsthalf;
 	fifo->count -= firsthalf;

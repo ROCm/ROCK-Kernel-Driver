@@ -159,7 +159,6 @@
 #define RELEVANT_IFLAG(iflag)	(iflag & (IGNBRK|BRKINT|IGNPAR|PARMRK|INPCK))
 
 #define CHAR2INT16(c1,c0)	(((u32)((c1) & 0xff) << 8) + (u32)((c0) & 0xff))
-#define MIN(a,b)		(((a)<(b))?(a):(b))
 
 #define NUM_BULK_URBS		24
 #define NUM_CONTROL_URBS	16
@@ -518,7 +517,7 @@ static int bluetooth_write (struct tty_struct * tty, int from_user, const unsign
 				}
 				
 
-				buffer_size = MIN (count, bluetooth->bulk_out_buffer_size);
+				buffer_size = min (int, count, bluetooth->bulk_out_buffer_size);
 				memcpy (urb->transfer_buffer, current_position, buffer_size);
 
 				/* build up our urb */

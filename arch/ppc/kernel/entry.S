@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.entry.S 1.20 07/19/01 23:02:48 paulus
+ * BK Id: SCCS/s.entry.S 1.22 08/15/01 22:43:06 paulus
  */
 /*
  *  PowerPC version 
@@ -23,12 +23,14 @@
  */
 
 #include "ppc_asm.h"
+#include <linux/config.h>
+#include <linux/errno.h>
+#include <linux/sys.h>
+#include <linux/threads.h>
 #include <asm/processor.h>
 #include <asm/page.h>
 #include <asm/mmu.h>
-#include <linux/errno.h>
-#include <linux/sys.h>
-#include <linux/config.h>
+#include <asm/cputable.h>
 
 #undef SHOW_SYSCALLS
 #undef SHOW_SYSCALLS_TASK
@@ -217,7 +219,9 @@ _GLOBAL(_switch)
 	mfmsr	r22
 	li	r0,MSR_FP	/* Disable floating-point */
 #ifdef CONFIG_ALTIVEC
-	oris	r0,r0,MSR_VEC@h
+BEGIN_FTR_SECTION
+	oris	r0,r0,MSR_VEC@h	/* Disable altivec */
+END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
 #endif /* CONFIG_ALTIVEC */
 	andc	r22,r22,r0
 	mtmsr	r22
@@ -238,21 +242,6 @@ _GLOBAL(_switch)
 	tophys(r0,r4)
 	CLR_TOP32(r0)
 	mtspr	SPRG3,r0	/* Update current THREAD phys addr */
-#ifdef CONFIG_8xx
-	/* XXX it would be nice to find a SPRGx for this on 6xx,7xx too */
-	lwz	r9,PGDIR(r4)	/* cache the page table root */
-        tophys(r9,r9)		/* convert to phys addr */
-#ifdef CONFIG_8xx_CPU6
-	lis	r6, cpu6_errata_word@h
-	ori	r6, r6, cpu6_errata_word@l
-	li	r5, 0x3980
-	stw	r5, 8(r6)
-	lwz	r5, 8(r6)
-#endif
-        mtspr   M_TWB,r9	/* Update MMU base address */
-	tlbia
-	sync
-#endif /* CONFIG_8xx */
 	lwz	r1,KSP(r4)	/* Load new stack pointer */
 	/* save the old current 'last' for return value */
 	mr	r3,r2
@@ -328,19 +317,16 @@ restore:
 	andi.	r0,r0,MSR_PR
 	beq+	1f
 #ifdef CONFIG_ALTIVEC
-	mfpvr	r8			/* check if we are on a G4 */
-	srwi	r8,r8,16
-	cmpwi	r8,PVR_7400@h
-	bne	2f
+BEGIN_FTR_SECTION
 	lwz	r0,THREAD+THREAD_VRSAVE(r2)
-	mtspr	SPRN_VRSAVE,r0		/* if so, restore VRSAVE reg */
-2:
+	mtspr	SPRN_VRSAVE,r0		/* if G4, restore VRSAVE reg */
+END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
 #endif /* CONFIG_ALTIVEC */
 	addi	r0,r1,INT_FRAME_SIZE	/* size of frame */
 	stw	r0,THREAD+KSP(r2)	/* save kernel stack pointer */
 	tophys(r8,r1)
 	CLR_TOP32(r8)
-	mtspr	SPRG2,r8		/* phys exception stack pointer */	
+	mtspr	SPRG2,r8		/* phys exception stack pointer */
 1:
 	lwz	r3,_CTR(r1)
 	lwz	r0,_LINK(r1)
@@ -348,15 +334,32 @@ restore:
 	mtlr	r0
 	REST_4GPRS(3, r1)
 	REST_2GPRS(7, r1)
+
+	/* We have to "dummy" load from the context save area in case
+	 * these instructions cause an MMU fault.  If this happens
+	 * after we load SRR0/SRR1, our return context is hosed.  -- Dan
+	 */
+	lwz	r0,GPR0(r1)
+	lwz	r0,GPR2(r1)
+	lwz	r0,GPR1(r1)
+
+	/* We re-use r3,r4 here (the load above was to cause the MMU
+	 * fault if necessary).  Using r3,r4 removes the need to "dummy"
+	 * load the CCR and NIP.  Since we load them we may as well
+	 * use them.
+	 */
+	lwz	r3,_CCR(r1)
+	lwz	r4,_NIP(r1)
+
 	lwz	r0,_MSR(r1)
 	FIX_SRR1(r0,r2)
 	mtspr	SRR1,r0
-	lwz	r2,_CCR(r1)
-	mtcrf	0xFF,r2
-	lwz	r2,_NIP(r1)
-	mtspr	SRR0,r2
+	mtcrf	0xFF,r3
+	mtspr	SRR0,r4
 	lwz	r0,GPR0(r1)
 	lwz	r2,GPR2(r1)
+	lwz	r3,GPR3(r1)
+	lwz	r4,GPR4(r1)
 	lwz	r1,GPR1(r1)
 	SYNC
 	RFI

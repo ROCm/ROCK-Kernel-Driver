@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.start.c 1.8 05/18/01 15:17:15 cort
+ * BK Id: SCCS/s.start.c 1.10 07/25/01 18:13:07 trini
  */
 /*
  * Copyright (C) Paul Mackerras 1997.
@@ -10,6 +10,9 @@
  * 2 of the License, or (at your option) any later version.
  */
 #include <stdarg.h>
+
+extern int strlen(const char *s);
+extern void boot(int a1, int a2, void *prom);
 
 int (*prom)();
 
@@ -109,7 +112,7 @@ read(void *handle, void *ptr, int nb)
 }
 
 void
-exit()
+exit(void)
 {
     struct prom_args {
 	char *service;
@@ -122,7 +125,7 @@ exit()
 }
 
 void
-pause()
+pause(void)
 {
     struct prom_args {
 	char *service;
@@ -243,7 +246,7 @@ fputs(char *str, void *f)
 }
 
 int
-readchar()
+readchar(void)
 {
     char ch;
 
@@ -263,7 +266,7 @@ static char *lineptr;
 static int lineleft;
 
 int
-getchar()
+getchar(void)
 {
     int c;
 

@@ -1,4 +1,4 @@
-/*  $Id: init.c,v 1.179 2001/08/08 07:52:00 davem Exp $
+/*  $Id: init.c,v 1.186 2001/08/23 05:14:57 kanoj Exp $
  *  arch/sparc64/mm/init.c
  *
  *  Copyright (C) 1996-1999 David S. Miller (davem@caip.rutgers.edu)
@@ -27,7 +27,6 @@
 #include <asm/io.h>
 #include <asm/uaccess.h>
 #include <asm/mmu_context.h>
-#include <asm/vaddrs.h>
 #include <asm/dma.h>
 #include <asm/starfire.h>
 
@@ -202,10 +201,10 @@ static void inherit_prom_mappings(void)
 	struct linux_prom_translation *trans;
 	unsigned long phys_page, tte_vaddr, tte_data;
 	void (*remap_func)(unsigned long, unsigned long, int);
-	pgd_t *pgdp;
-	pmd_t *pmdp;
+	pmd_t *pmdp, *pmd;
 	pte_t *ptep;
 	int node, n, i, tsz;
+	extern unsigned int obp_iaddr_patch[2], obp_daddr_patch[2];
 
 	node = prom_finddevice("/virtual-memory");
 	n = prom_getproplen(node, "translations");
@@ -229,36 +228,39 @@ static void inherit_prom_mappings(void)
 	}
 	n = n / sizeof(*trans);
 
+	/*
+	 * The obp translations are saved based on 8k pagesize, since obp can use
+	 * a mixture of pagesizes. Misses to the 0xf0000000 - 0x100000000, ie obp 
+	 * range, are handled in entry.S and do not use the vpte scheme (see rant
+	 * in inherit_locked_prom_mappings()).
+	 */
+#define OBP_PMD_SIZE 2048
+#define BASE_PAGE_SIZE 8192
+	pmd = __alloc_bootmem(OBP_PMD_SIZE, OBP_PMD_SIZE, 0UL);
+	if (pmd == NULL)
+		early_pgtable_allocfail("pmd");
+	memset(pmd, 0, OBP_PMD_SIZE);
 	for (i = 0; i < n; i++) {
 		unsigned long vaddr;
 
 		if (trans[i].virt >= 0xf0000000 && trans[i].virt < 0x100000000) {
 			for (vaddr = trans[i].virt;
 			     vaddr < trans[i].virt + trans[i].size;
-			     vaddr += PAGE_SIZE) {
+			     vaddr += BASE_PAGE_SIZE) {
 				unsigned long val;
 
-				pgdp = pgd_offset(&init_mm, vaddr);
-				if (pgd_none(*pgdp)) {
-					pmdp = __alloc_bootmem(PMD_TABLE_SIZE,
-							       PMD_TABLE_SIZE,
-							       0UL);
-					if (pmdp == NULL)
-						early_pgtable_allocfail("pmd");
-					memset(pmdp, 0, PMD_TABLE_SIZE);
-					pgd_set(pgdp, pmdp);
-				}
-				pmdp = pmd_offset(pgdp, vaddr);
+				pmdp = pmd + ((vaddr >> 23) & 0x7ff);
 				if (pmd_none(*pmdp)) {
-					ptep = __alloc_bootmem(PTE_TABLE_SIZE,
-							       PTE_TABLE_SIZE,
+					ptep = __alloc_bootmem(BASE_PAGE_SIZE,
+							       BASE_PAGE_SIZE,
 							       0UL);
 					if (ptep == NULL)
 						early_pgtable_allocfail("pte");
-					memset(ptep, 0, PTE_TABLE_SIZE);
+					memset(ptep, 0, BASE_PAGE_SIZE);
 					pmd_set(pmdp, ptep);
 				}
-				ptep = pte_offset(pmdp, vaddr);
+				ptep = (pte_t *)pmd_page(*pmdp) +
+						((vaddr >> 13) & 0x3ff);
 
 				val = trans[i].data;
 
@@ -267,10 +269,17 @@ static void inherit_prom_mappings(void)
 					val &= ~0x0003fe0000000000UL;
 
 				set_pte (ptep, __pte(val | _PAGE_MODIFIED));
-				trans[i].data += PAGE_SIZE;
+				trans[i].data += BASE_PAGE_SIZE;
 			}
 		}
 	}
+	phys_page = __pa(pmd);
+	obp_iaddr_patch[0] |= (phys_page >> 10);
+	obp_iaddr_patch[1] |= (phys_page & 0x3ff);
+	flushi((long)&obp_iaddr_patch[0]);
+	obp_daddr_patch[0] |= (phys_page >> 10);
+	obp_daddr_patch[1] |= (phys_page & 0x3ff);
+	flushi((long)&obp_daddr_patch[0]);
 
 	/* Now fixup OBP's idea about where we really are mapped. */
 	prom_printf("Remapping the kernel... ");

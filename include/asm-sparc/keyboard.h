@@ -1,4 +1,4 @@
-/* $Id: keyboard.h,v 1.3 1999/11/23 08:56:44 davem Exp $
+/* $Id: keyboard.h,v 1.7 2001/08/18 09:40:46 davem Exp $
  * linux/include/asm-sparc/keyboard.h
  *
  * sparc64 Created Aug 29 1997 by Eddie C. Dost (ecd@skynet.be)
@@ -13,7 +13,9 @@
 
 #ifdef __KERNEL__
 
+#include <linux/config.h>
 #include <linux/ioport.h>
+#include <linux/kd.h>
 #include <asm/io.h>
 
 #define KEYBOARD_IRQ			13

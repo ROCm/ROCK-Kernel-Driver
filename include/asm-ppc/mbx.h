@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.mbx.h 1.8 05/17/01 18:14:25 cort
+ * BK Id: SCCS/s.mbx.h 1.11 08/17/01 15:23:17 paulus
  */
 /*
  * A collection of structures, addresses, and values associated with
@@ -94,8 +94,5 @@ typedef struct bd_info {
 */
 #define NR_8259_INTS	16
 
-/* Generic 8xx type
-*/
-#define _MACH_8xx (_MACH_mbx)
 #endif
 #endif /* __KERNEL__ */

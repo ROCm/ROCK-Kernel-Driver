@@ -1,4 +1,4 @@
-/* $Id: pci_psycho.c,v 1.27 2001/08/12 13:18:23 davem Exp $
+/* $Id: pci_psycho.c,v 1.28 2001/08/24 19:36:58 kanoj Exp $
  * pci_psycho.c: PSYCHO/U2P specific PCI controller support.
  *
  * Copyright (C) 1997, 1998, 1999 David S. Miller (davem@caipfs.rutgers.edu)
@@ -18,6 +18,7 @@
 #include <asm/starfire.h>
 
 #include "pci_impl.h"
+#include "iommu_common.h"
 
 /* All PSYCHO registers are 64-bits.  The following accessor
  * routines are how they are accessed.  The REG parameter
@@ -715,12 +716,12 @@ static void psycho_check_iommu_error(struct pci_controller_info *p,
 			       ((tag & PSYCHO_IOMMU_TAG_WRITE) ? 1 : 0),
 			       ((tag & PSYCHO_IOMMU_TAG_STREAM) ? 1 : 0),
 			       ((tag & PSYCHO_IOMMU_TAG_SIZE) ? 64 : 8),
-			       (tag & PSYCHO_IOMMU_TAG_VPAGE) << PAGE_SHIFT);
+			       (tag & PSYCHO_IOMMU_TAG_VPAGE) << IOMMU_PAGE_SHIFT);
 			printk("PSYCHO%d: IOMMU DATA(%d)[valid(%d) cache(%d) ppg(%016lx)]\n",
 			       p->index, i,
 			       ((data & PSYCHO_IOMMU_DATA_VALID) ? 1 : 0),
 			       ((data & PSYCHO_IOMMU_DATA_CACHE) ? 1 : 0),
-			       (data & PSYCHO_IOMMU_DATA_PPAGE) << PAGE_SHIFT);
+			       (data & PSYCHO_IOMMU_DATA_PPAGE) << IOMMU_PAGE_SHIFT);
 		}
 	}
 	__psycho_check_stc_error(p, afsr, afar, type);
@@ -1322,7 +1323,7 @@ static void __init psycho_iommu_init(struct pci_controller_info *p)
 	 * table (128K ioptes * 8 bytes per iopte).  This is
 	 * page order 7 on UltraSparc.
 	 */
-	tsbbase = __get_free_pages(GFP_KERNEL, 7);
+	tsbbase = __get_free_pages(GFP_KERNEL, get_order(IO_TSB_SIZE));
 	if (!tsbbase) {
 		prom_printf("PSYCHO_IOMMU: Error, gfp(tsb) failed.\n");
 		prom_halt();
@@ -1331,7 +1332,7 @@ static void __init psycho_iommu_init(struct pci_controller_info *p)
 	iommu->page_table_sz_bits = 17;
 	iommu->page_table_map_base = 0xc0000000;
 	iommu->dma_addr_mask = 0xffffffff;
-	memset((char *)tsbbase, 0, PAGE_SIZE << 7);
+	memset((char *)tsbbase, 0, IO_TSB_SIZE);
 
 	/* We start with no consistent mappings. */
 	iommu->lowest_consistent_map =

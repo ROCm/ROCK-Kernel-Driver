@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.uninorth.h 1.7 05/17/01 18:14:26 cort
+ * BK Id: SCCS/s.uninorth.h 1.11 08/19/01 22:23:04 paulus
  */
 /*
  * uninorth.h: definitions for using the "UniNorth" host bridge chip
@@ -31,6 +31,52 @@
 #define UNI_N_CFG_GART_ENABLE		0x00000100
 #define UNI_N_CFG_GART_2xRESET		0x00010000
 
+/* My understanding of UniNorth AGP as of UniNorth rev 1.0x,
+ * revision 1.5 (x4 AGP) may need further changes.
+ * 
+ * AGP_BASE register contains the base address of the AGP aperture on
+ * the AGP bus. It doesn't seem to be visible to the CPU as of UniNorth 1.x,
+ * even if decoding of this address range is enabled in the address select
+ * register. Apparently, the only supported bases are 256Mb multiples
+ * (high 4 bits of that register).
+ * 
+ * GART_BASE register appear to contain the physical address of the GART
+ * in system memory in the high address bits (page aligned), and the
+ * GART size in the low order bits (number of GART pages)
+ *
+ * The GART format itself is one 32bits word per physical memory page.
+ * This word contains, in little-endian format (!!!), the physical address
+ * of the page in the high bits, and what appears to be an "enable" bit
+ * in the LSB bit (0) that must be set to 1 when the entry is valid.
+ * 
+ * Obviously, the GART is not cache coherent and so any change to it
+ * must be flushed to memory (or maybe just make the GART space non
+ * cachable). AGP memory itself doens't seem to be cache coherent neither.
+ * 
+ * In order to invalidate the GART (which is probably necessary to inval
+ * the bridge internal TLBs), the following sequence has to be written,
+ * in order, to the GART_CTRL register:
+ * 
+ *   UNI_N_CFG_GART_ENABLE | UNI_N_CFG_GART_INVAL
+ *   UNI_N_CFG_GART_ENABLE
+ *   UNI_N_CFG_GART_ENABLE | UNI_N_CFG_GART_2xRESET
+ *   UNI_N_CFG_GART_ENABLE
+ *   
+ * As far as AGP "features" are concerned, it looks like fast write may
+ * not be supported but this has to be confirmed.
+ * 
+ * Turning on AGP seem to require a double invalidate operation, one before
+ * setting the AGP command register, on after.
+ * 
+ * Turning off AGP seems to require the following sequence: first wait
+ * for the AGP to be idle by reading the internal status register, then
+ * write in that order to the GART_CTRL register:
+ * 
+ *   UNI_N_CFG_GART_ENABLE | UNI_N_CFG_GART_INVAL
+ *   0
+ *   UNI_N_CFG_GART_2xRESET
+ *   0
+ */
 
 /* 
  * Uni-N memory mapped reg. definitions

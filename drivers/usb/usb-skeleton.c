@@ -1,5 +1,5 @@
 /*
- * USB Skeleton driver
+ * USB Skeleton driver - 0.4
  *
  * Copyright (c) 2001 Greg Kroah-Hartman (greg@kroah.com)
  *
@@ -22,6 +22,7 @@
  *
  * History:
  *
+ * 2001_08_21 - 0.4 - more small bug fixes.
  * 2001_05_29 - 0.3 - more bug fixes based on review from linux-usb-devel
  * 2001_05_24 - 0.2 - bug fixes based on review from linux-usb-devel people
  * 2001_05_01 - 0.1 - first version
@@ -56,7 +57,7 @@
 
 
 /* Version Information */
-#define DRIVER_VERSION "v0.3"
+#define DRIVER_VERSION "v0.4"
 #define DRIVER_AUTHOR "Greg Kroah-Hartman, greg@kroah.com"
 #define DRIVER_DESC "USB Skeleton Driver"
 
@@ -179,6 +180,22 @@ static inline void usb_skel_debug_data (const char *function, int size, const un
 
 
 /**
+ *	skel_delete
+ */
+static inline void skel_delete (struct usb_skel *dev)
+{
+	minor_table[dev->minor] = NULL;
+	if (dev->bulk_in_buffer != NULL)
+		kfree (dev->bulk_in_buffer);
+	if (dev->bulk_out_buffer != NULL)
+		kfree (dev->bulk_out_buffer);
+	if (dev->write_urb != NULL)
+		usb_free_urb (dev->write_urb);
+	kfree (dev);
+}
+
+
+/**
  *	skel_open
  */
 static int skel_open (struct inode *inode, struct file *file)
@@ -256,27 +273,21 @@ static int skel_release (struct inode *inode, struct file *file)
 
 	if (dev->udev == NULL) {
 		/* the device was unplugged before the file was released */
-		minor_table[dev->minor] = NULL;
-		if (dev->bulk_in_buffer != NULL)
-			kfree (dev->bulk_in_buffer);
-		if (dev->bulk_out_buffer != NULL)
-			kfree (dev->bulk_out_buffer);
-		if (dev->write_urb != NULL)
-			usb_free_urb (dev->write_urb);
-		kfree (dev);
-		goto exit;
+		up (&dev->sem);
+		skel_delete (dev);
+		MOD_DEC_USE_COUNT;
+		up (&minor_table_mutex);
+		return 0;
 	}
 
 	/* decrement our usage count for the device */
 	--dev->open_count;
 	if (dev->open_count <= 0) {
 		/* shutdown any bulk writes that might be going on */
-		dev->write_urb->transfer_flags |= USB_ASYNC_UNLINK;
 		usb_unlink_urb (dev->write_urb);
 		dev->open_count = 0;
 	}
 
-exit:
 	/* decrement our usage count for the module */
 	MOD_DEC_USE_COUNT;
 
@@ -453,9 +464,12 @@ static void skel_write_bulk_callback (struct urb *urb)
 }
 
 
-
-
-
+/**
+ *	skel_probe
+ *
+ *	Called by the usb core when a new device is connected that it thinks
+ *	this driver might be interested in.
+ */
 static void * skel_probe(struct usb_device *udev, unsigned int ifnum, const struct usb_device_id *id)
 {
 	struct usb_skel *dev = NULL;
@@ -476,7 +490,7 @@ static void * skel_probe(struct usb_device *udev, unsigned int ifnum, const stru
 
 	/* select a "subminor" number (part of a minor number) */
 	down (&minor_table_mutex);
-	for (minor = 0; minor < MAX_DEVICES; i++) {
+	for (minor = 0; minor < MAX_DEVICES; ++minor) {
 		if (minor_table[minor] == NULL)
 			break;
 	}
@@ -558,14 +572,7 @@ static void * skel_probe(struct usb_device *udev, unsigned int ifnum, const stru
 	goto exit;
 	
 error:
-	minor_table [dev->minor] = NULL;
-	if (dev->bulk_in_buffer != NULL)
-		kfree (dev->bulk_in_buffer);
-	if (dev->bulk_out_buffer != NULL)
-		kfree (dev->bulk_out_buffer);
-	if (dev->write_urb != NULL)
-		usb_free_urb (dev->write_urb);
-	kfree (dev);
+	skel_delete (dev);
 	dev = NULL;
 
 exit:
@@ -576,6 +583,8 @@ exit:
 
 /**
  *	skel_disconnect
+ *
+ *	Called by the usb core when the device is removed from the system.
  */
 static void skel_disconnect(struct usb_device *udev, void *ptr)
 {
@@ -591,14 +600,7 @@ static void skel_disconnect(struct usb_device *udev, void *ptr)
 
 	/* if the device is not opened, then we clean up right now */
 	if (!dev->open_count) {
-		minor_table[dev->minor] = NULL;
-		if (dev->bulk_in_buffer != NULL)
-			kfree (dev->bulk_in_buffer);
-		if (dev->bulk_out_buffer != NULL)
-			kfree (dev->bulk_out_buffer);
-		if (dev->write_urb != NULL)
-			usb_free_urb (dev->write_urb);
-		kfree (dev);
+		skel_delete (dev);
 	} else {
 		dev->udev = NULL;
 		up (&dev->sem);
@@ -628,8 +630,7 @@ static int __init usb_skel_init(void)
 		return -1;
 	}
 
-	info(DRIVER_VERSION " " DRIVER_AUTHOR);
-	info(DRIVER_DESC);
+	info(DRIVER_DESC " " DRIVER_VERSION);
 	return 0;
 }
 

@@ -26,6 +26,7 @@
 #include <asm/processor.h>
 #include <asm/mmu.h>
 
+#include "nonstdio.h"
 #include "zlib.h"
 
 unsigned long com_port;
@@ -47,16 +48,8 @@ unsigned long initrd_start = 0, initrd_end = 0;
 char *zimage_start;
 int zimage_size;
 
-extern void puts(const char *);
-extern void putc(const char c);
-extern void puthex(unsigned long val);
-extern void *memcpy(void * __dest, __const void * __src,
-			    __kernel_size_t __n);
 extern void gunzip(void *, int, unsigned char *, int *);
-extern void udelay(long delay);
-extern int tstc(void);
-extern int getc(void);
-extern volatile unsigned long serial_init(int chan);
+extern unsigned long serial_init(int chan);
 
 void
 decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum)

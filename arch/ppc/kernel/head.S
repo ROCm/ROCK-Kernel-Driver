@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.head.S 1.25 07/07/01 17:08:44 paulus
+ * BK Id: SCCS/s.head.S 1.29 08/19/01 22:43:23 paulus
  */
 /*
  *  PowerPC version 
@@ -31,6 +31,7 @@
 #include <asm/page.h>
 #include <asm/mmu.h>
 #include <asm/pgtable.h>
+#include <asm/cputable.h>
 
 #ifdef CONFIG_APUS
 #include <asm/amigappc.h>
@@ -153,7 +154,7 @@ __start:
 
 #ifndef CONFIG_GEMINI
 /* Switch MMU off, clear BATs and flush TLB. At this point, r3 contains
- * the physical address we are running at, returned by prom_init()
+ * the physical address we are running at, returned by early_init()
  */
  	bl	mmu_off
 __after_mmu_off:
@@ -761,12 +762,10 @@ transfer_to_handler:
 	addi	r24,r1,STACK_FRAME_OVERHEAD
 	stw	r24,PT_REGS(r23)
 #ifdef CONFIG_ALTIVEC
-	mfpvr	r24			/* check if we are on a G4 */
-	srwi	r24,r24,16
-	cmpwi	r24,PVR_7400@h
-	bne	2f
-	mfspr	r22,SPRN_VRSAVE		/* if so, save vrsave register value */
+BEGIN_FTR_SECTION
+	mfspr	r22,SPRN_VRSAVE		/* if G4, save vrsave register value */
 	stw	r22,THREAD_VRSAVE(r23)
+END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
 #endif /* CONFIG_ALTIVEC */
 2:	addi	r2,r23,-THREAD		/* set r2 to current */
 	tovirt(r2,r2)
@@ -1280,9 +1279,12 @@ __secondary_start:
 	SYNC
 	MTMSRD(r0)
 	isync
-#else
-	bl	enable_caches
 #endif
+
+	lis	r3,-KERNELBASE@h
+	mr	r4,r24
+	bl	identify_cpu
+	bl	call_setup_cpu		/* Call setup_cpu for this CPU */
 
 	/* get current */
 	lis	r2,current_set@h
@@ -1322,54 +1324,87 @@ __secondary_start:
 /*
  * Enable caches and 604-specific features if necessary.
  */
-enable_caches:
-	mfspr	r9,PVR
-	rlwinm	r9,r9,16,16,31
-	cmpi	0,r9,1
-	beq	6f			/* not needed for 601 */
+_GLOBAL(__setup_cpu_601)
+	blr
+_GLOBAL(__setup_cpu_603)
+	b	setup_common_caches
+_GLOBAL(__setup_cpu_604)
+	mflr	r4
+	bl	setup_common_caches
+	bl	setup_604_hid0
+	mtlr	r4
+	blr
+_GLOBAL(__setup_cpu_750)
+	mflr	r4
+	bl	setup_common_caches
+	bl	setup_750_7400_hid0
+	mtlr	r4
+	blr
+_GLOBAL(__setup_cpu_7400)
+	mflr	r4
+	bl	setup_common_caches
+	bl	setup_750_7400_hid0
+	mtlr	r4
+	blr
+_GLOBAL(__setup_cpu_7450)
+	blr
+_GLOBAL(__setup_cpu_power3)
+	blr
+_GLOBAL(__setup_cpu_power4)
+	blr
+_GLOBAL(__setup_cpu_generic)
+	blr
+
+/* Enable caches for 603's, 604, 750 & 7400 */
+setup_common_caches:
 	mfspr	r11,HID0
 	andi.	r0,r11,HID0_DCE
 	ori	r11,r11,HID0_ICE|HID0_DCE
 	ori	r8,r11,HID0_ICFI
-	bne	3f			/* don't invalidate the D-cache */
+	bne	1f			/* don't invalidate the D-cache */
 	ori	r8,r8,HID0_DCI		/* unless it wasn't enabled */
-3:
-	sync
+1:	sync
 	mtspr	HID0,r8			/* enable and invalidate caches */
 	sync
 	mtspr	HID0,r11		/* enable caches */
 	sync
 	isync
-	cmpi	0,r9,4			/* check for 604 */
-	cmpi	1,r9,9			/* or 604e */
-	cmpi	2,r9,10			/* or mach5 / 604r */
-	cmpi	3,r9,8			/* check for 750 (G3) */
-	cmpi	4,r9,12			/* or 7400 (G4) */
-	cror	2,2,6
-	cror	2,2,10
-	bne	4f
-	ori	r11,r11,HID0_SIED|HID0_BHTE /* for 604[e|r], enable */
-	bne	2,5f
-	ori	r11,r11,HID0_BTCD	/* superscalar exec & br history tbl */
-	b	5f
-4:
-	cror	14,14,18
-	bne	3,6f
-	/* for G3/G4:
-	 * enable Store Gathering (SGE), Address Brodcast (ABE),
-	 * Branch History Table (BHTE), Branch Target ICache (BTIC)
-	 */
+	blr
+
+/* 604, 604e, 604ev, ...
+ * Enable superscalar execution & branch history table
+ */
+setup_604_hid0:
+	mfspr	r11,HID0
+	ori	r11,r11,HID0_SIED|HID0_BHTE
+	ori	r8,r11,HID0_BTCD
+	sync
+	mtspr	HID0,r8		/* flush branch target address cache */
+	sync			/* on 604e/604r */
+	mtspr	HID0,r11
+	sync
+	isync
+	blr
+
+/* 740/750/7400/7410
+ * Enable Store Gathering (SGE), Address Brodcast (ABE),
+ * Branch History Table (BHTE), Branch Target ICache (BTIC)
+ * Dynamic Power Management (DPM), Speculative (SPD)
+ * Clear Instruction cache throttling (ICTC)
+ */
+setup_750_7400_hid0:
+	mfspr	r11,HID0
 	ori	r11,r11,HID0_SGE | HID0_ABE | HID0_BHTE | HID0_BTIC
 	oris	r11,r11,HID0_DPM@h	/* enable dynamic power mgmt */
 	li	r3,HID0_SPD
 	andc	r11,r11,r3		/* clear SPD: enable speculative */
  	li	r3,0
  	mtspr	ICTC,r3			/* Instruction Cache Throttling off */
-5:	isync
+	isync
 	mtspr	HID0,r11
 	sync
 	isync
-6:	blr
+	blr
 
 /*
  * Load stuff into the MMU.  Intended to be called with
@@ -1414,9 +1449,10 @@ load_up_mmu:
  * This is where the main kernel code starts.
  */
 start_here:
-#ifndef CONFIG_PPC64BRIDGE
-	bl	enable_caches
-#endif
+	/* Call setup_cpu for CPU 0 */
+	li	r3,0		/* data offset */
+	li	r24,0		/* cpu# */
+	bl	call_setup_cpu
 
 	/* ptr to current */
 	lis	r2,init_task_union@h
@@ -1435,14 +1471,15 @@ start_here:
 	li	r0,0
 	stwu	r0,-STACK_FRAME_OVERHEAD(r1)
 /*
- * Decide what sort of machine this is and initialize the MMU.
+ * Do early bootinfo parsing, platform-specific initialization,
+ * and set up the MMU.
  */
 	mr	r3,r31
 	mr	r4,r30
 	mr	r5,r29
 	mr	r6,r28
 	mr	r7,r27
-	bl	identify_machine
+	bl	machine_init
 	bl	MMU_init
 
 #ifdef CONFIG_APUS
@@ -1475,12 +1512,10 @@ start_here:
 /* Load up the kernel context */
 2:
 	sync			/* Force all PTE updates to finish */
+	ISYNC_601
 	tlbia			/* Clear all TLB entries */
 	sync			/* wait for tlbia/tlbie to finish */
-#ifdef CONFIG_SMP
-	tlbsync			/* ... on all CPUs */
-	sync
-#endif
+	TLBSYNC			/* ... on all CPUs */
 
 	bl	load_up_mmu
 /* Now turn on the MMU for real! */
@@ -1500,7 +1535,7 @@ _GLOBAL(set_context)
 	mulli	r3,r3,897	/* multiply context by skew factor */
 	rlwinm	r3,r3,4,8,27	/* VSID = (context & 0xfffff) << 4 */
 	addis	r3,r3,0x6000	/* Set Ks, Ku bits */
-	li	r0,12		/* TASK_SIZE / SEGMENT_SIZE */
+	li	r0,NUM_USER_SEGMENTS
 	mtctr	r0
 	li	r4,0
 3:
@@ -1512,7 +1547,8 @@ _GLOBAL(set_context)
 	rlwinm	r3,r3,0,8,3	/* clear out any overflow from VSID field */
 	addis	r4,r4,0x1000	/* address of next segment */
 	bdnz	3b
-	SYNC
+	SYNC_601
+	isync
 	blr
 
 /* 

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.machdep.h 1.14 06/28/01 16:13:50 paulus
+ * BK Id: SCCS/s.machdep.h 1.19 08/18/01 18:16:33 paulus
  */
 #ifdef __KERNEL__
 #ifndef _PPC_MACHDEP_H
@@ -14,6 +14,7 @@
 struct pt_regs;
 struct pci_bus;	
 struct pci_dev;
+struct kbd_repeat;
 
 struct machdep_calls {
 	void		(*setup_arch)(void);
@@ -44,6 +45,8 @@ struct machdep_calls {
 	unsigned long	heartbeat_count;
 
 	unsigned long	(*find_end_of_memory)(void);
+	void		(*setup_io_mappings)(void);
+
   	void		(*progress)(char *, unsigned short);
 
 	unsigned char 	(*nvram_read_val)(int addr);
@@ -58,6 +61,7 @@ struct machdep_calls {
 				char raw_mode);
 	char		(*kbd_unexpected_up)(unsigned char keycode);
 	void		(*kbd_leds)(unsigned char leds);
+	int		(*kbd_rate_fn)(struct kbd_repeat *rep);
 	void		(*kbd_init_hw)(void);
 #ifdef CONFIG_MAGIC_SYSRQ
 	unsigned char 	*ppc_kbd_sysrq_xlate;
@@ -83,6 +87,11 @@ struct machdep_calls {
 
 	/* this is for modules, since _machine can be a define -- Cort */
 	int ppc_machine;
+
+#ifdef CONFIG_SMP
+	/* functions for dealing with other cpus */
+	struct smp_ops_t *smp_ops;
+#endif /* CONFIG_SMP */
 };
 
 extern struct machdep_calls ppc_md;
@@ -101,6 +110,15 @@ typedef enum sys_ctrler_kind {
 } sys_ctrler_t;
 
 extern sys_ctrler_t sys_ctrler;
+
+#ifdef CONFIG_SMP
+struct smp_ops_t {
+	void  (*message_pass)(int target, int msg, unsigned long data, int wait);
+	int   (*probe)(void);
+	void  (*kick_cpu)(int nr);
+	void  (*setup_cpu)(int nr);
+};
+#endif /* CONFIG_SMP */
 
 #endif /* _PPC_MACHDEP_H */
 #endif /* __KERNEL__ */

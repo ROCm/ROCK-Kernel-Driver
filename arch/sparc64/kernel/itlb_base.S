@@ -1,4 +1,4 @@
-/* $Id: itlb_base.S,v 1.10 2000/11/10 08:28:45 davem Exp $
+/* $Id: itlb_base.S,v 1.11 2001/08/17 04:55:09 kanoj Exp $
  * itlb_base.S:	Front end to ITLB miss replacement strategy.
  *              This is included directly into the trap table.
  *
@@ -6,8 +6,25 @@
  * Copyright (C) 1997,1998 Jakub Jelinek   (jj@ultra.linux.cz)
  */
 
-#define TAG_CONTEXT_BITS	0x3ff
-#define VPTE_SHIFT		(PAGE_SHIFT - 3)
+#if PAGE_SHIFT == 13
+/*
+ * To compute vpte offset, we need to do ((addr >> 13) << 3),
+ * which can be optimized to (addr >> 10) if bits 10/11/12 can
+ * be guaranteed to be 0 ... mmu_context.h does guarantee this
+ * by only using 10 bits in the hwcontext value.
+ */
+#define CREATE_VPTE_OFFSET1(r1, r2) \
+				srax	r1, 10, r2
+#define CREATE_VPTE_OFFSET2(r1, r2)
+#define CREATE_VPTE_NOP		nop
+#else /* PAGE_SHIFT */
+#define CREATE_VPTE_OFFSET1(r1, r2) \
+				srax	r1, PAGE_SHIFT, r2
+#define CREATE_VPTE_OFFSET2(r1, r2) \
+				sllx	r2, 3, r2
+#define CREATE_VPTE_NOP
+#endif /* PAGE_SHIFT */
+
 
 /* Ways we can get here:
  *
@@ -20,7 +37,8 @@
 
 /* ITLB ** ICACHE line 1: Quick user TLB misses		*/
 	ldxa		[%g1 + %g1] ASI_IMMU, %g4	! Get TAG_ACCESS
-	srax		%g4, VPTE_SHIFT, %g6		! Create VPTE offset
+	CREATE_VPTE_OFFSET1(%g4, %g6)			! Create VPTE offset
+	CREATE_VPTE_OFFSET2(%g4, %g6)			! Create VPTE offset
 	ldxa		[%g3 + %g6] ASI_P, %g5		! Load VPTE
 1:	brgez,pn	%g5, 3f				! Not valid, branch out
 	 nop						! Delay-slot
@@ -58,7 +76,8 @@ winfix_trampoline:
 	nop
 	nop
 	nop
-	nop
+	CREATE_VPTE_NOP
 
-#undef TAG_CONTEXT_BITS
-#undef VPTE_SHIFT
+#undef CREATE_VPTE_OFFSET1
+#undef CREATE_VPTE_OFFSET2
+#undef CREATE_VPTE_NOP

@@ -1,4 +1,4 @@
-/* $Id: pci_schizo.c,v 1.20 2001/08/12 13:18:23 davem Exp $
+/* $Id: pci_schizo.c,v 1.21 2001/08/24 19:36:58 kanoj Exp $
  * pci_schizo.c: SCHIZO specific PCI controller support.
  *
  * Copyright (C) 2001 David S. Miller (davem@redhat.com)
@@ -16,6 +16,7 @@
 #include <asm/upa.h>
 
 #include "pci_impl.h"
+#include "iommu_common.h"
 
 /* All SCHIZO registers are 64-bits.  The following accessor
  * routines are how they are accessed.  The REG parameter
@@ -659,12 +660,12 @@ static void schizo_check_iommu_error_pbm(struct pci_pbm_info *pbm,
 			       ((tag & SCHIZO_IOMMU_TAG_WRITE) ? 1 : 0),
 			       ((tag & SCHIZO_IOMMU_TAG_STREAM) ? 1 : 0),
 			       ((tag & SCHIZO_IOMMU_TAG_SIZE) ? 64 : 8),
-			       (tag & SCHIZO_IOMMU_TAG_VPAGE) << PAGE_SHIFT);
+			       (tag & SCHIZO_IOMMU_TAG_VPAGE) << IOMMU_PAGE_SHIFT);
 			printk("SCHIZO%d: PBM-%c IOMMU DATA(%d)[valid(%d) cache(%d) ppg(%016lx)]\n",
 			       p->index, pbm_name, i,
 			       ((data & SCHIZO_IOMMU_DATA_VALID) ? 1 : 0),
 			       ((data & SCHIZO_IOMMU_DATA_CACHE) ? 1 : 0),
-			       (data & SCHIZO_IOMMU_DATA_PPAGE) << PAGE_SHIFT);
+			       (data & SCHIZO_IOMMU_DATA_PPAGE) << IOMMU_PAGE_SHIFT);
 		}
 	}
 	__schizo_check_stc_error_pbm(pbm, type);
@@ -1639,7 +1640,7 @@ static void schizo_pbm_iommu_init(struct pci_controller_info *p,
 	 * table (128K ioptes * 8 bytes per iopte).  This is
 	 * page order 7 on UltraSparc.
 	 */
-	tsbbase = __get_free_pages(GFP_KERNEL, 7);
+	tsbbase = __get_free_pages(GFP_KERNEL, get_order(IO_TSB_SIZE));
 	if (!tsbbase) {
 		prom_printf("SCHIZO_IOMMU: Error, gfp(tsb) failed.\n");
 		prom_halt();
@@ -1648,7 +1649,7 @@ static void schizo_pbm_iommu_init(struct pci_controller_info *p,
 	iommu->page_table_sz_bits = 17;
 	iommu->page_table_map_base = 0xc0000000;
 	iommu->dma_addr_mask = 0xffffffff;
-	memset((char *)tsbbase, 0, PAGE_SIZE << 7);
+	memset((char *)tsbbase, 0, IO_TSB_SIZE);
 
 	/* We start with no consistent mappings. */
 	iommu->lowest_consistent_map =

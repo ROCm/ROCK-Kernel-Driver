@@ -349,7 +349,8 @@ static int keyspan_write(struct usb_serial_port *port, int from_user,
 		((char *)this_urb->transfer_buffer)[0] = 0;
 
 		if (from_user) {
-			copy_from_user(this_urb->transfer_buffer + 1, buf, todo);
+			if (copy_from_user(this_urb->transfer_buffer + 1, buf, todo))
+				return -EFAULT;
 		} else {
 			memcpy (this_urb->transfer_buffer + 1, buf, todo);
 		}

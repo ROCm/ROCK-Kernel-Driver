@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.mk_defs.c 1.8 06/28/01 15:50:16 paulus
+ * BK Id: SCCS/s.mk_defs.c 1.11 08/19/01 22:43:23 paulus
  */
 /*
  * This program is used to generate definitions needed by
@@ -26,6 +26,7 @@
 #include <asm/page.h>
 #include <asm/pgtable.h>
 #include <asm/processor.h>
+#include <asm/cputable.h>
 
 #define DEFINE(sym, val) \
 	asm volatile("\n#define\t" #sym "\t%0" : : "i" (val))
@@ -118,5 +119,14 @@ main(void)
 	DEFINE(TRAP, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, trap));
 	DEFINE(CLONE_VM, CLONE_VM);
 	DEFINE(MM_PGD, offsetof(struct mm_struct, pgd));
+
+	/* About the CPU features table */
+	DEFINE(CPU_SPEC_ENTRY_SIZE, sizeof(struct cpu_spec));
+	DEFINE(CPU_SPEC_PVR_MASK, offsetof(struct cpu_spec, pvr_mask));
+	DEFINE(CPU_SPEC_PVR_VALUE, offsetof(struct cpu_spec, pvr_value));
+	DEFINE(CPU_SPEC_FEATURES, offsetof(struct cpu_spec, cpu_features));
+	DEFINE(CPU_SPEC_SETUP, offsetof(struct cpu_spec, cpu_setup));
+
+	DEFINE(NUM_USER_SEGMENTS, TASK_SIZE>>28);
 	return 0;
 }

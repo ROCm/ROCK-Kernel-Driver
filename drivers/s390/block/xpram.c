@@ -625,8 +625,7 @@ int xpram_release (struct inode *inode, struct file *filp)
 	 */
 	if (!atomic_dec_return(&(dev->usage))) {
 		/* but flush it right now */
-		fsync_dev(inode->i_rdev);
-		invalidate_buffers(inode->i_rdev);
+		/* Everything is already flushed by caller -- AV */
 	}
 	MOD_DEC_USE_COUNT;
 	return(0);

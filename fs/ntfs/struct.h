@@ -4,6 +4,7 @@
  * Copyright (C) 1997 Régis Duchesne
  * Copyright (C) 2000-2001 Anton Altaparmakov (AIA)
  */
+#include <linux/ntfs_fs.h>
 
 /* Necessary forward definition. */
 struct ntfs_inode;
@@ -28,7 +29,8 @@ typedef struct ntfs_attribute{
 	int namelen;
 	int attrno;
 	__s64 size, allocated, initialized, compsize;
-	int compressed, resident, indexed;
+	ATTR_FLAGS flags;
+	__u8 resident, indexed;
 	int cengine;
 	union {
 		void *data;             /* if resident */

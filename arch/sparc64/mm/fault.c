@@ -1,4 +1,4 @@
-/* $Id: fault.c,v 1.55 2001/08/09 20:18:43 davem Exp $
+/* $Id: fault.c,v 1.56 2001/08/27 18:42:07 kanoj Exp $
  * arch/sparc64/mm/fault.c: Page fault handlers for the 64-bit Sparc.
  *
  * Copyright (C) 1996 David S. Miller (davem@caip.rutgers.edu)
@@ -26,6 +26,16 @@
 #define ELEMENTS(arr) (sizeof (arr)/sizeof (arr[0]))
 
 extern struct sparc_phys_banks sp_banks[SPARC_PHYS_BANKS];
+
+void syscall_trace_entry(struct pt_regs *regs)
+{
+	printk("scall entry: %s[%d]/cpu%d: %d\n", current->comm, current->pid, smp_processor_id(), (int) regs->u_regs[UREG_G1]);
+}
+
+void syscall_trace_exit(struct pt_regs *regs)
+{
+	printk("scall exit: %s[%d]/cpu%d: %d\n", current->comm, current->pid, smp_processor_id(), (int) regs->u_regs[UREG_G1]);
+}
 
 /* Nice, simple, prom library does all the sweating for us. ;) */
 unsigned long __init prom_probe_memory (void)

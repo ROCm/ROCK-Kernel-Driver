@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.pmac_pci.c 1.22 08/08/01 16:35:43 paulus
+ * BK Id: SCCS/s.pmac_pci.c 1.25 08/19/01 22:23:04 paulus
  */
 /*
  * Support for PCI bridges found on Power Macintoshes.
@@ -528,6 +528,7 @@ int __pmac
 pmac_pci_enable_device_hook(struct pci_dev *dev, int initial)
 {
 	struct device_node* node;
+	int updatecfg = 0;
 
 	node = pci_device_to_OF_node(dev);
 
@@ -538,14 +539,40 @@ pmac_pci_enable_device_hook(struct pci_dev *dev, int initial)
 	    && dev->device == PCI_DEVICE_ID_APPLE_KL_USB && !node)
 		return -EINVAL;
 		
-	/* Firewire was disabled after PCI probe, the driver is claiming it,
-	 * so we must re-enable it now, at least until the driver can do it
-	 * itself.
+	/* Firewire & GMAC were disabled after PCI probe, the driver is
+	 * claiming them, we must re-enable them now.
 	 */
 	if (node && !strcmp(node->name, "firewire") && 
-	    device_is_compatible(node, "pci106b,18")) {
+	    (device_is_compatible(node, "pci106b,18") || 
+	     device_is_compatible(node, "pci106b,30"))) {
 		feature_set_firewire_cable_power(node, 1);
 		feature_set_firewire_power(node, 1);
+		updatecfg = 1;
+	}
+	if (node && !strcmp(node->name, "ethernet") && 
+	    device_is_compatible(node, "gmac")) {
+		feature_set_gmac_power(node, 1);
+		updatecfg = 1;
+	}
+
+	if (updatecfg) {
+		u16 cmd;
+		
+		/*
+		 * Make sure PCI is correctly configured
+		 *
+		 * We use old pci_bios versions of the function since, by
+		 * default, gmac is not powered up, and so will be absent
+		 * from the kernel initial PCI lookup. 
+		 * 
+		 * Should be replaced by 2.4 new PCI mecanisms and really
+		 * regiser the device.
+		 */
+		pci_read_config_word(dev, PCI_COMMAND, &cmd);
+		cmd |= PCI_COMMAND_MEMORY | PCI_COMMAND_MASTER | PCI_COMMAND_INVALIDATE;
+    		pci_write_config_word(dev, PCI_COMMAND, cmd);
+    		pci_write_config_byte(dev, PCI_LATENCY_TIMER, 16);
+    		pci_write_config_byte(dev, PCI_CACHE_LINE_SIZE, 8);
 	}
 	
 	return 0;
@@ -580,7 +607,8 @@ pmac_pcibios_after_init(void)
 
 	nd = find_devices("firewire");
 	while (nd) {
-		if (nd->parent && device_is_compatible(nd, "pci106b,18")
+		if (nd->parent && (device_is_compatible(nd, "pci106b,18") ||
+					device_is_compatible(nd, "pci106b,30"))
 		    && device_is_compatible(nd->parent, "uni-north")) {
 			feature_set_firewire_power(nd, 0);
 			feature_set_firewire_cable_power(nd, 0);

@@ -21,6 +21,7 @@ CONFIG_KMOD=y
 # Platform support
 #
 CONFIG_PPC=y
+CONFIG_PPC32=y
 # CONFIG_6xx is not set
 CONFIG_4xx=y
 # CONFIG_POWER3 is not set
@@ -29,6 +30,7 @@ CONFIG_4xx=y
 CONFIG_OAK=y
 # CONFIG_WALNUT is not set
 CONFIG_PPC601_SYNC_FIX=y
+# CONFIG_ALL_PPC is not set
 # CONFIG_SMP is not set
 # CONFIG_MATH_EMULATION is not set
 

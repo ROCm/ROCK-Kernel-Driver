@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.misc.c 1.11 07/18/01 15:46:50 trini
+ * BK Id: SCCS/s.misc.c 1.13 07/27/01 11:44:37 trini
  */
 /*
  * Adapted for PowerPC by Gary Thomas
@@ -22,6 +22,8 @@
 #ifdef CONFIG_8260
 #include <asm/mpc8260.h>
 #endif
+
+#include "nonstdio.h"
 
 /*
  * The following references are needed to cause the linker to pull in the
@@ -75,14 +77,7 @@ unsigned long initrd_start = 0, initrd_end = 0;
 char *zimage_start;
 int zimage_size;
 
-extern void puts(const char *);
-extern void putc(const char c);
-extern void udelay(long x);
-extern void puthex(unsigned long val);
-extern void * memcpy(void * __dest, __const void * __src, __kernel_size_t __n);
 extern void gunzip(void *, int, unsigned char *, int *);
-extern int tstc(void);
-extern int getc(void);
 
 unsigned long
 decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum, bd_t *bp)
@@ -267,33 +262,4 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum, b
 	puts("done.\n");
 	puts("Now booting the kernel\n");
 	return (unsigned long)hold_residual;
-}
-
-/*
- * PCI/ISA I/O support
- */
-
-volatile unsigned char *ISA_io  = (unsigned char *)0x80000000;
-volatile unsigned char *ISA_mem = (unsigned char *)0xC0000000;
-
-void
-outb(int port, char val)
-{
-	/* Ensure I/O operations complete */
-	__asm__ volatile("eieio");
-	ISA_io[port] = val;
-}
-
-unsigned char
-inb(int port)
-{
-	/* Ensure I/O operations complete */
-	__asm__ volatile("eieio");
-	return (ISA_io[port]);
-}
-
-unsigned long
-local_to_PCI(unsigned long addr)
-{
-	return ((addr & 0x7FFFFFFF) | 0x80000000);
 }

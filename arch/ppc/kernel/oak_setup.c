@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.oak_setup.c 1.5 05/17/01 18:14:21 cort
+ * BK Id: SCCS/s.oak_setup.c 1.8 08/15/01 21:48:38 paulus
  */
 /*
  *
@@ -74,8 +74,8 @@ unsigned char __res[sizeof(bd_t)];
  *
  */
 void __init
-oak_init(unsigned long r3, unsigned long r4, unsigned long r5, 
-	 unsigned long r6, unsigned long r7)
+platform_init(unsigned long r3, unsigned long r4, unsigned long r5, 
+	      unsigned long r6, unsigned long r7)
 {
 	/*
 	 * If we were passed in a board information, copy it into the

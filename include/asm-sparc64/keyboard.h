@@ -1,4 +1,4 @@
-/* $Id: keyboard.h,v 1.4 2001/08/13 14:40:07 davem Exp $
+/* $Id: keyboard.h,v 1.5 2001/08/18 09:40:46 davem Exp $
  * linux/include/asm-sparc64/keyboard.h
  *
  * Created Aug 29 1997 by Eddie C. Dost (ecd@skynet.be)
@@ -25,7 +25,6 @@ extern int pcikbd_translate(unsigned char scancode, unsigned char *keycode,
 			    char raw_mode);
 extern char pcikbd_unexpected_up(unsigned char keycode);
 extern void pcikbd_leds(unsigned char leds);
-extern int pcikbd_rate(struct kbd_repeat *rep);
 extern void pcikbd_init_hw(void);
 extern unsigned char pcikbd_sysrq_xlate[128];
 
@@ -34,7 +33,6 @@ extern unsigned char pcikbd_sysrq_xlate[128];
 #define kbd_translate			pcikbd_translate
 #define kbd_unexpected_up		pcikbd_unexpected_up
 #define kbd_leds			pcikbd_leds
-#define kbd_rate			pcikbd_rate
 #define kbd_init_hw			pcikbd_init_hw
 #define kbd_sysrq_xlate			pcikbd_sysrq_xlate
 #define kbd_init			pcikbd_init

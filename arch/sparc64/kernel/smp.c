@@ -702,7 +702,7 @@ void smp_flush_tlb_range(struct mm_struct *mm, unsigned long start,
 		int cpu = smp_processor_id();
 
 		start &= PAGE_MASK;
-		end   &= PAGE_MASK;
+		end    = PAGE_ALIGN(end);
 
 		if (mm == current->active_mm && atomic_read(&mm->mm_users) == 1) {
 			mm->cpu_vm_mask = (1UL << cpu);

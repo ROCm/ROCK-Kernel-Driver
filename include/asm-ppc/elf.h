@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.elf.h 1.10 05/17/01 18:14:24 cort
+ * BK Id: SCCS/s.elf.h 1.14 08/21/01 16:07:48 trini
  */
 #ifndef __PPC_ELF_H
 #define __PPC_ELF_H
@@ -7,7 +7,9 @@
 /*
  * ELF register definitions..
  */
+#include <asm/types.h>
 #include <asm/ptrace.h>
+#include <asm/cputable.h>
 
 #define ELF_NGREG	48	/* includes nip, msr, lr, etc. */
 #define ELF_NFPREG	33	/* includes fpscr */
@@ -60,7 +62,7 @@ typedef elf_vrreg_t elf_vrregset_t[ELF_NVRREG];
    instruction set this cpu supports.  This could be done in userspace,
    but it's not easy, and we've already done it here.  */
 
-#define ELF_HWCAP	(0)
+#define ELF_HWCAP	(cur_cpu_spec[0]->cpu_user_features)
 
 /* This yields a string that ld.so will use to load implementation
    specific libraries for optimization.  This is more specific in

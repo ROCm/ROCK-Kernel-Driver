@@ -8,7 +8,7 @@
 
 L_TARGET := lib.a
 
-export-objs := cmdline.o rwsem-spinlock.o rwsem.o
+export-objs := cmdline.o dec_and_lock.o rwsem-spinlock.o rwsem.o
 
 obj-y := errno.o ctype.o string.o vsprintf.o brlock.o cmdline.o
 

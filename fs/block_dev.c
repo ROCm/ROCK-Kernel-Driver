@@ -153,7 +153,7 @@ ssize_t block_write(struct file * filp, const char * buf,
 			}
 			buffercount=0;
 		}
-		balance_dirty(dev);
+		balance_dirty();
 		if (write_error)
 			break;
 	}

@@ -1,4 +1,4 @@
-# BK Id: SCCS/s.Makefile 1.24 07/10/01 12:12:22 trini
+# BK Id: SCCS/s.Makefile 1.32 08/24/01 20:07:37 paulus
 #
 #
 # Makefile for the linux kernel.
@@ -29,12 +29,13 @@ all: $(KHEAD) kernel.o
 
 O_TARGET := kernel.o
 
-export-objs			:= ppc_ksyms.o prep_setup.o 
+export-objs			:= ppc_ksyms.o prep_setup.o time.o
 
 obj-y				:= entry.o traps.o irq.o idle.o time.o misc.o \
 					process.o signal.o ptrace.o \
 					ppc_htab.o semaphore.o syscalls.o  \
-					align.o setup.o
+					align.o setup.o cputable.o
+obj-$(CONFIG_6xx)		+= l2cr.o
 obj-$(CONFIG_MODULES)		+= ppc_ksyms.o
 obj-$(CONFIG_POWER4)		+= xics.o
 obj-$(CONFIG_PCI)		+= pci.o pci-dma.o
@@ -43,6 +44,7 @@ obj-$(CONFIG_SMP)		+= smp.o
 obj-$(CONFIG_4xx)		+= ppc4xx_pic.o
 obj-$(CONFIG_OAK)		+= oak_setup.o
 obj-$(CONFIG_WALNUT)		+= walnut_setup.o
+obj-$(CONFIG_TAU)		+= temp.o
 ifeq ($(CONFIG_WALNUT),y)
 obj-$(CONFIG_PCI)		+= galaxy_pci.o
 endif
@@ -71,12 +73,17 @@ obj-$(CONFIG_PREP_RESIDUAL)	+= residual.o
 obj-$(CONFIG_GEMINI)		+= gemini_prom.o gemini_pci.o gemini_setup.o \
 					open_pic.o
 obj-$(CONFIG_8260)		+= m8260_setup.o ppc8260_pic.o
+obj-$(CONFIG_BOOTX_TEXT)	+= btext.o
 
+ifeq ($(CONFIG_SMP),y)
+obj-$(CONFIG_ALL_PPC)		+= pmac_smp.o chrp_smp.o
+endif
 
 include $(TOPDIR)/Rules.make
 
 entry.o: entry.S ppc_defs.h
 misc.o: misc.S ppc_defs.h
+l2cr.o: l2cr.S ppc_defs.h
 head.o: head.S ppc_defs.h
 head_4xx.o: head_4xx.S ppc_defs.h
 head_8xx.o: head_8xx.S ppc_defs.h

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.pmac_pic.h 1.5 05/17/01 18:14:21 cort
+ * BK Id: SCCS/s.pmac_pic.h 1.9 08/19/01 22:23:04 paulus
  */
 #ifndef _PPC_KERNEL_PMAC_PIC_H
 #define _PPC_KERNEL_PMAC_PIC_H
@@ -10,6 +10,5 @@ extern struct hw_interrupt_type pmac_pic;
 
 void pmac_pic_init(void);
 int pmac_get_irq(struct pt_regs *regs);
-void pmac_post_irq(int);
 
 #endif /* _PPC_KERNEL_PMAC_PIC_H */

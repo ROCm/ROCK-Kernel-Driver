@@ -1,4 +1,4 @@
-/* $Id: pci_sabre.c,v 1.38 2001/08/12 13:18:23 davem Exp $
+/* $Id: pci_sabre.c,v 1.39 2001/08/24 19:36:58 kanoj Exp $
  * pci_sabre.c: Sabre specific PCI controller support.
  *
  * Copyright (C) 1997, 1998, 1999 David S. Miller (davem@caipfs.rutgers.edu)
@@ -19,6 +19,7 @@
 #include <asm/smp.h>
 
 #include "pci_impl.h"
+#include "iommu_common.h"
 
 /* All SABRE registers are 64-bits.  The following accessor
  * routines are how they are accessed.  The REG parameter
@@ -759,13 +760,13 @@ static void sabre_check_iommu_error(struct pci_controller_info *p,
 			       p->index, i, tag, type_string,
 			       ((tag & SABRE_IOMMUTAG_WRITE) ? 1 : 0),
 			       ((tag & SABRE_IOMMUTAG_SIZE) ? 64 : 8),
-			       ((tag & SABRE_IOMMUTAG_VPN) << PAGE_SHIFT));
+			       ((tag & SABRE_IOMMUTAG_VPN) << IOMMU_PAGE_SHIFT));
 			printk("SABRE%d: IOMMU DATA(%d)[RAW(%016lx)valid(%d)used(%d)cache(%d)ppg(%016lx)\n",
 			       p->index, i, data,
 			       ((data & SABRE_IOMMUDATA_VALID) ? 1 : 0),
 			       ((data & SABRE_IOMMUDATA_USED) ? 1 : 0),
 			       ((data & SABRE_IOMMUDATA_CACHE) ? 1 : 0),
-			       ((data & SABRE_IOMMUDATA_PPN) << PAGE_SHIFT));
+			       ((data & SABRE_IOMMUDATA_PPN) << IOMMU_PAGE_SHIFT));
 		}
 	}
 	spin_unlock_irqrestore(&iommu->lock, flags);

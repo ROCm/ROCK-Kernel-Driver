@@ -1,4 +1,4 @@
-/* $Id: iommu_common.h,v 1.1 1999/12/17 12:31:54 jj Exp $
+/* $Id: iommu_common.h,v 1.3 2001/08/24 19:36:58 kanoj Exp $
  * iommu_common.h: UltraSparc SBUS/PCI common iommu declarations.
  *
  * Copyright (C) 1999 David S. Miller (davem@redhat.com)
@@ -10,6 +10,22 @@
 #include <asm/page.h>
 #include <asm/iommu.h>
 #include <asm/scatterlist.h>
+
+/*
+ * These give mapping size of each iommu pte/tlb.
+ */
+#define IO_PAGE_SHIFT			13
+#define IO_PAGE_SIZE			(1UL << IO_PAGE_SHIFT)
+#define IO_PAGE_MASK			(~(IO_PAGE_SIZE-1))
+#define IO_PAGE_ALIGN(addr)		(((addr)+IO_PAGE_SIZE-1)&IO_PAGE_MASK)
+
+#define IO_TSB_ENTRIES			(128*1024)
+#define IO_TSB_SIZE			(IO_TSB_ENTRIES * 8)
+
+/*
+ * This is the hardwired shift in the iotlb tag/data parts.
+ */
+#define IOMMU_PAGE_SHIFT		13
 
 /* You are _strongly_ advised to enable the following debugging code
  * any time you make changes to the sg code below, run it for a while

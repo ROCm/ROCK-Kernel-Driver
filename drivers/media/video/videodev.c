@@ -164,7 +164,6 @@ static int video_open(struct inode *inode, struct file *file)
 	
 	if(vfl->owner)
 		__MOD_INC_USE_COUNT(vfl->owner);
-	unlock_kernel();
 	
 	if(vfl->open)
 	{
@@ -175,9 +174,11 @@ static int video_open(struct inode *inode, struct file *file)
 			if(vfl->owner)
 				__MOD_DEC_USE_COUNT(vfl->owner);
 			
+			unlock_kernel();
 			return err;
 		}
 	}
+	unlock_kernel();
 	return 0;
 error_out:
 	unlock_kernel();

@@ -2,7 +2,7 @@
 #define __LINUX_UHCI_H
 
 /*
-   $Id: usb-uhci.h,v 1.55 2000/05/13 12:50:30 acher Exp $
+   $Id: usb-uhci.h,v 1.58 2001/08/28 16:45:00 acher Exp $
  */
 #define MODNAME "usb-uhci"
 #define UHCI_LATENCY_TIMER 0
@@ -218,12 +218,35 @@ typedef struct uhci {
 	int timeout_urbs;
 	struct pci_dev *uhci_pci;
 	struct pci_pool *desc_pool;
+	long last_error_time;          // last error output in uhci_interrupt()
 } uhci_t, *puhci_t;
 
 
 #define MAKE_TD_ADDR(a) ((a)->dma_addr&~UHCI_PTR_QH)
 #define MAKE_QH_ADDR(a) ((a)->dma_addr|UHCI_PTR_QH)
 #define UHCI_GET_CURRENT_FRAME(uhci) (inw ((uhci)->io_addr + USBFRNUM))
+
+#define CLEAN_TRANSFER_NO_DELETION 0
+#define CLEAN_TRANSFER_REGULAR 1
+#define CLEAN_TRANSFER_DELETION_MARK 2
+
+#define CLEAN_NOT_FORCED 0
+#define CLEAN_FORCED 1
+
+#define PROCESS_ISO_REGULAR 0
+#define PROCESS_ISO_FORCE 1
+
+#define UNLINK_ASYNC_STORE_URB 0
+#define UNLINK_ASYNC_DONT_STORE 1
+
+#define is_td_active(desc) (desc->hw.td.status & cpu_to_le32(TD_CTRL_ACTIVE))
+
+#define set_qh_head(desc,val) (desc)->hw.qh.head=cpu_to_le32(val)
+#define set_qh_element(desc,val) (desc)->hw.qh.element=cpu_to_le32(val)
+#define set_td_link(desc,val) (desc)->hw.td.link=cpu_to_le32(val)
+#define set_td_ioc(desc) (desc)->hw.td.status |= cpu_to_le32(TD_CTRL_IOC)
+#define clr_td_ioc(desc) (desc)->hw.td.status &= cpu_to_le32(~TD_CTRL_IOC)
+
 
 /* ------------------------------------------------------------------------------------ 
    Virtual Root HUB 

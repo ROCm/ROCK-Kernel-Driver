@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.feature.h 1.9 05/17/01 18:14:24 cort
+ * BK Id: SCCS/s.feature.h 1.13 08/19/01 22:23:04 paulus
  */
 /*
  * Definitions for accessing the Feature Control Register (FCR)
@@ -91,6 +91,8 @@ extern void	feature_set_usb_power(struct device_node* device, int power);
 
 extern void 	feature_set_firewire_power(struct device_node* device, int power);
 extern void 	feature_set_firewire_cable_power(struct device_node* device, int power);
+
+extern void	feature_set_modem_power(struct device_node* device, int power);
 
 extern void	feature_set_airport_power(struct device_node* device, int power);
 

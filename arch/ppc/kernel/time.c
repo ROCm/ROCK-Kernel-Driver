@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.time.c 1.18 06/06/01 22:33:09 paulus
+ * BK Id: SCCS/s.time.c 1.21 08/20/01 22:08:08 paulus
  */
 /*
  * Common time routines among all ppc machines.
@@ -71,11 +71,6 @@
 #include <asm/time.h>
 
 unsigned long disarm_decr[NR_CPUS];
-
-#ifdef CONFIG_SMP
-extern void smp_local_timer_interrupt(struct pt_regs *);
-extern int smp_tb_synchronized;
-#endif /* CONFIG_SMP */
 
 extern int do_sys_settimeofday(struct timeval *tv, struct timezone *tz);
 
@@ -321,27 +316,30 @@ void __init time_init(void)
 	 * makes things more complex. Repeatedly read the RTC until the
 	 * next second boundary to try to achieve some precision...
 	 */
-	stamp = get_native_tbl();
-	sec = ppc_md.get_rtc_time();
-	elapsed = 0;
-	do {
-		old_stamp = stamp; 
-		old_sec = sec;
+	if (ppc_md.get_rtc_time) {
 		stamp = get_native_tbl();
-		if (__USE_RTC() && stamp < old_stamp) old_stamp -= 1000000000;
-		elapsed += stamp - old_stamp;
 		sec = ppc_md.get_rtc_time();
-	} while ( sec == old_sec && elapsed < 2*HZ*tb_ticks_per_jiffy);
-	if (sec==old_sec) {
-		printk("Warning: real time clock seems stuck!\n");
+		elapsed = 0;
+		do {
+			old_stamp = stamp; 
+			old_sec = sec;
+			stamp = get_native_tbl();
+			if (__USE_RTC() && stamp < old_stamp) old_stamp -= 1000000000;
+			elapsed += stamp - old_stamp;
+			sec = ppc_md.get_rtc_time();
+		} while ( sec == old_sec && elapsed < 2*HZ*tb_ticks_per_jiffy);
+		if (sec==old_sec) {
+			printk("Warning: real time clock seems stuck!\n");
+		}
+		write_lock_irqsave(&xtime_lock, flags);
+		xtime.tv_sec = sec;
+		last_jiffy_stamp(0) = tb_last_stamp = stamp;
+		xtime.tv_usec = 0;
+		/* No update now, we just read the time from the RTC ! */
+		last_rtc_update = xtime.tv_sec;
+		write_unlock_irqrestore(&xtime_lock, flags);
 	}
-	write_lock_irqsave(&xtime_lock, flags);
-	xtime.tv_sec = sec;
-	last_jiffy_stamp(0) = tb_last_stamp = stamp;
-	xtime.tv_usec = 0;
-	/* No update now, we just read the time from the RTC ! */
-	last_rtc_update = xtime.tv_sec;
-	write_unlock_irqrestore(&xtime_lock, flags);
+
 	/* Not exact, but the timer interrupt takes care of this */
 	set_dec(tb_ticks_per_jiffy);
 

@@ -27,8 +27,7 @@ static char I30[] = "$I30";
  * be restored. */
 int ntfs_check_index_record(ntfs_inode *ino, char *record)
 {
-	return ntfs_fixup_record(ino->vol, record, "INDX",
-				 ino->u.index.recordsize);
+	return ntfs_fixup_record(record, "INDX", ino->u.index.recordsize);
 }
 
 static inline int ntfs_is_top(ntfs_u64 stack)
@@ -268,12 +267,21 @@ static int ntfs_index_writeback(ntfs_iterate_s *walk, ntfs_u8 *buf, int block,
 		ntfs_resize_attr(walk->dir, a, used);
 	} else {
 		NTFS_PUTU16(buf + 0x1C, used - 0x18);
-		ntfs_insert_fixups(buf, vol->sector_size);
 		io.size = walk->dir->u.index.recordsize;
+		error = ntfs_insert_fixups(buf, io.size);
+		if (error) {
+			printk(KERN_ALERT "NTFS: ntfs_index_writeback() caught "
+					"corrupt index record ntfs record "
+					"header. Refusing to write corrupt "
+					"data to disk. Unmount and run chkdsk "
+					"immediately!\n");
+			return -EIO;
+		}
 		error = ntfs_write_attr(walk->dir, vol->at_index_allocation,
-			I30, (__s64)block << vol->cluster_size_bits, &io);
+				I30, (__s64)block << vol->cluster_size_bits,
+				&io);
 		if (error || (io.size != walk->dir->u.index.recordsize &&
-							(error = -EIO, 1)))
+				(error = -EIO, 1)))
 			return error;
 	}
 	return 0;
@@ -467,7 +475,7 @@ int ntfs_split_indexroot(ntfs_inode *ino)
 	NTFS_PUTU32(index + 0x24, NTFS_GETU32(root + 0x1C));
 	error = ntfs_index_writeback(&walk, index, walk.newblock, 
 				     isize + NTFS_GETU16(index + 0x18) + 0x18);
-	if(error)
+	if (error)
 		goto out;
 	/* Mark root as split. */
 	NTFS_PUTU32(root + 0x1C, 1);

@@ -752,7 +752,7 @@ static int ddp_device_event(struct notifier_block *this, unsigned long event,
 
 /* ioctl calls. Shouldn't even need touching */
 /* Device configuration ioctl calls */
-int atif_ioctl(int cmd, void *arg)
+static int atif_ioctl(int cmd, void *arg)
 {
 	static char aarp_mcast[6] = {0x09, 0x00, 0x00, 0xFF, 0xFF, 0xFF};
 	struct ifreq atreq;
@@ -1855,7 +1855,15 @@ static int atalk_ioctl(struct socket *sock,unsigned int cmd, unsigned long arg)
 		case SIOCDIFADDR:
 		case SIOCSARP:	/* proxy AARP */
 		case SIOCDARP:	/* proxy AARP */
-			return atif_ioctl(cmd, (void *)arg);
+		{
+			int ret;
+
+			rtnl_lock();
+			ret = atif_ioctl(cmd, (void *)arg);
+			rtnl_unlock();
+
+			return ret;
+		}
 		/* Physical layer ioctl calls */
 		case SIOCSIFLINK:
 		case SIOCGIFHWADDR:

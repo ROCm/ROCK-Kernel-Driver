@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.idle.c 1.11 05/17/01 18:14:21 cort
+ * BK Id: SCCS/s.idle.c 1.14 08/15/01 22:43:06 paulus
  */
 /*
  * Idle daemon for PowerPC.  Idle daemon will handle any action
@@ -31,12 +31,11 @@
 #include <asm/processor.h>
 #include <asm/mmu.h>
 #include <asm/cache.h>
+#include <asm/cputable.h>
 
 void zero_paged(void);
 void power_save(void);
-void inline htab_reclaim(void);
 
-unsigned long htab_reclaim_on = 0;
 unsigned long zero_paged_on = 0;
 unsigned long powersave_nap = 0;
 
@@ -50,27 +49,30 @@ int idled(void)
 {
 	int do_power_save = 0;
 
-	/* only sleep on the 603-family/750 processors */
-	switch (_get_PVR() >> 16) {
-	case 3:			/* 603 */
-	case 6:			/* 603e */
-	case 7:			/* 603ev */
-	case 8:			/* 750 */
-	case 12:		/* 7400 */
-	case 0x800c:		/* 7410 */
+	if (cur_cpu_spec[smp_processor_id()]->cpu_features & CPU_FTR_CAN_DOZE)
 		do_power_save = 1;
-	}
 
 	/* endless loop with no priority at all */
 	current->nice = 20;
 	current->counter = -100;
-	init_idle();	
-	for (;;)
-	{
-		/*if ( !current->need_resched && zero_paged_on )
-			zero_paged();*/
-		if (!current->need_resched && htab_reclaim_on)
-			htab_reclaim();
+	init_idle();
+	for (;;) {
+#ifdef CONFIG_SMP
+		int oldval;
+
+		if (!do_power_save) {
+			/*
+			 * Deal with another CPU just having chosen a thread to
+			 * run here:
+			 */
+			oldval = xchg(&current->need_resched, -1);
+
+			if (!oldval) {
+				while(current->need_resched == -1)
+					; /* Do Nothing */
+			}
+		}
+#endif
 		if (do_power_save && !current->need_resched)
 			power_save();
 
@@ -90,68 +92,6 @@ int cpu_idle(void)
 {
 	idled();
 	return 0; 
-}
-
-/*
- * Mark 'zombie' pte's in the hash table as invalid.
- * This improves performance for the hash table reload code
- * a bit since we don't consider unused pages as valid.
- *  -- Cort
- */
-PTE *reclaim_ptr = 0;
-void inline htab_reclaim(void)
-{
-#ifndef CONFIG_8xx		
-#if 0	
-	PTE *ptr, *start;
-	static int dir = 1;
-#endif	
-	struct task_struct *p;
-	unsigned long valid = 0;
-	extern PTE *Hash, *Hash_end;
-	extern unsigned long Hash_size;
-
-	/* if we don't have a htab */
-	if ( Hash_size == 0 )
-		return;
-#if 0	
-	/* find a random place in the htab to start each time */
-	start = &Hash[jiffies%(Hash_size/sizeof(PTE))];
-	/* go a different direction each time */
-	dir *= -1;
-        for ( ptr = start;
-	      !current->need_resched && (ptr != Hash_end) && (ptr != Hash);
-	      ptr += dir)
-	{
-#else
-	if ( !reclaim_ptr ) reclaim_ptr = Hash;
-	while ( !current->need_resched )
-	{
-		reclaim_ptr++;
-		if ( reclaim_ptr == Hash_end ) reclaim_ptr = Hash;
-#endif	  
-		if (!reclaim_ptr->v)
-			continue;
-		valid = 0;
-		for_each_task(p)
-		{
-			if ( current->need_resched )
-				goto out;
-			/* if this vsid/context is in use */
-			if ( (reclaim_ptr->vsid >> 4) == p->mm->context )
-			{
-				valid = 1;
-				break;
-			}
-		}
-		if ( valid )
-			continue;
-		/* this pte isn't used */
-		reclaim_ptr->v = 0;
-	}
-out:
-	if ( current->need_resched ) printk("need_resched: %lx\n", current->need_resched);
-#endif /* CONFIG_8xx */
 }
 
 #if 0
@@ -287,7 +227,7 @@ void zero_paged(void)
 		atomic_inc((atomic_t *)&zero_cache_total);
 	}
 }
-#endif
+#endif /* 0 */
 
 void power_save(void)
 {

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.misc.S 1.21 07/07/01 17:00:08 paulus
+ * BK Id: SCCS/s.misc.S 1.28 08/24/01 20:07:37 paulus
  */
 /*
  * This file contains miscellaneous low-level functions.
@@ -22,6 +22,7 @@
 #include <asm/processor.h>
 #include <asm/page.h>
 #include <asm/cache.h>
+#include <asm/cputable.h>
 #include "ppc_asm.h"
 
 	.text
@@ -48,6 +49,97 @@ _GLOBAL(reloc_offset)
 	subf	r3,r4,r3
 	mtlr	r0
 	blr
+
+/*
+ * identify_cpu,
+ * called with r3 = data offset and r4 = CPU number
+ * doesn't change r3
+ */
+_GLOBAL(identify_cpu)
+	addis	r8,r3,cpu_specs@ha
+	addi	r8,r8,cpu_specs@l
+	mfpvr	r7
+1:
+	lwz	r5,CPU_SPEC_PVR_MASK(r8)
+	and	r5,r5,r7
+	lwz	r6,CPU_SPEC_PVR_VALUE(r8)
+	cmplw	0,r6,r5
+	beq	1f
+	addi	r8,r8,CPU_SPEC_ENTRY_SIZE
+	b	1b
+1:
+	addis	r6,r3,cur_cpu_spec@ha
+	addi	r6,r6,cur_cpu_spec@l
+	slwi	r4,r4,2
+	sub	r8,r8,r3
+	stwx	r8,r4,r6
+	blr
+
+/*
+ * do_cpu_ftr_fixups - goes through the list of CPU feature fixups
+ * and writes nop's over sections of code that don't apply for this cpu.
+ * r3 = data offset (not changed)
+ */
+_GLOBAL(do_cpu_ftr_fixups)
+	/* Get CPU 0 features */
+	addis	r6,r3,cur_cpu_spec@ha
+	addi	r6,r6,cur_cpu_spec@l
+	lwz	r4,0(r6)
+	add	r4,r4,r3
+	lwz	r4,CPU_SPEC_FEATURES(r4)
+
+	/* Get the fixup table */
+	addis	r6,r3,__start___ftr_fixup@ha
+	addi	r6,r6,__start___ftr_fixup@l
+	addis	r7,r3,__stop___ftr_fixup@ha
+	addi	r7,r7,__stop___ftr_fixup@l
+
+	/* Do the fixup */
+1:	cmplw	0,r6,r7
+	bgelr
+	addi	r6,r6,16
+	lwz	r8,-16(r6)	/* mask */
+	and	r8,r8,r4
+	lwz	r9,-12(r6)	/* value */
+	cmplw	0,r8,r9
+	beq	1b
+	lwz	r8,-8(r6)	/* section begin */
+	lwz	r9,-4(r6)	/* section end */
+	subf.	r9,r8,r9
+	beq	1b
+	/* write nops over the section of code */
+	/* todo: if large section, add a branch at the start of it */
+	srwi	r9,r9,2
+	mtctr	r9
+	add	r8,r8,r3
+	lis	r0,0x60000000@h	/* nop */
+3:	stw	r0,0(r8)
+	andi.	r10,r4,CPU_FTR_SPLIT_ID_CACHE@l
+	beq	2f
+	dcbst	0,r8		/* suboptimal, but simpler */
+	sync
+	icbi	0,r8
+2:	addi	r8,r8,4
+	bdnz	3b
+	sync			/* additional sync needed on g4 */
+	isync
+	b	1b
+
+/*
+ * call_setup_cpu - call the setup_cpu function for this cpu
+ * r3 = data offset, r24 = cpu number
+ */
+_GLOBAL(call_setup_cpu)
+	addis	r5,r3,cur_cpu_spec@ha
+	addi	r5,r5,cur_cpu_spec@l
+	slwi	r4,r24,2
+	lwzx	r5,r4,r5
+	add	r5,r5,r3
+	lwz	r6,CPU_SPEC_SETUP(r5)
+	add	r6,r6,r3
+	mtctr	r6
+	mr	r3,r24
+	bctr
 
 /* void __save_flags_ptr(unsigned long *flags) */
 _GLOBAL(__save_flags_ptr)
@@ -185,7 +277,7 @@ _GLOBAL(__sti_end)
 _GLOBAL(_nmask_and_or_msr)
 	mfmsr	r0		/* Get current msr */
 	andc	r0,r0,r3	/* And off the bits set in r3 (first parm) */
-	or	r0,r0,r4		/* Or on the bits in r4 (second parm) */
+	or	r0,r0,r4	/* Or on the bits in r4 (second parm) */
 	SYNC			/* Some chip revs have problems here... */
 	mtmsr	r0		/* Update machine state */
 	isync
@@ -216,8 +308,7 @@ _GLOBAL(_tlbia)
 	tlbia
 	sync
 #ifdef CONFIG_SMP
-	tlbsync
-	sync
+	TLBSYNC
 	li	r0,0
 	stw	r0,0(r9)		/* clear hash_table_lock */
 	mtmsr	r10
@@ -249,8 +340,7 @@ _GLOBAL(_tlbie)
 	tlbie	r3
 	sync
 #ifdef CONFIG_SMP
-	tlbsync
-	sync
+	TLBSYNC
 	li	r0,0
 	stw	r0,0(r9)		/* clear hash_table_lock */
 	mtmsr	r10
@@ -314,26 +404,70 @@ _GLOBAL(flush_icache_range)
 	sync				/* additional sync needed on g4 */
 	isync
 	blr
+/*
+ * Write any modified data cache blocks out to memory.
+ * Does not invalidate the corresponding cache lines (especially for
+ * any corresponding instruction cache).
+ *
+ * clean_dcache_range(unsigned long start, unsigned long stop)
+ */
+_GLOBAL(clean_dcache_range)
+	li	r5,CACHE_LINE_SIZE-1
+	andc	r3,r3,r5
+	subf	r4,r3,r4
+	add	r4,r4,r5
+	srwi.	r4,r4,LG_CACHE_LINE_SIZE
+	beqlr
+	mtctr	r4
+
+1:	dcbst	0,r3
+	addi	r3,r3,CACHE_LINE_SIZE
+	bdnz	1b
+	sync				/* wait for dcbst's to get to ram */
+	blr
 
 /*
- * Like above, but only do the D-cache.
+ * Write any modified data cache blocks out to memory
+ * and invalidate the corresponding instruction cache blocks.
  *
  * flush_dcache_range(unsigned long start, unsigned long stop)
  */
 _GLOBAL(flush_dcache_range)
-       li      r5,CACHE_LINE_SIZE-1
-       andc    r3,r3,r5
-       subf    r4,r3,r4
-       add     r4,r4,r5
-       srwi.   r4,r4,LG_CACHE_LINE_SIZE
-       beqlr
-       mtctr   r4
+	li	r5,CACHE_LINE_SIZE-1
+	andc	r3,r3,r5
+	subf	r4,r3,r4
+	add	r4,r4,r5
+	srwi.	r4,r4,LG_CACHE_LINE_SIZE
+	beqlr
+	mtctr	r4
 
-1:     dcbst   0,r3
-       addi    r3,r3,CACHE_LINE_SIZE
-       bdnz    1b
-       sync                            /* wait for dcbst's to get to ram */
-       blr
+1:	dcbf	0,r3
+	addi	r3,r3,CACHE_LINE_SIZE
+	bdnz	1b
+	sync				/* wait for dcbst's to get to ram */
+	blr
+
+/*
+ * Like above, but invalidate the D-cache.  This is used by the 8xx
+ * to invalidate the cache so the PPC core doesn't get stale data
+ * from the CPM (no cache snooping here :-).
+ *
+ * invalidate_dcache_range(unsigned long start, unsigned long stop)
+ */
+_GLOBAL(invalidate_dcache_range)
+	li	r5,CACHE_LINE_SIZE-1
+	andc	r3,r3,r5
+	subf	r4,r3,r4
+	add	r4,r4,r5
+	srwi.	r4,r4,LG_CACHE_LINE_SIZE
+	beqlr
+	mtctr	r4
+
+1:	dcbi	0,r3
+	addi	r3,r3,CACHE_LINE_SIZE
+	bdnz	1b
+	sync				/* wait for dcbi's to get to ram */
+	blr
 
 /*
  * Flush a particular page from the data cache to RAM.
@@ -481,94 +615,9 @@ _GLOBAL(xchg_u32)
 	blr
 
 /*
- * Try to acquire a spinlock.
- * Only does the stwcx. if the load returned 0 - the Programming
- * Environments Manual suggests not doing unnecessary stcwx.'s
- * since they may inhibit forward progress by other CPUs in getting
- * a lock.
- */
-_GLOBAL(__spin_trylock)
-	mr	r4,r3
-	eieio			/* prevent reordering of stores */
-	li	r5,-1
-	lwarx	r3,0,r4		/* fetch old value, establish reservation */
-	cmpwi	0,r3,0		/* is it 0? */
-	bnelr-			/* return failure if not */
-	stwcx.	r5,0,r4		/* try to update with new value */
-	bne-	1f		/* if we failed */
-	eieio			/* prevent reordering of stores */
-	blr
-1:	li	r3,1		/* return non-zero for failure */
-	blr
-
-/*
- * Atomic add/sub/inc/dec operations
- *
- * void atomic_add(int c, int *v)
- * void atomic_sub(int c, int *v)
- * void atomic_inc(int *v)
- * void atomic_dec(int *v)
- * int atomic_dec_and_test(int *v)
- * int atomic_inc_return(int *v)
- * int atomic_dec_return(int *v)
  * void atomic_clear_mask(atomic_t mask, atomic_t *addr)
  * void atomic_set_mask(atomic_t mask, atomic_t *addr);
  */
-#if 0 /* now inline - paulus */
-_GLOBAL(atomic_add)
-10:	lwarx	r5,0,r4		/* Fetch old value & reserve */
-	add	r5,r5,r3	/* Perform 'add' operation */
-	stwcx.	r5,0,r4		/* Update with new value */
-	bne-	10b		/* Retry if "reservation" (i.e. lock) lost */
-	blr
-_GLOBAL(atomic_add_return)
-10:	lwarx	r5,0,r4		/* Fetch old value & reserve */
-	add	r5,r5,r3	/* Perform 'add' operation */
-	stwcx.	r5,0,r4		/* Update with new value */
-	bne-	10b		/* Retry if "reservation" (i.e. lock) lost */
-	mr	r3,r5
-	blr
-_GLOBAL(atomic_sub)
-10:	lwarx	r5,0,r4		/* Fetch old value & reserve */
-	sub	r5,r5,r3	/* Perform 'add' operation */
-	stwcx.	r5,0,r4		/* Update with new value */
-	bne-	10b		/* Retry if "reservation" (i.e. lock) lost */
-	blr
-_GLOBAL(atomic_inc)
-10:	lwarx	r5,0,r3		/* Fetch old value & reserve */
-	addi	r5,r5,1		/* Perform 'add' operation */
-	stwcx.	r5,0,r3		/* Update with new value */
-	bne-	10b		/* Retry if "reservation" (i.e. lock) lost */
-	blr
-_GLOBAL(atomic_inc_return)
-10:	lwarx	r5,0,r3		/* Fetch old value & reserve */
-	addi	r5,r5,1		/* Perform 'add' operation */
-	stwcx.	r5,0,r3		/* Update with new value */
-	bne-	10b		/* Retry if "reservation" (i.e. lock) lost */
-	mr	r3,r5		/* Return new value */
-	blr
-_GLOBAL(atomic_dec)
-10:	lwarx	r5,0,r3		/* Fetch old value & reserve */
-	subi	r5,r5,1		/* Perform 'add' operation */
-	stwcx.	r5,0,r3		/* Update with new value */
-	bne-	10b		/* Retry if "reservation" (i.e. lock) lost */
-	blr
-_GLOBAL(atomic_dec_return)
-10:	lwarx	r5,0,r3		/* Fetch old value & reserve */
-	subi	r5,r5,1		/* Perform 'add' operation */
-	stwcx.	r5,0,r3		/* Update with new value */
-	bne-	10b		/* Retry if "reservation" (i.e. lock) lost */
-	mr	r3,r5		/* Return new value */
-	blr
-_GLOBAL(atomic_dec_and_test)
-10:	lwarx	r5,0,r3		/* Fetch old value & reserve */
-	subi	r5,r5,1		/* Perform 'add' operation */
-	stwcx.	r5,0,r3		/* Update with new value */
-	bne-	10b		/* Retry if "reservation" (i.e. lock) lost */
-	cntlzw	r3,r5
-	srwi	r3,r3,5
-	blr
-#endif /* 0 */
 _GLOBAL(atomic_clear_mask)
 10:	lwarx	r5,0,r4
 	andc	r5,r5,r3
@@ -768,281 +817,7 @@ _GLOBAL(abs)
 _GLOBAL(_get_SP)
 	mr	r3,r1		/* Close enough */
 	blr
-
-#if 0
-/* isn't it just easier to use the mtspr/mfspr inline macros?? --Troy */
-_GLOBAL(_get_THRM1)
-	mfspr	r3,THRM1
-	blr
-
-_GLOBAL(_get_THRM2)
-	mfspr	r3,THRM2
-	blr
-
-_GLOBAL(_get_THRM3)
-	mfspr	r3,THRM3
-	blr
-		
-_GLOBAL(_set_THRM1)
-	mtspr	THRM1,r3
-	blr
-
-_GLOBAL(_set_THRM2)
-	mtspr	THRM2,r3
-	blr
-
-_GLOBAL(_set_THRM3)
-	mtspr	THRM3,r3
-	blr
-#endif
 	
-_GLOBAL(_get_PVR)
-	mfspr	r3,PVR
-	blr
-
-#ifdef CONFIG_8xx
-_GLOBAL(_get_IMMR)
-	mfspr	r3, 638
-	blr
-#endif
-	
-_GLOBAL(_get_HID0)
-	mfspr	r3,HID0
-	blr
-
-_GLOBAL(_set_HID0)
-	sync
-	mtspr	HID0, r3
-	SYNC		/* Handle errata in some cases */
-	blr
-
-_GLOBAL(_get_ICTC)
-	mfspr	r3,ICTC
-	blr
-
-_GLOBAL(_set_ICTC)
-	mtspr	ICTC,r3
-	blr
-
-/*
-	L2CR functions
-	Copyright © 1997-1998 by PowerLogix R & D, Inc.
-	
-	This program is free software; you can redistribute it and/or modify
-	it under the terms of the GNU General Public License as published by
-	the Free Software Foundation; either version 2 of the License, or
-	(at your option) any later version.
-	
-	This program is distributed in the hope that it will be useful,
-	but WITHOUT ANY WARRANTY; without even the implied warranty of
-	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-	GNU General Public License for more details.
-	
-	You should have received a copy of the GNU General Public License
-	along with this program; if not, write to the Free Software
-	Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-*/
-/*
-	Thur, Dec. 12, 1998.
-	- First public release, contributed by PowerLogix.
-	***********
-	Sat, Aug. 7, 1999.
-	- Terry: Made sure code disabled interrupts before running. (Previously
-			it was assumed interrupts were already disabled).
-	- Terry: Updated for tentative G4 support.  4MB of memory is now flushed
-			instead of 2MB.  (Prob. only 3 is necessary).
-	- Terry: Updated for workaround to HID0[DPM] processor bug
-			during global invalidates.
-	***********
-	Thu, July 13, 2000.
-	- Terry: Added isync to correct for an errata.
-	
-	Author:	Terry Greeniaus (tgree@phys.ualberta.ca)
-	Please e-mail updates to this file to me, thanks!
-*/
-/* Usage:
-	
-	When setting the L2CR register, you must do a few special
-	things.  If you are enabling the cache, you must perform a
-	global invalidate.  If you are disabling the cache, you must
-	flush the cache contents first.  This routine takes care of
-	doing these things.  When first enabling the cache, make sure
-	you pass in the L2CR you want, as well as passing in the
-	global invalidate bit set.  A global invalidate will only be
-	performed if the L2I bit is set in applyThis.  When enabling
-	the cache, you should also set the L2E bit in applyThis.  If
-	you want to modify the L2CR contents after the cache has been
-	enabled, the recommended procedure is to first call
-	__setL2CR(0) to disable the cache and then call it again with
-	the new values for L2CR.  Examples:
-
-	_setL2CR(0)		- disables the cache
-	_setL2CR(0xB3A04000)	- enables my G3 upgrade card:
-				- L2E set to turn on the cache
-				- L2SIZ set to 1MB
-				- L2CLK set to 1:1
-				- L2RAM set to pipelined synchronous late-write
-				- L2I set to perform a global invalidation
-				- L2OH set to 0.5 nS
-				- L2DF set because this upgrade card
-				  requires it
-
-	A similar call should work for your card.  You need to know
-	the correct setting for your card and then place them in the
-	fields I have outlined above.  Other fields support optional
-	features, such as L2DO which caches only data, or L2TS which
-	causes cache pushes from the L1 cache to go to the L2 cache
-	instead of to main memory.
-*/
-/*
- * Summary: this procedure ignores the L2I bit in the value passed in,
- * flushes the cache if it was already enabled, always invalidates the
- * cache, then enables the cache if the L2E bit is set in the value
- * passed in.
- *   -- paulus.
- */
-_GLOBAL(_set_L2CR)
-	/* Make sure this is a 750 or 7400 chip */
-	mfspr	r4,PVR
-	rlwinm	r4,r4,16,16,31
-	cmpwi	r4,0x0008
-	cmpwi	cr1,r4,0x000c
-	cror	2,2,4*cr1+2
-	bne	99f
-
-	/* Turn off interrupts and data relocation. */
-	mfmsr	r7		/* Save MSR in r7 */
-	rlwinm	r4,r7,0,17,15
-	rlwinm	r4,r4,0,28,26	/* Turn off DR bit */
-	sync
-	mtmsr	r4
-	isync
-
-	/* Get the current enable bit of the L2CR into r4 */
-	mfspr	r4,L2CR
-	
-	/* Tweak some bits */
-	rlwinm	r5,r3,0,0,0		/* r5 contains the new enable bit */
-	rlwinm	r3,r3,0,11,9		/* Turn off the invalidate bit */
-	rlwinm	r3,r3,0,1,31		/* Turn off the enable bit */
-
-	/* Check to see if we need to flush */
-	rlwinm.	r4,r4,0,0,0
-	beq	2f
-
-	/* Flush the cache. First, read the first 4MB of memory (physical) to
-	 * put new data in the cache.  (Actually we only need
-	 * the size of the L2 cache plus the size of the L1 cache, but 4MB will
-	 * cover everything just to be safe).
-	 */
-		
-	 /**** Might be a good idea to set L2DO here - to prevent instructions
-	       from getting into the cache.  But since we invalidate
-	       the next time we enable the cache it doesn't really matter.
-	  ****/
-
-	lis	r4,0x0002
-	mtctr	r4
-	li	r4,0
-1:
-	lwzx	r0,r0,r4
-	addi	r4,r4,32		/* Go to start of next cache line */
-	bdnz	1b
-	
-	/* Now, flush the first 4MB of memory */
-	lis	r4,0x0002
-	mtctr	r4
-	li	r4,0
-	sync
-1:
-	dcbf	r0,r4
-	addi	r4,r4,32		/* Go to start of next cache line */
-	bdnz	1b
-
-2:
-	/* Set up the L2CR configuration bits (and switch L2 off) */
-	sync
-	mtspr	L2CR,r3
-	sync
-
-	/* Before we perform the global invalidation, we must disable dynamic
-	 * power management via HID0[DPM] to work around a processor bug where
-	 * DPM can possibly interfere with the state machine in the processor
-	 * that invalidates the L2 cache tags.
-	 */
-	mfspr	r8,HID0			/* Save HID0 in r8 */
-	rlwinm	r4,r8,0,12,10		/* Turn off HID0[DPM] */
-	sync
-	mtspr	HID0,r4			/* Disable DPM */
-	sync
-
-	/* Perform a global invalidation */
-	oris	r3,r3,0x0020
-	sync
-	mtspr	L2CR,r3
-	sync
-	isync				/* For errata */
-
-	/* Wait for the invalidation to complete */
-3:	mfspr	r3,L2CR
-	rlwinm.	r4,r3,0,31,31
-	bne	3b
-	
-	rlwinm	r3,r3,0,11,9		/* Turn off the L2I bit */
-	sync
-	mtspr	L2CR,r3
-	sync
-	
-	/* Restore HID0[DPM] to whatever it was before */
-	sync
-	mtspr	1008,r8
-	sync
-
-	/* See if we need to enable the cache */
-	cmplwi	r5,0
-	beq	4f
-
-	/* Enable the cache */
-	oris	r3,r3,0x8000
-	mtspr	L2CR,r3
-	sync
-
-	/* Restore MSR (restores EE and DR bits to original state) */
-4:	SYNC
-	mtmsr	r7
-	isync
-	blr
-
-99:	li	r3,-1
-	blr
-
-_GLOBAL(_get_L2CR)
-	/* Make sure this is a 750 chip */
-	mfspr	r3,PVR
-	srwi	r3,r3,16
-	cmpwi	r3,0x0008
-	cmpwi	cr1,r3,0x000c
-	li	r3,0
-	cror	2,2,4*cr1+2
-	bnelr
-	/* Return the L2CR contents */
-	mfspr	r3,L2CR
-	blr
-
-/* --- End of PowerLogix code ---
- */
-
-/*
-_GLOBAL(_get_L2CR)
-	mfspr	r3,L2CR
-	blr
-
-_GLOBAL(_set_L2CR)
-	mtspr	L2CR,r3
-	blr
-		
-*/
-
 /*
  * These are used in the alignment trap handler when emulating
  * single-precision loads and stores.
@@ -1099,7 +874,7 @@ _GLOBAL(kernel_thread)
 	mr	r3,r4	        /* load arg and call fn */
 	blrl
 	li	r0,__NR_exit	/* exit after child exits */
-        li	r3,0
+	li	r3,0
 	sc
 
 /*
@@ -1279,7 +1054,7 @@ _GLOBAL(sys_call_table)
 	.long sys_setfsuid
 	.long sys_setfsgid
 	.long sys_llseek	/* 140 */
-        .long sys_getdents
+	.long sys_getdents
 	.long ppc_select
 	.long sys_flock
 	.long sys_msync

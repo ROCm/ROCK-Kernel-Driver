@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.process.c 1.23 07/19/01 23:02:48 paulus
+ * BK Id: SCCS/s.process.c 1.27 08/28/01 22:01:21 paulus
  */
 /*
  *  linux/arch/ppc/kernel/process.c
@@ -59,8 +59,6 @@ union task_union __attribute((aligned(16))) init_task_union = {
 };
 /* only used to get secondary processor up */
 struct task_struct *current_set[NR_CPUS] = {&init_task, };
-char *sysmap = NULL; 
-unsigned long sysmap_size = 0;
 
 #undef SHOW_TASK_SWITCHES
 #undef CHECK_STACK
@@ -324,7 +322,6 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	    unsigned long unused,
 	    struct task_struct *p, struct pt_regs *regs)
 {
-	unsigned long msr;
 	struct pt_regs *childregs, *kregs;
 	extern void ret_from_fork(void);
 	unsigned long sp = (unsigned long)p + sizeof(union task_union);
@@ -362,11 +359,12 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	 * copy fpu info - assume lazy fpu switch now always
 	 *  -- Cort
 	 */
-	if (regs->msr & MSR_FP)
+	if (regs->msr & MSR_FP) {
 		giveup_fpu(current);
+		childregs->msr &= ~(MSR_FP | MSR_FE0 | MSR_FE1);
+	}
 	memcpy(&p->thread.fpr, &current->thread.fpr, sizeof(p->thread.fpr));
 	p->thread.fpscr = current->thread.fpscr;
-	childregs->msr &= ~MSR_FP;
 
 #ifdef CONFIG_ALTIVEC
 	/*

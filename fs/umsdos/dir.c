@@ -67,7 +67,7 @@ struct UMSDOS_DIR_ONCE {
 static int umsdos_dir_once (	void *buf,
 				const char *name,
 				int len,
-				off_t offset,
+				loff_t offset,
 				ino_t ino,
 				unsigned type)
 {

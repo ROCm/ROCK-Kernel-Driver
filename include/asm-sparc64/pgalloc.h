@@ -1,4 +1,4 @@
-/* $Id: pgalloc.h,v 1.20 2001/04/26 02:36:36 davem Exp $ */
+/* $Id: pgalloc.h,v 1.21 2001/08/22 22:16:56 kanoj Exp $ */
 #ifndef _SPARC64_PGALLOC_H
 #define _SPARC64_PGALLOC_H
 
@@ -64,7 +64,7 @@ do { if(CTX_VALID((__mm)->context)) \
 #define flush_tlb_range(__mm, start, end) \
 do { if(CTX_VALID((__mm)->context)) { \
 	unsigned long __start = (start)&PAGE_MASK; \
-	unsigned long __end = (end)&PAGE_MASK; \
+	unsigned long __end = PAGE_ALIGN(end); \
 	__flush_tlb_range(CTX_HWBITS((__mm)->context), __start, \
 			  SECONDARY_CONTEXT, __end, PAGE_SIZE, \
 			  (__end - __start)); \

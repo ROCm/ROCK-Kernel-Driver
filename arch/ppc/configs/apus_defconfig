@@ -21,18 +21,21 @@ CONFIG_KMOD=y
 # Platform support
 #
 CONFIG_PPC=y
+CONFIG_PPC32=y
 CONFIG_6xx=y
 # CONFIG_4xx is not set
 # CONFIG_POWER3 is not set
 # CONFIG_POWER4 is not set
 # CONFIG_8xx is not set
 # CONFIG_8260 is not set
+CONFIG_PPC_STD_MMU=y
 # CONFIG_ALL_PPC is not set
 CONFIG_APUS=y
 # CONFIG_GEMINI is not set
 # CONFIG_PPC601_SYNC_FIX is not set
 # CONFIG_SMP is not set
 # CONFIG_ALTIVEC is not set
+# CONFIG_TAU is not set
 
 #
 # General setup
@@ -746,8 +749,10 @@ CONFIG_NLS_UTF8=m
 CONFIG_SOUND=y
 CONFIG_DMASOUND_PAULA=m
 CONFIG_DMASOUND=m
+# CONFIG_SOUND_BT878 is not set
 # CONFIG_SOUND_CMPCI is not set
 # CONFIG_SOUND_EMU10K1 is not set
+# CONFIG_MIDI_EMU10K1 is not set
 # CONFIG_SOUND_FUSION is not set
 # CONFIG_SOUND_CS4281 is not set
 # CONFIG_SOUND_ES1370 is not set
@@ -756,6 +761,7 @@ CONFIG_DMASOUND=m
 # CONFIG_SOUND_MAESTRO is not set
 # CONFIG_SOUND_MAESTRO3 is not set
 # CONFIG_SOUND_ICH is not set
+# CONFIG_SOUND_RME96XX is not set
 # CONFIG_SOUND_SONICVIBES is not set
 # CONFIG_SOUND_TRIDENT is not set
 # CONFIG_SOUND_MSNDCLAS is not set

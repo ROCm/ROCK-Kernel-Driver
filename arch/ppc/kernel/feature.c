@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.feature.c 1.16 07/06/01 14:42:47 trini
+ * BK Id: SCCS/s.feature.c 1.19 08/19/01 22:23:04 paulus
  */
 /*
  *  arch/ppc/kernel/feature.c
@@ -38,11 +38,15 @@
 #define FREG(c,r)			(&(((c)->reg)[(r)>>2]))
 
 /* Keylargo reg. access. */
-#define KL_FCR(r)	(keylargo_base + ((r) >> 2))
-#define KL_IN(r)	(in_le32(KL_FCR(r)))
-#define KL_OUT(r,v)	(out_le32(KL_FCR(r), (v)))
-#define KL_BIS(r,v)	(KL_OUT((r), KL_IN(r) | (v)))
-#define KL_BIC(r,v)	(KL_OUT((r), KL_IN(r) & ~(v)))
+#define KL_FCR(r)		(keylargo_base + ((r) >> 2))
+#define KL_IN(r)		(in_le32(KL_FCR(r)))
+#define KL_OUT(r,v)		(out_le32(KL_FCR(r), (v)))
+#define KL_BIS(r,v)		(KL_OUT((r), KL_IN(r) | (v)))
+#define KL_BIC(r,v)		(KL_OUT((r), KL_IN(r) & ~(v)))
+#define KL_GPIO_IN(r)		(in_8(((volatile u8 *)keylargo_base)+(r)))
+#define KL_GPIO_OUT(r,v)	(out_8(((volatile u8 *)keylargo_base)+(r), (v)))
+#define KL_LOCK()		spin_lock_irqsave(&keylargo->lock, flags)
+#define KL_UNLOCK()		spin_unlock_irqrestore(&keylargo->lock, flags)
 
 /* Uni-N reg. access. Note that Uni-N regs are big endian */
 #define UN_REG(r)	(uninorth_base + ((r) >> 2))
@@ -259,15 +263,29 @@ static struct feature_controller*	keylargo;
 static int				uninorth_rev;
 static int				keylargo_rev;
 static u32				board_features;
-static u8				airport_pwr_regs[5];
 static int				airport_pwr_state;
 static struct device_node*		airport_dev;
+static struct device_node*		uninorth_fw;
 
+/* Feature bits for Apple motherboards */
 #define FTR_NEED_OPENPIC_TWEAK		0x00000001
 #define FTR_CAN_NAP			0x00000002
 #define FTR_HAS_FW_POWER		0x00000004
 #define FTR_CAN_SLEEP			0x00000008
 
+/* This table currently lacks most oldworld machines, but
+ * they currently don't need it so...
+ * 
+ * Todo: The whole feature_xxx mecanism need to be redone
+ * some way to be able to handle the new kind of features
+ * exposed by core99. At this point, the main "tables" will
+ * probably be in this table, which will have to be filled with
+ * all known machines
+ */
+/* Warning: Don't change ordering of entries as some machines
+ * adverstise beeing compatible with several models. In those
+ * case, the "highest" has to be first
+ */
 static struct board_features_t {
 	char*	compatible;
 	u32	features;
@@ -283,17 +301,21 @@ static struct board_features_t {
   {	"PowerMac3,1",		FTR_NEED_OPENPIC_TWEAK		}, /* Sawtooth (G4) */
   {	"PowerMac3,2",		0				}, /* G4/Dual G4 */
   {	"PowerMac3,3",		FTR_NEED_OPENPIC_TWEAK		}, /* G4/Dual G4 */
-  {	"PowerMac5,1",		0				}, /* Cube */
+  {	"PowerMac3,4",		0				}, /* QuickSilver G4 */
+  {	"PowerMac3,5",		0				}, /* QuickSilver G4 */
+  {	"PowerMac5,1",		FTR_CAN_NAP			}, /* Cube */
   {	"AAPL,3400/2400",	FTR_CAN_SLEEP			}, /* 2400/3400 PowerBook */
   {	"AAPL,3500",		FTR_CAN_SLEEP			}, /* 3500 PowerBook (G3) */
   {	"AAPL,PowerBook1998",	FTR_CAN_SLEEP			}, /* Wallstreet PowerBook */
   {	"PowerBook1,1",		FTR_CAN_SLEEP			}, /* 101 (Lombard) PowerBook */
+  {	"PowerBook4,1",		FTR_CAN_NAP|FTR_CAN_SLEEP|	   /* New polycarbonate iBook */
+  				0/*FTR_HAS_FW_POWER*/		}, 
   {	"PowerBook2,1",		FTR_CAN_SLEEP 			}, /* iBook */
-  {	"PowerBook4,1",		FTR_CAN_NAP|FTR_CAN_SLEEP	}, /* iBook Dual USB */
   {	"PowerBook2,2",		FTR_CAN_SLEEP /*| FTR_CAN_NAP*/	}, /* iBook FireWire */
   {	"PowerBook3,1",		FTR_CAN_SLEEP|FTR_CAN_NAP|	   /* PowerBook 2000 (Pismo) */
   				FTR_HAS_FW_POWER		}, 
-  {	"PowerBook3,2",		FTR_CAN_NAP|FTR_CAN_SLEEP	}, /* PowerBook Titanium */
+  {	"PowerBook3,2",		FTR_CAN_NAP|FTR_CAN_SLEEP|	   /* PowerBook Titanium */
+  				0/*FTR_HAS_FW_POWER*/		},
   {	NULL, 0 }
 };
 
@@ -305,15 +327,25 @@ feature_init(void)
 	struct device_node *np;
 	u32 *rev;
 	int i;
-
+	char* model;
+	
 	if (_machine != _MACH_Pmac)
 		return;
 
-	/* Figure out motherboard type & options */
-	for(i=0;board_features_datas[i].compatible;i++) {
-		if (machine_is_compatible(board_features_datas[i].compatible)) {
-			board_features = board_features_datas[i].features;
-			break;
+	np = find_path_device("/");
+	if (!np) {
+		printk(KERN_ERR "feature.c: Can't find device-tree root !\n");
+		return;
+	}
+	model = (char*)get_property(np, "model", NULL);
+	if (model) {
+		printk("PowerMac model: %s\n", model);
+		/* Figure out motherboard type & options */
+		for(i=0;board_features_datas[i].compatible;i++) {
+			if (!strcmp(board_features_datas[i].compatible, model)) {
+				board_features = board_features_datas[i].features;
+				break;
+			}
 		}
 	}
 
@@ -382,8 +414,9 @@ feature_init(void)
 		printk("Uninorth at 0x%08x\n", np->addrs[0].address);
 	}
 	if (uninorth_base && keylargo_base)
-		printk("Uni-N revision: %d, KeyLargo revision: %d\n",
-			uninorth_rev, keylargo_rev);
+		printk("Uni-N revision: %d, KeyLargo revision: %d %s\n",
+			uninorth_rev, keylargo_rev,
+			(keylargo_rev & KL_PANGEA_REV) ? "(Pangea chipset)" : "");
 
 	if (uninorth_base)
 		uninorth_init();
@@ -401,6 +434,25 @@ feature_init(void)
 		feature_clear(controllers[0].device, FEATURE_Sound_power);
 		feature_clear(controllers[0].device, FEATURE_Sound_CLK_enable);
 	}
+#endif
+
+#ifdef CONFIG_PMAC_PBOOK
+	/* On PowerBooks, we disable the serial ports by default, they
+	 * will be re-enabled by the driver
+	 */
+#ifndef CONFIG_XMON
+	if (controller_count && find_devices("via-pmu") != NULL) {
+		feature_set_modem_power(NULL, 0);
+		feature_clear(controllers[0].device, FEATURE_Serial_IO_A);
+		feature_clear(controllers[0].device, FEATURE_Serial_IO_B);
+		feature_clear(controllers[0].device, FEATURE_Serial_enable);
+		if (controller_count > 1) {
+			feature_clear(controllers[1].device, FEATURE_Serial_IO_A);
+			feature_clear(controllers[1].device, FEATURE_Serial_IO_B);
+			feature_clear(controllers[1].device, FEATURE_Serial_enable);
+		}
+	}
+#endif
 #endif
 }
 
@@ -588,12 +640,16 @@ feature_set_gmac_power(struct device_node* device, int power)
 	/* TODO: Handle save/restore of PCI config space here
 	 */
 
-	spin_lock_irqsave(&keylargo->lock, flags);
+	/* XXX We use the keylargo spinlock, but we never
+	 * have uninorth without keylargo, so...
+	 */
+	KL_LOCK();
 	if (power)
 		UN_BIS(UNI_N_CLOCK_CNTL, UNI_N_CLOCK_CNTL_GMAC);
 	else
 		UN_BIC(UNI_N_CLOCK_CNTL, UNI_N_CLOCK_CNTL_GMAC);
-	spin_unlock_irqrestore(&keylargo->lock, flags);
+	(void)UN_IN(UNI_N_CLOCK_CNTL);
+	KL_UNLOCK();
 	udelay(20);
 }
 
@@ -605,17 +661,16 @@ feature_gmac_phy_reset(struct device_node* device)
 	if (!keylargo_base || !keylargo)
 		return;
 		
-	spin_lock_irqsave(&keylargo->lock, flags);
-	out_8((volatile u8 *)KL_FCR(KL_GPIO_ETH_PHY_RESET),
-		KEYLARGO_GPIO_OUTPUT_ENABLE);
-	(void)in_8((volatile u8 *)KL_FCR(KL_GPIO_ETH_PHY_RESET));
-	spin_unlock_irqrestore(&keylargo->lock, flags);
+	KL_LOCK();
+	KL_GPIO_OUT(KL_GPIO_ETH_PHY_RESET, KEYLARGO_GPIO_OUTPUT_ENABLE);
+	(void)KL_GPIO_IN(KL_GPIO_ETH_PHY_RESET);
+	KL_UNLOCK();
 	mdelay(10);
-	spin_lock_irqsave(&keylargo->lock, flags);
-	out_8((volatile u8 *)KL_FCR(KL_GPIO_ETH_PHY_RESET),
+	KL_LOCK();
+	KL_GPIO_OUT(KL_GPIO_ETH_PHY_RESET,
 		KEYLARGO_GPIO_OUTPUT_ENABLE | KEYLARGO_GPIO_OUTOUT_DATA);
-	(void)in_8((volatile u8 *)KL_FCR(KL_GPIO_ETH_PHY_RESET));
-	spin_unlock_irqrestore(&keylargo->lock, flags);
+	(void)KL_GPIO_IN(KL_GPIO_ETH_PHY_RESET);
+	KL_UNLOCK();
 	mdelay(10);
 }
 
@@ -642,17 +697,23 @@ feature_set_usb_power(struct device_node* device, int power)
 	else
 		return;
 
-	spin_lock_irqsave(&keylargo->lock, flags);
+	KL_LOCK();
 	if (power) {
 		/* Turn ON */
 			
 		if (number == 0) {
 			KL_BIC(KEYLARGO_FCR0, (KL0_USB0_PAD_SUSPEND0 | KL0_USB0_PAD_SUSPEND1));
+			(void)KL_IN(KEYLARGO_FCR0);
+			KL_UNLOCK();
 			mdelay(1);
+			KL_LOCK();
 			KL_BIS(KEYLARGO_FCR0, KL0_USB0_CELL_ENABLE);
 		} else {
 			KL_BIC(KEYLARGO_FCR0, (KL0_USB1_PAD_SUSPEND0 | KL0_USB1_PAD_SUSPEND1));
+			KL_UNLOCK();
+			(void)KL_IN(KEYLARGO_FCR0);
 			mdelay(1);
+			KL_LOCK();
 			KL_BIS(KEYLARGO_FCR0, KL0_USB1_CELL_ENABLE);
 		}
 		reg = KL_IN(KEYLARGO_FCR4);
@@ -689,7 +750,7 @@ feature_set_usb_power(struct device_node* device, int power)
 		}
 		udelay(1);
 	}
-	spin_unlock_irqrestore(&keylargo->lock, flags);
+	KL_UNLOCK();
 }
 
 void  __pmac
@@ -697,18 +758,25 @@ feature_set_firewire_power(struct device_node* device, int power)
 {
 	unsigned long flags;
 
-	/* TODO: Handle save/restore of PCI config space here
+	/* TODO: should probably handle save/restore of PCI config space here
 	 */
 		
+	if (!uninorth_fw || (device && uninorth_fw != device))
+		return;
 	if (!uninorth_base)
 		return;
-	spin_lock_irqsave(&keylargo->lock, flags);
+
+	/* XXX We use the keylargo spinlock, but we never
+	 * have uninorth without keylargo, so...
+	 */
+	KL_LOCK();
 	if (power)
 		UN_BIS(UNI_N_CLOCK_CNTL, UNI_N_CLOCK_CNTL_FW);
 	else
 		UN_BIC(UNI_N_CLOCK_CNTL, UNI_N_CLOCK_CNTL_FW);
+	(void)UN_IN(UNI_N_CLOCK_CNTL);
+	KL_UNLOCK();
 	udelay(20);
-	spin_unlock_irqrestore(&keylargo->lock, flags);
 }
 
 /* Warning: will kill the PHY.. */
@@ -717,79 +785,159 @@ feature_set_firewire_cable_power(struct device_node* device, int power)
 {
 	unsigned long flags;
 	u8 gpioValue = power ? 0 : 4;
-	
+
+	if (!uninorth_fw || (device && uninorth_fw != device))
+		return;
 	if (!keylargo_base || !(board_features & FTR_HAS_FW_POWER))
 		return;
-	spin_lock_irqsave(&keylargo->lock, flags);
-	out_8((volatile u8 *)KL_FCR(KL_GPIO_FW_CABLE_POWER), gpioValue);
-	(void)in_8((volatile u8 *)KL_FCR(KL_GPIO_FW_CABLE_POWER));
-	spin_unlock_irqrestore(&keylargo->lock, flags);		
+	KL_LOCK();
+	KL_GPIO_OUT(KL_GPIO_FW_CABLE_POWER, gpioValue);
+	(void)KL_GPIO_IN(KL_GPIO_FW_CABLE_POWER);
+	KL_UNLOCK();		
+}
+
+void
+feature_set_modem_power(struct device_node* device, int power)
+{
+	unsigned long flags;
+
+	if (!device) {
+		device = find_devices("ch-a");
+		while(device && !device_is_compatible(device, "cobalt"))
+			device = device->next;
+		if (!device)
+			return;
+	}
+	if (keylargo && (keylargo_rev & KL_PANGEA_REV)) {
+		KL_LOCK();
+		if (power) {
+			/* Assert modem reset */
+			KL_GPIO_OUT(KL_GPIO_MODEM_RESET, KEYLARGO_GPIO_OUTPUT_ENABLE);
+			(void)KL_GPIO_IN(KL_GPIO_MODEM_RESET);
+			udelay(10);
+			/* Power up modem */
+			KL_GPIO_OUT(KL_GPIO_MODEM_POWER, KEYLARGO_GPIO_OUTPUT_ENABLE);
+			(void)KL_GPIO_IN(KL_GPIO_MODEM_POWER);
+			udelay(10);
+			/* Release modem reset */
+			KL_GPIO_OUT(KL_GPIO_MODEM_RESET,
+				KEYLARGO_GPIO_OUTPUT_ENABLE | KEYLARGO_GPIO_OUTOUT_DATA);
+			(void)KL_GPIO_IN(KL_GPIO_MODEM_RESET);
+		} else {
+			/* Power down modem */
+			KL_GPIO_OUT(KL_GPIO_MODEM_POWER,
+				KEYLARGO_GPIO_OUTPUT_ENABLE | KEYLARGO_GPIO_OUTOUT_DATA);
+			(void)KL_GPIO_IN(KL_GPIO_MODEM_POWER);
+		}
+		KL_UNLOCK();
+	} else {
+		if (power) {
+			mdelay(300);
+			feature_set(device, FEATURE_Modem_power);
+	   		mdelay(5);
+			feature_clear(device, FEATURE_Modem_power);
+	   		mdelay(10);
+			feature_set(device, FEATURE_Modem_power);
+		} else {
+			feature_clear(device, FEATURE_Modem_power);
+			mdelay(10);
+		}
+	}
 }
 
 #ifdef CONFIG_SMP
 void __pmac
 feature_core99_kick_cpu(int cpu_nr)
 {
-#if 1 /* New way */
 	const int reset_lines[] = {	KL_GPIO_RESET_CPU0,
 					KL_GPIO_RESET_CPU1,
 					KL_GPIO_RESET_CPU2,
 					KL_GPIO_RESET_CPU3 };
-	volatile u8* reset_io;
-
+	int reset_io;
+	unsigned long flags;
+	
 	if (!keylargo_base || cpu_nr > 3)
 		return;
-	reset_io = (volatile u8*)KL_FCR(reset_lines[cpu_nr]);
-	out_8(reset_io, KEYLARGO_GPIO_OUTPUT_ENABLE);
+	reset_io = reset_lines[cpu_nr];
+	
+	KL_LOCK();
+	KL_GPIO_OUT(reset_io, KEYLARGO_GPIO_OUTPUT_ENABLE);
+	(void)KL_GPIO_IN(reset_io);
 	udelay(1);
-	out_8(reset_io, KEYLARGO_GPIO_OUTPUT_ENABLE | KEYLARGO_GPIO_OUTOUT_DATA);
-#else
-	out_8((volatile u8 *)KL_FCR(KL_GPIO_EXTINT_CPU1), KL_GPIO_EXTINT_CPU1_ASSERT);
-	udelay(1);
-	out_8((volatile u8 *)KL_FCR(KL_GPIO_EXTINT_CPU1), KL_GPIO_EXTINT_CPU1_RELEASE);
-#endif	
+	KL_GPIO_OUT(reset_io, KEYLARGO_GPIO_OUTPUT_ENABLE | KEYLARGO_GPIO_OUTOUT_DATA);
+	(void)KL_GPIO_IN(reset_io);
+	KL_UNLOCK();
 }
 #endif /* CONFIG_SMP */
 
 void __pmac
 feature_set_airport_power(struct device_node* device, int power)
 {
+	unsigned long flags;
+	
 	if (!keylargo_base || !airport_dev || airport_dev != device)
 		return;
 	if (airport_pwr_state == power)
-		return;
+		return;	
 	if (power) {
-		/* Some if this is from Darwin code, some is from tracing of
-		 * MacOS driver with Macsbug. Some real bit definitions would
-		 * really help here...
+		/* This code is a reproduction of OF enable-cardslot
+		 * and init-wireless methods, slightly hacked until
+		 * I got it working.
 		 */
-		out_8((volatile u8*)KL_FCR(KL_GPIO_AIRPORT_0), airport_pwr_regs[0]);
-		out_8((volatile u8*)KL_FCR(KL_GPIO_AIRPORT_1), airport_pwr_regs[1]);
-		out_8((volatile u8*)KL_FCR(KL_GPIO_AIRPORT_2), airport_pwr_regs[2]);
-		out_8((volatile u8*)KL_FCR(KL_GPIO_AIRPORT_3), airport_pwr_regs[3]);
-		out_8((volatile u8*)KL_FCR(KL_GPIO_AIRPORT_4), airport_pwr_regs[4]);
-		udelay(20);
-		out_8((volatile u8*)KL_FCR(KL_GPIO_AIRPORT_4), 5);
-		udelay(20);
-		out_8((volatile u8*)KL_FCR(KL_GPIO_AIRPORT_4), 4);
-		mdelay(20);
+		KL_LOCK();
+		KL_GPIO_OUT(KEYLARGO_GPIO_0+0xf, 5);
+		(void)KL_GPIO_IN(KEYLARGO_GPIO_0+0xf);
+		KL_UNLOCK();
+		mdelay(10);
+		KL_LOCK();
+		KL_GPIO_OUT(KEYLARGO_GPIO_0+0xf, 4);
+		(void)KL_GPIO_IN(KEYLARGO_GPIO_0+0xf);
+		KL_UNLOCK();
+
+		mdelay(10);
+
+		KL_LOCK();
 		KL_BIC(KEYLARGO_FCR2, KL2_AIRPORT_RESET_N);
+		(void)KL_IN(KEYLARGO_FCR2);
 		udelay(10);
+		KL_GPIO_OUT(KEYLARGO_GPIO_EXTINT_0+0xb, 0);
+		(void)KL_GPIO_IN(KEYLARGO_GPIO_EXTINT_0+0xb);
+		udelay(10);
+		KL_GPIO_OUT(KEYLARGO_GPIO_EXTINT_0+0xa, 0x28);
+		(void)KL_GPIO_IN(KEYLARGO_GPIO_EXTINT_0+0xa);
+		udelay(10);
+		KL_GPIO_OUT(KEYLARGO_GPIO_EXTINT_0+0xd, 0x28);
+		(void)KL_GPIO_IN(KEYLARGO_GPIO_EXTINT_0+0xd);
+		udelay(10);
+		KL_GPIO_OUT(KEYLARGO_GPIO_0+0xd, 0x28);
+		(void)KL_GPIO_IN(KEYLARGO_GPIO_0+0xd);
+		udelay(10);
+		KL_GPIO_OUT(KEYLARGO_GPIO_0+0xe, 0x28);
+		(void)KL_GPIO_IN(KEYLARGO_GPIO_0+0xe);
+		KL_UNLOCK();
+		udelay(10);
+		KL_OUT(0x1c000, 0);
+		
+		mdelay(1);
 		out_8((volatile u8*)KL_FCR(0x1a3e0), 0x41);
+		(void)in_8((volatile u8*)KL_FCR(0x1a3e0));
 		udelay(10);
+		KL_LOCK();
 		KL_BIS(KEYLARGO_FCR2, KL2_AIRPORT_RESET_N);
-		udelay(10);
+		(void)KL_IN(KEYLARGO_FCR2);
+		KL_UNLOCK();
+		mdelay(100);
 	} else {
-		airport_pwr_regs[0] = in_8((volatile u8*)KL_FCR(KL_GPIO_AIRPORT_0));
-		airport_pwr_regs[1] = in_8((volatile u8*)KL_FCR(KL_GPIO_AIRPORT_1));
-		airport_pwr_regs[2] = in_8((volatile u8*)KL_FCR(KL_GPIO_AIRPORT_2));
-		airport_pwr_regs[3] = in_8((volatile u8*)KL_FCR(KL_GPIO_AIRPORT_3));
-		airport_pwr_regs[4] = in_8((volatile u8*)KL_FCR(KL_GPIO_AIRPORT_4));
-		out_8((volatile u8*)KL_FCR(KL_GPIO_AIRPORT_0), 0);
-		out_8((volatile u8*)KL_FCR(KL_GPIO_AIRPORT_1), 0);
-		out_8((volatile u8*)KL_FCR(KL_GPIO_AIRPORT_2), 0);
-		out_8((volatile u8*)KL_FCR(KL_GPIO_AIRPORT_3), 0);
-		out_8((volatile u8*)KL_FCR(KL_GPIO_AIRPORT_4), 0);
+		KL_LOCK();
+		KL_BIC(KEYLARGO_FCR2, KL2_AIRPORT_RESET_N);
+		(void)KL_IN(KEYLARGO_FCR2);
+		KL_GPIO_OUT(KL_GPIO_AIRPORT_0, 0);
+		KL_GPIO_OUT(KL_GPIO_AIRPORT_1, 0);
+		KL_GPIO_OUT(KL_GPIO_AIRPORT_2, 0);
+		KL_GPIO_OUT(KL_GPIO_AIRPORT_3, 0);
+		KL_GPIO_OUT(KL_GPIO_AIRPORT_4, 0);
+		(void)KL_GPIO_IN(KL_GPIO_AIRPORT_4);
+		KL_UNLOCK();
 	}
 	airport_pwr_state = power;	
 }
@@ -826,8 +974,11 @@ uninorth_init(void)
 	/* Enable FW before PCI probe. Will be disabled later on
 	 */
 	fw = find_devices("firewire");
-	if (fw && device_is_compatible(fw, "pci106b,18"))
+	if (fw && (device_is_compatible(fw, "pci106b,18") || 
+			device_is_compatible(fw, "pci106b,30"))) {
+		uninorth_fw = fw;
 		feature_set_firewire_power(fw, 1);
+	}
 }
 
 /* Initialize the Core99 KeyLargo ASIC. 
@@ -864,7 +1015,7 @@ feature_prepare_for_sleep(void)
 		device_is_compatible(ctrler->device, "gatwick"))
 		ctrler = &controllers[1];
 
-	if (ctrler->bits == feature_bits_heathrow ||
+	if (ctrler->bits == feature_bits_wallstreet ||
 		ctrler->bits == feature_bits_paddington) {
 		heathrow_prepare_for_sleep(ctrler);
 		return;
@@ -884,7 +1035,7 @@ feature_wake_up(void)
 		device_is_compatible(ctrler->device, "gatwick"))
 		ctrler = &controllers[1];
 	
-	if (ctrler->bits == feature_bits_heathrow ||
+	if (ctrler->bits == feature_bits_wallstreet ||
 		ctrler->bits == feature_bits_paddington) {
 		heathrow_wakeup(ctrler);
 		return;
@@ -929,15 +1080,10 @@ turn_off_keylargo(void)
 {
 	u32 temp;
 
-	/* For now, suspending the USB ref cause the machine to die on
-	 * wakeup -- BenH
-	 */
-#if 0
 	mdelay(1);
 	KL_BIS(KEYLARGO_FCR0, KL0_USB_REF_SUSPEND);
 	(void)KL_IN(KEYLARGO_FCR0);
-	mdelay(1500);
-#endif
+	mdelay(100);
 
 	KL_BIC(KEYLARGO_FCR0,	KL0_SCCA_ENABLE | KL0_SCCB_ENABLE |
 				KL0_SCC_CELL_ENABLE |
@@ -1014,7 +1160,7 @@ static void __pmac
 core99_prepare_for_sleep(struct feature_controller* ctrler)
 {
 	int i;
-	u8* base8;
+	volatile u8* base8;
 	
 	/*
 	 * Save various bits of KeyLargo
@@ -1026,15 +1172,19 @@ core99_prepare_for_sleep(struct feature_controller* ctrler)
 	feature_set_airport_power(airport_dev, 0);
 
 	/* We power off the FW cable. Should be done by the driver... */
+	feature_set_firewire_power(NULL, 0);
 	feature_set_firewire_cable_power(NULL, 0);
+
+	/* We make sure int. modem is off (in case driver lost it) */
+	feature_set_modem_power(NULL, 0);
 	 
 	/* Save the state of the various GPIOs */
 	save_gpio_levels[0] = KL_IN(KEYLARGO_GPIO_LEVELS0);
 	save_gpio_levels[1] = KL_IN(KEYLARGO_GPIO_LEVELS1);
-	base8 = (u8 *)KL_FCR(KEYLARGO_GPIO_EXTINT_0);
+	base8 = ((volatile u8 *)keylargo_base) + KEYLARGO_GPIO_EXTINT_0;
 	for (i=0; i<KEYLARGO_GPIO_EXTINT_CNT; i++)
 		save_gpio_extint[i] = in_8(base8+i);
-	base8 = (u8 *)KL_FCR(KEYLARGO_GPIO_0);
+	base8 = ((volatile u8 *)keylargo_base) + KEYLARGO_GPIO_0;
 	for (i=0; i<KEYLARGO_GPIO_CNT; i++)
 		save_gpio_normal[i] = in_8(base8+i);
 
@@ -1089,7 +1239,7 @@ static void __pmac
 core99_wake_up(struct feature_controller* ctrler)
 {
 	int i;
-	u8* base8;
+	volatile u8* base8;
 
 	/*
 	 * Wakeup the host bridge
@@ -1131,10 +1281,10 @@ core99_wake_up(struct feature_controller* ctrler)
 
 	KL_OUT(KEYLARGO_GPIO_LEVELS0, save_gpio_levels[0]);
 	KL_OUT(KEYLARGO_GPIO_LEVELS1, save_gpio_levels[1]);
-	base8 = (u8 *)KL_FCR(KEYLARGO_GPIO_EXTINT_0);
+	base8 = ((volatile u8 *)keylargo_base) + KEYLARGO_GPIO_EXTINT_0;
 	for (i=0; i<KEYLARGO_GPIO_EXTINT_CNT; i++)
 		out_8(base8+i, save_gpio_extint[i]);
-	base8 = (u8 *)KL_FCR(KEYLARGO_GPIO_0);
+	base8 = ((volatile u8 *)keylargo_base) + KEYLARGO_GPIO_0;
 	for (i=0; i<KEYLARGO_GPIO_CNT; i++)
 		out_8(base8+i, save_gpio_normal[i]);
 

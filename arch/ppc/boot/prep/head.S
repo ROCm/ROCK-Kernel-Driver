@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.head.S 1.8 05/18/01 06:20:29 patch
+ * BK Id: SCCS/s.head.S 1.11 07/31/01 16:36:06 trini
  */
 #include "../../kernel/ppc_defs.h"
 #include "../../kernel/ppc_asm.tmpl"
@@ -95,6 +95,11 @@ start_ldr:
 	subi	r1,r1,256
 	li	r2,0x000F		/* Mask pointer to 16-byte boundary */
 	andc	r1,r1,r2
+/* Setup ISA_io */
+	lis	r3,ISA_io@h
+	ori	r3,r3,ISA_io@l
+	lis	r4,0x8000
+	stw	r4,0(r3)
 /* Run loader */
 	mr	r3,r8			/* Load point */
 	mr	r4,r7			/* Program length */

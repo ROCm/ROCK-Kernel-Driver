@@ -19,6 +19,7 @@ CONFIG_EXPERIMENTAL=y
 # Platform support
 #
 CONFIG_PPC=y
+CONFIG_PPC32=y
 # CONFIG_6xx is not set
 # CONFIG_4xx is not set
 # CONFIG_POWER3 is not set

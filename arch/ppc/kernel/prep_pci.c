@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.prep_pci.c 1.22 08/05/01 16:18:54 trini
+ * BK Id: SCCS/s.prep_pci.c 1.24 08/20/01 15:06:15 paulus
  */
 /*
  * PReP pci functions.
@@ -172,7 +172,7 @@ static char Mesquite_pci_IRQ_map[23] __prepdata =
 	0,	/* Slot 7  - unused */
 	0,	/* Slot 8  - unused */
 	0,	/* Slot 9  - unused */
-	0,	/* Slot 10 - unxued */
+	0,	/* Slot 10 - unused */
 	0,	/* Slot 11 - unused */
 	0,	/* Slot 12 - unused */
 	0,	/* Slot 13 - unused */
@@ -200,7 +200,7 @@ static char Sitka_pci_IRQ_map[21] __prepdata =
 	0,      /* Slot 7  - unused */
 	0,      /* Slot 8  - unused */
 	0,      /* Slot 9  - unused */
-	0,      /* Slot 10 - unxued */
+	0,      /* Slot 10 - unused */
 	0,      /* Slot 11 - unused */
 	0,      /* Slot 12 - unused */
 	0,      /* Slot 13 - unused */
@@ -322,8 +322,8 @@ static char Genesis2_pci_IRQ_map[23] __prepdata =
 	3,	/* Slot 12 - unused */
 	0,	/* Slot 13 - unused */
 	2,	/* Slot 14 - SCSI */
-	0,	/* Slot 15 - graphics on 3600 */
-	9,	/* Slot 16 - PMC */
+	0,	/* Slot 15 - unused */
+	9,	/* Slot 16 - PMC 1 */
 	12,	/* Slot 17 - pci */
 	11,	/* Slot 18 - pci */
 	10,	/* Slot 19 - pci */
@@ -509,6 +509,44 @@ static char Nobis_pci_IRQ_routes[] __prepdata = {
         13, /* Line 2 */
         13, /* Line 3 */
         13      /* Line 4 */
+};
+
+/*
+ * IBM RS/6000 43p/140  -- paulus
+ * XXX we should get all this from the residual data
+ */
+static char ibm43p_pci_IRQ_map[23] __prepdata = {
+        0, /* Slot 0  - unused */
+        0, /* Slot 1  - unused */
+        0, /* Slot 2  - unused */
+        0, /* Slot 3  - unused */
+        0, /* Slot 4  - unused */
+        0, /* Slot 5  - unused */
+        0, /* Slot 6  - unused */
+        0, /* Slot 7  - unused */
+        0, /* Slot 8  - unused */
+        0, /* Slot 9  - unused */
+        0, /* Slot 10 - unused */
+        0, /* Slot 11 - FireCoral ISA bridge */
+        6, /* Slot 12 - Ethernet  */
+        0, /* Slot 13 - openpic */
+        0, /* Slot 14 - unused */
+        0, /* Slot 15 - unused */
+        7, /* Slot 16 - NCR58C825a onboard scsi */
+        0, /* Slot 17 - unused */
+        2, /* Slot 18 - PCI Slot 2 PCIINTx# (See below) */
+        0, /* Slot 19 - unused */
+        0, /* Slot 20 - unused */
+        0, /* Slot 21 - unused */
+        1, /* Slot 22 - PCI slot 1 PCIINTx# (See below) */
+};
+
+static char ibm43p_pci_IRQ_routes[] __prepdata = {
+        0,      /* Line 0 - unused */
+        15,     /* Line 1 */
+        15,     /* Line 2 */
+        15,     /* Line 3 */
+        15,     /* Line 4 */
 };
 
 /* Motorola PowerPlus architecture PCI IRQ tables */
@@ -767,7 +805,52 @@ struct mot_info {
 	{0x000, 0x00, 0x00, "",					NULL,			NULL, NULL, NULL, 0x00}
 };
 
-unsigned long __init prep_route_pci_interrupts(void)
+void ibm_prep_init(void)
+{
+	u32 addr;
+#ifdef CONFIG_PREP_RESIDUAL
+	PPC_DEVICE *mpic;
+#endif
+
+	if (inb(0x0852) == 0xd5) {
+		/* This is for the 43p-140 */
+		early_read_config_dword(0, 0, PCI_DEVFN(13, 0),
+					PCI_BASE_ADDRESS_0, &addr);
+		if (addr != 0xffffffff
+		    && !(addr & PCI_BASE_ADDRESS_SPACE_IO)
+		    && (addr &= PCI_BASE_ADDRESS_MEM_MASK) != 0) {
+			addr += PREP_ISA_MEM_BASE;
+			OpenPIC_Addr = ioremap(addr, 0x40000);
+			ppc_md.get_irq = openpic_get_irq;
+		}
+	}
+
+#ifdef CONFIG_PREP_RESIDUAL
+	mpic = residual_find_device(-1, NULL, SystemPeripheral,
+				    ProgrammableInterruptController, MPIC, 0);
+	if (mpic != NULL) {
+		printk("mpic = %p\n", mpic);
+	}
+#endif
+}
+
+void
+ibm43p_pci_map_non0(struct pci_dev *dev)
+{
+	unsigned char intpin;
+	static unsigned char bridge_intrs[4] = { 3, 4, 5, 8 };
+
+	if (dev == NULL)
+		return;
+	pci_read_config_byte(dev, PCI_INTERRUPT_PIN, &intpin);
+	if (intpin < 1 || intpin > 4)
+		return;
+	intpin = (PCI_SLOT(dev->devfn) + intpin - 1) & 3;
+	dev->irq = openpic_to_irq(bridge_intrs[intpin]);
+	pci_write_config_byte(dev, PCI_INTERRUPT_LINE, dev->irq);
+}
+
+void __init prep_route_pci_interrupts(void)
 {
 	unsigned char *ibc_pirq = (unsigned char *)0x80800860;
 	unsigned char *ibc_pcicon = (unsigned char *)0x80800840;
@@ -856,7 +939,13 @@ unsigned long __init prep_route_pci_interrupts(void)
 			Motherboard_map_name = "IBM 6015";
 			Motherboard_map = ibm6015_pci_IRQ_map;
 			Motherboard_routes = ibm6015_pci_IRQ_routes;
-			break;			
+			break;
+		case 0xd5:
+			Motherboard_map_name = "IBM 43p/140";
+			Motherboard_map = ibm43p_pci_IRQ_map;
+			Motherboard_routes = ibm43p_pci_IRQ_routes;
+			Motherboard_non0 = ibm43p_pci_map_non0;
+			break;
 		default:
 			Motherboard_map_name = "IBM 8xx (Carolina)";
 			Motherboard_map = ibm8xx_pci_IRQ_map;
@@ -878,7 +967,7 @@ unsigned long __init prep_route_pci_interrupts(void)
 	else
 	{
 		printk("No known machine pci routing!\n");
-		return -1;
+		return;
 	}
 	
 	/* Set up mapping from slots */
@@ -888,16 +977,15 @@ unsigned long __init prep_route_pci_interrupts(void)
 	}
 	/* Enable PCI interrupts */
 	*ibc_pcicon |= 0x20;
-	return 0;
 }
 
 void __init
 prep_pib_init(void)
 {
-unsigned char   reg;
-unsigned short  short_reg;
+	unsigned char   reg;
+	unsigned short  short_reg;
 
-struct pci_dev *dev = NULL;
+	struct pci_dev *dev = NULL;
 
 	if (( _prep_type == _PREP_Motorola) && (OpenPIC_Addr)) {
 		/*
@@ -910,43 +998,47 @@ struct pci_dev *dev = NULL;
 			 * PPCBUG does not set the enable bits
 			 * for the IDE device. Force them on here.
 			 */
-			pcibios_read_config_byte(dev->bus->number, 
-					dev->devfn, 0x40, &reg);
+			pci_read_config_byte(dev, 0x40, &reg);
 
 			reg |= 0x03; /* IDE: Chip Enable Bits */
-			pcibios_write_config_byte(dev->bus->number, 
-					dev->devfn, 0x40, reg);
-
-			/* Force correct IDE function interrupt */
-			dev->irq = 14;
-			pcibios_write_config_byte(dev->bus->number,
-					dev->devfn,
+			pci_write_config_byte(dev, 0x40, reg);
+		}
+		if ((dev = pci_find_device(PCI_VENDOR_ID_VIA,
+						PCI_DEVICE_ID_VIA_82C586_2,
+						dev)) && (dev->devfn = 0x5a)) {
+			/* Force correct USB interrupt */
+			dev->irq = 11;
+			pci_write_config_byte(dev,
 					PCI_INTERRUPT_LINE,
 					dev->irq);
-
-		} else if ((dev = pci_find_device(PCI_VENDOR_ID_WINBOND, 
+		}
+		if ((dev = pci_find_device(PCI_VENDOR_ID_WINBOND,
 					PCI_DEVICE_ID_WINBOND_83C553, dev))) {
-			/*
-			 * Clear the PCI Interrupt Routing Control Register.
-			 */
+			 /* Clear PCI Interrupt Routing Control Register. */
 			short_reg = 0x0000;
 			pci_write_config_word(dev, 0x44, short_reg);
 			if (OpenPIC_Addr){
-				/*
-				 * Route both IDE interrupts to IRQ 14
-				 */
+				/* Route IDE interrupts to IRQ 14 */
 				reg = 0xEE;
-				pci_write_config_byte(dev, 0x44, reg);
+				pci_write_config_byte(dev, 0x43, reg);
 			}
 		}
 	}
+
 	if ((dev = pci_find_device(PCI_VENDOR_ID_WINBOND,
 				   PCI_DEVICE_ID_WINBOND_82C105, dev))){
 		if (OpenPIC_Addr){
-			/* Disable LEGIRQ mode so PCI INTs are routed to
-			   the 8259 */
-			printk("Set winbond IDE to native mode\n");
-			pci_write_config_dword(dev, 0x40, 0x10ff00a1);
+			/*
+			 * Disable LEGIRQ mode so PCI INTS are routed
+			 * directly to the 8259 and enable both channels
+			 */
+			pci_write_config_dword(dev, 0x40, 0x10ff0033);
+
+			/* Force correct IDE interrupt */
+			dev->irq = 14;
+			pci_write_config_byte(dev,
+					PCI_INTERRUPT_LINE,
+					dev->irq);
 		}else{
 			/* Enable LEGIRQ for PCI INT -> 8259 IRQ routing */
 			pci_write_config_dword(dev, 0x40, 0x10ff08a1);
@@ -1106,6 +1198,19 @@ prep_pcibios_fixup(void)
 	}
 }
 
+static void __init
+prep_init_resource(struct resource *res, unsigned long start,
+		   unsigned long end, int flags)
+{
+	res->flags = flags;
+	res->start = start;
+	res->end = end;
+	res->name = "PCI host bridge";
+	res->parent = NULL;
+	res->sibling = NULL;
+	res->child = NULL;
+}
+
 void __init
 prep_find_bridges(void)
 {
@@ -1119,6 +1224,9 @@ prep_find_bridges(void)
 	hose->last_busno = 0xff;
 	hose->pci_mem_offset = PREP_ISA_MEM_BASE;
 	hose->io_base_virt = (void *)PREP_ISA_IO_BASE;
+	prep_init_resource(&hose->io_resource, 0, 0x0fffffff, IORESOURCE_IO);
+	prep_init_resource(&hose->mem_resources[0], 0xc0000000, 0xfeffffff,
+			   IORESOURCE_MEM);
 	
 	printk("PReP architecture\n");
 	{

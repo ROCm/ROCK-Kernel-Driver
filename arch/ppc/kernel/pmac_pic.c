@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.pmac_pic.c 1.14 05/17/01 18:14:21 cort
+ * BK Id: SCCS/s.pmac_pic.c 1.18 08/19/01 22:23:04 paulus
  */
 #include <linux/config.h>
 #include <linux/stddef.h>
@@ -35,7 +35,6 @@ static volatile struct pmac_irq_hw *pmac_irq_hw[4] = {
 
 static int max_irqs;
 static int max_real_irqs;
-static int pmac_has_openpic;
 
 spinlock_t pmac_pic_lock = SPIN_LOCK_UNLOCKED;
 
@@ -291,17 +290,16 @@ pmac_fix_gatwick_interrupts(struct device_node *gw, int irq_base)
  * controller.  If we find this second ohare, set it up and fix the
  * interrupt value in the device tree for the ethernet chip.
  */
-static void __init enable_second_ohare(void)
+static int __init enable_second_ohare(void)
 {
 	unsigned char bus, devfn;
 	unsigned short cmd;
         unsigned long addr;
-	int second_irq;
 	struct device_node *irqctrler = find_devices("pci106b,7");
 	struct device_node *ether;
 
 	if (irqctrler == NULL || irqctrler->n_addrs <= 0)
-		return;
+		return -1;
 	addr = (unsigned long) ioremap(irqctrler->addrs[0].address, 0x40);
 	pmac_irq_hw[1] = (volatile struct pmac_irq_hw *)(addr + 0x20);
 	max_irqs = 64;
@@ -317,11 +315,6 @@ static void __init enable_second_ohare(void)
 		}
 	}
 
-	second_irq = irqctrler->intrs[0].line;
-	printk(KERN_INFO "irq: secondary controller on irq %d\n", second_irq);
-	request_irq(second_irq, gatwick_action, SA_INTERRUPT,
-		    "interrupt cascade", 0 );
-
 	/* Fix interrupt for the modem/ethernet combo controller. The number
 	   in the device tree (27) is bogus (correct for the ethernet-only
 	   board but not the combo ethernet/modem board).
@@ -333,6 +326,9 @@ static void __init enable_second_ohare(void)
 		printk(KERN_INFO "irq: Fixed ethernet IRQ to %d\n",
 		       ether->intrs[0].line);
 	}
+
+	/* Return the interrupt number of the cascade */
+	return irqctrler->intrs[0].line;
 }
 
 void __init
@@ -341,8 +337,8 @@ pmac_pic_init(void)
         int i;
         struct device_node *irqctrler;
         unsigned long addr;
-	int second_irq = -999;
-
+	int irq_cascade = -1;
+	
 	/* We first try to detect Apple's new Core99 chipset, since mac-io
 	 * is quite different on those machines and contains an IBM MPIC2.
 	 */
@@ -368,7 +364,6 @@ pmac_pic_init(void)
 			OpenPIC_Addr = ioremap(irqctrler->addrs[0].address,
 					       irqctrler->addrs[0].size);
 			openpic_init(1, 0, 0, nmi_irq);
-			pmac_has_openpic = 1;
 #ifdef CONFIG_XMON
 			if (nmi_irq >= 0)
 				request_irq(nmi_irq, xmon_irq, 0,
@@ -418,6 +413,9 @@ pmac_pic_init(void)
 			for (i = 2; i < 4; ++i)
 				pmac_irq_hw[i] = (volatile struct pmac_irq_hw*)
 					(addr + (4 - i) * 0x10);
+			irq_cascade = irqctrler->intrs[0].line;
+			if (device_is_compatible(irqctrler, "gatwick"))
+				pmac_fix_gatwick_interrupts(irqctrler, max_real_irqs);
 		}
 	} else {
 		/* older powermacs have a GC (grand central) or ohare at
@@ -430,23 +428,20 @@ pmac_pic_init(void)
 	   ohare chip, on the combo ethernet/modem card */
 	if (machine_is_compatible("AAPL,3400/2400")
 	     || machine_is_compatible("AAPL,3500"))
-		enable_second_ohare();
+		irq_cascade = enable_second_ohare();
 
 	/* disable all interrupts in all controllers */
 	for (i = 0; i * 32 < max_irqs; ++i)
 		out_le32(&pmac_irq_hw[i]->enable, 0);
 	
 	/* get interrupt line of secondary interrupt controller */
-	if (irqctrler) {
-		second_irq = irqctrler->intrs[0].line;
+	if (irq_cascade >= 0) {
 		printk(KERN_INFO "irq: secondary controller on irq %d\n",
-			(int)second_irq);
-		if (device_is_compatible(irqctrler, "gatwick"))
-			pmac_fix_gatwick_interrupts(irqctrler, max_real_irqs);
+			(int)irq_cascade);
 		for ( i = max_real_irqs ; i < max_irqs ; i++ )
 			irq_desc[i].handler = &gatwick_pic;
-		request_irq( second_irq, gatwick_action, SA_INTERRUPT,
-			     "gatwick cascade", 0 );
+		request_irq( irq_cascade, gatwick_action, SA_INTERRUPT,
+			     "cascade", 0 );
 	}
 	printk("System has %d possible interrupts\n", max_irqs);
 	if (max_irqs != max_real_irqs)
@@ -467,14 +462,15 @@ pmac_pic_init(void)
  */
 unsigned int sleep_save_mask[2];
 
-void
-sleep_save_intrs(int viaint)
+void __pmac
+pmac_sleep_save_intrs(int viaint)
 {
 	sleep_save_mask[0] = ppc_cached_irq_mask[0];
 	sleep_save_mask[1] = ppc_cached_irq_mask[1];
 	ppc_cached_irq_mask[0] = 0;
 	ppc_cached_irq_mask[1] = 0;
-	set_bit(viaint, ppc_cached_irq_mask);
+	if (viaint > 0)
+		set_bit(viaint, ppc_cached_irq_mask);
 	out_le32(&pmac_irq_hw[0]->enable, ppc_cached_irq_mask[0]);
 	if (max_real_irqs > 32)
 		out_le32(&pmac_irq_hw[1]->enable, ppc_cached_irq_mask[1]);
@@ -484,8 +480,8 @@ sleep_save_intrs(int viaint)
         (void)in_le32(&pmac_irq_hw[0]->enable);
 }
 
-void
-sleep_restore_intrs(void)
+void __pmac
+pmac_sleep_restore_intrs(void)
 {
 	int i;
 

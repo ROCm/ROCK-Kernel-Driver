@@ -1,10 +1,10 @@
 /*
- * BK Id: SCCS/s.sleep.S 1.10 06/28/01 15:50:17 paulus
+ * BK Id: SCCS/s.sleep.S 1.13 08/19/01 22:23:04 paulus
  */
 /*
  * This file contains sleep low-level functions for PowerBook G3.
  *    Copyright (C) 1999 Benjamin Herrenschmidt (benh@kernel.crashing.org)
- *    and Paul Mackerras (paulus@cs.anu.edu.au).
+ *    and Paul Mackerras (paulus@samba.org).
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -45,7 +45,13 @@
 #define tovirt(rd,rs)	addis	rd,rs,KERNELBASE@h
 
 	.text
+	.align	5
 
+/* This gets called by via-pmu.c late during the sleep process.
+ * The PMU was already send the sleep command and will shut us down
+ * soon. We need to save all that is needed and setup the wakeup
+ * vector that will be called by the ROM on wakeup
+ */
 _GLOBAL(low_sleep_handler)
 	mflr	r0
 	stw	r0,4(r1)
@@ -53,13 +59,14 @@ _GLOBAL(low_sleep_handler)
 	stw	r2,SL_R2(r1)
 	stmw	r12,SL_R12(r1)
 
-	/* Save MSR, SDR1, TB  */
+	/* Save MSR & SDR1 */
 	mfmsr	r4
 	stw	r4,SL_MSR(r1)
 	mfsdr1	r4
 	stw	r4,SL_SDR1(r1)
-1:	
-	mftbu	r4
+
+	/* Get a stable timebase and save it */
+1:	mftbu	r4
 	stw	r4,SL_TB(r1)
 	mftb	r5
 	stw	r5,SL_TB+4(r1)
@@ -114,10 +121,19 @@ _GLOBAL(low_sleep_handler)
 	/* Save HID0 */
 	mfspr	r4,HID0
 	stw	r4,SL_HID0(r1)
-
-	/* Set up stuff at address 0 */
-	lis	r5,wake_up@ha
-	addi	r5,r5,wake_up@l
+	
+	/* The ROM can wake us up via 2 different vectors:
+	 *  - On wallstreet & lombard, we must write a magic
+	 *    value 'Lars' at address 4 and a pointer to a
+	 *    memory location containing the PC to resume from
+	 *    at address 0.
+	 *  - On Core99, we must store the wakeup vector at
+	 *    address 0x80 and eventually it's parameters
+	 *    at address 0x84. I've have some trouble with those
+	 *    parameters however and I no longer use them.
+	 */
+	lis	r5,grackle_wake_up@ha
+	addi	r5,r5,grackle_wake_up@l
 	tophys(r5,r5)
 	stw	r5,SL_PC(r1)
 	lis	r4,KERNELBASE@h
@@ -127,22 +143,35 @@ _GLOBAL(low_sleep_handler)
 	addi	r6,r6,MAGIC@l
 	stw	r5,0(r4)
 	stw	r6,4(r4)
+	/* Setup stuffs at 0x80-0x84 for Core99 */
+	lis	r3,core99_wake_up@ha
+	addi	r3,r3,core99_wake_up@l
+	tophys(r3,r3)
+	stw	r3,0x80(r4)
+	stw	r5,0x84(r4)
+	/* Store a pointer to our backup storage into
+	 * a kernel global
+	 */
+	lis r3,sleep_storage@ha
+	addi r3,r3,sleep_storage@l
+	stw r5,0(r3)
+
 
 /*
- * Flush the L1 data cache by reading the first 64kB of RAM
+ * Flush the L1 data cache by reading the first 128kB of RAM
  * and then flushing the same area with the dcbf instruction.
  * The L2 cache has already been disabled.
  */
-	li	r4,0x0800	/* 64kB / 32B */
+	li	r4,0x1000	/* 128kB / 32B */
 	mtctr	r4
 	lis	r4,KERNELBASE@h
 1:
 	lwz	r0,0(r4)
-	addi	r4,r4,0x0020		/* Go to start of next cache line */
+	addi	r4,r4,0x0020	/* Go to start of next cache line */
 	bdnz	1b
 	sync
 	
-	li	r4,0x0800	/* 64k */
+	li	r4,0x1000	/* 128kB / 32B */
 	mtctr	r4
 	lis	r4,KERNELBASE@h
 1:
@@ -160,7 +189,13 @@ _GLOBAL(low_sleep_handler)
 	sync
 	mtspr	HID0,r2
 	sync
-	
+
+/* This loop puts us back to sleep in case we have a spurrious
+ * wakeup so that the host bridge properly stays asleep. The
+ * CPU will be turned off, either after a known time (about 1
+ * second) on wallstreet & lombard, or as soon as the CPU enters
+ * SLEEP mode on core99
+ */
 	mfmsr	r2
 	oris	r2,r2,MSR_POW@h
 1:	sync
@@ -170,22 +205,66 @@ _GLOBAL(low_sleep_handler)
 
 /* 
  * Here is the resume code.
+ */
+
+
+/*
+ * Core99 machines resume here
+ * r4 has the physical address of SL_PC(sp) (unused)
+ */
+_GLOBAL(core99_wake_up)
+	/* Make sure HID0 no longer contains any sleep bit */
+	mfspr	r3,HID0
+	rlwinm	r3,r3,0,11,7		/* clear SLEEP, NAP, DOZE bits */
+	mtspr	HID0,r3
+	sync
+	isync
+
+	/* Won't that cause problems on CPU that doesn't support it ? */
+	lis	r3, 0
+	mtspr	SPRN_MMCR0, r3
+	
+	/* sanitize MSR */
+	mfmsr	r3
+	ori	r3,r3,MSR_EE|MSR_IP
+	xori	r3,r3,MSR_EE|MSR_IP
+	sync
+	isync
+	mtmsr	r3
+	sync
+	isync
+
+	/* Recover sleep storage */
+	lis	r3,sleep_storage@ha
+	addi	r3,r3,sleep_storage@l
+	tophys(r3,r3)
+	lwz	r1,0(r3)
+
+	/* Pass thru to older resume code ... */
+/* 
+ * Here is the resume code for older machines.
  * r1 has the physical address of SL_PC(sp).
  */
 	
-wake_up:
-	/* Flash inval the instruction cache */
+grackle_wake_up:
+	/* Enable and then Flash inval the instruction & data cache */
 	mfspr	r3,HID0
-	ori	r3,r3, HID0_ICFI
-	mtspr	HID0,r3
+	ori	r3,r3, HID0_ICE|HID0_ICFI|HID0_DCE|HID0_DCI
+	sync
 	isync
-	/* Restore the HID0 register.  This turns on the L1 caches. */
+	mtspr	HID0,r3
+	xori	r3,r3, HID0_ICFI|HID0_DCI
+	mtspr	HID0,r3
+	sync
+	
+	/* Restore the remaining bits of the HID0 register. */
 	subi	r1,r1,SL_PC
 	lwz	r3,SL_HID0(r1)
 	sync
 	isync
 	mtspr	HID0,r3
 	sync
+	isync
 
 	/* Restore the kernel's segment registers, the
 	   BATs, and SDR1.  Then we can turn on the MMU. */
@@ -242,6 +321,13 @@ wake_up:
 	lwz	r4,SL_IBAT3+4(r1)
 	mtibatl	3,r4
 
+	/* Flush all TLBs */
+	lis	r4,0x1000
+1:	addic.	r4,r4,-0x1000
+	tlbie	r4
+	blt	1b
+	sync
+
 	/* restore the MSR and turn on the MMU */
 	lwz	r3,SL_MSR(r1)
 	bl	turn_on_mmu	
@@ -250,6 +336,8 @@ wake_up:
 	tovirt(r1,r1)
 
 	/* Restore TB */
+	li	r3,0
+	mttbl	r3
 	lwz	r3,SL_TB(r1)
 	lwz	r4,SL_TB+4(r1)
 	mttbu	r3
@@ -269,4 +357,10 @@ turn_on_mmu:
 	mtsrr0	r4
 	mtsrr1	r3
 	sync
+	isync
 	rfi
+
+	.data
+	.globl sleep_storage
+sleep_storage:
+	.long 0

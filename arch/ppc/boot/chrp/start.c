@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.start.c 1.6 05/18/01 15:16:59 cort
+ * BK Id: SCCS/s.start.c 1.8 07/25/01 18:13:07 trini
  */
 /*
  * Copyright (C) Paul Mackerras 1997.
@@ -23,6 +23,9 @@ void *finddevice(const char *name);
 int getprop(void *phandle, const char *name, void *buf, int buflen);
 
 void printk(char *fmt, ...);
+
+extern void chrpboot(int a1, int a2, void *prom);
+extern int strlen(const char *s);
 
 void
 start(int a1, int a2, void *promptr)
@@ -91,7 +94,7 @@ read(void *handle, void *ptr, int nb)
 }
 
 void
-exit()
+exit(void)
 {
     struct prom_args {
 	char *service;
@@ -104,7 +107,7 @@ exit()
 }
 
 void
-pause()
+pause(void)
 {
     struct prom_args {
 	char *service;
@@ -228,7 +231,7 @@ static char *lineptr;
 static int lineleft;
 
 int
-getchar()
+getchar(void)
 {
     int c;
 

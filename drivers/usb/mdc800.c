@@ -610,16 +610,18 @@ static int mdc800_device_release (struct inode* inode, struct file *file)
 	spin_lock (&mdc800->io_lock);
 	if (mdc800->open && (mdc800->state != NOT_CONNECTED))
 	{
-		mdc800->open=0;
+		spin_unlock(&mdc800->io_lock);
 		usb_unlink_urb (mdc800->irq_urb);
 		usb_unlink_urb (mdc800->write_urb);
 		usb_unlink_urb (mdc800->download_urb);
+		mdc800->open=0;
 	}
 	else
 	{
+		spin_unlock (&mdc800->io_lock);
 		retval=-EIO;
 	}
-	spin_unlock (&mdc800->io_lock);
+
 
 	return retval;
 }

@@ -72,7 +72,7 @@ affs_get_toupper(struct super_block *sb)
 static inline int
 __affs_hash_dentry(struct dentry *dentry, struct qstr *qstr, toupper_t toupper)
 {
-	const char *name = qstr->name;
+	const u8 *name = qstr->name;
 	unsigned long hash;
 	int i;
 
@@ -448,25 +448,20 @@ affs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	if (!bh)
 		goto done;
 
-	affs_lock_dir(old_dir);
-	if (old_dir != new_dir)
-		affs_lock_dir(new_dir);
-
 	/* Remove header from its parent directory. */
+	affs_lock_dir(old_dir);
 	retval = affs_remove_hash(old_dir, bh);
+	affs_unlock_dir(old_dir);
 	if (retval)
-		goto done_unlock;
+		goto done;
 
 	/* And insert it into the new directory with the new name. */
 	affs_copy_name(AFFS_TAIL(sb, bh)->name, new_dentry);
 	affs_fix_checksum(sb, bh);
+	affs_lock_dir(new_dir);
 	retval = affs_insert_hash(new_dir, bh);
-	/* TODO: move it back to old_dir? */
-
-done_unlock:
-	affs_unlock_dir(old_dir);
-	if (old_dir != new_dir)
-		affs_unlock_dir(new_dir);
+	affs_unlock_dir(new_dir);
+	/* TODO: move it back to old_dir, if error? */
 
 done:
 	mark_buffer_dirty_inode(bh, retval ? old_dir : new_dir);

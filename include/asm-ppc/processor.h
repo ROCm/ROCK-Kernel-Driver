@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.processor.h 1.24 06/15/01 13:56:56 paulus
+ * BK Id: SCCS/s.processor.h 1.28 08/17/01 15:23:17 paulus
  */
 #ifdef __KERNEL__
 #ifndef __ASM_PPC_PROCESSOR_H
@@ -475,33 +475,13 @@
 #define	PVR_8240	0x00810100
 #define	PVR_8260	PVR_8240
 
-
-/* I am just adding a single entry for 8260 boards.  I think we may be
- * able to combine mbx, fads, rpxlite, bseip, and classic into a single
- * generic 8xx as well.  The boards containing these processors are either
- * identical at the processor level (due to the high integration) or so
- * wildly different that testing _machine at run time is best replaced by
- * conditional compilation by board type (found in their respective .h file).
- *	-- Dan
+/* We only need to define a new _MACH_xxx for machines which are part of
+ * a configuration which supports more than one type of different machine.
+ * This is currently limited to CONFIG_ALL_PPC and CHRP/PReP/PMac. -- Tom
  */
 #define _MACH_prep	0x00000001
 #define _MACH_Pmac	0x00000002	/* pmac or pmac clone (non-chrp) */
 #define _MACH_chrp	0x00000004	/* chrp machine */
-#define _MACH_mbx	0x00000008	/* Motorola MBX board */
-#define _MACH_apus	0x00000010	/* amiga with phase5 powerup */
-#define _MACH_fads	0x00000020	/* Motorola FADS board */
-#define _MACH_rpxlite	0x00000040	/* RPCG RPX-Lite 8xx board */
-#define _MACH_bseip	0x00000080	/* Bright Star Engineering ip-Engine */
-#define _MACH_unused0	0x00000100	/* Now free to be used */
-#define _MACH_gemini	0x00000200      /* Synergy Microsystems gemini board */
-#define _MACH_classic	0x00000400	/* RPCG RPX-Classic 8xx board */
-#define _MACH_oak	0x00000800	/* IBM "Oak" 403 eval. board */
-#define _MACH_walnut	0x00001000	/* IBM "Walnut" 405GP eval. board */
-#define _MACH_8260	0x00002000	/* Generic 8260 */
-#define _MACH_tqm860	0x00004000	/* TQM860/L */
-#define _MACH_tqm8xxL	0x00008000	/* TQM8xxL */
-#define _MACH_spd8xx	0x00010000	/* SPD8xx */
-#define _MACH_ivms8	0x00020000	/* IVMS8 */
 
 /* see residual.h for these */
 #define _PREP_Motorola 0x01  /* motorola prep */
@@ -558,11 +538,10 @@ n:
 #ifndef __ASSEMBLY__
 #if defined(CONFIG_ALL_PPC)
 extern int _machine;
-extern int have_of;
-#endif /* CONFIG_ALL_PPC */
 
 /* what kind of prep workstation we are */
 extern int _prep_type;
+
 /*
  * This is used to identify the board type from a given PReP board
  * vendor. Board revision is also made available.
@@ -570,6 +549,9 @@ extern int _prep_type;
 extern unsigned char ucSystemType;
 extern unsigned char ucBoardRev;
 extern unsigned char ucBoardRevMaj, ucBoardRevMin;
+#else
+#define _machine 0
+#endif /* CONFIG_ALL_PPC */
 
 struct task_struct;
 void start_thread(struct pt_regs *regs, unsigned long nip, unsigned long sp);
@@ -681,26 +663,9 @@ void ll_puts(const char *);
 /* In misc.c */
 void _nmask_and_or_msr(unsigned long nmask, unsigned long or_val);
 
-#endif /* ndef ASSEMBLY*/
+#endif /* !__ASSEMBLY__ */
 
-#ifndef CONFIG_ALL_PPC
-#if defined(CONFIG_APUS)
-#define _machine _MACH_apus
-#elif defined(CONFIG_GEMINI)
-#define _machine _MACH_gemini
-#elif defined(CONFIG_OAK)
-#define _machine _MACH_oak
-#elif defined(CONFIG_WALNUT)
-#define _machine _MACH_walnut
-#elif defined(CONFIG_8xx)
-#define _machine _MACH_8xx
-#elif defined(CONFIG_8260)
-#define _machine _MACH_8260
-#else
-#error "Machine not defined correctly"
-#endif
-#define have_of 0
-#endif /* !CONFIG_ALL_PPC */
+#define have_of (_machine == _MACH_chrp || _machine == _MACH_Pmac)
 
 #endif /* __ASM_PPC_PROCESSOR_H */
 #endif /* __KERNEL__ */

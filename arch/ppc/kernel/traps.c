@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.traps.c 1.16 07/31/01 10:53:34 trini
+ * BK Id: SCCS/s.traps.c 1.19 08/24/01 20:07:37 paulus
  */
 /*
  *  linux/arch/ppc/kernel/traps.c
@@ -244,7 +244,7 @@ emulate_instruction(struct pt_regs *regs)
 	 */
 	if ((instword & INST_MFSPR_PVR_MASK) == INST_MFSPR_PVR) {
 		rd = (instword >> 21) & 0x1f;
-		regs->gpr[rd] = _get_PVR();
+		regs->gpr[rd] = mfspr(PVR);
 		retval = 0;
 	}
 	if (retval == 0)
@@ -372,12 +372,14 @@ SoftwareEmulation(struct pt_regs *regs)
 }
 #endif
 
+#if !defined(CONFIG_TAU_INT)
 void
 TAUException(struct pt_regs *regs)
 {
 	printk("TAU trap at PC: %lx, SR: %lx, vector=%lx\n",
 	       regs->nip, regs->msr, regs->trap);
 }
+#endif /* CONFIG_INT_TAU */
 
 void __init trap_init(void)
 {

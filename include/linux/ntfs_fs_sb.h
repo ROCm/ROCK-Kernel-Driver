@@ -1,7 +1,7 @@
 #ifndef _LINUX_NTFS_FS_SB_H
 #define _LINUX_NTFS_FS_SB_H
 
-typedef __s64 LCN;
+#include <linux/ntfs_fs_i.h>
 
 struct ntfs_sb_info{
 	/* Configuration provided by user at mount time. */
@@ -10,6 +10,8 @@ struct ntfs_sb_info{
 	ntmode_t umask;
 	void *nls_map;
 	unsigned int ngt;
+	char mft_zone_multiplier;
+	ntfs_cluster_t mft_zone_end;
 	/* Configuration provided by user with the ntfstools.
 	 * FIXME: This is no longer possible. What is this good for? (AIA) */
 	ntfs_size_t partition_bias;	/* For access to underlying device. */
@@ -36,7 +38,9 @@ struct ntfs_sb_info{
 	int index_clusters_per_record;
 	int index_record_size;
 	int index_record_size_bits;
-	LCN mft_lcn;
+	ntfs_cluster_t nr_clusters;
+	ntfs_cluster_t mft_lcn;
+	ntfs_cluster_t mft_mirr_lcn;
 	/* Data read from special files. */
 	unsigned char *mft;
 	unsigned short *upcase;

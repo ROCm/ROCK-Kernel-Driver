@@ -751,7 +751,6 @@ int __init usbdevfs_init(void)
 		usb_deregister(&usbdevfs_driver);
 		return ret;
 	}
-	kern_mount(&usbdevice_fs_type);
 #ifdef CONFIG_PROC_FS		
 	/* create mount point for usbdevfs */
 	usbdir = proc_mkdir("usb", proc_bus);
@@ -763,7 +762,6 @@ void __exit usbdevfs_cleanup(void)
 {
 	usb_deregister(&usbdevfs_driver);
 	unregister_filesystem(&usbdevice_fs_type);
-	kern_umount(usbdevice_fs_type.kern_mnt);
 #ifdef CONFIG_PROC_FS	
         if (usbdir)
                 remove_proc_entry("usb", proc_bus);

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.system.h 1.10 05/17/01 18:14:26 cort
+ * BK Id: SCCS/s.system.h 1.14 08/20/01 14:34:41 paulus
  */
 /*
  * Copyright (C) 1999 Cort Dougan <cort@cs.nmt.edu>
@@ -55,9 +55,13 @@ extern void show_regs(struct pt_regs * regs);
 extern void flush_instruction_cache(void);
 extern void hard_reset_now(void);
 extern void poweroff_now(void);
-extern int _get_PVR(void);
+#ifdef CONFIG_6xx
 extern long _get_L2CR(void);
 extern void _set_L2CR(unsigned long);
+#else
+#define _get_L2CR()	0
+#define _set_L2CR(val)	do { } while(0)
+#endif
 extern void via_cuda_init(void);
 extern void pmac_nvram_init(void);
 extern void read_rtc_time(void);

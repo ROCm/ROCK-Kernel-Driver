@@ -267,8 +267,8 @@ ip_nat_delete_sack(struct sk_buff *skb, struct tcphdr *tcph)
 		/* Replace with NOPs. */
 		tcph->check
 			= ip_nat_cheat_check(*((u_int16_t *)(opt + i))^0xFFFF,
-					     0, tcph->check);
-		opt[i] = opt[i+1] = 0;
+					     (TCPOPT_NOP<<8)|TCPOPT_NOP, tcph->check);
+		opt[i] = opt[i+1] = TCPOPT_NOP;
 	}
 	else DEBUGP("Something wrong with SACK_PERM.\n");
 }

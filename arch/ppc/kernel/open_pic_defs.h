@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.open_pic_defs.h 1.7 05/17/01 18:14:21 cort
+ * BK Id: SCCS/s.open_pic_defs.h 1.8 08/20/01 22:33:28 paulus
  */
 /*
  *  linux/openpic.h -- OpenPIC definitions
@@ -44,14 +44,6 @@
 #define OPENPIC_NUM_PRI		16
 #define OPENPIC_NUM_VECTORS	256
 
-
-    /*
-     *  Non-offset'ed vector numbers
-     */
-
-#define OPENPIC_VEC_TIMER       64    /* and up */
-#define OPENPIC_VEC_IPI         72    /* and up */
-#define OPENPIC_VEC_SPURIOUS    127
 
 
     /*

@@ -13,6 +13,7 @@
 #include "attr.h"
 
 #include <linux/errno.h>
+#include <linux/ntfs_fs.h>
 #include "macros.h"
 #include "support.h"
 #include "util.h"
@@ -148,7 +149,10 @@ int ntfs_new_attr(ntfs_inode *ino, int type, void *name, int namelen,
 					"attribute non-resident. Bug!\n");
 				return -EINVAL;
 			}
-			m = memcmp(value, a->d.data, min(int, value_len, a->size));
+			m = value_len;
+			if (m > a->size)
+				m = a->size;
+			m = memcmp(value, a->d.data, m);
 			if (m > 0)
 				continue;
 			if (m < 0) {
@@ -234,7 +238,7 @@ int ntfs_insert_run(ntfs_attribute *attr, int cnum, ntfs_cluster_t cluster,
 		}
 		if (attr->d.r.runlist) {
 			ntfs_memcpy(new, attr->d.r.runlist, attr->d.r.len
-							* sizeof(ntfs_runlist));
+					* sizeof(ntfs_runlist));
 			ntfs_vfree(attr->d.r.runlist);
 		}
 		attr->d.r.runlist = new;
@@ -250,7 +254,7 @@ int ntfs_insert_run(ntfs_attribute *attr, int cnum, ntfs_cluster_t cluster,
 }
 
 /* Extends an attribute. Another run will be added if necessary, but we try to
- * extend the last run in the runlist first.
+ * extend the last run in the run list first.
  * FIXME: what if there isn't enough contiguous space, we don't create
  * multiple runs?
  *
@@ -264,7 +268,8 @@ int ntfs_extend_attr(ntfs_inode *ino, ntfs_attribute *attr, __s64 *len, int flag
 	ntfs_cluster_t cluster;
 	int clen;
 
-	if (attr->compressed || ino->record_count > 1)
+	if ((attr->flags & (ATTR_IS_COMPRESSED | ATTR_IS_ENCRYPTED)) ||
+			ino->record_count > 1)
 		return -EOPNOTSUPP;
 	if (attr->resident) {
 		error = ntfs_make_attr_nonresident(ino, attr);
@@ -272,7 +277,7 @@ int ntfs_extend_attr(ntfs_inode *ino, ntfs_attribute *attr, __s64 *len, int flag
 			return error;
 	}
 	if (*len <= attr->allocated)
-		return 0;	/* Truely stupid things do sometimes happen. */
+		return 0;	/* Truly stupid things do sometimes happen. */
 	rl = attr->d.r.runlist;
 	rlen = attr->d.r.len - 1;
 	if (rlen >= 0)
@@ -357,7 +362,7 @@ int ntfs_resize_attr(ntfs_inode *ino, ntfs_attribute *attr, __s64 newsize)
 	if (newsize == oldsize)
 		return 0;
 	/* FIXME: Modifying compressed attributes not supported yet. */
-	if (attr->compressed)
+	if (attr->flags & (ATTR_IS_COMPRESSED | ATTR_IS_ENCRYPTED))
 		/* FIXME: Extending is easy: just insert sparse runs. */
 		return -EOPNOTSUPP;
 	if (attr->resident) {
@@ -370,16 +375,18 @@ int ntfs_resize_attr(ntfs_inode *ino, ntfs_attribute *attr, __s64 newsize)
 		}
 		v = attr->d.data;
 		if (newsize) {
+			__s64 minsize = newsize;
 			attr->d.data = ntfs_malloc(newsize);
 			if (!attr->d.data) {
 				ntfs_free(v);
 				return -ENOMEM;
 			}
-			if (newsize > oldsize)
+			if (newsize > oldsize) {
+				minsize = oldsize;
 				ntfs_bzero((char*)attr->d.data + oldsize,
 					   newsize - oldsize);
-			ntfs_memcpy((char*)attr->d.data, v,
-				    min(s64, newsize, oldsize));
+			}
+			ntfs_memcpy((char*)attr->d.data, v, minsize);
 		} else
 			attr->d.data = 0;
 		ntfs_free(v);
@@ -389,6 +396,12 @@ int ntfs_resize_attr(ntfs_inode *ino, ntfs_attribute *attr, __s64 newsize)
 	/* Non-resident attribute. */
 	rl = attr->d.r.runlist;
 	if (newsize < oldsize) {
+		/*
+		 * FIXME: We might be going awfully wrong for newsize = 0,
+		 * possibly even leaking memory really badly. But considering
+		 * in that case there is more breakage due to -ENOTSUP stuff
+		 * further down the code path, who cares for the moment... (AIA)
+		 */
 		for (i = 0, count = 0; i < attr->d.r.len; i++) {
 			if ((__s64)(count + rl[i].len) << clustersizebits >
 									newsize)
@@ -441,7 +454,7 @@ int ntfs_resize_attr(ntfs_inode *ino, ntfs_attribute *attr, __s64 newsize)
 }
 
 int ntfs_create_attr(ntfs_inode *ino, int anum, char *aname, void *data,
-		     int dsize, ntfs_attribute **rattr)
+		int dsize, ntfs_attribute **rattr)
 {
 	void *name;
 	int namelen;
@@ -463,7 +476,7 @@ int ntfs_create_attr(ntfs_inode *ino, int anum, char *aname, void *data,
 		namelen = 0;
 	}
 	error = ntfs_new_attr(ino, anum, name, namelen, data, dsize, &i,
-									&found);
+			&found);
 	if (error || found) {
 		ntfs_free(name);
 		return error ? error : -EEXIST;
@@ -481,7 +494,8 @@ int ntfs_create_attr(ntfs_inode *ino, int anum, char *aname, void *data,
 				"+ 0x28) (%i)\n", attr->attrno,
 				NTFS_GETU16(ino->attr + 0x28));
 	attr->resident = 1;
-	attr->compressed = attr->cengine = 0;
+	attr->flags = 0;
+	attr->cengine = 0;
 	attr->size = attr->allocated = attr->initialized = dsize;
 
 	/* FIXME: INDEXED information should come from $AttrDef
@@ -498,7 +512,8 @@ int ntfs_create_attr(ntfs_inode *ino, int anum, char *aname, void *data,
 	return 0;
 }
 
-/* Non-resident attributes are stored in runs (intervals of clusters).
+/*
+ * Non-resident attributes are stored in runs (intervals of clusters).
  *
  * This function stores in the inode readable information about a non-resident
  * attribute.
@@ -630,7 +645,7 @@ int ntfs_insert_attribute(ntfs_inode *ino, unsigned char* attrdata)
 	}
 	attr = ino->attrs + i;
 	attr->resident = NTFS_GETU8(attrdata + 8) == 0;
-	attr->compressed = NTFS_GETU16(attrdata + 0xC);
+	attr->flags = *(__u16*)(attrdata + 0xC);
 	attr->attrno = NTFS_GETU16(attrdata + 0xE);
   
 	if (attr->resident) {
@@ -640,13 +655,13 @@ int ntfs_insert_attribute(ntfs_inode *ino, unsigned char* attrdata)
 		if (!attr->d.data)
 			return -ENOMEM;
 		ntfs_memcpy(attr->d.data, data, attr->size);
-		attr->indexed = NTFS_GETU16(attrdata + 0x16);
+		attr->indexed = NTFS_GETU8(attrdata + 0x16);
 	} else {
 		attr->allocated = NTFS_GETS64(attrdata + 0x28);
 		attr->size = NTFS_GETS64(attrdata + 0x30);
 		attr->initialized = NTFS_GETS64(attrdata + 0x38);
 		attr->cengine = NTFS_GETU16(attrdata + 0x22);
-		if (attr->compressed)
+		if (attr->flags & ATTR_IS_COMPRESSED)
 			attr->compsize = NTFS_GETS64(attrdata + 0x40);
 		ntfs_debug(DEBUG_FILE3, "ntfs_insert_attribute: "
 			"attr->allocated = 0x%Lx, attr->size = 0x%Lx, "
@@ -664,11 +679,14 @@ int ntfs_insert_attribute(ntfs_inode *ino, unsigned char* attrdata)
 
 int ntfs_read_zero(ntfs_io *dest, int size)
 {
+	int i;
 	char *sparse = ntfs_calloc(512);
 	if (!sparse)
 		return -ENOMEM;
+	i = 512;
 	while (size) {
-		int i = min(int, size, 512);
+		if (i > size)
+			i = size;
 		dest->fn_put(dest, sparse, i);
 		size -= i;
 	}
@@ -683,7 +701,7 @@ int ntfs_read_compressed(ntfs_inode *ino, ntfs_attribute *attr, __s64 offset,
 	int error = 0;
 	int clustersizebits;
 	int s_vcn, rnum, vcn, got, l1;
-	__s64 copied, len, chunk, offs1, l;
+	__s64 copied, len, chunk, offs1, l, chunk2;
 	ntfs_cluster_t cluster, cl1;
 	char *comp = 0, *comp1;
 	char *decomp = 0;
@@ -720,12 +738,15 @@ int ntfs_read_compressed(ntfs_inode *ino, ntfs_attribute *attr, __s64 offset,
 		chunk = 0;
 		if (cluster == (ntfs_cluster_t)-1) {
 			/* Sparse cluster. */
-			__s64 l1;
+			__s64 ll;
+
 			if ((len - (s_vcn - vcn)) & 15)
 				ntfs_error("Unexpected sparse chunk size.");
-			l1 = chunk = min(s64, ((__s64)(vcn + len) << clustersizebits)
-								- offset, l);
-			error = ntfs_read_zero(dest, l1);
+			ll = ((__s64)(vcn + len) << clustersizebits) - offset;
+			if (ll > l)
+				ll = l;
+			chunk = ll;
+			error = ntfs_read_zero(dest, ll);
 			if (error)
 				goto out;
 		} else if (dest->do_read) {
@@ -741,14 +762,21 @@ int ntfs_read_compressed(ntfs_inode *ino, ntfs_attribute *attr, __s64 offset,
 			cl1 = cluster + s_vcn - vcn;
 			comp1 = comp;
 			do {
+				int delta;
+
 				io.param = comp1;
-				l1 = min(int, len - max(int, s_vcn - vcn, 0), 16 - got);
+				delta = s_vcn - vcn;
+				if (delta < 0)
+					delta = 0;
+				l1 = len - delta;
+				if (l1 > 16 - got)
+					l1 = 16 - got;
 				io.size = (__s64)l1 << clustersizebits;
 				error = ntfs_getput_clusters(ino->vol, cl1, 0,
 					       		     &io);
 				if (error)
 					goto out;
-				if (l1 + max(int, s_vcn - vcn, 0) == len) {
+				if (l1 + delta == len) {
 					rnum++;
 					rl++;
 					vcn += len;
@@ -779,8 +807,11 @@ int ntfs_read_compressed(ntfs_inode *ino, ntfs_attribute *attr, __s64 offset,
 				comp1 = decomp;
 			}
 			offs1 = offset - ((__s64)s_vcn << clustersizebits);
-			chunk = min(s64, (16 << clustersizebits) - offs1, chunk);
-			chunk = min(s64, l, chunk);
+			chunk2 = (16 << clustersizebits) - offs1;
+			if (chunk2 > l)
+				chunk2 = l;
+			if (chunk > chunk2)
+				chunk = chunk2;
 			dest->fn_put(dest, comp1 + offs1, chunk);
 		}
 		l -= chunk;
@@ -795,7 +826,7 @@ int ntfs_read_compressed(ntfs_inode *ino, ntfs_attribute *attr, __s64 offset,
 			len = rl->len;
 		}
 	}
- out:
+out:
 	if (comp)
 		ntfs_free(comp);
 	if (decomp)
@@ -805,7 +836,7 @@ int ntfs_read_compressed(ntfs_inode *ino, ntfs_attribute *attr, __s64 offset,
 }
 
 int ntfs_write_compressed(ntfs_inode *ino, ntfs_attribute *attr, __s64 offset,
-			  ntfs_io *dest)
+		ntfs_io *dest)
 {
 	return -EOPNOTSUPP;
 }

@@ -303,8 +303,7 @@ static struct super_block * sockfs_read_super(struct super_block *sb, void *data
 }
 
 static struct vfsmount *sock_mnt;
-static DECLARE_FSTYPE(sock_fs_type, "sockfs", sockfs_read_super,
-	FS_NOMOUNT|FS_SINGLE);
+static DECLARE_FSTYPE(sock_fs_type, "sockfs", sockfs_read_super, FS_NOMOUNT);
 static int sockfs_delete_dentry(struct dentry *dentry)
 {
 	return 1;
@@ -1205,13 +1204,14 @@ asmlinkage long sys_sendto(int fd, void * buff, size_t len, unsigned flags,
 	msg.msg_iovlen=1;
 	msg.msg_control=NULL;
 	msg.msg_controllen=0;
-	msg.msg_namelen=addr_len;
+	msg.msg_namelen=0;
 	if(addr)
 	{
 		err = move_addr_to_kernel(addr, addr_len, address);
 		if (err < 0)
 			goto out_put;
 		msg.msg_name=address;
+		msg.msg_namelen=addr_len;
 	}
 	if (sock->file->f_flags & O_NONBLOCK)
 		flags |= MSG_DONTWAIT;

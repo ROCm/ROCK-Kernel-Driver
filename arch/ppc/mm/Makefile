@@ -1,4 +1,4 @@
-# BK Id: SCCS/s.Makefile 1.6 06/28/01 15:50:17 paulus
+# BK Id: SCCS/s.Makefile 1.8 08/16/01 17:25:47 paulus
 #
 #
 # Makefile for the linux ppc-specific parts of the memory manager.
@@ -15,15 +15,13 @@ ifdef CONFIG_PPC64BRIDGE
 EXTRA_AFLAGS		:= -Wa,-mppc64bridge
 endif
 
-O_TARGET		:= mm.o
-obj-y			:= fault.o init.o mem_pieces.o extable.o
+O_TARGET			:= mm.o
+obj-y				:= fault.o init.o mem_pieces.o extable.o \
+					mmu_context.o pgtable.o
 
-ifneq ($(CONFIG_8xx),y)
-ifneq ($(CONFIG_4xx),y)
-obj-y			+= hashtable.o
-endif
-endif
-
-obj-$(CONFIG_4xx)	+= 4xx_tlb.o
+obj-$(CONFIG_PPC_STD_MMU)	+= hashtable.o ppc_mmu.o tlb.o
+obj-$(CONFIG_PPC_ISERIES)	+= iSeries_hashtable.o iSeries_mmu.o tlb.o
+obj-$(CONFIG_4xx)		+= cachemap.o 4xx_mmu.o
+obj-$(CONFIG_8xx)		+= cachemap.o
 
 include $(TOPDIR)/Rules.make

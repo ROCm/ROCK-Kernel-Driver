@@ -1,4 +1,4 @@
-/*  $Id: modutil.c,v 1.8 2001/04/04 00:49:39 davem Exp $
+/*  $Id: modutil.c,v 1.9 2001/08/14 22:10:56 davem Exp $
  *  arch/sparc64/mm/modutil.c
  *
  *  Copyright (C) 1997,1998 Jakub Jelinek (jj@sunsite.mff.cuni.cz)
@@ -10,7 +10,10 @@
 
 #include <asm/uaccess.h>
 #include <asm/system.h>
-#include <asm/vaddrs.h>
+
+#define  MODULES_VADDR	0x0000000001000000ULL  /* Where to map modules */
+#define  MODULES_LEN	0x000000007f000000ULL
+#define  MODULES_END	0x0000000080000000ULL
 
 static struct vm_struct * modvmlist = NULL;
 

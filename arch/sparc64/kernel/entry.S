@@ -1,4 +1,4 @@
-/* $Id: entry.S,v 1.129 2001/08/13 20:41:54 kanoj Exp $
+/* $Id: entry.S,v 1.134 2001/08/27 18:42:07 kanoj Exp $
  * arch/sparc64/kernel/entry.S:  Sparc64 trap low-level entry points.
  *
  * Copyright (C) 1995,1997 David S. Miller (davem@caip.rutgers.edu)
@@ -21,7 +21,7 @@
 #include <asm/visasm.h>
 #include <asm/estate.h>
 
-/* #define SYSCALL_TRACING */
+/* #define SYSCALL_TRACING	1 */
 
 #define curptr      g6
 
@@ -32,7 +32,25 @@
 
 	.globl		sparc64_vpte_patchme1
 	.globl		sparc64_vpte_patchme2
+/*
+ * On a second level vpte miss, check whether the original fault is to the OBP 
+ * range (note that this is only possible for instruction miss, data misses to
+ * obp range do not use vpte). If so, go back directly to the faulting address.
+ * This is because we want to read the tpc, otherwise we have no way of knowing
+ * the 8k aligned faulting address if we are using >8k kernel pagesize. This also
+ * ensures no vpte range addresses are dropped into tlb while obp is executing
+ * (see inherit_locked_prom_mappings() rant).
+ */
 sparc64_vpte_nucleus:
+	mov		0xf, %g5
+	sllx		%g5, 28, %g5			! Load 0xf0000000
+	cmp		%g4, %g5			! Is addr >= LOW_OBP_ADDRESS?
+	blu,pn		%xcc, sparc64_vpte_patchme1
+	 mov		0x1, %g5
+	sllx		%g5, 32, %g5			! Load 0x100000000
+	cmp		%g4, %g5			! Is addr < HI_OBP_ADDRESS?
+	blu,pn		%xcc, obp_iaddr_patch
+	 nop
 sparc64_vpte_patchme1:
 	sethi		%hi(0), %g5			! This has to be patched
 sparc64_vpte_patchme2:
@@ -44,6 +62,74 @@ vpte_noent:
 	mov		TLB_SFSR, %g1			! Restore %g1 value
 	stxa		%g4, [%g1 + %g1] ASI_DMMU	! Restore previous TAG_ACCESS
 	done						! Slick trick
+
+	.globl		obp_iaddr_patch
+	.globl		obp_daddr_patch
+
+obp_iaddr_patch:
+	sethi		%hi(0), %g5			! This and following is patched
+	or		%g5, %lo(0), %g5		! g5 now holds obp pmd base physaddr
+	wrpr		%g0, 1, %tl			! Behave as if we are at TL0
+	rdpr		%tpc, %g4			! Find original faulting iaddr
+	srlx		%g4, 13, %g4			! Throw out context bits
+	sllx		%g4, 13, %g4			! g4 has vpn + ctx0 now
+	mov		TLB_SFSR, %g1			! Restore %g1 value
+	stxa		%g4, [%g1 + %g1] ASI_IMMU	! Restore previous TAG_ACCESS
+	srlx		%g4, 23, %g6			! Find pmd number
+	and		%g6, 0x7ff, %g6			! Find pmd number
+	sllx		%g6, 2, %g6			! Find pmd offset
+	lduwa		[%g5 + %g6] ASI_PHYS_USE_EC, %g5! Load pmd, ie pagetable physaddr
+	brz,pn		%g5, longpath			! Kill the PROM ? :-)
+	 sllx		%g5, 11, %g5			! Shift into place
+	srlx		%g4, 13, %g6			! find pte number in pagetable
+	and		%g6, 0x3ff, %g6			! find pte number in pagetable
+	sllx		%g6, 3, %g6			! find pte offset in pagetable
+	ldxa		[%g5 + %g6] ASI_PHYS_USE_EC, %g5! Load pte
+	brgez,pn	%g5, longpath			! Kill the PROM ? :-)
+	 nop
+	stxa		%g5, [%g0] ASI_ITLB_DATA_IN	! put into tlb
+	retry						! go back to original fault
+
+obp_daddr_patch:
+	sethi		%hi(0), %g5			! This and following is patched
+	or		%g5, %lo(0), %g5		! g5 now holds obp pmd base physaddr
+	srlx		%g4, 23, %g6			! Find pmd number
+	and		%g6, 0x7ff, %g6			! Find pmd number
+	sllx		%g6, 2, %g6			! Find pmd offset
+	lduwa		[%g5 + %g6] ASI_PHYS_USE_EC, %g5! Load pmd, ie pagetable physaddr
+	brz,pn		%g5, longpath
+	 sllx		%g5, 11, %g5			! Shift into place
+	srlx		%g4, 13, %g6			! find pte number in pagetable
+	and		%g6, 0x3ff, %g6			! find pte number in pagetable
+	sllx		%g6, 3, %g6			! find pte offset in pagetable
+	ldxa		[%g5 + %g6] ASI_PHYS_USE_EC, %g5! Load pte
+	brgez,pn	%g5, longpath
+	 nop
+	stxa		%g5, [%g0] ASI_DTLB_DATA_IN	! put into tlb
+	retry
+
+/*
+ * On a first level data miss, check whether this is to the OBP range (note that
+ * such accesses can be made by prom, as well as by kernel using prom_getproperty
+ * on "address"), and if so, do not use vpte access ... rather, use information
+ * saved during inherit_prom_mappings() using 8k pagesize.
+ */
+kvmap:
+	mov		0xf, %g5
+	sllx		%g5, 28, %g5			! Load 0xf0000000
+	cmp		%g4, %g5			! Is addr >= LOW_OBP_ADDRESS?
+	blu,pn		%xcc, vmalloc_addr
+	 mov		0x1, %g5
+	sllx		%g5, 32, %g5			! Load 0x100000000
+	cmp		%g4, %g5			! Is addr < HI_OBP_ADDRESS?
+	blu,pn		%xcc, obp_daddr_patch
+	 nop
+vmalloc_addr:						! vmalloc addr accessed
+	ldxa		[%g3 + %g6] ASI_N, %g5		! Yep, load k-vpte
+	brgez,pn	%g5, longpath			! Valid, load into TLB
+	 nop
+	stxa		%g5, [%g0] ASI_DTLB_DATA_IN	! Reload TLB
+	retry
 
 	/* This is trivial with the new code... */
 	.globl		do_fpdis
@@ -1413,9 +1499,8 @@ linux_sparc_syscall32:
 	 srl		%i0, 0, %o0				! IEU0
 	sll		%g1, 2, %l4				! IEU0	Group
 #ifdef SYSCALL_TRACING
-	add		%sp, STACK_BIAS + REGWIN_SZ, %o1
 	call		syscall_trace_entry
-	 mov		%g1, %o0
+	 add		%sp, STACK_BIAS + REGWIN_SZ, %o0
 	srl		%i0, 0, %o0
 #endif
 	mov		%i4, %o4				! IEU1
@@ -1442,9 +1527,8 @@ linux_sparc_syscall:
 	 mov		%i0, %o0				! IEU0
 	sll		%g1, 2, %l4				! IEU0	Group
 #ifdef SYSCALL_TRACING
-	add		%sp, STACK_BIAS + REGWIN_SZ, %o1
 	call		syscall_trace_entry
-	 mov		%g1, %o0
+	 add		%sp, STACK_BIAS + REGWIN_SZ, %o0
 	mov		%i0, %o0
 #endif
 	mov		%i1, %o1				! IEU1
@@ -1464,8 +1548,10 @@ linux_sparc_syscall:
 3:	stx		%o0, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_I0]
 ret_sys_call:
 #ifdef SYSCALL_TRACING
+	mov		%o0, %o1
 	call		syscall_trace_exit
-	 add		%sp, STACK_BIAS + REGWIN_SZ, %o1
+	 add		%sp, STACK_BIAS + REGWIN_SZ, %o0
+	mov		%o1, %o0
 #endif
 	ldx		[%sp + STACK_BIAS + REGWIN_SZ + PT_V9_TSTATE], %g3
 	ldx		[%sp + STACK_BIAS + REGWIN_SZ + PT_V9_TNPC], %l1 ! pc = npc

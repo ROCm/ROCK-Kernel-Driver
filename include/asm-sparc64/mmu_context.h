@@ -1,23 +1,10 @@
-/* $Id: mmu_context.h,v 1.50 2001/08/13 20:24:34 kanoj Exp $ */
+/* $Id: mmu_context.h,v 1.51 2001/08/17 04:55:09 kanoj Exp $ */
 #ifndef __SPARC64_MMU_CONTEXT_H
 #define __SPARC64_MMU_CONTEXT_H
 
 /* Derived heavily from Linus's Alpha/AXP ASN code... */
 
-#ifndef __ASSEMBLY__
-
-#include <linux/spinlock.h>
-#include <asm/system.h>
-#include <asm/spitfire.h>
 #include <asm/page.h>
-
-static inline void enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk, unsigned cpu)
-{
-}
-
-extern spinlock_t ctx_alloc_lock;
-extern unsigned long tlb_context_cache;
-extern unsigned long mmu_context_bmap[];
 
 /*
  * For the 8k pagesize kernel, use only 10 hw context bits to optimize some shifts in
@@ -28,9 +15,25 @@ extern unsigned long mmu_context_bmap[];
  */
 #if PAGE_SHIFT == 13
 #define CTX_VERSION_SHIFT	10
+#define TAG_CONTEXT_BITS	0x3ff
 #else
 #define CTX_VERSION_SHIFT	12
+#define TAG_CONTEXT_BITS	0xfff
 #endif
+
+#ifndef __ASSEMBLY__
+
+#include <linux/spinlock.h>
+#include <asm/system.h>
+#include <asm/spitfire.h>
+
+static inline void enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk, unsigned cpu)
+{
+}
+
+extern spinlock_t ctx_alloc_lock;
+extern unsigned long tlb_context_cache;
+extern unsigned long mmu_context_bmap[];
 
 #define CTX_VERSION_MASK	((~0UL) << CTX_VERSION_SHIFT)
 #define CTX_FIRST_VERSION	((1UL << CTX_VERSION_SHIFT) + 1UL)

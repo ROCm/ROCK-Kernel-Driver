@@ -1,8 +1,7 @@
 /*
- * BK Id: SCCS/s.misc.c 1.14 06/16/01 20:43:20 trini
- */
-/*
- * misc.c
+ * BK Id: SCCS/s.misc.c 1.18 07/30/01 17:19:40 trini
+ *
+ * arch/ppc/boot/prep/misc.c
  *
  * Adapted for PowerPC by Gary Thomas
  *
@@ -11,7 +10,6 @@
  */
 
 #include <linux/types.h>
-#include "zlib.h"
 #include <asm/residual.h>
 #include <linux/config.h>
 #include <linux/threads.h>
@@ -22,9 +20,8 @@
 #include <asm/bootinfo.h>
 #include <asm/mmu.h>
 #include <asm/byteorder.h>
-#if defined(CONFIG_SERIAL_CONSOLE)
-unsigned long com_port;
-#endif /* CONFIG_SERIAL_CONSOLE */
+#include "nonstdio.h"
+#include "zlib.h"
 
 /*
  * Please send me load/board info and such data for hardware not
@@ -53,26 +50,28 @@ unsigned long initrd_start = 0, initrd_end = 0;
 char *zimage_start;
 int zimage_size;
 
+#if defined(CONFIG_SERIAL_CONSOLE)
+unsigned long com_port;
+#endif /* CONFIG_SERIAL_CONSOLE */
+#ifdef CONFIG_VGA_CONSOLE
 char *vidmem = (char *)0xC00B8000;
-int lines, cols;
-int orig_x, orig_y;
+int lines = 25, cols = 80;
+int orig_x, orig_y = 24;
+#endif /* CONFIG_VGA_CONSOLE */
 
-extern void puts(const char *);
-extern void putc(const char c);
-extern int tstc(void);
-extern int getc(void);
-extern void puthex(unsigned long val);
-extern void * memcpy(void * __dest, __const void * __src, __kernel_size_t __n);
 extern int CRT_tstc(void);
 extern void of_init(void *handler);
 extern int of_finddevice(const char *device_specifier, int *phandle);
 extern int of_getprop(int phandle, const char *name, void *buf, int buflen, 
 		int *size);
-extern __kernel_size_t strlen(const char *s);
 extern int vga_init(unsigned char *ISA_mem);
-extern void udelay(long x);
-void gunzip(void *, int, unsigned char *, int *);
-unsigned char inb(int);
+extern void gunzip(void *, int, unsigned char *, int *);
+
+extern void _put_HID0(unsigned int val);
+extern void _put_MSR(unsigned int val);
+extern unsigned int _get_HID0(void);
+extern unsigned int _get_MSR(void);
+extern unsigned long serial_init(int chan);
 
 void
 writel(unsigned int val, unsigned int address)
@@ -105,7 +104,7 @@ pci_read_config_32(unsigned char devfn,
 
 #ifdef CONFIG_VGA_CONSOLE
 void
-scroll()
+scroll(void)
 {
 	int i;
 
@@ -120,7 +119,7 @@ scroll()
  * Motorola dual processor platforms.  
  */
 void
-park_cpus()
+park_cpus(void)
 {
 	volatile void (*go)(RESIDUAL *, int, int, char *, int);
 	unsigned int i;
@@ -154,11 +153,6 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum,
 	unsigned char base_mod;
 	int start_multi = 0;
 	unsigned int pci_viddid, pci_did, tulip_pci_base, tulip_base;
-
-	lines = 25;
-	cols = 80;
-	orig_x = 0;
-	orig_y = 24;
 	
 	/*
 	 * IBM's have the MMU on, so we have to disable it or
@@ -438,28 +432,8 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum,
 /*
  * PCI/ISA I/O support
  */
-
-volatile unsigned char *ISA_io  = (unsigned char *)0x80000000;
-volatile unsigned char *ISA_mem = (unsigned char *)0xC0000000;
-
-void
-outb(int port, char val)
-{
-	/* Ensure I/O operations complete */
-	__asm__ volatile("eieio");
-	ISA_io[port] = val;
-}
-
-unsigned char
-inb(int port)
-{
-	/* Ensure I/O operations complete */
-	__asm__ volatile("eieio");
-	return (ISA_io[port]);
-}
-
 unsigned long
 local_to_PCI(unsigned long addr)
 {
-	return ((addr & 0x7FFFFFFF) | 0x80000000);
+	return (addr | 0x80000000);
 }

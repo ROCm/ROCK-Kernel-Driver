@@ -31,6 +31,7 @@
 #include <linux/miscdevice.h>
 #include <linux/slab.h>
 #include <linux/kbd_kern.h>
+#include <linux/vt_kern.h>
 #include <linux/smp_lock.h>
 
 #include <asm/keyboard.h>
@@ -602,7 +603,7 @@ static int write_kbd_rate(unsigned char r)
 		return 1;
 }
 
-int pckbd_rate(struct kbd_repeat *rep)
+static int pckbd_rate(struct kbd_repeat *rep)
 {
 	if (rep == NULL)
 		return -EINVAL;
@@ -834,6 +835,8 @@ void __init pckbd_init_hw(void)
 #if defined CONFIG_PSMOUSE
 	psaux_init();
 #endif
+
+	kbd_rate = pckbd_rate;
 
 	/* Ok, finally allocate the IRQ, and off we go.. */
 	kbd_request_irq(keyboard_interrupt);

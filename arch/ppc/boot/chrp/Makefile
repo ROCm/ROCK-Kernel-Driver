@@ -1,4 +1,4 @@
-# BK Id: SCCS/s.Makefile 1.10 07/19/01 09:11:27 trini
+# BK Id: SCCS/s.Makefile 1.13 07/27/01 20:24:17 trini
 #
 # Makefile for making ELF bootable images for booting on CHRP
 # using Open Firmware.
@@ -14,8 +14,6 @@ else
 MSIZE=
 endif
 
-CFLAGS += -fno-builtin
-
 .c.o:
 	$(CC) $(CFLAGS) -DKERNELBASE=$(KERNELBASE) -c -o $*.o $<
 .S.o:
@@ -23,7 +21,8 @@ CFLAGS += -fno-builtin
 
 LD_ARGS = -Ttext 0x00400000
 
-OBJS = ../common/crt0.o start.o main.o misc.o ../common/string.o image.o
+OBJS = ../common/crt0.o start.o main.o misc.o ../common/string.o image.o \
+	../common/ofcommon.o
 LIBS = $(TOPDIR)/lib/lib.a ../lib/zlib.a
 ADDNOTE = ../utils/addnote
 PIGGYBACK = ../utils/piggyback

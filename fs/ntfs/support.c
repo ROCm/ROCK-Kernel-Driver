@@ -17,10 +17,7 @@
 #include "util.h"
 #include "inode.h"
 #include "macros.h"
-
-#ifndef NLS_MAX_CHARSET_SIZE
 #include <linux/nls.h>
-#endif
 
 static char print_buf[1024];
 
@@ -108,8 +105,8 @@ void ntfs_error(const char *fmt,...)
         va_list ap;
 
         va_start(ap, fmt);
-        strcpy(print_buf, KERN_ERR);
-        vsprintf(print_buf + 3, fmt, ap);
+        strcpy(print_buf, KERN_ERR "NTFS: ");
+        vsprintf(print_buf + 9, fmt, ap);
         printk(print_buf);
         va_end(ap);
 }
@@ -162,8 +159,8 @@ int ntfs_read_mft_record(ntfs_volume *vol, int mftno, char *buf)
 	return 0;
 }
 
-int ntfs_getput_clusters(ntfs_volume *vol, int cluster,	ntfs_size_t start_offs,
-			 ntfs_io *buf)
+int ntfs_getput_clusters(ntfs_volume *vol, int cluster, ntfs_size_t start_offs,
+		ntfs_io *buf)
 {
 	struct super_block *sb = NTFS_SB(vol);
 	struct buffer_head *bh;
@@ -173,6 +170,7 @@ int ntfs_getput_clusters(ntfs_volume *vol, int cluster,	ntfs_size_t start_offs,
 
 	ntfs_debug(DEBUG_OTHER, "%s_clusters %d %d %d\n", 
 		   buf->do_read ? "get" : "put", cluster, start_offs, length);
+	to_copy = vol->cluster_size - start_offs;
 	while (length) {
 		if (!(bh = bread(sb->s_dev, cluster, vol->cluster_size))) {
 			ntfs_debug(DEBUG_OTHER, "%s failed\n",
@@ -180,7 +178,8 @@ int ntfs_getput_clusters(ntfs_volume *vol, int cluster,	ntfs_size_t start_offs,
 			error = -EIO;
 			goto error_ret;
 		}
-		to_copy = min(unsigned int, vol->cluster_size - start_offs, length);
+		if (to_copy > length)
+			to_copy = length;
 		lock_buffer(bh);
 		if (buf->do_read) {
 			buf->fn_put(buf, bh->b_data + start_offs, to_copy);
@@ -211,10 +210,11 @@ int ntfs_getput_clusters(ntfs_volume *vol, int cluster,	ntfs_size_t start_offs,
 				}
 			}
 		}
+		brelse(bh);
 		length -= to_copy;
 		start_offs = 0;
+		to_copy = vol->cluster_size;
 		cluster++;
-		brelse(bh);
 	}
 error_ret:
 	return error;

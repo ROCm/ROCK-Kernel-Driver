@@ -64,6 +64,26 @@ show_sys_files=<bool>	If enabled, show all system files as normal files. Note
 			Be careful not to write anything to them or you could
 			crash the kernel and/or corrupt your file system!
 
+mft_zone_multiplier=	Set the MFT zone multiplier for the volume (this
+			setting is not persistent across mounts and can be
+			changed from mount to mount but cannot be changed on
+			remount). Values of 1 to 4 are allowed, 1 being the
+			default. The MFT zone multiplier determines how much
+			space is reserved for the MFT on the volume. If all
+			other space is used up, then the MFT zone will be
+			shrunk dynamically, so this has no impact on the
+			amount of free space. However, it can have an impact
+			on performance by affecting fragmentation of the MFT.
+			In general use the default. If you have a lot of small
+			files then use a higher value. The values have the
+			following meaning:
+			      Value	     MFT zone size (% of volume size)
+				1		12.5%
+				2		25%
+				3		37.5%
+				4		50%
+			NOTE: This is currently ignored! Work in progress.
+
 Known bugs and (mis-)features
 =============================
 
@@ -71,17 +91,45 @@ Known bugs and (mis-)features
   use it, get the Linux-NTFS tools and use the ntfsfix utility after
   dismounting a partition you wrote to.
 
-- Use the show_sys_files mount option which should make things work generally
-  better. (It results in both the short and long file names being shown as well
-  as the sytem files.)
-
 - Writing of extension records is not supported properly.
+
+- $MFT extension is badly broken and really needs rewriting.
 
 Please send bug reports/comments/feed back/abuse to the Linux-NTFS development
 list at sourceforge: linux-ntfs-dev@lists.sourceforge.net
 
 ChangeLog
 =========
+
+NTFS 1.1.17:
+
+	- Fixed system file handling. No longer need to use show_sys_files
+	  option for driver to work fine. System files are now always treated
+	  the same, but without the option, they are made invisible to
+	  directory listings. As a result system files can once again be opened
+	  even without the show_sys_files option. This is important for the
+	  statfs system call to work properly, for example.
+	- Implemented MFT zone including mount parameter to tune it (just like
+	  in Windows via the registry, only we make it per mount rather than
+	  global for the whole driver, so we are better but we have no way of
+	  storing the value as we don't have a registry so either specify on
+	  each mount or put it in /etc/fstab). [Stage 1 of 3, mount parameter
+	  handling.]
+	- Fixed fixup functions to handle corruption cases and to return error
+	  codes to the caller.
+	- Made fixup functions apply hotfixes where sensible. [Stage 1 of 2+,
+	  in memory only.]
+	- Fixed ommission of "NTFS: " string in ntfs_error() output.
+	- Fixed stupid if statement bug in unistr.c. Thanks to Yann E. Morin
+	  for spotting it. 
+	- Get rid of all uses of max and min macros. This actually allowed for
+	  optimizing the code in several places so it was a Good Thing(TM).
+	- Make ntfs use generic_file_open to enforce the O_LARGEFILE flag.
+	- Detect encrypted files and refuse to access them (return EACCES
+	  error code to user space).
+	- Fix handling of encrypted & compressed files so that an encrypted
+	  file no longer is considered to be compressed (this was causing
+	  kernel segmentation faults).
 
 NTFS 1.1.16:
 

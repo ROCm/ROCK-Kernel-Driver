@@ -19,16 +19,17 @@ CONFIG_EXPERIMENTAL=y
 # Platform support
 #
 CONFIG_PPC=y
+CONFIG_PPC32=y
 CONFIG_6xx=y
 # CONFIG_4xx is not set
 # CONFIG_POWER3 is not set
 # CONFIG_POWER4 is not set
 # CONFIG_8xx is not set
 CONFIG_8260=y
+CONFIG_PPC_STD_MMU=y
 CONFIG_SERIAL_CONSOLE=y
 CONFIG_EST8260=y
 CONFIG_PPC601_SYNC_FIX=y
-# CONFIG_ALL_PPC is not set
 # CONFIG_SMP is not set
 
 #

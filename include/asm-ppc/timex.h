@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.timex.h 1.5 05/17/01 18:14:26 cort
+ * BK Id: SCCS/s.timex.h 1.8 08/15/01 22:43:07 paulus
  */
 /*
  * linux/include/asm-ppc/timex.h
@@ -11,6 +11,7 @@
 #define _ASMppc_TIMEX_H
 
 #include <linux/config.h>
+#include <asm/cputable.h>
 
 #define CLOCK_TICK_RATE	1193180 /* Underlying HZ */
 #define CLOCK_TICK_FACTOR	20	/* Factor of both 1000000 and CLOCK_TICK_RATE */
@@ -23,23 +24,25 @@ typedef unsigned long cycles_t;
 /*
  * For the "cycle" counter we use the timebase lower half.
  * Currently only used on SMP.
- *
- * Since SMP kernels won't run on the PPC601 CPU (which doesn't have
- * the timebase register) anyway, we don't bother checking the CPU version.
  */
 
 extern cycles_t cacheflush_time;
 
 static inline cycles_t get_cycles(void)
 {
-#ifdef CONFIG_SMP
-	cycles_t ret;
+	cycles_t ret = 0;
 
-	__asm__("mftb %0" : "=r" (ret) : );
+	__asm__ __volatile__(
+		"98:	mftb %0\n"
+		"99:\n"
+		".section __ftr_fixup,\"a\"\n"
+		"	.long %1\n"
+		"	.long 0\n"
+		"	.long 98b\n"
+		"	.long 99b\n"
+		".previous"
+		: "=r" (ret) : "i" (CPU_FTR_601));
 	return ret;
-#else
-	return 0;
-#endif
 }
 
 #endif

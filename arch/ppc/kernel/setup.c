@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.setup.c 1.46 07/26/01 14:18:18 trini
+ * BK Id: SCCS/s.setup.c 1.55 08/24/01 20:07:37 paulus
  */
 /*
  * Common prep/pmac/chrp boot and setup code.
@@ -28,6 +28,7 @@
 #include <asm/amigappc.h>
 #include <asm/smp.h>
 #include <asm/elf.h>
+#include <asm/cputable.h>
 #ifdef CONFIG_8xx
 #include <asm/mpc8xx.h>
 #include <asm/8xx_immap.h>
@@ -40,55 +41,18 @@
 #include <asm/ppc4xx.h>
 #endif
 #include <asm/bootx.h>
+#include <asm/btext.h>
 #include <asm/machdep.h>
 #include <asm/feature.h>
 #include <asm/uaccess.h>
+#include <asm/system.h>
 
-
-extern void apus_init(unsigned long r3,
-                      unsigned long r4,
-                      unsigned long r5,
-                      unsigned long r6,
-                      unsigned long r7);
-
-extern void chrp_init(unsigned long r3,
-                      unsigned long r4,
-                      unsigned long r5,
-                      unsigned long r6,
-                      unsigned long r7);
-
-extern void gemini_init(unsigned long r3,
-                      unsigned long r4,
-                      unsigned long r5,
-                      unsigned long r6,
-                      unsigned long r7);
-
-extern void m8xx_init(unsigned long r3,
-		     unsigned long r4,
-		     unsigned long r5,
-		     unsigned long r6,
-		     unsigned long r7);
-
-extern void m8260_init(unsigned long r3,
-		     unsigned long r4,
-		     unsigned long r5,
-		     unsigned long r6,
-		     unsigned long r7);
-
-extern void pmac_init(unsigned long r3,
-                      unsigned long r4,
-                      unsigned long r5,
-                      unsigned long r6,
-                      unsigned long r7);
-
-extern void prep_init(unsigned long r3,
-                      unsigned long r4,
-                      unsigned long r5,
-                      unsigned long r6,
-                      unsigned long r7);
-
+extern void platform_init(unsigned long r3, unsigned long r4,
+		unsigned long r5, unsigned long r6, unsigned long r7);
 extern void bootx_init(unsigned long r4, unsigned long phys);
 extern unsigned long reloc_offset(void);
+extern void identify_cpu(unsigned long offset, unsigned long cpu);
+extern void do_cpu_ftr_fixups(unsigned long offset);
 
 #ifdef CONFIG_XMON
 extern void xmon_map_scc(void);
@@ -98,6 +62,13 @@ extern boot_infos_t *boot_infos;
 char saved_command_line[256];
 unsigned char aux_device_present;
 struct ide_machdep_calls ppc_ide_md;
+char *sysmap;
+unsigned long sysmap_size;
+
+/* Used with the BI_MEMSIZE bootinfo parameter to store the memory
+   size value reported by the boot loader. */ 
+unsigned int boot_mem_size;
+
 int parse_bootinfo(void);
 
 unsigned long ISA_DMA_THRESHOLD;
@@ -105,7 +76,13 @@ unsigned long DMA_MODE_READ, DMA_MODE_WRITE;
 
 #ifdef CONFIG_ALL_PPC
 int _machine = 0;
-int have_of = 0;
+
+extern void prep_init(unsigned long r3, unsigned long r4,
+		unsigned long r5, unsigned long r6, unsigned long r7);
+extern void pmac_init(unsigned long r3, unsigned long r4,
+		unsigned long r5, unsigned long r6, unsigned long r7);
+extern void chrp_init(unsigned long r3, unsigned long r4,
+		unsigned long r5, unsigned long r6, unsigned long r7);
 #endif /* CONFIG_ALL_PPC */
 
 #ifdef CONFIG_MAGIC_SYSRQ
@@ -126,15 +103,7 @@ int dcache_bsize;
 int icache_bsize;
 int ucache_bsize;
 
-/*
- * Perhaps we can put the pmac screen_info[] here
- * on pmac as well so we don't need the ifdef's.
- * Until we get multiple-console support in here
- * that is.  -- Cort
- * Maybe tie it to serial consoles, since this is really what
- * these processors use on existing boards.  -- Dan
- */ 
-#if !defined(CONFIG_4xx) && !defined(CONFIG_8xx) && !defined(CONFIG_8260)
+#ifdef CONFIG_VGA_CONSOLE
 struct screen_info screen_info = {
 	0, 25,			/* orig-x, orig-y */
 	0,			/* unused */
@@ -146,35 +115,7 @@ struct screen_info screen_info = {
 	1,			/* orig-video-isVGA */
 	16			/* orig-video-points */
 };
-
-/*
- * I really need to add multiple-console support... -- Cort
- */
-int __init pmac_display_supported(char *name)
-{
-	return 0;
-}
-void __init pmac_find_display(void)
-{
-}
-
-#else /* CONFIG_4xx || CONFIG_8xx */
-
-/* We need this to satisfy some external references until we can
- * strip the kernel down.
- */
-struct screen_info screen_info = {
-	0, 25,			/* orig-x, orig-y */
-	0,			/* unused */
-	0,			/* orig-video-page */
-	0,			/* orig-video-mode */
-	80,			/* orig-video-cols */
-	0,0,0,			/* ega_ax, ega_bx, ega_cx */
-	25,			/* orig-video-lines */
-	0,			/* orig-video-isVGA */
-	16			/* orig-video-points */
-};
-#endif /* !CONFIG_4xx && !CONFIG_8xx */
+#endif /* CONFIG_VGA_CONSOLE */
 
 void machine_restart(char *cmd)
 {
@@ -190,35 +131,11 @@ void machine_halt(void)
 {
 	ppc_md.halt();
 }
-  
-unsigned long cpu_temp(void)
-{
-	unsigned char thres = 0;
-	
-#if 0
-	/* disable thrm2 */
-	_set_THRM2( 0 );
-	/* threshold 0 C, tid: exceeding threshold, tie: don't generate interrupt */
-	_set_THRM1( THRM1_V );
 
-	/* we need 20us to do the compare - assume 300MHz processor clock */
-	_set_THRM3(0);
-	_set_THRM3(THRM3_E | (300*30)<<18 );
-
-	udelay(100);
-	/* wait for the compare to complete */
-	/*while ( !(_get_THRM1() & THRM1_TIV) ) ;*/
-	if ( !(_get_THRM1() & THRM1_TIV) )
-		printk("no tiv\n");
-	if ( _get_THRM1() & THRM1_TIN )
-		printk("crossed\n");
-	/* turn everything off */
-	_set_THRM3(0);
-	_set_THRM1(0);
-#endif
-		
-	return thres;
-}
+#ifdef CONFIG_TAU
+extern u32 cpu_temp(unsigned long cpu);
+extern u32 cpu_temp_both(unsigned long cpu);
+#endif /* CONFIG_TAU */
 
 int get_cpuinfo(char *buffer)
 {
@@ -227,7 +144,7 @@ int get_cpuinfo(char *buffer)
 	unsigned long i;
 	unsigned int pvr;
 	unsigned short maj, min;
-	
+
 #ifdef CONFIG_SMP
 #define CPU_PRESENT(x) (cpu_callin_map[(x)])
 #define GET_PVR ((long int)(cpu_data[i].pvr))
@@ -235,7 +152,7 @@ int get_cpuinfo(char *buffer)
 #else
 #define CPU_PRESENT(x) ((x)==0)
 #define smp_num_cpus 1
-#define GET_PVR ((long int)_get_PVR())
+#define GET_PVR (mfspr(PVR))
 #define CD(x) (x)
 #endif	
 
@@ -249,90 +166,31 @@ int get_cpuinfo(char *buffer)
 		len += sprintf(len+buffer,"cpu\t\t: ");
 
 		pvr = GET_PVR;
-	
-		switch (PVR_VER(pvr))
-		{
-		case 0x0001:
-			len += sprintf(len+buffer, "601\n");
-			break;
-		case 0x0003:
-			len += sprintf(len+buffer, "603\n");
-			break;
-		case 0x0004:
-			len += sprintf(len+buffer, "604\n");
-			break;
-		case 0x0006:
-			len += sprintf(len+buffer, "603e\n");
-			break;
-		case 0x0007:
-			len += sprintf(len+buffer, "603");
-			if (((pvr >> 12) & 0xF) == 1) {
-				pvr ^= 0x00001000;	/* revision fix-up */
-				len += sprintf(len+buffer, "r\n");
-			} else {
-				len += sprintf(len+buffer, "ev\n");
-			}
-			break;
-		case 0x0008:		/* 740/750(P) */
-		case 0x1008:
-			len += sprintf(len+buffer, "750%s\n",
-				       PVR_VER(pvr) == 0x1008 ? "P" : "");
-			len += sprintf(len+buffer, "temperature \t: %lu C\n",
-				       cpu_temp());
-			break;
-		case 0x0009:		/* 604e/604r */
-		case 0x000A:
-			len += sprintf(len+buffer, "604");
 
-			if (PVR_VER(pvr) == 0x000A ||
-			    ((pvr >> 12) & 0xF) != 0) {
-				pvr &= ~0x00003000;	/* revision fix-up */
-				len += sprintf(len+buffer, "r\n");
-			} else {
-				len += sprintf(len+buffer, "e\n");
-			}
-			break;
-		case 0x000C:
-			len += sprintf(len+buffer, "7400 (G4");
+		if (cur_cpu_spec[i]->pvr_mask)
+			len += sprintf(len+buffer, "%s", cur_cpu_spec[i]->cpu_name);
+		else
+			len += sprintf(len+buffer, "unknown (%08x)", pvr);
 #ifdef CONFIG_ALTIVEC
+		if (cur_cpu_spec[i]->cpu_features & CPU_FTR_ALTIVEC)
 			len += sprintf(len+buffer, ", altivec supported");
-#endif /* CONFIG_ALTIVEC */
-			len += sprintf(len+buffer, ")\n");
-			break;
-		case 0x0020:
-			len += sprintf(len+buffer, "403G");
-			switch ((pvr >> 8) & 0xFF) {
-			case 0x02:
-				len += sprintf(len+buffer, "C\n");    
-				break;				      
-			case 0x14:
-				len += sprintf(len+buffer, "CX\n");
-				break;
-			}
-			break;
-		case 0x0035:
-			len += sprintf(len+buffer, "POWER4\n");
-			break;
-		case 0x0040:
-			len += sprintf(len+buffer, "POWER3 (630)\n");
-			break;
-		case 0x0041:
-			len += sprintf(len+buffer, "POWER3 (630+)\n");
-			break;
-		case 0x0050:
-			len += sprintf(len+buffer, "8xx\n");
-			break;
-		case 0x0081:
-			len += sprintf(len+buffer, "82xx\n");
-			break;
-		case 0x4011:
-			len += sprintf(len+buffer, "405GP\n");
-			break;
-		default:
-			len += sprintf(len+buffer, "unknown (%08x)\n", pvr);
-			break;
+#endif		
+		len += sprintf(len+buffer, "\n");
+#ifdef CONFIG_TAU
+		if (cur_cpu_spec[i]->cpu_features & CPU_FTR_TAU) {
+#ifdef CONFIG_TAU_AVERAGE	/* more straightforward, but potentially misleading */
+			len += sprintf(len+buffer, "temperature \t: %u C (uncalibrated)\n",
+				       cpu_temp(i));
+#else
+			/* show the actual temp sensor range */
+			u32 temp;
+			temp = cpu_temp_both(i);
+			len += sprintf(len+buffer, "temperature \t: %u-%u C (uncalibrated)\n",
+					temp & 0xff, temp >> 16);
+#endif
 		}
-		
+#endif
+
 		/*
 		 * Assume here that all clock rates are the same in a
 		 * smp system.  -- Cort
@@ -394,7 +252,7 @@ int get_cpuinfo(char *buffer)
 	}
 
 #ifdef CONFIG_SMP
-	if ( i )
+	if ( i && smp_num_cpus > 1)
 		len += sprintf(buffer+len, "\n");
 	len += sprintf(buffer+len,"total bogomips\t: %lu.%02lu\n",
 		       bogosum/(500000/HZ),
@@ -423,31 +281,6 @@ int get_cpuinfo(char *buffer)
 	return len;
 }
 
-#ifdef CONFIG_ALL_PPC
-void __init
-intuit_machine_type(void)
-{
-	char *model;
-	struct device_node *root;
-			
-	/* ask the OF info if we're a chrp or pmac */
-	root = find_path_device("/");
-	if (root != 0) {
-		/* assume pmac unless proven to be chrp -- Cort */
-		_machine = _MACH_Pmac;
-		model = get_property(root, "device_type", NULL);
-		if (model && !strncmp("chrp", model, 4))
-			_machine = _MACH_chrp;
-		else {
-			model = get_property(root, "model", NULL);
-			if (model && !strncmp(model, "IBM", 3))
-				_machine = _MACH_chrp;
-		}
-	}
-}
-#endif /* CONFIG_ALL_PPC */
-
-#if defined(CONFIG_6xx) || defined(CONFIG_PPC64BRIDGE)
 /*
  * We're called here very early in the boot.  We determine the machine
  * type and call the appropriate low-level setup functions.
@@ -472,6 +305,13 @@ early_init(int r3, int r4, int r5)
 	 * caches on yet */
 	memset_io(PTRRELOC(&__bss_start), 0, &_end - &__bss_start);
 
+	/*
+	 * Identify the CPU type and fix up code sections
+	 * that depend on which cpu we have.
+	 */
+	identify_cpu(offset, 0);
+	do_cpu_ftr_fixups(offset);
+
 #if defined(CONFIG_ALL_PPC)
 	/* If we came here from BootX, clear the screen,
 	 * set up some pointers and return. */
@@ -493,78 +333,105 @@ early_init(int r3, int r4, int r5)
 
 	return phys;
 }
-#endif /* CONFIG_6xx || CONFIG_PPC64BRIDGE */
+
+#ifdef CONFIG_ALL_PPC
+void __init
+intuit_machine_type(void)
+{
+	char *model;
+	struct device_node *root;
+			
+	/* ask the OF info if we're a chrp or pmac */
+	root = find_path_device("/");
+	if (root != 0) {
+		/* assume pmac unless proven to be chrp -- Cort */
+		_machine = _MACH_Pmac;
+		model = get_property(root, "device_type", NULL);
+		if (model && !strncmp("chrp", model, 4))
+			_machine = _MACH_chrp;
+		else {
+			model = get_property(root, "model", NULL);
+			if (model && !strncmp(model, "IBM", 3))
+				_machine = _MACH_chrp;
+		}
+	}
+}
 
 /*
- * Find out what kind of machine we're on and save any data we need
- * from the early boot process (devtree is copied on pmac by prom_init() )
+ * The ALL_PPC version of platform_init...
  */
-unsigned long __init
-identify_machine(unsigned long r3, unsigned long r4, unsigned long r5,
-		 unsigned long r6, unsigned long r7)
+void __init
+platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
+	      unsigned long r6, unsigned long r7)
 {
-#ifdef CONFIG_CMDLINE
-	strcpy(cmd_line, CONFIG_CMDLINE);
-#endif /* CONFIG_CMDLINE */
+#ifdef CONFIG_BOOTX_TEXT
+	extern boot_infos_t *disp_bi;
 
-	parse_bootinfo();
+	if (disp_bi) {
+		btext_clearscreen();
+		btext_welcome(disp_bi);
+	}
+#endif	
 
-	if ( ppc_md.progress ) ppc_md.progress("id mach(): start", 0x100);
-	
-#ifdef CONFIG_ALL_PPC
 	/* if we didn't get any bootinfo telling us what we are... */
-	if ( _machine == 0 )
-	{
+	if (_machine == 0) {
 		/* prep boot loader tells us if we're prep or not */
 		if ( *(unsigned long *)(KERNELBASE) == (0xdeadc0de) )
-		{
 			_machine = _MACH_prep;
-		} else
-			have_of = 1;
 	}
 
-	if ( have_of )
-	{
-		/* prom_init has already been called from __start */
-		if (boot_infos)
-			relocate_nodes();
-		/* we need to set _machine before calling finish_device_tree */
-		if (_machine == 0)
-			intuit_machine_type();
-		finish_device_tree();
-		/*
-		 * If we were booted via quik, r3 points to the physical
-		 * address of the command-line parameters.
-		 * If we were booted from an xcoff image (i.e. netbooted or
-		 * booted from floppy), we get the command line from the
-		 * bootargs property of the /chosen node.
-		 * If an initial ramdisk is present, r3 and r4
-		 * are used for initrd_start and initrd_size,
-		 * otherwise they contain 0xdeadbeef.  
-		 */
-		if (r3 >= 0x4000 && r3 < 0x800000 && r4 == 0) {
-			strncpy(cmd_line, (char *)r3 + KERNELBASE,
+	/* not much more to do here, if prep */
+	if (_machine == _MACH_prep) {
+		prep_init(r3, r4, r5, r6, r7);
+		return;
+	}
+
+	/* prom_init has already been called from __start */
+	if (boot_infos)
+		relocate_nodes();
+
+	/* If we aren't PReP, we can find out if we're Pmac
+	 * or CHRP with this. */
+	if (_machine == 0)
+		intuit_machine_type();
+
+	/* finish_device_tree may need _machine defined. */
+	finish_device_tree();
+
+	/*
+	 * If we were booted via quik, r3 points to the physical
+	 * address of the command-line parameters.
+	 * If we were booted from an xcoff image (i.e. netbooted or
+	 * booted from floppy), we get the command line from the
+	 * bootargs property of the /chosen node.
+	 * If an initial ramdisk is present, r3 and r4
+	 * are used for initrd_start and initrd_size,
+	 * otherwise they contain 0xdeadbeef.  
+	 */
+	if (r3 >= 0x4000 && r3 < 0x800000 && r4 == 0) {
+		cmd_line[0] = 0;
+		strncpy(cmd_line, (char *)r3 + KERNELBASE,
+			sizeof(cmd_line));
+	} else if (boot_infos != 0) {
+		/* booted by BootX - check for ramdisk */
+		if (boot_infos->kernelParamsOffset != 0)
+			strncpy(cmd_line, (char *) boot_infos
+				+ boot_infos->kernelParamsOffset,
 				sizeof(cmd_line));
-		} else if (boot_infos != 0) {
-			/* booted by BootX - check for ramdisk */
- 			if (boot_infos->kernelParamsOffset != 0)
-				strncpy(cmd_line, (char *) boot_infos
-					+ boot_infos->kernelParamsOffset,
-					sizeof(cmd_line));
 #ifdef CONFIG_BLK_DEV_INITRD
-			if (boot_infos->ramDisk) {
-				initrd_start = (unsigned long) boot_infos
-					+ boot_infos->ramDisk;
-				initrd_end = initrd_start + boot_infos->ramDiskSize;
-				initrd_below_start_ok = 1;
-			}
+		if (boot_infos->ramDisk) {
+			initrd_start = (unsigned long) boot_infos
+				+ boot_infos->ramDisk;
+			initrd_end = initrd_start + boot_infos->ramDiskSize;
+			initrd_below_start_ok = 1;
+		}
 #endif
-		} else {
-			struct device_node *chosen;
-			char *p;
+	} else {
+		struct device_node *chosen;
+		char *p;
 			
 #ifdef CONFIG_BLK_DEV_INITRD
-			if (r3 && r4 && r4 != 0xdeadbeef)
+		if (r3 && r4 && r4 != 0xdeadbeef)
 			{
 				if (r3 < KERNELBASE)
 					r3 += KERNELBASE;
@@ -574,92 +441,32 @@ identify_machine(unsigned long r3, unsigned long r4, unsigned long r5,
 				initrd_below_start_ok = 1;
 			}
 #endif
-			chosen = find_devices("chosen");
-			if (chosen != NULL) {
-				p = get_property(chosen, "bootargs", NULL);
-				if (p && *p) {
-					cmd_line[0] = 0;
-					strncpy(cmd_line, p, sizeof(cmd_line));
-				}
+		chosen = find_devices("chosen");
+		if (chosen != NULL) {
+			p = get_property(chosen, "bootargs", NULL);
+			if (p && *p) {
+				cmd_line[0] = 0;
+				strncpy(cmd_line, p, sizeof(cmd_line));
 			}
 		}
-		cmd_line[sizeof(cmd_line) - 1] = 0;
 	}
-#endif /* CONFIG_ALL_PPC */
+	cmd_line[sizeof(cmd_line) - 1] = 0;
 
-#if defined(CONFIG_ALL_PPC)
-	switch (_machine)
-	{
+	switch (_machine) {
 	case _MACH_Pmac:
-                pmac_init(r3, r4, r5, r6, r7);
-		break;
-	case _MACH_prep:
-                prep_init(r3, r4, r5, r6, r7);
+		pmac_init(r3, r4, r5, r6, r7);
 		break;
 	case _MACH_chrp:
-                chrp_init(r3, r4, r5, r6, r7);
+		chrp_init(r3, r4, r5, r6, r7);
 		break;
-	default:
-		printk("Unknown machine type in identify_machine!\n");
 	}
-#elif defined(CONFIG_APUS)
-	apus_init(r3, r4, r5, r6, r7);
-#elif defined(CONFIG_GEMINI)
-	gemini_init(r3, r4, r5, r6, r7);
-#elif defined(CONFIG_4xx)
-	oak_init(r3, r4, r5, r6, r7);
-#elif defined(CONFIG_8xx)
-        m8xx_init(r3, r4, r5, r6, r7);
-#elif defined(CONFIG_8260)
-        m8260_init(r3, r4, r5, r6, r7);
-#else
-#error "No board type has been defined for identify_machine()!"
-#endif
-
-#if !defined(CONFIG_4xx) && !defined(CONFIG_8xx) && !defined(CONFIG_8260)
-	/* Check for nobats option (used in mapin_ram). */
-	if (strstr(cmd_line, "nobats")) {
-		extern int __map_without_bats;
-		__map_without_bats = 1;
-	}
-#endif /* !CONFIG_4xx && !CONFIG_8xx && !CONFIG_8260 */
-
-	/* Look for mem= option on command line */
-	if (strstr(cmd_line, "mem=")) {
-		char *p, *q;
-		unsigned long maxmem = 0;
-		extern unsigned long __max_memory;
-
-		for (q = cmd_line; (p = strstr(q, "mem=")) != 0; ) {
-			q = p + 4;
-			if (p > cmd_line && p[-1] != ' ')
-				continue;
-			maxmem = simple_strtoul(q, &q, 0);
-			if (*q == 'k' || *q == 'K') {
-				maxmem <<= 10;
-				++q;
-			} else if (*q == 'm' || *q == 'M') {
-				maxmem <<= 20;
-				++q;
-			}
-		}
-		__max_memory = maxmem;
-	}
-
-	/* this is for modules since _machine can be a define -- Cort */
-	ppc_md.ppc_machine = _machine;
-
-	if ( ppc_md.progress ) ppc_md.progress("id mach(): done", 0x200);
-
-	return 0;
 }
+#endif /* CONFIG_ALL_PPC */
 
 int parse_bootinfo(void)
 {
 	struct bi_record *rec;
 	extern char __bss_start[];
-	extern char *sysmap;
-	extern unsigned long sysmap_size;
 
 	rec = (struct bi_record *)_ALIGN((ulong)__bss_start+(1<<20)-1,(1<<20));
 	if ( rec->tag != BI_FIRST )
@@ -696,20 +503,43 @@ int parse_bootinfo(void)
 #ifdef CONFIG_ALL_PPC
 		case BI_MACHTYPE:
 			_machine = data[0];
-			have_of = data[1];
 			break;
 #endif /* CONFIG_ALL_PPC */
+		case BI_MEMSIZE:
+			boot_mem_size = data[0];
+			break;
 		}
 	}
 
 	return 0;
 }
 
-/* Checks "l2cr=xxxx" command-line option */
-int ppc_setup_l2cr(char *str)
+/*
+ * Find out what kind of machine we're on and save any data we need
+ * from the early boot process (devtree is copied on pmac by prom_init()).
+ * This is called very early on the boot process, after a minimal
+ * MMU environment has been set up but before MMU_init is called.
+ */
+void __init
+machine_init(unsigned long r3, unsigned long r4, unsigned long r5,
+	     unsigned long r6, unsigned long r7)
 {
-	if ( ((_get_PVR() >> 16) == 8) || ((_get_PVR() >> 16) == 12) )
-	{
+#ifdef CONFIG_CMDLINE
+	strcpy(cmd_line, CONFIG_CMDLINE);
+#endif /* CONFIG_CMDLINE */
+
+	parse_bootinfo();
+
+	platform_init(r3, r4, r5, r6, r7);
+
+	if (ppc_md.progress)
+		ppc_md.progress("id mach(): done", 0x200);
+}
+
+/* Checks "l2cr=xxxx" command-line option */
+int __init ppc_setup_l2cr(char *str)
+{
+	if (cur_cpu_spec[0]->cpu_features & CPU_FTR_L2CR) {
 		unsigned long val = simple_strtoul(str, NULL, 0);
 		printk(KERN_INFO "l2cr set to %lx\n", val);
                 _set_L2CR(0);           /* force invalidate by disable cache */
@@ -761,18 +591,13 @@ void __init setup_arch(char **cmdline_p)
 	 * Systems with OF can look in the properties on the cpu node(s)
 	 * for a possibly more accurate value.
 	 */
-	dcache_bsize = icache_bsize = 32;	/* most common value */
-	switch (_get_PVR() >> 16) {
-	case 1:		/* 601, with unified cache */
-		ucache_bsize = 32;
-		break;
-	/* XXX need definitions in here for 8xx etc. */
-	case 0x40:
-	case 0x41:
-	case 0x35:	/* 64-bit POWER3, POWER3+, POWER4 */
-		dcache_bsize = icache_bsize = 128;
-		break;
-	}
+	if (cur_cpu_spec[0]->cpu_features & CPU_FTR_SPLIT_ID_CACHE) {
+		dcache_bsize = cur_cpu_spec[0]->dcache_bsize;
+		icache_bsize = cur_cpu_spec[0]->icache_bsize;
+		ucache_bsize = 0;
+	} else
+		ucache_bsize = dcache_bsize = icache_bsize
+			= cur_cpu_spec[0]->dcache_bsize;
 
 	/* reboot on panic */
 	panic_timeout = 180;
@@ -813,6 +638,9 @@ void __init setup_arch(char **cmdline_p)
 
 	paging_init();
 	sort_exception_table();
+
+	/* this is for modules since _machine can be a define -- Cort */
+	ppc_md.ppc_machine = _machine;
 }
 
 /* Convert the shorts/longs in hd_driveid from little to big endian;

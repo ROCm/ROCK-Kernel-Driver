@@ -325,7 +325,7 @@ void clear_dquot(struct dquot *dquot)
         memset(&dquot->dq_dqb, 0, sizeof(struct dqblk));
 }
 
-static void invalidate_dquots(kdev_t dev, short type)
+static void invalidate_dquots(struct super_block *sb, short type)
 {
 	struct dquot *dquot, *next;
 	int need_restart;
@@ -335,11 +335,9 @@ restart:
 	need_restart = 0;
 	while ((dquot = next) != NULL) {
 		next = dquot->dq_next;
-		if (dquot->dq_dev != dev)
+		if (dquot->dq_sb != sb)
 			continue;
 		if (dquot->dq_type != type)
-			continue;
-		if (!dquot->dq_sb)	/* Already invalidated entry? */
 			continue;
 		if (dquot->dq_flags & DQ_LOCKED) {
 			__wait_on_dquot(dquot);
@@ -349,11 +347,9 @@ restart:
 			/*
 			 * Make sure it's still the same dquot.
 			 */
-			if (dquot->dq_dev != dev)
+			if (dquot->dq_sb != sb)
 				continue;
 			if (dquot->dq_type != type)
-				continue;
-			if (!dquot->dq_sb)
 				continue;
 		}
 		/*
@@ -1409,7 +1405,7 @@ int quota_off(struct super_block *sb, short type)
 
 		/* Note: these are blocking operations */
 		remove_dquot_ref(sb, cnt);
-		invalidate_dquots(sb->s_dev, cnt);
+		invalidate_dquots(sb, cnt);
 
 		/* Wait for any pending IO - remove me as soon as invalidate is more polite */
 		down(&dqopt->dqio_sem);

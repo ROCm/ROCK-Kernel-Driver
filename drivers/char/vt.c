@@ -28,7 +28,6 @@
 
 #include <asm/io.h>
 #include <asm/uaccess.h>
-#include <asm/keyboard.h>
 
 #include <linux/kbd_kern.h>
 #include <linux/vt_kern.h>
@@ -145,8 +144,13 @@ _kd_mksound(unsigned int hz, unsigned int ticks)
 
 #endif
 
-void (*kd_mksound)(unsigned int hz, unsigned int ticks) = _kd_mksound;
+int _kbd_rate(struct kbd_repeat *rep)
+{
+	return -EINVAL;
+}
 
+void (*kd_mksound)(unsigned int hz, unsigned int ticks) = _kd_mksound;
+int (*kbd_rate)(struct kbd_repeat *rep) = _kbd_rate;
 
 #define i (tmp.kb_index)
 #define s (tmp.kb_table)
@@ -504,7 +508,6 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
 	{
 		struct kbd_repeat kbrep;
 		
-		if (!kbd_rate) return( -EINVAL );
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
 

@@ -573,7 +573,7 @@ void __init proc_misc_init(void)
 			entry->size = (1+prof_len) * sizeof(unsigned int);
 		}
 	}
-#ifdef __powerpc__
+#ifdef CONFIG_PPC32
 	{
 		extern struct file_operations ppc_htab_operations;
 		entry = create_proc_entry("ppc_htab", S_IRUGO|S_IWUSR, NULL);

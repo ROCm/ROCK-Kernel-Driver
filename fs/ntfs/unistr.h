@@ -1,6 +1,4 @@
 /*
- * $Id: unistr.h,v 1.5 2001/04/11 11:49:16 antona Exp $
- *
  * unistr.h - Exports for unicode string handling. Part of the Linux-NTFS
  *	      project.
  *

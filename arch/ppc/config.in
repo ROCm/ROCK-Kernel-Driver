@@ -1,4 +1,4 @@
-# BK Id: SCCS/s.config.in 1.34 07/08/01 11:39:11 trini
+# BK Id: SCCS/s.config.in 1.40 08/24/01 20:31:47 paulus
 #
 # For a description of the syntax of this configuration file,
 # see Documentation/kbuild/config-language.txt.
@@ -26,6 +26,7 @@ endmenu
 mainmenu_option next_comment
 comment 'Platform support'
 define_bool CONFIG_PPC y
+define_bool CONFIG_PPC32 y
 choice 'Processor Type'	\
 	"6xx/7xx/74xx/8260	CONFIG_6xx	\
 	 4xx			CONFIG_4xx	\
@@ -40,6 +41,11 @@ fi
 if [ "$CONFIG_POWER3" = "y" -o "$CONFIG_POWER4" = "y" ]; then
   define_bool CONFIG_PPC64BRIDGE y
   define_bool CONFIG_ALL_PPC y
+fi
+
+if [ "$CONFIG_6xx" = "y" -o "$CONFIG_POWER3" = "y" -o \
+     "$CONFIG_POWER4" = "y" ]; then
+  define_bool CONFIG_PPC_STD_MMU y
 fi
 
 if [ "$CONFIG_8260" = "y" ]; then
@@ -93,7 +99,8 @@ if [ "$CONFIG_PPC64BRIDGE" != "y" ]; then
   bool 'Workarounds for PPC601 bugs' CONFIG_PPC601_SYNC_FIX
 fi
 
-if [ "$CONFIG_8xx" = "y" -o "$CONFIG_8260" = "y" ]; then
+if [ "$CONFIG_POWER3" = "n" -a "$CONFIG_POWER4" = "n" -a \
+	"$CONFIG_6xx" = "n" ]; then
   define_bool CONFIG_ALL_PPC n
 fi
 
@@ -104,6 +111,11 @@ fi
 
 if [ "$CONFIG_6xx" = "y" -a "$CONFIG_8260" = "n" ];then
   bool 'AltiVec Support' CONFIG_ALTIVEC
+  bool 'Thermal Management Support' CONFIG_TAU
+  if [ "$CONFIG_TAU" = "y" ]; then
+    bool '    Interrupt driven TAU driver (DANGEROUS)' CONFIG_TAU_INT
+    bool '    Average high and low temp' CONFIG_TAU_AVERAGE
+  fi
 fi
 
 if [ "$CONFIG_4xx" = "y" -o "$CONFIG_8xx" = "y" ]; then

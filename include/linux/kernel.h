@@ -10,6 +10,7 @@
 #include <stdarg.h>
 #include <linux/linkage.h>
 #include <linux/stddef.h>
+#include <linux/types.h>
 
 /* Optimization barrier */
 /* The "volatile" is due to gcc bugs */
@@ -61,6 +62,8 @@ extern unsigned long long simple_strtoull(const char *,char **,unsigned int);
 extern long long simple_strtoll(const char *,char **,unsigned int);
 extern int sprintf(char * buf, const char * fmt, ...);
 extern int vsprintf(char *buf, const char *, va_list);
+extern int snprintf(char * buf, size_t size, const char *fmt, ...);
+extern int vsnprintf(char *buf, size_t size, const char *fmt, va_list args);
 extern int get_option(char **str, int *pint);
 extern char *get_options(char *str, int nints, int *ints);
 extern unsigned long long memparse(char *ptr, char **retptr);

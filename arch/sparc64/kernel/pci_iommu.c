@@ -1,4 +1,4 @@
-/* $Id: pci_iommu.c,v 1.14 2001/05/23 03:06:51 davem Exp $
+/* $Id: pci_iommu.c,v 1.15 2001/08/24 19:36:58 kanoj Exp $
  * pci_iommu.c: UltraSparc PCI controller IOM/STC support.
  *
  * Copyright (C) 1999 David S. Miller (davem@redhat.com)
@@ -121,7 +121,7 @@ static void free_streaming_cluster(struct pci_iommu *iommu, dma_addr_t base,
 	while ((1UL << cnum) < npages)
 		cnum++;
 
-	ent = (base << (32 - PAGE_SHIFT + PBM_LOGCLUSTERS - iommu->page_table_sz_bits))
+	ent = (base << (32 - IO_PAGE_SHIFT + PBM_LOGCLUSTERS - iommu->page_table_sz_bits))
 		>> (32 + PBM_LOGCLUSTERS + cnum - iommu->page_table_sz_bits);
 
 	/* If the global flush might not have caught this entry,
@@ -184,7 +184,7 @@ void *pci_alloc_consistent(struct pci_dev *pdev, size_t size, dma_addr_t *dma_ad
 	void *ret;
 	int npages;
 
-	size = PAGE_ALIGN(size);
+	size = IO_PAGE_ALIGN(size);
 	order = get_order(size);
 	if (order >= 10)
 		return NULL;
@@ -198,7 +198,7 @@ void *pci_alloc_consistent(struct pci_dev *pdev, size_t size, dma_addr_t *dma_ad
 	iommu = pcp->pbm->iommu;
 
 	spin_lock_irqsave(&iommu->lock, flags);
-	iopte = alloc_consistent_cluster(iommu, size >> PAGE_SHIFT);
+	iopte = alloc_consistent_cluster(iommu, size >> IO_PAGE_SHIFT);
 	if (iopte == NULL) {
 		spin_unlock_irqrestore(&iommu->lock, flags);
 		free_pages(first_page, order);
@@ -206,9 +206,9 @@ void *pci_alloc_consistent(struct pci_dev *pdev, size_t size, dma_addr_t *dma_ad
 	}
 
 	*dma_addrp = (iommu->page_table_map_base +
-		      ((iopte - iommu->page_table) << PAGE_SHIFT));
+		      ((iopte - iommu->page_table) << IO_PAGE_SHIFT));
 	ret = (void *) first_page;
-	npages = size >> PAGE_SHIFT;
+	npages = size >> IO_PAGE_SHIFT;
 	ctx = 0;
 	if (iommu->iommu_ctxflush)
 		ctx = iommu->iommu_cur_ctx++;
@@ -218,17 +218,17 @@ void *pci_alloc_consistent(struct pci_dev *pdev, size_t size, dma_addr_t *dma_ad
 				     IOPTE_WRITE |
 				     (first_page & IOPTE_PAGE));
 		iopte++;
-		first_page += PAGE_SIZE;
+		first_page += IO_PAGE_SIZE;
 	}
 
 	{
 		int i;
 		u32 daddr = *dma_addrp;
 
-		npages = size >> PAGE_SHIFT;
+		npages = size >> IO_PAGE_SHIFT;
 		for (i = 0; i < npages; i++) {
 			pci_iommu_write(iommu->iommu_flush, daddr);
-			daddr += PAGE_SIZE;
+			daddr += IO_PAGE_SIZE;
 		}
 	}
 
@@ -245,11 +245,11 @@ void pci_free_consistent(struct pci_dev *pdev, size_t size, void *cpu, dma_addr_
 	iopte_t *iopte;
 	unsigned long flags, order, npages, i, ctx;
 
-	npages = PAGE_ALIGN(size) >> PAGE_SHIFT;
+	npages = IO_PAGE_ALIGN(size) >> IO_PAGE_SHIFT;
 	pcp = pdev->sysdata;
 	iommu = pcp->pbm->iommu;
 	iopte = iommu->page_table +
-		((dvma - iommu->page_table_map_base) >> PAGE_SHIFT);
+		((dvma - iommu->page_table_map_base) >> IO_PAGE_SHIFT);
 
 	spin_lock_irqsave(&iommu->lock, flags);
 
@@ -286,7 +286,7 @@ void pci_free_consistent(struct pci_dev *pdev, size_t size, void *cpu, dma_addr_
 		pci_iommu_write(iommu->iommu_ctxflush, ctx);
 	} else {
 		for (i = 0; i < npages; i++) {
-			u32 daddr = dvma + (i << PAGE_SHIFT);
+			u32 daddr = dvma + (i << IO_PAGE_SHIFT);
 
 			pci_iommu_write(iommu->iommu_flush, daddr);
 		}
@@ -321,8 +321,8 @@ dma_addr_t pci_map_single(struct pci_dev *pdev, void *ptr, size_t sz, int direct
 		BUG();
 
 	oaddr = (unsigned long)ptr;
-	npages = PAGE_ALIGN(oaddr + sz) - (oaddr & PAGE_MASK);
-	npages >>= PAGE_SHIFT;
+	npages = IO_PAGE_ALIGN(oaddr + sz) - (oaddr & IO_PAGE_MASK);
+	npages >>= IO_PAGE_SHIFT;
 
 	spin_lock_irqsave(&iommu->lock, flags);
 
@@ -330,9 +330,9 @@ dma_addr_t pci_map_single(struct pci_dev *pdev, void *ptr, size_t sz, int direct
 	if (base == NULL)
 		goto bad;
 	bus_addr = (iommu->page_table_map_base +
-		    ((base - iommu->page_table) << PAGE_SHIFT));
-	ret = bus_addr | (oaddr & ~PAGE_MASK);
-	base_paddr = __pa(oaddr & PAGE_MASK);
+		    ((base - iommu->page_table) << IO_PAGE_SHIFT));
+	ret = bus_addr | (oaddr & ~IO_PAGE_MASK);
+	base_paddr = __pa(oaddr & IO_PAGE_MASK);
 	ctx = 0;
 	if (iommu->iommu_ctxflush)
 		ctx = iommu->iommu_cur_ctx++;
@@ -343,7 +343,7 @@ dma_addr_t pci_map_single(struct pci_dev *pdev, void *ptr, size_t sz, int direct
 	if (direction != PCI_DMA_TODEVICE)
 		iopte_protection |= IOPTE_WRITE;
 
-	for (i = 0; i < npages; i++, base++, base_paddr += PAGE_SIZE)
+	for (i = 0; i < npages; i++, base++, base_paddr += IO_PAGE_SIZE)
 		iopte_val(*base) = iopte_protection | base_paddr;
 
 	spin_unlock_irqrestore(&iommu->lock, flags);
@@ -372,15 +372,15 @@ void pci_unmap_single(struct pci_dev *pdev, dma_addr_t bus_addr, size_t sz, int 
 	iommu = pcp->pbm->iommu;
 	strbuf = &pcp->pbm->stc;
 
-	npages = PAGE_ALIGN(bus_addr + sz) - (bus_addr & PAGE_MASK);
-	npages >>= PAGE_SHIFT;
+	npages = IO_PAGE_ALIGN(bus_addr + sz) - (bus_addr & IO_PAGE_MASK);
+	npages >>= IO_PAGE_SHIFT;
 	base = iommu->page_table +
-		((bus_addr - iommu->page_table_map_base) >> PAGE_SHIFT);
+		((bus_addr - iommu->page_table_map_base) >> IO_PAGE_SHIFT);
 #ifdef DEBUG_PCI_IOMMU
 	if (iopte_val(*base) == IOPTE_INVALID)
 		printk("pci_unmap_single called on non-mapped region %08x,%08x from %016lx\n", bus_addr, sz, __builtin_return_address(0));
 #endif
-	bus_addr &= PAGE_MASK;
+	bus_addr &= IO_PAGE_MASK;
 
 	spin_lock_irqsave(&iommu->lock, flags);
 
@@ -404,7 +404,7 @@ void pci_unmap_single(struct pci_dev *pdev, dma_addr_t bus_addr, size_t sz, int 
 				pci_iommu_write(flushreg, ctx);
 			} while(((long)pci_iommu_read(matchreg)) < 0L);
 		} else {
-			for (i = 0; i < npages; i++, vaddr += PAGE_SIZE)
+			for (i = 0; i < npages; i++, vaddr += IO_PAGE_SIZE)
 				pci_iommu_write(strbuf->strbuf_pflush, vaddr);
 		}
 
@@ -432,9 +432,9 @@ static inline void fill_sg(iopte_t *iopte, struct scatterlist *sg, int nused, un
 		unsigned long pteval = ~0UL;
 		u32 dma_npages;
 
-		dma_npages = ((dma_sg->dvma_address & (PAGE_SIZE - 1UL)) +
+		dma_npages = ((dma_sg->dvma_address & (IO_PAGE_SIZE - 1UL)) +
 			      dma_sg->dvma_length +
-			      ((u32)(PAGE_SIZE - 1UL))) >> PAGE_SHIFT;
+			      ((u32)(IO_PAGE_SIZE - 1UL))) >> IO_PAGE_SHIFT;
 		do {
 			unsigned long offset;
 			signed int len;
@@ -449,15 +449,15 @@ static inline void fill_sg(iopte_t *iopte, struct scatterlist *sg, int nused, un
 
 				tmp = (unsigned long) __pa(sg->address);
 				len = sg->length;
-				if (((tmp ^ pteval) >> PAGE_SHIFT) != 0UL) {
-					pteval = tmp & PAGE_MASK;
-					offset = tmp & (PAGE_SIZE - 1UL);
+				if (((tmp ^ pteval) >> IO_PAGE_SHIFT) != 0UL) {
+					pteval = tmp & IO_PAGE_MASK;
+					offset = tmp & (IO_PAGE_SIZE - 1UL);
 					break;
 				}
-				if (((tmp ^ (tmp + len - 1UL)) >> PAGE_SHIFT) != 0UL) {
-					pteval = (tmp + PAGE_SIZE) & PAGE_MASK;
+				if (((tmp ^ (tmp + len - 1UL)) >> IO_PAGE_SHIFT) != 0UL) {
+					pteval = (tmp + IO_PAGE_SIZE) & IO_PAGE_MASK;
 					offset = 0UL;
-					len -= (PAGE_SIZE - (tmp & (PAGE_SIZE - 1UL)));
+					len -= (IO_PAGE_SIZE - (tmp & (IO_PAGE_SIZE - 1UL)));
 					break;
 				}
 				sg++;
@@ -466,8 +466,8 @@ static inline void fill_sg(iopte_t *iopte, struct scatterlist *sg, int nused, un
 			pteval = iopte_protection | (pteval & IOPTE_PAGE);
 			while (len > 0) {
 				*iopte++ = __iopte(pteval);
-				pteval += PAGE_SIZE;
-				len -= (PAGE_SIZE - offset);
+				pteval += IO_PAGE_SIZE;
+				len -= (IO_PAGE_SIZE - offset);
 				offset = 0;
 				dma_npages--;
 			}
@@ -479,14 +479,14 @@ static inline void fill_sg(iopte_t *iopte, struct scatterlist *sg, int nused, un
 			 * adjusting pteval along the way.  Stop when we
 			 * detect a page crossing event.
 			 */
-			while ((pteval << (64 - PAGE_SHIFT)) != 0UL &&
+			while ((pteval << (64 - IO_PAGE_SHIFT)) != 0UL &&
 			       pteval == __pa(sg->address) &&
 			       ((pteval ^
-				 (__pa(sg->address) + sg->length - 1UL)) >> PAGE_SHIFT) == 0UL) {
+				 (__pa(sg->address) + sg->length - 1UL)) >> IO_PAGE_SHIFT) == 0UL) {
 				pteval += sg->length;
 				sg++;
 			}
-			if ((pteval << (64 - PAGE_SHIFT)) == 0UL)
+			if ((pteval << (64 - IO_PAGE_SHIFT)) == 0UL)
 				pteval = ~0UL;
 		} while (dma_npages != 0);
 		dma_sg++;
@@ -534,7 +534,7 @@ int pci_map_sg(struct pci_dev *pdev, struct scatterlist *sglist, int nelems, int
 	base = alloc_streaming_cluster(iommu, npages);
 	if (base == NULL)
 		goto bad;
-	dma_base = iommu->page_table_map_base + ((base - iommu->page_table) << PAGE_SHIFT);
+	dma_base = iommu->page_table_map_base + ((base - iommu->page_table) << IO_PAGE_SHIFT);
 
 	/* Step 3: Normalize DMA addresses. */
 	used = nelems;
@@ -591,16 +591,16 @@ void pci_unmap_sg(struct pci_dev *pdev, struct scatterlist *sglist, int nelems, 
 	iommu = pcp->pbm->iommu;
 	strbuf = &pcp->pbm->stc;
 	
-	bus_addr = sglist->dvma_address & PAGE_MASK;
+	bus_addr = sglist->dvma_address & IO_PAGE_MASK;
 
 	for (i = 1; i < nelems; i++)
 		if (sglist[i].dvma_length == 0)
 			break;
 	i--;
-	npages = (PAGE_ALIGN(sglist[i].dvma_address + sglist[i].dvma_length) - bus_addr) >> PAGE_SHIFT;
+	npages = (IO_PAGE_ALIGN(sglist[i].dvma_address + sglist[i].dvma_length) - bus_addr) >> IO_PAGE_SHIFT;
 
 	base = iommu->page_table +
-		((bus_addr - iommu->page_table_map_base) >> PAGE_SHIFT);
+		((bus_addr - iommu->page_table_map_base) >> IO_PAGE_SHIFT);
 
 #ifdef DEBUG_PCI_IOMMU
 	if (iopte_val(*base) == IOPTE_INVALID)
@@ -629,7 +629,7 @@ void pci_unmap_sg(struct pci_dev *pdev, struct scatterlist *sglist, int nelems, 
 				pci_iommu_write(flushreg, ctx);
 			} while(((long)pci_iommu_read(matchreg)) < 0L);
 		} else {
-			for (i = 0; i < npages; i++, vaddr += PAGE_SIZE)
+			for (i = 0; i < npages; i++, vaddr += IO_PAGE_SIZE)
 				pci_iommu_write(strbuf->strbuf_pflush, vaddr);
 		}
 
@@ -667,9 +667,9 @@ void pci_dma_sync_single(struct pci_dev *pdev, dma_addr_t bus_addr, size_t sz, i
 
 	spin_lock_irqsave(&iommu->lock, flags);
 
-	npages = PAGE_ALIGN(bus_addr + sz) - (bus_addr & PAGE_MASK);
-	npages >>= PAGE_SHIFT;
-	bus_addr &= PAGE_MASK;
+	npages = IO_PAGE_ALIGN(bus_addr + sz) - (bus_addr & IO_PAGE_MASK);
+	npages >>= IO_PAGE_SHIFT;
+	bus_addr &= IO_PAGE_MASK;
 
 	/* Step 1: Record the context, if any. */
 	ctx = 0;
@@ -678,7 +678,7 @@ void pci_dma_sync_single(struct pci_dev *pdev, dma_addr_t bus_addr, size_t sz, i
 		iopte_t *iopte;
 
 		iopte = iommu->page_table +
-			((bus_addr - iommu->page_table_map_base)>>PAGE_SHIFT);
+			((bus_addr - iommu->page_table_map_base)>>IO_PAGE_SHIFT);
 		ctx = (iopte_val(*iopte) & IOPTE_CONTEXT) >> 47UL;
 	}
 
@@ -696,7 +696,7 @@ void pci_dma_sync_single(struct pci_dev *pdev, dma_addr_t bus_addr, size_t sz, i
 	} else {
 		unsigned long i;
 
-		for (i = 0; i < npages; i++, bus_addr += PAGE_SIZE)
+		for (i = 0; i < npages; i++, bus_addr += IO_PAGE_SIZE)
 			pci_iommu_write(strbuf->strbuf_pflush, bus_addr);
 	}
 
@@ -735,7 +735,7 @@ void pci_dma_sync_sg(struct pci_dev *pdev, struct scatterlist *sglist, int nelem
 		iopte_t *iopte;
 
 		iopte = iommu->page_table +
-			((sglist[0].dvma_address - iommu->page_table_map_base) >> PAGE_SHIFT);
+			((sglist[0].dvma_address - iommu->page_table_map_base) >> IO_PAGE_SHIFT);
 		ctx = (iopte_val(*iopte) & IOPTE_CONTEXT) >> 47UL;
 	}
 
@@ -754,14 +754,14 @@ void pci_dma_sync_sg(struct pci_dev *pdev, struct scatterlist *sglist, int nelem
 		unsigned long i, npages;
 		u32 bus_addr;
 
-		bus_addr = sglist[0].dvma_address & PAGE_MASK;
+		bus_addr = sglist[0].dvma_address & IO_PAGE_MASK;
 
 		for(i = 1; i < nelems; i++)
 			if (!sglist[i].dvma_length)
 				break;
 		i--;
-		npages = (PAGE_ALIGN(sglist[i].dvma_address + sglist[i].dvma_length) - bus_addr) >> PAGE_SHIFT;
-		for (i = 0; i < npages; i++, bus_addr += PAGE_SIZE)
+		npages = (IO_PAGE_ALIGN(sglist[i].dvma_address + sglist[i].dvma_length) - bus_addr) >> IO_PAGE_SHIFT;
+		for (i = 0; i < npages; i++, bus_addr += IO_PAGE_SIZE)
 			pci_iommu_write(strbuf->strbuf_pflush, bus_addr);
 	}
 

@@ -24,6 +24,10 @@
 #define PALM_M500_ID			0x0001
 #define PALM_M505_ID			0x0002
 
+#define SONY_VENDOR_ID			0x054C
+#define SONY_CLIE_ID			0x0038
+#define SONY_CLIE_320_ID		0x0066
+
 /****************************************************************************
  * Handspring Visor Vendor specific request codes (bRequest values)
  * A big thank you to Handspring for providing the following information.

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.ppc_asm.h 1.14 07/02/01 22:08:05 paulus
+ * BK Id: SCCS/s.ppc_asm.h 1.16 08/15/01 22:43:06 paulus
  */
 /*
  * arch/ppc/kernel/ppc_asm.h
@@ -70,20 +70,35 @@
 #define REST_32VR(n,b,base)	REST_16VR(n,b,base); REST_16VR(n+16,b,base)
 
 #ifdef CONFIG_PPC601_SYNC_FIX
-#define SYNC \
-	sync; \
-	isync
+#define SYNC				\
+BEGIN_FTR_SECTION			\
+	sync;				\
+	isync;				\
+END_FTR_SECTION_IFSET(CPU_FTR_601)
+#define SYNC_601			\
+BEGIN_FTR_SECTION			\
+	sync;				\
+END_FTR_SECTION_IFSET(CPU_FTR_601)
+#define ISYNC_601			\
+BEGIN_FTR_SECTION			\
+	isync;				\
+END_FTR_SECTION_IFSET(CPU_FTR_601)
 #else
 #define	SYNC
+#define SYNC_601
+#define ISYNC_601
 #endif
 
 #ifndef CONFIG_SMP
 #define TLBSYNC
 #else /* CONFIG_SMP */
+/* tlbsync is not implemented on 601 */
 #define TLBSYNC				\
+BEGIN_FTR_SECTION			\
 	tlbsync;			\
-	sync
-#endif /* CONFIG_SMP */
+	sync;				\
+END_FTR_SECTION_IFCLR(CPU_FTR_601)
+#endif
 
 /*
  * This instruction is not implemented on the PPC 603 or 601; however, on

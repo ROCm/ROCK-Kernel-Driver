@@ -1,4 +1,4 @@
-/* $Id: pcikbd.c,v 1.59 2001/08/13 14:40:08 davem Exp $
+/* $Id: pcikbd.c,v 1.61 2001/08/18 09:40:46 davem Exp $
  * pcikbd.c: Ultra/AX PC keyboard support.
  *
  * Copyright (C) 1997  Eddie C. Dost  (ecd@skynet.be)
@@ -22,6 +22,7 @@
 #include <linux/miscdevice.h>
 #include <linux/kbd_ll.h>
 #include <linux/kbd_kern.h>
+#include <linux/vt_kern.h>
 #include <linux/delay.h>
 #include <linux/spinlock.h>
 #include <linux/smp_lock.h>
@@ -224,6 +225,17 @@ unsigned char pcikbd_sysrq_xlate[128] =
 	"\r\000/";					/* 0x60 - 0x6f */
 #endif
 
+#define DEFAULT_KEYB_REP_DELAY	250
+#define DEFAULT_KEYB_REP_RATE	30	/* cps */
+
+static struct kbd_repeat kbdrate = {
+	DEFAULT_KEYB_REP_DELAY,
+	DEFAULT_KEYB_REP_RATE
+};
+
+static unsigned char parse_kbd_rate(struct kbd_repeat *r);
+static int write_kbd_rate(unsigned char r);
+
 int pcikbd_setkeycode(unsigned int scancode, unsigned int keycode)
 {
 	if(scancode < SC_LIM || scancode > 255 || keycode > 127)
@@ -335,12 +347,7 @@ static void ctrl_break(void)
 		printk("Prom Leave: Enable Keyboard: no ACK\n");
 
 	/* Reset keyboard rate */
-	pcikbd_write(KBD_DATA_REG, KBD_CMD_SET_RATE);
-	if(pcikbd_wait_for_input() != KBD_REPLY_ACK)
-		printk("Prom Leave: Set rate: no ACK\n");
-	pcikbd_write(KBD_DATA_REG, 0x00);
-	if(pcikbd_wait_for_input() != KBD_REPLY_ACK)
-		printk("Prom Leave: Set rate: no ACK\n");
+	write_kbd_rate(parse_kbd_rate(&kbdrate));
 }
 
 int pcikbd_translate(unsigned char scancode, unsigned char *keycode,
@@ -478,8 +485,81 @@ void pcikbd_leds(unsigned char leds)
 		send_data(KBD_CMD_ENABLE);
 }
 
-int pcikbd_rate(struct kbd_repeat *rep)
+static unsigned char parse_kbd_rate(struct kbd_repeat *r)
 {
+	static struct r2v {
+		int rate;
+		unsigned char val;
+	} kbd_rates[]={	{ 5,  0x14 },
+			{ 7,  0x10 },
+			{ 10, 0x0c },
+			{ 15, 0x08 },
+			{ 20, 0x04 },
+			{ 25, 0x02 },
+			{ 30, 0x00 } };
+	static struct d2v {
+		int delay;
+		unsigned char val;
+	} kbd_delays[]={ { 250,  0 },
+			 { 500,  1 },
+			 { 750,  2 },
+			 { 1000, 3 } };
+	int rate = 0, delay = 0;
+
+	if (r != NULL) {
+		int i, new_rate = 30, new_delay = 250;
+		if (r->rate <= 0)
+			r->rate = kbdrate.rate;
+		if (r->delay <= 0)
+			r->delay = kbdrate.delay;
+
+		for (i = 0; i < sizeof(kbd_rates) / sizeof(struct r2v); i++) {
+			if (kbd_rates[i].rate == r->rate) {
+				new_rate = kbd_rates[i].rate;
+				rate = kbd_rates[i].val;
+				break;
+			}
+		}
+		for (i=0; i < sizeof(kbd_delays) / sizeof(struct d2v); i++) {
+			if (kbd_delays[i].delay == r->delay) {
+				new_delay = kbd_delays[i].delay;
+				delay = kbd_delays[i].val;
+				break;
+			}
+		}
+		r->rate = new_rate;
+		r->delay = new_delay;
+	}
+	return (delay << 5) | rate;
+}
+
+static int write_kbd_rate(unsigned char r)
+{
+	if (!send_data(KBD_CMD_SET_RATE) || !send_data(r)) {
+		/* re-enable kbd if any errors */
+		send_data(KBD_CMD_ENABLE);
+		return 0;
+	}
+
+	return 1;
+}
+
+static int pcikbd_rate(struct kbd_repeat *rep)
+{
+	unsigned char r;
+	struct kbd_repeat old_rep;
+
+	if (rep == NULL)
+		return -EINVAL;
+
+	r = parse_kbd_rate(rep);
+	memcpy(&old_rep, &kbdrate, sizeof(struct kbd_repeat));
+	if (write_kbd_rate(r)) {
+		memcpy(&kbdrate,rep,sizeof(struct kbd_repeat));
+		memcpy(rep,&old_rep,sizeof(struct kbd_repeat));
+		return 0;
+	}
+
 	return -EIO;
 }
 
@@ -641,12 +721,7 @@ static char * __init do_pcikbd_init_hw(void)
 	if(pcikbd_wait_for_input() != KBD_REPLY_ACK)
 		return "Enable keyboard: no ACK";
 
-	pcikbd_write(KBD_DATA_REG, KBD_CMD_SET_RATE);
-	if(pcikbd_wait_for_input() != KBD_REPLY_ACK)
-		return "Set rate: no ACK";
-	pcikbd_write(KBD_DATA_REG, 0x00);
-	if(pcikbd_wait_for_input() != KBD_REPLY_ACK)
-		return "Set rate: no ACK";
+	write_kbd_rate(parse_kbd_rate(&kbdrate));
 
 	return NULL; /* success */
 }
@@ -744,6 +819,7 @@ found:
 	}
 
 	kd_mksound = nop_kd_mksound;
+	kbd_rate = pcikbd_rate;
 
 #ifdef __sparc_v9__
 	edev = 0;
