@@ -46,3 +46,6 @@ sa1100_cs-$(CONFIG_SA1100_SIMPAD)		+= sa1100_simpad.o
 sa1100_cs-$(CONFIG_SA1100_STORK)		+= sa1100_stork.o
 sa1100_cs-$(CONFIG_SA1100_TRIZEPS) 		+= sa1100_trizeps.o
 sa1100_cs-$(CONFIG_SA1100_YOPY)			+= sa1100_yopy.o
+
+pxa2xx_cs-$(CONFIG_ARCH_LUBBOCK)		+= pxa2xx_lubbock.o sa1111_generic.o
+
