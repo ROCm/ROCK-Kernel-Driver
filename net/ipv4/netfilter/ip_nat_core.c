@@ -817,7 +817,7 @@ do_bindings(struct ip_conntrack *ct,
 
 		/* Have to grab read lock before sibling_list traversal */
 		READ_LOCK(&ip_conntrack_lock);
-		list_for_each(cur_item, &ct->sibling_list) { 
+		list_for_each_prev(cur_item, &ct->sibling_list) { 
 			exp = list_entry(cur_item, struct ip_conntrack_expect, 
 					 expected_list);
 					 
