@@ -160,7 +160,7 @@ finish_device_tree(void)
 			   match on /chosen.interrupt_controller */
 			if ((name != NULL
 			     && strcmp(name, "interrupt-controller") == 0)
-			    || (ic != NULL && iclen == 0)) {
+			    || (ic != NULL && iclen == 0 && strcmp(name, "AppleKiwi"))) {
 				if (n == 0)
 					dflt_interrupt_controller = np;
 				++n;
@@ -217,7 +217,7 @@ finish_node(struct device_node *np, unsigned long mem_start,
 		ifunc = interpret_macio_props;
 	else if (!strcmp(np->type, "isa"))
 		ifunc = interpret_isa_props;
-	else if (!strcmp(np->name, "uni-n"))
+	else if (!strcmp(np->name, "uni-n") || !strcmp(np->name, "u3"))
 		ifunc = interpret_root_props;
 	else if (!((ifunc == interpret_dbdma_props
 		    || ifunc == interpret_macio_props)
@@ -431,10 +431,21 @@ finish_node_interrupts(struct device_node *np, unsigned long mem_start)
 		 * This doesn't cope with the general case of multiple
 		 * cascaded interrupt controllers, but then neither will
 		 * irq.c at the moment either.  -- paulus
+		 * The G5 triggers that code, I add a machine test. On
+		 * those machines, we want to offset interrupts from the
+		 * second openpic by 128 -- BenH
 		 */
-		if (num_interrupt_controllers > 1 && ic != NULL
+		if (_machine != _MACH_Pmac && num_interrupt_controllers > 1
+		    && ic != NULL
 		    && get_property(ic, "interrupt-parent", NULL) == NULL)
 			offset = 16;
+		else if (_machine == _MACH_Pmac && num_interrupt_controllers > 1
+			 && ic != NULL && ic->parent != NULL) {
+			char *name = get_property(ic->parent, "name", NULL);
+			if (name && !strcmp(name, "u3"))
+				offset = 128;
+		}
+
 		np->intrs[i].line = irq[0] + offset;
 		if (n > 1)
 			np->intrs[i].sense = irq[1];
