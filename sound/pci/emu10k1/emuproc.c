@@ -240,7 +240,7 @@ int __devinit snd_emu10k1_proc_init(emu10k1_t * emu)
 	snd_info_entry_t *entry;
 	
 	if (! snd_card_proc_new(emu->card, "emu10k1", &entry))
-		snd_info_set_text_ops(entry, emu, snd_emu10k1_proc_read);
+		snd_info_set_text_ops(entry, emu, 1024, snd_emu10k1_proc_read);
 
 	if (! snd_card_proc_new(emu->card, "fx8010_gpr", &entry)) {
 		entry->content = SNDRV_INFO_CONTENT_DATA;
