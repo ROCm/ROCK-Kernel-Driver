@@ -410,8 +410,6 @@ static struct kiocb *__aio_get_req(struct kioctx *ctx)
 		req->ki_ctx = ctx;
 		req->ki_users = 1;
 		okay = 1;
-	} else {
-		kmem_cache_free(kiocb_cachep, req);
 	}
 	kunmap_atomic(ring, KM_USER0);
 	spin_unlock_irq(&ctx->ctx_lock);
