@@ -17,7 +17,6 @@
 #include <asm/sections.h>
 #include <asm/segment.h>
 #include <asm/io.h>
-#include <asm/processor.h>
 #include <asm/machdep.h>
 #include <asm/prep_nvram.h>
 
@@ -140,6 +139,3 @@ char __prep *prep_nvram_next_var(char *name)
 		return NULL;
 	}
 }
-
-
-

@@ -32,8 +32,7 @@
  * values for some CPU specific registers. Called with r24
  * containing CPU number and r3 reloc offset
  */
- 	.globl	init_idle_6xx
-init_idle_6xx:
+_GLOBAL(init_idle_6xx)
 BEGIN_FTR_SECTION
 	mfspr	r4,SPRN_HID0
 	rlwinm	r4,r4,0,10,8	/* Clear NAP */
@@ -61,8 +60,7 @@ END_FTR_SECTION_IFSET(CPU_FTR_DUAL_PLL_750FX)
  * split into several functions & changing the function pointer
  * depending on the various features.
  */
-	.globl	ppc6xx_idle
-ppc6xx_idle:
+_GLOBAL(ppc6xx_idle)
 	/* Check if we can nap or doze, put HID0 mask in r3
 	 */
 	lis	r3, 0
@@ -173,8 +171,7 @@ END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
  * we are called with DR/IR still off and r2 containing physical
  * address of current.
  */
- 	.globl power_save_6xx_restore
-power_save_6xx_restore:
+_GLOBAL(power_save_6xx_restore)
 	mfspr	r11,SPRN_HID0
 	rlwinm.	r11,r11,0,10,8	/* Clear NAP & copy NAP bit !state to cr1 EQ */
 	cror	4*cr1+eq,4*cr0+eq,4*cr0+eq
@@ -217,26 +214,20 @@ END_FTR_SECTION_IFSET(CPU_FTR_DUAL_PLL_750FX)
 
 	.data
 
-	.globl nap_save_msscr0
-nap_save_msscr0:
+_GLOBAL(nap_save_msscr0)
 	.space	4*NR_CPUS
 
-	.globl nap_save_hid1
-nap_save_hid1:
+_GLOBAL(nap_save_hid1)
 	.space	4*NR_CPUS
 
-	.globl powersave_nap
-powersave_nap:
+_GLOBAL(powersave_nap)
 	.long	0
-	.globl powersave_lowspeed
-powersave_lowspeed:
+_GLOBAL(powersave_lowspeed)
 	.long	0
 
 #ifdef DEBUG
-	.globl nap_enter_count
-nap_enter_count:
+_GLOBAL(nap_enter_count)
 	.space	4
-	.globl nap_return_count
-nap_return_count:
+_GLOBAL(nap_return_count)
 	.space	4
 #endif

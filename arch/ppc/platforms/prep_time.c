@@ -24,7 +24,6 @@
 #include <asm/sections.h>
 #include <asm/segment.h>
 #include <asm/io.h>
-#include <asm/processor.h>
 #include <asm/machdep.h>
 #include <asm/prep_nvram.h>
 #include <asm/mk48t59.h>

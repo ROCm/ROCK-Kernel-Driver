@@ -5,14 +5,13 @@
 #ifndef _PPC_HW_IRQ_H
 #define _PPC_HW_IRQ_H
 
+#include <asm/ptrace.h>
+#include <asm/reg.h>
+
 extern void timer_interrupt(struct pt_regs *);
 extern void ppc_irq_dispatch_handler(struct pt_regs *regs, int irq);
 
 #define INLINE_IRQS
-
-#define mfmsr()		({unsigned int rval; \
-			asm volatile("mfmsr %0" : "=r" (rval)); rval;})
-#define mtmsr(v)	asm volatile("mtmsr %0" : : "r" (v))
 
 #define irqs_disabled()	((mfmsr() & MSR_EE) == 0)
 

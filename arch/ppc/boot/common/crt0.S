@@ -70,7 +70,7 @@ __start:
 	## Set up the stack
 
 	lis	r9,_start@h		# r9 = &_start (text section entry)
-	addi	r9,r9,_start@l
+	ori	r9,r9,_start@l
 	subi	r1,r9,64		# Start the stack 64 bytes below _start
 	clrrwi	r1,r1,4			# Make sure it is aligned on 16 bytes.
 	li	r0,0

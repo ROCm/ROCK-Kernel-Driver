@@ -19,7 +19,6 @@
 #include <asm/sections.h>
 #include <asm/prom.h>
 #include <asm/page.h>
-#include <asm/processor.h>
 #include <asm/irq.h>
 #include <asm/io.h>
 #include <asm/smp.h>
