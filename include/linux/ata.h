@@ -209,8 +209,8 @@ struct ata_taskfile {
 #define ata_id_has_lba48(dev)	((dev)->id[83] & (1 << 10))
 #define ata_id_has_wcache(dev)	((dev)->id[82] & (1 << 5))
 #define ata_id_has_pm(dev)	((dev)->id[82] & (1 << 3))
-#define ata_id_has_lba(dev)	((dev)->id[49] & (1 << 8))
-#define ata_id_has_dma(dev)	((dev)->id[49] & (1 << 9))
+#define ata_id_has_lba(dev)	((dev)->id[49] & (1 << 9))
+#define ata_id_has_dma(dev)	((dev)->id[49] & (1 << 8))
 #define ata_id_removeable(dev)	((dev)->id[0] & (1 << 7))
 #define ata_id_u32(dev,n)	\
 	(((u32) (dev)->id[(n) + 1] << 16) | ((u32) (dev)->id[(n)]))
