@@ -279,7 +279,6 @@ define rule_link_vmlinux
 	mv -f .tmpversion .version
 	+$(MAKE) -C init
 	$(call cmd,link_vmlinux)
-	$(cmd_link_vmlinux)
 	echo 'cmd_$@ := $(cmd_link_vmlinux)' > $(@D)/.$(@F).cmd
 	$(NM) vmlinux | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > System.map
 endef
