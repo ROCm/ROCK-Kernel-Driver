@@ -1345,6 +1345,13 @@ int expand_stack(struct vm_area_struct * vma, unsigned long address)
 	 */
 	address += 4 + PAGE_SIZE - 1;
 	address &= PAGE_MASK;
+
+	/* already expanded while waiting for anon_vma lock? */
+	if (vma->vm_start >= address) {
+		anon_vma_unlock(vma);
+		return 0;
+	}
+
 	grow = (address - vma->vm_end) >> PAGE_SHIFT;
 
 	/* Overcommit.. */
@@ -1400,6 +1407,12 @@ int expand_stack(struct vm_area_struct *vma, unsigned long address)
 	if (unlikely(anon_vma_prepare(vma)))
 		return -ENOMEM;
 	anon_vma_lock(vma);
+
+	/* already expanded while waiting for anon_vma lock? */
+	if (vma->vm_start <= address) {
+		anon_vma_unlock(vma);
+		return 0;
+	}
 
 	/*
 	 * vma->vm_start/vm_end cannot change under us because the caller
