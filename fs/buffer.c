@@ -428,8 +428,7 @@ int inode_has_buffers(struct inode *inode)
 	int ret;
 	
 	spin_lock(&inode->i_bufferlist_lock);
-	ret = !list_empty(&inode->i_dirty_buffers) ||
-			!list_empty(&inode->i_dirty_data_buffers);
+	ret = !list_empty(&inode->i_dirty_buffers);
 	spin_unlock(&inode->i_bufferlist_lock);
 	
 	return ret;
@@ -694,9 +693,6 @@ void invalidate_inode_buffers(struct inode *inode)
 	while ((entry = inode->i_dirty_buffers.next) !=
 				&inode->i_dirty_buffers)
 		__remove_inode_queue(BH_ENTRY(entry));
-	while ((entry = inode->i_dirty_data_buffers.next) !=
-				&inode->i_dirty_data_buffers)
-		__remove_inode_queue(BH_ENTRY(entry));
 	spin_unlock(&inode->i_bufferlist_lock);
 }
 
@@ -954,10 +950,6 @@ __getblk(struct block_device *bdev, sector_t block, int size)
  * block_read_full_page() against that page will discover all the uptodate
  * buffers, will set the page uptodate and will perform no I/O.
  */
-static inline void __mark_dirty(struct buffer_head *bh)
-{
-	__set_page_dirty_nobuffers(bh->b_page);
-}
 
 /**
  * mark_buffer_dirty - mark a buffer_head as needing writeout
@@ -973,7 +965,7 @@ static inline void __mark_dirty(struct buffer_head *bh)
 void mark_buffer_dirty(struct buffer_head *bh)
 {
 	if (!atomic_set_buffer_dirty(bh))
-		__mark_dirty(bh);
+		__set_page_dirty_nobuffers(bh->b_page);
 }
 
 /*
@@ -1498,10 +1490,7 @@ static int __block_commit_write(struct inode *inode, struct page *page,
 				partial = 1;
 		} else {
 			mark_buffer_uptodate(bh, 1);
-			if (!atomic_set_buffer_dirty(bh)) {
-				__mark_dirty(bh);
-				buffer_insert_inode_data_queue(bh, inode);
-			}
+			mark_buffer_dirty(bh);
 		}
 	}
 

@@ -1163,8 +1163,10 @@ int txCommit(tid_t tid,		/* transaction identifier */
 		 * committing transactions and use i_sem instead.
 		 */
 		if ((!S_ISDIR(ip->i_mode))
-		    && (tblk->flag & COMMIT_DELETE) == 0)
-			fsync_inode_data_buffers(ip);
+		    && (tblk->flag & COMMIT_DELETE) == 0) {
+			filemap_fdatasync(ip->i_mapping);
+			filemap_fdatawait(ip->i_mapping);
+		}
 
 		/*
 		 * Mark inode as not dirty.  It will still be on the dirty

@@ -435,7 +435,6 @@ struct inode {
 	struct list_head	i_dentry;
 
 	struct list_head	i_dirty_buffers;   /* uses i_bufferlist_lock */
-	struct list_head	i_dirty_data_buffers;
 	spinlock_t		i_bufferlist_lock;
 
 	unsigned long		i_ino;
@@ -1266,13 +1265,6 @@ buffer_insert_inode_queue(struct buffer_head *bh, struct inode *inode)
 			bh, &inode->i_dirty_buffers);
 }
 
-static inline void
-buffer_insert_inode_data_queue(struct buffer_head *bh, struct inode *inode)
-{
-	buffer_insert_list(&inode->i_bufferlist_lock,
-			bh, &inode->i_dirty_data_buffers);
-}
-
 #define atomic_set_buffer_dirty(bh) test_and_set_bit(BH_Dirty, &(bh)->b_state)
 
 static inline void mark_buffer_async(struct buffer_head * bh, int on)
@@ -1340,11 +1332,6 @@ static inline int fsync_inode_buffers(struct inode *inode)
 {
 	return fsync_buffers_list(&inode->i_bufferlist_lock,
 				&inode->i_dirty_buffers);
-}
-static inline int fsync_inode_data_buffers(struct inode *inode)
-{
-	return fsync_buffers_list(&inode->i_bufferlist_lock,
-				&inode->i_dirty_data_buffers);
 }
 extern int inode_has_buffers(struct inode *);
 extern int filemap_fdatasync(struct address_space *);

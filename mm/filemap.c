@@ -1084,8 +1084,6 @@ static ssize_t generic_file_direct_IO(int rw, struct file * filp, char * buf, si
 	 */
 	retval = filemap_fdatasync(mapping);
 	if (retval == 0)
-		retval = fsync_inode_data_buffers(inode);
-	if (retval == 0)
 		retval = filemap_fdatawait(mapping);
 	if (retval < 0)
 		goto out_free;

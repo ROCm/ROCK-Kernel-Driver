@@ -325,7 +325,8 @@ int dbSync(struct inode *ipbmap)
 	/*
 	 * write out dirty pages of bmap
 	 */
-	fsync_inode_data_buffers(ipbmap);
+	filemap_fdatasync(ipbmap->i_mapping);
+	filemap_fdatawait(ipbmap->i_mapping);
 
 	ipbmap->i_state |= I_DIRTY;
 	diWriteSpecial(ipbmap);
