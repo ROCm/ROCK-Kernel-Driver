@@ -553,6 +553,7 @@ struct sa1111_dev {
 	void		*mapbase;
 	unsigned int	skpcr_mask;
 	unsigned int	irq[6];
+	u64		dma_mask;
 };
 
 #define SA1111_DEV(_d)	container_of((_d), struct sa1111_dev, dev)
