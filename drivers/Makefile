@@ -9,43 +9,43 @@
 mod-subdirs :=	dio mtd sbus video macintosh usb input telephony sgi ide \
 		message scsi md ieee1394 pnp isdn atm \
 		fc4 i2c acpi bluetooth input/serio \
-		input/gameport parport hotplug
+		input/gameport parport hotplug \
+		base char block misc net media cdrom
 
-subdir-y :=	base char block net misc media cdrom
-subdir-m :=	$(subdir-y)
-
-subdir-$(CONFIG_PARPORT)	+= parport
-subdir-$(CONFIG_HOTPLUG_PCI)	+= hotplug
-subdir-$(CONFIG_DIO)		+= dio
-subdir-$(CONFIG_PCI)		+= pci
-subdir-$(CONFIG_PCMCIA)		+= pcmcia
-subdir-$(CONFIG_MTD)		+= mtd
-subdir-$(CONFIG_SBUS)		+= sbus
-subdir-$(CONFIG_ZORRO)		+= zorro
-subdir-$(CONFIG_NUBUS)		+= nubus
-subdir-$(CONFIG_TC)		+= tc
-subdir-$(CONFIG_VT)		+= video
-subdir-$(CONFIG_MAC)		+= macintosh
-subdir-$(CONFIG_ALL_PPC)	+= macintosh
-subdir-$(CONFIG_USB)		+= usb
-subdir-$(CONFIG_INPUT)		+= input
-subdir-$(CONFIG_SERIO)		+= input/serio
-subdir-$(CONFIG_GAMEPORT)	+= input/gameport
-subdir-$(CONFIG_PHONE)		+= telephony
-subdir-$(CONFIG_SGI)		+= sgi
-subdir-$(CONFIG_IDE)		+= ide
-subdir-$(CONFIG_SCSI)		+= scsi
-subdir-$(CONFIG_I2O)		+= message
-subdir-$(CONFIG_FUSION)		+= message
-subdir-$(CONFIG_MD)		+= md
-subdir-$(CONFIG_IEEE1394)	+= ieee1394
-subdir-$(CONFIG_PNP)		+= pnp
-subdir-$(CONFIG_ISDN)		+= isdn
-subdir-$(CONFIG_ATM)		+= atm
-subdir-$(CONFIG_FC4)		+= fc4
-subdir-$(CONFIG_I2C)		+= i2c
-subdir-$(CONFIG_ACPI)		+= acpi
-
-subdir-$(CONFIG_BLUEZ)		+= bluetooth
+obj-$(CONFIG_PCI)		+= pci/
+obj-$(CONFIG_ACPI)		+= acpi/
+obj-$(CONFIG_PARPORT)		+= parport/
+obj-y 				+= base/ char/ block/ misc/ net/ media/
+obj-$(CONFIG_NUBUS)		+= nubus/
+obj-$(CONFIG_ATM)		+= atm/
+obj-$(CONFIG_IDE)		+= ide/
+obj-$(CONFIG_FC4)		+= fc4/
+obj-$(CONFIG_SCSI)		+= scsi/
+obj-$(CONFIG_FUSION)		+= message/
+obj-$(CONFIG_IEEE1394)		+= ieee1394/
+obj-y				+= cdrom/
+obj-$(CONFIG_MTD)		+= mtd/
+obj-$(CONFIG_PCMCIA)		+= pcmcia/
+obj-$(CONFIG_DIO)		+= dio/
+obj-$(CONFIG_SBUS)		+= sbus/
+obj-$(CONFIG_ZORRO)		+= zorro/
+obj-$(CONFIG_ALL_PPC)		+= macintosh/
+obj-$(CONFIG_MAC)		+= macintosh/
+obj-$(CONFIG_PNP)		+= pnp/
+obj-$(CONFIG_SGI)		+= sgi/
+obj-$(CONFIG_VT)		+= video/
+obj-$(CONFIG_PARIDE) 		+= block/paride/
+obj-$(CONFIG_TC)		+= tc/
+obj-$(CONFIG_USB)		+= usb/
+obj-$(CONFIG_INPUT)		+= input/
+obj-$(CONFIG_GAMEPORT)		+= input/gameport/
+obj-$(CONFIG_SERIO)		+= input/serio/
+obj-$(CONFIG_I2O)		+= message/
+obj-$(CONFIG_I2C)		+= i2c/
+obj-$(CONFIG_PHONE)		+= telephony/
+obj-$(CONFIG_MD)		+= md/
+obj-$(CONFIG_BLUEZ)		+= bluetooth/
+obj-$(CONFIG_HOTPLUG_PCI)	+= hotplug/
+obj-$(CONFIG_ISDN)		+= isdn/
 
 include $(TOPDIR)/Rules.make

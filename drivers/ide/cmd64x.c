@@ -1099,6 +1099,7 @@ static struct ata_pci_device chipsets[] __initdata = {
 		init_chipset: cmd64x_init_chipset,
 		init_channel: cmd64x_init_channel,
 		bootable: ON_BOARD,
+		flags: ATA_F_SIMPLEX,
 	},
 	{
 		vendor: PCI_VENDOR_ID_CMD,

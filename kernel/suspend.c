@@ -49,7 +49,6 @@
 #include <linux/file.h>
 #include <linux/utsname.h>
 #include <linux/version.h>
-#include <linux/compile.h>
 #include <linux/delay.h>
 #include <linux/reboot.h>
 #include <linux/init.h>

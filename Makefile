@@ -110,56 +110,8 @@ NETWORKS	=net/network.o
 LIBS		=$(TOPDIR)/lib/lib.a
 SUBDIRS		=init kernel lib drivers mm fs net ipc sound
 
-DRIVERS-n :=
-DRIVERS-y :=
-DRIVERS-m :=
-DRIVERS-  :=
-
-DRIVERS-$(CONFIG_PCI) += drivers/pci/driver.o
-DRIVERS-$(CONFIG_ACPI) += drivers/acpi/acpi.o
-DRIVERS-$(CONFIG_PARPORT) += drivers/parport/driver.o
-DRIVERS-y += drivers/base/base.o \
-	drivers/char/char.o \
-	drivers/block/block.o \
-	drivers/misc/misc.o \
-	drivers/net/net.o \
-	drivers/media/media.o
-DRIVERS-$(CONFIG_NUBUS) += drivers/nubus/built-in.o
-DRIVERS-$(CONFIG_ATM) += drivers/atm/atm.o
-DRIVERS-$(CONFIG_IDE) += drivers/ide/idedriver.o
-DRIVERS-$(CONFIG_FC4) += drivers/fc4/built-in.o
-DRIVERS-$(CONFIG_SCSI) += drivers/scsi/scsidrv.o
-DRIVERS-$(CONFIG_FUSION) += drivers/message/message.o
-DRIVERS-$(CONFIG_IEEE1394) += drivers/ieee1394/ieee1394drv.o
-
-ifneq ($(CONFIG_CD_NO_IDESCSI)$(CONFIG_BLK_DEV_IDECD)$(CONFIG_BLK_DEV_SR)$(CONFIG_PARIDE_PCD),)
-DRIVERS-y += drivers/cdrom/driver.o
-endif
-
+DRIVERS-y 	= drivers/built-in.o
 DRIVERS-$(CONFIG_SOUND) += sound/sound.o
-DRIVERS-$(CONFIG_MTD) += drivers/mtd/mtdlink.o
-DRIVERS-$(CONFIG_PCMCIA) += drivers/pcmcia/pcmcia.o
-DRIVERS-$(CONFIG_DIO) += drivers/dio/built-in.o
-DRIVERS-$(CONFIG_SBUS) += drivers/sbus/sbus_all.o
-DRIVERS-$(CONFIG_ZORRO) += drivers/zorro/driver.o
-DRIVERS-$(CONFIG_ALL_PPC) += drivers/macintosh/macintosh.o
-DRIVERS-$(CONFIG_MAC) += drivers/macintosh/macintosh.o
-DRIVERS-$(CONFIG_PNP) += drivers/pnp/pnp.o
-DRIVERS-$(CONFIG_SGI_IP22) += drivers/sgi/built-in.o
-DRIVERS-$(CONFIG_VT) += drivers/video/video.o
-DRIVERS-$(CONFIG_PARIDE) += drivers/block/paride/built-in.o
-DRIVERS-$(CONFIG_TC) += drivers/tc/built-in.o
-DRIVERS-$(CONFIG_USB) += drivers/usb/usbdrv.o
-DRIVERS-$(CONFIG_INPUT) += drivers/input/inputdrv.o
-DRIVERS-$(CONFIG_GAMEPORT) += drivers/input/gameport/gamedrv.o
-DRIVERS-$(CONFIG_SERIO) += drivers/input/serio/seriodrv.o
-DRIVERS-$(CONFIG_I2O) += drivers/message/message.o
-DRIVERS-$(CONFIG_I2C) += drivers/i2c/i2c.o
-DRIVERS-$(CONFIG_PHONE) += drivers/telephony/telephony.o
-DRIVERS-$(CONFIG_MD) += drivers/md/mddev.o
-DRIVERS-$(CONFIG_BLUEZ) += drivers/bluetooth/bluetooth.o
-DRIVERS-$(CONFIG_HOTPLUG_PCI) += drivers/hotplug/vmlinux-obj.o
-DRIVERS-$(CONFIG_ISDN) += drivers/isdn/vmlinux-obj.o
 
 DRIVERS := $(DRIVERS-y)
 
@@ -219,8 +171,23 @@ $(sort $(vmlinux-objs)): $(SUBDIRS) ;
 
 # 	Handle descending into subdirectories listed in $(SUBDIRS)
 
+.PHONY: $(SUBDIRS)
 $(SUBDIRS): FORCE include/linux/version.h include/config/MARKER
 	@$(MAKE) -C $@
+
+# Single targets
+# ---------------------------------------------------------------------------
+
+%.s: %.c FORCE
+	@$(MAKE) -C $(@D) $(@F)
+%.i: %.c FORCE
+	@$(MAKE) -C $(@D) $(@F)
+%.o: %.c FORCE
+	@$(MAKE) -C $(@D) $(@F)
+%.s: %.S FORCE
+	@$(MAKE) -C $(@D) $(@F)
+%.o: %.S FORCE
+	@$(MAKE) -C $(@D) $(@F)
 
 # Configuration
 # ---------------------------------------------------------------------------
@@ -262,6 +229,11 @@ include/linux/version.h: ./Makefile
 	@echo Generating $@
 	@. scripts/mkversion_h $@ $(KERNELRELEASE) $(VERSION) $(PATCHLEVEL) $(SUBLEVEL)
 
+# helpers built in scripts/
+
+scripts/mkdep scripts/split-include : FORCE
+	@$(MAKE) -C scripts
+
 # ---------------------------------------------------------------------------
 # Generate dependencies
 
@@ -269,10 +241,33 @@ depend dep: dep-files
 
 dep-files: scripts/mkdep archdep include/linux/version.h
 	scripts/mkdep -- `find $(FINDHPATH) -name SCCS -prune -o -follow -name \*.h ! -name modversions.h -print` > .hdepend
-	$(MAKE) $(patsubst %,_sfdep_%,$(SUBDIRS)) _FASTDEP_ALL_SUB_DIRS="$(SUBDIRS)"
+	@$(MAKE) $(patsubst %,_sfdep_%,$(SUBDIRS))
 ifdef CONFIG_MODVERSIONS
 	$(MAKE) update-modverfile
 endif
+
+.PHONY: $(patsubst %,_sfdep_%,$(SUBDIRS))
+$(patsubst %,_sfdep_%,$(SUBDIRS)): FORCE
+	@$(MAKE) -C $(patsubst _sfdep_%, %, $@) fastdep
+
+# update modversions.h, but only if it would change
+update-modverfile:
+	@(echo "#ifndef _LINUX_MODVERSIONS_H";\
+	  echo "#define _LINUX_MODVERSIONS_H"; \
+	  echo "#include <linux/modsetver.h>"; \
+	  cd $(TOPDIR)/include/linux/modules; \
+	  for f in *.ver; do \
+	    if [ -f $$f ]; then echo "#include <linux/modules/$${f}>"; fi; \
+	  done; \
+	  echo "#endif"; \
+	) > $(TOPDIR)/include/linux/modversions.h.tmp
+	@if [ -r $(TOPDIR)/include/linux/modversions.h ] && cmp -s $(TOPDIR)/include/linux/modversions.h $(TOPDIR)/include/linux/modversions.h.tmp; then \
+		echo $(TOPDIR)/include/linux/modversions.h was not updated; \
+		rm -f $(TOPDIR)/include/linux/modversions.h.tmp; \
+	else \
+		echo $(TOPDIR)/include/linux/modversions.h was updated; \
+		mv -f $(TOPDIR)/include/linux/modversions.h.tmp $(TOPDIR)/include/linux/modversions.h; \
+	fi
 
 # ---------------------------------------------------------------------------
 # Modules
@@ -336,19 +331,6 @@ modules modules_install: FORCE
 	@exit 1
 
 endif # CONFIG_MODULES
-
-# ---------------------------------------------------------------------------
-
-include Rules.make
-
-# Build helpers in scripts/
-# FIXME: do that in scripts/Makefile?
-
-scripts/mkdep: scripts/mkdep.c
-	$(HOSTCC) $(HOSTCFLAGS) -o scripts/mkdep scripts/mkdep.c
-
-scripts/split-include: scripts/split-include.c
-	$(HOSTCC) $(HOSTCFLAGS) -o scripts/split-include scripts/split-include.c
 
 # Cleaning up
 # ---------------------------------------------------------------------------
@@ -507,3 +489,4 @@ if_changed_rule = $(if $(strip $? \
 			       $(filter-out $(cmd_$(@F)),$(cmd_$(1)))),\
 	               @$(rule_$(1)))
 
+FORCE:

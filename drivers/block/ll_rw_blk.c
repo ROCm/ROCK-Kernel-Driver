@@ -50,13 +50,7 @@ extern int mac_floppy_init(void);
 static kmem_cache_t *request_cachep;
 
 static struct list_head blk_plug_list;
-static spinlock_t blk_plug_lock = SPIN_LOCK_UNLOCKED;
-
-/*
- * The "disk" task queue is used to start the actual requests
- * after a plug
- */
-DECLARE_TASK_QUEUE(tq_disk);
+static spinlock_t blk_plug_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 
 /* blk_dev_struct is:
  *	request_queue
@@ -794,12 +788,11 @@ void blk_plug_device(request_queue_t *q)
 	if (!elv_queue_empty(q))
 		return;
 
-	if (test_and_set_bit(QUEUE_FLAG_PLUGGED, &q->queue_flags))
-		return;
-
-	spin_lock(&blk_plug_lock);
-	list_add_tail(&q->plug.list, &blk_plug_list);
-	spin_unlock(&blk_plug_lock);
+	if (!test_and_set_bit(QUEUE_FLAG_PLUGGED, &q->queue_flags)) {
+		spin_lock(&blk_plug_lock);
+		list_add_tail(&q->plug_list, &blk_plug_list);
+		spin_unlock(&blk_plug_lock);
+	}
 }
 
 /*
@@ -813,10 +806,8 @@ static inline void __generic_unplug_device(request_queue_t *q)
 	if (!__test_and_clear_bit(QUEUE_FLAG_PLUGGED, &q->queue_flags))
 		return;
 
-	if (test_bit(QUEUE_FLAG_STOPPED, &q->queue_flags)) {
-		printk("queue was stopped\n");
+	if (test_bit(QUEUE_FLAG_STOPPED, &q->queue_flags))
 		return;
-	}
 
 	/*
 	 * was plugged, fire request_fn if queue has stuff to do
@@ -834,22 +825,12 @@ static inline void __generic_unplug_device(request_queue_t *q)
  *   the device have at them. If a queue is plugged, the I/O scheduler
  *   is still adding and merging requests on the queue. Once the queue
  *   gets unplugged (either by manually calling this function, or by
- *   running the tq_disk task queue), the request_fn defined for the
+ *   calling blk_run_queues()), the request_fn defined for the
  *   queue is invoked and transfers started.
  **/
 void generic_unplug_device(void *data)
 {
 	request_queue_t *q = data;
-
-	tasklet_schedule(&q->plug.task);
-}
-
-/*
- * the plug tasklet
- */
-static void blk_task_run(unsigned long data)
-{
-	request_queue_t *q = (request_queue_t *) data;
 	unsigned long flags;
 
 	spin_lock_irqsave(q->queue_lock, flags);
@@ -858,23 +839,26 @@ static void blk_task_run(unsigned long data)
 }
 
 /*
- * clear top flag and schedule tasklet for execution
+ * clear stop flag and run queue
  */
 void blk_start_queue(request_queue_t *q)
 {
-	if (test_and_clear_bit(QUEUE_FLAG_STOPPED, &q->queue_flags))
-		tasklet_enable(&q->plug.task);
+	if (test_and_clear_bit(QUEUE_FLAG_STOPPED, &q->queue_flags)) {
+		unsigned long flags;
 
-	tasklet_schedule(&q->plug.task);
+		spin_lock_irqsave(q->queue_lock, flags);
+		if (!elv_queue_empty(q))
+			q->request_fn(q);
+		spin_unlock_irqrestore(q->queue_lock, flags);
+	}
 }
 
 /*
- * set stop bit and disable any pending tasklet
+ * set stop bit, queue won't be run until blk_start_queue() is called
  */
 void blk_stop_queue(request_queue_t *q)
 {
-	if (!test_and_set_bit(QUEUE_FLAG_STOPPED, &q->queue_flags))
-		tasklet_disable(&q->plug.task);
+	set_bit(QUEUE_FLAG_STOPPED, &q->queue_flags);
 }
 
 /*
@@ -882,22 +866,44 @@ void blk_stop_queue(request_queue_t *q)
  */
 void blk_run_queues(void)
 {
-	struct list_head *tmp, *n;
+	struct list_head *n, *tmp, local_plug_list;
 	unsigned long flags;
 
+	INIT_LIST_HEAD(&local_plug_list);
+
 	/*
-	 * we could splice to the stack prior to running
+	 * this will happen fairly often
 	 */
 	spin_lock_irqsave(&blk_plug_lock, flags);
-	list_for_each_safe(tmp, n, &blk_plug_list) {
-		request_queue_t *q = list_entry(tmp, request_queue_t,plug.list);
+	if (list_empty(&blk_plug_list)) {
+		spin_unlock_irqrestore(&blk_plug_lock, flags);
+		return;
+	}
+
+	list_splice(&blk_plug_list, &local_plug_list);
+	INIT_LIST_HEAD(&blk_plug_list);
+	spin_unlock_irqrestore(&blk_plug_lock, flags);
+
+	/*
+	 * local_plug_list is now a private copy we can traverse lockless
+	 */
+	list_for_each_safe(n, tmp, &local_plug_list) {
+		request_queue_t *q = list_entry(n, request_queue_t, plug_list);
 
 		if (!test_bit(QUEUE_FLAG_STOPPED, &q->queue_flags)) {
-			list_del(&q->plug.list);
-			tasklet_schedule(&q->plug.task);
+			list_del(&q->plug_list);
+			generic_unplug_device(q);
 		}
 	}
-	spin_unlock_irqrestore(&blk_plug_lock, flags);
+
+	/*
+	 * add any remaining queue back to plug list
+	 */
+	if (!list_empty(&local_plug_list)) {
+		spin_lock_irqsave(&blk_plug_lock, flags);
+		list_splice(&local_plug_list, &blk_plug_list);
+		spin_unlock_irqrestore(&blk_plug_lock, flags);
+	}
 }
 
 static int __blk_cleanup_queue(struct request_list *list)
@@ -1050,8 +1056,7 @@ int blk_init_queue(request_queue_t *q, request_fn_proc *rfn, spinlock_t *lock)
 	blk_queue_max_hw_segments(q, MAX_HW_SEGMENTS);
 	blk_queue_max_phys_segments(q, MAX_PHYS_SEGMENTS);
 
-	INIT_LIST_HEAD(&q->plug.list);
-	tasklet_init(&q->plug.task, blk_task_run, (unsigned long) q);
+	INIT_LIST_HEAD(&q->plug_list);
 
 	return 0;
 }

@@ -6,9 +6,8 @@ SH = $(CONFIG_SHELL)
 
 EXTRA_AFLAGS := -ansi
 
-all: kernel.o head.o init_task.o
-
-O_TARGET := kernel.o
+O_TARGET	:= kernel.o
+EXTRA_TARGETS	:= head.o init_task.o
 
 export-objs	:= sparc64_ksyms.o
 obj-y		:= process.o setup.o cpu.o idprom.o \
@@ -32,10 +31,6 @@ else
   endif
 endif
 
-head.o: head.S ttable.S itlb_base.S dtlb_base.S dtlb_backend.S dtlb_prot.S \
-	etrap.S rtrap.S winfixup.S entry.S
-	$(CC) $(AFLAGS) -ansi -c $*.S -o $*.o
-
 #
 # This is just to get the dependencies...
 #
@@ -48,3 +43,6 @@ else
 endif
 
 include $(TOPDIR)/Rules.make
+
+head.o: head.S ttable.S itlb_base.S dtlb_base.S dtlb_backend.S dtlb_prot.S \
+	etrap.S rtrap.S winfixup.S entry.S

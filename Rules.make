@@ -2,30 +2,6 @@
 # This file contains rules which are shared between multiple Makefiles.
 #
 
-#
-# Special variables which should not be exported
-#
-unexport EXTRA_AFLAGS
-unexport EXTRA_CFLAGS
-unexport EXTRA_LDFLAGS
-unexport EXTRA_ARFLAGS
-unexport SUBDIRS
-unexport SUB_DIRS
-unexport ALL_SUB_DIRS
-unexport MOD_SUB_DIRS
-unexport O_TARGET
-
-unexport obj-y
-unexport obj-m
-unexport obj-n
-unexport obj-
-unexport export-objs
-unexport subdir-y
-unexport subdir-m
-unexport subdir-n
-unexport subdir-
-unexport mod-subdirs
-
 # Some standard vars
 
 comma   := ,
@@ -76,7 +52,7 @@ obj-m		:= $(filter-out %/, $(obj-m))
 # add it to $(subdir-m)
 
 both-m          := $(filter $(mod-subdirs), $(subdir-y))
-SUB_DIRS	:= $(subdir-y)
+SUB_DIRS	:= $(subdir-y) $(if $(BUILD_MODULES),$(subdir-m))
 MOD_SUB_DIRS	:= $(sort $(subdir-m) $(both-m))
 ALL_SUB_DIRS	:= $(sort $(subdir-y) $(subdir-m) $(subdir-n) $(subdir-))
 
@@ -107,14 +83,14 @@ multi-objs-m := $(foreach m, $(multi-used-m), $($(m:.o=-objs)))
 subdir-obj-y := $(foreach o,$(obj-y),$(if $(filter-out $(o),$(notdir $(o))),$(o)))
 
 # Replace multi-part objects by their individual parts, look at local dir only
-real-objs-y := $(foreach m, $(filter-out $(subdir-obj-y), $(obj-y)), $(if $($(m:.o=-objs)),$($(m:.o=-objs)),$(m)))
+real-objs-y := $(foreach m, $(filter-out $(subdir-obj-y), $(obj-y)), $(if $($(m:.o=-objs)),$($(m:.o=-objs)),$(m))) $(EXTRA_TARGETS)
 real-objs-m := $(foreach m, $(obj-m), $(if $($(m:.o=-objs)),$($(m:.o=-objs)),$(m)))
 
 # ==========================================================================
 #
 # Get things started.
 #
-first_rule: all_targets
+first_rule: vmlinux $(if $(BUILD_MODULES),$(obj-m))
 
 #
 # Common rules
@@ -135,16 +111,18 @@ $(real-objs-m)      : modkern_cflags := $(CFLAGS_MODULE)
 $(real-objs-m:.o=.i): modkern_cflags := $(CFLAGS_MODULE)
 $(real-objs-m:.o=.s): modkern_cflags := $(CFLAGS_MODULE)
 
-$(export-objs)      : export_flags := $(EXPORT_FLAGS)
+$(export-objs)      : export_flags   := $(EXPORT_FLAGS)
+$(export-objs:.o=.i): export_flags   := $(EXPORT_FLAGS)
+$(export-objs:.o=.s): export_flags   := $(EXPORT_FLAGS)
 
 c_flags = $(CFLAGS) $(modkern_cflags) $(EXTRA_CFLAGS) $(CFLAGS_$(*F).o) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) $(export_flags)
 
-cmd_cc_s_c = $(CC) $(c_flags) -S $< -o $@
+cmd_cc_s_c = $(CC) $(c_flags) -S -o $@ $< 
 
 %.s: %.c FORCE
 	$(call if_changed,cmd_cc_s_c)
 
-cmd_cc_i_c = $(CPP) $(c_flags) $< > $@
+cmd_cc_i_c = $(CPP) $(c_flags)   -o $@ $<
 
 %.i: %.c FORCE
 	$(call if_changed,cmd_cc_i_c)
@@ -168,7 +146,7 @@ $(real-objs-m:.o=.s): modkern_aflags := $(AFLAGS_MODULE)
 
 a_flags = $(AFLAGS) $(modkern_aflags) $(EXTRA_AFLAGS) $(AFLAGS_$(*F).o)
 
-cmd_as_s_S = $(CPP) $(a_flags) $< > $@
+cmd_as_s_S = $(CPP) $(a_flags)   -o $@ $< 
 
 %.s: %.S FORCE
 	$(call if_changed,cmd_as_s_S)
@@ -197,7 +175,7 @@ endif
 # Build the compiled-in targets
 # ---------------------------------------------------------------------------
 
-all_targets: $(O_TARGET) $(L_TARGET) sub_dirs
+vmlinux: $(O_TARGET) $(L_TARGET) $(EXTRA_TARGETS) sub_dirs
 
 # To build objects in subdirs, we need to descend into the directories
 $(sort $(subdir-obj-y)): sub_dirs ;
@@ -282,8 +260,7 @@ $(patsubst %,_modinst_%,$(MOD_SUB_DIRS)) : FORCE
 endif
 
 .PHONY: modules
-modules: $(obj-m) FORCE \
-	 $(patsubst %,_modsubdir_%,$(MOD_SUB_DIRS))
+modules: $(obj-m) FORCE $(patsubst %,_modsubdir_%,$(MOD_SUB_DIRS))
 
 .PHONY: _modinst__
 _modinst__: FORCE
@@ -293,8 +270,7 @@ ifneq "$(strip $(obj-m))" ""
 endif
 
 .PHONY: modules_install
-modules_install: _modinst__ \
-	 $(patsubst %,_modinst_%,$(MOD_SUB_DIRS))
+modules_install: _modinst__ $(patsubst %,_modinst_%,$(MOD_SUB_DIRS))
 
 
 # Add FORCE to the prequisites of a target to force it to be always rebuilt.
@@ -350,29 +326,7 @@ $(addprefix $(MODINCL)/$(MODPREFIX),$(export-objs:.o=.ver)): $(TOPDIR)/include/l
 # updates .ver files but not modversions.h
 fastdep: $(addprefix $(MODINCL)/$(MODPREFIX),$(export-objs:.o=.ver))
 
-# updates .ver files and modversions.h like before (is this needed?)
-dep: fastdep update-modverfile
-
 endif # export-objs 
-
-# update modversions.h, but only if it would change
-update-modverfile:
-	@(echo "#ifndef _LINUX_MODVERSIONS_H";\
-	  echo "#define _LINUX_MODVERSIONS_H"; \
-	  echo "#include <linux/modsetver.h>"; \
-	  cd $(TOPDIR)/include/linux/modules; \
-	  for f in *.ver; do \
-	    if [ -f $$f ]; then echo "#include <linux/modules/$${f}>"; fi; \
-	  done; \
-	  echo "#endif"; \
-	) > $(TOPDIR)/include/linux/modversions.h.tmp
-	@if [ -r $(TOPDIR)/include/linux/modversions.h ] && cmp -s $(TOPDIR)/include/linux/modversions.h $(TOPDIR)/include/linux/modversions.h.tmp; then \
-		echo $(TOPDIR)/include/linux/modversions.h was not updated; \
-		rm -f $(TOPDIR)/include/linux/modversions.h.tmp; \
-	else \
-		echo $(TOPDIR)/include/linux/modversions.h was updated; \
-		mv -f $(TOPDIR)/include/linux/modversions.h.tmp $(TOPDIR)/include/linux/modversions.h; \
-	fi
 
 $(active-objs): $(TOPDIR)/include/linux/modversions.h
 

@@ -1,15 +1,11 @@
 #
 # Makefile for the linux kernel.
 #
-# Note! Dependencies are done automagically by 'make dep', which also
-# removes any old dependencies. DON'T put your own dependencies here
-# unless it's something special (ie not a .c file).
-#
-# Note 2! The CFLAGS definitions are now in the main makefile...
 
-O_TARGET := kernel.o
+O_TARGET	:= kernel.o
+EXTRA_TARGETS	:= head.o
 
-EXTRA_AFLAGS := $(CFLAGS)
+EXTRA_AFLAGS	:= $(CFLAGS)
 
 export-objs := alpha_ksyms.o
 
@@ -97,7 +93,7 @@ endif
 
 endif # GENERIC
 
-all: kernel.o head.o
+include $(TOPDIR)/Rules.make
 
 ASM_OFFSETS_H = $(TOPDIR)/include/asm-alpha/asm_offsets.h
 asm_offsets:
@@ -112,4 +108,3 @@ asm_offsets:
 clean::
 	rm -f check_asm
 
-include $(TOPDIR)/Rules.make

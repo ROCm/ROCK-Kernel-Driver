@@ -84,17 +84,48 @@ extern void put_bus(struct bus_type * bus);
 
 
 struct device_driver {
+	char			* name;
+	struct bus_type		* bus;
+
+	rwlock_t		lock;
+	atomic_t		refcount;
+
+	list_t			bus_list;
+	list_t			devices;
+
+	struct driver_dir_entry	dir;
+
 	int	(*probe)	(struct device * dev);
 	int 	(*remove)	(struct device * dev, u32 flags);
 
 	int	(*suspend)	(struct device * dev, u32 state, u32 level);
 	int	(*resume)	(struct device * dev, u32 level);
+
+	void	(*release)	(struct device_driver * drv);
 };
+
+
+
+extern int driver_register(struct device_driver * drv);
+
+static inline struct device_driver * get_driver(struct device_driver * drv)
+{
+	BUG_ON(!atomic_read(&drv->refcount));
+	atomic_inc(&drv->refcount);
+	return drv;
+}
+
+extern void put_driver(struct device_driver * drv);
+
+extern int driver_for_each_dev(struct device_driver * drv, void * data, 
+			       int (*callback)(struct device * dev, void * data));
+
 
 struct device {
 	struct list_head g_list;        /* node in depth-first order list */
 	struct list_head node;		/* node in sibling list */
 	struct list_head bus_list;	/* node in bus's list */
+	struct list_head driver_list;
 	struct list_head children;
 	struct device 	* parent;
 

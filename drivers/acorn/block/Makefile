@@ -2,14 +2,6 @@
 # Makefile for the Acorn block device drivers.
 #
 
-O_TARGET	:= acorn-block.o
-
-obj-y		:=
-obj-m		:=
-obj-n		:=
-obj-		:=
-
-export-objs	:=
 fd1772_mod-objs	:= fd1772.o fd1772dma.o
 mfmhd_mod-objs	:= mfmhd.o mfm.o
 

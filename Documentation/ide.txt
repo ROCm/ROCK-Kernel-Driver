@@ -212,7 +212,7 @@ When ide.c is used as a module, you can pass command line parameters to the
 driver using the "options=" keyword to insmod, while replacing any ',' with
 ';'.  For example:
 
-	insmod ide.o options="ide0=serialize ide2=0x1e8;0x3ee;11"
+	insmod ide.o options="ide0=serialize ide1=serialize ide2=0x1e8;0x3ee;11"
 
 
 ================================================================================
@@ -220,50 +220,69 @@ driver using the "options=" keyword to insmod, while replacing any ',' with
 Summary of ide driver parameters for kernel "command line":
 ----------------------------------------------------------
  "hdx="  is recognized for all "x" from "a" to "h", such as "hdc".
+ 
  "idex=" is recognized for all "x" from "0" to "3", such as "ide1".
 
  "hdx=noprobe"		: drive may be present, but do not probe for it
+ 
  "hdx=none"		: drive is NOT present, ignore cmos and do not probe
+ 
  "hdx=nowerr"		: ignore the WRERR_STAT bit on this drive
+ 
  "hdx=cdrom"		: drive is present, and is a cdrom drive
+ 
  "hdx=cyl,head,sect"	: disk drive is present, with specified geometry
+ 
  "hdx=autotune"		: driver will attempt to tune interface speed
-				to the fastest PIO mode supported,
-				if possible for this drive only.
-				Not fully supported by all chipset types,
-				and quite likely to cause trouble with
-				older/odd IDE drives.
+			  to the fastest PIO mode supported,
+			  if possible for this drive only.
+			  Not fully supported by all chipset types,
+			  and quite likely to cause trouble with
+			  older/odd IDE drives.
+
  "hdx=slow"		: insert a huge pause after each access to the data
-				port. Should be used only as a last resort.
+			  port. Should be used only as a last resort.
+				
  "hdxlun=xx"		: set the drive last logical unit
 
  "idebus=xx"		: inform IDE driver of VESA/PCI bus speed in MHz,
-				where "xx" is between 20 and 66 inclusive,
-				used when tuning chipset PIO modes.
-				For PCI bus, 25 is correct for a P75 system,
-				30 is correct for P90,P120,P180 systems,
-				and 33 is used for P100,P133,P166 systems.
-				If in doubt, use idebus=33 for PCI.
-				As for VLB, it is safest to not specify it.
-				Bigger values are safer than smaller ones.
+			  where "xx" is between 20 and 66 inclusive,
+			  used when tuning chipset PIO modes.
+			  For PCI bus, 25 is correct for a P75 system,
+			  30 is correct for P90,P120,P180 systems,
+			  and 33 is used for P100,P133,P166 systems.
+			  If in doubt, use idebus=33 for PCI.
+			  As for VLB, it is safest to not specify it.
+			  Bigger values are safer than smaller ones.
 
  "idex=noprobe"		: do not attempt to access/use this interface
+ 
  "idex=base"		: probe for an interface at the addr specified,
-				where "base" is usually 0x1f0 or 0x170
-				and "ctl" is assumed to be "base"+0x206
+			  where "base" is usually 0x1f0 or 0x170
+			  and "ctl" is assumed to be "base"+0x206
+			  
  "idex=base,ctl"	: specify both base and ctl
+
  "idex=base,ctl,irq"	: specify base, ctl, and irq number
+ 
  "idex=autotune"	: driver will attempt to tune interface speed
-				to the fastest PIO mode supported,
-				for all drives on this interface.
-				Not fully supported by all chipset types,
-				and quite likely to cause trouble with
-				older/odd IDE drives.
- "idex=noautotune"	: driver will NOT attempt to tune interface speed
-				This is the default for most chipsets,
-				except the cmd640.
- "idex=serialize"	: do not overlap operations on idex and ide(x^1)
+			  to the fastest PIO mode supported,
+			  for all drives on this interface.
+			  Not fully supported by all chipset types,
+			  and quite likely to cause trouble with
+			  older/odd IDE drives.
+
+ "idex=noautotune"	: driver will NOT attempt to tune interface speed 
+			  This is the default for most chipsets,
+			  except the cmd640.
+				
+ "idex=serialize"	: do not overlap operations on idex. Please note
+			  that you will have to specify this option for
+			  both the respecitve primary and secondary channel
+			  to take effect.
+			
  "idex=reset"		: reset interface after probe
+ 
  "idex=dma"		: automatically configure/use DMA if possible.
 
 The following are valid ONLY on ide0, which usually corresponds to the first
@@ -304,6 +323,6 @@ drives.
 
 mlord@pobox.com
 --
-Wed Apr 17 22:52:44 CEST 2002 edited by Marcin Dalecki
 
-For current maintainers of this stuff, please see the linux/MAINTAINERS file.
+Wed Apr 17 22:52:44 CEST 2002 edited by Marcin Dalecki, the current
+maintainer.

@@ -403,11 +403,11 @@ static int sis_get_info (char *buffer, char **addr, off_t offset, int count)
 
 	return p-buffer;
 }
-#endif /* defined(DISPLAY_SIS_TIMINGS) && defined(CONFIG_PROC_FS) */
-
 
 byte sis_proc = 0;
-extern char *ide_xfer_verbose (byte xfer_rate);
+
+#endif
+
 
 static int sis5513_ratemask(struct ata_device *drive)
 {

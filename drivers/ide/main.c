@@ -220,31 +220,6 @@ static void init_hwif_data(struct ata_channel *ch, unsigned int index)
 extern struct block_device_operations ide_fops[];
 
 /*
- * This is called exactly *once* for each channel.
- */
-void ide_geninit(struct ata_channel *ch)
-{
-	unsigned int unit;
-	struct gendisk *gd = ch->gd;
-
-	for (unit = 0; unit < MAX_DRIVES; ++unit) {
-		struct ata_device *drive = &ch->drives[unit];
-
-		if (!drive->present)
-			continue;
-
-		if (drive->type != ATA_DISK && drive->type != ATA_FLOPPY)
-			continue;
-
-		register_disk(gd,mk_kdev(ch->major,unit<<PARTN_BITS),
-#ifdef CONFIG_BLK_DEV_ISAPNP
-			(drive->forced_geom && drive->noprobe) ? 1 :
-#endif
-			1 << PARTN_BITS, ide_fops, ata_capacity(drive));
-	}
-}
-
-/*
  * Returns the (struct ata_device *) for a given device number.  Return
  * NULL if the given device number does not match any present drives.
  */
@@ -303,7 +278,10 @@ int ata_revalidate(kdev_t i_rdev)
 	if (!res) {
 		if (ata_ops(drive) && ata_ops(drive)->revalidate) {
 			ata_get(ata_ops(drive));
-			/* this is a no-op for tapes and SCSI based access */
+
+			/* This is expected to be a no-op for tapes and SCSI
+			 * based access.
+			 */
 			ata_ops(drive)->revalidate(drive);
 			ata_put(ata_ops(drive));
 		} else
@@ -312,6 +290,7 @@ int ata_revalidate(kdev_t i_rdev)
 
 	drive->busy = 0;
 	wake_up(&drive->wqueue);
+
 	MOD_DEC_USE_COUNT;
 
 	return res;
@@ -359,6 +338,9 @@ revalidate:
 	revalidate_drives();
 }
 
+/*
+ * Release the data associated with a channel.
+ */
 void ide_unregister(struct ata_channel *ch)
 {
 	struct gendisk *gd;
@@ -614,7 +596,7 @@ static struct ata_operations * subdriver_iterator(struct ata_operations *prev)
 
 /*
  * Register an IDE interface, specifing exactly the registers etc
- * Set init=1 iff calling before probes have taken place.
+ * Set initializing=1 iff calling before probes have taken place.
  */
 int ide_register_hw(hw_regs_t *hw)
 {
@@ -776,80 +758,8 @@ static void __init init_global_data(void)
  * line" strings beginning with "hdx=" or "ide".It gets called even before the
  * actual module gets initialized.
  *
- * Here is the complete set currently supported comand line options:
- *
- * "hdx="  is recognized for all "x" from "a" to "h", such as "hdc".
- * "idex=" is recognized for all "x" from "0" to "3", such as "ide1".
- *
- * "hdx=noprobe"	: drive may be present, but do not probe for it
- * "hdx=none"		: drive is NOT present, ignore cmos and do not probe
- * "hdx=nowerr"		: ignore the WRERR_STAT bit on this drive
- * "hdx=cdrom"		: drive is present, and is a cdrom drive
- * "hdx=cyl,head,sect"	: disk drive is present, with specified geometry
- * "hdx=noremap"	: do not remap 0->1 even though EZD was detected
- * "hdx=autotune"	: driver will attempt to tune interface speed
- *				to the fastest PIO mode supported,
- *				if possible for this drive only.
- *				Not fully supported by all chipset types,
- *				and quite likely to cause trouble with
- *				older/odd IDE drives.
- *
- * "hdx=slow"		: insert a huge pause after each access to the data
- *				port. Should be used only as a last resort.
- *
- * "hdxlun=xx"          : set the drive last logical unit.
- * "hdx=flash"		: allows for more than one ata_flash disk to be
- *				registered. In most cases, only one device
- *				will be present.
- * "hdx=ide-scsi"	: the return of the ide-scsi flag, this is useful for
- *				allowwing ide-floppy, ide-tape, and ide-cdrom|writers
- *				to use ide-scsi emulation on a device specific option.
- * "idebus=xx"		: inform IDE driver of VESA/PCI bus speed in MHz,
- *				where "xx" is between 20 and 66 inclusive,
- *				used when tuning chipset PIO modes.
- *				For PCI bus, 25 is correct for a P75 system,
- *				30 is correct for P90,P120,P180 systems,
- *				and 33 is used for P100,P133,P166 systems.
- *				If in doubt, use idebus=33 for PCI.
- *				As for VLB, it is safest to not specify it.
- *
- * "idex=noprobe"	: do not attempt to access/use this interface
- * "idex=base"		: probe for an interface at the address specified,
- *				where "base" is usually 0x1f0 or 0x170
- *				and "ctl" is assumed to be "base"+0x206
- * "idex=base,ctl"	: specify both base and ctl
- * "idex=base,ctl,irq"	: specify base, ctl, and irq number
- * "idex=autotune"	: driver will attempt to tune interface speed
- *				to the fastest PIO mode supported,
- *				for all drives on this interface.
- *				Not fully supported by all chipset types,
- *				and quite likely to cause trouble with
- *				older/odd IDE drives.
- * "idex=noautotune"	: driver will NOT attempt to tune interface speed
- *				This is the default for most chipsets,
- *				except the cmd640.
- * "idex=serialize"	: do not overlap operations on idex and ide(x^1)
- * "idex=four"		: four drives on idex and ide(x^1) share same ports
- * "idex=reset"		: reset interface before first use
- * "idex=dma"		: enable DMA by default on both drives if possible
- * "idex=ata66"		: informs the interface that it has an 80c cable
- *				for chipsets that are ATA-66 capable, but
- *				the ablity to bit test for detection is
- *				currently unknown.
- * "ide=reverse"	: Formerly called to pci sub-system, but now local.
- *
- * The following are valid ONLY on ide0, (except dc4030)
- * and the defaults for the base,ctl ports must not be altered.
- *
- * "ide0=dtc2278"	: probe/support DTC2278 interface
- * "ide0=ht6560b"	: probe/support HT6560B interface
- * "ide0=cmd640_vlb"	: *REQUIRED* for VLB cards with the CMD640 chip
- *			  (not for PCI -- automatically detected)
- * "ide0=qd65xx"	: probe/support qd65xx interface
- * "ide0=ali14xx"	: probe/support ali14xx chipsets (ALI M1439, M1443, M1445)
- * "ide0=umc8672"	: probe/support umc8672 chipsets
- * "idex=dc4030"	: probe/support Promise DC4030VL interface
- * "ide=doubler"	: probe/support IDE doublers on Amiga
+ * Please look at Documentation/ide.txt to see the complete list of supported
+ * options.
  */
 int __init ide_setup(char *s)
 {
@@ -1098,14 +1008,14 @@ int __init ide_setup(char *s)
 			case -6: /* dma */
 				ch->autodma = 1;
 				goto done;
-			case -5: /* "reset" */
+			case -5: /* reset */
 				ch->reset = 1;
 				goto done;
-			case -4: /* "noautotune" */
+			case -4: /* noautotune */
 				ch->drives[0].autotune = 2;
 				ch->drives[1].autotune = 2;
 				goto done;
-			case -3: /* "autotune" */
+			case -3: /* autotune */
 				ch->drives[0].autotune = 1;
 				ch->drives[1].autotune = 1;
 				goto done;
@@ -1167,21 +1077,21 @@ int ide_register_subdriver(struct ata_device *drive, struct ata_operations *driv
 {
 	unsigned long flags;
 
-	save_flags(flags);		/* all CPUs */
-	cli();				/* all CPUs */
+	/* FIXME: The locking here doesn't make the slightest sense! */
+	spin_lock_irqsave(&ide_lock, flags);
+
 	if (!drive->present || drive->driver != NULL || drive->busy || drive->usage) {
-		restore_flags(flags);	/* all CPUs */
+		spin_unlock_irqrestore(&ide_lock, flags);
 		return 1;
 	}
 
 	/* FIXME: This will be pushed to the drivers! Thus allowing us to
-	 * save one parameter here separate this out.
+	 * save one parameter here and to separate this out.
 	 */
-
 	drive->driver = driver;
 
-	restore_flags(flags);		/* all CPUs */
-	/* FIXME: Check what this magic number is supposed to be about? */
+	spin_unlock_irqrestore(&ide_lock, flags);
+	/* Default autotune or requested autotune */
 	if (drive->autotune != 2) {
 		if (drive->channel->XXX_udma) {
 
@@ -1380,11 +1290,9 @@ static struct notifier_block ata_notifier = {
  */
 static int __init ata_module_init(void)
 {
-	int h;
-
 	printk(KERN_INFO "ATA/ATAPI device driver v" VERSION "\n");
 
-	ide_devfs_handle = devfs_mk_dir (NULL, "ide", NULL);
+	ide_devfs_handle = devfs_mk_dir(NULL, "ata", NULL);
 
 	/*
 	 * Because most of the ATA adapters represent the timings in unit of
@@ -1582,12 +1490,6 @@ static int __init ata_module_init(void)
 #endif
 
 	initializing = 0;
-
-	for (h = 0; h < MAX_HWIFS; ++h) {
-		struct ata_channel *channel = &ide_hwifs[h];
-		if (channel->present)
-			ide_geninit(channel);
-	}
 
 	register_reboot_notifier(&ata_notifier);
 

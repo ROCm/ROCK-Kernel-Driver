@@ -8,8 +8,6 @@
 # In the future, some of these should be built conditionally.
 #
 
-O_TARGET := block.o
-
 export-objs	:= elevator.o ll_rw_blk.o blkpg.o loop.o DAC960.o genhd.o block_ioctl.o
 
 obj-y	:= elevator.o ll_rw_blk.o blkpg.o genhd.o block_ioctl.o
@@ -32,7 +30,5 @@ obj-$(CONFIG_BLK_DEV_DAC960)	+= DAC960.o
 
 obj-$(CONFIG_BLK_DEV_UMEM)	+= umem.o
 obj-$(CONFIG_BLK_DEV_NBD)	+= nbd.o
-
-subdir-$(CONFIG_PARIDE) += paride
 
 include $(TOPDIR)/Rules.make

@@ -8,14 +8,8 @@
 # In the future, some of these should be built conditionally.
 #
 
-O_TARGET := idedriver.o
-
-export-objs	:= ide-taskfile.o main.o ide.o ide-features.o ide-probe.o quirks.o pcidma.o tcq.o \
+export-objs	:= ide-taskfile.o main.o ide.o probe.o quirks.o pcidma.o tcq.o \
 		   atapi.o ataraid.o
-
-obj-y		:=
-obj-m		:=
-ide-obj-y	:=
 
 obj-$(CONFIG_BLK_DEV_HD)	+= hd.o
 obj-$(CONFIG_BLK_DEV_IDE)       += ide-mod.o
@@ -74,7 +68,7 @@ obj-$(CONFIG_BLK_DEV_ATARAID)		+= ataraid.o
 obj-$(CONFIG_BLK_DEV_ATARAID_PDC)	+= pdcraid.o
 obj-$(CONFIG_BLK_DEV_ATARAID_HPT)	+= hptraid.o
 
-ide-mod-objs	:= ide-taskfile.o main.o ide.o ide-probe.o ide-geometry.o ide-features.o \
+ide-mod-objs	:= ide-taskfile.o main.o ide.o probe.o \
 		   ioctl.o atapi.o ata-timing.o$(ide-obj-y)
 
 include $(TOPDIR)/Rules.make

@@ -443,7 +443,8 @@ static struct ata_pci_device chipsets[] __initdata = {
 		init_channel: amd74xx_init_channel,
 		init_dma: amd74xx_init_dma,
 		enablebits: {{0x40,0x01,0x01}, {0x40,0x02,0x02}},
-		bootable: ON_BOARD
+		bootable: ON_BOARD,
+		flags: ATA_F_SIMPLEX
 	},
 	{
 		vendor:	PCI_VENDOR_ID_AMD,

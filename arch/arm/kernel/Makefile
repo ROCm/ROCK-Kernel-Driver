@@ -1,15 +1,12 @@
 #
 # Makefile for the linux kernel.
 #
-# Note! Dependencies are done automagically by 'make dep', which also
-# removes any old dependencies. DON'T put your own dependencies here
-# unless it's something special (ie not a .c file).
+
+O_TARGET := kernel.o
 
 ENTRY_OBJ = entry-$(PROCESSOR).o
 
 AFLAGS_head.o := -DTEXTADDR=$(TEXTADDR)
-
-O_TARGET	:= kernel.o
 
 # Object file lists.
 
@@ -43,7 +40,7 @@ head-y			:= head.o
 obj-$(CONFIG_DEBUG_LL)	+= debug.o
 endif
 
-all: kernel.o $(head-y) init_task.o
+EXTRA_TARGETS := $(head-y) init_task.o
 
 include $(TOPDIR)/Rules.make
 
