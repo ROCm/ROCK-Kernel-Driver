@@ -274,29 +274,6 @@ out:
 
 static int fn_hash_last_dflt=-1;
 
-static int fib_detect_death(struct fib_info *fi, int order,
-			    struct fib_info **last_resort, int *last_idx)
-{
-	struct neighbour *n;
-	int state = NUD_NONE;
-
-	n = neigh_lookup(&arp_tbl, &fi->fib_nh[0].nh_gw, fi->fib_dev);
-	if (n) {
-		state = n->nud_state;
-		neigh_release(n);
-	}
-	if (state==NUD_REACHABLE)
-		return 0;
-	if ((state&NUD_VALID) && order != fn_hash_last_dflt)
-		return 0;
-	if ((state&NUD_VALID) ||
-	    (*last_idx<0 && order > fn_hash_last_dflt)) {
-		*last_resort = fi;
-		*last_idx = order;
-	}
-	return 1;
-}
-
 static void
 fn_hash_select_default(struct fib_table *tb, const struct flowi *flp, struct fib_result *res)
 {
@@ -337,7 +314,7 @@ fn_hash_select_default(struct fib_table *tb, const struct flowi *flp, struct fib
 				if (next_fi != res->fi)
 					break;
 			} else if (!fib_detect_death(fi, order, &last_resort,
-						     &last_idx)) {
+						     &last_idx, &fn_hash_last_dflt)) {
 				if (res->fi)
 					fib_info_put(res->fi);
 				res->fi = fi;
@@ -355,7 +332,7 @@ fn_hash_select_default(struct fib_table *tb, const struct flowi *flp, struct fib
 		goto out;
 	}
 
-	if (!fib_detect_death(fi, order, &last_resort, &last_idx)) {
+	if (!fib_detect_death(fi, order, &last_resort, &last_idx, &fn_hash_last_dflt)) {
 		if (res->fi)
 			fib_info_put(res->fi);
 		res->fi = fi;

@@ -315,6 +315,29 @@ struct fib_alias *fib_find_alias(struct list_head *fah, u8 tos, u32 prio)
 	return NULL;
 }
 
+int fib_detect_death(struct fib_info *fi, int order,
+		     struct fib_info **last_resort, int *last_idx, int *dflt)
+{
+	struct neighbour *n;
+	int state = NUD_NONE;
+
+	n = neigh_lookup(&arp_tbl, &fi->fib_nh[0].nh_gw, fi->fib_dev);
+	if (n) {
+		state = n->nud_state;
+		neigh_release(n);
+	}
+	if (state==NUD_REACHABLE)
+		return 0;
+	if ((state&NUD_VALID) && order != *dflt)
+		return 0;
+	if ((state&NUD_VALID) ||
+	    (*last_idx<0 && order > *dflt)) {
+		*last_resort = fi;
+		*last_idx = order;
+	}
+	return 1;
+}
+
 #ifdef CONFIG_IP_ROUTE_MULTIPATH
 
 static u32 fib_get_attr32(struct rtattr *attr, int attrlen, int type)
