@@ -34,6 +34,7 @@ struct task_security_struct {
 	u32 exec_sid;        /* exec SID */
 	u32 create_sid;      /* fscreate SID */
         struct avc_entry_ref avcr;     /* reference to process permissions */
+	u32 ptrace_sid;      /* SID of ptrace parent */
 };
 
 struct inode_security_struct {

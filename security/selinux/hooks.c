@@ -119,7 +119,7 @@ static int task_alloc_security(struct task_struct *task)
 	memset(tsec, 0, sizeof(struct task_security_struct));
 	tsec->magic = SELINUX_MAGIC;
 	tsec->task = task;
-	tsec->osid = tsec->sid = SECINITSID_UNLABELED;
+	tsec->osid = tsec->sid = tsec->ptrace_sid = SECINITSID_UNLABELED;
 	task->security = tsec;
 
 	return 0;
@@ -1331,13 +1331,19 @@ static int post_create(struct inode *dir,
 
 static int selinux_ptrace(struct task_struct *parent, struct task_struct *child)
 {
+	struct task_security_struct *psec = parent->security;
+	struct task_security_struct *csec = child->security;
 	int rc;
 
 	rc = secondary_ops->ptrace(parent,child);
 	if (rc)
 		return rc;
 
-	return task_has_perm(parent, child, PROCESS__PTRACE);
+	rc = task_has_perm(parent, child, PROCESS__PTRACE);
+	/* Save the SID of the tracing process for later use in apply_creds. */
+	if (!rc)
+		csec->ptrace_sid = psec->sid;
+	return rc;
 }
 
 static int selinux_capget(struct task_struct *target, kernel_cap_t *effective,
@@ -1747,7 +1753,7 @@ static inline void flush_unauthorized_files(struct files_struct * files)
 
 static void selinux_bprm_apply_creds(struct linux_binprm *bprm, int unsafe)
 {
-	struct task_security_struct *tsec, *psec;
+	struct task_security_struct *tsec;
 	struct bprm_security_struct *bsec;
 	u32 sid;
 	struct av_decision avd;
@@ -1782,14 +1788,13 @@ static void selinux_bprm_apply_creds(struct linux_binprm *bprm, int unsafe)
 		/* Check for ptracing, and update the task SID if ok.
 		   Otherwise, leave SID unchanged and kill. */
 		if (unsafe & (LSM_UNSAFE_PTRACE | LSM_UNSAFE_PTRACE_CAP)) {
-			psec = current->parent->security;
-			rc = avc_has_perm_noaudit(psec->sid, sid,
+			rc = avc_has_perm_noaudit(tsec->ptrace_sid, sid,
 					  SECCLASS_PROCESS, PROCESS__PTRACE,
 					  NULL, &avd);
 			if (!rc)
 				tsec->sid = sid;
 			task_unlock(current);
-			avc_audit(psec->sid, sid, SECCLASS_PROCESS,
+			avc_audit(tsec->ptrace_sid, sid, SECCLASS_PROCESS,
 				  PROCESS__PTRACE, &avd, rc, NULL);
 			if (rc) {
 				force_sig_specific(SIGKILL, current);
