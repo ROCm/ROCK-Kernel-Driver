@@ -385,7 +385,7 @@ qla2x00_get_mbx_iocb_entry(scsi_qla_host_t *ha, uint32_t handle)
 		if  (ha->req_ring_index < cnt)
 			ha->req_q_cnt = cnt - ha->req_ring_index;
 		else
-			ha->req_q_cnt = REQUEST_ENTRY_CNT -
+			ha->req_q_cnt = ha->request_q_length -
 			    (ha->req_ring_index - cnt);
 	}
 	if (ha->req_q_cnt >= 3) {

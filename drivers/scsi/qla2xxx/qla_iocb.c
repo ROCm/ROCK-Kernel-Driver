@@ -124,7 +124,7 @@ qla2x00_prep_cont_type0_iocb(scsi_qla_host_t *ha)
 
 	/* Adjust ring index. */
 	ha->req_ring_index++;
-	if (ha->req_ring_index == REQUEST_ENTRY_CNT) {
+	if (ha->req_ring_index == ha->request_q_length) {
 		ha->req_ring_index = 0;
 		ha->request_ring_ptr = ha->request_ring;
 	} else {
@@ -153,7 +153,7 @@ qla2x00_prep_cont_type1_iocb(scsi_qla_host_t *ha)
 
 	/* Adjust ring index. */
 	ha->req_ring_index++;
-	if (ha->req_ring_index == REQUEST_ENTRY_CNT) {
+	if (ha->req_ring_index == ha->request_q_length) {
 		ha->req_ring_index = 0;
 		ha->request_ring_ptr = ha->request_ring;
 	} else {
@@ -394,7 +394,7 @@ qla2x00_start_scsi(srb_t *sp)
 		if (ha->req_ring_index < cnt)
 			ha->req_q_cnt = cnt - ha->req_ring_index;
 		else
-			ha->req_q_cnt = REQUEST_ENTRY_CNT -
+			ha->req_q_cnt = ha->request_q_length -
 			    (ha->req_ring_index - cnt);
 	}
 
@@ -484,7 +484,7 @@ qla2x00_start_scsi(srb_t *sp)
 
 	/* Adjust ring index. */
 	ha->req_ring_index++;
-	if (ha->req_ring_index == REQUEST_ENTRY_CNT) {
+	if (ha->req_ring_index == ha->request_q_length) {
 		ha->req_ring_index = 0;
 		ha->request_ring_ptr = ha->request_ring;
 	} else
@@ -588,7 +588,7 @@ qla2x00_req_pkt(scsi_qla_host_t *ha)
 			if  (ha->req_ring_index < cnt)
 				ha->req_q_cnt = cnt - ha->req_ring_index;
 			else
-				ha->req_q_cnt = REQUEST_ENTRY_CNT -
+				ha->req_q_cnt = ha->request_q_length -
 				    (ha->req_ring_index - cnt);
 		}
 		/* If room for request in request ring. */
@@ -658,7 +658,7 @@ qla2x00_ms_req_pkt(scsi_qla_host_t *ha, srb_t  *sp)
 			if (ha->req_ring_index < cnt) {
 				ha->req_q_cnt = cnt - ha->req_ring_index;
 			} else {
-				ha->req_q_cnt = REQUEST_ENTRY_CNT -
+				ha->req_q_cnt = ha->request_q_length -
 				    (ha->req_ring_index - cnt);
 			}
 		}
@@ -740,7 +740,7 @@ qla2x00_isp_cmd(scsi_qla_host_t *ha)
 
 	/* Adjust ring index. */
 	ha->req_ring_index++;
-	if (ha->req_ring_index == REQUEST_ENTRY_CNT) {
+	if (ha->req_ring_index == ha->request_q_length) {
 		ha->req_ring_index = 0;
 		ha->request_ring_ptr = ha->request_ring;
 	} else

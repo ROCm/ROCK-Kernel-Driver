@@ -600,10 +600,11 @@ qla2x00_chip_diag(scsi_qla_host_t *ha)
 	ha->product_id[3] = mb[4];
 
 	/* Adjust fw RISC transfer size */
-	if (REQUEST_ENTRY_CNT > 1024)
+	if (ha->request_q_length > 1024)
 		ha->fw_transfer_size = REQUEST_ENTRY_SIZE * 1024;
 	else
-		ha->fw_transfer_size = REQUEST_ENTRY_SIZE * REQUEST_ENTRY_CNT;
+		ha->fw_transfer_size = REQUEST_ENTRY_SIZE *
+		    ha->request_q_length;
 
 	if (IS_QLA2200(ha) &&
 	    RD_MAILBOX_REG(ha, reg, 7) == QLA2200A_RISC_ROM_VER) {
@@ -802,7 +803,7 @@ qla2x00_init_rings(scsi_qla_host_t *ha)
 	/* Initialize firmware. */
 	ha->request_ring_ptr  = ha->request_ring;
 	ha->req_ring_index    = 0;
-	ha->req_q_cnt         = REQUEST_ENTRY_CNT;
+	ha->req_q_cnt         = ha->request_q_length;
 	ha->response_ring_ptr = ha->response_ring;
 	ha->rsp_ring_index    = 0;
 
@@ -1378,7 +1379,7 @@ qla2x00_nvram_config(scsi_qla_host_t *ha)
 	 */
 	icb->request_q_outpointer = __constant_cpu_to_le16(0);
 	icb->response_q_inpointer = __constant_cpu_to_le16(0);
-	icb->request_q_length = __constant_cpu_to_le16(REQUEST_ENTRY_CNT);
+	icb->request_q_length = cpu_to_le16(ha->request_q_length);
 	icb->response_q_length = cpu_to_le16(ha->response_q_length);
 	icb->request_q_address[0] = cpu_to_le32(LSD(ha->request_dma));
 	icb->request_q_address[1] = cpu_to_le32(MSD(ha->request_dma));

@@ -168,7 +168,6 @@ static struct scsi_host_template qla2x00_driver_template = {
 	.slave_configure	= qla2xxx_slave_configure,
 
 	.this_id		= -1,
-	.can_queue		= REQUEST_ENTRY_CNT+128,
 	.cmd_per_lun		= 3,
 	.use_clustering		= ENABLE_CLUSTERING,
 	.sg_tablesize		= SG_ALL,
@@ -1983,19 +1982,24 @@ int qla2x00_probe_one(struct pci_dev *pdev, struct qla_board_info *brd_info)
 	if (IS_QLA2100(ha)) {
 		ha->max_targets = MAX_TARGETS_2100;
 		ha->mbx_count = MAILBOX_REGISTER_COUNT_2100;
+		ha->request_q_length = REQUEST_ENTRY_CNT_2100;
 		ha->response_q_length = RESPONSE_ENTRY_CNT_2100;
 		ha->last_loop_id = SNS_LAST_LOOP_ID_2100;
+		host->sg_tablesize = 32;
 	} else if (IS_QLA2200(ha)) {
 		ha->max_targets = MAX_TARGETS_2200;
 		ha->mbx_count = MAILBOX_REGISTER_COUNT;
+		ha->request_q_length = REQUEST_ENTRY_CNT_2200;
 		ha->response_q_length = RESPONSE_ENTRY_CNT_2100;
 		ha->last_loop_id = SNS_LAST_LOOP_ID_2100;
 	} else /*if (IS_QLA2300(ha))*/ {
 		ha->max_targets = MAX_TARGETS_2200;
 		ha->mbx_count = MAILBOX_REGISTER_COUNT;
+		ha->request_q_length = REQUEST_ENTRY_CNT_2200;
 		ha->response_q_length = RESPONSE_ENTRY_CNT_2300;
 		ha->last_loop_id = SNS_LAST_LOOP_ID_2300;
 	}
+	host->can_queue = ha->request_q_length + 128;
 
 	/* load the F/W, read paramaters, and init the H/W */
 	ha->instance = num_hosts;
@@ -2390,8 +2394,8 @@ qla2x00_proc_info(struct Scsi_Host *shost, char *buffer,
 		(unsigned long long)ha->response_dma);
 
 	copy_info(&info,
-	    "Request Queue count = %ld, Response Queue count = %ld\n",
-	    (long)REQUEST_ENTRY_CNT, (long)ha->response_q_length);
+	    "Request Queue count = %d, Response Queue count = %d\n",
+	    ha->request_q_length, ha->response_q_length);
 
 	copy_info(&info,
 	    "Total number of active commands = %ld\n",
@@ -2861,7 +2865,7 @@ qla2x00_mem_alloc(scsi_qla_host_t *ha)
 		 * little delay and a retry.
 		 */
 		ha->request_ring = pci_alloc_consistent(ha->pdev,
-		    ((REQUEST_ENTRY_CNT + 1) * (sizeof(request_t))),
+		    ((ha->request_q_length + 1) * (sizeof(request_t))),
 		    &ha->request_dma);
 		if (ha->request_ring == NULL) {
 			qla_printk(KERN_WARNING, ha,
@@ -3077,7 +3081,7 @@ qla2x00_mem_free(scsi_qla_host_t *ha)
 
 	if (ha->request_ring) {
 		pci_free_consistent(ha->pdev,
-		    ((REQUEST_ENTRY_CNT + 1) * (sizeof(request_t))),
+		    ((ha->request_q_length + 1) * (sizeof(request_t))),
 		    ha->request_ring, ha->request_dma);
 	}
 

@@ -209,19 +209,10 @@
 #define MAX_OUTSTANDING_COMMANDS	1024
 
 /* ISP request and response entry counts (37-65535) */
-#define REQUEST_ENTRY_CNT		2048	/* Number of request entries. */
+#define REQUEST_ENTRY_CNT_2100		128	/* Number of request entries. */
+#define REQUEST_ENTRY_CNT_2200		2048	/* Number of request entries. */
 #define RESPONSE_ENTRY_CNT_2100		64	/* Number of response entries.*/
 #define RESPONSE_ENTRY_CNT_2300		512	/* Number of response entries.*/
-
-/* Calculations for SG segments */
-#define SEGS_PER_REQUEST_32	3 
-#define SEGS_PER_CONT_32	7
-#define SG_SEGMENTS_32 (SEGS_PER_REQUEST_32 + \
-    (SEGS_PER_CONT_32 * (REQUEST_ENTRY_CNT - 2)))     
-#define SEGS_PER_REQUEST_64	2 
-#define SEGS_PER_CONT_64	5
-#define SG_SEGMENTS_64 (SEGS_PER_REQUEST_64 + \
-    (SEGS_PER_CONT_64 * (REQUEST_ENTRY_CNT - 2)))     
 
 /*
  * SCSI Request Block 
@@ -2123,6 +2114,7 @@ typedef struct scsi_qla_host {
 	request_t       *request_ring_ptr;  /* Current address. */
 	uint16_t        req_ring_index;     /* Current index. */
 	uint16_t        req_q_cnt;          /* Number of available entries. */
+	uint16_t	request_q_length;
 
 	dma_addr_t	response_dma;       /* Physical address. */
 	response_t      *response_ring;     /* Base virtual address */
