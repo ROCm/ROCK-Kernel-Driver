@@ -183,7 +183,7 @@ udf_find_entry(struct inode *dir, struct dentry *dentry,
 		return NULL;
 	}
 
-	if (!(fibh->sbh = fibh->ebh = udf_tread(dir->i_sb, block, dir->i_sb->s_blocksize)))
+	if (!(fibh->sbh = fibh->ebh = udf_tread(dir->i_sb, block)))
 	{
 		udf_release_data(bh);
 		return NULL;
@@ -404,7 +404,7 @@ udf_add_entry(struct inode *dir, struct dentry *dentry,
 		else
 			offset = 0;
 
-		if (!(fibh->sbh = fibh->ebh = udf_tread(dir->i_sb, block, dir->i_sb->s_blocksize)))
+		if (!(fibh->sbh = fibh->ebh = udf_tread(dir->i_sb, block)))
 		{
 			udf_release_data(bh);
 			*err = -EIO;
@@ -488,7 +488,7 @@ udf_add_entry(struct inode *dir, struct dentry *dentry,
 		block = udf_get_lb_pblock(dir->i_sb, UDF_I_LOCATION(dir), 0);
 		if (UDF_I_ALLOCTYPE(dir) == ICB_FLAG_AD_IN_ICB)
 		{
-			fibh->sbh = fibh->ebh = udf_tread(dir->i_sb, block, dir->i_sb->s_blocksize);
+			fibh->sbh = fibh->ebh = udf_tread(dir->i_sb, block);
 			fibh->soffset = fibh->eoffset = udf_file_entry_alloc_offset(dir);
 		}
 		else
@@ -803,7 +803,7 @@ static int empty_dir(struct inode *dir)
 		return 0;
 	}
 
-	if (!(fibh.sbh = fibh.ebh = udf_tread(dir->i_sb, block, dir->i_sb->s_blocksize)))
+	if (!(fibh.sbh = fibh.ebh = udf_tread(dir->i_sb, block)))
 		return 0;
 
 	while ( (f_pos < size) )
@@ -964,7 +964,7 @@ static int udf_symlink(struct inode * dir, struct dentry * dentry, const char * 
 
 		block = udf_get_pblock(inode->i_sb, block,
 			UDF_I_LOCATION(inode).partitionReferenceNum, 0);
-		bh = udf_tread(inode->i_sb, block, inode->i_sb->s_blocksize);
+		bh = udf_tread(inode->i_sb, block);
 		lock_buffer(bh);
 		memset(bh->b_data, 0x00, inode->i_sb->s_blocksize);
 		mark_buffer_uptodate(bh, 1);
@@ -974,7 +974,7 @@ static int udf_symlink(struct inode * dir, struct dentry * dentry, const char * 
 	else
 	{
 		block = udf_get_lb_pblock(inode->i_sb, UDF_I_LOCATION(inode), 0);
-		bh = udf_tread(inode->i_sb, block, inode->i_sb->s_blocksize);
+		bh = udf_tread(inode->i_sb, block);
 	}
 	ea = bh->b_data + udf_ext0_offset(inode);
 

@@ -60,7 +60,7 @@ extern void set_device_ro(kdev_t dev,int flag);
 extern void *sys_call_table;
 
 extern struct timezone sys_tz;
-extern int request_dma(unsigned int dmanr, char * deviceID);
+extern int request_dma(unsigned int dmanr, const char * deviceID);
 extern void free_dma(unsigned int dmanr);
 extern spinlock_t dma_spin_lock;
 

@@ -65,7 +65,7 @@
 #include <linux/errno.h>
 #include <linux/kdev_t.h>
 #include <linux/blkdev.h>
-#include <linux/blk.h>		/* for io_request_lock (spinlock) decl */
+#include <linux/blk.h>
 #include "../../scsi/scsi.h"
 #include "../../scsi/hosts.h"
 #include "../../scsi/sd.h"
@@ -246,9 +246,9 @@ mptscsih_io_done(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *r)
 		mf_chk = search_taskQ(1,sc,MPI_SCSITASKMGMT_TASKTYPE_ABORT_TASK);
 		if (mf_chk != NULL) {
 			sc->result = DID_ABORT << 16;
-			spin_lock_irqsave(&io_request_lock, flags);
+			spin_lock_irqsave(&sc->host->host_lock, flags);
 			sc->scsi_done(sc);
-			spin_unlock_irqrestore(&io_request_lock, flags);
+			spin_unlock_irqrestore(&sc->host->host_lock, flags);
 			return 1;
 		}
 	}
@@ -426,9 +426,9 @@ mptscsih_io_done(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *r)
 					 scsi_to_pci_dma_dir(sc->sc_data_direction));
 		}
 
-		spin_lock_irqsave(&io_request_lock, flags);
+		spin_lock_irqsave(&sc->host->host_lock, flags);
 		sc->scsi_done(sc);
-		spin_unlock_irqrestore(&io_request_lock, flags);
+		spin_unlock_irqrestore(&sc->host->host_lock, flags);
 	}
 
 	return 1;
@@ -928,9 +928,9 @@ mptscsih_qcmd(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 			}
 			SCpnt->resid = SCpnt->request_bufflen - mpt_sdev->sense_sz;
 			SCpnt->result = 0;
-/*			spin_lock(&io_request_lock);	*/
+/*			spin_lock(&SCpnt->host->host_lock);	*/
 			SCpnt->scsi_done(SCpnt);
-/*			spin_unlock(&io_request_lock);	*/
+/*			spin_unlock(&SCpnt->host->host_lock);	*/
 			return 0;
 		}
 	}
@@ -1333,9 +1333,9 @@ mptscsih_abort(Scsi_Cmnd * SCpnt)
 	if (ctx2abort == -1) {
 		printk(KERN_ERR MYNAM ": ERROR - ScsiLookup fail(#2) for SCpnt=%p\n", SCpnt);
 		SCpnt->result = DID_SOFT_ERROR << 16;
-		spin_lock_irqsave(&io_request_lock, flags);
+		spin_lock_irqsave(&SCpnt->host->host_lock, flags);
 		SCpnt->scsi_done(SCpnt);
-		spin_unlock_irqrestore(&io_request_lock, flags);
+		spin_unlock_irqrestore(&SCpnt->host->host_lock, flags);
 		mpt_free_msg_frame(ScsiTaskCtx, hd->ioc->id, mf);
 	} else {
 		dprintk((KERN_INFO MYNAM ":DbG: ctx2abort = %08x\n", ctx2abort));
@@ -1352,9 +1352,9 @@ mptscsih_abort(Scsi_Cmnd * SCpnt)
 					": WARNING[2] - IOC error (%d) processing TaskMgmt request (mf=%p:sc=%p)\n",
 					i, mf, SCpnt);
 			SCpnt->result = DID_SOFT_ERROR << 16;
-			spin_lock_irqsave(&io_request_lock, flags);
+			spin_lock_irqsave(&SCpnt->host->host_lock, flags);
 			SCpnt->scsi_done(SCpnt);
-			spin_unlock_irqrestore(&io_request_lock, flags);
+			spin_unlock_irqrestore(&SCpnt->host->host_lock, flags);
 			mpt_free_msg_frame(ScsiTaskCtx, hd->ioc->id, mf);
 		}
 	}
@@ -1428,9 +1428,9 @@ mptscsih_dev_reset(Scsi_Cmnd * SCpnt)
 				": WARNING[3] - IOC error (%d) processing TaskMgmt request (mf=%p:sc=%p)\n",
 				i, mf, SCpnt);
 		SCpnt->result = DID_SOFT_ERROR << 16;
-		spin_lock_irqsave(&io_request_lock, flags);
+		spin_lock_irqsave(&SCpnt->host->host_lock, flags);
 		SCpnt->scsi_done(SCpnt);
-		spin_unlock_irqrestore(&io_request_lock, flags);
+		spin_unlock_irqrestore(&SCpnt->host->host_lock, flags);
 		mpt_free_msg_frame(ScsiTaskCtx, hd->ioc->id, mf);
 	}
 
@@ -1502,9 +1502,9 @@ mptscsih_bus_reset(Scsi_Cmnd * SCpnt)
 				": WARNING[4] - IOC error (%d) processing TaskMgmt request (mf=%p:sc=%p)\n",
 				i, mf, SCpnt);
 		SCpnt->result = DID_SOFT_ERROR << 16;
-		spin_lock_irqsave(&io_request_lock, flags);
+		spin_lock_irqsave(&SCpnt->host->host_lock, flags);
 		SCpnt->scsi_done(SCpnt);
-		spin_unlock_irqrestore(&io_request_lock, flags);
+		spin_unlock_irqrestore(&SCpnt->host->host_lock, flags);
 		mpt_free_msg_frame(ScsiTaskCtx, hd->ioc->id, mf);
 	}
 
@@ -1748,9 +1748,9 @@ mptscsih_taskmgmt_bh(void *sc)
 			if (ctx2abort == -1) {
 				printk(KERN_ERR MYNAM ": ERROR - ScsiLookup fail(#1) for SCpnt=%p\n", SCpnt);
 				SCpnt->result = DID_SOFT_ERROR << 16;
-				spin_lock_irqsave(&io_request_lock, flags);
+				spin_lock_irqsave(&SCpnt->host->host_lock, flags);
 				SCpnt->scsi_done(SCpnt);
-				spin_unlock_irqrestore(&io_request_lock, flags);
+				spin_unlock_irqrestore(&SCpnt->host->host_lock, flags);
 				mpt_free_msg_frame(ScsiTaskCtx, hd->ioc->id, mf);
 				continue;
 			}
@@ -1797,9 +1797,9 @@ mptscsih_taskmgmt_bh(void *sc)
 		    != 0) {
 			printk(KERN_WARNING MYNAM ": WARNING[1] - IOC error (%d) processing TaskMgmt request (mf=%p:sc=%p)\n", i, mf, SCpnt);
 			SCpnt->result = DID_SOFT_ERROR << 16;
-			spin_lock_irqsave(&io_request_lock, flags);
+			spin_lock_irqsave(&SCpnt->host->host_lock, flags);
 			SCpnt->scsi_done(SCpnt);
-			spin_unlock_irqrestore(&io_request_lock, flags);
+			spin_unlock_irqrestore(&SCpnt->host->host_lock, flags);
 			mpt_free_msg_frame(ScsiTaskCtx, hd->ioc->id, mf);
 		} else {
 			/* Spin-Wait for TaskMgmt complete!!! */

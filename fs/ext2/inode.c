@@ -239,8 +239,7 @@ static Indirect *ext2_get_branch(struct inode *inode,
 				 Indirect chain[4],
 				 int *err)
 {
-	kdev_t dev = inode->i_dev;
-	int size = inode->i_sb->s_blocksize;
+	struct super_block *sb = inode->i_sb;
 	Indirect *p = chain;
 	struct buffer_head *bh;
 
@@ -250,7 +249,7 @@ static Indirect *ext2_get_branch(struct inode *inode,
 	if (!p->key)
 		goto no_block;
 	while (--depth) {
-		bh = bread(dev, le32_to_cpu(p->key), size);
+		bh = sb_bread(sb, le32_to_cpu(p->key));
 		if (!bh)
 			goto failure;
 		/* Reader: pointers */
@@ -399,7 +398,7 @@ static int ext2_alloc_branch(struct inode *inode,
 		 * Get buffer_head for parent block, zero it out and set 
 		 * the pointer to new one, then send parent to disk.
 		 */
-		bh = getblk(inode->i_dev, parent, blocksize);
+		bh = sb_getblk(inode->i_sb, parent);
 		lock_buffer(bh);
 		memset(bh->b_data, 0, blocksize);
 		branch[n].bh = bh;
@@ -763,7 +762,7 @@ static void ext2_free_branches(struct inode *inode, u32 *p, u32 *q, int depth)
 			if (!nr)
 				continue;
 			*p = 0;
-			bh = bread (inode->i_dev, nr, inode->i_sb->s_blocksize);
+			bh = sb_bread(inode->i_sb, nr);
 			/*
 			 * A read failure? Report error and clear slot
 			 * (should be rare).
@@ -921,7 +920,7 @@ void ext2_read_inode (struct inode * inode)
 		EXT2_INODE_SIZE(inode->i_sb);
 	block = le32_to_cpu(gdp[desc].bg_inode_table) +
 		(offset >> EXT2_BLOCK_SIZE_BITS(inode->i_sb));
-	if (!(bh = bread (inode->i_dev, block, inode->i_sb->s_blocksize))) {
+	if (!(bh = sb_bread(inode->i_sb, block))) {
 		ext2_error (inode->i_sb, "ext2_read_inode",
 			    "unable to read inode block - "
 			    "inode=%lu, block=%lu", inode->i_ino, block);
@@ -1063,7 +1062,7 @@ static int ext2_update_inode(struct inode * inode, int do_sync)
 		EXT2_INODE_SIZE(inode->i_sb);
 	block = le32_to_cpu(gdp[desc].bg_inode_table) +
 		(offset >> EXT2_BLOCK_SIZE_BITS(inode->i_sb));
-	if (!(bh = bread (inode->i_dev, block, inode->i_sb->s_blocksize))) {
+	if (!(bh = sb_bread(inode->i_sb, block))) {
 		ext2_error (inode->i_sb, "ext2_write_inode",
 			    "unable to read inode block - "
 			    "inode=%lu, block=%lu", inode->i_ino, block);

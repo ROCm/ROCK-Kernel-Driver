@@ -69,7 +69,7 @@ unsigned long qnx4_count_free_blocks(struct super_block *sb)
 	struct buffer_head *bh;
 
 	while (total < size) {
-		if ((bh = bread(sb->s_dev, start + offset, QNX4_BLOCK_SIZE)) == NULL) {
+		if ((bh = sb_bread(sb, start + offset)) == NULL) {
 			printk("qnx4: I/O error in counting free blocks\n");
 			break;
 		}
@@ -96,7 +96,7 @@ int qnx4_is_free(struct super_block *sb, long block)
 	QNX4DEBUG(("qnx4: is_free requesting block [%lu], bitmap in block [%lu]\n",
 		   (unsigned long) block, (unsigned long) start));
 	(void) size;		/* CHECKME */
-	bh = bread(sb->s_dev, start, QNX4_BLOCK_SIZE);
+	bh = sb_bread(sb, start);
 	if (bh == NULL) {
 		return -EIO;
 	}
@@ -124,7 +124,7 @@ int qnx4_set_bitmap(struct super_block *sb, long block, int busy)
 	QNX4DEBUG(("qnx4: set_bitmap requesting block [%lu], bitmap in block [%lu]\n",
 		   (unsigned long) block, (unsigned long) start));
 	(void) size;		/* CHECKME */
-	bh = bread(sb->s_dev, start, QNX4_BLOCK_SIZE);
+	bh = sb_bread(sb, start);
 	if (bh == NULL) {
 		return -EIO;
 	}

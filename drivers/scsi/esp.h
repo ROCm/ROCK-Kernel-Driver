@@ -1,4 +1,4 @@
-/* $Id: esp.h,v 1.28 2000/03/30 01:33:17 davem Exp $
+/* $Id: esp.h,v 1.29 2001/12/11 04:55:47 davem Exp $
  * esp.h:  Defines and structures for the Sparc ESP (Enhanced SCSI
  *         Processor) driver under Linux.
  *
@@ -64,7 +64,6 @@ enum esp_rev {
 
 /* We get one of these for each ESP probed. */
 struct esp {
-	spinlock_t		lock;
 	unsigned long		eregs;		/* ESP controller registers */
 	unsigned long		dregs;		/* DMA controller registers */
 	struct sbus_dma		*dma;		/* DMA controller sw state */
@@ -416,6 +415,7 @@ extern int esp_revoke(Scsi_Device* SDptr);
 		sg_tablesize:   SG_ALL,				\
 		cmd_per_lun:    1,				\
 		use_clustering: ENABLE_CLUSTERING,		\
+		highmem_io:	1,				\
 }
 
 /* For our interrupt engine. */

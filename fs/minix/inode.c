@@ -143,15 +143,15 @@ static struct super_block *minix_read_super(struct super_block *s, void *data,
 		goto out_bad_hblock;
 
 	set_blocksize(dev, BLOCK_SIZE);
-	if (!(bh = bread(dev,1,BLOCK_SIZE)))
+	s->s_blocksize = BLOCK_SIZE;
+	s->s_blocksize_bits = BLOCK_SIZE_BITS;
+	if (!(bh = sb_bread(s, 1)))
 		goto out_bad_sb;
 
 	ms = (struct minix_super_block *) bh->b_data;
 	sbi->s_ms = ms;
 	sbi->s_sbh = bh;
 	sbi->s_mount_state = ms->s_state;
-	s->s_blocksize = BLOCK_SIZE;
-	s->s_blocksize_bits = BLOCK_SIZE_BITS;
 	sbi->s_ninodes = ms->s_ninodes;
 	sbi->s_nzones = ms->s_nzones;
 	sbi->s_imap_blocks = ms->s_imap_blocks;
@@ -198,12 +198,12 @@ static struct super_block *minix_read_super(struct super_block *s, void *data,
 
 	block=2;
 	for (i=0 ; i < sbi->s_imap_blocks ; i++) {
-		if (!(sbi->s_imap[i]=bread(dev,block,BLOCK_SIZE)))
+		if (!(sbi->s_imap[i]=sb_bread(s, block)))
 			goto out_no_bitmap;
 		block++;
 	}
 	for (i=0 ; i < sbi->s_zmap_blocks ; i++) {
-		if (!(sbi->s_zmap[i]=bread(dev,block,BLOCK_SIZE)))
+		if (!(sbi->s_zmap[i]=sb_bread(s, block)))
 			goto out_no_bitmap;
 		block++;
 	}

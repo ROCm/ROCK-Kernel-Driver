@@ -362,11 +362,12 @@ static struct super_block *sysv_read_super(struct super_block *sb,
 	if (64 != sizeof (struct sysv_inode))
 		panic("sysv fs: bad i-node size");
 	set_blocksize(dev,BLOCK_SIZE);
+	sb->s_blocksize = BLOCK_SIZE;
 	sb->sv_block_base = 0;
 
 	for (i = 0; i < sizeof(flavours)/sizeof(flavours[0]) && !size; i++) {
 		brelse(bh);
-		bh = bread(dev, flavours[i].block, BLOCK_SIZE);
+		bh = sb_bread(sb, flavours[i].block);
 		if (!bh)
 			continue;
 		size = flavours[i].test(sb, bh);
@@ -380,8 +381,9 @@ static struct super_block *sysv_read_super(struct super_block *sb,
 			blocknr = bh->b_blocknr << 1;
 			brelse(bh);
 			set_blocksize(dev, 512);
-			bh1 = bread(dev, blocknr, 512);
-			bh = bread(dev, blocknr + 1, 512);
+			sb->s_blocksize = 512;
+			bh1 = sb_bread(sb, blocknr);
+			bh = sb_bread(sb, blocknr + 1);
 			break;
 		case 2:
 			bh1 = bh;
@@ -390,7 +392,8 @@ static struct super_block *sysv_read_super(struct super_block *sb,
 			blocknr = bh->b_blocknr >> 1;
 			brelse(bh);
 			set_blocksize(dev, 2048);
-			bh1 = bh = bread(dev, blocknr, 2048);
+			sb->s_blocksize = 2048;
+			bh1 = bh = sb_bread(sb, blocknr);
 			break;
 		default:
 			goto Ebadsize;
@@ -441,8 +444,9 @@ static struct super_block *v7_read_super(struct super_block *sb,void *data,
 	sb->sv_bytesex = BYTESEX_PDP;
 
 	set_blocksize(dev, 512);
+	sb->s_blocksize = 512;
 
-	if ((bh = bread(dev, 1, 512)) == NULL) {
+	if ((bh = sb_bread(sb, 1)) == NULL) {
 		if (!silent)
 			printk("VFS: unable to read V7 FS superblock on "
 			       "device %s.\n", bdevname(dev));
@@ -458,7 +462,7 @@ static struct super_block *v7_read_super(struct super_block *sb,void *data,
 
 	/* plausibility check on root inode: it is a directory,
 	   with a nonzero size that is a multiple of 16 */
-	if ((bh2 = bread(dev, 2, 512)) == NULL)
+	if ((bh2 = sb_bread(sb, 2)) == NULL)
 		goto failed;
 	v7i = (struct sysv_inode *)(bh2->b_data + 64);
 	if ((fs16_to_cpu(sb,v7i->i_mode) & ~0777) != S_IFDIR ||

@@ -128,3 +128,21 @@ Sun Oct 28 15:00 2001 Gerard Roudier
 	* version sym-2.1.16-20011028
 	- Slightly simplify driver configuration.
 	- Prepare a new patch against linux-2.4.13.
+
+Sat Nov 17 10:00 2001 Gerard Roudier 
+	* version sym-2.1.17
+	- Fix a couple of gcc/gcc3 warnings.
+	- Allocate separately from the HCB the array for CCBs hashed by DSA.
+	  All driver memory allocations are now not greater than 1 PAGE 
+	  even on PPC64 / 4KB PAGE surprising setup.
+
+Sat Dec 01 18:00 2001 Gerard Roudier 
+	* version sym-2.1.17a
+	- Use u_long instead of U32 for the IO base cookie. This is more 
+	  consistent with what archs are expecting.
+	- Use MMIO per default for Power PC instead of some fake normal IO,
+	  as Paul Mackerras stated that MMIO works fine now on this arch.
+
+
+
+

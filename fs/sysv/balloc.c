@@ -73,7 +73,7 @@ void sysv_free_block(struct super_block * sb, u32 nr)
 	 */
 	if (count == sb->sv_flc_size || count == 0) {
 		block += sb->sv_block_base;
-		bh = getblk(sb->s_dev, block, sb->s_blocksize);
+		bh = sb_getblk(sb, block);
 		if (!bh) {
 			printk("sysv_free_block: getblk() failed\n");
 			unlock_super(sb);
@@ -125,7 +125,7 @@ u32 sysv_new_block(struct super_block * sb)
 		unsigned count;
 
 		block += sb->sv_block_base;
-		if (!(bh = bread(sb->s_dev, block, sb->s_blocksize))) {
+		if (!(bh = sb_bread(sb, block))) {
 			printk("sysv_new_block: cannot read free-list block\n");
 			/* retry this same block next time */
 			*sb->sv_bcache_count = cpu_to_fs16(sb, 1);
@@ -196,7 +196,7 @@ unsigned long sysv_count_free_blocks(struct super_block * sb)
 		if (block < sb->sv_firstdatazone || block >= sb->sv_nzones)
 			goto Einval;
 		block += sb->sv_block_base;
-		bh = bread(sb->s_dev, block, sb->s_blocksize);
+		bh = sb_bread(sb, block);
 		if (!bh)
 			goto Eio;
 		n = fs16_to_cpu(sb, *(u16*)bh->b_data);

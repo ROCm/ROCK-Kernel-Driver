@@ -130,7 +130,8 @@ scsi_unregister(struct Scsi_Host * sh){
  * pain to reverse this, so we try to avoid it 
  */
 extern int blk_nohighio;
-struct Scsi_Host * scsi_register(Scsi_Host_Template * tpnt, int j){
+struct Scsi_Host * scsi_register(Scsi_Host_Template * tpnt, int j)
+{
     struct Scsi_Host * retval, *shpnt, *o_shp;
     Scsi_Host_Name *shn, *shn2;
     int flag_new = 1;

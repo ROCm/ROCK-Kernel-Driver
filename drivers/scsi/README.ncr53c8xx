@@ -1,6 +1,6 @@
 The Linux NCR53C8XX/SYM53C8XX drivers README file
 
-Written by Gerard Roudier <groudier@club-internet.fr>
+Written by Gerard Roudier <groudier@free.fr>
 21 Rue Carnot
 95170 DEUIL LA BARRE - FRANCE
 
@@ -87,7 +87,7 @@ Written by Gerard Roudier <groudier@club-internet.fr>
 
 The initial Linux ncr53c8xx driver has been a port of the ncr driver from 
 FreeBSD that has been achieved in November 1995 by:
-          Gerard Roudier              <groudier@club-internet.fr>
+          Gerard Roudier              <groudier@free.fr>
 
 The original driver has been written for 386bsd and FreeBSD by:
           Wolfgang Stanglmeier        <wolf@cologne.de>
@@ -1287,7 +1287,7 @@ appropriate mailing lists or news-groups.  Send me a copy in order to
 be sure I will receive it.  Obviously, a bug in the driver code is
 possible.
 
-     My email address: Gerard Roudier <groudier@club-internet.fr>
+     My email address: Gerard Roudier <groudier@free.fr>
 
 Allowing disconnections is important if you use several devices on
 your SCSI bus but often causes problems with buggy devices.

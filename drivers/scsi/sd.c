@@ -765,7 +765,7 @@ static int sd_init_onedisk(int i)
 		return i;
 	}
 
-	buffer = (unsigned char *) scsi_malloc(512);
+	buffer = kmalloc(512, GFP_DMA);
 	if (!buffer) {
 		printk(KERN_WARNING "(sd_init_onedisk:) Memory allocation failure.\n");
 		scsi_release_request(SRpnt);
@@ -1042,7 +1042,7 @@ static int sd_init_onedisk(int i)
 	scsi_release_request(SRpnt);
 	SRpnt = NULL;
 
-	scsi_free(buffer, 512);
+	kfree(buffer);
 	return i;
 }
 
@@ -1111,7 +1111,7 @@ static int sd_init()
 		 * commands if they know what they're doing and they ask for it
 		 * explicitly via the SHpnt->max_sectors API.
 		 */
-		sd_max_sectors[i] = MAX_SEGMENTS*8;
+		sd_max_sectors[i] = MAX_PHYS_SEGMENTS*8;
 	}
 
 	for (i = 0; i < N_USED_SD_MAJORS; i++) {

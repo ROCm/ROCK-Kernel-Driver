@@ -78,7 +78,7 @@ isofs_find_entry(struct inode *dir, struct dentry *dentry,
 		char *dpnt;
 
 		if (!bh) {
-			bh = isofs_bread(dir, bufsize, block);
+			bh = isofs_bread(dir, block);
 			if (!bh)
 				return 0;
 		}
@@ -108,7 +108,7 @@ isofs_find_entry(struct inode *dir, struct dentry *dentry,
 			brelse(bh);
 			bh = NULL;
 			if (offset) {
-				bh = isofs_bread(dir, bufsize, block);
+				bh = isofs_bread(dir, block);
 				if (!bh)
 					return 0;
 				memcpy((void *) tmpde + slop, bh->b_data, offset);

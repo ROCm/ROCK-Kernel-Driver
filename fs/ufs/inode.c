@@ -106,8 +106,7 @@ int ufs_frag_map(struct inode *inode, int frag)
 		struct buffer_head *bh;
 		int n = *p++;
 
-		bh = bread(sb->s_dev, uspi->s_sbbase + fs32_to_cpu(sb, block)+(n>>shift),
-				sb->s_blocksize);
+		bh = sb_bread(sb, uspi->s_sbbase + fs32_to_cpu(sb, block)+(n>>shift));
 		if (!bh)
 			goto out;
 		block = ((u32*) bh->b_data)[n & mask];
@@ -147,8 +146,7 @@ repeat:
 	lastfrag = inode->u.ufs_i.i_lastfrag;
 	if (tmp && fragment < lastfrag) {
 		if (metadata) {
-			result = getblk (sb->s_dev, uspi->s_sbbase + tmp + blockoff,
-					 sb->s_blocksize);
+			result = sb_getblk(sb, uspi->s_sbbase + tmp + blockoff);
 			if (tmp == fs32_to_cpu(sb, *p)) {
 				UFSD(("EXIT, result %u\n", tmp + blockoff))
 				return result;
@@ -216,7 +214,7 @@ repeat:
 	 * now. -DaveM
 	 */
 	if (metadata) {
-		result = getblk (inode->i_dev, tmp + blockoff, sb->s_blocksize);
+		result = sb_getblk(inode->i_sb, tmp + blockoff);
 	} else {
 		*phys = tmp;
 		result = NULL;
@@ -264,8 +262,7 @@ repeat:
 	tmp = fs32_to_cpu(sb, *p);
 	if (tmp) {
 		if (metadata) {
-			result = getblk (bh->b_dev, uspi->s_sbbase + tmp + blockoff,
-					 sb->s_blocksize);
+			result = sb_getblk(sb, uspi->s_sbbase + tmp + blockoff);
 			if (tmp == fs32_to_cpu(sb, *p))
 				goto out;
 			brelse (result);
@@ -292,7 +289,7 @@ repeat:
 	 * now. -DaveM
 	 */
 	if (metadata) {
-		result = getblk (bh->b_dev, tmp + blockoff, sb->s_blocksize);
+		result = sb_getblk(sb, tmp + blockoff);
 	} else {
 		*phys = tmp;
 		*new = 1;
@@ -425,7 +422,7 @@ struct buffer_head *ufs_getfrag(struct inode *inode, unsigned int fragment,
 	*err = error;
 	if (!error && buffer_mapped(&dummy)) {
 		struct buffer_head *bh;
-		bh = getblk(dummy.b_dev, dummy.b_blocknr, inode->i_sb->s_blocksize);
+		bh = sb_getblk(inode->i_sb, dummy.b_blocknr);
 		if (buffer_new(&dummy)) {
 			memset(bh->b_data, 0, inode->i_sb->s_blocksize);
 			mark_buffer_uptodate(bh, 1);
@@ -500,7 +497,7 @@ void ufs_read_inode (struct inode * inode)
 		return;
 	}
 	
-	bh = bread (sb->s_dev, uspi->s_sbbase + ufs_inotofsba(inode->i_ino), sb->s_blocksize);
+	bh = sb_bread(sb, uspi->s_sbbase + ufs_inotofsba(inode->i_ino));
 	if (!bh) {
 		ufs_warning (sb, "ufs_read_inode", "unable to read inode %lu\n", inode->i_ino);
 		return;
@@ -591,7 +588,7 @@ static int ufs_update_inode(struct inode * inode, int do_sync)
 		return -1;
 	}
 
-	bh = bread (sb->s_dev, ufs_inotofsba(inode->i_ino), sb->s_blocksize);
+	bh = sb_bread(sb, ufs_inotofsba(inode->i_ino));
 	if (!bh) {
 		ufs_warning (sb, "ufs_read_inode", "unable to read inode %lu\n", inode->i_ino);
 		return -1;

@@ -389,8 +389,7 @@ static int ext3_block_to_path(struct inode *inode, long i_block, int offsets[4])
 static Indirect *ext3_get_branch(struct inode *inode, int depth, int *offsets,
 				 Indirect chain[4], int *err)
 {
-	kdev_t dev = inode->i_dev;
-	int blocksize = inode->i_sb->s_blocksize;
+	struct super_block *sb = inode->i_sb;
 	Indirect *p = chain;
 	struct buffer_head *bh;
 
@@ -400,7 +399,7 @@ static Indirect *ext3_get_branch(struct inode *inode, int depth, int *offsets,
 	if (!p->key)
 		goto no_block;
 	while (--depth) {
-		bh = bread(dev, le32_to_cpu(p->key), blocksize);
+		bh = sb_bread(sb, le32_to_cpu(p->key));
 		if (!bh)
 			goto failure;
 		/* Reader: pointers */
@@ -558,7 +557,7 @@ static int ext3_alloc_branch(handle_t *handle, struct inode *inode,
 			 * and set the pointer to new one, then send
 			 * parent to disk.  
 			 */
-			bh = getblk(inode->i_dev, parent, blocksize);
+			bh = sb_getblk(inode->i_sb, parent);
 			branch[n].bh = bh;
 			lock_buffer(bh);
 			BUFFER_TRACE(bh, "call get_create_access");
@@ -854,8 +853,7 @@ struct buffer_head *ext3_getblk(handle_t *handle, struct inode * inode,
 	*errp = ext3_get_block_handle(handle, inode, block, &dummy, create);
 	if (!*errp && buffer_mapped(&dummy)) {
 		struct buffer_head *bh;
-		bh = getblk(dummy.b_dev, dummy.b_blocknr,
-					inode->i_sb->s_blocksize);
+		bh = sb_getblk(inode->i_sb, dummy.b_blocknr);
 		if (buffer_new(&dummy)) {
 			J_ASSERT(create != 0);
 			J_ASSERT(handle != 0);
@@ -1549,9 +1547,6 @@ ext3_clear_blocks(handle_t *handle, struct inode *inode, struct buffer_head *bh,
 		u32 *first, u32 *last)
 {
 	u32 *p;
-	kdev_t dev = inode->i_sb->s_dev;
-	unsigned long blocksize = inode->i_sb->s_blocksize;
-
 	if (try_to_extend_transaction(handle, inode)) {
 		if (bh) {
 			BUFFER_TRACE(bh, "call ext3_journal_dirty_metadata");
@@ -1577,7 +1572,7 @@ ext3_clear_blocks(handle_t *handle, struct inode *inode, struct buffer_head *bh,
 			struct buffer_head *bh;
 
 			*p = 0;
-			bh = get_hash_table(dev, nr, blocksize);
+			bh = sb_get_hash_table(inode->i_sb, nr);
 			ext3_forget(handle, 0, inode, bh, nr);
 		}
 	}
@@ -1690,7 +1685,7 @@ static void ext3_free_branches(handle_t *handle, struct inode *inode,
 				continue;		/* A hole */
 
 			/* Go read the buffer for the next level down */
-			bh = bread(inode->i_dev, nr, inode->i_sb->s_blocksize);
+			bh = sb_bread(inode->i_sb, nr);
 
 			/*
 			 * A read failure? Report error and clear slot
@@ -2003,7 +1998,7 @@ int ext3_get_inode_loc (struct inode *inode, struct ext3_iloc *iloc)
 		EXT3_INODE_SIZE(inode->i_sb);
 	block = le32_to_cpu(gdp[desc].bg_inode_table) +
 		(offset >> EXT3_BLOCK_SIZE_BITS(inode->i_sb));
-	if (!(bh = bread (inode->i_dev, block, inode->i_sb->s_blocksize))) {
+	if (!(bh = sb_bread(inode->i_sb, block))) {
 		ext3_error (inode->i_sb, "ext3_get_inode_loc",
 			    "unable to read inode block - "
 			    "inode=%lu, block=%lu", inode->i_ino, block);

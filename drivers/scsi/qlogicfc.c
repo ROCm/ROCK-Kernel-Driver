@@ -1375,7 +1375,7 @@ static void redo_port_db(unsigned long arg)
 	hostdata->explore_timer.data = 0;
 	del_timer(&hostdata->explore_timer);
 
-	spin_lock_irqsave(&io_request_lock, flags);
+	spin_lock_irqsave(&host->host_lock, flags);
 
 	if (hostdata->adapter_state & AS_REDO_FABRIC_PORTDB || hostdata->adapter_state & AS_REDO_LOOP_PORTDB) {
 		isp2x00_make_portdb(host);
@@ -1422,7 +1422,7 @@ static void redo_port_db(unsigned long arg)
 		hostdata->adapter_state = AS_LOOP_GOOD;
 	}
 
-	spin_unlock_irqrestore(&io_request_lock, flags);
+	spin_unlock_irqrestore(&host->host_lock, flags);
 
 }
 
@@ -1430,11 +1430,12 @@ static void redo_port_db(unsigned long arg)
 
 void do_isp2x00_intr_handler(int irq, void *dev_id, struct pt_regs *regs)
 {
+	struct Scsi_Host *host = dev_id;
 	unsigned long flags;
 
-	spin_lock_irqsave(&io_request_lock, flags);
+	spin_lock_irqsave(&host->host_lock, flags);
 	isp2x00_intr_handler(irq, dev_id, regs);
-	spin_unlock_irqrestore(&io_request_lock, flags);
+	spin_unlock_irqrestore(&host->host_lock, flags);
 }
 
 void isp2x00_intr_handler(int irq, void *dev_id, struct pt_regs *regs)

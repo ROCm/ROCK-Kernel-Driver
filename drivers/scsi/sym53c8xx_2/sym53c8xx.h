@@ -130,17 +130,17 @@ int sym53c8xx_release(struct Scsi_Host *);
 #if !defined(HOSTS_C)
 
 /*
- *  Use normal IO if configured. Forced for alpha and powerpc.
- *  Powerpc fails copying to on-chip RAM using memcpy_toio().
+ *  Use normal IO if configured.
+ *  Normal IO forced for alpha.
  *  Forced to MMIO for sparc.
  */
 #if defined(__alpha__)
 #define	SYM_CONF_IOMAPPED
-#elif defined(__powerpc__)
-#define	SYM_CONF_IOMAPPED
-#define SYM_OPT_NO_BUS_MEMORY_MAPPING
 #elif defined(__sparc__)
 #undef SYM_CONF_IOMAPPED
+/* #elif defined(__powerpc__) */
+/* #define	SYM_CONF_IOMAPPED */
+/* #define SYM_OPT_NO_BUS_MEMORY_MAPPING */
 #elif defined(CONFIG_SCSI_SYM53C8XX_IOMAPPED)
 #define	SYM_CONF_IOMAPPED
 #endif

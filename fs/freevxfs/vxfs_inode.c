@@ -104,7 +104,7 @@ vxfs_blkiget(struct super_block *sbp, u_long extent, ino_t ino)
 
 	block = extent + ((ino * VXFS_ISIZE) / sbp->s_blocksize);
 	offset = ((ino % (sbp->s_blocksize / VXFS_ISIZE)) * VXFS_ISIZE);
-	bp = bread(sbp->s_dev, block, sbp->s_blocksize);
+	bp = sb_bread(sbp, block);
 
 	if (buffer_mapped(bp)) {
 		struct vxfs_inode_info	*vip;

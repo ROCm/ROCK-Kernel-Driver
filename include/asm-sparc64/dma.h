@@ -1,4 +1,4 @@
-/* $Id: dma.h,v 1.19 2000/01/28 13:43:14 jj Exp $
+/* $Id: dma.h,v 1.21 2001/12/13 04:16:52 davem Exp $
  * include/asm-sparc64/dma.h
  *
  * Copyright 1996 (C) David S. Miller (davem@caip.rutgers.edu)
@@ -217,11 +217,5 @@ extern int isa_dma_bridge_buggy;
 #else
 #define isa_dma_bridge_buggy 	(0)
 #endif
-
-/* We support dynamic DMA remapping and adjacent SG entries
- * which have addresses modulo DMA_CHUNK_SIZE will be merged
- * by dma_prepare_sg().
- */
-#define DMA_CHUNK_SIZE 8192
 
 #endif /* !(_ASM_SPARC64_DMA_H) */

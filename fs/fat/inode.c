@@ -584,7 +584,7 @@ fat_read_super(struct super_block *sb, void *data, int silent,
 
 	sb->s_blocksize = hard_blksize;
 	set_blocksize(sb->s_dev, hard_blksize);
-	bh = bread(sb->s_dev, 0, sb->s_blocksize);
+	bh = sb_bread(sb, 0);
 	if (bh == NULL) {
 		printk("FAT: unable to read boot sector\n");
 		goto out_fail;
@@ -656,7 +656,7 @@ fat_read_super(struct super_block *sb, void *data, int silent,
 			(sbi->fsinfo_sector * logical_sector_size) % hard_blksize;
 		fsinfo_bh = bh;
 		if (fsinfo_block != 0) {
-			fsinfo_bh = bread(sb->s_dev, fsinfo_block, hard_blksize);
+			fsinfo_bh = sb_bread(sb, fsinfo_block);
 			if (fsinfo_bh == NULL) {
 				printk("FAT: bread failed, FSINFO block"
 				       " (blocknr = %d)\n", fsinfo_block);

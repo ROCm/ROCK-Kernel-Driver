@@ -47,7 +47,7 @@ static void bfs_read_inode(struct inode * inode)
 	}
 
 	block = (ino - BFS_ROOT_INO)/BFS_INODES_PER_BLOCK + 1;
-	bh = bread(dev, block, BFS_BSIZE);
+	bh = sb_bread(inode->i_sb, block);
 	if (!bh) {
 		printf("Unable to read inode %s:%08lx\n", bdevname(dev), ino);
 		make_bad_inode(inode);
@@ -100,7 +100,7 @@ static void bfs_write_inode(struct inode * inode, int unused)
 
 	lock_kernel();
 	block = (ino - BFS_ROOT_INO)/BFS_INODES_PER_BLOCK + 1;
-	bh = bread(dev, block, BFS_BSIZE);
+	bh = sb_bread(inode->i_sb, block);
 	if (!bh) {
 		printf("Unable to read inode %s:%08lx\n", bdevname(dev), ino);
 		unlock_kernel();
@@ -153,7 +153,7 @@ static void bfs_delete_inode(struct inode * inode)
 	lock_kernel();
 	mark_inode_dirty(inode);
 	block = (ino - BFS_ROOT_INO)/BFS_INODES_PER_BLOCK + 1;
-	bh = bread(dev, block, BFS_BSIZE);
+	bh = sb_bread(s, block);
 	if (!bh) {
 		printf("Unable to read inode %s:%08lx\n", bdevname(dev), ino);
 		unlock_kernel();
@@ -252,7 +252,7 @@ static struct super_block * bfs_read_super(struct super_block * s,
 	s->s_blocksize = BFS_BSIZE;
 	s->s_blocksize_bits = BFS_BSIZE_BITS;
 
-	bh = bread(dev, 0, BFS_BSIZE);
+	bh = sb_bread(s, 0);
 	if(!bh)
 		goto out;
 	bfs_sb = (struct bfs_super_block *)bh->b_data;

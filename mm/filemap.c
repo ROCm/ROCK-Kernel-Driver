@@ -2847,7 +2847,7 @@ generic_file_write(struct file *file,const char *buf,size_t count, loff_t *ppos)
 	unsigned long	limit = current->rlim[RLIMIT_FSIZE].rlim_cur;
 	loff_t		pos;
 	struct page	*page, *cached_page;
-	unsigned long	written;
+	ssize_t		written;
 	long		status = 0;
 	int		err;
 	unsigned	bytes;

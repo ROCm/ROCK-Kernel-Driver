@@ -527,6 +527,7 @@ static struct super_block *isofs_read_super(struct super_block *s, void *data,
 	}
 
 	set_blocksize(dev, opt.blocksize);
+	s->s_blocksize = opt.blocksize;
 
 	s->u.isofs_sb.s_high_sierra = high_sierra = 0; /* default is iso9660 */
 
@@ -540,8 +541,8 @@ static struct super_block *isofs_read_super(struct super_block *s, void *data,
 	    struct iso_volume_descriptor  * vdp;
 
 	    block = iso_blknum << (ISOFS_BLOCK_BITS-blocksize_bits);
-	    if (!(bh = bread(dev, block, opt.blocksize)))
-		goto out_no_read;		
+	    if (!(bh = sb_bread(s, block)))
+		goto out_no_read;
 
 	    vdp = (struct iso_volume_descriptor *)bh->b_data;
 	    hdp = (struct hs_volume_descriptor *)bh->b_data;
@@ -896,7 +897,6 @@ int isofs_get_blocks(struct inode *inode, sector_t iblock,
 	unsigned int firstext;
 	unsigned long nextino;
 	int section, rv;
-	unsigned int blocksize = inode->i_sb->s_blocksize;
 
 	lock_kernel();
 
@@ -957,7 +957,7 @@ int isofs_get_blocks(struct inode *inode, sector_t iblock,
 			(*bh_result)->b_blocknr  = firstext + b_off - offset;
 			(*bh_result)->b_state   |= (1UL << BH_Mapped);
 		} else {
-			*bh_result = getblk(inode->i_dev, firstext+b_off-offset, blocksize);
+			*bh_result = sb_getblk(inode->i_sb, firstext+b_off-offset);
 			if ( !*bh_result )
 				goto abort;
 		}
@@ -1000,12 +1000,12 @@ static int isofs_bmap(struct inode *inode, int block)
 	return 0;
 }
 
-struct buffer_head *isofs_bread(struct inode *inode, unsigned int bufsize, unsigned int block)
+struct buffer_head *isofs_bread(struct inode *inode, unsigned int block)
 {
 	unsigned int blknr = isofs_bmap(inode, block);
 	if (!blknr)
 		return NULL;
-	return bread(inode->i_dev, blknr, bufsize);
+	return sb_bread(inode->i_sb, blknr);
 }
 
 static int isofs_readpage(struct file *file, struct page *page)
@@ -1060,7 +1060,7 @@ static int isofs_read_level3_size(struct inode * inode)
 		unsigned int de_len;
 
 		if (!bh) {
-			bh = bread(inode->i_dev, block, bufsize);
+			bh = sb_bread(inode->i_sb, block);
 			if (!bh)
 				goto out_noread;
 		}
@@ -1092,7 +1092,7 @@ static int isofs_read_level3_size(struct inode * inode)
 			brelse(bh);
 			bh = NULL;
 			if (offset) {
-				bh = bread(inode->i_dev, block, bufsize);
+				bh = sb_bread(inode->i_sb, block);
 				if (!bh)
 					goto out_noread;
 				memcpy((void *) tmpde + slop, bh->b_data, offset);
@@ -1150,7 +1150,7 @@ static void isofs_read_inode(struct inode * inode)
 	unsigned long offset;
 	int volume_seq_no, i;
 
-	bh = bread(inode->i_dev, block, bufsize);
+	bh = sb_bread(inode->i_sb, block);
 	if (!bh)
 		goto out_badread;
 
@@ -1168,7 +1168,7 @@ static void isofs_read_inode(struct inode * inode)
 		}
 		memcpy(tmpde, bh->b_data + offset, frag1);
 		brelse(bh);
-		bh = bread(inode->i_dev, ++block, bufsize);
+		bh = sb_bread(inode->i_sb, ++block);
 		if (!bh)
 			goto out_badread;
 		memcpy((char *)tmpde+frag1, bh->b_data, de_len - frag1);
@@ -1345,7 +1345,7 @@ static void isofs_read_inode(struct inode * inode)
 #ifdef LEAK_CHECK
 #undef malloc
 #undef free_s
-#undef bread
+#undef sb_bread
 #undef brelse
 
 void * leak_check_malloc(unsigned int size){
@@ -1360,9 +1360,9 @@ void leak_check_free_s(void * obj, int size){
   return kfree(obj);
 }
 
-struct buffer_head * leak_check_bread(int dev, int block, int size){
+struct buffer_head * leak_check_bread(struct super_block *sb, int block){
   check_bread++;
-  return bread(dev, block, size);
+  return sb_bread(sb, block);
 }
 
 void leak_check_brelse(struct buffer_head * bh){

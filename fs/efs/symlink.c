@@ -26,13 +26,13 @@ static int efs_symlink_readpage(struct file *file, struct page *page)
 	lock_kernel();
 	/* read first 512 bytes of link target */
 	err = -EIO;
-	bh = bread(inode->i_dev, efs_bmap(inode, 0), EFS_BLOCKSIZE);
+	bh = sb_bread(inode->i_sb, efs_bmap(inode, 0));
 	if (!bh)
 		goto fail;
 	memcpy(link, bh->b_data, (size > EFS_BLOCKSIZE) ? EFS_BLOCKSIZE : size);
 	brelse(bh);
 	if (size > EFS_BLOCKSIZE) {
-		bh = bread(inode->i_dev, efs_bmap(inode, 1), EFS_BLOCKSIZE);
+		bh = sb_bread(inode->i_sb, efs_bmap(inode, 1));
 		if (!bh)
 			goto fail;
 		memcpy(link + EFS_BLOCKSIZE, bh->b_data, size - EFS_BLOCKSIZE);

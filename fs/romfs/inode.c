@@ -108,7 +108,7 @@ romfs_read_super(struct super_block *s, void *data, int silent)
 	s->u.generic_sbp = (void *) 0;
 	s->s_maxbytes = 0xFFFFFFFF;
 
-	bh = bread(dev, 0, ROMBSIZE);
+	bh = sb_bread(s, 0);
 	if (!bh) {
 		/* XXX merge with other printk? */
                 printk ("romfs: unable to read superblock\n");
@@ -188,7 +188,7 @@ romfs_strnlen(struct inode *i, unsigned long offset, unsigned long count)
 	if (count > maxsize || offset+count > maxsize)
 		count = maxsize-offset;
 
-	bh = bread(i->i_dev, offset>>ROMBSBITS, ROMBSIZE);
+	bh = sb_bread(i->i_sb, offset>>ROMBSBITS);
 	if (!bh)
 		return -1;		/* error */
 
@@ -203,7 +203,7 @@ romfs_strnlen(struct inode *i, unsigned long offset, unsigned long count)
 	while (res < count) {
 		offset += maxsize;
 
-		bh = bread(i->i_dev, offset>>ROMBSBITS, ROMBSIZE);
+		bh = sb_bread(i->i_sb, offset>>ROMBSBITS);
 		if (!bh)
 			return -1;
 		maxsize = min_t(unsigned long, count - res, ROMBSIZE);
@@ -226,7 +226,7 @@ romfs_copyfrom(struct inode *i, void *dest, unsigned long offset, unsigned long 
 	if (offset >= maxsize || count > maxsize || offset+count>maxsize)
 		return -1;
 
-	bh = bread(i->i_dev, offset>>ROMBSBITS, ROMBSIZE);
+	bh = sb_bread(i->i_sb, offset>>ROMBSBITS);
 	if (!bh)
 		return -1;		/* error */
 
@@ -241,7 +241,7 @@ romfs_copyfrom(struct inode *i, void *dest, unsigned long offset, unsigned long 
 		offset += maxsize;
 		dest += maxsize;
 
-		bh = bread(i->i_dev, offset>>ROMBSBITS, ROMBSIZE);
+		bh = sb_bread(i->i_sb, offset>>ROMBSBITS);
 		if (!bh)
 			return -1;
 		maxsize = min_t(unsigned long, count - res, ROMBSIZE);

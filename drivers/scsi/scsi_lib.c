@@ -82,7 +82,7 @@ static void __scsi_insert_special(request_queue_t *q, struct request *rq,
 	rq->special = data;
 	rq->q = NULL;
 	rq->bio = rq->biotail = NULL;
-	rq->nr_segments = 0;
+	rq->nr_phys_segments = 0;
 	rq->elevator_sequence = 0;
 
 	/*
@@ -461,13 +461,13 @@ static void scsi_release_buffers(Scsi_Cmnd * SCpnt)
 		if (bbpnt) {
 			for (i = 0; i < SCpnt->use_sg; i++) {
 				if (bbpnt[i])
-					scsi_free(sgpnt[i].address, sgpnt[i].length);
+					kfree(sgpnt[i].address);
 			}
 		}
-		scsi_free(SCpnt->request_buffer, SCpnt->sglist_len);
+		scsi_free_sgtable(SCpnt->request_buffer, SCpnt->sglist_len);
 	} else {
 		if (SCpnt->request_buffer != req->buffer)
-			scsi_free(SCpnt->request_buffer,SCpnt->request_bufflen);
+			kfree(SCpnt->request_buffer);
 	}
 
 	/*
@@ -541,11 +541,11 @@ void scsi_io_completion(Scsi_Cmnd * SCpnt, int good_sectors,
 						       sgpnt[i].address,
 						       sgpnt[i].length);
 					}
-					scsi_free(sgpnt[i].address, sgpnt[i].length);
+					kfree(sgpnt[i].address);
 				}
 			}
 		}
-		scsi_free(SCpnt->buffer, SCpnt->sglist_len);
+		scsi_free_sgtable(SCpnt->buffer, SCpnt->sglist_len);
 	} else {
 		if (SCpnt->buffer != req->buffer) {
 			if (rq_data_dir(req) == READ) {
@@ -555,7 +555,7 @@ void scsi_io_completion(Scsi_Cmnd * SCpnt, int good_sectors,
 				memcpy(to, SCpnt->buffer, SCpnt->bufflen);
 				bio_kunmap_irq(to, &flags);
 			}
-			scsi_free(SCpnt->buffer, SCpnt->bufflen);
+			kfree(SCpnt->buffer);
 		}
 	}
 
@@ -922,15 +922,6 @@ void scsi_request_fn(request_queue_t * q)
 			 */
 			if (req->special) {
 				SCpnt = (Scsi_Cmnd *) req->special;
-				/*
-				 * We need to recount the number of
-				 * scatter-gather segments here - the
-				 * normal case code assumes this to be
-				 * correct, as it would be a performance
-				 * loss to always recount.  Handling
-				 * errors is always unusual, of course.
-				 */
-				recount_segments(SCpnt);
 			} else {
 				SCpnt = scsi_allocate_device(SDpnt, FALSE, FALSE);
 			}
@@ -1003,7 +994,7 @@ void scsi_request_fn(request_queue_t * q)
 			 * required).  Hosts that need bounce buffers will also
 			 * get those allocated here.  
 			 */
-			if (!SDpnt->scsi_init_io_fn(SCpnt)) {
+			if (!scsi_init_io(SCpnt)) {
 				SCpnt = __scsi_end_request(SCpnt, 0, 
 							   SCpnt->request.nr_sectors, 0, 0);
 				if( SCpnt != NULL )

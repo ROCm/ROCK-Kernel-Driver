@@ -118,7 +118,7 @@ extern int qnx4_unlink(struct inode *dir, struct dentry *dentry);
 extern int qnx4_rmdir(struct inode *dir, struct dentry *dentry);
 extern int qnx4_sync_file(struct file *file, struct dentry *dentry, int);
 extern int qnx4_sync_inode(struct inode *inode);
-extern int qnx4_get_block(struct inode *inode, long iblock, struct buffer_head *bh, int create);
+extern int qnx4_get_block(struct inode *inode, sector_t iblock, struct buffer_head *bh, int create);
 
 #endif				/* __KERNEL__ */
 

@@ -111,7 +111,8 @@ inline void bio_init(struct bio *bio)
 	bio->bi_rw = 0;
 	bio->bi_vcnt = 0;
 	bio->bi_idx = 0;
-	bio->bi_hw_seg = 0;
+	bio->bi_phys_segments = 0;
+	bio->bi_hw_segments = 0;
 	bio->bi_size = 0;
 	bio->bi_end_io = NULL;
 	atomic_set(&bio->bi_cnt, 1);
@@ -166,12 +167,20 @@ void bio_put(struct bio *bio)
 	}
 }
 
-inline int bio_hw_segments(request_queue_t *q, struct bio *bio)
+inline int bio_phys_segments(request_queue_t *q, struct bio *bio)
 {
-	if (unlikely(!(bio->bi_flags & BIO_SEG_VALID)))
+	if (unlikely(!(bio->bi_flags & (1 << BIO_SEG_VALID))))
 		blk_recount_segments(q, bio);
 
-	return bio->bi_hw_seg;
+	return bio->bi_phys_segments;
+}
+
+inline int bio_hw_segments(request_queue_t *q, struct bio *bio)
+{
+	if (unlikely(!(bio->bi_flags & (1 << BIO_SEG_VALID))))
+		blk_recount_segments(q, bio);
+
+	return bio->bi_hw_segments;
 }
 
 /**
@@ -199,7 +208,8 @@ inline void __bio_clone(struct bio *bio, struct bio *bio_src)
 	bio->bi_vcnt = bio_src->bi_vcnt;
 	bio->bi_idx = bio_src->bi_idx;
 	if (bio_src->bi_flags & (1 << BIO_SEG_VALID)) {
-		bio->bi_hw_seg = bio_src->bi_hw_seg;
+		bio->bi_phys_segments = bio_src->bi_phys_segments;
+		bio->bi_hw_segments = bio_src->bi_hw_segments;
 		bio->bi_flags |= (1 << BIO_SEG_VALID);
 	}
 	bio->bi_size = bio_src->bi_size;
@@ -496,7 +506,7 @@ static int __init init_bio(void)
 	if (!bio_pool)
 		panic("bio: can't create mempool\n");
 
-	printk("BIO: pool of %d setup, %uKb (%d bytes/bio)\n", BIO_POOL_SIZE, BIO_POOL_SIZE * sizeof(struct bio) >> 10, sizeof(struct bio));
+	printk("BIO: pool of %d setup, %ZuKb (%Zd bytes/bio)\n", BIO_POOL_SIZE, BIO_POOL_SIZE * sizeof(struct bio) >> 10, sizeof(struct bio));
 
 	biovec_init_pool();
 
@@ -513,4 +523,5 @@ EXPORT_SYMBOL(bio_init);
 EXPORT_SYMBOL(bio_copy);
 EXPORT_SYMBOL(__bio_clone);
 EXPORT_SYMBOL(bio_clone);
+EXPORT_SYMBOL(bio_phys_segments);
 EXPORT_SYMBOL(bio_hw_segments);

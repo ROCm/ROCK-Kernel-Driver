@@ -39,7 +39,7 @@ int reiserfs_resize (struct super_block * s, unsigned long block_count_new)
 	}
 
 	/* check the device size */
-	bh = bread(s->s_dev, block_count_new - 1, s->s_blocksize);
+	bh = sb_bread(s, block_count_new - 1);
 	if (!bh) {
 		printk("reiserfs_resize: can\'t read last block\n");
 		return -EINVAL;

@@ -925,6 +925,7 @@ struct super_block * ext3_read_super (struct super_block * sb, void * data,
 		goto out_fail;
 	}
 
+	sb->s_blocksize = blocksize;
 	set_blocksize (dev, blocksize);
 
 	/*
@@ -936,7 +937,7 @@ struct super_block * ext3_read_super (struct super_block * sb, void * data,
 		offset = (sb_block * EXT3_MIN_BLOCK_SIZE) % blocksize;
 	}
 
-	if (!(bh = bread (dev, logic_sb_block, blocksize))) {
+	if (!(bh = sb_bread(sb, logic_sb_block))) {
 		printk (KERN_ERR "EXT3-fs: unable to read superblock\n");
 		goto out_fail;
 	}
@@ -1009,7 +1010,7 @@ struct super_block * ext3_read_super (struct super_block * sb, void * data,
 		set_blocksize (dev, sb->s_blocksize);
 		logic_sb_block = (sb_block * EXT3_MIN_BLOCK_SIZE) / blocksize;
 		offset = (sb_block * EXT3_MIN_BLOCK_SIZE) % blocksize;
-		bh = bread (dev, logic_sb_block, blocksize);
+		bh = sb_bread(sb, logic_sb_block);
 		if (!bh) {
 			printk(KERN_ERR 
 			       "EXT3-fs: Can't read superblock on 2nd try.\n");
@@ -1093,8 +1094,7 @@ struct super_block * ext3_read_super (struct super_block * sb, void * data,
 		goto failed_mount;
 	}
 	for (i = 0; i < db_count; i++) {
-		sbi->s_group_desc[i] = bread(dev, logic_sb_block + i + 1,
-					     blocksize);
+		sbi->s_group_desc[i] = sb_bread(sb, logic_sb_block + i + 1);
 		if (!sbi->s_group_desc[i]) {
 			printk (KERN_ERR "EXT3-fs: "
 				"can't read group descriptor %d\n", i);

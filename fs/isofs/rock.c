@@ -69,7 +69,7 @@
     block = cont_extent; \
     offset = cont_offset; \
     offset1 = 0; \
-    pbh = bread(DEV->i_dev, block, ISOFS_BUFFER_SIZE(DEV)); \
+    pbh = sb_bread(DEV->i_sb, block); \
     if(pbh){       \
       memcpy(buffer + offset1, pbh->b_data + offset, cont_size - offset1); \
       brelse(pbh); \
@@ -511,7 +511,7 @@ static int rock_ridge_symlink_readpage(struct file *file, struct page *page)
 
 	block = inode->i_ino >> bufbits;
 	lock_kernel();
-	bh = bread(inode->i_dev, block, bufsize);
+	bh = sb_bread(inode->i_sb, block);
 	if (!bh)
 		goto out_noread;
 

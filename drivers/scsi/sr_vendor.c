@@ -115,7 +115,7 @@ int sr_set_blocklength(int minor, int blocklength)
 		density = (blocklength > 2048) ? 0x81 : 0x83;
 #endif
 
-	buffer = (unsigned char *) scsi_malloc(512);
+	buffer = (unsigned char *) kmalloc(512, GFP_KERNEL | GFP_DMA);
 	if (!buffer)
 		return -ENOMEM;
 
@@ -142,7 +142,7 @@ int sr_set_blocklength(int minor, int blocklength)
 		printk("sr%d: switching blocklength to %d bytes failed\n",
 		       minor, blocklength);
 #endif
-	scsi_free(buffer, 512);
+	kfree(buffer);
 	return rc;
 }
 
@@ -162,7 +162,7 @@ int sr_cd_check(struct cdrom_device_info *cdi)
 	if (scsi_CDs[minor].cdi.mask & CDC_MULTI_SESSION)
 		return 0;
 
-	buffer = (unsigned char *) scsi_malloc(512);
+	buffer = (unsigned char *) kmalloc(512, GFP_KERNEL | GFP_DMA);
 	if (!buffer)
 		return -ENOMEM;
 
@@ -306,6 +306,6 @@ int sr_cd_check(struct cdrom_device_info *cdi)
 		printk(KERN_DEBUG "sr%d: multisession offset=%lu\n",
 		       minor, sector);
 #endif
-	scsi_free(buffer, 512);
+	kfree(buffer);
 	return rc;
 }

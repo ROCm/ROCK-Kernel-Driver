@@ -1,4 +1,4 @@
-/* $Id: esp.c,v 1.99 2001/02/13 01:17:01 davem Exp $
+/* $Id: esp.c,v 1.100 2001/12/11 04:55:48 davem Exp $
  * esp.c:  EnhancedScsiProcessor Sun SCSI driver code.
  *
  * Copyright (C) 1995, 1998 David S. Miller (davem@caip.rutgers.edu)
@@ -1035,9 +1035,6 @@ static void __init esp_init_swstate(struct esp *esp)
 {
 	int i;
 
-	/* Driver spinlock... */
-	spin_lock_init(&esp->lock);
-
 	/* Command queues... */
 	esp->current_SC = NULL;
 	esp->disconnected_SC = NULL;
@@ -1816,7 +1813,6 @@ after_nego_msg_built:
 int esp_queue(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 {
 	struct esp *esp;
-	unsigned long flags;
 
 	/* Set up func ptr and initial driver cmd-phase. */
 	SCpnt->scsi_done = done;
@@ -1834,8 +1830,6 @@ int esp_queue(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 	SCpnt->SCp.Message          = 0xff;
 	SCpnt->SCp.sent_command     = 0;
 
-	spin_lock_irqsave(&esp->lock, flags);
-
 	/* Place into our queue. */
 	if (SCpnt->cmnd[0] == REQUEST_SENSE) {
 		ESPQUEUE(("RQSENSE\n"));
@@ -1848,8 +1842,6 @@ int esp_queue(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 	/* Run it now if we can. */
 	if (!esp->current_SC && !esp->resetting_bus)
 		esp_exec_cmd(esp);
-
-	spin_unlock_irqrestore(&esp->lock, flags);
 
 	return 0;
 }
@@ -1926,7 +1918,7 @@ int esp_abort(Scsi_Cmnd *SCptr)
 	unsigned long flags;
 	int don;
 
-	spin_lock_irqsave(&esp->lock, flags);
+	spin_lock_irqsave(&esp->ehost->host_lock, flags);
 
 	ESPLOG(("esp%d: Aborting command\n", esp->esp_id));
 	esp_dump_state(esp);
@@ -1942,7 +1934,7 @@ int esp_abort(Scsi_Cmnd *SCptr)
 		esp->msgout_len = 1;
 		esp->msgout_ctr = 0;
 		esp_cmd(esp, ESP_CMD_SATN);
-		spin_unlock_irqrestore(&esp->lock, flags);
+		spin_unlock_irqrestore(&esp->ehost->host_lock, flags);
 		return SCSI_ABORT_PENDING;
 	}
 
@@ -1964,14 +1956,14 @@ int esp_abort(Scsi_Cmnd *SCptr)
 				*prev = (Scsi_Cmnd *) this->host_scribble;
 				this->host_scribble = NULL;
 
-				spin_unlock_irqrestore(&esp->lock, flags);
-
 				esp_release_dmabufs(esp, this);
 				this->result = DID_ABORT << 16;
 				this->scsi_done(this);
+
 				if (don)
 					ESP_INTSON(esp->dregs);
 
+				spin_unlock_irqrestore(&esp->ehost->host_lock, flags);
 				return SCSI_ABORT_SUCCESS;
 			}
 		}
@@ -1985,7 +1977,7 @@ int esp_abort(Scsi_Cmnd *SCptr)
 	if (esp->current_SC) {
 		if (don)
 			ESP_INTSON(esp->dregs);
-		spin_unlock_irqrestore(&esp->lock, flags);
+		spin_unlock_irqrestore(&esp->ehost->host_lock, flags);
 		return SCSI_ABORT_BUSY;
 	}
 
@@ -1998,7 +1990,7 @@ int esp_abort(Scsi_Cmnd *SCptr)
 
 	if (don)
 		ESP_INTSON(esp->dregs);
-	spin_unlock_irqrestore(&esp->lock, flags);
+	spin_unlock_irqrestore(&esp->ehost->host_lock, flags);
 	return SCSI_ABORT_SNOOZE;
 }
 
@@ -2014,16 +2006,11 @@ static int esp_finish_reset(struct esp *esp)
 	/* Clean up currently executing command, if any. */
 	if (sp != NULL) {
 		esp->current_SC = NULL;
-		spin_unlock(&esp->lock);
 
 		esp_release_dmabufs(esp, sp);
 		sp->result = (DID_RESET << 16);
 
-		spin_lock(&io_request_lock);
 		sp->scsi_done(sp);
-		spin_unlock(&io_request_lock);
-
-		spin_lock(&esp->lock);
 	}
 
 	/* Clean up disconnected queue, they have been invalidated
@@ -2031,16 +2018,10 @@ static int esp_finish_reset(struct esp *esp)
 	 */
 	if (esp->disconnected_SC) {
 		while ((sp = remove_first_SC(&esp->disconnected_SC)) != NULL) {
-			spin_unlock(&esp->lock);
-
 			esp_release_dmabufs(esp, sp);
 			sp->result = (DID_RESET << 16);
 
-			spin_lock(&io_request_lock);
 			sp->scsi_done(sp);
-			spin_unlock(&io_request_lock);
-
-			spin_lock(&esp->lock);
 		}
 	}
 
@@ -2071,9 +2052,9 @@ int esp_reset(Scsi_Cmnd *SCptr, unsigned int how)
 	struct esp *esp = (struct esp *) SCptr->host->hostdata;
 	unsigned long flags;
 
-	spin_lock_irqsave(&esp->lock, flags);
+	spin_lock_irqsave(&esp->ehost->host_lock, flags);
 	(void) esp_do_resetbus(esp);
-	spin_unlock_irqrestore(&esp->lock, flags);
+	spin_unlock_irqrestore(&esp->ehost->host_lock, flags);
 
 	return SCSI_RESET_PENDING;
 }
@@ -2085,16 +2066,12 @@ static void esp_done(struct esp *esp, int error)
 
 	esp->current_SC = NULL;
 
-	spin_unlock(&esp->lock);
 	esp_release_dmabufs(esp, done_SC);
 	done_SC->result = error;
 
-	spin_lock(&io_request_lock);
 	done_SC->scsi_done(done_SC);
-	spin_unlock(&io_request_lock);
 
 	/* Bus is free, issue any commands in the queue. */
-	spin_lock(&esp->lock);
 	if (esp->issue_SC && !esp->current_SC)
 		esp_exec_cmd(esp);
 
@@ -4344,7 +4321,7 @@ static void esp_intr(int irq, void *dev_id, struct pt_regs *pregs)
 	struct esp *esp = dev_id;
 	unsigned long flags;
 
-	spin_lock_irqsave(&esp->lock, flags);
+	spin_lock_irqsave(&esp->ehost->host_lock, flags);
 	if (ESP_IRQ_P(esp->dregs)) {
 		ESP_INTSOFF(esp->dregs);
 
@@ -4354,7 +4331,7 @@ static void esp_intr(int irq, void *dev_id, struct pt_regs *pregs)
 
 		ESP_INTSON(esp->dregs);
 	}
-	spin_unlock_irqrestore(&esp->lock, flags);
+	spin_unlock_irqrestore(&esp->ehost->host_lock, flags);
 }
 
 int esp_revoke(Scsi_Device* SDptr)

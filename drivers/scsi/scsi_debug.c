@@ -182,7 +182,6 @@ static void scsi_dump(Scsi_Cmnd * SCpnt, int flag)
 	};
 	printk("\n");
 #endif
-	printk("DMA free %d sectors.\n", scsi_dma_free_sectors);
 }
 
 int scsi_debug_queuecommand(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
@@ -653,7 +652,6 @@ int scsi_debug_abort(Scsi_Cmnd * SCpnt)
 
 int scsi_debug_biosparam(Disk * disk, kdev_t dev, int *info)
 {
-	int size = disk->capacity;
 	info[0] = N_HEAD;
 	info[1] = N_SECTOR;
 	info[2] = N_CYLINDER;

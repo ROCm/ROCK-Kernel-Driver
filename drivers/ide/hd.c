@@ -62,6 +62,8 @@
 #define HD_IRQ IRQ_HARDDISK
 #endif
 
+static spinlock_t hd_lock = SPIN_LOCK_UNLOCKED;
+
 static int revalidate_hddisk(kdev_t, int);
 
 #define	HD_DELAY	0
@@ -106,7 +108,7 @@ static int NR_HD;
 static struct hd_struct hd[MAX_HD<<6];
 static int hd_sizes[MAX_HD<<6];
 static int hd_blocksizes[MAX_HD<<6];
-static int hd_hardsectsizes[MAX_HD<<6];
+
 
 static struct timer_list device_timer;
 
@@ -464,7 +466,7 @@ ok_to_write:
 	i = --CURRENT->nr_sectors;
 	--CURRENT->current_nr_sectors;
 	CURRENT->buffer += 512;
-	if (!i || (CURRENT->bh && !SUBSECTOR(i)))
+	if (!i || (CURRENT->bio && !SUBSECTOR(i)))
 		end_request(1);
 	if (i > 0) {
 		SET_INTR(&write_intr);
@@ -586,24 +588,29 @@ repeat:
 		dev+'a', (CURRENT->cmd == READ)?"read":"writ",
 		cyl, head, sec, nsect, (unsigned long) CURRENT->buffer);
 #endif
-	if (CURRENT->cmd == READ) {
-		hd_out(dev,nsect,sec,head,cyl,WIN_READ,&read_intr);
-		if (reset)
-			goto repeat;
-		return;
-	}
-	if (CURRENT->cmd == WRITE) {
-		hd_out(dev,nsect,sec,head,cyl,WIN_WRITE,&write_intr);
-		if (reset)
-			goto repeat;
-		if (wait_DRQ()) {
-			bad_rw_intr();
-			goto repeat;
+	if(CURRENT->flags & REQ_CMD) {
+		switch (rq_data_dir(CURRENT)) {
+		case READ:
+			hd_out(dev,nsect,sec,head,cyl,WIN_READ,&read_intr);
+			if (reset)
+				goto repeat;
+			break;
+		case WRITE:
+			hd_out(dev,nsect,sec,head,cyl,WIN_WRITE,&write_intr);
+			if (reset)
+				goto repeat;
+			if (wait_DRQ()) {
+				bad_rw_intr();
+				goto repeat;
+			}
+			outsw(HD_DATA,CURRENT->buffer,256);
+			break;
+		default:
+			printk("unknown hd-command\n");
+			end_request(0);
+			break;
 		}
-		outsw(HD_DATA,CURRENT->buffer,256);
-		return;
 	}
-	panic("unknown hd-command");
 }
 
 static void do_hd_request (request_queue_t * q)
@@ -723,12 +730,11 @@ static void __init hd_geninit(void)
 {
 	int drive;
 
-	for(drive=0; drive < (MAX_HD << 6); drive++) {
+	for(drive=0; drive < (MAX_HD << 6); drive++)
 		hd_blocksizes[drive] = 1024;
-		hd_hardsectsizes[drive] = 512;
-	}
+
 	blksize_size[MAJOR_NR] = hd_blocksizes;
-	hardsect_size[MAJOR_NR] = hd_hardsectsizes;
+	blk_queue_hardsect_size(QUEUE, 512);
 
 #ifdef __i386__
 	if (!NR_HD) {
@@ -830,7 +836,7 @@ int __init hd_init(void)
 		printk("hd: unable to get major %d for hard disk\n",MAJOR_NR);
 		return -1;
 	}
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST);
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST, &hd_lock);
 	blk_queue_max_sectors(BLK_DEFAULT_QUEUE(MAJOR_NR), 255);
 	read_ahead[MAJOR_NR] = 8;		/* 8 sector (4kB) read-ahead */
 	add_gendisk(&hd_gendisk);

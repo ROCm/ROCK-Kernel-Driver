@@ -1963,7 +1963,7 @@ int reiserfs_prepare_write(struct file *f, struct page *page,
 //
 // this is exactly what 2.3.99-pre9's ext2_bmap is
 //
-static int reiserfs_aop_bmap(struct address_space *as, sector_t block) {
+static int reiserfs_aop_bmap(struct address_space *as, long block) {
   return generic_block_bmap(as, block, reiserfs_bmap) ;
 }
 

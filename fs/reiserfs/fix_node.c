@@ -920,7 +920,7 @@ static int  is_left_neighbor_in_cache(
   /* Get left neighbor block number. */
   n_left_neighbor_blocknr = B_N_CHILD_NUM(p_s_tb->FL[n_h], n_left_neighbor_position);
   /* Look for the left neighbor in the cache. */
-  if ( (left = get_hash_table(p_s_sb->s_dev, n_left_neighbor_blocknr, p_s_sb->s_blocksize)) ) {
+  if ( (left = sb_get_hash_table(p_s_sb, n_left_neighbor_blocknr)) ) {
 
     RFALSE( buffer_uptodate (left) && ! B_IS_IN_TREE(left),
 	    "vs-8170: left neighbor (%b %z) is not in the tree", left, left);

@@ -4689,8 +4689,9 @@ out_reject:
 	return;
 out_clrack:
 	OUTL_DSP (SCRIPTA_BA (np, clrack));
+	return;
 out_stuck:
-	;
+	return;
 }
 
 /*
@@ -5223,8 +5224,10 @@ static void sym_alloc_lcb_tags (hcb_p np, u_char tn, u_char ln)
 	 *  And accept tagged commands now.
 	 */
 	lp->head.itlq_tbl_sa = cpu_to_scr(vtobus(lp->itlq_tbl));
+
+	return;
 fail:
-	;
+	return;
 }
 
 /*
@@ -5787,6 +5790,13 @@ int sym_hcb_attach(hcb_p np, struct sym_fw *fw)
 		goto attach_failed;
 
 	/*
+	 *  Allocate the array of lists of CCBs hashed by DSA.
+	 */
+	np->ccbh = sym_calloc(sizeof(ccb_p *)*CCB_HASH_SIZE, "CCBH");
+	if (!np->ccbh)
+		goto attach_failed;
+
+	/*
 	 *  Initialyze the CCB free and busy queues.
 	 */
 	sym_que_init(&np->free_ccbq);
@@ -5977,6 +5987,8 @@ void sym_hcb_free(hcb_p np)
 			sym_mfree_dma(cp, sizeof(*cp), "CCB");
 		}
 	}
+	if (np->ccbh)
+		sym_mfree(np->ccbh, sizeof(ccb_p *)*CCB_HASH_SIZE, "CCBH");
 
 	if (np->badluntbl)
 		sym_mfree_dma(np->badluntbl, 256,"BADLUNTBL");

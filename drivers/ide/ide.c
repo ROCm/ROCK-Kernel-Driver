@@ -3686,6 +3686,7 @@ EXPORT_SYMBOL(ide_spin_wait_hwgroup);
  */
 devfs_handle_t ide_devfs_handle;
 
+EXPORT_SYMBOL(ide_lock);
 EXPORT_SYMBOL(ide_probe);
 EXPORT_SYMBOL(drive_is_flashcard);
 EXPORT_SYMBOL(ide_timer_expiry);
@@ -3718,6 +3719,7 @@ EXPORT_SYMBOL(ide_do_drive_cmd);
 EXPORT_SYMBOL(ide_end_drive_cmd);
 EXPORT_SYMBOL(ide_end_request);
 EXPORT_SYMBOL(__ide_end_request);
+EXPORT_SYMBOL(ide_revalidate_drive);
 EXPORT_SYMBOL(ide_revalidate_disk);
 EXPORT_SYMBOL(ide_cmd);
 EXPORT_SYMBOL(ide_wait_cmd);

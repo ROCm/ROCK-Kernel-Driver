@@ -3084,7 +3084,7 @@ aic7xxx_done(struct aic7xxx_host *p, struct aic7xxx_scb *scb)
        * we check data_cmnd[0].  This catches the conditions for st.c, but
        * I'm still not sure if request.cmd is valid for sg devices.
        */
-      if ( (cmd->request.cmd == WRITE) || (cmd->data_cmnd[0] == WRITE_6) ||
+      if ( (rq_data_dir(&cmd->request) == WRITE) || (cmd->data_cmnd[0] == WRITE_6) ||
            (cmd->data_cmnd[0] == WRITE_FILEMARKS) )
       {
         sp->w_total++;
@@ -4294,7 +4294,7 @@ aic7xxx_calculate_residual (struct aic7xxx_host *p, struct aic7xxx_scb *scb)
       {
         printk(INFO_LEAD "Underflow - Wanted %u, %s %u, residual SG "
           "count %d.\n", p->host_no, CTL_OF_SCB(scb), cmd->underflow,
-          (cmd->request.cmd == WRITE) ? "wrote" : "read", actual,
+          (rq_data_dir(&cmd->request) == WRITE) ? "wrote" : "read", actual,
           hscb->residual_SG_segment_count);
         printk(INFO_LEAD "status 0x%x.\n", p->host_no, CTL_OF_SCB(scb),
           hscb->target_status);

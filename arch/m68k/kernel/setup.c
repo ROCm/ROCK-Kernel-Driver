@@ -93,7 +93,6 @@ void (*mach_power_off)( void ) = NULL;
 long mach_max_dma_address = 0x00ffffff; /* default set to the lower 16MB */
 #if defined(CONFIG_AMIGA_FLOPPY) || defined(CONFIG_ATARI_FLOPPY) 
 void (*mach_floppy_setup) (char *, int *) __initdata = NULL;
-void (*mach_floppy_eject) (void) = NULL;
 #endif
 #ifdef CONFIG_HEARTBEAT
 void (*mach_heartbeat) (int) = NULL;
@@ -514,11 +513,6 @@ void __init floppy_setup(char *str, int *ints)
 		mach_floppy_setup (str, ints);
 }
 
-void floppy_eject(void)
-{
-	if (mach_floppy_eject)
-		mach_floppy_eject();
-}
 #endif
 
 /* for "kbd-reset" cmdline param */

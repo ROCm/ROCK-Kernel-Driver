@@ -341,14 +341,14 @@ static void soc_intr(int irq, void *dev_id, struct pt_regs *regs)
 	unsigned long flags;
 	register struct soc *s = (struct soc *)dev_id;
 
-	spin_lock_irqsave(&io_request_lock, flags);
+	spin_lock_irqsave(&s->lock, flags);
 	cmd = sbus_readl(s->regs + CMD);
 	for (; (cmd = SOC_INTR (s, cmd)); cmd = sbus_readl(s->regs + CMD)) {
 		if (cmd & SOC_CMD_RSP_Q1) soc_unsolicited (s);
 		if (cmd & SOC_CMD_RSP_Q0) soc_solicited (s);
 		if (cmd & SOC_CMD_REQ_QALL) soc_request (s, cmd);
 	}
-	spin_unlock_irqrestore(&io_request_lock, flags);
+	spin_unlock_irqrestore(&s->lock, flags);
 }
 
 #define TOKEN(proto, port, token) (((proto)<<12)|(token)|(port))
@@ -559,6 +559,7 @@ static inline void soc_init(struct sbus_dev *sdev, int no)
 	if (s == NULL)
 		return;
 	memset (s, 0, sizeof(struct soc));
+	spin_lock_init(&s->lock);
 	s->soc_no = no;
 
 	SOD(("socs %08lx soc_intr %08lx soc_hw_enque %08x\n",

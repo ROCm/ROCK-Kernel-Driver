@@ -1620,7 +1620,3 @@ int fd1772_init(void)
 
 	return 0;
 }
-
-void floppy_eject(void)
-{
-}

@@ -133,7 +133,7 @@ minix_V1_raw_inode(struct super_block *sb, ino_t ino, struct buffer_head **bh)
 	ino--;
 	block = 2 + sbi->s_imap_blocks + sbi->s_zmap_blocks +
 		 ino / MINIX_INODES_PER_BLOCK;
-	*bh = bread(sb->s_dev, block, BLOCK_SIZE);
+	*bh = sb_bread(sb, block);
 	if (!*bh) {
 		printk("unable to read i-node block\n");
 		return NULL;
@@ -158,7 +158,7 @@ minix_V2_raw_inode(struct super_block *sb, ino_t ino, struct buffer_head **bh)
 	ino--;
 	block = 2 + sbi->s_imap_blocks + sbi->s_zmap_blocks +
 		 ino / MINIX2_INODES_PER_BLOCK;
-	*bh = bread(sb->s_dev, block, BLOCK_SIZE);
+	*bh = sb_bread(sb, block);
 	if (!*bh) {
 		printk("unable to read i-node block\n");
 		return NULL;

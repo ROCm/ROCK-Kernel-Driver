@@ -608,8 +608,11 @@ static void ide_init_queue(ide_drive_t *drive)
 #endif
 	blk_queue_max_sectors(q, max_sectors);
 
-	/* IDE DMA can do PRD_ENTRIES number of segments */
-	q->max_segments = PRD_ENTRIES;
+	/* IDE DMA can do PRD_ENTRIES number of segments. */
+	blk_queue_max_hw_segments(q, PRD_ENTRIES);
+
+	/* This is a driver limit and could be eliminated. */
+	blk_queue_max_phys_segments(q, PRD_ENTRIES);
 }
 
 /*

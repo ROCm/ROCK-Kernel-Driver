@@ -114,7 +114,7 @@ vxfs_bread(struct inode *ip, int block)
 	daddr_t			pblock;
 
 	pblock = vxfs_bmap1(ip, block);
-	bp = bread(ip->i_dev, pblock, ip->i_sb->s_blocksize);
+	bp = sb_bread(ip->i_sb, pblock);
 
 	return (bp);
 }
@@ -135,7 +135,7 @@ vxfs_bread(struct inode *ip, int block)
  *   Zero on success, else a negativ error code (-EIO).
  */
 static int
-vxfs_getblk(struct inode *ip, long iblock,
+vxfs_getblk(struct inode *ip, sector_t iblock,
 	    struct buffer_head *bp, int create)
 {
 	daddr_t			pblock;

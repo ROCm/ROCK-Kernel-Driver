@@ -432,6 +432,7 @@ struct super_block * ext2_read_super (struct super_block * sb, void * data,
 		printk ("EXT2-fs: unable to set blocksize %d\n", blocksize);
 		return NULL;
 	}
+	sb->s_blocksize = blocksize;
 
 	/*
 	 * If the superblock doesn't start on a sector boundary,
@@ -443,7 +444,7 @@ struct super_block * ext2_read_super (struct super_block * sb, void * data,
 		offset = (sb_block*BLOCK_SIZE) % blocksize;
 	}
 
-	if (!(bh = bread (dev, logic_sb_block, blocksize))) {
+	if (!(bh = sb_bread(sb, logic_sb_block))) {
 		printk ("EXT2-fs: unable to read superblock\n");
 		return NULL;
 	}
@@ -502,7 +503,7 @@ struct super_block * ext2_read_super (struct super_block * sb, void * data,
 
 		logic_sb_block = (sb_block*BLOCK_SIZE) / blocksize;
 		offset = (sb_block*BLOCK_SIZE) % blocksize;
-		bh = bread (dev, logic_sb_block, blocksize);
+		bh = sb_bread(sb, logic_sb_block);
 		if(!bh) {
 			printk("EXT2-fs: Couldn't read superblock on "
 			       "2nd try.\n");
@@ -606,8 +607,7 @@ struct super_block * ext2_read_super (struct super_block * sb, void * data,
 		goto failed_mount;
 	}
 	for (i = 0; i < db_count; i++) {
-		sb->u.ext2_sb.s_group_desc[i] = bread (dev, logic_sb_block + i + 1,
-						       sb->s_blocksize);
+		sb->u.ext2_sb.s_group_desc[i] = sb_bread(sb, logic_sb_block + i + 1);
 		if (!sb->u.ext2_sb.s_group_desc[i]) {
 			for (j = 0; j < i; j++)
 				brelse (sb->u.ext2_sb.s_group_desc[j]);

@@ -66,7 +66,7 @@ struct adfs_discmap {
 
 /* Inode stuff */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,0)
-int adfs_get_block(struct inode *inode, long block,
+int adfs_get_block(struct inode *inode, sector_t block,
 		   struct buffer_head *bh, int create);
 #else
 int adfs_bmap(struct inode *inode, int block);

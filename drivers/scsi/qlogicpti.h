@@ -524,6 +524,7 @@ struct qlogicpti {
 	sg_tablesize:	QLOGICPTI_MAX_SG(QLOGICPTI_REQ_QUEUE_LEN), \
 	cmd_per_lun:	1,					   \
 	use_clustering:	ENABLE_CLUSTERING,			   \
+	highmem_io:	1,			   		   \
 }
 
 /* For our interrupt engine. */

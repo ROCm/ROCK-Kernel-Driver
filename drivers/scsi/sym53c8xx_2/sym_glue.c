@@ -647,11 +647,14 @@ static int sym_scatter(hcb_p np, ccb_p cp, Scsi_Cmnd *cmd)
 
 	if (!use_sg)
 		segment = sym_scatter_no_sglist(np, cp, cmd);
-	else if (use_sg > SYM_CONF_MAX_SG)
-		segment = -1;
 	else if ((use_sg = map_scsi_sg_data(np, cmd)) > 0) {
 		struct scatterlist *scatter = (struct scatterlist *)cmd->buffer;
 		struct sym_tblmove *data;
+
+		if (use_sg > SYM_CONF_MAX_SG) {
+			unmap_scsi_data(np, cmd);
+			return -1;
+		}
 
 		data = &cp->phys.data[SYM_CONF_MAX_SG - use_sg];
 
@@ -2452,8 +2455,8 @@ sym53c8xx_pci_init(Scsi_Host_Template *tpnt, pcidev_t pdev, sym_device *device)
 	u_char pci_fix_up = SYM_SETUP_PCI_FIX_UP;
 	u_char revision;
 	u_int irq;
-	u_long base, base_2, io_port; 
-	u_long base_c, base_2_c; 
+	u_long base, base_2, base_io; 
+	u_long base_c, base_2_c, io_port; 
 	int i;
 	sym_chip *chip;
 
@@ -2470,7 +2473,7 @@ sym53c8xx_pci_init(Scsi_Host_Template *tpnt, pcidev_t pdev, sym_device *device)
 	device_id = PciDeviceId(pdev);
 	irq	  = PciIrqLine(pdev);
 
-	i = pci_get_base_address(pdev, 0, &io_port);
+	i = pci_get_base_address(pdev, 0, &base_io);
 	io_port = pci_get_base_cookie(pdev, 0);
 
 	base_c = pci_get_base_cookie(pdev, i);
@@ -2488,9 +2491,9 @@ sym53c8xx_pci_init(Scsi_Host_Template *tpnt, pcidev_t pdev, sym_device *device)
 	/*
 	 *  If user excluded this chip, donnot initialize it.
 	 */
-	if (io_port) {
+	if (base_io) {
 		for (i = 0 ; i < 8 ; i++) {
-			if (sym_driver_setup.excludes[i] == io_port)
+			if (sym_driver_setup.excludes[i] == base_io)
 				return -1;
 		}
 	}

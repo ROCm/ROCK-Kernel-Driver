@@ -184,7 +184,7 @@ void udf_expand_file_adinicb(struct inode * inode, int newsize, int * err)
 	}
 
 	block = udf_get_lb_pblock(inode->i_sb, UDF_I_LOCATION(inode), 0);
-	bh = udf_tread(inode->i_sb, block, inode->i_sb->s_blocksize);
+	bh = udf_tread(inode->i_sb, block);
 	if (!bh)
 		return;
 	page = grab_cache_page(inode->i_mapping, 0);
@@ -251,10 +251,10 @@ struct buffer_head * udf_expand_dir_adinicb(struct inode *inode, int *block, int
 		UDF_I_LOCATION(inode).partitionReferenceNum, 0);
 	if (!newblock)
 		return NULL;
-	sbh = udf_tread(inode->i_sb, inode->i_ino, inode->i_sb->s_blocksize);
+	sbh = udf_tread(inode->i_sb, inode->i_ino);
 	if (!sbh)
 		return NULL;
-	dbh = udf_tgetblk(inode->i_sb, newblock, inode->i_sb->s_blocksize);
+	dbh = udf_tgetblk(inode->i_sb, newblock);
 	if (!dbh)
 		return NULL;
 	lock_buffer(dbh);
@@ -382,7 +382,7 @@ struct buffer_head * udf_getblk(struct inode * inode, long block,
 	if (!*err && buffer_mapped(&dummy))
 	{
 		struct buffer_head *bh;
-		bh = getblk(dummy.b_dev, dummy.b_blocknr, inode->i_sb->s_blocksize);
+		bh = sb_getblk(inode->i_sb, dummy.b_blocknr);
 		if (buffer_new(&dummy))
 		{
 			lock_buffer(bh);
@@ -886,8 +886,7 @@ void udf_truncate(struct inode * inode)
 				udf_file_entry_alloc_offset(inode);
 
 			if ((bh = udf_tread(inode->i_sb,
-				udf_get_lb_pblock(inode->i_sb, UDF_I_LOCATION(inode), 0),
-				inode->i_sb->s_blocksize)))
+				udf_get_lb_pblock(inode->i_sb, UDF_I_LOCATION(inode), 0))))
 			{
 				memset(bh->b_data + offset, 0x00, inode->i_sb->s_blocksize - offset);
 				mark_buffer_dirty(bh);
@@ -1322,8 +1321,7 @@ udf_update_inode(struct inode *inode, int do_sync)
 	int err = 0;
 
 	bh = udf_tread(inode->i_sb,
-		udf_get_lb_pblock(inode->i_sb, UDF_I_LOCATION(inode), 0),
-		inode->i_sb->s_blocksize);
+		udf_get_lb_pblock(inode->i_sb, UDF_I_LOCATION(inode), 0));
 
 	if (!bh)
 	{
@@ -1624,8 +1622,7 @@ Sint8 udf_add_aext(struct inode *inode, lb_addr *bloc, int *extoffset,
 	if (!(*bh))
 	{
 		if (!(*bh = udf_tread(inode->i_sb,
-			udf_get_lb_pblock(inode->i_sb, *bloc, 0),
-			inode->i_sb->s_blocksize)))
+			udf_get_lb_pblock(inode->i_sb, *bloc, 0))))
 		{
 			udf_debug("reading block %d failed!\n",
 				udf_get_lb_pblock(inode->i_sb, *bloc, 0));
@@ -1653,7 +1650,7 @@ Sint8 udf_add_aext(struct inode *inode, lb_addr *bloc, int *extoffset,
 			return -1;
 		}
 		if (!(nbh = udf_tgetblk(inode->i_sb, udf_get_lb_pblock(inode->i_sb,
-			*bloc, 0), inode->i_sb->s_blocksize)))
+			*bloc, 0))))
 		{
 			return -1;
 		}
@@ -1759,8 +1756,7 @@ Sint8 udf_write_aext(struct inode *inode, lb_addr bloc, int *extoffset,
 	if (!(bh))
 	{
 		if (!(bh = udf_tread(inode->i_sb,
-			udf_get_lb_pblock(inode->i_sb, bloc, 0),
-			inode->i_sb->s_blocksize)))
+			udf_get_lb_pblock(inode->i_sb, bloc, 0))))
 		{
 			udf_debug("reading block %d failed!\n",
 				udf_get_lb_pblock(inode->i_sb, bloc, 0));
@@ -1828,8 +1824,7 @@ Sint8 udf_next_aext(struct inode *inode, lb_addr *bloc, int *extoffset,
 	if (!(*bh))
 	{
 		if (!(*bh = udf_tread(inode->i_sb,
-			udf_get_lb_pblock(inode->i_sb, *bloc, 0),
-			inode->i_sb->s_blocksize)))
+			udf_get_lb_pblock(inode->i_sb, *bloc, 0))))
 		{
 			udf_debug("reading block %d failed!\n",
 				udf_get_lb_pblock(inode->i_sb, *bloc, 0));
@@ -1951,8 +1946,7 @@ Sint8 udf_current_aext(struct inode *inode, lb_addr *bloc, int *extoffset,
 	if (!(*bh))
 	{
 		if (!(*bh = udf_tread(inode->i_sb,
-			udf_get_lb_pblock(inode->i_sb, *bloc, 0),
-			inode->i_sb->s_blocksize)))
+			udf_get_lb_pblock(inode->i_sb, *bloc, 0))))
 		{
 			udf_debug("reading block %d failed!\n",
 				udf_get_lb_pblock(inode->i_sb, *bloc, 0));
@@ -2033,8 +2027,7 @@ Sint8 udf_insert_aext(struct inode *inode, lb_addr bloc, int extoffset,
 	if (!bh)
 	{
 		if (!(bh = udf_tread(inode->i_sb,
-			udf_get_lb_pblock(inode->i_sb, bloc, 0),
-			inode->i_sb->s_blocksize)))
+			udf_get_lb_pblock(inode->i_sb, bloc, 0))))
 		{
 			udf_debug("reading block %d failed!\n",
 				udf_get_lb_pblock(inode->i_sb, bloc, 0));
@@ -2068,8 +2061,7 @@ Sint8 udf_delete_aext(struct inode *inode, lb_addr nbloc, int nextoffset,
 	if (!(nbh))
 	{
 		if (!(nbh = udf_tread(inode->i_sb,
-			udf_get_lb_pblock(inode->i_sb, nbloc, 0),
-			inode->i_sb->s_blocksize)))
+			udf_get_lb_pblock(inode->i_sb, nbloc, 0))))
 		{
 			udf_debug("reading block %d failed!\n",
 				udf_get_lb_pblock(inode->i_sb, nbloc, 0));

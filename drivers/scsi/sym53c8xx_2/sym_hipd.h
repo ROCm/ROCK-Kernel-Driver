@@ -1068,7 +1068,8 @@ struct sym_hcb {
 	/*
 	 *  CCB lists and queue.
 	 */
-	ccb_p ccbh[CCB_HASH_SIZE];	/* CCB hashed by DSA value	*/
+	ccb_p *ccbh;			/* CCBs hashed by DSA value	*/
+					/* CCB_HASH_SIZE lists of CCBs	*/
 	SYM_QUEHEAD	free_ccbq;	/* Queue of available CCBs	*/
 	SYM_QUEHEAD	busy_ccbq;	/* Queue of busy CCBs		*/
 

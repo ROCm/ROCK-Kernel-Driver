@@ -54,7 +54,7 @@ static int bfs_move_blocks(kdev_t dev, unsigned long start, unsigned long end,
 	return 0;
 }
 
-static int bfs_get_block(struct inode * inode, long block, 
+static int bfs_get_block(struct inode * inode, sector_t block, 
 	struct buffer_head * bh_result, int create)
 {
 	long phys;

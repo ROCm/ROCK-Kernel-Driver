@@ -98,7 +98,7 @@ static int read_block_bitmap(struct super_block * sb,
 	loc.logicalBlockNum = bitmap->s_extPosition;
 	loc.partitionReferenceNum = UDF_SB_PARTITION(sb);
 
-	bh = udf_tread(sb, udf_get_lb_pblock(sb, loc, block), sb->s_blocksize);
+	bh = udf_tread(sb, udf_get_lb_pblock(sb, loc, block));
 	if (!bh)
 	{
 		retval = -EIO;
@@ -463,7 +463,7 @@ static void udf_table_free_blocks(struct super_block * sb,
 	elen = 0;
 	obloc = nbloc = UDF_I_LOCATION(table);
 
-	obh = nbh = udf_tread(sb, udf_get_lb_pblock(sb, nbloc, 0), sb->s_blocksize);
+	obh = nbh = udf_tread(sb, udf_get_lb_pblock(sb, nbloc, 0));
 	atomic_inc(&nbh->b_count);
 
 	while (count && (etype =
@@ -571,8 +571,7 @@ static void udf_table_free_blocks(struct super_block * sb,
 			elen -= sb->s_blocksize;
 
 			if (!(nbh = udf_tread(sb,
-				udf_get_lb_pblock(sb, nbloc, 0),
-				sb->s_blocksize)))
+				udf_get_lb_pblock(sb, nbloc, 0))))
 			{
 				udf_release_data(obh);
 				goto error_return;
@@ -689,7 +688,7 @@ static int udf_table_prealloc_blocks(struct super_block * sb,
 	extoffset = sizeof(struct UnallocatedSpaceEntry);
 	bloc = UDF_I_LOCATION(table);
 
-	bh = udf_tread(sb, udf_get_lb_pblock(sb, bloc, 0), sb->s_blocksize);
+	bh = udf_tread(sb, udf_get_lb_pblock(sb, bloc, 0));
 	eloc.logicalBlockNum = 0xFFFFFFFF;
 
 	while (first_block != eloc.logicalBlockNum && (etype =
@@ -766,7 +765,7 @@ static int udf_table_new_block(struct super_block * sb,
 	extoffset = sizeof(struct UnallocatedSpaceEntry);
 	bloc = UDF_I_LOCATION(table);
 
-	goal_bh = bh = udf_tread(sb, udf_get_lb_pblock(sb, bloc, 0), sb->s_blocksize);
+	goal_bh = bh = udf_tread(sb, udf_get_lb_pblock(sb, bloc, 0));
 	atomic_inc(&goal_bh->b_count);
 
 	while (spread && (etype =

@@ -1948,8 +1948,11 @@ static boolean DAC960_RegisterBlockDevice(DAC960_Controller_T *Controller)
   RequestQueue = BLK_DEFAULT_QUEUE(MajorNumber);
   blk_init_queue(RequestQueue, DAC960_RequestFunction);
   RequestQueue->queuedata = Controller;
-  RequestQueue->max_segments = Controller->DriverScatterGatherLimit;
-  RequestQueue->max_sectors = Controller->MaxBlocksPerCommand;
+  blk_queue_max_hw_segments(RequestQueue,
+			    Controller->DriverScatterGatherLimit);
+  blk_queue_max_phys_segments(RequestQueue, ~0);
+  blk_queue_max_sectors(RequestQueue, Controller->MaxBlocksPerCommand);
+
   Controller->RequestQueue = RequestQueue;
   /*
     Initialize the Disk Partitions array, Partition Sizes array, Block Sizes
@@ -2889,7 +2892,7 @@ static boolean DAC960_ProcessRequest(DAC960_Controller_T *Controller,
   Command->LogicalDriveNumber = DAC960_LogicalDriveNumber(Request->rq_dev);
   Command->BlockNumber = Request->sector;
   Command->BlockCount = Request->nr_sectors;
-  Command->SegmentCount = Request->nr_segments;
+  Command->SegmentCount = Request->nr_phys_segments;
   Command->BufferHeader = Request->bio;
   Command->RequestBuffer = Request->buffer;
   blkdev_dequeue_request(Request);

@@ -232,8 +232,8 @@ static int ide_build_sglist (ide_hwif_t *hwif, struct request *rq)
 
 	nents = blk_rq_map_sg(q, rq, hwif->sg_table);
 
-	if (rq->q && nents > rq->nr_segments)
-		printk("ide-dma: received %d segments, build %d\n", rq->nr_segments, nents);
+	if (rq->q && nents > rq->nr_phys_segments)
+		printk("ide-dma: received %d phys segments, build %d\n", rq->nr_phys_segments, nents);
 
 	if (rq_data_dir(rq) == READ)
 		hwif->sg_dma_direction = PCI_DMA_FROMDEVICE;

@@ -176,7 +176,8 @@ void mempool_destroy(mempool_t *pool)
  *
  * this function only sleeps if the alloc_fn function sleeps or
  * returns NULL. Note that due to preallocation, this function
- * *never* fails.
+ * *never* fails when called from process contexts. (it might
+ * fail if called from an IRQ context.)
  */
 void * mempool_alloc(mempool_t *pool, int gfp_mask)
 {
@@ -185,7 +186,7 @@ void * mempool_alloc(mempool_t *pool, int gfp_mask)
 	struct list_head *tmp;
 	int curr_nr;
 	DECLARE_WAITQUEUE(wait, current);
-	int gfp_nowait = gfp_mask & ~__GFP_WAIT;
+	int gfp_nowait = gfp_mask & ~(__GFP_WAIT | __GFP_IO);
 
 repeat_alloc:
 	element = pool->alloc(gfp_nowait, pool->pool_data);
@@ -196,15 +197,11 @@ repeat_alloc:
 	 * If the pool is less than 50% full then try harder
 	 * to allocate an element:
 	 */
-	if (gfp_mask != gfp_nowait) {
-		if (pool->curr_nr <= pool->min_nr/2) {
-			element = pool->alloc(gfp_mask, pool->pool_data);
-			if (likely(element != NULL))
-				return element;
-		}
-	} else
-		/* we must not sleep */
-		return NULL;
+	if ((gfp_mask != gfp_nowait) && (pool->curr_nr <= pool->min_nr/2)) {
+		element = pool->alloc(gfp_mask, pool->pool_data);
+		if (likely(element != NULL))
+			return element;
+	}
 
 	/*
 	 * Kick the VM at this point.
@@ -218,19 +215,25 @@ repeat_alloc:
 		element = tmp;
 		pool->curr_nr--;
 		spin_unlock_irqrestore(&pool->lock, flags);
-
 		return element;
 	}
+	spin_unlock_irqrestore(&pool->lock, flags);
+
+	/* We must not sleep in the GFP_ATOMIC case */
+	if (gfp_mask == gfp_nowait)
+		return NULL;
+
+	run_task_queue(&tq_disk);
+
 	add_wait_queue_exclusive(&pool->wait, &wait);
 	set_task_state(current, TASK_UNINTERRUPTIBLE);
 
+	spin_lock_irqsave(&pool->lock, flags);
 	curr_nr = pool->curr_nr;
 	spin_unlock_irqrestore(&pool->lock, flags);
 
-	if (!curr_nr) {
-		run_task_queue(&tq_disk);
+	if (!curr_nr)
 		schedule();
-	}
 
 	current->state = TASK_RUNNING;
 	remove_wait_queue(&pool->wait, &wait);

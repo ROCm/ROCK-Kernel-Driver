@@ -20,6 +20,12 @@
 #ifndef __LINUX_BIO_H
 #define __LINUX_BIO_H
 
+/* Platforms may set this to teach the BIO layer about IOMMU hardware. */
+#include <asm/io.h>
+#ifndef BIO_VMERGE_BOUNDARY
+#define BIO_VMERGE_BOUNDARY	0
+#endif
+
 #define BIO_DEBUG
 
 #ifdef BIO_DEBUG
@@ -61,7 +67,17 @@ struct bio {
 
 	unsigned short		bi_vcnt;	/* how many bio_vec's */
 	unsigned short		bi_idx;		/* current index into bvl_vec */
-	unsigned short		bi_hw_seg;	/* actual mapped segments */
+
+	/* Number of segments in this BIO after
+	 * physical address coalescing is performed.
+	 */
+	unsigned short		bi_phys_segments;
+
+	/* Number of segments after physical and DMA remapping
+	 * hardware coalescing is performed.
+	 */
+	unsigned short		bi_hw_segments;
+
 	unsigned int		bi_size;	/* residual I/O count */
 	unsigned int		bi_max;		/* max bvl_vecs we can hold,
 						   used as index into pool */
@@ -128,10 +144,13 @@ struct bio {
 /*
  * merge helpers etc
  */
+
 #define __BVEC_END(bio)		bio_iovec_idx((bio), (bio)->bi_vcnt - 1)
 #define __BVEC_START(bio)	bio_iovec_idx((bio), 0)
-#define BIO_CONTIG(bio, nxt) \
-	BIOVEC_MERGEABLE(__BVEC_END((bio)), __BVEC_START((nxt)))
+#define BIOVEC_PHYS_MERGEABLE(vec1, vec2)	\
+	((bvec_to_phys((vec1)) + (vec1)->bv_len) == bvec_to_phys((vec2)))
+#define BIOVEC_VIRT_MERGEABLE(vec1, vec2)	\
+	((((bvec_to_phys((vec1)) + (vec1)->bv_len) | bvec_to_phys((vec2))) & (BIO_VMERGE_BOUNDARY - 1)) == 0)
 #define __BIO_SEG_BOUNDARY(addr1, addr2, mask) \
 	(((addr1) | (mask)) == (((addr2) - 1) | (mask)))
 #define BIOVEC_SEG_BOUNDARY(q, b1, b2) \
@@ -174,6 +193,7 @@ extern void bio_put(struct bio *);
 
 extern int bio_endio(struct bio *, int, int);
 struct request_queue;
+extern inline int bio_phys_segments(struct request_queue *, struct bio *);
 extern inline int bio_hw_segments(struct request_queue *, struct bio *);
 
 extern inline void __bio_clone(struct bio *, struct bio *);

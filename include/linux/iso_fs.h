@@ -219,7 +219,7 @@ int get_joliet_filename(struct iso_directory_record *, unsigned char *, struct i
 int get_acorn_filename(struct iso_directory_record *, char *, struct inode *);
 
 extern struct dentry *isofs_lookup(struct inode *, struct dentry *);
-extern struct buffer_head *isofs_bread(struct inode *, unsigned int, unsigned int);
+extern struct buffer_head *isofs_bread(struct inode *, unsigned int);
 extern int isofs_get_blocks(struct inode *, sector_t, struct buffer_head **, unsigned long);
 
 extern struct inode_operations isofs_dir_inode_operations;
@@ -230,11 +230,11 @@ extern struct address_space_operations isofs_symlink_aops;
 #ifdef LEAK_CHECK
 #define free_s leak_check_free_s
 #define malloc leak_check_malloc
-#define bread leak_check_bread
+#define sb_bread leak_check_bread
 #define brelse leak_check_brelse
 extern void * leak_check_malloc(unsigned int size);
 extern void leak_check_free_s(void * obj, int size);
-extern struct buffer_head * leak_check_bread(int dev, int block, int size);
+extern struct buffer_head * leak_check_bread(struct super_block *sb, int block);
 extern void leak_check_brelse(struct buffer_head * bh);
 #endif /* LEAK_CHECK */
 

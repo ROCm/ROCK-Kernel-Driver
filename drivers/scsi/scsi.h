@@ -439,6 +439,12 @@ extern int  scsi_partsize(struct buffer_head *bh, unsigned long capacity,
                     unsigned int *secs);
 
 /*
+ * sg list allocations
+ */
+struct scatterlist *scsi_alloc_sgtable(Scsi_Cmnd *SCpnt, int gfp_mask);
+void scsi_free_sgtable(struct scatterlist *sgl, int index);
+
+/*
  * Prototypes for functions in scsi_dma.c
  */
 void scsi_resize_dma_pool(void);
@@ -449,8 +455,8 @@ int scsi_free(void *, unsigned int);
 /*
  * Prototypes for functions in scsi_merge.c
  */
-extern void recount_segments(Scsi_Cmnd * SCpnt);
-extern void initialize_merge_fn(Scsi_Device * SDpnt);
+extern void scsi_initialize_merge_fn(Scsi_Device *SDpnt);
+extern int scsi_init_io(Scsi_Cmnd *SCpnt);
 
 /*
  * Prototypes for functions in scsi_queue.c
@@ -555,8 +561,6 @@ struct scsi_device {
 	request_queue_t request_queue;
         atomic_t                device_active; /* commands checked out for device */
 	volatile unsigned short device_busy;	/* commands actually active on low-level */
-	int (*scsi_init_io_fn) (Scsi_Cmnd *);	/* Used to initialize
-						   new request */
 	Scsi_Cmnd *device_queue;	/* queue of SCSI Command structures */
 
 /* public: */

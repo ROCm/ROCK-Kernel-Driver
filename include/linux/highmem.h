@@ -2,6 +2,7 @@
 #define _LINUX_HIGHMEM_H
 
 #include <linux/config.h>
+#include <linux/bio.h>
 #include <asm/pgalloc.h>
 
 #ifdef CONFIG_HIGHMEM
@@ -13,7 +14,7 @@ extern struct page *highmem_start_page;
 /* declarations for linux/mm/highmem.c */
 unsigned int nr_free_highpages(void);
 
-extern void create_bounce(unsigned long pfn, struct bio **bio_orig);
+extern void create_bounce(unsigned long pfn, int gfp, struct bio **bio_orig);
 
 static inline char *bh_kmap(struct buffer_head *bh)
 {

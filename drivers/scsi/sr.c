@@ -258,112 +258,6 @@ static request_queue_t *sr_find_queue(kdev_t dev)
 	return &scsi_CDs[MINOR(dev)].device->request_queue;
 }
 
-static int sr_scatter_pad(Scsi_Cmnd *SCpnt, int s_size)
-{
-	struct scatterlist *sg, *old_sg = NULL;
-	int i, fsize, bsize, sg_ent, sg_count;
-	char *front, *back;
-	void **bbpnt, **old_bbpnt = NULL;
-
-	back = front = NULL;
-	sg_ent = SCpnt->use_sg;
-	bsize = 0; /* gcc... */
-
-	/*
-	 * need front pad
-	 */
-	if ((fsize = SCpnt->request.sector % (s_size >> 9))) {
-		fsize <<= 9;
-		sg_ent++;
-		if ((front = scsi_malloc(fsize)) == NULL)
-			goto no_mem;
-	}
-	/*
-	 * need a back pad too
-	 */
-	if ((bsize = s_size - ((SCpnt->request_bufflen + fsize) % s_size))) {
-		sg_ent++;
-		if ((back = scsi_malloc(bsize)) == NULL)
-			goto no_mem;
-	}
-
-	/*
-	 * extend or allocate new scatter-gather table
-	 */
-	sg_count = SCpnt->use_sg;
-	if (sg_count) {
-		old_sg = (struct scatterlist *) SCpnt->request_buffer;
-		old_bbpnt = SCpnt->bounce_buffers;
-	} else {
-		sg_count = 1;
-		sg_ent++;
-	}
-
-	/* Get space for scatterlist and bounce buffer array. */
-	i  = sg_ent * sizeof(struct scatterlist);
-	i += sg_ent * sizeof(void *);
-	i  = (i + 511) & ~511;
-
-	if ((sg = scsi_malloc(i)) == NULL)
-		goto no_mem;
-
-	bbpnt = (void **)
-		((char *)sg + (sg_ent * sizeof(struct scatterlist)));
-
-	/*
-	 * no more failing memory allocs possible, we can safely assign
-	 * SCpnt values now
-	 */
-	SCpnt->sglist_len = i;
-	SCpnt->use_sg = sg_count;
-	memset(sg, 0, SCpnt->sglist_len);
-
-	i = 0;
-	if (fsize) {
-		sg[0].address = bbpnt[0] = front;
-		sg[0].length = fsize;
-		i++;
-	}
-	if (old_sg) {
-		memcpy(sg + i, old_sg, SCpnt->use_sg * sizeof(struct scatterlist));
-		if (old_bbpnt)
-			memcpy(bbpnt + i, old_bbpnt, SCpnt->use_sg * sizeof(void *));
-		scsi_free(old_sg, (((SCpnt->use_sg * sizeof(struct scatterlist)) +
-				    (SCpnt->use_sg * sizeof(void *))) + 511) & ~511);
-	} else {
-		sg[i].address = NULL;
-		sg[i].page = virt_to_page(SCpnt->request_buffer);
-		sg[i].offset = (unsigned long) SCpnt->request_buffer&~PAGE_MASK;
-		sg[i].length = SCpnt->request_bufflen;
-	}
-
-	SCpnt->request_bufflen += (fsize + bsize);
-	SCpnt->request_buffer = sg;
-	SCpnt->bounce_buffers = bbpnt;
-	SCpnt->use_sg += i;
-
-	if (bsize) {
-		sg[SCpnt->use_sg].address = NULL;
-		sg[SCpnt->use_sg].page = virt_to_page(back);
-		sg[SCpnt->use_sg].offset = (unsigned long) back & ~PAGE_MASK;
-		bbpnt[SCpnt->use_sg] = back;
-		sg[SCpnt->use_sg].length = bsize;
-		SCpnt->use_sg++;
-	}
-
-	return 0;
-
-no_mem:
-	printk("sr: ran out of mem for scatter pad\n");
-	if (front)
-		scsi_free(front, fsize);
-	if (back)
-		scsi_free(back, bsize);
-
-	return 1;
-}
-
-
 static int sr_init_command(Scsi_Cmnd * SCpnt)
 {
 	int dev, devm, block=0, this_count, s_size;
@@ -429,9 +323,10 @@ static int sr_init_command(Scsi_Cmnd * SCpnt)
 	/*
 	 * request doesn't start on hw block boundary, add scatter pads
 	 */
-	if ((SCpnt->request.sector % (s_size >> 9)) || (SCpnt->request_bufflen % s_size))
-		if (sr_scatter_pad(SCpnt, s_size))
-			return 0;
+	if ((SCpnt->request.sector % (s_size >> 9)) || (SCpnt->request_bufflen % s_size)) {
+		printk("sr: unaligned transfer\n");
+		return 0;
+	}
 
 	this_count = (SCpnt->request_bufflen >> 9) / (s_size >> 9);
 
@@ -583,7 +478,7 @@ void get_sectorsize(int i)
 	int sector_size;
 	Scsi_Request *SRpnt;
 
-	buffer = (unsigned char *) scsi_malloc(512);
+	buffer = (unsigned char *) kmalloc(512, GFP_DMA);
 	SRpnt = scsi_allocate_request(scsi_CDs[i].device);
 	
 	if(buffer == NULL || SRpnt == NULL)
@@ -592,7 +487,7 @@ void get_sectorsize(int i)
 		sector_size = 2048;	/* A guess, just in case */
 		scsi_CDs[i].needs_sector_size = 1;
 		if(buffer)
-			scsi_free(buffer, 512);
+			kfree(buffer);
 		if(SRpnt)
 			scsi_release_request(SRpnt);
 		return;
@@ -673,7 +568,7 @@ void get_sectorsize(int i)
 		sr_sizes[i] = scsi_CDs[i].capacity >> (BLOCK_SIZE_BITS - 9);
 	};
 	blk_queue_hardsect_size(blk_get_queue(MAJOR_NR), sector_size);
-	scsi_free(buffer, 512);
+	kfree(buffer);
 }
 
 void get_capabilities(int i)
@@ -694,7 +589,7 @@ void get_capabilities(int i)
 		""
 	};
 
-	buffer = (unsigned char *) scsi_malloc(512);
+	buffer = (unsigned char *) kmalloc(512, GFP_DMA);
 	if (!buffer)
 	{
 		printk(KERN_ERR "sr: out of memory.\n");
@@ -714,7 +609,7 @@ void get_capabilities(int i)
 		scsi_CDs[i].cdi.mask |= (CDC_CD_R | CDC_CD_RW | CDC_DVD_R |
 					 CDC_DVD | CDC_DVD_RAM |
 					 CDC_SELECT_DISC | CDC_SELECT_SPEED);
-		scsi_free(buffer, 512);
+		kfree(buffer);
 		printk("sr%i: scsi-1 drive\n", i);
 		return;
 	}
@@ -767,7 +662,7 @@ void get_capabilities(int i)
 	/*else    I don't think it can close its tray
 	   scsi_CDs[i].cdi.mask |= CDC_CLOSE_TRAY; */
 
-	scsi_free(buffer, 512);
+	kfree(buffer);
 }
 
 /*

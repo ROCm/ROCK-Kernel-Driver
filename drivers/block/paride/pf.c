@@ -361,7 +361,8 @@ int pf_init (void)      /* preliminary initialisation */
         }
 	q = BLK_DEFAULT_QUEUE(MAJOR_NR);
 	blk_init_queue(q, DEVICE_REQUEST, &pf_spin_lock);
-	blk_queue_max_segments(q, cluster);
+	blk_queue_max_phys_segments(q, cluster);
+	blk_queue_max_hw_segments(q, cluster);
         read_ahead[MAJOR_NR] = 8;       /* 8 sector (4kB) read ahead */
         
 	for (i=0;i<PF_UNITS;i++) pf_blocksizes[i] = 1024;

@@ -1301,7 +1301,8 @@ static int i2ob_install_device(struct i2o_controller *c, struct i2o_device *d, i
 		request_queue_t *q = i2ob_dev[unit].req_queue;
 
 		blk_queue_max_sectors(q, 256);
-		blk_queue_max_segments(q, (d->controller->status_block->inbound_frame_size - 8)/2);
+		blk_queue_max_phys_segments(q, (d->controller->status_block->inbound_frame_size - 8)/2);
+		blk_queue_max_hw_segments(q, (d->controller->status_block->inbound_frame_size - 8)/2);
 
 		if(d->controller->type == I2O_TYPE_PCI && d->controller->bus.pci.queue_buggy == 2)
 			i2ob_dev[i].depth = 32;
@@ -1309,14 +1310,16 @@ static int i2ob_install_device(struct i2o_controller *c, struct i2o_device *d, i
 		if(d->controller->type == I2O_TYPE_PCI && d->controller->bus.pci.queue_buggy == 1)
 		{
 			blk_queue_max_sectors(q, 32);
-			blk_queue_max_segments(q, 8);
+			blk_queue_max_phys_segments(q, 8);
+			blk_queue_max_hw_segments(q, 8);
 			i2ob_dev[i].depth = 4;
 		}
 
 		if(d->controller->type == I2O_TYPE_PCI && d->controller->bus.pci.short_req)
 		{
 			blk_queue_max_sectors(q, 8);
-			blk_queue_max_segments(q, 8);
+			blk_queue_max_phys_segments(q, 8);
+			blk_queue_max_hw_segments(q, 8);
 		}
 	}
 

@@ -52,14 +52,6 @@ static void ncp_add_mem(struct ncp_server *server, const void *source, int size)
 	return;
 }
 
-static void ncp_add_mem_fromfs(struct ncp_server *server, const char *source, int size)
-{
-	assert_server_locked(server);
-	copy_from_user(&(server->packet[server->current_size]), source, size);
-	server->current_size += size;
-	return;
-}
-
 static void ncp_add_pstring(struct ncp_server *server, const char *s)
 {
 	int len = strlen(s);

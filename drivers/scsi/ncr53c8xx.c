@@ -22,7 +22,7 @@
 **  This driver has been ported to Linux from the FreeBSD NCR53C8XX driver
 **  and is currently maintained by
 **
-**          Gerard Roudier              <groudier@club-internet.fr>
+**          Gerard Roudier              <groudier@free.fr>
 **
 **  Being given that this driver originates from the FreeBSD version, and
 **  in order to keep synergy on both, any suggested enhancements and corrections
@@ -63,7 +63,7 @@
 **  August 18 1997 by Cort <cort@cs.nmt.edu>:
 **     Support for Power/PC (Big Endian).
 **
-**  June 20 1998 by Gerard Roudier <groudier@club-internet.fr>:
+**  June 20 1998 by Gerard Roudier
 **     Support for up to 64 tags per lun.
 **     O(1) everywhere (C and SCRIPTS) for normal cases.
 **     Low PCI traffic for command handling when on-chip RAM is present.
@@ -8127,10 +8127,14 @@ static	int	ncr_scatter(ncb_p np, ccb_p cp, Scsi_Cmnd *cmd)
 			segment = 1;
 		}
 	}
-	else if (use_sg <= MAX_SCATTER) {
+	else {
 		struct scatterlist *scatter = (struct scatterlist *)cmd->buffer;
 
 		use_sg = map_scsi_sg_data(np, cmd);
+		if (use_sg > MAX_SCATTER) {
+			unmap_scsi_data(np, cmd);
+			return -1;
+		}
 		data = &data[MAX_SCATTER - use_sg];
 
 		while (segment < use_sg) {
@@ -8142,9 +8146,6 @@ static	int	ncr_scatter(ncb_p np, ccb_p cp, Scsi_Cmnd *cmd)
 			cp->data_len	  += len;
 			++segment;
 		}
-	}
-	else {
-		return -1;
 	}
 
 	return segment;

@@ -290,6 +290,7 @@ typedef struct {
 } socal_cq;
 
 struct socal {
+	spinlock_t		lock;
 	socal_port		port[2]; /* Every SOCAL has one or two FC ports */
 	socal_cq		req[4]; /* Request CQs */
 	socal_cq		rsp[4]; /* Response CQs */

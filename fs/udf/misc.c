@@ -67,21 +67,21 @@ udf64_high32(Uint64 indat)
 #if defined(__linux__) && defined(__KERNEL__)
 
 extern struct buffer_head *
-udf_tgetblk(struct super_block *sb, int block, int size)
+udf_tgetblk(struct super_block *sb, int block)
 {
 	if (UDF_QUERY_FLAG(sb, UDF_FLAG_VARCONV))
-		return getblk(sb->s_dev, udf_fixed_to_variable(block), size);
+		return sb_getblk(sb, udf_fixed_to_variable(block));
 	else
-		return getblk(sb->s_dev, block, size);
+		return sb_getblk(sb, block);
 }
 
 extern struct buffer_head *
-udf_tread(struct super_block *sb, int block, int size)
+udf_tread(struct super_block *sb, int block)
 {
 	if (UDF_QUERY_FLAG(sb, UDF_FLAG_VARCONV))
-		return bread(sb->s_dev, udf_fixed_to_variable(block), size);
+		return sb_bread(sb, udf_fixed_to_variable(block));
 	else
-		return bread(sb->s_dev, block, size);
+		return sb_bread(sb, block);
 }
 
 extern struct GenericAttrFormat *
@@ -92,7 +92,7 @@ udf_add_extendedattr(struct inode * inode, Uint32 size, Uint32 type,
 	long_ad eaicb;
 	int offset;
 
-	*bh = udf_tread(inode->i_sb, inode->i_ino, inode->i_sb->s_blocksize);
+	*bh = udf_tread(inode->i_sb, inode->i_ino);
 
 	if (UDF_I_EXTENDED_FE(inode) == 0)
 	{
@@ -208,7 +208,7 @@ udf_get_extendedattr(struct inode * inode, Uint32 type, Uint8 subtype,
 	long_ad eaicb;
 	Uint32 offset;
 
-	*bh = udf_tread(inode->i_sb, inode->i_ino, inode->i_sb->s_blocksize);
+	*bh = udf_tread(inode->i_sb, inode->i_ino);
 
 	if (UDF_I_EXTENDED_FE(inode) == 0)
 	{
@@ -273,7 +273,7 @@ udf_read_untagged(struct super_block *sb, Uint32 block, Uint32 offset)
 	struct buffer_head *bh = NULL;
 
 	/* Read the block */
-	bh = udf_tread(sb, block+offset, sb->s_blocksize);
+	bh = udf_tread(sb, block+offset);
 	if (!bh)
 	{
 		printk(KERN_ERR "udf: udf_read_untagged(%p,%d,%d) failed\n",
@@ -305,7 +305,7 @@ udf_read_tagged(struct super_block *sb, Uint32 block, Uint32 location, Uint16 *i
 	if (block == 0xFFFFFFFF)
 		return NULL;
 
-	bh = udf_tread(sb, block, sb->s_blocksize);
+	bh = udf_tread(sb, block);
 	if (!bh)
 	{
 		udf_debug("block=%d, location=%d: read failed\n", block, location);

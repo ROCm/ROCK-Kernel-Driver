@@ -265,6 +265,7 @@ typedef struct {
 } soc_cq;
 
 struct soc {
+	spinlock_t		lock;
 	soc_port		port[2]; /* Every SOC has one or two FC ports */
 	soc_cq			req[2]; /* Request CQs */
 	soc_cq			rsp[2]; /* Response CQs */

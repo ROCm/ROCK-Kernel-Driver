@@ -35,7 +35,7 @@ adfs_fplus_read(struct super_block *sb, unsigned int id, unsigned int sz, struct
 		goto out;
 	}
 
-	dir->bh[0] = bread(sb->s_dev, block, sb->s_blocksize);
+	dir->bh[0] = sb_bread(sb, block);
 	if (!dir->bh[0])
 		goto out;
 	dir->nr_buffers += 1;
@@ -60,7 +60,7 @@ adfs_fplus_read(struct super_block *sb, unsigned int id, unsigned int sz, struct
 			goto out;
 		}
 
-		dir->bh[blk] = bread(sb->s_dev, block, sb->s_blocksize);
+		dir->bh[blk] = sb_bread(sb, block);
 		if (!dir->bh[blk])
 			goto out;
 		dir->nr_buffers = blk;

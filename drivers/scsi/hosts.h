@@ -334,7 +334,6 @@ struct Scsi_Host
     int resetting; /* if set, it means that last_reset is a valid value */
     unsigned long last_reset;
 
-
     /*
      *	These three parameters can be used to allow for wide scsi,
      *	and for host adapters that support multiple busses

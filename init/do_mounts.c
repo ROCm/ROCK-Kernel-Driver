@@ -351,23 +351,20 @@ static int __init create_dev(char *name, kdev_t dev, char *devfs_name)
 	return sys_symlink(path + n + 5, name);
 }
 
-#ifdef CONFIG_MAC_FLOPPY
-int swim3_fd_eject(int devnum);
-#endif
 static void __init change_floppy(char *fmt, ...)
 {
 	extern void wait_for_keypress(void);
 	char buf[80];
+	int fd;
 	va_list args;
 	va_start(args, fmt);
 	vsprintf(buf, fmt, args);
 	va_end(args);
-#ifdef CONFIG_BLK_DEV_FD
-	floppy_eject();
-#endif
-#ifdef CONFIG_MAC_FLOPPY
-	swim3_fd_eject(MINOR(ROOT_DEV));
-#endif
+	fd = open("/dev/root", O_RDWR, 0);
+	if (fd >= 0) {
+		sys_ioctl(fd, FDEJECT, 0);
+		close(fd);
+	}
 	printk(KERN_NOTICE "VFS: Insert %s and press ENTER\n", buf);
 	wait_for_keypress();
 }

@@ -24,8 +24,6 @@
 #include <asm/segment.h>
 #include <asm/system.h>
 
-#define blocksize QNX4_BLOCK_SIZE
-
 /*
  * The functions for qnx4 fs file synchronization.
  */
@@ -40,7 +38,7 @@ static int sync_block(struct inode *inode, unsigned short *block, int wait)
 	if (!*block)
 		return 0;
 	tmp = *block;
-	bh = get_hash_table(inode->i_dev, *block, blocksize);
+	bh = sb_get_hash_table(inode->i_sb, *block);
 	if (!bh)
 		return 0;
 	if (*block != tmp) {
@@ -74,7 +72,7 @@ static int sync_iblock(struct inode *inode, unsigned short *iblock,
 	rc = sync_block(inode, iblock, wait);
 	if (rc)
 		return rc;
-	*bh = bread(inode->i_dev, tmp, blocksize);
+	*bh = sb_bread(inode->i_sb, tmp);
 	if (tmp != *iblock) {
 		brelse(*bh);
 		*bh = NULL;

@@ -139,8 +139,8 @@ extern void udf_discard_prealloc(struct inode *);
 
 /* misc.c */
 extern int udf_read_tagged_data(char *, int size, int fd, int block, int partref);
-extern struct buffer_head *udf_tgetblk(struct super_block *, int, int);
-extern struct buffer_head *udf_tread(struct super_block *, int, int);
+extern struct buffer_head *udf_tgetblk(struct super_block *, int);
+extern struct buffer_head *udf_tread(struct super_block *, int);
 extern struct GenericAttrFormat *udf_add_extendedattr(struct inode *, Uint32, Uint32, Uint8, struct buffer_head **);
 extern struct GenericAttrFormat *udf_get_extendedattr(struct inode *, Uint32, Uint8, struct buffer_head **);
 extern struct buffer_head *udf_read_tagged(struct super_block *, Uint32, Uint32, Uint16 *);

@@ -223,7 +223,7 @@ failed:
 
 #define NULLIFY_FRAGMENTS \
 	for (i = oldcount; i < newcount; i++) { \
-		bh = getblk (sb->s_dev, result + i, sb->s_blocksize); \
+		bh = sb_getblk(sb, result + i); \
 		memset (bh->b_data, 0, sb->s_blocksize); \
 		mark_buffer_uptodate(bh, 1); \
 		mark_buffer_dirty (bh); \
@@ -357,7 +357,7 @@ unsigned ufs_new_fragments (struct inode * inode, u32 * p, unsigned fragment,
 	result = ufs_alloc_fragments (inode, cgno, goal, request, err);
 	if (result) {
 		for (i = 0; i < oldcount; i++) {
-			bh = bread (sb->s_dev, tmp + i, sb->s_blocksize);
+			bh = sb_bread(sb, tmp + i);
 			if(bh)
 			{
 				mark_buffer_clean (bh);

@@ -57,7 +57,7 @@ static int udf_adinicb_readpage(struct file *file, struct page * page)
 	kaddr = kmap(page);
 	memset(kaddr, 0, PAGE_CACHE_SIZE);
 	block = udf_get_lb_pblock(inode->i_sb, UDF_I_LOCATION(inode), 0);
-	bh = bread (inode->i_dev, block, inode->i_sb->s_blocksize);
+	bh = sb_bread(inode->i_sb, block);
 	memcpy(kaddr, bh->b_data + udf_ext0_offset(inode), inode->i_size);
 	brelse(bh);
 	flush_dcache_page(page);
@@ -80,7 +80,7 @@ static int udf_adinicb_writepage(struct page *page)
 
 	kaddr = kmap(page);
 	block = udf_get_lb_pblock(inode->i_sb, UDF_I_LOCATION(inode), 0);
-	bh = bread (inode->i_dev, block, inode->i_sb->s_blocksize);
+	bh = sb_bread(inode->i_sb, block);
 	memcpy(bh->b_data + udf_ext0_offset(inode), kaddr, inode->i_size);
 	mark_buffer_dirty(bh);
 	brelse(bh);
@@ -105,7 +105,7 @@ static int udf_adinicb_commit_write(struct file *file, struct page *page, unsign
 	char *kaddr = page_address(page);
 
 	block = udf_get_lb_pblock(inode->i_sb, UDF_I_LOCATION(inode), 0);
-	bh = bread (inode->i_dev, block, inode->i_sb->s_blocksize);
+	bh = sb_bread(inode->i_sb, block);
 	memcpy(bh->b_data + udf_file_entry_alloc_offset(inode) + offset,
 		kaddr + offset, to-offset);
 	mark_buffer_dirty(bh);
@@ -246,8 +246,7 @@ int udf_ioctl(struct inode *inode, struct file *filp, unsigned int cmd,
 
 	/* ok, we need to read the inode */
 	bh = udf_tread(inode->i_sb,
-		udf_get_lb_pblock(inode->i_sb, UDF_I_LOCATION(inode), 0),
-		inode->i_sb->s_blocksize);
+		udf_get_lb_pblock(inode->i_sb, UDF_I_LOCATION(inode), 0));
 
 	if (!bh)
 	{

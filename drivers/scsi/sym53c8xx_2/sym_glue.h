@@ -77,7 +77,6 @@
 #include <linux/errno.h>
 #include <linux/pci.h>
 #include <linux/string.h>
-#include <linux/slab.h>
 #include <linux/mm.h>
 #include <linux/ioport.h>
 #include <linux/time.h>
@@ -463,7 +462,7 @@ struct sym_shcb {
 
 	vm_offset_t	mmio_va;	/* MMIO kernel virtual address	*/
 	vm_offset_t	ram_va;		/* RAM  kernel virtual address	*/
-	u32		io_port;	/* IO port address		*/
+	u_long		io_port;	/* IO port address cookie	*/
 	u_short		io_ws;		/* IO window size		*/
 	int		irq;		/* IRQ number			*/
 

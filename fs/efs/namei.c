@@ -24,7 +24,7 @@ static efs_ino_t efs_find_entry(struct inode *inode, const char *name, int len) 
 
 	for(block = 0; block < inode->i_blocks; block++) {
 
-		bh = bread(inode->i_dev, efs_bmap(inode, block), EFS_DIRBSIZE);
+		bh = sb_bread(inode->i_sb, efs_bmap(inode, block));
 		if (!bh) {
 			printk(KERN_ERR "EFS: find_entry(): failed to read dir block %d\n", block);
 			return 0;

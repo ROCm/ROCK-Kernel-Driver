@@ -23,7 +23,7 @@
 
 
 struct ufs_buffer_head * _ubh_bread_ (struct ufs_sb_private_info * uspi,
-	kdev_t dev, unsigned fragment, unsigned size)
+	struct super_block *sb, unsigned fragment, unsigned size)
 {
 	struct ufs_buffer_head * ubh;
 	unsigned i, j, count;
@@ -39,7 +39,7 @@ struct ufs_buffer_head * _ubh_bread_ (struct ufs_sb_private_info * uspi,
 	ubh->fragment = fragment;
 	ubh->count = count;
 	for (i = 0; i < count; i++)
-		if (!(ubh->bh[i] = bread (dev, fragment + i, uspi->s_fsize)))
+		if (!(ubh->bh[i] = sb_bread(sb, fragment + i)))
 			goto failed;
 	for (; i < UFS_MAXFRAG; i++)
 		ubh->bh[i] = NULL;
@@ -51,7 +51,7 @@ failed:
 }
 
 struct ufs_buffer_head * ubh_bread_uspi (struct ufs_sb_private_info * uspi,
-	kdev_t dev, unsigned fragment, unsigned size)
+	struct super_block *sb, unsigned fragment, unsigned size)
 {
 	unsigned i, j, count;
 	if (size & ~uspi->s_fmask)
@@ -62,7 +62,7 @@ struct ufs_buffer_head * ubh_bread_uspi (struct ufs_sb_private_info * uspi,
 	USPI_UBH->fragment = fragment;
 	USPI_UBH->count = count;
 	for (i = 0; i < count; i++)
-		if (!(USPI_UBH->bh[i] = bread (dev, fragment + i, uspi->s_fsize)))
+		if (!(USPI_UBH->bh[i] = sb_bread(sb, fragment + i)))
 			goto failed;
 	for (; i < UFS_MAXFRAG; i++)
 		USPI_UBH->bh[i] = NULL;

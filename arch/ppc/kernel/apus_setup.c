@@ -106,7 +106,6 @@ void (*mach_reset)( void );
 long mach_max_dma_address = 0x00ffffff; /* default set to the lower 16MB */
 #if defined(CONFIG_AMIGA_FLOPPY)
 void (*mach_floppy_setup) (char *, int *) __initdata = NULL;
-void (*mach_floppy_eject) (void) = NULL;
 #endif
 #ifdef CONFIG_HEARTBEAT
 void (*mach_heartbeat) (int) = NULL;
@@ -403,12 +402,6 @@ void floppy_setup(char *str, int *ints)
 {
 	if (mach_floppy_setup)
 		mach_floppy_setup (str, ints);
-}
-
-void floppy_eject(void)
-{
-	if (mach_floppy_eject)
-		mach_floppy_eject();
 }
 #endif
 

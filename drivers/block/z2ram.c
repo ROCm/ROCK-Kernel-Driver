@@ -68,6 +68,8 @@ static int chip_count       = 0;
 static int list_count       = 0;
 static int current_device   = -1;
 
+static spinlock_t z2ram_lock = SPIN_LOCK_UNLOCKED;
+
 static void
 do_z2_request( request_queue_t * q )
 {
@@ -364,7 +366,7 @@ z2_init( void )
 	    }
     }    
    
-    blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST);
+    blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUES, &z2ram_lock);
     blksize_size[ MAJOR_NR ] = z2_blocksizes;
     blk_size[ MAJOR_NR ] = z2_sizes;
 

@@ -184,13 +184,14 @@ void kunmap_high(struct page *page)
 		wake_up(&pkmap_map_wait);
 }
 
-#define POOL_SIZE 64
+#define POOL_SIZE	64
+#define ISA_POOL_SIZE	16
 
-static mempool_t *page_pool;
+static mempool_t *page_pool, *isa_page_pool;
 
-static void * page_pool_alloc(int gfp_mask, void *data)
+static void *page_pool_alloc(int gfp_mask, void *data)
 {
-	return alloc_page(gfp_mask & ~ __GFP_HIGHIO);
+	return alloc_page(gfp_mask);
 }
 
 static void page_pool_free(void *page, void *data)
@@ -212,6 +213,23 @@ static __init int init_emergency_pool(void)
 		BUG();
 	printk("highmem bounce pool size: %d pages and bhs.\n", POOL_SIZE);
 
+	return 0;
+}
+
+/*
+ * gets called "every" time someone init's a queue with BLK_BOUNCE_ISA
+ * as the max address, so check if the pool has already been created.
+ */
+int init_emergency_isa_pool(void)
+{
+	if (isa_page_pool)
+		return 0;
+
+	isa_page_pool = mempool_create(ISA_POOL_SIZE, page_pool_alloc, page_pool_free, NULL);
+	if (!isa_page_pool)
+		BUG();
+
+	printk("isa bounce pool size: %d pages\n", ISA_POOL_SIZE);
 	return 0;
 }
 
@@ -248,7 +266,7 @@ static inline void copy_to_high_bio_irq(struct bio *to, struct bio *from)
 	}
 }
 
-static inline int bounce_end_io (struct bio *bio, int nr_sectors)
+static inline int bounce_end_io (struct bio *bio, int nr_sectors, mempool_t *pool)
 {
 	struct bio *bio_orig = bio->bi_private;
 	struct bio_vec *bvec, *org_vec;
@@ -267,7 +285,7 @@ static inline int bounce_end_io (struct bio *bio, int nr_sectors)
 		if (bvec->bv_page == org_vec->bv_page)
 			continue;
 
-		mempool_free(bvec->bv_page, page_pool);	
+		mempool_free(bvec->bv_page, pool);	
 	}
 
 out_eio:
@@ -279,27 +297,52 @@ out_eio:
 
 static int bounce_end_io_write(struct bio *bio, int nr_sectors)
 {
-	return bounce_end_io(bio, nr_sectors);
+	return bounce_end_io(bio, nr_sectors, page_pool);
 }
 
-static int bounce_end_io_read (struct bio *bio, int nr_sectors)
+static int bounce_end_io_write_isa(struct bio *bio, int nr_sectors)
+{
+	return bounce_end_io(bio, nr_sectors, isa_page_pool);
+}
+
+static inline int __bounce_end_io_read(struct bio *bio, int nr_sectors,
+				       mempool_t *pool)
 {
 	struct bio *bio_orig = bio->bi_private;
 
 	if (test_bit(BIO_UPTODATE, &bio->bi_flags))
 		copy_to_high_bio_irq(bio_orig, bio);
 
-	return bounce_end_io(bio, nr_sectors);
+	return bounce_end_io(bio, nr_sectors, pool);
 }
 
-void create_bounce(unsigned long pfn, struct bio **bio_orig)
+static int bounce_end_io_read(struct bio *bio, int nr_sectors)
+{
+	return __bounce_end_io_read(bio, nr_sectors, page_pool);
+}
+
+static int bounce_end_io_read_isa(struct bio *bio, int nr_sectors)
+{
+	return __bounce_end_io_read(bio, nr_sectors, isa_page_pool);
+}
+
+void create_bounce(unsigned long pfn, int gfp, struct bio **bio_orig)
 {
 	struct page *page;
 	struct bio *bio = NULL;
-	int i, rw = bio_data_dir(*bio_orig);
+	int i, rw = bio_data_dir(*bio_orig), bio_gfp;
 	struct bio_vec *to, *from;
+	mempool_t *pool;
 
 	BUG_ON((*bio_orig)->bi_idx);
+
+	if (!(gfp & GFP_DMA)) {
+		bio_gfp = GFP_NOHIGHIO;
+		pool = page_pool;
+	} else {
+		bio_gfp = GFP_NOIO;
+		pool = isa_page_pool;
+	}
 
 	bio_for_each_segment(from, *bio_orig, i) {
 		page = from->bv_page;
@@ -314,11 +357,11 @@ void create_bounce(unsigned long pfn, struct bio **bio_orig)
 		 * irk, bounce it
 		 */
 		if (!bio)
-			bio = bio_alloc(GFP_NOHIGHIO, (*bio_orig)->bi_vcnt);
+			bio = bio_alloc(bio_gfp, (*bio_orig)->bi_vcnt);
 
 		to = &bio->bi_io_vec[i];
 
-		to->bv_page = mempool_alloc(page_pool, GFP_NOHIGHIO);
+		to->bv_page = mempool_alloc(pool, gfp);
 		to->bv_len = from->bv_len;
 		to->bv_offset = from->bv_offset;
 
@@ -359,10 +402,17 @@ void create_bounce(unsigned long pfn, struct bio **bio_orig)
 	bio->bi_idx = 0;
 	bio->bi_size = (*bio_orig)->bi_size;
 
-	if (rw & WRITE)
-		bio->bi_end_io = bounce_end_io_write;
-	else
-		bio->bi_end_io = bounce_end_io_read;
+	if (pool == page_pool) {
+		if (rw & WRITE)
+			bio->bi_end_io = bounce_end_io_write;
+		else
+			bio->bi_end_io = bounce_end_io_read;
+	} else {
+		if (rw & WRITE)
+			bio->bi_end_io = bounce_end_io_write_isa;
+		else
+			bio->bi_end_io = bounce_end_io_read_isa;
+	}
 
 	bio->bi_private = *bio_orig;
 	*bio_orig = bio;

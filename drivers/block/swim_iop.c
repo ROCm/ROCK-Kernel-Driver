@@ -84,6 +84,8 @@ static struct floppy_state floppy_states[MAX_FLOPPIES];
 static int floppy_blocksizes[2] = {512,512};
 static int floppy_sizes[2] = {2880,2880};
 
+static spinlock_t swim_iop_lock = SPIN_LOCK_UNLOCKED;
+
 static char *drive_names[7] = {
 	"not installed",	/* DRV_NONE    */
 	"unknown (1)",		/* DRV_UNKNOWN */
@@ -147,7 +149,7 @@ int swimiop_init(void)
 		       MAJOR_NR);
 		return -EBUSY;
 	}
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST);
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST, &swim_iop_lock);
 	blksize_size[MAJOR_NR] = floppy_blocksizes;
 	blk_size[MAJOR_NR] = floppy_sizes;
 

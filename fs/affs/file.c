@@ -38,8 +38,6 @@ static int affs_grow_extcache(struct inode *inode, u32 lc_idx);
 static struct buffer_head *affs_alloc_extblock(struct inode *inode, struct buffer_head *bh, u32 ext);
 static inline struct buffer_head *affs_get_extblock(struct inode *inode, u32 ext);
 static struct buffer_head *affs_get_extblock_slow(struct inode *inode, u32 ext);
-static int affs_get_block(struct inode *inode, long block, struct buffer_head *bh_result, int create);
-
 static ssize_t affs_file_write(struct file *filp, const char *buf, size_t count, loff_t *ppos);
 static int affs_file_open(struct inode *inode, struct file *filp);
 static int affs_file_release(struct inode *inode, struct file *filp);
@@ -332,7 +330,7 @@ err_bread:
 }
 
 static int
-affs_get_block(struct inode *inode, long block, struct buffer_head *bh_result, int create)
+affs_get_block(struct inode *inode, sector_t block, struct buffer_head *bh_result, int create)
 {
 	struct super_block	*sb = inode->i_sb;
 	struct buffer_head	*ext_bh;

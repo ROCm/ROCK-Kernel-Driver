@@ -88,7 +88,7 @@ static int read_block_bitmap (struct super_block * sb,
 	if (!gdp)
 		goto error_out;
 	retval = 0;
-	bh = bread (sb->s_dev, le32_to_cpu(gdp->bg_block_bitmap), sb->s_blocksize);
+	bh = sb_bread(sb, le32_to_cpu(gdp->bg_block_bitmap));
 	if (!bh) {
 		ext2_error (sb, "read_block_bitmap",
 			    "Cannot read block bitmap - "

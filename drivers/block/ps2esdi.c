@@ -66,8 +66,6 @@
 #define TYPE_0_CMD_BLK_LENGTH 2
 #define TYPE_1_CMD_BLK_LENGTH 4
 
-#define PS2ESDI_LOCK (&((BLK_DEFAULT_QUEUE(MAJOR_NR))->queue_lock))
-
 static void reset_ctrl(void);
 
 int ps2esdi_init(void);
@@ -130,6 +128,7 @@ static int intg_esdi = 0;       /* If integrated adapter */
 struct ps2esdi_i_struct {
 	unsigned int head, sect, cyl, wpcom, lzone, ctl;
 };
+static spinlock_t ps2esdi_lock = SPIN_LOCK_UNLOCKED;
 
 #if 0
 #if 0				/* try both - I don't know which one is better... UB */
@@ -180,7 +179,7 @@ int __init ps2esdi_init(void)
 		return -1;
 	}
 	/* set up some global information - indicating device specific info */
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST);
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST, &ps2esdi_lock);
 	read_ahead[MAJOR_NR] = 8;	/* 8 sector (4kB) read ahead */
 
 	/* some minor housekeeping - setup the global gendisk structure */
@@ -954,10 +953,10 @@ static void ps2esdi_normal_interrupt_handler(u_int int_ret_code)
 		break;
 	}
 	if(ending != -1) {
-		spin_lock_irqsave(PS2ESDI_LOCK, flags);
+		spin_lock_irqsave(ps2esdi_LOCK, flags);
 		end_request(ending);
 		do_ps2esdi_request(BLK_DEFAULT_QUEUE(MAJOR_NR));
-		spin_unlock_irqrestore(PS2ESDI_LOCK, flags);
+		spin_unlock_irqrestore(ps2esdi_LOCK, flags);
 	}
 }				/* handle interrupts */
 

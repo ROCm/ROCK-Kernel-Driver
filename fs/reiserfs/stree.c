@@ -1116,7 +1116,7 @@ static char  prepare_for_delete_or_cut(
 		    continue;
 		}
 		/* Search for the buffer in cache. */
-		p_s_un_bh = get_hash_table(p_s_sb->s_dev, get_block_num(p_n_unfm_pointer,0), n_blk_size);
+		p_s_un_bh = sb_get_hash_table(p_s_sb, get_block_num(p_n_unfm_pointer,0));
 
 		if (p_s_un_bh) {
 		    mark_buffer_clean(p_s_un_bh) ;

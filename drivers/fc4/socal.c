@@ -411,7 +411,7 @@ static void socal_intr(int irq, void *dev_id, struct pt_regs *regs)
 	unsigned long flags;
 	register struct socal *s = (struct socal *)dev_id;
 
-	spin_lock_irqsave(&io_request_lock, flags);
+	spin_lock_irqsave(&s->lock, flags);
 	cmd = sbus_readl(s->regs + CMD);
 	for (; (cmd = SOCAL_INTR (s, cmd)); cmd = sbus_readl(s->regs + CMD)) {
 #ifdef SOCALDEBUG
@@ -428,7 +428,7 @@ static void socal_intr(int irq, void *dev_id, struct pt_regs *regs)
 		if (cmd & SOCAL_CMD_REQ_QALL)
 			socal_request (s, cmd);
 	}
-	spin_unlock_irqrestore(&io_request_lock, flags);
+	spin_unlock_irqrestore(&s->lock, flags);
 }
 
 #define TOKEN(proto, port, token) (((proto)<<12)|(token)|(port))
@@ -667,6 +667,7 @@ static inline void socal_init(struct sbus_dev *sdev, int no)
 	s = kmalloc (sizeof (struct socal), GFP_KERNEL);
 	if (!s) return;
 	memset (s, 0, sizeof(struct socal));
+	spin_lock_init(&s->lock);
 	s->socal_no = no;
 
 	SOD(("socals %08lx socal_intr %08lx socal_hw_enque %08lx\n",

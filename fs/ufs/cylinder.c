@@ -54,7 +54,7 @@ static void ufs_read_cylinder (struct super_block * sb,
 	 */
 	UCPI_UBH->bh[0] = sb->u.ufs_sb.s_ucg[cgno];
 	for (i = 1; i < UCPI_UBH->count; i++)
-		if (!(UCPI_UBH->bh[i] = bread (sb->s_dev, UCPI_UBH->fragment + i, sb->s_blocksize)))
+		if (!(UCPI_UBH->bh[i] = sb_bread(sb, UCPI_UBH->fragment + i)))
 			goto failed;
 	sb->u.ufs_sb.s_cgno[bitmap_nr] = cgno;
 			

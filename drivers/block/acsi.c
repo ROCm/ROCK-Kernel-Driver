@@ -253,6 +253,8 @@ static int				CurrentNReq;
 static int				CurrentNSect;
 static char				*CurrentBuffer;
 
+static spinlock_t			acsi_lock = SPIN_LOCK_UNLOCKED;
+
 
 #define SET_TIMER()	mod_timer(&acsi_timer, jiffies + ACSI_TIMEOUT)
 #define CLEAR_TIMER()	del_timer(&acsi_timer)
@@ -1784,7 +1786,7 @@ int acsi_init( void )
 	phys_acsi_buffer = virt_to_phys( acsi_buffer );
 	STramMask = ATARIHW_PRESENT(EXTD_DMA) ? 0x00000000 : 0xff000000;
 	
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST);
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST, &acsi_lock);
 	read_ahead[MAJOR_NR] = 8;		/* 8 sector (4kB) read-ahead */
 	add_gendisk(&acsi_gendisk);
 

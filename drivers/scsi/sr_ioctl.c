@@ -95,7 +95,7 @@ int sr_do_ioctl(int target, unsigned char *sr_cmd, void *buffer, unsigned buflen
 	SRpnt->sr_request.buffer = buffer;
 	if (buffer && SRpnt->sr_host->unchecked_isa_dma &&
 	    (virt_to_phys(buffer) + buflength - 1 > ISA_DMA_THRESHOLD)) {
-		bounce_buffer = (char *) scsi_malloc((buflength + 511) & ~511);
+		bounce_buffer = (char *) kmalloc(buflength, GFP_DMA);
 		if (bounce_buffer == NULL) {
 			printk("SCSI DMA pool exhausted.");
 			return -ENOMEM;
@@ -114,7 +114,7 @@ int sr_do_ioctl(int target, unsigned char *sr_cmd, void *buffer, unsigned buflen
 	req = &SRpnt->sr_request;
 	if (SRpnt->sr_buffer && req->buffer && SRpnt->sr_buffer != req->buffer) {
 		memcpy(req->buffer, SRpnt->sr_buffer, SRpnt->sr_bufflen);
-		scsi_free(SRpnt->sr_buffer, (SRpnt->sr_bufflen + 511) & ~511);
+		kfree(SRpnt->sr_buffer);
 		SRpnt->sr_buffer = req->buffer;
         }
 
@@ -519,7 +519,7 @@ int sr_is_xa(int minor)
 	if (!xa_test)
 		return 0;
 
-	raw_sector = (unsigned char *) scsi_malloc(2048 + 512);
+	raw_sector = (unsigned char *) kmalloc(2048, GFP_DMA | GFP_KERNEL);
 	if (!raw_sector)
 		return -ENOMEM;
 	if (0 == sr_read_sector(minor, scsi_CDs[minor].ms_offset + 16,
@@ -529,7 +529,7 @@ int sr_is_xa(int minor)
 		/* read a raw sector failed for some reason. */
 		is_xa = -1;
 	}
-	scsi_free(raw_sector, 2048 + 512);
+	kfree(raw_sector);
 #ifdef DEBUG
 	printk("sr%d: sr_is_xa: %d\n", minor, is_xa);
 #endif

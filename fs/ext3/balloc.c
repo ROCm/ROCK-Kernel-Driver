@@ -91,8 +91,7 @@ static int read_block_bitmap (struct super_block * sb,
 	if (!gdp)
 		goto error_out;
 	retval = 0;
-	bh = bread (sb->s_dev,
-			le32_to_cpu(gdp->bg_block_bitmap), sb->s_blocksize);
+	bh = sb_bread(sb, le32_to_cpu(gdp->bg_block_bitmap));
 	if (!bh) {
 		ext3_error (sb, "read_block_bitmap",
 			    "Cannot read block bitmap - "
@@ -353,8 +352,7 @@ do_more:
 #ifdef CONFIG_JBD_DEBUG
 		{
 			struct buffer_head *debug_bh;
-			debug_bh = get_hash_table(sb->s_dev, block + i,
-							sb->s_blocksize);
+			debug_bh = sb_get_hash_table(sb, block + i);
 			if (debug_bh) {
 				BUFFER_TRACE(debug_bh, "Deleted!");
 				if (!bh2jh(bitmap_bh)->b_committed_data)
@@ -702,7 +700,7 @@ got_block:
 		struct buffer_head *debug_bh;
 
 		/* Record bitmap buffer state in the newly allocated block */
-		debug_bh = get_hash_table(sb->s_dev, tmp, sb->s_blocksize);
+		debug_bh = sb_get_hash_table(sb, tmp);
 		if (debug_bh) {
 			BUFFER_TRACE(debug_bh, "state when allocated");
 			BUFFER_TRACE2(debug_bh, bh, "bitmap state");

@@ -1,4 +1,4 @@
-/* $Id: iommu_common.h,v 1.4 2001/10/09 02:24:33 davem Exp $
+/* $Id: iommu_common.h,v 1.5 2001/12/11 09:41:01 davem Exp $
  * iommu_common.h: UltraSparc SBUS/PCI common iommu declarations.
  *
  * Copyright (C) 1999 David S. Miller (davem@redhat.com)
@@ -6,8 +6,9 @@
 
 #include <linux/kernel.h>
 #include <linux/types.h>
+#include <linux/sched.h>
+#include <linux/mm.h>
 
-#include <asm/page.h>
 #include <asm/iommu.h>
 #include <asm/scatterlist.h>
 

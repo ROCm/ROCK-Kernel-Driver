@@ -1445,7 +1445,7 @@ static void qpti_intr(int irq, void *dev_id, struct pt_regs *regs)
 	spin_unlock(&qpti->lock);
 
 	if (dq != NULL) {
-		spin_lock(&io_request_lock);
+		spin_lock(&qpti->qhost->host_lock);
 		do {
 			Scsi_Cmnd *next;
 
@@ -1453,7 +1453,7 @@ static void qpti_intr(int irq, void *dev_id, struct pt_regs *regs)
 			dq->scsi_done(dq);
 			dq = next;
 		} while (dq != NULL);
-		spin_unlock(&io_request_lock);
+		spin_unlock(&qpti->qhost->host_lock);
 	}
 	__restore_flags(flags);
 }

@@ -55,6 +55,7 @@
 #include <linux/init.h>
 #include <linux/smp_lock.h>
 #include <linux/completion.h>
+#include <linux/mempool.h>
 
 #define __KERNEL_SYSCALLS__
 
@@ -82,6 +83,18 @@ struct proc_dir_entry *proc_scsi;
 static int scsi_proc_info(char *buffer, char **start, off_t offset, int length);
 static void scsi_dump_status(int level);
 #endif
+
+#define SG_MEMPOOL_NR		5
+#define SG_MEMPOOL_SIZE		32
+
+struct scsi_host_sg_pool {
+	int size;
+	kmem_cache_t *slab;
+	mempool_t *pool;
+};
+
+static const int scsi_host_sg_pool_sizes[SG_MEMPOOL_NR] = { 8, 16, 32, 64, MAX_PHYS_SEGMENTS };
+struct scsi_host_sg_pool scsi_sg_pools[SG_MEMPOOL_NR];
 
 /*
    static const char RCSid[] = "$Header: /vger/u4/cvs/linux/drivers/scsi/scsi.c,v 1.38 1997/01/19 23:07:18 davem Exp $";
@@ -181,23 +194,22 @@ void scsi_build_commandblocks(Scsi_Device * SDpnt);
 void  scsi_initialize_queue(Scsi_Device * SDpnt, struct Scsi_Host * SHpnt)
 {
 	request_queue_t *q = &SDpnt->request_queue;
-	int max_segments = SHpnt->sg_tablesize;
 
 	blk_init_queue(q, scsi_request_fn, &SHpnt->host_lock);
 	q->queuedata = (void *) SDpnt;
 
-#ifdef DMA_CHUNK_SIZE
-	if (max_segments > 64)
-		max_segments = 64;
-#endif
+	/* Hardware imposed limit. */
+	blk_queue_max_hw_segments(q, SHpnt->sg_tablesize);
 
-	blk_queue_max_segments(q, max_segments);
+	/*
+	 * When we remove scsi_malloc soonish, this can die too
+	 */
+	blk_queue_max_phys_segments(q, PAGE_SIZE / sizeof(struct scatterlist));
+
 	blk_queue_max_sectors(q, SHpnt->max_sectors);
 
 	if (!SHpnt->use_clustering)
 		clear_bit(QUEUE_FLAG_CLUSTER, &q->queue_flags);
-	if (SHpnt->unchecked_isa_dma)
-		blk_queue_segment_boundary(q, ISA_DMA_THRESHOLD);
 }
 
 #ifdef MODULE
@@ -1955,13 +1967,6 @@ static int scsi_register_host(Scsi_Host_Template * tpnt)
 				}
 		}
 
-		/*
-		 * Now that we have all of the devices, resize the DMA pool,
-		 * as required.  */
-		if (!out_of_space)
-			scsi_resize_dma_pool();
-
-
 		/* This does any final handling that is required. */
 		for (sdtpnt = scsi_devicelist; sdtpnt; sdtpnt = sdtpnt->next) {
 			if (sdtpnt->finish && sdtpnt->nr_dev) {
@@ -2160,14 +2165,6 @@ static int scsi_unregister_host(Scsi_Host_Template * tpnt)
 		tpnt->present--;
 	}
 
-	/*
-	 * If there are absolutely no more hosts left, it is safe
-	 * to completely nuke the DMA pool.  The resize operation will
-	 * do the right thing and free everything.
-	 */
-	if (!scsi_hosts)
-		scsi_resize_dma_pool();
-
 	if (pcount0 != next_scsi_host)
 		printk(KERN_INFO "scsi : %d host%s left.\n", next_scsi_host,
 		       (next_scsi_host == 1) ? "" : "s");
@@ -2268,8 +2265,6 @@ static int scsi_register_device_module(struct Scsi_Device_Template *tpnt)
 	 */
 	if (tpnt->finish && tpnt->nr_dev)
 		(*tpnt->finish) ();
-	if (!out_of_space)
-		scsi_resize_dma_pool();
 	MOD_INC_USE_COUNT;
 
 	if (out_of_space) {
@@ -2535,16 +2530,81 @@ int __init scsi_setup(char *str)
 __setup("scsihosts=", scsi_setup);
 #endif
 
+static void *scsi_pool_alloc(int gfp_mask, void *data)
+{
+	return kmem_cache_alloc(data, gfp_mask);
+}
+
+static void scsi_pool_free(void *ptr, void *data)
+{
+	kmem_cache_free(data, ptr);
+}
+
+struct scatterlist *scsi_alloc_sgtable(Scsi_Cmnd *SCpnt, int gfp_mask)
+{
+	struct scsi_host_sg_pool *sgp;
+	struct scatterlist *sgl;
+
+	BUG_ON(!SCpnt->use_sg);
+
+	switch (SCpnt->use_sg) {
+		case 1 ... 8			: SCpnt->sglist_len = 0; break;
+		case 9 ... 16			: SCpnt->sglist_len = 1; break;
+		case 17 ... 32			: SCpnt->sglist_len = 2; break;
+		case 33 ... 64			: SCpnt->sglist_len = 3; break;
+		case 65 ... MAX_PHYS_SEGMENTS	: SCpnt->sglist_len = 4; break;
+		default: return NULL;
+	}
+
+	sgp = scsi_sg_pools + SCpnt->sglist_len;
+
+	sgl = mempool_alloc(sgp->pool, gfp_mask);
+	if (sgl) {
+		memset(sgl, 0, sgp->size);
+		return sgl;
+	}
+
+	return sgl;
+}
+
+void scsi_free_sgtable(struct scatterlist *sgl, int index)
+{
+	struct scsi_host_sg_pool *sgp = scsi_sg_pools + index;
+
+	if (unlikely(index > SG_MEMPOOL_NR)) {
+		printk("scsi_free_sgtable: mempool %d\n", index);
+		BUG();
+	}
+
+	mempool_free(sgl, sgp->pool);
+}
+
 static int __init init_scsi(void)
 {
 	struct proc_dir_entry *generic;
+	char name[16];
+	int i;
 
 	printk(KERN_INFO "SCSI subsystem driver " REVISION "\n");
 
-        if( scsi_init_minimal_dma_pool() != 0 )
-        {
-                return 1;
-        }
+	/*
+	 * setup sg memory pools
+	 */
+	for (i = 0; i < SG_MEMPOOL_NR; i++) {
+		struct scsi_host_sg_pool *sgp = scsi_sg_pools + i;
+		int size = scsi_host_sg_pool_sizes[i] * sizeof(struct scatterlist);
+
+		snprintf(name, sizeof(name) - 1, "sgpool-%d", scsi_host_sg_pool_sizes[i]);
+		sgp->slab = kmem_cache_create(name, size, 0, SLAB_HWCACHE_ALIGN, NULL, NULL);
+		if (!sgp->slab)
+			panic("SCSI: can't init sg slab\n");
+
+		sgp->pool = mempool_create(SG_MEMPOOL_SIZE, scsi_pool_alloc, scsi_pool_free, sgp->slab);
+		if (!sgp->pool)
+			panic("SCSI: can't init sg mempool\n");
+
+		sgp->size = size;
+	}
 
 	/*
 	 * This makes /proc/scsi and /proc/scsi/scsi visible.
@@ -2580,6 +2640,7 @@ static int __init init_scsi(void)
 static void __exit exit_scsi(void)
 {
 	Scsi_Host_Name *shn, *shn2 = NULL;
+	int i;
 
 	remove_bh(SCSI_BH);
 
@@ -2600,11 +2661,13 @@ static void __exit exit_scsi(void)
 	remove_proc_entry ("scsi", 0);
 #endif
 	
-	/*
-	 * Free up the DMA pool.
-	 */
-	scsi_resize_dma_pool();
-
+	for (i = 0; i < SG_MEMPOOL_NR; i++) {
+		struct scsi_host_sg_pool *sgp = scsi_sg_pools + i;
+		mempool_destroy(sgp->pool);
+		kmem_cache_destroy(sgp->slab);
+		sgp->pool = NULL;
+		sgp->slab = NULL;
+	}
 }
 
 module_init(init_scsi);

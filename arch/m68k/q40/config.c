@@ -36,7 +36,6 @@
 #include <asm/q40_master.h>
 #include <asm/keyboard.h>
 
-extern void floppy_eject(void);
 extern void floppy_setup(char *str, int *ints);
 
 extern int q40kbd_translate(unsigned char scancode, unsigned char *keycode,

@@ -369,10 +369,4 @@ struct floppy_raw_cmd {
 #define FDEJECT _IO(2, 0x5a)
 /* eject the disk */
 
-
-#ifdef __KERNEL__
-/* eject the boot floppy (if we need the drive for a different root floppy) */
-void floppy_eject(void);
-#endif
-
 #endif

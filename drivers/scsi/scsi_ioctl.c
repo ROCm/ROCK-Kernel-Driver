@@ -78,8 +78,7 @@ static int ioctl_probe(struct Scsi_Host *host, void *buffer)
  * *(char *) ((int *) arg)[2] the actual command byte.   
  * 
  * Note that if more than MAX_BUF bytes are requested to be transferred,
- * the ioctl will fail with error EINVAL.  MAX_BUF can be increased in
- * the future by increasing the size that scsi_malloc will accept.
+ * the ioctl will fail with error EINVAL.
  * 
  * This size *does not* include the initial lengths that were passed.
  * 
@@ -197,10 +196,14 @@ int scsi_ioctl_send_command(Scsi_Device * dev, Scsi_Ioctl_Command * sic)
 	unsigned int inlen, outlen, cmdlen;
 	unsigned int needed, buf_needed;
 	int timeout, retries, result;
-	int data_direction;
+	int data_direction, gfp_mask = GFP_KERNEL;
 
 	if (!sic)
 		return -EINVAL;
+
+	if (dev->host->unchecked_isa_dma)
+		gfp_mask |= GFP_DMA;
+
 	/*
 	 * Verify that we can read at least this much.
 	 */
@@ -232,7 +235,7 @@ int scsi_ioctl_send_command(Scsi_Device * dev, Scsi_Ioctl_Command * sic)
 		buf_needed = (buf_needed + 511) & ~511;
 		if (buf_needed > MAX_BUF)
 			buf_needed = MAX_BUF;
-		buf = (char *) scsi_malloc(buf_needed);
+		buf = (char *) kmalloc(buf_needed, gfp_mask);
 		if (!buf)
 			return -ENOMEM;
 		memset(buf, 0, buf_needed);
@@ -341,7 +344,7 @@ int scsi_ioctl_send_command(Scsi_Device * dev, Scsi_Ioctl_Command * sic)
 
 error:
 	if (buf)
-		scsi_free(buf, buf_needed);
+		kfree(buf);
 
 
 	return result;

@@ -226,9 +226,9 @@ ufs_set_inode_gid(struct super_block *sb, struct ufs_inode *inode, u32 value)
 /*
  * These functions manipulate ufs buffers
  */
-#define ubh_bread(dev,fragment,size) _ubh_bread_(uspi,dev,fragment,size)  
-extern struct ufs_buffer_head * _ubh_bread_(struct ufs_sb_private_info *, kdev_t, unsigned, unsigned);
-extern struct ufs_buffer_head * ubh_bread_uspi(struct ufs_sb_private_info *, kdev_t, unsigned, unsigned);
+#define ubh_bread(sb,fragment,size) _ubh_bread_(uspi,sb,fragment,size)  
+extern struct ufs_buffer_head * _ubh_bread_(struct ufs_sb_private_info *, struct super_block *, unsigned, unsigned);
+extern struct ufs_buffer_head * ubh_bread_uspi(struct ufs_sb_private_info *, struct super_block *, unsigned, unsigned);
 extern void ubh_brelse (struct ufs_buffer_head *);
 extern void ubh_brelse_uspi (struct ufs_sb_private_info *);
 extern void ubh_mark_buffer_dirty (struct ufs_buffer_head *);

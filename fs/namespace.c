@@ -517,9 +517,11 @@ static int do_loopback(struct nameidata *nd, char *old_name, int recurse)
 
 	if (mnt) {
 		err = graft_tree(mnt, nd);
-		if (err)
+		if (err) {
+			spin_lock(&dcache_lock);
 			umount_tree(mnt);
-		else
+			spin_unlock(&dcache_lock);
+		} else
 			mntput(mnt);
 	}
 

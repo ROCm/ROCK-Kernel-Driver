@@ -51,8 +51,7 @@ static struct buffer_head *read_inode_bitmap (struct super_block * sb,
 	if (!desc)
 		goto error_out;
 
-	bh = bread(sb->s_dev, le32_to_cpu(desc->bg_inode_bitmap),
-			sb->s_blocksize);
+	bh = sb_bread(sb, le32_to_cpu(desc->bg_inode_bitmap));
 	if (!bh)
 		ext2_error (sb, "read_inode_bitmap",
 			    "Cannot read inode bitmap - "

@@ -59,12 +59,12 @@ void fat_ll_rw_block (
 
 struct buffer_head *default_fat_bread(struct super_block *sb, int block)
 {
-	return bread (sb->s_dev, block, sb->s_blocksize);
+	return sb_bread(sb, block);
 }
 
 struct buffer_head *default_fat_getblk(struct super_block *sb, int block)
 {
-	return getblk (sb->s_dev, block, sb->s_blocksize);
+	return sb_getblk(sb, block);
 }
 
 void default_fat_brelse(struct super_block *sb, struct buffer_head *bh)

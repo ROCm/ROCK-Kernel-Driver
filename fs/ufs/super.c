@@ -339,7 +339,7 @@ int ufs_read_cylinder_structures (struct super_block * sb) {
 		size = uspi->s_bsize;
 		if (i + uspi->s_fpb > blks)
 			size = (blks - i) * uspi->s_fsize;
-		ubh = ubh_bread(sb->s_dev, uspi->s_csaddr + i, size);
+		ubh = ubh_bread(sb, uspi->s_csaddr + i, size);
 		if (!ubh)
 			goto failed;
 		ubh_ubhcpymem (space, ubh, size);
@@ -363,7 +363,7 @@ int ufs_read_cylinder_structures (struct super_block * sb) {
 	}
 	for (i = 0; i < uspi->s_ncg; i++) {
 		UFSD(("read cg %u\n", i))
-		if (!(sb->u.ufs_sb.s_ucg[i] = bread (sb->s_dev, ufs_cgcmin(i), sb->s_blocksize)))
+		if (!(sb->u.ufs_sb.s_ucg[i] = sb_bread(sb, ufs_cgcmin(i))))
 			goto failed;
 		if (!ufs_cg_chkmagic (sb, (struct ufs_cylinder_group *) sb->u.ufs_sb.s_ucg[i]->b_data))
 			goto failed;
@@ -414,7 +414,7 @@ void ufs_put_cylinder_structures (struct super_block * sb) {
 		size = uspi->s_bsize;
 		if (i + uspi->s_fpb > blks)
 			size = (blks - i) * uspi->s_fsize;
-		ubh = ubh_bread (sb->s_dev, uspi->s_csaddr + i, size);
+		ubh = ubh_bread(sb, uspi->s_csaddr + i, size);
 		ubh_memcpyubh (ubh, space, size);
 		space += size;
 		ubh_mark_buffer_uptodate (ubh, 1);
@@ -597,11 +597,12 @@ struct super_block * ufs_read_super (struct super_block * sb, void * data,
 	
 again:	
 	set_blocksize (sb->s_dev, block_size);
+	sb->s_blocksize = block_size;
 
 	/*
 	 * read ufs super block from device
 	 */
-	ubh = ubh_bread_uspi (uspi, sb->s_dev, uspi->s_sbbase + UFS_SBLOCK/block_size, super_block_size);
+	ubh = ubh_bread_uspi (uspi, sb, uspi->s_sbbase + UFS_SBLOCK/block_size, super_block_size);
 	if (!ubh) 
 		goto failed;
 	

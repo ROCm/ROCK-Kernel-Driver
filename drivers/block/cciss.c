@@ -1219,7 +1219,7 @@ queue:
 		goto startio;
 
 	creq = elv_next_request(q);
-	if (creq->nr_segments > MAXSGENTRIES)
+	if (creq->nr_phys_segments > MAXSGENTRIES)
                 BUG();
 
         if (h->ctlr != MAJOR(creq->rq_dev)-MAJOR_NR )
@@ -1866,9 +1866,16 @@ static int __init cciss_init_one(struct pci_dev *pdev,
 
 	q = BLK_DEFAULT_QUEUE(MAJOR_NR + i);
         q->queuedata = hba[i];
+	spin_lock_init(&hba[i]->lock);
         blk_init_queue(q, do_cciss_request, &hba[i]->lock);
 	blk_queue_bounce_limit(q, hba[i]->pdev->dma_mask);
-	blk_queue_max_segments(q, MAXSGENTRIES);
+
+	/* This is a hardware imposed limit. */
+	blk_queue_max_hw_segments(q, MAXSGENTRIES);
+
+	/* This is a limit in the driver and could be eliminated. */
+	blk_queue_max_phys_segments(q, MAXSGENTRIES);
+
 	blk_queue_max_sectors(q, 512);
 
 	/* fill in the other Kernel structs */

@@ -263,7 +263,7 @@ static struct adfs_discmap *adfs_read_map(struct super_block *sb, struct adfs_di
 		dm[zone].dm_startbit = 0;
 		dm[zone].dm_endbit   = zone_size;
 		dm[zone].dm_startblk = zone * zone_size - ADFS_DR_SIZE_BITS;
-		dm[zone].dm_bh       = bread(sb->s_dev, map_addr, sb->s_blocksize);
+		dm[zone].dm_bh       = sb_bread(sb, map_addr);
 
 		if (!dm[zone].dm_bh) {
 			adfs_error(sb, "unable to read map");
@@ -319,8 +319,9 @@ struct super_block *adfs_read_super(struct super_block *sb, void *data, int sile
 	if (parse_options(sb, data))
 		goto error;
 
+	sb->s_blocksize = BLOCK_SIZE;
 	set_blocksize(dev, BLOCK_SIZE);
-	if (!(bh = bread(dev, ADFS_DISCRECORD / BLOCK_SIZE, BLOCK_SIZE))) {
+	if (!(bh = sb_bread(sb, ADFS_DISCRECORD / BLOCK_SIZE))) {
 		adfs_error(sb, "unable to read superblock");
 		goto error;
 	}
@@ -354,7 +355,7 @@ struct super_block *adfs_read_super(struct super_block *sb, void *data, int sile
 
 		brelse(bh);
 		set_blocksize(dev, sb->s_blocksize);
-		bh = bread(dev, ADFS_DISCRECORD / sb->s_blocksize, sb->s_blocksize);
+		bh = sb_bread(sb, ADFS_DISCRECORD / sb->s_blocksize);
 		if (!bh) {
 			adfs_error(sb, "couldn't read superblock on "
 				"2nd try.");

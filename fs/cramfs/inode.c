@@ -153,7 +153,7 @@ static void *cramfs_read(struct super_block *sb, unsigned int offset, unsigned i
 
 		bh = NULL;
 		if (blocknr + i < devsize) {
-			bh = getblk(sb->s_dev, blocknr + i, PAGE_CACHE_SIZE);
+			bh = sb_getblk(sb, blocknr + i);
 			if (!buffer_uptodate(bh))
 				read_array[unread++] = bh;
 		}

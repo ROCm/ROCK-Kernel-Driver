@@ -402,6 +402,8 @@ struct super_block *hfs_read_super(struct super_block *s, void *data,
 
 	/* set the device driver to 512-byte blocks */
 	set_blocksize(dev, HFS_SECTOR_SIZE);
+	s->s_blocksize_bits = HFS_SECTOR_SIZE_BITS;
+	s->s_blocksize = HFS_SECTOR_SIZE;
 
 #ifdef CONFIG_MAC_PARTITION
 	/* check to see if we're in a partition */
@@ -437,8 +439,6 @@ struct super_block *hfs_read_super(struct super_block *s, void *data,
 	}
 
 	s->s_magic = HFS_SUPER_MAGIC;
-	s->s_blocksize_bits = HFS_SECTOR_SIZE_BITS;
-	s->s_blocksize = HFS_SECTOR_SIZE;
 	s->s_op = &hfs_super_operations;
 
 	/* try to get the root inode */

@@ -332,7 +332,7 @@ got_root:
 			       blocksize == 2048 ? 11 : 12;
 
 	/* Find out which kind of FS we have */
-	boot_bh = bread(sb->s_dev, 0, sb->s_blocksize);
+	boot_bh = sb_bread(sb, 0);
 	if (!boot_bh) {
 		printk(KERN_ERR "AFFS: Cannot read boot block\n");
 		goto out_error;

@@ -1,7 +1,7 @@
 /******************************************************************************
 **  High Performance device driver for the Symbios 53C896 controller.
 **
-**  Copyright (C) 1998-2000  Gerard Roudier <groudier@club-internet.fr>
+**  Copyright (C) 1998-2001  Gerard Roudier <groudier@free.fr>
 **
 **  This driver also supports all the Symbios 53C8XX controller family, 
 **  except 53C810 revisions < 16, 53C825 revisions < 16 and all 
@@ -32,7 +32,7 @@
 **  The Linux port of the FreeBSD ncr driver has been achieved in 
 **  november 1995 by:
 **
-**          Gerard Roudier              <groudier@club-internet.fr>
+**          Gerard Roudier              <groudier@free.fr>
 **
 **  Being given that this driver originates from the FreeBSD version, and
 **  in order to keep synergy on both, any suggested enhancements and corrections
@@ -12126,13 +12126,16 @@ static int ncr_scatter_896R1(ncb_p np, ccb_p cp, Scsi_Cmnd *cmd)
 
 	if (!use_sg)
 		segn = ncr_scatter_no_sglist(np, cp, cmd);
-	else if (use_sg > MAX_SCATTER)
-		segn = -1;
 	else {
 		struct scatterlist *scatter = (struct scatterlist *)cmd->buffer;
 		struct scr_tblmove *data;
 
 		use_sg = map_scsi_sg_data(np, cmd);
+		if (use_sg > MAX_SCATTER) {
+			unmap_scsi_data(np, cmd);
+			return -1;
+		}
+
 		data = &cp->phys.data[MAX_SCATTER - use_sg];
 
 		for (segn = 0; segn < use_sg; segn++) {
@@ -12165,13 +12168,15 @@ static int ncr_scatter(ncb_p np, ccb_p cp, Scsi_Cmnd *cmd)
 
 	if (!use_sg)
 		segment = ncr_scatter_no_sglist(np, cp, cmd);
-	else if (use_sg > MAX_SCATTER)
-		segment = -1;
 	else {
 		struct scatterlist *scatter = (struct scatterlist *)cmd->buffer;
 		struct scr_tblmove *data;
 
 		use_sg = map_scsi_sg_data(np, cmd);
+		if (use_sg > MAX_SCATTER) {
+			unmap_scsi_data(np, cmd);
+			return -1;
+		}
 		data = &cp->phys.data[MAX_SCATTER - use_sg];
 
 		for (segment = 0; segment < use_sg; segment++) {

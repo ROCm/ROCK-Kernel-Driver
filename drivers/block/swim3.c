@@ -203,6 +203,7 @@ struct floppy_state {
 
 static struct floppy_state floppy_states[MAX_FLOPPIES];
 static int floppy_count = 0;
+static spinlock_t swim3_lock = SPIN_LOCK_UNLOCKED;
 
 static unsigned short write_preamble[] = {
 	0x4e4e, 0x4e4e, 0x4e4e, 0x4e4e, 0x4e4e,	/* gap field */
@@ -807,16 +808,6 @@ static int fd_eject(struct floppy_state *fs)
 	return err;
 }
 
-int swim3_fd_eject(int devnum)
-{
-	if (devnum >= floppy_count)
-		return -ENODEV;
-	/* Do not check this - this function should ONLY be called early
-	 * in the boot process! */
-	/* if (floppy_states[devnum].ref_count != 1) return -EBUSY; */
-	return fd_eject(&floppy_states[devnum]);
-}
-
 static struct floppy_struct floppy_type =
 	{ 2880,18,2,80,0,0x1B,0x00,0xCF,0x6C,NULL };	/*  7 1.44MB 3.5"   */
 
@@ -1041,7 +1032,7 @@ int swim3_init(void)
 			       MAJOR_NR);
 			return -EBUSY;
 		}
-		blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST);
+		blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST,&swim3_lock);
 		blksize_size[MAJOR_NR] = floppy_blocksizes;
 		blk_size[MAJOR_NR] = floppy_sizes;
 	}

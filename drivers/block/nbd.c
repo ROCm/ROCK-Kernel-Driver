@@ -62,7 +62,7 @@ static u64 nbd_bytesizes[MAX_NBD];
 static struct nbd_device nbd_dev[MAX_NBD];
 static devfs_handle_t devfs_handle;
 
-static spinlock_t nbd_lock;
+static spinlock_t nbd_lock = SPIN_LOCK_UNLOCKED;
 
 #define DEBUG( s )
 /* #define DEBUG( s ) printk( s ) 

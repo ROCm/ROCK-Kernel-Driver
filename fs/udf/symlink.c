@@ -88,7 +88,7 @@ static int udf_symlink_filler(struct file *file, struct page *page)
 	lock_kernel();
 	if (UDF_I_ALLOCTYPE(inode) == ICB_FLAG_AD_IN_ICB)
 	{
-		bh = udf_tread(inode->i_sb, inode->i_ino, inode->i_sb->s_blocksize);
+		bh = udf_tread(inode->i_sb, inode->i_ino);
 
 		if (!bh)
 			goto out;
@@ -97,8 +97,7 @@ static int udf_symlink_filler(struct file *file, struct page *page)
 	}
 	else
 	{
-		bh = bread(inode->i_dev, udf_block_map(inode, 0),
-				inode->i_sb->s_blocksize);
+		bh = sb_bread(inode->i_sb, udf_block_map(inode, 0));
 
 		if (!bh)
 			goto out;

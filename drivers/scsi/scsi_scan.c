@@ -320,7 +320,7 @@ void scan_scsis(struct Scsi_Host *shpnt,
 	SDpnt->host = shpnt;
 	SDpnt->online = TRUE;
 
-	initialize_merge_fn(SDpnt);
+	scsi_initialize_merge_fn(SDpnt);
 
         /*
          * Initialize the object that we will use to wait for command blocks.
@@ -390,8 +390,6 @@ void scan_scsis(struct Scsi_Host *shpnt,
 					}
 				}
 			}
-			scsi_resize_dma_pool();
-
 			for (sdtpnt = scsi_devicelist; sdtpnt; sdtpnt = sdtpnt->next) {
 				if (sdtpnt->finish && sdtpnt->nr_dev) {
 					(*sdtpnt->finish) ();
@@ -759,7 +757,7 @@ static int scan_scsis_single(unsigned int channel, unsigned int dev,
 	 */
 	scsi_initialize_queue(SDpnt, shpnt);
 	SDpnt->host = shpnt;
-	initialize_merge_fn(SDpnt);
+	scsi_initialize_merge_fn(SDpnt);
 
 	/*
 	 * Mark this device as online, or otherwise we won't be able to do much with it.

@@ -86,8 +86,7 @@ static Indirect *get_branch(struct inode *inode,
 			    Indirect chain[],
 			    int *err)
 {
-	kdev_t dev = inode->i_dev;
-	int size = inode->i_sb->s_blocksize;
+	struct super_block *sb = inode->i_sb;
 	Indirect *p = chain;
 	struct buffer_head *bh;
 
@@ -96,8 +95,8 @@ static Indirect *get_branch(struct inode *inode,
 	if (!p->key)
 		goto no_block;
 	while (--depth) {
-		int block = block_to_cpu(inode->i_sb, p->key);
-		bh = bread(dev, block, size);
+		int block = block_to_cpu(sb, p->key);
+		bh = sb_bread(sb, block);
 		if (!bh)
 			goto failure;
 		if (!verify_chain(chain, p))
@@ -139,7 +138,7 @@ static int alloc_branch(struct inode *inode,
 		 * the pointer to new one, then send parent to disk.
 		 */
 		parent = block_to_cpu(inode->i_sb, branch[n-1].key);
-		bh = getblk(inode->i_dev, parent, blocksize);
+		bh = sb_getblk(inode->i_sb, parent);
 		lock_buffer(bh);
 		memset(bh->b_data, 0, blocksize);
 		branch[n].bh = bh;
@@ -192,7 +191,7 @@ changed:
 	return -EAGAIN;
 }
 
-static int get_block(struct inode *inode, long iblock, struct buffer_head *bh_result, int create)
+static int get_block(struct inode *inode, sector_t iblock, struct buffer_head *bh_result, int create)
 {
 	int err = -EIO;
 	int offsets[DEPTH];
@@ -336,7 +335,7 @@ static void free_branches(struct inode *inode, u32 *p, u32 *q, int depth)
 				continue;
 			*p = 0;
 			block = block_to_cpu(sb, nr);
-			bh = bread(inode->i_dev, block, sb->s_blocksize);
+			bh = sb_bread(sb, block);
 			if (!bh)
 				continue;
 			free_branches(inode, (u32*)bh->b_data,

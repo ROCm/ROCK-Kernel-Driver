@@ -467,9 +467,16 @@ int __init cpqarray_init(void)
 
 		q = BLK_DEFAULT_QUEUE(MAJOR_NR + i);
 		q->queuedata = hba[i];
+		spin_lock_init(&hba[i]->lock);
 		blk_init_queue(q, do_ida_request, &hba[i]->lock);
 		blk_queue_bounce_limit(q, hba[i]->pci_dev->dma_mask);
-		blk_queue_max_segments(q, SG_MAX);
+
+		/* This is a hardware imposed limit. */
+		blk_queue_max_hw_segments(q, SG_MAX);
+
+		/* This is a driver limit and could be eliminated. */
+		blk_queue_max_phys_segments(q, SG_MAX);
+
 		blksize_size[MAJOR_NR+i] = ida_blocksizes + (i*256);
 		read_ahead[MAJOR_NR+i] = READ_AHEAD;
 
@@ -864,7 +871,7 @@ queue_next:
 		goto startio;
 
 	creq = elv_next_request(q);
-	if (creq->nr_segments > SG_MAX)
+	if (creq->nr_phys_segments > SG_MAX)
 		BUG();
 
 	if (h->ctlr != MAJOR(creq->rq_dev)-MAJOR_NR || h->ctlr > nr_ctlr)

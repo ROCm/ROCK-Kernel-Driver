@@ -60,8 +60,7 @@ static int read_inode_bitmap (struct super_block * sb,
 		retval = -EIO;
 		goto error_out;
 	}
-	bh = bread (sb->s_dev,
-			le32_to_cpu(gdp->bg_inode_bitmap), sb->s_blocksize);
+	bh = sb_bread(sb, le32_to_cpu(gdp->bg_inode_bitmap));
 	if (!bh) {
 		ext3_error (sb, "read_inode_bitmap",
 			    "Cannot read inode bitmap - "

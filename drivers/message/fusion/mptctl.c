@@ -69,6 +69,7 @@
 #include <linux/version.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/major.h>
 #include <linux/errno.h>
 #include <linux/init.h>
 #include <linux/slab.h>

@@ -68,7 +68,7 @@ void hpfs_truncate(struct inode *i)
 	hpfs_write_inode(i);
 }
 
-int hpfs_get_block(struct inode *inode, long iblock, struct buffer_head *bh_result, int create)
+int hpfs_get_block(struct inode *inode, sector_t iblock, struct buffer_head *bh_result, int create)
 {
 	secno s;
 	s = hpfs_bmap(inode, iblock);
