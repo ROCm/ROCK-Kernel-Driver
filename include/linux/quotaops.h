@@ -20,7 +20,7 @@
 /*
  * declaration of quota_function calls in kernel.
  */
-extern int sync_dquots(kdev_t dev, int type);
+extern void sync_dquots(struct super_block *sb, int type);
 
 extern void dquot_initialize(struct inode *inode, int type);
 extern void dquot_drop(struct inode *inode);

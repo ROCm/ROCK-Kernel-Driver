@@ -368,12 +368,13 @@ restart:
 	}
 }
 
-int sync_dquots(struct super_block *sb, int type)
+static int vfs_quota_sync(struct super_block *sb, int type)
 {
 	struct list_head *head;
 	struct dquot *dquot;
+	struct quota_info *dqopt = sb_dqopt(sb);
+	int cnt;
 
-	lock_kernel();
 restart:
 	list_for_each(head, &inuse_list) {
 		dquot = list_entry(head, struct dquot, dq_inuse);
@@ -396,10 +397,62 @@ restart:
 		dqput(dquot);
 		goto restart;
 	}
-	/* FIXME: Here we should also sync all file info */
+	for (cnt = 0; cnt < MAXQUOTAS; cnt++)
+		if ((cnt == type || type == -1) && sb_has_quota_enabled(sb, cnt))
+			dqopt->info[cnt].dqi_flags &= ~DQF_ANY_DQUOT_DIRTY;
+	for (cnt = 0; cnt < MAXQUOTAS; cnt++)
+		if ((cnt == type || type == -1) && sb_has_quota_enabled(sb, cnt) && info_dirty(&dqopt->info[cnt]))
+			dqopt->ops[cnt]->write_file_info(sb, cnt);
 	dqstats.syncs++;
-	unlock_kernel();
 	return 0;
+}
+
+static struct super_block *get_super_to_sync(int type)
+{
+	struct list_head *head;
+	int cnt, dirty;
+
+restart:
+	spin_lock(&sb_lock);
+	list_for_each(head, &super_blocks) {
+		struct super_block *sb = list_entry(head, struct super_block, s_list);
+
+		for (cnt = 0, dirty = 0; cnt < MAXQUOTAS; cnt++)
+			if ((type == cnt || type == -1) && sb_has_quota_enabled(sb, cnt)
+			    && sb_dqopt(sb)->info[cnt].dqi_flags & DQF_ANY_DQUOT_DIRTY)
+				dirty = 1;
+		if (!dirty)
+			continue;
+		sb->s_count++;
+		spin_unlock(&sb_lock);
+		down_read(&sb->s_umount);
+		if (!sb->s_root) {
+			drop_super(sb);
+			goto restart;
+		}
+		return sb;
+	}
+	spin_unlock(&sb_lock);
+	return NULL;
+}
+
+void sync_dquots(struct super_block *sb, int type)
+{
+	if (sb) {
+		lock_kernel();
+		if (sb->s_qcop->quota_sync)
+			sb->s_qcop->quota_sync(sb, type);
+		unlock_kernel();
+	}
+	else {
+		while ((sb = get_super_to_sync(type))) {
+			lock_kernel();
+			if (sb->s_qcop->quota_sync)
+				sb->s_qcop->quota_sync(sb, type);
+			unlock_kernel();
+			drop_super(sb);
+		}
+	}
 }
 
 /* Free unused dquots from cache */
@@ -1212,7 +1265,7 @@ int vfs_quota_off(struct super_block *sb, int type)
 		/* Note: these are blocking operations */
 		remove_dquot_ref(sb, cnt);
 		invalidate_dquots(sb, cnt);
-                if (info_dirty(&dqopt->info[cnt]))
+		if (info_dirty(&dqopt->info[cnt]))
 			dqopt->ops[cnt]->write_file_info(sb, cnt);
 		if (dqopt->ops[cnt]->free_file_info)
 			dqopt->ops[cnt]->free_file_info(sb, cnt);
@@ -1289,11 +1342,6 @@ out_fmt:
 	put_quota_format(fmt);
 
 	return error; 
-}
-
-int vfs_quota_sync(struct super_block *sb, int type)
-{
-	return sync_dquots(sb, type);
 }
 
 /* Generic routine for getting common part of quota structure */

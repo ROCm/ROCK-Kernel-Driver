@@ -617,18 +617,6 @@ struct nameidata {
 	struct vfsmount *old_mnt;
 };
 
-#define DQUOT_USR_ENABLED	0x01		/* User diskquotas enabled */
-#define DQUOT_GRP_ENABLED	0x02		/* Group diskquotas enabled */
-
-struct quota_info {
-	unsigned int flags;			/* Flags for diskquotas on this device */
-	struct semaphore dqio_sem;		/* lock device while I/O in progress */
-	struct semaphore dqoff_sem;		/* serialize quota_off() and quota_on() on device */
-	struct file *files[MAXQUOTAS];		/* fp's to quotafiles */
-	struct mem_dqinfo info[MAXQUOTAS];	/* Information for each quota type */
-	struct quota_format_ops *ops[MAXQUOTAS];	/* Operations for each type */
-};
-
 /*
  *	Umount options
  */

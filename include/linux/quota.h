@@ -170,6 +170,7 @@ struct mem_dqinfo {
 
 #define DQF_MASK 0xffff		/* Mask for format specific flags */
 #define DQF_INFO_DIRTY 0x10000  /* Is info dirty? */
+#define DQF_ANY_DQUOT_DIRTY 0x20000	/* Is any dquot dirty? */
 
 extern inline void mark_info_dirty(struct mem_dqinfo *info)
 {
@@ -177,6 +178,9 @@ extern inline void mark_info_dirty(struct mem_dqinfo *info)
 }
 
 #define info_dirty(info) ((info)->dqi_flags & DQF_INFO_DIRTY)
+
+#define info_any_dirty(info) ((info)->dqi_flags & DQF_INFO_DIRTY ||\
+			      (info)->dqi_flags & DQF_ANY_DQUOT_DIRTY)
 
 #define sb_dqopt(sb) (&(sb)->s_dquot)
 
@@ -223,13 +227,6 @@ struct dquot {
 					   referenced during its lifetime */
 	struct mem_dqblk dq_dqb;	/* Diskquota usage */
 };
-
-extern inline void mark_dquot_dirty(struct dquot *dquot)
-{
-	dquot->dq_flags |= DQ_MOD;
-}
-
-#define dquot_dirty(dquot) ((dquot)->dq_flags & DQ_MOD)
 
 #define NODQUOT (struct dquot *)NULL
 
@@ -278,6 +275,26 @@ struct quota_format_type {
 	struct module *qf_owner;		/* Module implementing quota format */
 	struct quota_format_type *qf_next;
 };
+
+#define DQUOT_USR_ENABLED	0x01		/* User diskquotas enabled */
+#define DQUOT_GRP_ENABLED	0x02		/* Group diskquotas enabled */
+
+struct quota_info {
+	unsigned int flags;			/* Flags for diskquotas on this device */
+	struct semaphore dqio_sem;		/* lock device while I/O in progress */
+	struct semaphore dqoff_sem;		/* serialize quota_off() and quota_on() on device */
+	struct file *files[MAXQUOTAS];		/* fp's to quotafiles */
+	struct mem_dqinfo info[MAXQUOTAS];	/* Information for each quota type */
+	struct quota_format_ops *ops[MAXQUOTAS];	/* Operations for each type */
+};
+
+/* Inline would be better but we need to dereference super_block which is not defined yet */
+#define mark_dquot_dirty(dquot) do {\
+	dquot->dq_flags |= DQ_MOD;\
+	sb_dqopt(dquot->dq_sb)->info[dquot->dq_type].dqi_flags |= DQF_ANY_DQUOT_DIRTY;\
+} while (0)
+
+#define dquot_dirty(dquot) ((dquot)->dq_flags & DQ_MOD)
 
 static inline int is_enabled(struct quota_info *dqopt, int type)
 {
