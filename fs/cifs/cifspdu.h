@@ -729,12 +729,12 @@ typedef struct smb_com_read_rsp {
 } READ_RSP;
 
 typedef struct locking_andx_range {
-	__u16 Pid;
-	__u16 Pad;
-	__u32 OffsetHigh;
-	__u32 OffsetLow;
-	__u32 LengthHigh;
-	__u32 LengthLow;
+	__le16 Pid;
+	__le16 Pad;
+	__le32 OffsetHigh;
+	__le32 OffsetLow;
+	__le32 LengthHigh;
+	__le32 LengthLow;
 } LOCKING_ANDX_RANGE;
 
 #define LOCKING_ANDX_SHARED_LOCK     0x01
@@ -747,14 +747,14 @@ typedef struct smb_com_lock_req {
 	struct smb_hdr hdr;	/* wct = 8 */
 	__u8 AndXCommand;
 	__u8 AndXReserved;
-	__u16 AndXOffset;
+	__le16 AndXOffset;
 	__u16 Fid;
 	__u8 LockType;
 	__u8 OplockLevel;
-	__u32 Timeout;
-	__u16 NumberOfUnlocks;
-	__u16 NumberOfLocks;
-	__u16 ByteCount;
+	__le32 Timeout;
+	__le16 NumberOfUnlocks;
+	__le16 NumberOfLocks;
+	__le16 ByteCount;
 	LOCKING_ANDX_RANGE Locks[1];
 } LOCK_REQ;
 
@@ -762,7 +762,7 @@ typedef struct smb_com_lock_rsp {
 	struct smb_hdr hdr;	/* wct = 2 */
 	__u8 AndXCommand;
 	__u8 AndXReserved;
-	__u16 AndXOffset;
+	__le16 AndXOffset;
 	__u16 ByteCount;
 } LOCK_RSP;
 
