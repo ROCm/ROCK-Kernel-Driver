@@ -154,6 +154,9 @@ EXPORT_SYMBOL_GPL(cpufreq_setmax);
 
 #ifdef CONFIG_CPU_FREQ_24_API
 
+#warning The /proc/sys/cpu/ and sysctl interface to cpufreq will be removed from the 2.6. kernel series soon after 2005-01-01
+
+static unsigned int warning_print = 0;
 
 /*********************** cpufreq_sysctl interface ********************/
 static int
@@ -167,6 +170,11 @@ cpufreq_procctl(ctl_table *ctl, int write, struct file *filp,
 	if (!left || (filp->f_pos && !write) || !cpu_online(cpu)) {
 		*lenp = 0;
 		return 0;
+	}
+
+	if (!warning_print) {
+		warning_print++;
+		printk(KERN_INFO "Access to /proc/sys/cpu/ is deprecated and will be removed from (new) 2.6. kernels soon after 2005-01-01");
 	}
 
 	if (write) {
@@ -203,6 +211,11 @@ cpufreq_sysctl(ctl_table *table, int __user *name, int nlen,
 
 	if (!cpu_online(cpu))
 		return -EINVAL;
+
+	if (!warning_print) {
+		warning_print++;
+		printk(KERN_INFO "Access to /proc/sys/cpu/ is deprecated and will be removed from (new) 2.6. kernels soon after 2005-01-01");
+	}
 
 	if (oldval && oldlenp) {
 		size_t oldlen;
