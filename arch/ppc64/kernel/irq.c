@@ -563,9 +563,8 @@ void ppc_irq_dispatch_handler(struct pt_regs *regs, int irq)
 			if (irqtp->flags)
 				set_bits(irqtp->flags, &curtp->flags);
 		} else
-#else
-			action_ret = handle_irq_event(irq, regs, action);
 #endif
+			action_ret = handle_irq_event(irq, regs, action);
 
 		spin_lock(&desc->lock);
 		if (!noirqdebug)
