@@ -763,6 +763,210 @@ static void super_90_sync(mddev_t *mddev, mdk_rdev_t *rdev)
 	sb->sb_csum = calc_sb_csum(sb);
 }
 
+/*
+ * version 1 superblock
+ */
+
+static unsigned int calc_sb_1_csum(struct mdp_superblock_1 * sb)
+{
+	unsigned int disk_csum, csum;
+	int size = 256 + sb->max_dev*2;
+
+	disk_csum = sb->sb_csum;
+	sb->sb_csum = 0;
+	csum = csum_partial((void *)sb, size, 0);
+	sb->sb_csum = disk_csum;
+	return csum;
+}
+
+static int super_1_load(mdk_rdev_t *rdev, mdk_rdev_t *refdev, int minor_version)
+{
+	struct mdp_superblock_1 *sb;
+	int ret;
+	sector_t sb_offset;
+
+	/*
+	 * Calculate the position of the superblock.
+	 * It is always aligned to a 4K boundary and
+	 * depeding on minor_version, it can be:
+	 * 0: At least 8K, but less than 12K, from end of device
+	 * 1: At start of device
+	 * 2: 4K from start of device.
+	 */
+	switch(minor_version) {
+	case 0:
+		sb_offset = rdev->bdev->bd_inode->i_size >> 9;
+		sb_offset -= 8*2;
+		sb_offset &= ~(4*2);
+		/* convert from sectors to K */
+		sb_offset /= 2;
+		break;
+	case 1:
+		sb_offset = 0;
+		break;
+	case 2:
+		sb_offset = 4;
+		break;
+	default:
+		return -EINVAL;
+	}
+	rdev->sb_offset = sb_offset;
+
+	ret = read_disk_sb(rdev);
+	if (ret) return ret;
+
+
+	sb = (struct mdp_superblock_1*)page_address(rdev->sb_page);
+
+	if (sb->magic != cpu_to_le32(MD_SB_MAGIC) ||
+	    sb->major_version != cpu_to_le32(1) ||
+	    le32_to_cpu(sb->max_dev) > (4096-256)/2 ||
+	    le64_to_cpu(sb->super_offset) != (rdev->sb_offset<<1) ||
+	    sb->feature_map != 0)
+		return -EINVAL;
+
+	if (calc_sb_1_csum(sb) != sb->sb_csum) {
+		printk(BAD_CSUM, bdev_partition_name(rdev->bdev));
+		return -EINVAL;
+	}
+	rdev->preferred_minor = 0xffff;
+	rdev->data_offset = le64_to_cpu(sb->data_offset);
+
+	if (refdev == 0)
+		return 1;
+	else {
+		__u64 ev1, ev2;
+		struct mdp_superblock_1 *refsb = 
+			(struct mdp_superblock_1*)page_address(refdev->sb_page);
+
+		if (memcmp(sb->set_uuid, refsb->set_uuid, 16) != 0 ||
+		    sb->level != refsb->level ||
+		    sb->layout != refsb->layout ||
+		    sb->chunksize != refsb->chunksize) {
+			printk(KERN_WARNING "md: %s has strangely different superblock to %s\n",
+			       bdev_partition_name(rdev->bdev),
+			       bdev_partition_name(refdev->bdev));
+			return -EINVAL;
+		}
+		ev1 = le64_to_cpu(sb->events);
+		ev2 = le64_to_cpu(refsb->events);
+
+		if (ev1 > ev2)
+			return 1;
+	}
+	if (minor_version) 
+		rdev->size = ((rdev->bdev->bd_inode->i_size>>9) - le64_to_cpu(sb->data_offset)) / 2;
+	else
+		rdev->size = rdev->sb_offset;
+	if (rdev->size < le64_to_cpu(sb->data_size)/2)
+		return -EINVAL;
+	rdev->size = le64_to_cpu(sb->data_size)/2;
+	if (le32_to_cpu(sb->chunksize))
+		rdev->size &= ~((sector_t)le32_to_cpu(sb->chunksize)/2 - 1);
+	return 0;
+}
+
+static int super_1_validate(mddev_t *mddev, mdk_rdev_t *rdev)
+{
+	struct mdp_superblock_1 *sb = (struct mdp_superblock_1*)page_address(rdev->sb_page);
+
+	if (mddev->raid_disks == 0) {
+		mddev->major_version = 1;
+		mddev->minor_version = 0;
+		mddev->patch_version = 0;
+		mddev->persistent = 1;
+		mddev->chunk_size = le32_to_cpu(sb->chunksize) << 9;
+		mddev->ctime = le64_to_cpu(sb->ctime) & ((1ULL << 32)-1);
+		mddev->utime = le64_to_cpu(sb->utime) & ((1ULL << 32)-1);
+		mddev->level = le32_to_cpu(sb->level);
+		mddev->layout = le32_to_cpu(sb->layout);
+		mddev->raid_disks = le32_to_cpu(sb->raid_disks);
+		mddev->size = (u32)le64_to_cpu(sb->size);
+		mddev->events = le64_to_cpu(sb->events);
+		
+		mddev->recovery_cp = le64_to_cpu(sb->resync_offset);
+		memcpy(mddev->uuid, sb->set_uuid, 16);
+
+		mddev->max_disks =  (4096-256)/2;
+	} else {
+		__u64 ev1;
+		ev1 = le64_to_cpu(sb->events);
+		++ev1;
+		if (ev1 < mddev->events)
+			return -EINVAL;
+	}
+
+	if (mddev->level != LEVEL_MULTIPATH) {
+		int role;
+		rdev->desc_nr = le32_to_cpu(sb->dev_number);
+		role = le16_to_cpu(sb->dev_roles[rdev->desc_nr]);
+		switch(role) {
+		case 0xffff: /* spare */
+			rdev->in_sync = 0;
+			rdev->faulty = 0;
+			rdev->raid_disk = -1;
+			break;
+		case 0xfffe: /* faulty */
+			rdev->in_sync = 0;
+			rdev->faulty = 1;
+			rdev->raid_disk = -1;
+			break;
+		default:
+			rdev->in_sync = 1;
+			rdev->faulty = 0;
+			rdev->raid_disk = role;
+			break;
+		}
+	}
+	return 0;
+}
+
+static void super_1_sync(mddev_t *mddev, mdk_rdev_t *rdev)
+{
+	struct mdp_superblock_1 *sb;
+	struct list_head *tmp;
+	mdk_rdev_t *rdev2;
+	int max_dev, i;
+	/* make rdev->sb match mddev and rdev data. */
+
+	sb = (struct mdp_superblock_1*)page_address(rdev->sb_page);
+
+	sb->feature_map = 0;
+	sb->pad0 = 0;
+	memset(sb->pad1, 0, sizeof(sb->pad1));
+	memset(sb->pad2, 0, sizeof(sb->pad2));
+	memset(sb->pad3, 0, sizeof(sb->pad3));
+
+	sb->utime = cpu_to_le64((__u64)mddev->utime);
+	sb->events = cpu_to_le64(mddev->events);
+	if (mddev->in_sync)
+		sb->resync_offset = cpu_to_le64(mddev->recovery_cp);
+	else
+		sb->resync_offset = cpu_to_le64(0);
+
+	max_dev = 0;
+	ITERATE_RDEV(mddev,rdev2,tmp)
+		if (rdev2->desc_nr > max_dev)
+			max_dev = rdev2->desc_nr;
+	
+	sb->max_dev = max_dev;
+	for (i=0; i<max_dev;i++)
+		sb->dev_roles[max_dev] = cpu_to_le16(0xfffe);
+	
+	ITERATE_RDEV(mddev,rdev2,tmp) {
+		i = rdev2->desc_nr;
+		if (rdev2->faulty)
+			sb->dev_roles[i] = cpu_to_le16(0xfffe);
+		else if (rdev2->in_sync)
+			sb->dev_roles[i] = cpu_to_le16(rdev2->raid_disk);
+		else
+			sb->dev_roles[i] = cpu_to_le16(0xffff);
+	}
+
+	sb->recovery_offset = cpu_to_le64(0); /* not supported yet */
+}
+
+
 struct super_type super_types[] = {
 	[0] = {
 		.name	= "0.90.0",
@@ -771,9 +975,14 @@ struct super_type super_types[] = {
 		.validate_super	= super_90_validate,
 		.sync_super	= super_90_sync,
 	},
+	[1] = {
+		.name	= "md-1",
+		.owner	= THIS_MODULE,
+		.load_super	= super_1_load,
+		.validate_super	= super_1_validate,
+		.sync_super	= super_1_sync,
+	},
 };
-
-
 	
 static mdk_rdev_t * match_dev_unit(mddev_t *mddev, mdk_rdev_t *dev)
 {
