@@ -157,22 +157,16 @@ static void x25_remove_socket(struct sock *sk)
 	save_flags(flags);
 	cli();
 
-	if ((s = x25_list) == sk) {
+	if ((s = x25_list) == sk)
 		x25_list = s->next;
-		restore_flags(flags);
-		return;
-	}
-
-	while (s != NULL && s->next != NULL) {
+	else while (s && s->next) {
 		if (s->next == sk) {
 			s->next = sk->next;
-			restore_flags(flags);
-			return;
+			break;
 		}
 
 		s = s->next;
 	}
-
 	restore_flags(flags);
 }
 
@@ -183,7 +177,7 @@ static void x25_kill_by_device(struct net_device *dev)
 {
 	struct sock *s;
 
-	for (s = x25_list; s != NULL; s = s->next)
+	for (s = x25_list; s; s = s->next)
 		if (x25_sk(s)->neighbour && x25_sk(s)->neighbour->dev == dev)
 			x25_disconnect(s, ENETUNREACH, 0, 0);
 }
@@ -193,7 +187,7 @@ static void x25_kill_by_device(struct net_device *dev)
  */
 static int x25_device_event(struct notifier_block *this, unsigned long event, void *ptr)
 {
-	struct net_device *dev = (struct net_device *)ptr;
+	struct net_device *dev = ptr;
 	struct x25_neigh *neigh;
 
 	if (dev->type == ARPHRD_X25
@@ -248,17 +242,14 @@ static struct sock *x25_find_listener(struct x25_address *addr)
 	save_flags(flags);
 	cli();
 
-	for (s = x25_list; s != NULL; s = s->next) {
+	for (s = x25_list; s; s = s->next)
 		if ((!strcmp(addr->x25_addr, x25_sk(s)->source_addr.x25_addr) ||
-		     strcmp(addr->x25_addr, null_x25_address.x25_addr) == 0) &&
-		     s->state == TCP_LISTEN) {
-			restore_flags(flags);
-			return s;
-		}
-	}
+		     !strcmp(addr->x25_addr, null_x25_address.x25_addr)) &&
+		     s->state == TCP_LISTEN)
+			break;
 
 	restore_flags(flags);
-	return NULL;
+	return s;
 }
 
 /*
@@ -272,15 +263,12 @@ struct sock *x25_find_socket(unsigned int lci, struct x25_neigh *neigh)
 	save_flags(flags);
 	cli();
 
-	for (s = x25_list; s != NULL; s = s->next) {
-		if (x25_sk(s)->lci == lci && x25_sk(s)->neighbour == neigh) {
-			restore_flags(flags);
-			return s;
-		}
-	}
+	for (s = x25_list; s; s = s->next)
+		if (x25_sk(s)->lci == lci && x25_sk(s)->neighbour == neigh)
+			break;
 
 	restore_flags(flags);
-	return NULL;
+	return s;
 }
 
 /*
@@ -290,10 +278,11 @@ unsigned int x25_new_lci(struct x25_neigh *neigh)
 {
 	unsigned int lci = 1;
 
-	while (x25_find_socket(lci, neigh) != NULL) {
-		lci++;
-		if (lci == 4096) return 0;
-	}
+	while (x25_find_socket(lci, neigh))
+		if (++lci == 4096) {
+			lci = 0;
+			break;
+		}
 
 	return lci;
 }
@@ -457,10 +446,13 @@ static struct sock *x25_alloc_socket(void)
 	skb_queue_head_init(&x25->fragment_queue);
 	skb_queue_head_init(&x25->interrupt_in_queue);
 	skb_queue_head_init(&x25->interrupt_out_queue);
-out:	return sk;
-frees:	sk_free(sk);
+out:
+	return sk;
+frees:
+	sk_free(sk);
 	sk = NULL;
-decmod:	MOD_DEC_USE_COUNT;
+decmod:
+	MOD_DEC_USE_COUNT;
 	goto out;
 }
 
@@ -1230,7 +1222,7 @@ static int x25_get_info(char *buffer, char **start, off_t offset, int length)
 
 	len += sprintf(buffer, "dest_addr  src_addr   dev   lci st vs vr va   t  t2 t21 t22 t23 Snd-Q Rcv-Q inode\n");
 
-	for (s = x25_list; s != NULL; s = s->next) {
+	for (s = x25_list; s; s = s->next) {
 		x25_cb *x25 = x25_sk(s);
 
 		if (!x25->neighbour || (dev = x25->neighbour->dev) == NULL)
@@ -1256,7 +1248,7 @@ static int x25_get_info(char *buffer, char **start, off_t offset, int length)
 			x25->t23 / HZ,
 			atomic_read(&s->wmem_alloc),
 			atomic_read(&s->rmem_alloc),
-			s->socket != NULL ? SOCK_INODE(s->socket)->i_ino : 0L);
+			s->socket ? SOCK_INODE(s->socket)->i_ino : 0L);
 
 		pos = begin + len;
 
@@ -1274,9 +1266,10 @@ static int x25_get_info(char *buffer, char **start, off_t offset, int length)
 	*start = buffer + (offset - begin);
 	len   -= (offset - begin);
 
-	if (len > length) len = length;
+	if (len > length)
+		len = length;
 
-	return(len);
+	return len;
 } 
 
 struct net_proto_family x25_family_ops = {
@@ -1310,22 +1303,21 @@ SOCKOPS_WRAP(x25_proto, AF_X25);
 
 
 static struct packet_type x25_packet_type = {
-	.type =		__constant_htons(ETH_P_X25),
-	.func =		x25_lapb_receive_frame,
+	.type =	__constant_htons(ETH_P_X25),
+	.func =	x25_lapb_receive_frame,
 };
 
 struct notifier_block x25_dev_notifier = {
-	.notifier_call =x25_device_event,
+	.notifier_call = x25_device_event,
 };
 
 void x25_kill_by_neigh(struct x25_neigh *neigh)
 {
 	struct sock *s;
 
-	for( s=x25_list; s != NULL; s=s->next){
+	for (s = x25_list; s; s = s->next)
 		if (x25_sk(s)->neighbour == neigh)
 			x25_disconnect(s, ENETUNREACH, 0, 0);
-	} 
 }
 
 static int __init x25_init(void)
@@ -1353,7 +1345,7 @@ static int __init x25_init(void)
 	 *	Register any pre existing devices.
 	 */
 	read_lock(&dev_base_lock);
-	for (dev = dev_base; dev != NULL; dev = dev->next) {
+	for (dev = dev_base; dev; dev = dev->next) {
 		if ((dev->flags & IFF_UP) && (dev->type == ARPHRD_X25
 #if defined(CONFIG_LLC) || defined(CONFIG_LLC_MODULE)
 					   || dev->type == ARPHRD_ETHER
