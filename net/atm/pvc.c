@@ -116,20 +116,12 @@ static struct net_proto_family pvc_family_ops = {
  */
 
 
-static int __init atmpvc_init(void)
+int __init atmpvc_init(void)
 {
-	int error;
-
-	error = sock_register(&pvc_family_ops);
-	if (error < 0) {
-		printk(KERN_ERR "ATMPVC: can't register (%d)",error);
-		return error;
-	}
-#ifdef CONFIG_PROC_FS
-	error = atm_proc_init();
-	if (error) printk("atm_proc_init fails with %d\n",error);
-#endif
-	return 0;
+	return sock_register(&pvc_family_ops);
 }
 
-module_init(atmpvc_init);
+void __exit atmpvc_exit(void)
+{
+	sock_unregister(PF_ATMPVC);
+}

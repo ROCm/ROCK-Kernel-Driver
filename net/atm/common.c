@@ -1209,3 +1209,43 @@ void atm_lane_init(void)
         return;
 }        
 #endif
+
+static int __init atm_init(void)
+{
+	int error;
+
+	if ((error = atmpvc_init()) < 0) {
+		printk(KERN_ERR "atmpvc_init() failed with %d\n", error);
+		goto failure;
+	}
+	if ((error = atmsvc_init()) < 0) {
+		printk(KERN_ERR "atmsvc_init() failed with %d\n", error);
+		goto failure;
+	}
+#ifdef CONFIG_PROC_FS
+        if ((error = atm_proc_init()) < 0) {
+		printk(KERN_ERR "atm_proc_init() failed with %d\n",error);
+		goto failure;
+	}
+#endif
+	return 0;
+
+failure:
+	atmsvc_exit();
+	atmpvc_exit();
+	return error;
+}
+
+static void __exit atm_exit(void)
+{
+#ifdef CONFIG_PROC_FS
+	atm_proc_exit();
+#endif
+	atmsvc_exit();
+	atmpvc_exit();
+}
+
+module_init(atm_init);
+module_exit(atm_exit);
+
+MODULE_LICENSE("GPL");

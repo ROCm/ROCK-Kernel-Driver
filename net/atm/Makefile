@@ -11,7 +11,7 @@ atm-$(subst m,y,$(CONFIG_ATM_CLIP)) += ipcommon.o
 obj-$(CONFIG_ATM_BR2684) += br2684.o
 atm-$(subst m,y,$(CONFIG_ATM_BR2684)) += ipcommon.o
 atm-$(subst m,y,$CONFIG_NET_SCH_ATM)) += ipcommon.o
-obj-$(CONFIG_PROC_FS) += proc.o
+atm-$(CONFIG_PROC_FS) += proc.o
 
 obj-$(CONFIG_ATM_LANE) += lec.o
 obj-$(CONFIG_ATM_MPOA) += mpoa.o

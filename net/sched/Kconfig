@@ -63,7 +63,7 @@ config NET_SCH_CSZ
 #tristate '  H-PFQ packet scheduler' CONFIG_NET_SCH_HPFQ
 #tristate '  H-FSC packet scheduler' CONFIG_NET_SCH_HFCS
 config NET_SCH_ATM
-	bool "ATM pseudo-scheduler"
+	tristate "ATM pseudo-scheduler"
 	depends on NET_SCHED && ATM
 	---help---
 	  Say Y here if you want to use the ATM pseudo-scheduler.  This

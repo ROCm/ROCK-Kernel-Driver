@@ -632,12 +632,28 @@ void atm_proc_dev_deregister(struct atm_dev *dev)
     name->proc_fops = &proc_spec_atm_operations; \
     name->owner = THIS_MODULE
 
+static struct proc_dir_entry *devices = NULL, *pvc = NULL,
+		*svc = NULL, *arp = NULL, *lec = NULL, *vc = NULL;
+
+static void atm_proc_cleanup(void)
+{
+	if (devices)
+		remove_proc_entry("devices",atm_proc_root);
+	if (pvc)
+		remove_proc_entry("pvc",atm_proc_root);
+	if (svc)
+		remove_proc_entry("svc",atm_proc_root);
+	if (arp)
+		remove_proc_entry("arp",atm_proc_root);
+	if (lec)
+		remove_proc_entry("lec",atm_proc_root);
+	if (vc)
+		remove_proc_entry("vc",atm_proc_root);
+	remove_proc_entry("net/atm",NULL);
+}
 
 int __init atm_proc_init(void)
 {
-	struct proc_dir_entry *devices = NULL,*pvc = NULL,*svc = NULL;
-	struct proc_dir_entry *arp = NULL,*lec = NULL,*vc = NULL;
-
 	atm_proc_root = proc_mkdir("net/atm",NULL);
 	if (!atm_proc_root)
 		return -ENOMEM;
@@ -654,12 +670,11 @@ int __init atm_proc_init(void)
 	return 0;
 
 cleanup:
-	if (devices) remove_proc_entry("devices",atm_proc_root);
-	if (pvc) remove_proc_entry("pvc",atm_proc_root);
-	if (svc) remove_proc_entry("svc",atm_proc_root);
-	if (arp) remove_proc_entry("arp",atm_proc_root);
-	if (lec) remove_proc_entry("lec",atm_proc_root);
-	if (vc) remove_proc_entry("vc",atm_proc_root);
-	remove_proc_entry("net/atm",NULL);
+	atm_proc_cleanup();
 	return -ENOMEM;
+}
+
+void __exit atm_proc_exit(void)
+{
+	atm_proc_cleanup();
 }

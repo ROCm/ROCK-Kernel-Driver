@@ -213,7 +213,7 @@ source "net/xfrm/Kconfig"
 source "net/sctp/Kconfig"
 
 config ATM
-	bool "Asynchronous Transfer Mode (ATM) (EXPERIMENTAL)"
+	tristate "Asynchronous Transfer Mode (ATM) (EXPERIMENTAL)"
 	depends on EXPERIMENTAL
 	---help---
 	  ATM is a high-speed networking technology for Local Area Networks
