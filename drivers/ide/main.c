@@ -1080,8 +1080,6 @@ int ide_register_subdriver(struct ata_device *drive, struct ata_operations *driv
  */
 int ide_unregister_subdriver(struct ata_device *drive)
 {
-	unsigned long flags;
-
 #if 0
 	if (__MOD_IN_USE(ata_ops(drive)->owner))
 		return 1;
