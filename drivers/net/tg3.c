@@ -81,6 +81,7 @@
 /* hardware minimum and maximum for a single frame's data payload */
 #define TG3_MIN_MTU			60
 #define TG3_MAX_MTU			9000
+#define TG3_MAX_MTU_5705		1500
 
 /* These numbers seem to be hard coded in the NIC firmware somehow.
  * You can't change the ring sizes, but you can change where you place
@@ -90,7 +91,17 @@
 #define TG3_DEF_RX_RING_PENDING		200
 #define TG3_RX_JUMBO_RING_SIZE		256
 #define TG3_DEF_RX_JUMBO_RING_PENDING	100
-#define TG3_RX_RCB_RING_SIZE		1024
+
+/* Do not place this n-ring entries value into the tp struct itself,
+ * we really want to expose these constants to GCC so that modulo et
+ * al.  operations are done with shifts and masks instead of with
+ * hw multiply/modulo instructions.  Another solution would be to
+ * replace things like '% foo' with '& (foo - 1)'.
+ */
+#define TG3_RX_RCB_RING_SIZE(tp)	\
+	(GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705 ? \
+	 512 : 1024)
+
 #define TG3_TX_RING_SIZE		512
 #define TG3_DEF_TX_RING_PENDING		(TG3_TX_RING_SIZE - 1)
 
@@ -98,8 +109,8 @@
 				 TG3_RX_RING_SIZE)
 #define TG3_RX_JUMBO_RING_BYTES	(sizeof(struct tg3_rx_buffer_desc) * \
 			         TG3_RX_JUMBO_RING_SIZE)
-#define TG3_RX_RCB_RING_BYTES	(sizeof(struct tg3_rx_buffer_desc) * \
-			         TG3_RX_RCB_RING_SIZE)
+#define TG3_RX_RCB_RING_BYTES(tp) (sizeof(struct tg3_rx_buffer_desc) * \
+			           TG3_RX_RCB_RING_SIZE(tp))
 #define TG3_TX_RING_BYTES	(sizeof(struct tg3_tx_buffer_desc) * \
 				 TG3_TX_RING_SIZE)
 #define TX_RING_GAP(TP)	\
@@ -139,6 +150,10 @@ static struct pci_device_id tg3_pci_tbl[] = {
 	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5704,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
 	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5702FE,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5705,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5705M,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
 	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5702X,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
@@ -288,17 +303,28 @@ static inline void tg3_netif_start(struct tg3 *tp)
 
 static void tg3_switch_clocks(struct tg3 *tp)
 {
-	if (tr32(TG3PCI_CLOCK_CTRL) & CLOCK_CTRL_44MHZ_CORE) {
+	u32 clock_ctrl = tr32(TG3PCI_CLOCK_CTRL);
+	u32 orig_clock_ctrl;
+
+	orig_clock_ctrl = clock_ctrl;
+	clock_ctrl &= (CLOCK_CTRL_FORCE_CLKRUN |
+		       CLOCK_CTRL_CLKRUN_OENABLE |
+		       0x1f);
+	tp->pci_clock_ctrl = clock_ctrl;
+
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705 &&
+	    (orig_clock_ctrl & CLOCK_CTRL_44MHZ_CORE) != 0) {
 		tw32(TG3PCI_CLOCK_CTRL,
+		     clock_ctrl |
 		     (CLOCK_CTRL_44MHZ_CORE | CLOCK_CTRL_ALTCLK));
 		tr32(TG3PCI_CLOCK_CTRL);
 		udelay(40);
 		tw32(TG3PCI_CLOCK_CTRL,
-		     (CLOCK_CTRL_ALTCLK));
+		     clock_ctrl | (CLOCK_CTRL_ALTCLK));
 		tr32(TG3PCI_CLOCK_CTRL);
 		udelay(40);
 	}
-	tw32(TG3PCI_CLOCK_CTRL, 0);
+	tw32(TG3PCI_CLOCK_CTRL, clock_ctrl);
 	tr32(TG3PCI_CLOCK_CTRL);
 	udelay(40);
 }
@@ -444,6 +470,92 @@ static int tg3_phy_reset(struct tg3 *tp, int force)
 	return -EBUSY;
 }
 
+static void tg3_frob_aux_power(struct tg3 *tp)
+{
+	struct tg3 *tp_peer = tp;
+
+	if ((tp->tg3_flags & TG3_FLAG_EEPROM_WRITE_PROT) != 0)
+		return;
+
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704) {
+		tp_peer = pci_get_drvdata(tp->pdev_peer);
+		if (!tp_peer)
+			BUG();
+	}
+
+
+	if ((tp->tg3_flags & TG3_FLAG_WOL_ENABLE) != 0 ||
+	    (tp_peer->tg3_flags & TG3_FLAG_WOL_ENABLE) != 0) {
+		if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5700 ||
+		    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5701) {
+			tw32(GRC_LOCAL_CTRL, tp->grc_local_ctrl |
+			     (GRC_LCLCTRL_GPIO_OE0 |
+			      GRC_LCLCTRL_GPIO_OE1 |
+			      GRC_LCLCTRL_GPIO_OE2 |
+			      GRC_LCLCTRL_GPIO_OUTPUT0 |
+			      GRC_LCLCTRL_GPIO_OUTPUT1));
+			tr32(GRC_LOCAL_CTRL);
+			udelay(100);
+		} else {
+			if (tp_peer != tp &&
+			    (tp_peer->tg3_flags & TG3_FLAG_INIT_COMPLETE) != 0)
+				return;
+
+			tw32(GRC_LOCAL_CTRL, tp->grc_local_ctrl |
+			     (GRC_LCLCTRL_GPIO_OE0 |
+			      GRC_LCLCTRL_GPIO_OE1 |
+			      GRC_LCLCTRL_GPIO_OE2 |
+			      GRC_LCLCTRL_GPIO_OUTPUT1 |
+			      GRC_LCLCTRL_GPIO_OUTPUT2));
+			tr32(GRC_LOCAL_CTRL);
+			udelay(100);
+
+			tw32(GRC_LOCAL_CTRL, tp->grc_local_ctrl |
+			     (GRC_LCLCTRL_GPIO_OE0 |
+			      GRC_LCLCTRL_GPIO_OE1 |
+			      GRC_LCLCTRL_GPIO_OE2 |
+			      GRC_LCLCTRL_GPIO_OUTPUT0 |
+			      GRC_LCLCTRL_GPIO_OUTPUT1 |
+			      GRC_LCLCTRL_GPIO_OUTPUT2));
+			tr32(GRC_LOCAL_CTRL);
+			udelay(100);
+
+			tw32(GRC_LOCAL_CTRL, tp->grc_local_ctrl |
+			     (GRC_LCLCTRL_GPIO_OE0 |
+			      GRC_LCLCTRL_GPIO_OE1 |
+			      GRC_LCLCTRL_GPIO_OE2 |
+			      GRC_LCLCTRL_GPIO_OUTPUT0 |
+			      GRC_LCLCTRL_GPIO_OUTPUT1));
+			tr32(GRC_LOCAL_CTRL);
+			udelay(100);
+		}
+	} else {
+		if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5700 &&
+		    GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5701) {
+			if (tp_peer != tp &&
+			    (tp_peer->tg3_flags & TG3_FLAG_INIT_COMPLETE) != 0)
+				return;
+
+			tw32(GRC_LOCAL_CTRL, tp->grc_local_ctrl |
+			     (GRC_LCLCTRL_GPIO_OE1 |
+			      GRC_LCLCTRL_GPIO_OUTPUT1));
+			tr32(GRC_LOCAL_CTRL);
+			udelay(100);
+
+			tw32(GRC_LOCAL_CTRL, tp->grc_local_ctrl |
+			     (GRC_LCLCTRL_GPIO_OE1));
+			tr32(GRC_LOCAL_CTRL);
+			udelay(100);
+
+			tw32(GRC_LOCAL_CTRL, tp->grc_local_ctrl |
+			     (GRC_LCLCTRL_GPIO_OE1 |
+			      GRC_LCLCTRL_GPIO_OUTPUT1));
+			tr32(GRC_LOCAL_CTRL);
+			udelay(100);
+		}
+	}
+}
+
 static int tg3_setup_phy(struct tg3 *);
 
 static int tg3_set_power_state(struct tg3 *tp, int state)
@@ -547,88 +659,64 @@ static int tg3_set_power_state(struct tg3 *tp, int state)
 		udelay(10);
 	}
 
-	if (tp->tg3_flags & TG3_FLAG_WOL_SPEED_100MB) {
+	if (!(tp->tg3_flags & TG3_FLAG_WOL_SPEED_100MB) &&
+	    (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5700 ||
+	     GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5701)) {
 		u32 base_val;
 
-		base_val = 0;
-		if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5700 ||
-		    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5701)
-			base_val |= (CLOCK_CTRL_RXCLK_DISABLE |
-				     CLOCK_CTRL_TXCLK_DISABLE);
-
-		tw32(TG3PCI_CLOCK_CTRL, base_val |
-		     CLOCK_CTRL_ALTCLK);
-		tr32(TG3PCI_CLOCK_CTRL);
-		udelay(40);
-
-		tw32(TG3PCI_CLOCK_CTRL, base_val |
-		     CLOCK_CTRL_ALTCLK |
-		     CLOCK_CTRL_44MHZ_CORE);
-		tr32(TG3PCI_CLOCK_CTRL);
-		udelay(40);
-
-		tw32(TG3PCI_CLOCK_CTRL, base_val |
-		     CLOCK_CTRL_44MHZ_CORE);
-		tr32(TG3PCI_CLOCK_CTRL);
-		udelay(40);
-	} else {
-		u32 base_val;
-
-		base_val = 0;
-		if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5700 ||
-		    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5701)
-			base_val |= (CLOCK_CTRL_RXCLK_DISABLE |
-				     CLOCK_CTRL_TXCLK_DISABLE);
+		base_val = tp->pci_clock_ctrl;
+		base_val |= (CLOCK_CTRL_RXCLK_DISABLE |
+			     CLOCK_CTRL_TXCLK_DISABLE);
 
 		tw32(TG3PCI_CLOCK_CTRL, base_val |
 		     CLOCK_CTRL_ALTCLK |
 		     CLOCK_CTRL_PWRDOWN_PLL133);
 		tr32(TG3PCI_CLOCK_CTRL);
 		udelay(40);
-	}
+	} else {
+		u32 newbits1, newbits2;
 
-	if (!(tp->tg3_flags & TG3_FLAG_EEPROM_WRITE_PROT) &&
-	    (tp->tg3_flags & TG3_FLAG_WOL_ENABLE)) {
 		if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5700 ||
 		    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5701) {
-			tw32(GRC_LOCAL_CTRL,
-			     (GRC_LCLCTRL_GPIO_OE0 |
-			      GRC_LCLCTRL_GPIO_OE1 |
-			      GRC_LCLCTRL_GPIO_OE2 |
-			      GRC_LCLCTRL_GPIO_OUTPUT0 |
-			      GRC_LCLCTRL_GPIO_OUTPUT1));
-			tr32(GRC_LOCAL_CTRL);
-			udelay(100);
+			newbits1 = (CLOCK_CTRL_RXCLK_DISABLE |
+				    CLOCK_CTRL_TXCLK_DISABLE |
+				    CLOCK_CTRL_ALTCLK);
+			newbits2 = newbits1 | CLOCK_CTRL_44MHZ_CORE;
+		} else if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705) {
+			newbits1 = CLOCK_CTRL_625_CORE;
+			newbits2 = newbits1 | CLOCK_CTRL_ALTCLK;
 		} else {
-			tw32(GRC_LOCAL_CTRL,
-			     (GRC_LCLCTRL_GPIO_OE0 |
-			      GRC_LCLCTRL_GPIO_OE1 |
-			      GRC_LCLCTRL_GPIO_OE2 |
-			      GRC_LCLCTRL_GPIO_OUTPUT1 |
-			      GRC_LCLCTRL_GPIO_OUTPUT2));
-			tr32(GRC_LOCAL_CTRL);
-			udelay(100);
+			newbits1 = CLOCK_CTRL_ALTCLK;
+			newbits2 = newbits1 | CLOCK_CTRL_44MHZ_CORE;
+		}
 
-			tw32(GRC_LOCAL_CTRL,
-			     (GRC_LCLCTRL_GPIO_OE0 |
-			      GRC_LCLCTRL_GPIO_OE1 |
-			      GRC_LCLCTRL_GPIO_OE2 |
-			      GRC_LCLCTRL_GPIO_OUTPUT0 |
-			      GRC_LCLCTRL_GPIO_OUTPUT1 |
-			      GRC_LCLCTRL_GPIO_OUTPUT2));
-			tr32(GRC_LOCAL_CTRL);
-			udelay(100);
+		tw32(TG3PCI_CLOCK_CTRL, tp->pci_clock_ctrl | newbits1);
+		tr32(TG3PCI_CLOCK_CTRL);
+		udelay(40);
 
-			tw32(GRC_LOCAL_CTRL,
-			     (GRC_LCLCTRL_GPIO_OE0 |
-			      GRC_LCLCTRL_GPIO_OE1 |
-			      GRC_LCLCTRL_GPIO_OE2 |
-			      GRC_LCLCTRL_GPIO_OUTPUT0 |
-			      GRC_LCLCTRL_GPIO_OUTPUT1));
-			tr32(GRC_LOCAL_CTRL);
-			udelay(100);
+		tw32(TG3PCI_CLOCK_CTRL, tp->pci_clock_ctrl | newbits2);
+		tr32(TG3PCI_CLOCK_CTRL);
+		udelay(40);
+
+		if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705) {
+			u32 newbits3;
+
+			if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5700 ||
+			    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5701) {
+				newbits3 = (CLOCK_CTRL_RXCLK_DISABLE |
+					    CLOCK_CTRL_TXCLK_DISABLE |
+					    CLOCK_CTRL_44MHZ_CORE);
+			} else {
+				newbits3 = CLOCK_CTRL_44MHZ_CORE;
+			}
+
+			tw32(TG3PCI_CLOCK_CTRL, tp->pci_clock_ctrl | newbits3);
+			tr32(TG3PCI_CLOCK_CTRL);
+			udelay(40);
 		}
 	}
+
+	tg3_frob_aux_power(tp);
 
 	/* Finally, set the new power state. */
 	pci_write_config_word(tp->pdev, pm + PCI_PM_CTRL, power_control);
@@ -948,11 +1036,10 @@ static int tg3_setup_copper_phy(struct tg3 *tp)
 
 	/* Some third-party PHYs need to be reset on link going
 	 * down.
-	 *
-	 * XXX 5705 note: This workaround also applies to 5705_a0
 	 */
 	if ((GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5703 ||
-	     GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704) &&
+	     GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704 ||
+	     tp->pci_chip_rev_id == CHIPREV_ID_5705_A0) &&
 	    netif_carrier_ok(tp->dev)) {
 		tg3_readphy(tp, MII_BMSR, &bmsr);
 		tg3_readphy(tp, MII_BMSR, &bmsr);
@@ -1942,7 +2029,7 @@ static int tg3_rx(struct tg3 *tp, int budget)
 	int received;
 
 	hw_idx = tp->hw_status->idx[0].rx_producer;
-	sw_idx = rx_rcb_ptr % TG3_RX_RCB_RING_SIZE;
+	sw_idx = rx_rcb_ptr % TG3_RX_RCB_RING_SIZE(tp);
 	work_mask = 0;
 	received = 0;
 	while (sw_idx != hw_idx && budget > 0) {
@@ -2043,13 +2130,13 @@ next_pkt:
 		(*post_ptr)++;
 next_pkt_nopost:
 		rx_rcb_ptr++;
-		sw_idx = rx_rcb_ptr % TG3_RX_RCB_RING_SIZE;
+		sw_idx = rx_rcb_ptr % TG3_RX_RCB_RING_SIZE(tp);
 	}
 
 	/* ACK the status ring. */
 	tp->rx_rcb_ptr = rx_rcb_ptr;
 	tw32_mailbox(MAILBOX_RCVRET_CON_IDX_0 + TG3_64BIT_REG_LOW,
-		     (rx_rcb_ptr % TG3_RX_RCB_RING_SIZE));
+		     (rx_rcb_ptr % TG3_RX_RCB_RING_SIZE(tp)));
 	if (tp->tg3_flags & TG3_FLAG_MBOX_WRITE_REORDER)
 		tr32(MAILBOX_RCVRET_CON_IDX_0 + TG3_64BIT_REG_LOW);
 
@@ -2701,6 +2788,10 @@ static int tg3_change_mtu(struct net_device *dev, int new_mtu)
 	if (new_mtu < TG3_MIN_MTU || new_mtu > TG3_MAX_MTU)
 		return -EINVAL;
 
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705 &&
+	    new_mtu > TG3_MAX_MTU_5705)
+		return -EINVAL;
+
 	if (!netif_running(dev)) {
 		/* We'll just catch it later when the
 		 * device is up'd.
@@ -2816,7 +2907,7 @@ static void tg3_init_rings(struct tg3 *tp)
 	/* Zero out all descriptors. */
 	memset(tp->rx_std, 0, TG3_RX_RING_BYTES);
 	memset(tp->rx_jumbo, 0, TG3_RX_JUMBO_RING_BYTES);
-	memset(tp->rx_rcb, 0, TG3_RX_RCB_RING_BYTES);
+	memset(tp->rx_rcb, 0, TG3_RX_RCB_RING_BYTES(tp));
 
 	if (tp->tg3_flags & TG3_FLAG_HOST_TXDS) {
 		memset(tp->tx_ring, 0, TG3_TX_RING_BYTES);
@@ -2899,7 +2990,7 @@ static void tg3_free_consistent(struct tg3 *tp)
 		tp->rx_jumbo = NULL;
 	}
 	if (tp->rx_rcb) {
-		pci_free_consistent(tp->pdev, TG3_RX_RCB_RING_BYTES,
+		pci_free_consistent(tp->pdev, TG3_RX_RCB_RING_BYTES(tp),
 				    tp->rx_rcb, tp->rx_rcb_mapping);
 		tp->rx_rcb = NULL;
 	}
@@ -2957,7 +3048,7 @@ static int tg3_alloc_consistent(struct tg3 *tp)
 	if (!tp->rx_jumbo)
 		goto err_out;
 
-	tp->rx_rcb = pci_alloc_consistent(tp->pdev, TG3_RX_RCB_RING_BYTES,
+	tp->rx_rcb = pci_alloc_consistent(tp->pdev, TG3_RX_RCB_RING_BYTES(tp),
 					  &tp->rx_rcb_mapping);
 	if (!tp->rx_rcb)
 		goto err_out;
@@ -3003,6 +3094,23 @@ static int tg3_stop_block(struct tg3 *tp, unsigned long ofs, u32 enable_bit)
 {
 	unsigned int i;
 	u32 val;
+
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705) {
+		switch (ofs) {
+		case RCVLSC_MODE:
+		case DMAC_MODE:
+		case MBFREE_MODE:
+		case BUFMGR_MODE:
+		case MEMARB_MODE:
+			/* We can't enable/disable these bits of the
+			 * 5705, just say success.
+			 */
+			return 0;
+
+		default:
+			break;
+		};
+	}
 
 	val = tr32(ofs);
 	val &= ~enable_bit;
@@ -3127,7 +3235,10 @@ static void tg3_chip_reset(struct tg3 *tp)
 	tp->tg3_flags &= ~TG3_FLAG_5701_REG_WRITE_BUG;
 
 	/* do the reset */
-	tw32(GRC_MISC_CFG, GRC_MISC_CFG_CORECLK_RESET);
+	val = GRC_MISC_CFG_CORECLK_RESET;
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705)
+		val |= GRC_MISC_CFG_KEEP_GPHY_POWER;
+	tw32(GRC_MISC_CFG, val);
 
 	/* restore 5701 hardware bug workaround flag */
 	tp->tg3_flags = flags_save;
@@ -3162,6 +3273,13 @@ static void tg3_chip_reset(struct tg3 *tp)
 	pci_write_config_dword(tp->pdev, TG3PCI_X_CAPS, val);
 
 	tw32(MEMARB_MODE, MEMARB_MODE_ENABLE);
+
+	if ((tp->nic_sram_data_cfg & NIC_SRAM_DATA_CFG_MINI_PCI) != 0 &&
+	    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705) {
+		tp->pci_clock_ctrl |=
+			(CLOCK_CTRL_FORCE_CLKRUN | CLOCK_CTRL_CLKRUN_OENABLE);
+		tw32(TG3PCI_CLOCK_CTRL, tp->pci_clock_ctrl);
+	}
 
 	tw32(TG3PCI_MISC_HOST_CTRL, tp->misc_host_ctrl);
 }
@@ -3362,6 +3480,10 @@ static int tg3_reset_cpu(struct tg3 *tp, u32 offset)
 {
 	int i;
 
+	if (offset == TX_CPU_BASE &&
+	    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705)
+		BUG();
+
 	tw32(offset + CPU_STATE, 0xffffffff);
 	tw32(offset + CPU_MODE,  CPU_MODE_RESET);
 	if (offset == RX_CPU_BASE) {
@@ -3411,6 +3533,14 @@ static int tg3_load_firmware_cpu(struct tg3 *tp, u32 cpu_base, u32 cpu_scratch_b
 {
 	int err, i;
 	u32 orig_tg3_flags = tp->tg3_flags;
+
+	if (cpu_base == TX_CPU_BASE &&
+	    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705) {
+		printk(KERN_ERR PFX "tg3_load_firmware_cpu: Trying to load "
+		       "TX cpu firmware on %s which is 5705.\n",
+		       tp->dev->name);
+		return -EINVAL;
+	}
 
 	/* Force use of PCI config space for indirect register
 	 * write calls.
@@ -3791,6 +3921,9 @@ static int tg3_load_tso_firmware(struct tg3 *tp)
 	struct fw_info info;
 	int err, i;
 
+	/* XXX 5705 note: Need different firmware here, and load it onto
+	 * XXX            RX cpu instead of TX cpu as 5705 lacks the latter.
+	 */
 	info.text_base = TG3_TSO_FW_TEXT_ADDR;
 	info.text_len = TG3_TSO_FW_TEXT_LEN;
 	info.text_data = &tg3TsoFwText[0];
@@ -3860,6 +3993,15 @@ static void __tg3_set_mac_addr(struct tg3 *tp)
 		tw32(MAC_ADDR_0_LOW + (i * 8), addr_low);
 	}
 
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5700 &&
+	    GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5701 &&
+	    GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705) {
+		for (i = 0; i < 12; i++) {
+			tw32(MAC_EXTADDR_0_HIGH + (i * 8), addr_high);
+			tw32(MAC_EXTADDR_0_LOW + (i * 8), addr_low);
+		}
+	}
+
 	addr_high = (tp->dev->dev_addr[0] +
 		     tp->dev->dev_addr[1] +
 		     tp->dev->dev_addr[2] +
@@ -3918,7 +4060,7 @@ static void __tg3_set_rx_mode(struct net_device *);
 static int tg3_reset_hw(struct tg3 *tp)
 {
 	u32 val;
-	int i, err;
+	int i, err, limit;
 
 	tg3_disable_ints(tp);
 
@@ -3970,9 +4112,8 @@ static int tg3_reset_hw(struct tg3 *tp)
 	 * B3 tigon3 silicon.  This bit has no effect on any
 	 * other revision.
 	 */
-	val = tr32(TG3PCI_CLOCK_CTRL);
-	val |= CLOCK_CTRL_DELAY_PCI_GRANT;
-	tw32(TG3PCI_CLOCK_CTRL, val);
+	tp->pci_clock_ctrl |= CLOCK_CTRL_DELAY_PCI_GRANT;
+	tw32(TG3PCI_CLOCK_CTRL, tp->pci_clock_ctrl);
 	tr32(TG3PCI_CLOCK_CTRL);
 
 	if (tp->pci_chip_rev_id == CHIPREV_ID_5704_A0 &&
@@ -4025,13 +4166,34 @@ static int tg3_reset_hw(struct tg3 *tp)
 	     (65 << GRC_MISC_CFG_PRESCALAR_SHIFT));
 
 	/* Initialize MBUF/DESC pool. */
-	tw32(BUFMGR_MB_POOL_ADDR, NIC_SRAM_MBUF_POOL_BASE);
-	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704)
-		tw32(BUFMGR_MB_POOL_SIZE, NIC_SRAM_MBUF_POOL_SIZE64);
-	else
-		tw32(BUFMGR_MB_POOL_SIZE, NIC_SRAM_MBUF_POOL_SIZE96);
-	tw32(BUFMGR_DMA_DESC_POOL_ADDR, NIC_SRAM_DMA_DESC_POOL_BASE);
-	tw32(BUFMGR_DMA_DESC_POOL_SIZE, NIC_SRAM_DMA_DESC_POOL_SIZE);
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705) {
+		tw32(BUFMGR_MB_POOL_ADDR, NIC_SRAM_MBUF_POOL_BASE);
+		if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704)
+			tw32(BUFMGR_MB_POOL_SIZE, NIC_SRAM_MBUF_POOL_SIZE64);
+		else
+			tw32(BUFMGR_MB_POOL_SIZE, NIC_SRAM_MBUF_POOL_SIZE96);
+		tw32(BUFMGR_DMA_DESC_POOL_ADDR, NIC_SRAM_DMA_DESC_POOL_BASE);
+		tw32(BUFMGR_DMA_DESC_POOL_SIZE, NIC_SRAM_DMA_DESC_POOL_SIZE);
+	}
+#if TG3_DO_TSO != 0
+	else if (tp->dev->features & NETIF_F_TSO) {
+		/* XXX TSO note: Ok, there will be two sets of firmware.
+		 * XXX           One for non-5705 and one for 5705 chips.
+		 * XXX           Once that is implemented we need to size
+		 * XXX		 that 5705-specific firmware and use it
+		 * XXX           to calculate the proper BUFMGR_MB_POOL_ADDR
+		 * XXX		 size (NIC_SRAM_MBUF_POOL_BASE5705 + 5705fw_len)
+		 * XXX		 and BUFMGR_MB_POOL_SIZE value
+		 * XXX		 (NIC_SRAM_MBUF_POOL_SIZE5705 - 5705fw_len - 0xa00)
+		 */
+#if 0
+		fw_len = tg3_tso_fw_len(tp);
+		fw_len = (fw_len + (0x80 - 1)) & ~(0x80 - 1);
+		tw32(BUFMGR_MB_POOL_ADDR, NIC_SRAM_MBUF_POOL_BASE5705 + fw_len);
+		tw32(BUFMGR_MB_POOL_SIZE, NIC_SRAM_MBUF_POOL_SIZE5705 - fw_len - 0xa00);
+#endif
+	}
+#endif
 
 	if (!(tp->tg3_flags & TG3_FLAG_JUMBO_ENABLE)) {
 		tw32(BUFMGR_MB_RDMA_LOW_WATER,
@@ -4104,30 +4266,41 @@ static int tg3_reset_hw(struct tg3 *tp)
 	tw32(RCVDBDI_STD_BD + TG3_BDINFO_NIC_ADDR,
 	     NIC_SRAM_RX_BUFFER_DESC);
 
-	tw32(RCVDBDI_MINI_BD + TG3_BDINFO_MAXLEN_FLAGS,
-	     BDINFO_FLAGS_DISABLED);
-
-	if (tp->tg3_flags & TG3_FLAG_JUMBO_ENABLE) {
-		tw32(RCVDBDI_JUMBO_BD + TG3_BDINFO_HOST_ADDR + TG3_64BIT_REG_HIGH,
-		     ((u64) tp->rx_jumbo_mapping >> 32));
-		tw32(RCVDBDI_JUMBO_BD + TG3_BDINFO_HOST_ADDR + TG3_64BIT_REG_LOW,
-		     ((u64) tp->rx_jumbo_mapping & 0xffffffff));
-		tw32(RCVDBDI_JUMBO_BD + TG3_BDINFO_MAXLEN_FLAGS,
-		     RX_JUMBO_MAX_SIZE << BDINFO_FLAGS_MAXLEN_SHIFT);
-		tw32(RCVDBDI_JUMBO_BD + TG3_BDINFO_NIC_ADDR,
-		     NIC_SRAM_RX_JUMBO_BUFFER_DESC);
-	} else {
-		tw32(RCVDBDI_JUMBO_BD + TG3_BDINFO_MAXLEN_FLAGS,
+	/* Don't even try to program the JUMBO/MINI buffer descriptor
+	 * configs on 5705.
+	 */
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705) {
+		tw32(RCVDBDI_MINI_BD + TG3_BDINFO_MAXLEN_FLAGS,
 		     BDINFO_FLAGS_DISABLED);
+
+		if (tp->tg3_flags & TG3_FLAG_JUMBO_ENABLE) {
+			tw32(RCVDBDI_JUMBO_BD + TG3_BDINFO_HOST_ADDR + TG3_64BIT_REG_HIGH,
+			     ((u64) tp->rx_jumbo_mapping >> 32));
+			tw32(RCVDBDI_JUMBO_BD + TG3_BDINFO_HOST_ADDR + TG3_64BIT_REG_LOW,
+			     ((u64) tp->rx_jumbo_mapping & 0xffffffff));
+			tw32(RCVDBDI_JUMBO_BD + TG3_BDINFO_MAXLEN_FLAGS,
+			     RX_JUMBO_MAX_SIZE << BDINFO_FLAGS_MAXLEN_SHIFT);
+			tw32(RCVDBDI_JUMBO_BD + TG3_BDINFO_NIC_ADDR,
+			     NIC_SRAM_RX_JUMBO_BUFFER_DESC);
+		} else {
+			tw32(RCVDBDI_JUMBO_BD + TG3_BDINFO_MAXLEN_FLAGS,
+			     BDINFO_FLAGS_DISABLED);
+		}
 	}
 
 	/* Setup replenish thresholds. */
 	tw32(RCVBDI_STD_THRESH, tp->rx_pending / 8);
 	tw32(RCVBDI_JUMBO_THRESH, tp->rx_jumbo_pending / 8);
 
-	/* Clear out send RCB ring in SRAM. */
-	for (i = NIC_SRAM_SEND_RCB; i < NIC_SRAM_RCV_RET_RCB; i += TG3_BDINFO_SIZE)
-		tg3_write_mem(tp, i + TG3_BDINFO_MAXLEN_FLAGS, BDINFO_FLAGS_DISABLED);
+	/* There is only one send ring on 5705, no need to explicitly
+	 * disable the others.
+	 */
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705) {
+		/* Clear out send RCB ring in SRAM. */
+		for (i = NIC_SRAM_SEND_RCB; i < NIC_SRAM_RCV_RET_RCB; i += TG3_BDINFO_SIZE)
+			tg3_write_mem(tp, i + TG3_BDINFO_MAXLEN_FLAGS,
+				      BDINFO_FLAGS_DISABLED);
+	}
 
 	tp->tx_prod = 0;
 	tp->tx_cons = 0;
@@ -4149,9 +4322,15 @@ static int tg3_reset_hw(struct tg3 *tp)
 			       NIC_SRAM_TX_BUFFER_DESC);
 	}
 
-	for (i = NIC_SRAM_RCV_RET_RCB; i < NIC_SRAM_STATS_BLK; i += TG3_BDINFO_SIZE) {
-		tg3_write_mem(tp, i + TG3_BDINFO_MAXLEN_FLAGS,
-			      BDINFO_FLAGS_DISABLED);
+	/* There is only one receive return ring on 5705, no need to explicitly
+	 * disable the others.
+	 */
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705) {
+		for (i = NIC_SRAM_RCV_RET_RCB; i < NIC_SRAM_STATS_BLK;
+		     i += TG3_BDINFO_SIZE) {
+			tg3_write_mem(tp, i + TG3_BDINFO_MAXLEN_FLAGS,
+				      BDINFO_FLAGS_DISABLED);
+		}
 	}
 
 	tp->rx_rcb_ptr = 0;
@@ -4161,7 +4340,7 @@ static int tg3_reset_hw(struct tg3 *tp)
 
 	tg3_set_bdinfo(tp, NIC_SRAM_RCV_RET_RCB,
 		       tp->rx_rcb_mapping,
-		       (TG3_RX_RCB_RING_SIZE <<
+		       (TG3_RX_RCB_RING_SIZE(tp) <<
 			BDINFO_FLAGS_MAXLEN_SHIFT),
 		       0);
 
@@ -4216,32 +4395,40 @@ static int tg3_reset_hw(struct tg3 *tp)
 
 	tw32(HOSTCC_RXCOL_TICKS, 0);
 	tw32(HOSTCC_RXMAX_FRAMES, 1);
-	tw32(HOSTCC_RXCOAL_TICK_INT, 0);
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705)
+		tw32(HOSTCC_RXCOAL_TICK_INT, 0);
 	tw32(HOSTCC_RXCOAL_MAXF_INT, 1);
 	tw32(HOSTCC_TXCOL_TICKS, LOW_TXCOL_TICKS);
 	tw32(HOSTCC_TXMAX_FRAMES, LOW_RXMAX_FRAMES);
-	tw32(HOSTCC_TXCOAL_TICK_INT, 0);
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705)
+		tw32(HOSTCC_TXCOAL_TICK_INT, 0);
 	tw32(HOSTCC_TXCOAL_MAXF_INT, 0);
-	tw32(HOSTCC_STAT_COAL_TICKS,
-	     DEFAULT_STAT_COAL_TICKS);
 
-	/* Status/statistics block address. */
-	tw32(HOSTCC_STATS_BLK_HOST_ADDR + TG3_64BIT_REG_HIGH,
-	     ((u64) tp->stats_mapping >> 32));
-	tw32(HOSTCC_STATS_BLK_HOST_ADDR + TG3_64BIT_REG_LOW,
-	     ((u64) tp->stats_mapping & 0xffffffff));
-	tw32(HOSTCC_STATUS_BLK_HOST_ADDR + TG3_64BIT_REG_HIGH,
-	     ((u64) tp->status_mapping >> 32));
-	tw32(HOSTCC_STATUS_BLK_HOST_ADDR + TG3_64BIT_REG_LOW,
-	     ((u64) tp->status_mapping & 0xffffffff));
-	tw32(HOSTCC_STATS_BLK_NIC_ADDR, NIC_SRAM_STATS_BLK);
-	tw32(HOSTCC_STATUS_BLK_NIC_ADDR, NIC_SRAM_STATUS_BLK);
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705) {
+		/* Status/statistics block address.  See tg3_timer,
+		 * the tg3_periodic_fetch_stats call there, and
+		 * tg3_get_stats to see how this works for 5705 chips.
+		 */
+		tw32(HOSTCC_STAT_COAL_TICKS,
+		     DEFAULT_STAT_COAL_TICKS);
+		tw32(HOSTCC_STATS_BLK_HOST_ADDR + TG3_64BIT_REG_HIGH,
+		     ((u64) tp->stats_mapping >> 32));
+		tw32(HOSTCC_STATS_BLK_HOST_ADDR + TG3_64BIT_REG_LOW,
+		     ((u64) tp->stats_mapping & 0xffffffff));
+		tw32(HOSTCC_STATUS_BLK_HOST_ADDR + TG3_64BIT_REG_HIGH,
+		     ((u64) tp->status_mapping >> 32));
+		tw32(HOSTCC_STATUS_BLK_HOST_ADDR + TG3_64BIT_REG_LOW,
+		     ((u64) tp->status_mapping & 0xffffffff));
+		tw32(HOSTCC_STATS_BLK_NIC_ADDR, NIC_SRAM_STATS_BLK);
+		tw32(HOSTCC_STATUS_BLK_NIC_ADDR, NIC_SRAM_STATUS_BLK);
+	}
 
 	tw32(HOSTCC_MODE, HOSTCC_MODE_ENABLE | tp->coalesce_mode);
 
 	tw32(RCVCC_MODE, RCVCC_MODE_ENABLE | RCVCC_MODE_ATTN_ENABLE);
 	tw32(RCVLPC_MODE, RCVLPC_MODE_ENABLE);
-	tw32(RCVLSC_MODE, RCVLSC_MODE_ENABLE | RCVLSC_MODE_ATTN_ENABLE);
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705)
+		tw32(RCVLSC_MODE, RCVLSC_MODE_ENABLE | RCVLSC_MODE_ATTN_ENABLE);
 
 	tp->mac_mode = MAC_MODE_TXSTAT_ENABLE | MAC_MODE_RXSTAT_ENABLE |
 		MAC_MODE_TDE_ENABLE | MAC_MODE_RDE_ENABLE | MAC_MODE_FHDE_ENABLE;
@@ -4260,26 +4447,36 @@ static int tg3_reset_hw(struct tg3 *tp)
 	tw32_mailbox(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW, 0);
 	tr32(MAILBOX_INTERRUPT_0);
 
-	tw32(DMAC_MODE, DMAC_MODE_ENABLE);
-	tr32(DMAC_MODE);
-	udelay(40);
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705) {
+		tw32(DMAC_MODE, DMAC_MODE_ENABLE);
+		tr32(DMAC_MODE);
+		udelay(40);
+	}
 
-	tw32(WDMAC_MODE, (WDMAC_MODE_ENABLE | WDMAC_MODE_TGTABORT_ENAB |
-			  WDMAC_MODE_MSTABORT_ENAB | WDMAC_MODE_PARITYERR_ENAB |
-			  WDMAC_MODE_ADDROFLOW_ENAB | WDMAC_MODE_FIFOOFLOW_ENAB |
-			  WDMAC_MODE_FIFOURUN_ENAB | WDMAC_MODE_FIFOOREAD_ENAB |
-			  WDMAC_MODE_LNGREAD_ENAB));
+	val = (WDMAC_MODE_ENABLE | WDMAC_MODE_TGTABORT_ENAB |
+	       WDMAC_MODE_MSTABORT_ENAB | WDMAC_MODE_PARITYERR_ENAB |
+	       WDMAC_MODE_ADDROFLOW_ENAB | WDMAC_MODE_FIFOOFLOW_ENAB |
+	       WDMAC_MODE_FIFOURUN_ENAB | WDMAC_MODE_FIFOOREAD_ENAB |
+	       WDMAC_MODE_LNGREAD_ENAB);
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705 &&
+	    (tr32(TG3PCI_PCISTATE) & PCISTATE_BUS_SPEED_HIGH) != 0)
+		val |= WDMAC_MODE_RX_ACCEL;
+	tw32(WDMAC_MODE, val);
 	tr32(WDMAC_MODE);
 	udelay(40);
 
-	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704 &&
-	    (tp->tg3_flags & TG3_FLAG_PCIX_MODE)) {
+	if ((tp->tg3_flags & TG3_FLAG_PCIX_MODE) != 0) {
 		val = tr32(TG3PCI_X_CAPS);
-		val &= ~(PCIX_CAPS_SPLIT_MASK | PCIX_CAPS_BURST_MASK);
-		val |= (PCIX_CAPS_MAX_BURST_5704 << PCIX_CAPS_BURST_SHIFT);
-		if (tp->tg3_flags & TG3_FLAG_SPLIT_MODE)
-			val |= (tp->split_mode_max_reqs <<
-				PCIX_CAPS_SPLIT_SHIFT);
+		if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5703) {
+			val &= ~PCIX_CAPS_BURST_MASK;
+			val |= (PCIX_CAPS_MAX_BURST_CPIOB << PCIX_CAPS_BURST_SHIFT);
+		} else if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704) {
+			val &= ~(PCIX_CAPS_SPLIT_MASK | PCIX_CAPS_BURST_MASK);
+			val |= (PCIX_CAPS_MAX_BURST_CPIOB << PCIX_CAPS_BURST_SHIFT);
+			if (tp->tg3_flags & TG3_FLAG_SPLIT_MODE)
+				val |= (tp->split_mode_max_reqs <<
+					PCIX_CAPS_SPLIT_SHIFT);
+		}
 		tw32(TG3PCI_X_CAPS, val);
 	}
 
@@ -4290,12 +4487,25 @@ static int tg3_reset_hw(struct tg3 *tp)
 	       RDMAC_MODE_LNGREAD_ENAB);
 	if (tp->tg3_flags & TG3_FLAG_SPLIT_MODE)
 		val |= RDMAC_MODE_SPLIT_ENABLE;
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705) {
+		if (tp->pci_chip_rev_id != CHIPREV_ID_5705_A0) {
+#if TG3_DO_TSO != 0
+			if (tp->dev->features & NETIF_F_TSO) {
+				val |= RDMAC_MODE_FIFO_SIZE_128;
+			} else
+#endif
+			if (!(tr32(TG3PCI_PCISTATE) & PCISTATE_BUS_SPEED_HIGH)) {
+				val |= RDMAC_MODE_FIFO_LONG_BURST;
+			}
+		}
+	}
 	tw32(RDMAC_MODE, val);
 	tr32(RDMAC_MODE);
 	udelay(40);
 
 	tw32(RCVDCC_MODE, RCVDCC_MODE_ENABLE | RCVDCC_MODE_ATTN_ENABLE);
-	tw32(MBFREE_MODE, MBFREE_MODE_ENABLE);
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705)
+		tw32(MBFREE_MODE, MBFREE_MODE_ENABLE);
 	tw32(SNDDATAC_MODE, SNDDATAC_MODE_ENABLE);
 	tw32(SNDBDC_MODE, SNDBDC_MODE_ENABLE | SNDBDC_MODE_ATTN_ENABLE);
 	tw32(RCVBDI_MODE, RCVBDI_MODE_ENABLE | RCVBDI_MODE_RCB_ATTN_ENAB);
@@ -4378,22 +4588,48 @@ static int tg3_reset_hw(struct tg3 *tp)
 	tw32(MAC_RCV_VALUE_0, 0xffffffff & RCV_RULE_DISABLE_MASK);
 	tw32(MAC_RCV_RULE_1,  0x86000004 & RCV_RULE_DISABLE_MASK);
 	tw32(MAC_RCV_VALUE_1, 0xffffffff & RCV_RULE_DISABLE_MASK);
-#if 0
-	tw32(MAC_RCV_RULE_2,  0); tw32(MAC_RCV_VALUE_2,  0);
-	tw32(MAC_RCV_RULE_3,  0); tw32(MAC_RCV_VALUE_3,  0);
-#endif
-	tw32(MAC_RCV_RULE_4,  0); tw32(MAC_RCV_VALUE_4,  0);
-	tw32(MAC_RCV_RULE_5,  0); tw32(MAC_RCV_VALUE_5,  0);
-	tw32(MAC_RCV_RULE_6,  0); tw32(MAC_RCV_VALUE_6,  0);
-	tw32(MAC_RCV_RULE_7,  0); tw32(MAC_RCV_VALUE_7,  0);
-	tw32(MAC_RCV_RULE_8,  0); tw32(MAC_RCV_VALUE_8,  0);
-	tw32(MAC_RCV_RULE_9,  0); tw32(MAC_RCV_VALUE_9,  0);
-	tw32(MAC_RCV_RULE_10,  0); tw32(MAC_RCV_VALUE_10,  0);
-	tw32(MAC_RCV_RULE_11,  0); tw32(MAC_RCV_VALUE_11,  0);
-	tw32(MAC_RCV_RULE_12,  0); tw32(MAC_RCV_VALUE_12,  0);
-	tw32(MAC_RCV_RULE_13,  0); tw32(MAC_RCV_VALUE_13,  0);
-	tw32(MAC_RCV_RULE_14,  0); tw32(MAC_RCV_VALUE_14,  0);
-	tw32(MAC_RCV_RULE_15,  0); tw32(MAC_RCV_VALUE_15,  0);
+
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705)
+		limit = 8;
+	else
+		limit = 16;
+	if (tp->tg3_flags & TG3_FLAG_ENABLE_ASF)
+		limit -= 4;
+	switch (limit) {
+	case 16:
+		tw32(MAC_RCV_RULE_15,  0); tw32(MAC_RCV_VALUE_15,  0);
+	case 15:
+		tw32(MAC_RCV_RULE_14,  0); tw32(MAC_RCV_VALUE_14,  0);
+	case 14:
+		tw32(MAC_RCV_RULE_13,  0); tw32(MAC_RCV_VALUE_13,  0);
+	case 13:
+		tw32(MAC_RCV_RULE_12,  0); tw32(MAC_RCV_VALUE_12,  0);
+	case 12:
+		tw32(MAC_RCV_RULE_11,  0); tw32(MAC_RCV_VALUE_11,  0);
+	case 11:
+		tw32(MAC_RCV_RULE_10,  0); tw32(MAC_RCV_VALUE_10,  0);
+	case 10:
+		tw32(MAC_RCV_RULE_9,  0); tw32(MAC_RCV_VALUE_9,  0);
+	case 9:
+		tw32(MAC_RCV_RULE_8,  0); tw32(MAC_RCV_VALUE_8,  0);
+	case 8:
+		tw32(MAC_RCV_RULE_7,  0); tw32(MAC_RCV_VALUE_7,  0);
+	case 7:
+		tw32(MAC_RCV_RULE_6,  0); tw32(MAC_RCV_VALUE_6,  0);
+	case 6:
+		tw32(MAC_RCV_RULE_5,  0); tw32(MAC_RCV_VALUE_5,  0);
+	case 5:
+		tw32(MAC_RCV_RULE_4,  0); tw32(MAC_RCV_VALUE_4,  0);
+	case 4:
+		/* tw32(MAC_RCV_RULE_3,  0); tw32(MAC_RCV_VALUE_3,  0); */
+	case 3:
+		/* tw32(MAC_RCV_RULE_2,  0); tw32(MAC_RCV_VALUE_2,  0); */
+	case 2:
+	case 1:
+
+	default:
+		break;
+	};
 
 	if (tp->tg3_flags & TG3_FLAG_INIT_COMPLETE)
 		tg3_enable_ints(tp);
@@ -4423,6 +4659,50 @@ out:
 	return err;
 }
 
+#define TG3_STAT_ADD32(PSTAT, REG) \
+do {	u32 __val = tr32(REG); \
+	(PSTAT)->low += __val; \
+	if ((PSTAT)->low < __val) \
+		(PSTAT)->high += 1; \
+} while (0)
+
+static void tg3_periodic_fetch_stats(struct tg3 *tp)
+{
+	struct tg3_hw_stats *sp = tp->hw_stats;
+
+	if (!netif_carrier_ok(tp->dev))
+		return;
+
+	TG3_STAT_ADD32(&sp->tx_octets, MAC_TX_STATS_OCTETS);
+	TG3_STAT_ADD32(&sp->tx_collisions, MAC_TX_STATS_COLLISIONS);
+	TG3_STAT_ADD32(&sp->tx_xon_sent, MAC_TX_STATS_XON_SENT);
+	TG3_STAT_ADD32(&sp->tx_xoff_sent, MAC_TX_STATS_XOFF_SENT);
+	TG3_STAT_ADD32(&sp->tx_mac_errors, MAC_TX_STATS_MAC_ERRORS);
+	TG3_STAT_ADD32(&sp->tx_single_collisions, MAC_TX_STATS_SINGLE_COLLISIONS);
+	TG3_STAT_ADD32(&sp->tx_mult_collisions, MAC_TX_STATS_MULT_COLLISIONS);
+	TG3_STAT_ADD32(&sp->tx_deferred, MAC_TX_STATS_DEFERRED);
+	TG3_STAT_ADD32(&sp->tx_excessive_collisions, MAC_TX_STATS_EXCESSIVE_COL);
+	TG3_STAT_ADD32(&sp->tx_late_collisions, MAC_TX_STATS_LATE_COL);
+	TG3_STAT_ADD32(&sp->tx_ucast_packets, MAC_TX_STATS_UCAST);
+	TG3_STAT_ADD32(&sp->tx_mcast_packets, MAC_TX_STATS_MCAST);
+	TG3_STAT_ADD32(&sp->tx_bcast_packets, MAC_TX_STATS_BCAST);
+
+	TG3_STAT_ADD32(&sp->rx_octets, MAC_RX_STATS_OCTETS);
+	TG3_STAT_ADD32(&sp->rx_fragments, MAC_RX_STATS_FRAGMENTS);
+	TG3_STAT_ADD32(&sp->rx_ucast_packets, MAC_RX_STATS_UCAST);
+	TG3_STAT_ADD32(&sp->rx_mcast_packets, MAC_RX_STATS_MCAST);
+	TG3_STAT_ADD32(&sp->rx_bcast_packets, MAC_RX_STATS_BCAST);
+	TG3_STAT_ADD32(&sp->rx_fcs_errors, MAC_RX_STATS_FCS_ERRORS);
+	TG3_STAT_ADD32(&sp->rx_align_errors, MAC_RX_STATS_ALIGN_ERRORS);
+	TG3_STAT_ADD32(&sp->rx_xon_pause_rcvd, MAC_RX_STATS_XON_PAUSE_RECVD);
+	TG3_STAT_ADD32(&sp->rx_xoff_pause_rcvd, MAC_RX_STATS_XOFF_PAUSE_RECVD);
+	TG3_STAT_ADD32(&sp->rx_mac_ctrl_rcvd, MAC_RX_STATS_MAC_CTRL_RECVD);
+	TG3_STAT_ADD32(&sp->rx_xoff_entered, MAC_RX_STATS_XOFF_ENTERED);
+	TG3_STAT_ADD32(&sp->rx_frame_too_long_errors, MAC_RX_STATS_FRAME_TOO_LONG);
+	TG3_STAT_ADD32(&sp->rx_jabbers, MAC_RX_STATS_JABBERS);
+	TG3_STAT_ADD32(&sp->rx_undersize_packets, MAC_RX_STATS_UNDERSIZE);
+}
+
 static void tg3_timer(unsigned long __opaque)
 {
 	struct tg3 *tp = (struct tg3 *) __opaque;
@@ -4450,6 +4730,9 @@ static void tg3_timer(unsigned long __opaque)
 		schedule_work(&tp->reset_task);
 		return;
 	}
+
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705)
+		tg3_periodic_fetch_stats(tp);
 
 	/* This part only runs once per second. */
 	if (!--tp->timer_counter) {
@@ -4902,6 +5185,13 @@ static struct net_device_stats *tg3_get_stats(struct net_device *dev)
 	if (!hw_stats)
 		return old_stats;
 
+	/* On the 5705 we can't DMA the stats to memory, thus
+	 * a timer simply keeps tp->stats uptodate with direct
+	 * periodic reads of the statistics registers via a timer.
+	 */
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705)
+		return stats;
+
 	stats->rx_packets = old_stats->rx_packets +
 		get_stat64(&hw_stats->rx_ucast_packets) +
 		get_stat64(&hw_stats->rx_mcast_packets) +
@@ -5279,6 +5569,13 @@ static int tg3_set_ringparam(struct net_device *dev, struct ethtool_ringparam *e
 	spin_lock(&tp->tx_lock);
   
 	tp->rx_pending = ering->rx_pending;
+	if (tp->pci_chip_rev_id == CHIPREV_ID_5705_A1 &&
+#if TG3_DO_TSO != 0
+	    !(dev->features & NETIF_F_TSO) &&
+#endif
+	    !(tr32(TG3PCI_PCISTATE) & PCISTATE_BUS_SPEED_HIGH) &&
+	    tp->rx_pending > 64)
+		tp->rx_pending = 64;
 	tp->rx_jumbo_pending = ering->rx_jumbo_pending;
 	tp->tx_pending = ering->tx_pending;
 
@@ -5669,6 +5966,7 @@ static int __devinit tg3_phy_probe(struct tg3 *tp)
 		u32 nic_cfg;
 
 		tg3_read_mem(tp, NIC_SRAM_DATA_CFG, &nic_cfg);
+		tp->nic_sram_data_cfg = nic_cfg;
 
 		eeprom_signature_found = 1;
 
@@ -6142,7 +6440,8 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 	/* Determine if TX descriptors will reside in
 	 * main memory or in the chip SRAM.
 	 */
-	if (tp->tg3_flags & TG3_FLAG_PCIX_TARGET_HWBUG)
+	if ((tp->tg3_flags & TG3_FLAG_PCIX_TARGET_HWBUG) != 0 ||
+	    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705)
 		tp->tg3_flags |= TG3_FLAG_HOST_TXDS;
 
 	grc_misc_cfg = tr32(GRC_MISC_CFG);
@@ -6154,8 +6453,9 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 		tp->split_mode_max_reqs = SPLIT_MODE_5704_MAX_REQ;
 	}
 
-	/* this one is limited to 10/100 only */
-	if (grc_misc_cfg == GRC_MISC_CFG_BOARD_ID_5702FE)
+	/* these are limited to 10/100 only */
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5703 &&
+	    (grc_misc_cfg == 0x8000 || grc_misc_cfg == 0x4000))
 		tp->tg3_flags |= TG3_FLAG_10_100_ONLY;
 
 	err = tg3_phy_probe(tp);
@@ -6414,8 +6714,6 @@ static int __devinit tg3_test_dma(struct tg3 *tp)
 		goto out_nofree;
 	}
 
-	tw32(TG3PCI_CLOCK_CTRL, 0);
-
 	if ((tp->tg3_flags & TG3_FLAG_PCIX_MODE) == 0) {
 		tp->dma_rwctrl =
 			(0x7 << DMA_RWCTRL_PCI_WRITE_CMD_SHIFT) |
@@ -6423,7 +6721,9 @@ static int __devinit tg3_test_dma(struct tg3 *tp)
 			(0x7 << DMA_RWCTRL_WRITE_WATER_SHIFT) |
 			(0x7 << DMA_RWCTRL_READ_WATER_SHIFT) |
 			(0x0f << DMA_RWCTRL_MIN_DMA_SHIFT);
-		/* XXX 5705 note: set MIN_DMA to zero here */
+		if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705)
+			tp->dma_rwctrl &= ~(DMA_RWCTRL_MIN_DMA
+					    << DMA_RWCTRL_MIN_DMA_SHIFT);
 	} else {
 		if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704)
 			tp->dma_rwctrl =
@@ -6525,6 +6825,11 @@ static int __devinit tg3_test_dma(struct tg3 *tp)
 	}
 
 	tw32(TG3PCI_DMA_RW_CTRL, tp->dma_rwctrl);
+
+#if 0
+	/* Unneeded, already done by tg3_get_invariants.  */
+	tg3_switch_clocks(tp);
+#endif
 
 	ret = 0;
 	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5700 &&
@@ -6630,10 +6935,33 @@ static char * __devinit tg3_phy_string(struct tg3 *tp)
 	case PHY_ID_BCM5701:	return "5701";
 	case PHY_ID_BCM5703:	return "5703";
 	case PHY_ID_BCM5704:	return "5704";
+	case PHY_ID_BCM5705:	return "5705";
 	case PHY_ID_BCM8002:	return "8002";
 	case PHY_ID_SERDES:	return "serdes";
 	default:		return "unknown";
 	};
+}
+
+static struct pci_dev * __devinit tg3_find_5704_peer(struct tg3 *tp)
+{
+	struct pci_dev *peer = NULL;
+	unsigned int func;
+
+	for (func = 0; func < 7; func++) {
+		unsigned int devfn = tp->pdev->devfn;
+
+		devfn &= ~7;
+		devfn |= func;
+
+		if (devfn == tp->pdev->devfn)
+			continue;
+		peer = pci_find_slot(tp->pdev->bus->number, devfn);
+		if (peer)
+			break;
+	}
+	if (!peer || peer == tp->pdev)
+		BUG();
+	return peer;
 }
 
 static int __devinit tg3_init_one(struct pci_dev *pdev,
@@ -6793,6 +7121,38 @@ static int __devinit tg3_init_one(struct pci_dev *pdev,
 		       "aborting.\n");
 		goto err_out_iounmap;
 	}
+
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705) {
+		tp->bufmgr_config.mbuf_read_dma_low_water =
+			DEFAULT_MB_RDMA_LOW_WATER_5705;
+		tp->bufmgr_config.mbuf_mac_rx_low_water =
+			DEFAULT_MB_MACRX_LOW_WATER_5705;
+		tp->bufmgr_config.mbuf_high_water =
+			DEFAULT_MB_HIGH_WATER_5705;
+	}
+
+#if TG3_DO_TSO != 0
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5700 ||
+	    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5701 ||
+	    tp->pci_chip_rev_id == CHIPREV_ID_5705_A0 ||
+	    (tp->tg3_flags & TG3_FLAG_ENABLE_ASF) != 0)
+		dev->features &= ~NETIF_F_TSO;
+
+#if 1 /* Kill this when 5705 TSO firmware added.  */
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705)
+		dev->features &= ~NETIF_F_TSO;
+#endif
+#endif
+
+	if (tp->pci_chip_rev_id == CHIPREV_ID_5705_A1 &&
+#if TG3_DO_TSO != 0
+	    !(dev->features & NETIF_F_TSO) &&
+#endif
+	    !(tr32(TG3PCI_PCISTATE) & PCISTATE_BUS_SPEED_HIGH))
+		tp->rx_pending = 64;
+
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704)
+		tp->pdev_peer = tg3_find_5704_peer(tp);
 
 	err = tg3_get_device_address(tp);
 	if (err) {
