@@ -146,15 +146,12 @@ extern int diSync(struct inode *);
 /* external references */
 extern int diUpdatePMap(struct inode *ipimap, unsigned long inum,
 			boolean_t is_free, tblock_t * tblk);
-#ifdef _STILL_TO_PORT
-extern int diExtendFS(inode_t * ipimap, inode_t * ipbmap);
-#endif				/* _STILL_TO_PORT */
-
+extern int diExtendFS(struct inode *ipimap, struct inode *ipbmap);
 extern int diMount(struct inode *);
 extern int diUnmount(struct inode *, int);
 extern int diRead(struct inode *);
-extern struct inode *diReadSpecial(struct super_block *, ino_t);
-extern void diWriteSpecial(struct inode *);
+extern struct inode *diReadSpecial(struct super_block *, ino_t, int);
+extern void diWriteSpecial(struct inode *, int);
 extern void diFreeSpecial(struct inode *);
 extern int diWrite(tid_t tid, struct inode *);
 #endif				/* _H_JFS_IMAP */

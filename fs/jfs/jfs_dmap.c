@@ -330,7 +330,7 @@ int dbSync(struct inode *ipbmap)
 	filemap_fdatawait(ipbmap->i_mapping);
 
 	ipbmap->i_state |= I_DIRTY;
-	diWriteSpecial(ipbmap);
+	diWriteSpecial(ipbmap, 0);
 
 	return (0);
 }
@@ -3175,7 +3175,7 @@ static int dbAllocDmapBU(bmap_t * bmp, dmap_t * dp, s64 blkno, int nblocks)
 			dp->wmap[word] |= cpu_to_le32(ONES << (DBWORD - nb)
 						      >> wbitno);
 
-			word += 1;
+			word++;
 		} else {
 			/* one or more dmap words are fully contained
 			 * within the block range.  determine how many
@@ -3187,6 +3187,7 @@ static int dbAllocDmapBU(bmap_t * bmp, dmap_t * dp, s64 blkno, int nblocks)
 
 			/* determine how many bits */
 			nb = nwords << L2DBWORD;
+			word += nwords;
 		}
 	}
 

@@ -310,4 +310,7 @@ extern void txFreelock(struct inode *ip);
 
 extern int lmLog(log_t * log, tblock_t * tblk, lrd_t * lrd, tlock_t * tlck);
 
+extern void txQuiesce(struct super_block *sb);
+
+extern void txResume(struct super_block *sb);
 #endif				/* _H_JFS_TXNMGR */

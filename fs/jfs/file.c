@@ -38,9 +38,7 @@ int jfs_fsync(struct file *file, struct dentry *dentry, int datasync)
 	if (datasync && !(inode->i_state & I_DIRTY_DATASYNC))
 		return rc;
 
-	IWRITE_LOCK(inode);
 	rc |= jfs_commit_inode(inode, 1);
-	IWRITE_UNLOCK(inode);
 
 	return rc ? -EIO : 0;
 }
@@ -64,10 +62,19 @@ void jfs_truncate_nolock(struct inode *ip, loff_t length)
 	do {
 		tid = txBegin(ip->i_sb, 0);
 
+		/*
+		 * The commit_sem cannot be taken before txBegin.
+		 * txBegin may block and there is a chance the inode
+		 * could be marked dirty and need to be committed
+		 * before txBegin unblocks
+		 */
+		down(&JFS_IP(ip)->commit_sem);
+
 		newsize = xtTruncate(tid, ip, length,
 				     COMMIT_TRUNCATE | COMMIT_PWMAP);
 		if (newsize < 0) {
 			txEnd(tid);
+			up(&JFS_IP(ip)->commit_sem);
 			break;
 		}
 
@@ -76,6 +83,7 @@ void jfs_truncate_nolock(struct inode *ip, loff_t length)
 
 		txCommit(tid, 1, &ip, 0);
 		txEnd(tid);
+		up(&JFS_IP(ip)->commit_sem);
 	} while (newsize > length);	/* Truncate isn't always atomic */
 }
 

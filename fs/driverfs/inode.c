@@ -56,7 +56,6 @@ static struct vfsmount *driverfs_mount;
 static spinlock_t mount_lock = SPIN_LOCK_UNLOCKED;
 static int mount_count = 0;
 
-
 static int driverfs_readpage(struct file *file, struct page * page)
 {
 	if (!PageUptodate(page)) {
@@ -690,7 +689,7 @@ void driverfs_remove_file(struct driver_dir_entry * dir, const char * name)
 		if (dentry->d_inode && 
 		    (dentry->d_parent->d_inode == dir->dentry->d_inode)) {
 			driverfs_unlink(dir->dentry->d_inode,dentry);
-			dput(dir->dentry);
+			dput(dentry);
 			put_mount();
 		}
 	}
@@ -722,7 +721,7 @@ void driverfs_remove_dir(struct driver_dir_entry * dir)
 
 		node = node->next;
 		driverfs_unlink(dentry->d_inode,d);
-		dput(dentry);
+		dput(d);
 		put_mount();
 	}
 	up(&dentry->d_inode->i_sem);
