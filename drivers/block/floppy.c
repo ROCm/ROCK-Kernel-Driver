@@ -2293,7 +2293,12 @@ static int do_format(int drive, struct format_descr *tmp_format_req)
 
 static void floppy_end_request(struct request *req, int uptodate)
 {
-	if (end_that_request_first(req, uptodate, current_count_sectors))
+	unsigned int nr_sectors = current_count_sectors;
+
+	/* current_count_sectors can be zero if transfer failed */
+	if (!uptodate)
+		nr_sectors = req->current_nr_sectors;
+	if (end_that_request_first(req, uptodate, nr_sectors))
 		return;
 	add_disk_randomness(req->rq_disk);
 	floppy_off((long)req->rq_disk->private_data);
@@ -3768,7 +3773,7 @@ static int floppy_open(struct inode * inode, struct file * filp)
 	if (UFDCS->rawcmd == 1)
 		UFDCS->rawcmd = 2;
 
-	if (!filp->f_flags & O_NDELAY) {
+	if (!(filp->f_flags & O_NDELAY)) {
 		if (filp->f_mode & 3) {
 			UDRS->last_checked = 0;
 			check_disk_change(inode->i_bdev);
