@@ -44,7 +44,7 @@
 #include <linux/sysctl.h>
 
 static ctl_handler sctp_sysctl_jiffies_ms;
-static long rto_timer_min = 0;
+static long rto_timer_min = 1;
 static long rto_timer_max = 86400000; /* One day */
 
 static ctl_table sctp_table[] = {
