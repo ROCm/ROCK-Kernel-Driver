@@ -69,6 +69,7 @@ static Scsi_Host_Template lasi700_template = {
 	.name		= "LASI SCSI 53c700",
 	.proc_name	= "lasi700",
 	.this_id	= 7,
+	.module		= THIS_MODULE,
 };
 MODULE_DEVICE_TABLE(parisc, lasi700_ids);
 
