@@ -16,12 +16,12 @@
 #include <asm/cacheflush.h>
 #include <asm/tlbflush.h>
 
-static inline void zap_pte(struct mm_struct *mm, pte_t *ptep)
+static inline int zap_pte(struct mm_struct *mm, pte_t *ptep)
 {
 	pte_t pte = *ptep;
 
 	if (pte_none(pte))
-		return;
+		return 0;
 	if (pte_present(pte)) {
 		unsigned long pfn = pte_pfn(pte);
 
@@ -36,9 +36,12 @@ static inline void zap_pte(struct mm_struct *mm, pte_t *ptep)
 				mm->rss--;
 			}
 		}
+		return 1;
 	} else {
-		free_swap_and_cache(pte_to_swp_entry(pte));
+		if (!pte_file(pte))
+			free_swap_and_cache(pte_to_swp_entry(pte));
 		pte_clear(ptep);
+		return 0;
 	}
 }
 
@@ -47,9 +50,9 @@ static inline void zap_pte(struct mm_struct *mm, pte_t *ptep)
  * previously existing mapping.
  */
 int install_page(struct mm_struct *mm, struct vm_area_struct *vma,
-		unsigned long addr, struct page *page, unsigned long prot)
+		unsigned long addr, struct page *page, pgprot_t prot)
 {
-	int err = -ENOMEM;
+	int err = -ENOMEM, flush;
 	pte_t *pte, entry;
 	pgd_t *pgd;
 	pmd_t *pmd;
@@ -69,18 +72,17 @@ int install_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	if (!pte)
 		goto err_unlock;
 
-	zap_pte(mm, pte);
+	flush = zap_pte(mm, pte);
 
 	mm->rss++;
 	flush_page_to_ram(page);
 	flush_icache_page(vma, page);
-	entry = mk_pte(page, protection_map[prot]);
-	if (prot & PROT_WRITE)
-		entry = pte_mkwrite(pte_mkdirty(entry));
+	entry = mk_pte(page, prot);
 	set_pte(pte, entry);
 	pte_chain = page_add_rmap(page, pte, pte_chain);
 	pte_unmap(pte);
-	flush_tlb_page(vma, addr);
+	if (flush)
+		flush_tlb_page(vma, addr);
 
 	spin_unlock(&mm->page_table_lock);
 	pte_chain_free(pte_chain);
@@ -104,26 +106,38 @@ err:
  *
  * this syscall works purely via pagetables, so it's the most efficient
  * way to map the same (large) file into a given virtual window. Unlike
- * mremap()/mmap() it does not create any new vmas.
+ * mmap()/mremap() it does not create any new vmas. The new mappings are
+ * also safe across swapout.
  *
- * The new mappings do not live across swapout, so either use MAP_LOCKED
- * or use PROT_NONE in the original linear mapping and add a special
- * SIGBUS pagefault handler to reinstall zapped mappings.
+ * NOTE: the 'prot' parameter right now is ignored, and the vma's default
+ * protection is used. Arbitrary protections might be implemented in the
+ * future.
  */
 int sys_remap_file_pages(unsigned long start, unsigned long size,
-	unsigned long prot, unsigned long pgoff, unsigned long flags)
+	unsigned long __prot, unsigned long pgoff, unsigned long flags)
 {
 	struct mm_struct *mm = current->mm;
 	unsigned long end = start + size;
 	struct vm_area_struct *vma;
 	int err = -EINVAL;
 
+	if (__prot)
+		return err;
 	/*
 	 * Sanitize the syscall parameters:
 	 */
-	start = PAGE_ALIGN(start);
-	size = PAGE_ALIGN(size);
-	prot &= 0xf;
+	start = start & PAGE_MASK;
+	size = size & PAGE_MASK;
+
+	/* Does the address range wrap, or is the span zero-sized? */
+	if (start + size <= start)
+		return err;
+
+	/* Can we represent this offset inside this architecture's pte's? */
+#if PTE_FILE_MAX_BITS < BITS_PER_LONG
+	if (pgoff + (size >> PAGE_SHIFT) >= (1UL << PTE_FILE_MAX_BITS))
+		return err;
+#endif
 
 	down_read(&mm->mmap_sem);
 
@@ -136,15 +150,9 @@ int sys_remap_file_pages(unsigned long start, unsigned long size,
 	if (vma && (vma->vm_flags & VM_SHARED) &&
 		vma->vm_ops && vma->vm_ops->populate &&
 			end > start && start >= vma->vm_start &&
-				end <= vma->vm_end) {
-		/*
-		 * Change the default protection to PROT_NONE:
-		 */
-		if (pgprot_val(vma->vm_page_prot) != pgprot_val(__S000))
-			vma->vm_page_prot = __S000;
-		err = vma->vm_ops->populate(vma, start, size, prot,
-						pgoff, flags & MAP_NONBLOCK);
-	}
+				end <= vma->vm_end)
+		err = vma->vm_ops->populate(vma, start, size, vma->vm_page_prot,
+				pgoff, flags & MAP_NONBLOCK);
 
 	up_read(&mm->mmap_sem);
 

@@ -1195,7 +1195,7 @@ err:
 static int filemap_populate(struct vm_area_struct *vma,
 			unsigned long addr,
 			unsigned long len,
-			unsigned long prot,
+			pgprot_t prot,
 			unsigned long pgoff,
 			int nonblock)
 {

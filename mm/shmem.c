@@ -945,7 +945,7 @@ struct page *shmem_nopage(struct vm_area_struct *vma, unsigned long address, int
 
 static int shmem_populate(struct vm_area_struct *vma,
 	unsigned long addr, unsigned long len,
-	unsigned long prot, unsigned long pgoff, int nonblock)
+	pgprot_t prot, unsigned long pgoff, int nonblock)
 {
 	struct inode *inode = vma->vm_file->f_dentry->d_inode;
 	struct mm_struct *mm = vma->vm_mm;
