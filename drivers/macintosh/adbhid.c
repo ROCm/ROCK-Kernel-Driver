@@ -574,6 +574,7 @@ adbhid_input_register(int id, int default_id, int original_handler_id,
 	adbhid[id]->input.id.vendor = 0x0001;
 	adbhid[id]->input.id.product = (id << 12) | (default_id << 8) | original_handler_id;
 	adbhid[id]->input.id.version = 0x0100;
+	sprintf(adbhid[id]->input.cdev.class_id,"adbhid%d", id);
 
 	switch (default_id) {
 	case ADB_KEYBOARD:

@@ -507,7 +507,8 @@ void input_register_device(struct input_dev *dev)
 	
 	dev->cdev.dev = get_device(dev->dev);
 	if (class_device_register(&dev->cdev)) {
-		put_device(dev->dev);
+		if (dev->dev)
+			put_device(dev->dev);
 		return;
 	}
 

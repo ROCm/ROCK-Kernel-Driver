@@ -119,6 +119,7 @@ static void emumousebtn_input_register(void)
 	emumousebtn.id.vendor = 0x0001;
 	emumousebtn.id.product = 0x0001;
 	emumousebtn.id.version = 0x0100;
+	sprintf(emumousebtn.cdev.class_id,"emumousebtn");
 
 	input_register_device(&emumousebtn);
 
