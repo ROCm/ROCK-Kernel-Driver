@@ -504,27 +504,21 @@ got_block:
 	/*
 	 * Do block preallocation now if required.
 	 */
-	/* Writer: ->i_prealloc* */
+	write_lock(&EXT2_I(inode)->i_meta_lock);
 	if (group_alloc && !*prealloc_count) {
-		unsigned long next_block = block + 1;
+		unsigned n;
 
-		*prealloc_block = next_block;
-		/* Writer: end */
-		while (group_alloc && ++j < group_size) {
-			/* Writer: ->i_prealloc* */
-			if (*prealloc_block + *prealloc_count != next_block ||
-			    ext2_set_bit (j, bh->b_data)) {
-				/* Writer: end */
+		for (n = 0; n < group_alloc && ++j < group_size; n++) {
+			if (ext2_set_bit (j, bh->b_data))
  				break;
-			}
-			(*prealloc_count)++;
-			/* Writer: end */
-			next_block++;
-			es_alloc--;
-			dq_alloc--;
-			group_alloc--;
-		}	
+		}
+		*prealloc_block = block + 1;
+		*prealloc_count = n;
+		es_alloc -= n;
+		dq_alloc -= n;
+		group_alloc -= n;
 	}
+	write_unlock(&EXT2_I(inode->i_meta_lock);
 
 	mark_buffer_dirty(bh);
 	if (sb->s_flags & MS_SYNCHRONOUS) {

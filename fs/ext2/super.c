@@ -168,8 +168,10 @@ static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
 	struct ext2_inode_info *ei = (struct ext2_inode_info *) foo;
 
 	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
-	    SLAB_CTOR_CONSTRUCTOR)
+	    SLAB_CTOR_CONSTRUCTOR) {
+		rwlock_init(&ei->i_meta_lock);
 		inode_init_once(&ei->vfs_inode);
+	}
 }
  
 static int init_inodecache(void)

@@ -34,7 +34,6 @@ MODULE_AUTHOR("Remy Card and others");
 MODULE_DESCRIPTION("Second Extended Filesystem");
 MODULE_LICENSE("GPL");
 
-
 static int ext2_update_inode(struct inode * inode, int do_sync);
 
 /*
@@ -50,8 +49,6 @@ void ext2_put_inode (struct inode * inode)
  */
 void ext2_delete_inode (struct inode * inode)
 {
-	lock_kernel();
-
 	if (is_bad_inode(inode) ||
 	    inode->i_ino == EXT2_ACL_IDX_INO ||
 	    inode->i_ino == EXT2_ACL_DATA_INO)
@@ -59,15 +56,16 @@ void ext2_delete_inode (struct inode * inode)
 	EXT2_I(inode)->i_dtime	= CURRENT_TIME;
 	mark_inode_dirty(inode);
 	ext2_update_inode(inode, IS_SYNC(inode));
+
+	lock_kernel();
 	inode->i_size = 0;
 	if (inode->i_blocks)
 		ext2_truncate (inode);
 	ext2_free_inode (inode);
-
 	unlock_kernel();
+
 	return;
 no_delete:
-	unlock_kernel();
 	clear_inode(inode);	/* We must guarantee clearing of inode... */
 }
 
@@ -75,17 +73,17 @@ void ext2_discard_prealloc (struct inode * inode)
 {
 #ifdef EXT2_PREALLOCATE
 	struct ext2_inode_info *ei = EXT2_I(inode);
-	lock_kernel();
-	/* Writer: ->i_prealloc* */
+	write_lock(&ei->i_meta_lock);
 	if (ei->i_prealloc_count) {
 		unsigned short total = ei->i_prealloc_count;
 		unsigned long block = ei->i_prealloc_block;
 		ei->i_prealloc_count = 0;
 		ei->i_prealloc_block = 0;
-		/* Writer: end */
+		write_unlock(&ei->i_meta_lock);
 		ext2_free_blocks (inode, block, total);
-	}
-	unlock_kernel();
+		return;
+	} else
+		write_unlock(&ei->i_meta_lock);
 #endif
 }
 
@@ -99,17 +97,17 @@ static int ext2_alloc_block (struct inode * inode, unsigned long goal, int *err)
 
 #ifdef EXT2_PREALLOCATE
 	struct ext2_inode_info *ei = EXT2_I(inode);
-	/* Writer: ->i_prealloc* */
+	write_lock(&ei->i_meta_lock);
 	if (ei->i_prealloc_count &&
-	    (goal == ei->i_prealloc_block ||
-	     goal + 1 == ei->i_prealloc_block))
-	{		
+	    (goal == ei->i_prealloc_block || goal + 1 == ei->i_prealloc_block))
+	{
 		result = ei->i_prealloc_block++;
 		ei->i_prealloc_count--;
-		/* Writer: end */
+		write_unlock(&ei->i_meta_lock);
 		ext2_debug ("preallocation hit (%lu/%lu).\n",
 			    ++alloc_hits, ++alloc_attempts);
 	} else {
+		write_unlock(&ei->i_meta_lock);
 		ext2_discard_prealloc (inode);
 		ext2_debug ("preallocation miss (%lu/%lu).\n",
 			    alloc_hits, ++alloc_attempts);
@@ -253,17 +251,18 @@ static Indirect *ext2_get_branch(struct inode *inode,
 		bh = sb_bread(sb, le32_to_cpu(p->key));
 		if (!bh)
 			goto failure;
-		/* Reader: pointers */
+		read_lock(&EXT2_I(inode)->i_meta_lock);
 		if (!verify_chain(chain, p))
 			goto changed;
 		add_chain(++p, bh, (u32*)bh->b_data + *++offsets);
-		/* Reader: end */
+		read_unlock(&EXT2_I(inode)->i_meta_lock);
 		if (!p->key)
 			goto no_block;
 	}
 	return NULL;
 
 changed:
+	read_unlock(&EXT2_I(inode)->i_meta_lock);
 	*err = -EAGAIN;
 	goto no_block;
 failure:
@@ -329,13 +328,11 @@ static inline int ext2_find_goal(struct inode *inode,
 				 unsigned long *goal)
 {
 	struct ext2_inode_info *ei = EXT2_I(inode);
-	/* Writer: ->i_next_alloc* */
+	write_lock(&ei->i_meta_lock);
 	if (block == ei->i_next_alloc_block + 1) {
 		ei->i_next_alloc_block++;
 		ei->i_next_alloc_goal++;
 	} 
-	/* Writer: end */
-	/* Reader: pointers, ->i_next_alloc* */
 	if (verify_chain(chain, partial)) {
 		/*
 		 * try the heuristic for sequential allocation,
@@ -345,9 +342,10 @@ static inline int ext2_find_goal(struct inode *inode,
 			*goal = ei->i_next_alloc_goal;
 		if (!*goal)
 			*goal = ext2_find_near(inode, partial);
+		write_unlock(&ei->i_meta_lock);
 		return 0;
 	}
-	/* Reader: end */
+	write_unlock(&ei->i_meta_lock);
 	return -EAGAIN;
 }
 
@@ -454,9 +452,8 @@ static inline int ext2_splice_branch(struct inode *inode,
 
 	/* Verify that place we are splicing to is still there and vacant */
 
-	/* Writer: pointers, ->i_next_alloc* */
+	write_lock(&ei->i_meta_lock);
 	if (!verify_chain(chain, where-1) || *where->p)
-		/* Writer: end */
 		goto changed;
 
 	/* That's it */
@@ -465,7 +462,7 @@ static inline int ext2_splice_branch(struct inode *inode,
 	ei->i_next_alloc_block = block;
 	ei->i_next_alloc_goal = le32_to_cpu(where[num-1].key);
 
-	/* Writer: end */
+	write_unlock(&ei->i_meta_lock);
 
 	/* We are done with atomic stuff, now do the rest of housekeeping */
 
@@ -487,6 +484,7 @@ static inline int ext2_splice_branch(struct inode *inode,
 	return 0;
 
 changed:
+	write_unlock(&ei->i_meta_lock);
 	for (i = 1; i < num; i++)
 		bforget(where[i].bh);
 	for (i = 0; i < num; i++)
@@ -520,7 +518,6 @@ static int ext2_get_block(struct inode *inode, sector_t iblock, struct buffer_he
 	if (depth == 0)
 		goto out;
 
-	lock_kernel();
 reread:
 	partial = ext2_get_branch(inode, depth, offsets, chain, &err);
 
@@ -540,7 +537,6 @@ cleanup:
 			brelse(partial->bh);
 			partial--;
 		}
-		unlock_kernel();
 out:
 		return err;
 	}
@@ -666,16 +662,17 @@ static Indirect *ext2_find_shared(struct inode *inode,
 	for (k = depth; k > 1 && !offsets[k-1]; k--)
 		;
 	partial = ext2_get_branch(inode, k, offsets, chain, &err);
-	/* Writer: pointers */
 	if (!partial)
 		partial = chain + k-1;
 	/*
 	 * If the branch acquired continuation since we've looked at it -
 	 * fine, it should all survive and (new) top doesn't belong to us.
 	 */
-	if (!partial->key && *partial->p)
-		/* Writer: end */
+	write_lock(&EXT2_I(inode)->i_meta_lock);
+	if (!partial->key && *partial->p) {
+		write_unlock(&EXT2_I(inode)->i_meta_lock);
 		goto no_top;
+	}
 	for (p=partial; p>chain && all_zeroes((u32*)p->bh->b_data,p->p); p--)
 		;
 	/*
@@ -690,7 +687,7 @@ static Indirect *ext2_find_shared(struct inode *inode,
 		*top = *p->p;
 		*p->p = 0;
 	}
-	/* Writer: end */
+	write_unlock(&EXT2_I(inode)->i_meta_lock);
 
 	while(partial > p)
 	{
@@ -804,6 +801,7 @@ void ext2_truncate (struct inode * inode)
 	if (IS_APPEND(inode) || IS_IMMUTABLE(inode))
 		return;
 
+	unlock_kernel();
 	ext2_discard_prealloc(inode);
 
 	blocksize = inode->i_sb->s_blocksize;
@@ -877,6 +875,7 @@ do_indirects:
 		ext2_sync_inode (inode);
 	else
 		mark_inode_dirty(inode);
+	lock_kernel();
 }
 
 void ext2_read_inode (struct inode * inode)
@@ -1157,9 +1156,7 @@ static int ext2_update_inode(struct inode * inode, int do_sync)
 
 void ext2_write_inode (struct inode * inode, int wait)
 {
-	lock_kernel();
 	ext2_update_inode (inode, wait);
-	unlock_kernel();
 }
 
 int ext2_sync_inode (struct inode *inode)
