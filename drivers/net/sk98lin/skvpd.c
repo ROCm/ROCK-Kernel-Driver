@@ -468,6 +468,17 @@ SK_IOC	IoC)	/* IO Context */
 	
 	pAC->vpd.vpd_size = vpd_size;
 
+	/* Asus K8V Se Deluxe bugfix. Correct VPD content */
+	/* MBo April 2004 */
+	if (((unsigned char)pAC->vpd.vpd_buf[0x3f] == 0x38) &&
+	    ((unsigned char)pAC->vpd.vpd_buf[0x40] == 0x3c) &&
+	    ((unsigned char)pAC->vpd.vpd_buf[0x41] == 0x45)) {
+		printk("sk98lin: Asus mainboard with buggy VPD? "
+				"Correcting data.\n");
+		pAC->vpd.vpd_buf[0x40] = 0x38;
+	}
+
+
 	/* find the end tag of the RO area */
 	if (!(r = vpd_find_para(pAC, VPD_RV, &rp))) {
 		SK_DBG_MSG(pAC, SK_DBGMOD_VPD, SK_DBGCAT_ERR | SK_DBGCAT_FATAL,

@@ -1156,7 +1156,7 @@ core99_usb_enable(struct device_node* node, long param, long value)
 			(void)MACIO_IN32(KEYLARGO_FCR1);
 			mdelay(1);
 			LOCK(flags);
-			MACIO_BIS(KEYLARGO_FCR0, KL1_USB2_CELL_ENABLE);
+			MACIO_BIS(KEYLARGO_FCR1, KL1_USB2_CELL_ENABLE);
 		}
 		if (number < 4) {
 			reg = MACIO_IN32(KEYLARGO_FCR4);

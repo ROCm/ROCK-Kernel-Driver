@@ -1733,10 +1733,7 @@ static struct pci_driver w840_driver = {
 
 static int __init w840_init(void)
 {
-/* when a module, this is printed whether or not devices are found in probe */
-#ifdef MODULE
 	printk(version);
-#endif
 	return pci_module_init(&w840_driver);
 }
 

@@ -8,7 +8,7 @@
  * This hopefully works with any (fixed) IA-64 page-size, as defined
  * in <asm/page.h> (currently 8192).
  *
- * Copyright (C) 1998-2003 Hewlett-Packard Co
+ * Copyright (C) 1998-2004 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
@@ -475,6 +475,42 @@ extern void hugetlb_free_pgtables(struct mmu_gather *tlb,
  * flushing that may be necessary.
  */
 extern void update_mmu_cache (struct vm_area_struct *vma, unsigned long vaddr, pte_t pte);
+
+#define __HAVE_ARCH_PTEP_SET_ACCESS_FLAGS
+/*
+ * Update PTEP with ENTRY, which is guaranteed to be a less
+ * restrictive PTE.  That is, ENTRY may have the ACCESSED, DIRTY, and
+ * WRITABLE bits turned on, when the value at PTEP did not.  The
+ * WRITABLE bit may only be turned if SAFELY_WRITABLE is TRUE.
+ *
+ * SAFELY_WRITABLE is TRUE if we can update the value at PTEP without
+ * having to worry about races.  On SMP machines, there are only two
+ * cases where this is true:
+ *
+ *	(1) *PTEP has the PRESENT bit turned OFF
+ *	(2) ENTRY has the DIRTY bit turned ON
+ *
+ * On ia64, we could implement this routine with a cmpxchg()-loop
+ * which ORs in the _PAGE_A/_PAGE_D bit if they're set in ENTRY.
+ * However, like on x86, we can get a more streamlined version by
+ * observing that it is OK to drop ACCESSED bit updates when
+ * SAFELY_WRITABLE is FALSE.  Besides being rare, all that would do is
+ * result in an extra Access-bit fault, which would then turn on the
+ * ACCESSED bit in the low-level fault handler (iaccess_bit or
+ * daccess_bit in ivt.S).
+ */
+#ifdef CONFIG_SMP
+# define ptep_set_access_flags(__vma, __addr, __ptep, __entry, __safely_writable)	\
+do {											\
+	if (__safely_writable) {							\
+		set_pte(__ptep, __entry);						\
+		flush_tlb_page(__vma, __addr);						\
+	}										\
+} while (0)
+#else
+# define ptep_set_access_flags(__vma, __addr, __ptep, __entry, __safely_writable)	\
+	ptep_establish(__vma, __addr, __ptep, __entry)
+#endif
 
 #  ifdef CONFIG_VIRTUAL_MEM_MAP
   /* arch mem_map init routine is needed due to holes in a virtual mem_map */

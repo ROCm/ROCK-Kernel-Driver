@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2004 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -29,46 +29,44 @@
  *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef __XFS_SUPPORT_SPIN_H__
-#define __XFS_SUPPORT_SPIN_H__
-
-#include <linux/sched.h>	/* preempt needs this */
-#include <linux/spinlock.h>
 
 /*
- * Map lock_t from IRIX to Linux spinlocks.
- *
- * Note that linux turns on/off spinlocks depending on CONFIG_SMP.
- * We don't need to worry about SMP or not here.
+ * This file contains globals needed by XFS that were normally defined
+ * somewhere else in IRIX.
  */
 
-#define SPLDECL(s)		unsigned long s
+#include "xfs.h"
+#include "xfs_cred.h"
+#include "xfs_sysctl.h"
 
-typedef spinlock_t lock_t;
+/*
+ * System memory size - used to scale certain data structures in XFS.
+ */
+unsigned long xfs_physmem;
 
-#define spinlock_init(lock, name)	spin_lock_init(lock)
-#define	spinlock_destroy(lock)
+/*
+ * Tunable XFS parameters.  xfs_params is required even when CONFIG_SYSCTL=n,
+ * other XFS code uses these values.  Times are measured in centisecs (i.e.
+ * 100ths of a second).
+ */
+xfs_param_t xfs_params = {
+			  /*	MIN		DFLT		MAX	*/
+	.restrict_chown	= {	0,		1,		1	},
+	.sgid_inherit	= {	0,		0,		1	},
+	.symlink_mode	= {	0,		0,		1	},
+	.panic_mask	= {	0,		0,		127	},
+	.error_level	= {	0,		3,		11	},
+	.syncd_timer	= {	1*100,		30*100,		7200*100},
+	.stats_clear	= {	0,		0,		1	},
+	.inherit_sync	= {	0,		1,		1	},
+	.inherit_nodump	= {	0,		1,		1	},
+	.inherit_noatim = {	0,		1,		1	},
+	.xfs_buf_timer	= {	100/2,		1*100,		30*100	},
+	.xfs_buf_age	= {	1*100,		15*100,		7200*100},
+};
 
-static inline unsigned long mutex_spinlock(lock_t *lock)
-{
-	spin_lock(lock);
-	return 0;
-}
+/*
+ * Global system credential structure.
+ */
+cred_t sys_cred_val, *sys_cred = &sys_cred_val;
 
-/*ARGSUSED*/
-static inline void mutex_spinunlock(lock_t *lock, unsigned long s)
-{
-	spin_unlock(lock);
-}
-
-static inline void nested_spinlock(lock_t *lock)
-{
-	spin_lock(lock);
-}
-
-static inline void nested_spinunlock(lock_t *lock)
-{
-	spin_unlock(lock);
-}
-
-#endif /* __XFS_SUPPORT_SPIN_H__ */
