@@ -30,6 +30,8 @@
 #include "cifs_debug.h"
 #include "cifs_fs_sb.h"
 
+extern int is_size_safe_to_change(struct cifsInodeInfo *);
+
 int
 cifs_get_inode_info_unix(struct inode **pinode,
 			 const unsigned char *search_path,
@@ -42,9 +44,6 @@ cifs_get_inode_info_unix(struct inode **pinode,
 	struct inode *inode;
 	struct cifs_sb_info *cifs_sb = CIFS_SB(sb);
 	char *tmp_path;
-
-/* BB add caching check so we do not go to server to overwrite inode info to cached file
-	where the local file sizes are correct and the server info is stale  BB */
 
 	xid = GetXid();
 
@@ -125,7 +124,12 @@ cifs_get_inode_info_unix(struct inode **pinode,
 		inode->i_nlink = le64_to_cpu(findData.Nlinks);
 		findData.NumOfBytes = le64_to_cpu(findData.NumOfBytes);
 		findData.EndOfFile = le64_to_cpu(findData.EndOfFile);
-		i_size_write(inode,findData.EndOfFile);
+
+		if(is_size_safe_to_change(cifsInfo)) {
+		/* can not safely change the file size here if the 
+		   client is writing to it due to potential races */
+
+			i_size_write(inode,findData.EndOfFile);
 /* blksize needs to be multiple of two. So safer to default to blksize
 	and blkbits set in superblock so 2**blkbits and blksize will match */
 /*		inode->i_blksize =
@@ -141,7 +145,8 @@ cifs_get_inode_info_unix(struct inode **pinode,
 
 		/* 512 bytes (2**9) is the fake blocksize that must be used */
 		/* for this calculation */
-		inode->i_blocks = (512 - 1 + findData.NumOfBytes) >> 9;
+			inode->i_blocks = (512 - 1 + findData.NumOfBytes) >> 9;
+		}
 
 		if (findData.NumOfBytes < findData.EndOfFile)
 			cFYI(1, ("Server inconsistency Error: it says allocation size less than end of file "));
@@ -283,12 +288,18 @@ cifs_get_inode_info(struct inode **pinode, const unsigned char *search_path,
 				inode->i_mode &= ~(S_IWUGO);
    /* BB add code here - validate if device or weird share or device type? */
 		}
-		i_size_write(inode,le64_to_cpu(pfindData->EndOfFile));
-		pfindData->AllocationSize = le64_to_cpu(pfindData->AllocationSize);
+		if(is_size_safe_to_change(cifsInfo)) {
+		/* can not safely change the file size here if the 
+		client is writing to it due to potential races */
+
+			i_size_write(inode,le64_to_cpu(pfindData->EndOfFile));
 
 		/* 512 bytes (2**9) is the fake blocksize that must be used */
 		/* for this calculation */
-		inode->i_blocks = (512 - 1 + pfindData->AllocationSize) >> 9;
+			inode->i_blocks = (512 - 1 + pfindData->AllocationSize)
+				 >> 9;
+		}
+		pfindData->AllocationSize = le64_to_cpu(pfindData->AllocationSize);
 
 		inode->i_nlink = le32_to_cpu(pfindData->NumberOfLinks);
 
