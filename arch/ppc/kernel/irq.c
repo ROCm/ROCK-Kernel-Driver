@@ -628,7 +628,9 @@ static int prof_cpu_mask_read_proc (char *page, char **start, off_t off,
 static int prof_cpu_mask_write_proc (struct file *file, const char __user *buffer,
 					unsigned long count, void *data)
 {
-	cpumask_t *mask = (cpumask_t *)data, full_count = count, err;
+	int err;
+	int full_count = count;
+	cpumask_t *mask = (cpumask_t *)data;
 	cpumask_t new_value;
 
 	err = cpumask_parse(buffer, count, new_value);
