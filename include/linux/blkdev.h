@@ -22,7 +22,7 @@ typedef struct elevator_s elevator_t;
 struct request_pm_state;
 
 #define BLKDEV_MIN_RQ	4
-#define BLKDEV_MAX_RQ	128
+#define BLKDEV_MAX_RQ	128	/* Default maximum */
 
 struct request_list {
 	int count[2];
@@ -269,8 +269,15 @@ struct request_queue
 	spinlock_t		*queue_lock;
 
 	/*
+	 * queue kobject
+	 */
+	struct kobject kobj;
+
+	/*
 	 * queue settings
 	 */
+	unsigned long		nr_requests;	/* Max # of requests */
+
 	unsigned short		max_sectors;
 	unsigned short		max_phys_segments;
 	unsigned short		max_hw_segments;
@@ -398,6 +405,8 @@ struct sec_size {
 	unsigned block_size_bits;
 };
 
+extern int blk_register_queue(struct gendisk *disk);
+extern void blk_unregister_queue(struct gendisk *disk);
 extern void register_disk(struct gendisk *dev);
 extern void generic_make_request(struct bio *bio);
 extern void blk_put_request(struct request *);

@@ -42,12 +42,6 @@ static kmem_cache_t *request_cachep;
 static LIST_HEAD(blk_plug_list);
 static spinlock_t blk_plug_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 
-/*
- * Number of requests per queue.  This many for reads and for writes (twice
- * this number, total).
- */
-static int queue_nr_requests;
-
 static wait_queue_head_t congestion_wqh[2];
 
 /*
@@ -57,9 +51,9 @@ static struct workqueue_struct *kblockd_workqueue;
 
 unsigned long blk_max_low_pfn, blk_max_pfn;
 
-static inline int batch_requests(void)
+static inline int batch_requests(struct request_queue *q)
 {
-	return min(BLKDEV_MAX_RQ / 8, 8);
+	return min(q->nr_requests / 8, 8UL);
 }
 
 /*
@@ -67,11 +61,11 @@ static inline int batch_requests(void)
  * considered to be congested.  It include a little hysteresis to keep the
  * context switch rate down.
  */
-static inline int queue_congestion_on_threshold(void)
+static inline int queue_congestion_on_threshold(struct request_queue *q)
 {
 	int ret;
 
-	ret = queue_nr_requests / 8 - 1;
+	ret = q->nr_requests / 8 - 1;
 	if (ret < 0)
 		ret = 1;
 	return ret;
@@ -80,13 +74,13 @@ static inline int queue_congestion_on_threshold(void)
 /*
  * The threshold at which a queue is considered to be uncongested
  */
-static inline int queue_congestion_off_threshold(void)
+static inline int queue_congestion_off_threshold(struct request_queue *q)
 {
 	int ret;
 
-	ret = queue_nr_requests / 8 + 1;
-	if (ret > queue_nr_requests)
-		ret = queue_nr_requests;
+	ret = q->nr_requests / 8 + 1;
+	if (ret > q->nr_requests)
+		ret = q->nr_requests;
 	return ret;
 }
 
@@ -199,6 +193,7 @@ void blk_queue_make_request(request_queue_t * q, make_request_fn * mfn)
 	/*
 	 * set defaults
 	 */
+	q->nr_requests = BLKDEV_MAX_RQ;
 	q->max_phys_segments = MAX_PHYS_SEGMENTS;
 	q->max_hw_segments = MAX_HW_SEGMENTS;
 	q->make_request_fn = mfn;
@@ -452,13 +447,15 @@ void blk_queue_free_tags(request_queue_t *q)
 	q->queue_flags &= ~(1 << QUEUE_FLAG_QUEUED);
 }
 
-static int init_tag_map(struct blk_queue_tag *tags, int depth)
+static int
+init_tag_map(request_queue_t *q, struct blk_queue_tag *tags, int depth)
 {
 	int bits, i;
 
-	if (depth > (queue_nr_requests*2)) {
-		depth = (queue_nr_requests*2);
-		printk(KERN_ERR "%s: adjusted depth to %d\n", __FUNCTION__, depth);
+	if (depth > q->nr_requests * 2) {
+		depth = q->nr_requests * 2;
+		printk(KERN_ERR "%s: adjusted depth to %d\n",
+				__FUNCTION__, depth);
 	}
 
 	tags->tag_index = kmalloc(depth * sizeof(struct request *), GFP_ATOMIC);
@@ -487,7 +484,6 @@ fail:
 	return -ENOMEM;
 }
 
-
 /**
  * blk_queue_init_tags - initialize the queue tag info
  * @q:  the request queue for the device
@@ -501,7 +497,7 @@ int blk_queue_init_tags(request_queue_t *q, int depth)
 	if (!tags)
 		goto fail;
 
-	if (init_tag_map(tags, depth))
+	if (init_tag_map(q, tags, depth))
 		goto fail;
 
 	INIT_LIST_HEAD(&tags->busy_list);
@@ -551,7 +547,7 @@ int blk_queue_resize_tags(request_queue_t *q, int new_depth)
 	tag_map = bqt->tag_map;
 	max_depth = bqt->real_max_depth;
 
-	if (init_tag_map(bqt, new_depth))
+	if (init_tag_map(q, bqt, new_depth))
 		return -ENOMEM;
 
 	memcpy(bqt->tag_index, tag_index, max_depth * sizeof(struct request *));
@@ -1315,12 +1311,12 @@ static struct request *get_request(request_queue_t *q, int rw, int gfp_mask)
 	struct request_list *rl = &q->rq;
 
 	spin_lock_irq(q->queue_lock);
-	if (rl->count[rw] == BLKDEV_MAX_RQ || !elv_may_queue(q, rw)) {
+	if (rl->count[rw] >= q->nr_requests || !elv_may_queue(q, rw)) {
 		spin_unlock_irq(q->queue_lock);
 		goto out;
 	}
 	rl->count[rw]++;
-	if ((BLKDEV_MAX_RQ - rl->count[rw]) < queue_congestion_on_threshold())
+	if ((q->nr_requests - rl->count[rw]) < queue_congestion_on_threshold(q))
 		set_queue_congested(q, rw);
 	spin_unlock_irq(q->queue_lock);
 
@@ -1328,7 +1324,7 @@ static struct request *get_request(request_queue_t *q, int rw, int gfp_mask)
 	if (!rq) {
 		spin_lock_irq(q->queue_lock);
 		rl->count[rw]--;
-		if ((BLKDEV_MAX_RQ - rl->count[rw]) >= queue_congestion_off_threshold())
+		if ((q->nr_requests - rl->count[rw]) >= queue_congestion_off_threshold(q))
                         clear_queue_congested(q, rw);
 		spin_unlock_irq(q->queue_lock);
 		goto out;
@@ -1549,10 +1545,10 @@ void __blk_put_request(request_queue_t *q, struct request *req)
 		blk_free_request(q, req);
 
 		rl->count[rw]--;
-		if ((BLKDEV_MAX_RQ - rl->count[rw]) >=
-				queue_congestion_off_threshold())
+		if ((q->nr_requests - rl->count[rw]) >=
+				queue_congestion_off_threshold(q))
 			clear_queue_congested(q, rw);
-		if ((BLKDEV_MAX_RQ - rl->count[rw]) >= batch_requests() &&
+		if ((q->nr_requests - rl->count[rw]) >= batch_requests(q) &&
 				waitqueue_active(&rl->wait[rw]))
 			wake_up(&rl->wait[rw]);
 	}
@@ -2360,14 +2356,6 @@ int __init blk_dev_init(void)
 	if (!request_cachep)
 		panic("Can't create request pool slab cache\n");
 
-	queue_nr_requests = BLKDEV_MAX_RQ;
-
-	printk("block request queues:\n");
-	printk(" %d/%d requests per read queue\n", BLKDEV_MIN_RQ, queue_nr_requests);
-	printk(" %d/%d requests per write queue\n", BLKDEV_MIN_RQ, queue_nr_requests);
-	printk(" enter congestion at %d\n", queue_congestion_on_threshold());
-	printk(" exit congestion at %d\n", queue_congestion_off_threshold());
-
 	blk_max_low_pfn = max_low_pfn;
 	blk_max_pfn = max_pfn;
 
@@ -2375,6 +2363,153 @@ int __init blk_dev_init(void)
 		init_waitqueue_head(&congestion_wqh[i]);
 	return 0;
 }
+
+/*
+ * sysfs parts below
+ */
+struct queue_sysfs_entry {
+	struct attribute attr;
+	ssize_t (*show)(struct request_queue *, char *);
+	ssize_t (*store)(struct request_queue *, const char *, size_t);
+};
+
+static ssize_t
+queue_var_show(unsigned int var, char *page)
+{
+	return sprintf(page, "%d\n", var);
+}
+
+static ssize_t
+queue_var_store(unsigned long *var, const char *page, size_t count)
+{
+	char *p = (char *) page;
+
+	*var = simple_strtoul(p, &p, 10);
+	return count;
+}
+
+static ssize_t queue_requests_show(struct request_queue *q, char *page)
+{
+	return queue_var_show(q->nr_requests, (page));
+}
+
+static ssize_t
+queue_requests_store(struct request_queue *q, const char *page, size_t count)
+{
+	struct request_list *rl = &q->rq;
+
+	int ret = queue_var_store(&q->nr_requests, page, count);
+	if (q->nr_requests < BLKDEV_MIN_RQ)
+		q->nr_requests = BLKDEV_MIN_RQ;
+
+	if ((q->nr_requests - rl->count[READ]) <
+				queue_congestion_on_threshold(q))
+		set_queue_congested(q, READ);
+	else if ((q->nr_requests - rl->count[READ]) >=
+				queue_congestion_off_threshold(q))
+		clear_queue_congested(q, READ);
+
+	if ((q->nr_requests - rl->count[READ]) <
+				queue_congestion_on_threshold(q))
+		set_queue_congested(q, READ);
+	else if ((q->nr_requests - rl->count[READ]) >=
+				queue_congestion_off_threshold(q))
+		clear_queue_congested(q, READ);
+
+	return ret;
+}
+
+static struct queue_sysfs_entry queue_requests_entry = {
+	.attr = {.name = "nr_requests", .mode = S_IRUGO | S_IWUSR },
+	.show = queue_requests_show,
+	.store = queue_requests_store,
+};
+
+static struct attribute *default_attrs[] = {
+	&queue_requests_entry.attr,
+	NULL,
+};
+
+#define to_queue(atr) container_of((atr), struct queue_sysfs_entry, attr)
+
+static ssize_t
+queue_attr_show(struct kobject *kobj, struct attribute *attr, char *page)
+{
+	struct queue_sysfs_entry *entry = to_queue(attr);
+	struct request_queue *q;
+
+	q = container_of(kobj, struct request_queue, kobj);
+	if (!entry->show)
+		return 0;
+
+	return entry->show(q, page);
+}
+
+static ssize_t
+queue_attr_store(struct kobject *kobj, struct attribute *attr,
+		    const char *page, size_t length)
+{
+	struct queue_sysfs_entry *entry = to_queue(attr);
+	struct request_queue *q;
+
+	q = container_of(kobj, struct request_queue, kobj);
+	if (!entry->store)
+		return -EINVAL;
+
+	return entry->store(q, page, length);
+}
+
+static struct sysfs_ops queue_sysfs_ops = {
+	.show	= queue_attr_show,
+	.store	= queue_attr_store,
+};
+
+struct kobj_type queue_ktype = {
+	.sysfs_ops	= &queue_sysfs_ops,
+	.default_attrs	= default_attrs,
+};
+
+int blk_register_queue(struct gendisk *disk)
+{
+	int ret;
+
+	request_queue_t *q = disk->queue;
+
+	if (!q)
+		return -ENXIO;
+
+	q->kobj.parent = kobject_get(&disk->kobj);
+	if (!q->kobj.parent)
+		return -EBUSY;
+
+	snprintf(q->kobj.name, KOBJ_NAME_LEN, "%s", "queue");
+	q->kobj.ktype = &queue_ktype;
+
+	ret = kobject_register(&q->kobj);
+	if (ret < 0)
+		return ret;
+
+	ret = elv_register_queue(q);
+	if (ret) {
+		kobject_unregister(&q->kobj);
+		return ret;
+	}
+
+	return 0;
+}
+
+void blk_unregister_queue(struct gendisk *disk)
+{
+	request_queue_t *q = disk->queue;
+
+	if (q) {
+		elv_unregister_queue(q);
+
+		kobject_unregister(&q->kobj);
+		kobject_put(&disk->kobj);
+	}
+}
+
 
 EXPORT_SYMBOL(process_that_request_first);
 EXPORT_SYMBOL(end_that_request_first);

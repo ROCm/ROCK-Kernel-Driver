@@ -191,7 +191,7 @@ void add_disk(struct gendisk *disk)
 	blk_register_region(MKDEV(disk->major, disk->first_minor),
 			    disk->minors, NULL, exact_match, exact_lock, disk);
 	register_disk(disk);
-	elv_register_queue(disk);
+	blk_register_queue(disk);
 }
 
 EXPORT_SYMBOL(add_disk);
@@ -199,7 +199,7 @@ EXPORT_SYMBOL(del_gendisk);	/* in partitions/check.c */
 
 void unlink_gendisk(struct gendisk *disk)
 {
-	elv_unregister_queue(disk);
+	blk_unregister_queue(disk);
 	blk_unregister_region(MKDEV(disk->major, disk->first_minor),
 			      disk->minors);
 }

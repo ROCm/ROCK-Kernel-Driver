@@ -379,17 +379,13 @@ void elv_completed_request(request_queue_t *q, struct request *rq)
 		e->elevator_completed_req_fn(q, rq);
 }
 
-int elv_register_queue(struct gendisk *disk)
+int elv_register_queue(struct request_queue *q)
 {
-	request_queue_t *q = disk->queue;
 	elevator_t *e;
-
-	if (!q)
-		return -ENXIO;
 
 	e = &q->elevator;
 
-	e->kobj.parent = kobject_get(&disk->kobj);
+	e->kobj.parent = kobject_get(&q->kobj);
 	if (!e->kobj.parent)
 		return -EBUSY;
 
@@ -399,14 +395,12 @@ int elv_register_queue(struct gendisk *disk)
 	return kobject_register(&e->kobj);
 }
 
-void elv_unregister_queue(struct gendisk *disk)
+void elv_unregister_queue(struct request_queue *q)
 {
-	request_queue_t *q = disk->queue;
-
 	if (q) {
 		elevator_t * e = &q->elevator;
 		kobject_unregister(&e->kobj);
-		kobject_put(&disk->kobj);
+		kobject_put(&q->kobj);
 	}
 }
 
