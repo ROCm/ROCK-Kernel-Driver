@@ -317,7 +317,7 @@ static void isdn_net_hup_timer(unsigned long data)
 {
 	isdn_net_local *lp = (isdn_net_local *) data;
 
-	if (!(lp->flags & ISDN_NET_CONNECTED) || lp->dialstate != ST_ACTIVE) {
+	if (!isdn_net_bound(lp) || lp->dialstate != ST_ACTIVE) {
 		isdn_BUG();
 		return;
 	}
@@ -540,7 +540,7 @@ isdn_net_handle_event(isdn_net_local *lp, int pr, void *arg)
 		switch (pr) {
 		case ISDN_STAT_BSENT:
 			/* A packet has successfully been sent out */
-			if (lp->flags & ISDN_NET_CONNECTED) {
+			if (isdn_net_bound(lp)) {
 				isdn_net_dec_frame_cnt(lp);
 				lp->stats.tx_packets++;
 				lp->stats.tx_bytes += c->parm.length;
@@ -548,7 +548,7 @@ isdn_net_handle_event(isdn_net_local *lp, int pr, void *arg)
 			}
 			break;
 		case ISDN_STAT_DHUP:
-			if (!(lp->flags & ISDN_NET_CONNECTED))
+			if (!isdn_net_bound(lp))
 				break;
 
 			if (lp->disconnected)
@@ -695,10 +695,10 @@ isdn_net_hangup(isdn_net_local *lp)
 	isdn_ctrl cmd;
 
 	del_timer_sync(&lp->hup_timer);
-	if (lp->flags & ISDN_NET_CONNECTED) {
+	if (isdn_net_bound(lp)) {
 		if (lp->slave != NULL) {
 			isdn_net_local *slp = (isdn_net_local *)lp->slave->priv;
-			if (slp->flags & ISDN_NET_CONNECTED) {
+			if (isdn_net_bound(slp)) {
 				printk(KERN_INFO
 					"isdn_net: hang up slave %s before %s\n",
 					slp->name, lp->name);
@@ -879,7 +879,7 @@ void isdn_net_writebuf_skb(isdn_net_local *lp, struct sk_buff *skb)
 		goto error;
 	}
 
-	if (!(lp->flags & ISDN_NET_CONNECTED)) {
+	if (!isdn_net_bound(lp)) {
 		isdn_BUG();
 		goto error;
 	}
@@ -966,7 +966,7 @@ isdn_net_xmit(struct net_device *ndev, struct sk_buff *skb)
 				/* subsequent overload: if slavedelay exceeded, start dialing */
 				if (time_after(jiffies, lp->sqfull_stamp + lp->slavedelay)) {
 					slp = lp->slave->priv;
-					if (!(slp->flags & ISDN_NET_CONNECTED)) {
+					if (!isdn_net_bound(slp)) {
 						isdn_net_force_dial_lp((isdn_net_local *) lp->slave->priv);
 					}
 				}
@@ -1047,7 +1047,7 @@ isdn_net_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 		isdn_net_adjust_hdr(skb, ndev);
 		isdn_dumppkt("S:", skb->data, skb->len, 40);
 
-		if (!(lp->flags & ISDN_NET_CONNECTED)) {
+		if (!isdn_net_bound(lp)) {
 			int chi;
 			/* only do autodial if allowed by config */
 			if (!(ISDN_NET_DIALMODE(*lp) == ISDN_NET_DM_AUTO)) {
@@ -1212,8 +1212,8 @@ isdn_net_rcv_skb(int idx, struct sk_buff *skb)
 
 	if (p) {
 		isdn_net_local *lp = &p->local;
-		if ((lp->flags & ISDN_NET_CONNECTED) &&
-		    (lp->dialstate == ST_ACTIVE)) {
+		if (isdn_net_bound(lp) &&
+		    lp->dialstate == ST_ACTIVE) {
 			isdn_net_receive(&p->dev, skb);
 			return 1;
 		}
@@ -1441,7 +1441,7 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 		dbg_net_icall("n_fi: if='%s', l.msn=%s, l.flags=%d, l.dstate=%d\n",
 		       lp->name, lp->msn, lp->flags, lp->dialstate);
 		if ((!matchret) &&                                        /* EAZ is matching   */
-		    (((!(lp->flags & ISDN_NET_CONNECTED)) &&              /* but not connected */
+		    (((!isdn_net_bound(lp)) &&              /* but not connected */
 		      (USG_NONE(isdn_slot_usage(idx)))) ||                     /* and ch. unused or */
 		     ((((lp->dialstate == ST_OUT_WAIT_DCONN) || (lp->dialstate == ST_OUT_WAIT_DCONN)) && /* if dialing        */
 		       (!(lp->flags & ISDN_NET_CALLBACK)))                /* but no callback   */
@@ -1544,7 +1544,7 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 				isdn_net_local *mlp = (isdn_net_local *) lp->master->priv;
 				printk(KERN_DEBUG "ICALLslv: %s\n", lp->name);
 				printk(KERN_DEBUG "master=%s\n", mlp->name);
-				if (mlp->flags & ISDN_NET_CONNECTED) {
+				if (isdn_net_bound(mlp)) {
 					printk(KERN_DEBUG "master online\n");
 					/* Master is online, find parent-slave (master if first slave) */
 					while (mlp->slave) {
@@ -1555,8 +1555,8 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 				} else
 					printk(KERN_DEBUG "master offline\n");
 				/* Found parent, if it's offline iterate next device */
-				printk(KERN_DEBUG "mlpf: %d\n", mlp->flags & ISDN_NET_CONNECTED);
-				if (!(mlp->flags & ISDN_NET_CONNECTED)) {
+				printk(KERN_DEBUG "mlpf: %d\n", isdn_net_bound(mlp));
+				if (!isdn_net_bound(mlp)) {
 					continue;
 				}
 			} 
@@ -1690,7 +1690,7 @@ isdn_net_force_dial_lp(isdn_net_local * lp)
 	int chi;
 	unsigned long flags;
 
-	if (lp->flags & ISDN_NET_CONNECTED || lp->dialstate != ST_NULL)
+	if (isdn_net_bound(lp) || lp->dialstate != ST_NULL)
 		return -EBUSY;
 
 	save_flags(flags);

@@ -157,6 +157,11 @@ static inline void isdn_net_device_wake_queue(isdn_net_local *lp)
 		netif_wake_queue(&lp->netdev->dev);
 }
 
+static inline int isdn_net_bound(isdn_net_local *lp)
+{
+	return lp->flags & ISDN_NET_CONNECTED;
+}
+
 static inline int
 put_u8(unsigned char *p, u8 x)
 {

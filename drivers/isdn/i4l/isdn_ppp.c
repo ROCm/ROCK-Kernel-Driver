@@ -803,8 +803,8 @@ isdn_ppp_write(struct file *file, const char *buf, size_t count, loff_t *off)
 			goto out;
 		}
 		if ((dev->drv[isdn_slot_driver(lp->isdn_slot)]->flags & DRV_FLAG_RUNNING) &&
-			lp->dialstate == 0 &&
-		    (lp->flags & ISDN_NET_CONNECTED)) {
+		    lp->dialstate == 0 &&
+		    isdn_net_bound(lp)) {
 			unsigned short hl;
 			struct sk_buff *skb;
 			/*
@@ -1976,13 +1976,13 @@ isdn_ppp_dial_slave(char *name)
 	if (!(ndev = isdn_net_findif(name)))
 		return 1;
 	lp = &ndev->local;
-	if (!(lp->flags & ISDN_NET_CONNECTED))
+	if (!isdn_net_bound(lp))
 		return 5;
 
 	sdev = lp->slave;
 	while (sdev) {
 		isdn_net_local *mlp = (isdn_net_local *) sdev->priv;
-		if (!(mlp->flags & ISDN_NET_CONNECTED))
+		if (!isdn_net_bound(mlp))
 			break;
 		sdev = mlp->slave;
 	}
@@ -2007,7 +2007,7 @@ isdn_ppp_hangup_slave(char *name)
 	if (!(ndev = isdn_net_findif(name)))
 		return 1;
 	lp = &ndev->local;
-	if (!(lp->flags & ISDN_NET_CONNECTED))
+	if (!isdn_net_bound(lp))
 		return 5;
 
 	sdev = lp->slave;
@@ -2017,9 +2017,9 @@ isdn_ppp_hangup_slave(char *name)
 		if (mlp->slave) { /* find last connected link in chain */
 			isdn_net_local *nlp = (isdn_net_local *) mlp->slave->priv;
 
-			if (!(nlp->flags & ISDN_NET_CONNECTED))
+			if (!isdn_net_bound(nlp))
 				break;
-		} else if (mlp->flags & ISDN_NET_CONNECTED)
+		} else if (isdn_net_bound(mlp))
 			break;
 		
 		sdev = mlp->slave;
