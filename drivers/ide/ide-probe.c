@@ -803,7 +803,7 @@ void probe_hwif (ide_hwif_t *hwif)
 		return;
 
 	if ((hwif->chipset != ide_4drives || !hwif->mate || !hwif->mate->present) &&
-#if CONFIG_BLK_DEV_PDC4030
+#ifdef CONFIG_BLK_DEV_PDC4030
 	    (hwif->chipset != ide_pdc4030 || hwif->channel == 0) &&
 #endif /* CONFIG_BLK_DEV_PDC4030 */
 	    (hwif_check_regions(hwif))) {

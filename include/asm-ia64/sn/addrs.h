@@ -215,7 +215,7 @@
 #define REMOTE_HUB_ADDR(_n, _x)	(HUBREG_CAST (NODE_SWIN_BASE(_n, 1) +	\
 					      0x800000 + (_x)))
 #endif
-#if CONFIG_IA64_SGI_SN1
+#ifdef CONFIG_IA64_SGI_SN1
 #define REMOTE_HUB_PI_ADDR(_n, _sn, _x)	(HUBREG_CAST (NODE_SWIN_BASE(_n, 1) +	\
 					      0x800000 + PIREG(_x, _sn)))
 #endif

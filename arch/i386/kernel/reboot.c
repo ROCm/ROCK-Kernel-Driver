@@ -215,7 +215,7 @@ void machine_real_restart(unsigned char *code, int length)
 
 void machine_restart(char * __unused)
 {
-#if CONFIG_SMP
+#ifdef CONFIG_SMP
 	int cpuid;
 	
 	cpuid = GET_APIC_ID(apic_read(APIC_ID));

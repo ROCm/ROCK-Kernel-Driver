@@ -597,7 +597,7 @@ unsigned long __init find_max_low_pfn(void)
 	} else {
 		if (highmem_pages == -1)
 			highmem_pages = 0;
-#if CONFIG_HIGHMEM
+#ifdef CONFIG_HIGHMEM
 		if (highmem_pages >= max_pfn) {
 			printk(KERN_ERR "highmem size specified (%uMB) is bigger than pages available (%luMB)!.\n", pages_to_mb(highmem_pages), pages_to_mb(max_pfn));
 			highmem_pages = 0;

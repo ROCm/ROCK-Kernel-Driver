@@ -101,7 +101,7 @@ void show_trace(unsigned long * stack)
 		stack = (unsigned long*)&stack;
 
 	printk("Call Trace:");
-#if CONFIG_KALLSYMS
+#ifdef CONFIG_KALLSYMS
 	printk("\n");
 #endif
 	i = 1;
@@ -438,7 +438,7 @@ static void default_do_nmi(struct pt_regs * regs)
 	unsigned char reason = get_nmi_reason();
  
 	if (!(reason & 0xc0)) {
-#if CONFIG_X86_LOCAL_APIC
+#ifdef CONFIG_X86_LOCAL_APIC
 		/*
 		 * Ok, so this is none of the documented NMI sources,
 		 * so it must be the NMI watchdog.

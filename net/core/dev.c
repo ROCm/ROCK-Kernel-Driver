@@ -1392,7 +1392,7 @@ static int deliver_to_old_ones(struct packet_type *pt,
 	if (skb_is_nonlinear(skb) && skb_linearize(skb, GFP_ATOMIC))
 		goto out_kfree;
 
-#if CONFIG_SMP
+#ifdef CONFIG_SMP
 	/* Old protocols did not depened on BHs different of NET_BH and
 	   TIMER_BH - they need to be fixed for the new assumptions.
 	 */

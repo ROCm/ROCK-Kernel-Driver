@@ -43,7 +43,7 @@
 
 #include <net/irda/irda_device.h>
 
-#if CONFIG_IRDA_FAST_RR
+#ifdef CONFIG_IRDA_FAST_RR
 int sysctl_fast_poll_increase = 50;
 #endif
 

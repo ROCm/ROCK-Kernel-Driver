@@ -236,7 +236,7 @@ extern syscall_handler_t sys_epoll_wait;
 extern syscall_handler_t sys_remap_file_pages;
 extern syscall_handler_t sys_set_tid_address;
 
-#if CONFIG_NFSD
+#ifdef CONFIG_NFSD
 #define NFSSERVCTL sys_nfsservctl
 #else
 #define NFSSERVCTL sys_ni_syscall

@@ -696,7 +696,7 @@ static void sd_rw_intr(struct scsi_cmnd * SCpnt)
 	int good_sectors = (result == 0 ? this_count : 0);
 	sector_t block_sectors = 1;
 	sector_t error_sector;
-#if CONFIG_SCSI_LOGGING
+#ifdef CONFIG_SCSI_LOGGING
 	SCSI_LOG_HLCOMPLETE(1, printk("sd_rw_intr: %s: res=0x%x\n", 
 				SCpnt->request->rq_disk->disk_name, result));
 	if (0 != result) {

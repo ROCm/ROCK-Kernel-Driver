@@ -358,7 +358,7 @@ void cleanup_intermezzo_sysctl(void)
 	 */
 	PRESTO_FREE(presto_table[PRESTO_PRIMARY_CTLCNT].child, sizeof(ctl_table) * total_entries);
 
-#if CONFIG_PROC_FS
+#ifdef CONFIG_PROC_FS
 	remove_proc_entry("mounts", proc_fs_intermezzo);
 	remove_proc_entry("intermezzo", proc_root_fs);
 #endif

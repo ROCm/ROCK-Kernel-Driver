@@ -863,7 +863,7 @@ static int find_busiest_node(int this_node)
 
 #endif /* CONFIG_NUMA */
 
-#if CONFIG_SMP
+#ifdef CONFIG_SMP
 
 /*
  * double_lock_balance - lock the busiest runqueue
@@ -1309,7 +1309,7 @@ need_resched:
 	}
 pick_next_task:
 	if (unlikely(!rq->nr_running)) {
-#if CONFIG_SMP
+#ifdef CONFIG_SMP
 		load_balance(rq, 1, cpu_to_node_mask(smp_processor_id()));
 		if (rq->nr_running)
 			goto pick_next_task;
@@ -1440,7 +1440,7 @@ void __wake_up_locked(wait_queue_head_t *q, unsigned int mode)
 	__wake_up_common(q, mode, 1, 0);
 }
 
-#if CONFIG_SMP
+#ifdef CONFIG_SMP
 
 /**
  * __wake_up - sync- wake up threads blocked on a waitqueue.
@@ -2261,7 +2261,7 @@ void __init init_idle(task_t *idle, int cpu)
 #endif
 }
 
-#if CONFIG_SMP
+#ifdef CONFIG_SMP
 /*
  * This is how migration works:
  *
@@ -2443,7 +2443,7 @@ __init int migration_init(void)
 
 #endif
 
-#if CONFIG_SMP || CONFIG_PREEMPT
+#if defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)
 /*
  * The 'big kernel lock'
  *

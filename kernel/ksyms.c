@@ -447,7 +447,7 @@ EXPORT_SYMBOL(iomem_resource);
 EXPORT_SYMBOL(complete_and_exit);
 EXPORT_SYMBOL(default_wake_function);
 EXPORT_SYMBOL(__wake_up);
-#if CONFIG_SMP
+#ifdef CONFIG_SMP
 EXPORT_SYMBOL_GPL(__wake_up_sync); /* internal use only */
 #endif
 EXPORT_SYMBOL(wake_up_process);
@@ -465,10 +465,10 @@ EXPORT_SYMBOL(__cond_resched);
 EXPORT_SYMBOL(set_user_nice);
 EXPORT_SYMBOL(task_nice);
 EXPORT_SYMBOL_GPL(idle_cpu);
-#if CONFIG_SMP
+#ifdef CONFIG_SMP
 EXPORT_SYMBOL_GPL(set_cpus_allowed);
 #endif
-#if CONFIG_SMP || CONFIG_PREEMPT
+#if defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)
 EXPORT_SYMBOL(kernel_flag);
 #endif
 EXPORT_SYMBOL(jiffies);

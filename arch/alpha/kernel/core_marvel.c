@@ -780,7 +780,7 @@ __marvel_rtc_io(int write, u8 b, unsigned long addr)
 		rtc_access.function = 0x49;		/* GET_TOY */
 		if (write) rtc_access.function = 0x48;	/* PUT_TOY */
 
-#if CONFIG_SMP
+#ifdef CONFIG_SMP
 		if (smp_processor_id() != boot_cpuid)
 			smp_call_function_on_cpu(__marvel_access_rtc,
 						 &rtc_access,

@@ -761,7 +761,7 @@ specific_send_sig_info(int sig, struct siginfo *info, struct task_struct *t)
 
 	if (!irqs_disabled())
 		BUG();
-#if CONFIG_SMP
+#ifdef CONFIG_SMP
 	if (!spin_is_locked(&t->sighand->siglock))
 		BUG();
 #endif
@@ -846,7 +846,7 @@ __group_send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 	unsigned int mask;
 	int ret = 0;
 
-#if CONFIG_SMP
+#ifdef CONFIG_SMP
 	if (!spin_is_locked(&p->sighand->siglock))
 		BUG();
 #endif
