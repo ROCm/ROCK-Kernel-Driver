@@ -74,9 +74,16 @@
  */
 #define SD_MAX_RETRIES		5
 
+static void scsi_disk_release (struct kobject *kobj);
+
+static struct kobj_type scsi_disk_kobj_type = {
+	.release = scsi_disk_release,
+};
+
 struct scsi_disk {
 	struct scsi_driver *driver;	/* always &sd_template */
 	struct scsi_device *device;
+	struct kobject	kobj;
 	struct gendisk	*disk;
 	unsigned int	openers;	/* protected by BKL for now, yuck */
 	sector_t	capacity;	/* size in 512-byte sectors */
@@ -86,6 +93,7 @@ struct scsi_disk {
 	unsigned	WCE : 1;	/* state of disk WCE bit */
 	unsigned	RCD : 1;	/* state of disk RCD bit, unused */
 };
+
 
 static unsigned long sd_index_bits[SD_DISKS / BITS_PER_LONG];
 static spinlock_t sd_index_lock = SPIN_LOCK_UNLOCKED;
@@ -128,9 +136,31 @@ static int sd_major(int major_idx)
 	}
 }
 
+#define to_scsi_disk(obj) container_of(obj,struct scsi_disk,kobj);
+
 static inline struct scsi_disk *scsi_disk(struct gendisk *disk)
 {
 	return container_of(disk->private_data, struct scsi_disk, driver);
+}
+
+static int scsi_disk_get(struct scsi_disk *sdkp)
+{
+	if (!kobject_get(&sdkp->kobj))
+		goto out;
+	if (scsi_device_get(sdkp->device))
+		goto out_put_kobj;
+	return 0;
+
+out_put_kobj:
+	kobject_put(&sdkp->kobj);
+out:
+	return -ENXIO;
+}
+
+static void scsi_disk_put(struct scsi_disk *sdkp)
+{
+	scsi_device_put(sdkp->device);
+	kobject_put(&sdkp->kobj);
 }
 
 /**
@@ -352,14 +382,16 @@ static int sd_open(struct inode *inode, struct file *filp)
 {
 	struct gendisk *disk = inode->i_bdev->bd_disk;
 	struct scsi_disk *sdkp = scsi_disk(disk);
-	struct scsi_device *sdev = sdkp->device;
+	struct scsi_device *sdev;
 	int retval;
 
 	SCSI_LOG_HLQUEUE(3, printk("sd_open: disk=%s\n", disk->disk_name));
 
-	retval = scsi_device_get(sdev);
+	retval = scsi_disk_get(sdkp);
 	if (retval)
 		return retval;
+
+	sdev = sdkp->device;
 
 	/*
 	 * If the device is in error recovery, wait until it is done.
@@ -406,7 +438,7 @@ static int sd_open(struct inode *inode, struct file *filp)
 	return 0;
 
 error_out:
-	scsi_device_put(sdev);
+	scsi_disk_put(sdkp);
 	return retval;	
 }
 
@@ -438,7 +470,7 @@ static int sd_release(struct inode *inode, struct file *filp)
 	 * XXX and what if there are packets in flight and this close()
 	 * XXX is followed by a "rmmod sd_mod"?
 	 */
-	scsi_device_put(sdev);
+	scsi_disk_put(sdkp);
 	return 0;
 }
 
@@ -1279,6 +1311,10 @@ static int sd_probe(struct device *dev)
 	if (!sdkp)
 		goto out;
 
+	memset (sdkp, 0, sizeof(*sdkp));
+	kobject_init(&sdkp->kobj);
+	sdkp->kobj.ktype = &scsi_disk_kobj_type;
+
 	gd = alloc_disk(16);
 	if (!gd)
 		goto out_free;
@@ -1357,16 +1393,27 @@ static int sd_remove(struct device *dev)
 	struct scsi_disk *sdkp = dev_get_drvdata(dev);
 
 	del_gendisk(sdkp->disk);
+	sd_shutdown(dev);
+	kobject_put(&sdkp->kobj);
+
+	return 0;
+}
+
+/**
+ *	scsi_disk_release - Called to free the scsi_disk structure
+ *	@kobj: pointer to embedded kobject
+ **/
+static void scsi_disk_release(struct kobject *kobj)
+{
+	struct scsi_disk *sdkp = to_scsi_disk(kobj);
+	
+	put_disk(sdkp->disk);
 
 	spin_lock(&sd_index_lock);
 	clear_bit(sdkp->index, sd_index_bits);
 	spin_unlock(&sd_index_lock);
 
-	sd_shutdown(dev);
-	put_disk(sdkp->disk);
 	kfree(sdkp);
-
-	return 0;
 }
 
 /*
