@@ -70,7 +70,6 @@ jade_interrupt(struct IsdnCardState *cs, u8 val, u8 jade)
 {
 	u8 r;
 	struct BCState *bcs = cs->bcs + jade;
-	struct sk_buff *skb;
 	int fifo_size = 32;
 	int count;
 	int i_jade = (int) jade; /* To satisfy the compiler */
@@ -91,38 +90,19 @@ jade_interrupt(struct IsdnCardState *cs, u8 val, u8 jade)
 				if (cs->debug & L1_DEB_WARN)
 					debugl1(cs, "JADE %c CRC error", 'A'+jade);
 			WriteJADECMDR(bcs, jade_HDLC_RCMD, jadeRCMD_RMC);
+			bcs->rcvidx = 0;
 		} else {
 			count = jade_read_reg(cs, i_jade, jade_HDLC_RBCL) & 0x1F;
 			if (count == 0)
 				count = fifo_size;
+
 			jade_empty_fifo(bcs, count);
-			if ((count = bcs->rcvidx - 1) > 0) {
-				if (cs->debug & L1_DEB_HSCX_FIFO)
-					debugl1(cs, "HX Frame %d", count);
-				if (!(skb = dev_alloc_skb(count)))
-					printk(KERN_WARNING "JADE %s receive out of memory\n", (jade ? "B":"A"));
-				else {
-					memcpy(skb_put(skb, count), bcs->rcvbuf, count);
-					skb_queue_tail(&bcs->rqueue, skb);
-				}
-			}
+			recv_rme_b(bcs);
 		}
-		bcs->rcvidx = 0;
-		sched_b_event(bcs, B_RCVBUFREADY);
 	}
 	if (val & 0x40) {	/* RPF */
 		jade_empty_fifo(bcs, fifo_size);
-		if (bcs->mode == L1_MODE_TRANS) {
-			/* receive audio data */
-			if (!(skb = dev_alloc_skb(fifo_size)))
-				printk(KERN_WARNING "HiSax: receive out of memory\n");
-			else {
-				memcpy(skb_put(skb, fifo_size), bcs->rcvbuf, fifo_size);
-				skb_queue_tail(&bcs->rqueue, skb);
-			}
-			bcs->rcvidx = 0;
-			sched_b_event(bcs, B_RCVBUFREADY);
-		}
+		recv_rpf_b(bcs);
 	}
 	if (val & 0x10) {	/* XPR */
 		xmit_xpr_b(bcs);

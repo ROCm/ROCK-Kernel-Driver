@@ -541,7 +541,6 @@ bch_int(struct IsdnCardState *cs, u8 hscx)
 {
 	u8 istab;
 	struct BCState *bcs;
-	struct sk_buff *skb;
 	int count;
 	u8 rstab;
 
@@ -554,48 +553,28 @@ bch_int(struct IsdnCardState *cs, u8 hscx)
 		if ((rstab &0xf0) != 0xa0) { // !(VFR && !RDO && CRC && !RAB)
 			if (!(rstab &0x80))
 				if (cs->debug &L1_DEB_WARN) 
-          debugl1(cs, "bch_int() B-%d: invalid frame", hscx);
+					debugl1(cs, "bch_int() B-%d: invalid frame", hscx);
 			if ((rstab &0x40) && (bcs->mode != L1_MODE_NULL))
 				if (cs->debug &L1_DEB_WARN) 
-          debugl1(cs, "bch_int() B-%d: RDO mode=%d", hscx, bcs->mode);
+					debugl1(cs, "bch_int() B-%d: RDO mode=%d", hscx, bcs->mode);
 			if (!(rstab &0x20))
 				if (cs->debug &L1_DEB_WARN) 
-          debugl1(cs, "bch_int() B-%d: CRC error", hscx);
-	    ipacx_bc_write_reg(bcs, IPACX_CMDRB, 0x80);  // RMC
-		} 
-    else {  // received frame ok
+					debugl1(cs, "bch_int() B-%d: CRC error", hscx);
+			ipacx_bc_write_reg(bcs, IPACX_CMDRB, 0x80);  // RMC
+			bcs->rcvidx = 0;
+		}  else {  // received frame ok
 			count = ipacx_bc_read_reg(bcs, IPACX_RBCLB) &(B_FIFO_SIZE-1);
-			if (count == 0) count = B_FIFO_SIZE;
+			if (count == 0)
+				count = B_FIFO_SIZE;
+
 			ipacx_bc_empty_fifo(bcs, count);
-			if ((count = bcs->rcvidx - 1) > 0) {
-				if (cs->debug &L1_DEB_HSCX_FIFO)
-					debugl1(cs, "bch_int Frame %d", count);
-				if (!(skb = dev_alloc_skb(count)))
-					printk(KERN_WARNING "HiSax bch_int(): receive frame out of memory\n");
-				else {
-					memcpy(skb_put(skb, count), bcs->rcvbuf, count);
-					skb_queue_tail(&bcs->rqueue, skb);
-				}
-			}
+			recv_rme_b(bcs);
 		}
-		bcs->rcvidx = 0;
-		sched_b_event(bcs, B_RCVBUFREADY);
 	}
   
 	if (istab &0x40) {	// RPF
 		ipacx_bc_empty_fifo(bcs, B_FIFO_SIZE);
-
-		if (bcs->mode == L1_MODE_TRANS) { // queue every chunk
-			// receive transparent audio data
-			if (!(skb = dev_alloc_skb(B_FIFO_SIZE)))
-				printk(KERN_WARNING "HiSax bch_int(): receive transparent out of memory\n");
-			else {
-				memcpy(skb_put(skb, B_FIFO_SIZE), bcs->rcvbuf, B_FIFO_SIZE);
-				skb_queue_tail(&bcs->rqueue, skb);
-			}
-			bcs->rcvidx = 0;
-			sched_b_event(bcs, B_RCVBUFREADY);
-		}
+		recv_rpf_b(bcs);
 	}
   
 	if (istab &0x20) {	// RFO

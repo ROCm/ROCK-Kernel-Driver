@@ -263,7 +263,6 @@ W6692B_interrupt(struct IsdnCardState *cs, u8 bchan)
 	u8 val;
 	u8 r;
 	struct BCState *bcs;
-	struct sk_buff *skb;
 	int count;
 
 	bcs = (cs->bcs->channel == bchan) ? cs->bcs : (cs->bcs+1);
@@ -285,38 +284,18 @@ W6692B_interrupt(struct IsdnCardState *cs, u8 bchan)
 				if (cs->debug & L1_DEB_WARN)
 					debugl1(cs, "W6692 B CRC error");
 			w6692_bc_write_reg(cs, bchan, W_B_CMDR, W_B_CMDR_RACK | W_B_CMDR_RRST | W_B_CMDR_RACT);
+			bcs->hw.w6692.rcvidx = 0;
 		} else {
 			count = w6692_bc_read_reg(cs, bchan, W_B_RBCL) & (W_B_FIFO_THRESH - 1);
 			if (count == 0)
 				count = W_B_FIFO_THRESH;
 			W6692B_empty_fifo(bcs, count);
-			if ((count = bcs->hw.w6692.rcvidx) > 0) {
-				if (cs->debug & L1_DEB_HSCX_FIFO)
-					debugl1(cs, "W6692 Bchan Frame %d", count);
-				if (!(skb = dev_alloc_skb(count)))
-					printk(KERN_WARNING "W6692: Bchan receive out of memory\n");
-				else {
-					memcpy(skb_put(skb, count), bcs->hw.w6692.rcvbuf, count);
-					skb_queue_tail(&bcs->rqueue, skb);
-				}
-			}
+			recv_rme_b(bcs);
 		}
-		bcs->hw.w6692.rcvidx = 0;
-		sched_b_event(bcs, B_RCVBUFREADY);
 	}
 	if (val & W_B_EXI_RMR) {	/* RMR */
 		W6692B_empty_fifo(bcs, W_B_FIFO_THRESH);
-		if (bcs->mode == L1_MODE_TRANS) {
-			/* receive audio data */
-			if (!(skb = dev_alloc_skb(W_B_FIFO_THRESH)))
-				printk(KERN_WARNING "HiSax: receive out of memory\n");
-			else {
-				memcpy(skb_put(skb, W_B_FIFO_THRESH), bcs->hw.w6692.rcvbuf, W_B_FIFO_THRESH);
-				skb_queue_tail(&bcs->rqueue, skb);
-			}
-			bcs->hw.w6692.rcvidx = 0;
-			sched_b_event(bcs, B_RCVBUFREADY);
-		}
+		recv_rpf_b(bcs);
 	}
 	if (val & W_B_EXI_XFR) {	/* XFR */
 		xmit_xpr_b(bcs);

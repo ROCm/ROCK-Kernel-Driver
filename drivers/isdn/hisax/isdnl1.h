@@ -414,7 +414,7 @@ xmit_fill_fifo_d(struct IsdnCardState *cs, int fifo_size, int *count, int *more)
 	return p;
 }
 
-static inline u8 *
+static inline void
 recv_empty_fifo_b(struct BCState *bcs, int count)
 {
 	u8 *p;
@@ -427,7 +427,6 @@ recv_empty_fifo_b(struct BCState *bcs, int count)
 		if (cs->debug & L1_DEB_WARN)
 			debugl1(cs, "hscx_empty_fifo: incoming packet too large");
 		bcs->rcvidx = 0;
-		return NULL;
 	}
 	p = bcs->rcvbuf + bcs->rcvidx;
 	bcs->rcvidx += count;
@@ -441,6 +440,39 @@ recv_empty_fifo_b(struct BCState *bcs, int count)
 		QuickHex(t, p, count);
 		debugl1(cs, bcs->blog);
 	}
-
-	return p;
 }
+
+static inline void
+recv_rme_b(struct BCState *bcs)
+{
+	struct IsdnCardState *cs = bcs->cs;
+	struct sk_buff *skb;
+	int count;
+
+	count = bcs->rcvidx - 1;
+	bcs->rcvidx = 0;
+	if (count == 0)
+		return;
+
+	if (cs->debug & L1_DEB_HSCX_FIFO)
+		debugl1(cs, "HX Frame %d", count);
+
+	skb = dev_alloc_skb(count);
+	if (!skb) {
+		printk(KERN_WARNING "%s: out of memory\n", __FUNCTION__);
+		return;
+	}
+	memcpy(skb_put(skb, count), bcs->rcvbuf, count);
+	skb_queue_tail(&bcs->rqueue, skb);
+	sched_b_event(bcs, B_RCVBUFREADY);
+}
+
+static inline void
+recv_rpf_b(struct BCState *bcs)
+{
+	if (bcs->mode != L1_MODE_TRANS)
+		return;
+
+	recv_rme_b(bcs);
+}
+	

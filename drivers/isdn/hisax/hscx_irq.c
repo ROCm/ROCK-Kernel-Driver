@@ -76,7 +76,6 @@ hscx_interrupt(struct IsdnCardState *cs, u8 val, u8 hscx)
 {
 	u8 r;
 	struct BCState *bcs = cs->bcs + hscx;
-	struct sk_buff *skb;
 	int fifo_size = test_bit(HW_IPAC, &cs->HW_Flags)? 64: 32;
 	int count;
 
@@ -109,39 +108,19 @@ hscx_interrupt(struct IsdnCardState *cs, u8 val, u8 hscx)
 #endif
 			}
 			WriteHSCXCMDR(bcs, 0x80);
+			bcs->rcvidx = 0;
 		} else {
-			count = hscx_read(bcs, HSCX_RBCL) & (
-				test_bit(HW_IPAC, &cs->HW_Flags)? 0x3f: 0x1f);
+			count = hscx_read(bcs, HSCX_RBCL) & (fifo_size-1);
 			if (count == 0)
 				count = fifo_size;
+
 			hscx_empty_fifo(bcs, count);
-			if ((count = bcs->rcvidx - 1) > 0) {
-				if (cs->debug & L1_DEB_HSCX_FIFO)
-					debugl1(cs, "HX Frame %d", count);
-				if (!(skb = dev_alloc_skb(count)))
-					printk(KERN_WARNING "HSCX: receive out of memory\n");
-				else {
-					memcpy(skb_put(skb, count), bcs->rcvbuf, count);
-					skb_queue_tail(&bcs->rqueue, skb);
-				}
-			}
+			recv_rme_b(bcs);
 		}
-		bcs->rcvidx = 0;
-		sched_b_event(bcs, B_RCVBUFREADY);
 	}
 	if (val & 0x40) {	/* RPF */
 		hscx_empty_fifo(bcs, fifo_size);
-		if (bcs->mode == L1_MODE_TRANS) {
-			/* receive audio data */
-			if (!(skb = dev_alloc_skb(fifo_size)))
-				printk(KERN_WARNING "HiSax: receive out of memory\n");
-			else {
-				memcpy(skb_put(skb, fifo_size), bcs->rcvbuf, fifo_size);
-				skb_queue_tail(&bcs->rqueue, skb);
-			}
-			bcs->rcvidx = 0;
-			sched_b_event(bcs, B_RCVBUFREADY);
-		}
+		recv_rpf_b(bcs);
 	}
 	if (val & 0x10) {
 		xmit_xpr_b(bcs);

@@ -352,7 +352,6 @@ static inline void
 HDLC_irq(struct BCState *bcs, u_int stat)
 {
 	int len;
-	struct sk_buff *skb;
 
 	if (bcs->cs->debug & L1_DEB_HSCX)
 		debugl1(bcs->cs, "ch%d stat %#x", bcs->channel, stat);
@@ -376,15 +375,7 @@ HDLC_irq(struct BCState *bcs, u_int stat)
 			if ((stat & HDLC_STAT_RME) || (bcs->mode == L1_MODE_TRANS)) {
 				if (((stat & HDLC_STAT_CRCVFRRAB)==HDLC_STAT_CRCVFR) ||
 					(bcs->mode == L1_MODE_TRANS)) {
-					if (!(skb = dev_alloc_skb(bcs->hw.hdlc.rcvidx)))
-						printk(KERN_WARNING "HDLC: receive out of memory\n");
-					else {
-						memcpy(skb_put(skb, bcs->hw.hdlc.rcvidx),
-							bcs->hw.hdlc.rcvbuf, bcs->hw.hdlc.rcvidx);
-						skb_queue_tail(&bcs->rqueue, skb);
-					}
-					bcs->hw.hdlc.rcvidx = 0;
-					sched_b_event(bcs, B_RCVBUFREADY);
+					recv_rme_b(bcs);
 				} else {
 					if (bcs->cs->debug & L1_DEB_HSCX)
 						debugl1(bcs->cs, "invalid frame");
