@@ -1885,6 +1885,11 @@ pcnet32_rx(struct net_device *dev)
 	    } else {
 		int rx_in_place = 0;
 
+		if (unlikely(pkt_len > PKT_BUF_SZ - 2)) {
+		    if (netif_msg_drv(lp))
+		        printk(KERN_ERR "%s: Impossible packet size %u!\n", dev->name, pkt_len);
+		    skb = NULL;
+	        } else
 		if (pkt_len > rx_copybreak) {
 		    struct sk_buff *newskb;
 
