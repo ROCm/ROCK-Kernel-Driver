@@ -80,19 +80,6 @@ int try_irq(u_int Attributes, int irq, int specific)
 	case IRQ_TYPE_EXCLUSIVE:
 	    ret = CS_IN_USE;
 	    break;
-	case IRQ_TYPE_TIME:
-	    if ((info->Attributes & RES_IRQ_TYPE)
-		!= RES_IRQ_TYPE_TIME) {
-		ret = CS_IN_USE;
-		break;
-	    }
-	    if (Attributes & IRQ_FIRST_SHARED) {
-		ret = CS_BAD_ATTRIBUTE;
-		break;
-	    }
-	    info->Attributes |= RES_IRQ_TYPE_TIME | RES_ALLOCATED;
-	    info->time_share++;
-	    break;
 	case IRQ_TYPE_DYNAMIC_SHARING:
 	    if ((info->Attributes & RES_IRQ_TYPE)
 		!= RES_IRQ_TYPE_DYNAMIC) {
@@ -119,14 +106,6 @@ int try_irq(u_int Attributes, int irq, int specific)
 	switch (Attributes & IRQ_TYPE) {
 	case IRQ_TYPE_EXCLUSIVE:
 	    info->Attributes |= RES_ALLOCATED;
-	    break;
-	case IRQ_TYPE_TIME:
-	    if (!(Attributes & IRQ_FIRST_SHARED)) {
-		ret = CS_BAD_ATTRIBUTE;
-		break;
-	    }
-	    info->Attributes |= RES_IRQ_TYPE_TIME | RES_ALLOCATED;
-	    info->time_share = 1;
 	    break;
 	case IRQ_TYPE_DYNAMIC_SHARING:
 	    if (!(Attributes & IRQ_FIRST_SHARED)) {
@@ -158,11 +137,6 @@ void undo_irq(u_int Attributes, int irq)
     switch (Attributes & IRQ_TYPE) {
     case IRQ_TYPE_EXCLUSIVE:
 	info->Attributes &= RES_RESERVED;
-	break;
-    case IRQ_TYPE_TIME:
-	info->time_share--;
-	if (info->time_share == 0)
-	    info->Attributes &= RES_RESERVED;
 	break;
     case IRQ_TYPE_DYNAMIC_SHARING:
 	info->dyn_share--;
