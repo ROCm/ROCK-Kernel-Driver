@@ -41,7 +41,7 @@
 #include <linux/mm.h>
 #include <linux/init.h>
 
-MODULE_AUTHOR("SGI <sgi.com>");
+MODULE_AUTHOR("Silicon Graphics, Inc.");
 MODULE_DESCRIPTION("Additional kdb commands for debugging XFS");
 MODULE_LICENSE("GPL");
 
