@@ -537,17 +537,6 @@ RCreboot_callback (U32 Status, U32 p1, U32 p2, struct net_device *dev)
 			(PFNCALLBACK) RCreset_callback);
 }
 
-int
-broadcast_packet (unsigned char *address)
-{
-	int i;
-	for (i = 0; i < 6; i++)
-		if (address[i] != 0xff)
-			return 0;
-
-	return 1;
-}
-
 /*
  * RCrecv_callback()
  * 
