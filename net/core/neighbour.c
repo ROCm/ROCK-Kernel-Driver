@@ -307,6 +307,23 @@ struct neighbour *neigh_lookup(struct neigh_table *tbl, const void *pkey,
 	return n;
 }
 
+struct neighbour *neigh_lookup_nodev(struct neigh_table *tbl, const void *pkey)
+{
+	struct neighbour *n;
+	int key_len = tbl->key_len;
+	u32 hash_val = tbl->hash(pkey, NULL) & NEIGH_HASHMASK;
+
+	read_lock_bh(&tbl->lock);
+	for (n = tbl->hash_buckets[hash_val]; n; n = n->next) {
+		if (!memcmp(n->primary_key, pkey, key_len)) {
+			neigh_hold(n);
+			break;
+		}
+	}
+	read_unlock_bh(&tbl->lock);
+	return n;
+}
+
 struct neighbour *neigh_create(struct neigh_table *tbl, const void *pkey,
 			       struct net_device *dev)
 {
@@ -2068,6 +2085,7 @@ EXPORT_SYMBOL(neigh_dump_info);
 EXPORT_SYMBOL(neigh_event_ns);
 EXPORT_SYMBOL(neigh_ifdown);
 EXPORT_SYMBOL(neigh_lookup);
+EXPORT_SYMBOL(neigh_lookup_nodev);
 EXPORT_SYMBOL(neigh_parms_alloc);
 EXPORT_SYMBOL(neigh_parms_release);
 EXPORT_SYMBOL(neigh_rand_reach_time);

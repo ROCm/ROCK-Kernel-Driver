@@ -359,27 +359,6 @@ static int dn_phase3_output(struct sk_buff *skb)
  * basically does a neigh_lookup(), but without comparing the device
  * field. This is required for the On-Ethernet cache
  */
-struct neighbour *dn_neigh_lookup(struct neigh_table *tbl, const void *ptr)
-{
-	struct neighbour *neigh;
-	u32 hash_val;
-
-	hash_val = tbl->hash(ptr, NULL);
-
-	read_lock_bh(&tbl->lock);
-	for(neigh = tbl->hash_buckets[hash_val]; neigh != NULL; neigh = neigh->next) {
-		if (memcmp(neigh->primary_key, ptr, tbl->key_len) == 0) {
-			atomic_inc(&neigh->refcnt);
-			read_unlock_bh(&tbl->lock);
-			return neigh;
-		}
-	}
-	read_unlock_bh(&tbl->lock);
-
-	return NULL;
-}
-
-
 /*
  * Any traffic on a pointopoint link causes the timer to be reset
  * for the entry in the neighbour table.
