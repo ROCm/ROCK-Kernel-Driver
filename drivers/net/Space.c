@@ -103,7 +103,7 @@ extern int de620_probe(struct net_device *);
 extern int iph5526_probe(struct net_device *dev);
 
 /* SBNI adapters */
-extern int sbni_probe(void);
+extern int sbni_probe(int unit);
 
 struct devprobe
 {
@@ -338,7 +338,7 @@ static struct devprobe mips_probes[] __initdata = {
  * per bus interface. This drives the legacy devices only for now.
  */
  
-static int __init ethif_probe(void)
+static int __init ethif_probe(int unit)
 {
 	struct net_device *dev;
 	int err = -ENODEV;
@@ -347,6 +347,7 @@ static int __init ethif_probe(void)
 	if (!dev)
 		return -ENOMEM;
 
+	sprintf(dev->name, "eth%d", unit);
 	netdev_boot_setup_check(dev);
 
 	/* 
@@ -383,7 +384,7 @@ extern int sk_isa_probe(struct net_device *);
 extern int proteon_probe(struct net_device *);
 extern int smctr_probe(struct net_device *);
 
-static __init int trif_probe(void)
+static __init int trif_probe(int unit)
 {
 	struct net_device *dev;
 	int err = -ENODEV;
@@ -392,6 +393,7 @@ static __init int trif_probe(void)
 	if (!dev)
 		return -ENOMEM;
 
+	sprintf(dev->name, "tr%d", unit);
 	netdev_boot_setup_check(dev);
 	if (
 #ifdef CONFIG_IBMTR
@@ -435,16 +437,16 @@ void __init probe_old_netdevs(void)
 	
 #ifdef CONFIG_SBNI
 	for (num = 0; num < 8; ++num)
-		if (sbni_probe())
+		if (sbni_probe(num))
 			break;
 #endif
 #ifdef CONFIG_TR
 	for (num = 0; num < 8; ++num)
-		if (trif_probe())
+		if (trif_probe(num))
 			break;
 #endif
 	for (num = 0; num < 8; ++num)
-		if (ethif_probe())
+		if (ethif_probe(num))
 			break;
 #ifdef CONFIG_COPS
 	cops_probe(0);
