@@ -327,7 +327,7 @@ void udp_err(struct sk_buff *skb, u32 info)
 
 	sk = udp_v4_lookup(iph->daddr, uh->dest, iph->saddr, uh->source, skb->dev->ifindex);
 	if (sk == NULL) {
-		ICMP_INC_STATS_BH(IcmpInErrors);
+		ICMP_INC_STATS_BH(ICMP_MIB_INERRORS);
     	  	return;	/* No socket for error */
 	}
 
@@ -654,7 +654,7 @@ out:
 	if (free)
 		kfree(ipc.opt);
 	if (!err) {
-		UDP_INC_STATS_USER(UdpOutDatagrams);
+		UDP_INC_STATS_USER(UDP_MIB_OUTDATAGRAMS);
 		return len;
 	}
 	return err;
@@ -836,7 +836,7 @@ out:
   	return err;
 
 csum_copy_err:
-	UDP_INC_STATS_BH(UdpInErrors);
+	UDP_INC_STATS_BH(UDP_MIB_INERRORS);
 
 	/* Clear queue. */
 	if (flags&MSG_PEEK) {
@@ -1060,7 +1060,7 @@ static int udp_queue_rcv_skb(struct sock * sk, struct sk_buff *skb)
 		if (ret < 0) {
 			/* process the ESP packet */
 			ret = xfrm4_rcv_encap(skb, up->encap_type);
-			UDP_INC_STATS_BH(UdpInDatagrams);
+			UDP_INC_STATS_BH(UDP_MIB_INDATAGRAMS);
 			return -ret;
 		}
 		/* FALLTHROUGH -- it's a UDP Packet */
@@ -1068,7 +1068,7 @@ static int udp_queue_rcv_skb(struct sock * sk, struct sk_buff *skb)
 
 	if (sk->sk_filter && skb->ip_summed != CHECKSUM_UNNECESSARY) {
 		if (__udp_checksum_complete(skb)) {
-			UDP_INC_STATS_BH(UdpInErrors);
+			UDP_INC_STATS_BH(UDP_MIB_INERRORS);
 			kfree_skb(skb);
 			return -1;
 		}
@@ -1076,11 +1076,11 @@ static int udp_queue_rcv_skb(struct sock * sk, struct sk_buff *skb)
 	}
 
 	if (sock_queue_rcv_skb(sk,skb)<0) {
-		UDP_INC_STATS_BH(UdpInErrors);
+		UDP_INC_STATS_BH(UDP_MIB_INERRORS);
 		kfree_skb(skb);
 		return -1;
 	}
-	UDP_INC_STATS_BH(UdpInDatagrams);
+	UDP_INC_STATS_BH(UDP_MIB_INDATAGRAMS);
 	return 0;
 }
 
@@ -1208,7 +1208,7 @@ int udp_rcv(struct sk_buff *skb)
 	if (udp_checksum_complete(skb))
 		goto csum_error;
 
-	UDP_INC_STATS_BH(UdpNoPorts);
+	UDP_INC_STATS_BH(UDP_MIB_NOPORTS);
 	icmp_send(skb, ICMP_DEST_UNREACH, ICMP_PORT_UNREACH, 0);
 
 	/*
@@ -1228,7 +1228,7 @@ short_packet:
 			NIPQUAD(daddr),
 			ntohs(uh->dest)));
 no_header:
-	UDP_INC_STATS_BH(UdpInErrors);
+	UDP_INC_STATS_BH(UDP_MIB_INERRORS);
 	kfree_skb(skb);
 	return(0);
 
@@ -1245,7 +1245,7 @@ csum_error:
 			ntohs(uh->dest),
 			ulen));
 drop:
-	UDP_INC_STATS_BH(UdpInErrors);
+	UDP_INC_STATS_BH(UDP_MIB_INERRORS);
 	kfree_skb(skb);
 	return(0);
 }

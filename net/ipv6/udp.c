@@ -460,7 +460,7 @@ csum_copy_err:
 	skb_free_datagram(sk, skb);
 
 	if (flags & MSG_DONTWAIT) {
-		UDP6_INC_STATS_USER(UdpInErrors);
+		UDP6_INC_STATS_USER(UDP_MIB_INERRORS);
 		return -EAGAIN;
 	}
 	goto try_again;
@@ -509,7 +509,7 @@ static inline int udpv6_queue_rcv_skb(struct sock * sk, struct sk_buff *skb)
 
 	if (skb->ip_summed != CHECKSUM_UNNECESSARY) {
 		if ((unsigned short)csum_fold(skb_checksum(skb, 0, skb->len, skb->csum))) {
-			UDP6_INC_STATS_BH(UdpInErrors);
+			UDP6_INC_STATS_BH(UDP_MIB_INERRORS);
 			kfree_skb(skb);
 			return 0;
 		}
@@ -517,11 +517,11 @@ static inline int udpv6_queue_rcv_skb(struct sock * sk, struct sk_buff *skb)
 	}
 
 	if (sock_queue_rcv_skb(sk,skb)<0) {
-		UDP6_INC_STATS_BH(UdpInErrors);
+		UDP6_INC_STATS_BH(UDP_MIB_INERRORS);
 		kfree_skb(skb);
 		return 0;
 	}
-	UDP6_INC_STATS_BH(UdpInDatagrams);
+	UDP6_INC_STATS_BH(UDP_MIB_INDATAGRAMS);
 	return 0;
 }
 
@@ -670,7 +670,7 @@ static int udpv6_rcv(struct sk_buff **pskb, unsigned int *nhoffp)
 		if (skb->ip_summed != CHECKSUM_UNNECESSARY &&
 		    (unsigned short)csum_fold(skb_checksum(skb, 0, skb->len, skb->csum)))
 			goto discard;
-		UDP6_INC_STATS_BH(UdpNoPorts);
+		UDP6_INC_STATS_BH(UDP_MIB_NOPORTS);
 
 		icmpv6_send(skb, ICMPV6_DEST_UNREACH, ICMPV6_PORT_UNREACH, 0, dev);
 
@@ -689,7 +689,7 @@ short_packet:
 		printk(KERN_DEBUG "UDP: short packet: %d/%u\n", ulen, skb->len);
 
 discard:
-	UDP6_INC_STATS_BH(UdpInErrors);
+	UDP6_INC_STATS_BH(UDP_MIB_INERRORS);
 	kfree_skb(skb);
 	return(0);	
 }
@@ -988,7 +988,7 @@ do_append_data:
 out:
 	fl6_sock_release(flowlabel);
 	if (!err) {
-		UDP6_INC_STATS_USER(UdpOutDatagrams);
+		UDP6_INC_STATS_USER(UDP_MIB_OUTDATAGRAMS);
 		return len;
 	}
 	return err;
