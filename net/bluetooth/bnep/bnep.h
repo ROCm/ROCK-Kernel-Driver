@@ -117,12 +117,6 @@ struct bnep_ext_hdr {
 #define BNEPGETCONNLIST	_IOR('B', 210, int)
 #define BNEPGETCONNINFO	_IOR('B', 211, int)
 
-// Ioctl interface
-#define BNEPCONADD      1
-#define BNEPCONDEL      2
-#define BNEPGETCONLIST  3
-#define BNEPGETCONINFO  4
-
 struct bnep_connadd_req {
 	int   sock;       // Connected socket
 	__u32 flags;

@@ -83,7 +83,6 @@ static int bnep_sock_ioctl(struct socket *sock, unsigned int cmd, unsigned long 
 	BT_DBG("cmd %x arg %lx", cmd, arg);
 
 	switch (cmd) {
-	case BNEPCONADD:
 	case BNEPCONNADD:
 		if (!capable(CAP_NET_ADMIN))
 			return -EACCES;
@@ -107,7 +106,6 @@ static int bnep_sock_ioctl(struct socket *sock, unsigned int cmd, unsigned long 
 
 		return err;
 	
-	case BNEPCONDEL:
 	case BNEPCONNDEL:
 		if (!capable(CAP_NET_ADMIN))
 			return -EACCES;
@@ -117,7 +115,6 @@ static int bnep_sock_ioctl(struct socket *sock, unsigned int cmd, unsigned long 
 	
 		return bnep_del_connection(&cd);
 
-	case BNEPGETCONLIST:
 	case BNEPGETCONNLIST:
 		if (copy_from_user(&cl, (void *) arg, sizeof(cl)))
 			return -EFAULT;
@@ -131,7 +128,6 @@ static int bnep_sock_ioctl(struct socket *sock, unsigned int cmd, unsigned long 
 
 		return err;
 
-	case BNEPGETCONINFO:
 	case BNEPGETCONNINFO:
 		if (copy_from_user(&ci, (void *) arg, sizeof(ci)))
 			return -EFAULT;
