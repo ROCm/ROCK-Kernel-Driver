@@ -360,9 +360,6 @@ svc_sendto(struct svc_rqst *rqstp, struct xdr_buf *xdr)
 
 	slen = xdr->len;
 
-	/* Grab svsk->sk_sem to serialize outgoing data. */
-	down(&svsk->sk_sem);
-
 	if (rqstp->rq_prot == IPPROTO_UDP) {
 		/* set the destination */
 		struct msghdr	msg;
@@ -415,8 +412,6 @@ svc_sendto(struct svc_rqst *rqstp, struct xdr_buf *xdr)
 			len += result;
 	}
 out:
-	up(&svsk->sk_sem);
-
 	dprintk("svc: socket %p sendto([%p %Zu... ], %d) = %d (addr %x)\n",
 			rqstp->rq_sock, xdr->head[0].iov_base, xdr->head[0].iov_len, xdr->len, len,
 		rqstp->rq_addr.sin_addr.s_addr);
@@ -1258,7 +1253,13 @@ svc_send(struct svc_rqst *rqstp)
 		xb->page_len +
 		xb->tail[0].iov_len;
 
-	len = svsk->sk_sendto(rqstp);
+	/* Grab svsk->sk_sem to serialize outgoing data. */
+	down(&svsk->sk_sem);
+	if (test_bit(SK_DEAD, &svsk->sk_flags))
+		len = -ENOTCONN;
+	else
+		len = svsk->sk_sendto(rqstp);
+	up(&svsk->sk_sem);
 	svc_sock_release(rqstp);
 
 	if (len == -ECONNREFUSED || len == -ENOTCONN || len == -EAGAIN)
