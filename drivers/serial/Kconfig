@@ -412,9 +412,10 @@ config SERIAL_68360_SCC
 	help
 	  This driver supports the SCC serial ports of the Motorola 68360 CPU.
 
-config 68360_SERIAL
+config SERIAL_68360
 	bool
-	depends on SERIAL_68360_SMC || SERIAL_68630_SCC
+	depends on SERIAL_68360_SMC || SERIAL_68360_SCC
+	default y
 
 endmenu
 
