@@ -19,6 +19,7 @@ struct sigqueue {
 	spinlock_t *lock;
 	int flags;
 	siginfo_t info;
+	struct user_struct *user;
 };
 
 /* flags values. */
