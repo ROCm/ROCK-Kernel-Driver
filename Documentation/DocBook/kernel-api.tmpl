@@ -50,7 +50,7 @@
   kernel/sched.c has no docs, which stuffs up the sgml.  Comment
   out until somebody adds docs.  KAO
      <sect1><title>Delaying, scheduling, and timer routines</title>
-!Ekernel/sched.c
+X!Ekernel/sched.c
      </sect1>
 KAO -->
   </chapter>
@@ -367,7 +367,7 @@ KAO -->
   drivers/video/fbgen.c has no docs, which stuffs up the sgml.  Comment
   out until somebody adds docs.  KAO
      <sect1><title>Frame Buffer Generic Functions</title>
-!Idrivers/video/fbgen.c
+X!Idrivers/video/fbgen.c
      </sect1>
 KAO -->
      <sect1><title>Frame Buffer Video Mode Database</title>
@@ -381,5 +381,9 @@ KAO -->
 !Idrivers/video/fonts.c
      </sect1>
   </chapter>
-
+<!-- Needs ksyms to list additional exported symbols, but no specific doc.
+     docproc do not care about sgml commants.
+!Dkernel/ksyms.c
+!Dnet/netsyms.c
+-->
 </book>
