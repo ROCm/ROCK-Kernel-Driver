@@ -149,14 +149,13 @@ space      := $(nullstring) # end of line
 # careful not to include files twice if building in the source
 # directory. LOCALVERSION from the command line override all of this
 
-ifeq ($(objtree),$(srctree))
-localversion-files := $(wildcard $(srctree)/localversion*)
-else
-localversion-files := $(wildcard $(objtree)/localversion* $(srctree)/localversion*)
-endif
+localver := $(objtree)/localversion* $(srctree)/localversion*
+localver := $(sort $(wildcard $(localver)))
+# skip backup files (containing '~')
+localver := $(foreach f, $(localver), $(if $(findstring ~, $(f)),,$(f)))
 
 LOCALVERSION = $(subst $(space),, \
-	       $(shell cat /dev/null $(localversion-files:%~=)) \
+	       $(shell cat /dev/null $(localver)) \
 	       $(patsubst "%",%,$(CONFIG_LOCALVERSION)))
 
 KERNELRELEASE=$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)$(LOCALVERSION)
