@@ -113,9 +113,12 @@ loff_t vfs_llseek(struct file *file, loff_t offset, int origin)
 {
 	loff_t (*fn)(struct file *, loff_t, int);
 
-	fn = default_llseek;
-	if (file->f_op && file->f_op->llseek)
-		fn = file->f_op->llseek;
+	fn = no_llseek;
+	if (file->f_mode & FMODE_LSEEK) {
+		fn = default_llseek;
+		if (file->f_op && file->f_op->llseek)
+			fn = file->f_op->llseek;
+	}
 	return fn(file, offset, origin);
 }
 EXPORT_SYMBOL(vfs_llseek);
@@ -310,7 +313,9 @@ asmlinkage ssize_t sys_pread64(unsigned int fd, char __user *buf,
 
 	file = fget_light(fd, &fput_needed);
 	if (file) {
-		ret = vfs_read(file, buf, count, &pos);
+		ret = -ESPIPE;
+		if (file->f_mode & FMODE_LSEEK)
+			ret = vfs_read(file, buf, count, &pos);
 		fput_light(file, fput_needed);
 	}
 
@@ -329,7 +334,9 @@ asmlinkage ssize_t sys_pwrite64(unsigned int fd, const char __user *buf,
 
 	file = fget_light(fd, &fput_needed);
 	if (file) {
-		ret = vfs_write(file, buf, count, &pos);
+		ret = -ESPIPE;
+		if (file->f_mode & FMODE_LSEEK)  
+			ret = vfs_write(file, buf, count, &pos);
 		fput_light(file, fput_needed);
 	}
 

@@ -781,7 +781,7 @@ struct file *dentry_open(struct dentry *dentry, struct vfsmount *mnt, int flags)
 	if (!f)
 		goto cleanup_dentry;
 	f->f_flags = flags;
-	f->f_mode = (flags+1) & O_ACCMODE;
+	f->f_mode = ((flags+1) & O_ACCMODE) | FMODE_LSEEK;
 	inode = dentry->d_inode;
 	if (f->f_mode & FMODE_WRITE) {
 		error = get_write_access(inode);

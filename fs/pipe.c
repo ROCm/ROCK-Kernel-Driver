@@ -656,13 +656,13 @@ int do_pipe(int *fd)
 	f1->f_pos = f2->f_pos = 0;
 	f1->f_flags = O_RDONLY;
 	f1->f_op = &read_pipe_fops;
-	f1->f_mode = 1;
+	f1->f_mode = FMODE_READ;
 	f1->f_version = 0;
 
 	/* write file */
 	f2->f_flags = O_WRONLY;
 	f2->f_op = &write_pipe_fops;
-	f2->f_mode = 2;
+	f2->f_mode = FMODE_WRITE;
 	f2->f_version = 0;
 
 	fd_install(i, f1);
