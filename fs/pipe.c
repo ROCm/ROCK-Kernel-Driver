@@ -322,10 +322,7 @@ pipe_release(struct inode *inode, int decr, int decw)
 	PIPE_READERS(*inode) -= decr;
 	PIPE_WRITERS(*inode) -= decw;
 	if (!PIPE_READERS(*inode) && !PIPE_WRITERS(*inode)) {
-		struct pipe_inode_info *info = inode->i_pipe;
-		inode->i_pipe = NULL;
-		free_page((unsigned long) info->base);
-		kfree(info);
+		free_pipe_info(inode);
 	} else {
 		wake_up_interruptible(PIPE_WAIT(*inode));
 		kill_fasync(PIPE_FASYNC_READERS(*inode), SIGIO, POLL_IN);
@@ -530,6 +527,14 @@ struct file_operations rdwr_pipe_fops = {
 	.fasync		= pipe_rdwr_fasync,
 };
 
+void free_pipe_info(struct inode *inode)
+{
+	struct pipe_inode_info *info = inode->i_pipe;
+	inode->i_pipe = NULL;
+	free_page((unsigned long)info->base);
+	kfree(info);
+}
+
 struct inode* pipe_new(struct inode* inode)
 {
 	unsigned long page;
@@ -668,9 +673,7 @@ close_f12_inode_i_j:
 close_f12_inode_i:
 	put_unused_fd(i);
 close_f12_inode:
-	free_page((unsigned long) PIPE_BASE(*inode));
-	kfree(inode->i_pipe);
-	inode->i_pipe = NULL;
+	free_pipe_info(inode);
 	iput(inode);
 close_f12:
 	put_filp(f2);

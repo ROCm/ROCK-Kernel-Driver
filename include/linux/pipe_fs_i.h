@@ -44,5 +44,6 @@ struct pipe_inode_info {
 void pipe_wait(struct inode * inode);
 
 struct inode* pipe_new(struct inode* inode);
+void free_pipe_info(struct inode* inode);
 
 #endif
