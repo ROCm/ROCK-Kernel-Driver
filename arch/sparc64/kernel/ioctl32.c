@@ -3798,14 +3798,6 @@ static int ioc_settimeout(unsigned int fd, unsigned int cmd, unsigned long arg)
 	return rw_long(fd, AUTOFS_IOC_SETTIMEOUT, arg);
 }
 
-#define HCIUARTSETPROTO	_IOW('U', 200, int)
-#define HCIUARTGETPROTO	_IOR('U', 201, int)
-
-#define BNEPCONNADD	_IOW('B', 200, int)
-#define BNEPCONNDEL	_IOW('B', 201, int)
-#define BNEPGETCONNLIST	_IOR('B', 210, int)
-#define BNEPGETCONNINFO	_IOR('B', 211, int)
-
 struct usbdevfs_ctrltransfer32 {
 	__u8 bRequestType;
 	__u8 bRequest;
@@ -4284,6 +4276,15 @@ static int do_blkgetsize64(unsigned int fd, unsigned int cmd,
 {
 	return sys_ioctl(fd, BLKGETSIZE64, arg);
 }
+
+/* Bluetooth ioctls */
+#define HCIUARTSETPROTO	_IOW('U', 200, int)
+#define HCIUARTGETPROTO	_IOR('U', 201, int)
+
+#define BNEPCONNADD     _IOW('B', 200, int)
+#define BNEPCONNDEL     _IOW('B', 201, int)
+#define BNEPGETCONNLIST	_IOR('B', 210, int)
+#define BNEPGETCONNINFO	_IOR('B', 211, int)
 
 struct ioctl_trans {
 	unsigned int cmd;
