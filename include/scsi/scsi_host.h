@@ -262,6 +262,12 @@ struct scsi_host_template {
 	unsigned short max_sectors;
 
 	/*
+	 * dma scatter gather segment boundary limit. a segment crossing this
+	 * boundary will be split in two.
+	 */
+	unsigned long dma_boundary;
+
+	/*
 	 * This specifies "machine infinity" for host templates which don't
 	 * limit the transfer size.  Note this limit represents an absolute
 	 * maximum, and may be over the transfer limits allowed for
@@ -410,6 +416,7 @@ struct Scsi_Host {
 	short cmd_per_lun;
 	short unsigned int sg_tablesize;
 	short unsigned int max_sectors;
+	unsigned long dma_boundary;
 
 	unsigned in_recovery:1;
 	unsigned unchecked_isa_dma:1;

@@ -1239,6 +1239,7 @@ struct request_queue *scsi_alloc_queue(struct scsi_device *sdev)
 	blk_queue_max_phys_segments(q, MAX_PHYS_SEGMENTS);
 	blk_queue_max_sectors(q, shost->max_sectors);
 	blk_queue_bounce_limit(q, scsi_calculate_bounce_limit(shost));
+	blk_queue_segment_boundary(q, shost->dma_boundary);
 
 	if (!shost->use_clustering)
 		clear_bit(QUEUE_FLAG_CLUSTER, &q->queue_flags);

@@ -197,6 +197,14 @@ struct Scsi_Host *scsi_host_alloc(struct scsi_host_template *sht, int privsize)
 	else
 		shost->max_sectors = SCSI_DEFAULT_MAX_SECTORS;
 
+	/*
+	 * assume a 4GB boundary, if not set
+	 */
+	if (sht->dma_boundary)
+		shost->dma_boundary = sht->dma_boundary;
+	else
+		shost->dma_boundary = 0xffffffff;
+
 	rval = scsi_setup_command_freelist(shost);
 	if (rval)
 		goto fail;
