@@ -77,7 +77,6 @@ MODULE_PARM_DESC (rx_copybreak, "de2104x Breakpoint at which Rx packets are copi
 #define DE_DEF_MSG_ENABLE	(NETIF_MSG_DRV		| \
 				 NETIF_MSG_PROBE 	| \
 				 NETIF_MSG_LINK		| \
-				 NETIF_MSG_TIMER	| \
 				 NETIF_MSG_IFDOWN	| \
 				 NETIF_MSG_IFUP		| \
 				 NETIF_MSG_RX_ERR	| \
