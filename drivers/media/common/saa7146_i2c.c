@@ -186,7 +186,7 @@ static int saa7146_i2c_writeout(struct saa7146_dev *dev, u32* dword, int short_d
 {
 	u32 status = 0, mc2 = 0;
 	int trial = 0;
-	int timeout;
+	unsigned long timeout;
 
 	/* write out i2c-command */
 	DEB_I2C(("before: 0x%08x (status: 0x%08x), %d\n",*dword,saa7146_read(dev, I2C_STATUS), dev->i2c_op));
@@ -218,7 +218,7 @@ static int saa7146_i2c_writeout(struct saa7146_dev *dev, u32* dword, int short_d
 			if( 0 != mc2 ) {
 				break;
 			}
-			if (jiffies > timeout) {
+			if (time_after(jiffies,timeout)) {
 				printk(KERN_WARNING "saa7146_i2c_writeout: timed out waiting for MC2\n");
 				return -EIO;
 			}
@@ -233,7 +233,7 @@ static int saa7146_i2c_writeout(struct saa7146_dev *dev, u32* dword, int short_d
 			status = saa7146_i2c_status(dev);
 			if ((status & 0x3) != 1)
 				break;
-			if (jiffies > timeout) {
+			if (time_after(jiffies,timeout)) {
 				/* this is normal when probing the bus
 				 * (no answer from nonexisistant device...)
 				 */
