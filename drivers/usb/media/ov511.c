@@ -4592,7 +4592,7 @@ ov51x_v4l1_ioctl(struct inode *inode, struct file *file,
 	return rc;
 }
 
-static int
+static ssize_t
 ov51x_v4l1_read(struct file *file, char *buf, size_t cnt, loff_t *ppos)
 {
 	struct video_device *vdev = file->private_data;

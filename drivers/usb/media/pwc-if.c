@@ -129,7 +129,7 @@ static struct {
 
 static int pwc_video_open(struct inode *inode, struct file *file);
 static int pwc_video_close(struct inode *inode, struct file *file);
-static int pwc_video_read(struct file *file, char *buf,
+static ssize_t pwc_video_read(struct file *file, char *buf,
 			  size_t count, loff_t *ppos);
 static unsigned int pwc_video_poll(struct file *file, poll_table *wait);
 static int  pwc_video_ioctl(struct inode *inode, struct file *file,
@@ -1116,7 +1116,7 @@ static int pwc_video_close(struct inode *inode, struct file *file)
                 device is tricky anyhow.
  */
 
-static int pwc_video_read(struct file *file, char *buf,
+static ssize_t pwc_video_read(struct file *file, char *buf,
 			  size_t count, loff_t *ppos)
 {
 	struct video_device *vdev = file->private_data;
@@ -1124,7 +1124,7 @@ static int pwc_video_read(struct file *file, char *buf,
 	int noblock = file->f_flags & O_NONBLOCK;
 	DECLARE_WAITQUEUE(wait, current);
 
-	Trace(TRACE_READ, "video_read(0x%p, %p, %d) called.\n", vdev, buf, count);
+	Trace(TRACE_READ, "video_read(0x%p, %p, %Zd) called.\n", vdev, buf, count);
 	if (vdev == NULL)
 		return -EFAULT;
 	pdev = vdev->priv;
