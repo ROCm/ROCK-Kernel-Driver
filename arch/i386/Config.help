@@ -1083,3 +1083,11 @@ CONFIG_SCx200
 
   This support is also available as a module.  If compiled as a
   module, it will be called scx200.o.
+
+CONFIG_EDD
+  Say Y or M here if you want to enable BIOS Enhanced Disk Drive
+  Services real mode BIOS calls to determine which disk
+  BIOS tries boot from.  This information is then exported via driverfs.
+
+  This option is experimental, but believed to be safe,
+  and most disk controller BIOS vendors do not yet implement this feature.
