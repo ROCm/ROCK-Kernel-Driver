@@ -2093,16 +2093,23 @@ static void tty_unregister_devfs(struct tty_driver *driver, int index)
 # define tty_unregister_devfs(driver, index)	do { } while (0)
 #endif /* CONFIG_DEVFS_FS */
 
-static struct class tty_class = {
-	.name	= "tty",
-};
-
 struct tty_dev {
 	struct list_head node;
 	dev_t dev;
 	struct class_device class_dev;
 };
 #define to_tty_dev(d) container_of(d, struct tty_dev, class_dev)
+
+static void release_tty_dev(struct class_device *class_dev)
+{
+	struct tty_dev *tty_dev = to_tty_dev(class_dev);
+	kfree(tty_dev);
+}
+
+static struct class tty_class = {
+	.name		= "tty",
+	.release	= &release_tty_dev,
+};
 
 static LIST_HEAD(tty_dev_list);
 static spinlock_t tty_dev_list_lock = SPIN_LOCK_UNLOCKED;
@@ -2113,12 +2120,6 @@ static ssize_t show_dev(struct class_device *class_dev, char *buf)
 	return sprintf(buf, "%04lx\n", (unsigned long)tty_dev->dev);
 }
 static CLASS_DEVICE_ATTR(dev, S_IRUGO, show_dev, NULL);
-
-static void release_tty_dev(struct class_device *class_dev)
-{
-	struct tty_dev *tty_dev = to_tty_dev(class_dev);
-	kfree(tty_dev);
-}
 
 static void tty_add_class_device(char *name, dev_t dev, struct device *device)
 {
@@ -2140,7 +2141,6 @@ static void tty_add_class_device(char *name, dev_t dev, struct device *device)
 
 	tty_dev->class_dev.dev = device;
 	tty_dev->class_dev.class = &tty_class;
-	tty_dev->class_dev.release = &release_tty_dev;
 	snprintf(tty_dev->class_dev.class_id, BUS_ID_SIZE, "%s", temp);
 	retval = class_device_register(&tty_dev->class_dev);
 	if (retval)
