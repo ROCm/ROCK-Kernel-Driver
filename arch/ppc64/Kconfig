@@ -60,7 +60,7 @@ config PPC_ISERIES
 	bool "iSeries"
 
 config PPC_PSERIES
-	bool "pSeries"
+	bool "pSeries / PowerMac G5"
 
 endchoice
 
@@ -72,12 +72,33 @@ config PPC64
 	bool
 	default y
 
+config PPC_OF
+	depends on PPC_PSERIES
+	bool
+	default y
+
 # VMX is pSeries only for now until somebody writes the iSeries
 # exception vectors for it
 config ALTIVEC
 	bool "Support for VMX (Altivec) vector unit"
 	depends on PPC_PSERIES
 	default y
+
+config PPC_PMAC
+	depends on PPC_PSERIES
+	bool "Apple PowerMac G5 support"
+
+config PPC_PMAC64
+	bool
+	depends on PPC_PMAC
+	default y
+
+config BOOTX_TEXT
+	bool "Support for early boot text console"
+	depends PPC_OF
+	help
+	  Say Y here to see progress messages from the boot firmware in text
+	  mode. Requires an Open Firmware compatible video card.
 
 config POWER4_ONLY
 	bool "Optimize for POWER4"
