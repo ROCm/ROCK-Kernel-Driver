@@ -293,7 +293,10 @@ export CPPFLAGS NOSTDINC_FLAGS OBJCOPYFLAGS LDFLAGS
 export CFLAGS CFLAGS_KERNEL CFLAGS_MODULE 
 export AFLAGS AFLAGS_KERNEL AFLAGS_MODULE
 
-export MODVERDIR := .tmp_versions
+# When compiling out-of-tree modules, put MODVERDIR in the module source
+# tree rather than in the kernel source tree. The kernel source tree might
+# even be read-only.
+export MODVERDIR := $(shell D="$(firstword $(SUBDIRS))"; test "$${D:0:1}" = / -a "$${D\#$$PWD}" = "$$D" && echo "$$D/").tmp_versions
 
 # The temporary file to save gcc -MD generated dependencies must not
 # contain a comma
@@ -592,12 +595,12 @@ prepare0: prepare1 include/linux/version.h include/asm include/config/MARKER
 ifdef KBUILD_MODULES
 ifeq ($(origin SUBDIRS),file)
 	$(Q)rm -rf $(MODVERDIR)
-	$(if $(CONFIG_MODULES),$(Q)mkdir -p $(MODVERDIR))
 else
 	@echo '*** Warning: Overriding SUBDIRS on the command line can cause'
 	@echo '***          inconsistencies'
 endif
 endif
+	$(if $(CONFIG_MODULES),$(Q)mkdir -p $(MODVERDIR))
 
 # All the preparing..
 prepare-all: prepare0 prepare

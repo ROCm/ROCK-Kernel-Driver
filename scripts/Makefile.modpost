@@ -52,10 +52,16 @@ $(modules:.ko=.mod.c): __modpost ;
 # Extract all checksums for all exported symbols
 
 quiet_cmd_modpost = MODPOST
-      cmd_modpost = scripts/modpost $(filter-out FORCE,$^)
-
+ifeq ($(origin SUBDIRS),command line)
+      cmd_modpost = scripts/modpost $(filter-out FORCE,$^) \
+				    $(if $(wildcard modversions),-i modversions)
+__modpost: $(modules:.ko=.o)
+	$(call exec_cmd,modpost)
+else
+      cmd_modpost = scripts/modpost $(filter-out FORCE,$^) -o modversions
 __modpost: $(wildcard vmlinux) $(modules:.ko=.o) FORCE
 	$(call if_changed,modpost)
+endif
 
 targets += __modpost
 
