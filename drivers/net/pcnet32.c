@@ -323,7 +323,7 @@ struct pcnet32_private {
 
 static void pcnet32_probe_vlbus(void);
 static int  pcnet32_probe_pci(struct pci_dev *, const struct pci_device_id *);
-static int  pcnet32_probe1(unsigned long, unsigned char, int, struct pci_dev *);
+static int  pcnet32_probe1(unsigned long, unsigned int, int, struct pci_dev *);
 static int  pcnet32_open(struct net_device *);
 static int  pcnet32_init_ring(struct net_device *);
 static int  pcnet32_start_xmit(struct sk_buff *, struct net_device *);
@@ -507,7 +507,7 @@ pcnet32_probe_pci(struct pci_dev *pdev, const struct pci_device_id *ent)
  *  pdev will be NULL when called from pcnet32_probe_vlbus.
  */
 static int __devinit
-pcnet32_probe1(unsigned long ioaddr, unsigned char irq_line, int shared,
+pcnet32_probe1(unsigned long ioaddr, unsigned int irq_line, int shared,
 		struct pci_dev *pdev)
 {
     struct pcnet32_private *lp;
@@ -522,13 +522,13 @@ pcnet32_probe1(unsigned long ioaddr, unsigned char irq_line, int shared,
     u8 promaddr[6];
 
     /* reset the chip */
-    pcnet32_dwio_reset(ioaddr);
     pcnet32_wio_reset(ioaddr);
 
     /* NOTE: 16-bit check is first, otherwise some older PCnet chips fail */
     if (pcnet32_wio_read_csr(ioaddr, 0) == 4 && pcnet32_wio_check(ioaddr)) {
 	a = &pcnet32_wio;
     } else {
+	pcnet32_dwio_reset(ioaddr);
 	if (pcnet32_dwio_read_csr(ioaddr, 0) == 4 && pcnet32_dwio_check(ioaddr)) {
 	    a = &pcnet32_dwio;
 	} else
@@ -789,7 +789,7 @@ pcnet32_probe1(unsigned long ioaddr, unsigned char irq_line, int shared,
     dev->set_multicast_list = &pcnet32_set_multicast_list;
     dev->do_ioctl = &pcnet32_ioctl;
     dev->tx_timeout = pcnet32_tx_timeout;
-    dev->watchdog_timeo = (HZ >> 1);
+    dev->watchdog_timeo = (5*HZ);
 
     lp->next = pcnet32_dev;
     pcnet32_dev = dev;
@@ -946,7 +946,7 @@ pcnet32_purge_tx_ring(struct net_device *dev)
     for (i = 0; i < TX_RING_SIZE; i++) {
 	if (lp->tx_skbuff[i]) {
             pci_unmap_single(lp->pci_dev, lp->tx_dma_addr[i], lp->tx_skbuff[i]->len, PCI_DMA_TODEVICE);
-	    dev_kfree_skb(lp->tx_skbuff[i]); 
+	    dev_kfree_skb_any(lp->tx_skbuff[i]); 
 	    lp->tx_skbuff[i] = NULL;
             lp->tx_dma_addr[i] = 0;
 	}
@@ -1022,8 +1022,9 @@ static void
 pcnet32_tx_timeout (struct net_device *dev)
 {
     struct pcnet32_private *lp = dev->priv;
-    unsigned int ioaddr = dev->base_addr;
+    unsigned long ioaddr = dev->base_addr, flags;
 
+    spin_lock_irqsave(&lp->lock, flags);
     /* Transmitter timeout, serious problems. */
 	printk(KERN_ERR "%s: transmit timed out, status %4.4x, resetting.\n",
 	       dev->name, lp->a.read_csr(ioaddr, 0));
@@ -1048,6 +1049,8 @@ pcnet32_tx_timeout (struct net_device *dev)
 
 	dev->trans_start = jiffies;
 	netif_start_queue(dev);
+
+	spin_unlock_irqrestore(&lp->lock, flags);
 }
 
 
@@ -1055,7 +1058,7 @@ static int
 pcnet32_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
     struct pcnet32_private *lp = dev->priv;
-    unsigned int ioaddr = dev->base_addr;
+    unsigned long ioaddr = dev->base_addr;
     u16 status;
     int entry;
     unsigned long flags;
@@ -1307,6 +1310,7 @@ pcnet32_rx(struct net_device *dev)
 		    if ((newskb = dev_alloc_skb (PKT_BUF_SZ))) {
 			skb_reserve (newskb, 2);
 			skb = lp->rx_skbuff[entry];
+			pci_unmap_single(lp->pci_dev, lp->rx_dma_addr[entry], skb->len, PCI_DMA_FROMDEVICE);
 			skb_put (skb, pkt_len);
 			lp->rx_skbuff[entry] = newskb;
 			newskb->dev = dev;
@@ -1473,9 +1477,10 @@ static void pcnet32_load_multicast (struct net_device *dev)
  */
 static void pcnet32_set_multicast_list(struct net_device *dev)
 {
-    unsigned long ioaddr = dev->base_addr;
+    unsigned long ioaddr = dev->base_addr, flags;
     struct pcnet32_private *lp = dev->priv;	 
 
+    spin_lock_irqsave(&lp->lock, flags);
     if (dev->flags&IFF_PROMISC) {
 	/* Log any net taps. */
 	printk(KERN_INFO "%s: Promiscuous mode enabled.\n", dev->name);
@@ -1488,6 +1493,7 @@ static void pcnet32_set_multicast_list(struct net_device *dev)
     lp->a.write_csr (ioaddr, 0, 0x0004); /* Temporarily stop the lance. */
 
     pcnet32_restart(dev, 0x0042); /*  Resume normal operation */
+    spin_unlock_irqrestore(&lp->lock, flags);
 }
 
 static int mdio_read(struct net_device *dev, int phy_id, int reg_num)
