@@ -319,11 +319,11 @@ static int __w1_attach_slave_device(struct w1_slave *sl)
 	sl->dev.release = &w1_slave_release;
 
 	snprintf(&sl->dev.bus_id[0], sizeof(sl->dev.bus_id),
-		  "%x-%llx",
+		  "%02x-%012llx",
 		  (unsigned int) sl->reg_num.family,
 		  (unsigned long long) sl->reg_num.id);
 	snprintf (&sl->name[0], sizeof(sl->name),
-		  "%x-%llx",
+		  "%02x-%012llx",
 		  (unsigned int) sl->reg_num.family,
 		  (unsigned long long) sl->reg_num.id);
 
