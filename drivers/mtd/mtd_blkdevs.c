@@ -211,9 +211,10 @@ static int blktrans_ioctl(struct inode *inode, struct file *file,
 	case HDIO_GETGEO:
 		if (tr->getgeo) {
 			struct hd_geometry g;
+			int ret;
 
 			memset(&g, 0, sizeof(g));
-			int ret = tr->getgeo(dev, &g);
+			ret = tr->getgeo(dev, &g);
 			if (ret)
 				return ret;
 

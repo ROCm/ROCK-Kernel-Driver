@@ -403,7 +403,7 @@ static int mount_is_safe(struct nameidata *nd)
 		if (current->uid != nd->dentry->d_inode->i_uid)
 			return -EPERM;
 	}
-	if (permission(nd->dentry->d_inode, MAY_WRITE))
+	if (permission(nd->dentry->d_inode, MAY_WRITE, nd))
 		return -EPERM;
 	return 0;
 #endif

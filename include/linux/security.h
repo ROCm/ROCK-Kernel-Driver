@@ -49,6 +49,7 @@ extern int cap_bprm_secureexec(struct linux_binprm *bprm);
 extern int cap_task_post_setuid (uid_t old_ruid, uid_t old_euid, uid_t old_suid, int flags);
 extern void cap_task_reparent_to_init (struct task_struct *p);
 extern int cap_syslog (int type);
+extern int cap_vm_enough_memory (long pages);
 
 static inline int cap_netlink_send (struct sk_buff *skb)
 {
@@ -958,6 +959,10 @@ struct swap_info_struct;
  *	See the syslog(2) manual page for an explanation of the @type values.  
  *	@type contains the type of action.
  *	Return 0 if permission is granted.
+ * @vm_enough_memory:
+ *	Check permissions for allocating a new virtual mapping.
+ *      @pages contains the number of pages.
+ *	Return 0 if permission is granted.
  *
  * @register_security:
  * 	allow module stacking.
@@ -989,6 +994,7 @@ struct security_operations {
 	int (*quotactl) (int cmds, int type, int id, struct super_block * sb);
 	int (*quota_on) (struct file * f);
 	int (*syslog) (int type);
+	int (*vm_enough_memory) (long pages);
 
 	int (*bprm_alloc_security) (struct linux_binprm * bprm);
 	void (*bprm_free_security) (struct linux_binprm * bprm);
@@ -1236,6 +1242,11 @@ static inline int security_quota_on (struct file * file)
 static inline int security_syslog(int type)
 {
 	return security_ops->syslog(type);
+}
+
+static inline int security_vm_enough_memory(long pages)
+{
+	return security_ops->vm_enough_memory(pages);
 }
 
 static inline int security_bprm_alloc (struct linux_binprm *bprm)
@@ -1896,6 +1907,11 @@ static inline int security_quota_on (struct file * file)
 static inline int security_syslog(int type)
 {
 	return cap_syslog(type);
+}
+
+static inline int security_vm_enough_memory(long pages)
+{
+	return cap_vm_enough_memory(pages);
 }
 
 static inline int security_bprm_alloc (struct linux_binprm *bprm)

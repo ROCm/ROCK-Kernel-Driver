@@ -22,11 +22,62 @@ typedef struct elevator_s elevator_t;
 struct request_pm_state;
 
 #define BLKDEV_MIN_RQ	4
-#define BLKDEV_MAX_RQ	128
+#define BLKDEV_MAX_RQ	128	/* Default maximum */
+
+/*
+ * This is the per-process anticipatory I/O scheduler state.
+ */
+struct as_io_context {
+	spinlock_t lock;
+
+	void (*dtor)(struct as_io_context *aic); /* destructor */
+	void (*exit)(struct as_io_context *aic); /* called on task exit */
+
+	unsigned long state;
+	atomic_t nr_queued; /* queued reads & sync writes */
+	atomic_t nr_dispatched; /* number of requests gone to the drivers */
+
+	/* IO History tracking */
+	/* Thinktime */
+	unsigned long last_end_request;
+	unsigned long ttime_total;
+	unsigned long ttime_samples;
+	unsigned long ttime_mean;
+	/* Layout pattern */
+	long seek_samples;
+	sector_t last_request_pos;
+	sector_t seek_total;
+	sector_t seek_mean;
+};
+
+/*
+ * This is the per-process I/O subsystem state.  It is refcounted and
+ * kmalloc'ed. Currently all fields are modified in process io context
+ * (apart from the atomic refcount), so require no locking.
+ */
+struct io_context {
+	atomic_t refcount;
+	pid_t pid;
+
+	/*
+	 * For request batching
+	 */
+	unsigned long last_waited; /* Time last woken after wait for request */
+	int nr_batch_requests;     /* Number of requests left in the batch */
+
+	struct as_io_context *aic;
+};
+
+void put_io_context(struct io_context *ioc);
+void exit_io_context(void);
+struct io_context *get_io_context(int gfp_flags);
+void copy_io_context(struct io_context **pdst, struct io_context **psrc);
+void swap_io_context(struct io_context **ioc1, struct io_context **ioc2);
 
 struct request_list {
 	int count[2];
 	mempool_t *rq_pool;
+	wait_queue_head_t wait[2];
 };
 
 /*
@@ -268,8 +319,15 @@ struct request_queue
 	spinlock_t		*queue_lock;
 
 	/*
+	 * queue kobject
+	 */
+	struct kobject kobj;
+
+	/*
 	 * queue settings
 	 */
+	unsigned long		nr_requests;	/* Max # of requests */
+
 	unsigned short		max_sectors;
 	unsigned short		max_phys_segments;
 	unsigned short		max_hw_segments;
@@ -299,6 +357,8 @@ struct request_queue
 #define QUEUE_FLAG_CLUSTER	0	/* cluster several segments into 1 */
 #define QUEUE_FLAG_QUEUED	1	/* uses generic tag queueing */
 #define QUEUE_FLAG_STOPPED	2	/* queue is stopped */
+#define	QUEUE_FLAG_READFULL	3	/* write queue has been filled */
+#define QUEUE_FLAG_WRITEFULL	4	/* read queue has been filled */
 
 #define blk_queue_plugged(q)	!list_empty(&(q)->plug_list)
 #define blk_queue_tagged(q)	test_bit(QUEUE_FLAG_QUEUED, &(q)->queue_flags)
@@ -313,6 +373,30 @@ struct request_queue
 #define list_entry_rq(ptr)	list_entry((ptr), struct request, queuelist)
 
 #define rq_data_dir(rq)		((rq)->flags & 1)
+
+static inline int blk_queue_full(struct request_queue *q, int rw)
+{
+	if (rw == READ)
+		return test_bit(QUEUE_FLAG_READFULL, &q->queue_flags);
+	return test_bit(QUEUE_FLAG_WRITEFULL, &q->queue_flags);
+}
+
+static inline void blk_set_queue_full(struct request_queue *q, int rw)
+{
+	if (rw == READ)
+		set_bit(QUEUE_FLAG_READFULL, &q->queue_flags);
+	else
+		set_bit(QUEUE_FLAG_WRITEFULL, &q->queue_flags);
+}
+
+static inline void blk_clear_queue_full(struct request_queue *q, int rw)
+{
+	if (rw == READ)
+		clear_bit(QUEUE_FLAG_READFULL, &q->queue_flags);
+	else
+		clear_bit(QUEUE_FLAG_WRITEFULL, &q->queue_flags);
+}
+
 
 /*
  * mergeable request must not have _NOMERGE or _BARRIER bit set, nor may
@@ -397,6 +481,8 @@ struct sec_size {
 	unsigned block_size_bits;
 };
 
+extern int blk_register_queue(struct gendisk *disk);
+extern void blk_unregister_queue(struct gendisk *disk);
 extern void register_disk(struct gendisk *dev);
 extern void generic_make_request(struct bio *bio);
 extern void blk_put_request(struct request *);
@@ -559,6 +645,10 @@ static inline void put_dev_sector(Sector p)
 {
 	page_cache_release(p.v);
 }
+
+struct work_struct;
+int kblockd_schedule_work(struct work_struct *work);
+void kblockd_flush(void);
 
 #ifdef CONFIG_LBD
 # include <asm/div64.h>

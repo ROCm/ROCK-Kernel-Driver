@@ -79,7 +79,7 @@ void show_mem(void)
 		struct page *page, *end;
 
 		page = NODE_MEM_MAP(node);
-		end  = page + NODE_DATA(node)->node_size;
+		end  = page + NODE_DATA(node)->node_spanned_pages;
 
 		do {
 			total++;
@@ -576,7 +576,7 @@ void __init mem_init(void)
 	for (node = 0; node < numnodes; node++) {
 		pg_data_t *pgdat = NODE_DATA(node);
 
-		if (pgdat->node_size != 0)
+		if (pgdat->node_spanned_pages != 0)
 			totalram_pages += free_all_bootmem_node(pgdat);
 	}
 

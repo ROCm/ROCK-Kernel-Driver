@@ -635,9 +635,9 @@ cifs_setattr(struct dentry *direntry, struct iattr *attrs)
 	struct cifsFileInfo *open_file = NULL;
 	FILE_BASIC_INFO time_buf;
 	int set_time = FALSE;
-	__u64 mode = 0xFFFFFFFFFFFFFFFF;
-	__u64 uid = 0xFFFFFFFFFFFFFFFF;
-	__u64 gid = 0xFFFFFFFFFFFFFFFF;
+	__u64 mode = 0xFFFFFFFFFFFFFFFFULL;
+	__u64 uid = 0xFFFFFFFFFFFFFFFFULL;
+	__u64 gid = 0xFFFFFFFFFFFFFFFFULL;
 	struct cifsInodeInfo *cifsInode;
 
 	xid = GetXid();

@@ -19,6 +19,7 @@
 #include <linux/smp_lock.h>
 #include <linux/completion.h>
 #include <linux/delay.h>
+#include <linux/suspend.h>
 
 #include <net/irda/irda.h>
 
@@ -107,43 +108,11 @@ static void run_irda_queue(void)
 	spin_unlock_irqrestore(&irda_rq_queue.lock, flags);
 }		
 
-static int irda_rt_prio = 0;		/* MODULE_PARM? */
-
 static int irda_thread(void *startup)
 {
 	DECLARE_WAITQUEUE(wait, current);
 
 	daemonize("kIrDAd");
-
-	set_fs(KERNEL_DS);
-
-	if (irda_rt_prio > 0) {
-#if 0		/* works but requires EXPORT_SYMBOL(setscheduler) */
-		struct sched_param param;
-
-		param.sched_priority = irda_rt_prio;
-		setscheduler(0, SCHED_FIFO, &param);
-#endif
-
-#if 0		/* doesn't work - has some tendency to trigger instant reboot!
-		 * looks like we would have to deactivate current on the
-		 * runqueue - which is only possible inside of kernel/sched.h
-		 */
-
-		/* runqueues are per-cpu and we are current on this cpu. Hence
-		 * The tasklist_lock with irq-off protects our runqueue too
-		 * and we don't have to lock it (which would be impossible,
-		 * because it is private in kernel/sched.c)
-		 */
-
-		read_lock_irq(&tasklist_lock);
-		current->rt_priority = (irda_rt_prio<MAX_RT_PRIO)
-					? irda_rt_prio : MAX_RT_PRIO-1;
-		current->policy = SCHED_FIFO;
-		current->prio = MAX_USER_RT_PRIO-1 - irda_rt_prio;
-		read_unlock_irq(&tasklist_lock);
-#endif
-	}
 
 	irda_rq_queue.thread = current;
 
@@ -165,6 +134,10 @@ static int irda_thread(void *startup)
 		else
 			set_task_state(current, TASK_RUNNING);
 		remove_wait_queue(&irda_rq_queue.kick, &wait);
+
+		/* make swsusp happy with our thread */
+		if (current->flags & PF_FREEZE)
+			refrigerator(PF_IOTHREAD);
 
 		run_irda_queue();
 	}
@@ -442,7 +415,6 @@ static void irda_config_fsm(void *data)
 		case SIRDEV_STATE_COMPLETE:
 			/* config change finished, so we are not busy any longer */
 			sirdev_enable_rx(dev);
-			printk(KERN_INFO "%s - up\n", __FUNCTION__);
 			up(&fsm->sem);
 			return;
 		}
@@ -462,9 +434,7 @@ int sirdev_schedule_request(struct sir_dev *dev, int initial_state, unsigned par
 	struct sir_fsm *fsm = &dev->fsm;
 	int xmit_was_down;
 
-//	IRDA_DEBUG(2, "%s - state=0x%04x / param=%u\n", __FUNCTION__, initial_state, param);
-
-	printk(KERN_INFO "%s - state=0x%04x / param=%u\n", __FUNCTION__, initial_state, param);
+	IRDA_DEBUG(2, "%s - state=0x%04x / param=%u\n", __FUNCTION__, initial_state, param);
 
 	if (in_interrupt()) {
 		if (down_trylock(&fsm->sem)) {
@@ -474,12 +444,10 @@ int sirdev_schedule_request(struct sir_dev *dev, int initial_state, unsigned par
 	}
 	else
 		down(&fsm->sem);
-	printk(KERN_INFO "%s - down\n", __FUNCTION__);
 
 	if (fsm->state == SIRDEV_STATE_DEAD) {
 		/* race with sirdev_close should never happen */
 		ERROR("%s(), instance staled!\n", __FUNCTION__);
-		printk(KERN_INFO "%s - up\n", __FUNCTION__);
 		up(&fsm->sem);
 		return -ESTALE;		/* or better EPIPE? */
 	}
@@ -501,7 +469,6 @@ int sirdev_schedule_request(struct sir_dev *dev, int initial_state, unsigned par
 		atomic_set(&dev->enable_rx, 1);
 		if (!xmit_was_down)
 			netif_wake_queue(dev->netdev);		
-		printk(KERN_INFO "%s - up\n", __FUNCTION__);
 		up(&fsm->sem);
 		return -EAGAIN;
 	}

@@ -36,6 +36,7 @@
 #include <linux/writeback.h>
 #include <linux/vfs.h>
 #include <linux/blkdev.h>
+#include <linux/security.h>
 #include <asm/uaccess.h>
 #include <asm/div64.h>
 
@@ -507,7 +508,7 @@ static int shmem_notify_change(struct dentry *dentry, struct iattr *attr)
 	 	 */
 		change = VM_ACCT(attr->ia_size) - VM_ACCT(inode->i_size);
 		if (change > 0) {
-			if (!vm_enough_memory(change))
+			if (security_vm_enough_memory(change))
 				return -ENOMEM;
 		} else if (attr->ia_size < inode->i_size) {
 			vm_unacct_memory(-change);
@@ -1139,7 +1140,7 @@ shmem_file_write(struct file *file, const char __user *buf, size_t count, loff_t
 	maxpos = inode->i_size;
 	if (maxpos < pos + count) {
 		maxpos = pos + count;
-		if (!vm_enough_memory(VM_ACCT(maxpos) - VM_ACCT(inode->i_size))) {
+		if (security_vm_enough_memory(VM_ACCT(maxpos) - VM_ACCT(inode->i_size))) {
 			err = -ENOMEM;
 			goto out;
 		}
@@ -1397,7 +1398,8 @@ static int shmem_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 	return 0;
 }
 
-static int shmem_create(struct inode *dir, struct dentry *dentry, int mode)
+static int shmem_create(struct inode *dir, struct dentry *dentry, int mode,
+		struct nameidata *nd)
 {
 	return shmem_mknod(dir, dentry, mode | S_IFREG, 0);
 }
@@ -1493,7 +1495,7 @@ static int shmem_symlink(struct inode *dir, struct dentry *dentry, const char *s
 		memcpy(info, symname, len);
 		inode->i_op = &shmem_symlink_inline_operations;
 	} else {
-		if (!vm_enough_memory(VM_ACCT(1))) {
+		if (security_vm_enough_memory(VM_ACCT(1))) {
 			iput(inode);
 			return -ENOMEM;
 		}
@@ -1887,7 +1889,7 @@ struct file *shmem_file_setup(char *name, loff_t size, unsigned long flags)
 	if (size > SHMEM_MAX_BYTES)
 		return ERR_PTR(-EINVAL);
 
-	if ((flags & VM_ACCOUNT) && !vm_enough_memory(VM_ACCT(size)))
+	if ((flags & VM_ACCOUNT) && security_vm_enough_memory(VM_ACCT(size)))
 		return ERR_PTR(-ENOMEM);
 
 	error = -ENOMEM;

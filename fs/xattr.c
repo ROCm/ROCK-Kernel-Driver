@@ -160,9 +160,7 @@ getxattr(struct dentry *d, char *name, void *value, size_t size)
 		error = security_inode_getxattr(d, kname);
 		if (error)
 			goto out;
-		down(&d->d_inode->i_sem);
 		error = d->d_inode->i_op->getxattr(d, kname, kvalue, size);
-		up(&d->d_inode->i_sem);
 	}
 
 	if (kvalue && error > 0)
@@ -233,9 +231,7 @@ listxattr(struct dentry *d, char *list, size_t size)
 		error = security_inode_listxattr(d);
 		if (error)
 			goto out;
-		down(&d->d_inode->i_sem);
 		error = d->d_inode->i_op->listxattr(d, klist, size);
-		up(&d->d_inode->i_sem);
 	}
 
 	if (klist && error > 0)

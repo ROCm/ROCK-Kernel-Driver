@@ -497,11 +497,10 @@ static int ds1286_read_proc(char *page, char **start, off_t off,
 static int locks_read_proc(char *page, char **start, off_t off,
 				 int count, int *eof, void *data)
 {
-	int len;
-	lock_kernel();
-	len = get_locks_status(page, start, off, count);
-	unlock_kernel();
-	if (len < count) *eof = 1;
+	int len = get_locks_status(page, start, off, count);
+
+	if (len < count)
+		*eof = 1;
 	return len;
 }
 

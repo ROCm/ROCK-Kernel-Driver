@@ -443,27 +443,15 @@ void eventpoll_init_file(struct file *file)
 
 
 /*
- * This is called from inside fs/file_table.c:__fput() to unlink files
- * from the eventpoll interface. We need to have this facility to cleanup
- * correctly files that are closed without being removed from the eventpoll
- * interface.
+ * This is called from eventpoll_release() to unlink files from the eventpoll
+ * interface. We need to have this facility to cleanup correctly files that are
+ * closed without being removed from the eventpoll interface.
  */
-void eventpoll_release(struct file *file)
+void eventpoll_release_file(struct file *file)
 {
 	struct list_head *lsthead = &file->f_ep_links;
 	struct eventpoll *ep;
 	struct epitem *epi;
-
-	/*
-	 * Fast check to avoid the get/release of the semaphore. Since
-	 * we're doing this outside the semaphore lock, it might return
-	 * false negatives, but we don't care. It'll help in 99.99% of cases
-	 * to avoid the semaphore lock. False positives simply cannot happen
-	 * because the file in on the way to be removed and nobody ( but
-	 * eventpoll ) has still a reference to this file.
-	 */
-	if (list_empty(lsthead))
-		return;
 
 	/*
 	 * We don't want to get "file->f_ep_lock" because it is not
@@ -541,7 +529,7 @@ eexit_1:
 /*
  * The following function implement the controller interface for the eventpoll
  * file that enable the insertion/removal/change of file descriptors inside
- * the interest set. It rapresents the kernel part of the user spcae epoll_ctl(2).
+ * the interest set. It rapresents the kernel part of the user space epoll_ctl(2).
  */
 asmlinkage long sys_epoll_ctl(int epfd, int op, int fd, struct epoll_event *event)
 {
@@ -551,8 +539,8 @@ asmlinkage long sys_epoll_ctl(int epfd, int op, int fd, struct epoll_event *even
 	struct epitem *epi;
 	struct epoll_event epds;
 
-	DNPRINTK(3, (KERN_INFO "[%p] eventpoll: sys_epoll_ctl(%d, %d, %d, %u)\n",
-		     current, epfd, op, fd, event->events));
+	DNPRINTK(3, (KERN_INFO "[%p] eventpoll: sys_epoll_ctl(%d, %d, %d, %p)\n",
+		     current, epfd, op, fd, event));
 
 	error = -EFAULT;
 	if (copy_from_user(&epds, event, sizeof(struct epoll_event)))
@@ -633,8 +621,8 @@ eexit_3:
 eexit_2:
 	fput(file);
 eexit_1:
-	DNPRINTK(3, (KERN_INFO "[%p] eventpoll: sys_epoll_ctl(%d, %d, %d, %u) = %d\n",
-		     current, epfd, op, fd, event->events, error));
+	DNPRINTK(3, (KERN_INFO "[%p] eventpoll: sys_epoll_ctl(%d, %d, %d, %p) = %d\n",
+		     current, epfd, op, fd, event, error));
 
 	return error;
 }

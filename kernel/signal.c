@@ -579,8 +579,8 @@ static int rm_from_queue(unsigned long mask, struct sigpending *s)
 /*
  * Bad permissions for sending the signal
  */
-static inline int check_kill_permission(int sig, struct siginfo *info,
-					struct task_struct *t)
+static int check_kill_permission(int sig, struct siginfo *info,
+				 struct task_struct *t)
 {
 	int error = -EINVAL;
 	if (sig < 0 || sig > _NSIG)
@@ -797,10 +797,11 @@ force_sig_info(int sig, struct siginfo *info, struct task_struct *t)
 	int ret;
 
 	spin_lock_irqsave(&t->sighand->siglock, flags);
-	if (t->sighand->action[sig-1].sa.sa_handler == SIG_IGN)
+	if (sigismember(&t->blocked, sig) || t->sighand->action[sig-1].sa.sa_handler == SIG_IGN) {
 		t->sighand->action[sig-1].sa.sa_handler = SIG_DFL;
-	sigdelset(&t->blocked, sig);
-	recalc_sigpending_tsk(t);
+		sigdelset(&t->blocked, sig);
+		recalc_sigpending_tsk(t);
+	}
 	ret = specific_send_sig_info(sig, info, t);
 	spin_unlock_irqrestore(&t->sighand->siglock, flags);
 
@@ -2081,10 +2082,56 @@ sys_kill(int pid, int sig)
 	info.si_signo = sig;
 	info.si_errno = 0;
 	info.si_code = SI_USER;
-	info.si_pid = current->pid;
+	info.si_pid = current->tgid;
 	info.si_uid = current->uid;
 
 	return kill_something_info(sig, &info, pid);
+}
+
+/**
+ *  sys_tkill - send signal to one specific thread
+ *  @tgid: the thread group ID of the thread
+ *  @pid: the PID of the thread
+ *  @sig: signal to be sent
+ *
+ *  This syscall also checks the tgid and returns -ESRCH even if the PID
+ *  exists but it's not belonging to the target process anymore. This
+ *  method solves the problem of threads exiting and PIDs getting reused.
+ */
+asmlinkage long sys_tgkill(int tgid, int pid, int sig)
+{
+	struct siginfo info;
+	int error;
+	struct task_struct *p;
+
+	/* This is only valid for single tasks */
+	if (pid <= 0 || tgid <= 0)
+		return -EINVAL;
+
+	info.si_signo = sig;
+	info.si_errno = 0;
+	info.si_code = SI_TKILL;
+	info.si_pid = current->tgid;
+	info.si_uid = current->uid;
+
+	read_lock(&tasklist_lock);
+	p = find_task_by_pid(pid);
+	error = -ESRCH;
+	if (p && (p->tgid == tgid)) {
+		error = check_kill_permission(sig, &info, p);
+		/*
+		 * The null signal is a permissions and process existence
+		 * probe.  No signal is actually delivered.
+		 */
+		if (!error && sig && p->sighand) {
+			spin_lock_irq(&p->sighand->siglock);
+			handle_stop_signal(sig, p);
+			error = specific_send_sig_info(sig, &info, p);
+			spin_unlock_irq(&p->sighand->siglock);
+		}
+	}
+	read_unlock(&tasklist_lock);
+	return error;
 }
 
 /*
@@ -2104,7 +2151,7 @@ sys_tkill(int pid, int sig)
 	info.si_signo = sig;
 	info.si_errno = 0;
 	info.si_code = SI_TKILL;
-	info.si_pid = current->pid;
+	info.si_pid = current->tgid;
 	info.si_uid = current->uid;
 
 	read_lock(&tasklist_lock);

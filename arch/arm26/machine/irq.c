@@ -73,7 +73,6 @@ static struct irqchip arc_a_chip = {
 static void arc_mask_irq_b(unsigned int irq)
 {
 	unsigned int val, mask;
-
 	mask = 1 << (irq & 7);
 	val = ioc_readb(IOC_IRQMASKB);
 	ioc_writeb(val & ~mask, IOC_IRQMASKB);
@@ -94,7 +93,7 @@ static struct irqchip arc_b_chip = {
         .unmask = arc_unmask_irq_b,
 };
 
-/* FIXME - JMA none of these functions are used in arm26
+/* FIXME - JMA none of these functions are used in arm26 currently
 static void arc_mask_irq_fiq(unsigned int irq)
 {
 	unsigned int val, mask;
@@ -124,6 +123,7 @@ void __init arc_init_irq(void)
 {
 	unsigned int irq, flags;
 
+	/* Disable all IOC interrupt sources */
 	ioc_writeb(0, IOC_IRQMASKA);
 	ioc_writeb(0, IOC_IRQMASKB);
 	ioc_writeb(0, IOC_FIQMASK);

@@ -26,7 +26,7 @@
 #include <asm/mach-types.h>
 #include <asm/page.h>
 
-#include <asm/arch.h>
+//#include <asm/arch.h>
 //#include <asm/mach/irq.h>
 
 /*

@@ -129,7 +129,7 @@ static __inline__ void activate_context(struct mm_struct *mm)
    (Currently not used) */
 static __inline__ void switch_mm(struct mm_struct *prev,
 				 struct mm_struct *next,
-				 struct task_struct *tsk, unsigned int cpu)
+				 struct task_struct *tsk)
 {
 	if (likely(prev != next)) {
 		unsigned long __pgdir = (unsigned long)next->pgd;
@@ -144,10 +144,10 @@ static __inline__ void switch_mm(struct mm_struct *prev,
 #define deactivate_mm(tsk,mm)	do { } while (0)
 
 #define activate_mm(prev, next) \
-	switch_mm((prev),(next),NULL,smp_processor_id())
+	switch_mm((prev),(next),NULL)
 
 static __inline__ void
-enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk, unsigned cpu)
+enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk)
 {
 }
 #else /* !CONFIG_MMU */
@@ -157,10 +157,10 @@ enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk, unsigned cpu)
 #define set_asid(asid)			do { } while (0)
 #define get_asid()			(0)
 #define activate_context(mm)		do { } while (0)
-#define switch_mm(prev,next,tsk,cpu)	do { } while (0)
+#define switch_mm(prev,next,tsk)	do { } while (0)
 #define deactivate_mm(tsk,mm)		do { } while (0)
 #define activate_mm(prev,next)		do { } while (0)
-#define enter_lazy_tlb(mm,tsk,cpu)	do { } while (0)
+#define enter_lazy_tlb(mm,tsk)		do { } while (0)
 #endif /* CONFIG_MMU */
 
 #if defined(CONFIG_CPU_SH3) || defined(CONFIG_CPU_SH4)

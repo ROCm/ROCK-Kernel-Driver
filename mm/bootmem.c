@@ -84,10 +84,6 @@ static void __init reserve_bootmem_core(bootmem_data_t *bdata, unsigned long add
 
 	if (!size) BUG();
 
-	if (sidx < 0)
-		BUG();
-	if (eidx < 0)
-		BUG();
 	if (sidx >= eidx)
 		BUG();
 	if ((addr >> PAGE_SHIFT) >= bdata->node_low_pfn)
@@ -202,7 +198,7 @@ restart_scan:
 		;
 	}
 
-	if (preferred) {
+	if (preferred > offset) {
 		preferred = offset;
 		goto restart_scan;
 	}

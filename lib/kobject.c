@@ -314,6 +314,21 @@ int kobject_register(struct kobject * kobj)
 }
 
 /**
+ *	kobject_rename - change the name of an object
+ *	@kobj:	object in question.
+ *	@new_name: object's new name
+ */
+
+void kobject_rename(struct kobject * kobj, char *new_name)
+{
+	kobj = kobject_get(kobj);
+	if (!kobj)
+		return;
+	sysfs_rename_dir(kobj, new_name);
+	kobject_put(kobj);
+}
+
+/**
  *	kobject_del - unlink kobject from hierarchy.
  * 	@kobj:	object.
  */

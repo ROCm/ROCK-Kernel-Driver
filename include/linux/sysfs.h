@@ -10,9 +10,11 @@
 #define _SYSFS_H_
 
 struct kobject;
+struct module;
 
 struct attribute {
 	char			* name;
+	struct module 		* owner;
 	mode_t			mode;
 };
 
@@ -36,6 +38,9 @@ sysfs_create_dir(struct kobject *);
 
 extern void
 sysfs_remove_dir(struct kobject *);
+
+extern void
+sysfs_rename_dir(struct kobject *, char *new_name);
 
 extern int
 sysfs_create_file(struct kobject *, struct attribute *);

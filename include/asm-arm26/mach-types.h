@@ -1,5 +1,6 @@
 /*
  * Unlike ARM32 this is NOT automatically generated. DONT delete it
+ * Instead, consider FIXME-ing it so its auto-detected.
  */
 
 #ifndef __ASM_ARM_MACH_TYPE_H

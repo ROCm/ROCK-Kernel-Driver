@@ -14,6 +14,8 @@
 #include <linux/string.h>
 #include <linux/binfmts.h>
 #include <linux/mm.h>
+#include <linux/security.h>
+
 #include <asm/segment.h> 
 #include <asm/ptrace.h>
 #include <asm/processor.h>
@@ -339,7 +341,7 @@ int setup_arg_pages(struct linux_binprm *bprm)
 	if (!mpnt) 
 		return -ENOMEM; 
 	
-	if (!vm_enough_memory((IA32_STACK_TOP - (PAGE_MASK & (unsigned long) bprm->p))>>PAGE_SHIFT)) {
+	if (security_vm_enough_memory((IA32_STACK_TOP - (PAGE_MASK & (unsigned long) bprm->p))>>PAGE_SHIFT)) {
 		kmem_cache_free(vm_area_cachep, mpnt);
 		return -ENOMEM;
 	}

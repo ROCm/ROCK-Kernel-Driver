@@ -28,6 +28,7 @@
 #include <linux/vfs.h>
 #include <linux/namei.h>
 #include <linux/socket.h>
+#include <linux/security.h>
 
 #include <asm/ptrace.h>
 #include <asm/page.h>
@@ -527,8 +528,6 @@ asmlinkage int irix_gtime(struct pt_regs *regs)
 	return get_seconds();
 }
 
-int vm_enough_memory(long pages);
-
 /*
  * IRIX is completely broken... it returns 0 on success, otherwise
  * ENOMEM.
@@ -585,7 +584,7 @@ asmlinkage int irix_brk(unsigned long brk)
 	/*
 	 * Check if we have enough memory..
 	 */
-	if (!vm_enough_memory((newbrk-oldbrk) >> PAGE_SHIFT)) {
+	if (security_vm_enough_memory((newbrk-oldbrk) >> PAGE_SHIFT)) {
 		ret = -ENOMEM;
 		goto out;
 	}

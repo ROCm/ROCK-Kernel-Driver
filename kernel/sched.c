@@ -508,8 +508,8 @@ repeat_lock_task:
 		}
 #ifdef CONFIG_SMP
 	       	else
-			if (unlikely(kick) && task_running(rq, p) && (p->thread_info->cpu != smp_processor_id()))
-				smp_send_reschedule(p->thread_info->cpu);
+			if (unlikely(kick) && task_running(rq, p) && (task_cpu(p) != smp_processor_id()))
+				smp_send_reschedule(task_cpu(p));
 #endif
 		p->state = TASK_RUNNING;
 	}
@@ -646,9 +646,9 @@ static inline task_t * context_switch(runqueue_t *rq, task_t *prev, task_t *next
 	if (unlikely(!mm)) {
 		next->active_mm = oldmm;
 		atomic_inc(&oldmm->mm_count);
-		enter_lazy_tlb(oldmm, next, smp_processor_id());
+		enter_lazy_tlb(oldmm, next);
 	} else
-		switch_mm(oldmm, mm, next, smp_processor_id());
+		switch_mm(oldmm, mm, next);
 
 	if (unlikely(!prev->mm)) {
 		prev->active_mm = NULL;
@@ -1175,6 +1175,7 @@ DEFINE_PER_CPU(struct kernel_stat, kstat) = { { 0 } };
 void scheduler_tick(int user_ticks, int sys_ticks)
 {
 	int cpu = smp_processor_id();
+	struct cpu_usage_stat *cpustat = &kstat_this_cpu.cpustat;
 	runqueue_t *rq = this_rq();
 	task_t *p = current;
 
@@ -1184,19 +1185,19 @@ void scheduler_tick(int user_ticks, int sys_ticks)
 	if (p == rq->idle) {
 		/* note: this timer irq context must be accounted for as well */
 		if (irq_count() - HARDIRQ_OFFSET >= SOFTIRQ_OFFSET)
-			kstat_cpu(cpu).cpustat.system += sys_ticks;
+			cpustat->system += sys_ticks;
 		else if (atomic_read(&rq->nr_iowait) > 0)
-			kstat_cpu(cpu).cpustat.iowait += sys_ticks;
+			cpustat->iowait += sys_ticks;
 		else
-			kstat_cpu(cpu).cpustat.idle += sys_ticks;
+			cpustat->idle += sys_ticks;
 		rebalance_tick(rq, 1);
 		return;
 	}
 	if (TASK_NICE(p) > 0)
-		kstat_cpu(cpu).cpustat.nice += user_ticks;
+		cpustat->nice += user_ticks;
 	else
-		kstat_cpu(cpu).cpustat.user += user_ticks;
-	kstat_cpu(cpu).cpustat.system += sys_ticks;
+		cpustat->user += user_ticks;
+	cpustat->system += sys_ticks;
 
 	/* Task might have expired already, but not scheduled off yet */
 	if (p->array != rq->active) {
@@ -1332,7 +1333,7 @@ pick_next_task:
 switch_tasks:
 	prefetch(next);
 	clear_tsk_need_resched(prev);
-	RCU_qsctr(prev->thread_info->cpu)++;
+	RCU_qsctr(task_cpu(prev))++;
 
 	if (likely(prev != next)) {
 		rq->nr_switches++;
@@ -2527,7 +2528,7 @@ void __init sched_init(void)
 	 * The boot idle thread does lazy MMU switching as well:
 	 */
 	atomic_inc(&init_mm.mm_count);
-	enter_lazy_tlb(&init_mm, current, smp_processor_id());
+	enter_lazy_tlb(&init_mm, current);
 }
 
 #ifdef CONFIG_DEBUG_SPINLOCK_SLEEP

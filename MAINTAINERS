@@ -245,6 +245,21 @@ M:	jschlst@samba.org
 L:	linux-atalk@lists.netspace.org
 S:	Maintained
 
+ARM26 ARCHITECTURE
+P:	Ian Molton
+M:	spyro@f2s.com
+S:	Maintained
+
+ARM26/ARCHIMEDES
+P:	Ian Molton
+M:	spyro@f2s.com
+S:	Maintained
+
+ARM26/A5000
+P:	John Appleby
+M:	john@dnsworld.co.uk
+S:	Maintained
+
 ARM MFM AND FLOPPY DRIVERS
 P:	Dave Gilbert
 M:	linux@treblig.org
@@ -1265,8 +1280,8 @@ L:	linux-hams@vger.kernel.org
 S:	Maintained
 
 NETWORK BLOCK DEVICE
-P:	Pavel Machek
-M:	pavel@atrey.karlin.mff.cuni.cz
+P:	Paul Clements
+M:	Paul.Clements@steeleye.com
 S:	Maintained
 
 NETWORK DEVICE DRIVERS
@@ -2088,11 +2103,10 @@ L:	user-mode-linux-user@lists.sourceforge.net
 W:	http://user-mode-linux.sourceforge.net
 S:	Maintained
 	
-VFAT FILESYSTEM:
-P:	Gordon Chaffee
-M:	chaffee@cs.berkeley.edu
+FAT/VFAT/MSDOS FILESYSTEM:
+P:	OGAWA Hirofumi
+M:	hirofumi@mail.parknet.co.jp
 L:	linux-kernel@vger.kernel.org
-W:	http://bmrc.berkeley.edu/people/chaffee
 S:	Maintained
 
 VIA 82Cxxx AUDIO DRIVER

@@ -56,6 +56,8 @@
 #include <linux/smp_lock.h>
 #include <linux/init.h>
 #include <linux/version.h>
+#include <linux/pci.h>
+
 #include <asm/current.h>
 #include <asm/uaccess.h>
 #include <asm/io.h>

@@ -1203,12 +1203,12 @@ static int read_suspend_image(const char * specialfile, int noresume)
 
 void software_resume(void)
 {
-#ifdef CONFIG_SMP
-	printk(KERN_WARNING "Software Suspend has a malfunctioning SMP support. Disabled :(\n");
-#else
+	if (num_online_cpus() > 1) {
+		printk(KERN_WARNING "Software Suspend has malfunctioning SMP support. Disabled :(\n");	
+		return;
+	}
 	/* We enable the possibility of machine suspend */
 	software_suspend_enabled = 1;
-#endif
 	if (!resume_status)
 		return;
 

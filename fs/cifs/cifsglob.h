@@ -149,7 +149,9 @@ struct cifsSesInfo {
 	struct TCP_Server_Info *server;	/* pointer to server info */
 	atomic_t inUse;		/* # of CURRENT users of this ses */
 	enum statusEnum status;
+	__u32 sequence_number;  /* needed for CIFS PDU signature */
 	__u16 ipc_tid;		/* special tid for connection to IPC share */
+	char mac_signing_key[CIFS_SESSION_KEY_SIZE + 16];	
 	char *serverOS;		/* name of operating system underlying the server */
 	char *serverNOS;	/* name of network operating system that the server is running */
 	char *serverDomain;	/* security realm of server */
@@ -249,6 +251,7 @@ struct mid_q_entry {
 	struct list_head qhead;	/* mids waiting on reply from this server */
 	__u16 mid;		/* multiplex id */
 	__u16 pid;		/* process id */
+	__u32 sequence_number;  /* for CIFS signing */
 	__u16 command;		/* smb command code */
 	struct timeval when_sent;	/* time when smb sent */
 	struct cifsSesInfo *ses;	/* smb was sent to this server */

@@ -175,7 +175,8 @@ STATIC int
 linvfs_create(
 	struct inode	*dir,
 	struct dentry	*dentry,
-	int		mode)
+	int		mode,
+	struct nameidata *nd)
 {
 	return linvfs_mknod(dir, dentry, mode, 0);
 }
@@ -192,7 +193,8 @@ linvfs_mkdir(
 STATIC struct dentry *
 linvfs_lookup(
 	struct inode	*dir,
-	struct dentry	*dentry)
+	struct dentry	*dentry,
+	struct nameidata *nd)
 {
 	struct inode	*ip = NULL;
 	vnode_t		*vp, *cvp = NULL;
@@ -429,7 +431,8 @@ linvfs_follow_link(
 STATIC int
 linvfs_permission(
 	struct inode	*inode,
-	int		mode)
+	int		mode,
+	struct nameidata *nd)
 {
 	vnode_t		*vp = LINVFS_GET_VP(inode);
 	int		error;
@@ -639,7 +642,7 @@ linvfs_setxattr(
 }
 
 STATIC ssize_t
-linvfs_getxattr(
+__linvfs_getxattr(
 	struct dentry	*dentry,
 	const char	*name,
 	void		*data,
@@ -694,9 +697,24 @@ linvfs_getxattr(
 	return -EOPNOTSUPP;
 }
 
+STATIC ssize_t
+linvfs_getxattr(
+	struct dentry	*dentry,
+	const char	*name,
+	void		*data,
+	size_t		size)
+{
+	int error;
+
+	down(&dentry->d_inode->i_sem);
+	error = __linvfs_getxattr(dentry, name, data, size);
+	up(&dentry->d_inode->i_sem);
+
+	return error;
+}
 
 STATIC ssize_t
-linvfs_listxattr(
+__linvfs_listxattr(
 	struct dentry		*dentry,
 	char			*data,
 	size_t			size)
@@ -736,6 +754,21 @@ linvfs_listxattr(
 		}
 	}
 	return result;
+}
+
+STATIC ssize_t
+linvfs_listxattr(
+	struct dentry		*dentry,
+	char			*data,
+	size_t			size)
+{
+	int error;
+
+	down(&dentry->d_inode->i_sem);
+	error = __linvfs_listxattr(dentry, data, size);
+	up(&dentry->d_inode->i_sem);
+
+	return error;
 }
 
 STATIC int

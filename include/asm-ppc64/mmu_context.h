@@ -56,7 +56,7 @@ struct mmu_context_queue_t {
 extern struct mmu_context_queue_t mmu_context_queue;
 
 static inline void
-enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk, unsigned cpu)
+enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk)
 {
 }
 
@@ -140,10 +140,10 @@ extern void flush_stab(struct task_struct *tsk, struct mm_struct *mm);
  */
 static inline void
 switch_mm(struct mm_struct *prev, struct mm_struct *next,
-	  struct task_struct *tsk, int cpu)
+	  struct task_struct *tsk)
 {
 	flush_stab(tsk, next);
-	set_bit(cpu, &next->cpu_vm_mask);
+	set_bit(smp_processor_id(), &next->cpu_vm_mask);
 }
 
 #define deactivate_mm(tsk,mm)	do { } while (0)
@@ -153,7 +153,7 @@ switch_mm(struct mm_struct *prev, struct mm_struct *next,
  * the context for the new mm so we see the new mappings.
  */
 #define activate_mm(active_mm, mm) \
-	switch_mm(active_mm, mm, current, smp_processor_id());
+	switch_mm(active_mm, mm, current);
 
 #define VSID_RANDOMIZER 42470972311
 #define VSID_MASK	0xfffffffff

@@ -19,7 +19,7 @@
 #include <linux/hfs_fs.h>
 #include <linux/smp_lock.h>
 
-static int hfs_revalidate_dentry(struct dentry *, int);
+static int hfs_revalidate_dentry(struct dentry *, struct nameidata *);
 static int hfs_hash_dentry(struct dentry *, struct qstr *);
 static int hfs_compare_dentry(struct dentry *, struct qstr *, struct qstr *);
 static void hfs_dentry_iput(struct dentry *, struct inode *);
@@ -90,7 +90,7 @@ static void hfs_dentry_iput(struct dentry *dentry, struct inode *inode)
 	iput(inode);
 }
 
-static int hfs_revalidate_dentry(struct dentry *dentry, int flags)
+static int hfs_revalidate_dentry(struct dentry *dentry, struct nameidata *nd)
 {
 	struct inode *inode = dentry->d_inode;
 	int diff;

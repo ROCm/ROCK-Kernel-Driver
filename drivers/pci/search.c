@@ -7,12 +7,14 @@
  *	Copyright 2003 -- Greg Kroah-Hartman <greg@kroah.com>
  */
 
+#include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/module.h>
+#include <linux/interrupt.h>
 
 spinlock_t pci_bus_lock = SPIN_LOCK_UNLOCKED;
 
-static struct pci_bus *
+static struct pci_bus * __devinit
 pci_do_find_bus(struct pci_bus* bus, unsigned char busnr)
 {
 	struct pci_bus* child;
@@ -30,22 +32,24 @@ pci_do_find_bus(struct pci_bus* bus, unsigned char busnr)
 }
 
 /**
- * pci_find_bus - locate PCI bus from a given bus number
+ * pci_find_bus - locate PCI bus from a given domain and bus number
+ * @domain: number of PCI domain to search
  * @busnr: number of desired PCI bus
  *
- * Given a PCI bus number, the desired PCI bus is located in system
- * global list of PCI buses.  If the bus is found, a pointer to its
+ * Given a PCI bus number and domain number, the desired PCI bus is located
+ * in the global list of PCI buses.  If the bus is found, a pointer to its
  * data structure is returned.  If no bus is found, %NULL is returned.
  */
-struct pci_bus *
-pci_find_bus(unsigned char busnr)
+struct pci_bus * __devinit pci_find_bus(int domain, int busnr)
 {
-	struct pci_bus* bus = NULL;
-	struct pci_bus* tmp_bus;
+	struct pci_bus *bus = NULL;
+	struct pci_bus *tmp_bus;
 
 	while ((bus = pci_find_next_bus(bus)) != NULL)  {
+		if (pci_domain_nr(bus) != domain)
+			continue;
 		tmp_bus = pci_do_find_bus(bus, busnr);
-		if(tmp_bus)
+		if (tmp_bus)
 			return tmp_bus;
 	}
 	return NULL;
@@ -66,7 +70,7 @@ pci_find_next_bus(const struct pci_bus *from)
 	struct list_head *n;
 	struct pci_bus *b = NULL;
 
-	WARN_ON(irqs_disabled());
+	WARN_ON(in_interrupt());
 	spin_lock(&pci_bus_lock);
 	n = from ? from->node.next : pci_root_buses.next;
 	if (n != &pci_root_buses)
@@ -125,7 +129,7 @@ pci_find_subsys(unsigned int vendor, unsigned int device,
 	struct list_head *n;
 	struct pci_dev *dev;
 
-	WARN_ON(irqs_disabled());
+	WARN_ON(in_interrupt());
 	spin_lock(&pci_bus_lock);
 	n = from ? from->global_list.next : pci_devices.next;
 
@@ -190,7 +194,7 @@ pci_get_subsys(unsigned int vendor, unsigned int device,
 	struct list_head *n;
 	struct pci_dev *dev;
 
-	WARN_ON(irqs_disabled());
+	WARN_ON(in_interrupt());
 	spin_lock(&pci_bus_lock);
 	n = from ? from->global_list.next : pci_devices.next;
 
@@ -256,7 +260,7 @@ pci_find_device_reverse(unsigned int vendor, unsigned int device, const struct p
 	struct list_head *n;
 	struct pci_dev *dev;
 
-	WARN_ON(irqs_disabled());
+	WARN_ON(in_interrupt());
 	spin_lock(&pci_bus_lock);
 	n = from ? from->global_list.prev : pci_devices.prev;
 

@@ -462,6 +462,7 @@ EXPORT_SYMBOL(preempt_schedule);
 #endif
 EXPORT_SYMBOL(schedule_timeout);
 EXPORT_SYMBOL(yield);
+EXPORT_SYMBOL(io_schedule);
 EXPORT_SYMBOL(__cond_resched);
 EXPORT_SYMBOL(set_user_nice);
 EXPORT_SYMBOL(task_nice);
@@ -586,7 +587,7 @@ EXPORT_SYMBOL(tasklet_kill);
 EXPORT_SYMBOL(do_softirq);
 EXPORT_SYMBOL(raise_softirq);
 EXPORT_SYMBOL(open_softirq);
-EXPORT_SYMBOL(cpu_raise_softirq);
+EXPORT_SYMBOL(raise_softirq_irqoff);
 EXPORT_SYMBOL(__tasklet_schedule);
 EXPORT_SYMBOL(__tasklet_hi_schedule);
 

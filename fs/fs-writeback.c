@@ -516,6 +516,7 @@ int generic_osync_inode(struct inode *inode, int what)
 	int need_write_inode_now = 0;
 	int err2;
 
+	current->flags |= PF_SYNCWRITE;
 	if (what & OSYNC_DATA)
 		err = filemap_fdatawrite(inode->i_mapping);
 	if (what & (OSYNC_METADATA|OSYNC_DATA)) {
@@ -528,6 +529,7 @@ int generic_osync_inode(struct inode *inode, int what)
 		if (!err)
 			err = err2;
 	}
+	current->flags &= ~PF_SYNCWRITE;
 
 	spin_lock(&inode_lock);
 	if ((inode->i_state & I_DIRTY) &&

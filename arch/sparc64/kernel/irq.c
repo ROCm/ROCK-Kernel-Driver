@@ -733,7 +733,7 @@ void handler_irq(int irq, struct pt_regs *regs)
 #endif
 
 	irq_enter();
-	kstat_cpu(cpu).irqs[irq]++;
+	kstat_this_cpu.irqs[irq]++;
 
 	/* Sliiiick... */
 #ifndef CONFIG_SMP
@@ -805,7 +805,7 @@ void sparc_floppy_irq(int irq, void *dev_cookie, struct pt_regs *regs)
 	int cpu = smp_processor_id();
 
 	irq_enter();
-	kstat_cpu(cpu).irqs[irq]++;
+	kstat_this_cpu.irqs[irq]++;
 
 	*(irq_work(cpu, irq)) = 0;
 	bucket = get_ino_in_irqaction(action) + ivector_table;

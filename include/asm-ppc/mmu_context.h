@@ -48,7 +48,7 @@
    	-- Dan
  */
 
-static inline void enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk, unsigned cpu)
+static inline void enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk)
 {
 }
 
@@ -153,7 +153,7 @@ static inline void destroy_context(struct mm_struct *mm)
 }
 
 static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
-			     struct task_struct *tsk, int cpu)
+			     struct task_struct *tsk)
 {
 	tsk->thread.pgdir = next->pgd;
 	get_mmu_context(next);

@@ -88,7 +88,7 @@ void __adfs_error(struct super_block *sb, const char *function,
 #define adfs_error(sb, fmt...) __adfs_error(sb, __FUNCTION__, fmt)
 
 /* namei.c */
-extern struct dentry *adfs_lookup(struct inode *dir, struct dentry *dentry);
+extern struct dentry *adfs_lookup(struct inode *dir, struct dentry *dentry, struct nameidata *);
 
 /* super.c */
 

@@ -30,7 +30,7 @@ extern struct inode *pseudo_root;
  */
 
 /* nothing for now ... */
-static int umsdos_dentry_validate(struct dentry *dentry, int flags)
+static int umsdos_dentry_validate(struct dentry *dentry, struct nameidata *nd)
 {
 	return 1;
 }
@@ -564,7 +564,7 @@ out_remove:
  * Called by VFS; should fill dentry->d_inode via d_add.
  */
 
-struct dentry *UMSDOS_lookup (struct inode *dir, struct dentry *dentry)
+struct dentry *UMSDOS_lookup (struct inode *dir, struct dentry *dentry, struct nameidata *nd)
 {
 	struct dentry *ret;
 

@@ -230,6 +230,7 @@ void reparent_to_init(void)
 	/* signals? */
 	security_task_reparent_to_init(current);
 	memcpy(current->rlim, init_task.rlim, sizeof(*(current->rlim)));
+	atomic_inc(&(INIT_USER->__count));
 	switch_uid(INIT_USER);
 
 	write_unlock_irq(&tasklist_lock);
@@ -442,7 +443,7 @@ static inline void __exit_mm(struct task_struct * tsk)
 	/* more a memory barrier than a real lock */
 	task_lock(tsk);
 	tsk->mm = NULL;
-	enter_lazy_tlb(mm, current, smp_processor_id());
+	enter_lazy_tlb(mm, current);
 	task_unlock(tsk);
 	mmput(mm);
 }
@@ -651,6 +652,8 @@ static void exit_notify(struct task_struct *tsk)
 	if (tsk->exit_signal != -1) {
 		int signal = tsk->parent == tsk->real_parent ? tsk->exit_signal : SIGCHLD;
 		do_notify_parent(tsk, signal);
+	} else if (tsk->ptrace) {
+		do_notify_parent(tsk, SIGCHLD);
 	}
 
 	tsk->state = TASK_ZOMBIE;
@@ -680,6 +683,8 @@ NORET_TYPE void do_exit(long code)
 		panic("Attempted to kill the idle task!");
 	if (unlikely(tsk->pid == 1))
 		panic("Attempted to kill init!");
+	if (tsk->io_context)
+		exit_io_context();
 	tsk->flags |= PF_EXITING;
 	del_timer_sync(&tsk->real_timer);
 
@@ -715,7 +720,7 @@ NORET_TYPE void do_exit(long code)
 	tsk->exit_code = code;
 	exit_notify(tsk);
 
-	if (tsk->exit_signal == -1)
+	if (tsk->exit_signal == -1 && tsk->ptrace == 0)
 		release_task(tsk);
 
 	schedule();
@@ -859,7 +864,7 @@ static int wait_task_zombie(task_t *p, unsigned int *stat_addr, struct rusage *r
 		BUG_ON(state != TASK_DEAD);
 		return 0;
 	}
-	if (unlikely(p->exit_signal == -1))
+	if (unlikely(p->exit_signal == -1 && p->ptrace == 0))
 		/*
 		 * This can only happen in a race with a ptraced thread
 		 * dying on another processor.
@@ -889,8 +894,12 @@ static int wait_task_zombie(task_t *p, unsigned int *stat_addr, struct rusage *r
 		/* Double-check with lock held.  */
 		if (p->real_parent != p->parent) {
 			__ptrace_unlink(p);
-			do_notify_parent(p, p->exit_signal);
 			p->state = TASK_ZOMBIE;
+			/* If this is a detached thread, this is where it goes away.  */
+			if (p->exit_signal == -1)
+				release_task (p);
+			else
+				do_notify_parent(p, p->exit_signal);
 			p = NULL;
 		}
 		write_unlock_irq(&tasklist_lock);

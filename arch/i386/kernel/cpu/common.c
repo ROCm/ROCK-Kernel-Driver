@@ -430,6 +430,14 @@ void __init early_cpu_init(void)
 	rise_init_cpu();
 	nexgen_init_cpu();
 	umc_init_cpu();
+
+#ifdef CONFIG_DEBUG_PAGEALLOC
+	/* pse is not compatible with on-the-fly unmapping,
+	 * disable it even if the cpus claim to support it.
+	 */
+	clear_bit(X86_FEATURE_PSE, boot_cpu_data.x86_capability);
+	disable_pse = 1;
+#endif
 }
 /*
  * cpu_init() initializes state that is per-CPU. Some data is already
@@ -487,7 +495,7 @@ void __init cpu_init (void)
 	current->active_mm = &init_mm;
 	if (current->mm)
 		BUG();
-	enter_lazy_tlb(&init_mm, current, cpu);
+	enter_lazy_tlb(&init_mm, current);
 
 	load_esp0(t, thread->esp0);
 	set_tss_desc(cpu,t);

@@ -71,7 +71,7 @@ DECLARE_PER_CPU(u8, ia64_need_tlb_flush);
 extern void wrap_mmu_context (struct mm_struct *mm);
 
 static inline void
-enter_lazy_tlb (struct mm_struct *mm, struct task_struct *tsk, unsigned cpu)
+enter_lazy_tlb (struct mm_struct *mm, struct task_struct *tsk)
 {
 }
 
@@ -198,7 +198,7 @@ activate_mm (struct mm_struct *prev, struct mm_struct *next)
 	activate_context(next);
 }
 
-#define switch_mm(prev_mm,next_mm,next_task,cpu)	activate_mm(prev_mm, next_mm)
+#define switch_mm(prev_mm,next_mm,next_task)	activate_mm(prev_mm, next_mm)
 
 # endif /* ! __ASSEMBLY__ */
 #endif /* _ASM_IA64_MMU_CONTEXT_H */

@@ -311,8 +311,3 @@ serial_tstc(void *ignored)
 
 	return(!(rbdf->cbd_sc & BD_SC_EMPTY));
 }
-
-void
-serial_close(unsigned long com_port)
-{
-}

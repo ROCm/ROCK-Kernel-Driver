@@ -42,40 +42,50 @@ static kmem_cache_t *request_cachep;
 static LIST_HEAD(blk_plug_list);
 static spinlock_t blk_plug_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 
-/*
- * Number of requests per queue.  This many for reads and for writes (twice
- * this number, total).
- */
-static int queue_nr_requests;
-
-unsigned long blk_max_low_pfn, blk_max_pfn;
 static wait_queue_head_t congestion_wqh[2];
 
 /*
- * Return the threshold (number of free requests) at which the queue is
+ * Controlling structure to kblockd
+ */
+static struct workqueue_struct *kblockd_workqueue; 
+
+unsigned long blk_max_low_pfn, blk_max_pfn;
+
+/* Amount of time in which a process may batch requests */
+#define BLK_BATCH_TIME	(HZ/50UL)
+
+/* Number of requests a "batching" process may submit */
+#define BLK_BATCH_REQ	32
+
+/*
+ * Return the threshold (number of used requests) at which the queue is
  * considered to be congested.  It include a little hysteresis to keep the
  * context switch rate down.
  */
-static inline int queue_congestion_on_threshold(void)
+static inline int queue_congestion_on_threshold(struct request_queue *q)
 {
 	int ret;
 
-	ret = queue_nr_requests / 8 - 1;
-	if (ret < 0)
-		ret = 1;
+	ret = q->nr_requests - (q->nr_requests / 8) + 1;
+
+	if (ret > q->nr_requests)
+		ret = q->nr_requests;
+
 	return ret;
 }
 
 /*
  * The threshold at which a queue is considered to be uncongested
  */
-static inline int queue_congestion_off_threshold(void)
+static inline int queue_congestion_off_threshold(struct request_queue *q)
 {
 	int ret;
 
-	ret = queue_nr_requests / 8 + 1;
-	if (ret > queue_nr_requests)
-		ret = queue_nr_requests;
+	ret = q->nr_requests - (q->nr_requests / 8) - 1;
+
+	if (ret < 1)
+		ret = 1;
+
 	return ret;
 }
 
@@ -188,6 +198,7 @@ void blk_queue_make_request(request_queue_t * q, make_request_fn * mfn)
 	/*
 	 * set defaults
 	 */
+	q->nr_requests = BLKDEV_MAX_RQ;
 	q->max_phys_segments = MAX_PHYS_SEGMENTS;
 	q->max_hw_segments = MAX_HW_SEGMENTS;
 	q->make_request_fn = mfn;
@@ -441,13 +452,15 @@ void blk_queue_free_tags(request_queue_t *q)
 	q->queue_flags &= ~(1 << QUEUE_FLAG_QUEUED);
 }
 
-static int init_tag_map(struct blk_queue_tag *tags, int depth)
+static int
+init_tag_map(request_queue_t *q, struct blk_queue_tag *tags, int depth)
 {
 	int bits, i;
 
-	if (depth > (queue_nr_requests*2)) {
-		depth = (queue_nr_requests*2);
-		printk(KERN_ERR "%s: adjusted depth to %d\n", __FUNCTION__, depth);
+	if (depth > q->nr_requests * 2) {
+		depth = q->nr_requests * 2;
+		printk(KERN_ERR "%s: adjusted depth to %d\n",
+				__FUNCTION__, depth);
 	}
 
 	tags->tag_index = kmalloc(depth * sizeof(struct request *), GFP_ATOMIC);
@@ -476,7 +489,6 @@ fail:
 	return -ENOMEM;
 }
 
-
 /**
  * blk_queue_init_tags - initialize the queue tag info
  * @q:  the request queue for the device
@@ -490,7 +502,7 @@ int blk_queue_init_tags(request_queue_t *q, int depth)
 	if (!tags)
 		goto fail;
 
-	if (init_tag_map(tags, depth))
+	if (init_tag_map(q, tags, depth))
 		goto fail;
 
 	INIT_LIST_HEAD(&tags->busy_list);
@@ -540,7 +552,7 @@ int blk_queue_resize_tags(request_queue_t *q, int new_depth)
 	tag_map = bqt->tag_map;
 	max_depth = bqt->real_max_depth;
 
-	if (init_tag_map(bqt, new_depth))
+	if (init_tag_map(q, bqt, new_depth))
 		return -ENOMEM;
 
 	memcpy(bqt->tag_index, tag_index, max_depth * sizeof(struct request *));
@@ -1022,7 +1034,7 @@ static inline void __generic_unplug_device(request_queue_t *q)
 	/*
 	 * was plugged, fire request_fn if queue has stuff to do
 	 */
-	if (!elv_queue_empty(q))
+	if (elv_next_request(q))
 		q->request_fn(q);
 }
 
@@ -1057,7 +1069,7 @@ static void blk_unplug_timeout(unsigned long data)
 {
 	request_queue_t *q = (request_queue_t *)data;
 
-	schedule_work(&q->unplug_work);
+	kblockd_schedule_work(&q->unplug_work);
 }
 
 /**
@@ -1072,8 +1084,8 @@ static void blk_unplug_timeout(unsigned long data)
  **/
 void blk_start_queue(request_queue_t *q)
 {
-	if (test_and_clear_bit(QUEUE_FLAG_STOPPED, &q->queue_flags))
-		schedule_work(&q->unplug_work);
+	clear_bit(QUEUE_FLAG_STOPPED, &q->queue_flags);
+	schedule_work(&q->unplug_work);
 }
 
 /**
@@ -1165,7 +1177,7 @@ void blk_cleanup_queue(request_queue_t * q)
 	elevator_exit(q);
 
 	del_timer_sync(&q->unplug_timer);
-	flush_scheduled_work();
+	kblockd_flush();
 
 	mempool_destroy(rl->rq_pool);
 
@@ -1180,6 +1192,8 @@ static int blk_init_free_list(request_queue_t *q)
 	struct request_list *rl = &q->rq;
 
 	rl->count[READ] = rl->count[WRITE] = 0;
+	init_waitqueue_head(&rl->wait[READ]);
+	init_waitqueue_head(&rl->wait[WRITE]);
 
 	rl->rq_pool = mempool_create(BLKDEV_MIN_RQ, mempool_alloc_slab, mempool_free_slab, request_cachep);
 
@@ -1190,6 +1204,18 @@ static int blk_init_free_list(request_queue_t *q)
 }
 
 static int __make_request(request_queue_t *, struct bio *);
+
+static elevator_t *chosen_elevator = &iosched_as;
+
+static int __init elevator_setup(char *str)
+{
+	if (!strcmp(str, "deadline"))
+		chosen_elevator = &iosched_deadline;
+	if (!strcmp(str, "as"))
+		chosen_elevator = &iosched_as;
+	return 1;
+}
+__setup("elevator=", elevator_setup);
 
 /**
  * blk_init_queue  - prepare a request queue for use with a block device
@@ -1222,11 +1248,20 @@ static int __make_request(request_queue_t *, struct bio *);
 int blk_init_queue(request_queue_t *q, request_fn_proc *rfn, spinlock_t *lock)
 {
 	int ret;
+	static int printed;
 
 	if (blk_init_free_list(q))
 		return -ENOMEM;
 
-	if ((ret = elevator_init(q, &iosched_deadline))) {
+	if (!printed) {
+		printed = 1;
+		if (chosen_elevator == &iosched_deadline)
+			printk("deadline elevator\n");
+		else if (chosen_elevator == &iosched_as)
+			printk("anticipatory scheduling elevator\n");
+	}
+
+	if ((ret = elevator_init(q, chosen_elevator))) {
 		blk_cleanup_queue(q);
 		return ret;
 	}
@@ -1271,6 +1306,60 @@ static inline struct request *blk_alloc_request(request_queue_t *q,int gfp_mask)
 	return NULL;
 }
 
+/*
+ * ioc_batching returns true if the ioc is a valid batching request and
+ * should be given priority access to a request.
+ */
+static inline int ioc_batching(struct io_context *ioc)
+{
+	if (!ioc)
+		return 0;
+
+	/*
+	 * Make sure the process is able to allocate at least 1 request
+	 * even if the batch times out, otherwise we could theoretically
+	 * lose wakeups.
+	 */
+	return ioc->nr_batch_requests == BLK_BATCH_REQ ||
+		(ioc->nr_batch_requests > 0
+		&& time_before(jiffies, ioc->last_waited + BLK_BATCH_TIME));
+}
+
+/*
+ * ioc_set_batching sets ioc to be a new "batcher" if it is not one. This
+ * will cause the process to be a "batcher" on all queues in the system. This
+ * is the behaviour we want though - once it gets a wakeup it should be given
+ * a nice run.
+ */
+void ioc_set_batching(struct io_context *ioc)
+{
+	if (!ioc || ioc_batching(ioc))
+		return;
+
+	ioc->nr_batch_requests = BLK_BATCH_REQ;
+	ioc->last_waited = jiffies;
+}
+
+/*
+ * A request has just been released.  Account for it, update the full and
+ * congestion status, wake up any waiters.   Called under q->queue_lock.
+ */
+static void freed_request(request_queue_t *q, int rw)
+{
+	struct request_list *rl = &q->rq;
+
+	rl->count[rw]--;
+	if (rl->count[rw] < queue_congestion_off_threshold(q))
+		clear_queue_congested(q, rw);
+	if (rl->count[rw]+1 <= q->nr_requests) {
+		smp_mb();
+		if (waitqueue_active(&rl->wait[rw]))
+			wake_up(&rl->wait[rw]);
+		if (!waitqueue_active(&rl->wait[rw]))
+			blk_clear_queue_full(q, rw);
+	}
+}
+
 #define blkdev_free_rq(list) list_entry((list)->next, struct request, queuelist)
 /*
  * Get a free request, queue_lock must not be held
@@ -1279,26 +1368,54 @@ static struct request *get_request(request_queue_t *q, int rw, int gfp_mask)
 {
 	struct request *rq = NULL;
 	struct request_list *rl = &q->rq;
+	struct io_context *ioc = get_io_context(gfp_mask);
 
 	spin_lock_irq(q->queue_lock);
-	if (rl->count[rw] == BLKDEV_MAX_RQ) {
+	if (rl->count[rw]+1 >= q->nr_requests) {
+		/*
+		 * The queue will fill after this allocation, so set it as
+		 * full, and mark this process as "batching". This process
+		 * will be allowed to complete a batch of requests, others
+		 * will be blocked.
+		 */
+		if (!blk_queue_full(q, rw)) {
+			ioc_set_batching(ioc);
+			blk_set_queue_full(q, rw);
+		}
+	}
+
+	if (blk_queue_full(q, rw)
+			&& !ioc_batching(ioc) && !elv_may_queue(q, rw)) {
+		/*
+		 * The queue is full and the allocating process is not a
+		 * "batcher", and not exempted by the IO scheduler
+		 */
 		spin_unlock_irq(q->queue_lock);
 		goto out;
 	}
+
 	rl->count[rw]++;
-	if ((BLKDEV_MAX_RQ - rl->count[rw]) < queue_congestion_on_threshold())
+	if (rl->count[rw] >= queue_congestion_on_threshold(q))
 		set_queue_congested(q, rw);
 	spin_unlock_irq(q->queue_lock);
 
 	rq = blk_alloc_request(q, gfp_mask);
 	if (!rq) {
+		/*
+		 * Allocation failed presumably due to memory. Undo anything
+		 * we might have messed up.
+		 *
+		 * Allocating task should really be put onto the front of the
+		 * wait queue, but this is pretty rare.
+		 */
 		spin_lock_irq(q->queue_lock);
-		rl->count[rw]--;
-		if ((BLKDEV_MAX_RQ - rl->count[rw]) >= queue_congestion_off_threshold())
-                        clear_queue_congested(q, rw);
+		freed_request(q, rw);
 		spin_unlock_irq(q->queue_lock);
 		goto out;
 	}
+
+	if (ioc_batching(ioc))
+		ioc->nr_batch_requests--;
 	
 	INIT_LIST_HEAD(&rq->queuelist);
 
@@ -1321,22 +1438,44 @@ static struct request *get_request(request_queue_t *q, int rw, int gfp_mask)
 	rq->sense = NULL;
 
 out:
+	put_io_context(ioc);
 	return rq;
 }
 
 /*
- * No available requests for this queue, unplug the device.
+ * No available requests for this queue, unplug the device and wait for some
+ * requests to become available.
  */
 static struct request *get_request_wait(request_queue_t *q, int rw)
 {
+	DEFINE_WAIT(wait);
 	struct request *rq;
 
 	generic_unplug_device(q);
 	do {
+		struct request_list *rl = &q->rq;
+
+		prepare_to_wait_exclusive(&rl->wait[rw], &wait,
+				TASK_UNINTERRUPTIBLE);
+
 		rq = get_request(q, rw, GFP_NOIO);
 
-		if (!rq)
-			blk_congestion_wait(rw, HZ / 50);
+		if (!rq) {
+			struct io_context *ioc;
+
+			io_schedule();
+
+			/*
+			 * After sleeping, we become a "batching" process and
+			 * will be able to allocate at least one request, and
+			 * up to a big batch of them for a small period time.
+			 * See ioc_batching, ioc_set_batching
+			 */
+			ioc = get_io_context(GFP_NOIO);
+			ioc_set_batching(ioc);
+			put_io_context(ioc);
+		}
+		finish_wait(&rl->wait[rw], &wait);
 	} while (!rq);
 
 	return rq;
@@ -1348,10 +1487,10 @@ struct request *blk_get_request(request_queue_t *q, int rw, int gfp_mask)
 
 	BUG_ON(rw != READ && rw != WRITE);
 
-	rq = get_request(q, rw, gfp_mask);
-
-	if (!rq && (gfp_mask & __GFP_WAIT))
+	if (gfp_mask & __GFP_WAIT)
 		rq = get_request_wait(q, rw);
+	else
+		rq = get_request(q, rw, gfp_mask);
 
 	return rq;
 }
@@ -1482,6 +1621,8 @@ void __blk_put_request(request_queue_t *q, struct request *req)
 	if (unlikely(--req->ref_count))
 		return;
 
+	elv_completed_request(req->q, req);
+
 	req->rq_status = RQ_INACTIVE;
 	req->q = NULL;
 	req->rl = NULL;
@@ -1496,10 +1637,7 @@ void __blk_put_request(request_queue_t *q, struct request *req)
 		BUG_ON(!list_empty(&req->queuelist));
 
 		blk_free_request(q, req);
-
-		rl->count[rw]--;
-		if ((BLKDEV_MAX_RQ - rl->count[rw]) >= queue_congestion_off_threshold())
-			clear_queue_congested(q, rw);
+		freed_request(q, rw);
 	}
 }
 
@@ -1786,20 +1924,18 @@ out:
 		__blk_put_request(q, freereq);
 
 	if (blk_queue_plugged(q)) {
-		int nr_queued = q->rq.count[0] + q->rq.count[1];
+		int nr_queued = q->rq.count[READ] + q->rq.count[WRITE];
 
 		if (nr_queued == q->unplug_thresh)
 			__generic_unplug_device(q);
 	}
 	spin_unlock_irq(q->queue_lock);
-
 	return 0;
 
 end_io:
 	bio_endio(bio, nr_sectors << 9, -EWOULDBLOCK);
 	return 0;
 }
-
 
 /*
  * If bio->bi_dev is a partition, remap the location
@@ -1850,8 +1986,7 @@ static inline void blk_partition_remap(struct bio *bio)
  * bio happens to be merged with someone else, and may change bi_dev and
  * bi_sector for remaps as it sees fit.  So the values of these fields
  * should NOT be depended on after the call to generic_make_request.
- *
- * */
+ */
 void generic_make_request(struct bio *bio)
 {
 	request_queue_t *q;
@@ -2282,22 +2417,28 @@ void blk_rq_prep_restart(struct request *rq)
 	rq->current_nr_sectors = rq->hard_cur_sectors;
 }
 
+int kblockd_schedule_work(struct work_struct *work)
+{
+	return queue_work(kblockd_workqueue, work);
+}
+
+void kblockd_flush(void)
+{
+	flush_workqueue(kblockd_workqueue);
+}
+
 int __init blk_dev_init(void)
 {
 	int i;
+
+	kblockd_workqueue = create_workqueue("kblockd");
+	if (!kblockd_workqueue)
+		panic("Failed to create kblockd\n");
 
 	request_cachep = kmem_cache_create("blkdev_requests",
 			sizeof(struct request), 0, 0, NULL, NULL);
 	if (!request_cachep)
 		panic("Can't create request pool slab cache\n");
-
-	queue_nr_requests = BLKDEV_MAX_RQ;
-
-	printk("block request queues:\n");
-	printk(" %d/%d requests per read queue\n", BLKDEV_MIN_RQ, queue_nr_requests);
-	printk(" %d/%d requests per write queue\n", BLKDEV_MIN_RQ, queue_nr_requests);
-	printk(" enter congestion at %d\n", queue_congestion_on_threshold());
-	printk(" exit congestion at %d\n", queue_congestion_off_threshold());
 
 	blk_max_low_pfn = max_low_pfn;
 	blk_max_pfn = max_pfn;
@@ -2305,7 +2446,257 @@ int __init blk_dev_init(void)
 	for (i = 0; i < ARRAY_SIZE(congestion_wqh); i++)
 		init_waitqueue_head(&congestion_wqh[i]);
 	return 0;
+}
+
+static atomic_t nr_io_contexts = ATOMIC_INIT(0);
+
+/*
+ * IO Context helper functions
+ */
+void put_io_context(struct io_context *ioc)
+{
+	if (ioc == NULL)
+		return;
+
+	BUG_ON(atomic_read(&ioc->refcount) == 0);
+
+	if (atomic_dec_and_test(&ioc->refcount)) {
+		if (ioc->aic && ioc->aic->dtor)
+			ioc->aic->dtor(ioc->aic);
+		kfree(ioc);
+		atomic_dec(&nr_io_contexts);
+	}
+}
+
+/* Called by the exitting task */
+void exit_io_context(void)
+{
+	unsigned long flags;
+	struct io_context *ioc;
+
+	local_irq_save(flags);
+	ioc = current->io_context;
+	if (ioc) {
+		if (ioc->aic && ioc->aic->exit)
+			ioc->aic->exit(ioc->aic);
+		put_io_context(ioc);
+		current->io_context = NULL;
+	} else
+		WARN_ON(1);
+	local_irq_restore(flags);
+}
+
+/*
+ * If the current task has no IO context then create one and initialise it.
+ * If it does have a context, take a ref on it.
+ *
+ * This is always called in the context of the task which submitted the I/O.
+ * But weird things happen, so we disable local interrupts to ensure exclusive
+ * access to *current.
+ */
+struct io_context *get_io_context(int gfp_flags)
+{
+	struct task_struct *tsk = current;
+	unsigned long flags;
+	struct io_context *ret;
+
+	local_irq_save(flags);
+	ret = tsk->io_context;
+	if (ret == NULL) {
+		ret = kmalloc(sizeof(*ret), GFP_ATOMIC);
+		if (ret) {
+			atomic_inc(&nr_io_contexts);
+			atomic_set(&ret->refcount, 1);
+			ret->pid = tsk->pid;
+			ret->last_waited = jiffies; /* doesn't matter... */
+			ret->nr_batch_requests = 0; /* because this is 0 */
+			ret->aic = NULL;
+			tsk->io_context = ret;
+		}
+	}
+	if (ret)
+		atomic_inc(&ret->refcount);
+	local_irq_restore(flags);
+	return ret;
+}
+
+void copy_io_context(struct io_context **pdst, struct io_context **psrc)
+{
+	struct io_context *src = *psrc;
+	struct io_context *dst = *pdst;
+
+	if (src) {
+		BUG_ON(atomic_read(&src->refcount) == 0);
+		atomic_inc(&src->refcount);
+		put_io_context(dst);
+		*pdst = src;
+	}
+}
+
+void swap_io_context(struct io_context **ioc1, struct io_context **ioc2)
+{
+	struct io_context *temp;
+	temp = *ioc1;
+	*ioc1 = *ioc2;
+	*ioc2 = temp;
+}
+
+
+/*
+ * sysfs parts below
+ */
+struct queue_sysfs_entry {
+	struct attribute attr;
+	ssize_t (*show)(struct request_queue *, char *);
+	ssize_t (*store)(struct request_queue *, const char *, size_t);
 };
+
+static ssize_t
+queue_var_show(unsigned int var, char *page)
+{
+	return sprintf(page, "%d\n", var);
+}
+
+static ssize_t
+queue_var_store(unsigned long *var, const char *page, size_t count)
+{
+	char *p = (char *) page;
+
+	*var = simple_strtoul(p, &p, 10);
+	return count;
+}
+
+static ssize_t queue_requests_show(struct request_queue *q, char *page)
+{
+	return queue_var_show(q->nr_requests, (page));
+}
+
+static ssize_t
+queue_requests_store(struct request_queue *q, const char *page, size_t count)
+{
+	struct request_list *rl = &q->rq;
+
+	int ret = queue_var_store(&q->nr_requests, page, count);
+	if (q->nr_requests < BLKDEV_MIN_RQ)
+		q->nr_requests = BLKDEV_MIN_RQ;
+
+	if (rl->count[READ] >= queue_congestion_on_threshold(q))
+		set_queue_congested(q, READ);
+	else if (rl->count[READ] < queue_congestion_off_threshold(q))
+		clear_queue_congested(q, READ);
+
+	if (rl->count[WRITE] >= queue_congestion_on_threshold(q))
+		set_queue_congested(q, WRITE);
+	else if (rl->count[WRITE] < queue_congestion_off_threshold(q))
+		clear_queue_congested(q, WRITE);
+
+	if (rl->count[READ] >= q->nr_requests) {
+		blk_set_queue_full(q, READ);
+	} else if (rl->count[READ]+1 <= q->nr_requests) {
+		blk_clear_queue_full(q, READ);
+		wake_up(&rl->wait[READ]);
+	}
+
+	if (rl->count[WRITE] >= q->nr_requests) {
+		blk_set_queue_full(q, WRITE);
+	} else if (rl->count[WRITE]+1 <= q->nr_requests) {
+		blk_clear_queue_full(q, WRITE);
+		wake_up(&rl->wait[WRITE]);
+	}
+	return ret;
+}
+
+static struct queue_sysfs_entry queue_requests_entry = {
+	.attr = {.name = "nr_requests", .mode = S_IRUGO | S_IWUSR },
+	.show = queue_requests_show,
+	.store = queue_requests_store,
+};
+
+static struct attribute *default_attrs[] = {
+	&queue_requests_entry.attr,
+	NULL,
+};
+
+#define to_queue(atr) container_of((atr), struct queue_sysfs_entry, attr)
+
+static ssize_t
+queue_attr_show(struct kobject *kobj, struct attribute *attr, char *page)
+{
+	struct queue_sysfs_entry *entry = to_queue(attr);
+	struct request_queue *q;
+
+	q = container_of(kobj, struct request_queue, kobj);
+	if (!entry->show)
+		return 0;
+
+	return entry->show(q, page);
+}
+
+static ssize_t
+queue_attr_store(struct kobject *kobj, struct attribute *attr,
+		    const char *page, size_t length)
+{
+	struct queue_sysfs_entry *entry = to_queue(attr);
+	struct request_queue *q;
+
+	q = container_of(kobj, struct request_queue, kobj);
+	if (!entry->store)
+		return -EINVAL;
+
+	return entry->store(q, page, length);
+}
+
+static struct sysfs_ops queue_sysfs_ops = {
+	.show	= queue_attr_show,
+	.store	= queue_attr_store,
+};
+
+struct kobj_type queue_ktype = {
+	.sysfs_ops	= &queue_sysfs_ops,
+	.default_attrs	= default_attrs,
+};
+
+int blk_register_queue(struct gendisk *disk)
+{
+	int ret;
+
+	request_queue_t *q = disk->queue;
+
+	if (!q)
+		return -ENXIO;
+
+	q->kobj.parent = kobject_get(&disk->kobj);
+	if (!q->kobj.parent)
+		return -EBUSY;
+
+	snprintf(q->kobj.name, KOBJ_NAME_LEN, "%s", "queue");
+	q->kobj.ktype = &queue_ktype;
+
+	ret = kobject_register(&q->kobj);
+	if (ret < 0)
+		return ret;
+
+	ret = elv_register_queue(q);
+	if (ret) {
+		kobject_unregister(&q->kobj);
+		return ret;
+	}
+
+	return 0;
+}
+
+void blk_unregister_queue(struct gendisk *disk)
+{
+	request_queue_t *q = disk->queue;
+
+	if (q) {
+		elv_unregister_queue(q);
+
+		kobject_unregister(&q->kobj);
+		kobject_put(&disk->kobj);
+	}
+}
+
 
 EXPORT_SYMBOL(process_that_request_first);
 EXPORT_SYMBOL(end_that_request_first);

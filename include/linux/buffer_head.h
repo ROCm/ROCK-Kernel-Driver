@@ -167,6 +167,7 @@ struct buffer_head *__find_get_block(struct block_device *, sector_t, int);
 struct buffer_head * __getblk(struct block_device *, sector_t, int);
 void __brelse(struct buffer_head *);
 void __bforget(struct buffer_head *);
+void __breadahead(struct block_device *, sector_t block, int size);
 struct buffer_head *__bread(struct block_device *, sector_t block, int size);
 struct buffer_head *alloc_buffer_head(int gfp_flags);
 void free_buffer_head(struct buffer_head * bh);
@@ -239,6 +240,12 @@ static inline struct buffer_head *
 sb_bread(struct super_block *sb, sector_t block)
 {
 	return __bread(sb->s_bdev, block, sb->s_blocksize);
+}
+
+static inline void
+sb_breadahead(struct super_block *sb, sector_t block)
+{
+	__breadahead(sb->s_bdev, block, sb->s_blocksize);
 }
 
 static inline struct buffer_head *

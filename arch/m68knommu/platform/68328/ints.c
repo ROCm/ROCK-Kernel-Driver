@@ -81,6 +81,7 @@ unsigned int local_irq_count[NR_CPUS];
 /* irq node variables for the 32 (potential) on chip sources */
 static irq_node_t int_irq_list[NR_IRQS];
 
+#if !defined(CONFIG_DRAGEN2)
 asm ("
 	.global _start, __ramend
 	.section .romvec
@@ -102,6 +103,7 @@ e_vectors:
 ignore: rte
 
 ");
+#endif
 
 /*
  * This function should be called during kernel startup to initialize
@@ -204,7 +206,7 @@ int show_interrupts(struct seq_file *p, void *v)
 			seq_printf(p, "  ");
 		seq_printf(p, "%s\n", int_irq_list[i].devname);
 	}
-	seq_printf(p, "   : %10u   spurious", num_spurious);
+	seq_printf(p, "   : %10u   spurious\n", num_spurious);
 
 	return 0;
 }

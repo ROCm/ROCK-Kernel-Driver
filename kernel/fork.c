@@ -286,7 +286,7 @@ static inline int dup_mmap(struct mm_struct * mm, struct mm_struct * oldmm)
 			continue;
 		if (mpnt->vm_flags & VM_ACCOUNT) {
 			unsigned int len = (mpnt->vm_end - mpnt->vm_start) >> PAGE_SHIFT;
-			if (!vm_enough_memory(len))
+			if (security_vm_enough_memory(len))
 				goto fail_nomem;
 			charge += len;
 		}
@@ -864,6 +864,7 @@ struct task_struct *copy_process(unsigned long clone_flags,
 	p->lock_depth = -1;		/* -1 = no lock */
 	p->start_time = get_jiffies_64();
 	p->security = NULL;
+	p->io_context = NULL;
 
 	retval = -ENOMEM;
 	if ((retval = security_task_alloc(p)))

@@ -219,7 +219,7 @@ static inline long do_sys_truncate(const char __user * path, loff_t length)
 	if (!S_ISREG(inode->i_mode))
 		goto dput_and_out;
 
-	error = permission(inode,MAY_WRITE);
+	error = permission(inode,MAY_WRITE,&nd);
 	if (error)
 		goto dput_and_out;
 
@@ -365,7 +365,7 @@ asmlinkage long sys_utime(char __user * filename, struct utimbuf __user * times)
 		newattrs.ia_valid |= ATTR_ATIME_SET | ATTR_MTIME_SET;
 	} else {
 		if (current->fsuid != inode->i_uid &&
-		    (error = permission(inode,MAY_WRITE)) != 0)
+		    (error = permission(inode,MAY_WRITE,&nd)) != 0)
 			goto dput_and_out;
 	}
 	down(&inode->i_sem);
@@ -410,7 +410,7 @@ long do_utimes(char __user * filename, struct timeval * times)
 		newattrs.ia_valid |= ATTR_ATIME_SET | ATTR_MTIME_SET;
 	} else {
 		if (current->fsuid != inode->i_uid &&
-		    (error = permission(inode,MAY_WRITE)) != 0)
+		    (error = permission(inode,MAY_WRITE,&nd)) != 0)
 			goto dput_and_out;
 	}
 	down(&inode->i_sem);
@@ -467,9 +467,9 @@ asmlinkage long sys_access(const char __user * filename, int mode)
 	else
 		current->cap_effective = current->cap_permitted;
 
-	res = user_path_walk(filename, &nd);
+	res = __user_walk(filename, LOOKUP_FOLLOW|LOOKUP_ACCESS, &nd);
 	if (!res) {
-		res = permission(nd.dentry->d_inode, mode);
+		res = permission(nd.dentry->d_inode, mode, &nd);
 		/* SuS v2 requires we report a read only fs too */
 		if(!res && (mode & S_IWOTH) && IS_RDONLY(nd.dentry->d_inode)
 		   && !special_file(nd.dentry->d_inode->i_mode))
@@ -493,7 +493,7 @@ asmlinkage long sys_chdir(const char __user * filename)
 	if (error)
 		goto out;
 
-	error = permission(nd.dentry->d_inode,MAY_EXEC);
+	error = permission(nd.dentry->d_inode,MAY_EXEC,&nd);
 	if (error)
 		goto dput_and_out;
 
@@ -526,7 +526,7 @@ asmlinkage long sys_fchdir(unsigned int fd)
 	if (!S_ISDIR(inode->i_mode))
 		goto out_putf;
 
-	error = permission(inode, MAY_EXEC);
+	error = permission(inode, MAY_EXEC, NULL);
 	if (!error)
 		set_fs_pwd(current->fs, mnt, dentry);
 out_putf:
@@ -544,7 +544,7 @@ asmlinkage long sys_chroot(const char __user * filename)
 	if (error)
 		goto out;
 
-	error = permission(nd.dentry->d_inode,MAY_EXEC);
+	error = permission(nd.dentry->d_inode,MAY_EXEC,&nd);
 	if (error)
 		goto dput_and_out;
 
@@ -952,11 +952,8 @@ int filp_close(struct file *filp, fl_owner_t id)
 		return 0;
 	}
 	retval = 0;
-	if (filp->f_op && filp->f_op->flush) {
-		lock_kernel();
+	if (filp->f_op && filp->f_op->flush)
 		retval = filp->f_op->flush(filp);
-		unlock_kernel();
-	}
 	dnotify_flush(filp, id);
 	locks_remove_posix(filp, id);
 	fput(filp);

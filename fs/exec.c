@@ -117,7 +117,8 @@ asmlinkage long sys_uselib(const char __user * library)
 	struct nameidata nd;
 	int error;
 
-	error = user_path_walk(library, &nd);
+	nd.intent.open.flags = O_RDONLY;
+	error = __user_walk(library, LOOKUP_FOLLOW|LOOKUP_OPEN, &nd);
 	if (error)
 		goto out;
 
@@ -125,7 +126,7 @@ asmlinkage long sys_uselib(const char __user * library)
 	if (!S_ISREG(nd.dentry->d_inode->i_mode))
 		goto exit;
 
-	error = permission(nd.dentry->d_inode, MAY_READ | MAY_EXEC);
+	error = permission(nd.dentry->d_inode, MAY_READ | MAY_EXEC, &nd);
 	if (error)
 		goto exit;
 
@@ -392,7 +393,7 @@ int setup_arg_pages(struct linux_binprm *bprm)
 	if (!mpnt)
 		return -ENOMEM;
 
-	if (!vm_enough_memory((STACK_TOP - (PAGE_MASK & (unsigned long) bprm->p))>>PAGE_SHIFT)) {
+	if (security_vm_enough_memory((STACK_TOP - (PAGE_MASK & (unsigned long) bprm->p))>>PAGE_SHIFT)) {
 		kmem_cache_free(vm_area_cachep, mpnt);
 		return -ENOMEM;
 	}
@@ -441,9 +442,9 @@ static inline void free_arg_pages(struct linux_binprm *bprm)
 {
 	int i;
 
-	for (i = 0 ; i < MAX_ARG_PAGES ; i++) {
+	for (i = 0; i < MAX_ARG_PAGES; i++) {
 		if (bprm->page[i])
-		__free_page(bprm->page[i]);
+			__free_page(bprm->page[i]);
 		bprm->page[i] = NULL;
 	}
 }
@@ -461,7 +462,7 @@ struct file *open_exec(const char *name)
 		file = ERR_PTR(-EACCES);
 		if (!(nd.mnt->mnt_flags & MNT_NOEXEC) &&
 		    S_ISREG(inode->i_mode)) {
-			int err = permission(inode, MAY_EXEC);
+			int err = permission(inode, MAY_EXEC, &nd);
 			if (!err && !(inode->i_mode & 0111))
 				err = -EACCES;
 			file = ERR_PTR(err);
@@ -758,12 +759,6 @@ int flush_old_exec(struct linux_binprm * bprm)
 	char * name;
 	int i, ch, retval;
 
-	/* 
-	 * Release all of the old mmap stuff
-	 */
-	retval = exec_mmap(bprm->mm);
-	if (retval)
-		goto out;
 	/*
 	 * Make sure we have a private signal table and that
 	 * we are unassociated from the previous thread group.
@@ -771,6 +766,15 @@ int flush_old_exec(struct linux_binprm * bprm)
 	retval = de_thread(current);
 	if (retval)
 		goto out;
+
+	/*
+	 * Release all of the old mmap stuff
+	 */
+	retval = exec_mmap(bprm->mm);
+	if (retval)
+		goto out;
+
+	bprm->mm = NULL;		/* We're using it now */
 
 	/* This is the point of no return */
 
@@ -791,7 +795,7 @@ int flush_old_exec(struct linux_binprm * bprm)
 	flush_thread();
 
 	if (bprm->e_uid != current->euid || bprm->e_gid != current->egid || 
-	    permission(bprm->file->f_dentry->d_inode,MAY_READ))
+	    permission(bprm->file->f_dentry->d_inode,MAY_READ, NULL))
 		current->mm->dumpable = 0;
 
 	/* An exec changes our domain. We are no longer part of the thread
@@ -999,7 +1003,7 @@ int search_binary_handler(struct linux_binprm *bprm,struct pt_regs *regs)
 			}
 			read_lock(&binfmt_lock);
 			put_binfmt(fmt);
-			if (retval != -ENOEXEC)
+			if (retval != -ENOEXEC || bprm->mm == NULL)
 				break;
 			if (!bprm->file) {
 				read_unlock(&binfmt_lock);
@@ -1007,7 +1011,7 @@ int search_binary_handler(struct linux_binprm *bprm,struct pt_regs *regs)
 			}
 		}
 		read_unlock(&binfmt_lock);
-		if (retval != -ENOEXEC) {
+		if (retval != -ENOEXEC || bprm->mm == NULL) {
 			break;
 #ifdef CONFIG_KMOD
 		}else{
@@ -1035,7 +1039,6 @@ int do_execve(char * filename,
 	struct linux_binprm bprm;
 	struct file *file;
 	int retval;
-	int i;
 
 	sched_balance_exec();
 
@@ -1103,17 +1106,14 @@ int do_execve(char * filename,
 
 out:
 	/* Something went wrong, return the inode and free the argument pages*/
-	for (i = 0 ; i < MAX_ARG_PAGES ; i++) {
-		struct page * page = bprm.page[i];
-		if (page)
-			__free_page(page);
-	}
+	free_arg_pages(&bprm);
 
 	if (bprm.security)
 		security_bprm_free(&bprm);
 
 out_mm:
-	mmdrop(bprm.mm);
+	if (bprm.mm)
+		mmdrop(bprm.mm);
 
 out_file:
 	if (bprm.file) {
@@ -1256,10 +1256,21 @@ void format_corename(char *corename, const char *pattern, long signr)
 static void zap_threads (struct mm_struct *mm)
 {
 	struct task_struct *g, *p;
+	struct task_struct *tsk = current;
+	struct completion *vfork_done = tsk->vfork_done;
+
+	/*
+	 * Make sure nobody is waiting for us to release the VM,
+	 * otherwise we can deadlock when we wait on each other
+	 */
+	if (vfork_done) {
+		tsk->vfork_done = NULL;
+		complete(vfork_done);
+	}
 
 	read_lock(&tasklist_lock);
 	do_each_thread(g,p)
-		if (mm == p->mm && p != current) {
+		if (mm == p->mm && p != tsk) {
 			force_sig_specific(SIGKILL, p);
 			mm->core_waiters++;
 		}

@@ -8,7 +8,8 @@
 # Tom Rini	January 2001
 #
 
-lib-y					:= string.o util.o misc-common.o
+lib-y					:= string.o util.o misc-common.o \
+						serial_stub.o
 lib-$(CONFIG_PPC_PREP)			+= mpc10x_memory.o
 lib-$(CONFIG_LOPEC)			+= mpc10x_memory.o
 lib-$(CONFIG_PAL4)			+= cpc700_memory.o

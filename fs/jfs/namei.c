@@ -54,11 +54,13 @@ s64 commitZeroLink(tid_t, struct inode *);
  * PARAMETER:	dip 	- parent directory vnode
  *		dentry	- dentry of new file
  *		mode	- create mode (rwxrwxrwx).
+ *		nd- nd struct
  *
  * RETURN:	Errors from subroutines
  *
  */
-int jfs_create(struct inode *dip, struct dentry *dentry, int mode)
+int jfs_create(struct inode *dip, struct dentry *dentry, int mode,
+		struct nameidata *nd)
 {
 	int rc = 0;
 	tid_t tid;		/* transaction id */
@@ -1373,7 +1375,7 @@ int jfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t rdev)
 	return -rc;
 }
 
-static struct dentry *jfs_lookup(struct inode *dip, struct dentry *dentry)
+static struct dentry *jfs_lookup(struct inode *dip, struct dentry *dentry, struct nameidata *nd)
 {
 	struct btstack btstack;
 	ino_t inum;

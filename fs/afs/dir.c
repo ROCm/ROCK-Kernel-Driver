@@ -23,10 +23,10 @@
 #include "super.h"
 #include "internal.h"
 
-static struct dentry *afs_dir_lookup(struct inode *dir, struct dentry *dentry);
+static struct dentry *afs_dir_lookup(struct inode *dir, struct dentry *dentry, struct nameidata *);
 static int afs_dir_open(struct inode *inode, struct file *file);
 static int afs_dir_readdir(struct file *file, void *dirent, filldir_t filldir);
-static int afs_d_revalidate(struct dentry *dentry, int flags);
+static int afs_d_revalidate(struct dentry *dentry, struct nameidata *);
 static int afs_d_delete(struct dentry *dentry);
 static int afs_dir_lookup_filldir(void *_cookie, const char *name, int nlen, loff_t fpos,
 				     ino_t ino, unsigned dtype);
@@ -414,7 +414,7 @@ static int afs_dir_lookup_filldir(void *_cookie, const char *name, int nlen, lof
 /*
  * look up an entry in a directory
  */
-static struct dentry *afs_dir_lookup(struct inode *dir, struct dentry *dentry)
+static struct dentry *afs_dir_lookup(struct inode *dir, struct dentry *dentry, struct nameidata *nd)
 {
 	struct afs_dir_lookup_cookie cookie;
 	struct afs_super_info *as;
@@ -487,7 +487,7 @@ static struct dentry *afs_dir_lookup(struct inode *dir, struct dentry *dentry)
  * - NOTE! the hit can be a negative hit too, so we can't assume we have an inode
  * (derived from nfs_lookup_revalidate)
  */
-static int afs_d_revalidate(struct dentry *dentry, int flags)
+static int afs_d_revalidate(struct dentry *dentry, struct nameidata *nd)
 {
 	struct afs_dir_lookup_cookie cookie;
 	struct dentry *parent;
@@ -495,7 +495,7 @@ static int afs_d_revalidate(struct dentry *dentry, int flags)
 	unsigned fpos;
 	int ret;
 
-	_enter("%s,%x",dentry->d_name.name,flags);
+	_enter("%s,%p",dentry->d_name.name,nd);
 
 	parent = dget_parent(dentry);
 	dir = parent->d_inode;

@@ -105,7 +105,7 @@ int umsdos_make_emd(struct dentry *parent)
 Printk(("umsdos_make_emd: creating EMD %s/%s\n",
 parent->d_name.name, demd->d_name.name));
 
-	err = msdos_create(parent->d_inode, demd, S_IFREG | 0777);
+	err = msdos_create(parent->d_inode, demd, S_IFREG | 0777, NULL);
 	if (err) {
 		printk (KERN_WARNING
 			"umsdos_make_emd: create %s/%s failed, err=%d\n",

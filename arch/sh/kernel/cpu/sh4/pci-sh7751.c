@@ -200,7 +200,7 @@ static void __init pcibios_fixup_peer_bridges(void)
 		return;
 	PCIDBG(2,"PCI: Peer bridge fixup\n");
 	for (n=0; n <= pcibios_last_bus; n++) {
-		if (pci_bus_exists(&pci_root_buses, n))
+		if (pci_find_bus(0, n))
 			continue;
 		bus.number = n;
 		bus.ops = pci_root_ops;

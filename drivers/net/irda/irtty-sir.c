@@ -212,13 +212,6 @@ static int irtty_set_dtr_rts(struct sir_dev *dev, int dtr, int rts)
 /* called from sir_dev when there is more data to send
  * context is either netdev->hard_xmit or some transmit-completion bh
  * i.e. we are under spinlock here and must not sleep.
- *
- * Note: as of 2.5.44 the usb-serial driver calls down() on a semaphore
- * hence we are hitting the might_sleep bugcatcher. IMHO the whole tty-api
- * would be pretty pointless if write_room/write would be allowed to sleep.
- * Furthermore other tty ldiscs (like ppp) do also require the driver not
- * to sleep there. Hence this is considered a current limitation of
- * usb-serial.
  */
 
 static int irtty_do_write(struct sir_dev *dev, const unsigned char *ptr, size_t len)
@@ -269,16 +262,15 @@ static void irtty_receive_buf(struct tty_struct *tty, const unsigned char *cp,
 	struct sirtty_cb *priv = tty->disc_data;
 	int	i;
 
-	if (unlikely(!priv || priv->magic!=IRTTY_MAGIC))
-		return;
-	/* Please use ASSERT - Fix ASSERT as needed - Jean II */
+	ASSERT(priv != NULL, return;);
+	ASSERT(priv->magic == IRTTY_MAGIC, return;);
 
 	if (unlikely(count==0))		/* yes, this happens */
 		return;
 
 	dev = priv->dev;
 	if (!dev) {
-		printk(KERN_ERR "%s(), not ready yet!\n", __FUNCTION__);
+		WARNING("%s(), not ready yet!\n", __FUNCTION__);
 		return;
 	}
 
@@ -306,8 +298,8 @@ static int irtty_receive_room(struct tty_struct *tty)
 {
 	struct sirtty_cb *priv = tty->disc_data;
 
-	if (unlikely(!priv || priv->magic!=IRTTY_MAGIC))
-		return 0;
+	ASSERT(priv != NULL, return 0;);
+	ASSERT(priv->magic == IRTTY_MAGIC, return 0;);
 
 	return 65536;  /* We can handle an infinite amount of data. :-) */
 }
@@ -323,8 +315,8 @@ static void irtty_write_wakeup(struct tty_struct *tty)
 {
 	struct sirtty_cb *priv = tty->disc_data;
 
-	if (unlikely(!priv || priv->magic!=IRTTY_MAGIC))
-		return;
+	ASSERT(priv != NULL, return;);
+	ASSERT(priv->magic == IRTTY_MAGIC, return;);
 
 	tty->flags &= ~(1 << TTY_DO_WRITE_WAKEUP);
 
@@ -559,7 +551,7 @@ static int irtty_open(struct tty_struct *tty)
 
 	up(&irtty_sem);
 
-	printk(KERN_INFO "%s - done\n", __FUNCTION__);
+	IRDA_DEBUG(0, "%s - %s: irda line discipline opened\n", __FUNCTION__, tty->name);
 
 	return 0;
 
@@ -580,8 +572,8 @@ static void irtty_close(struct tty_struct *tty)
 {
 	struct sirtty_cb *priv = tty->disc_data;
 
-	if (!priv  ||  priv->magic != IRTTY_MAGIC)
-		return;
+	ASSERT(priv != NULL, return;);
+	ASSERT(priv->magic == IRTTY_MAGIC, return;);
 
 	/* Hm, with a dongle attached the dongle driver wants
 	 * to close the dongle - which requires the use of
@@ -610,6 +602,8 @@ static void irtty_close(struct tty_struct *tty)
 		tty->driver->stop(tty);
 
 	kfree(priv);
+
+	IRDA_DEBUG(0, "%s - %s: irda line discipline closed\n", __FUNCTION__, tty->name);
 }
 
 /* ------------------------------------------------------- */

@@ -82,9 +82,6 @@ nfs_file_open(struct inode *inode, struct file *filp)
 	/* Do NFSv4 open() call */
 	if ((open = server->rpc_ops->file_open) != NULL)
 		res = open(inode, filp);
-	/* Do cto revalidation */
-	else if (!(server->flags & NFS_MOUNT_NOCTO))
-		res = __nfs_revalidate_inode(server, inode);
 	/* Call generic open code in order to cache credentials */
 	if (!res)
 		res = nfs_open(inode, filp);
@@ -104,11 +101,13 @@ nfs_file_flush(struct file *file)
 
 	dfprintk(VFS, "nfs: flush(%s/%ld)\n", inode->i_sb->s_id, inode->i_ino);
 
+	lock_kernel();
 	status = nfs_wb_file(inode, file);
 	if (!status) {
 		status = file->f_error;
 		file->f_error = 0;
 	}
+	unlock_kernel();
 	return status;
 }
 

@@ -130,11 +130,12 @@ __get_new_mm_context(struct mm_struct *mm, long cpu)
 
 __EXTERN_INLINE void
 ev5_switch_mm(struct mm_struct *prev_mm, struct mm_struct *next_mm,
-	      struct task_struct *next, long cpu)
+	      struct task_struct *next)
 {
 	/* Check if our ASN is of an older version, and thus invalid. */
 	unsigned long asn;
 	unsigned long mmc;
+	long cpu = smp_processor_id();
 
 #ifdef CONFIG_SMP
 	cpu_data[cpu].asn_lock = 1;
@@ -159,7 +160,7 @@ ev5_switch_mm(struct mm_struct *prev_mm, struct mm_struct *next_mm,
 
 __EXTERN_INLINE void
 ev4_switch_mm(struct mm_struct *prev_mm, struct mm_struct *next_mm,
-	      struct task_struct *next, long cpu)
+	      struct task_struct *next)
 {
 	/* As described, ASN's are broken for TLB usage.  But we can
 	   optimize for switching between threads -- if the mm is
@@ -174,7 +175,7 @@ ev4_switch_mm(struct mm_struct *prev_mm, struct mm_struct *next_mm,
 
 	/* Do continue to allocate ASNs, because we can still use them
 	   to avoid flushing the icache.  */
-	ev5_switch_mm(prev_mm, next_mm, next, cpu);
+	ev5_switch_mm(prev_mm, next_mm, next);
 }
 
 extern void __load_new_mm_context(struct mm_struct *);
@@ -212,14 +213,14 @@ ev4_activate_mm(struct mm_struct *prev_mm, struct mm_struct *next_mm)
 #define deactivate_mm(tsk,mm)	do { } while (0)
 
 #ifdef CONFIG_ALPHA_GENERIC
-# define switch_mm(a,b,c,d)	alpha_mv.mv_switch_mm((a),(b),(c),(d))
+# define switch_mm(a,b,c)	alpha_mv.mv_switch_mm((a),(b),(c))
 # define activate_mm(x,y)	alpha_mv.mv_activate_mm((x),(y))
 #else
 # ifdef CONFIG_ALPHA_EV4
-#  define switch_mm(a,b,c,d)	ev4_switch_mm((a),(b),(c),(d))
+#  define switch_mm(a,b,c)	ev4_switch_mm((a),(b),(c))
 #  define activate_mm(x,y)	ev4_activate_mm((x),(y))
 # else
-#  define switch_mm(a,b,c,d)	ev5_switch_mm((a),(b),(c),(d))
+#  define switch_mm(a,b,c)	ev5_switch_mm((a),(b),(c))
 #  define activate_mm(x,y)	ev5_activate_mm((x),(y))
 # endif
 #endif
@@ -245,7 +246,7 @@ destroy_context(struct mm_struct *mm)
 }
 
 static inline void
-enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk, unsigned cpu)
+enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk)
 {
 	tsk->thread_info->pcb.ptbr
 	  = ((unsigned long)mm->pgd - IDENT_ADDR) >> PAGE_SHIFT;
