@@ -40,7 +40,6 @@
 #include <linux/init.h>
 #include <linux/tty.h>
 #include <linux/kmod.h>
-#include <linux/wireless.h>
 #include <linux/spinlock.h>
 
 #include <asm/ioctls.h>
