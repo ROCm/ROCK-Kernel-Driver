@@ -509,6 +509,10 @@ static int yenta_sock_suspend(struct pcmcia_socket *sock)
 #define BRIDGE_IO_MAX 256
 #define BRIDGE_IO_MIN 32
 
+#ifndef PCIBIOS_MIN_CARDBUS_IO
+#define PCIBIOS_MIN_CARDBUS_IO PCIBIOS_MIN_IO
+#endif
+
 static void yenta_allocate_res(struct yenta_socket *socket, int nr, unsigned type)
 {
 	struct pci_bus *bus;
@@ -551,7 +555,7 @@ static void yenta_allocate_res(struct yenta_socket *socket, int nr, unsigned typ
 		align = 1024;
 		size = BRIDGE_IO_MAX;
 		min = BRIDGE_IO_MIN;
-		start = PCIBIOS_MIN_IO;
+		start = PCIBIOS_MIN_CARDBUS_IO;
 		end = ~0U;
 	} else {
 		unsigned long avail = root->end - root->start;
