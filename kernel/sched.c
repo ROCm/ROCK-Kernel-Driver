@@ -736,7 +736,7 @@ static int try_to_wake_up(task_t * p, unsigned int state, int sync)
 
 	/* Passive load balancing */
 	load = get_low_cpu_load(cpu, 1);
-	this_load = get_high_cpu_load(this_cpu, 1);
+	this_load = get_high_cpu_load(this_cpu, 1) + SCHED_LOAD_SCALE;
 	if (load > this_load) {
 		new_cpu = sched_balance_wake(this_cpu, p);
 		set_task_cpu(p, new_cpu);
@@ -1201,6 +1201,9 @@ void sched_balance_exec(void)
 	if (numnodes == 1)
 		return;
 
+	if (this_rq()->nr_running <= 1)
+		return;
+
 	while (domain->parent && !(domain->flags & SD_FLAG_EXEC))
 		domain = domain->parent;
 
@@ -1367,7 +1370,7 @@ find_busiest_group(struct sched_domain *domain, int this_cpu,
 				unsigned long *imbalance, enum idle_type idle)
 {
 	unsigned long max_load, avg_load, total_load, this_load;
-	int modify, total_nr_cpus, busiest_nr_cpus = 0;
+	int modify, total_nr_cpus, busiest_nr_cpus, this_nr_cpus;
 	enum idle_type package_idle = IDLE;
 	struct sched_group *busiest = NULL, *group = domain->groups;
 
@@ -1375,6 +1378,8 @@ find_busiest_group(struct sched_domain *domain, int this_cpu,
 	this_load = 0;
 	total_load = 0;
 	total_nr_cpus = 0;
+	busiest_nr_cpus = 0;
+	this_nr_cpus = 0;
 
 	if (group == NULL)
 		goto out_balanced;
@@ -1418,14 +1423,30 @@ find_busiest_group(struct sched_domain *domain, int this_cpu,
 			goto nextgroup;
 
 		total_load += avg_load;
-		total_nr_cpus += nr_cpus;
-		avg_load /= nr_cpus;
+
+		/*
+		 * Load is cumulative over SD_FLAG_IDLE domains, but
+		 * spread over !SD_FLAG_IDLE domains. For example, 2
+		 * processes running on an SMT CPU puts a load of 2 on
+		 * that CPU, however 2 processes running on 2 CPUs puts
+		 * a load of 1 on that domain.
+		 *
+		 * This should be configurable so as SMT siblings become
+		 * more powerful, they can "spread" more load - for example,
+		 * the above case might only count as a load of 1.7.
+		 */
+		if (!(domain->flags & SD_FLAG_IDLE)) {
+			avg_load /= nr_cpus;
+			total_nr_cpus += nr_cpus;
+		} else
+			total_nr_cpus++;
 
 		if (avg_load > max_load)
 			max_load = avg_load;
 
 		if (local_group) {
 			this_load = avg_load;
+			this_nr_cpus = nr_cpus;
 		} else if (avg_load >= max_load) {
 			busiest = group;
 			busiest_nr_cpus = nr_cpus;
@@ -1438,7 +1459,8 @@ nextgroup:
 		goto out_balanced;
 
 	avg_load = total_load / total_nr_cpus;
-	if (idle == NOT_IDLE && this_load >= avg_load)
+
+	if (this_load >= avg_load)
 		goto out_balanced;
 
 	if (idle == NOT_IDLE && 100*max_load <= domain->imbalance_pct*this_load)
@@ -1455,21 +1477,16 @@ nextgroup:
 	 * by pulling tasks to us.  Be careful of negative numbers as they'll
 	 * appear as very large values with unsigned longs.
 	 */
-	if (avg_load >= this_load) {
-		*imbalance = min(max_load - avg_load, avg_load - this_load);
-		/* Get rid of the scaling factor, rounding *up* as we divide */
-		*imbalance = (*imbalance + SCHED_LOAD_SCALE - 1)
-						>> SCHED_LOAD_SHIFT;
-	} else
-		*imbalance = 0;
+	*imbalance = (min(max_load - avg_load, avg_load - this_load) + 1) / 2;
+	/* Get rid of the scaling factor, rounding *up* as we divide */
+	*imbalance = (*imbalance + SCHED_LOAD_SCALE/2 + 1)
+					>> SCHED_LOAD_SHIFT;
 
-	if (*imbalance == 0) {
-		if (package_idle != NOT_IDLE && domain->flags & SD_FLAG_IDLE
-			&& max_load * busiest_nr_cpus > (3*SCHED_LOAD_SCALE/2))
-			*imbalance = 1;
-		else
-			busiest = NULL;
-	}
+	if (*imbalance == 0)
+		goto out_balanced;
+
+	/* How many tasks to actually move to equalise the imbalance */
+	*imbalance *= min(busiest_nr_cpus, this_nr_cpus);
 
 	return busiest;
 
