@@ -25,53 +25,53 @@ extern long ___test_and_change_bit(unsigned long nr, volatile unsigned long *add
 
 static __inline__ void __set_bit(int nr, volatile unsigned long *addr)
 {
-	long *m = addr + (nr >> 6);
+	volatile unsigned long *m = addr + (nr >> 6);
 
 	*m |= (1UL << (nr & 63));
 }
 
 static __inline__ void __clear_bit(int nr, volatile unsigned long *addr)
 {
-	long *m = addr + (nr >> 6);
+	volatile unsigned long *m = addr + (nr >> 6);
 
 	*m &= ~(1UL << (nr & 63));
 }
 
 static __inline__ void __change_bit(int nr, volatile unsigned long *addr)
 {
-	long *m = addr + (nr >> 6);
+	volatile unsigned long *m = addr + (nr >> 6);
 
 	*m ^= (1UL << (nr & 63));
 }
 
 static __inline__ int __test_and_set_bit(int nr, volatile unsigned long *addr)
 {
-	long *m = addr + (nr >> 6);
+	volatile unsigned long *m = addr + (nr >> 6);
 	long old = *m;
-	long mask = (1UL << (__nr & 63));
+	long mask = (1UL << (nr & 63));
 
-	*m = (__old | __mask);
-	return ((__old & __mask) != 0);
+	*m = (old | mask);
+	return ((old & mask) != 0);
 }
 
 static __inline__ int __test_and_clear_bit(int nr, volatile unsigned long *addr)
 {
-	long *m = addr + (nr >> 6);
+	volatile unsigned long *m = addr + (nr >> 6);
 	long old = *m;
-	long mask = (1UL << (__nr & 63));
+	long mask = (1UL << (nr & 63));
 
-	*m = (__old & ~__mask);
-	return ((__old & __mask) != 0);
+	*m = (old & ~mask);
+	return ((old & mask) != 0);
 }
 
 static __inline__ int __test_and_change_bit(int nr, volatile unsigned long *addr)
 {
-	long *m = addr + (nr >> 6);
+	volatile unsigned long *m = addr + (nr >> 6);
 	long old = *m;
-	long mask = (1UL << (__nr & 63));
+	long mask = (1UL << (nr & 63));
 
-	*m = (__old ^ __mask);
-	return ((__old & __mask) != 0);
+	*m = (old ^ mask);
+	return ((old & mask) != 0);
 }
 
 #define smp_mb__before_clear_bit()	do { } while(0)
