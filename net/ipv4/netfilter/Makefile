@@ -20,6 +20,7 @@ ipchains-objs		:= $(ip_nf_compat-objs) ipchains_core.o
 obj-$(CONFIG_IP_NF_CONNTRACK) += ip_conntrack.o
 
 # connection tracking helpers
+obj-$(CONFIG_IP_NF_TFTP) += ip_conntrack_tftp.o
 obj-$(CONFIG_IP_NF_FTP) += ip_conntrack_ftp.o
 ifdef CONFIG_IP_NF_NAT_FTP
 endif
@@ -28,6 +29,7 @@ ifdef CONFIG_IP_NF_NAT_IRC
 endif
 
 # NAT helpers 
+obj-$(CONFIG_IP_NF_NAT_TFTP) += ip_nat_tftp.o
 obj-$(CONFIG_IP_NF_NAT_FTP) += ip_nat_ftp.o
 obj-$(CONFIG_IP_NF_NAT_IRC) += ip_nat_irc.o
 
