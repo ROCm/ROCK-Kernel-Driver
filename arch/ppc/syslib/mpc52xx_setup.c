@@ -23,6 +23,7 @@
 #include <asm/mpc52xx.h>
 #include <asm/mpc52xx_psc.h>
 #include <asm/ocp.h>
+#include <asm/pgtable.h>
 #include <asm/ppcboot.h>
 
 extern bd_t __res;
