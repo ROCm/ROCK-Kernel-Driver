@@ -649,6 +649,7 @@ static struct cpufreq_driver longhaul_driver = {
 	.target 	= longhaul_target,
 	.init		= longhaul_cpu_init,
 	.name		= "longhaul",
+	.owner		= THIS_MODULE,
 };
 
 static int __init longhaul_init (void)

@@ -673,7 +673,7 @@ static struct mc_device ubd_mc = {
 static int ubd_mc_init(void)
 {
 	mconsole_register_dev(&ubd_mc);
-	return(0);
+	return 0;
 }
 
 __initcall(ubd_mc_init);
@@ -682,29 +682,24 @@ int ubd_init(void)
 {
         int i;
 
-	ubd_dir_handle = devfs_mk_dir (NULL, "ubd", NULL);
-	if(register_blkdev(MAJOR_NR, "ubd", &ubd_blops)){
-		printk(KERN_ERR "ubd: unable to get major %d\n", MAJOR_NR);
+	ubd_dir_handle = devfs_mk_dir(NULL, "ubd", NULL);
+	if (register_blkdev(MAJOR_NR, "ubd"))
 		return -1;
-	}
 
 	blk_init_queue(&ubd_queue, do_ubd_request, &ubd_io_lock);
 	elevator_init(&ubd_queue, &elevator_noop);
 
-	if(fake_major != 0){
+	if (fake_major != 0) {
 		char name[sizeof("ubd_nnn\0")];
 
 		snprintf(name, sizeof(name), "ubd_%d", fake_major);
 		ubd_fake_dir_handle = devfs_mk_dir(NULL, name, NULL);
-		if(register_blkdev(fake_major, "ubd", &ubd_blops)){
-			printk(KERN_ERR "ubd: unable to get major %d\n",
-			       fake_major);
+		if (register_blkdev(fake_major, "ubd"))
 			return -1;
-		}
 	}
-	for(i = 0; i < MAX_DEV; i++) 
+	for (i = 0; i < MAX_DEV; i++) 
 		ubd_add(i);
-	return(0);
+	return 0;
 }
 
 late_initcall(ubd_init);

@@ -104,6 +104,7 @@ int show_interrupts(struct seq_file *p, void *v)
 {
 	int i;
 	struct irqaction * action;
+	unsigned long flags;
 #ifdef CONFIG_SMP
 	int j;
 #endif
@@ -114,9 +115,10 @@ int show_interrupts(struct seq_file *p, void *v)
 		return show_sun4d_interrupts(p, v);
 	}
 	for (i = 0 ; i < NR_IRQS ; i++) {
+		local_irq_save(flags);
 	        action = *(i + irq_action);
 		if (!action) 
-		        continue;
+		        goto skip;
 		seq_printf(p, "%3d: ", i);
 #ifndef CONFIG_SMP
 		seq_printf(p, "%10u ", kstat_irqs(i));
@@ -136,6 +138,8 @@ int show_interrupts(struct seq_file *p, void *v)
 				action->name);
 		}
 		seq_putc(p, '\n');
+skip:
+		local_irq_restore(flags);
 	}
 	return 0;
 }

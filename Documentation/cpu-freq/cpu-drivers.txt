@@ -63,6 +63,9 @@ And optionally
 
 cpufreq_driver.exit -		A pointer to a per-CPU cleanup function.
 
+cpufreq_driver.attr -		A pointer to a NULL-terminated list of
+				"struct freq_attr" which allow to
+				export values to sysfs.
 
 
 1.2 Per-CPU Initialization

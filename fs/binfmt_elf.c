@@ -390,7 +390,6 @@ static unsigned long load_aout_interp(struct exec * interp_ex,
 	unsigned long text_data, elf_entry = ~0UL;
 	char * addr;
 	loff_t offset;
-	int retval;
 
 	current->mm->end_code = interp_ex->a_text;
 	text_data = interp_ex->a_text + interp_ex->a_data;
@@ -412,11 +411,9 @@ static unsigned long load_aout_interp(struct exec * interp_ex,
 	}
 
 	do_brk(0, text_data);
-	retval = -ENOEXEC;
 	if (!interpreter->f_op || !interpreter->f_op->read)
 		goto out;
-	retval = interpreter->f_op->read(interpreter, addr, text_data, &offset);
-	if (retval < 0)
+	if (interpreter->f_op->read(interpreter, addr, text_data, &offset) < 0)
 		goto out;
 	flush_icache_range((unsigned long)addr,
 	                   (unsigned long)addr + text_data);
@@ -638,7 +635,7 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 	retval = setup_arg_pages(bprm);
 	if (retval < 0) {
 		send_sig(SIGKILL, current, 0);
-		return retval;
+		goto out_free_dentry;
 	}
 	
 	current->mm->start_stack = bprm->p;
@@ -742,7 +739,8 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 			printk(KERN_ERR "Unable to load interpreter\n");
 			kfree(elf_phdata);
 			send_sig(SIGSEGV, current, 0);
-			return 0;
+			retval = -ENOEXEC; /* Nobody gets to see this, but.. */
+			goto out;
 		}
 	} else {
 		elf_entry = elf_ex.e_entry;

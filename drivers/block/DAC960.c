@@ -13,9 +13,6 @@
   or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
   for complete details.
 
-  The author respectfully requests that any modifications to this software be
-  sent directly to him for evaluation and testing.
-
 */
 
 
@@ -2381,13 +2378,9 @@ static boolean DAC960_RegisterBlockDevice(DAC960_Controller_T *Controller)
   /*
     Register the Block Device Major Number for this DAC960 Controller.
   */
-  if (register_blkdev(MajorNumber, "dac960",
-			    &DAC960_BlockDeviceOperations) < 0)
-    {
-      DAC960_Error("UNABLE TO ACQUIRE MAJOR NUMBER %d - DETACHING\n",
-		   Controller, MajorNumber);
+  if (register_blkdev(MajorNumber, "dac960") < 0)
       return false;
-    }
+
   /*
     Initialize the I/O Request Queue.
   */

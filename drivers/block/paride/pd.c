@@ -890,10 +890,9 @@ static int __init pd_init(void)
 {
 	if (disable)
 		return -1;
-	if (register_blkdev(major, name, &pd_fops)) {
-		printk("%s: unable to get major number %d\n", name, major);
+	if (register_blkdev(major, name))
 		return -1;
-	}
+
 	blk_init_queue(&pd_queue, do_pd_request, &pd_lock);
 	blk_queue_max_sectors(&pd_queue, cluster);
 

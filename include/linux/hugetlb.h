@@ -66,6 +66,7 @@ static inline int is_vm_hugetlb_page(struct vm_area_struct *vma)
 
 #ifndef HPAGE_MASK
 #define HPAGE_MASK	0		/* Keep the compiler happy */
+#define HPAGE_SIZE	0
 #endif
 
 #endif /* !CONFIG_HUGETLB_PAGE */

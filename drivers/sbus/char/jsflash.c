@@ -570,9 +570,7 @@ static int jsfd_init(void)
 		jsfd_disk[i] = disk;
 	}
 
-	if (register_blkdev(JSFD_MAJOR, "jsfd", &jsfd_fops)) {
-		printk("jsfd_init: unable to get major number %d\n",
-		    JSFD_MAJOR);
+	if (register_blkdev(JSFD_MAJOR, "jsfd")) {
 		err = -EIO;
 		goto out;
 	}

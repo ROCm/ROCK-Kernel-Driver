@@ -1608,12 +1608,8 @@ static int i2o_block_init(void)
 	/*
 	 *	Register the block device interfaces
 	 */
-
-	if (register_blkdev(MAJOR_NR, "i2o_block", &i2ob_fops)) {
-		printk(KERN_ERR "Unable to get major number %d for i2o_block\n",
-		       MAJOR_NR);
+	if (register_blkdev(MAJOR_NR, "i2o_block"))
 		return -EIO;
-	}
 
 	for (i = 0; i < MAX_I2OB; i++) {
 		struct gendisk *disk = alloc_disk(16);

@@ -35,6 +35,7 @@
 #define NFSDBG_FACILITY		NFSDBG_FILE
 
 static int  nfs_file_mmap(struct file *, struct vm_area_struct *);
+static ssize_t nfs_file_sendfile(struct file *, loff_t *, size_t, read_actor_t, void *);
 static ssize_t nfs_file_read(struct kiocb *, char *, size_t, loff_t);
 static ssize_t nfs_file_write(struct kiocb *, const char *, size_t, loff_t);
 static int  nfs_file_flush(struct file *);
@@ -52,6 +53,7 @@ struct file_operations nfs_file_operations = {
 	.release	= nfs_release,
 	.fsync		= nfs_fsync,
 	.lock		= nfs_lock,
+	.sendfile	= nfs_file_sendfile,
 };
 
 struct inode_operations nfs_file_inode_operations = {
@@ -100,6 +102,24 @@ nfs_file_read(struct kiocb *iocb, char * buf, size_t count, loff_t pos)
 	if (!result)
 		result = generic_file_aio_read(iocb, buf, count, pos);
 	return result;
+}
+
+static ssize_t
+nfs_file_sendfile(struct file *filp, loff_t *ppos, size_t count,
+		read_actor_t actor, void *target)
+{
+	struct dentry *dentry = filp->f_dentry;
+	struct inode *inode = dentry->d_inode;
+	ssize_t res;
+
+	dfprintk(VFS, "nfs: sendfile(%s/%s, %lu@%Lu)\n",
+		dentry->d_parent->d_name.name, dentry->d_name.name,
+		(unsigned long) count, (unsigned long long) *ppos);
+
+	res = nfs_revalidate_inode(NFS_SERVER(inode), inode);
+	if (!res)
+		res = generic_file_sendfile(filp, ppos, count, actor, target);
+	return res;
 }
 
 static int

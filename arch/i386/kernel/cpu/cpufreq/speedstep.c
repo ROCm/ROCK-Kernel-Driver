@@ -29,7 +29,6 @@
 
 #include <asm/msr.h>
 
-
 /* speedstep_chipset:
  *   It is necessary to know which chipset is used. As accesses to 
  * this device occur at various places in this module, we need a 
@@ -40,7 +39,7 @@ static struct pci_dev                   *speedstep_chipset_dev;
 
 #define SPEEDSTEP_CHIPSET_ICH2M         0x00000002
 #define SPEEDSTEP_CHIPSET_ICH3M         0x00000003
-
+#define SPEEDSTEP_CHIPSET_ICH4M         0x00000004
 
 /* speedstep_processor
  */
@@ -106,6 +105,7 @@ static int speedstep_get_state (unsigned int *state)
 	switch (speedstep_chipset) {
 	case SPEEDSTEP_CHIPSET_ICH2M:
 	case SPEEDSTEP_CHIPSET_ICH3M:
+	case SPEEDSTEP_CHIPSET_ICH4M:
 		/* get PMBASE */
 		pci_read_config_dword(speedstep_chipset_dev, 0x40, &pmbase);
 		if (!(pmbase & 0x01))
@@ -166,6 +166,7 @@ static void speedstep_set_state (unsigned int state, int notify)
 	switch (speedstep_chipset) {
 	case SPEEDSTEP_CHIPSET_ICH2M:
 	case SPEEDSTEP_CHIPSET_ICH3M:
+	case SPEEDSTEP_CHIPSET_ICH4M:
 		/* get PMBASE */
 		pci_read_config_dword(speedstep_chipset_dev, 0x40, &pmbase);
 		if (!(pmbase & 0x01))
@@ -245,6 +246,7 @@ static int speedstep_activate (void)
 	switch (speedstep_chipset) {
 	case SPEEDSTEP_CHIPSET_ICH2M:
 	case SPEEDSTEP_CHIPSET_ICH3M:
+	case SPEEDSTEP_CHIPSET_ICH4M:
 	{
 		u16             value = 0;
 
@@ -276,6 +278,14 @@ static int speedstep_activate (void)
  */
 static unsigned int speedstep_detect_chipset (void)
 {
+	speedstep_chipset_dev = pci_find_subsys(PCI_VENDOR_ID_INTEL,
+			      PCI_DEVICE_ID_INTEL_82801DB_12, 
+			      PCI_ANY_ID,
+			      PCI_ANY_ID,
+			      NULL);
+	if (speedstep_chipset_dev)
+		return SPEEDSTEP_CHIPSET_ICH4M;
+
 	speedstep_chipset_dev = pci_find_subsys(PCI_VENDOR_ID_INTEL,
 			      PCI_DEVICE_ID_INTEL_82801CA_12, 
 			      PCI_ANY_ID,
@@ -658,6 +668,7 @@ static struct cpufreq_driver speedstep_driver = {
 	.verify 	= speedstep_verify,
 	.target 	= speedstep_target,
 	.init		= speedstep_cpu_init,
+	.owner		= THIS_MODULE,
 };
 
 

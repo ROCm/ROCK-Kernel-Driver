@@ -514,7 +514,7 @@ static int scsi_send_eh_cmnd(struct scsi_cmnd *scmd, int timeout)
 	 * actually did complete normally.
 	 */
 	if (rtn == SUCCESS) {
-		int rtn = scsi_eh_completed_normally(scmd);
+		rtn = scsi_eh_completed_normally(scmd);
 		SCSI_LOG_ERROR_RECOVERY(3,
 			printk("%s: scsi_eh_completed_normally %x\n",
 			       __FUNCTION__, rtn));
@@ -544,20 +544,20 @@ static int scsi_send_eh_cmnd(struct scsi_cmnd *scmd, int timeout)
 static int scsi_request_sense(struct scsi_cmnd *scmd)
 {
 	static unsigned char generic_sense[6] =
-	{REQUEST_SENSE, 0, 0, 0, 255, 0};
-	unsigned char scsi_result0[256], *scsi_result = &scsi_result0[0];
+	{REQUEST_SENSE, 0, 0, 0, 254, 0};
+	unsigned char *scsi_result;
 	int saved_result;
 	int rtn;
 
 	memcpy(scmd->cmnd, generic_sense, sizeof(generic_sense));
 
-	if (scmd->device->host->hostt->unchecked_isa_dma) {
-		scsi_result = kmalloc(512, GFP_ATOMIC | __GFP_DMA);
-		if (unlikely(!scsi_result)) {
-			printk(KERN_ERR "%s: cannot allocate scsi_result.\n",
-					__FUNCTION__);
-			return FAILED;
-		}
+	scsi_result = kmalloc(254, GFP_ATOMIC | (scmd->device->host->hostt->unchecked_isa_dma) ? __GFP_DMA : 0);
+
+
+	if (unlikely(!scsi_result)) {
+		printk(KERN_ERR "%s: cannot allocate scsi_result.\n",
+		       __FUNCTION__);
+		return FAILED;
 	}
 
 	/*
@@ -567,11 +567,11 @@ static int scsi_request_sense(struct scsi_cmnd *scmd)
 	 * address (db).  0 is not a valid sense code. 
 	 */
 	memset(scmd->sense_buffer, 0, sizeof(scmd->sense_buffer));
-	memset(scsi_result, 0, 256);
+	memset(scsi_result, 0, 254);
 
 	saved_result = scmd->result;
 	scmd->request_buffer = scsi_result;
-	scmd->request_bufflen = 256;
+	scmd->request_bufflen = 254;
 	scmd->use_sg = 0;
 	scmd->cmd_len = COMMAND_SIZE(scmd->cmnd[0]);
 	scmd->sc_data_direction = SCSI_DATA_READ;
@@ -580,13 +580,12 @@ static int scsi_request_sense(struct scsi_cmnd *scmd)
 	rtn = scsi_send_eh_cmnd(scmd, SENSE_TIMEOUT);
 
 	/* last chance to have valid sense data */
-	if (!SCSI_SENSE_VALID(scmd)) {
+	if(!SCSI_SENSE_VALID(scmd)) {
 		memcpy(scmd->sense_buffer, scmd->request_buffer,
-				sizeof(scmd->sense_buffer));
+		       sizeof(scmd->sense_buffer));
 	}
 
-	if (scsi_result != &scsi_result0[0])
-		kfree(scsi_result);
+	kfree(scsi_result);
 
 	/*
 	 * when we eventually call scsi_finish, we really wish to complete
@@ -702,25 +701,14 @@ static int scsi_eh_get_sense(struct list_head *work_q,
 		 * upper level.
 		 */
 		if (rtn == SUCCESS)
-			scsi_eh_finish_cmd(scmd, done_q);
-		if (rtn != NEEDS_RETRY)
+			/* we don't want this command reissued, just
+			 * finished with the sense data, so set
+			 * retries to the max allowed to ensure it
+			 * won't get reissued */
+			scmd->retries = scmd->allowed;
+		else if (rtn != NEEDS_RETRY)
 			continue;
 
-		/*
-		 * we only come in here if we want to retry a
-		 * command.  the test to see whether the command
-		 * should be retried should be keeping track of the
-		 * number of tries, so we don't end up looping, of
-		 * course.
-		 */
-		scmd->state = NEEDS_RETRY;
-		rtn = scsi_eh_retry_cmd(scmd);
-		if (rtn != SUCCESS)
-			continue;
-
-		/*
-		 * we eventually hand this one back to the top level.
-		 */
 		scsi_eh_finish_cmd(scmd, done_q);
 	}
 
@@ -1322,9 +1310,11 @@ int scsi_decide_disposition(struct scsi_cmnd *scmd)
 		rtn = scsi_check_sense(scmd);
 		if (rtn == NEEDS_RETRY)
 			goto maybe_retry;
-		/* if rtn == FAILED, we have no sense information */
-		/* was: return rtn; */
-		return SUCCESS;
+		/* if rtn == FAILED, we have no sense information;
+		 * returning FAILED will wake the error handler thread
+		 * to collect the sense and redo the decide
+		 * disposition */
+		return rtn;
 	case CONDITION_GOOD:
 	case INTERMEDIATE_GOOD:
 	case INTERMEDIATE_C_GOOD:

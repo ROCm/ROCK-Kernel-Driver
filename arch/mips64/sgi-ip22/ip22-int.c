@@ -237,11 +237,13 @@ int show_interrupts(struct seq_file *p, void *v)
 	int i;
 	int num = 0;
 	struct irqaction * action;
+	unsigned long flags;
 
 	for (i = 0 ; i < 16 ; i++, num++) {
+		local_irq_save(flags);
 		action = irq_action[i];
 		if (!action) 
-			continue;
+			goto skip_1;
 		seq_printf(p, "%2d: %8d %c %s",
 			num, kstat_cpu(0).irqs[num],
 			(action->flags & SA_INTERRUPT) ? '+' : ' ',
@@ -252,11 +254,14 @@ int show_interrupts(struct seq_file *p, void *v)
 				action->name);
 		}
 		seq_puts(p, " [on-chip]\n");
+skip_1:
+		local_irq_restore(flags);
 	}
 	for (i = 0 ; i < 24 ; i++, num++) {
+		local_irq_save(flags);
 		action = local_irq_action[i];
 		if (!action) 
-			continue;
+			goto skip_2;
 		seq_printf(p, "%2d: %8d %c %s",
 			num, kstat_cpu(0).irqs[num],
 			(action->flags & SA_INTERRUPT) ? '+' : ' ',
@@ -267,6 +272,8 @@ int show_interrupts(struct seq_file *p, void *v)
 				action->name);
 		}
 		seq_puts(p, " [local]\n");
+skip_2:
+		local_irq_restore(flags);
 	}
 	return 0;
 }

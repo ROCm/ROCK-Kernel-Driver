@@ -146,13 +146,10 @@ int __init ps2esdi_init(void)
 
 	int error = 0;
 
-	/* register the device - pass the name, major number and operations
-	   vector .                                                 */
-	if (register_blkdev(PS2ESDI_MAJOR, "ed", &ps2esdi_fops)) {
-		printk("%s: Unable to get major number %d\n", DEVICE_NAME,
-				PS2ESDI_MAJOR);
+	/* register the device - pass the name and major number */
+	if (register_blkdev(PS2ESDI_MAJOR, "ed"))
 		return -1;
-	}
+
 	/* set up some global information - indicating device specific info */
 	blk_init_queue(&ps2esdi_queue, do_ps2esdi_request, &ps2esdi_lock);
 

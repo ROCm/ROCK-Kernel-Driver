@@ -1258,20 +1258,24 @@ int do_munmap(struct mm_struct *mm, unsigned long start, size_t len)
  
 	/*
 	 * If we need to split any vma, do it now to save pain later.
+	 *
+	 * Note: mremap's move_vma VM_ACCOUNT handling assumes a partially
+	 * unmapped vm_area_struct will remain in use: so lower split_vma
+	 * places tmp vma above, and higher split_vma places tmp vma below.
 	 */
 	if (start > mpnt->vm_start) {
 		if (split_vma(mm, mpnt, start, 0))
 			return -ENOMEM;
 		prev = mpnt;
-		mpnt = mpnt->vm_next;
 	}
 
 	/* Does it split the last one? */
 	last = find_vma(mm, end);
 	if (last && end > last->vm_start) {
-		if (split_vma(mm, last, end, 0))
+		if (split_vma(mm, last, end, 1))
 			return -ENOMEM;
 	}
+	mpnt = prev? prev->vm_next: mm->mmap;
 
 	/*
 	 * Remove the vma's, and unmap the actual pages

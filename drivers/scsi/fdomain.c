@@ -271,13 +271,8 @@
 
  **************************************************************************/
 
+#include <linux/config.h>
 #include <linux/module.h>
-
-#ifdef PCMCIA
-#undef MODULE
-#endif
-
-#include <linux/config.h>	/* for CONFIG_PCI */
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/blk.h>
@@ -295,9 +290,13 @@
 
 #include "scsi.h"
 #include "hosts.h"
-#include "fdomain.h"
+
+MODULE_AUTHOR("Rickard E. Faith");
+MODULE_DESCRIPTION("Future domain SCSI driver");
+MODULE_LICENSE("GPL");
+
   
-#define VERSION          "$Revision: 5.50 $"
+#define VERSION          "$Revision: 5.51 $"
 
 /* START OF USER DEFINABLE OPTIONS */
 
@@ -421,15 +420,12 @@ static int               FIFO_Size = 0x2000; /* 8k FIFO for
 
 static void              do_fdomain_16x0_intr( int irq, void *dev_id,
 					    struct pt_regs * regs );
+int		 	fdomain_16x0_bus_reset(Scsi_Cmnd *SCpnt);
 
-#ifdef MODULE
-				/* Allow insmod parameters to be like LILO
-                                   parameters.  For example:
-				   insmod fdomain fdomain=0x140,11
-				*/
+/* Allow insmod parameters to be like LILO parameters.  For example:
+   insmod fdomain fdomain=0x140,11 */
 static char * fdomain = NULL;
 MODULE_PARM(fdomain, "s");
-#endif
 
 static unsigned long addresses[] = {
    0xc8000,
@@ -561,7 +557,7 @@ static void print_banner( struct Scsi_Host *shpnt )
    printk( "\n" );
 }
 
-static int __init fdomain_setup(char *str)
+int __init fdomain_setup(char *str)
 {
 	int ints[4];
 
@@ -862,7 +858,7 @@ static int fdomain_pci_bios_detect( int *irq, int *iobase, struct pci_dev **ret_
 }
 #endif
 
-static int fdomain_16x0_detect( Scsi_Host_Template *tpnt )
+struct Scsi_Host *__fdomain_16x0_detect( Scsi_Host_Template *tpnt )
 {
    int              retcode;
    struct Scsi_Host *shpnt;
@@ -879,13 +875,6 @@ static int fdomain_16x0_detect( Scsi_Host_Template *tpnt )
    unsigned char    buf[buflen];
 #endif
 
-   tpnt->proc_name = "fdomain";
-
-#ifdef MODULE
-	if (fdomain)
-		fdomain_setup(fdomain);
-#endif
-   
    if (setup_called) {
 #if DEBUG_DETECT
       printk( "scsi: <fdomain> No BIOS, using port_base = 0x%x, irq = %d\n",
@@ -895,7 +884,7 @@ static int fdomain_16x0_detect( Scsi_Host_Template *tpnt )
 	 printk( "scsi: <fdomain> Cannot locate chip at port base 0x%x\n",
 		 port_base );
 	 printk( "scsi: <fdomain> Bad LILO/INSMOD parameters?\n" );
-	 return 0;
+	 return NULL;
       }
    } else {
       int flag = 0;
@@ -910,7 +899,7 @@ static int fdomain_16x0_detect( Scsi_Host_Template *tpnt )
 
 	 if (!flag) {
 	    printk( "scsi: <fdomain> Detection failed (no card)\n" );
-	    return 0;
+	    return NULL;
 	 }
       }
    }
@@ -936,7 +925,7 @@ static int fdomain_16x0_detect( Scsi_Host_Template *tpnt )
       if (setup_called) {
 	 printk(KERN_ERR "scsi: <fdomain> Bad LILO/INSMOD parameters?\n");
       }
-      return 0;
+      return NULL;
    }
 
    if (this_id) {
@@ -957,7 +946,7 @@ static int fdomain_16x0_detect( Scsi_Host_Template *tpnt )
 
    shpnt = scsi_register( tpnt, 0 );
    if(shpnt == NULL)
-   	return 0;
+   	return NULL;
    shpnt->irq = interrupt_level;
    shpnt->io_port = port_base;
    scsi_set_device(shpnt, &pdev->dev);
@@ -967,7 +956,7 @@ static int fdomain_16x0_detect( Scsi_Host_Template *tpnt )
    /* Log IRQ with kernel */   
    if (!interrupt_level) {
       printk(KERN_ERR "scsi: <fdomain> Card Detected, but driver not loaded (no IRQ)\n" );
-      return 0;
+      return NULL;
    } else {
       /* Register the IRQ with the kernel */
 
@@ -988,7 +977,7 @@ static int fdomain_16x0_detect( Scsi_Host_Template *tpnt )
 	    printk(KERN_ERR "                Send mail to faith@acm.org\n" );
 	 }
 	 printk(KERN_ERR "scsi: <fdomain> Detected, but driver not loaded (IRQ)\n" );
-	 return 0;
+	 return NULL;
       }
    }
 
@@ -1048,7 +1037,14 @@ static int fdomain_16x0_detect( Scsi_Host_Template *tpnt )
    }
 #endif
 
-   return 1;			/* Maximum of one adapter will be detected. */
+   return shpnt;
+}
+
+static int fdomain_16x0_detect( Scsi_Host_Template *tpnt )
+{
+	if (fdomain)
+		fdomain_setup(fdomain);
+	return (__fdomain_16x0_detect(tpnt) != NULL);
 }
 
 static const char *fdomain_16x0_info( struct Scsi_Host *ignore )
@@ -1150,8 +1146,9 @@ static int fdomain_select( int target )
 {
    int           status;
    unsigned long timeout;
+#if ERRORS_ONLY
    static int    flag = 0;
-
+#endif
 
    outb( 0x82, SCSI_Cntl_port ); /* Bus Enable + Select */
    outb( adapter_mask | (1 << target), SCSI_Data_NoACK_port );
@@ -1574,6 +1571,7 @@ static int fdomain_16x0_command(Scsi_Cmnd *SCpnt)
 
 /* End of code derived from Tommy Thorn's work. */
 
+#if DEBUG_ABORT
 static void print_info(Scsi_Cmnd *SCpnt)
 {
    unsigned int imr;
@@ -1643,6 +1641,7 @@ static void print_info(Scsi_Cmnd *SCpnt)
 	 printk( "Configuration 2  = 0x%02x\n",
 		 inb( port_base + Configuration2 ) );
 }
+#endif
 
 static int fdomain_16x0_abort( Scsi_Cmnd *SCpnt)
 {
@@ -1670,7 +1669,7 @@ static int fdomain_16x0_abort( Scsi_Cmnd *SCpnt)
    return SUCCESS;
 }
 
-static int fdomain_16x0_bus_reset(Scsi_Cmnd *SCpnt)
+int fdomain_16x0_bus_reset(Scsi_Cmnd *SCpnt)
 {
    outb( 1, SCSI_Cntl_port );
    do_pause( 2 );
@@ -1866,9 +1865,29 @@ static int fdomain_16x0_release(struct Scsi_Host *shpnt)
 	return 0;
 }
 
-MODULE_LICENSE("GPL");
+Scsi_Host_Template fdomain_driver_template = {
+	.module			= THIS_MODULE,
+	.name			= "fdomain",
+	.proc_name		= "fdomain",
+	.proc_info		= fdomain_16x0_proc_info,
+	.detect			= fdomain_16x0_detect,
+	.info			= fdomain_16x0_info,
+	.command		= fdomain_16x0_command,
+	.queuecommand		= fdomain_16x0_queue,
+	.eh_abort_handler	= fdomain_16x0_abort,
+	.eh_bus_reset_handler	= fdomain_16x0_bus_reset,
+	.eh_device_reset_handler = fdomain_16x0_device_reset,
+	.eh_host_reset_handler	= fdomain_16x0_host_reset,
+	.bios_param		= fdomain_16x0_biosparam,
+	.release		= fdomain_16x0_release,
+	.can_queue		= 1,
+	.this_id		= 6,
+	.sg_tablesize		= 64,
+	.cmd_per_lun		= 1,
+	.use_clustering		= DISABLE_CLUSTERING,
+};
 
-/* Eventually this will go into an include file, but this will be later */
-static Scsi_Host_Template driver_template = FDOMAIN_16X0;
-
+#ifndef PCMCIA
+#define driver_template fdomain_driver_template
 #include "scsi_module.c"
+#endif

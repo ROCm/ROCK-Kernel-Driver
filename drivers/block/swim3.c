@@ -1004,9 +1004,7 @@ int swim3_init(void)
 			goto out;
 	}
 
-	if (register_blkdev(FLOPPY_MAJOR, "fd", &floppy_fops)) {
-		printk(KERN_ERR"Unable to get major %d for floppy\n",
-				FLOPPY_MAJOR);
+	if (register_blkdev(FLOPPY_MAJOR, "fd")) {
 		err = -EBUSY;
 		goto out;
 	}
