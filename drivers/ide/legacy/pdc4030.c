@@ -311,29 +311,7 @@ int __init pdc4030_init(void)
 }
 
 #ifdef MODULE
-static void __exit pdc4030_release_hwif(ide_hwif_t *hwif)
-{
-	hwif->chipset = ide_unknown;
-	hwif->selectproc = NULL;
-	hwif->serialized = 0;
-	hwif->drives[0].io_32bit = 0;
-	hwif->drives[1].io_32bit = 0;
-	hwif->drives[0].keep_settings = 0;
-	hwif->drives[1].keep_settings = 0;
-	hwif->drives[0].noprobe = 0;
-	hwif->drives[1].noprobe = 0;
-}
-
-static void __exit pdc4030_exit(void)
-{
-	unsigned int index;
-
-	for (index = 0; index < MAX_HWIFS; index++)
-		pdc4030_release_hwif(&ide_hwifs[index]);
-}
-
 module_init(pdc4030_init);
-module_exit(pdc4030_exit);
 #endif
 
 MODULE_AUTHOR("Peter Denison");

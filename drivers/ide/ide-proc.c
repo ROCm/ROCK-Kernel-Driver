@@ -508,8 +508,8 @@ int proc_ide_write_settings
 			}
 			if (*p != ':')
 				goto parse_error;
-			len = IDE_MIN(p - start, MAX_LEN);
-			strncpy(name, start, IDE_MIN(len, MAX_LEN));
+			len = min(p - start, MAX_LEN);
+			strncpy(name, start, min(len, MAX_LEN));
 			name[len] = 0;
 
 			if (n > 0) {

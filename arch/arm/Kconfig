@@ -210,6 +210,11 @@ config FORCE_MAX_ZONEORDER
 	depends on SA1111
 	default "9"
 
+config DMABOUNCE
+	bool
+	depends on SA1111
+	default y
+
 source arch/arm/mm/Kconfig
 
 #  bool 'Use XScale PMU as timer source' CONFIG_XSCALE_PMU_TIMER

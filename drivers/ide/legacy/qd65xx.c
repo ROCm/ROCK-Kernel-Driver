@@ -262,7 +262,7 @@ static void qd6580_tune_drive (ide_drive_t *drive, u8 pio)
 
 	if (drive->id && !qd_find_disk_type(drive, &active_time, &recovery_time)) {
 		pio = ide_get_best_pio_mode(drive, pio, 255, &d);
-		pio = IDE_MIN(pio,4);
+		pio = min_t(u8, pio, 4);
 
 		switch (pio) {
 			case 0: break;
@@ -354,12 +354,12 @@ static void __init qd_setup(ide_hwif_t *hwif, int base, int config,
 	probe_hwif_init(hwif);
 }
 
-#ifdef MODULE
 /*
  * qd_unsetup:
  *
  * called to unsetup an ata channel : back to default values, unlinks tuning
  */
+/*
 static void __exit qd_unsetup(ide_hwif_t *hwif)
 {
 	u8 config = hwif->config_data;
@@ -389,7 +389,7 @@ static void __exit qd_unsetup(ide_hwif_t *hwif)
 		printk(KERN_WARNING "keeping settings !\n");
 	}
 }
-#endif
+*/
 
 /*
  * qd_probe:
@@ -496,14 +496,7 @@ int __init qd65xx_init(void)
 }
 
 #ifdef MODULE
-static void __exit qd65xx_exit(void)
-{
-	qd_unsetup(&ide_hwifs[0]);
-	qd_unsetup(&ide_hwifs[1]);
-}
-
 module_init(qd65xx_init);
-module_exit(qd65xx_exit);
 #endif
 
 MODULE_AUTHOR("Samuel Thibault");

@@ -15,6 +15,7 @@
 #include <asm/errno.h>
 #include <asm/arch/memory.h>
 #include <asm/domain.h>
+#include <asm/system.h>
 
 #define VERIFY_READ 0
 #define VERIFY_WRITE 1
@@ -107,7 +108,9 @@ extern int __get_user_8(void *);
 extern int __get_user_bad(void);
 
 #define __get_user_x(__r1,__p,__e,__s,__i...)				\
-	   __asm__ __volatile__ ("bl	__get_user_" #__s		\
+	   __asm__ __volatile__ (					\
+		__asmeq("%0", "r0") __asmeq("%1", "r1")			\
+		"bl	__get_user_" #__s				\
 		: "=&r" (__e), "=r" (__r1)				\
 		: "0" (__p)						\
 		: __i, "cc")
@@ -223,7 +226,9 @@ extern int __put_user_8(void *, unsigned long long);
 extern int __put_user_bad(void);
 
 #define __put_user_x(__r1,__p,__e,__s)					\
-	   __asm__ __volatile__ ("bl	__put_user_" #__s		\
+	   __asm__ __volatile__ (					\
+		__asmeq("%0", "r0") __asmeq("%2", "r1")			\
+		"bl	__put_user_" #__s				\
 		: "=&r" (__e)						\
 		: "0" (__p), "r" (__r1)					\
 		: "ip", "lr", "cc")

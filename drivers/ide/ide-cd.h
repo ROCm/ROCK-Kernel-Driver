@@ -54,8 +54,6 @@
 
 #define BLOCKS_PER_FRAME	(CD_FRAMESIZE / BLOCK_SIZE)
 
-#define MIN(a,b) ((a) < (b) ? (a) : (b))
-
 /* special command codes for strategy routine. */
 #define PACKET_COMMAND        4315
 #define REQUEST_SENSE_COMMAND 4316

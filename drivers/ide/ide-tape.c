@@ -4698,7 +4698,7 @@ static void idetape_setup (ide_drive_t *drive, idetape_tape_t *tape, int minor)
 	 *	Ensure that the number we got makes sense; limit
 	 *	it within IDETAPE_DSC_RW_MIN and IDETAPE_DSC_RW_MAX.
 	 */
-	tape->best_dsc_rw_frequency = max((unsigned long) min(t, (unsigned long) IDETAPE_DSC_RW_MAX), (unsigned long) IDETAPE_DSC_RW_MIN);
+	tape->best_dsc_rw_frequency = max_t(unsigned long, min_t(unsigned long, t, IDETAPE_DSC_RW_MAX), IDETAPE_DSC_RW_MIN);
 	printk(KERN_INFO "ide-tape: %s <-> %s: %dKBps, %d*%dkB buffer, "
 		"%dkB pipeline, %lums tDSC%s\n",
 		drive->name, tape->name, tape->capabilities.speed,

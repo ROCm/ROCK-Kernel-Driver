@@ -146,7 +146,7 @@ static void idescsi_input_buffers (ide_drive_t *drive, idescsi_pc_t *pc, unsigne
 			idescsi_discard_data (drive, bcount);
 			return;
 		}
-		count = IDE_MIN (pc->sg->length - pc->b_count, bcount);
+		count = min(pc->sg->length - pc->b_count, bcount);
 		buf = page_address(pc->sg->page) + pc->sg->offset;
 		atapi_input_bytes (drive, buf + pc->b_count, count);
 		bcount -= count; pc->b_count += count;
@@ -168,7 +168,7 @@ static void idescsi_output_buffers (ide_drive_t *drive, idescsi_pc_t *pc, unsign
 			idescsi_output_zeros (drive, bcount);
 			return;
 		}
-		count = IDE_MIN (pc->sg->length - pc->b_count, bcount);
+		count = min(pc->sg->length - pc->b_count, bcount);
 		buf = page_address(pc->sg->page) + pc->sg->offset;
 		atapi_output_bytes (drive, buf + pc->b_count, count);
 		bcount -= count; pc->b_count += count;
@@ -396,7 +396,7 @@ static int idescsi_end_request (ide_drive_t *drive, int uptodate, int nrsecs)
 			if (!test_bit(PC_WRITING, &pc->flags) && pc->actually_transferred && pc->actually_transferred <= 1024 && pc->buffer) {
 				printk(", rst = ");
 				scsi_buf = pc->scsi_cmd->request_buffer;
-				hexdump(scsi_buf, IDE_MIN(16, pc->scsi_cmd->request_bufflen));
+				hexdump(scsi_buf, min_t(unsigned, 16, pc->scsi_cmd->request_bufflen));
 			} else printk("\n");
 		}
 	}
@@ -413,7 +413,7 @@ static int idescsi_end_request (ide_drive_t *drive, int uptodate, int nrsecs)
 
 static inline unsigned long get_timeout(idescsi_pc_t *pc)
 {
-	return IDE_MAX(WAIT_CMD, pc->timeout - jiffies);
+	return max_t(unsigned long, WAIT_CMD, pc->timeout - jiffies);
 }
 
 static int idescsi_expiry(ide_drive_t *drive)
@@ -580,7 +580,7 @@ static ide_startstop_t idescsi_issue_pc (ide_drive_t *drive, idescsi_pc_t *pc)
 	scsi->pc=pc;							/* Set the current packet command */
 	pc->actually_transferred=0;					/* We haven't transferred any data yet */
 	pc->current_position=pc->buffer;
-	bcount.all = IDE_MIN(pc->request_transfer, 63 * 1024);		/* Request to transfer the entire buffer at once */
+	bcount.all = min(pc->request_transfer, 63 * 1024);		/* Request to transfer the entire buffer at once */
 
 	feature.all = 0;
 	if (drive->using_dma && rq->bio) {

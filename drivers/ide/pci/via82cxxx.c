@@ -375,7 +375,7 @@ static void via82cxxx_tune_drive(ide_drive_t *drive, u8 pio)
 		return;
 	}
 
-	via_set_drive(drive, XFER_PIO_0 + MIN(pio, 5));
+	via_set_drive(drive, XFER_PIO_0 + min_t(u8, pio, 5));
 }
 
 /**
