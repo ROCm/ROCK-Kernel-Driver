@@ -65,6 +65,14 @@ CONFIG_X86_NUMAQ
   You will need a new lynxer.elf file to flash your firmware with - send
   email to Martin.Bligh@us.ibm.com
 
+CONFIG_X86_CYCLONE
+  This patch used the Cyclone performance counter on IBM x440, x360,
+  and other Summit based systems for calculating gettimeofday. This 
+  fixes problems resulting from TSC skew found in multi-CEC system. 
+
+  If you are suffering from time skew using a multi-CEC system, say YES.
+  Otherwise it is safe to say NO.
+
 CONFIG_X86_UP_IOAPIC
   An IO-APIC (I/O Advanced Programmable Interrupt Controller) is an
   SMP-capable replacement for PC-style interrupt controllers. Most
