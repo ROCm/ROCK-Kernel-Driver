@@ -361,9 +361,10 @@ running once the system is up.
 
 	noirqbalance	[IA-32,SMP,KNL] Disable kernel irq balancing
 
-	i8042_direct	[HW] Non-translated mode
-	i8042_dumbkbd
-	i8042_noaux
+	i8042_direct	[HW] Keyboard has been put into non-translated mode 
+			by BIOS
+	i8042_dumbkbd	[HW] Don't attempt to blink the leds
+	i8042_noaux	[HW] Don't check for auxiliary (== mouse) port
 	i8042_nomux
 	i8042_reset	[HW] Reset the controller during init and cleanup
 	i8042_unlock	[HW] Unlock (ignore) the keylock

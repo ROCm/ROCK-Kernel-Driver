@@ -124,7 +124,7 @@ static struct timer_list vacs_timer;
  * UART
  */
 static struct serial_uart_config uart_config[] = {
-        { "unknown",  1, 0 },  /* Must go first  --  used as unasigned */
+        { "unknown",  1, 0 },  /* Must go first  --  used as unassigned */
         { "VAC UART", 1, 0 }
 }; 
 #define VAC_UART_TYPE 1   /* Just index in above array */

@@ -549,7 +549,7 @@ config HPT34X_AUTODMA
 	  If unsure, say N.
 
 config BLK_DEV_HPT366
-	tristate "HPT366/368/370 chipset support"
+	tristate "HPT36X/37X chipset support"
 	depends on BLK_DEV_IDEDMA_PCI
 	---help---
 	  HPT366 is an Ultra DMA chipset for ATA-66.

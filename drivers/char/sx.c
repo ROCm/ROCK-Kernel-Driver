@@ -305,7 +305,6 @@ static void sx_enable_rx_interrupts (void * ptr);
 static int  sx_get_CD (void * ptr); 
 static void sx_shutdown_port (void * ptr);
 static int  sx_set_real_termios (void  *ptr);
-static void sx_hungup (void  *ptr);
 static void sx_close (void  *ptr);
 static int sx_chars_in_buffer (void * ptr);
 static int sx_init_board (struct sx_board *board);
@@ -386,7 +385,6 @@ static struct real_driver sx_real_driver = {
 	sx_set_real_termios, 
 	sx_chars_in_buffer,
 	sx_close,
-	sx_hungup,
 };
 
 
@@ -1453,8 +1451,6 @@ static int sx_open  (struct tty_struct * tty, struct file * filp)
 
 	tty->driver_data = port;
 	port->gs.tty = tty;
-	if (!port->gs.count)
-		MOD_INC_USE_COUNT;
 	port->gs.count++;
 
 	sx_dprintk (SX_DEBUG_OPEN, "starting port\n");
@@ -1466,7 +1462,6 @@ static int sx_open  (struct tty_struct * tty, struct file * filp)
 	sx_dprintk (SX_DEBUG_OPEN, "done gs_init\n");
 	if (retval) {
 		port->gs.count--;
-		if (port->gs.count) MOD_DEC_USE_COUNT;
 		return retval;
 	}
 
@@ -1485,7 +1480,6 @@ static int sx_open  (struct tty_struct * tty, struct file * filp)
 	if (sx_send_command (port, HS_LOPEN, -1, HS_IDLE_OPEN) != 1) {
 		printk (KERN_ERR "sx: Card didn't respond to LOPEN command.\n");
 		port->gs.count--;
-		if (!port->gs.count) MOD_DEC_USE_COUNT;
 		return -EIO;
 	}
 
@@ -1517,40 +1511,6 @@ static int sx_open  (struct tty_struct * tty, struct file * filp)
 	func_exit();
 	return 0;
 
-}
-
-
-/* I haven't the foggiest why the decrement use count has to happen
-   here. The whole linux serial drivers stuff needs to be redesigned.
-   My guess is that this is a hack to minimize the impact of a bug
-   elsewhere. Thinking about it some more. (try it sometime) Try
-   running minicom on a serial port that is driven by a modularized
-   driver. Have the modem hangup. Then remove the driver module. Then
-   exit minicom.  I expect an "oops".  -- REW */
-static void sx_hungup (void *ptr)
-{
-  /*
-	struct sx_port *port = ptr; 
-  */
-	func_enter ();
-
-	/* Don't force the SX card to close. mgetty doesn't like it !!!!!! -- pvdl */
-	/* For some reson we added this code. Don't know why anymore ;-( -- pvdl */
-	/*
-	sx_setsignals (port, 0, 0);
-	sx_reconfigure_port(port);	
-	sx_send_command (port, HS_CLOSE, 0, 0);
-
-	if (sx_read_channel_byte (port, hi_hstat) != HS_IDLE_CLOSED) {
-		if (sx_send_command (port, HS_FORCE_CLOSED, -1, HS_IDLE_CLOSED) != 1) {
-			printk (KERN_ERR 
-			        "sx: sent the force_close command, but card didn't react\n");
-		} else
-			sx_dprintk (SX_DEBUG_CLOSE, "sent the force_close command.\n");
-	}
-	*/
-	MOD_DEC_USE_COUNT;
-	func_exit ();
 }
 
 
@@ -1589,7 +1549,6 @@ static void sx_close (void *ptr)
 		port->gs.count = 0;
 	}
 
-	MOD_DEC_USE_COUNT;
 	func_exit ();
 }
 
@@ -2285,6 +2244,7 @@ static int sx_init_drivers(void)
 
 	memset(&sx_driver, 0, sizeof(sx_driver));
 	sx_driver.magic = TTY_DRIVER_MAGIC;
+	sx_driver.owner = THIS_MODULE;
 	sx_driver.driver_name = "specialix_sx";
 	sx_driver.name = "ttyX";
 	sx_driver.major = SX_NORMAL_MAJOR;

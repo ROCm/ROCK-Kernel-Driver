@@ -695,6 +695,14 @@ config HIGHPROFILE
 	help
 	  Use a fast secondary clock to produce profiling information.
 
+config BOOTPARAM
+	bool 'Compiled-in Kernel Boot Parameter'
+
+config BOOTPARAM_STRING 
+	string 'Kernel Boot Parameter'
+	default 'console=ttyS0,19200'
+	depends on BOOTPARAM
+
 config DUMPTOFLASH
 	bool "Panic/Dump to FLASH"
 	depends on COLDFIRE

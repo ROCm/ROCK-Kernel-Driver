@@ -230,6 +230,10 @@ Summary of ide driver parameters for kernel command line
  "hdx=cdrom"		: drive is present, and is a cdrom drive
  
  "hdx=cyl,head,sect"	: disk drive is present, with specified geometry
+
+ "hdx=remap"		: remap access of sector 0 to sector 1 (for EZD)
+
+ "hdx=remap63"		: remap the drive: shift all by 63 sectors (for DM)
  
  "hdx=autotune"		: driver will attempt to tune interface speed
 			  to the fastest PIO mode supported,

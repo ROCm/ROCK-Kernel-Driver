@@ -714,7 +714,7 @@ static int irlmp_state_dtr(struct lsap_cb *self, IRLMP_EVENT event,
 		break;
 	case LM_CONNECT_RESPONSE:
 		IRDA_DEBUG(0, "%s(), LM_CONNECT_RESPONSE, "
-			   "error, LSAP allready connected\n", __FUNCTION__);
+			   "error, LSAP already connected\n", __FUNCTION__);
 		/* Keep state */
 		break;
 	case LM_DISCONNECT_REQUEST:

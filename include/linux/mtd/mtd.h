@@ -260,10 +260,11 @@ extern int unregister_mtd_user (struct mtd_notifier *old);
 #define MTD_DEBUG_LEVEL3	(3)	/* Noisy   */
 
 #ifdef CONFIG_MTD_DEBUG
-#define DEBUG(n, args...)			\
-	if (n <=  CONFIG_MTD_DEBUG_VERBOSE) {	\
-		printk(KERN_INFO args);	\
-	}
+#define DEBUG(n, args...)				\
+ 	do {						\
+		if (n <= CONFIG_MTD_DEBUG_VERBOSE)	\
+			printk(KERN_INFO args);		\
+	} while(0)
 #else /* CONFIG_MTD_DEBUG */
 #define DEBUG(n, args...)
 #endif /* CONFIG_MTD_DEBUG */
