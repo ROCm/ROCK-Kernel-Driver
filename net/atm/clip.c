@@ -754,9 +754,6 @@ static int atm_init_atmarp(struct atm_vcc *vcc)
 		printk(KERN_ERR "register_netdevice_notifier failed\n");
 	if (register_inetaddr_notifier(&clip_inet_notifier))
 		printk(KERN_ERR "register_inetaddr_notifier failed\n");
-	for (dev = clip_devs; dev; dev = PRIV(dev)->next)
-		if (dev->flags & IFF_UP)
-			(void) to_atmarpd(act_up,PRIV(dev)->number,0);
 	return 0;
 }
 
