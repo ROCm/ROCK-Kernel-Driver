@@ -1,6 +1,6 @@
 /proc/bus/usb filesystem output
 ===============================
-(version 2002.03.18)
+(version 2002.03.19)
 
 
 The /proc filesystem for USB devices provides /proc/bus/usb/drivers
@@ -259,7 +259,7 @@ I:  If#=dd Alt=dd #EPs=dd Cls=xx(sssss) Sub=xx Prot=xx Driver=ssss
 
 Endpoint descriptor info (can be multiple per Interface):
 
-E:  Ad=xx(s) Atr=xx(ssss) MxPS=dddd Ivl=dddms
+E:  Ad=xx(s) Atr=xx(ssss) MxPS=dddd Ivl=dddss
 |   |        |            |         |__Interval (max) between transfers
 |   |        |            |__EndpointMaxPacketSize
 |   |        |__Attributes(EndpointType)
