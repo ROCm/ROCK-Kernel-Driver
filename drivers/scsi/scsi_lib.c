@@ -470,6 +470,13 @@ void scsi_queue_next_request(request_queue_t *q, struct scsi_cmnd *cmd)
 		spin_unlock_irqrestore(sdev2->request_queue->queue_lock, flags);
 
 		spin_lock_irqsave(shost->host_lock, flags);
+		if (unlikely(!list_empty(&sdev->starved_entry)))
+			/*
+			 * sdev lost a race, and was put back on the
+			 * starved list. This is unlikely but without this
+			 * in theory we could loop forever.
+			 */
+			break;
 	}
 	spin_unlock_irqrestore(shost->host_lock, flags);
 
