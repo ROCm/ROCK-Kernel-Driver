@@ -13,6 +13,17 @@
 #define MODULE_PARAM_PREFIX __stringify(KBUILD_MODNAME) "."
 #endif
 
+#ifdef MODULE
+#define ___module_cat(a,b) __mod_ ## a ## b
+#define __module_cat(a,b) ___module_cat(a,b)
+#define __MODULE_INFO(tag, name, info)					  \
+static const char __module_cat(name,__LINE__)[]				  \
+  __attribute_used__							  \
+  __attribute__((section(".modinfo"),unused)) = __stringify(tag) "=" info
+#else  /* !MODULE */
+#define __MODULE_INFO(tag, name, info)
+#endif
+
 struct kernel_param;
 
 /* Returns 0, or -errno.  arg is in kp->arg. */
