@@ -14,13 +14,43 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <stdint.h>
+#include <endian.h>
 
-/* 32 bits: if it turns out to be 64, we add explicitly (see EXTRA_SIZE). */
-typedef int kernel_ulong_t;
-#include "../include/linux/types.h"
+#include "elfconfig.h"
+
+/* We use the ELF typedefs, since we can't rely on stdint.h being present. */
+
+#if KERNEL_ELFCLASS == ELFCLASS32
+typedef Elf32_Addr     kernel_ulong_t;
+#else
+typedef Elf64_Addr     kernel_ulong_t;
+#endif
+
+typedef Elf32_Word     __u32;
+typedef Elf32_Half     __u16;
+typedef unsigned char  __u8;
+
+/* Big exception to the "don't include kernel headers into userspace, which
+ * even potentially has different endianness and word sizes, since 
+ * we handle those differences explicitly below */
 #include "../include/linux/mod_devicetable.h"
 
-static int switch_endian;
+#if KERNEL_ELFCLASS == ELFCLASS32
+
+#define Elf_Ehdr Elf32_Ehdr 
+#define Elf_Shdr Elf32_Shdr 
+#define Elf_Sym  Elf32_Sym
+
+#else
+
+#define Elf_Ehdr Elf64_Ehdr 
+#define Elf_Shdr Elf64_Shdr 
+#define Elf_Sym  Elf64_Sym
+
+#endif
+
+#if KERNEL_ELFDATA != HOST_ELFDATA
 
 static void __endian(const void *src, void *dest, unsigned int size)
 {
@@ -29,13 +59,21 @@ static void __endian(const void *src, void *dest, unsigned int size)
 		((unsigned char*)dest)[i] = ((unsigned char*)src)[size - i-1];
 }
 
+
+
 #define TO_NATIVE(x)						\
 ({								\
 	typeof(x) __x;						\
-	if (switch_endian) __endian(&(x), &(__x), sizeof(__x));	\
-	else __x = x;						\
+	__endian(&(x), &(__x), sizeof(__x));			\
 	__x;							\
 })
+
+#else /* endianness matches */
+
+#define TO_NATIVE(x) (x)
+
+#endif
+
 
 #define ADD(str, sep, cond, field)                              \
 do {                                                            \
@@ -161,30 +199,80 @@ static int do_table(void *symval, unsigned long size,
 	return wrote;
 }
 
-/* This is the best way of doing this without making a complete mess
-   of the code. */
-#undef analyse_file
-#undef Elf_Ehdr
-#undef Elf_Shdr
-#undef Elf_Sym
-#undef EXTRA_SIZE
-#define analyse_file analyze_file32
-#define Elf_Ehdr Elf32_Ehdr 
-#define Elf_Shdr Elf32_Shdr 
-#define Elf_Sym Elf32_Sym
-#define EXTRA_SIZE 0
-#include "file2alias_inc.c"
-#undef analyse_file
-#undef Elf_Ehdr
-#undef Elf_Shdr
-#undef Elf_Sym
-#undef EXTRA_SIZE
-#define analyse_file analyze_file64
-#define Elf_Ehdr Elf64_Ehdr 
-#define Elf_Shdr Elf64_Shdr 
-#define Elf_Sym Elf64_Sym
-#define EXTRA_SIZE 4
-#include "file2alias_inc.c"
+/* This contains the cookie-cutter code for ELF handling (32 v 64). */
+static void analyze_file(Elf_Ehdr *hdr,
+			unsigned int size,
+			const char *filename)
+{
+	unsigned int i, num_syms = 0;
+	Elf_Shdr *sechdrs;
+	Elf_Sym *syms = NULL;
+	char *secstrings, *strtab = NULL;
+	int first = 1;
+
+	if (size < sizeof(*hdr))
+		goto truncated;
+
+	sechdrs = (void *)hdr + TO_NATIVE(hdr->e_shoff);
+	hdr->e_shoff = TO_NATIVE(hdr->e_shoff);
+	hdr->e_shstrndx = TO_NATIVE(hdr->e_shstrndx);
+	hdr->e_shnum = TO_NATIVE(hdr->e_shnum);
+	for (i = 0; i < hdr->e_shnum; i++) {
+		sechdrs[i].sh_type = TO_NATIVE(sechdrs[i].sh_type);
+		sechdrs[i].sh_offset = TO_NATIVE(sechdrs[i].sh_offset);
+		sechdrs[i].sh_size = TO_NATIVE(sechdrs[i].sh_size);
+		sechdrs[i].sh_link = TO_NATIVE(sechdrs[i].sh_link);
+	}
+
+	/* Find symbol table. */
+	secstrings = (void *)hdr + sechdrs[hdr->e_shstrndx].sh_offset;
+
+	for (i = 1; i < hdr->e_shnum; i++) {
+		if (sechdrs[i].sh_offset > size)
+			goto truncated;
+		if (sechdrs[i].sh_type == SHT_SYMTAB) {
+			syms = (void *)hdr + sechdrs[i].sh_offset;
+			num_syms = sechdrs[i].sh_size / sizeof(syms[0]);
+		} else if (sechdrs[i].sh_type == SHT_STRTAB)
+			strtab = (void *)hdr + sechdrs[i].sh_offset;
+	}
+
+	if (!strtab || !syms) {
+		fprintf(stderr, "table2alias: %s no symtab?\n", filename);
+		abort();
+	}
+
+	for (i = 0; i < num_syms; i++) {
+		const char *symname;
+		void *symval;
+
+		syms[i].st_shndx = TO_NATIVE(syms[i].st_shndx);
+		syms[i].st_name = TO_NATIVE(syms[i].st_name);
+		syms[i].st_value = TO_NATIVE(syms[i].st_value);
+		syms[i].st_size = TO_NATIVE(syms[i].st_size);
+
+		if (!syms[i].st_shndx || syms[i].st_shndx >= hdr->e_shnum)
+			continue;
+
+		symname = strtab + syms[i].st_name;
+		symval = (void *)hdr
+			+ sechdrs[syms[i].st_shndx].sh_offset
+			+ syms[i].st_value;
+		if (sym_is(symname, "__mod_pci_device_table"))
+			do_table(symval, syms[i].st_size,
+				 sizeof(struct pci_device_id),
+				 do_pci_entry, filename, &first);
+		else if (sym_is(symname, "__mod_usb_device_table"))
+			do_table(symval, syms[i].st_size,
+				 sizeof(struct usb_device_id),
+				 do_usb_entry, filename, &first);
+	}
+	return;
+
+ truncated:
+	fprintf(stderr, "table2alias: %s is truncated.\n", filename);
+	abort();
+}
 
 static void *grab_file(const char *filename, unsigned long *size)
 {
@@ -215,45 +303,16 @@ int main(int argc, char *argv[])
 {
 	void *file;
 	unsigned long size;
-	int endian;
-	union { short s; char c[2]; } endian_test;
-
-	endian_test.s = 1;
-	if (endian_test.c[1] == 1) endian = ELFDATA2MSB;
-	else if (endian_test.c[0] == 1) endian = ELFDATA2LSB;
-	else
-		abort();
 
 	for (; argv[1]; argv++) {
 		file = grab_file(argv[1], &size);
 		if (!file) {
 			fprintf(stderr, "file2alias: opening %s: %s\n",
 				argv[1], strerror(errno));
-			continue;
+			abort();
 		}
-
-		if (size < SELFMAG || memcmp(file, ELFMAG, SELFMAG) != 0)
-			goto bad_elf;
-		
-		if (((unsigned char *)file)[EI_DATA] != endian)
-			switch_endian = 1;
-
-		switch (((unsigned char *)file)[EI_CLASS]) {
-		case ELFCLASS32:
-			analyze_file32(file, size, argv[1]);
-			break;
-		case ELFCLASS64:
-			analyze_file64(file, size, argv[1]);
-			break;
-		default:
-			goto bad_elf;
-		}
+		analyze_file(file, size, argv[1]);
 		munmap(file, size);
-		continue;
-		
-	bad_elf:
-		fprintf(stderr, "file2alias: %s is not elf\n", argv[1]);
-		return 1;
 	}
 	return 0;
 }

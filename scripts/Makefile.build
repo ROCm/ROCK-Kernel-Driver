@@ -199,7 +199,8 @@ cmd_as_o_S       = $(CC) $(a_flags) -c -o $@ $<
 %.o: %.S FORCE
 	$(call if_changed_dep,as_o_S)
 
-targets += $(real-objs-y) $(real-objs-m) $(EXTRA_TARGETS) $(MAKECMDGOALS)
+targets += $(real-objs-y) $(real-objs-m) $(EXTRA_TARGETS) $(MAKECMDGOALS) \
+	   $(build-targets)
 
 # Build the compiled-in targets
 # ---------------------------------------------------------------------------
