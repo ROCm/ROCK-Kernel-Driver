@@ -2115,25 +2115,25 @@ CIFSSMBSetFileSize(const int xid, struct cifsTconInfo *tcon, __u64 size,
 	pSMB->ParameterOffset = cpu_to_le16(pSMB->ParameterOffset);
 	pSMB->DataOffset = cpu_to_le16(pSMB->DataOffset);
 	parm_data =
-	    (struct file_end_of_file_info *) (((char *) &pSMB->hdr.Protocol) +
-				       pSMB->DataOffset);
-    parm_data->FileSize = size;
-    pSMB->Fid = fid;
-    if(SetAllocation) {
-        if (tcon->ses->capabilities & CAP_INFOLEVEL_PASSTHRU)
-            pSMB->InformationLevel =
-                cpu_to_le16(SMB_SET_FILE_ALLOCATION_INFO2);
-        else
-            pSMB->InformationLevel =
-                cpu_to_le16(SMB_SET_FILE_ALLOCATION_INFO);
-    } else /* Set File Size */  {    
+		(struct file_end_of_file_info *) (((char *) &pSMB->hdr.Protocol) +
+			pSMB->DataOffset);
+	parm_data->FileSize = size;
+	pSMB->Fid = fid;
+	if(SetAllocation) {
+		if (tcon->ses->capabilities & CAP_INFOLEVEL_PASSTHRU)
+			pSMB->InformationLevel =
+				cpu_to_le16(SMB_SET_FILE_ALLOCATION_INFO2);
+		else
+			pSMB->InformationLevel =
+				cpu_to_le16(SMB_SET_FILE_ALLOCATION_INFO);
+	} else /* Set File Size */  {    
 	    if (tcon->ses->capabilities & CAP_INFOLEVEL_PASSTHRU)
 		    pSMB->InformationLevel =
 		        cpu_to_le16(SMB_SET_FILE_END_OF_FILE_INFO2);
 	    else
 		    pSMB->InformationLevel =
 		        cpu_to_le16(SMB_SET_FILE_END_OF_FILE_INFO);
-    }
+	}
 	pSMB->Reserved4 = 0;
 	pSMB->hdr.smb_buf_length += pSMB->ByteCount;
 	pSMB->ByteCount = cpu_to_le16(pSMB->ByteCount);

@@ -233,8 +233,6 @@ cifs_get_inode_info(struct inode **pinode,
 		    cifs_NTtimeToUnix(le64_to_cpu(findData.LastWriteTime));
 		inode->i_ctime =
 		    cifs_NTtimeToUnix(le64_to_cpu(findData.ChangeTime));
-/* inode->i_mode = S_IRWXUGO;  *//* 777 perms */
-		/* should we treat the dos attribute of read-only as read-only mode bit e.g. 555 */
 		inode->i_mode = S_IALLUGO & ~(S_ISUID | S_IXGRP);	/* 2767 perms indicate mandatory locking - will override for dirs later */
 		cFYI(0,
 		     (" Attributes came in as 0x%x ", findData.Attributes));
@@ -247,6 +245,9 @@ cifs_get_inode_info(struct inode **pinode,
             inode->i_mode |= S_IFDIR;
 		} else {
 			inode->i_mode |= S_IFREG;
+			/* treat the dos attribute of read-only as read-only mode e.g. 555 */
+			if(cifsInfo->cifsAttrs & ATTR_READONLY)
+				inode->i_mode &= ~(S_IWUGO);
    /* BB add code here - validate if device or weird share or device type? */
 		}
 		inode->i_size = le64_to_cpu(findData.EndOfFile);
@@ -304,6 +305,7 @@ cifs_unlink(struct inode *inode, struct dentry *direntry)
 	struct cifsTconInfo *pTcon;
 	char *full_path = NULL;
 	struct cifsInodeInfo *cifsInode;
+	FILE_BASIC_INFO * pinfo_buf;
 
 	cFYI(1, (" cifs_unlink, inode = 0x%p with ", inode));
 
@@ -329,6 +331,22 @@ cifs_unlink(struct inode *inode, struct dentry *direntry)
 			CIFSSMBClose(xid, pTcon, netfid);
 			/* BB In the future chain close with the NTCreateX to narrow window */
 			direntry->d_inode->i_nlink--;
+		}
+	} else if (rc == -EACCES) {
+		/* try only if r/o attribute set in local lookup data? */
+		pinfo_buf = (FILE_BASIC_INFO *)kmalloc(sizeof(FILE_BASIC_INFO),GFP_KERNEL);
+		if(pinfo_buf) {
+			memset(pinfo_buf,0,sizeof(FILE_BASIC_INFO));        
+		/* ATTRS set to normal clears r/o bit */
+			pinfo_buf->Attributes = cpu_to_le32(ATTR_NORMAL);
+			rc = CIFSSMBSetTimes(xid, pTcon, full_path, pinfo_buf,
+				cifs_sb->local_nls);
+			kfree(pinfo_buf);
+		}
+		if(rc==0) {
+			rc = CIFSSMBDelFile(xid, pTcon, full_path, cifs_sb->local_nls);
+			if (!rc)
+				direntry->d_inode->i_nlink--;
 		}
 	}
 	cifsInode = CIFS_I(direntry->d_inode);
@@ -378,15 +396,14 @@ cifs_mkdir(struct inode *inode, struct dentry *direntry, int mode)
 		direntry->d_op = &cifs_dentry_ops;
 		d_instantiate(direntry, newinode);
 		direntry->d_inode->i_nlink = 2;
-        if (cifs_sb->tcon->ses->capabilities & CAP_UNIX)                
-            CIFSSMBUnixSetPerms(xid, pTcon, full_path, mode,
-                        0xFFFFFFFFFFFFFFFF,  
-                        0xFFFFFFFFFFFFFFFF,
-                        cifs_sb->local_nls);
-        else { /* BB to be implemented via Windows secrty descriptors*/
-        /* eg CIFSSMBWinSetPerms(xid,pTcon,full_path,mode,-1,-1,local_nls);*/
-        }
-
+		if (cifs_sb->tcon->ses->capabilities & CAP_UNIX)                
+			CIFSSMBUnixSetPerms(xid, pTcon, full_path, mode,
+				0xFFFFFFFFFFFFFFFF,  
+				0xFFFFFFFFFFFFFFFF,
+				cifs_sb->local_nls);
+		else { /* BB to be implemented via Windows secrty descriptors*/
+		/* eg CIFSSMBWinSetPerms(xid,pTcon,full_path,mode,-1,-1,local_nls);*/
+		}
 	}
 	if (full_path)
 		kfree(full_path);
@@ -600,7 +617,6 @@ static int cifs_trunc_page(struct address_space *mapping, loff_t from)
         if (!page)
                 return -ENOMEM;
 
-
         kaddr = kmap_atomic(page, KM_USER0);
         memset(kaddr + offset, 0, PAGE_CACHE_SIZE - offset);
         flush_dcache_page(page);
@@ -678,17 +694,29 @@ cifs_setattr(struct dentry *direntry, struct iattr *attrs)
 		gid = attrs->ia_gid;
 		/*      entry->gid = cpu_to_le16(attr->ia_gid); */
 	}
+
+	time_buf.Attributes = 0;
 	if (attrs->ia_valid & ATTR_MODE) {
 		cFYI(1, (" CIFS - Mode changed to 0x%x", attrs->ia_mode));
 		mode = attrs->ia_mode;
-		/*      entry->mode = cpu_to_le16(attr->ia_mode); */
+		/* entry->mode = cpu_to_le16(attr->ia_mode); */
 	}
 
 	if ((cifs_sb->tcon->ses->capabilities & CAP_UNIX)
 	    && (attrs->ia_valid & (ATTR_MODE | ATTR_GID | ATTR_UID)))
 		rc = CIFSSMBUnixSetPerms(xid, pTcon, full_path, mode, uid, gid,
 				    cifs_sb->local_nls);
-	else {			/* BB to be implemented - via Windows security descriptors */
+	else if (attrs->ia_valid & ATTR_MODE) {
+		if((mode & S_IWUGO) == 0) /* not writeable */ {
+			if((cifsInode->cifsAttrs & ATTR_READONLY) == 0)
+				time_buf.Attributes = 
+					cpu_to_le32(cifsInode->cifsAttrs | ATTR_READONLY);
+		} else if((mode & S_IWUGO) == S_IWUGO) {
+			if(cifsInode->cifsAttrs & ATTR_READONLY)
+				time_buf.Attributes = 
+					cpu_to_le32(cifsInode->cifsAttrs & (~ATTR_READONLY));
+		}
+		/* BB to be implemented - via Windows security descriptors or streams */
 		/* CIFSSMBWinSetPerms(xid,pTcon,full_path,mode,uid,gid,cifs_sb->local_nls);*/
 	}
 
@@ -714,14 +742,12 @@ cifs_setattr(struct dentry *direntry, struct iattr *attrs)
 	} else
 		time_buf.ChangeTime = 0;
 
-	if (set_time) {		
-        /* BB handle errors better if one attribute not set 
-            (such as size) but time setting works */
+	if (set_time | time_buf.Attributes) {
+		/* BB what if setting one attribute fails  
+			(such as size) but time setting works */
 		time_buf.CreationTime = 0;	/* do not change */
-		time_buf.Attributes = 0;	/* BB is this ignored by server?  
-                        or do I have to query and reset anyway BB */
 		rc = CIFSSMBSetTimes(xid, pTcon, full_path, &time_buf,
-				     cifs_sb->local_nls);
+				cifs_sb->local_nls);
 	}
 
 	/* do not  need local check to inode_check_ok since the server does that */

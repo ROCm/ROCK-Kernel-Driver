@@ -879,6 +879,9 @@ fill_in_inode(struct inode *tmp_inode,
 	} else {
 		*pobject_type = DT_REG;
 		tmp_inode->i_mode |= S_IFREG;
+		if(pfindData->ExtFileAttributes & ATTR_READONLY)
+			tmp_inode->i_mode &= ~(S_IWUGO);
+
 	}/* could add code here - to validate if device or weird share type? */
 
 	/* can not fill in nlink here as in qpathinfo version and Unx search */
@@ -1199,10 +1202,10 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 				cifsFile->search_resume_name = 
 					kmalloc(cifsFile->resume_name_length, GFP_KERNEL);
 				cFYI(1,("Last file: %s with name %d bytes long",
-					lastFindData->FileName,
+					pfindDataUnix->FileName,
 					cifsFile->resume_name_length));
 				memcpy(cifsFile->search_resume_name,
-					lastFindData->FileName, 
+					pfindDataUnix->FileName, 
 					cifsFile->resume_name_length);
 			}
 			for (i = 2; i < findParms.SearchCount + 2; i++) {
