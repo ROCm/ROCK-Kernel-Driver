@@ -822,7 +822,7 @@ CIFSSMBLock(const int xid, struct cifsTconInfo *tcon,
 	pSMB->AndXCommand = 0xFF;	/* none */
 	pSMB->Fid = smb_file_id; /* netfid stays le */
 
-	if(numLock != 0) {
+	if((numLock != 0) || (numUnlock != 0)) {
 		pSMB->Locks[0].Pid = cpu_to_le16(current->tgid);
 		/* BB where to store pid high? */
 		temp = cpu_to_le64(len);
