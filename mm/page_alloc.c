@@ -43,18 +43,6 @@ static int zone_balance_ratio[MAX_NR_ZONES] __initdata = { 128, 128, 128, };
 static int zone_balance_min[MAX_NR_ZONES] __initdata = { 20 , 20, 20, };
 static int zone_balance_max[MAX_NR_ZONES] __initdata = { 255 , 255, 255, };
 
-/*
- * Free_page() adds the page to the free lists. This is optimized for
- * fast normal cases (no error jumps taken normally).
- *
- * The way to optimize jumps for gcc-2.2.2 is to:
- *  - select the "normal" case and put it inside the if () { XXX }
- *  - no else-statements if you can avoid them
- *
- * With the above two rules, you get a straight-line execution path
- * for the normal case, giving better asm-code.
- */
-
 #define memlist_init(x) INIT_LIST_HEAD(x)
 #define memlist_add_head list_add
 #define memlist_add_tail list_add_tail
