@@ -1478,7 +1478,7 @@ int sddr09_transport(Scsi_Cmnd *srb, struct us_data *us)
 				  "mode page 0x%x\n", modepage);
 
 			memcpy(ptr, mode_page_01, sizeof(mode_page_01));
-			((u16*)ptr)[0] = sizeof(mode_page_01) - 2;
+			((u16*)ptr)[0] = cpu_to_be16(sizeof(mode_page_01) - 2);
 			ptr[3] = (info->flags & SDDR09_WP) ? 0x80 : 0;
 			usb_stor_set_xfer_buf(ptr, sizeof(mode_page_01), srb);
 			return USB_STOR_TRANSPORT_GOOD;
