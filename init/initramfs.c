@@ -535,7 +535,7 @@ void __init populate_rootfs(void)
 			// am I allowed to use vmalloc ?
 			dsdt_start = vmalloc(data-dsdt_start_tmp+1);
 			memcpy(dsdt_start, dsdt_start_tmp, data-dsdt_start_tmp);
-			printk(KERN_INFO "%d bytes allocated and copied for DSDT", data-dsdt_start_tmp);
+			printk(KERN_INFO "%d bytes allocated and copied for DSDT\n", data-dsdt_start_tmp);
 		}
 		else{
 			printk("No customized DSDT found in initrd!\n");
