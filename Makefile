@@ -323,7 +323,7 @@ prepare: include/linux/version.h include/asm include/config/MARKER
 
 AFLAGS_vmlinux.lds.o += -P -C -U$(ARCH)
 
-arch/$(ARCH)/vmlinux.lds.s: arch/$(ARCH)/vmlinux.lds.S FORCE
+arch/$(ARCH)/vmlinux.lds.s: arch/$(ARCH)/vmlinux.lds.S scripts FORCE
 	$(call if_changed_dep,as_s_S)
 
 targets += arch/$(ARCH)/vmlinux.lds.s
@@ -788,6 +788,7 @@ endif # ifeq ($(filter $(noconfig_targets),$(MAKECMDGOALS)),)
 
 # FIXME Should go into a make.lib or something 
 # ===========================================================================
+echo_target = $(RELDIR)/$@
 
 a_flags = -Wp,-MD,$(depfile) $(AFLAGS) $(NOSTDINC_FLAGS) \
 	  $(modkern_aflags) $(EXTRA_AFLAGS) $(AFLAGS_$(*F).o)
