@@ -26,7 +26,6 @@ extern vertex_hdl_t hwgraph_root;
 extern void io_module_init(void);
 extern int pci_bus_to_hcl_cvlink(void);
 
-cpuid_t master_procid;
 nasid_t console_nasid = (nasid_t) - 1;
 char master_baseio_wid;
 
@@ -47,10 +46,10 @@ per_hub_init(cnodeid_t cnode)
 	ii_ibcr_u_t ii_ibcr;
 	ii_ilcsr_u_t ii_ilcsr;
 
-	nasid = COMPACT_TO_NASID_NODEID(cnode);
+	nasid = cnodeid_to_nasid(cnode);
 
 	ASSERT(nasid != INVALID_NASID);
-	ASSERT(NASID_TO_COMPACT_NODEID(nasid) == cnode);
+	ASSERT(nasid_to_cnodeid(nasid) == cnode);
 
 	npdap = NODEPDA(cnode);
 
@@ -150,7 +149,7 @@ inline int
 check_nasid_equiv(nasid_t nasida, nasid_t nasidb)
 {
 	if ((nasida == nasidb)
-	    || (nasida == NODEPDA(NASID_TO_COMPACT_NODEID(nasidb))->xbow_peer))
+	    || (nasida == NODEPDA(nasid_to_cnodeid(nasidb))->xbow_peer))
 		return 1;
 	else
 		return 0;

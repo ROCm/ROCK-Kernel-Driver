@@ -31,13 +31,9 @@ void init_platform_nodepda(nodepda_t *npda, cnodeid_t node)
 	hubinfo_t hubinfo;
 	nasid_t nasid;
 
-	extern void router_map_init(nodepda_t *);
-	extern void router_queue_init(nodepda_t *,cnodeid_t);
-	extern void intr_init_vecblk(nodepda_t *, cnodeid_t, int);
-
 	/* Allocate per-node platform-dependent data */
 	
-	nasid = COMPACT_TO_NASID_NODEID(node);
+	nasid = cnodeid_to_nasid(node);
 	if (node >= numnodes) /* Headless/memless IO nodes */
 		hubinfo = (hubinfo_t)alloc_bootmem_node(NODE_DATA(0), sizeof(struct hubinfo_s));
 	else
@@ -81,7 +77,7 @@ init_platform_hubinfo(nodepda_t **nodepdaindr)
 	for (cnode = 0; cnode < numionodes; cnode++) {
 		npda = nodepdaindr[cnode];
 		hubinfo = (hubinfo_t)npda->pdinfo;
-		hubinfo->h_nasid = COMPACT_TO_NASID_NODEID(cnode);
+		hubinfo->h_nasid = cnodeid_to_nasid(cnode);
 		hubinfo->h_widgetid = hub_widget_id(hubinfo->h_nasid);
 	}
 }

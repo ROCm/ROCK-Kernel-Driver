@@ -184,10 +184,6 @@ extern module_t	       *modules[MODULE_MAX];	/* Indexed by cmoduleid_t   */
 extern int		nummodules;
 
 extern module_t	       *module_lookup(moduleid_t id);
-
-extern int		get_kmod_sys_snum(cmoduleid_t cmod,
-					  char *snum);
-
 extern void		format_module_id(char *buffer, moduleid_t m, int fmt);
 extern int		parse_module_id(char *buffer);
 

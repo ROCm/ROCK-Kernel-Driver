@@ -712,7 +712,7 @@ pci_bus_to_hcl_cvlink(void)
 			
 			/* Is this PCI bus associated with this moduleid? */
 			moduleid = NODE_MODULEID(
-				NASID_TO_COMPACT_NODEID(pcibr_soft->bs_nasid));
+				nasid_to_cnodeid(pcibr_soft->bs_nasid));
 			if (modules[i]->id == moduleid) {
 				struct pcibr_list_s *new_element;
 

@@ -8,9 +8,11 @@
 #ifndef _ASM_IA64_SN_INTR_H
 #define _ASM_IA64_SN_INTR_H
 
+#include <asm/sn/types.h>
 #include <asm/sn/sn2/intr.h>
 
 extern void sn_send_IPI_phys(long, int, int);
+extern void intr_init_vecblk(cnodeid_t node);
 
 #define CPU_VECTOR_TO_IRQ(cpuid,vector) (vector)
 #define SN_CPU_FROM_IRQ(irq)	(0)

@@ -651,7 +651,7 @@ hub_set_piomode(nasid_t nasid, int conveyor)
 	hubii_wcr_t ii_wcr;
 	int prbnum;
 
-	ASSERT(NASID_TO_COMPACT_NODEID(nasid) != INVALID_CNODEID);
+	ASSERT(nasid_to_cnodeid(nasid) != INVALID_CNODEID);
 
 	ii_iowa = REMOTE_HUB_L(nasid, IIO_OUTWIDGET_ACCESS);
 	REMOTE_HUB_S(nasid, IIO_OUTWIDGET_ACCESS, 0);

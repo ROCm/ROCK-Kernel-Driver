@@ -313,7 +313,7 @@ io_xswitch_widget_init(vertex_hdl_t  	xswitchv,
 
 	hubinfo_get(hubv, &hubinfo);
 	nasid = hubinfo->h_nasid;
-	cnode = NASID_TO_COMPACT_NODEID(nasid);
+	cnode = nasid_to_cnodeid(nasid);
 	hub_widgetid = hubinfo->h_widgetid;
 
 	/*
@@ -567,7 +567,7 @@ io_init_node(cnodeid_t cnodeid)
 	 * and hence widget id is Not 0.
 	 */
 	widget_partnum = (((*(volatile int32_t *)(NODE_SWIN_BASE
-			(COMPACT_TO_NASID_NODEID(cnodeid), 0) + 
+			(cnodeid_to_nasid(cnodeid), 0) + 
 			WIDGET_ID))) & WIDGET_PART_NUM) 
 			>> WIDGET_PART_NUM_SHFT;
 
@@ -584,7 +584,7 @@ io_init_node(cnodeid_t cnodeid)
 	} else {
 		void	*bridge;
 
-		bridge = (void *)NODE_SWIN_BASE(COMPACT_TO_NASID_NODEID(cnodeid), 0);
+		bridge = (void *)NODE_SWIN_BASE(cnodeid_to_nasid(cnodeid), 0);
 		npdap->basew_id = pcireg_bridge_control_get(bridge) & WIDGET_WIDGET_ID;
 
 		printk(" ****io_init_node: Unknown Widget Part Number 0x%x Widget ID 0x%x attached to Hubv 0x%p ****\n", widget_partnum, npdap->basew_id, (void *)hubv);
@@ -637,7 +637,7 @@ io_init_node(cnodeid_t cnodeid)
 
 		/* If there's someone else on this crossbow, recognize him */
 		if (npdap->xbow_peer != INVALID_NASID) {
-			nodepda_t *peer_npdap = NODEPDA(NASID_TO_COMPACT_NODEID(npdap->xbow_peer));
+			nodepda_t *peer_npdap = NODEPDA(nasid_to_cnodeid(npdap->xbow_peer));
 			peer_sema = &peer_npdap->xbow_sema;
 			volunteer_for_widgets(switchv, peer_npdap->node_vertex);
 		}

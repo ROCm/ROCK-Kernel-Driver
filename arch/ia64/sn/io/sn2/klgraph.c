@@ -65,7 +65,7 @@ klhwg_add_disabled_cpu(vertex_hdl_t node_vertex, cnodeid_t cnode, klcpu_t *cpu, 
         cpuid_t cpu_id;
 	nasid_t nasid;
 
-	nasid = COMPACT_TO_NASID_NODEID(cnode);
+	nasid = cnodeid_to_nasid(cnode);
         cpu_id = nasid_slice_to_cpuid(nasid, cpu->cpu_info.physid);
         if(cpu_id != -1){
 		snprintf(name, 120, "%s/%s/%c", EDGE_LBL_DISABLED, EDGE_LBL_CPU, 'a' + cpu->cpu_info.physid);
@@ -88,7 +88,7 @@ klhwg_add_cpu(vertex_hdl_t node_vertex, cnodeid_t cnode, klcpu_t *cpu)
         cpuid_t cpu_id;
 	nasid_t nasid;
 
-	nasid = COMPACT_TO_NASID_NODEID(cnode);
+	nasid = cnodeid_to_nasid(cnode);
         cpu_id = nasid_slice_to_cpuid(nasid, cpu->cpu_info.physid);
 
         snprintf(name, 120, "%s/%d/%c",
@@ -145,7 +145,7 @@ klhwg_add_xbow(cnodeid_t cnode, nasid_t nasid)
 			continue;
 		}
 
-		hub_cnode = NASID_TO_COMPACT_NODEID(hub_nasid);
+		hub_cnode = nasid_to_cnodeid(hub_nasid);
 
 		if (hub_cnode == INVALID_CNODEID) {
 			continue;
@@ -178,7 +178,7 @@ klhwg_add_xbow(cnodeid_t cnode, nasid_t nasid)
 		 */
 		if (hub_nasid != nasid) {
 			NODEPDA(hub_cnode)->xbow_peer = nasid;
-			NODEPDA(NASID_TO_COMPACT_NODEID(nasid))->xbow_peer =
+			NODEPDA(nasid_to_cnodeid(nasid))->xbow_peer =
 				hub_nasid;
 		}
 	}
@@ -200,7 +200,7 @@ klhwg_add_node(vertex_hdl_t hwgraph_root, cnodeid_t cnode)
 	klcpu_t *cpu;
 	vertex_hdl_t cpu_dir;
 
-	nasid = COMPACT_TO_NASID_NODEID(cnode);
+	nasid = cnodeid_to_nasid(cnode);
 	brd = find_lboard_any((lboard_t *)KL_CONFIG_INFO(nasid), KLTYPE_SNIA);
 	ASSERT(brd);
 
@@ -280,7 +280,7 @@ klhwg_add_all_routers(vertex_hdl_t hwgraph_root)
 	int rv;
 
 	for (cnode = 0; cnode < numnodes; cnode++) {
-		nasid = COMPACT_TO_NASID_NODEID(cnode);
+		nasid = cnodeid_to_nasid(cnode);
 		brd = find_lboard_class_any((lboard_t *)KL_CONFIG_INFO(nasid),
 				KLTYPE_ROUTER);
 
@@ -363,7 +363,7 @@ klhwg_connect_one_router(vertex_hdl_t hwgraph_root, lboard_t *brd,
 				 port));
 			continue;
 		}
-		if (NASID_TO_COMPACT_NODEID(router->rou_port[port].port_nasid) 
+		if (nasid_to_cnodeid(router->rou_port[port].port_nasid) 
 		    == INVALID_CNODEID) {
 			continue;
 		}
@@ -414,7 +414,7 @@ klhwg_connect_routers(vertex_hdl_t hwgraph_root)
 	lboard_t *brd;
 
 	for (cnode = 0; cnode < numnodes; cnode++) {
-		nasid = COMPACT_TO_NASID_NODEID(cnode);
+		nasid = cnodeid_to_nasid(cnode);
 		brd = find_lboard_class_any((lboard_t *)KL_CONFIG_INFO(nasid),
 				KLTYPE_ROUTER);
 
@@ -423,7 +423,7 @@ klhwg_connect_routers(vertex_hdl_t hwgraph_root)
 
 		do {
 
-			nasid = COMPACT_TO_NASID_NODEID(cnode);
+			nasid = cnodeid_to_nasid(cnode);
 
 			klhwg_connect_one_router(hwgraph_root, brd,
 						 cnode, nasid);
@@ -451,7 +451,7 @@ klhwg_connect_hubs(vertex_hdl_t hwgraph_root)
 	int port;
 
 	for (cnode = 0; cnode < numionodes; cnode++) {
-		nasid = COMPACT_TO_NASID_NODEID(cnode);
+		nasid = cnodeid_to_nasid(cnode);
 
 		brd = find_lboard_any((lboard_t *)KL_CONFIG_INFO(nasid), KLTYPE_SNIA);
 
@@ -463,7 +463,7 @@ klhwg_connect_hubs(vertex_hdl_t hwgraph_root)
 				continue; /* Port not active */
 			}
 
-			if (NASID_TO_COMPACT_NODEID(hub->hub_port[port].port_nasid) == INVALID_CNODEID)
+			if (nasid_to_cnodeid(hub->hub_port[port].port_nasid) == INVALID_CNODEID)
 				continue;
 
 			/* Generate a hardware graph path for this board. */
