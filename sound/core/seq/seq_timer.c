@@ -401,7 +401,7 @@ snd_seq_real_time_t snd_seq_timer_get_cur_time(seq_timer_t *tmr)
 	return cur_time;	
 }
 
-/* TODO: use interpolation on tick queue (will only be usefull for very
+/* TODO: use interpolation on tick queue (will only be useful for very
  high PPQ values) */
 snd_seq_tick_time_t snd_seq_timer_get_cur_tick(seq_timer_t *tmr)
 {

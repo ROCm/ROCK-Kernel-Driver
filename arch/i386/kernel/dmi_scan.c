@@ -440,7 +440,7 @@ static __init int broken_pirq(struct dmi_blacklist *d)
 {
 	printk(KERN_INFO " *** Possibly defective BIOS detected (irqtable)\n");
 	printk(KERN_INFO " *** Many BIOSes matching this signature have incorrect IRQ routing tables.\n");
-	printk(KERN_INFO " *** If you see IRQ problems, in paticular SCSI resets and hangs at boot\n");
+	printk(KERN_INFO " *** If you see IRQ problems, in particular SCSI resets and hangs at boot\n");
 	printk(KERN_INFO " *** contact your hardware vendor and ask about updates.\n");
 	printk(KERN_INFO " *** Building an SMP kernel may evade the bug some of the time.\n");
 #ifdef CONFIG_X86_IO_APIC

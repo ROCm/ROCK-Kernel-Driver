@@ -236,7 +236,7 @@
  *	-Fixed bug for RX counters. On an RX overflow interrupt the high
  *	 words of all RX counters were incremented.
  *	-SET operations on FLOWCTRL_MODE and LINK_MODE accept now the
- *	 value 0, which has no effect. It is usefull for multiple instance
+ *	 value 0, which has no effect. It is useful for multiple instance
  *	 SETs.
  *	
  *	Revision 1.37  1998/11/20 08:02:04  mhaveman
@@ -1672,7 +1672,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  * Description:
  *	Calls a general sub-function for all this stuff. The preset does
  *	the same as a set, but returns just before finally setting the
- *	new value. This is usefull to check if a set might be successfull.
+ *	new value. This is useful to check if a set might be successful.
  *	If as instance a -1 is passed, an array of values is supposed and
  *	all instance of the OID will be set.
  *
@@ -1716,7 +1716,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  * Description:
  *	Calls a general sub-function for all this stuff. The preset does
  *	the same as a set, but returns just before finally setting the
- *	new value. This is usefull to check if a set might be successfull.
+ *	new value. This is useful to check if a set might be successful.
  *	If as instance a -1 is passed, an array of values is supposed and
  *	all instance of the OID will be set.
  *
@@ -1935,7 +1935,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  * Description:
  *	Calls a general sub-function for all this set stuff. The preset does
  *	the same as a set, but returns just before finally setting the
- *	new value. This is usefull to check if a set might be successfull.
+ *	new value. This is useful to check if a set might be successful.
  *	The sub-function runs through the IdTable, checks which OIDs are able
  *	to set, and calls the handler function of the OID to perform the
  *	preset. The return value of the function will also be stored in
@@ -6813,7 +6813,7 @@ unsigned int PhysPortIndex)	/* Physical port index */
  *
  * Description:
  *	The COMMON module only tells us if the mode is half or full duplex.
- *	But in the decade of auto sensing it is usefull for the user to
+ *	But in the decade of auto sensing it is useful for the user to
  *	know if the mode was negotiated or forced. Therefore we have a
  *	look to the mode, which was last used by the negotiation process.
  *

@@ -13,7 +13,7 @@
  * Very simple lz77-ish encoder.
  *
  * Theory of operation: Both encoder and decoder have a list of "last
- * occurances" for every possible source-value; after sending the
+ * occurrences" for every possible source-value; after sending the
  * first source-byte, the second byte indicated the "run" length of
  * matches
  *

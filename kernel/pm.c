@@ -145,7 +145,7 @@ void pm_unregister_all(pm_callback callback)
  *	and conflicting.
  *
  *	WARNING: Calling pm_send directly is not generally recommended, in
- *	paticular there is no locking against the pm_dev going away. The
+ *	particular there is no locking against the pm_dev going away. The
  *	caller must maintain all needed locking or have 'inside knowledge'
  *	on the safety. Also remember that this function is not locked against
  *	pm_unregister. This means that you must handle SMP races on callback

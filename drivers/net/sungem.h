@@ -562,7 +562,7 @@
  */
 
 /* Statistics Registers.  All of these registers are 16-bits and
- * track occurances of a specific event.  GEM can be configured
+ * track occurrences of a specific event.  GEM can be configured
  * to interrupt the host cpu when any of these counters overflow.
  * They should all be explicitly initialized to zero when the interface
  * is brought up.

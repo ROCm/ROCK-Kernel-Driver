@@ -1582,7 +1582,7 @@ dasd_sleep_on_immediatly(dasd_ccw_req_t * cqr)
 
 /*
  * Cancels a request that was started with dasd_sleep_on_req.
- * This is usefull to timeout requests. The request will be
+ * This is useful to timeout requests. The request will be
  * terminated if it is currently in i/o.
  * Returns 1 if the request has been terminated.
  */

@@ -1630,7 +1630,7 @@ u32 TLan_HandleDummy( struct net_device *dev, u16 host_int )
 	 *		host_int	The contents of the HOST_INT
 	 *				port.
 	 *
-	 *	This driver is structured to determine EOC occurances by
+	 *	This driver is structured to determine EOC occurrences by
 	 *	reading the CSTAT member of the list structure.  Tx EOC
 	 *	interrupts are disabled via the DIO INTDIS register.
 	 *	However, TLAN chips before revision 3.0 didn't have this
@@ -1753,7 +1753,7 @@ u32 TLan_HandleStatusCheck( struct net_device *dev, u16 host_int )
 	 *		host_int	The contents of the HOST_INT
 	 *				port.
 	 *
-	 *	This driver is structured to determine EOC occurances by
+	 *	This driver is structured to determine EOC occurrences by
 	 *	reading the CSTAT member of the list structure.  Rx EOC
 	 *	interrupts are disabled via the DIO INTDIS register.
 	 *	However, TLAN chips before revision 3.0 didn't have this

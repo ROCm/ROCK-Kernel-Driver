@@ -99,7 +99,7 @@ UniStrcat(wchar_t * ucs1, const wchar_t * ucs2)
  * UniStrchr:  Find a character in a string
  *
  * Returns:
- *     Address of first occurance of character in string
+ *     Address of first occurrence of character in string
  *     or NULL if the character is not in the string
  */
 static inline wchar_t *
