@@ -528,6 +528,10 @@ load_fx(snd_emux_t *emu, int type, int mode, const void __user *buf, long len)
 	emu8000_t *hw;
 	hw = emu->hw;
 
+	/* skip header */
+	buf += 16;
+	len -= 16;
+
 	switch (type) {
 	case SNDRV_EMU8000_LOAD_CHORUS_FX:
 		return snd_emu8000_load_chorus_fx(hw, mode, buf, len);
