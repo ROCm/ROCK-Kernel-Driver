@@ -708,6 +708,7 @@ static int hub_port_status(struct usb_device *dev, int port,
 
 #define HUB_RESET_TRIES		5
 #define HUB_PROBE_TRIES		2
+#define HUB_ROOT_RESET_TIME	50	/* times are in msec */
 #define HUB_SHORT_RESET_TIME	10
 #define HUB_LONG_RESET_TIME	200
 #define HUB_RESET_TIMEOUT	500
@@ -902,6 +903,12 @@ static void hub_port_connect_change(struct usb_hub *hubstate, int port,
 		hub_port_disable(hub, port);
 		return;
 	}
+
+	/* root hub ports have a slightly longer reset period
+	 * (from USB 2.0 spec, section 7.1.7.5)
+	 */
+	if (!hub->parent)
+		delay = HUB_ROOT_RESET_TIME;
 
 	/* Some low speed devices have problems with the quick delay, so */
 	/*  be a bit pessimistic with those devices. RHbug #23670 */
