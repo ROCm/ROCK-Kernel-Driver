@@ -64,7 +64,7 @@ struct xfs_trans;
  * Offset in data space of a data entry.
  */
 typedef	__uint32_t	xfs_dir2_dataptr_t;
-#define	XFS_DIR2_MAX_DATAPTR	((xfs_dir2_dataptr_t)0x7fffffff)
+#define	XFS_DIR2_MAX_DATAPTR	((xfs_dir2_dataptr_t)0xffffffff)
 #define	XFS_DIR2_NULL_DATAPTR	((xfs_dir2_dataptr_t)0)
 
 /*
