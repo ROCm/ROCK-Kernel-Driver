@@ -8,11 +8,13 @@
 #include "linux/list.h"
 #include "linux/devfs_fs_kernel.h"
 #include "asm/irq.h"
+#include "asm/uaccess.h"
 #include "chan_kern.h"
 #include "irq_user.h"
 #include "line.h"
 #include "kern.h"
 #include "user_util.h"
+#include "kern_util.h"
 #include "os.h"
 
 #define LINE_BUFSIZE 4096
@@ -281,7 +283,7 @@ void close_lines(struct line *lines, int nlines)
 		close_chan(&lines[i].chan_list);
 }
 
-void line_setup(struct line *lines, int num, char *init)
+int line_setup(struct line *lines, int num, char *init, int all_allowed)
 {
 	int i, n;
 	char *end;
@@ -292,12 +294,36 @@ void line_setup(struct line *lines, int num, char *init)
 		if(*end != '='){
 			printk(KERN_ERR "line_setup failed to parse \"%s\"\n", 
 			       init);
-			return;
+			return(1);
 		}
 		init = end;
 	}
 	init++;
-	if(n == -1){
+	if((n >= 0) && (n >= num)){
+		printk("line_setup - %d out of range ((0 ... %d) allowed)\n",
+		       n, num);
+		return(1);
+	}
+	else if(n >= 0){
+		if(lines[n].count > 0){
+			printk("line_setup - device %d is open\n", n);
+			return(1);
+		}
+		if(lines[n].init_pri <= INIT_ONE){
+			lines[n].init_pri = INIT_ONE;
+			if(!strcmp(init, "none")) lines[n].valid = 0;
+			else {
+				lines[n].init_str = init;
+				lines[n].valid = 1;
+			}	
+		}
+	}
+	else if(!all_allowed){
+		printk("line_setup - can't configure all devices from "
+		       "mconsole\n");
+		return(1);
+	}
+	else {
 		for(i = 0; i < num; i++){
 			if(lines[i].init_pri <= INIT_ALL){
 				lines[i].init_pri = INIT_ALL;
@@ -309,14 +335,57 @@ void line_setup(struct line *lines, int num, char *init)
 			}
 		}
 	}
-	else if(lines[n].init_pri <= INIT_ONE){
-		lines[n].init_pri = INIT_ONE;
-		if(!strcmp(init, "none")) lines[n].valid = 0;
-		else {
-			lines[n].init_str = init;
-			lines[n].valid = 1;
-		}
+	return(0);
+}
+
+int line_config(struct line *lines, int num, char *str)
+{
+	char *new = uml_strdup(str);
+
+	if(new == NULL){
+		printk("line_config - uml_strdup failed\n");
+		return(-ENOMEM);
 	}
+	return(line_setup(lines, num, new, 0));
+}
+
+int line_get_config(char *name, struct line *lines, int num, char *str, 
+		    int size, char **error_out)
+{
+	struct line *line;
+	char *end;
+	int dev, n = 0;
+
+	dev = simple_strtoul(name, &end, 0);
+	if((*end != '\0') || (end == name)){
+		*error_out = "line_setup failed to parse device number";
+		return(0);
+	}
+
+	if((dev < 0) || (dev >= num)){
+		*error_out = "device number of of range";
+		return(0);
+	}
+
+	line = &lines[dev];
+	down(&line->sem);
+	
+	if(!line->valid)
+		CONFIG_CHUNK(str, size, n, "none", 1);
+	else if(line->count == 0)
+		CONFIG_CHUNK(str, size, n, line->init_str, 1);
+	else n = chan_config_string(&line->chan_list, str, size, error_out);
+
+	up(&line->sem);
+	return(n);
+}
+
+int line_remove(struct line *lines, int num, char *str)
+{
+	char config[sizeof("conxxxx=none\0")];
+
+	sprintf(config, "%s=none", str);
+	return(line_setup(lines, num, config, 0));
 }
 
 void line_register_devfs(struct lines *set, struct line_driver *line_driver, 
@@ -366,6 +435,8 @@ void line_register_devfs(struct lines *set, struct line_driver *line_driver,
 		if(!lines[i].valid) 
 			tty_unregister_devfs(driver, driver->minor_start + i);
 	}
+
+	mconsole_register_dev(&line_driver->mc);
 }
 
 void lines_init(struct line *lines, int nlines)
