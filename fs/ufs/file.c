@@ -35,6 +35,7 @@
 #include <linux/locks.h>
 #include <linux/mm.h>
 #include <linux/pagemap.h>
+#include <linux/smp_lock.h>
 
 /*
  * Make sure the offset never goes beyond the 32-bit mark..
