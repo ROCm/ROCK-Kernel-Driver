@@ -92,6 +92,25 @@ EXPORT_SYMBOL(svc_proc_unregister);
 EXPORT_SYMBOL(svc_proc_read);
 #endif
 
+/* caching... */
+EXPORT_SYMBOL(auth_domain_find);
+EXPORT_SYMBOL(cache_fresh);
+EXPORT_SYMBOL(unix_domain_find);
+EXPORT_SYMBOL(auth_domain_put);
+EXPORT_SYMBOL(cache_flush);
+EXPORT_SYMBOL(cache_unregister);
+EXPORT_SYMBOL(add_hex);
+EXPORT_SYMBOL(cache_check);
+EXPORT_SYMBOL(svcauth_unix_purge);
+EXPORT_SYMBOL(get_word);
+EXPORT_SYMBOL(cache_clean);
+EXPORT_SYMBOL(cache_register);
+EXPORT_SYMBOL(auth_unix_lookup);
+EXPORT_SYMBOL(auth_unix_add_addr);
+EXPORT_SYMBOL(cache_init);
+EXPORT_SYMBOL(auth_unix_forget_old);
+EXPORT_SYMBOL(add_word);
+
 /* Generic XDR */
 EXPORT_SYMBOL(xdr_encode_array);
 EXPORT_SYMBOL(xdr_encode_string);
