@@ -708,8 +708,8 @@ static void print_sb(mdp_super_t *sb)
 
 static void print_rdev(mdk_rdev_t *rdev)
 {
-	printk(KERN_INFO "md: rdev %s: O:%s, SZ:%08ld F:%d DN:%d ",
-		partition_name(rdev->dev), partition_name(rdev->old_dev),
+	printk(KERN_INFO "md: rdev %s, SZ:%08ld F:%d DN:%d ",
+		partition_name(rdev->dev),
 		rdev->size, rdev->faulty, rdev->desc_nr);
 	if (rdev->sb) {
 		printk(KERN_INFO "md: rdev superblock:\n");
@@ -1029,12 +1029,6 @@ static mdk_rdev_t *md_import_device(kdev_t newdev, int on_disk)
 			       partition_name(newdev));
 			goto abort_free;
 		}
-
-		if (rdev->sb->level != LEVEL_MULTIPATH)
-			rdev->old_dev = mk_kdev(rdev->sb->this_disk.major,
-						rdev->sb->this_disk.minor);
-		else
-			rdev->old_dev = NODEV;
 	}
 	INIT_LIST_HEAD(&rdev->same_set);
 
@@ -1954,7 +1948,6 @@ static int add_new_disk(mddev_t * mddev, mdu_disk_info_t *info)
 			printk(KERN_WARNING "md: error, md_import_device() returned %ld\n", PTR_ERR(rdev));
 			return PTR_ERR(rdev);
 		}
-		rdev->old_dev = dev;
 		rdev->desc_nr = info->number;
 		rdev->raid_disk = info->raid_disk;
 		rdev->faulty = 0;
@@ -2104,7 +2097,6 @@ static int hot_add_disk(mddev_t * mddev, kdev_t dev)
 	 * The rest should better be atomic, we can have disk failures
 	 * noticed in interrupt contexts ...
 	 */
-	rdev->old_dev = dev;
 	rdev->size = size;
 	rdev->sb_offset = calc_dev_sboffset(rdev, mddev, persistent);
 

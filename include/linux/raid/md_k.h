@@ -145,7 +145,6 @@ struct mdk_rdev_s
 	struct list_head same_set;	/* RAID devices within the same set */
 
 	kdev_t dev;			/* Device number */
-	kdev_t old_dev;			/*  "" when it was last imported */
 	unsigned long size;		/* Device size (in blocks) */
 	mddev_t *mddev;			/* RAID array if running */
 	unsigned long last_events;	/* IO event timestamp */
