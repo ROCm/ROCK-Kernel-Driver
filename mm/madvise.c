@@ -92,16 +92,14 @@ static long madvise_willneed(struct vm_area_struct * vma,
 static long madvise_dontneed(struct vm_area_struct * vma,
 			     unsigned long start, unsigned long end)
 {
-	struct zap_details details;
-
 	if (vma->vm_flags & VM_LOCKED)
 		return -EINVAL;
 
 	if (unlikely(vma->vm_flags & VM_NONLINEAR)) {
-		details.check_mapping = NULL;
-		details.nonlinear_vma = vma;
-		details.first_index = 0;
-		details.last_index = ULONG_MAX;
+		struct zap_details details = {
+			.nonlinear_vma = vma,
+			.last_index = ULONG_MAX,
+		};
 		zap_page_range(vma, start, end - start, &details);
 	} else
 		zap_page_range(vma, start, end - start, NULL);

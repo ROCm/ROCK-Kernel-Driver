@@ -300,7 +300,7 @@ migrate:
  *
  * This function is only called from page_referenced for object-based pages.
  *
- * The semaphore address_space->i_shared_sem is tried.  If it can't be gotten,
+ * The semaphore address_space->i_mmap_lock is tried.  If it can't be gotten,
  * assume a reference count of 0, so try_to_unmap will then have a go.
  */
 static inline int page_referenced_file(struct page *page)
@@ -313,7 +313,7 @@ static inline int page_referenced_file(struct page *page)
 	int referenced = 0;
 	int failed = 0;
 
-	if (down_trylock(&mapping->i_shared_sem))
+	if (!spin_trylock(&mapping->i_mmap_lock))
 		return 0;
 
 	list_for_each_entry(vma, &mapping->i_mmap, shared) {
@@ -355,7 +355,7 @@ static inline int page_referenced_file(struct page *page)
 
 	WARN_ON(!failed);
 out:
-	up(&mapping->i_shared_sem);
+	spin_unlock(&mapping->i_mmap_lock);
 	return referenced;
 }
 
@@ -725,7 +725,7 @@ out:
  *
  * This function is only called from try_to_unmap for object-based pages.
  *
- * The semaphore address_space->i_shared_sem is tried.  If it can't be gotten,
+ * The semaphore address_space->i_mmap_lock is tried.  If it can't be gotten,
  * return a temporary error.
  */
 static inline int try_to_unmap_file(struct page *page)
@@ -740,7 +740,7 @@ static inline int try_to_unmap_file(struct page *page)
 	unsigned long max_nl_cursor = 0;
 	unsigned long max_nl_size = 0;
 
-	if (down_trylock(&mapping->i_shared_sem))
+	if (!spin_trylock(&mapping->i_mmap_lock))
 		return ret;
 
 	list_for_each_entry(vma, &mapping->i_mmap, shared) {
@@ -839,7 +839,7 @@ static inline int try_to_unmap_file(struct page *page)
 relock:
 	page_map_lock(page);
 out:
-	up(&mapping->i_shared_sem);
+	spin_unlock(&mapping->i_mmap_lock);
 	return ret;
 }
 

@@ -331,7 +331,7 @@ struct address_space {
 	struct address_space_operations *a_ops;	/* methods */
 	struct list_head	i_mmap;		/* list of private mappings */
 	struct list_head	i_mmap_shared;	/* list of shared mappings */
-	struct semaphore	i_shared_sem;	/* protect both above lists */
+	spinlock_t		i_mmap_lock;	/* protect both above lists */
 	atomic_t		truncate_count;	/* Cover race condition with truncate */
 	unsigned long		flags;		/* error bits/gfp mask */
 	struct backing_dev_info *backing_dev_info; /* device readahead, etc */

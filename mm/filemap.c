@@ -55,17 +55,17 @@
 /*
  * Lock ordering:
  *
- *  ->i_shared_sem		(vmtruncate)
+ *  ->i_mmap_lock		(vmtruncate)
  *    ->private_lock		(__free_pte->__set_page_dirty_buffers)
  *      ->swap_list_lock
  *        ->swap_device_lock	(exclusive_swap_page, others)
  *          ->mapping->tree_lock
  *
  *  ->i_sem
- *    ->i_shared_sem		(truncate->unmap_mapping_range)
+ *    ->i_mmap_lock		(truncate->unmap_mapping_range)
  *
  *  ->mmap_sem
- *    ->i_shared_sem		(various places)
+ *    ->i_mmap_lock		(various places)
  *
  *  ->mmap_sem
  *    ->lock_page		(access_process_vm)

@@ -180,7 +180,6 @@ static unsigned long move_vma(struct vm_area_struct *vma,
 		unsigned long new_len, unsigned long new_addr)
 {
 	struct mm_struct *mm = vma->vm_mm;
-	struct address_space *mapping = NULL;
 	struct vm_area_struct *new_vma;
 	unsigned long vm_flags = vma->vm_flags;
 	unsigned long new_pgoff;
@@ -201,16 +200,6 @@ static unsigned long move_vma(struct vm_area_struct *vma,
 	if (!new_vma)
 		return -ENOMEM;
 
-	if (vma->vm_file) {
-		/*
-		 * Subtle point from Rajesh Venkatasubramanian: before
-		 * moving file-based ptes, we must lock vmtruncate out,
-		 * since it might clean the dst vma before the src vma,
-		 * and we propagate stale pages into the dst afterward.
-		 */
-		mapping = vma->vm_file->f_mapping;
-		down(&mapping->i_shared_sem);
-	}
 	moved_len = move_page_tables(vma, new_addr, old_addr, old_len, &cows);
 	if (moved_len < old_len) {
 		/*
@@ -227,8 +216,6 @@ static unsigned long move_vma(struct vm_area_struct *vma,
 	if (cows)	/* Downgrade or remove this message later */
 		printk(KERN_WARNING "%s: mremap moved %d cows\n",
 							current->comm, cows);
-	if (mapping)
-		up(&mapping->i_shared_sem);
 
 	/* Conceal VM_ACCOUNT so old reservation is not undone */
 	if (vm_flags & VM_ACCOUNT) {

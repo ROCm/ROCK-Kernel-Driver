@@ -477,6 +477,7 @@ struct zap_details {
 	struct address_space *check_mapping;	/* Check page->mapping if set */
 	pgoff_t	first_index;			/* Lowest page->index to unmap */
 	pgoff_t last_index;			/* Highest page->index to unmap */
+	int atomic;				/* May not schedule() */
 };
 
 void zap_page_range(struct vm_area_struct *vma, unsigned long address,

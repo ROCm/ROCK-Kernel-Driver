@@ -365,6 +365,8 @@ static void zap_pte_range(struct mmu_gather *tlb,
 	if (offset + size > PMD_SIZE)
 		size = PMD_SIZE - offset;
 	size &= PAGE_MASK;
+	if (details && !details->check_mapping && !details->nonlinear_vma)
+		details = NULL;
 	for (offset=0; offset < size; ptep++, offset += PAGE_SIZE) {
 		pte_t pte = *ptep;
 		if (pte_none(pte))
@@ -518,6 +520,7 @@ int unmap_vmas(struct mmu_gather **tlbp, struct mm_struct *mm,
 	unsigned long tlb_start = 0;	/* For tlb_finish_mmu */
 	int tlb_start_valid = 0;
 	int ret = 0;
+	int atomic = details && details->atomic;
 
 	for ( ; vma && vma->vm_start < end_addr; vma = vma->vm_next) {
 		unsigned long start;
@@ -555,7 +558,7 @@ int unmap_vmas(struct mmu_gather **tlbp, struct mm_struct *mm,
 			zap_bytes -= block;
 			if ((long)zap_bytes > 0)
 				continue;
-			if (need_resched()) {
+			if (!atomic && need_resched()) {
 				int fullmm = tlb_is_full_mm(*tlbp);
 				tlb_finish_mmu(*tlbp, tlb_start, start);
 				cond_resched_lock(&mm->page_table_lock);
@@ -582,8 +585,6 @@ void zap_page_range(struct vm_area_struct *vma, unsigned long address,
 	struct mmu_gather *tlb;
 	unsigned long end = address + size;
 	unsigned long nr_accounted = 0;
-
-	might_sleep();
 
 	if (is_vm_hugetlb_page(vma)) {
 		zap_hugepage_range(vma, address, size);
@@ -1133,8 +1134,7 @@ static void unmap_mapping_range_list(struct list_head *head,
 			zea = vea;
 		zap_page_range(vma,
 			((zba - vba) << PAGE_SHIFT) + vma->vm_start,
-			(zea - zba + 1) << PAGE_SHIFT,
-			details->check_mapping? details: NULL);
+			(zea - zba + 1) << PAGE_SHIFT, details);
 	}
 }
 
@@ -1155,7 +1155,7 @@ static void unmap_mapping_range_list(struct list_head *head,
  * but 0 when invalidating pagecache, don't throw away private data.
  */
 void unmap_mapping_range(struct address_space *mapping,
-	loff_t const holebegin, loff_t const holelen, int even_cows)
+		loff_t const holebegin, loff_t const holelen, int even_cows)
 {
 	struct zap_details details;
 	pgoff_t hba = holebegin >> PAGE_SHIFT;
@@ -1173,10 +1173,11 @@ void unmap_mapping_range(struct address_space *mapping,
 	details.nonlinear_vma = NULL;
 	details.first_index = hba;
 	details.last_index = hba + hlen - 1;
+	details.atomic = 1;	/* A spinlock is held */
 	if (details.last_index < details.first_index)
 		details.last_index = ULONG_MAX;
 
-	down(&mapping->i_shared_sem);
+	spin_lock(&mapping->i_mmap_lock);
 	/* Protect against page fault */
 	atomic_inc(&mapping->truncate_count);
 	if (unlikely(!list_empty(&mapping->i_mmap)))
@@ -1187,7 +1188,7 @@ void unmap_mapping_range(struct address_space *mapping,
 
 	if (unlikely(!list_empty(&mapping->i_mmap_shared)))
 		unmap_mapping_range_list(&mapping->i_mmap_shared, &details);
-	up(&mapping->i_shared_sem);
+	spin_unlock(&mapping->i_mmap_lock);
 }
 EXPORT_SYMBOL(unmap_mapping_range);
 

@@ -63,7 +63,7 @@ EXPORT_SYMBOL(sysctl_max_map_count);
 EXPORT_SYMBOL(vm_committed_space);
 
 /*
- * Requires inode->i_mapping->i_shared_sem
+ * Requires inode->i_mapping->i_mmap_lock
  */
 static inline void
 __remove_shared_vm_struct(struct vm_area_struct *vma, struct inode *inode)
@@ -84,9 +84,9 @@ static void remove_shared_vm_struct(struct vm_area_struct *vma)
 
 	if (file) {
 		struct address_space *mapping = file->f_mapping;
-		down(&mapping->i_shared_sem);
+		spin_lock(&mapping->i_mmap_lock);
 		__remove_shared_vm_struct(vma, file->f_dentry->d_inode);
-		up(&mapping->i_shared_sem);
+		spin_unlock(&mapping->i_mmap_lock);
 	}
 }
 
@@ -286,12 +286,12 @@ static void vma_link(struct mm_struct *mm, struct vm_area_struct *vma,
 		mapping = vma->vm_file->f_mapping;
 
 	if (mapping)
-		down(&mapping->i_shared_sem);
+		spin_lock(&mapping->i_mmap_lock);
 	spin_lock(&mm->page_table_lock);
 	__vma_link(mm, vma, prev, rb_link, rb_parent);
 	spin_unlock(&mm->page_table_lock);
 	if (mapping)
-		up(&mapping->i_shared_sem);
+		spin_unlock(&mapping->i_mmap_lock);
 
 	mark_mm_hugetlb(mm, vma);
 	mm->map_count++;
@@ -301,7 +301,7 @@ static void vma_link(struct mm_struct *mm, struct vm_area_struct *vma,
 /*
  * Insert vm structure into process list sorted by address and into the inode's
  * i_mmap ring. The caller should hold mm->page_table_lock and
- * ->f_mappping->i_shared_sem if vm_file is non-NULL.
+ * ->f_mappping->i_mmap_lock if vm_file is non-NULL.
  */
 static void
 __insert_vm_struct(struct mm_struct * mm, struct vm_area_struct * vma)
@@ -391,7 +391,7 @@ static struct vm_area_struct *vma_merge(struct mm_struct *mm,
 {
 	spinlock_t *lock = &mm->page_table_lock;
 	struct inode *inode = file ? file->f_dentry->d_inode : NULL;
-	struct semaphore *i_shared_sem;
+	spinlock_t *i_mmap_lock;
 
 	/*
 	 * We later require that vma->vm_flags == vm_flags, so this tests
@@ -400,7 +400,7 @@ static struct vm_area_struct *vma_merge(struct mm_struct *mm,
 	if (vm_flags & VM_SPECIAL)
 		return NULL;
 
-	i_shared_sem = file ? &file->f_mapping->i_shared_sem : NULL;
+	i_mmap_lock = file ? &file->f_mapping->i_mmap_lock : NULL;
 
 	if (!prev) {
 		prev = rb_entry(rb_parent, struct vm_area_struct, vm_rb);
@@ -417,7 +417,7 @@ static struct vm_area_struct *vma_merge(struct mm_struct *mm,
 
 		if (unlikely(file && prev->vm_next &&
 				prev->vm_next->vm_file == file)) {
-			down(i_shared_sem);
+			spin_lock(i_mmap_lock);
 			need_up = 1;
 		}
 		spin_lock(lock);
@@ -435,7 +435,7 @@ static struct vm_area_struct *vma_merge(struct mm_struct *mm,
 			__remove_shared_vm_struct(next, inode);
 			spin_unlock(lock);
 			if (need_up)
-				up(i_shared_sem);
+				spin_unlock(i_mmap_lock);
 			if (file)
 				fput(file);
 
@@ -445,7 +445,7 @@ static struct vm_area_struct *vma_merge(struct mm_struct *mm,
 		}
 		spin_unlock(lock);
 		if (need_up)
-			up(i_shared_sem);
+			spin_unlock(i_mmap_lock);
 		return prev;
 	}
 
@@ -460,13 +460,13 @@ static struct vm_area_struct *vma_merge(struct mm_struct *mm,
 			return NULL;
 		if (end == prev->vm_start) {
 			if (file)
-				down(i_shared_sem);
+				spin_lock(i_mmap_lock);
 			spin_lock(lock);
 			prev->vm_start = addr;
 			prev->vm_pgoff -= (end - addr) >> PAGE_SHIFT;
 			spin_unlock(lock);
 			if (file)
-				up(i_shared_sem);
+				spin_unlock(i_mmap_lock);
 			return prev;
 		}
 	}
@@ -1232,7 +1232,7 @@ int split_vma(struct mm_struct * mm, struct vm_area_struct * vma,
 		 mapping = vma->vm_file->f_mapping;
 
 	if (mapping)
-		down(&mapping->i_shared_sem);
+		spin_lock(&mapping->i_mmap_lock);
 	spin_lock(&mm->page_table_lock);
 
 	if (new_below) {
@@ -1245,7 +1245,7 @@ int split_vma(struct mm_struct * mm, struct vm_area_struct * vma,
 
 	spin_unlock(&mm->page_table_lock);
 	if (mapping)
-		up(&mapping->i_shared_sem);
+		spin_unlock(&mapping->i_mmap_lock);
 
 	return 0;
 }
@@ -1479,7 +1479,7 @@ void exit_mmap(struct mm_struct *mm)
 
 /* Insert vm structure into process list sorted by address
  * and into the inode's i_mmap ring.  If vm_file is non-NULL
- * then i_shared_sem is taken here.
+ * then i_mmap_lock is taken here.
  */
 void insert_vm_struct(struct mm_struct * mm, struct vm_area_struct * vma)
 {

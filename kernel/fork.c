@@ -324,9 +324,9 @@ static inline int dup_mmap(struct mm_struct * mm, struct mm_struct * oldmm)
 				atomic_dec(&inode->i_writecount);
       
 			/* insert tmp into the share list, just after mpnt */
-			down(&file->f_mapping->i_shared_sem);
+			spin_lock(&file->f_mapping->i_mmap_lock);
 			list_add(&tmp->shared, &mpnt->shared);
-			up(&file->f_mapping->i_shared_sem);
+			spin_unlock(&file->f_mapping->i_mmap_lock);
 		}
 
 		/*

@@ -69,15 +69,9 @@ static inline int mremap_moved_anon_rmap(struct page *page, unsigned long addr)
 static inline int make_page_exclusive(struct vm_area_struct *vma,
 					unsigned long addr)
 {
-	switch (handle_mm_fault(vma->vm_mm, vma, addr, 1)) {
-	case VM_FAULT_MINOR:
-	case VM_FAULT_MAJOR:
+	if (handle_mm_fault(vma->vm_mm, vma, addr, 1) != VM_FAULT_OOM)
 		return 0;
-	case VM_FAULT_OOM:
-		return -ENOMEM;
-	default:
-		return -EFAULT;
-	}
+	return -ENOMEM;
 }
 
 /*
