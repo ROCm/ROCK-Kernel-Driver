@@ -383,7 +383,7 @@ u64 hpsb_allocate_and_register_addrspace(struct hpsb_highlevel *hl,
 		a2sa = a2->start & align_mask;
 		a2ea = (a2->end + alignment -1) & align_mask;
 
-		if ((a2sa - a1ea >= size) && (a2sa - start >= size) && (end - a1ea >= size)) {
+		if ((a2sa - a1ea >= size) && (a2sa - start >= size) && (a2sa > start)) {
 			as->start = max(start, a1ea);
 			as->end = as->start + size;
 			list_add(&as->host_list, entry);

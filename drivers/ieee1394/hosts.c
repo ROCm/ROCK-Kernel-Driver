@@ -30,7 +30,7 @@
 #include "config_roms.h"
 
 
-static void delayed_reset_bus(unsigned long __reset_info)
+static void delayed_reset_bus(void * __reset_info)
 {
 	struct hpsb_host *host = (struct hpsb_host*)__reset_info;
 	int generation = host->csr.generation + 1;
@@ -129,9 +129,6 @@ struct hpsb_host *hpsb_alloc_host(struct hpsb_host_driver *drv, size_t extra,
 	skb_queue_head_init(&h->pending_packet_queue);
 	INIT_LIST_HEAD(&h->addr_space);
 
-	init_timer(&h->delayed_reset);
-	h->delayed_reset.function = delayed_reset_bus;
-	h->delayed_reset.data = (unsigned long)h;
 	for (i = 2; i < 16; i++)
 		h->csr.gen_timestamp[i] = jiffies - 60 * HZ;
 
@@ -140,6 +137,8 @@ struct hpsb_host *hpsb_alloc_host(struct hpsb_host_driver *drv, size_t extra,
 
 	atomic_set(&h->generation, 0);
 
+	INIT_WORK(&h->delayed_reset, delayed_reset_bus, h);
+	
 	init_timer(&h->timeout);
 	h->timeout.data = (unsigned long) h;
 	h->timeout.function = abort_timedouts;
@@ -188,7 +187,8 @@ void hpsb_remove_host(struct hpsb_host *host)
 {
         host->is_shutdown = 1;
 
-	del_timer_sync(&host->delayed_reset);
+	cancel_delayed_work(&host->delayed_reset);
+	flush_scheduled_work();
 
         host->driver = &dummy_driver;
 
@@ -202,7 +202,7 @@ void hpsb_remove_host(struct hpsb_host *host)
 
 int hpsb_update_config_rom_image(struct hpsb_host *host)
 {
-	unsigned long reset_time;
+	unsigned long reset_delay;
 	int next_gen = host->csr.generation + 1;
 
 	if (!host->update_config_rom)
@@ -213,21 +213,21 @@ int hpsb_update_config_rom_image(struct hpsb_host *host)
 
 	/* Stop the delayed interrupt, we're about to change the config rom and
 	 * it would be a waste to do a bus reset twice. */
-	del_timer_sync(&host->delayed_reset);
+	cancel_delayed_work(&host->delayed_reset);
 
 	/* IEEE 1394a-2000 prohibits using the same generation number
 	 * twice in a 60 second period. */
 	if (jiffies - host->csr.gen_timestamp[next_gen] < 60 * HZ)
 		/* Wait 60 seconds from the last time this generation number was
 		 * used. */
-		reset_time = (60 * HZ) + host->csr.gen_timestamp[next_gen];
+		reset_delay = (60 * HZ) + host->csr.gen_timestamp[next_gen] - jiffies;
 	else
 		/* Wait 1 second in case some other code wants to change the
 		 * Config ROM in the near future. */
-		reset_time = jiffies + HZ;
+		reset_delay = HZ;
 
-	/* This will add the timer as well as modify it */
-	mod_timer(&host->delayed_reset, reset_time);
+	PREPARE_WORK(&host->delayed_reset, delayed_reset_bus, host);
+	schedule_delayed_work(&host->delayed_reset, reset_delay);
 
 	return 0;
 }
