@@ -24,7 +24,8 @@
 #ifndef _BTTVP_H_
 #define _BTTVP_H_
 
-#define BTTV_VERSION_CODE KERNEL_VERSION(0,9,4)
+#include <linux/version.h>
+#define BTTV_VERSION_CODE KERNEL_VERSION(0,9,11)
 
 #include <linux/types.h>
 #include <linux/wait.h>
@@ -41,6 +42,7 @@
 
 #include "bt848.h"
 #include "bttv.h"
+#include "btcx-risc.h"
 
 #ifdef __KERNEL__
 
@@ -67,8 +69,7 @@
 
 /* ---------------------------------------------------------- */
 
-struct bttv_tvnorm 
-{
+struct bttv_tvnorm {
 	int   v4l2_id;
 	char  *name;
         u32   Fsc;
@@ -79,10 +80,11 @@ struct bttv_tvnorm
 	u16   hdelayx1, hactivex1;
 	u16   vdelay;
         u8    vbipack;
+	u16   vtotal;
 	int   sram;
 };
 extern const struct bttv_tvnorm bttv_tvnorms[];
-extern const int BTTV_TVNORMS;
+extern const unsigned int BTTV_TVNORMS;
 
 struct bttv_format {
 	char *name;
@@ -95,21 +97,14 @@ struct bttv_format {
 	int  hshift,vshift;   /* for planar modes   */
 };
 extern const struct bttv_format bttv_formats[];
-extern const int BTTV_FORMATS;
+extern const unsigned int BTTV_FORMATS;
 
 /* ---------------------------------------------------------- */
 
 struct bttv_geometry {
 	u8  vtc,crop,comb;
 	u16 width,hscale,hdelay;
-	u16 sheight,vscale,vdelay;
-};
-
-struct bttv_riscmem {
-	unsigned int   size;
-	u32            *cpu;
-	u32            *jmp;
-	dma_addr_t     dma;
+	u16 sheight,vscale,vdelay,vtotal;
 };
 
 struct bttv_buffer {
@@ -122,16 +117,25 @@ struct bttv_buffer {
 	int                        btformat;
 	int                        btswap;
 	struct bttv_geometry       geo;
-	struct bttv_riscmem        top;
-	struct bttv_riscmem        bottom;
+	struct btcx_riscmem        top;
+	struct btcx_riscmem        bottom;
+};
+
+struct bttv_buffer_set {
+	struct bttv_buffer     *top;       /* top field buffer    */
+	struct bttv_buffer     *bottom;    /* bottom field buffer */
+	struct bttv_buffer     *vbi;       /* vbi buffer */
+	unsigned int           irqflags;
+	unsigned int           topirq;
 };
 
 struct bttv_overlay {
-	int tvnorm;
+	int                    tvnorm;
 	struct v4l2_rect       w;
 	enum v4l2_field        field;
 	struct v4l2_clip       *clips;
 	int                    nclips;
+	int                    setup_ok;
 };
 
 struct bttv_fh {
@@ -141,7 +145,6 @@ struct bttv_fh {
 
 	/* video capture */
 	struct videobuf_queue    cap;
-	/* struct bttv_buffer       buf; */
 	const struct bttv_format *fmt;
 	int                      width;
 	int                      height;
@@ -158,28 +161,19 @@ struct bttv_fh {
 /* ---------------------------------------------------------- */
 /* bttv-risc.c                                                */
 
-/* alloc/free memory */
-int  bttv_riscmem_alloc(struct pci_dev *pci,
-			struct bttv_riscmem *risc,
-			unsigned int size);
-void bttv_riscmem_free(struct pci_dev *pci,
-		       struct bttv_riscmem *risc);
-
 /* risc code generators - capture */
-int bttv_risc_packed(struct bttv *btv, struct bttv_riscmem *risc,
+int bttv_risc_packed(struct bttv *btv, struct btcx_riscmem *risc,
 		     struct scatterlist *sglist,
-		     int offset, int bpl, int pitch, int lines);
-int bttv_risc_planar(struct bttv *btv, struct bttv_riscmem *risc,
+		     unsigned int offset, unsigned int bpl,
+		     unsigned int pitch, unsigned int lines);
+int bttv_risc_planar(struct bttv *btv, struct btcx_riscmem *risc,
 		     struct scatterlist *sglist,
-		     int yoffset, int ybpl, int ypadding, int ylines,
-		     int uoffset, int voffset, int hshift, int vshift,
-		     int cpadding);
-
-/* risc code generator + helpers - screen overlay */
-int bttv_screen_clips(int swidth, int sheight, struct v4l2_rect *win,
-		      struct v4l2_clip *clips, int n);
-void bttv_sort_clips(struct v4l2_clip *clips, int nclips);
-int bttv_risc_overlay(struct bttv *btv, struct bttv_riscmem *risc,
+		     unsigned int yoffset,  unsigned int ybpl,
+		     unsigned int ypadding, unsigned int ylines,
+		     unsigned int uoffset,  unsigned int voffset,
+		     unsigned int hshift,   unsigned int vshift,
+		     unsigned int cpadding);
+int bttv_risc_overlay(struct bttv *btv, struct btcx_riscmem *risc,
 		      const struct bttv_format *fmt,
 		      struct bttv_overlay *ov,
 		      int skip_top, int skip_bottom);
@@ -192,13 +186,13 @@ void bttv_apply_geo(struct bttv *btv, struct bttv_geometry *geo, int top);
 /* control dma register + risc main loop */
 void bttv_set_dma(struct bttv *btv, int override, int irqflags);
 int bttv_risc_init_main(struct bttv *btv);
-int bttv_risc_hook(struct bttv *btv, int slot, struct bttv_riscmem *risc,
+int bttv_risc_hook(struct bttv *btv, int slot, struct btcx_riscmem *risc,
 		   int irqflags);
 
 /* capture buffer handling */
 int bttv_buffer_risc(struct bttv *btv, struct bttv_buffer *buf);
-int bttv_buffer_activate(struct bttv *btv, struct bttv_buffer *top,
-			 struct bttv_buffer *bottom);
+int bttv_buffer_set_activate(struct bttv *btv,
+			     struct bttv_buffer_set *set);
 void bttv_dma_free(struct bttv *btv, struct bttv_buffer *buf);
 
 /* overlay handling */
@@ -210,7 +204,8 @@ int bttv_overlay_risc(struct bttv *btv, struct bttv_overlay *ov,
 /* ---------------------------------------------------------- */
 /* bttv-vbi.c                                                 */
 
-void bttv_vbi_fmt(struct bttv_fh *fh, struct v4l2_format *f);
+void bttv_vbi_try_fmt(struct bttv_fh *fh, struct v4l2_format *f);
+void bttv_vbi_get_fmt(struct bttv_fh *fh, struct v4l2_format *f);
 void bttv_vbi_setlines(struct bttv_fh *fh, struct bttv *btv, int lines);
 
 extern struct videobuf_queue_ops bttv_vbi_qops;
@@ -236,8 +231,8 @@ extern void bttv_field_count(struct bttv *btv);
 #define d2printk if (bttv_debug >= 2) printk
 
 /* our devices */
-#define BTTV_MAX 4
-extern int bttv_num;
+#define BTTV_MAX 16
+extern unsigned int bttv_num;
 extern struct bttv bttvs[BTTV_MAX];
 
 #define BTTV_MAX_FBUF   0x208000
@@ -264,8 +259,9 @@ struct bttv {
         unsigned int nr;       /* dev nr (for printk("bttv%d: ...");  */
 	char name[8];          /* dev name */
 	unsigned int cardid;   /* pci subsystem id (bt878 based ones) */
-	int type;              /* card type (pointer into tvcards[])  */
-        int tuner_type;        /* tuner chip type */
+	unsigned int type;     /* card type (pointer into tvcards[])  */
+        unsigned int tuner_type;  /* tuner chip type */
+        unsigned int pinnacle_id;
 	struct bttv_pll_info pll;
 	int triton1;
 
@@ -292,12 +288,12 @@ struct bttv {
         struct semaphore reslock;
 
 	/* video state */
-	int input;
-	int audio;
+	unsigned int input;
+	unsigned int audio;
 	unsigned long freq;
 	int tvnorm,hue,contrast,bright,saturation;
 	struct video_buffer fbuf;
-	int field_count;
+	unsigned int field_count;
 
 	/* various options */
 	int opt_combfilter;
@@ -326,21 +322,19 @@ struct bttv {
 
 	/* risc memory management data
 	   - must aquire s_lock before changing these
-	   - only the irq handler is supported to touch odd + even */
-	struct bttv_riscmem    main;
-	struct bttv_buffer     *top;       /* current active top field    */
-	struct bttv_buffer     *bottom;    /* current active bottom field */
-	struct bttv_buffer     *screen;    /* overlay                     */
-	struct list_head       capture;    /* capture buffer queue        */
-	struct bttv_buffer     *vcurr;
-	struct list_head       vcapture;
+	   - only the irq handler is supported to touch top + bottom + vcurr */
+	struct btcx_riscmem     main;
+	struct bttv_buffer      *screen;    /* overlay             */
+	struct list_head        capture;    /* video capture queue */
+	struct list_head        vcapture;   /* vbi capture queue   */
+	struct bttv_buffer_set  curr;       /* active buffers      */
 
 	unsigned long cap_ctl;
 	unsigned long dma_on;
 	struct timer_list timeout;
-	int errors;
+	unsigned int errors;
 
-	int users;
+	unsigned int users;
 	struct bttv_fh init;
 };
 

@@ -90,6 +90,7 @@
 #define BTTV_SENSORAY311    0x49
 #define BTTV_RV605          0x4a
 #define BTTV_WINDVR         0x4c
+#define BTTV_GRANDTEC       0x4d
 #define BTTV_KWORLD         0x4e
 #define BTTV_HAUPPAUGEPVR   0x50
 #define BTTV_GVBCTV5PCI     0x51
@@ -108,6 +109,12 @@
 #define BTTV_PINNACLESAT    0x5e
 #define BTTV_FORMAC_PROTV   0x5f
 #define BTTV_EURESYS_PICOLO 0x61
+#define BTTV_PV150          0x62
+#define BTTV_AD_TVK503      0x63
+#define BTTV_IVC200         0x66
+#define BTTV_XGUARD         0x67
+#define BTTV_NEBULA_DIGITV  0x68
+#define BTTV_PV143          0x69
 
 /* i2c address list */
 #define I2C_TSA5522        0xc2
@@ -123,6 +130,7 @@
 #define I2C_STBEE          0xae
 #define I2C_VHX            0xc0
 #define I2C_MSP3400        0x80
+#define I2C_MSP3400_ALT    0x88
 #define I2C_TEA6300        0x80
 #define I2C_DPL3518	   0x84
 #define I2C_TDA9887	   0x86
@@ -145,36 +153,37 @@ struct bttv;
 struct tvcard
 {
         char *name;
-        int video_inputs;
-        int audio_inputs;
-        int tuner;
-        int svhs;
-	int digital_mode; // DIGITAL_MODE_CAMERA or DIGITAL_MODE_VIDEO
+        unsigned int video_inputs;
+        unsigned int audio_inputs;
+        unsigned int tuner;
+        unsigned int svhs;
+	unsigned int digital_mode; // DIGITAL_MODE_CAMERA or DIGITAL_MODE_VIDEO
         u32 gpiomask;
         u32 muxsel[16];
         u32 audiomux[6]; /* Tuner, Radio, external, internal, mute, stereo */
         u32 gpiomask2;   /* GPIO MUX mask */
 
 	/* i2c audio flags */
-	int no_msp34xx:1;
-	int no_tda9875:1;
-	int no_tda7432:1;
-	int needs_tvaudio:1;
+	unsigned int no_msp34xx:1;
+	unsigned int no_tda9875:1;
+	unsigned int no_tda7432:1;
+	unsigned int needs_tvaudio:1;
+	unsigned int msp34xx_alt:1;
 
 	/* other settings */
-	int pll;
+	unsigned int pll;
 #define PLL_NONE 0
 #define PLL_28   1
 #define PLL_35   2
 
-	int tuner_type;
-	int has_radio;
+	unsigned int tuner_type;
+	unsigned int has_radio;
 	void (*audio_hook)(struct bttv *btv, struct video_audio *v, int set);
 	void (*muxsel_hook)(struct bttv *btv, unsigned int input);
 };
 
 extern struct tvcard bttv_tvcards[];
-extern const int bttv_num_tvcards;
+extern const unsigned int bttv_num_tvcards;
 
 /* identification / initialization of the card */
 extern void bttv_idcard(struct bttv *btv);

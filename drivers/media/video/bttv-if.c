@@ -25,7 +25,6 @@
     
 */
 
-#include <linux/version.h>
 #include <linux/module.h>
 #include <linux/init.h>
 
@@ -198,6 +197,9 @@ static int attach_inform(struct i2c_client *client)
 
 	if (btv->tuner_type != UNSET)
 		bttv_call_i2c_clients(btv,TUNER_SET_TYPE,&btv->tuner_type);
+	if (btv->pinnacle_id != UNSET)
+		bttv_call_i2c_clients(btv,AUDC_CONFIG_PINNACLE,
+				      &btv->pinnacle_id);
 
         if (bttv_debug)
 		printk("bttv%d: i2c attach [client=%s]\n",
@@ -231,9 +233,9 @@ static struct i2c_algo_bit_data bttv_i2c_algo_template = {
 
 static struct i2c_adapter bttv_i2c_adap_template = {
 	.owner             = THIS_MODULE,
+	.class             = I2C_ADAP_CLASS_TV_ANALOG,
 	I2C_DEVNAME("bt848"),
 	.id                = I2C_HW_B_BT848,
-	.class             = I2C_ADAP_CLASS_TV_ANALOG,
 	.client_register   = attach_inform,
 };
 
@@ -314,6 +316,7 @@ int __devinit init_bttv_i2c(struct bttv *btv)
 	       sizeof(struct i2c_client));
 
 	sprintf(btv->i2c_adap.dev.name, "bt848 #%d", btv->nr);
+	btv->i2c_adap.dev.parent = &btv->dev->dev;
 
         btv->i2c_algo.data = btv;
         i2c_set_adapdata(&btv->i2c_adap, btv);

@@ -19,7 +19,6 @@
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
-#include <linux/version.h>
 #include <linux/module.h>
 #include <linux/errno.h>
 #include <linux/fs.h>
@@ -63,7 +62,7 @@ vbi_buffer_risc(struct bttv *btv, struct bttv_buffer *buf, int lines)
 }
 
 static int vbi_buffer_setup(struct file *file,
-			unsigned int *count, unsigned int *size)
+			    unsigned int *count, unsigned int *size)
 {
 	struct bttv_fh *fh = file->private_data;
 	struct bttv *btv = fh->btv;
@@ -155,11 +154,53 @@ void bttv_vbi_setlines(struct bttv_fh *fh, struct bttv *btv, int lines)
 	}
 }
 
-void bttv_vbi_fmt(struct bttv_fh *fh, struct v4l2_format *f)
+void bttv_vbi_try_fmt(struct bttv_fh *fh, struct v4l2_format *f)
 {
+	const struct bttv_tvnorm *tvnorm;
+	u32 start0,start1;
+	s32 count0,count1,count;
+
+	tvnorm = &bttv_tvnorms[fh->btv->tvnorm];
+	f->type = V4L2_BUF_TYPE_VBI_CAPTURE;
+	f->fmt.vbi.sampling_rate    = tvnorm->Fsc;
+	f->fmt.vbi.samples_per_line = 2048;
+	f->fmt.vbi.sample_format    = V4L2_PIX_FMT_GREY;
+	f->fmt.vbi.offset           = 244;
+	f->fmt.vbi.flags            = 0;
+	switch (fh->btv->tvnorm) {
+	case 1: /* NTSC */
+		start0 = 10;
+		start1 = 273;
+		break;
+	case 0: /* PAL */
+	case 2: /* SECAM */
+	default:
+		start0 = 7;
+		start1 = 319;
+	}
+
+	count0 = (f->fmt.vbi.start[0] + f->fmt.vbi.count[0]) - start0;
+	count1 = (f->fmt.vbi.start[1] + f->fmt.vbi.count[1]) - start1;
+	count  = max(count0,count1);
+	if (count > VBI_MAXLINES)
+		count = VBI_MAXLINES;
+	if (count < 1)
+		count = 1;
+
+	f->fmt.vbi.start[0] = start0;
+	f->fmt.vbi.start[1] = start1;
+	f->fmt.vbi.count[0] = count;
+	f->fmt.vbi.count[1] = count;
+}
+
+void bttv_vbi_get_fmt(struct bttv_fh *fh, struct v4l2_format *f)
+{
+	const struct bttv_tvnorm *tvnorm;
+
+	tvnorm = &bttv_tvnorms[fh->btv->tvnorm];
 	memset(f,0,sizeof(*f));
 	f->type = V4L2_BUF_TYPE_VBI_CAPTURE;
-	f->fmt.vbi.sampling_rate    = 35468950;
+	f->fmt.vbi.sampling_rate    = tvnorm->Fsc;
 	f->fmt.vbi.samples_per_line = 2048;
 	f->fmt.vbi.sample_format    = V4L2_PIX_FMT_GREY;
 	f->fmt.vbi.offset           = 244;
