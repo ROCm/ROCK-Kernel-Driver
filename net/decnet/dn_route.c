@@ -893,6 +893,7 @@ static int dn_route_output_slow(struct dst_entry **pprt, const struct flowi *old
 			goto out;
 		dev_hold(dev_out);
 source_ok:
+		;
 	}
 
 	/* No destination? Assume its local */
