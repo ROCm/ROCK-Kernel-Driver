@@ -1339,6 +1339,12 @@ EXPORT_SYMBOL (usb_hcd_irq);
 
 /*-------------------------------------------------------------------------*/
 
+static void hcd_panic (void *_hcd)
+{
+	struct usb_hcd *hcd = _hcd;
+	hcd->driver->stop (hcd);
+}
+
 /**
  * usb_hc_died - report abnormal shutdown of a host controller (bus glue)
  * @hcd: pointer to the HCD representing the controller
@@ -1371,9 +1377,9 @@ void usb_hc_died (struct usb_hcd *hcd)
 		urb->status = -ESHUTDOWN;
 	spin_unlock_irqrestore (&hcd_data_lock, flags);
 
-	if (urb)
-		usb_rh_status_dequeue (hcd, urb);
-	hcd->driver->stop (hcd);
+	/* hcd->stop() needs a task context */
+	INIT_WORK (&hcd->work, hcd_panic, hcd);
+	(void) schedule_work (&hcd->work);
 }
 EXPORT_SYMBOL (usb_hc_died);
 
