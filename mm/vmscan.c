@@ -794,10 +794,8 @@ int kswapd(void *unused)
 		add_wait_queue(&kswapd_wait, &wait);
 
 		mb();
-		if (kswapd_can_sleep()) {
+		if (kswapd_can_sleep())
 			schedule();
-		}
-		
 
 		__set_current_state(TASK_RUNNING);
 		remove_wait_queue(&kswapd_wait, &wait);
