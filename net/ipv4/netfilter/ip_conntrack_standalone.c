@@ -201,7 +201,7 @@ static unsigned int ip_refrag(unsigned int hooknum,
 	/* Local packets are never produced too large for their
 	   interface.  We degfragment them at LOCAL_OUT, however,
 	   so we have to refragment them here. */
-	if ((*pskb)->len > rt->u.dst.pmtu) {
+	if ((*pskb)->len > dst_pmtu(&rt->u.dst)) {
 		/* No hook can be after us, so this should be OK. */
 		ip_fragment(*pskb, okfn);
 		return NF_STOLEN;

@@ -148,7 +148,7 @@ static void send_reset(struct sk_buff *oldskb, int local)
 	nskb->dst = &rt->u.dst;
 
 	/* "Never happens" */
-	if (nskb->len > nskb->dst->pmtu)
+	if (nskb->len > dst_pmtu(nskb->dst))
 		goto free_nskb;
 
 	connection_attach(nskb, oldskb->nfct);
@@ -225,8 +225,8 @@ static void send_unreach(struct sk_buff *skb_in, int code)
 	/* RFC says return as much as we can without exceeding 576 bytes. */
 	length = skb_in->len + sizeof(struct iphdr) + sizeof(struct icmphdr);
 
-	if (length > rt->u.dst.pmtu)
-		length = rt->u.dst.pmtu;
+	if (length > dst_pmtu(&rt->u.dst))
+		length = dst_pmtu(&rt->u.dst);
 	if (length > 576)
 		length = 576;
 
