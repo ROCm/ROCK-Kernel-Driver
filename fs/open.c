@@ -241,7 +241,7 @@ static inline long do_sys_truncate(const char __user * path, loff_t length)
 	if (length < 0)	/* sorry, but loff_t says... */
 		goto out;
 
-	FSHOOK_BEGIN_USER_PATH_WALK(truncate, error, path, nd, filename, .length = length)
+	FSHOOK_BEGIN_USER_PATH_WALK_IT(truncate, error, path, nd, filename, .length = length)
 
 	inode = nd.dentry->d_inode;
 
@@ -510,7 +510,7 @@ asmlinkage long sys_access(const char __user * filename, int mode)
 	else
 		current->cap_effective = current->cap_permitted;
 
-	FSHOOK_BEGIN_USER_WALK(access,
+	FSHOOK_BEGIN_USER_WALK_IT(access,
 		res,
 		filename,
 		LOOKUP_FOLLOW|LOOKUP_ACCESS,
@@ -607,7 +607,7 @@ asmlinkage long sys_chroot(const char __user * filename)
 	int error;
 	intent_init(&nd.intent, IT_GETATTR);
 
-	FSHOOK_BEGIN_USER_WALK(chroot,
+	FSHOOK_BEGIN_USER_WALK_IT(chroot,
 		error,
 		filename,
 		LOOKUP_FOLLOW | LOOKUP_DIRECTORY | LOOKUP_NOALT,

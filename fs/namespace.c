@@ -534,6 +534,8 @@ static int do_loopback(struct nameidata *nd, char *old_name, int recurse)
 		return err;
 	if (!old_name || !*old_name)
 		return -EINVAL;
+
+	intent_init(&old_nd.intent, IT_LOOKUP);
 	err = path_lookup(old_name, LOOKUP_FOLLOW, &old_nd);
 	if (err)
 		return err;
@@ -602,6 +604,7 @@ static int do_move_mount(struct nameidata *nd, char *old_name)
 		return -EPERM;
 	if (!old_name || !*old_name)
 		return -EINVAL;
+	intent_init(&old_nd.intent, IT_LOOKUP);
 	err = path_lookup(old_name, LOOKUP_FOLLOW, &old_nd);
 	if (err)
 		return err;

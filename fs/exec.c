@@ -125,10 +125,11 @@ asmlinkage long sys_uselib(const char __user * library)
 	struct file * file;
 	struct nameidata nd;
 	int error;
+
 	intent_init(&nd.intent, IT_OPEN);
 
-	nd.intent.it_flags = O_RDONLY;
-	FSHOOK_BEGIN_USER_WALK(open,
+	nd.intent.it_flags = FMODE_READ;
+	FSHOOK_BEGIN_USER_WALK_IT(open,
 		error,
 		library,
 		LOOKUP_FOLLOW|LOOKUP_OPEN,
@@ -497,7 +498,7 @@ struct file *open_exec(const char *name)
 	FSHOOK_BEGIN(open, err, .filename = name, .flags = O_RDONLY)
 
 	intent_init(&nd.intent, IT_OPEN);
-	nd.intent.it_flags = O_RDONLY;
+	nd.intent.it_flags = FMODE_READ;
 	err = path_lookup(name, LOOKUP_FOLLOW, &nd);
 	file = ERR_PTR(err);
 

@@ -75,9 +75,9 @@ int vfs_stat(char __user *name, struct kstat *stat)
 	int error;
 	intent_init(&nd.intent, IT_GETATTR);
 
-	FSHOOK_BEGIN_USER_PATH_WALK(stat, error, name, nd, path, .link = false)
+	FSHOOK_BEGIN_USER_PATH_WALK_IT(stat, error, name, nd, path, .link = false)
 
-	  error = vfs_getattr_it(nd.mnt, nd.dentry, &nd.intent, stat);
+		error = vfs_getattr_it(nd.mnt, nd.dentry, &nd.intent, stat);
 		path_release(&nd);
 
 	FSHOOK_END_USER_WALK(stat, error, path)
@@ -93,7 +93,7 @@ int vfs_lstat(char __user *name, struct kstat *stat)
 	int error;
 	intent_init(&nd.intent, IT_GETATTR);
 
-	FSHOOK_BEGIN_USER_PATH_WALK_LINK(stat, error, name, nd, path, .link = true)
+	FSHOOK_BEGIN_USER_PATH_WALK_LINK_IT(stat, error, name, nd, path, .link = true)
 
 		error = vfs_getattr_it(nd.mnt, nd.dentry, &nd.intent, stat);
 		path_release(&nd);
