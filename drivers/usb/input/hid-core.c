@@ -807,7 +807,11 @@ static void hid_input_field(struct hid_device *hid, struct hid_field *field, __u
 	unsigned size = field->report_size;
 	__s32 min = field->logical_minimum;
 	__s32 max = field->logical_maximum;
-	__s32 value[count]; /* WARNING: gcc specific */
+	__s32 *value;
+
+	value = kmalloc(sizeof(__s32)*count, GFP_ATOMIC);
+	if (!value)
+		return;
 
 	for (n = 0; n < count; n++) {
 
@@ -817,7 +821,7 @@ static void hid_input_field(struct hid_device *hid, struct hid_field *field, __u
 			if (!(field->flags & HID_MAIN_ITEM_VARIABLE) /* Ignore report if ErrorRollOver */
 			    && value[n] >= min && value[n] <= max
 			    && field->usage[value[n] - min].hid == HID_UP_KEYBOARD + 1)
-				return;
+				goto exit;
 	}
 
 	for (n = 0; n < count; n++) {
@@ -847,6 +851,8 @@ static void hid_input_field(struct hid_device *hid, struct hid_field *field, __u
 	}
 
 	memcpy(field->value, value, count * sizeof(__s32));
+exit:
+	kfree(value);
 }
 
 static int hid_input_report(int type, struct urb *urb, struct pt_regs *regs)
@@ -1425,6 +1431,9 @@ void hid_init_reports(struct hid_device *hid)
 #define USB_VENDOR_ID_GLAB		0x06c2
 #define USB_DEVICE_ID_4_PHIDGETSERVO_30	0x0038
 #define USB_DEVICE_ID_1_PHIDGETSERVO_30	0x0039
+#define USB_DEVICE_ID_8_8_8_IF_KIT	0x0045
+#define USB_DEVICE_ID_0_0_4_IF_KIT	0x0040
+#define USB_DEVICE_ID_0_8_8_IF_KIT	0x0053
 
 #define USB_VENDOR_ID_WISEGROUP		0x0925
 #define USB_DEVICE_ID_1_PHIDGETSERVO_20	0x8101
@@ -1483,8 +1492,13 @@ static struct hid_blacklist {
 	{ USB_VENDOR_ID_WACOM, USB_DEVICE_ID_WACOM_INTUOS2 + 7, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_WACOM, USB_DEVICE_ID_WACOM_VOLITO, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_WACOM, USB_DEVICE_ID_WACOM_PTU, HID_QUIRK_IGNORE },
+
 	{ USB_VENDOR_ID_GLAB, USB_DEVICE_ID_4_PHIDGETSERVO_30, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_GLAB, USB_DEVICE_ID_1_PHIDGETSERVO_30, HID_QUIRK_IGNORE },
+	{ USB_VENDOR_ID_GLAB, USB_DEVICE_ID_8_8_8_IF_KIT, HID_QUIRK_IGNORE },
+	{ USB_VENDOR_ID_GLAB, USB_DEVICE_ID_0_0_4_IF_KIT, HID_QUIRK_IGNORE },
+	{ USB_VENDOR_ID_GLAB, USB_DEVICE_ID_0_8_8_IF_KIT, HID_QUIRK_IGNORE },
+
 	{ USB_VENDOR_ID_WISEGROUP, USB_DEVICE_ID_4_PHIDGETSERVO_20, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_WISEGROUP, USB_DEVICE_ID_1_PHIDGETSERVO_20, HID_QUIRK_IGNORE },
 

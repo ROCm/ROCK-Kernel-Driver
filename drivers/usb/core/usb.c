@@ -1221,13 +1221,15 @@ void usb_buffer_unmap_sg (struct usb_device *dev, unsigned pipe,
 			usb_pipein (pipe) ? DMA_FROM_DEVICE : DMA_TO_DEVICE);
 }
 
-static int usb_device_suspend(struct device *dev, u32 state)
+static int usb_generic_suspend(struct device *dev, u32 state)
 {
 	struct usb_interface *intf;
 	struct usb_driver *driver;
 
+	if (dev->driver == &usb_generic_driver)
+		return usb_suspend_device (to_usb_device(dev), state);
+
 	if ((dev->driver == NULL) ||
-	    (dev->driver == &usb_generic_driver) ||
 	    (dev->driver_data == &usb_generic_driver_data))
 		return 0;
 
@@ -1239,13 +1241,16 @@ static int usb_device_suspend(struct device *dev, u32 state)
 	return 0;
 }
 
-static int usb_device_resume(struct device *dev)
+static int usb_generic_resume(struct device *dev)
 {
 	struct usb_interface *intf;
 	struct usb_driver *driver;
 
+	/* devices resume through their hub */
+	if (dev->driver == &usb_generic_driver)
+		return usb_resume_device (to_usb_device(dev));
+
 	if ((dev->driver == NULL) ||
-	    (dev->driver == &usb_generic_driver) ||
 	    (dev->driver_data == &usb_generic_driver_data))
 		return 0;
 
@@ -1261,8 +1266,8 @@ struct bus_type usb_bus_type = {
 	.name =		"usb",
 	.match =	usb_device_match,
 	.hotplug =	usb_hotplug,
-	.suspend =	usb_device_suspend,
-	.resume =	usb_device_resume,
+	.suspend =	usb_generic_suspend,
+	.resume =	usb_generic_resume,
 };
 
 #ifndef MODULE
@@ -1300,7 +1305,9 @@ static int __init usb_init(void)
 	retval = bus_register(&usb_bus_type);
 	if (retval) 
 		goto out;
-	usb_host_init();
+	retval = usb_host_init();
+	if (retval)
+		goto host_init_failed;
 	retval = usb_major_init();
 	if (retval)
 		goto major_init_failed;
@@ -1322,6 +1329,7 @@ fs_init_failed:
 	usb_major_cleanup();	
 major_init_failed:
 	usb_host_cleanup();
+host_init_failed:
 	bus_unregister(&usb_bus_type);
 out:
 	return retval;

@@ -246,15 +246,7 @@
 #include <linux/workqueue.h>
 #include <asm/uaccess.h>
 #include <linux/usb.h>
-
-#ifdef CONFIG_USB_SERIAL_DEBUG
-	static int debug = 1;
-#else
-	static int debug;
-#endif
-
 #include "usb-serial.h"
-
 
 /* Defines */
 
@@ -479,6 +471,8 @@ static int digi_read_oob_callback( struct urb *urb );
 
 
 /* Statics */
+
+static int debug;
 
 static struct usb_device_id id_table_combined [] = {
 	{ USB_DEVICE(DIGI_VENDOR_ID, DIGI_2_ID) },
@@ -2068,6 +2062,5 @@ MODULE_AUTHOR( DRIVER_AUTHOR );
 MODULE_DESCRIPTION( DRIVER_DESC );
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(debug, "i");
+module_param(debug, bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(debug, "Debug enabled or not");
-

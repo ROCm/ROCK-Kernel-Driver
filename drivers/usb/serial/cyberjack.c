@@ -35,16 +35,11 @@
 #include <linux/spinlock.h>
 #include <asm/uaccess.h>
 #include <linux/usb.h>
+#include "usb-serial.h"
 
 #define CYBERJACK_LOCAL_BUF_SIZE 32
 
-#ifdef CONFIG_USB_SERIAL_DEBUG
-	static int debug = 1;
-#else
-	static int debug;
-#endif
-
-#include "usb-serial.h"
+static int debug;
 
 /*
  * Version Information
@@ -243,7 +238,7 @@ static int cyberjack_write (struct usb_serial_port *port, int from_user, const u
 		memcpy (priv->wrbuf+priv->wrfilled, buf, count);
 	}  
 
-	usb_serial_debug_data (__FILE__, __FUNCTION__, count,
+	usb_serial_debug_data(debug, &port->dev, __FUNCTION__, count,
 		priv->wrbuf+priv->wrfilled);
 	priv->wrfilled += count;
 
@@ -318,7 +313,7 @@ static void cyberjack_read_int_callback( struct urb *urb, struct pt_regs *regs )
 	if (urb->status)
 		return;
 
-	usb_serial_debug_data (__FILE__, __FUNCTION__, urb->actual_length, data);
+	usb_serial_debug_data(debug, &port->dev, __FUNCTION__, urb->actual_length, data);
 
 	/* React only to interrupts signaling a bulk_in transfer */
 	if( (urb->actual_length==4) && (data[0]==0x01) ) {
@@ -374,13 +369,11 @@ static void cyberjack_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
 	
+	usb_serial_debug_data(debug, &port->dev, __FUNCTION__, urb->actual_length, data);
 	if (urb->status) {
-		usb_serial_debug_data (__FILE__, __FUNCTION__, urb->actual_length, urb->transfer_buffer);
 		dbg("%s - nonzero read bulk status received: %d", __FUNCTION__, urb->status);
 		return;
 	}
-
-	usb_serial_debug_data (__FILE__, __FUNCTION__, urb->actual_length, data);
 
 	tty = port->tty;
 	if (urb->actual_length) {
@@ -520,6 +513,5 @@ MODULE_AUTHOR( DRIVER_AUTHOR );
 MODULE_DESCRIPTION( DRIVER_DESC );
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(debug, "i");
+module_param(debug, bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(debug, "Debug enabled or not");
-

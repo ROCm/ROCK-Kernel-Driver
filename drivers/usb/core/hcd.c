@@ -102,6 +102,9 @@ EXPORT_SYMBOL_GPL (usb_bus_list_lock);
 /* used when updating hcd data */
 static spinlock_t hcd_data_lock = SPIN_LOCK_UNLOCKED;
 
+/* wait queue for synchronous unlinks */
+DECLARE_WAIT_QUEUE_HEAD(usb_kill_urb_queue);
+
 /*-------------------------------------------------------------------------*/
 
 /*
@@ -569,7 +572,7 @@ static int rh_urb_enqueue (struct usb_hcd *hcd, struct urb *urb)
 
 /*-------------------------------------------------------------------------*/
 
-void usb_rh_status_dequeue (struct usb_hcd *hcd, struct urb *urb)
+int usb_rh_status_dequeue (struct usb_hcd *hcd, struct urb *urb)
 {
 	unsigned long	flags;
 
@@ -581,6 +584,7 @@ void usb_rh_status_dequeue (struct usb_hcd *hcd, struct urb *urb)
 	urb->hcpriv = NULL;
 	usb_hcd_giveback_urb (hcd, urb, NULL);
 	local_irq_restore (flags);
+	return 0;
 }
 
 /*-------------------------------------------------------------------------*/
@@ -622,9 +626,9 @@ static struct class usb_host_class = {
 	.release	= &usb_host_release,
 };
 
-void usb_host_init(void)
+int usb_host_init(void)
 {
-	class_register(&usb_host_class);
+	return class_register(&usb_host_class);
 }
 
 void usb_host_cleanup(void)
@@ -1029,7 +1033,6 @@ static int hcd_alloc_dev (struct usb_device *udev)
 static void urb_unlink (struct urb *urb)
 {
 	unsigned long		flags;
-	struct usb_device	*dev;
 
 	/* Release any periodic transfer bandwidth */
 	if (urb->bandwidth)
@@ -1040,9 +1043,8 @@ static void urb_unlink (struct urb *urb)
 
 	spin_lock_irqsave (&hcd_data_lock, flags);
 	list_del_init (&urb->urb_list);
-	dev = urb->dev;
 	spin_unlock_irqrestore (&hcd_data_lock, flags);
-	usb_put_dev (dev);
+	usb_put_dev (urb->dev);
 }
 
 
@@ -1079,23 +1081,28 @@ static int hcd_submit_urb (struct urb *urb, int mem_flags)
 	// FIXME:  verify that quiescing hc works right (RH cleans up)
 
 	spin_lock_irqsave (&hcd_data_lock, flags);
-	if (HCD_IS_RUNNING (hcd->state) && hcd->state != USB_STATE_QUIESCING) {
+	if (unlikely (urb->reject))
+		status = -EPERM;
+	else if (HCD_IS_RUNNING (hcd->state) &&
+			hcd->state != USB_STATE_QUIESCING) {
 		usb_get_dev (urb->dev);
 		list_add_tail (&urb->urb_list, &dev->urb_list);
 		status = 0;
-	} else {
-		INIT_LIST_HEAD (&urb->urb_list);
+	} else
 		status = -ESHUTDOWN;
-	}
 	spin_unlock_irqrestore (&hcd_data_lock, flags);
-	if (status)
+	if (status) {
+		INIT_LIST_HEAD (&urb->urb_list);
 		return status;
+	}
 
 	/* increment urb's reference count as part of giving it to the HCD
 	 * (which now controls it).  HCD guarantees that it either returns
 	 * an error or calls giveback(), but not both.
 	 */
 	urb = usb_get_urb (urb);
+	atomic_inc (&urb->use_count);
+
 	if (urb->dev == hcd->self.root_hub) {
 		/* NOTE:  requirement on hub callers (usbfs and the hub
 		 * driver, for now) that URBs' urb->transfer_buffer be
@@ -1132,9 +1139,12 @@ static int hcd_submit_urb (struct urb *urb, int mem_flags)
 
 	status = hcd->driver->urb_enqueue (hcd, urb, mem_flags);
 done:
-	if (status) {
-		usb_put_urb (urb);
+	if (unlikely (status)) {
 		urb_unlink (urb);
+		atomic_dec (&urb->use_count);
+		if (urb->reject)
+			wake_up (&usb_kill_urb_queue);
+		usb_put_urb (urb);
 	}
 	return status;
 }
@@ -1157,60 +1167,39 @@ static int hcd_get_frame_number (struct usb_device *udev)
  * soon as practical.  we've already set up the urb's return status,
  * but we can't know if the callback completed already.
  */
-static void
+static int
 unlink1 (struct usb_hcd *hcd, struct urb *urb)
 {
+	int		value;
+
 	if (urb == (struct urb *) hcd->rh_timer.data)
-		usb_rh_status_dequeue (hcd, urb);
+		value = usb_rh_status_dequeue (hcd, urb);
 	else {
-		int		value;
 
-		/* failures "should" be harmless */
+		/* The only reason an HCD might fail this call is if
+		 * it has not yet fully queued the urb to begin with.
+		 * Such failures should be harmless. */
 		value = hcd->driver->urb_dequeue (hcd, urb);
-		if (value != 0)
-			dev_dbg (hcd->self.controller,
-				"dequeue %p --> %d\n",
-				urb, value);
 	}
-}
 
-struct completion_splice {		// modified urb context:
-	/* did we complete? */
-	struct completion	done;
-
-	/* original urb data */
-	usb_complete_t		complete;
-	void			*context;
-};
-
-static void unlink_complete (struct urb *urb, struct pt_regs *regs)
-{
-	struct completion_splice	*splice;
-
-	splice = (struct completion_splice *) urb->context;
-
-	/* issue original completion call */
-	urb->complete = splice->complete;
-	urb->context = splice->context;
-	urb->complete (urb, regs);
-
-	/* then let the synchronous unlink call complete */
-	complete (&splice->done);
+	if (value != 0)
+		dev_dbg (hcd->self.controller, "dequeue %p --> %d\n",
+				urb, value);
+	return value;
 }
 
 /*
- * called in any context; note ASYNC_UNLINK restrictions
+ * called in any context
  *
  * caller guarantees urb won't be recycled till both unlink()
  * and the urb's completion function return
  */
-static int hcd_unlink_urb (struct urb *urb)
+static int hcd_unlink_urb (struct urb *urb, int status)
 {
 	struct hcd_dev			*dev;
 	struct usb_hcd			*hcd = NULL;
 	struct device			*sys = NULL;
 	unsigned long			flags;
-	struct completion_splice	splice;
 	struct list_head		*tmp;
 	int				retval;
 
@@ -1262,8 +1251,6 @@ static int hcd_unlink_urb (struct urb *urb)
 
 	/* Any status except -EINPROGRESS means something already started to
 	 * unlink this URB from the hardware.  So there's no more work to do.
-	 *
-	 * FIXME use better explicit urb state
 	 */
 	if (urb->status != -EINPROGRESS) {
 		retval = -EBUSY;
@@ -1281,62 +1268,19 @@ static int hcd_unlink_urb (struct urb *urb)
 		hcd->saw_irq = 1;
 	}
 
-	/* maybe set up to block until the urb's completion fires.  the
-	 * lower level hcd code is always async, locking on urb->status
-	 * updates; an intercepted completion unblocks us.
-	 */
-	if (!(urb->transfer_flags & URB_ASYNC_UNLINK)) {
-		if (in_interrupt ()) {
-			dev_dbg (hcd->self.controller, 
-				"non-async unlink in_interrupt");
-			retval = -EWOULDBLOCK;
-			goto done;
-		}
-		/* synchronous unlink: block till we see the completion */
-		init_completion (&splice.done);
-		splice.complete = urb->complete;
-		splice.context = urb->context;
-		urb->complete = unlink_complete;
-		urb->context = &splice;
-		urb->status = -ENOENT;
-	} else {
-		/* asynchronous unlink */
-		urb->status = -ECONNRESET;
-	}
+	urb->status = status;
+
 	spin_unlock (&hcd_data_lock);
 	spin_unlock_irqrestore (&urb->lock, flags);
 
-	// FIXME remove splicing, so this becomes unlink1 (hcd, urb);
-	if (urb == (struct urb *) hcd->rh_timer.data) {
-		usb_rh_status_dequeue (hcd, urb);
-		retval = 0;
-	} else {
-		retval = hcd->driver->urb_dequeue (hcd, urb);
-
-		/* hcds shouldn't really fail these calls, but... */
-		if (retval) {
-			dev_dbg (sys, "dequeue %p --> %d\n", urb, retval);
-			if (!(urb->transfer_flags & URB_ASYNC_UNLINK)) {
-				spin_lock_irqsave (&urb->lock, flags);
-				urb->complete = splice.complete;
-				urb->context = splice.context;
-				spin_unlock_irqrestore (&urb->lock, flags);
-			}
-			goto bye;
-		}
-	}
-
-    	/* block till giveback, if needed */
-	if (urb->transfer_flags & URB_ASYNC_UNLINK)
-		return -EINPROGRESS;
-
-	wait_for_completion (&splice.done);
-	return 0;
+	retval = unlink1 (hcd, urb);
+	if (retval == 0)
+		retval = -EINPROGRESS;
+	return retval;
 
 done:
 	spin_unlock (&hcd_data_lock);
 	spin_unlock_irqrestore (&urb->lock, flags);
-bye:
 	if (retval != -EIDRM && sys && sys->driver)
 		dev_dbg (sys, "hcd_unlink_urb %p fail %d\n", urb, retval);
 	return retval;
@@ -1437,6 +1381,32 @@ rescan:
 
 /*-------------------------------------------------------------------------*/
 
+#ifdef	CONFIG_USB_SUSPEND
+
+static int hcd_hub_suspend (struct usb_bus *bus)
+{
+	struct usb_hcd		*hcd;
+
+	hcd = container_of (bus, struct usb_hcd, self);
+	if (hcd->driver->hub_suspend)
+		return hcd->driver->hub_suspend (hcd);
+	return 0;
+}
+
+static int hcd_hub_resume (struct usb_bus *bus)
+{
+	struct usb_hcd		*hcd;
+
+	hcd = container_of (bus, struct usb_hcd, self);
+	if (hcd->driver->hub_resume)
+		return hcd->driver->hub_resume (hcd);
+	return 0;
+}
+
+#endif
+
+/*-------------------------------------------------------------------------*/
+
 /* called by khubd, rmmod, apmd, or other thread for hcd-private cleanup.
  * we're guaranteed that the device is fully quiesced.  also, that each
  * endpoint has been hcd_endpoint_disabled.
@@ -1491,6 +1461,10 @@ struct usb_operations usb_hcd_operations = {
 	.buffer_alloc =		hcd_buffer_alloc,
 	.buffer_free =		hcd_buffer_free,
 	.disable =		hcd_endpoint_disable,
+#ifdef	CONFIG_USB_SUSPEND
+	.hub_suspend =		hcd_hub_suspend,
+	.hub_resume =		hcd_hub_resume,
+#endif
 };
 EXPORT_SYMBOL (usb_hcd_operations);
 
@@ -1536,6 +1510,9 @@ void usb_hcd_giveback_urb (struct usb_hcd *hcd, struct urb *urb, struct pt_regs 
 
 	/* pass ownership to the completion handler */
 	urb->complete (urb, regs);
+	atomic_dec (&urb->use_count);
+	if (unlikely (urb->reject))
+		wake_up (&usb_kill_urb_queue);
 	usb_put_urb (urb);
 }
 EXPORT_SYMBOL (usb_hcd_giveback_urb);

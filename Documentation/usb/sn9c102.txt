@@ -1,0 +1,276 @@
+
+                        SN9C10[12] PC Camera Controllers
+                                Driver for Linux
+                        ================================
+
+                               - Documentation -
+
+
+Index
+=====
+1.  Copyright
+2.  License
+3.  Overview
+4.  Module dependencies
+5.  Module loading
+6.  Module parameters
+7.  Device control through "sysfs"
+8.  Supported devices
+9.  How to add support for new image sensors
+10. Note for V4L2 developers
+11. Contact information
+12. Credits
+
+
+1. Copyright
+============
+Copyright (C) 2004 by Luca Risolia <luca.risolia@studio.unibo.it>
+
+SONiX is a trademark of SONiX Technology Company Limited, inc.
+This driver is not sponsored or developed by SONiX.
+
+
+2. License
+==========
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+
+
+3. Overview
+===========
+This driver attempts to support the video streaming capabilities of the devices
+mounting the SONiX SN9C101 or SONiX SN9C102 PC Camera Controllers.
+
+- It's worth to note that SONiX has never collaborated with me during the
+development of this project, despite of several requests for enough detailed
+specifications of the register tables, compression engine and video data format
+of the above chips -
+
+Up to 64 cameras can be handled at the same time. They can be connected and
+disconnected from the host many times without turning off the computer, if
+your system supports the hotplug facility.
+
+The driver relies on the Video4Linux2 and USB core modules. It has been
+designed to run properly on SMP systems as well.
+
+The latest version of the SN9C10[12] driver can be found at the following URL:
+http://go.lamarinapunto.com/
+
+
+4. Module dependencies
+======================
+For it to work properly, the driver needs kernel support for Video4Linux and
+USB.
+
+The following options of the kernel configuration file must be enabled and
+corresponding modules must be compiled:
+
+	# Multimedia devices
+	#
+	CONFIG_VIDEO_DEV=m
+
+	# USB support
+	#
+	CONFIG_USB=m
+
+In addition, depending on the hardware being used, the modules below are
+necessary:
+
+	# USB Host Controller Drivers
+	#
+	CONFIG_USB_EHCI_HCD=m
+	CONFIG_USB_UHCI_HCD=m
+	CONFIG_USB_OHCI_HCD=m
+
+And finally:
+
+	# USB Multimedia devices
+	#
+	CONFIG_USB_SN9C102=m
+
+
+5. Module loading
+=================
+To use the driver, it is necessary to load the "sn9c102" module into memory
+after every other module required: "videodev", "usbcore" and, depending on
+the USB host controller you have, "ehci-hcd", "uhci-hcd" or "ohci-hcd".
+
+Loading can be done as shown below:
+
+	[root@localhost home]# modprobe usbcore
+	[root@localhost home]# modprobe sn9c102
+
+At this point the devices should be recognized. You can invoke "dmesg" to
+analyze kernel messages and verify that the loading process has gone well:
+
+	[user@localhost home]$ dmesg
+
+
+6. Module parameters
+====================
+Module parameters are listed below:
+-------------------------------------------------------------------------------
+Name:           video_nr
+Type:           int array (min = 0, max = 32)
+Syntax:         <-1|n[,...]> 
+Description:    Specify V4L2 minor mode number:
+                -1 = use next available
+                 n = use minor number n
+                You can specify up to 32 cameras this way.
+                For example:
+                video_nr=-1,2,-1 would assign minor number 2 to the second
+                recognized camera and use auto for the first one and for every
+                other camera.
+Default:        -1
+-------------------------------------------------------------------------------
+Name:           debug
+Type:           int
+Syntax:         <n> 
+Description:    Debugging information level, from 0 to 3:
+                0 = none (use carefully)
+                1 = critical errors
+                2 = significant informations
+                3 = more verbose messages
+                Level 3 is useful for testing only, when just one device
+                is used.
+Default:        2
+-------------------------------------------------------------------------------
+
+
+7. Device control through "sysfs"
+=================================
+It is possible to read and write both the SN9C10[12] and the image sensor
+registers by using the "sysfs" filesystem interface.
+
+Every time a supported device is recognized, read-only files named "redblue"
+and "green" are created in the /sys/class/video4linux/videoX directory. You can
+set the red, blue and green channel's gain by writing the desired value to
+them. The value may range from 0 to 15 for each channel; this means that
+"redblue" accepts 8-bit values, where the low 4 bits are reserved for red and
+the others for blue.
+
+There are other four entries in the directory above for each registered camera:
+"reg", "val", "i2c_reg" and "i2c_val". The first two files control the
+SN9C10[12] bridge, while the other two control the sensor chip. "reg" and
+"i2c_reg" hold the values of the current register index where the following
+reading/writing operations are addressed at through "val" and "i2c_val". Their
+use is not intended for end-users, unless you know what you are doing. Note
+that "i2c_reg" and "i2c_val" won't be created if the sensor does not actually
+support the standard I2C protocol. Also, remember that you must be logged in as
+root before writing to them.
+
+As an example, suppose we were to want to read the value contained in the
+register number 1 of the sensor register table - which usually is the product
+identifier - of the camera registered as "/dev/video0":
+
+	[root@localhost #] cd /sys/class/video4linux/video0
+	[root@localhost #] echo 1 > i2c_reg
+	[root@localhost #] cat i2c_val
+
+Now let's set the green gain's register of the SN9C10[12] chip to 2:
+
+	[root@localhost #] echo 0x11 > reg
+	[root@localhost #] echo 2 > val
+
+Note that the SN9C10[12] always returns 0 when some of its registers are read.
+To avoid race conditions, all the I/O accesses to the files are serialized.
+
+
+8. Supported devices
+====================
+- I won't mention any of the names of the companies as well as their products
+here. They have never collaborated with me, so no advertising -
+
+From the point of view of a driver, what unambiguously identify a device are
+its vendor and product USB identifiers. Below is a list of known identifiers of
+devices mounting the SN9C10[12] PC camera controllers:
+
+Vendor ID  Product ID
+---------  ----------
+0xc45      0x6001
+0xc45      0x6005
+0xc45      0x6009
+0xc45      0x600d
+0xc45      0x6024
+0xc45      0x6025
+0xc45      0x6028
+0xc45      0x6029
+0xc45      0x602a
+0xc45      0x602c
+0xc45      0x8001
+
+The list above does NOT imply that all those devices work with this driver: up
+until now only the ones that mount the following image sensors are supported.
+Kernel messages will always tell you whether this is the case:
+
+Model       Manufacturer
+-----       ------------
+PAS106B     PixArt Imaging Inc.
+TAS5110C1B  Taiwan Advanced Sensor Corporation
+TAS5130D1B  Taiwan Advanced Sensor Corporation
+
+If you think your camera is based on the above hardware and is not actually
+listed in the above table, you may try to add the specific USB VendorID and
+ProductID identifiers to the sn9c102_id_table[] in the file "sn9c102_sensor.h";
+then compile, load the module again and look at the kernel output.
+If this works, please send an email to me reporting the kernel messages, so
+that I will add a new entry in the list of supported devices.
+
+Donations of new models for further testing and support would be much
+appreciated. I won't add official support for hardware that I don't actually
+have.
+
+
+9. How to add support for new image sensors
+===========================================
+It should be easy to write code for new sensors by using the small API that I
+have created for this purpose, which is present in "sn9c102_sensor.h"
+(documentation is included there). As an example, have a look at the code in
+"sn9c102_pas106b.c", which uses the mentioned interface.
+
+At the moment, not yet supported image sensors are: PAS202B (VGA),
+HV7131[D|E1] (VGA), MI03 (VGA), OV7620 (VGA).
+
+
+10. Note for V4L2 developers
+============================
+This driver follows the V4L2 API specifications. In particular, it enforces two
+rules:
+
+1) Exactly one I/O method, either "mmap" or "read", is associated with each
+file descriptor. Once it is selected, the application must close and reopen the
+device to switch to the other I/O method.
+
+2) Previously mapped buffer memory must always be unmapped before calling any
+of the "VIDIOC_S_CROP", "VIDIOC_TRY_FMT" and "VIDIOC_S_FMT" ioctl's. In case,
+the same number of buffers as before will be allocated again to match the size
+of the new video frames, so you have to map them again before any I/O attempts.
+
+
+11. Contact information
+=======================
+I may be contacted by e-mail at <luca.risolia@studio.unibo.it>.
+
+I can accept GPG/PGP encrypted e-mail. My GPG key ID is 'FCE635A4'.
+My public 1024-bit key should be available at any keyserver; the fingerprint
+is: '88E8 F32F 7244 68BA 3958  5D40 99DA 5D2A FCE6 35A4'.
+
+
+12. Credits
+===========
+I would thank the following persons:
+
+- Stefano Mozzi, who donated 45 EU;
+- Luca Capello for the donation of a webcam;
+- Mizuno Takafumi for the donation of a webcam.

@@ -20,13 +20,6 @@ config USB_SERIAL
 	  To compile this driver as a module, choose M here: the
 	  module will be called usbserial.
 
-config USB_SERIAL_DEBUG
-	bool "USB Serial Converter verbose debug"
-	depends on USB_SERIAL=y
-	help
-	  Say Y here if you want verbose debug messages from the USB Serial
-	  Drivers sent to the kernel debug log.
-
 config USB_SERIAL_CONSOLE
 	bool "USB Serial Console device support (EXPERIMENTAL)"
 	depends on USB_SERIAL=y && EXPERIMENTAL

@@ -56,13 +56,6 @@
 #include <linux/spinlock.h>
 #include <asm/uaccess.h>
 #include <linux/usb.h>
-
-#ifdef CONFIG_USB_SERIAL_DEBUG
-	static int debug = 1;
-#else
-	static int debug = 0;
-#endif
-
 #include "usb-serial.h"
 #include "ipaq.h"
 
@@ -76,7 +69,8 @@
 #define DRIVER_AUTHOR "Ganesh Varadarajan <ganesh@veritas.com>"
 #define DRIVER_DESC "USB PocketPC PDA driver"
 
-static int	product, vendor;
+static __u16 product, vendor;
+static int debug;
 
 /* Function prototypes for an ipaq */
 static int  ipaq_open (struct usb_serial_port *port, struct file *filp);
@@ -135,6 +129,7 @@ static struct usb_device_id ipaq_id_table [] = {
 	{ USB_DEVICE(HTC_VENDOR_ID, HTC_PRODUCT_ID) },
 	{ USB_DEVICE(NEC_VENDOR_ID, NEC_PRODUCT_ID) },
 	{ USB_DEVICE(ASUS_VENDOR_ID, ASUS_A600_PRODUCT_ID) },
+	{ USB_DEVICE(ASUS_VENDOR_ID, ASUS_A620_PRODUCT_ID) },
 	{ }					/* Terminating entry */
 };
 
@@ -315,7 +310,7 @@ static void ipaq_read_bulk_callback(struct urb *urb, struct pt_regs *regs)
 		return;
 	}
 
-	usb_serial_debug_data (__FILE__, __FUNCTION__, urb->actual_length, data);
+	usb_serial_debug_data(debug, &port->dev, __FUNCTION__, urb->actual_length, data);
 
 	tty = port->tty;
 	if (tty && urb->actual_length) {
@@ -396,7 +391,7 @@ static int ipaq_write_bulk(struct usb_serial_port *port, int from_user, const un
 	} else {
 		memcpy(pkt->data, buf, count);
 	}
-	usb_serial_debug_data(__FILE__, __FUNCTION__, count, pkt->data);
+	usb_serial_debug_data(debug, &port->dev, __FUNCTION__, count, pkt->data);
 
 	pkt->len = count;
 	pkt->written = 0;
@@ -579,11 +574,11 @@ MODULE_AUTHOR( DRIVER_AUTHOR );
 MODULE_DESCRIPTION( DRIVER_DESC );
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(debug, "i");
+module_param(debug, bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(debug, "Debug enabled or not");
 
-MODULE_PARM(vendor, "h");
+module_param(vendor, ushort, 0);
 MODULE_PARM_DESC(vendor, "User specified USB idVendor");
 
-MODULE_PARM(product, "h");
+module_param(product, ushort, 0);
 MODULE_PARM_DESC(product, "User specified USB idProduct");

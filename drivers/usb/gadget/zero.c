@@ -194,8 +194,13 @@ module_param (loopdefault, bool, S_IRUGO|S_IWUSR);
  * DO NOT REUSE THESE IDs with a protocol-incompatible driver!!  Ever!!
  * Instead:  allocate your own, using normal USB-IF procedures.
  */
+#ifndef	CONFIG_USB_ZERO_HNPTEST
 #define DRIVER_VENDOR_NUM	0x0525		/* NetChip */
 #define DRIVER_PRODUCT_NUM	0xa4a0		/* Linux-USB "Gadget Zero" */
+#else
+#define DRIVER_VENDOR_NUM	0x1a0a		/* OTG test device IDs */
+#define DRIVER_PRODUCT_NUM	0xbadd
+#endif
 
 /*-------------------------------------------------------------------------*/
 
@@ -259,6 +264,14 @@ loopback_config = {
 	.bMaxPower =		1,	/* self-powered */
 };
 
+static struct usb_otg_descriptor
+otg_descriptor = {
+	.bLength =		sizeof otg_descriptor,
+	.bDescriptorType =	USB_DT_OTG,
+
+	.bmAttributes =		USB_OTG_SRP,
+};
+
 /* one interface in each configuration */
 
 static const struct usb_interface_descriptor
@@ -302,6 +315,7 @@ fs_sink_desc = {
 };
 
 static const struct usb_descriptor_header *fs_source_sink_function [] = {
+	(struct usb_descriptor_header *) &otg_descriptor,
 	(struct usb_descriptor_header *) &source_sink_intf,
 	(struct usb_descriptor_header *) &fs_sink_desc,
 	(struct usb_descriptor_header *) &fs_source_desc,
@@ -309,6 +323,7 @@ static const struct usb_descriptor_header *fs_source_sink_function [] = {
 };
 
 static const struct usb_descriptor_header *fs_loopback_function [] = {
+	(struct usb_descriptor_header *) &otg_descriptor,
 	(struct usb_descriptor_header *) &loopback_intf,
 	(struct usb_descriptor_header *) &fs_sink_desc,
 	(struct usb_descriptor_header *) &fs_source_desc,
@@ -356,6 +371,7 @@ dev_qualifier = {
 };
 
 static const struct usb_descriptor_header *hs_source_sink_function [] = {
+	(struct usb_descriptor_header *) &otg_descriptor,
 	(struct usb_descriptor_header *) &source_sink_intf,
 	(struct usb_descriptor_header *) &hs_source_desc,
 	(struct usb_descriptor_header *) &hs_sink_desc,
@@ -363,6 +379,7 @@ static const struct usb_descriptor_header *hs_source_sink_function [] = {
 };
 
 static const struct usb_descriptor_header *hs_loopback_function [] = {
+	(struct usb_descriptor_header *) &otg_descriptor,
 	(struct usb_descriptor_header *) &loopback_intf,
 	(struct usb_descriptor_header *) &hs_source_desc,
 	(struct usb_descriptor_header *) &hs_sink_desc,
@@ -444,6 +461,10 @@ config_buf (struct usb_gadget *gadget,
 			? fs_source_sink_function
 			: fs_loopback_function;
 
+	/* for now, don't advertise srp-only devices */
+	if (!gadget->is_otg)
+		function++;
+
 	len = usb_gadget_config_buf (is_source_sink
 					? &source_sink_config
 					: &loopback_config,
@@ -485,7 +506,7 @@ static void free_ep_req (struct usb_ep *ep, struct usb_request *req)
 
 /* optionally require specific source/sink data patterns  */
 
-static inline int
+static int
 check_read_data (
 	struct zero_dev		*dev,
 	struct usb_ep		*ep,
@@ -519,7 +540,7 @@ check_read_data (
 	return 0;
 }
 
-static inline void
+static void
 reinit_write_data (
 	struct zero_dev		*dev,
 	struct usb_ep		*ep,
@@ -811,6 +832,7 @@ static void zero_reset_config (struct zero_dev *dev)
 		dev->out_ep = NULL;
 	}
 	dev->config = 0;
+	del_timer (&dev->resume);
 }
 
 /* change our operational config.  this code must agree with the code
@@ -902,6 +924,7 @@ zero_setup (struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 	/* usually this stores reply data in the pre-allocated ep0 buffer,
 	 * but config change events will reconfigure hardware.
 	 */
+	req->zero = 0;
 	switch (ctrl->bRequest) {
 
 	case USB_REQ_GET_DESCRIPTOR:
@@ -951,6 +974,12 @@ zero_setup (struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 	case USB_REQ_SET_CONFIGURATION:
 		if (ctrl->bRequestType != 0)
 			goto unknown;
+		if (gadget->a_hnp_support)
+			DBG (dev, "HNP available\n");
+		else if (gadget->a_alt_hnp_support)
+			DBG (dev, "HNP needs a different root port\n");
+		else
+			VDBG (dev, "HNP inactive\n");
 		spin_lock (&dev->lock);
 		value = zero_set_config (dev, ctrl->wValue, GFP_ATOMIC);
 		spin_unlock (&dev->lock);
@@ -1080,8 +1109,10 @@ zero_autoresume (unsigned long _dev)
 	/* normally the host would be woken up for something
 	 * more significant than just a timer firing...
 	 */
-	status = usb_gadget_wakeup (dev->gadget);
-	DBG (dev, "wakeup --> %d\n", status);
+	if (dev->gadget->speed != USB_SPEED_UNKNOWN) {
+		status = usb_gadget_wakeup (dev->gadget);
+		DBG (dev, "wakeup --> %d\n", status);
+	}
 }
 
 /*-------------------------------------------------------------------------*/
@@ -1198,6 +1229,12 @@ autoconf_fail:
 	hs_source_desc.bEndpointAddress = fs_source_desc.bEndpointAddress;
 	hs_sink_desc.bEndpointAddress = fs_sink_desc.bEndpointAddress;
 #endif
+
+	if (gadget->is_otg) {
+		otg_descriptor.bmAttributes |= USB_OTG_HNP,
+		source_sink_config.bmAttributes |= USB_CONFIG_ATT_WAKEUP;
+		loopback_config.bmAttributes |= USB_CONFIG_ATT_WAKEUP;
+	}
 
 	usb_gadget_set_selfpowered (gadget);
 

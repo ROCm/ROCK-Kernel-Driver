@@ -336,14 +336,6 @@
 #include <linux/smp_lock.h>
 #include <asm/uaccess.h>
 #include <linux/usb.h>
-
-
-#ifdef CONFIG_USB_SERIAL_DEBUG
-	static int debug = 1;
-#else
-	static int debug;
-#endif
-
 #include "usb-serial.h"
 #include "pl2303.h"
 
@@ -353,7 +345,6 @@
 #define DRIVER_VERSION "v2.0"
 #define DRIVER_AUTHOR "Greg Kroah-Hartman, greg@kroah.com, http://www.kroah.com/linux/"
 #define DRIVER_DESC "USB Serial Driver core"
-
 
 /* Driver structure we register with the USB core */
 static struct usb_driver usb_serial_driver = {
@@ -370,9 +361,9 @@ static struct usb_driver usb_serial_driver = {
    drivers depend on it.
 */
 
-static struct usb_serial	*serial_table[SERIAL_TTY_MINORS];	/* initially all NULL */
+static int debug;
+static struct usb_serial *serial_table[SERIAL_TTY_MINORS];	/* initially all NULL */
 static LIST_HEAD(usb_serial_driver_list);
-
 
 struct usb_serial *usb_serial_get_by_index(unsigned index)
 {
