@@ -169,7 +169,7 @@ pci_dma_sync_single_for_cpu(struct pci_dev *dev, dma_addr_t dma_addr,
 
 static inline void
 pci_dma_sync_single_for_device(struct pci_dev *dev, dma_addr_t dma_addr,
-			       long size, int direction)
+			       size_t size, int direction)
 {
 	/* Nothing to do.  */
 }
