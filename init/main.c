@@ -35,6 +35,7 @@
 #include <linux/profile.h>
 #include <linux/rcupdate.h>
 #include <linux/moduleparam.h>
+#include <linux/writeback.h>
 
 #include <asm/io.h>
 #include <asm/bugs.h>
@@ -439,6 +440,8 @@ asmlinkage void __init start_kernel(void)
 	vfs_caches_init(num_physpages);
 	radix_tree_init();
 	signals_init();
+	/* rootfs populating might need page-writeback */
+	page_writeback_init();
 	populate_rootfs();
 #ifdef CONFIG_PROC_FS
 	proc_root_init();
