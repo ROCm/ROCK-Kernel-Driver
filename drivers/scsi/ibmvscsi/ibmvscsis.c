@@ -53,8 +53,16 @@
 MODULE_DESCRIPTION("IBM Virtual SCSI Target");
 MODULE_AUTHOR("Dave Boutcher");
 MODULE_LICENSE("GPL");
+MODULE_VERSION("1.1");
 
 static int ibmvscsis_debug = 0;
+
+/* These are fixed and come from the device tree...we
+ * just store them here to save getting them every time.
+ */
+static char system_id[64] = "";
+static char partition_name[97] = "UNKNOWN";
+static unsigned int partition_number = -1;
 
 /*
  * Quick macro to enable/disable interrupts
@@ -75,6 +83,7 @@ static int ibmvscsis_debug = 0;
 #define SENSE_INVALID_CMD   6
 #define SENSE_INTERMEDIATE  7
 #define SENSE_WRITE_PROT    8
+#define SENSE_INVALID_FIELD 9
 
 #define TARGET_MAX_NAME_LEN 128
 
@@ -90,9 +99,10 @@ static unsigned char ibmvscsis_sense_data[][3] = {
 	{0x04, 0x00, 0x00},	/* Device fault      */
 	{0x0b, 0x00, 0x00},	/* Device busy       */
 	{0x02, 0x04, 0x00},	/* Unit offline      */
-	{0x20, 0x04, 0x00},	/* Invalid Command   */
+	{0x05, 0x20, 0x00},	/* Invalid Command   */
 	{0x10, 0x00, 0x00},	/* Intermediate      */
 	{0x07, 0x27, 0x00},	/* Write Protected   */
+	{0x05, 0x24, 0x00},	/* Invalid field     */
 };
 
 /*
@@ -117,6 +127,7 @@ struct inquiry_data {
 	char reserved1[2];
 	char version_descriptor[16];
 	char reserved2[22];
+	char unique[159];
 };
 
 extern int vio_num_address_cells;
@@ -274,9 +285,9 @@ static long send_rsp(struct iu_entry *iue, int status);
 #else
 #define dbg(format, arg...) do {} while (0)
 #endif
-#define err(format, arg...) printk(KERN_ERR __FILE__ ": " format , ## arg)
-#define info(format, arg...) printk(KERN_INFO __FILE__ ": " format  , ## arg)
-#define warn(format, arg...) printk(KERN_WARNING __FILE__ ": " format , ## arg)
+#define err(format, arg...) printk(KERN_ERR "ibmvscsis: " format , ## arg)
+#define info(format, arg...) printk(KERN_INFO "ibmvscsis: " format  , ## arg)
+#define warn(format, arg...) printk(KERN_WARNING "ibmvscsis: " format , ## arg)
 
 /* ==============================================================
  * Utility Routines
@@ -336,7 +347,7 @@ static int did_len(struct SRP_CMD *cmd)
 		      1) * sizeof(struct memory_descriptor));
 		break;
 	default:
-		err("ibmvscsis: did_len Invalid data_out_format %d\n",
+		err("client error. Invalid data_out_format %d\n",
 		    cmd->data_out_format);
 		return 0;
 	}
@@ -353,7 +364,7 @@ static int did_len(struct SRP_CMD *cmd)
 						    offset);
 		return id->total_length;
 	default:
-		err("ibmvscsis: Invalid data_in_format %d\n",
+		err("client error.  Invalid data_in_format %d\n",
 		    cmd->data_in_format);
 		return 0;
 	}
@@ -376,7 +387,7 @@ static int initialize_iu_pool(struct server_adapter *adapter, int size)
 
 	pool->list = kmalloc(pool->size * sizeof(*pool->list), GFP_KERNEL);
 	if (!pool->list) {
-		err("Error: no memory for IU list\n");
+		err("Error: Cannot allocate memory for IU list\n");
 		return -ENOMEM;
 	}
 	memset(pool->list, 0x00, pool->size * sizeof(*pool->list));
@@ -386,7 +397,7 @@ static int initialize_iu_pool(struct server_adapter *adapter, int size)
 			       pool->size * sizeof(*pool->iu_storage),
 			       &pool->iu_token, 0);
 	if (!pool->iu_storage) {
-		err("Error: no memory for IU pool\n");
+		err("Error: Cannot allocate memory for IU pool\n");
 		kfree(pool->list);
 		return -ENOMEM;
 	}
@@ -413,7 +424,8 @@ static void release_iu_pool(struct server_adapter *adapter)
 		if (pool->list[i].req.in_use)
 			++in_use;
 	if (in_use)
-		err("ibmvscsis: releasing event pool with %d events still in use?\n", in_use);
+		err("Releasing event pool with %d events still in use?\n", 
+		    in_use);
 	kfree(pool->list);
 	dma_free_coherent(adapter->dev, pool->size * sizeof(*pool->iu_storage),
 			  pool->iu_storage, pool->iu_token);
@@ -436,7 +448,7 @@ static struct iu_entry *get_iu(struct server_adapter *adapter)
 		list_del(adapter->pool.iu_entries.next);
 
 		if (e->req.in_use) {
-			err("Found in-use iue in pool!");
+			err("Found in-use iue in free pool!");
 		}
 
 		memset(&e->req, 0x00, sizeof(e->req));
@@ -463,7 +475,7 @@ static void free_iu(struct iu_entry *iue)
 
 	spin_lock_irqsave(&iue->adapter->pool.lock, flags);
 	if (iue->req.in_use == 0) {
-		warn("ibmvscsis: Internal error, freeing iue twice!\n");
+		warn("Internal error, freeing iue twice!\n");
 	} else {
 		iue->req.in_use = 0;
 		list_add_tail(&iue->next, &iue->adapter->pool.iu_entries);
@@ -535,7 +547,7 @@ static int send_srp(struct iu_entry *iue, u64 length)
 			 iue->adapter->riobn, iue->req.remote_token);
 
 	if (rc) {
-		err("Error: In send_srp, h_copy_rdma rc %ld\n", rc);
+		err("Error %ld transferring data to client\n", rc);
 	}
 
 	crq.cooked.valid = 0x80;
@@ -556,7 +568,7 @@ static int send_srp(struct iu_entry *iue, u64 length)
 			       crq.raw[0], crq.raw[1]);
 
 	if (rc1) {
-		err("ibmvscscsis Error: In send_srp, h_send_crq rc %ld\n", rc1);
+		err("Error %ld sending response to client\n", rc1);
 		return rc1;
 	}
 
@@ -584,7 +596,7 @@ static long send_md_data(dma_addr_t stoken, int len,
 			 stoken, adapter->riobn, md->virtual_address);
 
 	if (rc != H_Success) {
-		err("Error sending data with h_copy_rdma, rc %ld\n", rc);
+		err(" Error %ld transferring data to client\n", rc);
 		return -1;
 	}
 
@@ -623,7 +635,7 @@ static long send_cmd_data(dma_addr_t stoken, int len, struct iu_entry *iue)
 		      1) * sizeof(struct memory_descriptor));
 		break;
 	default:
-		err("Error: did_len Invalid data_out_format %d\n",
+		err("client error: Invalid data_out_format %d\n",
 		    cmd->data_out_format);
 		return 0;
 	}
@@ -634,11 +646,17 @@ static long send_cmd_data(dma_addr_t stoken, int len, struct iu_entry *iue)
 	case SRP_DIRECT_BUFFER:
 		md = (struct memory_descriptor *)(cmd->additional_data +
 						  offset);
-		return send_md_data(stoken, len, md, iue->adapter);
+		sentlen = send_md_data(stoken, len, md, iue->adapter);
+		len -= sentlen;
+		if (len) {
+			iue->req.diover = 1;
+			iue->req.data_in_residual_count = len;
+		}
+		return sentlen;
 	}
 
 	if (cmd->data_in_format != SRP_INDIRECT_BUFFER) {
-		err("Error: send_cmd_data Invalid data_in_format %d\n",
+		err("client error Invalid data_in_format %d\n",
 		    cmd->data_in_format);
 		return 0;
 	}
@@ -672,7 +690,6 @@ static long send_cmd_data(dma_addr_t stoken, int len, struct iu_entry *iue)
 	}
 
 	if (len) {
-		warn("Left over data sending to indirect buffer\n");
 		iue->req.diover = 1;
 		iue->req.data_in_residual_count = len;
 	}
@@ -701,7 +718,7 @@ static long get_md_data(dma_addr_t ttoken, int len,
 			 md->virtual_address, adapter->liobn, ttoken);
 
 	if (rc != H_Success) {
-		err("Error sending data with h_copy_rdma, rc %ld\n", rc);
+		err("Error %ld transferring data to client\n", rc);
 		return -1;
 	}
 
@@ -738,7 +755,7 @@ static long get_cmd_data(dma_addr_t stoken, int len, struct iu_entry *iue)
 	}
 
 	if (cmd->data_out_format != SRP_INDIRECT_BUFFER) {
-		err("get_cmd_data Invalid data_out_format %d\n",
+		err("client error: Invalid data_out_format %d\n",
 		    cmd->data_out_format);
 		return 0;
 	}
@@ -762,16 +779,12 @@ static long get_cmd_data(dma_addr_t stoken, int len, struct iu_entry *iue)
 			return bytes;
 
 		if (bytes != thislen) {
-			err("Tried to send %d, sent %d\n", thislen, bytes);
+			err("Partial data sent to client (%d/%d)\n", bytes, thislen);
 		}
 
 		sentlen += bytes;
 		total_length -= bytes;
 		len -= bytes;
-	}
-
-	if (len) {
-		warn("Left over data get indirect buffer\n");
 	}
 
 	return sentlen;
@@ -840,7 +853,7 @@ static void free_data_buffer(char *buffer, dma_addr_t data_token, size_t len,
 	for (i = 0; i < DMA_BUFFER_CACHE_SIZE; i++) {
 		if (adapter->dma_buffer[i].addr == buffer) {
 			if (adapter->dma_buffer[i].token != data_token) {
-				err("Incoherent data buffer pool info!\n");
+				err("Inconsistent data buffer pool info!\n");
 			}
 			if (!test_and_clear_bit(i, adapter->dma_buffer_use)) {
 				err("Freeing data buffer twice!\n");
@@ -938,6 +951,9 @@ static int ibmvscsis_end_io(struct bio *bio, unsigned int nbytes, int error)
 	struct iu_entry *iue = (struct iu_entry *)bio->bi_private;
 	struct server_adapter *adapter = iue->adapter;
 	unsigned long flags;
+
+	if (bio->bi_size)
+		return 1;
 
 	if (!test_bit(BIO_UPTODATE, &bio->bi_flags)) {
 		iue->req.ioerr = 1;
@@ -1050,7 +1066,10 @@ static void endio_task(unsigned long data)
 								  data_len,
 								  iue);
 						if (bytes != iue->req.data_len) {
-							err("Error sending data on response (tried %d, sent %d\n", bio->bi_size, bytes);
+							err("Error sending data "
+							    "on response "
+							    "(tried %d, sent %d\n", 
+							    bio->bi_size, bytes);
 							send_rsp(iue,
 								 SENSE_ABORT);
 						} else {
@@ -1093,26 +1112,70 @@ static void process_inquiry(struct iu_entry *iue)
 {
 	struct inquiry_data *id;
 	dma_addr_t data_token;
+	u8 *raw_id;
 	int bytes;
 
 	id = (struct inquiry_data *)dma_alloc_coherent(iue->adapter->dev,
 						       sizeof(*id),
 						       &data_token, 0);
+	raw_id = (u8 *)id;
 	memset(id, 0x00, sizeof(*id));
 
 	/* If we have a valid device */
 	if (iue->req.vd) {
-		dbg("  inquiry returning device\n");
-		id->qual_type = 0x00;	/* Direct Access    */
-		id->rmb_reserve = 0x00;	/* TODO: CD is removable  */
-		id->version = 0x84;	/* ISO/IE                 */
-		id->aerc_naca_hisup_format = 0x22;	/* naca & format 0x02 */
-		id->addl_len = sizeof(*id) - 4;	/* sizeof(*this) - 4 */
-		id->bque_encserv_vs_multip_mchngr_reserved = 0x00;
-		id->reladr_reserved_linked_cmdqueue_vs = 0x02;	/* CMDQ   */
-		memcpy(id->vendor, "IBM     ", 8);
-		memcpy(id->product, "VSCSI blkdev    ", 16);
-		memcpy(id->revision, "0001", 4);
+		/* Standard inquiry page */
+		if ((iue->iu->srp.cmd.cdb[1] == 0x00) &&
+		    (iue->iu->srp.cmd.cdb[2] == 0x00)) {
+			dbg("  inquiry returning device\n");
+			id->qual_type = 0x00;	/* Direct Access    */
+			id->rmb_reserve = 0x00;	/* TODO: CD is removable  */
+			id->version = 0x84;	/* ISO/IE                 */
+			id->aerc_naca_hisup_format = 0x22;/* naca & fmt 0x02 */
+			id->addl_len = sizeof(*id) - 4;	
+			id->bque_encserv_vs_multip_mchngr_reserved = 0x00;
+			id->reladr_reserved_linked_cmdqueue_vs = 0x02;/*CMDQ*/
+			memcpy(id->vendor, "IBM     ", 8);
+			memcpy(id->product, "VSCSI blkdev    ", 16);
+			memcpy(id->revision, "0001", 4);
+			snprintf(id->unique,sizeof(id->unique),
+				 "IBM-VSCSI-%s-P%d-%x-%d-%d-%d\n",
+				 system_id,
+				 partition_number,
+				 iue->adapter->dma_dev->unit_address,
+				 GETBUS(iue->req.vd->lun),
+				 GETTARGET(iue->req.vd->lun),
+				 GETLUN(iue->req.vd->lun));
+		} else if ((iue->iu->srp.cmd.cdb[1] == 0x01) &&
+			   (iue->iu->srp.cmd.cdb[2] == 0x00)) {
+			/* Supported VPD pages */
+			raw_id[0] = 0x00; /* qualifier & type */
+			raw_id[1] = 0x80; /* page */
+			raw_id[2] = 0x00; /* reserved */
+			raw_id[3] = 0x03; /* length */
+			raw_id[4] = 0x00; /* page 0 */
+			raw_id[5] = 0x80; /* serial number page */
+		} else if ((iue->iu->srp.cmd.cdb[1] == 0x01) &&
+			   (iue->iu->srp.cmd.cdb[2] == 0x80)) {
+			/* serial number page */
+			raw_id[0] = 0x00; /* qualifier & type */
+			raw_id[1] = 0x80; /* page */
+			raw_id[2] = 0x00; /* reserved */
+			snprintf((char *)(raw_id+4),
+				 sizeof(*id)-4,
+				 "IBM-VSCSI-%s-P%d-%x-%d-%d-%d\n",
+				 system_id,
+				 partition_number,
+				 iue->adapter->dma_dev->unit_address,
+				 GETBUS(iue->req.vd->lun),
+				 GETTARGET(iue->req.vd->lun),
+				 GETLUN(iue->req.vd->lun));
+			raw_id[3] = strlen((char *)raw_id+4);
+		} else {
+			/* Some unsupported data */
+			send_rsp(iue, SENSE_INVALID_FIELD);
+			free_iu(iue);
+			return;
+		}
 	} else {
 		dbg("  inquiry returning no device\n");
 		id->qual_type = 0x7F;	/* Not supported, no device */
@@ -1177,7 +1240,7 @@ static void process_rw(char *cmd, int rw, struct iu_entry *iue, long lba,
 
 	/* Writing to a read-only device */
 	if ((rw == WRITE) && (iue->req.vd->b.ro)) {
-		warn("WRITE op to r/o device\n");
+		warn("WRITE to read-only device\n");
 		send_rsp(iue, SENSE_WRITE_PROT);
 
 		free_iu(iue);
@@ -1232,7 +1295,7 @@ static void process_rw(char *cmd, int rw, struct iu_entry *iue, long lba,
 		 * should do it here
 		 */
 		iue->req.ioerr = 1;
-		err("Not able to get a bio\n");
+		err("Not able to allocate a bio\n");
 		send_rsp(iue, SENSE_DEVICE_FAULT);
 		free_iu(iue);
 		return;
@@ -1496,7 +1559,6 @@ static void processReportLUNs(struct iu_entry *iue)
 	listsize = listsize / 8;
 
 	if (listsize < 1) {
-		warn("report luns buffer too small\n");
 		send_rsp(iue, SENSE_INVALID_CMD);
 		free_iu(iue);
 	}
@@ -1638,9 +1700,6 @@ u16 send_adapter_info(struct iu_entry *iue,
 		      dma_addr_t remote_buffer, u16 length)
 {
 	dma_addr_t data_token;
-	struct device_node *rootdn;
-	const char *partition_name = "";
-	unsigned int *p_number_ptr;
 	struct MAD_ADAPTER_INFO_DATA *info =
 	    (struct MAD_ADAPTER_INFO_DATA *)dma_alloc_coherent(iue->adapter->
 							       dev,
@@ -1648,23 +1707,15 @@ u16 send_adapter_info(struct iu_entry *iue,
 							       &data_token, 0);
 
 	dbg("in send_adapter_info\n ");
-	rootdn = find_path_device("/");
 	if ((info) && (!dma_mapping_error(data_token))) {
 		int rc;
 		memset(info, 0x00, sizeof(*info));
 
 		dbg("building adapter_info\n ");
 		strcpy(info->srp_version, "1.6a");
-		partition_name =
-		    get_property(rootdn, "ibm,partition-name", NULL);
-		if (partition_name)
-			strncpy(info->partition_name, partition_name,
-				sizeof(info->partition_name));
-		p_number_ptr =
-		    (unsigned int *)get_property(rootdn, "ibm,partition-no",
-						 NULL);
-		if (p_number_ptr)
-			info->partition_number = *p_number_ptr;
+		strncpy(info->partition_name, partition_name,
+			sizeof(info->partition_name));
+		info->partition_number = partition_number;
 		info->mad_version = 1;
 		info->os_type = 3;
 
@@ -1865,7 +1916,7 @@ static void process_iu(struct VIOSRP_CRQ *crq, struct server_adapter *adapter)
 	iu = iue->iu;
 
 	if (rc) {
-		err("Got rc %ld from h_copy_rdma\n", rc);
+		err("Error %ld transferring data to client\n", rc);
 	}
 
 	if (crq->format == VIOSRP_MAD_FORMAT) {
@@ -1960,20 +2011,21 @@ static void handle_crq(struct VIOSRP_CRQ *crq, struct server_adapter *adapter)
 	case 0xC0:		/* initialization */
 		switch (crq->format) {
 		case 0x01:
-			info("Partner just initialized\n");
+			info("Client just initialized\n");
 			plpar_hcall_norets(H_SEND_CRQ,
 					   adapter->dma_dev->unit_address,
 					   0xC002000000000000, 0);
 			break;
 		case 0x02:
-			info("ibmvscsis: partner initialization complete\n");
+			info("Client initialization complete\n");
 			break;
 		default:
-			err("Unknwn CRQ format %d\n", crq->format);
+			err("Client error: Unknwn msg format %d\n", 
+			    crq->format);
 		}
 		return;
 	case 0xFF:		/* transport event */
-		info("ibmvscsis: partner closed\n");
+		info("Client closed\n");
 		return;
 	case 0x80:		/* real payload */
 		{
@@ -1999,12 +2051,13 @@ static void handle_crq(struct VIOSRP_CRQ *crq, struct server_adapter *adapter)
 				break;
 
 			default:
-				err("Unsupported CRQ format %d\n", crq->format);
+				err("Client error: Unsupported  msg format %d\n", 
+				    crq->format);
 			}
 		}
 		break;
 	default:
-		err("ibmvscsis: got an invalid message type 0x%02x!?\n",
+		err("Client error: unknown message type 0x%02x!?\n",
 		    crq->valid);
 		return;
 	}
@@ -2093,7 +2146,7 @@ static int initialize_crq_queue(struct crq_queue *queue,
 				queue->msg_token, PAGE_SIZE);
 	
 	if ((rc != 0) && (rc != 2)) {
-		err("couldn't register crq--rc 0x%x\n", rc);
+		err("Error 0x%x opening virtual adapter\n", rc);
 		goto reg_crq_failed;
 	}
 
@@ -2138,7 +2191,7 @@ static void release_crq_queue(struct crq_queue *queue,
 {
 	int rc;
 
-	info("releasing crq\n");
+	info("releasing adapter\n");
 	free_irq(adapter->dma_dev->irq, adapter);
 	do {
 		rc = plpar_hcall_norets(H_FREE_CRQ, adapter->dma_dev->unit_address);
@@ -2218,7 +2271,7 @@ static void set_num_targets(struct vbus* vbus, long value)
 				kmalloc(sizeof(struct vdev), GFP_KERNEL);
 			if (!vbus->vdev[i]) {
 				spin_unlock_irqrestore(&adapter->lock, flags);
-				err("Couldn't malloc target%d\n", i);
+				err("Couldn't allocate target memory %d\n", i);
 				return;
 			}
 			memset(vbus->vdev[i], 0x00, sizeof(struct vdev));
@@ -2240,7 +2293,7 @@ static void set_num_targets(struct vbus* vbus, long value)
 		{
 			if (!vbus->vdev[i]->disabled) {
 				spin_unlock_irqrestore(&adapter->lock, flags);
-				err("Can't remove active target%d\n", i);
+				err("Can't remove active target %d\n", i);
 				return;
 			}
 
@@ -2269,7 +2322,7 @@ static void set_num_buses(struct device *dev, long value)
 				kmalloc(sizeof(struct vbus), GFP_KERNEL);
 			if (!adapter->vbus[i]) {
 				spin_unlock_irqrestore(&adapter->lock, flags);
-				err("Couldn't malloc bus%d\n", i);
+				err("Couldn't allocate bus %d memory\n", i);
 				return;
 			}
 			memset(adapter->vbus[i], 0x00, sizeof(struct vbus));
@@ -2568,11 +2621,9 @@ static int ibmvscsis_probe(struct vio_dev *dev, const struct vio_device_id *id)
 	unsigned int *dma_window;
 	unsigned int dma_window_property_size;
 
-	info("entering probe for UA 0x%x\n", dev->unit_address);
-
 	adapter = kmalloc(sizeof(*adapter), GFP_KERNEL);
 	if (!adapter) {
-		err("couldn't kmalloc adapter structure\n");
+		err("couldn't allocate adapter memory\n");
 		return -1;
 	}
 	memset(adapter, 0x00, sizeof(*adapter));
@@ -2604,7 +2655,7 @@ static int ibmvscsis_probe(struct vio_dev *dev, const struct vio_device_id *id)
 	} else if (dma_window_property_size == 40) {
 		adapter->riobn = dma_window[5];
 	} else {
-		warn("ibmvscsis: Invalid size of ibm,my-dma-window=%i\n",
+		warn("Invalid size of ibm,my-dma-window=%i\n",
 		     dma_window_property_size);
 	}
 
@@ -2649,8 +2700,6 @@ static int ibmvscsis_remove(struct vio_dev *dev)
 	unsigned long flags;
 	struct server_adapter *adapter =
 	    (struct server_adapter *)dev->driver_data;
-
-	info("entering remove for UA 0x%x\n", dev->unit_address);
 
 	spin_lock_irqsave(&adapter->lock, flags);
 
@@ -2708,9 +2757,35 @@ static struct vio_driver ibmvscsis_driver = {
 
 static int mod_init(void)
 {
+	struct device_node *rootdn;
+	char *ppartition_name;
+	char *psystem_id;
+	char *pmodel;
+	unsigned int *p_number_ptr;
 	int rc;
 
-	info("ibmvscsis initialized\n");
+	/* Retrieve information about this partition */
+	rootdn = find_path_device("/");
+	if (rootdn) {
+		pmodel = get_property(rootdn, "model", NULL);
+		psystem_id = get_property(rootdn, "system-id", NULL);
+		if (pmodel && psystem_id) 
+			snprintf(system_id,sizeof(system_id),
+				 "%s-%s",
+				 pmodel, psystem_id);
+		ppartition_name =
+			get_property(rootdn, "ibm,partition-name", NULL);
+		if (ppartition_name)
+			strncpy(partition_name, ppartition_name,
+				sizeof(partition_name));
+		p_number_ptr =
+			(unsigned int *)get_property(rootdn, "ibm,partition-no",
+						     NULL);
+		if (p_number_ptr)
+			partition_number = *p_number_ptr;
+	}
+
+	info("initialized\n");
 
 	rc = vio_register_driver(&ibmvscsis_driver);
 

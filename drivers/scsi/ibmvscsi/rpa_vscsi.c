@@ -186,7 +186,7 @@ int ibmvscsi_init_crq_queue(struct crq_queue *queue,
 		printk(KERN_WARNING "ibmvscsi: Partner adapter not ready\n");
 	} else if (rc != 0) {
 		printk(KERN_WARNING
-		       "ibmvscsi: couldn't register crq--rc 0x%x\n", rc);
+		       "ibmvscsi: Error %d opening adapter\n", rc);
 		goto reg_crq_failed;
 	}
 

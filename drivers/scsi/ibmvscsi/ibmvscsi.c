@@ -536,9 +536,9 @@ static void handle_cmd_rsp(struct srp_event_struct *evt_struct)
 			       rsp->sense_data_list_length);
 		unmap_cmd_data(&evt_struct->cmd, evt_struct->hostdata->dev);
 
-		if (rsp->dounder)
+		if (rsp->doover)
 			cmnd->resid = rsp->data_out_residual_count;
-		else if (rsp->diunder)
+		else if (rsp->diover)
 			cmnd->resid = rsp->data_in_residual_count;
 	}
 
@@ -617,6 +617,17 @@ static struct srp_event_struct *scsi_cmd_to_event_struct(struct scsi_cmnd *cmd,
 	evt_struct->cmd = srp_cmd;
 	evt_struct->cmnd_done = done;
 	evt_struct->crq.timeout = cmd->timeout;
+
+	/* Fix up dma address of the buffer itself */
+	if ((srp_cmd.data_out_format == SRP_INDIRECT_BUFFER) ||
+	    (srp_cmd.data_in_format == SRP_INDIRECT_BUFFER)) {
+	    struct indirect_descriptor *indirect =
+		(struct indirect_descriptor *)srp_cmd.additional_data;
+	    indirect->head.virtual_address = evt_struct->crq.IU_data_ptr + 
+		offsetof(struct SRP_CMD, additional_data) +
+		offsetof(struct indirect_descriptor, list);
+	}
+
 	return evt_struct;
 }
 
