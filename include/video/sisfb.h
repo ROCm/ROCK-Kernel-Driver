@@ -38,7 +38,8 @@
 #define TV_AVIDEO               0x00000100
 #define TV_SVIDEO               0x00000200
 #define TV_SCART                0x00000400
-#define VB_CONEXANT		0x00000800
+#define VB_CONEXANT		0x00000800	/* 661 series only */
+#define VB_TRUMPION		VB_CONEXANT	/* 300 series only */
 #define TV_PALM                 0x00001000
 #define TV_PALN                 0x00002000
 #define TV_NTSCJ		0x00001000
@@ -86,204 +87,112 @@
 #define VB_DISPMODE_DUAL	VB_DUALVIEW_MODE
 #define VB_DISPLAY_MODE       	(SINGLE_MODE | MIRROR_MODE | DUALVIEW_MODE)
 
-/* *Never* change the order of the following enum */
-typedef enum _SIS_CHIP_TYPE {
-	SIS_VGALegacy = 0,	/* chip_id in sisfb_info */
-	SIS_300,
-	SIS_630,
-	SIS_540,
-	SIS_730,
-	SIS_315H,
-	SIS_315,
-	SIS_315PRO,
-	SIS_550,
-	SIS_650,
-	SIS_740,
-	SIS_330,
-	SIS_661,
-	SIS_741,
-	SIS_660,
-	SIS_760,
-	MAX_SIS_CHIP
-} SIS_CHIP_TYPE;
+/* Structure argument for SISFB_GET_INFO ioctl  */
+typedef struct _SISFB_INFO sisfb_info, *psisfb_info;
+
+struct _SISFB_INFO {
+	__u32   sisfb_id;         	/* for identifying sisfb */
+#ifndef SISFB_ID
+#define SISFB_ID	  0x53495346    /* Identify myself with 'SISF' */
+#endif
+ 	__u32   chip_id;		/* PCI-ID of detected chip */
+	__u32   memory;			/* video memory in KB which sisfb manages */
+	__u32   heapstart;            	/* heap start (= sisfb "mem" argument) in KB */
+	__u8    fbvidmode;		/* current sisfb mode */
+
+	__u8    sisfb_version;
+	__u8    sisfb_revision;
+	__u8 	sisfb_patchlevel;
+
+	__u8 	sisfb_caps;		/* sisfb capabilities */
+
+	__u32	sisfb_tqlen;		/* turbo queue length (in KB) */
+
+	__u32 	sisfb_pcibus;      	/* The card's PCI ID */
+	__u32 	sisfb_pcislot;
+	__u32 	sisfb_pcifunc;
+
+	__u8 	sisfb_lcdpdc;		/* PanelDelayCompensation */
+
+	__u8 	sisfb_lcda;		/* Detected status of LCDA for low res/text modes */
+
+	__u32 	sisfb_vbflags;
+	__u32 	sisfb_currentvbflags;
+
+	__u32 	sisfb_scalelcd;
+	__u32 	sisfb_specialtiming;
+
+	__u8 	sisfb_haveemi;
+	__u8 	sisfb_emi30,sisfb_emi31,sisfb_emi32,sisfb_emi33;
+	__u8 	sisfb_haveemilcd;
+
+	__u8 	sisfb_lcdpdca;		/* PanelDelayCompensation for LCD-via-CRT1 */
+
+	__u16	sisfb_tvxpos, sisfb_tvypos;  /* Warning: Values + 32 ! */
+
+	__u8 	reserved[208]; 		/* for future use */
+};
 
 /* Addtional IOCTLs for communication sisfb <> X driver                */
 /* If changing this, vgatypes.h must also be changed (for X driver)    */
 
 /* ioctl for identifying and giving some info (esp. memory heap start) */
-#define SISFB_GET_INFO	  	_IOR('n',0xF8,__u32)
+#define SISFB_GET_INFO_SIZE  	_IOR(0xF3,0x00,__u32)
+#define SISFB_GET_INFO	  	_IOR(0xF3,0x01,struct _SISFB_INFO)
+
 /* ioctrl to get current vertical retrace status */
-#define SISFB_GET_VBRSTATUS  	_IOR('n',0xF9,__u32)
+#define SISFB_GET_VBRSTATUS  	_IOR(0xF3,0x02,__u32)
+
 /* ioctl to enable/disable panning auto-maximize (like nomax parameter) */
-#define SISFB_GET_AUTOMAXIMIZE 	_IOR('n',0xFA,__u32)
-#define SISFB_SET_AUTOMAXIMIZE 	_IOW('n',0xFA,__u32)
+#define SISFB_GET_AUTOMAXIMIZE 	_IOR(0xF3,0x03,__u32)
+#define SISFB_SET_AUTOMAXIMIZE 	_IOW(0xF3,0x03,__u32)
 
-/* TW: Structure argument for SISFB_GET_INFO ioctl  */
-typedef struct _SISFB_INFO sisfb_info, *psisfb_info;
+/* ioctls to relocate TV output (x=D[31:16], y=D[15:0], + 32)*/
+#define SISFB_GET_TVPOSOFFSET   _IOR(0xF3,0x04,__u32)
+#define SISFB_SET_TVPOSOFFSET   _IOW(0xF3,0x04,__u32)
 
-struct _SISFB_INFO {
-	unsigned long sisfb_id;         /* for identifying sisfb */
-#ifndef SISFB_ID
-#define SISFB_ID	  0x53495346    /* Identify myself with 'SISF' */
-#endif
- 	int    chip_id;			/* PCI ID of detected chip */
-	int    memory;			/* video memory in KB which sisfb manages */
-	int    heapstart;               /* heap start (= sisfb "mem" argument) in KB */
-	unsigned char fbvidmode;	/* current sisfb mode */
+/* ioctl for locking sisfb (no register access during lock) */
+/* As of now, only used to avoid register access during
+ * the ioctls listed above.
+ */
+#define SISFB_SET_LOCK  	_IOW(0xF3,0x06,__u32)
 
-	unsigned char sisfb_version;
-	unsigned char sisfb_revision;
-	unsigned char sisfb_patchlevel;
+/* more to come soon */
 
-	unsigned char sisfb_caps;	/* Sisfb capabilities */
+/* ioctls 0xF3 up to 0x3F reserved for sisfb */
 
-	int    sisfb_tqlen;		/* turbo queue length (in KB) */
+/****************************************************************/
+/* The following are deprecated and should not be used anymore: */
+/****************************************************************/
+/* ioctl for identifying and giving some info (esp. memory heap start) */
+#define SISFB_GET_INFO_OLD  	   _IOR('n',0xF8,__u32)
+/* ioctrl to get current vertical retrace status */
+#define SISFB_GET_VBRSTATUS_OLD	   _IOR('n',0xF9,__u32)
+/* ioctl to enable/disable panning auto-maximize (like nomax parameter) */
+#define SISFB_GET_AUTOMAXIMIZE_OLD _IOR('n',0xFA,__u32)
+#define SISFB_SET_AUTOMAXIMIZE_OLD _IOW('n',0xFA,__u32)
+/****************************************************************/
+/*               End of deprecated ioctl numbers                */
+/****************************************************************/
 
-	unsigned int sisfb_pcibus;      /* The card's PCI ID */
-	unsigned int sisfb_pcislot;
-	unsigned int sisfb_pcifunc;
-
-	unsigned char sisfb_lcdpdc;	/* PanelDelayCompensation */
-
-	unsigned char sisfb_lcda;	/* Detected status of LCDA for low res/text modes */
-
-	unsigned long sisfb_vbflags;
-	unsigned long sisfb_currentvbflags;
-
-	int sisfb_scalelcd;
-	unsigned long sisfb_specialtiming;
-
-	unsigned char sisfb_haveemi;
-	unsigned char sisfb_emi30,sisfb_emi31,sisfb_emi32,sisfb_emi33;
-	unsigned char sisfb_haveemilcd;
-
-	char reserved[213]; 		/* for future use */
-};
-
-/* For fb memory manager */
+/* For fb memory manager (FBIO_ALLOC, FBIO_FREE) */
 struct sis_memreq {
-	unsigned long offset;
-	unsigned long size;
-};
-
-/* More or less deprecated stuff follows: */
-typedef enum _TVTYPE {
-	TVMODE_NTSC = 0,
-	TVMODE_PAL,
-	TVMODE_HIVISION,
-	TVMODE_TOTAL
-} SIS_TV_TYPE;
-
-typedef enum _TVPLUGTYPE {
-	TVPLUG_Legacy = 0,
-	TVPLUG_COMPOSITE,
-	TVPLUG_SVIDEO,
-	TVPLUG_SCART,
-	TVPLUG_TOTAL
-} SIS_TV_PLUG;
-
-struct mode_info {
-	int    bpp;
-	int    xres;
-	int    yres;
-	int    v_xres;		/* deprecated - use var instead */
-	int    v_yres;		/* deprecated - use var instead */
-	int    org_x;		/* deprecated - use var instead */
-	int    org_y;		/* deprecated - use var instead */
-	unsigned int  vrate;
-};
-
-struct ap_data {
-	struct mode_info minfo;
-	unsigned long iobase;
-	unsigned int  mem_size;
-	unsigned long disp_state;  /* deprecated */
-	SIS_CHIP_TYPE chip;
-	unsigned char hasVB;
-	SIS_TV_TYPE TV_type;	   /* deprecated */
-	SIS_TV_PLUG TV_plug;	   /* deprecated */
-	unsigned long version;
-	unsigned long vbflags;	   /* replaces deprecated entries above */
-	unsigned long currentvbflags;
-	char reserved[248];
+	__u32 	offset;
+	__u32 	size;
 };
 
 /**********************************************/
 /*                  PRIVATE                   */
+/*         (for IN-KERNEL usage only)         */
 /**********************************************/
 
 #ifdef __KERNEL__
-#include <linux/spinlock.h>
-
-typedef enum _VGA_ENGINE {
-	UNKNOWN_VGA = 0,
-	SIS_300_VGA,
-	SIS_315_VGA,
-} VGA_ENGINE;
-
-struct video_info {
-	int           chip_id;
-	unsigned int  video_size;
-	unsigned long video_base;
-	char  *       video_vbase;
-	unsigned long mmio_base;
-	char  *       mmio_vbase;
-	unsigned long vga_base;
-	unsigned long mtrr;
-	unsigned long heapstart;
-
-	int    video_bpp;
-	int    video_cmap_len;
-	int    video_width;
-	int    video_height;
-	int    video_vwidth;			/* DEPRECATED - use var instead */
-	int    video_vheight;			/* DEPRECATED - use var instead */
-	int    org_x;				/* DEPRECATED - use var instead */
-	int    org_y;				/* DEPRECATED - use var instead */
-	int    video_linelength;
-	unsigned int refresh_rate;
-
-	unsigned long disp_state;		/* DEPRECATED */
-	unsigned char hasVB;			/* DEPRECATED */
-	unsigned char TV_type;			/* DEPRECATED */
-	unsigned char TV_plug;			/* DEPRECATED */
-
-	SIS_CHIP_TYPE chip;
-	unsigned char revision_id;
-
-        unsigned short DstColor;		/* For 2d acceleration */
-	unsigned long  SiS310_AccelDepth;
-	unsigned long  CommandReg;
-
-	spinlock_t     lockaccel;		/* Do not use outside of kernel! */
-
-        unsigned int   pcibus;
-	unsigned int   pcislot;
-	unsigned int   pcifunc;
-
-	int 	       accel;
-
-	unsigned short subsysvendor;
-	unsigned short subsysdevice;
-
-	unsigned long  vbflags;			/* Replacing deprecated stuff from above */
-	unsigned long  currentvbflags;
-
-	int    current_bpp;
-	int    current_width;
-	int    current_height;
-	int    current_htotal;
-	int    current_vtotal;
-	__u32  current_pixclock;
-	int    current_refresh_rate;
-
-	char reserved[200];
-};
-
-extern struct video_info ivideo;
+#define	UNKNOWN_VGA  0
+#define	SIS_300_VGA  1
+#define	SIS_315_VGA  2
 
 extern void sis_malloc(struct sis_memreq *req);
-extern void sis_free(unsigned long base);
-extern void sis_dispinfo(struct ap_data *rec);
+extern void sis_free(u32 base);
 #endif
+
 #endif
