@@ -577,13 +577,7 @@ static int	XmitFrameSG(SK_AC*, TX_PORT*, struct sk_buff*);
 #ifdef CONFIG_PROC_FS
 static const char 	SK_Root_Dir_entry[] = "sk98lin";
 static struct		proc_dir_entry *pSkRootDir;
-
-extern int 		sk_proc_read(	char   *buffer,
-					char	**buffer_location,
-					off_t	offset,
-					int	buffer_length,
-					int	*eof,
-					void	*data);
+extern struct		file_operations sk_proc_fops;
 #endif
 
 extern void SkDimEnableModerationIfNeeded(SK_AC *pAC);	
@@ -762,16 +756,11 @@ static int __init skge_probe (void)
 		}
 		
 		/* Create proc file */
-		if (pSkRootDir && 
-		    (pProcFile = create_proc_entry(dev->name,
-						  S_IFREG | S_IXUSR | S_IWGRP | S_IROTH,
-						   pSkRootDir))) {
-			pProcFile->read_proc = sk_proc_read;
-			pProcFile->write_proc = NULL;
-			pProcFile->nlink = 1;
-			pProcFile->size = sizeof(dev->name + 1);
-			pProcFile->data = (void *)pProcFile;
-			pProcFile->owner = THIS_MODULE;
+		if (pSkRootDir 
+		    && (pProcFile = create_proc_entry(dev->name, S_IRUGO,
+						      pSkRootDir))) {
+			pProcFile->proc_fops = &sk_proc_fops;
+			pProcFile->data = dev;
 		}
 #endif
 
@@ -827,16 +816,11 @@ static int __init skge_probe (void)
 
 #ifdef CONFIG_PROC_FS
 			if (pSkRootDir 
-			    && (pProcFile = create_proc_entry(dev->name,
-							      S_IFREG | S_IXUSR | S_IWGRP | S_IROTH,
+			    && (pProcFile = create_proc_entry(dev->name, 
+							      S_IRUGO,
 							      pSkRootDir))) {
-		
-				pProcFile->read_proc = sk_proc_read;
-				pProcFile->write_proc = NULL;
-				pProcFile->nlink = 1;
-				pProcFile->size = sizeof(dev->name + 1);
-				pProcFile->data = (void *)pProcFile;
-				pProcFile->owner = THIS_MODULE;
+				pProcFile->proc_fops = &sk_proc_fops;
+				pProcFile->data = dev;
 			}
 #endif
 
