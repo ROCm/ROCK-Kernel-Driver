@@ -624,6 +624,7 @@ static int rawv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 	if (msg->msg_controllen) {
 		opt = &opt_space;
 		memset(opt, 0, sizeof(struct ipv6_txoptions));
+		opt->tot_len = sizeof(struct ipv6_txoptions);
 
 		err = datagram_send_ctl(msg, &fl, opt, &hlimit);
 		if (err < 0) {
