@@ -456,15 +456,6 @@ else
 include/linux/autoconf.h: ;
 endif
 
-include $(srctree)/arch/$(ARCH)/Makefile
-
-# Default kernel image to build when no specific target is given.
-# KBUILD_IMAGE may be overruled on the commandline or
-# set in the environment
-# Also any assingments in arch/$(ARCH)/Makefiel take precedence over
-# this default value
-export KBUILD_IMAGE ?= vmlinux
-
 # The all: target is the default when no target is given on the
 # command line.
 # This allow a user to issue only 'make' to build a kernel including modules
@@ -487,6 +478,15 @@ endif
 
 # warn about C99 declaration after statement
 CFLAGS += $(call cc-option,-Wdeclaration-after-statement,)
+
+include $(srctree)/arch/$(ARCH)/Makefile
+
+# Default kernel image to build when no specific target is given.
+# KBUILD_IMAGE may be overruled on the commandline or
+# set in the environment
+# Also any assingments in arch/$(ARCH)/Makefiel take precedence over
+# this default value
+export KBUILD_IMAGE ?= vmlinux
 
 #
 # INSTALL_PATH specifies where to place the updated kernel and system map
