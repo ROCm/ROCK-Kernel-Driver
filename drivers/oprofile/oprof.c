@@ -28,6 +28,8 @@ int oprofile_setup(void)
 {
 	int err;
  
+	down(&start_sem);
+
 	if ((err = alloc_cpu_buffers()))
 		goto out;
 
@@ -45,7 +47,6 @@ int oprofile_setup(void)
 	if ((err = sync_start()))
 		goto out3;
 
-	down(&start_sem);
 	is_setup = 1;
 	up(&start_sem);
 	return 0;
@@ -58,6 +59,7 @@ out2:
 out1:
 	free_cpu_buffers();
 out:
+	up(&start_sem);
 	return err;
 }
 
@@ -106,22 +108,20 @@ out:
 
 void oprofile_shutdown(void)
 {
+	down(&start_sem);
 	sync_stop();
 	if (oprofile_ops->shutdown)
 		oprofile_ops->shutdown(); 
-	/* down() is also necessary to synchronise all pending events
-	 * before freeing */
-	down(&buffer_sem);
 	is_setup = 0;
-	up(&buffer_sem);
 	free_event_buffer();
 	free_cpu_buffers();
+	up(&start_sem);
 }
 
- 
+
 extern void timer_init(struct oprofile_operations ** ops);
 
- 
+
 static int __init oprofile_init(void)
 {
 	int err;
