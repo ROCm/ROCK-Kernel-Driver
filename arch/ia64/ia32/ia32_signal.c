@@ -78,10 +78,10 @@ copy_siginfo_from_user32 (siginfo_t *to, siginfo_t32 *from)
 	err |= __get_user(to->si_errno, &from->si_errno);
 	err |= __get_user(to->si_code, &from->si_code);
 
-	if (from->si_code < 0)
+	if (to->si_code < 0)
 		err |= __copy_from_user(&to->_sifields._pad, &from->_sifields._pad, SI_PAD_SIZE);
 	else {
-		switch (from->si_code >> 16) {
+		switch (to->si_code >> 16) {
 		      case __SI_CHLD >> 16:
 			err |= __get_user(to->si_utime, &from->si_utime);
 			err |= __get_user(to->si_stime, &from->si_stime);
