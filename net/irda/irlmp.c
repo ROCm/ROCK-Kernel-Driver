@@ -177,8 +177,8 @@ struct lsap_cb *irlmp_open_lsap(__u8 slsap_sel, notify_t *notify, __u8 pid)
 	self->lsap_state = LSAP_DISCONNECTED;
 
 	/* Insert into queue of unconnected LSAPs */
-	hashbin_insert(irlmp->unconnected_lsaps, (irda_queue_t *) self, (int) self, 
-		       NULL);
+	hashbin_insert(irlmp->unconnected_lsaps, (irda_queue_t *) self,
+		       (long) self, NULL);
 
 	return self;
 }
@@ -238,7 +238,7 @@ void irlmp_close_lsap(struct lsap_cb *self)
 					   LM_LAP_DISCONNECT_REQUEST, NULL);
 		}
 		/* Now, remove from the link */
-		lsap = hashbin_remove(lap->lsaps, (int) self, NULL);
+		lsap = hashbin_remove(lap->lsaps, (long) self, NULL);
 #ifdef CONFIG_IRDA_CACHE_LAST_LSAP
 		lap->cache.valid = FALSE;
 #endif
@@ -246,7 +246,7 @@ void irlmp_close_lsap(struct lsap_cb *self)
 	self->lap = NULL;
 	/* Check if we found the LSAP! If not then try the unconnected lsaps */
 	if (!lsap) {
-		lsap = hashbin_remove(irlmp->unconnected_lsaps, (int) self,
+		lsap = hashbin_remove(irlmp->unconnected_lsaps, (long) self,
 				      NULL);
 	}
 	if (!lsap) {
@@ -436,14 +436,15 @@ int irlmp_connect_request(struct lsap_cb *self, __u8 dlsap_sel,
 	 *  Remove LSAP from list of unconnected LSAPs and insert it into the
 	 *  list of connected LSAPs for the particular link
 	 */
-	lsap = hashbin_remove(irlmp->unconnected_lsaps, (int) self, NULL);
+	lsap = hashbin_remove(irlmp->unconnected_lsaps, (long) self, NULL);
 
 	ASSERT(lsap != NULL, return -1;);
 	ASSERT(lsap->magic == LMP_LSAP_MAGIC, return -1;);
 	ASSERT(lsap->lap != NULL, return -1;);
 	ASSERT(lsap->lap->magic == LMP_LAP_MAGIC, return -1;);
 
-	hashbin_insert(self->lap->lsaps, (irda_queue_t *) self, (int) self, NULL);
+	hashbin_insert(self->lap->lsaps, (irda_queue_t *) self, (long) self,
+		       NULL);
 
 	set_bit(0, &self->connected);	/* TRUE */
 
@@ -578,7 +579,7 @@ struct lsap_cb *irlmp_dup(struct lsap_cb *orig, void *instance)
 	IRDA_DEBUG(1, __FUNCTION__ "()\n");
 
 	/* Only allowed to duplicate unconnected LSAP's */
-	if (!hashbin_find(irlmp->unconnected_lsaps, (int) orig, NULL)) {
+	if (!hashbin_find(irlmp->unconnected_lsaps, (long) orig, NULL)) {
 		IRDA_DEBUG(0, __FUNCTION__ "(), unable to find LSAP\n");
 		return NULL;
 	}
@@ -595,8 +596,8 @@ struct lsap_cb *irlmp_dup(struct lsap_cb *orig, void *instance)
 
 	init_timer(&new->watchdog_timer);
 
-	hashbin_insert(irlmp->unconnected_lsaps, (irda_queue_t *) new, (int) new,
-		       NULL);
+	hashbin_insert(irlmp->unconnected_lsaps, (irda_queue_t *) new,
+		       (long) new, NULL);
 
 	/* Make sure that we invalidate the cache */
 #ifdef CONFIG_IRDA_CACHE_LAST_LSAP
@@ -646,7 +647,7 @@ int irlmp_disconnect_request(struct lsap_cb *self, struct sk_buff *userdata)
 	ASSERT(self->lap->magic == LMP_LAP_MAGIC, return -1;);
 	ASSERT(self->lap->lsaps != NULL, return -1;);
 
-	lsap = hashbin_remove(self->lap->lsaps, (int) self, NULL);
+	lsap = hashbin_remove(self->lap->lsaps, (long) self, NULL);
 #ifdef CONFIG_IRDA_CACHE_LAST_LSAP
 	self->lap->cache.valid = FALSE;
 #endif
@@ -655,8 +656,8 @@ int irlmp_disconnect_request(struct lsap_cb *self, struct sk_buff *userdata)
 	ASSERT(lsap->magic == LMP_LSAP_MAGIC, return -1;);
 	ASSERT(lsap == self, return -1;);
 
-	hashbin_insert(irlmp->unconnected_lsaps, (irda_queue_t *) self, (int) self,
-		       NULL);
+	hashbin_insert(irlmp->unconnected_lsaps, (irda_queue_t *) self,
+		       (long) self, NULL);
 
 	/* Reset some values */
 	self->dlsap_sel = LSAP_ANY;
@@ -699,15 +700,15 @@ void irlmp_disconnect_indication(struct lsap_cb *self, LM_REASON reason,
 	ASSERT(self->lap != NULL, return;);
 	ASSERT(self->lap->lsaps != NULL, return;);
 
-	lsap = hashbin_remove(self->lap->lsaps, (int) self, NULL);
+	lsap = hashbin_remove(self->lap->lsaps, (long) self, NULL);
 #ifdef CONFIG_IRDA_CACHE_LAST_LSAP
 	self->lap->cache.valid = FALSE;
 #endif
 
 	ASSERT(lsap != NULL, return;);
 	ASSERT(lsap == self, return;);
-	hashbin_insert(irlmp->unconnected_lsaps, (irda_queue_t *) lsap, (int) lsap,
-		       NULL);
+	hashbin_insert(irlmp->unconnected_lsaps, (irda_queue_t *) lsap,
+		       (long) lsap, NULL);
 
 	self->dlsap_sel = LSAP_ANY;
 	self->lap = NULL;
@@ -1414,19 +1415,11 @@ __u16 irlmp_service_to_hint(int service)
  *    Register local service with IrLMP
  *
  */
-__u32 irlmp_register_service(__u16 hints)
+void *irlmp_register_service(__u16 hints)
 {
 	irlmp_service_t *service;
-	__u32 handle;
 
 	IRDA_DEBUG(4, __FUNCTION__ "(), hints = %04x\n", hints);
-
-	/* Get a unique handle for this service */
-	get_random_bytes(&handle, sizeof(handle));
-	while (hashbin_find(irlmp->services, handle, NULL) || !handle)
-		get_random_bytes(&handle, sizeof(handle));
-
-	irlmp->hints.word |= hints;
 
 	/* Make a new registration */
 	service = kmalloc(sizeof(irlmp_service_t), GFP_ATOMIC);
@@ -1435,9 +1428,12 @@ __u32 irlmp_register_service(__u16 hints)
 		return 0;
 	}
 	service->hints = hints;
-	hashbin_insert(irlmp->services, (irda_queue_t *) service, handle, NULL);
+	hashbin_insert(irlmp->services, (irda_queue_t *) service,
+		       (long) service, NULL);
 
-	return handle;
+	irlmp->hints.word |= hints;
+
+	return (void *)service;
 }
 
 /*
@@ -1447,7 +1443,7 @@ __u32 irlmp_register_service(__u16 hints)
  *
  *    Returns: 0 on success, -1 on error
  */
-int irlmp_unregister_service(__u32 handle)
+int irlmp_unregister_service(void *handle)
 {
 	irlmp_service_t *service;
 
@@ -1456,15 +1452,15 @@ int irlmp_unregister_service(__u32 handle)
 	if (!handle)
 		return -1;
 
-	service = hashbin_find(irlmp->services, handle, NULL);
+	/* Caller may call with invalid handle (it's legal) - Jean II */
+	service = hashbin_find(irlmp->services, (long) handle, NULL);
 	if (!service) {
 		IRDA_DEBUG(1, __FUNCTION__ "(), Unknown service!\n");
 		return -1;
 	}
 
-	service = hashbin_remove(irlmp->services, handle, NULL);
-	if (service)
-		kfree(service);
+	hashbin_remove_this(irlmp->services, (irda_queue_t *) service);
+	kfree(service);
 
 	/* Remove old hint bits */
 	irlmp->hints.word = 0;
@@ -1488,19 +1484,13 @@ int irlmp_unregister_service(__u32 handle)
  *
  *    Returns: handle > 0 on success, 0 on error
  */
-__u32 irlmp_register_client(__u16 hint_mask, DISCOVERY_CALLBACK1 disco_clb,
+void *irlmp_register_client(__u16 hint_mask, DISCOVERY_CALLBACK1 disco_clb,
 			    DISCOVERY_CALLBACK1 expir_clb, void *priv)
 {
 	irlmp_client_t *client;
-	__u32 handle;
 
 	IRDA_DEBUG(1, __FUNCTION__ "()\n");
 	ASSERT(irlmp != NULL, return 0;);
-
-	/* Get a unique handle for this client */
-	get_random_bytes(&handle, sizeof(handle));
-	while (hashbin_find(irlmp->clients, handle, NULL) || !handle)
-		get_random_bytes(&handle, sizeof(handle));
 
 	/* Make a new registration */
 	client = kmalloc(sizeof(irlmp_client_t), GFP_ATOMIC);
@@ -1515,9 +1505,10 @@ __u32 irlmp_register_client(__u16 hint_mask, DISCOVERY_CALLBACK1 disco_clb,
 	client->expir_callback = expir_clb;
 	client->priv = priv;
 
-	hashbin_insert(irlmp->clients, (irda_queue_t *) client, handle, NULL);
+	hashbin_insert(irlmp->clients, (irda_queue_t *) client,
+		       (long) client, NULL);
 
-	return handle;
+	return (void *) client;
 }
 
 /*
@@ -1528,7 +1519,7 @@ __u32 irlmp_register_client(__u16 hint_mask, DISCOVERY_CALLBACK1 disco_clb,
  *
  *    Returns: 0 on success, -1 on error
  */
-int irlmp_update_client(__u32 handle, __u16 hint_mask,
+int irlmp_update_client(void *handle, __u16 hint_mask,
 			DISCOVERY_CALLBACK1 disco_clb,
 			DISCOVERY_CALLBACK1 expir_clb, void *priv)
 {
@@ -1537,7 +1528,7 @@ int irlmp_update_client(__u32 handle, __u16 hint_mask,
 	if (!handle)
 		return -1;
 
-	client = hashbin_find(irlmp->clients, handle, NULL);
+	client = hashbin_find(irlmp->clients, (long) handle, NULL);
 	if (!client) {
 		IRDA_DEBUG(1, __FUNCTION__ "(), Unknown client!\n");
 		return -1;
@@ -1557,7 +1548,7 @@ int irlmp_update_client(__u32 handle, __u16 hint_mask,
  *    Returns: 0 on success, -1 on error
  *
  */
-int irlmp_unregister_client(__u32 handle)
+int irlmp_unregister_client(void *handle)
 {
 	struct irlmp_client *client;
 
@@ -1566,16 +1557,16 @@ int irlmp_unregister_client(__u32 handle)
 	if (!handle)
 		return -1;
 
-	client = hashbin_find(irlmp->clients, handle, NULL);
+	/* Caller may call with invalid handle (it's legal) - Jean II */
+	client = hashbin_find(irlmp->clients, (long) handle, NULL);
 	if (!client) {
 		IRDA_DEBUG(1, __FUNCTION__ "(), Unknown client!\n");
 		return -1;
 	}
 
 	IRDA_DEBUG( 4, __FUNCTION__ "(), removing client!\n");
-	client = hashbin_remove( irlmp->clients, handle, NULL);
-	if (client)
-		kfree(client);
+	hashbin_remove_this(irlmp->clients, (irda_queue_t *) client);
+	kfree(client);
 
 	return 0;
 }

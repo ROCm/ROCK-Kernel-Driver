@@ -197,12 +197,12 @@ struct lsap_cb *irlmp_open_lsap(__u8 slsap, notify_t *notify, __u8 pid);
 void irlmp_close_lsap( struct lsap_cb *self);
 
 __u16 irlmp_service_to_hint(int service);
-__u32 irlmp_register_service(__u16 hints);
-int irlmp_unregister_service(__u32 handle);
-__u32 irlmp_register_client(__u16 hint_mask, DISCOVERY_CALLBACK1 disco_clb,
+void *irlmp_register_service(__u16 hints);
+int irlmp_unregister_service(void *handle);
+void *irlmp_register_client(__u16 hint_mask, DISCOVERY_CALLBACK1 disco_clb,
 			    DISCOVERY_CALLBACK1 expir_clb, void *priv);
-int irlmp_unregister_client(__u32 handle);
-int irlmp_update_client(__u32 handle, __u16 hint_mask, 
+int irlmp_unregister_client(void *handle);
+int irlmp_update_client(void *handle, __u16 hint_mask, 
 			DISCOVERY_CALLBACK1 disco_clb,
 			DISCOVERY_CALLBACK1 expir_clb, void *priv);
 

@@ -147,7 +147,7 @@ int irias_delete_object(struct ias_object *obj)
 	ASSERT(obj != NULL, return -1;);
 	ASSERT(obj->magic == IAS_OBJECT_MAGIC, return -1;);
 
-	node = hashbin_remove(objects, 0, obj->name);
+	node = hashbin_remove_this(objects, (irda_queue_t *) obj);
 	if (!node)
 		return 0; /* Already removed */
 
@@ -172,7 +172,7 @@ int irias_delete_attrib(struct ias_object *obj, struct ias_attrib *attrib)
 	ASSERT(attrib != NULL, return -1;);
 
 	/* Remove attribute from object */
-	node = hashbin_remove(obj->attribs, 0, attrib->name);
+	node = hashbin_remove_this(obj->attribs, (irda_queue_t *) attrib);
 	if (!node)
 		return 0; /* Already removed or non-existent */
 

@@ -67,7 +67,7 @@ struct irda_queue {
 	struct irda_queue *q_prev;
 
 	char   q_name[NAME_SIZE];
-	__u32  q_hash;
+	long   q_hash;			/* Must be able to cast a (void *) */
 };
 typedef struct irda_queue irda_queue_t;
 
@@ -84,10 +84,10 @@ typedef struct hashbin_t {
 hashbin_t *hashbin_new(int type);
 int      hashbin_delete(hashbin_t* hashbin, FREE_FUNC func);
 int      hashbin_clear(hashbin_t* hashbin, FREE_FUNC free_func);
-void     hashbin_insert(hashbin_t* hashbin, irda_queue_t* entry, __u32 hashv, 
+void     hashbin_insert(hashbin_t* hashbin, irda_queue_t* entry, long hashv, 
 			char* name);
-void*    hashbin_find(hashbin_t* hashbin, __u32 hashv, char* name);
-void*    hashbin_remove(hashbin_t* hashbin, __u32 hashv, char* name);
+void*    hashbin_find(hashbin_t* hashbin, long hashv, char* name);
+void*    hashbin_remove(hashbin_t* hashbin, long hashv, char* name);
 void*    hashbin_remove_first(hashbin_t *hashbin);
 void*	 hashbin_remove_this( hashbin_t* hashbin, irda_queue_t* entry);
 irda_queue_t *hashbin_get_first(hashbin_t *hashbin);

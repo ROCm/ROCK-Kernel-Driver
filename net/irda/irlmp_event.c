@@ -581,15 +581,15 @@ static int irlmp_state_connect(struct lsap_cb *self, IRLMP_EVENT event,
 		 *  Bind this LSAP to the IrLAP link where the connect was
 		 *  received
 		 */
-		lsap = hashbin_remove(irlmp->unconnected_lsaps, (int) self,
+		lsap = hashbin_remove(irlmp->unconnected_lsaps, (long) self,
 				      NULL);
 
 		ASSERT(lsap == self, return -1;);
 		ASSERT(self->lap != NULL, return -1;);
 		ASSERT(self->lap->lsaps != NULL, return -1;);
 
-		hashbin_insert(self->lap->lsaps, (irda_queue_t *) self, (int) self,
-			       NULL);
+		hashbin_insert(self->lap->lsaps, (irda_queue_t *) self,
+			       (long) self, NULL);
 
 		irlmp_send_lcf_pdu(self->lap, self->dlsap_sel,
 				   self->slsap_sel, CONNECT_CNF, skb);

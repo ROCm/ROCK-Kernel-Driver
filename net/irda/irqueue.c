@@ -34,6 +34,21 @@
  *     
  ********************************************************************/
 
+/*
+ * NOTE :
+ * There are various problems with this package :
+ *	o the hash function for ints is pathetic (but could be changed)
+ *	o locking is sometime suspicious (especially during enumeration)
+ *	o most users have only a few elements (== overhead)
+ *	o most users never use seach, so don't benefit from hashing
+ * Problem already fixed :
+ *	o not 64 bit compliant (most users do hashv = (int) self)
+ *	o hashbin_remove() is broken => use hashbin_remove_this()
+ * I think most users would be better served by a simple linked list
+ * (like include/linux/list.h) with a global spinlock per list.
+ * Jean II
+ */
+
 #include <net/irda/irda.h>
 #include <net/irda/irqueue.h>
 
@@ -148,7 +163,7 @@ int hashbin_delete( hashbin_t* hashbin, FREE_FUNC free_func)
  *    Insert an entry into the hashbin
  *
  */
-void hashbin_insert(hashbin_t* hashbin, irda_queue_t* entry, __u32 hashv, char* name)
+void hashbin_insert(hashbin_t* hashbin, irda_queue_t* entry, long hashv, char* name)
 {
 	unsigned long flags = 0;
 	int bin;
@@ -209,7 +224,7 @@ void hashbin_insert(hashbin_t* hashbin, irda_queue_t* entry, __u32 hashv, char* 
  *    Find item with the given hashv or name
  *
  */
-void* hashbin_find( hashbin_t* hashbin, __u32 hashv, char* name )
+void* hashbin_find( hashbin_t* hashbin, long hashv, char* name )
 {
 	int bin, found = FALSE;
 	unsigned long flags = 0;
@@ -300,8 +315,16 @@ void *hashbin_remove_first( hashbin_t *hashbin)
  *
  *    Remove entry with the given name
  *
+ *  The use of this function is highly discouraged, because the whole
+ *  concept behind hashbin_remove() is broken. In many cases, it's not
+ *  possible to guarantee the unicity of the index (either hashv or name),
+ *  leading to removing the WRONG entry.
+ *  The only simple safe use is :
+ *		hashbin_remove(hasbin, (int) self, NULL);
+ *  In other case, you must think hard to guarantee unicity of the index.
+ *  Jean II
  */
-void* hashbin_remove( hashbin_t* hashbin, __u32 hashv, char* name)
+void* hashbin_remove( hashbin_t* hashbin, long hashv, char* name)
 {
 	int bin, found = FALSE;
 	unsigned long flags = 0;
@@ -404,7 +427,7 @@ void* hashbin_remove_this( hashbin_t* hashbin, irda_queue_t* entry)
 {
 	unsigned long flags = 0;
 	int	bin;
-	__u32	hashv;
+	long	hashv;
 
 	IRDA_DEBUG( 4, __FUNCTION__ "()\n");
 

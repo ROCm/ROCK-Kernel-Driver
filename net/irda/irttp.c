@@ -433,7 +433,7 @@ struct tsap_cb *irttp_open_tsap(__u8 stsap_sel, int credit, notify_t *notify)
 	self->notify = *notify;
 	self->lsap = lsap;
 
-	hashbin_insert(irttp->tsaps, (irda_queue_t *) self, (int) self, NULL);
+	hashbin_insert(irttp->tsaps, (irda_queue_t *) self, (long) self, NULL);
 
 	if (credit > TTP_RX_MAX_CREDIT)
 		self->initial_credit = TTP_RX_MAX_CREDIT;
@@ -503,7 +503,7 @@ int irttp_close_tsap(struct tsap_cb *self)
 		return 0; /* Will be back! */
 	}
 
-	tsap = hashbin_remove(irttp->tsaps, (int) self, NULL);
+	tsap = hashbin_remove(irttp->tsaps, (long) self, NULL);
 
 	ASSERT(tsap == self, return -1;);
 
@@ -1368,7 +1368,7 @@ struct tsap_cb *irttp_dup(struct tsap_cb *orig, void *instance)
 
 	IRDA_DEBUG(1, __FUNCTION__ "()\n");
 
-	if (!hashbin_find(irttp->tsaps, (int) orig, NULL)) {
+	if (!hashbin_find(irttp->tsaps, (long) orig, NULL)) {
 		IRDA_DEBUG(0, __FUNCTION__ "(), unable to find TSAP\n");
 		return NULL;
 	}
@@ -1389,7 +1389,7 @@ struct tsap_cb *irttp_dup(struct tsap_cb *orig, void *instance)
 	skb_queue_head_init(&new->tx_queue);
 	skb_queue_head_init(&new->rx_fragments);
 
-	hashbin_insert(irttp->tsaps, (irda_queue_t *) new, (int) new, NULL);
+	hashbin_insert(irttp->tsaps, (irda_queue_t *) new, (long) new, NULL);
 
 	return new;
 }

@@ -58,7 +58,7 @@ static const char *ias_charset_types[] = {
 #endif	/* CONFIG_IRDA_DEBUG */
 
 static hashbin_t *iriap = NULL;
-static __u32 service_handle;
+static void *service_handle;
 
 extern char *lmp_reasons[];
 
@@ -182,7 +182,7 @@ struct iriap_cb *iriap_open(__u8 slsap_sel, int mode, void *priv,
 
 	init_timer(&self->watchdog_timer);
 
-	hashbin_insert(iriap, (irda_queue_t *) self, (int) self, NULL);
+	hashbin_insert(iriap, (irda_queue_t *) self, (long) self, NULL);
 
 	/* Initialize state machines */
 	iriap_next_client_state(self, S_DISCONNECT);
@@ -235,7 +235,7 @@ void iriap_close(struct iriap_cb *self)
 		self->lsap = NULL;
 	}
 
-	entry = (struct iriap_cb *) hashbin_remove(iriap, (int) self, NULL);
+	entry = (struct iriap_cb *) hashbin_remove(iriap, (long) self, NULL);
 	ASSERT(entry == self, return;);
 
 	__iriap_close(self);

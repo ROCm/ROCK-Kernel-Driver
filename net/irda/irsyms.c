@@ -328,7 +328,8 @@ void __exit irda_cleanup(void)
  * On the other hand, it needs to be initialised *after* the basic
  * networking, the /proc/net filesystem and sysctl module. Those are
  * currently initialised in .../init/main.c (before initcalls).
- * Also, it needs to be initialised *after* the random number generator.
+ * Also, IrDA drivers needs to be initialised *after* the random number
+ * generator (main stack and higher layer init don't need it anymore).
  *
  * Jean II
  */

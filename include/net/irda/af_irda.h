@@ -55,8 +55,8 @@ struct irda_sock {
 	__u16 mask;           /* Hint bits mask */
 	__u16 hints;          /* Hint bits */
 
-	__u32 ckey;           /* IrLMP client handle */
-	__u32 skey;           /* IrLMP service handle */
+	void *ckey;           /* IrLMP client handle */
+	void *skey;           /* IrLMP service handle */
 
 	struct ias_object *ias_obj;   /* Our service name + lsap in IAS */
 	struct iriap_cb *iriap;	      /* Used to query remote IAS */

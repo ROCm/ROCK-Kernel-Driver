@@ -86,8 +86,8 @@ struct ircomm_tty_cb {
 
 	struct iriap_cb *iriap; /* Instance used for querying remote IAS */
 	struct ias_object* obj;
-	int skey;
-	int ckey;
+	void *skey;
+	void *ckey;
 
 	struct termios	  normal_termios;
 	struct termios	  callout_termios;
