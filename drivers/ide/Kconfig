@@ -992,12 +992,12 @@ config IDE_CHIPSETS
 
 	  People with SCSI-only systems can say N here.
 
+if IDE_CHIPSETS
+
 comment "Note: most of these also require special kernel boot parameters"
-	depends on IDE_CHIPSETS
 
 config BLK_DEV_4DRIVES
 	bool "Generic 4 drives/port support"
-	depends on IDE_CHIPSETS
 	help
 	  Certain older chipsets, including the Tekram 690CD, use a single set
 	  of I/O ports at 0x1f0 to control up to four drives, instead of the
@@ -1007,7 +1007,6 @@ config BLK_DEV_4DRIVES
 
 config BLK_DEV_ALI14XX
 	tristate "ALI M14xx support"
-	depends on IDE_CHIPSETS
 	help
 	  This driver is enabled at runtime using the "ide0=ali14xx" kernel
 	  boot parameter.  It enables support for the secondary IDE interface
@@ -1018,7 +1017,6 @@ config BLK_DEV_ALI14XX
 
 config BLK_DEV_DTC2278
 	tristate "DTC-2278 support"
-	depends on IDE_CHIPSETS
 	help
 	  This driver is enabled at runtime using the "ide0=dtc2278" kernel
 	  boot parameter. It enables support for the secondary IDE interface
@@ -1028,7 +1026,6 @@ config BLK_DEV_DTC2278
 
 config BLK_DEV_HT6560B
 	tristate "Holtek HT6560B support"
-	depends on IDE_CHIPSETS
 	help
 	  This driver is enabled at runtime using the "ide0=ht6560b" kernel
 	  boot parameter. It enables support for the secondary IDE interface
@@ -1038,7 +1035,7 @@ config BLK_DEV_HT6560B
 
 config BLK_DEV_PDC4030
 	tristate "PROMISE DC4030 support (EXPERIMENTAL)"
-	depends on IDE_CHIPSETS && BLK_DEV_IDEDISK && EXPERIMENTAL
+	depends on BLK_DEV_IDEDISK && EXPERIMENTAL
 	help
 	  This driver provides support for the secondary IDE interface and
 	  cache of the original Promise IDE chipsets, e.g. DC4030 and DC5030.
@@ -1051,7 +1048,6 @@ config BLK_DEV_PDC4030
 
 config BLK_DEV_QD65XX
 	tristate "QDI QD65xx support"
-	depends on IDE_CHIPSETS
 	help
 	  This driver is enabled at runtime using the "ide0=qd65xx" kernel
 	  boot parameter.  It permits faster I/O speeds to be set.  See the
@@ -1060,13 +1056,14 @@ config BLK_DEV_QD65XX
 
 config BLK_DEV_UMC8672
 	tristate "UMC-8672 support"
-	depends on IDE_CHIPSETS
 	help
 	  This driver is enabled at runtime using the "ide0=umc8672" kernel
 	  boot parameter. It enables support for the secondary IDE interface
 	  of the UMC-8672, and permits faster I/O speeds to be set as well.
 	  See the files <file:Documentation/ide.txt> and
 	  <file:drivers/ide/legacy/umc8672.c> for more info.
+
+endif
 
 config BLK_DEV_IDEDMA
 	bool
