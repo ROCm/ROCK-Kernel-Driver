@@ -244,6 +244,11 @@ void xdr_kunmap(struct xdr_buf *xdr, size_t base)
 		pglen -= base;
 		base  += xdr->page_base;
 		ppage += base >> PAGE_CACHE_SHIFT;
+		/* Note: The offset means that the length of the first
+		 * page is really (PAGE_CACHE_SIZE - (base & ~PAGE_CACHE_MASK)).
+		 * In order to avoid an extra test inside the loop,
+		 * we bump pglen here, and just subtract PAGE_CACHE_SIZE... */
+		pglen += base & ~PAGE_CACHE_MASK;
 	}
 	for (;;) {
 		flush_dcache_page(*ppage);
