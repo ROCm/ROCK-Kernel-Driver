@@ -193,11 +193,6 @@ static void __init check_config(void)
 	    && (boot_cpu_data.x86_mask < 6 || boot_cpu_data.x86_mask == 11))
 		panic("Kernel compiled for PMMX+, assumes a local APIC without the read-before-write bug!");
 #endif
-
-#ifdef CONFIG_X86_SSE2
-	if (!cpu_has_sse2)
-		panic("Kernel compiled for SSE2, CPU doesn't have it.");
-#endif
 }
 
 extern void alternative_instructions(void);
