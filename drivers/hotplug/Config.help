@@ -40,3 +40,14 @@ CONFIG_HOTPLUG_PCI_IBM
 
   When in doubt, say N.
 
+CONFIG_HOTPLUG_PCI_ACPI
+  Say Y here if you have a system that supports PCI Hotplug using
+  ACPI.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called acpiphp.o. If you want to compile it
+  as a module, say M here and read <file:Documentation/modules.txt>.
+
+  When in doubt, say N.
+
