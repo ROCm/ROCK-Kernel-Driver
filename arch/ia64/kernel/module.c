@@ -18,7 +18,8 @@
    LTOFF22X
    LTOFF22X
    LTOFF_FPTR22
-   PCREL21B
+   PCREL21B	(for br.call only; br.cond is not supported out of modules!)
+   PCREL60B	(for brl.cond only; brl.call is not supported for modules!)
    PCREL64LSB
    SECREL32LSB
    SEGREL64LSB
@@ -254,7 +255,7 @@ plt_target (struct plt_entry *plt)
 	b0 = b[0]; b1 = b[1];
 	off = (  ((b1 & 0x00fffff000000000) >> 36)		/* imm20b -> bit 0 */
 	       | ((b0 >> 48) << 20) | ((b1 & 0x7fffff) << 36)	/* imm39 -> bit 20 */
-	       | ((b1 & 0x0800000000000000) << 1));		/* i -> bit 60 */
+	       | ((b1 & 0x0800000000000000) << 0));		/* i -> bit 59 */
 	return (long) plt->bundle[1] + 16*off;
 }
 
