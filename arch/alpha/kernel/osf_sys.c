@@ -1053,9 +1053,10 @@ osf_select(int n, fd_set __user *inp, fd_set __user *outp, fd_set __user *exp,
 		ret = 0;
 	}
 
-	set_fd_set(n, inp->fds_bits, fds.res_in);
-	set_fd_set(n, outp->fds_bits, fds.res_out);
-	set_fd_set(n, exp->fds_bits, fds.res_ex);
+	if (set_fd_set(n, inp->fds_bits, fds.res_in) ||
+	    set_fd_set(n, outp->fds_bits, fds.res_out) ||
+	    set_fd_set(n, exp->fds_bits, fds.res_ex))
+		ret = -EFAULT;
 
  out:
 	kfree(bits);
