@@ -185,11 +185,10 @@ static struct file_operations rtc_fops = {
 	.release =	rtc_release,
 };
 
-static struct miscdevice rtc_dev=
-{
-	RTC_MINOR,
-	"rtc",
-	&rtc_fops
+static struct miscdevice rtc_dev = {
+	.minor =	RTC_MINOR,
+	.name =		"rtc",
+	.fops =		&rtc_fops
 };
 
 static int __init rtc_init(void)
@@ -201,9 +200,11 @@ static int __init rtc_init(void)
 		return retval;
 
 #ifdef CONFIG_PROC_FS
-	if (create_proc_read_entry ("driver/rtc", 0, NULL, rtc_read_proc, NULL) == NULL)
+	if (create_proc_read_entry("driver/rtc", 0, NULL, rtc_read_proc, NULL)
+			== NULL) {
 		misc_deregister(&rtc_dev);
 		return -ENOMEM;
+	}
 #endif
 
 	printk(KERN_INFO "i/pSeries Real Time Clock Driver v" RTC_VERSION "\n");
