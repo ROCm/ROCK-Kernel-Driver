@@ -41,7 +41,7 @@ struct ext2_group_desc * ext2_get_group_desc(struct super_block * sb,
 	unsigned long group_desc;
 	unsigned long offset;
 	struct ext2_group_desc * desc;
-	struct ext2_sb_info *sbi = &sb->u.ext2_sb;
+	struct ext2_sb_info *sbi = EXT2_SB(sb);
 
 	if (block_group >= sbi->s_groups_count) {
 		ext2_error (sb, "ext2_get_group_desc",
@@ -110,7 +110,7 @@ error_out:
 static struct buffer_head *load_block_bitmap(struct super_block * sb,
 						unsigned int block_group)
 {
-	struct ext2_sb_info *sbi = &sb->u.ext2_sb;
+	struct ext2_sb_info *sbi = EXT2_SB(sb);
 	int i, slot = 0;
 	struct buffer_head *bh = sbi->s_block_bitmap[0];
 
@@ -249,7 +249,7 @@ void ext2_free_blocks (struct inode * inode, unsigned long block,
 	unsigned freed = 0, group_freed;
 
 	lock_super (sb);
-	es = sb->u.ext2_sb.s_es;
+	es = EXT2_SB(sb)->s_es;
 	if (block < le32_to_cpu(es->s_first_data_block) || 
 	    (block + count) > le32_to_cpu(es->s_blocks_count)) {
 		ext2_error (sb, "ext2_free_blocks",
@@ -285,9 +285,9 @@ do_more:
 	if (in_range (le32_to_cpu(desc->bg_block_bitmap), block, count) ||
 	    in_range (le32_to_cpu(desc->bg_inode_bitmap), block, count) ||
 	    in_range (block, le32_to_cpu(desc->bg_inode_table),
-		      sb->u.ext2_sb.s_itb_per_group) ||
+		      EXT2_SB(sb)->s_itb_per_group) ||
 	    in_range (block + count - 1, le32_to_cpu(desc->bg_inode_table),
-		      sb->u.ext2_sb.s_itb_per_group))
+		      EXT2_SB(sb)->s_itb_per_group))
 		ext2_error (sb, "ext2_free_blocks",
 			    "Freeing blocks in system zones - "
 			    "Block = %lu, count = %lu",
@@ -552,11 +552,11 @@ unsigned long ext2_count_free_blocks (struct super_block * sb)
 	int i;
 	
 	lock_super (sb);
-	es = sb->u.ext2_sb.s_es;
+	es = EXT2_SB(sb)->s_es;
 	desc_count = 0;
 	bitmap_count = 0;
 	desc = NULL;
-	for (i = 0; i < sb->u.ext2_sb.s_groups_count; i++) {
+	for (i = 0; i < EXT2_SB(sb)->s_groups_count; i++) {
 		struct buffer_head *bh;
 		desc = ext2_get_group_desc (sb, i, NULL);
 		if (!desc)
@@ -576,7 +576,7 @@ unsigned long ext2_count_free_blocks (struct super_block * sb)
 	unlock_super (sb);
 	return bitmap_count;
 #else
-	return le32_to_cpu(sb->u.ext2_sb.s_es->s_free_blocks_count);
+	return le32_to_cpu(EXT2_SB(sb)->s_es->s_free_blocks_count);
 #endif
 }
 
@@ -584,7 +584,7 @@ static inline int block_in_use (unsigned long block,
 				struct super_block * sb,
 				unsigned char * map)
 {
-	return ext2_test_bit ((block - le32_to_cpu(sb->u.ext2_sb.s_es->s_first_data_block)) %
+	return ext2_test_bit ((block - le32_to_cpu(EXT2_SB(sb)->s_es->s_first_data_block)) %
 			 EXT2_BLOCKS_PER_GROUP(sb), map);
 }
 
@@ -651,11 +651,11 @@ void ext2_check_blocks_bitmap (struct super_block * sb)
 	struct ext2_group_desc * desc;
 	int i;
 
-	es = sb->u.ext2_sb.s_es;
+	es = EXT2_SB(sb)->s_es;
 	desc_count = 0;
 	bitmap_count = 0;
 	desc = NULL;
-	for (i = 0; i < sb->u.ext2_sb.s_groups_count; i++) {
+	for (i = 0; i < EXT2_SB(sb)->s_groups_count; i++) {
 		desc = ext2_get_group_desc (sb, i, NULL);
 		if (!desc)
 			continue;
@@ -685,7 +685,7 @@ void ext2_check_blocks_bitmap (struct super_block * sb)
 				    "Inode bitmap for group %d is marked free",
 				    i);
 
-		for (j = 0; j < sb->u.ext2_sb.s_itb_per_group; j++)
+		for (j = 0; j < EXT2_SB(sb)->s_itb_per_group; j++)
 			if (!block_in_use (le32_to_cpu(desc->bg_inode_table) + j, sb, bh->b_data))
 				ext2_error (sb, "ext2_check_blocks_bitmap",
 					    "Block #%ld of the inode table in "

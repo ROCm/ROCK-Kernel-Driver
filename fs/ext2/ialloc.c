@@ -77,7 +77,7 @@ static struct buffer_head *load_inode_bitmap (struct super_block * sb,
 					      unsigned int block_group)
 {
 	int i, slot = 0;
-	struct ext2_sb_info *sbi = &sb->u.ext2_sb;
+	struct ext2_sb_info *sbi = EXT2_SB(sb);
 	struct buffer_head *bh = sbi->s_inode_bitmap[0];
 
 	if (block_group >= sbi->s_groups_count)
@@ -171,7 +171,7 @@ void ext2_free_inode (struct inode * inode)
 	}
 
 	lock_super (sb);
-	es = sb->u.ext2_sb.s_es;
+	es = EXT2_SB(sb)->s_es;
 	is_directory = S_ISDIR(inode->i_mode);
 
 	/* Do this BEFORE marking the inode not in use or returning an error */
@@ -205,7 +205,7 @@ void ext2_free_inode (struct inode * inode)
 		mark_buffer_dirty(bh2);
 		es->s_free_inodes_count =
 			cpu_to_le32(le32_to_cpu(es->s_free_inodes_count) + 1);
-		mark_buffer_dirty(sb->u.ext2_sb.s_sbh);
+		mark_buffer_dirty(EXT2_SB(sb)->s_sbh);
 	}
 	mark_buffer_dirty(bh);
 	if (sb->s_flags & MS_SYNCHRONOUS) {
@@ -230,8 +230,8 @@ error_return:
 
 static int find_group_dir(struct super_block *sb, int parent_group)
 {
-	struct ext2_super_block * es = sb->u.ext2_sb.s_es;
-	int ngroups = sb->u.ext2_sb.s_groups_count;
+	struct ext2_super_block * es = EXT2_SB(sb)->s_es;
+	int ngroups = EXT2_SB(sb)->s_groups_count;
 	int avefreei = le32_to_cpu(es->s_free_inodes_count) / ngroups;
 	struct ext2_group_desc *desc, *best_desc = NULL;
 	struct buffer_head *bh, *best_bh = NULL;
@@ -263,7 +263,7 @@ static int find_group_dir(struct super_block *sb, int parent_group)
 
 static int find_group_other(struct super_block *sb, int parent_group)
 {
-	int ngroups = sb->u.ext2_sb.s_groups_count;
+	int ngroups = EXT2_SB(sb)->s_groups_count;
 	struct ext2_group_desc *desc;
 	struct buffer_head *bh;
 	int group, i;
@@ -330,7 +330,7 @@ struct inode * ext2_new_inode(struct inode * dir, int mode)
 
 	ei = EXT2_I(inode);
 	lock_super (sb);
-	es = sb->u.ext2_sb.s_es;
+	es = EXT2_SB(sb)->s_es;
 repeat:
 	if (S_ISDIR(mode))
 		group = find_group_dir(sb, EXT2_I(dir)->i_block_group);
@@ -369,7 +369,7 @@ repeat:
 
 	es->s_free_inodes_count =
 		cpu_to_le32(le32_to_cpu(es->s_free_inodes_count) - 1);
-	mark_buffer_dirty(sb->u.ext2_sb.s_sbh);
+	mark_buffer_dirty(EXT2_SB(sb)->s_sbh);
 	sb->s_dirt = 1;
 	inode->i_uid = current->fsuid;
 	if (test_opt (sb, GRPID))
@@ -405,7 +405,7 @@ repeat:
 	ei->i_dir_start_lookup = 0;
 	if (ei->i_flags & EXT2_SYNC_FL)
 		inode->i_flags |= S_SYNC;
-	inode->i_generation = sb->u.ext2_sb.s_next_generation++;
+	inode->i_generation = EXT2_SB(sb)->s_next_generation++;
 	insert_inode_hash(inode);
 	mark_inode_dirty(inode);
 
@@ -457,8 +457,8 @@ unsigned long ext2_count_free_inodes (struct super_block * sb)
 	int i;
 
 	lock_super (sb);
-	es = sb->u.ext2_sb.s_es;
-	for (i = 0; i < sb->u.ext2_sb.s_groups_count; i++) {
+	es = EXT2_SB(sb)->s_es;
+	for (i = 0; i < EXT2_SB(sb)->s_groups_count; i++) {
 		struct ext2_group_desc *desc = ext2_get_group_desc (sb, i, NULL);
 		struct buffer_head *bh;
 		unsigned x;
@@ -480,7 +480,7 @@ unsigned long ext2_count_free_inodes (struct super_block * sb)
 	unlock_super (sb);
 	return desc_count;
 #else
-	return le32_to_cpu(sb->u.ext2_sb.s_es->s_free_inodes_count);
+	return le32_to_cpu(EXT2_SB(sb)->s_es->s_free_inodes_count);
 #endif
 }
 
@@ -488,11 +488,11 @@ unsigned long ext2_count_free_inodes (struct super_block * sb)
 /* Called at mount-time, super-block is locked */
 void ext2_check_inodes_bitmap (struct super_block * sb)
 {
-	struct ext2_super_block * es = sb->u.ext2_sb.s_es;
+	struct ext2_super_block * es = EXT2_SB(sb)->s_es;
 	unsigned long desc_count = 0, bitmap_count = 0;
 	int i;
 
-	for (i = 0; i < sb->u.ext2_sb.s_groups_count; i++) {
+	for (i = 0; i < EXT2_SB(sb)->s_groups_count; i++) {
 		struct ext2_group_desc *desc = ext2_get_group_desc(sb, i, NULL);
 		struct buffer_head *bh;
 		unsigned x;
