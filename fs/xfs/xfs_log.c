@@ -1657,7 +1657,6 @@ xlog_write(xfs_mount_t *	mp,
     int		     copy_len;	     /* # bytes actually memcpy'ing */
     int		     copy_off;	     /* # bytes from entry start */
     int		     contwr;	     /* continued write of in-core log? */
-    int		     firstwr = 0;    /* first write of transaction */
     int		     error;
     int		     record_cnt = 0, data_cnt = 0;
 
@@ -1722,7 +1721,6 @@ xlog_write(xfs_mount_t *	mp,
 		logop_head->oh_flags    = XLOG_START_TRANS;
 		INT_ZERO(logop_head->oh_res2, ARCH_CONVERT);
 		ticket->t_flags		&= ~XLOG_TIC_INITED;	/* clear bit */
-		firstwr = 1;			  /* increment log ops below */
 		record_cnt++;
 
 		start_rec_copy = sizeof(xlog_op_header_t);
@@ -1793,7 +1791,6 @@ xlog_write(xfs_mount_t *	mp,
 	    copy_len += start_rec_copy + sizeof(xlog_op_header_t);
 	    record_cnt++;
 	    data_cnt += contwr ? copy_len : 0;
-	    firstwr = 0;
 	    if (partial_copy) {			/* copied partial region */
 		    /* already marked WANT_SYNC by xlog_state_get_iclog_space */
 		    xlog_state_finish_copy(log, iclog, record_cnt, data_cnt);

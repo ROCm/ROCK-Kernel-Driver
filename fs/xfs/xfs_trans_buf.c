@@ -799,7 +799,6 @@ xfs_trans_log_buf(xfs_trans_t	*tp,
 	if (bip->bli_flags & XFS_BLI_STALE) {
 		xfs_buf_item_trace("BLOG UNSTALE", bip);
 		bip->bli_flags &= ~XFS_BLI_STALE;
-		/* note this will have to change for page_buf interface... unstale isn't really an option RMC */
 		ASSERT(XFS_BUF_ISSTALE(bp));
 		XFS_BUF_UNSTALE(bp);
 		bip->bli_format.blf_flags &= ~XFS_BLI_CANCEL;
