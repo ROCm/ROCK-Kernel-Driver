@@ -34,8 +34,7 @@
 #ifndef ZFCP_DEF_H
 #define ZFCP_DEF_H
 
-/* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_DEF_REVISION "$Revision: 1.110 $"
+#define ZFCP_DEF_REVISION "$Revision: 1.111 $"
 
 /*************************** INCLUDES *****************************************/
 
@@ -70,6 +69,7 @@
 
 /********************* GENERAL DEFINES *********************************/
 
+/* zfcp version number, it consists of major, minor, and patch-level number */
 #define ZFCP_VERSION		"4.2.0"
 
 /**
