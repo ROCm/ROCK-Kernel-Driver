@@ -1790,7 +1790,8 @@ int ip_route_input(struct sk_buff *skb, u32 daddr, u32 saddr,
 
 		read_lock(&inetdev_lock);
 		if ((in_dev = __in_dev_get(dev)) != NULL) {
-			int our = ip_check_mc(in_dev, daddr);
+			int our = ip_check_mc(in_dev, daddr, saddr,
+				skb->nh.iph->protocol);
 			if (our
 #ifdef CONFIG_IP_MROUTE
 			    || (!LOCAL_MCAST(daddr) && IN_DEV_MFORWARD(in_dev))
@@ -2020,7 +2021,7 @@ make_route:
 		}
 	} else if (res.type == RTN_MULTICAST) {
 		flags |= RTCF_MULTICAST|RTCF_LOCAL;
-		if (!ip_check_mc(in_dev, oldflp->fl4_dst))
+		if (!ip_check_mc(in_dev, oldflp->fl4_dst, oldflp->fl4_src, oldflp->proto))
 			flags &= ~RTCF_LOCAL;
 		/* If multicast route do not exist use
 		   default one, but do not gateway in this case.
