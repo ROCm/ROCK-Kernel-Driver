@@ -279,7 +279,7 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 				length = sock_recvmsg(csocket, &smb_msg, 4, 0);
 				cFYI(0,("Received 4 byte keep alive packet"));
 			} else if (temp[0] == (char) RFC1002_POSITIVE_SESSION_RESPONSE) {
-				iov.iov_base = smb_buffer;
+					iov.iov_base = smb_buffer;
 					iov.iov_len = 4;
 					length = sock_recvmsg(csocket, &smb_msg, 4, 0);
 					cFYI(1,("Good RFC 1002 session rsp"));
@@ -1559,7 +1559,7 @@ CIFSSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 					bcc_ptr +=
 					    pSMBr->resp.SecurityBlobLength;
 
-				if (smb_buffer->Flags2 &= SMBFLG2_UNICODE) {
+				if (smb_buffer->Flags2 & SMBFLG2_UNICODE) {
 					if ((long) (bcc_ptr) % 2) {
 						remaining_words =
 						    (BCC(smb_buffer_response)
@@ -1812,7 +1812,7 @@ CIFSSpnegoSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 					      pSMBr->resp.SecurityBlobLength));
 				}
 
-				if (smb_buffer->Flags2 &= SMBFLG2_UNICODE) {
+				if (smb_buffer->Flags2 & SMBFLG2_UNICODE) {
 					if ((long) (bcc_ptr) % 2) {
 						remaining_words =
 						    (BCC(smb_buffer_response)
@@ -2123,7 +2123,7 @@ CIFSNTLMSSPNegotiateSessSetup(unsigned int xid,
 						ses->server->secMode |= 
 							SECMODE_SIGN_ENABLED;
 
-				if (smb_buffer->Flags2 &= SMBFLG2_UNICODE) {
+				if (smb_buffer->Flags2 & SMBFLG2_UNICODE) {
 					if ((long) (bcc_ptr) % 2) {
 						remaining_words =
 						    (BCC(smb_buffer_response)
@@ -2519,7 +2519,7 @@ CIFSNTLMSSPAuthSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 				cFYI(1,
 				     ("NTLMSSP response to Authenticate "));
 
-				if (smb_buffer->Flags2 &= SMBFLG2_UNICODE) {
+				if (smb_buffer->Flags2 & SMBFLG2_UNICODE) {
 					if ((long) (bcc_ptr) % 2) {
 						remaining_words =
 						    (BCC(smb_buffer_response)
@@ -2718,7 +2718,7 @@ CIFSTCon(unsigned int xid, struct cifsSesInfo *ses,
         /* skip service field (NB: this field is always ASCII) */
 		bcc_ptr += length + 1;	
 		strncpy(tcon->treeName, tree, MAX_TREE_SIZE);
-		if (smb_buffer->Flags2 &= SMBFLG2_UNICODE) {
+		if (smb_buffer->Flags2 & SMBFLG2_UNICODE) {
 			length = UniStrnlen((wchar_t *) bcc_ptr, 512);
 			if (((long) bcc_ptr + (2 * length)) -
 			    (long) pByteArea(smb_buffer_response) <=
