@@ -1449,7 +1449,7 @@ xfs_qm_dqpurge(
 		xfs_dqtrace_entry(dqp, "DQPURGE ->DQFLUSH: DQDIRTY");
 		/* dqflush unlocks dqflock */
 		/*
-		 * Given that dqpurge is a very rare occurence, it is OK
+		 * Given that dqpurge is a very rare occurrence, it is OK
 		 * that we're holding the hashlist and mplist locks
 		 * across the disk write. But, ... XXXsup
 		 *

@@ -1726,7 +1726,7 @@ if_send_start_and_exit:
 
 
 /*============================================================================
- * Setup so that a frame can be transmitted on the occurence of a transmit
+ * Setup so that a frame can be transmitted on the occurrence of a transmit
  * interrupt.
  */
 static int setup_for_delayed_transmit (netdevice_t* dev, struct sk_buff *skb)

@@ -250,7 +250,7 @@ int seq_release(struct inode *inode, struct file *file)
  *	@s:	string
  *	@esc:	set of characters that need escaping
  *
- *	Puts string into buffer, replacing each occurence of character from
+ *	Puts string into buffer, replacing each occurrence of character from
  *	@esc with usual octal escape.  Returns 0 in case of success, -1 - in
  *	case of overflow.
  */

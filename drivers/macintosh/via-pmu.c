@@ -1179,7 +1179,7 @@ pmu_queue_request(struct adb_request *req)
 static inline void
 wait_for_ack(void)
 {
-	/* Sightly increased the delay, I had one occurence of the message
+	/* Sightly increased the delay, I had one occurrence of the message
 	 * reported
 	 */
 	int timeout = 4000;

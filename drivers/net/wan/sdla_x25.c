@@ -1598,7 +1598,7 @@ if_send_crit_exit:
 }
 
 /*============================================================================
- * Setup so that a frame can be transmitted on the occurence of a transmit
+ * Setup so that a frame can be transmitted on the occurrence of a transmit
  * interrupt.
  *===========================================================================*/
 
