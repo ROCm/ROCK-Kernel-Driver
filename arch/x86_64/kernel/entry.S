@@ -907,6 +907,7 @@ ENTRY(divide_error)
 ENTRY(spurious_interrupt_bug)
 	zeroentry do_spurious_interrupt_bug
 
+#ifdef CONFIG_X86_MCE
 	/* runs on exception stack */
 ENTRY(machine_check)
 	CFI_STARTPROC
@@ -915,6 +916,7 @@ ENTRY(machine_check)
 	paranoidentry do_machine_check
 	jmp paranoid_exit
 	CFI_ENDPROC
+#endif
 
 ENTRY(call_debug)
        zeroentry do_call_debug

@@ -673,6 +673,7 @@ int ip_route_me_harder(struct sk_buff **pskb)
 
 	return 0;
 }
+EXPORT_SYMBOL(ip_route_me_harder);
 
 int skb_ip_make_writable(struct sk_buff **pskb, unsigned int writable_len)
 {
@@ -818,7 +819,6 @@ void __init netfilter_init(void)
 }
 
 EXPORT_SYMBOL(ip_ct_attach);
-EXPORT_SYMBOL(ip_route_me_harder);
 EXPORT_SYMBOL(nf_getsockopt);
 EXPORT_SYMBOL(nf_hook_slow);
 EXPORT_SYMBOL(nf_hooks);

@@ -647,22 +647,22 @@ void SoftwareEmulation(struct pt_regs *regs)
 }
 #endif /* CONFIG_8xx */
 
-#if defined(CONFIG_4xx) || defined(CONFIG_BOOKE)
+#if defined(CONFIG_40x) || defined(CONFIG_BOOKE)
 
 void DebugException(struct pt_regs *regs, unsigned long debug_status)
 {
-#if 0
-	if (debug_status & DBSR_TIE) {		/* trap instruction*/
-		if (!user_mode(regs) && debugger_bpt(regs))
-			return;
-		_exception(SIGTRAP, regs, 0, 0);
-
-	}
-#endif
 	if (debug_status & DBSR_IC) {	/* instruction completion */
-		if (!user_mode(regs) && debugger_sstep(regs))
-			return;
-		current->thread.dbcr0 &= ~DBCR0_IC;
+		regs->msr &= ~MSR_DE;
+		if (user_mode(regs)) {
+			current->thread.dbcr0 &= ~DBCR0_IC;
+		} else {
+			/* Disable instruction completion */
+			mtspr(SPRN_DBCR0, mfspr(SPRN_DBCR0) & ~DBCR0_IC);
+			/* Clear the instruction completion event */
+			mtspr(SPRN_DBSR, DBSR_IC);
+			if (debugger_sstep(regs))
+				return;
+		}
 		_exception(SIGTRAP, regs, TRAP_TRACE, 0);
 	}
 }

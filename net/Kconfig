@@ -219,6 +219,10 @@ source "net/bridge/netfilter/Kconfig"
 
 endif
 
+config XFRM
+       bool
+       depends on NET
+
 source "net/xfrm/Kconfig"
 
 source "net/sctp/Kconfig"

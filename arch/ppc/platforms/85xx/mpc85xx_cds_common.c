@@ -193,6 +193,13 @@ static void cpm2_cascade(int irq, void *dev_id, struct pt_regs *regs)
 	while((irq = cpm2_get_irq(regs)) >= 0)
 		__do_IRQ(irq, regs);
 }
+
+static struct irqaction cpm2_irqaction = {
+	.handler = cpm2_cascade,
+	.flags = SA_INTERRUPT,
+	.mask = CPU_MASK_NONE,
+	.name = "cpm2_cascade",
+};
 #endif /* CONFIG_CPM2 */
 
 void __init
@@ -235,7 +242,7 @@ mpc85xx_cds_init_IRQ(void)
 	immap->im_intctl.ic_scprrh = 0x05309770;
 	immap->im_intctl.ic_scprrl = 0x05309770;
 
-	request_irq(MPC85xx_IRQ_CPM, cpm2_cascade, SA_INTERRUPT, "cpm2_cascade", NULL);
+	setup_irq(MPC85xx_IRQ_CPM, &cpm2_irqaction);
 #endif
 
         return;

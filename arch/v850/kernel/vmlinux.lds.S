@@ -60,6 +60,11 @@
 		___start___kcrctab_gpl = .;				      \
 			*(__kcrctab_gpl)				      \
 		___stop___kcrctab_gpl = .;				      \
+		/* Built-in module parameters */			      \
+		___start___param = .;					      \
+		*(__param)						      \
+		___stop___param = .;
+
 
 /* Kernel text segment, and some constant data areas.  */
 #define TEXT_CONTENTS							      \

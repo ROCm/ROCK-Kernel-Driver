@@ -305,13 +305,15 @@ static void __smp_call_function (void (*func) (void *info), void *info,
 	/* Send a message to all other CPUs and wait for them to respond */
 	send_IPI_allbutself(CALL_FUNCTION_VECTOR);
 
+	if (!wait)
+		return;
+
 	/* Wait for response */
 	while (atomic_read(&data.started) != cpus)
 		barrier();
 
-	if (wait)
-		while (atomic_read(&data.finished) != cpus)
-			barrier();
+	while (atomic_read(&data.finished) != cpus)
+		barrier();
 }
 
 /*
@@ -361,11 +363,10 @@ void smp_send_stop(void)
 	int nolock = 0;
 	/* Don't deadlock on the call lock in panic */
 	if (!spin_trylock(&call_lock)) {
-		udelay(100);
 		/* ignore locking because we have paniced anyways */
 		nolock = 1;
 	}
-	__smp_call_function(smp_really_stop_cpu, NULL, 1, 0);
+	__smp_call_function(smp_really_stop_cpu, NULL, 0, 0);
 	if (!nolock)
 		spin_unlock(&call_lock);
 	smp_stop_cpu();

@@ -28,7 +28,7 @@ extern unsigned char syscall32_sysenter[], syscall32_sysenter_end[];
 extern int sysctl_vsyscall32;
 
 char *syscall32_page; 
-static int use_sysenter __initdata = -1;
+static int use_sysenter = -1;
 
 /*
  * Map the 32bit vsyscall page on demand.

@@ -8,6 +8,7 @@
 #include <asm/page.h>
 #include <asm/system.h>
 #include <asm/cache.h>
+#include <asm-generic/uaccess.h>
 
 #define VERIFY_READ 0
 #define VERIFY_WRITE 1

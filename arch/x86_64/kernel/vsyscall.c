@@ -89,7 +89,7 @@ static force_inline void do_vgettimeofday(struct timeval * tv)
 				 __vxtime.tsc_quot) >> 32;
 			/* See comment in x86_64 do_gettimeofday. */ 
 		} else {
-			usec += ((readl(fix_to_virt(VSYSCALL_HPET) + 0xf0) -
+			usec += ((readl((void *)fix_to_virt(VSYSCALL_HPET) + 0xf0) -
 				  __vxtime.last) * __vxtime.quot) >> 32;
 		}
 	} while (read_seqretry(&__xtime_lock, sequence));

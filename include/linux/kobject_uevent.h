@@ -11,6 +11,11 @@
 #ifndef _KOBJECT_EVENT_H_
 #define _KOBJECT_EVENT_H_
 
+#define HOTPLUG_PATH_LEN	256
+
+/* path to the hotplug userspace helper executed on an event */
+extern char hotplug_path[];
+
 /*
  * If you add an action here, you must also add the proper string to the
  * lib/kobject_uevent.c file.

@@ -11,12 +11,14 @@
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
+#include <linux/percpu.h>
 
 #include <asm/processor.h>
 #include <asm/proto.h>
 #include <asm/smp.h>
 #include <asm/bootsetup.h>
 #include <asm/setup.h>
+#include <asm/desc.h>
 
 /* Don't add a printk in there. printk relies on the PDA which is not initialized 
    yet. */
@@ -79,7 +81,11 @@ extern char _end[];
 void __init x86_64_start_kernel(char * real_mode_data)
 {
 	char *s;
+	int i;
 
+	for (i = 0; i < 256; i++)
+		set_intr_gate(i, early_idt_handler);
+	asm volatile("lidt %0" :: "m" (idt_descr));
 	clear_bss();
 	pda_init(0);
 	copy_bootdata(real_mode_data);

@@ -709,8 +709,20 @@ label:
 	EXCEPTION(0x1E00, Trap_1E, UnknownException, EXC_XFER_EE)
 	EXCEPTION(0x1F00, Trap_1F, UnknownException, EXC_XFER_EE)
 
-/* 0x2000 - Debug Exception
-*/
+/* Check for a single step debug exception while in an exception
+ * handler before state has been saved.  This is to catch the case
+ * where an instruction that we are trying to single step causes
+ * an exception (eg ITLB/DTLB miss) and thus the first instruction of
+ * the exception handler generates a single step debug exception.
+ *
+ * If we get a debug trap on the first instruction of an exception handler,
+ * we reset the MSR_DE in the _exception handler's_ MSR (the debug trap is
+ * a critical exception, so we are using SPRN_CSRR1 to manipulate the MSR).
+ * The exception handler was handling a non-critical interrupt, so it will
+ * save (and later restore) the MSR via SPRN_SRR1, which will still have
+ * the MSR_DE bit set.
+ */
+	/* 0x2000 - Debug Exception */
 	START_EXCEPTION(0x2000, DebugTrap)
 	CRITICAL_EXCEPTION_PROLOG
 
@@ -723,21 +735,20 @@ label:
 	 * off DE in the SRR3 value and clearing the debug status.
 	 */
 	mfspr	r10,SPRN_DBSR		/* check single-step/branch taken */
-	andis.	r10,r10,(DBSR_IC|DBSR_BT)@h
-	beq+	1f
-	andi.	r0,r9,MSR_IR|MSR_PR	/* check supervisor + MMU off */
-	beq	2f			/* branch if we need to fix it up... */
+	andis.	r10,r10,DBSR_IC@h
+	beq+	2f
 
-	/* continue normal handling for a critical exception... */
-1:	mfspr	r4,SPRN_DBSR
-	addi	r3,r1,STACK_FRAME_OVERHEAD
-	EXC_XFER_TEMPLATE(DebugException, 0x2002, \
-		(MSR_KERNEL & ~(MSR_ME|MSR_DE|MSR_CE)), \
-		NOCOPY, crit_transfer_to_handler, ret_from_crit_exc)
+	andi.	r10,r9,MSR_IR|MSR_PR	/* check supervisor + MMU off */
+	beq	1f			/* branch and fix it up */
+
+	mfspr   r10,SPRN_SRR2		/* Faulting instruction address */
+	cmplwi  r10,0x2100
+	bgt+    2f			/* address above exception vectors */
 
 	/* here it looks like we got an inappropriate debug exception. */
-2:	rlwinm	r9,r9,0,~MSR_DE		/* clear DE in the SRR3 value */
-	mtspr	SPRN_DBSR,r10		/* clear the IC/BT debug intr status */
+1:	rlwinm	r9,r9,0,~MSR_DE		/* clear DE in the SRR3 value */
+	lis	r10,DBSR_IC@h		/* clear the IC event */
+	mtspr	SPRN_DBSR,r10
 	/* restore state and get out */
 	lwz	r10,_CCR(r11)
 	lwz	r0,GPR0(r11)
@@ -752,6 +763,13 @@ label:
 	PPC405_ERR77_SYNC
 	rfci
 	b	.
+
+	/* continue normal handling for a critical exception... */
+2:	mfspr	r4,SPRN_DBSR
+	addi	r3,r1,STACK_FRAME_OVERHEAD
+	EXC_XFER_TEMPLATE(DebugException, 0x2002, \
+		(MSR_KERNEL & ~(MSR_ME|MSR_DE|MSR_CE)), \
+		NOCOPY, crit_transfer_to_handler, ret_from_crit_exc)
 
 /*
  * The other Data TLB exceptions bail out to this point

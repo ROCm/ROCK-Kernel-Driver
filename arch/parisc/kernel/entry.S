@@ -783,7 +783,7 @@ __kernel_thread:
 #ifdef __LP64__
 	ldo	-16(%r30),%r29		/* Reference param save area */
 #endif
-	bl	do_fork, %r2
+	BL	do_fork, %r2
 	copy	%r1, %r24		/* pt_regs */
 
 	/* Parent Returns here */
@@ -836,7 +836,7 @@ __execve:
 #ifdef __LP64__
 	ldo	-16(%r30),%r29		/* Reference param save area */
 #endif
-	bl	sys_execve, %r2
+	BL	sys_execve, %r2
 	copy	%r16, %r26
 
 	cmpib,=,n 0,%r28,intr_return    /* forward */
@@ -1076,7 +1076,7 @@ intr_do_signal:
 	ldo	-16(%r30),%r29			/* Reference param save area */
 #endif
 
-	bl	do_signal,%r2
+	BL	do_signal,%r2
 	copy	%r0, %r26			/* sigset_t *oldset = NULL */
 
 	b	intr_restore
@@ -1819,7 +1819,7 @@ sys_fork_wrapper:
 
 	LDREG	PT_GR30(%r1),%r25
 	copy	%r1,%r24
-	bl	sys_clone,%r2
+	BL	sys_clone,%r2
 	ldi	SIGCHLD,%r26
 
 	LDREG	-RP_OFFSET-FRAME_SIZE(%r30),%r2
@@ -1839,7 +1839,7 @@ wrapper_exit:
 
 	/* Set the return value for the child */
 child_return:
-	bl	schedule_tail, %r2
+	BL	schedule_tail, %r2
 	nop
 
 	LDREG	TI_TASK-THREAD_SZ_ALGN-FRAME_SIZE-FRAME_SIZE(%r30), %r1
@@ -1864,7 +1864,7 @@ sys_clone_wrapper:
 
 	STREG	%r2,PT_GR19(%r1)	/* save for child */
 	STREG	%r30,PT_GR21(%r1)
-	bl	sys_clone,%r2
+	BL	sys_clone,%r2
 	copy	%r1,%r24
 
 	b	wrapper_exit
@@ -1887,7 +1887,7 @@ sys_vfork_wrapper:
 	STREG	%r2,PT_GR19(%r1)	/* save for child */
 	STREG	%r30,PT_GR21(%r1)
 
-	bl	sys_vfork,%r2
+	BL	sys_vfork,%r2
 	copy	%r1,%r26
 
 	b	wrapper_exit
@@ -1950,10 +1950,10 @@ sys_rt_sigreturn_wrapper:
 	STREG	%r2, -RP_OFFSET(%r30)
 #ifdef __LP64__
 	ldo	FRAME_SIZE(%r30), %r30
-	bl	sys_rt_sigreturn,%r2
+	BL	sys_rt_sigreturn,%r2
 	ldo	-16(%r30),%r29		/* Reference param save area */
 #else
-	bl	sys_rt_sigreturn,%r2
+	BL	sys_rt_sigreturn,%r2
 	ldo	FRAME_SIZE(%r30), %r30
 #endif
 
@@ -1981,7 +1981,7 @@ sys_sigaltstack_wrapper:
 	STREG	%r2, -RP_OFFSET(%r30)
 #ifdef __LP64__
 	ldo	FRAME_SIZE(%r30), %r30
-	bl	do_sigaltstack,%r2
+	b,l	do_sigaltstack,%r2
 	ldo	-16(%r30),%r29		/* Reference param save area */
 #else
 	bl	do_sigaltstack,%r2
@@ -2001,7 +2001,7 @@ sys32_sigaltstack_wrapper:
 	LDREG	TASK_PT_GR30(%r24),%r24
 	STREG	%r2, -RP_OFFSET(%r30)
 	ldo	FRAME_SIZE(%r30), %r30
-	bl	do_sigaltstack32,%r2
+	b,l	do_sigaltstack32,%r2
 	ldo	-16(%r30),%r29		/* Reference param save area */
 
 	ldo	-FRAME_SIZE(%r30), %r30
@@ -2019,7 +2019,7 @@ sys_rt_sigsuspend_wrapper:
 	STREG	%r2, -RP_OFFSET(%r30)
 #ifdef __LP64__
 	ldo	FRAME_SIZE(%r30), %r30
-	bl	sys_rt_sigsuspend,%r2
+	b,l	sys_rt_sigsuspend,%r2
 	ldo	-16(%r30),%r29		/* Reference param save area */
 #else
 	bl	sys_rt_sigsuspend,%r2
@@ -2251,7 +2251,7 @@ syscall_do_softirq:
 
 	.import schedule,code
 syscall_do_resched:
-	bl	schedule,%r2
+	BL	schedule,%r2
 #ifdef __LP64__
 	ldo	-16(%r30),%r29		/* Reference param save area */
 #else
@@ -2275,7 +2275,7 @@ syscall_do_signal:
 #ifdef __LP64__
 	ldo	-16(%r30),%r29			/* Reference param save area */
 #endif
-	bl	do_signal,%r2
+	BL	do_signal,%r2
 	copy	%r0, %r26			/* sigset_t *oldset = NULL */
 
 	LDREG	TI_TASK-THREAD_SZ_ALGN-FRAME_SIZE(%r30),%r1

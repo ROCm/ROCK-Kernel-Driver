@@ -87,7 +87,9 @@ SECTIONS
 	*(.init.text)
 	_einittext = .;
   }
+  __initdata_begin = .;
   .init.data : { *(.init.data) }
+  __initdata_end = .;
   . = ALIGN(16);
   __setup_start = .;
   .init.setup : { *(.init.setup) }

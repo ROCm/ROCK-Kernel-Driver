@@ -161,6 +161,7 @@ int __init hpet_enable(void)
 		 * Register with driver.
 		 * Timer0 and Timer1 is used by platform.
 		 */
+		hd.hd_phys_address = hpet_address;
 		hd.hd_address = hpet_virt_address;
 		hd.hd_nirqs = ntimer;
 		hd.hd_flags = HPET_DATA_PLATFORM;

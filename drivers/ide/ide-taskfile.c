@@ -419,7 +419,7 @@ EXPORT_SYMBOL(task_in_intr);
 /*
  * Handler for command with PIO data-out phase (Write/Write Multiple).
  */
-ide_startstop_t task_out_intr (ide_drive_t *drive)
+static ide_startstop_t task_out_intr (ide_drive_t *drive)
 {
 	ide_hwif_t *hwif = drive->hwif;
 	struct request *rq = HWGROUP(drive)->rq;
@@ -443,8 +443,6 @@ ide_startstop_t task_out_intr (ide_drive_t *drive)
 
 	return ide_started;
 }
-
-EXPORT_SYMBOL(task_out_intr);
 
 ide_startstop_t pre_task_out_intr (ide_drive_t *drive, struct request *rq)
 {
