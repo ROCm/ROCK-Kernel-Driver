@@ -649,7 +649,6 @@ typedef enum {
 #define TCC_MASK		0x0003
 
 /* driver ioctl parameters */
-#define PHY_ID 			0x01	/* currently it is fixed */
 #define AMD8111E_REG_DUMP_LEN	 13*sizeof(u32) 
 
 /* crc generator constants */
@@ -777,6 +776,8 @@ struct amd8111e_priv{
 	int options;		/* Options enabled/disabled for the device */
 
 	unsigned long ext_phy_option;
+	int ext_phy_addr;
+	u32 ext_phy_id;
 	
 	struct amd8111e_link_config link_config;
 	int pm_cap;
