@@ -32,6 +32,7 @@
 
 #define __acpi_map_table(phys_addr, size) __va(phys_addr)
 
+const char *acpi_get_sysname (void);
 int acpi_boot_init (char *cdline);
 int acpi_find_rsdp (unsigned long *phys_addr);
 int acpi_request_vector (u32 int_type);
