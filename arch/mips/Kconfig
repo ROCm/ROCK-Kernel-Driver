@@ -403,6 +403,7 @@ config DDB5074
 	select HAVE_STD_PC_SERIAL_PORT
 	select HW_HAS_PCI
 	select IRQ_CPU
+	select I8259
 	select ISA
 	help
 	  This enables support for the VR5000-based NEC DDB Vrc-5074
@@ -414,6 +415,7 @@ config DDB5476
 	select HAVE_STD_PC_SERIAL_PORT
 	select HW_HAS_PCI
 	select IRQ_CPU
+	select I8259
 	select ISA
 	help
 	  This enables support for the R5432-based NEC DDB Vrc-5476
@@ -427,6 +429,7 @@ config DDB5477
 	bool "Support for NEC DDB Vrc-5477"
 	select DMA_NONCOHERENT
 	select HW_HAS_PCI
+	select I8259
 	select IRQ_CPU
 	help
 	  This enables support for the R5432-based NEC DDB Vrc-5477,
