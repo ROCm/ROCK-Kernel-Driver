@@ -1504,6 +1504,43 @@ out:
 }
 
 static int
+nfs4_deleg_conflict(u32 share, u32 dtype)
+{
+	return (((share & NFS4_SHARE_ACCESS_WRITE) &&
+		dtype == NFS4_OPEN_DELEGATE_READ) ||
+		((share & NFS4_SHARE_ACCESS_READ) &&
+		dtype == NFS4_OPEN_DELEGATE_WRITE));
+}
+
+#define DONT_DELEGATE  8
+
+/*
+ * nfs4_check_deleg_recall()
+ *
+ * Test any delegation that is currently within an incompleted recalled
+ * state, and return NFSERR_DELAY for conflicting open share.
+ * flag is set to DONT_DELEGATE for shares that match the deleg type.
+ */
+static int
+nfs4_check_deleg_recall(struct nfs4_file *fp, struct nfsd4_open *op, int *flag)
+{
+	struct nfs4_delegation *dp;
+	int status = 0;
+
+	list_for_each_entry(dp, &fp->fi_del_perfile, dl_del_perfile) {
+		dprintk("NFSD: found delegation %p with dl_state %d\n",
+		 	                 dp, atomic_read(&dp->dl_state));
+		if (atomic_read(&dp->dl_state) == NFS4_RECALL_IN_PROGRESS) {
+			if(nfs4_deleg_conflict(op->op_share_access, dp->dl_type))
+				status = nfserr_jukebox;
+			else
+				*flag = DONT_DELEGATE;
+		}
+	}
+	return status;
+}
+
+static int
 nfs4_check_open(struct nfs4_file *fp, struct nfs4_stateowner *sop, struct nfsd4_open *open, struct nfs4_stateid **stpp)
 {
 	struct nfs4_stateid *local;
