@@ -674,7 +674,7 @@ static void __set_size(struct gendisk *disk, sector_t size)
 	bdev = bdget_disk(disk, 0);
 	if (bdev) {
 		down(&bdev->bd_inode->i_sem);
-		i_size_write(bdev->bd_inode, size << SECTOR_SHIFT);
+		i_size_write(bdev->bd_inode, (loff_t)size << SECTOR_SHIFT);
 		up(&bdev->bd_inode->i_sem);
 		bdput(bdev);
 	}

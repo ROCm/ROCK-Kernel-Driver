@@ -2766,13 +2766,13 @@ int cdrom_sysctl_info(ctl_table *ctl, int write, struct file * filp,
 	for (cdi=topCdromPtr;cdi!=NULL;cdi=cdi->next)
 	    pos += sprintf(info+pos, "\t%d", CDROM_CAN(CDC_DVD_RAM) != 0);
 
-	pos += sprintf(info+pos, "\nCan read MRW:");
+	pos += sprintf(info+pos, "\nCan read MRW:\t");
 	for (cdi=topCdromPtr;cdi!=NULL;cdi=cdi->next)
-	    pos += sprintf(info+pos, "\t\t%d", CDROM_CAN(CDC_MRW) != 0);
+	    pos += sprintf(info+pos, "\t%d", CDROM_CAN(CDC_MRW) != 0);
 
-	pos += sprintf(info+pos, "\nCan write MRW:");
+	pos += sprintf(info+pos, "\nCan write MRW:\t");
 	for (cdi=topCdromPtr;cdi!=NULL;cdi=cdi->next)
-	    pos += sprintf(info+pos, "\t\t%d", CDROM_CAN(CDC_MRW_W) != 0);
+	    pos += sprintf(info+pos, "\t%d", CDROM_CAN(CDC_MRW_W) != 0);
 
 	strcpy(info+pos,"\n\n");
 		
