@@ -13,6 +13,8 @@
 #ifndef _PPC64_MMU_H_
 #define _PPC64_MMU_H_
 
+#include <asm/page.h>
+
 #ifndef __ASSEMBLY__
 
 /* Default "unsigned long" context */
@@ -244,6 +246,16 @@ static inline void tlbiel(unsigned long va)
 	__tlbiel(va);
 	asm volatile("ptesync": : :"memory");
 }
+
+/*
+ * Handle a fault by adding an HPTE. If the address can't be determined
+ * to be valid via Linux page tables, return 1. If handled return 0
+ */
+extern int __hash_page(unsigned long ea, unsigned long access,
+		       unsigned long vsid, pte_t *ptep, unsigned long trap,
+		       int local);
+
+extern void htab_finish_init(void);
 
 #endif /* __ASSEMBLY__ */
 

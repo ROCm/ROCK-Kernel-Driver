@@ -901,10 +901,6 @@ void flush_icache_user_range(struct vm_area_struct *vma, struct page *page,
 	flush_icache_range(maddr, maddr + len);
 }
 
-extern pte_t *find_linux_pte(pgd_t *pgdir, unsigned long ea);
-int __hash_page(unsigned long ea, unsigned long access, unsigned long vsid,
-		pte_t *ptep, unsigned long trap, int local);
-
 /*
  * This is called at the end of handling a user page fault, when the
  * fault has been handled by updating a PTE in the linux page tables.
@@ -944,6 +940,9 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long ea,
 		return;
 
 	ptep = find_linux_pte(pgdir, ea);
+	if (!ptep)
+		return;
+
 	vsid = get_vsid(vma->vm_mm->context, ea);
 
 	tmp = cpumask_of_cpu(smp_processor_id());

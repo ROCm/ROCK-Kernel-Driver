@@ -213,6 +213,10 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 #endif
 	}
 #endif
+	/* Finish initializing the hash table (do the dynamic
+	 * patching for the fast-path hashtable.S code)
+	 */
+	htab_finish_init();
 
 	printk("Starting Linux PPC64 %s\n", UTS_RELEASE);
 
