@@ -2,7 +2,6 @@
  *
  * Module Name: nsobject - Utilities for objects attached to namespace
  *                         table entries
- *              $Revision: 86 $
  *
  ******************************************************************************/
 
@@ -309,7 +308,7 @@ acpi_ns_get_secondary_object (
 acpi_status
 acpi_ns_attach_data (
 	acpi_namespace_node     *node,
-	ACPI_OBJECT_HANDLER     handler,
+	acpi_object_handler     handler,
 	void                    *data)
 {
 	acpi_operand_object     *prev_obj_desc;
@@ -371,7 +370,7 @@ acpi_ns_attach_data (
 acpi_status
 acpi_ns_detach_data (
 	acpi_namespace_node     *node,
-	ACPI_OBJECT_HANDLER     handler)
+	acpi_object_handler     handler)
 {
 	acpi_operand_object     *obj_desc;
 	acpi_operand_object     *prev_obj_desc;
@@ -419,7 +418,7 @@ acpi_ns_detach_data (
 acpi_status
 acpi_ns_get_attached_data (
 	acpi_namespace_node     *node,
-	ACPI_OBJECT_HANDLER     handler,
+	acpi_object_handler     handler,
 	void                    **data)
 {
 	acpi_operand_object     *obj_desc;

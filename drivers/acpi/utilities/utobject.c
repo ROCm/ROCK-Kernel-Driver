@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: utobject - ACPI object create/delete/size/cache routines
- *              $Revision: 81 $
  *
  *****************************************************************************/
 
@@ -128,7 +127,7 @@ acpi_ut_create_internal_object_dbg (
 
 acpi_operand_object *
 acpi_ut_create_buffer_object (
-	ACPI_SIZE               buffer_size)
+	acpi_size               buffer_size)
 {
 	acpi_operand_object     *buffer_desc;
 	u8                      *buffer;
@@ -355,9 +354,9 @@ acpi_ut_delete_object_cache (
 acpi_status
 acpi_ut_get_simple_object_size (
 	acpi_operand_object     *internal_object,
-	ACPI_SIZE               *obj_length)
+	acpi_size               *obj_length)
 {
-	ACPI_SIZE               length;
+	acpi_size               length;
 	acpi_status             status = AE_OK;
 
 
@@ -391,13 +390,13 @@ acpi_ut_get_simple_object_size (
 	switch (ACPI_GET_OBJECT_TYPE (internal_object)) {
 	case ACPI_TYPE_STRING:
 
-		length += (ACPI_SIZE) internal_object->string.length + 1;
+		length += (acpi_size) internal_object->string.length + 1;
 		break;
 
 
 	case ACPI_TYPE_BUFFER:
 
-		length += (ACPI_SIZE) internal_object->buffer.length;
+		length += (acpi_size) internal_object->buffer.length;
 		break;
 
 
@@ -462,7 +461,7 @@ acpi_ut_get_simple_object_size (
  *
  * FUNCTION:    Acpi_ut_get_element_length
  *
- * PARAMETERS:  ACPI_PKG_CALLBACK
+ * PARAMETERS:  acpi_pkg_callback
  *
  * RETURN:      Status
  *
@@ -479,7 +478,7 @@ acpi_ut_get_element_length (
 {
 	acpi_status             status = AE_OK;
 	acpi_pkg_info           *info = (acpi_pkg_info *) context;
-	ACPI_SIZE               object_space;
+	acpi_size               object_space;
 
 
 	switch (object_type) {
@@ -538,7 +537,7 @@ acpi_ut_get_element_length (
 acpi_status
 acpi_ut_get_package_object_size (
 	acpi_operand_object     *internal_object,
-	ACPI_SIZE               *obj_length)
+	acpi_size               *obj_length)
 {
 	acpi_status             status;
 	acpi_pkg_info           info;
@@ -563,7 +562,7 @@ acpi_ut_get_package_object_size (
 	 * Round up to the next machine word.
 	 */
 	info.length += ACPI_ROUND_UP_TO_NATIVE_WORD (sizeof (acpi_object)) *
-			  (ACPI_SIZE) info.num_packages;
+			  (acpi_size) info.num_packages;
 
 	/* Return the total package length */
 
@@ -589,7 +588,7 @@ acpi_ut_get_package_object_size (
 acpi_status
 acpi_ut_get_object_size(
 	acpi_operand_object     *internal_object,
-	ACPI_SIZE               *obj_length)
+	acpi_size               *obj_length)
 {
 	acpi_status             status;
 

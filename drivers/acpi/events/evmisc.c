@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: evmisc - Miscellaneous event manager support functions
- *              $Revision: 60 $
  *
  *****************************************************************************/
 
@@ -555,7 +554,7 @@ acpi_ev_release_global_lock (void)
 void
 acpi_ev_terminate (void)
 {
-	NATIVE_UINT_MAX32       i;
+	acpi_native_uint        i;
 	acpi_status             status;
 
 
@@ -572,9 +571,9 @@ acpi_ev_terminate (void)
 		 * Disable all fixed events
 		 */
 		for (i = 0; i < ACPI_NUM_FIXED_EVENTS; i++) {
-			status = acpi_disable_event(i, ACPI_EVENT_FIXED, 0);
+			status = acpi_disable_event ((u32) i, ACPI_EVENT_FIXED, 0);
 			if (ACPI_FAILURE (status)) {
-				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Could not disable fixed event %d\n", i));
+				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Could not disable fixed event %d\n", (u32) i));
 			}
 		}
 
@@ -582,10 +581,10 @@ acpi_ev_terminate (void)
 		 * Disable all GPEs
 		 */
 		for (i = 0; i < acpi_gbl_gpe_number_max; i++) {
-			if (acpi_ev_get_gpe_number_index(i) != ACPI_GPE_INVALID) {
-				status = acpi_hw_disable_gpe(i);
+			if (acpi_ev_get_gpe_number_index ((u32)i) != ACPI_GPE_INVALID) {
+				status = acpi_hw_disable_gpe((u32) i);
 				if (ACPI_FAILURE (status)) {
-					ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Could not disable GPE %d\n", i));
+					ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Could not disable GPE %d\n", (u32) i));
 				}
 			}
 		}
@@ -593,7 +592,7 @@ acpi_ev_terminate (void)
 		/*
 		 * Remove SCI handler
 		 */
-		status = acpi_ev_remove_sci_handler();
+		status = acpi_ev_remove_sci_handler ();
 		if (ACPI_FAILURE(status)) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Could not remove SCI handler\n"));
 		}

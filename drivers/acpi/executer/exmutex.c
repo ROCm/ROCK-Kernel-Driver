@@ -2,7 +2,6 @@
 /******************************************************************************
  *
  * Module Name: exmutex - ASL Mutex Acquire/Release functions
- *              $Revision: 17 $
  *
  *****************************************************************************/
 
@@ -48,7 +47,7 @@ void
 acpi_ex_unlink_mutex (
 	acpi_operand_object     *obj_desc)
 {
-	ACPI_THREAD_STATE       *thread = obj_desc->mutex.owner_thread;
+	acpi_thread_state       *thread = obj_desc->mutex.owner_thread;
 
 
 	if (!thread) {
@@ -84,7 +83,7 @@ acpi_ex_unlink_mutex (
 void
 acpi_ex_link_mutex (
 	acpi_operand_object     *obj_desc,
-	ACPI_THREAD_STATE       *thread)
+	acpi_thread_state       *thread)
 {
 	acpi_operand_object     *list_head;
 
@@ -298,7 +297,7 @@ acpi_ex_release_mutex (
 
 void
 acpi_ex_release_all_mutexes (
-	ACPI_THREAD_STATE       *thread)
+	acpi_thread_state       *thread)
 {
 	acpi_operand_object     *next = thread->acquired_mutex_list;
 	acpi_operand_object     *this;

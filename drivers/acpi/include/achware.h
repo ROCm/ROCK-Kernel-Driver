@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Name: achware.h -- hardware specific interfaces
- *       $Revision: 60 $
  *
  *****************************************************************************/
 
@@ -60,7 +59,7 @@ acpi_hw_get_mode_capabilities (
 
 /* Register I/O Prototypes */
 
-ACPI_BIT_REGISTER_INFO *
+acpi_bit_register_info *
 acpi_hw_get_bit_register_info (
 	u32                     register_id);
 

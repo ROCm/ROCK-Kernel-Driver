@@ -1,7 +1,6 @@
 /*******************************************************************************
  *
  * Module Name: utmisc - common utility procedures
- *              $Revision: 92 $
  *
  ******************************************************************************/
 
@@ -589,7 +588,7 @@ acpi_ut_mutex_terminate (
 
 acpi_status
 acpi_ut_create_mutex (
-	ACPI_MUTEX_HANDLE       mutex_id)
+	acpi_mutex_handle       mutex_id)
 {
 	acpi_status             status = AE_OK;
 
@@ -626,7 +625,7 @@ acpi_ut_create_mutex (
 
 acpi_status
 acpi_ut_delete_mutex (
-	ACPI_MUTEX_HANDLE       mutex_id)
+	acpi_mutex_handle       mutex_id)
 {
 	acpi_status             status;
 
@@ -661,7 +660,7 @@ acpi_ut_delete_mutex (
 
 acpi_status
 acpi_ut_acquire_mutex (
-	ACPI_MUTEX_HANDLE       mutex_id)
+	acpi_mutex_handle       mutex_id)
 {
 	acpi_status             status;
 	u32                     i;
@@ -739,7 +738,7 @@ acpi_ut_acquire_mutex (
 
 acpi_status
 acpi_ut_release_mutex (
-	ACPI_MUTEX_HANDLE       mutex_id)
+	acpi_mutex_handle       mutex_id)
 {
 	acpi_status             status;
 	u32                     i;
@@ -1000,7 +999,7 @@ acpi_ut_create_generic_state (void)
  *
  ******************************************************************************/
 
-ACPI_THREAD_STATE *
+acpi_thread_state *
 acpi_ut_create_thread_state (
 	void)
 {
@@ -1022,7 +1021,7 @@ acpi_ut_create_thread_state (
 	state->common.data_type = ACPI_DESC_TYPE_STATE_THREAD;
 	state->thread.thread_id = acpi_os_get_thread_id ();
 
-	return_PTR ((ACPI_THREAD_STATE *) state);
+	return_PTR ((acpi_thread_state *) state);
 }
 
 
@@ -1220,7 +1219,7 @@ acpi_status
 acpi_ut_walk_package_tree (
 	acpi_operand_object     *source_object,
 	void                    *target_object,
-	ACPI_PKG_CALLBACK       walk_callback,
+	acpi_pkg_callback       walk_callback,
 	void                    *context)
 {
 	acpi_status             status = AE_OK;

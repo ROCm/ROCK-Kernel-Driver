@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: exconvrt - Object conversion routines
- *              $Revision: 47 $
  *
  *****************************************************************************/
 
@@ -230,7 +229,7 @@ acpi_ex_convert_to_buffer (
 		 * Create a new Buffer object
 		 * Size will be the string length
 		 */
-		ret_desc = acpi_ut_create_buffer_object ((ACPI_SIZE) obj_desc->string.length);
+		ret_desc = acpi_ut_create_buffer_object ((acpi_size) obj_desc->string.length);
 		if (!ret_desc) {
 			return_ACPI_STATUS (AE_NO_MEMORY);
 		}
@@ -398,7 +397,6 @@ acpi_ex_convert_to_string (
 {
 	acpi_operand_object     *ret_desc;
 	u32                     i;
-	u32                     index;
 	u32                     string_length;
 	u8                      *new_buf;
 	u8                      *pointer;
@@ -438,7 +436,7 @@ acpi_ex_convert_to_string (
 
 		/* Need enough space for one ASCII integer plus null terminator */
 
-		new_buf = ACPI_MEM_CALLOCATE ((ACPI_SIZE) string_length + 1);
+		new_buf = ACPI_MEM_CALLOCATE ((acpi_size) string_length + 1);
 		if (!new_buf) {
 			ACPI_REPORT_ERROR
 				(("Ex_convert_to_string: Buffer allocation failure\n"));
@@ -467,9 +465,15 @@ acpi_ex_convert_to_string (
 
 	case ACPI_TYPE_BUFFER:
 
-		string_length = obj_desc->buffer.length * 3;
-		if (base == 10) {
-			string_length = obj_desc->buffer.length * 4;
+		/* Find the string length */
+
+		pointer = obj_desc->buffer.pointer;
+		for (string_length = 0; string_length < obj_desc->buffer.length; string_length++) {
+			/* Exit on null terminator */
+
+			if (!pointer[string_length]) {
+				break;
+			}
 		}
 
 		if (max_length > ACPI_MAX_STRING_CONVERSION) {
@@ -492,7 +496,7 @@ acpi_ex_convert_to_string (
 			string_length = max_length;
 		}
 
-		new_buf = ACPI_MEM_CALLOCATE ((ACPI_SIZE) string_length + 1);
+		new_buf = ACPI_MEM_CALLOCATE ((acpi_size) string_length + 1);
 		if (!new_buf) {
 			ACPI_REPORT_ERROR
 				(("Ex_convert_to_string: Buffer allocation failure\n"));
@@ -500,23 +504,15 @@ acpi_ex_convert_to_string (
 			return_ACPI_STATUS (AE_NO_MEMORY);
 		}
 
-		/*
-		 * Convert each byte of the buffer to two ASCII characters plus a space.
-		 */
-		pointer = obj_desc->buffer.pointer;
-		index = 0;
-		for (i = 0, index = 0; i < obj_desc->buffer.length; i++) {
-			index += acpi_ex_convert_to_ascii ((acpi_integer) pointer[i], base, &new_buf[index], 1);
+		/* Copy the appropriate number of buffer characters */
 
-			new_buf[index] = ' ';
-			index++;
-		}
+		ACPI_MEMCPY (new_buf, pointer, string_length);
 
 		/* Null terminate */
 
-		new_buf [index-1] = 0;
+		new_buf [string_length] = 0;
 		ret_desc->buffer.pointer = new_buf;
-		ret_desc->string.length = (u32) ACPI_STRLEN ((char *) new_buf);
+		ret_desc->string.length = string_length;
 		break;
 
 

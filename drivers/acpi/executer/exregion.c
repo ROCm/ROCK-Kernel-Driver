@@ -2,7 +2,6 @@
 /******************************************************************************
  *
  * Module Name: exregion - ACPI default Op_region (address space) handlers
- *              $Revision: 81 $
  *
  *****************************************************************************/
 
@@ -54,7 +53,7 @@
 acpi_status
 acpi_ex_system_memory_space_handler (
 	u32                     function,
-	ACPI_PHYSICAL_ADDRESS   address,
+	acpi_physical_address   address,
 	u32                     bit_width,
 	acpi_integer            *value,
 	void                    *handler_context,
@@ -64,7 +63,7 @@ acpi_ex_system_memory_space_handler (
 	void                    *logical_addr_ptr = NULL;
 	acpi_mem_space_context  *mem_info = region_context;
 	u32                     length;
-	ACPI_SIZE               window_size;
+	acpi_size               window_size;
 #ifndef _HW_ALIGNMENT_SUPPORT
 	u32                     remainder;
 #endif
@@ -132,7 +131,7 @@ acpi_ex_system_memory_space_handler (
 		 * Don't attempt to map memory beyond the end of the region, and
 		 * constrain the maximum mapping size to something reasonable.
 		 */
-		window_size = (ACPI_SIZE) ((mem_info->address + mem_info->length) - address);
+		window_size = (acpi_size) ((mem_info->address + mem_info->length) - address);
 		if (window_size > ACPI_SYSMEM_REGION_WINDOW_SIZE) {
 			window_size = ACPI_SYSMEM_REGION_WINDOW_SIZE;
 		}
@@ -258,7 +257,7 @@ acpi_ex_system_memory_space_handler (
 acpi_status
 acpi_ex_system_io_space_handler (
 	u32                     function,
-	ACPI_PHYSICAL_ADDRESS   address,
+	acpi_physical_address   address,
 	u32                     bit_width,
 	acpi_integer            *value,
 	void                    *handler_context,
@@ -280,12 +279,12 @@ acpi_ex_system_io_space_handler (
 	case ACPI_READ:
 
 		*value = 0;
-		status = acpi_os_read_port ((ACPI_IO_ADDRESS) address, value, bit_width);
+		status = acpi_os_read_port ((acpi_io_address) address, value, bit_width);
 		break;
 
 	case ACPI_WRITE:
 
-		status = acpi_os_write_port ((ACPI_IO_ADDRESS) address, *value, bit_width);
+		status = acpi_os_write_port ((acpi_io_address) address, *value, bit_width);
 		break;
 
 	default:
@@ -318,7 +317,7 @@ acpi_ex_system_io_space_handler (
 acpi_status
 acpi_ex_pci_config_space_handler (
 	u32                     function,
-	ACPI_PHYSICAL_ADDRESS   address,
+	acpi_physical_address   address,
 	u32                     bit_width,
 	acpi_integer            *value,
 	void                    *handler_context,
@@ -395,7 +394,7 @@ acpi_ex_pci_config_space_handler (
 acpi_status
 acpi_ex_cmos_space_handler (
 	u32                     function,
-	ACPI_PHYSICAL_ADDRESS   address,
+	acpi_physical_address   address,
 	u32                     bit_width,
 	acpi_integer            *value,
 	void                    *handler_context,
@@ -432,7 +431,7 @@ acpi_ex_cmos_space_handler (
 acpi_status
 acpi_ex_pci_bar_space_handler (
 	u32                     function,
-	ACPI_PHYSICAL_ADDRESS   address,
+	acpi_physical_address   address,
 	u32                     bit_width,
 	acpi_integer            *value,
 	void                    *handler_context,
@@ -469,7 +468,7 @@ acpi_ex_pci_bar_space_handler (
 acpi_status
 acpi_ex_data_table_space_handler (
 	u32                     function,
-	ACPI_PHYSICAL_ADDRESS   address,
+	acpi_physical_address   address,
 	u32                     bit_width,
 	acpi_integer            *value,
 	void                    *handler_context,

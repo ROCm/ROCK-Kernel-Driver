@@ -1,7 +1,6 @@
 /*******************************************************************************
  *
  * Module Name: rslist - Linked list utilities
- *              $Revision: 31 $
  *
  ******************************************************************************/
 
@@ -104,11 +103,11 @@ acpi_rs_byte_stream_to_list (
 	u8                      *output_buffer)
 {
 	acpi_status             status;
-	ACPI_SIZE               bytes_parsed = 0;
+	acpi_size               bytes_parsed = 0;
 	u8                      resource_type = 0;
-	ACPI_SIZE               bytes_consumed = 0;
+	acpi_size               bytes_consumed = 0;
 	u8                      *buffer = output_buffer;
-	ACPI_SIZE               structure_size = 0;
+	acpi_size               structure_size = 0;
 	u8                      end_tag_processed = FALSE;
 	acpi_resource           *resource;
 
@@ -334,12 +333,12 @@ acpi_rs_byte_stream_to_list (
 acpi_status
 acpi_rs_list_to_byte_stream (
 	acpi_resource           *linked_list,
-	ACPI_SIZE               byte_stream_size_needed,
+	acpi_size               byte_stream_size_needed,
 	u8                      *output_buffer)
 {
 	acpi_status             status;
 	u8                      *buffer = output_buffer;
-	ACPI_SIZE               bytes_consumed = 0;
+	acpi_size               bytes_consumed = 0;
 	u8                      done = FALSE;
 
 

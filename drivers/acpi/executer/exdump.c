@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: exdump - Interpreter debug output routines
- *              $Revision: 164 $
  *
  *****************************************************************************/
 
@@ -392,7 +391,7 @@ acpi_ex_dump_operands (
 	char                    *module_name,
 	u32                     line_number)
 {
-	NATIVE_UINT             i;
+	acpi_native_uint        i;
 	acpi_operand_object     **obj_desc;
 
 
@@ -469,7 +468,7 @@ acpi_ex_out_integer (
 void
 acpi_ex_out_address (
 	char                    *title,
-	ACPI_PHYSICAL_ADDRESS   value)
+	acpi_physical_address   value)
 {
 
 #if ACPI_MACHINE_WIDTH == 16
@@ -673,7 +672,7 @@ acpi_ex_dump_object_descriptor (
 
 		acpi_ex_out_integer ("Processor ID", obj_desc->processor.proc_id);
 		acpi_ex_out_integer ("Length",       obj_desc->processor.length);
-		acpi_ex_out_address ("Address",      (ACPI_PHYSICAL_ADDRESS) obj_desc->processor.address);
+		acpi_ex_out_address ("Address",      (acpi_physical_address) obj_desc->processor.address);
 		acpi_ex_out_pointer ("Sys_handler",  obj_desc->processor.sys_handler);
 		acpi_ex_out_pointer ("Drv_handler",  obj_desc->processor.drv_handler);
 		acpi_ex_out_pointer ("Addr_handler", obj_desc->processor.addr_handler);

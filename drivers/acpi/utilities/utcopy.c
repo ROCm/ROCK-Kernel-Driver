@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: utcopy - Internal to external object translation utilities
- *              $Revision: 109 $
  *
  *****************************************************************************/
 
@@ -54,7 +53,7 @@ acpi_ut_copy_isimple_to_esimple (
 	acpi_operand_object     *internal_object,
 	acpi_object             *external_object,
 	u8                      *data_space,
-	ACPI_SIZE               *buffer_space_used)
+	acpi_size               *buffer_space_used)
 {
 	acpi_status             status = AE_OK;
 
@@ -89,10 +88,10 @@ acpi_ut_copy_isimple_to_esimple (
 
 		external_object->string.pointer = (char *) data_space;
 		external_object->string.length = internal_object->string.length;
-		*buffer_space_used = ACPI_ROUND_UP_TO_NATIVE_WORD ((ACPI_SIZE) internal_object->string.length + 1);
+		*buffer_space_used = ACPI_ROUND_UP_TO_NATIVE_WORD ((acpi_size) internal_object->string.length + 1);
 
 		ACPI_MEMCPY ((void *) data_space, (void *) internal_object->string.pointer,
-				 (ACPI_SIZE) internal_object->string.length + 1);
+				 (acpi_size) internal_object->string.length + 1);
 		break;
 
 
@@ -168,7 +167,7 @@ acpi_ut_copy_isimple_to_esimple (
  *
  * FUNCTION:    Acpi_ut_copy_ielement_to_eelement
  *
- * PARAMETERS:  ACPI_PKG_CALLBACK
+ * PARAMETERS:  acpi_pkg_callback
  *
  * RETURN:      Status
  *
@@ -185,7 +184,7 @@ acpi_ut_copy_ielement_to_eelement (
 {
 	acpi_status             status = AE_OK;
 	acpi_pkg_info           *info = (acpi_pkg_info *) context;
-	ACPI_SIZE               object_space;
+	acpi_size               object_space;
 	u32                     this_index;
 	acpi_object             *target_object;
 
@@ -230,7 +229,7 @@ acpi_ut_copy_ielement_to_eelement (
 		 * update the buffer length counter
 		 */
 		object_space = ACPI_ROUND_UP_TO_NATIVE_WORD (
-				   (ACPI_SIZE) target_object->package.count * sizeof (acpi_object));
+				   (acpi_size) target_object->package.count * sizeof (acpi_object));
 		break;
 
 
@@ -267,7 +266,7 @@ static acpi_status
 acpi_ut_copy_ipackage_to_epackage (
 	acpi_operand_object     *internal_object,
 	u8                      *buffer,
-	ACPI_SIZE               *space_used)
+	acpi_size               *space_used)
 {
 	acpi_object             *external_object;
 	acpi_status             status;
@@ -298,7 +297,7 @@ acpi_ut_copy_ipackage_to_epackage (
 	 * Leave room for an array of ACPI_OBJECTS in the buffer
 	 * and move the free space past it
 	 */
-	info.length    += (ACPI_SIZE) external_object->package.count *
+	info.length    += (acpi_size) external_object->package.count *
 			 ACPI_ROUND_UP_TO_NATIVE_WORD (sizeof (acpi_object));
 	info.free_space += external_object->package.count *
 			 ACPI_ROUND_UP_TO_NATIVE_WORD (sizeof (acpi_object));
@@ -420,7 +419,7 @@ acpi_ut_copy_esimple_to_isimple (
 	case ACPI_TYPE_STRING:
 
 		internal_object->string.pointer =
-			ACPI_MEM_CALLOCATE ((ACPI_SIZE) external_object->string.length + 1);
+			ACPI_MEM_CALLOCATE ((acpi_size) external_object->string.length + 1);
 		if (!internal_object->string.pointer) {
 			return_ACPI_STATUS (AE_NO_MEMORY);
 		}
@@ -676,7 +675,7 @@ acpi_ut_copy_simple_object (
  *
  * FUNCTION:    Acpi_ut_copy_ielement_to_ielement
  *
- * PARAMETERS:  ACPI_PKG_CALLBACK
+ * PARAMETERS:  acpi_pkg_callback
  *
  * RETURN:      Status
  *
@@ -752,7 +751,7 @@ acpi_ut_copy_ielement_to_ielement (
 		 * Create the object array
 		 */
 		target_object->package.elements =
-			ACPI_MEM_CALLOCATE (((ACPI_SIZE) source_object->package.count + 1) *
+			ACPI_MEM_CALLOCATE (((acpi_size) source_object->package.count + 1) *
 					 sizeof (void *));
 		if (!target_object->package.elements) {
 			ACPI_MEM_FREE (target_object);
@@ -813,7 +812,7 @@ acpi_ut_copy_ipackage_to_ipackage (
 	 * Create the object array and walk the source package tree
 	 */
 	dest_obj->package.elements = ACPI_MEM_CALLOCATE (
-			   ((ACPI_SIZE) source_obj->package.count + 1) *
+			   ((acpi_size) source_obj->package.count + 1) *
 			   sizeof (void *));
 	if (!dest_obj->package.elements) {
 		ACPI_REPORT_ERROR (

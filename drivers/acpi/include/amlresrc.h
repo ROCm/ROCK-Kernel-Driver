@@ -2,7 +2,6 @@
 /******************************************************************************
  *
  * Module Name: amlresrc.h - AML resource descriptors
- *              $Revision: 22 $
  *
  *****************************************************************************/
 
@@ -76,7 +75,7 @@ typedef struct asl_resource_node
 	void                        *buffer;
 	struct asl_resource_node    *next;
 
-} ASL_RESOURCE_NODE;
+} asl_resource_node;
 
 
 /*
@@ -93,7 +92,7 @@ typedef struct asl_irq_format_desc
 	u16                         irq_mask;
 	u8                          flags;
 
-} ASL_IRQ_FORMAT_DESC;
+} asl_irq_format_desc;
 
 
 typedef struct asl_irq_noflags_desc
@@ -101,7 +100,7 @@ typedef struct asl_irq_noflags_desc
 	u8                          descriptor_type;
 	u16                         irq_mask;
 
-} ASL_IRQ_NOFLAGS_DESC;
+} asl_irq_noflags_desc;
 
 
 typedef struct asl_dma_format_desc
@@ -110,7 +109,7 @@ typedef struct asl_dma_format_desc
 	u8                          dma_channel_mask;
 	u8                          flags;
 
-} ASL_DMA_FORMAT_DESC;
+} asl_dma_format_desc;
 
 
 typedef struct asl_start_dependent_desc
@@ -118,21 +117,21 @@ typedef struct asl_start_dependent_desc
 	u8                          descriptor_type;
 	u8                          flags;
 
-} ASL_START_DEPENDENT_DESC;
+} asl_start_dependent_desc;
 
 
 typedef struct asl_start_dependent_noprio_desc
 {
 	u8                          descriptor_type;
 
-} ASL_START_DEPENDENT_NOPRIO_DESC;
+} asl_start_dependent_noprio_desc;
 
 
 typedef struct asl_end_dependent_desc
 {
 	u8                          descriptor_type;
 
-} ASL_END_DEPENDENT_DESC;
+} asl_end_dependent_desc;
 
 
 typedef struct asl_io_port_desc
@@ -144,7 +143,7 @@ typedef struct asl_io_port_desc
 	u8                          alignment;
 	u8                          length;
 
-} ASL_IO_PORT_DESC;
+} asl_io_port_desc;
 
 
 typedef struct asl_fixed_io_port_desc
@@ -153,7 +152,7 @@ typedef struct asl_fixed_io_port_desc
 	u16                         base_address;
 	u8                          length;
 
-} ASL_FIXED_IO_PORT_DESC;
+} asl_fixed_io_port_desc;
 
 
 typedef struct asl_small_vendor_desc
@@ -161,7 +160,7 @@ typedef struct asl_small_vendor_desc
 	u8                          descriptor_type;
 	u8                          vendor_defined[7];
 
-} ASL_SMALL_VENDOR_DESC;
+} asl_small_vendor_desc;
 
 
 typedef struct asl_end_tag_desc
@@ -169,7 +168,7 @@ typedef struct asl_end_tag_desc
 	u8                          descriptor_type;
 	u8                          checksum;
 
-} ASL_END_TAG_DESC;
+} asl_end_tag_desc;
 
 
 /* LARGE descriptors */
@@ -184,7 +183,7 @@ typedef struct asl_memory_24_desc
 	u16                         alignment;
 	u16                         range_length;
 
-} ASL_MEMORY_24_DESC;
+} asl_memory_24_desc;
 
 
 typedef struct asl_large_vendor_desc
@@ -193,7 +192,7 @@ typedef struct asl_large_vendor_desc
 	u16                         length;
 	u8                          vendor_defined[1];
 
-} ASL_LARGE_VENDOR_DESC;
+} asl_large_vendor_desc;
 
 
 typedef struct asl_memory_32_desc
@@ -206,7 +205,7 @@ typedef struct asl_memory_32_desc
 	u32                         alignment;
 	u32                         range_length;
 
-} ASL_MEMORY_32_DESC;
+} asl_memory_32_desc;
 
 
 typedef struct asl_fixed_memory_32_desc
@@ -217,7 +216,7 @@ typedef struct asl_fixed_memory_32_desc
 	u32                         base_address;
 	u32                         range_length;
 
-} ASL_FIXED_MEMORY_32_DESC;
+} asl_fixed_memory_32_desc;
 
 
 typedef struct asl_qword_address_desc
@@ -234,7 +233,7 @@ typedef struct asl_qword_address_desc
 	u64                         address_length;
 	u8                          optional_fields[2];
 
-} ASL_QWORD_ADDRESS_DESC;
+} asl_qword_address_desc;
 
 
 typedef struct asl_dword_address_desc
@@ -251,7 +250,7 @@ typedef struct asl_dword_address_desc
 	u32                         address_length;
 	u8                          optional_fields[2];
 
-} ASL_DWORD_ADDRESS_DESC;
+} asl_dword_address_desc;
 
 
 typedef struct asl_word_address_desc
@@ -268,7 +267,7 @@ typedef struct asl_word_address_desc
 	u16                         address_length;
 	u8                          optional_fields[2];
 
-} ASL_WORD_ADDRESS_DESC;
+} asl_word_address_desc;
 
 
 typedef struct asl_extended_xrupt_desc
@@ -280,7 +279,7 @@ typedef struct asl_extended_xrupt_desc
 	u32                         interrupt_number[1];
 	/* Res_source_index, Res_source optional fields follow */
 
-} ASL_EXTENDED_XRUPT_DESC;
+} asl_extended_xrupt_desc;
 
 
 typedef struct asl_general_register_desc
@@ -293,7 +292,7 @@ typedef struct asl_general_register_desc
 	u8                          reserved;
 	u64                         address;
 
-} ASL_GENERAL_REGISTER_DESC;
+} asl_general_register_desc;
 
 /* restore default alignment */
 
@@ -303,29 +302,29 @@ typedef struct asl_general_register_desc
 
 typedef union asl_resource_desc
 {
-	ASL_IRQ_FORMAT_DESC         irq;
-	ASL_DMA_FORMAT_DESC         dma;
-	ASL_START_DEPENDENT_DESC    std;
-	ASL_END_DEPENDENT_DESC      end;
-	ASL_IO_PORT_DESC            iop;
-	ASL_FIXED_IO_PORT_DESC      fio;
-	ASL_SMALL_VENDOR_DESC       smv;
-	ASL_END_TAG_DESC            et;
+	asl_irq_format_desc         irq;
+	asl_dma_format_desc         dma;
+	asl_start_dependent_desc    std;
+	asl_end_dependent_desc      end;
+	asl_io_port_desc            iop;
+	asl_fixed_io_port_desc      fio;
+	asl_small_vendor_desc       smv;
+	asl_end_tag_desc            et;
 
-	ASL_MEMORY_24_DESC          M24;
-	ASL_LARGE_VENDOR_DESC       lgv;
-	ASL_MEMORY_32_DESC          M32;
-	ASL_FIXED_MEMORY_32_DESC    F32;
-	ASL_QWORD_ADDRESS_DESC      qas;
-	ASL_DWORD_ADDRESS_DESC      das;
-	ASL_WORD_ADDRESS_DESC       was;
-	ASL_EXTENDED_XRUPT_DESC     exx;
-	ASL_GENERAL_REGISTER_DESC   grg;
+	asl_memory_24_desc          M24;
+	asl_large_vendor_desc       lgv;
+	asl_memory_32_desc          M32;
+	asl_fixed_memory_32_desc    F32;
+	asl_qword_address_desc      qas;
+	asl_dword_address_desc      das;
+	asl_word_address_desc       was;
+	asl_extended_xrupt_desc     exx;
+	asl_general_register_desc   grg;
 	u32                         U32_item;
 	u16                         U16_item;
 	u8                          U8item;
 
-} ASL_RESOURCE_DESC;
+} asl_resource_desc;
 
 
 #endif

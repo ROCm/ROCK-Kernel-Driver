@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Name: aclocal.h - Internal data types used across the ACPI subsystem
- *       $Revision: 183 $
  *
  *****************************************************************************/
 
@@ -30,7 +29,7 @@
 #define ACPI_WAIT_FOREVER               0xFFFF  /* u16, as per ACPI spec */
 
 typedef void*                           acpi_mutex;
-typedef u32                             ACPI_MUTEX_HANDLE;
+typedef u32                             acpi_mutex_handle;
 
 
 /* Total number of aml opcodes defined */
@@ -168,14 +167,14 @@ typedef union acpi_name_union
 {
 	u32                     integer;
 	char                    ascii[4];
-} ACPI_NAME_UNION;
+} acpi_name_union;
 
 typedef struct acpi_node
 {
 	u8                      descriptor;     /* Used to differentiate object descriptor types */
 	u8                      type;           /* Type associated with this name */
 	u16                     owner_id;
-	ACPI_NAME_UNION         name;           /* ACPI Name, always 4 chars per ACPI spec */
+	acpi_name_union         name;           /* ACPI Name, always 4 chars per ACPI spec */
 
 
 	union acpi_operand_obj  *object;        /* Pointer to attached ACPI object (optional) */
@@ -215,7 +214,7 @@ typedef struct acpi_table_desc
 	u8                      *aml_start;
 	u64                     physical_address;
 	u32                     aml_length;
-	ACPI_SIZE               length;
+	acpi_size               length;
 	u32                     count;
 	acpi_owner_id           table_id;
 	u8                      type;
@@ -288,7 +287,7 @@ typedef struct
 	u8                      attribute;
 	u8                      field_type;
 
-} ACPI_CREATE_FIELD_INFO;
+} acpi_create_field_info;
 
 
 /*****************************************************************************
@@ -305,7 +304,7 @@ typedef struct
 	u16                     register_count;
 	u8                      block_base_number;
 
-} ACPI_GPE_BLOCK_INFO;
+} acpi_gpe_block_info;
 
 /* Information about a particular GPE register pair */
 
@@ -318,7 +317,7 @@ typedef struct
 	u8                      wake_enable;    /* Mask of bits to keep enabled when sleeping */
 	u8                      base_gpe_number; /* Base GPE number for this register */
 
-} ACPI_GPE_REGISTER_INFO;
+} acpi_gpe_register_info;
 
 
 #define ACPI_GPE_LEVEL_TRIGGERED        1
@@ -336,14 +335,14 @@ typedef struct
 	u8                      bit_mask;
 
 
-} ACPI_GPE_NUMBER_INFO;
+} acpi_gpe_number_info;
 
 
 typedef struct
 {
 	u8                      number_index;
 
-} ACPI_GPE_INDEX_INFO;
+} acpi_gpe_index_info;
 
 /* Information about each particular fixed event */
 
@@ -352,7 +351,7 @@ typedef struct
 	acpi_event_handler      handler;        /* Address of handler. */
 	void                    *context;       /* Context to be passed to handler */
 
-} ACPI_FIXED_EVENT_HANDLER;
+} acpi_fixed_event_handler;
 
 
 typedef struct
@@ -486,7 +485,7 @@ typedef struct acpi_thread_state
 	u32                     thread_id;              /* Running thread ID */
 	u16                     current_sync_level;     /* Mutex Sync (nested acquire) level */
 
-} ACPI_THREAD_STATE;
+} acpi_thread_state;
 
 
 /*
@@ -536,7 +535,7 @@ typedef union acpi_gen_state
 	acpi_scope_state        scope;
 	acpi_pscope_state       parse_scope;
 	acpi_pkg_state          pkg;
-	ACPI_THREAD_STATE       thread;
+	acpi_thread_state       thread;
 	acpi_result_values      results;
 	acpi_notify_info        notify;
 
@@ -622,7 +621,7 @@ typedef union acpi_parse_val
 typedef struct acpi_parseobj_common
 {
 	ACPI_PARSE_COMMON
-} ACPI_PARSE_OBJ_COMMON;
+} acpi_parse_obj_common;
 
 
 /*
@@ -637,7 +636,7 @@ typedef struct acpi_parseobj_named
 	u32                     length;         /* AML length */
 	u32                     name;           /* 4-byte name or zero if no name */
 
-} ACPI_PARSE_OBJ_NAMED;
+} acpi_parse_obj_named;
 
 
 /* The parse node is the fundamental element of the parse tree */
@@ -673,14 +672,14 @@ typedef struct acpi_parseobj_asl
 	u8                          extra;
 	char                        parse_op_name[12];
 
-} ACPI_PARSE_OBJ_ASL;
+} acpi_parse_obj_asl;
 
 
 typedef union acpi_parse_obj
 {
-	ACPI_PARSE_OBJ_COMMON       common;
-	ACPI_PARSE_OBJ_NAMED        named;
-	ACPI_PARSE_OBJ_ASL          asl;
+	acpi_parse_obj_common       common;
+	acpi_parse_obj_named        named;
+	acpi_parse_obj_asl          asl;
 
 } acpi_parse_object;
 
@@ -735,7 +734,7 @@ typedef struct
 	u8                      bit_position;
 	u16                     access_bit_mask;
 
-} ACPI_BIT_REGISTER_INFO;
+} acpi_bit_register_info;
 
 
 /*
@@ -981,7 +980,7 @@ typedef struct
 	char                        *list_name;
 #endif
 
-} ACPI_MEMORY_LIST;
+} acpi_memory_list;
 
 
 #endif /* __ACLOCAL_H__ */

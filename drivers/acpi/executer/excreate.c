@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: excreate - Named object creation
- *              $Revision: 98 $
  *
  *****************************************************************************/
 
@@ -392,7 +391,7 @@ acpi_ex_create_table_region (
 	/* Init the region from the operands */
 
 	obj_desc->region.space_id = REGION_DATA_TABLE;
-	obj_desc->region.address = (ACPI_PHYSICAL_ADDRESS) ACPI_TO_INTEGER (table);
+	obj_desc->region.address = (acpi_physical_address) ACPI_TO_INTEGER (table);
 	obj_desc->region.length = table->length;
 	obj_desc->region.node   = node;
 	obj_desc->region.flags  = AOPOBJ_DATA_VALID;
@@ -463,7 +462,7 @@ acpi_ex_create_processor (
 	 * Initialize the processor object from the operands
 	 */
 	obj_desc->processor.proc_id = (u8)          operand[1]->integer.value;
-	obj_desc->processor.address = (ACPI_IO_ADDRESS) operand[2]->integer.value;
+	obj_desc->processor.address = (acpi_io_address) operand[2]->integer.value;
 	obj_desc->processor.length = (u8)           operand[3]->integer.value;
 
 	/* Install the processor object in the parent Node */

@@ -3,7 +3,6 @@
  *
  * Module Name: hwregs - Read/write access functions for the various ACPI
  *                       control and status registers.
- *              $Revision: 138 $
  *
  ******************************************************************************/
 
@@ -48,8 +47,8 @@
 acpi_status
 acpi_hw_clear_acpi_status (void)
 {
-	NATIVE_UINT_MAX32       i;
-	NATIVE_UINT             gpe_block;
+	acpi_native_uint        i;
+	acpi_native_uint        gpe_block;
 	acpi_status             status;
 
 
@@ -87,7 +86,7 @@ acpi_hw_clear_acpi_status (void)
 	for (gpe_block = 0; gpe_block < ACPI_MAX_GPE_BLOCKS; gpe_block++) {
 		for (i = 0; i < acpi_gbl_gpe_block_info[gpe_block].register_count; i++) {
 			status = acpi_hw_low_level_write (8, 0xFF,
-					 acpi_gbl_gpe_block_info[gpe_block].block_address, i);
+					 acpi_gbl_gpe_block_info[gpe_block].block_address, (u32) i);
 			if (ACPI_FAILURE (status)) {
 				goto unlock_and_exit;
 			}
@@ -208,7 +207,7 @@ acpi_get_sleep_type_data (
  *
  ******************************************************************************/
 
-ACPI_BIT_REGISTER_INFO *
+acpi_bit_register_info *
 acpi_hw_get_bit_register_info (
 	u32                     register_id)
 {
@@ -245,7 +244,7 @@ acpi_get_register (
 	u32                     flags)
 {
 	u32                     register_value = 0;
-	ACPI_BIT_REGISTER_INFO  *bit_reg_info;
+	acpi_bit_register_info  *bit_reg_info;
 	acpi_status             status;
 
 
@@ -310,7 +309,7 @@ acpi_set_register (
 	u32                     flags)
 {
 	u32                     register_value = 0;
-	ACPI_BIT_REGISTER_INFO  *bit_reg_info;
+	acpi_bit_register_info  *bit_reg_info;
 	acpi_status             status;
 
 
@@ -684,8 +683,8 @@ acpi_hw_low_level_read (
 	acpi_generic_address    *reg,
 	u32                     offset)
 {
-	ACPI_PHYSICAL_ADDRESS   mem_address;
-	ACPI_IO_ADDRESS         io_address;
+	acpi_physical_address   mem_address;
+	acpi_io_address         io_address;
 	acpi_pci_id             pci_id;
 	u16                     pci_register;
 	acpi_status             status;
@@ -713,7 +712,7 @@ acpi_hw_low_level_read (
 	case ACPI_ADR_SPACE_SYSTEM_MEMORY:
 
 		mem_address = (reg->address
-				  + (ACPI_PHYSICAL_ADDRESS) offset);
+				  + (acpi_physical_address) offset);
 
 		status = acpi_os_read_memory (mem_address, value, width);
 		break;
@@ -721,8 +720,8 @@ acpi_hw_low_level_read (
 
 	case ACPI_ADR_SPACE_SYSTEM_IO:
 
-		io_address = (ACPI_IO_ADDRESS) (reg->address
-				   + (ACPI_PHYSICAL_ADDRESS) offset);
+		io_address = (acpi_io_address) (reg->address
+				   + (acpi_physical_address) offset);
 
 		status = acpi_os_read_port (io_address, value, width);
 		break;
@@ -774,8 +773,8 @@ acpi_hw_low_level_write (
 	acpi_generic_address    *reg,
 	u32                     offset)
 {
-	ACPI_PHYSICAL_ADDRESS   mem_address;
-	ACPI_IO_ADDRESS         io_address;
+	acpi_physical_address   mem_address;
+	acpi_io_address         io_address;
 	acpi_pci_id             pci_id;
 	u16                     pci_register;
 	acpi_status             status;
@@ -801,7 +800,7 @@ acpi_hw_low_level_write (
 	case ACPI_ADR_SPACE_SYSTEM_MEMORY:
 
 		mem_address = (reg->address
-				  + (ACPI_PHYSICAL_ADDRESS) offset);
+				  + (acpi_physical_address) offset);
 
 		status = acpi_os_write_memory (mem_address, (acpi_integer) value, width);
 		break;
@@ -809,8 +808,8 @@ acpi_hw_low_level_write (
 
 	case ACPI_ADR_SPACE_SYSTEM_IO:
 
-		io_address = (ACPI_IO_ADDRESS) (reg->address
-				   + (ACPI_PHYSICAL_ADDRESS) offset);
+		io_address = (acpi_io_address) (reg->address
+				   + (acpi_physical_address) offset);
 
 		status = acpi_os_write_port (io_address, (acpi_integer) value, width);
 		break;

@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: dsmethod - Parser/Interpreter interface - control method parsing
- *              $Revision: 89 $
  *
  *****************************************************************************/
 
@@ -243,7 +242,7 @@ acpi_ds_begin_method_execution (
 
 acpi_status
 acpi_ds_call_control_method (
-	ACPI_THREAD_STATE       *thread,
+	acpi_thread_state       *thread,
 	acpi_walk_state         *this_walk_state,
 	acpi_parse_object       *op)
 {

@@ -1,7 +1,6 @@
 /*******************************************************************************
  *
  * Module Name: rscreate - Create resource lists/tables
- *              $Revision: 63 $
  *
  ******************************************************************************/
 
@@ -59,7 +58,7 @@ acpi_rs_create_resource_list (
 
 	acpi_status             status;
 	u8                      *byte_stream_start;
-	ACPI_SIZE               list_size_needed = 0;
+	acpi_size               list_size_needed = 0;
 	u32                     byte_stream_buffer_length;
 
 
@@ -139,7 +138,7 @@ acpi_rs_create_pci_routing_table (
 	acpi_operand_object     **top_object_list;
 	acpi_operand_object     **sub_object_list;
 	acpi_operand_object     *obj_desc;
-	ACPI_SIZE               buffer_size_needed = 0;
+	acpi_size               buffer_size_needed = 0;
 	u32                     number_of_elements;
 	u32                     index;
 	acpi_pci_routing_table  *user_prt;
@@ -364,7 +363,7 @@ acpi_rs_create_byte_stream (
 	acpi_buffer             *output_buffer)
 {
 	acpi_status             status;
-	ACPI_SIZE               byte_stream_size_needed = 0;
+	acpi_size               byte_stream_size_needed = 0;
 
 
 	ACPI_FUNCTION_TRACE ("Rs_create_byte_stream");

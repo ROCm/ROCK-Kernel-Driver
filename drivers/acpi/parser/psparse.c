@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: psparse - Parser top level AML parse routines
- *              $Revision: 138 $
  *
  *****************************************************************************/
 
@@ -1034,8 +1033,8 @@ acpi_ps_parse_aml (
 {
 	acpi_status             status;
 	acpi_status             terminate_status;
-	ACPI_THREAD_STATE       *thread;
-	ACPI_THREAD_STATE       *prev_walk_list = acpi_gbl_current_walk_list;
+	acpi_thread_state       *thread;
+	acpi_thread_state       *prev_walk_list = acpi_gbl_current_walk_list;
 	acpi_walk_state         *previous_walk_state;
 
 

@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: exfldio - Aml Field I/O
- *              $Revision: 91 $
  *
  *****************************************************************************/
 
@@ -155,7 +154,7 @@ acpi_ex_access_region (
 {
 	acpi_status             status;
 	acpi_operand_object     *rgn_desc;
-	ACPI_PHYSICAL_ADDRESS   address;
+	acpi_physical_address   address;
 
 
 	ACPI_FUNCTION_TRACE ("Ex_access_region");

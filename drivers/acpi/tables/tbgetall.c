@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: tbgetall - Get all required ACPI tables
- *              $Revision: 4 $
  *
  *****************************************************************************/
 
@@ -47,7 +46,7 @@
 
 acpi_status
 acpi_tb_get_primary_table (
-	ACPI_POINTER            *address,
+	acpi_pointer            *address,
 	acpi_table_desc         *table_info)
 {
 	acpi_status             status;
@@ -114,7 +113,7 @@ acpi_tb_get_primary_table (
 
 acpi_status
 acpi_tb_get_secondary_table (
-	ACPI_POINTER            *address,
+	acpi_pointer            *address,
 	acpi_string             signature,
 	acpi_table_desc         *table_info)
 {
@@ -190,7 +189,7 @@ acpi_tb_get_required_tables (
 	acpi_status             status = AE_OK;
 	u32                     i;
 	acpi_table_desc         table_info;
-	ACPI_POINTER            address;
+	acpi_pointer            address;
 
 
 	ACPI_FUNCTION_TRACE ("Tb_get_required_tables");

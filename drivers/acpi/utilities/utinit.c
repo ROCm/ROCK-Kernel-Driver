@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: utinit - Common ACPI subsystem initialization
- *              $Revision: 115 $
  *
  *****************************************************************************/
 
@@ -51,7 +50,7 @@ static void
 acpi_ut_fadt_register_error (
 	char                    *register_name,
 	u32                     value,
-	ACPI_SIZE               offset)
+	acpi_size               offset)
 {
 
 	ACPI_REPORT_WARNING (

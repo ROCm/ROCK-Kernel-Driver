@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: dswstate - Dispatcher parse tree walk management routines
- *              $Revision: 73 $
  *
  *****************************************************************************/
 
@@ -174,7 +173,7 @@ acpi_ds_result_pop (
 	acpi_operand_object     **object,
 	acpi_walk_state         *walk_state)
 {
-	NATIVE_UINT             index;
+	acpi_native_uint        index;
 	acpi_generic_state      *state;
 
 
@@ -234,7 +233,7 @@ acpi_ds_result_pop_from_bottom (
 	acpi_operand_object     **object,
 	acpi_walk_state         *walk_state)
 {
-	NATIVE_UINT             index;
+	acpi_native_uint        index;
 	acpi_generic_state      *state;
 
 
@@ -689,7 +688,7 @@ acpi_ds_obj_stack_get_value (
 		return_PTR (NULL);
 	}
 
-	return_PTR (walk_state->operands[(NATIVE_UINT)(walk_state->num_operands - 1) -
+	return_PTR (walk_state->operands[(acpi_native_uint)(walk_state->num_operands - 1) -
 			  index]);
 }
 
@@ -709,7 +708,7 @@ acpi_ds_obj_stack_get_value (
 
 acpi_walk_state *
 acpi_ds_get_current_walk_state (
-	ACPI_THREAD_STATE       *thread)
+	acpi_thread_state       *thread)
 
 {
 	ACPI_FUNCTION_NAME ("Ds_get_current_walk_state");
@@ -742,7 +741,7 @@ acpi_ds_get_current_walk_state (
 void
 acpi_ds_push_walk_state (
 	acpi_walk_state         *walk_state,
-	ACPI_THREAD_STATE       *thread)
+	acpi_thread_state       *thread)
 {
 	ACPI_FUNCTION_TRACE ("Ds_push_walk_state");
 
@@ -770,7 +769,7 @@ acpi_ds_push_walk_state (
 
 acpi_walk_state *
 acpi_ds_pop_walk_state (
-	ACPI_THREAD_STATE       *thread)
+	acpi_thread_state       *thread)
 {
 	acpi_walk_state         *walk_state;
 
@@ -815,7 +814,7 @@ acpi_ds_create_walk_state (
 	acpi_owner_id           owner_id,
 	acpi_parse_object       *origin,
 	acpi_operand_object     *mth_desc,
-	ACPI_THREAD_STATE       *thread)
+	acpi_thread_state       *thread)
 {
 	acpi_walk_state         *walk_state;
 	acpi_status             status;

@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: exfield - ACPI AML (p-code) execution - field manipulation
- *              $Revision: 117 $
  *
  *****************************************************************************/
 
@@ -56,7 +55,7 @@ acpi_ex_read_data_from_field (
 {
 	acpi_status             status;
 	acpi_operand_object     *buffer_desc;
-	ACPI_SIZE               length;
+	acpi_size               length;
 	void                    *buffer;
 	u8                      locked;
 
@@ -118,7 +117,7 @@ acpi_ex_read_data_from_field (
 	 *
 	 * Note: Field.length is in bits.
 	 */
-	length = (ACPI_SIZE) ACPI_ROUND_BITS_UP_TO_BYTES (obj_desc->field.bit_length);
+	length = (acpi_size) ACPI_ROUND_BITS_UP_TO_BYTES (obj_desc->field.bit_length);
 	if (length > acpi_gbl_integer_byte_width) {
 		/* Field is too large for an Integer, create a Buffer instead */
 

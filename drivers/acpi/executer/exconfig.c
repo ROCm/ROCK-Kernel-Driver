@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: exconfig - Namespace reconfiguration (Load/Unload opcodes)
- *              $Revision: 69 $
  *
  *****************************************************************************/
 
@@ -75,7 +74,7 @@ acpi_ex_add_table (
 	/* Install the new table into the local data structures */
 
 	table_info.pointer     = table;
-	table_info.length      = (ACPI_SIZE) table->length;
+	table_info.length      = (acpi_size) table->length;
 	table_info.allocation  = ACPI_MEM_ALLOCATED;
 
 	status = acpi_tb_install_table (&table_info);
@@ -282,7 +281,7 @@ acpi_ex_load_op (
 		table_header.length = 0;
 		for (i = 0; i < sizeof (acpi_table_header); i++) {
 			status = acpi_ev_address_space_dispatch (obj_desc, ACPI_READ,
-					   (ACPI_PHYSICAL_ADDRESS) i, 8,
+					   (acpi_physical_address) i, 8,
 					   ((u8 *) &table_header) + i);
 			if (ACPI_FAILURE (status)) {
 				return_ACPI_STATUS (status);
@@ -305,7 +304,7 @@ acpi_ex_load_op (
 
 		for (i = 0; i < table_header.length; i++) {
 			status = acpi_ev_address_space_dispatch (obj_desc, ACPI_READ,
-					   (ACPI_PHYSICAL_ADDRESS) i, 8,
+					   (acpi_physical_address) i, 8,
 					   ((u8 *) table_data_ptr + i));
 			if (ACPI_FAILURE (status)) {
 				goto cleanup;

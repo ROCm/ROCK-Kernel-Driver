@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: evrgnini- ACPI Address_space (Op_region) init
- *              $Revision: 64 $
  *
  *****************************************************************************/
 
@@ -406,7 +405,7 @@ acpi_ev_initialize_region (
 {
 	acpi_operand_object     *handler_obj;
 	acpi_operand_object     *obj_desc;
-	ACPI_ADR_SPACE_TYPE     space_id;
+	acpi_adr_space_type     space_id;
 	acpi_namespace_node     *node;
 	acpi_status             status;
 	acpi_namespace_node     *method_node;

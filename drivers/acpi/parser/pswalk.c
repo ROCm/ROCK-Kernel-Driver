@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: pswalk - Parser routines to walk parsed op tree(s)
- *              $Revision: 67 $
  *
  *****************************************************************************/
 
@@ -234,7 +233,7 @@ acpi_ps_delete_parse_tree (
 	acpi_parse_object       *subtree_root)
 {
 	acpi_walk_state         *walk_state;
-	ACPI_THREAD_STATE       *thread;
+	acpi_thread_state       *thread;
 	acpi_status             status;
 
 

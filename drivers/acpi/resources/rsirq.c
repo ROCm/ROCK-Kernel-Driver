@@ -1,7 +1,6 @@
 /*******************************************************************************
  *
  * Module Name: rsirq - IRQ resource descriptors
- *              $Revision: 31 $
  *
  ******************************************************************************/
 
@@ -55,9 +54,9 @@
 acpi_status
 acpi_rs_irq_resource (
 	u8                      *byte_stream_buffer,
-	ACPI_SIZE               *bytes_consumed,
+	acpi_size               *bytes_consumed,
 	u8                      **output_buffer,
-	ACPI_SIZE               *structure_size)
+	acpi_size               *structure_size)
 {
 	u8                      *buffer = byte_stream_buffer;
 	acpi_resource           *output_struct = (void *) *output_buffer;
@@ -65,7 +64,7 @@ acpi_rs_irq_resource (
 	u8                      temp8 = 0;
 	u8                      index;
 	u8                      i;
-	ACPI_SIZE               struct_size = ACPI_SIZEOF_RESOURCE (acpi_resource_irq);
+	acpi_size               struct_size = ACPI_SIZEOF_RESOURCE (acpi_resource_irq);
 
 
 	ACPI_FUNCTION_TRACE ("Rs_irq_resource");
@@ -103,7 +102,7 @@ acpi_rs_irq_resource (
 		/*
 		 * Calculate the structure size based upon the number of interrupts
 		 */
-		struct_size += ((ACPI_SIZE) i - 1) * 4;
+		struct_size += ((acpi_size) i - 1) * 4;
 	}
 
 	/*
@@ -184,7 +183,7 @@ acpi_status
 acpi_rs_irq_stream (
 	acpi_resource           *linked_list,
 	u8                      **output_buffer,
-	ACPI_SIZE               *bytes_consumed)
+	acpi_size               *bytes_consumed)
 {
 	u8                      *buffer = *output_buffer;
 	u16                     temp16 = 0;
@@ -279,9 +278,9 @@ acpi_rs_irq_stream (
 acpi_status
 acpi_rs_extended_irq_resource (
 	u8                      *byte_stream_buffer,
-	ACPI_SIZE               *bytes_consumed,
+	acpi_size               *bytes_consumed,
 	u8                      **output_buffer,
-	ACPI_SIZE               *structure_size)
+	acpi_size               *structure_size)
 {
 	u8                      *buffer = byte_stream_buffer;
 	acpi_resource           *output_struct = (void *) *output_buffer;
@@ -289,7 +288,7 @@ acpi_rs_extended_irq_resource (
 	u8                      temp8 = 0;
 	u8                      *temp_ptr;
 	u8                      index;
-	ACPI_SIZE               struct_size = ACPI_SIZEOF_RESOURCE (acpi_resource_ext_irq);
+	acpi_size               struct_size = ACPI_SIZEOF_RESOURCE (acpi_resource_ext_irq);
 
 
 	ACPI_FUNCTION_TRACE ("Rs_extended_irq_resource");
@@ -372,7 +371,7 @@ acpi_rs_extended_irq_resource (
 	 * stream that are default.
 	 */
 	if (*bytes_consumed >
-		((ACPI_SIZE) output_struct->data.extended_irq.number_of_interrupts * 4) + 5) {
+		((acpi_size) output_struct->data.extended_irq.number_of_interrupts * 4) + 5) {
 		/* Dereference the Index */
 
 		temp8 = *buffer;
@@ -454,7 +453,7 @@ acpi_status
 acpi_rs_extended_irq_stream (
 	acpi_resource           *linked_list,
 	u8                      **output_buffer,
-	ACPI_SIZE               *bytes_consumed)
+	acpi_size               *bytes_consumed)
 {
 	u8                      *buffer = *output_buffer;
 	u16                     *length_field;

@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: tbconvrt - ACPI Table conversion utilities
- *              $Revision: 45 $
  *
  *****************************************************************************/
 
@@ -48,7 +47,7 @@
 
 u32
 acpi_tb_get_table_count (
-	RSDP_DESCRIPTOR         *RSDP,
+	rsdp_descriptor         *RSDP,
 	acpi_table_header       *RSDT)
 {
 	u32                     pointer_size;
@@ -94,7 +93,7 @@ acpi_status
 acpi_tb_convert_to_xsdt (
 	acpi_table_desc         *table_info)
 {
-	ACPI_SIZE               table_size;
+	acpi_size               table_size;
 	u32                     i;
 	xsdt_descriptor         *new_table;
 
@@ -104,7 +103,7 @@ acpi_tb_convert_to_xsdt (
 
 	/* Compute size of the converted XSDT */
 
-	table_size = ((ACPI_SIZE) acpi_gbl_rsdt_table_count * sizeof (u64)) +
+	table_size = ((acpi_size) acpi_gbl_rsdt_table_count * sizeof (u64)) +
 			  sizeof (acpi_table_header);
 
 	/* Allocate an XSDT */

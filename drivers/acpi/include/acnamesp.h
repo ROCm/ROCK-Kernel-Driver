@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Name: acnamesp.h - Namespace subcomponent prototypes and defines
- *       $Revision: 132 $
  *
  *****************************************************************************/
 
@@ -304,7 +303,7 @@ acpi_ns_opens_scope (
 void
 acpi_ns_build_external_path (
 	acpi_namespace_node     *node,
-	ACPI_SIZE               size,
+	acpi_size               size,
 	char                    *name_buffer);
 
 char *
@@ -332,7 +331,7 @@ acpi_ns_get_node_by_path (
 	u32                     flags,
 	acpi_namespace_node     **out_node);
 
-ACPI_SIZE
+acpi_size
 acpi_ns_get_pathname_length (
 	acpi_namespace_node     *node);
 
@@ -358,18 +357,18 @@ acpi_ns_get_secondary_object (
 acpi_status
 acpi_ns_attach_data (
 	acpi_namespace_node     *node,
-	ACPI_OBJECT_HANDLER     handler,
+	acpi_object_handler     handler,
 	void                    *data);
 
 acpi_status
 acpi_ns_detach_data (
 	acpi_namespace_node     *node,
-	ACPI_OBJECT_HANDLER     handler);
+	acpi_object_handler     handler);
 
 acpi_status
 acpi_ns_get_attached_data (
 	acpi_namespace_node     *node,
-	ACPI_OBJECT_HANDLER     handler,
+	acpi_object_handler     handler,
 	void                    **data);
 
 

@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: tbxfroot - Find the root ACPI table (RSDT)
- *              $Revision: 67 $
  *
  *****************************************************************************/
 
@@ -118,8 +117,8 @@ acpi_get_firmware_table (
 	u32                     flags,
 	acpi_table_header       **table_pointer)
 {
-	ACPI_POINTER            rsdp_address;
-	ACPI_POINTER            address;
+	acpi_pointer            rsdp_address;
+	acpi_pointer            address;
 	acpi_status             status;
 	acpi_table_header       header;
 	acpi_table_desc         table_info;
@@ -160,7 +159,7 @@ acpi_get_firmware_table (
 		/* Map and validate the RSDP */
 
 		if ((flags & ACPI_MEMORY_MODE) == ACPI_LOGICAL_ADDRESSING) {
-			status = acpi_os_map_memory (rsdp_address.pointer.physical, sizeof (RSDP_DESCRIPTOR),
+			status = acpi_os_map_memory (rsdp_address.pointer.physical, sizeof (rsdp_descriptor),
 					  (void **) &acpi_gbl_RSDP);
 			if (ACPI_FAILURE (status)) {
 				return_ACPI_STATUS (status);
@@ -264,7 +263,7 @@ acpi_get_firmware_table (
 
 
 cleanup:
-	acpi_os_unmap_memory (rsdt_info.pointer, (ACPI_SIZE) rsdt_info.pointer->length);
+	acpi_os_unmap_memory (rsdt_info.pointer, (acpi_size) rsdt_info.pointer->length);
 	return_ACPI_STATUS (status);
 }
 
@@ -289,7 +288,7 @@ cleanup:
 acpi_status
 acpi_find_root_pointer (
 	u32                     flags,
-	ACPI_POINTER            *rsdp_address)
+	acpi_pointer            *rsdp_address)
 {
 	acpi_table_desc         table_info;
 	acpi_status             status;

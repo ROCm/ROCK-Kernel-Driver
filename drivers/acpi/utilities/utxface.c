@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: utxface - External interfaces for "global" ACPI functions
- *              $Revision: 100 $
  *
  *****************************************************************************/
 
@@ -438,7 +437,7 @@ acpi_get_system_info (
 
 acpi_status
 acpi_install_initialization_handler (
-	ACPI_INIT_HANDLER       handler,
+	acpi_init_handler       handler,
 	u32                     function)
 {
 

@@ -2,7 +2,6 @@
  *
  * Module Name: nsutils - Utilities for accessing ACPI namespace, accessing
  *                        parents and siblings and Scope manipulation
- *              $Revision: 120 $
  *
  *****************************************************************************/
 
@@ -355,7 +354,7 @@ acpi_ns_build_internal_name (
 	char                    *internal_name = info->internal_name;
 	char                    *external_name = info->next_external_char;
 	char                    *result = NULL;
-	NATIVE_UINT             i;
+	acpi_native_uint        i;
 
 
 	ACPI_FUNCTION_TRACE ("Ns_build_internal_name");
@@ -396,12 +395,12 @@ acpi_ns_build_internal_name (
 		}
 		else if (num_segments == 2) {
 			internal_name[i] = AML_DUAL_NAME_PREFIX;
-			result = &internal_name[i+1];
+			result = &internal_name[(acpi_native_uint) (i+1)];
 		}
 		else {
 			internal_name[i] = AML_MULTI_NAME_PREFIX_OP;
-			internal_name[i+1] = (char) num_segments;
-			result = &internal_name[i+2];
+			internal_name[(acpi_native_uint) (i+1)] = (char) num_segments;
+			result = &internal_name[(acpi_native_uint) (i+2)];
 		}
 	}
 
@@ -535,12 +534,12 @@ acpi_ns_externalize_name (
 	u32                     *converted_name_length,
 	char                    **converted_name)
 {
-	NATIVE_UINT_MIN32       prefix_length = 0;
-	NATIVE_UINT_MIN32       names_index = 0;
-	NATIVE_UINT_MIN32       num_segments = 0;
-	NATIVE_UINT_MIN32       i = 0;
-	NATIVE_UINT_MIN32       j = 0;
-	NATIVE_UINT_MIN32       required_length;
+	acpi_native_uint        names_index = 0;
+	acpi_native_uint        num_segments = 0;
+	acpi_native_uint        required_length;
+	acpi_native_uint        prefix_length = 0;
+	acpi_native_uint        i = 0;
+	acpi_native_uint        j = 0;
 
 
 	ACPI_FUNCTION_TRACE ("Ns_externalize_name");
@@ -591,7 +590,7 @@ acpi_ns_externalize_name (
 			/* <count> 4-byte names */
 
 			names_index = prefix_length + 2;
-			num_segments = (u32) (u8) internal_name[prefix_length + 1];
+			num_segments = (u32) (u8) internal_name[(acpi_native_uint) (prefix_length + 1)];
 			break;
 
 		case AML_DUAL_NAME_PREFIX:

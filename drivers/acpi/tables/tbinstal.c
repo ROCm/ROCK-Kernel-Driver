@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: tbinstal - ACPI table installation and removal
- *              $Revision: 65 $
  *
  *****************************************************************************/
 
@@ -52,7 +51,7 @@ acpi_tb_match_signature (
 	acpi_table_desc         *table_info,
 	u8                      search_type)
 {
-	NATIVE_UINT             i;
+	acpi_native_uint        i;
 
 
 	ACPI_FUNCTION_TRACE ("Tb_match_signature");
@@ -197,7 +196,7 @@ acpi_tb_recognize_table (
 
 	/* Return the table type and length via the info struct */
 
-	table_info->length = (ACPI_SIZE) table_header->length;
+	table_info->length = (acpi_size) table_header->length;
 
 	return_ACPI_STATUS (status);
 }

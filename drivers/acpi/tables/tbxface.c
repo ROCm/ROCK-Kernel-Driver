@@ -2,7 +2,6 @@
  *
  * Module Name: tbxface - Public interfaces to the ACPI subsystem
  *                         ACPI table oriented interfaces
- *              $Revision: 60 $
  *
  *****************************************************************************/
 
@@ -50,7 +49,7 @@
 acpi_status
 acpi_load_tables (void)
 {
-	ACPI_POINTER            rsdp_address;
+	acpi_pointer            rsdp_address;
 	acpi_status             status;
 
 
@@ -141,7 +140,7 @@ acpi_load_table (
 {
 	acpi_status             status;
 	acpi_table_desc         table_info;
-	ACPI_POINTER            address;
+	acpi_pointer            address;
 
 
 	ACPI_FUNCTION_TRACE ("Acpi_load_table");
@@ -356,7 +355,7 @@ acpi_get_table (
 {
 	acpi_table_header       *tbl_ptr;
 	acpi_status             status;
-	ACPI_SIZE               table_length;
+	acpi_size               table_length;
 
 
 	ACPI_FUNCTION_TRACE ("Acpi_get_table");
@@ -403,10 +402,10 @@ acpi_get_table (
 		/*
 		 *  RSD PTR is the only "table" without a header
 		 */
-		table_length = sizeof (RSDP_DESCRIPTOR);
+		table_length = sizeof (rsdp_descriptor);
 	}
 	else {
-		table_length = (ACPI_SIZE) tbl_ptr->length;
+		table_length = (acpi_size) tbl_ptr->length;
 	}
 
 	/* Validate/Allocate/Clear caller buffer */

@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: psargs - Parse AML opcode arguments
- *              $Revision: 67 $
  *
  *****************************************************************************/
 
@@ -122,7 +121,7 @@ acpi_ps_get_next_package_end (
 	acpi_parse_state        *parser_state)
 {
 	u8                      *start = parser_state->aml;
-	NATIVE_UINT             length;
+	acpi_native_uint        length;
 
 
 	ACPI_FUNCTION_TRACE ("Ps_get_next_package_end");
@@ -130,7 +129,7 @@ acpi_ps_get_next_package_end (
 
 	/* Function below changes Parser_state->Aml */
 
-	length = (NATIVE_UINT) acpi_ps_get_next_package_length (parser_state);
+	length = (acpi_native_uint) acpi_ps_get_next_package_length (parser_state);
 
 	return_PTR (start + length); /* end of package */
 }
@@ -194,7 +193,7 @@ acpi_ps_get_next_namestring (
 
 		/* Multiple name segments, 4 chars each */
 
-		end += 2 + ((ACPI_SIZE) ACPI_GET8 (end + 1) * ACPI_NAME_SIZE);
+		end += 2 + ((acpi_size) ACPI_GET8 (end + 1) * ACPI_NAME_SIZE);
 		break;
 
 	default:

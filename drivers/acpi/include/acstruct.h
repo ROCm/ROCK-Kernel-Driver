@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Name: acstruct.h - Internal structs
- *       $Revision: 22 $
  *
  *****************************************************************************/
 
@@ -94,7 +93,7 @@ typedef struct acpi_walk_state
 	acpi_parse_object       *next_op;                           /* next op to be processed */
 	acpi_parse_downwards    descending_callback;
 	acpi_parse_upwards      ascending_callback;
-	ACPI_THREAD_STATE       *thread;
+	acpi_thread_state       *thread;
 	struct acpi_walk_state  *next;                              /* Next Walk_state in list */
 
 
@@ -163,16 +162,16 @@ typedef union acpi_aml_operands
 
 	struct
 	{
-		ACPI_OBJECT_INTEGER     *type;
-		ACPI_OBJECT_INTEGER     *code;
-		ACPI_OBJECT_INTEGER     *argument;
+		acpi_object_integer     *type;
+		acpi_object_integer     *code;
+		acpi_object_integer     *argument;
 
 	} fatal;
 
 	struct
 	{
 		acpi_operand_object     *source;
-		ACPI_OBJECT_INTEGER     *index;
+		acpi_object_integer     *index;
 		acpi_operand_object     *target;
 
 	} index;
@@ -180,13 +179,13 @@ typedef union acpi_aml_operands
 	struct
 	{
 		acpi_operand_object     *source;
-		ACPI_OBJECT_INTEGER     *index;
-		ACPI_OBJECT_INTEGER     *length;
+		acpi_object_integer     *index;
+		acpi_object_integer     *length;
 		acpi_operand_object     *target;
 
 	} mid;
 
-} ACPI_AML_OPERANDS;
+} acpi_aml_operands;
 
 
 #endif

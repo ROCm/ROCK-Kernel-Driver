@@ -1,7 +1,6 @@
 /*******************************************************************************
  *
  * Module Name: rsaddr - Address resource descriptors (16/32/64)
- *              $Revision: 27 $
  *
  ******************************************************************************/
 
@@ -55,14 +54,14 @@
 acpi_status
 acpi_rs_address16_resource (
 	u8                      *byte_stream_buffer,
-	ACPI_SIZE               *bytes_consumed,
+	acpi_size               *bytes_consumed,
 	u8                      **output_buffer,
-	ACPI_SIZE               *structure_size)
+	acpi_size               *structure_size)
 {
 	u8                      *buffer = byte_stream_buffer;
 	acpi_resource           *output_struct = (void *) *output_buffer;
 	u8                      *temp_ptr;
-	ACPI_SIZE               struct_size = ACPI_SIZEOF_RESOURCE (acpi_resource_address16);
+	acpi_size               struct_size = ACPI_SIZEOF_RESOURCE (acpi_resource_address16);
 	u32                     index;
 	u16                     temp16;
 	u8                      temp8;
@@ -268,13 +267,13 @@ acpi_status
 acpi_rs_address16_stream (
 	acpi_resource           *linked_list,
 	u8                      **output_buffer,
-	ACPI_SIZE               *bytes_consumed)
+	acpi_size               *bytes_consumed)
 {
 	u8                      *buffer = *output_buffer;
 	u8                      *length_field;
 	u8                      temp8;
 	char                    *temp_pointer = NULL;
-	ACPI_SIZE               actual_bytes;
+	acpi_size               actual_bytes;
 
 
 	ACPI_FUNCTION_TRACE ("Rs_address16_stream");
@@ -433,16 +432,16 @@ acpi_rs_address16_stream (
 acpi_status
 acpi_rs_address32_resource (
 	u8                      *byte_stream_buffer,
-	ACPI_SIZE               *bytes_consumed,
+	acpi_size               *bytes_consumed,
 	u8                      **output_buffer,
-	ACPI_SIZE               *structure_size)
+	acpi_size               *structure_size)
 {
 	u8                      *buffer;
 	acpi_resource           *output_struct= (void *) *output_buffer;
 	u16                     temp16;
 	u8                      temp8;
 	u8                      *temp_ptr;
-	ACPI_SIZE               struct_size;
+	acpi_size               struct_size;
 	u32                     index;
 
 
@@ -651,7 +650,7 @@ acpi_status
 acpi_rs_address32_stream (
 	acpi_resource           *linked_list,
 	u8                      **output_buffer,
-	ACPI_SIZE               *bytes_consumed)
+	acpi_size               *bytes_consumed)
 {
 	u8                      *buffer;
 	u16                     *length_field;
@@ -815,16 +814,16 @@ acpi_rs_address32_stream (
 acpi_status
 acpi_rs_address64_resource (
 	u8                      *byte_stream_buffer,
-	ACPI_SIZE               *bytes_consumed,
+	acpi_size               *bytes_consumed,
 	u8                      **output_buffer,
-	ACPI_SIZE               *structure_size)
+	acpi_size               *structure_size)
 {
 	u8                      *buffer;
 	acpi_resource           *output_struct = (void *) *output_buffer;
 	u16                     temp16;
 	u8                      temp8;
 	u8                      *temp_ptr;
-	ACPI_SIZE               struct_size;
+	acpi_size               struct_size;
 	u32                     index;
 
 
@@ -1037,7 +1036,7 @@ acpi_status
 acpi_rs_address64_stream (
 	acpi_resource           *linked_list,
 	u8                      **output_buffer,
-	ACPI_SIZE               *bytes_consumed)
+	acpi_size               *bytes_consumed)
 {
 	u8                      *buffer;
 	u16                     *length_field;

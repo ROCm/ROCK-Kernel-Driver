@@ -2,7 +2,6 @@
 /******************************************************************************
  *
  * Module Name: exmisc - ACPI AML (p-code) execution - specific opcodes
- *              $Revision: 114 $
  *
  *****************************************************************************/
 
@@ -152,8 +151,8 @@ acpi_ex_concat_template (
 	u8                      *new_buf;
 	u8                      *end_tag1;
 	u8                      *end_tag2;
-	ACPI_SIZE               length1;
-	ACPI_SIZE               length2;
+	acpi_size               length1;
+	acpi_size               length2;
 
 
 	ACPI_FUNCTION_TRACE ("Ex_concat_template");
@@ -281,8 +280,8 @@ acpi_ex_do_concatenate (
 
 		/* Operand0 is string  */
 
-		new_buf = ACPI_MEM_CALLOCATE ((ACPI_SIZE) obj_desc1->string.length +
-				   (ACPI_SIZE) obj_desc2->string.length + 1);
+		new_buf = ACPI_MEM_CALLOCATE ((acpi_size) obj_desc1->string.length +
+				   (acpi_size) obj_desc2->string.length + 1);
 		if (!new_buf) {
 			ACPI_REPORT_ERROR
 				(("Ex_do_concatenate: String allocation failure\n"));
@@ -309,8 +308,8 @@ acpi_ex_do_concatenate (
 		/* Result of two Buffers is a Buffer */
 
 		return_desc = acpi_ut_create_buffer_object (
-				   (ACPI_SIZE) obj_desc1->buffer.length +
-				   (ACPI_SIZE) obj_desc2->buffer.length);
+				   (acpi_size) obj_desc1->buffer.length +
+				   (acpi_size) obj_desc2->buffer.length);
 		if (!return_desc) {
 			return (AE_NO_MEMORY);
 		}

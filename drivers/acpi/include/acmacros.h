@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Name: acmacros.h - C macros for the entire subsystem.
- *       $Revision: 135 $
  *
  *****************************************************************************/
 
@@ -71,7 +70,7 @@
 #define ACPI_HIDWORD(l)                 ((u32)(((*(uint64_struct *)(void *)(&l))).hi))
 
 #define ACPI_GET_ADDRESS(a)             (a)
-#define ACPI_STORE_ADDRESS(a,b)         ((a)=(ACPI_PHYSICAL_ADDRESS)(b))
+#define ACPI_STORE_ADDRESS(a,b)         ((a)=(acpi_physical_address)(b))
 #define ACPI_VALID_ADDRESS(a)           (a)
 #endif
 #endif
@@ -84,14 +83,14 @@
 
 /* Pointer arithmetic */
 
-#define ACPI_PTR_ADD(t,a,b)             (t *) (void *)((char *)(a) + (NATIVE_UINT)(b))
-#define ACPI_PTR_DIFF(a,b)              (NATIVE_UINT) ((char *)(a) - (char *)(b))
+#define ACPI_PTR_ADD(t,a,b)             (t *) (void *)((char *)(a) + (acpi_native_uint)(b))
+#define ACPI_PTR_DIFF(a,b)              (acpi_native_uint) ((char *)(a) - (char *)(b))
 
 /* Pointer/Integer type conversions */
 
-#define ACPI_TO_POINTER(i)              ACPI_PTR_ADD (void, (void *) NULL,(NATIVE_UINT)i)
+#define ACPI_TO_POINTER(i)              ACPI_PTR_ADD (void, (void *) NULL,(acpi_native_uint)i)
 #define ACPI_TO_INTEGER(p)              ACPI_PTR_DIFF (p,(void *) NULL)
-#define ACPI_OFFSET(d,f)                (ACPI_SIZE) ACPI_PTR_DIFF (&(((d *)0)->f),(void *) NULL)
+#define ACPI_OFFSET(d,f)                (acpi_size) ACPI_PTR_DIFF (&(((d *)0)->f),(void *) NULL)
 #define ACPI_FADT_OFFSET(f)             ACPI_OFFSET (FADT_DESCRIPTOR, f)
 
 #define ACPI_CAST_PTR(t, p)             ((t *)(void *)(p))
@@ -178,8 +177,8 @@
 /*
  * Rounding macros (Power of two boundaries only)
  */
-#define ACPI_ROUND_DOWN(value,boundary)      (((NATIVE_UINT)(value)) & (~(((NATIVE_UINT) boundary)-1)))
-#define ACPI_ROUND_UP(value,boundary)        ((((NATIVE_UINT)(value)) + (((NATIVE_UINT) boundary)-1)) & (~(((NATIVE_UINT) boundary)-1)))
+#define ACPI_ROUND_DOWN(value,boundary)      (((acpi_native_uint)(value)) & (~(((acpi_native_uint) boundary)-1)))
+#define ACPI_ROUND_UP(value,boundary)        ((((acpi_native_uint)(value)) + (((acpi_native_uint) boundary)-1)) & (~(((acpi_native_uint) boundary)-1)))
 
 #define ACPI_ROUND_DOWN_TO_32_BITS(a)        ACPI_ROUND_DOWN(a,4)
 #define ACPI_ROUND_DOWN_TO_64_BITS(a)        ACPI_ROUND_DOWN(a,8)
@@ -256,8 +255,8 @@
  *
  * The "Descriptor" field is the first field in both structures.
  */
-#define ACPI_GET_DESCRIPTOR_TYPE(d)     (((ACPI_DESCRIPTOR *)(void *)(d))->descriptor_id)
-#define ACPI_SET_DESCRIPTOR_TYPE(d,t)   (((ACPI_DESCRIPTOR *)(void *)(d))->descriptor_id = t)
+#define ACPI_GET_DESCRIPTOR_TYPE(d)     (((acpi_descriptor *)(void *)(d))->descriptor_id)
+#define ACPI_SET_DESCRIPTOR_TYPE(d,t)   (((acpi_descriptor *)(void *)(d))->descriptor_id = t)
 
 
 /* Macro to test the object type */
@@ -269,32 +268,16 @@
 #define ACPI_IS_SINGLE_TABLE(x)         (((x) & 0x01) == ACPI_TABLE_SINGLE ? 1 : 0)
 
 /*
- * Macro to check if a pointer is within an ACPI table.
- * Parameter (a) is the pointer to check.  Parameter (b) must be defined
- * as a pointer to an acpi_table_header.  (b+1) then points past the header,
- * and ((u8 *)b+b->Length) points one byte past the end of the table.
- */
-#if ACPI_MACHINE_WIDTH != 16
-#define ACPI_IS_IN_ACPI_TABLE(a,b)      (((u8 *)(a) >= (u8 *)(b + 1)) &&\
-							 ((u8 *)(a) < ((u8 *)b + b->length)))
-
-#else
-#define ACPI_IS_IN_ACPI_TABLE(a,b)      (_segment)(a) == (_segment)(b) &&\
-									 (((u8 *)(a) >= (u8 *)(b + 1)) &&\
-									 ((u8 *)(a) < ((u8 *)b + b->length)))
-#endif
-
-/*
  * Macros for the master AML opcode table
  */
 #if defined(ACPI_DISASSEMBLER) || defined (ACPI_DEBUG_OUTPUT)
-#define ACPI_OP(name,Pargs,Iargs,obj_type,class,type,flags)    {name,Pargs,Iargs,flags,obj_type,class,type}
+#define ACPI_OP(name,Pargs,Iargs,obj_type,class,type,flags)    {name,(u32)(Pargs),(u32)(Iargs),(u32)(flags),obj_type,class,type}
 #else
-#define ACPI_OP(name,Pargs,Iargs,obj_type,class,type,flags)    {Pargs,Iargs,flags,obj_type,class,type}
+#define ACPI_OP(name,Pargs,Iargs,obj_type,class,type,flags)    {(u32)(Pargs),(u32)(Iargs),(u32)(flags),obj_type,class,type}
 #endif
 
 #ifdef ACPI_DISASSEMBLER
-#define ACPI_DISASM_ONLY_MEMBERS(a)      a;
+#define ACPI_DISASM_ONLY_MEMBERS(a)     a;
 #else
 #define ACPI_DISASM_ONLY_MEMBERS(a)
 #endif
@@ -335,10 +318,10 @@
  * 5) Expand address to 64 bits
  */
 #define ASL_BUILD_GAS_FROM_ENTRY(a,b,c,d)   do {a.address_space_id = (u8) d;\
-											 a.register_bit_width = (u8) ACPI_MUL_8 (b);\
-											 a.register_bit_offset = 0;\
-											 a.reserved = 0;\
-											 ACPI_STORE_ADDRESS (a.address,(ACPI_PHYSICAL_ADDRESS) c);} while (0)
+							  a.register_bit_width = (u8) ACPI_MUL_8 (b);\
+							  a.register_bit_offset = 0;\
+							  a.reserved = 0;\
+							  ACPI_STORE_ADDRESS (a.address,(acpi_physical_address) c);} while (0)
 
 /* ACPI V1.0 entries -- address space is always I/O */
 
@@ -360,9 +343,9 @@
 #ifdef ACPI_DEBUG_OUTPUT
 
 #define ACPI_REPORT_INFO(fp)                {acpi_ut_report_info(_THIS_MODULE,__LINE__,_COMPONENT); \
-												acpi_os_printf ACPI_PARAM_LIST(fp);}
+									   acpi_os_printf ACPI_PARAM_LIST(fp);}
 #define ACPI_REPORT_ERROR(fp)               {acpi_ut_report_error(_THIS_MODULE,__LINE__,_COMPONENT); \
-												acpi_os_printf ACPI_PARAM_LIST(fp);}
+											 acpi_os_printf ACPI_PARAM_LIST(fp);}
 #define ACPI_REPORT_WARNING(fp)             {acpi_ut_report_warning(_THIS_MODULE,__LINE__,_COMPONENT); \
 												acpi_os_printf ACPI_PARAM_LIST(fp);}
 #define ACPI_REPORT_NSERROR(s,e)            acpi_ns_report_error(_THIS_MODULE,__LINE__,_COMPONENT, s, e);
@@ -572,8 +555,8 @@
 
 /* Memory allocation */
 
-#define ACPI_MEM_ALLOCATE(a)            acpi_ut_allocate((ACPI_SIZE)(a),_COMPONENT,_THIS_MODULE,__LINE__)
-#define ACPI_MEM_CALLOCATE(a)           acpi_ut_callocate((ACPI_SIZE)(a), _COMPONENT,_THIS_MODULE,__LINE__)
+#define ACPI_MEM_ALLOCATE(a)            acpi_ut_allocate((acpi_size)(a),_COMPONENT,_THIS_MODULE,__LINE__)
+#define ACPI_MEM_CALLOCATE(a)           acpi_ut_callocate((acpi_size)(a), _COMPONENT,_THIS_MODULE,__LINE__)
 #define ACPI_MEM_FREE(a)                acpi_os_free(a)
 #define ACPI_MEM_TRACKING(a)
 
@@ -582,8 +565,8 @@
 
 /* Memory allocation */
 
-#define ACPI_MEM_ALLOCATE(a)            acpi_ut_allocate_and_track((ACPI_SIZE)(a),_COMPONENT,_THIS_MODULE,__LINE__)
-#define ACPI_MEM_CALLOCATE(a)           acpi_ut_callocate_and_track((ACPI_SIZE)(a), _COMPONENT,_THIS_MODULE,__LINE__)
+#define ACPI_MEM_ALLOCATE(a)            acpi_ut_allocate_and_track((acpi_size)(a),_COMPONENT,_THIS_MODULE,__LINE__)
+#define ACPI_MEM_CALLOCATE(a)           acpi_ut_callocate_and_track((acpi_size)(a), _COMPONENT,_THIS_MODULE,__LINE__)
 #define ACPI_MEM_FREE(a)                acpi_ut_free_and_track(a,_COMPONENT,_THIS_MODULE,__LINE__)
 #define ACPI_MEM_TRACKING(a)            a
 

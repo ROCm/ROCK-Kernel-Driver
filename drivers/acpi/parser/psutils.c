@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: psutils - Parser miscellaneous utilities (Parser only)
- *              $Revision: 54 $
  *
  *****************************************************************************/
 
@@ -125,23 +124,23 @@ acpi_ps_alloc_op (
 	/* Allocate the minimum required size object */
 
 	if (op_info->flags & AML_DEFER) {
-		size = sizeof (ACPI_PARSE_OBJ_NAMED);
+		size = sizeof (acpi_parse_obj_named);
 		flags = ACPI_PARSEOP_DEFERRED;
 	}
 	else if (op_info->flags & AML_NAMED) {
-		size = sizeof (ACPI_PARSE_OBJ_NAMED);
+		size = sizeof (acpi_parse_obj_named);
 		flags = ACPI_PARSEOP_NAMED;
 	}
 	else if (opcode == AML_INT_BYTELIST_OP) {
-		size = sizeof (ACPI_PARSE_OBJ_NAMED);
+		size = sizeof (acpi_parse_obj_named);
 		flags = ACPI_PARSEOP_BYTELIST;
 	}
 	else {
-		size = sizeof (ACPI_PARSE_OBJ_COMMON);
+		size = sizeof (acpi_parse_obj_common);
 		flags = ACPI_PARSEOP_GENERIC;
 	}
 
-	if (size == sizeof (ACPI_PARSE_OBJ_COMMON)) {
+	if (size == sizeof (acpi_parse_obj_common)) {
 		/*
 		 * The generic op is by far the most common (16 to 1)
 		 */

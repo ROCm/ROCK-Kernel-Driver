@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: utglobal - Global variables for the ACPI subsystem
- *              $Revision: 177 $
  *
  *****************************************************************************/
 
@@ -304,7 +303,7 @@ ACPI_TABLE_SUPPORT          acpi_gbl_acpi_table_data[NUM_ACPI_TABLES] =
  *
  ******************************************************************************/
 
-ACPI_BIT_REGISTER_INFO      acpi_gbl_bit_register_info[ACPI_NUM_BITREG] =
+acpi_bit_register_info      acpi_gbl_bit_register_info[ACPI_NUM_BITREG] =
 {
 	/* Name                                     Parent Register             Register Bit Position                   Register Bit Mask       */
 
@@ -659,7 +658,7 @@ acpi_ut_init_globals (
 
 	/* Memory allocation and cache lists */
 
-	ACPI_MEMSET (acpi_gbl_memory_lists, 0, sizeof (ACPI_MEMORY_LIST) * ACPI_NUM_MEM_LISTS);
+	ACPI_MEMSET (acpi_gbl_memory_lists, 0, sizeof (acpi_memory_list) * ACPI_NUM_MEM_LISTS);
 
 	acpi_gbl_memory_lists[ACPI_MEM_LIST_STATE].link_offset      = (u16) ACPI_PTR_DIFF (&(((acpi_generic_state *) NULL)->common.next), NULL);
 	acpi_gbl_memory_lists[ACPI_MEM_LIST_PSNODE].link_offset     = (u16) ACPI_PTR_DIFF (&(((acpi_parse_object *) NULL)->common.next), NULL);
@@ -669,8 +668,8 @@ acpi_ut_init_globals (
 
 	acpi_gbl_memory_lists[ACPI_MEM_LIST_NSNODE].object_size     = sizeof (acpi_namespace_node);
 	acpi_gbl_memory_lists[ACPI_MEM_LIST_STATE].object_size      = sizeof (acpi_generic_state);
-	acpi_gbl_memory_lists[ACPI_MEM_LIST_PSNODE].object_size     = sizeof (ACPI_PARSE_OBJ_COMMON);
-	acpi_gbl_memory_lists[ACPI_MEM_LIST_PSNODE_EXT].object_size = sizeof (ACPI_PARSE_OBJ_NAMED);
+	acpi_gbl_memory_lists[ACPI_MEM_LIST_PSNODE].object_size     = sizeof (acpi_parse_obj_common);
+	acpi_gbl_memory_lists[ACPI_MEM_LIST_PSNODE_EXT].object_size = sizeof (acpi_parse_obj_named);
 	acpi_gbl_memory_lists[ACPI_MEM_LIST_OPERAND].object_size    = sizeof (acpi_operand_object);
 	acpi_gbl_memory_lists[ACPI_MEM_LIST_WALK].object_size       = sizeof (acpi_walk_state);
 

@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: utalloc - local cache and memory allocation routines
- *              $Revision: 130 $
  *
  *****************************************************************************/
 
@@ -49,7 +48,7 @@ acpi_ut_release_to_cache (
 	u32                     list_id,
 	void                    *object)
 {
-	ACPI_MEMORY_LIST        *cache_info;
+	acpi_memory_list        *cache_info;
 
 
 	ACPI_FUNCTION_ENTRY ();
@@ -104,7 +103,7 @@ void *
 acpi_ut_acquire_from_cache (
 	u32                     list_id)
 {
-	ACPI_MEMORY_LIST        *cache_info;
+	acpi_memory_list        *cache_info;
 	void                    *object;
 
 
@@ -176,7 +175,7 @@ void
 acpi_ut_delete_generic_cache (
 	u32                     list_id)
 {
-	ACPI_MEMORY_LIST        *cache_info;
+	acpi_memory_list        *cache_info;
 	char                    *next;
 
 
@@ -254,7 +253,7 @@ acpi_ut_validate_buffer (
 acpi_status
 acpi_ut_initialize_buffer (
 	acpi_buffer             *buffer,
-	ACPI_SIZE               required_length)
+	acpi_size               required_length)
 {
 	acpi_status             status = AE_OK;
 
@@ -330,7 +329,7 @@ acpi_ut_initialize_buffer (
 
 void *
 acpi_ut_allocate (
-	ACPI_SIZE               size,
+	acpi_size               size,
 	u32                     component,
 	char                    *module,
 	u32                     line)
@@ -380,7 +379,7 @@ acpi_ut_allocate (
 
 void *
 acpi_ut_callocate (
-	ACPI_SIZE               size,
+	acpi_size               size,
 	u32                     component,
 	char                    *module,
 	u32                     line)
@@ -445,7 +444,7 @@ acpi_ut_callocate (
 
 void *
 acpi_ut_allocate_and_track (
-	ACPI_SIZE               size,
+	acpi_size               size,
 	u32                     component,
 	char                    *module,
 	u32                     line)
@@ -491,7 +490,7 @@ acpi_ut_allocate_and_track (
 
 void *
 acpi_ut_callocate_and_track (
-	ACPI_SIZE               size,
+	acpi_size               size,
 	u32                     component,
 	char                    *module,
 	u32                     line)
@@ -645,13 +644,13 @@ acpi_status
 acpi_ut_track_allocation (
 	u32                     list_id,
 	acpi_debug_mem_block    *allocation,
-	ACPI_SIZE               size,
+	acpi_size               size,
 	u8                      alloc_type,
 	u32                     component,
 	char                    *module,
 	u32                     line)
 {
-	ACPI_MEMORY_LIST        *mem_list;
+	acpi_memory_list        *mem_list;
 	acpi_debug_mem_block    *element;
 	acpi_status             status = AE_OK;
 
@@ -734,7 +733,7 @@ acpi_ut_remove_allocation (
 	char                    *module,
 	u32                     line)
 {
-	ACPI_MEMORY_LIST        *mem_list;
+	acpi_memory_list        *mem_list;
 	acpi_status             status;
 
 
@@ -801,7 +800,7 @@ acpi_ut_dump_allocation_info (
 	void)
 {
 /*
-	ACPI_MEMORY_LIST        *Mem_list;
+	acpi_memory_list        *Mem_list;
 */
 
 	ACPI_FUNCTION_TRACE ("Ut_dump_allocation_info");
@@ -862,7 +861,7 @@ acpi_ut_dump_allocations (
 	char                    *module)
 {
 	acpi_debug_mem_block    *element;
-	ACPI_DESCRIPTOR         *descriptor;
+	acpi_descriptor         *descriptor;
 	u32                     num_outstanding = 0;
 
 
@@ -882,7 +881,7 @@ acpi_ut_dump_allocations (
 			((module == NULL) || (0 == ACPI_STRCMP (module, element->module)))) {
 			/* Ignore allocated objects that are in a cache */
 
-			descriptor = ACPI_CAST_PTR (ACPI_DESCRIPTOR, &element->user_space);
+			descriptor = ACPI_CAST_PTR (acpi_descriptor, &element->user_space);
 			if (descriptor->descriptor_id != ACPI_DESC_TYPE_CACHED) {
 				acpi_os_printf ("%p Len %04X %9.9s-%d ",
 						 descriptor, element->size, element->module,

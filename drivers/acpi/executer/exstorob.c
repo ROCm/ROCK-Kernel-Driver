@@ -2,7 +2,6 @@
 /******************************************************************************
  *
  * Module Name: exstorob - AML Interpreter object store support, store to object
- *              $Revision: 49 $
  *
  *****************************************************************************/
 
@@ -148,7 +147,7 @@ acpi_ex_store_string_to_string (
 		 * String will fit in existing non-static buffer.
 		 * Clear old string and copy in the new one
 		 */
-		ACPI_MEMSET (target_desc->string.pointer, 0, (ACPI_SIZE) target_desc->string.length + 1);
+		ACPI_MEMSET (target_desc->string.pointer, 0, (acpi_size) target_desc->string.length + 1);
 		ACPI_MEMCPY (target_desc->string.pointer, buffer, length);
 	}
 	else {
@@ -164,7 +163,7 @@ acpi_ex_store_string_to_string (
 			ACPI_MEM_FREE (target_desc->string.pointer);
 		}
 
-		target_desc->string.pointer = ACPI_MEM_CALLOCATE ((ACPI_SIZE) length + 1);
+		target_desc->string.pointer = ACPI_MEM_CALLOCATE ((acpi_size) length + 1);
 		if (!target_desc->string.pointer) {
 			return_ACPI_STATUS (AE_NO_MEMORY);
 		}

@@ -2,7 +2,6 @@
 /******************************************************************************
  *
  * Name: hwsleep.c - ACPI Hardware Sleep/Wake Interface
- *              $Revision: 48 $
  *
  *****************************************************************************/
 
@@ -45,7 +44,7 @@
 
 acpi_status
 acpi_set_firmware_waking_vector (
-	ACPI_PHYSICAL_ADDRESS physical_address)
+	acpi_physical_address physical_address)
 {
 
 	ACPI_FUNCTION_TRACE ("Acpi_set_firmware_waking_vector");
@@ -82,7 +81,7 @@ acpi_set_firmware_waking_vector (
 
 acpi_status
 acpi_get_firmware_waking_vector (
-	ACPI_PHYSICAL_ADDRESS *physical_address)
+	acpi_physical_address *physical_address)
 {
 
 	ACPI_FUNCTION_TRACE ("Acpi_get_firmware_waking_vector");
@@ -95,7 +94,7 @@ acpi_get_firmware_waking_vector (
 	/* Get the vector */
 
 	if (acpi_gbl_common_fACS.vector_width == 32) {
-		*physical_address = (ACPI_PHYSICAL_ADDRESS)
+		*physical_address = (acpi_physical_address)
 			*(ACPI_CAST_PTR (u32, acpi_gbl_common_fACS.firmware_waking_vector));
 	}
 	else {
@@ -186,8 +185,8 @@ acpi_enter_sleep_state (
 {
 	u32                     PM1Acontrol;
 	u32                     PM1Bcontrol;
-	ACPI_BIT_REGISTER_INFO  *sleep_type_reg_info;
-	ACPI_BIT_REGISTER_INFO  *sleep_enable_reg_info;
+	acpi_bit_register_info  *sleep_type_reg_info;
+	acpi_bit_register_info  *sleep_enable_reg_info;
 	u32                     in_value;
 	acpi_status             status;
 

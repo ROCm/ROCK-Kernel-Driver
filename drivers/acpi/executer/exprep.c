@@ -2,7 +2,6 @@
 /******************************************************************************
  *
  * Module Name: exprep - ACPI AML (p-code) execution - field prep utilities
- *              $Revision: 121 $
  *
  *****************************************************************************/
 
@@ -297,7 +296,7 @@ acpi_ex_prep_common_field_object (
 
 acpi_status
 acpi_ex_prep_field_value (
-	ACPI_CREATE_FIELD_INFO  *info)
+	acpi_create_field_info  *info)
 {
 	acpi_operand_object     *obj_desc;
 	u32                     type;

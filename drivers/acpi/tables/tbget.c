@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: tbget - ACPI Table get* routines
- *              $Revision: 82 $
  *
  *****************************************************************************/
 
@@ -48,7 +47,7 @@
 
 acpi_status
 acpi_tb_get_table (
-	ACPI_POINTER            *address,
+	acpi_pointer            *address,
 	acpi_table_desc         *table_info)
 {
 	acpi_status             status;
@@ -98,7 +97,7 @@ acpi_tb_get_table (
 
 acpi_status
 acpi_tb_get_table_header (
-	ACPI_POINTER            *address,
+	acpi_pointer            *address,
 	acpi_table_header       *return_header)
 {
 	acpi_status             status = AE_OK;
@@ -176,7 +175,7 @@ acpi_tb_get_table_header (
 
 acpi_status
 acpi_tb_get_table_body (
-	ACPI_POINTER            *address,
+	acpi_pointer            *address,
 	acpi_table_header       *header,
 	acpi_table_desc         *table_info)
 {
@@ -228,7 +227,7 @@ acpi_tb_table_override (
 {
 	acpi_table_header       *new_table;
 	acpi_status             status;
-	ACPI_POINTER            address;
+	acpi_pointer            address;
 
 
 	ACPI_FUNCTION_TRACE ("Tb_table_override");
@@ -297,7 +296,7 @@ acpi_tb_table_override (
 
 acpi_status
 acpi_tb_get_this_table (
-	ACPI_POINTER            *address,
+	acpi_pointer            *address,
 	acpi_table_header       *header,
 	acpi_table_desc         *table_info)
 {
@@ -342,7 +341,7 @@ acpi_tb_get_this_table (
 		 * Just map the table's physical memory
 		 * into our address space.
 		 */
-		status = acpi_os_map_memory (address->pointer.physical, (ACPI_SIZE) header->length,
+		status = acpi_os_map_memory (address->pointer.physical, (acpi_size) header->length,
 				  (void **) &full_table);
 		if (ACPI_FAILURE (status)) {
 			ACPI_REPORT_ERROR (("Could not map memory for table [%4.4s] at %8.8X%8.8X for length %X\n",
@@ -384,7 +383,7 @@ acpi_tb_get_this_table (
 	/* Return values */
 
 	table_info->pointer     = full_table;
-	table_info->length      = (ACPI_SIZE) header->length;
+	table_info->length      = (acpi_size) header->length;
 	table_info->allocation  = allocation;
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_INFO,

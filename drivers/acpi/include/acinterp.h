@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Name: acinterp.h - Interpreter subcomponent prototypes and defines
- *       $Revision: 144 $
  *
  *****************************************************************************/
 
@@ -310,7 +309,7 @@ acpi_ex_release_mutex (
 
 void
 acpi_ex_release_all_mutexes (
-	ACPI_THREAD_STATE       *thread);
+	acpi_thread_state       *thread);
 
 void
 acpi_ex_unlink_mutex (
@@ -319,7 +318,7 @@ acpi_ex_unlink_mutex (
 void
 acpi_ex_link_mutex (
 	acpi_operand_object     *obj_desc,
-	ACPI_THREAD_STATE       *thread);
+	acpi_thread_state       *thread);
 
 /*
  * exprep - ACPI AML (p-code) execution - prep utilities
@@ -335,7 +334,7 @@ acpi_ex_prep_common_field_object (
 
 acpi_status
 acpi_ex_prep_field_value (
-	ACPI_CREATE_FIELD_INFO  *info);
+	acpi_create_field_info  *info);
 
 /*
  * exsystem - Interface to OS services
@@ -489,7 +488,7 @@ acpi_ex_out_integer (
 void
 acpi_ex_out_address (
 	char                    *title,
-	ACPI_PHYSICAL_ADDRESS   value);
+	acpi_physical_address   value);
 
 
 /*
@@ -645,7 +644,7 @@ acpi_ex_unsigned_integer_to_string (
 acpi_status
 acpi_ex_system_memory_space_handler (
 	u32                     function,
-	ACPI_PHYSICAL_ADDRESS   address,
+	acpi_physical_address   address,
 	u32                     bit_width,
 	acpi_integer            *value,
 	void                    *handler_context,
@@ -654,7 +653,7 @@ acpi_ex_system_memory_space_handler (
 acpi_status
 acpi_ex_system_io_space_handler (
 	u32                     function,
-	ACPI_PHYSICAL_ADDRESS   address,
+	acpi_physical_address   address,
 	u32                     bit_width,
 	acpi_integer            *value,
 	void                    *handler_context,
@@ -663,7 +662,7 @@ acpi_ex_system_io_space_handler (
 acpi_status
 acpi_ex_pci_config_space_handler (
 	u32                     function,
-	ACPI_PHYSICAL_ADDRESS   address,
+	acpi_physical_address   address,
 	u32                     bit_width,
 	acpi_integer            *value,
 	void                    *handler_context,
@@ -672,7 +671,7 @@ acpi_ex_pci_config_space_handler (
 acpi_status
 acpi_ex_cmos_space_handler (
 	u32                     function,
-	ACPI_PHYSICAL_ADDRESS   address,
+	acpi_physical_address   address,
 	u32                     bit_width,
 	acpi_integer            *value,
 	void                    *handler_context,
@@ -681,7 +680,7 @@ acpi_ex_cmos_space_handler (
 acpi_status
 acpi_ex_pci_bar_space_handler (
 	u32                     function,
-	ACPI_PHYSICAL_ADDRESS   address,
+	acpi_physical_address   address,
 	u32                     bit_width,
 	acpi_integer            *value,
 	void                    *handler_context,
@@ -690,7 +689,7 @@ acpi_ex_pci_bar_space_handler (
 acpi_status
 acpi_ex_embedded_controller_space_handler (
 	u32                     function,
-	ACPI_PHYSICAL_ADDRESS   address,
+	acpi_physical_address   address,
 	u32                     bit_width,
 	acpi_integer            *value,
 	void                    *handler_context,
@@ -699,7 +698,7 @@ acpi_ex_embedded_controller_space_handler (
 acpi_status
 acpi_ex_sm_bus_space_handler (
 	u32                     function,
-	ACPI_PHYSICAL_ADDRESS   address,
+	acpi_physical_address   address,
 	u32                     bit_width,
 	acpi_integer            *value,
 	void                    *handler_context,
@@ -709,7 +708,7 @@ acpi_ex_sm_bus_space_handler (
 acpi_status
 acpi_ex_data_table_space_handler (
 	u32                     function,
-	ACPI_PHYSICAL_ADDRESS   address,
+	acpi_physical_address   address,
 	u32                     bit_width,
 	acpi_integer            *value,
 	void                    *handler_context,

@@ -1,7 +1,6 @@
 /*******************************************************************************
  *
  * Module Name: rsio - IO and DMA resource descriptors
- *              $Revision: 22 $
  *
  ******************************************************************************/
 
@@ -55,15 +54,15 @@
 acpi_status
 acpi_rs_io_resource (
 	u8                      *byte_stream_buffer,
-	ACPI_SIZE               *bytes_consumed,
+	acpi_size               *bytes_consumed,
 	u8                      **output_buffer,
-	ACPI_SIZE               *structure_size)
+	acpi_size               *structure_size)
 {
 	u8                      *buffer = byte_stream_buffer;
 	acpi_resource           *output_struct = (void *) *output_buffer;
 	u16                     temp16 = 0;
 	u8                      temp8 = 0;
-	ACPI_SIZE               struct_size = ACPI_SIZEOF_RESOURCE (acpi_resource_io);
+	acpi_size               struct_size = ACPI_SIZEOF_RESOURCE (acpi_resource_io);
 
 
 	ACPI_FUNCTION_TRACE ("Rs_io_resource");
@@ -153,15 +152,15 @@ acpi_rs_io_resource (
 acpi_status
 acpi_rs_fixed_io_resource (
 	u8                      *byte_stream_buffer,
-	ACPI_SIZE               *bytes_consumed,
+	acpi_size               *bytes_consumed,
 	u8                      **output_buffer,
-	ACPI_SIZE               *structure_size)
+	acpi_size               *structure_size)
 {
 	u8                      *buffer = byte_stream_buffer;
 	acpi_resource           *output_struct = (void *) *output_buffer;
 	u16                     temp16 = 0;
 	u8                      temp8 = 0;
-	ACPI_SIZE               struct_size = ACPI_SIZEOF_RESOURCE (acpi_resource_fixed_io);
+	acpi_size               struct_size = ACPI_SIZEOF_RESOURCE (acpi_resource_fixed_io);
 
 
 	ACPI_FUNCTION_TRACE ("Rs_fixed_io_resource");
@@ -223,7 +222,7 @@ acpi_status
 acpi_rs_io_stream (
 	acpi_resource           *linked_list,
 	u8                      **output_buffer,
-	ACPI_SIZE               *bytes_consumed)
+	acpi_size               *bytes_consumed)
 {
 	u8                      *buffer = *output_buffer;
 	u16                     temp16 = 0;
@@ -307,7 +306,7 @@ acpi_status
 acpi_rs_fixed_io_stream (
 	acpi_resource           *linked_list,
 	u8                      **output_buffer,
-	ACPI_SIZE               *bytes_consumed)
+	acpi_size               *bytes_consumed)
 {
 	u8                      *buffer = *output_buffer;
 	u16                     temp16 = 0;
@@ -372,16 +371,16 @@ acpi_rs_fixed_io_stream (
 acpi_status
 acpi_rs_dma_resource (
 	u8                      *byte_stream_buffer,
-	ACPI_SIZE               *bytes_consumed,
+	acpi_size               *bytes_consumed,
 	u8                      **output_buffer,
-	ACPI_SIZE               *structure_size)
+	acpi_size               *structure_size)
 {
 	u8                      *buffer = byte_stream_buffer;
 	acpi_resource           *output_struct = (void *) *output_buffer;
 	u8                      temp8 = 0;
 	u8                      index;
 	u8                      i;
-	ACPI_SIZE               struct_size = ACPI_SIZEOF_RESOURCE (acpi_resource_dma);
+	acpi_size               struct_size = ACPI_SIZEOF_RESOURCE (acpi_resource_dma);
 
 
 	ACPI_FUNCTION_TRACE ("Rs_dma_resource");
@@ -415,7 +414,7 @@ acpi_rs_dma_resource (
 		/*
 		 * Calculate the structure size based upon the number of interrupts
 		 */
-		struct_size += ((ACPI_SIZE) i - 1) * 4;
+		struct_size += ((acpi_size) i - 1) * 4;
 	}
 
 	/*
@@ -477,7 +476,7 @@ acpi_status
 acpi_rs_dma_stream (
 	acpi_resource           *linked_list,
 	u8                      **output_buffer,
-	ACPI_SIZE               *bytes_consumed)
+	acpi_size               *bytes_consumed)
 {
 	u8                      *buffer = *output_buffer;
 	u16                     temp16 = 0;

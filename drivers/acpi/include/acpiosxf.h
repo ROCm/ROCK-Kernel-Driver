@@ -55,7 +55,7 @@ typedef struct acpi_fatal_info
 	u32                     code;
 	u32                     argument;
 
-} ACPI_SIGNAL_FATAL_INFO;
+} acpi_signal_fatal_info;
 
 
 /*
@@ -91,7 +91,7 @@ acpi_os_terminate (
 acpi_status
 acpi_os_get_root_pointer (
 	u32                     flags,
-	ACPI_POINTER            *address);
+	acpi_pointer            *address);
 
 acpi_status
 acpi_os_table_override (
@@ -131,7 +131,7 @@ acpi_os_signal_semaphore (
 
 void *
 acpi_os_allocate (
-	ACPI_SIZE               size);
+	acpi_size               size);
 
 void
 acpi_os_free (
@@ -139,19 +139,19 @@ acpi_os_free (
 
 acpi_status
 acpi_os_map_memory (
-	ACPI_PHYSICAL_ADDRESS   physical_address,
-	ACPI_SIZE               size,
+	acpi_physical_address   physical_address,
+	acpi_size               size,
 	void                    **logical_address);
 
 void
 acpi_os_unmap_memory (
 	void                    *logical_address,
-	ACPI_SIZE               size);
+	acpi_size               size);
 
 acpi_status
 acpi_os_get_physical_address (
 	void                    *logical_address,
-	ACPI_PHYSICAL_ADDRESS   *physical_address);
+	acpi_physical_address   *physical_address);
 
 
 /*
@@ -200,13 +200,13 @@ acpi_os_stall (
 
 acpi_status
 acpi_os_read_port (
-	ACPI_IO_ADDRESS         address,
+	acpi_io_address         address,
 	void                    *value,
 	u32                     width);
 
 acpi_status
 acpi_os_write_port (
-	ACPI_IO_ADDRESS         address,
+	acpi_io_address         address,
 	acpi_integer            value,
 	u32                     width);
 
@@ -217,13 +217,13 @@ acpi_os_write_port (
 
 acpi_status
 acpi_os_read_memory (
-	ACPI_PHYSICAL_ADDRESS   address,
+	acpi_physical_address   address,
 	void                    *value,
 	u32                     width);
 
 acpi_status
 acpi_os_write_memory (
-	ACPI_PHYSICAL_ADDRESS   address,
+	acpi_physical_address   address,
 	acpi_integer            value,
 	u32                     width);
 

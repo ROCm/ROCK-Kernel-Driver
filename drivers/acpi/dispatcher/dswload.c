@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: dswload - Dispatcher namespace load callbacks
- *              $Revision: 82 $
  *
  *****************************************************************************/
 
@@ -340,7 +339,7 @@ acpi_ds_load1_end_op (
 
 	if (op->common.aml_opcode == AML_REGION_OP) {
 		status = acpi_ex_create_region (op->named.data, op->named.length,
-				   (ACPI_ADR_SPACE_TYPE) ((op->common.value.arg)->common.value.integer), walk_state);
+				   (acpi_adr_space_type) ((op->common.value.arg)->common.value.integer), walk_state);
 		if (ACPI_FAILURE (status)) {
 			return (status);
 		}

@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: dsobject - Dispatcher object management routines
- *              $Revision: 112 $
  *
  *****************************************************************************/
 
@@ -295,7 +294,7 @@ acpi_ds_build_internal_package_obj (
 	 * that the list is always null terminated.
 	 */
 	obj_desc->package.elements = ACPI_MEM_CALLOCATE (
-			 ((ACPI_SIZE) obj_desc->package.count + 1) * sizeof (void *));
+			 ((acpi_size) obj_desc->package.count + 1) * sizeof (void *));
 
 	if (!obj_desc->package.elements) {
 		acpi_ut_delete_object_desc (obj_desc);

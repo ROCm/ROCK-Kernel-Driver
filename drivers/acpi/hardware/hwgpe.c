@@ -2,7 +2,6 @@
 /******************************************************************************
  *
  * Module Name: hwgpe - Low level GPE enable/disable/clear functions
- *              $Revision: 42 $
  *
  *****************************************************************************/
 
@@ -296,7 +295,7 @@ acpi_hw_get_gpe_status (
 	u32                     in_byte = 0;
 	u32                     register_index = 0;
 	u8                      bit_mask = 0;
-	ACPI_GPE_REGISTER_INFO  *gpe_register_info;
+	acpi_gpe_register_info  *gpe_register_info;
 	acpi_status             status;
 
 
@@ -370,7 +369,7 @@ acpi_hw_disable_non_wakeup_gpes (
 	void)
 {
 	u32                     i;
-	ACPI_GPE_REGISTER_INFO  *gpe_register_info;
+	acpi_gpe_register_info  *gpe_register_info;
 	u32                     in_value;
 	acpi_status             status;
 
@@ -423,7 +422,7 @@ acpi_hw_enable_non_wakeup_gpes (
 	void)
 {
 	u32                     i;
-	ACPI_GPE_REGISTER_INFO  *gpe_register_info;
+	acpi_gpe_register_info  *gpe_register_info;
 	acpi_status             status;
 
 

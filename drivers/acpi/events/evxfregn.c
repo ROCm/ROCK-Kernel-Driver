@@ -2,7 +2,6 @@
  *
  * Module Name: evxfregn - External Interfaces, ACPI Operation Regions and
  *                         Address Spaces.
- *              $Revision: 52 $
  *
  *****************************************************************************/
 
@@ -53,7 +52,7 @@
 acpi_status
 acpi_install_address_space_handler (
 	acpi_handle             device,
-	ACPI_ADR_SPACE_TYPE     space_id,
+	acpi_adr_space_type     space_id,
 	acpi_adr_space_handler  handler,
 	acpi_adr_space_setup    setup,
 	void                    *context)
@@ -283,7 +282,7 @@ unlock_and_exit:
 acpi_status
 acpi_remove_address_space_handler (
 	acpi_handle             device,
-	ACPI_ADR_SPACE_TYPE     space_id,
+	acpi_adr_space_type     space_id,
 	acpi_adr_space_handler  handler)
 {
 	acpi_operand_object     *obj_desc;

@@ -1,7 +1,6 @@
 /*******************************************************************************
  *
  * Module Name: rscalc - Calculate stream and list lengths
- *              $Revision: 45 $
  *
  ******************************************************************************/
 
@@ -52,10 +51,10 @@
 acpi_status
 acpi_rs_get_byte_stream_length (
 	acpi_resource           *linked_list,
-	ACPI_SIZE               *size_needed)
+	acpi_size               *size_needed)
 {
-	ACPI_SIZE               byte_stream_size_needed = 0;
-	ACPI_SIZE               segment_size;
+	acpi_size               byte_stream_size_needed = 0;
+	acpi_size               segment_size;
 	acpi_resource_ext_irq   *ex_irq = NULL;
 	u8                      done = FALSE;
 
@@ -229,7 +228,7 @@ acpi_rs_get_byte_stream_length (
 			 * Resource Source + 1 for the null.
 			 */
 			segment_size = 9 +
-				(((ACPI_SIZE) linked_list->data.extended_irq.number_of_interrupts - 1) * 4);
+				(((acpi_size) linked_list->data.extended_irq.number_of_interrupts - 1) * 4);
 
 			if (ex_irq && ex_irq->resource_source.string_ptr) {
 				segment_size += linked_list->data.extended_irq.resource_source.string_length;
@@ -288,7 +287,7 @@ acpi_status
 acpi_rs_get_list_length (
 	u8                      *byte_stream_buffer,
 	u32                     byte_stream_buffer_length,
-	ACPI_SIZE               *size_needed)
+	acpi_size               *size_needed)
 {
 	u32                     buffer_size = 0;
 	u32                     bytes_parsed = 0;
@@ -723,10 +722,10 @@ acpi_rs_get_list_length (
 acpi_status
 acpi_rs_get_pci_routing_table_length (
 	acpi_operand_object     *package_object,
-	ACPI_SIZE               *buffer_size_needed)
+	acpi_size               *buffer_size_needed)
 {
 	u32                     number_of_elements;
-	ACPI_SIZE               temp_size_needed = 0;
+	acpi_size               temp_size_needed = 0;
 	acpi_operand_object     **top_object_list;
 	u32                     index;
 	acpi_operand_object     *package_element;

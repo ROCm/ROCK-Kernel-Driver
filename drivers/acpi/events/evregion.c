@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: evregion - ACPI Address_space (Op_region) handler dispatch
- *              $Revision: 136 $
  *
  *****************************************************************************/
 
@@ -206,7 +205,7 @@ acpi_status
 acpi_ev_address_space_dispatch (
 	acpi_operand_object     *region_obj,
 	u32                     function,
-	ACPI_PHYSICAL_ADDRESS   address,
+	acpi_physical_address   address,
 	u32                     bit_width,
 	void                    *value)
 {

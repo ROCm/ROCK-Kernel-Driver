@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: dsfield - Dispatcher field routines
- *              $Revision: 70 $
  *
  *****************************************************************************/
 
@@ -183,7 +182,7 @@ cleanup:
 
 acpi_status
 acpi_ds_get_field_names (
-	ACPI_CREATE_FIELD_INFO  *info,
+	acpi_create_field_info  *info,
 	acpi_walk_state         *walk_state,
 	acpi_parse_object       *arg)
 {
@@ -316,7 +315,7 @@ acpi_ds_create_field (
 {
 	acpi_status             status;
 	acpi_parse_object       *arg;
-	ACPI_CREATE_FIELD_INFO  info;
+	acpi_create_field_info  info;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("Ds_create_field", op);
@@ -458,7 +457,7 @@ acpi_ds_create_bank_field (
 {
 	acpi_status             status;
 	acpi_parse_object       *arg;
-	ACPI_CREATE_FIELD_INFO  info;
+	acpi_create_field_info  info;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("Ds_create_bank_field", op);
@@ -531,7 +530,7 @@ acpi_ds_create_index_field (
 {
 	acpi_status             status;
 	acpi_parse_object       *arg;
-	ACPI_CREATE_FIELD_INFO  info;
+	acpi_create_field_info  info;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("Ds_create_index_field", op);

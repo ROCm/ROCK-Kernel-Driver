@@ -2,7 +2,6 @@
  *
  * Module Name: dsopcode - Dispatcher Op Region support and handling of
  *                         "control" opcodes
- *              $Revision: 84 $
  *
  *****************************************************************************/
 
@@ -710,7 +709,7 @@ acpi_ds_eval_region_operands (
 	 */
 	operand_desc = walk_state->operands[walk_state->num_operands - 2];
 
-	obj_desc->region.address = (ACPI_PHYSICAL_ADDRESS) operand_desc->integer.value;
+	obj_desc->region.address = (acpi_physical_address) operand_desc->integer.value;
 	acpi_ut_remove_reference (operand_desc);
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Rgn_obj %p Addr %8.8X%8.8X Len %X\n",

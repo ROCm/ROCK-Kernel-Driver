@@ -2,7 +2,6 @@
  *
  * Module Name: nsxfeval - Public interfaces to the ACPI subsystem
  *                         ACPI Object evaluation interfaces
- *              $Revision: 6 $
  *
  ******************************************************************************/
 
@@ -156,7 +155,7 @@ acpi_evaluate_object (
 	acpi_status             status;
 	acpi_operand_object     **internal_params = NULL;
 	acpi_operand_object     *internal_return_obj = NULL;
-	ACPI_SIZE               buffer_space_needed;
+	acpi_size               buffer_space_needed;
 	u32                     i;
 
 
@@ -173,7 +172,7 @@ acpi_evaluate_object (
 		 * Allocate a new parameter block for the internal objects
 		 * Add 1 to count to allow for null terminated internal list
 		 */
-		internal_params = ACPI_MEM_CALLOCATE (((ACPI_SIZE) external_params->count + 1) *
+		internal_params = ACPI_MEM_CALLOCATE (((acpi_size) external_params->count + 1) *
 				  sizeof (void *));
 		if (!internal_params) {
 			return_ACPI_STATUS (AE_NO_MEMORY);
@@ -583,7 +582,7 @@ acpi_get_devices (
 acpi_status
 acpi_attach_data (
 	acpi_handle             obj_handle,
-	ACPI_OBJECT_HANDLER     handler,
+	acpi_object_handler     handler,
 	void                    *data)
 {
 	acpi_namespace_node     *node;
@@ -635,7 +634,7 @@ unlock_and_exit:
 acpi_status
 acpi_detach_data (
 	acpi_handle             obj_handle,
-	ACPI_OBJECT_HANDLER     handler)
+	acpi_object_handler     handler)
 {
 	acpi_namespace_node     *node;
 	acpi_status             status;
@@ -686,7 +685,7 @@ unlock_and_exit:
 acpi_status
 acpi_get_data (
 	acpi_handle             obj_handle,
-	ACPI_OBJECT_HANDLER     handler,
+	acpi_object_handler     handler,
 	void                    **data)
 {
 	acpi_namespace_node     *node;

@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: evevent - Fixed Event handling and dispatch
- *              $Revision: 104 $
  *
  *****************************************************************************/
 
@@ -25,7 +24,6 @@
 
 #include "acpi.h"
 #include "acevents.h"
-#include "acnamesp.h"
 
 #define _COMPONENT          ACPI_EVENTS
 	 ACPI_MODULE_NAME    ("evevent")
@@ -158,7 +156,7 @@ acpi_status
 acpi_ev_fixed_event_initialize (
 	void)
 {
-	NATIVE_UINT             i;
+	acpi_native_uint        i;
 	acpi_status             status;
 
 
@@ -204,7 +202,7 @@ acpi_ev_fixed_event_detect (
 	u32                     int_status = ACPI_INTERRUPT_NOT_HANDLED;
 	u32                     fixed_status;
 	u32                     fixed_enable;
-	NATIVE_UINT_MAX32       i;
+	acpi_native_uint        i;
 
 
 	ACPI_FUNCTION_NAME ("Ev_fixed_event_detect");
@@ -231,7 +229,7 @@ acpi_ev_fixed_event_detect (
 			(fixed_enable & acpi_gbl_fixed_event_info[i].enable_bit_mask)) {
 			/* Found an active (signalled) event */
 
-			int_status |= acpi_ev_fixed_event_dispatch (i);
+			int_status |= acpi_ev_fixed_event_dispatch ((u32) i);
 		}
 	}
 

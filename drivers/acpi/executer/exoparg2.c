@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: exoparg2 - AML execution - opcodes with 2 arguments
- *              $Revision: 116 $
  *
  *****************************************************************************/
 
@@ -247,7 +246,7 @@ acpi_ex_opcode_2A_1T_1R (
 	acpi_operand_object     *temp_desc = NULL;
 	u32                     index;
 	acpi_status             status = AE_OK;
-	ACPI_SIZE               length;
+	acpi_size               length;
 
 
 	ACPI_FUNCTION_TRACE_STR ("Ex_opcode_2A_1T_1R", acpi_ps_get_opcode_name (walk_state->opcode));

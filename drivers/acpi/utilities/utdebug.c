@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: utdebug - Debug print routines
- *              $Revision: 106 $
  *
  *****************************************************************************/
 
@@ -76,7 +75,7 @@ void
 acpi_ut_track_stack_ptr (
 	void)
 {
-	ACPI_SIZE           current_sp;
+	acpi_size           current_sp;
 
 
 	current_sp = ACPI_PTR_DIFF (&current_sp, NULL);
@@ -491,8 +490,8 @@ acpi_ut_dump_buffer (
 	u32                     display,
 	u32                     component_id)
 {
-	NATIVE_UINT             i = 0;
-	NATIVE_UINT             j;
+	acpi_native_uint        i = 0;
+	acpi_native_uint        j;
 	u32                     temp32;
 	u8                      buf_char;
 

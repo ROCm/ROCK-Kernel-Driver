@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: evgpe - General Purpose Event handling and dispatch
- *              $Revision: 3 $
  *
  *****************************************************************************/
 
@@ -46,13 +45,13 @@
 acpi_status
 acpi_ev_gpe_initialize (void)
 {
-	NATIVE_UINT_MAX32       i;
-	NATIVE_UINT_MAX32       j;
+	acpi_native_uint        i;
+	acpi_native_uint        j;
 	u32                     gpe_block;
 	u32                     gpe_register;
 	u32                     gpe_number_index;
 	u32                     gpe_number;
-	ACPI_GPE_REGISTER_INFO  *gpe_register_info;
+	acpi_gpe_register_info  *gpe_register_info;
 	acpi_status             status;
 
 
@@ -149,8 +148,8 @@ acpi_ev_gpe_initialize (void)
 	/* Allocate the GPE number-to-index translation table */
 
 	acpi_gbl_gpe_number_to_index = ACPI_MEM_CALLOCATE (
-			   sizeof (ACPI_GPE_INDEX_INFO) *
-			   ((ACPI_SIZE) acpi_gbl_gpe_number_max + 1));
+			   sizeof (acpi_gpe_index_info) *
+			   ((acpi_size) acpi_gbl_gpe_number_max + 1));
 	if (!acpi_gbl_gpe_number_to_index) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 			"Could not allocate the Gpe_number_to_index table\n"));
@@ -160,13 +159,13 @@ acpi_ev_gpe_initialize (void)
 	/* Set the Gpe index table to GPE_INVALID */
 
 	ACPI_MEMSET (acpi_gbl_gpe_number_to_index, (int) ACPI_GPE_INVALID,
-			sizeof (ACPI_GPE_INDEX_INFO) * ((ACPI_SIZE) acpi_gbl_gpe_number_max + 1));
+			sizeof (acpi_gpe_index_info) * ((acpi_size) acpi_gbl_gpe_number_max + 1));
 
 	/* Allocate the GPE register information block */
 
 	acpi_gbl_gpe_register_info = ACPI_MEM_CALLOCATE (
-			  (ACPI_SIZE) acpi_gbl_gpe_register_count *
-			  sizeof (ACPI_GPE_REGISTER_INFO));
+			  (acpi_size) acpi_gbl_gpe_register_count *
+			  sizeof (acpi_gpe_register_info));
 	if (!acpi_gbl_gpe_register_info) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 			"Could not allocate the Gpe_register_info table\n"));
@@ -178,8 +177,8 @@ acpi_ev_gpe_initialize (void)
 	 * per register.  Initialization to zeros is sufficient.
 	 */
 	acpi_gbl_gpe_number_info = ACPI_MEM_CALLOCATE (
-			  (ACPI_SIZE) (acpi_gbl_gpe_register_count * ACPI_GPE_REGISTER_WIDTH) *
-			  sizeof (ACPI_GPE_NUMBER_INFO));
+			  ((acpi_size) acpi_gbl_gpe_register_count * ACPI_GPE_REGISTER_WIDTH) *
+			  sizeof (acpi_gpe_number_info));
 	if (!acpi_gbl_gpe_number_info) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Could not allocate the Gpe_number_info table\n"));
 		goto error_exit2;
@@ -223,7 +222,7 @@ acpi_ev_gpe_initialize (void)
 			/* Init the Index mapping info for each GPE number within this register */
 
 			for (j = 0; j < ACPI_GPE_REGISTER_WIDTH; j++) {
-				gpe_number = gpe_register_info->base_gpe_number + j;
+				gpe_number = gpe_register_info->base_gpe_number + (u32) j;
 				acpi_gbl_gpe_number_to_index[gpe_number].number_index = (u8) gpe_number_index;
 
 				acpi_gbl_gpe_number_info[gpe_number_index].bit_mask = acpi_gbl_decode_to8bit[j];
@@ -446,7 +445,7 @@ acpi_ev_gpe_detect (void)
 	u32                     j;
 	u8                      enabled_status_byte;
 	u8                      bit_mask;
-	ACPI_GPE_REGISTER_INFO  *gpe_register_info;
+	acpi_gpe_register_info  *gpe_register_info;
 	u32                     in_value;
 	acpi_status             status;
 
@@ -533,7 +532,7 @@ acpi_ev_asynch_execute_gpe_method (
 {
 	u32                     gpe_number = (u32) ACPI_TO_INTEGER (context);
 	u32                     gpe_number_index;
-	ACPI_GPE_NUMBER_INFO    gpe_info;
+	acpi_gpe_number_info    gpe_info;
 	acpi_status             status;
 
 
@@ -611,7 +610,7 @@ acpi_ev_gpe_dispatch (
 	u32                     gpe_number)
 {
 	u32                     gpe_number_index;
-	ACPI_GPE_NUMBER_INFO    *gpe_info;
+	acpi_gpe_number_info    *gpe_info;
 	acpi_status             status;
 
 

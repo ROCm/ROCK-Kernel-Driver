@@ -1,7 +1,6 @@
 /*******************************************************************************
  *
  * Module Name: rsmisc - Miscellaneous resource descriptors
- *              $Revision: 24 $
  *
  ******************************************************************************/
 
@@ -55,12 +54,12 @@
 acpi_status
 acpi_rs_end_tag_resource (
 	u8                      *byte_stream_buffer,
-	ACPI_SIZE               *bytes_consumed,
+	acpi_size               *bytes_consumed,
 	u8                      **output_buffer,
-	ACPI_SIZE               *structure_size)
+	acpi_size               *structure_size)
 {
 	acpi_resource           *output_struct = (void *) *output_buffer;
-	ACPI_SIZE               struct_size = ACPI_RESOURCE_LENGTH;
+	acpi_size               struct_size = ACPI_RESOURCE_LENGTH;
 
 
 	ACPI_FUNCTION_TRACE ("Rs_end_tag_resource");
@@ -109,7 +108,7 @@ acpi_status
 acpi_rs_end_tag_stream (
 	acpi_resource           *linked_list,
 	u8                      **output_buffer,
-	ACPI_SIZE               *bytes_consumed)
+	acpi_size               *bytes_consumed)
 {
 	u8                      *buffer = *output_buffer;
 	u8                      temp8 = 0;
@@ -165,16 +164,16 @@ acpi_rs_end_tag_stream (
 acpi_status
 acpi_rs_vendor_resource (
 	u8                      *byte_stream_buffer,
-	ACPI_SIZE               *bytes_consumed,
+	acpi_size               *bytes_consumed,
 	u8                      **output_buffer,
-	ACPI_SIZE               *structure_size)
+	acpi_size               *structure_size)
 {
 	u8                      *buffer = byte_stream_buffer;
 	acpi_resource           *output_struct = (void *) *output_buffer;
 	u16                     temp16 = 0;
 	u8                      temp8 = 0;
 	u8                      index;
-	ACPI_SIZE               struct_size = ACPI_SIZEOF_RESOURCE (acpi_resource_vendor);
+	acpi_size               struct_size = ACPI_SIZEOF_RESOURCE (acpi_resource_vendor);
 
 
 	ACPI_FUNCTION_TRACE ("Rs_vendor_resource");
@@ -197,7 +196,7 @@ acpi_rs_vendor_resource (
 
 		/* Calculate bytes consumed */
 
-		*bytes_consumed = (ACPI_SIZE) temp16 + 3;
+		*bytes_consumed = (acpi_size) temp16 + 3;
 
 		/* Point to the first vendor byte */
 
@@ -211,7 +210,7 @@ acpi_rs_vendor_resource (
 
 		/* Calculate bytes consumed */
 
-		*bytes_consumed = (ACPI_SIZE) temp16 + 1;
+		*bytes_consumed = (acpi_size) temp16 + 1;
 
 		/* Point to the first vendor byte */
 
@@ -266,7 +265,7 @@ acpi_status
 acpi_rs_vendor_stream (
 	acpi_resource           *linked_list,
 	u8                      **output_buffer,
-	ACPI_SIZE               *bytes_consumed)
+	acpi_size               *bytes_consumed)
 {
 	u8                      *buffer = *output_buffer;
 	u16                     temp16 = 0;
@@ -345,14 +344,14 @@ acpi_rs_vendor_stream (
 acpi_status
 acpi_rs_start_depend_fns_resource (
 	u8                      *byte_stream_buffer,
-	ACPI_SIZE               *bytes_consumed,
+	acpi_size               *bytes_consumed,
 	u8                      **output_buffer,
-	ACPI_SIZE               *structure_size)
+	acpi_size               *structure_size)
 {
 	u8                      *buffer = byte_stream_buffer;
 	acpi_resource           *output_struct = (void *) *output_buffer;
 	u8                      temp8 = 0;
-	ACPI_SIZE               struct_size = ACPI_SIZEOF_RESOURCE (acpi_resource_start_dpf);
+	acpi_size               struct_size = ACPI_SIZEOF_RESOURCE (acpi_resource_start_dpf);
 
 
 	ACPI_FUNCTION_TRACE ("Rs_start_depend_fns_resource");
@@ -437,12 +436,12 @@ acpi_rs_start_depend_fns_resource (
 acpi_status
 acpi_rs_end_depend_fns_resource (
 	u8                      *byte_stream_buffer,
-	ACPI_SIZE               *bytes_consumed,
+	acpi_size               *bytes_consumed,
 	u8                      **output_buffer,
-	ACPI_SIZE               *structure_size)
+	acpi_size               *structure_size)
 {
 	acpi_resource           *output_struct = (void *) *output_buffer;
-	ACPI_SIZE               struct_size = ACPI_RESOURCE_LENGTH;
+	acpi_size               struct_size = ACPI_RESOURCE_LENGTH;
 
 
 	ACPI_FUNCTION_TRACE ("Rs_end_depend_fns_resource");
@@ -492,7 +491,7 @@ acpi_status
 acpi_rs_start_depend_fns_stream (
 	acpi_resource           *linked_list,
 	u8                      **output_buffer,
-	ACPI_SIZE               *bytes_consumed)
+	acpi_size               *bytes_consumed)
 {
 	u8                      *buffer = *output_buffer;
 	u8                      temp8 = 0;
@@ -556,7 +555,7 @@ acpi_status
 acpi_rs_end_depend_fns_stream (
 	acpi_resource           *linked_list,
 	u8                      **output_buffer,
-	ACPI_SIZE               *bytes_consumed)
+	acpi_size               *bytes_consumed)
 {
 	u8                      *buffer = *output_buffer;
 
