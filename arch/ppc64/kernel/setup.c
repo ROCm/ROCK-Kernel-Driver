@@ -46,6 +46,7 @@
 #include <asm/nvram.h>
 #include <asm/setup.h>
 #include <asm/system.h>
+#include <asm/rtas.h>
 
 extern unsigned long klimit;
 /* extern void *stab; */
@@ -253,6 +254,10 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 		pmac_init(r3, r4, r5, r6, r7);
 	}
 #endif /* CONFIG_PPC_PMAC */
+
+#if defined(CONFIG_HOTPLUG_CPU) &&  !defined(CONFIG_PPC_PMAC)
+	rtas_stop_self_args.token = rtas_token("stop-self");
+#endif /* CONFIG_HOTPLUG_CPU && !CONFIG_PPC_PMAC */
 
 	/* Finish initializing the hash table (do the dynamic
 	 * patching for the fast-path hashtable.S code)
@@ -698,7 +703,7 @@ int set_spread_lpevents( char * str )
 	unsigned long val = simple_strtoul( str, NULL, 0 );
 	if ( ( val > 0 ) && ( val <= NR_CPUS ) ) {
 		for ( i=1; i<val; ++i )
-			paca[i].lpQueuePtr = paca[0].lpQueuePtr;
+			paca[i].lpqueue_ptr = paca[0].lpqueue_ptr;
 		printk("lpevent processing spread over %ld processors\n", val);
 	}
 	else

@@ -349,10 +349,10 @@ static int sst_calc_pll(const int freq, int *freq_out, struct pll_timing *t)
 		if (m >= 128)
 			break;
 		fout = (DAC_FREF * (m + 2)) / ((1 << p) * (n + 2));
-		if ((ABS(fout - freq) < best_err) && (m > 0)) {
+		if ((abs(fout - freq) < best_err) && (m > 0)) {
 			best_n = n;
 			best_m = m;
-			best_err = ABS(fout - freq);
+			best_err = abs(fout - freq);
 			/* we get the lowest m , allowing 0.5% error in freq*/
 			if (200*best_err < freq) break;
 		}

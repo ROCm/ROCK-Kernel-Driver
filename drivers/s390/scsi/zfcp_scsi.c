@@ -31,7 +31,7 @@
 #define ZFCP_LOG_AREA			ZFCP_LOG_AREA_SCSI
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_SCSI_REVISION "$Revision: 1.62 $"
+#define ZFCP_SCSI_REVISION "$Revision: 1.65 $"
 
 #include "zfcp_ext.h"
 
@@ -50,6 +50,8 @@ static struct zfcp_unit *zfcp_unit_lookup(struct zfcp_adapter *, int, scsi_id_t,
 					  scsi_lun_t);
 
 static struct device_attribute *zfcp_sysfs_sdev_attrs[];
+
+struct scsi_transport_template *zfcp_transport_template;
 
 struct zfcp_data zfcp_data = {
 	.scsi_host_template = {
@@ -508,8 +510,7 @@ zfcp_scsi_eh_abort_handler(struct scsi_cmnd *scpnt)
 	ZFCP_LOG_DEBUG("unit 0x%016Lx (%p)\n", unit->fcp_lun, unit);
 
 	/*
-	 * The 'Abort FCP Command' routine may block (call schedule)
-	 * because it may wait for a free SBAL.
+	 * We block (call schedule)
 	 * That's why we must release the lock and enable the
 	 * interrupts before.
 	 * On the other hand we do not need the lock anymore since
@@ -518,8 +519,7 @@ zfcp_scsi_eh_abort_handler(struct scsi_cmnd *scpnt)
 	write_unlock_irqrestore(&adapter->abort_lock, flags);
 	/* call FSF routine which does the abort */
 	new_fsf_req = zfcp_fsf_abort_fcp_command((unsigned long) old_fsf_req,
-						 adapter,
-						 unit, ZFCP_WAIT_FOR_SBAL);
+						 adapter, unit, 0);
 	ZFCP_LOG_DEBUG("new_fsf_req=%p\n", new_fsf_req);
 	if (!new_fsf_req) {
 		retval = FAILED;
@@ -657,7 +657,7 @@ zfcp_task_management_function(struct zfcp_unit *unit, u8 tm_flags)
 
 	/* issue task management function */
 	fsf_req = zfcp_fsf_send_fcp_command_task_management
-	    (adapter, unit, tm_flags, ZFCP_WAIT_FOR_SBAL);
+		(adapter, unit, tm_flags, 0);
 	if (!fsf_req) {
 		ZFCP_LOG_INFO("error: creation of task management request "
 			      "failed for unit 0x%016Lx on port 0x%016Lx on  "
@@ -768,6 +768,7 @@ zfcp_adapter_scsi_register(struct zfcp_adapter *adapter)
 	adapter->scsi_host->max_channel = 0;
 	adapter->scsi_host->unique_id = unique_id++;	/* FIXME */
 	adapter->scsi_host->max_cmd_len = ZFCP_MAX_SCSI_CMND_LENGTH;
+	adapter->scsi_host->transportt = zfcp_transport_template;
 	/*
 	 * Reverse mapping of the host number to avoid race condition
 	 */
@@ -823,6 +824,44 @@ zfcp_fsf_start_scsi_er_timer(struct zfcp_adapter *adapter)
 	add_timer(&adapter->scsi_er_timer);
 }
 
+/*
+ * Support functions for FC transport class
+ */
+static void
+zfcp_get_port_id(struct scsi_device *sdev)
+{
+	struct zfcp_unit *unit;
+
+	unit = (struct zfcp_unit *) sdev->hostdata;
+	fc_port_id(sdev) = unit->port->d_id;
+}
+
+static void
+zfcp_get_port_name(struct scsi_device *sdev)
+{
+	struct zfcp_unit *unit;
+
+	unit = (struct zfcp_unit *) sdev->hostdata;
+	fc_port_name(sdev) = unit->port->wwpn;
+}
+
+static void
+zfcp_get_node_name(struct scsi_device *sdev)
+{
+	struct zfcp_unit *unit;
+
+	unit = (struct zfcp_unit *) sdev->hostdata;
+	fc_node_name(sdev) = unit->port->wwnn;
+}
+
+struct fc_function_template zfcp_transport_functions = {
+	.get_port_id = zfcp_get_port_id,
+	.get_port_name = zfcp_get_port_name,
+	.get_node_name = zfcp_get_node_name,
+	.show_port_id = 1,
+	.show_port_name = 1,
+	.show_node_name = 1,
+};
 
 /**
  * ZFCP_DEFINE_SCSI_ATTR

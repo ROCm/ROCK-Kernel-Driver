@@ -24,6 +24,7 @@
  */
 #include <linux/pci.h>
 #include <asm/pci-bridge.h>
+#include <asm/rtas.h>
 #include "../pci.h"		/* for pci_add_new_bus */
 
 #include "rpaphp.h"
@@ -378,8 +379,8 @@ int rpaphp_unconfig_pci_adapter(struct slot *slot)
 	
 		func = list_entry(ln, struct rpaphp_pci_func, sibling);
 		if (func->pci_dev) {
-			rpaphp_eeh_remove_bus_device(func->pci_dev);
 			pci_remove_bus_device(func->pci_dev); 
+			rpaphp_eeh_remove_bus_device(func->pci_dev);
 		}
 		kfree(func);
 	}
@@ -513,9 +514,18 @@ struct hotplug_slot *rpaphp_find_hotplug_slot(struct pci_dev *dev)
 		struct list_head *ln;
 
 		slot = list_entry(tmp, struct slot, rpaphp_slot_list);
+		if (slot->bridge == NULL) {
+			if (slot->dev_type == PCI_DEV) {
+				printk(KERN_WARNING "PCI slot missing bridge %s %s \n", 
+				                    slot->name, slot->location);
+			}
+			continue;
+		}
+
 		bus = slot->bridge->subordinate;
-		if (!bus)
-			return NULL; /* shouldn't be here */
+		if (!bus) {
+			continue;  /* should never happen? */
+		}
 		for (ln = bus->devices.next; ln != &bus->devices; ln = ln->next) {
                                 struct pci_dev *pdev = pci_dev_b(ln);
 				if (pdev == dev)

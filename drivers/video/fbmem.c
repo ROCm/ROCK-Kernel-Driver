@@ -999,9 +999,9 @@ fb_set_var(struct fb_info *info, struct fb_var_screeninfo *var)
 			fb_set_cmap(&info->cmap, 1, info);
 
 			if (info->flags & FBINFO_MISC_MODECHANGEUSER) {
+				info->flags &= ~FBINFO_MISC_MODECHANGEUSER;
 				notifier_call_chain(&fb_notifier_list,
 						    FB_EVENT_MODE_CHANGE, info);
-				info->flags &= ~FBINFO_MISC_MODECHANGEUSER;
 			}
 		}
 	}

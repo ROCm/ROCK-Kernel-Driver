@@ -34,7 +34,6 @@ struct __debug_entry{
 #define __DEBUG_FEATURE_VERSION      1  /* version of debug feature */
 
 #ifdef __KERNEL__
-#include <linux/version.h>
 #include <linux/spinlock.h>
 #include <linux/kernel.h>
 #include <linux/time.h>

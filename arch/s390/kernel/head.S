@@ -613,10 +613,6 @@ startup:basr  %r13,0                     # get base
         bne    .Lnop390-.LPG1(%r13)
         oi     3(%r12),4                # set P/390 flag
 .Lnop390:
-	chi    %r0,0x2084		# new stidp format?
-	bne    .Loldfmt-.LPG1(%r13)
-	oi     3(%r12),64		# set new stidp flag
-.Loldfmt:	
 
 #
 # find out if we have an IEEE fpu

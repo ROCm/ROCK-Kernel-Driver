@@ -6,7 +6,7 @@
 #include <linux/workqueue.h>
 #include <asm/ccwdev.h>
 
-#define VERSION_LCS_H "$Revision: 1.16 $"
+#define VERSION_LCS_H "$Revision: 1.17 $"
 
 #define LCS_DBF_TEXT(level, name, text) \
 	do { \
@@ -221,8 +221,8 @@ struct lcs_cmd {
 				struct lcs_ip_mac_pair
 				ip_mac_pair[32];
 				__u32	  response_data;
-			} lcs_ipass_ctlmsg;
-		} lcs_qipassist;
+			} lcs_ipass_ctlmsg __attribute ((packed));
+		} lcs_qipassist __attribute__ ((packed));
 #endif /*CONFIG_IP_MULTICAST */
 	} cmd __attribute__ ((packed));
 }  __attribute__ ((packed));

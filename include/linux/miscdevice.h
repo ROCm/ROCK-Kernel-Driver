@@ -26,14 +26,6 @@
 #define MPT_MINOR	220
 #define MISC_DYNAMIC_MINOR 255
 
-#define SGI_GRAPHICS_MINOR   146
-#define SGI_OPENGL_MINOR     147
-#define SGI_GFX_MINOR        148
-#define SGI_STREAMS_MOUSE    149
-#define SGI_STREAMS_KEYBOARD 150
-/* drivers/sgi/char/usema.c */
-#define SGI_USEMACLONE	     151
-
 #define TUN_MINOR	     200
 #define	HPET_MINOR	     228
 

@@ -91,13 +91,6 @@ config IBM_WORKPAD
 	select IRQ_CPU
 	select ISA
 
-config NEC_EAGLE
-	bool "Support for NEC Eagle/Hawk board"
-	select DMA_NONCOHERENT
-	select IRQ_CPU
-	depends on MACH_VR41XX
-	select HW_HAS_PCI
-
 config TANBAC_TB0226
 	bool "Support for TANBAC TB0226 (Mbase)"
 	depends on MACH_VR41XX
@@ -311,6 +304,7 @@ config MOMENCO_OCELOT_G
 	select HW_HAS_PCI
 	select IRQ_CPU
 	select IRQ_CPU_RM7K
+	select PCI_MARVELL
 	select RM7000_CPU_SCACHE
 	help
 	  The Ocelot is a MIPS-based Single Board Computer (SBC) made by
@@ -321,6 +315,8 @@ config MOMENCO_OCELOT_C
 	select DMA_NONCOHERENT
 	select HW_HAS_PCI
 	select IRQ_CPU
+	select IRQ_MV64340
+	select PCI_MARVELL
 	select RM7000_CPU_SCACHE
 	help
 	  The Ocelot is a MIPS-based Single Board Computer (SBC) made by
@@ -332,7 +328,9 @@ config MOMENCO_JAGUAR_ATX
 	select HW_HAS_PCI
 	select IRQ_CPU
 	select IRQ_CPU_RM7K
+	select IRQ_MV64340
 	select LIMITED_DMA
+	select PCI_MARVELL
 	select RM7000_CPU_SCACHE
 	help
 	  The Jaguar ATX is a MIPS-based Single Board Computer (SBC) made by
@@ -885,7 +883,7 @@ config MIPS_NILE4
 
 config CPU_LITTLE_ENDIAN
 	bool "Generate little endian code"
-	default y if ACER_PICA_61 || CASIO_E55 || DDB5074 || DDB5476 || DDB5477 || MACH_DECSTATION || HP_LASERJET || IBM_WORKPAD || LASAT || MIPS_COBALT || MIPS_ITE8172 || MIPS_IVR || SOC_AU1X00 || NEC_OSPREY || NEC_EAGLE || OLIVETTI_M700 || SNI_RM200_PCI || VICTOR_MPC30X || ZAO_CAPCELLA
+	default y if ACER_PICA_61 || CASIO_E55 || DDB5074 || DDB5476 || DDB5477 || MACH_DECSTATION || HP_LASERJET || IBM_WORKPAD || LASAT || MIPS_COBALT || MIPS_ITE8172 || MIPS_IVR || SOC_AU1X00 || NEC_OSPREY || OLIVETTI_M700 || SNI_RM200_PCI || VICTOR_MPC30X || ZAO_CAPCELLA
 	default n if BAGET_MIPS || MIPS_EV64120 || MIPS_EV96100 || MOMENCO_OCELOT || MOMENCO_OCELOT_G || SGI_IP22 || SGI_IP27 || SGI_IP32 || TOSHIBA_JMR3927
 	help
 	  Some MIPS machines can be configured for either little or big endian
@@ -896,6 +894,9 @@ config IRQ_CPU
 	bool
 
 config IRQ_CPU_RM7K
+	bool
+
+config IRQ_MV64340
 	bool
 
 config DDB5XXX_COMMON
@@ -918,15 +919,13 @@ config MIPS_GT64120
 	depends on MIPS_EV64120 || MIPS_EV96100 || LASAT || MIPS_ATLAS || MIPS_MALTA || MOMENCO_OCELOT
 	default y
 
-config MIPS_MV64340
-	bool
-	depends on MOMENCO_JAGUAR_ATX || MOMENCO_OCELOT_C
-	default y
-
 config MIPS_TX3927
 	bool
 	depends on TOSHIBA_JMR3927
 	default y
+
+config PCI_MARVELL
+	bool
 
 config ITE_BOARD_GEN
 	bool

@@ -1,5 +1,5 @@
 /*
- * $Id: ctcmain.c,v 1.59 2004/04/21 17:10:13 ptiedem Exp $
+ * $Id: ctcmain.c,v 1.60 2004/06/18 15:13:51 ptiedem Exp $
  *
  * CTC / ESCON network driver
  *
@@ -36,7 +36,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: CTC/ESCON network driver $Revision: 1.59 $
+ * RELEASE-TAG: CTC/ESCON network driver $Revision: 1.60 $
  *
  */
 
@@ -319,7 +319,7 @@ static void
 print_banner(void)
 {
 	static int printed = 0;
-	char vbuf[] = "$Revision: 1.59 $";
+	char vbuf[] = "$Revision: 1.60 $";
 	char *version = vbuf;
 
 	if (printed)
@@ -3052,9 +3052,9 @@ ctc_new_device(struct ccwgroup_device *cgdev)
 	}
 
 	if (privptr->protocol == CTC_PROTO_LINUX_TTY)
-		snprintf(dev->name, 8, "ctctty%%d");
+		strlcpy(dev->name, "ctctty%d", IFNAMSIZ);
 	else
-		snprintf(dev->name, 8, "ctc%%d");
+		strlcpy(dev->name, "ctc%d", IFNAMSIZ);
 
 	for (direction = READ; direction <= WRITE; direction++) {
 		privptr->channel[direction] =

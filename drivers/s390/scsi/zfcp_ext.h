@@ -31,7 +31,7 @@
 #ifndef ZFCP_EXT_H
 #define ZFCP_EXT_H
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_EXT_REVISION "$Revision: 1.50 $"
+#define ZFCP_EXT_REVISION "$Revision: 1.51 $"
 
 #include "zfcp_def.h"
 
@@ -136,6 +136,8 @@ extern int zfcp_scsi_command_async(struct zfcp_adapter *,struct zfcp_unit *unit,
 				   struct scsi_cmnd *scsi_cmnd);
 extern int zfcp_scsi_command_sync(struct zfcp_unit *unit,
 				  struct scsi_cmnd *scsi_cmnd);
+extern struct scsi_transport_template *zfcp_transport_template;
+extern struct fc_function_template zfcp_transport_functions;
 
 /******************************** ERP ****************************************/
 extern void zfcp_erp_modify_adapter_status(struct zfcp_adapter *, u32, int);

@@ -792,7 +792,7 @@ static int __init relocate_pagedir(void)
 	}
 
 	err = -ENOMEM;
-	while ((m = (void *) __get_free_pages(GFP_ATOMIC, pagedir_order))) {
+	while ((m = (void *) __get_free_pages(GFP_ATOMIC, pagedir_order)) != NULL) {
 		if (!does_collide_order(old_pagedir, (unsigned long)m,
 					pagedir_order)) {
 			pm_pagedir_nosave =

@@ -35,40 +35,45 @@ unsigned long saved_context_r08, saved_context_r09, saved_context_r10, saved_con
 unsigned long saved_context_r12, saved_context_r13, saved_context_r14, saved_context_r15;
 unsigned long saved_context_eflags;
 
-void save_processor_state (void)
+void __save_processor_state(struct saved_context *ctxt)
 {
 	kernel_fpu_begin();
 
 	/*
 	 * descriptor tables
 	 */
-	asm volatile ("sgdt %0" : "=m" (saved_context.gdt_limit));
-	asm volatile ("sidt %0" : "=m" (saved_context.idt_limit));
-	asm volatile ("sldt %0" : "=m" (saved_context.ldt));
-	asm volatile ("str %0"  : "=m" (saved_context.tr));
+	asm volatile ("sgdt %0" : "=m" (ctxt->gdt_limit));
+	asm volatile ("sidt %0" : "=m" (ctxt->idt_limit));
+	asm volatile ("sldt %0" : "=m" (ctxt->ldt));
+	asm volatile ("str %0"  : "=m" (ctxt->tr));
 
 	/* XMM0..XMM15 should be handled by kernel_fpu_begin(). */
 	/* EFER should be constant for kernel version, no need to handle it. */
 	/*
 	 * segment registers
 	 */
-	asm volatile ("movw %%ds, %0" : "=m" (saved_context.ds));
-	asm volatile ("movw %%es, %0" : "=m" (saved_context.es));
-	asm volatile ("movw %%fs, %0" : "=m" (saved_context.fs));
-	asm volatile ("movw %%gs, %0" : "=m" (saved_context.gs));
-	asm volatile ("movw %%ss, %0" : "=m" (saved_context.ss));
+	asm volatile ("movw %%ds, %0" : "=m" (ctxt->ds));
+	asm volatile ("movw %%es, %0" : "=m" (ctxt->es));
+	asm volatile ("movw %%fs, %0" : "=m" (ctxt->fs));
+	asm volatile ("movw %%gs, %0" : "=m" (ctxt->gs));
+	asm volatile ("movw %%ss, %0" : "=m" (ctxt->ss));
 
-	rdmsrl(MSR_FS_BASE, saved_context.fs_base);
-	rdmsrl(MSR_GS_BASE, saved_context.gs_base);
-	rdmsrl(MSR_KERNEL_GS_BASE, saved_context.gs_kernel_base);
+	rdmsrl(MSR_FS_BASE, ctxt->fs_base);
+	rdmsrl(MSR_GS_BASE, ctxt->gs_base);
+	rdmsrl(MSR_KERNEL_GS_BASE, ctxt->gs_kernel_base);
 
 	/*
 	 * control registers 
 	 */
-	asm volatile ("movq %%cr0, %0" : "=r" (saved_context.cr0));
-	asm volatile ("movq %%cr2, %0" : "=r" (saved_context.cr2));
-	asm volatile ("movq %%cr3, %0" : "=r" (saved_context.cr3));
-	asm volatile ("movq %%cr4, %0" : "=r" (saved_context.cr4));
+	asm volatile ("movq %%cr0, %0" : "=r" (ctxt->cr0));
+	asm volatile ("movq %%cr2, %0" : "=r" (ctxt->cr2));
+	asm volatile ("movq %%cr3, %0" : "=r" (ctxt->cr3));
+	asm volatile ("movq %%cr4, %0" : "=r" (ctxt->cr4));
+}
+
+void save_processor_state(void)
+{
+	__save_processor_state(&saved_context);
 }
 
 static void
@@ -80,40 +85,45 @@ do_fpu_end(void)
 	mxcsr_feature_mask_init();
 }
 
-void restore_processor_state(void)
+void __restore_processor_state(struct saved_context *ctxt)
 {
 	/*
 	 * control registers
 	 */
-	asm volatile ("movq %0, %%cr4" :: "r" (saved_context.cr4));
-	asm volatile ("movq %0, %%cr3" :: "r" (saved_context.cr3));
-	asm volatile ("movq %0, %%cr2" :: "r" (saved_context.cr2));
-	asm volatile ("movq %0, %%cr0" :: "r" (saved_context.cr0));
+	asm volatile ("movq %0, %%cr4" :: "r" (ctxt->cr4));
+	asm volatile ("movq %0, %%cr3" :: "r" (ctxt->cr3));
+	asm volatile ("movq %0, %%cr2" :: "r" (ctxt->cr2));
+	asm volatile ("movq %0, %%cr0" :: "r" (ctxt->cr0));
 
 	/*
 	 * segment registers
 	 */
-	asm volatile ("movw %0, %%ds" :: "r" (saved_context.ds));
-	asm volatile ("movw %0, %%es" :: "r" (saved_context.es));
-	asm volatile ("movw %0, %%fs" :: "r" (saved_context.fs));
-	load_gs_index(saved_context.gs);
-	asm volatile ("movw %0, %%ss" :: "r" (saved_context.ss));
+	asm volatile ("movw %0, %%ds" :: "r" (ctxt->ds));
+	asm volatile ("movw %0, %%es" :: "r" (ctxt->es));
+	asm volatile ("movw %0, %%fs" :: "r" (ctxt->fs));
+	load_gs_index(ctxt->gs);
+	asm volatile ("movw %0, %%ss" :: "r" (ctxt->ss));
 
-	wrmsrl(MSR_FS_BASE, saved_context.fs_base);
-	wrmsrl(MSR_GS_BASE, saved_context.gs_base);
-	wrmsrl(MSR_KERNEL_GS_BASE, saved_context.gs_kernel_base);
+	wrmsrl(MSR_FS_BASE, ctxt->fs_base);
+	wrmsrl(MSR_GS_BASE, ctxt->gs_base);
+	wrmsrl(MSR_KERNEL_GS_BASE, ctxt->gs_kernel_base);
 
 	/*
 	 * now restore the descriptor tables to their proper values
 	 * ltr is done i fix_processor_context().
 	 */
-	asm volatile ("lgdt %0" :: "m" (saved_context.gdt_limit));
-	asm volatile ("lidt %0" :: "m" (saved_context.idt_limit));
-	asm volatile ("lldt %0" :: "m" (saved_context.ldt));
+	asm volatile ("lgdt %0" :: "m" (ctxt->gdt_limit));
+	asm volatile ("lidt %0" :: "m" (ctxt->idt_limit));
+	asm volatile ("lldt %0" :: "m" (ctxt->ldt));
 
 	fix_processor_context();
 
 	do_fpu_end();
+}
+
+void restore_processor_state(void)
+{
+	__restore_processor_state(&saved_context);
 }
 
 void fix_processor_context(void)

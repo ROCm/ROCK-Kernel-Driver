@@ -31,7 +31,7 @@
 #define ZFCP_LOG_AREA			ZFCP_LOG_AREA_ERP
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_ERP_REVISION "$Revision: 1.54 $"
+#define ZFCP_ERP_REVISION "$Revision: 1.56 $"
 
 #include "zfcp_ext.h"
 
@@ -435,8 +435,20 @@ zfcp_els_handler(unsigned long data)
 	u8 req_code, resp_code;
 	int retval = 0;
 
-	if (send_els->status != 0)
+	if (send_els->status != 0) {
+		ZFCP_LOG_NORMAL("ELS request timed out, physical port reopen "
+				"of port 0x%016Lx on adapter %s failed\n",
+				port->wwpn, zfcp_get_busid_by_port(port));
+		debug_text_event(port->adapter->erp_dbf, 3, "forcreop");
+		retval = zfcp_erp_port_forced_reopen(port, 0);
+		if (retval != 0) {
+			ZFCP_LOG_NORMAL("reopen of remote port 0x%016Lx "
+					"on adapter %s failed\n", port->wwpn,
+					zfcp_get_busid_by_port(port));
+			retval = -EPERM;
+		}
 		goto skip_fsfstatus;
+	}
 
 	req = (void*)((page_to_pfn(send_els->req->page) << PAGE_SHIFT) + send_els->req->offset);
 	resp = (void*)((page_to_pfn(send_els->resp->page) << PAGE_SHIFT) + send_els->resp->offset);
@@ -2286,7 +2298,6 @@ zfcp_erp_adapter_strategy_open_qdio(struct zfcp_erp_action *erp_action)
 	int i;
 	volatile struct qdio_buffer_element *sbale;
 	struct zfcp_adapter *adapter = erp_action->adapter;
-	int retval_cleanup = 0;
 
 	if (atomic_test_mask(ZFCP_STATUS_ADAPTER_QDIOUP, &adapter->status)) {
 		ZFCP_LOG_NORMAL("bug: second attempt to set up QDIO on "
@@ -2301,7 +2312,7 @@ zfcp_erp_adapter_strategy_open_qdio(struct zfcp_erp_action *erp_action)
 			      zfcp_get_busid_by_adapter(adapter));
 		goto failed_qdio_establish;
 	}
-	ZFCP_LOG_DEBUG("queues established\n");
+	debug_text_event(adapter->erp_dbf, 3, "qdio_est");
 
 	if (qdio_activate(adapter->ccw_device, 0) != 0) {
 		ZFCP_LOG_INFO("error: activation of QDIO queues failed "
@@ -2309,7 +2320,7 @@ zfcp_erp_adapter_strategy_open_qdio(struct zfcp_erp_action *erp_action)
 			      zfcp_get_busid_by_adapter(adapter));
 		goto failed_qdio_activate;
 	}
-	ZFCP_LOG_DEBUG("queues activated\n");
+	debug_text_event(adapter->erp_dbf, 3, "qdio_act");
 
 	/*
 	 * put buffers into response queue,
@@ -2357,19 +2368,15 @@ zfcp_erp_adapter_strategy_open_qdio(struct zfcp_erp_action *erp_action)
 	/* NOP */
 
  failed_qdio_activate:
-	/* DEBUG */
-	//__ZFCP_WAIT_EVENT_TIMEOUT(timeout, 0);
-	/* cleanup queues previously established */
-	retval_cleanup = qdio_shutdown(adapter->ccw_device,
-				       QDIO_FLAG_CLEANUP_USING_CLEAR);
-	if (retval_cleanup) {
-		ZFCP_LOG_NORMAL("bug: shutdown of QDIO queues failed "
-				"(retval=%d)\n", retval_cleanup);
+	debug_text_event(adapter->erp_dbf, 3, "qdio_down1a");
+	while (qdio_shutdown(adapter->ccw_device,
+			     QDIO_FLAG_CLEANUP_USING_CLEAR) == -EINPROGRESS) {
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_timeout(HZ);
 	}
+	debug_text_event(adapter->erp_dbf, 3, "qdio_down1b");
 
  failed_qdio_establish:
-	atomic_clear_mask(ZFCP_STATUS_ADAPTER_QDIOUP, &adapter->status);
-
  failed_sanity:
 	retval = ZFCP_ERP_FAILED;
 
@@ -2401,42 +2408,22 @@ zfcp_erp_adapter_strategy_close_qdio(struct zfcp_erp_action *erp_action)
 		goto out;
 	}
 
-	/* cleanup queues previously established */
-
 	/*
-	 * MUST NOT LOCK - qdio_cleanup might call schedule
-	 * FIXME: need another way to make cleanup safe
+	 * Get queue_lock and clear QDIOUP flag. Thus it's guaranteed that
+	 * do_QDIO won't be called while qdio_shutdown is in progress.
 	 */
-	/* Note:
-	 * We need the request_queue lock here, otherwise there exists the 
-	 * following race:
-	 * 
-	 * queuecommand calls create_fcp_commmand_task...calls req_create, 
-	 * gets sbal x to x+y - meanwhile adapter reopen is called, completes 
-	 * - req_send calls do_QDIO for sbal x to x+y, i.e. wrong indices.
-	 *
-	 * with lock:
-	 * queuecommand calls create_fcp_commmand_task...calls req_create, 
-	 * gets sbal x to x+y - meanwhile adapter reopen is called, waits 
-	 * - req_send calls do_QDIO for sbal x to x+y, i.e. wrong indices 
-	 * but do_QDIO fails as adapter_reopen is still waiting for the lock
-	 * OR
-	 * queuecommand calls create_fcp_commmand_task...calls req_create 
-	 * - meanwhile adapter reopen is called...completes,
-	 * - gets sbal 0 to 0+y, - req_send calls do_QDIO for sbal 0 to 0+y, 
-	 * i.e. correct indices...though an fcp command is called before 
-	 * exchange config data...that should be fine, however
-	 */
-	if (qdio_shutdown(adapter->ccw_device, QDIO_FLAG_CLEANUP_USING_CLEAR)) {
-		/*
-		 * FIXME(design):
-		 * What went wrong? What to do best? Proper retval?
-		 */
-		ZFCP_LOG_NORMAL("bug: shutdown of QDIO queues failed on "
-				"adapter %s\n",
-				zfcp_get_busid_by_adapter(adapter));
-	} else
-		ZFCP_LOG_DEBUG("queues cleaned up\n");
+
+	write_lock_irq(&adapter->request_queue.queue_lock);
+	atomic_clear_mask(ZFCP_STATUS_ADAPTER_QDIOUP, &adapter->status);
+	write_unlock_irq(&adapter->request_queue.queue_lock);
+
+	debug_text_event(adapter->erp_dbf, 3, "qdio_down2a");
+	while (qdio_shutdown(adapter->ccw_device,
+			     QDIO_FLAG_CLEANUP_USING_CLEAR) == -EINPROGRESS) {
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_timeout(HZ);
+	}
+	debug_text_event(adapter->erp_dbf, 3, "qdio_down2b");
 
 	/*
 	 * First we had to stop QDIO operation.
@@ -2459,8 +2446,6 @@ zfcp_erp_adapter_strategy_close_qdio(struct zfcp_erp_action *erp_action)
 	adapter->request_queue.free_index = 0;
 	atomic_set(&adapter->request_queue.free_count, 0);
 	adapter->request_queue.distance_from_int = 0;
-
-	atomic_clear_mask(ZFCP_STATUS_ADAPTER_QDIOUP, &adapter->status);
  out:
 	return retval;
 }

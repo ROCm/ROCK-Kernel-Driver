@@ -418,8 +418,6 @@ static int tsa5059_set_tv_freq	(struct dvb_i2c_bus *i2c, u32 freq, int ftype, in
 }
 
 
-
-#define ABS(x) ((x) < 0 ? -(x) : (x))
 #define MIN2(a,b) ((a) < (b) ? (a) : (b))
 #define MIN3(a,b,c) MIN2(MIN2(a,b),c)
 
@@ -436,8 +434,8 @@ static int tua6100_set_tv_freq	(struct dvb_i2c_bus *i2c, u32 freq,
 
 	first_ZF = (freq) / 1000;
 
-	if (ABS(MIN2(ABS(first_ZF-1190),ABS(first_ZF-1790))) <
-	    ABS(MIN3(ABS(first_ZF-1202),ABS(first_ZF-1542),ABS(first_ZF-1890))))
+	if (abs(MIN2(abs(first_ZF-1190),abs(first_ZF-1790))) <
+	    abs(MIN3(abs(first_ZF-1202),abs(first_ZF-1542),abs(first_ZF-1890))))
 		_fband = 2;
 	else
 		_fband = 3;

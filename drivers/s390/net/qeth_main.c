@@ -1,6 +1,6 @@
 /*
  *
- * linux/drivers/s390/net/qeth_main.c ($Revision: 1.121 $)
+ * linux/drivers/s390/net/qeth_main.c ($Revision: 1.125 $)
  *
  * Linux on zSeries OSA Express and HiperSockets support
  *
@@ -12,7 +12,7 @@
  *			  Frank Pavlic (pavlic@de.ibm.com) and
  *		 	  Thomas Spatzier <tspat@de.ibm.com>
  *
- *    $Revision: 1.121 $	 $Date: 2004/06/11 16:32:15 $
+ *    $Revision: 1.125 $	 $Date: 2004/06/29 17:28:24 $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -78,7 +78,7 @@ qeth_eyecatcher(void)
 #include "qeth_mpc.h"
 #include "qeth_fs.h"
 
-#define VERSION_QETH_C "$Revision: 1.121 $"
+#define VERSION_QETH_C "$Revision: 1.125 $"
 static const char *version = "qeth S/390 OSA-Express driver";
 
 /**
@@ -818,14 +818,20 @@ static void qeth_add_multicast_ipv4(struct qeth_card *);
 static void qeth_add_multicast_ipv6(struct qeth_card *);
 #endif
 
-static void
+static inline int
 qeth_set_thread_start_bit(struct qeth_card *card, unsigned long thread)
 {
 	unsigned long flags;
 
 	spin_lock_irqsave(&card->thread_mask_lock, flags);
+	if ( !(card->thread_allowed_mask & thread) ||
+	      (card->thread_start_mask & thread) ) {
+		spin_unlock_irqrestore(&card->thread_mask_lock, flags);
+		return -EPERM;
+	}
 	card->thread_start_mask |= thread;
 	spin_unlock_irqrestore(&card->thread_mask_lock, flags);
+	return 0;
 }
 
 static void
@@ -952,8 +958,8 @@ qeth_schedule_recovery(struct qeth_card *card)
 {
 	QETH_DBF_TEXT(trace,2,"startrec");
 
-	qeth_set_thread_start_bit(card, QETH_RECOVER_THREAD);
-	schedule_work(&card->kernel_thread_starter);
+	if (qeth_set_thread_start_bit(card, QETH_RECOVER_THREAD) == 0)
+		schedule_work(&card->kernel_thread_starter);
 }
 
 static int
@@ -1568,9 +1574,9 @@ qeth_reset_ip_addresses(struct qeth_card *card)
 	QETH_DBF_TEXT(trace, 2, "rstipadd");
 
 	qeth_clear_ip_list(card, 0, 1);
-	qeth_set_thread_start_bit(card, QETH_SET_IP_THREAD);
-	qeth_set_thread_start_bit(card, QETH_SET_MC_THREAD);
-	schedule_work(&card->kernel_thread_starter);
+	if ( (qeth_set_thread_start_bit(card, QETH_SET_IP_THREAD) == 0) ||
+	     (qeth_set_thread_start_bit(card, QETH_SET_MC_THREAD) == 0) )
+		schedule_work(&card->kernel_thread_starter);
 }
 
 static struct qeth_ipa_cmd *
@@ -4718,10 +4724,9 @@ qeth_vlan_rx_kill_vid(struct net_device *dev, unsigned short vid)
 	if (card->vlangrp)
 		card->vlangrp->vlan_devices[vid] = NULL;
 	spin_unlock_irqrestore(&card->vlanlock, flags);
-	qeth_set_thread_start_bit(card, QETH_SET_IP_THREAD);
-	/* delete mc addresses for this vlan dev */
-	qeth_set_thread_start_bit(card, QETH_SET_MC_THREAD);
-	schedule_work(&card->kernel_thread_starter);
+ 	if ( (qeth_set_thread_start_bit(card, QETH_SET_IP_THREAD) == 0) ||
+	     (qeth_set_thread_start_bit(card, QETH_SET_MC_THREAD) == 0) )
+		schedule_work(&card->kernel_thread_starter);
 }
 #endif
 
@@ -4950,8 +4955,8 @@ qeth_set_multicast_list(struct net_device *dev)
 	QETH_DBF_TEXT(trace,3,"setmulti");
 	card = (struct qeth_card *) dev->priv;
 
-	qeth_set_thread_start_bit(card, QETH_SET_MC_THREAD);
-	schedule_work(&card->kernel_thread_starter);
+	if (qeth_set_thread_start_bit(card, QETH_SET_MC_THREAD) == 0)
+		schedule_work(&card->kernel_thread_starter);
 }
 
 static void
@@ -6422,8 +6427,8 @@ qeth_start_again(struct qeth_card *card)
 	rtnl_lock();
 	dev_open(card->dev);
 	rtnl_unlock();
-	qeth_set_thread_start_bit(card, QETH_SET_MC_THREAD);
-	schedule_work(&card->kernel_thread_starter);
+ 	if (qeth_set_thread_start_bit(card, QETH_SET_MC_THREAD) == 0)
+		schedule_work(&card->kernel_thread_starter);
 }
 
 static int
@@ -6809,8 +6814,8 @@ qeth_add_vipa(struct qeth_card *card, enum qeth_prot_versions proto,
 	}
 	if (!qeth_add_ip(card, ipaddr))
 		kfree(ipaddr);
-	qeth_set_thread_start_bit(card, QETH_SET_IP_THREAD);
-	schedule_work(&card->kernel_thread_starter);
+ 	if (qeth_set_thread_start_bit(card, QETH_SET_IP_THREAD) == 0)
+		schedule_work(&card->kernel_thread_starter);
 	return rc;
 }
 
@@ -6838,8 +6843,8 @@ qeth_del_vipa(struct qeth_card *card, enum qeth_prot_versions proto,
 		return;
 	if (!qeth_delete_ip(card, ipaddr))
 		kfree(ipaddr);
-	qeth_set_thread_start_bit(card, QETH_SET_IP_THREAD);
-	schedule_work(&card->kernel_thread_starter);
+ 	if (qeth_set_thread_start_bit(card, QETH_SET_IP_THREAD) == 0)
+		schedule_work(&card->kernel_thread_starter);
 }
 
 /*
@@ -6882,8 +6887,8 @@ qeth_add_rxip(struct qeth_card *card, enum qeth_prot_versions proto,
 	}
 	if (!qeth_add_ip(card, ipaddr))
 		kfree(ipaddr);
-	qeth_set_thread_start_bit(card, QETH_SET_IP_THREAD);
-	schedule_work(&card->kernel_thread_starter);
+ 	if (qeth_set_thread_start_bit(card, QETH_SET_IP_THREAD) == 0)
+		schedule_work(&card->kernel_thread_starter);
 	return 0;
 }
 
@@ -6911,8 +6916,8 @@ qeth_del_rxip(struct qeth_card *card, enum qeth_prot_versions proto,
 		return;
 	if (!qeth_delete_ip(card, ipaddr))
 		kfree(ipaddr);
-	qeth_set_thread_start_bit(card, QETH_SET_IP_THREAD);
-	schedule_work(&card->kernel_thread_starter);
+ 	if (qeth_set_thread_start_bit(card, QETH_SET_IP_THREAD) == 0)
+		schedule_work(&card->kernel_thread_starter);
 }
 
 /**
@@ -6952,8 +6957,8 @@ qeth_ip_event(struct notifier_block *this,
 	default:
 		break;
 	}
-	qeth_set_thread_start_bit(card, QETH_SET_IP_THREAD);
-	schedule_work(&card->kernel_thread_starter);
+ 	if (qeth_set_thread_start_bit(card, QETH_SET_IP_THREAD) == 0)
+		schedule_work(&card->kernel_thread_starter);
 out:
 	return NOTIFY_DONE;
 }
@@ -7005,8 +7010,8 @@ qeth_ip6_event(struct notifier_block *this,
 	default:
 		break;
 	}
-	qeth_set_thread_start_bit(card, QETH_SET_IP_THREAD);
-	schedule_work(&card->kernel_thread_starter);
+ 	if (qeth_set_thread_start_bit(card, QETH_SET_IP_THREAD) == 0)
+		schedule_work(&card->kernel_thread_starter);
 out:
 	return NOTIFY_DONE;
 }

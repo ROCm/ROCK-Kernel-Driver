@@ -9,7 +9,7 @@
  *
  * gendisk related functions for the dasd driver.
  *
- * $Revision: 1.46 $
+ * $Revision: 1.48 $
  */
 
 #include <linux/config.h>
@@ -152,8 +152,9 @@ dasd_destroy_partitions(struct dasd_device * device)
 	memset(&bpart, sizeof(struct blkpg_partition), 0);
 	memset(&barg, sizeof(struct blkpg_ioctl_arg), 0);
 	barg.data = &bpart;
+	barg.op = BLKPG_DEL_PARTITION;
 	for (bpart.pno = device->gdp->minors - 1; bpart.pno > 0; bpart.pno--)
-		ioctl_by_bdev(bdev, BLKPG_DEL_PARTITION, (unsigned long) &barg);
+		ioctl_by_bdev(bdev, BLKPG, (unsigned long) &barg);
 
 	invalidate_partition(device->gdp, 0);
 	/* Matching blkdev_put to the blkdev_get in dasd_scan_partitions. */

@@ -1622,6 +1622,10 @@ toshoboe_open (struct pci_dev *pci_dev, const struct pci_device_id *pdid)
       goto freeregion;
     }
 
+#if (BITS_PER_LONG == 64)
+#error broken on 64-bit:  casts pointer to 32-bit, and then back to pointer.
+#endif
+
   /*We need to align the taskfile on a taskfile size boundary */
   {
     unsigned long addr;

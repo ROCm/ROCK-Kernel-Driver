@@ -571,7 +571,7 @@ asiliantfb_pci_init(struct pci_dev *dp, const struct pci_device_id *ent)
 	}
 
 	pci_write_config_dword(dp, 4, 0x02800083);
-	writeb(3, addr + 0x400784);
+	writeb(3, p->screen_base + 0x400784);
 
 	init_asiliant(p, addr);
 

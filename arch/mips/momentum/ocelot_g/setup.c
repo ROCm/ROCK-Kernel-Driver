@@ -67,7 +67,7 @@
 extern unsigned char prom_mac_addr_base[6];
 #endif
 
-unsigned long gt64240_base;
+unsigned long marvell_base;
 
 /* These functions are used for rebooting or halting the machine*/
 extern void momenco_ocelot_restart(char *command);
@@ -117,7 +117,7 @@ void PMON_v2_setup(void)
 	add_temporary_entry(ENTRYLO(0xfc800000), ENTRYLO(0xfc810000),
 	                    0xfc800000, PM_64K);
 
-	gt64240_base = 0xf4000000;
+	marvell_base = 0xf4000000;
 }
 
 extern int rm7k_tcache_enabled;
@@ -133,7 +133,7 @@ static void __init setup_l3cache(unsigned long size)
 	printk("Enabling L3 cache...");
 
 	/* Enable the L3 cache in the GT64120A's CPU Configuration register */
-	GT_WRITE(0, GT_READ(0) | (1<<14));
+	MV_WRITE(0, MV_READ(0) | (1<<14));
 
 	/* Enable the L3 cache in the CPU */
 	set_c0_config(1<<12 /* CONF_TE */);
@@ -239,7 +239,7 @@ static int  __init momenco_ocelot_g_setup(void)
 	}
 
 	/* FIXME: Fix up the DiskOnChip mapping */
-	GT_WRITE(0x468, 0xfef73);
+	MV_WRITE(0x468, 0xfef73);
 
 	return 0;
 }

@@ -161,7 +161,7 @@ unsigned ItLpQueue_process( struct ItLpQueue * lpQueue, struct pt_regs *regs )
 	mb();
 	clear_inUse( lpQueue );
 
-	get_paca()->lpEvent_count += numIntsProcessed;
+	get_paca()->lpevent_count += numIntsProcessed;
 
 	return numIntsProcessed;
 }

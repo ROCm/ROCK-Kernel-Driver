@@ -234,6 +234,9 @@ ppc4xx_uic_disable_and_ack(unsigned int irq)
 	case 1:
 		mtdcr(DCRN_UIC_ER(UIC1), ppc_cached_irq_mask[word]);
 		mtdcr(DCRN_UIC_SR(UIC1), (1 << (31 - bit)));
+#if (NR_UICS == 2)
+		mtdcr(DCRN_UIC_SR(UIC0), (1 << (31 - UIC0_UIC1NC)));
+#endif
 #if (NR_UICS > 2)
 		mtdcr(DCRN_UIC_SR(UICB), UICB_UIC1NC);
 #endif
@@ -285,6 +288,9 @@ ppc4xx_uic_end(unsigned int irq)
 			break;
 		case 1:
 			mtdcr(DCRN_UIC_SR(UIC1), 1 << (31 - bit));
+#if (NR_UICS == 2)
+			mtdcr(DCRN_UIC_SR(UIC0), (1 << (31 - UIC0_UIC1NC)));
+#endif
 #if (NR_UICS > 2)
 			mtdcr(DCRN_UIC_SR(UICB),  UICB_UIC1NC);
 #endif
@@ -423,7 +429,7 @@ ppc4xx_extpic_init(void)
 		       bit, sense);
 #endif
 		ppc_cached_sense_mask[word] |=
-		    (sense & IRQ_SENSE_MASK) << (31 - bit);
+		    (~sense & IRQ_SENSE_MASK) << (31 - bit);
 		ppc_cached_pol_mask[word] |=
 		    ((sense & IRQ_POLARITY_MASK) >> 1) << (31 - bit);
 		switch (word) {

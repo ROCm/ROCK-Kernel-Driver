@@ -69,6 +69,10 @@ extern void __chk_user_ptr(void __user *);
 # define __deprecated		/* unimplemented */
 #endif
 
+#ifndef __must_check
+#define __must_check
+#endif
+
 /*
  * Allow us to avoid 'defined but not used' warnings on functions and data,
  * as well as force them to be emitted to the assembly file.

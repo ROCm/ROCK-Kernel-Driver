@@ -54,7 +54,7 @@ typedef struct
          *
          */
 	long args[0];
-} debug_sprintf_entry;
+} debug_sprintf_entry_t;
 
 
 extern void tod_to_timeval(uint64_t todval, struct timeval *xtime);
@@ -88,7 +88,7 @@ static int debug_raw_header_fn(debug_info_t * id, struct debug_view *view,
                          int area, debug_entry_t * entry, char *out_buf);
 
 static int debug_sprintf_format_fn(debug_info_t * id, struct debug_view *view,
-				   char *out_buf, debug_sprintf_entry *curr_event);
+				   char *out_buf, debug_sprintf_entry_t *curr_event);
 
 /* globals */
 
@@ -692,31 +692,21 @@ extern inline debug_entry_t *get_active_entry(debug_info_t * id)
 }
 
 /*
- * debug_common:
+ * debug_finish_entry:
  * - set timestamp, caller address, cpu number etc.
  */
 
-extern inline debug_entry_t *debug_common(debug_info_t * id, int level, 
-                                    const void *buf, int len, int exception)
+extern inline void debug_finish_entry(debug_info_t * id, debug_entry_t* active,
+		int level, int exception)
 {
-	unsigned long flags;
-	debug_entry_t *active;
-
-	spin_lock_irqsave(&id->lock, flags);
-	active = get_active_entry(id);
 	STCK(active->id.stck);
 	active->id.fields.cpuid = smp_processor_id();
 	active->caller = __builtin_return_address(0);
 	active->id.fields.exception = exception;
 	active->id.fields.level     = level;
-	memset(DEBUG_DATA(active), 0, id->buf_size);
-	memcpy(DEBUG_DATA(active), buf, MIN(len, id->buf_size));
 	proceed_active_entry(id);
 	if(exception)
 		proceed_active_area(id);
-	spin_unlock_irqrestore(&id->lock, flags);
-
-	return active;
 }
 
 /*
@@ -727,7 +717,17 @@ extern inline debug_entry_t *debug_common(debug_info_t * id, int level,
 debug_entry_t *debug_event_common(debug_info_t * id, int level, const void *buf,
 			          int len)
 {
-	return debug_common(id, level, buf, len, 0);
+	unsigned long flags;
+	debug_entry_t *active;
+
+	spin_lock_irqsave(&id->lock, flags);
+	active = get_active_entry(id);
+	memset(DEBUG_DATA(active), 0, id->buf_size);
+	memcpy(DEBUG_DATA(active), buf, MIN(len, id->buf_size));
+	debug_finish_entry(id, active, level, 0);
+	spin_unlock_irqrestore(&id->lock, flags);
+
+	return active;
 }
 
 /*
@@ -738,7 +738,17 @@ debug_entry_t *debug_event_common(debug_info_t * id, int level, const void *buf,
 debug_entry_t *debug_exception_common(debug_info_t * id, int level, 
                                       const void *buf, int len)
 {
-	return debug_common(id, level, buf, len, 1);
+	unsigned long flags;
+	debug_entry_t *active;
+
+	spin_lock_irqsave(&id->lock, flags);
+	active = get_active_entry(id);
+	memset(DEBUG_DATA(active), 0, id->buf_size);
+	memcpy(DEBUG_DATA(active), buf, MIN(len, id->buf_size));
+	debug_finish_entry(id, active, level, 1);
+	spin_unlock_irqrestore(&id->lock, flags);
+
+	return active;
 }
 
 /*
@@ -764,27 +774,28 @@ debug_entry_t *debug_sprintf_event(debug_info_t* id,
                                    int level,char *string,...)
 {
 	va_list   ap;
-	int numargs,alloc_size,idx;
-	debug_sprintf_entry *curr_event;
-	debug_entry_t *retval = NULL;
+	int numargs,idx;
+	unsigned long flags;
+	debug_sprintf_entry_t *curr_event;
+	debug_entry_t *active;
 
 	if((!id) || (level > id->level))
 		return NULL;
-	else {
-		numargs=debug_count_numargs(string);
-		alloc_size=offsetof(debug_sprintf_entry,args[numargs]);
-		curr_event=alloca(alloc_size);
 
-		if(curr_event){
-			va_start(ap,string);
-			curr_event->string=string;
-			for(idx=0;idx<numargs;idx++)
-				curr_event->args[idx]=va_arg(ap,long);
-			retval=debug_common(id,level, curr_event,alloc_size,0);
-			va_end(ap);
-		}
-		return retval;
-	}
+	numargs=debug_count_numargs(string);
+
+	spin_lock_irqsave(&id->lock, flags);
+	active = get_active_entry(id);
+	curr_event=(debug_sprintf_entry_t *) DEBUG_DATA(active);
+	va_start(ap,string);
+	curr_event->string=string;
+	for(idx=0;idx<MIN(numargs,((id->buf_size / sizeof(long))-1));idx++)
+		curr_event->args[idx]=va_arg(ap,long);
+	va_end(ap);
+	debug_finish_entry(id, active, level, 0);
+	spin_unlock_irqrestore(&id->lock, flags);
+
+	return active;
 }
 
 /*
@@ -795,27 +806,28 @@ debug_entry_t *debug_sprintf_exception(debug_info_t* id,
                                        int level,char *string,...)
 {
 	va_list   ap;
-	int numargs,alloc_size,idx;
-	debug_sprintf_entry *curr_event;
-	debug_entry_t *retval = NULL;
+	int numargs,idx;
+	unsigned long flags;
+	debug_sprintf_entry_t *curr_event;
+	debug_entry_t *active;
 
 	if((!id) || (level > id->level))
 		return NULL;
-	else {
-		numargs=debug_count_numargs(string);
-		alloc_size=offsetof(debug_sprintf_entry,args[numargs]);
-		curr_event=alloca(alloc_size);
 
-		if(curr_event){
-			va_start(ap,string);
-			curr_event->string=string;
-			for(idx=0;idx<numargs;idx++)
-				curr_event->args[idx]=va_arg(ap,long);
-			retval=debug_common(id,level, curr_event,alloc_size,1);
-			va_end(ap);
-		}
-		return retval;
-	}
+	numargs=debug_count_numargs(string);
+
+	spin_lock_irqsave(&id->lock, flags);
+	active = get_active_entry(id);
+	curr_event=(debug_sprintf_entry_t *)DEBUG_DATA(active);
+	va_start(ap,string);
+	curr_event->string=string;
+	for(idx=0;idx<MIN(numargs,((id->buf_size / sizeof(long))-1));idx++)
+		curr_event->args[idx]=va_arg(ap,long);
+	va_end(ap);
+	debug_finish_entry(id, active, level, 1);
+	spin_unlock_irqrestore(&id->lock, flags);
+
+	return active;
 }
 
 /*
@@ -1127,7 +1139,7 @@ int debug_dflt_header_fn(debug_info_t * id, struct debug_view *view,
 #define DEBUG_SPRINTF_MAX_ARGS 10
 
 int debug_sprintf_format_fn(debug_info_t * id, struct debug_view *view,
-                            char *out_buf, debug_sprintf_entry *curr_event)
+                            char *out_buf, debug_sprintf_entry_t *curr_event)
 {
 	int num_longs, num_used_args = 0,i, rc = 0;
 	int index[DEBUG_SPRINTF_MAX_ARGS];

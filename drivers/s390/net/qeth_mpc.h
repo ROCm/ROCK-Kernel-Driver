@@ -14,7 +14,7 @@
 
 #include <asm/qeth.h>
 
-#define VERSION_QETH_MPC_H "$Revision: 1.35 $"
+#define VERSION_QETH_MPC_H "$Revision: 1.36 $"
 
 extern const char *VERSION_QETH_MPC_C;
 
@@ -36,7 +36,7 @@ extern unsigned char IPA_PDU_HEADER[];
 
 #define QETH_TIMEOUT 		(10 * HZ)
 #define QETH_IPA_TIMEOUT 	(45 * HZ)
-#define QETH_IDX_COMMAND_SEQNO 	-1
+#define QETH_IDX_COMMAND_SEQNO 	0xffff0000
 #define SR_INFO_LEN		16
 
 #define QETH_CLEAR_CHANNEL_PARM	-10

@@ -188,11 +188,16 @@ static int __is_prefetch(struct pt_regs *regs, unsigned long addr)
 	return prefetch;
 }
 
-static inline int is_prefetch(struct pt_regs *regs, unsigned long addr)
+static inline int is_prefetch(struct pt_regs *regs, unsigned long addr,
+			      unsigned long error_code)
 {
 	if (unlikely(boot_cpu_data.x86_vendor == X86_VENDOR_AMD &&
-		     boot_cpu_data.x86 >= 6))
+		     boot_cpu_data.x86 >= 6)) {
+		/* Catch an obscure case of prefetch inside an NX page. */
+		if (nx_enabled && (error_code & 16))
+			return 0;
 		return __is_prefetch(regs, addr);
+	}
 	return 0;
 } 
 
@@ -374,7 +379,7 @@ bad_area_nosemaphore:
 		 * Valid to do another page fault here because this one came 
 		 * from user space.
 		 */
-		if (is_prefetch(regs, address))
+		if (is_prefetch(regs, address, error_code))
 			return;
 
 		tsk->thread.cr2 = address;
@@ -415,7 +420,7 @@ no_context:
 	 * had been triggered by is_prefetch fixup_exception would have 
 	 * handled it.
 	 */
- 	if (is_prefetch(regs, address))
+ 	if (is_prefetch(regs, address, error_code))
  		return;
 
 /*
@@ -426,18 +431,11 @@ no_context:
 	bust_spinlocks(1);
 
 #ifdef CONFIG_X86_PAE
-	{
-		pgd_t *pgd;
-		pmd_t *pmd;
+	if (error_code & 16) {
+		pte_t *pte = lookup_address(address);
 
-
-
-		pgd = init_mm.pgd + pgd_index(address);
-		if (pgd_present(*pgd)) {
-			pmd = pmd_offset(pgd, address);
-			if (pmd_val(*pmd) & _PAGE_NX)
-				printk(KERN_CRIT "kernel tried to access NX-protected page - exploit attempt? (uid: %d)\n", current->uid);
-		}
+		if (pte && pte_present(*pte) && !pte_exec_kernel(*pte))
+			printk(KERN_CRIT "kernel tried to execute NX-protected page - exploit attempt? (uid: %d)\n", current->uid);
 	}
 #endif
 	if (address < PAGE_SIZE)
@@ -492,7 +490,7 @@ do_sigbus:
 		goto no_context;
 
 	/* User space => ok to do another page fault */
-	if (is_prefetch(regs, address))
+	if (is_prefetch(regs, address, error_code))
 		return;
 
 	tsk->thread.cr2 = address;

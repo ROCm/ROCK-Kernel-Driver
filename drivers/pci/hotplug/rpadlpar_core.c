@@ -18,6 +18,7 @@
 #include <linux/pci.h>
 #include <asm/pci-bridge.h>
 #include <asm/semaphore.h>
+#include <asm/rtas.h>
 #include "../pci.h"
 #include "rpaphp.h"
 #include "rpadlpar.h"

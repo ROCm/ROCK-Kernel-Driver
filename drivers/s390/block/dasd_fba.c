@@ -4,7 +4,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.33 $
+ * $Revision: 1.34 $
  */
 
 #include <linux/config.h>
@@ -270,8 +270,8 @@ dasd_fba_build_cp(struct dasd_device * device, struct request *req)
 				return ERR_PTR(-EINVAL);
 			count += bv->bv_len >> (device->s2b_shift + 9);
 #if defined(CONFIG_ARCH_S390X)
-			cidaw += idal_nr_words(page_address(bv->bv_page) +
-					       bv->bv_offset, bv->bv_len);
+			if (idal_is_needed (page_address(bv->bv_page), bv->bv_len))
+				cidaw += bv->bv_len / blksize;
 #endif
 		}
 	}

@@ -156,7 +156,7 @@ void ppc64_enable_pmcs(void)
 
 	/* instruct hypervisor to maintain PMCs */
 	if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR) {
-		char *ptr = (char *)&paca[smp_processor_id()].xLpPaca;
+		char *ptr = (char *)&paca[smp_processor_id()].lppaca;
 		ptr[0xBB] = 1;
 	}
 

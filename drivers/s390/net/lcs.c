@@ -11,7 +11,7 @@
  *			  Frank Pavlic (pavlic@de.ibm.com) and
  *		 	  Martin Schwidefsky <schwidefsky@de.ibm.com>
  *
- *    $Revision: 1.81 $	 $Date: 2004/05/14 13:54:33 $
+ *    $Revision: 1.83 $	 $Date: 2004/06/30 12:48:14 $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -58,7 +58,7 @@
 /**
  * initialization string for output
  */
-#define VERSION_LCS_C  "$Revision: 1.81 $"
+#define VERSION_LCS_C  "$Revision: 1.83 $"
 
 static char version[] __initdata = "LCS driver ("VERSION_LCS_C "/" VERSION_LCS_H ")";
 static char debug_buffer[255];
@@ -1046,8 +1046,8 @@ lcs_register_mc_addresses(void *data)
 	}
 	spin_unlock(&card->ipm_lock);
 	read_unlock(&in4_dev->lock);
-	lcs_fix_multicast_list(card);
 	in_dev_put(in4_dev);
+	lcs_fix_multicast_list(card);
 	return 0;
 }
 /**

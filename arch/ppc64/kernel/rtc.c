@@ -40,6 +40,7 @@
 #include <asm/uaccess.h>
 #include <asm/system.h>
 #include <asm/time.h>
+#include <asm/rtas.h>
 
 #include <asm/iSeries/LparData.h>
 #include <asm/iSeries/mf.h>

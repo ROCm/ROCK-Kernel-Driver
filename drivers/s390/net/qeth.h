@@ -23,7 +23,7 @@
 
 #include "qeth_mpc.h"
 
-#define VERSION_QETH_H 		"$Revision: 1.110 $"
+#define VERSION_QETH_H 		"$Revision: 1.111 $"
 
 #ifdef CONFIG_QETH_IPV6
 #define QETH_VERSION_IPV6 	":IPv6"
@@ -610,14 +610,14 @@ struct qeth_seqno {
 	__u32 trans_hdr;
 	__u32 pdu_hdr;
 	__u32 pdu_hdr_ack;
-	__u32 ipa;
+	__u16 ipa;
 };
 
 struct qeth_reply {
 	struct list_head list;
 	wait_queue_head_t wait_q;
 	int (*callback)(struct qeth_card *,struct qeth_reply *,unsigned long);
- 	int seqno;
+ 	u32 seqno;
 	unsigned long offset;
 	int received;
 	int rc;

@@ -68,8 +68,8 @@ irq_desc_t irq_desc[NR_IRQS] __cacheline_aligned = {
 };
 
 int __irq_offset_value;
-int ppc_spurious_interrupts = 0;
-unsigned long lpEvent_count = 0;
+int ppc_spurious_interrupts;
+unsigned long lpevent_count;
 
 int
 setup_irq(unsigned int irq, struct irqaction * new)
@@ -613,19 +613,19 @@ int do_IRQ(struct pt_regs *regs)
 
 	lpaca = get_paca();
 #ifdef CONFIG_SMP
-	if (lpaca->xLpPaca.xIntDword.xFields.xIpiCnt) {
-		lpaca->xLpPaca.xIntDword.xFields.xIpiCnt = 0;
+	if (lpaca->lppaca.xIntDword.xFields.xIpiCnt) {
+		lpaca->lppaca.xIntDword.xFields.xIpiCnt = 0;
 		iSeries_smp_message_recv(regs);
 	}
 #endif /* CONFIG_SMP */
-	lpq = lpaca->lpQueuePtr;
+	lpq = lpaca->lpqueue_ptr;
 	if (lpq && ItLpQueue_isLpIntPending(lpq))
-		lpEvent_count += ItLpQueue_process(lpq, regs);
+		lpevent_count += ItLpQueue_process(lpq, regs);
 
 	irq_exit();
 
-	if (lpaca->xLpPaca.xIntDword.xFields.xDecrInt) {
-		lpaca->xLpPaca.xIntDword.xFields.xDecrInt = 0;
+	if (lpaca->lppaca.xIntDword.xFields.xDecrInt) {
+		lpaca->lppaca.xIntDword.xFields.xDecrInt = 0;
 		/* Signal a fake decrementer interrupt */
 		timer_interrupt(regs);
 	}

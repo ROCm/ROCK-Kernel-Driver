@@ -56,6 +56,7 @@
 #include <asm/cache.h>
 #include <asm/machdep.h>
 #ifdef CONFIG_PPC_ISERIES
+#include <asm/iSeries/ItLpQueue.h>
 #include <asm/iSeries/HvCallXm.h>
 #endif
 #include <asm/uaccess.h>
@@ -97,7 +98,7 @@ unsigned long tb_to_ns_shift;
 struct gettimeofday_struct do_gtod;
 
 extern unsigned long wall_jiffies;
-extern unsigned long lpEvent_count;
+extern unsigned long lpevent_count;
 extern int smp_tb_synchronized;
 
 void ppc_adjtimex(void);
@@ -275,7 +276,7 @@ int timer_interrupt(struct pt_regs * regs)
 	ppc64_do_profile(regs);
 #endif
 
-	lpaca->xLpPaca.xIntDword.xFields.xDecrInt = 0;
+	lpaca->lppaca.xIntDword.xFields.xDecrInt = 0;
 
 	while (lpaca->next_jiffy_update_tb <= (cur_tb = get_tb())) {
 
@@ -302,9 +303,9 @@ int timer_interrupt(struct pt_regs * regs)
 
 #ifdef CONFIG_PPC_ISERIES
 	{
-		struct ItLpQueue *lpq = lpaca->lpQueuePtr;
+		struct ItLpQueue *lpq = lpaca->lpqueue_ptr;
 		if (lpq && ItLpQueue_isLpIntPending(lpq))
-			lpEvent_count += ItLpQueue_process(lpq, regs);
+			lpevent_count += ItLpQueue_process(lpq, regs);
 	}
 #endif
 

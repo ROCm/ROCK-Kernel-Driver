@@ -192,21 +192,8 @@ lopec_init_IRQ(void)
 	OpenPIC_InitSenses = lopec_openpic_initsenses;
 	OpenPIC_NumInitSenses = sizeof(lopec_openpic_initsenses);
 
-	/*
-	 * We need to tell openpic_set_sources where things actually are.
-	 * mpc10x_common will setup OpenPIC_Addr at ioremap(EUMB phys base +
-	 * EPIC offset (0x40000));  The EPIC IRQ Register Address Map -
-	 * Interrupt Source Configuration Registers gives these numbers
-	 * as offsets starting at 0x50200, we need to adjust occordinly.
-	 */
-	/* Map serial interrupts 0-15 */
-	openpic_set_sources(0, 16, OpenPIC_Addr + 0x10200);
-	/* Skip reserved space and map i2c and DMA Ch[01] */
-	openpic_set_sources(16, 3, OpenPIC_Addr + 0x11020);
-	/* Skip reserved space and map Message Unit Interrupt (I2O) */
-	openpic_set_sources(19, 1, OpenPIC_Addr + 0x110C0);
+	mpc10x_set_openpic();
 
-	openpic_init(NUM_8259_INTERRUPTS);
 	/* We have a cascade on OpenPIC IRQ 0, Linux IRQ 16 */
 	openpic_hookup_cascade(NUM_8259_INTERRUPTS, "82c59 cascade",
 			&i8259_irq);

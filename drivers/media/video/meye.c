@@ -473,16 +473,6 @@ static u16 *jpeg_huffman_tables(int *size) {
 /* MCHIP low-level functions                                                */
 /****************************************************************************/
 
-/* waits for the specified miliseconds */
-static inline void wait_ms(unsigned int ms) {
-	if (!in_interrupt()) {
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(1 + ms * HZ / 1000);
-	}
-	else
-		mdelay(ms);
-}
-
 /* returns the horizontal capture size */
 static inline int mchip_hsize(void) {
 	return meye.params.subsample ? 320 : 640;
@@ -640,12 +630,12 @@ static void mchip_hic_stop(void) {
 		for (j = 0; j < 100; ++j) {
 			if (mchip_delay(MCHIP_HIC_STATUS, MCHIP_HIC_STATUS_IDLE))
 				return;
-			wait_ms(1);
+			msleep(1);
 		}
 		printk(KERN_ERR "meye: need to reset HIC!\n");
 	
 		mchip_set(MCHIP_HIC_CTL, MCHIP_HIC_CTL_SOFT_RESET);
-		wait_ms(250);
+		msleep(250);
 	}
 	printk(KERN_ERR "meye: resetting HIC hanged!\n");
 }
@@ -741,7 +731,7 @@ static void mchip_take_picture(void) {
 	for (i = 0; i < 100; ++i) {
 		if (mchip_delay(MCHIP_HIC_STATUS, MCHIP_HIC_STATUS_IDLE))
 			break;
-		wait_ms(1);
+		msleep(1);
 	}
 }
 
@@ -757,7 +747,7 @@ static void mchip_get_picture(u8 *buf, int bufsize) {
 	for (i = 0; i < 100; ++i) {
 		if (mchip_delay(MCHIP_HIC_STATUS, MCHIP_HIC_STATUS_IDLE))
 			break;
-		wait_ms(1);
+		msleep(1);
 	}
 	for (i = 0; i < 4 ; ++i) {
 		v = mchip_get_frame();
@@ -799,7 +789,7 @@ static int mchip_compress_frame(u8 *buf, int bufsize) {
 	for (i = 0; i < 100; ++i) {
 		if (mchip_delay(MCHIP_HIC_STATUS, MCHIP_HIC_STATUS_IDLE))
 			break;
-		wait_ms(1);
+		msleep(1);
 	}
 
 	for (i = 0; i < 4 ; ++i) {
@@ -1260,11 +1250,11 @@ static int meye_resume(struct pci_dev *pdev)
 
 	mchip_delay(MCHIP_HIC_CMD, 0);
 	mchip_delay(MCHIP_HIC_STATUS, MCHIP_HIC_STATUS_IDLE);
-	wait_ms(1);
+	msleep(1);
 	mchip_set(MCHIP_VRJ_SOFT_RESET, 1);
-	wait_ms(1);
+	msleep(1);
 	mchip_set(MCHIP_MM_PCI_MODE, 5);
-	wait_ms(1);
+	msleep(1);
 	mchip_set(MCHIP_MM_INTA, MCHIP_MM_INTA_HIC_1_MASK);
 
 	switch (meye.pm_mchip_mode) {
@@ -1349,13 +1339,13 @@ static int __devinit meye_probe(struct pci_dev *pcidev,
 	mchip_delay(MCHIP_HIC_CMD, 0);
 	mchip_delay(MCHIP_HIC_STATUS, MCHIP_HIC_STATUS_IDLE);
 
-	wait_ms(1);
+	msleep(1);
 	mchip_set(MCHIP_VRJ_SOFT_RESET, 1);
 
-	wait_ms(1);
+	msleep(1);
 	mchip_set(MCHIP_MM_PCI_MODE, 5);
 
-	wait_ms(1);
+	msleep(1);
 	mchip_set(MCHIP_MM_INTA, MCHIP_MM_INTA_HIC_1_MASK);
 
 	if (video_register_device(meye.video_dev, VFL_TYPE_GRABBER, video_nr) < 0) {

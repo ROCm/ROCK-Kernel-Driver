@@ -28,6 +28,7 @@
 #include <asm/iSeries/ItLpPaca.h>
 #include <asm/hvcall.h>
 #include <asm/cputable.h>
+#include <asm/rtas.h>
 
 #define MODULE_VERS "1.0"
 #define MODULE_NAME "lparcfg"
@@ -133,7 +134,7 @@ static int lparcfg_data(unsigned char *buf, unsigned long size)
 	}
 	memset(buf, 0, size); 
 
-	shared = (int)(lpaca->xLpPacaPtr->xSharedProc);
+	shared = (int)(lpaca->lppaca.xSharedProc);
 	n += scnprintf(buf, LPARCFG_BUFF_SIZE - n,
 		      "serial_number=%c%c%c%c%c%c%c\n", 
 		      e2a(xItExtVpdPanel.mfgID[2]),
@@ -244,7 +245,7 @@ unsigned int get_splpar_potential_characteristics(void)
 	/* return 0 for now.  Underlying rtas functionality is not yet complete. 12/01/2003*/
 	return 0; 
 #if 0 
-	long call_status;
+	int call_status;
 	unsigned long ret[2];
 
 	char * buffer = kmalloc(SPLPAR_MAXLENGTH, GFP_KERNEL);

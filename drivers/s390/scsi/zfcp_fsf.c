@@ -29,7 +29,7 @@
  */
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_FSF_C_REVISION "$Revision: 1.47 $"
+#define ZFCP_FSF_C_REVISION "$Revision: 1.49 $"
 
 #include "zfcp_ext.h"
 
@@ -3997,15 +3997,14 @@ zfcp_fsf_send_fcp_command_task_handler(struct zfcp_fsf_req *fsf_req)
 	scpnt->result |= fcp_rsp_iu->scsi_status;
 	if (unlikely(fcp_rsp_iu->scsi_status)) {
 		/* DEBUG */
-		ZFCP_LOG_NORMAL("status for SCSI Command:\n");
-		ZFCP_HEX_DUMP(ZFCP_LOG_LEVEL_NORMAL,
+		ZFCP_LOG_DEBUG("status for SCSI Command:\n");
+		ZFCP_HEX_DUMP(ZFCP_LOG_LEVEL_DEBUG,
 			      scpnt->cmnd, scpnt->cmd_len);
-
-		ZFCP_LOG_NORMAL("SCSI status code 0x%x\n",
+		ZFCP_LOG_DEBUG("SCSI status code 0x%x\n",
 				fcp_rsp_iu->scsi_status);
-		ZFCP_HEX_DUMP(ZFCP_LOG_LEVEL_NORMAL,
+		ZFCP_HEX_DUMP(ZFCP_LOG_LEVEL_DEBUG,
 			      (void *) fcp_rsp_iu, sizeof (struct fcp_rsp_iu));
-		ZFCP_HEX_DUMP(ZFCP_LOG_LEVEL_NORMAL,
+		ZFCP_HEX_DUMP(ZFCP_LOG_LEVEL_DEBUG,
 			      zfcp_get_fcp_sns_info_ptr(fcp_rsp_iu),
 			      fcp_rsp_iu->fcp_sns_len);
 	}
@@ -4780,6 +4779,16 @@ zfcp_fsf_req_create(struct zfcp_adapter *adapter, u32 fsf_cmd, int req_flags,
         ret = zfcp_fsf_req_sbal_get(adapter, req_flags, lock_flags);
         if(ret < 0) {
                 goto failed_sbals;
+	}
+
+	/*
+	 * We hold queue_lock here. Check if QDIOUP is set and let request fail
+	 * if it is not set (see also *_open_qdio and *_close_qdio).
+	 */
+
+	if (!atomic_test_mask(ZFCP_STATUS_ADAPTER_QDIOUP, &adapter->status)) {
+		write_unlock_irqrestore(&req_queue->queue_lock, *lock_flags);
+		goto failed_sbals;
 	}
 
 	fsf_req->adapter = adapter;	/* pointer to "parent" adapter */

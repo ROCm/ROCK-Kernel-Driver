@@ -31,6 +31,7 @@
 #include <asm/io.h>
 #include <asm/machdep.h>
 #include <asm/pgtable.h>
+#include <asm/rtas.h>
 #include "pci.h"
 
 #undef DEBUG
@@ -365,7 +366,7 @@ unsigned long eeh_check_failure(void *token, unsigned long val)
 	unsigned long addr;
 	struct pci_dev *dev;
 	struct device_node *dn;
-	unsigned long ret;
+	int ret;
 	int rets[2];
 	static spinlock_t lock = SPIN_LOCK_UNLOCKED;
 	/* dont want this on the stack */
@@ -419,7 +420,7 @@ unsigned long eeh_check_failure(void *token, unsigned long val)
 			BUID_LO(dn->phb->buid));
 
 	if (ret == 0 && rets[1] == 1 && rets[0] >= 2) {
-		unsigned long slot_err_ret;
+		int slot_err_ret;
 
 		spin_lock_irqsave(&lock, flags);
 		memset(slot_err_buf, 0, RTAS_ERROR_LOG_MAX);
@@ -470,7 +471,7 @@ struct eeh_early_enable_info {
 static void *early_enable_eeh(struct device_node *dn, void *data)
 {
 	struct eeh_early_enable_info *info = data;
-	long ret;
+	int ret;
 	char *status = get_property(dn, "status", 0);
 	u32 *class_code = (u32 *)get_property(dn, "class-code", 0);
 	u32 *vendor_id = (u32 *)get_property(dn, "vendor-id", 0);
