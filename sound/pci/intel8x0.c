@@ -949,6 +949,13 @@ static void snd_intel8x0_setup_multi_channels(intel8x0_t *chip, int channels)
 			cnt |= ICH_PCM_4;
 		else if (chip->multi6 && channels == 6)
 			cnt |= ICH_PCM_6;
+		if (chip->device_type == DEVICE_NFORCE) {
+			/* reset to 2ch once to keep the 6 channel data in alignment,
+			 * to start from Front Left always
+			 */
+			iputdword(chip, ICHREG(GLOB_CNT), (cnt & 0xcfffff));
+			mdelay(50); /* grrr... */
+		}
 		iputdword(chip, ICHREG(GLOB_CNT), cnt);
 		break;
 	}
