@@ -267,6 +267,7 @@ int kjournald(void *arg)
 	journal->j_task = NULL;
 	wake_up(&journal->j_wait_done_commit);
 	jbd_debug(1, "Journal thread exiting.\n");
+	unlock_kernel();
 	return 0;
 }
 

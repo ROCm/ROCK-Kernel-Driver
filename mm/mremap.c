@@ -11,9 +11,12 @@
 #include <linux/mman.h>
 #include <linux/swap.h>
 #include <linux/fs.h>
+#include <linux/highmem.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>
+#include <asm/cacheflush.h>
+#include <asm/tlbflush.h>
 
 extern int vm_enough_memory(long pages);
 

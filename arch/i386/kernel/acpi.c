@@ -43,6 +43,7 @@
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
 #include <asm/io_apic.h>
+#include <asm/tlbflush.h>
 
 
 #define PREFIX			"ACPI: "

@@ -37,6 +37,7 @@
 #include <asm/e820.h>
 #include <asm/apic.h>
 #include <asm/tlb.h>
+#include <asm/tlbflush.h>
 
 mmu_gather_t mmu_gathers[NR_CPUS];
 unsigned long highstart_pfn, highend_pfn;
@@ -573,7 +574,8 @@ void si_meminfo(struct sysinfo *val)
 }
 
 #if defined(CONFIG_X86_PAE)
-struct kmem_cache_s *pae_pgd_cachep;
+static struct kmem_cache_s *pae_pgd_cachep;
+
 void __init pgtable_cache_init(void)
 {
 	/*
@@ -584,4 +586,96 @@ void __init pgtable_cache_init(void)
 	if (!pae_pgd_cachep)
 		panic("init_pae(): Cannot alloc pae_pgd SLAB cache");
 }
+
+pgd_t *pgd_alloc(struct mm_struct *mm)
+{
+	int i;
+	pgd_t *pgd = kmem_cache_alloc(pae_pgd_cachep, GFP_KERNEL);
+
+	if (pgd) {
+		for (i = 0; i < USER_PTRS_PER_PGD; i++) {
+			unsigned long pmd = __get_free_page(GFP_KERNEL);
+			if (!pmd)
+				goto out_oom;
+			clear_page(pmd);
+			set_pgd(pgd + i, __pgd(1 + __pa(pmd)));
+		}
+		memcpy(pgd + USER_PTRS_PER_PGD,
+			swapper_pg_dir + USER_PTRS_PER_PGD,
+			(PTRS_PER_PGD - USER_PTRS_PER_PGD) * sizeof(pgd_t));
+	}
+	return pgd;
+out_oom:
+	for (i--; i >= 0; i--)
+		free_page((unsigned long)__va(pgd_val(pgd[i])-1));
+	kmem_cache_free(pae_pgd_cachep, pgd);
+	return NULL;
+}
+
+void pgd_free(pgd_t *pgd)
+{
+	int i;
+
+	for (i = 0; i < USER_PTRS_PER_PGD; i++)
+		free_page((unsigned long)__va(pgd_val(pgd[i])-1));
+	kmem_cache_free(pae_pgd_cachep, pgd);
+}
+
+#else
+
+pgd_t *pgd_alloc(struct mm_struct *mm)
+{
+	pgd_t *pgd = (pgd_t *)__get_free_page(GFP_KERNEL);
+
+	if (pgd) {
+		memset(pgd, 0, USER_PTRS_PER_PGD * sizeof(pgd_t));
+		memcpy(pgd + USER_PTRS_PER_PGD,
+			swapper_pg_dir + USER_PTRS_PER_PGD,
+			(PTRS_PER_PGD - USER_PTRS_PER_PGD) * sizeof(pgd_t));
+	}
+	return pgd;
+}
+
+void pgd_free(pgd_t *pgd)
+{
+	free_page((unsigned long)pgd);
+}
 #endif /* CONFIG_X86_PAE */
+
+pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
+{
+	int count = 0;
+	pte_t *pte;
+   
+   	do {
+		pte = (pte_t *) __get_free_page(GFP_KERNEL);
+		if (pte)
+			clear_page(pte);
+		else {
+			current->state = TASK_UNINTERRUPTIBLE;
+			schedule_timeout(HZ);
+		}
+	} while (!pte && (count++ < 10));
+	return pte;
+}
+
+struct page *pte_alloc_one(struct mm_struct *mm, unsigned long address)
+{
+	int count = 0;
+	struct page *pte;
+   
+   	do {
+#if CONFIG_HIGHPTE
+		pte = alloc_pages(GFP_KERNEL | __GFP_HIGHMEM, 0);
+#else
+		pte = alloc_pages(GFP_KERNEL, 0);
+#endif
+		if (pte)
+			clear_highpage(pte);
+		else {
+			current->state = TASK_UNINTERRUPTIBLE;
+			schedule_timeout(HZ);
+		}
+	} while (!pte && (count++ < 10));
+	return pte;
+}

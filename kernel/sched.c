@@ -843,7 +843,8 @@ asmlinkage void preempt_schedule(void)
 {
 	if (unlikely(preempt_get_count()))
 		return;
-	current->state = TASK_RUNNING;
+	if (current->state != TASK_RUNNING)
+		return;
 	schedule();
 }
 #endif /* CONFIG_PREEMPT */

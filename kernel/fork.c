@@ -29,6 +29,8 @@
 #include <asm/pgalloc.h>
 #include <asm/uaccess.h>
 #include <asm/mmu_context.h>
+#include <asm/cacheflush.h>
+#include <asm/tlbflush.h>
 
 static kmem_cache_t *task_struct_cachep;
 
