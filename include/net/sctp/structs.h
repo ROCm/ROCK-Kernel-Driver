@@ -1401,6 +1401,11 @@ struct sctp_association {
 		/* Does peer support ADDIP? */
 		__u8    asconf_capable;
 
+		/* This mask is used to disable sending the ASCONF chunk
+		 * with specified parameter to peer.
+		 */
+		__u16 addip_disabled_mask;
+
 		struct sctp_inithdr i;
 		int cookie_len;
 		void *cookie;

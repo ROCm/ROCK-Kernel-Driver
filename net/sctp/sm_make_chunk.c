@@ -2207,7 +2207,7 @@ struct sctp_chunk *sctp_make_asconf_ack(const struct sctp_association *asoc,
 }
 
 /* Add response parameters to an ASCONF_ACK chunk. */
-void sctp_add_asconf_response(struct sctp_chunk *chunk, __u32 crr_id,
+static void sctp_add_asconf_response(struct sctp_chunk *chunk, __u32 crr_id,
 			      __u16 err_code, sctp_addip_param_t *asconf_param)
 {
 	sctp_addip_param_t 	ack_param;
@@ -2248,16 +2248,19 @@ void sctp_add_asconf_response(struct sctp_chunk *chunk, __u32 crr_id,
 }
 
 /* Process a asconf parameter. */
-__u16 sctp_process_asconf_param(struct sctp_association *asoc,
-				struct sctp_chunk *asconf,
-				sctp_addip_param_t *asconf_param,
-				union sctp_addr_param *addr_param)
+static __u16 sctp_process_asconf_param(struct sctp_association *asoc,
+				       struct sctp_chunk *asconf,
+				       sctp_addip_param_t *asconf_param)
 {
 	struct sctp_transport *peer;
 	struct sctp_af *af;
 	union sctp_addr	addr;
 	struct list_head *pos;
+	union sctp_addr_param *addr_param;
 				 
+	addr_param = (union sctp_addr_param *)
+			((void *)asconf_param + sizeof(sctp_addip_param_t));
+
 	af = sctp_get_af_specific(param_type2af(addr_param->v4.param_hdr.type));
 	if (unlikely(!af))
 		return SCTP_ERROR_INV_PARAM;
@@ -2330,33 +2333,29 @@ struct sctp_chunk *sctp_process_asconf(struct sctp_association *asoc,
 
 	__u16	err_code;
 	int	length = 0;
-	int	chunk_len = ntohs(asconf->chunk_hdr->length);
-	int	asconf_param_len;
+	int	chunk_len = asconf->skb->len;
 	__u32	serial;
 	int	all_param_pass = 1;
 
 	hdr = (sctp_addiphdr_t *)asconf->skb->data;
 	serial = ntohl(hdr->serial);
 
-	/* Skip the chunkhdr. */ 
-	chunk_len -= sizeof(sctp_chunkhdr_t);
-
-	/* Skip the addiphdr and store a pointer to address parameter. */ 
+	/* Skip the addiphdr and store a pointer to address parameter.  */ 
 	length = sizeof(sctp_addiphdr_t);
-	addr_param = (union sctp_addr_param *)skb_pull(asconf->skb, length);
+	addr_param = (union sctp_addr_param *)(asconf->skb->data + length);
 	chunk_len -= length;
 
 	/* Skip the address parameter and store a pointer to the first
 	 * asconf paramter.
 	 */ 
 	length = ntohs(addr_param->v4.param_hdr.length);
-	asconf_param = (sctp_addip_param_t *)skb_pull(asconf->skb, length);
+	asconf_param = (sctp_addip_param_t *)((void *)addr_param + length);
 	chunk_len -= length;
 
 	/* create an ASCONF_ACK chunk. 
 	 * Based on the definitions of parameters, we know that the size of
 	 * ASCONF_ACK parameters are less than or equal to the twice of ASCONF
-	 * paramter.
+	 * paramters.
 	 */
 	asconf_ack = sctp_make_asconf_ack(asoc, serial, chunk_len * 2);
 	if (!asconf_ack)
@@ -2364,22 +2363,8 @@ struct sctp_chunk *sctp_process_asconf(struct sctp_association *asoc,
 
 	/* Process the TLVs contained within the ASCONF chunk. */
 	while (chunk_len > 0) {
-		asconf_param_len = ntohs(asconf_param->param_hdr.length);
-		length = sizeof(sctp_addip_param_t);
-
-		/* Unrecognized or unsupported	paramter. */
-		if (asconf_param_len <= length) {
-			sctp_add_asconf_response(asconf_ack, 0,
-						 SCTP_ERROR_UNKNOWN_PARAM,
-						 NULL);
-			goto done;
-		}
-
-		addr_param = (union sctp_addr_param *)skb_pull(asconf->skb,
-							       length);
-
-		err_code = sctp_process_asconf_param(asoc, asconf, asconf_param,
-						     addr_param);
+		err_code = sctp_process_asconf_param(asoc, asconf,
+						     asconf_param);
 		/* ADDIP 4.1 A7)
 		 * If an error response is received for a TLV parameter,
 		 * all TLVs with no response before the failed TLV are
@@ -2404,10 +2389,10 @@ struct sctp_chunk *sctp_process_asconf(struct sctp_association *asoc,
 			goto done;
 
 		/* Move to the next ASCONF param. */
-		length = ntohs(addr_param->v4.param_hdr.length);
-		asconf_param = (sctp_addip_param_t *)skb_pull(asconf->skb,
-							      length);
-		chunk_len -= asconf_param_len;
+		length = ntohs(asconf_param->param_hdr.length);
+		asconf_param = (sctp_addip_param_t *)((void *)asconf_param +
+						      length);
+		chunk_len -= length;
 	}
 	
 done:
@@ -2425,4 +2410,203 @@ done:
 	}
 
 	return asconf_ack;
+}
+
+/* Process a asconf parameter that is successfully acked. */
+static int sctp_asconf_param_success(struct sctp_association *asoc,
+				     sctp_addip_param_t *asconf_param)
+{
+	struct sctp_af *af;
+	union sctp_addr	addr;
+	struct sctp_bind_addr *bp = &asoc->base.bind_addr;
+	union sctp_addr_param *addr_param;
+	int retval = 0;
+
+	addr_param = (union sctp_addr_param *)
+			((void *)asconf_param + sizeof(sctp_addip_param_t));
+
+	/* We have checked the packet before, so we do not check again.	*/
+	af = sctp_get_af_specific(param_type2af(addr_param->v4.param_hdr.type));
+	af->from_addr_param(&addr, addr_param, bp->port, 0);
+
+	switch (asconf_param->param_hdr.type) {
+	case SCTP_PARAM_ADD_IP:
+		sctp_local_bh_disable();
+		sctp_write_lock(&asoc->base.addr_lock);
+		retval = sctp_add_bind_addr(bp, &addr, GFP_ATOMIC);
+		sctp_write_unlock(&asoc->base.addr_lock);
+		sctp_local_bh_enable();
+		break;
+	case SCTP_PARAM_DEL_IP:
+		sctp_local_bh_disable();
+		sctp_write_lock(&asoc->base.addr_lock);
+		retval = sctp_del_bind_addr(bp, &addr);
+		sctp_write_unlock(&asoc->base.addr_lock);
+		sctp_local_bh_enable();
+		break;
+	default:
+		break;
+	}
+
+	return retval;
+}
+
+/* Get the corresponding ASCONF response error code from the ASCONF_ACK chunk
+ * for the given asconf parameter.  If there is no response for this parameter,
+ * return the error code based on the third argument 'no_err'. 
+ * ADDIP 4.1
+ * A7) If an error response is received for a TLV parameter, all TLVs with no
+ * response before the failed TLV are considered successful if not reported.
+ * All TLVs after the failed response are considered unsuccessful unless a
+ * specific success indication is present for the parameter.
+ */
+static __u16 sctp_get_asconf_response(struct sctp_chunk *asconf_ack,
+				      sctp_addip_param_t *asconf_param,
+				      int no_err)
+{
+	sctp_addip_param_t	*asconf_ack_param;
+	sctp_errhdr_t		*err_param;
+	int			length;
+	int			asconf_ack_len = asconf_ack->skb->len;
+	__u16			err_code;
+
+	if (no_err)
+		err_code = SCTP_ERROR_NO_ERROR;
+	else
+		err_code = SCTP_ERROR_REQ_REFUSED;
+
+	/* Skip the addiphdr from the asconf_ack chunk and store a pointer to
+	 * the first asconf_ack parameter.
+	 */ 
+	length = sizeof(sctp_addiphdr_t);
+	asconf_ack_param = (sctp_addip_param_t *)(asconf_ack->skb->data +
+						  length);
+	asconf_ack_len -= length;
+
+	while (asconf_ack_len > 0) {
+		if (asconf_ack_param->crr_id == asconf_param->crr_id) {
+			switch(asconf_ack_param->param_hdr.type) {
+			case SCTP_PARAM_SUCCESS_REPORT:
+				return SCTP_ERROR_NO_ERROR;
+			case SCTP_PARAM_ERR_CAUSE:
+				length = sizeof(sctp_addip_param_t);
+				err_param = (sctp_errhdr_t *)
+					   ((void *)asconf_ack_param + length);
+				asconf_ack_len -= length;
+				if (asconf_ack_len > 0)
+					return err_param->cause;
+				else
+					return SCTP_ERROR_INV_PARAM;
+				break;
+			default:
+				return SCTP_ERROR_INV_PARAM;
+			}
+		}
+
+		length = ntohs(asconf_ack_param->param_hdr.length);
+		asconf_ack_param = (sctp_addip_param_t *)
+					((void *)asconf_ack_param + length);
+		asconf_ack_len -= length;
+	}
+
+	return err_code;
+}
+
+/* Process an incoming ASCONF_ACK chunk against the cached last ASCONF chunk. */
+int sctp_process_asconf_ack(struct sctp_association *asoc,
+			    struct sctp_chunk *asconf_ack)
+{
+	struct sctp_chunk	*asconf = asoc->addip_last_asconf;
+	union sctp_addr_param	*addr_param;
+	sctp_addip_param_t	*asconf_param;
+	int	length = 0;
+	int	asconf_len = asconf->skb->len;
+	int	all_param_pass = 0;
+	int	no_err = 1;
+	int	retval = 0;
+	__u16	err_code = SCTP_ERROR_NO_ERROR;
+
+	/* Skip the chunkhdr and addiphdr from the last asconf sent and store
+	 * a pointer to address parameter.
+	 */ 
+	length = sizeof(sctp_addip_chunk_t);
+	addr_param = (union sctp_addr_param *)(asconf->skb->data + length);
+	asconf_len -= length;
+
+	/* Skip the address parameter in the last asconf sent and store a
+	 * pointer to the first asconf paramter.
+	 */ 
+	length = ntohs(addr_param->v4.param_hdr.length);
+	asconf_param = (sctp_addip_param_t *)((void *)addr_param + length);
+	asconf_len -= length;
+
+	/* ADDIP 4.1
+	 * A8) If there is no response(s) to specific TLV parameter(s), and no
+	 * failures are indicated, then all request(s) are considered
+	 * successful.
+	 */
+	if (asconf_ack->skb->len == sizeof(sctp_addiphdr_t))
+		all_param_pass = 1;
+
+	/* Process the TLVs contained in the last sent ASCONF chunk. */
+	while (asconf_len > 0) {
+		if (all_param_pass)
+			err_code = SCTP_ERROR_NO_ERROR;
+		else {
+			err_code = sctp_get_asconf_response(asconf_ack,
+							    asconf_param,
+							    no_err);
+			if (no_err && (SCTP_ERROR_NO_ERROR != err_code))
+				no_err = 0;
+		}
+
+		switch (err_code) {
+		case SCTP_ERROR_NO_ERROR:
+			retval = sctp_asconf_param_success(asoc, asconf_param);
+			break;
+
+		case SCTP_ERROR_RSRC_LOW:
+			retval = 1;
+			break;
+
+		case SCTP_ERROR_INV_PARAM:
+			/* Disable sending this type of asconf parameter in
+			 * future.
+			 */	
+			asoc->peer.addip_disabled_mask |=
+				asconf_param->param_hdr.type;
+			break;
+
+		case SCTP_ERROR_REQ_REFUSED:
+		case SCTP_ERROR_DEL_LAST_IP:
+		case SCTP_ERROR_DEL_SRC_IP:
+		default:
+			 break;
+		}
+
+		/* Skip the processed asconf parameter and move to the next
+		 * one.
+	 	 */ 
+		length = ntohs(asconf_param->param_hdr.length);
+		asconf_param = (sctp_addip_param_t *)((void *)asconf_param +
+						      length);
+		asconf_len -= length;
+	}
+
+	/* Free the cached last sent asconf chunk. */
+	sctp_chunk_free(asconf);
+	asoc->addip_last_asconf = NULL;
+
+	/* Send the next asconf chunk from the addip chunk queue. */
+	asconf = (struct sctp_chunk *)__skb_dequeue(&asoc->addip_chunks);
+	if (asconf) {
+		/* Hold the chunk until an ASCONF_ACK is received. */
+		sctp_chunk_hold(asconf);
+		if (sctp_primitive_ASCONF(asoc, asconf))
+			sctp_chunk_free(asconf);
+		else
+			asoc->addip_last_asconf = asconf;
+	}
+
+	return retval;
 }

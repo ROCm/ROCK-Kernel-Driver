@@ -365,6 +365,10 @@ void sctp_association_free(struct sctp_association *asoc)
 	if (asoc->addip_last_asconf_ack)
 		sctp_chunk_free(asoc->addip_last_asconf_ack);
 
+	/* Free any cached ASCONF chunk. */
+	if (asoc->addip_last_asconf)
+		sctp_chunk_free(asoc->addip_last_asconf);
+
 	sctp_association_put(asoc);
 }
 
