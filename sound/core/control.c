@@ -454,7 +454,7 @@ static int snd_ctl_elem_read(snd_card_t *card, snd_ctl_elem_value_t *_control)
 	}
 	read_unlock(&card->control_rwlock);
 	if (result >= 0)
-		if (copy_to_user(_control, &control, sizeof(control)))
+		if (copy_to_user(_control, control, sizeof(*control)))
 			return -EFAULT;
 	kfree(control);
 	return result;
@@ -503,7 +503,7 @@ static int snd_ctl_elem_write(snd_ctl_file_t *file, snd_ctl_elem_value_t *_contr
 	read_unlock(&card->control_rwlock);
       __unlocked:
 	if (result >= 0)
-		if (copy_to_user(_control, &control, sizeof(control)))
+		if (copy_to_user(_control, control, sizeof(*control)))
 			return -EFAULT;
 	kfree(control);
 	return result;
