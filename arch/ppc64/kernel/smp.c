@@ -171,6 +171,13 @@ static void smp_iSeries_kick_cpu(int nr)
 	lpPaca = paca[nr].xLpPacaPtr;
 	if ( lpPaca->xDynProcStatus >= 2 )
 		return;
+
+	/* The information for processor bringup must
+	 * be written out to main store before we release
+	 * the processor.
+	 */
+	mb();
+
 	/* The processor is currently spinning, waiting
 	 * for the xProcStart field to become non-zero
 	 * After we set xProcStart, the processor will
@@ -235,6 +242,12 @@ smp_kick_cpu(int nr)
 	if ( ( nr <= 0 ) ||
 	     ( nr >= MAX_PACAS ) )
 		return;
+
+	/* The information for processor bringup must
+	 * be written out to main store before we release
+	 * the processor.
+	 */
+	mb();
 
 	/* The processor is currently spinning, waiting
 	 * for the xProcStart field to become non-zero
