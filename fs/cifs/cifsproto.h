@@ -57,7 +57,7 @@ extern void header_assemble(struct smb_hdr *, char /* command */ ,
 			const struct cifsTconInfo *, int
 			/* length of fixed section (word count) in two byte units  */
 			);
-struct oplock_q_entry * AllocOplockQEntry(struct file *,struct cifsTconInfo *);
+struct oplock_q_entry * AllocOplockQEntry(struct inode *, u16, struct cifsTconInfo *);
 void DeleteOplockQEntry(struct oplock_q_entry *);
 extern struct timespec cifs_NTtimeToUnix(u64 /* utc nanoseconds since 1601 */ );
 extern u64 cifs_UnixTimeToNT(struct timespec);
@@ -68,7 +68,8 @@ extern void RevUcode_to_Ucode_with_Len(char *revUnicode, char *UnicodeName,
 extern void Ucode_to_RevUcode_with_Len(char *Unicode, char *revUnicodeName,
 			int Len);
 extern int cifs_get_inode_info(struct inode **pinode,
-			const unsigned char *search_path,
+			const unsigned char *search_path, 
+			FILE_ALL_INFO * pfile_info,
 			struct super_block *sb);
 extern int cifs_get_inode_info_unix(struct inode **pinode,
 			const unsigned char *search_path,
@@ -195,7 +196,7 @@ extern int CIFSSMBQueryReparseLinkInfo(const int xid,
 extern int CIFSSMBOpen(const int xid, struct cifsTconInfo *tcon,
 			const char *fileName, const int disposition,
 			const int access_flags, const int omode,
-			__u16 * netfid, int *pOplock,
+			__u16 * netfid, int *pOplock, FILE_ALL_INFO *,
 			const struct nls_table *nls_codepage);
 extern int CIFSSMBClose(const int xid, struct cifsTconInfo *tcon,
 			const int smb_file_id);
