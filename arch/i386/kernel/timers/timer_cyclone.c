@@ -35,7 +35,7 @@ static u32* volatile cyclone_timer;	/* Cyclone MPMC0 register */
 static u32 last_cyclone_low;
 static u32 last_cyclone_high;
 static unsigned long long monotonic_base;
-static rwlock_t monotonic_lock = RW_LOCK_UNLOCKED;
+static seqlock_t monotonic_lock = SEQLOCK_UNLOCKED;
 
 /* helper macro to atomically read both cyclone counter registers */
 #define read_cyclone_counter(low,high) \
@@ -51,7 +51,7 @@ static void mark_offset_cyclone(void)
 	int count;
 	unsigned long long this_offset, last_offset;
 
-	write_lock(&monotonic_lock);
+	write_seqlock(&monotonic_lock);
 	last_offset = ((unsigned long long)last_cyclone_high<<32)|last_cyclone_low;
 	
 	spin_lock(&i8253_lock);
@@ -76,7 +76,7 @@ static void mark_offset_cyclone(void)
 	/* update the monotonic base value */
 	this_offset = ((unsigned long long)last_cyclone_high<<32)|last_cyclone_low;
 	monotonic_base += (this_offset - last_offset) & CYCLONE_TIMER_MASK;
-	write_unlock(&monotonic_lock);
+	write_sequnlock(&monotonic_lock);
 
 	/* calculate delay_at_last_interrupt */
 	count = ((LATCH-1) - count) * TICK_SIZE;
@@ -117,12 +117,15 @@ static unsigned long long monotonic_clock_cyclone(void)
 	u32 now_low, now_high;
 	unsigned long long last_offset, this_offset, base;
 	unsigned long long ret;
+	unsigned seq;
 
 	/* atomically read monotonic base & last_offset */
-	read_lock_irq(&monotonic_lock);
-	last_offset = ((unsigned long long)last_cyclone_high<<32)|last_cyclone_low;
-	base = monotonic_base;
-	read_unlock_irq(&monotonic_lock);
+	do {
+		seq = read_seqbegin(&monotonic_lock);
+		last_offset = ((unsigned long long)last_cyclone_high<<32)|last_cyclone_low;
+		base = monotonic_base;
+	} while (read_seqretry(&monotonic_lock, seq));
+
 
 	/* Read the cyclone counter */
 	read_cyclone_counter(now_low,now_high);
