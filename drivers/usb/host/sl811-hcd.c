@@ -1042,7 +1042,7 @@ sl811h_endpoint_disable(struct usb_hcd *hcd, struct usb_host_endpoint *hep)
 
 	usb_put_dev(ep->udev);
 	kfree(ep);
-	hep->hcpriv = 0;
+	hep->hcpriv = NULL;
 }
 
 static int

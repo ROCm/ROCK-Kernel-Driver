@@ -676,7 +676,7 @@ static struct hid_device *hid_parse_report(__u8 *start, unsigned size)
 	parser->device = device;
 
 	end = start + size;
-	while ((start = fetch_item(start, end, &item)) != 0) {
+	while ((start = fetch_item(start, end, &item)) != NULL) {
 
 		if (item.format != HID_ITEM_FORMAT_SHORT) {
 			dbg("unexpected long global item");

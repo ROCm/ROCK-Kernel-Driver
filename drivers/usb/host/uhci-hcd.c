@@ -236,7 +236,7 @@ static void uhci_insert_tds_in_qh(struct uhci_qh *qh, struct urb *urb, __le32 br
 {
 	struct urb_priv *urbp = (struct urb_priv *)urb->hcpriv;
 	struct uhci_td *td;
-	u32 *plink;
+	__le32 *plink;
 
 	/* Ordering isn't important here yet since the QH hasn't been */
 	/* inserted into the schedule yet */
@@ -637,8 +637,9 @@ static void uhci_dec_fsbr(struct uhci_hcd *uhci, struct urb *urb)
 /*
  * Map status to standard result codes
  *
- * <status> is (td->status & 0xF60000) [a.k.a. uhci_status_bits(td->status)]
- * Note: status does not include the TD_CTRL_NAK bit.
+ * <status> is (td_status(td) & 0xF60000), a.k.a.
+ * uhci_status_bits(td_status(td)).
+ * Note: <status> does not include the TD_CTRL_NAK bit.
  * <dir_out> is True for output TDs and False for input TDs.
  */
 static int uhci_map_status(int status, int dir_out)
@@ -843,21 +844,24 @@ static int uhci_result_control(struct uhci_hcd *uhci, struct urb *urb)
 	/* The rest of the TD's (but the last) are data */
 	tmp = tmp->next;
 	while (tmp != head && tmp->next != head) {
-		td = list_entry(tmp, struct uhci_td, list);
+		unsigned int ctrlstat;
 
+		td = list_entry(tmp, struct uhci_td, list);
 		tmp = tmp->next;
 
-		status = uhci_status_bits(td_status(td));
+		ctrlstat = td_status(td);
+		status = uhci_status_bits(ctrlstat);
 		if (status & TD_CTRL_ACTIVE)
 			return -EINPROGRESS;
 
-		urb->actual_length += uhci_actual_length(td_status(td));
+		urb->actual_length += uhci_actual_length(ctrlstat);
 
 		if (status)
 			goto td_error;
 
 		/* Check to see if we received a short packet */
-		if (uhci_actual_length(td_status(td)) < uhci_expected_length(td_token(td))) {
+		if (uhci_actual_length(ctrlstat) <
+				uhci_expected_length(td_token(td))) {
 			if (urb->transfer_flags & URB_SHORT_NOT_OK) {
 				ret = -EREMOTEIO;
 				goto err;
@@ -1031,16 +1035,19 @@ static int uhci_result_common(struct uhci_hcd *uhci, struct urb *urb)
 	urb->actual_length = 0;
 
 	list_for_each_entry(td, &urbp->td_list, list) {
-		status = uhci_status_bits(td_status(td));
+		unsigned int ctrlstat = td_status(td);
+
+		status = uhci_status_bits(ctrlstat);
 		if (status & TD_CTRL_ACTIVE)
 			return -EINPROGRESS;
 
-		urb->actual_length += uhci_actual_length(td_status(td));
+		urb->actual_length += uhci_actual_length(ctrlstat);
 
 		if (status)
 			goto td_error;
 
-		if (uhci_actual_length(td_status(td)) < uhci_expected_length(td_token(td))) {
+		if (uhci_actual_length(ctrlstat) <
+				uhci_expected_length(td_token(td))) {
 			if (urb->transfer_flags & URB_SHORT_NOT_OK) {
 				ret = -EREMOTEIO;
 				goto err;
@@ -1209,15 +1216,16 @@ static int uhci_result_isochronous(struct uhci_hcd *uhci, struct urb *urb)
 	i = 0;
 	list_for_each_entry(td, &urbp->td_list, list) {
 		int actlength;
+		unsigned int ctrlstat = td_status(td);
 
-		if (td_status(td) & TD_CTRL_ACTIVE)
+		if (ctrlstat & TD_CTRL_ACTIVE)
 			return -EINPROGRESS;
 
-		actlength = uhci_actual_length(td_status(td));
+		actlength = uhci_actual_length(ctrlstat);
 		urb->iso_frame_desc[i].actual_length = actlength;
 		urb->actual_length += actlength;
 
-		status = uhci_map_status(uhci_status_bits(td_status(td)),
+		status = uhci_map_status(uhci_status_bits(ctrlstat),
 				usb_pipeout(urb->pipe));
 		urb->iso_frame_desc[i].status = status;
 		if (status) {
@@ -1423,19 +1431,21 @@ static void uhci_unlink_generic(struct uhci_hcd *uhci, struct urb *urb)
 	 */
 	head = &urbp->td_list;
 	list_for_each_entry(td, head, list) {
-		if (!(td_status(td) & TD_CTRL_ACTIVE) &&
-				(uhci_actual_length(td_status(td)) <
+		unsigned int ctrlstat = td_status(td);
+
+		if (!(ctrlstat & TD_CTRL_ACTIVE) &&
+				(uhci_actual_length(ctrlstat) <
 				 uhci_expected_length(td_token(td)) ||
 				td->list.next == head))
 			usb_settoggle(urb->dev, uhci_endpoint(td_token(td)),
 				uhci_packetout(td_token(td)),
 				uhci_toggle(td_token(td)) ^ 1);
-		else if ((td_status(td) & TD_CTRL_ACTIVE) && !prevactive)
+		else if ((ctrlstat & TD_CTRL_ACTIVE) && !prevactive)
 			usb_settoggle(urb->dev, uhci_endpoint(td_token(td)),
 				uhci_packetout(td_token(td)),
 				uhci_toggle(td_token(td)));
 
-		prevactive = td_status(td) & TD_CTRL_ACTIVE;
+		prevactive = ctrlstat & TD_CTRL_ACTIVE;
 	}
 
 	uhci_delete_queued_urb(uhci, urb);

@@ -1063,6 +1063,29 @@ int s3c2410_dma_devconfig(int channel,
 
 EXPORT_SYMBOL(s3c2410_dma_devconfig);
 
+/* s3c2410_dma_getposition
+ *
+ * returns the current transfer points for the dma source and destination
+*/
+
+int s3c2410_dma_getposition(dmach_t channel, dma_addr_t *src, dma_addr_t *dst)
+{
+ 	s3c2410_dma_chan_t *chan = &s3c2410_chans[channel];
+
+ 	check_channel(channel);
+
+	if (src != NULL)
+ 		*src = dma_rdreg(chan, S3C2410_DMA_DCSRC);
+
+ 	if (dst != NULL)
+ 		*dst = dma_rdreg(chan, S3C2410_DMA_DCDST);
+
+ 	return 0;
+}
+
+EXPORT_SYMBOL(s3c2410_dma_getposition);
+
+
 /* system device class */
 
 #ifdef CONFIG_PM

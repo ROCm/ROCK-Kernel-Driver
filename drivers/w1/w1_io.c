@@ -174,6 +174,15 @@ u8 w1_calc_crc8(u8 * data, int len)
 	return crc;
 }
 
+void w1_search_devices(struct w1_master *dev, w1_slave_found_callback cb)
+{
+	dev->attempts++;
+	if (dev->bus_master->search)
+		dev->bus_master->search(dev->bus_master->data, cb);
+	else
+		w1_search(dev);
+}
+
 EXPORT_SYMBOL(w1_write_bit);
 EXPORT_SYMBOL(w1_write_8);
 EXPORT_SYMBOL(w1_read_bit);
@@ -183,3 +192,4 @@ EXPORT_SYMBOL(w1_calc_crc8);
 EXPORT_SYMBOL(w1_delay);
 EXPORT_SYMBOL(w1_read_block);
 EXPORT_SYMBOL(w1_write_block);
+EXPORT_SYMBOL(w1_search_devices);

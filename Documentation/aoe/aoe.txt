@@ -33,6 +33,10 @@ USING DEVICE NODES
   "echo > /dev/etherd/discover" tells the driver to find out what AoE
   devices are available.
 
+  These character devices may disappear and be replaced by sysfs
+  counterparts, so distribution maintainers are encouraged to create
+  scripts that use these devices.
+
   The block devices are named like this:
 
 	e{shelf}.{slot}
@@ -57,19 +61,24 @@ USING SYSFS
   There is a script in this directory that formats this information
   in a convenient way.
 
-  root@makki linux# sh Documentation/aoe/status.sh 
-    device                 mac       netif           state
-      e6.0        0010040010c6        eth0              up
-      e6.1        001004001067        eth0              up
-      e6.2        001004001068        eth0              up
-      e6.3        001004001065        eth0              up
-      e6.4        001004001066        eth0              up
-      e6.5        0010040010c7        eth0              up
-      e6.6        0010040010c8        eth0              up
-      e6.7        0010040010c9        eth0              up
-      e6.8        0010040010ca        eth0              up
-      e6.9        0010040010cb        eth0              up
-      e9.0        001004000020        eth1              up
-      e9.5        001004000025        eth1              up
-      e9.9        001004000029        eth1              up
-
+  root@makki root# sh Documentation/aoe/status.sh 
+     e10.0            eth3              up
+     e10.1            eth3              up
+     e10.2            eth3              up
+     e10.3            eth3              up
+     e10.4            eth3              up
+     e10.5            eth3              up
+     e10.6            eth3              up
+     e10.7            eth3              up
+     e10.8            eth3              up
+     e10.9            eth3              up
+      e4.0            eth1              up
+      e4.1            eth1              up
+      e4.2            eth1              up
+      e4.3            eth1              up
+      e4.4            eth1              up
+      e4.5            eth1              up
+      e4.6            eth1              up
+      e4.7            eth1              up
+      e4.8            eth1              up
+      e4.9            eth1              up

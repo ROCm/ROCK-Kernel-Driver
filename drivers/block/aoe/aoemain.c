@@ -53,39 +53,58 @@ discover_timer(ulong vp)
 	}
 }
 
-static void __exit
+static void
 aoe_exit(void)
 {
 	discover_timer(TKILL);
 
 	aoenet_exit();
-	aoeblk_exit();
+	unregister_blkdev(AOE_MAJOR, DEVICE_NAME);
 	aoechr_exit();
 	aoedev_exit();
+	aoeblk_exit();		/* free cache after de-allocating bufs */
 }
 
 static int __init
 aoe_init(void)
 {
-	int n, (**p)(void);
-	int (*fns[])(void) = {
-		aoedev_init, aoechr_init, aoeblk_init, aoenet_init, NULL
-	};
+	int ret;
 
-	for (p=fns; *p != NULL; p++) {
-		n = (*p)();
-		if (n) {
-			aoe_exit();
-			printk(KERN_INFO "aoe: aoe_init: initialisation failure.\n");
-			return n;
-		}
+	ret = aoedev_init();
+	if (ret)
+		return ret;
+	ret = aoechr_init();
+	if (ret)
+		goto chr_fail;
+	ret = aoeblk_init();
+	if (ret)
+		goto blk_fail;
+	ret = aoenet_init();
+	if (ret)
+		goto net_fail;
+	ret = register_blkdev(AOE_MAJOR, DEVICE_NAME);
+	if (ret < 0) {
+		printk(KERN_ERR "aoe: aoeblk_init: can't register major\n");
+		goto blkreg_fail;
 	}
+
 	printk(KERN_INFO
 	       "aoe: aoe_init: AoE v2.6-%s initialised.\n",
 	       VERSION);
-
 	discover_timer(TINIT);
 	return 0;
+
+ blkreg_fail:
+	aoenet_exit();
+ net_fail:
+	aoeblk_exit();
+ blk_fail:
+	aoechr_exit();
+ chr_fail:
+	aoedev_exit();
+	
+	printk(KERN_INFO "aoe: aoe_init: initialisation failure.\n");
+	return ret;
 }
 
 module_init(aoe_init);

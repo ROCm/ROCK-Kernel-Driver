@@ -604,7 +604,7 @@ static int intr_submit (
 	/* get qh and force any scheduling errors */
 	INIT_LIST_HEAD (&empty);
 	qh = qh_append_tds (ehci, urb, &empty, epnum, &ep->hcpriv);
-	if (qh == 0) {
+	if (qh == NULL) {
 		status = -ENOMEM;
 		goto done;
 	}
@@ -615,7 +615,7 @@ static int intr_submit (
 
 	/* then queue the urb's tds to the qh */
 	qh = qh_append_tds (ehci, urb, qtd_list, epnum, &ep->hcpriv);
-	BUG_ON (qh == 0);
+	BUG_ON (qh == NULL);
 
 	/* ... update usbfs periodic stats */
 	ehci_to_hcd(ehci)->self.bandwidth_int_reqs++;
@@ -638,7 +638,7 @@ iso_stream_alloc (int mem_flags)
 	struct ehci_iso_stream *stream;
 
 	stream = kmalloc(sizeof *stream, mem_flags);
-	if (likely (stream != 0)) {
+	if (likely (stream != NULL)) {
 		memset (stream, 0, sizeof(*stream));
 		INIT_LIST_HEAD(&stream->td_list);
 		INIT_LIST_HEAD(&stream->free_list);
@@ -791,7 +791,7 @@ iso_stream_put(struct ehci_hcd *ehci, struct ehci_iso_stream *stream)
 static inline struct ehci_iso_stream *
 iso_stream_get (struct ehci_iso_stream *stream)
 {
-	if (likely (stream != 0))
+	if (likely (stream != NULL))
 		stream->refcount++;
 	return stream;
 }
@@ -813,9 +813,9 @@ iso_stream_find (struct ehci_hcd *ehci, struct urb *urb)
 	spin_lock_irqsave (&ehci->lock, flags);
 	stream = ep->hcpriv;
 
-	if (unlikely (stream == 0)) {
+	if (unlikely (stream == NULL)) {
 		stream = iso_stream_alloc(GFP_ATOMIC);
-		if (likely (stream != 0)) {
+		if (likely (stream != NULL)) {
 			/* dev->ep owns the initial refcount */
 			ep->hcpriv = stream;
 			stream->ep = ep;
@@ -850,7 +850,7 @@ iso_sched_alloc (unsigned packets, int mem_flags)
 
 	size += packets * sizeof (struct ehci_iso_packet);
 	iso_sched = kmalloc (size, mem_flags);
-	if (likely (iso_sched != 0)) {
+	if (likely (iso_sched != NULL)) {
 		memset(iso_sched, 0, size);
 		INIT_LIST_HEAD (&iso_sched->td_list);
 	}
@@ -927,7 +927,7 @@ itd_urb_transaction (
 	unsigned long		flags;
 
 	sched = iso_sched_alloc (urb->number_of_packets, mem_flags);
-	if (unlikely (sched == 0))
+	if (unlikely (sched == NULL))
 		return -ENOMEM;
 
 	itd_sched_init (sched, stream, urb);
@@ -961,7 +961,7 @@ itd_urb_transaction (
 			spin_lock_irqsave (&ehci->lock, flags);
 		}
 
-		if (unlikely (0 == itd)) {
+		if (unlikely (NULL == itd)) {
 			iso_sched_free (stream, sched);
 			spin_unlock_irqrestore (&ehci->lock, flags);
 			return -ENOMEM;
@@ -1416,7 +1416,7 @@ static int itd_submit (struct ehci_hcd *ehci, struct urb *urb, int mem_flags)
 
 	/* Get iso_stream head */
 	stream = iso_stream_find (ehci, urb);
-	if (unlikely (stream == 0)) {
+	if (unlikely (stream == NULL)) {
 		ehci_dbg (ehci, "can't get iso stream\n");
 		return -ENOMEM;
 	}
@@ -1530,7 +1530,7 @@ sitd_urb_transaction (
 	unsigned long		flags;
 
 	iso_sched = iso_sched_alloc (urb->number_of_packets, mem_flags);
-	if (iso_sched == 0)
+	if (iso_sched == NULL)
 		return -ENOMEM;
 
 	sitd_sched_init (iso_sched, stream, urb);
@@ -1784,7 +1784,7 @@ static int sitd_submit (struct ehci_hcd *ehci, struct urb *urb, int mem_flags)
 
 	/* Get iso_stream head */
 	stream = iso_stream_find (ehci, urb);
-	if (stream == 0) {
+	if (stream == NULL) {
 		ehci_dbg (ehci, "can't get iso stream\n");
 		return -ENOMEM;
 	}
@@ -1889,7 +1889,7 @@ restart:
 		type = Q_NEXT_TYPE (*hw_p);
 		modified = 0;
 
-		while (q.ptr != 0) {
+		while (q.ptr != NULL) {
 			unsigned		uf;
 			union ehci_shadow	temp;
 			int			live;

@@ -909,7 +909,7 @@ static void set_rx_mode_8012(struct net_device *dev)
 			 i++, mclist = mclist->next)
 		{
 			int filterbit = ether_crc_le(ETH_ALEN, mclist->dmi_addr) & 0x3f;
-			mc_filter[filterbit >> 5] |= cpu_to_le32(1 << (filterbit & 31));
+			mc_filter[filterbit >> 5] |= 1 << (filterbit & 31);
 		}
 		new_mode = CMR2h_Normal;
 	}
