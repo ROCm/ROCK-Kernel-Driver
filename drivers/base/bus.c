@@ -96,7 +96,7 @@ static void attach(struct device * dev)
 
 static int bus_match(struct device * dev, struct device_driver * drv)
 {
-	int error = 0;
+	int error = -ENODEV;
 	if (dev->bus->match(dev,drv)) {
 		dev->driver = drv;
 		if (drv->probe) {
@@ -104,7 +104,8 @@ static int bus_match(struct device * dev, struct device_driver * drv)
 				attach(dev);
 			else
 				dev->driver = NULL;
-		}
+		} else 
+			attach(dev);
 	}
 	return error;
 }
