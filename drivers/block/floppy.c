@@ -2293,7 +2293,7 @@ static int do_format(kdev_t device, struct format_descr *tmp_format_req)
  * =============================
  */
 
-static inline void end_request(struct request *req, int uptodate)
+static void floppy_end_request(struct request *req, int uptodate)
 {
 	if (end_that_request_first(req, uptodate, current_count_sectors))
 		return;
@@ -2334,7 +2334,7 @@ static void request_done(int uptodate)
 
 		/* unlock chained buffers */
 		spin_lock_irqsave(q->queue_lock, flags);
-		end_request(req, 1);
+		floppy_end_request(req, 1);
 		spin_unlock_irqrestore(q->queue_lock, flags);
 	} else {
 		if (rq_data_dir(req) == WRITE) {
@@ -2348,7 +2348,7 @@ static void request_done(int uptodate)
 			DRWE->last_error_generation = DRS->generation;
 		}
 		spin_lock_irqsave(q->queue_lock, flags);
-		end_request(req, 0);
+		floppy_end_request(req, 0);
 		spin_unlock_irqrestore(q->queue_lock, flags);
 	}
 }
