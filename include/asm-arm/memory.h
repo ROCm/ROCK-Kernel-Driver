@@ -74,6 +74,8 @@ static inline void *phys_to_virt(unsigned long x)
 #define virt_to_page(kaddr)	(pfn_to_page(__pa(kaddr) >> PAGE_SHIFT))
 #define virt_addr_valid(kaddr)	((kaddr) >= PAGE_OFFSET && (kaddr) < (unsigned long)high_memory)
 
+#define PHYS_TO_NID(addr)	(0)
+
 #else
 /*
  * This is more complex.  We have a set of mem_map arrays spread

@@ -80,6 +80,4 @@ extern unsigned long __bus_to_virt(unsigned long);
 #define __phys_to_virt__is_a_macro
 #define __phys_to_virt(ppage) ((unsigned long)(ppage) + PAGE_OFFSET)
 
-#define PHYS_TO_NID(addr)	(0)
-
 #endif
