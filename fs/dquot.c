@@ -112,8 +112,10 @@
  * operations on dquots don't hold dq_lock as they copy data under dq_data_lock
  * spinlock to internal buffers before writing.
  *
- * Lock ordering (including journal_lock) is following:
- *  dqonoff_sem > journal_lock > dqptr_sem > dquot->dq_lock > dqio_sem
+ * Lock ordering (including some related VFS locks) is the following:
+ *   i_sem > dqonoff_sem > iprune_sem > journal_lock > dqptr_sem >
+ *   > dquot->dq_lock > dqio_sem
+ * i_sem on quota files is special (it's below dqio_sem)
  */
 
 spinlock_t dq_list_lock = SPIN_LOCK_UNLOCKED;
@@ -728,17 +730,18 @@ static void put_dquot_list(struct list_head *tofree_head)
 	}
 }
 
-/* Function in inode.c - remove pointers to dquots in icache */
-extern void remove_dquot_ref(struct super_block *, int, struct list_head *);
-
 /* Gather all references from inodes and drop them */
 static void drop_dquot_ref(struct super_block *sb, int type)
 {
 	LIST_HEAD(tofree_head);
 
+	/* We need to be guarded against prune_icache to reach all the
+	 * inodes - otherwise some can be on the local list of prune_icache */
+	down(&iprune_sem);
 	down_write(&sb_dqopt(sb)->dqptr_sem);
 	remove_dquot_ref(sb, type, &tofree_head);
 	up_write(&sb_dqopt(sb)->dqptr_sem);
+	up(&iprune_sem);
 	put_dquot_list(&tofree_head);
 }
 

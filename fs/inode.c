@@ -90,7 +90,7 @@ spinlock_t inode_lock = SPIN_LOCK_UNLOCKED;
  * from its final dispose_list, the struct super_block they refer to
  * (for inode->i_sb->s_op) may already have been freed and reused.
  */
-static DECLARE_MUTEX(iprune_sem);
+DECLARE_MUTEX(iprune_sem);
 
 /*
  * Statistics gathering..
