@@ -256,16 +256,16 @@ static struct cpufreq_frequency_table *longhaul_table;
 
 static int longhaul_get_cpu_fsb (void)
 {
+	unsigned long lo, hi;
 	unsigned int eblcr_fsb_table[] = { 66, 133, 100, -1 };
-	unsigned long invalue=0,lo, hi;
+	unsigned int invalue=0;
 
 	if (fsb == 0) {
 		rdmsr (MSR_IA32_EBL_CR_POWERON, lo, hi);
 		invalue = (lo & (1<<18|1<<19)) >>18;
-		return eblcr_fsb_table[invalue];
-	} else {
-		return fsb;
+		fsb = eblcr_fsb_table[invalue];
 	}
+	return fsb;
 }
 
 
