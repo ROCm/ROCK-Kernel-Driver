@@ -533,11 +533,9 @@ static inline void ipgre_ecn_decapsulate(struct iphdr *iph, struct sk_buff *skb)
 {
 	if (INET_ECN_is_ce(iph->tos)) {
 		if (skb->protocol == htons(ETH_P_IP)) {
-			if (INET_ECN_is_not_ce(skb->nh.iph->tos))
-				IP_ECN_set_ce(skb->nh.iph);
+			IP_ECN_set_ce(skb->nh.iph);
 		} else if (skb->protocol == htons(ETH_P_IPV6)) {
-			if (INET_ECN_is_not_ce(ip6_get_dsfield(skb->nh.ipv6h)))
-				IP6_ECN_set_ce(skb->nh.ipv6h);
+			IP6_ECN_set_ce(skb->nh.ipv6h);
 		}
 	}
 }
