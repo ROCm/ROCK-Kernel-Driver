@@ -320,25 +320,13 @@ _pagebuf_freepages(
  *	pagebuf_free releases the specified buffer.  The modification
  *	state of any associated pages is left unchanged.
  */
-STATIC void
-__pagebuf_free(
+void
+pagebuf_free(
 	page_buf_t		*pb)
 {
-	pb_hash_t		*hash = pb_hash(pb);
-
 	PB_TRACE(pb, "free", 0);
-
-	spin_lock(&hash->pb_hash_lock);
-	/*
-	 * Someone grabbed a reference while we weren't looking,
-	 * try again later.
-	 */
-	if (unlikely(atomic_read(&pb->pb_hold))) {
-		spin_unlock(&hash->pb_hash_lock);
-		return;
-	} else if (!list_empty(&pb->pb_hash_list))
-		list_del_init(&pb->pb_hash_list);
-	spin_unlock(&hash->pb_hash_lock);
+	
+	ASSERT(list_empty(&pb->pb_hash_list));
 
 	/* release any virtual mapping */ ;
 	if (pb->pb_flags & _PBF_ADDR_ALLOCATED) {
@@ -365,17 +353,6 @@ __pagebuf_free(
 	}
 
 	pagebuf_deallocate(pb);
-}
-
-void
-pagebuf_free(
-	page_buf_t		*pb)
-{
-	if (unlikely(!atomic_dec_and_test(&pb->pb_hold))) {
-		printk(KERN_ERR "XFS: freeing inuse buffer!\n");
-		dump_stack();
-	} else
-		__pagebuf_free(pb);
 }
 
 /*
@@ -588,8 +565,7 @@ _pagebuf_find(				/* find buffer for block	*/
 
 		if (pb->pb_target == target &&
 		    pb->pb_file_offset == range_base &&
-		    pb->pb_buffer_length == range_length &&
-		    atomic_read(&pb->pb_hold)) {
+		    pb->pb_buffer_length == range_length) {
 			/* If we look at something bring it to the
 			 * front of the list for next time
 			 */
@@ -946,16 +922,21 @@ void
 pagebuf_rele(
 	page_buf_t		*pb)
 {
+	pb_hash_t		*hash = pb_hash(pb);
+
 	PB_TRACE(pb, "rele", pb->pb_relse);
 
-	if (atomic_dec_and_test(&pb->pb_hold)) {
+	if (atomic_dec_and_lock(&pb->pb_hold, &hash->pb_hash_lock)) {
 		int		do_free = 1;
 
 		if (pb->pb_relse) {
 			atomic_inc(&pb->pb_hold);
+			spin_unlock(&hash->pb_hash_lock);
 			(*(pb->pb_relse)) (pb);
+			spin_lock(&hash->pb_hash_lock);
 			do_free = 0;
 		}
+
 		if (pb->pb_flags & PBF_DELWRI) {
 			pb->pb_flags |= PBF_ASYNC;
 			atomic_inc(&pb->pb_hold);
@@ -966,7 +947,11 @@ pagebuf_rele(
 		}
 
 		if (do_free) {
-			__pagebuf_free(pb);
+			list_del_init(&pb->pb_hash_list);
+			spin_unlock(&hash->pb_hash_lock);
+			pagebuf_free(pb);
+		} else {
+			spin_unlock(&hash->pb_hash_lock);
 		}
 	}
 }
