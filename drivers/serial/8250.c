@@ -156,7 +156,7 @@ static struct irq_info irq_lists[NR_IRQS];
 /*
  * Here we define the default xmit fifo size used for each type of UART.
  */
-static const struct serial_uart_config uart_config[PORT_MAX_8250+1] = {
+static const struct serial8250_config uart_config[PORT_MAX_8250+1] = {
 	{ "unknown",	1,	0 },
 	{ "8250",	1,	0 },
 	{ "16450",	1,	0 },
@@ -710,7 +710,7 @@ static void autoconfig(struct uart_8250_port *up, unsigned int probeflags)
 #endif
 	serial_outp(up, UART_LCR, save_lcr);
 
-	up->port.fifosize = uart_config[up->port.type].dfl_xmit_fifo_size;
+	up->port.fifosize = uart_config[up->port.type].fifo_size;
 	up->capabilities = uart_config[up->port.type].flags;
 
 	if (up->port.type == PORT_UNKNOWN)
