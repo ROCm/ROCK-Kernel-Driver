@@ -34,7 +34,7 @@
 #include <asm/rtas.h>
 #include <asm/system.h>
 
-#define MODULE_VERS "1.3"
+#define MODULE_VERS "1.4"
 #define MODULE_NAME "lparcfg"
 
 /* #define LPARCFG_DEBUG */
@@ -292,7 +292,8 @@ static int lparcfg_count_active_processors(void)
 
 static int lparcfg_data(struct seq_file *m, void *v)
 {
-	int system_active_processors;
+	int partition_potential_processors;
+	int partition_active_processors;
 	struct device_node *rootdn;
 	const char *model = "";
 	const char *system_id = "";
@@ -323,10 +324,12 @@ static int lparcfg_data(struct seq_file *m, void *v)
 	lrdrp = (int *)get_property(rtas_node, "ibm,lrdr-capacity", NULL);
 
 	if (lrdrp == NULL) {
-		system_active_processors = systemcfg->processorCount;
+		partition_potential_processors = systemcfg->processorCount;
 	} else {
-		system_active_processors = *(lrdrp + 4);
+		partition_potential_processors = *(lrdrp + 4);
 	}
+
+	partition_active_processors = lparcfg_count_active_processors();
 
 	if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR) {
 		unsigned long h_entitled, h_unallocated;
@@ -342,8 +345,6 @@ static int lparcfg_data(struct seq_file *m, void *v)
 		seq_printf(m, "R6=0x%lx\n", h_aggregation);
 		seq_printf(m, "R7=0x%lx\n", h_resource);
 
-		h_pic(&pool_idle_time, &pool_procs);
-
 		purr = get_purr();
 
 		/* this call handles the ibm,get-system-parameter contents */
@@ -352,17 +353,28 @@ static int lparcfg_data(struct seq_file *m, void *v)
 		seq_printf(m, "partition_entitled_capacity=%ld\n",
 			      h_entitled);
 
-		seq_printf(m, "pool=%ld\n",
-			      (h_aggregation >> 0*8) & 0xffff);
-
 		seq_printf(m, "group=%ld\n",
 			      (h_aggregation >> 2*8) & 0xffff);
 
 		seq_printf(m, "system_active_processors=%ld\n",
 			      (h_resource >> 0*8) & 0xffff);
 
-		seq_printf(m, "pool_capacity=%ld\n",
-			      (h_resource >> 2*8) & 0xffff);
+		/* pool related entries are apropriate for shared configs */
+		if (paca[0].lppaca.xSharedProc) {
+
+			h_pic(&pool_idle_time, &pool_procs);
+
+			seq_printf(m, "pool=%ld\n",
+				   (h_aggregation >> 0*8) & 0xffff);
+
+			/* report pool_capacity in percentage */
+			seq_printf(m, "pool_capacity=%ld\n",
+				   ((h_resource >> 2*8) & 0xffff)*100);
+
+			seq_printf(m, "pool_idle_time=%ld\n", pool_idle_time);
+
+			seq_printf(m, "pool_num_procs=%ld\n", pool_procs);
+		}
 
 		seq_printf(m, "unallocated_capacity_weight=%ld\n",
 			      (h_resource >> 4*8) & 0xFF);
@@ -376,34 +388,28 @@ static int lparcfg_data(struct seq_file *m, void *v)
 		seq_printf(m, "unallocated_capacity=%ld\n",
 			      h_unallocated);
 
-		seq_printf(m, "pool_idle_time=%ld\n",
-			      pool_idle_time);
-
-		seq_printf(m, "pool_num_procs=%ld\n",
-			      pool_procs);
-
 		seq_printf(m, "purr=%ld\n",
 			      purr);
 
 	} else /* non SPLPAR case */ {
 		seq_printf(m, "system_active_processors=%d\n",
-			      system_active_processors);
+			      partition_potential_processors);
 
 		seq_printf(m, "system_potential_processors=%d\n",
-			      system_active_processors);
+			      partition_potential_processors);
 
 		seq_printf(m, "partition_max_entitled_capacity=%d\n",
-			      100*system_active_processors);
+			      partition_potential_processors * 100);
 
 		seq_printf(m, "partition_entitled_capacity=%d\n",
-			      system_active_processors*100);
+			      partition_active_processors * 100);
 	}
 
 	seq_printf(m, "partition_active_processors=%d\n",
-			(int) lparcfg_count_active_processors());
+			      partition_active_processors);
 
 	seq_printf(m, "partition_potential_processors=%d\n",
-			system_active_processors);
+			      partition_potential_processors);
 
 	seq_printf(m, "shared_processor_mode=%d\n",
 			paca[0].lppaca.xSharedProc);
