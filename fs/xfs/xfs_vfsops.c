@@ -603,6 +603,7 @@ xfs_mntupdate(
 	struct vfs	*vfsp = bhvtovfs(bdp);
 	xfs_mount_t	*mp = XFS_BHVTOM(bdp);
 	int		pincount, error;
+	int		count = 0;
 
 	if (args->flags & XFSMNT_NOATIME)
 		mp->m_flags |= XFS_MOUNT_NOATIME;
@@ -617,11 +618,19 @@ xfs_mntupdate(
 		pagebuf_delwri_flush(mp->m_ddev_targp, 0, NULL);
 		xfs_finish_reclaim_all(mp, 0);
 
+		/* This loop must run at least twice.
+		 * The first instance of the loop will flush
+		 * most meta data but that will generate more
+		 * meta data (typically directory updates).
+		 * Which then must be flushed and logged before
+		 * we can write the unmount record.
+		 */ 
 		do {
 			VFS_SYNC(vfsp, REMOUNT_READONLY_FLAGS, NULL, error);
 			pagebuf_delwri_flush(mp->m_ddev_targp, PBDF_WAIT,
 								&pincount);
-		} while (pincount);
+			if(0 == pincount) { delay(50); count++; }
+		} while (count < 2);
 
 		/* Ok now write out an unmount record */
 		xfs_log_unmount_write(mp);
