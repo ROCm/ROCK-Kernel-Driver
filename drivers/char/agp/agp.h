@@ -141,16 +141,6 @@ struct agp_bridge_data {
 	char minor_version;
 };
 
-#define OUTREG64(mmap, addr, val)	__raw_writeq((val), (mmap)+(addr))
-#define OUTREG32(mmap, addr, val)	__raw_writel((val), (mmap)+(addr))
-#define OUTREG16(mmap, addr, val)	__raw_writew((val), (mmap)+(addr))
-#define OUTREG8(mmap, addr, val)	__raw_writeb((val), (mmap)+(addr))
-
-#define INREG64(mmap, addr)		__raw_readq((mmap)+(addr))
-#define INREG32(mmap, addr)		__raw_readl((mmap)+(addr))
-#define INREG16(mmap, addr)		__raw_readw((mmap)+(addr))
-#define INREG8(mmap, addr)		__raw_readb((mmap)+(addr))
-
 #define KB(x)	((x) * 1024)
 #define MB(x)	(KB (KB (x)))
 #define GB(x)	(MB (KB (x)))
