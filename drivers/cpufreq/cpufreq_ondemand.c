@@ -221,6 +221,7 @@ static struct attribute_group dbs_attr_group = {
 static void dbs_check_cpu(int cpu)
 {
 	unsigned int idle_ticks, up_idle_ticks, down_idle_ticks;
+	unsigned int total_idle_ticks;
 	unsigned int freq_down_step;
 	unsigned int freq_down_sampling_rate;
 	static int down_skip[NR_CPUS];
@@ -244,9 +245,11 @@ static void dbs_check_cpu(int cpu)
 	 * 5% of max_frequency 
 	 */
 	/* Check for frequency increase */
-	idle_ticks = kstat_cpu(cpu).cpustat.idle - 
+	total_idle_ticks = kstat_cpu(cpu).cpustat.idle +
+		kstat_cpu(cpu).cpustat.iowait;
+	idle_ticks = total_idle_ticks -
 		this_dbs_info->prev_cpu_idle_up;
-	this_dbs_info->prev_cpu_idle_up = kstat_cpu(cpu).cpustat.idle;
+	this_dbs_info->prev_cpu_idle_up = total_idle_ticks;
 
 	/* Scale idle ticks by 100 and compare with up and down ticks */
 	idle_ticks *= 100;
@@ -258,7 +261,7 @@ static void dbs_check_cpu(int cpu)
 			this_dbs_info->cur_policy->max, 
 			CPUFREQ_RELATION_H);
 		down_skip[cpu] = 0;
-		this_dbs_info->prev_cpu_idle_down = kstat_cpu(cpu).cpustat.idle;
+		this_dbs_info->prev_cpu_idle_down = total_idle_ticks;
 		return;
 	}
 
@@ -267,12 +270,12 @@ static void dbs_check_cpu(int cpu)
 	if (down_skip[cpu] < dbs_tuners_ins.sampling_down_factor)
 		return;
 
-	idle_ticks = kstat_cpu(cpu).cpustat.idle - 
+	idle_ticks = total_idle_ticks -
 		this_dbs_info->prev_cpu_idle_down;
 	/* Scale idle ticks by 100 and compare with up and down ticks */
 	idle_ticks *= 100;
 	down_skip[cpu] = 0;
-	this_dbs_info->prev_cpu_idle_down = kstat_cpu(cpu).cpustat.idle;
+	this_dbs_info->prev_cpu_idle_down = total_idle_ticks;
 
 	freq_down_sampling_rate = dbs_tuners_ins.sampling_rate *
 		dbs_tuners_ins.sampling_down_factor;
@@ -342,9 +345,11 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 		this_dbs_info->cur_policy = policy;
 		
 		this_dbs_info->prev_cpu_idle_up = 
-				kstat_cpu(cpu).cpustat.idle;
+				kstat_cpu(cpu).cpustat.idle +
+				kstat_cpu(cpu).cpustat.iowait;
 		this_dbs_info->prev_cpu_idle_down = 
-				kstat_cpu(cpu).cpustat.idle;
+				kstat_cpu(cpu).cpustat.idle +
+				kstat_cpu(cpu).cpustat.iowait;
 		this_dbs_info->enable = 1;
 		sysfs_create_group(&policy->kobj, &dbs_attr_group);
 		dbs_enable++;
