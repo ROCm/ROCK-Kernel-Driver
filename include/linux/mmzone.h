@@ -249,6 +249,25 @@ static inline struct zone *next_zone(struct zone *zone)
 #define for_each_zone(zone) \
 	for (zone = pgdat_list->node_zones; zone; zone = next_zone(zone))
 
+/**
+ * is_highmem - helper function to quickly check if a struct zone is a 
+ *              highmem zone or not.  This is an attempt to keep references
+ *              to ZONE_{DMA/NORMAL/HIGHMEM/etc} in general code to a minimum.
+ * @zone - pointer to struct zone variable
+ */
+static inline int is_highmem(struct zone *zone)
+{
+	return (zone - zone->zone_pgdat->node_zones == ZONE_HIGHMEM);
+}
+
+/* These two functions are used to setup the per zone pages min values */
+struct ctl_table;
+struct file;
+int min_free_kbytes_sysctl_handler(struct ctl_table *, int, struct file *, 
+					  void *, size_t *);
+extern void setup_per_zone_pages_min(void);
+
+
 #ifdef CONFIG_NUMA
 #define MAX_NR_MEMBLKS	BITS_PER_LONG /* Max number of Memory Blocks */
 #else /* !CONFIG_NUMA */

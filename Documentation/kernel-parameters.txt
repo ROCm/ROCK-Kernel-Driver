@@ -540,8 +540,6 @@ running once the system is up.
 			[KNL,ACPI] Mark specific memory as reserved.
 			Region of memory to be used, from ss to ss+nn.
 
-	memfrac=	[KNL]
-
 	meye=		[HW] Set MotionEye Camera parameters
 			See Documentation/video4linux/meye.txt.
 

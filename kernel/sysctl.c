@@ -57,6 +57,7 @@ extern char core_pattern[];
 extern int cad_pid;
 extern int pid_max;
 extern int sysctl_lower_zone_protection;
+extern int min_free_kbytes;
 
 /* this is needed for the proc_dointvec_minmax for [fs_]overflow UID and GID */
 static int maxolduid = 65535;
@@ -658,6 +659,16 @@ static ctl_table vm_table[] = {
 		.maxlen		= sizeof(sysctl_lower_zone_protection),
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec_minmax,
+		.strategy	= &sysctl_intvec,
+		.extra1		= &zero,
+	},
+	{
+		.ctl_name	= VM_MIN_FREE_KBYTES,
+		.procname	= "min_free_kbytes",
+		.data		= &min_free_kbytes,
+		.maxlen		= sizeof(min_free_kbytes),
+		.mode		= 0644,
+		.proc_handler	= &min_free_kbytes_sysctl_handler,
 		.strategy	= &sysctl_intvec,
 		.extra1		= &zero,
 	},

@@ -29,6 +29,7 @@
 #include <linux/slab.h>
 #include <linux/notifier.h>
 #include <linux/topology.h>
+#include <linux/sysctl.h>
 
 DECLARE_BITMAP(node_online_map, MAX_NUMNODES);
 DECLARE_BITMAP(memblk_online_map, MAX_NR_MEMBLKS);
@@ -47,9 +48,7 @@ struct zone *zone_table[MAX_NR_ZONES*MAX_NR_NODES];
 EXPORT_SYMBOL(zone_table);
 
 static char *zone_names[MAX_NR_ZONES] = { "DMA", "Normal", "HighMem" };
-static int zone_balance_ratio[MAX_NR_ZONES] __initdata = { 128, 128, 128, };
-static int zone_balance_min[MAX_NR_ZONES] __initdata = { 20 , 20, 20, };
-static int zone_balance_max[MAX_NR_ZONES] __initdata = { 255 , 255, 255, };
+int min_free_kbytes = 1024;
 
 /*
  * Temporary debugging check for pages not lying within a given zone.
@@ -1205,7 +1204,6 @@ static void __init free_area_init_core(struct pglist_data *pgdat,
 	
 	for (j = 0; j < MAX_NR_ZONES; j++) {
 		struct zone *zone = pgdat->node_zones + j;
-		unsigned long mask;
 		unsigned long size, realsize;
 		unsigned long batch;
 
@@ -1278,15 +1276,6 @@ static void __init free_area_init_core(struct pglist_data *pgdat,
 			init_waitqueue_head(zone->wait_table + i);
 
 		pgdat->nr_zones = j+1;
-
-		mask = (realsize / zone_balance_ratio[j]);
-		if (mask < zone_balance_min[j])
-			mask = zone_balance_min[j];
-		else if (mask > zone_balance_max[j])
-			mask = zone_balance_max[j];
-		zone->pages_min = mask;
-		zone->pages_low = mask*2;
-		zone->pages_high = mask*3;
 
 		zone->zone_mem_map = lmem_map;
 		zone->zone_start_pfn = zone_start_pfn;
@@ -1371,19 +1360,6 @@ void __init free_area_init(unsigned long *zones_size)
 	mem_map = contig_page_data.node_mem_map;
 }
 #endif
-
-static int __init setup_mem_frac(char *str)
-{
-	int j = 0;
-
-	while (get_option(&str, &zone_balance_ratio[j++]) == 2);
-	printk("setup_mem_frac: ");
-	for (j = 0; j < MAX_NR_ZONES; j++) printk("%d  ", zone_balance_ratio[j]);
-	printk("\n");
-	return 1;
-}
-
-__setup("memfrac=", setup_mem_frac);
 
 #ifdef CONFIG_PROC_FS
 
@@ -1560,4 +1536,65 @@ void __init page_alloc_init(void)
 {
 	init_page_alloc_cpu(smp_processor_id());
 	register_cpu_notifier(&page_alloc_nb);
+}
+
+/*
+ * setup_per_zone_pages_min - called when min_free_kbytes changes.  Ensures 
+ *	that the pages_{min,low,high} values for each zone are set correctly 
+ *	with respect to min_free_kbytes.
+ */
+void setup_per_zone_pages_min(void)
+{
+	unsigned long pages_min = min_free_kbytes >> (PAGE_SHIFT - 10);
+	unsigned long lowmem_pages = 0;
+	struct zone *zone;
+	unsigned long flags;
+
+	/* Calculate total number of !ZONE_HIGHMEM pages */
+	for_each_zone(zone)
+		if (!is_highmem(zone))
+			lowmem_pages += zone->present_pages;
+
+	for_each_zone(zone) {
+		spin_lock_irqsave(&zone->lru_lock, flags);
+		if (is_highmem(zone)) {
+			/*
+			 * Often, highmem doesn't need to reserve any pages.
+			 * But the pages_min/low/high values are also used for
+			 * batching up page reclaim activity so we need a
+			 * decent value here.
+			 */
+			int min_pages;
+
+			min_pages = zone->present_pages / 1024;
+			if (min_pages < SWAP_CLUSTER_MAX)
+				min_pages = SWAP_CLUSTER_MAX;
+			if (min_pages > 128)
+				min_pages = 128;
+			zone->pages_min = min_pages;
+		} else {
+			/* if it's a lowmem zone, reserve a number of pages 
+			 * proportionate to the zone's size.
+			 */
+			zone->pages_min = (pages_min * zone->present_pages) / 
+			                   lowmem_pages;
+		}
+
+		zone->pages_low = zone->pages_min * 2;
+		zone->pages_high = zone->pages_min * 3;
+		spin_unlock_irqrestore(&zone->lru_lock, flags);
+	}
+}
+
+/*
+ * min_free_kbytes_sysctl_handler - just a wrapper around proc_dointvec() so 
+ *	that we can call setup_per_zone_pages_min() whenever min_free_kbytes 
+ *	changes.
+ */
+int min_free_kbytes_sysctl_handler(ctl_table *table, int write, 
+		struct file *file, void *buffer, size_t *length)
+{
+	proc_dointvec(table, write, file, buffer, length);
+	setup_per_zone_pages_min();
+	return 0;
 }
