@@ -36,6 +36,10 @@
  *                      SAL 3.0 spec.
  * 00/03/29 C. Fleckenstein  Fixed PAL/SAL update issues, began MCA bug fixes, logging issues,
  *                           added min save state dump, added INIT handler.
+ *
+ * 2003-12-08 Keith Owens <kaos@sgi.com>
+ *            smp_call_function() must not be called from interrupt context (can
+ *            deadlock on tasklist_lock).  Use keventd to call smp_call_function().
  */
 #include <linux/config.h>
 #include <linux/types.h>
@@ -51,6 +55,7 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/smp.h>
+#include <linux/tqueue.h>
 
 #include <asm/delay.h>
 #include <asm/machvec.h>
@@ -151,6 +156,8 @@ static int cmc_polling_enabled = 1;
 static int cpe_poll_enabled = 1;
 
 extern void salinfo_log_wakeup(int type, u8 *buffer, u64 size);
+
+static struct tq_struct	cmc_disable_tq, cmc_enable_tq;
 
 /*
  *  ia64_mca_log_sal_error_record
@@ -610,6 +617,36 @@ verify_guid (efi_guid_t *test, efi_guid_t *target)
 }
 
 /*
+ * ia64_mca_cmc_vector_disable_keventd
+ *
+ * Called via keventd (smp_call_function() is not safe in interrupt context) to
+ * disable the cmc interrupt vector.
+ *
+ * Note: needs preempt_disable() if you apply the preempt patch to 2.4.
+ */
+static void
+ia64_mca_cmc_vector_disable_keventd(void *unused)
+{
+	ia64_mca_cmc_vector_disable(NULL);
+	smp_call_function(ia64_mca_cmc_vector_disable, NULL, 1, 0);
+}
+
+/*
+ * ia64_mca_cmc_vector_enable_keventd
+ *
+ * Called via keventd (smp_call_function() is not safe in interrupt context) to
+ * enable the cmc interrupt vector.
+ *
+ * Note: needs preempt_disable() if you apply the preempt patch to 2.4.
+ */
+static void
+ia64_mca_cmc_vector_enable_keventd(void *unused)
+{
+	smp_call_function(ia64_mca_cmc_vector_enable, NULL, 1, 0);
+	ia64_mca_cmc_vector_enable(NULL);
+}
+
+/*
  * ia64_mca_init
  *
  *  Do all the system level mca specific initialization.
@@ -641,6 +678,9 @@ ia64_mca_init(void)
 	u64 timeout = IA64_MCA_RENDEZ_TIMEOUT;	/* platform specific */
 
 	IA64_MCA_DEBUG("ia64_mca_init: begin\n");
+
+	INIT_TQUEUE(&cmc_disable_tq, ia64_mca_cmc_vector_disable_keventd, NULL);
+	INIT_TQUEUE(&cmc_enable_tq, ia64_mca_cmc_vector_enable_keventd, NULL);
 
 	/* initialize recovery success indicator */
 	ia64_os_mca_recovery_successful = 0;
@@ -1049,14 +1089,7 @@ ia64_mca_cmc_int_handler(int cmc_irq, void *arg, struct pt_regs *ptregs)
 
 			cmc_polling_enabled = 1;
 			spin_unlock(&cmc_history_lock);
-
-			/*
-			 * We rely on the local_irq_enable() above so
-			 * that this can't deadlock.
-			 */
-			ia64_mca_cmc_vector_disable(NULL);
-
-			smp_call_function(ia64_mca_cmc_vector_disable, NULL, 1, 0);
+			schedule_task(&cmc_disable_tq);
 
 			/*
 			 * Corrected errors will still be corrected, but
@@ -1151,19 +1184,7 @@ ia64_mca_cmc_int_caller(int cpe_irq, void *arg, struct pt_regs *ptregs)
 		if (start_count == IA64_LOG_COUNT(SAL_INFO_TYPE_CMC)) {
 
 			printk(KERN_WARNING "%s: Returning to interrupt driven CMC handler\n", __FUNCTION__);
-
-			/*
-			 * The cmc interrupt handler enabled irqs, so
-			 * this can't deadlock.
-			 */
-			smp_call_function(ia64_mca_cmc_vector_enable, NULL, 1, 0);
-
-			/*
-			 * Turn off interrupts before re-enabling the
-			 * cmc vector locally.  Make sure we get out.
-			 */
-			local_irq_disable();
-			ia64_mca_cmc_vector_enable(NULL);
+			schedule_task(&cmc_enable_tq);
 			cmc_polling_enabled = 0;
 
 		} else {
