@@ -409,14 +409,11 @@ static void lock_swapdevices(void) /* This is called after saving image so modif
 	swap_list_lock();
 	for(i = 0; i< MAX_SWAPFILES; i++)
 		if(swapfile_used[i] == SWAPFILE_IGNORED) {
-//			PRINTS( "device %s locked\n", swap_info[i].swap_file->d_name.name );
 			swap_info[i].flags ^= 0xFF; /* we make the device unusable. A new call to
 						       lock_swapdevices can unlock the devices. */
 		}
 	swap_list_unlock();
 }
-
-kdev_t suspend_device;
 
 static int write_suspend_image(void)
 {
@@ -425,6 +422,7 @@ static int write_suspend_image(void)
 	int nr_pgdir_pages = SUSPEND_PD_PAGES(nr_copy_pages);
 	union diskpage *cur,  *buffer = (union diskpage *)get_free_page(GFP_ATOMIC);
 	unsigned long address;
+	kdev_t suspend_device;
 
 	PRINTS( "Writing data to swap (%d pages): ", nr_copy_pages );
 	for (i=0; i<nr_copy_pages; i++) {
@@ -809,7 +807,6 @@ static int suspend_save_image(void)
 	 *
 	 * Following line enforces not writing to disk until we choose.
 	 */
-	suspend_device = NODEV;					/* We do not want any writes, thanx */
 	drivers_unsuspend();
 	spin_unlock_irq(&suspend_pagedir_lock);
 	PRINTS( "critical section/: done (%d pages copied)\n", nr_copy_pages );
@@ -899,13 +896,9 @@ static void do_magic_suspend_1(void)
 static void do_magic_suspend_2(void)
 {
 	read_swapfiles();
-	if (!suspend_save_image()) {
-#if 1
-		suspend_power_down ();	/* FIXME: if suspend_power_down is commented out, console is lost after few suspends ?! */
-#endif
-	}
+	if (!suspend_save_image())
+		suspend_power_down();	/* FIXME: if suspend_power_down is commented out, console is lost after few suspends ?! */
 
-	suspend_device = NODEV;
 	printk(KERN_WARNING "%sSuspend failed, trying to recover...\n", name_suspend);
 	MDELAY(1000); /* So user can wait and report us messages if armageddon comes :-) */
 
@@ -944,9 +937,8 @@ void do_software_suspend(void)
 			 * We sync here -- so you have consistent filesystem state when things go wrong.
 			 * -- so that noone writes to disk after we do atomic copy of data.
 			 */
-			PRINTS( "Syncing disks before copy\n" );
+			PRINTS("Syncing disks before copy\n");
 			do_suspend_sync();
-			drivers_suspend();
 			if(drivers_suspend()==0)
 				do_magic(0);			/* This function returns after machine woken up from resume */
 			PRINTR("Restarting processes...\n");

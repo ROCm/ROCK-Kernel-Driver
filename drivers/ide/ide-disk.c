@@ -27,7 +27,6 @@
 #include <linux/slab.h>
 #include <linux/delay.h>
 #include <linux/ide.h>
-#include <linux/suspend.h>
 
 #include <asm/byteorder.h>
 #include <asm/irq.h>

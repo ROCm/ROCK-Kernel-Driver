@@ -108,16 +108,16 @@ static int __pdflush(struct pdflush_work *my_work)
 	for ( ; ; ) {
 		struct pdflush_work *pdf;
 
-#ifdef CONFIG_SOFTWARE_SUSPEND
-		run_task_queue(&tq_bdflush);
-#endif
 		list_add(&my_work->list, &pdflush_list);
 		my_work->when_i_went_to_sleep = jiffies;
 		set_current_state(TASK_INTERRUPTIBLE);
 		spin_unlock_irq(&pdflush_lock);
 
+#ifdef CONFIG_SOFTWARE_SUSPEND
+		run_task_queue(&tq_bdflush);
 		if (current->flags & PF_FREEZE)
 			refrigerator(PF_IOTHREAD);
+#endif
 		schedule();
 
 		preempt_enable();
