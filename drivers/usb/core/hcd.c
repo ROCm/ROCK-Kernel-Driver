@@ -459,7 +459,8 @@ static int rh_status_urb (struct usb_hcd *hcd, struct urb *urb)
 	/* rh_timer protected by hcd_data_lock */
 	if (hcd->rh_timer.data
 			|| urb->status != -EINPROGRESS
-			|| urb->transfer_buffer_length < len) {
+			|| urb->transfer_buffer_length < len
+			|| !HCD_IS_RUNNING (hcd->state)) {
 		dev_dbg (hcd->controller,
 				"not queuing rh status urb, stat %d\n",
 				urb->status);
@@ -489,11 +490,10 @@ static void rh_report_status (unsigned long ptr)
 	local_irq_save (flags);
 	spin_lock (&urb->lock);
 
-	/* do nothing if the hc is gone or the urb's been unlinked */
+	/* do nothing if the urb's been unlinked */
 	if (!urb->dev
 			|| urb->status != -EINPROGRESS
-			|| (hcd = urb->dev->bus->hcpriv) == 0
-			|| !HCD_IS_RUNNING (hcd->state)) {
+			|| (hcd = urb->dev->bus->hcpriv) == 0) {
 		spin_unlock (&urb->lock);
 		local_irq_restore (flags);
 		return;
