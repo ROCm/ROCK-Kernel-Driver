@@ -1637,8 +1637,8 @@ static int process_backlog(struct net_device *backlog_dev, int *budget)
 #ifdef CONFIG_NET_HW_FLOWCONTROL
 		if (queue->throttle &&
 		    queue->input_pkt_queue.qlen < no_cong_thresh ) {
+			queue->throttle = 0;
 			if (atomic_dec_and_test(&netdev_dropping)) {
-				queue->throttle = 0;
 				netdev_wakeup();
 				break;
 			}
