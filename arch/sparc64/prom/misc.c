@@ -67,7 +67,6 @@ prom_cmdline(void)
 
 #ifdef CONFIG_SMP
 	smp_release();
-	spin_unlock_wait(&__br_write_locks[BR_GLOBALIRQ_LOCK].lock);
 #endif
 
 #ifdef CONFIG_SUN_CONSOLE
