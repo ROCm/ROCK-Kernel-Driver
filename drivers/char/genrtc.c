@@ -523,4 +523,4 @@ module_exit(rtc_generic_exit);
 
 MODULE_AUTHOR("Richard Zidlicky");
 MODULE_LICENSE("GPL");
-
+MODULE_ALIAS_MISCDEV(RTC_MINOR);

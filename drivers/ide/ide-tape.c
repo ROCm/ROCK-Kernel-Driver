@@ -6502,3 +6502,4 @@ static int idetape_init (void)
 
 module_init(idetape_init);
 module_exit(idetape_exit);
+MODULE_ALIAS_CHARDEV_MAJOR(IDETAPE_MAJOR);

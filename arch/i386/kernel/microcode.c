@@ -509,3 +509,4 @@ static void __exit microcode_exit (void)
 
 module_init(microcode_init)
 module_exit(microcode_exit)
+MODULE_ALIAS_MISCDEV(MICROCODE_MINOR);
