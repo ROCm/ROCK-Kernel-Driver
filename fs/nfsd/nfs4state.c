@@ -962,12 +962,10 @@ release_stateid(struct nfs4_stateid *stp, int flags) {
 	list_del(&stp->st_perfilestate);
 	if((stp->st_vfs_set) && (flags & OPEN_STATE)) {
 		release_stateid_lockowner(stp);
-		nfsd_close(&stp->st_vfs_file);
+		nfsd_close(stp->st_vfs_file);
 		vfsclose++;
-		dput(stp->st_vfs_file.f_dentry);
-		mntput(stp->st_vfs_file.f_vfsmnt);
 	} else if ((stp->st_vfs_set) && (flags & LOCK_STATE)) {
-		struct file *filp = &stp->st_vfs_file;
+		struct file *filp = stp->st_vfs_file;
 
 		locks_remove_posix(filp, (fl_owner_t) stp->st_stateowner);
 	}
@@ -1315,8 +1313,6 @@ nfsd4_process_open2(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nf
 			goto out_free;
 
 		vfsopen++;
-		dget(stp->st_vfs_file.f_dentry);
-		mntget(stp->st_vfs_file.f_vfsmnt);
 
 		init_stateid(stp, fp, sop, open);
 		stp->st_vfs_set = 1;
@@ -1331,7 +1327,7 @@ nfsd4_process_open2(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nf
 		share_access &= open->op_share_access;
 
 		/* update the struct file */
-		if ((status = nfs4_file_upgrade(&stp->st_vfs_file, share_access)))
+		if ((status = nfs4_file_upgrade(stp->st_vfs_file, share_access)))
 			goto out;
 		/* remember the open */
 		set_bit(open->op_share_access, &stp->st_access_bmap);
@@ -1499,7 +1495,7 @@ static inline int
 nfs4_check_fh(struct svc_fh *fhp, struct nfs4_stateid *stp)
 {
 	return (stp->st_vfs_set == 0 ||
-		fhp->fh_dentry->d_inode != stp->st_vfs_file.f_dentry->d_inode);
+		fhp->fh_dentry->d_inode != stp->st_vfs_file->f_dentry->d_inode);
 }
 
 static int
@@ -1816,7 +1812,7 @@ nfsd4_open_downgrade(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct n
 		goto out;
 	}
 	set_access(&share_access, stp->st_access_bmap);
-	nfs4_file_downgrade(&stp->st_vfs_file, 
+	nfs4_file_downgrade(stp->st_vfs_file,
 	                    share_access & ~od->od_share_access);
 
 	reset_union_bmap_access(od->od_share_access, &stp->st_access_bmap);
@@ -2059,7 +2055,7 @@ alloc_init_lock_stateid(struct nfs4_stateowner *sop, struct nfs4_file *fp, struc
 	stp->st_stateid.si_stateownerid = sop->so_id;
 	stp->st_stateid.si_fileid = fp->fi_id;
 	stp->st_stateid.si_generation = 0;
-	stp->st_vfs_file = open_stp->st_vfs_file;
+	stp->st_vfs_file = open_stp->st_vfs_file; /* FIXME refcount?? */
 	stp->st_vfs_set = open_stp->st_vfs_set;
 	stp->st_access_bmap = open_stp->st_access_bmap;
 	stp->st_deny_bmap = open_stp->st_deny_bmap;
@@ -2172,7 +2168,7 @@ nfsd4_lock(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_lock 
 			goto out;
 	}
 	/* lock->lk_stateowner and lock_stp have been created or found */
-	filp = &lock_stp->st_vfs_file;
+	filp = lock_stp->st_vfs_file;
 
 	if ((status = fh_verify(rqstp, current_fh, S_IFREG, MAY_LOCK))) {
 		printk("NFSD: nfsd4_lock: permission denied!\n");
@@ -2378,7 +2374,7 @@ nfsd4_locku(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_lock
 					&locku->lu_stateowner, &stp, NULL)))
 		goto out;
 
-	filp = &stp->st_vfs_file;
+	filp = stp->st_vfs_file;
 	BUG_ON(!filp);
 	file_lock.fl_type = F_UNLCK;
 	file_lock.fl_owner = (fl_owner_t) locku->lu_stateowner;
@@ -2473,7 +2469,7 @@ nfsd4_release_lockowner(struct svc_rqst *rqstp, struct nfsd4_release_lockowner *
 		list_for_each_entry(stp, &local->so_perfilestate,
 				st_perfilestate) {
 			if(stp->st_vfs_set) {
-				if (check_for_locks(&stp->st_vfs_file, local))
+				if (check_for_locks(stp->st_vfs_file, local))
 					goto out;
 			}
 		}

@@ -94,7 +94,7 @@ int		nfsd_commit(struct svc_rqst *, struct svc_fh *,
 				loff_t, unsigned long);
 #endif /* CONFIG_NFSD_V3 */
 int		nfsd_open(struct svc_rqst *, struct svc_fh *, int,
-				int, struct file *);
+				int, struct file **);
 void		nfsd_close(struct file *);
 int		nfsd_read(struct svc_rqst *, struct svc_fh *,
 				loff_t, struct kvec *,int, unsigned long *);

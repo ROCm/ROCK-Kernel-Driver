@@ -596,11 +596,6 @@ extern spinlock_t files_lock;
 #define get_file(x)	atomic_inc(&(x)->f_count)
 #define file_count(x)	atomic_read(&(x)->f_count)
 
-/* Initialize and open a private file and allocate its security structure. */
-extern int open_private_file(struct file *, struct dentry *, int);
-/* Release a private file and free its security structure. */
-extern void close_private_file(struct file *file);
-
 #define	MAX_NON_LFS	((1UL<<31) - 1)
 
 /* Page cache limit. The filesystems should put that into their s_maxbytes 

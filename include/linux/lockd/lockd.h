@@ -77,7 +77,7 @@ struct nlm_rqst {
 struct nlm_file {
 	struct nlm_file *	f_next;		/* linked list */
 	struct nfs_fh		f_handle;	/* NFS file handle */
-	struct file		f_file;		/* VFS file pointer */
+	struct file *		f_file;		/* VFS file pointer */
 	struct nlm_share *	f_shares;	/* DOS shares */
 	struct nlm_block *	f_blocks;	/* blocked locks */
 	unsigned int		f_locks;	/* guesstimate # of locks */
@@ -180,7 +180,7 @@ void		  nlmsvc_invalidate_all(void);
 static __inline__ struct inode *
 nlmsvc_file_inode(struct nlm_file *file)
 {
-	return file->f_file.f_dentry->d_inode;
+	return file->f_file->f_dentry->d_inode;
 }
 
 /*

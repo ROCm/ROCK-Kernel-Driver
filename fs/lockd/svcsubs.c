@@ -124,7 +124,7 @@ out_free:
 static inline void
 nlm_delete_file(struct nlm_file *file)
 {
-	struct inode *inode = file->f_file.f_dentry->d_inode;
+	struct inode *inode = file->f_file->f_dentry->d_inode;
 	struct nlm_file	**fp, *f;
 
 	dprintk("lockd: closing file %s/%ld\n",
@@ -133,7 +133,7 @@ nlm_delete_file(struct nlm_file *file)
 	while ((f = *fp) != NULL) {
 		if (f == file) {
 			*fp = file->f_next;
-			nlmsvc_ops->fclose(&file->f_file);
+			nlmsvc_ops->fclose(file->f_file);
 			kfree(file);
 			return;
 		}
@@ -176,7 +176,7 @@ again:
 			lock.fl_type  = F_UNLCK;
 			lock.fl_start = 0;
 			lock.fl_end   = OFFSET_MAX;
-			if (posix_lock_file(&file->f_file, &lock) < 0) {
+			if (posix_lock_file(file->f_file, &lock) < 0) {
 				printk("lockd: unlock failure in %s:%d\n",
 						__FILE__, __LINE__);
 				return 1;
@@ -230,7 +230,7 @@ nlm_traverse_files(struct nlm_host *host, int action)
 			if (!file->f_blocks && !file->f_locks
 			 && !file->f_shares && !file->f_count) {
 				*fp = file->f_next;
-				nlmsvc_ops->fclose(&file->f_file);
+				nlmsvc_ops->fclose(file->f_file);
 				kfree(file);
 			} else {
 				fp = &file->f_next;

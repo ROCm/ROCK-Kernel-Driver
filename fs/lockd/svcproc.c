@@ -82,7 +82,7 @@ nlmsvc_retrieve_args(struct svc_rqst *rqstp, struct nlm_args *argp,
 		*filp = file;
 
 		/* Set up the missing parts of the file_lock structure */
-		lock->fl.fl_file  = &file->f_file;
+		lock->fl.fl_file  = file->f_file;
 		lock->fl.fl_owner = (fl_owner_t) host;
 	}
 
