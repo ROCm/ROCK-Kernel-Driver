@@ -1631,7 +1631,7 @@ static void __exit exit_i82365(void)
 #endif
     unregister_ss_entry(&pcic_operations);
     if (poll_interval != 0)
-	del_timer(&poll_timer);
+	del_timer_sync(&poll_timer);
 #ifdef CONFIG_ISA
     if (grab_irq != 0)
 	free_irq(cs_irq, pcic_interrupt);
