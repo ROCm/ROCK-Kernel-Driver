@@ -1401,8 +1401,8 @@ asmlinkage long sys_waitid(int which, pid_t pid,
 	return do_wait(pid, options, infop, NULL, ru);
 }
 
-asmlinkage long sys_wait4(pid_t pid, unsigned int __user *stat_addr,
-				int options, struct rusage __user *ru)
+asmlinkage long sys_wait4(pid_t pid, int __user *stat_addr,
+			  int options, struct rusage __user *ru)
 {
 	if (options & ~(WNOHANG|WUNTRACED|__WNOTHREAD|__WCLONE|__WALL))
 		return -EINVAL;
@@ -1415,7 +1415,7 @@ asmlinkage long sys_wait4(pid_t pid, unsigned int __user *stat_addr,
  * sys_waitpid() remains for compatibility. waitpid() should be
  * implemented by calling sys_wait4() from libc.a.
  */
-asmlinkage long sys_waitpid(pid_t pid, unsigned __user *stat_addr, int options)
+asmlinkage long sys_waitpid(pid_t pid, int __user *stat_addr, int options)
 {
 	return sys_wait4(pid, stat_addr, options, NULL);
 }

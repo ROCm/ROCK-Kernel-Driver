@@ -7,7 +7,7 @@
  ******************************************************************************/
 
 
-typedef unsigned int virt_addr_t;
+typedef void __iomem *virt_addr_t;
 
 u_int32_t nicstar_read_eprom_status( virt_addr_t base );
 void nicstar_init_eprom( virt_addr_t base );

@@ -32,6 +32,7 @@
 
 #include <asm/arch/udc.h>
 #include <asm/arch/pxafb.h>
+#include <asm/arch/mmc.h>
 
 #include "generic.h"
 
@@ -127,6 +128,12 @@ static struct platform_device pxamci_device = {
 	.num_resources	= ARRAY_SIZE(pxamci_resources),
 	.resource	= pxamci_resources,
 };
+
+void __init pxa_set_mci_info(struct pxamci_platform_data *info)
+{
+	pxamci_device.dev.platform_data = info;
+}
+EXPORT_SYMBOL(pxa_set_mci_info);
 
 
 static struct pxa2xx_udc_mach_info pxa_udc_info;

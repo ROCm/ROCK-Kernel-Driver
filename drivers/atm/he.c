@@ -1007,6 +1007,7 @@ he_start(struct atm_dev *dev)
 {
 	struct he_dev *he_dev;
 	struct pci_dev *pci_dev;
+	unsigned long membase;
 
 	u16 command;
 	u32 gen_cntl_0, host_cntl, lb_swap;
@@ -1019,8 +1020,8 @@ he_start(struct atm_dev *dev)
 	he_dev = HE_DEV(dev);
 	pci_dev = he_dev->pci_dev;
 
-	he_dev->membase = pci_dev->resource[0].start;
-	HPRINTK("membase = 0x%lx  irq = %d.\n", he_dev->membase, pci_dev->irq);
+	membase = pci_resource_start(pci_dev, 0);
+	HPRINTK("membase = 0x%lx  irq = %d.\n", membase, pci_dev->irq);
 
 	/*
 	 * pci bus controller initialization 
@@ -1080,7 +1081,7 @@ he_start(struct atm_dev *dev)
 			hprintk("can't set latency timer to %d\n", timer);
 	}
 
-	if (!(he_dev->membase = (unsigned long) ioremap(he_dev->membase, HE_REGMAP_SIZE))) {
+	if (!(he_dev->membase = ioremap(membase, HE_REGMAP_SIZE))) {
 		hprintk("can't set up page mapping\n");
 		return -EINVAL;
 	}
@@ -1962,7 +1963,7 @@ he_service_tbrq(struct he_dev *he_dev, int group)
 	struct he_tpd *tpd;
 	int slot, updated = 0;
 #ifdef USE_TPD_POOL
-	struct list_head *p;
+	struct he_tpd *__tpd;
 #endif
 
 	/* 2.1.6 transmit buffer return queue */
@@ -1977,8 +1978,7 @@ he_service_tbrq(struct he_dev *he_dev, int group)
 			TBRQ_MULTIPLE(he_dev->tbrq_head) ? " MULTIPLE" : "");
 #ifdef USE_TPD_POOL
 		tpd = NULL;
-		list_for_each(p, &he_dev->outstanding_tpds) {
-			struct he_tpd *__tpd = list_entry(p, struct he_tpd, entry);
+		list_for_each_entry(__tpd, &he_dev->outstanding_tpds, entry) {
 			if (TPD_ADDR(__tpd->status) == TBRQ_TPD(he_dev->tbrq_head)) {
 				tpd = __tpd;
 				list_del(&__tpd->entry);
@@ -2595,9 +2595,8 @@ he_close(struct atm_vcc *vcc)
 
 		while (((tx_inuse = atomic_read(&vcc->sk->sk_wmem_alloc)) > 0) &&
 		       (retry < MAX_RETRY)) {
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			(void) schedule_timeout(sleep);
-			if (sleep < HZ)
+			msleep(sleep);
+			if (sleep < 250)
 				sleep = sleep * 2;
 
 			++retry;

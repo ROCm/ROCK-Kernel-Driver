@@ -189,7 +189,6 @@ header_assemble(struct smb_hdr *buffer, char smb_command /* command */ ,
     )
 {
 	int i;
-	__u32 tmp;
 	struct list_head* temp_item;
 	struct cifsSesInfo * ses;
 	char *temp = (char *) buffer;
@@ -211,10 +210,8 @@ header_assemble(struct smb_hdr *buffer, char smb_command /* command */ ,
 	buffer->Command = smb_command;
 	buffer->Flags = 0x00;	/* case sensitive */
 	buffer->Flags2 = SMBFLG2_KNOWS_LONG_NAMES;
-	tmp = cpu_to_le32(current->tgid);
-	buffer->Pid = tmp & 0xFFFF;
-	tmp >>= 16;
-	buffer->PidHigh = tmp & 0xFFFF;
+	buffer->Pid = cpu_to_le16((__u16)current->tgid);
+	buffer->PidHigh = cpu_to_le16((__u16)(current->tgid >> 16));
 	spin_lock(&GlobalMid_Lock);
 	GlobalMid++;
 	buffer->Mid = GlobalMid;
@@ -292,7 +289,7 @@ checkSMBhdr(struct smb_hdr *smb, __u16 mid)
 {
 	/* Make sure that this really is an SMB, that it is a response, 
 	   and that the message ids match */
-	if ((*(unsigned int *) smb->Protocol == cpu_to_le32(0x424d53ff)) && 
+	if ((*(__le32 *) smb->Protocol == cpu_to_le32(0x424d53ff)) && 
 		(mid == smb->Mid)) {    
 		if(smb->Flags & SMBFLG_RESPONSE)
 			return 0;                    
@@ -304,7 +301,7 @@ checkSMBhdr(struct smb_hdr *smb, __u16 mid)
 				cERROR(1, ("Rcvd Request not response "));         
 		}
 	} else { /* bad signature or mid */
-		if (*(unsigned int *) smb->Protocol != cpu_to_le32(0x424d53ff))
+		if (*(__le32 *) smb->Protocol != cpu_to_le32(0x424d53ff))
 			cERROR(1,
 			       ("Bad protocol string signature header %x ",
 				*(unsigned int *) smb->Protocol));
@@ -318,12 +315,12 @@ checkSMBhdr(struct smb_hdr *smb, __u16 mid)
 int
 checkSMB(struct smb_hdr *smb, __u16 mid, int length)
 {
+	__u32 len = be32_to_cpu(smb->smb_buf_length);
 	cFYI(0,
 	     ("Entering checkSMB with Length: %x, smb_buf_length: %x ",
-	      length, ntohl(smb->smb_buf_length)));
-	if (((unsigned int)length < 2 + sizeof (struct smb_hdr))
-	    || (ntohl(smb->smb_buf_length) >
-		CIFS_MAX_MSGSIZE + MAX_CIFS_HDR_SIZE - 4)) {
+	      length, len));
+	if (((unsigned int)length < 2 + sizeof (struct smb_hdr)) ||
+	    (len > CIFS_MAX_MSGSIZE + MAX_CIFS_HDR_SIZE - 4)) {
 		if ((unsigned int)length < 2 + sizeof (struct smb_hdr)) {
 			cERROR(1, ("Length less than 2 + sizeof smb_hdr "));
 			if (((unsigned int)length >= sizeof (struct smb_hdr) - 1)
@@ -331,8 +328,7 @@ checkSMB(struct smb_hdr *smb, __u16 mid, int length)
 				return 0;	/* some error cases do not return wct and bcc */
 
 		}
-		if (ntohl(smb->smb_buf_length) >
-		    CIFS_MAX_MSGSIZE + MAX_CIFS_HDR_SIZE - 4)
+		if (len > CIFS_MAX_MSGSIZE + MAX_CIFS_HDR_SIZE - 4)
 			cERROR(1,
 			       ("smb_buf_length greater than CIFS_MAX_MSGSIZE ... "));
 		cERROR(1,
@@ -344,8 +340,8 @@ checkSMB(struct smb_hdr *smb, __u16 mid, int length)
 	if (checkSMBhdr(smb, mid))
 		return 1;
 
-	if ((4 + ntohl(smb->smb_buf_length) != smbCalcSize(smb))
-	    || (4 + ntohl(smb->smb_buf_length) != (unsigned int)length)) {
+	if ((4 + len != smbCalcSize(smb))
+	    || (4 + len != (unsigned int)length)) {
 		return 0;
 	} else {
 		cERROR(1, ("smbCalcSize %x ", smbCalcSize(smb)));

@@ -1667,7 +1667,7 @@ static int __devinit fs_init (struct fs_dev *dev)
 
 	dev->hw_base = pci_resource_start(pci_dev, 0);
 
-	dev->base = (ulong) ioremap(dev->hw_base, 0x1000);
+	dev->base = ioremap(dev->hw_base, 0x1000);
 
 	reset_chip (dev);
   
@@ -1704,8 +1704,7 @@ static int __devinit fs_init (struct fs_dev *dev)
 		}
 
 		/* Try again after 10ms. */
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout ((HZ+99)/100);
+		msleep(10);
 	}
 
 	if (!to) {

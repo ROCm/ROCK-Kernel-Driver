@@ -241,8 +241,9 @@ static int exp_seq_show(struct seq_file *s, void *v)
 	seq_printf(s, "use=%u proto=%u ", atomic_read(&expect->use),
 		   expect->tuple.dst.protonum);
 
-	return print_tuple(s, &expect->tuple,
-			   __ip_ct_find_proto(expect->tuple.dst.protonum));
+	print_tuple(s, &expect->tuple,
+		    __ip_ct_find_proto(expect->tuple.dst.protonum));
+	return seq_putc(s, '\n');
 }
 
 static struct seq_operations exp_seq_ops = {
