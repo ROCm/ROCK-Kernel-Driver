@@ -269,9 +269,10 @@ static void inline do_trap(long interruption_code, int signr, char *str,
 		}
 #endif
         } else {
-                unsigned long fixup = search_exception_table(regs->psw.addr);
+                const struct exception_table_entry *fixup;
+                fixup = search_exception_tables(regs->psw.addr);
                 if (fixup)
-                        regs->psw.addr = fixup;
+                        regs->psw.addr = fixup->fixup;
                 else
                         die(str, regs, interruption_code);
         }
