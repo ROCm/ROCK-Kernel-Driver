@@ -254,7 +254,6 @@ int udpv6_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	struct inet_opt      	*inet = inet_sk(sk);
 	struct ipv6_pinfo      	*np = inet6_sk(sk);
 	struct in6_addr		*daddr;
-	struct in6_addr		saddr;
 	struct dst_entry	*dst;
 	struct flowi		fl;
 	struct ip6_flowlabel	*flowlabel = NULL;
@@ -355,7 +354,7 @@ ipv4_connected:
 
 	fl.proto = IPPROTO_UDP;
 	ipv6_addr_copy(&fl.fl6_dst, &np->daddr);
-	ipv6_addr_copy(&fl.fl6_src, &saddr);
+	ipv6_addr_copy(&fl.fl6_src, &np->saddr);
 	fl.oif = sk->bound_dev_if;
 	fl.fl_ip_dport = inet->dport;
 	fl.fl_ip_sport = inet->sport;
@@ -381,20 +380,23 @@ ipv4_connected:
 		return err;
 	}
 
-	ip6_dst_store(sk, dst, &fl.fl6_dst);
-
 	/* get the source address used in the appropriate device */
 
-	err = ipv6_get_saddr(dst, daddr, &saddr);
+	err = ipv6_get_saddr(dst, daddr, &fl.fl6_src);
 
 	if (err == 0) {
 		if (ipv6_addr_any(&np->saddr))
-			ipv6_addr_copy(&np->saddr, &saddr);
+			ipv6_addr_copy(&np->saddr, &fl.fl6_src);
 
 		if (ipv6_addr_any(&np->rcv_saddr)) {
-			ipv6_addr_copy(&np->rcv_saddr, &saddr);
+			ipv6_addr_copy(&np->rcv_saddr, &fl.fl6_src);
 			inet->rcv_saddr = LOOPBACK4_IPV6;
 		}
+
+		ip6_dst_store(sk, dst,
+			      !ipv6_addr_cmp(&fl.fl6_dst, &np->daddr) ?
+			      &np->daddr : NULL);
+
 		sk->state = TCP_ESTABLISHED;
 	}
 	fl6_sock_release(flowlabel);
