@@ -397,8 +397,8 @@ soc_common_pcmcia_set_io_map(struct pcmcia_socket *sock, struct pccard_io_map *m
 		map->stop = PAGE_SIZE-1;
 
 	map->stop -= map->start;
-	map->stop += (unsigned long)skt->virt_io;
-	map->start = (unsigned long)skt->virt_io;
+	map->stop += skt->socket.io_offset;
+	map->start = skt->socket.io_offset;
 
 	return 0;
 }

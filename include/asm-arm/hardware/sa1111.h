@@ -49,8 +49,8 @@
  */
 #define __CCREG(x)	__REGP(SA1111_VBASE + (x))
 
-#define sa1111_writel(val,addr)	({ *(volatile unsigned int *)(addr) = (val); })
-#define sa1111_readl(addr)	(*(volatile unsigned int *)(addr))
+#define sa1111_writel(val,addr)	__raw_writel(val, addr)
+#define sa1111_readl(addr)	__raw_readl(addr)
 
 /*
  * System Bus Interface (SBI)
@@ -551,7 +551,7 @@ struct sa1111_dev {
 	struct device	dev;
 	unsigned int	devid;
 	struct resource	res;
-	void		*mapbase;
+	void __iomem	*mapbase;
 	unsigned int	skpcr_mask;
 	unsigned int	irq[6];
 	u64		dma_mask;
