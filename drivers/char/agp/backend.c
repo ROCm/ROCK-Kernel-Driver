@@ -240,29 +240,35 @@ int agp_add_bridge(struct agp_bridge_data *bridge)
 	int error;
 
 	if (!bridge->dev) {
-		printk(KERN_DEBUG PFX "Erk, registering with no pci_dev!\n");
+		printk (KERN_DEBUG PFX "Erk, registering with no pci_dev!\n");
 		return -EINVAL;
 	}
 
 	if (agp_count) {
-		printk(KERN_DEBUG PFX
+		printk (KERN_INFO PFX
 		       "Only one agpgart device currently supported.\n");
 		return -ENODEV;
 	}
 
 	/* Grab reference on the chipset driver. */
-	if (!try_module_get(bridge->driver->owner))
+	if (!try_module_get(bridge->driver->owner)) {
+		printk (KERN_INFO PFX "Couldn't lock chipset driver.\n");
 		return -EINVAL;
+	}
 
 	bridge->type = SUPPORTED;
 
 	error = agp_backend_initialize(agp_bridge);
-	if (error)
+	if (error) {
+		printk (KERN_INFO PFX "agp_backend_initialize() failed.\n");
 		goto err_out;
+	}
 
 	error = agp_frontend_initialize();
-	if (error)
+	if (error) {
+		printk (KERN_INFO PFX "agp_frontend_initialize() failed.\n");
 		goto frontend_err;
+	}
 
 	/* FIXME: What to do with this? */
 	inter_module_register("drm_agp", THIS_MODULE, &drm_agp);
