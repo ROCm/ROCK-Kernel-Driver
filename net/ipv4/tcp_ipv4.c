@@ -886,8 +886,7 @@ static __inline__ int tcp_v4_iif(struct sk_buff *skb)
 
 static __inline__ u32 tcp_v4_synq_hash(u32 raddr, u16 rport, u32 rnd)
 {
-	return (jenkins_hash_2words(raddr, (u32) rport, rnd)
-		& (TCP_SYNQ_HSIZE - 1));
+	return (jhash_2words(raddr, (u32) rport, rnd) & (TCP_SYNQ_HSIZE - 1));
 }
 
 static struct open_request *tcp_v4_search_req(struct tcp_opt *tp,

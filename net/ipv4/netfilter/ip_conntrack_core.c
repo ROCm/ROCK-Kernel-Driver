@@ -115,12 +115,10 @@ hash_conntrack(const struct ip_conntrack_tuple *tuple)
 #if 0
 	dump_tuple(tuple);
 #endif
-	return (jenkins_hash_3words(tuple->src.ip,
-				    (tuple->dst.ip ^ tuple->dst.protonum),
-				    (tuple->src.u.all |
-				     (tuple->dst.u.all << 16)),
-				    ip_conntrack_hash_rnd)
-		% ip_conntrack_htable_size);
+	return (jhash_3words(tuple->src.ip,
+	                     (tuple->dst.ip ^ tuple->dst.protonum),
+	                     (tuple->src.u.all | (tuple->dst.u.all << 16)),
+	                     ip_conntrack_hash_rnd) % ip_conntrack_htable_size);
 }
 
 int

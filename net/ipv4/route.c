@@ -207,7 +207,7 @@ static int rt_intern_hash(unsigned hash, struct rtable *rth,
 
 static unsigned int rt_hash_code(u32 daddr, u32 saddr, u8 tos)
 {
-	return (jenkins_hash_3words(daddr, saddr, (u32) tos, rt_hash_rnd)
+	return (jhash_3words(daddr, saddr, (u32) tos, rt_hash_rnd)
 		& rt_hash_mask);
 }
 
