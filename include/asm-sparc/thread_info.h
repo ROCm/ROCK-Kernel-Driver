@@ -44,18 +44,23 @@ struct thread_info {
 	unsigned long kpc;
 	unsigned long kpsr;
 	unsigned long kwim;
+
+	struct restart_block	restart_block;
 };
 
 /*
  * macros/functions for gaining access to the thread information structure
  */
-#define INIT_THREAD_INFO(tsk)			\
-{						\
-	uwinmask:	0,			\
-	task:		&tsk,			\
-	exec_domain:	&default_exec_domain,	\
-	flags:		0,			\
-	cpu:		0,			\
+#define INIT_THREAD_INFO(tsk)				\
+{							\
+	.uwinmask	=	0,			\
+	.task		=	&tsk,			\
+	.exec_domain	=	&default_exec_domain,	\
+	.flags		=	0,			\
+	.cpu		=	0,			\
+	.restart_block	= {				\
+		.fn	=	do_no_restart_syscall,	\
+	},
 }
 
 #define init_thread_info	(init_thread_union.thread_info)
@@ -110,6 +115,7 @@ BTFIXUPDEF_CALL(void, free_thread_info, struct thread_info *)
 #define TI_KPC		0x24	/* kpc (ldd'ed with kpc) */
 #define TI_KPSR		0x28	/* kpsr */
 #define TI_KWIM		0x2c	/* kwim (ldd'ed with kpsr) */
+#define TI_RESTART_BLOCK 0x30
 
 #define PREEMPT_ACTIVE		0x4000000
 
