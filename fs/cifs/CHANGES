@@ -1,9 +1,17 @@
+Version 1.19
+------------
+Fix /proc/fs/cifs/Stats and DebugData display to handle larger
+amounts of return data.
+
+
 Version 1.18
 ------------
 Do not rename hardlinked files (since that should be a noop). Flush
 cached write behind data when reopening a file after session abend,
 except when already in write. Grab per socket sem during reconnect 
-to avoid oops in sendmsg if overlapping with reconnect.
+to avoid oops in sendmsg if overlapping with reconnect. Do not
+reset cached inode file size on readdir for files open for write on 
+client.
 
 
 Version 1.17
