@@ -1405,9 +1405,9 @@ find_busiest_group(struct sched_domain *sd, int this_cpu,
 
 		for_each_cpu_mask(i, tmp) {
 			/* Bias balancing toward cpus of our domain */
-			if (local_group) {
+			if (local_group)
 				load = get_high_cpu_load(i);
-			} else
+			else
 				load = get_low_cpu_load(i);
 
 			nr_cpus++;
@@ -1427,8 +1427,7 @@ find_busiest_group(struct sched_domain *sd, int this_cpu,
 			this_load = avg_load;
 			this = group;
 			goto nextgroup;
-		}
-		if (avg_load > max_load) {
+		} else if (avg_load > max_load) {
 			max_load = avg_load;
 			busiest = group;
 		}
@@ -1441,11 +1440,9 @@ nextgroup:
 
 	avg_load = (SCHED_LOAD_SCALE * total_load) / total_pwr;
 
-	if (idle == NOT_IDLE) {
-		if (this_load >= avg_load ||
+	if (this_load >= avg_load ||
 			100*max_load <= sd->imbalance_pct*this_load)
 		goto out_balanced;
-	}
 
 	/*
 	 * We're trying to get all the cpus to the average_load, so we don't
@@ -1458,11 +1455,20 @@ nextgroup:
 	 * by pulling tasks to us.  Be careful of negative numbers as they'll
 	 * appear as very large values with unsigned longs.
 	 */
-	*imbalance = (min(max_load - avg_load, avg_load - this_load) + 1) / 2;
+	*imbalance = min(max_load - avg_load, avg_load - this_load);
 
-	if (*imbalance <= SCHED_LOAD_SCALE/2) {
+	/* How much load to actually move to equalise the imbalance */
+	*imbalance = (*imbalance * min(busiest->cpu_power, this->cpu_power))
+				/ SCHED_LOAD_SCALE;
+
+	if (*imbalance < SCHED_LOAD_SCALE - 1) {
 		unsigned long pwr_now = 0, pwr_move = 0;
 		unsigned long tmp;
+
+		if (max_load - this_load >= SCHED_LOAD_SCALE*2) {
+			*imbalance = 1;
+			return busiest;
+		}
 
 		/*
 		 * OK, we don't have enough imbalance to justify moving tasks,
@@ -1482,26 +1488,26 @@ nextgroup:
 
 		/* Amount of load we'd add */
 		tmp = SCHED_LOAD_SCALE*SCHED_LOAD_SCALE/this->cpu_power;
-		pwr_move += this->cpu_power*min(this->cpu_power, this_load + tmp);
+		if (max_load < tmp)
+			tmp = max_load;
+		pwr_move += this->cpu_power*min(SCHED_LOAD_SCALE, this_load + tmp);
 		pwr_move /= SCHED_LOAD_SCALE;
 
 		/* Move if we gain another 8th of a CPU worth of throughput */
 		if (pwr_move < pwr_now + SCHED_LOAD_SCALE / 8)
 			goto out_balanced;
+
 		*imbalance = 1;
 		return busiest;
 	}
 
-	/* How many tasks to actually move to equalise the imbalance */
-	*imbalance = (*imbalance * min(busiest->cpu_power, this->cpu_power))
-				/ SCHED_LOAD_SCALE;
-	/* Get rid of the scaling factor, rounding *up* as we divide */
-	*imbalance = (*imbalance + SCHED_LOAD_SCALE/2) / SCHED_LOAD_SCALE;
+	/* Get rid of the scaling factor, rounding down as we divide */
+	*imbalance = (*imbalance + 1) / SCHED_LOAD_SCALE;
 
 	return busiest;
 
 out_balanced:
-	if (busiest && idle == NEWLY_IDLE) {
+	if (busiest && idle != NOT_IDLE && max_load > SCHED_LOAD_SCALE) {
 		*imbalance = 1;
 		return busiest;
 	}
