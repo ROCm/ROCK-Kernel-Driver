@@ -173,8 +173,7 @@ static dev_link_t *com20020_attach(void)
     if (!info)
 	goto fail_alloc_info;
 
-    dev = alloc_netdev(sizeof(struct arcnet_local), "arc%d",
-		       arcdev_setup);
+    dev = alloc_arcdev("");
     if (!dev)
 	goto fail_alloc_dev;
 

@@ -69,9 +69,7 @@ static int __devinit com20020pci_probe(struct pci_dev *pdev, const struct pci_de
 
 	if (pci_enable_device(pdev))
 		return -EIO;
-	dev = alloc_netdev(sizeof(struct arcnet_local),
-			device[0] ? device : "arc%d",
-			arcdev_setup); 
+	dev = alloc_arcdev(device);
 	if (!dev)
 		return -ENOMEM;
 	lp = dev->priv;

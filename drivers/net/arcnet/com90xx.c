@@ -408,10 +408,8 @@ static int __init com90xx_found(int ioaddr, int airq, u_long shmem)
 	u_long first_mirror, last_mirror;
 	int mirror_size;
 
-	/* allocate struct net_device if we don't have one yet */
-	dev = alloc_netdev(sizeof(struct arcnet_local),
-			device[0] ? device : "arc%d",
-			arcdev_setup); 
+	/* allocate struct net_device */
+	dev = alloc_arcdev(device);
 	if (!dev) {
 		BUGMSG2(D_NORMAL, "com90xx: Can't allocate device!\n");
 		release_mem_region(shmem, BUFFER_SIZE);

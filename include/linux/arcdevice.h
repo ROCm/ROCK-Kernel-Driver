@@ -331,6 +331,7 @@ void arcnet_dump_packet(struct net_device *dev, int bufnum, char *desc);
 void arcnet_unregister_proto(struct ArcProto *proto);
 irqreturn_t arcnet_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 void arcdev_setup(struct net_device *dev);
+struct net_device *alloc_arcdev(char *name);
 void arcnet_rx(struct net_device *dev, int bufnum);
 
 #endif				/* __KERNEL__ */

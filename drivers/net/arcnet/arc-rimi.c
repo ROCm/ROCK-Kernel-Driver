@@ -307,9 +307,7 @@ static int __init arc_rimi_init(void)
 {
 	struct net_device *dev;
 
-	dev = alloc_netdev(sizeof(struct arcnet_local),
-			device[0] ? device : "arc%d",
-			arcdev_setup); 
+	dev = alloc_arcdev(device);
 	if (!dev)
 		return -ENOMEM;
 

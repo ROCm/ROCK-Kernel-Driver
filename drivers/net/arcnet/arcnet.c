@@ -92,6 +92,7 @@ EXPORT_SYMBOL(arc_proto_null);
 EXPORT_SYMBOL(arcnet_unregister_proto);
 EXPORT_SYMBOL(arcnet_debug);
 EXPORT_SYMBOL(arcdev_setup);
+EXPORT_SYMBOL(alloc_arcdev);
 EXPORT_SYMBOL(arcnet_interrupt);
 
 /* Internal function prototypes */
@@ -331,6 +332,11 @@ void arcdev_setup(struct net_device *dev)
 	dev->rebuild_header = arcnet_rebuild_header;
 }
 
+struct net_device *alloc_arcdev(char *name)
+{
+	return alloc_netdev(sizeof(struct arcnet_local),
+			    name && *name ? name : "arc%d", arcdev_setup);
+}
 
 /*
  * Open/initialize the board.  This is called sometime after booting when
