@@ -2348,8 +2348,10 @@ acpi_processor_remove_fs (
 {
 	ACPI_FUNCTION_TRACE("acpi_processor_remove_fs");
 
-	if (acpi_device_dir(device))
+	if (acpi_device_dir(device)) {
 		remove_proc_entry(acpi_device_bid(device), acpi_processor_dir);
+		acpi_device_dir(device) = NULL;
+	}
 
 	return_VALUE(0);
 }
