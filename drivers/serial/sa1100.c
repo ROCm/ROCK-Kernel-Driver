@@ -447,7 +447,7 @@ sa1100_set_termios(struct uart_port *port, struct termios *termios,
 	/*
 	 * We only support CS7 and CS8.
 	 */
-	while ((termios->c_cflag & CSIZE) != CS7 ||
+	while ((termios->c_cflag & CSIZE) != CS7 &&
 	       (termios->c_cflag & CSIZE) != CS8) {
 		termios->c_cflag &= ~CSIZE;
 		termios->c_cflag |= old_csize;
