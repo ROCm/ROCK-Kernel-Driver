@@ -20,6 +20,7 @@
 #include <asm/system.h>
 #include <asm/pgtable.h>
 #include <asm/machvec.h>
+#include <asm/hwrpb.h>
 
 /*
  * We try to avoid hae updates (thus the cache), but when we
@@ -51,6 +52,7 @@ static inline void set_hae(unsigned long new_hae)
 /*
  * Change virtual addresses to physical addresses and vv.
  */
+#ifdef USE_48_BIT_KSEG
 static inline unsigned long virt_to_phys(void *address)
 {
 	return (unsigned long)address - IDENT_ADDR;
@@ -60,6 +62,26 @@ static inline void * phys_to_virt(unsigned long address)
 {
 	return (void *) (address + IDENT_ADDR);
 }
+#else
+static inline unsigned long virt_to_phys(void *address)
+{
+        unsigned long phys;
+
+        __asm__ (
+        "sll %1, 63-40, %0\n"
+        "sra %0, 63-40, %0\n"
+        : "=r" (phys) : "r" (address));
+
+        phys &= (1ul << hwrpb->pa_bits) - 1;
+
+        return phys;
+}
+
+static inline void * phys_to_virt(unsigned long address)
+{
+        return (void *)(IDENT_ADDR + (address & ((1ul << 41) - 1)));
+}
+#endif
 
 #define page_to_phys(page)	PAGE_TO_PA(page)
 
