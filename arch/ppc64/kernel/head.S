@@ -1248,7 +1248,21 @@ _GLOBAL(pseries_secondary_smp_init)
 	b 	1b			 /* Loop until told to go         */
 #ifdef CONFIG_PPC_ISERIES
 _GLOBAL(__start_initialization_iSeries)
+	/* Clear out the BSS */
+	LOADADDR(r11,__bss_stop)
 
+	LOADADDR(r8,__bss_start)
+
+	sub	r11,r11,r8        /* bss size                        */
+	addi	r11,r11,7         /* round up to an even double word */
+	rldicl. r11,r11,61,3      /* shift right by 3                */
+	beq	4f
+	addi	r8,r8,-8
+	li	r0,0
+	mtctr	r11		  /* zero this many doublewords      */
+3:	stdu	r0,8(r8)
+	bdnz	3b
+4:
 	LOADADDR(r1,init_thread_union)
 	addi	r1,r1,THREAD_SIZE
 	li	r0,0
@@ -1277,6 +1291,8 @@ _GLOBAL(__start_initialization_iSeries)
 
 	bl      .iSeries_fixup_klimit
 
+	/* relocation is on at this point */
+
 	b	.start_here_common
 #endif
 
@@ -1299,20 +1315,6 @@ _GLOBAL(__start_initialization_pSeries)
 
 	/* Relocate the TOC from a virt addr to a real addr */
 	sub	r2,r2,r3
-
-	/* setup the systemcfg pointer which is needed by prom_init       */
-	LOADADDR(r9,systemcfg)
-	sub	r9,r9,r3                /* addr of the variable systemcfg */
-	SET_REG_TO_CONST(r4, SYSTEMCFG_VIRT_ADDR)
-	sub	r4,r4,r3
-	std	r4,0(r9)		/* set the value of systemcfg     */
-
-	/* setup the naca pointer which is needed by prom_init            */
-	LOADADDR(r9,naca)
-	sub	r9,r9,r3                /* addr of the variable naca      */
-	SET_REG_TO_CONST(r4, NACA_VIRT_ADDR)
-	sub	r4,r4,r3
-	std	r4,0(r9)		/* set the value of naca          */
 
 	/* DRENG / PPPBBB Fix the following comment!!! -Peter */
 	/* The following copies the first 0x100 bytes of code from the    */
@@ -1917,24 +1919,7 @@ _STATIC(start_here_pSeries)
 
 	/* This is where all platforms converge execution */
 _STATIC(start_here_common)
-	/* relocation is on at this point */
-
-	/* Clear out the BSS */
-	LOADADDR(r11,_end)
-
-	LOADADDR(r8,__bss_start)
-
-	sub	r11,r11,r8        /* bss size                        */
-	addi	r11,r11,7         /* round up to an even double word */
-	rldicl. r11,r11,61,3      /* shift right by 3                */
-	beq	4f
-	addi	r8,r8,-8
-	li	r0,0
-	mtctr	r11		  /* zero this many doublewords      */
-3:	stdu	r0,8(r8)
-	bdnz	3b
-4:
-
+	
 	/* The following code sets up the SP and TOC now that we are */
 	/* running with translation enabled. */
 

@@ -48,6 +48,7 @@
 #include <asm/pci_dma.h>
 #include <asm/bootinfo.h>
 #include <asm/ppcdebug.h>
+#include <asm/sections.h>
 #include "open_pic.h"
 
 #ifdef CONFIG_LOGO_LINUX_CLUT224
@@ -1224,11 +1225,19 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 	unsigned long offset = reloc_offset();
 	long l;
 	char *p, *d;
- 	unsigned long phys;
-        u32 getprop_rval;
-        struct systemcfg *_systemcfg = RELOC(systemcfg);
+	unsigned long phys;
+	u32 getprop_rval;
+	struct systemcfg *_systemcfg;
 	struct paca_struct *_xPaca = PTRRELOC(&paca[0]);
 	struct prom_t *_prom = PTRRELOC(&prom);
+
+	/* First zero the BSS -- use memset, some arches don't have
+	 * caches on yet */
+	memset(PTRRELOC(&__bss_start), 0, __bss_stop - __bss_start);
+
+	/* Setup systemcfg and NACA pointers now */
+	RELOC(systemcfg) = _systemcfg = (struct systemcfg *)(SYSTEMCFG_VIRT_ADDR - offset);
+	RELOC(naca) = (struct naca_struct *)(NACA_VIRT_ADDR - offset);
 
 	/* Default machine type. */
 	_systemcfg->platform = PLATFORM_PSERIES;

@@ -28,29 +28,12 @@
 #include <asm/iSeries/IoHriProcessorVpd.h>
 #include <asm/iSeries/ItSpCommArea.h>
 
-extern char _start_boltedStacks[];
-
-/* The LparMap data is now located at offset 0x6000 in head.S
- * It was put there so that the HvReleaseData could address it
- * with a 32-bit offset as required by the iSeries hypervisor
- *
- * The Naca has a pointer to the ItVpdAreas.  The hypervisor finds
- * the Naca via the HvReleaseData area.  The HvReleaseData has the
- * offset into the Naca of the pointer to the ItVpdAreas.
- */
-
-extern struct ItVpdAreas itVpdAreas;
-
 /* The LpQueue is used to pass event data from the hypervisor to
  * the partition.  This is where I/O interrupt events are communicated.
- * The ItLpQueue must be initialized (even though only to all zeros)
- * If it were uninitialized (in .bss) it would get zeroed after the
- * kernel gets control.  The hypervisor will have filled in some fields
- * before the kernel gets control.  By initializing it we keep it out
- * of the .bss
  */
 
-struct ItLpQueue xItLpQueue = {};
+/* May be filled in by the hypervisor so cannot end up in the BSS */
+struct ItLpQueue xItLpQueue __attribute__((__section__(".data")));
 
 
 /* The HvReleaseData is the root of the information shared between 
@@ -141,9 +124,11 @@ struct ItLpNaca itLpNaca = {
 	}
 };
 
-struct ItIplParmsReal xItIplParmsReal = {};
+/* May be filled in by the hypervisor so cannot end up in the BSS */
+struct ItIplParmsReal xItIplParmsReal __attribute__((__section__(".data"))); 
 
-struct ItExtVpdPanel xItExtVpdPanel = {};
+/* May be filled in by the hypervisor so cannot end up in the BSS */
+struct ItExtVpdPanel xItExtVpdPanel __attribute__((__section__(".data")));
 
 #define maxPhysicalProcessors 32
 
@@ -157,10 +142,13 @@ struct IoHriProcessorVpd xIoHriProcessorVpd[maxPhysicalProcessors] = {
 	}
 };
 	
+/* Space for Main Store Vpd 27,200 bytes */
+/* May be filled in by the hypervisor so cannot end up in the BSS */
+u64    xMsVpd[3400] __attribute__((__section__(".data")));
 
-u64    xMsVpd[3400] = {};		/* Space for Main Store Vpd 27,200 bytes */
-
-u64    xRecoveryLogBuffer[32] = {};	/* Space for Recovery Log Buffer */
+/* Space for Recovery Log Buffer */
+/* May be filled in by the hypervisor so cannot end up in the BSS */
+u64    xRecoveryLogBuffer[32] __attribute__((__section__(".data")));
 
 struct SpCommArea xSpCommArea = {
 	0xE2D7C3C2,
@@ -169,6 +157,14 @@ struct SpCommArea xSpCommArea = {
 	0, 0, 0, 0, {0}
 };
 
+/* The LparMap data is now located at offset 0x6000 in head.S
+ * It was put there so that the HvReleaseData could address it
+ * with a 32-bit offset as required by the iSeries hypervisor
+ *
+ * The Naca has a pointer to the ItVpdAreas.  The hypervisor finds
+ * the Naca via the HvReleaseData area.  The HvReleaseData has the
+ * offset into the Naca of the pointer to the ItVpdAreas.
+ */
 struct ItVpdAreas itVpdAreas = {
 	0xc9a3e5c1,	/* "ItVA" */
 	sizeof( struct ItVpdAreas ),
@@ -223,7 +219,7 @@ struct ItVpdAreas itVpdAreas = {
 	}
 };
 
-struct msChunks msChunks = {0, 0, 0, 0, NULL};
+struct msChunks msChunks;
 
 /* Depending on whether this is called from iSeries or pSeries setup
  * code, the location of the msChunks struct may or may not have

@@ -36,12 +36,6 @@ CFLAGS		+= -mtune=power4
 endif
 endif
 
-have_zero_bss := $(shell if $(CC) -fno-zero-initialized-in-bss -S -o /dev/null -xc /dev/null > /dev/null 2>&1; then echo y; else echo n; fi)
-
-ifeq ($(have_zero_bss),y)
-CFLAGS		+= -fno-zero-initialized-in-bss
-endif
-
 head-y := arch/ppc64/kernel/head.o
 
 libs-y				+= arch/ppc64/lib/
