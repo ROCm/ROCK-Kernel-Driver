@@ -12,6 +12,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/kernel.h>
 #include <asm/types.h>
 #include <asm/page.h>
 #include <asm/prom.h>
@@ -27,7 +28,7 @@ extern unsigned long reloc_offset(void);
 static long lmb_add_region(struct lmb_region *, unsigned long, unsigned long, unsigned long);
 
 struct lmb lmb = {
-	0,
+	0, 0,
 	{0,0,0,0,{{0,0,0}}},
 	{0,0,0,0,{{0,0,0}}}
 };
@@ -150,6 +151,10 @@ lmb_add(unsigned long base, unsigned long size)
 	struct lmb *_lmb = PTRRELOC(&lmb);
 	struct lmb_region *_rgn = &(_lmb->memory);
 
+	/* On pSeries LPAR systems, the first LMB is our RMO region. */
+	if ( base == 0 )
+		_lmb->rmo_size = size;
+
 	return lmb_add_region(_rgn, base, size, LMB_MEMORY_AREA);
 
 }
@@ -257,12 +262,17 @@ lmb_overlaps_region(struct lmb_region *rgn, unsigned long base, unsigned long si
 	return (i < rgn->cnt) ? i : -1;
 }
 
-
 unsigned long
 lmb_alloc(unsigned long size, unsigned long align)
 {
+	return lmb_alloc_base(size, align, LMB_ALLOC_ANYWHERE);
+}
+
+unsigned long
+lmb_alloc_base(unsigned long size, unsigned long align, unsigned long max_addr)
+{
 	long i, j;
-	unsigned long base;
+	unsigned long base = 0;
 	unsigned long offset = reloc_offset();
 	struct lmb *_lmb = PTRRELOC(&lmb);
 	struct lmb_region *_mem = &(_lmb->memory);
@@ -276,7 +286,12 @@ lmb_alloc(unsigned long size, unsigned long align)
 		if ( lmbtype != LMB_MEMORY_AREA )
 			continue;
 
+		if ( max_addr == LMB_ALLOC_ANYWHERE )
 		base = _ALIGN_DOWN(lmbbase+lmbsize-size, align);
+		else if ( lmbbase < max_addr )
+			base = _ALIGN_DOWN(min(lmbbase+lmbsize,max_addr)-size, align);
+		else
+			continue;
 
 		while ( (lmbbase <= base) &&
 			((j = lmb_overlaps_region(_rsv,base,size)) >= 0) ) {

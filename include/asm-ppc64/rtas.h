@@ -17,6 +17,8 @@
  */
 
 #define RTAS_UNKNOWN_SERVICE (-1)
+#define RTAS_INSTANTIATE_MAX (1UL<<30) /* Don't instantiate rtas at/above this value */
+
 /*
  * In general to call RTAS use rtas_token("string") to lookup
  * an RTAS token for the given string (e.g. "event-scan").

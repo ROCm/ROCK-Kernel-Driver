@@ -28,6 +28,9 @@ union lmb_reg_property {
 #define LMB_MEMORY_AREA	1
 #define LMB_IO_AREA	2
 
+#define LMB_ALLOC_ANYWHERE	0
+#define LMB_ALLOC_FIRST4GBYTE	(1UL<<32)
+
 struct lmb_property {
 	unsigned long base;
 	unsigned long physbase;
@@ -45,6 +48,7 @@ struct lmb_region {
 
 struct lmb {
 	unsigned long debug;
+	unsigned long rmo_size;
 	struct lmb_region memory;
 	struct lmb_region reserved;
 };
@@ -59,6 +63,7 @@ extern long lmb_add_io(unsigned long base, unsigned long size);
 #endif /* CONFIG_MSCHUNKS */
 extern long lmb_reserve(unsigned long, unsigned long);
 extern unsigned long lmb_alloc(unsigned long, unsigned long);
+extern unsigned long lmb_alloc_base(unsigned long, unsigned long, unsigned long);
 extern unsigned long lmb_phys_mem_size(void);
 extern unsigned long lmb_end_of_DRAM(void);
 extern unsigned long lmb_abs_to_phys(unsigned long);
