@@ -598,6 +598,28 @@ static struct file_operations full_fops = {
 	.write		= write_full,
 };
 
+static ssize_t kmsg_write(struct file * file, const char * buf,
+			  size_t count, loff_t *ppos)
+{
+	char *tmp;
+	int ret;
+
+	tmp = kmalloc(count + 1, GFP_KERNEL);
+	if (tmp == NULL)
+		return -ENOMEM;
+	ret = -EFAULT;
+	if (!copy_from_user(tmp, buf, count)) {
+		tmp[count] = 0;
+		ret = printk("%s", tmp);
+	}
+	kfree(tmp);
+	return ret;
+}
+
+static struct file_operations kmsg_fops = {
+	write:		kmsg_write,
+};
+
 static int memory_open(struct inode * inode, struct file * filp)
 {
 	switch (minor(inode->i_rdev)) {
@@ -627,6 +649,9 @@ static int memory_open(struct inode * inode, struct file * filp)
 		case 9:
 			filp->f_op = &urandom_fops;
 			break;
+		case 11:
+			filp->f_op = &kmsg_fops;
+			break;
 		default:
 			return -ENXIO;
 	}
@@ -653,7 +678,8 @@ void __init memory_devfs_register (void)
 	{5, "zero",    S_IRUGO | S_IWUGO,           &zero_fops},
 	{7, "full",    S_IRUGO | S_IWUGO,           &full_fops},
 	{8, "random",  S_IRUGO | S_IWUSR,           &random_fops},
-	{9, "urandom", S_IRUGO | S_IWUSR,           &urandom_fops}
+	{9, "urandom", S_IRUGO | S_IWUSR,           &urandom_fops},
+	{11,"kmsg",    S_IRUGO | S_IWUSR,           &kmsg_fops},
     };
     int i;
 
