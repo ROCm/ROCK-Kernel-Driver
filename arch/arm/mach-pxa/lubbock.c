@@ -28,7 +28,6 @@
 #include <asm/mach/map.h>
 #include <asm/mach/irq.h>
 
-#include <asm/arch/irq.h>
 #include <asm/arch/udc.h>
 #include <asm/hardware/sa1111.h>
 
@@ -156,11 +155,7 @@ static void __init lubbock_init(void)
 }
 
 static struct map_desc lubbock_io_desc[] __initdata = {
- /* virtual     physical    length      type */
-  { 0xf0000000, 0x08000000, 0x00100000, MT_DEVICE }, /* CPLD */
-  { 0xf1000000, 0x0c000000, 0x00100000, MT_DEVICE }, /* LAN91C96 IO */
-  { 0xf1100000, 0x0e000000, 0x00100000, MT_DEVICE }, /* LAN91C96 Attr */
-  { 0xf4000000, 0x10000000, 0x00800000, MT_DEVICE }, /* SA1111 */
+  { LUBBOCK_FPGA_VIRT, LUBBOCK_FPGA_PHYS, 0x00100000, MT_DEVICE }, /* CPLD */
 };
 
 static void __init lubbock_map_io(void)
@@ -169,7 +164,6 @@ static void __init lubbock_map_io(void)
 	iotable_init(lubbock_io_desc, ARRAY_SIZE(lubbock_io_desc));
 
 	/* This enables the BTUART */
-	CKEN |= CKEN7_BTUART;
 	pxa_gpio_mode(GPIO42_BTRXD_MD);
 	pxa_gpio_mode(GPIO43_BTTXD_MD);
 	pxa_gpio_mode(GPIO44_BTCTS_MD);
@@ -188,7 +182,7 @@ static void __init lubbock_map_io(void)
 	PCFR |= PCFR_OPDE;
 }
 
-MACHINE_START(LUBBOCK, "Intel DBPXA250 Development Platform")
+MACHINE_START(LUBBOCK, "Intel DBPXA250 Development Platform (aka Lubbock)")
 	MAINTAINER("MontaVista Software Inc.")
 	BOOT_MEM(0xa0000000, 0x40000000, io_p2v(0x40000000))
 	MAPIO(lubbock_map_io)
