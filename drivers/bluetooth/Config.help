@@ -26,15 +26,6 @@ CONFIG_BLUEZ_HCIUSB
   Say Y here to compile support for Bluetooth USB devices into the
   kernel or say M to compile it as module (hci_usb.o).
 
-HCI USB firmware download support
-CONFIG_BLUEZ_USB_FW_LOAD
-  Firmware download support for Bluetooth USB devices.
-  This support is required for devices like Broadcom BCM2033.
-
-  HCI USB driver uses external firmware downloader program provided 
-  in BlueFW package.
-  For more information, see <http://bluez.sf.net/>.
-
 HCI USB zero packet support
 CONFIG_BLUEZ_USB_ZERO_PACKET
   Support for USB zero packets. 

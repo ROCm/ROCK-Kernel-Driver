@@ -3,7 +3,6 @@ comment 'Bluetooth device drivers'
 
 dep_tristate 'HCI USB driver' CONFIG_BLUEZ_HCIUSB $CONFIG_BLUEZ $CONFIG_USB
 if [ "$CONFIG_BLUEZ_HCIUSB" != "n" ]; then
-   bool '  Firmware download support'  CONFIG_BLUEZ_USB_FW_LOAD
    bool '  USB zero packet support'  CONFIG_BLUEZ_USB_ZERO_PACKET
 fi
 
