@@ -212,16 +212,22 @@ static inline void
 svc_sock_release(struct svc_rqst *rqstp)
 {
 	struct svc_sock	*svsk = rqstp->rq_sock;
+	struct svc_serv	*serv = svsk->sk_server;
 
 	if (!svsk)
 		return;
 	svc_release_skb(rqstp);
 	rqstp->rq_sock = NULL;
+
+	spin_lock_bh(&serv->sv_lock);
 	if (!--(svsk->sk_inuse) && svsk->sk_dead) {
+		spin_unlock_bh(&serv->sv_lock);
 		dprintk("svc: releasing dead socket\n");
 		sock_release(svsk->sk_sock);
 		kfree(svsk);
 	}
+	else
+		spin_unlock_bh(&serv->sv_lock);
 }
 
 /*
@@ -1034,14 +1040,15 @@ svc_delete_socket(struct svc_sock *svsk)
 	if (svsk->sk_qued)
 		rpc_remove_list(&serv->sv_sockets, svsk);
 
-	spin_unlock_bh(&serv->sv_lock);
 
 	svsk->sk_dead = 1;
 
 	if (!svsk->sk_inuse) {
+		spin_unlock_bh(&serv->sv_lock);
 		sock_release(svsk->sk_sock);
 		kfree(svsk);
 	} else {
+		spin_unlock_bh(&serv->sv_lock);
 		printk(KERN_NOTICE "svc: server socket destroy delayed\n");
 		/* svsk->sk_server = NULL; */
 	}

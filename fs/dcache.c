@@ -224,8 +224,7 @@ static inline struct dentry * __dget_locked(struct dentry *dentry)
 	atomic_inc(&dentry->d_count);
 	if (atomic_read(&dentry->d_count) == 1) {
 		dentry_stat.nr_unused--;
-		list_del(&dentry->d_lru);
-		INIT_LIST_HEAD(&dentry->d_lru);		/* make "list_empty()" work */
+		list_del_init(&dentry->d_lru);
 	}
 	return dentry;
 }
@@ -414,8 +413,7 @@ repeat:
 		if (atomic_read(&dentry->d_count))
 			continue;
 		dentry_stat.nr_unused--;
-		list_del(tmp);
-		INIT_LIST_HEAD(tmp);
+		list_del_init(tmp);
 		prune_one_dentry(dentry);
 		goto repeat;
 	}
@@ -657,6 +655,7 @@ struct dentry * d_alloc(struct dentry * parent, const struct qstr *name)
  
 void d_instantiate(struct dentry *entry, struct inode * inode)
 {
+	if (!list_empty(&entry->d_alias)) BUG();
 	spin_lock(&dcache_lock);
 	if (inode)
 		list_add(&entry->d_alias, &inode->i_dentry);
@@ -745,58 +744,48 @@ struct dentry * d_lookup(struct dentry * parent, struct qstr * name)
 
 /**
  * d_validate - verify dentry provided from insecure source
- * @dentry: The dentry alleged to be valid
- * @dparent: The parent dentry
+ * @dentry: The dentry alleged to be valid child of @dparent
+ * @dparent: The parent dentry (known to be valid)
  * @hash: Hash of the dentry
  * @len: Length of the name
  *
  * An insecure source has sent us a dentry, here we verify it and dget() it.
  * This is used by ncpfs in its readdir implementation.
  * Zero is returned in the dentry is invalid.
- *
- * NOTE: This function does _not_ dereference the pointers before we have
- * validated them. We can test the pointer values, but we
- * must not actually use them until we have found a valid
- * copy of the pointer in kernel space..
  */
  
-int d_validate(struct dentry *dentry, struct dentry *dparent,
-	       unsigned int hash, unsigned int len)
+int d_validate(struct dentry *dentry, struct dentry *dparent)
 {
+	unsigned long dent_addr = (unsigned long) dentry;
+	unsigned long min_addr = PAGE_OFFSET;
+	unsigned long align_mask = 0x0F;
 	struct list_head *base, *lhp;
-	int valid = 1;
+
+	if (dent_addr < min_addr)
+		goto out;
+	if (dent_addr > (unsigned long)high_memory - sizeof(struct dentry))
+		goto out;
+	if (dent_addr & align_mask)
+		goto out;
+	if ((!kern_addr_valid(dent_addr)) || (!kern_addr_valid(dent_addr -1 +
+						sizeof(struct dentry))))
+		goto out;
+
+	if (dentry->d_parent != dparent)
+		goto out;
 
 	spin_lock(&dcache_lock);
-	if (dentry != dparent) {
-		base = d_hash(dparent, hash);
-		lhp = base;
-		while ((lhp = lhp->next) != base) {
-			if (dentry == list_entry(lhp, struct dentry, d_hash)) {
-				__dget_locked(dentry);
-				goto out;
-			}
-		}
-	} else {
-		/*
-		 * Special case: local mount points don't live in
-		 * the hashes, so we search the super blocks.
-		 */
-		struct super_block *sb = sb_entry(super_blocks.next);
-
-		for (; sb != sb_entry(&super_blocks); 
-		     sb = sb_entry(sb->s_list.next)) {
-			if (!sb->s_dev)
-				continue;
-			if (sb->s_root == dentry) {
-				__dget_locked(dentry);
-				goto out;
-			}
+	lhp = base = d_hash(dparent, dentry->d_name.hash);
+	while ((lhp = lhp->next) != base) {
+		if (dentry == list_entry(lhp, struct dentry, d_hash)) {
+			__dget_locked(dentry);
+			spin_unlock(&dcache_lock);
+			return 1;
 		}
 	}
-	valid = 0;
-out:
 	spin_unlock(&dcache_lock);
-	return valid;
+out:
+	return 0;
 }
 
 /*
@@ -849,6 +838,7 @@ void d_delete(struct dentry * dentry)
 void d_rehash(struct dentry * entry)
 {
 	struct list_head *list = d_hash(entry->d_parent, entry->d_name.hash);
+	if (!list_empty(&entry->d_hash)) BUG();
 	spin_lock(&dcache_lock);
 	list_add(&entry->d_hash, list);
 	spin_unlock(&dcache_lock);
@@ -923,8 +913,7 @@ void d_move(struct dentry * dentry, struct dentry * target)
 	list_add(&dentry->d_hash, &target->d_hash);
 
 	/* Unhash the target: dput() will then get rid of it */
-	list_del(&target->d_hash);
-	INIT_LIST_HEAD(&target->d_hash);
+	list_del_init(&target->d_hash);
 
 	list_del(&dentry->d_child);
 	list_del(&target->d_child);

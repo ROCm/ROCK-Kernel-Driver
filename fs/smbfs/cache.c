@@ -71,47 +71,6 @@ smb_invalidate_dircache_entries(struct dentry *parent)
 	spin_unlock(&dcache_lock);
 }
 
-
-static int
-smb_d_validate(struct dentry *dentry)
-{
-	unsigned long dent_addr = (unsigned long) dentry;
-	unsigned long min_addr = PAGE_OFFSET;
-	unsigned long align_mask = 0x0F;
-	unsigned int len;
-	int valid = 0;
-
-	if (dent_addr < min_addr)
-		goto bad_addr;
-	if (dent_addr > (unsigned long)high_memory - sizeof(struct dentry))
-		goto bad_addr;
-	if ((dent_addr & ~align_mask) != dent_addr)
-		goto bad_align;
-	if ((!kern_addr_valid(dent_addr)) || (!kern_addr_valid(dent_addr -1 +
-						       sizeof(struct dentry))))
-		goto bad_addr;
-	/*
-	 * Looks safe enough to dereference ...
-	 */
-	len = dentry->d_name.len;
-	if (len > SMB_MAXPATHLEN)
-		goto out;
-	/*
-	 * Note: d_validate doesn't dereference the parent pointer ...
-	 * just combines it with the name hash to find the hash chain.
-	 */
-	valid = d_validate(dentry, dentry->d_parent, dentry->d_name.hash, len);
-out:
-	return valid;
-
-bad_addr:
-	printk(KERN_ERR "smb_d_validate: invalid address %lx\n", dent_addr);
-	goto out;
-bad_align:
-	printk(KERN_ERR "smb_d_validate: unaligned address %lx\n", dent_addr);
-	goto out;
-}
-
 /*
  * dget, but require that fpos and parent matches what the dentry contains.
  * dentry is not known to be a valid pointer at entry.
@@ -122,8 +81,8 @@ smb_dget_fpos(struct dentry *dentry, struct dentry *parent, unsigned long fpos)
 	struct dentry *dent = dentry;
 	struct list_head *next;
 
-	if (smb_d_validate(dent)) {
-		if (dent->d_parent == parent &&
+	if (d_validate(dent, parent)) {
+		if (dent->d_name.len <= SMB_MAXPATHLEN &&
 		    (unsigned long)dent->d_fsdata == fpos) {
 			if (!dent->d_inode) {
 				dput(dent);

@@ -698,7 +698,9 @@ static void export_rdev (mdk_rdev_t * rdev)
 		md_list_del(&rdev->pending);
 		MD_INIT_LIST_HEAD(&rdev->pending);
 	}
+#ifndef MODULE
 	md_autodetect_dev(rdev->dev);
+#endif
 	rdev->dev = 0;
 	rdev->faulty = 0;
 	kfree(rdev);
@@ -3528,6 +3530,7 @@ static void md_geninit (void)
 int md__init md_init (void)
 {
 	static char * name = "mdrecoveryd";
+	int minor;
 	
 	printk (KERN_INFO "md driver %d.%d.%d MAX_MD_DEVS=%d, MD_SB_DISKS=%d\n",
 			MD_MAJOR_VERSION, MD_MINOR_VERSION,
@@ -3539,9 +3542,14 @@ int md__init md_init (void)
 		return (-1);
 	}
 	devfs_handle = devfs_mk_dir (NULL, "md", NULL);
-	devfs_register_series (devfs_handle, "%u",MAX_MD_DEVS,DEVFS_FL_DEFAULT,
-				MAJOR_NR, 0, S_IFBLK | S_IRUSR | S_IWUSR,
-				&md_fops, NULL);
+	/* we don't use devfs_register_series because we want to fill md_hd_struct */
+	for (minor=0; minor < MAX_MD_DEVS; ++minor) {
+		char devname[128];
+		sprintf (devname, "%u", minor);
+		md_hd_struct[minor].de = devfs_register (devfs_handle,
+			devname, DEVFS_FL_DEFAULT, MAJOR_NR, minor,
+			S_IFBLK | S_IRUSR | S_IWUSR, &md_fops, NULL);
+	}
 
 	/* forward all md request to md_make_request */
 	blk_queue_make_request(BLK_DEFAULT_QUEUE(MAJOR_NR), md_make_request);
@@ -3584,7 +3592,7 @@ struct {
  * Searches all registered partitions for autorun RAID arrays
  * at boot time.
  */
-static int detected_devices[128] md__initdata;
+static int detected_devices[128];
 static int dev_cnt;
 
 void md_autodetect_dev (kdev_t dev)

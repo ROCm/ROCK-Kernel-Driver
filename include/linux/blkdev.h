@@ -180,7 +180,7 @@ extern int * max_segments[MAX_BLKDEV];
 extern atomic_t queued_sectors;
 
 #define MAX_SEGMENTS 128
-#define MAX_SECTORS (MAX_SEGMENTS*8)
+#define MAX_SECTORS 255
 
 #define PageAlignSize(size) (((size) + PAGE_SIZE -1) & PAGE_MASK)
 

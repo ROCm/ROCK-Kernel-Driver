@@ -217,7 +217,7 @@ extern void d_move(struct dentry *, struct dentry *);
 extern struct dentry * d_lookup(struct dentry *, struct qstr *);
 
 /* validate "insecure" dentry pointer */
-extern int d_validate(struct dentry *, struct dentry *, unsigned int, unsigned int);
+extern int d_validate(struct dentry *, struct dentry *);
 
 extern char * __d_path(struct dentry *, struct vfsmount *, struct dentry *,
 	struct vfsmount *, char *, int);

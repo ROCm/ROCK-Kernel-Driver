@@ -21,6 +21,14 @@ typedef struct free_area_struct {
 
 struct pglist_data;
 
+/*
+ * On machines where it is needed (eg PCs) we divide physical memory
+ * into multiple physical zones. On a PC we have 3 zones:
+ *
+ * ZONE_DMA	  < 16 MB	ISA DMA capable memory
+ * ZONE_NORMAL	16-896 MB	direct mapped by the kernel
+ * ZONE_HIGHMEM	 > 896 MB	only page cache and user processes
+ */
 typedef struct zone_struct {
 	/*
 	 * Commonly accessed fields:
@@ -75,6 +83,17 @@ typedef struct zonelist_struct {
 
 #define NR_GFPINDEX		0x100
 
+/*
+ * The pg_data_t structure is used in machines with CONFIG_DISCONTIGMEM
+ * (mostly NUMA machines?) to denote a higher-level memory zone than the
+ * zone_struct denotes.
+ *
+ * On NUMA machines, each NUMA node would have a pg_data_t to describe
+ * it's memory layout.
+ *
+ * XXX: we need to move the global memory statistics (active_list, ...)
+ *      into the pg_data_t to properly support NUMA.
+ */
 struct bootmem_data;
 typedef struct pglist_data {
 	zone_t node_zones[MAX_NR_ZONES];

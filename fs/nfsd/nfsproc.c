@@ -196,7 +196,7 @@ nfsd_proc_create(struct svc_rqst *rqstp, struct nfsd_createargs *argp,
 	struct iattr	*attr = &argp->attrs;
 	struct inode	*inode;
 	struct dentry	*dchild;
-	int		nfserr, type, mode, rdonly = 0;
+	int		nfserr, type, mode;
 	dev_t		rdev = NODEV;
 
 	dprintk("nfsd: CREATE   %s %s\n",
@@ -207,13 +207,7 @@ nfsd_proc_create(struct svc_rqst *rqstp, struct nfsd_createargs *argp,
 	if (nfserr)
 		goto done; /* must fh_put dirfhp even on error */
 
-	/* Check for MAY_WRITE separately. */
-	nfserr = nfsd_permission(dirfhp->fh_export, dirfhp->fh_dentry,
-				 MAY_WRITE);
-	if (nfserr == nfserr_rofs) {
-		rdonly = 1;	/* Non-fatal error for echo > /dev/null */
-	} else if (nfserr)
-		goto done;
+	/* Check for MAY_WRITE in nfsd_create if necessary */
 
 	nfserr = nfserr_acces;
 	if (!argp->len)
@@ -257,10 +251,25 @@ nfsd_proc_create(struct svc_rqst *rqstp, struct nfsd_createargs *argp,
 			 * else assume a file */
 			if (inode) {
 				type = inode->i_mode & S_IFMT;
-				if (type == S_IFCHR || type == S_IFBLK) {
+				switch(type) {
+				case S_IFCHR:
+				case S_IFBLK:
 					/* reserve rdev for later checking */
 					attr->ia_size = inode->i_rdev;
 					attr->ia_valid |= ATTR_SIZE;
+
+					/* FALLTHROUGH */
+				case S_IFIFO:
+					/* this is probably a permission check..
+					 * at least IRIX implements perm checking on
+					 *   echo thing > device-special-file-or-pipe
+					 * by does a CREATE with type==0
+					 */
+					nfserr = nfsd_permission(newfhp->fh_export,
+								 newfhp->fh_dentry,
+								 MAY_WRITE);
+					if (nfserr && nfserr != nfserr_rofs)
+						goto out_unlock;
 				}
 			} else
 				type = S_IFREG;
@@ -272,11 +281,6 @@ nfsd_proc_create(struct svc_rqst *rqstp, struct nfsd_createargs *argp,
 		type = S_IFREG;
 		mode = 0;	/* ??? */
 	}
-
-	/* This is for "echo > /dev/null" a la SunOS. Argh. */
-	nfserr = nfserr_rofs;
-	if (rdonly && (!inode || type == S_IFREG))
-		goto out_unlock;
 
 	attr->ia_valid |= ATTR_MODE;
 	attr->ia_mode = mode;

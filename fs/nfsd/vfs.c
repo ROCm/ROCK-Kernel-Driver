@@ -737,27 +737,24 @@ nfsd_write(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset,
 		 * nice and simple solution (IMHO), and it seems to
 		 * work:-)
 		 */
-		if (EX_WGATHER(exp) && (atomic_read(&inode->i_writecount) > 1
-		 || (last_ino == inode->i_ino && last_dev == inode->i_dev))) {
-#if 0
-			interruptible_sleep_on_timeout(&inode->i_wait, 10 * HZ / 1000);
-#else
-			dprintk("nfsd: write defer %d\n", current->pid);
-/* FIXME: Olaf commented this out [gam3] */
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout((HZ+99)/100);
-			current->state = TASK_RUNNING;
-			dprintk("nfsd: write resume %d\n", current->pid);
-#endif
-		}
+		if (EX_WGATHER(exp)) {
+			if (atomic_read(&inode->i_writecount) > 1
+			    || (last_ino == inode->i_ino && last_dev == inode->i_dev)) {
+				dprintk("nfsd: write defer %d\n", current->pid);
+				set_current_state(TASK_UNINTERRUPTIBLE);
+				schedule_timeout((HZ+99)/100);
+				current->state = TASK_RUNNING;
+				dprintk("nfsd: write resume %d\n", current->pid);
+			}
 
-		if (inode->i_state & I_DIRTY) {
-			dprintk("nfsd: write sync %d\n", current->pid);
-			nfsd_sync(&file);
-		}
+			if (inode->i_state & I_DIRTY) {
+				dprintk("nfsd: write sync %d\n", current->pid);
+				nfsd_sync(&file);
+			}
 #if 0
-		wake_up(&inode->i_wait);
+			wake_up(&inode->i_wait);
 #endif
+		}
 		last_ino = inode->i_ino;
 		last_dev = inode->i_dev;
 	}

@@ -974,7 +974,7 @@ static void __init pci_fixup_vt8363(struct pci_dev *d)
 		pci_write_config_byte(d, 0x70, tmp & ~(1<<3));
 	}
 	pci_read_config_byte(d, 0x71, &tmp);
-	if(tmp & (1<<3)) {
+	if(!(tmp & (1<<3))) {
 		printk("PCI: Bursting cornercase bug worked around\n");
 		pci_write_config_byte(d, 0x71, tmp | (1<<3));
 	}

@@ -327,7 +327,7 @@ int el3_probe(struct net_device *dev)
 			irq = idev->irq_resource[0].start;
 			if (el3_debug > 3)
 				printk ("ISAPnP reports %s at i/o 0x%x, irq %d\n",
-					el3_isapnp_adapters[i].name, ioaddr, irq);
+					(char*) el3_isapnp_adapters[i].driver_data, ioaddr, irq);
 			EL3WINDOW(0);
 			for (j = 0; j < 3; j++)
 				el3_isapnp_phys_addr[pnp_cards][j] =

@@ -1501,15 +1501,6 @@ CONFIG_MD_RAID0
 
   If unsure, say Y.
 
-RAID-1/RAID-5 code (DANGEROUS)
-CONFIG_RAID15_DANGEROUS
-  This new RAID1/RAID5 code has been freshly merged, and has not seen
-  enough testing yet. While there are no known bugs in it, it might
-  destroy your filesystems, eat your data and start World War III.
-  You have been warned.
-
-  If unsure, say N.
-
 RAID-1 (mirroring) mode
 CONFIG_MD_RAID1
   A RAID-1 set consists of several disk drives which are exact copies

@@ -474,7 +474,7 @@ static int corkscrew_scan(struct net_device *dev)
 			irq = idev->irq_resource[0].start;
 			if(corkscrew_debug)
 				printk ("ISAPNP reports %s at i/o 0x%x, irq %d\n",
-					corkscrew_isapnp_adapters[i].name,ioaddr, irq);
+					(char*) corkscrew_isapnp_adapters[i].driver_data, ioaddr, irq);
 					
 			if ((inw(ioaddr + 0x2002) & 0x1f0) != (ioaddr & 0x1f0))
 				continue;

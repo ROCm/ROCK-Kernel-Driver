@@ -326,56 +326,15 @@ ncp_lookup_validate(struct dentry * dentry, int flags)
 	return res;
 }
 
-/* most parts from nfsd_d_validate() */
-static int
-ncp_d_validate(struct dentry *dentry)
-{
-	unsigned long dent_addr = (unsigned long) dentry;
-	unsigned long min_addr = PAGE_OFFSET;
-	unsigned long align_mask = 0x0F;
-	unsigned int len;
-	int valid = 0;
-
-	if (dent_addr < min_addr)
-		goto bad_addr;
-	if (dent_addr > (unsigned long)high_memory - sizeof(struct dentry))
-		goto bad_addr;
-	if ((dent_addr & ~align_mask) != dent_addr)
-		goto bad_align;
-	if ((!kern_addr_valid(dent_addr)) || (!kern_addr_valid(dent_addr -1 +
-						sizeof(struct dentry))))
-		goto bad_addr;
-	/*
-	 * Looks safe enough to dereference ...
-	 */
-	len = dentry->d_name.len;
-	if (len > NCP_MAXPATHLEN)
-		goto out;
-	/*
-	 * Note: d_validate doesn't dereference the parent pointer ...
-	 * just combines it with the name hash to find the hash chain.
-	 */
-	valid = d_validate(dentry, dentry->d_parent, dentry->d_name.hash, len);
-out:
-	return valid;
-
-bad_addr:
-	PRINTK("ncp_d_validate: invalid address %lx\n", dent_addr);
-	goto out;
-bad_align:
-	PRINTK("ncp_d_validate: unaligned address %lx\n", dent_addr);
-	goto out;
-}
-
 static struct dentry *
 ncp_dget_fpos(struct dentry *dentry, struct dentry *parent, unsigned long fpos)
 {
 	struct dentry *dent = dentry;
 	struct list_head *next;
 
-	if (ncp_d_validate(dent)) {
-		if (dent->d_parent == parent &&
-		   (unsigned long)dent->d_fsdata == fpos) {
+	if (d_validate(dent, parent)) {
+		if (dent->d_name.len <= NCP_MAXPATHLEN &&
+		    (unsigned long)dent->d_fsdata == fpos) {
 			if (!dent->d_inode) {
 				dput(dent);
 				dent = NULL;
@@ -580,6 +539,7 @@ ncp_fill_cache(struct file *filp, void *dirent, filldir_t filldir,
 	struct ncp_cache_control ctl = *ctrl;
 	struct qstr qname;
 	int valid = 0;
+	int hashed = 0;
 	ino_t ino = 0;
 	__u8 __name[256];
 
@@ -602,9 +562,11 @@ ncp_fill_cache(struct file *filp, void *dirent, filldir_t filldir,
 		newdent = d_alloc(dentry, &qname);
 		if (!newdent)
 			goto end_advance;
-	} else
+	} else {
+		hashed = 1;
 		memcpy((char *) newdent->d_name.name, qname.name,
 							newdent->d_name.len);
+	}
 
 	if (!newdent->d_inode) {
 		entry->opened = 0;
@@ -612,7 +574,9 @@ ncp_fill_cache(struct file *filp, void *dirent, filldir_t filldir,
 		newino = ncp_iget(inode->i_sb, entry);
 		if (newino) {
 			newdent->d_op = &ncp_dentry_operations;
-			d_add(newdent, newino);
+			d_instantiate(newdent, newino);
+			if (!hashed)
+				d_rehash(newdent);
 		}
 	} else
 		ncp_update_inode2(newdent->d_inode, entry);
