@@ -12,7 +12,6 @@
 #include <linux/slab.h>
 #include <linux/err.h>
 #include <linux/init.h>
-#include <linux/err.h>
 #include "base.h"
 
 LIST_HEAD(global_device_list);
