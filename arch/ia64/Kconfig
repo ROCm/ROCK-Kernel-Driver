@@ -234,8 +234,8 @@ config IA64_NODESIZE_256GB
 endchoice
 
 config DISCONTIGMEM
-	bool "Discontiguous memory support" if (IA64_DIG && NUMA)
-	default y if IA64_SGI_SN2 || IA64_GENERIC
+	bool "Discontiguous memory support" if (IA64_DIG || IA64_SGI_SN2 || IA64_GENERIC) && NUMA
+	default y if (IA64_SGI_SN2 || IA64_GENERIC) && NUMA
 	help
 	  Say Y to support efficient handling of discontiguous physical memory,
 	  for architectures which are either NUMA (Non-Uniform Memory Access)
@@ -647,6 +647,33 @@ config MAGIC_SYSRQ
 	  send a BREAK and then within 5 seconds a command keypress. The
 	  keys are documented in <file:Documentation/sysrq.txt>. Don't say Y
 	  unless you really know what this hack does.
+
+config IA64_EARLY_PRINTK
+	bool "Early printk support"
+	depends on DEBUG_KERNEL && !IA64_GENERIC
+	help
+	  Selecting this option uses the VGA screen or serial console for
+	  printk() output before the consoles are initialised.  It is useful
+	  for debugging problems early in the boot process, but only if you
+	  have a suitable VGA/serial console attached.  If you're unsure,
+	  select N.
+
+config IA64_EARLY_PRINTK_UART
+	bool "Early printk on MMIO serial port"
+	depends on IA64_EARLY_PRINTK
+
+config IA64_EARLY_PRINTK_UART_BASE
+	hex "UART MMIO base address"
+	depends on IA64_EARLY_PRINTK_UART
+	default "ff5e0000"
+
+config IA64_EARLY_PRINTK_VGA
+	bool "Early printk on VGA"
+	depends on IA64_EARLY_PRINTK
+
+config IA64_EARLY_PRINTK_SGI_SN
+	bool "Early printk on SGI SN serial console"
+	depends on IA64_EARLY_PRINTK && (IA64_GENERIC || IA64_SGI_SN2)
 
 config DEBUG_SLAB
 	bool "Debug memory allocations"
