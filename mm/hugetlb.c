@@ -15,12 +15,16 @@ const unsigned long hugetlb_zero = 0, hugetlb_infinity = ~0UL;
 static unsigned long nr_huge_pages, free_huge_pages;
 unsigned long max_huge_pages;
 static struct list_head hugepage_freelists[MAX_NUMNODES];
+static unsigned int nr_huge_pages_node[MAX_NUMNODES];
+static unsigned int free_huge_pages_node[MAX_NUMNODES];
 static spinlock_t hugetlb_lock = SPIN_LOCK_UNLOCKED;
 
 static void enqueue_huge_page(struct page *page)
 {
-	list_add(&page->lru,
-		 &hugepage_freelists[page_zone(page)->zone_pgdat->node_id]);
+	int nid = page_zone(page)->zone_pgdat->node_id;
+	list_add(&page->lru, &hugepage_freelists[nid]);
+	free_huge_pages++;
+	free_huge_pages_node[nid]++;
 }
 
 static struct page *dequeue_huge_page(void)
@@ -38,6 +42,8 @@ static struct page *dequeue_huge_page(void)
 		page = list_entry(hugepage_freelists[nid].next,
 				  struct page, lru);
 		list_del(&page->lru);
+		free_huge_pages--;
+		free_huge_pages_node[nid]--;
 	}
 	return page;
 }
@@ -49,6 +55,10 @@ static struct page *alloc_fresh_huge_page(void)
 	page = alloc_pages_node(nid, GFP_HIGHUSER|__GFP_COMP,
 					HUGETLB_PAGE_ORDER);
 	nid = (nid + 1) % numnodes;
+	if (page) {
+		nr_huge_pages++;
+		nr_huge_pages_node[page_zone(page)->zone_pgdat->node_id]++;
+	}
 	return page;
 }
 
@@ -61,7 +71,6 @@ void free_huge_page(struct page *page)
 
 	spin_lock(&hugetlb_lock);
 	enqueue_huge_page(page);
-	free_huge_pages++;
 	spin_unlock(&hugetlb_lock);
 }
 
@@ -76,7 +85,6 @@ struct page *alloc_huge_page(void)
 		spin_unlock(&hugetlb_lock);
 		return NULL;
 	}
-	free_huge_pages--;
 	spin_unlock(&hugetlb_lock);
 	set_page_count(page, 1);
 	page[1].mapping = (void *)free_huge_page;
@@ -119,6 +127,7 @@ static void update_and_free_page(struct page *page)
 {
 	int i;
 	nr_huge_pages--;
+	nr_huge_pages_node[page_zone(page)->zone_pgdat->node_id]--;
 	for (i = 0; i < (HPAGE_SIZE / PAGE_SIZE); i++) {
 		page[i].flags &= ~(1 << PG_locked | 1 << PG_error | 1 << PG_referenced |
 				1 << PG_dirty | 1 << PG_active | 1 << PG_reserved |
@@ -132,7 +141,7 @@ static void update_and_free_page(struct page *page)
 #ifdef CONFIG_HIGHMEM
 static void try_to_free_low(unsigned long count)
 {
-	int i;
+	int i, nid;
 	for (i = 0; i < MAX_NUMNODES; ++i) {
 		struct page *page, *next;
 		list_for_each_entry_safe(page, next, &hugepage_freelists[i], lru) {
@@ -140,7 +149,9 @@ static void try_to_free_low(unsigned long count)
 				continue;
 			list_del(&page->lru);
 			update_and_free_page(page);
-			--free_huge_pages;
+			nid = page_zone(page)->zone_pgdat->node_id;
+			free_huge_pages--;
+			free_huge_pages_node[nid]--;
 			if (count >= nr_huge_pages)
 				return;
 		}
@@ -160,8 +171,6 @@ static unsigned long set_max_huge_pages(unsigned long count)
 			return nr_huge_pages;
 		spin_lock(&hugetlb_lock);
 		enqueue_huge_page(page);
-		free_huge_pages++;
-		nr_huge_pages++;
 		spin_unlock(&hugetlb_lock);
 	}
 	if (count >= nr_huge_pages)
@@ -169,7 +178,7 @@ static unsigned long set_max_huge_pages(unsigned long count)
 
 	spin_lock(&hugetlb_lock);
 	try_to_free_low(count);
-	for (; count < nr_huge_pages; --free_huge_pages) {
+	while (count < nr_huge_pages) {
 		struct page *page = dequeue_huge_page();
 		if (!page)
 			break;
@@ -199,6 +208,15 @@ int hugetlb_report_meminfo(char *buf)
 			nr_huge_pages,
 			free_huge_pages,
 			HPAGE_SIZE/1024);
+}
+
+int hugetlb_report_node_meminfo(int nid, char *buf)
+{
+	return sprintf(buf,
+		"Node %d HugePages_Total: %5u\n"
+		"Node %d HugePages_Free:  %5u\n",
+		nid, nr_huge_pages_node[nid],
+		nid, free_huge_pages_node[nid]);
 }
 
 int is_hugepage_mem_enough(size_t size)
