@@ -43,22 +43,6 @@
 #define __IA32_NR_sigreturn            119
 #define __IA32_NR_rt_sigreturn         173
 
-#ifdef ASM_SUPPORTED
-/*
- * Don't let GCC uses f16-f31 so that save_ia32_fpstate_live() and
- * restore_ia32_fpstate_live() can be sure the live register contain user-level state.
- */
-register double f16 asm ("f16"); register double f17 asm ("f17");
-register double f18 asm ("f18"); register double f19 asm ("f19");
-register double f20 asm ("f20"); register double f21 asm ("f21");
-register double f22 asm ("f22"); register double f23 asm ("f23");
-
-register double f24 asm ("f24"); register double f25 asm ("f25");
-register double f26 asm ("f26"); register double f27 asm ("f27");
-register double f28 asm ("f28"); register double f29 asm ("f29");
-register double f30 asm ("f30"); register double f31 asm ("f31");
-#endif
-
 struct sigframe_ia32
 {
        int pretcode;
@@ -173,7 +157,8 @@ copy_siginfo_to_user32 (siginfo_t32 *to, siginfo_t *from)
 		case __SI_MESGQ >> 16:
 			err |= __put_user(from->si_uid, &to->si_uid);
 			err |= __put_user(from->si_pid, &to->si_pid);
-			err |= __put_user(from->si_ptr, &to->si_ptr);
+			addr = (unsigned long) from->si_ptr;
+			err |= __put_user(addr, &to->si_ptr);
 			break;
 		}
 	}

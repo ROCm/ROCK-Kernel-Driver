@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 1999-2003 Hewlett-Packard Co
+ * Copyright (C) 1999-2004 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  * Copyright (C) 2003 Fenghua Yu <fenghua.yu@intel.com>
  * 	- Change pt_regs_off() to make it less dependant on pt_regs structure.
@@ -242,9 +242,9 @@ static struct {
 };
 
 static inline int
-read_only (unsigned long *addr)
+read_only (void *addr)
 {
-	return (addr == &unw.r0);
+	return (unsigned long) ((char *) addr - (char *) &unw.r0) < sizeof(unw.r0);
 }
 
 /*
