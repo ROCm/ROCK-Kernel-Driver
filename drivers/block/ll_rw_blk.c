@@ -780,6 +780,11 @@ static char *rq_flags[] = {
 	"REQ_PM_SUSPEND",
 	"REQ_PM_RESUME",
 	"REQ_PM_SHUTDOWN",
+	"REQ_IDETAPE_PC1",
+	"REQ_IDETAPE_PC2",
+	"REQ_IDETAPE_READ",
+	"REQ_IDETAPE_WRITE",
+	"REQ_IDETAPE_READ_BUFFER",
 };
 
 void blk_dump_rq_flags(struct request *rq, char *msg)
