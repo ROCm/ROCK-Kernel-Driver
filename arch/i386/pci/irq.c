@@ -805,8 +805,10 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 		    	if ( dev2->irq && dev2->irq != irq && \
 			(!(pci_probe & PCI_USE_PIRQ_MASK) || \
 			((1 << dev2->irq) & mask)) ) {
+#ifndef CONFIG_PCI_USE_VECTOR
 		    		printk(KERN_INFO "IRQ routing conflict for %s, have irq %d, want irq %d\n",
 				       pci_name(dev2), dev2->irq, irq);
+#endif
 		    		continue;
 		    	}
 			dev2->irq = irq;
@@ -870,6 +872,10 @@ static void __init pcibios_fixup_irqs(void)
 							bridge->bus->number, PCI_SLOT(bridge->devfn), pin, irq);
 				}
 				if (irq >= 0) {
+					if (use_pci_vector() &&
+						!platform_legacy_irq(irq))
+						irq = IO_APIC_VECTOR(irq);
+
 					printk(KERN_INFO "PCI->APIC IRQ transform: (B%d,I%d,P%d) -> %d\n",
 						dev->bus->number, PCI_SLOT(dev->devfn), pin, irq);
 					dev->irq = irq;

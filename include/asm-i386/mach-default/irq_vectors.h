@@ -76,6 +76,18 @@
  * Since vectors 0x00-0x1f are used/reserved for the CPU,
  * the usable vector space is 0x20-0xff (224 vectors)
  */
+
+/*
+ * The maximum number of vectors supported by i386 processors
+ * is limited to 256. For processors other than i386, NR_VECTORS
+ * should be changed accordingly.
+ */
+#define NR_VECTORS 256
+
+#ifdef CONFIG_PCI_USE_VECTOR
+#define NR_IRQS FIRST_SYSTEM_VECTOR
+#define NR_IRQ_VECTORS NR_IRQS
+#else
 #ifdef CONFIG_X86_IO_APIC
 #define NR_IRQS 224
 # if (224 >= 32 * NR_CPUS)
@@ -86,6 +98,7 @@
 #else
 #define NR_IRQS 16
 #define NR_IRQ_VECTORS NR_IRQS
+#endif
 #endif
 
 #define FPU_IRQ			13

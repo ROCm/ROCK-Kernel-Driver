@@ -237,7 +237,7 @@ acpi_pci_irq_add_prt (
                           PCI Interrupt Routing Support
    -------------------------------------------------------------------------- */
 
-static int
+int
 acpi_pci_irq_lookup (struct pci_bus *bus, int device, int pin)
 {
 	struct acpi_prt_entry	*entry = NULL;

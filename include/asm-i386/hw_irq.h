@@ -41,6 +41,7 @@ asmlinkage void apic_timer_interrupt(void);
 asmlinkage void error_interrupt(void);
 asmlinkage void spurious_interrupt(void);
 asmlinkage void thermal_interrupt(struct pt_regs);
+#define platform_legacy_irq(irq)	((irq) < 16)
 #endif
 
 void mask_irq(unsigned int irq);
