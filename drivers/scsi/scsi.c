@@ -51,6 +51,7 @@
 #include <linux/unistd.h>
 #include <linux/spinlock.h>
 #include <linux/kmod.h>
+#include <linux/interrupt.h>
 
 #include "scsi.h"
 #include "hosts.h"
