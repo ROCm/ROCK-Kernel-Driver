@@ -4,7 +4,8 @@
  * Atmel DVB-C Frontend Driver (at76c651/dat7021)
  *
  * Copyright (C) 2001 fnbrd <fnbrd@gmx.de>
- *             & 2002 Andreas Oberritter <andreas@oberritter.de>
+ *             & 2002 Andreas Oberritter <obi@linuxtv.org>
+ *             & 2003 Wolfram Joost <dbox2@frokaschwei.de>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -524,6 +525,6 @@ module_init(at76c651_init);
 module_exit(at76c651_exit);
 
 MODULE_DESCRIPTION("at76c651/dat7021 dvb-c frontend driver");
-MODULE_AUTHOR("Andreas Oberritter <andreas@oberritter.de>");
+MODULE_AUTHOR("Andreas Oberritter <obi@linuxtv.org>");
 MODULE_LICENSE("GPL");
 MODULE_PARM(debug, "i");

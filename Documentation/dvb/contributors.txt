@@ -30,11 +30,15 @@ Steve Brown <sbrown@cortland.com>
 Christoph Martin <martin@uni-mainz.de>
   for his LIRC infrared handler
 
-Andreas Oberritter <andreas@oberritter.de>
+Andreas Oberritter <obi@linuxtv.org>
+Dennis Noermann <dennis.noermann@noernet.de>
+Felix Domke <tmbinc@elitedvb.net>
 Florian Schirmer <jolt@tuxbox.org>
-...and all the other dBox2 people
-  for many bugfixes in the generic DVB Core and their work on the 
-  dBox2 port of the DVB driver
+Ronny Strutz <3des@elitedvb.de>
+Wolfram Joost <dbox2@frokaschwei.de>
+...and all the other dbox2 people
+  for many bugfixes in the generic DVB Core, frontend drivers and
+  their work on the dbox2 port of the DVB driver
 
 Oliver Endriss <o.endriss@gmx.de>
   for many bugfixes
@@ -50,5 +54,9 @@ Roberto Ragusa <r.ragusa@libero.it>
 Augusto Cardoso <augusto@carhil.net>
   for all the work for the FlexCopII chipset by B2C2,Inc.
 
+Davor Emard <emard@softhome.net>
+  for his work on the budget drivers, the demux code,
+  the module unloading problems, ...
+  
 (If you think you should be in this list, but you are not, drop a
  line to the DVB mailing list)

@@ -8,7 +8,7 @@
 	Alps TDED4 (Tuner: TI ALP510, external Nxt6000)
 	Comtech DVBT-6k07 (PLL IC: SP5730)
 
-    Copyright (C) 2002-2003 Florian Schirmer <schirmer@taytron.net>
+    Copyright (C) 2002-2003 Florian Schirmer <jolt@tuxbox.org>
     Copyright (C) 2003 Paul Andreassen <paul@andreassen.com.au>
 
     This program is free software; you can redistribute it and/or modify
