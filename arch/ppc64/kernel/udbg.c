@@ -20,6 +20,9 @@
 #include <asm/prom.h>
 #include <asm/pmac_feature.h>
 
+extern u8 real_readb(volatile u8 *addr);
+extern void real_writeb(u8 data, volatile u8 *addr);
+
 struct NS16550 {
 	/* this struct must be packed */
 	unsigned char rbr;  /* 0 */
@@ -148,9 +151,6 @@ void udbg_init_scc(struct device_node *np)
 #endif /* CONFIG_PPC_PMAC */
 
 #if CONFIG_PPC_PMAC
-extern u8 real_readb(volatile u8 *addr);
-extern void real_writeb(u8 data, volatile u8 *addr);
-
 static void udbg_real_putc(unsigned char c)
 {
 	while ((real_readb(sccc) & SCC_TXRDY) == 0)
@@ -170,6 +170,32 @@ void udbg_init_pmac_realmode(void)
 	ppc_md.udbg_getc_poll = NULL;
 }
 #endif /* CONFIG_PPC_PMAC */
+
+#ifdef CONFIG_PPC_MAPLE
+void udbg_maple_real_putc(unsigned char c)
+{
+	if (udbg_comport) {
+		while ((real_readb(&udbg_comport->lsr) & LSR_THRE) == 0)
+			/* wait for idle */;
+		real_writeb(c, &udbg_comport->thr); eieio();
+		if (c == '\n') {
+			/* Also put a CR.  This is for convenience. */
+			while ((real_readb(&udbg_comport->lsr) & LSR_THRE) == 0)
+				/* wait for idle */;
+			real_writeb('\r', &udbg_comport->thr); eieio();
+		}
+	}
+}
+
+void udbg_init_maple_realmode(void)
+{
+	udbg_comport = (volatile struct NS16550 *)0xf40003f8;
+
+	ppc_md.udbg_putc = udbg_maple_real_putc;
+	ppc_md.udbg_getc = NULL;
+	ppc_md.udbg_getc_poll = NULL;
+}
+#endif /* CONFIG_PPC_MAPLE */
 
 void udbg_putc(unsigned char c)
 {

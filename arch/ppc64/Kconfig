@@ -80,6 +80,16 @@ config PPC_PMAC
 	select ADB_PMU
 	select U3_DART
 
+config PPC_MAPLE
+	depends on PPC_MULTIPLATFORM
+	bool "  Maple 970FX Evaluation Board"
+	select U3_DART
+	select MPIC_BROKEN_U3
+	default n
+	help
+          This option enables support for the Maple 970FX Evaluation Board.
+	  For more informations, refer to http://www.970eval.com
+
 config PPC
 	bool
 	default y
@@ -119,6 +129,11 @@ config U3_DART
 	bool 
 	depends on PPC_MULTIPLATFORM
 	default n
+
+config MPIC_BROKEN_U3
+	bool
+	depends on PPC_MAPLE
+	default y
 
 config PPC_PMAC64
 	bool

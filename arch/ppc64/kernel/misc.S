@@ -591,7 +591,7 @@ _GLOBAL(do_cpu_ftr_fixups)
 	isync
 	b	1b
 
-#ifdef CONFIG_PPC_PMAC
+#if defined(CONFIG_PPC_PMAC) || defined(CONFIG_PPC_MAPLE)
 /*
  * Do an IO access in real mode
  */
@@ -653,7 +653,7 @@ _GLOBAL(real_writeb)
 	sync
 	isync
 	blr
-#endif /* CONFIG_PPC_PMAC */
+#endif /* defined(CONFIG_PPC_PMAC) || defined(CONFIG_PPC_MAPLE) */
 
 /*
  * Create a kernel thread
