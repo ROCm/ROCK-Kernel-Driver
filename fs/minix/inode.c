@@ -33,27 +33,6 @@ static void minix_delete_inode(struct inode *inode)
 	unlock_kernel();
 }
 
-static void minix_commit_super(struct super_block * sb)
-{
-	mark_buffer_dirty(minix_sb(sb)->s_sbh);
-	sb->s_dirt = 0;
-}
-
-static void minix_write_super(struct super_block * sb)
-{
-	struct minix_super_block * ms;
-
-	if (!(sb->s_flags & MS_RDONLY)) {
-		ms = minix_sb(sb)->s_ms;
-
-		if (ms->s_state & MINIX_VALID_FS)
-			ms->s_state &= ~MINIX_VALID_FS;
-		minix_commit_super(sb);
-	}
-	sb->s_dirt = 0;
-}
-
-
 static void minix_put_super(struct super_block *sb)
 {
 	int i;
@@ -124,7 +103,6 @@ static struct super_operations minix_sops = {
 	write_inode:	minix_write_inode,
 	delete_inode:	minix_delete_inode,
 	put_super:	minix_put_super,
-	write_super:	minix_write_super,
 	statfs:		minix_statfs,
 	remount_fs:	minix_remount,
 };
@@ -144,15 +122,11 @@ static int minix_remount (struct super_block * sb, int * flags, char * data)
 		/* Mounting a rw partition read-only. */
 		ms->s_state = sbi->s_mount_state;
 		mark_buffer_dirty(sbi->s_sbh);
-		sb->s_dirt = 1;
-		minix_commit_super(sb);
-	}
-	else {
+	} else {
 	  	/* Mount a partition which is read-only, read-write. */
 		sbi->s_mount_state = ms->s_state;
 		ms->s_state &= ~MINIX_VALID_FS;
 		mark_buffer_dirty(sbi->s_sbh);
-		sb->s_dirt = 1;
 
 		if (!(sbi->s_mount_state & MINIX_VALID_FS))
 			printk ("MINIX-fs warning: remounting unchecked fs, "
@@ -271,7 +245,6 @@ static int minix_fill_super(struct super_block *s, void *data, int silent)
 	if (!(s->s_flags & MS_RDONLY)) {
 		ms->s_state &= ~MINIX_VALID_FS;
 		mark_buffer_dirty(bh);
-		s->s_dirt = 1;
 	}
 	if (!(sbi->s_mount_state & MINIX_VALID_FS))
 		printk ("MINIX-fs: mounting unchecked file system, "
