@@ -14,7 +14,7 @@
 #define __local_bh_enable()	do { barrier(); preempt_count() -= IRQ_OFFSET; } while (0)
 #define local_bh_enable()				\
 do { if (unlikely((preempt_count() == IRQ_OFFSET) &&	\
-	 softirq_pending(smp_processor_id())) {   	\
+	 softirq_pending(smp_processor_id()))) {   	\
 		__local_bh_enable();			\
 		do_softirq();			  	\
 		preempt_check_resched();		\
