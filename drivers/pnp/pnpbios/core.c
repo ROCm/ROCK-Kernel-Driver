@@ -1168,3 +1168,5 @@ module_init(pnpbios_init_all);
 module_exit(pnpbios_exit);
 
 #endif
+
+EXPORT_SYMBOL(pnpbios_protocol);

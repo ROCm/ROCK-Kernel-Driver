@@ -155,6 +155,7 @@ static inline int _snd_magic_bad(void *obj, unsigned long magic)
 #define snd_card_dummy_t_magic			0xa15a2501
 #define snd_card_dummy_pcm_t_magic		0xa15a2502
 #define opl3_t_magic				0xa15a2601
+#define opl4_t_magic				0xa15a2602
 #define snd_seq_dummy_port_t_magic		0xa15a2701
 #define ice1712_t_magic				0xa15a2801
 #define ad1816a_t_magic				0xa15a2901
@@ -193,10 +194,9 @@ static inline int _snd_magic_bad(void *obj, unsigned long magic)
 #define snd_usb_midi_in_endpoint_t_magic	0xa15a3f03
 #define ak4117_t_magic				0xa15a4000
 #define psic_t_magic				0xa15a4100
-#define opl4_t_magic				0xa15a2602
 #define vx_core_t_magic				0xa15a4110
 #define vx_pipe_t_magic				0xa15a4112
-
+#define azf3328_t_magic				0xa15a4200
 
 #else
 

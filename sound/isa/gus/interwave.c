@@ -757,7 +757,7 @@ static int __devinit snd_interwave_probe(int dev, struct pnp_card_link *pcard,
 
 	if (request_irq(xirq, snd_interwave_interrupt, SA_INTERRUPT, "InterWave", (void *)iwcard)) {
 		snd_card_free(card);
-		snd_printk("unable to grab IRQ %d\n", irq);
+		snd_printk("unable to grab IRQ %d\n", xirq);
 		return -EBUSY;
 	}
 	iwcard->irq = xirq;
