@@ -176,9 +176,26 @@ static void __xfrm_state_delete(struct xfrm_state *x)
 		spin_unlock(&xfrm_state_lock);
 		if (del_timer(&x->timer))
 			atomic_dec(&x->refcnt);
-		if (atomic_read(&x->refcnt) != 1)
+
+		/* The number two in this test is the reference
+		 * mentioned in the comment below plus the reference
+		 * our caller holds.  A larger value means that
+		 * there are DSTs attached to this xfrm_state.
+		 */
+		if (atomic_read(&x->refcnt) > 2)
 			xfrm_flush_bundles(x);
 	}
+
+	/* All xfrm_state objects are created by one of two possible
+	 * paths:
+	 *
+	 * 1) xfrm_state_alloc --> xfrm_state_insert
+	 * 2) xfrm_state_lookup --> xfrm_state_insert
+	 *
+	 * The xfrm_state_lookup or xfrm_state_alloc call gives a
+	 * reference, and that is what we are dropping here.
+	 */
+	atomic_dec(&x->refcnt);
 
 	if (kill && x->type)
 		x->type->destructor(x);
