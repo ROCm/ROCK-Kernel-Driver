@@ -478,6 +478,33 @@ int icmp_reply_translation(struct sk_buff **pskb,
 	return 1;
 }
 
+/* Protocol registration. */
+int ip_nat_protocol_register(struct ip_nat_protocol *proto)
+{
+	int ret = 0;
+
+	WRITE_LOCK(&ip_nat_lock);
+	if (ip_nat_protos[proto->protonum] != &ip_nat_unknown_protocol) {
+		ret = -EBUSY;
+		goto out;
+	}
+	ip_nat_protos[proto->protonum] = proto;
+ out:
+	WRITE_UNLOCK(&ip_nat_lock);
+	return ret;
+}
+
+/* Noone stores the protocol anywhere; simply delete it. */
+void ip_nat_protocol_unregister(struct ip_nat_protocol *proto)
+{
+	WRITE_LOCK(&ip_nat_lock);
+	ip_nat_protos[proto->protonum] = &ip_nat_unknown_protocol;
+	WRITE_UNLOCK(&ip_nat_lock);
+
+	/* Someone could be still looking at the proto in a bh. */
+	synchronize_net();
+}
+
 int __init ip_nat_init(void)
 {
 	size_t i;

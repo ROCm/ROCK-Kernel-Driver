@@ -50,6 +50,7 @@
 #include <linux/moduleparam.h>
 #include <linux/netfilter_ipv4.h>
 #include <linux/netfilter_ipv4/ip_nat.h>
+#include <linux/netfilter_ipv4/ip_conntrack_helper.h>
 #include <linux/netfilter_ipv4/ip_nat_helper.h>
 #include <linux/ip.h>
 #include <net/checksum.h>
@@ -1203,9 +1204,7 @@ static int snmp_parse_mangle(unsigned char *msg,
  * SNMP translation routine.
  */
 static int snmp_translate(struct ip_conntrack *ct,
-                          struct ip_nat_info *info,
                           enum ip_conntrack_info ctinfo,
-                          unsigned int hooknum,
                           struct sk_buff **pskb)
 {
 	struct iphdr *iph = (*pskb)->nh.iph;
@@ -1243,49 +1242,25 @@ static int snmp_translate(struct ip_conntrack *ct,
 
 /* We don't actually set up expectations, just adjust internal IP
  * addresses if this is being NATted */
-static unsigned int nat_help(struct ip_conntrack *ct,
-			     struct ip_conntrack_expect *exp,
-                             struct ip_nat_info *info,
-                             enum ip_conntrack_info ctinfo,
-                             unsigned int hooknum,
-                             struct sk_buff **pskb)
+static int help(struct sk_buff **pskb,
+		struct ip_conntrack *ct,
+		enum ip_conntrack_info ctinfo)
 {
 	int dir = CTINFO2DIR(ctinfo);
 	unsigned int ret;
 	struct iphdr *iph = (*pskb)->nh.iph;
 	struct udphdr *udph = (struct udphdr *)((u_int32_t *)iph + iph->ihl);
-	
-	/*
-	 * Translate snmp replies on pre-routing (DNAT) and snmp traps
-	 * on post routing (SNAT).
-	 */
-	if (!((dir == IP_CT_DIR_REPLY && hooknum == NF_IP_PRE_ROUTING &&
-	       udph->source == ntohs(SNMP_PORT)) ||
-	      (dir == IP_CT_DIR_ORIGINAL && hooknum == NF_IP_POST_ROUTING &&
-	       udph->dest == ntohs(SNMP_TRAP_PORT))))
+
+	/* SNMP replies and originating SNMP traps get mangled */
+	if (udph->source == ntohs(SNMP_PORT) && dir != IP_CT_DIR_REPLY)
+		return NF_ACCEPT;
+	if (udph->dest == ntohs(SNMP_TRAP_PORT) && dir != IP_CT_DIR_ORIGINAL)
 		return NF_ACCEPT;
 
 	/* No NAT? */
-	if (ct->nat.num_manips == 0)
+	if (!(ct->status & IPS_NAT_MASK))
 		return NF_ACCEPT;
 
-	if (debug > 1) {
-		printk(KERN_DEBUG "bsalg: dir=%s hook=%d manip=%s len=%d "
-		       "src=%u.%u.%u.%u:%u dst=%u.%u.%u.%u:%u "
-		       "osrc=%u.%u.%u.%u odst=%u.%u.%u.%u "
-		       "rsrc=%u.%u.%u.%u rdst=%u.%u.%u.%u "
-		       "\n", 
-		       dir == IP_CT_DIR_REPLY ? "reply" : "orig", hooknum, 
-		       HOOK2MANIP(hooknum) == IP_NAT_MANIP_SRC ? "snat" :
-		       "dnat", (*pskb)->len,
-		       NIPQUAD(iph->saddr), ntohs(udph->source),
-		       NIPQUAD(iph->daddr), ntohs(udph->dest),
-		       NIPQUAD(ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple.src.ip),
-		       NIPQUAD(ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.ip),
-		       NIPQUAD(ct->tuplehash[IP_CT_DIR_REPLY].tuple.src.ip),
-		       NIPQUAD(ct->tuplehash[IP_CT_DIR_REPLY].tuple.dst.ip));
-	}
-	
 	/* 
 	 * Make sure the packet length is ok.  So far, we were only guaranteed
 	 * to have a valid length IP header plus 8 bytes, which means we have
@@ -1304,7 +1279,7 @@ static unsigned int nat_help(struct ip_conntrack *ct,
 		return NF_DROP;
 
 	spin_lock_bh(&snmp_lock);
-	ret = snmp_translate(ct, info, ctinfo, hooknum, pskb);
+	ret = snmp_translate(ct, ctinfo, pskb);
 	spin_unlock_bh(&snmp_lock);
 	return ret;
 }
@@ -1320,7 +1295,7 @@ static struct ip_conntrack_helper snmp_helper = {
 		   .dst = { .protonum = IPPROTO_UDP },
 	},
 	.mask = { .src = { .u = { 0xFFFF } },
-		 .dst = { .protonum = 0xFFFF },
+		 .dst = { .protonum = 0xFF },
 	},
 };
 
@@ -1335,7 +1310,7 @@ static struct ip_conntrack_helper snmp_trap_helper = {
 		   .dst = { .protonum = IPPROTO_UDP },
 	},
 	.mask = { .src = { .u = { 0xFFFF } },
-		 .dst = { .protonum = 0xFFFF },
+		 .dst = { .protonum = 0xFF },
 	},
 };
 
@@ -1349,12 +1324,12 @@ static int __init init(void)
 {
 	int ret = 0;
 
-	ret = ip_conntrack_helper_register(&snmp);
+	ret = ip_conntrack_helper_register(&snmp_helper);
 	if (ret < 0)
 		return ret;
-	ret = ip_conntrack_helper_register(&snmp_trap);
+	ret = ip_conntrack_helper_register(&snmp_trap_helper);
 	if (ret < 0) {
-		ip_conntrack_helper_unregister(&snmp);
+		ip_conntrack_helper_unregister(&snmp_helper);
 		return ret;
 	}
 	return ret;
@@ -1362,8 +1337,8 @@ static int __init init(void)
 
 static void __exit fini(void)
 {
-	ip_conntrack_helper_unregister(&snmp);
-	ip_conntrack_helper_unregister(&snmp_trap);
+	ip_conntrack_helper_unregister(&snmp_helper);
+	ip_conntrack_helper_unregister(&snmp_trap_helper);
 }
 
 module_init(init);
