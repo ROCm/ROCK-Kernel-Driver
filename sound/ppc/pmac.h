@@ -84,7 +84,7 @@ struct snd_pmac_stream {
 
 	snd_pcm_substream_t *substream;
 
-	unsigned int cur_freqs;		/* currently available frequences */
+	unsigned int cur_freqs;		/* currently available frequencies */
 	unsigned int cur_formats;	/* currently available formats */
 };
 
