@@ -349,8 +349,8 @@ static int psmouse_extensions(struct psmouse *psmouse)
 	if (param[1]) {
 
 		int i;
-		static int logitech_4btn[] = { 12, 40, 41, 42, 43, 73, 80, -1 };
-		static int logitech_wheel[] = { 75, 76, 80, 81, 83, 88, -1 };
+		static int logitech_4btn[] = { 12, 40, 41, 42, 43, 52, 73, 80, -1 };
+		static int logitech_wheel[] = { 52, 75, 76, 80, 81, 83, 88, -1 };
 		static int logitech_ps2pp[] = { 12, 13, 40, 41, 42, 43, 50, 51, 52, 53, 73, 75,
 							76, 80, 81, 83, 88, 96, 97, -1 };
 		psmouse->vendor = "Logitech";
