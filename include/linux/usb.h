@@ -31,8 +31,6 @@ static __inline__ void wait_ms(unsigned int ms)
 		mdelay(ms);
 }
 
-void usb_uninterruptible_sleep_ms(int msecs);
-
 struct usb_device;
 struct usb_driver;
 
