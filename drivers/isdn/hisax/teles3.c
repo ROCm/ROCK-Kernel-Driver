@@ -165,8 +165,8 @@ release_ioregs(struct IsdnCardState *cs, int mask)
 		release_region(cs->hw.teles3.hscx[1] + 32, 32);
 }
 
-void
-release_io_teles3(struct IsdnCardState *cs)
+static void
+teles3_release(struct IsdnCardState *cs)
 {
 	if (cs->typ == ISDN_CTYPE_TELESPCMCIA) {
 		release_region(cs->hw.teles3.hscx[1], 96);
@@ -183,7 +183,7 @@ release_io_teles3(struct IsdnCardState *cs)
 }
 
 static int
-reset_teles3(struct IsdnCardState *cs)
+teles3_reset(struct IsdnCardState *cs)
 {
 	u8 irqcfg;
 
@@ -241,21 +241,13 @@ reset_teles3(struct IsdnCardState *cs)
 static int
 Teles_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 {
-	switch (mt) {
-		case CARD_RESET:
-			reset_teles3(cs);
-			return(0);
-		case CARD_RELEASE:
-			release_io_teles3(cs);
-			return(0);
-		case CARD_TEST:
-			return(0);
-	}
 	return(0);
 }
 
 static struct card_ops teles3_ops = {
 	.init     = inithscxisac,
+	.reset    = teles3_reset,
+	.release  = teles3_release,
 	.irq_func = teles3_interrupt,
 };
 
@@ -445,13 +437,13 @@ setup_teles3(struct IsdnCard *card)
 		if ((val = bytein(cs->hw.teles3.cfg_reg + 0)) != 0x51) {
 			printk(KERN_WARNING "Teles: 16.3 Byte at %x is %x\n",
 			       cs->hw.teles3.cfg_reg + 0, val);
-			release_io_teles3(cs);
+			teles3_release(cs);
 			return (0);
 		}
 		if ((val = bytein(cs->hw.teles3.cfg_reg + 1)) != 0x93) {
 			printk(KERN_WARNING "Teles: 16.3 Byte at %x is %x\n",
 			       cs->hw.teles3.cfg_reg + 1, val);
-			release_io_teles3(cs);
+			teles3_release(cs);
 			return (0);
 		}
 		val = bytein(cs->hw.teles3.cfg_reg + 2);/* 0x1e=without AB
@@ -464,7 +456,7 @@ setup_teles3(struct IsdnCard *card)
 		if (val != 0x46 && val != 0x39 && val != 0x38 && val != 0x1c && val != 0x1e && val != 0x1f) {
 			printk(KERN_WARNING "Teles: 16.3 Byte at %x is %x\n",
 			       cs->hw.teles3.cfg_reg + 2, val);
-			release_io_teles3(cs);
+			teles3_release(cs);
 			return (0);
 		}
 	}
@@ -476,9 +468,9 @@ setup_teles3(struct IsdnCard *card)
 	       "HiSax: hscx A:0x%X  hscx B:0x%X\n",
 	       cs->hw.teles3.hscx[0] + 32, cs->hw.teles3.hscx[1] + 32);
 
-	if (reset_teles3(cs)) {
+	if (teles3_reset(cs)) {
 		printk(KERN_WARNING "Teles3: wrong IRQ\n");
-		release_io_teles3(cs);
+		teles3_release(cs);
 		return (0);
 	}
 	cs->dc_hw_ops = &isac_ops;
@@ -489,7 +481,7 @@ setup_teles3(struct IsdnCard *card)
 	if (HscxVersion(cs, "Teles3:")) {
 		printk(KERN_WARNING
 		       "Teles3: wrong HSCX versions check IO address\n");
-		release_io_teles3(cs);
+		teles3_release(cs);
 		return (0);
 	}
 	return (1);

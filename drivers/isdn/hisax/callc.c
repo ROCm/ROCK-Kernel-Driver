@@ -1458,12 +1458,8 @@ lli_got_fac_req(struct Channel *chanp, capi_msg *cm) {
 
 void
 lli_got_manufacturer(struct Channel *chanp, struct IsdnCardState *cs, capi_msg *cm) {
-	if ((cs->typ == ISDN_CTYPE_ELSA) || (cs->typ == ISDN_CTYPE_ELSA_PNP) ||
-		(cs->typ == ISDN_CTYPE_ELSA_PCI)) {
-		if (cs->hw.elsa.MFlag) {
-			cs->cardmsg(cs, CARD_AUX_IND, cm->para);
-		}
-	}
+	if (cs->card_ops->aux_ind)
+		cs->card_ops->aux_ind(cs, cm->para);
 }
 
 

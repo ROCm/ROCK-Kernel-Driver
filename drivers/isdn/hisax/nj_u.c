@@ -72,8 +72,8 @@ nj_u_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	spin_unlock(&cs->lock);
 }
 
-static void
-reset_netjet_u(struct IsdnCardState *cs)
+static int
+nj_u_reset(struct IsdnCardState *cs)
 {
 	cs->hw.njet.ctrl_reg = 0xff;  /* Reset On */
 	byteout(cs->hw.njet.base + NETJET_CTRL, cs->hw.njet.ctrl_reg);
@@ -91,21 +91,12 @@ reset_netjet_u(struct IsdnCardState *cs)
 	byteout(cs->hw.njet.base + NETJET_AUXCTRL, ~NETJET_ISACIRQ);
 	byteout(cs->hw.njet.base + NETJET_IRQMASK1, NETJET_ISACIRQ);
 	byteout(cs->hw.njet.auxa, cs->hw.njet.auxd);
+	return 0;
 }
 
 static int
 NETjet_U_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 {
-	switch (mt) {
-		case CARD_RESET:
-			reset_netjet_u(cs);
-			return(0);
-		case CARD_RELEASE:
-			release_io_netjet(cs);
-			return(0);
-		case CARD_TEST:
-			return(0);
-	}
 	return(0);
 }
 
@@ -120,6 +111,8 @@ nj_u_init(struct IsdnCardState *cs)
 
 static struct card_ops nj_u_ops = {
 	.init     = nj_u_init,
+	.reset    = nj_u_reset,
+	.release  = netjet_release,
 	.irq_func = nj_u_interrupt,
 };
 
@@ -229,7 +222,7 @@ setup_netjet_u(struct IsdnCard *card)
 		       cs->hw.njet.base + bytecnt);
 		return (0);
 	}
-	reset_netjet_u(cs);
+	nj_u_reset(cs);
 	cs->dc_hw_ops = &netjet_dc_ops;
 	cs->cardmsg = &NETjet_U_card_msg;
 	cs->irq_flags |= SA_SHIRQ;

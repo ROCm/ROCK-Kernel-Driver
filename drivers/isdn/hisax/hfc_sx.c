@@ -308,8 +308,8 @@ read_fifo(struct IsdnCardState *cs, u8 fifo, int trans_max)
 /******************************************/
 /* free hardware resources used by driver */
 /******************************************/
-void
-release_io_hfcsx(struct IsdnCardState *cs)
+static void
+hfcsx_release(struct IsdnCardState *cs)
 {
 	cs->hw.hfcsx.int_m2 = 0;	/* interrupt output off ! */
 	Write_hfc(cs, HFCSX_INT_M2, cs->hw.hfcsx.int_m2);
@@ -347,8 +347,8 @@ static int set_fifo_size(struct IsdnCardState *cs)
 /* function called to reset the HFC SX chip. A complete software reset of chip */
 /* and fifos is done.                                                           */
 /********************************************************************************/
-static void
-reset_hfcsx(struct IsdnCardState *cs)
+static int
+hfcsx_reset(struct IsdnCardState *cs)
 {
 	cs->hw.hfcsx.int_m2 = 0;	/* interrupt output off ! */
 	Write_hfc(cs, HFCSX_INT_M2, cs->hw.hfcsx.int_m2);
@@ -415,6 +415,7 @@ reset_hfcsx(struct IsdnCardState *cs)
 	cs->hw.hfcsx.int_m2 = HFCSX_IRQ_ENABLE;
 	Write_hfc(cs, HFCSX_INT_M2, cs->hw.hfcsx.int_m2);
 	if (Read_hfc(cs, HFCSX_INT_S2));
+	return 0;
 }
 
 /***************************************************/
@@ -1143,18 +1144,6 @@ inithfcsx(struct IsdnCardState *cs)
 static int
 hfcsx_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 {
-	if (cs->debug & L1_DEB_ISAC)
-		debugl1(cs, "HFCSX: card_msg %x", mt);
-	switch (mt) {
-		case CARD_RESET:
-			reset_hfcsx(cs);
-			return (0);
-		case CARD_RELEASE:
-			release_io_hfcsx(cs);
-			return (0);
-		case CARD_TEST:
-			return (0);
-	}
 	return (0);
 }
 
@@ -1173,6 +1162,8 @@ hfcsx_init(struct IsdnCardState *cs)
 
 static struct card_ops hfcsx_ops = {
 	.init     = hfcsx_init,
+	.reset    = hfcsx_reset,
+	.release  = hfcsx_release,
 	.irq_func = hfcsx_interrupt,
 };
 
@@ -1300,7 +1291,7 @@ setup_hfcsx(struct IsdnCard *card)
 	cs->hw.hfcsx.cirm = ccd_sp_irqtab[cs->irq & 0xF]; /* RAM not evaluated */
 	init_timer(&cs->hw.hfcsx.timer);
 
-	reset_hfcsx(cs);
+	hfcsx_reset(cs);
 	cs->cardmsg = &hfcsx_card_msg;
 	cs->auxcmd = &hfcsx_auxcmd;
 	cs->card_ops = &hfcsx_ops;

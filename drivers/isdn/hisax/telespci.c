@@ -226,7 +226,7 @@ telespci_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 }
 
 void
-release_io_telespci(struct IsdnCardState *cs)
+telespci_release(struct IsdnCardState *cs)
 {
 	iounmap((void *)cs->hw.teles0.membase);
 }
@@ -234,20 +234,12 @@ release_io_telespci(struct IsdnCardState *cs)
 static int
 TelesPCI_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 {
-	switch (mt) {
-		case CARD_RESET:
-			return(0);
-		case CARD_RELEASE:
-			release_io_telespci(cs);
-			return(0);
-		case CARD_TEST:
-			return(0);
-	}
 	return(0);
 }
 
 static struct card_ops telespci_ops = {
 	.init     = inithscxisac,
+	.release  = telespci_release,
 	.irq_func = telespci_interrupt,
 };
 
@@ -316,7 +308,7 @@ setup_telespci(struct IsdnCard *card)
 	if (HscxVersion(cs, "TelesPCI:")) {
 		printk(KERN_WARNING
 		 "TelesPCI: wrong HSCX versions check IO/MEM addresses\n");
-		release_io_telespci(cs);
+		telespci_release(cs);
 		return (0);
 	}
 	return (1);

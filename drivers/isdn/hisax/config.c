@@ -843,8 +843,8 @@ static void closecard(int cardnr)
 	if (csta->DC_Close != NULL) {
 		csta->DC_Close(csta);
 	}
-	if (csta->cardmsg)
-		csta->cardmsg(csta, CARD_RELEASE, NULL);
+	if (csta->card_ops->release)
+		csta->card_ops->release(csta);
 	if (csta->dbusytimer.function != NULL) // FIXME?
 		del_timer(&csta->dbusytimer);
 	ll_unload(csta);
@@ -879,11 +879,13 @@ static int __devinit init_card(struct IsdnCardState *cs)
 				free_irq(cs->irq, cs);
 				return 2;
 			} else {
-				cs->cardmsg(cs, CARD_RESET, NULL);
+				if (cs->card_ops->reset)
+					cs->card_ops->reset(cs);
 				cnt--;
 			}
 		} else {
-			cs->cardmsg(cs, CARD_TEST, NULL);
+			if (cs->card_ops->test)
+				cs->card_ops->test(cs);
 			return 0;
 		}
 	}

@@ -167,15 +167,6 @@ release_ioregs(struct IsdnCardState *cs, int mask)
 static int
 AVM_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 {
-	switch (mt) {
-		case CARD_RESET:
-			return(0);
-		case CARD_RELEASE:
-			release_ioregs(cs, 0x3f);
-			return(0);
-		case CARD_TEST:
-			return(0);
-	}
 	return(0);
 }
 
@@ -187,8 +178,15 @@ avm_a1_init(struct IsdnCardState *cs)
 	inithscxisac(cs);
 }
 
+static void
+avm_a1_release(struct IsdnCardState *cs)
+{
+	release_ioregs(cs, 0x3f);
+}
+
 static struct card_ops avm_a1_ops = {
 	.init     = avm_a1_init,
+	.release  = avm_a1_release,
 	.irq_func = avm_a1_interrupt,
 };
 

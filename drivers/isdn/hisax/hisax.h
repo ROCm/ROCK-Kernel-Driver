@@ -46,10 +46,6 @@
 #define HW_INFO4_P10	0x0048
 #define HW_RSYNC	0x0060
 #define HW_TESTLOOP	0x0070
-#define CARD_RESET	0x00F0
-#define CARD_RELEASE	0x00F3
-#define CARD_TEST	0x00F4
-#define CARD_AUX_IND	0x00F5
 
 #define PH_ACTIVATE	0x0100
 #define PH_DEACTIVATE	0x0110
@@ -858,6 +854,10 @@ struct IsdnCardState;
 
 struct card_ops {
 	void   (*init)      (struct IsdnCardState *);
+	void   (*test)      (struct IsdnCardState *);
+	int    (*reset)     (struct IsdnCardState *);
+	void   (*release)   (struct IsdnCardState *);
+	void   (*aux_ind)   (struct IsdnCardState *, void *arg);
 	void   (*irq_func)  (int, void *, struct pt_regs *);
 };
 

@@ -324,104 +324,109 @@ gazel_ipac_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	writereg_ipac(cs, IPAC_MASK, 0xFF);
 	writereg_ipac(cs, IPAC_MASK, 0xC0);
 }
-void
-release_io_gazel(struct IsdnCardState *cs)
+
+static void
+gazel_release(struct IsdnCardState *cs)
 {
 	unsigned int i;
 
 	switch (cs->subtyp) {
-		case R647:
-			for (i = 0x0000; i < 0xC000; i += 0x1000)
-				release_region(i + cs->hw.gazel.hscx[0], 16);
-			release_region(0xC000 + cs->hw.gazel.hscx[0], 1);
-			break;
+	case R647:
+		for (i = 0x0000; i < 0xC000; i += 0x1000)
+			release_region(i + cs->hw.gazel.hscx[0], 16);
+		release_region(0xC000 + cs->hw.gazel.hscx[0], 1);
+		break;
+	case R685:
+		release_region(cs->hw.gazel.hscx[0], 0x100);
+		release_region(cs->hw.gazel.cfg_reg, 0x80);
+		break;
+	}
+}
 
-		case R685:
-			release_region(cs->hw.gazel.hscx[0], 0x100);
-			release_region(cs->hw.gazel.cfg_reg, 0x80);
-			break;
-
-		case R753:
-			release_region(cs->hw.gazel.ipac, 0x8);
-			release_region(cs->hw.gazel.cfg_reg, 0x80);
-			break;
-
-		case R742:
-			release_region(cs->hw.gazel.ipac, 8);
-			break;
+static void
+gazel_ipac_release(struct IsdnCardState *cs)
+{
+	switch (cs->subtyp) {
+	case R753:
+		release_region(cs->hw.gazel.ipac, 0x8);
+		release_region(cs->hw.gazel.cfg_reg, 0x80);
+		break;
+	case R742:
+		release_region(cs->hw.gazel.ipac, 8);
+		break;
 	}
 }
 
 static int
-reset_gazel(struct IsdnCardState *cs)
+gazel_reset(struct IsdnCardState *cs)
 {
 	unsigned long plxcntrl, addr = cs->hw.gazel.cfg_reg;
 
 	switch (cs->subtyp) {
-		case R647:
-			writereg(addr, 0, 0);
-			HZDELAY(10);
-			writereg(addr, 0, 1);
-			HZDELAY(2);
-			break;
-		case R685:
-			plxcntrl = inl(addr + PLX_CNTRL);
-			plxcntrl |= (RESET_9050 + RESET_GAZEL);
-			outl(plxcntrl, addr + PLX_CNTRL);
-			plxcntrl &= ~(RESET_9050 + RESET_GAZEL);
-			HZDELAY(4);
-			outl(plxcntrl, addr + PLX_CNTRL);
-			HZDELAY(10);
-			outb(INT_ISAC_EN + INT_HSCX_EN + INT_PCI_EN, addr + PLX_INCSR);
-			break;
-		case R753:
-			if (test_bit(FLG_BUGGY_PLX9050, &cs->HW_Flags))
-				/* we can't read, assume the default */
-				plxcntrl = 0x18784db6;
-			else
-				plxcntrl = inl(addr + PLX_CNTRL);
-			plxcntrl |= (RESET_9050 + RESET_GAZEL);
-			outl(plxcntrl, addr + PLX_CNTRL);
-			writereg_ipac(cs, IPAC_POTA2, 0x20);
-			HZDELAY(4);
-			plxcntrl &= ~(RESET_9050 + RESET_GAZEL);
-			outl(plxcntrl, addr + PLX_CNTRL);
-			HZDELAY(10);
-			writereg_ipac(cs, IPAC_POTA2, 0x00);
-			writereg_ipac(cs, IPAC_ACFG, 0xff);
-			writereg_ipac(cs, IPAC_AOE, 0x0);
-			writereg_ipac(cs, IPAC_MASK, 0xff);
-			writereg_ipac(cs, IPAC_CONF, 0x1);
-			outb(INT_IPAC_EN + INT_PCI_EN, addr + PLX_INCSR);
-			writereg_ipac(cs, IPAC_MASK, 0xc0);
-			break;
-		case R742:
-			writereg_ipac(cs, IPAC_POTA2, 0x20);
-			HZDELAY(4);
-			writereg_ipac(cs, IPAC_POTA2, 0x00);
-			writereg_ipac(cs, IPAC_ACFG, 0xff);
-			writereg_ipac(cs, IPAC_AOE, 0x0);
-			writereg_ipac(cs, IPAC_MASK, 0xff);
-			writereg_ipac(cs, IPAC_CONF, 0x1);
-			writereg_ipac(cs, IPAC_MASK, 0xc0);
-			break;
+	case R647:
+		writereg(addr, 0, 0);
+		HZDELAY(10);
+		writereg(addr, 0, 1);
+		HZDELAY(2);
+		break;
+	case R685:
+		plxcntrl = inl(addr + PLX_CNTRL);
+		plxcntrl |= (RESET_9050 + RESET_GAZEL);
+		outl(plxcntrl, addr + PLX_CNTRL);
+		plxcntrl &= ~(RESET_9050 + RESET_GAZEL);
+		HZDELAY(4);
+		outl(plxcntrl, addr + PLX_CNTRL);
+		HZDELAY(10);
+		outb(INT_ISAC_EN + INT_HSCX_EN + INT_PCI_EN, addr + PLX_INCSR);
+		break;
 	}
-	return (0);
+	return 0;
+}
+
+static int
+gazel_ipac_reset(struct IsdnCardState *cs)
+{
+	unsigned long plxcntrl, addr = cs->hw.gazel.cfg_reg;
+
+	switch (cs->subtyp) {
+	case R753:
+		if (test_bit(FLG_BUGGY_PLX9050, &cs->HW_Flags))
+			/* we can't read, assume the default */
+			plxcntrl = 0x18784db6;
+		else
+			plxcntrl = inl(addr + PLX_CNTRL);
+		plxcntrl |= (RESET_9050 + RESET_GAZEL);
+		outl(plxcntrl, addr + PLX_CNTRL);
+		writereg_ipac(cs, IPAC_POTA2, 0x20);
+		HZDELAY(4);
+		plxcntrl &= ~(RESET_9050 + RESET_GAZEL);
+		outl(plxcntrl, addr + PLX_CNTRL);
+		HZDELAY(10);
+		writereg_ipac(cs, IPAC_POTA2, 0x00);
+		writereg_ipac(cs, IPAC_ACFG, 0xff);
+		writereg_ipac(cs, IPAC_AOE, 0x0);
+		writereg_ipac(cs, IPAC_MASK, 0xff);
+		writereg_ipac(cs, IPAC_CONF, 0x1);
+		outb(INT_IPAC_EN + INT_PCI_EN, addr + PLX_INCSR);
+		writereg_ipac(cs, IPAC_MASK, 0xc0);
+		break;
+	case R742:
+		writereg_ipac(cs, IPAC_POTA2, 0x20);
+		HZDELAY(4);
+		writereg_ipac(cs, IPAC_POTA2, 0x00);
+		writereg_ipac(cs, IPAC_ACFG, 0xff);
+		writereg_ipac(cs, IPAC_AOE, 0x0);
+		writereg_ipac(cs, IPAC_MASK, 0xff);
+		writereg_ipac(cs, IPAC_CONF, 0x1);
+		writereg_ipac(cs, IPAC_MASK, 0xc0);
+		break;
+	}
+	return 0;
 }
 
 static int
 Gazel_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 {
-	switch (mt) {
-		case CARD_RESET:
-			reset_gazel(cs);
-			return (0);
-		case CARD_RELEASE:
-			release_io_gazel(cs);
-			return (0);
-		case CARD_TEST:
-			return (0);
-	}
 	return (0);
 }
 
@@ -438,11 +443,15 @@ gazel_init(struct IsdnCardState *cs)
 
 static struct card_ops gazel_ops = {
 	.init     = gazel_init,
+	.reset    = gazel_reset,
+	.release  = gazel_release,
 	.irq_func = gazel_interrupt,
 };
 
 static struct card_ops gazel_ipac_ops = {
 	.init     = inithscxisac,
+	.reset    = gazel_ipac_reset,
+	.release  = gazel_ipac_release,
 	.irq_func = gazel_ipac_interrupt,
 };
 
@@ -683,11 +692,6 @@ setup_gazel(struct IsdnCard *card)
 	if (reserve_regions(card, cs)) {
 		return (0);
 	}
-	if (reset_gazel(cs)) {
-		printk(KERN_WARNING "Gazel: wrong IRQ\n");
-		release_io_gazel(cs);
-		return (0);
-	}
 	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &Gazel_card_msg;
@@ -695,17 +699,19 @@ setup_gazel(struct IsdnCard *card)
 	switch (cs->subtyp) {
 		case R647:
 		case R685:
+			gazel_reset(cs);
 			cs->card_ops = &gazel_ops;
 			ISACVersion(cs, "Gazel:");
 			if (HscxVersion(cs, "Gazel:")) {
 				printk(KERN_WARNING
 				       "Gazel: wrong HSCX versions check IO address\n");
-				release_io_gazel(cs);
+				gazel_release(cs);
 				return (0);
 			}
 			break;
 		case R742:
 		case R753:
+			gazel_ipac_reset(cs);
 			cs->card_ops = &gazel_ipac_ops;
 			val = readreg_ipac(cs, IPAC_ID);
 			printk(KERN_INFO "Gazel: IPAC version %x\n", val);

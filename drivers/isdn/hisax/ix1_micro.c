@@ -141,7 +141,7 @@ static struct bc_hw_ops hscx_ops = {
 };
 
 static void
-ix1micro_interrupt(int intno, void *dev_id, struct pt_regs *regs)
+ix1_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
 	u8 val;
@@ -176,14 +176,14 @@ ix1micro_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	spin_unlock(&cs->lock);
 }
 
-void
-release_io_ix1micro(struct IsdnCardState *cs)
+static void
+ix1_release(struct IsdnCardState *cs)
 {
 	if (cs->hw.ix1.cfg_reg)
 		release_region(cs->hw.ix1.cfg_reg, 4);
 }
 
-static void
+static int
 ix1_reset(struct IsdnCardState *cs)
 {
 	int cnt;
@@ -195,27 +195,20 @@ ix1_reset(struct IsdnCardState *cs)
 		HZDELAY(1);	/* wait >=10 ms */
 	}
 	byteout(cs->hw.ix1.cfg_reg + SPECIAL_PORT_OFFSET, 0);
+	return 0;
 }
 
 static int
 ix1_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 {
-	switch (mt) {
-		case CARD_RESET:
-			ix1_reset(cs);
-			return(0);
-		case CARD_RELEASE:
-			release_io_ix1micro(cs);
-			return(0);
-		case CARD_TEST:
-			return(0);
-	}
 	return(0);
 }
 
 static struct card_ops ix1_ops = {
 	.init     = inithscxisac,
-	.irq_func = ix1micro_interrupt,
+	.reset    = ix1_reset,
+	.release  = ix1_release,
+	.irq_func = ix1_interrupt,
 };
 
 #ifdef __ISAPNP__
@@ -314,7 +307,7 @@ setup_ix1micro(struct IsdnCard *card)
 	if (HscxVersion(cs, "ix1-Micro:")) {
 		printk(KERN_WARNING
 		    "ix1-Micro: wrong HSCX versions check IO address\n");
-		release_io_ix1micro(cs);
+		ix1_release(cs);
 		return (0);
 	}
 	return (1);

@@ -593,7 +593,8 @@ setstack_w6692(struct PStack *st, struct BCState *bcs)
 	return (0);
 }
 
-void resetW6692(struct IsdnCardState *cs)
+static int
+w6692_reset(struct IsdnCardState *cs)
 {
 	w6692_write_reg(cs, W_D_CTL, W_D_CTL_SRST);
 	schedule_timeout((10*HZ)/1000);
@@ -613,9 +614,10 @@ void resetW6692(struct IsdnCardState *cs)
 		w6692_write_reg(cs, W_PCTL, 0x80);
 		w6692_write_reg(cs, W_XDATA, 0x00);
 	}
+	return 0;
 }
 
-void __init
+static void
 w6692_init(struct IsdnCardState *cs)
 {
 	INIT_WORK(&cs->work, W6692_bh, cs);
@@ -624,7 +626,7 @@ w6692_init(struct IsdnCardState *cs)
 	cs->dbusytimer.function = (void *) dbusy_timer_handler;
 	cs->dbusytimer.data = (long) cs;
 	init_timer(&cs->dbusytimer);
-	resetW6692(cs);
+	w6692_reset(cs);
 	ph_command(cs, W_L1CMD_RST);
 	cs->dc.w6692.ph_state = W_L1CMD_RST;
 	W6692_new_ph(cs);
@@ -642,28 +644,26 @@ w6692_init(struct IsdnCardState *cs)
 	w6692_write_reg(cs, W_D_CMDR, W_D_CMDR_RRST | W_D_CMDR_XRST);
 }
 
+
+static void
+w6692_release(struct IsdnCardState *cs)
+{
+	w6692_write_reg(cs, W_IMASK, 0xff);
+	release_region(cs->hw.w6692.iobase, 256);
+	if (cs->subtyp == W6692_USR)
+		w6692_write_reg(cs, W_XDATA, 0x04);
+}
+
 static int
 w6692_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 {
-	switch (mt) {
-		case CARD_RESET:
-			resetW6692(cs);
-			return (0);
-		case CARD_RELEASE:
-			w6692_write_reg(cs, W_IMASK, 0xff);
-			release_region(cs->hw.w6692.iobase, 256);
-			if (cs->subtyp == W6692_USR) {
-				w6692_write_reg(cs, W_XDATA, 0x04);
-			}
-			return (0);
-		case CARD_TEST:
-			return (0);
-	}
 	return (0);
 }
 
 static struct card_ops w6692_ops = {
 	.init     = w6692_init,
+	.reset    = w6692_reset,
+	.release  = w6692_release,
 	.irq_func = w6692_interrupt,
 };
 

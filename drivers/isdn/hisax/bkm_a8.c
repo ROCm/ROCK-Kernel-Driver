@@ -241,22 +241,6 @@ reset_bkm(struct IsdnCardState *cs)
 static int
 BKM_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 {
-	switch (mt) {
-		case CARD_RESET:
-			/* Disable ints */
-			set_ipac_active(cs, 0);
-			enable_bkm_int(cs, 0);
-			reset_bkm(cs);
-			return (0);
-		case CARD_RELEASE:
-			/* Sanity */
-			set_ipac_active(cs, 0);
-			enable_bkm_int(cs, 0);
-			release_io_sct_quadro(cs);
-			return (0);
-		case CARD_TEST:
-			return (0);
-	}
 	return (0);
 }
 
@@ -270,8 +254,28 @@ bkm_a8_init(struct IsdnCardState *cs)
 	enable_bkm_int(cs, 1);
 }
 
+static int
+bkm_a8_reset(struct IsdnCardState *cs)
+{
+	/* Disable ints */
+	set_ipac_active(cs, 0);
+	enable_bkm_int(cs, 0);
+	reset_bkm(cs);
+	return 0;
+}
+
+static void
+bkm_a8_release(struct IsdnCardState *cs)
+{
+	set_ipac_active(cs, 0);
+	enable_bkm_int(cs, 0);
+	release_io_sct_quadro(cs);
+}
+
 static struct card_ops bkm_a8_ops = {
 	.init     = bkm_a8_init,
+	.reset    = bkm_a8_reset,
+	.release  = bkm_a8_release,
 	.irq_func = bkm_a8_interrupt,
 };
 

@@ -168,32 +168,22 @@ mic_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	spin_unlock(&cs->lock);
 }
 
-void
-release_io_mic(struct IsdnCardState *cs)
+static void
+mic_release(struct IsdnCardState *cs)
 {
-	int bytecnt = 8;
-
 	if (cs->hw.mic.cfg_reg)
-		release_region(cs->hw.mic.cfg_reg, bytecnt);
+		release_region(cs->hw.mic.cfg_reg, 8);
 }
 
 static int
 mic_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 {
-	switch (mt) {
-		case CARD_RESET:
-			return(0);
-		case CARD_RELEASE:
-			release_io_mic(cs);
-			return(0);
-		case CARD_TEST:
-			return(0);
-	}
 	return(0);
 }
 
 static struct card_ops mic_ops = {
 	.init     = inithscxisac,
+	.release  = mic_release,
 	.irq_func = mic_interrupt,
 };
 
@@ -237,7 +227,7 @@ setup_mic(struct IsdnCard *card)
 	if (HscxVersion(cs, "mic:")) {
 		printk(KERN_WARNING
 		    "mic: wrong HSCX versions check IO address\n");
-		release_io_mic(cs);
+		mic_release(cs);
 		return (0);
 	}
 	return (1);

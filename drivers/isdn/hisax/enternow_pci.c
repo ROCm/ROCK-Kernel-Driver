@@ -162,15 +162,6 @@ enpci_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 		debugl1(cs, "enter:now PCI: card_msg: 0x%04X", mt);
 
         switch (mt) {
-		case CARD_RESET:
-			reset_enpci(cs);
-                        Amd7930_init(cs);
-			break;
-		case CARD_RELEASE:
-			release_io_netjet(cs);
-			break;
-		case CARD_TEST:
-			break;
                 case MDL_ASSIGN:
                         /* TEI assigned, LED1 on */
                         cs->hw.njet.auxd = TJ_AMD_IRQ << 1;
@@ -219,6 +210,14 @@ enpci_init(struct IsdnCardState *cs)
 {
 	inittiger(cs);
 	Amd7930_init(cs);
+}
+
+static int
+enpci_reset(struct IsdnCardState *cs)
+{
+	reset_enpci(cs);
+	Amd7930_init(cs);
+	return 0;
 }
 
 static void
@@ -270,6 +269,8 @@ enpci_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 
 static struct card_ops enpci_ops = {
 	.init     = enpci_init,
+	.reset    = enpci_reset,
+	.release  = netjet_release,
 	.irq_func = enpci_interrupt,
 };
 

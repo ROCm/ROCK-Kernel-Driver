@@ -148,8 +148,8 @@ teles0_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	spin_unlock(&cs->lock);
 }
 
-void
-release_io_teles0(struct IsdnCardState *cs)
+static void
+teles0_release(struct IsdnCardState *cs)
 {
 	if (cs->hw.teles0.cfg_reg)
 		release_region(cs->hw.teles0.cfg_reg, 8);
@@ -158,7 +158,7 @@ release_io_teles0(struct IsdnCardState *cs)
 }
 
 static int
-reset_teles0(struct IsdnCardState *cs)
+teles0_reset(struct IsdnCardState *cs)
 {
 	u8 cfval;
 
@@ -208,21 +208,13 @@ reset_teles0(struct IsdnCardState *cs)
 static int
 Teles_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 {
-	switch (mt) {
-		case CARD_RESET:
-			reset_teles0(cs);
-			return(0);
-		case CARD_RELEASE:
-			release_io_teles0(cs);
-			return(0);
-		case CARD_TEST:
-			return(0);
-	}
 	return(0);
 }
 
 static struct card_ops teles0_ops = {
 	.init     = inithscxisac,
+	.reset    = teles0_reset,
+	.release  = teles0_release,
 	.irq_func = teles0_interrupt,
 };
 
@@ -306,9 +298,9 @@ setup_teles0(struct IsdnCard *card)
 	       "HiSax: %s config irq:%d mem:0x%lX cfg:0x%X\n",
 	       CardType[cs->typ], cs->irq,
 	       cs->hw.teles0.membase, cs->hw.teles0.cfg_reg);
-	if (reset_teles0(cs)) {
+	if (teles0_reset(cs)) {
 		printk(KERN_WARNING "Teles0: wrong IRQ\n");
-		release_io_teles0(cs);
+		teles0_release(cs);
 		return (0);
 	}
 	cs->dc_hw_ops = &isac_ops;
@@ -319,7 +311,7 @@ setup_teles0(struct IsdnCard *card)
 	if (HscxVersion(cs, "Teles0:")) {
 		printk(KERN_WARNING
 		 "Teles0: wrong HSCX versions check IO/MEM addresses\n");
-		release_io_teles0(cs);
+		teles0_release(cs);
 		return (0);
 	}
 	return (1);

@@ -257,52 +257,45 @@ Start_IPAC:
 	writereg(cs, cs->hw.asus.isac, IPAC_MASK, 0xC0);
 }
 
-void
-release_io_asuscom(struct IsdnCardState *cs)
+static void
+asuscom_release(struct IsdnCardState *cs)
 {
-	int bytecnt = 8;
-
 	if (cs->hw.asus.cfg_reg)
-		release_region(cs->hw.asus.cfg_reg, bytecnt);
+		release_region(cs->hw.asus.cfg_reg, 8);
 }
 
-static void
-reset_asuscom(struct IsdnCardState *cs)
+static int
+asuscom_reset(struct IsdnCardState *cs)
 {
-	if (cs->subtyp == ASUS_IPAC)
-		writereg(cs, cs->hw.asus.isac, IPAC_POTA2, 0x20);
-	else
-		byteout(cs->hw.asus.adr, ASUS_RESET);	/* Reset On */
+	byteout(cs->hw.asus.adr, ASUS_RESET);	/* Reset On */
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout((10*HZ)/1000);
-	if (cs->subtyp == ASUS_IPAC)
-		writereg(cs, cs->hw.asus.isac, IPAC_POTA2, 0x0);
-	else
-		byteout(cs->hw.asus.adr, 0);	/* Reset Off */
+	byteout(cs->hw.asus.adr, 0);	/* Reset Off */
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout((10*HZ)/1000);
-	if (cs->subtyp == ASUS_IPAC) {
-		writereg(cs, cs->hw.asus.isac, IPAC_CONF, 0x0);
-		writereg(cs, cs->hw.asus.isac, IPAC_ACFG, 0xff);
-		writereg(cs, cs->hw.asus.isac, IPAC_AOE, 0x0);
-		writereg(cs, cs->hw.asus.isac, IPAC_MASK, 0xc0);
-		writereg(cs, cs->hw.asus.isac, IPAC_PCFG, 0x12);
-	}
+	return 0;
+}
+
+static int
+asuscom_ipac_reset(struct IsdnCardState *cs)
+{
+	writereg(cs, cs->hw.asus.isac, IPAC_POTA2, 0x20);
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	schedule_timeout((10*HZ)/1000);
+	writereg(cs, cs->hw.asus.isac, IPAC_POTA2, 0x0);
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	schedule_timeout((10*HZ)/1000);
+	writereg(cs, cs->hw.asus.isac, IPAC_CONF, 0x0);
+	writereg(cs, cs->hw.asus.isac, IPAC_ACFG, 0xff);
+	writereg(cs, cs->hw.asus.isac, IPAC_AOE, 0x0);
+	writereg(cs, cs->hw.asus.isac, IPAC_MASK, 0xc0);
+	writereg(cs, cs->hw.asus.isac, IPAC_PCFG, 0x12);
+	return 0;
 }
 
 static int
 Asus_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 {
-	switch (mt) {
-		case CARD_RESET:
-			reset_asuscom(cs);
-			return(0);
-		case CARD_RELEASE:
-			release_io_asuscom(cs);
-			return(0);
-		case CARD_TEST:
-			return(0);
-	}
 	return(0);
 }
 
@@ -315,11 +308,15 @@ asuscom_init(struct IsdnCardState *cs)
 
 static struct card_ops asuscom_ops = {
 	.init     = asuscom_init,
+	.reset    = asuscom_reset,
+	.release  = asuscom_release,
 	.irq_func = asuscom_interrupt,
 };
 
 static struct card_ops asuscom_ipac_ops = {
 	.init     = asuscom_init,
+	.reset    = asuscom_ipac_reset,
+	.release  = asuscom_release,
 	.irq_func = asuscom_ipac_interrupt,
 };
 
@@ -434,11 +431,11 @@ setup_asuscom(struct IsdnCard *card)
 		if (HscxVersion(cs, "ISDNLink:")) {
 			printk(KERN_WARNING
 		     	"ISDNLink: wrong HSCX versions check IO address\n");
-			release_io_asuscom(cs);
+			asuscom_release(cs);
 			return (0);
 		}
 	}
 	printk(KERN_INFO "ISDNLink: resetting card\n");
-	reset_asuscom(cs);
+	cs->card_ops->reset(cs);
 	return (1);
 }

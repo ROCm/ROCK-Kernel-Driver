@@ -195,7 +195,7 @@ niccy_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 }
 
 void
-release_io_niccy(struct IsdnCardState *cs)
+niccy_release(struct IsdnCardState *cs)
 {
 	if (cs->subtyp == NICCY_PCI) {
 		int val;
@@ -211,7 +211,7 @@ release_io_niccy(struct IsdnCardState *cs)
 	}
 }
 
-static void
+static int
 niccy_reset(struct IsdnCardState *cs)
 {
 	if (cs->subtyp == NICCY_PCI) {
@@ -221,27 +221,19 @@ niccy_reset(struct IsdnCardState *cs)
 		val |= PCI_IRQ_ENABLE;
 		outl(val, cs->hw.niccy.cfg_reg + PCI_IRQ_CTRL_REG);
 	}
-	inithscxisac(cs);
+	return 0;
 }
 
 static int
 niccy_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 {
-	switch (mt) {
-		case CARD_RESET:
-			niccy_reset(cs);
-			return(0);
-		case CARD_RELEASE:
-			release_io_niccy(cs);
-			return(0);
-		case CARD_TEST:
-			return(0);
-	}
 	return(0);
 }
 
 static struct card_ops niccy_ops = {
-	.init     = niccy_reset,
+	.init     = inithscxisac,
+	.reset    = niccy_reset,
+	.release  = niccy_release,
 	.irq_func = niccy_interrupt,
 };
 
@@ -391,7 +383,7 @@ setup_niccy(struct IsdnCard *card)
 	if (HscxVersion(cs, "Niccy:")) {
 		printk(KERN_WARNING
 		    "Niccy: wrong HSCX versions check IO address\n");
-		release_io_niccy(cs);
+		niccy_release(cs);
 		return (0);
 	}
 	return (1);

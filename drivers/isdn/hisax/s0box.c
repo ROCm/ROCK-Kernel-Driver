@@ -208,7 +208,7 @@ s0box_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 }
 
 void
-release_io_s0box(struct IsdnCardState *cs)
+s0box_release(struct IsdnCardState *cs)
 {
 	release_region(cs->hw.teles3.cfg_reg, 8);
 }
@@ -216,20 +216,12 @@ release_io_s0box(struct IsdnCardState *cs)
 static int
 S0Box_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 {
-	switch (mt) {
-		case CARD_RESET:
-			break;
-		case CARD_RELEASE:
-			release_io_s0box(cs);
-			break;
-		case CARD_TEST:
-			break;
-	}
 	return(0);
 }
 
 static struct card_ops s0box_ops = {
 	.init     = inithscxisac,
+	.release  = s0box_release,
 	.irq_func = s0box_interrupt,
 };
 
@@ -275,7 +267,7 @@ setup_s0box(struct IsdnCard *card)
 	if (HscxVersion(cs, "S0Box:")) {
 		printk(KERN_WARNING
 		       "S0Box: wrong HSCX versions check IO address\n");
-		release_io_s0box(cs);
+		s0box_release(cs);
 		return (0);
 	}
 	return (1);

@@ -70,8 +70,8 @@ static const PCI_ENTRY id_list[] =
 /******************************************/
 /* free hardware resources used by driver */
 /******************************************/
-void
-release_io_hfcpci(struct IsdnCardState *cs)
+static void
+hfcpci_release(struct IsdnCardState *cs)
 {
 	printk(KERN_INFO "HiSax: release hfcpci at %p\n",
 		cs->hw.hfcpci.pci_io);
@@ -91,8 +91,8 @@ release_io_hfcpci(struct IsdnCardState *cs)
 /* function called to reset the HFC PCI chip. A complete software reset of chip */
 /* and fifos is done.                                                           */
 /********************************************************************************/
-static void
-reset_hfcpci(struct IsdnCardState *cs)
+static int
+hfcpci_reset(struct IsdnCardState *cs)
 {
 	pci_disable_device(cs->hw.hfcpci.pdev);
 	cs->hw.hfcpci.int_m2 = 0;	/* interrupt output off ! */
@@ -159,6 +159,8 @@ reset_hfcpci(struct IsdnCardState *cs)
 	cs->hw.hfcpci.int_m2 = HFCPCI_IRQ_ENABLE;
 	Write_hfc(cs, HFCPCI_INT_M2, cs->hw.hfcpci.int_m2);
 	if (Read_hfc(cs, HFCPCI_INT_S2));
+	
+	return 0;
 }
 
 /***************************************************/
@@ -1366,18 +1368,6 @@ inithfcpci(struct IsdnCardState *cs)
 static int
 hfcpci_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 {
-	if (cs->debug & L1_DEB_ISAC)
-		debugl1(cs, "HFCPCI: card_msg %x", mt);
-	switch (mt) {
-		case CARD_RESET:
-			reset_hfcpci(cs);
-			return (0);
-		case CARD_RELEASE:
-			release_io_hfcpci(cs);
-			return (0);
-		case CARD_TEST:
-			return (0);
-	}
 	return (0);
 }
 
@@ -1396,6 +1386,8 @@ hfcpci_init(struct IsdnCardState *cs)
 
 static struct card_ops hfcpci_ops = {
 	.init     = hfcpci_init,
+	.reset    = hfcpci_reset,
+	.release  = hfcpci_release,
 	.irq_func = hfcpci_interrupt,
 };
 
@@ -1488,7 +1480,7 @@ setup_hfcpci(struct IsdnCard *card)
 	cs->hw.hfcpci.timer.data = (long) cs;
 	init_timer(&cs->hw.hfcpci.timer);
 
-	reset_hfcpci(cs);
+	hfcpci_reset(cs);
 	cs->cardmsg = &hfcpci_card_msg;
 	cs->auxcmd = &hfcpci_auxcmd;
 	cs->card_ops = &hfcpci_ops;

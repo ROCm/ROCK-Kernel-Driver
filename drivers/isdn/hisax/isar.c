@@ -174,7 +174,7 @@ ISARVersion(struct IsdnCardState *cs, char *s)
 	u8 len;
 	int debug;
 
-	cs->cardmsg(cs, CARD_RESET,  NULL);
+	cs->card_ops->reset(cs);
 	/* disable ISAR IRQ */
 	isar_write_reg(cs, 0, ISAR_IRQBIT, 0);
 	debug = cs->debug;

@@ -182,8 +182,8 @@ SaphirWatchDog(struct IsdnCardState *cs)
 	mod_timer(&cs->hw.saphir.timer, jiffies+1*HZ);
 }
 
-void
-release_io_saphir(struct IsdnCardState *cs)
+static void
+saphir_release(struct IsdnCardState *cs)
 {
 	byteout(cs->hw.saphir.cfg_reg + IRQ_REG, 0xff);
 	del_timer_sync(&cs->hw.saphir.timer);
@@ -231,21 +231,13 @@ saphir_reset(struct IsdnCardState *cs)
 static int
 saphir_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 {
-	switch (mt) {
-		case CARD_RESET:
-			saphir_reset(cs);
-			return(0);
-		case CARD_RELEASE:
-			release_io_saphir(cs);
-			return(0);
-		case CARD_TEST:
-			return(0);
-	}
 	return(0);
 }
 
 static struct card_ops saphir_ops = {
 	.init     = inithscxisac,
+	.reset    = saphir_reset,
+	.release  = saphir_release,
 	.irq_func = saphir_interrupt,
 };
 
@@ -286,7 +278,7 @@ setup_saphir(struct IsdnCard *card)
 	cs->hw.saphir.timer.expires = jiffies + 4*HZ;
 	add_timer(&cs->hw.saphir.timer);
 	if (saphir_reset(cs)) {
-		release_io_saphir(cs);
+		saphir_release(cs);
 		return (0);
 	}
 	cs->dc_hw_ops = &isac_ops;
@@ -297,7 +289,7 @@ setup_saphir(struct IsdnCard *card)
 	if (HscxVersion(cs, "saphir:")) {
 		printk(KERN_WARNING
 		    "saphir: wrong HSCX versions check IO address\n");
-		release_io_saphir(cs);
+		saphir_release(cs);
 		return (0);
 	}
 	return (1);

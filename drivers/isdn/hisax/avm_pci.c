@@ -556,8 +556,14 @@ avm_pcipnp_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	WriteISAC(cs, ISAC_MASK, 0x0);
 }
 
-static void
-reset_avmpcipnp(struct IsdnCardState *cs)
+static int
+AVM_card_msg(struct IsdnCardState *cs, int mt, void *arg)
+{
+	return(0);
+}
+
+static int
+avm_pcipnp_reset(struct IsdnCardState *cs)
 {
 	printk(KERN_INFO "AVM PCI/PnP: reset\n");
 	outb(AVM_STATUS0_RESET | AVM_STATUS0_DIS_TIMER, cs->hw.avm.cfg_reg + 2);
@@ -568,27 +574,11 @@ reset_avmpcipnp(struct IsdnCardState *cs)
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout((10*HZ)/1000); /* Timeout 10ms */
 	printk(KERN_INFO "AVM PCI/PnP: S1 %x\n", inb(cs->hw.avm.cfg_reg + 3));
-}
-
-static int
-AVM_card_msg(struct IsdnCardState *cs, int mt, void *arg)
-{
-	switch (mt) {
-		case CARD_RESET:
-			reset_avmpcipnp(cs);
-			return(0);
-		case CARD_RELEASE:
-			outb(0, cs->hw.avm.cfg_reg + 2);
-			release_region(cs->hw.avm.cfg_reg, 32);
-			return(0);
-		case CARD_TEST:
-			return(0);
-	}
-	return(0);
+	return 0;
 }
 
 static void
-avm_pci_init(struct IsdnCardState *cs)
+avm_pcipnp_init(struct IsdnCardState *cs)
 {
 	initisac(cs);
 	inithdlc(cs);
@@ -598,8 +588,17 @@ avm_pci_init(struct IsdnCardState *cs)
 	     AVM_STATUS0_ENA_IRQ, cs->hw.avm.cfg_reg + 2);
 }
 
+static void
+avm_pcipnp_release(struct IsdnCardState *cs)
+{
+	outb(0, cs->hw.avm.cfg_reg + 2);
+	release_region(cs->hw.avm.cfg_reg, 32);
+}
+
 static struct card_ops avm_pci_ops = {
-	.init     = avm_pci_init,
+	.init     = avm_pcipnp_init,
+	.reset    = avm_pcipnp_reset,
+	.release  = avm_pcipnp_release,
 	.irq_func = avm_pcipnp_interrupt,
 };
 
@@ -714,7 +713,7 @@ ready:
 		val = inb(cs->hw.avm.cfg_reg);
 		ver = inb(cs->hw.avm.cfg_reg + 1);
 		printk(KERN_INFO "AVM PnP: Class %X Rev %d\n", val, ver);
-		reset_avmpcipnp(cs);
+		avm_pcipnp_reset(cs);
 		break;
 	}
 	printk(KERN_INFO "HiSax: %s config irq:%d base:0x%X\n",

@@ -998,7 +998,7 @@ inittiger(struct IsdnCardState *cs)
 	cs->hw.njet.last_is0 = 0;
 }
 
-void
+static void
 releasetiger(struct IsdnCardState *cs)
 {
 	if (cs->bcs[0].hw.tiger.send) {
@@ -1024,7 +1024,7 @@ releasetiger(struct IsdnCardState *cs)
 }
 
 void
-release_io_netjet(struct IsdnCardState *cs)
+netjet_release(struct IsdnCardState *cs)
 {
 	byteout(cs->hw.njet.base + NETJET_IRQMASK0, 0);
 	byteout(cs->hw.njet.base + NETJET_IRQMASK1, 0);
