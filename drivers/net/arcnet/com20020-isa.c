@@ -152,7 +152,6 @@ int init_module(void)
 	lp->clockp = clockp & 7;
 	lp->clockm = clockm & 3;
 	lp->timeout = timeout & 3;
-	lp->owner = THIS_MODULE;
 
 	dev->base_addr = io;
 	dev->irq = irq;
