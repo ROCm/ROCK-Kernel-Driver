@@ -24,6 +24,7 @@
 #endif
 #include <linux/pagemap.h>
 #include <linux/bootmem.h>
+#include <linux/proc_fs.h>
 
 #include <asm/processor.h>
 #include <asm/system.h>
@@ -40,6 +41,8 @@
 #include <asm/smp.h>
 
 #define Dprintk(x...)
+
+extern char _stext;
 
 DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
 
@@ -393,6 +396,9 @@ static inline int page_is_ram (unsigned long pagenr)
 	return 0;
 }
 
+static struct kcore_list kcore_mem, kcore_vmalloc, kcore_kernel, kcore_modules,
+			 kcore_vsyscall;
+
 void __init mem_init(void)
 {
 	int codesize, reservedpages, datasize, initsize;
@@ -434,6 +440,15 @@ void __init mem_init(void)
 	datasize =  (unsigned long) &_edata - (unsigned long) &_etext;
 	initsize =  (unsigned long) &__init_end - (unsigned long) &__init_begin;
 
+	/* Register memory areas for /proc/kcore */
+	kclist_add(&kcore_mem, __va(0), max_low_pfn << PAGE_SHIFT); 
+	kclist_add(&kcore_vmalloc, (void *)VMALLOC_START, 
+		   VMALLOC_END-VMALLOC_START);
+	kclist_add(&kcore_kernel, &_stext, &_end - &_stext); 
+	kclist_add(&kcore_modules, (void *)MODULES_VADDR, MODULES_LEN);
+	kclist_add(&kcore_vsyscall, (void *)VSYSCALL_START, 
+				 VSYSCALL_END - VSYSCALL_START);
+
 	printk("Memory: %luk/%luk available (%dk kernel code, %dk reserved, %dk data, %dk init)\n",
 		(unsigned long) nr_free_pages() << (PAGE_SHIFT-10),
 		end_pfn << (PAGE_SHIFT-10),
@@ -462,7 +477,7 @@ void free_initmem(void)
 		ClearPageReserved(virt_to_page(addr));
 		set_page_count(virt_to_page(addr), 1);
 #ifdef CONFIG_INIT_DEBUG
-		memset(addr & ~(PAGE_SIZE-1), 0xcc, PAGE_SIZE); 
+		memset((void *)(addr & ~(PAGE_SIZE-1)), 0xcc, PAGE_SIZE); 
 #endif
 		free_page(addr);
 		totalram_pages++;
@@ -496,4 +511,30 @@ void __init reserve_bootmem_generic(unsigned long phys, unsigned len)
 #else       		
 	reserve_bootmem(phys, len);    
 #endif
+}
+
+int kern_addr_valid(unsigned long addr) 
+{ 
+	unsigned long above = ((long)addr) >> __VIRTUAL_MASK_SHIFT;
+	if (above != 0 && above != -1UL)
+		return 0; 
+	
+	pml4_t *pml4 = pml4_offset_k(addr);
+	if (pml4_none(*pml4))
+		return 0;
+
+	pgd_t *pgd = pgd_offset_k(addr); 
+	if (pgd_none(*pgd))
+		return 0; 
+
+	pmd_t *pmd = pmd_offset(pgd, addr);
+	if (pmd_none(*pmd))
+		return 0;
+	if (pmd_large(*pmd))
+		return pfn_valid(pmd_pfn(*pmd));
+
+	pte_t *pte = pte_offset_kernel(pmd, addr); 
+	if (pte_none(*pte))
+		return 0;
+	return pfn_valid(pte_pfn(*pte));
 }

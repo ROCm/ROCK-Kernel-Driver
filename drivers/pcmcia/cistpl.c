@@ -82,13 +82,13 @@ static const u_int exponent[] = {
 
 INT_MODULE_PARM(cis_width,	0);		/* 16-bit CIS? */
 
-void release_cis_mem(socket_info_t *s)
+void release_cis_mem(struct pcmcia_socket *s)
 {
     if (s->cis_mem.sys_start != 0) {
 	s->cis_mem.flags &= ~MAP_ACTIVE;
-	s->ss_entry->set_mem_map(s->sock, &s->cis_mem);
-	if (!(s->cap.features & SS_CAP_STATIC_MAP))
-	    release_mem_region(s->cis_mem.sys_start, s->cap.map_size);
+	s->ss_entry->set_mem_map(s, &s->cis_mem);
+	if (!(s->features & SS_CAP_STATIC_MAP))
+	    release_mem_region(s->cis_mem.sys_start, s->map_size);
 	iounmap(s->cis_virt);
 	s->cis_mem.sys_start = 0;
 	s->cis_virt = NULL;
@@ -101,29 +101,29 @@ void release_cis_mem(socket_info_t *s)
  * map the memory space.
  */
 static unsigned char *
-set_cis_map(socket_info_t *s, unsigned int card_offset, unsigned int flags)
+set_cis_map(struct pcmcia_socket *s, unsigned int card_offset, unsigned int flags)
 {
     pccard_mem_map *mem = &s->cis_mem;
-    if (!(s->cap.features & SS_CAP_STATIC_MAP) &&
+    if (!(s->features & SS_CAP_STATIC_MAP) &&
 	mem->sys_start == 0) {
-	int low = !(s->cap.features & SS_CAP_PAGE_REGS);
+	int low = !(s->features & SS_CAP_PAGE_REGS);
 	validate_mem(s);
 	mem->sys_start = 0;
-	if (find_mem_region(&mem->sys_start, s->cap.map_size,
-			    s->cap.map_size, low, "card services", s)) {
+	if (find_mem_region(&mem->sys_start, s->map_size,
+			    s->map_size, low, "card services", s)) {
 	    printk(KERN_NOTICE "cs: unable to map card memory!\n");
 	    return NULL;
 	}
-	mem->sys_stop = mem->sys_start+s->cap.map_size-1;
-	s->cis_virt = ioremap(mem->sys_start, s->cap.map_size);
+	mem->sys_stop = mem->sys_start+s->map_size-1;
+	s->cis_virt = ioremap(mem->sys_start, s->map_size);
     }
     mem->card_start = card_offset;
     mem->flags = flags;
-    s->ss_entry->set_mem_map(s->sock, mem);
-    if (s->cap.features & SS_CAP_STATIC_MAP) {
+    s->ss_entry->set_mem_map(s, mem);
+    if (s->features & SS_CAP_STATIC_MAP) {
 	if (s->cis_virt)
 	    iounmap(s->cis_virt);
-	s->cis_virt = ioremap(mem->sys_start, s->cap.map_size);
+	s->cis_virt = ioremap(mem->sys_start, s->map_size);
     }
     return s->cis_virt;
 }
@@ -139,7 +139,7 @@ set_cis_map(socket_info_t *s, unsigned int card_offset, unsigned int flags)
 #define IS_ATTR		1
 #define IS_INDIRECT	8
 
-int read_cis_mem(socket_info_t *s, int attr, u_int addr,
+int read_cis_mem(struct pcmcia_socket *s, int attr, u_int addr,
 		 u_int len, void *ptr)
 {
     u_char *sys, *end, *buf = ptr;
@@ -178,21 +178,21 @@ int read_cis_mem(socket_info_t *s, int attr, u_int addr,
 	    addr *= 2;
 	}
 
-	card_offset = addr & ~(s->cap.map_size-1);
+	card_offset = addr & ~(s->map_size-1);
 	while (len) {
 	    sys = set_cis_map(s, card_offset, flags);
 	    if (!sys) {
 		memset(ptr, 0xff, len);
 		return -1;
 	    }
-	    end = sys + s->cap.map_size;
-	    sys = sys + (addr & (s->cap.map_size-1));
+	    end = sys + s->map_size;
+	    sys = sys + (addr & (s->map_size-1));
 	    for ( ; len > 0; len--, buf++, sys += inc) {
 		if (sys == end)
 		    break;
 		*buf = readb(sys);
 	    }
-	    card_offset += s->cap.map_size;
+	    card_offset += s->map_size;
 	    addr = 0;
 	}
     }
@@ -202,7 +202,7 @@ int read_cis_mem(socket_info_t *s, int attr, u_int addr,
     return 0;
 }
 
-void write_cis_mem(socket_info_t *s, int attr, u_int addr,
+void write_cis_mem(struct pcmcia_socket *s, int attr, u_int addr,
 		   u_int len, void *ptr)
 {
     u_char *sys, *end, *buf = ptr;
@@ -239,20 +239,20 @@ void write_cis_mem(socket_info_t *s, int attr, u_int addr,
 	    addr *= 2;
 	}
 
-	card_offset = addr & ~(s->cap.map_size-1);
+	card_offset = addr & ~(s->map_size-1);
 	while (len) {
 	    sys = set_cis_map(s, card_offset, flags);
 	    if (!sys)
 		return; /* FIXME: error */
 
-	    end = sys + s->cap.map_size;
-	    sys = sys + (addr & (s->cap.map_size-1));
+	    end = sys + s->map_size;
+	    sys = sys + (addr & (s->map_size-1));
 	    for ( ; len > 0; len--, buf++, sys += inc) {
 		if (sys == end)
 		    break;
 		writeb(*buf, sys);
 	    }
-	    card_offset += s->cap.map_size;
+	    card_offset += s->map_size;
 	    addr = 0;
 	}
     }
@@ -266,7 +266,7 @@ void write_cis_mem(socket_info_t *s, int attr, u_int addr,
     
 ======================================================================*/
 
-static void read_cis_cache(socket_info_t *s, int attr, u_int addr,
+static void read_cis_cache(struct pcmcia_socket *s, int attr, u_int addr,
 			   u_int len, void *ptr)
 {
     struct cis_cache_entry *cis;
@@ -306,7 +306,7 @@ static void read_cis_cache(socket_info_t *s, int attr, u_int addr,
 }
 
 static void
-remove_cis_cache(socket_info_t *s, int attr, u_int addr, u_int len)
+remove_cis_cache(struct pcmcia_socket *s, int attr, u_int addr, u_int len)
 {
 	struct cis_cache_entry *cis;
 
@@ -318,7 +318,7 @@ remove_cis_cache(socket_info_t *s, int attr, u_int addr, u_int len)
 		}
 }
 
-void destroy_cis_cache(socket_info_t *s)
+void destroy_cis_cache(struct pcmcia_socket *s)
 {
 	struct list_head *l, *n;
 
@@ -337,7 +337,7 @@ void destroy_cis_cache(socket_info_t *s)
     
 ======================================================================*/
 
-int verify_cis_cache(socket_info_t *s)
+int verify_cis_cache(struct pcmcia_socket *s)
 {
 	struct cis_cache_entry *cis;
 	char buf[256];
@@ -369,7 +369,7 @@ int verify_cis_cache(socket_info_t *s)
 
 int pcmcia_replace_cis(client_handle_t handle, cisdump_t *cis)
 {
-    socket_info_t *s;
+    struct pcmcia_socket *s;
     if (CHECK_HANDLE(handle))
 	return CS_BAD_HANDLE;
     s = SOCKET(handle);
@@ -409,7 +409,7 @@ int pcmcia_get_next_tuple(client_handle_t handle, tuple_t *tuple);
 
 int pcmcia_get_first_tuple(client_handle_t handle, tuple_t *tuple)
 {
-    socket_info_t *s;
+    struct pcmcia_socket *s;
     if (CHECK_HANDLE(handle))
 	return CS_BAD_HANDLE;
     s = SOCKET(handle);
@@ -418,7 +418,7 @@ int pcmcia_get_first_tuple(client_handle_t handle, tuple_t *tuple)
     tuple->TupleLink = tuple->Flags = 0;
 #ifdef CONFIG_CARDBUS
     if (s->state & SOCKET_CARDBUS) {
-	struct pci_dev *dev = s->cap.cb_dev;
+	struct pci_dev *dev = s->cb_dev;
 	u_int ptr;
 	pci_bus_read_config_dword(dev->subordinate, 0, PCI_CARDBUS_CIS, &ptr);
 	tuple->CISOffset = ptr & ~7;
@@ -445,7 +445,7 @@ int pcmcia_get_first_tuple(client_handle_t handle, tuple_t *tuple)
     return pcmcia_get_next_tuple(handle, tuple);
 }
 
-static int follow_link(socket_info_t *s, tuple_t *tuple)
+static int follow_link(struct pcmcia_socket *s, tuple_t *tuple)
 {
     u_char link[5];
     u_int ofs;
@@ -487,7 +487,7 @@ static int follow_link(socket_info_t *s, tuple_t *tuple)
 
 int pcmcia_get_next_tuple(client_handle_t handle, tuple_t *tuple)
 {
-    socket_info_t *s;
+    struct pcmcia_socket *s;
     u_char link[2], tmp;
     int ofs, i, attr;
     
@@ -588,7 +588,7 @@ int pcmcia_get_next_tuple(client_handle_t handle, tuple_t *tuple)
 
 int pcmcia_get_tuple_data(client_handle_t handle, tuple_t *tuple)
 {
-    socket_info_t *s;
+    struct pcmcia_socket *s;
     u_int len;
     
     if (CHECK_HANDLE(handle))

@@ -223,9 +223,15 @@ asmlinkage int sys_ipc (unsigned call, int first, int second, unsigned long thir
 		}
 	if (call <= SHMCTL) 
 		switch (call) {
-		case SHMAT:
-			err = sys_shmat (first, (char *) ptr, second, (ulong *) third);
+		case SHMAT: {
+			ulong raddr;
+			err = sys_shmat (first, (char *) ptr, second, &raddr);
+			if (!err) {
+				if (put_user(raddr, (ulong __user *) third))
+					err = -EFAULT;
+			}
 			goto out;
+		}
 		case SHMDT:
 			err = sys_shmdt ((char *)ptr);
 			goto out;
@@ -440,12 +446,6 @@ asmlinkage int sys_getdomainname(char __user *name, int len)
 done:
 	up_read(&uts_sem);
 	return err;
-}
-
-/* only AP+ systems have sys_aplib */
-asmlinkage int sys_aplib(void)
-{
-	return -ENOSYS;
 }
 
 asmlinkage int solaris_syscall(struct pt_regs *regs)

@@ -96,7 +96,6 @@ struct sparc_trapf {
 #ifdef __KERNEL__
 #define user_mode(regs) (!((regs)->tstate & TSTATE_PRIV))
 #define instruction_pointer(regs) ((regs)->tpc)
-#define force_successful_syscall_return()	do { } while (0)
 extern void show_regs(struct pt_regs *);
 #endif
 

@@ -97,12 +97,10 @@
 #define STD_COM_FLAGS (0)
 
 #define SERIAL_TYPE_NORMAL  1
-#define SERIAL_TYPE_CALLOUT 2
-
 
 DECLARE_TASK_QUEUE(tq_cyclades);
 
-struct tty_driver cy_serial_driver, cy_callout_driver;
+static struct tty_driver *cy_serial_driver;
 extern int serial_console;
 static struct cyclades_port *serial_console_info = NULL;
 static unsigned int serial_console_cflag = 0;
@@ -128,13 +126,6 @@ struct cyclades_port cy_port[] = {
         {-1 },      /* ttyS3 */
 };
 #define NR_PORTS        (sizeof(cy_port)/sizeof(struct cyclades_port))
-
-static int serial_refcount;
-
-static struct tty_struct *serial_table[NR_PORTS];
-static struct termios *serial_termios[NR_PORTS];
-static struct termios *serial_termios_locked[NR_PORTS];
-
 
 /*
  * tmp_buf is used as a temporary buffer by serial_write.  We need to
@@ -517,8 +508,7 @@ cd2401_modem_interrupt(int irq, void *dev_id, struct pt_regs *fp)
 	    if(mdm_status & CyDCD){
 /* CP('!'); */
 		cy_sched_event(info, Cy_EVENT_OPEN_WAKEUP);
-	    }else if(!((info->flags & ASYNC_CALLOUT_ACTIVE)
-		     &&(info->flags & ASYNC_CALLOUT_NOHUP))){
+	    } else {
 /* CP('@'); */
 		cy_sched_event(info, Cy_EVENT_HANGUP);
 	    }
@@ -769,8 +759,7 @@ do_softint(void *private_)
     if (test_and_clear_bit(Cy_EVENT_HANGUP, &info->event)) {
 	tty_hangup(info->tty);
 	wake_up_interruptible(&info->open_wait);
-	info->flags &= ~(ASYNC_NORMAL_ACTIVE|
-			     ASYNC_CALLOUT_ACTIVE);
+	info->flags &= ~ASYNC_NORMAL_ACTIVE;
     }
     if (test_and_clear_bit(Cy_EVENT_OPEN_WAKEUP, &info->event)) {
 	wake_up_interruptible(&info->open_wait);
@@ -1906,14 +1895,6 @@ cy_close(struct tty_struct * tty, struct file * filp)
     if (info->count)
 	return;
     info->flags |= ASYNC_CLOSING;
-    /*
-     * Save the termios structure, since this port may have
-     * separate termios for callout and dialin.
-     */
-    if (info->flags & ASYNC_NORMAL_ACTIVE)
-	info->normal_termios = *tty->termios;
-    if (info->flags & ASYNC_CALLOUT_ACTIVE)
-	info->callout_termios = *tty->termios;
     if (info->flags & ASYNC_INITIALIZED)
 	tty_wait_until_sent(tty, 3000); /* 30 seconds timeout */
     shutdown(info);
@@ -1938,8 +1919,7 @@ cy_close(struct tty_struct * tty, struct file * filp)
 	}
 	wake_up_interruptible(&info->open_wait);
     }
-    info->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CALLOUT_ACTIVE|
-		     ASYNC_CLOSING);
+    info->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CLOSING);
     wake_up_interruptible(&info->close_wait);
 
 #ifdef SERIAL_DEBUG_OTHER
@@ -1973,7 +1953,7 @@ cy_hangup(struct tty_struct *tty)
 #endif
     info->tty = 0;
 #endif
-    info->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CALLOUT_ACTIVE);
+    info->flags &= ~ASYNC_NORMAL_ACTIVE;
     wake_up_interruptible(&info->open_wait);
 } /* cy_hangup */
 
@@ -2009,35 +1989,10 @@ block_til_ready(struct tty_struct *tty, struct file * filp,
     }
 
     /*
-     * If this is a callout device, then just make sure the normal
-     * device isn't being used.
-     */
-    if (tty->driver->subtype == SERIAL_TYPE_CALLOUT) {
-	if (info->flags & ASYNC_NORMAL_ACTIVE){
-	    return -EBUSY;
-	}
-	if ((info->flags & ASYNC_CALLOUT_ACTIVE) &&
-	    (info->flags & ASYNC_SESSION_LOCKOUT) &&
-	    (info->session != current->session)){
-	    return -EBUSY;
-	}
-	if ((info->flags & ASYNC_CALLOUT_ACTIVE) &&
-	    (info->flags & ASYNC_PGRP_LOCKOUT) &&
-	    (info->pgrp != current->pgrp)){
-	    return -EBUSY;
-	}
-	info->flags |= ASYNC_CALLOUT_ACTIVE;
-	return 0;
-    }
-
-    /*
      * If non-blocking mode is set, then make the check up front
      * and then exit.
      */
     if (filp->f_flags & O_NONBLOCK) {
-	if (info->flags & ASYNC_CALLOUT_ACTIVE){
-	    return -EBUSY;
-	}
 	info->flags |= ASYNC_NORMAL_ACTIVE;
 	return 0;
     }
@@ -2065,16 +2020,14 @@ block_til_ready(struct tty_struct *tty, struct file * filp,
 
     while (1) {
 	local_irq_save(flags);
-	    if (!(info->flags & ASYNC_CALLOUT_ACTIVE)){
-		base_addr[CyCAR] = (u_char)channel;
-		base_addr[CyMSVR1] = CyRTS;
+	base_addr[CyCAR] = (u_char)channel;
+	base_addr[CyMSVR1] = CyRTS;
 /* CP('S');CP('4'); */
-		base_addr[CyMSVR2] = CyDTR;
+	base_addr[CyMSVR2] = CyDTR;
 #ifdef SERIAL_DEBUG_DTR
-                printk("cyc: %d: raising DTR\n", __LINE__);
-                printk("     status: 0x%x, 0x%x\n", base_addr[CyMSVR1], base_addr[CyMSVR2]);
+	printk("cyc: %d: raising DTR\n", __LINE__);
+	printk("     status: 0x%x, 0x%x\n", base_addr[CyMSVR1], base_addr[CyMSVR2]);
 #endif
-	    }
 	local_irq_restore(flags);
 	set_current_state(TASK_INTERRUPTIBLE);
 	if (tty_hung_up_p(filp)
@@ -2089,8 +2042,7 @@ block_til_ready(struct tty_struct *tty, struct file * filp,
 	local_irq_save(flags);
 	    base_addr[CyCAR] = (u_char)channel;
 /* CP('L');CP1(1 && C_CLOCAL(tty)); CP1(1 && (base_addr[CyMSVR1] & CyDCD) ); */
-	    if (!(info->flags & ASYNC_CALLOUT_ACTIVE)
-	    && !(info->flags & ASYNC_CLOSING)
+	    if (!(info->flags & ASYNC_CLOSING)
 	    && (C_CLOCAL(tty)
 	        || (base_addr[CyMSVR1] & CyDCD))) {
 		    local_irq_restore(flags);
@@ -2168,12 +2120,6 @@ cy_open(struct tty_struct *tty, struct file * filp)
         }
     }
 
-    if ((info->count == 1) && (info->flags & ASYNC_SPLIT_TERMIOS)) {
-	if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
-	    *tty->termios = info->normal_termios;
-	else 
-	    *tty->termios = info->callout_termios;
-    }
     /*
      * Start up serial port
      */
@@ -2190,9 +2136,6 @@ cy_open(struct tty_struct *tty, struct file * filp)
 #endif
 	return retval;
     }
-
-    info->session = current->session;
-    info->pgrp = current->pgrp;
 
 #ifdef SERIAL_DEBUG_OPEN
     printk("cy_open done\n");/**/
@@ -2345,6 +2288,23 @@ mvme167_serial_console_setup(int cflag)
 					rcor >> 5, rbpr);
 } /* serial_console_init */
 
+static struct tty_operations cy_ops = {
+	.open = cy_open,
+	.close = cy_close,
+	.write = cy_write,
+	.put_char = cy_put_char,
+	.flush_chars = cy_flush_chars,
+	.write_room = cy_write_room,
+	.chars_in_buffer = cy_chars_in_buffer,
+	.flush_buffer = cy_flush_buffer,
+	.ioctl = cy_ioctl,
+	.throttle = cy_throttle,
+	.unthrottle = cy_unthrottle,
+	.set_termios = cy_set_termios,
+	.stop = cy_stop,
+	.start = cy_start,
+	.hangup = cy_hangup,
+};
 /* The serial driver boot-time initialization code!
     Hardware I/O ports are mapped to character special devices on a
     first found, first allocated manner.  That is, this code searches
@@ -2377,6 +2337,10 @@ serial167_init(void)
     if (!(mvme16x_config &MVME16x_CONFIG_GOT_CD2401))
 	return 0;
 
+    cy_serial_driver = alloc_tty_driver(NR_PORTS);
+    if (!cy_serial_driver)
+	return -ENOMEM;
+
 #if 0
 scrn[1] = '\0';
 #endif
@@ -2397,65 +2361,24 @@ scrn[1] = '\0';
 
     /* Initialize the tty_driver structure */
     
-    memset(&cy_serial_driver, 0, sizeof(struct tty_driver));
-    cy_serial_driver.magic = TTY_DRIVER_MAGIC;
-    cy_serial_driver.owner = THIS_MODULE;
-#ifdef CONFIG_DEVFS_FS
-    cy_serial_driver.name = "tts/";
-#else
-    cy_serial_driver.name = "ttyS";
-#endif
-    cy_serial_driver.major = TTY_MAJOR;
-    cy_serial_driver.minor_start = 64;
-    cy_serial_driver.num = NR_PORTS;
-    cy_serial_driver.type = TTY_DRIVER_TYPE_SERIAL;
-    cy_serial_driver.subtype = SERIAL_TYPE_NORMAL;
-    cy_serial_driver.init_termios = tty_std_termios;
-    cy_serial_driver.init_termios.c_cflag =
+    cy_serial_driver->owner = THIS_MODULE;
+    cy_serial_driver->devfs_name = "tts/";
+    cy_serial_driver->name = "ttyS";
+    cy_serial_driver->major = TTY_MAJOR;
+    cy_serial_driver->minor_start = 64;
+    cy_serial_driver->type = TTY_DRIVER_TYPE_SERIAL;
+    cy_serial_driver->subtype = SERIAL_TYPE_NORMAL;
+    cy_serial_driver->init_termios = tty_std_termios;
+    cy_serial_driver->init_termios.c_cflag =
 	    B9600 | CS8 | CREAD | HUPCL | CLOCAL;
-    cy_serial_driver.flags = TTY_DRIVER_REAL_RAW;
-    cy_serial_driver.refcount = &serial_refcount;
-    cy_serial_driver.table = serial_table;
-    cy_serial_driver.termios = serial_termios;
-    cy_serial_driver.termios_locked = serial_termios_locked;
-    cy_serial_driver.open = cy_open;
-    cy_serial_driver.close = cy_close;
-    cy_serial_driver.write = cy_write;
-    cy_serial_driver.put_char = cy_put_char;
-    cy_serial_driver.flush_chars = cy_flush_chars;
-    cy_serial_driver.write_room = cy_write_room;
-    cy_serial_driver.chars_in_buffer = cy_chars_in_buffer;
-    cy_serial_driver.flush_buffer = cy_flush_buffer;
-    cy_serial_driver.ioctl = cy_ioctl;
-    cy_serial_driver.throttle = cy_throttle;
-    cy_serial_driver.unthrottle = cy_unthrottle;
-    cy_serial_driver.set_termios = cy_set_termios;
-    cy_serial_driver.stop = cy_stop;
-    cy_serial_driver.start = cy_start;
-    cy_serial_driver.hangup = cy_hangup;
+    cy_serial_driver->flags = TTY_DRIVER_REAL_RAW;
+    tty_set_operations(cy_serial_driver, &cy_ops);
 
-    /*
-     * The callout device is just like normal device except for
-     * major number and the subtype code.
-     */
-    cy_callout_driver = cy_serial_driver;
-#ifdef CONFIG_DEVFS_FS
-    cy_callout_driver.name = "cua/";
-#else
-    cy_callout_driver.name = "cua";
-#endif
-    cy_callout_driver.major = TTYAUX_MAJOR;
-    cy_callout_driver.subtype = SERIAL_TYPE_CALLOUT;
-
-    ret = tty_register_driver(&cy_serial_driver);
+    ret = tty_register_driver(cy_serial_driver);
     if (ret) {
 	    printk(KERN_ERR "Couldn't register MVME166/7 serial driver\n");
+	    put_tty_driver(cy_serial_driver);
 	    return ret;
-    }
-    ret = tty_register_driver(&cy_callout_driver);
-    if (ret) {
-	    printk(KERN_ERR "Couldn't register MVME166/7 callout driver\n");
-	    goto cleanup_serial_driver;
     }
 
     init_bh(CYCLADES_BH, do_cyclades_bh);
@@ -2499,8 +2422,6 @@ scrn[1] = '\0';
 		info->default_timeout = 0;
 		info->tqueue.routine = do_softint;
 		info->tqueue.data = info;
-		info->callout_termios =cy_callout_driver.init_termios;
-		info->normal_termios = cy_serial_driver.init_termios;
 		init_waitqueue_head(&info->open_wait);
 		init_waitqueue_head(&info->close_wait);
 		/* info->session */
@@ -2530,7 +2451,7 @@ scrn[1] = '\0';
 				"cd2401_errors", cd2401_rxerr_interrupt);
     if (ret) {
 	    printk(KERN_ERR "Could't get cd2401_errors IRQ");
-	    goto cleanup_callout_driver;
+	    goto cleanup_serial_driver;
     }
 
     ret = request_irq(MVME167_IRQ_SER_MODEM, cd2401_modem_interrupt, 0,
@@ -2569,12 +2490,10 @@ cleanup_irq_cd2401_modem:
     free_irq(MVME167_IRQ_SER_MODEM, cd2401_modem_interrupt);
 cleanup_irq_cd2401_errors:
     free_irq(MVME167_IRQ_SER_ERR, cd2401_rxerr_interrupt);
-cleanup_callout_driver:
-    if (tty_unregister_driver(&cy_callout_driver))
-	    printk(KERN_ERR "Couldn't unregister MVME166/7 callout driver\n");
 cleanup_serial_driver:
-    if (tty_unregister_driver(&cy_serial_driver))
+    if (tty_unregister_driver(cy_serial_driver))
 	    printk(KERN_ERR "Couldn't unregister MVME166/7 serial driver\n");
+    put_tty_driver(cy_serial_driver);
     return ret;
 } /* serial167_init */
 
@@ -2607,8 +2526,8 @@ show_status(int line_num)
              info->close_delay, info->event, info->count);
     printk("  x_char blocked_open = %x %x\n",
              info->x_char, info->blocked_open);
-    printk("  session pgrp open_wait = %lx %lx %lx\n",
-             info->session, info->pgrp, (long)info->open_wait);
+    printk("  open_wait = %lx %lx %lx\n",
+             (long)info->open_wait);
 
 
     local_irq_save(flags);
@@ -2822,7 +2741,7 @@ void serial167_console_write(struct console *co, const char *str, unsigned count
 static struct tty_driver *serial167_console_device(struct console *c, int *index)
 {
 	*index = c->index;
-	return &cy_serial_driver;
+	return cy_serial_driver;
 }
 
 

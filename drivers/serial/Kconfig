@@ -77,7 +77,7 @@ config SERIAL_8250_CS
 	  a module, say M here and read <file:Documentation/modules.txt>.
 	  If unsure, say N.
 
-config SERIAL_8250_HCDP
+config SERIAL_HCDP
 	bool "8250/16550 device discovery support via EFI HCDP table"
 	depends on IA64
 	---help---

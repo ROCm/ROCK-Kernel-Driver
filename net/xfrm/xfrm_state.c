@@ -112,9 +112,9 @@ static void xfrm_timer_handler(unsigned long data)
 		if (tmo < next)
 			next = tmo;
 	}
-	if (x->lft.hard_use_expires_seconds && x->curlft.use_time) {
+	if (x->lft.hard_use_expires_seconds) {
 		long tmo = x->lft.hard_use_expires_seconds +
-			x->curlft.use_time - now;
+			(x->curlft.use_time ? : now) - now;
 		if (tmo <= 0)
 			goto expired;
 		if (tmo < next)
@@ -130,9 +130,9 @@ static void xfrm_timer_handler(unsigned long data)
 		else if (tmo < next)
 			next = tmo;
 	}
-	if (x->lft.soft_use_expires_seconds && x->curlft.use_time) {
+	if (x->lft.soft_use_expires_seconds) {
 		long tmo = x->lft.soft_use_expires_seconds +
-			x->curlft.use_time - now;
+			(x->curlft.use_time ? : now) - now;
 		if (tmo <= 0)
 			warn = 1;
 		else if (tmo < next)
@@ -513,7 +513,7 @@ xfrm_alloc_spi(struct xfrm_state *x, u32 minspi, u32 maxspi)
 		maxspi = ntohl(maxspi);
 		for (h=0; h<maxspi-minspi+1; h++) {
 			spi = minspi + net_random()%(maxspi-minspi+1);
-			x0 = xfrm_state_lookup(&x->id.daddr, minspi, x->id.proto, x->props.family);
+			x0 = xfrm_state_lookup(&x->id.daddr, htonl(spi), x->id.proto, x->props.family);
 			if (x0 == NULL)
 				break;
 			xfrm_state_put(x0);
@@ -701,7 +701,8 @@ int xfrm_user_policy(struct sock *sk, int optname, u8 *optval, int optlen)
 	err = -EINVAL;
 	read_lock(&xfrm_km_lock);
 	list_for_each_entry(km, &xfrm_km_list, list) {
-		pol = km->compile_policy(sk->family, optname, data, optlen, &err);
+		pol = km->compile_policy(sk->sk_family, optname, data,
+					 optlen, &err);
 		if (err >= 0)
 			break;
 	}

@@ -1152,7 +1152,7 @@ mpt_adapter_find_next(MPT_ADAPTER *prev)
 static int __init
 mpt_pci_scan(void)
 {
-	struct pci_dev *pdev;
+	struct pci_dev *pdev = NULL;
 	struct pci_dev *pdev2;
 	int found = 0;
 	int count = 0;
@@ -1164,11 +1164,8 @@ mpt_pci_scan(void)
 	 *  NOTE: The 929, 929X, 1030 and 1035 will appear as 2 separate PCI devices,
 	 *  one for each channel.
 	 */
-	pci_for_each_dev(pdev) {
+	while ((pdev = pci_find_device(PCI_VENDOR_ID_LSI_LOGIC, PCI_ANY_ID, pdev)) != NULL) {
 		pdev2 = NULL;
-		if (pdev->vendor != 0x1000)
-			continue;
-
 		if ((pdev->device != MPI_MANUFACTPAGE_DEVICEID_FC909) &&
 		    (pdev->device != MPI_MANUFACTPAGE_DEVICEID_FC929) &&
 		    (pdev->device != MPI_MANUFACTPAGE_DEVICEID_FC919) &&
@@ -1187,7 +1184,7 @@ mpt_pci_scan(void)
 		 * Do some kind of look ahead here...
 		 */
 		if (pdev->devfn & 1) {
-			pdev2 = pci_peek_next_dev(pdev);
+			pdev2 = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, pdev);
 			if (pdev2 && (pdev2->vendor == 0x1000) &&
 			    (PCI_SLOT(pdev2->devfn) == PCI_SLOT(pdev->devfn)) &&
 			    (pdev2->device == pdev->device) &&
@@ -1822,6 +1819,7 @@ mpt_adapter_disable(MPT_ADAPTER *this, int freeup)
 	if (this != NULL) {
 		int sz;
 		u32 state;
+		int ret;
 
 		/* Disable the FW */
 		state = mpt_GetIocState(this, 1);
@@ -1832,9 +1830,9 @@ mpt_adapter_disable(MPT_ADAPTER *this, int freeup)
 		if (this->cached_fw != NULL) {
 			ddlprintk((KERN_INFO MYNAM ": Pushing FW onto adapter\n"));
 
-			if ((state = mpt_downloadboot(this, NO_SLEEP)) < 0) {
+			if ((ret = mpt_downloadboot(this, NO_SLEEP)) < 0) {
 				printk(KERN_WARNING MYNAM
-					": firmware downloadboot failure (%d)!\n", state);
+					": firmware downloadboot failure (%d)!\n", ret);
 			}
 		}
 

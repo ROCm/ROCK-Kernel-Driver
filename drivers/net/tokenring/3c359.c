@@ -1129,7 +1129,7 @@ static irqreturn_t xl_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 				netif_stop_queue(dev) ;
 				xl_freemem(dev) ; 
 				free_irq(dev->irq,dev); 
-				unregister_trdev(dev) ; 
+				unregister_netdev(dev) ; 
 				kfree(dev) ;  
 				xl_reset(dev) ; 
 				writel(ACK_INTERRUPT | LATCH_ACK, xl_mmio + MMIO_COMMAND) ; 
@@ -1783,7 +1783,7 @@ static void __devexit xl_remove_one (struct pci_dev *pdev)
 	struct net_device *dev = pci_get_drvdata(pdev);
 	struct xl_private *xl_priv=(struct xl_private *)dev->priv;
 	
-	unregister_trdev(dev);
+	unregister_netdev(dev);
 	iounmap(xl_priv->xl_mmio) ; 
 	pci_release_regions(pdev) ; 
 	pci_set_drvdata(pdev,NULL) ; 

@@ -32,10 +32,6 @@
 #include <asm/tlbflush.h>
 #include <asm/proto.h>
 
-extern void die(const char *,struct pt_regs *,long);
-
-extern spinlock_t console_lock;
-
 void bust_spinlocks(int yes)
 {
 	int loglevel_save = console_loglevel;
@@ -238,10 +234,13 @@ bad_area_nosemaphore:
 
 	/* User mode accesses just cause a SIGSEGV */
 	if (error_code & 4) {
+		if (exception_trace && !(tsk->ptrace & PT_PTRACED) && 
+		    (tsk->sighand->action[SIGSEGV-1].sa.sa_handler == SIG_IGN ||
+		    (tsk->sighand->action[SIGSEGV-1].sa.sa_handler == SIG_DFL)))
 		printk(KERN_INFO 
-		       "%s[%d] segfault at rip:%lx rsp:%lx adr:%lx err:%lx\n",
-		       tsk->comm, tsk->pid, regs->rip, regs->rsp, address, 
-		       error_code);
+		       "%s[%d]: segfault at %016lx rip %016lx rsp %016lx error %lx\n",
+					tsk->comm, tsk->pid, address, regs->rip,
+					regs->rsp, error_code);
        
 		tsk->thread.cr2 = address;
 		tsk->thread.error_code = error_code;
@@ -260,10 +259,6 @@ no_context:
 	fixup = search_exception_tables(regs->rip);
 	if (fixup) {
 		regs->rip = fixup->fixup;
-		if (0 && exception_trace) 
-		printk(KERN_ERR 
-		       "%s: fixed kernel exception at %lx address %lx err:%ld\n", 
-		       current->comm, regs->rip, address, error_code);
 		return;
 	}
 
@@ -272,7 +267,7 @@ no_context:
  * terminate things with extreme prejudice.
  */
 
-	bust_spinlocks(1); 
+	oops_begin(); 
 
 	if (address < PAGE_SIZE)
 		printk(KERN_ALERT "Unable to handle kernel NULL pointer dereference");
@@ -282,8 +277,9 @@ no_context:
 	printk(" printing rip:\n");
 	printk("%016lx\n", regs->rip);
 	dump_pagetable(address);
-	die("Oops", regs, error_code);
-	bust_spinlocks(0); 
+	__die("Oops", regs, error_code);
+
+	/* never reached */
 	do_exit(SIGKILL);
 
 /*

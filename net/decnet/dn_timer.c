@@ -38,16 +38,16 @@ static void dn_slow_timer(unsigned long arg);
 
 void dn_start_slow_timer(struct sock *sk)
 {
-	sk->timer.expires = jiffies + SLOW_INTERVAL;
-	sk->timer.function = dn_slow_timer;
-	sk->timer.data = (unsigned long)sk;
+	sk->sk_timer.expires	= jiffies + SLOW_INTERVAL;
+	sk->sk_timer.function	= dn_slow_timer;
+	sk->sk_timer.data	= (unsigned long)sk;
 
-	add_timer(&sk->timer);
+	add_timer(&sk->sk_timer);
 }
 
 void dn_stop_slow_timer(struct sock *sk)
 {
-	del_timer(&sk->timer);
+	del_timer(&sk->sk_timer);
 }
 
 static void dn_slow_timer(unsigned long arg)
@@ -59,8 +59,8 @@ static void dn_slow_timer(unsigned long arg)
 	bh_lock_sock(sk);
 
 	if (sock_owned_by_user(sk)) {
-		sk->timer.expires = jiffies + HZ / 10;
-		add_timer(&sk->timer);
+		sk->sk_timer.expires = jiffies + HZ / 10;
+		add_timer(&sk->sk_timer);
 		goto out;
 	}
 
@@ -102,9 +102,9 @@ static void dn_slow_timer(unsigned long arg)
 			scp->keepalive_fxn(sk);
 	}
 
-	sk->timer.expires = jiffies + SLOW_INTERVAL;
+	sk->sk_timer.expires = jiffies + SLOW_INTERVAL;
 
-	add_timer(&sk->timer);
+	add_timer(&sk->sk_timer);
 out:
 	bh_unlock_sock(sk);
 	sock_put(sk);

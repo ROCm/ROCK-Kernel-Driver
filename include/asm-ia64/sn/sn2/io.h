@@ -32,8 +32,8 @@ __sn_inb (unsigned long port)
 	unsigned char ret;
 
 	ret = *addr;
-	__sn_mf_a();
 	sn_dma_flush((unsigned long)addr);
+	__sn_mf_a();
 	return ret;
 }
 
@@ -44,8 +44,8 @@ __sn_inw (unsigned long port)
 	unsigned short ret;
 
 	ret = *addr;
-	__sn_mf_a();
 	sn_dma_flush((unsigned long)addr);
+	__sn_mf_a();
 	return ret;
 }
 
@@ -56,8 +56,8 @@ __sn_inl (unsigned long port)
 	unsigned int ret;
 
 	ret = *addr;
-	__sn_mf_a();
 	sn_dma_flush((unsigned long)addr);
+	__sn_mf_a();
 	return ret;
 }
 
@@ -103,7 +103,6 @@ __sn_readb (void *addr)
 	unsigned char val;
 
 	val = *(volatile unsigned char *)addr;
-	__sn_mf_a();
 	sn_dma_flush((unsigned long)addr);
         return val;
 }
@@ -114,7 +113,6 @@ __sn_readw (void *addr)
 	unsigned short val;
 
 	val = *(volatile unsigned short *)addr;
-	__sn_mf_a();
 	sn_dma_flush((unsigned long)addr);
         return val;
 }
@@ -125,7 +123,6 @@ __sn_readl (void *addr)
 	unsigned int val;
 
 	val = *(volatile unsigned int *) addr;
-	__sn_mf_a();
 	sn_dma_flush((unsigned long)addr);
         return val;
 }
@@ -136,7 +133,6 @@ __sn_readq (void *addr)
 	unsigned long val;
 
 	val = *(volatile unsigned long *) addr;
-	__sn_mf_a();
 	sn_dma_flush((unsigned long)addr);
         return val;
 }

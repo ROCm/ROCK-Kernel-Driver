@@ -48,11 +48,13 @@ struct atm_mpoa_qos {
 struct atm_mpoa_ops {
         int (*mpoad_attach)(struct atm_vcc *vcc, int arg);  /* attach mpoa daemon  */
         int (*vcc_attach)(struct atm_vcc *vcc, long arg);   /* attach shortcut vcc */
+	struct module *owner;
 };
 
 /* Boot/module initialization function */
-void atm_mpoa_init(void);
-void atm_mpoa_init_ops(struct atm_mpoa_ops *ops);
+extern struct atm_mpoa_ops *atm_mpoa_ops;
+int try_atm_mpoa_ops(void);
+void atm_mpoa_ops_set(struct atm_mpoa_ops *hook);
 
 /* MPOA QoS operations */
 struct atm_mpoa_qos *atm_mpoa_add_qos(uint32_t dst_ip, struct atm_qos *qos);

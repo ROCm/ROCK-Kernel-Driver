@@ -32,8 +32,7 @@
 
 irqreturn_t snd_gus_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	snd_gus_card_t * gus = snd_magic_cast(snd_gus_card_t,
-					dev_id, return IRQ_NONE);
+	snd_gus_card_t * gus = snd_magic_cast(snd_gus_card_t, dev_id, return IRQ_NONE);
 	unsigned char status;
 	int loop = 100;
 	int handled = 0;

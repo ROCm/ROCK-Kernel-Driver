@@ -563,10 +563,6 @@ long sys32_rt_sigaction(int sig, const struct sigaction32 *act,
 	return ret;
 }
 
-
-extern long sys_rt_sigprocmask(int how, sigset_t *set,
-		sigset_t *oset, size_t sigsetsize);
-
 /*
  * Note: it is necessary to treat how as an unsigned int, with the
  * corresponding cast to a signed int to insure that the proper
@@ -612,10 +608,6 @@ long sys32_rt_sigprocmask(u32 how, compat_sigset_t *set,
 	}
 	return 0;
 }
-
-
-extern long sys_rt_sigpending(sigset_t *set, size_t sigsetsize);
-
 
 long sys32_rt_sigpending(compat_sigset_t *set, compat_size_t sigsetsize)
 {
@@ -682,11 +674,6 @@ static int copy_siginfo_to_user32(siginfo_t32 *d, siginfo_t *s)
 	}
 	return err;
 }
-
-
-extern long sys_rt_sigtimedwait(const sigset_t *uthese,
-		siginfo_t *uinfo, const struct timespec *uts,
-		size_t sigsetsize);
 
 long sys32_rt_sigtimedwait(compat_sigset_t *uthese, siginfo_t32 *uinfo,
 		struct compat_timespec *uts, compat_size_t sigsetsize)
@@ -758,9 +745,6 @@ static siginfo_t * siginfo32to64(siginfo_t *d, siginfo_t32 *s)
 	return d;
 }
 
-
-extern long sys_rt_sigqueueinfo(int pid, int sig, siginfo_t *uinfo);
-
 /*
  * Note: it is necessary to treat pid and sig as unsigned ints, with the
  * corresponding cast to a signed int to insure that the proper conversion
@@ -785,8 +769,6 @@ long sys32_rt_sigqueueinfo(u32 pid, u32 sig, siginfo_t32 *uinfo)
 	set_fs (old_fs);
 	return ret;
 }
-
-extern int do_signal(sigset_t *oldset, struct pt_regs *regs);
 
 int sys32_rt_sigsuspend(compat_sigset_t* unewset, size_t sigsetsize, int p3,
 		int p4, int p6, int p7, struct pt_regs *regs)

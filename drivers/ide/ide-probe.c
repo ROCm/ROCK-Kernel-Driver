@@ -723,35 +723,7 @@ static void hwif_register (ide_hwif_t *hwif)
 
 //EXPORT_SYMBOL(hwif_register);
 
-/* Enable code below on all archs later, for now, I want it on PPC
- */
 #ifdef CONFIG_PPC
-/*
- * This function waits for the hwif to report a non-busy status
- * see comments in probe_hwif()
- */
-static int wait_not_busy(ide_hwif_t *hwif, unsigned long timeout)
-{
-	u8 stat = 0;
-	
-	while(timeout--) {
-		/* Turn this into a schedule() sleep once I'm sure
-		 * about locking issues (2.5 work ?)
-		 */
-		mdelay(1);
-		stat = hwif->INB(hwif->io_ports[IDE_STATUS_OFFSET]);
-		if ((stat & BUSY_STAT) == 0)
-			break;
-		/* Assume a value of 0xff means nothing is connected to
-		 * the interface and it doesn't implement the pull-down
-		 * resistor on D7
-		 */
-		if (stat == 0xff)
-			break;
-	}
-	return ((stat & BUSY_STAT) == 0) ? 0 : -EBUSY;
-}
-
 static int wait_hwif_ready(ide_hwif_t *hwif)
 {
 	int rc;
@@ -766,7 +738,7 @@ static int wait_hwif_ready(ide_hwif_t *hwif)
 	 * I know of at least one disk who takes 31 seconds, I use 35
 	 * here to be safe
 	 */
-	rc = wait_not_busy(hwif, 35000);
+	rc = ide_wait_not_busy(hwif, 35000);
 	if (rc)
 		return rc;
 
@@ -774,20 +746,20 @@ static int wait_hwif_ready(ide_hwif_t *hwif)
 	SELECT_DRIVE(&hwif->drives[0]);
 	hwif->OUTB(8, hwif->io_ports[IDE_CONTROL_OFFSET]);
 	mdelay(2);
-	rc = wait_not_busy(hwif, 10000);
+	rc = ide_wait_not_busy(hwif, 10000);
 	if (rc)
 		return rc;
 	SELECT_DRIVE(&hwif->drives[1]);
 	hwif->OUTB(8, hwif->io_ports[IDE_CONTROL_OFFSET]);
 	mdelay(2);
-	rc = wait_not_busy(hwif, 10000);
+	rc = ide_wait_not_busy(hwif, 10000);
 
 	/* Exit function with master reselected (let's be sane) */
 	SELECT_DRIVE(&hwif->drives[0]);
 	
 	return rc;
 }
-#endif /* CONFIG_PPC */
+#endif
 
 /*
  * This routine only knows how to look for drive units 0 and 1

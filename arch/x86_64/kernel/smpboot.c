@@ -51,8 +51,7 @@
 #include <asm/desc.h>
 #include <asm/kdebug.h>
 #include <asm/tlbflush.h>
-
-extern int disable_apic;
+#include <asm/proto.h>
 
 /* Bitmask of currently online CPUs */
 unsigned long cpu_online_map = 1;
@@ -126,7 +125,6 @@ static void __init synchronize_tsc_bp (void)
 	long long delta;
 	long one_usec;
 	int buggy = 0;
-	extern unsigned cpu_khz;
 
 	printk(KERN_INFO "checking TSC synchronization across %u CPUs: ",num_booting_cpus());
 
@@ -240,8 +238,6 @@ static void __init synchronize_tsc_ap (void)
 }
 #undef NR_LOOPS
 
-extern void calibrate_delay(void);
-
 static atomic_t init_deasserted;
 
 void __init smp_callin(void)
@@ -334,8 +330,6 @@ void __init smp_callin(void)
 }
 
 int cpucount;
-
-extern int cpu_idle(void);
 
 /*
  * Activate a secondary processor.
@@ -558,8 +552,6 @@ static int __init wakeup_secondary_via_INIT(int phys_apicid, unsigned int start_
 	return (send_status | accept_status);
 }
 
-extern unsigned long cpu_initialized;
-
 static void __init do_boot_cpu (int apicid)
 {
 	struct task_struct *idle;
@@ -760,7 +752,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 		if (APIC_init_uniprocessor())
 			printk(KERN_NOTICE "Local APIC not detected."
 					   " Using dummy APIC emulation.\n");
-		return;
+		goto smp_done;
 	}
 
 	/*
@@ -784,7 +776,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 		cpu_online_map = phys_cpu_present_map = 1;
 		phys_cpu_present_map = 1;
 		disable_apic = 1;
-		return;
+		goto smp_done;
 	}
 
 	verify_local_APIC();
@@ -799,7 +791,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 		cpu_online_map = phys_cpu_present_map = 1;
 		phys_cpu_present_map = 1;
 		disable_apic = 1;
-		return;
+		goto smp_done;
 	}
 
 	connect_bsp_APIC();
@@ -883,6 +875,9 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	 */
 	if (cpu_has_tsc && cpucount)
 		synchronize_tsc_bp();
+
+ smp_done:
+	time_init_smp();
 }
 
 /* These are wrappers to interface to the new boot process.  Someone

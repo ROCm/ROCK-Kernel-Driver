@@ -677,6 +677,7 @@ munmap_back:
 	vma->vm_pgoff = pgoff;
 	vma->vm_file = NULL;
 	vma->vm_private_data = NULL;
+	vma->vm_next = NULL;
 	INIT_LIST_HEAD(&vma->shared);
 
 	if (file) {

@@ -352,9 +352,7 @@ static inline void balance_irq(int cpu, int irq)
 	unsigned long allowed_mask;
 	unsigned int new_cpu;
 		
-	if (irqbalance_disabled == IRQBALANCE_CHECK_ARCH && NO_BALANCE_IRQ)
-		return;
-	else if (irqbalance_disabled) 
+	if (irqbalance_disabled)
 		return; 
 
 	allowed_mask = cpu_online_map & irq_affinity[irq];
@@ -614,6 +612,9 @@ static int __init balanced_irq_init(void)
 	struct cpuinfo_x86 *c;
 
         c = &boot_cpu_data;
+	/* When not overwritten by the command line ask subarchitecture. */
+	if (irqbalance_disabled == IRQBALANCE_CHECK_ARCH)
+		irqbalance_disabled = NO_BALANCE_IRQ;
 	if (irqbalance_disabled)
 		return 0;
 	
@@ -1072,6 +1073,8 @@ static int pin_2_irq(int idx, int apic, int pin)
 			while (i < apic)
 				irq += nr_ioapic_registers[i++];
 			irq += pin;
+			if ((!apic) && (irq < 16)) 
+				irq += 16;
 			break;
 		}
 		default:
@@ -1159,7 +1162,8 @@ void __init setup_IO_APIC_irqs(void)
 		entry.delivery_mode = INT_DELIVERY_MODE;
 		entry.dest_mode = INT_DEST_MODE;
 		entry.mask = 0;				/* enable IRQ */
-		entry.dest.logical.logical_dest = TARGET_CPUS;
+		entry.dest.logical.logical_dest = 
+					cpu_mask_to_apicid(TARGET_CPUS);
 
 		idx = find_irq_entry(apic,pin,mp_INT);
 		if (idx == -1) {
@@ -1238,7 +1242,7 @@ void __init setup_ExtINT_IRQ0_pin(unsigned int pin, int vector)
 	 */
 	entry.dest_mode = INT_DEST_MODE;
 	entry.mask = 0;					/* unmask IRQ now */
-	entry.dest.logical.logical_dest = TARGET_CPUS;
+	entry.dest.logical.logical_dest = cpu_mask_to_apicid(TARGET_CPUS);
 	entry.delivery_mode = INT_DELIVERY_MODE;
 	entry.polarity = 0;
 	entry.trigger = 0;
@@ -1299,7 +1303,9 @@ void __init print_IO_APIC(void)
 	printk(KERN_DEBUG ".......    : physical APIC id: %02X\n", reg_00.ID);
 	printk(KERN_DEBUG ".......    : Delivery Type: %X\n", reg_00.delivery_type);
 	printk(KERN_DEBUG ".......    : LTS          : %X\n", reg_00.LTS);
-	if (reg_00.__reserved_0 || reg_00.__reserved_1 || reg_00.__reserved_2)
+	if (reg_00.ID >= APIC_BROADCAST_ID)
+		UNEXPECTED_IO_APIC();
+	if (reg_00.__reserved_1 || reg_00.__reserved_2)
 		UNEXPECTED_IO_APIC();
 
 	printk(KERN_DEBUG ".... register #01: %08X\n", *(int *)&reg_01);
@@ -1623,7 +1629,7 @@ static void __init setup_ioapic_ids_from_mpc(void)
 			mp_ioapics[apic].mpc_apicid = i;
 		} else {
 			printk("Setting %d in the phys_id_present_map\n", mp_ioapics[apic].mpc_apicid);
-			phys_id_present_map |= 1 << mp_ioapics[apic].mpc_apicid;
+			phys_id_present_map |= apicid_to_cpu_present(mp_ioapics[apic].mpc_apicid);
 		}
 
 
@@ -2224,10 +2230,10 @@ int __init io_apic_get_unique_id (int ioapic, int apic_id)
 	 * Every APIC in a system must have a unique ID or we get lots of nice 
 	 * 'stuck on smp_invalidate_needed IPI wait' messages.
 	 */
-	if (apic_id_map & (1 << apic_id)) {
+	if (check_apicid_used(apic_id_map, apic_id)) {
 
 		for (i = 0; i < IO_APIC_MAX_ID; i++) {
-			if (!(apic_id_map & (1 << i)))
+			if (!check_apicid_used(apic_id_map, i))
 				break;
 		}
 
@@ -2240,7 +2246,7 @@ int __init io_apic_get_unique_id (int ioapic, int apic_id)
 		apic_id = i;
 	} 
 
-	apic_id_map |= (1 << apic_id);
+	apic_id_map |= apicid_to_cpu_present(apic_id);
 
 	if (reg_00.ID != apic_id) {
 		reg_00.ID = apic_id;
@@ -2308,7 +2314,7 @@ int io_apic_set_pci_routing (int ioapic, int pin, int irq)
 
 	entry.delivery_mode = INT_DELIVERY_MODE;
 	entry.dest_mode = INT_DEST_MODE;
-	entry.dest.logical.logical_dest = TARGET_CPUS;
+	entry.dest.logical.logical_dest = cpu_mask_to_apicid(TARGET_CPUS);
 	entry.mask = 1;					 /* Disabled (masked) */
 	entry.trigger = 1;				   /* Level sensitive */
 	entry.polarity = 1;					/* Low active */

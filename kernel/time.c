@@ -68,22 +68,15 @@ asmlinkage long sys_time(int * tloc)
  
 asmlinkage long sys_stime(int * tptr)
 {
-	int value;
+	struct timespec tv;
 
 	if (!capable(CAP_SYS_TIME))
 		return -EPERM;
-	if (get_user(value, tptr))
+	if (get_user(tv.tv_sec, tptr))
 		return -EFAULT;
-	write_seqlock_irq(&xtime_lock);
 
-	time_interpolator_reset();
-	xtime.tv_sec = value;
-	xtime.tv_nsec = 0;
-	time_adjust = 0;	/* stop active adjtime() */
-	time_status |= STA_UNSYNC;
-	time_maxerror = NTP_PHASE_LIMIT;
-	time_esterror = NTP_PHASE_LIMIT;
-	write_sequnlock_irq(&xtime_lock);
+	tv.tv_nsec = 0;
+	do_settimeofday(&tv);
 	return 0;
 }
 
@@ -123,9 +116,11 @@ asmlinkage long sys_gettimeofday(struct timeval __user *tv, struct timezone __us
 inline static void warp_clock(void)
 {
 	write_seqlock_irq(&xtime_lock);
+	wall_to_monotonic.tv_sec -= sys_tz.tz_minuteswest * 60;
 	xtime.tv_sec += sys_tz.tz_minuteswest * 60;
 	time_interpolator_update(sys_tz.tz_minuteswest * 60 * NSEC_PER_SEC);
 	write_sequnlock_irq(&xtime_lock);
+	clock_was_set();
 }
 
 /*
@@ -139,7 +134,7 @@ inline static void warp_clock(void)
  * various programs will get confused when the clock gets warped.
  */
 
-int do_sys_settimeofday(struct timeval *tv, struct timezone *tz)
+int do_sys_settimeofday(struct timespec *tv, struct timezone *tz)
 {
 	static int firsttime = 1;
 
@@ -160,19 +155,20 @@ int do_sys_settimeofday(struct timeval *tv, struct timezone *tz)
 		/* SMP safe, again the code in arch/foo/time.c should
 		 * globally block out interrupts when it runs.
 		 */
-		do_settimeofday(tv);
+		return do_settimeofday(tv);
 	}
 	return 0;
 }
 
 asmlinkage long sys_settimeofday(struct timeval __user *tv, struct timezone __user *tz)
 {
-	struct timeval	new_tv;
+	struct timespec	new_tv;
 	struct timezone new_tz;
 
 	if (tv) {
 		if (copy_from_user(&new_tv, tv, sizeof(*tv)))
 			return -EFAULT;
+		new_tv.tv_nsec *= NSEC_PER_USEC;
 	}
 	if (tz) {
 		if (copy_from_user(&new_tz, tz, sizeof(*tz)))
@@ -341,7 +337,7 @@ int do_adjtimex(struct timex *txc)
 	    } /* txc->modes & ADJ_OFFSET */
 	    if (txc->modes & ADJ_TICK) {
 		tick_usec = txc->tick;
-		tick_nsec = TICK_NSEC(tick_usec);
+		tick_nsec = TICK_USEC_TO_NSEC(tick_usec);
 	    }
 	} /* txc->modes */
 leave:	if ((time_status & (STA_UNSYNC|STA_CLOCKERR)) != 0

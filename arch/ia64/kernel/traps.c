@@ -247,8 +247,7 @@ disabled_fph_fault (struct pt_regs *regs)
 	psr->dfh = 0;
 #ifndef CONFIG_SMP
 	{
-		struct task_struct *fpu_owner
-			= (struct task_struct *)ia64_get_kr(IA64_KR_FPU_OWNER);
+		struct task_struct *fpu_owner = ia64_get_fpu_owner();
 
 		if (fpu_owner == current)
 			return;
@@ -257,7 +256,7 @@ disabled_fph_fault (struct pt_regs *regs)
 			ia64_flush_fph(fpu_owner);
 	}
 #endif /* !CONFIG_SMP */
-	ia64_set_local_fpu_owner(current);
+	ia64_set_fpu_owner(current);
 	if ((current->thread.flags & IA64_THREAD_FPH_VALID) != 0) {
 		__ia64_load_fpu(current->thread.fph);
 		psr->mfh = 0;

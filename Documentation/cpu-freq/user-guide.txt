@@ -53,9 +53,12 @@ The following processors for the x86 architecture are supported by cpufreq:
 AMD Elan - SC400, SC410
 AMD mobile K6-2+
 AMD mobile K6-3+
+AMD mobile Duron
+AMD mobile Athlon
 Cyrix Media GXm
 Intel mobile PIII [*] and Intel mobile PIII-M on certain chipsets
 Intel Pentium 4, Intel Xeon
+Intel Pentium M (Centrino)
 National Semiconductors Geode GX
 Transmeta Crusoe
 VIA Cyrix 3 / C3
@@ -117,7 +120,7 @@ the processor shall run at.
 The preferred interface is located in the sysfs filesystem. If you
 mounted it at /sys, the cpufreq interface is located in a subdirectory
 "cpufreq" within the cpu-device directory
-(e.g. /sys/devices/sys/cpu0/cpufreq/ for the first CPU).
+(e.g. /sys/class/cpu/cpu0/cpufreq/ for the first CPU).
 
 cpuinfo_min_freq :		this file shows the minimum operating
 				frequency the processor can run at(in kHz) 

@@ -983,8 +983,6 @@ struct dentry * __d_lookup(struct dentry * parent, struct qstr * name)
 		struct dentry *dentry; 
 		unsigned long move_count;
 		struct qstr * qstr;
-		
-		prefetch(node->next);
 
 		smp_read_barrier_depends();
 		dentry = hlist_entry(node, struct dentry, d_hash);
@@ -1072,7 +1070,6 @@ int d_validate(struct dentry *dentry, struct dentry *dparent)
 	spin_lock(&dcache_lock);
 	base = d_hash(dparent, dentry->d_name.hash);
 	hlist_for_each(lhp,base) { 
-		prefetch(lhp->next);
 		/* read_barrier_depends() not required for d_hash list
 		 * as it is parsed under dcache_lock
 		 */
@@ -1224,10 +1221,14 @@ void d_move(struct dentry * dentry, struct dentry * target)
 	}
 
 	/* Move the dentry to the target hash queue, if on different bucket */
+	if (dentry->d_vfs_flags & DCACHE_UNHASHED)
+		goto already_unhashed;
 	if (dentry->d_bucket != target->d_bucket) {
-		dentry->d_bucket = target->d_bucket;
 		hlist_del_rcu(&dentry->d_hash);
+already_unhashed:
+		dentry->d_bucket = target->d_bucket;
 		hlist_add_head_rcu(&dentry->d_hash, target->d_bucket);
+		dentry->d_vfs_flags &= ~DCACHE_UNHASHED;
 	}
 
 	/* Unhash the target: dput() will then get rid of it */

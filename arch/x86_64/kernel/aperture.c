@@ -25,8 +25,6 @@
 int fallback_aper_order __initdata = 1; /* 64MB */
 int fallback_aper_force __initdata = 0; 
 
-extern int no_iommu, force_mmu;
-
 /* This code runs before the PCI subsystem is initialized, so just 
    access the northbridge directly. */
 

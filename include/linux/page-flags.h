@@ -7,6 +7,7 @@
 
 #include <linux/percpu.h>
 #include <linux/cache.h>
+#include <asm/pgtable.h>
 
 /*
  * Various page->flags bits:
@@ -158,8 +159,16 @@ extern void get_full_page_state(struct page_state *ret);
 #define ClearPageReferenced(page)	clear_bit(PG_referenced, &(page)->flags)
 #define TestClearPageReferenced(page) test_and_clear_bit(PG_referenced, &(page)->flags)
 
+#ifndef arch_set_page_uptodate
+#define arch_set_page_uptodate(page) do { } while (0)
+#endif
+
 #define PageUptodate(page)	test_bit(PG_uptodate, &(page)->flags)
-#define SetPageUptodate(page)	set_bit(PG_uptodate, &(page)->flags)
+#define SetPageUptodate(page) \
+	do {								\
+		arch_set_page_uptodate(page);				\
+		set_bit(PG_uptodate, &(page)->flags);			\
+	} while (0)
 #define ClearPageUptodate(page)	clear_bit(PG_uptodate, &(page)->flags)
 
 #define PageDirty(page)		test_bit(PG_dirty, &(page)->flags)

@@ -206,7 +206,7 @@ void setup_arch(char **cmdline_p)
 	printk("based on 2.0.38 port by Lineo Inc. <mleslie@lineo.com>.\n");
 #endif
 #ifdef CONFIG_DRAGEN2
-	printk("Dragon Engine II board support by Georges Menie\n");
+	printk("DragonEngine II board support by Georges Menie\n");
 #endif
 
 #ifdef DEBUG
@@ -223,10 +223,6 @@ void setup_arch(char **cmdline_p)
 #endif
 		(int) memory_start, (int) memory_end,
 		(int) memory_end, (int) _ramend);
-#endif
-
-#ifdef CONFIG_BLK_DEV_BLKMEM
-	ROOT_DEV = MKDEV(BLKMEM_MAJOR, 0);
 #endif
 
 	/* Keep a copy of command line */

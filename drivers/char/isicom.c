@@ -73,13 +73,9 @@ static struct pci_device_id isicom_pci_tbl[] = {
 };
 MODULE_DEVICE_TABLE(pci, isicom_pci_tbl);
 
-static int isicom_refcount;
 static int prev_card = 3;	/*	start servicing isi_card[0]	*/
 static struct isi_board * irq_to_board[16];
-static struct tty_driver isicom_normal, isicom_callout;
-static struct tty_struct * isicom_table[PORT_COUNT];
-static struct termios * isicom_termios[PORT_COUNT];
-static struct termios * isicom_termios_locked[PORT_COUNT];
+static struct tty_driver *isicom_normal;
 
 static struct isi_board isi_card[BOARD_COUNT];
 static struct isi_port  isi_ports[PORT_COUNT];
@@ -588,10 +584,7 @@ static irqreturn_t isicom_interrupt(int irq, void *dev_id,
 							printk(KERN_DEBUG "ISICOM: interrupt: DCD->low.\n");
 #endif							
 							port->status &= ~ISI_DCD;
-							if (!((port->flags & ASYNC_CALLOUT_ACTIVE) &&
-								(port->flags & ASYNC_CALLOUT_NOHUP))) {
-								schedule_task(&port->hangup_tq);
-							}
+							schedule_task(&port->hangup_tq);
 						}
 					}
 					else {
@@ -903,49 +896,18 @@ static int block_til_ready(struct tty_struct * tty, struct file * filp, struct i
 			return -ERESTARTSYS;
 	}
 	
-	/* trying to open a callout device... check for constraints */
-	
-	if (tty->driver->subtype == SERIAL_TYPE_CALLOUT) {
-#ifdef ISICOM_DEBUG
-		printk(KERN_DEBUG "ISICOM: bl_ti_rdy: callout open.\n");	
-#endif		
-		if (port->flags & ASYNC_NORMAL_ACTIVE)
-			return -EBUSY;
-		if ((port->flags & ASYNC_CALLOUT_ACTIVE) &&
-		    (port->flags & ASYNC_SESSION_LOCKOUT) &&
-		    (port->session != current->session))
-			return -EBUSY;
-			
-		if ((port->flags & ASYNC_CALLOUT_ACTIVE) &&
-		    (port->flags & ASYNC_PGRP_LOCKOUT) &&
-		    (port->pgrp != current->pgrp))
-			return -EBUSY;
-		port->flags |= ASYNC_CALLOUT_ACTIVE;
-		cli();
-		raise_dtr_rts(port);
-		sti();
-		return 0;
-	}
-	
 	/* if non-blocking mode is set ... */
 	
 	if ((filp->f_flags & O_NONBLOCK) || (tty->flags & (1 << TTY_IO_ERROR))) {
 #ifdef ISICOM_DEBUG	
 		printk(KERN_DEBUG "ISICOM: block_til_ready: non-block mode.\n");
 #endif		
-		if (port->flags & ASYNC_CALLOUT_ACTIVE)
-			return -EBUSY;
 		port->flags |= ASYNC_NORMAL_ACTIVE;
 		return 0;	
 	}	
 	
-	if (port->flags & ASYNC_CALLOUT_ACTIVE) {
-		if (port->normal_termios.c_cflag & CLOCAL)
-			do_clocal = 1; 
-	} else {
-		if (C_CLOCAL(tty))
-			do_clocal = 1;
-	}
+	if (C_CLOCAL(tty))
+		do_clocal = 1;
 #ifdef ISICOM_DEBUG	
 	if (do_clocal)
 		printk(KERN_DEBUG "ISICOM: block_til_ready: CLOCAL set.\n");
@@ -965,9 +927,7 @@ static int block_til_ready(struct tty_struct * tty, struct file * filp, struct i
 #endif	
 	while (1) {
 		cli();
-		if (!(port->flags & ASYNC_CALLOUT_ACTIVE)) 
-			raise_dtr_rts(port);
-		
+		raise_dtr_rts(port);
 		sti();
 		set_current_state(TASK_INTERRUPTIBLE);
 		if (tty_hung_up_p(filp) || !(port->flags & ASYNC_INITIALIZED)) { 	
@@ -980,8 +940,7 @@ static int block_til_ready(struct tty_struct * tty, struct file * filp, struct i
 #endif			
 			break;
 		}	
-		if (!(port->flags & ASYNC_CALLOUT_ACTIVE) &&
-		    !(port->flags & ASYNC_CLOSING) &&
+		if (!(port->flags & ASYNC_CLOSING) &&
 		    (do_clocal || (port->status & ISI_DCD))) {
 #ifdef ISICOM_DEBUG		    
 		 	printk(KERN_DEBUG "ISICOM: block_til_ready: do_clocal || DCD.\n");   
@@ -1068,19 +1027,7 @@ static int isicom_open(struct tty_struct * tty, struct file * filp)
 #endif	
 	if ((error = block_til_ready(tty, filp, port))!=0)
 		return error;
-		
-	if ((port->count == 1) && (port->flags & ASYNC_SPLIT_TERMIOS)) {
-		if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
-			*tty->termios = port->normal_termios;
-		else 
-			*tty->termios = port->callout_termios;
-		save_flags(flags); cli();
-		isicom_config_port(port);
-		restore_flags(flags);		
-	}	
-	
-	port->session = current->session;	
-	port->pgrp = current->pgrp;
+
 #ifdef ISICOM_DEBUG	
 	printk(KERN_DEBUG "ISICOM: open end!!!.\n");
 #endif	
@@ -1174,15 +1121,6 @@ static void isicom_close(struct tty_struct * tty, struct file * filp)
 		return;
 	} 	
 	port->flags |= ASYNC_CLOSING;
-	/* 
-	 * save termios struct since callout and dialin termios may be 
-	 * different.
-	 */	
-	if (port->flags & ASYNC_NORMAL_ACTIVE)
-		port->normal_termios = *tty->termios;
-	if (port->flags & ASYNC_CALLOUT_ACTIVE)
-		port->callout_termios = *tty->termios;
-	
 	tty->closing = 1;
 	if (port->closing_wait != ASYNC_CLOSING_WAIT_NONE)
 		tty_wait_until_sent(tty, port->closing_wait);
@@ -1209,8 +1147,7 @@ static void isicom_close(struct tty_struct * tty, struct file * filp)
 		}
 		wake_up_interruptible(&port->open_wait);
 	}	
-	port->flags &= ~(ASYNC_NORMAL_ACTIVE | ASYNC_CALLOUT_ACTIVE | 
-			ASYNC_CLOSING);
+	port->flags &= ~(ASYNC_NORMAL_ACTIVE | ASYNC_CLOSING);
 	wake_up_interruptible(&port->close_wait);
 	restore_flags(flags);
 #ifdef ISICOM_DEBUG	
@@ -1651,7 +1588,7 @@ static void isicom_hangup(struct tty_struct * tty)
 	
 	isicom_shutdown_port(port);
 	port->count = 0;
-	port->flags &= ~(ASYNC_NORMAL_ACTIVE | ASYNC_CALLOUT_ACTIVE);
+	port->flags &= ~ASYNC_NORMAL_ACTIVE;
 	port->tty = 0;
 	wake_up_interruptible(&port->open_wait);
 }
@@ -1703,63 +1640,50 @@ static void unregister_ioregion(void)
 		}
 }
 
+static struct tty_operations isicom_ops = {
+	.open	= isicom_open,
+	.close	= isicom_close,
+	.write	= isicom_write,
+	.put_char	= isicom_put_char,
+	.flush_chars	= isicom_flush_chars,
+	.write_room	= isicom_write_room,
+	.chars_in_buffer	= isicom_chars_in_buffer,
+	.ioctl	= isicom_ioctl,
+	.set_termios	= isicom_set_termios,
+	.throttle	= isicom_throttle,
+	.unthrottle	= isicom_unthrottle,
+	.stop	= isicom_stop,
+	.start	= isicom_start,
+	.hangup	= isicom_hangup,
+	.flush_buffer	= isicom_flush_buffer,
+};
+
 static int register_drivers(void)
 {
 	int error;
 
 	/* tty driver structure initialization */
-	memset(&isicom_normal, 0, sizeof(struct tty_driver));
-	isicom_normal.magic	= TTY_DRIVER_MAGIC;
-	isicom_normal.owner	= THIS_MODULE;
-	isicom_normal.name 	= "ttyM";
-	isicom_normal.major	= ISICOM_NMAJOR;
-	isicom_normal.minor_start	= 0;
-	isicom_normal.num	= PORT_COUNT;
-	isicom_normal.type	= TTY_DRIVER_TYPE_SERIAL;
-	isicom_normal.subtype	= SERIAL_TYPE_NORMAL;
-	isicom_normal.init_termios	= tty_std_termios;
-	isicom_normal.init_termios.c_cflag	= 
+	isicom_normal = alloc_tty_driver(PORT_COUNT);
+	if (!isicom_normal)
+		return -ENOMEM;
+
+	isicom_normal->owner	= THIS_MODULE;
+	isicom_normal->name 	= "ttyM";
+	isicom_normal->major	= ISICOM_NMAJOR;
+	isicom_normal->minor_start	= 0;
+	isicom_normal->type	= TTY_DRIVER_TYPE_SERIAL;
+	isicom_normal->subtype	= SERIAL_TYPE_NORMAL;
+	isicom_normal->init_termios	= tty_std_termios;
+	isicom_normal->init_termios.c_cflag	= 
 				B9600 | CS8 | CREAD | HUPCL |CLOCAL;
-	isicom_normal.flags	= TTY_DRIVER_REAL_RAW;
-	isicom_normal.refcount	= &isicom_refcount;
+	isicom_normal->flags	= TTY_DRIVER_REAL_RAW;
+	tty_set_operations(isicom_normal, &isicom_ops);
 	
-	isicom_normal.table	= isicom_table;
-	isicom_normal.termios	= isicom_termios;
-	isicom_normal.termios_locked	= isicom_termios_locked;
-	
-	isicom_normal.open	= isicom_open;
-	isicom_normal.close	= isicom_close;
-	isicom_normal.write	= isicom_write;
-	isicom_normal.put_char	= isicom_put_char;
-	isicom_normal.flush_chars	= isicom_flush_chars;
-	isicom_normal.write_room	= isicom_write_room;
-	isicom_normal.chars_in_buffer	= isicom_chars_in_buffer;
-	isicom_normal.ioctl	= isicom_ioctl;
-	isicom_normal.set_termios	= isicom_set_termios;
-	isicom_normal.throttle	= isicom_throttle;
-	isicom_normal.unthrottle	= isicom_unthrottle;
-	isicom_normal.stop	= isicom_stop;
-	isicom_normal.start	= isicom_start;
-	isicom_normal.hangup	= isicom_hangup;
-	isicom_normal.flush_buffer	= isicom_flush_buffer;
-	
-	/*	callout device	*/
-	
-	isicom_callout	= isicom_normal;
-	isicom_callout.name	= "cum"; 
-	isicom_callout.major	= ISICOM_CMAJOR;
-	isicom_callout.subtype	= SERIAL_TYPE_CALLOUT;
-	
-	if ((error=tty_register_driver(&isicom_normal))!=0) {
+	if ((error=tty_register_driver(isicom_normal))!=0) {
 		printk(KERN_DEBUG "ISICOM: Couldn't register the dialin driver, error=%d\n",
 			error);
+		put_tty_driver(isicom_normal);
 		return error;
-	}
-	if ((error=tty_register_driver(&isicom_callout))!=0) {
-		tty_unregister_driver(&isicom_normal);
-		printk(KERN_DEBUG "ISICOM: Couldn't register the callout driver, error=%d\n",
-			error);
-		return error;	
 	}
 	return 0;
 }
@@ -1767,10 +1691,9 @@ static int register_drivers(void)
 static void unregister_drivers(void)
 {
 	int error;
-	if ((error=tty_unregister_driver(&isicom_callout))!=0)
-		printk(KERN_DEBUG "ISICOM: couldn't unregister callout driver error=%d.\n",error);
-	if (tty_unregister_driver(&isicom_normal))
+	if (tty_unregister_driver(isicom_normal))
 		printk(KERN_DEBUG "ISICOM: couldn't unregister normal driver error=%d.\n",error);
+	put_tty_driver(isicom_normal);
 }
 
 static int register_isr(void)
@@ -1896,8 +1819,6 @@ static int isicom_init(void)
 			port->magic = ISICOM_MAGIC;
 			port->card = &isi_card[card];
 			port->channel = channel;		
-			port->normal_termios = isicom_normal.init_termios;
-			port->callout_termios = isicom_callout.init_termios;
 		 	port->close_delay = 50 * HZ/100;
 		 	port->closing_wait = 3000 * HZ/100;
 			port->hangup_tq.routine = do_isicom_hangup;
@@ -1966,7 +1887,7 @@ int init_module(void)
 		}
 	}	
 	
-	if (pci_present() && (card < BOARD_COUNT)) {
+	if (card < BOARD_COUNT) {
 		for (idx=0; idx < DEVID_COUNT; idx++) {
 			dev = NULL;
 			for (;;){

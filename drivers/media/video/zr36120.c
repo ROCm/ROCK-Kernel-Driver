@@ -1693,12 +1693,12 @@ long vbi_read(struct video_device* dev, char* buf, unsigned long count, int nonb
 			for (x=0; optr+1<eptr && x<-done->w; x++)
 			{
 				unsigned char a = iptr[x*2];
-				*optr++ = a;
-				*optr++ = a;
+				__put_user(a, optr++);
+				__put_user(a, optr++);
 			}
 			/* and clear the rest of the line */
 			for (x*=2; optr<eptr && x<done->bpl; x++)
-				*optr++ = 0;
+				__put_user(0, optr++);
 			/* next line */
 			iptr += done->bpl;
 		}
@@ -1715,10 +1715,10 @@ long vbi_read(struct video_device* dev, char* buf, unsigned long count, int nonb
 		{
 			/* copy to doubled data to userland */
 			for (x=0; optr<eptr && x<-done->w; x++)
-				*optr++ = iptr[x*2];
+				__put_user(iptr[x*2], optr++);
 			/* and clear the rest of the line */
 			for (;optr<eptr && x<done->bpl; x++)
-				*optr++ = 0;
+				__put_user(0, optr++);
 			/* next line */
 			iptr += done->bpl;
 		}
@@ -1727,7 +1727,7 @@ long vbi_read(struct video_device* dev, char* buf, unsigned long count, int nonb
 	/* API compliance:
 	 * place the framenumber (half fieldnr) in the last long
 	 */
-	((ulong*)eptr)[-1] = done->fieldnr/2;
+	__put_user(done->fieldnr/2, ((ulong*)eptr)[-1]);
 	}
 
 	/* keep the engine running */

@@ -1112,11 +1112,18 @@ asmlinkage long sys32_pause(void)
 
 
 
-static inline long get_tv32(struct timeval *o, struct compat_timeval *i)
+static inline long get_ts32(struct timespec *o, struct compat_timeval *i)
 {
-	return (!access_ok(VERIFY_READ, i, sizeof(*i)) ||
-		(__get_user(o->tv_sec, &i->tv_sec) |
-		 __get_user(o->tv_usec, &i->tv_usec)));
+	long usec;
+
+	if (!access_ok(VERIFY_READ, i, sizeof(*i)))
+		return -EFAULT;
+	if (__get_user(o->tv_sec, &i->tv_sec))
+		return -EFAULT;
+	if (__get_user(usec, &i->tv_usec))
+		return -EFAULT;
+	o->tv_nsec = usec * 1000;
+	return 0;
 }
 
 static inline long put_tv32(struct compat_timeval *o, struct timeval *i)
@@ -1136,7 +1143,11 @@ struct sysinfo32 {
         u32 totalswap;
         u32 freeswap;
         unsigned short procs;
-        char _f[22];
+	unsigned short pad;
+	u32 totalhigh;
+	u32 freehigh;
+	u32 mem_unit;
+	char _f[20-2*sizeof(long)-sizeof(int)];
 };
 
 extern asmlinkage long sys_sysinfo(struct sysinfo *info);
@@ -1145,11 +1156,30 @@ asmlinkage long sys32_sysinfo(struct sysinfo32 *info)
 {
 	struct sysinfo s;
 	int ret, err;
+	int bitcount=0;
 	mm_segment_t old_fs = get_fs ();
 	
 	set_fs (KERNEL_DS);
 	ret = sys_sysinfo(&s);
 	set_fs (old_fs);
+	/* Check to see if any memory value is too large for 32-bit and
+         * scale down if needed.
+         */
+	if ((s.totalram >> 32) || (s.totalswap >> 32)) {
+	    while (s.mem_unit < PAGE_SIZE) {
+		s.mem_unit <<= 1;
+		bitcount++;
+	    }
+	    s.totalram >>=bitcount;
+	    s.freeram >>= bitcount;
+	    s.sharedram >>= bitcount;
+	    s.bufferram >>= bitcount;
+	    s.totalswap >>= bitcount;
+	    s.freeswap >>= bitcount;
+	    s.totalhigh >>= bitcount;
+	    s.freehigh >>= bitcount;
+	}
+
 	err = put_user (s.uptime, &info->uptime);
 	err |= __put_user (s.loads[0], &info->loads[0]);
 	err |= __put_user (s.loads[1], &info->loads[1]);
@@ -1161,6 +1191,9 @@ asmlinkage long sys32_sysinfo(struct sysinfo32 *info)
 	err |= __put_user (s.totalswap, &info->totalswap);
 	err |= __put_user (s.freeswap, &info->freeswap);
 	err |= __put_user (s.procs, &info->procs);
+	err |= __put_user (s.totalhigh, &info->totalhigh);
+	err |= __put_user (s.freehigh, &info->freehigh);
+	err |= __put_user (s.mem_unit, &info->mem_unit);
 	if (err)
 		return -EFAULT;
 	
@@ -1173,7 +1206,6 @@ asmlinkage long sys32_sysinfo(struct sysinfo32 *info)
 /* Translations due to time_t size differences.  Which affects all
    sorts of things, like timeval and itimerval.  */
 extern struct timezone sys_tz;
-extern int do_sys_settimeofday(struct timeval *tv, struct timezone *tz);
 
 asmlinkage long sys32_gettimeofday(struct compat_timeval *tv, struct timezone *tz)
 {
@@ -1195,11 +1227,11 @@ asmlinkage long sys32_gettimeofday(struct compat_timeval *tv, struct timezone *t
 
 asmlinkage long sys32_settimeofday(struct compat_timeval *tv, struct timezone *tz)
 {
-	struct timeval ktv;
+	struct timespec kts;
 	struct timezone ktz;
 	
  	if (tv) {
-		if (get_tv32(&ktv, tv))
+		if (get_ts32(&kts, tv))
 			return -EFAULT;
 	}
 	if (tz) {
@@ -1207,7 +1239,7 @@ asmlinkage long sys32_settimeofday(struct compat_timeval *tv, struct timezone *t
 			return -EFAULT;
 	}
 
-	return do_sys_settimeofday(tv ? &ktv : NULL, tz ? &ktz : NULL);
+	return do_sys_settimeofday(tv ? &kts : NULL, tz ? &ktz : NULL);
 }
 
 
@@ -2316,6 +2348,14 @@ long sys32_nice(u32 increment)
 {
 	/* sign extend increment */
 	return sys_nice((int)increment);
+}
+
+extern off_t sys_lseek(unsigned int fd, off_t offset, unsigned int origin);
+
+off_t ppc32_lseek(unsigned int fd, u32 offset, unsigned int origin)
+{
+	/* sign extend n */
+	return sys_lseek(fd, (int)offset, origin);
 }
 
 /*

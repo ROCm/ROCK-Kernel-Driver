@@ -37,7 +37,6 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/config.h>
-#include <linux/proc_fs.h>
 
 #include <pcmcia/version.h>
 #include <pcmcia/cs_types.h>
@@ -106,17 +105,8 @@ static struct device_driver sa11x0_pcmcia_driver = {
 	.remove		= sa11xx_drv_pcmcia_remove,
 	.name		= "sa11x0-pcmcia",
 	.bus		= &platform_bus_type,
-	.devclass	= &pcmcia_socket_class,
 	.suspend 	= pcmcia_socket_dev_suspend,
 	.resume 	= pcmcia_socket_dev_resume,
-};
-
-static struct platform_device sa11x0_pcmcia_device = {
-	.name		= "sa11x0-pcmcia",
-	.id		= 0,
-	.dev		= {
-		.name	= "Intel Corporation SA11x0 [PCMCIA]",
-	},
 };
 
 /* sa11x0_pcmcia_init()
@@ -129,16 +119,7 @@ static struct platform_device sa11x0_pcmcia_device = {
  */
 static int __init sa11x0_pcmcia_init(void)
 {
-	int ret;
-
-	ret = driver_register(&sa11x0_pcmcia_driver);
-	if (ret == 0) {
-		ret = platform_device_register(&sa11x0_pcmcia_device);
-		if (ret)
-			driver_unregister(&sa11x0_pcmcia_driver);
-	}
-
-	return ret;
+	return driver_register(&sa11x0_pcmcia_driver);
 }
 
 /* sa11x0_pcmcia_exit()
@@ -148,7 +129,6 @@ static int __init sa11x0_pcmcia_init(void)
  */
 static void __exit sa11x0_pcmcia_exit(void)
 {
-	platform_device_unregister(&sa11x0_pcmcia_device);
 	driver_unregister(&sa11x0_pcmcia_driver);
 }
 

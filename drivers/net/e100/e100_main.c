@@ -614,10 +614,6 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
 		goto err_dealloc;
 	}
 
-	if ((rc = register_netdev(dev)) != 0) {
-		goto err_pci;
-	}
-
 	if (((bdp->pdev->device > 0x1030)
 	       && (bdp->pdev->device < 0x103F))
 	    || ((bdp->pdev->device >= 0x1050)
@@ -641,6 +637,28 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
 	} else {
 		bdp->rfd_size = 16;
 	}
+
+	dev->vlan_rx_register = e100_vlan_rx_register;
+	dev->vlan_rx_add_vid = e100_vlan_rx_add_vid;
+	dev->vlan_rx_kill_vid = e100_vlan_rx_kill_vid;
+	dev->irq = pcid->irq;
+	dev->open = &e100_open;
+	dev->hard_start_xmit = &e100_xmit_frame;
+	dev->stop = &e100_close;
+	dev->change_mtu = &e100_change_mtu;
+	dev->get_stats = &e100_get_stats;
+	dev->set_multicast_list = &e100_set_multi;
+	dev->set_mac_address = &e100_set_mac;
+	dev->do_ioctl = &e100_ioctl;
+
+	if (bdp->flags & USE_IPCB)
+	dev->features = NETIF_F_SG | NETIF_F_HW_CSUM |
+			NETIF_F_HW_VLAN_TX | NETIF_F_HW_VLAN_RX;
+		
+	if ((rc = register_netdev(dev)) != 0) {
+		goto err_pci;
+	}
+
 	e100_check_options(e100nics, bdp);
 
 	if (!e100_init(bdp)) {
@@ -660,23 +678,6 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
                 goto err_unregister_netdev;
 	}
 	
-	dev->vlan_rx_register = e100_vlan_rx_register;
-	dev->vlan_rx_add_vid = e100_vlan_rx_add_vid;
-	dev->vlan_rx_kill_vid = e100_vlan_rx_kill_vid;
-	dev->irq = pcid->irq;
-	dev->open = &e100_open;
-	dev->hard_start_xmit = &e100_xmit_frame;
-	dev->stop = &e100_close;
-	dev->change_mtu = &e100_change_mtu;
-	dev->get_stats = &e100_get_stats;
-	dev->set_multicast_list = &e100_set_multi;
-	dev->set_mac_address = &e100_set_mac;
-	dev->do_ioctl = &e100_ioctl;
-
-	if (bdp->flags & USE_IPCB)
-	dev->features = NETIF_F_SG | NETIF_F_HW_CSUM |
-			NETIF_F_HW_VLAN_TX | NETIF_F_HW_VLAN_RX;
-		
 	e100nics++;
 
 	e100_get_speed_duplex_caps(bdp);
@@ -4271,13 +4272,13 @@ e100_vlan_rx_kill_vid(struct net_device *netdev, u16 vid)
 static int
 e100_notify_reboot(struct notifier_block *nb, unsigned long event, void *p)
 {
-        struct pci_dev *pdev;
+        struct pci_dev *pdev = NULL;
 	
         switch(event) {
         case SYS_DOWN:
         case SYS_HALT:
         case SYS_POWER_OFF:
-                pci_for_each_dev(pdev) {
+		while ((pdev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, pdev)) != NULL) {
                         if(pci_dev_driver(pdev) == &e100_driver) {
 				/* If net_device struct is allocated? */
                                 if (pci_get_drvdata(pdev))

@@ -1262,6 +1262,13 @@ static int bput_one(handle_t *handle, struct buffer_head *bh)
 	return 0;
 }
 
+static int journal_dirty_data_fn(handle_t *handle, struct buffer_head *bh)
+{
+	if (buffer_mapped(bh))
+		return ext3_journal_dirty_data(handle, bh);
+	return 0;
+}
+
 /*
  * Note that we always start a transaction even if we're not journalling
  * data.  This is to preserve ordering: any hole instantiation within
@@ -1381,7 +1388,7 @@ static int ext3_writepage(struct page *page, struct writeback_control *wbc)
 		if (ret == 0) {
 			err = walk_page_buffers(handle, page_bufs,
 				0, PAGE_CACHE_SIZE, NULL,
-				ext3_journal_dirty_data);
+				journal_dirty_data_fn);
 			if (!ret)
 				ret = err;
 		}

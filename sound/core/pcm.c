@@ -317,10 +317,10 @@ static void snd_pcm_substream_proc_hw_params_read(snd_info_entry_t *entry, snd_i
 		snd_iprintf(buffer, "closed\n");
 		return;
 	}
-	spin_lock_irq(&runtime->lock);
+	snd_pcm_stream_lock_irq(substream);
 	if (runtime->status->state == SNDRV_PCM_STATE_OPEN) {
 		snd_iprintf(buffer, "no setup\n");
-		spin_unlock_irq(&runtime->lock);
+		snd_pcm_stream_unlock_irq(substream);
 		return;
 	}
 	snd_iprintf(buffer, "access: %s\n", snd_pcm_access_name(runtime->access));
@@ -340,7 +340,7 @@ static void snd_pcm_substream_proc_hw_params_read(snd_info_entry_t *entry, snd_i
 		snd_iprintf(buffer, "OSS periods: %u\n", runtime->oss.periods);
 	}
 #endif
-	spin_unlock_irq(&runtime->lock);
+	snd_pcm_stream_unlock_irq(substream);
 }
 
 static void snd_pcm_substream_proc_sw_params_read(snd_info_entry_t *entry, snd_info_buffer_t *buffer)
@@ -351,10 +351,10 @@ static void snd_pcm_substream_proc_sw_params_read(snd_info_entry_t *entry, snd_i
 		snd_iprintf(buffer, "closed\n");
 		return;
 	}
-	spin_lock_irq(&runtime->lock);
+	snd_pcm_stream_lock_irq(substream);
 	if (runtime->status->state == SNDRV_PCM_STATE_OPEN) {
 		snd_iprintf(buffer, "no setup\n");
-		spin_unlock_irq(&runtime->lock);
+		snd_pcm_stream_unlock_irq(substream);
 		return;
 	}
 	snd_iprintf(buffer, "tstamp_mode: %s\n", snd_pcm_tstamp_mode_name(runtime->tstamp_mode));
@@ -367,7 +367,7 @@ static void snd_pcm_substream_proc_sw_params_read(snd_info_entry_t *entry, snd_i
 	snd_iprintf(buffer, "silence_threshold: %lu\n", runtime->silence_threshold);
 	snd_iprintf(buffer, "silence_size: %lu\n", runtime->silence_size);
 	snd_iprintf(buffer, "boundary: %lu\n", runtime->boundary);
-	spin_unlock_irq(&runtime->lock);
+	snd_pcm_stream_unlock_irq(substream);
 }
 
 static void snd_pcm_substream_proc_status_read(snd_info_entry_t *entry, snd_info_buffer_t *buffer)
@@ -588,13 +588,15 @@ int snd_pcm_new_stream(snd_pcm_t *pcm, int stream, int substream_count)
 			pstr->substream = substream;
 		else
 			prev->next = substream;
-		substream->link_next = substream;
-		substream->link_prev = substream;
 		err = snd_pcm_substream_proc_init(substream);
 		if (err < 0) {
 			snd_magic_kfree(substream);
 			return err;
 		}
+		substream->group = &substream->self_group;
+		spin_lock_init(&substream->self_group.lock);
+		INIT_LIST_HEAD(&substream->self_group.substreams);
+		list_add_tail(&substream->link_list, &substream->self_group.substreams);
 		spin_lock_init(&substream->timer_lock);
 		prev = substream;
 	}
@@ -793,7 +795,6 @@ int snd_pcm_open_substream(snd_pcm_t *pcm, int stream,
 	memset((void*)runtime->control, 0, size);
 
 	init_waitqueue_head(&runtime->sleep);
-	spin_lock_init(&runtime->lock);
 	atomic_set(&runtime->mmap_count, 0);
 	init_timer(&runtime->tick_timer);
 	runtime->tick_timer.function = snd_pcm_tick_timer_func;
@@ -1022,6 +1023,7 @@ EXPORT_SYMBOL(snd_pcm_release_substream);
 EXPORT_SYMBOL(snd_pcm_format_name);
 EXPORT_SYMBOL(snd_pcm_subformat_name);
   /* pcm_native.c */
+EXPORT_SYMBOL(snd_pcm_link_rwlock);
 EXPORT_SYMBOL(snd_pcm_start);
 #ifdef CONFIG_PM
 EXPORT_SYMBOL(snd_pcm_suspend);

@@ -29,6 +29,7 @@ struct evdev {
 	char name[16];
 	struct input_handle handle;
 	wait_queue_head_t wait;
+	struct evdev_list *grab;
 	struct list_head list;
 };
 
@@ -48,7 +49,8 @@ static void evdev_event(struct input_handle *handle, unsigned int type, unsigned
 	struct evdev *evdev = handle->private;
 	struct evdev_list *list;
 
-	list_for_each_entry(list, &evdev->list, node) {
+	if (evdev->grab) {
+		list = evdev->grab;
 
 		do_gettimeofday(&list->buffer[list->head].time);
 		list->buffer[list->head].type = type;
@@ -57,7 +59,17 @@ static void evdev_event(struct input_handle *handle, unsigned int type, unsigned
 		list->head = (list->head + 1) & (EVDEV_BUFFER_SIZE - 1);
 
 		kill_fasync(&list->fasync, SIGIO, POLL_IN);
-	}
+	} else
+		list_for_each_entry(list, &evdev->list, node) {
+
+			do_gettimeofday(&list->buffer[list->head].time);
+			list->buffer[list->head].type = type;
+			list->buffer[list->head].code = code;
+			list->buffer[list->head].value = value;
+			list->head = (list->head + 1) & (EVDEV_BUFFER_SIZE - 1);
+
+			kill_fasync(&list->fasync, SIGIO, POLL_IN);
+		}
 
 	wake_up_interruptible(&evdev->wait);
 }
@@ -87,6 +99,11 @@ static void evdev_free(struct evdev *evdev)
 static int evdev_release(struct inode * inode, struct file * file)
 {
 	struct evdev_list *list = file->private_data;
+
+	if (list->evdev->grab == list) {
+		input_release_device(&list->evdev->handle);
+		list->evdev->grab = NULL;
+	}
 
 	evdev_fasync(-1, file, 0);
 	list_del(&list->node);
@@ -256,6 +273,22 @@ static int evdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 			if (put_user(dev->ff_effects_max, (int*) arg))
 				return -EFAULT;
 			return 0;
+
+		case EVIOCGRAB:
+			if (arg) {
+				if (evdev->grab)
+					return -EBUSY;
+				if (input_grab_device(&evdev->handle))
+					return -EBUSY;
+				evdev->grab = list;
+				return 0;
+			} else {
+				if (evdev->grab != list)
+					return -EINVAL;
+				input_release_device(&evdev->handle);
+				evdev->grab = NULL;
+				return 0;
+			}
 
 		default:
 

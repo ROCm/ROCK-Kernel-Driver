@@ -79,10 +79,7 @@
 #include <linux/mount.h>
 #include <linux/security.h>
 #include <linux/compat.h>
-
-#if defined(CONFIG_KMOD) && defined(CONFIG_NET)
 #include <linux/kmod.h>
-#endif
 
 #ifdef CONFIG_NET_RADIO
 #include <linux/wireless.h>		/* Note : will define WIRELESS_EXT */
@@ -770,11 +767,9 @@ static int sock_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 	unlock_kernel();
 	sock = SOCKET_I(inode);
-#ifdef CONFIG_NET
 	if (cmd >= SIOCDEVPRIVATE && cmd <= (SIOCDEVPRIVATE + 15)) {
 		err = dev_ioctl(cmd, (void *)arg);
 	} else
-#endif  /* CONFIG_NET */
 #ifdef WIRELESS_EXT
 	if (cmd >= SIOCIWFIRST && cmd <= SIOCIWLAST) {
 		err = dev_ioctl(cmd, (void *)arg);
@@ -795,11 +790,8 @@ static int sock_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		case SIOCGIFBR:
 		case SIOCSIFBR:
 			err = -ENOPKG;
-			
-#ifdef CONFIG_KMOD
 			if (!br_ioctl_hook)
 				request_module("bridge");
-#endif
 
 			down(&br_ioctl_mutex);
 			if (br_ioctl_hook) 
@@ -809,10 +801,9 @@ static int sock_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		case SIOCGIFVLAN:
 		case SIOCSIFVLAN:
 			err = -ENOPKG;
-#ifdef CONFIG_KMOD
 			if (!vlan_ioctl_hook)
 				request_module("8021q");
-#endif
+
 			down(&vlan_ioctl_mutex);
 			if (vlan_ioctl_hook)
 				err = vlan_ioctl_hook(arg);
@@ -826,10 +817,9 @@ static int sock_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		case SIOCADDDLCI:
 		case SIOCDELDLCI:
 			err = -ENOPKG;
-#ifdef CONFIG_KMOD
 			if (!dlci_ioctl_hook)
 				request_module("dlci");
-#endif
+
 			if (dlci_ioctl_hook) {
 				down(&dlci_ioctl_mutex);
 				err = dlci_ioctl_hook(cmd, (void *)arg);
@@ -889,11 +879,11 @@ int sock_close(struct inode *inode, struct file *filp)
  *
  *	1. fasync_list is modified only under process context socket lock
  *	   i.e. under semaphore.
- *	2. fasync_list is used under read_lock(&sk->callback_lock)
+ *	2. fasync_list is used under read_lock(&sk->sk_callback_lock)
  *	   or under socket lock.
  *	3. fasync_list can be used from softirq context, so that
  *	   modification under socket lock have to be enhanced with
- *	   write_lock_bh(&sk->callback_lock).
+ *	   write_lock_bh(&sk->sk_callback_lock).
  *							--ANK (990710)
  */
 
@@ -930,9 +920,9 @@ static int sock_fasync(int fd, struct file *filp, int on)
 	{
 		if(fa!=NULL)
 		{
-			write_lock_bh(&sk->callback_lock);
+			write_lock_bh(&sk->sk_callback_lock);
 			fa->fa_fd=fd;
-			write_unlock_bh(&sk->callback_lock);
+			write_unlock_bh(&sk->sk_callback_lock);
 
 			kfree(fna);
 			goto out;
@@ -941,17 +931,17 @@ static int sock_fasync(int fd, struct file *filp, int on)
 		fna->fa_fd=fd;
 		fna->magic=FASYNC_MAGIC;
 		fna->fa_next=sock->fasync_list;
-		write_lock_bh(&sk->callback_lock);
+		write_lock_bh(&sk->sk_callback_lock);
 		sock->fasync_list=fna;
-		write_unlock_bh(&sk->callback_lock);
+		write_unlock_bh(&sk->sk_callback_lock);
 	}
 	else
 	{
 		if (fa!=NULL)
 		{
-			write_lock_bh(&sk->callback_lock);
+			write_lock_bh(&sk->sk_callback_lock);
 			*prev=fa->fa_next;
-			write_unlock_bh(&sk->callback_lock);
+			write_unlock_bh(&sk->sk_callback_lock);
 			kfree(fa);
 		}
 	}
@@ -1021,7 +1011,7 @@ int sock_create(int family, int type, int protocol, struct socket **res)
 	if (err)
 		return err;
 		
-#if defined(CONFIG_KMOD) && defined(CONFIG_NET)
+#if defined(CONFIG_KMOD)
 	/* Attempt to load a protocol module if the find failed. 
 	 * 
 	 * 12/09/1996 Marcin: But! this makes REALLY only sense, if the user 

@@ -36,17 +36,6 @@
 #include <asm/feature.h>
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0)
-#define pmu_suspend()	/**/
-#define pmu_resume()	/**/
-#endif
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,18)
-#define request_OF_resource(io,num,str)  1
-#define release_OF_resource(io,num) /**/
-#endif
-
-
 #define chip_t pmac_t
 
 
@@ -1222,9 +1211,12 @@ static void snd_pmac_suspend(pmac_t *chip)
 	spin_lock_irqsave(&chip->reg_lock, flags);
 	snd_pmac_beep_stop(chip);
 	spin_unlock_irqrestore(&chip->reg_lock, flags);
-	disable_irq(chip->irq);
-	disable_irq(chip->tx_irq);
-	disable_irq(chip->rx_irq);
+	if (chip->irq >= 0)
+		disable_irq(chip->irq);
+	if (chip->tx_irq >= 0)
+		disable_irq(chip->tx_irq);
+	if (chip->rx_irq >= 0)
+		disable_irq(chip->rx_irq);
 	snd_pmac_sound_feature(chip, 0);
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 }
@@ -1248,9 +1240,12 @@ static void snd_pmac_resume(pmac_t *chip)
 
 	snd_pmac_pcm_set_format(chip);
 
-	enable_irq(chip->irq);
-	enable_irq(chip->tx_irq);
-	enable_irq(chip->rx_irq);
+	if (chip->irq >= 0)
+		enable_irq(chip->irq);
+	if (chip->tx_irq >= 0)
+		enable_irq(chip->tx_irq);
+	if (chip->rx_irq >= 0)
+		enable_irq(chip->rx_irq);
 
 	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
 }

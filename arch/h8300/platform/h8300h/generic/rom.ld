@@ -83,6 +83,7 @@ SECTIONS
 	___con_initcall_start = .;
 		*(.con_initcall.init)
 	___con_initcall_end = .;
+	SECURITY_INIT
 		. = ALIGN(4);
 	___initramfs_start = .;
   		*(.init.ramfs)

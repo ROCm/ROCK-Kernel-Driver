@@ -531,28 +531,27 @@ static int elsa_cs_event(event_t event, int priority,
     return 0;
 } /* elsa_cs_event */
 
-/*====================================================================*/
+static struct pcmcia_driver elsa_cs_driver = {
+	.owner		= THIS_MODULE,
+	.drv		= {
+		.name	= "elsa_cs",
+	},
+	.attach		= elsa_cs_attach,
+	.detach		= elsa_cs_detach,
+};
 
 static int __init init_elsa_cs(void)
 {
-    servinfo_t serv;
-    DEBUG(0, "%s\n", version);
-    CardServices(GetCardServicesInfo, &serv);
-    if (serv.Revision != CS_RELEASE_CODE) {
-        printk(KERN_NOTICE "elsa_cs: Card Services release "
-               "does not match!\n");
-        return -1;
-    }
-    register_pccard_driver(&dev_info, &elsa_cs_attach, &elsa_cs_detach);
-    return 0;
+	return pcmcia_register_driver(&elsa_cs_driver);
 }
 
 static void __exit exit_elsa_cs(void)
 {
-    DEBUG(0, "elsa_cs: unloading\n");
-    unregister_pccard_driver(&dev_info);
-    while (dev_list != NULL)
-        elsa_cs_detach(dev_list);
+	pcmcia_unregister_driver(&elsa_cs_driver);
+
+	/* XXX: this really needs to move into generic code.. */
+	while (dev_list != NULL)
+		elsa_cs_detach(dev_list);
 }
 
 module_init(init_elsa_cs);

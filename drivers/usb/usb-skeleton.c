@@ -172,6 +172,7 @@ static struct usb_class_driver skel_class = {
 
 /* usb specific object needed to register this driver with the usb subsystem */
 static struct usb_driver skel_driver = {
+	.owner =	THIS_MODULE,
 	.name =		"skeleton",
 	.probe =	skel_probe,
 	.disconnect =	skel_disconnect,

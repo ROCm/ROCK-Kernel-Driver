@@ -132,9 +132,6 @@ extern inline int pci_dma_supported(struct pci_dev *hwdev, u64 mask)
 
 #define pci_dac_dma_supported(dev, mask)	(0)
 
-/* Return the index of the PCI controller for device PDEV. */
-#define pci_controller_num(PDEV)	(0)
-
 #endif /* __KERNEL__ */
 
 /* generic pci stuff */

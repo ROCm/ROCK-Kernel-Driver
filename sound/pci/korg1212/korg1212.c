@@ -1136,8 +1136,7 @@ static void snd_korg1212_OnDSPDownloadComplete(korg1212_t *korg1212)
 static irqreturn_t snd_korg1212_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
         u32 doorbellValue;
-        korg1212_t *korg1212 = snd_magic_cast(korg1212_t, dev_id,
-						return IRQ_NONE);
+        korg1212_t *korg1212 = snd_magic_cast(korg1212_t, dev_id, return IRQ_NONE);
 
 	if(irq != korg1212->irq)
 		return IRQ_NONE;

@@ -35,7 +35,7 @@
 #define L1_CACHE_BYTES				NB85E_CACHE_LINE_SIZE
 
 
-#ifndef __ASSEMBLY__
+#if defined(__KERNEL__) && !defined(__ASSEMBLY__)
 
 /* Set caching params via the BHC and DCC registers.  */
 void nb85e_cache_enable (u16 bhc, u16 dcc);
@@ -73,6 +73,6 @@ extern void nb85e_cache_flush_sigtramp (unsigned long addr);
 #define flush_icache_user_range	nb85e_cache_flush_icache_user_range
 #define flush_cache_sigtramp	nb85e_cache_flush_sigtramp
 
-#endif /* !__ASSEMBLY__ */
+#endif /* __KERNEL__ && !__ASSEMBLY__ */
 
 #endif /* __V850_NB85E_CACHE_H__ */

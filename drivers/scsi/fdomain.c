@@ -1068,45 +1068,6 @@ static const char *fdomain_16x0_info( struct Scsi_Host *ignore )
    return buffer;
 }
 
-				/* First pass at /proc information routine. */
-/*
- * inout : decides on the direction of the dataflow and the meaning of the 
- *         variables
- * buffer: If inout==FALSE data is being written to it else read from it
- * *start: If inout==FALSE start of the valid data in the buffer
- * offset: If inout==FALSE offset from the beginning of the imaginary file 
- *         from which we start writing into the buffer
- * length: If inout==FALSE max number of bytes to be written into the buffer 
- *         else number of bytes in the buffer
- */
-static int fdomain_16x0_proc_info( char *buffer, char **start, off_t offset,
-			    int length, int hostno, int inout )
-{
-   const char *info = fdomain_16x0_info( NULL );
-   int        len;
-   int        pos;
-   int        begin;
-
-   if (inout) return(-EINVAL);
-    
-   begin = 0;
-   strcpy( buffer, info );
-   strcat( buffer, "\n" );
-
-   pos = len = strlen( buffer );
-
-   if(pos < offset) {
-      len = 0;
-      begin = pos;
-   }
-    
-   *start = buffer + (offset - begin);   /* Start of wanted data */
-   len -= (offset - begin);
-   if(len > length) len = length;
-   
-   return(len);
-}
-   
 #if 0
 static int fdomain_arbitrate( void )
 {
@@ -1870,7 +1831,6 @@ Scsi_Host_Template fdomain_driver_template = {
 	.module			= THIS_MODULE,
 	.name			= "fdomain",
 	.proc_name		= "fdomain",
-	.proc_info		= fdomain_16x0_proc_info,
 	.detect			= fdomain_16x0_detect,
 	.info			= fdomain_16x0_info,
 	.command		= fdomain_16x0_command,

@@ -9,11 +9,18 @@
 Original driver (sg.h):
 *       Copyright (C) 1992 Lawrence Foard
 Version 2 and 3 extensions to driver:
-*       Copyright (C) 1998 - 2002 Douglas Gilbert
+*       Copyright (C) 1998 - 2003 Douglas Gilbert
 
-    Version: 3.5.27 (20020812)
+    Version: 3.5.29 (20030529)
     This version is for 2.5 series kernels.
 
+    Changes since 3.5.28 (20030308)
+	- fix bug introduced in version 3.1.24 (last segment of sgat list)
+    Changes since 3.5.27 (20020812)
+    	- remove procfs entries: hosts, host_hdr + host_strs (now in sysfs)
+	- add sysfs sg driver params: def_reserved_size, allow_dio, version
+	- new boot option: "sg_allow_dio" and module parameter: "allow_dio"
+        - multiple internal changes due to scsi subsystem rework	
     Changes since 3.5.26 (20020708)
 	- re-add direct IO using Kai Makisara's work
 	- re-tab to 8, start using C99-isms
@@ -237,7 +244,7 @@ typedef struct sg_req_info { /* used by SG_GET_REQUEST_TABLE ioctl() */
    read/written by a single scsi command. The user can find the value of
    PAGE_SIZE by calling getpagesize() defined in unistd.h . */
 
-#define SG_DEFAULT_RETRIES 1
+#define SG_DEFAULT_RETRIES 0
 
 /* Defaults, commented if they differ from original sg driver */
 #define SG_DEF_FORCE_LOW_DMA 0  /* was 1 -> memory below 16MB on i386 */

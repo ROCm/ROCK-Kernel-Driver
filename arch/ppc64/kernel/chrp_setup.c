@@ -62,13 +62,13 @@
 #include "open_pic.h"
 #include <asm/xics.h>
 #include <asm/ppcdebug.h>
+#include <asm/cputable.h>
 
 extern volatile unsigned char *chrp_int_ack_special;
 
 void chrp_progress(char *, unsigned short);
 
 extern void openpic_init_IRQ(void);
-extern void init_ras_IRQ(void);
 
 extern void find_and_init_phbs(void);
 
@@ -238,7 +238,6 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 		ppc_md.init_IRQ       = xics_init_IRQ;
 		ppc_md.get_irq        = xics_get_irq;
 	}
-	ppc_md.init_ras_IRQ = init_ras_IRQ;
 
 	ppc_md.init           = chrp_init2;
 
@@ -253,6 +252,34 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 
 	ppc_md.progress = chrp_progress;
 
+        /* build up the firmware_features bitmask field
+         * using contents of device-tree/ibm,hypertas-functions.
+         * Ultimately this functionality may be moved into prom.c prom_init().
+         */
+	struct device_node * dn;
+	char * hypertas;
+	unsigned int len;
+	dn = find_path_device("/rtas");
+	cur_cpu_spec->firmware_features = 0;
+	hypertas = get_property(dn, "ibm,hypertas-functions", &len);
+	if (hypertas) {
+	    while (len > 0){
+		int i;
+		/* check value against table of strings */
+		for(i=0; i < FIRMWARE_MAX_FEATURES ;i++) {
+		    if ((firmware_features_table[i].name) && (strcmp(firmware_features_table[i].name,hypertas))==0) {
+			/* we have a match */
+			cur_cpu_spec->firmware_features |= (1UL << firmware_features_table[i].val);
+			break;
+		    } 
+		}
+		int hypertas_len = strlen(hypertas);
+		len -= hypertas_len +1;
+		hypertas+= hypertas_len +1;
+	    }
+	}
+	udbg_printf("firmware_features bitmask: 0x%x \n",
+		    cur_cpu_spec->firmware_features);
 }
 
 void

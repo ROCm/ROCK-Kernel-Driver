@@ -297,14 +297,14 @@ static void __init hades_fixup(int pci_modify)
 			    IRQ_TT_MFP_SCC,	/* Slot 2. */
 			    IRQ_TT_MFP_SCSIDMA	/* Slot 3. */
 			  };
-	struct pci_dev *dev;
+	struct pci_dev *dev = NULL;
 	unsigned char slot;
 
 	/*
 	 * Go through all devices, fixing up irqs as we see fit:
 	 */
 
-	for (dev = pci_devices; dev; dev = dev->next)
+	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL)
 	{
 		if (dev->class >> 16 != PCI_BASE_CLASS_BRIDGE)
 		{

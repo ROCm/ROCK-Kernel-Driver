@@ -253,13 +253,15 @@ static struct rt6_info *rt6_best_dflt(struct rt6_info *rt, int oif)
 				}
 			}
 			for (sprt = rt;
-			     !match && sprt && sprt != rt6_dflt_pointer; 
+			     !match && sprt;
 			     sprt = sprt->u.next) {
 				if (sprt->u.dst.obsolete <= 0 &&
 				    sprt->u.dst.error == 0) {
 					match = sprt;
 					break;
 				}
+				if (sprt == rt6_dflt_pointer)
+					break;
 			}
 		}
 	}
@@ -334,7 +336,7 @@ static int rt6_ins(struct rt6_info *rt, struct nlmsghdr *nlh, void *_rtattr)
 	return err;
 }
 
-/* No rt6_lock! If COW faild, the function returns dead route entry
+/* No rt6_lock! If COW failed, the function returns dead route entry
    with dst->error set to errno value.
  */
 
@@ -584,19 +586,6 @@ out:
 
    Remove it only when all the things will work!
  */
-
-static void ipv6_addr_prefix(struct in6_addr *pfx,
-			     const struct in6_addr *addr, int plen)
-{
-	int b = plen&0x7;
-	int o = plen>>3;
-
-	memcpy(pfx->s6_addr, addr, o);
-	if (o < 16)
-		memset(pfx->s6_addr + o, 0, 16 - o);
-	if (b != 0)
-		pfx->s6_addr[o] = addr->s6_addr[o]&(0xff00 >> b);
-}
 
 static int ipv6_get_mtu(struct net_device *dev)
 {
@@ -1218,10 +1207,12 @@ int ip6_rt_addr_add(struct in6_addr *addr, struct net_device *dev)
 	if (rt == NULL)
 		return -ENOMEM;
 
+	dev_hold(&loopback_dev);
+
 	rt->u.dst.flags = DST_HOST;
 	rt->u.dst.input = ip6_input;
 	rt->u.dst.output = ip6_output;
-	rt->rt6i_dev = dev_get_by_name("lo");
+	rt->rt6i_dev = &loopback_dev;
 	rt->u.dst.metrics[RTAX_MTU-1] = ipv6_get_mtu(rt->rt6i_dev);
 	rt->u.dst.metrics[RTAX_ADVMSS-1] = max_t(unsigned int, dst_pmtu(&rt->u.dst) - 60, ip6_rt_min_advmss);
 	if (rt->u.dst.metrics[RTAX_ADVMSS-1] > 65535-20)
@@ -1784,11 +1775,12 @@ extern struct rt6_statistics rt6_stats;
 
 static int rt6_stats_seq_show(struct seq_file *seq, void *v)
 {
-	seq_printf(seq, "%04x %04x %04x %04x %04x %04x\n",
+	seq_printf(seq, "%04x %04x %04x %04x %04x %04x %04x\n",
 		      rt6_stats.fib_nodes, rt6_stats.fib_route_nodes,
 		      rt6_stats.fib_rt_alloc, rt6_stats.fib_rt_entries,
 		      rt6_stats.fib_rt_cache,
-		      atomic_read(&ip6_dst_ops.entries));
+		      atomic_read(&ip6_dst_ops.entries),
+		      rt6_stats.fib_discarded_routes);
 
 	return 0;
 }

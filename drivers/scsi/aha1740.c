@@ -76,21 +76,15 @@ static spinlock_t aha1740_lock = SPIN_LOCK_UNLOCKED;
 /* One for each IRQ level (9-15) */
 static struct Scsi_Host * aha_host[8] = {NULL, };
 
-static int aha1740_proc_info(char *buffer, char **start, off_t offset,
-		      int length, int hostno, int inout)
+static int aha1740_proc_info(struct Scsi_Host *shpnt, char *buffer, char **start, off_t offset,
+		      int length, int inout)
 {
     int len;
-    struct Scsi_Host * shpnt;
     struct aha1740_hostdata *host;
 
     if (inout)
 	return-ENOSYS;
 
-    for (len = 0; len < 8; len++) {
-	shpnt = aha_host[len];
-	if (shpnt && shpnt->host_no == hostno)
-	    break;
-    }
     host = HOSTDATA(shpnt);
 
     len = sprintf(buffer, "aha174x at IO:%lx, IRQ %d, SLOT %d.\n"
@@ -108,7 +102,6 @@ static int aha1740_proc_info(char *buffer, char **start, off_t offset,
     if (len > length)
 	len = length;
     return len;
-}
 
 
 static int aha1740_makecode(unchar *sense, unchar *status)

@@ -7,7 +7,7 @@
  * Author: Fabrice Bellard (fabrice.bellard@netgem.com) 
  * Copyright (C) 2000 Netgem S.A.
  *
- * $Id: docecc.c,v 1.4 2001/10/02 15:05:13 dwmw2 Exp $
+ * $Id: docecc.c,v 1.5 2003/05/21 15:15:06 dwmw2 Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -518,6 +518,8 @@ int doc_decode_ecc(unsigned char sector[SECTOR_SIZE], unsigned char ecc1[6])
     kfree(Index_of);
     return nb_errors;
 }
+
+EXPORT_SYMBOL_GPL(doc_decode_ecc);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Fabrice Bellard <fabrice.bellard@netgem.com>");

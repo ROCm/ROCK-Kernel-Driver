@@ -109,12 +109,10 @@ static char serial_version[] __initdata = "2.2";
 
 static DECLARE_TASK_QUEUE(tq_esp);
 
-static struct tty_driver esp_driver, esp_callout_driver;
-static int serial_refcount;
+static struct tty_driver *esp_driver;
 
 /* serial subtype definitions */
 #define SERIAL_TYPE_NORMAL	1
-#define SERIAL_TYPE_CALLOUT	2
 
 /*
  * Serial driver configuration section.  Here are the various options:
@@ -135,7 +133,7 @@ static int serial_refcount;
   
 #if defined(MODULE) && defined(SERIAL_DEBUG_MCOUNT)
 #define DBG_CNT(s) printk("(%s): [%x] refc=%d, serc=%d, ttyc=%d -> %s\n", \
- tty->name, (info->flags), serial_refcount,info->count,tty->count,s)
+ tty->name, (info->flags), serial_driver.refcount,info->count,tty->count,s)
 #else
 #define DBG_CNT(s)
 #endif
@@ -153,10 +151,6 @@ static void rs_wait_until_sent(struct tty_struct *, int);
 
 /* Standard COM flags (except for COM4, because of the 8514 problem) */
 #define STD_COM_FLAGS (ASYNC_BOOT_AUTOCONF | ASYNC_SKIP_TEST)
-
-static struct tty_struct *serial_table[NR_PORTS];
-static struct termios *serial_termios[NR_PORTS];
-static struct termios *serial_termios_locked[NR_PORTS];
 
 #ifndef MIN
 #define MIN(a,b)	((a) < (b) ? (a) : (b))
@@ -638,8 +632,7 @@ static _INLINE_ void check_modem_status(struct esp_struct *info)
 #endif		
 		if (status & UART_MSR_DCD)
 			wake_up_interruptible(&info->open_wait);
-		else if (!((info->flags & ASYNC_CALLOUT_ACTIVE) &&
-			   (info->flags & ASYNC_CALLOUT_NOHUP))) {
+		else {
 #ifdef SERIAL_DEBUG_OPEN
 			printk("scheduling hangup...");
 #endif
@@ -2072,14 +2065,6 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 	}
 	info->flags |= ASYNC_CLOSING;
 	/*
-	 * Save the termios structure, since this port may have
-	 * separate termios for callout and dialin.
-	 */
-	if (info->flags & ASYNC_NORMAL_ACTIVE)
-		info->normal_termios = *tty->termios;
-	if (info->flags & ASYNC_CALLOUT_ACTIVE)
-		info->callout_termios = *tty->termios;
-	/*
 	 * Now we wait for the transmit buffer to clear; and we notify 
 	 * the line discipline to only process XON/XOFF characters.
 	 */
@@ -2126,8 +2111,7 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 		}
 		wake_up_interruptible(&info->open_wait);
 	}
-	info->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CALLOUT_ACTIVE|
-			 ASYNC_CLOSING);
+	info->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CLOSING);
 	wake_up_interruptible(&info->close_wait);
 out:
 	restore_flags(flags);
@@ -2185,7 +2169,7 @@ static void esp_hangup(struct tty_struct *tty)
 	shutdown(info);
 	info->event = 0;
 	info->count = 0;
-	info->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CALLOUT_ACTIVE);
+	info->flags &= ~ASYNC_NORMAL_ACTIVE;
 	info->tty = 0;
 	wake_up_interruptible(&info->open_wait);
 }
@@ -2222,44 +2206,18 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 	}
 
 	/*
-	 * If this is a callout device, then just make sure the normal
-	 * device isn't being used.
-	 */
-	if (tty->driver->subtype == SERIAL_TYPE_CALLOUT) {
-		if (info->flags & ASYNC_NORMAL_ACTIVE)
-			return -EBUSY;
-		if ((info->flags & ASYNC_CALLOUT_ACTIVE) &&
-		    (info->flags & ASYNC_SESSION_LOCKOUT) &&
-		    (info->session != current->session))
-		    return -EBUSY;
-		if ((info->flags & ASYNC_CALLOUT_ACTIVE) &&
-		    (info->flags & ASYNC_PGRP_LOCKOUT) &&
-		    (info->pgrp != current->pgrp))
-		    return -EBUSY;
-		info->flags |= ASYNC_CALLOUT_ACTIVE;
-		return 0;
-	}
-	
-	/*
 	 * If non-blocking mode is set, or the port is not enabled,
 	 * then make the check up front and then exit.
 	 */
 	if ((filp->f_flags & O_NONBLOCK) ||
 	    (tty->flags & (1 << TTY_IO_ERROR))) {
-		if (info->flags & ASYNC_CALLOUT_ACTIVE)
-			return -EBUSY;
 		info->flags |= ASYNC_NORMAL_ACTIVE;
 		return 0;
 	}
 
-	if (info->flags & ASYNC_CALLOUT_ACTIVE) {
-		if (info->normal_termios.c_cflag & CLOCAL)
-			do_clocal = 1;
-	} else {
-		if (tty->termios->c_cflag & CLOCAL)
-			do_clocal = 1;
-	}
-	
+	if (tty->termios->c_cflag & CLOCAL)
+		do_clocal = 1;
+
 	/*
 	 * Block waiting for the carrier detect and the line to become
 	 * free (i.e., not in use by the callout).  While we are in
@@ -2282,8 +2240,7 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 	while (1) {
 		save_flags(flags);
 		cli();
-		if (!(info->flags & ASYNC_CALLOUT_ACTIVE) &&
-			(tty->termios->c_cflag & CBAUD)) {
+		if ((tty->termios->c_cflag & CBAUD)) {
 			unsigned int scratch;
 
 			serial_out(info, UART_ESI_CMD1, ESI_READ_UART);
@@ -2313,8 +2270,7 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 		if (serial_in(info, UART_ESI_STAT2) & UART_MSR_DCD)
 			do_clocal = 1;
 
-		if (!(info->flags & ASYNC_CALLOUT_ACTIVE) &&
-		    !(info->flags & ASYNC_CLOSING) &&
+		if (!(info->flags & ASYNC_CLOSING) &&
 		    (do_clocal))
 			break;
 		if (signal_pending(current)) {
@@ -2397,17 +2353,6 @@ static int esp_open(struct tty_struct *tty, struct file * filp)
 #endif
 		return retval;
 	}
-
-	if ((info->count == 1) && (info->flags & ASYNC_SPLIT_TERMIOS)) {
-		if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
-			*tty->termios = info->normal_termios;
-		else 
-			*tty->termios = info->callout_termios;
-		change_speed(info);
-	}
-
-	info->session = current->session;
-	info->pgrp = current->pgrp;
 
 #ifdef SERIAL_DEBUG_OPEN
 	printk("esp_open %s successful...", tty->name);
@@ -2497,6 +2442,26 @@ static _INLINE_ int autoconfig(struct esp_struct * info, int *region_start)
 	return (port_detected);
 }
 
+static struct tty_operations esp_ops = {
+	.open = esp_open,
+	.close = rs_close,
+	.write = rs_write,
+	.put_char = rs_put_char,
+	.flush_chars = rs_flush_chars,
+	.write_room = rs_write_room,
+	.chars_in_buffer = rs_chars_in_buffer,
+	.flush_buffer = rs_flush_buffer,
+	.ioctl = rs_ioctl,
+	.throttle = rs_throttle,
+	.unthrottle = rs_unthrottle,
+	.set_termios = rs_set_termios,
+	.stop = rs_stop,
+	.start = rs_start,
+	.hangup = esp_hangup,
+	.break_ctl = esp_break,
+	.wait_until_sent = rs_wait_until_sent,
+};
+
 /*
  * The serial driver boot-time initialization code!
  */
@@ -2507,6 +2472,10 @@ int __init espserial_init(void)
 	struct esp_struct * info;
 	struct esp_struct *last_primary = 0;
 	int esp[] = {0x100,0x140,0x180,0x200,0x240,0x280,0x300,0x380};
+
+	esp_driver = alloc_tty_driver(NR_PORTS);
+	if (!esp_driver)
+		return -ENOMEM;
 	
 	init_bh(ESP_BH, do_serial_bh);
 
@@ -2545,71 +2514,31 @@ int __init espserial_init(void)
 
 	/* Initialize the tty_driver structure */
 	
-	memset(&esp_driver, 0, sizeof(struct tty_driver));
-	esp_driver.magic = TTY_DRIVER_MAGIC;
-	esp_driver.owner = THIS_MODULE;
-	esp_driver.name = "ttyP";
-	esp_driver.major = ESP_IN_MAJOR;
-	esp_driver.minor_start = 0;
-	esp_driver.num = NR_PORTS;
-	esp_driver.type = TTY_DRIVER_TYPE_SERIAL;
-	esp_driver.subtype = SERIAL_TYPE_NORMAL;
-	esp_driver.init_termios = tty_std_termios;
-	esp_driver.init_termios.c_cflag =
+	esp_driver->owner = THIS_MODULE;
+	esp_driver->name = "ttyP";
+	esp_driver->major = ESP_IN_MAJOR;
+	esp_driver->minor_start = 0;
+	esp_driver->type = TTY_DRIVER_TYPE_SERIAL;
+	esp_driver->subtype = SERIAL_TYPE_NORMAL;
+	esp_driver->init_termios = tty_std_termios;
+	esp_driver->init_termios.c_cflag =
 		B9600 | CS8 | CREAD | HUPCL | CLOCAL;
-	esp_driver.flags = TTY_DRIVER_REAL_RAW;
-	esp_driver.refcount = &serial_refcount;
-	esp_driver.table = serial_table;
-	esp_driver.termios = serial_termios;
-	esp_driver.termios_locked = serial_termios_locked;
-
-	esp_driver.open = esp_open;
-	esp_driver.close = rs_close;
-	esp_driver.write = rs_write;
-	esp_driver.put_char = rs_put_char;
-	esp_driver.flush_chars = rs_flush_chars;
-	esp_driver.write_room = rs_write_room;
-	esp_driver.chars_in_buffer = rs_chars_in_buffer;
-	esp_driver.flush_buffer = rs_flush_buffer;
-	esp_driver.ioctl = rs_ioctl;
-	esp_driver.throttle = rs_throttle;
-	esp_driver.unthrottle = rs_unthrottle;
-	esp_driver.set_termios = rs_set_termios;
-	esp_driver.stop = rs_stop;
-	esp_driver.start = rs_start;
-	esp_driver.hangup = esp_hangup;
-	esp_driver.break_ctl = esp_break;
-	esp_driver.wait_until_sent = rs_wait_until_sent;
-
-	/*
-	 * The callout device is just like normal device except for
-	 * major number and the subtype code.
-	 */
-	esp_callout_driver = esp_driver;
-	esp_callout_driver.name = "cup";
-	esp_callout_driver.major = ESP_OUT_MAJOR;
-	esp_callout_driver.subtype = SERIAL_TYPE_CALLOUT;
-
-	if (tty_register_driver(&esp_driver))
+	esp_driver->flags = TTY_DRIVER_REAL_RAW;
+	tty_set_operations(esp_driver, &esp_ops);
+	if (tty_register_driver(esp_driver))
 	{
 		printk(KERN_ERR "Couldn't register esp serial driver");
+		put_tty_driver(esp_driver);
 		return 1;
 	}
 
-	if (tty_register_driver(&esp_callout_driver))
-	{
-		printk(KERN_ERR "Couldn't register esp callout driver");
-		tty_unregister_driver(&esp_driver);
-		return 1;
-	}
-	
 	info = kmalloc(sizeof(struct esp_struct), GFP_KERNEL);
 
 	if (!info)
 	{
 		printk(KERN_ERR "Couldn't allocate memory for esp serial device information\n");
-		tty_unregister_driver(&esp_driver);
-		tty_unregister_driver(&esp_callout_driver);
+		tty_unregister_driver(esp_driver);
+		put_tty_driver(esp_driver);
 		return 1;
 	}
 
@@ -2643,8 +2572,6 @@ int __init espserial_init(void)
 		info->tqueue.data = info;
 		info->tqueue_hangup.routine = do_serial_hangup;
 		info->tqueue_hangup.data = info;
-		info->callout_termios = esp_callout_driver.init_termios;
-		info->normal_termios = esp_driver.init_termios;
 		info->config.rx_timeout = rx_timeout;
 		info->config.flow_on = flow_on;
 		info->config.flow_off = flow_off;
@@ -2714,13 +2641,11 @@ static void __exit espserial_exit(void)
 	save_flags(flags);
 	cli();
 	remove_bh(ESP_BH);
-	if ((e1 = tty_unregister_driver(&esp_driver)))
+	if ((e1 = tty_unregister_driver(esp_driver)))
 		printk("SERIAL: failed to unregister serial driver (%d)\n",
 		       e1);
-	if ((e2 = tty_unregister_driver(&esp_callout_driver)))
-		printk("SERIAL: failed to unregister callout driver (%d)\n", 
-		       e2);
 	restore_flags(flags);
+	put_tty_driver(esp_driver);
 
 	while (ports) {
 		if (ports->port) {

@@ -194,7 +194,7 @@ int ip_ra_control(struct sock *sk, unsigned char on, void (*destructor)(struct s
 {
 	struct ip_ra_chain *ra, *new_ra, **rap;
 
-	if (sk->type != SOCK_RAW || inet_sk(sk)->num == IPPROTO_RAW)
+	if (sk->sk_type != SOCK_RAW || inet_sk(sk)->num == IPPROTO_RAW)
 		return -EINVAL;
 
 	new_ra = on ? kmalloc(sizeof(*new_ra), GFP_KERNEL) : NULL;
@@ -315,7 +315,7 @@ int ip_recv_error(struct sock *sk, struct msghdr *msg, int len)
 	int copied;
 
 	err = -EAGAIN;
-	skb = skb_dequeue(&sk->error_queue);
+	skb = skb_dequeue(&sk->sk_error_queue);
 	if (skb == NULL)
 		goto out;
 
@@ -362,15 +362,14 @@ int ip_recv_error(struct sock *sk, struct msghdr *msg, int len)
 	err = copied;
 
 	/* Reset and regenerate socket error */
-	spin_lock_irq(&sk->error_queue.lock);
-	sk->err = 0;
-	if ((skb2 = skb_peek(&sk->error_queue)) != NULL) {
-		sk->err = SKB_EXT_ERR(skb2)->ee.ee_errno;
-		spin_unlock_irq(&sk->error_queue.lock);
-		sk->error_report(sk);
-	} else {
-		spin_unlock_irq(&sk->error_queue.lock);
-	}
+	spin_lock_irq(&sk->sk_error_queue.lock);
+	sk->sk_err = 0;
+	if ((skb2 = skb_peek(&sk->sk_error_queue)) != NULL) {
+		sk->sk_err = SKB_EXT_ERR(skb2)->ee.ee_errno;
+		spin_unlock_irq(&sk->sk_error_queue.lock);
+		sk->sk_error_report(sk);
+	} else
+		spin_unlock_irq(&sk->sk_error_queue.lock);
 
 out_free_skb:	
 	kfree_skb(skb);
@@ -431,12 +430,13 @@ int ip_setsockopt(struct sock *sk, int level, int optname, char *optval, int opt
 			err = ip_options_get(&opt, optval, optlen, 1);
 			if (err)
 				break;
-			if (sk->type == SOCK_STREAM) {
+			if (sk->sk_type == SOCK_STREAM) {
 				struct tcp_opt *tp = tcp_sk(sk);
 #if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
-				if (sk->family == PF_INET ||
-				    (!((1<<sk->state)&(TCPF_LISTEN|TCPF_CLOSE))
-				     && inet->daddr != LOOPBACK4_IPV6)) {
+				if (sk->sk_family == PF_INET ||
+				    (!((1 << sk->sk_state) &
+				       (TCPF_LISTEN | TCPF_CLOSE)) &&
+				     inet->daddr != LOOPBACK4_IPV6)) {
 #endif
 					if (inet->opt)
 						tp->ext_header_len -= inet->opt->optlen;
@@ -483,7 +483,7 @@ int ip_setsockopt(struct sock *sk, int level, int optname, char *optval, int opt
 				inet->cmsg_flags &= ~IP_CMSG_RETOPTS;
 			break;
 		case IP_TOS:	/* This sets both TOS and Precedence */
-			if (sk->type == SOCK_STREAM) {
+			if (sk->sk_type == SOCK_STREAM) {
 				val &= ~3;
 				val |= inet->tos & 3;
 			}
@@ -494,7 +494,7 @@ int ip_setsockopt(struct sock *sk, int level, int optname, char *optval, int opt
 			}
 			if (inet->tos != val) {
 				inet->tos = val;
-				sk->priority = rt_tos2priority(val);
+				sk->sk_priority = rt_tos2priority(val);
 				sk_dst_reset(sk); 
 			}
 			break;
@@ -506,7 +506,7 @@ int ip_setsockopt(struct sock *sk, int level, int optname, char *optval, int opt
 			inet->uc_ttl = val;
 			break;
 		case IP_HDRINCL:
-			if(sk->type!=SOCK_RAW) {
+			if (sk->sk_type != SOCK_RAW) {
 				err = -ENOPROTOOPT;
 				break;
 			}
@@ -520,10 +520,10 @@ int ip_setsockopt(struct sock *sk, int level, int optname, char *optval, int opt
 		case IP_RECVERR:
 			inet->recverr = !!val;
 			if (!val)
-				skb_queue_purge(&sk->error_queue);
+				skb_queue_purge(&sk->sk_error_queue);
 			break;
 		case IP_MULTICAST_TTL:
-			if (sk->type == SOCK_STREAM)
+			if (sk->sk_type == SOCK_STREAM)
 				goto e_inval;
 			if (optlen<1)
 				goto e_inval;
@@ -543,7 +543,7 @@ int ip_setsockopt(struct sock *sk, int level, int optname, char *optval, int opt
 			struct ip_mreqn mreq;
 			struct net_device *dev = NULL;
 
-			if (sk->type == SOCK_STREAM)
+			if (sk->sk_type == SOCK_STREAM)
 				goto e_inval;
 			/*
 			 *	Check the arguments are allowable
@@ -581,7 +581,8 @@ int ip_setsockopt(struct sock *sk, int level, int optname, char *optval, int opt
 				break;
 
 			err = -EINVAL;
-			if (sk->bound_dev_if && mreq.imr_ifindex != sk->bound_dev_if)
+			if (sk->sk_bound_dev_if &&
+			    mreq.imr_ifindex != sk->sk_bound_dev_if)
 				break;
 
 			inet->mc_index = mreq.imr_ifindex;
@@ -998,7 +999,7 @@ int ip_getsockopt(struct sock *sk, int level, int optname, char *optval, int *op
 
 			release_sock(sk);
 
-			if (sk->type != SOCK_STREAM)
+			if (sk->sk_type != SOCK_STREAM)
 				return -ENOPROTOOPT;
 
 			msg.msg_control = optval;

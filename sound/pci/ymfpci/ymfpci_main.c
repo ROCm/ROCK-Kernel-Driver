@@ -779,15 +779,14 @@ static irqreturn_t snd_ymfpci_interrupt(int irq, void *dev_id, struct pt_regs *r
 		}
 	}
 
-	status = snd_ymfpci_readl(chip, YDSXGR_INTFLAG);
+	status = snd_ymfpci_readw(chip, YDSXGR_INTFLAG);
 	if (status & 1) {
 		/* timer handler */
-		snd_ymfpci_writel(chip, YDSXGR_INTFLAG, ~0);
 	}
+	snd_ymfpci_writew(chip, YDSXGR_INTFLAG, status);
 
 	if (chip->rawmidi)
 		snd_mpu401_uart_interrupt(irq, chip->rawmidi->private_data, regs);
-
 	return IRQ_HANDLED;
 }
 
@@ -2253,8 +2252,10 @@ int __devinit snd_ymfpci_create(snd_card_t * card,
 		return -EIO;
 	}
 
-	if ((err = snd_ymfpci_ac3_init(chip)) < 0)
+	if ((err = snd_ymfpci_ac3_init(chip)) < 0) {
+		snd_ymfpci_free(chip);
 		return err;
+	}
 
 #ifdef CONFIG_PM
 	chip->saved_regs = vmalloc(YDSXGR_NUM_SAVED_REGS * sizeof(u32));

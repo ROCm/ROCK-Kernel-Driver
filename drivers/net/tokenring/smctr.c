@@ -143,7 +143,6 @@ static int smctr_hardware_send_packet(struct net_device *dev,
 /* I */
 static int smctr_init_acbs(struct net_device *dev);
 static int smctr_init_adapter(struct net_device *dev);
-static int __init smctr_init_card(struct net_device *dev);
 static int smctr_init_card_real(struct net_device *dev);
 static int smctr_init_rx_bdbs(struct net_device *dev);
 static int smctr_init_rx_fcbs(struct net_device *dev);
@@ -541,25 +540,18 @@ static int smctr_chk_mca(struct net_device *dev)
 			dev->irq = 15;
                		break;
 	}
-	if(request_irq(dev->irq, smctr_interrupt, SA_SHIRQ, smctr_name, dev))
-                return (-ENODEV);
+	if (request_irq(dev->irq, smctr_interrupt, SA_SHIRQ, smctr_name, dev)) {
+		release_region(dev->base_addr, SMCTR_IO_EXTENT);
+		return -ENODEV;
+	}
 
 	/* Get RAM base */
 	r3 = mca_read_stored_pos(tp->slot_num, 3);
-	if(r3 & 0x8) 
-	{ 
-        	if(r3 & 0x80)
-               		tp->ram_base = ((__u32)(r3 & 0x7) << 13) + 0xFD0000;
-            	else
-			tp->ram_base = ((__u32)(r3 & 0x7) << 13) + 0x0D0000;
-        }
-	else 
-	{
-            	if(r3 & 0x80)
-               		tp->ram_base = ((__u32)(r3 & 0x7) << 13) + 0xFC0000;
-            	else
-			tp->ram_base = ((__u32)(r3 & 0x7) << 13) + 0x0C0000;
-        }
+	tp->ram_base = ((__u32)(r3 & 0x7) << 13) + 0x0C0000;
+	if (r3 & 0x8)
+		tp->ram_base += 0x010000;
+	if (r3 & 0x80)
+		tp->ram_base += 0xF00000;
 
 	/* Get Ram Size */
 	r3 &= 0x30;
@@ -570,26 +562,24 @@ static int smctr_chk_mca(struct net_device *dev)
 	tp->board_id |= TOKEN_MEDIA;
 
 	r4 = mca_read_stored_pos(tp->slot_num, 4);
-	if(r4 & 0x8)
-		tp->rom_base = ((__u32)(r4 & 0x7) << 13) + 0xD0000;
-	else
-		tp->rom_base = ((__u32)(r4 & 0x7) << 13) + 0xC0000;
+	tp->rom_base = ((__u32)(r4 & 0x7) << 13) + 0x0C0000;
+	if (r4 & 0x8)
+		tp->rom_base += 0x010000;
 
 	/* Get ROM size. */
 	r4 >>= 4;
-	if(r4 == 0)
-		tp->rom_size = CNFG_SIZE_8KB;
-	else
-	{
-		if(r4 == 1)
+	switch (r4) {
+		case 0:
+			tp->rom_size = CNFG_SIZE_8KB;
+			break;
+		case 1:
 			tp->rom_size = CNFG_SIZE_16KB;
-		else
-		{
-			if(r4 == 2)
-				tp->rom_size = CNFG_SIZE_32KB;
-			else
-				tp->rom_size = ROM_DISABLE;
-		}
+			break;
+		case 2:
+			tp->rom_size = CNFG_SIZE_32KB;
+			break;
+		default:
+			tp->rom_size = ROM_DISABLE;
 	}
 
 	/* Get Media Type. */
@@ -953,12 +943,19 @@ static int __init smctr_chk_isa(struct net_device *dev)
         __u8 r1, r2, b, chksum = 0;
         __u16 r;
 	int i;
+	int err = -ENODEV;
 
         if(smctr_debug > 10)
                 printk(KERN_DEBUG "%s: smctr_chk_isa %#4x\n", dev->name, ioaddr);
 
 	if((ioaddr & 0x1F) != 0)
-                return (-ENODEV);
+                goto out;
+
+        /* Grab the region so that no one else tries to probe our ioports. */
+	if (!request_region(ioaddr, SMCTR_IO_EXTENT, smctr_name)) {
+		err = -EBUSY;
+		goto out;
+	}
 
         /* Checksum SMC node address */
         for(i = 0; i < 8; i++)
@@ -967,17 +964,14 @@ static int __init smctr_chk_isa(struct net_device *dev)
                 chksum += b;
         }
 
-        if(chksum != NODE_ADDR_CKSUM)
-                return (-ENODEV);            /* Adapter Not Found */
-
-        /* Grab the region so that no one else tries to probe our ioports. */
-        request_region(ioaddr, SMCTR_IO_EXTENT, smctr_name);
+        if (chksum != NODE_ADDR_CKSUM)
+                goto out2;
 
         b = inb(ioaddr + BDID);
 	if(b != BRD_ID_8115T)
         {
                 printk(KERN_ERR "%s: The adapter found is not supported\n", dev->name);
-                return (-1);
+                goto out2;
         }
 
         /* Check for 8115T Board ID */
@@ -990,7 +984,7 @@ static int __init smctr_chk_isa(struct net_device *dev)
 
         /* value of RegF adds up the sum to 0xFF */
         if((r2 != 0xFF) && (r2 != 0xEE))
-                return (-1);
+                goto out2;
 
         /* Get adapter ID */
         tp->board_id = smctr_get_boardid(dev, 0);
@@ -1077,11 +1071,11 @@ static int __init smctr_chk_isa(struct net_device *dev)
 
                 default:
                         printk(KERN_ERR "%s: No IRQ found aborting\n", dev->name);
-                        return(-1);
+                        goto out2;
          }
 
-        if(request_irq(dev->irq, smctr_interrupt, SA_SHIRQ, smctr_name, dev))
-                return (-ENODEV);
+        if (request_irq(dev->irq, smctr_interrupt, SA_SHIRQ, smctr_name, dev))
+                goto out2;
 
         /* Get 58x Rom Base */
         r1 = inb(ioaddr + CNFG_BIO_583);
@@ -1157,12 +1151,18 @@ static int __init smctr_chk_isa(struct net_device *dev)
                 if(smctr_read_584_chksum(ioaddr))
                 {
                         printk(KERN_ERR "%s: EEPROM Checksum Failure\n", dev->name);
-                        return(-1);
+                        goto out3;
                 }
 		*/
         }
 
         return (0);
+out3:
+	free_irq(dev->irq, dev);
+out2:
+	release_region(ioaddr, SMCTR_IO_EXTENT);
+out:
+	return err;
 }
 
 static int __init smctr_get_boardid(struct net_device *dev, int mca)
@@ -1646,15 +1646,6 @@ static int smctr_init_adapter(struct net_device *dev)
                 return (err);
 
         smctr_disable_16bit(dev);
-
-        return (0);
-}
-
-/* Dummy function */
-static int __init smctr_init_card(struct net_device *dev)
-{
-        if(smctr_debug > 10)
-                printk(KERN_DEBUG "%s: smctr_init_card\n", dev->name);
 
         return (0);
 }
@@ -3608,8 +3599,14 @@ out:
 int __init smctr_probe (struct net_device *dev)
 {
         int i;
-        int base_addr = dev ? dev->base_addr : 0;
+        int base_addr;
 
+#ifndef MODULE
+	netdev_boot_setup_check(dev);
+	tr_setup(dev);
+#endif
+
+        base_addr = dev->base_addr;
         if(base_addr > 0x1ff)    /* Check a single specified location. */
                 return (smctr_probe1(dev, base_addr));
         else if(base_addr != 0)  /* Don't probe at all. */
@@ -3618,13 +3615,25 @@ int __init smctr_probe (struct net_device *dev)
         for(i = 0; smctr_portlist[i]; i++)
         {
                 int ioaddr = smctr_portlist[i];
-                if(check_region(ioaddr, SMCTR_IO_EXTENT))
-                        continue;
                 if (!smctr_probe1(dev, ioaddr))
                         return (0);
         }
 
         return (-ENODEV);
+}
+
+static void cleanup_card(struct net_device *dev)
+{
+#ifdef CONFIG_MCA
+	struct net_local *tp = (struct net_local *)dev->priv;
+	if (tp->slot_num)
+		mca_mark_as_unused(tp->slot_num);
+#endif
+	release_region(dev->base_addr, SMCTR_IO_EXTENT);
+	if (dev->irq)
+		free_irq(dev->irq, dev);
+	if (dev->priv)
+		kfree(dev->priv);
 }
 
 static int __init smctr_probe1(struct net_device *dev, int ioaddr)
@@ -3636,12 +3645,6 @@ static int __init smctr_probe1(struct net_device *dev, int ioaddr)
 
         if(smctr_debug && version_printed++ == 0)
                 printk(version);
-
-#ifndef MODULE
-        dev = init_trdev(dev, 0);
-        if(dev == NULL)
-                return (-ENOMEM);
-#endif
 
         /* Setup this devices private information structure */
         tp = (struct net_local *)kmalloc(sizeof(struct net_local),
@@ -3677,8 +3680,9 @@ static int __init smctr_probe1(struct net_device *dev, int ioaddr)
         if(err != UCODE_PRESENT && err != SUCCESS)
         {
                 printk(KERN_ERR "%s: Firmware load failed (%d)\n", dev->name, err);
+		cleanup_card(dev);
 		err = -EIO;
-		goto out_tp;
+		goto out;
         }
 
 	/* Allow user to specify ring speed on module insert. */
@@ -3692,8 +3696,6 @@ static int __init smctr_probe1(struct net_device *dev, int ioaddr)
                 (unsigned int)dev->base_addr,
                 dev->irq, tp->rom_base, tp->ram_base);
 
-	/* AKPM: there's no point in this */
-        dev->init               = smctr_init_card;
         dev->open               = smctr_open;
         dev->stop               = smctr_close;
         dev->hard_start_xmit    = smctr_send_packet;
@@ -5689,33 +5691,31 @@ int init_module(void)
 {
         int i;
 
-        for(i = 0; i < SMCTR_MAX_ADAPTERS; i++)
-        {
+        for(i = 0; i < SMCTR_MAX_ADAPTERS; i++) {
+		struct net_device *dev = alloc_trdev(0);
                 irq[i] = 0;
                 mem[i] = 0;
-                dev_smctr[i] = NULL;
-                dev_smctr[i] = init_trdev(dev_smctr[i], 0);
-                if(dev_smctr[i] == NULL)
-                        return (-ENOMEM);
+		if (!dev)
+			return -ENOMEM;
+                dev->base_addr = io[i];
+                dev->irq       = irq[i];
+                dev->mem_start = mem[i];
 
-                dev_smctr[i]->base_addr = io[i];
-                dev_smctr[i]->irq       = irq[i];
-                dev_smctr[i]->mem_start = mem[i];
-                dev_smctr[i]->init      = &smctr_probe;
-
-                if(register_trdev(dev_smctr[i]) != 0)
-                {
-                        kfree(dev_smctr[i]);
-                        dev_smctr[i] = NULL;
-                        if(i == 0)
-                        {
-                                printk(KERN_ERR "%s: register_trdev() returned (<0).\n",
+		if (smctr_probe(dev) != 0) {
+                        kfree(dev);
+                        if (i == 0) {
+                                printk(KERN_ERR "%s: smctr_probe failed.\n",
                                         cardname);
-                                return (-EIO);
+                                return -EIO;
                         }
-                        else
-                                return (0);
+			return 0;
                 }
+		if (register_netdev(dev) != 0) {
+                        cleanup_card(dev);
+			kfree(dev);
+			continue;
+                }
+                dev_smctr[i] = dev;
         }
 
         return (0);
@@ -5725,26 +5725,13 @@ void cleanup_module(void)
 {
         int i;
 
-        for(i = 0; i < SMCTR_MAX_ADAPTERS; i++)
-        {
-                if(dev_smctr[i])
-                {
-#ifdef CONFIG_MCA
-			struct net_local *tp 
-				= (struct net_local *)dev_smctr[i]->priv;
-			if(tp->slot_num)
-				mca_mark_as_unused(tp->slot_num);
-#endif
-                        unregister_trdev(dev_smctr[i]);
-                        release_region(dev_smctr[i]->base_addr,
-                                SMCTR_IO_EXTENT);
-                        if(dev_smctr[i]->irq)
-                                free_irq(dev_smctr[i]->irq, dev_smctr[i]);
-                        if(dev_smctr[i]->priv)
-                                kfree(dev_smctr[i]->priv);
-                        kfree(dev_smctr[i]);
-                        dev_smctr[i] = NULL;
-                }
+        for(i = 0; i < SMCTR_MAX_ADAPTERS; i++) {
+		struct net_device *dev = dev_smctr[i];
+		if (dev) {
+			unregister_netdev(dev);
+			cleanup_card(dev);
+			kfree(dev);
+		}
         }
 }
 #endif /* MODULE */

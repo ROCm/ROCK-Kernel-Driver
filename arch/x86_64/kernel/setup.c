@@ -31,6 +31,7 @@
 #include <linux/initrd.h>
 #include <linux/highmem.h>
 #include <linux/bootmem.h>
+#include <linux/module.h>
 #include <asm/processor.h>
 #include <linux/console.h>
 #include <linux/seq_file.h>
@@ -44,6 +45,7 @@
 #include <asm/smp.h>
 #include <asm/msr.h>
 #include <asm/desc.h>
+#include <video/edid.h>
 #include <asm/e820.h>
 #include <asm/dma.h>
 #include <asm/mpspec.h>
@@ -52,8 +54,6 @@
 #include <asm/smp.h>
 #include <asm/proto.h>
 
-#define Dprintk(x...) printk(x)
-
 /*
  * Machine setup..
  */
@@ -61,6 +61,7 @@
 struct cpuinfo_x86 boot_cpu_data;
 
 unsigned long mmu_cr4_features;
+EXPORT_SYMBOL_GPL(mmu_cr4_features);
 
 int acpi_disabled __initdata = 0;
 
@@ -79,6 +80,7 @@ struct sys_desc_table_struct {
 	unsigned char table[0];
 };
 
+struct edid_info edid_info;
 struct e820map e820;
 
 unsigned char aux_device_present;
@@ -241,11 +243,10 @@ static void __init contig_initmem_init(void)
 
 void __init setup_arch(char **cmdline_p)
 {
-	Dprintk("setup_arch\n");
-
  	ROOT_DEV = ORIG_ROOT_DEV;
  	drive_info = DRIVE_INFO;
  	screen_info = SCREEN_INFO;
+	edid_info = EDID_INFO;
 	aux_device_present = AUX_DEVICE_INFO;
 	saved_video_mode = SAVED_VIDEO_MODE;
 
@@ -584,7 +585,7 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 void __init print_cpu_info(struct cpuinfo_x86 *c)
 {
 	if (c->x86_model_id[0])
-		printk("AMD %s", c->x86_model_id);
+		printk("%s", c->x86_model_id);
 
 	if (c->x86_mask || c->cpuid_level >= 0) 
 		printk(" stepping %02x\n", c->x86_mask);

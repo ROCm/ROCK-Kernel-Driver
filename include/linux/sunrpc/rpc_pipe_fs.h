@@ -24,6 +24,8 @@ struct rpc_inode {
 	int pipelen;
 	int nreaders;
 	wait_queue_head_t waitq;
+#define RPC_PIPE_WAIT_FOR_OPEN	1
+	int flags;
 	struct rpc_pipe_ops *ops;
 };
 
@@ -38,10 +40,11 @@ extern int rpc_queue_upcall(struct inode *, struct rpc_pipe_msg *);
 
 extern struct dentry *rpc_mkdir(char *, struct rpc_clnt *);
 extern int rpc_rmdir(char *);
-extern struct dentry *rpc_mkpipe(char *, void *, struct rpc_pipe_ops *);
+extern struct dentry *rpc_mkpipe(char *, void *, struct rpc_pipe_ops *, int flags);
 extern int rpc_unlink(char *);
 
 void __rpc_purge_current_upcall(struct file *);
+void __rpc_purge_one_upcall(struct file *filp, struct rpc_pipe_msg *target);
 
 #endif
 #endif

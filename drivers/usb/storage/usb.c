@@ -3,10 +3,11 @@
  * $Id: usb.c,v 1.75 2002/04/22 03:39:43 mdharm Exp $
  *
  * Current development and maintenance by:
- *   (c) 1999-2002 Matthew Dharm (mdharm-usb@one-eyed-alien.net)
+ *   (c) 1999-2003 Matthew Dharm (mdharm-usb@one-eyed-alien.net)
  *
  * Developed with the assistance of:
  *   (c) 2000 David L. Brown, Jr. (usb-storage@davidb.org)
+ *   (c) 2003 Alan Stern (stern@rowland.harvard.edu)
  *
  * Initial work by:
  *   (c) 1999 Michael Gee (michael@linuxspecific.com)
@@ -218,6 +219,7 @@ static struct us_unusual_dev us_unusual_dev_list[] = {
 };
 
 struct usb_driver usb_storage_driver = {
+	.owner =	THIS_MODULE,
 	.name =		"usb-storage",
 	.probe =	storage_probe,
 	.disconnect =	storage_disconnect,
@@ -296,16 +298,13 @@ static int usb_stor_control_thread(void * __us)
 
 	/*
 	 * This thread doesn't need any user-level access,
-	 * so get rid of all our resources..
+	 * so get rid of all our resources.
 	 */
 	daemonize("usb-storage");
 
 	current->flags |= PF_IOTHREAD;
 
 	unlock_kernel();
-
-	/* set up for wakeups by new commands */
-	init_MUTEX_LOCKED(&us->sema);
 
 	/* signal that we've started the thread */
 	complete(&(us->notify));
@@ -365,17 +364,6 @@ static int usb_stor_control_thread(void * __us)
 			us->srb->result = DID_BAD_TARGET << 16;
 		}
 
-		/* handle requests for EVPD, which most USB devices do
-		 * not support */
-		else if((us->srb->cmnd[0] == INQUIRY) &&
-				(us->srb->cmnd[1] & 0x1)) {
-				US_DEBUGP("Faking INQUIRY command for EVPD\n");
-				memcpy(us->srb->sense_buffer, 
-				       usb_stor_sense_invalidCDB, 
-				       sizeof(usb_stor_sense_invalidCDB));
-				us->srb->result = CHECK_CONDITION << 1;
-		}
-
 		/* Handle those devices which need us to fake 
 		 * their inquiry data */
 		else if ((us->srb->cmnd[0] == INQUIRY) &&
@@ -386,7 +374,7 @@ static int usb_stor_control_thread(void * __us)
 
 			US_DEBUGP("Faking INQUIRY command\n");
 			fill_inquiry_response(us, data_ptr, 36);
-			us->srb->result = GOOD << 1;
+			us->srb->result = SAM_STAT_GOOD;
 		}
 
 		/* we've got a command, let's do it! */
@@ -411,9 +399,11 @@ static int usb_stor_control_thread(void * __us)
 			US_DEBUGP("scsi command aborted\n");
 		}
 
-		/* in case an abort request was received after the command
-		 * completed, we must use a separate test to see whether
-		 * we need to signal that the abort has finished */
+		/* If an abort request was received we need to signal that
+		 * the abort has finished.  The proper test for this is
+		 * sm_state == US_STATE_ABORTING, not srb->result == DID_ABORT,
+		 * because an abort request might be received after all the
+		 * USB processing was complete. */
 		if (atomic_read(&us->sm_state) == US_STATE_ABORTING)
 			complete(&(us->notify));
 
@@ -429,272 +419,60 @@ static int usb_stor_control_thread(void * __us)
 	return 0;
 }	
 
-/* Set up the URB and the usb_ctrlrequest.
- * us->dev_semaphore must already be locked.
- * Note that this function assumes that all the data in the us_data
- * structure is current.
- * Returns non-zero on failure, zero on success
- */ 
-static int usb_stor_allocate_urbs(struct us_data *us)
+/***********************************************************************
+ * Device probing and disconnecting
+ ***********************************************************************/
+
+/* Get the unusual_devs entries and the string descriptors */
+static void get_device_info(struct us_data *us,
+			struct us_unusual_dev *unusual_dev)
 {
-	/* calculate and store the pipe values */
-	us->send_ctrl_pipe = usb_sndctrlpipe(us->pusb_dev, 0);
-	us->recv_ctrl_pipe = usb_rcvctrlpipe(us->pusb_dev, 0);
-	us->send_bulk_pipe = usb_sndbulkpipe(us->pusb_dev, us->ep_out);
-	us->recv_bulk_pipe = usb_rcvbulkpipe(us->pusb_dev, us->ep_in);
-	us->recv_intr_pipe = usb_rcvintpipe(us->pusb_dev, us->ep_int);
+	struct usb_device *dev = us->pusb_dev;
 
-	/* allocate the usb_ctrlrequest for control packets */
-	US_DEBUGP("Allocating usb_ctrlrequest\n");
-	us->dr = kmalloc(sizeof(struct usb_ctrlrequest), GFP_NOIO);
-	if (!us->dr) {
-		US_DEBUGP("allocation failed\n");
-		return 1;
-	}
+	if (unusual_dev->vendorName)
+		US_DEBUGP("Vendor: %s\n", unusual_dev->vendorName);
+	if (unusual_dev->productName)
+		US_DEBUGP("Product: %s\n", unusual_dev->productName);
 
-	/* allocate the URB we're going to use */
-	US_DEBUGP("Allocating URB\n");
-	us->current_urb = usb_alloc_urb(0, GFP_KERNEL);
-	if (!us->current_urb) {
-		US_DEBUGP("allocation failed\n");
-		return 2;
-	}
+	/* Store the entries */
+	us->unusual_dev = unusual_dev;
+	us->subclass = unusual_dev->useProtocol;
+	us->protocol = unusual_dev->useTransport;
+	us->flags = unusual_dev->flags;
 
-	US_DEBUGP("Allocating scatter-gather request block\n");
-	us->current_sg = kmalloc(sizeof(*us->current_sg), GFP_KERNEL);
-	if (!us->current_sg) {
-		US_DEBUGP("allocation failed\n");
-		return 5;
-	}
-
-	return 0;	/* success */
-}
-
-/* Deallocate the URB, the usb_ctrlrequest, and the IRQ pipe.
- * us->dev_semaphore must already be locked.
- */
-static void usb_stor_deallocate_urbs(struct us_data *us)
-{
-	/* free the scatter-gather request block */
-	if (us->current_sg) {
-		kfree(us->current_sg);
-		us->current_sg = NULL;
-	}
-
-	/* free up the main URB for this device */
-	if (us->current_urb) {
-		US_DEBUGP("-- releasing main URB\n");
-		usb_free_urb(us->current_urb);
-		us->current_urb = NULL;
-	}
-
-	/* free the usb_ctrlrequest buffer */
-	if (us->dr) {
-		kfree(us->dr);
-		us->dr = NULL;
-	}
-
-	/* mark the device as gone */
-	usb_put_dev(us->pusb_dev);
-	us->pusb_dev = NULL;
-}
-
-/* Probe to see if a new device is actually a SCSI device */
-static int storage_probe(struct usb_interface *intf,
-			 const struct usb_device_id *id)
-{
-	struct usb_device *dev = interface_to_usbdev(intf);
-	int ifnum = intf->altsetting->desc.bInterfaceNumber;
-	int i;
-	const int id_index = id - storage_usb_ids; 
-	char mf[USB_STOR_STRING_LEN];		     /* manufacturer */
-	char prod[USB_STOR_STRING_LEN];		     /* product */
-	char serial[USB_STOR_STRING_LEN];	     /* serial number */
-	unsigned int flags;
-	struct us_unusual_dev *unusual_dev;
-	struct us_data *us = NULL;
-	int result;
-
-	/* these are temporary copies -- we test on these, then put them
-	 * in the us-data structure 
-	 */
-	struct usb_endpoint_descriptor *ep_in = NULL;
-	struct usb_endpoint_descriptor *ep_out = NULL;
-	struct usb_endpoint_descriptor *ep_int = NULL;
-	u8 subclass = 0;
-	u8 protocol = 0;
-
-	/* the altsetting on the interface we're probing that matched our
-	 * usb_match_id table
-	 */
-	struct usb_host_interface *altsetting =
-		intf[ifnum].altsetting + intf[ifnum].act_altsetting;
-	US_DEBUGP("act_altsetting is %d\n", intf[ifnum].act_altsetting);
-
-	/* clear the temporary strings */
-	memset(mf, 0, sizeof(mf));
-	memset(prod, 0, sizeof(prod));
-	memset(serial, 0, sizeof(serial));
-
-	/* 
-	 * Can we support this device, either because we know about it
-	 * from our unusual device list, or because it advertises that it's
-	 * compliant to the specification?
-	 *
-	 * id_index is calculated in the declaration to be the index number
-	 * of the match from the usb_device_id table, so we can find the
-	 * corresponding entry in the private table.
-	 */
-	US_DEBUGP("id_index calculated to be: %d\n", id_index);
-	US_DEBUGP("Array length appears to be: %d\n", sizeof(us_unusual_dev_list) / sizeof(us_unusual_dev_list[0]));
-	if (id_index <
-	    sizeof(us_unusual_dev_list) / sizeof(us_unusual_dev_list[0])) {
-		unusual_dev = &us_unusual_dev_list[id_index];
-		if (unusual_dev->vendorName)
-			US_DEBUGP("Vendor: %s\n", unusual_dev->vendorName);
-		if (unusual_dev->productName)
-			US_DEBUGP("Product: %s\n", unusual_dev->productName);
-	} else
-		/* no, we can't support it */
-		return -EIO;
-
-	/* At this point, we know we've got a live one */
-	US_DEBUGP("USB Mass Storage device detected\n");
-
-	/* Determine subclass and protocol, or copy from the interface */
-	subclass = unusual_dev->useProtocol;
-	protocol = unusual_dev->useTransport;
-	flags = unusual_dev->flags;
-
-	/*
-	 * Find the endpoints we need
-	 * We are expecting a minimum of 2 endpoints - in and out (bulk).
-	 * An optional interrupt is OK (necessary for CBI protocol).
-	 * We will ignore any others.
-	 */
-	for (i = 0; i < altsetting->desc.bNumEndpoints; i++) {
-		struct usb_endpoint_descriptor *ep;
-
-		ep = &altsetting->endpoint[i].desc;
-
-		/* is it an BULK endpoint? */
-		if ((ep->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK)
-				== USB_ENDPOINT_XFER_BULK) {
-			/* BULK in or out? */
-			if (ep->bEndpointAddress & USB_DIR_IN)
-				ep_in = ep;
-			else
-				ep_out = ep;
-		}
-
-		/* is it an interrupt endpoint? */
-		else if ((ep->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK)
-				== USB_ENDPOINT_XFER_INT) {
-			ep_int = ep;
-		}
-	}
-	US_DEBUGP("Endpoints: In: 0x%p Out: 0x%p Int: 0x%p (Period %d)\n",
-		  ep_in, ep_out, ep_int, ep_int ? ep_int->bInterval : 0);
-
-#ifdef CONFIG_USB_STORAGE_SDDR09
-	if (protocol == US_PR_EUSB_SDDR09 || protocol == US_PR_DPCM_USB) {
-		/* set the configuration -- STALL is an acceptable response here */
-		result = usb_set_configuration(dev, 1);
-
-		US_DEBUGP("Result from usb_set_configuration is %d\n", result);
-		if (result == -EPIPE) {
-			US_DEBUGP("-- stall on control interface\n");
-		} else if (result != 0) {
-			/* it's not a stall, but another error -- time to bail */
-			US_DEBUGP("-- Unknown error.  Rejecting device\n");
-			return -EIO;
-		}
-	}
-#endif
-
-	/* Do some basic sanity checks, and bail if we find a problem */
-	if (!ep_in || !ep_out || (protocol == US_PR_CBI && !ep_int)) {
-		US_DEBUGP("Endpoint sanity check failed! Rejecting dev.\n");
-		return -EIO;
-	}
-
-	/* At this point, we've decided to try to use the device */
-	usb_get_dev(dev);
-
-	/* fetch the strings */
+	/* Read the device's string descriptors */
 	if (dev->descriptor.iManufacturer)
 		usb_string(dev, dev->descriptor.iManufacturer, 
-			   mf, sizeof(mf));
+			   us->vendor, sizeof(us->vendor));
 	if (dev->descriptor.iProduct)
 		usb_string(dev, dev->descriptor.iProduct, 
-			   prod, sizeof(prod));
-	if (dev->descriptor.iSerialNumber && !(flags & US_FL_IGNORE_SER))
+			   us->product, sizeof(us->product));
+	if (dev->descriptor.iSerialNumber && !(us->flags & US_FL_IGNORE_SER))
 		usb_string(dev, dev->descriptor.iSerialNumber, 
-			   serial, sizeof(serial));
+			   us->serial, sizeof(us->serial));
 
-	/* New device -- allocate memory and initialize */
-	if ((us = (struct us_data *)kmalloc(sizeof(struct us_data), 
-					    GFP_KERNEL)) == NULL) {
-		printk(KERN_WARNING USB_STORAGE "Out of memory\n");
-		usb_put_dev(dev);
-		return -ENOMEM;
-	}
-	memset(us, 0, sizeof(struct us_data));
-
-	/* Initialize the mutexes only when the struct is new */
-	init_completion(&(us->notify));
-	init_MUTEX_LOCKED(&(us->dev_semaphore));
-
-	/* copy over the subclass and protocol data */
-	us->subclass = subclass;
-	us->protocol = protocol;
-	us->flags = flags;
-	us->unusual_dev = unusual_dev;
-
-	/* copy over the endpoint data */
-	us->ep_in = ep_in->bEndpointAddress & 
-		USB_ENDPOINT_NUMBER_MASK;
-	us->ep_out = ep_out->bEndpointAddress & 
-		USB_ENDPOINT_NUMBER_MASK;
-	if (ep_int) {
-		us->ep_int = ep_int->bEndpointAddress & 
-			USB_ENDPOINT_NUMBER_MASK;
-		us->ep_bInterval = ep_int->bInterval;
-	}
-	else
-		us->ep_int = us->ep_bInterval = 0;
-
-	/* establish the connection to the new device */
-	us->ifnum = ifnum;
-	us->pusb_dev = dev;
-
-	/* copy over the identifiying strings */
-	strncpy(us->vendor, mf, USB_STOR_STRING_LEN);
-	strncpy(us->product, prod, USB_STOR_STRING_LEN);
-	strncpy(us->serial, serial, USB_STOR_STRING_LEN);
+	/* Use the unusual_dev strings if the device didn't provide them */
 	if (strlen(us->vendor) == 0) {
 		if (unusual_dev->vendorName)
 			strncpy(us->vendor, unusual_dev->vendorName,
-				USB_STOR_STRING_LEN);
+				sizeof(us->vendor) - 1);
 		else
-			strncpy(us->vendor, "Unknown",
-				USB_STOR_STRING_LEN);
+			strcpy(us->vendor, "Unknown");
 	}
 	if (strlen(us->product) == 0) {
 		if (unusual_dev->productName)
 			strncpy(us->product, unusual_dev->productName,
-				USB_STOR_STRING_LEN);
+				sizeof(us->product) - 1);
 		else
-			strncpy(us->product, "Unknown",
-				USB_STOR_STRING_LEN);
+			strcpy(us->product, "Unknown");
 	}
 	if (strlen(us->serial) == 0)
-		strncpy(us->serial, "None", USB_STOR_STRING_LEN);
+		strcpy(us->serial, "None");
+}
 
-	/* 
-	 * Set the handler pointers based on the protocol
-	 * Again, this data is persistent across reattachments
-	 */
+/* Get the transport settings */
+static int get_transport(struct us_data *us)
+{
 	switch (us->protocol) {
 	case US_PR_CB:
 		us->transport_name = "Control/Bulk";
@@ -714,7 +492,6 @@ static int storage_probe(struct usb_interface *intf,
 		us->transport_name = "Bulk";
 		us->transport = usb_stor_Bulk_transport;
 		us->transport_reset = usb_stor_Bulk_reset;
-		us->max_lun = usb_stor_Bulk_max_lun(us);
 		break;
 
 #ifdef CONFIG_USB_STORAGE_HP8200e
@@ -781,15 +558,19 @@ static int storage_probe(struct usb_interface *intf,
 #endif
 
 	default:
-		/* us->transport_name = "Unknown"; */
-		goto BadDevice;
+		return -EIO;
 	}
 	US_DEBUGP("Transport: %s\n", us->transport_name);
 
 	/* fix for single-lun devices */
 	if (us->flags & US_FL_SINGLE_LUN)
 		us->max_lun = 0;
+	return 0;
+}
 
+/* Get the protocol settings */
+static int get_protocol(struct us_data *us)
+{
 	switch (us->subclass) {
 	case US_SC_RBC:
 		us->protocol_name = "Reduced Block Commands (RBC)";
@@ -832,175 +613,335 @@ static int storage_probe(struct usb_interface *intf,
 #endif
 
 	default:
-		/* us->protocol_name = "Unknown"; */
-		goto BadDevice;
+		return -EIO;
 	}
 	US_DEBUGP("Protocol: %s\n", us->protocol_name);
+	return 0;
+}
 
-	/* allocate the URB, the usb_ctrlrequest, and the IRQ URB */
-	if (usb_stor_allocate_urbs(us))
-		goto BadDevice;
+/* Get the pipe settings */
+static int get_pipes(struct us_data *us)
+{
+	struct usb_host_interface *altsetting =
+		&us->pusb_intf->altsetting[us->pusb_intf->act_altsetting];
+	int i;
+	struct usb_endpoint_descriptor *ep;
+	struct usb_endpoint_descriptor *ep_in = NULL;
+	struct usb_endpoint_descriptor *ep_out = NULL;
+	struct usb_endpoint_descriptor *ep_int = NULL;
 
 	/*
-	 * Since this is a new device, we need to generate a scsi 
-	 * host definition, and register with the higher SCSI layers
+	 * Find the endpoints we need.
+	 * We are expecting a minimum of 2 endpoints - in and out (bulk).
+	 * An optional interrupt is OK (necessary for CBI protocol).
+	 * We will ignore any others.
 	 */
+	for (i = 0; i < altsetting->desc.bNumEndpoints; i++) {
+		ep = &altsetting->endpoint[i].desc;
+
+		/* Is it a BULK endpoint? */
+		if ((ep->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK)
+				== USB_ENDPOINT_XFER_BULK) {
+			/* BULK in or out? */
+			if (ep->bEndpointAddress & USB_DIR_IN)
+				ep_in = ep;
+			else
+				ep_out = ep;
+		}
+
+		/* Is it an interrupt endpoint? */
+		else if ((ep->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK)
+				== USB_ENDPOINT_XFER_INT) {
+			ep_int = ep;
+		}
+	}
+	US_DEBUGP("Endpoints: In: 0x%p Out: 0x%p Int: 0x%p (Period %d)\n",
+		  ep_in, ep_out, ep_int, ep_int ? ep_int->bInterval : 0);
+
+	if (!ep_in || !ep_out || (us->protocol == US_PR_CBI && !ep_int)) {
+		US_DEBUGP("Endpoint sanity check failed! Rejecting dev.\n");
+		return -EIO;
+	}
+
+	/* Calculate and store the pipe values */
+	us->send_ctrl_pipe = usb_sndctrlpipe(us->pusb_dev, 0);
+	us->recv_ctrl_pipe = usb_rcvctrlpipe(us->pusb_dev, 0);
+	us->send_bulk_pipe = usb_sndbulkpipe(us->pusb_dev,
+		ep_out->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK);
+	us->recv_bulk_pipe = usb_rcvbulkpipe(us->pusb_dev, 
+		ep_in->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK);
+	if (ep_int) {
+		us->recv_intr_pipe = usb_rcvintpipe(us->pusb_dev,
+			ep_int->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK);
+		us->ep_bInterval = ep_int->bInterval;
+	}
+	return 0;
+}
+
+/* Initialize all the dynamic resources we need */
+static int usb_stor_acquire_resources(struct us_data *us)
+{
+	int p;
+
+	/* Allocate the USB control blocks */
+	US_DEBUGP("Allocating usb_ctrlrequest\n");
+	us->dr = kmalloc(sizeof(*us->dr), GFP_KERNEL);
+	if (!us->dr) {
+		US_DEBUGP("allocation failed\n");
+		return -ENOMEM;
+	}
+
+	US_DEBUGP("Allocating URB\n");
+	us->current_urb = usb_alloc_urb(0, GFP_KERNEL);
+	if (!us->current_urb) {
+		US_DEBUGP("allocation failed\n");
+		return -ENOMEM;
+	}
+
+	US_DEBUGP("Allocating scatter-gather request block\n");
+	us->current_sg = kmalloc(sizeof(*us->current_sg), GFP_KERNEL);
+	if (!us->current_sg) {
+		US_DEBUGP("allocation failed\n");
+		return -ENOMEM;
+	}
+
+	/* Lock the device while we carry out the next two operations */
+	down(&us->dev_semaphore);
+
+	/* For bulk-only devices, determine the max LUN value */
+	if (us->protocol == US_PR_BULK)
+		us->max_lun = usb_stor_Bulk_max_lun(us);
 
 	/* Just before we start our control thread, initialize
 	 * the device if it needs initialization */
-	if (unusual_dev && unusual_dev->initFunction)
-		unusual_dev->initFunction(us);
+	if (us->unusual_dev->initFunction)
+		us->unusual_dev->initFunction(us);
 
-	/* start up our control thread */
+	up(&us->dev_semaphore);
+
+	/* Start up our control thread */
 	atomic_set(&us->sm_state, US_STATE_IDLE);
-	us->pid = kernel_thread(usb_stor_control_thread, us,
-				CLONE_VM);
-	if (us->pid < 0) {
+	p = kernel_thread(usb_stor_control_thread, us, CLONE_VM);
+	if (p < 0) {
 		printk(KERN_WARNING USB_STORAGE 
 		       "Unable to start control thread\n");
-		goto BadDevice;
+		return p;
 	}
+	us->pid = p;
 
-	/* wait for the thread to start */
+	/* Wait for the thread to start */
 	wait_for_completion(&(us->notify));
 
-	/* unlock the device pointers */
-	up(&(us->dev_semaphore));
-
-	/* now register	*/
+	/*
+	 * Since this is a new device, we need to register a SCSI
+	 * host definition with the higher SCSI layers.
+	 */
 	us->host = scsi_register(&usb_stor_host_template, sizeof(us));
 	if (!us->host) {
 		printk(KERN_WARNING USB_STORAGE
 			"Unable to register the scsi host\n");
-
-		/* tell the control thread to exit */
-		us->srb = NULL;
-		up(&us->sema);
-		wait_for_completion(&us->notify);
-
-		/* re-lock the device pointers */
-		down(&us->dev_semaphore);
-		goto BadDevice;
+		return -EBUSY;
 	}
 
-	/* set the hostdata to prepare for scanning */
-	us->host->hostdata[0] = (unsigned long)us;
+	/* Set the hostdata to prepare for scanning */
+	us->host->hostdata[0] = (unsigned long) us;
 
-	/* associate this host with our interface */
-	scsi_set_device(us->host, &intf->dev);
+	return 0;
+}
 
-	/* now add the host */
-	result = scsi_add_host(us->host, NULL);
+/* Dissociate from the USB device */
+static void dissociate_dev(struct us_data *us)
+{
+	US_DEBUGP("-- %s\n", __FUNCTION__);
+	down(&us->dev_semaphore);
+	usb_set_intfdata(us->pusb_intf, NULL);
+	usb_put_dev(us->pusb_dev);
+	us->pusb_dev = NULL;
+	us->pusb_intf = NULL;
+	up(&us->dev_semaphore);
+}
+
+/* Release all our static and dynamic resources */
+void usb_stor_release_resources(struct us_data *us)
+{
+	/*
+	 * The host must already have been removed
+	 * and dissociate_dev() must have been called.
+	 */
+
+	/* Finish the SCSI host removal sequence */
+	if (us->host) {
+		(struct us_data *) us->host->hostdata[0] = NULL;
+		scsi_unregister(us->host);
+	}
+
+	/* Kill the control thread
+	 *
+	 * Enqueue the command, wake up the thread, and wait for 
+	 * notification that it has exited.
+	 */
+	if (us->pid) {
+		US_DEBUGP("-- sending exit command to thread\n");
+		BUG_ON(atomic_read(&us->sm_state) != US_STATE_IDLE);
+		us->srb = NULL;
+		up(&(us->sema));
+		wait_for_completion(&(us->notify));
+	}
+
+	/* Call the destructor routine, if it exists */
+	if (us->extra_destructor) {
+		US_DEBUGP("-- calling extra_destructor()\n");
+		us->extra_destructor(us->extra);
+	}
+
+	/* Destroy the extra data */
+	if (us->extra) {
+		kfree(us->extra);
+	}
+
+	/* Free the USB control blocks */
+	if (us->current_sg)
+		kfree(us->current_sg);
+	if (us->current_urb)
+		usb_free_urb(us->current_urb);
+	if (us->dr)
+		kfree(us->dr);
+
+	/* Free the structure itself */
+	kfree(us);
+	US_DEBUGP("-- %s finished\n", __FUNCTION__);
+}
+
+/* Probe to see if we can drive a newly-connected USB device */
+static int storage_probe(struct usb_interface *intf,
+			 const struct usb_device_id *id)
+{
+	struct us_data *us;
+	const int id_index = id - storage_usb_ids; 
+	int result;
+
+	US_DEBUGP("USB Mass Storage device detected\n");
+	US_DEBUGP("act_altsetting is %d, id_index is %d\n",
+			intf->act_altsetting, id_index);
+
+	/* Allocate the us_data structure and initialize the mutexes */
+	us = (struct us_data *) kmalloc(sizeof(*us), GFP_KERNEL);
+	if (!us) {
+		printk(KERN_WARNING USB_STORAGE "Out of memory\n");
+		return -ENOMEM;
+	}
+	memset(us, 0, sizeof(struct us_data));
+	init_MUTEX(&(us->dev_semaphore));
+	init_MUTEX_LOCKED(&(us->sema));
+	init_completion(&(us->notify));
+
+	/* Fill in the device-related fields */
+	us->pusb_dev = interface_to_usbdev(intf);
+	us->pusb_intf = intf;
+	us->ifnum = intf->altsetting->desc.bInterfaceNumber;
+
+	/* Store our private data in the interface and increment the
+	 * device's reference count */
+	usb_set_intfdata(intf, us);
+	usb_get_dev(us->pusb_dev);
+
+	/*
+	 * Get the unusual_devs entries and the descriptors
+	 *
+	 * id_index is calculated in the declaration to be the index number
+	 * of the match from the usb_device_id table, so we can find the
+	 * corresponding entry in the private table.
+	 */
+	get_device_info(us, &us_unusual_dev_list[id_index]);
+
+#ifdef CONFIG_USB_STORAGE_SDDR09
+	if (us->protocol == US_PR_EUSB_SDDR09 ||
+			us->protocol == US_PR_DPCM_USB) {
+		/* set the configuration -- STALL is an acceptable response here */
+		result = usb_set_configuration(us->pusb_dev, 1);
+
+		US_DEBUGP("Result from usb_set_configuration is %d\n", result);
+		if (result == -EPIPE) {
+			US_DEBUGP("-- stall on control interface\n");
+		} else if (result != 0) {
+			/* it's not a stall, but another error -- time to bail */
+			US_DEBUGP("-- Unknown error.  Rejecting device\n");
+			goto BadDevice;
+		}
+	}
+#endif
+
+	/* Get the transport, protocol, and pipe settings */
+	result = get_transport(us);
+	if (result)
+		goto BadDevice;
+	result = get_protocol(us);
+	if (result)
+		goto BadDevice;
+	result = get_pipes(us);
+	if (result)
+		goto BadDevice;
+
+	/* Acquire all the other resources */
+	result = usb_stor_acquire_resources(us);
+	if (result)
+		goto BadDevice;
+
+	/* Finally, add the host (this does SCSI device scanning) */
+	result = scsi_add_host(us->host, &intf->dev);
 	if (result) {
 		printk(KERN_WARNING USB_STORAGE
 			"Unable to add the scsi host\n");
-
-		/* tell the control thread to exit */
-		us->srb = NULL;
-		up(&us->sema);
-		wait_for_completion(&us->notify);
-
-		/* re-lock the device pointers */
-		down(&us->dev_semaphore);
 		goto BadDevice;
 	}
 
 	printk(KERN_DEBUG 
 	       "WARNING: USB Mass Storage data integrity not assured\n");
 	printk(KERN_DEBUG 
-	       "USB Mass Storage device found at %d\n", dev->devnum);
-
-	/* save a pointer to our structure */
-	usb_set_intfdata(intf, us);
+	       "USB Mass Storage device found at %d\n", us->pusb_dev->devnum);
 	return 0;
 
-	/* we come here if there are any problems */
-	/* us->dev_semaphore must be locked */
+	/* We come here if there are any problems */
 BadDevice:
 	US_DEBUGP("storage_probe() failed\n");
-	usb_stor_deallocate_urbs(us);
-	up(&us->dev_semaphore);
-	kfree(us);
-	return -EIO;
+	dissociate_dev(us);
+	usb_stor_release_resources(us);
+	return result;
 }
 
 /* Handle a disconnect event from the USB core */
 static void storage_disconnect(struct usb_interface *intf)
 {
-	struct us_data *us;
+	struct us_data *us = usb_get_intfdata(intf);
 	struct scsi_device *sdev;
 
 	US_DEBUGP("storage_disconnect() called\n");
 
-	us = usb_get_intfdata(intf);
-	usb_set_intfdata(intf, NULL);
-
-	/* set devices offline -- need host lock for this */
+	/* Set devices offline -- need host lock for this */
 	scsi_lock(us->host);
 	list_for_each_entry(sdev, &us->host->my_devices, siblings)
 		sdev->online = 0;
 	scsi_unlock(us->host);
 
-	/* lock device access -- no need to unlock, as we're going away */
-	down(&(us->dev_semaphore));
+	/* Prevent new USB transfers and stop the current command */
+	set_bit(US_FLIDX_DISCONNECTING, &us->flags);
+	usb_stor_stop_transport(us);
 
-	/* Complete all pending commands with * cmd->result = DID_ERROR << 16.
-	 * Since we only queue one command at a time, this is pretty easy. */
-	if (us->srb) {
-		us->srb->result = DID_ERROR << 16;
-		us->srb->scsi_done(us->srb);
+	/* Dissociate from the USB device */
+	dissociate_dev(us);
+
+	/* Begin the SCSI host removal sequence */
+	if (scsi_remove_host(us->host)) {
+		US_DEBUGP("-- SCSI refused to remove the host\n");
+		BUG();
+		return;
 	}
 
 	/* TODO: somehow, wait for the device to
 	 * be 'idle' (tasklet completion) */
 
-	/* remove the pointer to the data structure we were using */
-	(struct us_data*)us->host->hostdata[0] = NULL;
-
-	/* begin SCSI host removal sequence */
-	if(scsi_remove_host(us->host)) {
-		US_DEBUGP("-- SCSI refused to unregister\n");
-		BUG();
-		return;
-	};
-
-	/* finish SCSI host removal sequence */
-	scsi_unregister(us->host);
-
-	/* Kill the control threads
-	 *
-	 * Enqueue the command, wake up the thread, and wait for 
-	 * notification that it has exited.
-	 */
-	US_DEBUGP("-- sending exit command to thread\n");
-	BUG_ON(atomic_read(&us->sm_state) != US_STATE_IDLE);
-	us->srb = NULL;
-	up(&(us->sema));
-	wait_for_completion(&(us->notify));
-
-	/* free allocated urbs */
-	usb_stor_deallocate_urbs(us);
-
-	/* If there's extra data in the us_data structure then
-	 * free that first */
-	if (us->extra) {
-		/* call the destructor routine, if it exists */
-		if (us->extra_destructor) {
-			US_DEBUGP("-- calling extra_destructor()\n");
-			us->extra_destructor(us->extra);
-		}
-
-		/* destroy the extra data */
-		US_DEBUGP("-- freeing the data structure\n");
-		kfree(us->extra);
-	}
-
-	/* up the semaphore so auto-code-checkers won't complain about
-	 * the down/up imbalance */
-	up(&(us->dev_semaphore));
-
-	/* free the structure itself */
-	kfree (us);
+	/* Release all our other resources */
+	usb_stor_release_resources(us);
 }
 
 /***********************************************************************

@@ -726,7 +726,7 @@ static void NCR5380_print_status (struct Scsi_Host *instance)
 	printk("NCR5380_print_status: no memory for print buffer\n");
 	return;
     }
-    len = NCR5380_proc_info(pr_bfr, &start, 0, PAGE_SIZE, HOSTNO, 0);
+    len = NCR5380_proc_info(instance, pr_bfr, &start, 0, PAGE_SIZE, 0);
     pr_bfr[len] = 0;
     printk("\n%s\n", pr_bfr);
     free_page((unsigned long) pr_bfr);
@@ -754,11 +754,10 @@ static void NCR5380_print_status (struct Scsi_Host *instance)
 static
 char *lprint_Scsi_Cmnd (Scsi_Cmnd *cmd, char *pos, char *buffer, int length);
 
-static int NCR5380_proc_info (char *buffer, char **start, off_t offset,
-			      int length, int hostno, int inout)
+static int NCR5380_proc_info (struct Scsi_Host *instance, char *buffer, char **start, off_t offset,
+			      int length, int inout)
 {
     char *pos = buffer;
-    struct Scsi_Host *instance;
     struct NCR5380_hostdata *hostdata;
     Scsi_Cmnd *ptr;
     unsigned long flags;
@@ -771,9 +770,6 @@ static int NCR5380_proc_info (char *buffer, char **start, off_t offset,
 	}					\
     } while (0)
 
-    instance = scsi_host_hn_get(hostno);
-    if (!instance)
-	return(-ESRCH);
     hostdata = (struct NCR5380_hostdata *)instance->hostdata;
 
     if (inout) { /* Has data been written to the file ? */

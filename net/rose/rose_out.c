@@ -58,7 +58,7 @@ void rose_kick(struct sock *sk)
 	if (rose->condition & ROSE_COND_PEER_RX_BUSY)
 		return;
 
-	if (skb_peek(&sk->write_queue) == NULL)
+	if (!skb_peek(&sk->sk_write_queue))
 		return;
 
 	start = (skb_peek(&rose->ack_queue) == NULL) ? rose->va : rose->vs;
@@ -74,11 +74,11 @@ void rose_kick(struct sock *sk)
 	 * the window is full.
 	 */
 
-	skb  = skb_dequeue(&sk->write_queue);
+	skb  = skb_dequeue(&sk->sk_write_queue);
 
 	do {
 		if ((skbn = skb_clone(skb, GFP_ATOMIC)) == NULL) {
-			skb_queue_head(&sk->write_queue, skb);
+			skb_queue_head(&sk->sk_write_queue, skb);
 			break;
 		}
 
@@ -96,7 +96,8 @@ void rose_kick(struct sock *sk)
 		 */
 		skb_queue_tail(&rose->ack_queue, skb);
 
-	} while (rose->vs != end && (skb = skb_dequeue(&sk->write_queue)) != NULL);
+	} while (rose->vs != end &&
+		 (skb = skb_dequeue(&sk->sk_write_queue)) != NULL);
 
 	rose->vl         = rose->vr;
 	rose->condition &= ~ROSE_COND_ACK_PENDING;

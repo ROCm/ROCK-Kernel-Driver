@@ -167,9 +167,9 @@ int ip_call_ra_chain(struct sk_buff *skb)
 		/* If socket is bound to an interface, only report
 		 * the packet if it came  from that interface.
 		 */
-		if (sk && inet_sk(sk)->num == protocol 
-		    && ((sk->bound_dev_if == 0) 
-			|| (sk->bound_dev_if == skb->dev->ifindex))) {
+		if (sk && inet_sk(sk)->num == protocol &&
+		    (!sk->sk_bound_dev_if ||
+		     sk->sk_bound_dev_if == skb->dev->ifindex)) {
 			if (skb->nh.iph->frag_off & htons(IP_MF|IP_OFFSET)) {
 				skb = ip_defrag(skb);
 				if (skb == NULL) {
@@ -225,7 +225,7 @@ static inline int ip_local_deliver_finish(struct sk_buff *skb)
 
 	resubmit:
 		hash = protocol & (MAX_INET_PROTOS - 1);
-		raw_sk = raw_v4_htable[hash];
+		raw_sk = sk_head(&raw_v4_htable[hash]);
 
 		/* If there maybe a raw socket we must check - if not we
 		 * don't care less

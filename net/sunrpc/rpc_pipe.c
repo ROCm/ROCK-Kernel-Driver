@@ -75,6 +75,28 @@ __rpc_purge_current_upcall(struct file *filp)
 		msg->errno = 0;
 }
 
+void
+__rpc_purge_one_upcall(struct file *filp, struct rpc_pipe_msg *target)
+{
+	struct rpc_inode *rpci = RPC_I(filp->f_dentry->d_inode);
+	struct rpc_pipe_msg *msg;
+
+	msg = filp->private_data;
+	if (msg == target) {
+		filp->private_data = NULL;
+		goto found;
+	}
+	list_for_each_entry(msg, &rpci->pipe, list) {
+		if (msg == target) {
+			list_del(&msg->list);
+			goto found;
+		}
+	}
+	BUG();
+found:
+	return;
+}
+
 int
 rpc_queue_upcall(struct inode *inode, struct rpc_pipe_msg *msg)
 {
@@ -82,7 +104,7 @@ rpc_queue_upcall(struct inode *inode, struct rpc_pipe_msg *msg)
 	int res = 0;
 
 	down(&inode->i_sem);
-	if (rpci->nreaders) {
+	if (rpci->nreaders || (rpci->flags & RPC_PIPE_WAIT_FOR_OPEN)) {
 		list_add_tail(&msg->list, &rpci->pipe);
 		rpci->pipelen += msg->len;
 	} else
@@ -149,7 +171,7 @@ rpc_pipe_release(struct inode *inode, struct file *filp)
 	down(&inode->i_sem);
 	if (filp->f_mode & FMODE_READ)
 		rpci->nreaders --;
-	if (!rpci->nreaders)
+	if (!rpci->nreaders && !(rpci->flags & RPC_PIPE_WAIT_FOR_OPEN))
 		__rpc_purge_upcall(inode, -EPIPE);
 	up(&inode->i_sem);
 	return 0;
@@ -273,6 +295,8 @@ rpc_show_info(struct seq_file *m, void *v)
 			clnt->cl_prog, clnt->cl_vers);
 	seq_printf(m, "address: %u.%u.%u.%u\n",
 			NIPQUAD(clnt->cl_xprt->addr.sin_addr.s_addr));
+	seq_printf(m, "protocol: %s\n",
+			clnt->cl_xprt->prot == IPPROTO_UDP ? "udp" : "tcp");
 	return 0;
 }
 
@@ -448,30 +472,37 @@ static void
 rpc_depopulate(struct dentry *parent)
 {
 	struct inode *dir = parent->d_inode;
-	HLIST_HEAD(head);
 	struct list_head *pos, *next;
-	struct dentry *dentry;
+	struct dentry *dentry, *dvec[10];
+	int n = 0;
 
 	down(&dir->i_sem);
+repeat:
 	spin_lock(&dcache_lock);
 	list_for_each_safe(pos, next, &parent->d_subdirs) {
 		dentry = list_entry(pos, struct dentry, d_child);
+		spin_lock(&dentry->d_lock);
 		if (!d_unhashed(dentry)) {
 			dget_locked(dentry);
 			__d_drop(dentry);
-			hlist_add_head(&dentry->d_hash, &head);
-		}
+			spin_unlock(&dentry->d_lock);
+			dvec[n++] = dentry;
+			if (n == ARRAY_SIZE(dvec))
+				break;
+		} else
+			spin_unlock(&dentry->d_lock);
 	}
 	spin_unlock(&dcache_lock);
-	while (!hlist_empty(&head)) {
-		dentry = list_entry(head.first, struct dentry, d_hash);
-		/* Private list, so no dcache_lock needed and use __d_drop */
-		__d_drop(dentry);
-		if (dentry->d_inode) {
-			rpc_inode_setowner(dentry->d_inode, NULL);
-			simple_unlink(dir, dentry);
-		}
-		dput(dentry);
+	if (n) {
+		do {
+			dentry = dvec[--n];
+			if (dentry->d_inode) {
+				rpc_inode_setowner(dentry->d_inode, NULL);
+				simple_unlink(dir, dentry);
+			}
+			dput(dentry);
+		} while (n);
+		goto repeat;
 	}
 	up(&dir->i_sem);
 }
@@ -644,7 +675,7 @@ out_release:
 }
 
 struct dentry *
-rpc_mkpipe(char *path, void *private, struct rpc_pipe_ops *ops)
+rpc_mkpipe(char *path, void *private, struct rpc_pipe_ops *ops, int flags)
 {
 	struct nameidata nd;
 	struct dentry *dentry;
@@ -663,6 +694,7 @@ rpc_mkpipe(char *path, void *private, struct rpc_pipe_ops *ops)
 	d_instantiate(dentry, inode);
 	rpci = RPC_I(inode);
 	rpci->private = private;
+	rpci->flags = flags;
 	rpci->ops = ops;
 	inode_dir_notify(dir, DN_CREATE);
 out:

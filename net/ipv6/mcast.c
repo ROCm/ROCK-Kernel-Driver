@@ -1210,7 +1210,7 @@ static struct sk_buff *mld_newpack(struct net_device *dev, int size)
 		     IPV6_TLV_ROUTERALERT, 2, 0, 0,
 		     IPV6_TLV_PADN, 0 };
 
-	skb = sock_alloc_send_skb(sk, size + dev->hard_header_len+15, 0, &err);
+	skb = sock_alloc_send_skb(sk, size + dev->hard_header_len+15, 1, &err);
 
 	if (skb == 0)
 		return 0;
@@ -1545,7 +1545,7 @@ static void igmp6_send(struct in6_addr *addr, struct net_device *dev, int type)
 	payload_len = len + sizeof(ra);
 	full_len = sizeof(struct ipv6hdr) + payload_len;
 
-	skb = sock_alloc_send_skb(sk, dev->hard_header_len + full_len + 15, 0, &err);
+	skb = sock_alloc_send_skb(sk, dev->hard_header_len + full_len + 15, 1, &err);
 
 	if (skb == NULL)
 		return;
@@ -2176,8 +2176,8 @@ int __init igmp6_init(struct net_proto_family *ops)
 	}
 
 	sk = igmp6_socket->sk;
-	sk->allocation = GFP_ATOMIC;
-	sk->prot->unhash(sk);
+	sk->sk_allocation = GFP_ATOMIC;
+	sk->sk_prot->unhash(sk);
 
 	np = inet6_sk(sk);
 	np->hop_limit = 1;

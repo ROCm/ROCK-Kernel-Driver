@@ -222,6 +222,7 @@ struct bio_pair {
 };
 extern struct bio_pair *bio_split(struct bio *bi, mempool_t *pool,
 				  int first_sectors);
+extern mempool_t *bio_split_pool;
 extern void bio_pair_release(struct bio_pair *dbio);
 
 extern struct bio *bio_alloc(int, int);
@@ -234,7 +235,6 @@ extern inline int bio_hw_segments(struct request_queue *, struct bio *);
 
 extern inline void __bio_clone(struct bio *, struct bio *);
 extern struct bio *bio_clone(struct bio *, int);
-extern struct bio *bio_copy(struct bio *, int, int);
 
 extern inline void bio_init(struct bio *);
 

@@ -36,6 +36,7 @@
 #include <linux/buffer_head.h>
 #include <linux/bio.h>
 #include <linux/notifier.h>
+#include <linux/cpu.h>
 #include <asm/bitops.h>
 
 static void invalidate_bh_lrus(void);
@@ -821,9 +822,6 @@ int __set_page_dirty_buffers(struct page *page)
 		SetPageDirty(page);
 		goto out;
 	}
-
-	if (!PageUptodate(page))
-		buffer_error();
 
 	spin_lock(&mapping->private_lock);
 	if (page_has_buffers(page)) {

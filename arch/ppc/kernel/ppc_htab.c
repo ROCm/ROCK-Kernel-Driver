@@ -30,13 +30,13 @@
 #include <asm/cputable.h>
 #include <asm/system.h>
 
-static ssize_t ppc_htab_read(struct file * file, char * buf,
+static ssize_t ppc_htab_read(struct file * file, char __user * buf,
 			     size_t count, loff_t *ppos);
-static ssize_t ppc_htab_write(struct file * file, const char * buffer,
+static ssize_t ppc_htab_write(struct file * file, const char __user * buffer,
 			      size_t count, loff_t *ppos);
 static long long ppc_htab_lseek(struct file * file, loff_t offset, int orig);
 int proc_dol2crvec(ctl_table *table, int write, struct file *filp,
-		  void *buffer, size_t *lenp);
+		  void __user *buffer, size_t *lenp);
 
 extern PTE *Hash, *Hash_end;
 extern unsigned long Hash_size, Hash_mask;
@@ -109,7 +109,7 @@ static char *pmc2_lookup(unsigned long mmcr0)
  * is _REALLY_ slow (see the nested for loops below) but nothing
  * in here should be really timing critical. -- Cort
  */
-static ssize_t ppc_htab_read(struct file * file, char * buf,
+static ssize_t ppc_htab_read(struct file * file, char __user * buf,
 			     size_t count, loff_t *ppos)
 {
 	unsigned long mmcr0 = 0, pmc1 = 0, pmc2 = 0;
@@ -211,13 +211,19 @@ return_string:
 /*
  * Allow user to define performance counters and resize the hash table
  */
-static ssize_t ppc_htab_write(struct file * file, const char * buffer,
+static ssize_t ppc_htab_write(struct file * file, const char __user * ubuffer,
 			      size_t count, loff_t *ppos)
 {
 #ifdef CONFIG_PPC_STD_MMU
 	unsigned long tmp;
+	char buffer[16];
+
 	if ( current->uid != 0 )
 		return -EACCES;
+	if (strncpy_from_user(buffer, ubuffer, 15))
+		return -EFAULT;
+	buffer[15] = 0;
+
 	/* don't set the htab size for now */
 	if ( !strncmp( buffer, "size ", 5) )
 		return -EBUSY;
@@ -387,9 +393,10 @@ ppc_htab_lseek(struct file * file, loff_t offset, int orig)
 }
 
 int proc_dol2crvec(ctl_table *table, int write, struct file *filp,
-		  void *buffer, size_t *lenp)
+		  void __user *buffer_arg, size_t *lenp)
 {
 	int vleft, first=1, len, left, val;
+	char __user *buffer = (char __user *) buffer_arg;
 	#define TMPBUFLEN 256
 	char buf[TMPBUFLEN], *p;
 	static const char *sizestrings[4] = {
@@ -422,12 +429,12 @@ int proc_dol2crvec(ctl_table *table, int write, struct file *filp,
 		if (write) {
 			while (left) {
 				char c;
-				if(get_user(c,(char *) buffer))
+				if(get_user(c, buffer))
 					return -EFAULT;
 				if (!isspace(c))
 					break;
 				left--;
-				((char *) buffer)++;
+				buffer++;
 			}
 			if (!left)
 				break;
@@ -474,7 +481,7 @@ int proc_dol2crvec(ctl_table *table, int write, struct file *filp,
 			len = strlen(buf);
 			if (len > left)
 				len = left;
-			if(copy_to_user(buffer, buf, len))
+			if (copy_to_user(buffer, buf, len))
 				return -EFAULT;
 			left -= len;
 			buffer += len;

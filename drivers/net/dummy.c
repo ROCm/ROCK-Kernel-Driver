@@ -51,15 +51,9 @@ static int dummy_accept_fastpath(struct net_device *dev, struct dst_entry *dst)
 }
 #endif
 
-static int __init dummy_init(struct net_device *dev)
+static void __init dummy_setup(struct net_device *dev)
 {
 	/* Initialize the device structure. */
-
-	dev->priv = kmalloc(sizeof(struct net_device_stats), GFP_KERNEL);
-	if (dev->priv == NULL)
-		return -ENOMEM;
-	memset(dev->priv, 0, sizeof(struct net_device_stats));
-
 	dev->get_stats = dummy_get_stats;
 	dev->hard_start_xmit = dummy_xmit;
 	dev->set_multicast_list = set_multicast_list;
@@ -72,8 +66,7 @@ static int __init dummy_init(struct net_device *dev)
 	dev->tx_queue_len = 0;
 	dev->flags |= IFF_NOARP;
 	dev->flags &= ~IFF_MULTICAST;
-
-	return 0;
+	SET_MODULE_OWNER(dev);
 }
 
 static int dummy_xmit(struct sk_buff *skb, struct net_device *dev)
@@ -92,32 +85,30 @@ static struct net_device_stats *dummy_get_stats(struct net_device *dev)
 	return dev->priv;
 }
 
-static struct net_device dev_dummy;
+static struct net_device *dev_dummy;
 
 static int __init dummy_init_module(void)
 {
 	int err;
 
-	dev_dummy.init = dummy_init;
-	SET_MODULE_OWNER(&dev_dummy);
+	dev_dummy = alloc_netdev(sizeof(struct net_device_stats),
+				 "dummy%d", dummy_setup);
 
-	/* Find a name for this unit */
-	err=dev_alloc_name(&dev_dummy,"dummy%d");
-	if(err<0)
-		return err;
-	err = register_netdev(&dev_dummy);
-	if (err<0)
-		return err;
-	return 0;
+	if (!dev_dummy)
+		return -ENOMEM;
+
+	if ((err = register_netdev(dev_dummy))) {
+		kfree(dev_dummy);
+		dev_dummy = NULL;
+	}
+	return err;
 }
 
 static void __exit dummy_cleanup_module(void)
 {
-	unregister_netdev(&dev_dummy);
-	kfree(dev_dummy.priv);
-
-	memset(&dev_dummy, 0, sizeof(dev_dummy));
-	dev_dummy.init = dummy_init;
+	unregister_netdev(dev_dummy);
+	kfree(dev_dummy);
+	dev_dummy = NULL;
 }
 
 module_init(dummy_init_module);

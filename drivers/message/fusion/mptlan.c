@@ -1356,16 +1356,16 @@ out:
 }
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
-struct net_device *
+static struct net_device *
 mpt_register_lan_device (MPT_ADAPTER *mpt_dev, int pnum)
 {
-	struct net_device *dev = NULL;
+	struct net_device *dev = alloc_fcdev(sizeof(struct mpt_lan_priv));
 	struct mpt_lan_priv *priv = NULL;
 	u8 HWaddr[FC_ALEN], *a;
 
-	dev = init_fcdev(NULL, sizeof(struct mpt_lan_priv));
 	if (!dev)
-		return (NULL);
+		return NULL;
+
 	dev->mtu = MPT_LAN_MTU;
 
 	priv = (struct mpt_lan_priv *) dev->priv;
@@ -1435,15 +1435,18 @@ mpt_register_lan_device (MPT_ADAPTER *mpt_dev, int pnum)
 
 	SET_MODULE_OWNER(dev);
 
+	if (register_netdev(dev) != 0) {
+		kfree(dev);
+		dev = NULL;
+	}
 	return dev;
 }
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
-int __init
-mpt_lan_init (void)
+static int __init mpt_lan_init (void)
 {
 	struct net_device *dev;
-	MPT_ADAPTER *curadapter;
+	MPT_ADAPTER *p;
 	int i, j;
 
 	show_mptmod_ver(LANAME, LANVER);
@@ -1477,51 +1480,49 @@ mpt_lan_init (void)
 		mpt_landev[j] = NULL;
 	}
 
-	curadapter = mpt_adapter_find_first();
-	while (curadapter != NULL) {
-		for (i = 0; i < curadapter->facts.NumberOfPorts; i++) {
+	for (p = mpt_adapter_find_first(); p; p = mpt_adapter_find_next(p)) {
+		for (i = 0; i < p->facts.NumberOfPorts; i++) {
 			printk (KERN_INFO MYNAM ": %s: PortNum=%x, ProtocolFlags=%02Xh (%c%c%c%c)\n",
-					curadapter->name,
-					curadapter->pfacts[i].PortNumber,
-					curadapter->pfacts[i].ProtocolFlags,
-					MPT_PROTOCOL_FLAGS_c_c_c_c(curadapter->pfacts[i].ProtocolFlags));
+					p->name,
+					p->pfacts[i].PortNumber,
+					p->pfacts[i].ProtocolFlags,
+					MPT_PROTOCOL_FLAGS_c_c_c_c(p->pfacts[i].ProtocolFlags));
 
-			if (curadapter->pfacts[i].ProtocolFlags & MPI_PORTFACTS_PROTOCOL_LAN) {
-				dev = mpt_register_lan_device (curadapter, i);
-				if (dev != NULL) {
-					printk (KERN_INFO MYNAM ": %s: Fusion MPT LAN device registered as '%s'\n",
-							curadapter->name, dev->name);
-					printk (KERN_INFO MYNAM ": %s/%s: LanAddr = %02X:%02X:%02X:%02X:%02X:%02X\n",
-							IOC_AND_NETDEV_NAMES_s_s(dev),
-							dev->dev_addr[0], dev->dev_addr[1],
-							dev->dev_addr[2], dev->dev_addr[3],
-							dev->dev_addr[4], dev->dev_addr[5]);
+			if (!(p->pfacts[i].ProtocolFlags & MPI_PORTFACTS_PROTOCOL_LAN)) {
+				printk (KERN_INFO MYNAM ": %s: Hmmm... LAN protocol seems to be disabled on this adapter port!\n",
+						p->name);
+				continue;
+			}
+
+			dev = mpt_register_lan_device (p, i);
+			if (!dev) {
+				printk (KERN_ERR MYNAM ": %s: Unable to register port%d as a LAN device\n",
+						p->name,
+						p->pfacts[i].PortNumber);
+			}
+			printk (KERN_INFO MYNAM ": %s: Fusion MPT LAN device registered as '%s'\n",
+					p->name, dev->name);
+			printk (KERN_INFO MYNAM ": %s/%s: LanAddr = %02X:%02X:%02X:%02X:%02X:%02X\n",
+					IOC_AND_NETDEV_NAMES_s_s(dev),
+					dev->dev_addr[0], dev->dev_addr[1],
+					dev->dev_addr[2], dev->dev_addr[3],
+					dev->dev_addr[4], dev->dev_addr[5]);
 //					printk (KERN_INFO MYNAM ": %s/%s: Max_TX_outstanding = %d\n",
 //							IOC_AND_NETDEV_NAMES_s_s(dev),
 //							NETDEV_TO_LANPRIV_PTR(dev)->tx_max_out);
-					j = curadapter->id;
-					mpt_landev[j] = dev;
-					dlprintk((KERN_INFO MYNAM "/init: dev_addr=%p, mpt_landev[%d]=%p\n",
-							dev, j,  mpt_landev[j]));
+			j = p->id;
+			mpt_landev[j] = dev;
+			dlprintk((KERN_INFO MYNAM "/init: dev_addr=%p, mpt_landev[%d]=%p\n",
+					dev, j,  mpt_landev[j]));
 
-				} else {
-					printk (KERN_ERR MYNAM ": %s: Unable to register port%d as a LAN device\n",
-							curadapter->name,
-							curadapter->pfacts[i].PortNumber);
-				}
-			} else {
-				printk (KERN_INFO MYNAM ": %s: Hmmm... LAN protocol seems to be disabled on this adapter port!\n",
-						curadapter->name);
-			}
 		}
-		curadapter = mpt_adapter_find_next(curadapter);
 	}
 
 	return 0;
 }
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
-static void mpt_lan_exit(void)
+static void __exit mpt_lan_exit(void)
 {
 	int i;
 
@@ -1532,7 +1533,7 @@ static void mpt_lan_exit(void)
 
 		printk (KERN_INFO ": %s/%s: Fusion MPT LAN device unregistered\n",
 			       IOC_AND_NETDEV_NAMES_s_s(dev));
-		unregister_fcdev(dev);
+		unregister_netdev(dev);
 		//mpt_landev[i] = (struct net_device *) 0xdeadbeef; /* Debug */
 		mpt_landev[i] = NULL;
 	}

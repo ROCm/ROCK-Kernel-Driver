@@ -35,6 +35,7 @@
 #include <linux/console.h>
 #include <linux/root_dev.h>
 #include <linux/highmem.h>
+#include <linux/module.h>
 #include <video/edid.h>
 #include <asm/e820.h>
 #include <asm/mpspec.h>
@@ -58,6 +59,7 @@ struct cpuinfo_x86 new_cpu_data __initdata = { 0, 0, 0, 0, -1, 1, 0, 0, -1 };
 struct cpuinfo_x86 boot_cpu_data = { 0, 0, 0, 0, -1, 1, 0, 0, -1 };
 
 unsigned long mmu_cr4_features;
+EXPORT_SYMBOL_GPL(mmu_cr4_features);
 
 int acpi_disabled __initdata = 0;
 
@@ -977,6 +979,9 @@ void __init setup_arch(char **cmdline_p)
 #ifdef CONFIG_X86_LOCAL_APIC
 	if (smp_found_config)
 		get_smp_config();
+#endif
+#ifdef CONFIG_X86_SUMMIT
+	setup_summit();
 #endif
 
 	register_memory(max_low_pfn);

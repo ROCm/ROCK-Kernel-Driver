@@ -192,9 +192,6 @@ static int snd_gus_synth_create_port(snd_gus_card_t * gus, int idx)
 	p->chset->port = snd_seq_event_port_attach(gus->gf1.seq_client,
 						   &callbacks,
 						   SNDRV_SEQ_PORT_CAP_WRITE | SNDRV_SEQ_PORT_CAP_SUBS_WRITE,
-						   SNDRV_SEQ_PORT_TYPE_MIDI_GENERIC |
-						   SNDRV_SEQ_PORT_TYPE_MIDI_GM |
-						   SNDRV_SEQ_PORT_TYPE_MIDI_GS |
 						   SNDRV_SEQ_PORT_TYPE_DIRECT_SAMPLE |
 						   SNDRV_SEQ_PORT_TYPE_SYNTH,
 						   16, 0,

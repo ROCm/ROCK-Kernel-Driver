@@ -1751,30 +1751,29 @@ lcs_new_device(struct ccwgroup_device *ccwgdev)
 #ifdef CONFIG_NET_ETHERNET
 	case LCS_FRAME_TYPE_ENET:
 		card->lan_type_trans = eth_type_trans;
-		dev = init_etherdev(NULL,0);
+		dev = alloc_etherdev(0);
 		break;
 #endif
 #ifdef CONFIG_TR
 	case LCS_FRAME_TYPE_TR:
 		card->lan_type_trans = tr_type_trans;
-		dev = init_trdev(NULL,0);
+		dev = alloc_trdev(0);
 		break;
 #endif
 #ifdef CONFIG_FDDI
 	case LCS_FRAME_TYPE_FDDI:
 		card->lan_type_trans = fddi_type_trans;
-		dev = init_fddidev(NULL,0);
+		dev = alloc_fddidev(0);
 		break;
 #endif
 	default:
 		LCS_DBF_TEXT(3, setup, "errinit");
 		PRINT_ERR("LCS: Initialization failed\n");
 		PRINT_ERR("LCS: No device found!\n");
-		lcs_cleanup_channel(&card->read);
-		lcs_cleanup_channel(&card->write);
-		lcs_free_card(card);
-		return -ENODEV;
+		goto out;
 	}
+	if (!dev)
+		goto out;
 	memcpy(dev->dev_addr, card->mac, LCS_MAC_LENGTH);
 	card->dev = dev;
 	dev->priv = card;
@@ -1787,9 +1786,16 @@ lcs_new_device(struct ccwgroup_device *ccwgdev)
 #endif
 	dev->get_stats = lcs_getstats;
 	SET_MODULE_OWNER(&tun->dev);
+	if (register_netdev(dev) != 0)
+		goto out;
 	netif_stop_queue(dev);
 	lcs_stopcard(card);
 	return 0;
+out:
+	lcs_cleanup_channel(&card->read);
+	lcs_cleanup_channel(&card->write);
+	lcs_free_card(card);
+	return -ENODEV;
 }
 
 /**

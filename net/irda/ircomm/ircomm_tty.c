@@ -74,14 +74,30 @@ static void ircomm_tty_flow_indication(void *instance, void *sap,
 static int ircomm_tty_read_proc(char *buf, char **start, off_t offset, int len,
 				int *eof, void *unused);
 #endif /* CONFIG_PROC_FS */
-static struct tty_driver driver;
-static int ircomm_tty_refcount;       /* If we manage several devices */
-
-static struct tty_struct *ircomm_tty_table[NR_PTYS];
-static struct termios *ircomm_tty_termios[NR_PTYS];
-static struct termios *ircomm_tty_termios_locked[NR_PTYS];
+static struct tty_driver *driver;
 
 hashbin_t *ircomm_tty = NULL;
+
+static struct tty_operations ops = {
+	.open            = ircomm_tty_open,
+	.close           = ircomm_tty_close,
+	.write           = ircomm_tty_write,
+	.write_room      = ircomm_tty_write_room,
+	.chars_in_buffer = ircomm_tty_chars_in_buffer,
+	.flush_buffer    = ircomm_tty_flush_buffer,
+	.ioctl           = ircomm_tty_ioctl,
+	.throttle        = ircomm_tty_throttle,
+	.unthrottle      = ircomm_tty_unthrottle,
+	.send_xchar      = ircomm_tty_send_xchar,
+	.set_termios     = ircomm_tty_set_termios,
+	.stop            = ircomm_tty_stop,
+	.start           = ircomm_tty_start,
+	.hangup          = ircomm_tty_hangup,
+	.wait_until_sent = ircomm_tty_wait_until_sent,
+#ifdef CONFIG_PROC_FS
+	.read_proc       = ircomm_tty_read_proc,
+#endif /* CONFIG_PROC_FS */
+};
 
 /*
  * Function ircomm_tty_init()
@@ -90,49 +106,30 @@ hashbin_t *ircomm_tty = NULL;
  *
  */
 int __init ircomm_tty_init(void)
-{	
+{
+	driver = alloc_tty_driver(IRCOMM_TTY_PORTS);
+	if (!driver)
+		return -ENOMEM;
 	ircomm_tty = hashbin_new(HB_LOCK); 
 	if (ircomm_tty == NULL) {
 		ERROR("%s(), can't allocate hashbin!\n", __FUNCTION__);
+		put_tty_driver(driver);
 		return -ENOMEM;
 	}
 
-	memset(&driver, 0, sizeof(struct tty_driver));
-	driver.magic           = TTY_DRIVER_MAGIC;
-	driver.driver_name     = "ircomm";
-	driver.name            = "ircomm";
-	driver.major           = IRCOMM_TTY_MAJOR;
-	driver.minor_start     = IRCOMM_TTY_MINOR;
-	driver.num             = IRCOMM_TTY_PORTS;
-	driver.type            = TTY_DRIVER_TYPE_SERIAL;
-	driver.subtype         = SERIAL_TYPE_NORMAL;
-	driver.init_termios    = tty_std_termios;
-	driver.init_termios.c_cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
-	driver.flags           = TTY_DRIVER_REAL_RAW;
-	driver.refcount        = &ircomm_tty_refcount;
-	driver.table           = ircomm_tty_table;
-	driver.termios         = ircomm_tty_termios;
-	driver.termios_locked  = ircomm_tty_termios_locked;
-	driver.open            = ircomm_tty_open;
-	driver.close           = ircomm_tty_close;
-	driver.write           = ircomm_tty_write;
-	driver.write_room      = ircomm_tty_write_room;
-	driver.chars_in_buffer = ircomm_tty_chars_in_buffer;
-	driver.flush_buffer    = ircomm_tty_flush_buffer;
-	driver.ioctl           = ircomm_tty_ioctl;
-	driver.throttle        = ircomm_tty_throttle;
-	driver.unthrottle      = ircomm_tty_unthrottle;
-	driver.send_xchar      = ircomm_tty_send_xchar;
-	driver.set_termios     = ircomm_tty_set_termios;
-	driver.stop            = ircomm_tty_stop;
-	driver.start           = ircomm_tty_start;
-	driver.hangup          = ircomm_tty_hangup;
-	driver.wait_until_sent = ircomm_tty_wait_until_sent;
-#ifdef CONFIG_PROC_FS
-	driver.read_proc       = ircomm_tty_read_proc;
-#endif /* CONFIG_PROC_FS */
-	if (tty_register_driver(&driver)) {
+	driver->driver_name     = "ircomm";
+	driver->name            = "ircomm";
+	driver->major           = IRCOMM_TTY_MAJOR;
+	driver->minor_start     = IRCOMM_TTY_MINOR;
+	driver->type            = TTY_DRIVER_TYPE_SERIAL;
+	driver->subtype         = SERIAL_TYPE_NORMAL;
+	driver->init_termios    = tty_std_termios;
+	driver->init_termios.c_cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
+	driver->flags           = TTY_DRIVER_REAL_RAW;
+	tty_set_operations(driver, &ops);
+	if (tty_register_driver(driver)) {
 		ERROR("%s(): Couldn't register serial driver\n", __FUNCTION__);
+		put_tty_driver(driver);
 		return -1;
 	}
 	return 0;
@@ -163,13 +160,14 @@ void __exit ircomm_tty_cleanup(void)
 
 	IRDA_DEBUG(4, "%s()\n", __FUNCTION__ );	
 
-	ret = tty_unregister_driver(&driver);
+	ret = tty_unregister_driver(driver);
         if (ret) {
                 ERROR("%s(), failed to unregister driver\n", __FUNCTION__);
 		return;
 	}
 
 	hashbin_delete(ircomm_tty, (FREE_FUNC) __ircomm_tty_cleanup);
+	put_tty_driver(driver);
 }
 
 /*
@@ -248,48 +246,20 @@ static int ircomm_tty_block_til_ready(struct ircomm_tty_cb *self,
 
 	tty = self->tty;
 
-	if (tty->driver->subtype == SERIAL_TYPE_CALLOUT) {
-		/* this is a callout device */
-		/* just verify that normal device is not in use */
-		if (self->flags & ASYNC_NORMAL_ACTIVE)
-			return -EBUSY;
-		if ((self->flags & ASYNC_CALLOUT_ACTIVE) &&
-		    (self->flags & ASYNC_SESSION_LOCKOUT) &&
-		    (self->session != current->session))
-			return -EBUSY;
-		if ((self->flags & ASYNC_CALLOUT_ACTIVE) &&
-		    (self->flags & ASYNC_PGRP_LOCKOUT) &&
-		    (self->pgrp != current->pgrp))
-			return -EBUSY;
-		self->flags |= ASYNC_CALLOUT_ACTIVE;
-		return 0;
-	}
-	
 	/*
 	 * If non-blocking mode is set, or the port is not enabled,
 	 * then make the check up front and then exit.
 	 */	
 	if (filp->f_flags & O_NONBLOCK || tty->flags & (1 << TTY_IO_ERROR)){
 		/* nonblock mode is set or port is not enabled */
-		/* just verify that callout device is not active */
-		if (self->flags & ASYNC_CALLOUT_ACTIVE)
-			return -EBUSY;
 		self->flags |= ASYNC_NORMAL_ACTIVE;
-
 		IRDA_DEBUG(1, "%s(), O_NONBLOCK requested!\n", __FUNCTION__ );
 		return 0;
 	}
 
-	if (self->flags & ASYNC_CALLOUT_ACTIVE) {
-		if (self->normal_termios.c_cflag & CLOCAL) {
-			IRDA_DEBUG(1, "%s(), doing CLOCAL!\n", __FUNCTION__ );
-			do_clocal = 1;
-		}
-	} else {
-		if (tty->termios->c_cflag & CLOCAL) {
-			IRDA_DEBUG(1, "%s(), doing CLOCAL!\n", __FUNCTION__ );
-			do_clocal = 1;
-		}
+	if (tty->termios->c_cflag & CLOCAL) {
+		IRDA_DEBUG(1, "%s(), doing CLOCAL!\n", __FUNCTION__ );
+		do_clocal = 1;
 	}
 	
 	/* Wait for carrier detect and the line to become
@@ -315,8 +285,7 @@ static int ircomm_tty_block_til_ready(struct ircomm_tty_cb *self,
 	self->blocked_open++;
 	
 	while (1) {
-		if (!(self->flags & ASYNC_CALLOUT_ACTIVE) &&
- 		    (tty->termios->c_cflag & CBAUD)) {
+		if (tty->termios->c_cflag & CBAUD) {
 			/* Here, we use to lock those two guys, but
 			 * as ircomm_param_request() does it itself,
 			 * I don't see the point (and I see the deadlock).
@@ -339,8 +308,7 @@ static int ircomm_tty_block_til_ready(struct ircomm_tty_cb *self,
 		 * specified, we cannot return before the IrCOMM link is
 		 * ready 
 		 */
- 		if (!(self->flags & ASYNC_CALLOUT_ACTIVE) &&
- 		    !(self->flags & ASYNC_CLOSING) &&
+ 		if (!(self->flags & ASYNC_CLOSING) &&
  		    (do_clocal || (self->settings.dce & IRCOMM_CD)) &&
 		    self->state == IRCOMM_TTY_READY)
 		{
@@ -509,10 +477,6 @@ static int ircomm_tty_open(struct tty_struct *tty, struct file *filp)
 
 		return ret;
 	}
-
-	self->session = current->session;
-	self->pgrp = current->pgrp;
-
 	return 0;
 }
 
@@ -605,8 +569,7 @@ static void ircomm_tty_close(struct tty_struct *tty, struct file *filp)
 		wake_up_interruptible(&self->open_wait);
 	}
 
-	self->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CALLOUT_ACTIVE|
-			 ASYNC_CLOSING);
+	self->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CLOSING);
 	wake_up_interruptible(&self->close_wait);
 
 	MOD_DEC_USE_COUNT;
@@ -1054,7 +1017,7 @@ static void ircomm_tty_hangup(struct tty_struct *tty)
 
 	/* I guess we need to lock here - Jean II */
 	spin_lock_irqsave(&self->spinlock, flags);
-	self->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CALLOUT_ACTIVE);
+	self->flags &= ~ASYNC_NORMAL_ACTIVE;
 	self->tty = 0;
 	self->open_count = 0;
 	spin_unlock_irqrestore(&self->spinlock, flags);
@@ -1133,9 +1096,7 @@ void ircomm_tty_check_modem_status(struct ircomm_tty_cb *self)
 
 		if (status & IRCOMM_CD) {
 			wake_up_interruptible(&self->open_wait);
-		} else if (!((self->flags & ASYNC_CALLOUT_ACTIVE) &&
-			   (self->flags & ASYNC_CALLOUT_NOHUP))) 
-		{
+		} else {
 			IRDA_DEBUG(2, 
 				   "%s(), Doing serial hangup..\n", __FUNCTION__ );
 			if (tty)
@@ -1364,8 +1325,6 @@ static int ircomm_tty_line_info(struct ircomm_tty_cb *self, char *buf)
 		ret += sprintf(buf+ret, "ASYNC_CLOSING|");
 	if (self->flags & ASYNC_NORMAL_ACTIVE)
 		ret += sprintf(buf+ret, "ASYNC_NORMAL_ACTIVE|");
-	if (self->flags & ASYNC_CALLOUT_ACTIVE)
-		ret += sprintf(buf+ret, "ASYNC_CALLOUT_ACTIVE|");
 	if (self->flags)
 		ret--; /* remove the last | */
 	ret += sprintf(buf+ret, "\n");

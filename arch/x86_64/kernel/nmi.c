@@ -8,6 +8,8 @@
  *  Fixes:
  *  Mikael Pettersson	: AMD K7 support for local APIC NMI watchdog.
  *  Mikael Pettersson	: Power Management for local APIC NMI watchdog.
+ *  Pavel Machek and
+ *  Mikael Pettersson	: PM converted to driver model. Disable/enable API.
  */
 
 #include <linux/config.h>
@@ -19,6 +21,8 @@
 #include <linux/interrupt.h>
 #include <linux/mc146818rtc.h>
 #include <linux/kernel_stat.h>
+#include <linux/module.h>
+#include <linux/sysdev.h>
 
 #include <asm/smp.h>
 #include <asm/mtrr.h>
@@ -113,14 +117,18 @@ static int __init setup_nmi_watchdog(char *str)
 
 __setup("nmi_watchdog=", setup_nmi_watchdog);
 
-#ifdef CONFIG_PM
+/* nmi_active:
+ * +1: the lapic NMI watchdog is active, but can be disabled
+ *  0: the lapic NMI watchdog has not been set up, and cannot
+ *     be enabled
+ * -1: the lapic NMI watchdog is disabled, but can be enabled
+ */
+static int nmi_active;
 
-#include <linux/pm.h>
-
-struct pm_dev *nmi_pmdev;
-
-static void disable_apic_nmi_watchdog(void)
+void disable_lapic_nmi_watchdog(void)
 {
+	if (nmi_active <= 0)
+		return;
 	switch (boot_cpu_data.x86_vendor) {
 	case X86_VENDOR_AMD:
 		wrmsr(MSR_K7_EVNTSEL0, 0, 0);
@@ -129,46 +137,61 @@ static void disable_apic_nmi_watchdog(void)
 		wrmsr(MSR_IA32_EVNTSEL0, 0, 0);
 		break;
 	}
+	nmi_active = -1;
+	/* tell do_nmi() and others that we're not active any more */
+	nmi_watchdog = 0;
 }
-
-static int nmi_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data)
-{
-	switch (rqst) {
-	case PM_SUSPEND:
-		disable_apic_nmi_watchdog();
-		break;
-	case PM_RESUME:
+void enable_lapic_nmi_watchdog(void)
+  {
+	if (nmi_active < 0) {
+		nmi_watchdog = NMI_LOCAL_APIC;
 		setup_apic_nmi_watchdog();
-		break;
 	}
+  }
+
+#ifdef CONFIG_PM
+
+#include <linux/device.h>
+
+static int lapic_nmi_suspend(struct sys_device *dev, u32 state)
+{
+	disable_lapic_nmi_watchdog();
 	return 0;
 }
 
-struct pm_dev * set_nmi_pm_callback(pm_callback callback)
+static int lapic_nmi_resume(struct sys_device *dev)
 {
-	apic_pm_unregister(nmi_pmdev);
-	return apic_pm_register(PM_SYS_DEV, 0, callback);
+#if 0
+	enable_lapic_nmi_watchdog();
+#endif
+	return 0;
 }
 
-void unset_nmi_pm_callback(struct pm_dev * dev)
+static struct sysdev_class nmi_sysclass = {
+	set_kset_name("lapic_nmi"),
+	.resume		= lapic_nmi_resume,
+	.suspend	= lapic_nmi_suspend,
+};
+
+static struct sys_device device_lapic_nmi = {
+	.id		= 0,
+	.cls	= &nmi_sysclass,
+};
+
+static int __init init_lapic_nmi_sysfs(void)
 {
-	apic_pm_unregister(dev);
-	nmi_pmdev = apic_pm_register(PM_SYS_DEV, 0, nmi_pm_callback);
+	int error;
+
+	if (nmi_active == 0)
+		return 0;
+
+	error = sysdev_class_register(&nmi_sysclass);
+	if (!error)
+		error = sys_device_register(&device_lapic_nmi);
+	return error;
 }
-
-static void nmi_pm_init(void)
-{
-	if (!nmi_pmdev)
-		nmi_pmdev = apic_pm_register(PM_SYS_DEV, 0, nmi_pm_callback);
-}
-
-#define __pminit	/*empty*/
-
-#else	/* CONFIG_PM */
-
-static inline void nmi_pm_init(void) { }
-
-#define __pminit	__init
+/* must come after the local APIC's device_initcall() */
+late_initcall(init_lapic_nmi_sysfs);
 
 #endif	/* CONFIG_PM */
 
@@ -217,7 +240,7 @@ void setup_apic_nmi_watchdog (void)
 	default:
 		return;
 	}
-	nmi_pm_init();
+	nmi_active = 1;
 }
 
 static spinlock_t nmi_print_lock = SPIN_LOCK_UNLOCKED;
@@ -261,7 +284,6 @@ void nmi_watchdog_tick (struct pt_regs * regs, unsigned reason)
 	int sum, cpu = safe_smp_processor_id();
 
 	sum = read_pda(apic_timer_irqs);
-
 	if (last_irq_sums[cpu] == sum) {
 		/*
 		 * Ayiee, looks like this CPU is stuck ...
@@ -306,18 +328,11 @@ asmlinkage void do_nmi(struct pt_regs * regs, long error_code)
 {
 	int cpu = safe_smp_processor_id();
 
-	init_tss[cpu].ist[NMI_STACK] -= 2048;	/* this shouldn't be needed. */	
-
 	nmi_enter();
-
 	add_pda(__nmi_count,1);
-
 	if (!nmi_callback(regs, cpu))
 		default_do_nmi(regs);
-	
 	nmi_exit();
-
-	init_tss[cpu].ist[NMI_STACK] += 2048;
 }
 
 void set_nmi_callback(nmi_callback_t callback)
@@ -329,3 +344,7 @@ void unset_nmi_callback(void)
 {
 	nmi_callback = dummy_nmi_callback;
 }
+
+EXPORT_SYMBOL(nmi_watchdog);
+EXPORT_SYMBOL(disable_lapic_nmi_watchdog);
+EXPORT_SYMBOL(enable_lapic_nmi_watchdog);

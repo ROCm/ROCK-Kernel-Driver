@@ -366,8 +366,8 @@ do_sys_ptrace(long request, long pid, long addr, long data,
 		ret = -EIO;
 		if ((unsigned long) data > _NSIG)
 			break;
-		/* Set single stepping.  */
-		ptrace_set_bpt(child);
+		/* Mark single stepping.  */
+		child->thread_info->bpt_nsaved = -1;
 		clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
 		wake_up_process(child);
 		child->exit_code = data;

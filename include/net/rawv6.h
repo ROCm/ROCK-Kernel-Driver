@@ -4,7 +4,7 @@
 #ifdef __KERNEL__
 
 #define RAWV6_HTABLE_SIZE	MAX_INET_PROTOS
-extern struct sock *raw_v6_htable[RAWV6_HTABLE_SIZE];
+extern struct hlist_head raw_v6_htable[RAWV6_HTABLE_SIZE];
 extern rwlock_t raw_v6_lock;
 
 extern void ipv6_raw_deliver(struct sk_buff *skb, int nexthdr);

@@ -196,7 +196,7 @@ static struct hw_interrupt_type piix4_virtual_irq_type = {
  * enable_irq gets the right irq. This 'master' irq is never directly
  * manipulated by any driver.
  */
-static void piix4_master_intr(int irq, void *dev_id, struct pt_regs * regs)
+static irqreturn_t piix4_master_intr(int irq, void *dev_id, struct pt_regs * regs)
 {
 	int realirq;
 	irq_desc_t *desc;
@@ -254,11 +254,11 @@ static void piix4_master_intr(int irq, void *dev_id, struct pt_regs * regs)
 	if (!(desc->status & IRQ_DISABLED))
 		enable_8259A_irq(realirq);
 
-	return;
+	return IRQ_HANDLED;
 
 out_unlock:
 	spin_unlock_irqrestore(&i8259A_lock, flags);
-	return;
+	return IRQ_NONE;
 }
 
 static struct irqaction master_action = {

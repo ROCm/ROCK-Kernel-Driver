@@ -1,9 +1,6 @@
 #include <asm-generic/vmlinux.lds.h>
 
 OUTPUT_ARCH(powerpc)
-SEARCH_DIR(/lib); SEARCH_DIR(/usr/lib); SEARCH_DIR(/usr/local/lib); SEARCH_DIR(/usr/local/powerpc-any-elf/lib);
-/* Do we need any of these for elf?
-   __DYNAMIC = 0;    */
 jiffies = jiffies_64 + 4;
 SECTIONS
 {
@@ -53,6 +50,10 @@ SECTIONS
   __start___ex_table = .;
   __ex_table : { *(__ex_table) }
   __stop___ex_table = .;
+
+  __start___bug_table = .;
+  __bug_table : { *(__bug_table) }
+  __stop___bug_table = .;
 
   /* Read-write section, merged into data segment: */
   . = ALIGN(4096);
@@ -115,6 +116,8 @@ SECTIONS
   .con_initcall.init : { *(.con_initcall.init) }
   __con_initcall_end = .;
 
+  SECURITY_INIT
+
   __start___ftr_fixup = .;
   __ftr_fixup : { *(__ftr_fixup) }
   __stop___ftr_fixup = .;
@@ -172,4 +175,9 @@ SECTIONS
 
   _end = . ;
   PROVIDE (end = .);
+
+  /* Sections to be discarded. */
+  /DISCARD/ : {
+    *(.exitcall.exit)
+  }
 }

@@ -2,6 +2,7 @@
  * Default generic APIC driver. This handles upto 8 CPUs.
  */
 #define APIC_DEFINITION 1
+#include <asm/mach-default/mach_apicdef.h>
 #include <asm/genapic.h>
 #include <asm/fixmap.h>
 #include <asm/apicdef.h>
@@ -10,7 +11,6 @@
 #include <linux/smp.h>
 #include <linux/init.h>
 #include <asm/mach-default/mach_apic.h>
-#include <asm/mach-default/mach_apicdef.h>
 #include <asm/mach-default/mach_ipi.h>
 #include <asm/mach-default/mach_mpparse.h>
 

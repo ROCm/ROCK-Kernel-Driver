@@ -139,6 +139,35 @@ int ide_end_request (ide_drive_t *drive, int uptodate, int nr_sectors)
 EXPORT_SYMBOL(ide_end_request);
 
 /**
+ *	ide_complete_pm_request - end the current Power Management request
+ *	@drive: target drive
+ *	@rq: request
+ *
+ *	This function cleans up the current PM request and stops the queue
+ *	if necessary.
+ */
+static void ide_complete_pm_request (ide_drive_t *drive, struct request *rq)
+{
+	unsigned long flags;
+
+#ifdef DEBUG_PM
+	printk("%s: completing PM request, %s\n", drive->name,
+	       blk_pm_suspend_request(rq) ? "suspend" : "resume");
+#endif
+	spin_lock_irqsave(&ide_lock, flags);
+	if (blk_pm_suspend_request(rq)) {
+		blk_stop_queue(&drive->queue);
+	} else {
+		drive->blocked = 0;
+		blk_start_queue(&drive->queue);
+	}
+	blkdev_dequeue_request(rq);
+	HWGROUP(drive)->rq = NULL;
+	end_that_request_last(rq);
+	spin_unlock_irqrestore(&ide_lock, flags);
+}
+
+/**
  *	ide_end_drive_cmd	-	end an explicit drive command
  *	@drive: command 
  *	@stat: status bits
@@ -214,6 +243,15 @@ void ide_end_drive_cmd (ide_drive_t *drive, u8 stat, u8 err)
 				args->hobRegister[IDE_HCYL_OFFSET_HOB]    = hwif->INB(IDE_HCYL_REG);
 			}
 		}
+	} else if (blk_pm_request(rq)) {
+#ifdef DEBUG_PM
+		printk("%s: complete_power_step(step: %d, stat: %x, err: %x)\n",
+			drive->name, rq->pm->pm_step, stat, err);
+#endif
+		DRIVER(drive)->complete_power_step(drive, rq, stat, err);
+		if (rq->pm->pm_step == ide_pm_state_completed)
+			ide_complete_pm_request(drive, rq);
+		return;
 	}
 
 	spin_lock_irqsave(&ide_lock, flags);
@@ -615,6 +653,34 @@ ide_startstop_t start_request (ide_drive_t *drive, struct request *rq)
 	while ((read_timer() - HWIF(drive)->last_time) < DISK_RECOVERY_TIME);
 #endif
 
+	if (blk_pm_suspend_request(rq) &&
+	    rq->pm->pm_step == ide_pm_state_start_suspend)
+		/* Mark drive blocked when starting the suspend sequence. */
+		drive->blocked = 1;
+	else if (blk_pm_resume_request(rq) &&
+		 rq->pm->pm_step == ide_pm_state_start_resume) {
+		/* 
+		 * The first thing we do on wakeup is to wait for BSY bit to
+		 * go away (with a looong timeout) as a drive on this hwif may
+		 * just be POSTing itself.
+		 * We do that before even selecting as the "other" device on
+		 * the bus may be broken enough to walk on our toes at this
+		 * point.
+		 */
+		int rc;
+#ifdef DEBUG_PM
+		printk("%s: Wakeup request inited, waiting for !BSY...\n", drive->name);
+#endif
+		rc = ide_wait_not_busy(HWIF(drive), 35000);
+		if (rc)
+			printk(KERN_WARNING "%s: bus not ready on wakeup\n", drive->name);
+		SELECT_DRIVE(drive);
+		HWIF(drive)->OUTB(8, HWIF(drive)->io_ports[IDE_CONTROL_OFFSET]);
+		rc = ide_wait_not_busy(HWIF(drive), 10000);
+		if (rc)
+			printk(KERN_WARNING "%s: drive not ready on wakeup\n", drive->name);
+	}
+
 	SELECT_DRIVE(drive);
 	if (ide_wait_stat(&startstop, drive, drive->ready_stat, BUSY_STAT|DRQ_STAT, WAIT_READY)) {
 		printk(KERN_ERR "%s: drive not ready for command\n", drive->name);
@@ -625,6 +691,17 @@ ide_startstop_t start_request (ide_drive_t *drive, struct request *rq)
 			return execute_drive_cmd(drive, rq);
 		else if (rq->flags & REQ_DRIVE_TASKFILE)
 			return execute_drive_cmd(drive, rq);
+		else if (blk_pm_request(rq)) {
+#ifdef DEBUG_PM
+			printk("%s: start_power_step(step: %d)\n",
+				drive->name, rq->pm->pm_step);
+#endif
+			startstop = DRIVER(drive)->start_power_step(drive, rq);
+			if (startstop == ide_stopped &&
+			    rq->pm->pm_step == ide_pm_state_completed)
+				ide_complete_pm_request(drive, rq);
+			return startstop;
+		}
 		return (DRIVER(drive)->do_request(drive, rq, block));
 	}
 	return do_special(drive);
@@ -834,6 +911,28 @@ queue_next:
 		rq = elv_next_request(&drive->queue);
 		if (!rq) {
 			hwgroup->busy = !!ata_pending_commands(drive);
+			break;
+		}
+
+		/*
+		 * Sanity: don't accept a request that isn't a PM request
+		 * if we are currently power managed. This is very important as
+		 * blk_stop_queue() doesn't prevent the elv_next_request()
+		 * above to return us whatever is in the queue. Since we call
+		 * ide_do_request() ourselves, we end up taking requests while
+		 * the queue is blocked...
+		 * 
+		 * We let requests forced at head of queue with ide-preempt
+		 * though. I hope that doesn't happen too much, hopefully not
+		 * unless the subdriver triggers such a thing in it's own PM
+		 * state machine.
+		 */
+		if (drive->blocked && !blk_pm_request(rq) && !(rq->flags & REQ_PREEMPT)) {
+#ifdef DEBUG_PM
+			printk("%s: a request made it's way while we are power managing...\n", drive->name);
+#endif
+			/* We clear busy, there should be no pending ATA command at this point. */
+			hwgroup->busy = 0;
 			break;
 		}
 
@@ -1282,12 +1381,16 @@ int ide_do_drive_cmd (ide_drive_t *drive, struct request *rq, ide_action_t actio
 	ide_hwgroup_t *hwgroup = HWGROUP(drive);
 	DECLARE_COMPLETION(wait);
 	int insert_end = 1, err;
+	int must_wait = (action == ide_wait || action == ide_head_wait);
 
 #ifdef CONFIG_BLK_DEV_PDC4030
 	/*
 	 *	FIXME: there should be a drive or hwif->special
 	 *	handler that points here by default, not hacks
 	 *	in the ide-io.c code
+	 *
+	 *	FIXME2: That code breaks power management if used with
+	 *	this chipset, that really doesn't belong here !
 	 */
 	if (HWIF(drive)->chipset == ide_pdc4030 && rq->buffer != NULL)
 		return -ENOSYS;  /* special drive cmds not supported */
@@ -1301,22 +1404,23 @@ int ide_do_drive_cmd (ide_drive_t *drive, struct request *rq, ide_action_t actio
 	 * we need to hold an extra reference to request for safe inspection
 	 * after completion
 	 */
-	if (action == ide_wait) {
+	if (must_wait) {
 		rq->ref_count++;
 		rq->waiting = &wait;
 	}
 
 	spin_lock_irqsave(&ide_lock, flags);
-	if (action == ide_preempt) {
+	if (action == ide_preempt || action == ide_head_wait) {
 		hwgroup->rq = NULL;
 		insert_end = 0;
+		rq->flags |= REQ_PREEMPT;
 	}
 	__elv_add_request(&drive->queue, rq, insert_end, 0);
 	ide_do_request(hwgroup, IDE_NO_IRQ);
 	spin_unlock_irqrestore(&ide_lock, flags);
 
 	err = 0;
-	if (action == ide_wait) {
+	if (must_wait) {
 		wait_for_completion(&wait);
 		if (rq->errors)
 			err = -EIO;

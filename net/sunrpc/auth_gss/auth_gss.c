@@ -156,7 +156,7 @@ gss_cred_set_ctx(struct rpc_cred *cred, struct gss_cl_ctx *ctx)
 }
 
 static struct gss_cl_ctx *
-gss_cred_get_ctx(struct rpc_cred *cred)
+gss_cred_get_uptodate_ctx(struct rpc_cred *cred)
 {
 	struct gss_cred *gss_cred = container_of(cred, struct gss_cred, gc_base);
 	struct gss_cl_ctx *ctx = NULL;
@@ -206,9 +206,22 @@ dup_netobj(struct xdr_netobj *source, struct xdr_netobj *dest)
 	return 0;
 }
 
+static struct gss_cl_ctx *
+gss_cred_get_ctx(struct rpc_cred *cred)
+{
+	struct gss_cred *gss_cred = container_of(cred, struct gss_cred, gc_base);
+	struct gss_cl_ctx *ctx = NULL;
+
+	read_lock(&gss_ctx_lock);
+	if (gss_cred->gc_ctx)
+		ctx = gss_get_ctx(gss_cred->gc_ctx);
+	read_unlock(&gss_ctx_lock);
+	return ctx;
+}
+
 static int
 gss_parse_init_downcall(struct gss_api_mech *gm, struct xdr_netobj *buf,
-		struct gss_cl_ctx **gc, uid_t *uid)
+		struct gss_cl_ctx **gc, uid_t *uid, int *gss_err)
 {
 	char *end = buf->data + buf->len;
 	char *p = buf->data;
@@ -231,8 +244,17 @@ gss_parse_init_downcall(struct gss_api_mech *gm, struct xdr_netobj *buf,
 	/* FIXME: discarded timeout for now */
 	if (simple_get_bytes(&p, end, &timeout, sizeof(timeout)))
 		goto err_free_ctx;
+	*gss_err = 0;
 	if (simple_get_bytes(&p, end, &ctx->gc_win, sizeof(ctx->gc_win)))
 		goto err_free_ctx;
+	/* gssd signals an error by passing ctx->gc_win = 0: */
+	if (!ctx->gc_win) {
+		/* in which case the next int is an error code: */
+		if (simple_get_bytes(&p, end, gss_err, sizeof(*gss_err)))
+			goto err_free_ctx;
+		err = 0;
+		goto err_free_ctx;
+	}
 	if (simple_get_netobj(&p, end, &tmp_buf))
 		goto err_free_ctx;
 	if (dup_netobj(&tmp_buf, &ctx->gc_wire_ctx)) {
@@ -261,6 +283,7 @@ err:
 struct gss_upcall_msg {
 	struct rpc_pipe_msg msg;
 	struct list_head list;
+	struct gss_auth *auth;
 	struct rpc_wait_queue waitq;
 	uid_t	uid;
 	atomic_t count;
@@ -296,8 +319,6 @@ gss_release_callback(struct rpc_task *task)
 	gss_msg = gss_find_upcall(gss_auth, task->tk_msg.rpc_cred->cr_uid);
 	if (gss_msg) {
 		rpc_wake_up(&gss_msg->waitq);
-		list_del(&gss_msg->list);
-		gss_release_msg(gss_msg);
 	}
 	spin_unlock(&gss_auth->lock);
 }
@@ -328,19 +349,24 @@ retry:
 	memset(gss_new, 0, sizeof(*gss_new));
 	INIT_LIST_HEAD(&gss_new->list);
 	INIT_RPC_WAITQ(&gss_new->waitq, "RPCSEC_GSS upcall waitq");
-	atomic_set(&gss_new->count, 2);
+	atomic_set(&gss_new->count, 1);
 	msg = &gss_new->msg;
 	msg->data = &gss_new->uid;
 	msg->len = sizeof(gss_new->uid);
 	gss_new->uid = uid;
+	gss_new->auth = gss_auth;
 	list_add(&gss_new->list, &gss_auth->upcalls);
 	gss_new = NULL;
+	task->tk_timeout = 5 * HZ;
 	rpc_sleep_on(&gss_msg->waitq, task, gss_release_callback, NULL);
 	spin_unlock(&gss_auth->lock);
 	res = rpc_queue_upcall(dentry->d_inode, msg);
 	spin_lock(&gss_auth->lock);
-	if (res)
+	if (res) {
+		rpc_wake_up(&gss_msg->waitq);
+		list_del(&gss_msg->list);
 		gss_release_msg(gss_msg);
+	}
 	return res;
 out_sleep:
 	rpc_sleep_on(&gss_msg->waitq, task, NULL, NULL);
@@ -354,13 +380,12 @@ gss_pipe_upcall(struct file *filp, struct rpc_pipe_msg *msg,
 		char *dst, size_t buflen)
 {
 	char *data = (char *)msg->data + msg->copied;
-	ssize_t mlen = msg->len - msg->copied;
+	ssize_t mlen = msg->len;
 	ssize_t left;
 
 	if (mlen > buflen)
 		mlen = buflen;
 	left = copy_to_user(dst, data, mlen);
-	msg->copied += mlen - left;
 	return mlen - left;
 }
 
@@ -381,9 +406,10 @@ gss_pipe_downcall(struct file *filp, const char *src, size_t mlen)
 	struct auth_cred acred = { 0 };
 	struct rpc_cred *cred;
 	struct gss_upcall_msg *gss_msg;
-	struct gss_cl_ctx *ctx;
+	struct gss_cl_ctx *ctx = NULL;
 	ssize_t left;
 	int err;
+	int gss_err;
 
 	if (mlen > sizeof(buf))
 		return -ENOSPC;
@@ -395,23 +421,30 @@ gss_pipe_downcall(struct file *filp, const char *src, size_t mlen)
 	auth = clnt->cl_auth;
 	gss_auth = container_of(auth, struct gss_auth, rpc_auth);
 	mech = gss_auth->mech;
-	err = gss_parse_init_downcall(mech, &obj, &ctx, &acred.uid);
+	err = gss_parse_init_downcall(mech, &obj, &ctx, &acred.uid, &gss_err);
 	if (err)
 		goto err;
 	cred = rpcauth_lookup_credcache(auth, &acred, 0);
 	if (!cred)
-		goto err_release_ctx;
-	gss_cred_set_ctx(cred, ctx);
+		goto err;
+	if (gss_err)
+		cred->cr_flags |= RPCAUTH_CRED_DEAD;
+	else
+		gss_cred_set_ctx(cred, ctx);
 	spin_lock(&gss_auth->lock);
 	gss_msg = gss_find_upcall(gss_auth, acred.uid);
-	if (gss_msg)
+	if (gss_msg) {
+		list_del(&gss_msg->list);
+		__rpc_purge_one_upcall(filp, &gss_msg->msg);
 		rpc_wake_up(&gss_msg->waitq);
+		gss_release_msg(gss_msg);
+	}
 	spin_unlock(&gss_auth->lock);
 	rpc_release_client(clnt);
 	return mlen;
-err_release_ctx:
-	gss_destroy_ctx(ctx);
 err:
+	if (ctx)
+		gss_destroy_ctx(ctx);
 	rpc_release_client(clnt);
 	dprintk("RPC: gss_pipe_downcall returning %d\n", err);
 	return err;
@@ -421,9 +454,13 @@ void
 gss_pipe_destroy_msg(struct rpc_pipe_msg *msg)
 {
 	struct gss_upcall_msg *gss_msg = container_of(msg, struct gss_upcall_msg, msg);
+	struct gss_auth *gss_auth = gss_msg->auth;
 
+	spin_lock(&gss_auth->lock);
+	list_del(&gss_msg->list);
 	rpc_wake_up(&gss_msg->waitq);
 	gss_release_msg(gss_msg);
+	spin_unlock(&gss_auth->lock);
 }
 
 /* 
@@ -459,7 +496,7 @@ gss_create(struct rpc_clnt *clnt, rpc_authflavor_t flavor)
 	snprintf(gss_auth->path, sizeof(gss_auth->path), "%s/%s",
 			clnt->cl_pathname,
 			gss_auth->mech->gm_ops->name);
-	gss_auth->dentry = rpc_mkpipe(gss_auth->path, clnt, &gss_upcall_ops);
+	gss_auth->dentry = rpc_mkpipe(gss_auth->path, clnt, &gss_upcall_ops, RPC_PIPE_WAIT_FOR_OPEN);
 	if (IS_ERR(gss_auth->dentry))
 		goto err_free;
 
@@ -637,7 +674,7 @@ gss_refresh(struct rpc_task *task)
 
 	task->tk_timeout = xprt->timeout.to_current;
 	spin_lock(&gss_auth->lock);
-	if (gss_cred_get_ctx(cred))
+	if (gss_cred_get_uptodate_ctx(cred))
 		goto out;
 	err = gss_upcall(clnt, task, cred->cr_uid);
 out:
@@ -648,8 +685,8 @@ out:
 static u32 *
 gss_validate(struct rpc_task *task, u32 *p)
 {
-	struct gss_cred *cred = (struct gss_cred *)task->tk_msg.rpc_cred; 
-	struct gss_cl_ctx	*ctx = cred->gc_ctx;
+	struct rpc_cred *cred = task->tk_msg.rpc_cred;
+	struct gss_cl_ctx *ctx = gss_cred_get_ctx(cred);
 	u32		seq, qop_state;
 	struct xdr_netobj bufin;
 	struct xdr_netobj bufout;

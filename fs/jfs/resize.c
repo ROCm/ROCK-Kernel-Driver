@@ -1,5 +1,5 @@
 /*
- *   Copyright (c) International Business Machines  Corp., 2000-2002
+ *   Copyright (c) International Business Machines  Corp., 2000-2003
  *
  *   This program is free software;  you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -348,7 +348,7 @@ int jfs_extendfs(struct super_block *sb, s64 newLVSize, int newLogSize)
 
 	/* need to grow map file ? */
 	if (nPages == newNpages)
-		goto updateImap;
+		goto finalizeBmap;
 
 	/*
 	 * grow bmap file for the new map pages required:
@@ -414,6 +414,7 @@ int jfs_extendfs(struct super_block *sb, s64 newLVSize, int newLogSize)
 	if (XSize)
 		goto extendBmap;
 
+      finalizeBmap:
 	/* finalize bmap */
 	dbFinalizeBmap(ipbmap);
 
@@ -427,7 +428,6 @@ int jfs_extendfs(struct super_block *sb, s64 newLVSize, int newLogSize)
 	 * (computation of ag number from agstart based on agsize
 	 * will correctly identify the new ag);
 	 */
-      updateImap:
 	/* if new AG size the same as old AG size, done! */
 	if (bmp->db_agsize != old_agsize) {
 		if ((rc = diExtendFS(ipimap, ipbmap)))
@@ -485,8 +485,8 @@ int jfs_extendfs(struct super_block *sb, s64 newLVSize, int newLogSize)
 
 	/* mark extendfs() completion */
 	j_sb->s_state &= cpu_to_le32(~FM_EXTENDFS);
-	j_sb->s_size = cpu_to_le64(bmp->db_mapsize) <<
-		       le16_to_cpu(j_sb->s_l2bfactor);
+	j_sb->s_size = cpu_to_le64(bmp->db_mapsize <<
+				   le16_to_cpu(j_sb->s_l2bfactor));
 	j_sb->s_agsize = cpu_to_le32(bmp->db_agsize);
 
 	/* update inline log space descriptor */

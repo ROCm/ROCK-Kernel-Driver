@@ -149,7 +149,7 @@ struct x25_opt {
 	unsigned long 		vc_facil_mask;	/* inc_call facilities mask */
 };
 
-#define x25_sk(__sk) ((struct x25_opt *)(__sk)->protinfo)
+#define x25_sk(__sk) ((struct x25_opt *)(__sk)->sk_protinfo)
 
 /* af_x25.c */
 extern int  sysctl_x25_restart_request_timeout;
@@ -263,7 +263,7 @@ struct x25_skb_cb {
 };
 #define X25_SKB_CB(s) ((struct x25_skb_cb *) ((s)->cb))
 
-extern struct sock *x25_list;
+extern struct hlist_head x25_list;
 extern rwlock_t x25_list_lock;
 extern struct list_head x25_route_list;
 extern rwlock_t x25_route_list_lock;

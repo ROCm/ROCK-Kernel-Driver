@@ -1,7 +1,7 @@
 /*
  * arch/v850/kernel/rte_ma1_cb.c -- Midas labs RTE-V850E/MA1-CB board
  *
- *  Copyright (C) 2001,02,03  NEC Corporation
+ *  Copyright (C) 2001,02,03  NEC Electronics Corporation
  *  Copyright (C) 2001,02,03  Miles Bader <miles@gnu.org>
  *
  * This file is subject to the terms and conditions of the GNU General

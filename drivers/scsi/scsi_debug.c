@@ -1259,8 +1259,8 @@ static const char * scsi_debug_info(struct Scsi_Host * shp)
 /* scsi_debug_proc_info
  * Used if the driver currently has no own support for /proc/scsi
  */
-static int scsi_debug_proc_info(char *buffer, char **start, off_t offset,
-				int length, int inode, int inout)
+static int scsi_debug_proc_info(struct Scsi_Host *host, char *buffer, char **start, off_t offset,
+				int length, int inout)
 {
 	int len, pos, begin;
 	int orig_length;

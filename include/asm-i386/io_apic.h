@@ -27,8 +27,7 @@ struct IO_APIC_reg_00 {
 		LTS		:  1,
 		delivery_type	:  1,
 		__reserved_1	:  8,
-		ID		:  4,
-		__reserved_0	:  4;
+		ID		:  8;
 } __attribute__ ((packed));
 
 struct IO_APIC_reg_01 {

@@ -20,11 +20,4 @@
    worth it. Would need a page for it. */
 #define flush_agp_cache() asm volatile("wbinvd":::"memory")
 
-/*
- * Page-protection value to be used for AGP memory mapped into kernel space.  For
- * platforms which use coherent AGP DMA, this can be PAGE_KERNEL.  For others, it needs to
- * be an uncached mapping (such as write-combining).
- */
-#define PAGE_AGP			PAGE_KERNEL_NOCACHE
-
 #endif

@@ -16,7 +16,7 @@ struct inflate_codes_state;
 #define bits word.what.Bits
 
 /* Table for deflate from PKZIP's appnote.txt. */
-local const uInt border[] = { /* Order of the bit length code lengths */
+static const uInt border[] = { /* Order of the bit length code lengths */
         16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15};
 
 /*
@@ -65,12 +65,13 @@ local const uInt border[] = { /* Order of the bit length code lengths */
  */
 
 
-void zlib_inflate_blocks_reset(s, z, c)
-inflate_blocks_statef *s;
-z_streamp z;
-uLongf *c;
+void zlib_inflate_blocks_reset(
+	inflate_blocks_statef *s,
+	z_streamp z,
+	uLong *c
+)
 {
-  if (c != Z_NULL)
+  if (c != NULL)
     *c = s->check;
   if (s->mode == CODES)
     zlib_inflate_codes_free(s->sub.decode.codes, z);
@@ -78,14 +79,15 @@ uLongf *c;
   s->bitk = 0;
   s->bitb = 0;
   s->read = s->write = s->window;
-  if (s->checkfn != Z_NULL)
-    z->adler = s->check = (*s->checkfn)(0L, (const Bytef *)Z_NULL, 0);
+  if (s->checkfn != NULL)
+    z->adler = s->check = (*s->checkfn)(0L, NULL, 0);
 }
 
-inflate_blocks_statef *zlib_inflate_blocks_new(z, c, w)
-z_streamp z;
-check_func c;
-uInt w;
+inflate_blocks_statef *zlib_inflate_blocks_new(
+	z_streamp z,
+	check_func c,
+	uInt w
+)
 {
   inflate_blocks_statef *s;
 
@@ -95,22 +97,23 @@ uInt w;
   s->end = s->window + w;
   s->checkfn = c;
   s->mode = TYPE;
-  zlib_inflate_blocks_reset(s, z, Z_NULL);
+  zlib_inflate_blocks_reset(s, z, NULL);
   return s;
 }
 
 
-int zlib_inflate_blocks(s, z, r)
-inflate_blocks_statef *s;
-z_streamp z;
-int r;
+int zlib_inflate_blocks(
+	inflate_blocks_statef *s,
+	z_streamp z,
+	int r
+)
 {
   uInt t;               /* temporary storage */
   uLong b;              /* bit buffer */
   uInt k;               /* bits in bit buffer */
-  Bytef *p;             /* input data pointer */
+  Byte *p;              /* input data pointer */
   uInt n;               /* bytes available there */
-  Bytef *q;             /* output window write pointer */
+  Byte *q;              /* output window write pointer */
   uInt m;               /* bytes to end of window or read pointer */
 
   /* copy input/output information to locals (UPDATE macro restores) */
@@ -138,7 +141,7 @@ int r;
 
             zlib_inflate_trees_fixed(&bl, &bd, &tl, &td, z);
             s->sub.decode.codes = zlib_inflate_codes_new(bl, bd, tl, td, z);
-            if (s->sub.decode.codes == Z_NULL)
+            if (s->sub.decode.codes == NULL)
             {
               r = Z_MEM_ERROR;
               LEAVE
@@ -267,7 +270,7 @@ int r;
           s->sub.trees.index = i;
         }
       }
-      s->sub.trees.tb = Z_NULL;
+      s->sub.trees.tb = NULL;
       {
         uInt bl, bd;
         inflate_huft *tl, *td;
@@ -286,7 +289,7 @@ int r;
           r = t;
           LEAVE
         }
-        if ((c = zlib_inflate_codes_new(bl, bd, tl, td, z)) == Z_NULL)
+        if ((c = zlib_inflate_codes_new(bl, bd, tl, td, z)) == NULL)
         {
           r = Z_MEM_ERROR;
           LEAVE
@@ -325,19 +328,21 @@ int r;
 }
 
 
-int zlib_inflate_blocks_free(s, z)
-inflate_blocks_statef *s;
-z_streamp z;
+int zlib_inflate_blocks_free(
+	inflate_blocks_statef *s,
+	z_streamp z
+)
 {
-  zlib_inflate_blocks_reset(s, z, Z_NULL);
+  zlib_inflate_blocks_reset(s, z, NULL);
   return Z_OK;
 }
 
 
-void zlib_inflate_set_dictionary(s, d, n)
-inflate_blocks_statef *s;
-const Bytef *d;
-uInt  n;
+void zlib_inflate_set_dictionary(
+	inflate_blocks_statef *s,
+	const Byte *d,
+	uInt  n
+)
 {
   memcpy(s->window, d, n);
   s->read = s->write = s->window + n;
@@ -346,10 +351,11 @@ uInt  n;
 
 /* Returns true if inflate is currently at the end of a block generated
  * by Z_SYNC_FLUSH or Z_FULL_FLUSH. 
- * IN assertion: s != Z_NULL
+ * IN assertion: s != NULL
  */
-int zlib_inflate_blocks_sync_point(s)
-inflate_blocks_statef *s;
+int zlib_inflate_blocks_sync_point(
+	inflate_blocks_statef *s
+)
 {
   return s->mode == LENS;
 }

@@ -65,7 +65,7 @@ nfs4_get_client(void)
 	struct nfs4_client *clp;
 
 	if ((clp = kmalloc(sizeof(*clp), GFP_KERNEL)))
-		memset(clp, 0, sizeof(nfs4_verifier));
+		memset(clp, 0, sizeof(*clp));
 	return clp;
 }
 

@@ -8,7 +8,7 @@
  * Copyright (C) 1998-2000 Hewlett-Packard Co
  * Copyright (C) 1998-2000 David Mosberger-Tang <davidm@hpl.hp.com>
  *
- * Copyright (C) 2000-2003 Silicon Graphics, Inc. All rights reserved.
+ * Copyright (C) 2000-2002 Silicon Graphics, Inc. All rights reserved.
  */
 
 
@@ -57,7 +57,9 @@
  * be 0x00000ffffc000000, but on snia we use the (inverse swizzled)
  * IOSPEC_BASE value
  */
-#ifdef SGI_SN2
+#ifdef CONFIG_IA64_SGI_SN1
+#define IOPB_PA		0xc0000FFFFC000000
+#else
 #define IOPB_PA		0xc000000fcc000000
 #endif
 
@@ -82,7 +84,10 @@ _start:
 
 // Isolate node number we are running on.
 	mov		r6 = ip;;
-#ifdef SGI_SN2
+#ifdef CONFIG_IA64_SGI_SN1
+	shr		r5 = r6,33;;			// r5 = node number
+	shl		r6 = r5,33			// r6 = base memory address of node
+#else
 	shr		r5 = r6,38			// r5 = node number
 	dep		r6 = 0,r6,0,36			// r6 = base memory address of node
 
@@ -94,7 +99,7 @@ _start:
 	or 		r1 = r1,r6			// Relocate to boot node
 
 // Lets figure out who we are & put it in the LID register.
-#ifdef SGI_SN2
+#ifdef CONFIG_IA64_SGI_SN2
 // On SN2, we (currently) pass the cpu number in r10 at boot
 	and		r25=3,r10;;
 	movl		r16=0x8000008110000400		// Allow IPIs
@@ -319,7 +324,10 @@ static:	cmp.eq	p6,p7=6,r28		/* PAL_PTCE_INFO */
 1:	cmp.eq	p6,p7=8,r28		/* PAL_VM_SUMMARY */
 (p7)	br.cond.sptk.few 1f
 	movl	r8=0
-#ifdef SGI_SN2
+#ifdef CONFIG_IA64_SGI_SN1
+	movl	r9=0x0203083001151059
+	movl	r10=0x1232
+#else
 	movl	r9=0x0203083001151065
 	movl	r10=0x183f
 #endif

@@ -464,7 +464,7 @@ relocate_nodes(void)
 	struct device_node *np;
 	struct property *pp;
 
-#define ADDBASE(x)	(x = (x)? ((typeof (x))((unsigned long)(x) + base)): 0)
+#define ADDBASE(x)	(x = (typeof (x))((x)? ((unsigned long)(x) + base): 0))
 
 	base = (unsigned long) boot_infos + boot_infos->deviceTreeOffset;
 	allnodes = (struct device_node *)(base + 4);

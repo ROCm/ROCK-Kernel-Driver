@@ -160,17 +160,11 @@ static int snd_opl3_detect(opl3_t * opl3)
 		opl3->hardware = OPL3_HW_OPL2;
 	} else {
 		/*
-		 * Detect availability of OPL4. Unfortunately, the OPL4
-		 * port of the chip may not be connected to the PC bus.
+		 * If we had an OPL4 chip, opl3->hardware would have been set
+		 * by the OPL4 driver; so we can assume OPL3 here.
 		 */
 		snd_assert(opl3->r_port != 0, return -ENODEV);
-		opl3->command(opl3, OPL3_RIGHT | OPL3_REG_MODE, OPL3_OPL3_ENABLE | OPL3_OPL4_ENABLE);
-		/* All OPL4 registers are readable. */
-		if (inb(opl3->r_port + 1) == (OPL3_OPL3_ENABLE | OPL3_OPL4_ENABLE)) {
-			opl3->hardware = OPL3_HW_OPL4;
-		} else {
-			opl3->hardware = OPL3_HW_OPL3;
-		}
+		opl3->hardware = OPL3_HW_OPL3;
 	}
 	return 0;
 }

@@ -53,6 +53,13 @@ DEFINE_PER_CPU(unsigned long, process_counts) = 0;
 
 rwlock_t tasklist_lock __cacheline_aligned = RW_LOCK_UNLOCKED;  /* outer */
 
+/*
+ * A per-CPU task cache - this relies on the fact that
+ * the very last portion of sys_exit() is executed with
+ * preemption turned off.
+ */
+static task_t *task_cache[NR_CPUS] __cacheline_aligned;
+
 int nr_processes(void)
 {
 	int cpu;
@@ -65,23 +72,13 @@ int nr_processes(void)
 	return total;
 }
 
-#ifdef CONFIG_IA64
-# define HAVE_ARCH_DUP_TASK_STRUCT
+#ifndef __HAVE_ARCH_TASK_STRUCT_ALLOCATOR
+# define alloc_task_struct()	kmem_cache_alloc(task_struct_cachep, GFP_KERNEL)
+# define free_task_struct(tsk)	kmem_cache_free(task_struct_cachep, (tsk))
+static kmem_cache_t *task_struct_cachep;
 #endif
 
-#ifdef HAVE_ARCH_DUP_TASK_STRUCT
-extern void free_task_struct (struct task_struct *tsk);
-#else
-static kmem_cache_t *task_struct_cachep;
-
-/*
- * A per-CPU task cache - this relies on the fact that
- * the very last portion of sys_exit() is executed with
- * preemption turned off.
- */
-static task_t *task_cache[NR_CPUS] __cacheline_aligned;
-
-static void free_task_struct(struct task_struct *tsk)
+static void free_task(struct task_struct *tsk)
 {
 	/*
 	 * The task cache is effectively disabled right now.
@@ -91,20 +88,19 @@ static void free_task_struct(struct task_struct *tsk)
 	 */
 	if (tsk != current) {
 		free_thread_info(tsk->thread_info);
-		kmem_cache_free(task_struct_cachep,tsk);
+		free_task_struct(tsk);
 	} else {
 		int cpu = get_cpu();
 
 		tsk = task_cache[cpu];
 		if (tsk) {
 			free_thread_info(tsk->thread_info);
-			kmem_cache_free(task_struct_cachep,tsk);
+			free_task_struct(tsk);
 		}
 		task_cache[cpu] = current;
 		put_cpu();
 	}
 }
-#endif /* HAVE_ARCH_DUP_TASK_STRUCT */
 
 void __put_task_struct(struct task_struct *tsk)
 {
@@ -114,7 +110,7 @@ void __put_task_struct(struct task_struct *tsk)
 
 	security_task_free(tsk);
 	free_uid(tsk->user);
-	free_task_struct(tsk);
+	free_task(tsk);
 }
 
 void add_wait_queue(wait_queue_head_t *q, wait_queue_t * wait)
@@ -194,7 +190,7 @@ int autoremove_wake_function(wait_queue_t *wait, unsigned mode, int sync)
 
 void __init fork_init(unsigned long mempages)
 {
-#ifndef HAVE_ARCH_DUP_TASK_STRUCT
+#ifndef __HAVE_ARCH_TASK_STRUCT_ALLOCATOR
 	/* create a slab on which task_structs can be allocated */
 	task_struct_cachep =
 		kmem_cache_create("task_struct",
@@ -220,11 +216,7 @@ void __init fork_init(unsigned long mempages)
 	init_task.rlim[RLIMIT_NPROC].rlim_max = max_threads/2;
 }
 
-#ifdef HAVE_ARCH_DUP_TASK_STRUCT
-extern struct task_struct *dup_task_struct (struct task_struct *orig);
-#else /* !HAVE_ARCH_DUP_TASK_STRUCT */
-
-struct task_struct *dup_task_struct(struct task_struct *orig)
+static struct task_struct *dup_task_struct(struct task_struct *orig)
 {
 	struct task_struct *tsk;
 	struct thread_info *ti;
@@ -236,13 +228,13 @@ struct task_struct *dup_task_struct(struct task_struct *orig)
 	task_cache[cpu] = NULL;
 	put_cpu();
 	if (!tsk) {
-		ti = alloc_thread_info();
-		if (!ti)
+		tsk = alloc_task_struct();
+		if (!tsk)
 			return NULL;
 
-		tsk = kmem_cache_alloc(task_struct_cachep, GFP_KERNEL);
-		if (!tsk) {
-			free_thread_info(ti);
+		ti = alloc_thread_info(tsk);
+		if (!ti) {
+			free_task_struct(tsk);
 			return NULL;
 		}
 	} else
@@ -257,8 +249,6 @@ struct task_struct *dup_task_struct(struct task_struct *orig)
 	atomic_set(&tsk->usage,2);
 	return tsk;
 }
-
-#endif /* !HAVE_ARCH_DUP_TASK_STRUCT */
 
 #ifdef CONFIG_MMU
 static inline int dup_mmap(struct mm_struct * mm, struct mm_struct * oldmm)
@@ -856,6 +846,7 @@ struct task_struct *copy_process(unsigned long clone_flags,
 	p->vfork_done = NULL;
 	spin_lock_init(&p->alloc_lock);
 	spin_lock_init(&p->switch_lock);
+	spin_lock_init(&p->proc_lock);
 
 	clear_tsk_thread_flag(p, TIF_SIGPENDING);
 	init_sigpending(&p->pending);
@@ -898,15 +889,11 @@ struct task_struct *copy_process(unsigned long clone_flags,
 
 	if (clone_flags & CLONE_CHILD_SETTID)
 		p->set_child_tid = child_tidptr;
-	else
-		p->set_child_tid = NULL;
 	/*
 	 * Clear TID on mm_release()?
 	 */
 	if (clone_flags & CLONE_CHILD_CLEARTID)
 		p->clear_child_tid = child_tidptr;
-	else
-		p->clear_child_tid = NULL;
 
 	/*
 	 * Syscall tracing should be turned off in the child regardless
@@ -1061,7 +1048,7 @@ bad_fork_cleanup_count:
 	atomic_dec(&p->user->processes);
 	free_uid(p->user);
 bad_fork_free:
-	free_task_struct(p);
+	free_task(p);
 	goto fork_out;
 }
 

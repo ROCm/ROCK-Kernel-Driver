@@ -265,6 +265,11 @@ static inline  int ptep_test_and_clear_young(pte_t *ptep)	{ return test_and_clea
 static inline void ptep_set_wrprotect(pte_t *ptep)		{ clear_bit(_PAGE_BIT_RW, ptep); }
 static inline void ptep_mkdirty(pte_t *ptep)			{ set_bit(_PAGE_BIT_DIRTY, ptep); }
 
+/*
+ * Macro to mark a page protection value as "uncacheable".
+ */
+#define pgprot_noncached(prot)	(__pgprot(pgprot_val(prot) | _PAGE_PCD | _PAGE_PWT))
+
 #define __LARGE_PTE (_PAGE_PSE|_PAGE_PRESENT) 
 static inline int pmd_large(pmd_t pte) { 
 	return (pmd_val(pte) & __LARGE_PTE) == __LARGE_PTE; 
@@ -334,7 +339,7 @@ static inline pgd_t *current_pgd_offset_k(unsigned long address)
 #define pmd_clear(xp)	do { set_pmd(xp, __pmd(0)); } while (0)
 #define	pmd_bad(x)	((pmd_val(x) & (~PTE_MASK & ~_PAGE_USER)) != _KERNPG_TABLE )
 #define pfn_pmd(nr,prot) (__pmd(((nr) << PAGE_SHIFT) | pgprot_val(prot)))
-
+#define pmd_pfn(x)  ((pmd_val(x) >> PAGE_SHIFT) & __PHYSICAL_MASK)
 
 #define pte_to_pgoff(pte) ((pte_val(pte) & PHYSICAL_PAGE_MASK) >> PAGE_SHIFT)
 #define pgoff_to_pte(off) ((pte_t) { ((off) << PAGE_SHIFT) | _PAGE_FILE })
@@ -387,9 +392,7 @@ typedef pte_t *pte_addr_t;
 
 #endif /* !__ASSEMBLY__ */
 
-#ifndef CONFIG_DISCONTIGMEM
-#define kern_addr_valid(addr)	(1)
-#endif
+extern int kern_addr_valid(unsigned long addr); 
 
 #define io_remap_page_range remap_page_range
 
@@ -397,5 +400,10 @@ typedef pte_t *pte_addr_t;
 
 #define pgtable_cache_init()   do { } while (0)
 #define check_pgt_cache()      do { } while (0)
+
+/* fs/proc/kcore.c */
+#define	kc_vaddr_to_offset(v) ((v) & __VIRTUAL_MASK)
+#define	kc_offset_to_vaddr(o) \
+   (((o) & (1UL << (__VIRTUAL_MASK_SHIFT-1))) ? ((o) | (~__VIRTUAL_MASK)) : (o))
 
 #endif /* _X86_64_PGTABLE_H */

@@ -85,9 +85,9 @@ static int x25_queue_rx_frame(struct sock *sk, struct sk_buff *skb, int more)
 	}
 
 	skb_set_owner_r(skbn, sk);
-	skb_queue_tail(&sk->receive_queue, skbn);
-	if (!test_bit(SOCK_DEAD, &sk->flags))
-		sk->data_ready(sk, skbn->len);
+	skb_queue_tail(&sk->sk_receive_queue, skbn);
+	if (!sock_flag(sk, SOCK_DEAD))
+		sk->sk_data_ready(sk, skbn->len);
 
 	return 0;
 }
@@ -112,7 +112,7 @@ static int x25_state1_machine(struct sock *sk, struct sk_buff *skb, int frametyp
 			x25->vr        = 0;
 			x25->vl        = 0;
 			x25->state     = X25_STATE_3;
-			sk->state      = TCP_ESTABLISHED;
+			sk->sk_state   = TCP_ESTABLISHED;
 			/*
 			 *	Parse the data in the frame.
 			 */
@@ -129,8 +129,8 @@ static int x25_state1_machine(struct sock *sk, struct sk_buff *skb, int frametyp
 				       skb->len);
 				x25->calluserdata.cudlength = skb->len;
 			}
-			if (!test_bit(SOCK_DEAD, &sk->flags))
-				sk->state_change(sk);
+			if (!sock_flag(sk, SOCK_DEAD))
+				sk->sk_state_change(sk);
 			break;
 		}
 		case X25_CLEAR_REQUEST:
@@ -255,7 +255,8 @@ static int x25_state3_machine(struct sock *sk, struct sk_buff *skb, int frametyp
 					x25->state     = X25_STATE_4;
 					break;
 				}
-				if (atomic_read(&sk->rmem_alloc) > (sk->rcvbuf / 2))
+				if (atomic_read(&sk->sk_rmem_alloc) >
+				    (sk->sk_rcvbuf / 2))
 					x25->condition |= X25_COND_OWN_RX_BUSY;
 			}
 			/*
@@ -277,9 +278,9 @@ static int x25_state3_machine(struct sock *sk, struct sk_buff *skb, int frametyp
 			break;
 
 		case X25_INTERRUPT:
-			if (test_bit(SOCK_URGINLINE, &sk->flags)) {
-				queued = (sock_queue_rcv_skb(sk, skb) == 0);
-			} else {
+			if (sock_flag(sk, SOCK_URGINLINE))
+				queued = !sock_queue_rcv_skb(sk, skb);
+			else {
 				skb_set_owner_r(skb, sk);
 				skb_queue_tail(&x25->interrupt_in_queue, skb);
 				queued = 1;

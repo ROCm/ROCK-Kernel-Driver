@@ -63,6 +63,8 @@ MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
 
+static const char driver_name[] = "catc";
+
 /*
  * Some defines.
  */ 
@@ -677,7 +679,7 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
         /* get driver info */
         case ETHTOOL_GDRVINFO: {
                 struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
-                strncpy(info.driver, SHORT_DRIVER_DESC, ETHTOOL_BUSINFO_LEN);
+                strncpy(info.driver, driver_name, ETHTOOL_BUSINFO_LEN);
                 strncpy(info.version, DRIVER_VERSION, ETHTOOL_BUSINFO_LEN);
 		usb_make_path (catc->usbdev, info.bus_info, sizeof info.bus_info);
                 if (copy_to_user(useraddr, &info, sizeof(info)))
@@ -795,7 +797,7 @@ static int catc_probe(struct usb_interface *intf, const struct usb_device_id *id
 
 	memset(catc, 0, sizeof(struct catc));
 
-	netdev = init_etherdev(0, 0);
+	netdev = alloc_etherdev(0);
 	if (!netdev) {
 		kfree(catc);
 		return -EIO;
@@ -933,6 +935,17 @@ static int catc_probe(struct usb_interface *intf, const struct usb_device_id *id
 	for (i = 0; i < 5; i++) printk("%2.2x:", netdev->dev_addr[i]);
 	printk("%2.2x.\n", netdev->dev_addr[i]);
 	usb_set_intfdata(intf, catc);
+
+	if (register_netdev(netdev) != 0) {
+		usb_set_intfdata(intf, NULL);
+		usb_free_urb(catc->ctrl_urb);
+		usb_free_urb(catc->tx_urb);
+		usb_free_urb(catc->rx_urb);
+		usb_free_urb(catc->irq_urb);
+		kfree(netdev);
+		kfree(catc);
+		return -EIO;
+	}
 	return 0;
 }
 
@@ -966,7 +979,8 @@ static struct usb_device_id catc_id_table [] = {
 MODULE_DEVICE_TABLE(usb, catc_id_table);
 
 static struct usb_driver catc_driver = {
-	.name =		"catc",
+	.owner =	THIS_MODULE,
+	.name =		driver_name,
 	.probe =	catc_probe,
 	.disconnect =	catc_disconnect,
 	.id_table =	catc_id_table,

@@ -147,8 +147,8 @@ console_initcall(tub3270_con_init);
 static struct tty_driver *tub3270_con_device(struct console *conp, int *index)
 {
 	*index = conp->index + 1;
-	extern struct tty_driver tty3270_driver;
-	return &tty3270_driver;
+	extern struct tty_driver *tty3270_driver;
+	return tty3270_driver;
 }
 
 static void

@@ -860,7 +860,8 @@ int ip_mroute_setsockopt(struct sock *sk,int optname,char *optval,int optlen)
 	switch(optname)
 	{
 		case MRT_INIT:
-			if(sk->type!=SOCK_RAW || inet_sk(sk)->num!=IPPROTO_IGMP)
+			if (sk->sk_type != SOCK_RAW ||
+			    inet_sk(sk)->num != IPPROTO_IGMP)
 				return -EOPNOTSUPP;
 			if(optlen!=sizeof(int))
 				return -ENOPROTOOPT;

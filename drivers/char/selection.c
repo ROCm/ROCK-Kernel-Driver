@@ -23,6 +23,7 @@
 #include <linux/vt_kern.h>
 #include <linux/consolemap.h>
 #include <linux/selection.h>
+#include <linux/tiocl.h>
 
 #ifndef MIN
 #define MIN(a,b)	((a) < (b) ? (a) : (b))
@@ -111,33 +112,31 @@ static inline unsigned short limit(const unsigned short v, const unsigned short 
 }
 
 /* set the current selection. Invoked by ioctl() or by kernel code. */
-int set_selection(const unsigned long arg, struct tty_struct *tty, int user)
+int set_selection(const struct tiocl_selection *sel, struct tty_struct *tty, int user)
 {
 	int sel_mode, new_sel_start, new_sel_end, spc;
 	char *bp, *obp;
 	int i, ps, pe;
 	unsigned int currcons = fg_console;
 
-	unblank_screen();
 	poke_blanked_console();
 
-	{ unsigned short *args, xs, ys, xe, ye;
+	{ unsigned short xs, ys, xe, ye;
 
-	  args = (unsigned short *)(arg + 1);
 	  if (user) {
-		  if (verify_area(VERIFY_READ, args, sizeof(short) * 5))
+		  if (verify_area(VERIFY_READ, sel, sizeof(*sel)))
 		  	return -EFAULT;
-		  __get_user(xs, args++);
-		  __get_user(ys, args++);
-		  __get_user(xe, args++);
-		  __get_user(ye, args++);
-		  __get_user(sel_mode, args);
+		  __get_user(xs, &sel->xs);
+		  __get_user(ys, &sel->ys);
+		  __get_user(xe, &sel->xe);
+		  __get_user(ye, &sel->ye);
+		  __get_user(sel_mode, &sel->sel_mode);
 	  } else {
-		  xs = *(args++); /* set selection from kernel */
-		  ys = *(args++);
-		  xe = *(args++);
-		  ye = *(args++);
-		  sel_mode = *args;
+		  xs = sel->xs; /* set selection from kernel */
+		  ys = sel->ys;
+		  xe = sel->xe;
+		  ye = sel->ye;
+		  sel_mode = sel->sel_mode;
 	  }
 	  xs--; ys--; xe--; ye--;
 	  xs = limit(xs, video_num_columns - 1);
@@ -147,14 +146,14 @@ int set_selection(const unsigned long arg, struct tty_struct *tty, int user)
 	  ps = ys * video_size_row + (xs << 1);
 	  pe = ye * video_size_row + (xe << 1);
 
-	  if (sel_mode == 4) {
+	  if (sel_mode == TIOCL_SELCLEAR) {
 	      /* useful for screendump without selection highlights */
 	      clear_selection();
 	      return 0;
 	  }
 
-	  if (mouse_reporting() && (sel_mode & 16)) {
-	      mouse_report(tty, sel_mode & 15, xs, ys);
+	  if (mouse_reporting() && (sel_mode & TIOCL_SELMOUSEREPORT)) {
+	      mouse_report(tty, sel_mode & TIOCL_SELBUTTONMASK, xs, ys);
 	      return 0;
 	  }
         }
@@ -173,11 +172,11 @@ int set_selection(const unsigned long arg, struct tty_struct *tty, int user)
 
 	switch (sel_mode)
 	{
-		case 0:	/* character-by-character selection */
+		case TIOCL_SELCHAR:	/* character-by-character selection */
 			new_sel_start = ps;
 			new_sel_end = pe;
 			break;
-		case 1:	/* word-by-word selection */
+		case TIOCL_SELWORD:	/* word-by-word selection */
 			spc = isspace(sel_pos(ps));
 			for (new_sel_start = ps; ; ps -= 2)
 			{
@@ -199,12 +198,12 @@ int set_selection(const unsigned long arg, struct tty_struct *tty, int user)
 					break;
 			}
 			break;
-		case 2:	/* line-by-line selection */
+		case TIOCL_SELLINE:	/* line-by-line selection */
 			new_sel_start = ps - ps % video_size_row;
 			new_sel_end = pe + video_size_row
 				    - pe % video_size_row - 2;
 			break;
-		case 3:
+		case TIOCL_SELPOINTER:
 			highlight_pointer(pe);
 			return 0;
 		default:

@@ -2220,7 +2220,7 @@ static void bond_mii_monitor(struct net_device *master)
 					}
 					printk(KERN_INFO
 						"%s: link status definitely down "
-						"for interface %s, disabling it\n",
+						"for interface %s, disabling it",
 						master->name,
 						dev->name);
 
@@ -2994,6 +2994,7 @@ static int bond_ioctl(struct net_device *master_dev, struct ifreq *ifr, int cmd)
 	struct ifbond *u_binfo = NULL, k_binfo;
 	struct ifslave *u_sinfo = NULL, k_sinfo;
 	struct mii_ioctl_data *mii = NULL;
+	int prev_abi_ver = orig_app_abi_ver;
 	int ret = 0;
 
 #ifdef BONDING_DEBUG
@@ -3112,6 +3113,15 @@ static int bond_ioctl(struct net_device *master_dev, struct ifreq *ifr, int cmd)
 		}
 		dev_put(slave_dev);
 	}
+
+	if (ret < 0) {
+		/* The ioctl failed, so there's no point in changing the
+		 * orig_app_abi_ver. We'll restore it's value just in case
+		 * we've changed it earlier in this function.
+		 */
+		orig_app_abi_ver = prev_abi_ver;
+	}
+
 	return ret;
 }
 

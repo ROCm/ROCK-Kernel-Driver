@@ -130,7 +130,7 @@ _GLOBAL(__copy_tofrom_user)
 6:	cmpwi	cr1,r5,8
 	addi	r3,r3,32
 	sld	r9,r9,r10
-	blt	cr1,.Ldo_tail
+	ble	cr1,.Ldo_tail
 34:	ld	r0,8(r4)
 	srd	r7,r0,r11
 	or	r9,r7,r9
@@ -483,8 +483,20 @@ _GLOBAL(__copy_tofrom_user)
  * on an exception, reset to the beginning and jump back into the
  * standard __copy_tofrom_user
  */
-100:	ld	r3,-24(r1)
-	ld	r4,-24(r1)
+100:	ld	r20,-120(1)
+	ld	r21,-112(1)
+	ld	r22,-104(1)
+	ld	r23,-96(1)
+	ld	r24,-88(1)
+	ld	r25,-80(1)
+	ld	r26,-72(1)
+	ld	r27,-64(1)
+	ld	r28,-56(1)
+	ld	r29,-48(1)
+	ld	r30,-40(1)
+	ld	r31,-32(1)
+	ld	r3,-24(r1)
+	ld	r4,-16(r1)
 	li	r5,4096
 	b	.Ldst_aligned
 

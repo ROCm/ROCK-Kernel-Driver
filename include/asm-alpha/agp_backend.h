@@ -33,8 +33,8 @@ struct alpha_agp_ops {
 	int (*setup)(alpha_agp_info *);
 	void (*cleanup)(alpha_agp_info *);
 	int (*configure)(alpha_agp_info *);
-	int (*bind)(alpha_agp_info *, off_t, agp_memory *);
-	int (*unbind)(alpha_agp_info *, off_t, agp_memory *);
+	int (*bind)(alpha_agp_info *, off_t, struct agp_memory *);
+	int (*unbind)(alpha_agp_info *, off_t, struct agp_memory *);
 	unsigned long (*translate)(alpha_agp_info *, dma_addr_t);
 };
 

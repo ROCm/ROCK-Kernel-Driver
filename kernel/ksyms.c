@@ -95,11 +95,12 @@ EXPORT_SYMBOL(kmem_cache_free);
 EXPORT_SYMBOL(kmem_cache_size);
 EXPORT_SYMBOL(set_shrinker);
 EXPORT_SYMBOL(remove_shrinker);
-EXPORT_SYMBOL(kmalloc);
+EXPORT_SYMBOL(malloc_sizes);
+EXPORT_SYMBOL(__kmalloc);
 EXPORT_SYMBOL(kfree);
 #ifdef CONFIG_SMP
-EXPORT_SYMBOL(kmalloc_percpu);
-EXPORT_SYMBOL(kfree_percpu);
+EXPORT_SYMBOL(__alloc_percpu);
+EXPORT_SYMBOL(free_percpu);
 EXPORT_SYMBOL(percpu_counter_mod);
 #endif
 EXPORT_SYMBOL(vfree);
@@ -402,9 +403,6 @@ EXPORT_SYMBOL(add_timer);
 EXPORT_SYMBOL(del_timer);
 EXPORT_SYMBOL(request_irq);
 EXPORT_SYMBOL(free_irq);
-#if !defined(CONFIG_IA64)
-EXPORT_SYMBOL(irq_stat);
-#endif
 
 /* waitqueue handling */
 EXPORT_SYMBOL(add_wait_queue);
@@ -594,9 +592,7 @@ EXPORT_SYMBOL(__tasklet_hi_schedule);
 /* init task, for moving kthread roots - ought to export a function ?? */
 
 EXPORT_SYMBOL(init_task);
-#ifndef CONFIG_IA64
 EXPORT_SYMBOL(init_thread_union);
-#endif
 
 EXPORT_SYMBOL(tasklist_lock);
 EXPORT_SYMBOL(find_task_by_pid);

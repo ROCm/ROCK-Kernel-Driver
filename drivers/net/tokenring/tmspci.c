@@ -112,11 +112,11 @@ static int __init tms_pci_attach(struct pci_dev *pdev, const struct pci_device_i
 	pci_ioaddr = pci_resource_start (pdev, 0);
 
 	/* At this point we have found a valid card. */
-	dev = init_trdev(NULL, 0);
+	dev = alloc_trdev(0);
 	if (!dev)
 		return -ENOMEM;
 	SET_MODULE_OWNER(dev);
-		
+
 	if (!request_region(pci_ioaddr, TMS_PCI_IO_EXTENT, dev->name)) {
 		ret = -EBUSY;
 		goto err_out_trdev;
@@ -163,22 +163,22 @@ static int __init tms_pci_attach(struct pci_dev *pdev, const struct pci_device_i
 
 	dev->open = tms380tr_open;
 	dev->stop = tms380tr_close;
+	pci_set_drvdata(pdev, dev);
 
-	ret = register_trdev(dev);
+	ret = register_netdev(dev);
 	if (ret)
 		goto err_out_tmsdev;
 	
-	pci_set_drvdata(pdev, dev);
 	return 0;
 
 err_out_tmsdev:
+	pci_set_drvdata(pdev, NULL);
 	tmsdev_term(dev);
 err_out_irq:
 	free_irq(pdev->irq, dev);
 err_out_region:
 	release_region(pci_ioaddr, TMS_PCI_IO_EXTENT);
 err_out_trdev:
-	unregister_netdev(dev);
 	kfree(dev);
 	return ret;
 }

@@ -143,11 +143,11 @@ restore_sigcontext (struct sigcontext *sc, struct sigscratch *scr)
 		__copy_from_user(current->thread.fph, &sc->sc_fr[32], 96*16);
 		psr->mfh = 0;	/* drop signal handler's fph contents... */
 		if (psr->dfh)
-			ia64_drop_fpu(current);
+			current->thread.last_fph_cpu = -1;
 		else {
-			/* We already own the local fph, otherwise psr->dfh wouldn't be 0.  */
 			__ia64_load_fpu(current->thread.fph);
-			ia64_set_local_fpu_owner(current);
+			ia64_set_fpu_owner(current);
+			current->thread.last_fph_cpu = smp_processor_id();
 		}
 	}
 	return err;

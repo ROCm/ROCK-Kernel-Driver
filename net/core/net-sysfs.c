@@ -3,10 +3,6 @@
  *
  * Copyright (c) 2003 Stephen Hemminber <shemminger@osdl.org>
  * 
- *
- * TODO:
- * last_tx
- * last_rx
  */
 
 #include <linux/config.h>
@@ -16,43 +12,66 @@
 #include <net/sock.h>
 #include <linux/rtnetlink.h>
 
-const char *if_port_text[] = {
-   [IF_PORT_UNKNOWN] = "unknown",
-   [IF_PORT_10BASE2] = "BNC",
-   [IF_PORT_10BASET] = "10baseT",
-   [IF_PORT_AUI]     = "AUI",
-   [IF_PORT_100BASET] = "100baseT",
-   [IF_PORT_100BASETX] = "100baseTX",
-   [IF_PORT_100BASEFX] = "100baseFX"
-};
+#define to_class_dev(obj) container_of(obj,struct class_device,kobj)
+#define to_net_dev(class) container_of(class, struct net_device, class_dev)
 
-#define to_net_dev(class) container_of((class), struct net_device, class_dev)
-
-/* generate a show function for  simple field */
-#define NETDEVICE_SHOW(field, format_string)				\
-static ssize_t show_##field(struct class_device *dev, char *buf)	\
-{									\
-	return sprintf(buf, format_string, to_net_dev(dev)->field);	\
+static inline int dev_isalive(const struct net_device *dev) 
+{
+	return dev->reg_state == NETREG_REGISTERED;
 }
 
-/* generate a store function for a field with locking */
-#define NETDEVICE_STORE(field)						\
-static ssize_t 								\
-store_##field(struct class_device *dev, const char *buf, size_t len)	\
+/* use same locking rules as GIF* ioctl's */
+static ssize_t netdev_show(const struct class_device *cd, char *buf,
+			   ssize_t (*format)(const struct net_device *, char *))
+{
+	struct net_device *net = to_net_dev(cd);
+	ssize_t ret = -EINVAL;
+
+	read_lock(&dev_base_lock);
+	if (dev_isalive(net))
+		ret = (*format)(net, buf);
+	read_unlock(&dev_base_lock);
+
+	return ret;
+}
+
+/* generate a show function for simple field */
+#define NETDEVICE_SHOW(field, format_string)				\
+static ssize_t format_##field(const struct net_device *net, char *buf)	\
 {									\
-	char *endp;							\
-	long new = simple_strtol(buf, &endp, 16);			\
-									\
-	if (endp == buf || new < 0)					\
-		return -EINVAL;						\
-									\
-	if (!capable(CAP_NET_ADMIN))					\
-		return -EPERM;						\
-									\
-	rtnl_lock();							\
-	to_net_dev(dev)->field = new;					\
-	rtnl_unlock();							\
-	return len;							\
+	return sprintf(buf, format_string, net->field);			\
+}									\
+static ssize_t show_##field(struct class_device *cd, char *buf)		\
+{									\
+	return netdev_show(cd, buf, format_##field);			\
+}
+
+
+/* use same locking and permission rules as SIF* ioctl's */
+static ssize_t netdev_store(struct class_device *dev,
+			    const char *buf, size_t len,
+			    int (*set)(struct net_device *, unsigned long))
+{
+	struct net_device *net = to_net_dev(dev);
+	char *endp;
+	unsigned long new;
+	int ret = -EINVAL;
+
+	if (!capable(CAP_NET_ADMIN))
+		return -EPERM;
+
+	new = simple_strtoul(buf, &endp, 0);
+	if (endp == buf)
+		goto err;
+
+	rtnl_lock();
+	if (dev_isalive(net)) {
+		if ((ret = (*set)(net, new)) == 0)
+			ret = len;
+	}
+	rtnl_unlock();
+ err:
+	return ret;
 }
 
 /* generate a read-only network device class attribute */
@@ -66,20 +85,7 @@ NETDEVICE_ATTR(ifindex, "%d\n");
 NETDEVICE_ATTR(features, "%#x\n");
 NETDEVICE_ATTR(type, "%d\n");
 
-/* TODO: only a few devices set this now should fix others. */
-static ssize_t show_port(struct class_device *dev, char *buf)
-{
-	unsigned char port = to_net_dev(dev)->if_port;
-	char *cp = buf;
-
-	cp += sprintf(cp, "%d", port);
-	if (port < ARRAY_SIZE(if_port_text))
-		cp += sprintf(cp, " (%s)", if_port_text[port]);
-	*cp++ ='\n';
-	return cp - buf;
-}
-static CLASS_DEVICE_ATTR(if_port, S_IRUGO, show_port, NULL);
-
+/* use same locking rules as GIFHWADDR ioctl's */
 static ssize_t format_addr(char *buf, const unsigned char *addr, int len)
 {
 	int i;
@@ -96,13 +102,17 @@ static ssize_t format_addr(char *buf, const unsigned char *addr, int len)
 static ssize_t show_address(struct class_device *dev, char *buf)
 {
 	struct net_device *net = to_net_dev(dev);
-	return format_addr(buf, net->dev_addr, net->addr_len);
+	if (dev_isalive(net))
+	    return format_addr(buf, net->dev_addr, net->addr_len);
+	return -EINVAL;
 }
 
 static ssize_t show_broadcast(struct class_device *dev, char *buf)
 {
 	struct net_device *net = to_net_dev(dev);
-	return format_addr(buf, net->broadcast, net->addr_len);
+	if (dev_isalive(net))
+		return format_addr(buf, net->broadcast, net->addr_len);
+	return -EINVAL;
 }
 
 static CLASS_DEVICE_ATTR(address, S_IRUGO, show_address, NULL);
@@ -111,60 +121,47 @@ static CLASS_DEVICE_ATTR(broadcast, S_IRUGO, show_broadcast, NULL);
 /* read-write attributes */
 NETDEVICE_SHOW(mtu, "%d\n");
 
+static int change_mtu(struct net_device *net, unsigned long new_mtu)
+{
+	return dev_set_mtu(net, (int) new_mtu);
+}
+
 static ssize_t store_mtu(struct class_device *dev, const char *buf, size_t len)
 {
-	char *endp;
-	int new_mtu;
-	int err;
-
-	new_mtu = simple_strtoul(buf, &endp, 10);
-	if (endp == buf) 
-		return -EINVAL;
-
-	if (!capable(CAP_NET_ADMIN))
-		return -EPERM;
-	
-	rtnl_lock();
-	err = dev_set_mtu(to_net_dev(dev), new_mtu);
-	rtnl_unlock();
-
-	return err == 0 ? len : err;
+	return netdev_store(dev, buf, len, change_mtu);
 }
 
 static CLASS_DEVICE_ATTR(mtu, S_IRUGO | S_IWUSR, show_mtu, store_mtu);
 
 NETDEVICE_SHOW(flags, "%#x\n");
 
+static int change_flags(struct net_device *net, unsigned long new_flags)
+{
+	return dev_change_flags(net, (unsigned) new_flags);
+}
+
 static ssize_t store_flags(struct class_device *dev, const char *buf, size_t len)
 {
-	unsigned long new_flags;
-	char *endp;
-	int err = 0;
-
-	new_flags = simple_strtoul(buf, &endp, 16);
-	if (endp == buf)
-		return -EINVAL;
-
-	if (!capable(CAP_NET_ADMIN))
-		return -EPERM;
-	
-	rtnl_lock();
-	err = dev_change_flags(to_net_dev(dev), new_flags);
-	rtnl_unlock();
-
-	return err ? err : len;
+	return netdev_store(dev, buf, len, change_flags);
 }
 
 static CLASS_DEVICE_ATTR(flags, S_IRUGO | S_IWUSR, show_flags, store_flags);
 
 NETDEVICE_SHOW(tx_queue_len, "%lu\n");
-NETDEVICE_STORE(tx_queue_len);
+
+static int change_tx_queue_len(struct net_device *net, unsigned long new_len)
+{
+	net->tx_queue_len = new_len;
+	return 0;
+}
+
+static ssize_t store_tx_queue_len(struct class_device *dev, const char *buf, size_t len)
+{
+	return netdev_store(dev, buf, len, change_tx_queue_len);
+}
+
 static CLASS_DEVICE_ATTR(tx_queue_len, S_IRUGO | S_IWUSR, show_tx_queue_len, 
 			 store_tx_queue_len);
-
-static struct class net_class = {
-	.name = "net",
-};
 
 
 static struct class_device_attribute *net_class_attributes[] = {
@@ -175,7 +172,6 @@ static struct class_device_attribute *net_class_attributes[] = {
 	&class_device_attr_features,
 	&class_device_attr_mtu,
 	&class_device_attr_flags,
-	&class_device_attr_if_port,
 	&class_device_attr_type,
 	&class_device_attr_address,
 	&class_device_attr_broadcast,
@@ -262,16 +258,17 @@ netstat_attr_show(struct kobject *kobj, struct attribute *attr, char *buf)
 {
 	struct netstat_fs_entry *entry
 		= container_of(attr, struct netstat_fs_entry, attr);
-	struct class_device *class_dev
-		= container_of(kobj->parent, struct class_device, kobj);
 	struct net_device *dev
-		= to_net_dev(class_dev);
-	struct net_device_stats *stats 
-		= dev->get_stats ? dev->get_stats(dev) : NULL;
-
-	if (stats && entry->show) 
-		return entry->show(stats, buf);
-	return -EINVAL;
+		= to_net_dev(to_class_dev(kobj->parent));
+	struct net_device_stats *stats;
+	ssize_t ret = -EINVAL;
+	
+	read_lock(&dev_base_lock);
+	if (dev_isalive(dev) && entry->show && dev->get_stats &&
+	    (stats = (*dev->get_stats)(dev)))
+		ret = entry->show(stats, buf);
+	read_unlock(&dev_base_lock);
+	return ret;
 }
 
 static struct sysfs_ops netstat_sysfs_ops = {
@@ -281,6 +278,35 @@ static struct sysfs_ops netstat_sysfs_ops = {
 static struct kobj_type netstat_ktype = {
 	.sysfs_ops	= &netstat_sysfs_ops,
 	.default_attrs  = default_attrs,
+};
+
+#ifdef CONFIG_HOTPLUG
+static int netdev_hotplug(struct class_device *cd, char **envp,
+			  int num_envp, char *buf, int size)
+{
+	struct net_device *dev = to_net_dev(cd);
+	int i = 0;
+	int n;
+
+	/* pass interface in env to hotplug. */
+	envp[i++] = buf;
+	n = snprintf(buf, size, "INTERFACE=%s", dev->name) + 1;
+	buf += n;
+	size -= n;
+
+	if ((size <= 0) || (i >= num_envp))
+		return -ENOMEM;
+
+	envp[i] = 0;
+	return 0;
+}
+#endif
+
+static struct class net_class = {
+	.name = "net",
+#ifdef CONFIG_HOTPLUG
+	.hotplug = netdev_hotplug,
+#endif
 };
 
 /* Create sysfs entries for network device. */
@@ -294,7 +320,7 @@ int netdev_register_sysfs(struct net_device *net)
 	class_dev->class = &net_class;
 	class_dev->class_data = net;
 
-	snprintf(class_dev->class_id, BUS_ID_SIZE, net->name);
+	strlcpy(class_dev->class_id, net->name, BUS_ID_SIZE);
 	if ((ret = class_device_register(class_dev)))
 		goto out;
 
@@ -303,17 +329,12 @@ int netdev_register_sysfs(struct net_device *net)
 		    goto out_unreg;
 	}
 
+	net->stats_kobj.parent = NULL;
 	if (net->get_stats) {
 		struct kobject *k = &net->stats_kobj;
 
-		memset(k, 0, sizeof(*k));
-		k->parent = kobject_get(&class_dev->kobj);
-		if (!k->parent) {
-			ret = -EBUSY;
-			goto out_unreg;
-		}
-
-		snprintf(k->name, KOBJ_NAME_LEN, "%s", "statistics");
+		k->parent = &class_dev->kobj;
+		strlcpy(k->name, "statistics", KOBJ_NAME_LEN);
 		k->ktype = &netstat_ktype;
 
 		if((ret = kobject_register(k))) 
@@ -331,8 +352,9 @@ out_unreg:
 
 void netdev_unregister_sysfs(struct net_device *net)
 {
-	if (net->get_stats)
-		kobject_del(&net->stats_kobj);
+	if (net->stats_kobj.parent) 
+		kobject_unregister(&net->stats_kobj);
+
 	class_device_unregister(&net->class_dev);
 }
 

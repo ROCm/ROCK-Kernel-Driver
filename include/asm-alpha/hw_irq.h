@@ -13,6 +13,4 @@ extern volatile unsigned long irq_err_count;
 #define ACTUAL_NR_IRQS	NR_IRQS
 #endif
 
-extern irq_desc_t irq_desc [NR_IRQS];
-
 #endif

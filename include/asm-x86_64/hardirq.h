@@ -12,10 +12,6 @@
    special access macros. This would generate better code. */ 
 #define __IRQ_STAT(cpu,member) (read_pda(me)->member)
 
-typedef struct {
-	/* Empty. All the fields have moved to the PDA. */
-} irq_cpustat_t; 
-
 #include <linux/irq_cpustat.h>	/* Standard mappings for irq_cpustat_t above */
 
 /*

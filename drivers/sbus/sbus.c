@@ -334,7 +334,7 @@ static int __init sbus_init(void)
 		nd = prom_searchsiblings(topnd, "sbus");
 		if(nd == 0) {
 #ifdef CONFIG_PCI
-			if (!pci_present()) {
+			if (pci_find_device(PCI_ANY_ID, PCI_ANY_ID, NULL) == NULL) {
 				prom_printf("Neither SBUS nor PCI found.\n");
 				prom_halt();
 			} else {

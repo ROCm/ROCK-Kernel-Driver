@@ -4,7 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992-1997,2000-2003 Silicon Graphics, Inc. All rights reserved.
+ * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc. All rights reserved.
  */
 
 #include <linux/types.h>
@@ -20,6 +20,8 @@
 #include <asm/sn/pci/pciio.h>
 #include <asm/sn/slotnum.h>
 
+unsigned char Is_pic_on_this_nasid[512];	/* non-0 when this is a pic shub */
+
 void *
 snia_kmem_zalloc(size_t size, int flag)
 {
@@ -33,6 +35,13 @@ void
 snia_kmem_free(void *ptr, size_t size)
 {
         kfree(ptr);
+}
+
+int
+nic_vertex_info_match(devfs_handle_t v, char *s)
+{
+	/* we don't support this */
+	return(0);
 }
 
 /*
@@ -93,6 +102,34 @@ atoi(register char *p)
                 }
         }
         return (neg ? n : -n);
+}
+
+char *
+strtok_r(char *string, const char *sepset, char **lasts)
+{
+        register char   *q, *r;
+
+        /*first or subsequent call*/
+        if (string == NULL)
+                string = *lasts;
+
+        if(string == 0)         /* return if no tokens remaining */
+                return(NULL);
+
+        q = string + strspn(string, sepset);    /* skip leading separators */
+
+        if(*q == '\0') {                /* return if no tokens remaining */
+                *lasts = 0;     /* indicate this is last token */
+                return(NULL);
+        }
+
+        if((r = strpbrk(q, sepset)) == NULL)    /* move past token */
+                *lasts = 0;     /* indicate this is last token */
+        else {
+                *r = '\0';
+                *lasts = r+1;
+        }
+        return(q);
 }
 
 /*

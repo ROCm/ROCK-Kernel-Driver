@@ -182,7 +182,7 @@ struct compressor {
 #define CI_DEFLATE_DRAFT	24	/* value used in original draft RFC */
 #define CILEN_DEFLATE		4	/* length of its config option */
 
-#define DEFLATE_MIN_SIZE	8
+#define DEFLATE_MIN_SIZE	9
 #define DEFLATE_MAX_SIZE	15
 #define DEFLATE_METHOD_VAL	8
 #define DEFLATE_SIZE(x)		(((x) >> 4) + DEFLATE_MIN_SIZE)

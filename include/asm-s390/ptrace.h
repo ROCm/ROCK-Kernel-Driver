@@ -458,7 +458,6 @@ struct user_regs_struct
 #ifdef __KERNEL__
 #define user_mode(regs) (((regs)->psw.mask & PSW_MASK_PSTATE) != 0)
 #define instruction_pointer(regs) ((regs)->psw.addr & PSW_ADDR_INSN)
-#define force_successful_syscall_return()	do { } while (0)
 extern void show_regs(struct pt_regs * regs);
 #endif
 

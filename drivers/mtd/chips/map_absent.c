@@ -1,7 +1,7 @@
 /*
  * Common code to handle absent "placeholder" devices
  * Copyright 2001 Resilience Corporation <ebrower@resilience.com>
- * $Id: map_absent.c,v 1.2 2001/10/02 15:05:12 dwmw2 Exp $
+ * $Id: map_absent.c,v 1.4 2003/05/28 12:51:49 dwmw2 Exp $
  *
  * This map driver is used to allocate "placeholder" MTD
  * devices on systems that have socketed/removable media. 
@@ -23,9 +23,10 @@
 #include <linux/kernel.h>
 #include <linux/errno.h>
 #include <linux/slab.h>
-
+#include <linux/init.h>
+#include <linux/mtd/mtd.h>
 #include <linux/mtd/map.h>
-
+#include <linux/mtd/compatmac.h>
 
 static int map_absent_read (struct mtd_info *, loff_t, size_t, size_t *, u_char *);
 static int map_absent_write (struct mtd_info *, loff_t, size_t, size_t *, const u_char *);
@@ -36,10 +37,10 @@ static void map_absent_destroy (struct mtd_info *);
 
 
 static struct mtd_chip_driver map_absent_chipdrv = {
-	.probe 		= map_absent_probe,
+	.probe		= map_absent_probe,
 	.destroy	= map_absent_destroy,
-	.name 		= "map_absent",
-	.module 	= THIS_MODULE
+	.name		= "map_absent",
+	.module		= THIS_MODULE
 };
 
 static struct mtd_info *map_absent_probe(struct map_info *map)
@@ -65,7 +66,7 @@ static struct mtd_info *map_absent_probe(struct map_info *map)
 	mtd->flags 	= 0;
 	mtd->erasesize = PAGE_SIZE;
 
-	MOD_INC_USE_COUNT;
+	__module_get(THIS_MODULE);
 	return mtd;
 }
 

@@ -337,12 +337,15 @@ void do_gettimeofday(struct timeval *tv)
         tv->tv_usec = usec;
 }
 
-void do_settimeofday(struct timeval *tv)
+int do_settimeofday(struct timespec *tv)
 {
 	unsigned long flags;
 	unsigned long delta_xsec;
-	long int tb_delta, new_usec, new_sec;
+	long int tb_delta, new_nsec, new_sec;
 	unsigned long new_xsec;
+
+	if ((unsigned long)tv->tv_nsec >= NSEC_PER_SEC)
+		return -EINVAL;
 
 	write_seqlock_irqsave(&xtime_lock, flags);
 	/* Updating the RTC is not the job of this code. If the time is
@@ -362,12 +365,12 @@ void do_settimeofday(struct timeval *tv)
 	tb_delta += (jiffies - wall_jiffies) * tb_ticks_per_jiffy;
 
 	new_sec = tv->tv_sec;
-	new_usec = tv->tv_usec - tb_delta / tb_ticks_per_usec;
-	while (new_usec <0) {
+	new_nsec = tv->tv_nsec - (tb_delta / tb_ticks_per_usec / 1000);
+	while (new_nsec < 0) {
 		new_sec--; 
-		new_usec += USEC_PER_SEC;
+		new_nsec += NSEC_PER_SEC;
 	}
-	xtime.tv_nsec = new_usec * 1000;
+	xtime.tv_nsec = new_nsec;
 	xtime.tv_sec = new_sec;
 
 	/* In case of a large backwards jump in time with NTP, we want the 
@@ -381,7 +384,7 @@ void do_settimeofday(struct timeval *tv)
 	time_esterror = NTP_PHASE_LIMIT;
 
 	delta_xsec = mulhdu( (tb_last_stamp-do_gtod.tb_orig_stamp), do_gtod.varp->tb_to_xs );
-	new_xsec = (new_usec * XSEC_PER_SEC) / USEC_PER_SEC;
+	new_xsec = (new_nsec * XSEC_PER_SEC) / NSEC_PER_SEC;
 	new_xsec += new_sec * XSEC_PER_SEC;
 	if ( new_xsec > delta_xsec ) {
 		do_gtod.varp->stamp_xsec = new_xsec - delta_xsec;
@@ -396,6 +399,7 @@ void do_settimeofday(struct timeval *tv)
 	}
 
 	write_sequnlock_irqrestore(&xtime_lock, flags);
+	return 0;
 }
 
 /*
@@ -407,7 +411,7 @@ void do_settimeofday(struct timeval *tv)
 long ppc64_sys32_stime(int* tptr)
 {
 	int value;
-	struct timeval myTimeval;
+	struct timespec myTimeval;
 
 	if (!capable(CAP_SYS_TIME))
 		return -EPERM;
@@ -416,7 +420,7 @@ long ppc64_sys32_stime(int* tptr)
 		return -EFAULT;
 
 	myTimeval.tv_sec = value;
-	myTimeval.tv_usec = 0;
+	myTimeval.tv_nsec = 0;
 
 	do_settimeofday(&myTimeval);
 
@@ -432,7 +436,7 @@ long ppc64_sys32_stime(int* tptr)
 long ppc64_sys_stime(long* tptr)
 {
 	long value;
-	struct timeval myTimeval;
+	struct timespec myTimeval;
 
 	if (!capable(CAP_SYS_TIME))
 		return -EPERM;
@@ -441,7 +445,7 @@ long ppc64_sys_stime(long* tptr)
 		return -EFAULT;
 
 	myTimeval.tv_sec = value;
-	myTimeval.tv_usec = 0;
+	myTimeval.tv_nsec = 0;
 
 	do_settimeofday(&myTimeval);
 

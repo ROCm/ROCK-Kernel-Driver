@@ -3,9 +3,6 @@
 
 #include "matroxfb_base.h"
 
-void matrox_init_putc(WPMINFO struct display* p, void (*)(WPMINFO struct display *p));
 void matrox_cfbX_init(WPMINFO2);
-void matrox_text_round(CPMINFO struct fb_var_screeninfo* var, struct display* p);
-void initMatrox(WPMINFO struct display* p);
 
 #endif

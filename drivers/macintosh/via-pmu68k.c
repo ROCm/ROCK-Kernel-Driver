@@ -839,11 +839,11 @@ static inline void __openfirmware
 pbook_pci_save(void)
 {
 	int npci;
-	struct pci_dev *pd;
+	struct pci_dev *pd = NULL;
 	struct pci_save *ps;
 
 	npci = 0;
-	for (pd = pci_devices; pd != NULL; pd = pd->next)
+	while ((pd = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, pd)) != NULL)
 		++npci;
 	n_pbook_pci_saves = npci;
 	if (npci == 0)
@@ -853,7 +853,8 @@ pbook_pci_save(void)
 	if (ps == NULL)
 		return;
 
-	for (pd = pci_devices; pd != NULL && npci != 0; pd = pd->next) {
+	pd = NULL;
+	while ((pd = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, pd)) != NULL) {
 		pci_read_config_word(pd, PCI_COMMAND, &ps->command);
 		pci_read_config_word(pd, PCI_CACHE_LINE_SIZE, &ps->cache_lat);
 		pci_read_config_word(pd, PCI_INTERRUPT_LINE, &ps->intr);
@@ -867,10 +868,10 @@ pbook_pci_restore(void)
 {
 	u16 cmd;
 	struct pci_save *ps = pbook_pci_saves;
-	struct pci_dev *pd;
+	struct pci_dev *pd = NULL;
 	int j;
 
-	for (pd = pci_devices; pd != NULL; pd = pd->next, ++ps) {
+	while ((pd = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, pd)) != NULL) {
 		if (ps->command == 0)
 			continue;
 		pci_read_config_word(pd, PCI_COMMAND, &cmd);

@@ -32,8 +32,8 @@
 
 /*
  * fill ring buffer with silence
- * runtime->silenced_start: starting pointer to silence area
- * runtime->silenced_size: size filled with silence
+ * runtime->silence_start: starting pointer to silence area
+ * runtime->silence_filled: size filled with silence
  * runtime->silence_threshold: threshold from application
  * runtime->silence_size: maximal size from application
  *
@@ -46,20 +46,20 @@ void snd_pcm_playback_silence(snd_pcm_substream_t *substream, snd_pcm_uframes_t 
 
 	if (runtime->silence_size < runtime->boundary) {
 		snd_pcm_sframes_t noise_dist, n;
-		if (runtime->silenced_start != runtime->control->appl_ptr) {
-			n = runtime->control->appl_ptr - runtime->silenced_start;
+		if (runtime->silence_start != runtime->control->appl_ptr) {
+			n = runtime->control->appl_ptr - runtime->silence_start;
 			if (n < 0)
 				n += runtime->boundary;
-			if ((snd_pcm_uframes_t)n < runtime->silenced_size)
-				runtime->silenced_size -= n;
+			if ((snd_pcm_uframes_t)n < runtime->silence_filled)
+				runtime->silence_filled -= n;
 			else
-				runtime->silenced_size = 0;
-			runtime->silenced_start = runtime->control->appl_ptr;
+				runtime->silence_filled = 0;
+			runtime->silence_start = runtime->control->appl_ptr;
 		}
-		if (runtime->silenced_size == runtime->buffer_size)
+		if (runtime->silence_filled == runtime->buffer_size)
 			return;
-		snd_assert(runtime->silenced_size <= runtime->buffer_size, return);
-		noise_dist = snd_pcm_playback_hw_avail(runtime) + runtime->silenced_size;
+		snd_assert(runtime->silence_filled <= runtime->buffer_size, return);
+		noise_dist = snd_pcm_playback_hw_avail(runtime) + runtime->silence_filled;
 		if (noise_dist > (snd_pcm_sframes_t) runtime->silence_threshold)
 			return;
 		frames = runtime->silence_threshold - noise_dist;
@@ -67,30 +67,30 @@ void snd_pcm_playback_silence(snd_pcm_substream_t *substream, snd_pcm_uframes_t 
 			frames = runtime->silence_size;
 	} else {
 		if (new_hw_ptr == ULONG_MAX) {	/* initialization */
-			runtime->silenced_size = 0;
-			runtime->silenced_start = runtime->control->appl_ptr;
+			runtime->silence_filled = 0;
+			runtime->silence_start = runtime->control->appl_ptr;
 		} else {
 			ofs = runtime->status->hw_ptr;
 			frames = new_hw_ptr - ofs;
 			if ((snd_pcm_sframes_t)frames < 0)
 				frames += runtime->boundary;
-			runtime->silenced_size -= frames;
-			if ((snd_pcm_sframes_t)runtime->silenced_size < 0) {
-				runtime->silenced_size = 0;
-				runtime->silenced_start = (ofs + frames) - runtime->buffer_size;
+			runtime->silence_filled -= frames;
+			if ((snd_pcm_sframes_t)runtime->silence_filled < 0) {
+				runtime->silence_filled = 0;
+				runtime->silence_start = (ofs + frames) - runtime->buffer_size;
 			} else {
-				runtime->silenced_start = ofs - runtime->silenced_size;
+				runtime->silence_start = ofs - runtime->silence_filled;
 			}
-			if ((snd_pcm_sframes_t)runtime->silenced_start < 0)
-				runtime->silenced_start += runtime->boundary;
+			if ((snd_pcm_sframes_t)runtime->silence_start < 0)
+				runtime->silence_start += runtime->boundary;
 		}
 		frames = runtime->buffer_size;
 	}
-	snd_assert(frames >= runtime->silenced_size, return);
-	frames -= runtime->silenced_size;
+	snd_assert(frames >= runtime->silence_filled, return);
+	frames -= runtime->silence_filled;
 	if (frames == 0)
 		return;
-	ofs = (runtime->silenced_start + runtime->silenced_size) % runtime->buffer_size;
+	ofs = (runtime->silence_start + runtime->silence_filled) % runtime->buffer_size;
 	while (frames > 0) {
 		transfer = ofs + frames > runtime->buffer_size ? runtime->buffer_size - ofs : frames;
 		if (runtime->access == SNDRV_PCM_ACCESS_RW_INTERLEAVED ||
@@ -120,13 +120,13 @@ void snd_pcm_playback_silence(snd_pcm_substream_t *substream, snd_pcm_uframes_t 
 				}
 			}
 		}
-		runtime->silenced_size += transfer;
+		runtime->silence_filled += transfer;
 		frames -= transfer;
 		ofs = 0;
 	}
 }
 
-int snd_pcm_update_hw_ptr_interrupt(snd_pcm_substream_t *substream)
+static inline int snd_pcm_update_hw_ptr_interrupt(snd_pcm_substream_t *substream)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	snd_pcm_uframes_t pos;
@@ -1932,9 +1932,9 @@ void snd_pcm_tick_prepare(snd_pcm_substream_t *substream)
 		if (runtime->silence_size >= runtime->boundary) {
 			frames = 1;
 		} else if (runtime->silence_size > 0 &&
-		    runtime->silenced_size < runtime->buffer_size) {
+		    runtime->silence_filled < runtime->buffer_size) {
 			snd_pcm_sframes_t noise_dist;
-			noise_dist = snd_pcm_playback_hw_avail(runtime) + runtime->silenced_size;
+			noise_dist = snd_pcm_playback_hw_avail(runtime) + runtime->silence_filled;
 			snd_assert(noise_dist <= (snd_pcm_sframes_t)runtime->silence_threshold, );
 			frames = noise_dist - runtime->silence_threshold;
 		}
@@ -1976,18 +1976,20 @@ void snd_pcm_tick_prepare(snd_pcm_substream_t *substream)
 void snd_pcm_tick_elapsed(snd_pcm_substream_t *substream)
 {
 	snd_pcm_runtime_t *runtime;
+	unsigned long flags;
+	
 	snd_assert(substream != NULL, return);
 	runtime = substream->runtime;
 	snd_assert(runtime != NULL, return);
 
-	spin_lock_irq(&runtime->lock);
+	snd_pcm_stream_lock_irqsave(substream, flags);
 	if (!snd_pcm_running(substream) ||
 	    snd_pcm_update_hw_ptr(substream) < 0)
 		goto _end;
 	if (runtime->sleep_min)
 		snd_pcm_tick_prepare(substream);
  _end:
-	spin_unlock_irq(&runtime->lock);
+	snd_pcm_stream_unlock_irqrestore(substream, flags);
 }
 
 /**
@@ -2004,6 +2006,8 @@ void snd_pcm_tick_elapsed(snd_pcm_substream_t *substream)
 void snd_pcm_period_elapsed(snd_pcm_substream_t *substream)
 {
 	snd_pcm_runtime_t *runtime;
+	unsigned long flags;
+
 	snd_assert(substream != NULL, return);
 	runtime = substream->runtime;
 	snd_assert(runtime != NULL, return);
@@ -2011,7 +2015,7 @@ void snd_pcm_period_elapsed(snd_pcm_substream_t *substream)
 	if (runtime->transfer_ack_begin)
 		runtime->transfer_ack_begin(substream);
 
-	spin_lock(&runtime->lock);
+	snd_pcm_stream_lock_irqsave(substream, flags);
 	if (!snd_pcm_running(substream) ||
 	    snd_pcm_update_hw_ptr_interrupt(substream) < 0)
 		goto _end;
@@ -2021,7 +2025,7 @@ void snd_pcm_period_elapsed(snd_pcm_substream_t *substream)
 	if (runtime->sleep_min)
 		snd_pcm_tick_prepare(substream);
  _end:
-	spin_unlock(&runtime->lock);
+	snd_pcm_stream_unlock_irqrestore(substream, flags);
 	if (runtime->transfer_ack_end)
 		runtime->transfer_ack_end(substream);
 	kill_fasync(&runtime->fasync, SIGIO, POLL_IN);
@@ -2065,7 +2069,7 @@ static snd_pcm_sframes_t snd_pcm_lib_write1(snd_pcm_substream_t *substream,
 	if (size > runtime->xfer_align)
 		size -= size % runtime->xfer_align;
 
-	spin_lock_irq(&runtime->lock);
+	snd_pcm_stream_lock_irq(substream);
 	switch (runtime->status->state) {
 	case SNDRV_PCM_STATE_PREPARED:
 	case SNDRV_PCM_STATE_RUNNING:
@@ -2093,6 +2097,7 @@ static snd_pcm_sframes_t snd_pcm_lib_write1(snd_pcm_substream_t *substream,
 		   (size >= runtime->xfer_align && avail < runtime->xfer_align))) {
 			wait_queue_t wait;
 			enum { READY, SIGNALED, ERROR, SUSPENDED, EXPIRED } state;
+			long tout;
 
 			if (nonblock) {
 				err = -EAGAIN;
@@ -2107,16 +2112,16 @@ static snd_pcm_sframes_t snd_pcm_lib_write1(snd_pcm_substream_t *substream,
 					state = SIGNALED;
 					break;
 				}
-				spin_unlock_irq(&runtime->lock);
-				if (schedule_timeout(10 * HZ) == 0) {
-					spin_lock_irq(&runtime->lock);
+				snd_pcm_stream_unlock_irq(substream);
+				tout = schedule_timeout(10 * HZ);
+				snd_pcm_stream_lock_irq(substream);
+				if (tout == 0) {
 					if (runtime->status->state != SNDRV_PCM_STATE_PREPARED &&
 					    runtime->status->state != SNDRV_PCM_STATE_PAUSED) {
 						state = runtime->status->state == SNDRV_PCM_STATE_SUSPENDED ? SUSPENDED : EXPIRED;
 						break;
 					}
 				}
-				spin_lock_irq(&runtime->lock);
 				switch (runtime->status->state) {
 				case SNDRV_PCM_STATE_XRUN:
 				case SNDRV_PCM_STATE_DRAINING:
@@ -2162,15 +2167,13 @@ static snd_pcm_sframes_t snd_pcm_lib_write1(snd_pcm_substream_t *substream,
 		cont = runtime->buffer_size - runtime->control->appl_ptr % runtime->buffer_size;
 		if (frames > cont)
 			frames = cont;
-		snd_assert(frames != 0,
-			   spin_unlock_irq(&runtime->lock);
-			   return -EINVAL);
+		snd_assert(frames != 0, snd_pcm_stream_unlock_irq(substream); return -EINVAL);
 		appl_ptr = runtime->control->appl_ptr;
 		appl_ofs = appl_ptr % runtime->buffer_size;
-		spin_unlock_irq(&runtime->lock);
+		snd_pcm_stream_unlock_irq(substream);
 		if ((err = transfer(substream, appl_ofs, (void *)data, offset, frames)) < 0)
 			goto _end;
-		spin_lock_irq(&runtime->lock);
+		snd_pcm_stream_lock_irq(substream);
 		switch (runtime->status->state) {
 		case SNDRV_PCM_STATE_XRUN:
 			err = -EPIPE;
@@ -2204,7 +2207,7 @@ static snd_pcm_sframes_t snd_pcm_lib_write1(snd_pcm_substream_t *substream,
 			snd_pcm_tick_prepare(substream);
 	}
  _end_unlock:
-	spin_unlock_irq(&runtime->lock);
+	snd_pcm_stream_unlock_irq(substream);
  _end:
 	return xfer > 0 ? (snd_pcm_sframes_t)xfer : err;
 }
@@ -2348,7 +2351,7 @@ static snd_pcm_sframes_t snd_pcm_lib_read1(snd_pcm_substream_t *substream, void 
 	if (size > runtime->xfer_align)
 		size -= size % runtime->xfer_align;
 
-	spin_lock_irq(&runtime->lock);
+	snd_pcm_stream_lock_irq(substream);
 	switch (runtime->status->state) {
 	case SNDRV_PCM_STATE_PREPARED:
 		if (size >= runtime->start_threshold) {
@@ -2389,6 +2392,7 @@ static snd_pcm_sframes_t snd_pcm_lib_read1(snd_pcm_substream_t *substream, void 
 			   (size >= runtime->xfer_align && avail < runtime->xfer_align)) {
 			wait_queue_t wait;
 			enum { READY, SIGNALED, ERROR, SUSPENDED, EXPIRED } state;
+			long tout;
 
 			if (nonblock) {
 				err = -EAGAIN;
@@ -2403,16 +2407,16 @@ static snd_pcm_sframes_t snd_pcm_lib_read1(snd_pcm_substream_t *substream, void 
 					state = SIGNALED;
 					break;
 				}
-				spin_unlock_irq(&runtime->lock);
-				if (schedule_timeout(10 * HZ) == 0) {
-					spin_lock_irq(&runtime->lock);
+				snd_pcm_stream_unlock_irq(substream);
+				tout = schedule_timeout(10 * HZ);
+				snd_pcm_stream_lock_irq(substream);
+				if (tout == 0) {
 					if (runtime->status->state != SNDRV_PCM_STATE_PREPARED &&
 					    runtime->status->state != SNDRV_PCM_STATE_PAUSED) {
 						state = runtime->status->state == SNDRV_PCM_STATE_SUSPENDED ? SUSPENDED : EXPIRED;
 						break;
 					}
 				}
-				spin_lock_irq(&runtime->lock);
 				switch (runtime->status->state) {
 				case SNDRV_PCM_STATE_XRUN:
 					state = ERROR;
@@ -2459,15 +2463,13 @@ static snd_pcm_sframes_t snd_pcm_lib_read1(snd_pcm_substream_t *substream, void 
 		cont = runtime->buffer_size - runtime->control->appl_ptr % runtime->buffer_size;
 		if (frames > cont)
 			frames = cont;
-		snd_assert(frames != 0,
-			   spin_unlock_irq(&runtime->lock);
-			   return -EINVAL);
+		snd_assert(frames != 0, snd_pcm_stream_unlock_irq(substream); return -EINVAL);
 		appl_ptr = runtime->control->appl_ptr;
 		appl_ofs = appl_ptr % runtime->buffer_size;
-		spin_unlock_irq(&runtime->lock);
+		snd_pcm_stream_unlock_irq(substream);
 		if ((err = transfer(substream, appl_ofs, (void *)data, offset, frames)) < 0)
 			goto _end;
-		spin_lock_irq(&runtime->lock);
+		snd_pcm_stream_lock_irq(substream);
 		switch (runtime->status->state) {
 		case SNDRV_PCM_STATE_XRUN:
 			err = -EPIPE;
@@ -2495,7 +2497,7 @@ static snd_pcm_sframes_t snd_pcm_lib_read1(snd_pcm_substream_t *substream, void 
 			snd_pcm_tick_prepare(substream);
 	}
  _end_unlock:
-	spin_unlock_irq(&runtime->lock);
+	snd_pcm_stream_unlock_irq(substream);
  _end:
 	return xfer > 0 ? (snd_pcm_sframes_t)xfer : err;
 }

@@ -2857,18 +2857,15 @@ char *acornscsi_info(struct Scsi_Host *host)
     return string;
 }
 
-int acornscsi_proc_info(char *buffer, char **start, off_t offset,
-			int length, int host_no, int inout)
+int acornscsi_proc_info(struct Scsi_Host *instance, char *buffer, char **start, off_t offset,
+			int length, int inout)
 {
     int pos, begin = 0, devidx;
-    struct Scsi_Host *instance;
     Scsi_Device *scd;
     AS_Host *host;
     char *p = buffer;
 
-    instance = scsi_host_hn_get(host_no);
-
-    if (inout == 1 || !instance)
+    if (inout == 1)
 	return -EINVAL;
 
     host  = (AS_Host *)instance->hostdata;

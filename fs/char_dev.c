@@ -89,6 +89,8 @@ __register_chrdev_region(unsigned int major, unsigned int baseminor,
 	if (cd == NULL)
 		return ERR_PTR(-ENOMEM);
 
+	memset(cd, 0, sizeof(struct char_device_struct));
+
 	write_lock_irq(&chrdevs_lock);
 
 	/* temporary */
@@ -177,10 +179,10 @@ fail:
 	return PTR_ERR(cd);
 }
 
-int alloc_chrdev_region(dev_t *dev, unsigned count, char *name)
+int alloc_chrdev_region(dev_t *dev, unsigned baseminor, unsigned count, char *name)
 {
 	struct char_device_struct *cd;
-	cd = __register_chrdev_region(0, 0, count, name);
+	cd = __register_chrdev_region(0, baseminor, count, name);
 	if (IS_ERR(cd))
 		return PTR_ERR(cd);
 	*dev = MKDEV(cd->major, cd->baseminor);
@@ -219,7 +221,7 @@ int register_chrdev(unsigned int major, const char *name,
 out:
 	kobject_put(&cdev->kobj);
 out2:
-	__unregister_chrdev_region(cd->major, 0, 256);
+	kfree(__unregister_chrdev_region(cd->major, 0, 256));
 	return err;
 }
 
@@ -364,7 +366,10 @@ int cdev_add(struct cdev *p, dev_t dev, unsigned count)
 	int err = kobject_add(&p->kobj);
 	if (err)
 		return err;
-	return kobj_map(cdev_map, dev, count, NULL, exact_match, exact_lock, p);
+	err = kobj_map(cdev_map, dev, count, NULL, exact_match, exact_lock, p);
+	if (err)
+		kobject_del(&p->kobj);
+	return err;
 }
 
 void cdev_unmap(dev_t dev, unsigned count)

@@ -144,7 +144,7 @@ static inline int __check_fcs(u8 *data, int type, u8 fcs)
 /* ---- L2CAP callbacks ---- */
 static void rfcomm_l2state_change(struct sock *sk)
 {
-	BT_DBG("%p state %d", sk, sk->state);
+	BT_DBG("%p state %d", sk, sk->sk_state);
 	rfcomm_schedule(RFCOMM_SCHED_STATE);
 }
 
@@ -163,8 +163,8 @@ static int rfcomm_l2sock_create(struct socket **sock)
 	err = sock_create(PF_BLUETOOTH, SOCK_SEQPACKET, BTPROTO_L2CAP, sock);
 	if (!err) {
 		struct sock *sk = (*sock)->sk;
-		sk->data_ready   = rfcomm_l2data_ready;
-		sk->state_change = rfcomm_l2state_change;
+		sk->sk_data_ready   = rfcomm_l2data_ready;
+		sk->sk_state_change = rfcomm_l2state_change;
 	}
 	return err;
 }
@@ -1545,19 +1545,19 @@ static inline void rfcomm_process_rx(struct rfcomm_session *s)
 	struct sock *sk = sock->sk;
 	struct sk_buff *skb;
 
-	BT_DBG("session %p state %ld qlen %d", s, s->state, skb_queue_len(&sk->receive_queue));
+	BT_DBG("session %p state %ld qlen %d", s, s->state, skb_queue_len(&sk->sk_receive_queue));
 
 	/* Get data directly from socket receive queue without copying it. */
-	while ((skb = skb_dequeue(&sk->receive_queue))) {
+	while ((skb = skb_dequeue(&sk->sk_receive_queue))) {
 		skb_orphan(skb);
 		rfcomm_recv_frame(s, skb);
 	}
 
-	if (sk->state == BT_CLOSED) {
+	if (sk->sk_state == BT_CLOSED) {
 		if (!s->initiator)
 			rfcomm_session_put(s);
 
-		rfcomm_session_close(s, sk->err);
+		rfcomm_session_close(s, sk->sk_err);
 	}
 }
 
@@ -1587,8 +1587,8 @@ static inline void rfcomm_accept_connection(struct rfcomm_session *s)
 	}
 
 	/* Set our callbacks */
-	nsock->sk->data_ready   = rfcomm_l2data_ready;
-	nsock->sk->state_change = rfcomm_l2state_change;
+	nsock->sk->sk_data_ready   = rfcomm_l2data_ready;
+	nsock->sk->sk_state_change = rfcomm_l2state_change;
 
 	s = rfcomm_session_add(nsock, BT_OPEN);
 	if (s)
@@ -1603,7 +1603,7 @@ static inline void rfcomm_check_connection(struct rfcomm_session *s)
 
 	BT_DBG("%p state %ld", s, s->state);
 
-	switch(sk->state) {
+	switch(sk->sk_state) {
 	case BT_CONNECTED:
 		s->state = BT_CONNECT;
 
@@ -1616,7 +1616,7 @@ static inline void rfcomm_check_connection(struct rfcomm_session *s)
 
 	case BT_CLOSED:
 		s->state = BT_CLOSED;
-		rfcomm_session_close(s, sk->err);
+		rfcomm_session_close(s, sk->sk_err);
 		break;
 	}
 }

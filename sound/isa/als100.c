@@ -328,8 +328,10 @@ static int __init alsa_card_als100_init(void)
 
 	cards += pnp_register_card_driver(&als100_pnpc_driver);
 #ifdef MODULE
-	if (!cards)
+	if (!cards) {
+		pnp_unregister_card_driver(&als100_pnpc_driver);
 		snd_printk(KERN_ERR "no ALS100 based soundcards found\n");
+	}
 #endif
 	return cards ? 0 : -ENODEV;
 }

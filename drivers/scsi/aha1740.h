@@ -156,7 +156,6 @@ static int aha1740_detect(Scsi_Host_Template *);
 static int aha1740_command(Scsi_Cmnd *);
 static int aha1740_queuecommand(Scsi_Cmnd *, void (*done) (Scsi_Cmnd *));
 static int aha1740_biosparam(struct scsi_device *, struct block_device *, sector_t, int *);
-static int aha1740_proc_info(char *buffer, char **start, off_t offset, int length, int hostno, int inout);
 
 #define AHA1740_ECBS 32
 #define AHA1740_SCATTER 16

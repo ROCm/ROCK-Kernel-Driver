@@ -288,11 +288,6 @@ struct user_struct {
 	uid_t uid;
 };
 
-#define get_current_user() ({ 				\
-	struct user_struct *__user = current->user;	\
-	atomic_inc(&__user->__count);			\
-	__user; })
-
 extern struct user_struct *find_user(uid_t);
 
 extern struct user_struct root_user;
@@ -317,6 +312,7 @@ struct k_itimer {
 	unsigned long it_incr;		/* interval specified in jiffies */
 	struct task_struct *it_process;	/* process to send signal to */
 	struct timer_list it_timer;
+	struct sigqueue *sigq;		/* signal queue entry. */
 };
 
 
@@ -479,6 +475,7 @@ do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
 #define PF_FSTRANS	0x00020000	/* inside a filesystem transaction */
 #define PF_KSWAPD	0x00040000	/* I am kswapd */
 #define PF_SWAPOFF	0x00080000	/* I am in swapoff */
+#define PF_LESS_THROTTLE 0x01000000	/* Throttle me less: I clena memory */
 
 #ifdef CONFIG_SMP
 extern void set_cpus_allowed(task_t *p, unsigned long new_mask);
@@ -509,14 +506,14 @@ extern struct exec_domain	default_exec_domain;
 
 #ifndef INIT_THREAD_SIZE
 # define INIT_THREAD_SIZE	2048*sizeof(long)
+#endif
+
 union thread_union {
 	struct thread_info thread_info;
 	unsigned long stack[INIT_THREAD_SIZE/sizeof(long)];
 };
 
 extern union thread_union init_thread_union;
-#endif
-
 extern struct task_struct init_task;
 
 extern struct   mm_struct init_mm;
@@ -571,6 +568,10 @@ extern void zap_other_threads(struct task_struct *p);
 extern int kill_pg(pid_t, int, int);
 extern int kill_sl(pid_t, int, int);
 extern int kill_proc(pid_t, int, int);
+extern struct sigqueue *sigqueue_alloc(void);
+extern void sigqueue_free(struct sigqueue *);
+extern int send_sigqueue(int, struct sigqueue *,  struct task_struct *);
+extern int send_group_sigqueue(int, struct sigqueue *,  struct task_struct *);
 extern int do_sigaction(int, const struct k_sigaction *, struct k_sigaction *);
 extern int do_sigaltstack(const stack_t __user *, stack_t __user *, unsigned long);
 

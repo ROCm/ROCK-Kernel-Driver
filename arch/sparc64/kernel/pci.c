@@ -802,11 +802,11 @@ int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
 	return 0;
 }
 
-/* Return the index of the PCI controller for device PDEV. */
+/* Return the domain nuber for this pci bus */
 
-int pci_controller_num(struct pci_dev *pdev)
+int pci_domain_nr(struct pci_bus *bus)
 {
-	struct pcidev_cookie *cookie = pdev->sysdata;
+	struct pcidev_cookie *cookie = bus->sysdata;
 	int ret;
 
 	if (cookie != NULL) {

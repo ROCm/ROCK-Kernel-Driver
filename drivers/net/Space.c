@@ -105,9 +105,6 @@ extern int mc32_probe(struct net_device *dev);
 /* Detachable devices ("pocket adaptors") */
 extern int de620_probe(struct net_device *);
 
-/* FDDI adapters */
-extern int skfp_probe(struct net_device *dev);
-
 /* Fibre Channel adapters */
 extern int iph5526_probe(struct net_device *dev);
 
@@ -401,47 +398,6 @@ static int __init ethif_probe(struct net_device *dev)
 	return -ENODEV;
 }
 
-#ifdef CONFIG_FDDI
-static int __init fddiif_probe(struct net_device *dev)
-{
-    unsigned long base_addr = dev->base_addr;
-
-    if (base_addr == 1)
-	    return 1;		/* ENXIO */
-
-    if (1
-#ifdef CONFIG_APFDDI
-	&& apfddi_init(dev)
-#endif
-#ifdef CONFIG_SKFP
-	&& skfp_probe(dev)
-#endif
-	&& 1 ) {
-	    return 1;	/* -ENODEV or -EAGAIN would be more accurate. */
-    }
-    return 0;
-}
-#endif
-
-
-#ifdef CONFIG_NET_FC
-static int fcif_probe(struct net_device *dev)
-{
-	if (dev->base_addr == -1)
-		return 1;
-
-	if (1
-#ifdef CONFIG_IPHASE5526
-	    && iph5526_probe(dev)
-#endif
-	    && 1 ) {
-		return 1; /* -ENODEV or -EAGAIN would be more accurate. */
-	}
-	return 0;
-}
-#endif  /* CONFIG_NET_FC */
-
-
 #ifdef CONFIG_ETHERTAP
 static struct net_device tap0_dev = {
 	.name		= "tap0",
@@ -614,68 +570,6 @@ static struct net_device tr0_dev = {
 #define      NEXT_DEV        (&tr0_dev)
 
 #endif 
-
-#ifdef CONFIG_FDDI
-static struct net_device fddi7_dev = {
-	.name		= "fddi7",
-	.next		=  NEXT_DEV,
-	.init		= fddiif_probe
-};
-static struct net_device fddi6_dev = {
-	.name		= "fddi6",
-	.next		= &fddi7_dev,
-	.init		= fddiif_probe
-};
-static struct net_device fddi5_dev = {
-	.name		= "fddi5",
-	.next		= &fddi6_dev,
-	.init		= fddiif_probe
-};
-static struct net_device fddi4_dev = {
-	.name		= "fddi4",
-	.next		= &fddi5_dev,
-	.init		= fddiif_probe
-};
-static struct net_device fddi3_dev = {
-	.name		= "fddi3",
-	.next		= &fddi4_dev,
-	.init		= fddiif_probe
-};
-static struct net_device fddi2_dev = {
-	.name		= "fddi2",
-	.next		= &fddi3_dev,
-	.init		= fddiif_probe
-};
-static struct net_device fddi1_dev = {
-	.name		= "fddi1",
-	.next		= &fddi2_dev,
-	.init		= fddiif_probe
-};
-static struct net_device fddi0_dev = {
-	.name		= "fddi0",
-	.next		= &fddi1_dev,
-	.init		= fddiif_probe
-};
-#undef	NEXT_DEV
-#define	NEXT_DEV	(&fddi0_dev)
-#endif 
-
-
-#ifdef CONFIG_NET_FC
-static struct net_device fc1_dev = {
-	.name		= "fc1",
-	.next		= NEXT_DEV,
-	.init		= fcif_probe
-};
-static struct net_device fc0_dev = {
-	.name		= "fc0",
-	.next		=  &fc1_dev,
-	.init		= fcif_probe
-};
-#undef       NEXT_DEV
-#define      NEXT_DEV        (&fc0_dev)
-#endif
-
 
 #ifdef CONFIG_SBNI
 static struct net_device sbni7_dev = {

@@ -59,7 +59,7 @@ struct ipx_interface {
 
 	/* socket support */
 	unsigned short		if_sknum;
-	struct sock		*if_sklist;
+	struct hlist_head	if_sklist;
 	spinlock_t		if_sklist_lock;
 
 	/* administrative overhead */
@@ -105,7 +105,7 @@ struct ipx_opt {
 	unsigned short		ipx_ncp_conn;
 };
 
-#define ipx_sk(__sk) ((struct ipx_opt *)(__sk)->protinfo)
+#define ipx_sk(__sk) ((struct ipx_opt *)(__sk)->sk_protinfo)
 #define IPX_SKB_CB(__skb) ((struct ipx_cb *)&((__skb)->cb[0]))
 #endif
 #define IPX_MIN_EPHEMERAL_SOCKET	0x4000

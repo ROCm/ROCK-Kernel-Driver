@@ -316,7 +316,7 @@ typedef struct error_info_t {
 
 /* Special stuff for binding drivers to sockets */
 typedef struct bind_req_t {
-    socket_t	Socket;
+    struct pcmcia_socket	*Socket;
     u_char	Function;
     dev_info_t	*dev_info;
 } bind_req_t;
@@ -325,7 +325,7 @@ typedef struct bind_req_t {
 #define BIND_FN_ALL	0xff
 
 typedef struct mtd_bind_t {
-    socket_t	Socket;
+    struct pcmcia_socket	*Socket;
     u_int	Attributes;
     u_int	CardOffset;
     dev_info_t	*dev_info;

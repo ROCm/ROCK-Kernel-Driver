@@ -137,36 +137,19 @@ static struct vmalloc_info get_vmalloc_info(void)
 static int uptime_read_proc(char *page, char **start, off_t off,
 				 int count, int *eof, void *data)
 {
-	u64 uptime;
-	unsigned long uptime_remainder;
+	struct timespec uptime;
+	struct timespec idle;
 	int len;
+	u64 idle_jiffies = init_task.utime + init_task.stime;
 
-	uptime = get_jiffies_64() - INITIAL_JIFFIES;
-	uptime_remainder = (unsigned long) do_div(uptime, HZ);
+	do_posix_clock_monotonic_gettime(&uptime);
+	jiffies_to_timespec(idle_jiffies, &idle);
+	len = sprintf(page,"%lu.%02lu %lu.%02lu\n",
+			(unsigned long) uptime.tv_sec,
+			(uptime.tv_nsec / (NSEC_PER_SEC / 100)),
+			(unsigned long) idle.tv_sec,
+			(idle.tv_nsec / (NSEC_PER_SEC / 100)));
 
-#if HZ!=100
-	{
-		u64 idle = init_task.utime + init_task.stime;
-		unsigned long idle_remainder;
-
-		idle_remainder = (unsigned long) do_div(idle, HZ);
-		len = sprintf(page,"%lu.%02lu %lu.%02lu\n",
-			(unsigned long) uptime,
-			(uptime_remainder * 100) / HZ,
-			(unsigned long) idle,
-			(idle_remainder * 100) / HZ);
-	}
-#else
-	{
-		unsigned long idle = init_task.utime + init_task.stime;
-
-		len = sprintf(page,"%lu.%02lu %lu.%02lu\n",
-			(unsigned long) uptime,
-			uptime_remainder,
-			idle / HZ,
-			idle % HZ);
-	}
-#endif
 	return proc_calc_metrics(page, start, off, count, eof, len);
 }
 
@@ -378,8 +361,23 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 {
 	int i, len;
 	extern unsigned long total_forks;
-	u64 jif = get_jiffies_64() - INITIAL_JIFFIES;
+	u64 jif;
 	unsigned int sum = 0, user = 0, nice = 0, system = 0, idle = 0, iowait = 0;
+	struct timeval now; 
+	unsigned long seq;
+
+	/* Atomically read jiffies and time of day */ 
+	do {
+		seq = read_seqbegin(&xtime_lock);
+
+		jif = get_jiffies_64();
+		do_gettimeofday(&now);
+	} while (read_seqretry(&xtime_lock, seq));
+
+	/* calc # of seconds since boot time */
+	jif -= INITIAL_JIFFIES;
+	jif = ((u64)now.tv_sec * HZ) + (now.tv_usec/(1000000/HZ)) - jif;
+	do_div(jif, HZ);
 
 	for (i = 0 ; i < NR_CPUS; i++) {
 		int j;
@@ -419,7 +417,6 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 		len += sprintf(page + len, " %u", kstat_irqs(i));
 #endif
 
-	do_div(jif, HZ);
 	len += sprintf(page + len,
 		"\nctxt %lu\n"
 		"btime %lu\n"
@@ -427,7 +424,7 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 		"procs_running %lu\n"
 		"procs_blocked %lu\n",
 		nr_context_switches(),
-		xtime.tv_sec - (unsigned long) jif,
+		(unsigned long)jif,
 		total_forks,
 		nr_running(),
 		nr_iowait());

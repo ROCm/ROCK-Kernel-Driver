@@ -15,21 +15,6 @@
 #include "hosts.h"
 
 
-/* XXX - For now, we assume the first (i.e. having the least host_no)
-   real (i.e. non-emulated) host adapter shall be BIOS-controlled one.
-   We *SHOULD* invent another way.  */
-static inline struct Scsi_Host *first_real_host(void)
-{
-	struct Scsi_Host *shost = NULL;
-
-	while ((shost = scsi_host_get_next(shost))) {
-		if (!shost->hostt->emulated)
-			break;
-	}
-
-	return shost;
-}
-
 static int pc98_first_bios_param(struct scsi_device *sdev, int *ip)
 {
 	const u8 *p = (&__PC9800SCA(u8, PC9800SCA_SCSI_PARAMS) + sdev->id * 4);
@@ -50,7 +35,16 @@ int pc98_bios_param(struct scsi_device *sdev, struct block_device *bdev,
 {
 	struct Scsi_Host *first_real = first_real_host();
 
-	if (sdev->host == first_real && sdev->id < 7 &&
+	/*
+	 * XXX
+	 * XXX This needs to become a sysfs attribute that's set
+	 * XXX by code that knows which host is the first one.
+	 * XXX
+	 * XXX Currently we support only one host on with a
+	 * XXX PC98ish HBA.
+	 * XXX
+	 */
+	if (1 || sdev->host == first_real && sdev->id < 7 &&
 	    __PC9800SCA_TEST_BIT(PC9800SCA_DISK_EQUIPS, sdev->id))
 	    	return pc98_first_bios_param(sdev, ip);
 

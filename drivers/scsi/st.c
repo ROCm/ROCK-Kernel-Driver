@@ -170,22 +170,19 @@ static int sgl_map_user_pages(struct scatterlist *, const unsigned int,
 			      unsigned long, size_t, int);
 static int sgl_unmap_user_pages(struct scatterlist *, const unsigned int, int);
 
-static int st_attach(Scsi_Device *);
-static void st_detach(Scsi_Device *);
+static int st_probe(struct device *);
+static int st_remove(struct device *);
 
 static void do_create_driverfs_files(void);
 static void do_remove_driverfs_files(void);
 
 
-static struct Scsi_Device_Template st_template = {
-	.module =	THIS_MODULE,
-	.list =		LIST_HEAD_INIT(st_template.list),
-	.name =		"tape", 
-	.scsi_type =	TYPE_TAPE,
-	.attach =	st_attach, 
-	.detach =	st_detach,
-	.scsi_driverfs_driver = {
-		.name = "st",
+static struct scsi_driver st_template = {
+	.owner			= THIS_MODULE,
+	.gendrv = {
+		.name		= "st",
+		.probe		= st_probe,
+		.remove		= st_remove,
 	},
 };
 
@@ -3704,8 +3701,9 @@ static struct file_operations st_fops =
 	.release =	st_release,
 };
 
-static int st_attach(Scsi_Device * SDp)
+static int st_probe(struct device *dev)
 {
+	struct scsi_device *SDp = to_scsi_device(dev);
 	struct gendisk *disk;
 	Scsi_Tape *tpnt;
 	ST_mode *STm;
@@ -3716,13 +3714,13 @@ static int st_attach(Scsi_Device * SDp)
 	u64 bounce_limit;
 
 	if (SDp->type != TYPE_TAPE)
-		return 1;
+		return -ENODEV;
 	if ((stp = st_incompatible(SDp))) {
 		printk(KERN_INFO
 		       "st: Found incompatible tape at scsi%d, channel %d, id %d, lun %d\n",
 		       SDp->host->host_no, SDp->channel, SDp->id, SDp->lun);
 		printk(KERN_INFO "st: The suggested driver is %s.\n", stp);
-		return 1;
+		return -ENODEV;
 	}
 
 	i = SDp->host->sg_tablesize;
@@ -3862,43 +3860,11 @@ static int st_attach(Scsi_Device * SDp)
 	write_unlock(&st_dev_arr_lock);
 
 	for (mode = 0; mode < ST_NBR_MODES; ++mode) {
-	    char name[8];
-
 	    /*  Rewind entry  */
-	    sprintf(name, "mt%s", st_formats[mode]);
-	    
-	    sprintf(tpnt->driverfs_dev_r[mode].bus_id, "%s:%s", 
-		    SDp->sdev_driverfs_dev.bus_id, name);
-	    sprintf(tpnt->driverfs_dev_r[mode].name, "%s%s", 
-		    SDp->sdev_driverfs_dev.name, name);
-	    tpnt->driverfs_dev_r[mode].parent = &SDp->sdev_driverfs_dev;
-	    tpnt->driverfs_dev_r[mode].bus = SDp->sdev_driverfs_dev.bus;
-	    tpnt->driverfs_dev_r[mode].driver_data =
-			(void *)(long)__mkdev(SCSI_TAPE_MAJOR, dev_num + (mode << 5));
-	    device_register(&tpnt->driverfs_dev_r[mode]);
-	    device_create_file(&tpnt->driverfs_dev_r[mode], 
-			       &dev_attr_type);
-	    device_create_file(&tpnt->driverfs_dev_r[mode], &dev_attr_kdev);
 	    devfs_mk_cdev(MKDEV(SCSI_TAPE_MAJOR, dev_num + (mode << 5)),
 				S_IFCHR | S_IRUGO | S_IWUGO,
 				"%s/mt%s", SDp->devfs_name, st_formats[mode]);
-
 	    /*  No-rewind entry  */
-	    sprintf (name, "mt%sn", st_formats[mode]);
-
-	    sprintf(tpnt->driverfs_dev_n[mode].bus_id, "%s:%s", 
-		    SDp->sdev_driverfs_dev.bus_id, name);
-	    sprintf(tpnt->driverfs_dev_n[mode].name, "%s%s", 
-		    SDp->sdev_driverfs_dev.name, name);
-	    tpnt->driverfs_dev_n[mode].parent= &SDp->sdev_driverfs_dev;
-	    tpnt->driverfs_dev_n[mode].bus = SDp->sdev_driverfs_dev.bus;
-	    tpnt->driverfs_dev_n[mode].driver_data =
-			(void *)(long)__mkdev(SCSI_TAPE_MAJOR, dev_num + (mode << 5) + 128);
-	    device_register(&tpnt->driverfs_dev_n[mode]);
-	    device_create_file(&tpnt->driverfs_dev_n[mode], 
-			       &dev_attr_type);
-	    device_create_file(&tpnt->driverfs_dev_n[mode], 
-			       &dev_attr_kdev);
 	    devfs_mk_cdev(MKDEV(SCSI_TAPE_MAJOR, dev_num + (mode << 5) + 128),
 				S_IFCHR | S_IRUGO | S_IWUGO,
 				"%s/mt%sn", SDp->devfs_name, st_formats[mode]);
@@ -3918,11 +3884,12 @@ out_put_disk:
 out_buffer_free:
 	kfree(buffer);
 out:
-	return 1;
+	return -ENODEV;
 };
 
-static void st_detach(Scsi_Device * SDp)
+static int st_remove(struct device *dev)
 {
+	Scsi_Device *SDp = to_scsi_device(dev);
 	Scsi_Tape *tpnt;
 	int i, mode;
 
@@ -3937,16 +3904,6 @@ static void st_detach(Scsi_Device * SDp)
 			for (mode = 0; mode < ST_NBR_MODES; ++mode) {
 				devfs_remove("%s/mt%s", SDp->devfs_name, st_formats[mode]);
 				devfs_remove("%s/mt%sn", SDp->devfs_name, st_formats[mode]);
-				device_remove_file(&tpnt->driverfs_dev_r[mode],
-						   &dev_attr_type);
-				device_remove_file(&tpnt->driverfs_dev_r[mode],
-						   &dev_attr_kdev);
-				device_unregister(&tpnt->driverfs_dev_r[mode]);
-				device_remove_file(&tpnt->driverfs_dev_n[mode],
-						   &dev_attr_type);
-				device_remove_file(&tpnt->driverfs_dev_n[mode],
-						   &dev_attr_kdev);
-				device_unregister(&tpnt->driverfs_dev_n[mode]);
 			}
 			tpnt->device = NULL;
 
@@ -3957,12 +3914,12 @@ static void st_detach(Scsi_Device * SDp)
 			}
 			put_disk(tpnt->disk);
 			kfree(tpnt);
-			return;
+			return 0;
 		}
 	}
 
 	write_unlock(&st_dev_arr_lock);
-	return;
+	return 0;
 }
 
 static int __init init_st(void)
@@ -3974,7 +3931,7 @@ static int __init init_st(void)
 		verstr, st_fixed_buffer_size, st_max_sg_segs);
 
 	if (register_chrdev(SCSI_TAPE_MAJOR, "st", &st_fops) >= 0) {
-		if (scsi_register_device(&st_template) == 0) {
+		if (scsi_register_driver(&st_template.gendrv) == 0) {
 			do_create_driverfs_files();
 			return 0;
 		}
@@ -3987,20 +3944,10 @@ static int __init init_st(void)
 
 static void __exit exit_st(void)
 {
-	int i;
-
 	do_remove_driverfs_files();
-	scsi_unregister_device(&st_template);
+	scsi_unregister_driver(&st_template.gendrv);
 	unregister_chrdev(SCSI_TAPE_MAJOR, "st");
-	if (scsi_tapes != NULL) {
-		for (i=0; i < st_dev_max; ++i)
-			if (scsi_tapes[i]) {
-				printk(KERN_WARNING "st: scsi_tapes[] not "
-				    "empty after scsi_unregister_device\n");
-				st_detach(scsi_tapes[i]->device);
-			}
-		kfree(scsi_tapes);
-	}
+	kfree(scsi_tapes);
 	printk(KERN_INFO "st: Unloaded.\n");
 }
 
@@ -4035,7 +3982,7 @@ static DRIVER_ATTR(version, S_IRUGO, st_version_show, NULL);
 
 static void do_create_driverfs_files(void)
 {
-	struct device_driver *driverfs = &st_template.scsi_driverfs_driver;
+	struct device_driver *driverfs = &st_template.gendrv;
 
 	driver_create_file(driverfs, &driver_attr_try_direct_io);
 	driver_create_file(driverfs, &driver_attr_fixed_buffer_size);
@@ -4045,7 +3992,7 @@ static void do_create_driverfs_files(void)
 
 static void do_remove_driverfs_files(void)
 {
-	struct device_driver *driverfs = &st_template.scsi_driverfs_driver;
+	struct device_driver *driverfs = &st_template.gendrv;
 
 	driver_remove_file(driverfs, &driver_attr_version);
 	driver_remove_file(driverfs, &driver_attr_max_sg_segs);

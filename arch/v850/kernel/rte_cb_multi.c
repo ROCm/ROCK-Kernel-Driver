@@ -2,7 +2,7 @@
  * include/asm-v850/rte_multi.c -- Support for Multi debugger monitor ROM
  * 	on Midas lab RTE-CB series of evaluation boards
  *
- *  Copyright (C) 2001,02,03  NEC Corporation
+ *  Copyright (C) 2001,02,03  NEC Electronics Corporation
  *  Copyright (C) 2001,02,03  Miles Bader <miles@gnu.org>
  *
  * This file is subject to the terms and conditions of the GNU General

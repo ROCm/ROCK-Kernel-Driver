@@ -248,12 +248,6 @@ int cap_task_post_setuid (uid_t old_ruid, uid_t old_euid, uid_t old_suid,
 	return 0;
 }
 
-void cap_task_kmod_set_label (void)
-{
-	cap_set_full (current->cap_effective);
-	return;
-}
-
 void cap_task_reparent_to_init (struct task_struct *p)
 {
 	p->cap_effective = CAP_INIT_EFF_SET;
@@ -278,7 +272,6 @@ EXPORT_SYMBOL(cap_capset_set);
 EXPORT_SYMBOL(cap_bprm_set_security);
 EXPORT_SYMBOL(cap_bprm_compute_creds);
 EXPORT_SYMBOL(cap_task_post_setuid);
-EXPORT_SYMBOL(cap_task_kmod_set_label);
 EXPORT_SYMBOL(cap_task_reparent_to_init);
 EXPORT_SYMBOL(cap_syslog);
 
@@ -298,7 +291,6 @@ static struct security_operations capability_ops = {
 	.bprm_set_security =		cap_bprm_set_security,
 
 	.task_post_setuid =		cap_task_post_setuid,
-	.task_kmod_set_label =		cap_task_kmod_set_label,
 	.task_reparent_to_init =	cap_task_reparent_to_init,
 
 	.syslog =                       cap_syslog,
@@ -348,7 +340,7 @@ static void __exit capability_exit (void)
 	}
 }
 
-module_init (capability_init);
+security_initcall (capability_init);
 module_exit (capability_exit);
 
 MODULE_DESCRIPTION("Standard Linux Capabilities Security Module");

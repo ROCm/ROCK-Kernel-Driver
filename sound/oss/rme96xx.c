@@ -1093,9 +1093,6 @@ static struct pci_driver rme96xx_driver = {
 
 static int __init init_rme96xx(void)
 {
-  
-	if (!pci_present())   /* No PCI bus in this machine! */
-		return -ENODEV;
 	printk(KERN_INFO RME_MESS" version "RMEVERSION" time " __TIME__ " " __DATE__ "\n");
 	devices = ((devices-1) & RME96xx_MASK_DEVS) + 1;
 	printk(KERN_INFO RME_MESS" reserving %d dsp device(s)\n",devices);

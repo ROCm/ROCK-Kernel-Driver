@@ -2309,8 +2309,7 @@ static boolean DAC960_V2_ReportDeviceConfiguration(DAC960_Controller_T
 		    (PhysicalDeviceInfo->NegotiatedDataWidthBits == 16
 		     ? "Wide " :""),
 		    (PhysicalDeviceInfo->NegotiatedSynchronousMegaTransfers
-		     * (PhysicalDeviceInfo->NegotiatedDataWidthBits == 16
-			? 2 : 1)));
+		     * PhysicalDeviceInfo->NegotiatedDataWidthBits/8));
       if (InquiryUnitSerialNumber->PeripheralDeviceType != 0x1F)
 	DAC960_Info("         Serial Number: %s\n", Controller, SerialNumber);
       if (PhysicalDeviceInfo->PhysicalDeviceState ==

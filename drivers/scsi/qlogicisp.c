@@ -666,11 +666,6 @@ int isp1020_detect(Scsi_Host_Template *tmpt)
 
 	tmpt->proc_name = "isp1020";
 
-	if (pci_present() == 0) {
-		printk("qlogicisp : PCI not present\n");
-		return 0;
-	}
-
 	while ((pdev = pci_find_device(PCI_VENDOR_ID_QLOGIC, PCI_DEVICE_ID_QLOGIC_ISP1020, pdev)))
 	{
 		if (pci_enable_device(pdev))

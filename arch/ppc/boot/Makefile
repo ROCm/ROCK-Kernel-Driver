@@ -16,9 +16,10 @@ HOSTCFLAGS	+= -Iarch/$(ARCH)/boot/include
 BOOT_TARGETS	= zImage zImage.initrd znetboot znetboot.initrd
 
 bootdir-y			:= simple
-bootdir-$(CONFIG_ALL_PPC)	:= openfirmware prep
+bootdir-$(CONFIG_PPC_OF)	:= openfirmware
+bootdir-$(CONFIG_PPC_PREP)	+= prep
 subdir-y			:= lib/ common/ images/
-subdir-$(CONFIG_ALL_PPC)	+= of1275/
+subdir-$(CONFIG_PPC_OF)		+= of1275/
 
 # for cleaning
 subdir-				+= simple/ openfirmware/ prep/

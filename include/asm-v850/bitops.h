@@ -1,8 +1,8 @@
 /*
  * include/asm-v850/bitops.h -- Bit operations
  *
- *  Copyright (C) 2001,02  NEC Corporation
- *  Copyright (C) 2001,02  Miles Bader <miles@gnu.org>
+ *  Copyright (C) 2001,02,03  NEC Electronics Corporation
+ *  Copyright (C) 2001,02,03  Miles Bader <miles@gnu.org>
  *  Copyright (C) 1992  Linus Torvalds.
  *
  * This file is subject to the terms and conditions of the GNU General
@@ -133,7 +133,7 @@ extern __inline__ unsigned long ffz (unsigned long word)
                 "m" (*((const char *)(addr) + ((nr) >> 3))));		\
      __test_bit_res;							\
   })
-extern __inline__ int __test_bit (int nr, void *addr)
+extern __inline__ int __test_bit (int nr, const void *addr)
 {
 	int res;
 	__asm__ ("tst1 %1, [%2]; setf nz, %0"

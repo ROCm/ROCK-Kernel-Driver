@@ -164,7 +164,14 @@ struct RxFD {
 
 #define SOURCE_ID(flags)	(((flags) >> 28) & 0x03)
 #define TO_SIZE(state)		(((state) >> 16) & 0x1fff)
-#define TO_STATE(len)		cpu_to_le32(((len) & TxSizeMax) << 16)
+
+/*
+ * Given the operating range of Linux HDLC, the 2 defines below could be
+ * made simpler. However they are a fine reminder for the limitations of
+ * the driver: it's better to stay < TxSizeMax and < RxSizeMax.
+ */
+#define TO_STATE_TX(len)	cpu_to_le32(((len) & TxSizeMax) << 16)
+#define TO_STATE_RX(len)	cpu_to_le32((RX_MAX(len) % RxSizeMax) << 16)
 #define RX_MAX(len)		((((len) >> 5) + 1) << 5)
 #define SCC_REG_START(dpriv)	(SCC_START+(dpriv->dev_id)*SCC_OFFSET)
 
@@ -272,7 +279,8 @@ struct dscc4_dev_priv {
 #define Idt		0x00080000
 #define TxSccRes	0x01000000
 #define RxSccRes	0x00010000
-#define TxSizeMax	0x1fff
+#define TxSizeMax	0x1fff		/* Datasheet DS1 - 11.1.1.1 */
+#define RxSizeMax	0x1ffc		/* Datasheet DS1 - 11.1.2.1 */
 
 #define Ccr0ClockMask	0x0000003f
 #define Ccr1LoopMask	0x00000200
@@ -467,8 +475,8 @@ static void dscc4_release_ring(struct dscc4_dev_priv *dpriv)
 	skbuff = dpriv->rx_skbuff;
 	for (i = 0; i < RX_RING_SIZE; i++) {
 		if (*skbuff) {
-			pci_unmap_single(pdev, rx_fd->data, (*skbuff)->len,
-				PCI_DMA_FROMDEVICE);
+			pci_unmap_single(pdev, rx_fd->data,
+				RX_MAX(HDLC_MAX_MRU), PCI_DMA_FROMDEVICE);
 			dev_kfree_skb(*skbuff);
 		}
 		skbuff++;
@@ -480,17 +488,18 @@ inline int try_get_rx_skb(struct dscc4_dev_priv *dpriv, struct net_device *dev)
 {
 	unsigned int dirty = dpriv->rx_dirty%RX_RING_SIZE;
 	struct RxFD *rx_fd = dpriv->rx_fd + dirty;
+	const int len = RX_MAX(HDLC_MAX_MRU);
 	struct sk_buff *skb;
 	int ret = 0;
 
-	skb = dev_alloc_skb(RX_MAX(HDLC_MAX_MRU));
+	skb = dev_alloc_skb(len);
 	dpriv->rx_skbuff[dirty] = skb;
 	if (skb) {
 	skb->dev = dev;
-	skb->protocol = htons(ETH_P_IP);
+	skb->protocol = hdlc_type_trans(skb, dev);
 	skb->mac.raw = skb->data;
 		rx_fd->data = pci_map_single(dpriv->pci_priv->pdev, skb->data,
-					       skb->len, PCI_DMA_FROMDEVICE);
+					     len, PCI_DMA_FROMDEVICE);
 	} else {
 		rx_fd->data = (u32) NULL;
 		ret = -1;
@@ -613,13 +622,12 @@ static inline void dscc4_rx_skb(struct dscc4_dev_priv *dpriv,
 	}
 	pkt_len = TO_SIZE(rx_fd->state2);
 	pci_dma_sync_single(pdev, rx_fd->data, pkt_len, PCI_DMA_FROMDEVICE);
-	pci_unmap_single(pdev, rx_fd->data, pkt_len, PCI_DMA_FROMDEVICE);
+	pci_unmap_single(pdev, rx_fd->data, RX_MAX(HDLC_MAX_MRU), PCI_DMA_FROMDEVICE);
 	if ((skb->data[--pkt_len] & FrameOk) == FrameOk) {
 		stats->rx_packets++;
 		stats->rx_bytes += pkt_len;
-		skb->tail += pkt_len;
-		skb->len = pkt_len;
-       	if (netif_running(dev))
+		skb_put(skb, pkt_len);
+		if (netif_running(dev))
 			skb->protocol = hdlc_type_trans(skb, dev);
 		skb->dev->last_rx = jiffies;
 		netif_rx(skb);
@@ -1029,7 +1037,7 @@ static int dscc4_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	next = dpriv->tx_current%TX_RING_SIZE;
 	dpriv->tx_skbuff[next] = skb;
 	tx_fd = dpriv->tx_fd + next;
-	tx_fd->state = FrameEnd | TO_STATE(skb->len);
+	tx_fd->state = FrameEnd | TO_STATE_TX(skb->len);
 	tx_fd->data = pci_map_single(ppriv->pdev, skb->data, skb->len,
 				     PCI_DMA_TODEVICE);
 	tx_fd->complete = 0x00000000;
@@ -1223,9 +1231,9 @@ static int dscc4_clock_setting(struct dscc4_dev_priv *dpriv,
 	if (bps) { /* DCE */
 		printk(KERN_DEBUG "%s: generated RxClk (DCE)\n", dev->name);
 		if (settings->clock_rate != bps) {
-			settings->clock_rate = bps;
 			printk(KERN_DEBUG "%s: clock adjusted (%08d -> %08d)\n",
-				dev->name, dpriv->settings.clock_rate, bps);
+				dev->name, settings->clock_rate, bps);
+			settings->clock_rate = bps;
 		}
 	} else { /* DTE */
 		state = 0x80001000;
@@ -1436,7 +1444,7 @@ try:
 			 * random freeze induced by null sized tx frames.
 			 */
 			tx_fd->data = tx_fd->next;
-			tx_fd->state = FrameEnd | TO_STATE(2*DUMMY_SKB_SIZE);
+			tx_fd->state = FrameEnd | TO_STATE_TX(2*DUMMY_SKB_SIZE);
 			tx_fd->complete = 0x00000000;
 			tx_fd->jiffies = 0;
 
@@ -1723,7 +1731,7 @@ struct sk_buff *dscc4_init_dummy_skb(struct dscc4_dev_priv *dpriv)
 
 		skb->len = DUMMY_SKB_SIZE;
 		memcpy(skb->data, version, strlen(version)%DUMMY_SKB_SIZE);
-		tx_fd->state = FrameEnd | TO_STATE(DUMMY_SKB_SIZE);
+		tx_fd->state = FrameEnd | TO_STATE_TX(DUMMY_SKB_SIZE);
 		tx_fd->data = pci_map_single(dpriv->pci_priv->pdev, skb->data,
 					     DUMMY_SKB_SIZE, PCI_DMA_TODEVICE);
 		dpriv->tx_skbuff[last] = skb;
@@ -1754,7 +1762,7 @@ static int dscc4_init_ring(struct net_device *dev)
 	dpriv->tx_dirty = 0xffffffff;
 	i = dpriv->tx_current = 0;
 	do {
-		tx_fd->state = FrameEnd | TO_STATE(2*DUMMY_SKB_SIZE);
+		tx_fd->state = FrameEnd | TO_STATE_TX(2*DUMMY_SKB_SIZE);
 		tx_fd->complete = 0x00000000;
 	        /* FIXME: NULL should be ok - to be tried */
 	        tx_fd->data = dpriv->tx_fd_dma;
@@ -1772,7 +1780,7 @@ static int dscc4_init_ring(struct net_device *dev)
 	        rx_fd->state1 = HiDesc;
 	        rx_fd->state2 = 0x00000000;
 	        rx_fd->end = 0xbabeface;
-	        rx_fd->state1 |= (RX_MAX(HDLC_MAX_MRU) << 16);
+	        rx_fd->state1 |= TO_STATE_RX(HDLC_MAX_MRU);
 		// FIXME: return value verifiee mais traitement suspect
 		if (try_get_rx_skb(dpriv, dev) >= 0)
 			dpriv->rx_dirty++;

@@ -24,6 +24,8 @@ obj-$(CONFIG_MODULES) += module.o
 
 $(obj)/bootflag.c: 
 	@ln -sf ../../i386/kernel/bootflag.c $(obj)/bootflag.c
+$(obj)/cpuid.c: 
+	@ln -sf ../../i386/kernel/cpuid.c $(obj)/cpuid.c
 
-clean-files += bootflag.c
+clean-files += bootflag.c cpuid.c
 

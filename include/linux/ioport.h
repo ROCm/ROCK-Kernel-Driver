@@ -105,12 +105,15 @@ extern int allocate_resource(struct resource *root, struct resource *new,
 extern struct resource * __request_region(struct resource *, unsigned long start, unsigned long n, const char *name);
 
 /* Compatibility cruft */
-#define check_region(start,n)	__check_region(&ioport_resource, (start), (n))
 #define release_region(start,n)	__release_region(&ioport_resource, (start), (n))
 #define check_mem_region(start,n)	__check_region(&iomem_resource, (start), (n))
 #define release_mem_region(start,n)	__release_region(&iomem_resource, (start), (n))
 
-extern int __deprecated __check_region(struct resource *, unsigned long, unsigned long);
+extern int __check_region(struct resource *, unsigned long, unsigned long);
 extern void __release_region(struct resource *, unsigned long, unsigned long);
 
+static inline int __deprecated check_region(unsigned long s, unsigned long n)
+{
+	return __check_region(&ioport_resource, s, n);
+}
 #endif	/* _LINUX_IOPORT_H */

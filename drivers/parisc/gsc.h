@@ -43,4 +43,4 @@ int gsc_common_irqsetup(struct parisc_device *parent, struct busdevice *busdev);
 extern int gsc_alloc_irq(struct gsc_irq *dev);	/* dev needs an irq */
 extern int gsc_claim_irq(struct gsc_irq *dev, int irq);	/* dev needs this irq */
 
-void busdev_barked(int busdev_irq, void *dev, struct pt_regs *regs);
+irqreturn_t busdev_barked(int busdev_irq, void *dev, struct pt_regs *regs);

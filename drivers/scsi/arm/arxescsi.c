@@ -236,17 +236,12 @@ static const char *arxescsi_info(struct Scsi_Host *host)
  * Returns : length of data written to buffer.
  */
 static int
-arxescsi_proc_info(char *buffer, char **start, off_t offset, int length,
+arxescsi_proc_info(struct Scsi_Host *host, char *buffer, char **start, off_t offset, int length,
 		   int host_no, int inout)
 {
-	struct Scsi_Host *host;
 	struct arxescsi_info *info;
 	char *p = buffer;
 	int pos;
-
-	host = scsi_host_hn_get(host_no);
-	if (!host)
-		return 0;
 
 	info = (struct arxescsi_info *)host->hostdata;
 	if (inout == 1)

@@ -60,9 +60,10 @@ int sysfs_create(struct dentry * dentry, int mode, int (*init)(struct inode *))
  Proceed:
 	if (init)
 		error = init(inode);
-	if (!error)
+	if (!error) {
 		d_instantiate(dentry, inode);
-	else
+		dget(dentry); /* Extra count - pin the dentry in core */
+	} else
 		iput(inode);
  Done:
 	return error;

@@ -5,6 +5,7 @@
 #include <linux/config.h>
 #include <linux/cache.h>
 #include <linux/smp_lock.h>
+#include <asm/irq.h>
 
 /* The __last_jiffy_stamp field is needed to ensure that no decrementer 
  * interrupt is lost on SMP machines. Since on most CPUs it is in the same 

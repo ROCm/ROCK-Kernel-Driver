@@ -1,4 +1,3 @@
-
 /*
     card-azt2320.c - driver for Aztech Systems AZT2320 based soundcards.
     Copyright (C) 1999-2000 by Massimo Piccioni <dafastidio@libero.it>
@@ -105,11 +104,9 @@ MODULE_PARM_DESC(dma2, "2nd DMA # for azt2320 driver.");
 MODULE_PARM_SYNTAX(dma2, SNDRV_DMA_DESC);
 
 struct snd_card_azt2320 {
-#ifdef CONFIG_PNP
 	int dev_no;
 	struct pnp_dev *dev;
 	struct pnp_dev *devmpu;
-#endif	/* CONFIG_PNP */
 };
 
 static struct pnp_card_device_id snd_azt2320_pnpids[] __devinitdata = {
@@ -365,8 +362,10 @@ static int __init alsa_card_azt2320_init(void)
 
 	cards += pnp_register_card_driver(&azt2320_pnpc_driver);
 #ifdef MODULE
-	if (!cards)
+	if (!cards) {
+		pnp_unregister_card_driver(&azt2320_pnpc_driver);
 		snd_printk(KERN_ERR "no AZT2320 based soundcards found\n");
+	}
 #endif
 	return cards ? 0 : -ENODEV;
 }

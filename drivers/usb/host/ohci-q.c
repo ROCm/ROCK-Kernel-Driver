@@ -377,12 +377,8 @@ static struct ed *ed_get (
 		ed->type = type;
 	}
 
-	/* FIXME:  Don't do this without knowing it's safe to clobber this
-	 * state/mode info.  Currently the upper layers don't support such
-	 * guarantees; we're lucky changing config/altsetting is rare.
-	 * The state/mode info also changes during enumeration: set_address
-	 * uses the 'wrong' device address, and ep0 maxpacketsize will often
-	 * improve on the initial value.
+	/* NOTE: only ep0 currently needs this "re"init logic, during
+	 * enumeration (after set_address, or if ep0 maxpacket >8).
 	 */
   	if (ed->state == ED_IDLE) {
 		u32	info;

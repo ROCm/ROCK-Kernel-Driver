@@ -1728,10 +1728,8 @@ int acsi_init( void )
 		sprintf(disk->disk_name, "ad%c", 'a'+i);
 		disk->major = ACSI_MAJOR;
 		disk->first_minor = i << 4;
-		if (acsi_info[i].type != HARDDISK) {
-			disk->minor_shift = 0;
+		if (acsi_info[i].type != HARDDISK)
 			disk->minors = 1;
-		}
 		disk->fops = &acsi_fops;
 		disk->private_data = &acsi_info[i];
 		set_capacity(disk, acsi_info[i].size);

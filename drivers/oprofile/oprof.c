@@ -131,36 +131,33 @@ extern void timer_init(struct oprofile_operations ** ops);
 
 static int __init oprofile_init(void)
 {
-	int err = -ENODEV;
+	/* Architecture must fill in the interrupt ops and the
+	 * logical CPU type, or we can fall back to the timer
+	 * interrupt profiler.
+	 */
+	int err = oprofile_arch_init(&oprofile_ops);
 
-	if (!timer) {
-		/* Architecture must fill in the interrupt ops and the
-		 * logical CPU type, or we can fall back to the timer
-		 * interrupt profiler.
-		 */
-		err = oprofile_arch_init(&oprofile_ops);
-	}
-
-	if (err == -ENODEV) {
+	if (err == -ENODEV || timer) {
 		timer_init(&oprofile_ops);
 		err = 0;
-	}
-
-	if (err)
+	} else if (err) {
 		goto out;
+	}
 
 	if (!oprofile_ops->cpu_type) {
 		printk(KERN_ERR "oprofile: cpu_type not set !\n");
 		err = -EFAULT;
-		goto out;
+	} else {
+		err = oprofilefs_register();
 	}
-
-	err = oprofilefs_register();
-	if (err)
-		goto out;
  
+	if (err)
+		goto out_exit;
 out:
 	return err;
+out_exit:
+	oprofile_arch_exit();
+	goto out;
 }
 
 

@@ -7,13 +7,18 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: os-linux.h,v 1.21 2002/11/12 09:44:30 dwmw2 Exp $
+ * $Id: os-linux.h,v 1.26 2003/05/16 18:45:25 dwmw2 Exp $
  *
  */
 
 #ifndef __JFFS2_OS_LINUX_H__
 #define __JFFS2_OS_LINUX_H__
 #include <linux/version.h>
+
+/* JFFS2 uses Linux mode bits natively -- no need for conversion */
+#define os_to_jffs2_mode(x) (x)
+#define jffs2_to_os_mode(x) (x)
+
 
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,2)
 #define JFFS2_INODE_INFO(i) (list_entry(i, struct jffs2_inode_info, vfs_inode))
@@ -37,9 +42,6 @@
 #define JFFS2_F_I_MODE(f) (OFNI_EDONI_2SFFJ(f)->i_mode)
 #define JFFS2_F_I_UID(f) (OFNI_EDONI_2SFFJ(f)->i_uid)
 #define JFFS2_F_I_GID(f) (OFNI_EDONI_2SFFJ(f)->i_gid)
-#define JFFS2_F_I_CTIME(f) (OFNI_EDONI_2SFFJ(f)->i_ctime.tv_sec)
-#define JFFS2_F_I_MTIME(f) (OFNI_EDONI_2SFFJ(f)->i_mtime.tv_sec)
-#define JFFS2_F_I_ATIME(f) (OFNI_EDONI_2SFFJ(f)->i_atime.tv_sec)
 
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,1)
 #define JFFS2_F_I_RDEV_MIN(f) (minor(OFNI_EDONI_2SFFJ(f)->i_rdev))
@@ -49,6 +51,21 @@
 #define JFFS2_F_I_RDEV_MAJ(f) (MAJOR(to_kdev_t(OFNI_EDONI_2SFFJ(f)->i_rdev)))
 #endif
 
+/* Urgh. The things we do to keep the 2.4 build working */
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,47)
+#define ITIME(sec) ((struct timespec){sec, 0})
+#define I_SEC(tv) ((tv).tv_sec)
+#define JFFS2_F_I_CTIME(f) (OFNI_EDONI_2SFFJ(f)->i_ctime.tv_sec)
+#define JFFS2_F_I_MTIME(f) (OFNI_EDONI_2SFFJ(f)->i_mtime.tv_sec)
+#define JFFS2_F_I_ATIME(f) (OFNI_EDONI_2SFFJ(f)->i_atime.tv_sec)
+#else
+#define ITIME(x) (x)
+#define I_SEC(x) (x)
+#define JFFS2_F_I_CTIME(f) (OFNI_EDONI_2SFFJ(f)->i_ctime)
+#define JFFS2_F_I_MTIME(f) (OFNI_EDONI_2SFFJ(f)->i_mtime)
+#define JFFS2_F_I_ATIME(f) (OFNI_EDONI_2SFFJ(f)->i_atime)
+#endif
+
 /* Hmmm. P'raps generic code should only ever see versions of signal
    functions which do the locking automatically? */
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,40)
@@ -56,6 +73,16 @@
 #else
 #define current_sig_lock current->sighand->siglock
 #endif
+
+#define sleep_on_spinunlock(wq, s)				\
+	do {							\
+		DECLARE_WAITQUEUE(__wait, current);		\
+		add_wait_queue((wq), &__wait);			\
+		set_current_state(TASK_UNINTERRUPTIBLE);	\
+		spin_unlock(s);					\
+		schedule();					\
+		remove_wait_queue((wq), &__wait);		\
+	} while(0)
 
 static inline void jffs2_init_inode_info(struct jffs2_inode_info *f)
 {

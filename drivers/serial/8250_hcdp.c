@@ -4,12 +4,13 @@
  * Copyright (C) 2002 Hewlett-Packard Co.
  *	Khalid Aziz <khalid_aziz@hp.com>
  *
- * Parse the EFI HCDP table to locate serial console and debug ports and initialize them.
+ * Parse the EFI HCDP table to locate serial console and debug ports and
+ * initialize them.
  *
- * 2002/08/29 davidm	Adjust it to new 2.5 serial driver infrastructure (untested).
+ * 2002/08/29 davidm	Adjust it to new 2.5 serial driver infrastructure.
  */
-#include <linux/config.h>
 
+#include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/efi.h>
 #include <linux/init.h>
@@ -28,14 +29,15 @@
 #undef SERIAL_DEBUG_HCDP
 
 /*
- * Parse the HCDP table to find descriptions for headless console and debug serial ports
- * and add them to rs_table[]. A pointer to HCDP table is passed as parameter. This
- * function should be called before serial_console_init() is called to make sure the HCDP
- * serial console will be available for use. IA-64 kernel calls this function from
- * setup_arch() after the EFI and ACPI tables have been parsed.
+ * Parse the HCDP table to find descriptions for headless console and debug
+ * serial ports and add them to rs_table[]. A pointer to HCDP table is
+ * passed as parameter. This function should be called before
+ * serial_console_init() is called to make sure the HCDP serial console will
+ * be available for use. IA-64 kernel calls this function from setup_arch()
+ * after the EFI and ACPI tables have been parsed.
  */
 void __init
-setup_serial_hcdp (void *tablep)
+setup_serial_hcdp(void *tablep)
 {
 	hcdp_dev_t *hcdp_dev;
 	struct uart_port port;
@@ -57,14 +59,16 @@ setup_serial_hcdp (void *tablep)
 	memset(&port, 0, sizeof(port));
 
 	/*
-	 * Don't trust firmware to give us a table starting at an aligned address. Make a
-	 * local copy of the HCDP table with aligned structures.
+	 * Don't trust firmware to give us a table starting at an aligned
+	 * address. Make a local copy of the HCDP table with aligned
+	 * structures.
 	 */
 	memcpy(&hcdp, tablep, sizeof(hcdp));
 
 	/*
-	 * Perform a sanity check on the table. Table should have a signature of "HCDP"
-	 * and it should be atleast 82 bytes long to have any useful information.
+	 * Perform a sanity check on the table. Table should have a signature
+	 * of "HCDP" and it should be atleast 82 bytes long to have any
+	 * useful information.
 	 */
 	if ((strncmp(hcdp.signature, HCDP_SIGNATURE, HCDP_SIG_LEN) != 0))
 		return;
@@ -75,7 +79,8 @@ setup_serial_hcdp (void *tablep)
 	printk("setup_serial_hcdp(): table pointer = 0x%p, sig = '%.4s'\n",
 	       tablep, hcdp.signature);
 	printk(" length = %d, rev = %d, ", hcdp.len, hcdp.rev);
-	printk("OEM ID = %.6s, # of entries = %d\n", hcdp.oemid, hcdp.num_entries);
+	printk("OEM ID = %.6s, # of entries = %d\n", hcdp.oemid,
+			hcdp.num_entries);
 #endif
 
 	/*
@@ -84,49 +89,69 @@ setup_serial_hcdp (void *tablep)
 	for (nr = 0; nr < hcdp.num_entries; nr++) {
 		hcdp_dev = hcdp.hcdp_dev + nr;
 		/*
-		 * We will parse only the primary console device which is the first entry
-		 * for these devices. We will ignore rest of the entries for the same type
-		 * device that has already been parsed and initialized
+		 * We will parse only the primary console device which is
+		 * the first entry for these devices. We will ignore rest
+		 * of the entries for the same type device that has already
+		 * been parsed and initialized
 		 */
 		if (hcdp_dev->type != HCDP_DEV_CONSOLE)
 			continue;
 
-		iobase = ((u64) hcdp_dev->base_addr.addrhi << 32) | hcdp_dev->base_addr.addrlo;
+		iobase = ((u64) hcdp_dev->base_addr.addrhi << 32) |
+					hcdp_dev->base_addr.addrlo;
 		gsi = hcdp_dev->global_int;
 
 		/* See PCI spec v2.2, Appendix D (Class Codes): */
 		switch (hcdp_dev->pci_prog_intfc) {
-		      case 0x00: port.type = PORT_8250;  break;
-		      case 0x01: port.type = PORT_16450; break;
-		      case 0x02: port.type = PORT_16550; break;
-		      case 0x03: port.type = PORT_16650; break;
-		      case 0x04: port.type = PORT_16750; break;
-		      case 0x05: port.type = PORT_16850; break;
-		      case 0x06: port.type = PORT_16C950; break;
-		      default:
-			printk(KERN_WARNING"warning: EFI HCDP table reports unknown serial "
-			       "programming interface 0x%02x; will autoprobe.\n",
-			       hcdp_dev->pci_prog_intfc);
+		case 0x00:
+			port.type = PORT_8250;
+			break;
+		case 0x01:
+			port.type = PORT_16450;
+			break;
+		case 0x02:
+			port.type = PORT_16550;
+			break;
+		case 0x03:
+			port.type = PORT_16650;
+			break;
+		case 0x04:
+			port.type = PORT_16750;
+			break;
+		case 0x05:
+			port.type = PORT_16850;
+			break;
+		case 0x06:
+			port.type = PORT_16C950;
+			break;
+		default:
+			printk(KERN_WARNING "warning: EFI HCDP table reports "
+				"unknown serial programming interface 0x%02x; "
+				"will autoprobe.\n", hcdp_dev->pci_prog_intfc);
 			port.type = PORT_UNKNOWN;
 			break;
 		}
 
 #ifdef SERIAL_DEBUG_HCDP
-		printk("  type = %s, uart = %d\n", ((hcdp_dev->type == HCDP_DEV_CONSOLE)
-					 ? "Headless Console" : ((hcdp_dev->type == HCDP_DEV_DEBUG)
-								 ? "Debug port" : "Huh????")),
-		       port.type);
+		printk("  type = %s, uart = %d\n",
+			((hcdp_dev->type == HCDP_DEV_CONSOLE) ?
+			"Headless Console" :
+			((hcdp_dev->type == HCDP_DEV_DEBUG) ?
+			"Debug port" : "Huh????")), port.type);
 		printk("  base address space = %s, base address = 0x%lx\n",
-		       ((hcdp_dev->base_addr.space_id == ACPI_MEM_SPACE)
-			? "Memory Space" : ((hcdp_dev->base_addr.space_id == ACPI_IO_SPACE)
-					    ? "I/O space" : "PCI space")),
+		       ((hcdp_dev->base_addr.space_id == ACPI_MEM_SPACE) ?
+		       "Memory Space" :
+			((hcdp_dev->base_addr.space_id == ACPI_IO_SPACE) ?
+			"I/O space" : "PCI space")),
 		       iobase);
 		printk("  gsi = %d, baud rate = %lu, bits = %d, clock = %d\n",
-		       gsi, (unsigned long) hcdp_dev->baud, hcdp_dev->bits, hcdp_dev->clock_rate);
+		       gsi, (unsigned long) hcdp_dev->baud, hcdp_dev->bits,
+		       hcdp_dev->clock_rate);
 		if (hcdp_dev->base_addr.space_id == ACPI_PCICONF_SPACE)
-			printk(" PCI id: %02x:%02x:%02x, vendor ID=0x%x, dev ID=0x%x\n",
-			       hcdp_dev->pci_seg, hcdp_dev->pci_bus, hcdp_dev->pci_dev,
-			       hcdp_dev->pci_vendor_id, hcdp_dev->pci_dev_id);
+			printk(" PCI id: %02x:%02x:%02x, vendor ID=0x%x, "
+				"dev ID=0x%x\n", hcdp_dev->pci_seg,
+				hcdp_dev->pci_bus, hcdp_dev->pci_dev,
+				hcdp_dev->pci_vendor_id, hcdp_dev->pci_dev_id);
 #endif
 		/*
 		 * Now fill in a port structure to update the 8250 port table..
@@ -137,7 +162,8 @@ setup_serial_hcdp (void *tablep)
 			port.uartclk = BASE_BAUD * 16;
 
 		/*
-		 * Check if this is an I/O mapped address or a memory mapped address
+		 * Check if this is an I/O mapped address or a memory mapped
+		 * address
 		 */
 		if (hcdp_dev->base_addr.space_id == ACPI_MEM_SPACE) {
 			port.iobase = 0;
@@ -154,7 +180,8 @@ setup_serial_hcdp (void *tablep)
 			return;
 		}
 #ifdef CONFIG_IA64
-		port.irq = acpi_register_irq(gsi, ACPI_ACTIVE_HIGH, ACPI_EDGE_SENSITIVE);
+		port.irq = acpi_register_irq(gsi, ACPI_ACTIVE_HIGH,
+				ACPI_EDGE_SENSITIVE);
 #else
 		port.irq = gsi;
 #endif
@@ -163,12 +190,13 @@ setup_serial_hcdp (void *tablep)
 			port.flags |= ASYNC_AUTO_IRQ;
 
 		/*
-		 * Note: the above memset() initializes port.line to 0, so we register
-		 * this port as ttyS0.
+		 * Note: the above memset() initializes port.line to 0,
+		 * so we register this port as ttyS0.
 		 */
 		if (early_serial_setup(&port) < 0) {
-			printk("setup_serial_hcdp(): early_serial_setup() for HCDP serial "
-			       "console port failed. Will try any additional consoles in HCDP.\n");
+			printk("setup_serial_hcdp(): early_serial_setup() "
+				"for HCDP serial console port failed. "
+				"Will try any additional consoles in HCDP.\n");
 			continue;
 		}
 		break;

@@ -586,6 +586,7 @@ MODULE_LICENSE("GPL");
 
 
 static struct usb_driver cpia_driver = {
+	.owner		= THIS_MODULE,
 	.name		= "cpia",
 	.probe		= cpia_probe,
 	.disconnect	= cpia_disconnect,

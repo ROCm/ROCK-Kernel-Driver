@@ -174,7 +174,12 @@ struct usb_hub {
 	struct urb		*urb;		/* for interrupt polling pipe */
 
 	/* buffer for urb ... 1 bit each for hub and children, rounded up */
-	char			buffer[(USB_MAXCHILDREN + 1 + 7) / 8];
+	char			(*buffer)[(USB_MAXCHILDREN + 1 + 7) / 8];
+	dma_addr_t		buffer_dma;	/* DMA address for buffer */
+	union {
+		struct usb_hub_status	hub;
+		struct usb_port_status	port;
+	}			*status;	/* buffer for status reports */
 
 	int			error;		/* last reported error */
 	int			nerrors;	/* track consecutive errors */

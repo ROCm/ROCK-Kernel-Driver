@@ -45,3 +45,9 @@
 		*(__ksymtab_strings)					\
 	}
 
+#define SECURITY_INIT							\
+	.security_initcall.init : {					\
+		__security_initcall_start = .;				\
+		*(.security_initcall.init) 				\
+		__security_initcall_end = .;				\
+	}

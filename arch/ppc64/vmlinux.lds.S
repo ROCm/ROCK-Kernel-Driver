@@ -65,6 +65,14 @@ SECTIONS
   __ex_table : { *(__ex_table) }
   __stop___ex_table = .;
 
+  __start___bug_table = .;
+  __bug_table : { *(__bug_table) }
+  __stop___bug_table = .;
+
+  __start___ftr_fixup = .;
+  __ftr_fixup : { *(__ftr_fixup) }
+  __stop___ftr_fixup = .;
+
   . = ALIGN(16384);		/* init_task */
   .data.init_task : { *(.data.init_task) }
 
@@ -104,6 +112,7 @@ SECTIONS
   __con_initcall_start = .;
   .con_initcall.init : { *(.con_initcall.init) }
   __con_initcall_end = .;
+  SECURITY_INIT
   . = ALIGN(4096);
   __initramfs_start = .;
   .init.ramfs : { *(.init.ramfs) }

@@ -14,7 +14,7 @@ static int scsi_debug_abort(struct scsi_cmnd *);
 static int scsi_debug_bus_reset(struct scsi_cmnd *);
 static int scsi_debug_device_reset(struct scsi_cmnd *);
 static int scsi_debug_host_reset(struct scsi_cmnd *);
-static int scsi_debug_proc_info(char *, char **, off_t, int, int, int);
+static int scsi_debug_proc_info(struct Scsi_Host *, char *, char **, off_t, int, int);
 static const char * scsi_debug_info(struct Scsi_Host *);
 
 /*

@@ -445,12 +445,15 @@ do_gettimeofday(struct timeval *tv)
 	tv->tv_usec = usec;
 }
 
-void
-do_settimeofday(struct timeval *tv)
+int
+do_settimeofday(struct timespec *tv)
 {
-	unsigned long delta_usec;
-	long sec, usec;
-	
+	unsigned long delta_nsec;
+	long sec, nsec;
+
+	if ((unsigned long)tv->tv_nsec >= NSEC_PER_SEC)
+		return -EINVAL;
+
 	write_seqlock_irq(&xtime_lock);
 
 	/* The offset that is added into time in do_gettimeofday above
@@ -458,31 +461,33 @@ do_settimeofday(struct timeval *tv)
 	   time.  Without this, a full-tick error is possible.  */
 
 #ifdef CONFIG_SMP
-	delta_usec = (jiffies - wall_jiffies) * (1000000 / HZ);
+	delta_nsec = (jiffies - wall_jiffies) * (NSEC_PER_SEC / HZ);
 #else
-	delta_usec = rpcc() - state.last_time;
-	delta_usec = (delta_usec * state.scaled_ticks_per_cycle 
+	delta_nsec = rpcc() - state.last_time;
+	delta_nsec = (delta_nsec * state.scaled_ticks_per_cycle 
 		      + state.partial_tick
 		      + ((jiffies - wall_jiffies) << FIX_SHIFT)) * 15625;
-	delta_usec = ((delta_usec / ((1UL << (FIX_SHIFT-6-1)) * HZ)) + 1) / 2;
+	delta_nsec = ((delta_nsec / ((1UL << (FIX_SHIFT-6-1)) * HZ)) + 1) / 2;
+	delta_nsec *= 1000;
 #endif
 
 	sec = tv->tv_sec;
-	usec = tv->tv_usec;
-	usec -= delta_usec;
-	if (usec < 0) {
-		usec += 1000000;
+	nsec = tv->tv_nsec;
+	nsec -= delta_nsec;
+	if (nsec < 0) {
+		nsec += NSEC_PER_SEC;
 		sec -= 1;
 	}
 
 	xtime.tv_sec = sec;
-	xtime.tv_nsec = (usec / 1000);
+	xtime.tv_nsec = nsec;
 	time_adjust = 0;		/* stop active adjtime() */
 	time_status |= STA_UNSYNC;
 	time_maxerror = NTP_PHASE_LIMIT;
 	time_esterror = NTP_PHASE_LIMIT;
 
 	write_sequnlock_irq(&xtime_lock);
+	return 0;
 }
 
 

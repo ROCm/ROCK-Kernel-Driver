@@ -201,12 +201,15 @@ struct hid_item {
  * HID device quirks.
  */
 
-#define HID_QUIRK_INVERT	0x01
-#define HID_QUIRK_NOTOUCH	0x02
-#define HID_QUIRK_IGNORE	0x04
-#define HID_QUIRK_NOGET		0x08
-#define HID_QUIRK_HIDDEV	0x10
-#define HID_QUIRK_BADPAD        0x20
+#define HID_QUIRK_INVERT		0x001
+#define HID_QUIRK_NOTOUCH		0x002
+#define HID_QUIRK_IGNORE		0x004
+#define HID_QUIRK_NOGET			0x008
+#define HID_QUIRK_HIDDEV		0x010
+#define HID_QUIRK_BADPAD		0x020
+#define HID_QUIRK_MULTI_INPUT		0x040
+#define HID_QUIRK_2WHEEL_MOUSE_HACK	0x080
+#define HID_QUIRK_2WHEEL_MOUSE_HACK_ON	0x100
 
 /*
  * This is the global environment of the parser. This information is
@@ -321,6 +324,12 @@ struct hid_control_fifo {
 #define HID_CTRL_RUNNING	1
 #define HID_OUT_RUNNING		2
 
+struct hid_input {
+	struct list_head list;
+	struct hid_report *report;
+	struct input_dev input;
+};
+
 struct hid_device {							/* device report descriptor */
 	 __u8 *rdesc;
 	unsigned rsize;
@@ -360,7 +369,7 @@ struct hid_device {							/* device report descriptor */
 	unsigned claimed;						/* Claimed by hidinput, hiddev? */	
 	unsigned quirks;						/* Various quirks the device can pull on us */
 
-	struct input_dev input;						/* The input structure */
+	struct list_head inputs;					/* The list of inputs */
 	void *hiddev;							/* The hiddev structure */
 	int minor;							/* Hiddev minor number */
 

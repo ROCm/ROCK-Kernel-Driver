@@ -97,7 +97,10 @@ void config_BSP(char *commandp, int size)
 {
 	mcf_setimr(MCFSIM_IMR_MASKALL);
 
-#ifdef CONFIG_NETtel
+#if defined(CONFIG_BOOTPARAM)
+	strncpy(commandp, CONFIG_BOOTPARAM_STRING, size);
+	commandp[size-1] = 0;
+#elif defined(CONFIG_NETtel)
 	/* Copy command line from FLASH to local buffer... */
 	memcpy(commandp, (char *) 0xf0004000, size);
 	commandp[size-1] = 0;

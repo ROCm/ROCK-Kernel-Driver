@@ -105,12 +105,8 @@ static unsigned char scc_inittab[] = {
 #endif
 #define ZS_CLOCK         3686400 	/* Z8530 RTxC input clock rate */
 
-static struct tty_driver serial_driver, callout_driver;
-static int serial_refcount;
-
 /* serial subtype definitions */
 #define SERIAL_TYPE_NORMAL	1
-#define SERIAL_TYPE_CALLOUT	2
 
 /* number of characters left in xmit buffer before we ask for more */
 #define WAKEUP_CHARS 256
@@ -159,10 +155,6 @@ static irqreturn_t rs_rxdma_irq(int irq, void *dev_id, struct pt_regs *regs);
 static void dma_init(struct mac_serial * info);
 static void rxdma_start(struct mac_serial * info, int current);
 static void rxdma_to_tty(struct mac_serial * info);
-
-static struct tty_struct *serial_table[NUM_CHANNELS];
-static struct termios *serial_termios[NUM_CHANNELS];
-static struct termios *serial_termios_locked[NUM_CHANNELS];
 
 #ifndef MIN
 #define MIN(a,b)	((a) < (b) ? (a) : (b))
@@ -492,7 +484,7 @@ static _INLINE_ void status_handle(struct mac_serial *info)
 	    && info->tty && !C_CLOCAL(info->tty)) {
 		if (status & DCD) {
 			wake_up_interruptible(&info->open_wait);
-		} else if (!(info->flags & ZILOG_CALLOUT_ACTIVE)) {
+		} else {
 			if (info->tty)
 				tty_hangup(info->tty);
 		}
@@ -1695,7 +1687,7 @@ static void rs_unthrottle(struct tty_struct * tty)
  */
 
 static int get_serial_info(struct mac_serial * info,
-			   struct serial_struct * retinfo)
+			   struct serial_struct __user * retinfo)
 {
 	struct serial_struct tmp;
   
@@ -1717,7 +1709,7 @@ static int get_serial_info(struct mac_serial * info,
 }
 
 static int set_serial_info(struct mac_serial * info,
-			   struct serial_struct * new_info)
+			   struct serial_struct __user * new_info)
 {
 	struct serial_struct new_serial;
 	struct mac_serial old_info;
@@ -1877,15 +1869,15 @@ static int rs_ioctl(struct tty_struct *tty, struct file * file,
 			return set_modem_info(info, cmd, (unsigned int *) arg);
 		case TIOCGSERIAL:
 			return get_serial_info(info,
-					       (struct serial_struct *) arg);
+					(struct serial_struct __user *) arg);
 		case TIOCSSERIAL:
 			return set_serial_info(info,
-					       (struct serial_struct *) arg);
+					(struct serial_struct __user *) arg);
 		case TIOCSERGETLSR: /* Get line status register */
 			return get_lsr_info(info, (unsigned int *) arg);
 
 		case TIOCSERGSTRUCT:
-			if (copy_to_user((struct mac_serial *) arg,
+			if (copy_to_user((struct mac_serial __user *) arg,
 					 info, sizeof(struct mac_serial)))
 				return -EFAULT;
 			return 0;
@@ -1960,14 +1952,6 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 	}
 	info->flags |= ZILOG_CLOSING;
 	/*
-	 * Save the termios structure, since this port may have
-	 * separate termios for callout and dialin.
-	 */
-	if (info->flags & ZILOG_NORMAL_ACTIVE)
-		info->normal_termios = *tty->termios;
-	if (info->flags & ZILOG_CALLOUT_ACTIVE)
-		info->callout_termios = *tty->termios;
-	/*
 	 * Now we wait for the transmit buffer to clear; and we notify 
 	 * the line discipline to only process XON/XOFF characters.
 	 */
@@ -2021,8 +2005,7 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 		}
 		wake_up_interruptible(&info->open_wait);
 	}
-	info->flags &= ~(ZILOG_NORMAL_ACTIVE|ZILOG_CALLOUT_ACTIVE|
-			 ZILOG_CLOSING);
+	info->flags &= ~(ZILOG_NORMAL_ACTIVE|ZILOG_CLOSING);
 	wake_up_interruptible(&info->close_wait);
 }
 
@@ -2087,7 +2070,7 @@ static void rs_hangup(struct tty_struct *tty)
 	shutdown(info);
 	info->event = 0;
 	info->count = 0;
-	info->flags &= ~(ZILOG_NORMAL_ACTIVE|ZILOG_CALLOUT_ACTIVE);
+	info->flags &= ~ZILOG_NORMAL_ACTIVE;
 	info->tty = 0;
 	wake_up_interruptible(&info->open_wait);
 }
@@ -2119,43 +2102,17 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 	}
 
 	/*
-	 * If this is a callout device, then just make sure the normal
-	 * device isn't being used.
-	 */
-	if (tty->driver->subtype == SERIAL_TYPE_CALLOUT) {
-		if (info->flags & ZILOG_NORMAL_ACTIVE)
-			return -EBUSY;
-		if ((info->flags & ZILOG_CALLOUT_ACTIVE) &&
-		    (info->flags & ZILOG_SESSION_LOCKOUT) &&
-		    (info->session != current->session))
-		    return -EBUSY;
-		if ((info->flags & ZILOG_CALLOUT_ACTIVE) &&
-		    (info->flags & ZILOG_PGRP_LOCKOUT) &&
-		    (info->pgrp != current->pgrp))
-		    return -EBUSY;
-		info->flags |= ZILOG_CALLOUT_ACTIVE;
-		return 0;
-	}
-
-	/*
 	 * If non-blocking mode is set, or the port is not enabled,
 	 * then make the check up front and then exit.
 	 */
 	if ((filp->f_flags & O_NONBLOCK) ||
 	    (tty->flags & (1 << TTY_IO_ERROR))) {
-		if (info->flags & ZILOG_CALLOUT_ACTIVE)
-			return -EBUSY;
 		info->flags |= ZILOG_NORMAL_ACTIVE;
 		return 0;
 	}
 
-	if (info->flags & ZILOG_CALLOUT_ACTIVE) {
-		if (info->normal_termios.c_cflag & CLOCAL)
-			do_clocal = 1;
-	} else {
-		if (tty->termios->c_cflag & CLOCAL)
-			do_clocal = 1;
-	}
+	if (tty->termios->c_cflag & CLOCAL)
+		do_clocal = 1;
 
 	/*
 	 * Block waiting for the carrier detect and the line to become
@@ -2175,8 +2132,7 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 	info->blocked_open++;
 	while (1) {
 		spin_lock_irq(&info->lock);
-		if (!(info->flags & ZILOG_CALLOUT_ACTIVE) &&
-		    (tty->termios->c_cflag & CBAUD) &&
+		if ((tty->termios->c_cflag & CBAUD) &&
 		    !info->is_irda)
 			zs_rtsdtr(info, 1);
 		spin_unlock_irq(&info->lock);
@@ -2193,8 +2149,7 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 #endif
 			break;
 		}
-		if (!(info->flags & ZILOG_CALLOUT_ACTIVE) &&
-		    !(info->flags & ZILOG_CLOSING) &&
+		if (!(info->flags & ZILOG_CLOSING) &&
 		    (do_clocal || (read_zsreg(info->zs_channel, 0) & DCD)))
 			break;
 		if (signal_pending(current)) {
@@ -2290,13 +2245,6 @@ static int rs_open(struct tty_struct *tty, struct file * filp)
 		return retval;
 	}
 
-	if ((info->count == 1) && (info->flags & ZILOG_SPLIT_TERMIOS)) {
-		if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
-			*tty->termios = info->normal_termios;
-		else 
-			*tty->termios = info->callout_termios;
-		change_speed(info, 0);
-	}
 #ifdef CONFIG_SERIAL_CONSOLE
 	if (sercons.cflag && sercons.index == line) {
 		tty->termios->c_cflag = sercons.cflag;
@@ -2304,9 +2252,6 @@ static int rs_open(struct tty_struct *tty, struct file * filp)
 		change_speed(info, 0);
 	}
 #endif
-
-	info->session = current->session;
-	info->pgrp = current->pgrp;
 
 	OPNDBG("rs_open %s successful...\n", tty->name);
 	return 0;
@@ -2470,7 +2415,7 @@ done:
 
 /* Ask the PROM how many Z8530s we have and initialize their zs_channels */
 static void
-probe_sccs()
+probe_sccs(void)
 {
 	struct device_node *dev, *ch;
 	struct mac_serial **pp;
@@ -2540,6 +2485,26 @@ probe_sccs()
 #endif /* CONFIG_PMAC_PBOOK */
 }
 
+static struct tty_operations serial_ops = {
+	.open = rs_open,
+	.close = rs_close,
+	.write = rs_write,
+	.flush_chars = rs_flush_chars,
+	.write_room = rs_write_room,
+	.chars_in_buffer = rs_chars_in_buffer,
+	.flush_buffer = rs_flush_buffer,
+	.ioctl = rs_ioctl,
+	.throttle = rs_throttle,
+	.unthrottle = rs_unthrottle,
+	.set_termios = rs_set_termios,
+	.stop = rs_stop,
+	.start = rs_start,
+	.hangup = rs_hangup,
+	.break_ctl = rs_break,
+	.wait_until_sent = rs_wait_until_sent,
+	.read_proc = macserial_read_proc,
+};
+
 /* rs_init inits the driver */
 int macserial_init(void)
 {
@@ -2549,6 +2514,10 @@ int macserial_init(void)
 	/* Find out how many Z8530 SCCs we have */
 	if (zs_chain == 0)
 		probe_sccs();
+
+	serial_driver = alloc_tty_driver(zs_channels_found);
+	if (!serial_driver)
+		return -ENOMEM;
 
 	/* XXX assume it's a powerbook if we have a via-pmu
 	 * 
@@ -2564,6 +2533,7 @@ int macserial_init(void)
 		struct device_node* ch = zs_soft[i].dev_node;
 		if (!request_OF_resource(ch, 0, NULL)) {
 			printk(KERN_ERR "macserial: can't request IO resource !\n");
+			put_tty_driver(serial_driver);
 			return -ENODEV;
 		}
 		if (zs_soft[i].has_dma) {
@@ -2602,67 +2572,22 @@ no_dma:
 	/* Initialize the tty_driver structure */
 	/* Not all of this is exactly right for us. */
 
-	memset(&serial_driver, 0, sizeof(struct tty_driver));
-	serial_driver.magic = TTY_DRIVER_MAGIC;
-	serial_driver.owner = THIS_MODULE;
-	serial_driver.driver_name = "macserial";
-#ifdef CONFIG_DEVFS_FS
-	serial_driver.name = "tts/";
-#else
-	serial_driver.name = "ttyS";
-#endif /* CONFIG_DEVFS_FS */
-	serial_driver.major = TTY_MAJOR;
-	serial_driver.minor_start = 64;
-	serial_driver.num = zs_channels_found;
-	serial_driver.type = TTY_DRIVER_TYPE_SERIAL;
-	serial_driver.subtype = SERIAL_TYPE_NORMAL;
-	serial_driver.init_termios = tty_std_termios;
-
-	serial_driver.init_termios.c_cflag =
+	serial_driver->owner = THIS_MODULE;
+	serial_driver->driver_name = "macserial";
+	serial_driver->devfs_name = "tts/";
+	serial_driver->name = "ttyS";
+	serial_driver->major = TTY_MAJOR;
+	serial_driver->minor_start = 64;
+	serial_driver->type = TTY_DRIVER_TYPE_SERIAL;
+	serial_driver->subtype = SERIAL_TYPE_NORMAL;
+	serial_driver->init_termios = tty_std_termios;
+	serial_driver->init_termios.c_cflag =
 		B38400 | CS8 | CREAD | HUPCL | CLOCAL;
-	serial_driver.flags = TTY_DRIVER_REAL_RAW;
-	serial_driver.refcount = &serial_refcount;
-	serial_driver.table = serial_table;
-	serial_driver.termios = serial_termios;
-	serial_driver.termios_locked = serial_termios_locked;
+	serial_driver->flags = TTY_DRIVER_REAL_RAW;
+	tty_set_operations(serial_driver, &serial_ops);
 
-	serial_driver.open = rs_open;
-	serial_driver.close = rs_close;
-	serial_driver.write = rs_write;
-	serial_driver.flush_chars = rs_flush_chars;
-	serial_driver.write_room = rs_write_room;
-	serial_driver.chars_in_buffer = rs_chars_in_buffer;
-	serial_driver.flush_buffer = rs_flush_buffer;
-	serial_driver.ioctl = rs_ioctl;
-	serial_driver.throttle = rs_throttle;
-	serial_driver.unthrottle = rs_unthrottle;
-	serial_driver.set_termios = rs_set_termios;
-	serial_driver.stop = rs_stop;
-	serial_driver.start = rs_start;
-	serial_driver.hangup = rs_hangup;
-	serial_driver.break_ctl = rs_break;
-	serial_driver.wait_until_sent = rs_wait_until_sent;
-	serial_driver.read_proc = macserial_read_proc;
-
-	/*
-	 * The callout device is just like normal device except for
-	 * major number and the subtype code.
-	 */
-	callout_driver = serial_driver;
-#ifdef CONFIG_DEVFS_FS
-	callout_driver.name = "cua/";
-#else
-	callout_driver.name = "cua";
-#endif /* CONFIG_DEVFS_FS */
-	callout_driver.major = TTYAUX_MAJOR;
-	callout_driver.subtype = SERIAL_TYPE_CALLOUT;
-	callout_driver.read_proc = 0;
-	callout_driver.proc_entry = 0;
-
-	if (tty_register_driver(&serial_driver))
+	if (tty_register_driver(serial_driver))
 		printk(KERN_ERR "Error: couldn't register serial driver\n");
-	if (tty_register_driver(&callout_driver))
-		printk(KERN_ERR "Error: couldn't register callout driver\n");
 
 	for (channel = 0; channel < zs_channels_found; ++channel) {
 #ifdef CONFIG_KGDB
@@ -2713,8 +2638,6 @@ no_dma:
 		info->blocked_open = 0;
 		INIT_WORK(&info->tqueue, do_softint, info);
 		spin_lock_init(&info->lock);
-		info->callout_termios = callout_driver.init_termios;
-		info->normal_termios = serial_driver.init_termios;
 		init_waitqueue_head(&info->open_wait);
 		init_waitqueue_head(&info->close_wait);
 		info->timeout = HZ;
@@ -2758,8 +2681,8 @@ void macserial_cleanup(void)
 		}
 	}
 	spin_unlock_irqrestore(&info->lock, flags);
-	tty_unregister_driver(&callout_driver);
-	tty_unregister_driver(&serial_driver);
+	tty_unregister_driver(serial_driver);
+	put_tty_driver(serial_driver);
 
 	if (tmp_buf) {
 		free_page((unsigned long) tmp_buf);
@@ -2835,11 +2758,12 @@ static void serial_console_write(struct console *co, const char *s,
 	/* Don't disable the transmitter. */
 }
 
-extern struct tty_driver serial_driver;
+static struct tty_driver *serial_driver;
+
 static struct tty_driver *serial_console_device(struct console *c, int *index)
 {
 	*index = c->index;
-	return &serial_driver;
+	return serial_driver;
 }
 
 /*

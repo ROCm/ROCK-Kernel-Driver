@@ -82,7 +82,7 @@
 /* ----------------- Begin global definitions ------------------- */
 
 static char mesg[100];
-static int pc_refcount, nbdevs, num_cards, liloconfig;
+static int nbdevs, num_cards, liloconfig;
 static int digi_poller_inhibited = 1 ;
 
 static int setup_error_code;
@@ -97,20 +97,8 @@ static struct board_info boards[MAXBOARDS];
 
 /* ------------- Begin structures used for driver registeration ---------- */
 
-struct tty_driver pc_driver;
-struct tty_driver pc_callout;
-struct tty_driver pc_info;
-
-/* The below structures are used to initialize the tty_driver structures. */
-
-/*	-------------------------------------------------------------------------
-	Note : MAX_ALLOC is currently limited to 0x100.  This restriction is 
-	placed on us by Linux not Digi.
-----------------------------------------------------------------------------*/
-static struct tty_struct *pc_table[MAX_ALLOC];
-static struct termios *pc_termios[MAX_ALLOC];
-static struct termios *pc_termios_locked[MAX_ALLOC];
-
+static struct tty_driver *pc_driver;
+static struct tty_driver *pc_info;
 
 /* ------------------ Begin Digi specific structures -------------------- */
 
@@ -215,6 +203,8 @@ static unsigned termios2digi_c(struct channel *ch, unsigned);
 static void epcaparam(struct tty_struct *, struct channel *);
 static void receive_data(struct channel *);
 static int pc_ioctl(struct tty_struct *, struct file *,
+                    unsigned int, unsigned long);
+static int info_ioctl(struct tty_struct *, struct file *,
                     unsigned int, unsigned long);
 static void pc_set_termios(struct tty_struct *, struct termios *);
 static void do_softint(void *);
@@ -503,12 +493,6 @@ static void pc_close(struct tty_struct * tty, struct file * filp)
 	struct channel *ch;
 	unsigned long flags;
 
-	if (tty->driver->subtype == SERIAL_TYPE_INFO) 
-	{
-		return;
-	}
-
-
 	/* ---------------------------------------------------------
 		verifyChannel returns the channel from the tty struct
 		if it is valid.  This serves as a sanity check.
@@ -554,17 +538,6 @@ static void pc_close(struct tty_struct * tty, struct file * filp)
 
 		ch->asyncflags |= ASYNC_CLOSING;
 	
-		/* -------------------------------------------------------------
-			Save the termios structure, since this port may have
-			separate termios for callout and dialin.
-		--------------------------------------------------------------- */
-
-		if (ch->asyncflags & ASYNC_NORMAL_ACTIVE)
-			ch->normal_termios = *tty->termios;
-
-		if (ch->asyncflags & ASYNC_CALLOUT_ACTIVE)
-			ch->callout_termios = *tty->termios;
-
 		tty->closing = 1;
 
 		if (ch->asyncflags & ASYNC_INITIALIZED) 
@@ -599,7 +572,7 @@ static void pc_close(struct tty_struct * tty, struct file * filp)
 		} /* End if blocked_open */
 
 		ch->asyncflags &= ~(ASYNC_NORMAL_ACTIVE | ASYNC_INITIALIZED | 
-		                      ASYNC_CALLOUT_ACTIVE | ASYNC_CLOSING);
+		                      ASYNC_CLOSING);
 		wake_up_interruptible(&ch->close_wait);
 
 
@@ -693,7 +666,7 @@ static void pc_hangup(struct tty_struct *tty)
 		ch->event = 0;
 		ch->count = 0;
 		restore_flags(flags);
-		ch->asyncflags &= ~(ASYNC_NORMAL_ACTIVE | ASYNC_INITIALIZED | ASYNC_CALLOUT_ACTIVE);
+		ch->asyncflags &= ~(ASYNC_NORMAL_ACTIVE | ASYNC_INITIALIZED);
 		wake_up_interruptible(&ch->open_wait);
 
 	} /* End if ch != NULL */
@@ -726,13 +699,6 @@ static int pc_write(struct tty_struct * tty, int from_user,
 		implementation itself is done at the kernel level and is not 
 		brought into the driver.  
 	------------------------------------------------------------------- */
-
-	/* Stop users from hurting themselves on control minor */
-
-	if (tty->driver->subtype == SERIAL_TYPE_INFO) 
-	{
-		return (0) ;
-	}
 
 	/* ---------------------------------------------------------
 		verifyChannel returns the channel from the tty struct
@@ -1233,31 +1199,6 @@ static int block_til_ready(struct tty_struct *tty,
 			return -ERESTARTSYS;
 	}
 
-	/* ----------------------------------------------------------------- 
-	   If this is a callout device, then just make sure the normal
-	   device isn't being used.
-	-------------------------------------------------------------------- */
-
-	if (tty->driver->subtype == SERIAL_TYPE_CALLOUT) 
-	{ /* A cud device has been opened */
-		if (ch->asyncflags & ASYNC_NORMAL_ACTIVE)
-			return -EBUSY;
-
-		if ((ch->asyncflags & ASYNC_CALLOUT_ACTIVE) &&
-		    (ch->asyncflags & ASYNC_SESSION_LOCKOUT) &&
-		    (ch->session != current->session))
-		    return -EBUSY;
-
-		if ((ch->asyncflags & ASYNC_CALLOUT_ACTIVE) &&
-		    (ch->asyncflags & ASYNC_PGRP_LOCKOUT) &&
-		    (ch->pgrp != current->pgrp))
-		    return -EBUSY;
- 
-		ch->asyncflags |= ASYNC_CALLOUT_ACTIVE;
-
-		return 0;
-	} /* End a cud device has been opened */
-
 	if (filp->f_flags & O_NONBLOCK) 
 	{
 		/* ----------------------------------------------------------------- 
@@ -1265,25 +1206,14 @@ static int block_til_ready(struct tty_struct *tty,
 	  	 and then exit.
 		-------------------------------------------------------------------- */
 
-		if (ch->asyncflags & ASYNC_CALLOUT_ACTIVE)
-			return -EBUSY;
-
 		ch->asyncflags |= ASYNC_NORMAL_ACTIVE;
 
 		return 0;
 	}
 
 
-	if (ch->asyncflags & ASYNC_CALLOUT_ACTIVE) 
-	{
-		if (ch->normal_termios.c_cflag & CLOCAL)
-			do_clocal = 1;
-	}
-	else 
-	{
-		if (tty->termios->c_cflag & CLOCAL)
-			do_clocal = 1;
-	}
+	if (tty->termios->c_cflag & CLOCAL)
+		do_clocal = 1;
 	
    /* Block waiting for the carrier detect and the line to become free */
 	
@@ -1317,7 +1247,6 @@ static int block_til_ready(struct tty_struct *tty,
 		}
 
 		if (!(ch->asyncflags & ASYNC_CLOSING) && 
-		    !(ch->asyncflags & ASYNC_CALLOUT_ACTIVE) &&
 			  (do_clocal || (ch->imodem & ch->dcd)))
 			break;
 
@@ -1365,13 +1294,6 @@ static int pc_open(struct tty_struct *tty, struct file * filp)
 	int line, retval, boardnum;
 	volatile struct board_chan *bc;
 	volatile unsigned int head;
-
-	/* Nothing "real" happens in open of control device */
-
-	if (tty->driver->subtype == SERIAL_TYPE_INFO) 
-	{
-		return (0) ;
-	}
 
 	line = tty->index;
 	if (line < 0 || line >= nbdevs) 
@@ -1449,18 +1371,6 @@ static int pc_open(struct tty_struct *tty, struct file * filp)
 		If this is the first time the channel has been opened, initialize
 		the tty->termios struct otherwise let pc_close handle it.
 	-------------------------------------------------------------------- */
-
-	/* Should this be here except for SPLIT termios ? */
-	if (ch->count == 1) 
-	{
-		if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
-			*tty->termios = ch->normal_termios;
-		else 
-			*tty->termios = ch->callout_termios;
-	}
-
-	ch->session = current->session;
-	ch->pgrp = current->pgrp;
 
 	save_flags(flags);
 	cli();
@@ -1557,14 +1467,15 @@ static void __exit epca_module_exit(void)
 	save_flags(flags);
 	cli();
 
-	if ((tty_unregister_driver(&pc_driver)) ||  
-	    (tty_unregister_driver(&pc_callout)) ||
-	    (tty_unregister_driver(&pc_info)))
+	if ((tty_unregister_driver(pc_driver)) ||  
+	    (tty_unregister_driver(pc_info)))
 	{
 		printk(KERN_WARNING "<Error> - DIGI : cleanup_module failed to un-register tty driver\n");
 		restore_flags(flags);
 		return;
 	}
+	put_tty_driver(pc_driver);
+	put_tty_driver(pc_info);
 
 	for (crd = 0; crd < num_cards; crd++) 
 	{ /* Begin for each card */
@@ -1602,6 +1513,34 @@ static void __exit epca_module_exit(void)
 module_exit(epca_module_exit);
 #endif /* MODULE */
 
+static struct tty_operations pc_ops = {
+	.open = pc_open,
+	.close = pc_close,
+	.write = pc_write,
+	.write_room = pc_write_room,
+	.flush_buffer = pc_flush_buffer,
+	.chars_in_buffer = pc_chars_in_buffer,
+	.flush_chars = pc_flush_chars,
+	.put_char = pc_put_char,
+	.ioctl = pc_ioctl,
+	.set_termios = pc_set_termios,
+	.stop = pc_stop,
+	.start = pc_start,
+	.throttle = pc_throttle,
+	.unthrottle = pc_unthrottle,
+	.hangup = pc_hangup,
+};
+
+static int info_open(struct tty_struct *tty, struct file * filp)
+{
+	return 0;
+}
+
+static struct tty_operations info_ops = {
+	.open = info_open,
+	.ioctl = info_ioctl,
+};
+
 /* ------------------ Begin pc_init  ---------------------- */
 
 int __init pc_init(void)
@@ -1626,13 +1565,22 @@ int __init pc_init(void)
 	int crd;
 	struct board_info *bd;
 	unsigned char board_id = 0;
-	
 
 #ifdef ENABLE_PCI
 	int pci_boards_found, pci_count;
 
 	pci_count = 0;
 #endif /* ENABLE_PCI */
+
+	pc_driver = alloc_tty_driver(MAX_ALLOC);
+	if (!pc_driver)
+		return -ENOMEM;
+
+	pc_info = alloc_tty_driver(MAX_ALLOC);
+	if (!pc_info) {
+		put_tty_driver(pc_driver);
+		return -ENOMEM;
+	}
 
 	/* -----------------------------------------------------------------------
 		If epca_setup has not been ran by LILO set num_cards to defaults; copy
@@ -1687,81 +1635,39 @@ int __init pc_init(void)
 	--------------------------------------------------------------------- */
   
 	pci_boards_found = 0;
-	if (pci_present())
-	{
-		if(num_cards < MAXBOARDS)
-			pci_boards_found += init_PCI();
-		num_cards += pci_boards_found;
-	}
-	else 
-	{
-		printk(KERN_ERR "<Error> - No PCI BIOS found\n");
-	}
+	if(num_cards < MAXBOARDS)
+		pci_boards_found += init_PCI();
+	num_cards += pci_boards_found;
 
 #endif /* ENABLE_PCI */
 
-	memset(&pc_driver, 0, sizeof(struct tty_driver));
-	memset(&pc_callout, 0, sizeof(struct tty_driver));
-	memset(&pc_info, 0, sizeof(struct tty_driver));
+	pc_driver->owner = THIS_MODULE;
+	pc_driver->name = "ttyD"; 
+	pc_driver->major = DIGI_MAJOR; 
+	pc_driver->minor_start = 0;
+	pc_driver->type = TTY_DRIVER_TYPE_SERIAL;
+	pc_driver->subtype = SERIAL_TYPE_NORMAL;
+	pc_driver->init_termios = tty_std_termios;
+	pc_driver->init_termios.c_iflag = 0;
+	pc_driver->init_termios.c_oflag = 0;
+	pc_driver->init_termios.c_cflag = B9600 | CS8 | CREAD | CLOCAL | HUPCL;
+	pc_driver->init_termios.c_lflag = 0;
+	pc_driver->flags = TTY_DRIVER_REAL_RAW;
+	tty_set_operations(pc_driver, &pc_ops);
 
-	pc_driver.magic = TTY_DRIVER_MAGIC;
-	pc_driver.owner = THIS_MODULE;
-	pc_driver.name = "ttyD"; 
-	pc_driver.major = DIGI_MAJOR; 
-	pc_driver.minor_start = 0;
-	pc_driver.num = MAX_ALLOC;
-	pc_driver.type = TTY_DRIVER_TYPE_SERIAL;
-	pc_driver.subtype = SERIAL_TYPE_NORMAL;
-	pc_driver.init_termios = tty_std_termios;
-	pc_driver.init_termios.c_iflag = 0;
-	pc_driver.init_termios.c_oflag = 0;
-
-	pc_driver.init_termios.c_cflag = B9600 | CS8 | CREAD | CLOCAL | HUPCL;
-	pc_driver.init_termios.c_lflag = 0;
-	pc_driver.flags = TTY_DRIVER_REAL_RAW;
-	pc_driver.refcount = &pc_refcount;
-	pc_driver.table = pc_table;
-	
-	/* pc_termios is an array of pointers pointing at termios structs */
-	/* The below should get the first pointer */
-	pc_driver.termios = pc_termios;
-	pc_driver.termios_locked = pc_termios_locked;
-
-	/* ------------------------------------------------------------------
-		Setup entry points for the driver.  These are primarily called by 
-		the kernel in tty_io.c and n_tty.c
-	--------------------------------------------------------------------- */
-
-	pc_driver.open = pc_open;
-	pc_driver.close = pc_close;
-	pc_driver.write = pc_write;
-	pc_driver.write_room = pc_write_room;
-	pc_driver.flush_buffer = pc_flush_buffer;
-	pc_driver.chars_in_buffer = pc_chars_in_buffer;
-	pc_driver.flush_chars = pc_flush_chars;
-	pc_driver.put_char = pc_put_char;
-	pc_driver.ioctl = pc_ioctl;
-	pc_driver.set_termios = pc_set_termios;
-	pc_driver.stop = pc_stop;
-	pc_driver.start = pc_start;
-	pc_driver.throttle = pc_throttle;
-	pc_driver.unthrottle = pc_unthrottle;
-	pc_driver.hangup = pc_hangup;
-	pc_callout = pc_driver;
-
-	pc_callout.name = "cud";
-	pc_callout.major = DIGICU_MAJOR;
-	pc_callout.minor_start = 0;
-	pc_callout.init_termios.c_cflag = B9600 | CS8 | CREAD | CLOCAL | HUPCL;
-	pc_callout.subtype = SERIAL_TYPE_CALLOUT;
-
-	pc_info = pc_driver;
-	pc_info.name = "digi_ctl";
-	pc_info.major = DIGIINFOMAJOR;
-	pc_info.minor_start = 0;
-	pc_info.num = 1;
-	pc_info.init_termios.c_cflag = B9600 | CS8 | CREAD | HUPCL;
-	pc_info.subtype = SERIAL_TYPE_INFO;
+	pc_info->owner = THIS_MODULE;
+	pc_info->name = "digi_ctl";
+	pc_info->major = DIGIINFOMAJOR;
+	pc_info->minor_start = 0;
+	pc_info->type = TTY_DRIVER_TYPE_SERIAL;
+	pc_info->subtype = SERIAL_TYPE_INFO;
+	pc_info->init_termios = tty_std_termios;
+	pc_info->init_termios.c_iflag = 0;
+	pc_info->init_termios.c_oflag = 0;
+	pc_info->init_termios.c_lflag = 0;
+	pc_info->init_termios.c_cflag = B9600 | CS8 | CREAD | HUPCL;
+	pc_info->flags = TTY_DRIVER_REAL_RAW;
+	tty_set_operations(pc_info, &info_ops);
 
 
 	save_flags(flags);
@@ -1886,13 +1792,10 @@ int __init pc_init(void)
 
 	} /* End for each card */
 
-	if (tty_register_driver(&pc_driver))
+	if (tty_register_driver(pc_driver))
 		panic("Couldn't register Digi PC/ driver");
 
-	if (tty_register_driver(&pc_callout))
-		panic("Couldn't register Digi PC/ callout");
-
-	if (tty_register_driver(&pc_info))
+	if (tty_register_driver(pc_info))
 		panic("Couldn't register Digi PC/ info ");
 
 	/* -------------------------------------------------------------------
@@ -2165,8 +2068,6 @@ static void post_fep_init(unsigned int crd)
 		ch->close_delay = 50;
 		ch->count = 0;
 		ch->blocked_open = 0;
-		ch->callout_termios = pc_callout.init_termios;
-		ch->normal_termios = pc_driver.init_termios;
 		init_waitqueue_head(&ch->open_wait);
 		init_waitqueue_head(&ch->close_wait);
 		ch->tmp_buf = kmalloc(ch->txbufsize,GFP_KERNEL);
@@ -2712,7 +2613,7 @@ static void epcaparam(struct tty_struct *tty, struct channel *ch)
 			the driver will wait on carrier detect.
 		------------------------------------------------------------------- */
 
-		if ((ts->c_cflag & CLOCAL) || (tty->driver->subtype == SERIAL_TYPE_CALLOUT))
+		if (ts->c_cflag & CLOCAL)
 		{ /* Begin it is a cud device or a ttyD device with CLOCAL on */
 			ch->asyncflags &= ~ASYNC_CHECK_CD;
 		} /* End it is a cud device or a ttyD device with CLOCAL on */
@@ -2945,6 +2846,88 @@ static void receive_data(struct channel *ch)
 
 } /* End receive_data */
 
+static int info_ioctl(struct tty_struct *tty, struct file * file,
+		    unsigned int cmd, unsigned long arg)
+{
+	int error;
+	
+	switch (cmd) 
+	{ /* Begin switch cmd */
+
+		case DIGI_GETINFO:
+		{ /* Begin case DIGI_GETINFO */
+
+			struct digi_info di ;
+			int brd;
+
+			getUser(brd, (unsigned int *)arg);
+
+			if ((error = verify_area(VERIFY_WRITE, (char*)arg, sizeof(di))))
+			{
+				printk(KERN_ERR "DIGI_GETINFO : verify area size 0x%x failed\n",sizeof(di));
+				return(error);
+			}
+
+			if ((brd < 0) || (brd >= num_cards) || (num_cards == 0))
+				return (-ENODEV);
+
+			memset(&di, 0, sizeof(di));
+
+			di.board = brd ; 
+			di.status = boards[brd].status;
+			di.type = boards[brd].type ;
+			di.numports = boards[brd].numports ;
+			di.port = boards[brd].port ;
+			di.membase = boards[brd].membase ;
+
+			if (copy_to_user((char *)arg, &di, sizeof (di)))
+				return -EFAULT;
+			break;
+
+		} /* End case DIGI_GETINFO */
+
+		case DIGI_POLLER:
+		{ /* Begin case DIGI_POLLER */
+
+			int brd = arg & 0xff000000 >> 16 ; 
+			unsigned char state = arg & 0xff ; 
+
+			if ((brd < 0) || (brd >= num_cards))
+			{
+				printk(KERN_ERR "<Error> - DIGI POLLER : brd not valid!\n");
+				return (-ENODEV);
+			}
+
+			digi_poller_inhibited = state ;
+			break ; 
+
+		} /* End case DIGI_POLLER */
+
+		case DIGI_INIT:
+		{ /* Begin case DIGI_INIT */
+
+			/* ------------------------------------------------------------
+				This call is made by the apps to complete the initilization
+				of the board(s).  This routine is responsible for setting
+				the card to its initial state and setting the drivers control
+				fields to the sutianle settings for the card in question.
+			---------------------------------------------------------------- */
+		
+			int crd ; 
+			for (crd = 0; crd < num_cards; crd++) 
+				post_fep_init (crd);
+
+			break ; 
+
+		} /* End case DIGI_INIT */
+
+
+		default:
+			return -ENOIOCTLCMD;
+
+	} /* End switch cmd */
+	return (0) ;
+}
 /* --------------------- Begin pc_ioctl  ----------------------- */
 
 static int pc_ioctl(struct tty_struct *tty, struct file * file,
@@ -2959,89 +2942,6 @@ static int pc_ioctl(struct tty_struct *tty, struct file * file,
 	volatile struct board_chan *bc;
 	struct channel *ch = (struct channel *) tty->driver_data;
 	
-	/* The control device has it's own set of commands */
-	if (tty->driver->subtype == SERIAL_TYPE_INFO) 
-	{ /* Begin if subtype is the control device */
-
-		switch (cmd) 
-		{ /* Begin switch cmd */
-
-			case DIGI_GETINFO:
-			{ /* Begin case DIGI_GETINFO */
-
-				struct digi_info di ;
-				int brd;
-
-				getUser(brd, (unsigned int *)arg);
-
-				if ((error = verify_area(VERIFY_WRITE, (char*)arg, sizeof(di))))
-				{
-					printk(KERN_ERR "DIGI_GETINFO : verify area size 0x%x failed\n",sizeof(di));
-					return(error);
-				}
-
-				if ((brd < 0) || (brd >= num_cards) || (num_cards == 0))
-					return (-ENODEV);
-
-				memset(&di, 0, sizeof(di));
-
-				di.board = brd ; 
-				di.status = boards[brd].status;
-				di.type = boards[brd].type ;
-				di.numports = boards[brd].numports ;
-				di.port = boards[brd].port ;
-				di.membase = boards[brd].membase ;
-
-				if (copy_to_user((char *)arg, &di, sizeof (di)))
-					return -EFAULT;
-				break;
-
-			} /* End case DIGI_GETINFO */
-
-			case DIGI_POLLER:
-			{ /* Begin case DIGI_POLLER */
-
-				int brd = arg & 0xff000000 >> 16 ; 
-				unsigned char state = arg & 0xff ; 
-
-				if ((brd < 0) || (brd >= num_cards))
-				{
-					printk(KERN_ERR "<Error> - DIGI POLLER : brd not valid!\n");
-					return (-ENODEV);
-				}
-
-				digi_poller_inhibited = state ;
-				break ; 
-
-			} /* End case DIGI_POLLER */
-
-			case DIGI_INIT:
-			{ /* Begin case DIGI_INIT */
-
-				/* ------------------------------------------------------------
-					This call is made by the apps to complete the initilization
-					of the board(s).  This routine is responsible for setting
-					the card to its initial state and setting the drivers control
-					fields to the sutianle settings for the card in question.
-				---------------------------------------------------------------- */
-			
-				int crd ; 
-				for (crd = 0; crd < num_cards; crd++) 
-					post_fep_init (crd);
-
-			 	break ; 
-
-			} /* End case DIGI_INIT */
-
-
-			default:
-				return -ENOIOCTLCMD;
-
-		} /* End switch cmd */
-		return (0) ;
-
-	} /* End if subtype is the control device */
-
 	if (ch)
 		bc = ch->brdchan;
 	else 
@@ -3406,7 +3306,7 @@ static void do_softint(void *private_)
 
 				tty_hangup(tty);	/* FIXME: module removal race here - AKPM */
 				wake_up_interruptible(&ch->open_wait);
-				ch->asyncflags &= ~(ASYNC_NORMAL_ACTIVE | ASYNC_CALLOUT_ACTIVE);
+				ch->asyncflags &= ~ASYNC_NORMAL_ACTIVE;
 
 			} /* End if clear_bit */
 		}
@@ -3740,7 +3640,7 @@ void epca_setup(char *str, int *ints)
 
 			case 5:
 				board.port = (unsigned char *)ints[index];
-				if (board.port <= 0)
+				if (ints[index] <= 0)
 				{
 					printk(KERN_ERR "<Error> - epca_setup: Invalid io port 0x%x\n", (unsigned int)board.port);
 					invalid_lilo_config = 1;
@@ -3752,7 +3652,7 @@ void epca_setup(char *str, int *ints)
 
 			case 6:
 				board.membase = (unsigned char *)ints[index];
-				if (board.membase <= 0)
+				if (ints[index] <= 0)
 				{
 					printk(KERN_ERR "<Error> - epca_setup: Invalid memory base 0x%x\n",(unsigned int)board.membase);
 					invalid_lilo_config = 1;

@@ -203,8 +203,8 @@
 #define LOCKUP                      8
 
 struct gtt_data {
-	agp_memory *i810_fb_memory;
-	agp_memory *i810_cursor_memory;
+	struct agp_memory *i810_fb_memory;
+	struct agp_memory *i810_cursor_memory;
 };
 
 struct mode_registers {

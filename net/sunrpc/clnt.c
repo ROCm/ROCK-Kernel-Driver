@@ -850,17 +850,16 @@ call_refreshresult(struct rpc_task *task)
 
 	task->tk_status = 0;
 	task->tk_action = call_reserve;
-	if (status >= 0)
+	if (status >= 0 && rpcauth_uptodatecred(task))
 		return;
-	switch (status) {
-		case -EPIPE:
-			rpc_delay(task, 3*HZ);
-		case -ETIMEDOUT:
-			task->tk_action = call_refresh;
-			break;
-		default:
-			rpc_exit(task, -EACCES);
+	if (rpcauth_deadcred(task)) {
+		rpc_exit(task, -EACCES);
+		return;
 	}
+	task->tk_action = call_refresh;
+	if (status != -ETIMEDOUT)
+		rpc_delay(task, 3*HZ);
+	return;
 }
 
 /*
@@ -909,6 +908,8 @@ call_verify(struct rpc_task *task)
 		switch ((n = ntohl(*p++))) {
 		case RPC_AUTH_REJECTEDCRED:
 		case RPC_AUTH_REJECTEDVERF:
+		case RPCSEC_GSS_CREDPROBLEM:
+		case RPCSEC_GSS_CTXPROBLEM:
 			if (!task->tk_cred_retry)
 				break;
 			task->tk_cred_retry--;

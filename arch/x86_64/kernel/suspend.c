@@ -130,7 +130,7 @@ void fix_processor_context(void)
 	/*
 	 * Now maybe reload the debug registers
 	 */
-	if (current->thread.debugreg[7]){
+	if (current->thread.debugreg7){
                 loaddebug(&current->thread, 0);
                 loaddebug(&current->thread, 1);
                 loaddebug(&current->thread, 2);

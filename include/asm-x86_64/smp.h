@@ -42,10 +42,11 @@ extern int pic_mode;
 extern void smp_flush_tlb(void);
 extern void smp_message_irq(int cpl, void *dev_id, struct pt_regs *regs);
 extern void smp_send_reschedule(int cpu);
-extern void smp_send_reschedule_all(void);
 extern void smp_invalidate_rcv(void);		/* Process an NMI */
 extern void (*mtrr_hook) (void);
 extern void zap_low_mappings(void);
+void smp_stop_cpu(void);
+
 
 #define SMP_TRAMPOLINE_BASE 0x6000
 

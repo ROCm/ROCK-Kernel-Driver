@@ -84,14 +84,6 @@ extern int smp_threads_ready;
 #define MSG_RESCHEDULE		0x0003	/* Reschedule request from master CPU*/
 #define MSG_CALL_FUNCTION       0x0004  /* Call function on all other CPUs */
 
-struct notifier_block;
-
-/* Need to know about CPUs going up/down? */
-extern int register_cpu_notifier(struct notifier_block *nb);
-extern void unregister_cpu_notifier(struct notifier_block *nb);
-
-int cpu_up(unsigned int cpu);
-
 /*
  * Mark the boot cpu "online" so that it can call console drivers in
  * printk() and can access its per-cpu storage.
@@ -110,7 +102,6 @@ void smp_prepare_boot_cpu(void);
 #define smp_call_function(func,info,retry,wait)	({ 0; })
 #define on_each_cpu(func,info,retry,wait)	({ func(info); 0; })
 static inline void smp_send_reschedule(int cpu) { }
-static inline void smp_send_reschedule_all(void) { }
 #define cpu_online_map				1
 #define cpu_online(cpu)				({ BUG_ON((cpu) != 0); 1; })
 #define num_online_cpus()			1
@@ -118,16 +109,6 @@ static inline void smp_send_reschedule_all(void) { }
 #define cpu_possible(cpu)			({ BUG_ON((cpu) != 0); 1; })
 #define smp_prepare_boot_cpu()			do {} while (0)
 
-struct notifier_block;
-
-/* Need to know about CPUs going up/down? */
-static inline int register_cpu_notifier(struct notifier_block *nb)
-{
-	return 0;
-}
-static inline void unregister_cpu_notifier(struct notifier_block *nb)
-{
-}
 #endif /* !SMP */
 
 #define get_cpu()		({ preempt_disable(); smp_processor_id(); })

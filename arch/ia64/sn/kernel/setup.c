@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 1999,2001-2003 Silicon Graphics, Inc. All rights reserved.
+ * Copyright (C) 1999,2001-2002 Silicon Graphics, Inc. All rights reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it 
  * under the terms of version 2 of the GNU General Public License 
@@ -69,25 +69,22 @@
 #include <asm/sn/bte.h>
 #include <asm/sn/clksupport.h>
 #include <asm/sn/sn_sal.h>
+
+#ifdef CONFIG_IA64_SGI_SN2
 #include <asm/sn/sn2/shub.h>
+#endif
 
 DEFINE_PER_CPU(struct pda_s, pda_percpu);
 
-#define pxm_to_nasid(pxm) ((pxm)<<1)
-
 extern void bte_init_node (nodepda_t *, cnodeid_t);
 extern void bte_init_cpu (void);
-extern void sn_timer_init (void);
-extern void (*ia64_mark_idle)(int);
-void snidle(int);
 
 unsigned long sn_rtc_cycles_per_second;   
+unsigned long sn_rtc_usec_per_cyc;
 
 partid_t sn_partid = -1;
 char sn_system_serial_number_string[128];
 u64 sn_partition_serial_number;
-
-short physical_node_map[MAX_PHYSNODE_ID];
 
 /*
  * This is the address of the RRegs in the HSpace of the global
@@ -97,14 +94,21 @@ short physical_node_map[MAX_PHYSNODE_ID];
  * early_printk won't try to access the UART before
  * master_node_bedrock_address is properly calculated.
  */
-u64 master_node_bedrock_address;
+u64 master_node_bedrock_address = 0UL;
 
 static void sn_init_pdas(char **);
 
+extern struct irq_desc *_sn_irq_desc[];
+
+#if defined(CONFIG_IA64_SGI_SN1)
+extern synergy_da_t	*Synergy_da_indr[];
+#endif
 
 static nodepda_t	*nodepdaindr[MAX_COMPACT_NODES];
 
-irqpda_t		*irqpdaindr;
+#ifdef CONFIG_IA64_SGI_SN2
+irqpda_t		*irqpdaindr[NR_CPUS];
+#endif /* CONFIG_IA64_SGI_SN2 */
 
 
 /*
@@ -131,19 +135,29 @@ struct screen_info sn_screen_info = {
  * running in the simulator.  Note that passing zeroes in DRIVE_INFO
  * is sufficient (the IDE driver will autodetect the drive geometry).
  */
-#ifdef CONFIG_IA64_GENERIC
-extern char drive_info[4*16];
-#else
 char drive_info[4*16];
-#endif
+
+/**
+ * sn_map_nr - return the mem_map entry for a given kernel address
+ * @addr: kernel address to query
+ *
+ * Finds the mem_map entry for the kernel address given.  Used by
+ * virt_to_page() (asm-ia64/page.h), among other things.
+ */
+unsigned long
+sn_map_nr (unsigned long addr)
+{
+	return BANK_MAP_NR(addr);
+}
 
 /**
  * early_sn_setup - early setup routine for SN platforms
  *
  * Sets up an initial console to aid debugging.  Intended primarily
- * for bringup.  See start_kernel() in init/main.c.
+ * for bringup, it's only called if %BRINGUP and %CONFIG_IA64_EARLY_PRINTK
+ * are turned on.  See start_kernel() in init/main.c.
  */
-#if defined(CONFIG_IA64_EARLY_PRINTK) || defined(CONFIG_IA64_SGI_SN_SIM)
+#if defined(CONFIG_IA64_EARLY_PRINTK)
 
 void __init
 early_sn_setup(void)
@@ -181,48 +195,21 @@ early_sn_setup(void)
 	}
 
 	if ( IS_RUNNING_ON_SIMULATOR() ) {
+#if defined(CONFIG_IA64_SGI_SN1)
+		master_node_bedrock_address = (u64)REMOTE_HSPEC_ADDR(get_nasid(), 0);
+#else
 		master_node_bedrock_address = (u64)REMOTE_HUB(get_nasid(), SH_JUNK_BUS_UART0);
+#endif
 		printk(KERN_DEBUG "early_sn_setup: setting master_node_bedrock_address to 0x%lx\n", master_node_bedrock_address);
 	}
 }
-#endif /* CONFIG_IA64_EARLY_PRINTK */
+#endif /* CONFIG_IA64_SGI_SN1 */
 
 #ifdef CONFIG_IA64_MCA
 extern int platform_intr_list[];
 #endif
 
 extern nasid_t master_nasid;
-static int shub_1_1_found __initdata;
-
-
-/*
- * sn_check_for_wars
- *
- * Set flag for enabling shub specific wars
- */
-
-static inline int __init
-is_shub_1_1(int nasid)
-{
-	unsigned long id;
-	int	rev;
-
-	id = REMOTE_HUB_L(nasid, SH_SHUB_ID);
-	rev =  (id & SH_SHUB_ID_REVISION_MASK) >> SH_SHUB_ID_REVISION_SHFT;
-	return rev <= 2;
-}
-
-static void __init
-sn_check_for_wars(void)
-{
-	int	cnode;
-
-	for (cnode=0; cnode< numnodes; cnode++)
-		if (is_shub_1_1(cnodeid_to_nasid(cnode)))
-			shub_1_1_found = 1;
-}
-
-
 
 /**
  * sn_setup - SN platform setup routine
@@ -236,18 +223,8 @@ void __init
 sn_setup(char **cmdline_p)
 {
 	long status, ticks_per_sec, drift;
-	int pxm;
+	int i;
 	int major = sn_sal_rev_major(), minor = sn_sal_rev_minor();
-	extern void io_sh_swapper(int, int);
-	extern nasid_t get_master_baseio_nasid(void);
-	extern void sn_cpu_init(void);
-
-	MAX_DMA_ADDRESS = PAGE_OFFSET + MAX_PHYS_MEMORY;
-
-	memset(physical_node_map, -1, sizeof(physical_node_map));
-	for (pxm=0; pxm<MAX_PXM_DOMAINS; pxm++)
-		if (pxm_to_nid_map[pxm] != -1)
-			physical_node_map[pxm_to_nasid(pxm)] = pxm_to_nid_map[pxm];
 
 	printk("SGI SAL version %x.%02x\n", major, minor);
 
@@ -260,13 +237,23 @@ sn_setup(char **cmdline_p)
 		       "%x.%02x\n", SN_SAL_MIN_MAJOR, SN_SAL_MIN_MINOR);
 		panic("PROM version too old\n");
 	}
-
-	io_sh_swapper(get_nasid(), 0);
+#ifdef CONFIG_PCI
+#ifdef CONFIG_IA64_SGI_SN2
+	{
+		extern void io_sh_swapper(int, int);
+		io_sh_swapper(get_nasid(), 0);
+	}
+#endif
 
 	master_nasid = get_nasid();
 	(void)get_console_nasid();
-	(void)get_master_baseio_nasid();
-
+#ifndef CONFIG_IA64_SGI_SN1
+	{
+		extern nasid_t get_master_baseio_nasid(void);
+		(void)get_master_baseio_nasid();
+	}
+#endif
+#endif /* CONFIG_PCI */
 	status = ia64_sal_freq_base(SAL_FREQ_BASE_REALTIME_CLOCK, &ticks_per_sec, &drift);
 	if (status != 0 || ticks_per_sec < 100000) {
 		printk(KERN_WARNING "unable to determine platform RTC clock frequency, guessing.\n");
@@ -276,12 +263,26 @@ sn_setup(char **cmdline_p)
 	else
 		sn_rtc_cycles_per_second = ticks_per_sec;
 
+#ifdef CONFIG_IA64_SGI_SN1
+	/* PROM has wrong value on SN1 */
+	sn_rtc_cycles_per_second = 990177;
+#endif
+	sn_rtc_usec_per_cyc = ((1000000000UL<<IA64_NSEC_PER_CYC_SHIFT)
+			       + sn_rtc_cycles_per_second/2) / sn_rtc_cycles_per_second;
+		
+	for (i=0;i<NR_CPUS;i++)
+		_sn_irq_desc[i] = _irq_desc;
+
 	platform_intr_list[ACPI_INTERRUPT_CPEI] = IA64_PCE_VECTOR;
 
 
 	if ( IS_RUNNING_ON_SIMULATOR() )
 	{
+#ifdef CONFIG_IA64_SGI_SN2
 		master_node_bedrock_address = (u64)REMOTE_HUB(get_nasid(), SH_JUNK_BUS_UART0);
+#else
+		master_node_bedrock_address = (u64)REMOTE_HSPEC_ADDR(get_nasid(), 0);
+#endif
 		printk(KERN_DEBUG "sn_setup: setting master_node_bedrock_address to 0x%lx\n",
 		       master_node_bedrock_address);
 	}
@@ -291,10 +292,6 @@ sn_setup(char **cmdline_p)
 	 */
 	sn_init_pdas(cmdline_p);
 
-	/*
-	 * Check for WARs.
-	 */
-	sn_check_for_wars();
 
 	/* 
 	 * For the bootcpu, we do this here. All other cpus will make the
@@ -308,9 +305,10 @@ sn_setup(char **cmdline_p)
 #endif
 	screen_info = sn_screen_info;
 
-	sn_timer_init();
-
-	ia64_mark_idle = &snidle;
+	/*
+	 * Turn off "floating-point assist fault" warnings by default.
+	 */
+	current->thread.flags |= IA64_THREAD_FPEMU_NOPRINT;
 }
 
 /**
@@ -327,12 +325,8 @@ sn_init_pdas(char **cmdline_p)
 	 * Make sure that the PDA fits entirely in the same page as the 
 	 * cpu_data area.
 	 */
-	if ((((unsigned long)pda & (~PAGE_MASK)) + sizeof(pda_t)) > PAGE_SIZE)
+	if ( (((unsigned long)pda & ~PAGE_MASK) + sizeof(pda_t)) > PAGE_SIZE)
 		panic("overflow of cpu_data page");
-
-	memset(pda->cnodeid_to_nasid_table, -1, sizeof(pda->cnodeid_to_nasid_table));
-	for (cnode=0; cnode<numnodes; cnode++)
-		pda->cnodeid_to_nasid_table[cnode] = pxm_to_nasid(nid_to_pxm_map[cnode]);
 
         /*
          * Allocate & initalize the nodepda for each node.
@@ -340,6 +334,13 @@ sn_init_pdas(char **cmdline_p)
         for (cnode=0; cnode < numnodes; cnode++) {
 		nodepdaindr[cnode] = alloc_bootmem_node(NODE_DATA(cnode), sizeof(nodepda_t));
 		memset(nodepdaindr[cnode], 0, sizeof(nodepda_t));
+
+#if defined(CONFIG_IA64_SGI_SN1)
+		Synergy_da_indr[cnode * 2] = (synergy_da_t *) alloc_bootmem_node(NODE_DATA(cnode), sizeof(synergy_da_t));
+		Synergy_da_indr[cnode * 2 + 1] = (synergy_da_t *) alloc_bootmem_node(NODE_DATA(cnode), sizeof(synergy_da_t));
+		memset(Synergy_da_indr[cnode * 2], 0, sizeof(synergy_da_t));
+		memset(Synergy_da_indr[cnode * 2 + 1], 0, sizeof(synergy_da_t));
+#endif
         }
 
 	/*
@@ -348,7 +349,7 @@ sn_init_pdas(char **cmdline_p)
         for (cnode=0; cnode < numnodes; cnode++)
 		memcpy(nodepdaindr[cnode]->pernode_pdaindr, nodepdaindr, sizeof(nodepdaindr));
 
-
+#ifdef CONFIG_PCI
 	/*
 	 * Set up IO related platform-dependent nodepda fields.
 	 * The following routine actually sets up the hubinfo struct
@@ -358,6 +359,7 @@ sn_init_pdas(char **cmdline_p)
 		init_platform_nodepda(nodepdaindr[cnode], cnode);
 		bte_init_node (nodepdaindr[cnode], cnode);
 	}
+#endif
 }
 
 /**
@@ -372,11 +374,7 @@ sn_init_pdas(char **cmdline_p)
 void __init
 sn_cpu_init(void)
 {
-	int	cpuid;
-	int	cpuphyid;
-	int	nasid;
-	int	slice;
-	int	cnode, i;
+	int cpuid, cpuphyid, nasid, nodeid, slice;
 
 	/*
 	 * The boot cpu makes this call again after platform initialization is
@@ -388,43 +386,14 @@ sn_cpu_init(void)
 	cpuid = smp_processor_id();
 	cpuphyid = ((ia64_get_lid() >> 16) & 0xffff);
 	nasid = cpu_physical_id_to_nasid(cpuphyid);
-	cnode = nasid_to_cnodeid(nasid);
+	nodeid = cpu_to_node_map[cpuphyid];
 	slice = cpu_physical_id_to_slice(cpuphyid);
 
-	printk("CPU %d: nasid %d, slice %d, cnode %d\n",
-			smp_processor_id(), nasid, slice, cnode);
-
-	memset(pda, 0, sizeof(pda));
-	pda->p_nodepda = nodepdaindr[cnode];
-	pda->led_address = (typeof(pda->led_address)) (LED0 + (slice<<LED_CPU_SHIFT));
-	pda->led_state = LED_ALWAYS_SET;
+	memset(pda, 0, sizeof(pda_t));
+	pda->p_nodepda = nodepdaindr[nodeid];
 	pda->hb_count = HZ/2;
 	pda->hb_state = 0;
 	pda->idle_flag = 0;
-	pda->shub_1_1_found = shub_1_1_found;
-	
-	memset(pda->cnodeid_to_nasid_table, -1, sizeof(pda->cnodeid_to_nasid_table));
-	for (i=0; i<numnodes; i++)
-		pda->cnodeid_to_nasid_table[i] = pxm_to_nasid(nid_to_pxm_map[i]);
-
-	if (local_node_data->active_cpu_count == 1)
-		nodepda->node_first_cpu = cpuid;
-
-
-
-	/*
-	 * We must use different memory allocators for first cpu (bootmem 
-	 * allocator) than for the other cpus (regular allocator).
-	 */
-	if (cpuid == 0)
-		irqpdaindr = alloc_bootmem_node(NODE_DATA(cpuid_to_cnodeid(cpuid)),sizeof(irqpda_t));
-
-	memset(irqpdaindr, 0, sizeof(irqpda_t));
-	irqpdaindr->irq_flags[SGI_PCIBR_ERROR] = SN2_IRQ_SHARED;
-	irqpdaindr->irq_flags[SGI_PCIBR_ERROR] |= SN2_IRQ_RESERVED;
-	irqpdaindr->irq_flags[SGI_II_ERROR] = SN2_IRQ_SHARED;
-	irqpdaindr->irq_flags[SGI_II_ERROR] |= SN2_IRQ_RESERVED;
-
 	pda->pio_write_status_addr = (volatile unsigned long *)
 			LOCAL_MMR_ADDR((slice < 2 ? SH_PIO_WRITE_STATUS_0 : SH_PIO_WRITE_STATUS_1 ) );
 	pda->mem_write_status_addr = (volatile u64 *)
@@ -432,25 +401,89 @@ sn_cpu_init(void)
 
 	if (nodepda->node_first_cpu == cpuid) {
 		int	buddy_nasid;
-		buddy_nasid = cnodeid_to_nasid(numa_node_id() == numnodes-1 ? 0 : numa_node_id()+ 1);
+		buddy_nasid = cnodeid_to_nasid(local_nodeid == numnodes - 1 ? 0 : local_nodeid + 1);
 		pda->pio_shub_war_cam_addr = (volatile unsigned long*)GLOBAL_MMR_ADDR(nasid, SH_PI_CAM_CONTROL);
 	}
 
 	bte_init_cpu();
 }
 
-void snidle(int idleness)
+#ifdef II_PRTE_TLB_WAR
+long iiprt_lock[16*64] __cacheline_aligned; /* allow for NASIDs up to 64 */
+#endif
+
+#ifdef BUS_INT_WAR
+
+#include <asm/hw_irq.h>
+#include <asm/sn/pda.h>
+
+void ia64_handle_irq (ia64_vector vector, struct pt_regs *regs);
+
+static spinlock_t irq_lock = SPIN_LOCK_UNLOCKED;
+
+#define IRQCPU(irq)	((irq)>>8)
+
+void
+sn_add_polled_interrupt(int irq, int interval)
 {
-	if (!idleness) {
-		if (pda->idle_flag == 0) {
-			set_led_bits(0, LED_CPU_ACTIVITY);
-		}
+	unsigned long flags, irq_cnt;
+	sn_poll_entry_t	*irq_list;
 
-		pda->idle_flag = 1;
-	}
-	else {
-		set_led_bits(LED_CPU_ACTIVITY, LED_CPU_ACTIVITY);
+	irq_list = pdacpu(IRQCPU(irq)).pda_poll_entries;;
 
-		pda->idle_flag = 0;
-	}
+	spin_lock_irqsave(&irq_lock, flags);
+	irq_cnt = pdacpu(IRQCPU(irq)).pda_poll_entry_count;
+	irq_list[irq_cnt].irq = irq;
+	irq_list[irq_cnt].interval = interval;
+	irq_list[irq_cnt].tick = interval;
+	pdacpu(IRQCPU(irq)).pda_poll_entry_count++;
+	spin_unlock_irqrestore(&irq_lock, flags);
+
+
 }
+
+void
+sn_delete_polled_interrupt(int irq)
+{
+	unsigned long flags, i, irq_cnt;
+	sn_poll_entry_t	*irq_list;
+
+	irq_list = pdacpu(IRQCPU(irq)).pda_poll_entries;
+
+	spin_lock_irqsave(&irq_lock, flags);
+	irq_cnt = pdacpu(IRQCPU(irq)).pda_poll_entry_count;
+	for (i=0; i<irq_cnt; i++) {
+		if (irq_list[i].irq == irq) {
+			irq_list[i] = irq_list[irq_cnt-1];
+			pdacpu(IRQCPU(irq)).pda_poll_entry_count--;
+			break;
+		}
+	}
+	spin_unlock_irqrestore(&irq_lock, flags);
+}
+
+void
+sn_irq_poll(int cpu, int reason) 
+{
+	unsigned long flags, i;
+	sn_poll_entry_t	*irq_list;
+
+
+	ia64_handle_irq(IA64_IPI_VECTOR, 0);
+
+	if (reason == 0)
+		return;
+
+	irq_list = pda->pda_poll_entries;
+
+	for (i=0; i<pda->pda_poll_entry_count; i++, irq_list++) {
+		if (--irq_list->tick <= 0) {
+			irq_list->tick = irq_list->interval;
+			local_irq_save(flags);
+			ia64_handle_irq(irq_to_vector(irq_list->irq), 0);
+			local_irq_restore(flags);
+		}
+	}
+}	
+
+#endif

@@ -2454,9 +2454,7 @@ void snd_seq_info_clients_read(snd_info_entry_t *entry,
 
 static struct file_operations snd_seq_f_ops =
 {
-#ifndef LINUX_2_2
 	.owner =	THIS_MODULE,
-#endif
 	.read =		snd_seq_read,
 	.write =	snd_seq_write,
 	.open =		snd_seq_open,

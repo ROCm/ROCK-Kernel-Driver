@@ -331,7 +331,7 @@ static int snd_sb8_capture_trigger(snd_pcm_substream_t * substream,
 	return 0;
 }
 
-void snd_sb8dsp_interrupt(sb_t *chip)
+irqreturn_t snd_sb8dsp_interrupt(sb_t *chip)
 {
 	snd_pcm_substream_t *substream;
 	snd_pcm_runtime_t *runtime;
@@ -356,6 +356,7 @@ void snd_sb8dsp_interrupt(sb_t *chip)
 		snd_pcm_period_elapsed(substream);
 		break;
 	}
+	return IRQ_HANDLED;
 }
 
 static snd_pcm_uframes_t snd_sb8_playback_pointer(snd_pcm_substream_t * substream)

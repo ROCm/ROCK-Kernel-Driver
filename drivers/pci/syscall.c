@@ -98,8 +98,6 @@ sys_pciconfig_write(unsigned long bus, unsigned long dfn,
 
 	if (!capable(CAP_SYS_ADMIN))
 		return -EPERM;
-	if (!pci_present())
-		return -ENOSYS;
 
 	dev = pci_find_slot(bus, dfn);
 	if (!dev)

@@ -957,6 +957,10 @@ static void hid_output_field(struct hid_field *field, __u8 *data)
 void hid_output_report(struct hid_report *report, __u8 *data)
 {
 	unsigned n;
+
+	if (report->id > 0)
+		*data++ = report->id;
+
 	for (n = 0; n < report->maxfield; n++)
 		hid_output_field(report->field[n], data);
 }
@@ -1051,7 +1055,7 @@ static int hid_submit_out(struct hid_device *hid)
 	report = hid->out[hid->outtail];
 
 	hid_output_report(report, hid->outbuf);
-	hid->urbout->transfer_buffer_length = ((report->size - 1) >> 3) + 1;
+	hid->urbout->transfer_buffer_length = ((report->size - 1) >> 3) + 1 + (report->id > 0);
 	hid->urbout->dev = hid->dev;
 
 	dbg("submitting out urb");
@@ -1075,7 +1079,7 @@ static int hid_submit_ctrl(struct hid_device *hid)
 	if (dir == USB_DIR_OUT)
 		hid_output_report(report, hid->ctrlbuf);
 
-	hid->urbctrl->transfer_buffer_length = ((report->size - 1) >> 3) + 1 + ((report->id > 0) && (dir != USB_DIR_OUT));
+	hid->urbctrl->transfer_buffer_length = ((report->size - 1) >> 3) + 1 + (report->id > 0);
 	hid->urbctrl->pipe = (dir == USB_DIR_OUT) ?  usb_sndctrlpipe(hid->dev, 0) : usb_rcvctrlpipe(hid->dev, 0);
 	hid->urbctrl->dev = hid->dev;
 
@@ -1351,6 +1355,9 @@ void hid_init_reports(struct hid_device *hid)
 #define USB_VENDOR_ID_ESSENTIAL_REALITY	0x0d7f
 #define USB_DEVICE_ID_ESSENTIAL_REALITY_P5	0x0100
 
+#define USB_VENDOR_ID_A4TECH		0x09DA
+#define USB_DEVICE_ID_A4TECH_WCP32PU	0x0006
+
 struct hid_blacklist {
 	__u16 idVendor;
 	__u16 idProduct;
@@ -1387,9 +1394,9 @@ struct hid_blacklist {
 	{ USB_VENDOR_ID_MGE, USB_DEVICE_ID_MGE_UPS, HID_QUIRK_HIDDEV },
 	{ USB_VENDOR_ID_MGE, USB_DEVICE_ID_MGE_UPS1, HID_QUIRK_HIDDEV },
 	{ USB_VENDOR_ID_TOPMAX, USB_DEVICE_ID_TOPMAX_COBRAPAD, HID_QUIRK_BADPAD },
-	{ USB_VENDOR_ID_HAPP, USB_DEVICE_ID_UGCI_DRIVING, HID_QUIRK_BADPAD },
-	{ USB_VENDOR_ID_HAPP, USB_DEVICE_ID_UGCI_FLYING, HID_QUIRK_BADPAD },
-	{ USB_VENDOR_ID_HAPP, USB_DEVICE_ID_UGCI_FIGHTING, HID_QUIRK_BADPAD },
+	{ USB_VENDOR_ID_HAPP, USB_DEVICE_ID_UGCI_DRIVING, HID_QUIRK_BADPAD|HID_QUIRK_MULTI_INPUT },
+	{ USB_VENDOR_ID_HAPP, USB_DEVICE_ID_UGCI_FLYING, HID_QUIRK_BADPAD|HID_QUIRK_MULTI_INPUT },
+	{ USB_VENDOR_ID_HAPP, USB_DEVICE_ID_UGCI_FIGHTING, HID_QUIRK_BADPAD|HID_QUIRK_MULTI_INPUT },
 	{ USB_VENDOR_ID_ONTRAK, USB_DEVICE_ID_ONTRAK_ADU100, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_ONTRAK, USB_DEVICE_ID_ONTRAK_ADU100 + 100, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_ONTRAK, USB_DEVICE_ID_ONTRAK_ADU100 + 200, HID_QUIRK_IGNORE },
@@ -1398,6 +1405,7 @@ struct hid_blacklist {
 	{ USB_VENDOR_ID_ONTRAK, USB_DEVICE_ID_ONTRAK_ADU100 + 500, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_TANGTOP, USB_DEVICE_ID_TANGTOP_USBPS2, HID_QUIRK_NOGET },
 	{ USB_VENDOR_ID_ESSENTIAL_REALITY, USB_DEVICE_ID_ESSENTIAL_REALITY_P5, HID_QUIRK_IGNORE },
+	{ USB_VENDOR_ID_A4TECH, USB_DEVICE_ID_A4TECH_WCP32PU, HID_QUIRK_2WHEEL_MOUSE_HACK },
 	{ 0, 0 }
 };
 
@@ -1629,8 +1637,6 @@ static int hid_probe (struct usb_interface *intf, const struct usb_device_id *id
 	hid_init_reports(hid);
 	hid_dump_device(hid);
 
-	hid_ff_init(hid);
-
 	if (!hidinput_connect(hid))
 		hid->claimed |= HID_CLAIMED_INPUT;
 	if (!hiddev_connect(hid))
@@ -1680,6 +1686,7 @@ static struct usb_device_id hid_usb_ids [] = {
 MODULE_DEVICE_TABLE (usb, hid_usb_ids);
 
 static struct usb_driver hid_driver = {
+	.owner =	THIS_MODULE,
 	.name =		"hid",
 	.probe =	hid_probe,
 	.disconnect =	hid_disconnect,

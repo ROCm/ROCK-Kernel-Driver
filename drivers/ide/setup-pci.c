@@ -870,17 +870,17 @@ static int __init ide_scan_pcidev(struct pci_dev *dev)
  	
 void __init ide_scan_pcibus (int scan_direction)
 {
-	struct pci_dev *dev;
+	struct pci_dev *dev = NULL;
 	struct pci_driver *d;
 	struct list_head *l, *n;
 
 	pre_init = 0;
 	if (!scan_direction) {
-		pci_for_each_dev(dev) {
+		while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 			ide_scan_pcidev(dev);
 		}
 	} else {
-		pci_for_each_dev_reverse(dev) {
+		while ((dev = pci_find_device_reverse(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 			ide_scan_pcidev(dev);
 		}
 	}

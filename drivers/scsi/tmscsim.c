@@ -394,7 +394,7 @@ MODULE_DEVICE_TABLE(pci, tmscsim_pci_tbl);
 # define PCI_WRITE_CONFIG_WORD(pd, rv, bv) pci_write_config_word (pd, rv, bv)
 # define PCI_READ_CONFIG_WORD(pd, rv, bv) pci_read_config_word (pd, rv, bv)
 # define PCI_BUS_DEV pdev->bus->number, pdev->devfn
-# define PCI_PRESENT pci_present ()
+# define PCI_PRESENT (1)
 # define PCI_SET_MASTER pci_set_master (pdev)
 # define PCI_FIND_DEVICE(vend, id) (pdev = pci_find_device (vend, id, pdev))
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,10)
@@ -2855,12 +2855,11 @@ int dc390_set_info (char *buffer, int length, PACB pACB)
  else SPRINTF(" No  ")
 
 
-int DC390_proc_info (char *buffer, char **start,
-		     off_t offset, int length, int hostno, int inout)
+int DC390_proc_info (struct Scsi_Host *shpnt, char *buffer, char **start,
+		     off_t offset, int length, int inout)
 {
   int dev, spd, spd1;
   char *pos = buffer;
-  PSH shpnt = 0;
   PACB pACB;
   PDCB pDCB;
   PSCSICMD pcmd;
@@ -2870,13 +2869,12 @@ int DC390_proc_info (char *buffer, char **start,
 
   while(pACB != (PACB)-1)
      {
-	shpnt = pACB->pScsiHost;
-	if (shpnt->host_no == hostno) break;
+	if (shpnt == pACB->pScsiHost)
+		break;
 	pACB = pACB->pNextACB;
      }
 
   if (pACB == (PACB)-1) return(-ESRCH);
-  if(!shpnt) return(-ESRCH);
 
   if(inout) /* Has data been written to the file ? */
       return dc390_set_info(buffer, length, pACB);

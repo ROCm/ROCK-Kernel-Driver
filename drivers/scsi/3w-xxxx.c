@@ -2379,12 +2379,6 @@ int tw_scsi_detect(Scsi_Host_Template *tw_host)
 
 	printk(KERN_WARNING "3ware Storage Controller device driver for Linux v%s.\n", tw_driver_version);
 
-	/* Check if the kernel has PCI interface compiled in */
-	if (!pci_present()) {
-		printk(KERN_WARNING "3w-xxxx: tw_scsi_detect(): No pci interface present.\n");
-		return 0;
-	}
-
 	ret = tw_findcards(tw_host);
 
 	return ret;
@@ -2497,7 +2491,8 @@ int tw_scsi_eh_reset(Scsi_Cmnd *SCpnt)
 } /* End tw_scsi_eh_reset() */
 
 /* This function handles input and output from /proc/scsi/3w-xxxx/x */
-int tw_scsi_proc_info(char *buffer, char **start, off_t offset, int length, int hostno, int inout) 
+int tw_scsi_proc_info(struct Scsi_Host *shost, char *buffer, char **start,
+		      off_t offset, int length, int inout) 
 {
 	TW_Device_Extension *tw_dev = NULL;
 	TW_Info info;
@@ -2508,7 +2503,7 @@ int tw_scsi_proc_info(char *buffer, char **start, off_t offset, int length, int 
 
 	/* Find the correct device extension */
 	for (i=0;i<tw_device_extension_count;i++) 
-		if (tw_device_extension_list[i]->host->host_no == hostno) 
+		if (tw_device_extension_list[i]->host->host_no == shost->host_no) 
 			tw_dev = tw_device_extension_list[i];
 	if (tw_dev == NULL) {
 		printk(KERN_WARNING "3w-xxxx: tw_scsi_proc_info(): Couldn't locate device extension.\n");
@@ -2544,7 +2539,7 @@ int tw_scsi_proc_info(char *buffer, char **start, off_t offset, int length, int 
 		if (start) {
 			*start = buffer;
 		}
-		tw_copy_info(&info, "scsi%d: 3ware Storage Controller\n", hostno);
+		tw_copy_info(&info, "scsi%d: 3ware Storage Controller\n", shost->host_no);
 		tw_copy_info(&info, "Driver version: %s\n", tw_driver_version);
 		tw_copy_info(&info, "Current commands posted:       %3d\n", tw_dev->posted_request_count);
 		tw_copy_info(&info, "Max commands posted:           %3d\n", tw_dev->max_posted_request_count);

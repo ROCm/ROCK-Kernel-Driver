@@ -400,6 +400,7 @@ static int ov51x_control_ioctl(struct inode *, struct file *, unsigned int,
 			       unsigned long);
 
 static struct file_operations ov511_control_fops = {
+	.owner =	THIS_MODULE,
 	.ioctl =	ov51x_control_ioctl,
 };
 
@@ -6455,8 +6456,6 @@ ov511_register_decomp_module(int ver, struct ov51x_decomp_ops *ops, int ov518,
 		}
 	}
 
-	MOD_INC_USE_COUNT;
-
 	unlock_kernel();
 	return 0;
 
@@ -6481,8 +6480,6 @@ ov511_deregister_decomp_module(int ov518, int mmx)
 		else
 			ov511_decomp_ops = NULL;
 	}
-
-	MOD_DEC_USE_COUNT;
 
 	unlock_kernel();
 }

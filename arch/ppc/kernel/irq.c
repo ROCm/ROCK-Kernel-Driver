@@ -66,8 +66,11 @@ static void register_irq_proc (unsigned int irq);
 
 #define MAXCOUNT 10000000
 
-irq_desc_t irq_desc[NR_IRQS] __cacheline_aligned =
-	{ [0 ... NR_IRQS-1] = { 0, NULL, NULL, 0, SPIN_LOCK_UNLOCKED}};
+irq_desc_t irq_desc[NR_IRQS] __cacheline_aligned = {
+	[0 ... NR_IRQS-1] = {
+		.lock = SPIN_LOCK_UNLOCKED
+	}
+};
 	
 int ppc_spurious_interrupts = 0;
 struct irqaction *ppc_irq_action[NR_IRQS];
@@ -580,7 +583,7 @@ static int irq_affinity_read_proc (char *page, char **start, off_t off,
 	return sprintf (page, "%08x\n", irq_affinity[(int)data]);
 }
 
-static unsigned int parse_hex_value (const char *buffer,
+static unsigned int parse_hex_value (const char __user *buffer,
 		unsigned long count, unsigned long *ret)
 {
 	unsigned char hexnum [HEX_DIGITS];
@@ -617,7 +620,7 @@ out:
 	return 0;
 }
 
-static int irq_affinity_write_proc (struct file *file, const char *buffer,
+static int irq_affinity_write_proc (struct file *file, const char __user *buffer,
 					unsigned long count, void *data)
 {
 	int irq = (int) data, full_count = count, err;
@@ -656,7 +659,7 @@ static int prof_cpu_mask_read_proc (char *page, char **start, off_t off,
 	return sprintf (page, "%08lx\n", *mask);
 }
 
-static int prof_cpu_mask_write_proc (struct file *file, const char *buffer,
+static int prof_cpu_mask_write_proc (struct file *file, const char __user *buffer,
 					unsigned long count, void *data)
 {
 	unsigned long *mask = (unsigned long *) data, full_count = count, err;

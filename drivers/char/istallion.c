@@ -159,9 +159,6 @@ static int	stli_nrbrds = sizeof(stli_brdconf) / sizeof(stlconf_t);
 #define	STL_CALLOUTMAJOR	25
 #endif
 
-#define	STL_DRVTYPSERIAL	1
-#define	STL_DRVTYPCALLOUT	2
-
 /*****************************************************************************/
 
 /*
@@ -172,14 +169,8 @@ static char	*stli_drvtitle = "Stallion Intelligent Multiport Serial Driver";
 static char	*stli_drvname = "istallion";
 static char	*stli_drvversion = "5.6.0";
 static char	*stli_serialname = "ttyE";
-static char	*stli_calloutname = "cue";
 
-static struct tty_driver	stli_serial;
-static struct tty_driver	stli_callout;
-static struct tty_struct	*stli_ttys[STL_MAXDEVS];
-static struct termios		*stli_termios[STL_MAXDEVS];
-static struct termios		*stli_termioslocked[STL_MAXDEVS];
-static int			stli_refcount;
+static struct tty_driver	*stli_serial;
 
 /*
  *	We will need to allocate a temporary write buffer for chars that
@@ -856,14 +847,14 @@ static void __exit istallion_module_exit(void)
 		del_timer(&stli_timerlist);
 	}
 
-	i = tty_unregister_driver(&stli_serial);
-	j = tty_unregister_driver(&stli_callout);
-	if (i || j) {
+	i = tty_unregister_driver(stli_serial);
+	if (i) {
 		printk("STALLION: failed to un-register tty driver, "
-			"errno=%d,%d\n", -i, -j);
+			"errno=%d,%d\n", -i);
 		restore_flags(flags);
 		return;
 	}
+	put_tty_driver(stli_serial);
 	for (i = 0; i < 4; i++)
 		devfs_remove("staliomem/%d", i);
 	devfs_remove("staliomem");
@@ -1114,39 +1105,11 @@ static int stli_open(struct tty_struct *tty, struct file *filp)
  *	previous opens still in effect. If we are a normal serial device
  *	then also we might have to wait for carrier.
  */
-	if (tty->driver->subtype == STL_DRVTYPCALLOUT) {
-		if (portp->flags & ASYNC_NORMAL_ACTIVE)
-			return(-EBUSY);
-		if (portp->flags & ASYNC_CALLOUT_ACTIVE) {
-			if ((portp->flags & ASYNC_SESSION_LOCKOUT) &&
-			    (portp->session != current->session))
-				return(-EBUSY);
-			if ((portp->flags & ASYNC_PGRP_LOCKOUT) &&
-			    (portp->pgrp != current->pgrp))
-				return(-EBUSY);
-		}
-		portp->flags |= ASYNC_CALLOUT_ACTIVE;
-	} else {
-		if (filp->f_flags & O_NONBLOCK) {
-			if (portp->flags & ASYNC_CALLOUT_ACTIVE)
-				return(-EBUSY);
-		} else {
-			if ((rc = stli_waitcarrier(brdp, portp, filp)) != 0)
-				return(rc);
-		}
-		portp->flags |= ASYNC_NORMAL_ACTIVE;
+	if (!(filp->f_flags & O_NONBLOCK)) {
+		if ((rc = stli_waitcarrier(brdp, portp, filp)) != 0)
+			return(rc);
 	}
-
-	if ((portp->refcount == 1) && (portp->flags & ASYNC_SPLIT_TERMIOS)) {
-		if (tty->driver->subtype == STL_DRVTYPSERIAL)
-			*tty->termios = portp->normaltermios;
-		else
-			*tty->termios = portp->callouttermios;
-		stli_setport(portp);
-	}
-
-	portp->session = current->session;
-	portp->pgrp = current->pgrp;
+	portp->flags |= ASYNC_NORMAL_ACTIVE;
 	return(0);
 }
 
@@ -1180,11 +1143,6 @@ static void stli_close(struct tty_struct *tty, struct file *filp)
 	}
 
 	portp->flags |= ASYNC_CLOSING;
-
-	if (portp->flags & ASYNC_NORMAL_ACTIVE)
-		portp->normaltermios = *tty->termios;
-	if (portp->flags & ASYNC_CALLOUT_ACTIVE)
-		portp->callouttermios = *tty->termios;
 
 /*
  *	May want to wait for data to drain before closing. The BUSY flag
@@ -1226,8 +1184,7 @@ static void stli_close(struct tty_struct *tty, struct file *filp)
 		wake_up_interruptible(&portp->open_wait);
 	}
 
-	portp->flags &= ~(ASYNC_CALLOUT_ACTIVE | ASYNC_NORMAL_ACTIVE |
-		ASYNC_CLOSING);
+	portp->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CLOSING);
 	wake_up_interruptible(&portp->close_wait);
 	restore_flags(flags);
 }
@@ -1558,13 +1515,8 @@ static int stli_waitcarrier(stlibrd_t *brdp, stliport_t *portp, struct file *fil
 	rc = 0;
 	doclocal = 0;
 
-	if (portp->flags & ASYNC_CALLOUT_ACTIVE) {
-		if (portp->normaltermios.c_cflag & CLOCAL)
-			doclocal++;
-	} else {
-		if (portp->tty->termios->c_cflag & CLOCAL)
-			doclocal++;
-	}
+	if (portp->tty->termios->c_cflag & CLOCAL)
+		doclocal++;
 
 	save_flags(flags);
 	cli();
@@ -1573,12 +1525,10 @@ static int stli_waitcarrier(stlibrd_t *brdp, stliport_t *portp, struct file *fil
 		portp->refcount--;
 
 	for (;;) {
-		if ((portp->flags & ASYNC_CALLOUT_ACTIVE) == 0) {
-			stli_mkasysigs(&portp->asig, 1, 1);
-			if ((rc = stli_cmdwait(brdp, portp, A_SETSIGNALS,
-			    &portp->asig, sizeof(asysigs_t), 0)) < 0)
-				break;
-		}
+		stli_mkasysigs(&portp->asig, 1, 1);
+		if ((rc = stli_cmdwait(brdp, portp, A_SETSIGNALS,
+		    &portp->asig, sizeof(asysigs_t), 0)) < 0)
+			break;
 		if (tty_hung_up_p(filp) ||
 		    ((portp->flags & ASYNC_INITIALIZED) == 0)) {
 			if (portp->flags & ASYNC_HUP_NOTIFY)
@@ -1587,8 +1537,7 @@ static int stli_waitcarrier(stlibrd_t *brdp, stliport_t *portp, struct file *fil
 				rc = -ERESTARTSYS;
 			break;
 		}
-		if (((portp->flags & ASYNC_CALLOUT_ACTIVE) == 0) &&
-		    ((portp->flags & ASYNC_CLOSING) == 0) &&
+		if (((portp->flags & ASYNC_CLOSING) == 0) &&
 		    (doclocal || (portp->sigs & TIOCM_CD))) {
 			break;
 		}
@@ -2420,7 +2369,7 @@ static void stli_hangup(struct tty_struct *tty)
 	clear_bit(ST_RXSTOP, &portp->state);
 	set_bit(TTY_IO_ERROR, &tty->flags);
 	portp->tty = (struct tty_struct *) NULL;
-	portp->flags &= ~(ASYNC_NORMAL_ACTIVE | ASYNC_CALLOUT_ACTIVE);
+	portp->flags &= ~ASYNC_NORMAL_ACTIVE;
 	portp->refcount = 0;
 	wake_up_interruptible(&portp->open_wait);
 }
@@ -2996,12 +2945,8 @@ static inline int stli_hostcmd(stlibrd_t *brdp, stliport_t *portp)
 			if ((oldsigs & TIOCM_CD) &&
 			    ((portp->sigs & TIOCM_CD) == 0)) {
 				if (portp->flags & ASYNC_CHECK_CD) {
-					if (! ((portp->flags & ASYNC_CALLOUT_ACTIVE) &&
-					    (portp->flags & ASYNC_CALLOUT_NOHUP))) {
-						if (tty != (struct tty_struct *) NULL) {
-							schedule_task(&portp->tqhangup);
-						}
-					}
+					if (tty)
+						schedule_task(&portp->tqhangup);
 				}
 			}
 		}
@@ -3369,8 +3314,6 @@ static inline int stli_initports(stlibrd_t *brdp)
 		init_waitqueue_head(&portp->open_wait);
 		init_waitqueue_head(&portp->close_wait);
 		init_waitqueue_head(&portp->raw_wait);
-		portp->normaltermios = stli_deftermios;
-		portp->callouttermios = stli_deftermios;
 		panelport++;
 		if (panelport >= brdp->panels[panelnr]) {
 			panelport = 0;
@@ -4715,9 +4658,6 @@ static inline int stli_findpcibrds()
 	printk("stli_findpcibrds()\n");
 #endif
 
-	if (! pci_present())
-		return(0);
-
 	while ((dev = pci_find_device(PCI_VENDOR_ID_STALLION,
 	    PCI_DEVICE_ID_ECRA, dev))) {
 		if ((rc = stli_initpcibrd(BRD_ECPPCI, dev)))
@@ -5298,6 +5238,28 @@ static int stli_memioctl(struct inode *ip, struct file *fp, unsigned int cmd, un
 	return(rc);
 }
 
+static struct tty_operations stli_ops = {
+	.open = stli_open,
+	.close = stli_close,
+	.write = stli_write,
+	.put_char = stli_putchar,
+	.flush_chars = stli_flushchars,
+	.write_room = stli_writeroom,
+	.chars_in_buffer = stli_charsinbuffer,
+	.ioctl = stli_ioctl,
+	.set_termios = stli_settermios,
+	.throttle = stli_throttle,
+	.unthrottle = stli_unthrottle,
+	.stop = stli_stop,
+	.start = stli_start,
+	.hangup = stli_hangup,
+	.flush_buffer = stli_flushbuffer,
+	.break_ctl = stli_breakctl,
+	.wait_until_sent = stli_waituntilsent,
+	.send_xchar = stli_sendxchar,
+	.read_proc = stli_readproc,
+};
+
 /*****************************************************************************/
 
 int __init stli_init(void)
@@ -5306,6 +5268,10 @@ int __init stli_init(void)
 	printk(KERN_INFO "%s: version %s\n", stli_drvtitle, stli_drvversion);
 
 	stli_initbrds();
+
+	stli_serial = alloc_tty_driver(STL_MAXBRDS * STL_MAXPORTS);
+	if (!stli_serial)
+		return -ENOMEM;
 
 /*
  *	Allocate a temporary write buffer.
@@ -5336,56 +5302,23 @@ int __init stli_init(void)
 
 /*
  *	Set up the tty driver structure and register us as a driver.
- *	Also setup the callout tty device.
  */
-	memset(&stli_serial, 0, sizeof(struct tty_driver));
-	stli_serial.magic = TTY_DRIVER_MAGIC;
-	stli_serial.owner = THIS_MODULE;
-	stli_serial.driver_name = stli_drvname;
-	stli_serial.name = stli_serialname;
-	stli_serial.major = STL_SERIALMAJOR;
-	stli_serial.minor_start = 0;
-	stli_serial.num = STL_MAXBRDS * STL_MAXPORTS;
-	stli_serial.type = TTY_DRIVER_TYPE_SERIAL;
-	stli_serial.subtype = STL_DRVTYPSERIAL;
-	stli_serial.init_termios = stli_deftermios;
-	stli_serial.flags = TTY_DRIVER_REAL_RAW;
-	stli_serial.refcount = &stli_refcount;
-	stli_serial.table = stli_ttys;
-	stli_serial.termios = stli_termios;
-	stli_serial.termios_locked = stli_termioslocked;
-	
-	stli_serial.open = stli_open;
-	stli_serial.close = stli_close;
-	stli_serial.write = stli_write;
-	stli_serial.put_char = stli_putchar;
-	stli_serial.flush_chars = stli_flushchars;
-	stli_serial.write_room = stli_writeroom;
-	stli_serial.chars_in_buffer = stli_charsinbuffer;
-	stli_serial.ioctl = stli_ioctl;
-	stli_serial.set_termios = stli_settermios;
-	stli_serial.throttle = stli_throttle;
-	stli_serial.unthrottle = stli_unthrottle;
-	stli_serial.stop = stli_stop;
-	stli_serial.start = stli_start;
-	stli_serial.hangup = stli_hangup;
-	stli_serial.flush_buffer = stli_flushbuffer;
-	stli_serial.break_ctl = stli_breakctl;
-	stli_serial.wait_until_sent = stli_waituntilsent;
-	stli_serial.send_xchar = stli_sendxchar;
-	stli_serial.read_proc = stli_readproc;
+	stli_serial->owner = THIS_MODULE;
+	stli_serial->driver_name = stli_drvname;
+	stli_serial->name = stli_serialname;
+	stli_serial->major = STL_SERIALMAJOR;
+	stli_serial->minor_start = 0;
+	stli_serial->type = TTY_DRIVER_TYPE_SERIAL;
+	stli_serial->subtype = SERIAL_TYPE_NORMAL;
+	stli_serial->init_termios = stli_deftermios;
+	stli_serial->flags = TTY_DRIVER_REAL_RAW;
+	tty_set_operations(stli_serial, &stli_ops);
 
-	stli_callout = stli_serial;
-	stli_callout.name = stli_calloutname;
-	stli_callout.major = STL_CALLOUTMAJOR;
-	stli_callout.subtype = STL_DRVTYPCALLOUT;
-	stli_callout.read_proc = 0;
-
-	if (tty_register_driver(&stli_serial))
+	if (tty_register_driver(stli_serial)) {
+		put_tty_driver(stli_serial);
 		printk(KERN_ERR "STALLION: failed to register serial driver\n");
-	if (tty_register_driver(&stli_callout))
-		printk(KERN_ERR "STALLION: failed to register callout driver\n");
-
+		return -EBUSY;
+	}
 	return(0);
 }
 

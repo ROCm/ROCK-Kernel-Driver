@@ -15,7 +15,7 @@
  *                           features support
  */
 
-/* $Id: uda1341.h,v 1.4 2003/02/25 12:48:16 perex Exp $ */
+/* $Id: uda1341.h,v 1.5 2003/04/19 13:34:32 perex Exp $ */
 
 #define UDA1341_ALSA_NAME "snd-uda1341"
 
@@ -210,6 +210,10 @@ enum uda1341_config {
 	CMD_IG,
 	CMD_AGC_TIME,
 	CMD_AGC_LEVEL,
+#ifdef CONFIG_PM
+	CMD_SUSPEND,
+	CMD_RESUME,
+#endif
 	CMD_LAST,
 };
 
@@ -221,19 +225,6 @@ enum write_through {
 };
 
 int __init snd_chip_uda1341_mixer_new(snd_card_t *card, struct l3_client **clnt);
-void __init snd_chip_uda1341_mixer_del(snd_card_t *card);
-
-#ifdef DEBUG_MODE
-#define DEBUG(format, args...)      do{printk(format, ##args);}while(0)
-#else
-#define DEBUG(format, args...)      /* nothing */
-#endif
-
-#ifdef DEBUG_FUNCTION_NAMES
-#define DEBUG_NAME(format, args...)     do{printk(format, ##args);}while(0)
-#else
-#define DEBUG_NAME(format, args...)     /* nothing */
-#endif
 
 /*
  * Local variables:

@@ -1,4 +1,3 @@
-
 /*
     dmx3191d.h - defines for the Domex DMX3191D SCSI card.
     Copyright (C) 2000 by Massimo Piccioni <dafastidio@libero.it>
@@ -23,7 +22,6 @@
 static int dmx3191d_abort(Scsi_Cmnd *);
 static int dmx3191d_detect(Scsi_Host_Template *);
 static const char* dmx3191d_info(struct Scsi_Host *);
-static int dmx3191d_proc_info(char *, char **, off_t, int, int, int);
 static int dmx3191d_queue_command(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
 static int dmx3191d_release_resources(struct Scsi_Host *);
 static int dmx3191d_bus_reset(Scsi_Cmnd *);

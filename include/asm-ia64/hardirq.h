@@ -16,6 +16,9 @@
 /*
  * No irq_cpustat_t for IA-64.  The data is held in the per-CPU data structure.
  */
+
+#define __ARCH_IRQ_STAT	1
+
 #define softirq_pending(cpu)		(cpu_data(cpu)->softirq_pending)
 #define syscall_count(cpu)		/* unused on IA-64 */
 #define ksoftirqd_task(cpu)		(cpu_data(cpu)->ksoftirqd)

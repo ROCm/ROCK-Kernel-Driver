@@ -40,7 +40,9 @@ struct oprofile_operations {
 
 /**
  * One-time initialisation. *ops must be set to a filled-in
- * operations structure.
+ * operations structure. This is called even in timer interrupt
+ * mode.
+ *
  * Return 0 on success.
  */
 int oprofile_arch_init(struct oprofile_operations ** ops);

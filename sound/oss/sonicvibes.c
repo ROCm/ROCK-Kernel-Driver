@@ -2723,8 +2723,6 @@ static struct pci_driver sv_driver = {
  
 static int __init init_sonicvibes(void)
 {
-	if (!pci_present())   /* No PCI bus in this machine! */
-		return -ENODEV;
 	printk(KERN_INFO "sv: version v0.31 time " __TIME__ " " __DATE__ "\n");
 #if 0
 	if (!(wavetable_mem = __get_free_pages(GFP_KERNEL, 20-PAGE_SHIFT)))

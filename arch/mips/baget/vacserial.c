@@ -29,7 +29,7 @@
   
 #if defined(MODULE) && defined(SERIAL_DEBUG_MCOUNT)
 #define DBG_CNT(s) baget_printk("(%s):[%x] refc=%d, serc=%d, ttyc=%d-> %s\n", \
-  tty->name,(info->flags),serial_refcount,info->count,tty->count,s)
+  tty->name,(info->flags),serial_driver->refcount,info->count,tty->count,s)
 #else
 #define DBG_CNT(s)
 #endif
@@ -95,8 +95,7 @@ static char *serial_version = "4.26";
 
 static DECLARE_TASK_QUEUE(tq_serial);
 
-static struct tty_driver serial_driver, callout_driver;
-static int serial_refcount;
+static struct tty_driver *serial_driver;
 
 /* number of characters left in xmit buffer before we ask for more */
 #define WAKEUP_CHARS 256
@@ -142,10 +141,6 @@ static struct serial_state rs_table[] = {
 };
 
 #define NR_PORTS	(sizeof(rs_table)/sizeof(struct serial_state))
-
-static struct tty_struct *serial_table[NR_PORTS];
-static struct termios *serial_termios[NR_PORTS];
-static struct termios *serial_termios_locked[NR_PORTS];
 
 #ifndef MIN
 #define MIN(a,b)	((a) < (b) ? (a) : (b))
@@ -1685,14 +1680,6 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 	}
 	info->flags |= ASYNC_CLOSING;
 	/*
-	 * Save the termios structure, since this port may have
-	 * separate termios for callout and dialin.
-	 */
-	if (info->flags & ASYNC_NORMAL_ACTIVE)
-		info->state->normal_termios = *tty->termios;
-	if (info->flags & ASYNC_CALLOUT_ACTIVE)
-		info->state->callout_termios = *tty->termios;
-	/*
 	 * Now we wait for the transmit buffer to clear; and we notify 
 	 * the line discipline to only process XON/XOFF characters.
 	 */
@@ -1731,8 +1718,7 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 		}
 		wake_up_interruptible(&info->open_wait);
 	}
-	info->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CALLOUT_ACTIVE|
-			 ASYNC_CLOSING);
+	info->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CLOSING);
 	wake_up_interruptible(&info->close_wait);
 	MOD_DEC_USE_COUNT;
 	restore_flags(flags);
@@ -1811,7 +1797,7 @@ static void rs_hangup(struct tty_struct *tty)
 	shutdown(info);
 	info->event = 0;
 	state->count = 0;
-	info->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CALLOUT_ACTIVE);
+	info->flags &= ~ASYNC_NORMAL_ACTIVE;
 	info->tty = 0;
 	wake_up_interruptible(&info->open_wait);
 }
@@ -1847,44 +1833,18 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 	}
 
 	/*
-	 * If this is a callout device, then just make sure the normal
-	 * device isn't being used.
-	 */
-	if (tty->driver->subtype == SERIAL_TYPE_CALLOUT) {
-		if (info->flags & ASYNC_NORMAL_ACTIVE)
-			return -EBUSY;
-		if ((info->flags & ASYNC_CALLOUT_ACTIVE) &&
-		    (info->flags & ASYNC_SESSION_LOCKOUT) &&
-		    (info->session != current->session))
-		    return -EBUSY;
-		if ((info->flags & ASYNC_CALLOUT_ACTIVE) &&
-		    (info->flags & ASYNC_PGRP_LOCKOUT) &&
-		    (info->pgrp != current->pgrp))
-		    return -EBUSY;
-		info->flags |= ASYNC_CALLOUT_ACTIVE;
-		return 0;
-	}
-	
-	/*
 	 * If non-blocking mode is set, or the port is not enabled,
 	 * then make the check up front and then exit.
 	 */
 	if ((filp->f_flags & O_NONBLOCK) ||
 	    (tty->flags & (1 << TTY_IO_ERROR))) {
-		if (info->flags & ASYNC_CALLOUT_ACTIVE)
-			return -EBUSY;
 		info->flags |= ASYNC_NORMAL_ACTIVE;
 		return 0;
 	}
 
-	if (info->flags & ASYNC_CALLOUT_ACTIVE) {
-		if (state->normal_termios.c_cflag & CLOCAL)
-			do_clocal = 1;
-	} else {
-		if (tty->termios->c_cflag & CLOCAL)
-			do_clocal = 1;
-	}
-	
+	if (tty->termios->c_cflag & CLOCAL)
+		do_clocal = 1;
+
 	/*
 	 * Block waiting for the carrier detect and the line to become
 	 * free (i.e., not in use by the callout).  While we are in
@@ -1919,8 +1879,7 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 #endif
 			break;
 		}
-		if (!(info->flags & ASYNC_CALLOUT_ACTIVE) &&
-		    !(info->flags & ASYNC_CLOSING))
+		if (!(info->flags & ASYNC_CLOSING))
 			break;
 		if (signal_pending(current)) {
 			retval = -ERESTARTSYS;
@@ -2068,14 +2027,6 @@ static int rs_open(struct tty_struct *tty, struct file * filp)
 		 return retval;
 	}
 
-	if ((info->state->count == 1) &&
-	    (info->flags & ASYNC_SPLIT_TERMIOS)) {
-		if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
-			*tty->termios = info->state->normal_termios;
-		else 
-			*tty->termios = info->state->callout_termios;
-		change_speed(info);
-	}
 #ifdef CONFIG_SERIAL_CONSOLE
 	if (sercons.cflag && sercons.index == line) {
 		tty->termios->c_cflag = sercons.cflag;
@@ -2083,8 +2034,6 @@ static int rs_open(struct tty_struct *tty, struct file * filp)
 		change_speed(info);
 	}
 #endif
-	info->session = current->session;
-	info->pgrp = current->pgrp;
 
 #ifdef SERIAL_DEBUG_OPEN
 	baget_printk("rs_open %s successful...", tty->name);
@@ -2302,6 +2251,28 @@ static void rs_timer(unsigned long dummy)
                 mod_timer(&vacs_timer, jiffies + IRQ_timeout[0] - 2);
         }
 }
+
+static struct tty_operations rs_ops = {
+	.open = rs_open,
+	.close = rs_close,
+	.write = rs_write,
+	.put_char = rs_put_char,
+	.flush_chars = rs_flush_chars,
+	.write_room = rs_write_room,
+	.chars_in_buffer = rs_chars_in_buffer,
+	.flush_buffer = rs_flush_buffer,
+	.ioctl = rs_ioctl,
+	.throttle = rs_throttle,
+	.unthrottle = rs_unthrottle,
+	.send_xchar = rs_send_xchar,
+	.set_termios = rs_set_termios,
+	.stop = rs_stop,
+	.start = rs_start,
+	.hangup = rs_hangup,
+	.break_ctl = rs_break,
+	.wait_until_sent = rs_wait_until_sent,
+	.read_proc = rs_read_proc,
+};
  
 /*
  * The serial driver boot-time initialization code!
@@ -2351,63 +2322,28 @@ int __init rs_init(void)
 #endif
 
 #endif
+	serial_driver = alloc_tty_driver(NR_PORTS);
+	if (!serial_driver)
+		return -ENOMEM;
+
 	show_serial_version();
 
 	/* Initialize the tty_driver structure */
 	
-	memset(&serial_driver, 0, sizeof(struct tty_driver));
-	serial_driver.magic = TTY_DRIVER_MAGIC;
-	serial_driver.driver_name = "serial";
-	serial_driver.name = "ttyS";
-	serial_driver.major = TTY_MAJOR;
-	serial_driver.minor_start = 64;
-	serial_driver.num = NR_PORTS;
-	serial_driver.type = TTY_DRIVER_TYPE_SERIAL;
-	serial_driver.subtype = SERIAL_TYPE_NORMAL;
-	serial_driver.init_termios = tty_std_termios;
-	serial_driver.init_termios.c_cflag =
+	serial_driver->driver_name = "serial";
+	serial_driver->name = "ttyS";
+	serial_driver->major = TTY_MAJOR;
+	serial_driver->minor_start = 64;
+	serial_driver->type = TTY_DRIVER_TYPE_SERIAL;
+	serial_driver->subtype = SERIAL_TYPE_NORMAL;
+	serial_driver->init_termios = tty_std_termios;
+	serial_driver->init_termios.c_cflag =
 		B9600 | CS8 | CREAD | HUPCL | CLOCAL;
-	serial_driver.flags = TTY_DRIVER_REAL_RAW;
-	serial_driver.refcount = &serial_refcount;
-	serial_driver.table = serial_table;
-	serial_driver.termios = serial_termios;
-	serial_driver.termios_locked = serial_termios_locked;
-
-	serial_driver.open = rs_open;
-	serial_driver.close = rs_close;
-	serial_driver.write = rs_write;
-	serial_driver.put_char = rs_put_char;
-	serial_driver.flush_chars = rs_flush_chars;
-	serial_driver.write_room = rs_write_room;
-	serial_driver.chars_in_buffer = rs_chars_in_buffer;
-	serial_driver.flush_buffer = rs_flush_buffer;
-	serial_driver.ioctl = rs_ioctl;
-	serial_driver.throttle = rs_throttle;
-	serial_driver.unthrottle = rs_unthrottle;
-	serial_driver.send_xchar = rs_send_xchar;
-	serial_driver.set_termios = rs_set_termios;
-	serial_driver.stop = rs_stop;
-	serial_driver.start = rs_start;
-	serial_driver.hangup = rs_hangup;
-	serial_driver.break_ctl = rs_break;
-	serial_driver.wait_until_sent = rs_wait_until_sent;
-	serial_driver.read_proc = rs_read_proc;
+	serial_driver->flags = TTY_DRIVER_REAL_RAW;
+	tty_set_operations(serial_driver, &rs_ops);
 	
-	/*
-	 * The callout device is just like normal device except for
-	 * major number and the subtype code.
-	 */
-	callout_driver = serial_driver;
-	callout_driver.name = "cua";
-	callout_driver.major = TTYAUX_MAJOR;
-	callout_driver.subtype = SERIAL_TYPE_CALLOUT;
-	callout_driver.read_proc = 0;
-	callout_driver.proc_entry = 0;
-
-	if (tty_register_driver(&serial_driver))
+	if (tty_register_driver(serial_driver))
 		panic("Couldn't register serial driver\n");
-	if (tty_register_driver(&callout_driver))
-		panic("Couldn't register callout driver\n");
 	
 	for (i = 0, state = rs_table; i < NR_PORTS; i++,state++) {
 		state->magic = SSTATE_MAGIC;
@@ -2416,8 +2352,6 @@ int __init rs_init(void)
 		state->custom_divisor = 0;
 		state->close_delay = 5*HZ/10;
 		state->closing_wait = 30*HZ;
-		state->callout_termios = callout_driver.init_termios;
-		state->normal_termios = serial_driver.init_termios;
 		state->icount.cts = state->icount.dsr = 
 			state->icount.rng = state->icount.dcd = 0;
 		state->icount.rx = state->icount.tx = 0;
@@ -2530,13 +2464,11 @@ void cleanup_module(void)
 	del_timer_sync(&vacs_timer);
         remove_bh(SERIAL_BH);
 
-	if ((e1 = tty_unregister_driver(&serial_driver)))
+	if ((e1 = tty_unregister_driver(serial_driver)))
 		printk("SERIAL: failed to unregister serial driver (%d)\n",
 		       e1);
-	if ((e2 = tty_unregister_driver(&callout_driver)))
-		printk("SERIAL: failed to unregister callout driver (%d)\n", 
-		       e2);
 	restore_flags(flags);
+	put_tty_driver(serial_driver);
 
 	for (i = 0; i < NR_PORTS; i++) {
 		if (rs_table[i].type != PORT_UNKNOWN)
@@ -2624,7 +2556,7 @@ static void serial_console_write(struct console *co, const char *s,
 static struct tty_driver *serial_console_device(struct console *c, int *index)
 {
 	*index = c->index;
-	return &serial_driver;
+	return serial_driver;
 }
 
 /*

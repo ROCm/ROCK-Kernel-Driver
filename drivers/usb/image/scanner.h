@@ -43,7 +43,7 @@
 
 // #define DEBUG
 
-#define DRIVER_VERSION "0.4.11"
+#define DRIVER_VERSION "0.4.13"
 #define DRIVER_DESC "USB Scanner Driver"
 
 #include <linux/usb.h>
@@ -70,7 +70,7 @@ MODULE_PARM_DESC(read_timeout, "User specified read timeout in seconds");
 
 static struct usb_device_id scanner_device_ids [] = {
 	/* Acer (now Benq) */
-	{ USB_DEVICE(0x04a5, 0x1a20) },	/* Unknown - Oliver Schwartz */
+	{ USB_DEVICE(0x04a5, 0x1a20) },	/* Prisa 310U */
 	{ USB_DEVICE(0x04a5, 0x1a2a) },	/* Another 620U */
 	{ USB_DEVICE(0x04a5, 0x2022) },	/* 340U */
 	{ USB_DEVICE(0x04a5, 0x2040) },	/* 620U (!) */
@@ -101,6 +101,7 @@ static struct usb_device_id scanner_device_ids [] = {
 	{ USB_DEVICE(0x05d8, 0x4003) }, /* E+ 48U */
 	{ USB_DEVICE(0x05d8, 0x4004) }, /* E+ Pro */
 	/* Avision */
+	{ USB_DEVICE(0x0638, 0x0268) }, /* iVina 1200U */
 	{ USB_DEVICE(0x0638, 0x0a10) },	/* iVina FB1600 (=Umax Astra 4500) */
 	/* Benq: see Acer */
 	/* Brother */
@@ -138,6 +139,7 @@ static struct usb_device_id scanner_device_ids [] = {
 	{ USB_DEVICE(0x0458, 0x2013) }, /* ColorPage HR7 */
 	{ USB_DEVICE(0x0458, 0x2015) }, /* ColorPage HR7LE */
 	{ USB_DEVICE(0x0458, 0x2016) }, /* ColorPage HR6X */
+	{ USB_DEVICE(0x0458, 0x2018) },	/* ColorPage HR7X */
 	/* Hewlett Packard */
 	{ USB_DEVICE(0x03f0, 0x0101) },	/* ScanJet 4100C */
 	{ USB_DEVICE(0x03f0, 0x0102) },	/* PhotoSmart S20 */
@@ -157,10 +159,10 @@ static struct usb_device_id scanner_device_ids [] = {
 	{ USB_DEVICE(0x03F0, 0x1005) },	/* ScanJet 5400C */
 	{ USB_DEVICE(0x03F0, 0x1105) },	/* ScanJet 5470C */
 	{ USB_DEVICE(0x03f0, 0x1305) },	/* Scanjet 4570c */
+	{ USB_DEVICE(0x03f0, 0x1411) }, /* PSC 750 */
 	{ USB_DEVICE(0x03f0, 0x2005) },	/* ScanJet 3570c */
 	{ USB_DEVICE(0x03f0, 0x2205) },	/* ScanJet 3500c */
-	/* iVina */
-	{ USB_DEVICE(0x0638, 0x0268) }, /* 1200U */
+	{ USB_DEVICE(0x03f0, 0x2f11) }, /* PSC 1210 */
 	/* Lexmark */
 	{ USB_DEVICE(0x043d, 0x002d) }, /* X70/X73 */
 	{ USB_DEVICE(0x043d, 0x003d) }, /* X83 */
@@ -173,6 +175,7 @@ static struct usb_device_id scanner_device_ids [] = {
 	/* Microtek */
 	{ USB_DEVICE(0x05da, 0x30ce) },	/* ScanMaker 3800 */
 	{ USB_DEVICE(0x05da, 0x30cf) },	/* ScanMaker 4800 */
+	{ USB_DEVICE(0x04a7, 0x0224) },	/* Scanport 3000 (actually Visioneer?)*/
 	/* The following SCSI-over-USB Microtek devices are supported by the
 	   microtek driver: Enable SCSI and USB Microtek in kernel config */
 	//	{ USB_DEVICE(0x05da, 0x0099) },	/* ScanMaker X6 - X6U */
@@ -205,25 +208,30 @@ static struct usb_device_id scanner_device_ids [] = {
 	{ USB_DEVICE(0x055f, 0x021d) }, /* Bearpaw 2400 CU Plus */
 	{ USB_DEVICE(0x055f, 0x021e) }, /* BearPaw 1200 TA/CS */
 	{ USB_DEVICE(0x055f, 0x0400) }, /* BearPaw 2400 TA PRO */
+	{ USB_DEVICE(0x055f, 0x0401) },	/* P 3600 A3 Pro */
 	{ USB_DEVICE(0x055f, 0x0873) }, /* ScanExpress 600 USB */
 	{ USB_DEVICE(0x055f, 0x1000) }, /* BearPaw 4800 TA PRO */
 	//	{ USB_DEVICE(0x05d8, 0x4002) }, /* BearPaw 1200 CU and ScanExpress 1200 UB Plus (see Artec) */
 	/* Nikon */
 	{ USB_DEVICE(0x04b0, 0x4000) }, /* Coolscan LS 40 ED */
+	/* Pacific Image Electronics */
+	{ USB_DEVICE(0x05e3, 0x0120) },	/* PrimeFilm 1800u */
 	/* Plustek */
+	{ USB_DEVICE(0x07b3, 0x0001) },	/* 1212U */
 	{ USB_DEVICE(0x07b3, 0x0005) }, /* Unknown */
 	{ USB_DEVICE(0x07b3, 0x0007) }, /* Unknown */
 	{ USB_DEVICE(0x07b3, 0x000F) }, /* Unknown */
 	{ USB_DEVICE(0x07b3, 0x0010) }, /* OpticPro U12 */
 	{ USB_DEVICE(0x07b3, 0x0011) }, /* OpticPro U24 */
 	{ USB_DEVICE(0x07b3, 0x0012) }, /* Unknown */
-	{ USB_DEVICE(0x07b3, 0x0013) }, /* Unknown */
+	{ USB_DEVICE(0x07b3, 0x0013) }, /* UT12 */
 	{ USB_DEVICE(0x07b3, 0x0014) }, /* Unknown */
 	{ USB_DEVICE(0x07b3, 0x0015) }, /* OpticPro U24 */
 	{ USB_DEVICE(0x07b3, 0x0016) }, /* Unknown */
 	{ USB_DEVICE(0x07b3, 0x0017) }, /* OpticPro UT12/UT16/UT24 */
 	{ USB_DEVICE(0x07b3, 0x0400) }, /* OpticPro 1248U */
 	{ USB_DEVICE(0x07b3, 0x0401) }, /* OpticPro 1248U (another one) */
+	{ USB_DEVICE(0x07b3, 0x0403) },	/* U16B */
 	/* Primax/Colorado */
 	{ USB_DEVICE(0x0461, 0x0300) },	/* G2-300 #1 */
 	{ USB_DEVICE(0x0461, 0x0301) },	/* G2E-300 #1 */
@@ -281,6 +289,8 @@ static struct usb_device_id scanner_device_ids [] = {
 	/* Visioneer */
 	{ USB_DEVICE(0x04a7, 0x0211) },	/* OneTouch 7600 USB */
 	{ USB_DEVICE(0x04a7, 0x0221) },	/* OneTouch 5300 USB */
+	{ USB_DEVICE(0x04a7, 0x0224) },	/* OneTouch 4800 USB */
+	{ USB_DEVICE(0x04a7, 0x0226) },	/* OneTouch 5300 USB */
 	{ USB_DEVICE(0x04a7, 0x0231) },	/* 6100 USB */
 	{ USB_DEVICE(0x04a7, 0x0311) },	/* 6200 EPP/USB */
 	{ USB_DEVICE(0x04a7, 0x0321) },	/* OneTouch 8100 EPP/USB */

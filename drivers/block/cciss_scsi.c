@@ -54,11 +54,11 @@ static int sendcmd(
 const char *cciss_scsi_info(struct Scsi_Host *sa);
 
 int cciss_scsi_proc_info(
+		struct Scsi_Host *sh,
 		char *buffer, /* data buffer */
 		char **start, 	   /* where data in buffer starts */
 		off_t offset,	   /* offset from start of imaginary file */
 		int length, 	   /* length of data in buffer */
-		int hostnum, 	   /* which host adapter (always zero for me) */
 		int func);	   /* 0 == read, 1 == write */
 
 int cciss_scsi_queue_command (Scsi_Cmnd *cmd, void (* done)(Scsi_Cmnd *));
@@ -1121,23 +1121,18 @@ cciss_scsi_user_command(int ctlr, int hostno, char *buffer, int length)
 
 
 int
-cciss_scsi_proc_info(char *buffer, /* data buffer */
+cciss_scsi_proc_info(struct Scsi_Host *sh,
+		char *buffer, /* data buffer */
 		char **start, 	   /* where data in buffer starts */
 		off_t offset,	   /* offset from start of imaginary file */
 		int length, 	   /* length of data in buffer */
-		int hostnum, 	   /* which host adapter (always zero for me) */
 		int func)	   /* 0 == read, 1 == write */
 {
 
 	int buflen, datalen;
-	struct Scsi_Host *sh;
 	ctlr_info_t *ci;
 	int cntl_num;
 
-
-	sh = scsi_host_hn_get(hostnum);
-	if (sh == NULL) /* This really shouldn't ever happen. */
-		return -EINVAL;
 
 	ci = (ctlr_info_t *) sh->hostdata[0];
 	if (ci == NULL)  /* This really shouldn't ever happen. */
@@ -1146,7 +1141,7 @@ cciss_scsi_proc_info(char *buffer, /* data buffer */
 	cntl_num = ci->ctlr;	/* Get our index into the hba[] array */
 
 	if (func == 0) {	/* User is reading from /proc/scsi/ciss*?/?*  */
-		buflen = sprintf(buffer, "hostnum=%d\n", hostnum); 	
+		buflen = sprintf(buffer, "hostnum=%d\n", sh->host_no); 	
 
 		datalen = buflen - offset;
 		if (datalen < 0) { 	/* they're reading past EOF. */
@@ -1156,7 +1151,7 @@ cciss_scsi_proc_info(char *buffer, /* data buffer */
 			*start = buffer + offset;
 		return(datalen);
 	} else 	/* User is writing to /proc/scsi/cciss*?/?*  ... */
-		return cciss_scsi_user_command(cntl_num, hostnum,
+		return cciss_scsi_user_command(cntl_num, sh->host_no,
 			buffer, length);	
 } 
 

@@ -2493,6 +2493,11 @@ found_virt:
 	}
 	if(file->f_mode & FMODE_WRITE) {
 		if((dmabuf->write_channel = card->alloc_pcm_channel(card)) == NULL) {
+			/* free any read channel allocated earlier */
+			if(file->f_mode & FMODE_READ)
+				card->free_pcm_channel(card,
+						dmabuf->read_channel->num);
+
 			kfree (card->states[i]);
 			card->states[i] = NULL;;
 			return -EBUSY;
@@ -3449,9 +3454,6 @@ static struct pci_driver i810_pci_driver = {
 
 static int __init i810_init_module (void)
 {
-	if (!pci_present())   /* No PCI bus in this machine! */
-		return -ENODEV;
-
 	printk(KERN_INFO "Intel 810 + AC97 Audio, version "
 	       DRIVER_VERSION ", " __TIME__ " " __DATE__ "\n");
 

@@ -147,8 +147,6 @@ enum {
 
 #ifdef __KERNEL__
 
-extern const char *if_port_text[];
-
 #include <linux/cache.h>
 #include <linux/skbuff.h>
 
@@ -335,6 +333,7 @@ struct net_device
 	void                    *dn_ptr;        /* DECnet specific data */
 	void                    *ip6_ptr;       /* IPv6 specific data */
 	void			*ec_ptr;	/* Econet specific data	*/
+	void			*ax25_ptr;	/* AX.25 specific data */
 
 	struct list_head	poll_list;	/* Link to poll list	*/
 	int			quota;
@@ -356,8 +355,16 @@ struct net_device
 	spinlock_t		queue_lock;
 	/* Number of references to this device */
 	atomic_t		refcnt;
-	/* The flag marking that device is unregistered, but held by an user */
-	int			deadbeaf;
+	/* delayed register/unregister */
+	struct list_head	todo_list;
+
+	/* register/unregister state machine */
+	enum { NETREG_UNINITIALIZED=0,
+	       NETREG_REGISTERING,	/* called register_netdevice */
+	       NETREG_REGISTERED,	/* completed register todo */
+	       NETREG_UNREGISTERING,	/* called unregister_netdevice */
+	       NETREG_UNREGISTERED,	/* completed unregister todo */
+	} reg_state;
 
 	/* Net device features */
 	int			features;
@@ -817,6 +824,8 @@ extern void		tr_setup(struct net_device *dev);
 extern void		fc_setup(struct net_device *dev);
 extern void		fc_freedev(struct net_device *dev);
 /* Support for loadable net-drivers */
+extern struct net_device *alloc_netdev(int sizeof_priv, const char *name,
+				       void (*setup)(struct net_device *));
 extern int		register_netdev(struct net_device *dev);
 extern void		unregister_netdev(struct net_device *dev);
 /* Functions used for multicast support */

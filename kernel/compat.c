@@ -344,12 +344,16 @@ asmlinkage long compat_sys_getrusage(int who, struct compat_rusage *ru)
 	struct rusage r;
 	int ret;
 	mm_segment_t old_fs = get_fs();
-		
+
 	set_fs(KERNEL_DS);
 	ret = sys_getrusage(who, &r);
 	set_fs(old_fs);
 
-	return ret || put_compat_rusage(ru, &r);
+	if (ret)
+		return ret;
+
+	if (put_compat_rusage(ru, &r))
+		return -EFAULT;
 }
 
 asmlinkage long
@@ -368,8 +372,7 @@ compat_sys_wait4(compat_pid_t pid, compat_uint_t * stat_addr, int options,
 		ret = sys_wait4(pid, stat_addr ? &status : NULL, options, &r);
 		set_fs (old_fs);
 
-		if (!ret)
-		{
+		if (ret > 0) {
 			if (put_compat_rusage(ru, &r)) 
 				return -EFAULT;
 			if (stat_addr && put_user(status, stat_addr))

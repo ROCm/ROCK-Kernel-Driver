@@ -159,10 +159,6 @@ int init_mycard(void)
 	struct pci_dev *pcidev=NULL;
 	int count=0;
 		
-	if(!pci_present())
-		return -ENODEV;
-	
-		
 	while((pcidev = pci_find_device(PCI_VENDOR_MYIDENT, PCI_DEVICE_ID_MYIDENT_MYCARD1, pcidev))!=NULL)
 	{
 		if (pci_enable_device(pcidev))

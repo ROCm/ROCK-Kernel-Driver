@@ -679,12 +679,8 @@ toshoboe_remove (struct pci_dev *pci_dev)
       self->recv_bufs[i] = NULL;
     }
 
-  if (self->netdev) {
-	  /* Remove netdevice */
-	  rtnl_lock();
-	  unregister_netdevice(self->netdev);
-	  rtnl_unlock();
-  }
+  if (self->netdev)
+	  unregister_netdev(self->netdev);
 
   kfree (self->taskfilebuf);
   self->taskfilebuf = NULL;

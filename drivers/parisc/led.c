@@ -3,7 +3,7 @@
  *
  *      (c) Copyright 2000 Red Hat Software
  *      (c) Copyright 2000 Helge Deller <hdeller@redhat.com>
- *      (c) Copyright 2001-2002 Helge Deller <deller@gmx.de>
+ *      (c) Copyright 2001-2003 Helge Deller <deller@gmx.de>
  *      (c) Copyright 2001 Randolph Chung <tausq@debian.org>
  *
  *      This program is free software; you can redistribute it and/or modify
@@ -13,7 +13,7 @@
  *
  * TODO:
  *	- speed-up calculations with inlined assembler
- *	- interface to write to second row of LCD from /proc
+ *	- interface to write to second row of LCD from /proc (if technically possible)
  */
 
 #include <linux/config.h>
@@ -22,10 +22,11 @@
 #include <linux/init.h>
 #include <linux/types.h>
 #include <linux/ioport.h>
-#include <linux/bitops.h>
 #include <linux/version.h>
 #include <linux/delay.h>
 #include <linux/netdevice.h>
+#include <linux/inetdevice.h>
+#include <linux/in.h>
 #include <linux/interrupt.h>
 #include <linux/kernel_stat.h>
 #include <linux/reboot.h>
@@ -57,10 +58,6 @@ static char lcd_text[32];
 #else
 #define DPRINTK(x)
 #endif
-
-
-#define CALC_ADD(val, comp, add) \
- (val<=(comp/8) ? add/16 : val<=(comp/4) ? add/8 : val<=(comp/2) ? add/4 : add)
 
 
 struct lcd_block {
@@ -341,93 +338,81 @@ static void led_LCD_driver(unsigned char leds)
 
 /*
    ** 
-   ** led_get_net_stats()
+   ** led_get_net_activity()
    ** 
-   ** calculate the TX- & RX-troughput on the network interfaces in
-   ** the system for usage in the LED code
-   **
+   ** calculate if there was TX- or RX-troughput on the network interfaces
    ** (analog to dev_get_info() from net/core/dev.c)
    **   
  */
-static unsigned long led_net_rx_counter, led_net_tx_counter;
-
-static void led_get_net_stats(int addvalue)
+static __inline__ int led_get_net_activity(void)
 { 
-#ifdef CONFIG_NET
+#ifndef CONFIG_NET
+	return 0;
+#else
 	static unsigned long rx_total_last, tx_total_last;
 	unsigned long rx_total, tx_total;
 	struct net_device *dev;
-	struct net_device_stats *stats;
+	int retval;
 
 	rx_total = tx_total = 0;
 	
-	/* we are running as a tasklet, so locking dev_base 
+	/* we are running as tasklet, so locking dev_base 
 	 * for reading should be OK */
 	read_lock(&dev_base_lock);
-	for (dev = dev_base; dev != NULL; dev = dev->next) {
-	    if (dev->get_stats) { 
-	        stats = dev->get_stats(dev);
-		rx_total += stats->rx_packets;
-		tx_total += stats->tx_packets;
-	    }
+	for (dev = dev_base; dev; dev = dev->next) {
+	    struct net_device_stats *stats;
+	    struct in_device *in_dev = __in_dev_get(dev);
+	    if (!in_dev || !in_dev->ifa_list)
+		continue;
+	    if (LOOPBACK(in_dev->ifa_list->ifa_local))
+		continue;
+	    if (!dev->get_stats) 
+		continue;
+	    stats = dev->get_stats(dev);
+	    rx_total += stats->rx_packets;
+	    tx_total += stats->tx_packets;
 	}
 	read_unlock(&dev_base_lock);
 
-	rx_total -= rx_total_last;
-	tx_total -= tx_total_last;
-	
-	if (rx_total)
-	    led_net_rx_counter += CALC_ADD(rx_total, tx_total, addvalue);
+	retval = 0;
 
-	if (tx_total)
-	    led_net_tx_counter += CALC_ADD(tx_total, rx_total, addvalue);
-        
-	rx_total_last += rx_total;
-        tx_total_last += tx_total;
+	if (rx_total != rx_total_last) {
+		rx_total_last = rx_total;
+		retval |= LED_LAN_RCV;
+	}
+
+	if (tx_total != tx_total_last) {
+		tx_total_last = tx_total;
+		retval |= LED_LAN_TX;
+	}
+
+	return retval;
 #endif
 }
 
 
 /*
    ** 
-   ** led_get_diskio_stats()
+   ** led_get_diskio_activity()
    ** 
-   ** calculate the disk-io througput in the system
-   ** (analog to linux/fs/proc/proc_misc.c)
+   ** calculate if there was disk-io in the system
    **   
  */
-static unsigned long led_diskio_counter;
-
-static void led_get_diskio_stats(int addvalue)
+static __inline__ int led_get_diskio_activity(void)
 {	
-	static unsigned int diskio_total_last, diskio_max;
-	int major, disk, total;
+	static unsigned long last_pgpgin, last_pgpgout;
+	struct page_state pgstat;
+	int changed;
 	
-	total = 0;
-#if 0
-	/*
-	 * this section will no longer work in 2.5, as we no longer
-	 * have either kstat.dk_drive nor DK_MAX_*.  It can probably
-	 * be rewritten to use the per-disk statistics now kept in the
-	 * gendisk, but since I have no HP machines to test it on, I'm
-	 * not really up to that.  ricklind@us.ibm.com 11/7/02
-	 */
-	for (major = 0; major < DK_MAX_MAJOR; major++) {
-	    for (disk = 0; disk < DK_MAX_DISK; disk++)
-		total += dkstat.drive[major][disk];
-	}
-	total -= diskio_total_last;
+	get_full_page_state(&pgstat); /* get no of sectors in & out */
+
+	/* Just use a very simple calculation here. Do not care about overflow,
+	   since we only want to know if there was activity or not. */
+	changed = (pgstat.pgpgin != last_pgpgin) || (pgstat.pgpgout != last_pgpgout);
+	last_pgpgin  = pgstat.pgpgin;
+	last_pgpgout = pgstat.pgpgout;
 	
-	if (total) {
-	    if (total >= diskio_max) {
-		led_diskio_counter += addvalue;
-	        diskio_max = total; /* new maximum value found */ 
-	    } else
-		led_diskio_counter += CALC_ADD(total, diskio_max, addvalue);
-	}
-#endif
-	
-	diskio_total_last += total; 
+	return (changed ? LED_DISK_IO : 0);
 }
 
 
@@ -443,16 +428,23 @@ static void led_get_diskio_stats(int addvalue)
     - optimizations
  */
 
-static unsigned char currentleds;	/* stores current value of the LEDs */
-
 #define HEARTBEAT_LEN (HZ*6/100)
 #define HEARTBEAT_2ND_RANGE_START (HZ*22/100)
 #define HEARTBEAT_2ND_RANGE_END   (HEARTBEAT_2ND_RANGE_START + HEARTBEAT_LEN)
 
+#if HZ==100
+ #define NORMALIZED_COUNT(count) (count)
+#else
+ #warning "Untested situation HZ != 100 !!"
+ #define NORMALIZED_COUNT(count) (count/(HZ/100))
+#endif
+
 static void led_tasklet_func(unsigned long unused)
 {
-	static unsigned int count, count_HZ;
 	static unsigned char lastleds;
+	unsigned char currentleds; /* stores current value of the LEDs */
+	static unsigned long count; /* static incremented value, not wrapped */
+	static unsigned long count_HZ; /* counter in range 0..HZ */
 
 	/* exit if not initialized */
 	if (!led_func_ptr)
@@ -462,6 +454,8 @@ static void led_tasklet_func(unsigned long unused)
 	++count;
 	if (++count_HZ == HZ)
 	    count_HZ = 0;
+
+	currentleds = lastleds;
 
 	if (led_heartbeat)
 	{
@@ -473,42 +467,25 @@ static void led_tasklet_func(unsigned long unused)
 		    currentleds &= ~LED_HEARTBEAT;
 	}
 
-	/* gather network and diskio statistics and flash LEDs respectively */
-
-	if (led_lanrxtx)
+	/* look for network activity and flash LEDs respectively */
+	if (led_lanrxtx && ((NORMALIZED_COUNT(count)+(8/2)) & 7) == 0)
 	{
-		if ((count & 31) == 0)
-			led_get_net_stats(30);
-
-		if (led_net_rx_counter) {
-			led_net_rx_counter--;
-			currentleds |= LED_LAN_RCV;
-		}
-		else    
-			currentleds &= ~LED_LAN_RCV;
-
-		if (led_net_tx_counter) {
-			led_net_tx_counter--;
-			currentleds |= LED_LAN_TX;
-		}
-		else    
-			currentleds &= ~LED_LAN_TX;
+		currentleds &= ~(LED_LAN_RCV | LED_LAN_TX);
+		currentleds |= led_get_net_activity();
 	}
 
-	if (led_diskio)
+	/* avoid to calculate diskio-stats at same irq  as netio-stats */
+	if (led_diskio && (NORMALIZED_COUNT(count) & 7) == 0)
 	{
-		/* avoid to calculate diskio-stats at same irq as netio-stats ! */
-		if ((count & 31) == 15) 
-			led_get_diskio_stats(30);
-
-		if (led_diskio_counter) {
-			led_diskio_counter--;
-			currentleds |= LED_DISK_IO;
-		}
-		else    
-			currentleds &= ~LED_DISK_IO;
+		currentleds &= ~LED_DISK_IO;
+		currentleds |= led_get_diskio_activity();
 	}
 
+	/* blink all LEDs twice a second if we got an Oops (HPMC) */
+	if (oops_in_progress) {
+		currentleds = (count_HZ<=(HZ/2)) ? 0 : 0xff;
+	}
+	
 	/* update the LCD/LEDs */
 	if (currentleds != lastleds) {
 	    led_func_ptr(currentleds);

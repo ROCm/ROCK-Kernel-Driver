@@ -167,9 +167,10 @@ static int ptable_alloc(void) {
 
 	memset(meye.mchip_ptable, 0, sizeof(meye.mchip_ptable));
 
-	meye.mchip_ptable[MCHIP_NB_PAGES] = pci_alloc_consistent(meye.mchip_dev, 
-								 PAGE_SIZE, 
-								 &meye.mchip_dmahandle);
+	meye.mchip_ptable[MCHIP_NB_PAGES] = dma_alloc_coherent(&meye.mchip_dev->dev, 
+							       PAGE_SIZE, 
+							       &meye.mchip_dmahandle,
+							       GFP_KERNEL);
 	if (!meye.mchip_ptable[MCHIP_NB_PAGES]) {
 		meye.mchip_dmahandle = 0;
 		return -1;
@@ -177,16 +178,17 @@ static int ptable_alloc(void) {
 
 	pt = (u32 *)meye.mchip_ptable[MCHIP_NB_PAGES];
 	for (i = 0; i < MCHIP_NB_PAGES; i++) {
-		meye.mchip_ptable[i] = pci_alloc_consistent(meye.mchip_dev, 
-							    PAGE_SIZE,
-							    pt);
+		meye.mchip_ptable[i] = dma_alloc_coherent(&meye.mchip_dev->dev, 
+							  PAGE_SIZE,
+							  pt,
+							  GFP_KERNEL);
 		if (!meye.mchip_ptable[i]) {
 			int j;
 			pt = (u32 *)meye.mchip_ptable[MCHIP_NB_PAGES];
 			for (j = 0; j < i; ++j) {
-				pci_free_consistent(meye.mchip_dev,
-						    PAGE_SIZE,
-						    meye.mchip_ptable[j], *pt);
+				dma_free_coherent(&meye.mchip_dev->dev,
+						  PAGE_SIZE,
+						  meye.mchip_ptable[j], *pt);
 				pt++;
 			}
 			meye.mchip_dmahandle = 0;
@@ -204,17 +206,17 @@ static void ptable_free(void) {
 	pt = (u32 *)meye.mchip_ptable[MCHIP_NB_PAGES];
 	for (i = 0; i < MCHIP_NB_PAGES; i++) {
 		if (meye.mchip_ptable[i])
-			pci_free_consistent(meye.mchip_dev, 
-					    PAGE_SIZE, 
-					    meye.mchip_ptable[i], *pt);
+			dma_free_coherent(&meye.mchip_dev->dev, 
+					  PAGE_SIZE, 
+					  meye.mchip_ptable[i], *pt);
 		pt++;
 	}
 
 	if (meye.mchip_ptable[MCHIP_NB_PAGES])
-		pci_free_consistent(meye.mchip_dev, 
-				    PAGE_SIZE, 
-				    meye.mchip_ptable[MCHIP_NB_PAGES], 
-				    meye.mchip_dmahandle);
+		dma_free_coherent(&meye.mchip_dev->dev, 
+				  PAGE_SIZE, 
+				  meye.mchip_ptable[MCHIP_NB_PAGES],
+				  meye.mchip_dmahandle);
 
 	memset(meye.mchip_ptable, 0, sizeof(meye.mchip_ptable));
 	meye.mchip_dmahandle = 0;
@@ -613,25 +615,25 @@ static void mchip_dma_free(void) {
 /* stop any existing HIC action and wait for any dma to complete then
    reset the dma engine */
 static void mchip_hic_stop(void) {
-	int i = 0;
+	int i, j;
 
 	meye.mchip_mode = MCHIP_HIC_MODE_NOOP;
-	if (!(mchip_read(MCHIP_HIC_STATUS) & MCHIP_HIC_STATUS_BUSY)) 
+	if (!(mchip_read(MCHIP_HIC_STATUS) & MCHIP_HIC_STATUS_BUSY))
 		return;
-	mchip_set(MCHIP_HIC_CMD, MCHIP_HIC_CMD_STOP);
-	mchip_delay(MCHIP_HIC_CMD, 0);
-	while (!mchip_delay(MCHIP_HIC_STATUS, MCHIP_HIC_STATUS_IDLE)) {
-		/*  resetting HIC */
+	for (i = 0; i < 20; ++i) {
 		mchip_set(MCHIP_HIC_CMD, MCHIP_HIC_CMD_STOP);
 		mchip_delay(MCHIP_HIC_CMD, 0);
+		for (j = 0; j < 100; ++j) {
+			if (mchip_delay(MCHIP_HIC_STATUS, MCHIP_HIC_STATUS_IDLE))
+				return;
+			wait_ms(1);
+		}
+		printk(KERN_ERR "meye: need to reset HIC!\n");
+	
 		mchip_set(MCHIP_HIC_CTL, MCHIP_HIC_CTL_SOFT_RESET);
 		wait_ms(250);
-		if (i++ > 20) {
-			printk(KERN_ERR "meye: resetting HIC hanged!\n");
-			break;
-		}
 	}
-	wait_ms(100);
+	printk(KERN_ERR "meye: resetting HIC hanged!\n");
 }
 
 /****************************************************************************/
@@ -832,7 +834,7 @@ static void mchip_cont_compression_start(void) {
 /* Interrupt handling                                                       */
 /****************************************************************************/
 
-static void meye_irq(int irq, void *dev_id, struct pt_regs *regs) {
+static irqreturn_t meye_irq(int irq, void *dev_id, struct pt_regs *regs) {
 	u32 v;
 	int reqnr;
 	v = mchip_read(MCHIP_MM_INTA);
@@ -840,7 +842,7 @@ static void meye_irq(int irq, void *dev_id, struct pt_regs *regs) {
 	while (1) {
 		v = mchip_get_frame();
 		if (!(v & MCHIP_MM_FIR_RDY))
-			return;
+			return IRQ_NONE;
 		switch (meye.mchip_mode) {
 
 		case MCHIP_HIC_MODE_CONT_OUT:
@@ -873,11 +875,12 @@ static void meye_irq(int irq, void *dev_id, struct pt_regs *regs) {
 
 		default:
 			/* do not free frame, since it can be a snap */
-			return;
+			return IRQ_NONE;
 		} /* switch */
 
 		mchip_free_frame();
 	}
+	return IRQ_HANDLED;
 }
 
 /****************************************************************************/
@@ -1391,6 +1394,8 @@ static void __devexit meye_remove(struct pci_dev *pcidev) {
 
 	mchip_hic_stop();
 
+	mchip_dma_free();
+
 	/* disable interrupts */
 	mchip_set(MCHIP_MM_INTA, 0x0);
 
@@ -1402,8 +1407,6 @@ static void __devexit meye_remove(struct pci_dev *pcidev) {
 			   pci_resource_len(meye.mchip_dev, 0));
 
 	pci_disable_device(meye.mchip_dev);
-
-	mchip_dma_free();
 
 	if (meye.grab_fbuffer)
 		rvfree(meye.grab_fbuffer, gbuffers*gbufsize);

@@ -8,6 +8,7 @@
 #include <linux/mm.h>
 #include <asm/scatterlist.h>
 #include <asm/io.h>
+#include <asm/pci-bridge.h>
 
 struct pci_dev;
 
@@ -266,7 +267,7 @@ pci_dac_dma_sync_single(struct pci_dev *pdev, dma64_addr_t dma_addr, size_t len,
 }
 
 /* Return the index of the PCI controller for device PDEV. */
-extern int pci_controller_num(struct pci_dev *pdev);
+#define pci_domain_nr(bus) ((struct pci_controller *)(bus)->sysdata)->index
 
 /* Map a range of PCI memory or I/O space for a device into user space */
 int pci_mmap_page_range(struct pci_dev *pdev, struct vm_area_struct *vma,

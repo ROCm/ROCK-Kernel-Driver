@@ -33,7 +33,12 @@
 		       result; })
 
 #endif
+#define CLOCK_REALTIME_RES TICK_NSEC  // In nano seconds.
 
+static inline u64  mpy_l_X_l_ll(unsigned long mpy1,unsigned long mpy2)
+{
+	return (u64)mpy1 * mpy2;
+}
 /*
  * Management arrays for POSIX timers.	 Timers are kept in slab memory
  * Timer ids are allocated by an external routine that keeps track of the
@@ -175,8 +180,8 @@ static inline void unlock_timer(struct k_itimer *timr, unsigned long flags);
  */
 static __init int init_posix_timers(void)
 {
-	struct k_clock clock_realtime = {.res = NSEC_PER_SEC / HZ };
-	struct k_clock clock_monotonic = {.res = NSEC_PER_SEC / HZ,
+	struct k_clock clock_realtime = {.res = CLOCK_REALTIME_RES };
+	struct k_clock clock_monotonic = {.res = CLOCK_REALTIME_RES,
 		.clock_get = do_posix_clock_monotonic_gettime,
 		.clock_set = do_posix_clock_monotonic_settime
 	};
@@ -204,24 +209,14 @@ static void tstojiffie(struct timespec *tp, int res, u64 *jiff)
 	}
 
 	/*
-	 * A note on jiffy overflow: It is possible for the system to
-	 * have been up long enough for the jiffies quanity to overflow.
-	 * In order for correct timer evaluations we require that the
-	 * specified time be somewhere between now and now + (max
-	 * unsigned int/2).  Times beyond this will be truncated back to
-	 * this value.   This is done in the absolute adjustment code,
-	 * below.  Here it is enough to just discard the high order
-	 * bits.
-	 */
-	*jiff = (s64)sec * HZ;
-	/*
-	 * Do the res thing. (Don't forget the add in the declaration of nsec)
-	 */
-	nsec -= nsec % res;
-	/*
-	 * Split to jiffie and sub jiffie
-	 */
-	*jiff += nsec / (NSEC_PER_SEC / HZ);
+	 * The scaling constants are defined in <linux/time.h>
+	 * The difference between there and here is that we do the
+	 * res rounding and compute a 64-bit result (well so does that
+	 * but it then throws away the high bits).
+  	 */
+	*jiff =  (mpy_l_X_l_ll(sec, SEC_CONVERSION) +
+		  (mpy_l_X_l_ll(nsec, NSEC_CONVERSION) >> 
+		   (NSEC_JIFFIE_SC - SEC_JIFFIE_SC))) >> SEC_JIFFIE_SC;
 }
 
 static void schedule_next_timer(struct k_itimer *timr)
@@ -293,46 +288,32 @@ exit:
 
 static void timer_notify_task(struct k_itimer *timr)
 {
-	struct siginfo info;
 	int ret;
 
-	memset(&info, 0, sizeof (info));
+	memset(&timr->sigq->info, 0, sizeof(siginfo_t));
 
 	/* Send signal to the process that owns this timer. */
-	info.si_signo = timr->it_sigev_signo;
-	info.si_errno = 0;
-	info.si_code = SI_TIMER;
-	info.si_tid = timr->it_id;
-	info.si_value = timr->it_sigev_value;
+	timr->sigq->info.si_signo = timr->it_sigev_signo;
+	timr->sigq->info.si_errno = 0;
+	timr->sigq->info.si_code = SI_TIMER;
+	timr->sigq->info.si_tid = timr->it_id;
+	timr->sigq->info.si_value = timr->it_sigev_value;
 	if (timr->it_incr)
-		info.si_sys_private = ++timr->it_requeue_pending;
+		timr->sigq->info.si_sys_private = ++timr->it_requeue_pending;
 
 	if (timr->it_sigev_notify & SIGEV_THREAD_ID & MIPS_SIGEV)
-		ret = send_sig_info(info.si_signo, &info, timr->it_process);
+		ret = send_sigqueue(timr->it_sigev_signo, timr->sigq,
+			timr->it_process);
 	else
-		ret = send_group_sig_info(info.si_signo, &info, 
-					  timr->it_process);
-	switch (ret) {
-
-	default:
+		ret = send_group_sigqueue(timr->it_sigev_signo, timr->sigq,
+			timr->it_process);
+	if (ret) {
 		/*
-		 * Signal was not sent.  May or may not need to
-		 * restart the timer.
-		 */
-		printk(KERN_WARNING "sending signal failed: %d\n", ret);
-	case 1:
-		/*
-		 * signal was not sent because of sig_ignor or,
-		 * possibly no queue memory OR will be sent but,
+		 * signal was not sent because of sig_ignor
 		 * we will not get a call back to restart it AND
 		 * it should be restarted.
 		 */
 		schedule_next_timer(timr);
-	case 0:
-		/*
-		 * all's well new signal queued
-		 */
-		break;
 	}
 }
 
@@ -384,7 +365,11 @@ static struct k_itimer * alloc_posix_timer(void)
 	struct k_itimer *tmr;
 	tmr = kmem_cache_alloc(posix_timers_cache, GFP_KERNEL);
 	memset(tmr, 0, sizeof (struct k_itimer));
-
+	tmr->it_id = (timer_t)-1;
+	if (unlikely(!(tmr->sigq = sigqueue_alloc()))) {
+		kmem_cache_free(posix_timers_cache, tmr);
+		tmr = 0;
+	}
 	return tmr;
 }
 
@@ -395,6 +380,7 @@ static void release_posix_timer(struct k_itimer *tmr)
 		idr_remove(&posix_timers_id, tmr->it_id);
 		spin_unlock_irq(&idr_lock);
 	}
+	sigqueue_free(tmr->sigq);
 	kmem_cache_free(posix_timers_cache, tmr);
 }
 
@@ -423,7 +409,7 @@ sys_timer_create(clockid_t which_clock,
 	do {
 		if (unlikely(!idr_pre_get(&posix_timers_id))) {
 			error = -EAGAIN;
-			new_timer_id = (timer_t)-1;
+			new_timer->it_id = (timer_t)-1;
 			goto out;
 		}
 		spin_lock_irq(&idr_lock);
@@ -1040,8 +1026,7 @@ sys_clock_settime(clockid_t which_clock, const struct timespec __user *tp)
 	if (posix_clocks[which_clock].clock_set)
 		return posix_clocks[which_clock].clock_set(&new_tp);
 
-	new_tp.tv_nsec /= NSEC_PER_USEC;
-	return do_sys_settimeofday((struct timeval *) &new_tp, NULL);
+	return do_sys_settimeofday(&new_tp, NULL);
 }
 
 asmlinkage long
@@ -1207,6 +1192,7 @@ do_clock_nanosleep(clockid_t which_clock, int flags, struct timespec *tsave)
 		if (abs || !rq_time) {
 			adjust_abs_time(&posix_clocks[which_clock], &t, abs,
 					&rq_time);
+			rq_time += (t.tv_sec || t.tv_nsec);
 		}
 
 		left = rq_time - get_jiffies_64();
@@ -1229,7 +1215,6 @@ do_clock_nanosleep(clockid_t which_clock, int flags, struct timespec *tsave)
 		finish_wait(&nanosleep_abs_wqueue, &abs_wqueue);
 
 	if (left > (s64)0) {
-		unsigned long rmd;
 
 		/*
 		 * Always restart abs calls from scratch to pick up any
@@ -1238,9 +1223,10 @@ do_clock_nanosleep(clockid_t which_clock, int flags, struct timespec *tsave)
 		if (abs)
 			return -ERESTARTNOHAND;
 
-		tsave->tv_sec = div_long_long_rem(left, HZ, &rmd);
-		tsave->tv_nsec = rmd * (NSEC_PER_SEC / HZ);
-
+		left *= TICK_NSEC;
+		tsave->tv_sec = div_long_long_rem(left, 
+						  NSEC_PER_SEC, 
+						  &tsave->tv_nsec);
 		restart_block->fn = clock_nanosleep_restart;
 		restart_block->arg0 = which_clock;
 		restart_block->arg1 = (unsigned long)tsave;

@@ -83,15 +83,8 @@
 
 static DECLARE_TASK_QUEUE(tq_riscom);
 
-#define RISCOM_TYPE_NORMAL	1
-#define RISCOM_TYPE_CALLOUT	2
-
 static struct riscom_board * IRQ_to_board[16];
-static struct tty_driver riscom_driver, riscom_callout_driver;
-static int    riscom_refcount;
-static struct tty_struct * riscom_table[RC_NBOARD * RC_NPORT];
-static struct termios * riscom_termios[RC_NBOARD * RC_NPORT];
-static struct termios * riscom_termios_locked[RC_NBOARD * RC_NPORT];
+static struct tty_driver *riscom_driver;
 static unsigned char * tmp_buf;
 static DECLARE_MUTEX(tmp_buf_sem);
 
@@ -550,10 +543,8 @@ static inline void rc_check_modem(struct riscom_board const * bp)
 	if (mcr & MCR_CDCHG)  {
 		if (rc_in(bp, CD180_MSVR) & MSVR_CD) 
 			wake_up_interruptible(&port->open_wait);
-		else if (!((port->flags & ASYNC_CALLOUT_ACTIVE) &&
-			   (port->flags & ASYNC_CALLOUT_NOHUP))) {
+		else
 			schedule_task(&port->tqueue_hangup);
-		}
 	}
 	
 #ifdef RISCOM_BRAIN_DAMAGED_CTS
@@ -986,44 +977,18 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 	}
 
 	/*
-	 * If this is a callout device, then just make sure the normal
-	 * device isn't being used.
-	 */
-	if (tty->driver->subtype == RISCOM_TYPE_CALLOUT) {
-		if (port->flags & ASYNC_NORMAL_ACTIVE)
-			return -EBUSY;
-		if ((port->flags & ASYNC_CALLOUT_ACTIVE) &&
-		    (port->flags & ASYNC_SESSION_LOCKOUT) &&
-		    (port->session != current->session))
-		    return -EBUSY;
-		if ((port->flags & ASYNC_CALLOUT_ACTIVE) &&
-		    (port->flags & ASYNC_PGRP_LOCKOUT) &&
-		    (port->pgrp != current->pgrp))
-		    return -EBUSY;
-		port->flags |= ASYNC_CALLOUT_ACTIVE;
-		return 0;
-	}
-	
-	/*
 	 * If non-blocking mode is set, or the port is not enabled,
 	 * then make the check up front and then exit.
 	 */
 	if ((filp->f_flags & O_NONBLOCK) ||
 	    (tty->flags & (1 << TTY_IO_ERROR))) {
-		if (port->flags & ASYNC_CALLOUT_ACTIVE)
-			return -EBUSY;
 		port->flags |= ASYNC_NORMAL_ACTIVE;
 		return 0;
 	}
 
-	if (port->flags & ASYNC_CALLOUT_ACTIVE) {
-		if (port->normal_termios.c_cflag & CLOCAL) 
-			do_clocal = 1;
-	} else {
-		if (C_CLOCAL(tty))  
-			do_clocal = 1;
-	}
-	
+	if (C_CLOCAL(tty))  
+		do_clocal = 1;
+
 	/*
 	 * Block waiting for the carrier detect and the line to become
 	 * free (i.e., not in use by the callout).  While we are in
@@ -1042,11 +1007,9 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 		cli();
 		rc_out(bp, CD180_CAR, port_No(port));
 		CD = rc_in(bp, CD180_MSVR) & MSVR_CD;
-		if (!(port->flags & ASYNC_CALLOUT_ACTIVE))  {
-			rc_out(bp, CD180_MSVR, MSVR_RTS);
-			bp->DTR &= ~(1u << port_No(port));
-			rc_out(bp, RC_DTR, bp->DTR);
-		}
+		rc_out(bp, CD180_MSVR, MSVR_RTS);
+		bp->DTR &= ~(1u << port_No(port));
+		rc_out(bp, RC_DTR, bp->DTR);
 		sti();
 		set_current_state(TASK_INTERRUPTIBLE);
 		if (tty_hung_up_p(filp) ||
@@ -1057,8 +1020,7 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 				retval = -ERESTARTSYS;	
 			break;
 		}
-		if (!(port->flags & ASYNC_CALLOUT_ACTIVE) &&
-		    !(port->flags & ASYNC_CLOSING) &&
+		if (!(port->flags & ASYNC_CLOSING) &&
 		    (do_clocal || CD))
 			break;
 		if (signal_pending(current)) {
@@ -1109,19 +1071,6 @@ static int rc_open(struct tty_struct * tty, struct file * filp)
 	if ((error = block_til_ready(tty, filp, port)))
 		return error;
 	
-	if ((port->count == 1) && (port->flags & ASYNC_SPLIT_TERMIOS)) {
-		if (tty->driver->subtype == RISCOM_TYPE_NORMAL)
-			*tty->termios = port->normal_termios;
-		else
-			*tty->termios = port->callout_termios;
-		save_flags(flags); cli();
-		rc_change_speed(bp, port);
-		restore_flags(flags);
-	}
-
-	port->session = current->session;
-	port->pgrp = current->pgrp;
-	
 	return 0;
 }
 
@@ -1155,14 +1104,6 @@ static void rc_close(struct tty_struct * tty, struct file * filp)
 	if (port->count)
 		goto out;
 	port->flags |= ASYNC_CLOSING;
-	/*
-	 * Save the termios structure, since this port may have
-	 * separate termios for callout and dialin.
-	 */
-	if (port->flags & ASYNC_NORMAL_ACTIVE)
-		port->normal_termios = *tty->termios;
-	if (port->flags & ASYNC_CALLOUT_ACTIVE)
-		port->callout_termios = *tty->termios;
 	/*
 	 * Now we wait for the transmit buffer to clear; and we notify 
 	 * the line discipline to only process XON/XOFF characters.
@@ -1210,8 +1151,7 @@ static void rc_close(struct tty_struct * tty, struct file * filp)
 		}
 		wake_up_interruptible(&port->open_wait);
 	}
-	port->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CALLOUT_ACTIVE|
-			 ASYNC_CLOSING);
+	port->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CLOSING);
 	wake_up_interruptible(&port->close_wait);
 out:	restore_flags(flags);
 }
@@ -1689,7 +1629,7 @@ static void rc_hangup(struct tty_struct * tty)
 	rc_shutdown_port(bp, port);
 	port->event = 0;
 	port->count = 0;
-	port->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CALLOUT_ACTIVE);
+	port->flags &= ~ASYNC_NORMAL_ACTIVE;
 	port->tty = 0;
 	wake_up_interruptible(&port->open_wait);
 }
@@ -1738,76 +1678,61 @@ static void do_softint(void *private_)
 	}
 }
 
+static struct tty_operations riscom_ops = {
+	.open  = rc_open,
+	.close = rc_close,
+	.write = rc_write,
+	.put_char = rc_put_char,
+	.flush_chars = rc_flush_chars,
+	.write_room = rc_write_room,
+	.chars_in_buffer = rc_chars_in_buffer,
+	.flush_buffer = rc_flush_buffer,
+	.ioctl = rc_ioctl,
+	.throttle = rc_throttle,
+	.unthrottle = rc_unthrottle,
+	.set_termios = rc_set_termios,
+	.stop = rc_stop,
+	.start = rc_start,
+	.hangup = rc_hangup,
+};
+
 static inline int rc_init_drivers(void)
 {
 	int error;
 	int i;
 
+	riscom_driver = alloc_tty_driver(RC_NBOARD * RC_NPORT);
+	if (!riscom_driver)	
+		return -ENOMEM;
 	
 	if (!(tmp_buf = (unsigned char *) get_zeroed_page(GFP_KERNEL))) {
 		printk(KERN_ERR "rc: Couldn't get free page.\n");
+		put_tty_driver(riscom_driver);
 		return 1;
 	}
 	init_bh(RISCOM8_BH, do_riscom_bh);
 	memset(IRQ_to_board, 0, sizeof(IRQ_to_board));
-	memset(&riscom_driver, 0, sizeof(riscom_driver));
-	riscom_driver.magic = TTY_DRIVER_MAGIC;
-	riscom_driver.owner = THIS_MODULE;
-	riscom_driver.name = "ttyL";
-	riscom_driver.major = RISCOM8_NORMAL_MAJOR;
-	riscom_driver.num = RC_NBOARD * RC_NPORT;
-	riscom_driver.type = TTY_DRIVER_TYPE_SERIAL;
-	riscom_driver.subtype = RISCOM_TYPE_NORMAL;
-	riscom_driver.init_termios = tty_std_termios;
-	riscom_driver.init_termios.c_cflag =
+	riscom_driver->owner = THIS_MODULE;
+	riscom_driver->name = "ttyL";
+	riscom_driver->major = RISCOM8_NORMAL_MAJOR;
+	riscom_driver->type = TTY_DRIVER_TYPE_SERIAL;
+	riscom_driver->subtype = SERIAL_TYPE_NORMAL;
+	riscom_driver->init_termios = tty_std_termios;
+	riscom_driver->init_termios.c_cflag =
 		B9600 | CS8 | CREAD | HUPCL | CLOCAL;
-	riscom_driver.flags = TTY_DRIVER_REAL_RAW;
-	riscom_driver.refcount = &riscom_refcount;
-	riscom_driver.table = riscom_table;
-	riscom_driver.termios = riscom_termios;
-	riscom_driver.termios_locked = riscom_termios_locked;
-
-	riscom_driver.open  = rc_open;
-	riscom_driver.close = rc_close;
-	riscom_driver.write = rc_write;
-	riscom_driver.put_char = rc_put_char;
-	riscom_driver.flush_chars = rc_flush_chars;
-	riscom_driver.write_room = rc_write_room;
-	riscom_driver.chars_in_buffer = rc_chars_in_buffer;
-	riscom_driver.flush_buffer = rc_flush_buffer;
-	riscom_driver.ioctl = rc_ioctl;
-	riscom_driver.throttle = rc_throttle;
-	riscom_driver.unthrottle = rc_unthrottle;
-	riscom_driver.set_termios = rc_set_termios;
-	riscom_driver.stop = rc_stop;
-	riscom_driver.start = rc_start;
-	riscom_driver.hangup = rc_hangup;
-
-	riscom_callout_driver = riscom_driver;
-	riscom_callout_driver.name = "cul";
-	riscom_callout_driver.major = RISCOM8_CALLOUT_MAJOR;
-	riscom_callout_driver.subtype = RISCOM_TYPE_CALLOUT;
-	
-	if ((error = tty_register_driver(&riscom_driver)))  {
+	riscom_driver->flags = TTY_DRIVER_REAL_RAW;
+	tty_set_operations(riscom_driver, &riscom_ops);
+	if ((error = tty_register_driver(riscom_driver)))  {
 		free_page((unsigned long)tmp_buf);
+		put_tty_driver(riscom_driver);
 		printk(KERN_ERR "rc: Couldn't register RISCom/8 driver, "
 				"error = %d\n",
 		       error);
 		return 1;
 	}
-	if ((error = tty_register_driver(&riscom_callout_driver)))  {
-		free_page((unsigned long)tmp_buf);
-		tty_unregister_driver(&riscom_driver);
-		printk(KERN_ERR "rc: Couldn't register RISCom/8 callout "
-				"driver, error = %d\n",
-		       error);
-		return 1;
-	}
-	
+
 	memset(rc_port, 0, sizeof(rc_port));
 	for (i = 0; i < RC_NPORT * RC_NBOARD; i++)  {
-		rc_port[i].callout_termios = riscom_callout_driver.init_termios;
-		rc_port[i].normal_termios  = riscom_driver.init_termios;
 		rc_port[i].magic = RISCOM8_MAGIC;
 		rc_port[i].tqueue.routine = do_softint;
 		rc_port[i].tqueue.data = &rc_port[i];
@@ -1830,8 +1755,8 @@ static void rc_release_drivers(void)
 	cli();
 	remove_bh(RISCOM8_BH);
 	free_page((unsigned long)tmp_buf);
-	tty_unregister_driver(&riscom_driver);
-	tty_unregister_driver(&riscom_callout_driver);
+	tty_unregister_driver(riscom_driver);
+	put_tty_driver(riscom_driver);
 	restore_flags(flags);
 }
 

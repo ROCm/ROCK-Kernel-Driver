@@ -138,7 +138,7 @@ sctp_xmit_t sctp_packet_transmit_chunk(struct sctp_packet *packet,
 		if (!packet->has_cookie_echo) {
 			error = sctp_packet_transmit(packet);
 			if (error < 0)
-				chunk->skb->sk->err = -error;
+				chunk->skb->sk->sk_err = -error;
 
 			/* If we have an empty packet, then we can NOT ever
 			 * return PMTU_FULL.
@@ -429,7 +429,7 @@ int sctp_packet_transmit(struct sctp_packet *packet)
 
 	/* Set up the IP options.  */
 	/* BUG: not implemented
-	 * For v4 this all lives somewhere in sk->opt...
+	 * For v4 this all lives somewhere in sk->sk_opt...
 	 */
 
 	/* Dump that on IP!  */

@@ -45,7 +45,9 @@
 
 #define INIT_SIGNALS(sig) {	\
 	.count		= ATOMIC_INIT(1), 		\
-	.shared_pending	= { NULL, &sig.shared_pending.head, {{0}}}, \
+	.shared_pending	= { 				\
+		.list = LIST_HEAD_INIT(sig.shared_pending.list),	\
+		.signal =  {{0}}}, \
 }
 
 #define INIT_SIGHAND(sighand) {	\
@@ -97,9 +99,11 @@
 	.files		= &init_files,					\
 	.signal		= &init_signals,				\
 	.sighand	= &init_sighand,				\
-	.pending	= { NULL, &tsk.pending.head, {{0}}},		\
+	.pending	= {						\
+		.list = LIST_HEAD_INIT(tsk.pending.list),		\
+		.signal = {{0}}},					\
 	.blocked	= {{0}},					\
-	 .posix_timers	 = LIST_HEAD_INIT(tsk.posix_timers),		   \
+	.posix_timers	 = LIST_HEAD_INIT(tsk.posix_timers),		\
 	.alloc_lock	= SPIN_LOCK_UNLOCKED,				\
 	.proc_lock	= SPIN_LOCK_UNLOCKED,				\
 	.switch_lock	= SPIN_LOCK_UNLOCKED,				\

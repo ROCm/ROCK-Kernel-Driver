@@ -508,6 +508,15 @@ debug_stack_correct:
 ENTRY(nmi)
 	cmpl $sysenter_entry,(%esp)
 	je nmi_stack_fixup
+	pushl %eax
+	movl %esp,%eax
+	/* Do not access memory above the end of our stack page,
+	 * it might not exist.
+	 */
+	andl $0x1fff,%eax
+	cmpl $0x1fec,%eax
+	popl %eax
+	jae nmi_stack_correct
 	cmpl $sysenter_entry,12(%esp)
 	je nmi_debug_stack_check
 nmi_stack_correct:

@@ -356,7 +356,7 @@ at_breakpoint(unsigned pc)
 }
 
 static void
-insert_bpts()
+insert_bpts(void)
 {
 	int i;
 	struct bpt *bp;
@@ -382,7 +382,7 @@ insert_bpts()
 }
 
 static void
-remove_bpts()
+remove_bpts(void)
 {
 	int i;
 	struct bpt *bp;
@@ -843,7 +843,7 @@ backtrace(struct pt_regs *excp)
 }
 
 int
-getsp()
+getsp(void)
 {
     int x;
 
@@ -969,7 +969,7 @@ print_sysmap(void)
 }
 
 void
-super_regs()
+super_regs(void)
 {
 	int i, cmd;
 	unsigned val;
@@ -1019,7 +1019,7 @@ super_regs()
 
 #ifndef CONFIG_PPC_STD_MMU
 static void
-dump_hash_table()
+dump_hash_table(void)
 {
 	printf("This CPU doesn't have a hash table.\n");
 }
@@ -1149,7 +1149,7 @@ static unsigned hash_start;
 static unsigned hash_end;
 
 static void
-dump_hash_table()
+dump_hash_table(void)
 {
 	int seg;
 	unsigned seg_start, seg_end;
@@ -1271,7 +1271,7 @@ static int brev;
 static int mnoread;
 
 void
-memex()
+memex(void)
 {
     int cmd, inc, i, nslash;
     unsigned n;
@@ -1408,7 +1408,7 @@ memex()
 }
 
 int
-bsesc()
+bsesc(void)
 {
 	int c;
 
@@ -1423,7 +1423,7 @@ bsesc()
 }
 
 void
-dump()
+dump(void)
 {
 	int c;
 
@@ -1522,8 +1522,7 @@ ppc_inst_dump(unsigned adr, int count)
 }
 
 void
-print_address(addr)
-unsigned addr;
+print_address(unsigned addr)
 {
 	printf("0x%x", addr);
 }
@@ -1582,7 +1581,7 @@ static unsigned mend;
 static unsigned mask;
 
 void
-memlocate()
+memlocate(void)
 {
 	unsigned a, n;
 	unsigned char val[4];
@@ -1615,7 +1614,7 @@ static unsigned mskip = 0x1000;
 static unsigned mlim = 0xffffffff;
 
 void
-memzcan()
+memzcan(void)
 {
 	unsigned char v;
 	unsigned a;
@@ -1679,7 +1678,7 @@ void proccall(void)
 
 /* Input scanning routines */
 int
-skipbl()
+skipbl(void)
 {
 	int c;
 
@@ -1704,8 +1703,7 @@ static char *regnames[N_PTREGS] = {
 };
 
 int
-scanhex(vp)
-unsigned *vp;
+scanhex(unsigned *vp)
 {
 	int c, d;
 	unsigned v;
@@ -1776,7 +1774,7 @@ unsigned *vp;
 }
 
 void
-scannl()
+scannl(void)
 {
 	int c;
 
@@ -1786,8 +1784,7 @@ scannl()
 		c = inchar();
 }
 
-int
-hexdigit(c)
+int hexdigit(int c)
 {
 	if( '0' <= c && c <= '9' )
 		return c - '0';
@@ -1819,13 +1816,13 @@ static char line[256];
 static char *lineptr;
 
 void
-flush_input()
+flush_input(void)
 {
 	lineptr = NULL;
 }
 
 int
-inchar()
+inchar(void)
 {
 	if (lineptr == NULL || *lineptr == 0) {
 		if (fgets(line, sizeof(line), stdin) == NULL) {
@@ -1838,8 +1835,7 @@ inchar()
 }
 
 void
-take_input(str)
-char *str;
+take_input(char *str)
 {
 	lineptr = str;
 }

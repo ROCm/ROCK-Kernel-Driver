@@ -13,16 +13,14 @@ CONFIG_EXPERIMENTAL=y
 #
 # General setup
 #
+CONFIG_SWAP=y
 CONFIG_SYSVIPC=y
 # CONFIG_BSD_PROCESS_ACCT is not set
 # CONFIG_SYSCTL is not set
-# CONFIG_LOG_BUF_SHIFT_17 is not set
-# CONFIG_LOG_BUF_SHIFT_16 is not set
-# CONFIG_LOG_BUF_SHIFT_15 is not set
-CONFIG_LOG_BUF_SHIFT_14=y
-# CONFIG_LOG_BUF_SHIFT_13 is not set
-# CONFIG_LOG_BUF_SHIFT_12 is not set
 CONFIG_LOG_BUF_SHIFT=14
+CONFIG_EMBEDDED=y
+CONFIG_FUTEX=y
+# CONFIG_EPOLL is not set
 
 #
 # Loadable module support
@@ -36,7 +34,6 @@ CONFIG_PPC=y
 CONFIG_PPC32=y
 # CONFIG_6xx is not set
 # CONFIG_40x is not set
-# CONFIG_440 is not set
 # CONFIG_POWER3 is not set
 CONFIG_8xx=y
 
@@ -70,12 +67,14 @@ CONFIG_MBX=y
 # CONFIG_SMP is not set
 # CONFIG_PREEMPT is not set
 CONFIG_MATH_EMULATION=y
+# CONFIG_CPU_FREQ is not set
 
 #
 # General setup
 #
 # CONFIG_HIGHMEM is not set
 # CONFIG_PCI is not set
+# CONFIG_PCI_DOMAINS is not set
 # CONFIG_PCI_QSPAN is not set
 CONFIG_KCORE_ELF=y
 CONFIG_BINFMT_ELF=y
@@ -98,11 +97,10 @@ CONFIG_KERNEL_ELF=y
 # Default settings for advanced configuration options are used
 #
 CONFIG_HIGHMEM_START=0xfe000000
-CONFIG_LOWMEM_SIZE=0x20000000
+CONFIG_LOWMEM_SIZE=0x30000000
 CONFIG_KERNEL_START=0xc0000000
 CONFIG_TASK_SIZE=0x80000000
 CONFIG_BOOT_LOAD=0x00400000
-CONFIG_SWAP=y
 
 #
 # Memory Technology Devices (MTD)
@@ -121,6 +119,7 @@ CONFIG_SWAP=y
 # CONFIG_BLK_DEV_LOOP is not set
 # CONFIG_BLK_DEV_NBD is not set
 # CONFIG_BLK_DEV_RAM is not set
+# CONFIG_BLK_DEV_INITRD is not set
 
 #
 # Multi-device support (RAID and LVM)
@@ -144,7 +143,6 @@ CONFIG_SWAP=y
 #
 # I2O device support
 #
-# CONFIG_I2O is not set
 
 #
 # Networking support
@@ -157,7 +155,6 @@ CONFIG_NET=y
 # CONFIG_PACKET is not set
 # CONFIG_NETLINK_DEV is not set
 # CONFIG_NETFILTER is not set
-# CONFIG_FILTER is not set
 CONFIG_UNIX=y
 # CONFIG_NET_KEY is not set
 CONFIG_INET=y
@@ -174,8 +171,9 @@ CONFIG_IP_PNP_BOOTP=y
 # CONFIG_SYN_COOKIES is not set
 # CONFIG_INET_AH is not set
 # CONFIG_INET_ESP is not set
-# CONFIG_XFRM_USER is not set
+# CONFIG_INET_IPCOMP is not set
 # CONFIG_IPV6 is not set
+# CONFIG_XFRM_USER is not set
 
 #
 # SCTP Configuration (EXPERIMENTAL)
@@ -215,11 +213,15 @@ CONFIG_NETDEVICES=y
 # Ethernet (10 or 100Mbit)
 #
 CONFIG_NET_ETHERNET=y
-# CONFIG_CRC32 is not set
+CONFIG_MII=y
 # CONFIG_OAKNET is not set
 
 #
 # Ethernet (1000 Mbit)
+#
+
+#
+# Ethernet (10000 Mbit)
 #
 # CONFIG_PPP is not set
 # CONFIG_SLIP is not set
@@ -260,13 +262,6 @@ CONFIG_NET_ETHERNET=y
 # CONFIG_FB is not set
 
 #
-# Console display driver support
-#
-# CONFIG_VGA_CONSOLE is not set
-# CONFIG_MDA_CONSOLE is not set
-CONFIG_DUMMY_CONSOLE=y
-
-#
 # Old CD-ROM drivers (not SCSI, not IDE)
 #
 # CONFIG_CD_NO_IDESCSI is not set
@@ -298,7 +293,6 @@ CONFIG_SOUND_GAMEPORT=y
 #
 # Character devices
 #
-# CONFIG_VT is not set
 # CONFIG_SERIAL_NONSTANDARD is not set
 
 #
@@ -327,6 +321,7 @@ CONFIG_SERIAL_CORE_CONSOLE=y
 #
 # I2C Hardware Sensors Chip support
 #
+# CONFIG_I2C_SENSOR is not set
 
 #
 # Mice
@@ -335,11 +330,15 @@ CONFIG_SERIAL_CORE_CONSOLE=y
 # CONFIG_QIC02_TAPE is not set
 
 #
+# IPMI
+#
+# CONFIG_IPMI_HANDLER is not set
+
+#
 # Watchdog Cards
 #
 # CONFIG_WATCHDOG is not set
 # CONFIG_NVRAM is not set
-# CONFIG_RTC is not set
 CONFIG_GEN_RTC=y
 # CONFIG_GEN_RTC_X is not set
 # CONFIG_DTLK is not set
@@ -353,6 +352,7 @@ CONFIG_GEN_RTC=y
 # CONFIG_AGP is not set
 # CONFIG_DRM is not set
 # CONFIG_RAW_DRIVER is not set
+# CONFIG_HANGCHECK_TIMER is not set
 
 #
 # Multimedia devices
@@ -360,62 +360,85 @@ CONFIG_GEN_RTC=y
 # CONFIG_VIDEO_DEV is not set
 
 #
+# Digital Video Broadcasting Devices
+#
+# CONFIG_DVB is not set
+
+#
 # File systems
 #
+CONFIG_EXT2_FS=y
+# CONFIG_EXT2_FS_XATTR is not set
+CONFIG_EXT3_FS=y
+CONFIG_EXT3_FS_XATTR=y
+# CONFIG_EXT3_FS_POSIX_ACL is not set
+# CONFIG_EXT3_FS_SECURITY is not set
+CONFIG_JBD=y
+# CONFIG_JBD_DEBUG is not set
+CONFIG_FS_MBCACHE=y
+# CONFIG_REISERFS_FS is not set
+# CONFIG_JFS_FS is not set
+# CONFIG_XFS_FS is not set
+# CONFIG_MINIX_FS is not set
+# CONFIG_ROMFS_FS is not set
 # CONFIG_QUOTA is not set
 # CONFIG_AUTOFS_FS is not set
 # CONFIG_AUTOFS4_FS is not set
-# CONFIG_REISERFS_FS is not set
+
+#
+# CD-ROM/DVD Filesystems
+#
+# CONFIG_ISO9660_FS is not set
+# CONFIG_UDF_FS is not set
+
+#
+# DOS/FAT/NT Filesystems
+#
+# CONFIG_FAT_FS is not set
+# CONFIG_NTFS_FS is not set
+
+#
+# Pseudo filesystems
+#
+CONFIG_PROC_FS=y
+# CONFIG_DEVFS_FS is not set
+CONFIG_TMPFS=y
+CONFIG_RAMFS=y
+
+#
+# Miscellaneous filesystems
+#
 # CONFIG_ADFS_FS is not set
 # CONFIG_AFFS_FS is not set
 # CONFIG_HFS_FS is not set
 # CONFIG_BEFS_FS is not set
 # CONFIG_BFS_FS is not set
-CONFIG_EXT3_FS=y
-CONFIG_EXT3_FS_XATTR=y
-# CONFIG_EXT3_FS_POSIX_ACL is not set
-CONFIG_JBD=y
-# CONFIG_JBD_DEBUG is not set
-# CONFIG_FAT_FS is not set
 # CONFIG_EFS_FS is not set
 # CONFIG_CRAMFS is not set
-CONFIG_TMPFS=y
-CONFIG_RAMFS=y
-# CONFIG_ISO9660_FS is not set
-# CONFIG_JFS_FS is not set
-# CONFIG_MINIX_FS is not set
 # CONFIG_VXFS_FS is not set
-# CONFIG_NTFS_FS is not set
 # CONFIG_HPFS_FS is not set
-CONFIG_PROC_FS=y
-# CONFIG_DEVFS_FS is not set
 # CONFIG_QNX4FS_FS is not set
-# CONFIG_ROMFS_FS is not set
-CONFIG_EXT2_FS=y
-# CONFIG_EXT2_FS_XATTR is not set
 # CONFIG_SYSV_FS is not set
-# CONFIG_UDF_FS is not set
 # CONFIG_UFS_FS is not set
-# CONFIG_XFS_FS is not set
 
 #
 # Network File Systems
 #
-# CONFIG_CODA_FS is not set
-# CONFIG_INTERMEZZO_FS is not set
 CONFIG_NFS_FS=y
 # CONFIG_NFS_V3 is not set
 # CONFIG_NFS_V4 is not set
-CONFIG_ROOT_NFS=y
 # CONFIG_NFSD is not set
-CONFIG_SUNRPC=y
+CONFIG_ROOT_NFS=y
 CONFIG_LOCKD=y
 # CONFIG_EXPORTFS is not set
-# CONFIG_CIFS is not set
+CONFIG_SUNRPC=y
+# CONFIG_SUNRPC_GSS is not set
 # CONFIG_SMB_FS is not set
+# CONFIG_CIFS is not set
 # CONFIG_NCP_FS is not set
+# CONFIG_CODA_FS is not set
+# CONFIG_INTERMEZZO_FS is not set
 # CONFIG_AFS_FS is not set
-CONFIG_FS_MBCACHE=y
 
 #
 # Partition Types
@@ -428,6 +451,7 @@ CONFIG_PARTITION_ADVANCED=y
 # CONFIG_MAC_PARTITION is not set
 # CONFIG_MSDOS_PARTITION is not set
 # CONFIG_LDM_PARTITION is not set
+# CONFIG_NEC98_PARTITION is not set
 # CONFIG_SGI_PARTITION is not set
 # CONFIG_ULTRIX_PARTITION is not set
 # CONFIG_SUN_PARTITION is not set
@@ -462,6 +486,7 @@ CONFIG_8xx_CPU6=y
 #
 # USB support
 #
+# CONFIG_USB_GADGET is not set
 
 #
 # Bluetooth support
@@ -471,6 +496,7 @@ CONFIG_8xx_CPU6=y
 #
 # Library routines
 #
+# CONFIG_CRC32 is not set
 
 #
 # Kernel hacking

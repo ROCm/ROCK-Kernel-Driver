@@ -68,7 +68,6 @@ static int blk_do_rq(request_queue_t *q, struct block_device *bdev,
 
 	rq->flags |= REQ_NOMERGE;
 	rq->waiting = &wait;
-        drive_stat_acct(rq, rq->nr_sectors, 1);
 	elv_add_request(q, rq, 1, 1);
 	generic_unplug_device(q);
 	wait_for_completion(&wait);
@@ -99,7 +98,7 @@ static int scsi_get_bus(request_queue_t *q, int *p)
 
 static int sg_get_timeout(request_queue_t *q)
 {
-	return q->sg_timeout;
+	return q->sg_timeout / (HZ / USER_HZ);
 }
 
 static int sg_set_timeout(request_queue_t *q, int *p)
@@ -107,7 +106,7 @@ static int sg_set_timeout(request_queue_t *q, int *p)
 	int timeout, err = get_user(timeout, p);
 
 	if (!err)
-		q->sg_timeout = timeout;
+		q->sg_timeout = timeout * (HZ / USER_HZ);
 
 	return err;
 }
@@ -121,10 +120,14 @@ static int sg_set_reserved_size(request_queue_t *q, int *p)
 {
 	int size, err = get_user(size, p);
 
-	if (!err)
-		q->sg_reserved_size = size;
+	if (err)
+		return err;
 
-	return err;
+	if (size > (q->max_sectors << 9))
+		return -EINVAL;
+
+	q->sg_reserved_size = size;
+	return 0;
 }
 
 /*
@@ -139,27 +142,20 @@ static int sg_emulated_host(request_queue_t *q, int *p)
 static int sg_io(request_queue_t *q, struct block_device *bdev,
 		 struct sg_io_hdr *uptr)
 {
-	unsigned long uaddr, start_time;
-	int reading, writing, nr_sectors;
+	unsigned long start_time;
+	int reading, writing;
 	struct sg_io_hdr hdr;
 	struct request *rq;
 	struct bio *bio;
 	char sense[SCSI_SENSE_BUFFERSIZE];
 	void *buffer;
 
-	if (!access_ok(VERIFY_WRITE, uptr, sizeof(*uptr)))
-		return -EFAULT;
 	if (copy_from_user(&hdr, uptr, sizeof(*uptr)))
 		return -EFAULT;
 
 	if (hdr.interface_id != 'S')
 		return -EINVAL;
 	if (hdr.cmd_len > sizeof(rq->cmd))
-		return -EINVAL;
-	if (!access_ok(VERIFY_READ, hdr.cmdp, hdr.cmd_len))
-		return -EFAULT;
-
-	if (hdr.dxfer_len > 65536)
 		return -EINVAL;
 
 	/*
@@ -168,7 +164,9 @@ static int sg_io(request_queue_t *q, struct block_device *bdev,
 	if (hdr.iovec_count)
 		return -EOPNOTSUPP;
 
-	nr_sectors = 0;
+	if (hdr.dxfer_len > (q->max_sectors << 9))
+		return -EIO;
+
 	reading = writing = 0;
 	buffer = NULL;
 	bio = NULL;
@@ -189,19 +187,12 @@ static int sg_io(request_queue_t *q, struct block_device *bdev,
 			break;
 		}
 
-		uaddr = (unsigned long) hdr.dxferp;
-		/* writing to device -> reading from vm */
-		if (writing && !access_ok(VERIFY_READ, uaddr, bytes))
-			return -EFAULT;
-		/* reading from device -> writing to vm */
-		else if (reading && !access_ok(VERIFY_WRITE, uaddr, bytes))
-			return -EFAULT;
-
 		/*
 		 * first try to map it into a bio. reading from device will
 		 * be a write to vm.
 		 */
-		bio = bio_map_user(bdev, uaddr, hdr.dxfer_len, reading);
+		bio = bio_map_user(bdev, (unsigned long) hdr.dxferp,
+				   hdr.dxfer_len, reading);
 
 		/*
 		 * if bio setup failed, fall back to slow approach
@@ -211,10 +202,11 @@ static int sg_io(request_queue_t *q, struct block_device *bdev,
 			if (!buffer)
 				return -ENOMEM;
 
-			nr_sectors = bytes >> 9;
-			if (writing)
-				copy_from_user(buffer,hdr.dxferp,hdr.dxfer_len);
-			else
+			if (writing) {
+				if (copy_from_user(buffer, hdr.dxferp,
+						   hdr.dxfer_len))
+					goto out_buffer;
+			} else
 				memset(buffer, 0, hdr.dxfer_len);
 		}
 	}
@@ -225,7 +217,8 @@ static int sg_io(request_queue_t *q, struct block_device *bdev,
 	 * fill in request structure
 	 */
 	rq->cmd_len = hdr.cmd_len;
-	copy_from_user(rq->cmd, hdr.cmdp, hdr.cmd_len);
+	if (copy_from_user(rq->cmd, hdr.cmdp, hdr.cmd_len))
+		goto out_request;
 	if (sizeof(rq->cmd) != hdr.cmd_len)
 		memset(rq->cmd + hdr.cmd_len, 0, sizeof(rq->cmd) - hdr.cmd_len);
 
@@ -235,18 +228,15 @@ static int sg_io(request_queue_t *q, struct block_device *bdev,
 
 	rq->flags |= REQ_BLOCK_PC;
 
-	rq->hard_nr_sectors = rq->nr_sectors = nr_sectors;
-	rq->hard_cur_sectors = rq->current_nr_sectors = nr_sectors;
-
-	rq->bio = rq->biotail = bio;
+	rq->bio = rq->biotail = NULL;
 
 	if (bio)
 		blk_rq_bio_prep(q, rq, bio);
 
-	rq->data_len = hdr.dxfer_len;
 	rq->data = buffer;
+	rq->data_len = hdr.dxfer_len;
 
-	rq->timeout = hdr.timeout;
+	rq->timeout = (hdr.timeout * HZ) / 1000;
 	if (!rq->timeout)
 		rq->timeout = q->sg_timeout;
 	if (!rq->timeout)
@@ -273,12 +263,11 @@ static int sg_io(request_queue_t *q, struct block_device *bdev,
 	if (hdr.masked_status || hdr.host_status || hdr.driver_status)
 		hdr.info |= SG_INFO_CHECK;
 	hdr.resid = rq->data_len;
-	hdr.duration = (jiffies - start_time) * (1000 / HZ);
+	hdr.duration = ((jiffies - start_time) * 1000) / HZ;
 	hdr.sb_len_wr = 0;
 
 	if (rq->sense_len && hdr.sbp) {
-		int len = (hdr.mx_sb_len < rq->sense_len) ? 
-				hdr.mx_sb_len : rq->sense_len;
+		int len = min((unsigned int) hdr.mx_sb_len, rq->sense_len);
 
 		if (!copy_to_user(hdr.sbp, rq->sense, len))
 			hdr.sb_len_wr = len;
@@ -286,17 +275,25 @@ static int sg_io(request_queue_t *q, struct block_device *bdev,
 
 	blk_put_request(rq);
 
-	copy_to_user(uptr, &hdr, sizeof(*uptr));
+	if (copy_to_user(uptr, &hdr, sizeof(*uptr)))
+		goto out_buffer;
 
 	if (buffer) {
 		if (reading)
-			copy_to_user(hdr.dxferp, buffer, hdr.dxfer_len);
+			if (copy_to_user(hdr.dxferp, buffer, hdr.dxfer_len))
+				goto out_buffer;
 
 		kfree(buffer);
 	}
+
 	/* may not have succeeded, but output values written to control
 	 * structure (struct sg_io_hdr).  */
 	return 0;
+out_request:
+	blk_put_request(rq);
+out_buffer:
+	kfree(buffer);
+	return -EFAULT;
 }
 
 #define FORMAT_UNIT_TIMEOUT		(2 * 60 * 60 * HZ)

@@ -154,15 +154,10 @@ typedef struct _mgslpc_info {
 	
 	struct mgsl_icount	icount;
 	
-	struct termios		normal_termios;
-	struct termios		callout_termios;
-	
 	struct tty_struct 	*tty;
 	int			timeout;
 	int			x_char;		/* xon/xoff character */
 	int			blocked_open;	/* # of blocked opens */
-	long			session;	/* Session of opening process */
-	long			pgrp;		/* pgrp of opening process */
 	unsigned char		read_status_mask;
 	unsigned char		ignore_status_mask;	
 
@@ -500,18 +495,13 @@ MODULE_LICENSE("GPL");
 static char *driver_name = "SyncLink PC Card driver";
 static char *driver_version = "$Revision: 4.10 $";
 
-static struct tty_driver serial_driver, callout_driver;
-static int serial_refcount;
+static struct tty_driver *serial_driver;
 
 /* number of characters left in xmit buffer before we ask for more */
 #define WAKEUP_CHARS 256
 
 static void mgslpc_change_params(MGSLPC_INFO *info);
 static void mgslpc_wait_until_sent(struct tty_struct *tty, int timeout);
-
-static struct tty_struct *serial_table[MAX_DEVICE_COUNT];
-static struct termios *serial_termios[MAX_DEVICE_COUNT];
-static struct termios *serial_termios_locked[MAX_DEVICE_COUNT];
 
 #ifndef MIN
 #define MIN(a,b)	((a) < (b) ? (a) : (b))
@@ -613,13 +603,6 @@ static dev_link_t *mgslpc_attach(void)
     }
 
     mgslpc_add_device(info);
-
-    memset(serial_table,0,sizeof(struct tty_struct*)*MAX_DEVICE_COUNT);
-    memset(serial_termios,0,sizeof(struct termios*)*MAX_DEVICE_COUNT);
-    memset(serial_termios_locked,0,sizeof(struct termios*)*MAX_DEVICE_COUNT);
-		
-    info->callout_termios = callout_driver.init_termios;
-    info->normal_termios  = serial_driver.init_termios;
 
     return link;
 }
@@ -1307,7 +1290,7 @@ void dcd_change(MGSLPC_INFO *info)
 			       (info->serial_signals & SerialSignal_DCD) ? "on" : "off");
 		if (info->serial_signals & SerialSignal_DCD)
 			wake_up_interruptible(&info->open_wait);
-		else if (!(info->flags & (ASYNC_CALLOUT_ACTIVE | ASYNC_CALLOUT_NOHUP))) {
+		else if (!(info->flags & ASYNC_CALLOUT_NOHUP)) {
 			if (debug_level >= DEBUG_LEVEL_ISR)
 				printk("doing serial hangup...");
 			if (info->tty)
@@ -2584,14 +2567,6 @@ static void mgslpc_close(struct tty_struct *tty, struct file * filp)
 	
 	info->flags |= ASYNC_CLOSING;
 	
-	/* Save the termios structure, since this port may have
-	 * separate termios for callout and dialin.
-	 */
-	if (info->flags & ASYNC_NORMAL_ACTIVE)
-		info->normal_termios = *tty->termios;
-	if (info->flags & ASYNC_CALLOUT_ACTIVE)
-		info->callout_termios = *tty->termios;
-		
 	/* set tty->closing to notify line discipline to 
 	 * only process XON/XOFF characters. Only the N_TTY
 	 * discipline appears to use this (ppp does not).
@@ -2629,8 +2604,7 @@ static void mgslpc_close(struct tty_struct *tty, struct file * filp)
 		wake_up_interruptible(&info->open_wait);
 	}
 	
-	info->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CALLOUT_ACTIVE|
-			 ASYNC_CLOSING);
+	info->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CLOSING);
 			 
 	wake_up_interruptible(&info->close_wait);
 	
@@ -2723,7 +2697,7 @@ static void mgslpc_hangup(struct tty_struct *tty)
 	shutdown(info);
 	
 	info->count = 0;	
-	info->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CALLOUT_ACTIVE);
+	info->flags &= ~ASYNC_NORMAL_ACTIVE;
 	info->tty = 0;
 
 	wake_up_interruptible(&info->open_wait);
@@ -2744,40 +2718,16 @@ static int block_til_ready(struct tty_struct *tty, struct file *filp,
 		printk("%s(%d):block_til_ready on %s\n",
 			 __FILE__,__LINE__, tty->driver->name );
 
-	if (tty->driver->subtype == SERIAL_TYPE_CALLOUT) {
-		/* this is a callout device */
-		/* just verify that normal device is not in use */
-		if (info->flags & ASYNC_NORMAL_ACTIVE)
-			return -EBUSY;
-		if ((info->flags & ASYNC_CALLOUT_ACTIVE) &&
-		    (info->flags & ASYNC_SESSION_LOCKOUT) &&
-		    (info->session != current->session))
-		    return -EBUSY;
-		if ((info->flags & ASYNC_CALLOUT_ACTIVE) &&
-		    (info->flags & ASYNC_PGRP_LOCKOUT) &&
-		    (info->pgrp != current->pgrp))
-		    return -EBUSY;
-		info->flags |= ASYNC_CALLOUT_ACTIVE;
-		return 0;
-	}
-	
 	if (filp->f_flags & O_NONBLOCK || tty->flags & (1 << TTY_IO_ERROR)){
 		/* nonblock mode is set or port is not enabled */
 		/* just verify that callout device is not active */
-		if (info->flags & ASYNC_CALLOUT_ACTIVE)
-			return -EBUSY;
 		info->flags |= ASYNC_NORMAL_ACTIVE;
 		return 0;
 	}
 
-	if (info->flags & ASYNC_CALLOUT_ACTIVE) {
-		if (info->normal_termios.c_cflag & CLOCAL)
-			do_clocal = 1;
-	} else {
-		if (tty->termios->c_cflag & CLOCAL)
-			do_clocal = 1;
-	}
-	
+	if (tty->termios->c_cflag & CLOCAL)
+		do_clocal = 1;
+
 	/* Wait for carrier detect and the line to become
 	 * free (i.e., not in use by the callout).  While we are in
 	 * this loop, info->count is dropped by one, so that
@@ -2801,8 +2751,7 @@ static int block_til_ready(struct tty_struct *tty, struct file *filp,
 	info->blocked_open++;
 	
 	while (1) {
-		if (!(info->flags & ASYNC_CALLOUT_ACTIVE) &&
- 		    (tty->termios->c_cflag & CBAUD)) {
+		if ((tty->termios->c_cflag & CBAUD)) {
 			spin_lock_irqsave(&info->lock,flags);
 			info->serial_signals |= SerialSignal_RTS + SerialSignal_DTR;
 		 	set_signals(info);
@@ -2821,8 +2770,7 @@ static int block_til_ready(struct tty_struct *tty, struct file *filp,
 	 	get_signals(info);
 		spin_unlock_irqrestore(&info->lock,flags);
 		
- 		if (!(info->flags & ASYNC_CALLOUT_ACTIVE) &&
- 		    !(info->flags & ASYNC_CLOSING) &&
+ 		if (!(info->flags & ASYNC_CLOSING) &&
  		    (do_clocal || (info->serial_signals & SerialSignal_DCD)) ) {
  			break;
 		}
@@ -2923,18 +2871,6 @@ static int mgslpc_open(struct tty_struct *tty, struct file * filp)
 				 __FILE__,__LINE__, info->device_name, retval);
 		goto cleanup;
 	}
-
-	if ((info->count == 1) &&
-	    info->flags & ASYNC_SPLIT_TERMIOS) {
-		if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
-			*tty->termios = info->normal_termios;
-		else 
-			*tty->termios = info->callout_termios;
-		mgslpc_change_params(info);
-	}
-	
-	info->session = current->session;
-	info->pgrp    = current->pgrp;
 
 	if (debug_level >= DEBUG_LEVEL_INFO)
 		printk("%s(%d):mgslpc_open(%s) success\n",
@@ -3170,9 +3106,42 @@ void mgslpc_remove_device(MGSLPC_INFO *remove_info)
 	}
 }
 
+static struct pcmcia_driver mgslpc_driver = {
+	.owner		= THIS_MODULE,
+	.drv		= {
+		.name	= "synclink_cs",
+	},
+	.attach		= mgslpc_attach,
+	.detach		= mgslpc_detach,
+};
+
+static struct tty_operations mgslpc_ops = {
+	.open = mgslpc_open,
+	.close = mgslpc_close,
+	.write = mgslpc_write,
+	.put_char = mgslpc_put_char,
+	.flush_chars = mgslpc_flush_chars,
+	.write_room = mgslpc_write_room,
+	.chars_in_buffer = mgslpc_chars_in_buffer,
+	.flush_buffer = mgslpc_flush_buffer,
+	.ioctl = mgslpc_ioctl,
+	.throttle = mgslpc_throttle,
+	.unthrottle = mgslpc_unthrottle,
+	.send_xchar = mgslpc_send_xchar,
+	.break_ctl = mgslpc_break,
+	.wait_until_sent = mgslpc_wait_until_sent,
+	.read_proc = mgslpc_read_proc,
+	.set_termios = mgslpc_set_termios,
+	.stop = tx_pause,
+	.start = tx_release,
+	.hangup = mgslpc_hangup,
+	.tiocmget = tiocmget,
+	.tiocmset = tiocmset,
+};
+
 static int __init synclink_cs_init(void)
 {
-    servinfo_t serv;
+    int error;
 
     if (break_on_load) {
 	    mgslpc_get_text_ptr();
@@ -3181,79 +3150,38 @@ static int __init synclink_cs_init(void)
 
     printk("%s %s\n", driver_name, driver_version);
 
-    CardServices(GetCardServicesInfo, &serv);
-    if (serv.Revision != CS_RELEASE_CODE) {
-	    printk(KERN_NOTICE "synclink_cs: Card Services release "
-		   "does not match!\n");
-	    return -1;
+    serial_driver = alloc_tty_driver(MAX_DEVICE_COUNT);
+    if (!serial_driver)
+	    return -ENOMEM;
+
+    error = pcmcia_register_driver(&mgslpc_driver);
+    if (error) {
+	    put_tty_driver(serial_driver);
+	    return error;
     }
-    register_pccard_driver(&dev_info, &mgslpc_attach, &mgslpc_detach);
 
     /* Initialize the tty_driver structure */
 	
-    memset(&serial_driver, 0, sizeof(struct tty_driver));
-    serial_driver.magic = TTY_DRIVER_MAGIC;
-    serial_driver.owner = THIS_MODULE;
-    serial_driver.driver_name = "synclink_cs";
-    serial_driver.name = "ttySLP";
-    serial_driver.major = ttymajor;
-    serial_driver.minor_start = 64;
-    serial_driver.num = MAX_DEVICE_COUNT;
-    serial_driver.type = TTY_DRIVER_TYPE_SERIAL;
-    serial_driver.subtype = SERIAL_TYPE_NORMAL;
-    serial_driver.init_termios = tty_std_termios;
-    serial_driver.init_termios.c_cflag =
+    serial_driver->owner = THIS_MODULE;
+    serial_driver->driver_name = "synclink_cs";
+    serial_driver->name = "ttySLP";
+    serial_driver->major = ttymajor;
+    serial_driver->minor_start = 64;
+    serial_driver->type = TTY_DRIVER_TYPE_SERIAL;
+    serial_driver->subtype = SERIAL_TYPE_NORMAL;
+    serial_driver->init_termios = tty_std_termios;
+    serial_driver->init_termios.c_cflag =
 	    B9600 | CS8 | CREAD | HUPCL | CLOCAL;
-    serial_driver.flags = TTY_DRIVER_REAL_RAW;
-    serial_driver.refcount = &serial_refcount;
-    serial_driver.table = serial_table;
-    serial_driver.termios = serial_termios;
-    serial_driver.termios_locked = serial_termios_locked;
+    serial_driver->flags = TTY_DRIVER_REAL_RAW;
+    tty_set_operations(serial_driver, &mgslpc_ops);
 
-    serial_driver.open = mgslpc_open;
-    serial_driver.close = mgslpc_close;
-    serial_driver.write = mgslpc_write;
-    serial_driver.put_char = mgslpc_put_char;
-    serial_driver.flush_chars = mgslpc_flush_chars;
-    serial_driver.write_room = mgslpc_write_room;
-    serial_driver.chars_in_buffer = mgslpc_chars_in_buffer;
-    serial_driver.flush_buffer = mgslpc_flush_buffer;
-    serial_driver.ioctl = mgslpc_ioctl;
-    serial_driver.throttle = mgslpc_throttle;
-    serial_driver.unthrottle = mgslpc_unthrottle;
-    serial_driver.send_xchar = mgslpc_send_xchar;
-    serial_driver.break_ctl = mgslpc_break;
-    serial_driver.wait_until_sent = mgslpc_wait_until_sent;
-    serial_driver.read_proc = mgslpc_read_proc;
-    serial_driver.set_termios = mgslpc_set_termios;
-    serial_driver.stop = tx_pause;
-    serial_driver.start = tx_release;
-    serial_driver.hangup = mgslpc_hangup;
-    serial_driver.tiocmget = tiocmget;
-    serial_driver.tiocmset = tiocmset;
-	
-    /*
-     * The callout device is just like normal device except for
-     * major number and the subtype code.
-     */
-    callout_driver = serial_driver;
-    callout_driver.name = "cuaSLP";
-    callout_driver.major = cuamajor;
-    callout_driver.subtype = SERIAL_TYPE_CALLOUT;
-    callout_driver.read_proc = 0;
-    callout_driver.proc_entry = 0;
-
-    if (tty_register_driver(&serial_driver) < 0)
+    if (tty_register_driver(serial_driver) < 0)
 	    printk("%s(%d):Couldn't register serial driver\n",
 		   __FILE__,__LINE__);
 			
-    if (tty_register_driver(&callout_driver) < 0)
-	    printk("%s(%d):Couldn't register callout driver\n",
-		   __FILE__,__LINE__);
-
-    printk("%s %s, tty major#%d callout major#%d\n",
+    printk("%s %s, tty major#%d\n",
 	   driver_name, driver_version,
-	   serial_driver.major, callout_driver.major);
+	   serial_driver->major);
 	
     return 0;
 }
@@ -3267,14 +3195,14 @@ static void __exit synclink_cs_exit(void)
 	while(mgslpc_device_list)
 		mgslpc_remove_device(mgslpc_device_list);
 
-	if ((rc = tty_unregister_driver(&serial_driver)))
+	if ((rc = tty_unregister_driver(serial_driver)))
 		printk("%s(%d) failed to unregister tty driver err=%d\n",
 		       __FILE__,__LINE__,rc);
-	if ((rc = tty_unregister_driver(&callout_driver)))
-		printk("%s(%d) failed to unregister callout driver err=%d\n",
-		       __FILE__,__LINE__,rc);
+	put_tty_driver(serial_driver);
 
-	unregister_pccard_driver(&dev_info);
+	pcmcia_unregister_driver(&mgslpc_driver);
+
+	/* XXX: this really needs to move into generic code.. */
 	while (dev_list != NULL) {
 		if (dev_list->state & DEV_CONFIG)
 			mgslpc_release((u_long)dev_list);

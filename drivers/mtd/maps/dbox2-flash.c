@@ -1,12 +1,13 @@
 /*
- * $Id: dbox2-flash.c,v 1.4 2001/10/02 15:05:14 dwmw2 Exp $
+ * $Id: dbox2-flash.c,v 1.9 2003/05/21 12:45:18 dwmw2 Exp $
  *
- * Nokia / Sagem D-Box 2 flash driver
+ * D-Box 2 flash driver
  */
 
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
+#include <linux/init.h>
 #include <asm/io.h>
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/map.h>
@@ -18,24 +19,40 @@
  * device. */
 static struct mtd_partition partition_info[]= {
 	{
-		.name		= "BR bootloader",	/* raw */
-		.size		= 128 * 1024, 
-		.mask_flags	= MTD_WRITEABLE
+	.name		= "BR bootloader",
+	.size		= 128 * 1024, 
+	.offset		= 0,                  
+	.mask_flags	= MTD_WRITEABLE
 	},
 	{
-		.name		= "PPC bootloader",	/* flfs */
-		.size		= 128 * 1024, 
-		.offset		= MTDPART_OFS_APPEND, 
+	.name		= "flfs (ppcboot)",
+	.size		= 128 * 1024, 
+	.offset		= MTDPART_OFS_APPEND, 
+	.mask_flags	= 0
 	},
 	{
-		.name		= "Kernel",		/* idxfs */
-		.size		= 768 * 1024, 
-		.offset		= MTDPART_OFS_APPEND, 
+	.name		= "root (cramfs)",	
+	.size		= 7040 * 1024, 
+	.offset		= MTDPART_OFS_APPEND, 
+	.mask_flags	= 0
 	},
 	{
-		.name		= "System",		/* jffs */
-		.size		= MTDPART_SIZ_FULL, 
-		.offset		= MTDPART_OFS_APPEND, 
+	.name		= "var (jffs2)",
+	.size		= 896 * 1024, 
+	.offset		= MTDPART_OFS_APPEND, 
+	.mask_flags	= 0
+	},
+	{
+	.name		= "flash without bootloader",	
+	.size		= MTDPART_SIZ_FULL, 
+	.offset		= 128 * 1024, 
+	.mask_flags	= 0
+	},
+	{
+	.name		= "complete flash",	
+	.size		= MTDPART_SIZ_FULL, 
+	.offset		= 0, 
+	.mask_flags	= MTD_WRITEABLE
 	}
 };
 
@@ -46,72 +63,24 @@ static struct mtd_partition partition_info[]= {
 
 static struct mtd_info *mymtd;
 
-__u8 dbox2_flash_read8(struct map_info *map, unsigned long ofs)
-{
-	return __raw_readb(map->map_priv_1 + ofs);
-}
-
-__u16 dbox2_flash_read16(struct map_info *map, unsigned long ofs)
-{
-	return __raw_readw(map->map_priv_1 + ofs);
-}
-
-__u32 dbox2_flash_read32(struct map_info *map, unsigned long ofs)
-{
-	return __raw_readl(map->map_priv_1 + ofs);
-}
-
-void dbox2_flash_copy_from(struct map_info *map, void *to, unsigned long from, ssize_t len)
-{
-	memcpy_fromio(to, map->map_priv_1 + from, len);
-}
-
-void dbox2_flash_write8(struct map_info *map, __u8 d, unsigned long adr)
-{
-	__raw_writeb(d, map->map_priv_1 + adr);
-	mb();
-}
-
-void dbox2_flash_write16(struct map_info *map, __u16 d, unsigned long adr)
-{
-	__raw_writew(d, map->map_priv_1 + adr);
-	mb();
-}
-
-void dbox2_flash_write32(struct map_info *map, __u32 d, unsigned long adr)
-{
-	__raw_writel(d, map->map_priv_1 + adr);
-	mb();
-}
-
-void dbox2_flash_copy_to(struct map_info *map, unsigned long to, const void *from, ssize_t len)
-{
-	memcpy_toio(map->map_priv_1 + to, from, len);
-}
 
 struct map_info dbox2_flash_map = {
 	.name		= "D-Box 2 flash memory",
 	.size		= WINDOW_SIZE,
 	.buswidth	= 4,
-	.read8		= dbox2_flash_read8,
-	.read16		= dbox2_flash_read16,
-	.read32		= dbox2_flash_read32,
-	.copy_from	= dbox2_flash_copy_from,
-	.write8		= dbox2_flash_write8,
-	.write16	= dbox2_flash_write16,
-	.write32	= dbox2_flash_write32,
-	.copy_to	= dbox2_flash_copy_to
+	.phys		= WINDOW_ADDR,
 };
 
 int __init init_dbox2_flash(void)
 {
        	printk(KERN_NOTICE "D-Box 2 flash driver (size->0x%X mem->0x%X)\n", WINDOW_SIZE, WINDOW_ADDR);
-	dbox2_flash_map.map_priv_1 = (unsigned long)ioremap(WINDOW_ADDR, WINDOW_SIZE);
+	dbox2_flash_map.virt = (unsigned long)ioremap(WINDOW_ADDR, WINDOW_SIZE);
 
-	if (!dbox2_flash_map.map_priv_1) {
+	if (!dbox2_flash_map.virt) {
 		printk("Failed to ioremap\n");
 		return -EIO;
 	}
+	simple_map_init(&dbox2_flash_map);
 
 	// Probe for dual Intel 28F320 or dual AMD
 	mymtd = do_map_probe("cfi_probe", &dbox2_flash_map);
@@ -123,7 +92,7 @@ int __init init_dbox2_flash(void)
 	}
 	    
 	if (mymtd) {
-		mymtd->module = THIS_MODULE;
+		mymtd->owner = THIS_MODULE;
 
                 /* Create MTD devices for each partition. */
 	        add_mtd_partitions(mymtd, partition_info, NUM_PARTITIONS);
@@ -131,7 +100,7 @@ int __init init_dbox2_flash(void)
 		return 0;
 	}
 
-	iounmap((void *)dbox2_flash_map.map_priv_1);
+	iounmap((void *)dbox2_flash_map.virt);
 	return -ENXIO;
 }
 
@@ -141,9 +110,9 @@ static void __exit cleanup_dbox2_flash(void)
 		del_mtd_partitions(mymtd);
 		map_destroy(mymtd);
 	}
-	if (dbox2_flash_map.map_priv_1) {
-		iounmap((void *)dbox2_flash_map.map_priv_1);
-		dbox2_flash_map.map_priv_1 = 0;
+	if (dbox2_flash_map.virt) {
+		iounmap((void *)dbox2_flash_map.virt);
+		dbox2_flash_map.virt = 0;
 	}
 }
 
@@ -152,5 +121,5 @@ module_exit(cleanup_dbox2_flash);
 
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Kári Davíðsson <kd@flaga.is>");
-MODULE_DESCRIPTION("MTD map driver for Nokia/Sagem D-Box 2 board");
+MODULE_AUTHOR("Kári Davíðsson <kd@flaga.is>, Bastian Blank <waldi@tuxbox.org>, Alexander Wild <wild@te-elektronik.com>");
+MODULE_DESCRIPTION("MTD map driver for D-Box 2 board");

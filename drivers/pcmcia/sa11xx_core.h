@@ -9,7 +9,6 @@
 #ifndef _ASM_ARCH_PCMCIA
 #define _ASM_ARCH_PCMCIA
 
-#include <linux/proc_fs.h>
 /* include the world */
 #include <pcmcia/version.h>
 #include <pcmcia/cs_types.h>
@@ -44,6 +43,8 @@ struct pcmcia_state {
  * use when responding to a Card Services query of some kind.
  */
 struct sa1100_pcmcia_socket {
+	struct pcmcia_socket	socket;
+
 	/*
 	 * Info from low level handler
 	 */

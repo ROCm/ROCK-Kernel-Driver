@@ -2545,6 +2545,14 @@ int __devinit snd_cs46xx_mixer(cs46xx_t *chip)
 	chip->eapd_switch = snd_ctl_find_id(chip->card, &id);
     
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
+	if (chip->nr_ac97_codecs == 1 && 
+	    snd_cs46xx_codec_read(chip, AC97_VENDOR_ID2,
+				  CS46XX_PRIMARY_CODEC_INDEX) == 0x592d) {
+		/* set primary cs4294 codec into Extended Audio Mode */
+		snd_printdd("setting EAM bit on cs4294 CODEC\n");
+		snd_cs46xx_codec_write(chip, AC97_CSR_ACMODE, 0x200,
+				       CS46XX_PRIMARY_CODEC_INDEX);
+	}
 	/* do soundcard specific mixer setup */
 	if (chip->mixer_init) {
 		snd_printdd ("calling chip->mixer_init(chip);\n");

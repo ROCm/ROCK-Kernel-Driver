@@ -38,7 +38,7 @@ static kmem_cache_t *bio_slab;
  * basically we just need to survive
  */
 #define BIO_SPLIT_ENTRIES 8	
-static mempool_t *bio_split_pool;
+mempool_t *bio_split_pool;
 
 struct biovec_pool {
 	int nr_vecs;
@@ -53,7 +53,7 @@ struct biovec_pool {
  * unsigned short
  */
 
-#define BV(x) { x, "biovec-" #x }
+#define BV(x) { .nr_vecs = x, .name = "biovec-" #x }
 static struct biovec_pool bvec_array[BIOVEC_NR_POOLS] = {
 	BV(1), BV(4), BV(16), BV(64), BV(128), BV(BIO_MAX_PAGES),
 };
@@ -259,84 +259,6 @@ struct bio *bio_clone(struct bio *bio, int gfp_mask)
 }
 
 /**
- *	bio_copy	-	create copy of a bio
- *	@bio: bio to copy
- *	@gfp_mask: allocation priority
- *	@copy: copy data to allocated bio
- *
- *	Create a copy of a &bio. Caller will own the returned bio and
- *	the actual data it points to. Reference count of returned
- * 	bio will be one.
- */
-struct bio *bio_copy(struct bio *bio, int gfp_mask, int copy)
-{
-	struct bio *b = bio_alloc(gfp_mask, bio->bi_vcnt);
-	unsigned long flags = 0; /* gcc silly */
-	struct bio_vec *bv;
-	int i;
-
-	if (unlikely(!b))
-		return NULL;
-
-	/*
-	 * iterate iovec list and alloc pages + copy data
-	 */
-	__bio_for_each_segment(bv, bio, i, 0) {
-		struct bio_vec *bbv = &b->bi_io_vec[i];
-		char *vfrom, *vto;
-
-		bbv->bv_page = alloc_page(gfp_mask);
-		if (bbv->bv_page == NULL)
-			goto oom;
-
-		bbv->bv_len = bv->bv_len;
-		bbv->bv_offset = bv->bv_offset;
-
-		/*
-		 * if doing a copy for a READ request, no need
-		 * to memcpy page data
-		 */
-		if (!copy)
-			continue;
-
-		if (gfp_mask & __GFP_WAIT) {
-			vfrom = kmap(bv->bv_page);
-			vto = kmap(bbv->bv_page);
-		} else {
-			local_irq_save(flags);
-			vfrom = kmap_atomic(bv->bv_page, KM_BIO_SRC_IRQ);
-			vto = kmap_atomic(bbv->bv_page, KM_BIO_DST_IRQ);
-		}
-
-		memcpy(vto + bbv->bv_offset, vfrom + bv->bv_offset, bv->bv_len);
-		if (gfp_mask & __GFP_WAIT) {
-			kunmap(bbv->bv_page);
-			kunmap(bv->bv_page);
-		} else {
-			kunmap_atomic(vto, KM_BIO_DST_IRQ);
-			kunmap_atomic(vfrom, KM_BIO_SRC_IRQ);
-			local_irq_restore(flags);
-		}
-	}
-
-	b->bi_sector = bio->bi_sector;
-	b->bi_bdev = bio->bi_bdev;
-	b->bi_rw = bio->bi_rw;
-
-	b->bi_vcnt = bio->bi_vcnt;
-	b->bi_size = bio->bi_size;
-
-	return b;
-
-oom:
-	while (--i >= 0)
-		__free_page(b->bi_io_vec[i].bv_page);
-
-	mempool_free(b, bio_pool);
-	return NULL;
-}
-
-/**
  *	bio_get_nr_vecs		- return approx number of vecs
  *	@bdev:  I/O target
  *
@@ -538,12 +460,6 @@ struct bio *bio_map_user(struct block_device *bdev, unsigned long uaddr,
 	bio = __bio_map_user(bdev, uaddr, len, write_to_vm);
 
 	if (bio) {
-		if (bio->bi_size < len) {
-			bio_endio(bio, bio->bi_size, 0);
-			bio_unmap_user(bio, 0);
-			return NULL;
-		}
-
 		/*
 		 * subtle -- if __bio_map_user() ended up bouncing a bio,
 		 * it would normally disappear when its bi_end_io is run.
@@ -551,6 +467,12 @@ struct bio *bio_map_user(struct block_device *bdev, unsigned long uaddr,
 		 * reference to it
 		 */
 		bio_get(bio);
+
+		if (bio->bi_size < len) {
+			bio_endio(bio, bio->bi_size, 0);
+			bio_unmap_user(bio, 0);
+			return NULL;
+		}
 	}
 
 	return bio;
@@ -905,7 +827,6 @@ EXPORT_SYMBOL(bio_alloc);
 EXPORT_SYMBOL(bio_put);
 EXPORT_SYMBOL(bio_endio);
 EXPORT_SYMBOL(bio_init);
-EXPORT_SYMBOL(bio_copy);
 EXPORT_SYMBOL(__bio_clone);
 EXPORT_SYMBOL(bio_clone);
 EXPORT_SYMBOL(bio_phys_segments);
@@ -916,3 +837,4 @@ EXPORT_SYMBOL(bio_map_user);
 EXPORT_SYMBOL(bio_unmap_user);
 EXPORT_SYMBOL(bio_pair_release);
 EXPORT_SYMBOL(bio_split);
+EXPORT_SYMBOL(bio_split_pool);

@@ -102,20 +102,15 @@ static unsigned long queue_counter;
  * length: If inout==FALSE max number of bytes to be written into the buffer 
  *         else number of bytes in the buffer
  */
-static int eata_pio_proc_info(char *buffer, char **start, off_t offset,
-			      int length, int hostno, int rw)
+static int eata_pio_proc_info(struct Scsi_Host *shost, char *buffer, char **start, off_t offset,
+			      int length, int rw)
 {
-    struct Scsi_Host *shost;
     static u8 buff[512];
     int size, len = 0;
     off_t begin = 0, pos = 0;
 
     if (rw)
     	return -ENOSYS;
-    shost = scsi_host_hn_get(hostno);
-    if (!shost)
-    	return -EINVAL;
-
     if (offset == 0)
 	memset(buff, 0, sizeof(buff));
 

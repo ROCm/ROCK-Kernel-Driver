@@ -92,9 +92,6 @@ struct ircomm_tty_cb {
 	void *skey;
 	void *ckey;
 
-	struct termios	  normal_termios;
-	struct termios	  callout_termios;
-
 	wait_queue_head_t open_wait;
 	wait_queue_head_t close_wait;
 	struct timer_list watchdog_timer;
@@ -103,8 +100,6 @@ struct ircomm_tty_cb {
         unsigned short    close_delay;
         unsigned short    closing_wait; /* time to wait before closing */
 
-	long session;           /* Session of opening process */
-	long pgrp;		/* pgrp of opening process */
 	int  open_count;
 	int  blocked_open;	/* # of blocked opens */
 

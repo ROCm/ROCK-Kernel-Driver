@@ -1122,11 +1122,8 @@ static void __exit sa1100_irda_exit(void)
 {
 	struct net_device *dev = dev_get_drvdata(&sa1100ir_device.dev);
 
-	if (dev) {
-		rtnl_lock();
-		unregister_netdevice(dev);
-		rtnl_unlock();
-	}
+	if (dev)
+		unregister_netdev(dev);
 
 	sys_device_unregister(&sa1100ir_device);
 	driver_unregister(&sa1100ir_driver);

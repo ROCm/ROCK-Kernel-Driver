@@ -1,4 +1,4 @@
-/* orinoco_cs.c 0.13a	- (formerly known as dldwd_cs.c)
+/* orinoco_cs.c 0.13e	- (formerly known as dldwd_cs.c)
  *
  * A driver for "Hermes" chipset based PCMCIA wireless adaptors, such
  * as the Lucent WavelanIEEE/Orinoco cards and their OEM (Cabletron/
@@ -14,6 +14,7 @@
 #ifdef  __IN_PCMCIA_PACKAGE__
 #include <pcmcia/k_compat.h>
 #endif /* __IN_PCMCIA_PACKAGE__ */
+
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
@@ -21,9 +22,7 @@
 #include <linux/ptrace.h>
 #include <linux/slab.h>
 #include <linux/string.h>
-#include <linux/timer.h>
 #include <linux/ioport.h>
-#include <linux/proc_fs.h>
 #include <linux/netdevice.h>
 #include <linux/if_arp.h>
 #include <linux/etherdevice.h>
@@ -90,8 +89,9 @@ struct orinoco_pccard {
 	dev_node_t node;
 
 	/* Used to handle hard reset */
-	wait_queue_head_t hard_reset_queue;
-	int hard_reset_flag;
+	/* yuck, we need this hack to work around the insanity of the
+         * PCMCIA layer */
+	unsigned long hard_reset_in_progress; 
 };
 
 /*
@@ -128,14 +128,14 @@ orinoco_cs_hard_reset(struct orinoco_private *priv)
 	dev_link_t *link = &card->link;
 	int err;
 
-	card->hard_reset_flag = 0;
+	/* We need atomic ops here, because we're not holding the lock */
+	set_bit(0, &card->hard_reset_in_progress);
 
 	err = CardServices(ResetCard, link->handle, NULL);
 	if (err)
 		return err;
 
-	wait_event_interruptible(card->hard_reset_queue,
-				 card->hard_reset_flag);
+	clear_bit(0, &card->hard_reset_in_progress);
 
 	return 0;
 }
@@ -143,6 +143,16 @@ orinoco_cs_hard_reset(struct orinoco_private *priv)
 /********************************************************************/
 /* PCMCIA stuff     						    */
 /********************************************************************/
+
+/* In 2.5 (as of 2.5.69 at least) there is a cs_error exported which
+ * does this, but it's not in 2.4 so we do our own for now. */
+static void
+orinoco_cs_error(client_handle_t handle, int func, int ret)
+{
+	error_info_t err = { func, ret };
+	CardServices(ReportError, handle, &err);
+}
+
 
 /* Remove zombie instances (card removed, detach pending) */
 static void
@@ -187,7 +197,6 @@ orinoco_cs_attach(void)
 		return NULL;
 	priv = dev->priv;
 	card = priv->card;
-	init_waitqueue_head(&card->hard_reset_queue);
 
 	/* Link both structures together */
 	link = &card->link;
@@ -233,7 +242,7 @@ orinoco_cs_attach(void)
 
 	ret = CardServices(RegisterClient, &link->handle, &client_reg);
 	if (ret != CS_SUCCESS) {
-		cs_error(link->handle, RegisterClient, ret);
+		orinoco_cs_error(link->handle, RegisterClient, ret);
 		orinoco_cs_detach(link);
 		return NULL;
 	}
@@ -262,19 +271,12 @@ orinoco_cs_detach(dev_link_t * link)
 		return;
 	}
 
-	/*
-	   If the device is currently configured and active, we won't
-	   actually delete it yet.  Instead, it is marked so that when
-	   the release() function is called, that will trigger a proper
-	   detach().
-	 */
 	if (link->state & DEV_CONFIG) {
-#ifdef PCMCIA_DEBUG
-		printk(KERN_DEBUG "orinoco_cs: detach postponed, '%s' "
-		       "still locked\n", link->dev->dev_name);
-#endif
-		link->state |= DEV_STALE_LINK;
-		return;
+		orinoco_cs_release((u_long)link);
+		if (link->state & DEV_CONFIG) {
+			link->state |= DEV_STALE_LINK;
+			return;
+		}
 	}
 
 	/* Break the link with Card Services */
@@ -465,7 +467,7 @@ orinoco_cs_config(dev_link_t *link)
 				link->irq.IRQInfo2 |= 1 << irq_list[i];
 		
   		link->irq.Handler = orinoco_interrupt; 
-  		link->irq.Instance = priv; 
+  		link->irq.Instance = dev; 
 		
 		CS_CHECK(RequestIRQ, link->handle, &link->irq);
 	}
@@ -522,18 +524,10 @@ orinoco_cs_config(dev_link_t *link)
 		       link->io.BasePort2 + link->io.NumPorts2 - 1);
 	printk("\n");
 
-	/* And give us the proc nodes for debugging */
-	if (orinoco_proc_dev_init(dev) != 0) {
-		printk(KERN_ERR "orinoco_cs: Failed to create /proc node for %s\n",
-		       dev->name);
-		goto failed;
-	}
-	
-
 	return;
 
  cs_failed:
-	cs_error(link->handle, last_fn, last_ret);
+	orinoco_cs_error(link->handle, last_fn, last_ret);
 
  failed:
 	orinoco_cs_release((u_long) link);
@@ -550,21 +544,13 @@ orinoco_cs_release(u_long arg)
 	dev_link_t *link = (dev_link_t *) arg;
 	struct net_device *dev = link->priv;
 	struct orinoco_private *priv = dev->priv;
+	unsigned long flags;
 
-	/*
-	   If the device is currently in use, we won't release until it
-	   is actually closed, because until then, we can't be sure that
-	   no one will try to access the device or its data structures.
-	 */
-	if (priv->open) {
-		DEBUG(0, "orinoco_cs: release postponed, '%s' still open\n",
-		      link->dev->dev_name);
-		link->state |= DEV_STALE_CONFIG;
-		return;
-	}
-
-	/* Unregister proc entry */
-	orinoco_proc_dev_cleanup(dev);
+	/* We're committed to taking the device away now, so mark the
+	 * hardware as unavailable */
+	spin_lock_irqsave(&priv->lock, flags);
+	priv->hw_unavailable++;
+	spin_unlock_irqrestore(&priv->lock, flags);
 
 	/* Don't bother checking to see if these succeed or not */
 	CardServices(ReleaseConfiguration, link->handle);
@@ -586,6 +572,7 @@ orinoco_cs_event(event_t event, int priority,
 	dev_link_t *link = args->client_data;
 	struct net_device *dev = link->priv;
 	struct orinoco_private *priv = dev->priv;
+	struct orinoco_pccard *card = priv->card;
 	int err = 0;
 	unsigned long flags;
 
@@ -596,14 +583,9 @@ orinoco_cs_event(event_t event, int priority,
 			orinoco_lock(priv, &flags);
 
 			netif_device_detach(dev);
-			priv->hw_unavailable = 1;
+			priv->hw_unavailable++;
 
 			orinoco_unlock(priv, &flags);
-
-/*  			if (link->open) */
-/*  				orinoco_cs_stop(dev); */
-
-			mod_timer(&link->release, jiffies + HZ / 20);
 		}
 		break;
 
@@ -618,24 +600,24 @@ orinoco_cs_event(event_t event, int priority,
 	case CS_EVENT_RESET_PHYSICAL:
 		/* Mark the device as stopped, to block IO until later */
 		if (link->state & DEV_CONFIG) {
-			err = orinoco_lock(priv, &flags);
-			if (err) {
-				printk(KERN_ERR "%s: hw_unavailable on SUSPEND/RESET_PHYSICAL\n",
-				       dev->name);
-				break;
+			/* This is probably racy, but I can't think of
+                           a better way, short of rewriting the PCMCIA
+                           layer to not suck :-( */
+			if (! test_bit(0, &card->hard_reset_in_progress)) {
+				spin_lock_irqsave(&priv->lock, flags);
+
+				err = __orinoco_down(dev);
+				if (err)
+					printk(KERN_WARNING "%s: %s: Error %d downing interface\n",
+					       dev->name,
+					       event == CS_EVENT_PM_SUSPEND ? "SUSPEND" : "RESET_PHYSICAL",
+					       err);
+				
+				netif_device_detach(dev);
+				priv->hw_unavailable++;
+
+				spin_unlock_irqrestore(&priv->lock, flags);
 			}
-
-			err = __orinoco_down(dev);
-			if (err)
-				printk(KERN_WARNING "%s: %s: Error %d downing interface\n",
-				       dev->name,
-				       event == CS_EVENT_PM_SUSPEND ? "SUSPEND" : "RESET_PHYSICAL",
-				       err);
-
-			netif_device_detach(dev);
-			priv->hw_unavailable = 1;
-
-			orinoco_unlock(priv, &flags);
 
 			CardServices(ReleaseConfiguration, link->handle);
 		}
@@ -646,32 +628,34 @@ orinoco_cs_event(event_t event, int priority,
 		/* Fall through... */
 	case CS_EVENT_CARD_RESET:
 		if (link->state & DEV_CONFIG) {
+			/* FIXME: should we double check that this is
+			 * the same card as we had before */
 			CardServices(RequestConfiguration, link->handle,
 				     &link->conf);
 
-			/* FIXME: should we double check that this is
-			 * the same card as we had before */
-			err = orinoco_reinit_firmware(dev);
-			if (err) {
-				printk(KERN_ERR "%s: Error %d re-initializing firmware\n",
-				       dev->name, err);
-				break;
-			}
-
-			spin_lock_irqsave(&priv->lock, flags);
-
-			netif_device_attach(dev);
-			priv->hw_unavailable = 0;
-
-			if (priv->open) {
-				err = __orinoco_up(dev);
-				if (err)
-					printk(KERN_ERR "%s: Error %d restarting card\n",
+			if (! test_bit(0, &card->hard_reset_in_progress)) {
+				err = orinoco_reinit_firmware(dev);
+				if (err) {
+					printk(KERN_ERR "%s: Error %d re-initializing firmware\n",
 					       dev->name, err);
+					break;
+				}
+				
+				spin_lock_irqsave(&priv->lock, flags);
+				
+				netif_device_attach(dev);
+				priv->hw_unavailable--;
+				
+				if (priv->open && ! priv->hw_unavailable) {
+					err = __orinoco_up(dev);
+					if (err)
+						printk(KERN_ERR "%s: Error %d restarting card\n",
+						       dev->name, err);
+					
+				}
 
+				spin_unlock_irqrestore(&priv->lock, flags);
 			}
-
-			orinoco_unlock(priv, &flags);
 		}
 		break;
 	}
@@ -685,7 +669,7 @@ orinoco_cs_event(event_t event, int priority,
 
 /* Can't be declared "const" or the whole __initdata section will
  * become const */
-static char version[] __initdata = "orinoco_cs.c 0.13a (David Gibson <hermes@gibson.dropbear.id.au> and others)";
+static char version[] __initdata = "orinoco_cs.c 0.13e (David Gibson <hermes@gibson.dropbear.id.au> and others)";
 
 static struct pcmcia_driver orinoco_driver = {
 	.owner		= THIS_MODULE,
@@ -712,7 +696,6 @@ exit_orinoco_cs(void)
 	if (dev_list)
 		DEBUG(0, "orinoco_cs: Removing leftover devices.\n");
 	while (dev_list != NULL) {
-		del_timer(&dev_list->release);
 		if (dev_list->state & DEV_CONFIG)
 			orinoco_cs_release((u_long) dev_list);
 		orinoco_cs_detach(dev_list);

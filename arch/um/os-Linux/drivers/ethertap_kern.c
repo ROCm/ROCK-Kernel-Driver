@@ -24,18 +24,16 @@ static void etap_init(struct net_device *dev, void *data)
 	struct ethertap_data *epri;
 	struct ethertap_init *init = data;
 
-	init_etherdev(dev, 0);
 	pri = dev->priv;
 	epri = (struct ethertap_data *) pri->user;
-	*epri = ((struct ethertap_data)
-		{ .dev_name 		= init->dev_name,
-		  .gate_addr 		= init->gate_addr,
-		  .data_fd 		= -1,
-		  .control_fd 		= -1,
-		  .dev 			= dev });
+	epri->dev_name = init->dev_name;
+	epri->gate_addr = init->gate_addr;
+	epri->data_fd = -1;
+	epri->control_fd = -1;
+	epri->dev = dev;
 
 	printk("ethertap backend - %s", epri->dev_name);
-	if(epri->gate_addr != NULL) 
+	if (epri->gate_addr != NULL)
 		printk(", IP = %s", epri->gate_addr);
 	printk("\n");
 }

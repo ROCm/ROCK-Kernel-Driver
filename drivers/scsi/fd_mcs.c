@@ -586,9 +586,8 @@ static int TOTAL_INTR = 0;
  * length: If inout==FALSE max number of bytes to be written into the buffer 
  *         else number of bytes in the buffer
  */
-static int fd_mcs_proc_info(char *buffer, char **start, off_t offset, int length, int hostno, int inout)
+static int fd_mcs_proc_info(struct Scsi_Host *shpnt, char *buffer, char **start, off_t offset, int length, int inout)
 {
-	struct Scsi_Host *shpnt;
 	int len = 0;
 	int i;
 
@@ -597,20 +596,10 @@ static int fd_mcs_proc_info(char *buffer, char **start, off_t offset, int length
 
 	*start = buffer + offset;
 
-	for (i = 0; hosts[i] && hosts[i]->host_no != hostno; i++);
-	shpnt = hosts[i];
-
-	if (!shpnt) {
-		return (-ENOENT);
-	} else {
-		len += sprintf(buffer + len, "Future Domain MCS-600/700 Driver %s\n", DRIVER_VERSION);
-
-		len += sprintf(buffer + len, "HOST #%d: %s\n", hostno, adapter_name);
-
-		len += sprintf(buffer + len, "FIFO Size=0x%x, FIFO Count=%d\n", FIFO_Size, FIFO_COUNT);
-
-		len += sprintf(buffer + len, "DriverCalls=%d, Interrupts=%d, BytesRead=%d, BytesWrite=%d\n\n", TOTAL_INTR, INTR_Processed, Bytes_Read, Bytes_Written);
-	}
+	len += sprintf(buffer + len, "Future Domain MCS-600/700 Driver %s\n", DRIVER_VERSION);
+	len += sprintf(buffer + len, "HOST #%d: %s\n", shpnt->host_no, adapter_name);
+	len += sprintf(buffer + len, "FIFO Size=0x%x, FIFO Count=%d\n", FIFO_Size, FIFO_COUNT);
+	len += sprintf(buffer + len, "DriverCalls=%d, Interrupts=%d, BytesRead=%d, BytesWrite=%d\n\n", TOTAL_INTR, INTR_Processed, Bytes_Read, Bytes_Written);
 
 	if ((len -= offset) <= 0)
 		return 0;

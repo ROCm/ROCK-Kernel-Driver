@@ -207,6 +207,7 @@ S:	Maintained
 AGPGART DRIVER
 P:	Dave Jones
 M:	davej@codemonkey.org.uk
+W:	http://www.codemonkey.org.uk/agp/
 S:	Maintained
 
 AHA152X SCSI DRIVER
@@ -279,6 +280,13 @@ P:	Chas Williams
 M:	chas@cmf.nrl.navy.mil
 L:	linux-atm-general@lists.sourceforge.net
 W:	http://linux-atm.sourceforge.net
+S:	Maintained
+
+ATMEL WIRELESS DRIVER
+P:	Simon Kelley
+M:	simon@thekelleys.org.uk
+W:	http://www.thekelleys.org.uk/atmel
+W:	http://atmelwlandriver.sourceforge.net/
 S:	Maintained
 
 AX.25 NETWORK LAYER
@@ -387,27 +395,6 @@ M:	scottm@somanetworks.com
 M:	scott@spiteful.org
 L:	pcihpd-discuss@lists.sourceforge.net
 S:	Supported
-
-COMPAQ FIBRE CHANNEL 64-bit/66MHz PCI non-intelligent HBA
-P:	Amy Vanzant-Hodge 
-M:	Amy Vanzant-Hodge (fibrechannel@compaq.com)
-L:	compaqandlinux@cpqlin.van-dijk.net
-W:	ftp.compaq.com/pub/products/drivers/linux
-S:	Supported
-
-COMPAQ SMART2 RAID DRIVER
-P:	Charles White	
-M:	Charles White <arrays@compaq.com>
-L:	compaqandlinux@cpqlin.van-dijk.net
-W:	ftp.compaq.com/pub/products/drivers/linux
-S:	Supported	
-
-COMPAQ SMART CISS RAID DRIVER 
-P:	Charles White
-M:	Charles White <arrays@compaq.com>
-L:	compaqandlinux@cpqlin.van-dijk.net
-W:	ftp.compaq.com/pub/products/drivers/linux	
-S:	Supported 
 
 COMPUTONE INTELLIPORT MULTIPORT CARD
 P:	Michael H. Warfield
@@ -785,6 +772,24 @@ M:	jes@trained-monkey.org
 L:	linux-hippi@sunsite.dk
 S:	Maintained
 
+HEWLETT-PACKARD FIBRE CHANNEL 64-bit/66MHz PCI non-intelligent HBA
+P:	Chase Maupin
+M:	Chase Maupin (support@compaq.com)
+ L:	compaqandlinux@cpqlin.van-dijk.net
+ S:	Supported
+ 
+HEWLETT-PACKARD SMART2 RAID DRIVER
+P:	Francis Wiran
+M:	Francis Wiran <support@compaq.com>
+ L:	compaqandlinux@cpqlin.van-dijk.net
+ S:	Supported	
+ 
+HEWLETT-PACKARD SMART CISS RAID DRIVER 
+P:	Mike Miller, Michael Ni
+M:	Mike Miller, Michael Ni <support@compaq.com>
+ L:	compaqandlinux@cpqlin.van-dijk.net
+ S:	Supported 
+ 
 HP100:	Driver for HP 10/100 Mbit/s Voice Grade Network Adapter Series
 P:	Jaroslav Kysela
 M:	perex@suse.cz
@@ -1111,8 +1116,10 @@ M:	acme@conectiva.com.br
 S:	Maintained
 
 LINUX FOR 64BIT POWERPC
-P:	David Engebretsen
+P:	David Engebretsen (stable kernel)
 M:	engebret@us.ibm.com
+P:	Anton Blanchard (development kernel)
+M:	anton@au.ibm.com
 W:	http://linuxppc64.org
 L:	linuxppc64-dev@lists.linuxppc.org
 S:	Supported
@@ -1523,6 +1530,12 @@ M:	reiserfs-dev@namesys.com
 L:	reiserfs-list@namesys.com
 W:	http://www.namesys.com
 S:	Supported
+
+ROCKETPORT DRIVER
+P:	Comtrol Corp.
+M:	support@comtrol.com
+W:	http://www.comtrol.com
+S:	Maintained
 
 ROSE NETWORK LAYER
 P:	Ralf Baechle

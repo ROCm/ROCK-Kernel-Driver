@@ -1288,7 +1288,7 @@ getorigdst(struct sock *sk, int optval, void *user, int *len)
 					      IPPROTO_TCP } };
 
 	/* We only do TCP at the moment: is there a better way? */
-	if (strcmp(sk->prot->name, "TCP") != 0) {
+	if (strcmp(sk->sk_prot->name, "TCP")) {
 		DEBUGP("SO_ORIGINAL_DST: Not a TCP socket\n");
 		return -ENOPROTOOPT;
 	}

@@ -390,11 +390,8 @@ static int __exit ali_ircc_close(struct ali_ircc_cb *self)
         iobase = self->io.fir_base;
 
 	/* Remove netdevice */
-	if (self->netdev) {
-		rtnl_lock();
-		unregister_netdevice(self->netdev);
-		rtnl_unlock();
-	}
+	if (self->netdev)
+		unregister_netdev(self->netdev);
 
 	/* Release the PORT that this driver is using */
 	IRDA_DEBUG(4, "%s(), Releasing Region %03x\n", __FUNCTION__, self->io.fir_base);

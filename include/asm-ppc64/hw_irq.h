@@ -81,7 +81,5 @@ static inline void __do_save_and_cli(unsigned long *flags)
 struct hw_interrupt_type;
 static inline void hw_resend_irq(struct hw_interrupt_type *h, unsigned int i) {}
  
-extern irq_desc_t irq_desc [NR_IRQS];
-
 #endif /* _PPC64_HW_IRQ_H */
 #endif /* __KERNEL__ */

@@ -78,16 +78,12 @@ struct e100_serial {
 	int			type;  /* PORT_ETRAX */
 	int			count;	    /* # of fd on device */
 	int			blocked_open; /* # of blocked opens */
-	long			session; /* Session of opening process */
-	long			pgrp; /* pgrp of opening process */
 	struct circ_buf		xmit;
 	struct circ_buf		recv;
 	unsigned char		*flag_buf;
 
 	struct tq_struct	tqueue;
 	struct async_icount	icount;   /* error-statistics etc.*/
-	struct termios		normal_termios;
-	struct termios		callout_termios;
 #ifdef DECLARE_WAITQUEUE
 	wait_queue_head_t	open_wait;
 	wait_queue_head_t	close_wait;

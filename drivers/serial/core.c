@@ -2061,6 +2061,32 @@ uart_unconfigure_port(struct uart_driver *drv, struct uart_state *state)
 	up(&state->sem);
 }
 
+static struct tty_operations uart_ops = {
+	.open		= uart_open,
+	.close		= uart_close,
+	.write		= uart_write,
+	.put_char	= uart_put_char,
+	.flush_chars	= uart_flush_chars,
+	.write_room	= uart_write_room,
+	.chars_in_buffer= uart_chars_in_buffer,
+	.flush_buffer	= uart_flush_buffer,
+	.ioctl		= uart_ioctl,
+	.throttle	= uart_throttle,
+	.unthrottle	= uart_unthrottle,
+	.send_xchar	= uart_send_xchar,
+	.set_termios	= uart_set_termios,
+	.stop		= uart_stop,
+	.start		= uart_start,
+	.hangup		= uart_hangup,
+	.break_ctl	= uart_break_ctl,
+	.wait_until_sent= uart_wait_until_sent,
+#ifdef CONFIG_PROC_FS
+	.read_proc	= uart_read_proc,
+#endif
+	.tiocmget	= uart_tiocmget,
+	.tiocmset	= uart_tiocmset,
+};
+
 /**
  *	uart_register_driver - register a driver with the uart core layer
  *	@drv: low level driver structure
@@ -2077,82 +2103,40 @@ uart_unconfigure_port(struct uart_driver *drv, struct uart_state *state)
 int uart_register_driver(struct uart_driver *drv)
 {
 	struct tty_driver *normal = NULL;
-	struct termios **termios = NULL;
 	int i, retval;
 
 	BUG_ON(drv->state);
 
 	/*
 	 * Maybe we should be using a slab cache for this, especially if
-	 * we have a large number of ports to handle.  Note that we also
-	 * allocate space for an integer for reference counting.
+	 * we have a large number of ports to handle.
 	 */
-	drv->state = kmalloc(sizeof(struct uart_state) * drv->nr +
-			     sizeof(int), GFP_KERNEL);
+	drv->state = kmalloc(sizeof(struct uart_state) * drv->nr, GFP_KERNEL);
 	retval = -ENOMEM;
 	if (!drv->state)
 		goto out;
 
-	memset(drv->state, 0, sizeof(struct uart_state) * drv->nr +
-			sizeof(int));
+	memset(drv->state, 0, sizeof(struct uart_state) * drv->nr);
 
-	termios = kmalloc(sizeof(struct termios *) * drv->nr * 2 +
-			  sizeof(struct tty_struct *) * drv->nr, GFP_KERNEL);
-	if (!termios)
-		goto out;
-
-	memset(termios, 0, sizeof(struct termios *) * drv->nr * 2 +
-			   sizeof(struct tty_struct *) * drv->nr);
-
-	normal  = kmalloc(sizeof(struct tty_driver), GFP_KERNEL);
+	normal  = alloc_tty_driver(drv->nr);
 	if (!normal)
 		goto out;
 
-	memset(normal, 0, sizeof(struct tty_driver));
-
 	drv->tty_driver = normal;
 
-	normal->magic		= TTY_DRIVER_MAGIC;
 	normal->owner		= drv->owner;
 	normal->driver_name	= drv->driver_name;
+	normal->devfs_name	= drv->devfs_name;
 	normal->name		= drv->dev_name;
 	normal->major		= drv->major;
 	normal->minor_start	= drv->minor;
-	normal->num		= drv->nr;
 	normal->type		= TTY_DRIVER_TYPE_SERIAL;
 	normal->subtype		= SERIAL_TYPE_NORMAL;
 	normal->init_termios	= tty_std_termios;
 	normal->init_termios.c_cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
 	normal->flags		= TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS;
-	normal->refcount	= (int *)(drv->state + drv->nr);
-	normal->termios		= termios;
-	normal->termios_locked	= termios + drv->nr;
-	normal->table		= (struct tty_struct **)(termios + drv->nr * 2);
 	normal->driver_state    = drv;
-
-	normal->open		= uart_open;
-	normal->close		= uart_close;
-	normal->write		= uart_write;
-	normal->put_char	= uart_put_char;
-	normal->flush_chars	= uart_flush_chars;
-	normal->write_room	= uart_write_room;
-	normal->chars_in_buffer	= uart_chars_in_buffer;
-	normal->flush_buffer	= uart_flush_buffer;
-	normal->ioctl		= uart_ioctl;
-	normal->throttle	= uart_throttle;
-	normal->unthrottle	= uart_unthrottle;
-	normal->send_xchar	= uart_send_xchar;
-	normal->set_termios	= uart_set_termios;
-	normal->stop		= uart_stop;
-	normal->start		= uart_start;
-	normal->hangup		= uart_hangup;
-	normal->break_ctl	= uart_break_ctl;
-	normal->wait_until_sent	= uart_wait_until_sent;
-#ifdef CONFIG_PROC_FS
-	normal->read_proc	= uart_read_proc;
-#endif
-	normal->tiocmget	= uart_tiocmget;
-	normal->tiocmset	= uart_tiocmset;
+	tty_set_operations(normal, &uart_ops);
 
 	/*
 	 * Initialise the UART state(s).
@@ -2169,9 +2153,8 @@ int uart_register_driver(struct uart_driver *drv)
 	retval = tty_register_driver(normal);
  out:
 	if (retval < 0) {
-		kfree(normal);
+		put_tty_driver(normal);
 		kfree(drv->state);
-		kfree(termios);
 	}
 	return retval;
 }
@@ -2188,11 +2171,10 @@ int uart_register_driver(struct uart_driver *drv)
 void uart_unregister_driver(struct uart_driver *drv)
 {
 	struct tty_driver *p = drv->tty_driver;
-	drv->tty_driver = NULL;
 	tty_unregister_driver(p);
+	put_tty_driver(p);
 	kfree(drv->state);
-	kfree(drv->tty_driver->termios);
-	kfree(drv->tty_driver);
+	drv->tty_driver = NULL;
 }
 
 struct tty_driver *uart_console_device(struct console *co, int *index)

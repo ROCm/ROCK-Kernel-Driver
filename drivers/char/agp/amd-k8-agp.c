@@ -244,7 +244,7 @@ static int __init agp_amdk8_probe(struct pci_dev *pdev,
 				  const struct pci_device_id *ent)
 {
 	struct agp_bridge_data *bridge;
-	struct pci_dev *loop_dev;
+	struct pci_dev *loop_dev = NULL;
 	u8 rev_id;
 	u8 cap_ptr;
 	int i = 0;
@@ -278,12 +278,13 @@ static int __init agp_amdk8_probe(struct pci_dev *pdev,
 		default:	revstring="??";
 				break;
 		}
-		printk ("Detected AMD 8151 AGP Bridge rev %s", revstring);
+		printk (KERN_INFO PFX "Detected AMD 8151 AGP Bridge rev %s\n", revstring);
 		/*
 		 * Work around errata.
 		 * Chips before B2 stepping incorrectly reporting v3.5
 		 */
 		if (rev_id < 0x13) {
+			printk (KERN_INFO PFX "Correcting AGP revision (reports 3.5, is really 3.0)\n");
 			bridge->major_version = 3;
 			bridge->minor_version = 0;
 		}
@@ -297,7 +298,7 @@ static int __init agp_amdk8_probe(struct pci_dev *pdev,
 	pci_read_config_dword(pdev, bridge->capndx+PCI_AGP_STATUS, &bridge->mode);
 
 	/* cache pci_devs of northbridges. */
-	pci_for_each_dev(loop_dev) {
+	while ((loop_dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, loop_dev)) != NULL) {
 		if (loop_dev->bus->number == 0 &&
 		    PCI_FUNC(loop_dev->devfn) == 3 &&
 		    PCI_SLOT(loop_dev->devfn) >=24 &&

@@ -48,7 +48,7 @@
 #define CS8427_REG_UDATABUF	0x13
 #define CS8427_REG_QSUBCODE	0x14	/* 0x14-0x1d (10 bytes) */
 #define CS8427_REG_OMCKRMCKRATIO 0x1e
-#define CS8427_REG_CORU_DATABUF	0x20
+#define CS8427_REG_CORU_DATABUF	0x20	/* 24 byte buffer area */
 #define CS8427_REG_ID_AND_VER	0x7f
 
 /* CS8427_REG_CONTROL1 bits */
@@ -188,6 +188,7 @@
 
 int snd_cs8427_detect(snd_i2c_bus_t *bus, unsigned char addr);
 int snd_cs8427_create(snd_i2c_bus_t *bus, unsigned char addr, snd_i2c_device_t **r_cs8427);
+void snd_cs8427_reset(snd_i2c_device_t *cs8427);
 int snd_cs8427_iec958_build(snd_i2c_device_t *cs8427, snd_pcm_substream_t *playback_substream, snd_pcm_substream_t *capture_substream);
 int snd_cs8427_iec958_active(snd_i2c_device_t *cs8427, int active);
 int snd_cs8427_iec958_pcm(snd_i2c_device_t *cs8427, unsigned int rate);

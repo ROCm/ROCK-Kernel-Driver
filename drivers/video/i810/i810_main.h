@@ -111,7 +111,6 @@ static int i810fb_blank      (int blank_mode, struct fb_info *info);
 /* Initialization */
 static void i810fb_release_resource       (struct fb_info *info, struct i810fb_par *par);
 extern int __init agp_intel_init(void);
-extern int __init agp_init(void);
 
 
 /* Video Timings */

@@ -49,38 +49,6 @@ static struct file_system_type **find_filesystem(const char *name)
 	return p;
 }
 
-
-/* define fs_subsys */
-static decl_subsys(fs, NULL, NULL);
-
-static int register_fs_subsys(struct file_system_type * fs)
-{
-	struct subsystem *sub = &fs->subsys;
-
-	snprintf(sub->kset.kobj.name, KOBJ_NAME_LEN, "%s", fs->name);
-	subsys_set_kset(fs, fs_subsys);
-	return subsystem_register(sub);
-}
-
-static int unlink_fs(struct file_system_type * fs)
-{
-	struct file_system_type ** tmp;
-
-	write_lock(&file_systems_lock);
-	tmp = &file_systems;
-	while (*tmp) {
-		if (fs == *tmp) {
-			*tmp = fs->next;
-			fs->next = NULL;
-			write_unlock(&file_systems_lock);
-			return 0;
-		}
-		tmp = &(*tmp)->next;
-	}
-	write_unlock(&file_systems_lock);
-	return -EINVAL;
-}
-
 /**
  *	register_filesystem - register a new filesystem
  *	@fs: the file system structure
@@ -111,12 +79,6 @@ int register_filesystem(struct file_system_type * fs)
 	else
 		*p = fs;
 	write_unlock(&file_systems_lock);
-
-	if (!res) {
-		/* we implicitly possess reference to @fs during registration,
-		 * so it cannot be unregister from under us. */
-		register_fs_subsys(fs);
-	}
 	return res;
 }
 
@@ -134,44 +96,21 @@ int register_filesystem(struct file_system_type * fs)
  
 int unregister_filesystem(struct file_system_type * fs)
 {
-	int res;
+	struct file_system_type ** tmp;
 
-	res = unlink_fs(fs);
-	if (!res)
-		subsystem_unregister(&fs->subsys);
-	return res;
-}
-
-extern int sysfs_init(void);
-
-/**
- *	fs_subsys_init - initialize sysfs and fs subsystem.
- *
- *	In order to register filesystems in sysfs, it has to be 
- *	initialized. Also, we need the base fs filesystem, so the 
- *	registered filesystems have a home.
- *	
- *	During sysfs_init(), the registration of sysfs into itself
- *	will fail, since it's not mounted yet. To make sure that 
- *	sysfs does show up, we re-register sysfs's embedded subsystem,
- *	which will get added, since sysfs is now mounted.
- */
-
-void __init fs_subsys_init(void)
-{
-	struct file_system_type ** p;
-
-	/* make sure sysfs is up and running */
-	sysfs_init();
-
-	/* register fs_subsys */
-	subsystem_register(&fs_subsys);
-
-	p = find_filesystem("sysfs");
-
-	if (p)
-		/* make sure it's registered */
-		register_fs_subsys(*p);
+	write_lock(&file_systems_lock);
+	tmp = &file_systems;
+	while (*tmp) {
+		if (fs == *tmp) {
+			*tmp = fs->next;
+			fs->next = NULL;
+			write_unlock(&file_systems_lock);
+			return 0;
+		}
+		tmp = &(*tmp)->next;
+	}
+	write_unlock(&file_systems_lock);
+	return -EINVAL;
 }
 
 static int fs_index(const char __user * __name)

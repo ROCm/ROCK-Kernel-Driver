@@ -1753,25 +1753,7 @@ static struct sa1100fb_info * __init sa1100fb_init_fbinfo(void)
 	return fbi;
 }
 
-static struct device_driver sa1100fb_driver = {
-	.name		= "sa1100fb",
-	.bus		= &system_bus_type,
-	.suspend	= sa1100fb_suspend,
-	.resume		= sa1100fb_resume,
-};
-
-static struct sys_device sa1100fb_dev = {
-	.name	= "LCD",
-	.id	= 0,
-	.root	= NULL,
-	.dev	= {
-		.name	= "Intel Corporation SA11x0 [LCD]",
-		.bus_id	= "b0100000",
-		.driver	= &sa1100fb_driver,
-	},
-};
-
-int __init sa1100fb_init(void)
+static int __init sa1100fb_probe(struct device *dev)
 {
 	struct sa1100fb_info *fbi;
 	int ret;
@@ -1779,15 +1761,10 @@ int __init sa1100fb_init(void)
 	if (!request_mem_region(0xb0100000, 0x10000, "LCD"))
 		return -EBUSY;
 
-	driver_register(&sa1100fb_driver);
-	sys_device_register(&sa1100fb_dev);
-
 	fbi = sa1100fb_init_fbinfo();
 	ret = -ENOMEM;
 	if (!fbi)
 		goto failed;
-
-	dev_set_drvdata(&sa1100fb_dev.dev, fbi);
 
 	/* Initialize video memory */
 	ret = sa1100fb_map_video_memory(fbi);
@@ -1822,6 +1799,8 @@ int __init sa1100fb_init(void)
 	 */
 	sa1100fb_check_var(&fbi->fb.var, &fbi->fb);
 
+	dev_set_drvdata(dev, fbi);
+
 	ret = register_framebuffer(&fbi->fb);
 	if (ret < 0)
 		goto failed;
@@ -1839,12 +1818,24 @@ int __init sa1100fb_init(void)
 	return 0;
 
 failed:
-	sys_device_unregister(&sa1100fb_dev);
-	driver_unregister(&sa1100fb_driver);
+	dev_set_drvdata(dev, NULL);
 	if (fbi)
 		kfree(fbi);
 	release_mem_region(0xb0100000, 0x10000);
 	return ret;
+}
+
+static struct device_driver sa1100fb_driver = {
+	.name		= "sa11x0-fb",
+	.bus		= &platform_bus_type,
+	.probe		= sa1100fb_probe,
+	.suspend	= sa1100fb_suspend,
+	.resume		= sa1100fb_resume,
+};
+
+int __init sa1100fb_init(void)
+{
+	return driver_register(&sa1100fb_driver);
 }
 
 int __init sa1100fb_setup(char *options)

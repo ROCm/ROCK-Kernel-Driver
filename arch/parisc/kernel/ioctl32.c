@@ -1785,9 +1785,6 @@ static int do_atm_ioctl(unsigned int fd, unsigned int cmd32, unsigned long arg)
         return -EINVAL;
 }
 
-#ifdef CONFIG_GENRTC
-#endif
-
 #if defined(CONFIG_DRM) || defined(CONFIG_DRM_MODULE)
 /* This really belongs in include/linux/drm.h -DaveM */
 #include "../../../drivers/char/drm/drm.h"

@@ -3,6 +3,11 @@
  *
  * Copyright (c) 2002-2003 Patrick Mochel <mochel@osdl.org>
  *
+ * This file is released under the GPLv2.
+ *
+ *
+ * Please see the file Documentation/kobject.txt for critical information
+ * about using the kobject interface.
  */
 
 #undef DEBUG
@@ -11,10 +16,6 @@
 #include <linux/string.h>
 #include <linux/module.h>
 #include <linux/stat.h>
-
-/* This lock can be removed entirely when the sysfs_init() code is cleaned up
- * to not try to reference itself before it is initialized. */
-static spinlock_t kobj_lock = SPIN_LOCK_UNLOCKED;
 
 /**
  *	populate_dir - populate directory with attributes.
@@ -251,14 +252,15 @@ int kobject_add(struct kobject * kobj)
 
 	if (kobj->kset) {
 		down_write(&kobj->kset->subsys->rwsem);
-		if (parent) 
-			list_add_tail(&kobj->entry,&parent->entry);
-		else {
-			list_add_tail(&kobj->entry,&kobj->kset->list);
-			kobj->parent = kobject_get(&kobj->kset->kobj);
-		}
+
+		if (!parent)
+			parent = kobject_get(&kobj->kset->kobj);
+
+		list_add_tail(&kobj->entry,&kobj->kset->list);
 		up_write(&kobj->kset->subsys->rwsem);
 	}
+	kobj->parent = parent;
+
 	error = create_dir(kobj);
 	if (error)
 		unlink(kobj);
@@ -345,14 +347,12 @@ void kobject_unregister(struct kobject * kobj)
 struct kobject * kobject_get(struct kobject * kobj)
 {
 	struct kobject * ret = kobj;
-	unsigned long flags;
 
-	spin_lock_irqsave(&kobj_lock, flags);
-	if (kobj && atomic_read(&kobj->refcount) > 0)
+	if (kobj) {
+		WARN_ON(!atomic_read(&kobj->refcount));
 		atomic_inc(&kobj->refcount);
-	else
+	} else
 		ret = NULL;
-	spin_unlock_irqrestore(&kobj_lock, flags);
 	return ret;
 }
 
@@ -382,15 +382,8 @@ void kobject_cleanup(struct kobject * kobj)
 
 void kobject_put(struct kobject * kobj)
 {
-	unsigned long flags;
-
-	local_irq_save(flags);
-	if (atomic_dec_and_lock(&kobj->refcount, &kobj_lock)) {
-		spin_unlock_irqrestore(&kobj_lock, flags);
+	if (atomic_dec_and_test(&kobj->refcount))
 		kobject_cleanup(kobj);
-	} else {
-		local_irq_restore(flags);
-	}
 }
 
 

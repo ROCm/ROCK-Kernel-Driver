@@ -1579,12 +1579,7 @@ toshoboe_close (struct pci_dev *pci_dev)
     }
 
   if (self->netdev)
-    {
-      /* Remove netdevice */
-      rtnl_lock ();
-      unregister_netdevice (self->netdev);
-      rtnl_unlock ();
-    }
+      unregister_netdev(self->netdev);
 
   kfree (self->ringbuf);
   self->ringbuf = NULL;

@@ -53,20 +53,17 @@
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 
-struct sock *raw_v6_htable[RAWV6_HTABLE_SIZE];
+struct hlist_head raw_v6_htable[RAWV6_HTABLE_SIZE];
 rwlock_t raw_v6_lock = RW_LOCK_UNLOCKED;
 
 static void raw_v6_hash(struct sock *sk)
 {
-	struct sock **skp = &raw_v6_htable[inet_sk(sk)->num &
-					   (RAWV6_HTABLE_SIZE - 1)];
+	struct hlist_head *list = &raw_v6_htable[inet_sk(sk)->num &
+						 (RAWV6_HTABLE_SIZE - 1)];
 
 	write_lock_bh(&raw_v6_lock);
-	if ((sk->next = *skp) != NULL)
-		(*skp)->pprev = &sk->next;
-	*skp = sk;
-	sk->pprev = skp;
-	sock_prot_inc_use(sk->prot);
+	sk_add_node(sk, list);
+	sock_prot_inc_use(sk->sk_prot);
  	sock_hold(sk);
  	write_unlock_bh(&raw_v6_lock);
 }
@@ -74,12 +71,8 @@ static void raw_v6_hash(struct sock *sk)
 static void raw_v6_unhash(struct sock *sk)
 {
  	write_lock_bh(&raw_v6_lock);
-	if (sk->pprev) {
-		if (sk->next)
-			sk->next->pprev = sk->pprev;
-		*sk->pprev = sk->next;
-		sk->pprev = NULL;
-		sock_prot_dec_use(sk->prot);
+	if (sk_del_node_init(sk)) {
+		sock_prot_dec_use(sk->sk_prot);
 		__sock_put(sk);
 	}
 	write_unlock_bh(&raw_v6_lock);
@@ -90,12 +83,12 @@ static void raw_v6_unhash(struct sock *sk)
 struct sock *__raw_v6_lookup(struct sock *sk, unsigned short num,
 			     struct in6_addr *loc_addr, struct in6_addr *rmt_addr)
 {
-	struct sock *s = sk;
+	struct hlist_node *node;
 	int addr_type = ipv6_addr_type(loc_addr);
 
-	for(s = sk; s; s = s->next) {
-		if (inet_sk(s)->num == num) {
-			struct ipv6_pinfo *np = inet6_sk(s);
+	sk_for_each_from(sk, node)
+		if (inet_sk(sk)->num == num) {
+			struct ipv6_pinfo *np = inet6_sk(sk);
 
 			if (!ipv6_addr_any(&np->daddr) &&
 			    ipv6_addr_cmp(&np->daddr, rmt_addr))
@@ -103,16 +96,17 @@ struct sock *__raw_v6_lookup(struct sock *sk, unsigned short num,
 
 			if (!ipv6_addr_any(&np->rcv_saddr)) {
 				if (!ipv6_addr_cmp(&np->rcv_saddr, loc_addr))
-					break;
+					goto found;
 				if ((addr_type & IPV6_ADDR_MULTICAST) &&
-				    inet6_mc_check(s, loc_addr, rmt_addr))
-					break;
+				    inet6_mc_check(sk, loc_addr, rmt_addr))
+					goto found;
 				continue;
 			}
-			break;
+			goto found;
 		}
-	}
-	return s;
+	sk = NULL;
+found:
+	return sk;
 }
 
 /*
@@ -156,7 +150,7 @@ void ipv6_raw_deliver(struct sk_buff *skb, int nexthdr)
 	hash = nexthdr & (MAX_INET_PROTOS - 1);
 
 	read_lock(&raw_v6_lock);
-	sk = raw_v6_htable[hash];
+	sk = sk_head(&raw_v6_htable[hash]);
 
 	/*
 	 *	The first socket found will be delivered after
@@ -176,7 +170,7 @@ void ipv6_raw_deliver(struct sk_buff *skb, int nexthdr)
 			if (clone)
 				rawv6_rcv(sk, clone);
 		}
-		sk = __raw_v6_lookup(sk->next, nexthdr, daddr, saddr);
+		sk = __raw_v6_lookup(sk_next(sk), nexthdr, daddr, saddr);
 	}
 out:
 	read_unlock(&raw_v6_lock);
@@ -203,7 +197,7 @@ static int rawv6_bind(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	lock_sock(sk);
 
 	err = -EINVAL;
-	if (sk->state != TCP_CLOSE)
+	if (sk->sk_state != TCP_CLOSE)
 		goto out;
 
 	if (addr_type & IPV6_ADDR_LINKLOCAL) {
@@ -212,11 +206,11 @@ static int rawv6_bind(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 			/* Override any existing binding, if another one
 			 * is supplied by user.
 			 */
-			sk->bound_dev_if = addr->sin6_scope_id;
+			sk->sk_bound_dev_if = addr->sin6_scope_id;
 		}
 
 		/* Binding to link-local address requires an interface */
-		if (sk->bound_dev_if == 0)
+		if (!sk->sk_bound_dev_if)
 			goto out;
 	}
 
@@ -257,7 +251,7 @@ void rawv6_err(struct sock *sk, struct sk_buff *skb,
 	   2. Socket is connected (otherwise the error indication
 	      is useless without recverr and error is hard.
 	 */
-	if (!np->recverr && sk->state != TCP_ESTABLISHED)
+	if (!np->recverr && sk->sk_state != TCP_ESTABLISHED)
 		return;
 
 	harderr = icmpv6_err_convert(type, code, &err);
@@ -272,14 +266,14 @@ void rawv6_err(struct sock *sk, struct sk_buff *skb,
 	}
 
 	if (np->recverr || harderr) {
-		sk->err = err;
-		sk->error_report(sk);
+		sk->sk_err = err;
+		sk->sk_error_report(sk);
 	}
 }
 
 static inline int rawv6_rcv_skb(struct sock * sk, struct sk_buff * skb)
 {
-	if (sk->filter && skb->ip_summed != CHECKSUM_UNNECESSARY) {
+	if (sk->sk_filter && skb->ip_summed != CHECKSUM_UNNECESSARY) {
 		if ((unsigned short)csum_fold(skb_checksum(skb, 0, skb->len, skb->csum))) {
 			/* FIXME: increment a raw6 drops counter here */
 			kfree_skb(skb);
@@ -422,12 +416,12 @@ csum_copy_err:
 	/* Clear queue. */
 	if (flags&MSG_PEEK) {
 		int clear = 0;
-		spin_lock_irq(&sk->receive_queue.lock);
-		if (skb == skb_peek(&sk->receive_queue)) {
-			__skb_unlink(skb, &sk->receive_queue);
+		spin_lock_irq(&sk->sk_receive_queue.lock);
+		if (skb == skb_peek(&sk->sk_receive_queue)) {
+			__skb_unlink(skb, &sk->sk_receive_queue);
 			clear = 1;
 		}
-		spin_unlock_irq(&sk->receive_queue.lock);
+		spin_unlock_irq(&sk->sk_receive_queue.lock);
 		if (clear)
 			kfree_skb(skb);
 	}
@@ -446,7 +440,7 @@ static int rawv6_push_pending_frames(struct sock *sk, struct flowi *fl, struct r
 	int err = 0;
 	u16 *csum;
 
-	if ((skb = skb_peek(&sk->write_queue)) == NULL)
+	if ((skb = skb_peek(&sk->sk_write_queue)) == NULL)
 		goto out;
 
 	if (opt->offset + 1 < len)
@@ -456,7 +450,7 @@ static int rawv6_push_pending_frames(struct sock *sk, struct flowi *fl, struct r
 		goto out;
 	}
 
-	if (skb_queue_len(&sk->write_queue) == 1) {
+	if (skb_queue_len(&sk->sk_write_queue) == 1) {
 		/*
 		 * Only one fragment on the socket.
 		 */
@@ -467,7 +461,7 @@ static int rawv6_push_pending_frames(struct sock *sk, struct flowi *fl, struct r
 	} else {
 		u32 tmp_csum = 0;
 
-		skb_queue_walk(&sk->write_queue, skb) {
+		skb_queue_walk(&sk->sk_write_queue, skb) {
 			tmp_csum = csum_add(tmp_csum, skb->csum);
 		}
 
@@ -508,7 +502,7 @@ static int rawv6_send_hdrinc(struct sock *sk, void *from, int length,
 		goto error; 
 	skb_reserve(skb, hh_len);
 
-	skb->priority = sk->priority;
+	skb->priority = sk->sk_priority;
 	skb->dst = dst_clone(&rt->u.dst);
 
 	skb->nh.ipv6h = iph = (struct ipv6hdr *)skb_put(skb, length);
@@ -597,8 +591,11 @@ static int rawv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 			}
 		}
 
-		/* Otherwise it will be difficult to maintain sk->dst_cache. */
-		if (sk->state == TCP_ESTABLISHED &&
+		/*
+		 * Otherwise it will be difficult to maintain
+		 * sk->sk_dst_cache.
+		 */
+		if (sk->sk_state == TCP_ESTABLISHED &&
 		    !ipv6_addr_cmp(daddr, &np->daddr))
 			daddr = &np->daddr;
 
@@ -607,7 +604,7 @@ static int rawv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 		    ipv6_addr_type(daddr)&IPV6_ADDR_LINKLOCAL)
 			fl.oif = sin6->sin6_scope_id;
 	} else {
-		if (sk->state != TCP_ESTABLISHED) 
+		if (sk->sk_state != TCP_ESTABLISHED) 
 			return(-EINVAL);
 		
 		proto = inet->num;
@@ -625,7 +622,7 @@ static int rawv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 	}
 
 	if (fl.oif == 0)
-		fl.oif = sk->bound_dev_if;
+		fl.oif = sk->sk_bound_dev_if;
 
 	if (msg->msg_controllen) {
 		opt = &opt_space;
@@ -857,7 +854,7 @@ static int rawv6_ioctl(struct sock *sk, int cmd, unsigned long arg)
 	switch(cmd) {
 		case SIOCOUTQ:
 		{
-			int amount = atomic_read(&sk->wmem_alloc);
+			int amount = atomic_read(&sk->sk_wmem_alloc);
 			return put_user(amount, (int *)arg);
 		}
 		case SIOCINQ:
@@ -865,11 +862,11 @@ static int rawv6_ioctl(struct sock *sk, int cmd, unsigned long arg)
 			struct sk_buff *skb;
 			int amount = 0;
 
-			spin_lock_irq(&sk->receive_queue.lock);
-			skb = skb_peek(&sk->receive_queue);
+			spin_lock_irq(&sk->sk_receive_queue.lock);
+			skb = skb_peek(&sk->sk_receive_queue);
 			if (skb != NULL)
 				amount = skb->tail - skb->h.raw;
-			spin_unlock_irq(&sk->receive_queue.lock);
+			spin_unlock_irq(&sk->sk_receive_queue.lock);
 			return put_user(amount, (int *)arg);
 		}
 
@@ -923,16 +920,16 @@ struct raw6_iter_state {
 
 static struct sock *raw6_get_first(struct seq_file *seq)
 {
-	struct sock *sk = NULL;
+	struct sock *sk;
+	struct hlist_node *node;
 	struct raw6_iter_state* state = raw6_seq_private(seq);
 
-	for (state->bucket = 0; state->bucket < RAWV6_HTABLE_SIZE; ++state->bucket) {
-		sk = raw_v6_htable[state->bucket];
-		while (sk && sk->family != PF_INET6)
-			sk = sk->next;
-		if (sk)
-			break;
-	}
+	for (state->bucket = 0; state->bucket < RAWV6_HTABLE_SIZE; ++state->bucket)
+		sk_for_each(sk, node, &raw_v6_htable[state->bucket])
+			if (sk->sk_family == PF_INET6)
+				goto out;
+	sk = NULL;
+out:
 	return sk;
 }
 
@@ -941,13 +938,13 @@ static struct sock *raw6_get_next(struct seq_file *seq, struct sock *sk)
 	struct raw6_iter_state* state = raw6_seq_private(seq);
 
 	do {
-		sk = sk->next;
+		sk = sk_next(sk);
 try_again:
 		;
-	} while (sk && sk->family != PF_INET6);
+	} while (sk && sk->sk_family != PF_INET6);
 
 	if (!sk && ++state->bucket < RAWV6_HTABLE_SIZE) {
-		sk = raw_v6_htable[state->bucket];
+		sk = sk_head(&raw_v6_htable[state->bucket]);
 		goto try_again;
 	}
 	return sk;
@@ -1003,12 +1000,13 @@ static void raw6_sock_seq_show(struct seq_file *seq, struct sock *sp, int i)
 		   src->s6_addr32[2], src->s6_addr32[3], srcp,
 		   dest->s6_addr32[0], dest->s6_addr32[1],
 		   dest->s6_addr32[2], dest->s6_addr32[3], destp,
-		   sp->state, 
-		   atomic_read(&sp->wmem_alloc), atomic_read(&sp->rmem_alloc),
+		   sp->sk_state, 
+		   atomic_read(&sp->sk_wmem_alloc),
+		   atomic_read(&sp->sk_rmem_alloc),
 		   0, 0L, 0,
 		   sock_i_uid(sp), 0,
 		   sock_i_ino(sp),
-		   atomic_read(&sp->refcnt), sp);
+		   atomic_read(&sp->sk_refcnt), sp);
 }
 
 static int raw6_seq_show(struct seq_file *seq, void *v)

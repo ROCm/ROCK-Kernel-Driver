@@ -156,13 +156,8 @@ struct dz_serial {
   struct tty_struct       *tty;                /* tty associated */
   struct tq_struct        tqueue;              /* Queue for BH */
   struct tq_struct        tqueue_hangup;
-  struct termios          normal_termios;
-  struct termios          callout_termios;
   wait_queue_head_t       open_wait;
   wait_queue_head_t       close_wait;
-
-  long                    session;             /* Session of opening process */
-  long                    pgrp;                /* pgrp of opening process */
 
   unsigned char           is_console;          /* flag indicating a serial console */
   unsigned char           is_initialized;
@@ -170,13 +165,6 @@ struct dz_serial {
 
 static struct dz_serial multi[DZ_NB_PORT];    /* Four serial lines in the DZ chip */
 static struct dz_serial *dz_console;
-static struct tty_driver serial_driver, callout_driver;
-
-static struct tty_struct *serial_table[DZ_NB_PORT];
-static struct termios *serial_termios[DZ_NB_PORT];
-static struct termios *serial_termios_locked[DZ_NB_PORT];
-
-static int serial_refcount;
 
 /*
  * tmp_buf is used as a temporary buffer by serial_write.  We need to

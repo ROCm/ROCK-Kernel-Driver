@@ -346,6 +346,7 @@ parse_mount_options(char *options, const char *devname, struct smb_vol *vol)
 {
 	char *value;
 	char *data;
+	int  temp_len;
 
 	memset(vol,0,sizeof(struct smb_vol));
 	vol->linux_uid = current->uid;	/* current->euid instead? */
@@ -398,8 +399,9 @@ parse_mount_options(char *options, const char *devname, struct smb_vol *vol)
 				       "CIFS: invalid path to network resource\n");
 				return 1;	/* needs_arg; */
 			}
-			if (strnlen(value, 300) < 300) {
-				vol->UNC = value;
+			if ((temp_len = strnlen(value, 300)) < 300) {
+				vol->UNC = kmalloc(GFP_KERNEL, temp_len);
+				strcpy(vol->UNC,value);
 				if (strncmp(vol->UNC, "//", 2) == 0) {
 					vol->UNC[0] = '\\';
 					vol->UNC[1] = '\\';
@@ -472,8 +474,9 @@ parse_mount_options(char *options, const char *devname, struct smb_vol *vol)
 			printk(KERN_WARNING "CIFS: Missing UNC name for mount target\n");
 			return 1;
 		}
-		if (strnlen(devname, 300) < 300) {
-			vol->UNC = devname;
+		if ((temp_len = strnlen(devname, 300)) < 300) {
+			vol->UNC = kmalloc(GFP_KERNEL, temp_len);
+			strcpy(vol->UNC,devname);
 			if (strncmp(vol->UNC, "//", 2) == 0) {
 				vol->UNC[0] = '\\';
 				vol->UNC[1] = '\\';
@@ -812,6 +815,8 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 	cFYI(1, ("Entering cifs_mount. Xid: %d with: %s", xid, mount_data));
 
 	if (parse_mount_options(mount_data, devname, &volume_info)) {
+		if(volume_info.UNC)
+			kfree(volume_info.UNC);
 		FreeXid(xid);
 		return -EINVAL;
 	}
@@ -852,6 +857,8 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 			       ("Error connecting to IPv4 socket. Aborting operation"));
 			if(csocket != NULL)
 				sock_release(csocket);
+			if(volume_info.UNC)
+				kfree(volume_info.UNC);
 			FreeXid(xid);
 			return rc;
 		}
@@ -860,6 +867,8 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 		if (srvTcp == NULL) {
 			rc = -ENOMEM;
 			sock_release(csocket);
+			if(volume_info.UNC)
+				kfree(volume_info.UNC);
 			FreeXid(xid);
 			return rc;
 		} else {
@@ -943,6 +952,8 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 								 "",
 								 cifs_sb->
 								 local_nls);
+					if(volume_info.UNC)
+						kfree(volume_info.UNC);
 					FreeXid(xid);
 					return -ENODEV;
 				} else {
@@ -995,7 +1006,8 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 		if (tcon->ses->capabilities & CAP_UNIX)
 			CIFSSMBQFSUnixInfo(xid, tcon, cifs_sb->local_nls);
 	}
-
+	if(volume_info.UNC)
+		kfree(volume_info.UNC);
 	FreeXid(xid);
 	return rc;
 }
@@ -2293,7 +2305,7 @@ CIFSTCon(unsigned int xid, struct cifsSesInfo *ses,
 		length = strnlen(bcc_ptr, BCC(smb_buffer_response) - 2);
         /* skip service field (NB: this field is always ASCII) */
 		bcc_ptr += length + 1;	
-        strncpy(tcon->treeName, tree, MAX_TREE_SIZE);
+		strncpy(tcon->treeName, tree, MAX_TREE_SIZE);
 		if (smb_buffer->Flags2 &= SMBFLG2_UNICODE) {
 			length = UniStrnlen((wchar_t *) bcc_ptr, 512);
 			if (((long) bcc_ptr + (2 * length)) -

@@ -58,11 +58,6 @@ static int __init dmx3191d_detect(Scsi_Host_Template *tmpl) {
 	struct Scsi_Host *instance = NULL;
 	struct pci_dev *pdev = NULL;
 
-	if (!pci_present()) {
-		printk(KERN_WARNING "dmx3191: PCI support not enabled\n");
-		return 0;
-	}
-
 	tmpl->proc_name = DMX3191D_DRIVER_NAME;
 
 	while ((pdev = pci_find_device(PCI_VENDOR_ID_DOMEX,
@@ -139,3 +134,4 @@ static Scsi_Host_Template driver_template = {
         .use_clustering		= DISABLE_CLUSTERING,
 };
 #include "scsi_module.c"
+

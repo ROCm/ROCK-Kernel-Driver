@@ -35,9 +35,6 @@
 #define NCR5380_queue_command		cumanascsi_queue_command
 #define NCR5380_proc_info		cumanascsi_proc_info
 
-int NCR5380_proc_info(char *buffer, char **start, off_t offset,
-		      int length, int hostno, int inout);
-
 #define BOARD_NORMAL	0
 #define BOARD_NCR53C400	1
 

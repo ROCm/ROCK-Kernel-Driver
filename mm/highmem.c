@@ -472,23 +472,6 @@ void blk_queue_bounce(request_queue_t *q, struct bio **bio_orig)
 	__blk_queue_bounce(q, bio_orig, pool);
 }
 
-#if defined(CONFIG_DEBUG_HIGHMEM) && defined(CONFIG_HIGHMEM)
-void check_highmem_ptes(void)
-{
-	int idx, type;
-
-	preempt_disable();
-	for (type = 0; type < KM_TYPE_NR; type++) {
-		idx = type + KM_TYPE_NR*smp_processor_id();
-		if (!pte_none(*(kmap_pte-idx))) {
-			printk("scheduling with KM_TYPE %d held!\n", type);
-			BUG();
-		}
-	}
-	preempt_enable();
-}
-#endif
-
 #if defined(HASHED_PAGE_VIRTUAL)
 
 #define PA_HASH_ORDER	7

@@ -1,5 +1,5 @@
 /*
- * $Id: iq80310.c,v 1.9 2002/01/01 22:45:02 rmk Exp $
+ * $Id: iq80310.c,v 1.16 2003/05/21 15:15:07 dwmw2 Exp $
  *
  * Mapping for the Intel XScale IQ80310 evaluation board
  *
@@ -14,6 +14,8 @@
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
+#include <linux/init.h>
+#include <linux/slab.h>
 #include <asm/io.h>
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/map.h>
@@ -26,81 +28,32 @@
 
 static struct mtd_info *mymtd;
 
-static __u8 iq80310_read8(struct map_info *map, unsigned long ofs)
-{
-	return *(__u8 *)(map->map_priv_1 + ofs);
-}
-
-static __u16 iq80310_read16(struct map_info *map, unsigned long ofs)
-{
-	return *(__u16 *)(map->map_priv_1 + ofs);
-}
-
-static __u32 iq80310_read32(struct map_info *map, unsigned long ofs)
-{
-	return *(__u32 *)(map->map_priv_1 + ofs);
-}
-
-static void iq80310_copy_from(struct map_info *map, void *to, unsigned long from, ssize_t len)
-{
-	memcpy(to, (void *)(map->map_priv_1 + from), len);
-}
-
-static void iq80310_write8(struct map_info *map, __u8 d, unsigned long adr)
-{
-	*(__u8 *)(map->map_priv_1 + adr) = d;
-}
-
-static void iq80310_write16(struct map_info *map, __u16 d, unsigned long adr)
-{
-	*(__u16 *)(map->map_priv_1 + adr) = d;
-}
-
-static void iq80310_write32(struct map_info *map, __u32 d, unsigned long adr)
-{
-	*(__u32 *)(map->map_priv_1 + adr) = d;
-}
-
-static void iq80310_copy_to(struct map_info *map, unsigned long to, const void *from, ssize_t len)
-{
-	memcpy((void *)(map->map_priv_1 + to), from, len);
-}
-
 static struct map_info iq80310_map = {
-	.name		= "IQ80310 flash",
-	.size		= WINDOW_SIZE,
-	.buswidth	= BUSWIDTH,
-	.read8		= iq80310_read8,
-	.read16		= iq80310_read16,
-	.read32		= iq80310_read32,
-	.copy_from	= iq80310_copy_from,
-	.write8		= iq80310_write8,
-	.write16	= iq80310_write16,
-	.write32	= iq80310_write32,
-	.copy_to	= iq80310_copy_to
+	.name = "IQ80310 flash",
+	.size = WINDOW_SIZE,
+	.buswidth = BUSWIDTH,
+	.phys = WINDOW_ADDR
 };
 
 static struct mtd_partition iq80310_partitions[4] = {
 	{
-		.name		= "Firmware",
-		.size		= 0x00080000,
-		.mask_flags	= MTD_WRITEABLE  /* force read-only */
-	},
-	{
-		.name		= "Kernel",
-		.size		= 0x000a0000,
-		.offset		= 0x00080000,
-	},
-	{
-		.name		= "Filesystem",
-		.size		= 0x00600000,
-		.offset		= 0x00120000
-	},
-	{
-		.name		= "RedBoot",
-		.size		= 0x000e0000,
-		.offset		= 0x00720000,
-		.mask_flags	= MTD_WRITEABLE
+		.name =		"Firmware",
+		.size =		0x00080000,
+		.offset =	0,
+		.mask_flags =	MTD_WRITEABLE  /* force read-only */
+	},{
+		.name =		"Kernel",
+		.size =		0x000a0000,
+		.offset =	0x00080000,
+	},{
+		.name =		"Filesystem",
+		.size =		0x00600000,
+		.offset =	0x00120000
+	},{
+		.name =		"RedBoot",
+		.size =		0x000e0000,
+		.offset =	0x00720000,
+		.mask_flags =	MTD_WRITEABLE
 	}
 };
 
@@ -108,38 +61,33 @@ static struct mtd_partition iq80310_partitions[4] = {
 
 static struct mtd_info *mymtd;
 static struct mtd_partition *parsed_parts;
-
-extern int parse_redboot_partitions(struct mtd_info *master, struct mtd_partition **pparts);
+static const char *probes[] = { "RedBoot", "cmdlinepart", NULL };
 
 static int __init init_iq80310(void)
 {
 	struct mtd_partition *parts;
 	int nb_parts = 0;
 	int parsed_nr_parts = 0;
-	char *part_type = "static";
+	int ret;
 
-	iq80310_map.map_priv_1 = (unsigned long)ioremap(WINDOW_ADDR, WINDOW_SIZE);
-	if (!iq80310_map.map_priv_1) {
+	iq80310_map.virt = (unsigned long)ioremap(WINDOW_ADDR, WINDOW_SIZE);
+	if (!iq80310_map.virt) {
 		printk("Failed to ioremap\n");
 		return -EIO;
 	}
+	simple_map_init(&iq80310_map);
+
 	mymtd = do_map_probe("cfi_probe", &iq80310_map);
 	if (!mymtd) {
-		iounmap((void *)iq80310_map.map_priv_1);
+		iounmap((void *)iq80310_map.virt);
 		return -ENXIO;
 	}
-	mymtd->module = THIS_MODULE;
+	mymtd->owner = THIS_MODULE;
 
-#ifdef CONFIG_MTD_REDBOOT_PARTS
-	if (parsed_nr_parts == 0) {
-		int ret = parse_redboot_partitions(mymtd, &parsed_parts);
+	ret = parse_mtd_partitions(mymtd, probes, &parsed_parts, 0);
 
-		if (ret > 0) {
-			part_type = "RedBoot";
-			parsed_nr_parts = ret;
-		}
-	}
-#endif
+	if (ret > 0)
+		parsed_nr_parts = ret;
 
 	if (parsed_nr_parts > 0) {
 		parts = parsed_parts;
@@ -148,7 +96,6 @@ static int __init init_iq80310(void)
 		parts = iq80310_partitions;
 		nb_parts = NB_OF(iq80310_partitions);
 	}
-	printk(KERN_NOTICE "Using %s partition definition\n", part_type);
 	add_mtd_partitions(mymtd, parts, nb_parts);
 	return 0;
 }
@@ -161,8 +108,8 @@ static void __exit cleanup_iq80310(void)
 		if (parsed_parts)
 			kfree(parsed_parts);
 	}
-	if (iq80310_map.map_priv_1)
-		iounmap((void *)iq80310_map.map_priv_1);
+	if (iq80310_map.virt)
+		iounmap((void *)iq80310_map.virt);
 }
 
 module_init(init_iq80310);

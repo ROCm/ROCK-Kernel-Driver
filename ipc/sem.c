@@ -268,39 +268,39 @@ static int try_atomic_semop (struct sem_array * sma, struct sembuf * sops,
 	for (sop = sops; sop < sops + nsops; sop++) {
 		curr = sma->sem_base + sop->sem_num;
 		sem_op = sop->sem_op;
-
-		if (!sem_op && curr->semval)
+		result = curr->semval;
+  
+		if (!sem_op && result)
 			goto would_block;
 
-		curr->sempid = (curr->sempid << 16) | pid;
-		curr->semval += sem_op;
-		if (sop->sem_flg & SEM_UNDO)
-		{
+		result += sem_op;
+		if (result < 0)
+			goto would_block;
+		if (result > SEMVMX)
+			goto out_of_range;
+		if (sop->sem_flg & SEM_UNDO) {
 			int undo = un->semadj[sop->sem_num] - sem_op;
 			/*
 	 		 *	Exceeding the undo range is an error.
 			 */
 			if (undo < (-SEMAEM - 1) || undo > SEMAEM)
-			{
-				/* Don't undo the undo */
-				sop->sem_flg &= ~SEM_UNDO;
 				goto out_of_range;
-			}
-			un->semadj[sop->sem_num] = undo;
 		}
-		if (curr->semval < 0)
-			goto would_block;
-		if (curr->semval > SEMVMX)
-			goto out_of_range;
+		curr->semval = result;
 	}
 
-	if (do_undo)
-	{
-		sop--;
+	if (do_undo) {
 		result = 0;
 		goto undo;
 	}
-
+	sop--;
+	while (sop >= sops) {
+		sma->sem_base[sop->sem_num].sempid = pid;
+		if (sop->sem_flg & SEM_UNDO)
+			un->semadj[sop->sem_num] -= sop->sem_op;
+		sop--;
+	}
+	
 	sma->sem_otime = get_seconds();
 	return 0;
 
@@ -315,13 +315,9 @@ would_block:
 		result = 1;
 
 undo:
+	sop--;
 	while (sop >= sops) {
-		curr = sma->sem_base + sop->sem_num;
-		curr->semval -= sop->sem_op;
-		curr->sempid >>= 16;
-
-		if (sop->sem_flg & SEM_UNDO)
-			un->semadj[sop->sem_num] += sop->sem_op;
+		sma->sem_base[sop->sem_num].semval -= sop->sem_op;
 		sop--;
 	}
 
@@ -659,7 +655,7 @@ static int semctl_main(int semid, int semnum, int cmd, int version, union semun 
 		err = curr->semval;
 		goto out_unlock;
 	case GETPID:
-		err = curr->sempid & 0xffff;
+		err = curr->sempid;
 		goto out_unlock;
 	case GETNCNT:
 		err = count_semncnt(sma,semnum);

@@ -42,12 +42,12 @@ extern struct bus_type sa1111_bus_type;
 /*
  * Return whether the given device DMA address mask can be supported
  * properly.  For example, if your device can only drive the low 24-bits
- * during PCI bus mastering, then you would pass 0x00ffffff as the mask
+ * during bus mastering, then you would pass 0x00ffffff as the mask
  * to this function.
  */
 static inline int dma_supported(struct device *dev, u64 mask)
 {
-	return 1;
+	return dev->dma_mask && *dev->dma_mask != 0;
 }
 
 static inline int dma_set_mask(struct device *dev, u64 dma_mask)
@@ -81,14 +81,8 @@ static inline int dma_is_consistent(dma_addr_t handle)
  * return the CPU-viewed address, and sets @handle to be the
  * device-viewed address.
  */
-static inline void *
-dma_alloc_coherent(struct device *dev, size_t size, dma_addr_t *handle, int gfp)
-{
-	if (dev == NULL || dmadev_is_sa1111(dev) || *dev->dma_mask != 0xffffffff)
-		gfp |= GFP_DMA;
-
-	return consistent_alloc(gfp, size, handle, 0);
-}
+extern void *
+dma_alloc_coherent(struct device *dev, size_t size, dma_addr_t *handle, int gfp);
 
 /**
  * dma_free_coherent - free memory allocated by dma_alloc_coherent

@@ -505,8 +505,8 @@ static const char *adpt_info(struct Scsi_Host *host)
 	return (char *) (pHba->detail);
 }
 
-static int adpt_proc_info(char *buffer, char **start, off_t offset,
-		  int length, int hostno, int inout)
+static int adpt_proc_info(struct Scsi_Host *host, char *buffer, char **start, off_t offset,
+		  int length, int inout)
 {
 	struct adpt_device* d;
 	int id;
@@ -515,7 +515,6 @@ static int adpt_proc_info(char *buffer, char **start, off_t offset,
 	int begin = 0;
 	int pos = 0;
 	adpt_hba* pHba;
-	struct Scsi_Host *host;
 	int unit;
 
 	*start = buffer;
@@ -539,7 +538,7 @@ static int adpt_proc_info(char *buffer, char **start, off_t offset,
 	// Find HBA (host bus adapter) we are looking for
 	down(&adpt_configuration_lock);
 	for (pHba = hba_chain; pHba; pHba = pHba->next) {
-		if (pHba->host->host_no == hostno) {
+		if (pHba->host == host) {
 			break;	/* found adapter */
 		}
 	}
@@ -2539,7 +2538,7 @@ static int adpt_i2o_activate_hba(adpt_hba* pHba)
 
 	if(pHba->initialized ) {
 		if (adpt_i2o_status_get(pHba) < 0) {
-			if((rcode = adpt_i2o_reset_hba(pHba) != 0)){
+			if((rcode = adpt_i2o_reset_hba(pHba)) != 0){
 				printk(KERN_WARNING"%s: Could NOT reset.\n", pHba->name);
 				return rcode;
 			}
@@ -2565,7 +2564,7 @@ static int adpt_i2o_activate_hba(adpt_hba* pHba)
 			}
 		}
 	} else {
-		if((rcode = adpt_i2o_reset_hba(pHba) != 0)){
+		if((rcode = adpt_i2o_reset_hba(pHba)) != 0){
 			printk(KERN_WARNING"%s: Could NOT reset.\n", pHba->name);
 			return rcode;
 		}

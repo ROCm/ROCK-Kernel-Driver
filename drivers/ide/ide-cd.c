@@ -666,8 +666,10 @@ static void cdrom_end_request (ide_drive_t *drive, int uptodate)
 		struct cdrom_info *info = drive->driver_data;
 		void *sense = &info->sense_data;
 		
-		if (failed && failed->sense)
+		if (failed && failed->sense) {
 			sense = failed->sense;
+			failed->sense_len = rq->sense_len;
+		}
 
 		cdrom_analyze_sense_data(drive, failed, sense);
 	}
@@ -723,7 +725,7 @@ static int cdrom_decode_status(ide_drive_t *drive, int good_stat, int *stat_ret)
 		 * scsi status byte
 		 */
 		if ((rq->flags & REQ_BLOCK_PC) && !rq->errors)
-			rq->errors = CHECK_CONDITION;
+			rq->errors = SAM_STAT_CHECK_CONDITION;
 
 		/* Check for tray open. */
 		if (sense_key == NOT_READY) {
@@ -1471,8 +1473,9 @@ static ide_startstop_t cdrom_pc_intr (ide_drive_t *drive)
 		/* Keep count of how much data we've moved. */
 		rq->data += thislen;
 		rq->data_len -= thislen;
-		if (rq->cmd[0] == GPCMD_REQUEST_SENSE)
-			rq->sense_len++;
+
+		if (rq->flags & REQ_SENSE)
+			rq->sense_len += thislen;
 	} else {
 confused:
 		printk ("%s: cdrom_pc_intr: The drive "
@@ -1609,10 +1612,18 @@ static inline int cdrom_write_check_ireason(ide_drive_t *drive, int len, int ire
 
 static void post_transform_command(struct request *req)
 {
-	char *ibuf = req->buffer;
 	u8 *c = req->cmd;
+	char *ibuf;
 
 	if (!blk_pc_request(req))
+		return;
+
+	if (req->bio)
+		ibuf = bio_data(req->bio);
+	else
+		ibuf = req->data;
+
+	if (!ibuf)
 		return;
 
 	/*
@@ -2993,12 +3004,6 @@ static int ide_cdrom_prep_fs(request_queue_t *q, struct request *rq)
 	long block = (long)rq->hard_sector / (hard_sect >> 9);
 	unsigned long blocks = rq->hard_nr_sectors / (hard_sect >> 9);
 
-	BUG_ON(sizeof(rq->hard_sector) > 4 && (rq->hard_sector >> 32));
-
-	if (rq->hard_nr_sectors != rq->nr_sectors) {
-		printk(KERN_ERR "ide-cd: hard_nr_sectors differs from nr_sectors! %lu %lu\n",
-				rq->nr_sectors, rq->hard_nr_sectors);
-	}
 	memset(rq->cmd, 0, sizeof(rq->cmd));
 
 	if (rq_data_dir(rq) == READ)
@@ -3248,6 +3253,45 @@ int ide_cdrom_cleanup(ide_drive_t *drive)
 
 static int ide_cdrom_attach (ide_drive_t *drive);
 
+/*
+ * Power Management state machine.
+ *
+ * We don't do much for CDs right now.
+ */
+
+static void ide_cdrom_complete_power_step (ide_drive_t *drive, struct request *rq, u8 stat, u8 error)
+{
+}
+
+static ide_startstop_t ide_cdrom_start_power_step (ide_drive_t *drive, struct request *rq)
+{
+	ide_task_t *args = rq->special;
+
+	memset(args, 0, sizeof(*args));
+
+	switch (rq->pm->pm_step) {
+	case ide_pm_state_start_suspend:
+		break;
+
+	case ide_pm_state_start_resume:	/* Resume step 1 (restore DMA) */
+		/*
+		 * Right now, all we do is call hwif->ide_dma_check(drive),
+		 * we could be smarter and check for current xfer_speed
+		 * in struct drive etc...
+		 * Also, this step could be implemented as a generic helper
+		 * as most subdrivers will use it.
+		 */
+		if ((drive->id->capability & 1) == 0)
+			break;
+		if (HWIF(drive)->ide_dma_check == NULL)
+			break;
+		HWIF(drive)->ide_dma_check(drive);
+		break;
+	}
+	rq->pm->pm_step = ide_pm_state_completed;
+	return ide_stopped;
+}
+
 static ide_driver_t ide_cdrom_driver = {
 	.owner			= THIS_MODULE,
 	.name			= "ide-cdrom",
@@ -3264,6 +3308,12 @@ static ide_driver_t ide_cdrom_driver = {
 	.capacity		= ide_cdrom_capacity,
 	.attach			= ide_cdrom_attach,
 	.drives			= LIST_HEAD_INIT(ide_cdrom_driver.drives),
+	.start_power_step	= ide_cdrom_start_power_step,
+	.complete_power_step	= ide_cdrom_complete_power_step,
+	.gen_driver		= {
+		.suspend	= generic_ide_suspend,
+		.resume		= generic_ide_resume,
+	}
 };
 
 static int idecd_open(struct inode * inode, struct file * file)
@@ -3371,7 +3421,6 @@ static int ide_cdrom_attach (ide_drive_t *drive)
 	drive->driver_data = info;
 	DRIVER(drive)->busy++;
 	g->minors = 1;
-	g->minor_shift = 0;
 	snprintf(g->devfs_name, sizeof(g->devfs_name),
 			"%s/cd", drive->devfs_name);
 	g->driverfs_dev = &drive->gendev;

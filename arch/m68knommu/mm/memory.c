@@ -114,51 +114,18 @@ unsigned long kernel_map(unsigned long paddr, unsigned long size,
 
 int is_in_rom(unsigned long addr)
 {
+	extern unsigned long _ramstart, _ramend;
 
-#ifdef CONFIG_COLDFIRE
-	{
-		extern unsigned long    _ramstart, _ramend;
-
-		/* Anything not in operational RAM is returned as in rom! */
-		if (addr < _ramstart || addr >= _ramend)
-			return(1);
-	}
-#endif
-
-#if defined(CONFIG_PILOT) || defined(CONFIG_UCSIMM)
-	if (addr >= 0x10c00000)
-		return 1;
-#endif
-
-#ifdef CONFIG_M68EZ328ADS
-	if ( 0x00200000 <= addr && addr < 0x00400000)
-		return 1;
-#endif
-
-#ifdef CONFIG_M68332
-	extern char _etext;
-	
- #ifdef SHGLCORE_ROM_BANK_0_ADDR
-	if ((addr >= SHGLCORE_ROM_BANK_0_ADDR) &&
-	    (addr < (SHGLCORE_ROM_BANK_0_ADDR+SHGLCORE_ROM_BANK_0_LENGTH)))
-		return 1;
- #endif
- #ifdef SHGLCORE_ROM_BANK_1_ADDR
-	else if ((addr >= SHGLCORE_ROM_BANK_1_ADDR) &&
-	    (addr < (SHGLCORE_ROM_BANK_1_ADDR+SHGLCORE_ROM_BANK_1_LENGTH)))
-		return 1;
- #endif
- #ifdef SHGLCORE_FLASH_BANK_0_ADDR
-	else if ((addr >= SHGLCORE_FLASH_BANK_0_ADDR) &&
-	    (addr < (SHGLCORE_FLASH_BANK_0_ADDR+SHGLCORE_FLASH_BANK_0_LENGTH)))
-		return 1;
- #endif
- #ifdef SHGLCORE_FLASH_BANK_1_ADDR
-	else if ((addr >= SHGLCORE_FLASH_BANK_1_ADDR) &&
-	    (addr < (SHGLCORE_FLASH_BANK_1_ADDR+SHGLCORE_FLASH_BANK_1_LENGTH)))
-		return 1;
- #endif
-#endif
+	/*
+	 *	What we are really trying to do is determine if addr is
+	 *	in an allocated kernel memory region. If not then assume
+	 *	we cannot free it or otherwise de-allocate it. Ideally
+	 *	we could restrict this to really being in a ROM or flash,
+	 *	but that would need to be done on a board by board basis,
+	 *	not globally.
+	 */
+	if ((addr < _ramstart) || (addr >= _ramend))
+		return(1);
 
 	/* Default case, not in ROM */
 	return(0);

@@ -265,7 +265,7 @@ sort_regions (struct rsvd_region *rsvd_region, int max)
 static void
 find_memory (void)
 {
-#	define KERNEL_END	(&_end)
+#	define KERNEL_END	((unsigned long) &_end)
 	unsigned long bootmap_size;
 	unsigned long max_pfn;
 	int n = 0;
@@ -286,8 +286,8 @@ find_memory (void)
 				+ strlen(__va(ia64_boot_param->command_line)) + 1);
 	n++;
 
-	rsvd_region[n].start = (unsigned long) ia64_imva((void *)KERNEL_START);
-	rsvd_region[n].end   = (unsigned long) ia64_imva(KERNEL_END);
+	rsvd_region[n].start = KERNEL_START;
+	rsvd_region[n].end   = KERNEL_END;
 	n++;
 
 #ifdef CONFIG_BLK_DEV_INITRD
@@ -347,47 +347,6 @@ find_memory (void)
 #endif
 }
 
-/*
- * There are two places in the performance critical path of
- * the exception handling code where we need to know the physical
- * address of the swapper_pg_dir structure.  This routine
- * patches the "movl" instructions to load the value needed.
- */
-static void __init
-patch_ivt_with_phys_swapper_pg_dir(void)
-{
-	extern char ia64_ivt_patch1[], ia64_ivt_patch2[];
-	unsigned long spd = ia64_tpa((__u64)swapper_pg_dir);
-	unsigned long *p;
-
-	p = (unsigned long *)ia64_imva(ia64_ivt_patch1);
-
-	*p = (*p & 0x3fffffffffffUL) |
-		((spd & 0x000000ffffc00000UL)<<24);
-	p++;
-	*p = (*p & 0xf000080fff800000UL) |
-		((spd & 0x8000000000000000UL) >> 4)  |
-		((spd & 0x7fffff0000000000UL) >> 40) |
-		((spd & 0x00000000001f0000UL) << 29) |
-		((spd & 0x0000000000200000UL) << 23) |
-		((spd & 0x000000000000ff80UL) << 43) |
-		((spd & 0x000000000000007fUL) << 36);
-
-	p = (unsigned long *)ia64_imva(ia64_ivt_patch2);
-
-	*p = (*p & 0x3fffffffffffUL) |
-		((spd & 0x000000ffffc00000UL)<<24);
-	p++;
-	*p = (*p & 0xf000080fff800000UL) |
-		((spd & 0x8000000000000000UL) >> 4)  |
-		((spd & 0x7fffff0000000000UL) >> 40) |
-		((spd & 0x00000000001f0000UL) << 29) |
-		((spd & 0x0000000000200000UL) << 23) |
-		((spd & 0x000000000000ff80UL) << 43) |
-		((spd & 0x000000000000007fUL) << 36);
-}
-
-
 void __init
 setup_arch (char **cmdline_p)
 {
@@ -396,11 +355,8 @@ setup_arch (char **cmdline_p)
 
 	unw_init();
 
-	patch_ivt_with_phys_swapper_pg_dir();
-
 	*cmdline_p = __va(ia64_boot_param->command_line);
-	strncpy(saved_command_line, *cmdline_p, sizeof(saved_command_line));
-	saved_command_line[COMMAND_LINE_SIZE-1] = '\0';		/* for safety */
+	strlcpy(saved_command_line, *cmdline_p, sizeof(saved_command_line));
 
 	efi_init();
 
@@ -789,12 +745,16 @@ cpu_init (void)
 	 */
 	ia64_set_dcr(  IA64_DCR_DP | IA64_DCR_DK | IA64_DCR_DX | IA64_DCR_DR
 		     | IA64_DCR_DA | IA64_DCR_DD | IA64_DCR_LC);
+#ifndef CONFIG_SMP
+	ia64_set_fpu_owner(0);
+#endif
+
 	atomic_inc(&init_mm.mm_count);
 	current->active_mm = &init_mm;
 	if (current->mm)
 		BUG();
 
-	ia64_mmu_init(ia64_imva(cpu_data));
+	ia64_mmu_init(cpu_data);
 
 #ifdef CONFIG_IA32_SUPPORT
 	/* initialize global ia32 state - CR0 and CR4 */

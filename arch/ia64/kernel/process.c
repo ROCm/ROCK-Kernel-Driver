@@ -33,14 +33,15 @@
 #include <asm/unwind.h>
 #include <asm/user.h>
 
+#ifdef CONFIG_IA64_SGI_SN
+#include <asm/sn/idle.h>
+#endif
+
 #ifdef CONFIG_PERFMON
 # include <asm/perfmon.h>
 #endif
 
 #include "sigframe.h"
-
-void (*ia64_mark_idle)(int);
-
 
 void
 ia64_do_show_stack (struct unw_frame_info *info, void *arg)
@@ -174,8 +175,6 @@ default_idle (void)
 void __attribute__((noreturn))
 cpu_idle (void *unused)
 {
-	void (*mark_idle)(int) = ia64_mark_idle;
-
 	/* endless idle loop with no priority at all */
 	while (1) {
 		void (*idle)(void) = pm_idle;
@@ -188,13 +187,15 @@ cpu_idle (void *unused)
 #endif
 
 		while (!need_resched()) {
-			if (mark_idle)
-				(*mark_idle)(1);
+#ifdef CONFIG_IA64_SGI_SN
+			snidle();
+#endif
 			(*idle)();
 		}
 
-		if (mark_idle)
-			(*mark_idle)(0);
+#ifdef CONFIG_IA64_SGI_SN
+		snidleoff();
+#endif
 
 #ifdef CONFIG_SMP
 		normal_xtp();
@@ -378,7 +379,7 @@ copy_thread (int nr, unsigned long clone_flags,
 #	define THREAD_FLAGS_TO_SET	0
 	p->thread.flags = ((current->thread.flags & ~THREAD_FLAGS_TO_CLEAR)
 			   | THREAD_FLAGS_TO_SET);
-	ia64_drop_fpu(p);	/* don't pick up stale state from a CPU's fph */
+	p->thread.last_fph_cpu = -1;
 #ifdef CONFIG_IA32_SUPPORT
 	/*
 	 * If we're cloning an IA32 task then save the IA32 extra
@@ -578,8 +579,7 @@ pid_t
 kernel_thread (int (*fn)(void *), void *arg, unsigned long flags)
 {
 	struct task_struct *parent = current;
-	int result; 
-	pid_t tid;
+	int result, tid;
 
 	tid = clone(flags | CLONE_VM | CLONE_UNTRACED, 0);
 	if (parent != current) {
@@ -606,7 +606,11 @@ flush_thread (void)
 {
 	/* drop floating-point and debug-register state if it exists: */
 	current->thread.flags &= ~(IA64_THREAD_FPH_VALID | IA64_THREAD_DBG_VALID);
-	ia64_drop_fpu(current);
+
+#ifndef CONFIG_SMP
+	if (ia64_get_fpu_owner() == current)
+		ia64_set_fpu_owner(0);
+#endif
 }
 
 #ifdef CONFIG_PERFMON
@@ -644,10 +648,13 @@ release_thread (struct task_struct *task)
 void
 exit_thread (void)
 {
-	ia64_drop_fpu(current);
+#ifndef CONFIG_SMP
+	if (ia64_get_fpu_owner() == current)
+		ia64_set_fpu_owner(0);
+#endif
 #ifdef CONFIG_PERFMON
        /* if needed, stop monitoring and flush state to perfmon context */
-	if (current->thread.pfm_context)
+	if (current->thread.pfm_context) 
 		pfm_flush_regs(current);
 
 	/* free debug register resources */

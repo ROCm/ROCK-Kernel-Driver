@@ -4290,14 +4290,14 @@ STATIC void         asc_prt_hex(char *f, uchar *, int);
  * user just won't get all the available statistics.
  */
 int
-advansys_proc_info(char *buffer, char **start, off_t offset, int length,
-                   int hostno, int inout)
+advansys_proc_info(struct Scsi_Host *shost, char *buffer, char **start,
+		off_t offset, int length, int inout)
 {
     struct Scsi_Host    *shp;
     asc_board_t         *boardp;
     int                 i;
     char                *cp;
-    int                 cplen;
+    int			cplen;
     int                 cnt;
     int                 totcnt;
     int                 leftlen;
@@ -4322,7 +4322,7 @@ advansys_proc_info(char *buffer, char **start, off_t offset, int length,
 
     /* Find the specified board. */
     for (i = 0; i < asc_board_count; i++) {
-        if (asc_host[i]->host_no == hostno) {
+        if (asc_host[i]->host_no == shost->host_no) {
             break;
         }
     }
@@ -4767,7 +4767,7 @@ advansys_detect(Scsi_Host_Template *tpnt)
 
 	    scsi_set_device(shp, &pci_devp->dev);
 
-            /* Save a pointer to the Scsi_host of each board found. */
+            /* Save a pointer to the Scsi_Host of each board found. */
             asc_host[asc_board_count++] = shp;
 
             /* Initialize private per board data */

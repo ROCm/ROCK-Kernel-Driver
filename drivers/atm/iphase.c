@@ -1782,14 +1782,14 @@ static int open_tx(struct atm_vcc *vcc)
         if (ia_vcc->pcr < iadev->rate_limit) {
            if (vcc->qos.txtp.max_sdu != 0) {
                if (ia_vcc->pcr > 60000)
-                  vcc->sk->sndbuf = vcc->qos.txtp.max_sdu * 5;
+                  vcc->sk->sk_sndbuf = vcc->qos.txtp.max_sdu * 5;
                else if (ia_vcc->pcr > 2000)
-                  vcc->sk->sndbuf = vcc->qos.txtp.max_sdu * 4;
+                  vcc->sk->sk_sndbuf = vcc->qos.txtp.max_sdu * 4;
                else
-                 vcc->sk->sndbuf = 3*vcc->qos.txtp.max_sdu;
+                 vcc->sk->sk_sndbuf = vcc->qos.txtp.max_sdu * 3;
            }
            else
-             vcc->sk->sndbuf = 24576;
+             vcc->sk->sk_sndbuf = 24576;
         }
            
 	vc = (struct main_vc *)iadev->MAIN_VC_TABLE_ADDR;  

@@ -166,15 +166,10 @@ typedef struct _synclinkmp_info {
 
 	struct mgsl_icount	icount;
 
-	struct termios		normal_termios;
-	struct termios		callout_termios;
-
 	struct tty_struct 	*tty;
 	int			timeout;
 	int			x_char;		/* xon/xoff character */
 	int			blocked_open;	/* # of blocked opens */
-	long			session;	/* Session of opening process */
-	long			pgrp;		/* pgrp of opening process */
 	u16			read_status_mask1;  /* break detection (SR1 indications) */
 	u16			read_status_mask2;  /* parity/framing/overun (SR2 indications) */
 	unsigned char 		ignore_status_mask1;  /* break detection (SR1 indications) */
@@ -524,15 +519,10 @@ static struct pci_driver synclinkmp_pci_driver = {
 };
 
 
-static struct tty_driver serial_driver, callout_driver;
-static int serial_refcount;
+static struct tty_driver *serial_driver;
 
 /* number of characters left in xmit buffer before we ask for more */
 #define WAKEUP_CHARS 256
-
-static struct tty_struct *serial_table[MAX_DEVICES];
-static struct termios *serial_termios[MAX_DEVICES];
-static struct termios *serial_termios_locked[MAX_DEVICES];
 
 #ifndef MIN
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
@@ -805,18 +795,6 @@ static int open(struct tty_struct *tty, struct file *filp)
 		goto cleanup;
 	}
 
-	if ((info->count == 1) &&
-	    info->flags & ASYNC_SPLIT_TERMIOS) {
-		if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
-			*tty->termios = info->normal_termios;
-		else
-			*tty->termios = info->callout_termios;
-		change_params(info);
-	}
-
-	info->session = current->session;
-	info->pgrp    = current->pgrp;
-
 	if (debug_level >= DEBUG_LEVEL_INFO)
 		printk("%s(%d):%s open() success\n",
 			 __FILE__,__LINE__, info->device_name);
@@ -868,14 +846,6 @@ static void close(struct tty_struct *tty, struct file *filp)
 
 	info->flags |= ASYNC_CLOSING;
 
-	/* Save the termios structure, since this port may have
-	 * separate termios for callout and dialin.
-	 */
-	if (info->flags & ASYNC_NORMAL_ACTIVE)
-		info->normal_termios = *tty->termios;
-	if (info->flags & ASYNC_CALLOUT_ACTIVE)
-		info->callout_termios = *tty->termios;
-
 	/* set tty->closing to notify line discipline to
 	 * only process XON/XOFF characters. Only the N_TTY
 	 * discipline appears to use this (ppp does not).
@@ -913,8 +883,7 @@ static void close(struct tty_struct *tty, struct file *filp)
 		wake_up_interruptible(&info->open_wait);
 	}
 
-	info->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CALLOUT_ACTIVE|
-			 ASYNC_CLOSING);
+	info->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CLOSING);
 
 	wake_up_interruptible(&info->close_wait);
 
@@ -942,7 +911,7 @@ static void hangup(struct tty_struct *tty)
 	shutdown(info);
 
 	info->count = 0;
-	info->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CALLOUT_ACTIVE);
+	info->flags &= ~ASYNC_NORMAL_ACTIVE;
 	info->tty = 0;
 
 	wake_up_interruptible(&info->open_wait);
@@ -2402,8 +2371,7 @@ void isr_io_pin( SLMP_INFO *info, u16 status )
 				       (status & SerialSignal_DCD) ? "on" : "off");
 			if (status & SerialSignal_DCD)
 				wake_up_interruptible(&info->open_wait);
-			else if (!((info->flags & ASYNC_CALLOUT_ACTIVE) &&
-				   (info->flags & ASYNC_CALLOUT_NOHUP))) {
+			else {
 				if ( debug_level >= DEBUG_LEVEL_ISR )
 					printk("doing serial hangup...");
 				if (info->tty)
@@ -3202,39 +3170,15 @@ static int block_til_ready(struct tty_struct *tty, struct file *filp,
 		printk("%s(%d):%s block_til_ready()\n",
 			 __FILE__,__LINE__, tty->driver->name );
 
-	if (tty->driver->subtype == SERIAL_TYPE_CALLOUT) {
-		/* this is a callout device */
-		/* just verify that normal device is not in use */
-		if (info->flags & ASYNC_NORMAL_ACTIVE)
-			return -EBUSY;
-		if ((info->flags & ASYNC_CALLOUT_ACTIVE) &&
-		    (info->flags & ASYNC_SESSION_LOCKOUT) &&
-		    (info->session != current->session))
-		    return -EBUSY;
-		if ((info->flags & ASYNC_CALLOUT_ACTIVE) &&
-		    (info->flags & ASYNC_PGRP_LOCKOUT) &&
-		    (info->pgrp != current->pgrp))
-		    return -EBUSY;
-		info->flags |= ASYNC_CALLOUT_ACTIVE;
-		return 0;
-	}
-
 	if (filp->f_flags & O_NONBLOCK || tty->flags & (1 << TTY_IO_ERROR)){
 		/* nonblock mode is set or port is not enabled */
 		/* just verify that callout device is not active */
-		if (info->flags & ASYNC_CALLOUT_ACTIVE)
-			return -EBUSY;
 		info->flags |= ASYNC_NORMAL_ACTIVE;
 		return 0;
 	}
 
-	if (info->flags & ASYNC_CALLOUT_ACTIVE) {
-		if (info->normal_termios.c_cflag & CLOCAL)
-			do_clocal = 1;
-	} else {
-		if (tty->termios->c_cflag & CLOCAL)
-			do_clocal = 1;
-	}
+	if (tty->termios->c_cflag & CLOCAL)
+		do_clocal = 1;
 
 	/* Wait for carrier detect and the line to become
 	 * free (i.e., not in use by the callout).  While we are in
@@ -3259,8 +3203,7 @@ static int block_til_ready(struct tty_struct *tty, struct file *filp,
 	info->blocked_open++;
 
 	while (1) {
-		if (!(info->flags & ASYNC_CALLOUT_ACTIVE) &&
- 		    (tty->termios->c_cflag & CBAUD)) {
+		if ((tty->termios->c_cflag & CBAUD)) {
 			spin_lock_irqsave(&info->lock,flags);
 			info->serial_signals |= SerialSignal_RTS + SerialSignal_DTR;
 		 	set_signals(info);
@@ -3279,8 +3222,7 @@ static int block_til_ready(struct tty_struct *tty, struct file *filp,
 	 	get_signals(info);
 		spin_unlock_irqrestore(&info->lock,flags);
 
- 		if (!(info->flags & ASYNC_CALLOUT_ACTIVE) &&
- 		    !(info->flags & ASYNC_CLOSING) &&
+ 		if (!(info->flags & ASYNC_CLOSING) &&
  		    (do_clocal || (info->serial_signals & SerialSignal_DCD)) ) {
  			break;
 		}
@@ -3804,6 +3746,30 @@ void device_init(int adapter_num, struct pci_dev *pdev)
 	}
 }
 
+static struct tty_operations ops = {
+	.open = open,
+	.close = close,
+	.write = write,
+	.put_char = put_char,
+	.flush_chars = flush_chars,
+	.write_room = write_room,
+	.chars_in_buffer = chars_in_buffer,
+	.flush_buffer = flush_buffer,
+	.ioctl = ioctl,
+	.throttle = throttle,
+	.unthrottle = unthrottle,
+	.send_xchar = send_xchar,
+	.break_ctl = set_break,
+	.wait_until_sent = wait_until_sent,
+ 	.read_proc = read_proc,
+	.set_termios = set_termios,
+	.stop = tx_hold,
+	.start = tx_release,
+	.hangup = hangup,
+	.tiocmget = tiocmget,
+	.tiocmset = tiocmset,
+};
+
 /* Driver initialization entry point.
  */
 
@@ -3826,84 +3792,31 @@ static int __init synclinkmp_init(void)
 		return -ENODEV;
 	}
 
-	memset(serial_table,0,sizeof(struct tty_struct*)*MAX_DEVICES);
-	memset(serial_termios,0,sizeof(struct termios*)*MAX_DEVICES);
-	memset(serial_termios_locked,0,sizeof(struct termios*)*MAX_DEVICES);
+	serial_driver = alloc_tty_driver(synclinkmp_device_count);
+	if (!serial_driver)
+		return -ENOMEM;
 
 	/* Initialize the tty_driver structure */
 
-	memset(&serial_driver, 0, sizeof(struct tty_driver));
-	serial_driver.magic = TTY_DRIVER_MAGIC;
-	serial_driver.owner = THIS_MODULE;
-	serial_driver.driver_name = "synclinkmp";
-	serial_driver.name = "ttySLM";
-	serial_driver.major = ttymajor;
-	serial_driver.minor_start = 64;
-	serial_driver.num = synclinkmp_device_count;
-	serial_driver.type = TTY_DRIVER_TYPE_SERIAL;
-	serial_driver.subtype = SERIAL_TYPE_NORMAL;
-	serial_driver.init_termios = tty_std_termios;
-	serial_driver.init_termios.c_cflag =
+	serial_driver->owner = THIS_MODULE;
+	serial_driver->driver_name = "synclinkmp";
+	serial_driver->name = "ttySLM";
+	serial_driver->major = ttymajor;
+	serial_driver->minor_start = 64;
+	serial_driver->type = TTY_DRIVER_TYPE_SERIAL;
+	serial_driver->subtype = SERIAL_TYPE_NORMAL;
+	serial_driver->init_termios = tty_std_termios;
+	serial_driver->init_termios.c_cflag =
 		B9600 | CS8 | CREAD | HUPCL | CLOCAL;
-	serial_driver.flags = TTY_DRIVER_REAL_RAW;
-	serial_driver.refcount = &serial_refcount;
-	serial_driver.table = serial_table;
-	serial_driver.termios = serial_termios;
-	serial_driver.termios_locked = serial_termios_locked;
-
-	serial_driver.open = open;
-	serial_driver.close = close;
-	serial_driver.write = write;
-	serial_driver.put_char = put_char;
-	serial_driver.flush_chars = flush_chars;
-	serial_driver.write_room = write_room;
-	serial_driver.chars_in_buffer = chars_in_buffer;
-	serial_driver.flush_buffer = flush_buffer;
-	serial_driver.ioctl = ioctl;
-	serial_driver.throttle = throttle;
-	serial_driver.unthrottle = unthrottle;
-	serial_driver.send_xchar = send_xchar;
-	serial_driver.break_ctl = set_break;
-	serial_driver.wait_until_sent = wait_until_sent;
- 	serial_driver.read_proc = read_proc;
-	serial_driver.set_termios = set_termios;
-	serial_driver.stop = tx_hold;
-	serial_driver.start = tx_release;
-	serial_driver.hangup = hangup;
-	serial_driver.tiocmget = tiocmget;
-	serial_driver.tiocmset = tiocmset;
-
-	/*
-	 * The callout device is just like normal device except for
-	 * major number and the subtype code.
-	 */
-	callout_driver = serial_driver;
-	callout_driver.name = "cuaSLM";
-	callout_driver.major = cuamajor;
-	callout_driver.subtype = SERIAL_TYPE_CALLOUT;
-	callout_driver.read_proc = 0;
-	callout_driver.proc_entry = 0;
-
-	if (tty_register_driver(&serial_driver) < 0)
+	serial_driver->flags = TTY_DRIVER_REAL_RAW;
+	tty_set_operations(serial_driver, &ops);
+	if (tty_register_driver(serial_driver) < 0)
 		printk("%s(%d):Couldn't register serial driver\n",
 			__FILE__,__LINE__);
 
-	if (tty_register_driver(&callout_driver) < 0)
-		printk("%s(%d):Couldn't register callout driver\n",
-			__FILE__,__LINE__);
-
- 	printk("%s %s, tty major#%d callout major#%d\n",
+ 	printk("%s %s, tty major#%d\n",
 		driver_name, driver_version,
-		serial_driver.major, callout_driver.major);
-
-	/* Propagate these values to all device instances */
-
-	info = synclinkmp_device_list;
-	while(info){
-		info->callout_termios = callout_driver.init_termios;
-		info->normal_termios  = serial_driver.init_termios;
-		info = info->next_device;
-	}
+		serial_driver->major);
 
 	return 0;
 }
@@ -3917,12 +3830,10 @@ static void __exit synclinkmp_exit(void)
 
 	printk("Unloading %s %s\n", driver_name, driver_version);
 
-	if ((rc = tty_unregister_driver(&serial_driver)))
+	if ((rc = tty_unregister_driver(serial_driver)))
 		printk("%s(%d) failed to unregister tty driver err=%d\n",
 		       __FILE__,__LINE__,rc);
-	if ((rc = tty_unregister_driver(&callout_driver)))
-		printk("%s(%d) failed to unregister callout driver err=%d\n",
-		       __FILE__,__LINE__,rc);
+	put_tty_driver(serial_driver);
 
 	info = synclinkmp_device_list;
 	while(info) {

@@ -83,13 +83,11 @@ struct m68k_serial *m68k_consinfo = 0;
 extern wait_queue_head_t keypress_wait; 
 #endif
 
-struct tty_driver serial_driver, callout_driver;
-static int serial_refcount;
+struct tty_driver *serial_driver;
 
 /* serial subtype definitions */
 #define SERIAL_TYPE_NORMAL	1
-#define SERIAL_TYPE_CALLOUT	2
-  
+ 
 /* number of characters left in xmit buffer before we ask for more */
 #define WAKEUP_CHARS 256
 
@@ -105,10 +103,6 @@ static int serial_refcount;
 #define _INLINE_ inline
 
 static void change_speed(struct m68k_serial *info);
-
-static struct tty_struct *serial_table[NR_PORTS];
-static struct termios *serial_termios[NR_PORTS];
-static struct termios *serial_termios_locked[NR_PORTS];
 
 /*
  *	Setup for console. Argument comes from the boot command line.
@@ -1173,14 +1167,6 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 	}
 	info->flags |= S_CLOSING;
 	/*
-	 * Save the termios structure, since this port may have
-	 * separate termios for callout and dialin.
-	 */
-	if (info->flags & S_NORMAL_ACTIVE)
-		info->normal_termios = *tty->termios;
-	if (info->flags & S_CALLOUT_ACTIVE)
-		info->callout_termios = *tty->termios;
-	/*
 	 * Now we wait for the transmit buffer to clear; and we notify 
 	 * the line discipline to only process XON/XOFF characters.
 	 */
@@ -1220,8 +1206,7 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 		}
 		wake_up_interruptible(&info->open_wait);
 	}
-	info->flags &= ~(S_NORMAL_ACTIVE|S_CALLOUT_ACTIVE|
-			 S_CLOSING);
+	info->flags &= ~(S_NORMAL_ACTIVE|S_CLOSING);
 	wake_up_interruptible(&info->close_wait);
 	restore_flags(flags);
 }
@@ -1240,7 +1225,7 @@ void rs_hangup(struct tty_struct *tty)
 	shutdown(info);
 	info->event = 0;
 	info->count = 0;
-	info->flags &= ~(S_NORMAL_ACTIVE|S_CALLOUT_ACTIVE);
+	info->flags &= ~S_NORMAL_ACTIVE;
 	info->tty = 0;
 	wake_up_interruptible(&info->open_wait);
 }
@@ -1272,25 +1257,6 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 		return -EAGAIN;
 #endif
 	}
-
-	/*
-	 * If this is a callout device, then just make sure the normal
-	 * device isn't being used.
-	 */
-	if (tty->driver->subtype == SERIAL_TYPE_CALLOUT) {
-		if (info->flags & S_NORMAL_ACTIVE)
-			return -EBUSY;
-		if ((info->flags & S_CALLOUT_ACTIVE) &&
-		    (info->flags & S_SESSION_LOCKOUT) &&
-		    (info->session != current->session))
-		    return -EBUSY;
-		if ((info->flags & S_CALLOUT_ACTIVE) &&
-		    (info->flags & S_PGRP_LOCKOUT) &&
-		    (info->pgrp != current->pgrp))
-		    return -EBUSY;
-		info->flags |= S_CALLOUT_ACTIVE;
-		return 0;
-	}
 	
 	/*
 	 * If non-blocking mode is set, or the port is not enabled,
@@ -1298,20 +1264,13 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 	 */
 	if ((filp->f_flags & O_NONBLOCK) ||
 	    (tty->flags & (1 << TTY_IO_ERROR))) {
-		if (info->flags & S_CALLOUT_ACTIVE)
-			return -EBUSY;
 		info->flags |= S_NORMAL_ACTIVE;
 		return 0;
 	}
 
-	if (info->flags & S_CALLOUT_ACTIVE) {
-		if (info->normal_termios.c_cflag & CLOCAL)
-			do_clocal = 1;
-	} else {
-		if (tty->termios->c_cflag & CLOCAL)
-			do_clocal = 1;
-	}
-	
+	if (tty->termios->c_cflag & CLOCAL)
+		do_clocal = 1;
+
 	/*
 	 * Block waiting for the carrier detect and the line to become
 	 * free (i.e., not in use by the callout).  While we are in
@@ -1326,8 +1285,7 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 	info->blocked_open++;
 	while (1) {
 		cli();
-		if (!(info->flags & S_CALLOUT_ACTIVE))
-			m68k_rtsdtr(info, 1);
+		m68k_rtsdtr(info, 1);
 		sti();
 		current->state = TASK_INTERRUPTIBLE;
 		if (tty_hung_up_p(filp) ||
@@ -1342,8 +1300,7 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 #endif
 			break;
 		}
-		if (!(info->flags & S_CALLOUT_ACTIVE) &&
-		    !(info->flags & S_CLOSING) && do_clocal)
+		if (!(info->flags & S_CLOSING) && do_clocal)
 			break;
                 if (signal_pending(current)) {
 			retval = -ERESTARTSYS;
@@ -1395,23 +1352,7 @@ int rs_open(struct tty_struct *tty, struct file * filp)
 	if (retval)
 		return retval;
 
-	retval = block_til_ready(tty, filp, info);
-	if (retval) {
-		return retval;
-	}
-
-	if ((info->count == 1) && (info->flags & S_SPLIT_TERMIOS)) {
-		if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
-			*tty->termios = info->normal_termios;
-		else 
-			*tty->termios = info->callout_termios;
-		change_speed(info);
-	}
-
-	info->session = current->session;
-	info->pgrp = current->pgrp;
-
-	return 0;
+	return block_til_ready(tty, filp, info);
 }
 
 /* Finally, routines used to initialize the serial driver. */
@@ -1474,65 +1415,57 @@ void startup_console(void)
 #endif
 
 
+static struct tty_operations rs_ops = {
+	.open = rs_open,
+	.close = rs_close,
+	.write = rs_write,
+	.flush_chars = rs_flush_chars,
+	.write_room = rs_write_room,
+	.chars_in_buffer = rs_chars_in_buffer,
+	.flush_buffer = rs_flush_buffer,
+	.ioctl = rs_ioctl,
+	.throttle = rs_throttle,
+	.unthrottle = rs_unthrottle,
+	.set_termios = rs_set_termios,
+	.stop = rs_stop,
+	.start = rs_start,
+	.hangup = rs_hangup,
+	.set_ldisc = rs_set_ldisc,
+};
+
 /* rs_init inits the driver */
 static int __init
 rs68328_init(void)
 {
 	int flags, i;
 	struct m68k_serial *info;
-	
+
+	serial_driver = alloc_tty_driver(NR_PORTS);
+	if (!serial_driver)
+		return -ENOMEM;
+
 	show_serial_version();
 
 	/* Initialize the tty_driver structure */
 	/* SPARC: Not all of this is exactly right for us. */
 	
-	memset(&serial_driver, 0, sizeof(struct tty_driver));
-	serial_driver.magic = TTY_DRIVER_MAGIC;
-	serial_driver.name = "ttyS";
-	serial_driver.major = TTY_MAJOR;
-	serial_driver.minor_start = 64;
-	serial_driver.num = NR_PORTS;
-	serial_driver.type = TTY_DRIVER_TYPE_SERIAL;
-	serial_driver.subtype = SERIAL_TYPE_NORMAL;
-	serial_driver.init_termios = tty_std_termios;
-	serial_driver.init_termios.c_cflag = 
+	serial_driver->name = "ttyS";
+	serial_driver->major = TTY_MAJOR;
+	serial_driver->minor_start = 64;
+	serial_driver->type = TTY_DRIVER_TYPE_SERIAL;
+	serial_driver->subtype = SERIAL_TYPE_NORMAL;
+	serial_driver->init_termios = tty_std_termios;
+	serial_driver->init_termios.c_cflag = 
 			m68328_console_cbaud | CS8 | CREAD | HUPCL | CLOCAL;
-	serial_driver.flags = TTY_DRIVER_REAL_RAW;
-	serial_driver.refcount = &serial_refcount;
-	serial_driver.table = serial_table;
-	serial_driver.termios = serial_termios;
-	serial_driver.termios_locked = serial_termios_locked;
+	serial_driver->flags = TTY_DRIVER_REAL_RAW;
+	tty_set_operations(serial_driver, &rs_ops);
 
-	serial_driver.open = rs_open;
-	serial_driver.close = rs_close;
-	serial_driver.write = rs_write;
-	serial_driver.flush_chars = rs_flush_chars;
-	serial_driver.write_room = rs_write_room;
-	serial_driver.chars_in_buffer = rs_chars_in_buffer;
-	serial_driver.flush_buffer = rs_flush_buffer;
-	serial_driver.ioctl = rs_ioctl;
-	serial_driver.throttle = rs_throttle;
-	serial_driver.unthrottle = rs_unthrottle;
-	serial_driver.set_termios = rs_set_termios;
-	serial_driver.stop = rs_stop;
-	serial_driver.start = rs_start;
-	serial_driver.hangup = rs_hangup;
-	serial_driver.set_ldisc = rs_set_ldisc;
+	if (tty_register_driver(serial_driver)) {
+		put_tty_driver(serial_driver);
+		printk(KERN_ERR "Couldn't register serial driver\n");
+		return -ENOMEM;
+	}
 
-	/*
-	 * The callout device is just like normal device except for
-	 * major number and the subtype code.
-	 */
-	callout_driver = serial_driver;
-	callout_driver.name = "cua";
-	callout_driver.major = TTYAUX_MAJOR;
-	callout_driver.subtype = SERIAL_TYPE_CALLOUT;
-
-	if (tty_register_driver(&serial_driver))
-		panic("Couldn't register serial driver\n");
-	if (tty_register_driver(&callout_driver))
-		panic("Couldn't register callout driver\n");
-	
 	save_flags(flags); cli();
 
 	for(i=0;i<NR_PORTS;i++) {
@@ -1551,14 +1484,12 @@ rs68328_init(void)
 	    info->blocked_open = 0;
 	    INIT_WORK(&info->tqueue, do_softint, info);
 	    INIT_WORK(&info->tqueue_hangup, do_serial_hangup, info);
-	    info->callout_termios =callout_driver.init_termios;
-	    info->normal_termios = serial_driver.init_termios;
 	    init_waitqueue_head(&info->open_wait);
 	    init_waitqueue_head(&info->close_wait);
 	    info->line = i;
 	    info->is_cons = 1; /* Means shortcuts work */
 	    
-	    printk("%s%d at 0x%08x (irq = %d)", serial_driver.name, info->line, 
+	    printk("%s%d at 0x%08x (irq = %d)", serial_driver->name, info->line, 
 		   info->port, info->irq);
 	    printk(" is a builtin MC68328 UART\n");
 	    
@@ -1665,7 +1596,7 @@ int m68328_console_setup(struct console *cp, char *arg)
 static struct tty_driver *m68328_console_device(struct console *c, int *index)
 {
 	*index = c->index;
-	return &serial_driver;
+	return serial_driver;
 }
 
 

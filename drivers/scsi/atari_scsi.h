@@ -21,7 +21,6 @@
 int atari_scsi_detect (Scsi_Host_Template *);
 const char *atari_scsi_info (struct Scsi_Host *);
 int atari_scsi_reset (Scsi_Cmnd *, unsigned int);
-int atari_scsi_proc_info (char *, char **, off_t, int, int, int);
 #ifdef MODULE
 int atari_scsi_release (struct Scsi_Host *);
 #else

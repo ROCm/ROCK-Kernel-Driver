@@ -200,20 +200,14 @@ ia64_decrement_ip (struct pt_regs *regs)
  */
 static unsigned long
 get_rnat (struct pt_regs *pt, struct switch_stack *sw,
-	  unsigned long *krbs, unsigned long *urnat_addr, unsigned long *urbs_end)
+	  unsigned long *krbs, unsigned long *urnat_addr)
 {
-	unsigned long rnat0 = 0, rnat1 = 0, urnat = 0, *slot0_kaddr, umask = 0, mask, m;
+	unsigned long rnat0 = 0, rnat1 = 0, urnat = 0, *slot0_kaddr, umask = 0UL;
 	unsigned long *kbsp, *ubspstore, *rnat0_kaddr, *rnat1_kaddr, shift;
-	long num_regs, nbits;
+	long num_regs;
 
 	kbsp = (unsigned long *) sw->ar_bspstore;
 	ubspstore = (unsigned long *) pt->ar_bspstore;
-
-	if (urbs_end < urnat_addr)
-		nbits = ia64_rse_num_regs(urnat_addr - 63, urbs_end);
-	else
-		nbits = 63;
-	mask = (1UL << nbits) - 1;
 	/*
 	 * First, figure out which bit number slot 0 in user-land maps to in the kernel
 	 * rnat.  Do this by figuring out how many register slots we're beyond the user's
@@ -227,26 +221,20 @@ get_rnat (struct pt_regs *pt, struct switch_stack *sw,
 
 	if (ubspstore + 63 > urnat_addr) {
 		/* some bits need to be merged in from pt->ar_rnat */
-		umask = ((1UL << ia64_rse_slot_num(ubspstore)) - 1) & mask;
+		umask = ((1UL << ia64_rse_slot_num(ubspstore)) - 1);
 		urnat = (pt->ar_rnat & umask);
-		mask &= ~umask;
-		if (!mask)
-			return urnat;
 	}
-
-	m = mask << shift;
-	if (rnat0_kaddr >= kbsp)
+	if (rnat0_kaddr >= kbsp) {
 		rnat0 = sw->ar_rnat;
-	else if (rnat0_kaddr > krbs)
+	} else if (rnat0_kaddr > krbs) {
 		rnat0 = *rnat0_kaddr;
-	urnat |= (rnat0 & m) >> shift;
-
-	m = mask >> (63 - shift);
-	if (rnat1_kaddr >= kbsp)
+	}
+	if (rnat1_kaddr >= kbsp) {
 		rnat1 = sw->ar_rnat;
-	else if (rnat1_kaddr > krbs)
+	} else if (rnat1_kaddr > krbs) {
 		rnat1 = *rnat1_kaddr;
-	urnat |= (rnat1 & m) << (63 - shift);
+	}
+	urnat |= ((rnat1 << (63 - shift)) | (rnat0 >> shift)) & ~umask;
 	return urnat;
 }
 
@@ -255,58 +243,60 @@ get_rnat (struct pt_regs *pt, struct switch_stack *sw,
  */
 static void
 put_rnat (struct pt_regs *pt, struct switch_stack *sw,
-	  unsigned long *krbs, unsigned long *urnat_addr, unsigned long urnat,
-	  unsigned long *urbs_end)
+	  unsigned long *krbs, unsigned long *urnat_addr, unsigned long urnat)
 {
 	unsigned long rnat0 = 0, rnat1 = 0, *slot0_kaddr, umask = 0, mask, m;
-	unsigned long *kbsp, *ubspstore, *rnat0_kaddr, *rnat1_kaddr, shift;
+	unsigned long *kbsp, *ubspstore, *rnat0_kaddr, *rnat1_kaddr, shift, slot, ndirty;
 	long num_regs, nbits;
+
+	ndirty = ia64_rse_num_regs(krbs, krbs + (pt->loadrs >> 19));
+	nbits = ndirty % 63;
 
 	kbsp = (unsigned long *) sw->ar_bspstore;
 	ubspstore = (unsigned long *) pt->ar_bspstore;
-
-	if (urbs_end < urnat_addr)
-		nbits = ia64_rse_num_regs(urnat_addr - 63, urbs_end);
-	else
-		nbits = 63;
-	mask = (1UL << nbits) - 1;
-
 	/*
 	 * First, figure out which bit number slot 0 in user-land maps to in the kernel
 	 * rnat.  Do this by figuring out how many register slots we're beyond the user's
 	 * backingstore and then computing the equivalent address in kernel space.
 	 */
-	num_regs = ia64_rse_num_regs(ubspstore, urnat_addr + 1);
+	num_regs = (long) ia64_rse_num_regs(ubspstore, urnat_addr + 1);
 	slot0_kaddr = ia64_rse_skip_regs(krbs, num_regs);
 	shift = ia64_rse_slot_num(slot0_kaddr);
 	rnat1_kaddr = ia64_rse_rnat_addr(slot0_kaddr);
 	rnat0_kaddr = rnat1_kaddr - 64;
 
+printk("%s: ubspstore=%p urnat_addr=%p\n", __FUNCTION__, ubspstore, urnat_addr);
 	if (ubspstore + 63 > urnat_addr) {
 		/* some bits need to be place in pt->ar_rnat: */
-		umask = ((1UL << ia64_rse_slot_num(ubspstore)) - 1) & mask;
+		slot = ia64_rse_slot_num(ubspstore);
+		umask = ((1UL << slot) - 1);
 		pt->ar_rnat = (pt->ar_rnat & ~umask) | (urnat & umask);
-		mask &= ~umask;
-		if (!mask)
+		nbits -= slot;
+		if (nbits <= 0)
 			return;
 	}
+	mask = (1UL << nbits) - 1;
 	/*
 	 * Note: Section 11.1 of the EAS guarantees that bit 63 of an
 	 * rnat slot is ignored. so we don't have to clear it here.
 	 */
 	rnat0 = (urnat << shift);
 	m = mask << shift;
-	if (rnat0_kaddr >= kbsp)
+printk("%s: rnat0=%016lx, m=%016lx, rnat0_kaddr=%p kbsp=%p\n", __FUNCTION__, rnat0, m, rnat0_kaddr, kbsp);
+	if (rnat0_kaddr >= kbsp) {
 		sw->ar_rnat = (sw->ar_rnat & ~m) | (rnat0 & m);
-	else if (rnat0_kaddr > krbs)
+	} else if (rnat0_kaddr > krbs) {
 		*rnat0_kaddr = ((*rnat0_kaddr & ~m) | (rnat0 & m));
+	}
 
 	rnat1 = (urnat >> (63 - shift));
 	m = mask >> (63 - shift);
-	if (rnat1_kaddr >= kbsp)
+printk("%s: rnat1=%016lx, m=%016lx, rnat1_kaddr=%p kbsp=%p\n", __FUNCTION__, rnat1, m, rnat1_kaddr, kbsp);
+	if (rnat1_kaddr >= kbsp) {
 		sw->ar_rnat = (sw->ar_rnat & ~m) | (rnat1 & m);
-	else if (rnat1_kaddr > krbs)
+	} else if (rnat1_kaddr > krbs) {
 		*rnat1_kaddr = ((*rnat1_kaddr & ~m) | (rnat1 & m));
+	}
 }
 
 /*
@@ -339,7 +329,7 @@ ia64_peek (struct task_struct *child, struct switch_stack *child_stack, unsigned
 		 * read the corresponding bits in the kernel RBS.
 		 */
 		rnat_addr = ia64_rse_rnat_addr(laddr);
-		ret = get_rnat(child_regs, child_stack, krbs, rnat_addr, urbs_end);
+		ret = get_rnat(child_regs, child_stack, krbs, rnat_addr);
 
 		if (laddr == rnat_addr) {
 			/* return NaT collection word itself */
@@ -390,7 +380,7 @@ ia64_poke (struct task_struct *child, struct switch_stack *child_stack, unsigned
 		 * => write the corresponding bits in the kernel RBS.
 		 */
 		if (ia64_rse_is_rnat_slot(laddr))
-			put_rnat(child_regs, child_stack, krbs, laddr, val, urbs_end);
+			put_rnat(child_regs, child_stack, krbs, laddr, val);
 		else {
 			if (laddr < urbs_end) {
 				regnum = ia64_rse_num_regs(bspstore, laddr);
@@ -598,13 +588,18 @@ inline void
 ia64_flush_fph (struct task_struct *task)
 {
 	struct ia64_psr *psr = ia64_psr(ia64_task_regs(task));
+#ifdef CONFIG_SMP
+	struct task_struct *fpu_owner = current;
+#else
+	struct task_struct *fpu_owner = ia64_get_fpu_owner();
+#endif
 
-	if (ia64_is_local_fpu_owner(task) && psr->mfh) {
+	if (task == fpu_owner && psr->mfh) {
 		psr->mfh = 0;
-		task->thread.flags |= IA64_THREAD_FPH_VALID;
 		ia64_save_fpu(&task->thread.fph[0]);
+		task->thread.flags |= IA64_THREAD_FPH_VALID;
+		task->thread.last_fph_cpu = smp_processor_id();
 	}
-	ia64_drop_fpu(task);
 }
 
 /*
@@ -623,8 +618,11 @@ ia64_sync_fph (struct task_struct *task)
 	ia64_flush_fph(task);
 	if (!(task->thread.flags & IA64_THREAD_FPH_VALID)) {
 		task->thread.flags |= IA64_THREAD_FPH_VALID;
+		task->thread.last_fph_cpu = -1;		/* force reload */
 		memset(&task->thread.fph, 0, sizeof(task->thread.fph));
 	}
+	if (ia64_get_fpu_owner() == task)
+		ia64_set_fpu_owner(0);
 	psr->dfh = 1;
 }
 

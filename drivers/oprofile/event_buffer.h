@@ -31,6 +31,7 @@ void wake_up_buffer_waiter(void);
 #define KERNEL_ENTER_SWITCH_CODE	4
 #define KERNEL_EXIT_SWITCH_CODE		5
 #define MODULE_LOADED_CODE		6
+#define CTX_TGID_CODE			7
  
 /* add data to the event buffer */
 void add_event_entry(unsigned long data);

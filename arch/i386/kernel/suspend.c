@@ -114,7 +114,7 @@ static void fix_processor_context(void)
         cpu_gdt_table[cpu][GDT_ENTRY_TSS].b &= 0xfffffdff;
 
 	load_TR_desc();				/* This does ltr */
-	load_LDT(&current->mm->context);	/* This does lldt */
+	load_LDT(&current->active_mm->context);	/* This does lldt */
 
 	/*
 	 * Now maybe reload the debug registers

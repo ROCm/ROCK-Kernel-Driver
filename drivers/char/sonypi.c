@@ -120,9 +120,9 @@ static inline int sonypi_emptyq(void) {
 
 static int ec_read16(u8 addr, u16 *value) {
 	u8 val_lb, val_hb;
-	if (ec_read(addr, &val_lb))
+	if (sonypi_ec_read(addr, &val_lb))
 		return -1;
-	if (ec_read(addr + 1, &val_hb))
+	if (sonypi_ec_read(addr + 1, &val_hb))
 		return -1;
 	*value = val_lb | (val_hb << 8);
 	return 0;
@@ -152,17 +152,17 @@ static void __devinit sonypi_type1_srs(void) {
 }
 
 static void __devinit sonypi_type2_srs(void) {
-	if (ec_write(SONYPI_SHIB, (sonypi_device.ioport1 & 0xFF00) >> 8))
+	if (sonypi_ec_write(SONYPI_SHIB, (sonypi_device.ioport1 & 0xFF00) >> 8))
 		printk(KERN_WARNING "ec_write failed\n");
-	if (ec_write(SONYPI_SLOB,  sonypi_device.ioport1 & 0x00FF))
+	if (sonypi_ec_write(SONYPI_SLOB,  sonypi_device.ioport1 & 0x00FF))
 		printk(KERN_WARNING "ec_write failed\n");
-	if (ec_write(SONYPI_SIRQ,  sonypi_device.bits))
+	if (sonypi_ec_write(SONYPI_SIRQ,  sonypi_device.bits))
 		printk(KERN_WARNING "ec_write failed\n");
 	udelay(10);
 }
 
 /* Disables the device - this comes from the AML code in the ACPI bios */
-static void __devexit sonypi_type1_dis(void) {
+static void sonypi_type1_dis(void) {
 	u32 v;
 
 	pci_read_config_dword(sonypi_device.dev, SONYPI_G10A, &v);
@@ -174,12 +174,12 @@ static void __devexit sonypi_type1_dis(void) {
 	outl(v, SONYPI_IRQ_PORT);
 }
 
-static void __devexit sonypi_type2_dis(void) {
-	if (ec_write(SONYPI_SHIB, 0))
+static void sonypi_type2_dis(void) {
+	if (sonypi_ec_write(SONYPI_SHIB, 0))
 		printk(KERN_WARNING "ec_write failed\n");
-	if (ec_write(SONYPI_SLOB, 0))
+	if (sonypi_ec_write(SONYPI_SLOB, 0))
 		printk(KERN_WARNING "ec_write failed\n");
-	if (ec_write(SONYPI_SIRQ, 0))
+	if (sonypi_ec_write(SONYPI_SIRQ, 0))
 		printk(KERN_WARNING "ec_write failed\n");
 }
 
@@ -265,7 +265,7 @@ static void sonypi_camera_on(void) {
 
 	for (j = 5; j > 0; j--) {
 
-		while (sonypi_call2(0x91, 0x1) != 0) {
+		while (sonypi_call2(0x91, 0x1)) {
 			set_current_state(TASK_UNINTERRUPTIBLE);
 			schedule_timeout(1);
 		}
@@ -277,7 +277,7 @@ static void sonypi_camera_on(void) {
 			set_current_state(TASK_UNINTERRUPTIBLE);
 			schedule_timeout(1);
 		}
-		if (i != 0)
+		if (i)
 			break;
 	}
 	
@@ -293,14 +293,12 @@ static void sonypi_camera_on(void) {
 /* sets the bluetooth subsystem power state */
 static void sonypi_setbluetoothpower(u8 state) {
 
-	state = (state != 0);
-	if (sonypi_device.bluetooth_power && state) 
-		return;
-	if (!sonypi_device.bluetooth_power && !state) 
+	state = !!state;
+	if (sonypi_device.bluetooth_power == state) 
 		return;
 	
 	sonypi_call2(0x96, state);
-	sonypi_call1(0x93);
+	sonypi_call1(0x82);
 	sonypi_device.bluetooth_power = state;
 }
 
@@ -311,10 +309,6 @@ static irqreturn_t sonypi_irq(int irq, void *dev_id, struct pt_regs *regs) {
 
 	v1 = inb_p(sonypi_device.ioport1);
 	v2 = inb_p(sonypi_device.ioport2);
-
-	if (verbose > 1)
-		printk(KERN_INFO 
-		       "sonypi: event port1=0x%02x,port2=0x%02x\n", v1, v2);
 
 	for (i = 0; sonypi_eventtypes[i].model; i++) {
 		if (sonypi_device.model != sonypi_eventtypes[i].model)
@@ -334,10 +328,17 @@ static irqreturn_t sonypi_irq(int irq, void *dev_id, struct pt_regs *regs) {
 	if (verbose)
 		printk(KERN_WARNING 
 		       "sonypi: unknown event port1=0x%02x,port2=0x%02x\n",v1,v2);
-	return IRQ_NONE;
+	/* We need to return IRQ_HANDLED here because there *are*
+	 * events belonging to the sonypi device we don't know about, 
+	 * but we still don't want those to pollute the logs... */
+	return IRQ_HANDLED;
 
 found:
-#if defined(CONFIG_INPUT) || defined(CONFIG_INPUT_MODULE)
+	if (verbose > 1)
+		printk(KERN_INFO 
+		       "sonypi: event port1=0x%02x,port2=0x%02x\n", v1, v2);
+
+#ifdef SONYPI_USE_INPUT
 	if (useinput) {
 		struct input_dev *jog_dev = &sonypi_device.jog_dev;
 		if (event == SONYPI_EVENT_JOGDIAL_PRESSED)
@@ -352,7 +353,7 @@ found:
 			input_report_rel(jog_dev, REL_WHEEL, -1);
 		input_sync(jog_dev);
 	}
-#endif /* CONFIG_INPUT || CONFIG_INPUT_MODULE */
+#endif /* SONYPI_USE_INPUT */
 	sonypi_pushq(event);
 	return IRQ_HANDLED;
 }
@@ -509,7 +510,7 @@ static int sonypi_misc_ioctl(struct inode *ip, struct file *fp,
 	down(&sonypi_device.lock);
 	switch (cmd) {
 	case SONYPI_IOCGBRT:
-		if (ec_read(SONYPI_LCD_LIGHT, &val8)) {
+		if (sonypi_ec_read(SONYPI_LCD_LIGHT, &val8)) {
 			ret = -EIO;
 			break;
 		}
@@ -521,7 +522,7 @@ static int sonypi_misc_ioctl(struct inode *ip, struct file *fp,
 			ret = -EFAULT;
 			break;
 		}
-		if (ec_write(SONYPI_LCD_LIGHT, val8))
+		if (sonypi_ec_write(SONYPI_LCD_LIGHT, val8))
 			ret = -EIO;
 		break;
 	case SONYPI_IOCGBAT1CAP:
@@ -557,7 +558,7 @@ static int sonypi_misc_ioctl(struct inode *ip, struct file *fp,
 			ret = -EFAULT;
 		break;
 	case SONYPI_IOCGBATFLAGS:
-		if (ec_read(SONYPI_BAT_FLAGS, &val8)) {
+		if (sonypi_ec_read(SONYPI_BAT_FLAGS, &val8)) {
 			ret = -EIO;
 			break;
 		}
@@ -613,18 +614,14 @@ static int sonypi_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data)
 			sonypi_type2_dis();
 		else
 			sonypi_type1_dis();
-#ifndef CONFIG_ACPI
 		/* disable ACPI mode */
-		if (fnkeyinit)
+		if (!SONYPI_ACPI_ACTIVE && fnkeyinit)
 			outb(0xf1, 0xb2);
-#endif
 		break;
 	case PM_RESUME:
-#ifndef CONFIG_ACPI
 		/* Enable ACPI mode to get Fn key events */
-		if (fnkeyinit)
+		if (!SONYPI_ACPI_ACTIVE && fnkeyinit)
 			outb(0xf0, 0xb2);
-#endif
 		if (sonypi_device.model == SONYPI_DEVICE_MODEL_TYPE2)
 			sonypi_type2_srs();
 		else
@@ -698,36 +695,44 @@ static int __devinit sonypi_probe(struct pci_dev *pcidev) {
 	}
 
 	for (i = 0; irq_list[i].irq; i++) {
-		if (!request_irq(irq_list[i].irq, sonypi_irq, 
-				 SA_SHIRQ, "sonypi", sonypi_irq)) {
-			sonypi_device.irq = irq_list[i].irq;
-			sonypi_device.bits = irq_list[i].bits;
+
+		sonypi_device.irq = irq_list[i].irq;
+		sonypi_device.bits = irq_list[i].bits;
+
+		/* Enable sonypi IRQ settings */
+		if (sonypi_device.model == SONYPI_DEVICE_MODEL_TYPE2)
+			sonypi_type2_srs();
+		else
+			sonypi_type1_srs();
+
+		sonypi_call1(0x82);
+		sonypi_call2(0x81, 0xff);
+		if (compat)
+			sonypi_call1(0x92); 
+		else
+			sonypi_call1(0x82);
+
+		/* Now try requesting the irq from the system */
+		if (!request_irq(sonypi_device.irq, sonypi_irq, 
+				 SA_SHIRQ, "sonypi", sonypi_irq))
 			break;
-		}
+
+		/* If request_irq failed, disable sonypi IRQ settings */
+		if (sonypi_device.model == SONYPI_DEVICE_MODEL_TYPE2)
+			sonypi_type2_dis();
+		else
+			sonypi_type1_dis();
 	}
-	if (!sonypi_device.irq ) {
+
+	if (!irq_list[i].irq) {
 		printk(KERN_ERR "sonypi: request_irq failed\n");
 		ret = -ENODEV;
 		goto out3;
 	}
 
-#ifndef CONFIG_ACPI
 	/* Enable ACPI mode to get Fn key events */
-	if (fnkeyinit)
+	if (!SONYPI_ACPI_ACTIVE && fnkeyinit)
 		outb(0xf0, 0xb2);
-#endif
-
-	if (sonypi_device.model == SONYPI_DEVICE_MODEL_TYPE2)
-		sonypi_type2_srs();
-	else
-		sonypi_type1_srs();
-
-	sonypi_call1(0x82);
-	sonypi_call2(0x81, 0xff);
-	if (compat)
-		sonypi_call1(0x92); 
-	else
-		sonypi_call1(0x82);
 
 	printk(KERN_INFO "sonypi: Sony Programmable I/O Controller Driver v%d.%d.\n",
 	       SONYPI_DRIVER_MAJORVERSION,
@@ -750,7 +755,7 @@ static int __devinit sonypi_probe(struct pci_dev *pcidev) {
 		printk(KERN_INFO "sonypi: device allocated minor is %d\n",
 		       sonypi_misc_device.minor);
 
-#if defined(CONFIG_INPUT) || defined(CONFIG_INPUT_MODULE)
+#ifdef SONYPI_USE_INPUT
 	if (useinput) {
 		/* Initialize the Input Drivers: */
 		sonypi_device.jog_dev.evbit[0] = BIT(EV_KEY) | BIT(EV_REL);
@@ -765,7 +770,7 @@ static int __devinit sonypi_probe(struct pci_dev *pcidev) {
 		input_register_device(&sonypi_device.jog_dev);
 		printk(KERN_INFO "%s installed.\n", sonypi_device.jog_dev.name);
 	}
-#endif /* CONFIG_INPUT || CONFIG_INPUT_MODULE */
+#endif /* SONYPI_USE_INPUT */
 
 #ifdef CONFIG_PM
 	sonypi_device.pm = pm_register(PM_PCI_DEV, 0, sonypi_pm_callback);
@@ -789,12 +794,12 @@ static void __devexit sonypi_remove(void) {
 
 	sonypi_call2(0x81, 0); /* make sure we don't get any more events */
 	
-#if defined(CONFIG_INPUT) || defined(CONFIG_INPUT_MODULE)
+#ifdef SONYPI_USE_INPUT
 	if (useinput) {
 		input_unregister_device(&sonypi_device.jog_dev);
 		kfree(sonypi_device.jog_dev.name);
 	}
-#endif /* CONFIG_INPUT || CONFIG_INPUT_MODULE */
+#endif /* SONYPI_USE_INPUT */
 
 	if (camera)
 		sonypi_camera_off();
@@ -802,11 +807,9 @@ static void __devexit sonypi_remove(void) {
 		sonypi_type2_dis();
 	else
 		sonypi_type1_dis();
-#ifndef CONFIG_ACPI
 	/* disable ACPI mode */
-	if (fnkeyinit)
+	if (!SONYPI_ACPI_ACTIVE && fnkeyinit)
 		outb(0xf1, 0xb2);
-#endif
 	free_irq(sonypi_device.irq, sonypi_irq);
 	release_region(sonypi_device.ioport1, sonypi_device.region_size);
 	misc_deregister(&sonypi_misc_device);

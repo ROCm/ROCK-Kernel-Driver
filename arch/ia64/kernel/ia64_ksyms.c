@@ -124,18 +124,6 @@ EXPORT_SYMBOL_NOVERS(__udivdi3);
 EXPORT_SYMBOL_NOVERS(__moddi3);
 EXPORT_SYMBOL_NOVERS(__umoddi3);
 
-#ifdef CONFIG_MD_RAID5
-extern void xor_ia64_2(void);
-extern void xor_ia64_3(void);
-extern void xor_ia64_4(void);
-extern void xor_ia64_5(void);
-
-EXPORT_SYMBOL_NOVERS(xor_ia64_2);
-EXPORT_SYMBOL_NOVERS(xor_ia64_3);
-EXPORT_SYMBOL_NOVERS(xor_ia64_4);
-EXPORT_SYMBOL_NOVERS(xor_ia64_5);
-#endif
-
 extern unsigned long ia64_iobase;
 EXPORT_SYMBOL(ia64_iobase);
 
@@ -163,7 +151,6 @@ EXPORT_SYMBOL(pm_power_off);
 EXPORT_SYMBOL(ia64_mv);
 #endif
 EXPORT_SYMBOL(machvec_noop);
-EXPORT_SYMBOL(zero_page_memmap_ptr);
 #ifdef CONFIG_PERFMON
 #include <asm/perfmon.h>
 EXPORT_SYMBOL(pfm_install_alternate_syswide_subsystem);
@@ -186,12 +173,10 @@ EXPORT_SYMBOL(unw_access_fr);
 EXPORT_SYMBOL(unw_access_ar);
 EXPORT_SYMBOL(unw_access_pr);
 
-#ifdef CONFIG_SMP
-# if __GNUC__ < 3 || (__GNUC__ == 3 && __GNUC_MINOR__ < 4)
+#if __GNUC__ < 3 || (__GNUC__ == 3 && __GNUC_MINOR__ < 4)
 extern void ia64_spinlock_contention_pre3_4 (void);
 EXPORT_SYMBOL(ia64_spinlock_contention_pre3_4);
-# else
+#else
 extern void ia64_spinlock_contention (void);
 EXPORT_SYMBOL(ia64_spinlock_contention);
-# endif
 #endif

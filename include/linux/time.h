@@ -26,6 +26,16 @@ struct timezone {
 
 #include <linux/spinlock.h>
 #include <linux/seqlock.h>
+#include <linux/timex.h>
+#include <asm/div64.h>
+#ifndef div_long_long_rem
+
+#define div_long_long_rem(dividend,divisor,remainder) ({ \
+		       u64 result = dividend;		\
+		       *remainder = do_div(result,divisor); \
+		       result; })
+
+#endif
 
 /*
  * Have the 32 bit jiffies value wrap 5 minutes after boot
@@ -60,24 +70,59 @@ struct timezone {
 #define NSEC_PER_USEC (1000L)
 #endif
 
+/*
+ * We want to do realistic conversions of time so we need to use the same
+ * values the update wall clock code uses as the jiffie size.  This value
+ * is: TICK_NSEC (both of which are defined in timex.h).  This 
+ * is a constant and is in nanoseconds.  We will used scaled math and
+ * with a scales defined here as SEC_JIFFIE_SC,  USEC_JIFFIE_SC and 
+ * NSEC_JIFFIE_SC.  Note that these defines contain nothing but
+ * constants and so are computed at compile time.  SHIFT_HZ (computed in
+ * timex.h) adjusts the scaling for different HZ values.
+ */
+#define SEC_JIFFIE_SC (30 - SHIFT_HZ)
+#define NSEC_JIFFIE_SC (SEC_JIFFIE_SC + 30)
+#define USEC_JIFFIE_SC (SEC_JIFFIE_SC + 20)
+#define SEC_CONVERSION ((unsigned long)(((u64)NSEC_PER_SEC << SEC_JIFFIE_SC) /\
+				(u64)TICK_NSEC))
+#define NSEC_CONVERSION ((unsigned long)(((u64)1 << NSEC_JIFFIE_SC) /\
+				(u64)TICK_NSEC))
+#define USEC_CONVERSION ((unsigned long)(((u64)NSEC_PER_USEC << USEC_JIFFIE_SC)/\
+				(u64)TICK_NSEC))
+#if BITS_PER_LONG < 64
+# define MAX_SEC_IN_JIFFIES \
+	(long)((u64)((u64)MAX_JIFFY_OFFSET * TICK_NSEC) / NSEC_PER_SEC)
+#else	/* take care of overflow on 64 bits machines */
+# define MAX_SEC_IN_JIFFIES \
+	(SH_DIV((MAX_JIFFY_OFFSET >> SEC_JIFFIE_SC) * TICK_NSEC, NSEC_PER_SEC, 1) - 1)
+
+#endif
+
 static __inline__ unsigned long
 timespec_to_jiffies(struct timespec *value)
 {
 	unsigned long sec = value->tv_sec;
-	long nsec = value->tv_nsec;
+	long nsec = value->tv_nsec + TICK_NSEC - 1;
 
-	if (sec >= (MAX_JIFFY_OFFSET / HZ))
-		return MAX_JIFFY_OFFSET;
-	nsec += 1000000000L / HZ - 1;
-	nsec /= 1000000000L / HZ;
-	return HZ * sec + nsec;
+	if (sec >= MAX_SEC_IN_JIFFIES){
+		sec = MAX_SEC_IN_JIFFIES;
+		nsec = 0;
+	}
+	return (((u64)sec * SEC_CONVERSION) +
+		(((u64)nsec * NSEC_CONVERSION) >>
+		 (NSEC_JIFFIE_SC - SEC_JIFFIE_SC))) >> SEC_JIFFIE_SC;
+
 }
 
 static __inline__ void
 jiffies_to_timespec(unsigned long jiffies, struct timespec *value)
 {
-	value->tv_nsec = (jiffies % HZ) * (1000000000L / HZ);
-	value->tv_sec = jiffies / HZ;
+	/*
+	 * Convert jiffies to nanoseconds and seperate with
+	 * one divide.
+	 */
+	u64 nsec = (u64)jiffies * TICK_NSEC; 
+	value->tv_sec = div_long_long_rem(nsec, NSEC_PER_SEC, &value->tv_nsec);
 }
 
 /* Same for "timeval" */
@@ -85,20 +130,27 @@ static __inline__ unsigned long
 timeval_to_jiffies(struct timeval *value)
 {
 	unsigned long sec = value->tv_sec;
-	long usec = value->tv_usec;
+	long usec = value->tv_usec + TICK_USEC - 1;
 
-	if (sec >= (MAX_JIFFY_OFFSET / HZ))
-		return MAX_JIFFY_OFFSET;
-	usec += 1000000L / HZ - 1;
-	usec /= 1000000L / HZ;
-	return HZ * sec + usec;
+	if (sec >= MAX_SEC_IN_JIFFIES){
+		sec = MAX_SEC_IN_JIFFIES;
+		usec = 0;
+	}
+	return (((u64)sec * SEC_CONVERSION) +
+		(((u64)usec * USEC_CONVERSION) >>
+		 (USEC_JIFFIE_SC - SEC_JIFFIE_SC))) >> SEC_JIFFIE_SC;
 }
 
 static __inline__ void
 jiffies_to_timeval(unsigned long jiffies, struct timeval *value)
 {
-	value->tv_usec = (jiffies % HZ) * (1000000L / HZ);
-	value->tv_sec = jiffies / HZ;
+	/*
+	 * Convert jiffies to nanoseconds and seperate with
+	 * one divide.
+	 */
+	u64 nsec = (u64)jiffies * TICK_NSEC; 
+	value->tv_sec = div_long_long_rem(nsec, NSEC_PER_SEC, &value->tv_usec);
+	value->tv_usec /= NSEC_PER_USEC;
 }
 
 static __inline__ int timespec_equal(struct timespec *a, struct timespec *b) 
@@ -158,9 +210,10 @@ struct timespec current_kernel_time(void);
 
 #ifdef __KERNEL__
 extern void do_gettimeofday(struct timeval *tv);
-extern void do_settimeofday(struct timeval *tv);
-extern int do_sys_settimeofday(struct timeval *tv, struct timezone *tz);
+extern int do_settimeofday(struct timespec *tv);
+extern int do_sys_settimeofday(struct timespec *tv, struct timezone *tz);
 extern void clock_was_set(void); // call when ever the clock is set
+extern int do_posix_clock_monotonic_gettime(struct timespec *tp);
 extern long do_nanosleep(struct timespec *t);
 extern long do_utimes(char __user * filename, struct timeval * times);
 #endif

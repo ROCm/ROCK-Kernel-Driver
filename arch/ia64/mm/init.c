@@ -32,7 +32,7 @@
 struct mmu_gather mmu_gathers[NR_CPUS];
 
 /* References to section boundaries: */
-extern char _stext, _etext, _edata, __init_begin, __init_end;
+extern char _stext, _etext, _edata, __init_begin, __init_end, _end;
 
 extern void ia64_tlb_init (void);
 
@@ -46,8 +46,6 @@ unsigned long MAX_DMA_ADDRESS = PAGE_OFFSET + 0x100000000UL;
 #endif
 
 static int pgt_cache_water[2] = { 25, 50 };
-
-struct page *zero_page_memmap_ptr;		/* map entry for zero page */
 
 void
 check_pgt_cache (void)
@@ -114,16 +112,14 @@ ia64_init_addr_space (void)
 void
 free_initmem (void)
 {
-	unsigned long addr, eaddr;
+	unsigned long addr;
 
-	addr = (unsigned long) ia64_imva(&__init_begin);
-	eaddr = (unsigned long) ia64_imva(&__init_end);
-	while (addr < eaddr) {
+	addr = (unsigned long) &__init_begin;
+	for (; addr < (unsigned long) &__init_end; addr += PAGE_SIZE) {
 		ClearPageReserved(virt_to_page(addr));
 		set_page_count(virt_to_page(addr), 1);
 		free_page(addr);
 		++totalram_pages;
-		addr += PAGE_SIZE;
 	}
 	printk(KERN_INFO "Freeing unused kernel memory: %ldkB freed\n",
 	       (&__init_end - &__init_begin) >> 10);
@@ -273,7 +269,7 @@ put_gate_page (struct page *page, unsigned long address)
 void __init
 ia64_mmu_init (void *my_cpu_data)
 {
-	unsigned long psr, pta, impl_va_bits;
+	unsigned long psr, rid, pta, impl_va_bits;
 	extern void __init tlb_init (void);
 #ifdef CONFIG_DISABLE_VHPT
 #	define VHPT_ENABLE_BIT	0
@@ -281,8 +277,21 @@ ia64_mmu_init (void *my_cpu_data)
 #	define VHPT_ENABLE_BIT	1
 #endif
 
-	/* Pin mapping for percpu area into TLB */
+	/*
+	 * Set up the kernel identity mapping for regions 6 and 5.  The mapping for region
+	 * 7 is setup up in _start().
+	 */
 	psr = ia64_clear_ic();
+
+	rid = ia64_rid(IA64_REGION_ID_KERNEL, __IA64_UNCACHED_OFFSET);
+	ia64_set_rr(__IA64_UNCACHED_OFFSET, (rid << 8) | (IA64_GRANULE_SHIFT << 2));
+
+	rid = ia64_rid(IA64_REGION_ID_KERNEL, VMALLOC_START);
+	ia64_set_rr(VMALLOC_START, (rid << 8) | (PAGE_SHIFT << 2) | 1);
+
+	/* ensure rr6 is up-to-date before inserting the PERCPU_ADDR translation: */
+	ia64_srlz_d();
+
 	ia64_itr(0x2, IA64_TR_PERCPU_DATA, PERCPU_ADDR,
 		 pte_val(pfn_pte(__pa(my_cpu_data) >> PAGE_SHIFT, PAGE_KERNEL)),
 		 PERCPU_PAGE_SHIFT);
@@ -480,7 +489,6 @@ paging_init (void)
 
 	discontig_paging_init();
 	efi_memmap_walk(count_pages, &num_physpages);
-	zero_page_memmap_ptr = virt_to_page(ia64_imva(empty_zero_page));
 }
 #else /* !CONFIG_DISCONTIGMEM */
 void
@@ -552,7 +560,6 @@ paging_init (void)
 	}
 	free_area_init(zones_size);
 #  endif /* !CONFIG_VIRTUAL_MEM_MAP */
-	zero_page_memmap_ptr = virt_to_page(ia64_imva(empty_zero_page));
 }
 #endif /* !CONFIG_DISCONTIGMEM */
 
@@ -576,6 +583,7 @@ mem_init (void)
 	long reserved_pages, codesize, datasize, initsize;
 	unsigned long num_pgt_pages;
 	pg_data_t *pgdat;
+	static struct kcore_list kcore_mem, kcore_vmem, kcore_kernel;
 
 #ifdef CONFIG_PCI
 	/*
@@ -593,6 +601,10 @@ mem_init (void)
 #endif
 
 	high_memory = __va(max_low_pfn * PAGE_SIZE);
+
+	kclist_add(&kcore_mem, __va(0), max_low_pfn * PAGE_SIZE);
+	kclist_add(&kcore_vmem, (void *)VMALLOC_START, VMALLOC_END-VMALLOC_START);
+	kclist_add(&kcore_kernel, &_stext, &_end - &_stext);
 
 	for_each_pgdat(pgdat)
 		totalram_pages += free_all_bootmem_node(pgdat);
@@ -623,7 +635,7 @@ mem_init (void)
 		pgt_cache_water[1] = num_pgt_pages;
 
 	/* install the gate page in the global page table: */
-	put_gate_page(virt_to_page(ia64_imva(__start_gate_section)), GATE_ADDR);
+	put_gate_page(virt_to_page(__start_gate_section), GATE_ADDR);
 
 #ifdef CONFIG_IA32_SUPPORT
 	ia32_gdt_init();

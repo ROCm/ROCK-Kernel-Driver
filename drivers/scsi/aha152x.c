@@ -3734,26 +3734,18 @@ static int aha152x_set_info(char *buffer, int length, struct Scsi_Host *shpnt)
 #define SPRINTF(args...) \
 	do { if(pos < buffer + length) pos += sprintf(pos, ## args); } while(0)
 
-static int aha152x_proc_info(char *buffer, char **start,
-		      off_t offset, int length, int hostno, int inout)
+static int aha152x_proc_info(struct Scsi_Host *shpnt, char *buffer, char **start,
+		      off_t offset, int length, int inout)
 {
 	int i;
 	char *pos = buffer;
-	struct Scsi_Host *shpnt;
 	Scsi_Cmnd *ptr;
 	unsigned long flags;
 	int thislength;
 
-	for (i = 0, shpnt = (struct Scsi_Host *) NULL; i<ARRAY_SIZE(aha152x_host); i++)
-		if (aha152x_host[i] && aha152x_host[i]->host_no == hostno)
-			shpnt = aha152x_host[i];
-
-	if (!shpnt)
-		return -ESRCH;
-
 	DPRINTK(debug_procinfo, 
 	       KERN_DEBUG "aha152x_proc_info: buffer=%p offset=%ld length=%d hostno=%d inout=%d\n",
-	       buffer, offset, length, hostno, inout);
+	       buffer, offset, length, shpnt->host_no, inout);
 
 
 	if (inout)

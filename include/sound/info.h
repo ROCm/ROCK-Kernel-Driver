@@ -69,20 +69,15 @@ struct snd_info_entry_ops {
 		     struct vm_area_struct * vma);
 };
 
-struct snd_info_entry_device {
-	unsigned short major;
-	unsigned short minor;
-};
-
 struct snd_info_entry {
 	const char *name;
 	mode_t mode;
 	long size;
 	unsigned short content;
+	unsigned short disconnected: 1;
 	union {
 		struct snd_info_entry_text text;
 		struct snd_info_entry_ops *ops;
-		struct snd_info_entry_device device;
 	} c;
 	snd_info_entry_t *parent;
 	snd_card_t *card;

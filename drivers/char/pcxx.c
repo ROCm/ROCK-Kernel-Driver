@@ -129,9 +129,6 @@ static int numcards = 1;
 static int nbdevs = 0;
  
 static struct channel    *digi_channels;
-static struct tty_struct **pcxe_table;
-static struct termios    **pcxe_termios;
-static struct termios    **pcxe_termios_locked;
  
 int pcxx_ncook=sizeof(pcxx_cook);
 int pcxx_nbios=sizeof(pcxx_bios);
@@ -141,12 +138,9 @@ int pcxx_nbios=sizeof(pcxx_bios);
 
 #define FEPTIMEOUT 200000  
 #define SERIAL_TYPE_NORMAL	1
-#define SERIAL_TYPE_CALLOUT	2
 #define PCXE_EVENT_HANGUP   1
 
-struct tty_driver pcxe_driver;
-struct tty_driver pcxe_callout;
-static int pcxe_refcount;
+static struct tty_driver *pcxe_driver;
 
 static struct timer_list pcxx_timer;
 
@@ -238,16 +232,12 @@ void cleanup_module()
 	del_timer_sync(&pcxx_timer);
 	remove_bh(DIGI_BH);
 
-	if ((e1 = tty_unregister_driver(&pcxe_driver)))
+	if ((e1 = tty_unregister_driver(pcxe_driver)))
 		printk("SERIAL: failed to unregister serial driver (%d)\n", e1);
-	if ((e2 = tty_unregister_driver(&pcxe_callout)))
-		printk("SERIAL: failed to unregister callout driver (%d)\n",e2);
 
+	put_tty_driver(pcxe_driver);
 	cleanup_board_resources();
 	kfree(digi_channels);
-	kfree(pcxe_termios_locked);
-	kfree(pcxe_termios);
-	kfree(pcxe_table);
 	restore_flags(flags);
 }
 #endif
@@ -341,13 +331,8 @@ static int pcxx_waitcarrier(struct tty_struct *tty,struct file *filp,struct chan
 	int	retval = 0;
 	int	do_clocal = 0;
 
-	if (info->asyncflags & ASYNC_CALLOUT_ACTIVE) {
-		if (info->normal_termios.c_cflag & CLOCAL)
-			do_clocal = 1;
-	} else {
-		if (tty->termios->c_cflag & CLOCAL)
-			do_clocal = 1;
-	}
+	if (tty->termios->c_cflag & CLOCAL)
+		do_clocal = 1;
 
 	/*
 	 * Block waiting for the carrier detect and the line to become free
@@ -360,12 +345,10 @@ static int pcxx_waitcarrier(struct tty_struct *tty,struct file *filp,struct chan
 
 	for (;;) {
 		cli();
-		if ((info->asyncflags & ASYNC_CALLOUT_ACTIVE) == 0) {
-			globalwinon(info);
-			info->omodem |= DTR|RTS;
-			fepcmd(info, SETMODEM, DTR|RTS, 0, 10, 1);
-			memoff(info);
-		}
+		globalwinon(info);
+		info->omodem |= DTR|RTS;
+		fepcmd(info, SETMODEM, DTR|RTS, 0, 10, 1);
+		memoff(info);
 		sti();
 		set_current_state(TASK_INTERRUPTIBLE);
 		if(tty_hung_up_p(filp) || (info->asyncflags & ASYNC_INITIALIZED) == 0) {
@@ -375,8 +358,7 @@ static int pcxx_waitcarrier(struct tty_struct *tty,struct file *filp,struct chan
 				retval = -ERESTARTSYS;	
 			break;
 		}
-		if ((info->asyncflags & ASYNC_CALLOUT_ACTIVE) == 0 &&
-		    (info->asyncflags & ASYNC_CLOSING) == 0 &&
+		if ((info->asyncflags & ASYNC_CLOSING) == 0 &&
 			(do_clocal || (info->imodem & info->dcd)))
 			break;
 		if(signal_pending(current)) {
@@ -476,57 +458,20 @@ int pcxe_open(struct tty_struct *tty, struct file * filp)
 		else
 			return -ERESTARTSYS;
 	}
-	/*
-	 * If this is a callout device, then just make sure the normal
-	 * device isn't being used.
-	 */
-	if (tty->driver->subtype == SERIAL_TYPE_CALLOUT) {
-		if (ch->asyncflags & ASYNC_NORMAL_ACTIVE)
-			return -EBUSY;
-		if (ch->asyncflags & ASYNC_CALLOUT_ACTIVE) {
-			if ((ch->asyncflags & ASYNC_SESSION_LOCKOUT) &&
-		    		(ch->session != current->session))
-			    return -EBUSY;
-			if((ch->asyncflags & ASYNC_PGRP_LOCKOUT) &&
-			    (ch->pgrp != current->pgrp))
-			    return -EBUSY;
-		}
-		ch->asyncflags |= ASYNC_CALLOUT_ACTIVE;
-	}
-	else {
-		if (filp->f_flags & O_NONBLOCK) {
-			if(ch->asyncflags & ASYNC_CALLOUT_ACTIVE)
-				return -EBUSY;
-		}
-		else {
-			/* this has to be set in order for the "block until
-			 * CD" code to work correctly.  i'm not sure under
-			 * what circumstances asyncflags should be set to
-			 * ASYNC_NORMAL_ACTIVE though
-			 * brian@ilinx.com
-			 */
-			ch->asyncflags |= ASYNC_NORMAL_ACTIVE;
-			if ((retval = pcxx_waitcarrier(tty, filp, ch)) != 0)
-				return retval;
-		}
-		ch->asyncflags |= ASYNC_NORMAL_ACTIVE;
-	}
- 	
-	save_flags(flags);
-	cli();
-	if((ch->count == 1) && (ch->asyncflags & ASYNC_SPLIT_TERMIOS)) {
-		if(tty->driver->subtype == SERIAL_TYPE_NORMAL)
-			*tty->termios = ch->normal_termios;
-		else 
-			*tty->termios = ch->callout_termios;
-		globalwinon(ch);
-		pcxxparam(tty,ch);
-		memoff(ch);
-	}
 
-	ch->session = current->session;
-	ch->pgrp = current->pgrp;
-	restore_flags(flags);
+	if (!(filp->f_flags & O_NONBLOCK)) {
+		/* this has to be set in order for the "block until
+		 * CD" code to work correctly.  i'm not sure under
+		 * what circumstances asyncflags should be set to
+		 * ASYNC_NORMAL_ACTIVE though
+		 * brian@ilinx.com
+		 */
+		ch->asyncflags |= ASYNC_NORMAL_ACTIVE;
+		if ((retval = pcxx_waitcarrier(tty, filp, ch)) != 0)
+			return retval;
+	}
+	ch->asyncflags |= ASYNC_NORMAL_ACTIVE;
+ 	
 	return 0;
 } 
 
@@ -599,14 +544,6 @@ static void pcxe_close(struct tty_struct * tty, struct file * filp)
 
 		info->asyncflags |= ASYNC_CLOSING;
 	
-		/*
-		* Save the termios structure, since this port may have
-		* separate termios for callout and dialin.
-		*/
-		if(info->asyncflags & ASYNC_NORMAL_ACTIVE)
-			info->normal_termios = *tty->termios;
-		if(info->asyncflags & ASYNC_CALLOUT_ACTIVE)
-			info->callout_termios = *tty->termios;
 		tty->closing = 1;
 		if(info->asyncflags & ASYNC_INITIALIZED) {
 			setup_empty_event(tty,info);		
@@ -644,8 +581,7 @@ static void pcxe_close(struct tty_struct * tty, struct file * filp)
 			}
 			wake_up_interruptible(&info->open_wait);
 		}
-		info->asyncflags &= ~(ASYNC_NORMAL_ACTIVE|
-							  ASYNC_CALLOUT_ACTIVE|ASYNC_CLOSING);
+		info->asyncflags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CLOSING);
 		wake_up_interruptible(&info->close_wait);
 		restore_flags(flags);
 	}
@@ -665,7 +601,7 @@ void pcxe_hangup(struct tty_struct *tty)
 		ch->event = 0;
 		ch->count = 0;
 		ch->tty = NULL;
-		ch->asyncflags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CALLOUT_ACTIVE);
+		ch->asyncflags &= ~ASYNC_NORMAL_ACTIVE;
 		wake_up_interruptible(&ch->open_wait);
 		restore_flags(flags);
 	}
@@ -1091,6 +1027,24 @@ void __init pcxx_setup(char *str, int *ints)
 }
 #endif
 
+static struct tty_operations pcxe_ops = {
+	.open = pcxe_open,
+	.close = pcxe_close,
+	.write = pcxe_write,
+	.put_char = pcxe_put_char,
+	.flush_chars = pcxe_flush_chars,
+	.write_room = pcxe_write_room,
+	.chars_in_buffer = pcxe_chars_in_buffer,
+	.flush_buffer = pcxe_flush_buffer,
+	.ioctl = pcxe_ioctl,
+	.throttle = pcxe_throttle,
+	.unthrottle = pcxe_unthrottle,
+	.set_termios = pcxe_set_termios,
+	.stop = pcxe_stop,
+	.start = pcxe_start,
+	.hangup = pcxe_hangup,
+};
+
 /*
  * function to initialize the driver with the given parameters, which are either
  * the default values from this file or the parameters given at boot.
@@ -1184,6 +1138,10 @@ int __init pcxe_init(void)
 		return -EIO;
 	}
 
+	pcxe_driver = alloc_tty_driver(nbdevs);
+	if (!pcxe_driver)
+		return -ENOMEM;
+
 	/*
 	 * this turns out to be more memory efficient, as there are no 
 	 * unused spaces.
@@ -1191,77 +1149,26 @@ int __init pcxe_init(void)
 	digi_channels = kmalloc(sizeof(struct channel) * nbdevs, GFP_KERNEL);
 	if (!digi_channels) {
 		printk(KERN_ERR "Unable to allocate digi_channel struct\n");
+		put_tty_driver(pcxe_driver);
 		return -ENOMEM;
 	}
 	memset(digi_channels, 0, sizeof(struct channel) * nbdevs);
-
-	pcxe_table =  kmalloc(sizeof(struct tty_struct *) * nbdevs, GFP_KERNEL);
-	if (!pcxe_table) {
-		printk(KERN_ERR "Unable to allocate pcxe_table struct\n");
-		goto cleanup_digi_channels;
-	}
-	memset(pcxe_table, 0, sizeof(struct tty_struct *) * nbdevs);
-
-	pcxe_termios = kmalloc(sizeof(struct termios *) * nbdevs, GFP_KERNEL);
-	if (!pcxe_termios) {
-		printk(KERN_ERR "Unable to allocate pcxe_termios struct\n");
-		goto cleanup_pcxe_table;
-	}
-	memset(pcxe_termios,0,sizeof(struct termios *)*nbdevs);
-
-	pcxe_termios_locked = kmalloc(sizeof(struct termios *) * nbdevs, GFP_KERNEL);
-	if (!pcxe_termios_locked) {
-		printk(KERN_ERR "Unable to allocate pcxe_termios_locked struct\n");
-		goto cleanup_pcxe_termios;
-	}
-	memset(pcxe_termios_locked,0,sizeof(struct termios *)*nbdevs);
 
 	init_bh(DIGI_BH,do_pcxe_bh);
 
 	init_timer(&pcxx_timer);
 	pcxx_timer.function = pcxxpoll;
 
-	memset(&pcxe_driver, 0, sizeof(struct tty_driver));
-	pcxe_driver.magic = TTY_DRIVER_MAGIC;
-	pcxe_driver.owner = THIS_MODULE;
-	pcxe_driver.name = "ttyD";
-	pcxe_driver.major = DIGI_MAJOR; 
-	pcxe_driver.minor_start = 0;
-
-	pcxe_driver.num = nbdevs;
-
-	pcxe_driver.type = TTY_DRIVER_TYPE_SERIAL;
-	pcxe_driver.subtype = SERIAL_TYPE_NORMAL;
-	pcxe_driver.init_termios = tty_std_termios;
-	pcxe_driver.init_termios.c_cflag = B9600 | CS8 | CREAD | HUPCL;
-	pcxe_driver.flags = TTY_DRIVER_REAL_RAW;
-	pcxe_driver.refcount = &pcxe_refcount;
-
-	pcxe_driver.table = pcxe_table;
-	pcxe_driver.termios = pcxe_termios;
-	pcxe_driver.termios_locked = pcxe_termios_locked;
-
-	pcxe_driver.open = pcxe_open;
-	pcxe_driver.close = pcxe_close;
-	pcxe_driver.write = pcxe_write;
-	pcxe_driver.put_char = pcxe_put_char;
-	pcxe_driver.flush_chars = pcxe_flush_chars;
-	pcxe_driver.write_room = pcxe_write_room;
-	pcxe_driver.chars_in_buffer = pcxe_chars_in_buffer;
-	pcxe_driver.flush_buffer = pcxe_flush_buffer;
-	pcxe_driver.ioctl = pcxe_ioctl;
-	pcxe_driver.throttle = pcxe_throttle;
-	pcxe_driver.unthrottle = pcxe_unthrottle;
-	pcxe_driver.set_termios = pcxe_set_termios;
-	pcxe_driver.stop = pcxe_stop;
-	pcxe_driver.start = pcxe_start;
-	pcxe_driver.hangup = pcxe_hangup;
-
-	pcxe_callout = pcxe_driver;
-	pcxe_callout.name = "cud";
-	pcxe_callout.major = DIGICU_MAJOR;
-	pcxe_callout.subtype = SERIAL_TYPE_CALLOUT;
-	pcxe_callout.init_termios.c_cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
+	pcxe_driver->owner = THIS_MODULE;
+	pcxe_driver->name = "ttyD";
+	pcxe_driver->major = DIGI_MAJOR; 
+	pcxe_driver->minor_start = 0;
+	pcxe_driver->type = TTY_DRIVER_TYPE_SERIAL;
+	pcxe_driver->subtype = SERIAL_TYPE_NORMAL;
+	pcxe_driver->init_termios = tty_std_termios;
+	pcxe_driver->init_termios.c_cflag = B9600 | CS8 | CREAD | HUPCL;
+	pcxe_driver->flags = TTY_DRIVER_REAL_RAW;
+	tty_set_operations(pcxe_driver, &pcxe_ops);
 
 	for(crd=0; crd < numcards; crd++) {
 		bd = &boards[crd];
@@ -1619,8 +1526,6 @@ load_fep:
 			ch->close_delay = 50;
 			ch->count = 0;
 			ch->blocked_open = 0;
-			ch->callout_termios = pcxe_callout.init_termios;
-			ch->normal_termios = pcxe_driver.init_termios;
 			init_waitqueue_head(&ch->open_wait);
 			init_waitqueue_head(&ch->close_wait);
 			ch->asyncflags = 0;
@@ -1645,16 +1550,10 @@ load_fep:
 		goto cleanup_boards;
 	}
 
-	ret = tty_register_driver(&pcxe_driver);
+	ret = tty_register_driver(pcxe_driver);
 	if(ret) {
 		printk(KERN_ERR "Couldn't register PC/Xe driver\n");
 		goto cleanup_boards;
-	}
-
-	ret = tty_register_driver(&pcxe_callout);
-	if(ret) {
-		printk(KERN_ERR "Couldn't register PC/Xe callout\n");
-		goto cleanup_pcxe_driver;
 	}
 
 	/*
@@ -1666,12 +1565,10 @@ load_fep:
 		printk(KERN_NOTICE "PC/Xx: Driver with %d card(s) ready.\n", enabled_cards);
 
 	return 0;
-cleanup_pcxe_driver:	tty_unregister_driver(&pcxe_driver);
-cleanup_boards:		cleanup_board_resources();
-			kfree(pcxe_termios_locked);
-cleanup_pcxe_termios:	kfree(pcxe_termios);
-cleanup_pcxe_table:	kfree(pcxe_table);
-cleanup_digi_channels:	kfree(digi_channels);
+cleanup_boards:
+	cleanup_board_resources();
+	kfree(digi_channels);
+	put_tty_driver(pcxe_driver);
 	return ret;
 }
 
@@ -1760,7 +1657,7 @@ static void doevent(int crd)
 
 		if (event & MODEMCHG_IND) {
 			ch->imodem = mstat;
-			if (ch->asyncflags & (ASYNC_NORMAL_ACTIVE|ASYNC_CALLOUT_ACTIVE)) {
+			if (ch->asyncflags & ASYNC_NORMAL_ACTIVE) {
 				if (ch->asyncflags & ASYNC_CHECK_CD) {
 					if (mstat & ch->dcd) {
 						wake_up_interruptible(&ch->open_wait);
@@ -2377,7 +2274,7 @@ static void do_softint(void *private_)
 			if(test_and_clear_bit(PCXE_EVENT_HANGUP, &info->event)) {
 				tty_hangup(tty);
 				wake_up_interruptible(&info->open_wait);
-				info->asyncflags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CALLOUT_ACTIVE);
+				info->asyncflags &= ~ASYNC_NORMAL_ACTIVE;
 			}
 		}
 	}

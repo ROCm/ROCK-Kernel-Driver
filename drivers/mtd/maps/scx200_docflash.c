@@ -2,6 +2,8 @@
 
    Copyright (c) 2001,2002 Christer Weinigel <wingel@nano-system.com>
 
+   $Id: scx200_docflash.c,v 1.5 2003/05/21 12:45:20 dwmw2 Exp $ 
+
    National Semiconductor SCx200 flash mapped with DOCCS
 */
 
@@ -9,6 +11,7 @@
 #include <linux/config.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
+#include <linux/init.h>
 #include <asm/io.h>
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/map.h>
@@ -36,7 +39,7 @@ MODULE_PARM(flashtype, "s");
 MODULE_PARM_DESC(flashtype, "Type of MTD probe to do");
 
 static int probe = 0;		/* Don't autoprobe */
-static unsigned size = 0x1000000; /* 16 MB the whole ISA address space */
+static unsigned size = 0x1000000; /* 16 MiB the whole ISA address space */
 static unsigned width = 8;	/* Default to 8 bits wide */
 static char *flashtype = "cfi_probe";
 
@@ -73,46 +76,9 @@ static struct mtd_partition partition_info[] = {
 #define NUM_PARTITIONS (sizeof(partition_info)/sizeof(partition_info[0]))
 #endif
 
-static __u8 scx200_docflash_read8(struct map_info *map, unsigned long ofs)
-{
-	return __raw_readb(map->map_priv_1 + ofs);
-}
-
-static __u16 scx200_docflash_read16(struct map_info *map, unsigned long ofs)
-{
-	return __raw_readw(map->map_priv_1 + ofs);
-}
-
-static void scx200_docflash_copy_from(struct map_info *map, void *to, unsigned long from, ssize_t len)
-{
-	memcpy_fromio(to, map->map_priv_1 + from, len);
-}
-
-static void scx200_docflash_write8(struct map_info *map, __u8 d, unsigned long adr)
-{
-	__raw_writeb(d, map->map_priv_1 + adr);
-	mb();
-}
-
-static void scx200_docflash_write16(struct map_info *map, __u16 d, unsigned long adr)
-{
-	__raw_writew(d, map->map_priv_1 + adr);
-	mb();
-}
-
-static void scx200_docflash_copy_to(struct map_info *map, unsigned long to, const void *from, ssize_t len)
-{
-	memcpy_toio(map->map_priv_1 + to, from, len);
-}
 
 static struct map_info scx200_docflash_map = {
 	.name      = "NatSemi SCx200 DOCCS Flash",
-	.read8     = scx200_docflash_read8,
-	.read16    = scx200_docflash_read16,
-	.copy_from = scx200_docflash_copy_from,
-	.write8    = scx200_docflash_write8,
-	.write16   = scx200_docflash_write16,
-	.copy_to   = scx200_docflash_copy_to
 };
 
 int __init init_scx200_docflash(void)
@@ -211,8 +177,11 @@ int __init init_scx200_docflash(void)
 	else
 		scx200_docflash_map.buswidth = 2;
 
-	scx200_docflash_map.map_priv_1 = (unsigned long)ioremap(docmem.start, scx200_docflash_map.size);
-	if (!scx200_docflash_map.map_priv_1) {
+	simple_map_init(&scx200_docflash_map);
+
+	scx200_docflash_map.phys = docmem.start;
+	scx200_docflash_map.virt = (unsigned long)ioremap(docmem.start, scx200_docflash_map.size);
+	if (!scx200_docflash_map.virt) {
 		printk(KERN_ERR NAME ": failed to ioremap the flash\n");
 		release_resource(&docmem);
 		return -EIO;
@@ -221,7 +190,7 @@ int __init init_scx200_docflash(void)
 	mymtd = do_map_probe(flashtype, &scx200_docflash_map);
 	if (!mymtd) {
 		printk(KERN_ERR NAME ": unable to detect flash\n");
-		iounmap((void *)scx200_docflash_map.map_priv_1);
+		iounmap((void *)scx200_docflash_map.virt);
 		release_resource(&docmem);
 		return -ENXIO;
 	}
@@ -229,7 +198,7 @@ int __init init_scx200_docflash(void)
 	if (size < mymtd->size)
 		printk(KERN_WARNING NAME ": warning, flash mapping is smaller than flash size\n");
 
-	mymtd->module = THIS_MODULE;
+	mymtd->owner = THIS_MODULE;
 
 #if PARTITION
 	partition_info[3].offset = mymtd->size-partition_info[3].size;
@@ -251,8 +220,8 @@ static void __exit cleanup_scx200_docflash(void)
 #endif
 		map_destroy(mymtd);
 	}
-	if (scx200_docflash_map.map_priv_1) {
-		iounmap((void *)scx200_docflash_map.map_priv_1);
+	if (scx200_docflash_map.virt) {
+		iounmap((void *)scx200_docflash_map.virt);
 		release_resource(&docmem);
 	}
 }

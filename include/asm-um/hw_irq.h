@@ -7,6 +7,4 @@
 static inline void hw_resend_irq(struct hw_interrupt_type *h, unsigned int i)
 {}
 
-extern irq_desc_t irq_desc [NR_IRQS];
-
 #endif

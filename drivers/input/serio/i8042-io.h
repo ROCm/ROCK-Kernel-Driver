@@ -20,11 +20,14 @@
  */
 
 #ifdef __alpha__
-#define I8042_KBD_IRQ	1
-#define I8042_AUX_IRQ	(RTC_PORT(0) == 0x170 ? 9 : 12)	/* Jensen is special */
+# define I8042_KBD_IRQ	1
+# define I8042_AUX_IRQ	(RTC_PORT(0) == 0x170 ? 9 : 12)	/* Jensen is special */
+#elif defined(__ia64__)
+# define I8042_KBD_IRQ isa_irq_to_vector(1)
+# define I8042_AUX_IRQ isa_irq_to_vector(12)
 #else
-#define I8042_KBD_IRQ	1
-#define I8042_AUX_IRQ	12
+# define I8042_KBD_IRQ	1
+# define I8042_AUX_IRQ	12
 #endif
 
 /*

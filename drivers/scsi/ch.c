@@ -94,8 +94,8 @@ MODULE_PARM(vendor_labels,"1-4s");
 
 #define MAX_RETRIES   1
 
-static int  ch_attach(Scsi_Device *);
-static void ch_detach(Scsi_Device *);
+static int  ch_probe(struct device *);
+static int  ch_remove(struct device *);
 static int  ch_open(struct inode * inode, struct file * filp);
 static int  ch_release(struct inode * inode, struct file * filp);
 static int  ch_ioctl(struct inode * inode, struct file * filp,
@@ -118,16 +118,13 @@ static LIST_HEAD(ch_devlist);
 static spinlock_t ch_devlist_lock = SPIN_LOCK_UNLOCKED;
 static int ch_devcount;
 
-struct Scsi_Device_Template ch_template =
+struct scsi_driver ch_template =
 {
-	.module     = THIS_MODULE,
-	.list       = LIST_HEAD_INIT(ch_template.list),
-	.name       = "media changer",
-	.scsi_type  = TYPE_MEDIUM_CHANGER,
-	.attach     = ch_attach,
-	.detach     = ch_detach,
-	.scsi_driverfs_driver = {
-		.name = "ch",
+	.owner     	= THIS_MODULE,
+	.gendrv     	= {
+		.name	= "ch",
+		.probe  = ch_probe,
+		.remove = ch_remove,
 	},
 };
 
@@ -997,16 +994,17 @@ static int ch_ioctl(struct inode * inode, struct file * file,
 
 /* ------------------------------------------------------------------------ */
 
-static int ch_attach(Scsi_Device * sd)
+static int ch_probe(struct device *dev)
 {
+	struct scsi_device *sd = to_scsi_device(dev);
 	scsi_changer *ch;
 	
 	if (sd->type != TYPE_MEDIUM_CHANGER)
-		return 1;
+		return -ENODEV;
     
 	ch = kmalloc(sizeof(*ch), GFP_KERNEL);
 	if (NULL == ch)
-		return 1;
+		return -ENOMEM;
 
 	memset(ch,0,sizeof(*ch));
 	ch->minor = ch_devcount;
@@ -1017,15 +1015,8 @@ static int ch_attach(Scsi_Device * sd)
 	if (init)
 		ch_init_elem(ch);
 
-#if 0
-	devfs_register(NULL, ch->name, 0,
-		       MAJOR_NR, ch->minor,
-		       S_IFCHR | S_IRUGO | S_IWUGO,
-		       &changer_fops, NULL);
-#else
 	devfs_mk_cdev(MKDEV(MAJOR_NR,ch->minor),
 		      S_IFCHR | S_IRUGO | S_IWUGO, ch->name);
-#endif
 
 	printk(KERN_INFO "Attached scsi changer %s "
 	       "at scsi%d, channel %d, id %d, lun %d\n", 
@@ -1038,8 +1029,9 @@ static int ch_attach(Scsi_Device * sd)
 	return 0;
 }
 
-static void ch_detach(Scsi_Device *sd)
+static int ch_remove(struct device *dev)
 {
+	struct scsi_device *sd = to_scsi_device(dev);
 	struct list_head *item;
 	scsi_changer *tmp, *ch;
 
@@ -1058,7 +1050,7 @@ static void ch_detach(Scsi_Device *sd)
 	kfree(ch->dt);
 	kfree(ch);
 	ch_devcount--;
-	return;
+	return 0;
 }
 
 static int __init init_ch_module(void)
@@ -1074,7 +1066,7 @@ static int __init init_ch_module(void)
 		return rc;
 	}
 	ioctl32_register();
-	rc = scsi_register_device(&ch_template);
+	rc = scsi_register_driver(&ch_template.gendrv);
 	if (rc < 0)
 		goto fail1;
 	return 0;
@@ -1087,7 +1079,7 @@ static int __init init_ch_module(void)
 
 static void __exit exit_ch_module(void) 
 {
-	scsi_unregister_device(&ch_template);
+	scsi_unregister_driver(&ch_template.gendrv);
 	unregister_chrdev(MAJOR_NR, "ch");
 	ioctl32_unregister();
 }

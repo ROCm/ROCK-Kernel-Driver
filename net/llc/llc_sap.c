@@ -34,11 +34,7 @@ void llc_sap_assign_sock(struct llc_sap *sap, struct sock *sk)
 {
 	write_lock_bh(&sap->sk_list.lock);
 	llc_sk(sk)->sap = sap;
-	sk->next = sap->sk_list.list;
-	if (sk->next)
-		sap->sk_list.list->pprev = &sk->next;
-	sap->sk_list.list = sk;
-	sk->pprev = &sap->sk_list.list;
+	sk_add_node(sk, &sap->sk_list.list);
 	sock_hold(sk);
 	write_unlock_bh(&sap->sk_list.lock);
 }
@@ -48,22 +44,14 @@ void llc_sap_assign_sock(struct llc_sap *sap, struct sock *sk)
  *	@sap: SAP
  *	@sk: pointer to connection
  *
- *	This function removes a connection from sk_list.list of a SAP.
+ *	This function removes a connection from sk_list.list of a SAP if
+ *	the connection was in this list.
  */
 void llc_sap_unassign_sock(struct llc_sap *sap, struct sock *sk)
 {
 	write_lock_bh(&sap->sk_list.lock);
-	if (sk->pprev) {
-		if (sk->next)
-			sk->next->pprev = sk->pprev;
-		*sk->pprev = sk->next;
-		sk->pprev  = NULL;
-		/*
-		 * This only makes sense if the socket was inserted on the
-		 * list, if sk->pprev is NULL it wasn't
-		 */
+	if (sk_del_node_init(sk))
 		sock_put(sk);
-	}
 	write_unlock_bh(&sap->sk_list.lock);
 }
 
@@ -195,7 +183,7 @@ void llc_sap_state_process(struct llc_sap *sap, struct sk_buff *skb)
 	ev->ind_cfm_flag = 0;
 	llc_sap_next_state(sap, skb);
 	if (ev->ind_cfm_flag == LLC_IND) {
-		if (skb->sk->state == TCP_LISTEN)
+		if (skb->sk->sk_state == TCP_LISTEN)
 			kfree_skb(skb);
 		else {
 			llc_save_primitive(skb, ev->prim);

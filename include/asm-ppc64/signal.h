@@ -2,6 +2,7 @@
 #define _ASMPPC64_SIGNAL_H
 
 #include <linux/types.h>
+#include <asm/siginfo.h>
 
 /* Avoid too many header ordering problems.  */
 struct siginfo;
@@ -72,19 +73,19 @@ typedef struct {
  * SA_ONESHOT and SA_NOMASK are the historical Linux names for the Single
  * Unix names RESETHAND and NODEFER respectively.
  */
-#define SA_NOCLDSTOP	0x00000001
-#define SA_NOCLDWAIT	0x00000002
-#define SA_SIGINFO	0x00000004
-#define SA_ONSTACK	0x08000000
-#define SA_RESTART	0x10000000
-#define SA_NODEFER	0x40000000
-#define SA_RESETHAND	0x80000000
+#define SA_NOCLDSTOP	0x00000001u
+#define SA_NOCLDWAIT	0x00000002u
+#define SA_SIGINFO	0x00000004u
+#define SA_ONSTACK	0x08000000u
+#define SA_RESTART	0x10000000u
+#define SA_NODEFER	0x40000000u
+#define SA_RESETHAND	0x80000000u
 
 #define SA_NOMASK	SA_NODEFER
 #define SA_ONESHOT	SA_RESETHAND
-#define SA_INTERRUPT	0x20000000 /* dummy -- ignored */
+#define SA_INTERRUPT	0x20000000u /* dummy -- ignored */
 
-#define SA_RESTORER	0x04000000
+#define SA_RESTORER	0x04000000u
 
 /* 
  * sigaltstack controls
@@ -143,6 +144,16 @@ typedef struct sigaltstack {
 	size_t ss_size;
 } stack_t;
 
+struct pt_regs;
+struct timespec;
+extern int do_signal(sigset_t *oldset, struct pt_regs *regs);
+extern int do_signal32(sigset_t *oldset, struct pt_regs *regs);
+extern long sys_rt_sigprocmask(int how, sigset_t *set, sigset_t *oset,
+			       size_t sigsetsize);
+extern long sys_rt_sigpending(sigset_t *set, size_t sigsetsize);
+extern long sys_rt_sigtimedwait(const sigset_t *uthese, siginfo_t *uinfo,
+				const struct timespec *uts, size_t sigsetsize);
+extern long sys_rt_sigqueueinfo(int pid, int sig, siginfo_t *uinfo);
 #define ptrace_signal_deliver(regs, cookie) do { } while (0)
 
 struct pt_regs;

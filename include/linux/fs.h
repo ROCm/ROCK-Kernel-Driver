@@ -917,7 +917,6 @@ struct export_operations {
 
 struct file_system_type {
 	const char *name;
-	struct subsystem subsys;
 	int fs_flags;
 	struct super_block *(*get_sb) (struct file_system_type *, int,
 				       const char *, void *);
@@ -1059,7 +1058,7 @@ extern void bd_release(struct block_device *);
 extern void blk_run_queues(void);
 
 /* fs/char_dev.c */
-extern int alloc_chrdev_region(dev_t *, unsigned, char *);
+extern int alloc_chrdev_region(dev_t *, unsigned, unsigned, char *);
 extern int register_chrdev_region(dev_t, unsigned, char *);
 extern int register_chrdev(unsigned int, const char *,
 			   struct file_operations *);

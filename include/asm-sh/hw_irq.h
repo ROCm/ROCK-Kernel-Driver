@@ -3,7 +3,4 @@
 static __inline__ void sh_do_profile (unsigned long pc) {/*Not implemented yet*/}
 
 static __inline__ void hw_resend_irq(struct hw_interrupt_type *h, unsigned int i) { /* Nothing to do */ }
-
-extern irq_desc_t irq_desc [NR_IRQS];
-
 #endif /* __ASM_SH_HW_IRQ_H */

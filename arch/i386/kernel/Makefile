@@ -26,6 +26,7 @@ obj-$(CONFIG_X86_LOCAL_APIC)	+= apic.o nmi.o
 obj-$(CONFIG_X86_IO_APIC)	+= io_apic.o
 obj-$(CONFIG_SOFTWARE_SUSPEND)	+= suspend.o suspend_asm.o
 obj-$(CONFIG_X86_NUMAQ)		+= numaq.o
+obj-$(CONFIG_X86_SUMMIT)	+= summit.o
 obj-$(CONFIG_EDD)             	+= edd.o
 obj-$(CONFIG_MODULES)		+= module.o
 obj-y				+= sysenter.o vsyscall.o
@@ -37,14 +38,22 @@ obj-$(CONFIG_SCx200)		+= scx200.o
 
 # vsyscall.o contains the vsyscall DSO images as __initdata.
 # We must build both images before we can assemble it.
+# Note: kbuild does not track this dependency due to usage of .incbin
 $(obj)/vsyscall.o: $(obj)/vsyscall-int80.so $(obj)/vsyscall-sysenter.so
-extra-y += $(foreach F,int80 sysenter,vsyscall-$F.o vsyscall-$F.so)
+targets += $(foreach F,int80 sysenter,vsyscall-$F.o vsyscall-$F.so)
 
 # The DSO images are built using a special linker script.
+quiet_cmd_syscall = SYSCALL $@
+      cmd_syscall = $(CC) -nostdlib $(SYSCFLAGS_$(@F)) \
+		          -Wl,-T,$(filter-out FORCE,$^) -o $@
+
+vsyscall-flags = -shared -s -Wl,-soname=linux-vsyscall.so.1
+SYSCFLAGS_vsyscall-sysenter.so	= $(vsyscall-flags)
+SYSCFLAGS_vsyscall-int80.so	= $(vsyscall-flags)
+
 $(obj)/vsyscall-int80.so $(obj)/vsyscall-sysenter.so: \
-$(obj)/vsyscall-%.so: $(src)/vsyscall.lds $(obj)/vsyscall-%.o
-	$(CC) -nostdlib -shared -s -Wl,-soname=linux-vsyscall.so.1 \
-	      -o $@ -Wl,-T,$^
+$(obj)/vsyscall-%.so: $(src)/vsyscall.lds $(obj)/vsyscall-%.o FORCE
+	$(call if_changed,syscall)
 
 # We also create a special relocatable object that should mirror the symbol
 # table and layout of the linked DSO.  With ld -R we can then refer to
@@ -52,5 +61,7 @@ $(obj)/vsyscall-%.so: $(src)/vsyscall.lds $(obj)/vsyscall-%.o
 extra-y += vsyscall-syms.o
 $(obj)/built-in.o: $(obj)/vsyscall-syms.o
 $(obj)/built-in.o: ld_flags += -R $(obj)/vsyscall-syms.o
-$(obj)/vsyscall-syms.o: $(src)/vsyscall.lds $(obj)/vsyscall-sysenter.o
-	$(CC) -nostdlib -r -o $@ -Wl,-T,$^
+
+SYSCFLAGS_vsyscall-syms.o = -r
+$(obj)/vsyscall-syms.o: $(src)/vsyscall.lds $(obj)/vsyscall-sysenter.o FORCE
+	$(call if_changed,syscall)

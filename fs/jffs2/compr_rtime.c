@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: compr_rtime.c,v 1.9 2002/05/20 14:56:37 dwmw2 Exp $
+ * $Id: compr_rtime.c,v 1.10 2003/05/11 10:47:13 dwmw2 Exp $
  *
  *
  * Very simple lz77-ish encoder.
@@ -30,7 +30,7 @@
 int jffs2_rtime_compress(unsigned char *data_in, unsigned char *cpage_out, 
 		   uint32_t *sourcelen, uint32_t *dstlen)
 {
-	int positions[256];
+	short positions[256];
 	int outpos = 0;
 	int pos=0;
 
@@ -70,7 +70,7 @@ int jffs2_rtime_compress(unsigned char *data_in, unsigned char *cpage_out,
 void jffs2_rtime_decompress(unsigned char *data_in, unsigned char *cpage_out,
 		      uint32_t srclen, uint32_t destlen)
 {
-	int positions[256];
+	short positions[256];
 	int outpos = 0;
 	int pos=0;
 	

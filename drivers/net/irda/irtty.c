@@ -282,11 +282,8 @@ static void irtty_close(struct tty_struct *tty)
 	self->dongle = NULL;
 
 	/* Remove netdevice */
-	if (self->netdev) {
-		rtnl_lock();
-		unregister_netdevice(self->netdev);
-		rtnl_unlock();
-	}
+	if (self->netdev)
+		unregister_netdev(self->netdev);
 	
 	self = hashbin_remove(irtty, (int) self, NULL);
 

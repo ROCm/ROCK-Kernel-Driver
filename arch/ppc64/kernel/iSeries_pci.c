@@ -304,7 +304,7 @@ void iSeries_pcibios_init(void)
  ***********************************************************************/
 void __init pcibios_final_fixup(void)
 {
-	struct pci_dev* PciDev;
+	struct pci_dev* PciDev = NULL;
 	struct iSeries_Device_Node* DeviceNode;
 	char   Buffer[256];
     	int    DeviceCount = 0;
@@ -315,7 +315,7 @@ void __init pcibios_final_fixup(void)
 	/******************************************************/
 	mf_displaySrc(0xC9000100);
 
-	pci_for_each_dev(PciDev) {
+	while ((PciDev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, PciDev)) != NULL) {
 		DeviceNode = find_Device_Node(PciDev);
 		if(DeviceNode != NULL) {
 			++DeviceCount;

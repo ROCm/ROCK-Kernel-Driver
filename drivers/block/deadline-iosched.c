@@ -121,6 +121,15 @@ static inline void deadline_del_drq_hash(struct deadline_rq *drq)
 		__deadline_del_drq_hash(drq);
 }
 
+static void
+deadline_remove_merge_hints(request_queue_t *q, struct deadline_rq *drq)
+{
+	deadline_del_drq_hash(drq);
+
+	if (q->last_merge == &drq->request->queuelist)
+		q->last_merge = NULL;
+}
+
 static inline void
 deadline_add_drq_hash(struct deadline_data *dd, struct deadline_rq *drq)
 {
@@ -310,7 +319,7 @@ static void deadline_remove_request(request_queue_t *q, struct request *rq)
 		struct deadline_data *dd = q->elevator.elevator_data;
 
 		list_del_init(&drq->fifo);
-		deadline_del_drq_hash(drq);
+		deadline_remove_merge_hints(q, drq);
 		deadline_del_drq_rb(dd, drq);
 	}
 }

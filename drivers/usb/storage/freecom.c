@@ -399,7 +399,7 @@ freecom_init (struct us_data *us)
 		}
 	}
 
-	result = usb_control_msg(us->pusb_dev, us->recv_ctrl_pipe,
+	result = usb_stor_control_msg(us, us->recv_ctrl_pipe,
 			0x4c, 0xc0, 0x4346, 0x0, buffer, 0x20, 3*HZ);
 	buffer[32] = '\0';
 	US_DEBUGP("String returned from FC init is: %s\n", buffer);
@@ -411,7 +411,7 @@ freecom_init (struct us_data *us)
 	 */
 
 	/* send reset */
-	result = usb_control_msg(us->pusb_dev, us->send_ctrl_pipe,
+	result = usb_stor_control_msg(us, us->send_ctrl_pipe,
 			0x4d, 0x40, 0x24d8, 0x0, NULL, 0x0, 3*HZ);
 	US_DEBUGP("result from activate reset is %d\n", result);
 
@@ -419,7 +419,7 @@ freecom_init (struct us_data *us)
 	mdelay(250);
 
 	/* clear reset */
-	result = usb_control_msg(us->pusb_dev, us->send_ctrl_pipe,
+	result = usb_stor_control_msg(us, us->send_ctrl_pipe,
 			0x4d, 0x40, 0x24f8, 0x0, NULL, 0x0, 3*HZ);
 	US_DEBUGP("result from clear reset is %d\n", result);
 

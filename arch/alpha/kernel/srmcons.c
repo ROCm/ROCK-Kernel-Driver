@@ -30,11 +30,6 @@ static int srm_is_registered_console = 0;
  */
 #define MAX_SRM_CONSOLE_DEVICES 1	/* only support 1 console device */
 
-static int srmcons_refcount;
-static struct tty_struct *srmcons_table[MAX_SRM_CONSOLE_DEVICES];
-static struct termios *srmcons_termios[MAX_SRM_CONSOLE_DEVICES];
-static struct termios *srmcons_termios_locked[MAX_SRM_CONSOLE_DEVICES];
-
 struct srmcons_private {
 	struct tty_struct *tty;
 	struct timer_list timer;
@@ -269,21 +264,9 @@ srmcons_close(struct tty_struct *tty, struct file *filp)
 }
 
 
-static struct tty_driver srmcons_driver = {
-	.driver_name	= "srm",
-	.name		= "srm",
-	.magic		= TTY_DRIVER_MAGIC,
-	.major		= 0, 	/* dynamic */
-	.minor_start	= 0,
-	.num		= MAX_SRM_CONSOLE_DEVICES,
-	.type		= TTY_DRIVER_TYPE_SYSTEM,
-	.subtype	= SYSTEM_TYPE_SYSCONS,
+static struct tty_driver *srmcons_driver;
 
-	.table		= srmcons_table,
-	.termios	= srmcons_termios,
-	.termios_locked	= srmcons_termios_locked,
-	.refcount	= &srmcons_refcount,
-
+static struct tty_operations srmcons_ops = {
 	.open		= srmcons_open,
 	.close		= srmcons_close,
 	.write		= srmcons_write,
@@ -295,8 +278,25 @@ static int __init
 srmcons_init(void)
 {
 	if (srm_is_registered_console) {
-		srmcons_driver.init_termios = tty_std_termios;
-		return tty_register_driver(&srmcons_driver);
+		struct tty_driver *driver;
+		int err;
+
+		driver = alloc_tty_driver(MAX_SRM_CONSOLE_DEVICES);
+		if (!driver)
+			return -ENOMEM;
+		driver->driver_name = "srm";
+		driver->name = "srm";
+		driver->major = 0; 	/* dynamic */
+		driver->minor_start = 0;
+		driver->type = TTY_DRIVER_TYPE_SYSTEM;
+		driver->subtype = SYSTEM_TYPE_SYSCONS;
+		driver->init_termios = tty_std_termios;
+		err = tty_register_driver(driver);
+		if (err) {
+			put_tty_driver(driver);
+			return err;
+		}
+		srmcons_driver = driver;
 	}
 
 	return -ENODEV;
@@ -322,7 +322,7 @@ static struct tty_driver *
 srm_console_device(struct console *co, int *index)
 {
 	*index = co->index;
-	return &srmcons_driver;
+	return srmcons_driver;
 }
 
 static int __init

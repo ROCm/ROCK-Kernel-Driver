@@ -41,12 +41,9 @@
 #include <asm/smp.h>
 #include <asm/pgalloc.h>
 #include <asm/pda.h>
+#include <asm/proto.h>
 
 #include <linux/irq.h>
-
-asmlinkage int system_call(void);
-asmlinkage int kernel_syscall(void);
-extern void ia32_syscall(void);
 
 extern struct gate_struct idt_table[256]; 
 
@@ -72,8 +69,6 @@ asmlinkage void alignment_check(void);
 asmlinkage void machine_check(void);
 asmlinkage void spurious_interrupt_bug(void);
 asmlinkage void call_debug(void);
-
-extern int exception_trace;
 
 struct notifier_block *die_chain;
 
@@ -263,7 +258,7 @@ void show_registers(struct pt_regs *regs)
 		rsp = regs->rsp;
 
 	printk("CPU %d ", cpu);
-	show_regs(regs);
+	__show_regs(regs);
 	printk("Process %s (pid: %d, stackpage=%08lx)\n",
 		cur->comm, cur->pid, 4096+(unsigned long)cur);
 
@@ -318,19 +313,12 @@ void out_of_line_bug(void)
 	BUG(); 
 } 
 
-spinlock_t die_lock = SPIN_LOCK_UNLOCKED;
-int die_owner = -1;
+static spinlock_t die_lock = SPIN_LOCK_UNLOCKED;
+static int die_owner = -1;
 
-void die(const char * str, struct pt_regs * regs, long err)
+void oops_begin(void)
 {
-	static int die_counter;
-	int cpu;
-	console_verbose();
-	bust_spinlocks(1);
-	handle_BUG(regs); 
-	printk(KERN_EMERG "%s: %04lx [%u]\n", str, err & 0xffff, ++die_counter);
-	notify_die(DIE_OOPS, (char *)str, regs, err, 255, SIGSEGV);
-	cpu = safe_smp_processor_id(); 
+	int cpu = safe_smp_processor_id(); 
 	/* racy, but better than risking deadlock. */ 
 	local_irq_disable();
 	if (!spin_trylock(&die_lock)) { 
@@ -340,10 +328,27 @@ void die(const char * str, struct pt_regs * regs, long err)
 			spin_lock(&die_lock); 
 	}
 	die_owner = cpu; 
+	console_verbose();
+	bust_spinlocks(1); 
+}
+
+void __die(const char * str, struct pt_regs * regs, long err)
+{
+	static int die_counter;
+	handle_BUG(regs); 
+	printk(KERN_EMERG "%s: %04lx [%u]\n", str, err & 0xffff, ++die_counter);
+	notify_die(DIE_OOPS, (char *)str, regs, err, 255, SIGSEGV);
 	show_registers(regs);
 	bust_spinlocks(0);
+	die_owner = -1; 
 	spin_unlock_irq(&die_lock);
 	do_exit(SIGSEGV);
+}
+
+void die(const char * str, struct pt_regs * regs, long err)
+{
+	oops_begin();
+	__die(str, regs, err);
 }
 
 static inline void die_if_kernel(const char * str, struct pt_regs * regs, long err)
@@ -382,9 +387,13 @@ static void do_trap(int trapnr, int signr, char *str,
 	if ((regs->cs & 3)  != 0) { 
 		struct task_struct *tsk = current;
 
-		if (exception_trace && trapnr != 3)
-			printk("%s[%d] trap %s at rip:%lx rsp:%lx err:%lx\n",
-		       tsk->comm, tsk->pid, str, regs->rip, regs->rsp, error_code);
+		if (exception_trace && !(tsk->ptrace & PT_PTRACED) && 
+		    (tsk->sighand->action[signr-1].sa.sa_handler == SIG_IGN ||
+		    (tsk->sighand->action[signr-1].sa.sa_handler == SIG_DFL)))
+			printk(KERN_INFO
+			       "%s[%d] trap %s rip:%lx rsp:%lx error:%lx\n",
+			       tsk->comm, tsk->pid, str,
+			       regs->rip,regs->rsp,error_code); 
 
 		tsk->thread.error_code = error_code;
 		tsk->thread.trap_no = trapnr;
@@ -401,12 +410,6 @@ static void do_trap(int trapnr, int signr, char *str,
 		const struct exception_table_entry *fixup;
 		fixup = search_exception_tables(regs->rip);
 		if (fixup) {
-			extern int exception_trace; 
-			if (exception_trace)
-	       printk(KERN_ERR
-	             "%s: fixed kernel exception at %lx err:%ld\n",
-	             current->comm, regs->rip, error_code);
-		
 			regs->rip = fixup->fixup;
 		} else	
 			die(str, regs, error_code);
@@ -449,8 +452,6 @@ DO_ERROR(12, SIGBUS,  "stack segment", stack_segment)
 DO_ERROR_INFO(17, SIGBUS, "alignment check", alignment_check, BUS_ADRALN, get_cr2())
 DO_ERROR(18, SIGSEGV, "reserved", reserved)
 
-extern void dump_pagetable(unsigned long);
-
 asmlinkage void do_general_protection(struct pt_regs * regs, long error_code)
 {
 	conditional_sti(regs);
@@ -471,9 +472,14 @@ asmlinkage void do_general_protection(struct pt_regs * regs, long error_code)
 
 	if ((regs->cs & 3)!=0) { 
 		struct task_struct *tsk = current;
-		if (exception_trace)
-			printk("%s[%d] #gp at rip:%lx rsp:%lx err:%lx\n",
-			       tsk->comm, tsk->pid, regs->rip, regs->rsp, error_code);
+
+		if (exception_trace && !(tsk->ptrace & PT_PTRACED) && 
+		    (tsk->sighand->action[SIGSEGV-1].sa.sa_handler == SIG_IGN ||
+		    (tsk->sighand->action[SIGSEGV-1].sa.sa_handler == SIG_DFL)))
+			printk(KERN_INFO
+		       "%s[%d] general protection rip:%lx rsp:%lx error:%lx\n",
+			       tsk->comm, tsk->pid,
+			       regs->rip,regs->rsp,error_code); 
 
 		tsk->thread.error_code = error_code;
 		tsk->thread.trap_no = 13;

@@ -270,14 +270,14 @@ static inline int ppa_proc_write(int hostno, char *buffer, int length)
     return (-EINVAL);
 }
 
-int ppa_proc_info(char *buffer, char **start, off_t offset,
-		  int length, int hostno, int inout)
+int ppa_proc_info(struct Scsi_Host *host, char *buffer, char **start, off_t offset,
+		  int length, int inout)
 {
     int i;
     int len = 0;
 
     for (i = 0; i < 4; i++)
-	if (ppa_hosts[i].host == hostno)
+	if (ppa_hosts[i].host == host->host_no)
 	    break;
 
     if (inout)

@@ -148,8 +148,6 @@ struct	isi_port {
 	unsigned short		channel;
 	unsigned short		status;
 	unsigned short		closing_wait;
-	long 			session;
-	long			pgrp;
 	struct isi_board	* card;
 	struct tty_struct 	* tty;
 	wait_queue_head_t	close_wait;
@@ -160,8 +158,6 @@ struct	isi_port {
 	int			xmit_head;
 	int			xmit_tail;
 	int			xmit_cnt;
-	struct termios 		normal_termios;
-	struct termios		callout_termios;
 };
 
 

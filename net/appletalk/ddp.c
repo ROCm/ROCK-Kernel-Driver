@@ -85,31 +85,25 @@ static struct proto_ops atalk_dgram_ops;
 *                                                                          *
 \**************************************************************************/
 
-struct sock *atalk_sockets;
+HLIST_HEAD(atalk_sockets);
 rwlock_t atalk_sockets_lock = RW_LOCK_UNLOCKED;
 
-#if 0 /* currently unused -DaveM */
+static inline void __atalk_insert_socket(struct sock *sk)
+{
+	sk_add_node(sk, &atalk_sockets);
+}
+
 static inline void atalk_insert_socket(struct sock *sk)
 {
 	write_lock_bh(&atalk_sockets_lock);
-	sk->next = atalk_sockets;
-	if (sk->next)
-		atalk_sockets->pprev = &sk->next;
-	atalk_sockets = sk;
-	sk->pprev = &atalk_sockets;
+	__atalk_insert_socket(sk);
 	write_unlock_bh(&atalk_sockets_lock);
 }
-#endif
 
 static inline void atalk_remove_socket(struct sock *sk)
 {
 	write_lock_bh(&atalk_sockets_lock);
-	if (sk->pprev) {
-		if (sk->next)
-			sk->next->pprev = sk->pprev;
-		*sk->pprev = sk->next;
-		sk->pprev = NULL;
-	}
+	sk_del_node_init(sk);
 	write_unlock_bh(&atalk_sockets_lock);
 }
 
@@ -117,9 +111,10 @@ static struct sock *atalk_search_socket(struct sockaddr_at *to,
 					struct atalk_iface *atif)
 {
 	struct sock *s;
+	struct hlist_node *node;
 
 	read_lock_bh(&atalk_sockets_lock);
-	for (s = atalk_sockets; s; s = s->next) {
+	sk_for_each(s, node, &atalk_sockets) {
 		struct atalk_sock *at = at_sk(s);
 
 		if (to->sat_port != at->src_port)
@@ -128,13 +123,13 @@ static struct sock *atalk_search_socket(struct sockaddr_at *to,
 	    	if (to->sat_addr.s_net == ATADDR_ANYNET &&
 		    to->sat_addr.s_node == ATADDR_BCAST &&
 		    at->src_net == atif->address.s_net)
-			break;
+			goto found;
 
 	    	if (to->sat_addr.s_net == at->src_net &&
 		    (to->sat_addr.s_node == at->src_node ||
 		     to->sat_addr.s_node == ATADDR_BCAST ||
 		     to->sat_addr.s_node == ATADDR_ANYNODE))
-			break;
+			goto found;
 
 	    	/* XXXX.0 -- we got a request for this router. make sure
 		 * that the node is appropriately set. */
@@ -142,9 +137,11 @@ static struct sock *atalk_search_socket(struct sockaddr_at *to,
 		    to->sat_addr.s_net != ATADDR_ANYNET &&
 		    atif->address.s_node == at->src_node) {
 			to->sat_addr.s_node = atif->address.s_node;
-			break; 
+			goto found;
 		}
 	}
+	s = NULL;
+found:
 	read_unlock_bh(&atalk_sockets_lock);
 	return s;
 }
@@ -163,26 +160,21 @@ static struct sock *atalk_find_or_insert_socket(struct sock *sk,
 						struct sockaddr_at *sat)
 {
 	struct sock *s;
+	struct hlist_node *node;
+	struct atalk_sock *at;
 
 	write_lock_bh(&atalk_sockets_lock);
-	for (s = atalk_sockets; s; s = s->next) {
-		struct atalk_sock *at = at_sk(s);
+	sk_for_each(s, node, &atalk_sockets) {
+		at = at_sk(s);
 
 		if (at->src_net == sat->sat_addr.s_net &&
 		    at->src_node == sat->sat_addr.s_node &&
 		    at->src_port == sat->sat_port)
-			break;
+			goto found;
 	}
-
-	if (!s) {
-		/* Wheee, it's free, assign and insert. */
-		sk->next = atalk_sockets;
-		if (sk->next)
-			atalk_sockets->pprev = &sk->next;
-		atalk_sockets = sk;
-		sk->pprev = &atalk_sockets;
-	}
-
+	s = NULL;
+	__atalk_insert_socket(sk); /* Wheee, it's free, assign and insert. */
+found:
 	write_unlock_bh(&atalk_sockets_lock);
 	return s;
 }
@@ -191,29 +183,29 @@ static void atalk_destroy_timer(unsigned long data)
 {
 	struct sock *sk = (struct sock *)data;
 
-	if (!atomic_read(&sk->wmem_alloc) &&
-	    !atomic_read(&sk->rmem_alloc) && test_bit(SOCK_DEAD, &sk->flags))
+	if (!atomic_read(&sk->sk_wmem_alloc) &&
+	    !atomic_read(&sk->sk_rmem_alloc) && sock_flag(sk, SOCK_DEAD))
 		sock_put(sk);
 	else {
-		sk->timer.expires = jiffies + SOCK_DESTROY_TIME;
-		add_timer(&sk->timer);
+		sk->sk_timer.expires = jiffies + SOCK_DESTROY_TIME;
+		add_timer(&sk->sk_timer);
 	}
 }
 
 static inline void atalk_destroy_socket(struct sock *sk)
 {
 	atalk_remove_socket(sk);
-	skb_queue_purge(&sk->receive_queue);
+	skb_queue_purge(&sk->sk_receive_queue);
 
-	if (!atomic_read(&sk->wmem_alloc) &&
-	    !atomic_read(&sk->rmem_alloc) && test_bit(SOCK_DEAD, &sk->flags))
+	if (!atomic_read(&sk->sk_wmem_alloc) &&
+	    !atomic_read(&sk->sk_rmem_alloc) && sock_flag(sk, SOCK_DEAD))
 		sock_put(sk);
 	else {
-		init_timer(&sk->timer);
-		sk->timer.expires = jiffies + SOCK_DESTROY_TIME;
-		sk->timer.function = atalk_destroy_timer;
-		sk->timer.data = (unsigned long) sk;
-		add_timer(&sk->timer);
+		init_timer(&sk->sk_timer);
+		sk->sk_timer.expires	= jiffies + SOCK_DESTROY_TIME;
+		sk->sk_timer.function	= atalk_destroy_timer;
+		sk->sk_timer.data	= (unsigned long)sk;
+		add_timer(&sk->sk_timer);
 	}
 }
 
@@ -992,7 +984,7 @@ static int atalk_create(struct socket *sock, int protocol)
 	sock->ops = &atalk_dgram_ops;
 	sock_init_data(sock, sk);
 	/* Checksums on by default */
-	sk->zapped = 1;
+	sk->sk_zapped = 1;
 out:
 	return rc;
 outsk:
@@ -1006,9 +998,10 @@ static int atalk_release(struct socket *sock)
 	struct sock *sk = sock->sk;
 
 	if (sk) {
-		if (!test_bit(SOCK_DEAD, &sk->flags))
-			sk->state_change(sk);
-		__set_bit(SOCK_DEAD, &sk->flags);
+		if (!sock_flag(sk, SOCK_DEAD)) {
+			sk->sk_state_change(sk);
+			sock_set_flag(sk, SOCK_DEAD);
+		}
 		sock->sk = NULL;
 		atalk_destroy_socket(sk);
 	}
@@ -1027,7 +1020,6 @@ static int atalk_release(struct socket *sock)
  */
 static int atalk_pick_and_bind_port(struct sock *sk, struct sockaddr_at *sat)
 {
-	struct sock *s;
 	int retval;
 
 	write_lock_bh(&atalk_sockets_lock);
@@ -1035,7 +1027,10 @@ static int atalk_pick_and_bind_port(struct sock *sk, struct sockaddr_at *sat)
 	for (sat->sat_port = ATPORT_RESERVED;
 	     sat->sat_port < ATPORT_LAST;
 	     sat->sat_port++) {
-		for (s = atalk_sockets; s; s = s->next) {
+		struct sock *s;
+		struct hlist_node *node;
+
+		sk_for_each(s, node, &atalk_sockets) {
 			struct atalk_sock *at = at_sk(s);
 
 			if (at->src_net == sat->sat_addr.s_net &&
@@ -1045,11 +1040,7 @@ static int atalk_pick_and_bind_port(struct sock *sk, struct sockaddr_at *sat)
 		}
 
 		/* Wheee, it's free, assign and insert. */
-		sk->next = atalk_sockets;
-		if (sk->next)
-			atalk_sockets->pprev = &sk->next;
-		atalk_sockets = sk;
-		sk->pprev = &atalk_sockets;
+		__atalk_insert_socket(sk);
 		at_sk(sk)->src_port = sat->sat_port;
 		retval = 0;
 		goto out;
@@ -1078,7 +1069,7 @@ static int atalk_autobind(struct sock *sk)
 
 	n = atalk_pick_and_bind_port(sk, &sat);
 	if (!n)
-		sk->zapped = 0;
+		sk->sk_zapped = 0;
 out:
 	return n;
 }
@@ -1090,7 +1081,7 @@ static int atalk_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 	struct sock *sk = sock->sk;
 	struct atalk_sock *at = at_sk(sk);
 
-	if (!sk->zapped || addr_len != sizeof(struct sockaddr_at))
+	if (!sk->sk_zapped || addr_len != sizeof(struct sockaddr_at))
 		return -EINVAL;
 
 	if (addr->sat_family != AF_APPLETALK)
@@ -1125,7 +1116,7 @@ static int atalk_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 			return -EADDRINUSE;
 	}
 
-	sk->zapped = 0;
+	sk->sk_zapped = 0;
 	return 0;
 }
 
@@ -1137,7 +1128,7 @@ static int atalk_connect(struct socket *sock, struct sockaddr *uaddr,
 	struct atalk_sock *at = at_sk(sk);
 	struct sockaddr_at *addr;
 
-	sk->state   = TCP_CLOSE;
+	sk->sk_state   = TCP_CLOSE;
 	sock->state = SS_UNCONNECTED;
 
 	if (addr_len != sizeof(*addr))
@@ -1149,7 +1140,7 @@ static int atalk_connect(struct socket *sock, struct sockaddr *uaddr,
 		return -EAFNOSUPPORT;
 
 	if (addr->sat_addr.s_node == ATADDR_BCAST &&
-			!test_bit(SOCK_BROADCAST, &sk->flags)) {
+	    !sock_flag(sk, SOCK_BROADCAST)) {
 #if 1	
 		printk(KERN_WARNING "%s is broken and did not set "
 				    "SO_BROADCAST. It will break when 2.2 is "
@@ -1160,7 +1151,7 @@ static int atalk_connect(struct socket *sock, struct sockaddr *uaddr,
 #endif			
 	}
 
-	if (sk->zapped)
+	if (sk->sk_zapped)
 		if (atalk_autobind(sk) < 0)
 			return -EBUSY;
 
@@ -1171,8 +1162,8 @@ static int atalk_connect(struct socket *sock, struct sockaddr *uaddr,
 	at->dest_net  = addr->sat_addr.s_net;
 	at->dest_node = addr->sat_addr.s_node;
 
-	sock->state = SS_CONNECTED;
-	sk->state   = TCP_ESTABLISHED;
+	sock->state  = SS_CONNECTED;
+	sk->sk_state = TCP_ESTABLISHED;
 	return 0;
 }
 
@@ -1187,14 +1178,14 @@ static int atalk_getname(struct socket *sock, struct sockaddr *uaddr,
 	struct sock *sk = sock->sk;
 	struct atalk_sock *at = at_sk(sk);
 
-	if (sk->zapped)
+	if (sk->sk_zapped)
 		if (atalk_autobind(sk) < 0)
 			return -ENOBUFS;
 
 	*uaddr_len = sizeof(struct sockaddr_at);
 
 	if (peer) {
-		if (sk->state != TCP_ESTABLISHED)
+		if (sk->sk_state != TCP_ESTABLISHED)
 			return -ENOTCONN;
 
 		sat.sat_addr.s_net  = at->dest_net;
@@ -1505,7 +1496,7 @@ static int atalk_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr 
 		return -EMSGSIZE;
 
 	if (usat) {
-		if (sk->zapped)
+		if (sk->sk_zapped)
 			if (atalk_autobind(sk) < 0)
 				return -EBUSY;
 
@@ -1515,7 +1506,7 @@ static int atalk_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr 
 
 		/* netatalk doesn't implement this check */
 		if (usat->sat_addr.s_node == ATADDR_BCAST &&
-				!test_bit(SOCK_BROADCAST, &sk->flags)) {
+		    !sock_flag(sk, SOCK_BROADCAST)) {
 			printk(KERN_INFO "SO_BROADCAST: Fix your netatalk as "
 					 "it will break before 2.2\n");
 #if 0
@@ -1523,7 +1514,7 @@ static int atalk_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr 
 #endif
 		}
 	} else {
-		if (sk->state != TCP_ESTABLISHED)
+		if (sk->sk_state != TCP_ESTABLISHED)
 			return -ENOTCONN;
 		usat = &local_satalk;
 		usat->sat_family      = AF_APPLETALK;
@@ -1598,7 +1589,7 @@ static int atalk_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr 
 		return -EFAULT;
 	}
 
-	if (sk->no_check == 1)
+	if (sk->sk_no_check == 1)
 		ddp->deh_sum = 0;
 	else
 		ddp->deh_sum = atalk_checksum(ddp, len + sizeof(*ddp));
@@ -1660,7 +1651,7 @@ static int atalk_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr 
 	ddp = ddp_hdr(skb);
 	*((__u16 *)&ddphv) = ntohs(*((__u16 *)ddp));
 
-	if (sk->type == SOCK_RAW) {
+	if (sk->sk_type == SOCK_RAW) {
 		copied = ddphv.deh_len;
 		if (copied > size) {
 			copied = size;
@@ -1704,7 +1695,8 @@ static int atalk_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 	switch (cmd) {
 		/* Protocol layer */
 		case TIOCOUTQ: {
-			long amount = sk->sndbuf - atomic_read(&sk->wmem_alloc);
+			long amount = sk->sk_sndbuf -
+				      atomic_read(&sk->sk_wmem_alloc);
 
 			if (amount < 0)
 				amount = 0;
@@ -1716,7 +1708,7 @@ static int atalk_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 			 * These two are safe on a single CPU system as only
 			 * user tasks fiddle here
 			 */
-			struct sk_buff *skb = skb_peek(&sk->receive_queue);
+			struct sk_buff *skb = skb_peek(&sk->sk_receive_queue);
 			long amount = 0;
 
 			if (skb)
@@ -1728,9 +1720,9 @@ static int atalk_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 			if (!sk)
 				break;
 			rc = -ENOENT;
-			if (!sk->stamp.tv_sec)
+			if (!sk->sk_stamp.tv_sec)
 				break;
-			rc = copy_to_user((void *)arg, &sk->stamp,
+			rc = copy_to_user((void *)arg, &sk->sk_stamp,
 					  sizeof(struct timeval)) ? -EFAULT : 0;
 			break;
 		/* Routing */

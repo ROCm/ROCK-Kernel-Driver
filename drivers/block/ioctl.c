@@ -207,11 +207,8 @@ int blkdev_ioctl(struct inode *inode, struct file *file, unsigned cmd,
 		set_device_ro(bdev, n);
 		return 0;
 	default:
-		if (disk->fops->ioctl) {
-			ret = disk->fops->ioctl(inode, file, cmd, arg);
-			if (ret != -EINVAL)
-				return ret;
-		}
+		if (disk->fops->ioctl)
+			return disk->fops->ioctl(inode, file, cmd, arg);
 	}
 	return -ENOTTY;
 }

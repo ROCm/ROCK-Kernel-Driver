@@ -295,9 +295,9 @@ ncp_delete_inode(struct inode *inode)
 static void ncp_stop_tasks(struct ncp_server *server) {
 	struct sock* sk = server->ncp_sock->sk;
 		
-	sk->error_report = server->error_report;
-	sk->data_ready = server->data_ready;
-	sk->write_space = server->write_space;
+	sk->sk_error_report = server->error_report;
+	sk->sk_data_ready   = server->data_ready;
+	sk->sk_write_space  = server->write_space;
 	del_timer_sync(&server->timeout_tm);
 	flush_scheduled_work();
 }
@@ -550,12 +550,12 @@ static int ncp_fill_super(struct super_block *sb, void *raw_data, int silent)
 
 	INIT_LIST_HEAD(&server->tx.requests);
 	init_MUTEX(&server->rcv.creq_sem);
-	server->tx.creq = NULL;
-	server->rcv.creq = NULL;
-	server->data_ready = sock->sk->data_ready;
-	server->write_space = sock->sk->write_space;
-	server->error_report = sock->sk->error_report;
-	sock->sk->user_data = server;
+	server->tx.creq		= NULL;
+	server->rcv.creq	= NULL;
+	server->data_ready	= sock->sk->sk_data_ready;
+	server->write_space	= sock->sk->sk_write_space;
+	server->error_report	= sock->sk->sk_error_report;
+	sock->sk->sk_user_data	= server;
 
 	init_timer(&server->timeout_tm);
 #undef NCP_PACKET_SIZE
@@ -566,15 +566,15 @@ static int ncp_fill_super(struct super_block *sb, void *raw_data, int silent)
 	if (server->packet == NULL)
 		goto out_nls;
 
-	sock->sk->data_ready = ncp_tcp_data_ready;
-	sock->sk->error_report = ncp_tcp_error_report;
+	sock->sk->sk_data_ready	  = ncp_tcp_data_ready;
+	sock->sk->sk_error_report = ncp_tcp_error_report;
 	if (sock->type == SOCK_STREAM) {
 		server->rcv.ptr = (unsigned char*)&server->rcv.buf;
 		server->rcv.len = 10;
 		server->rcv.state = 0;
 		INIT_WORK(&server->rcv.tq, ncp_tcp_rcv_proc, server);
 		INIT_WORK(&server->tx.tq, ncp_tcp_tx_proc, server);
-		sock->sk->write_space = ncp_tcp_write_space;
+		sock->sk->sk_write_space = ncp_tcp_write_space;
 	} else {
 		INIT_WORK(&server->rcv.tq, ncpdgram_rcv_proc, server);
 		INIT_WORK(&server->timeout_tq, ncpdgram_timeout_proc, server);

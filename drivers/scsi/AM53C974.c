@@ -732,6 +732,12 @@ static int __init  AM53C974_init(Scsi_Host_Template * tpnt, struct pci_dev *pdev
 	hostdata->disconnecting = 0;
 	hostdata->dma_busy = 0;
 
+	if (!request_region (instance->io_port, 128, "AM53C974")) {
+		printk ("AM53C974 (scsi%d): Could not get IO region %04lx.\n",
+			instance->host_no, instance->io_port);
+		scsi_unregister(instance);
+		return 0;
+	}
 /* Set up an interrupt handler if we aren't already sharing an IRQ with another board */
 	for (search = first_host;
 	     search && (((the_template != NULL) && (search->hostt != the_template)) ||
@@ -2442,6 +2448,7 @@ static int AM53C974_reset(Scsi_Cmnd * cmd, unsigned int reset_flags)
 static int AM53C974_release(struct Scsi_Host *shp)
 {
 	free_irq(shp->irq, shp);
+	release_region(shp->io_port, 128);
 	scsi_unregister(shp);
 	return 0;
 }

@@ -711,11 +711,6 @@ int isp2x00_detect(Scsi_Host_Template * tmpt)
 
 	tmpt->proc_name = "isp2x00";
 
-	if (pci_present() == 0) {
-		printk(KERN_INFO "qlogicfc : PCI not present\n");
-		return 0;
-	}
-
 	for (i=0; i<2; i++){
 		pdev = NULL;
 	        while ((pdev = pci_find_device(PCI_VENDOR_ID_QLOGIC, device_ids[i], pdev))) {

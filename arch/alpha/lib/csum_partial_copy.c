@@ -46,7 +46,7 @@ __asm__ __volatile__("insqh %1,%2,%0":"=r" (z):"r" (x),"r" (y))
 	"1:	ldq_u %0,%2\n"				\
 	"2:\n"						\
 	".section __ex_table,\"a\"\n"			\
-	"	.gprel32 1b\n"				\
+	"	.long 1b - .\n"				\
 	"	lda %0,2b-1b(%1)\n"			\
 	".previous"					\
 		: "=r"(x), "=r"(__guu_err)		\
@@ -61,7 +61,7 @@ __asm__ __volatile__("insqh %1,%2,%0":"=r" (z):"r" (x),"r" (y))
 	"1:	stq_u %2,%1\n"				\
 	"2:\n"						\
 	".section __ex_table,\"a\"\n"			\
-	"	.gprel32 1b"				\
+	"	.long 1b - ."				\
 	"	lda $31,2b-1b(%0)\n"			\
 	".previous"					\
 		: "=r"(__puu_err)			\

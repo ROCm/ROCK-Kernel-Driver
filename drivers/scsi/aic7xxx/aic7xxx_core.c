@@ -37,7 +37,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic7xxx.c#128 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic7xxx.c#131 $
  *
  * $FreeBSD$
  */
@@ -202,7 +202,7 @@ static void		ahc_handle_devreset(struct ahc_softc *ahc,
 					    struct ahc_devinfo *devinfo,
 					    cam_status status, char *message,
 					    int verbose_level);
-#if AHC_TARGET_MODE
+#ifdef AHC_TARGET_MODE
 static void		ahc_setup_target_msgin(struct ahc_softc *ahc,
 					       struct ahc_devinfo *devinfo,
 					       struct scb *scb);
@@ -291,7 +291,7 @@ ahc_restart(struct ahc_softc *ahc)
 			 ahc_inb(ahc, SEQ_FLAGS2) & ~SCB_DMA);
 	}
 	ahc_outb(ahc, MWI_RESIDUAL, 0);
-	ahc_outb(ahc, SEQCTL, FASTMODE);
+	ahc_outb(ahc, SEQCTL, ahc->seqctl);
 	ahc_outb(ahc, SEQADDR0, 0);
 	ahc_outb(ahc, SEQADDR1, 0);
 	ahc_unpause(ahc);
@@ -705,7 +705,7 @@ ahc_handle_seqint(struct ahc_softc *ahc, u_int intstat)
 					ahc->msgin_index = 0;
 				}
 			}
-#if AHC_TARGET_MODE
+#ifdef AHC_TARGET_MODE
 			else {
 				if (bus_phase == P_MESGOUT) {
 					ahc->msg_type =
@@ -1467,7 +1467,7 @@ ahc_clear_critical_section(struct ahc_softc *ahc)
 			else
 				ahc_outb(ahc, SIMODE1, 0);
 			ahc_outb(ahc, CLRINT, CLRSCSIINT);
-			ahc_outb(ahc, SEQCTL, ahc_inb(ahc, SEQCTL) | STEP);
+			ahc_outb(ahc, SEQCTL, ahc->seqctl | STEP);
 			stepping = TRUE;
 		}
 		if ((ahc->features & AHC_DT) != 0) {
@@ -1481,7 +1481,7 @@ ahc_clear_critical_section(struct ahc_softc *ahc)
 	if (stepping) {
 		ahc_outb(ahc, SIMODE0, simode0);
 		ahc_outb(ahc, SIMODE1, simode1);
-		ahc_outb(ahc, SEQCTL, ahc_inb(ahc, SEQCTL) & ~STEP);
+		ahc_outb(ahc, SEQCTL, ahc->seqctl);
 	}
 }
 
@@ -3573,7 +3573,7 @@ ahc_handle_ign_wide_residue(struct ahc_softc *ahc, struct ahc_devinfo *devinfo)
 
 		sgptr = ahc_inb(ahc, SCB_RESIDUAL_SGPTR);
 		if ((sgptr & SG_LIST_NULL) != 0
-		 && ahc_inb(ahc, DATA_COUNT_ODD) == 1) {
+		 && (ahc_inb(ahc, SCB_LUN) & SCB_XFERLEN_ODD) != 0) {
 			/*
 			 * If the residual occurred on the last
 			 * transfer and the transfer request was
@@ -3586,25 +3586,27 @@ ahc_handle_ign_wide_residue(struct ahc_softc *ahc, struct ahc_devinfo *devinfo)
 			uint32_t data_addr;
 			uint32_t sglen;
 
-			/* Pull in the rest of the sgptr */
-			sgptr |= (ahc_inb(ahc, SCB_RESIDUAL_SGPTR + 3) << 24)
-			      | (ahc_inb(ahc, SCB_RESIDUAL_SGPTR + 2) << 16)
-			      | (ahc_inb(ahc, SCB_RESIDUAL_SGPTR + 1) << 8);
-			sgptr &= SG_PTR_MASK;
-			data_cnt = (ahc_inb(ahc, SCB_RESIDUAL_DATACNT+3) << 24)
-				 | (ahc_inb(ahc, SCB_RESIDUAL_DATACNT+2) << 16)
-				 | (ahc_inb(ahc, SCB_RESIDUAL_DATACNT+1) << 8)
-				 | (ahc_inb(ahc, SCB_RESIDUAL_DATACNT));
+			/* Pull in all of the sgptr */
+			sgptr = ahc_inl(ahc, SCB_RESIDUAL_SGPTR);
+			data_cnt = ahc_inl(ahc, SCB_RESIDUAL_DATACNT);
 
-			data_addr = (ahc_inb(ahc, SHADDR + 3) << 24)
-				  | (ahc_inb(ahc, SHADDR + 2) << 16)
-				  | (ahc_inb(ahc, SHADDR + 1) << 8)
-				  | (ahc_inb(ahc, SHADDR));
+			if ((sgptr & SG_LIST_NULL) != 0) {
+				/*
+				 * The residual data count is not updated
+				 * for the command run to completion case.
+				 * Explicitly zero the count.
+				 */
+				data_cnt &= ~AHC_SG_LEN_MASK;
+			}
+
+			data_addr = ahc_inl(ahc, SHADDR);
 
 			data_cnt += 1;
 			data_addr -= 1;
+			sgptr &= SG_PTR_MASK;
 
 			sg = ahc_sg_bus_to_virt(scb, sgptr);
+
 			/*
 			 * The residual sg ptr points to the next S/G
 			 * to load so we must go back one.
@@ -3630,19 +3632,17 @@ ahc_handle_ign_wide_residue(struct ahc_softc *ahc, struct ahc_devinfo *devinfo)
 				 */
 				sg++;
 				sgptr = ahc_sg_virt_to_bus(scb, sg);
-				ahc_outb(ahc, SCB_RESIDUAL_SGPTR + 3,
-					 sgptr >> 24);
-				ahc_outb(ahc, SCB_RESIDUAL_SGPTR + 2,
-					 sgptr >> 16);
-				ahc_outb(ahc, SCB_RESIDUAL_SGPTR + 1,
-					 sgptr >> 8);
-				ahc_outb(ahc, SCB_RESIDUAL_SGPTR, sgptr);
 			}
-
-			ahc_outb(ahc, SCB_RESIDUAL_DATACNT + 3, data_cnt >> 24);
-			ahc_outb(ahc, SCB_RESIDUAL_DATACNT + 2, data_cnt >> 16);
-			ahc_outb(ahc, SCB_RESIDUAL_DATACNT + 1, data_cnt >> 8);
-			ahc_outb(ahc, SCB_RESIDUAL_DATACNT, data_cnt);
+			ahc_outl(ahc, SCB_RESIDUAL_SGPTR, sgptr);
+			ahc_outl(ahc, SCB_RESIDUAL_DATACNT, data_cnt);
+			/*
+			 * Toggle the "oddness" of the transfer length
+			 * to handle this mid-transfer ignore wide
+			 * residue.  This ensures that the oddness is
+			 * correct for subsequent data transfers.
+			 */
+			ahc_outb(ahc, SCB_LUN,
+				 ahc_inb(ahc, SCB_LUN) ^ SCB_XFERLEN_ODD);
 		}
 	}
 }
@@ -3826,6 +3826,12 @@ ahc_alloc(void *platform_arg, char *name)
 	ahc->features = AHC_FENONE;
 	ahc->bugs = AHC_BUGNONE;
 	ahc->flags = AHC_FNONE;
+	/*
+	 * Default to all error reporting enabled with the
+	 * sequencer operating at its fastest speed.
+	 * The bus attach code may modify this.
+	 */
+	ahc->seqctl = FASTMODE;
 
 	for (i = 0; i < AHC_NUM_TARGETS; i++)
 		TAILQ_INIT(&ahc->untagged_queues[i]);
@@ -3986,7 +3992,7 @@ ahc_free(struct ahc_softc *ahc)
 
 		tstate = ahc->enabled_targets[i];
 		if (tstate != NULL) {
-#if AHC_TARGET_MODE
+#ifdef AHC_TARGET_MODE
 			int j;
 
 			for (j = 0; j < AHC_NUM_LUNS; j++) {
@@ -4002,7 +4008,7 @@ ahc_free(struct ahc_softc *ahc)
 			free(tstate, M_DEVBUF);
 		}
 	}
-#if AHC_TARGET_MODE
+#ifdef AHC_TARGET_MODE
 	if (ahc->black_hole != NULL) {
 		xpt_free_path(ahc->black_hole->path);
 		free(ahc->black_hole, M_DEVBUF);
@@ -5120,7 +5126,7 @@ ahc_suspend(struct ahc_softc *ahc)
 		return (EBUSY);
 	}
 
-#if AHC_TARGET_MODE
+#ifdef AHC_TARGET_MODE
 	/*
 	 * XXX What about ATIOs that have not yet been serviced?
 	 * Perhaps we should just refuse to be suspended if we
@@ -5221,7 +5227,7 @@ ahc_match_scb(struct ahc_softc *ahc, struct scb *scb, int target,
 	if (match != 0)
 		match = ((lun == slun) || (lun == CAM_LUN_WILDCARD));
 	if (match != 0) {
-#if AHC_TARGET_MODE
+#ifdef AHC_TARGET_MODE
 		int group;
 
 		group = XPT_FC_GROUP(scb->io_ctx->ccb_h.func_code);
@@ -5964,7 +5970,7 @@ ahc_reset_channel(struct ahc_softc *ahc, char channel, int initiate_reset)
 	 * before the reset occurred.
 	 */
 	ahc_run_qoutfifo(ahc);
-#if AHC_TARGET_MODE
+#ifdef AHC_TARGET_MODE
 	/*
 	 * XXX - In Twin mode, the tqinfifo may have commands
 	 *	 for an unaffected channel in it.  However, if
@@ -5996,7 +6002,7 @@ ahc_reset_channel(struct ahc_softc *ahc, char channel, int initiate_reset)
 		 */
 		ahc_outb(ahc, SBLKCTL, sblkctl ^ SELBUSB);
 		simode1 = ahc_inb(ahc, SIMODE1) & ~(ENBUSFREE|ENSCSIRST);
-#if AHC_TARGET_MODE
+#ifdef AHC_TARGET_MODE
 		/*
 		 * Bus resets clear ENSELI, so we cannot
 		 * defer re-enabling bus reset interrupts
@@ -6015,7 +6021,7 @@ ahc_reset_channel(struct ahc_softc *ahc, char channel, int initiate_reset)
 	} else {
 		/* Case 2: A command from this bus is active or we're idle */
 		simode1 = ahc_inb(ahc, SIMODE1) & ~(ENBUSFREE|ENSCSIRST);
-#if AHC_TARGET_MODE
+#ifdef AHC_TARGET_MODE
 		/*
 		 * Bus resets clear ENSELI, so we cannot
 		 * defer re-enabling bus reset interrupts

@@ -55,11 +55,11 @@ pci_bus_max_busnr(struct pci_bus* bus)
 unsigned char __devinit
 pci_max_busnr(void)
 {
-	struct pci_bus* bus;
+	struct pci_bus *bus = NULL;
 	unsigned char max, n;
 
 	max = 0;
-	pci_for_each_bus(bus) {
+	while ((bus = pci_find_next_bus(bus)) != NULL) {
 		n = pci_bus_max_busnr(bus);
 		if(n > max)
 			max = n;
@@ -701,11 +701,22 @@ pci_dac_set_dma_mask(struct pci_dev *dev, u64 mask)
 	return 0;
 }
 
+int
+pci_set_consistent_dma_mask(struct pci_dev *dev, u64 mask)
+{
+	if (!pci_dma_supported(dev, mask))
+		return -EIO;
+
+	dev->consistent_dma_mask = mask;
+
+	return 0;
+}
+     
 static int __devinit pci_init(void)
 {
-	struct pci_dev *dev;
+	struct pci_dev *dev = NULL;
 
-	pci_for_each_dev(dev) {
+	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 		pci_fixup_device(PCI_FIXUP_FINAL, dev);
 	}
 	return 0;
@@ -751,6 +762,7 @@ EXPORT_SYMBOL(pci_set_mwi);
 EXPORT_SYMBOL(pci_clear_mwi);
 EXPORT_SYMBOL(pci_set_dma_mask);
 EXPORT_SYMBOL(pci_dac_set_dma_mask);
+EXPORT_SYMBOL(pci_set_consistent_dma_mask);
 EXPORT_SYMBOL(pci_assign_resource);
 EXPORT_SYMBOL(pci_find_parent_resource);
 

@@ -190,33 +190,33 @@ gss_import_sec_context(struct xdr_netobj	*input_token,
 		->gss_import_sec_context(input_token, *ctx_id);
 }
 
-/* gss_verify_mic: hash messages_buffer and return gss verify token. */
+/* gss_get_mic: compute a mic over message and return mic_token. */
 
 u32
 gss_get_mic(struct gss_ctx	*context_handle,
 	    u32			qop,
-	    struct xdr_netobj	*message_buffer,
-	    struct xdr_netobj	*message_token)
+	    struct xdr_netobj	*message,
+	    struct xdr_netobj	*mic_token)
 {
 	 return context_handle->mech_type->gm_ops
 		->gss_get_mic(context_handle,
 			      qop,
-			      message_buffer,
-			      message_token);
+			      message,
+			      mic_token);
 }
 
-/* gss_verify_mic: hash messages_buffer and return gss verify token. */
+/* gss_verify_mic: check whether the provided mic_token verifies message. */
 
 u32
 gss_verify_mic(struct gss_ctx		*context_handle,
-		struct xdr_netobj	*signbuf,
-		struct xdr_netobj	*checksum,
-		u32			*qstate)
+	       struct xdr_netobj	*message,
+	       struct xdr_netobj	*mic_token,
+	       u32			*qstate)
 {
 	return context_handle->mech_type->gm_ops
 		->gss_verify_mic(context_handle,
-				 signbuf,
-				 checksum,
+				 message,
+				 mic_token,
 				 qstate);
 }
 

@@ -73,8 +73,7 @@ extern int  kgdb_output_string (const char* s, unsigned int count);
 static char *serial_name = "CPM UART driver";
 static char *serial_version = "0.03";
 
-static struct tty_driver serial_driver, callout_driver;
-static int serial_refcount;
+static struct tty_driver *serial_driver;
 int serial_console_setup(struct console *co, char *options);
 
 /*
@@ -163,8 +162,6 @@ struct serial_state {
         unsigned short  close_delay;
         unsigned short  closing_wait; /* time to wait before closing */
         struct async_icount_24     icount; 
-        struct termios          normal_termios;
-        struct termios          callout_termios;
         int     io_type;
         struct async_struct *info;
 };
@@ -217,10 +214,6 @@ static struct serial_state rs_table[] = {
 
 #define NR_PORTS	(sizeof(rs_table)/sizeof(struct serial_state))
 
-static struct tty_struct *serial_table[NR_PORTS];
-static struct termios *serial_termios[NR_PORTS];
-static struct termios *serial_termios_locked[NR_PORTS];
-
 /* The number of buffer descriptors and their sizes.
  */
 #define RX_NUM_FIFO	4
@@ -256,8 +249,6 @@ typedef struct serial_info {
 	unsigned long		event;
 	unsigned long		last_active;
 	int			blocked_open; /* # of blocked opens */
-	long			session; /* Session of opening process */
-	long			pgrp; /* pgrp of opening process */
 	struct work_struct	tqueue;
 	struct work_struct	tqueue_hangup;
  	wait_queue_head_t	open_wait; 
@@ -610,8 +601,7 @@ static _INLINE_ void check_modem_status(struct async_struct *info)
 #endif		
 		if (status & UART_MSR_DCD)
 			wake_up_interruptible(&info->open_wait);
-		else if (!((info->flags & ASYNC_CALLOUT_ACTIVE) &&
-			   (info->flags & ASYNC_CALLOUT_NOHUP))) {
+		else {
 #ifdef SERIAL_DEBUG_OPEN
 			printk("scheduling hangup...");
 #endif
@@ -1713,14 +1703,6 @@ static void rs_360_close(struct tty_struct *tty, struct file * filp)
 	}
 	info->flags |= ASYNC_CLOSING;
 	/*
-	 * Save the termios structure, since this port may have
-	 * separate termios for callout and dialin.
-	 */
-	if (info->flags & ASYNC_NORMAL_ACTIVE)
-		info->state->normal_termios = *tty->termios;
-	if (info->flags & ASYNC_CALLOUT_ACTIVE)
-		info->state->callout_termios = *tty->termios;
-	/*
 	 * Now we wait for the transmit buffer to clear; and we notify 
 	 * the line discipline to only process XON/XOFF characters.
 	 */
@@ -1768,8 +1750,7 @@ static void rs_360_close(struct tty_struct *tty, struct file * filp)
 		}
 		wake_up_interruptible(&info->open_wait);
 	}
-	info->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CALLOUT_ACTIVE|
-			 ASYNC_CLOSING);
+	info->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CLOSING);
 	wake_up_interruptible(&info->close_wait);
 	MOD_DEC_USE_COUNT;
 	local_irq_restore(flags);
@@ -1861,7 +1842,7 @@ static void rs_360_hangup(struct tty_struct *tty)
 	shutdown(info);
 	info->event = 0;
 	state->count = 0;
-	info->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CALLOUT_ACTIVE);
+	info->flags &= ~ASYNC_NORMAL_ACTIVE;
 	info->tty = 0;
 	wake_up_interruptible(&info->open_wait);
 }
@@ -1899,28 +1880,6 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 #endif
 	}
 
-
-#if 0 /* FIXME */
-	/*
-	 * If this is a callout device, then just make sure the normal
-	 * device isn't being used.
-	 */
-	if (tty->driver->subtype == SERIAL_TYPE_CALLOUT) {
-		if (info->flags & ASYNC_NORMAL_ACTIVE)
-			return -EBUSY;
-		if ((info->flags & ASYNC_CALLOUT_ACTIVE) &&
-		    (info->flags & ASYNC_SESSION_LOCKOUT) &&
-		    (info->session != current->session))
-		    return -EBUSY;
-		if ((info->flags & ASYNC_CALLOUT_ACTIVE) &&
-		    (info->flags & ASYNC_PGRP_LOCKOUT) &&
-		    (info->pgrp != current->pgrp))
-		    return -EBUSY;
-		info->flags |= ASYNC_CALLOUT_ACTIVE;
-		return 0;
-	}
-#endif	
-
 	/*
 	 * If non-blocking mode is set, or the port is not enabled,
 	 * then make the check up front and then exit.
@@ -1930,19 +1889,12 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 	if ((filp->f_flags & O_NONBLOCK) ||
 	    (tty->flags & (1 << TTY_IO_ERROR)) ||
 	    !(info->state->smc_scc_num & NUM_IS_SCC)) {
-		if (info->flags & ASYNC_CALLOUT_ACTIVE)
-			return -EBUSY;
 		info->flags |= ASYNC_NORMAL_ACTIVE;
 		return 0;
 	}
 
-	if (info->flags & ASYNC_CALLOUT_ACTIVE) {
-		if (state->normal_termios.c_cflag & CLOCAL)
-			do_clocal = 1;
-	} else {
-		if (tty->termios->c_cflag & CLOCAL)
-			do_clocal = 1;
-	}
+	if (tty->termios->c_cflag & CLOCAL)
+		do_clocal = 1;
 	
 	/*
 	 * Block waiting for the carrier detect and the line to become
@@ -1965,8 +1917,7 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 	info->blocked_open++;
 	while (1) {
 		local_irq_disable();
-		if (!(info->flags & ASYNC_CALLOUT_ACTIVE) &&
-		    (tty->termios->c_cflag & CBAUD))
+		if (tty->termios->c_cflag & CBAUD)
 			serial_out(info, UART_MCR,
 				   serial_inp(info, UART_MCR) |
 				   (UART_MCR_DTR | UART_MCR_RTS));
@@ -1984,8 +1935,7 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 #endif
 			break;
 		}
-		if (!(info->flags & ASYNC_CALLOUT_ACTIVE) &&
-		    !(info->flags & ASYNC_CLOSING) &&
+		if (!(info->flags & ASYNC_CLOSING) &&
 		    (do_clocal || (serial_in(info, UART_MSR) &
 				   UART_MSR_DCD)))
 			break;
@@ -2073,18 +2023,6 @@ static int rs_360_open(struct tty_struct *tty, struct file * filp)
 		MOD_DEC_USE_COUNT;
 		return retval;
 	}
-
-	if ((info->state->count == 1) &&
-	    (info->flags & ASYNC_SPLIT_TERMIOS)) {
-		if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
-			*tty->termios = info->state->normal_termios;
-		else 
-			*tty->termios = info->state->callout_termios;
-		change_speed(info);
-	}
-
-	info->session = current->session;
-	info->pgrp = current->pgrp;
 
 #ifdef SERIAL_DEBUG_OPEN
 	printk("rs_open %s successful...", tty->name);
@@ -2524,7 +2462,7 @@ void kgdb_map_scc(void)
 static struct tty_struct *serial_console_device(struct console *c, int *index)
 {
 	*index = c->index;
-	return &serial_driver;
+	return serial_driver;
 }
 
 
@@ -2557,6 +2495,25 @@ long console_360_init(long kmem_start, long kmem_end)
 */
 static	int	baud_idx;
 
+static struct tty_operations rs_360_ops = {
+	.open = rs_360_open,
+	.close = rs_360_close,
+	.write = rs_360_write,
+	.put_char = rs_360_put_char,
+	.write_room = rs_360_write_room,
+	.chars_in_buffer = rs_360_chars_in_buffer,
+	.flush_buffer = rs_360_flush_buffer,
+	.ioctl = rs_360_ioctl,
+	.throttle = rs_360_throttle,
+	.unthrottle = rs_360_unthrottle,
+	/* .send_xchar = rs_360_send_xchar, */
+	.set_termios = rs_360_set_termios,
+	.stop = rs_360_stop,
+	.start = rs_360_start,
+	.hangup = rs_360_hangup,
+	/* .wait_until_sent = rs_360_wait_until_sent, */
+	/* .read_proc = rs_360_read_proc, */
+};
 
 /* int __init rs_360_init(void) */
 int rs_360_init(void)
@@ -2575,64 +2532,26 @@ int rs_360_init(void)
 	volatile	struct uart_pram	*sup;
 	/* volatile	immap_t		*immap; */
 	
+	serial_driver = alloc_tty_driver(NR_PORTS);
+	if (!serial_driver)
+		return -1;
+
 	show_serial_version();
 
-	/* Initialize the tty_driver structure */
-	
-	/* __clear_user(&serial_driver,sizeof(struct tty_driver)); */
-	memset(&serial_driver, 0, sizeof(struct tty_driver));
-
-	serial_driver.magic = TTY_DRIVER_MAGIC;
-	/* serial_driver.driver_name = "serial"; */
-	serial_driver.name = "ttyS";
-	serial_driver.major = TTY_MAJOR;
-	serial_driver.minor_start = 64;
-	serial_driver.num = NR_PORTS;
-	serial_driver.type = TTY_DRIVER_TYPE_SERIAL;
-	serial_driver.subtype = SERIAL_TYPE_NORMAL;
-	serial_driver.init_termios = tty_std_termios;
-	serial_driver.init_termios.c_cflag =
+	serial_driver->name = "ttyS";
+	serial_driver->major = TTY_MAJOR;
+	serial_driver->minor_start = 64;
+	serial_driver->type = TTY_DRIVER_TYPE_SERIAL;
+	serial_driver->subtype = SERIAL_TYPE_NORMAL;
+	serial_driver->init_termios = tty_std_termios;
+	serial_driver->init_termios.c_cflag =
 		baud_idx | CS8 | CREAD | HUPCL | CLOCAL;
-	serial_driver.flags = TTY_DRIVER_REAL_RAW;
-	serial_driver.refcount = &serial_refcount;
-	serial_driver.table = serial_table;
-	serial_driver.termios = serial_termios;
-	serial_driver.termios_locked = serial_termios_locked;
-
-	serial_driver.open = rs_360_open;
-	serial_driver.close = rs_360_close;
-	serial_driver.write = rs_360_write;
-	serial_driver.put_char = rs_360_put_char;
-	serial_driver.write_room = rs_360_write_room;
-	serial_driver.chars_in_buffer = rs_360_chars_in_buffer;
-	serial_driver.flush_buffer = rs_360_flush_buffer;
-	serial_driver.ioctl = rs_360_ioctl;
-	serial_driver.throttle = rs_360_throttle;
-	serial_driver.unthrottle = rs_360_unthrottle;
-	/* serial_driver.send_xchar = rs_360_send_xchar; */
-	serial_driver.set_termios = rs_360_set_termios;
-	serial_driver.stop = rs_360_stop;
-	serial_driver.start = rs_360_start;
-	serial_driver.hangup = rs_360_hangup;
-	/* serial_driver.wait_until_sent = rs_360_wait_until_sent; */
-	/* serial_driver.read_proc = rs_360_read_proc; */
+	serial_driver->flags = TTY_DRIVER_REAL_RAW;
+	tty_set_operations(serial_driver, &rs_360_ops);
 	
-	/*
-	 * The callout device is just like normal device except for
-	 * major number and the subtype code.
-	 */
-	callout_driver = serial_driver;
-	callout_driver.name = "cua";
-	callout_driver.major = TTYAUX_MAJOR;
-	callout_driver.subtype = SERIAL_TYPE_CALLOUT;
-	/* callout_driver.read_proc = 0; */
-	/* callout_driver.proc_entry = 0; */
-
-	if (tty_register_driver(&serial_driver))
+	if (tty_register_driver(serial_driver))
 		panic("Couldn't register serial driver\n");
-	if (tty_register_driver(&callout_driver))
-		panic("Couldn't register callout driver\n");
-	
+
 	cp = pquicc;	/* Get pointer to Communication Processor */
 	/* immap = (immap_t *)IMAP_ADDR; */	/* and to internal registers */
 
@@ -2690,8 +2609,6 @@ int rs_360_init(void)
 		state->custom_divisor = 0;
 		state->close_delay = 5*HZ/10;
 		state->closing_wait = 30*HZ;
-		state->callout_termios = callout_driver.init_termios;
-		state->normal_termios = serial_driver.init_termios;
 		state->icount.cts = state->icount.dsr = 
 			state->icount.rng = state->icount.dcd = 0;
 		state->icount.rx = state->icount.tx = 0;
@@ -2940,7 +2857,7 @@ int rs_360_init(void)
 			/* cpm_install_handler(IRQ_MACHSPEC | state->irq, rs_360_interrupt, info);  */
 			/*request_irq(IRQ_MACHSPEC | state->irq, rs_360_interrupt, */
 			request_irq(state->irq, rs_360_interrupt,
-						IRQ_FLG_LOCK, serial_driver.name, (void *)info);
+						IRQ_FLG_LOCK, "ttyS", (void *)info);
 
 			/* Set up the baud rate generator.
 			*/

@@ -35,7 +35,6 @@ extern struct address_space_operations jfs_aops;
 
 extern int jfs_fsync(struct file *, struct dentry *, int);
 extern void jfs_truncate_nolock(struct inode *, loff_t);
-extern struct inode *jfs_iget(struct super_block *, ino_t);
 extern int jfs_init_acl(struct inode *, struct inode *);
 
 /*
@@ -1406,9 +1405,11 @@ static struct dentry *jfs_lookup(struct inode *dip, struct dentry *dentry)
 		}
 	}
 
-	ip = jfs_iget(dip->i_sb, inum);
-	if (ip == NULL) {
+	ip = iget(dip->i_sb, inum);
+	if (ip == NULL || is_bad_inode(ip)) {
 		jfs_err("jfs_lookup: iget failed on inum %d", (uint) inum);
+		if (ip)
+			iput(ip);
 		return ERR_PTR(-EACCES);
 	}
 
@@ -1421,12 +1422,16 @@ struct dentry *jfs_get_parent(struct dentry *dentry)
 	struct dentry *parent = ERR_PTR(-EACCES);
 	struct inode *inode;
 
-	inode = jfs_iget(sb, JFS_IP(dentry->d_inode)->i_dtroot.header.idotdot);
+	inode = iget(sb, JFS_IP(dentry->d_inode)->i_dtroot.header.idotdot);
 	if (inode) {
-		parent = d_alloc_anon(inode);
-		if (!parent) {
-			parent = ERR_PTR(-ENOMEM);
+		if (is_bad_inode(inode))
 			iput(inode);
+		else {
+			parent = d_alloc_anon(inode);
+			if (!parent) {
+				parent = ERR_PTR(-ENOMEM);
+				iput(inode);
+			}
 		}
 	}
 

@@ -24,6 +24,36 @@
 
 #define JORTUCR_VAL	0x20000400
 
+static struct resource sa1111_resources[] = {
+	[0] = {
+		.start		= 0x40000000,
+		.end		= 0x40001fff,
+		.flags		= IORESOURCE_MEM,
+	},
+	[1] = {
+		.start		= IRQ_GPIO1,
+		.end		= IRQ_GPIO1,
+		.flags		= IORESOURCE_IRQ,
+	},
+};
+
+static u64 sa1111_dmamask = 0xffffffffUL;
+
+static struct platform_device sa1111_device = {
+	.name		= "sa1111",
+	.id		= 0,
+	.dev		= {
+		.name	= "Intel Corporation SA1111",
+		.dma_mask = &sa1111_dmamask,
+	},
+	.num_resources	= ARRAY_SIZE(sa1111_resources),
+	.resource	= sa1111_resources,
+};
+
+static struct platform_device *devices[] __initdata = {
+	&sa1111_device,
+};
+
 static int __init jornada720_init(void)
 {
 	int ret = -ENODEV;
@@ -43,7 +73,7 @@ static int __init jornada720_init(void)
 		PPSR &= ~(PPC_LDD3 | PPC_LDD4);
 		PPDR |= PPC_LDD3 | PPC_LDD4;
 
-		ret = sa1111_init(0x40000000, IRQ_GPIO1);
+		ret = platform_add_devices(devices, ARRAY_SIZE(devices));
 	}
 	return ret;
 }

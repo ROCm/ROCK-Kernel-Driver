@@ -36,6 +36,7 @@
 #include <linux/delay.h>
 #include <linux/bootmem.h>
 #include <linux/highmem.h>
+#include <linux/proc_fs.h>
 #ifdef CONFIG_BLK_DEV_INITRD
 #include <linux/blk.h>		/* for initrd_* */
 #endif
@@ -58,6 +59,7 @@
 #include <asm/eeh.h>
 #include <asm/processor.h>
 #include <asm/mmzone.h>
+#include <asm/cputable.h>
 
 #include <asm/ppcdebug.h>
 
@@ -509,6 +511,37 @@ void __init paging_init(void)
 }
 #endif
 
+static struct kcore_list kcore_vmem;
+
+static int __init setup_kcore(void)
+{
+	int i;
+
+	for (i=0; i < lmb.memory.cnt; i++) {
+		unsigned long physbase, size;
+		unsigned long type = lmb.memory.region[i].type;
+		struct kcore_list *kcore_mem;
+
+		if (type != LMB_MEMORY_AREA)
+			continue;
+
+		physbase = lmb.memory.region[i].physbase;
+		size = lmb.memory.region[i].size;
+
+		/* GFP_ATOMIC to avoid might_sleep warnings during boot */
+		kcore_mem = kmalloc(sizeof(struct kcore_list), GFP_ATOMIC);
+		if (!kcore_mem)
+			panic("mem_init: kmalloc failed\n");
+
+		kclist_add(kcore_mem, __va(physbase), size);
+	}
+
+	kclist_add(&kcore_vmem, (void *)VMALLOC_START, VMALLOC_END-VMALLOC_START);
+
+	return 0;
+}
+module_init(setup_kcore);
+
 void initialize_paca_hardware_interrupt_stack(void);
 
 void __init mem_init(void)
@@ -667,7 +700,7 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long ea,
 	int local = 0;
 
 	/* handle i-cache coherency */
-	if (!cpu_has_noexecute()) {
+	if (!(cur_cpu_spec->cpu_features & CPU_FTR_NOEXECUTE)) {
 		unsigned long pfn = pte_pfn(pte);
 		if (pfn_valid(pfn)) {
 			struct page *page = pfn_to_page(pfn);

@@ -1620,16 +1620,7 @@ static struct pcmcia_driver pcnet_driver = {
 
 static int __init init_pcnet_cs(void)
 {
-    servinfo_t serv;
-    DEBUG(0, "%s\n", version);
-    CardServices(GetCardServicesInfo, &serv);
-    if (serv.Revision != CS_RELEASE_CODE) {
-	printk(KERN_NOTICE "pcnet_cs: Card Services release "
-	       "does not match!\n");
-	return -EINVAL;
-    }
-    pcmcia_register_driver(&pcnet_driver);
-    return 0;
+    return pcmcia_register_driver(&pcnet_driver);
 }
 
 static void __exit exit_pcnet_cs(void)

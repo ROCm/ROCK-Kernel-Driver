@@ -546,12 +546,13 @@ static int print_desc_block (struct buffer_head * bh)
 {
     struct reiserfs_journal_desc * desc;
 
-    desc = (struct reiserfs_journal_desc *)(bh->b_data);
-    if (memcmp(desc->j_magic, JOURNAL_DESC_MAGIC, 8))
+    if (memcmp(get_journal_desc_magic (bh), JOURNAL_DESC_MAGIC, 8))
 	return 1;
 
+    desc = (struct reiserfs_journal_desc *)(bh->b_data);
     printk ("Desc block %llu (j_trans_id %d, j_mount_id %d, j_len %d)",
-	    (unsigned long long)bh->b_blocknr, desc->j_trans_id, desc->j_mount_id, desc->j_len);
+	    (unsigned long long)bh->b_blocknr, get_desc_trans_id (desc), get_desc_mount_id (desc),
+	    get_desc_trans_len (desc));
 
     return 0;
 }

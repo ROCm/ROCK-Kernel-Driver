@@ -619,11 +619,11 @@ static int scsi_add_lun(Scsi_Device *sdev, char *inq_result, int *bflags)
 	if (inq_result[7] & 0x10)
 		sdev->sdtr = 1;
 
-	scsi_device_register(sdev);
-
 	sprintf(sdev->devfs_name, "scsi/host%d/bus%d/target%d/lun%d",
 				sdev->host->host_no, sdev->channel,
 				sdev->id, sdev->lun);
+
+	scsi_device_register(sdev);
 
 	/*
 	 * End driverfs/devfs code.
@@ -639,6 +639,13 @@ static int scsi_add_lun(Scsi_Device *sdev, char *inq_result, int *bflags)
 	 */
 	if ((*bflags & BLIST_BORKEN) == 0)
 		sdev->borken = 0;
+
+	/*
+	 * Some devices may not want to have a start command automatically
+	 * issued when a device is added.
+	 */
+	if (*bflags & BLIST_NOSTARTONADD)
+		sdev->no_start_on_add = 1;
 
 	/*
 	 * If we need to allow I/O to only one of the luns attached to
@@ -678,6 +685,9 @@ static int scsi_add_lun(Scsi_Device *sdev, char *inq_result, int *bflags)
 	/* if the device needs this changing, it may do so in the detect
 	 * function */
 	sdev->max_device_blocked = SCSI_DEFAULT_DEVICE_BLOCKED;
+
+	sdev->use_10_for_rw = 1;
+	sdev->use_10_for_ms = 0;
 
 	if(sdev->host->hostt->slave_configure)
 		sdev->host->hostt->slave_configure(sdev);
@@ -1091,22 +1101,29 @@ struct scsi_device *scsi_add_device(struct Scsi_Host *shost,
 				    uint channel, uint id, uint lun)
 {
 	struct scsi_device *sdev;
-	int error = -ENODEV, res;
+	int res;
 
 	res = scsi_probe_and_add_lun(shost, channel, id, lun, NULL, &sdev);
-	if (res == SCSI_SCAN_LUN_PRESENT)
-		error = scsi_attach_device(sdev);
-
-	if (error)
-		sdev = ERR_PTR(error);
+	if (res != SCSI_SCAN_LUN_PRESENT)
+		sdev = ERR_PTR(-ENODEV);
 	return sdev;
 }
 
 int scsi_remove_device(struct scsi_device *sdev)
 {
-	scsi_detach_device(sdev);
 	scsi_device_unregister(sdev);
 	return 0;
+}
+
+void scsi_rescan_device(struct device *dev)
+{
+	struct scsi_driver *drv = to_scsi_driver(dev->driver);
+
+	if (try_module_get(drv->owner)) {
+		if (drv->rescan)
+			drv->rescan(dev);
+		module_put(drv->owner);
+	}
 }
 
 /**

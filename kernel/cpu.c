@@ -8,6 +8,7 @@
 #include <linux/notifier.h>
 #include <linux/sched.h>
 #include <linux/unistd.h>
+#include <linux/cpu.h>
 #include <asm/semaphore.h>
 
 /* This protects CPUs going up and down... */

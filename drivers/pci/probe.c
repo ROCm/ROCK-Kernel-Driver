@@ -396,7 +396,7 @@ static void pci_read_irq(struct pci_dev *dev)
  * Returns 0 on success and -1 if unknown type of device (not normal, bridge
  * or CardBus).
  */
-int pci_setup_device(struct pci_dev * dev)
+static int pci_setup_device(struct pci_dev * dev)
 {
 	u32 class;
 
@@ -517,6 +517,7 @@ pci_scan_device(struct pci_bus *bus, int devfn)
 	/* Assume 32-bit PCI; let 64-bit PCI cards (which are far rarer)
 	   set this higher, assuming the system even supports it.  */
 	dev->dma_mask = 0xffffffff;
+	dev->consistent_dma_mask = 0xffffffff;
 	if (pci_setup_device(dev) < 0) {
 		kfree(dev);
 		return NULL;
@@ -528,7 +529,8 @@ pci_scan_device(struct pci_bus *bus, int devfn)
 	pci_name_device(dev);
 
 	/* now put in global tree */
-	strcpy(dev->dev.bus_id,dev->slot_name);
+	sprintf(dev->dev.bus_id, "%04x:%s", pci_domain_nr(bus),
+			dev->slot_name);
 	dev->dev.dma_mask = &dev->dma_mask;
 
 	return dev;
@@ -641,7 +643,7 @@ int __devinit pci_bus_exists(const struct list_head *list, int nr)
 	return 0;
 }
 
-struct pci_bus * __devinit pci_alloc_primary_bus_parented(struct device *parent, int bus)
+static struct pci_bus * __devinit pci_alloc_primary_bus_parented(struct device *parent, int bus)
 {
 	struct pci_bus *b;
 
@@ -688,11 +690,9 @@ struct pci_bus * __devinit pci_scan_bus_parented(struct device *parent, int bus,
 }
 EXPORT_SYMBOL(pci_scan_bus_parented);
 
-EXPORT_SYMBOL(pci_devices);
 EXPORT_SYMBOL(pci_root_buses);
 
 #ifdef CONFIG_HOTPLUG
-EXPORT_SYMBOL(pci_setup_device);
 EXPORT_SYMBOL(pci_add_new_bus);
 EXPORT_SYMBOL(pci_do_scan_bus);
 EXPORT_SYMBOL(pci_scan_slot);

@@ -770,14 +770,13 @@ static int sprint_Scsi_Cmnd(char *buffer, int len, Scsi_Cmnd * cmd)
  *	Locks: global cli/lock for queue walk
  */
  
-int generic_NCR5380_proc_info(char *buffer, char **start, off_t offset, int length, int hostno, int inout)
+int generic_NCR5380_proc_info(struct Scsi_Host *scsi_ptr, char *buffer, char **start, off_t offset, int length, int inout)
 {
 	int len = 0;
 	NCR5380_local_declare();
 	unsigned long flags;
 	unsigned char status;
 	int i;
-	struct Scsi_Host *scsi_ptr;
 	Scsi_Cmnd *ptr;
 	struct NCR5380_hostdata *hostdata;
 #ifdef NCR5380_STATS
@@ -785,9 +784,6 @@ int generic_NCR5380_proc_info(char *buffer, char **start, off_t offset, int leng
 	extern const char *const scsi_device_types[MAX_SCSI_DEVICE_CODE];
 #endif
 
-	/* For now this is constant so we may walk it */
-	scsi_ptr = scsi_host_hn_get(hostno);
-	
 	NCR5380_setup(scsi_ptr);
 	hostdata = (struct NCR5380_hostdata *) scsi_ptr->hostdata;
 

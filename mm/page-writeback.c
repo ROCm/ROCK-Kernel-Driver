@@ -26,6 +26,8 @@
 #include <linux/percpu.h>
 #include <linux/notifier.h>
 #include <linux/smp.h>
+#include <linux/sysctl.h>
+#include <linux/cpu.h>
 
 /*
  * The maximum number of pages to writeout in a single bdflush/kupdate
@@ -102,11 +104,13 @@ static void background_writeout(unsigned long _min_pages);
  * clamping level.
  */
 static void
-get_dirty_limits(struct page_state *ps, long *background, long *dirty)
+get_dirty_limits(struct page_state *ps, long *pbackground, long *pdirty)
 {
 	int background_ratio;		/* Percentages */
 	int dirty_ratio;
 	int unmapped_ratio;
+	long background;
+	long dirty;
 
 	get_page_state(ps);
 
@@ -123,8 +127,14 @@ get_dirty_limits(struct page_state *ps, long *background, long *dirty)
 	if (background_ratio >= dirty_ratio)
 		background_ratio = dirty_ratio / 2;
 
-	*background = (background_ratio * total_pages) / 100;
-	*dirty = (dirty_ratio * total_pages) / 100;
+	background = (background_ratio * total_pages) / 100;
+	dirty = (dirty_ratio * total_pages) / 100;
+	if (current->flags & PF_LESS_THROTTLE) {
+		background += background / 4;
+		dirty += dirty / 4;
+	}
+	*pbackground = background;
+	*pdirty = dirty;
 }
 
 /*
@@ -219,7 +229,6 @@ void balance_dirty_pages_ratelimited(struct address_space *mapping)
 	}
 	put_cpu();
 }
-EXPORT_SYMBOL_GPL(balance_dirty_pages_ratelimited);
 
 /*
  * writeback at least _min_pages, and keep writing until the amount of dirty
@@ -329,7 +338,24 @@ static void wb_kupdate(unsigned long arg)
 	}
 	if (time_before(next_jif, jiffies + HZ))
 		next_jif = jiffies + HZ;
-	mod_timer(&wb_timer, next_jif);
+	if (dirty_writeback_centisecs)
+		mod_timer(&wb_timer, next_jif);
+}
+
+/*
+ * sysctl handler for /proc/sys/vm/dirty_writeback_centisecs
+ */
+int dirty_writeback_centisecs_handler(ctl_table *table, int write,
+		struct file *file, void *buffer, size_t *length)
+{
+	proc_dointvec(table, write, file, buffer, length);
+	if (dirty_writeback_centisecs) {
+		mod_timer(&wb_timer,
+			jiffies + (dirty_writeback_centisecs * HZ) / 100);
+	} else {
+		del_timer(&wb_timer);
+	}
+	return 0;
 }
 
 static void wb_timer_fn(unsigned long unused)
@@ -430,11 +456,12 @@ int write_one_page(struct page *page, int wait)
 	int ret = 0;
 	struct writeback_control wbc = {
 		.sync_mode = WB_SYNC_ALL,
+		.nr_to_write = 1,
 	};
 
 	BUG_ON(!PageLocked(page));
 
-	if (wait && PageWriteback(page))
+	if (wait)
 		wait_on_page_writeback(page);
 
 	spin_lock(&mapping->page_lock);

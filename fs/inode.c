@@ -71,7 +71,6 @@ static unsigned int i_hash_shift;
 LIST_HEAD(inode_in_use);
 LIST_HEAD(inode_unused);
 static struct hlist_head *inode_hashtable;
-static HLIST_HEAD(anon_hash_chain); /* for inodes with NULL i_sb */
 
 /*
  * A simple spinlock to protect the list manipulations.
@@ -484,7 +483,6 @@ static struct inode * find_inode(struct super_block * sb, struct hlist_head *hea
 
 repeat:
 	hlist_for_each (node, head) { 
-		prefetch(node->next);
 		inode = hlist_entry(node, struct inode, i_hash);
 		if (inode->i_sb != sb)
 			continue;
@@ -510,8 +508,7 @@ static struct inode * find_inode_fast(struct super_block * sb, struct hlist_head
 
 repeat:
 	hlist_for_each (node, head) {
-		prefetch(node->next);
-		inode = list_entry(node, struct inode, i_hash);
+		inode = hlist_entry(node, struct inode, i_hash);
 		if (inode->i_ino != ino)
 			continue;
 		if (inode->i_sb != sb)
@@ -920,15 +917,12 @@ EXPORT_SYMBOL(iget_locked);
  *	@hashval: unsigned long value used to locate this object in the
  *		inode_hashtable.
  *
- *	Add an inode to the inode hash for this superblock. If the inode
- *	has no superblock it is added to a separate anonymous chain.
+ *	Add an inode to the inode hash for this superblock.
  */
  
 void __insert_inode_hash(struct inode *inode, unsigned long hashval)
 {
-	struct hlist_head *head = &anon_hash_chain;
-	if (inode->i_sb)
-		head = inode_hashtable + hash(inode->i_sb, hashval);
+	struct hlist_head *head = inode_hashtable + hash(inode->i_sb, hashval);
 	spin_lock(&inode_lock);
 	hlist_add_head(&inode->i_hash, head);
 	spin_unlock(&inode_lock);
@@ -938,7 +932,7 @@ void __insert_inode_hash(struct inode *inode, unsigned long hashval)
  *	remove_inode_hash - remove an inode from the hash
  *	@inode: inode to unhash
  *
- *	Remove an inode from the superblock or anonymous hash.
+ *	Remove an inode from the superblock.
  */
  
 void remove_inode_hash(struct inode *inode)

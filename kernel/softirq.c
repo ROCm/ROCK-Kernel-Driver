@@ -14,6 +14,7 @@
 #include <linux/init.h>
 #include <linux/mm.h>
 #include <linux/notifier.h>
+#include <linux/cpu.h>
 
 /*
    - No shared variables, all the data are CPU local.
@@ -33,10 +34,10 @@
    - Tasklets: serialized wrt itself.
  */
 
-/* No separate irq_stat for ia64, it is part of PSA */
-#if !defined(CONFIG_IA64)
+#ifndef __ARCH_IRQ_STAT
 irq_cpustat_t irq_stat[NR_CPUS] ____cacheline_aligned;
-#endif /* CONFIG_IA64 */
+EXPORT_SYMBOL(irq_stat);
+#endif
 
 static struct softirq_action softirq_vec[32] __cacheline_aligned_in_smp;
 

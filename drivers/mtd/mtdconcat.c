@@ -3,9 +3,11 @@
  *
  * (C) 2002 Robert Kaiser <rkaiser@sysgo.de>
  *
+ * NAND support by Christian Gan <cgan@iders.ca>
+ *
  * This code is GPL
  *
- * $Id: mtdconcat.c,v 1.3 2002/05/21 21:04:25 dwmw2 Exp $
+ * $Id: mtdconcat.c,v 1.4 2003/03/07 17:44:59 rkaiser Exp $
  */
 
 #include <linux/module.h>
@@ -63,16 +65,16 @@ static int concat_read (struct mtd_info *mtd, loff_t from, size_t len,
 		size_t size, retsize;
 
 		if (from >= subdev->size)
-		{
+		{   /* Not destined for this subdev */
 			size  = 0;
 			from -= subdev->size;
 		}
 		else
 		{
 			if (from + len > subdev->size)
-				size = subdev->size - from;
+				size = subdev->size - from; /* First part goes into this subdev */
 			else
-				size = len;
+				size = len; /* Entire transaction goes into this subdev */
 
 			err = subdev->read(subdev, from, size, &retsize, buf);
 
@@ -141,6 +143,214 @@ static int concat_write (struct mtd_info *mtd, loff_t to, size_t len,
 	}
 	return err;
 }
+
+static int concat_read_ecc (struct mtd_info *mtd, loff_t from, size_t len,
+            size_t *retlen, u_char *buf, u_char *eccbuf, struct nand_oobinfo *oobsel)
+{
+	struct mtd_concat *concat = CONCAT(mtd);
+	int err = -EINVAL;
+	int i;
+
+	*retlen = 0;
+
+	for(i = 0; i < concat->num_subdev; i++)
+	{
+		struct mtd_info *subdev = concat->subdev[i];
+		size_t size, retsize;
+        
+		if (from >= subdev->size)
+		{   /* Not destined for this subdev */
+			size  = 0;
+			from -= subdev->size;
+		}
+		else
+		{
+			if (from + len > subdev->size)
+				size = subdev->size - from; /* First part goes into this subdev */
+			else
+				size = len; /* Entire transaction goes into this subdev */
+            
+            if (subdev->read_ecc)
+    			err = subdev->read_ecc(subdev, from, size, &retsize, buf, eccbuf, oobsel);
+            else
+                err = -EINVAL;
+
+			if(err)
+				break;
+
+			*retlen += retsize;
+			len -= size;
+			if(len == 0)
+				break;
+
+			err = -EINVAL;
+			buf += size;
+            if (eccbuf)
+            {
+                eccbuf += subdev->oobsize;
+                /* in nand.c at least, eccbufs are tagged with 2 (int)eccstatus',
+                   we must account for these */
+                eccbuf += 2 * (sizeof(int)); 
+            }
+			from = 0;
+		}
+	}
+	return err;
+}
+
+static int concat_write_ecc (struct mtd_info *mtd, loff_t to, size_t len,
+            size_t *retlen, const u_char *buf, u_char *eccbuf, struct nand_oobinfo *oobsel)
+{
+	struct mtd_concat *concat = CONCAT(mtd);
+	int err = -EINVAL;
+	int i;
+
+	if (!(mtd->flags & MTD_WRITEABLE))
+		return -EROFS;
+
+	*retlen = 0;
+
+	for(i = 0; i < concat->num_subdev; i++)
+	{
+		struct mtd_info *subdev = concat->subdev[i];
+		size_t size, retsize;
+        
+		if (to >= subdev->size)
+		{
+			size  = 0;
+			to -= subdev->size;
+		}
+		else
+		{
+			if (to + len > subdev->size)
+				size = subdev->size - to;
+			else
+				size = len;
+
+			if (!(subdev->flags & MTD_WRITEABLE))
+				err = -EROFS;
+			else if (subdev->write_ecc)
+				err = subdev->write_ecc(subdev, to, size, &retsize, buf, eccbuf, oobsel);
+            else
+                err = -EINVAL;
+
+			if(err)
+				break;
+
+			*retlen += retsize;
+			len -= size;
+			if(len == 0)
+				break;
+
+			err = -EINVAL;
+			buf += size;
+            if (eccbuf)
+                eccbuf += subdev->oobsize;
+			to = 0;
+		}
+	}
+	return err;
+}
+
+static int concat_read_oob (struct mtd_info *mtd, loff_t from, size_t len,
+            size_t *retlen, u_char *buf)
+{
+	struct mtd_concat *concat = CONCAT(mtd);
+	int err = -EINVAL;
+	int i;
+
+	*retlen = 0;
+
+	for(i = 0; i < concat->num_subdev; i++)
+	{
+		struct mtd_info *subdev = concat->subdev[i];
+		size_t size, retsize;
+        
+		if (from >= subdev->size)
+		{   /* Not destined for this subdev */
+			size  = 0;
+			from -= subdev->size;
+		}
+		else
+		{
+			if (from + len > subdev->size)
+				size = subdev->size - from; /* First part goes into this subdev */
+			else
+				size = len; /* Entire transaction goes into this subdev */
+            
+            if (subdev->read_oob)
+    			err = subdev->read_oob(subdev, from, size, &retsize, buf);
+            else
+                err = -EINVAL;
+
+			if(err)
+				break;
+
+			*retlen += retsize;
+			len -= size;
+			if(len == 0)
+				break;
+
+			err = -EINVAL;
+			buf += size;
+			from = 0;
+		}
+	}
+	return err;
+}
+
+static int concat_write_oob (struct mtd_info *mtd, loff_t to, size_t len, 
+            size_t *retlen, const u_char *buf)
+{
+	struct mtd_concat *concat = CONCAT(mtd);
+	int err = -EINVAL;
+	int i;
+
+	if (!(mtd->flags & MTD_WRITEABLE))
+		return -EROFS;
+
+	*retlen = 0;
+
+	for(i = 0; i < concat->num_subdev; i++)
+	{
+		struct mtd_info *subdev = concat->subdev[i];
+		size_t size, retsize;
+        
+		if (to >= subdev->size)
+		{
+			size  = 0;
+			to -= subdev->size;
+		}
+		else
+		{
+			if (to + len > subdev->size)
+				size = subdev->size - to;
+			else
+				size = len;
+
+			if (!(subdev->flags & MTD_WRITEABLE))
+				err = -EROFS;
+			else if (subdev->write_oob)
+				err = subdev->write_oob(subdev, to, size, &retsize, buf);
+            else
+                err = -EINVAL;
+
+			if(err)
+				break;
+
+			*retlen += retsize;
+			len -= size;
+			if(len == 0)
+				break;
+
+			err = -EINVAL;
+			buf += size;
+			to = 0;
+		}
+	}
+	return err;
+}
+
 
 static void concat_erase_callback (struct erase_info *instr)
 {
@@ -526,14 +736,18 @@ struct mtd_info *mtd_concat_create(
 	 *       because they are messy to implement and they are not
 	 *       used to a great extent anyway.
 	 */
-	concat->mtd.erase   = concat_erase;
-	concat->mtd.read    = concat_read;
-	concat->mtd.write   = concat_write;
-	concat->mtd.sync    = concat_sync;
-	concat->mtd.lock    = concat_lock;
-	concat->mtd.unlock  = concat_unlock;
-	concat->mtd.suspend = concat_suspend;
-	concat->mtd.resume  = concat_resume;
+	concat->mtd.erase     = concat_erase;
+	concat->mtd.read      = concat_read;    
+	concat->mtd.write     = concat_write;
+	concat->mtd.read_ecc  = concat_read_ecc;    
+	concat->mtd.write_ecc = concat_write_ecc;
+	concat->mtd.read_oob  = concat_read_oob;    
+	concat->mtd.write_oob = concat_write_oob;
+	concat->mtd.sync      = concat_sync;
+	concat->mtd.lock      = concat_lock;
+	concat->mtd.unlock    = concat_unlock;
+	concat->mtd.suspend   = concat_suspend;
+	concat->mtd.resume    = concat_resume;
 
 
 	/*
