@@ -1166,9 +1166,7 @@ static void ndisc_router_discovery(struct sk_buff *skb)
 				ND_PRINTK0("NDISC: router announcement with mtu = %d\n",
 					   mtu);
 			}
-		}
-
-		if (in6_dev->cnf.mtu6 != mtu) {
+		} else if (in6_dev->cnf.mtu6 != mtu) {
 			in6_dev->cnf.mtu6 = mtu;
 
 			if (rt)
