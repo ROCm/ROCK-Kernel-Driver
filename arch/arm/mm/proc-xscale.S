@@ -663,8 +663,8 @@ cpu_manu_name:
 cpu_80200_name:
 	.asciz	"XScale-80200"
 
-cpu_cotulla_name:
-	.asciz	"XScale-Cotulla"
+cpu_pxa250_name:
+	.asciz	"XScale-PXA250"
 
 	.align
 
@@ -734,11 +734,11 @@ cpu_80200_info:
 	.long	cpu_80200_name
 	.size	cpu_80200_info, . - cpu_80200_info
 
-	.type	cpu_cotulla_info, #object
-cpu_cotulla_info:
+	.type	cpu_pxa250_info, #object
+cpu_pxa250_info:
 	.long	cpu_manu_name
-	.long	cpu_cotulla_name
-	.size	cpu_cotulla_info, . - cpu_cotulla_info
+	.long	cpu_pxa250_name
+	.size	cpu_pxa250_info, . - cpu_pxa250_info
 
 	.type	cpu_arch_name, #object
 cpu_arch_name:
@@ -767,8 +767,8 @@ __80200_proc_info:
 	.long	v4wbi_tlb_fns
 	.size	__80200_proc_info, . - __80200_proc_info
 
-	.type	__cotulla_proc_info,#object
-__cotulla_proc_info:
+	.type	__pxa250_proc_info,#object
+__pxa250_proc_info:
 	.long	0x69052100
 	.long	0xfffffff0
 	.long	0x00000c0e
@@ -776,8 +776,9 @@ __cotulla_proc_info:
 	.long	cpu_arch_name
 	.long	cpu_elf_name
 	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP
-	.long	cpu_cotulla_info
+	.long	cpu_pxa250_info
 	.long	xscale_processor_functions
 	.long	v4wbi_tlb_fns
 	.size	__cotulla_proc_info, . - __cotulla_proc_info
+	.size	__pxa250_proc_info, . - __pxa250_proc_info
 

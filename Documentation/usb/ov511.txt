@@ -182,9 +182,9 @@ MODULE PARAMETERS:
   DEFAULT: 1 (Always on)
   DESC: Controls whether the LED (the little light) on the front of the camera
 	is always off (0), always on (1), or only on when driver is open (2).
-	This is only supported with the OV511+ chipset, and even then only on
-	some cameras (ones that actually have the LED wired to the control pin,
-	and not just hardwired to be on all the time).
+	This is not supported with the OV511, and might only work with certain
+	cameras (ones that actually have the LED wired to the control pin, and
+	not just hard-wired to be on all the time).
 
   NAME: dump_bridge
   TYPE: integer (Boolean)

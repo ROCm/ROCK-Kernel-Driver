@@ -11,6 +11,7 @@
  * 
  *     Copyright (c) 1998-1999 Dag Brattli <dagb@cs.uit.no>, 
  *     All Rights Reserved.
+ *     Copyright (c) 2000-2001 Jean Tourrilhes <jt@hpl.hp.com>
  *     
  *     This program is free software; you can redistribute it and/or 
  *     modify it under the terms of the GNU General Public License as 
@@ -44,6 +45,7 @@
 #define LAP_ADDR_HEADER 1  /* IrLAP Address Header */
 #define LAP_CTRL_HEADER 1  /* IrLAP Control Header */
 
+/* May be different when we get VFIR */
 #define LAP_MAX_HEADER (LAP_ADDR_HEADER + LAP_CTRL_HEADER)
 
 #define BROADCAST  0xffffffff /* Broadcast device address */
@@ -210,9 +212,8 @@ void irlap_wait_min_turn_around(struct irlap_cb *, struct qos_info *);
 void irlap_init_qos_capabilities(struct irlap_cb *, struct qos_info *);
 void irlap_apply_default_connection_parameters(struct irlap_cb *self);
 void irlap_apply_connection_parameters(struct irlap_cb *self, int now);
-void irlap_set_local_busy(struct irlap_cb *self, int status);
 
-#define IRLAP_GET_HEADER_SIZE(self) 2 /* Will be different when we get VFIR */
+#define IRLAP_GET_HEADER_SIZE(self) (LAP_MAX_HEADER)
 #define IRLAP_GET_TX_QUEUE_LEN(self) skb_queue_len(&self->txq)
 
 #endif

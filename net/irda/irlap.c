@@ -131,7 +131,7 @@ struct irlap_cb *irlap_open(struct net_device *dev, struct qos_info *qos,
 	/* FIXME: should we get our own field? */
 	dev->atalk_ptr = self;
 
-	irlap_next_state(self, LAP_OFFLINE);
+	self->state = LAP_OFFLINE;
 
 	/* Initialize transmit queue */
 	skb_queue_head_init(&self->txq);
@@ -155,7 +155,7 @@ struct irlap_cb *irlap_open(struct net_device *dev, struct qos_info *qos,
 
 	self->N3 = 3; /* # connections attemts to try before giving up */
 	
-	irlap_next_state(self, LAP_NDM);
+	self->state = LAP_NDM;
 
 	hashbin_insert(irlap, (irda_queue_t *) self, self->saddr, NULL);
 
@@ -346,25 +346,21 @@ void irlap_data_request(struct irlap_cb *self, struct sk_buff *skb,
 	else
 		skb->data[1] = I_FRAME;
 
+	/* Add at the end of the queue (keep ordering) - Jean II */
+	skb_queue_tail(&self->txq, skb);
+
 	/* 
 	 *  Send event if this frame only if we are in the right state 
 	 *  FIXME: udata should be sent first! (skb_queue_head?)
 	 */
   	if ((self->state == LAP_XMIT_P) || (self->state == LAP_XMIT_S)) {
-		/*
-		 *  Check if the transmit queue contains some unsent frames,
-		 *  and if so, make sure they are sent first
-		 */
-		if (!skb_queue_empty(&self->txq)) {
-			skb_queue_tail(&self->txq, skb);
-			skb = skb_dequeue(&self->txq);
-			
-			ASSERT(skb != NULL, return;);
-		}
-		irlap_do_event(self, SEND_I_CMD, skb, NULL);
-		kfree_skb(skb);
-	} else
-		skb_queue_tail(&self->txq, skb);
+		/* If we are not already processing the Tx queue, trigger
+		 * transmission immediately - Jean II */
+		if((skb_queue_len(&self->txq) <= 1) && (!self->local_busy))
+			irlap_do_event(self, DATA_REQUEST, skb, NULL);
+		/* Otherwise, the packets will be sent normally at the
+		 * next pf-poll - Jean II */
+	}
 }
 
 /*
@@ -1013,6 +1009,7 @@ void irlap_apply_connection_parameters(struct irlap_cb *self, int now)
 	self->window_size = self->qos_tx.window_size.value;
 	self->window      = self->qos_tx.window_size.value;
 
+#ifdef CONFIG_IRDA_DYNAMIC_WINDOW
 	/*
 	 *  Calculate how many bytes it is possible to transmit before the
 	 *  link must be turned around
@@ -1020,6 +1017,8 @@ void irlap_apply_connection_parameters(struct irlap_cb *self, int now)
 	self->line_capacity = 
 		irlap_max_line_capacity(self->qos_tx.baud_rate.value,
 					self->qos_tx.max_turn_time.value);
+	self->bytes_left = self->line_capacity;
+#endif /* CONFIG_IRDA_DYNAMIC_WINDOW */
 
 	
 	/* 
@@ -1080,24 +1079,6 @@ void irlap_apply_connection_parameters(struct irlap_cb *self, int now)
 	self->N2 = self->qos_tx.link_disc_time.value * 1000 / 
 		self->qos_rx.max_turn_time.value;
 	IRDA_DEBUG(4, "Setting N2 = %d\n", self->N2);
-}
-
-/*
- * Function irlap_set_local_busy (self, status)
- *
- *    
- *
- */
-void irlap_set_local_busy(struct irlap_cb *self, int status)
-{
-	IRDA_DEBUG(0, __FUNCTION__ "()\n");
-
-	self->local_busy = status;
-	
-	if (status)
-		IRDA_DEBUG(0, __FUNCTION__ "(), local busy ON\n");
-	else
-		IRDA_DEBUG(0, __FUNCTION__ "(), local busy OFF\n");
 }
 
 #ifdef CONFIG_PROC_FS

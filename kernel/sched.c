@@ -397,7 +397,7 @@ void sched_exit(task_t * p)
 			p->sleep_avg) / (EXIT_WEIGHT + 1);
 }
 
-#if CONFIG_SMP
+#if CONFIG_SMP || CONFIG_PREEMPT
 asmlinkage void schedule_tail(void)
 {
 	spin_unlock_irq(&this_rq()->lock);

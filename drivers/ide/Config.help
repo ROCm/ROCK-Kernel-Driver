@@ -807,14 +807,6 @@ CONFIG_IDEDISK_STROKE
 
   If you are unsure, say N here.
 
-CONFIG_IDE_TASK_IOCTL
-  This is a direct raw access to the media.  It is a complex but
-  elegant solution to test and validate the domain of the hardware and
-  perform below the driver data recovery if needed.  This is the most
-  basic form of media-forensics.
-
-  If you are unsure, say N here.
-
 CONFIG_BLK_DEV_IDEDMA_FORCED
   This is an old piece of lost code from Linux 2.0 Kernels.
 

@@ -1222,7 +1222,7 @@ static int mfm_ioctl(struct inode *inode, struct file *file, u_int cmd, u_long a
 	case BLKROSET:
 	case BLKROGET:
 	case BLKPG:
-		return blk_ioctl(dev, cmd, arg);
+		return blk_ioctl(inode->i_bdev, cmd, arg);
 
 	default:
 		return -EINVAL;

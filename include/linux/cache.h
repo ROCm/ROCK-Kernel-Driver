@@ -4,8 +4,10 @@
 #include <linux/config.h>
 #include <asm/cache.h>
 
+#define ALIGN(x,a) (((x)+(a)-1)&~((a)-1))
+
 #ifndef L1_CACHE_ALIGN
-#define L1_CACHE_ALIGN(x) (((x)+(L1_CACHE_BYTES-1))&~(L1_CACHE_BYTES-1))
+#define L1_CACHE_ALIGN(x) ALIGN(x, L1_CACHE_BYTES)
 #endif
 
 #ifndef SMP_CACHE_BYTES

@@ -332,7 +332,7 @@ END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
 
 	.globl	ret_from_fork
 ret_from_fork:
-#ifdef CONFIG_SMP
+#if CONFIG_SMP || CONFIG_PREEMPT
 	bl	schedule_tail
 #endif
 	rlwinm	r3,r1,0,0,18

@@ -13,4 +13,11 @@
 #define likely(x)	__builtin_expect((x),1)
 #define unlikely(x)	__builtin_expect((x),0)
 
+/* This macro obfuscates arithmetic on a variable address so that gcc
+   shouldn't recognize the original var, and make assumptions about it */
+	strcpy(s, "xxx"+X) => memcpy(s, "xxx"+X, 4-X) */
+#define RELOC_HIDE(var, off)						\
+  ({ __typeof__(&(var)) __ptr;					\
+    __asm__ ("" : "=g"(__ptr) : "0"((void *)&(var) + (off)));	\
+    *__ptr; })
 #endif /* __LINUX_COMPILER_H */

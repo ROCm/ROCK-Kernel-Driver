@@ -654,7 +654,7 @@ static int hd_ioctl(struct inode * inode, struct file * file,
 		case BLKROGET:
 		case BLKFLSBUF:
 		case BLKPG:
-			return blk_ioctl(inode->i_rdev, cmd, arg);
+			return blk_ioctl(inode->i_bdev, cmd, arg);
 
 		default:
 			return -EINVAL;

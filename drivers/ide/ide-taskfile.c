@@ -1750,6 +1750,29 @@ abort:
 	return err;
 }
 
+/*
+ * Issue ATA command and wait for completion. use for implementing commands in
+ * kernel.
+ *
+ * The caller has to make sure buf is never NULL!
+ */
+static int ide_wait_cmd(ide_drive_t *drive, int cmd, int nsect, int feature, int sectors, byte *argbuf)
+{
+	struct request rq;
+
+	/* FIXME: Do we really have to zero out the buffer?
+	 */
+	memset(argbuf, 0, 4 + SECTOR_WORDS * 4 * sectors);
+	ide_init_drive_cmd(&rq);
+	rq.buffer = argbuf;
+	*argbuf++ = cmd;
+	*argbuf++ = nsect;
+	*argbuf++ = feature;
+	*argbuf++ = sectors;
+
+	return ide_do_drive_cmd(drive, &rq, ide_wait);
+}
+
 int ide_cmd_ioctl (ide_drive_t *drive, struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
 {
 	int err = 0;
@@ -1806,12 +1829,20 @@ abort:
 int ide_task_ioctl (ide_drive_t *drive, struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
 {
 	int err = 0;
-	byte args[7], *argbuf = args;
+	u8 args[7];
+	u8 *argbuf;
 	int argsize = 7;
+	struct request rq;
+
+	argbuf = args;
 
 	if (copy_from_user(args, (void *)arg, 7))
 		return -EFAULT;
-	err = ide_wait_cmd_task(drive, argbuf);
+
+	ide_init_drive_cmd(&rq);
+	rq.flags = REQ_DRIVE_TASK;
+	rq.buffer = argbuf;
+	err = ide_do_drive_cmd(drive, &rq, ide_wait);
 	if (copy_to_user((void *)arg, argbuf, argsize))
 		err = -EFAULT;
 	return err;

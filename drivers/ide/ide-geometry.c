@@ -14,14 +14,14 @@
 #if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
 
 extern ide_drive_t * get_info_ptr(kdev_t);
-extern unsigned long current_capacity (ide_drive_t *);
 
 /*
  * If heads is nonzero: find a translation with this many heads and S=63.
  * Otherwise: find out how OnTrack Disk Manager would translate the disk.
  */
 static void
-ontrack(ide_drive_t *drive, int heads, unsigned int *c, int *h, int *s) {
+ontrack(ide_drive_t *drive, int heads, unsigned int *c, int *h, int *s)
+{
 	static const byte dm_head_vals[] = {4, 8, 16, 32, 64, 128, 255, 0};
 	const byte *headp = dm_head_vals;
 	unsigned long total;
@@ -34,7 +34,7 @@ ontrack(ide_drive_t *drive, int heads, unsigned int *c, int *h, int *s) {
 	 * computes a geometry different from what OnTrack uses.]
 	 */
 
-	total = ata_ops(drive)->capacity(drive);
+	total = ata_capacity(drive);
 
 	*s = 63;
 
@@ -136,7 +136,7 @@ int ide_xlate_1024 (kdev_t i_rdev, int xparm, int ptheads, const char *msg)
 		ret = 1;
 	}
 
-	drive->part[0].nr_sects = current_capacity(drive);
+	drive->part[0].nr_sects = ata_capacity(drive);
 
 	if (ret)
 		printk("%s%s [%d/%d/%d]", msg, msg1,
