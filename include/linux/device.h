@@ -163,6 +163,9 @@ extern void driver_remove_file(struct device_driver *, struct driver_attribute *
  */
 struct device_class {
 	char			* name;
+	atomic_t		refcount;
+	u32			present;
+
 	u32			devnum;
 
 	struct list_head	node;
@@ -179,6 +182,9 @@ struct device_class {
 
 extern int devclass_register(struct device_class *);
 extern void devclass_unregister(struct device_class *);
+
+extern struct device_class * get_devclass(struct device_class *);
+extern void put_devclass(struct device_class *);
 
 
 struct devclass_attribute {
