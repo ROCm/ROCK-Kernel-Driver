@@ -1211,7 +1211,7 @@ static int tg3_fiber_aneg_smachine(struct tg3 *tp,
 		if (ap->rxconfig & ANEG_CFG_FD)
 			ap->flags |= MR_LP_ADV_FULL_DUPLEX;
 		if (ap->rxconfig & ANEG_CFG_HD)
-			ap->flags |= MR_LP_ADV_FULL_DUPLEX;
+			ap->flags |= MR_LP_ADV_HALF_DUPLEX;
 		if (ap->rxconfig & ANEG_CFG_PS1)
 			ap->flags |= MR_LP_ADV_SYM_PAUSE;
 		if (ap->rxconfig & ANEG_CFG_PS2)
