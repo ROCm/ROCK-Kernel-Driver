@@ -476,23 +476,6 @@ void show_regs(struct pt_regs * regs)
 }
 
 /*
- * No need to lock the MM as we are the last user
- */
-void release_segments(struct mm_struct *mm)
-{
-	void * ldt = mm->context.segments;
-
-	/*
-	 * free the LDT
-	 */
-	if (ldt) {
-		mm->context.segments = NULL;
-		clear_LDT();
-		vfree(ldt);
-	}
-}
-
-/*
  * Create a kernel thread
  */
 int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
@@ -544,40 +527,15 @@ void flush_thread(void)
 void release_thread(struct task_struct *dead_task)
 {
 	if (dead_task->mm) {
-		void * ldt = dead_task->mm->context.segments;
-
 		// temporary debugging check
-		if (ldt) {
-			printk("WARNING: dead process %8s still has LDT? <%p>\n",
-					dead_task->comm, ldt);
+		if (dead_task->mm->context.size) {
+			printk("WARNING: dead process %8s still has LDT? <%p/%d>\n",
+					dead_task->comm,
+					dead_task->mm->context.ldt,
+					dead_task->mm->context.size);
 			BUG();
 		}
 	}
-}
-
-/*
- * we do not have to muck with descriptors here, that is
- * done in switch_mm() as needed.
- */
-void copy_segments(struct task_struct *p, struct mm_struct *new_mm)
-{
-	struct mm_struct * old_mm;
-	void *old_ldt, *ldt;
-
-	ldt = NULL;
-	old_mm = current->mm;
-	if (old_mm && (old_ldt = old_mm->context.segments) != NULL) {
-		/*
-		 * Completely new LDT, we initialize it from the parent:
-		 */
-		ldt = vmalloc(LDT_ENTRIES*LDT_ENTRY_SIZE);
-		if (!ldt)
-			printk(KERN_WARNING "ldt allocation failed\n");
-		else
-			memcpy(ldt, old_ldt, LDT_ENTRIES*LDT_ENTRY_SIZE);
-	}
-	new_mm->context.segments = ldt;
-	new_mm->context.cpuvalid = ~0UL;	/* valid on all CPU's - they can't have stale data */
 }
 
 /*
