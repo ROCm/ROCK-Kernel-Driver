@@ -45,7 +45,7 @@ validate_fields(
 	vattr_t		va;
 	int		error;
 
-	va.va_mask = XFS_AT_NLINK|XFS_AT_SIZE;
+	va.va_mask = XFS_AT_NLINK|XFS_AT_SIZE|XFS_AT_NBLOCKS;
 	VOP_GETATTR(vp, &va, ATTR_LAZY, NULL, error);
 	ip->i_nlink = va.va_nlink;
 	ip->i_size = va.va_size;

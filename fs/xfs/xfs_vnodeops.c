@@ -125,7 +125,8 @@ xfs_getattr(
 	 * Quick exit for non-stat callers
 	 */
 	if ((vap->va_mask &
-	    ~(XFS_AT_SIZE|XFS_AT_FSID|XFS_AT_NODEID|XFS_AT_NLINK)) == 0) {
+	    ~(XFS_AT_SIZE|XFS_AT_FSID|XFS_AT_NODEID|
+	      XFS_AT_NLINK|XFS_AT_BLKSIZE)) == 0) {
 		if (!(flags & ATTR_LAZY))
 			xfs_iunlock(ip, XFS_ILOCK_SHARED);
 		return 0;
