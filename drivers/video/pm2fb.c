@@ -1434,24 +1434,24 @@ static void pm2fb_clear_margins8(struct vc_data* conp, struct display* p,
 }
 
 static struct display_switch pm2_cfb8 = {
-	.setup =	fbcon_cfb8_setup,
-	.bmove =	pm2fb_pp_bmove,
+	.setup		= fbcon_cfb8_setup,
+	.bmove		= pm2fb_pp_bmove,
 #ifdef __alpha__
 	/* Not sure why, but this works and the other does not. */
 	/* Also, perhaps we need a separate routine to wait for the
 	   blitter to stop before doing this? */
 	/* In addition, maybe we need to do this for 16 and 32 bit depths? */
-	.clear =	fbcon_cfb8_clear,
+	.clear		= fbcon_cfb8_clear,
 #else
-	.clear =	pm2fb_clear8,
+	.clear		= pm2fb_clear8,
 #endif
-	.putc =		fbcon_cfb8_putc,
-	.putcs =	fbcon_cfb8_putcs,
-	.revc =		fbcon_cfb8_revc,
-	.cursor =	pm2fb_cursor,
-	.set_font =	pm2fb_set_font,
-	.clear_margins =pm2fb_clear_margins8,
-	fontwidthmask:	FONTWIDTH(4)|FONTWIDTH(8)|FONTWIDTH(12)|FONTWIDTH(16) };
+	.putc		= fbcon_cfb8_putc,
+	.putcs		= fbcon_cfb8_putcs,
+	.revc		= fbcon_cfb8_revc,
+	.cursor		= pm2fb_cursor,
+	.set_font	= pm2fb_set_font,
+	.clear_margins	= pm2fb_clear_margins8,
+	.fontwidthmask	= FONTWIDTH(4)|FONTWIDTH(8)|FONTWIDTH(12)|FONTWIDTH(16) };
 #endif /* FBCON_HAS_CFB8 */
 
 #ifdef FBCON_HAS_CFB16

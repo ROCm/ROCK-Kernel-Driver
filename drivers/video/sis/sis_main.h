@@ -286,43 +286,43 @@ static struct fb_info sis_fb_info;
 static int    video_type = FB_TYPE_PACKED_PIXELS;
 
 static struct fb_var_screeninfo default_var = {
-	xres:           0,
-	yres:           0,
-	xres_virtual:   0,
-	yres_virtual:   0,
-	xoffset:        0,
-	yoffset:        0,
-	bits_per_pixel: 0,
-	grayscale:      0,
-	red:            {0, 8, 0},
-	green:          {0, 8, 0},
-	blue:           {0, 8, 0},
-	transp:         {0, 0, 0},
-	nonstd:         0,
-	activate:       FB_ACTIVATE_NOW,
-	height:         -1,
-	width:          -1,
-	accel_flags:    0,
-	pixclock:       0,
-	left_margin:    0,
-	right_margin:   0,
-	upper_margin:   0,
-	lower_margin:   0,
-	hsync_len:      0,
-	vsync_len:      0,
-	sync:           0,
-	vmode:          FB_VMODE_NONINTERLACED,
+	.xres		= 0,
+	.yres		= 0,
+	.xres_virtual	= 0,
+	.yres_virtual	= 0,
+	.xoffset	= 0,
+	.yoffset	= 0,
+	.bits_per_pixel	= 0,
+	.grayscale	= 0,
+	.red		= {0, 8, 0},
+	.green		= {0, 8, 0},
+	.blue		= {0, 8, 0},
+	.transp		= {0, 0, 0},
+	.nonstd		= 0,
+	.activate	= FB_ACTIVATE_NOW,
+	.height		= -1,
+	.width		= -1,
+	.accel_flags	= 0,
+	.pixclock	= 0,
+	.left_margin	= 0,
+	.right_margin	= 0,
+	.upper_margin	= 0,
+	.lower_margin	= 0,
+	.hsync_len	= 0,
+	.vsync_len	= 0,
+	.sync		= 0,
+	.vmode		= FB_VMODE_NONINTERLACED,
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)	
-	reserved:       {0, 0, 0, 0, 0, 0}
+	.reserved	= {0, 0, 0, 0, 0, 0}
 #endif	
 };
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 static struct fb_fix_screeninfo sisfb_fix = {
-	id:		"SiS",
-	type:		FB_TYPE_PACKED_PIXELS,
-	xpanstep:	1,
-	ypanstep:	1,
+	.id		= "SiS",
+	.type		= FB_TYPE_PACKED_PIXELS,
+	.xpanstep	= 1,
+	.ypanstep	= 1,
 };
 static char myid[20];
 static u32 pseudo_palette[17];

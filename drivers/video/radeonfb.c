@@ -3121,10 +3121,10 @@ static void __devexit radeonfb_pci_unregister (struct pci_dev *pdev)
 
 
 static struct pci_driver radeonfb_driver = {
-	name:		"radeonfb",
-	id_table:	radeonfb_pci_table,
-	probe:		radeonfb_pci_register,
-	remove:		__devexit_p(radeonfb_pci_unregister),
+	.name		= "radeonfb",
+	.id_table	= radeonfb_pci_table,
+	.probe		= radeonfb_pci_register,
+	.remove		= __devexit_p(radeonfb_pci_unregister),
 };
 
 

@@ -1204,10 +1204,10 @@ static struct pci_device_id trident_devices[] __devinitdata = {
 MODULE_DEVICE_TABLE(pci,trident_devices); 
 
 static struct pci_driver tridentfb_pci_driver = {
-	name:"tridentfb",
-	id_table:trident_devices,
-	probe:trident_pci_probe,
-	remove:__devexit_p(trident_pci_remove)
+	.name		= "tridentfb",
+	.id_table	= trident_devices,
+	.probe		= trident_pci_probe,
+	.remove		= __devexit_p(trident_pci_remove)
 };
 
 int __init tridentfb_init(void)

@@ -1589,13 +1589,13 @@ static void retz3_clear_margins(struct vc_data* conp, struct display* p,
 
 
 static struct display_switch fbcon_retz3_8 = {
-    setup:		fbcon_cfb8_setup,
-    bmove:		retz3_8_bmove,
-    clear:		retz3_8_clear,
-    putc:		retz3_putc,
-    putcs:		retz3_putcs,
-    revc:		retz3_revc,
-    clear_margins:	retz3_clear_margins,
-    fontwidthmask:	FONTWIDTH(8)
+	.setup		= fbcon_cfb8_setup,
+	.bmove		= retz3_8_bmove,
+	.clear		= retz3_8_clear,
+	.putc		= retz3_putc,
+	.putcs		= retz3_putcs,
+	.revc		= retz3_revc,
+	.clear_margins	= retz3_clear_margins,
+	.fontwidthmask	= FONTWIDTH(8)
 };
 #endif

@@ -297,34 +297,34 @@ static char *mode_option __initdata = NULL;
 #endif
 
 static struct fb_fix_screeninfo rivafb_fix = {
-	id:		"nVidia",
-	type:		FB_TYPE_PACKED_PIXELS,
-	xpanstep:	1,
-	ypanstep:	1,
+	.id		= "nVidia",
+	.type		= FB_TYPE_PACKED_PIXELS,
+	.xpanstep	= 1,
+	.ypanstep	= 1,
 };
 
 static struct fb_var_screeninfo rivafb_default_var = {
-	xres:		640,
-	yres:		480,
-	xres_virtual:	640,
-	yres_virtual:	480,
-	bits_per_pixel:	8,
-	red:		{0, 8, 0},
-	green:		{0, 8, 0},
-	blue:		{0, 8, 0},
-	transp:		{0, 0, 0},
-	activate:	FB_ACTIVATE_NOW,
-	height:		-1,
-	width:		-1,
-	accel_flags:	FB_ACCELF_TEXT,
-	pixclock:	39721,
-	left_margin:	40,
-	right_margin:	24,
-	upper_margin:	32,
-	lower_margin:	11,
-	hsync_len:	96,
-	vsync_len:	2,
-	vmode:		FB_VMODE_NONINTERLACED
+	.xres		= 640,
+	.yres		= 480,
+	.xres_virtual	= 640,
+	.yres_virtual	= 480,
+	.bits_per_pixel	= 8,
+	.red		= {0, 8, 0},
+	.green		= {0, 8, 0},
+	.blue		= {0, 8, 0},
+	.transp		= {0, 0, 0},
+	.activate	= FB_ACTIVATE_NOW,
+	.height		= -1,
+	.width		= -1,
+	.accel_flags	= FB_ACCELF_TEXT,
+	.pixclock	= 39721,
+	.left_margin	= 40,
+	.right_margin	= 24,
+	.upper_margin	= 32,
+	.lower_margin	= 11,
+	.hsync_len	= 96,
+	.vsync_len	= 2,
+	.vmode		= FB_VMODE_NONINTERLACED
 };
 
 /* from GGI */
@@ -1468,14 +1468,6 @@ static int rivafb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 	int i, j, d_idx = 0, s_idx = 0;
 	u16 flags = cursor->set, fg, bg;
 
-	/*
-	 * Can't do invert if one of the operands (dest) is missing,
-	 * ie, only opaque cursor supported.  This should be
-	 * standard for GUI apps.
-	 */
-	if (cursor->dest == NULL && cursor->rop == ROP_XOR)
-		return 1;
-
 	if (par->cursor_reset) {
 		flags = FB_CUR_SETALL;
 		par->cursor_reset = 0;
@@ -1500,12 +1492,11 @@ static int rivafb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 		memset_io(par->riva.CURSOR, 0, MAX_CURS * MAX_CURS * 2);
 	}
 
-	if (flags & (FB_CUR_SETSHAPE | FB_CUR_SETCMAP | FB_CUR_SETDEST)) {
+	if (flags & (FB_CUR_SETSHAPE | FB_CUR_SETCMAP)) {
 		int bg_idx = cursor->image.bg_color;
 		int fg_idx = cursor->image.fg_color;
 		int width = (cursor->image.width+7)/8;
 		u8 *dat = (u8 *) cursor->image.data;
-		u8 *dst = (u8 *) cursor->dest;
 		u8 *msk = (u8 *) cursor->mask;
 
 		switch (cursor->rop) {
@@ -1514,7 +1505,7 @@ static int rivafb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 				for (j = 0; j < width; j++) {
 					d_idx = i * MAX_CURS/8  + j;
 					data[d_idx] =  byte_rev[dat[s_idx] ^ 
-								dst[s_idx]];
+								msk[s_idx]];
 					mask[d_idx] = byte_rev[msk[s_idx]];
 					s_idx++;
 				}
@@ -1984,10 +1975,10 @@ int __init rivafb_setup(char *options)
 #endif /* !MODULE */
 
 static struct pci_driver rivafb_driver = {
-	name:		"rivafb",
-	id_table:	rivafb_pci_tbl,
-	probe:		rivafb_probe,
-	remove:		__exit_p(rivafb_remove),
+	.name		= "rivafb",
+	.id_table	= rivafb_pci_tbl,
+	.probe		= rivafb_probe,
+	.remove		= __exit_p(rivafb_remove),
 };
 
 
