@@ -62,23 +62,6 @@ csum_partial_inline(const unsigned char * buff, int len, unsigned int sum)
 }
 
 /*
- * the same as csum_partial, but copies from src while it
- * checksums
- *
- * here even more important to align src and dst on a 32-bit (or even
- * better 64-bit) boundary
- *
- * this will go away soon.
- */
-
-static inline unsigned int 
-csum_partial_copy(const char *src, char *dst, int len,unsigned int sum)
-{
-	memcpy(dst,src,len);
-        return csum_partial_inline(dst, len, sum);
-}
-
-/*
  * the same as csum_partial_copy, but copies from user space.
  *
  * here even more important to align src and dst on a 32-bit (or even

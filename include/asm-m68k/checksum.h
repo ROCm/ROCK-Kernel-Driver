@@ -21,18 +21,6 @@ unsigned int csum_partial(const unsigned char * buff, int len, unsigned int sum)
  *
  * here even more important to align src and dst on a 32-bit (or even
  * better 64-bit) boundary
- *
- * this will go away soon.
- */
-
-unsigned int csum_partial_copy(const char *src, char *dst, int len, int sum);
-
-
-/*
- * the same as csum_partial_copy, but copies from user space.
- *
- * here even more important to align src and dst on a 32-bit (or even
- * better 64-bit) boundary
  */
 
 extern unsigned int csum_partial_copy_from_user(const char *src, char *dst,

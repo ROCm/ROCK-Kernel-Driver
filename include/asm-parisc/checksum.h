@@ -21,30 +21,14 @@ extern unsigned int csum_partial(const unsigned char *, int, unsigned int);
  *
  * here even more important to align src and dst on a 32-bit (or even
  * better 64-bit) boundary
- *
- * this will go away soon.
  */
-extern unsigned int csum_partial_copy(const char *, char *, int, unsigned int);
+extern unsigned int csum_partial_copy_nocheck(const char *, char *, int, unsigned int);
 
 /*
  * this is a new version of the above that records errors it finds in *errp,
  * but continues and zeros the rest of the buffer.
  */
 unsigned int csum_partial_copy_from_user(const char *src, char *dst, int len, unsigned int sum, int *errp);
-
-/*
- *	Note: when you get a NULL pointer exception here this means someone
- *	passed in an incorrect kernel address to one of these functions. 
- *	
- *	If you use these functions directly please don't forget the 
- *	verify_area().
- */
-extern __inline__
-unsigned int csum_partial_copy_nocheck (const char *src, char *dst,
-					int len, int sum)
-{
-	return csum_partial_copy (src, dst, len, sum);
-}
 
 /*
  *	Optimized for IP headers, which always checksum on 4 octet boundaries.

@@ -75,9 +75,6 @@ EXPORT_SYMBOL_NOVERS(__strnlen_user_nocheck_asm);
 EXPORT_SYMBOL_NOVERS(__strnlen_user_asm);
 
 
-/* Networking helper routines. */
-EXPORT_SYMBOL(csum_partial_copy);
-
 /*
  * Functions to control caches.
  */

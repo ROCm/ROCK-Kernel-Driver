@@ -40,10 +40,6 @@ extern unsigned int csum_partial(const unsigned char * buff, int len, unsigned i
  * better 64-bit) boundary
  */
 
-/* FIXME: Remove this macro ASAP */
-#define csum_partial_copy(src, dst, len, sum) \
- 		       csum_partial_copy_nocheck(src,dst,len,sum)
-  
 extern unsigned int __csum_partial_copy_sparc_generic (const char *, char *);
 
 extern __inline__ unsigned int 

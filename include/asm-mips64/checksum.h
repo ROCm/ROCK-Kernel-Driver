@@ -30,12 +30,6 @@ unsigned int csum_partial(const unsigned char *buff, int len, unsigned int sum);
  * this is a new version of the above that records errors it finds in *errp,
  * but continues and zeros the rest of the buffer.
  */
-#define csum_partial_copy_nocheck csum_partial_copy
-
-/*
- * this is a new version of the above that records errors it finds in *errp,
- * but continues and zeros the rest of the buffer.
- */
 unsigned int csum_partial_copy_from_user(const char *src, char *dst, int len,
                                          unsigned int sum, int *errp);
 
@@ -60,11 +54,9 @@ extern inline unsigned int csum_and_copy_to_user (const char *src, char *dst,
 /*
  * the same as csum_partial, but copies from user space (but on MIPS
  * we have just one address space, so this is identical to the above)
- *
- * this is obsolete and will go away.
  */
-unsigned int csum_partial_copy(const char *src, char *dst, int len,
-			       unsigned int sum);
+unsigned int csum_partial_copy_nocheck(const char *src, char *dst, int len,
+				       unsigned int sum);
 
 /*
  *	Fold a partial checksum without adding pseudo headers

@@ -58,14 +58,6 @@ unsigned int csum_partial_copy_from_user ( const char *src, char *dst,
 }
 
 /*
- * This is the old (and unsafe) way of doing checksums, a warning message will
- * be printed if it is used and an exeption occurs.
- *
- * this function should go away after some time.
- */
-unsigned int csum_partial_copy( const char *src, char *dst, int len, int sum);
-
-/*
  *	Fold a partial checksum
  */
 
