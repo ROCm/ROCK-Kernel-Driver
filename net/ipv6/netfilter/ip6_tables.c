@@ -1780,14 +1780,15 @@ static struct ip6t_match icmp6_matchstruct = {
 };
 
 #ifdef CONFIG_PROC_FS
-static inline int print_name(const struct ip6t_table *t,
+static inline int print_name(const char *i,
 			     off_t start_offset, char *buffer, int length,
 			     off_t *pos, unsigned int *count)
 {
 	if ((*count)++ >= start_offset) {
 		unsigned int namelen;
 
-		namelen = sprintf(buffer + *pos, "%s\n", t->name);
+		namelen = sprintf(buffer + *pos, "%s\n",
+				  i + sizeof(struct list_head));
 		if (*pos + namelen > length) {
 			/* Stop iterating */
 			return 1;
@@ -1805,7 +1806,7 @@ static int ip6t_get_tables(char *buffer, char **start, off_t offset, int length)
 	if (down_interruptible(&ip6t_mutex) != 0)
 		return 0;
 
-	LIST_FIND(&ip6t_tables, print_name, struct ip6t_table *,
+	LIST_FIND(&ip6t_tables, print_name, char *,
 		  offset, buffer, length, &pos, &count);
 
 	up(&ip6t_mutex);
@@ -1814,6 +1815,46 @@ static int ip6t_get_tables(char *buffer, char **start, off_t offset, int length)
 	*start=(char *)((unsigned long)count-offset);
 	return pos;
 }
+
+static int ip6t_get_targets(char *buffer, char **start, off_t offset, int length)
+{
+	off_t pos = 0;
+	unsigned int count = 0;
+
+	if (down_interruptible(&ip6t_mutex) != 0)
+		return 0;
+
+	LIST_FIND(&ip6t_target, print_name, char *,
+		  offset, buffer, length, &pos, &count);
+
+	up(&ip6t_mutex);
+
+	*start = (char *)((unsigned long)count - offset);
+	return pos;
+}
+
+static int ip6t_get_matches(char *buffer, char **start, off_t offset, int length)
+{
+	off_t pos = 0;
+	unsigned int count = 0;
+
+	if (down_interruptible(&ip6t_mutex) != 0)
+		return 0;
+
+	LIST_FIND(&ip6t_match, print_name, char *,
+		  offset, buffer, length, &pos, &count);
+
+	up(&ip6t_mutex);
+
+	*start = (char *)((unsigned long)count - offset);
+	return pos;
+}
+
+static struct { char *name; get_info_t *get_info; } ip6t_proc_entry[] =
+{ { "ip6_tables_names", ip6t_get_tables },
+  { "ip6_tables_targets", ip6t_get_targets },
+  { "ip6_tables_matches", ip6t_get_matches },
+  { NULL, NULL} };
 #endif /*CONFIG_PROC_FS*/
 
 static int __init init(void)
@@ -1839,13 +1880,19 @@ static int __init init(void)
 #ifdef CONFIG_PROC_FS
 	{
 		struct proc_dir_entry *proc;
-		proc = proc_net_create("ip6_tables_names", 0,
-					ip6t_get_tables);
-		if (!proc) {
-			nf_unregister_sockopt(&ip6t_sockopts);
-			return -ENOMEM;
+		int i;
+
+		for (i = 0; ip6t_proc_entry[i].name; i++) {
+			proc = proc_net_create(ip6t_proc_entry[i].name, 0,
+					       ip6t_proc_entry[i].get_info);
+			if (!proc) {
+				while (--i >= 0)
+				       proc_net_remove(ip6t_proc_entry[i].name);
+				nf_unregister_sockopt(&ip6t_sockopts);
+				return -ENOMEM;
+			}
+			proc->owner = THIS_MODULE;
 		}
-		proc->owner = THIS_MODULE;
 	}
 #endif
 
@@ -1857,7 +1904,11 @@ static void __exit fini(void)
 {
 	nf_unregister_sockopt(&ip6t_sockopts);
 #ifdef CONFIG_PROC_FS
-	proc_net_remove("ip6_tables_names");
+	{
+		int i;
+		for (i = 0; ip6t_proc_entry[i].name; i++)
+			proc_net_remove(ip6t_proc_entry[i].name);
+	}
 #endif
 }
 
