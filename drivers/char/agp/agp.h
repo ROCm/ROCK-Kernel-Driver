@@ -128,8 +128,8 @@ struct agp_bridge_data {
 	void *dev_private_data;
 	struct pci_dev *dev;
 	struct gatt_mask *masks;
-	unsigned long *gatt_table;
-	unsigned long *gatt_table_real;
+	u32 *gatt_table;
+	u32 *gatt_table_real;
 	unsigned long scratch_page;
 	unsigned long gart_bus_addr;
 	unsigned long gatt_bus_addr;
