@@ -23,7 +23,7 @@ int esp_output(struct sk_buff **pskb)
 	int err;
 	struct dst_entry *dst = (*pskb)->dst;
 	struct xfrm_state *x  = dst->xfrm;
-	struct iphdr *iph, *top_iph;
+	struct iphdr *top_iph;
 	struct ip_esp_hdr *esph;
 	struct crypto_tfm *tfm;
 	struct esp_data *esp;
@@ -32,32 +32,9 @@ int esp_output(struct sk_buff **pskb)
 	int clen;
 	int alen;
 	int nfrags;
-	union {
-		struct iphdr	iph;
-		char 		buf[60];
-	} tmp_iph;
 
-	if ((*pskb)->ip_summed == CHECKSUM_HW) {
-		err = skb_checksum_help(pskb, 0);
-		if (err)
-			goto error_nolock;
-	}
-
-	spin_lock_bh(&x->lock);
-	err = xfrm_state_check(x, *pskb);
-	if (err)
-		goto error;
-
-	if (x->props.mode) {
-		err = xfrm4_tunnel_check_size(*pskb);
-		if (err)
-			goto error;
-	} else {
-		/* Strip IP header in transport mode. Save it. */
-		iph = (*pskb)->nh.iph;
-		memcpy(&tmp_iph, iph, iph->ihl*4);
-		__skb_pull(*pskb, iph->ihl*4);
-	}
+	/* Strip IP+ESP header. */
+	__skb_pull(*pskb, (*pskb)->h.raw - (*pskb)->data);
 	/* Now skb is pure payload to encrypt */
 
 	err = -ENOMEM;
@@ -85,35 +62,11 @@ int esp_output(struct sk_buff **pskb)
 	*(u8*)(trailer->tail + clen-(*pskb)->len - 2) = (clen - (*pskb)->len)-2;
 	pskb_put(*pskb, trailer, clen - (*pskb)->len);
 
-	iph = (*pskb)->nh.iph;
-	if (x->props.mode) {
-		top_iph = (struct iphdr*)skb_push(*pskb, x->props.header_len);
-		esph = (struct ip_esp_hdr*)(top_iph+1);
-		*(u8*)(trailer->tail - 1) = IPPROTO_IPIP;
-		top_iph->ihl = 5;
-		top_iph->version = 4;
-		top_iph->tos = iph->tos;	/* DS disclosed */
-		if (x->props.flags & XFRM_STATE_NOECN)
-			IP_ECN_clear(top_iph);
-		top_iph->tot_len = htons((*pskb)->len + alen);
-		top_iph->frag_off = iph->frag_off&htons(IP_DF);
-		if (!(top_iph->frag_off))
-			ip_select_ident(top_iph, dst, NULL);
-		top_iph->ttl = iph->ttl;	/* TTL disclosed */
-		top_iph->check = 0;
-		top_iph->saddr = x->props.saddr.a4;
-		top_iph->daddr = x->id.daddr.a4;
-		memset(&(IPCB(*pskb)->opt), 0, sizeof(struct ip_options));
-	} else {
-		esph = (struct ip_esp_hdr*)skb_push(*pskb, x->props.header_len);
-		top_iph = (struct iphdr*)skb_push(*pskb, iph->ihl*4);
-		memcpy(top_iph, &tmp_iph, iph->ihl*4);
-		iph = &tmp_iph.iph;
-		top_iph->tot_len = htons((*pskb)->len + alen);
-		top_iph->check = 0;
-		top_iph->frag_off = iph->frag_off;
-		*(u8*)(trailer->tail - 1) = iph->protocol;
-	}
+	__skb_push(*pskb, (*pskb)->data - (*pskb)->nh.raw);
+	top_iph = (*pskb)->nh.iph;
+	esph = (struct ip_esp_hdr *)((*pskb)->nh.raw + top_iph->ihl*4);
+	top_iph->tot_len = htons((*pskb)->len + alen);
+	*(u8*)(trailer->tail - 1) = top_iph->protocol;
 
 	/* this is non-NULL only with UDP Encapsulation */
 	if (x->encap) {
@@ -124,7 +77,7 @@ int esp_output(struct sk_buff **pskb)
 		uh = (struct udphdr *)esph;
 		uh->source = encap->encap_sport;
 		uh->dest = encap->encap_dport;
-		uh->len = htons((*pskb)->len + alen - iph->ihl*4);
+		uh->len = htons((*pskb)->len + alen - top_iph->ihl*4);
 		uh->check = 0;
 
 		switch (encap->encap_type) {
@@ -176,21 +129,9 @@ int esp_output(struct sk_buff **pskb)
 
 	ip_send_check(top_iph);
 
-	(*pskb)->nh.raw = (*pskb)->data;
-
-	x->curlft.bytes += (*pskb)->len;
-	x->curlft.packets++;
-	spin_unlock_bh(&x->lock);
-	if (((*pskb)->dst = dst_pop(dst)) == NULL) {
-		err = -EHOSTUNREACH;
-		goto error_nolock;
-	}
-	return NET_XMIT_BYPASS;
+	err = 0;
 
 error:
-	spin_unlock_bh(&x->lock);
-error_nolock:
-	kfree_skb(*pskb);
 	return err;
 }
 
