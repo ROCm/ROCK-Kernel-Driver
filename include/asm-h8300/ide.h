@@ -16,23 +16,14 @@
 #ifdef __KERNEL__
 /****************************************************************************/
 
-void h8300_ide_print_resource(char *name, hw_regs_t *hw);
-static __inline__ int ide_default_irq(unsigned long base) { return 0; };
-static __inline__ unsigned long ide_default_io_base(int index) { return 0; };
-
-static __inline__ void ide_init_hwif_ports(hw_regs_t *hw, unsigned long data_port,
-	 unsigned long ctrl_port, int *irq)
-{
-}
+#define ide_default_irq(base)		(0)
+#define ide_default_io_base(index)	(0)
 
 #define ide_init_default_irq(base)	(0)
 
 #define MAX_HWIFS	1
 
-#define __ide_mm_insw(port,addr,count)  do { } while(0)
-#define __ide_mm_insl(port,addr,count)  do { } while(0)
-#define __ide_mm_outsw(port,addr,count) do { } while(0)
-#define __ide_mm_outsl(port,addr,count) do { } while(0)
+#include <asm-generic/ide_iops.h>
 
 /****************************************************************************/
 #endif /* __KERNEL__ */

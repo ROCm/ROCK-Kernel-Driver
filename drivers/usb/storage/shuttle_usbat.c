@@ -202,13 +202,13 @@ static int usbat_wait_not_busy(struct us_data *us, int minutes)
 		}
 
 		if (i<500)
-			wait_ms(10); // 5 seconds
+			msleep(10); // 5 seconds
 		else if (i<700)
-			wait_ms(50); // 10 seconds
+			msleep(50); // 10 seconds
 		else if (i<1200)
-			wait_ms(100); // 50 seconds
+			msleep(100); // 50 seconds
 		else
-			wait_ms(1000); // X minutes
+			msleep(1000); // X minutes
 	}
 
 	US_DEBUGP("Waited not busy for %d minutes, timing out.\n",
@@ -691,7 +691,7 @@ int init_8200e(struct us_data *us)
 
 	US_DEBUGP("INIT 1\n");
 
-	wait_ms(2000);
+	msleep(2000);
 
 	if (usbat_read_user_io(us, status) !=
 			USB_STOR_XFER_GOOD)
@@ -725,7 +725,7 @@ int init_8200e(struct us_data *us)
 
 	US_DEBUGP("INIT 5\n");
 
-	wait_ms(250);
+	msleep(250);
 
 	// Write 0x80 to ISA port 0x3F
 
@@ -776,7 +776,7 @@ int init_8200e(struct us_data *us)
 
 	US_DEBUGP("INIT 12\n");
 
-	wait_ms(1400);
+	msleep(1400);
 
 	if (usbat_read_user_io(us, status) !=
 			USB_STOR_XFER_GOOD)

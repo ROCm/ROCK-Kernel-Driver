@@ -601,11 +601,4 @@ union i2c_smbus_data {
 #define i2c_is_isa_adapter(adapptr) \
         ((adapptr)->algo->id == I2C_ALGO_ISA)
 
-/* Tiny delay function used by the i2c bus drivers */
-static inline void i2c_delay(signed long timeout)
-{
-	set_current_state(TASK_INTERRUPTIBLE);
-	schedule_timeout(timeout);
-}
-
 #endif /* _LINUX_I2C_H */

@@ -180,7 +180,7 @@ static int sa1100_target(struct cpufreq_policy *policy,
 			 unsigned int target_freq,
 			 unsigned int relation)
 {
-	unsigned int cur = sa11x0_getspeed();
+	unsigned int cur = sa11x0_getspeed(0);
 	unsigned int new_ppcr;
 
 	struct cpufreq_freqs freqs;
@@ -221,7 +221,7 @@ static int __init sa1100_cpu_init(struct cpufreq_policy *policy)
 {
 	if (policy->cpu != 0)
 		return -EINVAL;
-	policy->cur = policy->min = policy->max = sa11x0_getspeed();
+	policy->cur = policy->min = policy->max = sa11x0_getspeed(0);
 	policy->governor = CPUFREQ_DEFAULT_GOVERNOR;
 	policy->cpuinfo.min_freq = 59000;
 	policy->cpuinfo.max_freq = 287000;
@@ -230,15 +230,17 @@ static int __init sa1100_cpu_init(struct cpufreq_policy *policy)
 }
 
 static struct cpufreq_driver sa1100_driver = {
+	.flags		= (CPUFREQ_PANIC_OUTOFSYNC | 
+			   CPUFREQ_PANIC_RESUME_OUTOFSYNC),
 	.verify		= sa11x0_verify_speed,
 	.target		= sa1100_target,
+	.get		= sa11x0_getspeed,
 	.init		= sa1100_cpu_init,
 	.name		= "sa1100",
 };
 
 static int __init sa1100_dram_init(void)
 {
-	cpufreq_gov_userspace_init();
  	if ((processor_id & CPU_SA1100_MASK) == CPU_SA1100_ID)
 		return cpufreq_register_driver(&sa1100_driver);
 	else

@@ -1,4 +1,4 @@
-version 1.0.2 January 29, 2004
+version 1.14 May 14, 2004
 
 A Partial List of Known Problems and Missing Features
 =====================================================
@@ -21,8 +21,8 @@ e) NTLMv2 authentication (mostly implemented)
 
 f) MD5-HMAC signing SMB PDUs when SPNEGO style SessionSetup 
 used (Kerberos or NTLMSSP). Signing alreadyimplemented for NTLM
-	and raw NTLMSSP already. This is important when enabling
-	extended security and mounting to Windows 2003 Servers
+and raw NTLMSSP already. This is important when enabling
+extended security and mounting to Windows 2003 Servers
 
 f) Directory entry caching relies on a 1 second timer, rather than 
 using FindNotify or equivalent.  - (started)
@@ -34,7 +34,8 @@ h) quota support
 
 i) support for the Linux 2.5 kernel new feature get_xattr and set_xattr
 which will allow us to expose dos attributes as well as real
-ACLs
+ACLs. This support has been started in the current code, but is
+ifdeffed out.
 
 k) finish writepages support (multi-page write behind for improved
 performance) and syncpage
@@ -42,7 +43,9 @@ performance) and syncpage
 l) hook lower into the sockets api (as NFS/SunRPC does) to avoid the
 extra copy in/out of the socket buffers in some cases.
 
-m) finish support for IPv6
+m) finish support for IPv6.  This is mostly complete but
+needs a simple inet_pton like function to convert ipv6
+addresses in string representation.
 
 o) Better optimize open (and pathbased setfilesize) to reduce the
 oplock breaks coming from windows srv.  Piggyback identical file
@@ -53,8 +56,18 @@ spurious oplock breaks).
 p) Improve performance of readpages by sending more than one read
 at a time when 8 pages or more are requested.
 
+q) For support of Windows9x/98 we need to retry failed mounts
+to *SMBSERVER (default server name) with the uppercase hostname
+in the RFC1001 session_init request.
 
-KNOWN BUGS (updated January 30, 2004)
+r) Add Extended Attributed support (for storing UID/GID info
+to Windows servers)
+
+s) Finish fcntl D_NOTIFY support so kde and gnome file list windows
+will autorefresh
+
+
+KNOWN BUGS (updated May 14, 2004)
 ====================================
 1) existing symbolic links (Windows reparse points) are recognized but
 can not be created remotely. They are implemented for Samba and those that
@@ -64,20 +77,22 @@ symlink text beginning with slash
 but recognizes them
 3) create of new files to FAT partitions on Windows servers can
 succeed but still return access denied (appears to be Windows 
-not client problem).  NTFS partitions do not have this problem.
-4) debug connectathon special test case nfs_idem (which does
-some invalid symlink naming, or at least what Samba thinks
-is an invalid symlink target).
-5) debug connectation lock test case 10 which fails against
+not client problem) and has not been reproduced recently.
+NTFS partitions do not have this problem.
+4) debug connectation lock test case 10 which fails against
 Samba (may be unmappable due to POSIX to Windows lock model
 differences but worth investigating).  Also debug Samba to 
 see why lock test case 7 takes longer to complete to Samba
 than to Windows.
+5) prepare_write does not initialize pages properly when partial
+page writes begin in the middle of a page (pages can get zeroed).
+6) Write caching done incorrectly when files are only opened
+with write permission by the application.
 
 Misc testing to do
 =================
 1) check out max path names and max path name components against various server
-types.
+types. Return max path name in stat -f information
 
 2) Modify file portion of ltp so it can run against a mounted network
 share and run it against cifs vfs.

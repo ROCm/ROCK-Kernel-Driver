@@ -177,10 +177,14 @@ static int proc_mf_change_cmdline(struct file *file, const char *buffer,
 static int proc_mf_change_vmlinux(struct file *file, const char *buffer,
 		unsigned long count, void *data)
 {
+	int rc;
 	if (!capable(CAP_SYS_ADMIN))
 		return -EACCES;
 
-	mf_setVmlinuxChunk(buffer, count, file->f_pos, (u64)data);
+	rc = mf_setVmlinuxChunk(buffer, count, file->f_pos, (u64)data);
+	if (rc < 0)
+		return rc;
+
 	file->f_pos += count;
 
 	return count;			

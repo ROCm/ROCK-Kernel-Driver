@@ -1793,10 +1793,10 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 					cifsFile->search_resume_name = 
 						kmalloc(cifsFile->resume_name_length, GFP_KERNEL);
 					cFYI(1,("fnext last file: %s with name %d bytes long",
-						lastFindData->FileName,
+						pfindDataUnix->FileName,
 						cifsFile->resume_name_length));
 					memcpy(cifsFile->search_resume_name,
-						lastFindData->FileName, 
+						pfindDataUnix->FileName, 
 						cifsFile->resume_name_length);
 				}
 

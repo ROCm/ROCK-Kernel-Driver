@@ -51,6 +51,9 @@ static __inline__ unsigned long ide_default_io_base(int index)
 	}
 }
 
+#define IDE_ARCH_OBSOLETE_INIT
+#define ide_default_io_ctl(base)	((base) + 0x206) /* obsolete */
+
 #ifdef CONFIG_BLK_DEV_IDEPCI
 #define ide_init_default_irq(base)	(0)
 #else

@@ -63,6 +63,7 @@ struct smb_vol {
 	mode_t dir_mode;
 	int rw:1;
 	int retry:1;
+	int intr:1;
 	unsigned int rsize;
 	unsigned int wsize;
 	unsigned int sockopt;
@@ -699,6 +700,7 @@ cifs_parse_mount_options(char *options, const char *devname, struct smb_vol *vol
 				   (strnicmp(data, "exec", 4) == 0) ||
 				   (strnicmp(data, "noexec", 6) == 0) ||
 				   (strnicmp(data, "nodev", 5) == 0) ||
+				   (strnicmp(data, "noauto", 6) == 0) ||
 				   (strnicmp(data, "dev", 3) == 0)) {
 			/*  The mount tool or mount.cifs helper (if present)
 				uses these opts to set flags, and the flags are read
@@ -717,6 +719,12 @@ cifs_parse_mount_options(char *options, const char *devname, struct smb_vol *vol
 			vol->retry = 0;
 		} else if (strnicmp(data, "nosoft", 6) == 0) {
 			vol->retry = 1;
+		} else if (strnicmp(data, "nointr", 6) == 0) {
+			vol->intr = 0;
+		} else if (strnicmp(data, "intr", 4) == 0) {
+			vol->intr = 1;
+		} else if (strnicmp(data, "noac", 4) == 0) {
+			printk(KERN_WARNING "CIFS: Mount option noac not supported. Instead set /proc/fs/cifs/LookupCacheEnabled to 0\n");
 		} else
 			printk(KERN_WARNING "CIFS: Unknown mount option %s\n",data);
 	}
@@ -908,7 +916,7 @@ ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket,
 		} else {
 		/* BB other socket options to set KEEPALIVE, NODELAY? */
 			cFYI(1,("Socket created"));
-	/*		(*csocket)->sk->allocation = GFP_NOFS; */ /* BB is there equivalent in 2.6 */
+			(*csocket)->sk->sk_allocation = GFP_NOFS; 
 		}
 	}
 
@@ -1015,6 +1023,7 @@ ipv6_connect(struct sockaddr_in6 *psin_server, struct socket **csocket)
 		} else {
 		/* BB other socket options to set KEEPALIVE, NODELAY? */
 			 cFYI(1,("ipv6 Socket created"));
+                        (*csocket)->sk->sk_allocation = GFP_NOFS;
 		}
 	}
 

@@ -41,6 +41,7 @@
 #include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/kernel.h>
+#include <linux/delay.h>
 #include <linux/stddef.h>
 #include <linux/sched.h>
 #include <linux/ioport.h>
@@ -124,7 +125,7 @@ static int amd756_transaction(struct i2c_adapter *adap)
 	if ((temp = inw_p(SMB_GLOBAL_STATUS)) & (GS_HST_STS | GS_SMB_STS)) {
 		dev_dbg(&adap->dev, ": SMBus busy (%04x). Waiting... \n", temp);
 		do {
-			i2c_delay(1);
+			msleep(1);
 			temp = inw_p(SMB_GLOBAL_STATUS);
 		} while ((temp & (GS_HST_STS | GS_SMB_STS)) &&
 		         (timeout++ < MAX_TIMEOUT));
@@ -141,7 +142,7 @@ static int amd756_transaction(struct i2c_adapter *adap)
 
 	/* We will always wait for a fraction of a second! */
 	do {
-		i2c_delay(1);
+		msleep(1);
 		temp = inw_p(SMB_GLOBAL_STATUS);
 	} while ((temp & GS_HST_STS) && (timeout++ < MAX_TIMEOUT));
 
@@ -188,7 +189,7 @@ static int amd756_transaction(struct i2c_adapter *adap)
  abort:
 	dev_warn(&adap->dev, ": Sending abort.\n");
 	outw_p(inw(SMB_GLOBAL_ENABLE) | GE_ABORT, SMB_GLOBAL_ENABLE);
-	i2c_delay(100);
+	msleep(100);
 	outw_p(GS_CLEAR_STS, SMB_GLOBAL_STATUS);
 	return -1;
 }

@@ -10,6 +10,7 @@
 #include <linux/smp_lock.h>
 #include <asm/uaccess.h>
 #include <linux/pagemap.h>
+#include <linux/swap.h>
 #include <linux/writeback.h>
 #include <linux/blkdev.h>
 #include <linux/buffer_head.h>
@@ -655,10 +656,6 @@ int reiserfs_submit_file_region_for_write(
 			     // we only remember error status to report it on
 			     // exit.
 	write_bytes-=count;
-	SetPageReferenced(page);
-	unlock_page(page); // We unlock the page as it was locked by earlier call
-			  // to grab_cache_page
-	page_cache_release(page);
     }
     /* now that we've gotten all the ordered buffers marked dirty,
      * we can safely update i_size and close any running transaction
@@ -695,6 +692,17 @@ int reiserfs_submit_file_region_for_write(
 	reiserfs_write_unlock(inode->i_sb);
     }
     th->t_trans_id = 0;
+
+    /* 
+     * we have to unlock the pages after updating i_size, otherwise
+     * we race with writepage
+     */
+    for ( i = 0; i < num_pages ; i++) {
+	struct page *page=prepared_pages[i];
+	unlock_page(page); 
+	mark_page_accessed(page);
+	page_cache_release(page);
+    }
     return retval;
 }
 

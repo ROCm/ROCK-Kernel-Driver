@@ -97,23 +97,6 @@ static const char *ata_thr_state_name(unsigned int thr_state)
 }
 
 /**
- *	msleep - sleep for a number of milliseconds
- *	@msecs: number of milliseconds to sleep
- *
- *	Issues schedule_timeout call for the specified number
- *	of milliseconds.
- *
- *	LOCKING:
- *	None.
- */
-
-static void msleep(unsigned long msecs)
-{
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(msecs_to_jiffies(msecs) + 1);
-}
-
-/**
  *	ata_tf_load_pio - send taskfile registers to host controller
  *	@ioaddr: set of IO ports to which output is sent
  *	@tf: ATA taskfile register set

@@ -631,17 +631,54 @@ TAUException(struct pt_regs *regs)
 }
 #endif /* CONFIG_INT_TAU */
 
+void AltivecUnavailException(struct pt_regs *regs)
+{
+	static int kernel_altivec_count;
+
+#ifndef CONFIG_ALTIVEC
+	if (user_mode(regs)) {
+		/* A user program has executed an altivec instruction,
+		   but this kernel doesn't support altivec. */
+		_exception(SIGILL, regs, ILL_ILLOPC, regs->nip);
+		return;
+	}
+#endif
+	/* The kernel has executed an altivec instruction without
+	   first enabling altivec.  Whinge but let it do it. */
+	if (++kernel_altivec_count < 10)
+		printk(KERN_ERR "AltiVec used in kernel (task=%p, pc=%x)\n",
+		       current, regs->nip);
+	regs->msr |= MSR_VEC;
+}
+
 #ifdef CONFIG_ALTIVEC
 void
 AltivecAssistException(struct pt_regs *regs)
 {
+	int err;
+
 	preempt_disable();
 	if (regs->msr & MSR_VEC)
 		giveup_altivec(current);
 	preempt_enable();
 
-	/* XXX quick hack for now: set the non-Java bit in the VSCR */
-	current->thread.vscr.u[3] |= 0x10000;
+	err = emulate_altivec(regs);
+	if (err == 0) {
+		regs->nip += 4;		/* skip emulated instruction */
+		emulate_single_step(regs);
+		return;
+	}
+
+	if (err == -EFAULT) {
+		/* got an error reading the instruction */
+		_exception(SIGSEGV, regs, SEGV_ACCERR, regs->nip);
+	} else {
+		/* didn't recognize the instruction */
+		/* XXX quick hack for now: set the non-Java bit in the VSCR */
+		printk(KERN_ERR "unrecognized altivec instruction "
+		       "in %s at %lx\n", current->comm, regs->nip);
+		current->thread.vscr.u[3] |= 0x10000;
+	}
 }
 #endif /* CONFIG_ALTIVEC */
 

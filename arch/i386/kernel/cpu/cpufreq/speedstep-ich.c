@@ -179,7 +179,7 @@ static int speedstep_activate (void)
 /**
  * speedstep_detect_chipset - detect the Southbridge which contains SpeedStep logic
  *
- *   Detects PIIX4, ICH2-M and ICH3-M so far. The pci_dev points to 
+ *   Detects ICH2-M, ICH3-M and ICH4-M so far. The pci_dev points to 
  * the LPC bridge / PM module which contains all power-management 
  * functions. Returns the SPEEDSTEP_CHIPSET_-number for the detected
  * chipset, or zero on failure.
@@ -322,6 +322,10 @@ static int speedstep_cpu_exit(struct cpufreq_policy *policy)
 	return 0;
 }
 
+static unsigned int speedstep_get(unsigned int cpu)
+{
+	return speedstep_get_processor_frequency(speedstep_processor);
+}
 
 static struct freq_attr* speedstep_attr[] = {
 	&cpufreq_freq_attr_scaling_available_freqs,
@@ -335,6 +339,7 @@ static struct cpufreq_driver speedstep_driver = {
 	.target 	= speedstep_target,
 	.init		= speedstep_cpu_init,
 	.exit		= speedstep_cpu_exit,
+	.get		= speedstep_get,
 	.owner		= THIS_MODULE,
 	.attr		= speedstep_attr,
 };

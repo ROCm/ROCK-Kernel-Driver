@@ -260,11 +260,11 @@ static void gf2k_connect(struct gameport *gameport, struct gameport_dev *dev)
 
 	gf2k_trigger_seq(gameport, gf2k_seq_reset);
 
-	wait_ms(GF2K_TIMEOUT);
+	msleep(GF2K_TIMEOUT);
 
 	gf2k_trigger_seq(gameport, gf2k_seq_digital);
 
-	wait_ms(GF2K_TIMEOUT);
+	msleep(GF2K_TIMEOUT);
 
 	if (gf2k_read_packet(gameport, GF2K_LENGTH, data) < 12)
 		goto fail2;
