@@ -55,15 +55,17 @@ struct dentry_stat_t dentry_stat = {
 	.age_limit = 45,
 };
 
-/* no dcache_lock, please */
-static inline void d_free(struct dentry *dentry)
+/*
+ * no dcache_lock, please.  The caller must decrement dentry_stat.nr_dentry
+ * inside dcache_lock.
+ */
+static void d_free(struct dentry *dentry)
 {
 	if (dentry->d_op && dentry->d_op->d_release)
 		dentry->d_op->d_release(dentry);
 	if (dname_external(dentry)) 
 		kfree(dentry->d_name.name);
 	kmem_cache_free(dentry_cache, dentry); 
-	dentry_stat.nr_dentry--;
 }
 
 /*
@@ -149,6 +151,7 @@ unhash_it:
 kill_it: {
 		struct dentry *parent;
 		list_del(&dentry->d_child);
+		dentry_stat.nr_dentry--;	/* For d_free, below */
 		/* drops the lock, at that point nobody can reach this dentry */
 		dentry_iput(dentry);
 		parent = dentry->d_parent;
@@ -307,6 +310,7 @@ static inline void prune_one_dentry(struct dentry * dentry)
 
 	list_del_init(&dentry->d_hash);
 	list_del(&dentry->d_child);
+	dentry_stat.nr_dentry--;	/* For d_free, below */
 	dentry_iput(dentry);
 	parent = dentry->d_parent;
 	d_free(dentry);
@@ -569,11 +573,25 @@ void shrink_dcache_anon(struct list_head *head)
 }
 
 /*
- * This is called from kswapd when we think we need some
- * more memory. 
+ * This is called from kswapd when we think we need some more memory.
+ *
+ * We don't want the VM to steal _all_ unused dcache.  Because that leads to
+ * the VM stealing all unused inodes, which shoots down recently-used
+ * pagecache.  So what we do is to tell fibs to the VM about how many reapable
+ * objects there are in this cache.   If the number of unused dentries is
+ * less than half of the total dentry count then return zero.  The net effect
+ * is that the number of unused dentries will be, at a minimum, equal to the
+ * number of used ones.
+ *
+ * If unused_ratio is set to 5, the number of unused dentries will not fall
+ * below 5* the number of used ones.
  */
 static int shrink_dcache_memory(int nr, unsigned int gfp_mask)
 {
+	int nr_used;
+	int nr_unused;
+	const int unused_ratio = 1;
+
 	if (nr) {
 		/*
 		 * Nasty deadlock avoidance.
@@ -589,7 +607,11 @@ static int shrink_dcache_memory(int nr, unsigned int gfp_mask)
 		if (gfp_mask & __GFP_FS)
 			prune_dcache(nr);
 	}
-	return dentry_stat.nr_dentry;
+	nr_unused = dentry_stat.nr_unused;
+	nr_used = dentry_stat.nr_dentry - nr_unused;
+	if (nr_unused < nr_used * unused_ratio)
+		return 0;
+	return nr_unused - nr_used * unused_ratio;
 }
 
 #define NAME_ALLOC_LEN(len)	((len+16) & ~15)
@@ -642,16 +664,20 @@ struct dentry * d_alloc(struct dentry * parent, const struct qstr *name)
 	INIT_LIST_HEAD(&dentry->d_lru);
 	INIT_LIST_HEAD(&dentry->d_subdirs);
 	INIT_LIST_HEAD(&dentry->d_alias);
+
 	if (parent) {
 		dentry->d_parent = dget(parent);
 		dentry->d_sb = parent->d_sb;
-		spin_lock(&dcache_lock);
-		list_add(&dentry->d_child, &parent->d_subdirs);
-		spin_unlock(&dcache_lock);
-	} else
+	} else {
 		INIT_LIST_HEAD(&dentry->d_child);
+	}
 
+	spin_lock(&dcache_lock);
+	if (parent)
+		list_add(&dentry->d_child, &parent->d_subdirs);
 	dentry_stat.nr_dentry++;
+	spin_unlock(&dcache_lock);
+
 	return dentry;
 }
 
