@@ -306,6 +306,9 @@ int hfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	res = hfs_cat_move(old_dentry->d_inode->i_ino,
 			   old_dir, &old_dentry->d_name,
 			   new_dir, &new_dentry->d_name);
+	if (!res)
+		hfs_cat_build_key((btree_key *)&HFS_I(old_dentry->d_inode)->cat_key,
+				  new_dir->i_ino, &new_dentry->d_name);
 	return res;
 }
 
