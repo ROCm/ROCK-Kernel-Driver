@@ -386,7 +386,9 @@ ergo_waitpofready(struct HYSDN_CARD *card)
 			dpr->ToPcInt = 1;	/* interrupt to E1 for all cards */
 
 			restore_flags(flags);
-			if ((i = hysdn_net_create(card))) {
+			if ((hynet_enable & (1 << card->myid)) 
+			    && (i = hysdn_net_create(card))) 
+			{
 				ergo_stopcard(card);
 				card->state = CARD_STATE_BOOTERR;
 				return (i);

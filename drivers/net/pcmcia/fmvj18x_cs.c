@@ -76,7 +76,7 @@ static int irq_list[4] = { -1 };
 
 /* SRAM configuration */
 /* 0:4KB*2 TX buffer   else:8KB*2 TX buffer */
-static int sram_config = 0;
+static int sram_config;
 
 MODULE_PARM(irq_mask, "i");
 MODULE_PARM(irq_list, "1-4i");
@@ -117,7 +117,7 @@ static void set_rx_mode(struct net_device *dev);
 static void fjn_tx_timeout(struct net_device *dev);
 
 static dev_info_t dev_info = "fmvj18x_cs";
-static dev_link_t *dev_list = NULL;
+static dev_link_t *dev_list;
 
 /*
     card type

@@ -294,7 +294,7 @@ static char ax25_test[7] __initdata =
 
 /* Global variables */
 
-static struct scc_info *first = NULL;
+static struct scc_info *first;
 static unsigned long rand;
 
 
@@ -593,7 +593,6 @@ int __init setup_adapter(int card_base, int type, int n) {
     dev->tx_queue_len = 64;
     memcpy(dev->broadcast, ax25_broadcast, 7);
     memcpy(dev->dev_addr, ax25_test, 7);
-    dev_init_buffers(dev);
     rtnl_lock();
     if (register_netdevice(dev)) {
       printk("dmascc: could not register %s\n", dev->name);

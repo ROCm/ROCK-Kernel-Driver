@@ -542,6 +542,8 @@ __constant_copy_from_user(void *to, const void *from, unsigned long n)
 {
 	if (access_ok(VERIFY_READ, from, n))
 		__constant_copy_user_zeroing(to,from,n);
+	else
+		memset(to, 0, n);
 	return n;
 }
 

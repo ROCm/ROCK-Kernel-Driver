@@ -436,7 +436,6 @@ struct super_block *hfs_read_super(struct super_block *s, void *data,
 		goto bail1;
 	}
 
-	s->s_maxbytes = MAX_NON_LFS;
 	s->s_magic = HFS_SUPER_MAGIC;
 	s->s_blocksize_bits = HFS_SECTOR_SIZE_BITS;
 	s->s_blocksize = HFS_SECTOR_SIZE;

@@ -174,8 +174,6 @@ static struct net_device *init_netdev(struct net_device *dev, int sizeof_priv,
 #if defined(CONFIG_HIPPI) || defined(CONFIG_TR) || defined(CONFIG_NET_FC)
 static int __register_netdev(struct net_device *dev)
 {
-	dev_init_buffers(dev);
-	
 	if (dev->init && dev->init(dev) != 0) {
 		unregister_netdev(dev);
 		return -EIO;
@@ -418,8 +416,6 @@ void ether_setup(struct net_device *dev)
 
 	/* New-style flags. */
 	dev->flags		= IFF_BROADCAST|IFF_MULTICAST;
-
-	dev_init_buffers(dev);
 }
 EXPORT_SYMBOL(ether_setup);
 
@@ -446,10 +442,6 @@ void fddi_setup(struct net_device *dev)
 
 	/* New-style flags */
 	dev->flags		= IFF_BROADCAST | IFF_MULTICAST;
-
-	dev_init_buffers(dev);
-	
-	return;
 }
 EXPORT_SYMBOL(fddi_setup);
 
@@ -486,8 +478,6 @@ void hippi_setup(struct net_device *dev)
 	 * static ARP tables. ARP is disabled by hippi_neigh_setup_dev. 
 	 */
 	dev->flags = 0; 
-
-	dev_init_buffers(dev);
 }
 EXPORT_SYMBOL(hippi_setup);
 #endif /* CONFIG_HIPPI */
@@ -525,8 +515,6 @@ void ltalk_setup(struct net_device *dev)
 	dev->broadcast[0]	= 0xFF;
 
 	dev->flags		= IFF_BROADCAST|IFF_MULTICAST|IFF_NOARP;
-
-	dev_init_buffers(dev);
 }
 EXPORT_SYMBOL(ltalk_setup);
 
@@ -676,7 +664,6 @@ void fc_setup(struct net_device *dev)
 
         /* New-style flags. */
         dev->flags              =        IFF_BROADCAST;
-	dev_init_buffers(dev);
 }
 
 /**

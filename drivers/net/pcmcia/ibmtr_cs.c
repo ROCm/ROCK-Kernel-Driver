@@ -93,10 +93,10 @@ static u_int irq_mask = 0xdeb8;
 static int irq_list[4] = { -1 };
 
 /* MMIO base address */
-static u_long mmiobase = 0;
+static u_long mmiobase;
 
 /* SRAM base address */
-static u_long srambase = 0;
+static u_long srambase;
 
 /* SRAM size 8,16,32,64 */
 static u_long sramsize = 16;
@@ -124,7 +124,7 @@ static dev_info_t dev_info = "ibmtr_cs";
 static dev_link_t *ibmtr_attach(void);
 static void ibmtr_detach(dev_link_t *);
 
-static dev_link_t *dev_list = NULL;
+static dev_link_t *dev_list;
 
 extern int ibmtr_probe(struct net_device *dev);
 unsigned char pcmcia_reality_check(unsigned char gss);

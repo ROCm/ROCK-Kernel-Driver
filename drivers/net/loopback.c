@@ -127,7 +127,5 @@ int __init loopback_init(struct net_device *dev)
 	 *	Fill in the generic fields of the device structure. 
 	 */
    
-	dev_init_buffers(dev);
-  
 	return(0);
 };

@@ -379,7 +379,7 @@ static char *version =
 #endif
 
 static dev_info_t dev_info="nmclan_cs";
-static dev_link_t *dev_list=NULL;
+static dev_link_t *dev_list;
 
 static char *if_names[]={
     "Auto", "10baseT", "BNC",
@@ -400,7 +400,7 @@ Parameters
 ---------------------------------------------------------------------------- */
 
 /* 0=auto, 1=10baseT, 2 = 10base2, default=auto */
-static int if_port=0;
+static int if_port;
 
 /* Bit map of interrupts to choose from */
 static u_int irq_mask = 0xdeb8;
@@ -1605,7 +1605,7 @@ static void set_multicast_list(struct net_device *dev)
 
 #ifdef PCMCIA_DEBUG
   if (pc_debug > 1) {
-    static int old = 0;
+    static int old;
     if (dev->mc_count != old) {
       old = dev->mc_count;
       DEBUG(0, "%s: setting Rx mode to %d addresses.\n",
@@ -1660,7 +1660,7 @@ static void set_multicast_list(struct net_device *dev)
 
 #ifdef PCMCIA_DEBUG
   if (pc_debug > 1) {
-    static int old = 0;
+    static int old;
     if (dev->mc_count != old) {
       old = dev->mc_count;
       DEBUG(0, "%s: setting Rx mode to %d addresses.\n",

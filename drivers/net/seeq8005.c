@@ -14,7 +14,7 @@
 
 */
 
-static const char *version =
+static const char version[] =
 	"seeq8005.c:v1.00 8/07/95 Hamish Coleman (hamish@zot.apana.org.au)\n";
 
 /*

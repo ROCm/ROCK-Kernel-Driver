@@ -79,7 +79,7 @@
 
 #define MAX_POLL_TIME	10
 
-static char *version =
+static char version[] =
 	"bionet.c:v1.0 06-feb-96 (c) Hartmut Laue.\n";
 
 #include <linux/module.h>

@@ -107,7 +107,7 @@ struct bulk_cs_wrap {
  * us_bulk_transfer() return codes
  */
 #define US_BULK_TRANSFER_GOOD		0  /* good transfer                 */
-#define US_BULK_TRANSFER_SHORT		1  /* transfered less than expected */
+#define US_BULK_TRANSFER_SHORT		1  /* transferred less than expected */
 #define US_BULK_TRANSFER_FAILED		2  /* transfer died in the middle   */
 #define US_BULK_TRANSFER_ABORTED	3  /* transfer canceled             */
 

@@ -327,7 +327,7 @@ static void b1pciv4_remove_ctr(struct capi_ctr *ctrl)
 
 	div4->detach_ctr(ctrl);
 	free_irq(card->irq, card);
-	iounmap((void *) (((unsigned long) card->mbase) & PAGE_MASK));
+	iounmap(card->mbase);
 	release_region(card->port, AVMB1_PORTLEN);
 	ctrl->driverdata = 0;
 	kfree(card->ctrlinfo);
@@ -358,7 +358,6 @@ static char *b1pciv4_procinfo(struct capi_ctr *ctrl)
 
 static int b1pciv4_add_card(struct capi_driver *driver, struct capicardparams *p)
 {
-	unsigned long base, page_offset;
 	avmcard *card;
 	avmctrl_info *cinfo;
 	int retval;
@@ -409,12 +408,8 @@ static int b1pciv4_add_card(struct capi_driver *driver, struct capicardparams *p
 		return -EBUSY;
 	}
 
-	base = card->membase & PAGE_MASK;
-	page_offset = card->membase - base;
-	card->mbase = ioremap_nocache(base, page_offset + 64);
-	if (card->mbase) {
-		card->mbase += page_offset;
-	} else {
+	card->mbase = ioremap_nocache(card->membase, 64);
+	if (!card->mbase) {
 		printk(KERN_NOTICE "%s: can't remap memory at 0x%lx\n",
 					driver->name, card->membase);
 	        kfree(card->ctrlinfo);
@@ -429,7 +424,7 @@ static int b1pciv4_add_card(struct capi_driver *driver, struct capicardparams *p
 	if ((retval = b1pciv4_detect(card)) != 0) {
 		printk(KERN_NOTICE "%s: NO card at 0x%x (%d)\n",
 					driver->name, card->port, retval);
-                iounmap((void *) (((unsigned long) card->mbase) & PAGE_MASK));
+                iounmap(card->mbase);
 	        kfree(card->ctrlinfo);
 		kfree(card->dma);
 		kfree(card);
@@ -445,7 +440,7 @@ static int b1pciv4_add_card(struct capi_driver *driver, struct capicardparams *p
 	if (retval) {
 		printk(KERN_ERR "%s: unable to get IRQ %d.\n",
 				driver->name, card->irq);
-                iounmap((void *) (((unsigned long) card->mbase) & PAGE_MASK));
+                iounmap(card->mbase);
 		release_region(card->port, AVMB1_PORTLEN);
 	        kfree(card->ctrlinfo);
 		kfree(card->dma);
@@ -457,7 +452,7 @@ static int b1pciv4_add_card(struct capi_driver *driver, struct capicardparams *p
 	cinfo->capi_ctrl = div4->attach_ctr(driver, card->name, cinfo);
 	if (!cinfo->capi_ctrl) {
 		printk(KERN_ERR "%s: attach controller failed.\n", driver->name);
-                iounmap((void *) (((unsigned long) card->mbase) & PAGE_MASK));
+                iounmap(card->mbase);
 		free_irq(card->irq, card);
 		release_region(card->port, AVMB1_PORTLEN);
 	        kfree(card->ctrlinfo);
@@ -508,21 +503,21 @@ static int add_card(struct pci_dev *dev)
 	struct capicardparams param;
 	int retval;
 
+	if (pci_enable_device(dev) < 0) {
+		printk(KERN_ERR "%s: failed to enable AVM-B1\n",
+		       driver->name);
+		return -ENODEV;
+	}
+	param.irq = dev->irq;
+
 	if (pci_resource_start(dev, 2)) { /* B1 PCI V4 */
 #ifdef CONFIG_ISDN_DRV_AVMB1_B1PCIV4
 		driver = &b1pciv4_driver;
+
+		pci_set_master(dev);
 #endif
 		param.membase = pci_resource_start(dev, 0);
 		param.port = pci_resource_start(dev, 2);
-		param.irq = dev->irq;
-
-		retval = pci_enable_device (dev);
-		if (retval != 0) {
-		        printk(KERN_ERR
-			"%s: failed to enable AVM-B1 V4 at i/o %#x, irq %d, mem %#x err=%d\n",
-			driver->name, param.port, param.irq, param.membase, retval);
-			return -EIO;
-		}
 
 		printk(KERN_INFO
 		"%s: PCI BIOS reports AVM-B1 V4 at i/o %#x, irq %d, mem %#x\n",
@@ -540,15 +535,7 @@ static int add_card(struct pci_dev *dev)
 	} else {
 		param.membase = 0;
 		param.port = pci_resource_start(dev, 1);
-		param.irq = dev->irq;
 
-		retval = pci_enable_device (dev);
-		if (retval != 0) {
-		        printk(KERN_ERR
-			"%s: failed to enable AVM-B1 at i/o %#x, irq %d, err=%d\n",
-			driver->name, param.port, param.irq, retval);
-			return -EIO;
-		}
 		printk(KERN_INFO
 		"%s: PCI BIOS reports AVM-B1 at i/o %#x, irq %d\n",
 		driver->name, param.port, param.irq);
@@ -570,7 +557,6 @@ static int __init b1pci_init(void)
 #endif
 	struct pci_dev *dev = NULL;
 	char *p;
-	int retval;
 
 	MOD_INC_USE_COUNT;
 
@@ -592,50 +578,29 @@ static int __init b1pci_init(void)
 	printk(KERN_INFO "%s: revision %s\n", driver->name, driver->revision);
 
         di = attach_capi_driver(driver);
-
 	if (!di) {
 		printk(KERN_ERR "%s: failed to attach capi_driver\n",
 				driver->name);
 		MOD_DEC_USE_COUNT;
-		return -EIO;
+		return -ENODEV;
 	}
 
 #ifdef CONFIG_ISDN_DRV_AVMB1_B1PCIV4
 	printk(KERN_INFO "%s: revision %s\n", driverv4->name, driverv4->revision);
 
         div4 = attach_capi_driver(driverv4);
-
 	if (!div4) {
     		detach_capi_driver(driver);
 		printk(KERN_ERR "%s: failed to attach capi_driver\n",
 				driverv4->name);
 		MOD_DEC_USE_COUNT;
-		return -EIO;
+		return -ENODEV;
 	}
 #endif
-
-#ifdef CONFIG_PCI
-	if (!pci_present()) {
-		printk(KERN_ERR "%s: no PCI bus present\n", driver->name);
-    		detach_capi_driver(driver);
-#ifdef CONFIG_ISDN_DRV_AVMB1_B1PCIV4
-    		detach_capi_driver(driverv4);
-#endif
-		MOD_DEC_USE_COUNT;
-		return -EIO;
-	}
 
 	while ((dev = pci_find_device(PCI_VENDOR_ID_AVM, PCI_DEVICE_ID_AVM_B1, dev))) {
-		retval = add_card(dev);
-		if (retval != 0) {
-    			detach_capi_driver(driver);
-#ifdef CONFIG_ISDN_DRV_AVMB1_B1PCIV4
-    			detach_capi_driver(driverv4);
-#endif
-			MOD_DEC_USE_COUNT;
-			return retval;
-		}
-		ncards++;
+		if (add_card(dev) == 0)
+			ncards++;
 	}
 	if (ncards) {
 		printk(KERN_INFO "%s: %d B1-PCI card(s) detected\n",
@@ -649,12 +614,7 @@ static int __init b1pci_init(void)
 	detach_capi_driver(driverv4);
 #endif
 	MOD_DEC_USE_COUNT;
-	return -ESRCH;
-#else
-	printk(KERN_ERR "%s: kernel not compiled with PCI.\n", driver->name);
-	MOD_DEC_USE_COUNT;
-	return -EIO;
-#endif
+	return -ENODEV;
 }
 
 static void __exit b1pci_exit(void)

@@ -256,7 +256,7 @@
       - for horizontal panning decrease diwstrt_h
       - the length of a fetchline must be aligned to fetchsize (table 3)
       - if fetchstart is smaller than fetchsize, then ddfstrt can a little bit
-        moved to optimize use of dma (usefull for OCS/ECS overscan displays)
+        moved to optimize use of dma (useful for OCS/ECS overscan displays)
       - ddfstop is ddfstrt+ddfsize-fetchsize
       - If C= didn't change anything for AGA, then at following positions the
         dma bus is allready used:
@@ -2106,7 +2106,7 @@ static int ami_decode_var(struct fb_var_screeninfo *var,
 			return -EINVAL;
 		}
 		if (par->diwstop_v > par->vtotal) {
-			DPRINTK("invaild diwstop_v\n");
+			DPRINTK("invalid diwstop_v\n");
 			return -EINVAL;
 		}
 

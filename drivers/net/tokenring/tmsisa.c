@@ -93,7 +93,7 @@ struct tms_isa_card {
 	struct tms_isa_card *next;
 };
 
-static struct tms_isa_card *tms_isa_card_list = NULL;
+static struct tms_isa_card *tms_isa_card_list;
 
 static int __init tms_isa_probe1(int ioaddr)
 {
@@ -129,7 +129,7 @@ static int __init tms_isa_probe1(int ioaddr)
 
 int __init tms_isa_probe(struct net_device *dev)
 {
-        static int versionprinted = 0;
+        static int versionprinted;
 	struct net_local *tp;
 	int j;
 	struct tms_isa_card *card;

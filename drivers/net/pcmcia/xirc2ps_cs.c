@@ -328,7 +328,7 @@ static dev_info_t dev_info = "xirc2ps_cs";
  * device numbers are used to derive the corresponding array index.
  */
 
-static dev_link_t *dev_list = NULL;
+static dev_link_t *dev_list;
 
 /****************
  * A dev_link_t structure has fields for most things that are needed

@@ -31,7 +31,7 @@
 	If this happens, you must power down the machine for about 30 seconds.
 */
 
-static const char *version =
+static const char version[] =
 	"e2100.c:v1.01 7/21/94 Donald Becker (becker@cesdis.gsfc.nasa.gov)\n";
 
 #include <linux/module.h>

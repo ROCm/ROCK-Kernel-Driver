@@ -66,10 +66,10 @@ struct file * get_empty_filp(void)
 			goto new_one;
 		}
 		/* Big problems... */
-		printk("VFS: filp allocation failed\n");
+		printk(KERN_WARNING "VFS: filp allocation failed\n");
 
 	} else if (files_stat.max_files > old_max) {
-		printk("VFS: file-max limit %d reached\n", files_stat.max_files);
+		printk(KERN_INFO "VFS: file-max limit %d reached\n", files_stat.max_files);
 		old_max = files_stat.max_files;
 	}
 	file_list_unlock();

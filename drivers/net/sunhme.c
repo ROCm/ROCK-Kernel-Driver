@@ -1,4 +1,4 @@
-/* $Id: sunhme.c,v 1.115 2001/03/29 06:37:09 davem Exp $
+/* $Id: sunhme.c,v 1.116 2001/04/17 07:20:52 davem Exp $
  * sunhme.c: Sparc HME/BigMac 10/100baseT half/full duplex auto switching,
  *           auto carrier detecting ethernet driver.  Also known as the
  *           "Happy Meal Ethernet" found on SunSwift SBUS cards.
@@ -13,7 +13,7 @@
  *     argument : macaddr=0x00,0x10,0x20,0x30,0x40,0x50
  */
 
-static char *version =
+static char version[] =
         "sunhme.c:v1.99 12/Sep/99 David S. Miller (davem@redhat.com)\n";
 
 #include <linux/module.h>
@@ -73,14 +73,14 @@ static int macaddr[6];
 /* accept MAC address of the form macaddr=0x08,0x00,0x20,0x30,0x40,0x50 */
 MODULE_PARM(macaddr, "6i");
 
-static struct happy_meal *root_happy_dev = NULL;
+static struct happy_meal *root_happy_dev;
 
 #ifdef CONFIG_SBUS
-static struct quattro *qfe_sbus_list = NULL;
+static struct quattro *qfe_sbus_list;
 #endif
 
 #ifdef CONFIG_PCI
-static struct quattro *qfe_pci_list = NULL;
+static struct quattro *qfe_pci_list;
 #endif
 
 #undef HMEDEBUG
@@ -102,7 +102,7 @@ struct hme_tx_logent {
 };
 #define TX_LOG_LEN	128
 static struct hme_tx_logent tx_log[TX_LOG_LEN];
-static int txlog_cur_entry = 0;
+static int txlog_cur_entry;
 static __inline__ void tx_add_log(struct happy_meal *hp, unsigned int a, unsigned int s)
 {
 	struct hme_tx_logent *tlp;
@@ -1997,16 +1997,12 @@ static void happy_meal_tx(struct happy_meal *hp)
 			dma_len &= TXFLAG_SIZE;
 			hme_dma_unmap(hp, dma_addr, dma_len, DMA_TODEVICE);
 
-			if (frag != skb_shinfo(skb)->nr_frags) {
-				elem = NEXT_TX(elem);
-				this = &txbase[elem];
-			}
+			elem = NEXT_TX(elem);
+			this = &txbase[elem];
 		}
 
 		dev_kfree_skb_irq(skb);
-
 		hp->net_stats.tx_packets++;
-		elem = NEXT_TX(elem);
 	}
 	hp->tx_old = elem;
 	TXD((">"));
@@ -2510,7 +2506,7 @@ static int happy_meal_ioctl(struct net_device *dev,
 		return -EOPNOTSUPP;
 }
 
-static int hme_version_printed = 0;
+static int hme_version_printed;
 
 #ifdef CONFIG_SBUS
 void __init quattro_get_ranges(struct quattro *qp)

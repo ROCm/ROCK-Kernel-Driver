@@ -42,7 +42,7 @@
 
 */
 
-static char *version = "atarilance.c: v1.3 04/04/96 "
+static char version[] = "atarilance.c: v1.3 04/04/96 "
 					   "Roman.Hodek@informatik.uni-erlangen.de\n";
 
 #include <linux/module.h>

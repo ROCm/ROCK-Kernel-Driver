@@ -205,7 +205,7 @@ struct hid_global {
 };
 
 /*
- * This is the local enviroment. It is resistent up the the next main-item.
+ * This is the local enviroment. It is resistent up the next main-item.
  */
 
 #define HID_MAX_DESCRIPTOR_SIZE		4096

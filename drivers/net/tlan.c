@@ -205,7 +205,7 @@ static  int		debug;
 static	int		bbuf;
 static	u8		*TLanPadBuffer;
 static	char		TLanSignature[] = "TLAN";
-static const char *tlan_banner = "ThunderLAN driver v1.14a\n";
+static const char tlan_banner[] = "ThunderLAN driver v1.14a\n";
 static int tlan_have_pci;
 static int tlan_have_eisa;
 
@@ -427,7 +427,7 @@ static struct pci_driver tlan_driver = {
 
 static int __init tlan_probe(void)
 {
-	static int	pad_allocated = 0;
+	static int	pad_allocated;
 	
 	printk(KERN_INFO "%s", tlan_banner);
 	

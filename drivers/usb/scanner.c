@@ -174,7 +174,7 @@
  *      <flynn@isr.uni-stuttgart.de>.
  *    - Added iVina 1200U ID. Thanks to Dyson Lin <dyson@avision.com.tw>.
  *    - Added access time update for the device file courtesy of Paul
- *      Mackerras <paulus@linuxcare.com>.  This allows a user space daemon
+ *      Mackerras <paulus@samba.org>.  This allows a user space daemon
  *      to turn the lamp off for a Umax 1220U scanner after a prescribed
  *      time.
  *    - Fixed HP S20 ID's.  Thanks to Ruud Linders <rlinders@xs4all.nl>.
@@ -420,7 +420,7 @@ write_scanner(struct file * file, const char * buffer,
 		dbg("write stats(%d): result:%d this_write:%d partial:%d", scn_minor, result, this_write, partial);
 
 		if (result == -ETIMEDOUT) {	/* NAK -- shouldn't happen */
-			warn("write_scanner: NAK recieved.");
+			warn("write_scanner: NAK received.");
 			ret = result;
 			break;
 		} else if (result < 0) { /* We should not get any I/O errors */

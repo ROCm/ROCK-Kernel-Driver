@@ -791,7 +791,6 @@ static int hdlcdrv_probe(struct net_device *dev)
 	dev->get_stats = hdlcdrv_get_stats;
 
 	/* Fill in the fields of the device structure */
-	dev_init_buffers(dev);
 
 	s->skb = NULL;
 	

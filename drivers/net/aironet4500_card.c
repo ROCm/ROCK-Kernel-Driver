@@ -128,17 +128,12 @@ int awc4500_pci_probe(struct net_device *dev)
 //		request_region(pci_cisaddr, AIRONET4X00_CIS_SIZE, "aironet4x00 cis");
 //		request_region(pci_memaddr, AIRONET4X00_MEM_SIZE, "aironet4x00 mem");
 
-//		pci_write_config_word(pdev, PCI_COMMAND, 0);
-		udelay(10000);
+		mdelay(10);
 
 		pci_read_config_word(pdev, PCI_COMMAND, &pci_command);
-		new_command = pci_command |0x100 | PCI_COMMAND_MEMORY|PCI_COMMAND_IO;
-		if (pci_command != new_command) {
-			printk(KERN_INFO "  The PCI BIOS has not enabled this"
-				   " device!  Updating PCI command %4.4x->%4.4x.\n",
-				   pci_command, new_command);
+		new_command = pci_command | PCI_COMMAND_SERR;
+		if (pci_command != new_command)
 			pci_write_config_word(pdev, PCI_COMMAND, new_command);
-		}
 
 
 /*		if (device == PCI_DEVICE_AIRONET_4800)

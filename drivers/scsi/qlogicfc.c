@@ -758,7 +758,7 @@ int isp2x00_detect(Scsi_Host_Template * tmpt)
 
 		        host = scsi_register(tmpt, sizeof(struct isp2x00_hostdata));
 			if (!host) {
-			        printk("qlogicfc%d : could not register host.\n", hostdata->host_id);
+			        printk("qlogicfc%d : could not register host.\n", hosts);
 				continue;
 			}
 			host->max_id = QLOGICFC_MAX_ID + 1;
@@ -771,7 +771,7 @@ int isp2x00_detect(Scsi_Host_Template * tmpt)
 			hostdata->res = pci64_alloc_consistent(pdev, RES_SIZE + REQ_SIZE, &busaddr);
 
 			if (!hostdata->res){
-			        printk("qlogicfc%d : could not allocate memory for request and response queue.\n", hostdata->host_id);
+			        printk("qlogicfc%d : could not allocate memory for request and response queue.\n", hosts);
 				pci64_free_consistent(pdev, RES_SIZE + REQ_SIZE, hostdata->res, busaddr);
 			        scsi_unregister(host);
 				continue;

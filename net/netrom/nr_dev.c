@@ -231,7 +231,5 @@ int nr_init(struct net_device *dev)
 
 	dev->get_stats = nr_get_stats;
 
-	dev_init_buffers(dev);
-
 	return 0;
 };

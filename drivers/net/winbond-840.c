@@ -67,7 +67,7 @@ static int multicast_filter_limit = 32;
 
 /* Set the copy breakpoint for the copy-only-tiny-frames scheme.
    Setting to > 1518 effectively disables this feature. */
-static int rx_copybreak = 0;
+static int rx_copybreak;
 
 /* Used to pass the media type, etc.
    Both 'options[]' and 'full_duplex[]' should exist for driver

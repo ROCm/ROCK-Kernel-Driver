@@ -243,7 +243,7 @@ static void set_multicast_list( struct net_device *dev );
 
 int __init sun3lance_probe( struct net_device *dev )
 {	
-	static int found = 0;
+	static int found;
 
 	if(found)
 		return(ENODEV);
@@ -262,7 +262,7 @@ static int __init lance_probe( struct net_device *dev)
 	
 	struct lance_private	*lp;
 	int 			i;
-	static int 		did_version = 0;
+	static int 		did_version;
 	int found = 0;
 	volatile unsigned short *ioaddr_probe;
 	unsigned short tmp1, tmp2;
@@ -585,7 +585,7 @@ static void lance_interrupt( int irq, void *dev_id, struct pt_regs *fp)
 	struct net_device *dev = dev_id;
 	struct lance_private *lp = dev->priv;
 	int csr0;
-	static int in_interrupt = 0;
+	static int in_interrupt;
 
 	if (dev == NULL) {
 		DPRINTK( 1, ( "lance_interrupt(): invalid dev_id\n" ));

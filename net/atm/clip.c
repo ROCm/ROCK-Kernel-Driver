@@ -571,7 +571,6 @@ static int clip_init(struct net_device *dev)
 	    /* compromise between decent burst-tolerance and protection */
 	    /* against memory hogs. */
 	dev->flags = 0;
-	dev_init_buffers(dev); /* is this ever supposed to be used ? */
 	return 0;
 }
 

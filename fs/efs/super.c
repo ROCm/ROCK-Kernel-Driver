@@ -178,7 +178,6 @@ struct super_block *efs_read_super(struct super_block *s, void *d, int silent) {
 	s->s_magic		= EFS_SUPER_MAGIC;
 	s->s_blocksize		= EFS_BLOCKSIZE;
 	s->s_blocksize_bits	= EFS_BLOCKSIZE_BITS;
-	s->s_maxbytes		= MAX_NON_LFS;
 
 	if (!(s->s_flags & MS_RDONLY)) {
 #ifdef DEBUG

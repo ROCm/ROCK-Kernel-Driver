@@ -178,10 +178,10 @@ enum {
 
 /* TI TVP 3030 RAMDAC Direct Registers */
 enum {
-	TVPADDRW = 0x00,	/* 0  Palette/Cursor RAM Write Adress/Index */
+	TVPADDRW = 0x00,	/* 0  Palette/Cursor RAM Write Address/Index */
 	TVPPDATA = 0x04,	/* 1  Palette Data RAM Data */
 	TVPPMASK = 0x08,	/* 2  Pixel Read-Mask */
-	TVPPADRR = 0x0c,	/* 3  Palette/Cursor RAM Read Adress */
+	TVPPADRR = 0x0c,	/* 3  Palette/Cursor RAM Read Address */
 	TVPCADRW = 0x10,	/* 4  Cursor/Overscan Color Write Address */
 	TVPCDATA = 0x14,	/* 5  Cursor/Overscan Color Data */
 				/* 6  reserved */

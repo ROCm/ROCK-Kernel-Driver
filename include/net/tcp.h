@@ -19,7 +19,7 @@
 #define _TCP_H
 
 #define TCP_DEBUG 1
-#define FASTRETRANS_DEBUG 2
+#define FASTRETRANS_DEBUG 1
 
 /* Cancel timers, when they are not required. */
 #undef TCP_CLEAR_TIMERS

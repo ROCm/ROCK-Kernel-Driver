@@ -24,6 +24,7 @@
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/locks.h>
+#include <linux/blkdev.h>
 #include <asm/uaccess.h>
 
 
@@ -380,6 +381,23 @@ static int ext2_check_descriptors (struct super_block * sb)
 }
 
 #define log2(n) ffz(~(n))
+ 
+/*
+ * Maximal file size.  There is a direct, and {,double-,triple-}indirect
+ * block limit, and also a limit of (2^32 - 1) 512-byte sectors in i_blocks.
+ * We need to be 1 filesystem block less than the 2^32 sector limit.
+ */
+static loff_t ext2_max_size(int bits)
+{
+	loff_t res = EXT2_NDIR_BLOCKS;
+	res += 1LL << (bits-2);
+	res += 1LL << (2*(bits-2));
+	res += 1LL << (3*(bits-2));
+	res <<= bits;
+	if (res > (512LL << 32) - (1 << bits))
+		res = (512LL << 32) - (1 << bits);
+	return res;
+}
 
 struct super_block * ext2_read_super (struct super_block * sb, void * data,
 				      int silent)
@@ -404,11 +422,9 @@ struct super_block * ext2_read_super (struct super_block * sb, void * data,
 	 * This is important for devices that have a hardware
 	 * sectorsize that is larger than the default.
 	 */
-	blocksize = get_hardblocksize(dev);
-	if( blocksize == 0 || blocksize < BLOCK_SIZE )
-	  {
+	blocksize = get_hardsect_size(dev);
+	if(blocksize < BLOCK_SIZE )
 	    blocksize = BLOCK_SIZE;
-	  }
 
 	sb->u.ext2_sb.s_mount_opt = 0;
 	if (!parse_options ((char *) data, &sb_block, &resuid, &resgid,
@@ -475,6 +491,9 @@ struct super_block * ext2_read_super (struct super_block * sb, void * data,
 	sb->s_blocksize_bits =
 		le32_to_cpu(EXT2_SB(sb)->s_es->s_log_block_size) + 10;
 	sb->s_blocksize = 1 << sb->s_blocksize_bits;
+
+	sb->s_maxbytes = ext2_max_size(sb->s_blocksize_bits);
+
 	if (sb->s_blocksize != BLOCK_SIZE &&
 	    (sb->s_blocksize == 1024 || sb->s_blocksize == 2048 ||
 	     sb->s_blocksize == 4096)) {
@@ -482,11 +501,9 @@ struct super_block * ext2_read_super (struct super_block * sb, void * data,
 		 * Make sure the blocksize for the filesystem is larger
 		 * than the hardware sectorsize for the machine.
 		 */
-		hblock = get_hardblocksize(dev);
-		if(    (hblock != 0)
-		    && (sb->s_blocksize < hblock) )
-		{
-			printk("EXT2-fs: blocksize too small for device.\n");
+		hblock = get_hardsect_size(dev);
+		if (sb->s_blocksize < hblock) {
+			printk(KERN_ERR "EXT2-fs: blocksize too small for device.\n");
 			goto failed_mount;
 		}
 

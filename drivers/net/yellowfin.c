@@ -386,7 +386,7 @@ static int __devinit yellowfin_init_one(struct pci_dev *pdev,
 	struct yellowfin_private *np;
 	int irq;
 	int chip_idx = ent->driver_data;
-	static int find_cnt = 0;
+	static int find_cnt;
 	long ioaddr, real_ioaddr;
 	int i, option = find_cnt < MAX_UNITS ? options[find_cnt] : 0;
 	int drv_flags = pci_id_tbl[chip_idx].drv_flags;

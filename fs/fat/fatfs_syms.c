@@ -14,7 +14,6 @@
 #include <linux/fat_cvf.h>
 
 #include "msbuffer.h"
-#include "tables.h"
 
 EXPORT_SYMBOL(fat_new_dir);
 EXPORT_SYMBOL(fat_get_block);

@@ -3,18 +3,21 @@ IBM PCI Pit/Pit-Phy/Olympic CHIPSET BASED TOKEN RING CARDS README
 
 Release 0.2.0 - Release    
 	June 8th 1999 Peter De Schrijver & Mike Phillips
-
+Release 0.9.C - Release
+	April 18th 2001 Mike Phillips
 
 Thanks:
 Erik De Cock, Adrian Bridgett and Frank Fiene for their 
-patience and testing.  
-Paul Norton without whose tr.c code we would have had
-a lot more work to do.
+patience and testing.
+Donald Champion for the cardbus support
+Kyle Lucke for the dma api changes.   
+Jonathon Bitner for hardware support. 
+Everybody on linux-tr for their continued support.  
  
 Options:
 
-The driver accepts three options: ringspeed, pkt_buf_sz, and  
-message_level.
+The driver accepts four options: ringspeed, pkt_buf_sz,  
+message_level and network_monitor.
 
 These options can be specified differently for each card found. 
 
@@ -40,6 +43,17 @@ which only displays start-up and critical messages.  Presently any non-zero
 value will display all soft messages as well.  NB This does not turn 
 debugging messages on, that must be done by modified the source code.
 
+network_monitor: Any non-zero value will provide a quasi network monitoring 
+mode.  All unexpected MAC frames (beaconing etc.) will be received
+by the driver and the source and destination addresses printed. 
+Also an entry will be added in  /proc/net called olympic_tr%d, where tr%d
+is the registered device name, i.e tr0, tr1, etc. This displays low
+level information about the configuration of the ring and the adapter.
+This feature has been designed for network administrators to assist in 
+the diagnosis of network / ring problems. (This used to OLYMPIC_NETWORK_MONITOR,
+but has now changed to allow each adapter to be configured differently and
+to alleviate the necessity to re-compile olympic to turn the option on).
+
 Multi-card:
 
 The driver will detect multiple cards and will work with shared interrupts,
@@ -60,16 +74,6 @@ necessary for the tx sk_buff's.  Remember this is per card, so if you are
 building routers, gateway's etc, you could start to use a lot of memory
 real fast.
 
-Network Monitor Mode:
-
-By modifying the #define OLYMPIC_NETWORK_MONITOR from 0 to 1 in the 
-source code the driver will implement a quasi network monitoring 
-mode.  All unexpected MAC frames (beaconing etc.) will be received
-by the driver and the source and destination addresses printed. 
-Also an entry will be added in  /proc/net called olympic_tr. This 
-displays low level information about the configuration of the ring and
-the adapter. This feature has been designed for network administrators
-to assist in the diagnosis of network / ring problems.
 
 6/8/99 Peter De Schrijver and Mike Phillips
 

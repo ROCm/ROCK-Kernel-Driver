@@ -961,9 +961,9 @@ OLYMPIC NETWORK DRIVER
 P:	Peter De Shrijver
 M:	p2@ace.ulyssis.sutdent.kuleuven.ac.be	
 P:	Mike Phillips
-M:	phillim@amtrak.com
+M:	mikep@linuxtr.net 
 L:	linux-net@vger.kernel.org
-L:	linux-tr@emissary.aus-etc.com
+L:	linux-tr@linuxtr.net
 W:	http://www.linuxtr.net
 S:	Maintained
 

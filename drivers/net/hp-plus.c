@@ -18,7 +18,7 @@
 	programming information.
 */
 
-static const char *version =
+static const char version[] =
 "hp-plus.c:v1.10 9/24/94 Donald Becker (becker@cesdis.gsfc.nasa.gov)\n";
 
 #include <linux/module.h>
@@ -141,7 +141,7 @@ static int __init hpp_probe1(struct net_device *dev, int ioaddr)
 {
 	int i, retval;
 	unsigned char checksum = 0;
-	const char *name = "HP-PC-LAN+";
+	const char name[] = "HP-PC-LAN+";
 	int mem_start;
 	static unsigned version_printed;
 

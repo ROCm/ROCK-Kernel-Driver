@@ -530,8 +530,6 @@ static int bpq_new_device(struct net_device *dev)
                 return -EIO;
         }
 
-	dev_init_buffers(dev);
-
 	dev->hard_start_xmit = bpq_xmit;
 	dev->open	     = bpq_open;
 	dev->stop	     = bpq_close;

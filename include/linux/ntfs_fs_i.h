@@ -60,24 +60,23 @@ typedef unsigned long long ntfs_time64_t;
 typedef unsigned int ntfs_cluster_t;
 #endif
 
-/* Definition of NTFS in-memory inode structure */
+/* Definition of the NTFS in-memory inode structure. */
 struct ntfs_inode_info{
 	unsigned long mmu_private;
 	struct ntfs_sb_info *vol;
-	int i_number;                /* should be really 48 bits */
-	unsigned sequence_number;
-	unsigned char* attr;         /* array of the attributes */
-	int attr_count;              /* size of attrs[] */
+	int i_number;                /* Should be really 48 bits. */
+	__u16 sequence_number;	     /* The current sequence number. */
+	unsigned char* attr;         /* Array of the attributes. */
+	int attr_count;              /* Size of attrs[]. */
 	struct ntfs_attribute *attrs;
-	int record_count;            /* size of records[] */
-	/* array of the record numbers of the MFT 
-	   whose attributes have been inserted in the inode */
-	int *records;
-	union{
-		struct{
+	int record_count;            /* Size of records[]. */
+	int *records; /* Array of the record numbers of the $Mft whose 
+		       * attributes have been inserted in the inode. */
+	union {
+		struct {
 			int recordsize;
 			int clusters_per_record;
-		}index;
+		} index;
 	} u;	
 };
 

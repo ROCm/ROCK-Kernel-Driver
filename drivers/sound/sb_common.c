@@ -1227,7 +1227,7 @@ int probe_sbmpu(struct address_info *hw_config, struct module *owner)
 		if (!ess_midi_init(devc, hw_config))
 			return 0;
 		hw_config->name = "ESS1xxx MPU";
-		devc->midi_irq_cookie = -1;
+		devc->midi_irq_cookie = NULL;
 		if (!probe_mpu401(hw_config))
 			return 0;
 		attach_mpu401(hw_config, owner);

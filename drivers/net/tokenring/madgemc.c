@@ -61,7 +61,7 @@ struct madgemc_card {
 
 	struct madgemc_card *next;
 };
-static struct madgemc_card *madgemc_card_list = NULL;
+static struct madgemc_card *madgemc_card_list;
 
 
 int madgemc_probe(void);
@@ -155,7 +155,7 @@ static void madgemc_sifwritew(struct net_device *dev, unsigned short val, unsign
 
 int __init madgemc_probe(void)
 {	
-	static int versionprinted = 0;
+	static int versionprinted;
 	struct net_device *dev;
 	struct net_local *tp;
 	struct madgemc_card *card;
@@ -525,7 +525,7 @@ unsigned short madgemc_setnselout_pins(struct net_device *dev)
  */
 static void madgemc_setregpage(struct net_device *dev, int page)
 {	
-	static int reg1 = 0;
+	static int reg1;
 
 	reg1 = inb(dev->base_addr + MC_CONTROL_REG1);
 	if ((page == 0) && (reg1 & MC_CONTROL_REG1_SRSX)) {

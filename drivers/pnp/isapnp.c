@@ -55,7 +55,7 @@ struct resource *pnpwrp_res;
 struct resource *isapnp_rdp_res;
 
 int isapnp_disable;			/* Disable ISA PnP */
-int isapnp_rdp;			/* Read Data Port */
+int isapnp_rdp;				/* Read Data Port */
 int isapnp_reset = 1;			/* reset all PnP cards (deactivate) */
 int isapnp_skip_pci_scan;		/* skip PCI resource scanning */
 int isapnp_verbose = 1;			/* verbose mode */
@@ -993,10 +993,15 @@ static int __init isapnp_build_device_list(void)
 			header[4], header[5], header[6], header[7], header[8]);
 		printk("checksum = 0x%x\n", checksum);
 #endif
-		if (checksum == 0x00 || checksum != header[8])	/* not valid CSN */
+		/* Don't be strict on the checksum, here !
+                   e.g. 'SCM SwapBox Plug and Play' has header[8]==0 (should be: b7)*/
+		if (header[8] == 0)
+			;
+		else if (checksum == 0x00 || checksum != header[8])	/* not valid CSN */
 			continue;
 		if ((card = isapnp_alloc(sizeof(struct pci_bus))) == NULL)
 			continue;
+
 		card->number = csn;
 		card->vendor = (header[1] << 8) | header[0];
 		card->device = (header[3] << 8) | header[2];
@@ -2197,7 +2202,7 @@ int __init isapnp_init(void)
 	 *	so let the user know where.
 	 */
 	 
-	printk("isapnp: Scanning for Pnp cards...\n");
+	printk("isapnp: Scanning for PnP cards...\n");
 	if (isapnp_rdp >= 0x203 && isapnp_rdp <= 0x3ff) {
 		isapnp_rdp |= 3;
 		isapnp_rdp_res=request_region(isapnp_rdp, 1, "isapnp read");
@@ -2258,5 +2263,86 @@ void cleanup_module(void)
 	if (isapnp_detected)
 		isapnp_free_all_resources();
 }
+
+#else
+
+/* format is: noisapnp */
+
+static int __init isapnp_setup_disable(char *str)
+{
+	isapnp_disable = 1;
+	return 1;
+}
+
+__setup("noisapnp", isapnp_setup_disable);
+
+/* format is: isapnp=rdp,reset,skip_pci_scan,verbose */
+
+static int __init isapnp_setup_isapnp(char *str)
+{
+	(void)((get_option(&str,&isapnp_rdp) == 2) &&
+	       (get_option(&str,&isapnp_reset) == 2) &&
+	       (get_option(&str,&isapnp_skip_pci_scan) == 2) &&
+	       (get_option(&str,&isapnp_verbose) == 2));
+	return 1;
+}
+
+__setup("isapnp=", isapnp_setup_isapnp);
+
+/* format is: isapnp_reserve_irq=irq1[,irq2] .... */
+
+static int __init isapnp_setup_reserve_irq(char *str)
+{
+	int i;
+
+	for (i = 0; i < 16; i++)
+		if (get_option(&str,&isapnp_reserve_irq[i]) != 2)
+			break;
+	return 1;
+}
+
+__setup("isapnp_reserve_irq=", isapnp_setup_reserve_irq);
+
+/* format is: isapnp_reserve_dma=dma1[,dma2] .... */
+
+static int __init isapnp_setup_reserve_dma(char *str)
+{
+	int i;
+
+	for (i = 0; i < 8; i++)
+		if (get_option(&str,&isapnp_reserve_dma[i]) != 2)
+			break;
+	return 1;
+}
+
+__setup("isapnp_reserve_dma=", isapnp_setup_reserve_dma);
+
+/* format is: isapnp_reserve_io=io1,size1[,io2,size2] .... */
+
+static int __init isapnp_setup_reserve_io(char *str)
+{
+	int i;
+
+	for (i = 0; i < 16; i++)
+		if (get_option(&str,&isapnp_reserve_io[i]) != 2)
+			break;
+	return 1;
+}
+
+__setup("isapnp_reserve_io=", isapnp_setup_reserve_io);
+
+/* format is: isapnp_reserve_mem=mem1,size1[,mem2,size2] .... */
+
+static int __init isapnp_setup_reserve_mem(char *str)
+{
+	int i;
+
+	for (i = 0; i < 16; i++)
+		if (get_option(&str,&isapnp_reserve_mem[i]) != 2)
+			break;
+	return 1;
+}
+
+__setup("isapnp_reserve_mem=", isapnp_setup_reserve_mem);
 
 #endif

@@ -107,7 +107,7 @@ static int go_tx(struct net_device *dev);
 
 void __init arcnet_init(void)
 {
-	static int arcnet_inited = 0;
+	static int arcnet_inited;
 	int count;
 
 	if (arcnet_inited++)
@@ -361,8 +361,6 @@ void arcdev_setup(struct net_device *dev)
 	dev->get_stats = arcnet_get_stats;
 	dev->hard_header = arcnet_header;
 	dev->rebuild_header = arcnet_rebuild_header;
-
-	dev_init_buffers(dev);
 }
 
 
@@ -528,7 +526,7 @@ static int arcnet_rebuild_header(struct sk_buff *skb)
 	struct arcnet_local *lp = (struct arcnet_local *) dev->priv;
 	int status = 0;		/* default is failure */
 	unsigned short type;
-	uint8_t daddr;
+	uint8_t daddr=0;
 
 	if (skb->nh.raw - skb->mac.raw != 2) {
 		BUGMSG(D_NORMAL,

@@ -794,8 +794,6 @@ static void ipip_tunnel_init_gen(struct net_device *dev)
 	dev->do_ioctl		= ipip_tunnel_ioctl;
 	dev->change_mtu		= ipip_tunnel_change_mtu;
 
-	dev_init_buffers(dev);
-
 	dev->type		= ARPHRD_TUNNEL;
 	dev->hard_header_len 	= LL_MAX_HEADER + sizeof(struct iphdr);
 	dev->mtu		= 1500 - sizeof(struct iphdr);

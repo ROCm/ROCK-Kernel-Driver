@@ -1395,8 +1395,8 @@ static int rose_get_info(char *buffer, char **start, off_t offset, int length)
 } 
 
 static struct net_proto_family rose_family_ops = {
-	PF_ROSE,
-	rose_create
+	family:		PF_ROSE,
+	create:		rose_create,
 };
 
 static struct proto_ops SOCKOPS_WRAPPED(rose_proto_ops) = {
@@ -1424,17 +1424,23 @@ static struct proto_ops SOCKOPS_WRAPPED(rose_proto_ops) = {
 SOCKOPS_WRAP(rose_proto, PF_ROSE);
 
 static struct notifier_block rose_dev_notifier = {
-	rose_device_event,
-	0
+	notifier_call:	rose_device_event,
 };
 
 static struct net_device *dev_rose;
+
+static const char banner[] = KERN_INFO "F6FBB/G4KLX ROSE for Linux. Version 0.62 for AX25.037 Linux 2.4\n";
 
 static int __init rose_proto_init(void)
 {
 	int i;
 
 	rose_callsign = null_ax25_address;
+
+	if (rose_ndevs > 0x7FFFFFFF/sizeof(struct net_device)) {
+		printk(KERN_ERR "ROSE: rose_proto_init - rose_ndevs parameter to large\n");
+		return -1;
+	}
 
 	if ((dev_rose = kmalloc(rose_ndevs * sizeof(struct net_device), GFP_KERNEL)) == NULL) {
 		printk(KERN_ERR "ROSE: rose_proto_init - unable to allocate device structure\n");
@@ -1451,7 +1457,7 @@ static int __init rose_proto_init(void)
 
 	sock_register(&rose_family_ops);
 	register_netdevice_notifier(&rose_dev_notifier);
-	printk(KERN_INFO "F6FBB/G4KLX ROSE for Linux. Version 0.62 for AX25.037 Linux 2.4\n");
+	printk(banner);
 
 	ax25_protocol_register(AX25_P_ROSE, rose_route_frame);
 	ax25_linkfail_register(rose_link_failed);

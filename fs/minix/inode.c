@@ -21,6 +21,7 @@
 #include <linux/init.h>
 #include <linux/smp_lock.h>
 #include <linux/highuid.h>
+#include <linux/blkdev.h>
 
 #include <asm/system.h>
 #include <asm/bitops.h>
@@ -179,7 +180,7 @@ static struct super_block *minix_read_super(struct super_block *s, void *data,
 	const char * errmsg;
 	struct inode *root_inode;
 	unsigned int hblock;
-	
+
 	/* N.B. These should be compile-time tests.
 	   Unfortunately that is impossible. */
 	if (32 != sizeof (struct minix_inode))
@@ -187,8 +188,8 @@ static struct super_block *minix_read_super(struct super_block *s, void *data,
 	if (64 != sizeof(struct minix2_inode))
 		panic("bad V2 i-node size");
 
-	hblock = get_hardblocksize(dev);
-	if (hblock && hblock > BLOCK_SIZE)
+	hblock = get_hardsect_size(dev);
+	if (hblock > BLOCK_SIZE)
 		goto out_bad_hblock;
 
 	set_blocksize(dev, BLOCK_SIZE);
@@ -259,8 +260,6 @@ static struct super_block *minix_read_super(struct super_block *s, void *data,
 
 	minix_set_bit(0,s->u.minix_sb.s_imap[0]->b_data);
 	minix_set_bit(0,s->u.minix_sb.s_zmap[0]->b_data);
-
-	s->s_maxbytes = MAX_NON_LFS;
 
 	/* set up enough so that it can read an inode */
 	s->s_op = &minix_sops;

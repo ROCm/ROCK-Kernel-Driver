@@ -555,25 +555,6 @@ struct buffer_head * get_hash_table(kdev_t dev, int block, int size)
 	return bh;
 }
 
-unsigned int get_hardblocksize(kdev_t dev)
-{
-	/*
-	 * Get the hard sector size for the given device.  If we don't know
-	 * what it is, return 0.
-	 */
-	if (hardsect_size[MAJOR(dev)] != NULL) {
-		int blksize = hardsect_size[MAJOR(dev)][MINOR(dev)];
-		if (blksize != 0)
-			return blksize;
-	}
-
-	/*
-	 * We don't know what the hardware sector size for this device is.
-	 * Return 0 indicating that we don't know.
-	 */
-	return 0;
-}
-
 void buffer_insert_inode_queue(struct buffer_head *bh, struct inode *inode)
 {
 	spin_lock(&lru_list_lock);

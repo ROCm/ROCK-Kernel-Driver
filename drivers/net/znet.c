@@ -1,6 +1,6 @@
 /* znet.c: An Zenith Z-Note ethernet driver for linux. */
 
-static const char *version = "znet.c:v1.02 9/23/94 becker@cesdis.gsfc.nasa.gov\n";
+static const char version[] = "znet.c:v1.02 9/23/94 becker@cesdis.gsfc.nasa.gov\n";
 
 /*
 	Written by Donald Becker.

@@ -51,7 +51,8 @@ static inline void eth_copy_and_sum (struct sk_buff *dest, unsigned char *src, i
  * @addr: Pointer to a six-byte array containing the Ethernet address
  *
  * Check that the Ethernet address (MAC) is not 00:00:00:00:00:00, is not
- * a multicast address, and is not FF:FF:FF:FF:FF:FF.
+ * a multicast address, and is not FF:FF:FF:FF:FF:FF.  The multicast
+ * and FF:FF:... tests are combined into the single test "!(addr[0]&1)".
  *
  * Return true if the address is valid.
  */

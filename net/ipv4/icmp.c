@@ -3,7 +3,7 @@
  *	
  *		Alan Cox, <alan@redhat.com>
  *
- *	Version: $Id: icmp.c,v 1.73 2000/12/13 18:31:48 davem Exp $
+ *	Version: $Id: icmp.c,v 1.74 2001/04/16 23:58:51 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License
@@ -668,7 +668,7 @@ static void icmp_unreach(struct sk_buff *skb)
 
 		ipprot = nextip;
   	}
-out:
+out:;
 }
 
 
@@ -879,7 +879,7 @@ int icmp_rcv(struct sk_buff *skb)
 	case CHECKSUM_NONE:
 		if ((u16)csum_fold(skb_checksum(skb, 0, skb->len, 0)))
 			goto error;
-	default:
+	default:;
 	}
 
 	if (!pskb_pull(skb, sizeof(struct icmphdr)))

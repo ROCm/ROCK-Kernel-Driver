@@ -1292,8 +1292,6 @@ static int hdlc_fr_pvc(hdlc_device *hdlc, int dlci)
 		pvc->netdev.tx_queue_len = 0;
 		pvc->netdev.flags = IFF_POINTOPOINT;
 
-		dev_init_buffers(&pvc->netdev);
-
 		pvc->master = hdlc;
 		*(u16*)pvc->netdev.dev_addr = htons(dlci);
 		dlci_to_q922(pvc->netdev.broadcast, dlci);
@@ -1393,7 +1391,6 @@ static int hdlc_init(struct net_device *dev)
 
 	dev->flags = IFF_POINTOPOINT | IFF_NOARP;
 
-	dev_init_buffers(dev);
 	return 0;
 }
 
@@ -1423,7 +1420,6 @@ int register_hdlc_device(hdlc_device *hdlc)
 	if (result != 0)
 		return -EIO;
 
-	dev_init_buffers(dev);
 	MOD_INC_USE_COUNT;
 	return 0;
 }

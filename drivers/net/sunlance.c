@@ -66,10 +66,10 @@
 
 #undef DEBUG_DRIVER
 
-static char *version =
+static char version[] =
 	"sunlance.c:v2.00 11/Sep/99 Miguel de Icaza (miguel@nuclecu.unam.mx)\n";
 
-static char *lancestr = "LANCE";
+static char lancestr[] = "LANCE";
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -291,7 +291,7 @@ int sparc_lance_debug = 2;
 
 #define LANCE_ADDR(x) ((long)(x) & ~0xff000000)
 
-static struct lance_private *root_lance_dev = NULL;
+static struct lance_private *root_lance_dev;
 
 /* Load the CSR registers */
 static void load_csrs(struct lance_private *lp)
@@ -1307,7 +1307,7 @@ static int __init sparc_lance_init(struct net_device *dev,
 				   struct sbus_dma *ledma,
 				   struct sbus_dev *lebuffer)
 {
-	static unsigned version_printed = 0;
+	static unsigned version_printed;
 	struct lance_private *lp = NULL;
 	int    i;
 
@@ -1518,7 +1518,7 @@ static inline struct sbus_dma *find_ledma(struct sbus_dev *sdev)
 static int __init sparc_lance_probe(void)
 {
 	static struct sbus_dev sdev;
-	static int called = 0;
+	static int called;
 
 	root_lance_dev = NULL;
 
@@ -1545,7 +1545,7 @@ static int __init sparc_lance_probe(void)
 	struct sbus_dev *sdev = 0;
 	struct net_device *dev = NULL;
 	struct sbus_dma *ledma = 0;
-	static int called = 0;
+	static int called;
 	int cards = 0, v;
 
 	root_lance_dev = NULL;

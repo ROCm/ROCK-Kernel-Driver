@@ -1,4 +1,4 @@
-/* $Id: isdn_common.c,v 1.114.6.8 2001/02/16 16:43:22 kai Exp $
+/* $Id: isdn_common.c,v 1.114.6.10 2001/04/08 19:14:00 kai Exp $
 
  * Linux ISDN subsystem, common used functions (linklevel).
  *
@@ -51,7 +51,7 @@
 
 isdn_dev *dev;
 
-static char *isdn_revision = "$Revision: 1.114.6.8 $";
+static char *isdn_revision = "$Revision: 1.114.6.10 $";
 
 extern char *isdn_net_revision;
 extern char *isdn_tty_revision;
@@ -260,7 +260,6 @@ isdn_dc2minor(int di, int ch)
 static int isdn_timer_cnt1 = 0;
 static int isdn_timer_cnt2 = 0;
 static int isdn_timer_cnt3 = 0;
-static int isdn_timer_cnt4 = 0;
 
 static void
 isdn_timer_funct(ulong dummy)
@@ -284,15 +283,10 @@ isdn_timer_funct(ulong dummy)
 			isdn_timer_cnt2 = 0;
 			if (tf & ISDN_TIMER_NETHANGUP)
 				isdn_net_autohup();
-			if (++isdn_timer_cnt3 > ISDN_TIMER_RINGING) {
+			if (++isdn_timer_cnt3 >= ISDN_TIMER_RINGING) {
 				isdn_timer_cnt3 = 0;
 				if (tf & ISDN_TIMER_MODEMRING)
 					isdn_tty_modem_ring();
-			}
-			if (++isdn_timer_cnt4 > ISDN_TIMER_KEEPINT) {
-				isdn_timer_cnt4 = 0;
-				if (tf & ISDN_TIMER_KEEPALIVE)
-					isdn_net_slarp_out();
 			}
 			if (tf & ISDN_TIMER_CARRIER)
 				isdn_tty_carrier_timeout();
@@ -1120,7 +1114,7 @@ isdn_write(struct file *file, const char *buf, size_t count, loff_t * off)
 		return -ENODEV;
 
 	lock_kernel();
- 	if (minor <= ISDN_MINOR_BMAX) {
+	if (minor <= ISDN_MINOR_BMAX) {
 		printk(KERN_WARNING "isdn_write minor %d obsolete!\n", minor);
 		drvidx = isdn_minor2drv(minor);
 		if (drvidx < 0) {

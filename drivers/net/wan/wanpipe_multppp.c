@@ -720,7 +720,6 @@ static int if_init (netdevice_t* dev)
    
 	/* Initialize socket buffers */
       #if defined(LINUX_2_1) || defined(LINUX_2_4)
-	dev_init_buffers(dev);
       #else
         for (i = 0; i < DEV_NUMBUFFS; ++i)
                 skb_queue_head_init(&dev->buffs[i]);

@@ -191,7 +191,7 @@ sb1000_probe(struct net_device *dev)
 		ioaddr[0]=idev->resource[0].start;
 		ioaddr[1]=idev->resource[1].start;
 		
-		irq = idev->irq;
+		irq = idev->irq_resource[0].start;
 
 		/* check I/O base and IRQ */
 		if (dev->base_addr != 0 && dev->base_addr != ioaddr[0])

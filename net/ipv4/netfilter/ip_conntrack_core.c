@@ -1081,10 +1081,14 @@ int __init ip_conntrack_init(void)
 	int ret;
 
 	/* Idea from tcp.c: use 1/16384 of memory.  On i386: 32MB
-	 * machine has 256 buckets.  1GB machine has 8192 buckets. */
+	 * machine has 256 buckets.  >= 1GB machines have 8192 buckets. */
 	ip_conntrack_htable_size
 		= (((num_physpages << PAGE_SHIFT) / 16384)
 		   / sizeof(struct list_head));
+	if (num_physpages > (1024 * 1024 * 1024 / PAGE_SIZE))
+		ip_conntrack_htable_size = 8192;
+	if (ip_conntrack_htable_size < 16)
+		ip_conntrack_htable_size = 16;
 	ip_conntrack_max = 8 * ip_conntrack_htable_size;
 
 	printk("ip_conntrack (%u buckets, %d max)\n",

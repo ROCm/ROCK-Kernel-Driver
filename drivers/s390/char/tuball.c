@@ -14,7 +14,7 @@
 #ifndef MODULE
 #include <linux/init.h>
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,0))
-#include "../../../arch/s390/kernel/cpcmd.h"
+#include <asm/cpcmd.h>
 #include <linux/bootmem.h>
 #else
 #include "../../../../arch/s390/kernel/cpcmd.h"

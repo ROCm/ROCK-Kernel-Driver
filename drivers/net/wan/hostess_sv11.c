@@ -347,7 +347,6 @@ static struct sv11_device *sv11_init(int iobase, int irq)
 		d->do_ioctl = hostess_ioctl;
 #ifdef LINUX_21			
 		d->neigh_setup = hostess_neigh_setup_dev;
-		dev_init_buffers(d);
 #else
 		d->init = return_0;
 #endif

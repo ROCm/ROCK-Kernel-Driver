@@ -1,4 +1,4 @@
-/* $Id: pci_schizo.c,v 1.13 2001/03/21 00:29:58 davem Exp $
+/* $Id: pci_schizo.c,v 1.14 2001/04/17 01:19:23 davem Exp $
  * pci_schizo.c: SCHIZO specific PCI controller support.
  *
  * Copyright (C) 2001 David S. Miller (davem@redhat.com)
@@ -716,6 +716,8 @@ static void schizo_ue_intr(int irq, void *dev_id, struct pt_regs *regs)
 	error_bits = afsr &
 		(SCHIZO_UEAFSR_PPIO | SCHIZO_UEAFSR_PDRD | SCHIZO_UEAFSR_PDWR |
 		 SCHIZO_UEAFSR_SPIO | SCHIZO_UEAFSR_SDMA);
+	if (!error_bits)
+		return;
 	schizo_write(afsr_reg, error_bits);
 
 	/* Log the error. */
@@ -802,6 +804,8 @@ static void schizo_ce_intr(int irq, void *dev_id, struct pt_regs *regs)
 	error_bits = afsr &
 		(SCHIZO_CEAFSR_PPIO | SCHIZO_CEAFSR_PDRD | SCHIZO_CEAFSR_PDWR |
 		 SCHIZO_CEAFSR_SPIO | SCHIZO_CEAFSR_SDMA);
+	if (!error_bits)
+		return;
 	schizo_write(afsr_reg, error_bits);
 
 	/* Log the error. */
@@ -901,6 +905,8 @@ static void schizo_pcierr_intr(int irq, void *dev_id, struct pt_regs *regs)
 		 SCHIZO_PCIAFSR_SMA | SCHIZO_PCIAFSR_STA |
 		 SCHIZO_PCIAFSR_SRTRY | SCHIZO_PCIAFSR_SPERR |
 		 SCHIZO_PCIAFSR_STTO | SCHIZO_PCIAFSR_SUNUS);
+	if (!error_bits)
+		return;
 	schizo_write(afsr_reg, error_bits);
 
 	/* Log the error. */

@@ -575,8 +575,6 @@ int dlci_init(struct net_device *dev)
 	dev->addr_len		= sizeof(short);
 	memset(dev->dev_addr, 0, sizeof(dev->dev_addr));
 
-	dev_init_buffers(dev);
-	
 	return(0);
 }
 

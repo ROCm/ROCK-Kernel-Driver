@@ -210,7 +210,7 @@ struct el3_private {
 /* Set iff a MII transceiver on any interface requires mdio preamble.
    This only set with the original DP83840 on older 3c905 boards, so the extra
    code size of a per-interface flag is not worthwhile. */
-static char mii_preamble_required = 0;
+static char mii_preamble_required;
 
 #ifdef PCMCIA_DEBUG
 static int pc_debug = PCMCIA_DEBUG;
@@ -253,7 +253,7 @@ static dev_info_t dev_info = "3c574_cs";
 static dev_link_t *tc574_attach(void);
 static void tc574_detach(dev_link_t *);
 
-static dev_link_t *dev_list = NULL;
+static dev_link_t *dev_list;
 
 static void flush_stale_links(void)
 {

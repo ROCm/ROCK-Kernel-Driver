@@ -52,6 +52,7 @@
 #include <asm/io.h>
 #include <asm/segment.h>
 #include <asm/dma.h>
+#include <asm/mca_dma.h>
 #include <asm/uaccess.h>
 
 #define PS2ESDI_IRQ 14
@@ -657,33 +658,23 @@ static int ps2esdi_out_cmd_blk(u_short * cmd_blk)
 /* prepare for dma - do all the necessary setup */
 static void ps2esdi_prep_dma(char *buffer, u_short length, u_char dma_xmode)
 {
-	u_int tc;
-	
-	buffer=(char *)virt_to_bus(buffer);
-
+	unsigned long flags;
 #if 0
 	printk("ps2esdi: b_wait: %p\n", &CURRENT->bh->b_wait);
 #endif
-	cli();
+	flags = claim_dma_lock();
 
-	outb(dma_arb_level | DMA_MASK_CHAN, PORT_DMA_FN);
+	mca_disable_dma(dma_arb_level);
 
-	outb(dma_arb_level | DMA_WRITE_ADDR, PORT_DMA_FN);
-	outb((u_int) buffer & (u_int) 0xff, PORT_DMA_EX);
-	outb(((u_int) buffer >> 8) & (u_int) 0xff, PORT_DMA_EX);
-	outb(((u_int) buffer >> 16) & (u_int) 0xff, PORT_DMA_EX);
+	mca_set_dma_addr(dma_arb_level, virt_to_bus(buffer));
 
-	outb(dma_arb_level | DMA_WRITE_TC, PORT_DMA_FN);
-	tc = (length * SECT_SIZE / 2) - 1;
-	outb(tc & 0xff, PORT_DMA_EX);
-	outb((tc >> 8) & 0xff, PORT_DMA_EX);
+	mca_set_dma_count(dma_arb_level, length * 512 / 2);
 
-	outb(dma_arb_level | DMA_WRITE_MODE, PORT_DMA_FN);
-	outb(dma_xmode, PORT_DMA_EX);
+	mca_set_dma_mode(dma_arb_level, dma_xmode);
 
-	outb(dma_arb_level | DMA_UNMASK_CHAN, PORT_DMA_FN);
+	mca_enable_dma(dma_arb_level);
 
-	sti();
+	release_dma_lock(flags);
 
 }				/* prepare for dma */
 
@@ -861,7 +852,9 @@ static void ps2esdi_normal_interrupt_handler(u_int int_ret_code)
 	switch (int_ret_code & 0x0f) {
 	case INT_TRANSFER_REQ:
 		ps2esdi_prep_dma(CURRENT->buffer, CURRENT->current_nr_sectors,
-		    (CURRENT->cmd == READ) ? DMA_READ_16 : DMA_WRITE_16);
+		    (CURRENT->cmd == READ)
+		    ? MCA_DMA_MODE_16 | MCA_DMA_MODE_WRITE | MCA_DMA_MODE_XFER
+		    : MCA_DMA_MODE_16 | MCA_DMA_MODE_READ);
 		outb(CTRL_ENABLE_DMA | CTRL_ENABLE_INTR, ESDI_CONTROL);
 		ending = -1;
 		break;

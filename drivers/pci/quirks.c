@@ -248,6 +248,20 @@ static void __init quirk_vt82c598_id(struct pci_dev *dev)
 }
 
 /*
+ * CardBus controllers have a legacy base address that enables them
+ * to respond as i82365 pcmcia controllers.  We don't want them to
+ * do this even if the Linux CardBus driver is not loaded, because
+ * the Linux i82365 driver does not (and should not) handle CardBus.
+ */
+static void __init quirk_cardbus_legacy(struct pci_dev *dev)
+{
+	if ((PCI_CLASS_BRIDGE_CARDBUS << 8) ^ dev->class)
+		return;
+	pci_write_config_dword(dev, PCI_CB_LEGACY_MODE_BASE, 0);
+}
+
+
+/*
  *  The main table of quirks.
  */
 
@@ -283,6 +297,7 @@ static struct pci_fixup pci_fixups[] __initdata = {
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_AL,	PCI_DEVICE_ID_AL_M7101,		quirk_ali7101_acpi },
  	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82371SB_2,	quirk_piix3_usb },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82371AB_2,	quirk_piix3_usb },
+	{ PCI_FIXUP_FINAL,	PCI_ANY_ID,		PCI_ANY_ID,			quirk_cardbus_legacy },
 	{ 0 }
 };
 

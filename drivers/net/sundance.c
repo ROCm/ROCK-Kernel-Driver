@@ -30,7 +30,7 @@ static const char version2[] =
 static int debug = 1;			/* 1 normal messages, 0 quiet .. 7 verbose. */
 /* Maximum events (Rx packets, etc.) to handle at each interrupt. */
 static int max_interrupt_work = 20;
-static int mtu = 0;
+static int mtu;
 /* Maximum number of multicast addresses to filter (vs. rx-all-multicast).
    Typical is a 64 element hash table based on the Ethernet CRC.  */
 static int multicast_filter_limit = 32;
@@ -39,7 +39,7 @@ static int multicast_filter_limit = 32;
    Setting to > 1518 effectively disables this feature.
    This chip can receive into offset buffers, so the Alpha does not
    need a copy-align. */
-static int rx_copybreak = 0;
+static int rx_copybreak;
 
 /* Used to pass the media type, etc.
    Both 'options[]' and 'full_duplex[]' should exist for driver
@@ -527,7 +527,7 @@ static int eeprom_read(long ioaddr, int location)
 /* Set iff a MII transceiver on any interface requires mdio preamble.
    This only set with older tranceivers, so the extra
    code size of a per-interface flag is not worthwhile. */
-static char mii_preamble_required = 0;
+static char mii_preamble_required;
 
 enum mii_reg_bits {
 	MDIO_ShiftClk=0x0001, MDIO_Data=0x0002, MDIO_EnbOutput=0x0004,

@@ -85,7 +85,7 @@
  *
  */
 
-static const char *version =
+static const char version[] =
     "3c501.c: 2000/02/08 Alan Cox (alan@redhat.com).\n";
 
 /*

@@ -747,8 +747,6 @@ static void ipip6_tunnel_init_gen(struct net_device *dev)
 	dev->do_ioctl		= ipip6_tunnel_ioctl;
 	dev->change_mtu		= ipip6_tunnel_change_mtu;
 
-	dev_init_buffers(dev);
-
 	dev->type		= ARPHRD_SIT;
 	dev->hard_header_len 	= LL_MAX_HEADER + sizeof(struct iphdr);
 	dev->mtu		= 1500 - sizeof(struct iphdr);

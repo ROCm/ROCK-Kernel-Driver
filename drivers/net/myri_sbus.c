@@ -3,7 +3,7 @@
  * Copyright (C) 1996, 1999 David S. Miller (davem@redhat.com)
  */
 
-static char *version =
+static char version[] =
         "myri_sbus.c:v1.9 12/Sep/99 David S. Miller (davem@redhat.com)\n";
 
 #include <linux/module.h>

@@ -152,13 +152,13 @@ typedef struct chdlc_private_area
 	unsigned short timer_int_enabled;
 	char update_comms_stats;		/* updating comms stats */
 
-      #if defined(LINUX_2_1) || defined(LINUX_2_4)
+#if defined(LINUX_2_1) || defined(LINUX_2_4)
 	bh_data_t *bh_head;	  	  /* Circular buffer for chdlc_bh */
 	unsigned long  tq_working;
 	volatile int  bh_write;
 	volatile int  bh_read;
 	atomic_t  bh_buff_used;
-      #endif
+#endif
 	
 	unsigned char interface_down;
 
@@ -568,7 +568,7 @@ int wpc_init (sdla_t* card, wandev_conf_t* conf)
 	}
 
 	if ((card->tty_opt=conf->tty) == WANOPT_YES){
-              #if defined(LINUX_2_4) || defined(LINUX_2_1)	
+#if defined(LINUX_2_4) || defined(LINUX_2_1)	
 		int err;
 		card->tty_minor = conf->tty_minor;
 
@@ -581,11 +581,11 @@ int wpc_init (sdla_t* card, wandev_conf_t* conf)
 		if (err){
 			return err;
 		}
-              #else
+#else
 		printk(KERN_INFO "%s: Error: TTY driver is not supported on 2.0.X kernels!\n",
 				card->devname);	
 		return -EINVAL;  
-              #endif
+#endif
 	}else{
 	
 
@@ -850,7 +850,7 @@ static int new_if (wan_device_t* wandev, netdevice_t* dev, wanif_conf_t* conf)
 			min (conf->slarp_timer, MAX_SLARP_REQ_TIMER) :
 			DEFAULT_SLARP_REQ_TIMER;
 
-	      #ifdef LINUX_2_0
+#ifdef LINUX_2_0
 		if (card->u.c.slarp_timer){
 			printk(KERN_INFO 
 				"%s: Error: Dynamic IP support not available for 2.0.X kernels\n",
@@ -859,7 +859,7 @@ static int new_if (wan_device_t* wandev, netdevice_t* dev, wanif_conf_t* conf)
 						card->devname);
 		}
 		card->u.c.slarp_timer=0;
-	      #endif	
+#endif	
 
 
 		if (conf->hdlc_streaming == WANOPT_YES) {
@@ -891,48 +891,48 @@ static int new_if (wan_device_t* wandev, netdevice_t* dev, wanif_conf_t* conf)
 			} 
 
 		} else if( strcmp(conf->usedby, "API") == 0) {
-                      #if defined(LINUX_2_1) || defined(LINUX_2_4) 
+#if defined(LINUX_2_1) || defined(LINUX_2_4) 
 			card->u.c.usedby = API;
 			printk(KERN_INFO "%s: Running in API mode !\n",
 				wandev->name);
-                      #else
+#else
 			printk(KERN_INFO "%s: API Mode is not supported for kernels lower than 2.2.X!\n",
 				wandev->name);
 			printk(KERN_INFO "%s: Please upgrade to a 2.2.X kernel fro the API support\n",
 				wandev->name);
 	                kfree(chdlc_priv_area);
 			return -EINVAL;
-                      #endif
+#endif
 		}
 	}
 
-      #if defined(LINUX_2_1) || defined(LINUX_2_4)
+#if defined(LINUX_2_1) || defined(LINUX_2_4)
 	/* Tells us that if this interface is a
          * gateway or not */
 	if ((chdlc_priv_area->gateway = conf->gateway) == WANOPT_YES){
 		printk(KERN_INFO "%s: Interface %s is set as a gateway.\n",
 			card->devname,card->u.c.if_name);
 	}
-      #endif
+#endif
 
 	/* Get Multicast Information */
 	chdlc_priv_area->mc = conf->mc;
 
 	/* prepare network device data space for registration */
-      #ifdef LINUX_2_4
+#ifdef LINUX_2_4
 	strcpy(dev->name,card->u.c.if_name);
-      #else
+#else
 	dev->name = (char *)kmalloc(strlen(card->u.c.if_name) + 2, GFP_KERNEL); 
 	sprintf(dev->name, "%s", card->u.c.if_name);
-      #endif
+#endif
 
 	dev->init = &if_init;
 	dev->priv = chdlc_priv_area;
 
 	/* Initialize the polling task routine */
-      #ifndef LINUX_2_4
+#ifndef LINUX_2_4
 	chdlc_priv_area->poll_task.next = NULL;
-      #endif
+#endif
 	chdlc_priv_area->poll_task.sync=0;
 	chdlc_priv_area->poll_task.routine = (void*)(void*)chdlc_poll;
 	chdlc_priv_area->poll_task.data = dev;
@@ -962,9 +962,9 @@ static int if_init (netdevice_t* dev)
 	chdlc_private_area_t* chdlc_priv_area = dev->priv;
 	sdla_t* card = chdlc_priv_area->card;
 	wan_device_t* wandev = &card->wandev;
-      #ifdef LINUX_2_0
+#ifdef LINUX_2_0
 	int i;
-      #endif
+#endif
 
 	/* Initialize device driver entry points */
 	dev->open		= &if_open;
@@ -973,10 +973,10 @@ static int if_init (netdevice_t* dev)
 	dev->rebuild_header	= &if_rebuild_hdr;
 	dev->hard_start_xmit	= &if_send;
 	dev->get_stats		= &if_stats;
-      #ifdef LINUX_2_4
+#ifdef LINUX_2_4
 	dev->tx_timeout		= &if_tx_timeout;
 	dev->watchdog_timeo	= TX_TIMEOUT;
-      #endif
+#endif
 
 	
 	/* Initialize media-specific parameters */
@@ -988,16 +988,16 @@ static int if_init (netdevice_t* dev)
 		dev->flags 	|= IFF_MULTICAST;
 	}
 	
-      #ifdef LINUX_2_0
+#ifdef LINUX_2_0
 	dev->family		= AF_INET;
-      #endif	
+#endif	
 
 	if (chdlc_priv_area->true_if_encoding){
-	      #if defined(LINUX_2_1) || defined(LINUX_2_4)
+#if defined(LINUX_2_1) || defined(LINUX_2_4)
 		dev->type	= ARPHRD_HDLC; /* This breaks the tcpdump */
-	      #else
+#else
 		dev->type	= ARPHRD_PPP;
-	      #endif
+#endif
 	}else{
 		dev->type	= ARPHRD_PPP;
 	}
@@ -1024,13 +1024,12 @@ static int if_init (netdevice_t* dev)
         dev->tx_queue_len = 100;
    
 	/* Initialize socket buffers */
-      #if defined(LINUX_2_1) || defined(LINUX_2_4)
+#if defined(LINUX_2_1) || defined(LINUX_2_4)
 	dev_init_buffers(dev);
-      #else
+#else
         for (i = 0; i < DEV_NUMBUFFS; ++i)
                 skb_queue_head_init(&dev->buffs[i]);
-      #endif
-
+#endif
 	return 0;
 }
 
@@ -1053,13 +1052,13 @@ static int if_open (netdevice_t* dev)
 	if (is_dev_running(dev))
 		return -EBUSY;
 
-      #if defined(LINUX_2_1) || defined(LINUX_2_4)
+#if defined(LINUX_2_1) || defined(LINUX_2_4)
 	/* Initialize the task queue */
 	chdlc_priv_area->tq_working=0;
 
-      #ifndef LINUX_2_4
+#ifndef LINUX_2_4
 	chdlc_priv_area->common.wanpipe_task.next = NULL;
-      #endif
+#endif
 	chdlc_priv_area->common.wanpipe_task.sync = 0;
 	chdlc_priv_area->common.wanpipe_task.routine = (void *)(void *)chdlc_bh;
 	chdlc_priv_area->common.wanpipe_task.data = dev;
@@ -1069,18 +1068,18 @@ static int if_open (netdevice_t* dev)
 	chdlc_priv_area->bh_head = kmalloc((sizeof(bh_data_t)*(MAX_BH_BUFF+1)),GFP_ATOMIC);
 	memset(chdlc_priv_area->bh_head,0,(sizeof(bh_data_t)*(MAX_BH_BUFF+1)));
 	atomic_set(&chdlc_priv_area->bh_buff_used, 0);
-      #endif
+#endif
  
 	do_gettimeofday(&tv);
 	chdlc_priv_area->router_start_time = tv.tv_sec;
 
-      #ifdef LINUX_2_4
+#ifdef LINUX_2_4
 	netif_start_queue(dev);
-      #else
+#else
 	dev->interrupt = 0;
 	dev->tbusy = 0;
 	dev->start = 1;
-      #endif
+#endif
 
 	wanpipe_open(card);
 
@@ -1111,7 +1110,7 @@ static int if_close (netdevice_t* dev)
 	chdlc_private_area_t* chdlc_priv_area = dev->priv;
 	sdla_t* card = chdlc_priv_area->card;
 
-      #if defined(LINUX_2_1) || defined(LINUX_2_4)
+#if defined(LINUX_2_1) || defined(LINUX_2_4)
 
 	if (chdlc_priv_area->bh_head){
 		int i;
@@ -1126,12 +1125,12 @@ static int if_close (netdevice_t* dev)
 		kfree(chdlc_priv_area->bh_head);
 		chdlc_priv_area->bh_head=NULL;
 	}
-      #endif
+#endif
 
 	stop_net_queue(dev);
-      #ifndef LINUX_2_4
+#ifndef LINUX_2_4
 	dev->start=0;
-      #endif
+#endif
 	wanpipe_close(card);
 	del_timer(&chdlc_priv_area->poll_delay_timer);
 	return 0;
@@ -1147,7 +1146,7 @@ static void disable_comm (sdla_t *card)
 		flags->interrupt_info_struct.interrupt_permission = 0;	
 	}
 
-      #if defined(LINUX_2_4) || defined(LINUX_2_1)	
+#if defined(LINUX_2_4) || defined(LINUX_2_1)	
 	if (!tty_init_cnt)
 		return;
 
@@ -1171,7 +1170,7 @@ static void disable_comm (sdla_t *card)
 		state = &rs_table[card->tty_minor];
 		memset(state,0,sizeof(state));
 	}
-      #endif
+#endif
 	return;
 }
 
@@ -1264,9 +1263,9 @@ static int if_send (struct sk_buff* skb, netdevice_t* dev)
 	unsigned long smp_flags;
 	int err=0;
 
-      #ifdef LINUX_2_4
+#ifdef LINUX_2_4
 	netif_stop_queue(dev);
-      #endif
+#endif
 	
 	if (skb == NULL){
 		/* If we get here, some higher layer thinks we've missed an
@@ -1279,7 +1278,7 @@ static int if_send (struct sk_buff* skb, netdevice_t* dev)
 		return 0;
 	}
 
-      #ifndef LINUX_2_4
+#ifndef LINUX_2_4
 	if (dev->tbusy){
 
 		/* If our device stays busy for at least 5 seconds then we will
@@ -1298,7 +1297,7 @@ static int if_send (struct sk_buff* skb, netdevice_t* dev)
 		/* unbusy the interface */
 		clear_bit(0,&dev->tbusy);
 	}
-      #endif
+#endif
 
    	if (ntohs(skb->protocol) != htons(PVC_PROT)){
 
@@ -1380,15 +1379,15 @@ static int if_send (struct sk_buff* skb, netdevice_t* dev)
 			stop_net_queue(dev);
 		}else{
 			++card->wandev.stats.tx_packets;
-		      #if defined(LINUX_2_1) || defined(LINUX_2_4)
+#if defined(LINUX_2_1) || defined(LINUX_2_4)
                         card->wandev.stats.tx_bytes += len;
-		      #endif
+#endif
 			
 			start_net_queue(dev);
 			
-		      #ifdef LINUX_2_4
+#ifdef LINUX_2_4
 		 	dev->trans_start = jiffies;
-		      #endif
+#endif
 		}	
 	}
 
@@ -1420,14 +1419,14 @@ static int chk_bcast_mcast_addr(sdla_t *card, netdevice_t* dev,
 {
 	u32 src_ip_addr;
         u32 broadcast_ip_addr = 0;
-      #if defined(LINUX_2_1) || defined(LINUX_2_4)
+#if defined(LINUX_2_1) || defined(LINUX_2_4)
         struct in_device *in_dev;
-      #endif
+#endif
         /* read the IP source address from the outgoing packet */
         src_ip_addr = *(u32 *)(skb->data + 12);
 
 	/* read the IP broadcast address for the device */
-      #if defined(LINUX_2_1) || defined(LINUX_2_4)
+#if defined(LINUX_2_1) || defined(LINUX_2_4)
         in_dev = dev->ip_ptr;
         if(in_dev != NULL) {
                 struct in_ifaddr *ifa= in_dev->ifa_list;
@@ -1436,9 +1435,9 @@ static int chk_bcast_mcast_addr(sdla_t *card, netdevice_t* dev,
                 else
                         return 0;
         }
-      #else
+#else
         broadcast_ip_addr = dev->pa_brdaddr;
-      #endif
+#endif
  
         /* check if the IP Source Address is a Broadcast address */
         if((dev->flags & IFF_BROADCAST) && (src_ip_addr == broadcast_ip_addr)) {
@@ -2028,7 +2027,7 @@ static void wpc_isr (sdla_t* card)
 		flags->interrupt_info_struct.interrupt_permission &=
 			 ~APP_INT_ON_TX_FRAME;
 
-	      #if defined(LINUX_2_1) || defined(LINUX_2_4)
+#if defined(LINUX_2_1) || defined(LINUX_2_4)
 
 		if (card->tty_opt){
 			wanpipe_tty_trigger_poll(card);
@@ -2043,9 +2042,9 @@ static void wpc_isr (sdla_t* card)
 				wake_net_dev(dev);
 			}
 		}
-	      #else
+#else
 		wake_net_dev(dev);
-	      #endif
+#endif
 		break;
 
 	case COMMAND_COMPLETE_APP_INT_PEND:/* 0x04: cmd cplt */
@@ -2131,7 +2130,7 @@ static void rx_intr (sdla_t* card)
 
 	len  = rxbuf->frame_length;
 
-      #if defined(LINUX_2_4) || defined(LINUX_2_1)	
+#if defined(LINUX_2_4) || defined(LINUX_2_1)	
 	if (card->tty_opt){
 
 		if (rxbuf->error_flag){	
@@ -2149,7 +2148,7 @@ static void rx_intr (sdla_t* card)
 		wanpipe_tty_receive(card,addr,len);
 		goto rx_exit;
 	}
-      #endif
+#endif
 
 	dev = card->wandev.dev;
 
@@ -3266,9 +3265,9 @@ dflt_1:
 		
 			if(!chdlc_send(card, chdlc_priv_area->udp_pkt_data, len)) {
 				++ card->wandev.stats.tx_packets;
-				#if defined(LINUX_2_1) || defined(LINUX_2_4)
+#if defined(LINUX_2_1) || defined(LINUX_2_4)
 				card->wandev.stats.tx_bytes += len;
-				#endif
+#endif
 			}
 		}
 	} else {	
@@ -3804,11 +3803,11 @@ static void trigger_chdlc_poll (netdevice_t *dev)
 	if (test_bit(PERI_CRIT,&card->wandev.critical)){
 		return; 
 	}
-      #ifdef LINUX_2_4
+#ifdef LINUX_2_4
 	schedule_task(&chdlc_priv_area->poll_task);
-      #else
+#else
 	queue_task(&chdlc_priv_area->poll_task, &tq_scheduler);
-      #endif
+#endif
 	return;
 }
 
@@ -3856,11 +3855,11 @@ static void wanpipe_tty_trigger_tx_irq(sdla_t *card)
 
 static void wanpipe_tty_trigger_poll(sdla_t *card)
 {
-      #ifdef LINUX_2_4
+#ifdef LINUX_2_4
 	schedule_task(&card->tty_task_queue);
-      #else
+#else
 	queue_task(&card->tty_task_queue, &tq_scheduler);
-      #endif
+#endif
 }
 
 static void tty_poll_task (void* data)
@@ -3876,10 +3875,10 @@ static void tty_poll_task (void* data)
 		(tty->ldisc.write_wakeup)(tty);
 	}
 	wake_up_interruptible(&tty->write_wait);
-      #if defined(SERIAL_HAVE_POLL_WAIT) || \
+#if defined(SERIAL_HAVE_POLL_WAIT) || \
          (defined LINUX_2_1 && LINUX_VERSION_CODE >= KERNEL_VERSION(2,2,15))
 	wake_up_interruptible(&tty->poll_wait);
-      #endif	
+#endif	
 	return;
 }
 

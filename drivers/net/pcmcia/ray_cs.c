@@ -82,7 +82,7 @@ typedef u_char	mac_addr[ETH_ALEN];	/* Hardware address */
 #define PCMCIA_DEBUG RAYLINK_DEBUG
 #endif
 #ifdef PCMCIA_DEBUG
-static int ray_debug = 0;
+static int ray_debug;
 static int pc_debug = PCMCIA_DEBUG;
 MODULE_PARM(pc_debug, "i");
 /* #define DEBUG(n, args...) if (pc_debug>(n)) printk(KERN_DEBUG args); */
@@ -172,19 +172,19 @@ static int hop_dwell = 128;
 static int beacon_period = 256;
 
 /* power save mode (0 = off, 1 = save power) */
-static int psm = 0;
+static int psm;
 
 /* String for network's Extended Service Set ID. 32 Characters max */
-static char *essid = NULL;
+static char *essid;
 
 /* Default to encapsulation unless translation requested */
 static int translate = 1;
 
 static int country = USA;
 
-static int sniffer = 0;
+static int sniffer;
 
-static int bc = 0;
+static int bc;
 
 /* 48 bit physical card address if overriding card's real physical
  * address is required.  Since IEEE 802.11 addresses are 48 bits

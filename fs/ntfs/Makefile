@@ -4,7 +4,8 @@ O_TARGET := ntfs.o
 
 obj-y   := fs.o sysctl.o support.o util.o inode.o dir.o super.o attr.o
 obj-m   := $(O_TARGET)
-EXTRA_CFLAGS = -DNTFS_IN_LINUX_KERNEL -DNTFS_VERSION=\"000607\"
+# Version format: YYMMDD
+EXTRA_CFLAGS = -DNTFS_IN_LINUX_KERNEL -DNTFS_VERSION=\"010116\"
 
 include $(TOPDIR)/Rules.make
 

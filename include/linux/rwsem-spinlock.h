@@ -54,17 +54,13 @@ struct rw_semaphore {
 #define __RWSEM_DEBUG_MINIT(name)	/* */
 #endif
 
-#define __RWSEM_INITIALIZER(name,count) \
+#define __RWSEM_INITIALIZER(name) \
 { RWSEM_UNLOCKED_VALUE, SPIN_LOCK_UNLOCKED, \
 	__WAIT_QUEUE_HEAD_INITIALIZER((name).wait) \
 	__RWSEM_DEBUG_INIT __RWSEM_DEBUG_MINIT(name) }
 
-#define __DECLARE_RWSEM_GENERIC(name,count) \
-	struct rw_semaphore name = __RWSEM_INITIALIZER(name,count)
-
-#define DECLARE_RWSEM(name) __DECLARE_RWSEM_GENERIC(name,RW_LOCK_BIAS)
-#define DECLARE_RWSEM_READ_LOCKED(name) __DECLARE_RWSEM_GENERIC(name,RW_LOCK_BIAS-1)
-#define DECLARE_RWSEM_WRITE_LOCKED(name) __DECLARE_RWSEM_GENERIC(name,0)
+#define DECLARE_RWSEM(name) \
+	struct rw_semaphore name = __RWSEM_INITIALIZER(name)
 
 static inline void init_rwsem(struct rw_semaphore *sem)
 {

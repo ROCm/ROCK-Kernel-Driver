@@ -707,7 +707,6 @@ iucv_init (net_device * dev)
 	dev->flags = IFF_NOARP | IFF_POINTOPOINT;
 	dev->mtu = 9216;
 
-	dev_init_buffers (dev);
 	pr_debug ("%s: iucv_init  dev@=%p\n", dev->name, dev);
 	return 0;
 }

@@ -27,6 +27,7 @@
 #include <linux/nls.h>
 #include <linux/ctype.h>
 #include <linux/smp_lock.h>
+#include <linux/blkdev.h>
 
 #include <asm/system.h>
 #include <asm/uaccess.h>
@@ -493,21 +494,21 @@ static struct super_block *isofs_read_super(struct super_block *s, void *data,
 	printk("iocharset = %s\n", opt.iocharset);
 #endif
 
- 	/*
- 	 * First of all, get the hardware blocksize for this device.
- 	 * If we don't know what it is, or the hardware blocksize is
- 	 * larger than the blocksize the user specified, then use
- 	 * that value.
- 	 */
- 	blocksize = get_hardblocksize(dev);
- 	if(blocksize > opt.blocksize) {
- 	    /*
- 	     * Force the blocksize we are going to use to be the
- 	     * hardware blocksize.
- 	     */
- 	    opt.blocksize = blocksize;
+	/*
+	 * First of all, get the hardware blocksize for this device.
+	 * If we don't know what it is, or the hardware blocksize is
+	 * larger than the blocksize the user specified, then use
+	 * that value.
+	 */
+	blocksize = get_hardsect_size(dev);
+	if(blocksize > opt.blocksize) {
+	    /*
+	     * Force the blocksize we are going to use to be the
+	     * hardware blocksize.
+	     */
+	    opt.blocksize = blocksize;
 	}
- 
+
 	blocksize_bits = 0;
 	{
 	  int i = opt.blocksize;
@@ -666,8 +667,6 @@ root_found:
 	/* Set this for reference. Its not currently used except on write
 	   which we don't have .. */
 	   
-	s->s_maxbytes = MAX_NON_LFS;
-
 	/* RDE: data zone now byte offset! */
 
 	first_data_zone = ((isonum_733 (rootp->extent) +

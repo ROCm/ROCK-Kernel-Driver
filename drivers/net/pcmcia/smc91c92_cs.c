@@ -76,7 +76,7 @@ static char *if_names[] = { "auto", "10baseT", "10base2"};
    1 = 10baseT (and autoselect if #define AUTOSELECT),
    2 = AUI/10base2,
 */
-static int if_port = 0;
+static int if_port;
 
 /* Bit map of interrupts to choose from. */
 static u_int irq_mask = 0xdeb8;
@@ -100,7 +100,7 @@ MODULE_PARM(irq_list, "1-4i");
 
 static dev_info_t dev_info = "smc91c92_cs";
 
-static dev_link_t *dev_list = NULL;
+static dev_link_t *dev_list;
 
 struct smc_private {
     dev_link_t			link;

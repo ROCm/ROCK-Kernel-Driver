@@ -68,7 +68,7 @@
  */
 
 #ifdef MODULE
-static const char *version = "tms380tr.c: v1.08 14/01/2001 by Christoph Goos, Adam Fritzler\n";
+static const char version[] = "tms380tr.c: v1.08 14/01/2001 by Christoph Goos, Adam Fritzler\n";
 #endif
 
 #ifdef MODULE

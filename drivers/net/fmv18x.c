@@ -31,7 +31,7 @@
     The Fujitsu FMV-181/182 user's guide
 */
 
-static const char *version =
+static const char version[] =
 	"fmv18x.c:v2.2.0 09/24/98  Yutaka TAMIYA (tamy@flab.fujitsu.co.jp)\n";
 
 #include <linux/module.h>

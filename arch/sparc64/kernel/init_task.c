@@ -15,6 +15,5 @@ struct mm_struct init_mm = INIT_MM(init_mm);
  * We really don't need this special alignment like the Intel does, but
  * I do it anyways for completeness.
  */
-union task_union init_task_union
-	__attribute__((__section__(".text"))) =
-		{ INIT_TASK(init_task_union.task) };
+__asm__ (".text");
+union task_union init_task_union = { INIT_TASK(init_task_union.task) };

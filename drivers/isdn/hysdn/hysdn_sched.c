@@ -47,7 +47,10 @@ hysdn_sched_rx(hysdn_card * card, uchar * buf, word len, word chan)
 
 	switch (chan) {
 		case CHAN_NDIS_DATA:
-			hysdn_rx_netpkt(card, buf, len);	/* give packet to network handler */
+			if (hynet_enable & (1 << card->myid)) {
+                          /* give packet to network handler */
+				hysdn_rx_netpkt(card, buf, len);
+			}
 			break;
 
 		case CHAN_ERRLOG:
@@ -58,7 +61,9 @@ hysdn_sched_rx(hysdn_card * card, uchar * buf, word len, word chan)
 #ifdef CONFIG_HYSDN_CAPI
          	case CHAN_CAPI:
 /* give packet to CAPI handler */
-			hycapi_rx_capipkt(card, buf, len);
+			if (hycapi_enable & (1 << card->myid)) {
+				hycapi_rx_capipkt(card, buf, len);
+			}
 			break;
 #endif /* CONFIG_HYSDN_CAPI */
 		default:
@@ -115,7 +120,9 @@ hysdn_sched_tx(hysdn_card * card, uchar * buf, word volatile *len, word volatile
 		return (1);	/* tell that data should be send */
 	}			/* error log start and able to send */
 	/* now handle network interface packets */
-	if ((skb = hysdn_tx_netget(card)) != NULL) {
+	if ((hynet_enable & (1 << card->myid)) && 
+	    (skb = hysdn_tx_netget(card)) != NULL) 
+	{
 		if (skb->len <= maxlen) {
 			memcpy(buf, skb->data, skb->len);	/* copy the packet to the buffer */
 			*len = skb->len;
@@ -126,7 +133,9 @@ hysdn_sched_tx(hysdn_card * card, uchar * buf, word volatile *len, word volatile
 			hysdn_tx_netack(card);	/* aknowledge packet -> throw away */
 	}			/* send a network packet if available */
 #ifdef CONFIG_HYSDN_CAPI
-	if((skb = hycapi_tx_capiget(card)) != NULL) {
+	if( ((hycapi_enable & (1 << card->myid))) && 
+	    ((skb = hycapi_tx_capiget(card)) != NULL) )
+	{
 		if (skb->len <= maxlen) {
 			memcpy(buf, skb->data, skb->len);
 			*len = skb->len;

@@ -7,7 +7,7 @@
  * Copyright (C) 1996, 1999 David S. Miller (davem@redhat.com)
  */
 
-static char *version =
+static char version[] =
         "sunqe.c:v2.9 9/11/99 David S. Miller (davem@redhat.com)\n";
 
 #include <linux/module.h>
@@ -46,7 +46,7 @@ static char *version =
 
 #include "sunqe.h"
 
-static struct sunqec *root_qec_dev = NULL;
+static struct sunqec *root_qec_dev;
 
 static void qe_set_multicast(struct net_device *dev);
 
@@ -733,7 +733,7 @@ static inline void qec_init_once(struct sunqec *qecp, struct sbus_dev *qsdev)
 /* Four QE's per QEC card. */
 static int __init qec_ether_init(struct net_device *dev, struct sbus_dev *sdev)
 {
-	static unsigned version_printed = 0;
+	static unsigned version_printed;
 	struct net_device *qe_devs[4];
 	struct sunqe *qeps[4];
 	struct sbus_dev *qesdevs[4];
@@ -983,7 +983,7 @@ static int __init qec_probe(void)
 	struct net_device *dev = NULL;
 	struct sbus_bus *bus;
 	struct sbus_dev *sdev = 0;
-	static int called = 0;
+	static int called;
 	int cards = 0, v;
 
 	root_qec_dev = NULL;

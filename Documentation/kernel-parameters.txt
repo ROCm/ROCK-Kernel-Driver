@@ -22,6 +22,7 @@ restrictions referred to are that the relevant option is valid if:
 	HW	Appropriate hardware is enabled.
 	IA-32	IA-32 aka i386 architecture is enabled.
 	IA-64	IA-64 architecture is enabled.
+	ISAPNP  ISA PnP code is enabled.
 	ISDN	Appropriate ISDN support is enabled.
 	JOY 	Appropriate joystick support is enabled.
 	LP	Printer support is enabled.
@@ -246,6 +247,18 @@ running once the system is up.
 
 	ip=		[PNP]
 
+	isapnp=		[ISAPNP] Specify RDP, reset, pci_scan and verbosity.
+
+	isapnp_reserve_irq= [ISAPNP] Exclude IRQs for the autoconfiguration.
+
+	isapnp_reserve_dma= [ISAPNP] Exclude DMAs for the autoconfiguration.
+
+	isapnp_reserve_io= [ISAPNP] Exclude I/O ports for the autoconfiguration.
+				    Ranges are in pairs (I/O port base and size).
+
+	isapnp_reserve_mem= [ISAPNP] Exclude memory regions for the autoconfiguration.
+				     Ranges are in pairs (memory base and size).
+
 	isp16=		[HW,CD]
 
 	iucv=		[HW,NET] 
@@ -361,6 +374,8 @@ running once the system is up.
 	nohlt		[BUGS=ARM]
  
 	no-hlt		[BUGS=ix86]
+
+	noisapnp	[ISAPNP] Disables ISA PnP code.
 
 	noinitrd	[RAM] Tells the kernel not to load any configured
 			initial RAM disk.

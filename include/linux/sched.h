@@ -239,7 +239,7 @@ extern int mmlist_nr;
 	mm_users:	ATOMIC_INIT(2), 		\
 	mm_count:	ATOMIC_INIT(1), 		\
 	map_count:	1, 				\
-	mmap_sem:	__RWSEM_INITIALIZER(name.mmap_sem, RW_LOCK_BIAS), \
+	mmap_sem:	__RWSEM_INITIALIZER(name.mmap_sem), \
 	page_table_lock: SPIN_LOCK_UNLOCKED, 		\
 	mmlist:		LIST_HEAD_INIT(name.mmlist),	\
 }

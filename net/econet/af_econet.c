@@ -695,8 +695,8 @@ static int econet_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg
 }
 
 static struct net_proto_family econet_family_ops = {
-	PF_ECONET,
-	econet_create
+	family:		PF_ECONET,
+	create:		econet_create,
 };
 
 static struct proto_ops SOCKOPS_WRAPPED(econet_ops) = {
@@ -727,7 +727,7 @@ SOCKOPS_WRAP(econet, PF_ECONET);
  *	Find the listening socket, if any, for the given data.
  */
 
-struct sock *ec_listening_socket(unsigned char port, unsigned char
+static struct sock *ec_listening_socket(unsigned char port, unsigned char
 				 station, unsigned char net)
 {
 	struct sock *sk = econet_sklist;
@@ -1065,18 +1065,13 @@ static int econet_rcv(struct sk_buff *skb, struct net_device *dev, struct packet
 			       hdr->port);
 }
 
-struct packet_type econet_packet_type=
-{
-	0,
-	NULL,
-	econet_rcv,
-	NULL,
-	NULL
+static struct packet_type econet_packet_type = {
+	type:		__constant_htons(ETH_P_ECONET),
+	func:		econet_rcv,
 };
 
 static void econet_hw_initialise(void)
 {
-	econet_packet_type.type = htons(ETH_P_ECONET);
 	dev_add_pack(&econet_packet_type);
 }
 
@@ -1105,15 +1100,12 @@ static int econet_notifier(struct notifier_block *this, unsigned long msg, void 
 	return NOTIFY_DONE;
 }
 
-struct notifier_block econet_netdev_notifier={
-	econet_notifier,
-	NULL,
-	0
+static struct notifier_block econet_netdev_notifier = {
+	notifier_call:	econet_notifier,
 };
 
-void __exit econet_proto_exit(void)
+static void __exit econet_proto_exit(void)
 {
-	extern void econet_sysctl_unregister(void);
 #ifdef CONFIG_ECONET_AUNUDP
 	del_timer(&ab_cleanup_timer);
 	if (udpsock)
@@ -1121,14 +1113,10 @@ void __exit econet_proto_exit(void)
 #endif
 	unregister_netdevice_notifier(&econet_netdev_notifier);
 	sock_unregister(econet_family_ops.family);
-#ifdef CONFIG_SYSCTL
-	econet_sysctl_unregister();
-#endif
 }
 
-int __init econet_proto_init(void)
+static int __init econet_proto_init(void)
 {
-	extern void econet_sysctl_register(void);
 	sock_register(&econet_family_ops);
 #ifdef CONFIG_ECONET_AUNUDP
 	spin_lock_init(&aun_queue_lock);
@@ -1138,9 +1126,6 @@ int __init econet_proto_init(void)
 	econet_hw_initialise();
 #endif
 	register_netdevice_notifier(&econet_netdev_notifier);
-#ifdef CONFIG_SYSCTL
-	econet_sysctl_register();
-#endif
 	return 0;
 }
 

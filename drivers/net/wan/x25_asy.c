@@ -874,8 +874,6 @@ int x25_asy_init(struct net_device *dev)
 	dev->type		= ARPHRD_X25;
 	dev->tx_queue_len	= 10;
 
-	dev_init_buffers(dev);
-	
 	/* New-style flags. */
 	dev->flags		= IFF_NOARP;
 

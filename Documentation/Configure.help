@@ -2462,20 +2462,6 @@ CONFIG_PCMCIA_SERIAL_CS
   a module, say M here and read Documentation/modules.txt. If unsure,
   say N.
 
-CardBus serial device support
-CONFIG_PCMCIA_SERIAL_CB
-  Say Y here to enable support for CardBus serial devices, including
-  serial port cards, modems, and the modem functions of multi-function
-  ethernet/modem devices. (CardBus cards are the newer and better 
-  version of PCMCIA- or PC-cards: credit card size devices often 
-  used with laptops.)
-
-  This driver is also available as a module ( = code which can be
-  inserted in and removed from the running kernel whenever you want).
-  The module will be called serial_cb.o. If you want to compile it as
-  a module, say M here and read Documentation/modules.txt. If unsure,
-  say N.
-
 /dev/agpgart (AGP Support) (EXPERIMENTAL)
 CONFIG_AGP
   AGP (Accelerated Graphics Port) is a bus system mainly used to

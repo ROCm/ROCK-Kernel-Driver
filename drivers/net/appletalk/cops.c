@@ -98,7 +98,7 @@ static int board_type = TANGENT;
 static int io = 0x240;		/* Default IO for Dayna */
 static int irq = 5;		/* Default IRQ */
 #else
-static int io = 0;		/* Default IO for Dayna */
+static int io;			/* Default IO for Dayna */
 #endif
 
 /*

@@ -38,7 +38,7 @@
     Arnaldo Carvalho de Melo <acme@conectiva.com.br> - 11/01/2001
 */
 
-static const char *version = "lance.c:v1.15ac 1999/11/13 dplatt@3do.com, becker@cesdis.gsfc.nasa.gov\n";
+static const char version[] = "lance.c:v1.15ac 1999/11/13 dplatt@3do.com, becker@cesdis.gsfc.nasa.gov\n";
 
 #include <linux/module.h>
 #include <linux/kernel.h>

@@ -132,7 +132,7 @@ extern struct proc_dir_entry *proc_mknod(const char *,mode_t,
 		struct proc_dir_entry *,kdev_t);
 extern struct proc_dir_entry *proc_mkdir(const char *,struct proc_dir_entry *);
 
-extern inline struct proc_dir_entry *create_proc_read_entry(const char *name,
+static inline struct proc_dir_entry *create_proc_read_entry(const char *name,
 	mode_t mode, struct proc_dir_entry *base, 
 	read_proc_t *read_proc, void * data)
 {
@@ -144,7 +144,7 @@ extern inline struct proc_dir_entry *create_proc_read_entry(const char *name,
 	return res;
 }
  
-extern inline struct proc_dir_entry *create_proc_info_entry(const char *name,
+static inline struct proc_dir_entry *create_proc_info_entry(const char *name,
 	mode_t mode, struct proc_dir_entry *base, get_info_t *get_info)
 {
 	struct proc_dir_entry *res=create_proc_entry(name,mode,base);
@@ -152,44 +152,44 @@ extern inline struct proc_dir_entry *create_proc_info_entry(const char *name,
 	return res;
 }
  
-extern inline struct proc_dir_entry *proc_net_create(const char *name,
+static inline struct proc_dir_entry *proc_net_create(const char *name,
 	mode_t mode, get_info_t *get_info)
 {
 	return create_proc_info_entry(name,mode,proc_net,get_info);
 }
 
-extern inline void proc_net_remove(const char *name)
+static inline void proc_net_remove(const char *name)
 {
 	remove_proc_entry(name,proc_net);
 }
 
 #else
 
-extern inline struct proc_dir_entry *proc_net_create(const char *name, mode_t mode, 
+static inline struct proc_dir_entry *proc_net_create(const char *name, mode_t mode, 
 	get_info_t *get_info) {return NULL;}
-extern inline void proc_net_remove(const char *name) {}
+static inline void proc_net_remove(const char *name) {}
 
-extern inline struct proc_dir_entry *create_proc_entry(const char *name,
+static inline struct proc_dir_entry *create_proc_entry(const char *name,
 	mode_t mode, struct proc_dir_entry *parent) { return NULL; }
 
-extern inline void remove_proc_entry(const char *name, struct proc_dir_entry *parent) {};
-extern inline struct proc_dir_entry *proc_symlink(const char *name,
+static inline void remove_proc_entry(const char *name, struct proc_dir_entry *parent) {};
+static inline struct proc_dir_entry *proc_symlink(const char *name,
 		struct proc_dir_entry *parent,char *dest) {return NULL;}
-extern inline struct proc_dir_entry *proc_mknod(const char *name,mode_t mode,
+static inline struct proc_dir_entry *proc_mknod(const char *name,mode_t mode,
 		struct proc_dir_entry *parent,kdev_t rdev) {return NULL;}
-extern inline struct proc_dir_entry *proc_mkdir(const char *name,
+static inline struct proc_dir_entry *proc_mkdir(const char *name,
 	struct proc_dir_entry *parent) {return NULL;}
 
-extern inline struct proc_dir_entry *create_proc_read_entry(const char *name,
+static inline struct proc_dir_entry *create_proc_read_entry(const char *name,
 	mode_t mode, struct proc_dir_entry *base, 
 	int (*read_proc)(char *, char **, off_t, int, int *, void *),
 	void * data) { return NULL; }
-extern inline struct proc_dir_entry *create_proc_info_entry(const char *name,
+static inline struct proc_dir_entry *create_proc_info_entry(const char *name,
 	mode_t mode, struct proc_dir_entry *base, get_info_t *get_info)
 	{ return NULL; }
 
-extern inline void proc_tty_register_driver(struct tty_driver *driver) {};
-extern inline void proc_tty_unregister_driver(struct tty_driver *driver) {};
+static inline void proc_tty_register_driver(struct tty_driver *driver) {};
+static inline void proc_tty_unregister_driver(struct tty_driver *driver) {};
 
 extern struct proc_dir_entry proc_root;
 

@@ -1,4 +1,4 @@
-static const char *version =
+static const char version[] =
 	"de600.c: $Revision: 1.40 $,  Bjorn Ekwall (bj0rn@blox.se)\n";
 /*
  *	de600.c

@@ -96,7 +96,7 @@
 
 */
 
-static const char *version =
+static const char version[] =
 	"eepro.c: v0.12c 01/08/2000 aris@conectiva.com.br\n";
 
 #include <linux/module.h>

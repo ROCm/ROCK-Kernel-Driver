@@ -116,7 +116,8 @@ struct ei_device {
  
 #if defined(CONFIG_MAC) || defined(CONFIG_AMIGA_PCMCIA) || \
     defined(CONFIG_ARIADNE2) || defined(CONFIG_ARIADNE2_MODULE) || \
-    defined(CONFIG_HYDRA) || defined(CONFIG_HYDRA_MODULE)
+    defined(CONFIG_HYDRA) || defined(CONFIG_HYDRA_MODULE) || \
+    defined(CONFIG_ARM_ETHERH) || defined(CONFIG_ARM_ETHERH_MODULE)
 #define EI_SHIFT(x)	(ei_local->reg_offset[x])
 #else
 #define EI_SHIFT(x)	(x)

@@ -1,4 +1,4 @@
-# $Id: config.in,v 1.139 2001/04/03 12:29:38 davem Exp $
+# $Id: config.in,v 1.141 2001/04/19 01:52:04 davem Exp $
 # For a description of the syntax of this configuration file,
 # see the Configure script.
 #
@@ -33,8 +33,8 @@ define_bool CONFIG_SPARC64 y
 
 # Global things across all Sun machines.
 define_bool CONFIG_HAVE_DEC_LOCK y
-define_bool CONFIG_RWSEM_GENERIC_SPINLOCK y
-define_bool CONFIG_RWSEM_XCHGADD_ALGORITHM n
+define_bool CONFIG_RWSEM_GENERIC_SPINLOCK n
+define_bool CONFIG_RWSEM_XCHGADD_ALGORITHM y
 define_bool CONFIG_ISA n
 define_bool CONFIG_EISA n
 define_bool CONFIG_MCA n

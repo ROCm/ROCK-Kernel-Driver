@@ -29,7 +29,7 @@
 
 /****************************************************************************
  * VISOR_REQUEST_BYTES_AVAILABLE asks the visor for the number of bytes that
- * are available to be transfered to the host for the specified endpoint.
+ * are available to be transferred to the host for the specified endpoint.
  * Currently this is not used, and always returns 0x0001
  ****************************************************************************/
 #define VISOR_REQUEST_BYTES_AVAILABLE		0x01

@@ -1071,7 +1071,6 @@ static int yam_probe(struct net_device *dev)
 	dev->hard_start_xmit = yam_send_packet;
 	dev->get_stats = yam_get_stats;
 
-	dev_init_buffers(dev);
 	skb_queue_head_init(&yp->send_queue);
 
 #if defined(CONFIG_AX25) || defined(CONFIG_AX25_MODULE)

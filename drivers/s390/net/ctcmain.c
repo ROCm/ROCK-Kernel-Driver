@@ -3252,7 +3252,6 @@ int ctc_probe(net_device *dev)
 	dev->type                = ARPHRD_SLIP;
 	dev->tx_queue_len        = 100;
 	SET_DEVICE_START(dev, 1);
-	dev_init_buffers(dev);
 	dev->flags	         = IFF_POINTOPOINT | IFF_NOARP;
 	for (direction = READ; direction <= WRITE; direction++) {
 		if ((ctc_no_auto == 0) || (devno[direction] == -1))

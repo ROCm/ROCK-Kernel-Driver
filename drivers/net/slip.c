@@ -92,7 +92,7 @@ typedef struct slip_ctrl {
 	struct slip	ctrl;		/* SLIP things			*/
 	struct net_device	dev;		/* the device			*/
 } slip_ctrl_t;
-static slip_ctrl_t	**slip_ctrls = NULL;
+static slip_ctrl_t	**slip_ctrls;
 
 int slip_maxdev = SL_NRUNIT;		/* Can be overridden with insmod! */
 MODULE_PARM(slip_maxdev, "i");
@@ -647,8 +647,6 @@ static int sl_init(struct net_device *dev)
 	dev->tx_queue_len	= 10;
 
 	SET_MODULE_OWNER(dev);
-
-	dev_init_buffers(dev);
 
 	/* New-style flags. */
 	dev->flags		= IFF_NOARP|IFF_POINTOPOINT|IFF_MULTICAST;

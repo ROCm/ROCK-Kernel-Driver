@@ -897,6 +897,10 @@ int __init vga16fb_init(void)
 	/* XXX share VGA_FB_PHYS region with vgacon */
 
         vga16fb.video_vbase = ioremap(VGA_FB_PHYS, VGA_FB_PHYS_LEN);
+	if (!vga16fb.video_vbase) {
+		printk(KERN_ERR "vga16fb: unable to map device\n");
+		return -ENOMEM;
+	}
 	printk(KERN_INFO "vga16fb: mapped to 0x%p\n", vga16fb.video_vbase);
 
 	vga16fb.isVGA = ORIG_VIDEO_ISVGA;
@@ -931,8 +935,10 @@ int __init vga16fb_init(void)
 	vga16fb.fb_info.flags=FBINFO_FLAG_DEFAULT;
 	vga16fb_set_disp(-1, &vga16fb);
 
-	if (register_framebuffer(&vga16fb.fb_info)<0)
+	if (register_framebuffer(&vga16fb.fb_info)<0) {
+		iounmap(vga16fb.video_vbase);
 		return -EINVAL;
+	}
 
 	printk(KERN_INFO "fb%d: %s frame buffer device\n",
 	       GET_FB_IDX(vga16fb.fb_info.node), vga16fb.fb_info.modename);

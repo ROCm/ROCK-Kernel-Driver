@@ -1,4 +1,4 @@
-/******************************************************************************
+;/******************************************************************************
  *
  * Name:      	skge.c
  * Project:	GEnesis, PCI Gigabit Ethernet Adapter
@@ -343,7 +343,7 @@ static void	DumpLong(char*, int);
 
 /* global variables *********************************************************/
 static const char *BootString = BOOT_STRING;
-static struct net_device *root_dev = NULL;
+static struct net_device *root_dev;
 static int probed __initdata = 0;
 
 /* local variables **********************************************************/
@@ -602,8 +602,8 @@ static char *RlmtMode[SK_MAX_CARD_PARAM] = {"", };
 #endif
 
 
-static int debug = 0; /* not used */
-static int options[SK_MAX_CARD_PARAM] = {0, }; /* not used */
+static int debug; /* not used */
+static int options[SK_MAX_CARD_PARAM]; /* not used */
 
 
 /*****************************************************************************

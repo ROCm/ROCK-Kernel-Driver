@@ -1379,8 +1379,6 @@ static int baycom_probe(struct net_device *dev)
 	dev->get_stats = baycom_get_stats;
 
 	/* Fill in the fields of the device structure */
-	dev_init_buffers(dev);
-
 	bc->skb = NULL;
 	
 #if defined(CONFIG_AX25) || defined(CONFIG_AX25_MODULE)

@@ -1147,8 +1147,6 @@ static void ipgre_tunnel_init_gen(struct net_device *dev)
 	dev->do_ioctl		= ipgre_tunnel_ioctl;
 	dev->change_mtu		= ipgre_tunnel_change_mtu;
 
-	dev_init_buffers(dev);
-
 	dev->type		= ARPHRD_IPGRE;
 	dev->hard_header_len 	= LL_MAX_HEADER + sizeof(struct iphdr) + 4;
 	dev->mtu		= 1500 - sizeof(struct iphdr) - 4;

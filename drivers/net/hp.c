@@ -18,7 +18,7 @@
 	  The Crynwr packet driver.
 */
 
-static const char *version =
+static const char version[] =
 	"hp.c:v1.10 9/23/94 Donald Becker (becker@cesdis.gsfc.nasa.gov)\n";
 
 

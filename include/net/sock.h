@@ -739,12 +739,12 @@ struct proto {
 };
 
 /* Called with local bh disabled */
-static void __inline__ sock_prot_inc_use(struct proto *prot)
+static __inline__ void sock_prot_inc_use(struct proto *prot)
 {
 	prot->stats[smp_processor_id()].inuse++;
 }
 
-static void __inline__ sock_prot_dec_use(struct proto *prot)
+static __inline__ void sock_prot_dec_use(struct proto *prot)
 {
 	prot->stats[smp_processor_id()].inuse--;
 }

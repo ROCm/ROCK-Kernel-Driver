@@ -2,6 +2,7 @@
  * ethtool.h: Defines for Linux ethtool.
  *
  * Copyright (C) 1998 David S. Miller (davem@redhat.com)
+ * Copyright 2001 Jeff Garzik <jgarzik@mandrakesoft.com>
  */
 
 #ifndef _LINUX_ETHTOOL_H

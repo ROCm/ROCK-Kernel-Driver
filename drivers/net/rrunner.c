@@ -104,7 +104,7 @@ static inline void netif_start_queue(struct net_device *dev)
 
 static char version[] __initdata = "rrunner.c: v0.22 03/01/2000  Jes Sorensen (Jes.Sorensen@cern.ch)\n";
 
-static struct net_device *root_dev = NULL;
+static struct net_device *root_dev;
 
 
 /*

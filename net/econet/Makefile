@@ -9,7 +9,8 @@
 
 O_TARGET := econet.o
 
-obj-y := af_econet.o sysctl_net_ec.o
+obj-y := af_econet.o
 obj-m := $(O_TARGET)
 
 include $(TOPDIR)/Rules.make
+

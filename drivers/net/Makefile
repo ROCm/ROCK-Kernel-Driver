@@ -18,6 +18,8 @@ O_TARGET := net.o
 export-objs     :=	8390.o arlan.o aironet4500_core.o aironet4500_card.o \
 			ppp_async.o ppp_generic.o slhc.o pppox.o auto_irq.o \
 			net_init.o
+list-multi	:=	rcpci.o
+rcpci-objs	:=	rcpci45.o rclanmtl.o
 
 ifeq ($(CONFIG_TULIP),y)
   obj-y += tulip/tulip.o
@@ -169,6 +171,7 @@ obj-$(CONFIG_8139TOO) += 8139too.o
 obj-$(CONFIG_WAVELAN) += wavelan.o
 obj-$(CONFIG_ARLAN) += arlan.o arlan-proc.o
 obj-$(CONFIG_ZNET) += znet.o
+obj-$(CONFIG_LAN_SAA9730) += saa9730.o
 obj-$(CONFIG_DEPCA) += depca.o
 obj-$(CONFIG_EWRK3) += ewrk3.o
 obj-$(CONFIG_ATP) += atp.o
@@ -187,6 +190,7 @@ obj-$(CONFIG_HPLANCE) += hplance.o 7990.o
 obj-$(CONFIG_MVME147_NET) += mvme147.o 7990.o
 obj-$(CONFIG_EQUALIZER) += eql.o
 obj-$(CONFIG_MIPS_JAZZ_SONIC) += jazzsonic.o
+obj-$(CONFIG_MIPS_GT96100ETH) += gt96100eth.o
 obj-$(CONFIG_SGI_IOC3_ETH) += ioc3-eth.o
 obj-$(CONFIG_BAGETLANCE) += bagetlance.o
 obj-$(CONFIG_DECLANCE) += declance.o
@@ -201,12 +205,21 @@ obj-$(CONFIG_MACSONIC) += macsonic.o
 obj-$(CONFIG_MACMACE) += macmace.o
 obj-$(CONFIG_MAC89x0) += mac89x0.o
 obj-$(CONFIG_TUN) += tun.o
+
+ifeq ($(CONFIG_ARCH_ACORN),y)
+mod-subdirs	+= ../acorn/net
+subdir-y	+= ../acorn/net
+obj-y		+= ../acorn/net/acorn-net.o
+endif
+
 #
 # HIPPI adapters
 #
 
 ifneq ($(ARCH),s390)
+ifneq ($(ARCH),s390x)
 obj-y += auto_irq.o
+endif
 endif
 
 include $(TOPDIR)/Rules.make
@@ -214,6 +227,6 @@ include $(TOPDIR)/Rules.make
 clean:
 	rm -f core *.o *.a *.s
 
-rcpci.o: rcpci45.o rclanmtl.o
-	$(LD) -r -o rcpci.o rcpci45.o rclanmtl.o
+rcpci.o: $(rcpci-objs)
+	$(LD) -r -o $@ $(rcpci-objs)
 

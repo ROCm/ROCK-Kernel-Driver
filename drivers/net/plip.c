@@ -54,7 +54,7 @@
  *     To use with DOS box, please do (Turn on ARP switch):
  *	# ifconfig plip[0-2] arp
  */
-static const char *version = "NET3 PLIP version 2.4-parport gniibe@mri.co.jp\n";
+static const char version[] = "NET3 PLIP version 2.4-parport gniibe@mri.co.jp\n";
 
 /*
   Sources:

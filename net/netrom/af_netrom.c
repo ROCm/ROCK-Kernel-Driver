@@ -1268,7 +1268,7 @@ static int __init nr_proto_init(void)
 {
 	int i;
 
-	if (nr_ndevs * sizeof(struct net_device) >= KMALLOC_MAXSIZE) {
+	if (nr_ndevs > 0x7fffffff/sizeof(struct net_device)) {
 		printk(KERN_ERR "NET/ROM: nr_proto_init - nr_ndevs parameter to large\n");
 		return -1;
 	}

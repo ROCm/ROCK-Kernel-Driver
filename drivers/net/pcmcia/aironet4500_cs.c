@@ -81,7 +81,7 @@ static void awc_release(u_long arg);
 static int awc_event(event_t event, int priority,
 					   event_callback_args_t *args);
 
-static dev_link_t *dev_list = NULL;
+static dev_link_t *dev_list;
 
 static void cs_error(client_handle_t handle, int func, int ret)
 {

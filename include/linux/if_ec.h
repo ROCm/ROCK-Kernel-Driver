@@ -60,9 +60,6 @@ struct ec_device
   unsigned char station, net;		/* Econet protocol address */
 };
 
-extern struct sock *ec_listening_socket(unsigned char port, unsigned char
-				 station, unsigned char net);
-
 #endif
 
 #endif

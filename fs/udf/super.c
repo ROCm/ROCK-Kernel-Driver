@@ -344,8 +344,7 @@ static  int
 udf_set_blocksize(struct super_block *sb, int bsize)
 {
 	/* Use specified block size if specified */
-	if (!(sb->s_blocksize = get_hardblocksize(sb->s_dev)))
-		sb->s_blocksize = 2048;
+	sb->s_blocksize = get_hardsect_size(sb->s_dev);
 	if (bsize > sb->s_blocksize)
 		sb->s_blocksize = bsize;
 

@@ -263,28 +263,28 @@ acornfb_set_timing(struct fb_var_screeninfo *var)
 	vidc.v_border_end	= vidc.v_display_end;
 
 #ifdef CONFIG_ARCH_A5K
-	outb(vid_ctl, IOEB_VID_CTL);
+	__raw_writeb(vid_ctl, IOEB_VID_CTL);
 #endif
 	if (memcmp(&current_vidc, &vidc, sizeof(vidc))) {
 		current_vidc = vidc;
 
-		outl(0xe0000000 | vidc_ctl,			IO_VIDC_BASE);
-		outl(0x80000000 | (vidc.h_cycle << 14),		IO_VIDC_BASE);
-		outl(0x84000000 | (vidc.h_sync_width << 14),	IO_VIDC_BASE);
-		outl(0x88000000 | (vidc.h_border_start << 14),	IO_VIDC_BASE);
-		outl(0x8c000000 | (vidc.h_display_start << 14),	IO_VIDC_BASE);
-		outl(0x90000000 | (vidc.h_display_end << 14),	IO_VIDC_BASE);
-		outl(0x94000000 | (vidc.h_border_end << 14),	IO_VIDC_BASE);
-		outl(0x98000000,				IO_VIDC_BASE);
-		outl(0x9c000000 | (vidc.h_interlace << 14),	IO_VIDC_BASE);
-		outl(0xa0000000 | (vidc.v_cycle << 14),		IO_VIDC_BASE);
-		outl(0xa4000000 | (vidc.v_sync_width << 14),	IO_VIDC_BASE);
-		outl(0xa8000000 | (vidc.v_border_start << 14),	IO_VIDC_BASE);
-		outl(0xac000000 | (vidc.v_display_start << 14),	IO_VIDC_BASE);
-		outl(0xb0000000 | (vidc.v_display_end << 14),	IO_VIDC_BASE);
-		outl(0xb4000000 | (vidc.v_border_end << 14),	IO_VIDC_BASE);
-		outl(0xb8000000,				IO_VIDC_BASE);
-		outl(0xbc000000,				IO_VIDC_BASE);
+		vidc_writel(0xe0000000 | vidc_ctl);
+		vidc_writel(0x80000000 | (vidc.h_cycle << 14));
+		vidc_writel(0x84000000 | (vidc.h_sync_width << 14));
+		vidc_writel(0x88000000 | (vidc.h_border_start << 14));
+		vidc_writel(0x8c000000 | (vidc.h_display_start << 14));
+		vidc_writel(0x90000000 | (vidc.h_display_end << 14));
+		vidc_writel(0x94000000 | (vidc.h_border_end << 14));
+		vidc_writel(0x98000000);
+		vidc_writel(0x9c000000 | (vidc.h_interlace << 14));
+		vidc_writel(0xa0000000 | (vidc.v_cycle << 14));
+		vidc_writel(0xa4000000 | (vidc.v_sync_width << 14));
+		vidc_writel(0xa8000000 | (vidc.v_border_start << 14));
+		vidc_writel(0xac000000 | (vidc.v_display_start << 14));
+		vidc_writel(0xb0000000 | (vidc.v_display_end << 14));
+		vidc_writel(0xb4000000 | (vidc.v_border_end << 14));
+		vidc_writel(0xb8000000);
+		vidc_writel(0xbc000000);
 	}
 #ifdef DEBUG_MODE_SELECTION
 	printk(KERN_DEBUG "VIDC registers for %dx%dx%d:\n", var->xres,
@@ -310,7 +310,7 @@ acornfb_set_timing(struct fb_var_screeninfo *var)
 static inline void
 acornfb_palette_write(u_int regno, union palette pal)
 {
-	outl(pal.p, IO_VIDC_BASE);
+	vidc_writel(pal.p);
 }
 
 static inline union palette
@@ -402,27 +402,27 @@ acornfb_set_timing(struct fb_var_screeninfo *var)
 	if (memcmp(&current_vidc, &vidc, sizeof(vidc))) {
 		current_vidc = vidc;
 
-		outl(VIDC20_CTRL| vidc.control,		IO_VIDC_BASE);
-		outl(0xd0000000 | vidc.pll_ctl,		IO_VIDC_BASE);
-		outl(0x80000000 | vidc.h_cycle,		IO_VIDC_BASE);
-		outl(0x81000000 | vidc.h_sync_width,	IO_VIDC_BASE);
-		outl(0x82000000 | vidc.h_border_start,	IO_VIDC_BASE);
-		outl(0x83000000 | vidc.h_display_start,	IO_VIDC_BASE);
-		outl(0x84000000 | vidc.h_display_end,	IO_VIDC_BASE);
-		outl(0x85000000 | vidc.h_border_end,	IO_VIDC_BASE);
-		outl(0x86000000,			IO_VIDC_BASE);
-		outl(0x87000000 | vidc.h_interlace,	IO_VIDC_BASE);
-		outl(0x90000000 | vidc.v_cycle,		IO_VIDC_BASE);
-		outl(0x91000000 | vidc.v_sync_width,	IO_VIDC_BASE);
-		outl(0x92000000 | vidc.v_border_start,	IO_VIDC_BASE);
-		outl(0x93000000 | vidc.v_display_start,	IO_VIDC_BASE);
-		outl(0x94000000 | vidc.v_display_end,	IO_VIDC_BASE);
-		outl(0x95000000 | vidc.v_border_end,	IO_VIDC_BASE);
-		outl(0x96000000,			IO_VIDC_BASE);
-		outl(0x97000000,			IO_VIDC_BASE);
+		vidc_writel(VIDC20_CTRL| vidc.control);
+		vidc_writel(0xd0000000 | vidc.pll_ctl);
+		vidc_writel(0x80000000 | vidc.h_cycle);
+		vidc_writel(0x81000000 | vidc.h_sync_width);
+		vidc_writel(0x82000000 | vidc.h_border_start);
+		vidc_writel(0x83000000 | vidc.h_display_start);
+		vidc_writel(0x84000000 | vidc.h_display_end);
+		vidc_writel(0x85000000 | vidc.h_border_end);
+		vidc_writel(0x86000000);
+		vidc_writel(0x87000000 | vidc.h_interlace);
+		vidc_writel(0x90000000 | vidc.v_cycle);
+		vidc_writel(0x91000000 | vidc.v_sync_width);
+		vidc_writel(0x92000000 | vidc.v_border_start);
+		vidc_writel(0x93000000 | vidc.v_display_start);
+		vidc_writel(0x94000000 | vidc.v_display_end);
+		vidc_writel(0x95000000 | vidc.v_border_end);
+		vidc_writel(0x96000000);
+		vidc_writel(0x97000000);
 	}
 
-	outl(fsize, IOMD_FSIZE);
+	iomd_writel(fsize, IOMD_FSIZE);
 
 	ext_ctl = acornfb_default_econtrol();
 
@@ -440,7 +440,7 @@ acornfb_set_timing(struct fb_var_screeninfo *var)
 			ext_ctl |= VIDC20_ECTL_VS_NVSYNC;
 	}
 
-	outl(VIDC20_ECTL | ext_ctl, IO_VIDC_BASE);
+	vidc_writel(VIDC20_ECTL | ext_ctl);
 
 	words_per_line = var->xres * var->bits_per_pixel / 32;
 
@@ -461,7 +461,7 @@ acornfb_set_timing(struct fb_var_screeninfo *var)
 	} else 
 		dat_ctl |= VIDC20_DCTL_BUS_D31_0;
 
-	outl(VIDC20_DCTL | dat_ctl, IO_VIDC_BASE);
+	vidc_writel(VIDC20_DCTL | dat_ctl);
 
 #ifdef DEBUG_MODE_SELECTION
 	printk(KERN_DEBUG "VIDC registers for %dx%dx%d:\n", var->xres,
@@ -490,8 +490,8 @@ acornfb_set_timing(struct fb_var_screeninfo *var)
 static inline void
 acornfb_palette_write(u_int regno, union palette pal)
 {
-	outl(0x10000000 | regno, IO_VIDC_BASE);
-	outl(pal.p, IO_VIDC_BASE);
+	vidc_writel(0x10000000 | regno);
+	vidc_writel(pal.p);
 }
 
 static inline union palette
@@ -672,7 +672,7 @@ acornfb_update_dma(struct fb_var_screeninfo *var)
 #if defined(HAS_MEMC)
 	memc_write(VDMA_INIT, off >> 2);
 #elif defined(HAS_IOMD)
-	outl(current_par.screen_base_p + off, IOMD_VIDINIT);
+	iomd_writel(current_par.screen_base_p + off, IOMD_VIDINIT);
 #endif
 }
 
@@ -744,12 +744,12 @@ acornfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 		int i;
 
 		pal.p = 0;
-		outl(0x10000000, IO_VIDC_BASE);
+		vidc_writel(0x10000000);
 		for (i = 0; i < 256; i += 1) {
 			pal.vidc20.red   = current_par.palette[ i       & 31].vidc20.red;
 			pal.vidc20.green = current_par.palette[(i >> 1) & 31].vidc20.green;
 			pal.vidc20.blue  = current_par.palette[(i >> 2) & 31].vidc20.blue;
-			outl(pal.p, IO_VIDC_BASE);
+			vidc_writel(pal.p);
 			/* Palette register pointer auto-increments */
 		}
 	} else
@@ -1074,9 +1074,9 @@ acornfb_set_var(struct fb_var_screeninfo *var, int con, struct fb_info *info)
 			control = DMA_CR_E | DMA_CR_D | 16;
 		}
 
-		outl(start,   IOMD_VIDSTART);
-		outl(size,    IOMD_VIDEND);
-		outl(control, IOMD_VIDCR);
+		iomd_writel(start,   IOMD_VIDSTART);
+		iomd_writel(size,    IOMD_VIDEND);
+		iomd_writel(control, IOMD_VIDCR);
 #endif
 		acornfb_update_dma(var);
 		acornfb_set_timing(var);
@@ -1119,6 +1119,45 @@ acornfb_pan_display(struct fb_var_screeninfo *var, int con,
 	return 0;
 }
 
+/*
+ * Note that we are entered with the kernel locked.
+ */
+static int
+acornfb_mmap(struct fb_info *info, struct file *file, struct vm_area_struct *vma)
+{
+	unsigned long off, start;
+	u32 len;
+
+	off = vma->vm_pgoff << PAGE_SHIFT;
+
+	start = current_par.screen_base_p;
+	len = PAGE_ALIGN(start & ~PAGE_MASK) + current_par.screen_size;
+	start &= PAGE_MASK;
+	if ((vma->vm_end - vma->vm_start + off) > len)
+		return -EINVAL;
+	off += start;
+	vma->vm_pgoff = off >> PAGE_SHIFT;
+
+	/* This is an IO map - tell maydump to skip this VMA */
+	vma->vm_flags |= VM_IO;
+
+#ifdef CONFIG_CPU_32
+	pgprot_val(vma->vm_page_prot) &= ~L_PTE_CACHEABLE;
+#endif
+
+	/*
+	 * Don't alter the page protection flags; we want to keep the area
+	 * cached for better performance.  This does mean that we may miss
+	 * some updates to the screen occasionally, but process switches
+	 * should cause the caches and buffers to be flushed often enough.
+	 */
+	if (io_remap_page_range(vma->vm_start, off,
+				vma->vm_end - vma->vm_start,
+				vma->vm_page_prot))
+		return -EAGAIN;
+	return 0;
+}
+
 static struct fb_ops acornfb_ops = {
 	owner:		THIS_MODULE,
 	fb_get_fix:	acornfb_get_fix,
@@ -1127,6 +1166,7 @@ static struct fb_ops acornfb_ops = {
 	fb_get_cmap:	acornfb_get_cmap,
 	fb_set_cmap:	acornfb_set_cmap,
 	fb_pan_display:	acornfb_pan_display,
+	fb_mmap:	acornfb_mmap,
 };
 
 static int

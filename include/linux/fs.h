@@ -1252,7 +1252,6 @@ static inline void bforget(struct buffer_head *buf)
 		__bforget(buf);
 }
 extern void set_blocksize(kdev_t, int);
-extern unsigned int get_hardblocksize(kdev_t);
 extern struct buffer_head * bread(kdev_t, int, int);
 extern void wakeup_bdflush(int wait);
 

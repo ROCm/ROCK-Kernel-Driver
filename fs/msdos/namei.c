@@ -389,7 +389,7 @@ out_unlock:
 	return res;
 
 mkdir_error:
-	printk("msdos_mkdir: error=%d, attempting cleanup\n", res);
+	printk(KERN_WARNING "msdos_mkdir: error=%d, attempting cleanup\n", res);
 	inode->i_nlink = 0;
 	inode->i_ctime = dir->i_ctime = dir->i_mtime = CURRENT_TIME;
 	dir->i_nlink--;

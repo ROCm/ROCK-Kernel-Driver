@@ -33,31 +33,9 @@
  * Definitions for Cisco-HDLC header.
  */
 
-typedef struct cisco_hdr {
-	__u8  addr; /* unicast/broadcast */
-	__u8  ctrl; /* Always 0          */
-	__u16 type; /* IP-typefield      */
-} cisco_hdr;
-
-typedef struct cisco_slarp {
-	__u32 code;                     /* SLREQ/SLREPLY/KEEPALIVE */
-	union {
-		struct {
-			__u32 ifaddr;   /* My interface address     */
-			__u32 netmask;  /* My interface netmask     */
-		} reply;
-		struct {
-			__u32 my_seq;   /* Packet sequence number   */
-			__u32 your_seq;
-		} keepalive;
-	} slarp;
-	__u16 rel;                      /* Always 0xffff            */
-	__u16 t1;                       /* Uptime in usec >> 16     */
-	__u16 t0;                       /* Uptime in usec & 0xffff  */
-} cisco_slarp;
-
 #define CISCO_ADDR_UNICAST    0x0f
 #define CISCO_ADDR_BROADCAST  0x8f
+#define CISCO_CTRL            0x00
 #define CISCO_TYPE_INET       0x0800
 #define CISCO_TYPE_SLARP      0x8035
 #define CISCO_SLARP_REPLY     0
@@ -83,7 +61,6 @@ extern int isdn_net_force_hangup(char *);
 extern int isdn_net_force_dial(char *);
 extern isdn_net_dev *isdn_net_findif(char *);
 extern int isdn_net_rcv_skb(int, struct sk_buff *);
-extern void isdn_net_slarp_out(void);
 extern int isdn_net_dial_req(isdn_net_local *);
 extern void isdn_net_writebuf_skb(isdn_net_local *lp, struct sk_buff *skb);
 extern void isdn_net_write_super(isdn_net_local *lp, struct sk_buff *skb);
@@ -166,6 +143,52 @@ static __inline__ void isdn_net_rm_from_bundle(isdn_net_local *lp)
 		master_lp->netdev->queue = lp->next;
 	lp->next = lp->last = lp;	/* (re)set own pointers */
 	spin_unlock_irqrestore(&master_lp->netdev->queue_lock, flags);
+}
+
+static inline int
+put_u8(unsigned char *p, __u8 x)
+{
+	p[0] = x;
+	return 1;
+}
+
+static inline int
+put_u16(unsigned char *p, __u16 x)
+{
+	p[0] = x >> 8;
+	p[1] = x;
+	return 2;
+}
+
+static inline int
+put_u32(unsigned char *p, __u32 x)
+{
+	p[0] = x >> 24;
+	p[1] = x >> 16;
+	p[2] = x >> 8;
+	p[3] = x;
+	return 4;
+}
+
+static inline int
+get_u8(unsigned char *p, __u8 *x)
+{
+	*x = p[0];
+	return 1;
+}
+
+static inline int
+get_u16(unsigned char *p, __u16 *x)
+{
+	*x = (p[0] << 8) + p[1];
+	return 2;
+}
+
+static inline int
+get_u32(unsigned char *p, __u32 *x)
+{
+	*x = (p[0] << 24) + (p[1] << 16) + (p[2] << 8) + p[3];
+	return 4;
 }
 
 

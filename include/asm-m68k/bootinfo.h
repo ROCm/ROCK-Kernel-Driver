@@ -163,7 +163,7 @@ struct bi_record {
 #define BI_MAC_SCCTYPE		0x801c	/* Mac SCC serial type (normal, IOP) */
 #define BI_MAC_ETHTYPE		0x801d	/* Mac builtin ethernet type (Sonic, MACE */
 #define BI_MAC_ETHBASE		0x801e	/* Mac builtin ethernet base address */
-#define BI_MAC_PMU		0x801f	/* Mac power managment / poweroff hardware */
+#define BI_MAC_PMU		0x801f	/* Mac power management / poweroff hardware */
 #define BI_MAC_IOP_SWIM		0x8020	/* Mac SWIM floppy IOP */
 #define BI_MAC_IOP_ADB		0x8021	/* Mac ADB IOP */
 

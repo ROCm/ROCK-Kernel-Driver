@@ -2557,7 +2557,7 @@ void drv_reset_indication(struct s_smc *smc)
  *
  ************************/
 #define LP(a) ((struct s_smc*)(a))
-static struct net_device *mdev = NULL;
+static struct net_device *mdev;
 
 /************************
  *

@@ -1814,11 +1814,7 @@ static int i810_release(struct inode *inode, struct file *file)
 	/* stop DMA state machine and free DMA buffers/channels */
 	if(dmabuf->enable == DAC_RUNNING ||
 	   (dmabuf->count && (dmabuf->trigger & PCM_ENABLE_OUTPUT))) {
-		if(drain_dac(state,file->f_mode & O_NDELAY)) {
-			up(&state->open_sem);
-			unlock_kernel();
-			return -EBUSY;
-		}
+		drain_dac(state,0);
 		stop_dac(state);
 	}
 	if(dmabuf->enable & ADC_RUNNING) {

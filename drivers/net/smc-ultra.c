@@ -53,7 +53,7 @@
 	interface and then load the module with an explicit io=0x___ option.
 */
 
-static const char *version =
+static const char version[] =
 	"smc-ultra.c:v2.02 2/3/98 Donald Becker (becker@cesdis.gsfc.nasa.gov)\n";
 
 #include <linux/config.h>

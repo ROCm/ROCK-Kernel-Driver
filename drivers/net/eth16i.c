@@ -434,7 +434,7 @@ static ushort  eth16i_parse_mediatype(const char* s);
 
 static struct net_device_stats *eth16i_get_stats(struct net_device *dev);
 
-static char *cardname = "ICL EtherTeam 16i/32";
+static char cardname[] = "ICL EtherTeam 16i/32";
 
 int __init eth16i_probe(struct net_device *dev)
 {

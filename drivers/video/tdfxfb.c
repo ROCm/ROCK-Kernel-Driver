@@ -88,6 +88,10 @@
 
 #include <linux/spinlock.h>
 
+#ifndef PCI_DEVICE_ID_3DFX_VOODOO5
+#define PCI_DEVICE_ID_3DFX_VOODOO5	0x0009
+#endif
+
 /* membase0 register offsets */
 #define STATUS		0x00
 #define PCIINIT0	0x04
@@ -248,6 +252,7 @@
 
 #define BANSHEE_MAX_PIXCLOCK 270000.0
 #define VOODOO3_MAX_PIXCLOCK 300000.0
+#define VOODOO5_MAX_PIXCLOCK 350000.0
 
 struct banshee_reg {
   /* VGA rubbish */
@@ -279,6 +284,7 @@ struct banshee_reg {
   unsigned long clip1max;
   unsigned long srcbase;
   unsigned long dstbase;
+  unsigned long miscinit0;
 };
 
 struct tdfxfb_par {
@@ -646,12 +652,14 @@ static void do_pan_var(struct fb_var_screeninfo* var, struct fb_info_tdfx *i)
 static void do_flashcursor(unsigned long ptr)
 {
    struct fb_info_tdfx* i=(struct fb_info_tdfx *)ptr;
-   spin_lock(&i->DAClock);
+   unsigned long flags;
+
+   spin_lock_irqsave(&i->DAClock, flags);
    banshee_make_room(1);
    tdfx_outl( VIDPROCCFG, tdfx_inl(VIDPROCCFG) ^ VIDCFG_HWCURSOR_ENABLE );
    i->cursor.timer.expires=jiffies+HZ/2;
    add_timer(&i->cursor.timer);
-   spin_unlock(&i->DAClock);
+   spin_unlock_irqrestore(&i->DAClock, flags);
 }
 
 /*
@@ -921,6 +929,7 @@ static void do_write_regs(struct banshee_reg* reg) {
   tdfx_outl(VIDDESKSTART,  reg->startaddr);
   tdfx_outl(VIDPROCCFG,    reg->vidcfg);
   tdfx_outl(VGAINIT1,      reg->vgainit1);  
+  tdfx_outl(MISCINIT0,	   reg->miscinit0);
 
   banshee_make_room(8);
   tdfx_outl(SRCBASE,         reg->srcbase);
@@ -942,19 +951,27 @@ static unsigned long do_lfb_size(void) {
   u32 lfbsize   = 0;
   int sgram_p     = 0;
 
-  if(!((fb_info.dev == PCI_DEVICE_ID_3DFX_BANSHEE) ||
-       (fb_info.dev == PCI_DEVICE_ID_3DFX_VOODOO3)))
-    return 0;
-
   draminit0 = tdfx_inl(DRAMINIT0);  
   draminit1 = tdfx_inl(DRAMINIT1);
-   
-  sgram_p = (draminit1 & DRAMINIT1_MEM_SDRAM) ? 0 : 1;
+
+  if ((fb_info.dev == PCI_DEVICE_ID_3DFX_BANSHEE) ||
+      (fb_info.dev == PCI_DEVICE_ID_3DFX_VOODOO3)) {
+    sgram_p = (draminit1 & DRAMINIT1_MEM_SDRAM) ? 0 : 1;
   
-  lfbsize = sgram_p ?
-    (((draminit0 & DRAMINIT0_SGRAM_NUM)  ? 2 : 1) * 
-     ((draminit0 & DRAMINIT0_SGRAM_TYPE) ? 8 : 4) * 1024 * 1024) :
-    16 * 1024 * 1024;
+    lfbsize = sgram_p ?
+      (((draminit0 & DRAMINIT0_SGRAM_NUM)  ? 2 : 1) * 
+       ((draminit0 & DRAMINIT0_SGRAM_TYPE) ? 8 : 4) * 1024 * 1024) :
+      16 * 1024 * 1024;
+  } else {
+    /* Voodoo4/5 */
+    u32 chips, psize, banks;
+
+    chips = ((draminit0 & (1 << 26)) == 0) ? 4 : 8;
+    psize = 1 << ((draminit0 & 0x38000000) >> 28);
+    banks = ((draminit0 & (1 << 30)) == 0) ? 2 : 4;
+    lfbsize = chips * psize * banks;
+    lfbsize <<= 20;
+  }
 
   /* disable block writes for SDRAM (why?) */
   miscinit1 = tdfx_inl(MISCINIT1);
@@ -1412,6 +1429,26 @@ static void tdfxfb_set_par(const struct tdfxfb_par* par,
   reg.screensize = par->width | (par->height << 12);
   reg.vidcfg &= ~VIDCFG_HALF_MODE;
 
+  reg.miscinit0 = tdfx_inl(MISCINIT0);
+
+#if defined(__BIG_ENDIAN)
+  switch (par->bpp) {
+    case 8:
+      reg.miscinit0 &= ~(1 << 30);
+      reg.miscinit0 &= ~(1 << 31);
+      break;
+    case 16:
+      reg.miscinit0 |= (1 << 30);
+      reg.miscinit0 |= (1 << 31);
+      break;
+    case 24:
+    case 32:
+      reg.miscinit0 |= (1 << 30);
+      reg.miscinit0 &= ~(1 << 31);
+      break;
+  }
+#endif
+
   do_write_regs(&reg);
 
   i->current_par = *par;
@@ -1462,6 +1499,7 @@ static int tdfxfb_decode_var(const struct fb_var_screeninfo* var,
   switch(i->dev) {
   case PCI_DEVICE_ID_3DFX_BANSHEE:
   case PCI_DEVICE_ID_3DFX_VOODOO3:
+  case PCI_DEVICE_ID_3DFX_VOODOO5:
     par->width       = (var->xres + 15) & ~15; /* could sometimes be 8 */
     par->width_virt  = par->width;
     par->height      = var->yres;
@@ -1584,31 +1622,33 @@ static int tdfxfb_encode_fix(struct fb_fix_screeninfo*  fix,
 
   switch(info->dev) {
   case PCI_DEVICE_ID_3DFX_BANSHEE:
+    strcpy(fix->id, "3Dfx Banshee");
+    break;
   case PCI_DEVICE_ID_3DFX_VOODOO3:
-    strcpy(fix->id, 
-	   info->dev == PCI_DEVICE_ID_3DFX_BANSHEE 
-	   ? "3Dfx Banshee"
-	   : "3Dfx Voodoo3");
-    fix->smem_start  = info->bufbase_phys;
-    fix->smem_len    = info->bufbase_size;
-    fix->mmio_start  = info->regbase_phys;
-    fix->mmio_len    = info->regbase_size;
-    fix->accel       = FB_ACCEL_3DFX_BANSHEE;
-    fix->type        = FB_TYPE_PACKED_PIXELS;
-    fix->type_aux    = 0;
-    fix->line_length = par->lpitch;
-    fix->visual      = (par->bpp == 8) 
-                       ? FB_VISUAL_PSEUDOCOLOR
-                       : FB_VISUAL_DIRECTCOLOR;
-
-    fix->xpanstep    = 0; 
-    fix->ypanstep    = nopan ? 0 : 1;
-    fix->ywrapstep   = nowrap ? 0 : 1;
-
+    strcpy(fix->id, "3Dfx Voodoo3");
+    break;
+  case PCI_DEVICE_ID_3DFX_VOODOO5:
+    strcpy(fix->id, "3Dfx Voodoo5");
     break;
   default:
     return -EINVAL;
   }
+
+  fix->smem_start  = info->bufbase_phys;
+  fix->smem_len    = info->bufbase_size;
+  fix->mmio_start  = info->regbase_phys;
+  fix->mmio_len    = info->regbase_size;
+  fix->accel       = FB_ACCEL_3DFX_BANSHEE;
+  fix->type        = FB_TYPE_PACKED_PIXELS;
+  fix->type_aux    = 0;
+  fix->line_length = par->lpitch;
+  fix->visual      = (par->bpp == 8) 
+                     ? FB_VISUAL_PSEUDOCOLOR
+                     : FB_VISUAL_DIRECTCOLOR;
+
+  fix->xpanstep    = 0; 
+  fix->ypanstep    = nopan ? 0 : 1;
+  fix->ywrapstep   = nowrap ? 0 : 1;
 
   return 0;
 }
@@ -1850,17 +1890,25 @@ int __init tdfxfb_init(void) {
   while ((pdev = pci_find_device(PCI_VENDOR_ID_3DFX, PCI_ANY_ID, pdev))) {
     if(((pdev->class >> 16) == PCI_BASE_CLASS_DISPLAY) &&
        ((pdev->device == PCI_DEVICE_ID_3DFX_BANSHEE) ||
-	(pdev->device == PCI_DEVICE_ID_3DFX_VOODOO3))) {
-      char* name = pdev->device == PCI_DEVICE_ID_3DFX_BANSHEE
-	? "Banshee"
-	: "Voodoo3";
+	(pdev->device == PCI_DEVICE_ID_3DFX_VOODOO3) ||
+	(pdev->device == PCI_DEVICE_ID_3DFX_VOODOO5))) {
+      char *name;
 
       fb_info.dev   = pdev->device;
-      fb_info.max_pixclock = 
-	pdev->device == PCI_DEVICE_ID_3DFX_BANSHEE 
-	? BANSHEE_MAX_PIXCLOCK
-	: VOODOO3_MAX_PIXCLOCK;
-
+      switch (pdev->device) {
+      case PCI_DEVICE_ID_3DFX_BANSHEE:
+	fb_info.max_pixclock = BANSHEE_MAX_PIXCLOCK;
+	name = "Banshee";
+	break;
+      case PCI_DEVICE_ID_3DFX_VOODOO3:
+	fb_info.max_pixclock = VOODOO3_MAX_PIXCLOCK;
+	name = "Voodoo3";
+	break;
+      case PCI_DEVICE_ID_3DFX_VOODOO5:
+	fb_info.max_pixclock = VOODOO5_MAX_PIXCLOCK;
+	name = "Voodoo5";
+	break;
+      }
       fb_info.regbase_phys = pci_resource_start(pdev, 0);
       fb_info.regbase_size = 1 << 24;
       fb_info.regbase_virt = ioremap_nocache(fb_info.regbase_phys, 1 << 24);

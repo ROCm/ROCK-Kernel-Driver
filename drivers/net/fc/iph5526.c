@@ -241,7 +241,7 @@ static int __init iph5526_probe_pci(struct net_device *dev)
 	struct fc_info *fi = (struct fc_info *)dev->priv;
 #else
 	struct fc_info *fi;
-	static int count = 0;
+	static int count;
  
 	if(fc[count] != NULL) {
 		if (dev == NULL) {
@@ -4523,9 +4523,9 @@ static char buf[80];
 
 static struct net_device *dev_fc[MAX_FC_CARDS];
 
-static int io =  0;
-static int irq  = 0;
-static int bad  = 0;	/* 0xbad = bad sig or no reset ack */
+static int io;
+static int irq;
+static int bad;	/* 0xbad = bad sig or no reset ack */
 static int scsi_registered;
 
 

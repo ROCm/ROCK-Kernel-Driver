@@ -255,7 +255,7 @@ static int plusb_add_buf_tail (plusb_t *s, struct list_head *dst, struct list_he
 /*
  * dequeue_next_skb - submit the first thing on the tx_skb_list to the
  * USB stack.  This function should be called each time we get a new
- * message to send to the other host, or each time a message is sucessfully
+ * message to send to the other host, or each time a message is successfully
  * sent.
  */
 static void dequeue_next_skb(char * func, plusb_t * s)
@@ -393,7 +393,7 @@ static int plusb_net_xmit(struct sk_buff *skb, struct net_device *dev)
 
 /*
  * plusb_write_bulk_complete () - callback after the data has been
- *   sent to the USB device, or a timeout occured.
+ *   sent to the USB device, or a timeout occurred.
  */
 static void plusb_write_bulk_complete(urb_t *purb)
 {

@@ -23,7 +23,7 @@
  *
 -*/
 
-static const char *rcsid = "$Id: sk_g16.c,v 1.1 1994/06/30 16:25:15 root Exp $";
+static const char rcsid[] = "$Id: sk_g16.c,v 1.1 1994/06/30 16:25:15 root Exp $";
 
 /*
  * The Schneider & Koch (SK) G16 Network device driver is based
@@ -622,7 +622,7 @@ MODULE_PARM_DESC(io, "0 to probe common ports (unsafe), or the I/O base of the b
 
 
 #ifdef MODULE
-static int io = 0; /* 0 == probe */
+static int io;	/* 0 == probe */
 
 static int __init SK_init_module (void)
 {

@@ -400,8 +400,6 @@ static int lapbeth_new_device(struct net_device *dev)
                 return -EIO;
         }
 
-	dev_init_buffers(dev);
-
 	dev->hard_start_xmit = lapbeth_xmit;
 	dev->open	     = lapbeth_open;
 	dev->stop	     = lapbeth_close;

@@ -1,4 +1,4 @@
-/* $Id: su.c,v 1.45 2001/03/15 02:11:10 davem Exp $
+/* $Id: su.c,v 1.47 2001/04/18 21:06:15 davem Exp $
  * su.c: Small serial driver for keyboard/mouse interface on sparc32/PCI
  *
  * Copyright (C) 1997  Eddie C. Dost  (ecd@skynet.be)
@@ -11,7 +11,7 @@
 /*
  * Configuration section.
  */
-#define SERIAL_PARANOIA_CHECK
+#undef SERIAL_PARANOIA_CHECK
 #define CONFIG_SERIAL_NOPAUSE_IO	/* Unused on sparc */
 #define SERIAL_DO_RESTART
 
@@ -335,7 +335,7 @@ static void su_start(struct tty_struct *tty)
  * This routine is used by the interrupt handler to schedule
  * processing in the software interrupt portion of the driver.
  */
-static __inline__ void
+static void
 su_sched_event(struct su_struct *info, int event)
 {
 	info->event |= 1 << event;
@@ -343,7 +343,7 @@ su_sched_event(struct su_struct *info, int event)
 	mark_bh(SERIAL_BH);
 }
 
-static __inline__ void
+static void
 receive_kbd_ms_chars(struct su_struct *info, struct pt_regs *regs, int is_brk)
 {
 	unsigned char status = 0;
@@ -378,7 +378,7 @@ receive_kbd_ms_chars(struct su_struct *info, struct pt_regs *regs, int is_brk)
 	} while (status & UART_LSR_DR);
 }
 
-static __inline__ void
+static void
 receive_serial_chars(struct su_struct *info, int *status, struct pt_regs *regs)
 {
 	struct tty_struct *tty = info->tty;
@@ -471,7 +471,7 @@ receive_serial_chars(struct su_struct *info, int *status, struct pt_regs *regs)
 		batten_down_hatches();
 }
 
-static __inline__ void
+static void
 transmit_chars(struct su_struct *info, int *intr_done)
 {
 	int count;
@@ -515,7 +515,7 @@ transmit_chars(struct su_struct *info, int *intr_done)
 	}
 }
 
-static __inline__ void
+static void
 check_modem_status(struct su_struct *info)
 {
 	int	status;
@@ -929,7 +929,7 @@ shutdown(struct su_struct *info)
 	restore_flags(flags);
 }
 
-static __inline__ int
+static int
 su_get_baud_rate(struct su_struct *info)
 {
 	static int baud_table[] = {
@@ -2117,7 +2117,7 @@ su_open(struct tty_struct *tty, struct file * filp)
 /*
  * /proc fs routines....
  */
-static __inline__ int
+static int
 line_info(char *buf, struct su_struct *info)
 {
 	char		stat_buf[30], control, status;
@@ -2220,7 +2220,7 @@ done:
  */
 static __inline__ void __init show_su_version(void)
 {
-	char *revision = "$Revision: 1.45 $";
+	char *revision = "$Revision: 1.47 $";
 	char *version, *p;
 
 	version = strchr(revision, ' ');
@@ -2900,6 +2900,7 @@ static int __init serial_console_setup(struct console *co, char *options)
 		case 9600:
 		default:
 			cflag |= B9600;
+			baud = 9600;
 			break;
 	}
 	switch (bits) {

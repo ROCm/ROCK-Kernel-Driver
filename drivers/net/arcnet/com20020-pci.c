@@ -44,12 +44,12 @@
 
 /* Module parameters */
 
-static int node = 0;
+static int node;
 static char *device;		/* use eg. device="arc1" to change name */
 static int timeout = 3;
-static int backplane = 0;
-static int clockp = 0;
-static int clockm = 0;
+static int backplane;
+static int clockp;
+static int clockm;
 
 MODULE_PARM(node, "i");
 MODULE_PARM(device, "s");

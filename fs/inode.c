@@ -13,6 +13,8 @@
 #include <linux/quotaops.h>
 #include <linux/slab.h>
 #include <linux/cache.h>
+#include <linux/swap.h>
+#include <linux/swapctl.h>
 
 /*
  * New inode.c implementation.
@@ -197,6 +199,34 @@ static inline void __iget(struct inode * inode)
 	inodes_stat.nr_unused--;
 }
 
+static inline void __sync_one(struct inode *inode, int sync)
+{
+	unsigned dirty;
+
+	list_del(&inode->i_list);
+	list_add(&inode->i_list, atomic_read(&inode->i_count)
+						? &inode_in_use
+						: &inode_unused);
+
+	/* Set I_LOCK, reset I_DIRTY */
+	dirty = inode->i_state & I_DIRTY;
+	inode->i_state |= I_LOCK;
+	inode->i_state &= ~I_DIRTY;
+	spin_unlock(&inode_lock);
+
+	filemap_fdatasync(inode->i_mapping);
+
+	/* Don't write the inode if only I_DIRTY_PAGES was set */
+	if (dirty & (I_DIRTY_SYNC | I_DIRTY_DATASYNC))
+		write_inode(inode, sync);
+
+	filemap_fdatawait(inode->i_mapping);
+
+	spin_lock(&inode_lock);
+	inode->i_state &= ~I_LOCK;
+	wake_up(&inode->i_wait);
+}
+
 static inline void sync_one(struct inode *inode, int sync)
 {
 	if (inode->i_state & I_LOCK) {
@@ -206,29 +236,7 @@ static inline void sync_one(struct inode *inode, int sync)
 		iput(inode);
 		spin_lock(&inode_lock);
 	} else {
-		unsigned dirty;
-
-		list_del(&inode->i_list);
-		list_add(&inode->i_list, atomic_read(&inode->i_count)
-							? &inode_in_use
-							: &inode_unused);
-		/* Set I_LOCK, reset I_DIRTY */
-		dirty = inode->i_state & I_DIRTY;
-		inode->i_state |= I_LOCK;
-		inode->i_state &= ~I_DIRTY;
-		spin_unlock(&inode_lock);
-
-		filemap_fdatasync(inode->i_mapping);
-
-		/* Don't write the inode if only I_DIRTY_PAGES was set */
-		if (dirty & (I_DIRTY_SYNC | I_DIRTY_DATASYNC))
-			write_inode(inode, sync);
-
-		filemap_fdatawait(inode->i_mapping);
-
-		spin_lock(&inode_lock);
-		inode->i_state &= ~I_LOCK;
-		wake_up(&inode->i_wait);
+		__sync_one(inode, sync);
 	}
 }
 
@@ -236,8 +244,40 @@ static inline void sync_list(struct list_head *head)
 {
 	struct list_head * tmp;
 
-	while ((tmp = head->prev) != head)
+	while ((tmp = head->prev) != head) 
 		sync_one(list_entry(tmp, struct inode, i_list), 0);
+}
+
+static inline int try_to_sync_unused_list(struct list_head *head)
+{
+	struct list_head *tmp = head;
+	struct inode *inode;
+
+	while ((tmp = tmp->prev) != head) {
+		inode = list_entry(tmp, struct inode, i_list);
+
+		if (!(inode->i_state & I_LOCK) 
+				&& !atomic_read(&inode->i_count)) {
+			/* 
+			 * We're under PF_MEMALLOC here, and syncing the 
+			 * inode may have to allocate memory. To avoid
+			 * running into a OOM deadlock, we write one 
+			 * inode synchronously and stop syncing in case 
+			 * we're under freepages.low
+			 */
+
+			int sync = nr_free_pages() < freepages.low;
+			__sync_one(inode, sync);
+			if (sync) 
+				return 0;
+			/* 
+			 * __sync_one moved the inode to another list,
+			 * so we have to start looking from the list head.
+			 */
+			tmp = head;
+		}
+	}
+	return 1;
 }
 
 /**
@@ -273,13 +313,14 @@ void sync_inodes(kdev_t dev)
 /*
  * Called with the spinlock already held..
  */
-static void sync_all_inodes(void)
+static void try_to_sync_unused_inodes(void)
 {
 	struct super_block * sb = sb_entry(super_blocks.next);
 	for (; sb != sb_entry(&super_blocks); sb = sb_entry(sb->s_list.next)) {
 		if (!sb->s_dev)
 			continue;
-		sync_list(&sb->s_dirty);
+		if (!try_to_sync_unused_list(&sb->s_dirty))
+			break;
 	}
 }
 
@@ -503,13 +544,12 @@ void prune_icache(int goal)
 {
 	LIST_HEAD(list);
 	struct list_head *entry, *freeable = &list;
-	int count = 0;
+	int count = 0, synced = 0;
 	struct inode * inode;
 
 	spin_lock(&inode_lock);
-	/* go simple and safe syncing everything before starting */
-	sync_all_inodes();
 
+free_unused:
 	entry = inode_unused.prev;
 	while (entry != &inode_unused)
 	{
@@ -536,6 +576,20 @@ void prune_icache(int goal)
 	spin_unlock(&inode_lock);
 
 	dispose_list(freeable);
+
+	/* 
+	 * If we freed enough clean inodes, avoid writing 
+	 * dirty ones. Also giveup if we already tried to
+	 * sync dirty inodes.
+	 */
+	if (!goal || synced)
+		return;
+	
+	synced = 1;
+
+	spin_lock(&inode_lock);
+	try_to_sync_unused_inodes();
+	goto free_unused;
 }
 
 void shrink_icache_memory(int priority, int gfp_mask)

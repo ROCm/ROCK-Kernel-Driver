@@ -9,7 +9,6 @@
 
 O_TARGET := netfilter.o
 
-multi-objs :=
 export-objs :=
 
 # Link order matters here.

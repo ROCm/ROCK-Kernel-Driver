@@ -511,11 +511,11 @@ static int setup (wan_device_t* wandev, wandev_conf_t* conf)
 	if (!card->configured){
 
 		/* Initialize the Spin lock */
-	      #if defined(__SMP__) || defined(LINUX_2_4) 
+#if defined(__SMP__) || defined(LINUX_2_4) 
 		printk(KERN_INFO "%s: Initializing for SMP\n",wandev->name);
-	      #endif
+#endif
 
-		/* Piggiback spin lock has already been initialized,
+		/* Piggyback spin lock has already been initialized,
 		 * in check_s514/s508_conflicts() */
 		if (!card->wandev.piggyback){
 			spin_lock_init(&card->wandev.lock);
@@ -543,7 +543,7 @@ static int setup (wan_device_t* wandev, wandev_conf_t* conf)
 
 	case SFID_X25_502:
 	case SFID_X25_508:
-		printk(KERN_INFO "%s: Starting x25 Protocol Init.\n",
+		printk(KERN_INFO "%s: Starting X.25 Protocol Init.\n",
 				card->devname);
 		err = wpx_init(card, conf);
 		break;

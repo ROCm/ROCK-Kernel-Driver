@@ -63,7 +63,7 @@ static char version[] __initdata =
 #define DIRQ(x)
 #endif
 
-static struct bigmac *root_bigmac_dev = NULL;
+static struct bigmac *root_bigmac_dev;
 
 #define DEFAULT_JAMSIZE    4 /* Toe jam */
 

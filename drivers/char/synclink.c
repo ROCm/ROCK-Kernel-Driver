@@ -7344,8 +7344,6 @@ void mgsl_sppp_init(struct mgsl_struct *info)
 	d->tx_timeout = mgsl_sppp_tx_timeout;
 	d->watchdog_timeo = 10*HZ;
 
-	dev_init_buffers(d);
-
 	if (register_netdev(d) == -1) {
 		printk(KERN_WARNING "%s: register_netdev failed.\n", d->name);
 		sppp_detach(info->netdev);

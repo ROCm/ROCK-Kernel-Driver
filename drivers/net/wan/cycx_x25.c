@@ -492,7 +492,6 @@ static int if_init (struct net_device *dev)
         dev->tx_queue_len = 10;
 
 	/* Initialize socket buffers */
-	dev_init_buffers(dev);
 	set_chan_state(dev, WAN_DISCONNECTED);
 
 	return 0;

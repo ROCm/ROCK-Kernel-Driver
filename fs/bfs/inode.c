@@ -250,7 +250,6 @@ static struct super_block * bfs_read_super(struct super_block * s,
 	set_blocksize(dev, BFS_BSIZE);
 	s->s_blocksize = BFS_BSIZE;
 	s->s_blocksize_bits = BFS_BSIZE_BITS;
-	s->s_maxbytes = MAX_NON_LFS;
 
 	bh = bread(dev, 0, BFS_BSIZE);
 	if(!bh)

@@ -273,6 +273,7 @@ extern int hysdn_sched_rx(hysdn_card *, uchar *, word, word);
 extern int hysdn_tx_cfgline(hysdn_card *, uchar *, word);	/* send one cfg line */
 
 /* hysdn_net.c */
+extern unsigned int hynet_enable; 
 extern char *hysdn_net_revision;
 extern int hysdn_net_create(hysdn_card *);	/* create a new net device */
 extern int hysdn_net_release(hysdn_card *);	/* delete the device */
@@ -282,6 +283,7 @@ extern struct sk_buff *hysdn_tx_netget(hysdn_card *);	/* get next network packet
 extern void hysdn_rx_netpkt(hysdn_card *, uchar *, word);	/* rxed packet from network */
 
 #ifdef CONFIG_HYSDN_CAPI
+extern unsigned int hycapi_enable; 
 extern struct capi_driver_interface *hy_di;
 extern int hycapi_capi_create(hysdn_card *);	/* create a new capi device */
 extern int hycapi_capi_release(hysdn_card *);	/* delete the device */

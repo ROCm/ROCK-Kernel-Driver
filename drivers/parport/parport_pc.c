@@ -2180,7 +2180,8 @@ struct parport *__devinit parport_pc_probe_port (unsigned long int base,
 
 
 /* Via support maintained by Jeff Garzik <jgarzik@mandrakesoft.com> */
-static int __devinit sio_via_686a_probe (struct pci_dev *pdev)
+static int __devinit sio_via_686a_probe (struct pci_dev *pdev, int autoirq,
+					 int autodma)
 {
 	u8 tmp;
 	int dma, irq;
@@ -2215,7 +2216,7 @@ static int __devinit sio_via_686a_probe (struct pci_dev *pdev)
 	case 0x378: port2 = 0x778; break;
 	case 0x278: port2 = 0x678; break;
 	default:
-		printk (KERN_INFO "parport_pc: Via 686A weird parport base 0x%X, ignoring\n",
+		printk (KERN_INFO "parport_pc: Weird Via 686A parport base 0x%X, ignoring\n",
 			port1);
 		return 0;
 	}
@@ -2260,6 +2261,14 @@ static int __devinit sio_via_686a_probe (struct pci_dev *pdev)
 	if (!have_eppecp)
 		dma = PARPORT_DMA_NONE;
 
+	/* Let the user (or defaults) steer us away from interrupts and DMA */
+	if (autoirq != PARPORT_IRQ_AUTO) {
+		irq = PARPORT_IRQ_NONE;
+		dma = PARPORT_DMA_NONE;
+	}
+	if (autodma != PARPORT_DMA_AUTO)
+		dma = PARPORT_DMA_NONE;
+
 	/* finally, do the probe with values obtained */
 	if (parport_pc_probe_port (port1, port2, irq, dma, NULL)) {
 		printk (KERN_INFO
@@ -2285,7 +2294,7 @@ enum parport_pc_sio_types {
 
 /* each element directly indexed from enum list, above */
 static struct parport_pc_superio {
-	int (*probe) (struct pci_dev *pdev);
+	int (*probe) (struct pci_dev *pdev, int autoirq, int autodma);
 } parport_pc_superio_info[] __devinitdata = {
 	{ sio_via_686a_probe, },
 };
@@ -2542,7 +2551,7 @@ static struct pci_driver parport_pc_pci_driver = {
 	probe:		parport_pc_pci_probe,
 };
 
-static int __init parport_pc_init_superio (void)
+static int __init parport_pc_init_superio (int autoirq, int autodma)
 {
 #ifdef CONFIG_PCI
 	const struct pci_device_id *id;
@@ -2553,7 +2562,8 @@ static int __init parport_pc_init_superio (void)
 		if (id == NULL || id->driver_data >= last_sio)
 			continue;
 
-		return parport_pc_superio_info[id->driver_data].probe (pdev);
+		return parport_pc_superio_info[id->driver_data].probe
+			(pdev, autoirq, autodma);
 	}
 #endif /* CONFIG_PCI */
 
@@ -2596,7 +2606,7 @@ static int __init parport_pc_find_ports (int autoirq, int autodma)
 #endif
 
 	/* Onboard SuperIO chipsets that show themselves on the PCI bus. */
-	count += parport_pc_init_superio ();
+	count += parport_pc_init_superio (autoirq, autodma);
 
 	/* ISA ports and whatever (see asm/parport.h). */
 	count += parport_pc_find_nonpci_ports (autoirq, autodma);

@@ -1174,16 +1174,12 @@ static void set_multicast_list(struct net_device *dev)
 }
 
 #ifdef MODULE
-static struct net_device dev_ni65 = {
-	"",	/* "ni6510": device name inserted by net_init.c */
-	0, 0, 0, 0,
-	0x360, 9,	 /* I/O address, IRQ */
-	0, 0, 0, NULL, ni65_probe };
+static struct net_device dev_ni65 = { base_addr: 0x360, irq: 9, init: ni65_probe };
 
 /* set: io,irq,dma or set it when calling insmod */
-static int irq=0;
-static int io=0;
-static int dma=0;
+static int irq;
+static int io;
+static int dma;
 
 MODULE_PARM(irq, "i");
 MODULE_PARM(io, "i");

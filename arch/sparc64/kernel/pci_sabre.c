@@ -1,4 +1,4 @@
-/* $Id: pci_sabre.c,v 1.25 2001/02/28 03:28:55 davem Exp $
+/* $Id: pci_sabre.c,v 1.26 2001/04/17 01:19:23 davem Exp $
  * pci_sabre.c: Sabre specific PCI controller support.
  *
  * Copyright (C) 1997, 1998, 1999 David S. Miller (davem@caipfs.rutgers.edu)
@@ -774,6 +774,8 @@ static void sabre_ue_intr(int irq, void *dev_id, struct pt_regs *regs)
 		(SABRE_UEAFSR_PDRD | SABRE_UEAFSR_PDWR |
 		 SABRE_UEAFSR_SDRD | SABRE_UEAFSR_SDWR |
 		 SABRE_UEAFSR_SDTE | SABRE_UEAFSR_PDTE);
+	if (!error_bits)
+		return;
 	sabre_write(afsr_reg, error_bits);
 
 	/* Log the error. */
@@ -829,6 +831,8 @@ static void sabre_ce_intr(int irq, void *dev_id, struct pt_regs *regs)
 	error_bits = afsr &
 		(SABRE_CEAFSR_PDRD | SABRE_CEAFSR_PDWR |
 		 SABRE_CEAFSR_SDRD | SABRE_CEAFSR_SDWR);
+	if (!error_bits)
+		return;
 	sabre_write(afsr_reg, error_bits);
 
 	/* Log the error. */
@@ -885,6 +889,8 @@ static void sabre_pcierr_intr(int irq, void *dev_id, struct pt_regs *regs)
 		 SABRE_PIOAFSR_PRTRY | SABRE_PIOAFSR_PPERR |
 		 SABRE_PIOAFSR_SMA | SABRE_PIOAFSR_STA |
 		 SABRE_PIOAFSR_SRTRY | SABRE_PIOAFSR_SPERR);
+	if (!error_bits)
+		return;
 	sabre_write(afsr_reg, error_bits);
 
 	/* Log the error. */

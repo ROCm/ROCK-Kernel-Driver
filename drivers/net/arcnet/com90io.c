@@ -373,8 +373,8 @@ static struct net_device *my_dev;
 
 /* Module parameters */
 
-static int io = 0x0;		/* use the insmod io= irq= shmem= options */
-static int irq = 0;
+static int io;			/* use the insmod io= irq= shmem= options */
+static int irq;
 static char *device;		/* use eg. device=arc1 to change name */
 
 MODULE_PARM(io, "i");

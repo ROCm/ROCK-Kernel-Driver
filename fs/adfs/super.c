@@ -386,12 +386,6 @@ struct super_block *adfs_read_super(struct super_block *sb, void *data, int sile
 	sb->u.adfs_sb.s_version  = dr->format_version;
 	sb->u.adfs_sb.s_log2sharesize = dr->log2sharesize;
 	
-	/*
-	 * Max file size is 2Gb
-	 */
-	 
-	sb->s_maxbytes = MAX_NON_LFS;
-
 	sb->u.adfs_sb.s_map = adfs_read_map(sb, dr);
 	if (!sb->u.adfs_sb.s_map)
 		goto error_free_bh;

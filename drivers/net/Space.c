@@ -544,7 +544,6 @@ static struct net_device eth0_dev = {
 #ifdef CONFIG_TR
 /* Token-ring device probe */
 extern int ibmtr_probe(struct net_device *);
-extern int olympic_probe(struct net_device *);
 extern int smctr_probe(struct net_device *);
 
 static int
@@ -553,9 +552,6 @@ trif_probe(struct net_device *dev)
     if (1
 #ifdef CONFIG_IBMTR
 	&& ibmtr_probe(dev)
-#endif
-#ifdef CONFIG_IBMOL
-	&& olympic_probe(dev)
 #endif
 #ifdef CONFIG_SMCTR
 	&& smctr_probe(dev)

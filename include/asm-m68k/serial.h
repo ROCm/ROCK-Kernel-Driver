@@ -1,7 +1,7 @@
 /*
  * include/asm-m68k/serial.h
  *
- * currently this seems usefull only for a Q40,
+ * currently this seems useful only for a Q40,
  * its an almost exact copy of ../asm/alpha/serial.h 
  *
  */

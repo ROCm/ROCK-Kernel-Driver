@@ -185,6 +185,24 @@ suggestions welcome)  (WIP)
 Change History
 --------------
 
+Version 0.9.16 - April 14, 2001
+
+* Complete MMIO audit, disable read-after-every-write
+* Update Rx interrupt handling
+* Enable Early Rx thresholds, highly recommended to reduce
+  Rx FIFO overflow
+* Make 8129 support conditional
+* Support for new 2.4.3 kernel APIs
+* More correct PIO/MMIO PCI BAR region size checking
+* Add check for totally dead/missing hardware
+* Disable media timer code to "set full duplex"
+* s/spin_lock_irq/spin_lock_irqsave/
+* Only set AcceptMulticast if more than one mc address
+* Only set rx_mode if changed, in set_rx_mode
+* Only suspend/resume if interface is up
+* Always print out version upon module load, even if no devices found
+
+
 Version 0.9.15 - February 20, 2001
 
 * Call pci_enable_device to wake up/assign resource to device,

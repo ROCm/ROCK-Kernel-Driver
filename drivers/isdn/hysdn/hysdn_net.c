@@ -37,8 +37,11 @@
 
 #include "hysdn_defs.h"
 
+unsigned int hynet_enable = 0xffffffff; 
+MODULE_PARM(hynet_enable, "i");
+
 /* store the actual version for log reporting */
-char *hysdn_net_revision = "$Revision: 1.8.6.1 $";
+char *hysdn_net_revision = "$Revision: 1.10 $";
 
 #define MAX_SKB_BUFFERS 20	/* number of buffers for keeping TX-data */
 

@@ -53,7 +53,7 @@
  .      12/15/00  Christian Jullien fix "Warning: kfree_skb on hard IRQ"
  ----------------------------------------------------------------------------*/
 
-static const char *version =
+static const char version[] =
 	"smc9194.c:v0.14 12/15/00 by Erik Stahlman (erik@vt.edu)\n";
 
 #include <linux/module.h>

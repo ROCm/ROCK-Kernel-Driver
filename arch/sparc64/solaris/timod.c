@@ -1,4 +1,4 @@
-/* $Id: timod.c,v 1.10 2000/07/28 12:15:02 davem Exp $
+/* $Id: timod.c,v 1.11 2001/04/14 21:12:01 davem Exp $
  * timod.c: timod emulation.
  *
  * Copyright (C) 1998 Patrik Rak (prak3264@ss1000.ms.mff.cuni.cz)
@@ -611,7 +611,7 @@ int timod_putmsg(unsigned int fd, char *ctl_buf, int ctl_len,
 		return 0;
 	}
 	default:
-		printk("timod_putmsg: unsupported command %u.\n", ret);
+		printk(KERN_INFO "timod_putmsg: unsupported command %u.\n", ret);
 		break;
 	}
 	return -EINVAL;

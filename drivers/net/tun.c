@@ -48,7 +48,7 @@
 #include <asm/uaccess.h>
 
 #ifdef TUN_DEBUG
-static int debug=0;
+static int debug;
 #endif
 
 /* Network device part of the driver */
@@ -147,8 +147,6 @@ int tun_net_init(struct net_device *dev)
 		dev->type = ARPHRD_PPP; 
 		dev->flags = IFF_POINTOPOINT | IFF_NOARP | IFF_MULTICAST;
 		dev->tx_queue_len = 10;
-
-		dev_init_buffers(dev);
 		break;
 
 	case TUN_TAP_DEV:

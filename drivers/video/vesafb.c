@@ -2,7 +2,7 @@
  * framebuffer driver for VBE 2.0 compliant graphic boards
  *
  * switching to graphics mode happens at boot time (while
- * running in real mode, see arch/i386/video.S).
+ * running in real mode, see arch/i386/boot/video.S).
  *
  * (c) 1998 Gerd Knorr <kraxel@goldbach.in-berlin.de>
  *

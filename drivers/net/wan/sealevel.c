@@ -375,7 +375,6 @@ static struct slvl_board *slvl_init(int iobase, int irq, int txdma, int rxdma, i
 			d->do_ioctl = sealevel_ioctl;
 #ifdef LINUX_21			
 			d->neigh_setup = sealevel_neigh_setup_dev;
-			dev_init_buffers(d);
 #else
 			d->init = return_0;
 #endif

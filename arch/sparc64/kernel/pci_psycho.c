@@ -1,4 +1,4 @@
-/* $Id: pci_psycho.c,v 1.21 2001/02/28 03:28:55 davem Exp $
+/* $Id: pci_psycho.c,v 1.22 2001/04/17 01:19:23 davem Exp $
  * pci_psycho.c: PSYCHO/U2P specific PCI controller support.
  *
  * Copyright (C) 1997, 1998, 1999 David S. Miller (davem@caipfs.rutgers.edu)
@@ -757,6 +757,8 @@ static void psycho_ue_intr(int irq, void *dev_id, struct pt_regs *regs)
 	error_bits = afsr &
 		(PSYCHO_UEAFSR_PPIO | PSYCHO_UEAFSR_PDRD | PSYCHO_UEAFSR_PDWR |
 		 PSYCHO_UEAFSR_SPIO | PSYCHO_UEAFSR_SDRD | PSYCHO_UEAFSR_SDWR);
+	if (!error_bits)
+		return;
 	psycho_write(afsr_reg, error_bits);
 
 	/* Log the error. */
@@ -830,6 +832,8 @@ static void psycho_ce_intr(int irq, void *dev_id, struct pt_regs *regs)
 	error_bits = afsr &
 		(PSYCHO_CEAFSR_PPIO | PSYCHO_CEAFSR_PDRD | PSYCHO_CEAFSR_PDWR |
 		 PSYCHO_CEAFSR_SPIO | PSYCHO_CEAFSR_SDRD | PSYCHO_CEAFSR_SDWR);
+	if (!error_bits)
+		return;
 	psycho_write(afsr_reg, error_bits);
 
 	/* Log the error. */
@@ -922,6 +926,8 @@ static void psycho_pcierr_intr(int irq, void *dev_id, struct pt_regs *regs)
 		 PSYCHO_PCIAFSR_PRTRY | PSYCHO_PCIAFSR_PPERR |
 		 PSYCHO_PCIAFSR_SMA | PSYCHO_PCIAFSR_STA |
 		 PSYCHO_PCIAFSR_SRTRY | PSYCHO_PCIAFSR_SPERR);
+	if (!error_bits)
+		return;
 	psycho_write(afsr_reg, error_bits);
 
 	/* Log the error. */

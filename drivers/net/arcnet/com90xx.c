@@ -610,9 +610,9 @@ static void com90xx_copy_from_card(struct net_device *dev, int bufnum, int offse
 
 /* Module parameters */
 
-static int io = 0x0;		/* use the insmod io= irq= shmem= options */
-static int irq = 0;
-static int shmem = 0;
+static int io;			/* use the insmod io= irq= shmem= options */
+static int irq;
+static int shmem;
 static char *device;		/* use eg. device=arc1 to change name */
 
 MODULE_PARM(io, "i");

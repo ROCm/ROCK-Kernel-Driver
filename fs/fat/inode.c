@@ -434,7 +434,7 @@ fat_read_super(struct super_block *sb, void *data, int silent,
 	char *p;
 	int data_sectors,logical_sector_size,sector_mult,fat_clusters=0;
 	int debug,error,fat,cp;
-	int blksize = 512;
+	int blksize;
 	int fat32;
 	struct fat_mount_options opts;
 	char buf[50];
@@ -448,14 +448,14 @@ fat_read_super(struct super_block *sb, void *data, int silent,
 	sbi->private_data = NULL;
 
 	sbi->dir_ops = fs_dir_inode_ops;
-	sb->s_op = &fat_sops;
-	if (hardsect_size[MAJOR(sb->s_dev)] != NULL){
-		blksize = hardsect_size[MAJOR(sb->s_dev)][MINOR(sb->s_dev)];
-		if (blksize != 512){
-			printk ("MSDOS: Hardware sector size is %d\n",blksize);
-		}
 
-	}
+	sb->s_maxbytes = MAX_NON_LFS;
+	sb->s_op = &fat_sops;
+	blksize = get_hardsect_size(sb->s_dev);
+	if (!blksize)
+		blksize = 512;
+	if (blksize != 512)
+		printk ("MSDOS: Hardware sector size is %d\n",blksize);
 
 	opts.isvfat = sbi->options.isvfat;
 	if (!parse_options((char *) data, &fat, &blksize, &debug, &opts, 

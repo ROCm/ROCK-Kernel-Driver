@@ -41,7 +41,7 @@ static char *hysdn_procconf_revision = "$Revision: 1.8.6.1 $";
 #define CONF_STATE_DETECT 0	/* waiting for detect */
 #define CONF_STATE_CONF   1	/* writing config data */
 #define CONF_STATE_POF    2	/* writing pof data */
-#define CONF_LINE_LEN    80	/* 80 chars max */
+#define CONF_LINE_LEN   255	/* 255 chars max */
 
 struct conf_writedata {
 	hysdn_card *card;	/* card the device is connected to */

@@ -412,7 +412,6 @@ static int read_old_super_block (struct super_block * s, int size)
     SB_BUFFER_WITH_SB (s) = bh;
     SB_DISK_SUPER_BLOCK (s) = rs;
     s->s_op = &reiserfs_sops;
-    s->s_maxbytes = MAX_NON_LFS;
     return 0;
 }
 #endif

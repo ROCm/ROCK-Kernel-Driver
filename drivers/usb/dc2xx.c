@@ -48,7 +48,7 @@
  * 01 Nov, 2000 .. usb_device_id support added by Adam J. Richter
  *
  * Thanks to:  the folk who've provided USB product IDs, sent in
- * patches, and shared their sucesses!
+ * patches, and shared their successes!
  */
 
 #include <linux/config.h>

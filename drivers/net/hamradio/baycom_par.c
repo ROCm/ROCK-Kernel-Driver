@@ -569,7 +569,7 @@ module_exit(cleanup_baycompar);
 
 static int __init baycom_par_setup(char *str)
 {
-        static unsigned nr_dev = 0;
+        static unsigned nr_dev;
 	int ints[2];
 
         if (nr_dev >= NR_PORTS)

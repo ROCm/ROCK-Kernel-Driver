@@ -1,4 +1,4 @@
-/* $Id: sab82532.c,v 1.56 2001/03/15 02:11:10 davem Exp $
+/* $Id: sab82532.c,v 1.58 2001/04/17 06:30:36 davem Exp $
  * sab82532.c: ASYNC Driver for the SIEMENS SAB82532 DUSCC.
  *
  * Copyright (C) 1997  Eddie C. Dost  (ecd@skynet.be)
@@ -49,7 +49,7 @@ static int sab82532_refcount;
 /* number of characters left in xmit buffer before we ask for more */
 #define WAKEUP_CHARS 256
 
-#define SERIAL_PARANOIA_CHECK
+#undef SERIAL_PARANOIA_CHECK
 #define SERIAL_DO_RESTART
 
 /* Set of debugging defines */
@@ -299,15 +299,15 @@ static void sab82532_start(struct tty_struct *tty)
  * This routine is used by the interrupt handler to schedule
  * processing in the software interrupt portion of the driver.
  */
-static inline void sab82532_sched_event(struct sab82532 *info, int event)
+static void sab82532_sched_event(struct sab82532 *info, int event)
 {
 	info->event |= 1 << event;
 	queue_task(&info->tqueue, &tq_serial);
 	mark_bh(SERIAL_BH);
 }
 
-static inline void receive_chars(struct sab82532 *info,
-				 union sab82532_irq_status *stat)
+static void receive_chars(struct sab82532 *info,
+			  union sab82532_irq_status *stat)
 {
 	struct tty_struct *tty = info->tty;
 	unsigned char buf[32];
@@ -389,8 +389,8 @@ static inline void receive_chars(struct sab82532 *info,
 	queue_task(&tty->flip.tqueue, &tq_timer);
 }
 
-static inline void transmit_chars(struct sab82532 *info,
-				  union sab82532_irq_status *stat)
+static void transmit_chars(struct sab82532 *info,
+			   union sab82532_irq_status *stat)
 {
 	int i;
 
@@ -446,8 +446,8 @@ static inline void transmit_chars(struct sab82532 *info,
 	}
 }
 
-static inline void check_status(struct sab82532 *info,
-				union sab82532_irq_status *stat)
+static void check_status(struct sab82532 *info,
+			 union sab82532_irq_status *stat)
 {
 	struct tty_struct *tty = info->tty;
 	int modem_change = 0;
@@ -1887,10 +1887,6 @@ static int sab82532_open(struct tty_struct *tty, struct file * filp)
 	       info->count);
 #endif
 
-	info->count++;
-	tty->driver_data = info;
-	info->tty = tty;
-
 	if (!tmp_buf) {
 		page = get_free_page(GFP_KERNEL);
 		if (!page)
@@ -1900,6 +1896,10 @@ static int sab82532_open(struct tty_struct *tty, struct file * filp)
 		else
 			tmp_buf = (unsigned char *) page;
 	}
+
+	info->count++;
+	tty->driver_data = info;
+	info->tty = tty;
 
 	/*
 	 * If the port is in the middle of closing, bail out now.
@@ -2151,7 +2151,7 @@ static void __init sab82532_kgdb_hook(int line)
 
 static inline void __init show_serial_version(void)
 {
-	char *revision = "$Revision: 1.56 $";
+	char *revision = "$Revision: 1.58 $";
 	char *version, *p;
 
 	version = strchr(revision, ' ');

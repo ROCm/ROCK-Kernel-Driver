@@ -141,7 +141,6 @@ static struct super_block * coda_read_super(struct super_block *sb,
         sb->s_magic = CODA_SUPER_MAGIC;
         sb->s_dev = dev;
         sb->s_op = &coda_super_operations;
-	sb->s_maxbytes = MAX_NON_LFS;
 
 	/* get root fid from Venus: this needs the root inode */
 	error = venus_rootfid(sb, &fid);

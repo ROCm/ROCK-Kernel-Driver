@@ -737,11 +737,11 @@ static int
 /**************************** VARIABLES ****************************/
 
 static dev_info_t dev_info = "wavelan_cs";
-static dev_link_t *dev_list = NULL;	/* Linked list of devices */
+static dev_link_t *dev_list;		/* Linked list of devices */
 
 /* WARNING : the following variable MUST be volatile
  * It is used by wv_82593_cmd to syncronise with wavelan_interrupt */ 
-static volatile int	wv_wait_completed = 0;
+static volatile int	wv_wait_completed;
 
 /*
  * Parameters that can be set with 'insmod'
@@ -754,7 +754,7 @@ static int	irq_mask = 0xdeb8;
 static int 	irq_list[4] = { -1 };
 
 /* Shared memory speed, in ns */
-static int	mem_speed = 0;
+static int	mem_speed;
 
 /* New module interface */
 MODULE_PARM(irq_mask, "i");
@@ -763,7 +763,7 @@ MODULE_PARM(mem_speed, "i");
 
 #ifdef WAVELAN_ROAMING		/* Conditional compile, see above in options */
 /* Enable roaming mode ? No ! Please keep this to 0 */
-static int	do_roaming = 0;
+static int	do_roaming;
 MODULE_PARM(do_roaming, "i");
 #endif	/* WAVELAN_ROAMING */
 

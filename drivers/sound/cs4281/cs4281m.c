@@ -4294,23 +4294,24 @@ static int __devinit cs4281_probe(struct pci_dev *pcidev,
 			 "cs4281: pci_enable_device() failed\n"));
 		return -1;
 	}
-	if (!RSRCISMEMORYREGION(pcidev, 0) ||
-	    !RSRCISMEMORYREGION(pcidev, 1)) {
+	if (!(pci_resource_flags(pcidev, 0) & IORESOURCE_MEM) ||
+	    !(pci_resource_flags(pcidev, 1) & IORESOURCE_MEM)) {
 		CS_DBGOUT(CS_ERROR, 1, printk(KERN_ERR
 			 "cs4281: probe()- Memory region not assigned\n"));
-		return -1;
+		return -ENODEV;
 	}
 	if (pcidev->irq == 0) {
 		CS_DBGOUT(CS_ERROR, 1, printk(KERN_ERR
 			 "cs4281: probe() IRQ not assigned\n"));
-		return -1;
-	}
-	if (!pci_dma_supported(pcidev, 0xffffffff)) {
-		CS_DBGOUT(CS_ERROR, 1, printk(KERN_ERR
-		      "cs4281: probe() architecture does not support 32bit PCI busmaster DMA\n"));
-		return -1;
+		return -ENODEV;
 	}
 	dma_mask = 0xffffffff;	/* this enables playback and recording */
+	i = pci_set_dma_mask(pcidev, dma_mask);
+	if (i) {
+		CS_DBGOUT(CS_ERROR, 1, printk(KERN_ERR
+		      "cs4281: probe() architecture does not support 32bit PCI busmaster DMA\n"));
+		return i;
+	}
 	if (!(s = kmalloc(sizeof(struct cs4281_state), GFP_KERNEL))) {
 		CS_DBGOUT(CS_ERROR, 1, printk(KERN_ERR
 		      "cs4281: probe() no memory for state struct.\n"));
@@ -4328,8 +4329,8 @@ static int __devinit cs4281_probe(struct pci_dev *pcidev,
 	init_MUTEX(&s->open_sem_adc);
 	init_MUTEX(&s->open_sem_dac);
 	spin_lock_init(&s->lock);
-	s->pBA0phys = RSRCADDRESS(pcidev, 0);
-	s->pBA1phys = RSRCADDRESS(pcidev, 1);
+	s->pBA0phys = pci_resource_start(pcidev, 0);
+	s->pBA1phys = pci_resource_start(pcidev, 1);
 
 	/* Convert phys to linear. */
 	s->pBA0 = ioremap_nocache(s->pBA0phys, 4096);
@@ -4427,8 +4428,7 @@ static int __devinit cs4281_probe(struct pci_dev *pcidev,
 	mixer_ioctl(s, SOUND_MIXER_PRIVATE1, (unsigned long) &val);
 	set_fs(fs);
 
-	PCI_SET_DRIVER_DATA(pcidev, s);
-	PCI_SET_DMA_MASK(pcidev, dma_mask);
+	pci_set_drvdata(pcidev, s);
 	list_add(&s->list, &cs4281_devs);
 	CS_DBGOUT(CS_INIT | CS_FUNCTION, 2, printk(KERN_INFO
 		"cs4281: probe()- device allocated successfully\n"));
@@ -4457,7 +4457,7 @@ static int __devinit cs4281_probe(struct pci_dev *pcidev,
 
 static void __devinit cs4281_remove(struct pci_dev *pci_dev)
 {
-	struct cs4281_state *s = PCI_GET_DRIVER_DATA(pci_dev);
+	struct cs4281_state *s = pci_get_drvdata(pci_dev);
 	// stop DMA controller 
 	synchronize_irq();
 	free_irq(s->irq, s);
@@ -4467,7 +4467,7 @@ static void __devinit cs4281_remove(struct pci_dev *pci_dev)
 	iounmap(s->pBA1);
 	iounmap(s->pBA0);
 	kfree(s);
-	PCI_SET_DRIVER_DATA(pci_dev,NULL);
+	pci_set_drvdata(pci_dev,NULL);
 	list_del(&s->list);
 	CS_DBGOUT(CS_INIT | CS_FUNCTION, 2, printk(KERN_INFO
 		 "cs4281: cs4281_remove()-: remove successful\n"));

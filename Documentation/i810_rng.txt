@@ -70,6 +70,9 @@ Driver details:
 
 Change history:
 
+	Version 0.9.6:
+	* Internal driver cleanups, prep for 1.0.0 release.
+
 	Version 0.9.5:
 	* Rip out entropy injection via timer.  It never ever worked,
 	  and a better solution (rngd) is now available.

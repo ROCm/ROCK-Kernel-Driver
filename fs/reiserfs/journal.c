@@ -2052,7 +2052,7 @@ relock:
 	sleep_on(&(SB_JOURNAL(p_s_sb)->j_join_wait)) ;
       }
     }
-    lock_journal(p_s_sb) ; /* relock to continue */
+    goto relock ;
   }
 
   if (SB_JOURNAL(p_s_sb)->j_trans_start_time == 0) { /* we are the first writer, set trans_id */

@@ -794,8 +794,6 @@ static int sixpack_init(struct net_device *dev)
 	memcpy(dev->broadcast, ax25_bcast, AX25_ADDR_LEN);	/* Only activated in AX.25 mode */
 	memcpy(dev->dev_addr, ax25_test, AX25_ADDR_LEN);	/*    ""      ""       ""    "" */
 
-	dev_init_buffers(dev);
-
 	/* New-style flags. */
 	dev->flags		= 0;
 

@@ -30,7 +30,7 @@
 
 */
 
-static const char *version =
+static const char version[] =
     "3c503.c:v1.10 9/23/93  Donald Becker (becker@cesdis.gsfc.nasa.gov)\n";
 
 #include <linux/module.h>

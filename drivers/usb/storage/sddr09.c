@@ -182,7 +182,7 @@ static int sddr09_raw_bulk(struct us_data *us,
 		return US_BULK_TRANSFER_SHORT;
 	}
 
-	US_DEBUGP("Transfered %d of %d bytes\n", act_len, len);
+	US_DEBUGP("Transferred %d of %d bytes\n", act_len, len);
 
 	return US_BULK_TRANSFER_GOOD;
 }

@@ -1,4 +1,4 @@
-/* $Id: zs.c,v 1.61 2001/01/03 08:08:49 ecd Exp $
+/* $Id: zs.c,v 1.63 2001/04/17 06:30:36 davem Exp $
  * zs.c: Zilog serial port driver for the Sparc.
  *
  * Copyright (C) 1995 David S. Miller (davem@caip.rutgers.edu)
@@ -217,7 +217,7 @@ int zs_dumplog(char *buffer)
  * buffer across all the serial ports, since it significantly saves
  * memory if large numbers of serial ports are open.
  */
-static unsigned char tmp_buf[4096]; /* This is cheating */
+static unsigned char *tmp_buf = 0;
 static DECLARE_MUTEX(tmp_buf_sem);
 
 static inline int serial_paranoia_check(struct sun_serial *info,
@@ -252,8 +252,8 @@ static int baud_table[] = {
  * register access, other machines handle this in hardware via auxiliary
  * flip-flops which implement the settle time we do in software.
  */
-static inline unsigned char read_zsreg(struct sun_zschannel *channel,
-				       unsigned char reg)
+static unsigned char read_zsreg(struct sun_zschannel *channel,
+				unsigned char reg)
 {
 	unsigned char retval;
 
@@ -265,8 +265,8 @@ static inline unsigned char read_zsreg(struct sun_zschannel *channel,
 	return retval;
 }
 
-static inline void write_zsreg(struct sun_zschannel *channel,
-			       unsigned char reg, unsigned char value)
+static void write_zsreg(struct sun_zschannel *channel,
+			unsigned char reg, unsigned char value)
 {
 	ZSLOG(reg, value, 1);
 	sbus_writeb(reg, &channel->control);
@@ -275,7 +275,7 @@ static inline void write_zsreg(struct sun_zschannel *channel,
 	ZSDELAY();
 }
 
-static inline void load_zsregs(struct sun_serial *info, unsigned char *regs)
+static void load_zsregs(struct sun_serial *info, unsigned char *regs)
 {
 	struct sun_zschannel *channel = info->zs_channel;
 	unsigned long flags;
@@ -323,7 +323,7 @@ static inline void load_zsregs(struct sun_serial *info, unsigned char *regs)
 
 #define ZS_PUT_CHAR_MAX_DELAY	2000	/* 10 ms */
 
-static inline void zs_put_char(struct sun_zschannel *channel, char ch)
+static void zs_put_char(struct sun_zschannel *channel, char ch)
 {
 	int loops = ZS_PUT_CHAR_MAX_DELAY;
 
@@ -346,7 +346,7 @@ static inline void zs_put_char(struct sun_zschannel *channel, char ch)
 }
 
 /* Sets or clears DTR/RTS on the requested line */
-static inline void zs_rtsdtr(struct sun_serial *ss, int set)
+static void zs_rtsdtr(struct sun_serial *ss, int set)
 {
 	unsigned long flags;
 
@@ -362,7 +362,7 @@ static inline void zs_rtsdtr(struct sun_serial *ss, int set)
 	return;
 }
 
-static inline void kgdb_chaninit(struct sun_serial *ss, int intson, int bps)
+static void kgdb_chaninit(struct sun_serial *ss, int intson, int bps)
 {
 	int brg;
 
@@ -475,8 +475,7 @@ void batten_down_hatches(void)
  * This routine is used by the interrupt handler to schedule
  * processing in the software interrupt portion of the driver.
  */
-static _INLINE_ void zs_sched_event(struct sun_serial *info,
-				    int event)
+static void zs_sched_event(struct sun_serial *info, int event)
 {
 	info->event |= 1 << event;
 	queue_task(&info->tqueue, &tq_serial);
@@ -487,7 +486,7 @@ static _INLINE_ void zs_sched_event(struct sun_serial *info,
 extern void breakpoint(void);  /* For the KGDB frame character */
 #endif
 
-static _INLINE_ void receive_chars(struct sun_serial *info, struct pt_regs *regs)
+static void receive_chars(struct sun_serial *info, struct pt_regs *regs)
 {
 	struct tty_struct *tty = info->tty;
 	unsigned char ch, stat;
@@ -575,7 +574,7 @@ static _INLINE_ void receive_chars(struct sun_serial *info, struct pt_regs *regs
 		queue_task(&tty->flip.tqueue, &tq_timer);
 }
 
-static _INLINE_ void transmit_chars(struct sun_serial *info)
+static void transmit_chars(struct sun_serial *info)
 {
 	struct tty_struct *tty = info->tty;
 
@@ -611,7 +610,7 @@ static _INLINE_ void transmit_chars(struct sun_serial *info)
 	}
 }
 
-static _INLINE_ void status_handle(struct sun_serial *info)
+static void status_handle(struct sun_serial *info)
 {
 	unsigned char status;
 
@@ -655,7 +654,7 @@ static _INLINE_ void status_handle(struct sun_serial *info)
 	return;
 }
 
-static _INLINE_ void special_receive(struct sun_serial *info)
+static void special_receive(struct sun_serial *info)
 {
 	struct tty_struct *tty = info->tty;
 	unsigned char ch, stat;
@@ -1153,7 +1152,7 @@ static int zs_write(struct tty_struct * tty, int from_user,
 	if (serial_paranoia_check(info, tty->device, "zs_write"))
 		return 0;
 
-	if (!info || !info->xmit_buf)
+	if (!info || !info->xmit_buf || !tmp_buf)
 		return 0;
 
 	save_flags(flags);
@@ -1863,6 +1862,17 @@ int zs_open(struct tty_struct *tty, struct file * filp)
 		printk("zs_open %s%d, tty overwrite.\n", tty->driver.name, info->line);
 		return -EBUSY;
 	}
+
+	if (!tmp_buf) {
+		unsigned long page = get_free_page(GFP_KERNEL);
+		if (!page)
+			return -ENOMEM;
+		if (tmp_buf)
+			free_page(page);
+		else
+			tmp_buf = (unsigned char *) page;
+	}
+
 	info->count++;
 	tty->driver_data = info;
 	info->tty = tty;
@@ -1912,7 +1922,7 @@ int zs_open(struct tty_struct *tty, struct file * filp)
 
 static void show_serial_version(void)
 {
-	char *revision = "$Revision: 1.61 $";
+	char *revision = "$Revision: 1.63 $";
 	char *version, *p;
 
 	version = strchr(revision, ' ');

@@ -1,4 +1,4 @@
-/* $Id: sungem.c,v 1.11 2001/04/04 14:49:40 davem Exp $
+/* $Id: sungem.c,v 1.12 2001/04/17 07:20:20 davem Exp $
  * sungem.c: Sun GEM ethernet driver.
  *
  * Copyright (C) 2000, 2001 David S. Miller (davem@redhat.com)
@@ -412,21 +412,41 @@ static __inline__ void gem_tx(struct net_device *dev, struct gem *gp, u32 gem_st
 	while (entry != limit) {
 		struct sk_buff *skb;
 		struct gem_txd *txd;
-		u32 dma_addr;
+		u32 dma_addr, dma_len;
+		int frag;
 
-		txd = &gp->init_block->txd[entry];
 		skb = gp->tx_skbs[entry];
-		dma_addr = (u32) le64_to_cpu(txd->buffer);
-		pci_unmap_single(gp->pdev, dma_addr,
-				 skb->len, PCI_DMA_TODEVICE);
+		if (skb_shinfo(skb)->nr_frags) {
+			int last = entry + skb_shinfo(skb)->nr_frags;
+			int walk = entry;
+			int incomplete = 0;
+
+			last &= (TX_RING_SIZE - 1);
+			for (;;) {
+				walk = NEXT_TX(walk);
+				if (walk == limit)
+					incomplete = 1;
+				if (walk == last)
+					break;
+			}
+			if (incomplete)
+				break;
+		}
 		gp->tx_skbs[entry] = NULL;
-
 		gp->net_stats.tx_bytes += skb->len;
+
+		for (frag = 0; frag <= skb_shinfo(skb)->nr_frags; frag++) {
+			txd = &gp->init_block->txd[entry];
+
+			dma_addr = (u32) le64_to_cpu(txd->buffer);
+			dma_len = le64_to_cpu(txd->control_word) & TXDCTRL_BUFSZ;
+
+			pci_unmap_single(gp->pdev, dma_addr, dma_len, PCI_DMA_TODEVICE);
+			entry = NEXT_TX(entry);
+		}
+
 		gp->net_stats.tx_packets++;
-
 		dev_kfree_skb_irq(skb);
-
-		entry = NEXT_TX(entry);
 	}
 	gp->tx_old = entry;
 
@@ -606,29 +626,83 @@ static void gem_tx_timeout(struct net_device *dev)
 static int gem_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct gem *gp = dev->priv;
-	long len;
-	int entry, avail;
-	u32 mapping;
+	int entry;
+	u64 ctrl;
 
-	len = skb->len;
-	mapping = pci_map_single(gp->pdev, skb->data, len, PCI_DMA_TODEVICE);
+	ctrl = 0;
+	if (skb->ip_summed == CHECKSUM_HW) {
+		u64 csum_start_off, csum_stuff_off;
+
+		csum_start_off = (u64) (skb->h.raw - skb->data);
+		csum_stuff_off = (u64) ((skb->h.raw + skb->csum) - skb->data);
+
+		ctrl = (TXDCTRL_CENAB |
+			(csum_start_off << 15) |
+			(csum_stuff_off << 21));
+	}
 
 	spin_lock_irq(&gp->lock);
+
+	if (TX_BUFFS_AVAIL(gp) <= (skb_shinfo(skb)->nr_frags + 1)) {
+		netif_stop_queue(dev);
+		spin_unlock_irq(&gp->lock);
+		return 1;
+	}
+
 	entry = gp->tx_new;
 	gp->tx_skbs[entry] = skb;
 
-	gp->tx_new = NEXT_TX(entry);
-	avail = TX_BUFFS_AVAIL(gp);
-	if (avail <= 0)
-		netif_stop_queue(dev);
-
-	{
+	if (skb_shinfo(skb)->nr_frags == 0) {
 		struct gem_txd *txd = &gp->init_block->txd[entry];
-		u64 ctrl = (len & TXDCTRL_BUFSZ) | TXDCTRL_EOF | TXDCTRL_SOF;
+		u32 mapping, len;
 
-		txd->control_word = cpu_to_le64(ctrl);
+		len = skb->len;
+		mapping = pci_map_single(gp->pdev, skb->data, len, PCI_DMA_TODEVICE);
+		ctrl |= TXDCTRL_SOF | TXDCTRL_EOF | len;
 		txd->buffer = cpu_to_le64(mapping);
+		txd->control_word = cpu_to_le64(ctrl);
+		entry = NEXT_TX(entry);
+	} else {
+		struct gem_txd *txd;
+		u32 first_len, first_mapping;
+		int frag, first_entry = entry;
+
+		/* We must give this initial chunk to the device last.
+		 * Otherwise we could race with the device.
+		 */
+		first_len = skb->len - skb->data_len;
+		first_mapping = pci_map_single(gp->pdev, skb->data,
+					       first_len, PCI_DMA_TODEVICE);
+		entry = NEXT_TX(entry);
+
+		for (frag = 0; frag < skb_shinfo(skb)->nr_frags; frag++) {
+			skb_frag_t *this_frag = &skb_shinfo(skb)->frags[frag];
+			u32 len, mapping;
+			u64 this_ctrl;
+
+			len = this_frag->size;
+			mapping = pci_map_single(gp->pdev,
+						 ((void *) page_address(this_frag->page) +
+						  this_frag->page_offset),
+						 len, PCI_DMA_TODEVICE);
+			this_ctrl = ctrl;
+			if (frag == skb_shinfo(skb)->nr_frags - 1)
+				this_ctrl |= TXDCTRL_EOF;
+			
+			txd = &gp->init_block->txd[entry];
+			txd->buffer = cpu_to_le64(mapping);
+			txd->control_word = cpu_to_le64(this_ctrl | len);
+
+			entry = NEXT_TX(entry);
+		}
+		txd = &gp->init_block->txd[first_entry];
+		txd->buffer = cpu_to_le64(first_mapping);
+		txd->control_word = cpu_to_le64(ctrl | TXDCTRL_SOF | first_len);
 	}
+
+	gp->tx_new = entry;
+	if (TX_BUFFS_AVAIL(gp) <= 0)
+		netif_stop_queue(dev);
 
 	writel(gp->tx_new, gp->regs + TXDMA_KICK);
 	spin_unlock_irq(&gp->lock);
@@ -890,14 +964,22 @@ static void gem_clean_rings(struct gem *gp)
 	for (i = 0; i < TX_RING_SIZE; i++) {
 		if (gp->tx_skbs[i] != NULL) {
 			struct gem_txd *txd;
+			int frag;
 
 			skb = gp->tx_skbs[i];
-			txd = &gb->txd[i];
-			dma_addr = (u32) le64_to_cpu(txd->buffer);
-			pci_unmap_single(gp->pdev, dma_addr,
-					 skb->len, PCI_DMA_TODEVICE);
-			dev_kfree_skb_any(skb);
 			gp->tx_skbs[i] = NULL;
+
+			for (frag = 0; frag <= skb_shinfo(skb)->nr_frags; frag++) {
+				txd = &gb->txd[i];
+				dma_addr = (u32) le64_to_cpu(txd->buffer);
+				pci_unmap_single(gp->pdev, dma_addr,
+						 le64_to_cpu(txd->control_word) &
+						 TXDCTRL_BUFSZ, PCI_DMA_TODEVICE);
+
+				if (frag != skb_shinfo(skb)->nr_frags)
+					i++;
+			}
+			dev_kfree_skb_any(skb);
 		}
 	}
 }
@@ -1609,6 +1691,9 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 	dev->change_mtu = gem_change_mtu;
 	dev->irq = pdev->irq;
 	dev->dma = 0;
+
+	/* GEM can do it all... */
+	dev->features |= NETIF_F_SG | NETIF_F_HW_CSUM;
 
 	return 0;
 

@@ -1,4 +1,4 @@
-/* $Id: hfc_pci.h,v 1.8 2000/06/26 08:59:13 keil Exp $
+/* $Id: hfc_pci.h,v 1.8.6.1 2001/04/08 19:32:26 kai Exp $
  *
  *  specific defines for CCD's HFC 2BDS0 PCI chips
  *
@@ -178,6 +178,9 @@
 #define HFCPCI_FIFOEN_B1     0x03
 #define HFCPCI_FIFOEN_B2     0x0C
 #define HFCPCI_FIFOEN_DTX    0x10
+#define HFCPCI_FIFOEN_B1TX   0x01
+#define HFCPCI_FIFOEN_B1RX   0x02
+#define HFCPCI_FIFOEN_B2TX   0x04
 #define HFCPCI_FIFOEN_B2RX   0x08
 
 

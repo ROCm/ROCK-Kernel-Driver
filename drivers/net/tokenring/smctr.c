@@ -63,7 +63,7 @@
 #include "smctr_firmware.h"      /* SMC adapter firmware */
 
 static char version[] __initdata = KERN_INFO "smctr.c: v1.4 7/12/00 by jschlst@turbolinux.com\n";
-static const char *cardname = "smctr";
+static const char cardname[] = "smctr";
 
 
 #define SMCTR_IO_EXTENT   20
@@ -82,7 +82,7 @@ static unsigned int smctr_posid = 0x6ec6;
 static int ringspeed;
 
 /* SMC Name of the Adapter. */
-static char *smctr_name = "SMC TokenCard";
+static char smctr_name[] = "SMC TokenCard";
 char *smctr_model = "Unknown";
 
 /* Use 0 for production, 1 for verification, 2 for debug, and

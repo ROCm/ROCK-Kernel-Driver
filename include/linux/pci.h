@@ -525,7 +525,9 @@ int pci_write_config_byte(struct pci_dev *dev, int where, u8 val);
 int pci_write_config_word(struct pci_dev *dev, int where, u16 val);
 int pci_write_config_dword(struct pci_dev *dev, int where, u32 val);
 
+#define HAVE_PCI_DISABLE_DEVICE
 int pci_enable_device(struct pci_dev *dev);
+void pci_disable_device(struct pci_dev *dev);
 void pci_set_master(struct pci_dev *dev);
 int pci_set_dma_mask(struct pci_dev *dev, dma_addr_t mask);
 int pci_set_power_state(struct pci_dev *dev, int state);
@@ -551,6 +553,14 @@ void pci_insert_device(struct pci_dev *, struct pci_bus *);
 void pci_remove_device(struct pci_dev *);
 struct pci_driver *pci_dev_driver(const struct pci_dev *);
 const struct pci_device_id *pci_match_device(const struct pci_device_id *ids, const struct pci_dev *dev);
+
+/* kmem_cache style wrapper around pci_alloc_consistent() */
+struct pci_pool *pci_pool_create (const char *name, struct pci_dev *dev,
+		size_t size, size_t align, size_t allocation, int flags);
+void pci_pool_destroy (struct pci_pool *pool);
+
+void *pci_pool_alloc (struct pci_pool *pool, int flags, dma_addr_t *handle);
+void pci_pool_free (struct pci_pool *pool, void *vaddr, dma_addr_t addr);
 
 #endif /* CONFIG_PCI */
 
@@ -594,6 +604,7 @@ unsigned int ss_vendor, unsigned int ss_device, const struct pci_dev *from)
 
 static inline void pci_set_master(struct pci_dev *dev) { }
 static inline int pci_enable_device(struct pci_dev *dev) { return -EIO; }
+static inline void pci_disable_device(struct pci_dev *dev) { }
 static inline int pci_module_init(struct pci_driver *drv) { return -ENODEV; }
 static inline int pci_assign_resource(struct pci_dev *dev, int i) { return -EBUSY;}
 static inline int pci_register_driver(struct pci_driver *drv) { return 0;}

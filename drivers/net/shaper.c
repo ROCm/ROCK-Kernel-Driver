@@ -651,8 +651,6 @@ static int __init shaper_probe(struct net_device *dev)
 	 *	Intialise the packet queues
 	 */
 	 
-	dev_init_buffers(dev);
-	
 	/*
 	 *	Handlers for when we attach to a device.
 	 */

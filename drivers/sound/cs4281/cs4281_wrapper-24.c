@@ -40,12 +40,3 @@ void cs4281_null(struct pci_dev *pcidev) { return; }
 				    (state)->tmpbuff, (state)->dmaaddr_tmpbuff);
 #define cs4x_pgoff(vma) ((vma)->vm_pgoff)
 
-#define RSRCISIOREGION(dev,num) ((dev)->resource[(num)].start != 0 && \
-	 ((dev)->resource[(num)].flags & PCI_BASE_ADDRESS_SPACE) == PCI_BASE_ADDRESS_SPACE_IO)
-#define RSRCISMEMORYREGION(dev,num) ((dev)->resource[(num)].start != 0 && \
-	 ((dev)->resource[(num)].flags & PCI_BASE_ADDRESS_SPACE) == PCI_BASE_ADDRESS_SPACE_MEMORY)
-#define RSRCADDRESS(dev,num) ((dev)->resource[(num)].start)
-#define PCI_GET_DRIVER_DATA pci_get_drvdata
-#define PCI_SET_DRIVER_DATA pci_set_drvdata
-#define PCI_SET_DMA_MASK(pcidev,mask) pcidev->dma_mask = mask
-

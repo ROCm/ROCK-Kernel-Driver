@@ -1411,7 +1411,7 @@ _static int iso_find_start (urb_t *urb)
 /*-------------------------------------------------------------------*/
 // submits USB interrupt (ie. polling ;-) 
 // ASAP-flag set implicitely
-// if period==0, the the transfer is only done once
+// if period==0, the transfer is only done once
 
 _static int uhci_submit_int_urb (urb_t *urb)
 {
@@ -2390,7 +2390,7 @@ _static int process_interrupt (uhci_t *s, urb_t *urb)
 			usb_endpoint_halt (urb->dev, usb_pipeendpoint (urb->pipe), usb_pipeout (urb->pipe));
 		}
 
-		// if any error occured: ignore this td, and continue
+		// if any error occurred: ignore this td, and continue
 		if (status != 0) {
 			//uhci_show_td (desc);
 			urb->error_count++;

@@ -415,12 +415,6 @@ got_root:
 
 	s->s_flags |= MS_NODEV | MS_NOSUID;
 
-	/*
-	 * Max file size is 2Gb
-	 */
-	 
-	s->s_maxbytes = MAX_NON_LFS;
-
 	/* Keep super block in cache */
 	bb = affs_bread(dev,root_block,s->s_blocksize);
 	if (!bb)

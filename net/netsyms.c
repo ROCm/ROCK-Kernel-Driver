@@ -202,7 +202,6 @@ EXPORT_SYMBOL(__scm_send);
 EXPORT_SYMBOL(scm_fp_dup);
 EXPORT_SYMBOL(files_stat);
 EXPORT_SYMBOL(memcpy_toiovec);
-EXPORT_SYMBOL(csum_partial);
 
 #ifdef CONFIG_IPX_MODULE
 EXPORT_SYMBOL(make_8023_client);

@@ -2595,17 +2595,15 @@ static int __init m3_probe(struct pci_dev *pci_dev, const struct pci_device_id *
 
     DPRINTK(DPMOD, "in maestro_install\n");
 
-    if (!pci_dma_supported(pci_dev, M3_PCI_DMA_MASK)) {
+    if (pci_enable_device(pci_dev))
+        return -EIO;
+
+    if (pci_set_dma_mask(pci_dev, M3_PCI_DMA_MASK)) {
         printk(KERN_ERR PFX "architecture does not support limiting to 28bit PCI bus addresses\n");
         return -ENODEV;
     }
         
-    if (pci_enable_device(pci_dev))
-        return -EIO;
-
     pci_set_master(pci_dev);
-
-    pci_dev->dma_mask = M3_PCI_DMA_MASK;
 
     if( (card = kmalloc(sizeof(struct m3_card), GFP_KERNEL)) == NULL) {
         printk(KERN_WARNING PFX "out of memory\n");

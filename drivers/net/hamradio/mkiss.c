@@ -935,8 +935,6 @@ static int ax25_init(struct net_device *dev)
 	memcpy(dev->broadcast, ax25_bcast, AX25_ADDR_LEN);
 	memcpy(dev->dev_addr,  ax25_test,  AX25_ADDR_LEN);
 
-	dev_init_buffers(dev);
-
 	/* New-style flags. */
 	dev->flags      = 0;
 

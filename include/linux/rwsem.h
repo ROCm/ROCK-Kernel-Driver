@@ -42,20 +42,20 @@
 #include <asm/atomic.h>
 #include <linux/wait.h>
 
-#ifdef CONFIG_RWSEM_GENERIC_SPINLOCK
-#include <linux/rwsem-spinlock.h> /* use a generic implementation */
-#else
-#include <asm/rwsem.h> /* use an arch-specific implementation */
-#endif
-
 /* defined contention handler functions for the generic case
  * - these are also used for the exchange-and-add based algorithm
  */
-#if defined(CONFIG_RWSEM_GENERIC) || defined(CONFIG_RWSEM_XCHGADD_ALGORITHM)
+#if defined(CONFIG_RWSEM_GENERIC_SPINLOCK) || defined(CONFIG_RWSEM_XCHGADD_ALGORITHM)
 /* we use FASTCALL convention for the helpers */
 extern struct rw_semaphore *FASTCALL(rwsem_down_read_failed(struct rw_semaphore *sem));
 extern struct rw_semaphore *FASTCALL(rwsem_down_write_failed(struct rw_semaphore *sem));
 extern struct rw_semaphore *FASTCALL(rwsem_wake(struct rw_semaphore *sem));
+#endif
+
+#ifdef CONFIG_RWSEM_GENERIC_SPINLOCK
+#include <linux/rwsem-spinlock.h> /* use a generic implementation */
+#else
+#include <asm/rwsem.h> /* use an arch-specific implementation */
 #endif
 
 #ifndef rwsemtrace

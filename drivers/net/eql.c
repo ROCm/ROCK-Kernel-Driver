@@ -240,8 +240,6 @@ static int __init eql_init(struct net_device *dev)
 	 *	eql-generic values. 
 	 */
 
-	dev_init_buffers(dev);
-	
 	/*
 	 *	Now we undo some of the things that eth_setup does
 	 * 	that we don't like 

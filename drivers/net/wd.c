@@ -24,7 +24,7 @@
 
 */
 
-static const char *version =
+static const char version[] =
 	"wd.c:v1.10 9/23/94 Donald Becker (becker@cesdis.gsfc.nasa.gov)\n";
 
 #include <linux/module.h>
@@ -126,7 +126,7 @@ static int __init wd_probe1(struct net_device *dev, int ioaddr)
 	int ancient = 0;			/* An old card without config registers. */
 	int word16 = 0;				/* 0 = 8 bit, 1 = 16 bit */
 	const char *model_name;
-	static unsigned version_printed = 0;
+	static unsigned version_printed;
 
 	for (i = 0; i < 8; i++)
 		checksum += inb(ioaddr + 8 + i);

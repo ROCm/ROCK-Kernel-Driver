@@ -5,6 +5,8 @@ CONFIG_X86=y
 CONFIG_ISA=y
 # CONFIG_SBUS is not set
 CONFIG_UID16=y
+# CONFIG_RWSEM_GENERIC_SPINLOCK is not set
+CONFIG_RWSEM_XCHGADD_ALGORITHM=y
 
 #
 # Code maturity level options

@@ -1,6 +1,6 @@
 /*
  *  olympic.h (c) 1999 Peter De Schrijver All Rights Reserved
- *                1999 Mike Phillips (mikep@linuxtr.net)
+ *                1999,2000 Mike Phillips (mikep@linuxtr.net)
  *
  *  Linux driver for IBM PCI tokenring cards based on the olympic and the PIT/PHY chipset.
  *
@@ -251,6 +251,7 @@ struct olympic_private {
 
 	__u8 *olympic_mmio;
 	__u8 *olympic_lap;
+	struct pci_dev *pdev ; 
 	char *olympic_card_name ; 
 
 	spinlock_t olympic_lock ; 
@@ -263,10 +264,12 @@ struct olympic_private {
 	volatile int trb_queued;   /* True if a TRB is posted */
 	wait_queue_head_t trb_wait ; 
 
+	/* These must be on a 4 byte boundary. */
 	struct olympic_rx_desc olympic_rx_ring[OLYMPIC_RX_RING_SIZE];
 	struct olympic_tx_desc olympic_tx_ring[OLYMPIC_TX_RING_SIZE];
 	struct olympic_rx_status olympic_rx_status_ring[OLYMPIC_RX_RING_SIZE];	
 	struct olympic_tx_status olympic_tx_status_ring[OLYMPIC_TX_RING_SIZE];	
+
 	struct sk_buff *tx_ring_skb[OLYMPIC_TX_RING_SIZE], *rx_ring_skb[OLYMPIC_RX_RING_SIZE];	
 	int tx_ring_free, tx_ring_last_status, rx_ring_last_received,rx_status_last_received, free_tx_ring_entries;
 
@@ -274,9 +277,13 @@ struct olympic_private {
 	__u16 olympic_lan_status ;
 	__u8 olympic_ring_speed ;
 	__u16 pkt_buf_sz ; 
-	__u8 olympic_receive_options, olympic_copy_all_options, olympic_message_level;  
+	__u8 olympic_receive_options, olympic_copy_all_options,olympic_message_level, olympic_network_monitor;  
 	__u16 olympic_addr_table_addr, olympic_parms_addr ; 
 	__u8 olympic_laa[6] ; 
+	__u32 rx_ring_dma_addr;
+	__u32 rx_status_ring_dma_addr;
+	__u32 tx_ring_dma_addr;
+	__u32 tx_status_ring_dma_addr;
 };
 
 struct olympic_adapter_addr_table {

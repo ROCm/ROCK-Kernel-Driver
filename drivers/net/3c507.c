@@ -23,7 +23,7 @@
 	The statistics need to be updated correctly.
 */
 
-static const char *version =
+static const char version[] =
 	"3c507.c:v1.10 9/23/94 Donald Becker (becker@cesdis.gsfc.nasa.gov)\n";
 
 

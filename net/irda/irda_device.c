@@ -430,7 +430,6 @@ int irda_device_setup(struct net_device *dev)
 	memset(dev->broadcast, 0xff, 4);
 
 	dev->mtu = 2048;
-	dev_init_buffers(dev);
 	dev->flags = IFF_NOARP;
 	return 0;
 }

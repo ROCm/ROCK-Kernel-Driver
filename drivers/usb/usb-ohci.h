@@ -39,7 +39,7 @@ static int cc_to_error[16] = {
 #define ED_URB_DEL  	0x08
 
 /* usb_ohci_ed */
-typedef struct ed {
+struct ed {
 	__u32 hwINFO;       
 	__u32 hwTailP;
 	__u32 hwHeadP;
@@ -53,9 +53,12 @@ typedef struct ed {
 	__u8 state;
 	__u8 type; 
 	__u16 last_iso;
-    struct ed * ed_rm_list;
-   
-} ed_t;
+	struct ed * ed_rm_list;
+
+	dma_addr_t dma;
+	__u32 unused[3];
+} __attribute((aligned(16)));
+typedef struct ed ed_t;
 
  
 /* TD info field */
@@ -75,7 +78,7 @@ typedef struct ed {
 #define TD_DP_IN    0x00100000
 #define TD_DP_OUT   0x00080000
 
-#define TD_ISO		0x00010000
+#define TD_ISO	    0x00010000
 #define TD_DEL      0x00020000
 
 /* CC Codes */
@@ -96,20 +99,24 @@ typedef struct ed {
 
 #define MAXPSW 1
 
-typedef struct td { 
+struct td {
 	__u32 hwINFO;
   	__u32 hwCBP;		/* Current Buffer Pointer */
   	__u32 hwNextTD;		/* Next TD Pointer */
   	__u32 hwBE;		/* Memory Buffer End Pointer */
-  	__u16 hwPSW[MAXPSW];
 
+  	__u16 hwPSW[MAXPSW];
   	__u8 unused;
   	__u8 index;
   	struct ed * ed;
   	struct td * next_dl_td;
   	urb_t * urb;
-} td_t;
 
+	dma_addr_t td_dma;
+	dma_addr_t data_dma;
+	__u32 unused2[2];
+} __attribute((aligned(16)));
+typedef struct td td_t;
 
 #define OHCI_ED_SKIP	(1 << 14)
 
@@ -121,7 +128,7 @@ typedef struct td {
  
 #define NUM_INTS 32	/* part of the OHCI standard */
 struct ohci_hcca {
-    __u32	int_table[NUM_INTS];	/* Interrupt ED table */
+	__u32	int_table[NUM_INTS];	/* Interrupt ED table */
 	__u16	frame_no;		/* current frame number */
 	__u16	pad1;			/* set to 0 on each frame_no change */
 	__u32	done_head;		/* info returned for an interrupt */
@@ -337,6 +344,27 @@ typedef struct
 } urb_priv_t;
 #define URB_DEL 1
 
+
+/* Hash struct used for TD/ED hashing */
+struct hash_t {
+	void		*virt;
+	dma_addr_t	dma;
+	struct hash_t	*next; // chaining for collision cases
+};
+
+/* List of TD/ED hash entries */
+struct hash_list_t {
+	struct hash_t	*head;
+	struct hash_t	*tail;
+};
+
+#define TD_HASH_SIZE    64    /* power'o'two */
+#define ED_HASH_SIZE    64    /* power'o'two */
+
+#define TD_HASH_FUNC(td_dma) ((td_dma ^ (td_dma >> 5)) % TD_HASH_SIZE)
+#define ED_HASH_FUNC(ed_dma) ((ed_dma ^ (ed_dma >> 5)) % ED_HASH_SIZE)
+
+
 /*
  * This is the full ohci controller description
  *
@@ -356,7 +384,8 @@ typedef struct ohci {
 	struct ohci_regs * regs;	/* OHCI controller's memory */
 	struct list_head ohci_hcd_list;	/* list of all ohci_hcd */
 
-	struct ohci * next; 		// chain of uhci device contexts
+	struct ohci * next; 		// chain of ohci device contexts
+	struct list_head timeout_list;
 	// struct list_head urb_list; 	// list of all pending urbs
 	// spinlock_t urb_list_lock; 	// lock to keep consistency 
   
@@ -371,17 +400,21 @@ typedef struct ohci {
 	struct usb_device * dev[128];
 	struct virt_root_hub rh;
 
-	/* PCI device handle and settings */
+	/* PCI device handle, settings, ... */
 	struct pci_dev	*ohci_dev;
 	u8		pci_latency;
+	struct pci_pool	*td_cache;
+	struct pci_pool	*dev_cache;
+	struct hash_list_t	td_hash[TD_HASH_SIZE];
+	struct hash_list_t	ed_hash[ED_HASH_SIZE];
+
 } ohci_t;
 
-
-#define NUM_TDS	0		/* num of preallocated transfer descriptors */
 #define NUM_EDS 32		/* num of preallocated endpoint descriptors */
 
 struct ohci_device {
 	ed_t 	ed[NUM_EDS];
+	dma_addr_t dma;
 	int ed_cnt;
 	wait_queue_head_t * wait;
 };
@@ -393,10 +426,10 @@ struct ohci_device {
 /* endpoint */
 static int ep_link(ohci_t * ohci, ed_t * ed);
 static int ep_unlink(ohci_t * ohci, ed_t * ed);
-static ed_t * ep_add_ed(struct usb_device * usb_dev, unsigned int pipe, int interval, int load);
+static ed_t * ep_add_ed(struct usb_device * usb_dev, unsigned int pipe, int interval, int load, int mem_flags);
 static void ep_rm_ed(struct usb_device * usb_dev, ed_t * ed);
 /* td */
-static void td_fill(unsigned int info, void * data, int len, urb_t * urb, int index);
+static void td_fill(ohci_t * ohci, unsigned int info, dma_addr_t data, int len, urb_t * urb, int index);
 static void td_submit_urb(urb_t * urb);
 /* root hub */
 static int rh_submit_urb(urb_t * urb);
@@ -406,97 +439,204 @@ static int rh_init_int_timer(urb_t * urb);
 /*-------------------------------------------------------------------------*/
 
 #define ALLOC_FLAGS (in_interrupt () ? GFP_ATOMIC : GFP_KERNEL)
- 
-#ifdef OHCI_MEM_SLAB
-#define	__alloc(t,c) kmem_cache_alloc(c,ALLOC_FLAGS)
-#define	__free(c,x) kmem_cache_free(c,x)
-static kmem_cache_t *td_cache, *ed_cache;
 
-/*
- * WARNING:  do NOT use this with "forced slab debug"; it won't respect
- * our hardware alignment requirement.
- */
-#ifndef OHCI_MEM_FLAGS
-#define	OHCI_MEM_FLAGS 0
+#ifdef DEBUG
+#	define OHCI_MEM_FLAGS	SLAB_POISON
+#else
+#	define OHCI_MEM_FLAGS	0
+#endif
+ 
+#ifndef CONFIG_PCI
+#	error "usb-ohci currently requires PCI-based controllers"
+	/* to support non-PCI OHCIs, you need custom bus/mem/... glue */
 #endif
 
-static int ohci_mem_init (void)
+
+/* Recover a TD/ED using its collision chain */
+static inline void *
+dma_to_ed_td (struct hash_list_t * entry, dma_addr_t dma)
 {
-	/* redzoning (or forced debug!) breaks alignment */
-	int	flags = (OHCI_MEM_FLAGS) & ~SLAB_RED_ZONE;
+	struct hash_t * scan = entry->head;
+	while (scan && scan->dma != dma)
+		scan = scan->next;
+	if (!scan)
+		BUG();
+	return scan->virt;
+}
 
-	/* TDs accessed by controllers and host */
-	td_cache = kmem_cache_create ("ohci_td", sizeof (struct td), 0,
-		flags | SLAB_HWCACHE_ALIGN, NULL, NULL);
-	if (!td_cache) {
-		dbg ("no TD cache?");
-		return -ENOMEM;
-	}
+static inline struct ed *
+dma_to_ed (struct ohci * hc, dma_addr_t ed_dma)
+{
+	return (struct ed *) dma_to_ed_td(&(hc->ed_hash[ED_HASH_FUNC(ed_dma)]),
+				      ed_dma);
+}
 
-	/* EDs are accessed by controllers and host;  dev part is host-only */
-	ed_cache = kmem_cache_create ("ohci_ed", sizeof (struct ohci_device), 0,
-		flags | SLAB_HWCACHE_ALIGN, NULL, NULL);
-	if (!ed_cache) {
-		dbg ("no ED cache?");
-		kmem_cache_destroy (td_cache);
-		td_cache = 0;
-		return -ENOMEM;
+static inline struct td *
+dma_to_td (struct ohci * hc, dma_addr_t td_dma)
+{
+	return (struct td *) dma_to_ed_td(&(hc->td_hash[TD_HASH_FUNC(td_dma)]),
+				      td_dma);
+}
+
+/* Add a hash entry for a TD/ED; return true on success */
+static inline int
+hash_add_ed_td(struct hash_list_t * entry, void * virt, dma_addr_t dma)
+{
+	struct hash_t * scan;
+	
+	scan = (struct hash_t *)kmalloc(sizeof(struct hash_t), ALLOC_FLAGS);
+	if (!scan)
+		return 0;
+	
+	if (!entry->tail) {
+		entry->head = entry->tail = scan;
+	} else {
+		entry->tail->next = scan;
+		entry->tail = scan;
 	}
-	dbg ("slab flags 0x%x", flags);
+	
+	scan->virt = virt;
+	scan->dma = dma;
+	scan->next = NULL;
+	return 1;
+}
+
+static inline int
+hash_add_ed (struct ohci * hc, struct ed * ed)
+{
+	return hash_add_ed_td (&(hc->ed_hash[ED_HASH_FUNC(ed->dma)]),
+			ed, ed->dma);
+}
+
+static inline int
+hash_add_td (struct ohci * hc, struct td * td)
+{
+	return hash_add_ed_td (&(hc->td_hash[TD_HASH_FUNC(td->td_dma)]),
+			td, td->td_dma);
+}
+
+
+static inline void
+hash_free_ed_td (struct hash_list_t * entry, void * virt)
+{
+	struct hash_t *scan, *prev;
+	scan = prev = entry->head;
+
+	// Find and unlink hash entry
+	while (scan && scan->virt != virt) {
+		prev = scan;
+		scan = scan->next;
+	}
+	if (scan) {
+		if (scan == entry->head) {
+			if (entry->head == entry->tail)
+				entry->head = entry->tail = NULL;
+			else
+				entry->head = scan->next;
+		} else if (scan == entry->tail) {
+			entry->tail = prev;
+			prev->next = NULL;
+		} else
+			prev->next = scan->next;
+		kfree(scan);
+	}
+}
+
+static inline void
+hash_free_ed (struct ohci * hc, struct ed * ed)
+{
+	hash_free_ed_td (&(hc->ed_hash[ED_HASH_FUNC(ed->dma)]), ed);
+}
+
+static inline void
+hash_free_td (struct ohci * hc, struct td * td)
+{
+	hash_free_ed_td (&(hc->td_hash[TD_HASH_FUNC(td->td_dma)]), td);
+}
+
+
+static int ohci_mem_init (struct ohci *ohci)
+{
+	ohci->td_cache = pci_pool_create ("ohci_td", ohci->ohci_dev,
+		sizeof (struct td),
+		16 /* byte alignment */,
+		0 /* no page-crossing issues */,
+		GFP_KERNEL | OHCI_MEM_FLAGS);
+	if (!ohci->td_cache)
+		return -ENOMEM;
+	ohci->dev_cache = pci_pool_create ("ohci_dev", ohci->ohci_dev,
+		sizeof (struct ohci_device),
+		16 /* byte alignment */,
+		0 /* no page-crossing issues */,
+		GFP_KERNEL | OHCI_MEM_FLAGS);
+	if (!ohci->dev_cache)
+		return -ENOMEM;
 	return 0;
 }
 
-static void ohci_mem_cleanup (void)
+static void ohci_mem_cleanup (struct ohci *ohci)
 {
-	if (ed_cache && kmem_cache_destroy (ed_cache))
-		err ("ed_cache remained");
-	ed_cache = 0;
-
-	if (td_cache && kmem_cache_destroy (td_cache))
-		err ("td_cache remained");
-	td_cache = 0;
+	if (ohci->td_cache) {
+		pci_pool_destroy (ohci->td_cache);
+		ohci->td_cache = 0;
+	}
+	if (ohci->dev_cache) {
+		pci_pool_destroy (ohci->dev_cache);
+		ohci->dev_cache = 0;
+	}
 }
-
-#else
-#define	__alloc(t,c) kmalloc(sizeof(t),ALLOC_FLAGS)
-#define	__free(dev,x) kfree(x)
-#define td_cache 0
-#define ed_cache 0
-
-static inline int ohci_mem_init (void) { return 0; }
-static inline void ohci_mem_cleanup (void) { return; }
-
-/* FIXME: pci_consistent version */
-
-#endif
-
 
 /* TDs ... */
 static inline struct td *
-td_alloc (struct ohci *hc)
+td_alloc (struct ohci *hc, int mem_flags)
 {
-	struct td *td = (struct td *) __alloc (struct td, td_cache);
+	dma_addr_t	dma;
+	struct td	*td;
+
+	td = pci_pool_alloc (hc->td_cache, mem_flags, &dma);
+	if (td) {
+		td->td_dma = dma;
+
+		/* hash it for later reverse mapping */
+		if (!hash_add_td (hc, td)) {
+			pci_pool_free (hc->td_cache, td, dma);
+			return NULL;
+		}
+	}
 	return td;
 }
 
 static inline void
 td_free (struct ohci *hc, struct td *td)
 {
-	__free (td_cache, td);
+	hash_free_td (hc, td);
+	pci_pool_free (hc->td_cache, td, td->td_dma);
 }
 
 
 /* DEV + EDs ... only the EDs need to be consistent */
 static inline struct ohci_device *
-dev_alloc (struct ohci *hc)
+dev_alloc (struct ohci *hc, int mem_flags)
 {
-	struct ohci_device *dev = (struct ohci_device *)
-		__alloc (struct ohci_device, ed_cache);
+	dma_addr_t		dma;
+	struct ohci_device	*dev;
+	int			i, offset;
+
+	dev = pci_pool_alloc (hc->dev_cache, mem_flags, &dma);
+	if (dev) {
+		memset (dev, 0, sizeof (*dev));
+		dev->dma = dma;
+		offset = ((char *)&dev->ed) - ((char *)dev);
+		for (i = 0; i < NUM_EDS; i++, offset += sizeof dev->ed [0])
+			dev->ed [i].dma = dma + offset;
+		/* add to hashtable if used */
+	}
 	return dev;
 }
 
 static inline void
-dev_free (struct ohci_device *dev)
+dev_free (struct ohci *hc, struct ohci_device *dev)
 {
-	__free (ed_cache, dev);
+	pci_pool_free (hc->dev_cache, dev, dev->dma);
 }
+

@@ -5,7 +5,7 @@
  *	Authors:
  *	Pedro Roque		<roque@di.fc.ul.pt>	
  *
- *	$Id: ip6_output.c,v 1.30 2001/03/03 01:20:10 davem Exp $
+ *	$Id: ip6_output.c,v 1.31 2001/04/17 20:39:51 davem Exp $
  *
  *	Based on linux/net/ipv4/ip_output.c
  *
@@ -22,6 +22,7 @@
  *				etc.
  *
  *      H. von Brand    :       Added missing #include <linux/string.h>
+ *	Imran Patel	: 	frag id should be in NBO
  */
 
 #include <linux/config.h>
@@ -55,7 +56,7 @@ static __inline__ void ipv6_select_ident(struct sk_buff *skb, struct frag_hdr *f
 	static spinlock_t ip6_id_lock = SPIN_LOCK_UNLOCKED;
 
 	spin_lock_bh(&ip6_id_lock);
-	fhdr->identification = ipv6_fragmentation_id;
+	fhdr->identification = htonl(ipv6_fragmentation_id);
 	if (++ipv6_fragmentation_id == 0)
 		ipv6_fragmentation_id = 1;
 	spin_unlock_bh(&ip6_id_lock);

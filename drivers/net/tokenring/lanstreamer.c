@@ -121,7 +121,7 @@
  * Official releases will only have an a.b.c version number format.
  */
 
-static char *version = "LanStreamer.c v0.4.0 03/08/01 - Mike Sullivan";
+static char version[] = "LanStreamer.c v0.4.0 03/08/01 - Mike Sullivan";
 
 static struct pci_device_id streamer_pci_tbl[] __initdata = {
 	{ PCI_VENDOR_ID_IBM, PCI_DEVICE_ID_IBM_TR, PCI_ANY_ID, PCI_ANY_ID,},

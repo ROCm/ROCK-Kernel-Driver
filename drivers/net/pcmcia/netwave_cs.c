@@ -187,7 +187,7 @@ static u_int  scramble_key = 0x0;
  * This timing should be provided by the HBA. If it becomes a 
  * problem, try setting mem_speed to 400. 
  */
-static int mem_speed = 0;
+static int mem_speed;
 
 /* Bit map of interrupts to choose from */
 /* This means pick from 15, 14, 12, 11, 10, 9, 7, 5, 4, and 3 */
@@ -250,7 +250,7 @@ static void set_multicast_list(struct net_device *dev);
    memory card driver uses an array of dev_link_t pointers, where minor
    device numbers are used to derive the corresponding array index.
 */
-static dev_link_t *dev_list = NULL;
+static dev_link_t *dev_list;
 
 /*
    A dev_link_t structure has fields for most things that are needed
@@ -1554,7 +1554,7 @@ static void set_multicast_list(struct net_device *dev)
    
 #ifdef PCMCIA_DEBUG
     if (pc_debug > 2) {
-	static int old = 0;
+	static int old;
 	if (old != dev->mc_count) {
 	    old = dev->mc_count;
 	    DEBUG(0, "%s: setting Rx mode to %d addresses.\n",

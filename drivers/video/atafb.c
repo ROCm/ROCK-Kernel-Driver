@@ -208,7 +208,7 @@ static enum cardtype external_card_type = IS_VGA;
 
 /*
 The MV300 mixes the color registers. So we need an array of munged
-indices in order to acces the correct reg.
+indices in order to access the correct reg.
 */
 static int MV300_reg_1bit[2]={0,1};
 static int MV300_reg_4bit[16]={

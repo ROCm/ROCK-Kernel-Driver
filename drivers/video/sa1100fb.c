@@ -688,6 +688,16 @@ __init sa1100fb_init_fbinfo(void)
 		init_var.grayscale	= 0;
 		init_var.sync		= 0;
 		init_var.pixclock	= 171521;
+	} else if (machine_is_pangolin()) {
+		current_par.max_xres	= 1024;
+		current_par.max_yres	= 768;
+		current_par.max_bpp	= 16;
+		init_var.red.length	= 5;
+		init_var.green.length	= 6;
+		init_var.blue.length	= 5;
+		init_var.grayscale	= 0;
+		init_var.sync		= 0;	
+		init_var.pixclock	= 15400;
 	} else if (machine_is_bitsy()) {
 		current_par.max_xres	= 320;
 		current_par.max_yres	= 240;
@@ -717,7 +727,7 @@ __init sa1100fb_init_fbinfo(void)
 		init_var.grayscale	= 1;
 		init_var.pixclock	= 150000;	
 		init_var.sync		= 0;
-	} else if (machine_is_penny()) {
+	} else if (machine_is_graphicsclient()) {
 		current_par.max_xres	= 640;
 		current_par.max_yres	= 480;
 		current_par.max_bpp	= 8;
@@ -725,32 +735,6 @@ __init sa1100fb_init_fbinfo(void)
 		init_var.green		= init_var.red;
 		init_var.blue		= init_var.red;
 		init_var.sync		= 0;
-	} else if (machine_is_thinclient() || machine_is_graphicsclient()) {
-		current_par.max_xres	= 640;
-		current_par.max_yres	= 480;
-		current_par.max_bpp	= 8;
-		init_var.red.length	= 4;				
-		init_var.green		= init_var.red;
-		init_var.blue		= init_var.red;
-		init_var.sync		= 0;
-	} else if (machine_is_tifon()) {
-		current_par.max_xres	= 640;
-		current_par.max_yres	= 200;
-		current_par.max_bpp	= 4;
-		current_par.inv_4bpp	= 1;
-		init_var.red.length	= 4;				
-		init_var.green		= init_var.red;
-		init_var.blue		= init_var.red;
-		init_var.grayscale	= 1;
-	        init_var.pixclock	= 150000;	
-	        init_var.left_margin	= 20;
-	        init_var.right_margin	= 255;
-	        init_var.upper_margin	= 20;
-	        init_var.lower_margin	= 0;
-	        init_var.hsync_len	= 2;
-	        init_var.vsync_len	= 1;
-		init_var.sync		= FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT;
-		init_var.vmode		= 0;
 	} else if (machine_is_xp860()) {
 		current_par.max_xres	= 1024;
 		current_par.max_yres	= 768;
@@ -870,14 +854,7 @@ static inline int get_pcd(unsigned int pixclock)
 {
 	unsigned int pcd = 0;
 
-	if (machine_is_tifon()) {
-		pcd = frequency[PPCR &0xf] / 1000;
-		pcd *= pixclock/1000;
-		pcd = pcd / 10000000 * 12;
-		/* the last multiplication by 1.2 is to handle */
-		/* sync problems */
-	}
-	if (machine_is_assabet()) {
+	if (machine_is_assabet() | machine_is_pangolin()) {
 		pcd = frequency[PPCR & 0xf] / 1000;
 		pcd *= pixclock / 1000;
 		pcd = pcd / 1000000;
@@ -933,6 +910,26 @@ sa1100fb_activate_var(struct fb_var_screeninfo *var)
 
 		/* Set board control register to handle new color depth */
 		sa1100fb_assabet_set_truecolor(var->bits_per_pixel >= 16);
+	} else if (machine_is_pangolin()) {
+		DPRINTK("Configuring Pangolin LCD\n");
+		lcd_shadow.lccr0 = 
+			LCCR0_LEN + LCCR0_Color + LCCR0_LDM +
+			LCCR0_BAM + LCCR0_ERM + LCCR0_Act +
+			LCCR0_LtlEnd + LCCR0_DMADel(0);
+		lcd_shadow.lccr1 = 
+			LCCR1_DisWdth(var->xres) + LCCR1_HorSnchWdth(63) + 
+			LCCR1_BegLnDel(127) + LCCR1_EndLnDel(127);
+		lcd_shadow.lccr2 = 
+			LCCR2_DisHght(var->yres) + LCCR2_VrtSnchWdth(2) + 
+			LCCR2_BegFrmDel(18) + LCCR2_EndFrmDel(18);
+		lcd_shadow.lccr3 = 
+			LCCR3_PixClkDiv(pcd) + LCCR3_HorSnchH +
+			LCCR3_VrtSnchH + LCCR3_OutEnH;
+		DPRINTK("pcd = %d\n", pcd);
+		DPRINTK("LCCR1_DisWdth(var->xres) = 0x%x\n",
+			LCCR1_DisWdth(var->xres));
+		DPRINTK("LCCR2_DisHght(var->yres) = 0x%x\n",
+			LCCR2_DisHght(var->yres));
 	} else if (machine_is_bitsy()) {
 		DPRINTK("Configuring  Bitsy LCD\n");
 		lcd_shadow.lccr0 = LCCR0_LEN + LCCR0_Color + LCCR0_Sngl + LCCR0_Act +
@@ -998,24 +995,8 @@ sa1100fb_activate_var(struct fb_var_screeninfo *var)
 		lcd_shadow.lccr3 = 
 			LCCR3_PixClkDiv(34) + LCCR3_ACBsDiv(512) +
 			LCCR3_ACBsCntOff + LCCR3_HorSnchH + LCCR3_VrtSnchH;
-	} else if (machine_is_penny()) {
-		DPRINTK("Configuring  Penny LCD\n");
-		lcd_shadow.lccr0 = 
-			LCCR0_LEN + LCCR0_Color + LCCR0_Sngl + LCCR0_Act + 
-			LCCR0_LtlEnd + LCCR0_LDM + LCCR0_BAM + LCCR0_ERM + 
-			LCCR0_DMADel(0); 
-		lcd_shadow.lccr1 = 
-			LCCR1_DisWdth(var->xres) + LCCR1_HorSnchWdth(65) +
-			LCCR1_EndLnDel(43) + LCCR1_BegLnDel(43);
-		lcd_shadow.lccr2 = 
-			LCCR2_DisHght(var->yres) + LCCR2_VrtSnchWdth(35) + 
-			LCCR2_EndFrmDel(0) + LCCR2_BegFrmDel(0);
-		lcd_shadow.lccr3 = 
-			LCCR3_PixClkDiv(16) + LCCR3_ACBsDiv (2) + LCCR3_ACBsCntOff +
-			((var->sync & FB_SYNC_HOR_HIGH_ACT) ? LCCR3_HorSnchH : LCCR3_HorSnchL) +
-			((var->sync & FB_SYNC_VERT_HIGH_ACT) ? LCCR3_VrtSnchH : LCCR3_VrtSnchL);
-	} else if (machine_is_thinclient() || machine_is_graphicsclient()) {
-		DPRINTK("Configuring ThinClient LCD\n");
+	} else if (machine_is_graphicsclient()) {
+		DPRINTK("Configuring GraphicsClient LCD\n");
 		lcd_shadow.lccr0 = 
 			LCCR0_LEN + LCCR0_Color + LCCR0_Sngl + LCCR0_Act;
 		lcd_shadow.lccr1 = 
@@ -1027,29 +1008,6 @@ sa1100fb_activate_var(struct fb_var_screeninfo *var)
 		lcd_shadow.lccr3 = 
 			LCCR3_PixClkDiv(6) + LCCR3_ACBsDiv(2) + 
 			LCCR3_ACBsCntOff + LCCR3_HorSnchL + LCCR3_VrtSnchL;
-	} else if (machine_is_tifon()) {
-		DPRINTK("Configuring TIFON LCD\n");
-		lcd_shadow.lccr0 = 
-			LCCR0_LEN + LCCR0_Mono + LCCR0_Sngl + LCCR0_Pas +
-			LCCR0_BigEnd + LCCR0_LDM + LCCR0_BAM + LCCR0_ERM + 
-			LCCR0_8PixMono + LCCR0_DMADel(0);
-		lcd_shadow.lccr1 = 
-			LCCR1_DisWdth(var->xres) + 
-			LCCR1_HorSnchWdth(var->hsync_len) +
-			LCCR1_BegLnDel(var->left_margin) +
-			LCCR1_EndLnDel(var->right_margin);
-		lcd_shadow.lccr2 = 
-			LCCR2_DisHght(var->yres) + 
-			LCCR2_VrtSnchWdth(var->vsync_len) +
-			LCCR2_BegFrmDel(var->upper_margin) +
-			LCCR2_EndFrmDel(var->lower_margin);
-		lcd_shadow.lccr3 = 
-			LCCR3_PixClkDiv(pcd) + LCCR3_ACBsDiv(512) +
-			LCCR3_ACBsCnt(0) + LCCR3_HorSnchH + LCCR3_VrtSnchH;
-		/*
-			((current_var.sync & FB_SYNC_HOR_HIGH_ACT) ? LCCR3_HorSnchH : LCCR3_HorSnchL) +
-			((current_var.sync & FB_SYNC_VERT_HIGH_ACT) ? LCCR3_VrtSnchH : LCCR3_VrtSnchL);
-		*/
 	} else if (machine_is_xp860()) {
 		DPRINTK("Configuring XP860 LCD\n");
 		lcd_shadow.lccr0 = 
@@ -1116,13 +1074,6 @@ static void sa1100fb_inter_handler(int irq, void *dev_id, struct pt_regs *regs)
 		                if (current_par.controller_state != LCD_MODE_DISABLE_BEFORE_ENABLE)
 		                        clr_bitsy_egpio(EGPIO_BITSY_LCD_ON | EGPIO_BITSY_LCD_PCI | EGPIO_BITSY_LCD_5V_ON | EGPIO_BITSY_LVDD_ON);
 #endif
-			} else if (machine_is_penny()) {
-#ifdef CONFIG_SA1100_PENNY
-				FpgaLcdCS1 = 0x000;	/* LCD Backlight to 0%    */
-				FpgaPortI &= ~LCD_ON;	/* Turn off LCD Backlight */
-#endif
-			} else if (machine_is_tifon()) {
-				GPCR = GPIO_GPIO(24);	/* turn off display */
 			}
 		}
 	}
@@ -1174,7 +1125,7 @@ static void sa1100fb_enable_lcd_controller(void)
 
 		/* Make sure the mode bits are present in the first palette entry */
 		current_par.v_palette_base[0] &= 0x0FFF; 	           
-		current_par.v_palette_base[0] |= SA1100_PALETTE_MODE_VAL(current_par.bits_per_pixel); 	 
+		current_par.v_palette_base[0] |= SA1100_PALETTE_MODE_VAL(current_par.bits_per_pixel);
 
 		/* Enable GPIO<9:2> for LCD usage if dual-scan */
 		if (lcd_shadow.lccr0 & LCCR0_SDS) {
@@ -1204,15 +1155,6 @@ static void sa1100fb_enable_lcd_controller(void)
 			DPRINTK("LCCR2=%x\n", LCCR2);
 			DPRINTK("LCCR3=%x\n", LCCR3);
 #endif
-		} else if (machine_is_penny()) {
-#ifdef CONFIG_SA1100_PENNY
-			FpgaLcdCS1 = 0x0FF;	/* LCD Backlight to 100% */
-			FpgaPortI  |= LCD_ON;	/* Turn on LCD Backlight */
-#endif
-		} else if (machine_is_tifon()) {
-			GPCR = GPIO_GPIO(24);	/* cycle on/off-switch */
-			udelay(150);
-			GPSR = GPIO_GPIO(24);	/* turn on display */
 		}
 
 		current_par.controller_state = LCD_MODE_ENABLED;
@@ -1307,19 +1249,15 @@ int __init sa1100fb_init(void)
 		GAFR |= 0x3fc;
 		sa1100fb_assabet_set_truecolor(current_par.visual ==
 					       FB_VISUAL_TRUECOLOR);
+	} else if (machine_is_pangolin()) {
+		GPDR |= 0x3fc;
+		GAFR |= 0x3fc;
 	} else if (machine_is_bitsy()) {
 		GPDR = (GPIO_LDD15 | GPIO_LDD14 | GPIO_LDD13 | GPIO_LDD12 | GPIO_LDD11 | GPIO_LDD10 | GPIO_LDD9 | GPIO_LDD8);
 		GAFR |= (GPIO_LDD15 | GPIO_LDD14 | GPIO_LDD13 | GPIO_LDD12 | GPIO_LDD11 | GPIO_LDD10 | GPIO_LDD9 | GPIO_LDD8);
 	} else if (machine_is_cerf()) {
 		GPDR |= 0x3fc;
 		GAFR |= 0x3fc;
-	} else if (machine_is_penny()) {
-#ifdef CONFIG_SA1100_PENNY
-		GPDR |= GPIO_GPDR_GFX;	/* GPIO Data Direction register for LCD data bits 8-11 */
-		GAFR |= GPIO_GAFR_GFX;	/* GPIO Alternate Function register for LCD data bits 8-11 */
-#endif
-	} else if (machine_is_tifon()) {
-		GPDR |= GPIO_GPIO(24);	/* set GPIO24 to output */
 	} else if (machine_is_xp860()) {
 		GPDR |= 0x3fc;
 		GAFR |= 0x3fc;

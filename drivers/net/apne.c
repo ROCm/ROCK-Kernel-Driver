@@ -116,7 +116,7 @@ static int init_pcmcia(void);
 #define WORDSWAP(a) ( (((a)>>8)&0xff) | ((a)<<8) )
 
 
-static const char *version =
+static const char version[] =
     "apne.c:v1.1 7/10/98 Alain Malek (Alain.Malek@cryogen.ch)\n";
 
 static int apne_owned;	/* signal if card already owned */

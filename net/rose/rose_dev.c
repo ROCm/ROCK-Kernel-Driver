@@ -200,7 +200,5 @@ int rose_init(struct net_device *dev)
 
 	dev->get_stats = rose_get_stats;
 
-	dev_init_buffers(dev);
-
 	return 0;
 };

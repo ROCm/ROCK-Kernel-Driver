@@ -54,7 +54,7 @@
 #define IOP_MSGSTATUS_COMPLETE	3	/* message complete and reply rcvd */
 #define IOP_MSGSTATUS_UNSOL	6	/* message is unsolicited          */
 
-/* IOP memory addresses of the members of the the mac_iop_kernel structure. */
+/* IOP memory addresses of the members of the mac_iop_kernel structure. */
 
 #define IOP_ADDR_MAX_SEND_CHAN	0x0200
 #define IOP_ADDR_SEND_STATE	0x0201

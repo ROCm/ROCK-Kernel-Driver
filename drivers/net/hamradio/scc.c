@@ -214,7 +214,7 @@ static int scc_net_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd);
 static int scc_net_set_mac_address(struct net_device *dev, void *addr);
 static struct net_device_stats * scc_net_get_stats(struct net_device *dev);
 
-static unsigned char *SCC_DriverName = "scc";
+static unsigned char SCC_DriverName[] = "scc";
 
 static struct irqflags { unsigned char used : 1; } Ivec[16];
 	
@@ -1574,8 +1574,6 @@ static unsigned char ax25_nocall[AX25_ADDR_LEN] =
 
 static int scc_net_init(struct net_device *dev)
 {
-	dev_init_buffers(dev);
-	
 	dev->tx_queue_len    = 16;	/* should be enough... */
 
 	dev->open            = scc_net_open;

@@ -891,27 +891,26 @@ static int new_if (wan_device_t* wandev, netdevice_t* dev, wanif_conf_t* conf)
 			
 			chan->common.usedby = BRIDGE;
 			
-                      #if defined(LINUX_2_1) || defined(LINUX_2_4) 
+#if defined(LINUX_2_1) || defined(LINUX_2_4) 
 			printk(KERN_INFO "%s: Running in WANPIPE (BRIDGE) mode.\n", 
 					card->devname);
-                      #else
+#else
 			printk(KERN_INFO "%s: WANPIPE Bridging mode not supported in 2.0.X kernels.\n",
 					card->devname);
 			err = -EPROTONOSUPPORT;
-                      #endif
-			
+#endif
 		}else if( strcmp(conf->usedby, "BRIDGE_N") == 0 ){
 			
 			chan->common.usedby = BRIDGE_NODE;
-			
-                      #if defined(LINUX_2_1) || defined(LINUX_2_4)
+		
+#if defined(LINUX_2_1) || defined(LINUX_2_4)
 			printk(KERN_INFO "%s: Running in WANPIPE (BRIDGE_NODE) mode.\n", 
 					card->devname);
-                      #else
+#else
 			printk(KERN_INFO "%s: WANPIPE Bridging mode not supported in 2.0.X kernels.\n",
 					card->devname);
 			err = -EPROTONOSUPPORT;
-                      #endif
+#endif
 		}
 
 		if (!err){
@@ -928,18 +927,18 @@ static int new_if (wan_device_t* wandev, netdevice_t* dev, wanif_conf_t* conf)
 
         } else if(strcmp(conf->usedby, "API") == 0){
 
-              #if defined(LINUX_2_1) || defined(LINUX_2_4) 
+#if defined(LINUX_2_1) || defined(LINUX_2_4) 
                 chan->common.usedby = API;
                 printk(KERN_INFO "%s: Running in API mode.\n",
 			wandev->name);
-              #else
+#else
                 printk(KERN_INFO "%s: The API Mode is not supported for"
 				 "kernels lower than 2.2.X !\n",
 					wandev->name);
 		printk(KERN_INFO "%s: Please upgrade to a 2.2.X kernel for the API support\n",
 					wandev->name);
                 err = -EINVAL;
-              #endif
+#endif
         }
 
 	if (err) {
@@ -984,16 +983,16 @@ static int new_if (wan_device_t* wandev, netdevice_t* dev, wanif_conf_t* conf)
 	chan->mc = conf->mc;
 
 	if (conf->inarp == WANOPT_YES){
-	      #if defined(LINUX_2_1) || defined(LINUX_2_4)
+#if defined(LINUX_2_1) || defined(LINUX_2_4)
 		printk(KERN_INFO "%s: Inverse ARP Support Enabled\n",card->devname);
 		chan->inarp = conf->inarp ? INARP_REQUEST : INARP_NONE;
 		chan->inarp_interval = conf->inarp_interval ? conf->inarp_interval : 10;
-	      #else
+#else
 		printk(KERN_INFO "%s: Warning, Inverse ARP Support not available for 2.0.X kernels!\n",
 				card->devname);
 		chan->inarp = INARP_NONE;
 		chan->inarp_interval = 10;
-              #endif
+#endif
 	}else{
 		printk(KERN_INFO "%s: Inverse ARP Support Disabled\n",card->devname);
 		chan->inarp = INARP_NONE;
@@ -1027,12 +1026,17 @@ static int new_if (wan_device_t* wandev, netdevice_t* dev, wanif_conf_t* conf)
 	chan->transmit_length = 0;
 
 	/* prepare network device data space for registration */
-      #ifdef LINUX_2_4
+#ifdef LINUX_2_4
 	strcpy(dev->name,chan->name);
-      #else
+#else
 	dev->name = (char *)kmalloc(strlen(chan->name) + 2, GFP_KERNEL); 
+	if(dev->name == NULL)
+	{
+		kfree(chan);
+		return -ENOMEM;
+	}
 	sprintf(dev->name, "%s", chan->name);
-      #endif
+#endif
 	
 	dev->init = &if_init;
 	dev->priv = chan;
@@ -1041,9 +1045,9 @@ static int new_if (wan_device_t* wandev, netdevice_t* dev, wanif_conf_t* conf)
          * We need a poll routine for each network
          * interface. 
          */
-      #ifndef LINUX_2_4
+#ifndef LINUX_2_4
 	chan->fr_poll_task.next = NULL;
-      #endif
+#endif
 	chan->fr_poll_task.sync = 0;
 	chan->fr_poll_task.routine = (void *)(void *)fr_poll;
 	chan->fr_poll_task.data = dev;
@@ -1222,9 +1226,9 @@ static int if_init (netdevice_t* dev)
 	fr_channel_t* chan = dev->priv;
 	sdla_t* card = chan->card;
 	wan_device_t* wandev = &card->wandev;
-      #ifdef LINUX_2_0
+#ifdef LINUX_2_0
 	int i;
-      #endif
+#endif
 
 	/* Initialize device driver entry points */
 	dev->open		= &if_open;
@@ -1233,16 +1237,15 @@ static int if_init (netdevice_t* dev)
 	dev->rebuild_header	= &if_rebuild_hdr;
 	dev->hard_start_xmit	= &if_send;
 	dev->get_stats		= &if_stats;
-      #ifdef LINUX_2_4
+#ifdef LINUX_2_4
 	dev->tx_timeout		= &if_tx_timeout;
 	dev->watchdog_timeo	= TX_TIMEOUT;
-      #endif
+#endif
 	
 	if (chan->common.usedby == WANPIPE || chan->common.usedby == API){
-		
-              #ifdef LINUX_2_0
+#ifdef LINUX_2_0
 		dev->family = AF_INET;
-              #endif
+#endif
 		/* Initialize media-specific parameters */
 		if (chan->true_if_encoding){
 			dev->type 		= ARPHRD_DLCI;  /* This breaks tcpdump */
@@ -1275,13 +1278,12 @@ static int if_init (netdevice_t* dev)
         	dev->tx_queue_len = 100;
 
 			/* Initialize socket buffers */
-	      #if defined(LINUX_2_1) || defined(LINUX_2_4)
+#if defined(LINUX_2_1) || defined(LINUX_2_4)
 		dev_init_buffers(dev);
-	      #else
+#else
 	        for (i = 0; i < DEV_NUMBUFFS; ++i)
 			skb_queue_head_init(&dev->buffs[i]);
-	      #endif
- 
+#endif
 	}else{
 
 		/* Setup the interface for Bridging */
@@ -1321,13 +1323,13 @@ static int if_open (netdevice_t* dev)
 	if (is_dev_running(dev))
 		return -EBUSY;
 	
-      #if defined(LINUX_2_1) || defined(LINUX_2_4)
+#if defined(LINUX_2_1) || defined(LINUX_2_4)
 	/* Initialize the task queue */
 	chan->tq_working=0;
 
-      #ifndef LINUX_2_4
+#ifndef LINUX_2_4
 	chan->common.wanpipe_task.next = NULL;
-      #endif
+#endif
 	chan->common.wanpipe_task.sync = 0;
 	chan->common.wanpipe_task.routine = (void *)(void *)fr_bh;
 	chan->common.wanpipe_task.data = dev;
@@ -1336,15 +1338,15 @@ static int if_open (netdevice_t* dev)
 	chan->bh_head = kmalloc((sizeof(bh_data_t)*MAX_BH_BUFF),GFP_ATOMIC);
 	memset(chan->bh_head,0,(sizeof(bh_data_t)*MAX_BH_BUFF));
 	atomic_set(&chan->bh_buff_used, 0);
-      #endif
+#endif
 
-      #ifdef LINUX_2_4
+#ifdef LINUX_2_4
 	netif_start_queue(dev);
-      #else	
+#else	
 	dev->interrupt = 0;
 	dev->tbusy = 0;
 	dev->start = 1;
-      #endif
+#endif
 
 	wanpipe_open(card);
 	do_gettimeofday( &tv );
@@ -1374,9 +1376,9 @@ static int if_close (netdevice_t* dev)
 	}
 
 	stop_net_queue(dev);
-      #ifndef LINUX_2_4
+#ifndef LINUX_2_4
 	dev->start=0;
-      #endif
+#endif
 	wanpipe_close(card);
 
 	return 0;
@@ -1397,9 +1399,9 @@ static int if_rebuild_hdr (void* hdr, netdevice_t* dev, unsigned long raddr,
 {
 #endif
 
-      #if defined(LINUX_2_1) || defined(LINUX_2_4) 
+#if defined(LINUX_2_1) || defined(LINUX_2_4) 
 	netdevice_t *dev = skb->dev;
-      #endif
+#endif
 	fr_channel_t* chan = dev->priv;
 	sdla_t* card = chan->card;
 
@@ -1468,9 +1470,9 @@ static int if_send (struct sk_buff* skb, netdevice_t* dev)
 
 	chan->drvstats_if_send.if_send_entry++;
 
-      #ifdef LINUX_2_4
+#ifdef LINUX_2_4
 	netif_stop_queue(dev);
-      #endif
+#endif
 	
         if (skb == NULL) {             
 		/* if we get here, some higher layer thinks we've missed an
@@ -1509,7 +1511,7 @@ static int if_send (struct sk_buff* skb, netdevice_t* dev)
 	}
        	clear_bit(SEND_TXIRQ_CRIT, (void*)&card->wandev.critical);
  
-      #ifndef LINUX_2_4
+#ifndef LINUX_2_4
     	if (dev->tbusy) {
 
 		/* If our device stays busy for at least 5 seconds then we will
@@ -1530,7 +1532,7 @@ static int if_send (struct sk_buff* skb, netdevice_t* dev)
 		chan->drvstats_if_send.if_send_tbusy_timeout ++;
 		dev->tbusy = 0;
     	}
-      #endif
+#endif
 
 	
 	/* Move the if_header() code to here. By inserting frame
@@ -1693,14 +1695,13 @@ static int if_send (struct sk_buff* skb, netdevice_t* dev)
 				++chan->ifstats.tx_packets;
 				++card->wandev.stats.tx_packets;
 				
-			      #if defined(LINUX_2_1) || defined(LINUX_2_4)
+#if defined(LINUX_2_1) || defined(LINUX_2_4)
                                 chan->ifstats.tx_bytes += skb->len;
                                 card->wandev.stats.tx_bytes += skb->len;
-			      #endif
-				
-			      #ifdef LINUX_2_4
+#endif
+#ifdef LINUX_2_4
 				dev->trans_start = jiffies;
-			      #endif
+#endif
 			}
 		}
 	}
@@ -1789,16 +1790,16 @@ static int chk_bcast_mcast_addr(sdla_t *card, netdevice_t* dev,
 {
         u32 src_ip_addr;
         u32 broadcast_ip_addr = 0;
-      #if defined(LINUX_2_1) || defined(LINUX_2_4)
+#if defined(LINUX_2_1) || defined(LINUX_2_4)
         struct in_device *in_dev;
-      #endif
+#endif
         fr_channel_t* chan = dev->priv;
  
         /* read the IP source address from the outgoing packet */
         src_ip_addr = *(u32 *)(skb->data + 14);
 
         /* read the IP broadcast address for the device */
-      #if defined(LINUX_2_1) || defined(LINUX_2_4)
+#if defined(LINUX_2_1) || defined(LINUX_2_4)
         in_dev = dev->ip_ptr;
         if(in_dev != NULL) {
                 struct in_ifaddr *ifa= in_dev->ifa_list;
@@ -1807,9 +1808,9 @@ static int chk_bcast_mcast_addr(sdla_t *card, netdevice_t* dev,
                 else
                         return 0;
         }
-      #else
+#else
         broadcast_ip_addr = dev->pa_brdaddr;
-      #endif
+#endif
 
         /* check if the IP Source Address is a Broadcast address */
         if((dev->flags & IFF_BROADCAST) && (src_ip_addr == broadcast_ip_addr)) {
@@ -2255,7 +2256,7 @@ static void rx_intr (sdla_t* card)
 			}
 		}
 
-	#if defined(LINUX_2_1) || defined(LINUX_2_4)
+#if defined(LINUX_2_1) || defined(LINUX_2_4)
 	}else if (chan->common.usedby == API) {
 
 		/* We are in API mode. 
@@ -2361,10 +2362,10 @@ static void rx_intr (sdla_t* card)
 		++chan->ifstats.rx_packets;
 		++card->wandev.stats.rx_packets;
 
-		#if defined(LINUX_2_1) || defined(LINUX_2_4)
+#if defined(LINUX_2_1) || defined(LINUX_2_4)
 		chan->ifstats.rx_bytes += len_incl_hdr;
 		card->wandev.stats.rx_bytes += len_incl_hdr;
-		#endif
+#endif
 	}
 
 rx_done:
@@ -2456,10 +2457,10 @@ static void tx_intr(sdla_t *card)
 
 		++chan->ifstats.tx_packets;
 		++card->wandev.stats.tx_packets;
-              #if defined(LINUX_2_1) || defined(LINUX_2_4)
+#if defined(LINUX_2_1) || defined(LINUX_2_4)
 		chan->ifstats.tx_bytes += chan->transmit_length;
 		card->wandev.stats.tx_bytes += chan->transmit_length;
-              #endif
+#endif
 
 		/* We must free an sk buffer, which we used
 		 * for delayed transmission; Otherwise, the sock
@@ -2469,13 +2470,13 @@ static void tx_intr(sdla_t *card)
 		chan->delay_skb = NULL;				
         	chan->transmit_length = 0;
 
-	      #ifdef LINUX_2_4
+#ifdef LINUX_2_4
 		dev->trans_start = jiffies;
-	      #endif
+#endif
 
-	      #ifdef LINUX_2_0
+#ifdef LINUX_2_0
 		wake_net_dev(dev);
-	      #else
+#else
 		if (is_queue_stopped(dev)){
 			/* If using API, than wakeup socket BH handler */
 			if (chan->common.usedby == API){
@@ -2485,7 +2486,7 @@ static void tx_intr(sdla_t *card)
 				wake_net_dev(dev);
 			}
 		}
-	      #endif
+#endif
 	}
 
 end_of_tx_intr:
@@ -4712,15 +4713,15 @@ void s508_s514_lock(sdla_t *card, unsigned long *smp_flags)
 {
 	if (card->hw.type != SDLA_S514){
 
-	      #if defined(__SMP__) || defined(LINUX_2_4)
+#if defined(__SMP__) || defined(LINUX_2_4)
 		spin_lock_irqsave(&card->wandev.lock, *smp_flags);
-	      #else
+#else
           	disable_irq(card->hw.irq);
-	      #endif
+#endif
 	}else{
-	      #if defined(__SMP__) || defined(LINUX_2_4)
+#if defined(__SMP__) || defined(LINUX_2_4)
 		spin_lock(&card->u.f.if_send_lock);
-	      #endif
+#endif
 	}
 	return;
 }
@@ -4730,15 +4731,15 @@ void s508_s514_unlock(sdla_t *card, unsigned long *smp_flags)
 {
 	if (card->hw.type != SDLA_S514){
 
-	      #if defined(__SMP__) || defined(LINUX_2_4)
+#if defined(__SMP__) || defined(LINUX_2_4)
 		spin_unlock_irqrestore (&card->wandev.lock, *smp_flags);
-	      #else
+#else
           	enable_irq(card->hw.irq);
-	      #endif
+#endif
 	}else{
-	      #if defined(__SMP__) || defined(LINUX_2_4)
+#if defined(__SMP__) || defined(LINUX_2_4)
 		spin_unlock(&card->u.f.if_send_lock);
-	      #endif
+#endif
 	}
 	return;
 }
@@ -4925,11 +4926,11 @@ static int fr_bh_cleanup (netdevice_t *dev)
 static void trigger_fr_poll (netdevice_t *dev)
 {
 	fr_channel_t* chan = dev->priv;
-      #ifdef LINUX_2_4
+#ifdef LINUX_2_4
 	schedule_task(&chan->fr_poll_task);
-      #else
+#else
 	queue_task(&chan->fr_poll_task, &tq_scheduler);
-      #endif
+#endif
 	return;
 }
 
@@ -5301,13 +5302,13 @@ static int setup_fr_header(struct sk_buff ** skb_orig, netdevice_t* dev, char op
 	 * an Ethernet header */
 	if (op_mode == BRIDGE || op_mode == BRIDGE_NODE){
 
-	      #if defined(LINUX_2_1) || defined(LINUX_2_4)
+#if defined(LINUX_2_1) || defined(LINUX_2_4)
 
 		/* Encapsulate the packet as a bridged Ethernet frame. */
-              #ifdef DEBUG
+#ifdef DEBUG
 		printk(KERN_INFO "%s: encapsulating skb for frame relay\n", 
 			dev->name);
-              #endif
+#endif
 		
 		chan->fr_header[0] = 0x03;
 		chan->fr_header[1] = 0x00;
@@ -5322,12 +5323,12 @@ static int setup_fr_header(struct sk_buff ** skb_orig, netdevice_t* dev, char op
 		skb->protocol = ETH_P_802_3;
 		return 8;
 
-	      #else
+#else
 
 		/* BRIDGING is not supported in 2.0.X */
 		return -EINVAL;
 
-	      #endif
+#endif
 	}
 		
 	return 0;

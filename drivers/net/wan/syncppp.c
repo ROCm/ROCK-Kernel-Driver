@@ -1048,7 +1048,6 @@ void sppp_attach(struct ppp_device *pd)
 	dev->hard_header_cache = NULL;
 	dev->header_cache_update = NULL;
 	dev->flags = IFF_MULTICAST|IFF_POINTOPOINT|IFF_NOARP;
-	dev_init_buffers(dev);
 }
 
 EXPORT_SYMBOL(sppp_attach);

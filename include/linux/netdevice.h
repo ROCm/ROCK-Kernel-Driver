@@ -565,7 +565,7 @@ extern int		netdev_nit;
 
 static inline void dev_init_buffers(struct net_device *dev)
 {
-	/* DO NOTHING */
+	/* WILL BE REMOVED IN 2.5.0 */
 }
 
 extern int netdev_finish_unregister(struct net_device *dev);

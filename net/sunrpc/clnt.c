@@ -694,9 +694,14 @@ call_decode(struct rpc_task *task)
 	}
 
 	if (task->tk_status < 12) {
-		printk(KERN_WARNING "%s: too small RPC reply size (%d bytes)\n",
-			clnt->cl_protname, task->tk_status);
-		rpc_exit(task, -EIO);
+		if (!clnt->cl_softrtry) {
+			task->tk_action = call_transmit;
+			clnt->cl_stats->rpcretrans++;
+		} else {
+			printk(KERN_WARNING "%s: too small RPC reply size (%d bytes)\n",
+				clnt->cl_protname, task->tk_status);
+			rpc_exit(task, -EIO);
+		}
 		return;
 	}
 

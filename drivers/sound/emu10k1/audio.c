@@ -272,7 +272,7 @@ static int emu10k1_audio_ioctl(struct inode *inode, struct file *file, unsigned 
 
 					/* Undo marking the pages as reserved */
 					for (i = 0; i < woinst->buffer.pages; i++)
-						mem_map_reserve(virt_to_page(woinst->buffer.addr[i]));
+						mem_map_unreserve(virt_to_page(woinst->buffer.addr[i]));
 				}
 
 				emu10k1_waveout_close(wave_dev);
@@ -322,7 +322,7 @@ static int emu10k1_audio_ioctl(struct inode *inode, struct file *file, unsigned 
 
 					/* Undo marking the pages as reserved */
 					for (i = 0; i < woinst->buffer.pages; i++)
-						mem_map_reserve(virt_to_page(woinst->buffer.addr[i]));
+						mem_map_unreserve(virt_to_page(woinst->buffer.addr[i]));
 				}
 
 				emu10k1_waveout_close(wave_dev);
@@ -1011,7 +1011,7 @@ static int emu10k1_audio_mmap(struct file *file, struct vm_area_struct *vma)
 static int emu10k1_audio_open(struct inode *inode, struct file *file)
 {
 	int minor = MINOR(inode->i_rdev);
-	struct emu10k1_card *card;
+	struct emu10k1_card *card=NULL;
 	struct list_head *entry;
 	struct emu10k1_wavedevice *wave_dev;
 
@@ -1204,7 +1204,7 @@ static int emu10k1_audio_release(struct inode *inode, struct file *file)
 
 				/* Undo marking the pages as reserved */
 				for (i = 0; i < woinst->buffer.pages; i++)
-					mem_map_reserve(virt_to_page(woinst->buffer.addr[i]));
+					mem_map_unreserve(virt_to_page(woinst->buffer.addr[i]));
 			}
 
 			emu10k1_waveout_close(wave_dev);

@@ -422,7 +422,7 @@ static int ftdi_sio_write (struct usb_serial_port *port, int from_user,
 		unsigned char *first_byte = port->write_urb->transfer_buffer;
 
 		/* Was seeing a race here, got a read callback, then write callback before
-		   hitting interuptible_sleep_on  - so wrapping in a wait_queue */
+		   hitting interruptible_sleep_on  - so wrapping in a wait_queue */
 
 		add_wait_queue(&port->write_wait, &wait);
 		set_current_state (TASK_INTERRUPTIBLE);

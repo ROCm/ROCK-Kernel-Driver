@@ -1,4 +1,4 @@
-/* $Id: sunserial.c,v 1.78 2001/03/21 22:43:11 davem Exp $
+/* $Id: sunserial.c,v 1.79 2001/04/18 21:06:17 davem Exp $
  * serial.c: Serial port driver infrastructure for the Sparc.
  *
  * Copyright (C) 1997  Eddie C. Dost  (ecd@skynet.be)
@@ -308,7 +308,7 @@ no_options:
 		case 9600: cflag |= B9600; break;
 		case 19200: cflag |= B19200; break;
 		case 38400: cflag |= B38400; break;
-		default: cflag |= B9600; break;
+		default: baud = 9600; cflag |= B9600; break;
 	}
 
 	switch (bits) {

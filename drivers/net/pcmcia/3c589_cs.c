@@ -127,7 +127,7 @@ static char *version =
 /* Parameters that can be set with 'insmod' */
 
 /* Special hook for setting if_port when module is loaded */
-static int if_port = 0;
+static int if_port;
 
 /* Bit map of interrupts to choose from */
 static u_int irq_mask = 0xdeb8;
@@ -163,7 +163,7 @@ static dev_info_t dev_info = "3c589_cs";
 static dev_link_t *tc589_attach(void);
 static void tc589_detach(dev_link_t *);
 
-static dev_link_t *dev_list = NULL;
+static dev_link_t *dev_list;
 
 /*======================================================================
 

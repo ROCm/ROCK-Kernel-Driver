@@ -1363,7 +1363,7 @@ void net_call_rx_atomic(void (*fn)(void))
 void (*br_handle_frame_hook)(struct sk_buff *skb) = NULL;
 #endif
 
-static int __inline__ handle_bridge(struct sk_buff *skb,
+static __inline__ int handle_bridge(struct sk_buff *skb,
 				     struct packet_type *pt_prev)
 {
 	int ret = NET_RX_DROP;

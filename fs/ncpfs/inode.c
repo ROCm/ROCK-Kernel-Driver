@@ -327,7 +327,6 @@ ncp_read_super(struct super_block *sb, void *raw_data, int silent)
 	else
 		default_bufsize = 1024;
 
-	sb->s_maxbytes = MAX_NON_LFS;
 	sb->s_blocksize = 1024;	/* Eh...  Is this correct? */
 	sb->s_blocksize_bits = 10;
 	sb->s_magic = NCP_SUPER_MAGIC;

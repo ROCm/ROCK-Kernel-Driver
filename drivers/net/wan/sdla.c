@@ -1641,8 +1641,6 @@ int __init sdla_init(struct net_device *dev)
 	dev->addr_len		= 0;
 	dev->mtu		= SDLA_MAX_MTU;
 
-	dev_init_buffers(dev);
-   
 	flp->activate		= sdla_activate;
 	flp->deactivate		= sdla_deactivate;
 	flp->assoc		= sdla_assoc;

@@ -5,7 +5,7 @@
  *	Authors:
  *	Lennert Buytenhek		<buytenh@gnu.org>
  *
- *	$Id: br_stp_if.c,v 1.3 2000/05/05 02:17:17 davem Exp $
+ *	$Id: br_stp_if.c,v 1.4 2001/04/14 21:14:39 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License
@@ -203,7 +203,10 @@ void br_stp_set_bridge_priority(struct net_bridge *br, int newprio)
 /* called under bridge lock */
 void br_stp_set_port_priority(struct net_bridge_port *p, int newprio)
 {
-	int new_port_id = ((newprio & 0xFF) << 8) | p->port_no;
+	__u16 new_port_id;
+
+	p->priority = newprio & 0xFF;
+	new_port_id = br_make_port_id(p);
 
 	if (br_is_designated_port(p))
 		p->designated_port = new_port_id;

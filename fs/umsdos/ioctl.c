@@ -95,7 +95,7 @@ dentry->d_parent->d_name.name, dentry->d_name.name, cmd, data_ptr));
 	    && cmd != UMSDOS_DOS_SETUP)
 		return fat_dir_ioctl (dir, filp, cmd, data_ptr);
 
-	/* #Specification: ioctl / acces
+	/* #Specification: ioctl / access
 	 * Only root (effective id) is allowed to do IOCTL on directory
 	 * in UMSDOS. EPERM is returned for other user.
 	 */

@@ -1,3 +1,10 @@
+2001-04-14  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	Merged:  2001-03-30  Tim Waugh  <twaugh@redhat.com>
+
+        * drivers/parport/parport_pc.c: Make Via SuperIO chipsets behave
+        like everything else with respect to irq= and dma= parameters.
+
 2001-04-08  Tim Waugh  <twaugh@redhat.com>
 
       * parport_pc.c (parport_pc_save_state): Read from the soft copy of
