@@ -114,7 +114,7 @@ static void mmc_request(request_queue_t *q)
 {
 	struct mmc_queue *mq = q->queuedata;
 
-	if (!mq->req && !blk_queue_plugged(q))
+	if (!mq->req)
 		wake_up(&mq->thread_wq);
 }
 
@@ -131,7 +131,7 @@ int mmc_init_queue(struct mmc_queue *mq, struct mmc_card *card, spinlock_t *lock
 	u64 limit = BLK_BOUNCE_HIGH;
 	int ret;
 
-	if (card->host->dev->dma_mask)
+	if (card->host->dev->dma_mask && *card->host->dev->dma_mask)
 		limit = *card->host->dev->dma_mask;
 
 	mq->card = card;

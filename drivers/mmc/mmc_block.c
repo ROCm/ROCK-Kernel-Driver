@@ -55,7 +55,6 @@ struct mmc_blk_data {
 
 	unsigned int	usage;
 	unsigned int	block_bits;
-	unsigned int	suspended;
 };
 
 static DECLARE_MUTEX(open_lock);
@@ -149,6 +148,7 @@ struct mmc_blk_request {
 static int mmc_blk_prep_rq(struct mmc_queue *mq, struct request *req)
 {
 	struct mmc_blk_data *md = mq->data;
+	int stat = BLKPREP_OK;
 
 	/*
 	 * If we have no device, we haven't finished initialising.
@@ -156,29 +156,10 @@ static int mmc_blk_prep_rq(struct mmc_queue *mq, struct request *req)
 	if (!md || !mq->card) {
 		printk(KERN_ERR "%s: killing request - no device/host\n",
 		       req->rq_disk->disk_name);
-		goto kill;
+		stat = BLKPREP_KILL;
 	}
 
-	if (md->suspended) {
-		blk_plug_device(md->queue.queue);
-		goto defer;
-	}
-
-	/*
-	 * Check for excessive requests.
-	 */
-	if (req->sector + req->nr_sectors > get_capacity(req->rq_disk)) {
-		printk(KERN_ERR "%s: bad request size\n",
-		       req->rq_disk->disk_name);
-		goto kill;
-	}
-
-	return BLKPREP_OK;
-
- defer:
-	return BLKPREP_DEFER;
- kill:
-	return BLKPREP_KILL;
+	return stat;
 }
 
 static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
