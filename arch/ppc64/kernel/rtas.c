@@ -75,9 +75,9 @@ rtas_token(const char *service)
 
 
 static int
-__log_rtas_error(struct rtas_args *rtas_args)
+__log_rtas_error(void)
 {
-	struct rtas_args err_args, temp_args;
+	struct rtas_args err_args, save_args;
 
 	err_args.token = rtas_token("rtas-last-error");
 	err_args.nargs = 2;
@@ -88,7 +88,7 @@ __log_rtas_error(struct rtas_args *rtas_args)
 	err_args.args[1] = RTAS_ERROR_LOG_MAX;
 	err_args.args[2] = 0;
 
-	temp_args = *rtas_args;
+	save_args = rtas.args;
 	rtas.args = err_args;
 
 	PPCDBG(PPCDBG_RTAS, "\tentering rtas with 0x%lx\n",
@@ -97,19 +97,19 @@ __log_rtas_error(struct rtas_args *rtas_args)
 	PPCDBG(PPCDBG_RTAS, "\treturned from rtas ...\n");
 
 	err_args = rtas.args;
-	rtas.args = temp_args;
+	rtas.args = save_args;
 
 	return err_args.rets[0];
 }
 
 void
-log_rtas_error(struct rtas_args	*rtas_args)
+log_rtas_error(void)
 {
 	unsigned long s;
 	int rc;
 
 	spin_lock_irqsave(&rtas.lock, s);
-	rc = __log_rtas_error(rtas_args);
+	rc = __log_rtas_error();
 	spin_unlock_irqrestore(&rtas.lock, s);
 	if (rc == 0)
 		log_error(rtas_err_buf, ERR_TYPE_RTAS_LOG, 0);
@@ -155,7 +155,7 @@ int rtas_call(int token, int nargs, int nret, int *outputs, ...)
 	PPCDBG(PPCDBG_RTAS, "\treturned from rtas ...\n");
 
 	if (rtas_args->rets[0] == -1)
-		logit = (__log_rtas_error(rtas_args) == 0);
+		logit = (__log_rtas_error() == 0);
 
 	ifppcdebug(PPCDBG_RTAS) {
 		for(i=0; i < nret ;i++)
@@ -447,7 +447,7 @@ asmlinkage int ppc_rtas(struct rtas_args __user *uargs)
 
 	args.rets  = (rtas_arg_t *)&(args.args[nargs]);
 	if (args.rets[0] == -1)
-		log_rtas_error(&args);
+		log_rtas_error();
 
 	/* Copy out args. */
 	if (copy_to_user(uargs->args + nargs,
