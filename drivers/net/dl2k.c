@@ -1142,7 +1142,8 @@ set_multicast (struct net_device *dev)
 	u16 rx_mode = 0;
 	int i;
 	int bit;
-	int index, crc;
+	int index;
+	long crc;
 	struct dev_mc_list *mclist;
 	struct netdev_private *np = dev->priv;
 	
