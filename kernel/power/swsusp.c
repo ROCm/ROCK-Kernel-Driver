@@ -696,6 +696,7 @@ static void suspend_power_down(void)
 	else
 #endif
 	{
+		device_suspend(3);
 		device_shutdown();
 		machine_power_off();
 	}
@@ -716,7 +717,7 @@ asmlinkage void do_magic_resume_1(void)
 	mb();
 	spin_lock_irq(&suspend_pagedir_lock);	/* Done to disable interrupts */ 
 
-	device_power_down(4);
+	device_power_down(3);
 	PRINTK( "Waiting for DMAs to settle down...\n");
 	mdelay(1000);	/* We do not want some readahead with DMA to corrupt our memory, right?
 			   Do it with disabled interrupts for best effect. That way, if some
@@ -785,7 +786,7 @@ asmlinkage void do_magic_suspend_2(void)
 {
 	int is_problem;
 	read_swapfiles();
-	device_power_down(4);
+	device_power_down(3);
 	is_problem = suspend_prepare_image();
 	device_power_up();
 	spin_unlock_irq(&suspend_pagedir_lock);
@@ -802,7 +803,6 @@ asmlinkage void do_magic_suspend_2(void)
 	barrier();
 	mb();
 	spin_lock_irq(&suspend_pagedir_lock);	/* Done to disable interrupts */ 
-	mdelay(1000);
 
 	free_pages((unsigned long) pagedir_nosave, pagedir_order);
 	spin_unlock_irq(&suspend_pagedir_lock);
@@ -839,9 +839,10 @@ int software_suspend(void)
                    need half of memory free. */
 
 		free_some_memory();
-		
-		/* Save state of all device drivers, and stop them. */		   
-		if ((res = device_suspend(4))==0)
+		disable_nonboot_cpus();
+		/* Save state of all device drivers, and stop them. */
+		printk("Suspending devices... ");
+		if ((res = device_suspend(3))==0) {
 			/* If stopping device drivers worked, we proceed basically into
 			 * suspend_save_image.
 			 *
@@ -852,7 +853,9 @@ int software_suspend(void)
 			 * using normal kernel mechanism.
 			 */
 			do_magic(0);
+		}
 		thaw_processes();
+		enable_nonboot_cpus();
 	} else
 		res = -EBUSY;
 	software_suspend_enabled = 1;
@@ -1192,7 +1195,9 @@ static int __init software_resume(void)
 	printk( "resuming from %s\n", resume_file);
 	if (read_suspend_image(resume_file, 0))
 		goto read_failure;
-	device_suspend(4);
+	/* FIXME: Should we stop processes here, just to be safer? */
+	disable_nonboot_cpus();
+	device_suspend(3);
 	do_magic(1);
 	panic("This never returns");
 
