@@ -449,7 +449,6 @@ CONFIG_PSMOUSE=y
 #
 # CONFIG_WATCHDOG is not set
 # CONFIG_INTEL_RNG is not set
-CONFIG_NVRAM=y
 # CONFIG_DTLK is not set
 # CONFIG_R3964 is not set
 # CONFIG_APPLICOM is not set
