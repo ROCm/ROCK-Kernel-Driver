@@ -339,8 +339,9 @@ int inflateReset(
 }
 
 
-int inflateEnd(z)
-z_stream *z;
+int inflateEnd(
+	z_stream *z
+)
 {
   uLong c;
 
@@ -355,9 +356,10 @@ z_stream *z;
 }
 
 
-int inflateInit2(z, w)
-z_stream *z;
-int w;
+int inflateInit2(
+	z_stream *z,
+	int w
+)
 {
   /* initialize state */
   if (z == Z_NULL)
@@ -401,8 +403,9 @@ int w;
 }
 
 
-int inflateInit(z)
-z_stream *z;
+int inflateInit(
+	z_stream *z
+)
 {
   return inflateInit2(z, DEF_WBITS);
 }
@@ -1151,8 +1154,9 @@ local int inflate_addhistory(
  * At the end of a Deflate-compressed PPP packet, we expect to have seen
  * a `stored' block type value but not the (zero) length bytes.
  */
-local int inflate_packet_flush(s)
-    inflate_blocks_statef *s;
+local int inflate_packet_flush(
+	inflate_blocks_statef *s
+)
 {
     if (s->mode != LENS)
 	return Z_DATA_ERROR;
@@ -1615,9 +1619,10 @@ local int inflate_trees_fixed(
 }
 
 
-local int inflate_trees_free(t, z)
-inflate_huft *t;        /* table to free */
-z_stream *z;            /* for zfree function */
+local int inflate_trees_free(
+	inflate_huft *t,        /* table to free */
+	z_stream *z             /* for zfree function */
+)
 /* Free the malloc'ed tables built by huft_build(), which makes a linked
    list of the tables it made, with the links in a dummy first entry of
    each table. */

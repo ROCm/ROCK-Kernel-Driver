@@ -6,7 +6,7 @@
  *
  * Portions Copyright (c) 2001 Matrox Graphics Inc.
  *
- * Version: 1.64 2002/06/02
+ * Version: 1.65 2002/08/14
  *
  * See matroxfb_base.c for contributors.
  *
@@ -20,6 +20,88 @@
 #include <asm/uaccess.h>
 #include <asm/div64.h>
 
+/* Definition of the various controls */
+struct mctl {
+	struct v4l2_queryctrl desc;
+	size_t control;
+};
+
+#define BLMIN	0xF3
+#define WLMAX	0x3FF
+
+static const struct mctl g450_controls[] =
+{	{ { V4L2_CID_BRIGHTNESS, V4L2_CTRL_TYPE_INTEGER, 
+	  "brightness",
+	  0, WLMAX-BLMIN, 1, 370-BLMIN, 
+	  0,
+	}, offsetof(struct matrox_fb_info, altout.tvo_params.brightness) },
+	{ { V4L2_CID_CONTRAST, V4L2_CTRL_TYPE_INTEGER, 
+	  "contrast",
+	  0, 1023, 1, 127, 
+	  0,
+	}, offsetof(struct matrox_fb_info, altout.tvo_params.contrast) },
+	{ { V4L2_CID_SATURATION, V4L2_CTRL_TYPE_INTEGER,
+	  "saturation",
+	  0, 255, 1, 165, 
+	  0,
+	}, offsetof(struct matrox_fb_info, altout.tvo_params.saturation) },
+	{ { V4L2_CID_HUE, V4L2_CTRL_TYPE_INTEGER,
+	  "hue",
+	  0, 255, 1, 0, 
+	  0,
+	}, offsetof(struct matrox_fb_info, altout.tvo_params.hue) },
+	{ { MATROXFB_CID_TESTOUT, V4L2_CTRL_TYPE_BOOLEAN,
+	  "test output",
+	  0, 1, 1, 0, 
+	  0,
+	}, offsetof(struct matrox_fb_info, altout.tvo_params.testout) },
+};
+
+#define G450CTRLS (sizeof(g450_controls)/sizeof(g450_controls[0]))
+
+/* Return: positive number: id found
+           -EINVAL:         id not found, return failure
+	   -ENOENT:         id not found, create fake disabled control */
+static int get_ctrl_id(__u32 v4l2_id) {
+	int i;
+
+	for (i = 0; i < G450CTRLS; i++) {
+		if (v4l2_id < g450_controls[i].desc.id) {
+			if (g450_controls[i].desc.id == 0x08000000) {
+				return -EINVAL;
+			}
+			return -ENOENT;
+		}
+		if (v4l2_id == g450_controls[i].desc.id) {
+			return i;
+		}
+	}
+	return -EINVAL;
+}
+
+static inline int* get_ctrl_ptr(WPMINFO unsigned int idx) {
+	return (int*)((char*)MINFO + g450_controls[idx].control);
+}
+
+static void tvo_fill_defaults(WPMINFO2) {
+	unsigned int i;
+	
+	for (i = 0; i < G450CTRLS; i++) {
+		*get_ctrl_ptr(PMINFO i) = g450_controls[i].desc.default_value;
+	}
+}
+
+static int cve2_get_reg(WPMINFO int reg) {
+	unsigned long flags;
+	int val;
+	
+	matroxfb_DAC_lock_irqsave(flags);
+	matroxfb_DAC_out(PMINFO 0x87, reg);
+	val = matroxfb_DAC_in(PMINFO 0x88);
+	matroxfb_DAC_unlock_irqrestore(flags);
+	return val;
+}
+
 static void cve2_set_reg(WPMINFO int reg, int val) {
 	unsigned long flags;
 
@@ -27,6 +109,110 @@ static void cve2_set_reg(WPMINFO int reg, int val) {
 	matroxfb_DAC_out(PMINFO 0x87, reg);
 	matroxfb_DAC_out(PMINFO 0x88, val);
 	matroxfb_DAC_unlock_irqrestore(flags);
+}
+
+static void cve2_set_reg10(WPMINFO int reg, int val) {
+	unsigned long flags;
+
+	matroxfb_DAC_lock_irqsave(flags);
+	matroxfb_DAC_out(PMINFO 0x87, reg);
+	matroxfb_DAC_out(PMINFO 0x88, val >> 2);
+	matroxfb_DAC_out(PMINFO 0x87, reg + 1);
+	matroxfb_DAC_out(PMINFO 0x88, val & 3);
+	matroxfb_DAC_unlock_irqrestore(flags);
+}
+
+static void g450_compute_bwlevel(CPMINFO int *bl, int *wl) {
+	const int b = ACCESS_FBINFO(altout.tvo_params.brightness) + BLMIN;
+	const int c = ACCESS_FBINFO(altout.tvo_params.contrast);
+
+	*bl = max(b - c, BLMIN);
+	*wl = min(b + c, WLMAX);
+}
+
+static int g450_query_ctrl(void* md, struct v4l2_queryctrl *p) {
+	int i;
+	
+	i = get_ctrl_id(p->id);
+	if (i >= 0) {
+		*p = g450_controls[i].desc;
+		return 0;
+	}
+	if (i == -ENOENT) {
+		static const struct v4l2_queryctrl disctrl = 
+			{ .flags = V4L2_CTRL_FLAG_DISABLED };
+			
+		i = p->id;
+		*p = disctrl;
+		p->id = i;
+		sprintf(p->name, "Ctrl #%08X", i);
+		return 0;
+	}
+	return -EINVAL;
+}
+
+static int g450_set_ctrl(void* md, struct v4l2_control *p) {
+	int i;
+	MINFO_FROM(md);
+	
+	i = get_ctrl_id(p->id);
+	if (i < 0) return -EINVAL;
+
+	/*
+	 * Check if changed.
+	 */
+	if (p->value == *get_ctrl_ptr(PMINFO i)) return 0;
+
+	/*
+	 * Check limits.
+	 */
+	if (p->value > g450_controls[i].desc.maximum) return -EINVAL;
+	if (p->value < g450_controls[i].desc.minimum) return -EINVAL;
+
+	/*
+	 * Store new value.
+	 */
+	*get_ctrl_ptr(PMINFO i) = p->value;
+
+	switch (p->id) {
+		case V4L2_CID_BRIGHTNESS:
+		case V4L2_CID_CONTRAST:
+			{
+				int blacklevel, whitelevel;
+				g450_compute_bwlevel(PMINFO &blacklevel, &whitelevel);
+				cve2_set_reg10(PMINFO 0x0e, blacklevel);
+				cve2_set_reg10(PMINFO 0x1e, whitelevel);
+			}
+			break;
+		case V4L2_CID_SATURATION:
+			cve2_set_reg(PMINFO 0x20, p->value);
+			cve2_set_reg(PMINFO 0x22, p->value);
+			break;
+		case V4L2_CID_HUE:
+			cve2_set_reg(PMINFO 0x25, p->value);
+			break;
+		case MATROXFB_CID_TESTOUT:
+			{
+				unsigned char val = cve2_get_reg (PMINFO 0x05);
+				if (p->value) val |=  0x02;
+				else          val &= ~0x02;
+				cve2_set_reg(PMINFO 0x05, val);
+			}
+			break;
+	}
+	
+
+	return 0;
+}
+
+static int g450_get_ctrl(void* md, struct v4l2_control *p) {
+	int i;
+	MINFO_FROM(md);
+	
+	i = get_ctrl_id(p->id);
+	if (i < 0) return -EINVAL;
+	p->value = *get_ctrl_ptr(PMINFO i);
+	return 0;
 }
 
 struct output_desc {
@@ -329,6 +515,23 @@ static int matroxfb_g450_compute(void* md, struct my_timming* mt) {
 		const struct output_desc* outd;
 
 		cve2_init_TVdata(ACCESS_FBINFO(outputs[1]).mode, &ACCESS_FBINFO(hw).maven, &outd);
+		{
+			int blacklevel, whitelevel;
+			g450_compute_bwlevel(PMINFO &blacklevel, &whitelevel);
+			ACCESS_FBINFO(hw).maven.regs[0x0E] = blacklevel >> 2;
+			ACCESS_FBINFO(hw).maven.regs[0x0F] = blacklevel & 3;
+			ACCESS_FBINFO(hw).maven.regs[0x1E] = whitelevel >> 2;
+			ACCESS_FBINFO(hw).maven.regs[0x1F] = whitelevel & 3;
+
+			ACCESS_FBINFO(hw).maven.regs[0x20] =
+			ACCESS_FBINFO(hw).maven.regs[0x22] = ACCESS_FBINFO(altout.tvo_params.saturation);
+
+			ACCESS_FBINFO(hw).maven.regs[0x25] = ACCESS_FBINFO(altout.tvo_params.hue);
+
+			if (ACCESS_FBINFO(altout.tvo_params.testout)) {
+				ACCESS_FBINFO(hw).maven.regs[0x05] |= 0x02;
+			}
+		}
 		computeRegs(PMINFO &ACCESS_FBINFO(hw).maven, mt, outd);
 	} else if (mt->mnp < 0) {
 		/* We must program clocks before CRTC2, otherwise interlaced mode
@@ -374,6 +577,9 @@ static struct matrox_altout matroxfb_g450_altout = {
 	.compute	= matroxfb_g450_compute,
 	.program	= matroxfb_g450_program,
 	.verifymode	= matroxfb_g450_verify_mode,
+	.getqueryctrl	= g450_query_ctrl,
+	.getctrl	= g450_get_ctrl,
+	.setctrl	= g450_set_ctrl,
 };
 
 static struct matrox_altout matroxfb_g450_dvi = {
@@ -384,6 +590,7 @@ static struct matrox_altout matroxfb_g450_dvi = {
 void matroxfb_g450_connect(WPMINFO2) {
 	if (ACCESS_FBINFO(devflags.g450dac)) {
 		down_write(&ACCESS_FBINFO(altout.lock));
+		tvo_fill_defaults(PMINFO2);
 		ACCESS_FBINFO(outputs[1]).src = MATROXFB_SRC_CRTC1;
 		ACCESS_FBINFO(outputs[1]).data = MINFO;
 		ACCESS_FBINFO(outputs[1]).output = &matroxfb_g450_altout;

@@ -26,21 +26,9 @@ MODULE_PARM_DESC(mem, "Memory size reserved for dualhead (default=8MB)");
 
 /* **************************************************** */
 
-static int matroxfb_dh_getcolreg(unsigned regno, unsigned *red, unsigned *green,
-		unsigned *blue, unsigned *transp, struct fb_info* info) {
-#define m2info (container_of(info, struct matroxfb_dh_fb_info, fbcon))
-	if (regno >= 16)
-		return 1;
-	*red = m2info->palette[regno].red;
-	*blue = m2info->palette[regno].blue;
-	*green = m2info->palette[regno].green;
-	*transp = m2info->palette[regno].transp;
-	return 0;
-#undef m2info
-}
-
 static int matroxfb_dh_setcolreg(unsigned regno, unsigned red, unsigned green,
 		unsigned blue, unsigned transp, struct fb_info* info) {
+	u_int32_t col;
 #define m2info (container_of(info, struct matroxfb_dh_fb_info, fbcon))
 
 	if (regno >= 16)
@@ -58,42 +46,22 @@ static int matroxfb_dh_setcolreg(unsigned regno, unsigned red, unsigned green,
 	blue = CNVT_TOHW(blue, m2info->fbcon.var.blue.length);
 	transp = CNVT_TOHW(transp, m2info->fbcon.var.transp.length);
 
+	col = (red << m2info->fbcon.var.red.offset)     |
+	      (green << m2info->fbcon.var.green.offset) |
+	      (blue << m2info->fbcon.var.blue.offset)   |
+	      (transp << m2info->fbcon.var.transp.offset);
+
 	switch (m2info->fbcon.var.bits_per_pixel) {
-#ifdef FBCON_HAS_CFB16
 		case 16:
-			m2info->cmap.cfb16[regno] =
-				(red << m2info->fbcon.var.red.offset)     |
-				(green << m2info->fbcon.var.green.offset) |
-				(blue << m2info->fbcon.var.blue.offset)   |
-				(transp << m2info->fbcon.var.transp.offset);
+			m2info->cmap[regno] = col | (col << 16);
 			break;
-#endif
-#ifdef FBCON_HAS_CFB32
 		case 32:
-			m2info->cmap.cfb32[regno] =
-				(red << m2info->fbcon.var.red.offset)     |
-				(green << m2info->fbcon.var.green.offset) |
-				(blue << m2info->fbcon.var.blue.offset)   |
-				(transp << m2info->fbcon.var.transp.offset);
+			m2info->cmap[regno] = col;
 			break;
-#endif
 	}
 	return 0;
 #undef m2info
 }
-
-static inline void my_install_cmap(struct matroxfb_dh_fb_info* m2info)
-{
-	/* Do not touch this code if you do not understand what it does! */
-	/* Never try to use do_install_cmap() instead. It is crap. */
-	struct fb_cmap* cmap = &m2info->currcon_display->cmap;
-	
-	if (cmap->len)
-		fb_set_cmap(cmap, 1, &m2info->fbcon);
-	else
-		fb_set_cmap(fb_default_cmap(16), 1, &m2info->fbcon);
-}
-
 
 static void matroxfb_dh_restore(struct matroxfb_dh_fb_info* m2info,
 		struct my_timming* mt,
@@ -201,6 +169,7 @@ static void matroxfb_dh_disable(struct matroxfb_dh_fb_info* m2info) {
 
 static void matroxfb_dh_cfbX_init(struct matroxfb_dh_fb_info* m2info) {
 	/* no acceleration for secondary head... */
+	m2info->cmap[16] = 0xFFFFFFFF;
 }
 
 static void matroxfb_dh_pan_var(struct matroxfb_dh_fb_info* m2info,
@@ -234,14 +203,10 @@ static int matroxfb_dh_decode_var(struct matroxfb_dh_fb_info* m2info,
 	unsigned int vramlen;
 
 	switch (var->bits_per_pixel) {
-#ifdef FBCON_HAS_CFB16
 		case 16:	mask = 0x1F;
 				break;
-#endif
-#ifdef FBCON_HAS_CFB32
 		case 32:	mask = 0x0F;
 				break;
-#endif
 		default:	return -EINVAL;
 	}
 	vramlen = m2info->video.len_usable;
@@ -302,34 +267,19 @@ static int matroxfb_dh_decode_var(struct matroxfb_dh_fb_info* m2info,
 	return 0;
 }
 
-static void initMatroxDH(struct matroxfb_dh_fb_info* m2info, struct display* p) {
-	switch (m2info->fbcon.var.bits_per_pixel) {
-#ifdef FBCON_HAS_CFB16
-		case 16:
-			p->dispsw_data = m2info->cmap.cfb16;
-			p->dispsw = &fbcon_cfb16;
-			break;
-#endif
-#ifdef FBCON_HAS_CFB32
-		case 32:
-			p->dispsw_data = m2info->cmap.cfb32;
-			p->dispsw = &fbcon_cfb32;
-			break;
-#endif
-		default:
-			p->dispsw_data = NULL;
-			p->dispsw = &fbcon_dummy;
-			break;
-	}
-}
-
 static int matroxfb_dh_open(struct fb_info* info, int user) {
 #define m2info (container_of(info, struct matroxfb_dh_fb_info, fbcon))
 	MINFO_FROM(m2info->primary_dev);
 
 	if (MINFO) {
+		int err;
+
 		if (ACCESS_FBINFO(dead)) {
 			return -ENXIO;
+		}
+		err = ACCESS_FBINFO(fbops).fb_open(&ACCESS_FBINFO(fbcon), user);
+		if (err) {
+			return err;
 		}
 	}
 	return 0;
@@ -338,15 +288,17 @@ static int matroxfb_dh_open(struct fb_info* info, int user) {
 
 static int matroxfb_dh_release(struct fb_info* info, int user) {
 #define m2info (container_of(info, struct matroxfb_dh_fb_info, fbcon))
+	int err = 0;
 	MINFO_FROM(m2info->primary_dev);
 
 	if (MINFO) {
+		err = ACCESS_FBINFO(fbops).fb_release(&ACCESS_FBINFO(fbcon), user);
 	}
-	return 0;
+	return err;
 #undef m2info
 }
 
-static void matroxfb_dh_update_fix(struct matroxfb_dh_fb_info *m2info) {
+static void matroxfb_dh_init_fix(struct matroxfb_dh_fb_info *m2info) {
 	struct fb_fix_screeninfo *fix = &m2info->fbcon.fix;
 
 	strcpy(fix->id, "MATROX DH");
@@ -361,57 +313,36 @@ static void matroxfb_dh_update_fix(struct matroxfb_dh_fb_info *m2info) {
 	fix->accel = 0;		/* no accel... */
 }
 
-static int matroxfb_dh_set_var(struct fb_var_screeninfo* var, int con,
-		struct fb_info* info) {
+static int matroxfb_dh_check_var(struct fb_var_screeninfo* var, struct fb_info* info) {
 #define m2info (container_of(info, struct matroxfb_dh_fb_info, fbcon))
-	struct display* p;
-	int chgvar;
+	int visual;
+	int cmap_len;
+	int mode;
+
+	return matroxfb_dh_decode_var(m2info, var, &visual, &cmap_len, &mode);
+#undef m2info
+}
+
+static int matroxfb_dh_set_par(struct fb_info* info) {
+#define m2info (container_of(info, struct matroxfb_dh_fb_info, fbcon))
 	int visual;
 	int cmap_len;
 	int mode;
 	int err;
+	struct fb_var_screeninfo* var = &info->var;
 	MINFO_FROM(m2info->primary_dev);
 
-	if (con < 0)
-		p = m2info->fbcon.disp;
-	else
-		p = fb_display + con;
 	if ((err = matroxfb_dh_decode_var(m2info, var, &visual, &cmap_len, &mode)) != 0)
 		return err;
-	switch (var->activate & FB_ACTIVATE_MASK) {
-		case FB_ACTIVATE_TEST:	return 0;
-		case FB_ACTIVATE_NXTOPEN:
-		case FB_ACTIVATE_NOW:	break;
-		default:		return -EINVAL;
-	}
-	if (con >= 0) {
-		chgvar = (p->var.xres != var->xres) ||
-			(p->var.yres != var->yres) ||
-			(p->var.xres_virtual != var->xres_virtual) ||
-			(p->var.yres_virtual != var->yres_virtual) ||
-			(p->var.bits_per_pixel != var->bits_per_pixel) ||
-			memcmp(&p->var.red, &var->red, sizeof(var->red)) ||
-			memcmp(&p->var.green, &var->green, sizeof(var->green)) ||
-			memcmp(&p->var.blue, &var->blue, sizeof(var->blue));
-	} else
-		chgvar = 0;
-	p->var = *var;
 	/* cmap */
-	if (con == m2info->fbcon.currcon) {
+	{
 		m2info->fbcon.screen_base = vaddr_va(m2info->video.vbase);
-		m2info->fbcon.var = *var;
 		m2info->fbcon.fix.visual = visual;
 		m2info->fbcon.fix.type = FB_TYPE_PACKED_PIXELS;
 		m2info->fbcon.fix.type_aux = 0;
-		p->next_line = m2info->fbcon.fix.line_length = (var->xres_virtual * var->bits_per_pixel) >> 3;
-		matroxfb_dh_update_fix(m2info);
+		m2info->fbcon.fix.line_length = (var->xres_virtual * var->bits_per_pixel) >> 3;
 	}
-	p->can_soft_blank = 0;
-	p->inverse = 0;	/* TBD */
-	initMatroxDH(m2info, p);
-	if (chgvar && info && info->changevar)
-		info->changevar(con);
-	if (con == m2info->fbcon.currcon) {
+	{
 		struct my_timming mt;
 		unsigned int pos;
 		int out;
@@ -459,74 +390,22 @@ static int matroxfb_dh_set_var(struct fb_var_screeninfo* var, int con,
 		}
 		up_read(&ACCESS_FBINFO(altout).lock);
 		matroxfb_dh_cfbX_init(m2info);
-		my_install_cmap(m2info);
 	}
 	return 0;
 #undef m2info
 }
 
-static int matroxfb_dh_get_cmap(struct fb_cmap* cmap, int kspc, int con,
-		struct fb_info* info) {
+static int matroxfb_dh_pan_display(struct fb_var_screeninfo* var, struct fb_info* info) {
 #define m2info (container_of(info, struct matroxfb_dh_fb_info, fbcon))
-	struct display* dsp;
-
-	if (con < 0)
-		dsp = m2info->fbcon.disp;
-	else
-		dsp = fb_display + con;
-	if (con == m2info->fbcon.currcon)
-		return fb_get_cmap(cmap, kspc, matroxfb_dh_getcolreg, info);
-	else if (dsp->cmap.len)
-		fb_copy_cmap(&dsp->cmap, cmap, kspc ? 0 : 2);
-	else
-		fb_copy_cmap(fb_default_cmap(16), cmap, kspc ? 0 : 2);
+	matroxfb_dh_pan_var(m2info, var);
 	return 0;
 #undef m2info
 }
-
-static int matroxfb_dh_set_cmap(struct fb_cmap* cmap, int kspc, int con,
-		struct fb_info* info) {
-#define m2info (container_of(info, struct matroxfb_dh_fb_info, fbcon))
-	struct display* dsp;
-
-	if (con < 0)
-		dsp = m2info->fbcon.disp;
-	else
-		dsp = fb_display + con;
-	if (dsp->cmap.len != 16) {
-		int err;
-
-		err = fb_alloc_cmap(&dsp->cmap, 16, 0);
-		if (err)
-			return err;
-	}
-	if (con == m2info->fbcon.currcon)
-		return fb_set_cmap(cmap, kspc, info);
-	else
-		fb_copy_cmap(cmap, &dsp->cmap, kspc ? 0 : 1);
-	return 0;
-#undef m2info
-}
-
-static int matroxfb_dh_pan_display(struct fb_var_screeninfo* var, int con,
-		struct fb_info* info) {
-#define m2info (container_of(info, struct matroxfb_dh_fb_info, fbcon))
-	if (var->xoffset + fb_display[con].var.xres > fb_display[con].var.xres_virtual ||
-	    var->yoffset + fb_display[con].var.yres > fb_display[con].var.yres_virtual)
-		return -EINVAL;
-	if (con == m2info->fbcon.currcon)
-		matroxfb_dh_pan_var(m2info, var);
-	fb_display[con].var.xoffset = var->xoffset;
-	fb_display[con].var.yoffset = var->yoffset;
-	return 0;
-#undef m2info
-}
-
-static int matroxfb_dh_switch(int con, struct fb_info* info);
 
 static int matroxfb_dh_get_vblank(const struct matroxfb_dh_fb_info* m2info, struct fb_vblank* vblank) {
 	MINFO_FROM(m2info->primary_dev);
 
+	matroxfb_enable_irq(PMINFO 0);
 	memset(vblank, 0, sizeof(*vblank));
 	vblank->flags = FB_VBLANK_HAVE_VCOUNT | FB_VBLANK_HAVE_VBLANK;
 	/* mask out reserved bits + field number (odd/even) */
@@ -534,6 +413,12 @@ static int matroxfb_dh_get_vblank(const struct matroxfb_dh_fb_info* m2info, stru
 	/* compatibility stuff */
 	if (vblank->vcount >= m2info->fbcon.var.yres)
 		vblank->flags |= FB_VBLANK_VBLANKING;
+        if (test_bit(0, &ACCESS_FBINFO(irq_flags))) {
+                vblank->flags |= FB_VBLANK_HAVE_COUNT;
+                /* Only one writer, aligned int value...
+                   it should work without lock and without atomic_t */
+                vblank->count = ACCESS_FBINFO(crtc2).vsync.cnt;
+        }
 	return 0;
 }
 
@@ -541,12 +426,11 @@ static int matroxfb_dh_ioctl(struct inode* inode,
 		struct file* file,
 		unsigned int cmd,
 		unsigned long arg,
-		int con,
 		struct fb_info* info) {
 #define m2info (container_of(info, struct matroxfb_dh_fb_info, fbcon))
 	MINFO_FROM(m2info->primary_dev);
 
-	DBG("matroxfb_crtc2_ioctl")
+	DBG(__FUNCTION__)
 
 	switch (cmd) {
 		case FBIOGET_VBLANK:
@@ -561,11 +445,22 @@ static int matroxfb_dh_ioctl(struct inode* inode,
 					return -EFAULT;
 				return 0;
 			}
+		case FBIO_WAITFORVSYNC:
+			{
+				u_int32_t crt;
+
+				if (get_user(crt, (u_int32_t *)arg))
+					return -EFAULT;
+
+				if (crt != 0)
+					return -ENODEV;
+				return matroxfb_wait_for_sync(PMINFO 1);
+			}
 		case MATROXFB_SET_OUTPUT_MODE:
 		case MATROXFB_GET_OUTPUT_MODE:
 		case MATROXFB_GET_ALL_OUTPUTS:
 			{
-				return ACCESS_FBINFO(fbcon.fbops)->fb_ioctl(inode, file, cmd, arg, con, &ACCESS_FBINFO(fbcon));
+				return ACCESS_FBINFO(fbcon.fbops)->fb_ioctl(inode, file, cmd, arg, &ACCESS_FBINFO(fbcon));
 			}
 		case MATROXFB_SET_OUTPUT_CONNECTION:
 			{
@@ -610,7 +505,7 @@ static int matroxfb_dh_ioctl(struct inode* inode,
 				}
 				if (!changes)
 					return 0;
-				matroxfb_dh_switch(m2info->fbcon.currcon, info);
+				matroxfb_dh_set_par(info);
 				return 0;
 			}
 		case MATROXFB_GET_OUTPUT_CONNECTION:
@@ -675,44 +570,17 @@ static struct fb_ops matroxfb_dh_ops = {
 	.owner =	THIS_MODULE,
 	.fb_open =	matroxfb_dh_open,
 	.fb_release =	matroxfb_dh_release,
-	.fb_set_var =	matroxfb_dh_set_var,
-	.fb_get_cmap =	matroxfb_dh_get_cmap,
-	.fb_set_cmap =	matroxfb_dh_set_cmap,
+	.fb_check_var =	matroxfb_dh_check_var,
+	.fb_set_par =	matroxfb_dh_set_par,
 	.fb_setcolreg =	matroxfb_dh_setcolreg,
 	.fb_pan_display =matroxfb_dh_pan_display,
 	.fb_blank =	matroxfb_dh_blank,
 	.fb_ioctl =	matroxfb_dh_ioctl,
+	.fb_fillrect =	cfb_fillrect,
+	.fb_copyarea =	cfb_copyarea,
+	.fb_imageblit =	cfb_imageblit,
+	.fb_cursor =	soft_cursor,
 };
-
-static int matroxfb_dh_switch(int con, struct fb_info* info) {
-#define m2info (container_of(info, struct matroxfb_dh_fb_info, fbcon))
-	struct fb_cmap* cmap;
-	struct display* p;
-
-	if (m2info->fbcon.currcon >= 0) {
-		cmap = &m2info->currcon_display->cmap;
-		if (cmap->len) {
-			fb_get_cmap(cmap, 1, matroxfb_dh_getcolreg, info);
-		}
-	}
-	m2info->fbcon.currcon = con;
-	if (con < 0)
-		p = m2info->fbcon.disp;
-	else
-		p = fb_display + con;
-	m2info->currcon_display = p;
-	p->var.activate = FB_ACTIVATE_NOW;
-	matroxfb_dh_set_var(&p->var, con, info);
-	return 0;
-#undef m2info
-}
-
-static int matroxfb_dh_updatevar(int con, struct fb_info* info) {
-#define m2info (container_of(info, struct matroxfb_dh_fb_info, fbcon))
-	matroxfb_dh_pan_var(m2info, &fb_display[con].var);
-	return 0;
-#undef m2info
-}
 
 static struct fb_var_screeninfo matroxfb_dh_defined = {
 		640,480,640,480,/* W,H, virtual W,H */
@@ -730,30 +598,17 @@ static struct fb_var_screeninfo matroxfb_dh_defined = {
 		39721L,48L,16L,33L,10L,
 		96L,2,0,	/* no sync info */
 		FB_VMODE_NONINTERLACED,
-		{0,0,0,0,0,0}
+		0, {0,0,0,0,0}
 };
 
 static int matroxfb_dh_regit(CPMINFO struct matroxfb_dh_fb_info* m2info) {
 #define minfo (m2info->primary_dev)
-	struct display* d;
 	void* oldcrtc2;
 
-	d = kmalloc(sizeof(*d), GFP_KERNEL);
-	if (!d) {
-		return -ENOMEM;
-	}
-
-	memset(d, 0, sizeof(*d));
-
-	strcpy(m2info->fbcon.modename, "MATROX CRTC2");
-	m2info->fbcon.changevar = NULL;
 	m2info->fbcon.fbops = &matroxfb_dh_ops;
-	m2info->fbcon.disp = d;
-	m2info->fbcon.switch_con = &matroxfb_dh_switch;
-	m2info->fbcon.updatevar = &matroxfb_dh_updatevar;
 	m2info->fbcon.flags = FBINFO_FLAG_DEFAULT;
 	m2info->fbcon.currcon = -1;
-	m2info->currcon_display = d;
+	m2info->fbcon.pseudo_palette = m2info->cmap;
 
 	if (mem < 64)
 		mem *= 1024;
@@ -763,7 +618,6 @@ static int matroxfb_dh_regit(CPMINFO struct matroxfb_dh_fb_info* m2info) {
 	if (ACCESS_FBINFO(video.len_usable) + mem <= ACCESS_FBINFO(video.len))
 		m2info->video.offbase = ACCESS_FBINFO(video.len) - mem;
 	else if (ACCESS_FBINFO(video.len) < mem) {
-		kfree(d);
 		return -ENOMEM;
 	} else { /* check yres on first head... */
 		m2info->video.borrowed = mem;
@@ -786,13 +640,12 @@ static int matroxfb_dh_regit(CPMINFO struct matroxfb_dh_fb_info* m2info) {
 		ACCESS_FBINFO(outputs[1]).src = MATROXFB_SRC_CRTC2;
 	}
 
-	matroxfb_dh_set_var(&matroxfb_dh_defined, -2, &m2info->fbcon);
+	matroxfb_dh_init_fix(m2info);
 	if (register_framebuffer(&m2info->fbcon)) {
-		kfree(d);
 		return -ENXIO;
 	}
 	if (m2info->fbcon.currcon < 0) {
-		matroxfb_dh_set_var(&matroxfb_dh_defined, -1, &m2info->fbcon);
+		fb_set_var(&m2info->fbcon, &matroxfb_dh_defined);
 	}
 	down_write(&ACCESS_FBINFO(crtc2.lock));
 	oldcrtc2 = ACCESS_FBINFO(crtc2.info);
@@ -840,7 +693,6 @@ static void matroxfb_dh_deregisterfb(struct matroxfb_dh_fb_info* m2info) {
 		}
 		id = m2info->fbcon.node;
 		unregister_framebuffer(&m2info->fbcon);
-		kfree(m2info->fbcon.disp);
 		/* return memory back to primary head */
 		ACCESS_FBINFO(video.len_usable) += m2info->video.borrowed;
 		printk(KERN_INFO "matroxfb_crtc2: fb%u unregistered\n", id);

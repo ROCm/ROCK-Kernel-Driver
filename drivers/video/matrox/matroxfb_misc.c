@@ -88,52 +88,14 @@
 #include <linux/interrupt.h>
 #include <linux/matroxfb.h>
 
-void matroxfb_createcursorshape(WPMINFO struct display* p, int vmode) {
-	unsigned int h;
-	unsigned int cu, cd;
-
-	h = fontheight(p);
-
-	if (vmode & FB_VMODE_DOUBLE)
-		h *= 2;
-	cd = h;
-	if (cd >= 10)
-		cd--;
-	switch (ACCESS_FBINFO(cursor.type) = (p->conp->vc_cursor_type & CUR_HWMASK)) {
-		case CUR_NONE:
-				cu = cd;
-				break;
-		case CUR_UNDERLINE:
-				cu = cd - 2;
-				break;
-		case CUR_LOWER_THIRD:
-				cu = (h * 2) / 3;
-				break;
-		case CUR_LOWER_HALF:
-				cu = h / 2;
-				break;
-		case CUR_TWO_THIRDS:
-				cu = h / 3;
-				break;
-		case CUR_BLOCK:
-		default:
-				cu = 0;
-				cd = h;
-				break;
-	}
-	ACCESS_FBINFO(cursor.w) = fontwidth(p);
-	ACCESS_FBINFO(cursor.u) = cu;
-	ACCESS_FBINFO(cursor.d) = cd;
-}
-
 void matroxfb_DAC_out(CPMINFO int reg, int val) {
-	DBG_REG("outDAC");
+	DBG_REG(__FUNCTION__)
 	mga_outb(M_RAMDAC_BASE+M_X_INDEX, reg);
 	mga_outb(M_RAMDAC_BASE+M_X_DATAREG, val);
 }
 
 int matroxfb_DAC_in(CPMINFO int reg) {
-	DBG_REG("inDAC");
+	DBG_REG(__FUNCTION__)
 	mga_outb(M_RAMDAC_BASE+M_X_INDEX, reg);
 	return mga_inb(M_RAMDAC_BASE+M_X_DATAREG);
 }
@@ -141,7 +103,7 @@ int matroxfb_DAC_in(CPMINFO int reg) {
 void matroxfb_var2my(struct fb_var_screeninfo* var, struct my_timming* mt) {
 	unsigned int pixclock = var->pixclock;
 
-	DBG("var2my")
+	DBG(__FUNCTION__)
 
 	if (!pixclock) pixclock = 10000;	/* 10ns = 100MHz */
 	mt->pixclock = 1000000000 / pixclock;
@@ -168,7 +130,7 @@ int matroxfb_PLL_calcclock(const struct matrox_pll_features* pll, unsigned int f
 	unsigned int fwant;
 	unsigned int p;
 
-	DBG("PLL_calcclock")
+	DBG(__FUNCTION__)
 
 	fwant = freq;
 
@@ -221,23 +183,18 @@ int matroxfb_PLL_calcclock(const struct matrox_pll_features* pll, unsigned int f
 	return bestvco;
 }
 
-int matroxfb_vgaHWinit(WPMINFO struct my_timming* m, struct display* p) {
+int matroxfb_vgaHWinit(WPMINFO struct my_timming* m) {
 	unsigned int hd, hs, he, hbe, ht;
-	unsigned int vd, vs, ve, vt;
+	unsigned int vd, vs, ve, vt, lc;
 	unsigned int wd;
 	unsigned int divider;
 	int i;
-	int text = ACCESS_FBINFO(fbcon).fix.type == FB_TYPE_TEXT;
 	int fwidth;
 	struct matrox_hw_state * const hw = &ACCESS_FBINFO(hw);
 
-	if (text) {
-		fwidth = fontwidth(p);
-		if (!fwidth) fwidth = 8;
-	} else
-		fwidth = 8;
+	fwidth = 8;
 
-	DBG("vgaHWinit")
+	DBG(__FUNCTION__)
 
 	hw->SEQ[0] = 0x00;
 	if (fwidth == 9)
@@ -246,10 +203,7 @@ int matroxfb_vgaHWinit(WPMINFO struct my_timming* m, struct display* p) {
 		hw->SEQ[1] = 0x01;	/* or 0x09 */
 	hw->SEQ[2] = 0x0F;	/* bitplanes */
 	hw->SEQ[3] = 0x00;
-	if (text)
-		hw->SEQ[4] = 0x02;
-	else
-		hw->SEQ[4] = 0x0E;
+	hw->SEQ[4] = 0x0E;
 	/* CRTC 0..7, 9, 16..19, 21, 22 are reprogrammed by Matrox Millennium code... Hope that by MGA1064 too */
 	if (m->dblscan) {
 		m->VTotal <<= 1;
@@ -270,24 +224,15 @@ int matroxfb_vgaHWinit(WPMINFO struct my_timming* m, struct display* p) {
 	hw->GCTL[2] = 0x00;
 	hw->GCTL[3] = 0x00;
 	hw->GCTL[4] = 0x00;
-	if (text) {
-		hw->GCTL[5] = 0x10;
-		hw->GCTL[6] = 0x02;
-	} else {
-		hw->GCTL[5] = 0x40;
-		hw->GCTL[6] = 0x05;
-	}
+	hw->GCTL[5] = 0x40;
+	hw->GCTL[6] = 0x05;
 	hw->GCTL[7] = 0x0F;
 	hw->GCTL[8] = 0xFF;
 
 	/* Whole ATTR is ignored in PowerGraphics mode */
 	for (i = 0; i < 16; i++)
 		hw->ATTR[i] = i;
-	if (text) {
-		hw->ATTR[16] = 0x04;
-	} else {
-		hw->ATTR[16] = 0x41;
-	}
+	hw->ATTR[16] = 0x41;
 	hw->ATTR[17] = 0xFF;
 	hw->ATTR[18] = 0x0F;
 	if (fwidth == 9)
@@ -296,22 +241,14 @@ int matroxfb_vgaHWinit(WPMINFO struct my_timming* m, struct display* p) {
 		hw->ATTR[19] = 0x00;
 	hw->ATTR[20] = 0x00;
 
-	if (text) {
-		hd = m->HDisplay / fwidth;
-		hs = m->HSyncStart / fwidth;
-		he = m->HSyncEnd / fwidth;
-		ht = m->HTotal / fwidth;
-		divider = 8;
-	} else {
-		hd = m->HDisplay >> 3;
-		hs = m->HSyncStart >> 3;
-		he = m->HSyncEnd >> 3;
-		ht = m->HTotal >> 3;
-		/* standard timmings are in 8pixels, but for interleaved we cannot */
-		/* do it for 4bpp (because of (4bpp >> 1(interleaved))/4 == 0) */
-		/* using 16 or more pixels per unit can save us */
-		divider = ACCESS_FBINFO(curr.final_bppShift);
-	}
+	hd = m->HDisplay >> 3;
+	hs = m->HSyncStart >> 3;
+	he = m->HSyncEnd >> 3;
+	ht = m->HTotal >> 3;
+	/* standard timmings are in 8pixels, but for interleaved we cannot */
+	/* do it for 4bpp (because of (4bpp >> 1(interleaved))/4 == 0) */
+	/* using 16 or more pixels per unit can save us */
+	divider = ACCESS_FBINFO(curr.final_bppShift);
 	while (divider & 3) {
 		hd >>= 1;
 		hs >>= 1;
@@ -336,16 +273,12 @@ int matroxfb_vgaHWinit(WPMINFO struct my_timming* m, struct display* p) {
 	vs = m->VSyncStart - 1;
 	ve = m->VSyncEnd - 1;
 	vt = m->VTotal - 2;
+	lc = vd;
 	/* G200 cannot work with (ht & 7) == 6 */
 	if (((ht & 0x07) == 0x06) || ((ht & 0x0F) == 0x04))
 		ht++;
-	if (text) {
-		hbe = ht - 1;
-		wd = p->var.xres_virtual / (fwidth * 2);
-	} else {
-		hbe = ht;
-		wd = p->var.xres_virtual * ACCESS_FBINFO(curr.final_bppShift) / 64;
-	}
+	hbe = ht;
+	wd = ACCESS_FBINFO(fbcon).var.xres_virtual * ACCESS_FBINFO(curr.final_bppShift) / 64;
 
 	hw->CRTCEXT[0] = 0;
 	hw->CRTCEXT[5] = 0;
@@ -367,11 +300,9 @@ int matroxfb_vgaHWinit(WPMINFO struct my_timming* m, struct display* p) {
 	hw->CRTCEXT[2] =  ((vt & 0xC00) >> 10) |
 			  ((vd & 0x400) >>  8) |	/* disp end */
 			  ((vd & 0xC00) >>  7) |	/* vblanking start */
-			  ((vs & 0xC00) >>  5);
-	if (text)
-		hw->CRTCEXT[3] = 0x00;
-	else
-		hw->CRTCEXT[3] = (divider - 1) | 0x80;
+			  ((vs & 0xC00) >>  5) |
+			  ((lc & 0x400) >>  3);
+	hw->CRTCEXT[3] = (divider - 1) | 0x80;
 	hw->CRTCEXT[4] = 0;
 
 	hw->CRTC[0] = ht-4;
@@ -380,21 +311,18 @@ int matroxfb_vgaHWinit(WPMINFO struct my_timming* m, struct display* p) {
 	hw->CRTC[3] = (hbe & 0x1F) | 0x80;
 	hw->CRTC[4] = hs;
 	hw->CRTC[5] = ((hbe & 0x20) << 2) | (he & 0x1F);
-	if (text)
-		hw->CRTC[5] |= 0x60;	/* delay sync for 3 clocks (to same picture position on MGA and VGA) */
 	hw->CRTC[6] = vt & 0xFF;
 	hw->CRTC[7] = ((vt & 0x100) >> 8) |
 		      ((vd & 0x100) >> 7) |
 		      ((vs & 0x100) >> 6) |
 		      ((vd & 0x100) >> 5) |
-		      0x10                |
+		      ((lc & 0x100) >> 4) |
 		      ((vt & 0x200) >> 4) |
 		      ((vd & 0x200) >> 3) |
 		      ((vs & 0x200) >> 2);
 	hw->CRTC[8] = 0x00;
-	hw->CRTC[9] = ((vd & 0x200) >> 4) | 0x40;
-	if (text)
-		hw->CRTC[9] |= fontheight(p) - 1;
+	hw->CRTC[9] = ((vd & 0x200) >> 4) |
+		      ((lc & 0x200) >> 3);
 	if (m->dblscan && !m->interlaced)
 		hw->CRTC[9] |= 0x80;
 	for (i = 10; i < 16; i++)
@@ -406,18 +334,8 @@ int matroxfb_vgaHWinit(WPMINFO struct my_timming* m, struct display* p) {
 	hw->CRTC[20] = 0x00;
 	hw->CRTC[21] = vd /* & 0xFF */;
 	hw->CRTC[22] = (vt + 1) /* & 0xFF */;
-	if (text) {
-		if (ACCESS_FBINFO(devflags.textmode) == 1)
-			hw->CRTC[23] = 0xC3;
-		else
-			hw->CRTC[23] = 0xA3;
-		if (ACCESS_FBINFO(devflags.textmode) == 4)
-			hw->CRTC[20] = 0x5F;
-		else
-			hw->CRTC[20] = 0x1F;
-	} else
-		hw->CRTC[23] = 0xC3;
-	hw->CRTC[24] = 0xFF;
+	hw->CRTC[23] = 0xC3;
+	hw->CRTC[24] = lc;
 	return 0;
 };
 
@@ -426,7 +344,7 @@ void matroxfb_vgaHWrestore(WPMINFO2) {
 	struct matrox_hw_state * const hw = &ACCESS_FBINFO(hw);
 	CRITFLAGS
 
-	DBG("vgaHWrestore")
+	DBG(__FUNCTION__)
 
 	dprintk(KERN_INFO "MiscOutReg: %02X\n", hw->MiscOutReg);
 	dprintk(KERN_INFO "SEQ regs:   ");
@@ -471,182 +389,6 @@ void matroxfb_vgaHWrestore(WPMINFO2) {
 	mga_outb(M_ATTR_INDEX, 0x20);
 
 	CRITEND
-}
-
-void matroxfb_fastfont_init(struct matrox_fb_info* minfo){
-	unsigned int size;
-
-	size = ACCESS_FBINFO(fastfont.size);
-	ACCESS_FBINFO(fastfont.size) = 0;
-	if (size) {
-		unsigned int end = ACCESS_FBINFO(video.len_usable);
-
-		if (size < end) {
-			unsigned int start;
-
-			start = (end - size) & PAGE_MASK;
-			if (start >= 0x00100000) {
-				ACCESS_FBINFO(video.len_usable) = start;
-				ACCESS_FBINFO(fastfont.mgabase) = start * 8;
-				ACCESS_FBINFO(fastfont.vbase) = ACCESS_FBINFO(video.vbase);
-				vaddr_add(&ACCESS_FBINFO(fastfont.vbase), start);
-				ACCESS_FBINFO(fastfont.size) = end - start;
-			}
-		}
-	}
-}
-
-#ifndef FNTCHARCNT
-#define FNTCHARCNT(fd)	(((int *)(fd))[-3])
-#endif
-
-int matrox_text_loadfont(WPMINFO struct display* p) {
-	unsigned int fsize;
-	unsigned int width;
-	vaddr_t dst;
-	unsigned int i;
-	u_int8_t* font;
-	CRITFLAGS
-
-	if (!p || !p->fontdata)
-		return 0;
-	width = fontwidth(p);
-	fsize = p->userfont?FNTCHARCNT(p->fontdata):256;
-
-	dst = ACCESS_FBINFO(video.vbase);
-	i = 2;
-	font = (u_int8_t*)p->fontdata;
-
-	CRITBEGIN
-
-	mga_setr(M_SEQ_INDEX, 0x02, 0x04);
-	while (fsize--) {
-		int l;
-
-		for (l = 0; l < fontheight(p); l++) {
-			mga_writeb(dst, i, *font++);
-			if (fontwidth(p) > 8) font++;
-			i += ACCESS_FBINFO(devflags.vgastep);
-		}
-		i += (32 - fontheight(p)) * ACCESS_FBINFO(devflags.vgastep);
-	}
-	mga_setr(M_SEQ_INDEX, 0x02, 0x03);
-
-	CRITEND
-
-	return 1;
-}
-
-int matroxfb_fastfont_tryset(WPMINFO struct display* p) {
-	unsigned int fsize;
-	unsigned int width;
-	CRITFLAGS
-
-	if (!p || !p->fontdata)
-		return 0;
-	width = fontwidth(p);
-	if (width > 32)
-		return 0;
-	fsize = (p->userfont?FNTCHARCNT(p->fontdata):256) * fontheight(p);
-	if (((fsize * width + 31) / 32) * 4 > ACCESS_FBINFO(fastfont.size))
-		return 0;
-
-	CRITBEGIN
-
-	mga_outl(M_OPMODE, M_OPMODE_8BPP);
-	if (width <= 8) {
-		if (width == 8)
-			mga_memcpy_toio(ACCESS_FBINFO(fastfont.vbase), 0, p->fontdata, fsize);
-		else {
-			vaddr_t dst;
-			unsigned int i;
-			u_int8_t* font;
-			u_int32_t mask, valid, reg;
-
-			dst = ACCESS_FBINFO(fastfont.vbase);
-			font = (u_int8_t*)p->fontdata;
-			mask = ~0 << (8 - width);
-			valid = 0;
-			reg = 0;
-			i = 0;
-			while (fsize--) {
-				reg |= (*font++ & mask) << (8 - valid);
-				valid += width;
-				if (valid >= 8) {
-					mga_writeb(dst, i++, reg >> 8);
-					reg = reg << 8;
-					valid -= 8;
-				}
-			}
-			if (valid)
-				mga_writeb(dst, i, reg >> 8);
-		}
-	} else if (width <= 16) {
-		if (width == 16)
-			mga_memcpy_toio(ACCESS_FBINFO(fastfont.vbase), 0, p->fontdata, fsize*2);
-		else {
-			vaddr_t dst;
-			u_int16_t* font;
-			u_int32_t mask, valid, reg;
-			unsigned int i;
-
-			dst = ACCESS_FBINFO(fastfont.vbase);
-			font = (u_int16_t*)p->fontdata;
-			mask = ~0 << (16 - width);
-			valid = 0;
-			reg = 0;
-			i = 0;
-			while (fsize--) {
-				reg |= (ntohs(*font++) & mask) << (16 - valid);
-				valid += width;
-				if (valid >= 16) {
-					mga_writew(dst, i, htons(reg >> 16));
-					i += 2;
-					reg = reg << 16;
-					valid -= 16;
-				}
-			}
-			if (valid)
-				mga_writew(dst, i, htons(reg >> 16));
-		}
-	} else {
-		if (width == 32)
-			mga_memcpy_toio(ACCESS_FBINFO(fastfont.vbase), 0, p->fontdata, fsize*4);
-		else {
-			vaddr_t dst;
-			u_int32_t* font;
-			u_int32_t mask, valid, reg;
-			unsigned int i;
-
-			dst = ACCESS_FBINFO(fastfont.vbase);
-			font = (u_int32_t*)p->fontdata;
-			mask = ~0 << (32 - width);
-			valid = 0;
-			reg = 0;
-			i = 0;
-			while (fsize--) {
-				reg |= (ntohl(*font) & mask) >> valid;
-				valid += width;
-				if (valid >= 32) {
-					mga_writel(dst, i, htonl(reg));
-					i += 4;
-					valid -= 32;
-					if (valid)
-						reg = (ntohl(*font) & mask) << (width - valid);
-					else
-						reg = 0;
-				}
-				font++;
-			}
-			if (valid)
-				mga_writel(dst, i, htonl(reg));
-		}
-	}
-	mga_outl(M_OPMODE, ACCESS_FBINFO(accel.m_opmode));
-
-	CRITEND
-
-	return 1;
 }
 
 static void get_pins(unsigned char* pins, struct matrox_bios* bd) {
@@ -994,6 +736,27 @@ void matroxfb_read_pins(WPMINFO2) {
 	parse_bios(vaddr_va(ACCESS_FBINFO(video).vbase), &ACCESS_FBINFO(bios));
 	pci_write_config_dword(pdev, PCI_ROM_ADDRESS, biosbase);
 	pci_write_config_dword(pdev, PCI_OPTION_REG, opt);
+#ifdef CONFIG_X86
+	if (!ACCESS_FBINFO(bios).bios_valid) {
+		unsigned char* b;
+
+		b = ioremap(0x000C0000, 65536);
+		if (!b) {
+			printk(KERN_INFO "matroxfb: Unable to map legacy BIOS\n");
+		} else {
+			unsigned int ven = readb(b+0x64+0) | (readb(b+0x64+1) << 8);
+			unsigned int dev = readb(b+0x64+2) | (readb(b+0x64+3) << 8);
+			
+			if (ven != pdev->vendor || dev != pdev->device) {
+				printk(KERN_INFO "matroxfb: Legacy BIOS is for %04X:%04X, while this device is %04X:%04X\n",
+					ven, dev, pdev->vendor, pdev->device);
+			} else {
+				parse_bios(b, &ACCESS_FBINFO(bios));
+			}
+			iounmap(b);
+		}
+	}
+#endif
 	matroxfb_set_limits(PMINFO &ACCESS_FBINFO(bios));
 }
 
@@ -1005,10 +768,6 @@ EXPORT_SYMBOL(matroxfb_PLL_calcclock);
 struct matrox_fb_info matroxfb_global_mxinfo;
 EXPORT_SYMBOL(matroxfb_global_mxinfo);
 #endif
-EXPORT_SYMBOL(matrox_text_loadfont);	/* for matroxfb_accel */
-EXPORT_SYMBOL(matroxfb_createcursorshape);	/* accel, DAC1064, Ti3026 */
-EXPORT_SYMBOL(matroxfb_fastfont_tryset);	/* accel */
-EXPORT_SYMBOL(matroxfb_fastfont_init);		/* DAC1064, Ti3026 */
 EXPORT_SYMBOL(matroxfb_vgaHWinit);		/* DAC1064, Ti3026 */
 EXPORT_SYMBOL(matroxfb_vgaHWrestore);		/* DAC1064, Ti3026 */
 EXPORT_SYMBOL(matroxfb_read_pins);
