@@ -232,11 +232,6 @@ int del_timer(struct timer_list * timer)
 }
 
 #ifdef CONFIG_SMP
-void sync_timers(void)
-{
-	spin_unlock_wait(&global_bh_lock);
-}
-
 /*
  * SMP specific function to delete periodic timer.
  * Caller must disable by some means restarting the timer
