@@ -424,7 +424,7 @@ cifs_read_wrapper(struct file * file, char *read_data, size_t read_size,
 	else if(file->f_dentry->d_inode == NULL)
 		return -EIO;
 
-	cFYI(1,("In read_wrapper size %d at %lld",read_size,*poffset));
+	cFYI(1,("In read_wrapper size %zd at %lld",read_size,*poffset));
 	if(CIFS_I(file->f_dentry->d_inode)->clientCanCacheRead) {
 		return generic_file_read(file,read_data,read_size,poffset);
 	} else {
@@ -455,7 +455,7 @@ cifs_write_wrapper(struct file * file, const char *write_data,
 	else if(file->f_dentry->d_inode == NULL)
 		return -EIO;
 
-	cFYI(1,("In write_wrapper size %d at %lld",write_size,*poffset));
+	cFYI(1,("In write_wrapper size %zd at %lld",write_size,*poffset));
 
 	/* check whether we can cache writes locally */
 	written = generic_file_write(file,write_data,write_size,poffset);
