@@ -159,6 +159,9 @@ typedef __s64	Elf64_Sxword;
 #define ELF32_ST_BIND(x) ((x) >> 4)
 #define ELF32_ST_TYPE(x) (((unsigned int) x) & 0xf)
 
+#define ELF64_ST_BIND(x) ((x) >> 4)
+#define ELF64_ST_TYPE(x) (((unsigned int) x) & 0xf)
+
 /* Symbolic values for the entries in the auxiliary table
    put on the initial stack */
 #define AT_NULL   0	/* end of vector */
@@ -362,22 +365,30 @@ typedef struct {
 #define R_ALPHA_SREL16          9       /* PC relative 16 bit */
 #define R_ALPHA_SREL32          10      /* PC relative 32 bit */
 #define R_ALPHA_SREL64          11      /* PC relative 64 bit */
-#define R_ALPHA_OP_PUSH         12      /* OP stack push */
-#define R_ALPHA_OP_STORE        13      /* OP stack pop and store */
-#define R_ALPHA_OP_PSUB         14      /* OP stack subtract */
-#define R_ALPHA_OP_PRSHIFT      15      /* OP stack right shift */
-#define R_ALPHA_GPVALUE         16
-#define R_ALPHA_GPRELHIGH       17
-#define R_ALPHA_GPRELLOW        18
-#define R_ALPHA_IMMED_GP_16     19
-#define R_ALPHA_IMMED_GP_HI32   20
-#define R_ALPHA_IMMED_SCN_HI32  21
-#define R_ALPHA_IMMED_BR_HI32   22
-#define R_ALPHA_IMMED_LO32      23
+#define R_ALPHA_GPRELHIGH       17      /* GP relative 32 bit, high 16 bits */
+#define R_ALPHA_GPRELLOW        18      /* GP relative 32 bit, low 16 bits */
+#define R_ALPHA_GPREL16         19      /* GP relative 16 bit */
 #define R_ALPHA_COPY            24      /* Copy symbol at runtime */
 #define R_ALPHA_GLOB_DAT        25      /* Create GOT entry */
 #define R_ALPHA_JMP_SLOT        26      /* Create PLT entry */
 #define R_ALPHA_RELATIVE        27      /* Adjust by program base */
+#define R_ALPHA_BRSGP		28
+#define R_ALPHA_TLSGD           29
+#define R_ALPHA_TLS_LDM         30
+#define R_ALPHA_DTPMOD64        31
+#define R_ALPHA_GOTDTPREL       32
+#define R_ALPHA_DTPREL64        33
+#define R_ALPHA_DTPRELHI        34
+#define R_ALPHA_DTPRELLO        35
+#define R_ALPHA_DTPREL16        36
+#define R_ALPHA_GOTTPREL        37
+#define R_ALPHA_TPREL64         38
+#define R_ALPHA_TPRELHI         39
+#define R_ALPHA_TPRELLO         40
+#define R_ALPHA_TPREL16         41
+
+#define SHF_ALPHA_GPREL		0x10000000
+
 
 /* PowerPC relocations defined by the ABIs */
 #define R_PPC_NONE		0
