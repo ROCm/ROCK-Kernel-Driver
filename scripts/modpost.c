@@ -390,13 +390,19 @@ read_symbols(char *modname)
 	struct elf_info info = { };
 	Elf_Sym *sym;
 
-	/* When there's no vmlinux, don't print warnings about
-	 * unresolved symbols (since there'll be too many ;) */
-	have_vmlinux = is_vmlinux(modname);
-
 	parse_elf(&info, modname);
 
 	mod = new_module(modname);
+
+	/* When there's no vmlinux, don't print warnings about
+	 * unresolved symbols (since there'll be too many ;) */
+	if (is_vmlinux(modname)) {
+		unsigned int fake_crc = 0;
+		have_vmlinux = 1;
+		/* May not have this if !CONFIG_MODULE_UNLOAD: fake it.
+		   If it appears, we'll get the real CRC. */
+		add_exported_symbol("cleanup_module", mod, &fake_crc);
+	}
 
 	for (sym = info.symtab_start; sym < info.symtab_stop; sym++) {
 		symname = info.strtab + sym->st_name;
