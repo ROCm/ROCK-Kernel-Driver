@@ -175,7 +175,7 @@ if [ "$CONFIG_FB" = "y" ]; then
 	 bool '    Leo (ZX) support' CONFIG_FB_LEO
       fi
    fi
-   if [ "$ARCH" = "sparc" ]; then
+   if [ "$CONFIG_SPARC32" = "y" ]; then
       if [ "$CONFIG_PCI" != "n" ]; then
 	 bool '  PCI framebuffers' CONFIG_FB_PCI
 	 if [ "$CONFIG_FB_PCI" != "n" ]; then
