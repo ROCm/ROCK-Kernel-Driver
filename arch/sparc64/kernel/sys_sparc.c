@@ -254,7 +254,7 @@ asmlinkage int sys_ipc (unsigned call, int first, int second, unsigned long thir
 		switch (call) {
 		case SHMAT: {
 			ulong raddr;
-			err = sys_shmat (first, (char *) ptr, second, &raddr);
+			err = do_shmat (first, (char *) ptr, second, &raddr);
 			if (!err) {
 				if (put_user(raddr, (ulong __user *) third))
 					err = -EFAULT;

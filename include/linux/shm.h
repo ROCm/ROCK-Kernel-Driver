@@ -90,7 +90,14 @@ struct shmid_kernel /* private to the kernel */
 #define SHM_LOCKED      02000   /* segment will not be swapped */
 #define SHM_HUGETLB     04000   /* segment will use huge TLB pages */
 
-long sys_shmat (int shmid, char __user *shmaddr, int shmflg, unsigned long *addr);
+#ifdef CONFIG_SYSVIPC
+long do_shmat (int shmid, char __user *shmaddr, int shmflg, unsigned long *addr);
+#else
+inline long do_shmat (int shmid, char __user *shmaddr, int shmflg, unsigned long *addr)
+{
+	return -ENOSYS;
+}
+#endif
 asmlinkage long sys_shmget (key_t key, size_t size, int flag);
 asmlinkage long sys_shmdt (char __user *shmaddr);
 asmlinkage long sys_shmctl (int shmid, int cmd, struct shmid_ds __user *buf);

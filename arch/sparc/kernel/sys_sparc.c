@@ -185,7 +185,7 @@ asmlinkage int sys_ipc (uint call, int first, int second, int third, void __user
 			switch (version) {
 			case 0: default: {
 				ulong raddr;
-				err = sys_shmat (first, (char __user *) ptr, second, &raddr);
+				err = do_shmat (first, (char __user *) ptr, second, &raddr);
 				if (err)
 					goto out;
 				err = -EFAULT;
@@ -195,7 +195,7 @@ asmlinkage int sys_ipc (uint call, int first, int second, int third, void __user
 				goto out;
 				}
 			case 1:	/* iBCS2 emulator entry point */
-				err = sys_shmat (first, (char __user *) ptr, second, (ulong __user *) third);
+				err = do_shmat (first, (char __user *) ptr, second, (ulong __user *) third);
 				goto out;
 			}
 		case SHMDT: 

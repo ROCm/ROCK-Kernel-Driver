@@ -98,7 +98,7 @@ ia64_shmat (int shmid, void *shmaddr, int shmflg)
 	unsigned long raddr;
 	int retval;
 
-	retval = sys_shmat(shmid, shmaddr, shmflg, &raddr);
+	retval = do_shmat(shmid, shmaddr, shmflg, &raddr);
 	if (retval < 0)
 		return retval;
 
