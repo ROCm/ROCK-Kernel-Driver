@@ -995,10 +995,8 @@ s390_validate_subchannel (int irq, int enable)
 	int ccode2;		/* condition code for other I/O routines */
 	schib_t *p_schib;
 	int ret;
-#ifdef CONFIG_CHSC
 	int      chp = 0;
 	int      mask;
-#endif /* CONFIG_CHSC */
 
 	char dbf_txt[15];
 
@@ -1121,7 +1119,6 @@ s390_validate_subchannel (int irq, int enable)
 	ioinfo[irq]->opm = ioinfo[irq]->schib.pmcw.pim
 	    & ioinfo[irq]->schib.pmcw.pam & ioinfo[irq]->schib.pmcw.pom;
 
-#ifdef CONFIG_CHSC
 	if (ioinfo[irq]->opm) {
 		for (chp=0;chp<=7;chp++) {
 			mask = 0x80 >> chp;
@@ -1133,7 +1130,6 @@ s390_validate_subchannel (int irq, int enable)
 			}
 		}
 	}
-#endif /* CONFIG_CHSC */
 
 	CIO_DEBUG_IFMSG(KERN_INFO, 0,
 			"Detected device %04X "
@@ -1700,11 +1696,9 @@ s390_DevicePathVerification (int irq, __u8 usermask)
 	int ccode;
 	__u8 pathmask;
 	__u8 domask;
-#ifdef CONFIG_CHSC
 	int chp;
 	int mask;
 	int old_opm = 0;
-#endif /* CONFIG_CHSC */
 
 	int ret = 0;
 	int i;
@@ -1720,9 +1714,7 @@ s390_DevicePathVerification (int irq, __u8 usermask)
 	if (ioinfo[irq]->st) 
 		return -ENODEV;
 
-#ifdef CONFIG_CHSC
 	old_opm = ioinfo[irq]->opm;
-#endif /* CONFIG_CHSC */
 	ccode = stsch (irq, &(ioinfo[irq]->schib));
 
 	if (ccode) {
@@ -1735,7 +1727,6 @@ s390_DevicePathVerification (int irq, __u8 usermask)
 		ioinfo[irq]->ui.flags.pgid_supp = 0;
 		ret = 0;
 
-#ifdef CONFIG_CHSC
 		/*
 		 * disable if chpid is logically offline
 		 */
@@ -1781,14 +1772,12 @@ s390_DevicePathVerification (int irq, __u8 usermask)
 		} else {
 			ret = 0;
 		}
-#endif /* CONFIG_CHSC */
 		return ret;
 	}
 
 	ioinfo[irq]->opm = ioinfo[irq]->schib.pmcw.pim
 	    & ioinfo[irq]->schib.pmcw.pam & ioinfo[irq]->schib.pmcw.pom;
 
-#ifdef CONFIG_CHSC
 	if (ioinfo[irq]->opm) {
 		for (chp=0;chp<=7;chp++) {
 			mask = 0x80 >> chp;
@@ -1830,7 +1819,6 @@ s390_DevicePathVerification (int irq, __u8 usermask)
 				pdevreg->oper_func( irq, pdevreg);
 
 	}
-#endif /* CONFIG_CHSC */
 
 	if ( ioinfo[irq]->ui.flags.pgid_supp == 0 )
 		return( 0);	/* just exit ... */

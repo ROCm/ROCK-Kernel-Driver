@@ -9,4 +9,6 @@ obj-$(CONFIG_QDIO) += qdio.o
 obj-y += s390mach.o s390dyn.o sysinfo.o
 obj-y += block/ char/ misc/ net/ cio/
 
+drivers-y += drivers/s390/built-in.o
+
 include $(TOPDIR)/Rules.make

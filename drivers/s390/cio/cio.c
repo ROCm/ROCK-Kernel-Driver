@@ -969,10 +969,7 @@ do_IRQ (struct pt_regs regs)
 		return;
 	}
 	/* endif */
-#ifdef CONFIG_FAST_IRQ
 	do {
-#endif				/* CONFIG_FAST_IRQ */
-
 		/*
 		 * Non I/O-subchannel thin interrupts are processed differently
 		 */
@@ -1008,16 +1005,14 @@ do_IRQ (struct pt_regs regs)
 			irq_exit ();
 		}
 
-#ifdef CONFIG_FAST_IRQ
-
 		/*
 		 * Are more interrupts pending?
 		 * If so, the tpi instruction will update the lowcore 
 		 * to hold the info for the next interrupt.
+		 * We don't do this for VM because a tpi drops the cpu
+		 * out of the sie which costs more cycles than it saves.
 		 */
-	} while (tpi (NULL) != 0);
-
-#endif				/* CONFIG_FAST_IRQ */
+	} while (!MACHINE_IS_VM && tpi (NULL) != 0);
 
 	return;
 }

@@ -17,31 +17,29 @@ define_bool CONFIG_ARCH_S390X y
 source init/Config.in
 
 mainmenu_option next_comment
+comment 'Base setup'
 comment 'Processor type and features'
 bool 'Symmetric multi-processing support' CONFIG_SMP
 bool 'Kernel support for 31 bit emulation' CONFIG_S390_SUPPORT
 if [ "$CONFIG_S390_SUPPORT" = "y" ]; then
   tristate 'Kernel support for 31 bit ELF binaries' CONFIG_BINFMT_ELF32 
 fi
-endmenu
 
-mainmenu_option next_comment
-comment 'Base setup'
-bool 'Fast IRQ handling' CONFIG_FAST_IRQ
+comment 'I/O subsystem configuration'
 bool 'Process warning machine checks' CONFIG_MACHCHK_WARNING
-bool 'Use chscs for Common I/O' CONFIG_CHSC
-  
 tristate 'QDIO support' CONFIG_QDIO
-  if [ "$CONFIG_QDIO" != "n" ]; then
-    bool '   Performance statistics in /proc' CONFIG_QDIO_PERF_STATS
-  fi
+if [ "$CONFIG_QDIO" != "n" ]; then
+  bool '   Performance statistics in /proc' CONFIG_QDIO_PERF_STATS
+fi
 
+comment 'Misc'
 bool 'Builtin IPL record support' CONFIG_IPL
 if [ "$CONFIG_IPL" = "y" ]; then
   choice 'IPL method generated into head.S' \
           "tape                   CONFIG_IPL_TAPE \
            vm_reader              CONFIG_IPL_VM" tape
 fi
+
 define_bool CONFIG_KCORE_ELF y
 tristate 'Kernel support for ELF binaries' CONFIG_BINFMT_ELF
 tristate 'Kernel support for MISC binaries' CONFIG_BINFMT_MISC
@@ -71,7 +69,6 @@ source fs/Config.in
 mainmenu_option next_comment
 comment 'Kernel hacking'
 
-#bool 'Debug kmalloc/kfree' CONFIG_DEBUG_MALLOC
 #if [ "$CONFIG_CTC" = "y" ]; then
 #  bool 'Remote GDB kernel debugging' CONFIG_REMOTE_DEBUG
 #fi
