@@ -424,7 +424,7 @@ static struct pci_driver gemtek_pci_driver =
     name:	"gemtek_pci",
 id_table:	gemtek_pci_id,
    probe:	gemtek_pci_probe,
-  remove:	gemtek_pci_remove
+  remove:	__devexit_p(gemtek_pci_remove)
 };
 
 static int __init gemtek_pci_init_module( void )

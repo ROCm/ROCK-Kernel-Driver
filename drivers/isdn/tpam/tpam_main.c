@@ -254,7 +254,7 @@ static struct pci_driver tpam_driver = {
 	name:		"tpam",
 	id_table:	tpam_pci_tbl,
 	probe:		tpam_probe,
-	remove:		tpam_remove,
+	remove:		__devexit_p(tpam_remove),
 };
 
 static int __init tpam_init(void) {

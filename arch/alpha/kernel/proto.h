@@ -162,9 +162,9 @@ extern struct mcheck_info
 	unsigned char extra;
 } __mcheck_info;
 
-#define mcheck_expected(cpu)	(__mcheck_info.expected)
-#define mcheck_taken(cpu)	(__mcheck_info.taken)
-#define mcheck_extra(cpu)	(__mcheck_info.extra)
+#define mcheck_expected(cpu)	((void)(cpu), __mcheck_info.expected)
+#define mcheck_taken(cpu)	((void)(cpu), __mcheck_info.taken)
+#define mcheck_extra(cpu)	((void)(cpu), __mcheck_info.extra)
 #endif
 
 #define DEBUG_MCHECK 0          /* 0 = minimal, 1 = debug, 2 = debug+dump.  */

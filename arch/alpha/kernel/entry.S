@@ -497,6 +497,7 @@ alpha_switch_to:
 	ret	$31,($26),1
 .end alpha_switch_to
 
+#ifdef CONFIG_SMP
 .globl  ret_from_fork
 .align 3
 .ent ret_from_fork
@@ -505,6 +506,7 @@ ret_from_fork:
 	mov	$0,$16
 	jmp	$31,schedule_tail
 .end ret_from_fork
+#endif
 
 /*
  * Oh, well.. Disassembling OSF/1 binaries to find out how the

@@ -2504,7 +2504,7 @@ static struct pci_driver natsemi_driver = {
 	name:		DRV_NAME,
 	id_table:	natsemi_pci_tbl,
 	probe:		natsemi_probe1,
-	remove:		natsemi_remove1,
+	remove:		__devexit_p(natsemi_remove1),
 #ifdef CONFIG_PM
 	suspend:	natsemi_suspend,
 	resume:		natsemi_resume,

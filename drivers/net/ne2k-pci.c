@@ -642,7 +642,7 @@ static void __devexit ne2k_pci_remove_one (struct pci_dev *pdev)
 static struct pci_driver ne2k_driver = {
 	name:		DRV_NAME,
 	probe:		ne2k_pci_init_one,
-	remove:		ne2k_pci_remove_one,
+	remove:		__devexit_p(ne2k_pci_remove_one),
 	id_table:	ne2k_pci_tbl,
 };
 

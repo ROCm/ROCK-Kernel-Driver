@@ -1460,7 +1460,7 @@ static struct pci_driver meye_driver = {
 	name:		"meye",
 	id_table:	meye_pci_tbl,
 	probe:		meye_probe,
-	remove:		meye_remove,
+	remove:		__devexit_p(meye_remove),
 };
 
 static int __init meye_init_module(void) {
