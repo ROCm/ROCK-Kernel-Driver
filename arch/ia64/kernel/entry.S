@@ -589,7 +589,7 @@ END(ia64_ret_from_syscall)
  *	     r16-r19: cleared
  *		 r20: user-level ar.fpsr
  *		 r21: user-level b0
- *		 r22: NOT HANDLED
+ *		 r22: cleared
  *		 r23: user-level ar.bspstore
  *		 r24: user-level ar.rnat
  *		 r25: user-level ar.unat

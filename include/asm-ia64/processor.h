@@ -304,35 +304,13 @@ struct thread_struct {
 	regs->loadrs = 0;									\
 	regs->r8 = current->mm->dumpable;	/* set "don't zap registers" flag */		\
 	regs->r12 = new_sp - 16;	/* allocate 16 byte scratch area */			\
-	if (unlikely(!current->mm->dumpable)) {					\
+	if (unlikely(!current->mm->dumpable)) {							\
 		/*										\
 		 * Zap scratch regs to avoid leaking bits between processes with different	\
 		 * uid/privileges.								\
 		 */										\
-		regs->ar_pfs = 0;								\
-		regs->pr = 0;									\
-		/*										\
-		 * XXX fix me: everything below can go away once we stop preserving scratch	\
-		 * regs on a system call.							\
-		 */										\
-		regs->b6 = 0;									\
-		regs->r1 = 0; regs->r2 = 0; regs->r3 = 0;					\
-		regs->r13 = 0; regs->r14 = 0; regs->r15 = 0;					\
-		regs->r9  = 0; regs->r11 = 0;							\
-		regs->r16 = 0; regs->r17 = 0; regs->r18 = 0; regs->r19 = 0;			\
-		regs->r20 = 0; regs->r21 = 0; regs->r22 = 0; regs->r23 = 0;			\
-		regs->r24 = 0; regs->r25 = 0; regs->r26 = 0; regs->r27 = 0;			\
-		regs->r28 = 0; regs->r29 = 0; regs->r30 = 0; regs->r31 = 0;			\
-		regs->ar_ccv = 0;								\
-		regs->ar_csd = 0;                                                               \
-		regs->ar_ssd = 0;                                                               \
-		regs->b0 = 0; regs->b7 = 0;							\
-		regs->f6.u.bits[0] = 0; regs->f6.u.bits[1] = 0;					\
-		regs->f7.u.bits[0] = 0; regs->f7.u.bits[1] = 0;					\
-		regs->f8.u.bits[0] = 0; regs->f8.u.bits[1] = 0;					\
-		regs->f9.u.bits[0] = 0; regs->f9.u.bits[1] = 0;					\
-		regs->f10.u.bits[0] = 0; regs->f10.u.bits[1] = 0;				\
-		regs->f11.u.bits[0] = 0; regs->f11.u.bits[1] = 0;				\
+		regs->ar_pfs = 0; regs->b0 = 0; regs->pr = 0;					\
+		regs->r1 = 0; regs->r9  = 0; regs->r11 = 0; regs->r13 = 0; regs->r15 = 0;	\
 	}											\
 } while (0)
 
