@@ -702,7 +702,9 @@ static void cleanup_ipv6_mibs(void)
 	kfree_percpu(udp_stats_in6[0]);
 	kfree_percpu(udp_stats_in6[1]);
 }
-	
+
+extern int ipv6_misc_proc_init(void);
+
 static int __init inet6_init(void)
 {
 	struct sk_buff *dummy_skb;
@@ -786,10 +788,9 @@ static int __init inet6_init(void)
 		goto proc_tcp6_fail;
 	if (!proc_net_create("udp6", 0, udp6_get_info))
 		goto proc_udp6_fail;
-	if (!proc_net_create("sockstat6", 0, afinet6_get_info))
-		goto proc_sockstat6_fail;
-	if (!proc_net_create("snmp6", 0, afinet6_get_snmp))
-		goto proc_snmp6_fail;
+	if (ipv6_misc_proc_init())
+		goto proc_misc6_fail;
+
 	if (!proc_net_create("anycast6", 0, anycast6_get_info))
 		goto proc_anycast6_fail;
 #endif
@@ -800,7 +801,7 @@ static int __init inet6_init(void)
 	addrconf_init();
 	sit_init();
 
-	/* Init v6 extention headers. */
+	/* Init v6 extension headers. */
 	ipv6_hopopts_init();
 	ipv6_rthdr_init();
 	ipv6_frag_init();
@@ -815,10 +816,9 @@ static int __init inet6_init(void)
 
 #ifdef CONFIG_PROC_FS
 proc_anycast6_fail:
-	proc_net_remove("anycast6");
-proc_snmp6_fail:
+	proc_net_remove("snmp6");
 	proc_net_remove("sockstat6");
-proc_sockstat6_fail:
+proc_misc6_fail:
 	proc_net_remove("udp6");
 proc_udp6_fail:
 	proc_net_remove("tcp6");
