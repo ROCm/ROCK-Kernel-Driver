@@ -254,7 +254,8 @@ static int n2_close(struct net_device *dev)
 static int n2_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
 	const size_t size = sizeof(sync_serial_settings);
-	sync_serial_settings new_line, *line = ifr->ifr_settings.ifs_ifsu.sync;
+	sync_serial_settings new_line;
+	sync_serial_settings __user *line = ifr->ifr_settings.ifs_ifsu.sync;
 	port_t *port = dev_to_port(dev);
 
 #ifdef DEBUG_RINGS
