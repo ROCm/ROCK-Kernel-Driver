@@ -181,14 +181,18 @@ static struct sysfs_ops class_dev_sysfs_ops = {
 
 static void class_dev_release(struct kobject * kobj)
 {
-	struct class_device *class_dev = to_class_dev(kobj);
-	if (class_dev->release)
-		class_dev->release(class_dev);
+	struct class_device *cd = to_class_dev(kobj);
+	struct class * cls = cd->class;
+
+	pr_debug("device class '%s': release.\n",cd->class_id);
+
+	if (cls->release)
+		cd->release(cd);
 }
 
 static struct kobj_type ktype_class_device = {
-	.release	= &class_dev_release,
 	.sysfs_ops	= &class_dev_sysfs_ops,
+	.release	= class_dev_release,
 };
 
 static int class_hotplug_filter(struct kset *kset, struct kobject *kobj)
