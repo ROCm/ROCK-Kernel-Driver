@@ -58,6 +58,7 @@ static int queue_nr_requests;
 static int batch_requests;
 
 unsigned long blk_max_low_pfn, blk_max_pfn;
+atomic_t nr_iowait_tasks = ATOMIC_INIT(0);
 int blk_nohighio = 0;
 
 static struct congestion_state {
@@ -114,6 +115,27 @@ static void set_queue_congested(request_queue_t *q, int rw)
 
 	if (!test_and_set_bit(bit, &q->backing_dev_info.state))
 		atomic_inc(&congestion_states[rw].nr_congested_queues);
+}
+
+/*
+ * This task is about to go to sleep on IO.  Increment nr_iowait_tasks so
+ * that process accounting knows that this is a task in IO wait state.
+ *
+ * But don't do that if it is a deliberate, throttling IO wait (this task
+ * has set its backing_dev_info: the queue against which it should throttle)
+ */
+void io_schedule(void)
+{
+	atomic_inc(&nr_iowait_tasks);
+	schedule();
+	atomic_dec(&nr_iowait_tasks);
+}
+
+void io_schedule_timeout(long timeout)
+{
+	atomic_inc(&nr_iowait_tasks);
+	schedule_timeout(timeout);
+	atomic_dec(&nr_iowait_tasks);
 }
 
 /**
@@ -1274,7 +1296,7 @@ static struct request *get_request_wait(request_queue_t *q, int rw)
 		prepare_to_wait_exclusive(&rl->wait, &wait,
 					TASK_UNINTERRUPTIBLE);
 		if (!rl->count)
-			schedule();
+			io_schedule();
 		finish_wait(&rl->wait, &wait);
 		spin_lock_irq(q->queue_lock);
 		rq = get_request(q, rw);
@@ -1497,7 +1519,7 @@ void blk_congestion_wait(int rw, long timeout)
 	blk_run_queues();
 	prepare_to_wait(&cs->wqh, &wait, TASK_UNINTERRUPTIBLE);
 	if (atomic_read(&cs->nr_congested_queues) != 0)
-		schedule_timeout(timeout);
+		io_schedule_timeout(timeout);
 	finish_wait(&cs->wqh, &wait);
 }
 

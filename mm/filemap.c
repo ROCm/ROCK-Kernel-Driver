@@ -24,6 +24,7 @@
 #include <linux/hash.h>
 #include <linux/writeback.h>
 #include <linux/pagevec.h>
+#include <linux/blkdev.h>
 #include <linux/security.h>
 /*
  * This is needed for the following functions:
@@ -50,7 +51,6 @@
  *
  * SMP-threaded pagemap-LRU 1999, Andrea Arcangeli <andrea@suse.de>
  */
-
 
 /*
  * Lock ordering:
@@ -302,7 +302,7 @@ void wait_on_page_bit(struct page *page, int bit_nr)
 		prepare_to_wait(waitqueue, &wait, TASK_UNINTERRUPTIBLE);
 		sync_page(page);
 		if (test_bit(bit_nr, &page->flags))
-			schedule();
+			io_schedule();
 	} while (test_bit(bit_nr, &page->flags));
 	finish_wait(waitqueue, &wait);
 }
@@ -366,7 +366,7 @@ void __lock_page(struct page *page)
 		prepare_to_wait(wqh, &wait, TASK_UNINTERRUPTIBLE);
 		sync_page(page);
 		if (PageLocked(page))
-			schedule();
+			io_schedule();
 	}
 	finish_wait(wqh, &wait);
 }

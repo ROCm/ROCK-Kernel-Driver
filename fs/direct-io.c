@@ -18,6 +18,7 @@
 #include <linux/bio.h>
 #include <linux/wait.h>
 #include <linux/err.h>
+#include <linux/blkdev.h>
 #include <linux/buffer_head.h>
 #include <linux/rwsem.h>
 #include <asm/atomic.h>
@@ -230,7 +231,7 @@ static struct bio *dio_await_one(struct dio *dio)
 			dio->waiter = current;
 			spin_unlock_irqrestore(&dio->bio_list_lock, flags);
 			blk_run_queues();
-			schedule();
+			io_schedule();
 			spin_lock_irqsave(&dio->bio_list_lock, flags);
 			dio->waiter = NULL;
 		}

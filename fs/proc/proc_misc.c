@@ -339,7 +339,7 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 	int i, len;
 	extern unsigned long total_forks;
 	unsigned long jif = jiffies;
-	unsigned int sum = 0, user = 0, nice = 0, system = 0;
+	unsigned int sum = 0, user = 0, nice = 0, system = 0, idle = 0, iowait = 0;
 	int major, disk;
 
 	for (i = 0 ; i < NR_CPUS; i++) {
@@ -349,27 +349,29 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 		user += kstat.per_cpu_user[i];
 		nice += kstat.per_cpu_nice[i];
 		system += kstat.per_cpu_system[i];
+		idle += kstat.per_cpu_idle[i];
+		iowait += kstat.per_cpu_iowait[i];
 #if !defined(CONFIG_ARCH_S390)
 		for (j = 0 ; j < NR_IRQS ; j++)
 			sum += kstat.irqs[i][j];
 #endif
 	}
 
-	len = sprintf(page, "cpu  %u %u %u %lu\n",
+	len = sprintf(page, "cpu  %u %u %u %u %u\n",
 		jiffies_to_clock_t(user),
 		jiffies_to_clock_t(nice),
 		jiffies_to_clock_t(system),
-		jiffies_to_clock_t(jif * num_online_cpus() - (user + nice + system)));
+		jiffies_to_clock_t(idle),
+		jiffies_to_clock_t(iowait));
 	for (i = 0 ; i < NR_CPUS; i++){
 		if (!cpu_online(i)) continue;
-		len += sprintf(page + len, "cpu%d %u %u %u %lu\n",
+		len += sprintf(page + len, "cpu%d %u %u %u %u %u\n",
 			i,
 			jiffies_to_clock_t(kstat.per_cpu_user[i]),
 			jiffies_to_clock_t(kstat.per_cpu_nice[i]),
 			jiffies_to_clock_t(kstat.per_cpu_system[i]),
-			jiffies_to_clock_t(jif - (  kstat.per_cpu_user[i] \
-				   + kstat.per_cpu_nice[i] \
-				   + kstat.per_cpu_system[i])));
+			jiffies_to_clock_t(kstat.per_cpu_idle[i]),
+			jiffies_to_clock_t(kstat.per_cpu_iowait[i]));
 	}
 	len += sprintf(page + len, "intr %u", sum);
 
