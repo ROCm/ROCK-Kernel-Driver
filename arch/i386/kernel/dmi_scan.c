@@ -314,6 +314,22 @@ static __init int disable_smbus(struct dmi_blacklist *d)
 }
 
 /*
+ * Work around broken Acer TravelMate 360 Notebooks which assign Cardbus to
+ * IRQ 11 even though it is actually wired to IRQ 10
+ */
+static __init int fix_acer_tm360_irqrouting(struct dmi_blacklist *d)
+{
+#ifdef CONFIG_PCI
+	extern int acer_tm360_irqrouting;
+	if (acer_tm360_irqrouting == 0) {
+		acer_tm360_irqrouting = 1;
+		printk(KERN_INFO "%s detected - fixing broken IRQ routing\n", d->ident);
+	}
+#endif
+	return 0;
+}
+
+/*
  *  Check for clue free BIOS implementations who use
  *  the following QA technique
  *
@@ -799,6 +815,13 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			NO_MATCH, NO_MATCH
 			} },
 	 
+
+	{ fix_acer_tm360_irqrouting, "Acer TravelMate 36x Laptop", {
+			MATCH(DMI_SYS_VENDOR, "Acer"),
+			MATCH(DMI_PRODUCT_NAME, "TravelMate 360"),
+			NO_MATCH, NO_MATCH
+			} },
+
 	/*
 	 *	Generic per vendor APM settings
 	 */
@@ -986,6 +1009,13 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			MATCH(DMI_BOARD_NAME, "PR-DLS"),
 			MATCH(DMI_BIOS_VERSION, "ASUS PR-DLS ACPI BIOS Revision 1010"),
 			MATCH(DMI_BIOS_DATE, "03/21/2003") }},
+
+ 	{ disable_acpi_pci, "Acer TravelMate 36x Laptop", {
+ 			MATCH(DMI_SYS_VENDOR, "Acer"),
+ 			MATCH(DMI_PRODUCT_NAME, "TravelMate 360"),
+ 			NO_MATCH, NO_MATCH
+ 			} },
+
 #endif
 
 	{ NULL, }
