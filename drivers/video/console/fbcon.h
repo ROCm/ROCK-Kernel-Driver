@@ -33,6 +33,19 @@ struct display {
     short yscroll;                  /* Hardware scrolling */
     int vrows;                      /* number of virtual rows */
     int cursor_shape;
+    u32 xres_virtual;
+    u32 yres_virtual;
+    u32 height;
+    u32 width;
+    u32 bits_per_pixel;
+    u32 grayscale;
+    u32 nonstd;
+    u32 accel_flags;
+    struct fb_bitfield red;
+    struct fb_bitfield green;
+    struct fb_bitfield blue;
+    struct fb_bitfield transp;
+    struct fb_videomode *mode;
 };
 
 /* drivers/video/console/fbcon.c */

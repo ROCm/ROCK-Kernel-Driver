@@ -282,6 +282,7 @@ struct fb_chroma {
 struct fb_monspecs {
 	struct fb_chroma chroma;
 	struct fb_videomode *modedb;	/* mode database */
+	struct list_head modelist;      /* mode list */
 	__u8  manufacturer[4];		/* Manufacturer */
 	__u8  monitor[14];		/* Monitor String */
 	__u8  serial_no[14];		/* Serial Number */

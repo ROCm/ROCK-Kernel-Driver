@@ -625,6 +625,47 @@ void accel_clear_margins(struct vc_data *vc, struct fb_info *info,
  *  Low Level Operations
  */
 /* NOTE: fbcon cannot be __init: it may be called from take_over_console later */
+static int var_to_display(struct display *disp,
+			  struct fb_var_screeninfo *var,
+			  struct fb_info *info)
+{
+	disp->xres_virtual = var->xres_virtual;
+	disp->yres_virtual = var->yres_virtual;
+	disp->bits_per_pixel = var->bits_per_pixel;
+	disp->grayscale = var->grayscale;
+	disp->nonstd = var->nonstd;
+	disp->accel_flags = var->accel_flags;
+	disp->height = var->height;
+	disp->width = var->width;
+	disp->red = var->red;
+	disp->green = var->green;
+	disp->blue = var->blue;
+	disp->transp = var->transp;
+	disp->mode = fb_match_mode(var, &info->monspecs.modelist);
+	if (disp->mode == NULL)
+		/* This should not happen */
+		return -EINVAL;
+	return 0;
+}
+
+static void display_to_var(struct fb_var_screeninfo *var,
+			   struct display *disp)
+{
+	fb_videomode_to_var(var, disp->mode);
+	var->xres_virtual = disp->xres_virtual;
+	var->yres_virtual = disp->yres_virtual;
+	var->bits_per_pixel = disp->bits_per_pixel;
+	var->grayscale = disp->grayscale;
+	var->nonstd = disp->nonstd;
+	var->accel_flags = disp->accel_flags;
+	var->height = disp->height;
+	var->width = disp->width;
+	var->red = disp->red;
+	var->green = disp->green;
+	var->blue = disp->blue;
+	var->transp = disp->transp;
+}
+
 static const char *fbcon_startup(void)
 {
 	const char *display_desc = "frame buffer device";
@@ -797,6 +838,9 @@ static void fbcon_init(struct vc_data *vc, int init)
 		logo = 0;
 
 	info->var.xoffset = info->var.yoffset = p->yscroll = 0;	/* reset wrap/pan */
+
+	if (var_to_display(p, &info->var, info))
+		return;
 
 	/* If we are not the first console on this
 	   fb, copy the font from that console */
@@ -1174,6 +1218,8 @@ static void fbcon_set_disp(struct fb_info *info, struct vc_data *vc)
 	int rows, cols, charcnt = 256;
 
 	info->var.xoffset = info->var.yoffset = p->yscroll = 0;
+	if (var_to_display(p, &info->var, info))
+		return;
 	t = &fb_display[display_fg];
 	if (!vc->vc_font.data) {
 		vc->vc_font.data = p->fontdata = t->fontdata;
@@ -1861,7 +1907,7 @@ static int fbcon_resize(struct vc_data *vc, unsigned int width,
 	struct fb_info *info = registered_fb[(int) con2fb_map[vc->vc_num]];
 	struct display *p = &fb_display[vc->vc_num];
 	struct fb_var_screeninfo var = info->var;
-	int err; int x_diff, y_diff;
+	int x_diff, y_diff;
 	int fw = vc->vc_font.width;
 	int fh = vc->vc_font.height;
 
@@ -1870,15 +1916,31 @@ static int fbcon_resize(struct vc_data *vc, unsigned int width,
 	x_diff = info->var.xres - var.xres;
 	y_diff = info->var.yres - var.yres;
 	if (x_diff < 0 || x_diff > fw || (y_diff < 0 || y_diff > fh)) {
-		char mode[40];
+		struct fb_videomode *mode;
 
 		DPRINTK("attempting resize %ix%i\n", var.xres, var.yres);
-		snprintf(mode, 40, "%ix%i", var.xres, var.yres);
-		err = fb_find_mode(&var, info, mode, info->monspecs.modedb,
-				   info->monspecs.modedb_len, NULL,
-				   info->var.bits_per_pixel);
-		if (!err || width > var.xres/fw || height > var.yres/fh)
+		mode = fb_find_best_mode(&var, &info->monspecs.modelist);
+		if (mode == NULL)
 			return -EINVAL;
+		fb_videomode_to_var(&var, mode);
+		if (width > var.xres/fw || height > var.yres/fh)
+			return -EINVAL;
+		/*
+		 * The following can probably have any value... Do we need to
+		 * set all of them?
+		 */
+		var.bits_per_pixel = p->bits_per_pixel;
+		var.xres_virtual = p->xres_virtual;
+		var.yres_virtual = p->yres_virtual;
+		var.accel_flags = p->accel_flags;
+		var.width = p->width;
+		var.height = p->height;
+		var.red = p->red;
+		var.green = p->green;
+		var.blue = p->blue;
+		var.transp = p->transp;
+		var.nonstd = p->nonstd;
+
 		DPRINTK("resize now %ix%i\n", var.xres, var.yres);
 		if (CON_IS_VISIBLE(vc)) {
 			var.activate = FB_ACTIVATE_NOW |
@@ -1886,6 +1948,7 @@ static int fbcon_resize(struct vc_data *vc, unsigned int width,
 			fb_set_var(info, &var);
 			info->flags &= ~FBINFO_MISC_MODESWITCH;
 		}
+		var_to_display(p, &info->var, info);
 	}
 	updatescrollmode(p, info, vc);
 	return 0;
@@ -1895,6 +1958,7 @@ static int fbcon_switch(struct vc_data *vc)
 {
 	struct fb_info *info = registered_fb[(int) con2fb_map[vc->vc_num]];
 	struct display *p = &fb_display[vc->vc_num];
+	struct fb_var_screeninfo var;
 	int i;
 
 	if (softback_top) {
@@ -1920,8 +1984,6 @@ static int fbcon_switch(struct vc_data *vc)
 			conp2->vc_top = 0;
 		logo_shown = -1;
 	}
-	if (info)
-		info->var.yoffset = p->yscroll = 0;
 
 	/*
 	 * FIXME: If we have multiple fbdev's loaded, we need to
@@ -1936,7 +1998,18 @@ static int fbcon_switch(struct vc_data *vc)
 			registered_fb[i]->currcon = vc->vc_num;
 	}
 
- 	fbcon_resize(vc, vc->vc_cols, vc->vc_rows);
+	memset(&var, 0, sizeof(struct fb_var_screeninfo));
+	fb_videomode_to_var(&var, p->mode);
+	display_to_var(&var, p);
+	var.activate = FB_ACTIVATE_NOW;
+
+	/*
+	 * make sure we don't unnecessarily trip the memcmp()
+	 * in fb_set_var()
+	 */
+	info->var.activate = var.activate;
+	info->var.yoffset = info->var.xoffset = p->yscroll = 0;
+	fb_set_var(info, &var);
 
 	if (info->flags & FBINFO_MISC_MODESWITCH) {
 		if (info->fbops->fb_set_par)
@@ -1944,9 +2017,9 @@ static int fbcon_switch(struct vc_data *vc)
 		info->flags &= ~FBINFO_MISC_MODESWITCH;
 	}
 
-	info->var.xoffset = info->var.yoffset = p->yscroll = 0;
 	vc->vc_can_do_color = (fb_get_color_depth(info) != 1);
 	vc->vc_complement_mask = vc->vc_can_do_color ? 0x7700 : 0x0800;
+	updatescrollmode(p, info, vc);
 
 	switch (p->scrollmode) {
 	case SCROLL_WRAP_MOVE:
@@ -2575,6 +2648,7 @@ static void fbcon_modechanged(struct fb_info *info)
 	info->var.xoffset = info->var.yoffset = p->yscroll = 0;
 
 	if (CON_IS_VISIBLE(vc)) {
+		var_to_display(p, &info->var, info);
 		cols = info->var.xres / vc->vc_font.width;
 		rows = info->var.yres / vc->vc_font.height;
 		vc_resize(vc->vc_num, cols, rows);
