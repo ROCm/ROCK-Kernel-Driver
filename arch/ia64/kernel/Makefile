@@ -2,7 +2,7 @@
 # Makefile for the linux kernel.
 #
 
-extra-y	:= head.o init_task.o vmlinux.lds.s
+extra-y	:= head.o init_task.o vmlinux.lds
 
 obj-y := acpi.o entry.o efi.o efi_stub.o gate-data.o fsys.o ia64_ksyms.o irq.o irq_ia64.o	\
 	 irq_lsapic.o ivt.o machvec.o pal.o patch.o process.o perfmon.o ptrace.o sal.o		\
@@ -21,25 +21,25 @@ obj-$(CONFIG_IA64_CYCLONE)	+= cyclone.o
 # The gate DSO image is built using a special linker script.
 targets += gate.so gate-syms.o
 
-extra-y += gate.so gate-syms.o gate.lds.s gate.o
+extra-y := gate.so gate-syms.o gate.lds gate.o
 
 # fp_emulate() expects f2-f5,f16-f31 to contain the user-level state.
 CFLAGS_traps.o  += -mfixed-range=f2-f5,f16-f31
 
-AFLAGS_gate.lds.o += -P -C -U$(ARCH)
+CPPFLAGS_gate.lds := -P -C -U$(ARCH)
 
 quiet_cmd_gate = GATE $@
       cmd_gate = $(CC) -nostdlib $(GATECFLAGS_$(@F)) -Wl,-T,$(filter-out FORCE,$^) -o $@
 
 GATECFLAGS_gate.so = -shared -s -Wl,-soname=linux-gate.so.1
-$(obj)/gate.so: $(obj)/gate.lds.s $(obj)/gate.o FORCE
+$(obj)/gate.so: $(obj)/gate.lds $(obj)/gate.o FORCE
 	$(call if_changed,gate)
 
 $(obj)/built-in.o: $(obj)/gate-syms.o
 $(obj)/built-in.o: ld_flags += -R $(obj)/gate-syms.o
 
 GATECFLAGS_gate-syms.o = -r
-$(obj)/gate-syms.o: $(src)/gate.lds.s $(obj)/gate.o FORCE
+$(obj)/gate-syms.o: $(obj)/gate.lds $(obj)/gate.o FORCE
 	$(call if_changed,gate)
 
 # gate-data.o contains the gate DSO image as data in section .data.gate.

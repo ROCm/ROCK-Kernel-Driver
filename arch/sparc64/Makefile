@@ -10,7 +10,7 @@
 
 CHECK		:= $(CHECK) -D__sparc__=1 -D__sparc_v9__=1
 
-AFLAGS_vmlinux.lds.o += -Usparc
+CPPFLAGS_vmlinux.lds += -Usparc
 
 CC		:= $(shell if $(CC) -m64 -S -o /dev/null -xc /dev/null >/dev/null 2>&1; then echo $(CC); else echo sparc64-linux-gcc; fi )
 

@@ -938,6 +938,37 @@ When kbuild executes the following steps are followed (roughly):
 	will be displayed with "make KBUILD_VERBOSE=0".
 	
 
+--- 6.8 Preprocessing linker scripts
+
+	When the vmlinux image is build the linker script:
+	arch/$(ARCH)/kernel/vmlinux.lds is used.
+	The script is a preprocessed variant of the file vmlinux.lds.S
+	located in the same directory.
+	kbuild knows .lds file and includes a rule *lds.S -> *lds.
+	
+	Example:
+		#arch/i386/kernel/Makefile
+		always := vmlinux.lds
+	
+		#Makefile
+		export CPPFLAGS_vmlinux.lds += -P -C -U$(ARCH)
+		
+	The assigment to $(always) is used to tell kbuild to build the
+	target: vmlinux.lds.
+	The assignment to $(CPPFLAGS_vmlinux.lds) tell kbuild to use the
+	specified options when building the target vmlinux.lds.
+	
+	When building the *.lds target kbuild used the variakles:
+	CPPFLAGS	: Set in top-level Makefile
+	EXTRA_CPPFLAGS	: May be set in the kbuild makefile
+	CPPFLAGS_$(@F)  : Target specific flags.
+	                  Note that the full filename is used in this
+	                  assignment.
+
+	The kbuild infrastructure for *lds file are used in several
+	architecture specific files.
+
+
 === 7 Kbuild Variables
 
 The top Makefile exports the following variables:

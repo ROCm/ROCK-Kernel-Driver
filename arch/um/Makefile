@@ -77,7 +77,7 @@ vmlinux: $(ARCH_DIR)/main.o
 # CONFIG_MODE_SKAS + CONFIG_STATIC_LINK case.
 
 LINK_TT = -static
-LD_SCRIPT_TT := uml.lds.s
+LD_SCRIPT_TT := uml.lds
 
 ifeq ($(CONFIG_STATIC_LINK),y)
   LINK-y += $(LINK_TT)
@@ -98,12 +98,12 @@ CPP_MODE_TT := $(shell [ "$(CONFIG_MODE_TT)" = "y" ] && echo -DMODE_TT)
 CONFIG_KERNEL_STACK_ORDER ?= 2
 STACK_SIZE := $(shell echo $$[ 4096 * (1 << $(CONFIG_KERNEL_STACK_ORDER)) ] )
 
-AFLAGS_vmlinux.lds.o = -U$(SUBARCH) \
+CPPFLAGS_vmlinux.lds = -U$(SUBARCH) \
 	-DSTART=$$(($(TOP_ADDR) - $(SIZE))) -DELF_ARCH=$(ELF_ARCH) \
 	-DELF_FORMAT=\"$(ELF_FORMAT)\" $(CPP_MODE_TT) \
 	-DKERNEL_STACK_SIZE=$(STACK_SIZE)
 
-AFLAGS_$(LD_SCRIPT-y:.s=).o = $(AFLAGS_vmlinux.lds.o) -P -C -Uum
+CPPFLAGS_$(LD_SCRIPT-y) = $(CPPFLAGS_vmlinux.lds) -P -C -Uum
 
 LD_SCRIPT-y := $(ARCH_DIR)/$(LD_SCRIPT-y)
 
@@ -122,7 +122,7 @@ USER_CFLAGS := $(patsubst -D__KERNEL__,,$(USER_CFLAGS)) $(ARCH_INCLUDE) \
 # To get a definition of F_SETSIG
 USER_CFLAGS += -D_GNU_SOURCE
 
-CLEAN_FILES += linux x.i gmon.out $(ARCH_DIR)/uml.lds.s \
+CLEAN_FILES += linux x.i gmon.out $(ARCH_DIR)/uml.lds \
 	$(ARCH_DIR)/dyn_link.ld.s $(GEN_HEADERS)
 
 $(ARCH_DIR)/main.o: $(ARCH_DIR)/main.c

@@ -14,5 +14,5 @@ obj-y		:= compat.o dma.o entry.o irq.o   \
 obj-$(CONFIG_FIQ)		+= fiq.o
 obj-$(CONFIG_MODULES)		+= armksyms.o
 
-extra-y := init_task.o vmlinux.lds.s
+extra-y := init_task.o vmlinux.lds
 

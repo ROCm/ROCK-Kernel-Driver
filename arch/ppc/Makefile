@@ -70,7 +70,7 @@ BOOT_TARGETS = zImage zImage.initrd znetboot znetboot.initrd vmlinux.sm
 
 all: zImage
 
-AFLAGS_vmlinux.lds.o	:= -Upowerpc
+CPPFLAGS_vmlinux.lds	:= -Upowerpc
 
 # All the instructions talk about "make bzImage".
 bzImage: zImage

@@ -643,7 +643,7 @@ endif
 # none has been choosen above.
 #
 
-AFLAGS_vmlinux.lds.o := \
+CPPFLAGS_vmlinux.lds := \
 	-D"LOADADDR=$(load-y)" \
 	-D"JIFFIES=$(JIFFIES)" \
 	-imacros $(srctree)/include/asm-$(ARCH)/sn/mapped_kernel.h

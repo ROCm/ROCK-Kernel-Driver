@@ -122,7 +122,7 @@ drivers-$(CONFIG_OPROFILE)	+= arch/sh/oprofile/
 
 boot := arch/sh/boot
 
-AFLAGS_vmlinux.lds.o := -traditional
+CPPFLAGS_vmlinux.lds := -traditional
 
 prepare: target_links
 
