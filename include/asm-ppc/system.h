@@ -86,8 +86,9 @@ struct device_node;
 extern void note_scsi_host(struct device_node *, void *);
 
 struct task_struct;
-extern void __switch_to(struct task_struct *, struct task_struct *);
-#define switch_to(prev, next, last)	__switch_to((prev), (next))
+extern struct task_struct *__switch_to(struct task_struct *,
+	struct task_struct *);
+#define switch_to(prev, next, last)	((last) = __switch_to((prev), (next)))
 
 struct thread_struct;
 extern struct task_struct *_switch(struct thread_struct *prev,
