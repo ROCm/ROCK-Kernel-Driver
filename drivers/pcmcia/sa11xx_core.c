@@ -933,6 +933,8 @@ sa1100_pcmcia_notifier(struct notifier_block *nb, unsigned long val,
 		if (freqs->new < freqs->old)
 			sa1100_pcmcia_update_mecr(freqs->new);
 		break;
+	case CPUFREQ_RESUMECHANGE:
+		sa1100_pcmcia_update_mecr(freqs->new);
 	}
 
 	return 0;

@@ -21,6 +21,7 @@
 #include <linux/kobject.h>
 #include <linux/sysfs.h>
 #include <linux/completion.h>
+#include <linux/workqueue.h>
 
 #define CPUFREQ_NAME_LEN 16
 
@@ -81,6 +82,9 @@ struct cpufreq_policy {
  	struct semaphore	lock;   /* CPU ->setpolicy or ->target may
 					   only be called once a time */
 
+	struct work_struct	update; /* if update_policy() needs to be
+					 * called, but you're in IRQ context */
+
 	struct cpufreq_real_policy	user_policy;
 
 	struct kobject		kobj;
@@ -96,11 +100,13 @@ struct cpufreq_policy {
 
 #define CPUFREQ_PRECHANGE	(0)
 #define CPUFREQ_POSTCHANGE	(1)
+#define CPUFREQ_RESUMECHANGE	(8)
 
 struct cpufreq_freqs {
 	unsigned int cpu;	/* cpu nr */
 	unsigned int old;
 	unsigned int new;
+	u8 flags;		/* flags of cpufreq_driver, see below. */
 };
 
 
@@ -187,6 +193,9 @@ struct cpufreq_driver {
 				 unsigned int target_freq,
 				 unsigned int relation);
 
+	/* should be defined, if possible */
+	unsigned int	(*get)	(unsigned int cpu);
+
 	/* optional */
 	int	(*exit)		(struct cpufreq_policy *policy);
 	int	(*resume)	(struct cpufreq_policy *policy);
@@ -195,8 +204,19 @@ struct cpufreq_driver {
 
 /* flags */
 
-#define CPUFREQ_STICKY	0x01	/* the driver isn't removed even if 
-				   all ->init() calls failed */
+#define CPUFREQ_STICKY		0x01	/* the driver isn't removed even if 
+					 * all ->init() calls failed */
+#define CPUFREQ_CONST_LOOPS 	0x02	/* loops_per_jiffy or other kernel
+					 * "constants" aren't affected by
+					 * frequency transitions */
+#define CPUFREQ_PANIC_OUTOFSYNC	0x04	/* panic if cpufreq's opinion of
+					 * current frequency differs from
+					 * actual frequency */
+#define CPUFREQ_PANIC_RESUME_OUTOFSYNC 0x08 /* panic if cpufreq's opinion of
+					 * current frequency differs from
+					 * actual frequency on resume
+					 * from sleep. */
+
 
 int cpufreq_register_driver(struct cpufreq_driver *driver_data);
 int cpufreq_unregister_driver(struct cpufreq_driver *driver_data);
@@ -234,6 +254,9 @@ int cpufreq_set_policy(struct cpufreq_policy *policy);
 int cpufreq_get_policy(struct cpufreq_policy *policy, unsigned int cpu);
 int cpufreq_update_policy(unsigned int cpu);
 
+/* query the current CPU frequency (in kHz). If zero, cpufreq couldn't detect it */
+unsigned int cpufreq_get(unsigned int cpu);
+
 /* the proc_intf.c needs this */
 int cpufreq_parse_governor (char *str_governor, unsigned int *policy, struct cpufreq_governor **governor);
 
@@ -241,13 +264,10 @@ int cpufreq_parse_governor (char *str_governor, unsigned int *policy, struct cpu
 /*********************************************************************
  *                      CPUFREQ USERSPACE GOVERNOR                   *
  *********************************************************************/
-int cpufreq_gov_userspace_init(void);
-
 #ifdef CONFIG_CPU_FREQ_24_API
 
 int cpufreq_setmax(unsigned int cpu);
 int cpufreq_set(unsigned int kHz, unsigned int cpu);
-unsigned int cpufreq_get(unsigned int cpu);
 
 
 /* /proc/sys/cpu */

@@ -128,6 +128,17 @@ static int longrun_verify_policy(struct cpufreq_policy *policy)
 	return 0;
 }
 
+static unsigned int longrun_get(unsigned int cpu)
+{
+	u32 eax, ebx, ecx, edx;
+
+	if (cpu)
+		return 0;
+
+	cpuid(0x80860007, &eax, &ebx, &ecx, &edx);
+
+	return (eax * 1000);
+}
 
 /**
  * longrun_determine_freqs - determines the lowest and highest possible core frequency
@@ -250,8 +261,10 @@ static int __init longrun_cpu_init(struct cpufreq_policy *policy)
 
 
 static struct cpufreq_driver longrun_driver = {
+	.flags		= CPUFREQ_CONST_LOOPS,
 	.verify 	= longrun_verify_policy,
 	.setpolicy 	= longrun_set_policy,
+	.get		= longrun_get,
 	.init		= longrun_cpu_init,
 	.name		= "longrun",
 	.owner		= THIS_MODULE,

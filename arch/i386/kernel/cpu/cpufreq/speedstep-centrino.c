@@ -38,13 +38,37 @@
 #define dprintk(msg...) do { } while(0)
 #endif
 
+struct cpu_id
+{
+	__u8	x86;            /* CPU family */
+	__u8	x86_vendor;     /* CPU vendor */
+	__u8	x86_model;	/* model */
+	__u8	x86_mask;	/* stepping */
+};
+
+static const struct cpu_id cpu_id_banias = {
+	.x86_vendor = X86_VENDOR_INTEL,
+	.x86 = 6,
+	.x86_model = 9,
+	.x86_mask = 5,
+};
+
+static const struct cpu_id cpu_id_dothan_a1 = {
+	.x86_vendor = X86_VENDOR_INTEL,
+	.x86 = 6,
+	.x86_model = 13,
+	.x86_mask = 1,
+};
+
 struct cpu_model
 {
+	const struct cpu_id *cpu_id;
 	const char	*model_name;
 	unsigned	max_freq; /* max clock in kHz */
 
 	struct cpufreq_frequency_table *op_points; /* clock/voltage pairs */
 };
+static int centrino_verify_cpu_id(struct cpuinfo_x86 *c, const struct cpu_id *x);
 
 /* Operating points for current CPU */
 static struct cpu_model *centrino_model;
@@ -67,8 +91,8 @@ static struct cpu_model *centrino_model;
  * M.
  */
 
-/* Ultra Low Voltage Intel Pentium M processor 900MHz */
-static struct cpufreq_frequency_table op_900[] =
+/* Ultra Low Voltage Intel Pentium M processor 900MHz (Banias) */
+static struct cpufreq_frequency_table banias_900[] =
 {
 	OP(600,  844),
 	OP(800,  988),
@@ -76,8 +100,8 @@ static struct cpufreq_frequency_table op_900[] =
 	{ .frequency = CPUFREQ_TABLE_END }
 };
 
-/* Ultra Low Voltage Intel Pentium M processor 1000MHz */
-static struct cpufreq_frequency_table op_1000[] =
+/* Ultra Low Voltage Intel Pentium M processor 1000MHz (Banias) */
+static struct cpufreq_frequency_table banias_1000[] =
 {
 	OP(600,  844),
 	OP(800,  972),
@@ -86,8 +110,8 @@ static struct cpufreq_frequency_table op_1000[] =
 	{ .frequency = CPUFREQ_TABLE_END }
 };
 
-/* Low Voltage Intel Pentium M processor 1.10GHz */
-static struct cpufreq_frequency_table op_1100[] =
+/* Low Voltage Intel Pentium M processor 1.10GHz (Banias) */
+static struct cpufreq_frequency_table banias_1100[] =
 {
 	OP( 600,  956),
 	OP( 800, 1020),
@@ -98,8 +122,8 @@ static struct cpufreq_frequency_table op_1100[] =
 };
 
 
-/* Low Voltage Intel Pentium M processor 1.20GHz */
-static struct cpufreq_frequency_table op_1200[] =
+/* Low Voltage Intel Pentium M processor 1.20GHz (Banias) */
+static struct cpufreq_frequency_table banias_1200[] =
 {
 	OP( 600,  956),
 	OP( 800, 1004),
@@ -110,8 +134,8 @@ static struct cpufreq_frequency_table op_1200[] =
 	{ .frequency = CPUFREQ_TABLE_END }
 };
 
-/* Intel Pentium M processor 1.30GHz */
-static struct cpufreq_frequency_table op_1300[] = 
+/* Intel Pentium M processor 1.30GHz (Banias) */
+static struct cpufreq_frequency_table banias_1300[] = 
 {
 	OP( 600,  956),
 	OP( 800, 1260),
@@ -121,8 +145,8 @@ static struct cpufreq_frequency_table op_1300[] =
 	{ .frequency = CPUFREQ_TABLE_END }
 };
 
-/* Intel Pentium M processor 1.40GHz */
-static struct cpufreq_frequency_table op_1400[] = 
+/* Intel Pentium M processor 1.40GHz (Banias) */
+static struct cpufreq_frequency_table banias_1400[] = 
 {
 	OP( 600,  956),
 	OP( 800, 1180),
@@ -132,8 +156,8 @@ static struct cpufreq_frequency_table op_1400[] =
 	{ .frequency = CPUFREQ_TABLE_END }
 };
 
-/* Intel Pentium M processor 1.50GHz */
-static struct cpufreq_frequency_table op_1500[] = 
+/* Intel Pentium M processor 1.50GHz (Banias) */
+static struct cpufreq_frequency_table banias_1500[] = 
 {
 	OP( 600,  956),
 	OP( 800, 1116),
@@ -144,8 +168,8 @@ static struct cpufreq_frequency_table op_1500[] =
 	{ .frequency = CPUFREQ_TABLE_END }
 };
 
-/* Intel Pentium M processor 1.60GHz */
-static struct cpufreq_frequency_table op_1600[] = 
+/* Intel Pentium M processor 1.60GHz (Banias) */
+static struct cpufreq_frequency_table banias_1600[] = 
 {
 	OP( 600,  956),
 	OP( 800, 1036),
@@ -156,8 +180,8 @@ static struct cpufreq_frequency_table op_1600[] =
 	{ .frequency = CPUFREQ_TABLE_END }
 };
 
-/* Intel Pentium M processor 1.70GHz */
-static struct cpufreq_frequency_table op_1700[] =
+/* Intel Pentium M processor 1.70GHz (Banias) */
+static struct cpufreq_frequency_table banias_1700[] =
 {
 	OP( 600,  956),
 	OP( 800, 1004),
@@ -169,26 +193,31 @@ static struct cpufreq_frequency_table op_1700[] =
 };
 #undef OP
 
-#define _CPU(max, name)	\
-	{ "Intel(R) Pentium(R) M processor " name "MHz", (max)*1000, op_##max }
-#define CPU(max)	_CPU(max, #max)
+#define _BANIAS(cpuid, max, name)	\
+{	.cpu_id		= cpuid,	\
+	.model_name	= "Intel(R) Pentium(R) M processor " name "MHz", \
+	.max_freq	= (max)*1000,	\
+	.op_points	= banias_##max,	\
+}
+#define BANIAS(max)	_BANIAS(&cpu_id_banias, max, #max)
 
 /* CPU models, their operating frequency range, and freq/voltage
    operating points */
 static struct cpu_model models[] = 
 {
-       _CPU( 900, " 900"),
-	CPU(1000),
-	CPU(1100),
-	CPU(1200),
-	CPU(1300),
-	CPU(1400),
-	CPU(1500),
-	CPU(1600),
-	CPU(1700),
+	_BANIAS(&cpu_id_banias, 900, " 900"),
+	BANIAS(1000),
+	BANIAS(1100),
+	BANIAS(1200),
+	BANIAS(1300),
+	BANIAS(1400),
+	BANIAS(1500),
+	BANIAS(1600),
+	BANIAS(1700),
 	{ 0, }
 };
-#undef CPU
+#undef _BANIAS
+#undef BANIAS
 
 static int centrino_cpu_init_table(struct cpufreq_policy *policy)
 {
@@ -196,7 +225,8 @@ static int centrino_cpu_init_table(struct cpufreq_policy *policy)
 	struct cpu_model *model;
 
 	for(model = models; model->model_name != NULL; model++)
-		if (strcmp(cpu->x86_model_id, model->model_name) == 0)
+		if ((strcmp(cpu->x86_model_id, model->model_name) == 0) &&
+		    (!centrino_verify_cpu_id(cpu, model->cpu_id)))
 			break;
 	if (model->model_name == NULL) {
 		printk(KERN_INFO PFX "no support for CPU model \"%s\": "
@@ -217,6 +247,16 @@ static int centrino_cpu_init_table(struct cpufreq_policy *policy)
 static inline int centrino_cpu_init_table(struct cpufreq_policy *policy) { return -ENODEV; }
 #endif /* CONFIG_X86_SPEEDSTEP_CENTRINO_TABLE */
 
+static int centrino_verify_cpu_id(struct cpuinfo_x86 *c, const struct cpu_id *x)
+{
+	if ((c->x86 == x->x86) &&
+	    (c->x86_vendor == x->x86_vendor) &&
+	    (c->x86_model == x->x86_model) &&
+	    (c->x86_mask == x->x86_mask))
+		return 0;
+	return -ENODEV;
+}
+
 /* Extract clock in kHz from PERF_CTL value */
 static unsigned extract_clock(unsigned msr)
 {
@@ -225,9 +265,11 @@ static unsigned extract_clock(unsigned msr)
 }
 
 /* Return the current CPU frequency in kHz */
-static unsigned get_cur_freq(void)
+static unsigned int get_cur_freq(unsigned int cpu)
 {
 	unsigned l, h;
+	if (cpu)
+		return 0;
 
 	rdmsr(MSR_IA32_PERF_STATUS, l, h);
 	return extract_clock(l);
@@ -322,7 +364,7 @@ static int centrino_cpu_init_acpi(struct cpufreq_policy *policy)
                 goto err_kfree;
         }
 
-	cur_freq = get_cur_freq();
+	cur_freq = get_cur_freq(0);
 
         for (i=0; i<p.state_count; i++) {
 		centrino_model->op_points[i].index = p.states[i].control;
@@ -357,13 +399,8 @@ static int centrino_cpu_init(struct cpufreq_policy *policy)
 	if (!cpu_has(cpu, X86_FEATURE_EST))
 		return -ENODEV;
 
-	/* Only Intel Pentium M stepping 5 for now - add new CPUs as
-	   they appear after making sure they use PERF_CTL in the same
-	   way. */
-	if (cpu->x86_vendor != X86_VENDOR_INTEL ||
-	    cpu->x86        != 6 ||
-	    cpu->x86_model  != 9 ||
-	    cpu->x86_mask   != 5) {
+	if ((centrino_verify_cpu_id(cpu, &cpu_id_banias)) &&
+	    (centrino_verify_cpu_id(cpu, &cpu_id_dothan_a1))) {
 		printk(KERN_INFO PFX "found unsupported CPU with Enhanced SpeedStep: "
 		       "send /proc/cpuinfo to " MAINTAINER "\n");
 		return -ENODEV;
@@ -391,7 +428,7 @@ static int centrino_cpu_init(struct cpufreq_policy *policy)
 		}
 	}
 
-	freq = get_cur_freq();
+	freq = get_cur_freq(0);
 
 	policy->governor = CPUFREQ_DEFAULT_GOVERNOR;
 	policy->cpuinfo.transition_latency = 10; /* 10uS transition latency */
@@ -516,6 +553,7 @@ static struct cpufreq_driver centrino_driver = {
 	.exit		= centrino_cpu_exit,
 	.verify 	= centrino_verify,
 	.target 	= centrino_target,
+	.get		= get_cur_freq,
 	.attr           = centrino_attr,
 	.owner		= THIS_MODULE,
 };

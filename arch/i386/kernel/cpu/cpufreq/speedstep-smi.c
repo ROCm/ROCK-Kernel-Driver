@@ -36,6 +36,8 @@ static int		smi_port	= 0;
 static int		smi_cmd		= 0;
 static unsigned int	smi_sig		= 0;
 
+/* info about the processor */
+static unsigned int	speedstep_processor = 0;
 
 /* 
  *   There are only two frequency states for each processor. Values
@@ -258,9 +260,10 @@ static int speedstep_cpu_init(struct cpufreq_policy *policy)
 				&speedstep_freqs[SPEEDSTEP_HIGH].frequency);
 	if (result) {
 		/* fall back to speedstep_lib.c dection mechanism: try both states out */
-		unsigned int speedstep_processor = speedstep_detect_processor();
-
 		dprintk(KERN_INFO PFX "could not detect low and high frequencies by SMI call.\n");
+		if (!speedstep_processor)
+			speedstep_processor = speedstep_detect_processor();
+
 		if (!speedstep_processor)
 			return -ENODEV;
 
@@ -298,11 +301,21 @@ static int speedstep_cpu_init(struct cpufreq_policy *policy)
 	return 0;
 }
 
-
 static int speedstep_cpu_exit(struct cpufreq_policy *policy)
 {
 	cpufreq_frequency_table_put_attr(policy->cpu);
 	return 0;
+}
+
+static unsigned int speedstep_get(unsigned int cpu)
+{
+	if (cpu)
+		return -ENODEV;
+	if (!speedstep_processor)
+		speedstep_processor = speedstep_detect_processor();
+	if (!speedstep_processor)
+		return 0;
+	return speedstep_get_processor_frequency(speedstep_processor);
 }
 
 
@@ -327,6 +340,7 @@ static struct cpufreq_driver speedstep_driver = {
 	.target 	= speedstep_target,
 	.init		= speedstep_cpu_init,
 	.exit		= speedstep_cpu_exit,
+	.get		= speedstep_get,
 	.resume		= speedstep_resume,
 	.owner		= THIS_MODULE,
 	.attr		= speedstep_attr,

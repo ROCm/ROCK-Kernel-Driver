@@ -380,6 +380,13 @@ static int longhaul_target (struct cpufreq_policy *policy,
 	return 0;
 }
 
+static unsigned int longhaul_get(unsigned int cpu)
+{
+	if (cpu)
+		return 0;
+	return (calc_speed (longhaul_get_cpu_mult(), fsb));
+}
+
 static int __init longhaul_cpu_init (struct cpufreq_policy *policy)
 {
 	struct cpuinfo_x86 *c = cpu_data;
@@ -472,6 +479,7 @@ static struct freq_attr* longhaul_attr[] = {
 static struct cpufreq_driver longhaul_driver = {
 	.verify 	= longhaul_verify,
 	.target 	= longhaul_target,
+	.get 		= longhaul_get,
 	.init		= longhaul_cpu_init,
 	.exit		= longhaul_cpu_exit,
 	.name		= "longhaul",

@@ -51,6 +51,7 @@ enum {
 
 static int has_N44_O17_errata[NR_CPUS];
 static unsigned int stock_freq;
+static struct cpufreq_driver p4clockmod_driver;
 
 static int cpufreq_p4_setdc(unsigned int cpu, unsigned int newstate)
 {
@@ -177,7 +178,7 @@ static int cpufreq_p4_verify(struct cpufreq_policy *policy)
 static unsigned int cpufreq_p4_get_frequency(struct cpuinfo_x86 *c)
 {
 	if ((c->x86 == 0x06) && (c->x86_model == 0x09)) {
-		/* Pentium M */
+		/* Pentium M (Banias) */
 		printk(KERN_WARNING PFX "Warning: Pentium M detected. "
 		       "The speedstep_centrino module offers voltage scaling"
 		       " in addition of frequency scaling. You should use "
@@ -185,10 +186,26 @@ static unsigned int cpufreq_p4_get_frequency(struct cpuinfo_x86 *c)
 		return speedstep_get_processor_frequency(SPEEDSTEP_PROCESSOR_PM);
 	}
 
+	if ((c->x86 == 0x06) && (c->x86_model == 0x13)) {
+		/* Pentium M (Dothan) */
+		printk(KERN_WARNING PFX "Warning: Pentium M detected. "
+		       "The speedstep_centrino module offers voltage scaling"
+		       " in addition of frequency scaling. You should use "
+		       "that instead of p4-clockmod, if possible.\n");
+		/* on P-4s, the TSC runs with constant frequency independent wether
+		 * throttling is active or not. */
+		p4clockmod_driver.flags |= CPUFREQ_CONST_LOOPS;
+		return speedstep_get_processor_frequency(SPEEDSTEP_PROCESSOR_PM);
+	}
+
 	if (c->x86 != 0xF) {
 		printk(KERN_WARNING PFX "Unknown p4-clockmod-capable CPU. Please send an e-mail to <linux@brodo.de>\n");
 		return 0;
 	}
+
+	/* on P-4s, the TSC runs with constant frequency independent wether
+	 * throttling is active or not. */
+	p4clockmod_driver.flags |= CPUFREQ_CONST_LOOPS;
 
 	if (speedstep_detect_processor() == SPEEDSTEP_PROCESSOR_P4M) {
 		printk(KERN_WARNING PFX "Warning: Pentium 4-M detected. "
@@ -249,6 +266,43 @@ static int cpufreq_p4_cpu_exit(struct cpufreq_policy *policy)
 	return 0;
 }
 
+static unsigned int cpufreq_p4_get(unsigned int cpu)
+{
+	unsigned int hyperthreading;
+	cpumask_t cpus_allowed, affected_cpu_map;
+	u32 l, h;
+
+	hyperthreading = 0;
+
+	/* only run on CPU to be set, or on its sibling */
+	cpus_allowed = current->cpus_allowed;
+	affected_cpu_map = cpumask_of_cpu(cpu);
+#ifdef CONFIG_X86_HT
+	hyperthreading = ((cpu_has_ht) && (smp_num_siblings == 2));
+	if (hyperthreading) {
+		sibling = cpu_sibling_map[cpu];
+		cpu_set(sibling, affected_cpu_map);
+	}
+#endif
+	set_cpus_allowed(current, affected_cpu_map);
+        BUG_ON(!cpu_isset(smp_processor_id(), affected_cpu_map));
+
+	rdmsr(MSR_IA32_THERM_CONTROL, l, h);
+
+	set_cpus_allowed(current, cpus_allowed);
+
+	if (l & 0x10) {
+		l = l >> 1;
+		l &= 0x7;
+	} else
+		l = DC_DISABLE;
+
+	if (l != DC_DISABLE)
+		return (stock_freq * l / 8);
+
+	return stock_freq;
+}
+
 static struct freq_attr* p4clockmod_attr[] = {
 	&cpufreq_freq_attr_scaling_available_freqs,
 	NULL,
@@ -259,6 +313,7 @@ static struct cpufreq_driver p4clockmod_driver = {
 	.target		= cpufreq_p4_target,
 	.init		= cpufreq_p4_cpu_init,
 	.exit		= cpufreq_p4_cpu_exit,
+	.get		= cpufreq_p4_get,
 	.name		= "p4-clockmod",
 	.owner		= THIS_MODULE,
 	.attr		= p4clockmod_attr,

@@ -145,19 +145,6 @@ int cpufreq_setmax(unsigned int cpu)
 EXPORT_SYMBOL_GPL(cpufreq_setmax);
 
 
-/** 
- * cpufreq_get - get the current CPU frequency (in kHz)
- * @cpu: CPU number
- *
- * Get the CPU current (static) CPU frequency
- */
-unsigned int cpufreq_get(unsigned int cpu)
-{
-	return cpu_cur_freq[cpu];
-}
-EXPORT_SYMBOL(cpufreq_get);
-
-
 #ifdef CONFIG_CPU_FREQ_24_API
 
 
@@ -542,20 +529,6 @@ static int cpufreq_governor_userspace(struct cpufreq_policy *policy,
 	return 0;
 }
 
-/* on ARM SA1100 we need to rely on the values of cpufreq_get() - because 
- * of this, cpu_cur_freq[] needs to be set early.
- */
-#if defined(CONFIG_ARM) && defined(CONFIG_ARCH_SA1100)
-extern unsigned int sa11x0_getspeed(void);
-
-static void cpufreq_sa11x0_compat(void)
-{
-	cpu_cur_freq[0] = sa11x0_getspeed();
-}
-#else
-#define cpufreq_sa11x0_compat() do {} while(0)
-#endif
-
 
 struct cpufreq_governor cpufreq_gov_userspace = {
 	.name		= "userspace",
@@ -564,21 +537,12 @@ struct cpufreq_governor cpufreq_gov_userspace = {
 };
 EXPORT_SYMBOL(cpufreq_gov_userspace);
 
-static int already_init = 0;
-
-int cpufreq_gov_userspace_init(void)
+static int __init cpufreq_gov_userspace_init(void)
 {
-	if (!already_init) {
-		down(&userspace_sem);
-		cpufreq_sa11x0_compat();
-		cpufreq_sysctl_init();
-		cpufreq_register_notifier(&userspace_cpufreq_notifier_block, CPUFREQ_TRANSITION_NOTIFIER);
-		already_init = 1;
-		up(&userspace_sem);
-	}
+	cpufreq_sysctl_init();
+	cpufreq_register_notifier(&userspace_cpufreq_notifier_block, CPUFREQ_TRANSITION_NOTIFIER);
 	return cpufreq_register_governor(&cpufreq_gov_userspace);
 }
-EXPORT_SYMBOL(cpufreq_gov_userspace_init);
 
 
 static void __exit cpufreq_gov_userspace_exit(void)

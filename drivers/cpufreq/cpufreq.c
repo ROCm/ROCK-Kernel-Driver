@@ -33,9 +33,10 @@ static struct cpufreq_driver   	*cpufreq_driver;
 static struct cpufreq_policy	*cpufreq_cpu_data[NR_CPUS];
 static spinlock_t		cpufreq_driver_lock = SPIN_LOCK_UNLOCKED;
 
-/* internal prototype */
+/* internal prototypes */
 static int __cpufreq_governor(struct cpufreq_policy *policy, unsigned int event);
-
+static void handle_update(void *data);
+static inline void adjust_jiffies(unsigned long val, struct cpufreq_freqs *ci);
 
 /**
  * Two notifier lists: the "policy" list is involved in the 
@@ -161,6 +162,7 @@ show_one(cpuinfo_min_freq, cpuinfo.min_freq);
 show_one(cpuinfo_max_freq, cpuinfo.max_freq);
 show_one(scaling_min_freq, min);
 show_one(scaling_max_freq, max);
+show_one(scaling_cur_freq, cur);
 
 /**
  * cpufreq_per_cpu_attr_write() / store_##file_name() - sysfs write access
@@ -187,6 +189,18 @@ static ssize_t store_##file_name					\
 
 store_one(scaling_min_freq,min);
 store_one(scaling_max_freq,max);
+
+/**
+ * show_cpuinfo_cur_freq - current CPU frequency as detected by hardware
+ */
+static ssize_t show_cpuinfo_cur_freq (struct cpufreq_policy * policy, char *buf)
+{
+	unsigned int cur_freq = cpufreq_get(policy->cpu);
+	if (!cur_freq)
+		return sprintf(buf, "<unknown>");
+	return sprintf(buf, "%u\n", cur_freq);
+}
+
 
 /**
  * show_scaling_governor - show the current policy for the specified CPU
@@ -268,6 +282,12 @@ struct freq_attr _name = { \
 	.show = show_##_name, \
 }
 
+#define define_one_ro0400(_name) \
+struct freq_attr _name = { \
+	.attr = { .name = __stringify(_name), .mode = 0400 }, \
+	.show = show_##_name, \
+}
+
 #define define_one_rw(_name) \
 struct freq_attr _name = { \
 	.attr = { .name = __stringify(_name), .mode = 0644 }, \
@@ -275,10 +295,12 @@ struct freq_attr _name = { \
 	.store = store_##_name, \
 }
 
+define_one_ro0400(cpuinfo_cur_freq);
 define_one_ro(cpuinfo_min_freq);
 define_one_ro(cpuinfo_max_freq);
 define_one_ro(scaling_available_governors);
 define_one_ro(scaling_driver);
+define_one_ro(scaling_cur_freq);
 define_one_rw(scaling_min_freq);
 define_one_rw(scaling_max_freq);
 define_one_rw(scaling_governor);
@@ -369,6 +391,7 @@ static int cpufreq_add_dev (struct sys_device * sys_dev)
 	policy->cpu = cpu;
 	init_MUTEX_LOCKED(&policy->lock);
 	init_completion(&policy->kobj_unregister);
+	INIT_WORK(&policy->update, handle_update, (void *)(long)cpu);
 
 	/* call driver. From then on the cpufreq must be able
 	 * to accept all calls to ->verify and ->setpolicy for this CPU
@@ -394,6 +417,10 @@ static int cpufreq_add_dev (struct sys_device * sys_dev)
 		sysfs_create_file(&policy->kobj, &((*drv_attr)->attr));
 		drv_attr++;
 	}
+	if (cpufreq_driver->get)
+		sysfs_create_file(&policy->kobj, &cpuinfo_cur_freq.attr);
+	if (cpufreq_driver->target)
+		sysfs_create_file(&policy->kobj, &scaling_cur_freq.attr);
 
 	spin_lock_irqsave(&cpufreq_driver_lock, flags);
 	cpufreq_cpu_data[cpu] = policy;
@@ -474,11 +501,86 @@ static int cpufreq_remove_dev (struct sys_device * sys_dev)
 	return 0;
 }
 
+
+static void handle_update(void *data)
+{
+	unsigned int cpu = (unsigned int)(long)data;
+	cpufreq_update_policy(cpu);
+}
+
 /**
- *	cpufreq_resume - restore the CPU clock frequency after resume
+ *	cpufreq_out_of_sync - If actual and saved CPU frequency differs, we're in deep trouble.
+ *	@cpu: cpu number
+ *	@old_freq: CPU frequency the kernel thinks the CPU runs at
+ *	@new_freq: CPU frequency the CPU actually runs at
  *
- *	Restore the CPU clock frequency so that our idea of the current
- *	frequency reflects the actual hardware.
+ *	We adjust to current frequency first, and need to clean up later. So either call
+ *	to cpufreq_update_policy() or schedule handle_update()).
+ */
+static void cpufreq_out_of_sync(unsigned int cpu, unsigned int old_freq, unsigned int new_freq)
+{
+	struct cpufreq_freqs freqs;
+
+	if (cpufreq_driver->flags & CPUFREQ_PANIC_OUTOFSYNC)
+		panic("CPU Frequency is out of sync.");
+
+	printk(KERN_WARNING "Warning: CPU frequency out of sync: cpufreq and timing "
+	       "core thinks of %u, is %u kHz.\n", old_freq, new_freq);
+
+	freqs.cpu = cpu;
+	freqs.old = old_freq;
+	freqs.new = new_freq;
+	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+}
+
+
+/** 
+ * cpufreq_get - get the current CPU frequency (in kHz)
+ * @cpu: CPU number
+ *
+ * Get the CPU current (static) CPU frequency
+ */
+unsigned int cpufreq_get(unsigned int cpu)
+{
+	struct cpufreq_policy *policy = cpufreq_cpu_get(cpu);
+	unsigned int ret = 0;
+
+	if (!policy)
+		return 0;
+
+	if (!cpufreq_driver->get)
+		goto out;
+
+	down(&policy->lock);
+
+	ret = cpufreq_driver->get(cpu);
+
+	if (ret && policy->cur && !(cpufreq_driver->flags & CPUFREQ_CONST_LOOPS)) 
+	{
+		/* verify no discrepancy between actual and saved value exists */
+		if (unlikely(ret != policy->cur)) {
+			cpufreq_out_of_sync(cpu, policy->cur, ret);
+			schedule_work(&policy->update);
+		}
+	}
+
+	up(&policy->lock);
+
+ out:
+	cpufreq_cpu_put(policy);
+
+	return (ret);
+}
+EXPORT_SYMBOL(cpufreq_get);
+
+
+/**
+ *	cpufreq_resume -  restore proper CPU frequency handling after resume
+ *
+ *	1.) resume CPUfreq hardware support (cpufreq_driver->resume())
+ *	2.) if ->target and !CPUFREQ_CONST_LOOPS: verify we're in sync
+ *	3.) schedule call cpufreq_update_policy() ASAP as interrupts are restored.
  */
 static int cpufreq_resume(struct sys_device * sysdev)
 {
@@ -498,25 +600,37 @@ static int cpufreq_resume(struct sys_device * sysdev)
 	if (!cpu_policy)
 		return -EINVAL;
 
-	if (cpufreq_driver->resume)
-		ret = cpufreq_driver->resume(cpu_policy);
-	if (ret) {
-		printk(KERN_ERR "cpufreq: resume failed in ->resume step on CPU %u\n", cpu_policy->cpu);
-		goto out;
+	if (!cpufreq_driver->flags & CPUFREQ_CONST_LOOPS) {
+		unsigned int cur_freq = 0;
+
+		if (cpufreq_driver->get)
+			cur_freq = cpufreq_driver->get(cpu_policy->cpu);
+
+		if (!cur_freq || !cpu_policy->cur) {
+			printk(KERN_ERR "cpufreq: resume failed to assert current frequency is what timing core thinks it is.\n");
+			goto out;
+		}
+
+		if (unlikely(cur_freq != cpu_policy->cur)) {
+			struct cpufreq_freqs freqs;
+
+			if (cpufreq_driver->flags & CPUFREQ_PANIC_RESUME_OUTOFSYNC)
+				panic("CPU Frequency is out of sync.");
+
+			printk(KERN_WARNING "Warning: CPU frequency out of sync: cpufreq and timing"
+			       "core thinks of %u, is %u kHz.\n", cpu_policy->cur, cur_freq);
+
+			freqs.cpu = cpu;
+			freqs.old = cpu_policy->cur;
+			freqs.new = cur_freq;
+
+			notifier_call_chain(&cpufreq_transition_notifier_list, CPUFREQ_RESUMECHANGE, &freqs);
+			adjust_jiffies(CPUFREQ_RESUMECHANGE, &freqs);
+		}
 	}
 
-	if (cpufreq_driver->setpolicy)
-		ret = cpufreq_driver->setpolicy(cpu_policy);
-	else
-		/* CPUFREQ_RELATION_H or CPUFREQ_RELATION_L have the same effect here, as cpu_policy->cur is known
-		 * to be a valid and exact target frequency
-		 */
-		ret = cpufreq_driver->target(cpu_policy, cpu_policy->cur, CPUFREQ_RELATION_H);
-
-	if (ret)
-		printk(KERN_ERR "cpufreq: resume failed in ->setpolicy/target step on CPU %u\n", cpu_policy->cpu);
-
 out:
+	schedule_work(&cpu_policy->update);
 	cpufreq_cpu_put(cpu_policy);
 	return ret;
 }
@@ -904,16 +1018,20 @@ static unsigned int  l_p_j_ref_freq;
 
 static inline void adjust_jiffies(unsigned long val, struct cpufreq_freqs *ci)
 {
+	if (ci->flags & CPUFREQ_CONST_LOOPS)
+		return;
+
 	if (!l_p_j_ref_freq) {
 		l_p_j_ref = loops_per_jiffy;
 		l_p_j_ref_freq = ci->old;
 	}
 	if ((val == CPUFREQ_PRECHANGE  && ci->old < ci->new) ||
-	    (val == CPUFREQ_POSTCHANGE && ci->old > ci->new))
+	    (val == CPUFREQ_POSTCHANGE && ci->old > ci->new) ||
+	    (val == CPUFREQ_RESUMECHANGE))
 		loops_per_jiffy = cpufreq_scale(l_p_j_ref, l_p_j_ref_freq, ci->new);
 }
 #else
-#define adjust_jiffies(x...) do {} while (0)
+static inline void adjust_jiffies(unsigned long val, struct cpufreq_freqs *ci) { return; }
 #endif
 
 
@@ -925,13 +1043,29 @@ static inline void adjust_jiffies(unsigned long val, struct cpufreq_freqs *ci)
  */
 void cpufreq_notify_transition(struct cpufreq_freqs *freqs, unsigned int state)
 {
-	if (irqs_disabled())
-		return;   /* Only valid if we're in the resume process where
-			   * everyone knows what CPU frequency we are at */
+	BUG_ON(irqs_disabled());
+
+	freqs->flags = cpufreq_driver->flags;
 
 	down_read(&cpufreq_notifier_rwsem);
 	switch (state) {
 	case CPUFREQ_PRECHANGE:
+		/* detect if the driver reported a value as "old frequency" which
+		 * is not equal to what the cpufreq core thinks is "old frequency".
+		 */
+		if (!(cpufreq_driver->flags & CPUFREQ_CONST_LOOPS)) {
+			if ((likely(cpufreq_cpu_data[freqs->cpu]->cur)) &&
+			    (unlikely(freqs->old != cpufreq_cpu_data[freqs->cpu]->cur)))
+			{
+				if (cpufreq_driver->flags & CPUFREQ_PANIC_OUTOFSYNC)
+					panic("CPU Frequency is out of sync.");
+
+				printk(KERN_WARNING "Warning: CPU frequency out of sync: "
+				       "cpufreq and timing core thinks of %u, is %u kHz.\n", 
+				       cpufreq_cpu_data[freqs->cpu]->cur, freqs->old);
+				freqs->old = cpufreq_cpu_data[freqs->cpu]->cur;
+			}
+		}
 		notifier_call_chain(&cpufreq_transition_notifier_list, CPUFREQ_PRECHANGE, freqs);
 		adjust_jiffies(CPUFREQ_PRECHANGE, freqs);
 		break;
@@ -969,6 +1103,9 @@ int cpufreq_register_driver(struct cpufreq_driver *driver_data)
 	if (!driver_data || !driver_data->verify || !driver_data->init ||
 	    ((!driver_data->setpolicy) && (!driver_data->target)))
 		return -EINVAL;
+
+	if (driver_data->setpolicy)
+		driver_data->flags |= CPUFREQ_CONST_LOOPS;
 
 	spin_lock_irqsave(&cpufreq_driver_lock, flags);
 	if (cpufreq_driver) {

@@ -1239,7 +1239,8 @@ static int sci_notifier(struct notifier_block *self, unsigned long phase, void *
 	struct cpufreq_freqs *freqs = p;
 	int i;
 
-	if (phase == CPUFREQ_POSTCHANGE) {
+	if ((phase == CPUFREQ_POSTCHANGE) ||
+	    (phase == CPUFREQ_RESUMECHANGE)) {
 		for (i = 0; i < SCI_NPORTS; i++) {
 			/*
 			 * This will force a baud rate change in hardware.
