@@ -1729,7 +1729,7 @@ int acsi_init( void )
 #endif
 	err = -ENOMEM;
 	for( i = 0; i < NDevices; ++i ) {
-		acsi_gendisk[i] = alloc_disk();
+		acsi_gendisk[i] = alloc_disk(16);
 		if (!acsi_gendisk[i])
 			goto out4;
 	}

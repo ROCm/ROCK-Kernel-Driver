@@ -69,6 +69,7 @@ struct hd_struct {
 #define GENHD_FL_DRIVERFS  2
 #define GENHD_FL_DEVFS	4
 #define GENHD_FL_CD	8
+#define GENHD_FL_UP	16
 
 struct gendisk {
 	int major;			/* major number of driver */
@@ -262,7 +263,7 @@ char *disk_name (struct gendisk *hd, int part, char *buf);
 extern int rescan_partitions(struct gendisk *disk, struct block_device *bdev);
 extern void update_partition(struct gendisk *disk, int part);
 
-extern struct gendisk *alloc_disk(void);
+extern struct gendisk *alloc_disk(int minors);
 extern void put_disk(struct gendisk *disk);
 
 /* will go away */

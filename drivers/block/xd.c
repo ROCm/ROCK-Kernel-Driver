@@ -205,12 +205,11 @@ static int __init xd_init(void)
 		goto out3;
 
 	for (i = 0; i < xd_drives; i++) {
-		struct gendisk *disk = alloc_disk();
+		struct gendisk *disk = alloc_disk(64);
 		if (!disk)
 			goto Enomem;
 		disk->major = MAJOR_NR;
 		disk->first_minor = i<<6;
-		disk->minor_shift = 6;
 		sprintf(disk->disk_name, "xd%c", i+'a');
 		disk->fops = &xd_fops;
 		xd_gendisk[i] = disk;

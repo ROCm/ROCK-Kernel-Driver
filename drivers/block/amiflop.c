@@ -1735,7 +1735,7 @@ static int __init fd_probe_drives(void)
 		fd_probe(drive);
 		if (unit[drive].type->code == FD_NODRIVE)
 			continue;
-		disk = alloc_disk();
+		disk = alloc_disk(1);
 		if (!disk) {
 			unit[drive].type->code = FD_NODRIVE;
 			continue;
@@ -1751,7 +1751,6 @@ static int __init fd_probe_drives(void)
 		printk("fd%d ",drive);
 		disk->major = MAJOR_NR;
 		disk->first_minor = drive;
-		disk->minor_shift = 0;
 		disk->fops = &floppy_fops;
 		sprintf(disk->disk_name, "fd%d", drive);
 		set_capacity(disk, 880*2);

@@ -365,14 +365,13 @@ z2_init( void )
 	    MAJOR_NR );
 	return -EBUSY;
     }
-    z2ram_gendisk = alloc_disk();
+    z2ram_gendisk = alloc_disk(1);
     if (!z2ram_gendisk) {
 	unregister_blkdev( MAJOR_NR, DEVICE_NAME );
 	return -ENOMEM;
     }
     z2ram_gendisk->major = MAJOR_NR;
     z2ram_gendisk->first_minor = 0;
-    z2ram_gendisk->minor_shift = 0;
     z2ram_gendisk->fops = &z2_fops;
     sprintf(z2ram_gendisk->disk_name, "z2ram");
 

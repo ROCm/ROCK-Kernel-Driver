@@ -740,7 +740,7 @@ static int revalidate_allvol(kdev_t dev)
 
 	for(i=0; i< NWD; i++) {
 		struct gendisk *disk = hba[ctlr]->gendisk[i];
-		if (disk->part)
+		if (disk->flags & GENHD_FL_UP)
 			del_gendisk(disk);
 	}
 
@@ -792,7 +792,7 @@ static int deregister_disk(int ctlr, int logvol)
 	spin_unlock_irqrestore(CCISS_LOCK(ctlr), flags);
 
 	/* invalidate the devices and deregister the disk */ 
-	if (disk->part)
+	if (disk->flags & GENHD_FL_UP)
 		del_gendisk(disk);
 	/* check to see if it was the last disk */
 	if (logvol == h->highest_lun) {
@@ -2274,7 +2274,7 @@ static int alloc_cciss_hba(void)
 	struct gendisk *disk[NWD];
 	int i, n;
 	for (n = 0; n < NWD; n++) {
-		disk[n] = alloc_disk();
+		disk[n] = alloc_disk(1 << NWD_SHIFT);
 		if (!disk[n])
 			goto out;
 	}
@@ -2447,7 +2447,6 @@ static int __init cciss_init_one(struct pci_dev *pdev,
 		sprintf(disk->disk_name, "cciss/c%dd%d", i, j);
 		disk->major = MAJOR_NR + i;
 		disk->first_minor = j << NWD_SHIFT;
-		disk->minor_shift = NWD_SHIFT;
 		if( !(drv->nr_blocks))
 			continue;
 		(BLK_DEFAULT_QUEUE(MAJOR_NR + i))->hardsect_size = drv->block_size;
@@ -2500,7 +2499,7 @@ static void __devexit cciss_remove_one (struct pci_dev *pdev)
 	/* remove it from the disk list */
 	for (j = 0; j < NWD; j++) {
 		struct gendisk *disk = hba[i]->gendisk[j];
-		if (disk->part)
+		if (disk->flags & GENHD_FL_UP)
 			del_gendisk(disk);
 	}
 

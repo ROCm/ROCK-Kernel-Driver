@@ -986,7 +986,7 @@ static void init_gendisk (ide_hwif_t *hwif)
 	units = MAX_DRIVES;
 
 	for (unit = 0; unit < MAX_DRIVES; unit++) {
-		disks[unit] = alloc_disk();
+		disks[unit] = alloc_disk(1 << PARTN_BITS);
 		if (!disks[unit])
 			goto err_kmalloc_gd;
 	}
@@ -996,7 +996,6 @@ static void init_gendisk (ide_hwif_t *hwif)
 		disk->major  = hwif->major;
 		disk->first_minor = unit << PARTN_BITS;
 		sprintf(disk->disk_name,"hd%c",'a'+hwif->index*MAX_DRIVES+unit);
-		disk->minor_shift = PARTN_BITS; 
 		disk->fops = ide_fops;
 		hwif->drives[unit].disk = disk;
 	}

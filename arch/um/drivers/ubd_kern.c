@@ -404,12 +404,11 @@ static int ubd_add(int n)
 	if (!dev->file)
 		return -1;
 
-	disk = alloc_disk();
+	disk = alloc_disk(1 << UBD_SHIFT);
 	if (!disk)
 		return -1;
 	disk->major = MAJOR_NR;
 	disk->first_minor = n << UBD_SHIFT;
-	disk->minor_shift = UBD_SHIFT;
 	disk->fops = &ubd_blops;
 	if (fakehd_set)
 		sprintf(disk->disk_name, "hd%c", n + 'a');
@@ -417,14 +416,13 @@ static int ubd_add(int n)
 		sprintf(disk->disk_name, "ubd%d", n);
 
 	if (fake_major) {
-		fake_disk = alloc_disk();
+		fake_disk = alloc_disk(1 << UBD_SHIFT);
 		if (!fake_disk) {
 			put_disk(disk);
 			return -1;
 		}
 		fake_disk->major = fake_major;
 		fake_disk->first_minor = n << UBD_SHIFT;
-		fake_disk->minor_shift = UBD_SHIFT;
 		fake_disk->fops = &ubd_blops;
 		sprintf(fake_disk->disk_name, "ubd%d", n);
 		fake_gendisk[n] = fake_disk;

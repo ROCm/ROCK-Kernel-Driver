@@ -1076,7 +1076,7 @@ int __init mcdx_init_drive(int drive)
 		return 1;
 	}
 
-	disk = alloc_disk();
+	disk = alloc_disk(1);
 	if (!disk) {
 		xwarn("init() malloc failed\n");
 		kfree(stuffp);
@@ -1221,7 +1221,6 @@ int __init mcdx_init_drive(int drive)
 	stuffp->info.dev = mk_kdev(MAJOR_NR, drive);
 	disk->major = MAJOR_NR;
 	disk->first_minor = drive;
-	disk->minor_shift = 0;
 	strcpy(disk->disk_name, stuffp->info.name);
 	disk->fops = &mcdx_bdops;
 	disk->flags = GENHD_FL_CD;

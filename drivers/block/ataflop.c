@@ -1949,7 +1949,7 @@ int __init atari_floppy_init (void)
 	}
 
 	for (i = 0; i < FD_MAX_UNITS; i++) {
-		unit[i].disk = alloc_disk();
+		unit[i].disk = alloc_disk(1);
 		if (!unit[i].disk)
 			goto Enomem;
 	}

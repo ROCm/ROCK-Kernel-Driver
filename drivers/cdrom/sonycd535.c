@@ -1605,12 +1605,11 @@ static int __init sony535_init(void)
 	}
 	initialized = 1;
 
-	cdu_disk = alloc_disk();
+	cdu_disk = alloc_disk(1);
 	if (!cdu_disk)
 		goto out6;
 	cdu_disk->major = MAJOR_NR;
 	cdu_disk->first_minor = 0;
-	cdu_disk->minor_shift = 0;
 	cdu_disk->fops = &cdu_fops;
 	sprintf(cdu_disk->disk_name, "cdu");
 

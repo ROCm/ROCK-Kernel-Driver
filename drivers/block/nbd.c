@@ -507,7 +507,7 @@ static int __init nbd_init(void)
 	}
 
 	for (i = 0; i < MAX_NBD; i++) {
-		struct gendisk *disk = alloc_disk();
+		struct gendisk *disk = alloc_disk(1);
 		if (!disk)
 			goto out;
 		nbd_dev[i].disk = disk;
@@ -537,7 +537,6 @@ static int __init nbd_init(void)
 		nbd_bytesizes[i] = 0x7ffffc00; /* 2GB */
 		disk->major = MAJOR_NR;
 		disk->first_minor = i;
-		disk->minor_shift = 0;
 		disk->fops = &nbd_fops;
 		sprintf(disk->disk_name, "nbd%d", i);
 		set_capacity(disk, 0x3ffffe);

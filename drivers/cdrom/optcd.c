@@ -2010,14 +2010,13 @@ static int __init optcd_init(void)
 			"optcd: no Optics Storage CDROM Initialization\n");
 		return -EIO;
 	}
-	optcd_disk = alloc_disk();
+	optcd_disk = alloc_disk(1);
 	if (!optcd_disk) {
 		printk(KERN_ERR "optcd: can't allocate disk\n");
 		return -ENOMEM;
 	}
 	optcd_disk->major = MAJOR_NR;
 	optcd_disk->first_minor = 0;
-	optcd_disk->minor_shift = 0;
 	optcd_disk->fops = &opt_fops;
 	sprintf(optcd_disk->disk_name, "optcd");
 	if (!request_region(optcd_port, 4, "optcd")) {

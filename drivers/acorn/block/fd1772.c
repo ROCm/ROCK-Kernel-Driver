@@ -1547,7 +1547,7 @@ int fd1772_init(void)
 		return 0;
 
 	for (i = 0; i < FD_MAX_UNITS; i++) {
-		disks[i] = alloc_disk();
+		disks[i] = alloc_disk(1);
 		if (!disks[i])
 			goto out;
 	}

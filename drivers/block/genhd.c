@@ -57,34 +57,16 @@ EXPORT_SYMBOL(blk_set_probe);	/* Will go away */
  * This function registers the partitioning information in @gp
  * with the kernel.
  */
-static void add_gendisk(struct gendisk *gp)
-{
-	struct hd_struct *p = NULL;
-
-	if (gp->minor_shift) {
-		size_t size = sizeof(struct hd_struct)*((1<<gp->minor_shift)-1);
-		p = kmalloc(size, GFP_KERNEL);
-		if (!p) {
-			printk(KERN_ERR "out of memory; no partitions for %s\n",
-				gp->disk_name);
-			gp->minor_shift = 0;
-		} else
-			memset(p, 0, size);
-	}
-	gp->part = p;
-
-	write_lock(&gendisk_lock);
-	list_add(&gp->list, &gendisks[gp->major].list);
-	if (gp->minor_shift)
-		list_add_tail(&gp->full_list, &gendisk_list);
-	else
-		INIT_LIST_HEAD(&gp->full_list);
-	write_unlock(&gendisk_lock);
-}
-
 void add_disk(struct gendisk *disk)
 {
-	add_gendisk(disk);
+	write_lock(&gendisk_lock);
+	list_add(&disk->list, &gendisks[disk->major].list);
+	if (disk->minor_shift)
+		list_add_tail(&disk->full_list, &gendisk_list);
+	else
+		INIT_LIST_HEAD(&disk->full_list);
+	write_unlock(&gendisk_lock);
+	disk->flags |= GENHD_FL_UP;
 	register_disk(disk);
 }
 
@@ -225,17 +207,33 @@ __initcall(device_init);
 
 EXPORT_SYMBOL(disk_devclass);
 
-struct gendisk *alloc_disk(void)
+struct gendisk *alloc_disk(int minors)
 {
 	struct gendisk *disk = kmalloc(sizeof(struct gendisk), GFP_KERNEL);
-	if (disk)
+	if (disk) {
 		memset(disk, 0, sizeof(struct gendisk));
+		if (minors > 1) {
+			int size = (minors - 1) * sizeof(struct hd_struct);
+			disk->part = kmalloc(size, GFP_KERNEL);
+			if (!disk->part) {
+				kfree(disk);
+				return NULL;
+			}
+			memset(disk->part, 0, size);
+		}
+		disk->minors = minors;
+		while (minors >>= 1)
+			disk->minor_shift++;
+	}
 	return disk;
 }
 
 void put_disk(struct gendisk *disk)
 {
-	kfree(disk);
+	if (disk) {
+		kfree(disk->part);
+		kfree(disk);
+	}
 }
 EXPORT_SYMBOL(alloc_disk);
 EXPORT_SYMBOL(put_disk);

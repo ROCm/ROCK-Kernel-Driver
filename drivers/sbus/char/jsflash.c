@@ -622,7 +622,7 @@ static int jsfd_init(void)
 
 	err = -ENOMEM;
 	for (i = 0; i < JSF_MAX; i++) {
-		struct gendisk *disk = alloc_disk();
+		struct gendisk *disk = alloc_disk(1);
 		if (!disk)
 			goto out;
 		jsfd_disk[i] = disk;
@@ -648,7 +648,6 @@ static int jsfd_init(void)
 		disk->first_minor = i;
 		sprintf(disk->disk_name, "jsfd%d", i);
 		disk->fops = &jsfd_fops;
-		disk->minor_shift = 0;
 		set_capacity(disk, jdp->dsize >> 9);
 		add_disk(disk);
 		set_device_ro(MKDEV(JSFD_MAJOR, i), 1);

@@ -308,7 +308,7 @@ void pf_init_units(void)
 
 	pf_drive_count = 0;
 	for (unit = 0, pf = units; unit < PF_UNITS; unit++, pf++) {
-		struct gendisk *disk = alloc_disk();
+		struct gendisk *disk = alloc_disk(1);
 		if (!disk)
 			continue;
 		pf->disk = disk;
@@ -320,7 +320,6 @@ void pf_init_units(void)
 		disk->major = MAJOR_NR;
 		disk->first_minor = unit;
 		strcpy(disk->disk_name, pf->name);
-		disk->minor_shift = 0;
 		disk->fops = &pf_fops;
 		if (!(*drives[unit])[D_PRT])
 			pf_drive_count++;

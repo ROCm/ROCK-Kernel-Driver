@@ -531,10 +531,7 @@ void del_gendisk(struct gendisk *disk)
 	wipe_partitions(disk);
 	unlink_gendisk(disk);
 	devfs_remove_partitions(disk);
-	if (disk->part) {
-		kfree(disk->part);
-		disk->part = NULL;
-	}
+	disk->flags &= ~GENHD_FL_UP;
 }
 
 struct dev_name {

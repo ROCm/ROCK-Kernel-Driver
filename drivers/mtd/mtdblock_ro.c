@@ -224,7 +224,7 @@ int __init init_mtdblock(void)
 	int i;
 
 	for (i = 0; i < MAX_MTD_DEVICES; i++) {
-		struct gendisk *disk = alloc_disk();
+		struct gendisk *disk = alloc_disk(1);
 		if (!disk)
 			goto out;
 		disk->major = MAJOR_NR;

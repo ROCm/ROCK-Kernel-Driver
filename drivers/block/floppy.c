@@ -4240,7 +4240,7 @@ int __init floppy_init(void)
 	raw_cmd = NULL;
 
 	for (i=0; i<N_DRIVE; i++) {
-		disks[i] = alloc_disk();
+		disks[i] = alloc_disk(1);
 		if (!disks[i])
 			goto Enomem;
 	}

@@ -5831,10 +5831,9 @@ int __init sbpcd_init(void)
 		sbpcd_infop->dev = mk_kdev(MAJOR_NR, j);
 		sbpcd_infop->handle = p;
 		p->sbpcd_infop = sbpcd_infop;
-		disk = alloc_disk();
+		disk = alloc_disk(1);
 		disk->major = MAJOR_NR;
 		disk->first_minor = j;
-		disk->minor_shift = 0;
 		disk->fops = &sbpcd_bdops;
 		strcpy(disk->disk_name, sbpcd_infop->name);
 		disk->flags = GENHD_FL_CD;

@@ -757,7 +757,7 @@ void sr_finish()
 		 * with loadable modules. */
 		if (cd->disk)
 			continue;
-		disk = alloc_disk();
+		disk = alloc_disk(1);
 		if (!disk)
 			continue;
 		if (cd->disk) {
@@ -766,7 +766,6 @@ void sr_finish()
 		}
 		disk->major = MAJOR_NR;
 		disk->first_minor = i;
-		disk->minor_shift = 0;
 		strcpy(disk->disk_name, cd->cdi.name);
 		disk->fops = &sr_bdops;
 		disk->flags = GENHD_FL_CD;

@@ -1057,7 +1057,7 @@ int __init stram_device_init(void)
 	if (!max_swap_size)
 		/* swapping not enabled */
 		return -ENXIO;
-	stram_disk = alloc_disk();
+	stram_disk = alloc_disk(1);
 	if (!stram_disk)
 		return -ENOMEM;
 
@@ -1070,7 +1070,6 @@ int __init stram_device_init(void)
 	blk_init_queue(BLK_DEFAULT_QUEUE(STRAM_MAJOR), do_stram_request);
 	stram_disk->major = STRAM_MAJOR;
 	stram_disk->first_minor = STRAM_MINOR;
-	stram_disk->minor_shift = 0;
 	stram_disk->fops = &stram_fops;
 	sprintf(stram_disk->disk_name, "stram");
 	set_capacity(stram_disk, (swap_end - swap_start)/512);

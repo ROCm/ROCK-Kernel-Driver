@@ -1031,7 +1031,7 @@ static void mcd_release(struct cdrom_device_info *cdi)
 
 int __init mcd_init(void)
 {
-	struct gendisk *disk = alloc_disk();
+	struct gendisk *disk = alloc_disk(1);
 	int count;
 	unsigned char result[3];
 	char msg[80];
@@ -1124,7 +1124,6 @@ int __init mcd_init(void)
 
 	disk->major = MAJOR_NR;
 	disk->first_minor = 0;
-	disk->minor_shift = 0;
 	sprintf(disk->disk_name, "mcd");
 	disk->fops = &mcd_bdops;
 	disk->flags = GENHD_FL_CD;

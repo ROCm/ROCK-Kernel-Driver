@@ -1336,12 +1336,11 @@ static int __init mfm_init (void)
 		goto out3;
 	
 	for (i = 0; i < mfm_drives; i++) {
-		struct gendisk *disk = alloc_disk();
+		struct gendisk *disk = alloc_disk(64);
 		if (!disk)
 			goto Enomem;
 		disk->major = MAJOR_NR;
 		disk->first_minor = i << 6;
-		disk->minor_shift = 6;
 		disk->fops = &mfm_fops;
 		sprintf(disk->disk_name, "mfm%c", 'a'+i);
 		mfm_gendisk[i] = disk;

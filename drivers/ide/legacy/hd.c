@@ -802,12 +802,11 @@ static int __init hd_init(void)
 		goto out;
 
 	for (drive=0 ; drive < NR_HD ; drive++) {
-		struct gendisk *disk = alloc_disk();
+		struct gendisk *disk = alloc_disk(64);
 		if (!disk)
 			goto Enomem;
 		disk->major = MAJOR_NR;
 		disk->first_minor = drive << 6;
-		disk->minor_shift = 6;
 		disk->fops = &hd_fops;
 		sprintf(disk->disk_name, "hd%c", 'a'+drive);
 		hd_gendisk[drive] = disk;

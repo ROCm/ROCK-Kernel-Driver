@@ -1394,12 +1394,11 @@ static int do_md_run(mddev_t * mddev)
 #endif
 	}
 
-	disk = alloc_disk();
+	disk = alloc_disk(1);
 	if (!disk)
 		return -ENOMEM;
 	disk->major = MD_MAJOR;
 	disk->first_minor = mdidx(mddev);
-	disk->minor_shift = 0;
 	sprintf(disk->disk_name, "md%d", mdidx(mddev));
 	disk->fops = &md_fops;
 

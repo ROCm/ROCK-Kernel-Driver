@@ -972,12 +972,11 @@ static int __init gscd_init(void)
 		i++;
 	}
 
-	gscd_disk = alloc_disk();
+	gscd_disk = alloc_disk(1);
 	if (!gscd_disk)
 		goto err_out1;
 	gscd_disk->major = MAJOR_NR;
 	gscd_disk->first_minor = 0;
-	gscd_disk->minor_shift = 0;
 	gscd_disk->fops = &gscd_fops;
 	sprintf(gscd_disk->disk_name, "gscd");
 

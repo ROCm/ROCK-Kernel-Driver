@@ -421,13 +421,12 @@ static int __init ps2esdi_geninit(void)
 
 	error = -ENOMEM;
 	for (i = 0; i < ps2esdi_drives; i++) {
-		struct gendisk *disk = alloc_disk();
+		struct gendisk *disk = alloc_disk(64);
 		if (!disk)
 			goto err_out4;
 		disk->major = MAJOR_NR;
 		disk->first_minor = i<<6;
 		sprintf(disk->disk_name, "ed%c", 'a'+i);
-		disk->minor_shift = 6;
 		disk->fops = &ps2esdi_fops;
 		ps2esdi_gendisk[i] = disk;
 	}

@@ -1190,7 +1190,7 @@ int __init mm_init(void)
 	}
 
 	for (i = 0; i < num_cards; i++) {
-		mm_gendisk[i] = alloc_disk();
+		mm_gendisk[i] = alloc_disk(1 << MM_SHIFT);
 		if (!mm_gendisk[i])
 			goto out;
 	}
@@ -1203,7 +1203,6 @@ int __init mm_init(void)
 		spin_lock_init(&cards[i].lock);
 		disk->major = major_nr;
 		disk->first_minor  = i << MM_SHIFT;
-		disk->minor_shift = MM_SHIFT;
 		disk->fops = &mm_fops;
 		set_capacity(disk, cards[i].mm_size << 1);
 		add_disk(disk);
