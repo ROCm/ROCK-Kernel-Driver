@@ -75,6 +75,7 @@ static void snd_ac97_proc_read_main(ac97_t *ac97, snd_info_buffer_t * buffer, in
 	static const char *spdif_slots[4] = { " SPDIF=3/4", " SPDIF=7/8", " SPDIF=6/9", " SPDIF=res" };
 	static const char *spdif_rates[4] = { " Rate=44.1kHz", " Rate=res", " Rate=48kHz", " Rate=32kHz" };
 	static const char *spdif_rates_cs4205[4] = { " Rate=48kHz", " Rate=44.1kHz", " Rate=res", " Rate=res" };
+	static const char *double_rate_slots[4] = { "10/11", "7/8", "reserved", "reserved" };
 
 	snd_ac97_get_name(NULL, ac97->id, name, 0);
 	snd_iprintf(buffer, "%d-%d/%d: %s\n\n", ac97->addr, ac97->num, subidx, name);
@@ -137,6 +138,9 @@ static void snd_ac97_proc_read_main(ac97_t *ac97, snd_info_buffer_t * buffer, in
 		    val & 0x0200 ? "Mic" : "MIX",
 		    val & 0x0100 ? "Mic2" : "Mic1",
 		    val & 0x0080 ? "on" : "off");
+	if (ac97->ext_id & AC97_EI_DRA)
+		snd_iprintf(buffer, "Double rate slots: %s\n",
+			    double_rate_slots[(val >> 10) & 3]);
 
 	ext = snd_ac97_read(ac97, AC97_EXTENDED_ID);
 	if (ext == 0)

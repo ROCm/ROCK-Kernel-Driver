@@ -26,6 +26,7 @@
  */
 
 #include <linux/bitops.h>
+#include "pcm.h"
 #include "control.h"
 #include "info.h"
 
@@ -132,6 +133,11 @@
 #define AC97_BC_18BIT_ADC	0x0100	/* 18-bit ADC resolution */
 #define AC97_BC_20BIT_ADC	0x0200	/* 20-bit ADC resolution */
 #define AC97_BC_ADC_MASK	0x0300
+
+/* general purpose */
+#define AC97_GP_DRSS_MASK	0x0c00	/* double rate slot select */
+#define AC97_GP_DRSS_1011	0x0000	/* LR(C) 10+11(+12) */
+#define AC97_GP_DRSS_78		0x0400	/* LR 7+8 */
 
 /* extended audio ID bit defines */
 #define AC97_EI_VRA		0x0001	/* Variable bit rate supported */
@@ -355,6 +361,7 @@
 #define AC97_CS_SPDIF		(1<<2)	/* Cirrus Logic uses funky SPDIF */
 #define AC97_CX_SPDIF		(1<<3)	/* Conexant's spdif interface */
 #define AC97_STEREO_MUTES	(1<<4)	/* has stereo mute bits */
+#define AC97_DOUBLE_RATE	(1<<5)	/* supports double rate playback */
 
 /* rates indexes */
 #define AC97_RATES_FRONT_DAC	0
@@ -432,6 +439,7 @@ struct _snd_ac97_bus {
 	snd_card_t *card;
 	unsigned short num;	/* bus number */
 	unsigned short no_vra: 1, /* bridge doesn't support VRA */
+		       dra: 1,	/* bridge supports double rate */
 		       isdin: 1;/* independent SDIN */
 	unsigned int clock;	/* AC'97 base clock (usually 48000Hz) */
 	spinlock_t bus_lock;	/* used mainly for slot allocation */
@@ -549,7 +557,7 @@ struct ac97_quirk {
 };
 
 int snd_ac97_tune_hardware(ac97_t *ac97, struct ac97_quirk *quirk, int override);
-int snd_ac97_set_rate(ac97_t *ac97, int reg, unsigned short rate);
+int snd_ac97_set_rate(ac97_t *ac97, int reg, unsigned int rate);
 
 int snd_ac97_pcm_assign(ac97_bus_t *ac97,
 			unsigned short pcms_count,
@@ -557,5 +565,6 @@ int snd_ac97_pcm_assign(ac97_bus_t *ac97,
 int snd_ac97_pcm_open(struct ac97_pcm *pcm, unsigned int rate,
 		      enum ac97_pcm_cfg cfg, unsigned short slots);
 int snd_ac97_pcm_close(struct ac97_pcm *pcm);
+int snd_ac97_pcm_double_rate_rules(snd_pcm_runtime_t *runtime);
 
 #endif /* __SOUND_AC97_CODEC_H */

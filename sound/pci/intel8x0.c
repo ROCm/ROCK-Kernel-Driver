@@ -420,6 +420,7 @@ struct _snd_intel8x0 {
 
 	int multi4: 1,
 	    multi6: 1,
+	    dra: 1,
 	    smp20bit: 1;
 	int in_ac97_init: 1,
 	    in_sdin_init: 1;
@@ -954,6 +955,7 @@ static int snd_intel8x0_hw_params(snd_pcm_substream_t * substream,
 	ichdev_t *ichdev = get_ichdev(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	size_t size = params_buffer_bytes(hw_params);
+	int dbl = params_rate(hw_params) > 48000;
 	int err;
 
 	if (chip->fix_nocache && runtime->dma_area && runtime->dma_bytes < size)
@@ -969,7 +971,7 @@ static int snd_intel8x0_hw_params(snd_pcm_substream_t * substream,
 	}
 	err = snd_ac97_pcm_open(ichdev->pcm, params_rate(hw_params),
 				params_channels(hw_params),
-				ichdev->pcm->r[0].slots);
+				ichdev->pcm->r[dbl].slots);
 	if (err >= 0) {
 		ichdev->pcm_open_flag = 1;
 		/* FIXME: hack to enable spdif support */
@@ -994,34 +996,35 @@ static int snd_intel8x0_hw_free(snd_pcm_substream_t * substream)
 }
 
 static void snd_intel8x0_setup_pcm_out(intel8x0_t *chip,
-				       int channels, int sample_bits)
+				       snd_pcm_runtime_t *runtime)
 {
 	unsigned int cnt;
+	int dbl = runtime->rate > 48000;
 	switch (chip->device_type) {
 	case DEVICE_ALI:
 		cnt = igetdword(chip, ICHREG(ALI_SCR));
 		cnt &= ~ICH_ALI_SC_PCM_246_MASK;
-		if (chip->multi4 && channels == 4)
+		if (runtime->channels == 4 || dbl)
 			cnt |= ICH_ALI_SC_PCM_4;
-		else if (chip->multi6 && channels == 6)
+		else if (runtime->channels == 6)
 			cnt |= ICH_ALI_SC_PCM_6;
 		iputdword(chip, ICHREG(ALI_SCR), cnt);
 		break;
 	case DEVICE_SIS:
 		cnt = igetdword(chip, ICHREG(GLOB_CNT));
 		cnt &= ~ICH_SIS_PCM_246_MASK;
-		if (chip->multi4 && channels == 4)
+		if (runtime->channels == 4 || dbl)
 			cnt |= ICH_SIS_PCM_4;
-		else if (chip->multi6 && channels == 6)
+		else if (runtime->channels == 6)
 			cnt |= ICH_SIS_PCM_6;
 		iputdword(chip, ICHREG(GLOB_CNT), cnt);
 		break;
 	default:
 		cnt = igetdword(chip, ICHREG(GLOB_CNT));
 		cnt &= ~(ICH_PCM_246_MASK | ICH_PCM_20BIT);
-		if (chip->multi4 && channels == 4)
+		if (runtime->channels == 4 || dbl)
 			cnt |= ICH_PCM_4;
-		else if (chip->multi6 && channels == 6)
+		else if (runtime->channels == 6)
 			cnt |= ICH_PCM_6;
 		if (chip->device_type == DEVICE_NFORCE) {
 			/* reset to 2ch once to keep the 6 channel data in alignment,
@@ -1032,7 +1035,7 @@ static void snd_intel8x0_setup_pcm_out(intel8x0_t *chip,
 				msleep(50); /* grrr... */
 			}
 		} else if (chip->device_type == DEVICE_INTEL_ICH4) {
-			if (sample_bits > 16)
+			if (runtime->sample_bits > 16)
 				cnt |= ICH_PCM_20BIT;
 		}
 		iputdword(chip, ICHREG(GLOB_CNT), cnt);
@@ -1051,8 +1054,7 @@ static int snd_intel8x0_pcm_prepare(snd_pcm_substream_t * substream)
 	ichdev->fragsize = snd_pcm_lib_period_bytes(substream);
 	spin_lock_irq(&chip->reg_lock);
 	if (ichdev->ichd == ICHD_PCMOUT) {
-		snd_intel8x0_setup_pcm_out(chip, runtime->channels,
-					   runtime->sample_bits);
+		snd_intel8x0_setup_pcm_out(chip, runtime);
 		if (chip->device_type == DEVICE_INTEL_ICH4) {
 			ichdev->pos_shift = (runtime->sample_bits > 16) ? 2 : 1;
 		}
@@ -1167,6 +1169,9 @@ static int snd_intel8x0_playback_open(snd_pcm_substream_t * substream)
 	} else if (chip->multi4) {
 		runtime->hw.channels_max = 4;
 		snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS, &hw_constraints_channels4);
+	}
+	if (chip->dra) {
+		snd_ac97_pcm_double_rate_rules(runtime);
 	}
 	if (chip->smp20bit) {
 		runtime->hw.formats |= SNDRV_PCM_FMTBIT_S32_LE;
@@ -1662,6 +1667,12 @@ static struct ac97_pcm ac97_pcm_defs[] __devinitdata = {
 					 (1 << AC97_SLOT_PCM_SLEFT) |
 					 (1 << AC97_SLOT_PCM_SRIGHT) |
 					 (1 << AC97_SLOT_LFE)
+			},
+			{
+				.slots = (1 << AC97_SLOT_PCM_LEFT) |
+					 (1 << AC97_SLOT_PCM_RIGHT) |
+					 (1 << AC97_SLOT_PCM_LEFT_0) |
+					 (1 << AC97_SLOT_PCM_RIGHT_0)
 			}
 		}
 	},
@@ -1944,6 +1955,7 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock, int ac
 	/* FIXME: my test board doesn't work well with VRA... */
 	if (chip->device_type == DEVICE_ALI)
 		pbus->no_vra = 1;
+	pbus->dra = 1;
 	chip->ac97_bus = pbus;
 
 	ac97.pci = chip->pci;
@@ -2003,6 +2015,9 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock, int ac
 		chip->multi4 = 1;
 		if (pbus->pcms[0].r[0].slots & (1 << AC97_SLOT_LFE))
 			chip->multi6 = 1;
+	}
+	if (pbus->pcms[0].r[1].rslots[0]) {
+		chip->dra = 1;
 	}
 	if (chip->device_type == DEVICE_INTEL_ICH4) {
 		if ((igetdword(chip, ICHREG(GLOB_STA)) & ICH_SAMPLE_CAP) == ICH_SAMPLE_16_20)

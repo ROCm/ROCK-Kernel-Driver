@@ -1559,7 +1559,7 @@ static int snd_ac97_mixer_build(ac97_t * ac97)
 			return err;
 	}
 
-	snd_ac97_write_cache(ac97, AC97_GENERAL_PURPOSE, 0x0000);
+	snd_ac97_update_bits(ac97, AC97_GENERAL_PURPOSE, ~AC97_GP_DRSS_MASK, 0x0000);
 
 	/* build 3D controls */
 	if (ac97->build_ops && ac97->build_ops->build_3d) {
@@ -1646,6 +1646,9 @@ static void snd_ac97_determine_rates(ac97_t *ac97, int reg, int shadow_reg, unsi
 {
 	unsigned int result = 0;
 
+	if ((ac97->ext_id & AC97_EI_DRA) && reg == AC97_PCM_FRONT_DAC_RATE)
+		snd_ac97_update_bits(ac97, AC97_EXTENDED_STATUS,
+				     AC97_EA_DRA, 0);
 	/* test a non-standard rate */
 	if (snd_ac97_test_rate(ac97, reg, shadow_reg, 11000))
 		result |= SNDRV_PCM_RATE_CONTINUOUS;
@@ -1664,6 +1667,23 @@ static void snd_ac97_determine_rates(ac97_t *ac97, int reg, int shadow_reg, unsi
 		result |= SNDRV_PCM_RATE_44100;
 	if (snd_ac97_test_rate(ac97, reg, shadow_reg, 48000))
 		result |= SNDRV_PCM_RATE_48000;
+	if ((ac97->flags & AC97_DOUBLE_RATE) &&
+	    reg == AC97_PCM_FRONT_DAC_RATE) {
+		/* test standard double rates */
+		snd_ac97_update_bits(ac97, AC97_EXTENDED_STATUS,
+				     AC97_EA_DRA, AC97_EA_DRA);
+		if (snd_ac97_test_rate(ac97, reg, shadow_reg, 64000 / 2))
+			result |= SNDRV_PCM_RATE_64000;
+		if (snd_ac97_test_rate(ac97, reg, shadow_reg, 88200 / 2))
+			result |= SNDRV_PCM_RATE_88200;
+		if (snd_ac97_test_rate(ac97, reg, shadow_reg, 96000 / 2))
+			result |= SNDRV_PCM_RATE_96000;
+		/* some codecs don't support variable double rates */
+		if (!snd_ac97_test_rate(ac97, reg, shadow_reg, 76100 / 2))
+			result &= ~SNDRV_PCM_RATE_CONTINUOUS;
+		snd_ac97_update_bits(ac97, AC97_EXTENDED_STATUS,
+				     AC97_EA_DRA, 0);
+	}
 	*r_result = result;
 }
 
@@ -2006,11 +2026,20 @@ int snd_ac97_mixer(ac97_bus_t *bus, ac97_template_t *template, ac97_t **rac97)
 		ac97->addr = (ac97->ext_mid & AC97_MEI_ADDR_MASK) >> AC97_MEI_ADDR_SHIFT;
 	if (ac97->ext_id & 0x0189)	/* L/R, MIC, SDAC, LDAC VRA support */
 		snd_ac97_write_cache(ac97, AC97_EXTENDED_STATUS, ac97->ext_id & 0x0189);
+	if ((ac97->ext_id & AC97_EI_DRA) && bus->dra) {
+		/* Intel controllers require double rate data to be put in
+		 * slots 7+8, so let's hope the codec supports it. */
+		snd_ac97_update_bits(ac97, AC97_GENERAL_PURPOSE, AC97_GP_DRSS_MASK, AC97_GP_DRSS_78);
+		if ((snd_ac97_read(ac97, AC97_GENERAL_PURPOSE) & AC97_GP_DRSS_MASK) == AC97_GP_DRSS_78)
+			ac97->flags |= AC97_DOUBLE_RATE;
+	}
 	if (ac97->ext_id & AC97_EI_VRA) {	/* VRA support */
 		snd_ac97_determine_rates(ac97, AC97_PCM_FRONT_DAC_RATE, 0, &ac97->rates[AC97_RATES_FRONT_DAC]);
 		snd_ac97_determine_rates(ac97, AC97_PCM_LR_ADC_RATE, 0, &ac97->rates[AC97_RATES_ADC]);
 	} else {
 		ac97->rates[AC97_RATES_FRONT_DAC] = SNDRV_PCM_RATE_48000;
+		if (ac97->flags & AC97_DOUBLE_RATE)
+			ac97->rates[AC97_RATES_FRONT_DAC] |= SNDRV_PCM_RATE_96000;
 		ac97->rates[AC97_RATES_ADC] = SNDRV_PCM_RATE_48000;
 	}
 	if (ac97->ext_id & AC97_EI_SPDIF) {
@@ -2438,6 +2467,7 @@ EXPORT_SYMBOL(snd_ac97_mixer);
 EXPORT_SYMBOL(snd_ac97_pcm_assign);
 EXPORT_SYMBOL(snd_ac97_pcm_open);
 EXPORT_SYMBOL(snd_ac97_pcm_close);
+EXPORT_SYMBOL(snd_ac97_pcm_double_rate_rules);
 EXPORT_SYMBOL(snd_ac97_tune_hardware);
 EXPORT_SYMBOL(snd_ac97_set_rate);
 #ifdef CONFIG_PM
