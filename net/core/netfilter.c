@@ -342,10 +342,15 @@ static unsigned int nf_iterate(struct list_head *head,
 			       const struct net_device *indev,
 			       const struct net_device *outdev,
 			       struct list_head **i,
-			       int (*okfn)(struct sk_buff *))
+			       int (*okfn)(struct sk_buff *),
+			       int hook_thresh)
 {
 	for (*i = (*i)->next; *i != head; *i = (*i)->next) {
 		struct nf_hook_ops *elem = (struct nf_hook_ops *)*i;
+
+		if (hook_thresh > elem->priority)
+			continue;
+
 		switch (elem->hook(hook, skb, indev, outdev, okfn)) {
 		case NF_QUEUE:
 			return NF_QUEUE;
@@ -413,6 +418,10 @@ static void nf_queue(struct sk_buff *skb,
 {
 	int status;
 	struct nf_info *info;
+#if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
+	struct net_device *physindev = NULL;
+	struct net_device *physoutdev = NULL;
+#endif
 
 	if (!queue_handler[pf].outfn) {
 		kfree_skb(skb);
@@ -435,11 +444,24 @@ static void nf_queue(struct sk_buff *skb,
 	if (indev) dev_hold(indev);
 	if (outdev) dev_hold(outdev);
 
+#if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
+	if (skb->nf_bridge) {
+		physindev = skb->nf_bridge->physindev;
+		if (physindev) dev_hold(physindev);
+		physoutdev = skb->nf_bridge->physoutdev;
+		if (physoutdev) dev_hold(physoutdev);
+	}
+#endif
+
 	status = queue_handler[pf].outfn(skb, info, queue_handler[pf].data);
 	if (status < 0) {
 		/* James M doesn't say fuck enough. */
 		if (indev) dev_put(indev);
 		if (outdev) dev_put(outdev);
+#if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
+		if (physindev) dev_put(physindev);
+		if (physoutdev) dev_put(physoutdev);
+#endif
 		kfree(info);
 		kfree_skb(skb);
 		return;
@@ -449,7 +471,8 @@ static void nf_queue(struct sk_buff *skb,
 int nf_hook_slow(int pf, unsigned int hook, struct sk_buff *skb,
 		 struct net_device *indev,
 		 struct net_device *outdev,
-		 int (*okfn)(struct sk_buff *))
+		 int (*okfn)(struct sk_buff *),
+		 int hook_thresh)
 {
 	struct list_head *elem;
 	unsigned int verdict;
@@ -481,7 +504,7 @@ int nf_hook_slow(int pf, unsigned int hook, struct sk_buff *skb,
 
 	elem = &nf_hooks[pf][hook];
 	verdict = nf_iterate(&nf_hooks[pf][hook], &skb, hook, indev,
-			     outdev, &elem, okfn);
+			     outdev, &elem, okfn, hook_thresh);
 	if (verdict == NF_QUEUE) {
 		NFDEBUG("nf_hook: Verdict = QUEUE.\n");
 		nf_queue(skb, elem, pf, hook, indev, outdev, okfn);
@@ -530,7 +553,7 @@ void nf_reinject(struct sk_buff *skb, struct nf_info *info,
 		verdict = nf_iterate(&nf_hooks[info->pf][info->hook],
 				     &skb, info->hook, 
 				     info->indev, info->outdev, &elem,
-				     info->okfn);
+				     info->okfn, INT_MIN);
 	}
 
 	switch (verdict) {

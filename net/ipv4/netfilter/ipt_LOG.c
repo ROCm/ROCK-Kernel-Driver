@@ -289,6 +289,18 @@ ipt_log_target(struct sk_buff **pskb,
 	       loginfo->prefix,
 	       in ? in->name : "",
 	       out ? out->name : "");
+#if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
+	if ((*pskb)->nf_bridge) {
+		struct net_device *physindev = (*pskb)->nf_bridge->physindev;
+		struct net_device *physoutdev = (*pskb)->nf_bridge->physoutdev;
+
+		if (physindev && in != physindev)
+			printk("PHYSIN=%s ", physindev->name);
+		if (physoutdev && out != physoutdev)
+			printk("PHYSOUT=%s ", physoutdev->name);
+	}
+#endif
+
 	if (in && !out) {
 		/* MAC logging for input chain only. */
 		printk("MAC=");

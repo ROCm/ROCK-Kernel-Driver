@@ -402,6 +402,10 @@ static void ip_copy_metadata(struct sk_buff *to, struct sk_buff *from)
 	/* Connection association is same as pre-frag packet */
 	to->nfct = from->nfct;
 	nf_conntrack_get(to->nfct);
+#if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
+	to->nf_bridge = from->nf_bridge;
+	nf_bridge_get(to->nf_bridge);
+#endif
 #ifdef CONFIG_NETFILTER_DEBUG
 	to->nf_debug = from->nf_debug;
 #endif
