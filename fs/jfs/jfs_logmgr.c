@@ -1093,7 +1093,7 @@ int lmLogOpen(struct super_block *sb, log_t ** logptr)
 	 * initialize log.
 	 */
 	if ((rc = lmLogInit(log)))
-		goto errout10;
+		goto free;
 	goto out;
 
 	/*
@@ -1103,18 +1103,19 @@ int lmLogOpen(struct super_block *sb, log_t ** logptr)
 	 */
       externalLog:
 
-	/*
-	 * TODO: Check for already opened log devices
-	 */
-
 	if (!(bdev = bdget(kdev_t_to_nr(JFS_SBI(sb)->logdev)))) {
 		rc = ENODEV;
-		goto errout10;
+		goto free;
 	}
 
 	if ((rc = blkdev_get(bdev, FMODE_READ|FMODE_WRITE, 0, BDEV_FS))) {
 		rc = -rc;
-		goto errout10;
+		goto bdput;
+	}
+
+	if ((rc = bd_claim(bdev, log))) {
+		rc = -rc;
+		goto close;
 	}
 
 	log->bdev = bdev;
@@ -1124,13 +1125,13 @@ int lmLogOpen(struct super_block *sb, log_t ** logptr)
 	 * initialize log:
 	 */
 	if ((rc = lmLogInit(log)))
-		goto errout20;
+		goto unclaim;
 
 	/*
 	 * add file system to log active file system list
 	 */
 	if ((rc = lmLogFileSystem(log, JFS_SBI(sb)->uuid, 1)))
-		goto errout30;
+		goto shutdown;
 
       out:
 	jFYI(1, ("lmLogOpen: exit(0)\n"));
@@ -1140,13 +1141,19 @@ int lmLogOpen(struct super_block *sb, log_t ** logptr)
 	/*
 	 *      unwind on error
 	 */
-      errout30:		/* unwind lbmLogInit() */
+      shutdown:		/* unwind lbmLogInit() */
 	lbmLogShutdown(log);
 
-      errout20:		/* close external log device */
+      unclaim:
+	bd_release(bdev);
+
+      close:		/* close external log device */
 	blkdev_put(bdev, BDEV_FS);
 
-      errout10:		/* free log descriptor */
+      bdput:
+	bdput(bdev);
+
+      free:		/* free log descriptor */
 	kfree(log);
 
 	jFYI(1, ("lmLogOpen: exit(%d)\n", rc));
@@ -1369,6 +1376,7 @@ static int lmLogInit(log_t * log)
  */
 int lmLogClose(struct super_block *sb, log_t * log)
 {
+	struct block_device *bdev = log->bdev;
 	int rc;
 
 	jFYI(1, ("lmLogClose: log:0x%p\n", log));
@@ -1388,7 +1396,10 @@ int lmLogClose(struct super_block *sb, log_t * log)
       externalLog:
 	lmLogFileSystem(log, JFS_SBI(sb)->uuid, 0);
 	rc = lmLogShutdown(log);
-	blkdev_put(log->bdev, BDEV_FS);
+
+	bd_release(bdev);
+	blkdev_put(bdev, BDEV_FS);
+	bdput(bdev);
 
       out:
 	jFYI(0, ("lmLogClose: exit(%d)\n", rc));
