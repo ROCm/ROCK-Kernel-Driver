@@ -256,7 +256,7 @@ config ACPI_EFI
 	default y
 
 config ACPI_RELAXED_AML
-	bool
+	bool "Relaxed AML"
 	depends on ACPI_INTERPRETER
 	depends on !IA64_SGI_SN
 	default n
