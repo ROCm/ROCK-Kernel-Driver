@@ -322,7 +322,7 @@ int __init proteon_probe(struct net_device *dev)
  * Calling this on a board that does not support it can be a very
  * dangerous thing.  The Madge board, for instance, will lock your
  * machine hard when this is called.  Luckily, its supported in a
- * seperate driver.  --ASF
+ * separate driver.  --ASF
  */
 static void proteon_read_eeprom(struct net_device *dev)
 {
