@@ -519,7 +519,7 @@ static struct pci_driver synclinkmp_pci_driver = {
 };
 
 
-static struct tty_driver serial_driver;
+static struct tty_driver *serial_driver;
 
 /* number of characters left in xmit buffer before we ask for more */
 #define WAKEUP_CHARS 256
@@ -3746,6 +3746,30 @@ void device_init(int adapter_num, struct pci_dev *pdev)
 	}
 }
 
+static struct tty_operations ops = {
+	.open = open,
+	.close = close,
+	.write = write,
+	.put_char = put_char,
+	.flush_chars = flush_chars,
+	.write_room = write_room,
+	.chars_in_buffer = chars_in_buffer,
+	.flush_buffer = flush_buffer,
+	.ioctl = ioctl,
+	.throttle = throttle,
+	.unthrottle = unthrottle,
+	.send_xchar = send_xchar,
+	.break_ctl = set_break,
+	.wait_until_sent = wait_until_sent,
+ 	.read_proc = read_proc,
+	.set_termios = set_termios,
+	.stop = tx_hold,
+	.start = tx_release,
+	.hangup = hangup,
+	.tiocmget = tiocmget,
+	.tiocmset = tiocmset,
+};
+
 /* Driver initialization entry point.
  */
 
@@ -3768,52 +3792,31 @@ static int __init synclinkmp_init(void)
 		return -ENODEV;
 	}
 
+	serial_driver = alloc_tty_driver(synclinkmp_device_count);
+	if (!serial_driver)
+		return -ENOMEM;
+
 	/* Initialize the tty_driver structure */
 
-	memset(&serial_driver, 0, sizeof(struct tty_driver));
-	serial_driver.magic = TTY_DRIVER_MAGIC;
-	serial_driver.owner = THIS_MODULE;
-	serial_driver.driver_name = "synclinkmp";
-	serial_driver.name = "ttySLM";
-	serial_driver.major = ttymajor;
-	serial_driver.minor_start = 64;
-	serial_driver.num = synclinkmp_device_count;
-	serial_driver.type = TTY_DRIVER_TYPE_SERIAL;
-	serial_driver.subtype = SERIAL_TYPE_NORMAL;
-	serial_driver.init_termios = tty_std_termios;
-	serial_driver.init_termios.c_cflag =
+	serial_driver->owner = THIS_MODULE;
+	serial_driver->driver_name = "synclinkmp";
+	serial_driver->name = "ttySLM";
+	serial_driver->major = ttymajor;
+	serial_driver->minor_start = 64;
+	serial_driver->type = TTY_DRIVER_TYPE_SERIAL;
+	serial_driver->subtype = SERIAL_TYPE_NORMAL;
+	serial_driver->init_termios = tty_std_termios;
+	serial_driver->init_termios.c_cflag =
 		B9600 | CS8 | CREAD | HUPCL | CLOCAL;
-	serial_driver.flags = TTY_DRIVER_REAL_RAW;
-
-	serial_driver.open = open;
-	serial_driver.close = close;
-	serial_driver.write = write;
-	serial_driver.put_char = put_char;
-	serial_driver.flush_chars = flush_chars;
-	serial_driver.write_room = write_room;
-	serial_driver.chars_in_buffer = chars_in_buffer;
-	serial_driver.flush_buffer = flush_buffer;
-	serial_driver.ioctl = ioctl;
-	serial_driver.throttle = throttle;
-	serial_driver.unthrottle = unthrottle;
-	serial_driver.send_xchar = send_xchar;
-	serial_driver.break_ctl = set_break;
-	serial_driver.wait_until_sent = wait_until_sent;
- 	serial_driver.read_proc = read_proc;
-	serial_driver.set_termios = set_termios;
-	serial_driver.stop = tx_hold;
-	serial_driver.start = tx_release;
-	serial_driver.hangup = hangup;
-	serial_driver.tiocmget = tiocmget;
-	serial_driver.tiocmset = tiocmset;
-
-	if (tty_register_driver(&serial_driver) < 0)
+	serial_driver->flags = TTY_DRIVER_REAL_RAW;
+	tty_set_operations(serial_driver, &ops);
+	if (tty_register_driver(serial_driver) < 0)
 		printk("%s(%d):Couldn't register serial driver\n",
 			__FILE__,__LINE__);
 
  	printk("%s %s, tty major#%d\n",
 		driver_name, driver_version,
-		serial_driver.major);
+		serial_driver->major);
 
 	return 0;
 }
@@ -3827,9 +3830,10 @@ static void __exit synclinkmp_exit(void)
 
 	printk("Unloading %s %s\n", driver_name, driver_version);
 
-	if ((rc = tty_unregister_driver(&serial_driver)))
+	if ((rc = tty_unregister_driver(serial_driver)))
 		printk("%s(%d) failed to unregister tty driver err=%d\n",
 		       __FILE__,__LINE__,rc);
+	put_tty_driver(serial_driver);
 
 	info = synclinkmp_device_list;
 	while(info) {
