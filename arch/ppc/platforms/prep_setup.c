@@ -1126,6 +1126,10 @@ prep_init(unsigned long r3, unsigned long r4, unsigned long r5,
 		_prep_type = _PREP_Motorola;
 	}
 
+	/* Switch off all residual data processing if the user requests it */
+	if (strstr(cmd_line, "noresidual") != NULL)
+			res = NULL;
+
 	/* Initialise progress early to get maximum benefit */
 	prep_set_bat();
 	ibm_statusled_init();
