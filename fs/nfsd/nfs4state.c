@@ -495,15 +495,13 @@ nfsd4_setclientid(struct svc_rqst *rqstp, struct nfsd4_setclientid *setclid)
 		gen_clid(new);
 		gen_confirm(new);
 		add_to_unconfirmed(new, strhashval);
-	} else if (!cmp_clid(&conf->cl_clientid, &unconf->cl_clientid) &&
-	      !cmp_verf(&conf->cl_confirm, &unconf->cl_confirm)) {
+	} else if (!cmp_verf(&conf->cl_confirm, &unconf->cl_confirm)) {
 		/*	
 		 * CASE3:
 		 * confirmed found (name, principal match)
 		 * confirmed verifier does not match input clverifier
 		 *
 		 * unconfirmed found (name match)
-		 * confirmed->cl_clientid != unconfirmed->cl_clientid and
 		 * confirmed->cl_confirm != unconfirmed->cl_confirm
 		 *
 		 * remove unconfirmed.
