@@ -56,7 +56,6 @@ show_syscalls_task:
  * Handle a system call.
  */
 _GLOBAL(DoSyscall)
-	std	r0,THREAD+LAST_SYSCALL(r13)
 	ld	r11,_CCR(r1)	/* Clear SO bit in CR */
 	lis	r10,0x1000
 	andc	r11,r11,r10
