@@ -320,6 +320,7 @@ DEF_DIRTY_BACKGROUND_RATIO=10
 DEF_DIRTY_RATIO=40
 DEF_XFS_AGE_BUFFER=15
 DEF_XFS_SYNC_INTERVAL=30
+DEF_XFS_BUFD_INTERVAL=1
 
 # This must be adjusted manually to the value of HZ in the running kernel
 # on 2.4, until the XFS people change their 2.4 external interfaces to work in
@@ -372,6 +373,7 @@ case "$1" in
 			# not USER_HZ, so we have to use $AGE, not $XFS_AGE.
 			echo $AGE > /proc/sys/fs/xfs/age_buffer_centisecs
 			echo $AGE > /proc/sys/fs/xfs/xfssyncd_centisecs
+			echo 3000 > /proc/sys/fs/xfs/xfsbufd_centisecs
 		fi
 
 		case "$KLEVEL" in
@@ -419,6 +421,7 @@ case "$1" in
 			# These need to be restored as well.
 			echo "$((100*$DEF_XFS_AGE_BUFFER))" > /proc/sys/fs/xfs/age_buffer_centisecs
 			echo "$((100*$DEF_XFS_SYNC_INTERVAL))" > /proc/sys/fs/xfs/xfssyncd_centisecs
+			echo "$((100*$DEF_XFS_BUFD_INTERVAL))" > /proc/sys/fs/xfs/xfsbufd_centisecs
 		fi
 		case "$KLEVEL" in
 			"2.4")
