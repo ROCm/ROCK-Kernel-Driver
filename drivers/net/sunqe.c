@@ -981,7 +981,7 @@ static int __init qec_probe(void)
 {
 	struct net_device *dev = NULL;
 	struct sbus_bus *bus;
-	struct sbus_dev *sdev = 0;
+	struct sbus_dev *sdev = NULL;
 	static int called;
 	int cards = 0, v;
 

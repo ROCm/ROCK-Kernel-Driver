@@ -619,7 +619,7 @@ static int init_i596_mem(struct net_device *dev)
 #endif
 	unsigned long flags;
 
-	MPU_PORT(dev, PORT_RESET, 0);
+	MPU_PORT(dev, PORT_RESET, NULL);
 
 	udelay(100);		/* Wait 100us - seems to help */
 
@@ -760,7 +760,7 @@ static int init_i596_mem(struct net_device *dev)
 
 failed:
 	printk(KERN_CRIT "%s: Failed to initialise 82596\n", dev->name);
-	MPU_PORT(dev, PORT_RESET, 0);
+	MPU_PORT(dev, PORT_RESET, NULL);
 	return -1;
 }
 

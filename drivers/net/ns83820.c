@@ -1089,7 +1089,7 @@ again:
 
 	frag = skb_shinfo(skb)->frags;
 	if (!nr_frags)
-		frag = 0;
+		frag = NULL;
 	extsts = 0;
 	if (skb->ip_summed == CHECKSUM_HW) {
 		extsts |= EXTSTS_IPPKT;

@@ -359,9 +359,9 @@ prism54_probe(struct pci_dev *pdev, const struct pci_device_id *id)
       do_unregister_netdev:
 	unregister_netdev(ndev);
 	islpci_free_memory(priv);
-	pci_set_drvdata(pdev, 0);
+	pci_set_drvdata(pdev, NULL);
 	free_netdev(ndev);
-	priv = 0;
+	priv = NULL;
       do_pci_release_regions:
 	pci_release_regions(pdev);
       do_pci_disable_device:
@@ -377,7 +377,7 @@ void
 prism54_remove(struct pci_dev *pdev)
 {
 	struct net_device *ndev = pci_get_drvdata(pdev);
-	islpci_private *priv = ndev ? netdev_priv(ndev) : 0;
+	islpci_private *priv = ndev ? netdev_priv(ndev) : NULL;
 	BUG_ON(!priv);
 
 	if (!__in_cleanup_module) {
@@ -405,9 +405,9 @@ prism54_remove(struct pci_dev *pdev)
 	/* free the PCI memory and unmap the remapped page */
 	islpci_free_memory(priv);
 
-	pci_set_drvdata(pdev, 0);
+	pci_set_drvdata(pdev, NULL);
 	free_netdev(ndev);
-	priv = 0;
+	priv = NULL;
 
 	pci_release_regions(pdev);
 
@@ -418,7 +418,7 @@ int
 prism54_suspend(struct pci_dev *pdev, u32 state)
 {
 	struct net_device *ndev = pci_get_drvdata(pdev);
-	islpci_private *priv = ndev ? netdev_priv(ndev) : 0;
+	islpci_private *priv = ndev ? netdev_priv(ndev) : NULL;
 	BUG_ON(!priv);
 
 	printk(KERN_NOTICE "%s: got suspend request (state %d)\n",
@@ -443,7 +443,7 @@ int
 prism54_resume(struct pci_dev *pdev)
 {
 	struct net_device *ndev = pci_get_drvdata(pdev);
-	islpci_private *priv = ndev ? netdev_priv(ndev) : 0;
+	islpci_private *priv = ndev ? netdev_priv(ndev) : NULL;
 	BUG_ON(!priv);
 
 	printk(KERN_NOTICE "%s: got resume request\n", ndev->name);
