@@ -44,7 +44,6 @@ extern int			nfs_stat_to_errno(int stat);
 #define NFS_info_sz		5
 #define NFS_entry_sz		NFS_filename_sz+3
 
-#define NFS_enc_void_sz		0
 #define NFS_diropargs_sz	NFS_fhandle_sz+NFS_filename_sz
 #define NFS_sattrargs_sz	NFS_fhandle_sz+NFS_sattr_sz
 #define NFS_readlinkargs_sz	NFS_fhandle_sz
@@ -56,7 +55,6 @@ extern int			nfs_stat_to_errno(int stat);
 #define NFS_symlinkargs_sz	NFS_diropargs_sz+NFS_path_sz+NFS_sattr_sz
 #define NFS_readdirargs_sz	NFS_fhandle_sz+2
 
-#define NFS_dec_void_sz		0
 #define NFS_attrstat_sz		1+NFS_fattr_sz
 #define NFS_diropres_sz		1+NFS_fhandle_sz+NFS_fattr_sz
 #define NFS_readlinkres_sz	1
@@ -154,16 +152,6 @@ xdr_encode_sattr(u32 *p, struct iattr *attr)
 /*
  * NFS encode functions
  */
-/*
- * Encode void argument
- */
-static int
-nfs_xdr_enc_void(struct rpc_rqst *req, u32 *p, void *dummy)
-{
-	req->rq_slen = xdr_adjust_iovec(req->rq_svec, p);
-	return 0;
-}
-
 /*
  * Encode file handle argument
  * GETATTR, READLINK, STATFS
@@ -462,15 +450,6 @@ nfs_decode_dirent(u32 *p, struct nfs_entry *entry, int plus)
 /*
  * NFS XDR decode functions
  */
-/*
- * Decode void reply
- */
-static int
-nfs_xdr_dec_void(struct rpc_rqst *req, u32 *p, void *dummy)
-{
-	return 0;
-}
-
 /*
  * Decode simple status reply
  */

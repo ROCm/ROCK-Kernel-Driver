@@ -379,18 +379,13 @@ nlmsvc_encode_void(struct svc_rqst *rqstp, u32 *p, void *dummy)
 /*
  * Now, the client side XDR functions
  */
-static int
-nlmclt_encode_void(struct rpc_rqst *req, u32 *p, void *ptr)
-{
-	req->rq_slen = xdr_adjust_iovec(req->rq_svec, p);
-	return 0;
-}
-
+#ifdef NLMCLNT_SUPPORT_SHARES
 static int
 nlmclt_decode_void(struct rpc_rqst *req, u32 *p, void *ptr)
 {
 	return 0;
 }
+#endif
 
 static int
 nlmclt_encode_testargs(struct rpc_rqst *req, u32 *p, nlm_args *argp)

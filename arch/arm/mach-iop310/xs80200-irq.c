@@ -11,8 +11,6 @@
  * published by the Free Software Foundation.
  */
 #include <linux/init.h>
-#include <linux/sched.h>
-#include <linux/interrupt.h>
 
 #include <asm/mach/irq.h>
 #include <asm/irq.h>

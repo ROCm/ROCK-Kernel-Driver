@@ -1098,6 +1098,15 @@ sys_init_module(void *umod,
 	list_add(&mod->extable.list, &extables);
 	spin_unlock_irq(&modlist_lock);
 
+	/* Note, setting the mod->live to 1 here is safe because we haven't
+	 * linked the module into the system's kernel symbol table yet,
+	 * which means that the only way any other kernel code can call
+	 * into this module right now is if this module hands out entry
+	 * pointers to the other code.  We assume that no module hands out
+	 * entry pointers to the rest of the kernel unless it is ready to
+	 * have them used.
+	 */
+	mod->live = 1;
 	/* Start the module */
 	ret = mod->init ? mod->init() : 0;
 	if (ret < 0) {
@@ -1110,9 +1119,10 @@ sys_init_module(void *umod,
 			/* Mark it "live" so that they can force
 			   deletion later, and we don't keep getting
 			   woken on every decrement. */
-			mod->live = 1;
-		} else
+		} else {
+			mod->live = 0;
 			free_module(mod);
+		}
 		up(&module_mutex);
 		return ret;
 	}
@@ -1127,7 +1137,6 @@ sys_init_module(void *umod,
 	mod->module_init = NULL;
 
 	/* All ok! */
-	mod->live = 1;
 	up(&module_mutex);
 	return 0;
 }
@@ -1179,7 +1188,7 @@ struct seq_operations modules_op = {
 	.show	= m_show
 };
 
-static int __init init(void)
+void __init extable_init(void)
 {
 	/* Add kernel symbols to symbol table */
 	kernel_symbols.num_syms = (__stop___ksymtab - __start___ksymtab);
@@ -1190,12 +1199,8 @@ static int __init init(void)
 	kernel_extable.num_entries = (__stop___ex_table -__start___ex_table);
 	kernel_extable.entry = __start___ex_table;
 	list_add(&kernel_extable.list, &extables);
-	return 0;
 }
 
 /* Obsolete lvalue for broken code which asks about usage */
 int module_dummy_usage = 1;
 EXPORT_SYMBOL(module_dummy_usage);
-
-/* Call this at boot */
-__initcall(init);

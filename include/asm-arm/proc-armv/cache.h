@@ -93,11 +93,7 @@
 #define mapping_mapped(map)	(!list_empty(&(map)->i_mmap) || \
 				 !list_empty(&(map)->i_mmap_shared))
 
-static inline void __flush_dcache_page(struct page *page)
-{
-	unsigned long virt = (unsigned long)page_address(page);
-	cpu_cache_clean_invalidate_range(virt, virt + PAGE_SIZE, 0);
-}
+extern void __flush_dcache_page(struct page *);
 
 static inline void flush_dcache_page(struct page *page)
 {
@@ -115,8 +111,6 @@ static inline void flush_dcache_page(struct page *page)
  * duplicate cache flushing elsewhere performed by flush_dcache_page().
  */
 #define flush_icache_page(vma,page)	do { } while (0)
-
-#define clean_dcache_entry(_s)		cpu_dcache_clean_entry((unsigned long)(_s))
 
 /*
  * I cache coherency stuff.

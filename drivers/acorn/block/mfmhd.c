@@ -161,13 +161,6 @@ struct hd_geometry {
 /*#define DEBUG */
 #endif
 /*
- * List of card types that we recognise
- */
-static const card_ids mfm_cids[] = {
-	{ MANU_ACORN, PROD_ACORN_MFM },
-	{ 0xffff, 0xffff }
-};
-/*
  * End of configuration
  */
 
@@ -1230,8 +1223,6 @@ static struct block_device_operations mfm_fops =
 	.ioctl		= mfm_ioctl,
 };
 
-static struct expansion_card *ecs;
-
 /*
  * See if there is a controller at the address presently at mfm_addr
  *
@@ -1266,44 +1257,18 @@ static int mfm_probecontroller (unsigned int mfm_addr)
 	return 1;
 }
 
-/*
- * Look for a MFM controller - first check the motherboard, then the podules
- * The podules have an extra interrupt enable that needs to be played with
- *
- * The HDC is accessed at MEDIUM IOC speeds.
- */
-static int __init mfm_init (void)
+static int mfm_do_init(unsigned char irqmask)
 {
-	unsigned char irqmask;
-	int i;
-
-	if (mfm_probecontroller(ONBOARD_MFM_ADDRESS)) {
-		mfm_addr	= ONBOARD_MFM_ADDRESS;
-		mfm_IRQPollLoc	= IOC_IRQSTATB;
-		mfm_irqenable	= 0;
-		mfm_irq		= IRQ_HARDDISK;
-		irqmask		= 0x08;			/* IL3 pin */
-	} else {
-		ecs = ecard_find(0, mfm_cids);
-		if (!ecs) {
-			mfm_addr = 0;
-			return -1;
-		}
-
-		mfm_addr	= ecard_address(ecs, ECARD_IOC, ECARD_MEDIUM) + 0x800;
-		mfm_IRQPollLoc	= ioaddr(mfm_addr + 0x400);
-		mfm_irqenable	= mfm_IRQPollLoc;
-		mfm_irq		= ecs->irq;
-		irqmask		= 0x08;
-
-		ecard_claim(ecs);
-	}
+	int i, ret;
 
 	printk("mfm: found at address %08X, interrupt %d\n", mfm_addr, mfm_irq);
+
+	ret = -EBUSY;
 	if (!request_region (mfm_addr, 10, "mfm"))
 		goto out1;
 
-	if (register_blkdev(MAJOR_NR, "mfm", &mfm_fops)) {
+	ret = register_blkdev(MAJOR_NR, "mfm", &mfm_fops);
+	if (ret) {
 		printk("mfm_init: unable to get major number %d\n", MAJOR_NR);
 		goto out2;
 	}
@@ -1319,8 +1284,10 @@ static int __init mfm_init (void)
 	lastspecifieddrive = -1;
 
 	mfm_drives = mfm_initdrives();
-	if (!mfm_drives)
+	if (!mfm_drives) {
+		ret = -ENODEV;
 		goto out3;
+	}
 	
 	for (i = 0; i < mfm_drives; i++) {
 		struct gendisk *disk = alloc_disk(64);
@@ -1335,7 +1302,8 @@ static int __init mfm_init (void)
 
 	printk("mfm: detected %d hard drive%s\n", mfm_drives,
 				mfm_drives == 1 ? "" : "s");
-	if (request_irq(mfm_irq, mfm_interrupt_handler, SA_INTERRUPT, "MFM harddisk", NULL)) {
+	ret = request_irq(mfm_irq, mfm_interrupt_handler, SA_INTERRUPT, "MFM harddisk", NULL);
+	if (ret) {
 		printk("mfm: unable to get IRQ%d\n", mfm_irq);
 		goto out4;
 	}
@@ -1359,19 +1327,17 @@ out3:
 out2:
 	release_region(mfm_addr, 10);
 out1:
-	ecard_release(ecs);
-	return -1;
+	return ret;
 Enomem:
 	while (i--)
 		put_disk(mfm_gendisk[i]);
 	goto out3;
 }
 
-static void __exit mfm_exit(void)
+static void mfm_do_exit(void)
 {
 	int i;
-	if (ecs && mfm_irqenable)
-		outw (0, mfm_irqenable);	/* Required to enable IRQs from MFM podule */
+
 	free_irq(mfm_irq, NULL);
 	for (i = 0; i < mfm_drives; i++) {
 		del_gendisk(mfm_gendisk[i]);
@@ -1379,10 +1345,70 @@ static void __exit mfm_exit(void)
 	}
 	blk_cleanup_queue(&mfm_queue);
 	unregister_blkdev(MAJOR_NR, "mfm");
-	if (ecs)
-		ecard_release(ecs);
 	if (mfm_addr)
 		release_region(mfm_addr, 10);
+}
+
+static int __devinit mfm_probe(struct expansion_card *ec, struct ecard_id *id)
+{
+	if (mfm_addr)
+		return -EBUSY;
+
+	mfm_addr	= ecard_address(ec, ECARD_IOC, ECARD_MEDIUM) + 0x800;
+	mfm_IRQPollLoc	= ioaddr(mfm_addr + 0x400);
+	mfm_irqenable	= mfm_IRQPollLoc;
+	mfm_irq		= ec->irq;
+
+	return mfm_do_init(0x08);
+}
+
+static void __devexit mfm_remove(struct expansion_card *ec)
+{
+	outw (0, mfm_irqenable);	/* Required to enable IRQs from MFM podule */
+	mfm_do_exit();
+}
+
+static const struct ecard_id mfm_cids[] = {
+	{ MANU_ACORN, PROD_ACORN_MFM },
+	{ 0xffff, 0xffff },
+};
+
+static struct ecard_driver mfm_driver = {
+	.probe		= mfm_probe,
+	.remove		= __devexit(mfm_remove),
+	.id_table	= mfm_cids,
+	.drv = {
+		.name	= "mfm",
+	},
+};
+
+/*
+ * Look for a MFM controller - first check the motherboard, then the podules
+ * The podules have an extra interrupt enable that needs to be played with
+ *
+ * The HDC is accessed at MEDIUM IOC speeds.
+ */
+static int __init mfm_init (void)
+{
+	unsigned char irqmask;
+
+	if (mfm_probecontroller(ONBOARD_MFM_ADDRESS)) {
+		mfm_addr	= ONBOARD_MFM_ADDRESS;
+		mfm_IRQPollLoc	= IOC_IRQSTATB;
+		mfm_irqenable	= 0;
+		mfm_irq		= IRQ_HARDDISK;
+		return mfm_do_init(0x08);	/* IL3 pin */
+	} else {
+		return ecard_register_driver(&mfm_driver);
+	}
+}
+
+static void __exit mfm_exit(void)
+{
+	if (mfm_addr == ONBOARD_MFM_ADDRESS)
+		mfm_do_exit();
+	else
+		ecard_unregister_driver(&mfm_driver);
 }
 
 module_init(mfm_init)

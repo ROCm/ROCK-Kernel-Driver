@@ -568,8 +568,6 @@ etherh_probe(struct expansion_card *ec, const struct ecard_id *id)
 
 	etherh_banner();
 
-	ecard_claim(ec);
-	
 	dev = init_etherdev(NULL, sizeof(struct etherh_priv));
 	if (!dev) {
 		ret = -ENOMEM;
@@ -725,7 +723,6 @@ free:
 	kfree(dev->priv);
 	kfree(dev);
 out:
-	ecard_release(ec);
 	return ret;
 }
 
@@ -744,7 +741,6 @@ static void __devexit etherh_remove(struct expansion_card *ec)
 
 	ec->ops = NULL;
 	kfree(ec->irq_data);
-	ecard_release(ec);
 }
 
 static const struct ecard_id etherh_ids[] = {

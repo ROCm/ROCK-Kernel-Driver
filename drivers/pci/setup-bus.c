@@ -105,7 +105,7 @@ pci_setup_bridge(struct pci_bus *bus)
 	pcibios_fixup_pbus_ranges(bus, &ranges);
 
 	DBGC((KERN_INFO "PCI: Bus %d, bridge: %s\n",
-			bus->number, bridge->name));
+			bus->number, bridge->dev.name));
 
 	/* Set up the top and bottom of the PCI I/O segment for this bus. */
 	if (bus->resource[0]->flags & IORESOURCE_IO) {

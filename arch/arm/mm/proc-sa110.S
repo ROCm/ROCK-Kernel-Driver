@@ -425,18 +425,16 @@ ENTRY(cpu_sa1100_set_pgd)
 	mov	pc, lr
 
 /*
- * cpu_sa110_set_pmd(pmdp, pmd)
+ * cpu_sa110_flush_pmd(pmdp)
  *
  * Set a level 1 translation table entry, and clean it out of
  * any caches such that the MMUs can load it correctly.
  *
  * pmdp: pointer to PMD entry
- * pmd:  PMD value to store
  */
 	.align	5
-ENTRY(cpu_sa110_set_pmd)
-ENTRY(cpu_sa1100_set_pmd)
-	str	r1, [r0]
+ENTRY(cpu_sa110_flush_pmd)
+ENTRY(cpu_sa1100_flush_pmd)
 	mcr	p15, 0, r0, c7, c10, 1		@ clean D entry
 	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
 	mov	pc, lr
@@ -544,7 +542,7 @@ ENTRY(sa110_processor_functions)
 
 	/* pgtable */
 	.word	cpu_sa110_set_pgd
-	.word	cpu_sa110_set_pmd
+	.word	cpu_sa110_flush_pmd
 	.word	cpu_sa110_set_pte
 
 	.size	sa110_processor_functions, . - sa110_processor_functions
@@ -584,7 +582,7 @@ ENTRY(sa1100_processor_functions)
 
 	/* pgtable */
 	.word	cpu_sa1100_set_pgd
-	.word	cpu_sa1100_set_pmd
+	.word	cpu_sa1100_flush_pmd
 	.word	cpu_sa1100_set_pte
 
 	.size	sa1100_processor_functions, . - sa1100_processor_functions

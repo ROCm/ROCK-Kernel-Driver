@@ -14,7 +14,6 @@
 #include <linux/kernel.h>
 #include <linux/pci.h>
 #include <linux/init.h>
-#include <linux/sched.h>
 
 #include <asm/hardware.h>
 #include <asm/io.h>

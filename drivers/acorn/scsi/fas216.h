@@ -214,10 +214,22 @@ typedef enum {
 
 typedef struct {
 	unsigned long		magic_start;
+	spinlock_t		host_lock;
 	struct Scsi_Host	*host;			/* host					*/
 	Scsi_Cmnd		*SCpnt;			/* currently processing command		*/
 	Scsi_Cmnd		*origSCpnt;		/* original connecting command		*/
 	Scsi_Cmnd		*reqSCpnt;		/* request sense command		*/
+	Scsi_Cmnd		*rstSCpnt;		/* reset command			*/
+	Scsi_Cmnd		*pending_SCpnt[8];	/* per-device pending commands		*/
+	int			next_pending;		/* next pending device			*/
+
+	/*
+	 * Error recovery
+	 */
+	wait_queue_head_t	eh_wait;
+	struct timer_list	eh_timer;
+	unsigned int		rst_dev_status;
+	unsigned int		rst_bus_status;
 
 	/* driver information */
 	struct {
@@ -281,6 +293,8 @@ typedef struct {
 	/* per-device info */
 	struct fas216_device {
 		unsigned char	disconnect_ok:1;	/* device can disconnect		*/
+		unsigned char	parity_enabled:1;	/* parity checking enabled		*/
+		unsigned char	parity_check:1;		/* need to check parity checking	*/
 		unsigned char	period;			/* sync xfer period in (*4ns)		*/
 		unsigned char	stp;			/* synchronous transfer period		*/
 		unsigned char	sof;			/* synchronous offset register		*/

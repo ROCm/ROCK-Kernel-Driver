@@ -17,17 +17,9 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-#include <linux/sched.h>
-#include <linux/slab.h>
-#include <linux/mman.h>
 #include <linux/init.h>
 
-#include <asm/page.h>
-#include <asm/pgtable.h>
 #include <asm/dma.h>
-#include <asm/io.h>
-#include <asm/hardware.h>
-
 #include <asm/mach/dma.h>
 
 void __init arch_dma_init(dma_t *dma)

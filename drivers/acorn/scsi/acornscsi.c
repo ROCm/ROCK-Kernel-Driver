@@ -109,10 +109,7 @@
  * If not set, then use PIO mode (not currently supported).
  */
 #define USE_DMAC
-/*
- * List of devices that the driver will recognise
- */
-#define ACORNSCSI_LIST { MANU_ACORN, PROD_ACORN_SCSI }
+
 /*
  * ====================================================================================
  */
@@ -2832,148 +2829,6 @@ int acornscsi_reset(Scsi_Cmnd *SCpnt, unsigned int reset_flags)
 /*==============================================================================================
  * initialisation & miscellaneous support
  */
-static struct expansion_card *ecs[MAX_ECARDS];
-
-/*
- * Prototype: void acornscsi_init(AS_Host *host)
- * Purpose  : initialise the AS_Host structure for one interface & setup hardware
- * Params   : host - host to setup
- */
-static
-void acornscsi_host_init(AS_Host *host)
-{
-    memset(&host->stats, 0, sizeof (host->stats));
-    queue_initialise(&host->queues.issue);
-    queue_initialise(&host->queues.disconnected);
-    msgqueue_initialise(&host->scsi.msgs);
-
-    acornscsi_resetcard(host);
-}
-
-int acornscsi_detect(Scsi_Host_Template * tpnt)
-{
-    static const card_ids acornscsi_cids[] = { ACORNSCSI_LIST, { 0xffff, 0xffff } };
-    int i, count = 0;
-    struct Scsi_Host *instance;
-    AS_Host *host;
-
-    tpnt->proc_name = "acornscsi";
-
-    for (i = 0; i < MAX_ECARDS; i++)
-	ecs[i] = NULL;
-
-    ecard_startfind();
-
-    while(1) {
-	ecs[count] = ecard_find(0, acornscsi_cids);
-	if (!ecs[count])
-	    break;
-
-	if (ecs[count]->irq == 0xff) {
-	    printk("scsi: WD33C93 does not have IRQ enabled - ignoring\n");
-	    continue;
-	}
-
-	ecard_claim(ecs[count]); /* Must claim here - card produces irq on reset */
-
-	instance = scsi_register(tpnt, sizeof(AS_Host));
-	if (!instance) {
-		ecard_release(ecs[count]);
-		break;
-	}
-
-	host = (AS_Host *)instance->hostdata;
-
-	instance->io_port = ecard_address(ecs[count], ECARD_MEMC, 0);
-	instance->irq = ecs[count]->irq;
-
-	host->host		= instance;
-	host->scsi.io_port	= ioaddr(instance->io_port + 0x800);
-	host->scsi.irq		= instance->irq;
-	host->card.io_intr	= POD_SPACE(instance->io_port) + 0x800;
-	host->card.io_page	= POD_SPACE(instance->io_port) + 0xc00;
-	host->card.io_ram	= ioaddr(instance->io_port);
-	host->dma.io_port	= instance->io_port + 0xc00;
-	host->dma.io_intr_clear = POD_SPACE(instance->io_port) + 0x800;
-
-	ecs[count]->irqaddr	= (char *)ioaddr(host->card.io_intr);
-	ecs[count]->irqmask	= 0x0a;
-
-	if (!request_region(instance->io_port + 0x800,  2, "acornscsi(sbic)"))
-		goto err_1;
-	if (!request_region(host->card.io_intr,  1, "acornscsi(intr)"))
-		goto err_2;
-	if (!request_region(host->card.io_page,  1, "acornscsi(page)"))
-		goto err_3;
-#ifdef USE_DMAC
-	if (!request_region(host->dma.io_port, 256, "acornscsi(dmac)"))
-		goto err_4;
-#endif
-	if (!request_region(instance->io_port, 2048, "acornscsi(ram)"))
-		goto err_5;
-
-	if (request_irq(host->scsi.irq, acornscsi_intr, SA_INTERRUPT, "acornscsi", host)) {
-	    printk(KERN_CRIT "scsi%d: IRQ%d not free, interrupts disabled\n",
-		instance->host_no, host->scsi.irq);
-	    host->scsi.irq = NO_IRQ;
-	}
-
-	acornscsi_host_init(host);
-
-	++count;
-    }
-    return count;
-    
-err_5:
-#ifdef USE_DMAC
-    release_region(host->dma.io_port, 256);
-#endif
-err_4:
-    release_region(host->card.io_page, 1);
-err_3:
-    release_region(host->card.io_intr, 1);    
-err_2:
-    release_region(instance->io_port + 0x800, 2);
-err_1:
-    scsi_unregister(instance);
-    return 0;
-}
-
-/*
- * Function: int acornscsi_release(struct Scsi_Host *host)
- * Purpose : release all resources used by this adapter
- * Params  : host - driver structure to release
- * Returns : nothing of any consequence
- */
-int acornscsi_release(struct Scsi_Host *instance)
-{
-    AS_Host *host = (AS_Host *)instance->hostdata;
-    int i;
-
-    /*
-     * Put card into RESET state
-     */
-    outb(0x80, host->card.io_page);
-
-    if (host->scsi.irq != NO_IRQ)
-	free_irq(host->scsi.irq, host);
-
-    release_region(instance->io_port + 0x800, 2);
-    release_region(host->card.io_intr, 1);
-    release_region(host->card.io_page, 1);
-    release_region(host->dma.io_port, 256);
-    release_region(instance->io_port, 2048);
-
-    for (i = 0; i < MAX_ECARDS; i++)
-	if (ecs[i] && instance->io_port == ecard_address(ecs[i], ECARD_MEMC, 0))
-	    ecard_release(ecs[i]);
-
-    msgqueue_free(&host->scsi.msgs);
-    queue_free(&host->queues.disconnected);
-    queue_free(&host->queues.issue);
-
-    return 0;
-}
 
 /*
  * Function: char *acornscsi_info(struct Scsi_Host *host)
@@ -3126,10 +2981,9 @@ static Scsi_Host_Template acornscsi_template = {
 	.module			= THIS_MODULE,
 	.proc_info		= acornscsi_proc_info,
 	.name			= "AcornSCSI",
-	.detect			= acornscsi_detect,
-	.release		= acornscsi_release,
 	.info			= acornscsi_info,
 	.queuecommand		= acornscsi_queuecmd,
+#warning fixme
 	.abort			= acornscsi_abort,
 	.reset			= acornscsi_reset,
 	.can_queue		= 16,
@@ -3137,22 +2991,137 @@ static Scsi_Host_Template acornscsi_template = {
 	.sg_tablesize		= SG_ALL,
 	.cmd_per_lun		= 2,
 	.unchecked_isa_dma	= 0,
-	.use_clustering		= DISABLE_CLUSTERING
+	.use_clustering		= DISABLE_CLUSTERING,
+	.proc_name		= "acornscsi",
+};
+
+static int __devinit
+acornscsi_probe(struct expansion_card *ec, const struct ecard_id *id)
+{
+	struct Scsi_Host *host;
+	AS_Host *ashost;
+	int ret = -ENOMEM;
+
+	host = scsi_register(&acornscsi_template, sizeof(AS_Host));
+	if (!host)
+		goto out;
+
+	ashost = (AS_Host *)host->hostdata;
+
+	host->io_port = ecard_address(ec, ECARD_MEMC, 0);
+	host->irq = ec->irq;
+
+	ashost->host		= host;
+	ashost->scsi.io_port	= ioaddr(host->io_port + 0x800);
+	ashost->scsi.irq	= host->irq;
+	ashost->card.io_intr	= POD_SPACE(host->io_port) + 0x800;
+	ashost->card.io_page	= POD_SPACE(host->io_port) + 0xc00;
+	ashost->card.io_ram	= ioaddr(host->io_port);
+	ashost->dma.io_port	= host->io_port + 0xc00;
+	ashost->dma.io_intr_clear = POD_SPACE(host->io_port) + 0x800;
+
+	ec->irqaddr	= (char *)ioaddr(ashost->card.io_intr);
+	ec->irqmask	= 0x0a;
+
+	ret = -EBUSY;
+	if (!request_region(host->io_port + 0x800, 2, "acornscsi(sbic)"))
+		goto err_1;
+	if (!request_region(ashost->card.io_intr, 1, "acornscsi(intr)"))
+		goto err_2;
+	if (!request_region(ashost->card.io_page, 1, "acornscsi(page)"))
+		goto err_3;
+#ifdef USE_DMAC
+	if (!request_region(ashost->dma.io_port, 256, "acornscsi(dmac)"))
+		goto err_4;
+#endif
+	if (!request_region(host->io_port, 2048, "acornscsi(ram)"))
+		goto err_5;
+
+	ret = request_irq(host->irq, acornscsi_intr, SA_INTERRUPT, "acornscsi", ashost);
+	if (ret) {
+		printk(KERN_CRIT "scsi%d: IRQ%d not free: %d\n",
+			host->host_no, ashost->scsi.irq, ret);
+		goto err_6;
+	}
+
+	memset(&ashost->stats, 0, sizeof (ashost->stats));
+	queue_initialise(&ashost->queues.issue);
+	queue_initialise(&ashost->queues.disconnected);
+	msgqueue_initialise(&ashost->scsi.msgs);
+
+	acornscsi_resetcard(ashost);
+
+	ret = scsi_add_host(host);
+	if (ret == 0)
+		goto out;
+
+	free_irq(host->irq, ashost);
+ err_6:
+	release_region(host->io_port, 2048);
+ err_5:
+#ifdef USE_DMAC
+	release_region(ashost->dma.io_port, 256);
+#endif
+ err_4:
+	release_region(ashost->card.io_page, 1);
+ err_3:
+	release_region(ashost->card.io_intr, 1);    
+ err_2:
+	release_region(host->io_port + 0x800, 2);
+ err_1:
+	scsi_unregister(host);
+ out:
+	return ret;
+}
+
+static void __devexit acornscsi_remove(struct expansion_card *ec)
+{
+	struct Scsi_Host *host = ecard_get_drvdata(ec);
+	AS_Host *ashost = (AS_Host *)host->hostdata;
+
+	ecard_set_drvdata(ec, NULL);
+	scsi_remove_host(host);
+
+	/*
+	 * Put card into RESET state
+	 */
+	outb(0x80, ashost->card.io_page);
+
+	free_irq(host->irq, ashost);
+
+	release_region(host->io_port + 0x800, 2);
+	release_region(ashost->card.io_intr, 1);
+	release_region(ashost->card.io_page, 1);
+	release_region(ashost->dma.io_port, 256);
+	release_region(host->io_port, 2048);
+
+	msgqueue_free(&ashost->scsi.msgs);
+	queue_free(&ashost->queues.disconnected);
+	queue_free(&ashost->queues.issue);
+}
+
+static const struct ecard_id acornscsi_cids[] = {
+	{ MANU_ACORN, PROD_ACORN_SCSI },
+	{ 0xffff, 0xffff },
+};
+
+static struct ecard_driver acornscsi_driver = {
+	.probe		= acornscsi_probe,
+	.remove		= __devexit_p(acornscsi_remove),
+	.id_table	= acornscsi_cids,
+	.drv = {
+		.name	= "acornscsi",
+	},
 };
 
 static int __init acornscsi_init(void)
 {
-	scsi_register_host(&acornscsi_template);
-	if (acornscsi_template.present)
-		return 0;
-
-	scsi_unregister_host(&acornscsi_template);
-	return -ENODEV;
+	return ecard_register_driver(&acornscsi_driver);
 }
 
 static void __exit acornscsi_exit(void)
 {
-	scsi_unregister_host(&acornscsi_template);
+	ecard_remove_driver(&acornscsi_driver);
 }
 
 module_init(acornscsi_init);
@@ -3161,4 +3130,3 @@ module_exit(acornscsi_exit);
 MODULE_AUTHOR("Russell King");
 MODULE_DESCRIPTION("AcornSCSI driver");
 MODULE_LICENSE("GPL");
-

@@ -573,17 +573,15 @@ ENTRY(cpu_xscale_set_pgd)
 	cpwait_ret lr, ip
 
 /*
- * cpu_xscale_set_pmd(pmdp, pmd)
+ * cpu_xscale_flush_pmd(pmdp)
  *
  * Set a level 1 translation table entry, and clean it out of
  * any caches such that the MMUs can load it correctly.
  *
  * pmdp: pointer to PMD entry
- * pmd:  PMD value to store
  */
 	.align	5
-ENTRY(cpu_xscale_set_pmd)
-	str	r1, [r0]
+ENTRY(cpu_xscale_flush_pmd)
 	mov	ip, #0
 	mcr	p15, 0, r0, c7, c10, 1		@ Clean D cache line
 	mcr	p15, 0, ip, c7, c10, 4		@ Drain Write (& Fill) Buffer
@@ -721,7 +719,7 @@ ENTRY(xscale_processor_functions)
 
 	/* pgtable */
 	.word	cpu_xscale_set_pgd
-	.word	cpu_xscale_set_pmd
+	.word	cpu_xscale_flush_pmd
 	.word	cpu_xscale_set_pte
 	.size	xscale_processor_functions, . - xscale_processor_functions
 

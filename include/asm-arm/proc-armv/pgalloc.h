@@ -96,7 +96,7 @@ static inline void
 pmd_populate_kernel(struct mm_struct *mm, pmd_t *pmdp, pte_t *ptep)
 {
 	unsigned long pte_ptr = (unsigned long)ptep;
-	pmd_t pmd;
+	unsigned long pmdval;
 
 	BUG_ON(mm != &init_mm);
 
@@ -105,21 +105,21 @@ pmd_populate_kernel(struct mm_struct *mm, pmd_t *pmdp, pte_t *ptep)
 	 * address of the PTE table
 	 */
 	pte_ptr -= PTRS_PER_PTE * sizeof(void *);
-	pmd_val(pmd) = __pa(pte_ptr) | _PAGE_KERNEL_TABLE;
-	set_pmd(pmdp, pmd);
-	pmd_val(pmd) += 256 * sizeof(pte_t);
-	set_pmd(pmdp + 1, pmd);
+	pmdval = __pa(pte_ptr) | _PAGE_KERNEL_TABLE;
+	pmdp[0] = __pmd(pmdval);
+	pmdp[1] = __pmd(pmdval + 256 * sizeof(pte_t));
+	cpu_flush_pmd(pmdp);
 }
 
 static inline void
 pmd_populate(struct mm_struct *mm, pmd_t *pmdp, struct page *ptep)
 {
-	pmd_t pmd;
+	unsigned long pmdval;
 
 	BUG_ON(mm == &init_mm);
 
-	pmd_val(pmd) = __pa(page_address(ptep)) | _PAGE_USER_TABLE;
-	set_pmd(pmdp, pmd);
-	pmd_val(pmd) += 256 * sizeof(pte_t);
-	set_pmd(pmdp + 1, pmd);
+	pmdval = page_to_pfn(ptep) << PAGE_SHIFT | _PAGE_USER_TABLE;
+	pmdp[0] = __pmd(pmdval);
+	pmdp[1] = __pmd(pmdval + 256 * sizeof(pte_t));
+	cpu_flush_pmd(pmdp);
 }

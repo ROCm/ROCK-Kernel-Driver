@@ -53,6 +53,9 @@
 #define MANU_SERPORT		0x003f
 #define PROD_SERPORT_DSPORT		0x00b9
 
+#define MANU_ARXE		0x0041
+#define PROD_ARXE_SCSI			0x00be
+
 #define MANU_I3			0x0046
 #define PROD_I3_ETHERLAN500		0x00d4
 #define PROD_I3_ETHERLAN600		0x00ec
@@ -95,11 +98,11 @@ typedef enum {				/* Speed for ECARD_IOC space	*/
 	ECARD_SYNC	 = 3
 } card_speed_t;
 
-typedef struct ecard_id {		/* Card ID structure		*/
+struct ecard_id {			/* Card ID structure		*/
 	unsigned short	manufacturer;
 	unsigned short	product;
 	void		*data;
-} card_ids;
+};
 
 struct in_ecid {			/* Packed card ID information	*/
 	unsigned short	product;	/* Product code			*/
@@ -177,16 +180,6 @@ struct in_chunk_dir {
  */
 #define ecard_release(ec) ((ec)->claimed = 0)
 
-/*
- * Start finding cards from the top of the list
- */
-extern void ecard_startfind (void);
-
-/*
- * Find an expansion card with the correct cid, product and manufacturer code
- */
-extern struct expansion_card *ecard_find (int cid, const card_ids *ids);
- 
 /*
  * Read a chunk from an expansion card
  * cd : where to put read data

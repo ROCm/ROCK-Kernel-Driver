@@ -12,7 +12,6 @@
  *   10-Oct-1996	RMK	Brought up to date with arch-sa110eval
  *   04-Dec-1997	RMK	Updated for new arch/arm/time.c
  */
-#include <linux/sched.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
 
