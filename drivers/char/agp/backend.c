@@ -43,10 +43,18 @@
  * past 0.99 at all due to some boolean logic error. */
 #define AGPGART_VERSION_MAJOR 0
 #define AGPGART_VERSION_MINOR 100
+static struct agp_version agp_current_version =
+{
+	.major = AGPGART_VERSION_MAJOR,
+	.minor = AGPGART_VERSION_MINOR,
+};
+
+static int agp_count=0;
 
 struct agp_bridge_data agp_bridge_dummy = { .type = NOT_SUPPORTED };
 struct agp_bridge_data *agp_bridge = &agp_bridge_dummy;
 EXPORT_SYMBOL(agp_bridge);
+
 
 /**
  *	agp_backend_acquire  -  attempt to acquire the agp backend.
@@ -65,6 +73,8 @@ int agp_backend_acquire(void)
 	atomic_inc(&agp_bridge->agp_in_use);
 	return 0;
 }
+EXPORT_SYMBOL(agp_backend_acquire);
+
 
 /**
  *	agp_backend_release  -  release the lock on the agp backend.
@@ -79,6 +89,8 @@ void agp_backend_release(void)
 
 	atomic_dec(&agp_bridge->agp_in_use);
 }
+EXPORT_SYMBOL(agp_backend_release);
+
 
 struct agp_max_table {
 	int mem;
@@ -118,11 +130,6 @@ static int agp_find_max (void)
 	return result;
 }
 
-static struct agp_version agp_current_version =
-{
-	.major = AGPGART_VERSION_MAJOR,
-	.minor = AGPGART_VERSION_MINOR,
-};
 
 static int agp_backend_initialize(struct pci_dev *dev)
 {
@@ -207,6 +214,7 @@ static void agp_backend_cleanup(void)
 		agp_bridge->agp_destroy_page(phys_to_virt(agp_bridge->scratch_page_real));
 }
 
+
 static int agp_power(struct pm_dev *dev, pm_request_t rq, void *data)
 {
 	switch(rq) {
@@ -231,7 +239,6 @@ static const drm_agp_t drm_agp = {
 	&agp_copy_info
 };
 
-static int agp_count=0;
 
 int agp_register_driver (struct agp_driver *drv)
 {
@@ -274,6 +281,8 @@ err_out:
 	drv->dev = NULL;
 	return ret_val;
 }
+EXPORT_SYMBOL_GPL(agp_register_driver);
+
 
 int agp_unregister_driver(struct agp_driver *drv)
 {
@@ -289,6 +298,7 @@ int agp_unregister_driver(struct agp_driver *drv)
 	module_put(drv->owner);
 	return 0;
 }
+EXPORT_SYMBOL_GPL(agp_unregister_driver);
 
 
 int __init agp_init(void)
@@ -308,6 +318,7 @@ int __init agp_init(void)
 	return 0;
 }
 
+
 void __exit agp_exit(void)
 {
 	if (agp_count!=0)
@@ -318,11 +329,6 @@ void __exit agp_exit(void)
 module_init(agp_init);
 module_exit(agp_exit);
 #endif
-
-EXPORT_SYMBOL(agp_backend_acquire);
-EXPORT_SYMBOL(agp_backend_release);
-EXPORT_SYMBOL_GPL(agp_register_driver);
-EXPORT_SYMBOL_GPL(agp_unregister_driver);
 
 MODULE_AUTHOR("Dave Jones <davej@codemonkey.org.uk>");
 MODULE_LICENSE("GPL and additional rights");
