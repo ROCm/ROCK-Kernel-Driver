@@ -60,7 +60,7 @@ static DECLARE_MUTEX(clocks_sem);
 
 /* old functions */
 
-void inline s3c2410_clk_enable(unsigned int clocks, unsigned int enable)
+void inline s3c24xx_clk_enable(unsigned int clocks, unsigned int enable)
 {
 	unsigned long clkcon;
 	unsigned long flags;
@@ -88,9 +88,9 @@ static int clk_null_enable(struct clk *clk, int enable)
 	return 0;
 }
 
-int s3c2410_clkcon_enable(struct clk *clk, int enable)
+int s3c24xx_clkcon_enable(struct clk *clk, int enable)
 {
-	s3c2410_clk_enable(clk->ctrlbit, enable);
+	s3c24xx_clk_enable(clk->ctrlbit, enable);
 	return 0;
 }
 
@@ -264,90 +264,90 @@ static struct clk init_clocks[] = {
 	{ .name    = "nand",
 	  .id	   = -1,
 	  .parent  = &clk_h,
-	  .enable  = s3c2410_clkcon_enable,
+	  .enable  = s3c24xx_clkcon_enable,
 	  .ctrlbit = S3C2410_CLKCON_NAND
 	},
 	{ .name    = "lcd",
 	  .id	   = -1,
 	  .parent  = &clk_h,
-	  .enable  = s3c2410_clkcon_enable,
+	  .enable  = s3c24xx_clkcon_enable,
 	  .ctrlbit = S3C2410_CLKCON_LCDC
 	},
 	{ .name    = "usb-host",
 	  .id	   = -1,
 	  .parent  = &clk_h,
-	  .enable  = s3c2410_clkcon_enable,
+	  .enable  = s3c24xx_clkcon_enable,
 	  .ctrlbit = S3C2410_CLKCON_USBH
 	},
 	{ .name    = "usb-device",
 	  .id	   = -1,
 	  .parent  = &clk_h,
-	  .enable  = s3c2410_clkcon_enable,
+	  .enable  = s3c24xx_clkcon_enable,
 	  .ctrlbit = S3C2410_CLKCON_USBD
 	},
 	{ .name    = "timers",
 	  .parent  = &clk_p,
-	  .enable  = s3c2410_clkcon_enable,
+	  .enable  = s3c24xx_clkcon_enable,
 	  .ctrlbit = S3C2410_CLKCON_PWMT
 	},
 	{ .name    = "sdi",
 	  .id	   = -1,
 	  .parent  = &clk_p,
-	  .enable  = s3c2410_clkcon_enable,
+	  .enable  = s3c24xx_clkcon_enable,
 	  .ctrlbit = S3C2410_CLKCON_SDI
 	},
 	{ .name    = "uart",
 	  .id	   = 0,
 	  .parent  = &clk_p,
-	  .enable  = s3c2410_clkcon_enable,
+	  .enable  = s3c24xx_clkcon_enable,
 	  .ctrlbit = S3C2410_CLKCON_UART0
 	},
 	{ .name    = "uart",
 	  .id	   = 1,
 	  .parent  = &clk_p,
-	  .enable  = s3c2410_clkcon_enable,
+	  .enable  = s3c24xx_clkcon_enable,
 	  .ctrlbit = S3C2410_CLKCON_UART1
 	},
 	{ .name    = "uart",
 	  .id	   = 2,
 	  .parent  = &clk_p,
-	  .enable  = s3c2410_clkcon_enable,
+	  .enable  = s3c24xx_clkcon_enable,
 	  .ctrlbit = S3C2410_CLKCON_UART2
 	},
 	{ .name    = "gpio",
 	  .id	   = -1,
 	  .parent  = &clk_p,
-	  .enable  = s3c2410_clkcon_enable,
+	  .enable  = s3c24xx_clkcon_enable,
 	  .ctrlbit = S3C2410_CLKCON_GPIO
 	},
 	{ .name    = "rtc",
 	  .id	   = -1,
 	  .parent  = &clk_p,
-	  .enable  = s3c2410_clkcon_enable,
+	  .enable  = s3c24xx_clkcon_enable,
 	  .ctrlbit = S3C2410_CLKCON_RTC
 	},
 	{ .name    = "adc",
 	  .id	   = -1,
 	  .parent  = &clk_p,
-	  .enable  = s3c2410_clkcon_enable,
+	  .enable  = s3c24xx_clkcon_enable,
 	  .ctrlbit = S3C2410_CLKCON_ADC
 	},
 	{ .name    = "i2c",
 	  .id	   = -1,
 	  .parent  = &clk_p,
-	  .enable  = s3c2410_clkcon_enable,
+	  .enable  = s3c24xx_clkcon_enable,
 	  .ctrlbit = S3C2410_CLKCON_IIC
 	},
 	{ .name    = "iis",
 	  .id	   = -1,
 	  .parent  = &clk_p,
-	  .enable  = s3c2410_clkcon_enable,
+	  .enable  = s3c24xx_clkcon_enable,
 	  .ctrlbit = S3C2410_CLKCON_IIS
 	},
 	{ .name    = "spi",
 	  .id	   = -1,
 	  .parent  = &clk_p,
-	  .enable  = s3c2410_clkcon_enable,
+	  .enable  = s3c24xx_clkcon_enable,
 	  .ctrlbit = S3C2410_CLKCON_SPI
 	},
 	{ .name    = "watchdog",
@@ -359,7 +359,7 @@ static struct clk init_clocks[] = {
 
 /* initialise the clock system */
 
-int s3c2410_register_clock(struct clk *clk)
+int s3c24xx_register_clock(struct clk *clk)
 {
 	clk->owner = THIS_MODULE;
 	atomic_set(&clk->used, 0);
@@ -378,7 +378,7 @@ int s3c2410_register_clock(struct clk *clk)
 
 /* initalise all the clocks */
 
-int __init s3c2410_init_clocks(void)
+int __init s3c24xx_setup_clocks(void)
 {
 	struct clk *clkp = init_clocks;
 	int ptr;
@@ -403,28 +403,28 @@ int __init s3c2410_init_clocks(void)
 	 * and of course, this looks neater
 	 */
 
-	s3c2410_clk_enable(S3C2410_CLKCON_NAND, 0);
-	s3c2410_clk_enable(S3C2410_CLKCON_USBH, 0);
-	s3c2410_clk_enable(S3C2410_CLKCON_USBD, 0);
-	s3c2410_clk_enable(S3C2410_CLKCON_ADC, 0);
-	s3c2410_clk_enable(S3C2410_CLKCON_IIC, 0);
-	s3c2410_clk_enable(S3C2410_CLKCON_SPI, 0);
+	s3c24xx_clk_enable(S3C2410_CLKCON_NAND, 0);
+	s3c24xx_clk_enable(S3C2410_CLKCON_USBH, 0);
+	s3c24xx_clk_enable(S3C2410_CLKCON_USBD, 0);
+	s3c24xx_clk_enable(S3C2410_CLKCON_ADC, 0);
+	s3c24xx_clk_enable(S3C2410_CLKCON_IIC, 0);
+	s3c24xx_clk_enable(S3C2410_CLKCON_SPI, 0);
 
 	/* assume uart clocks are correctly setup */
 
 	/* register our clocks */
 
-	if (s3c2410_register_clock(&clk_f) < 0)
+	if (s3c24xx_register_clock(&clk_f) < 0)
 		printk(KERN_ERR "failed to register cpu fclk\n");
 
-	if (s3c2410_register_clock(&clk_h) < 0)
+	if (s3c24xx_register_clock(&clk_h) < 0)
 		printk(KERN_ERR "failed to register cpu hclk\n");
 
-	if (s3c2410_register_clock(&clk_p) < 0)
+	if (s3c24xx_register_clock(&clk_p) < 0)
 		printk(KERN_ERR "failed to register cpu pclk\n");
 
 	for (ptr = 0; ptr < ARRAY_SIZE(init_clocks); ptr++, clkp++) {
-		ret = s3c2410_register_clock(clkp);
+		ret = s3c24xx_register_clock(clkp);
 		if (ret < 0) {
 			printk(KERN_ERR "Failed to register clock %s (%d)\n",
 			       clkp->name, ret);

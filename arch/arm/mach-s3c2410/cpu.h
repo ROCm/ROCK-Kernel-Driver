@@ -14,6 +14,7 @@
  *     18-Oct-2004 BJD  Moved board struct into this file
  *     04-Jan-2005 BJD  New uart initialisation
  *     10-Jan-2005 BJD  Moved generic init here, specific to cpu headers
+ *     14-Jan-2005 BJD  Added s3c24xx_init_clocks() call
 */
 
 #define IODESC_ENT(x) { S3C2410_VA_##x, S3C2410_PA_##x, S3C2410_SZ_##x, MT_DEVICE }
@@ -34,6 +35,8 @@ extern void s3c24xx_init_irq(void);
 extern void s3c24xx_init_io(struct map_desc *mach_desc, int size);
 
 extern void s3c24xx_init_uarts(struct s3c2410_uartcfg *cfg, int no);
+
+extern void s3c24xx_init_clocks(int xtal);
 
 /* the board structure is used at first initialsation time
  * to get info such as the devices to register for this

@@ -2093,6 +2093,13 @@ L:	sparclinux@vger.kernel.org
 L:	ultralinux@vger.kernel.org
 S:	Maintained
 
+SHARP LH SUPPORT (LH7952X & LH7A40X)
+P:	Marc Singer
+M:	elf@buici.com
+W:	http://projects.buici.com/arm
+L:	linux-arm-kernel@lists.arm.linux.org.uk
+S:	Maintained
+
 SPARC (sparc32):
 P:	William L. Irwin
 M:	wli@holomorphy.com
