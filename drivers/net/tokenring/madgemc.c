@@ -177,7 +177,7 @@ static int __init madgemc_probe(void)
 		if (versionprinted++ == 0)
 			printk("%s", version);
 
-		dev = alloc_trdev(0);
+		dev = alloc_trdev(sizeof(struct net_local));
 		if (dev == NULL) {
 			printk("madgemc: unable to allocate dev space\n");
 			if (madgemc_card_list)

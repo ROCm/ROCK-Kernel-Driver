@@ -2,6 +2,7 @@
 #define _M68KNOMMU_MACHDEP_H
 
 #include <linux/seq_file.h>
+#include <linux/interrupt.h>
 
 struct pt_regs;
 struct kbd_repeat;
@@ -10,14 +11,14 @@ struct hwclk_time;
 struct gendisk;
 struct buffer_head;
 
-extern void (*mach_sched_init) (void (*handler)(int, void *, struct pt_regs *));
+extern void (*mach_sched_init) (irqreturn_t (*handler)(int, void *, struct pt_regs *));
 /* machine dependent keyboard functions */
 extern int (*mach_keyb_init) (void);
 extern int (*mach_kbdrate) (struct kbd_repeat *);
 extern void (*mach_kbd_leds) (unsigned int);
 /* machine dependent irq functions */
 extern void (*mach_init_IRQ) (void);
-extern void (*(*mach_default_handler)[]) (int, void *, struct pt_regs *);
+extern irqreturn_t (*(*mach_default_handler)[]) (int, void *, struct pt_regs *);
 extern int (*mach_request_irq) (unsigned int irq, void (*handler)(int, void *, struct pt_regs *),
                                 unsigned long flags, const char *devname, void *dev_id);
 extern void (*mach_free_irq) (unsigned int irq, void *dev_id);

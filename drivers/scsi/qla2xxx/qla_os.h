@@ -41,8 +41,6 @@
 #include <linux/slab.h>
 #include <linux/mempool.h>
 #include <linux/vmalloc.h>
-#define __KERNEL_SYSCALLS__
-#include <linux/unistd.h>
 #include <linux/smp_lock.h>
 #include <linux/bio.h>
 #include <linux/moduleparam.h>

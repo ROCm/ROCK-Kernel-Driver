@@ -35,7 +35,7 @@
 #include <asm/io.h>
 
 #define DRV_NAME	"sata_promise"
-#define DRV_VERSION	"0.89"
+#define DRV_VERSION	"0.90"
 
 
 enum {
@@ -115,7 +115,12 @@ enum {
 	PDC_DIMM_SPD_SYSTEM_FREQ      = 126,
 	PDC_CTL_STATUS		      = 0x08,	
 	PDC_DIMM_WINDOW_CTLR	      = 0x0C,
+	PDC_TIME_CONTROL              = 0x3C,
+	PDC_TIME_PERIOD               = 0x40,
+	PDC_TIME_COUNTER              = 0x44,
 	PDC_GENERAL_CTLR	      = 0x484,
+	PCI_PLL_INIT                  = 0x8A531824,
+	PCI_X_TCOUNT                  = 0xEE1E5CFF
 };
 
 
@@ -182,7 +187,7 @@ static Scsi_Host_Template pdc_sata_sht = {
 	.eh_strategy_handler	= ata_scsi_error,
 	.can_queue		= ATA_DEF_QUEUE,
 	.this_id		= ATA_SHT_THIS_ID,
-	.sg_tablesize		= ATA_MAX_PRD,
+	.sg_tablesize		= LIBATA_MAX_PRD,
 	.max_sectors		= ATA_MAX_SECTORS,
 	.cmd_per_lun		= ATA_SHT_CMD_PER_LUN,
 	.emulated		= ATA_SHT_EMULATED,
@@ -1454,13 +1459,64 @@ static unsigned int pdc20621_dimm_init(struct ata_probe_ent *pe)
 	int speed, size, length; 
 	u32 addr,spd0,pci_status;
 	u32 tmp=0;
+	u32 time_period=0;
+	u32 tcount=0;
+	u32 ticks=0;
+	u32 clock=0;
+	u32 fparam=0;
    	void *mmio = pe->mmio_base;
 
 	/* hard-code chip #0 */
    	mmio += PDC_CHIP0_OFS;
 
+	/* Initialize PLL based upon PCI Bus Frequency */
+
+	/* Initialize Time Period Register */
+	writel(0xffffffff, mmio + PDC_TIME_PERIOD);
+	time_period = readl(mmio + PDC_TIME_PERIOD);
+	VPRINTK("Time Period Register (0x40): 0x%x\n", time_period);
+
+	/* Enable timer */
+	writel(0x00001a0, mmio + PDC_TIME_CONTROL);
+	readl(mmio + PDC_TIME_CONTROL);
+
+	/* Wait 3 seconds */
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	schedule_timeout(3 * HZ);
+
+	/* 
+	   When timer is enabled, counter is decreased every internal
+	   clock cycle.
+	*/
+
+	tcount = readl(mmio + PDC_TIME_COUNTER);
+	VPRINTK("Time Counter Register (0x44): 0x%x\n", tcount);
+
+	/* 
+	   If SX4 is on PCI-X bus, after 3 seconds, the timer counter
+	   register should be >= (0xffffffff - 3x10^8).
+	*/
+	if(tcount >= PCI_X_TCOUNT) {
+		ticks = (time_period - tcount);
+		VPRINTK("Num counters 0x%x (%d)\n", ticks, ticks);
+	
+		clock = (ticks / 300000);
+		VPRINTK("10 * Internal clk = 0x%x (%d)\n", clock, clock);
+		
+		clock = (clock * 33);
+		VPRINTK("10 * Internal clk * 33 = 0x%x (%d)\n", clock, clock);
+
+		/* PLL F Param (bit 22:16) */
+		fparam = (1400000 / clock) - 2;
+		VPRINTK("PLL F Param: 0x%x (%d)\n", fparam, fparam);
+		
+		/* OD param = 0x2 (bit 31:30), R param = 0x5 (bit 29:25) */
+		pci_status = (0x8a001824 | (fparam << 16));
+	} else
+		pci_status = PCI_PLL_INIT;
+
 	/* Initialize PLL. */
-	pci_status = 0x8a531824;
+	VPRINTK("pci_status: 0x%x\n", pci_status);
 	writel(pci_status, mmio + PDC_CTL_STATUS);
 	readl(mmio + PDC_CTL_STATUS);
 

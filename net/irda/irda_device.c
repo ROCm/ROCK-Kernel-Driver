@@ -40,15 +40,12 @@
 #include <linux/init.h>
 #include <linux/tty.h>
 #include <linux/kmod.h>
-#include <linux/wireless.h>
 #include <linux/spinlock.h>
 
 #include <asm/ioctls.h>
 #include <asm/uaccess.h>
 #include <asm/dma.h>
 #include <asm/io.h>
-
-#include <net/pkt_sched.h>
 
 #include <net/irda/irda_device.h>
 #include <net/irda/irlap.h>
@@ -59,13 +56,6 @@ static void __irda_task_delete(struct irda_task *task);
 
 static hashbin_t *dongles = NULL;
 static hashbin_t *tasks = NULL;
-
-const char *infrared_mode[] = {
-	"IRDA_IRLAP",
-	"IRDA_RAW",
-	"SHARP_ASK",
-	"TV_REMOTE",
-};
 
 #ifdef CONFIG_IRDA_DEBUG
 static const char *task_state[] = {
@@ -248,7 +238,7 @@ void irda_task_delete(struct irda_task *task)
  *    processing, and notify the parent task, that is waiting for this task
  *    to complete.
  */
-int irda_task_kick(struct irda_task *task)
+static int irda_task_kick(struct irda_task *task)
 {
 	int finished = TRUE;
 	int count = 0;
@@ -406,22 +396,6 @@ struct net_device *alloc_irdadev(int sizeof_priv)
 	return alloc_netdev(sizeof_priv, "irda%d", irda_device_setup);
 }
 
-
-/*
- * Function irda_device_txqueue_empty (dev)
- *
- *    Check if there is still some frames in the transmit queue for this
- *    device. Maybe we should use: q->q.qlen == 0.
- *
- */
-int irda_device_txqueue_empty(struct net_device *dev)
-{
-	if (skb_queue_len(&dev->qdisc->q))
-		return FALSE;
-
-	return TRUE;
-}
-
 /*
  * Function irda_device_init_dongle (self, type, qos)
  *
@@ -557,7 +531,7 @@ int irda_device_set_mode(struct net_device* dev, int mode)
  *    Setup the DMA channel. Commonly used by ISA FIR drivers
  *
  */
-void setup_dma(int channel, char *buffer, int count, int mode)
+void irda_setup_dma(int channel, char *buffer, int count, int mode)
 {
 	unsigned long flags;
 
@@ -572,4 +546,5 @@ void setup_dma(int channel, char *buffer, int count, int mode)
 
 	release_dma_lock(flags);
 }
+EXPORT_SYMBOL(irda_setup_dma);
 #endif

@@ -182,11 +182,15 @@ xor_pII_mmx_5(unsigned long bytes, unsigned long *p1, unsigned long *p2,
 
 	kernel_fpu_begin();
 
-	/* need to save/restore p4/p5 manually otherwise gcc's 10 argument
-	   limit gets exceeded (+ counts as two arguments) */
+	/* Make sure GCC forgets anything it knows about p4 or p5,
+	   such that it won't pass to the asm volatile below a
+	   register that is shared with any other variable.  That's
+	   because we modify p4 and p5 there, but we can't mark them
+	   as read/write, otherwise we'd overflow the 10-asm-operands
+	   limit of GCC < 3.1.  */
+	__asm__ ("" : "+r" (p4), "+r" (p5));
+
 	__asm__ __volatile__ (
-		"  pushl %4\n"
-		"  pushl %5\n"
 #undef BLOCK
 #define BLOCK(i) \
 	LD(i,0)					\
@@ -229,12 +233,15 @@ xor_pII_mmx_5(unsigned long bytes, unsigned long *p1, unsigned long *p2,
 	"       addl $128, %5         ;\n"
 	"       decl %0               ;\n"
 	"       jnz 1b                ;\n"
-	"	popl %5\n"
-	"	popl %4\n"
 	: "+r" (lines),
 	  "+r" (p1), "+r" (p2), "+r" (p3)
 	: "r" (p4), "r" (p5) 
 	: "memory");
+
+	/* p4 and p5 were modified, and now the variables are dead.
+	   Clobber them just to be sure nobody does something stupid
+	   like assuming they have some legal value.  */
+	__asm__ ("" : "=r" (p4), "=r" (p5));
 
 	kernel_fpu_end();
 }
@@ -425,10 +432,15 @@ xor_p5_mmx_5(unsigned long bytes, unsigned long *p1, unsigned long *p2,
 
 	kernel_fpu_begin();
 
-	/* need to save p4/p5 manually to not exceed gcc's 10 argument limit */
+	/* Make sure GCC forgets anything it knows about p4 or p5,
+	   such that it won't pass to the asm volatile below a
+	   register that is shared with any other variable.  That's
+	   because we modify p4 and p5 there, but we can't mark them
+	   as read/write, otherwise we'd overflow the 10-asm-operands
+	   limit of GCC < 3.1.  */
+	__asm__ ("" : "+r" (p4), "+r" (p5));
+
 	__asm__ __volatile__ (
-	"	pushl %4\n"
-	"	pushl %5\n"        	
 	" .align 32,0x90             ;\n"
 	" 1:                         ;\n"
 	"       movq   (%1), %%mm0   ;\n"
@@ -487,12 +499,15 @@ xor_p5_mmx_5(unsigned long bytes, unsigned long *p1, unsigned long *p2,
 	"       addl $64, %5         ;\n"
 	"       decl %0              ;\n"
 	"       jnz 1b               ;\n"
-	"	popl %5\n"
-	"	popl %4\n"
-	: "+g" (lines),
+	: "+r" (lines),
 	  "+r" (p1), "+r" (p2), "+r" (p3)
 	: "r" (p4), "r" (p5)
 	: "memory");
+
+	/* p4 and p5 were modified, and now the variables are dead.
+	   Clobber them just to be sure nobody does something stupid
+	   like assuming they have some legal value.  */
+	__asm__ ("" : "=r" (p4), "=r" (p5));
 
 	kernel_fpu_end();
 }
@@ -757,10 +772,15 @@ xor_sse_5(unsigned long bytes, unsigned long *p1, unsigned long *p2,
 
 	XMMS_SAVE;
 
-	/* need to save p4/p5 manually to not exceed gcc's 10 argument limit */
+	/* Make sure GCC forgets anything it knows about p4 or p5,
+	   such that it won't pass to the asm volatile below a
+	   register that is shared with any other variable.  That's
+	   because we modify p4 and p5 there, but we can't mark them
+	   as read/write, otherwise we'd overflow the 10-asm-operands
+	   limit of GCC < 3.1.  */
+	__asm__ ("" : "+r" (p4), "+r" (p5));
+
         __asm__ __volatile__ (
-		" pushl %4\n"
-		" pushl %5\n"
 #undef BLOCK
 #define BLOCK(i) \
 		PF1(i)					\
@@ -817,12 +837,15 @@ xor_sse_5(unsigned long bytes, unsigned long *p1, unsigned long *p2,
         "       addl $256, %5           ;\n"
         "       decl %0                 ;\n"
         "       jnz 1b                  ;\n"
-	"	popl %5\n"	
-	"	popl %4\n"	
 	: "+r" (lines),
 	  "+r" (p1), "+r" (p2), "+r" (p3)
 	: "r" (p4), "r" (p5)
 	: "memory");
+
+	/* p4 and p5 were modified, and now the variables are dead.
+	   Clobber them just to be sure nobody does something stupid
+	   like assuming they have some legal value.  */
+	__asm__ ("" : "=r" (p4), "=r" (p5));
 
 	XMMS_RESTORE;
 }

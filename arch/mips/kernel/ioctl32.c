@@ -61,6 +61,7 @@
 #include <linux/ethtool.h>
 #include <linux/mii.h>
 #include <linux/if_bonding.h>
+#include <linux/syscalls.h>
 #include <linux/watchdog.h>
 
 #include <asm/ioctls.h>
@@ -95,8 +96,6 @@
 #ifdef CONFIG_SIBYTE_TBPROF
 #include <asm/sibyte/trace_prof.h>
 #endif
-
-long sys_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg);
 
 static int w_long(unsigned int fd, unsigned int cmd, unsigned long arg)
 {

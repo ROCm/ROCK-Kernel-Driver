@@ -5,7 +5,8 @@
  *
  * sysfs port related routines
  *
- * Copyright (C) 2003 IBM Entwicklung GmbH, IBM Corporation
+ * (C) Copyright IBM Corp. 2003, 2004
+ *
  * Authors:
  *      Martin Peschke <mpeschke@de.ibm.com>
  *	Heiko Carstens <heiko.carstens@de.ibm.com>
@@ -25,7 +26,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#define ZFCP_SYSFS_PORT_C_REVISION "$Revision: 1.32 $"
+#define ZFCP_SYSFS_PORT_C_REVISION "$Revision: 1.37 $"
 
 #include <linux/init.h>
 #include <linux/module.h>
@@ -34,7 +35,6 @@
 #include "zfcp_def.h"
 
 #define ZFCP_LOG_AREA                   ZFCP_LOG_AREA_CONFIG
-#define ZFCP_LOG_AREA_PREFIX            ZFCP_LOG_AREA_PREFIX_CONFIG
 
 /**
  * zfcp_sysfs_port_release - gets called when a struct device port is released
@@ -209,11 +209,6 @@ zfcp_sysfs_port_failed_store(struct device *dev, const char *buf, size_t count)
 		goto out;
 	}
 
-	/* restart error recovery only if adapter is online */
-	if (port->adapter->ccw_device->online != 1) {
-		retval = -ENXIO;
-		goto out;
-	}
 	zfcp_erp_modify_port_status(port, ZFCP_STATUS_COMMON_RUNNING, ZFCP_SET);
 	zfcp_erp_port_reopen(port, ZFCP_STATUS_COMMON_ERP_FAILED);
 	zfcp_erp_wait(port->adapter);
@@ -268,6 +263,10 @@ zfcp_sysfs_port_in_recovery_show(struct device *dev, char *buf)
 static DEVICE_ATTR(in_recovery, S_IRUGO, zfcp_sysfs_port_in_recovery_show,
 		   NULL);
 
+/**
+ * zfcp_port_common_attrs
+ * sysfs attributes that are common for all kind of fc ports.
+ */
 static struct attribute *zfcp_port_common_attrs[] = {
 	&dev_attr_failed.attr,
 	&dev_attr_in_recovery.attr,
@@ -281,6 +280,10 @@ static struct attribute_group zfcp_port_common_attr_group = {
 	.attrs = zfcp_port_common_attrs,
 };
 
+/**
+ * zfcp_port_no_ns_attrs
+ * sysfs attributes not to be used for nameserver ports.
+ */
 static struct attribute *zfcp_port_no_ns_attrs[] = {
 	&dev_attr_unit_add.attr,
 	&dev_attr_unit_remove.attr,
@@ -330,4 +333,3 @@ zfcp_sysfs_port_remove_files(struct device *dev, u32 flags)
 }
 
 #undef ZFCP_LOG_AREA
-#undef ZFCP_LOG_AREA_PREFIX

@@ -70,7 +70,7 @@ MODULE_DEVICE_TABLE(usb, bfusb_table);
 #define BFUSB_MAX_BULK_RX	2
 
 struct bfusb {
-	struct hci_dev		hdev;
+	struct hci_dev		*hdev;
 
 	unsigned long		state;
 
@@ -155,7 +155,7 @@ static int bfusb_send_bulk(struct bfusb *bfusb, struct sk_buff *skb)
 	err = usb_submit_urb(urb, GFP_ATOMIC);
 	if (err) {
 		BT_ERR("%s bulk tx submit failed urb %p err %d", 
-					bfusb->hdev.name, urb, err);
+					bfusb->hdev->name, urb, err);
 		skb_unlink(skb);
 		usb_free_urb(urb);
 	} else
@@ -200,13 +200,13 @@ static void bfusb_tx_complete(struct urb *urb, struct pt_regs *regs)
 
 	atomic_dec(&bfusb->pending_tx);
 
-	if (!test_bit(HCI_RUNNING, &bfusb->hdev.flags))
+	if (!test_bit(HCI_RUNNING, &bfusb->hdev->flags))
 		return;
 
 	if (!urb->status)
-		bfusb->hdev.stat.byte_tx += skb->len;
+		bfusb->hdev->stat.byte_tx += skb->len;
 	else
-		bfusb->hdev.stat.err_tx++;
+		bfusb->hdev->stat.err_tx++;
 
 	read_lock(&bfusb->lock);
 
@@ -250,7 +250,7 @@ static int bfusb_rx_submit(struct bfusb *bfusb, struct urb *urb)
 	err = usb_submit_urb(urb, GFP_ATOMIC);
 	if (err) {
 		BT_ERR("%s bulk rx submit failed urb %p err %d",
-					bfusb->hdev.name, urb, err);
+					bfusb->hdev->name, urb, err);
 		skb_unlink(skb);
 		kfree_skb(skb);
 		usb_free_urb(urb);
@@ -264,7 +264,7 @@ static inline int bfusb_recv_block(struct bfusb *bfusb, int hdr, unsigned char *
 	BT_DBG("bfusb %p hdr 0x%02x data %p len %d", bfusb, hdr, data, len);
 
 	if (hdr & 0x10) {
-		BT_ERR("%s error in block", bfusb->hdev.name);
+		BT_ERR("%s error in block", bfusb->hdev->name);
 		if (bfusb->reassembly)
 			kfree_skb(bfusb->reassembly);
 		bfusb->reassembly = NULL;
@@ -277,13 +277,13 @@ static inline int bfusb_recv_block(struct bfusb *bfusb, int hdr, unsigned char *
 		int pkt_len = 0;
 
 		if (bfusb->reassembly) {
-			BT_ERR("%s unexpected start block", bfusb->hdev.name);
+			BT_ERR("%s unexpected start block", bfusb->hdev->name);
 			kfree_skb(bfusb->reassembly);
 			bfusb->reassembly = NULL;
 		}
 
 		if (len < 1) {
-			BT_ERR("%s no packet type found", bfusb->hdev.name);
+			BT_ERR("%s no packet type found", bfusb->hdev->name);
 			return -EPROTO;
 		}
 
@@ -295,7 +295,7 @@ static inline int bfusb_recv_block(struct bfusb *bfusb, int hdr, unsigned char *
 				struct hci_event_hdr *hdr = (struct hci_event_hdr *) data;
 				pkt_len = HCI_EVENT_HDR_SIZE + hdr->plen;
 			} else {
-				BT_ERR("%s event block is too short", bfusb->hdev.name);
+				BT_ERR("%s event block is too short", bfusb->hdev->name);
 				return -EILSEQ;
 			}
 			break;
@@ -305,7 +305,7 @@ static inline int bfusb_recv_block(struct bfusb *bfusb, int hdr, unsigned char *
 				struct hci_acl_hdr *hdr = (struct hci_acl_hdr *) data;
 				pkt_len = HCI_ACL_HDR_SIZE + __le16_to_cpu(hdr->dlen);
 			} else {
-				BT_ERR("%s data block is too short", bfusb->hdev.name);
+				BT_ERR("%s data block is too short", bfusb->hdev->name);
 				return -EILSEQ;
 			}
 			break;
@@ -315,7 +315,7 @@ static inline int bfusb_recv_block(struct bfusb *bfusb, int hdr, unsigned char *
 				struct hci_sco_hdr *hdr = (struct hci_sco_hdr *) data;
 				pkt_len = HCI_SCO_HDR_SIZE + hdr->dlen;
 			} else {
-				BT_ERR("%s audio block is too short", bfusb->hdev.name);
+				BT_ERR("%s audio block is too short", bfusb->hdev->name);
 				return -EILSEQ;
 			}
 			break;
@@ -323,17 +323,17 @@ static inline int bfusb_recv_block(struct bfusb *bfusb, int hdr, unsigned char *
 
 		skb = bt_skb_alloc(pkt_len, GFP_ATOMIC);
 		if (!skb) {
-			BT_ERR("%s no memory for the packet", bfusb->hdev.name);
+			BT_ERR("%s no memory for the packet", bfusb->hdev->name);
 			return -ENOMEM;
 		}
 
-		skb->dev = (void *) &bfusb->hdev;
+		skb->dev = (void *) bfusb->hdev;
 		skb->pkt_type = pkt_type;
 
 		bfusb->reassembly = skb;
 	} else {
 		if (!bfusb->reassembly) {
-			BT_ERR("%s unexpected continuation block", bfusb->hdev.name);
+			BT_ERR("%s unexpected continuation block", bfusb->hdev->name);
 			return -EIO;
 		}
 	}
@@ -359,7 +359,7 @@ static void bfusb_rx_complete(struct urb *urb, struct pt_regs *regs)
 
 	BT_DBG("bfusb %p urb %p skb %p len %d", bfusb, urb, skb, skb->len);
 
-	if (!test_bit(HCI_RUNNING, &bfusb->hdev.flags))
+	if (!test_bit(HCI_RUNNING, &bfusb->hdev->flags))
 		return;
 
 	read_lock(&bfusb->lock);
@@ -367,7 +367,7 @@ static void bfusb_rx_complete(struct urb *urb, struct pt_regs *regs)
 	if (urb->status || !count)
 		goto resubmit;
 
-	bfusb->hdev.stat.byte_rx += count;
+	bfusb->hdev->stat.byte_rx += count;
 
 	skb_put(skb, count);
 
@@ -386,7 +386,7 @@ static void bfusb_rx_complete(struct urb *urb, struct pt_regs *regs)
 
 		if (count < len) {
 			BT_ERR("%s block extends over URB buffer ranges",
-					bfusb->hdev.name);
+					bfusb->hdev->name);
 		}
 
 		if ((hdr & 0xe1) == 0xc1)
@@ -411,7 +411,7 @@ resubmit:
 	err = usb_submit_urb(urb, GFP_ATOMIC);
 	if (err) {
 		BT_ERR("%s bulk resubmit failed urb %p err %d",
-					bfusb->hdev.name, urb, err);
+					bfusb->hdev->name, urb, err);
 	}
 
 	read_unlock(&bfusb->lock);
@@ -698,7 +698,13 @@ static int bfusb_probe(struct usb_interface *intf, const struct usb_device_id *i
 	release_firmware(firmware);
 
 	/* Initialize and register HCI device */
-	hdev = &bfusb->hdev;
+	hdev = hci_alloc_dev();
+	if (!hdev) {
+		BT_ERR("Can't allocate HCI device");
+		goto error;
+	}
+
+	bfusb->hdev = hdev;
 
 	hdev->type = HCI_USB;
 	hdev->driver_data = bfusb;
@@ -715,6 +721,7 @@ static int bfusb_probe(struct usb_interface *intf, const struct usb_device_id *i
 
 	if (hci_register_dev(hdev) < 0) {
 		BT_ERR("Can't register HCI device");
+		hci_free_dev(hdev);
 		goto error;
 	}
 
@@ -735,7 +742,7 @@ done:
 static void bfusb_disconnect(struct usb_interface *intf)
 {
 	struct bfusb *bfusb = usb_get_intfdata(intf);
-	struct hci_dev *hdev = &bfusb->hdev;
+	struct hci_dev *hdev = bfusb->hdev;
 
 	BT_DBG("intf %p", intf);
 
@@ -748,6 +755,8 @@ static void bfusb_disconnect(struct usb_interface *intf)
 
 	if (hci_unregister_dev(hdev) < 0)
 		BT_ERR("Can't unregister HCI device %s", hdev->name);
+
+	hci_free_dev(hdev);
 }
 
 static struct usb_driver bfusb_driver = {

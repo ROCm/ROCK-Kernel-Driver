@@ -388,6 +388,9 @@ type name (atype a, btype b, ctype c, dtype d, etype e, ftype f)	      \
 
 #ifdef __KERNEL_SYSCALLS__
 
+#include <linux/compiler.h>
+#include <linux/types.h>
+
 /*
  * we need this inline - forking from kernel space will result
  * in NO COPY ON WRITE (!!!), until an execve is executed. This
@@ -416,6 +419,22 @@ extern inline pid_t wait(int * wait_stat)
 {
 	return waitpid (-1, wait_stat, 0);
 }
+
+unsigned long sys_mmap(unsigned long addr, size_t len,
+			unsigned long prot, unsigned long flags,
+			unsigned long fd, off_t offset);
+unsigned long sys_mmap2(unsigned long addr, size_t len,
+			unsigned long prot, unsigned long flags,
+			unsigned long fd, unsigned long pgoff);
+struct pt_regs;
+int sys_execve (char *name, char **argv, char **envp, struct pt_regs *regs);
+int sys_pipe (int *fildes);
+int sys_ptrace(long request, long pid, long addr, long data);
+struct sigaction;
+asmlinkage long sys_rt_sigaction(int sig,
+				const struct sigaction __user *act,
+				struct sigaction __user *oact,
+				size_t sigsetsize);
 
 #endif
 

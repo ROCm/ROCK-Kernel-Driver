@@ -27,8 +27,6 @@
 #include "conv.h"
 #include "socksys.h"
 
-extern asmlinkage int sys_ioctl(unsigned int fd, unsigned int cmd, 
-	unsigned long arg);
 asmlinkage int solaris_ioctl(unsigned int fd, unsigned int cmd, u32 arg);
 
 static spinlock_t timod_pagelock = SPIN_LOCK_UNLOCKED;

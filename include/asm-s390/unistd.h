@@ -505,7 +505,12 @@ type name(type1 arg1, type2 arg2, type3 arg3, type4 arg4,    \
 
 #ifdef __KERNEL_SYSCALLS__
 
+#include <linux/config.h>
+#include <linux/compiler.h>
+#include <linux/types.h>
+#include <asm/ptrace.h>
 #include <asm/stat.h>
+#include <linux/syscalls.h>
 
 /*
  * we need this inline - forking from kernel space will result
@@ -528,15 +533,32 @@ static inline _syscall1(int,dup,int,fd)
 static inline _syscall3(int,execve,const char *,file,char **,argv,char **,envp)
 static inline _syscall3(int,open,const char *,file,int,flag,int,mode)
 static inline _syscall1(int,close,int,fd)
-static inline _syscall1(int,_exit,int,exitcode)
 static inline _syscall2(long,stat,char *,filename,struct stat *,statbuf)
 
-struct rusage;
-extern long sys_wait4(pid_t, unsigned int *, int, struct rusage *);
 static inline pid_t waitpid(int pid, int *wait_stat, int flags)
 {
 	return sys_wait4(pid, wait_stat, flags, NULL);
 }
+struct mmap_arg_struct;
+asmlinkage long sys_mmap2(struct mmap_arg_struct *arg);
+
+asmlinkage int sys_execve(struct pt_regs regs);
+asmlinkage int sys_clone(struct pt_regs regs);
+asmlinkage int sys_fork(struct pt_regs regs);
+asmlinkage int sys_vfork(struct pt_regs regs);
+#ifndef CONFIG_ARCH_S390X
+#define __SYS_RETTYPE int
+#else
+#define __SYS_RETTYPE long
+#endif /* CONFIG_ARCH_S390X */
+asmlinkage __SYS_RETTYPE sys_pipe(unsigned long *fildes);
+asmlinkage int sys_ptrace(long request, long pid, long addr, long data);
+asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int on);
+struct sigaction;
+asmlinkage long sys_rt_sigaction(int sig,
+				const struct sigaction __user *act,
+				struct sigaction __user *oact,
+				size_t sigsetsize);
 
 #endif
 

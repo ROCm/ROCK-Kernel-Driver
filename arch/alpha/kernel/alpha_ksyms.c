@@ -11,6 +11,7 @@
 #include <linux/user.h>
 #include <linux/elfcore.h>
 #include <linux/socket.h>
+#include <linux/syscalls.h>
 #include <linux/in.h>
 #include <linux/in6.h>
 #include <linux/pci.h>

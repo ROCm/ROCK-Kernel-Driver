@@ -347,12 +347,6 @@ setup_sigcontext (struct sigcontext *sc, sigset_t *mask, struct sigscratch *scr)
 		__copy_to_user(&sc->sc_fr[32], current->thread.fph, 96*16);
 	}
 
-	/*
-	 * Note: sw->ar_unat is UNDEFINED unless the process is being
-	 * PTRACED.  However, this is OK because the NaT bits of the
-	 * preserved registers (r4-r7) are never being looked at by
-	 * the signal handler (registers r4-r7 are used instead).
-	 */
 	nat = ia64_get_scratch_nat_bits(&scr->pt, scr->scratch_unat);
 
 	err  = __put_user(flags, &sc->sc_flags);

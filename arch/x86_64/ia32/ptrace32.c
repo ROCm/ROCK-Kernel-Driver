@@ -14,6 +14,8 @@
 #include <linux/kernel.h>
 #include <linux/stddef.h>
 #include <linux/sched.h>
+#include <linux/syscalls.h>
+#include <linux/unistd.h>
 #include <linux/mm.h>
 #include <asm/ptrace.h>
 #include <asm/uaccess.h>
@@ -222,8 +224,6 @@ static struct task_struct *find_target(int request, int pid, int *err)
 	return NULL; 
 	
 } 
-
-extern asmlinkage long sys_ptrace(long request, long pid, unsigned long addr, unsigned long data);
 
 asmlinkage long sys32_ptrace(long request, u32 pid, u32 addr, u32 data)
 {

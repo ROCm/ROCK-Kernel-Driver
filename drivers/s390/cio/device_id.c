@@ -195,7 +195,7 @@ __ccw_device_sense_id_start(struct ccw_device *cdev)
 	/* Try on every path. */
 	ret = -ENODEV;
 	while (cdev->private->imask != 0) {
-		if ((sch->lpm & cdev->private->imask) != 0 &&
+		if ((sch->opm & cdev->private->imask) != 0 &&
 		    cdev->private->iretry > 0) {
 			cdev->private->iretry--;
 			ret = cio_start (sch, cdev->private->iccws,
@@ -246,22 +246,26 @@ ccw_device_check_sense_id(struct ccw_device *cdev)
 	/* Check the error cases. */
 	if (irb->scsw.fctl & (SCSW_FCTL_HALT_FUNC | SCSW_FCTL_CLEAR_FUNC))
 		return -ETIME;
-	if (irb->esw.esw0.erw.cons &&
-	    (irb->ecw[0] & (SNS0_CMD_REJECT | SNS0_INTERVENTION_REQ))) {
+	if (irb->esw.esw0.erw.cons && (irb->ecw[0] & SNS0_CMD_REJECT)) {
 		/*
 		 * if the device doesn't support the SenseID
 		 *  command further retries wouldn't help ...
+		 * NB: We don't check here for intervention required like we
+		 *     did before, because tape devices with no tape inserted
+		 *     may present this status *in conjunction with* the
+		 *     sense id information. So, for intervention required,
+		 *     we use the "whack it until it talks" strategy...
 		 */
-		CIO_MSG_EVENT(2, "SenseID : device %s on Subchannel %s "
-			      "reports cmd reject or intervention required\n",
-			      cdev->dev.bus_id, sch->dev.bus_id);
+		CIO_MSG_EVENT(2, "SenseID : device %04x on Subchannel %04x "
+			      "reports cmd reject\n",
+			      cdev->private->devno, sch->irq);
 		return -EOPNOTSUPP;
 	}
 	if (irb->esw.esw0.erw.cons) {
-		CIO_MSG_EVENT(2, "SenseID : UC on dev %s, "
+		CIO_MSG_EVENT(2, "SenseID : UC on dev %04x, "
 			      "lpum %02X, cnt %02d, sns :"
 			      " %02X%02X%02X%02X %02X%02X%02X%02X ...\n",
-			      cdev->dev.bus_id,
+			      cdev->private->devno,
 			      irb->esw.esw0.sublog.lpum,
 			      irb->esw.esw0.erw.scnt,
 			      irb->ecw[0], irb->ecw[1],
@@ -271,15 +275,18 @@ ccw_device_check_sense_id(struct ccw_device *cdev)
 		return -EAGAIN;
 	}
 	if (irb->scsw.cc == 3) {
-		CIO_MSG_EVENT(2, "SenseID : path %02X for device %s on "
-			      "subchannel %s is 'not operational'\n",
-			      sch->orb.lpm, cdev->dev.bus_id, sch->dev.bus_id);
+		if ((sch->orb.lpm &
+		     sch->schib.pmcw.pim & sch->schib.pmcw.pam) != 0)
+			CIO_MSG_EVENT(2, "SenseID : path %02X for device %04x on"
+				      " subchannel %04x is 'not operational'\n",
+				      sch->orb.lpm, cdev->private->devno,
+				      sch->irq);
 		return -EACCES;
 	}
 	/* Hmm, whatever happened, try again. */
-	CIO_MSG_EVENT(2, "SenseID : start_IO() for device %s on "
-		      "subchannel %s returns status %02X%02X\n",
-		      cdev->dev.bus_id, sch->dev.bus_id,
+	CIO_MSG_EVENT(2, "SenseID : start_IO() for device %04x on "
+		      "subchannel %04x returns status %02X%02X\n",
+		      cdev->private->devno, sch->irq,
 		      irb->scsw.dstat, irb->scsw.cstat);
 	return -EAGAIN;
 }

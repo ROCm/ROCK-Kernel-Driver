@@ -29,6 +29,7 @@
 #include <linux/msg.h>
 #include <linux/shm.h>
 #include <linux/stat.h>
+#include <linux/syscalls.h>
 #include <linux/mman.h>
 #include <linux/sys.h>
 #include <linux/ipc.h>
@@ -199,8 +200,6 @@ unsigned long sys_mmap(unsigned long addr, size_t len,
 out:
 	return err;
 }
-
-extern int sys_select(int, fd_set *, fd_set *, fd_set *, struct timeval *);
 
 /*
  * Due to some executables calling the wrong select we sometimes

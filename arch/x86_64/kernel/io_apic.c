@@ -1653,6 +1653,7 @@ static inline void check_timer(void)
 		 */
 		unmask_IO_APIC_irq(0);
 		if (timer_irq_works()) {
+			nmi_watchdog_default();
 			if (nmi_watchdog == NMI_IO_APIC) {
 				disable_8259A_irq(0);
 				setup_nmi();
@@ -1674,6 +1675,7 @@ static inline void check_timer(void)
 		setup_ExtINT_IRQ0_pin(pin2, vector);
 		if (timer_irq_works()) {
 			printk("works.\n");
+			nmi_watchdog_default();
 			if (nmi_watchdog == NMI_IO_APIC) {
 				setup_nmi();
 				check_nmi_watchdog();
@@ -1758,23 +1760,6 @@ void __init setup_IO_APIC(void)
 	if (!acpi_ioapic)
 		print_IO_APIC();
 }
-
-/* Ensure the ACPI SCI interrupt level is active low, edge-triggered */
-
-void __init mp_config_ioapic_for_sci(int irq)
-{
-#if 0 /* fixme */
-       int ioapic;
-       int ioapic_pin;
-
-       ioapic = mp_find_ioapic(irq);
-
-       ioapic_pin = irq - mp_ioapic_routing[ioapic].irq_start;
-
-       io_apic_set_pci_routing(ioapic, ioapic_pin, irq);
-#endif
-}
-
 
 /* --------------------------------------------------------------------------
                           ACPI-based IOAPIC Configuration

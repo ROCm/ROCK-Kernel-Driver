@@ -238,8 +238,8 @@ acpi_ex_resolve_object_to_value (
 
 				/* Invalid reference object */
 
-				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-					"Unknown target_type %X in Index/Reference obj %p\n",
+				ACPI_REPORT_ERROR ((
+					"During resolve, Unknown target_type %X in Index/Reference obj %p\n",
 					stack_desc->reference.target_type, stack_desc));
 				status = AE_AML_INTERNAL;
 				break;
@@ -258,7 +258,7 @@ acpi_ex_resolve_object_to_value (
 
 		default:
 
-			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unknown Reference opcode %X (%s) in %p\n",
+			ACPI_REPORT_ERROR (("During resolve, Unknown Reference opcode %X (%s) in %p\n",
 				opcode, acpi_ps_get_opcode_name (opcode), stack_desc));
 			status = AE_AML_INTERNAL;
 			break;

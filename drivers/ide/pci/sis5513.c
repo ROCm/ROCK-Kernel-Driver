@@ -944,9 +944,6 @@ static void __init init_hwif_sis5513 (ide_hwif_t *hwif)
 	return;
 }
 
-extern void ide_setup_pci_device(struct pci_dev *, ide_pci_device_t *);
-
-
 static int __devinit sis5513_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
 	ide_pci_device_t *d = &sis5513_chipsets[id->driver_data];

@@ -17,6 +17,7 @@
 #include <linux/sched.h>
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
+#include <linux/syscalls.h>
 #include <linux/ioctl.h>
 #include <linux/fs.h>
 #include <linux/file.h>
@@ -34,8 +35,6 @@
 #include "conv.h"
 #include "socksys.h"
 
-extern asmlinkage int sys_ioctl(unsigned int fd, unsigned int cmd, 
-	unsigned long arg);
 extern asmlinkage int compat_sys_ioctl(unsigned int fd, unsigned int cmd,
 	u32 arg);
 asmlinkage int solaris_ioctl(unsigned int fd, unsigned int cmd, u32 arg);

@@ -10,6 +10,7 @@ struct ccwgroup_device {
 		CCWGROUP_OFFLINE,
 		CCWGROUP_ONLINE,
 	} state;
+	atomic_t onoff;
 	unsigned int count;		/* number of attached slave devices */
 	struct device	dev;		/* master device		    */
 	struct ccw_device *cdev[0];	/* variable number, allocate as needed */

@@ -1091,27 +1091,14 @@ static int nodemgr_hotplug(struct class_device *cdev, char **envp, int num_envp,
 
 int hpsb_register_protocol(struct hpsb_protocol_driver *driver)
 {
-	driver_register(&driver->driver);
-	nodemgr_create_drv_files(driver);
+	int ret;
 
-	/*
-	 * Right now registration always succeeds, but maybe we should
-	 * detect clashes in protocols handled by other drivers.
-     * DRD> No because multiple drivers are needed to handle certain devices.
-     * For example, a DV camera is an IEC 61883 device (dv1394) and AV/C (raw1394).
-     * This will become less an issue with libiec61883 using raw1394.
-     *
-     * BenC: But can we handle this with an ALLOW_SHARED flag for a
-     * protocol? When we get an SBP-3 driver, it will be nice if they were
-     * mutually exclusive, since SBP-3 can handle SBP-2 protocol.
-     *
-     * Not to mention that we currently do not seem to support multiple
-     * drivers claiming the same unitdirectory. If we implement both of
-     * those, then we'll need to keep probing when a driver claims a
-     * unitdirectory, but is sharable.
-	 */
+	/* This will cause a probe for devices */
+	ret = driver_register(&driver->driver);
+	if (!ret)
+		nodemgr_create_drv_files(driver);
 
-	return 0;
+	return ret;
 }
 
 void hpsb_unregister_protocol(struct hpsb_protocol_driver *driver)
@@ -1247,32 +1234,10 @@ static void nodemgr_node_scan(struct host_info *hi, int generation)
 }
 
 
-static void nodemgr_suspend_ud(struct unit_directory *ud)
-{
-	struct device *dev;
-
-	list_for_each_entry(dev, &ud->device.children, node)
-		nodemgr_suspend_ud(container_of(dev, struct unit_directory, device));
-
-	if (ud->device.driver) {
-		int ret = -1;
-
-		if (ud->device.driver->suspend)
-			ret = ud->device.driver->suspend(&ud->device, 0, 0);
-
-		if (ret) {
-			dev = &ud->device;
-			down_write(&dev->bus->subsys.rwsem);
-			device_release_driver(dev);
-			up_write(&dev->bus->subsys.rwsem);
-		}
-	}								
-}
-
-
 static void nodemgr_suspend_ne(struct node_entry *ne)
 {
-	struct device *dev;
+	struct class_device *cdev;
+	struct unit_directory *ud;
 
 	HPSB_DEBUG("Node suspended: ID:BUS[" NODE_BUS_FMT "]  GUID[%016Lx]",
 		   NODE_BUS_ARGS(ne->host, ne->nodeid), (unsigned long long)ne->guid);
@@ -1280,32 +1245,41 @@ static void nodemgr_suspend_ne(struct node_entry *ne)
 	ne->in_limbo = 1;
 	device_create_file(&ne->device, &dev_attr_ne_in_limbo);
 
-	list_for_each_entry(dev, &ne->device.children, node)
-		nodemgr_suspend_ud(container_of(dev, struct unit_directory, device));
-}
+	down_write(&ne->device.bus->subsys.rwsem);
+	list_for_each_entry(cdev, &nodemgr_ud_class.children, node) {
+		ud = container_of(cdev, struct unit_directory, class_dev);
 
+		if (ud->ne != ne)
+			continue;
 
-static void nodemgr_resume_ud(struct unit_directory *ud)
-{
-	struct device *dev;
-
-	list_for_each_entry(dev, &ud->device.children, node)
-		nodemgr_resume_ud(container_of(dev, struct unit_directory, device));
-
-	if (ud->device.driver && ud->device.driver->resume)
-		ud->device.driver->resume(&ud->device, 0);
+		if (ud->device.driver &&
+		    (!ud->device.driver->suspend ||
+		      ud->device.driver->suspend(&ud->device, 0, 0)))
+			device_release_driver(&ud->device);
+	}
+	up_write(&ne->device.bus->subsys.rwsem);
 }
 
 
 static void nodemgr_resume_ne(struct node_entry *ne)
 {
-	struct device *dev;
+	struct class_device *cdev;
+	struct unit_directory *ud;
 
 	ne->in_limbo = 0;
 	device_remove_file(&ne->device, &dev_attr_ne_in_limbo);
 
-	list_for_each_entry(dev, &ne->device.children, node)
-		nodemgr_resume_ud(container_of(dev, struct unit_directory, device));
+	down_read(&ne->device.bus->subsys.rwsem);
+	list_for_each_entry(cdev, &nodemgr_ud_class.children, node) {
+		ud = container_of(cdev, struct unit_directory, class_dev);
+
+		if (ud->ne != ne)
+			continue;
+
+		if (ud->device.driver && ud->device.driver->resume)
+			ud->device.driver->resume(&ud->device, 0);
+	}
+	up_read(&ne->device.bus->subsys.rwsem);
 
 	HPSB_DEBUG("Node resumed: ID:BUS[" NODE_BUS_FMT "]  GUID[%016Lx]",
 		   NODE_BUS_ARGS(ne->host, ne->nodeid), (unsigned long long)ne->guid);

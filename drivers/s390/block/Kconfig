@@ -11,6 +11,11 @@ config BLK_DEV_XPRAM
 	  This option is also available as a module which will be called
 	  xpram.  If unsure, say "N".
 
+config DCSSBLK
+	tristate "DCSSBLK support"
+	help
+	  Support for dcss block device
+
 config DASD
 	tristate "Support for DASD devices"
 	depends on CCW
@@ -47,3 +52,13 @@ config DASD_DIAG
 	  Select this option if you want to use CMS reserved Disks under VM
 	  with the Diagnose250 command.  If you are not running under VM or
 	  unsure what it is, say "N".
+
+config DASD_CMB
+	tristate "Compatibility interface for DASD channel measurement blocks"
+	depends on DASD
+	help
+	  This driver provides an additional interface to the channel measurement
+	  facility, which is normally accessed though sysfs, with a set of
+	  ioctl functions specific to the dasd driver.
+	  This is only needed if you want to use applications written for
+	  linux-2.4 dasd channel measurement facility interface.

@@ -475,6 +475,12 @@ struct pcibr_soft_s {
     
     vertex_hdl_t	    bs_noslot_conn;	/* NO-SLOT connection point */
     pcibr_info_t	    bs_noslot_info;
+
+#ifdef CONFIG_HOTPLUG_PCI_SGI
+    /* Linux PCI bus structure pointer */
+    struct pci_bus         *bs_pci_bus;
+#endif
+
     struct pcibr_soft_slot_s {
 	/* information we keep about each CFG slot */
 
@@ -492,8 +498,13 @@ struct pcibr_soft_s {
 	pciio_slot_t            host_slot;
 	vertex_hdl_t		slot_conn;
 
+#ifdef CONFIG_HOTPLUG_PCI_SGI
         /* PCI Hot-Plug status word */
         int 			slot_status;
+
+	/* PCI Hot-Plug core structure pointer */
+	struct hotplug_slot    *bss_hotplug_slot;
+#endif	/* CONFIG_HOTPLUG_PCI_SGI */
 
 	/* Potentially several connection points
 	 * for this slot. bss_ninfo is how many,

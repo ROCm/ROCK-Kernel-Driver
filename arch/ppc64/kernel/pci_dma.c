@@ -67,10 +67,10 @@ struct iSeries_Device_Node iSeries_veth_dev_node = { .LogicalSlot = 0xFF, .DevTc
 struct iSeries_Device_Node iSeries_vio_dev_node  = { .LogicalSlot = 0xFF, .DevTceTable = &virtBusVioTceTable };
 
 struct pci_dev    iSeries_veth_dev_st = { .sysdata = &iSeries_veth_dev_node };
-struct pci_dev    iSeries_vio_dev_st  = { .sysdata = &iSeries_vio_dev_node  };
+struct pci_dev    iSeries_vio_dev_st  = { .sysdata = &iSeries_vio_dev_node, .dev.bus = &pci_bus_type };
 
 struct pci_dev  * iSeries_veth_dev = &iSeries_veth_dev_st;
-struct pci_dev  * iSeries_vio_dev  = &iSeries_vio_dev_st;
+struct device  * iSeries_vio_dev  = &iSeries_vio_dev_st.dev;
 
 /* Device TceTable is stored in Device Node */
 /* struct TceTable * tceTables[256]; */	/* Tce tables for 256 busses

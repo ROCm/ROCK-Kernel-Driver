@@ -37,6 +37,25 @@ static inline int is_kernel_text(unsigned long addr)
 	return 0;
 }
 
+/* Lookup the address for this symbol. Returns 0 if not found. */
+unsigned long kallsyms_lookup_name(const char *name)
+{
+	char namebuf[128];
+	unsigned long i;
+	char *knames;
+
+	for (i = 0, knames = kallsyms_names; i < kallsyms_num_syms; i++) {
+		unsigned prefix = *knames++;
+
+		strlcpy(namebuf + prefix, knames, 127 - prefix);
+		if (strcmp(namebuf, name) == 0)
+			return kallsyms_addresses[i];
+
+		knames += strlen(knames) + 1;
+	}
+	return module_kallsyms_lookup_name(name);
+}
+
 /* Lookup an address.  modname is set to NULL if it's in the kernel. */
 const char *kallsyms_lookup(unsigned long addr,
 			    unsigned long *symbolsize,

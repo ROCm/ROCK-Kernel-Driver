@@ -69,12 +69,19 @@ static int __init init_ras_IRQ(void)
 {
 	struct device_node *np;
 	unsigned int *ireg, len, i;
+	int virq;
 
 	if ((np = of_find_node_by_path("/event-sources/internal-errors")) &&
 	    (ireg = (unsigned int *)get_property(np, "open-pic-interrupt",
 						 &len))) {
 		for (i=0; i<(len / sizeof(*ireg)); i++) {
-			request_irq(virt_irq_create_mapping(*(ireg)) + NUM_8259_INTERRUPTS, 
+			virq = virt_irq_create_mapping(*(ireg));
+			if (virq == NO_IRQ) {
+				printk(KERN_ERR "Unable to allocate interrupt "
+				       "number for %s\n", np->full_name);
+				break;
+			}
+			request_irq(virq + NUM_8259_INTERRUPTS, 
 				    ras_error_interrupt, 0, 
 				    "RAS_ERROR", NULL);
 			ireg++;
@@ -86,7 +93,13 @@ static int __init init_ras_IRQ(void)
 	    (ireg = (unsigned int *)get_property(np, "open-pic-interrupt",
 						 &len))) {
 		for (i=0; i<(len / sizeof(*ireg)); i++) {
-			request_irq(virt_irq_create_mapping(*(ireg)) + NUM_8259_INTERRUPTS, 
+			virq = virt_irq_create_mapping(*(ireg));
+			if (virq == NO_IRQ) {
+				printk(KERN_ERR "Unable to allocate interrupt "
+				       " number for %s\n", np->full_name);
+				break;
+			}
+			request_irq(virq + NUM_8259_INTERRUPTS, 
 				    ras_epow_interrupt, 0, 
 				    "RAS_EPOW", NULL);
 			ireg++;

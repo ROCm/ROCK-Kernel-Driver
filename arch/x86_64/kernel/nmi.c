@@ -42,10 +42,12 @@
 int nmi_active;		/* oprofile uses this */
 static int panic_on_timeout;
 
-unsigned int nmi_watchdog = NMI_LOCAL_APIC;
+unsigned int nmi_watchdog = NMI_DEFAULT;
 static unsigned int nmi_hz = HZ;
 unsigned int nmi_perfctr_msr;	/* the MSR to reset in NMI handler */
-int nmi_watchdog_disabled;
+
+/* Note that these events don't tick when the CPU idles. This means
+   the frequency varies with CPU load. */
 
 #define K7_EVNTSEL_ENABLE	(1 << 22)
 #define K7_EVNTSEL_INT		(1 << 20)
@@ -60,6 +62,27 @@ int nmi_watchdog_disabled;
 #define P6_EVNTSEL_USR		(1 << 16)
 #define P6_EVENT_CPU_CLOCKS_NOT_HALTED	0x79
 #define P6_NMI_EVENT		P6_EVENT_CPU_CLOCKS_NOT_HALTED
+
+/* Run after command line and cpu_init init, but before all other checks */
+void __init nmi_watchdog_default(void)
+{
+	if (nmi_watchdog != NMI_DEFAULT)
+		return;
+
+	/* For some reason the IO APIC watchdog doesn't work on the AMD
+	   8111 chipset. For now switch to local APIC mode using
+	   perfctr0 there.  On Intel CPUs we don't have code to handle
+	   the perfctr and the IO-APIC seems to work, so use that.  */
+
+	if (boot_cpu_data.x86_vendor == X86_VENDOR_AMD) {
+		nmi_watchdog = NMI_LOCAL_APIC; 
+		printk(KERN_INFO 
+              "Using local APIC NMI watchdog using perfctr0\n");
+	} else {
+		printk(KERN_INFO "Using IO APIC NMI watchdog\n");
+		nmi_watchdog = NMI_IO_APIC;
+	}
+}
 
 /* Why is there no CPUID flag for this? */
 static __init int cpu_has_lapic(void)
@@ -112,7 +135,7 @@ int __init check_nmi_watchdog (void)
 	return 0;
 }
 
-static int __init setup_nmi_watchdog(char *str)
+int __init setup_nmi_watchdog(char *str)
 {
 	int nmi;
 
@@ -236,6 +259,9 @@ static void setup_k7_watchdog(void)
 	int i;
 	unsigned int evntsel;
 
+	/* No check, so can start with slow frequency */
+	nmi_hz = 1; 
+
 	/* XXX should check these in EFER */
 
 	nmi_perfctr_msr = MSR_K7_PERFCTR0;
@@ -253,14 +279,13 @@ static void setup_k7_watchdog(void)
 		| K7_NMI_EVENT;
 
 	wrmsr(MSR_K7_EVNTSEL0, evntsel, 0);
-	printk(KERN_INFO "watchdog: setting K7_PERFCTR0 to %08x\n", -(cpu_khz/nmi_hz*1000));
-	wrmsr(MSR_K7_PERFCTR0, -(cpu_khz/nmi_hz*1000), -1);
+	wrmsrl(MSR_K7_PERFCTR0, -((u64)cpu_khz*1000) / nmi_hz);
 	apic_write(APIC_LVTPC, APIC_DM_NMI);
 	evntsel |= K7_EVNTSEL_ENABLE;
 	wrmsr(MSR_K7_EVNTSEL0, evntsel, 0);
 }
 
-void setup_apic_nmi_watchdog (void)
+void setup_apic_nmi_watchdog(void)
 {
 	switch (boot_cpu_data.x86_vendor) {
 	case X86_VENDOR_AMD:
@@ -311,11 +336,9 @@ void touch_nmi_watchdog (void)
 
 void nmi_watchdog_tick (struct pt_regs * regs, unsigned reason)
 {
-	int sum, cpu = safe_smp_processor_id();
+	int sum, cpu;
 
-	if (nmi_watchdog_disabled)
-		return;
-
+	cpu = safe_smp_processor_id();
 	sum = read_pda(apic_timer_irqs);
 	if (last_irq_sums[cpu] == sum) {
 		/*
@@ -336,7 +359,7 @@ void nmi_watchdog_tick (struct pt_regs * regs, unsigned reason)
 			bust_spinlocks(1);
 			printk("NMI Watchdog detected LOCKUP on CPU%d, registers:\n", cpu);
 			show_registers(regs);
-			if (panic_on_timeout)
+			if (panic_on_timeout || panic_on_oops)
 				panic("nmi watchdog");
 			printk("console shuts up ...\n");
 			console_silent();

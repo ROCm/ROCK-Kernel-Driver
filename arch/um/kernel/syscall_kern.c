@@ -11,6 +11,7 @@
 #include "linux/msg.h"
 #include "linux/shm.h"
 #include "linux/sys.h"
+#include "linux/syscalls.h"
 #include "linux/unistd.h"
 #include "linux/slab.h"
 #include "linux/utime.h"

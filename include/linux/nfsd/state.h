@@ -113,6 +113,8 @@ struct nfs4_replay {
 	unsigned int		rp_buflen;
 	char			*rp_buf;
 	unsigned		intrp_allocated;
+	int			rp_openfh_len;
+	char			rp_openfh[NFS4_FHSIZE];
 	char			rp_ibuf[NFSD4_REPLAY_ISIZE];
 };
 
@@ -128,12 +130,15 @@ struct nfs4_replay {
 *    so_perfilestate: heads the list of nfs4_stateid (either open or lock) 
 *         and is used to ensure no dangling nfs4_stateid references when we 
 *         release a stateowner.
+*    so_perlockowner: (open) nfs4_stateid->st_perlockowner entry - used when
+*         close is called to reap associated byte-range locks
 */
 struct nfs4_stateowner {
 	struct list_head        so_idhash;   /* hash by so_id */
 	struct list_head        so_strhash;   /* hash by op_name */
 	struct list_head        so_perclient; /* nfs4_client->cl_perclient */
 	struct list_head        so_perfilestate; /* list: nfs4_stateid */
+	struct list_head        so_perlockowner; /* nfs4_stateid->st_perlockowner */
 	int			so_is_open_owner; /* 1=openowner,0=lockowner */
 	u32                     so_id;
 	struct nfs4_client *    so_client;
@@ -164,21 +169,23 @@ struct nfs4_file {
 * 	st_hash: stateid_hashtbl[] entry or lockstateid_hashtbl entry
 * 	st_perfile: file_hashtbl[] entry.
 * 	st_perfile_state: nfs4_stateowner->so_perfilestate
-* 	st_share_access: used only for open stateid
-* 	st_share_deny: used only for open stateid
+*       st_perlockowner: (open stateid) list of lock nfs4_stateowners
+* 	st_access_bmap: used only for open stateid
+* 	st_deny_bmap: used only for open stateid
 */
 
 struct nfs4_stateid {
 	struct list_head              st_hash; 
 	struct list_head              st_perfile;
 	struct list_head              st_perfilestate; 
+	struct list_head              st_perlockowner;
 	struct nfs4_stateowner      * st_stateowner;
 	struct nfs4_file            * st_file;
 	stateid_t                     st_stateid;
 	struct file                   st_vfs_file;
 	int                           st_vfs_set;
-	unsigned int                  st_share_access;
-	unsigned int                  st_share_deny;
+	unsigned long                 st_access_bmap;
+	unsigned long                 st_deny_bmap;
 };
 
 /* flags for preprocess_seqid_op() */

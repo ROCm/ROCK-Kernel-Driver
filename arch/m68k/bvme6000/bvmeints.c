@@ -20,6 +20,7 @@
 #include <asm/system.h>
 #include <asm/irq.h>
 #include <asm/traps.h>
+#include <asm/unistd.h>
 
 static irqreturn_t bvme6000_defhand (int irq, void *dev_id, struct pt_regs *fp);
 

@@ -64,8 +64,6 @@ endif
 
 # We keep a list of all modules in $(MODVERDIR)
 
-touch-module = @echo $(@:.o=.ko) > $(MODVERDIR)/$(@F:.o=.mod)
-
 __build: $(if $(KBUILD_BUILTIN),$(builtin-target) $(lib-target) $(extra-y)) \
 	 $(if $(KBUILD_MODULES),$(obj-m)) \
 	 $(subdir-ym) $(always)
@@ -178,7 +176,7 @@ endef
 
 $(single-used-m): %.o: %.c FORCE
 	$(call if_changed_rule,cc_o_c)
-	$(touch-module)
+	@{ echo $(@:.o=.ko); echo $@; } > $(MODVERDIR)/$(@F:.o=.mod)
 
 quiet_cmd_cc_lst_c = MKLST   $@
       cmd_cc_lst_c = $(CC) $(c_flags) -g -c -o $*.o $< && \
@@ -273,7 +271,7 @@ $(multi-used-y) : %.o: $(multi-objs-y) FORCE
 
 $(multi-used-m) : %.o: $(multi-objs-m) FORCE
 	$(call if_changed,link_multi-m)
-	$(touch-module)
+	@{ echo $(@:.o=.ko); echo $(link_multi_deps); } > $(MODVERDIR)/$(@F:.o=.mod)
 
 targets += $(multi-used-y) $(multi-used-m)
 

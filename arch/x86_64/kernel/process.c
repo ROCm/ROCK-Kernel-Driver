@@ -583,16 +583,18 @@ extern void scheduling_functions_end_here(void);
 
 unsigned long get_wchan(struct task_struct *p)
 {
+	unsigned long stack;
 	u64 fp,rip;
 	int count = 0;
 
 	if (!p || p == current || p->state==TASK_RUNNING)
 		return 0; 
-	if (p->thread.rsp < (u64)p || p->thread.rsp > (u64)p + THREAD_SIZE)
+	stack = (unsigned long)p->thread_info; 
+	if (p->thread.rsp < stack || p->thread.rsp > stack+THREAD_SIZE)
 		return 0;
 	fp = *(u64 *)(p->thread.rsp);
 	do { 
-		if (fp < (unsigned long)p || fp > (unsigned long)p+THREAD_SIZE)
+		if (fp < (unsigned long)stack || fp > (unsigned long)stack+THREAD_SIZE)
 			return 0; 
 		rip = *(u64 *)(fp+8); 
 		if (rip < first_sched || rip >= last_sched)

@@ -5,7 +5,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 2000, 2001
  *
- * $Revision: 1.26 $
+ * $Revision: 1.27 $
  */
 
 #include <linux/timer.h>
@@ -2129,13 +2129,10 @@ dasd_3990_erp_inspect_32(struct dasd_ccw_req * erp, char *sense)
 		/* single program action codes (byte25 bit 0 == '0') */
 		switch (sense[25]) {
 
-		case 0x00:	/* success */
-			DEV_MESSAGE(KERN_DEBUG, device,
-				    "ERP called for successful request %p"
-				    " - NO ERP necessary", erp);
-
-			erp = dasd_3990_erp_cleanup(erp, DASD_CQR_DONE);
-
+		case 0x00:	/* success - use default ERP for retries */
+		        DEV_MESSAGE(KERN_DEBUG, device, "%s",
+				    "ERP called for successful request"
+				    " - just retry");
 			break;
 
 		case 0x01:	/* fatal error */

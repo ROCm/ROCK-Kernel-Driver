@@ -5,7 +5,8 @@
  *
  * sysfs adapter related routines
  *
- * Copyright (C) 2003 IBM Entwicklung GmbH, IBM Corporation
+ * (C) Copyright IBM Corp. 2003, 2004
+ *
  * Authors:
  *      Martin Peschke <mpeschke@de.ibm.com>
  *	Heiko Carstens <heiko.carstens@de.ibm.com>
@@ -25,14 +26,13 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#define ZFCP_SYSFS_ADAPTER_C_REVISION "$Revision: 1.26 $"
+#define ZFCP_SYSFS_ADAPTER_C_REVISION "$Revision: 1.30 $"
 
 #include <asm/ccwdev.h>
 #include "zfcp_ext.h"
 #include "zfcp_def.h"
 
 #define ZFCP_LOG_AREA                   ZFCP_LOG_AREA_CONFIG
-#define ZFCP_LOG_AREA_PREFIX            ZFCP_LOG_AREA_PREFIX_CONFIG
 
 static const char fc_topologies[5][25] = {
 	{"<error>"},
@@ -66,12 +66,15 @@ ZFCP_DEFINE_ADAPTER_ATTR(status, "0x%08x\n", atomic_read(&adapter->status));
 ZFCP_DEFINE_ADAPTER_ATTR(wwnn, "0x%016llx\n", adapter->wwnn);
 ZFCP_DEFINE_ADAPTER_ATTR(wwpn, "0x%016llx\n", adapter->wwpn);
 ZFCP_DEFINE_ADAPTER_ATTR(s_id, "0x%06x\n", adapter->s_id);
-ZFCP_DEFINE_ADAPTER_ATTR(hw_version, "0x%04x\n", adapter->hydra_version);
+ZFCP_DEFINE_ADAPTER_ATTR(card_version, "0x%04x\n", adapter->hydra_version);
 ZFCP_DEFINE_ADAPTER_ATTR(lic_version, "0x%08x\n", adapter->fsf_lic_version);
 ZFCP_DEFINE_ADAPTER_ATTR(fc_link_speed, "%d Gb/s\n", adapter->fc_link_speed);
 ZFCP_DEFINE_ADAPTER_ATTR(fc_service_class, "%d\n", adapter->fc_service_class);
 ZFCP_DEFINE_ADAPTER_ATTR(fc_topology, "%s\n",
 			 fc_topologies[adapter->fc_topology]);
+ZFCP_DEFINE_ADAPTER_ATTR(hardware_version, "0x%08x\n",
+			 adapter->hardware_version);
+ZFCP_DEFINE_ADAPTER_ATTR(serial_number, "%17s\n", adapter->serial_number);
 
 /**
  * zfcp_sysfs_adapter_in_recovery_show - recovery state of adapter
@@ -259,11 +262,6 @@ zfcp_sysfs_adapter_failed_store(struct device *dev,
 		goto out;
 	}
 
-	/* restart error recovery only if adapter is online */
-	if (adapter->ccw_device->online != 1) {
-		retval = -ENXIO;
-		goto out;
-	}
 	zfcp_erp_modify_adapter_status(adapter, ZFCP_STATUS_COMMON_RUNNING,
 				       ZFCP_SET);
 	zfcp_erp_adapter_reopen(adapter, ZFCP_STATUS_COMMON_ERP_FAILED);
@@ -304,13 +302,15 @@ static struct attribute *zfcp_adapter_attrs[] = {
 	&dev_attr_wwnn.attr,
 	&dev_attr_wwpn.attr,
 	&dev_attr_s_id.attr,
-	&dev_attr_hw_version.attr,
+	&dev_attr_card_version.attr,
 	&dev_attr_lic_version.attr,
 	&dev_attr_fc_link_speed.attr,
 	&dev_attr_fc_service_class.attr,
 	&dev_attr_fc_topology.attr,
 	&dev_attr_scsi_host_no.attr,
 	&dev_attr_status.attr,
+	&dev_attr_hardware_version.attr,
+	&dev_attr_serial_number.attr,
 	NULL
 };
 
@@ -343,4 +343,3 @@ zfcp_sysfs_adapter_remove_files(struct device *dev)
 }
 
 #undef ZFCP_LOG_AREA
-#undef ZFCP_LOG_AREA_PREFIX

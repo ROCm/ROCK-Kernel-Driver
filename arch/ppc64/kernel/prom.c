@@ -152,11 +152,6 @@ struct device_node *allnodes = 0;
  */
 static rwlock_t devtree_lock = RW_LOCK_UNLOCKED;
 
-#define UNDEFINED_IRQ 0xffff
-unsigned short real_irq_to_virt_map[NR_HW_IRQS];
-unsigned short virt_irq_to_real_map[NR_IRQS];
-int last_virt_irq = 2;	/* index of last virt_irq.  Skip through IPI */
-
 static unsigned long call_prom(const char *service, int nargs, int nret, ...);
 static void prom_panic(const char *reason);
 static unsigned long copy_device_tree(unsigned long);
@@ -1678,45 +1673,6 @@ check_display(unsigned long mem)
 	return DOUBLEWORD_ALIGN(mem);
 }
 
-void
-virt_irq_init(void)
-{
-	int i;
-	for (i = 0; i < NR_IRQS; i++)
-		virt_irq_to_real_map[i] = UNDEFINED_IRQ;
-	for (i = 0; i < NR_HW_IRQS; i++)
-		real_irq_to_virt_map[i] = UNDEFINED_IRQ;
-}
-
-/* Create a mapping for a real_irq if it doesn't already exist.
- * Return the virtual irq as a convenience.
- */
-unsigned long
-virt_irq_create_mapping(unsigned long real_irq)
-{
-	unsigned long virq;
-	if (naca->interrupt_controller == IC_OPEN_PIC)
-		return real_irq;	/* no mapping for openpic (for now) */
-	virq = real_irq_to_virt(real_irq);
-	if (virq == UNDEFINED_IRQ) {
-		/* Assign a virtual IRQ number */
-		if (real_irq < NR_IRQS && virt_irq_to_real(real_irq) == UNDEFINED_IRQ) {
-			/* A 1-1 mapping will work. */
-			virq = real_irq;
-		} else {
-			while (last_virt_irq < NR_IRQS &&
-			       virt_irq_to_real(++last_virt_irq) != UNDEFINED_IRQ)
-				/* skip irq's in use */;
-			if (last_virt_irq >= NR_IRQS)
-				panic("Too many IRQs are required on this system.  NR_IRQS=%d\n", NR_IRQS);
-			virq = last_virt_irq;
-		}
-		virt_irq_to_real_map[virq] = real_irq;
-		real_irq_to_virt_map[real_irq] = virq;
-	}
-	return virq;
-}
-
 
 static int __init
 prom_next_node(phandle *nodep)
@@ -2082,7 +2038,7 @@ finish_node_interrupts(struct device_node *np, unsigned long mem_start)
 	unsigned int *ints;
 	int intlen, intrcells;
 	int i, j, n;
-	unsigned int *irq;
+	unsigned int *irq, virq;
 	struct device_node *ic;
 
 	ints = (unsigned int *) get_property(np, "interrupts", &intlen);
@@ -2100,7 +2056,13 @@ finish_node_interrupts(struct device_node *np, unsigned long mem_start)
 		n = map_interrupt(&irq, &ic, np, ints, intrcells);
 		if (n <= 0)
 			continue;
-		np->intrs[i].line = openpic_to_irq(virt_irq_create_mapping(irq[0]));
+		virq = virt_irq_create_mapping(irq[0]);
+		if (virq == NO_IRQ) {
+			printk(KERN_CRIT "Could not allocate interrupt "
+			       "number for %s\n", np->full_name);
+		} else
+			np->intrs[i].line = openpic_to_irq(virq);
+
 		/* We offset irq numbers for the u3 MPIC by 128 in PowerMac */
 		if (systemcfg->platform == PLATFORM_POWERMAC && ic && ic->parent) {
 			char *name = get_property(ic->parent, "name", NULL);
@@ -2941,7 +2903,7 @@ static int of_finish_dynamic_node(struct device_node *node)
 	unsigned int *ints;
 	int intlen, intrcells;
 	int i, j, n, err = 0;
-	unsigned int *irq;
+	unsigned int *irq, virq;
 	struct device_node *ic;
  
 	node->name = get_property(node, "name", 0);
@@ -3010,7 +2972,12 @@ static int of_finish_dynamic_node(struct device_node *node)
 		n = map_interrupt(&irq, &ic, node, ints, intrcells);
 		if (n <= 0)
 			continue;
-		node->intrs[i].line = openpic_to_irq(virt_irq_create_mapping(irq[0]));
+		virq = virt_irq_create_mapping(irq[0]);
+		if (virq == NO_IRQ) {
+			printk(KERN_CRIT "Could not allocate interrupt "
+			       "number for %s\n", node->full_name);
+		} else
+			node->intrs[i].line = openpic_to_irq(virq);
 		if (n > 1)
 			node->intrs[i].sense = irq[1];
 		if (n > 2) {

@@ -507,7 +507,7 @@ acpi_ex_prep_field_value (
 			(info->field_bit_position / ACPI_MUL_8 (obj_desc->field.access_byte_width));
 
 		if (!obj_desc->index_field.data_obj || !obj_desc->index_field.index_obj) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Null Index Object\n"));
+			ACPI_REPORT_ERROR (("Null Index Object during field prep\n"));
 			return_ACPI_STATUS (AE_AML_INTERNAL);
 		}
 

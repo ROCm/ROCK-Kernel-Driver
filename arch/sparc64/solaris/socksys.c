@@ -24,6 +24,7 @@
 #include <linux/init.h>
 #include <linux/poll.h>
 #include <linux/slab.h>
+#include <linux/syscalls.h>
 #include <linux/in.h>
 #include <linux/devfs_fs_kernel.h>
 
@@ -35,9 +36,6 @@
 #include "conv.h"
 #include "socksys.h"
 
-extern asmlinkage int sys_ioctl(unsigned int fd, unsigned int cmd, 
-	unsigned long arg);
-	
 static int af_inet_protocols[] = {
 IPPROTO_ICMP, IPPROTO_ICMP, IPPROTO_IGMP, IPPROTO_IPIP, IPPROTO_TCP,
 IPPROTO_EGP, IPPROTO_PUP, IPPROTO_UDP, IPPROTO_IDP, IPPROTO_RAW,

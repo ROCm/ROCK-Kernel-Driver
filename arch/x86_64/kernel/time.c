@@ -24,6 +24,7 @@
 #include <linux/ioport.h>
 #include <linux/module.h>
 #include <linux/device.h>
+#include <linux/sysdev.h>
 #include <linux/bcd.h>
 #include <asm/pgtable.h>
 #include <asm/vsyscall.h>
@@ -43,6 +44,8 @@ extern int using_apic_timer;
 
 spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
 spinlock_t i8253_lock = SPIN_LOCK_UNLOCKED;
+
+static int nohpet __initdata = 0;
 
 #undef HPET_HACK_ENABLE_DANGEROUS
 
@@ -217,14 +220,22 @@ static void set_rtc_mmss(unsigned long nowtime)
 		real_minutes += 30;		/* correct for half hour time zone */
 	real_minutes %= 60;
 
-	if (abs(real_minutes - cmos_minutes) < 30) {
+#if 0
+	/* AMD 8111 is a really bad time keeper and hits this regularly. 
+	   It probably was an attempt to avoid screwing up DST, but ignore
+	   that for now. */	   
+	if (abs(real_minutes - cmos_minutes) >= 30) {
+		printk(KERN_WARNING "time.c: can't update CMOS clock "
+		       "from %d to %d\n", cmos_minutes, real_minutes);
+	} else
+#endif
+
+	{
 			BIN_TO_BCD(real_seconds);
 			BIN_TO_BCD(real_minutes);
 		CMOS_WRITE(real_seconds, RTC_SECONDS);
 		CMOS_WRITE(real_minutes, RTC_MINUTES);
-	} else
-		printk(KERN_WARNING "time.c: can't update CMOS clock "
-		       "from %d to %d\n", cmos_minutes, real_minutes);
+	}
 
 /*
  * The following flags have to be released exactly in this order, otherwise the
@@ -683,6 +694,8 @@ void __init time_init(void)
 		       "at %#lx.\n", hpet_address);
         }
 #endif
+	if (nohpet)
+		vxtime.hpet_address = 0;
 
 	xtime.tv_sec = get_cmos_time();
 	xtime.tv_nsec = 0;
@@ -735,6 +748,51 @@ void __init time_init_smp(void)
 }
 
 __setup("report_lost_ticks", time_setup);
+
+static long clock_cmos_diff;
+
+static int time_suspend(struct sys_device *dev, u32 state)
+{
+	/*
+	 * Estimate time zone so that set_time can update the clock
+	 */
+	clock_cmos_diff = -get_cmos_time();
+	clock_cmos_diff += get_seconds();
+	return 0;
+}
+
+static int time_resume(struct sys_device *dev)
+{
+	unsigned long sec = get_cmos_time() + clock_cmos_diff;
+	write_seqlock_irq(&xtime_lock);
+	xtime.tv_sec = sec;
+	xtime.tv_nsec = 0;
+	write_sequnlock_irq(&xtime_lock);
+	return 0;
+}
+
+static struct sysdev_class pit_sysclass = {
+	.resume = time_resume,
+	.suspend = time_suspend,
+	set_kset_name("pit"),
+};
+
+
+/* XXX this driverfs stuff should probably go elsewhere later -john */
+static struct sys_device device_i8253 = {
+	.id	= 0,
+	.cls	= &pit_sysclass,
+};
+
+static int time_init_device(void)
+{
+	int error = sysdev_class_register(&pit_sysclass);
+	if (!error)
+		error = sys_device_register(&device_i8253);
+	return error;
+}
+
+device_initcall(time_init_device);
 
 #ifdef CONFIG_HPET_EMULATE_RTC
 /* HPET in LegacyReplacement Mode eats up RTC interrupt line. When, HPET
@@ -961,3 +1019,11 @@ irqreturn_t hpet_rtc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	return IRQ_HANDLED;
 }
 #endif
+
+static int __init nohpet_setup(char *s) 
+{ 
+	nohpet = 1;
+	return 0;
+} 
+
+__setup("nohpet", nohpet_setup);

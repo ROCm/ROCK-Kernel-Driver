@@ -377,6 +377,10 @@ type name(type1 arg1, type2 arg2, type3 arg3, type4 arg4, type5 arg5)	\
  */
 
 #ifdef __KERNEL_SYSCALLS__
+
+#include <linux/compiler.h>
+#include <linux/types.h>
+
 /*
  * System call prototypes.
  */
@@ -389,6 +393,32 @@ extern int execve(const char *file, char **argv, char **envp);
 extern int open(const char *file, int flag, int mode);
 extern int close(int fd);
 extern pid_t waitpid(pid_t pid, int *wait_stat, int options);
+
+unsigned long sys_mmap(unsigned long addr, size_t len,
+			unsigned long prot, unsigned long flags,
+			unsigned long fd, off_t offset);
+unsigned long sys_mmap2(unsigned long addr, size_t len,
+			unsigned long prot, unsigned long flags,
+			unsigned long fd, unsigned long pgoff);
+struct pt_regs;
+int sys_execve(unsigned long a0, unsigned long a1, unsigned long a2,
+		unsigned long a3, unsigned long a4, unsigned long a5,
+		struct pt_regs *regs);
+int sys_clone(unsigned long clone_flags, unsigned long usp,
+	      int __user *parent_tidp, void __user *child_threadptr,
+	      int __user *child_tidp, int p6,
+	      struct pt_regs *regs);
+int sys_fork(int p1, int p2, int p3, int p4, int p5, int p6,
+		struct pt_regs *regs);
+int sys_vfork(int p1, int p2, int p3, int p4, int p5, int p6,
+		struct pt_regs *regs);
+int sys_pipe(int __user *fildes);
+int sys_ptrace(long request, long pid, long addr, long data);
+struct sigaction;
+asmlinkage long sys_rt_sigaction(int sig,
+				const struct sigaction __user *act,
+				struct sigaction __user *oact,
+				size_t sigsetsize);
 
 #endif /* __KERNEL_SYSCALLS__ */
 

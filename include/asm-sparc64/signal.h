@@ -250,30 +250,12 @@ struct signal_deliver_cookie {
 	unsigned long orig_i0;
 };
 
-#define ptrace_signal_deliver(REGS, COOKIE) \
-do {	struct signal_deliver_cookie *cp = (COOKIE); \
-	if (cp->restart_syscall && \
-	    (regs->u_regs[UREG_I0] == ERESTARTNOHAND || \
-	     regs->u_regs[UREG_I0] == ERESTARTSYS || \
-	     regs->u_regs[UREG_I0] == ERESTARTNOINTR)) { \
-		/* replay the system call when we are done */ \
-		regs->u_regs[UREG_I0] = cp->orig_i0; \
-		regs->tpc -= 4; \
-		regs->tnpc -= 4; \
-		cp->restart_syscall = 0; \
-	} \
-	if (cp->restart_syscall && \
-	    regs->u_regs[UREG_I0] == ERESTART_RESTARTBLOCK) { \
-		regs->u_regs[UREG_G1] = __NR_restart_syscall; \
-		regs->tpc -= 4; \
-		regs->tnpc -= 4; \
-		cp->restart_syscall = 0; \
-	} \
-} while (0)
+struct pt_regs;
+extern void ptrace_signal_deliver(struct pt_regs *regs, void *cookie);
 
 #define HAVE_ARCH_SYS_PAUSE
 
-#endif
+#endif /* !(__KERNEL__) */
 
 #endif /* !(__ASSEMBLY__) */
 

@@ -1,323 +1,328 @@
 /*
- * linux/fs/hfs/btree.c
+ *  linux/fs/hfs/btree.c
  *
- * Copyright (C) 1995-1997  Paul H. Hargrove
- * This file may be distributed under the terms of the GNU General Public License.
+ * Copyright (C) 2001
+ * Brad Boyer (flar@allandria.com)
+ * (C) 2003 Ardis Technologies <roman@ardistech.com>
  *
- * This file contains the code to manipulate the B-tree structure.
- * The catalog and extents files are both B-trees.
- *
- * "XXX" in a comment is a note to myself to consider changing something.
- *
- * In function preconditions the term "valid" applied to a pointer to
- * a structure means that the pointer is non-NULL and the structure it
- * points to has all fields initialized to consistent values.
- *
- * The code in this file initializes some structures which contain
- * pointers by calling memset(&foo, 0, sizeof(foo)).
- * This produces the desired behavior only due to the non-ANSI
- * assumption that the machine representation of NULL is all zeros.
+ * Handle opening/closing btree
  */
 
-#include "hfs_btree.h"
+#include <linux/pagemap.h>
 
-/*================ File-local functions ================*/
+#include "btree.h"
 
-/*
- * hfs_bnode_ditch() 
- *
- * Description:
- *   This function deletes an entire linked list of bnodes, so it
- *   does not need to keep the linked list consistent as
- *   hfs_bnode_delete() does.
- *   Called by hfs_btree_init() for error cleanup and by hfs_btree_free().
- * Input Variable(s):
- *   struct hfs_bnode *bn: pointer to the first (struct hfs_bnode) in
- *    the linked list to be deleted.
- * Output Variable(s):
- *   NONE
- * Returns:
- *   void
- * Preconditions:
- *   'bn' is NULL or points to a "valid" (struct hfs_bnode) with a 'prev'
- *    field of NULL.
- * Postconditions:
- *   'bn' and all (struct hfs_bnode)s in the chain of 'next' pointers
- *   are deleted, freeing the associated memory and hfs_buffer_put()ing
- *   the associated buffer.
- */
-static void hfs_bnode_ditch(struct hfs_bnode *bn) {
-	struct hfs_bnode *tmp;
-#if defined(DEBUG_BNODES) || defined(DEBUG_ALL)
-	extern int bnode_count;
-#endif
-
-	while (bn != NULL) {
-		tmp = bn->next;
-#if defined(DEBUG_BNODES) || defined(DEBUG_ALL)
-		hfs_warn("deleting node %d from tree %d with count %d\n",
-		         bn->node, (int)ntohl(bn->tree->entry.cnid), bn->count);
-		--bnode_count;
-#endif
-		hfs_buffer_put(bn->buf); /* safe: checks for NULL argument */
-
-		/* free all but the header */
-		if (bn->node) {
-			HFS_DELETE(bn);
-		}
-		bn = tmp;
-	}
-}
-
-/*================ Global functions ================*/
-
-/*
- * hfs_btree_free()
- *
- * Description:
- *   This function frees a (struct hfs_btree) obtained from hfs_btree_init().
- *   Called by hfs_put_super().
- * Input Variable(s):
- *   struct hfs_btree *bt: pointer to the (struct hfs_btree) to free
- * Output Variable(s):
- *   NONE
- * Returns:
- *   void
- * Preconditions:
- *   'bt' is NULL or points to a "valid" (struct hfs_btree)
- * Postconditions:
- *   If 'bt' points to a "valid" (struct hfs_btree) then all (struct
- *    hfs_bnode)s associated with 'bt' are freed by calling
- *    hfs_bnode_ditch() and the memory associated with the (struct
- *    hfs_btree) is freed.
- *   If 'bt' is NULL or not "valid" an error is printed and nothing
- *    is changed.
- */
-void hfs_btree_free(struct hfs_btree *bt)
+/* Get a reference to a B*Tree and do some initial checks */
+struct hfs_btree *hfs_btree_open(struct super_block *sb, u32 id, btree_keycmp keycmp)
 {
-	int lcv;
+	struct hfs_btree *tree;
+	struct hfs_btree_header_rec *head;
+	struct address_space *mapping;
+	struct page *page;
+	unsigned int shift, size;
 
-	if (bt && (bt->magic == HFS_BTREE_MAGIC)) {
-		hfs_extent_free(&bt->entry.u.file.data_fork);
+	tree = kmalloc(sizeof(*tree), GFP_KERNEL);
+	if (!tree)
+		return NULL;
+	memset(tree, 0, sizeof(*tree));
 
-		for (lcv=0; lcv<HFS_CACHELEN; ++lcv) {
-#if defined(DEBUG_BNODES) || defined(DEBUG_ALL)
-			hfs_warn("deleting nodes from bucket %d:\n", lcv);
-#endif
-			hfs_bnode_ditch(bt->cache[lcv]);
-		}
+	init_MUTEX(&tree->tree_lock);
+	spin_lock_init(&tree->hash_lock);
+	/* Set the correct compare function */
+	tree->sb = sb;
+	tree->cnid = id;
+	tree->keycmp = keycmp;
 
-#if defined(DEBUG_BNODES) || defined(DEBUG_ALL)
-		hfs_warn("deleting header and bitmap nodes\n");
-#endif
-		hfs_bnode_ditch(&bt->head);
-
-#if defined(DEBUG_BNODES) || defined(DEBUG_ALL)
-		hfs_warn("deleting root node\n");
-#endif
-		hfs_bnode_ditch(bt->root);
-
-		HFS_DELETE(bt);
-	} else if (bt) {
-		hfs_warn("hfs_btree_free: corrupted hfs_btree.\n");
+	tree->inode = iget_locked(sb, id);
+	if (!tree->inode)
+		goto free_tree;
+	if (!(tree->inode->i_state & I_NEW))
+		BUG();
+	{
+	struct hfs_mdb *mdb = HFS_SB(sb)->mdb;
+	HFS_I(tree->inode)->flags = 0;
+	init_MUTEX(&HFS_I(tree->inode)->extents_lock);
+	switch (id) {
+	case HFS_EXT_CNID:
+		hfs_inode_read_fork(tree->inode, mdb->drXTExtRec, mdb->drXTFlSize,
+				    mdb->drXTFlSize, be32_to_cpu(mdb->drXTClpSiz));
+		tree->inode->i_mapping->a_ops = &hfs_btree_aops;
+		break;
+	case HFS_CAT_CNID:
+		hfs_inode_read_fork(tree->inode, mdb->drCTExtRec, mdb->drCTFlSize,
+				    mdb->drCTFlSize, be32_to_cpu(mdb->drCTClpSiz));
+		tree->inode->i_mapping->a_ops = &hfs_btree_aops;
+		break;
+	default:
+		BUG();
 	}
-}
-
-/*
- * hfs_btree_init()
- *
- * Description:
- *   Given some vital information from the MDB (HFS superblock),
- *   initializes the fields of a (struct hfs_btree).
- * Input Variable(s):
- *   struct hfs_mdb *mdb: pointer to the MDB
- *   ino_t cnid: the CNID (HFS_CAT_CNID or HFS_EXT_CNID) of the B-tree
- *   hfs_u32 tsize: the size, in bytes, of the B-tree
- *   hfs_u32 csize: the size, in bytes, of the clump size for the B-tree
- * Output Variable(s):
- *   NONE
- * Returns:
- *   (struct hfs_btree *): pointer to the initialized hfs_btree on success,
- *    or NULL on failure
- * Preconditions:
- *   'mdb' points to a "valid" (struct hfs_mdb)
- * Postconditions:
- *   Assuming the inputs are what they claim to be, no errors occur
- *   reading from disk, and no inconsistencies are noticed in the data
- *   read from disk, the return value is a pointer to a "valid"
- *   (struct hfs_btree).  If there are errors reading from disk or
- *   inconsistencies are noticed in the data read from disk, then and
- *   all resources that were allocated are released and NULL is
- *   returned.	If the inputs are not what they claim to be or if they
- *   are unnoticed inconsistencies in the data read from disk then the
- *   returned hfs_btree is probably going to lead to errors when it is
- *   used in a non-trivial way.
- */
-struct hfs_btree * hfs_btree_init(struct hfs_mdb *mdb, ino_t cnid,
-				  hfs_byte_t ext[12],
-				  hfs_u32 tsize, hfs_u32 csize)
-{
-	struct hfs_btree * bt;
-	struct BTHdrRec * th;
-	struct hfs_bnode * tmp;
-	unsigned int next;
-#if defined(DEBUG_HEADER) || defined(DEBUG_ALL)
-	unsigned char *p, *q;
-#endif
-
-	if (!mdb || !ext || !HFS_NEW(bt)) {
-		goto bail3;
 	}
+	unlock_new_inode(tree->inode);
 
-	bt->magic = HFS_BTREE_MAGIC;
-	bt->sys_mdb = mdb->sys_mdb;
-	bt->reserved = 0;
-	sema_init(&bt->sem, 1);
-	bt->dirt = 0;
-	memset(bt->cache, 0, sizeof(bt->cache));
+	mapping = tree->inode->i_mapping;
+	page = read_cache_page(mapping, 0, (filler_t *)mapping->a_ops->readpage, NULL);
+	if (IS_ERR(page))
+		goto free_tree;
 
-#if 0   /* this is a fake entry. so we don't need to initialize it. */
-	memset(&bt->entry, 0, sizeof(bt->entry));
-	hfs_init_waitqueue(&bt->entry.wait);
-	INIT_LIST_HEAD(&bt->entry.hash);
-	INIT_LIST_HEAD(&bt->entry.list);
-#endif
+	/* Load the header */
+	head = (struct hfs_btree_header_rec *)(kmap(page) + sizeof(struct hfs_bnode_desc));
+	tree->root = be32_to_cpu(head->root);
+	tree->leaf_count = be32_to_cpu(head->leaf_count);
+	tree->leaf_head = be32_to_cpu(head->leaf_head);
+	tree->leaf_tail = be32_to_cpu(head->leaf_tail);
+	tree->node_count = be32_to_cpu(head->node_count);
+	tree->free_nodes = be32_to_cpu(head->free_nodes);
+	tree->attributes = be32_to_cpu(head->attributes);
+	tree->node_size = be16_to_cpu(head->node_size);
+	tree->max_key_len = be16_to_cpu(head->max_key_len);
+	tree->depth = be16_to_cpu(head->depth);
 
-	bt->entry.mdb = mdb;
-	bt->entry.cnid = cnid;
-	bt->entry.type = HFS_CDR_FIL;
-	bt->entry.u.file.magic = HFS_FILE_MAGIC;
-	bt->entry.u.file.clumpablks = (csize / mdb->alloc_blksz)
-						>> HFS_SECTOR_SIZE_BITS;
-	bt->entry.u.file.data_fork.entry = &bt->entry;
-	bt->entry.u.file.data_fork.lsize = tsize;
-	bt->entry.u.file.data_fork.psize = tsize >> HFS_SECTOR_SIZE_BITS;
-	bt->entry.u.file.data_fork.fork = HFS_FK_DATA;
-	hfs_extent_in(&bt->entry.u.file.data_fork, ext);
+	size = tree->node_size;
+	if (!size || size & (size - 1))
+		goto fail_page;
+	if (!tree->node_count)
+		goto fail_page;
+	for (shift = 0; size >>= 1; shift += 1)
+		;
+	tree->node_size_shift = shift;
 
-	hfs_bnode_read(&bt->head, bt, 0, HFS_STICKY);
-	if (!hfs_buffer_ok(bt->head.buf)) {
-		goto bail2;
-	}
-	th = (struct BTHdrRec *)((char *)hfs_buffer_data(bt->head.buf) +
-						sizeof(struct NodeDescriptor));
+	tree->pages_per_bnode = (tree->node_size + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
 
-	/* read in the bitmap nodes (if any) */
-	tmp = &bt->head;
-	while ((next = tmp->ndFLink)) {
-		if (!HFS_NEW(tmp->next)) {
-			goto bail2;
-		}
-		hfs_bnode_read(tmp->next, bt, next, HFS_STICKY);
-		if (!hfs_buffer_ok(tmp->next->buf)) {
-			goto bail2;
-		}
-		tmp->next->prev = tmp;
-		tmp = tmp->next;
-	}
+	kunmap(page);
+	page_cache_release(page);
+	return tree;
 
-	if (hfs_get_ns(th->bthNodeSize) != htons(HFS_SECTOR_SIZE)) {
-		hfs_warn("hfs_btree_init: bthNodeSize!=512 not supported\n");
-		goto bail2;
-	}
-
-	if (cnid == htonl(HFS_CAT_CNID)) {
-		bt->compare = (hfs_cmpfn)hfs_cat_compare;
-	} else if (cnid == htonl(HFS_EXT_CNID)) {
-		bt->compare = (hfs_cmpfn)hfs_ext_compare;
-	} else {
-		goto bail2;
-	}
-	bt->bthDepth  = hfs_get_hs(th->bthDepth);
-	bt->bthRoot   = hfs_get_hl(th->bthRoot);
-	bt->bthNRecs  = hfs_get_hl(th->bthNRecs);
-	bt->bthFNode  = hfs_get_hl(th->bthFNode);
-	bt->bthLNode  = hfs_get_hl(th->bthLNode);
-	bt->bthNNodes = hfs_get_hl(th->bthNNodes);
-	bt->bthFree   = hfs_get_hl(th->bthFree);
-	bt->bthKeyLen = hfs_get_hs(th->bthKeyLen);
-
-#if defined(DEBUG_HEADER) || defined(DEBUG_ALL)
-	hfs_warn("bthDepth %d\n", bt->bthDepth);
-	hfs_warn("bthRoot %d\n", bt->bthRoot);
-	hfs_warn("bthNRecs %d\n", bt->bthNRecs);
-	hfs_warn("bthFNode %d\n", bt->bthFNode);
-	hfs_warn("bthLNode %d\n", bt->bthLNode);
-	hfs_warn("bthKeyLen %d\n", bt->bthKeyLen);
-	hfs_warn("bthNNodes %d\n", bt->bthNNodes);
-	hfs_warn("bthFree %d\n", bt->bthFree);
-	p = (unsigned char *)hfs_buffer_data(bt->head.buf);
-	q = p + HFS_SECTOR_SIZE;
-	while (p < q) {
-		hfs_warn("%02x %02x %02x %02x %02x %02x %02x %02x "
-		         "%02x %02x %02x %02x %02x %02x %02x %02x\n",
-			 *p++, *p++, *p++, *p++, *p++, *p++, *p++, *p++,
-			 *p++, *p++, *p++, *p++, *p++, *p++, *p++, *p++);
-	}
-#endif
-
-	/* Read in the root if it exists.
-	   The header always exists, but the root exists only if the
-	   tree is non-empty */
-	if (bt->bthDepth && bt->bthRoot) {
-		if (!HFS_NEW(bt->root)) {
-			goto bail2;
-		}
-		hfs_bnode_read(bt->root, bt, bt->bthRoot, HFS_STICKY);
-		if (!hfs_buffer_ok(bt->root->buf)) {
-			goto bail1;
-		}
-	} else {
-		bt->root = NULL;
-	}
-
-	return bt;
-
- bail1:
-	hfs_bnode_ditch(bt->root);
- bail2:
-	hfs_bnode_ditch(&bt->head);
-	HFS_DELETE(bt);
- bail3:
+ fail_page:
+	tree->inode->i_mapping->a_ops = &hfs_aops;
+	page_cache_release(page);
+ free_tree:
+	iput(tree->inode);
+	kfree(tree);
 	return NULL;
 }
 
-/*
- * hfs_btree_commit()
- *
- * Called to write a possibly dirty btree back to disk.
- */
-void hfs_btree_commit(struct hfs_btree *bt, hfs_byte_t ext[12], hfs_lword_t size)
+/* Release resources used by a btree */
+void hfs_btree_close(struct hfs_btree *tree)
 {
-	if (bt->dirt) {
-		struct BTHdrRec *th;
-		th = (struct BTHdrRec *)((char *)hfs_buffer_data(bt->head.buf) +
-						 sizeof(struct NodeDescriptor));
+	struct hfs_bnode *node;
+	int i;
 
-		hfs_put_hs(bt->bthDepth,  th->bthDepth);
-		hfs_put_hl(bt->bthRoot,   th->bthRoot);
-		hfs_put_hl(bt->bthNRecs,  th->bthNRecs);
-		hfs_put_hl(bt->bthFNode,  th->bthFNode);
-		hfs_put_hl(bt->bthLNode,  th->bthLNode);
-		hfs_put_hl(bt->bthNNodes, th->bthNNodes);
-		hfs_put_hl(bt->bthFree,   th->bthFree);
-		hfs_buffer_dirty(bt->head.buf);
+	if (!tree)
+		return;
 
-		/*
-		 * Commit the bnodes which are not cached.
-		 * The map nodes don't need to be committed here because
-		 * they are committed every time they are changed.
-		 */
-		hfs_bnode_commit(&bt->head);
-		if (bt->root) {
-			hfs_bnode_commit(bt->root);
+	for (i = 0; i < NODE_HASH_SIZE; i++) {
+		while ((node = tree->node_hash[i])) {
+			tree->node_hash[i] = node->next_hash;
+			if (atomic_read(&node->refcnt))
+				printk("HFS: node %d:%d still has %d user(s)!\n",
+					node->tree->cnid, node->this, atomic_read(&node->refcnt));
+			hfs_bnode_free(node);
+			tree->node_hash_cnt--;
 		}
-
-	
-		hfs_put_hl(bt->bthNNodes << HFS_SECTOR_SIZE_BITS, size);
-		hfs_extent_out(&bt->entry.u.file.data_fork, ext);
-		/* hfs_buffer_dirty(mdb->buf); (Done by caller) */
-
-		bt->dirt = 0;
 	}
+	iput(tree->inode);
+	kfree(tree);
+}
+
+void hfs_btree_write(struct hfs_btree *tree)
+{
+	struct hfs_btree_header_rec *head;
+	struct hfs_bnode *node;
+	struct page *page;
+
+	node = hfs_bnode_find(tree, 0);
+	if (IS_ERR(node))
+		/* panic? */
+		return;
+	/* Load the header */
+	page = node->page[0];
+	head = (struct hfs_btree_header_rec *)(kmap(page) + sizeof(struct hfs_bnode_desc));
+
+	head->root = cpu_to_be32(tree->root);
+	head->leaf_count = cpu_to_be32(tree->leaf_count);
+	head->leaf_head = cpu_to_be32(tree->leaf_head);
+	head->leaf_tail = cpu_to_be32(tree->leaf_tail);
+	head->node_count = cpu_to_be32(tree->node_count);
+	head->free_nodes = cpu_to_be32(tree->free_nodes);
+	head->attributes = cpu_to_be32(tree->attributes);
+	head->depth = cpu_to_be16(tree->depth);
+
+	kunmap(page);
+	set_page_dirty(page);
+	hfs_bnode_put(node);
+}
+
+static struct hfs_bnode *hfs_bmap_new_bmap(struct hfs_bnode *prev, u32 idx)
+{
+	struct hfs_btree *tree = prev->tree;
+	struct hfs_bnode *node;
+	struct hfs_bnode_desc desc;
+	u32 cnid;
+
+	node = hfs_bnode_create(tree, idx);
+	if (IS_ERR(node))
+		return node;
+
+	if (!tree->free_nodes)
+		panic("FIXME!!!");
+	tree->free_nodes--;
+	prev->next = idx;
+	cnid = cpu_to_be32(idx);
+	hfs_bnode_write(prev, &cnid, offsetof(struct hfs_bnode_desc, next), 4);
+
+	node->type = HFS_NODE_MAP;
+	node->num_recs = 1;
+	hfs_bnode_clear(node, 0, tree->node_size);
+	desc.next = 0;
+	desc.prev = 0;
+	desc.type = HFS_NODE_MAP;
+	desc.height = 0;
+	desc.num_recs = cpu_to_be16(1);
+	desc.reserved = 0;
+	hfs_bnode_write(node, &desc, 0, sizeof(desc));
+	hfs_bnode_write_u16(node, 14, 0x8000);
+	hfs_bnode_write_u16(node, tree->node_size - 2, 14);
+	hfs_bnode_write_u16(node, tree->node_size - 4, tree->node_size - 6);
+
+	return node;
+}
+
+struct hfs_bnode *hfs_bmap_alloc(struct hfs_btree *tree)
+{
+	struct hfs_bnode *node, *next_node;
+	struct page **pagep;
+	u32 nidx, idx;
+	u16 off, len;
+	u8 *data, byte, m;
+	int i;
+
+	while (!tree->free_nodes) {
+		struct inode *inode = tree->inode;
+		u32 count;
+		int res;
+
+		res = hfs_extend_file(inode);
+		if (res)
+			return ERR_PTR(res);
+		inode->i_blocks = HFS_I(inode)->alloc_blocks *
+				  HFS_SB(tree->sb)->fs_div;
+		HFS_I(inode)->phys_size = inode->i_size =
+			(loff_t)inode->i_blocks << tree->sb->s_blocksize_bits;
+		count = inode->i_size >> tree->node_size_shift;
+		tree->free_nodes = count - tree->node_count;
+		tree->node_count = count;
+	}
+
+	nidx = 0;
+	node = hfs_bnode_find(tree, nidx);
+	if (IS_ERR(node))
+		return node;
+	len = hfs_brec_lenoff(node, 2, &off);
+
+	off += node->page_offset;
+	pagep = node->page + (off >> PAGE_CACHE_SHIFT);
+	data = kmap(*pagep);
+	off &= ~PAGE_CACHE_MASK;
+	idx = 0;
+
+	for (;;) {
+		while (len) {
+			byte = data[off];
+			if (byte != 0xff) {
+				for (m = 0x80, i = 0; i < 8; m >>= 1, i++) {
+					if (!(byte & m)) {
+						idx += i;
+						data[off] |= m;
+						set_page_dirty(*pagep);
+						kunmap(*pagep);
+						tree->free_nodes--;
+						mark_inode_dirty(tree->inode);
+						hfs_bnode_put(node);
+						return hfs_bnode_create(tree, idx);
+					}
+				}
+			}
+			if (++off >= PAGE_CACHE_SIZE) {
+				kunmap(*pagep);
+				data = kmap(*++pagep);
+				off = 0;
+			}
+			idx += 8;
+			len--;
+		}
+		kunmap(*pagep);
+		nidx = node->next;
+		if (!nidx) {
+			printk("create new bmap node...\n");
+			next_node = hfs_bmap_new_bmap(node, idx);
+		} else
+			next_node = hfs_bnode_find(tree, nidx);
+		hfs_bnode_put(node);
+		if (IS_ERR(next_node))
+			return next_node;
+		node = next_node;
+
+		len = hfs_brec_lenoff(node, 0, &off);
+		off += node->page_offset;
+		pagep = node->page + (off >> PAGE_CACHE_SHIFT);
+		data = kmap(*pagep);
+		off &= ~PAGE_CACHE_MASK;
+	}
+}
+
+void hfs_bmap_free(struct hfs_bnode *node)
+{
+	struct hfs_btree *tree;
+	struct page *page;
+	u16 off, len;
+	u32 nidx;
+	u8 *data, byte, m;
+
+	dprint(DBG_BNODE_MOD, "btree_free_node: %u\n", node->this);
+	tree = node->tree;
+	nidx = node->this;
+	node = hfs_bnode_find(tree, 0);
+	if (IS_ERR(node))
+		return;
+	len = hfs_brec_lenoff(node, 2, &off);
+	while (nidx >= len * 8) {
+		u32 i;
+
+		nidx -= len * 8;
+		i = node->next;
+		hfs_bnode_put(node);
+		if (!i) {
+			/* panic */;
+			printk("HFS: unable to free bnode %u. bmap not found!\n", node->this);
+			return;
+		}
+		node = hfs_bnode_find(tree, i);
+		if (IS_ERR(node))
+			return;
+		if (node->type != HFS_NODE_MAP) {
+			/* panic */;
+			printk("HFS: invalid bmap found! (%u,%d)\n", node->this, node->type);
+			hfs_bnode_put(node);
+			return;
+		}
+		len = hfs_brec_lenoff(node, 0, &off);
+	}
+	off += node->page_offset + nidx / 8;
+	page = node->page[off >> PAGE_CACHE_SHIFT];
+	data = kmap(page);
+	off &= ~PAGE_CACHE_MASK;
+	m = 1 << (~nidx & 7);
+	byte = data[off];
+	if (!(byte & m)) {
+		printk("HFS: trying to free free bnode %u(%d)\n", node->this, node->type);
+		kunmap(page);
+		hfs_bnode_put(node);
+		return;
+	}
+	data[off] = byte & ~m;
+	set_page_dirty(page);
+	kunmap(page);
+	hfs_bnode_put(node);
+	tree->free_nodes++;
+	mark_inode_dirty(tree->inode);
 }

@@ -242,10 +242,15 @@ struct vio_dev * __devinit vio_register_device(struct device_node *of_node)
 	viodev->unit_address = *unit_address;
 	viodev->tce_table = vio_build_tce_table(viodev);
 
-	viodev->irq = (unsigned int) -1;
+	viodev->irq = NO_IRQ;
 	irq_p = (unsigned int *)get_property(of_node, "interrupts", 0);
 	if (irq_p) {
-		viodev->irq = openpic_to_irq(virt_irq_create_mapping(*irq_p));
+		int virq = virt_irq_create_mapping(*irq_p);
+		if (virq == NO_IRQ) {
+			printk(KERN_ERR "Unable to allocate interrupt "
+			       "number for %s\n", of_node->full_name);
+		} else
+			viodev->irq = openpic_to_irq(virq);
 	}
 
 	/* init generic 'struct device' fields: */

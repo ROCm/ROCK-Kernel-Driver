@@ -81,9 +81,11 @@ typedef enum {
 struct video_event { 
         int32_t type; 
 #define VIDEO_EVENT_SIZE_CHANGED 1
+#define VIDEO_EVENT_FRAME_RATE_CHANGED	2
         time_t timestamp;
 	union { 
 	        video_size_t size;
+		unsigned int frame_rate;	/* in frames per 1000sec */
 	} u; 
 };
 
@@ -194,6 +196,7 @@ typedef uint16_t video_attributes_t;
 #define VIDEO_GET_NAVI             _IOR('o', 52, video_navi_pack_t)
 #define VIDEO_SET_ATTRIBUTES       _IO('o', 53)
 #define VIDEO_GET_SIZE             _IOR('o', 55, video_size_t)
+#define VIDEO_GET_FRAME_RATE       _IOR('o', 56, unsigned int)
 
 #endif /*_DVBVIDEO_H_*/
 

@@ -68,8 +68,8 @@ static int i2c_readregs(struct dvb_i2c_bus *i2c, u8 id, u8 reg, u8 *buf, u8 len)
 {
         u8 mm1[] = { reg };
         struct i2c_msg msgs[2] = {
-		{ addr: id/2, flags: 0, buf: mm1, len: 1 },
-		{ addr: id/2, flags: I2C_M_RD, buf: buf, len: len }
+		{ .addr = id/2, .flags = 0, .buf = mm1, .len = 1 },
+		{ .addr = id/2, .flags = I2C_M_RD, .buf = buf, .len = len }
 	};
 
         if (i2c->xfer(i2c, msgs, 2) != 2)

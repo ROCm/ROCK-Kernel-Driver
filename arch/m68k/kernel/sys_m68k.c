@@ -15,6 +15,7 @@
 #include <linux/msg.h>
 #include <linux/shm.h>
 #include <linux/stat.h>
+#include <linux/syscalls.h>
 #include <linux/mman.h>
 #include <linux/file.h>
 #include <linux/utsname.h>
@@ -156,8 +157,6 @@ out:
 }
 #endif
 
-extern asmlinkage int sys_select(int, fd_set *, fd_set *, fd_set *, struct timeval *);
-
 struct sel_arg_struct {
 	unsigned long n;
 	fd_set *inp, *outp, *exp;
@@ -262,7 +261,7 @@ asmlinkage int sys_ipc (uint call, int first, int second,
 	return -EINVAL;
 }
 
-asmlinkage int sys_ioperm(unsigned long from, unsigned long num, int on)
+asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int on)
 {
   return -ENOSYS;
 }

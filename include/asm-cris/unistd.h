@@ -283,6 +283,9 @@
 
 #ifdef __KERNEL_SYSCALLS__
 
+#include <linux/compiler.h>
+#include <linux/types.h>
+
 /*
  * we need this inline - forking from kernel space will result
  * in NO COPY ON WRITE (!!!), until an execve is executed. This
@@ -304,6 +307,28 @@ extern inline _syscall1(int,dup,int,fd)
 extern inline _syscall3(int,execve,const char *,file,char **,argv,char **,envp)
 extern inline _syscall3(int,open,const char *,file,int,flag,int,mode)
 extern inline _syscall1(int,close,int,fd)
+
+struct pt_regs;
+asmlinkage long sys_mmap2(
+			unsigned long addr, unsigned long len,
+			unsigned long prot, unsigned long flags,
+			unsigned long fd, unsigned long pgoff);
+asmlinkage int sys_execve(const char *fname, char **argv, char **envp,
+			long r13, long mof, long srp, struct pt_regs *regs);
+asmlinkage int sys_clone(unsigned long newusp, unsigned long flags,
+			int* parent_tid, int* child_tid, long mof, long srp,
+			struct pt_regs *regs);
+asmlinkage int sys_fork(long r10, long r11, long r12, long r13,
+			long mof, long srp, struct pt_regs *regs);
+asmlinkage int sys_vfork(long r10, long r11, long r12, long r13,
+			long mof, long srp, struct pt_regs *regs);
+asmlinkage int sys_pipe(unsigned long __user *fildes);
+asmlinkage int sys_ptrace(long request, long pid, long addr, long data);
+struct sigaction;
+asmlinkage long sys_rt_sigaction(int sig,
+				const struct sigaction __user *act,
+				struct sigaction __user *oact,
+				size_t sigsetsize);
 
 /*
  * Since we define it "external", it collides with the built-in

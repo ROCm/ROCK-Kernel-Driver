@@ -661,8 +661,8 @@ static struct block_device_operations sd_fops = {
 static void sd_rw_intr(struct scsi_cmnd * SCpnt)
 {
 	int result = SCpnt->result;
-	int this_count = SCpnt->bufflen >> 9;
-	int good_sectors = (result == 0 ? this_count : 0);
+	int this_count = SCpnt->bufflen;
+	int good_bytes = (result == 0 ? this_count : 0);
 	sector_t block_sectors = 1;
 	sector_t error_sector;
 #ifdef CONFIG_SCSI_LOGGING
@@ -687,6 +687,8 @@ static void sd_rw_intr(struct scsi_cmnd * SCpnt)
 		switch (SCpnt->sense_buffer[2]) {
 		case MEDIUM_ERROR:
 			if (!(SCpnt->sense_buffer[0] & 0x80))
+				break;
+			if (!blk_fs_request(SCpnt->request))
 				break;
 			error_sector = (SCpnt->sense_buffer[3] << 24) |
 			(SCpnt->sense_buffer[4] << 16) |
@@ -718,9 +720,9 @@ static void sd_rw_intr(struct scsi_cmnd * SCpnt)
 			}
 
 			error_sector &= ~(block_sectors - 1);
-			good_sectors = error_sector - SCpnt->request->sector;
-			if (good_sectors < 0 || good_sectors >= this_count)
-				good_sectors = 0;
+			good_bytes = (error_sector - SCpnt->request->sector) << 9;
+			if (good_bytes < 0 || good_bytes >= this_count)
+				good_bytes = 0;
 			break;
 
 		case RECOVERED_ERROR:
@@ -732,7 +734,7 @@ static void sd_rw_intr(struct scsi_cmnd * SCpnt)
 			print_sense("sd", SCpnt);
 			SCpnt->result = 0;
 			SCpnt->sense_buffer[0] = 0x0;
-			good_sectors = this_count;
+			good_bytes = this_count;
 			break;
 
 		case ILLEGAL_REQUEST:
@@ -755,7 +757,7 @@ static void sd_rw_intr(struct scsi_cmnd * SCpnt)
 	 * how many actual sectors finished, and how many sectors we need
 	 * to say have failed.
 	 */
-	scsi_io_completion(SCpnt, good_sectors, block_sectors);
+	scsi_io_completion(SCpnt, good_bytes, block_sectors << 9);
 }
 
 static int media_not_present(struct scsi_disk *sdkp, struct scsi_request *srp)
