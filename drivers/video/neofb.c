@@ -1143,7 +1143,6 @@ static int neofb_set_par(struct fb_info *info)
 		VGAwCR(0x70, par->VerticalExt);
 	}
 
-
 	vgaHWProtect(0);	/* Turn on screen */
 
 	/* Calling this also locks offset registers required in update_start */
@@ -1152,8 +1151,16 @@ static int neofb_set_par(struct fb_info *info)
 	info->fix.line_length =
 	    info->var.xres_virtual * (info->var.bits_per_pixel >> 3);
 
-	if (info->var.accel_flags & FB_ACCELF_TEXT)
-		neo2200_accel_init(info, &info->var);
+	switch (info->fix.accel) {
+		case FB_ACCEL_NEOMAGIC_NM2200:
+		case FB_ACCEL_NEOMAGIC_NM2230: 
+		case FB_ACCEL_NEOMAGIC_NM2360: 
+		case FB_ACCEL_NEOMAGIC_NM2380: 
+			neo2200_accel_init(info, &info->var);
+			break;
+		default:
+			break;
+	}	
 	return 0;
 }
 
@@ -1431,30 +1438,66 @@ neo2200_imageblit(struct fb_info *info, struct fb_image *image)
 static void
 neofb_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
 {
-	if (info->var.accel_flags == FB_ACCELF_TEXT)
-		neo2200_fillrect(info, rect);	
-	else
-		cfb_fillrect(info, rect);
+	switch (info->fix.accel) {
+		case FB_ACCEL_NEOMAGIC_NM2200:
+		case FB_ACCEL_NEOMAGIC_NM2230: 
+		case FB_ACCEL_NEOMAGIC_NM2360: 
+		case FB_ACCEL_NEOMAGIC_NM2380: 
+			neo2200_fillrect(info, rect);
+			break;
+		default:
+			cfb_fillrect(info, rect);
+			break;
+	}	
 }
 
 static void
 neofb_copyarea(struct fb_info *info, struct fb_copyarea *area)
 {
-	if (info->var.accel_flags == FB_ACCELF_TEXT)
-		neo2200_copyarea(info, area);	
-	else
-		cfb_copyarea(info, area);	
+	switch (info->fix.accel) {
+		case FB_ACCEL_NEOMAGIC_NM2200:
+		case FB_ACCEL_NEOMAGIC_NM2230: 
+		case FB_ACCEL_NEOMAGIC_NM2360: 
+		case FB_ACCEL_NEOMAGIC_NM2380: 
+			neo2200_copyarea(info, area);
+			break;
+		default:
+			cfb_copyarea(info, area);
+			break;
+	}	
 }
 
 static void
 neofb_imageblit(struct fb_info *info, struct fb_image *image)
 {
-	if (info->var.accel_flags == FB_ACCELF_TEXT)
-		neo2200_imageblit(info, image);	
-	else
-		cfb_imageblit(info, image);	
+	switch (info->fix.accel) {
+		case FB_ACCEL_NEOMAGIC_NM2200:
+		case FB_ACCEL_NEOMAGIC_NM2230: 
+		case FB_ACCEL_NEOMAGIC_NM2360: 
+		case FB_ACCEL_NEOMAGIC_NM2380: 
+			neo2200_imageblit(info, image);
+			break;
+		default:
+			cfb_imageblit(info, image);
+			break;
+	}
 }	
-	
+
+static void
+neofb_sync(struct fb_info *info)
+{
+	switch (info->fix.accel) {
+		case FB_ACCEL_NEOMAGIC_NM2200:
+		case FB_ACCEL_NEOMAGIC_NM2230: 
+		case FB_ACCEL_NEOMAGIC_NM2360: 
+		case FB_ACCEL_NEOMAGIC_NM2380: 
+			neo2200_sync(info);
+			break;
+		default:
+			break;
+	}		
+}
+
 static struct fb_ops neofb_ops = {
 	.owner		= THIS_MODULE,
 	.fb_check_var	= neofb_check_var,
@@ -1462,7 +1505,7 @@ static struct fb_ops neofb_ops = {
 	.fb_setcolreg	= neofb_setcolreg,
 	.fb_pan_display	= neofb_pan_display,
 	.fb_blank	= neofb_blank,
-	.fb_sync	= neo2200_sync,
+	.fb_sync	= neofb_sync,
 	.fb_fillrect	= neofb_fillrect,
 	.fb_copyarea	= neofb_copyarea,
 	.fb_imageblit	= neofb_imageblit,
