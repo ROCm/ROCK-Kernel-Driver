@@ -526,7 +526,6 @@ static int skel_probe(struct usb_interface *interface, const struct usb_device_i
 	init_MUTEX (&dev->sem);
 	dev->udev = udev;
 	dev->interface = interface;
-	dev->minor = interface->minor;
 
 	/* set up the endpoint information */
 	/* check out the endpoints */
@@ -606,6 +605,7 @@ static int skel_probe(struct usb_interface *interface, const struct usb_device_i
 		goto error;
 	}
 
+	dev->minor = interface->minor;
 
 	/* let the user know what node this device is now attached to */
 	info ("USB Skeleton device now attached to USBSkel-%d", dev->minor);
@@ -640,9 +640,6 @@ static void skel_disconnect(struct usb_interface *interface)
 	usb_set_intfdata (interface, NULL);
 
 	down (&dev->sem);
-
-	/* disable open() */
-	interface->minor = -1;
 
 	minor = dev->minor;
 

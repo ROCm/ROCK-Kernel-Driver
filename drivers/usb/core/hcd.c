@@ -1307,7 +1307,8 @@ rescan:
 		/* ignore urbs for other endpoints */
 		if (usb_pipeendpoint (tmp) != epnum)
 			continue;
-		if ((tmp ^ endpoint) & USB_DIR_IN)
+		/* NOTE assumption that only ep0 is a control endpoint */
+		if (epnum != 0 && ((tmp ^ endpoint) & USB_DIR_IN))
 			continue;
 
 		/* another cpu may be in hcd, spinning on hcd_data_lock

@@ -2460,6 +2460,7 @@ static struct usb_hcd *uhci_hcd_alloc(void)
 		return NULL;
 
 	memset(uhci, 0, sizeof(*uhci));
+	uhci->hcd.product_desc = "UHCI Host Controller";
 	return &uhci->hcd;
 }
 

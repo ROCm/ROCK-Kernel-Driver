@@ -412,8 +412,7 @@ static int hc_reset (struct ohci_hcd *ohci)
 	/* Disable HC interrupts */
 	writel (OHCI_INTR_MIE, &ohci->regs->intrdisable);
 
-	ohci_dbg (ohci, "USB HC reset_hc %s: ctrl = 0x%x ;\n",
-		hcd_to_bus (&ohci->hcd)->bus_name,
+	ohci_dbg (ohci, "reset, control = 0x%x\n",
 		readl (&ohci->regs->control));
 
   	/* Reset USB (needed by some controllers); RemoteWakeupConnected
@@ -548,7 +547,6 @@ static int hc_start (struct ohci_hcd *ohci)
 		return -ENODEV;
 	}
 
-	create_debug_files (ohci);
 	return 0;
 }
 
