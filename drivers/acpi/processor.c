@@ -40,6 +40,7 @@
 #include <asm/delay.h>
 #include <linux/compatmac.h>
 #include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 #include "acpi_bus.h"
 #include "acpi_drivers.h"
 
@@ -90,6 +91,11 @@ MODULE_LICENSE("GPL");
 
 static int acpi_processor_add (struct acpi_device *device);
 static int acpi_processor_remove (struct acpi_device *device, int type);
+static int acpi_processor_info_open_fs(struct inode *inode, struct file *file);
+static int acpi_processor_throttling_open_fs(struct inode *inode, struct file *file);
+static int acpi_processor_power_open_fs(struct inode *inode, struct file *file);
+static int acpi_processor_limit_open_fs(struct inode *inode, struct file *file);
+
 
 static struct acpi_driver acpi_processor_driver = {
 	.name =		ACPI_PROCESSOR_DRIVER_NAME,
@@ -224,6 +230,34 @@ struct acpi_processor_errata {
 	}			piix4;
 };
 
+static struct file_operations acpi_processor_info_fops = {
+	.open 		= acpi_processor_info_open_fs,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
+static struct file_operations acpi_processor_power_fops = {
+	.open 		= acpi_processor_power_open_fs,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
+static struct file_operations acpi_processor_throttling_fops = {
+	.open 		= acpi_processor_throttling_open_fs,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
+static struct file_operations acpi_processor_limit_fops = {
+	.open 		= acpi_processor_limit_open_fs,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
 static struct acpi_processor	*processors[NR_CPUS];
 static struct acpi_processor_errata errata;
 static void (*pm_idle_save)(void) = NULL;
@@ -231,6 +265,13 @@ static void (*pm_idle_save)(void) = NULL;
 #ifdef CONFIG_ACPI_PROCESSOR_PERF
 static unsigned int cpufreq_usage_count = 0;
 static struct cpufreq_driver *acpi_cpufreq_driver;
+static int acpi_processor_perf_open_fs(struct inode *inode, struct file *file);
+static struct file_operations acpi_processor_perf_fops = {
+	.open 		= acpi_processor_perf_open_fs,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
 #endif
 
 
@@ -1884,174 +1925,132 @@ acpi_cpufreq_exit (
 
 struct proc_dir_entry		*acpi_processor_dir = NULL;
 
-static int
-acpi_processor_read_info (
-	char			*page,
-	char			**start,
-	off_t			off,
-	int 			count,
-	int 			*eof,
-	void			*data)
+static int acpi_processor_info_seq_show(struct seq_file *seq, void *offset)
 {
-	struct acpi_processor	*pr = (struct acpi_processor *) data;
-	char			*p = page;
-	int			len = 0;
+	struct acpi_processor	*pr = (struct acpi_processor *)seq->private;
 
-	ACPI_FUNCTION_TRACE("acpi_processor_read_info");
+	ACPI_FUNCTION_TRACE("acpi_processor_info_seq_show");
 
-	if (!pr || (off != 0))
+	if (!pr)
 		goto end;
 
-	p += sprintf(p, "processor id:            %d\n",
-		pr->id);
-
-	p += sprintf(p, "acpi id:                 %d\n",
-		pr->acpi_id);
-
-	p += sprintf(p, "bus mastering control:   %s\n",
-		pr->flags.bm_control ? "yes" : "no");
-
-	p += sprintf(p, "power management:        %s\n",
-		pr->flags.power ? "yes" : "no");
-
-	p += sprintf(p, "throttling control:      %s\n",
-		pr->flags.throttling ? "yes" : "no");
-
-	p += sprintf(p, "performance management:  %s\n",
-		pr->flags.performance ? "yes" : "no");
-
-	p += sprintf(p, "limit interface:         %s\n",
-		pr->flags.limit ? "yes" : "no");
+	seq_printf(seq, "processor id:            %d\n"
+			"acpi id:                 %d\n"
+			"bus mastering control:   %s\n"
+			"power management:        %s\n"
+			"throttling control:      %s\n"
+			"performance management:  %s\n"
+			"limit interface:         %s\n",
+			pr->id,
+			pr->acpi_id,
+			pr->flags.bm_control ? "yes" : "no",
+			pr->flags.power ? "yes" : "no",
+			pr->flags.throttling ? "yes" : "no",
+			pr->flags.performance ? "yes" : "no",
+			pr->flags.limit ? "yes" : "no");
 
 end:
-	len = (p - page);
-	if (len <= off+count) *eof = 1;
-	*start = page + off;
-	len -= off;
-	if (len>count) len = count;
-	if (len<0) len = 0;
-
-	return_VALUE(len);
+	return 0;
 }
 
-
-static int
-acpi_processor_read_power (
-	char			*page,
-	char			**start,
-	off_t			off,
-	int 			count,
-	int 			*eof,
-	void			*data)
+static int acpi_processor_info_open_fs(struct inode *inode, struct file *file)
 {
-	struct acpi_processor	*pr = (struct acpi_processor *) data;
-	char			*p = page;
-	int			len = 0;
+	return single_open(file, acpi_processor_info_seq_show,
+						PDE(inode)->data);
+}
+
+static int acpi_processor_power_seq_show(struct seq_file *seq, void *offset)
+{
+	struct acpi_processor	*pr = (struct acpi_processor *)seq->private;
 	int			i = 0;
 
-	ACPI_FUNCTION_TRACE("acpi_processor_read_power");
+	ACPI_FUNCTION_TRACE("acpi_processor_power_seq_show");
 
-	if (!pr || (off != 0))
+	if (!pr)
 		goto end;
 
-	p += sprintf(p, "active state:            C%d\n",
-		pr->power.state);
+	seq_printf(seq, "active state:            C%d\n"
+			"default state:           C%d\n"
+			"bus master activity:     %08x\n",
+			pr->power.state,
+			pr->power.default_state,
+			pr->power.bm_activity);
 
-	p += sprintf(p, "default state:           C%d\n",
-		pr->power.default_state);
+	seq_puts(seq, "states:\n");
 
-	p += sprintf(p, "bus master activity:     %08x\n",
-		pr->power.bm_activity);
-
-	p += sprintf(p, "states:\n");
-
-	for (i=1; i<ACPI_C_STATE_COUNT; i++) {
-
-		p += sprintf(p, "   %cC%d:                  ", 
+	for (i = 1; i < ACPI_C_STATE_COUNT; i++) {
+		seq_printf(seq, "   %cC%d:                  ", 
 			(i == pr->power.state?'*':' '), i);
 
 		if (!pr->power.states[i].valid) {
-			p += sprintf(p, "<not supported>\n");
+			seq_puts(seq, "<not supported>\n");
 			continue;
 		}
 
 		if (pr->power.states[i].promotion.state)
-			p += sprintf(p, "promotion[C%d] ",
+			seq_printf(seq, "promotion[C%d] ",
 				pr->power.states[i].promotion.state);
 		else
-			p += sprintf(p, "promotion[--] ");
+			seq_puts(seq, "promotion[--] ");
 
 		if (pr->power.states[i].demotion.state)
-			p += sprintf(p, "demotion[C%d] ",
+			seq_printf(seq, "demotion[C%d] ",
 				pr->power.states[i].demotion.state);
 		else
-			p += sprintf(p, "demotion[--] ");
+			seq_puts(seq, "demotion[--] ");
 
-		p += sprintf(p, "latency[%03d] usage[%08d]\n",
+		seq_printf(seq, "latency[%03d] usage[%08d]\n",
 			pr->power.states[i].latency,
 			pr->power.states[i].usage);
 	}
 
 end:
-	len = (p - page);
-	if (len <= off+count) *eof = 1;
-	*start = page + off;
-	len -= off;
-	if (len>count) len = count;
-	if (len<0) len = 0;
+	return 0;
+}
 
-	return_VALUE(len);
+static int acpi_processor_power_open_fs(struct inode *inode, struct file *file)
+{
+	return single_open(file, acpi_processor_power_seq_show,
+						PDE(inode)->data);
 }
 
 #ifdef CONFIG_ACPI_PROCESSOR_PERF
-static int
-acpi_processor_read_performance (
-	char			*page,
-	char			**start,
-	off_t			off,
-	int 			count,
-	int 			*eof,
-	void			*data)
+static int acpi_processor_perf_seq_show(struct seq_file *seq, void *offset)
 {
-	struct acpi_processor	*pr = (struct acpi_processor *) data;
-	char			*p = page;
-	int			len = 0;
+	struct acpi_processor	*pr = (struct acpi_processor *)seq->private;
 	int			i = 0;
 
-	ACPI_FUNCTION_TRACE("acpi_processor_read_performance");
+	ACPI_FUNCTION_TRACE("acpi_processor_perf_seq_show");
 
-	if (!pr || (off != 0))
+	if (!pr)
 		goto end;
 
 	if (!pr->flags.performance) {
-		p += sprintf(p, "<not supported>\n");
+		seq_puts(seq, "<not supported>\n");
 		goto end;
 	}
 
-	p += sprintf(p, "state count:             %d\n",
-		pr->performance.state_count);
+	seq_printf(seq, "state count:             %d\n"
+			"active state:            P%d\n",
+			pr->performance.state_count,
+			pr->performance.state);
 
-	p += sprintf(p, "active state:            P%d\n",
-		pr->performance.state);
-
-	p += sprintf(p, "states:\n");
-
-	for (i=0; i<pr->performance.state_count; i++)
-		p += sprintf(p, "   %cP%d:                  %d MHz, %d mW, %d uS\n",
+	seq_puts(seq, "states:\n");
+	for (i = 0; i < pr->performance.state_count; i++)
+		seq_printf(seq, "   %cP%d:                  %d MHz, %d mW, %d uS\n",
 			(i == pr->performance.state?'*':' '), i,
 			(u32) pr->performance.states[i].core_frequency,
 			(u32) pr->performance.states[i].power,
 			(u32) pr->performance.states[i].transition_latency);
 
 end:
-	len = (p - page);
-	if (len <= off+count) *eof = 1;
-	*start = page + off;
-	len -= off;
-	if (len>count) len = count;
-	if (len<0) len = 0;
+	return 0;
+}
 
-	return_VALUE(len);
+static int acpi_processor_perf_open_fs(struct inode *inode, struct file *file)
+{
+	return single_open(file, acpi_processor_perf_seq_show,
+						PDE(inode)->data);
 }
 
 static int
@@ -2091,63 +2090,49 @@ acpi_processor_write_performance (
 }
 #endif
 
-
-static int
-acpi_processor_read_throttling (
-	char			*page,
-	char			**start,
-	off_t			off,
-	int 			count,
-	int 			*eof,
-	void			*data)
+static int acpi_processor_throttling_seq_show(struct seq_file *seq, void *offset)
 {
-	struct acpi_processor	*pr = (struct acpi_processor *) data;
-	char			*p = page;
-	int			len = 0;
+	struct acpi_processor	*pr = (struct acpi_processor *)seq->private;
 	int			i = 0;
 	int                     result = 0;
 
-	ACPI_FUNCTION_TRACE("acpi_processor_read_throttling");
+	ACPI_FUNCTION_TRACE("acpi_processor_throttling_seq_show");
 
-	if (!pr || (off != 0))
+	if (!pr)
 		goto end;
 
 	if (!(pr->throttling.state_count > 0)) {
-		p += sprintf(p, "<not supported>\n");
+		seq_puts(seq, "<not supported>\n");
 		goto end;
 	}
 
 	result = acpi_processor_get_throttling(pr);
 
 	if (result) {
-		p += sprintf(p, "Could not determine current throttling state.\n");
+		seq_puts(seq, "Could not determine current throttling state.\n");
 		goto end;
 	}
 
-	p += sprintf(p, "state count:             %d\n",
-		pr->throttling.state_count);
+	seq_printf(seq, "state count:             %d\n"
+			"active state:            T%d\n",
+			pr->throttling.state_count,
+			pr->throttling.state);
 
-	p += sprintf(p, "active state:            T%d\n",
-		pr->throttling.state);
-
-	p += sprintf(p, "states:\n");
-
-	for (i=0; i<pr->throttling.state_count; i++)
-		p += sprintf(p, "   %cT%d:                  %02d%%\n",
+	seq_puts(seq, "states:\n");
+	for (i = 0; i < pr->throttling.state_count; i++)
+		seq_printf(seq, "   %cT%d:                  %02d%%\n",
 			(i == pr->throttling.state?'*':' '), i,
 			(pr->throttling.states[i].performance?pr->throttling.states[i].performance/10:0));
 
 end:
-	len = (p - page);
-	if (len <= off+count) *eof = 1;
-	*start = page + off;
-	len -= off;
-	if (len>count) len = count;
-	if (len<0) len = 0;
-
-	return_VALUE(len);
+	return 0;
 }
 
+static int acpi_processor_throttling_open_fs(struct inode *inode, struct file *file)
+{
+	return single_open(file, acpi_processor_throttling_seq_show,
+						PDE(inode)->data);
+}
 
 static int
 acpi_processor_write_throttling (
@@ -2178,53 +2163,38 @@ acpi_processor_write_throttling (
 	return_VALUE(count);
 }
 
-
-static int
-acpi_processor_read_limit (
-	char			*page,
-	char			**start,
-	off_t			off,
-	int 			count,
-	int 			*eof,
-	void			*data)
+static int acpi_processor_limit_seq_show(struct seq_file *seq, void *offset)
 {
-	struct acpi_processor	*pr = (struct acpi_processor *) data;
-	char			*p = page;
-	int			len = 0;
+	struct acpi_processor	*pr = (struct acpi_processor *)seq->private;
 
-	ACPI_FUNCTION_TRACE("acpi_processor_read_limit");
+	ACPI_FUNCTION_TRACE("acpi_processor_limit_seq_show");
 
-	if (!pr || (off != 0))
+	if (!pr)
 		goto end;
 
 	if (!pr->flags.limit) {
-		p += sprintf(p, "<not supported>\n");
+		seq_puts(seq, "<not supported>\n");
 		goto end;
 	}
 
-	p += sprintf(p, "active limit:            P%d:T%d\n",
-		pr->limit.state.px, pr->limit.state.tx);
-
-	p += sprintf(p, "platform limit:          P%d:T0\n",
-		pr->flags.performance?pr->performance.platform_limit:0);
-
-	p += sprintf(p, "user limit:              P%d:T%d\n",
-		pr->limit.user.px, pr->limit.user.tx);
-
-	p += sprintf(p, "thermal limit:           P%d:T%d\n",
-		pr->limit.thermal.px, pr->limit.thermal.tx);
+	seq_printf(seq, "active limit:            P%d:T%d\n"
+			"platform limit:          P%d:T0\n"
+			"user limit:              P%d:T%d\n"
+			"thermal limit:           P%d:T%d\n",
+			pr->limit.state.px, pr->limit.state.tx,
+			pr->flags.performance?pr->performance.platform_limit:0,
+			pr->limit.user.px, pr->limit.user.tx,
+			pr->limit.thermal.px, pr->limit.thermal.tx);
 
 end:
-	len = (p - page);
-	if (len <= off+count) *eof = 1;
-	*start = page + off;
-	len -= off;
-	if (len>count) len = count;
-	if (len<0) len = 0;
-
-	return_VALUE(len);
+	return 0;
 }
 
+static int acpi_processor_limit_open_fs(struct inode *inode, struct file *file)
+{
+	return single_open(file, acpi_processor_limit_seq_show,
+						PDE(inode)->data);
+}
 
 static int
 acpi_processor_write_limit (
@@ -2304,7 +2274,7 @@ acpi_processor_add_fs (
 			"Unable to create '%s' fs entry\n",
 			ACPI_PROCESSOR_FILE_INFO));
 	else {
-		entry->read_proc = acpi_processor_read_info;
+		entry->proc_fops = &acpi_processor_info_fops;
 		entry->data = acpi_driver_data(device);
 	}
 
@@ -2316,7 +2286,7 @@ acpi_processor_add_fs (
 			"Unable to create '%s' fs entry\n",
 			ACPI_PROCESSOR_FILE_POWER));
 	else {
-		entry->read_proc = acpi_processor_read_power;
+		entry->proc_fops = &acpi_processor_power_fops;
 		entry->data = acpi_driver_data(device);
 	}
 
@@ -2329,7 +2299,7 @@ acpi_processor_add_fs (
 			"Unable to create '%s' fs entry\n",
 			ACPI_PROCESSOR_FILE_PERFORMANCE));
 	else {
-		entry->read_proc = acpi_processor_read_performance;
+		entry->proc_fops = &acpi_processor_perf_fops;
 		entry->write_proc = acpi_processor_write_performance;
 		entry->data = acpi_driver_data(device);
 	}
@@ -2343,7 +2313,7 @@ acpi_processor_add_fs (
 			"Unable to create '%s' fs entry\n",
 			ACPI_PROCESSOR_FILE_THROTTLING));
 	else {
-		entry->read_proc = acpi_processor_read_throttling;
+		entry->proc_fops = &acpi_processor_throttling_fops;
 		entry->write_proc = acpi_processor_write_throttling;
 		entry->data = acpi_driver_data(device);
 	}
@@ -2356,7 +2326,7 @@ acpi_processor_add_fs (
 			"Unable to create '%s' fs entry\n",
 			ACPI_PROCESSOR_FILE_LIMIT));
 	else {
-		entry->read_proc = acpi_processor_read_limit;
+		entry->proc_fops = &acpi_processor_limit_fops;
 		entry->write_proc = acpi_processor_write_limit;
 		entry->data = acpi_driver_data(device);
 	}

@@ -41,6 +41,7 @@
 #include <linux/init.h>
 #include <linux/types.h>
 #include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 #include <linux/version.h>
 
 #include <acconfig.h>
@@ -100,6 +101,47 @@ MODULE_LICENSE("GPL");
 #define HCI_VIDEO_OUT_CRT		0x2
 #define HCI_VIDEO_OUT_TV		0x4
 
+static int toshiba_lcd_open_fs(struct inode *inode, struct file *file);
+static int toshiba_video_open_fs(struct inode *inode, struct file *file);
+static int toshiba_fan_open_fs(struct inode *inode, struct file *file);
+static int toshiba_keys_open_fs(struct inode *inode, struct file *file);
+static int toshiba_version_open_fs(struct inode *inode, struct file *file);
+
+static struct file_operations toshiba_lcd_fops = {
+	.open		= toshiba_lcd_open_fs,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
+static struct file_operations toshiba_video_fops = {
+	.open		= toshiba_video_open_fs,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
+static struct file_operations toshiba_fan_fops = {
+	.open		= toshiba_fan_open_fs,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
+static struct file_operations toshiba_keys_fops = {
+	.open		= toshiba_keys_open_fs,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
+static struct file_operations toshiba_version_fops = {
+	.open		= toshiba_version_open_fs,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
 /* utility
  */
 
@@ -124,22 +166,6 @@ snscanf(const char* str, int n, const char* format, ...)
 	va_end(args);
 	kfree(str2);
 	return result;
-}
-
-/* This is the common code at the end of every proc read handler.  I don't
- * understand it yet.
- */
-static int
-end_proc_read(const char* p, char* page, off_t off, int count,
-	char** start, int* eof)
-{
-	int len = (p - page);
-	if (len <= off+count) *eof = 1;
-	*start = page + off;
-	len -= off;
-	if (len>count) len = count;
-	if (len<0) len = 0;
-	return len;
 }
 
 /* acpi interface wrappers
@@ -259,29 +285,27 @@ static int			key_event_valid;
 /* proc file handlers
  */
 
-static int
-proc_read_lcd(char* page, char** start, off_t off, int count, int* eof,
-	void* context)
+static int toshiba_lcd_seq_show(struct seq_file *seq, void *offset)
 {
-	char* p = page;
 	u32 hci_result;
 	u32 value;
-
-	if (off != 0) goto end;
 
 	hci_read1(HCI_LCD_BRIGHTNESS, &value, &hci_result);
 	if (hci_result == HCI_SUCCESS) {
 		value = value >> HCI_LCD_BRIGHTNESS_SHIFT;
-		p += sprintf(p, "brightness:              %d\n", value);
-		p += sprintf(p, "brightness_levels:       %d\n",
-			HCI_LCD_BRIGHTNESS_LEVELS);
-	} else {
-		p += sprintf(p, "ERROR\n");
-		goto end;
-	}
+		seq_printf(seq, "brightness:              %d\n"
+				"brightness_levels:       %d\n",
+				value,
+				HCI_LCD_BRIGHTNESS_LEVELS);
+	} else
+		seq_puts(seq, "ERROR\n");
 
-end:
-	return end_proc_read(p, page, off, count, start, eof);
+	return 0;
+}
+
+static int toshiba_lcd_open_fs(struct inode *inode, struct file *file)
+{
+	return single_open(file, toshiba_lcd_seq_show, NULL);
 }
 
 static int
@@ -306,31 +330,31 @@ proc_write_lcd(struct file* file, const char* buffer, unsigned long count,
 	return count;
 }
 
-static int
-proc_read_video(char* page, char** start, off_t off, int count, int* eof,
-	void* context)
+static int toshiba_video_seq_show(struct seq_file *seq, void *offset)
 {
-	char* p = page;
 	u32 hci_result;
 	u32 value;
-
-	if (off != 0) goto end;
 
 	hci_read1(HCI_VIDEO_OUT, &value, &hci_result);
 	if (hci_result == HCI_SUCCESS) {
 		int is_lcd = (value & HCI_VIDEO_OUT_LCD) ? 1 : 0;
 		int is_crt = (value & HCI_VIDEO_OUT_CRT) ? 1 : 0;
 		int is_tv  = (value & HCI_VIDEO_OUT_TV ) ? 1 : 0;
-		p += sprintf(p, "lcd_out:                 %d\n", is_lcd);
-		p += sprintf(p, "crt_out:                 %d\n", is_crt);
-		p += sprintf(p, "tv_out:                  %d\n", is_tv);
-	} else {
-		p += sprintf(p, "ERROR\n");
-		goto end;
-	}
+		seq_printf(seq, "lcd_out:                 %d\n"
+				"crt_out:                 %d\n"
+				"tv_out:                  %d\n",
+				is_lcd,
+				is_crt,
+				is_tv);
+	} else
+		seq_puts(seq, "ERROR\n");
 
-end:
-	return end_proc_read(p, page, off, count, start, eof);
+	return 0;
+}
+
+static int toshiba_video_open_fs(struct inode *inode, struct file *file)
+{
+	return single_open(file, toshiba_video_seq_show, NULL);
 }
 
 static int
@@ -376,27 +400,26 @@ proc_write_video(struct file* file, const char* buffer, unsigned long count,
 	return count;
 }
 
-static int
-proc_read_fan(char* page, char** start, off_t off, int count, int* eof,
-	void* context)
+static int toshiba_fan_seq_show(struct seq_file *seq, void *offset)
 {
-	char* p = page;
 	u32 hci_result;
 	u32 value;
 
-	if (off != 0) goto end;
-
 	hci_read1(HCI_FAN, &value, &hci_result);
 	if (hci_result == HCI_SUCCESS) {
-		p += sprintf(p, "running:                 %d\n", (value > 0));
-		p += sprintf(p, "force_on:                %d\n", force_fan);
-	} else {
-		p += sprintf(p, "ERROR\n");
-		goto end;
-	}
+		seq_printf(seq, "running:                 %d\n"
+				"force_on:                %d\n",
+				(value > 0),
+				force_fan);
+	} else
+		seq_puts(seq, "ERROR\n");
 
-end:
-	return end_proc_read(p, page, off, count, start, eof);
+	return 0;
+}
+
+static int toshiba_fan_open_fs(struct inode *inode, struct file *file)
+{
+	return single_open(file, toshiba_fan_seq_show, NULL);
 }
 
 static int
@@ -420,15 +443,10 @@ proc_write_fan(struct file* file, const char* buffer, unsigned long count,
 	return count;
 }
 
-static int
-proc_read_keys(char* page, char** start, off_t off, int count, int* eof,
-	void* context)
+static int toshiba_keys_seq_show(struct seq_file *seq, void *offset)
 {
-	char* p = page;
 	u32 hci_result;
 	u32 value;
-
-	if (off != 0) goto end;
 
 	if (!key_event_valid) {
 		hci_read1(HCI_SYSTEM_EVENT, &value, &hci_result);
@@ -438,16 +456,23 @@ proc_read_keys(char* page, char** start, off_t off, int count, int* eof,
 		} else if (hci_result == HCI_EMPTY) {
 			/* better luck next time */
 		} else {
-			p += sprintf(p, "ERROR\n");
+			seq_puts(seq, "ERROR\n");
 			goto end;
 		}
 	}
 
-	p += sprintf(p, "hotkey_ready:            %d\n", key_event_valid);
-	p += sprintf(p, "hotkey:                  0x%04x\n", last_key_event);
+	seq_printf(seq, "hotkey_ready:            %d\n"
+			"hotkey:                  0x%04x\n",
+			key_event_valid,
+			last_key_event);
 
 end:
-	return end_proc_read(p, page, off, count, start, eof);
+	return 0;
+}
+
+static int toshiba_keys_open_fs(struct inode *inode, struct file *file)
+{
+	return single_open(file, toshiba_keys_seq_show, NULL);
 }
 
 static int
@@ -466,20 +491,19 @@ proc_write_keys(struct file* file, const char* buffer, unsigned long count,
 	return count;
 }
 
-static int
-proc_read_version(char* page, char** start, off_t off, int count, int* eof,
-	void* context)
+static int toshiba_version_seq_show(struct seq_file *seq, void *offset)
 {
-	char* p = page;
+	seq_printf(seq, "driver:                  %s\n"
+			"proc_interface:          %d\n",
+			TOSHIBA_ACPI_VERSION,
+			PROC_INTERFACE_VERSION);
 
-	if (off != 0) goto end;
+	return 0;
+}
 
-	p += sprintf(p, "driver:                  %s\n", TOSHIBA_ACPI_VERSION);
-	p += sprintf(p, "proc_interface:          %d\n",
-		PROC_INTERFACE_VERSION);
-
-end:
-	return end_proc_read(p, page, off, count, start, eof);
+static int toshiba_version_open_fs(struct inode *inode, struct file *file)
+{
+	return single_open(file, toshiba_version_seq_show, NULL);
 }
 
 /* proc and module init
@@ -490,24 +514,38 @@ add_device(void)
 {
 	struct proc_dir_entry* proc;
 
-	proc = create_proc_read_entry(PROC_LCD, S_IFREG | S_IRUGO | S_IWUSR,
-		toshiba_proc_dir, proc_read_lcd, 0);
-	if (proc) proc->write_proc = proc_write_lcd;
+	proc = create_proc_entry(PROC_LCD, S_IFREG | S_IRUGO | S_IWUSR,
+		toshiba_proc_dir);
+	if (proc) {
+		proc->proc_fops = &toshiba_lcd_fops;
+		proc->write_proc = proc_write_lcd;
+	}
 
-	proc = create_proc_read_entry(PROC_VIDEO, S_IFREG | S_IRUGO | S_IWUSR,
-		toshiba_proc_dir, proc_read_video, 0);
-	if (proc) proc->write_proc = proc_write_video;
+	proc = create_proc_entry(PROC_VIDEO, S_IFREG | S_IRUGO | S_IWUSR,
+		toshiba_proc_dir);
+	if (proc) {
+		proc->proc_fops = &toshiba_video_fops;
+		proc->write_proc = proc_write_video;
+	}
 
-	proc = create_proc_read_entry(PROC_FAN, S_IFREG | S_IRUGO | S_IWUSR,
-		toshiba_proc_dir, proc_read_fan, 0);
-	if (proc) proc->write_proc = proc_write_fan;
+	proc = create_proc_entry(PROC_FAN, S_IFREG | S_IRUGO | S_IWUSR,
+		toshiba_proc_dir);
+	if (proc) {
+		proc->proc_fops = &toshiba_fan_fops;
+		proc->write_proc = proc_write_fan;
+	}
 
-	proc = create_proc_read_entry(PROC_KEYS, S_IFREG | S_IRUGO | S_IWUSR,
-		toshiba_proc_dir, proc_read_keys, 0);
-	if (proc) proc->write_proc = proc_write_keys;
+	proc = create_proc_entry(PROC_KEYS, S_IFREG | S_IRUGO | S_IWUSR,
+		toshiba_proc_dir);
+	if (proc) {
+		proc->proc_fops = &toshiba_keys_fops;
+		proc->write_proc = proc_write_keys;
+	}
 
-	proc = create_proc_read_entry(PROC_VERSION, S_IFREG | S_IRUGO | S_IWUSR,
-		toshiba_proc_dir, proc_read_version, 0);
+	proc = create_proc_entry(PROC_VERSION, S_IFREG | S_IRUGO | S_IWUSR,
+		toshiba_proc_dir);
+	if (proc)
+		proc->proc_fops = &toshiba_version_fops;
 
 	return(AE_OK);
 }
