@@ -153,10 +153,6 @@ __handle_signal:
 rtrap_irq:
 rtrap_clr_l6:	clr			%l6
 rtrap:
-#if 1
-		call			tlb_batch_rtrap_debug
-		 add			%sp, PTREGS_OFF, %o0
-#endif
 		ldub			[%g6 + TI_CPU], %l0
 		sethi			%hi(irq_stat), %l2	! &softirq_active
 		or			%l2, %lo(irq_stat), %l2	! &softirq_active

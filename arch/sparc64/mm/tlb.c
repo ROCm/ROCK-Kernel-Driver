@@ -41,21 +41,6 @@ void flush_tlb_pending(void)
 	}
 }
 
-void tlb_batch_rtrap_debug(struct pt_regs *regs)
-{
-	/* If we are returning to userspace and have pending
-	 * tlb batch work on this processor, all hope is lost.
-	 */
-	if (!(regs->tstate & TSTATE_PRIV)) {
-		struct mmu_gather *mp = &get_cpu_var(mmu_gathers);
-
-		if (mp->tlb_nr)
-			BUG();
-
-		put_cpu_var(mmu_gathers);
-	}
-}
-
 void tlb_batch_add(pte_t *ptep, pte_t orig)
 {
 	struct mmu_gather *mp = &__get_cpu_var(mmu_gathers);
