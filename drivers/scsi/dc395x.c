@@ -822,6 +822,7 @@ void __init eeprom_override(struct NvRamType *eeprom)
  *
  * @head: The pointer to the head of the list to count the items in.
  **/
+static
 unsigned int list_size(struct list_head *head)
 {
 	unsigned int count = 0;
@@ -841,6 +842,7 @@ unsigned int list_size(struct list_head *head)
  * @pos: The pointer the dcb for which we are searching for the
  *       following dcb.
  **/
+static
 struct DeviceCtlBlk *dcb_get_next(
 		struct list_head *head,
 		struct DeviceCtlBlk *pos)
