@@ -43,6 +43,33 @@ expand_backing_store (struct vm_area_struct *vma, unsigned long address)
 	return 0;
 }
 
+/*
+ * Return TRUE if ADDRESS points at a page in the kernel's mapped segment
+ * (inside region 5, on ia64) and that page is present.
+ */
+static int
+mapped_kernel_page_is_present (unsigned long address)
+{
+	pgd_t *pgd;
+	pmd_t *pmd;
+	pte_t *ptep, pte;
+
+	pgd = pgd_offset_k(address);
+	if (pgd_none(*pgd) || pgd_bad(*pgd))
+		return 0;
+
+	pmd = pmd_offset(pgd,address);
+	if (pmd_none(*pmd) || pmd_bad(*pmd))
+		return 0;
+
+	ptep = pte_offset_kernel(pmd, address);
+	if (!ptep)
+		return 0;
+
+	pte = *ptep;
+	return pte_present(pte);
+}
+
 void
 ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_regs *regs)
 {
@@ -187,6 +214,16 @@ ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_regs *re
 	}
 
 	if (done_with_exception(regs))
+		return;
+
+	/*
+	 * Since we have no vma's for region 5, we might get here even if the address is
+	 * valid, due to the VHPT walker inserting a non present translation that becomes
+	 * stale. If that happens, the non present fault handler already purged the stale
+	 * translation, which fixed the problem. So, we check to see if the translation is
+	 * valid, and return if it is.
+	 */
+	if (REGION_NUMBER(address) == 5 && mapped_kernel_page_is_present(address))
 		return;
 
 	/*

@@ -344,8 +344,11 @@ init_handler_platform (sal_log_processor_info_t *proc_ptr,
 	unw_init_from_interruption(&info, current, pt, sw);
 	ia64_do_show_stack(&info, NULL);
 
+#ifdef CONFIG_SMP
+	/* read_trylock() would be handy... */
 	if (!tasklist_lock.write_lock)
 		read_lock(&tasklist_lock);
+#endif
 	{
 		struct task_struct *g, *t;
 		do_each_thread (g, t) {
@@ -356,8 +359,10 @@ init_handler_platform (sal_log_processor_info_t *proc_ptr,
 			show_stack(t);
 		} while_each_thread (g, t);
 	}
+#ifdef CONFIG_SMP
 	if (!tasklist_lock.write_lock)
 		read_unlock(&tasklist_lock);
+#endif
 
 	printk("\nINIT dump complete.  Please reboot now.\n");
 	while (1);			/* hang city if no debugger */

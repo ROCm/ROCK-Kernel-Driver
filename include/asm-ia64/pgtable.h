@@ -209,7 +209,13 @@ ia64_phys_addr_valid (unsigned long addr)
 
 #define VMALLOC_START		(0xa000000000000000 + 3*PERCPU_PAGE_SIZE)
 #define VMALLOC_VMADDR(x)	((unsigned long)(x))
-#define VMALLOC_END		(0xa000000000000000 + (1UL << (4*PAGE_SHIFT - 9)))
+#ifdef CONFIG_VIRTUAL_MEM_MAP
+# define VMALLOC_END_INIT	(0xa000000000000000 + (1UL << (4*PAGE_SHIFT - 9)))
+# define VMALLOC_END		vmalloc_end
+  extern unsigned long vmalloc_end;
+#else
+# define VMALLOC_END		(0xa000000000000000 + (1UL << (4*PAGE_SHIFT - 9)))
+#endif
 
 /*
  * Conversion functions: convert page frame number (pfn) and a protection value to a page
@@ -451,6 +457,12 @@ extern unsigned long empty_zero_page[PAGE_SIZE/sizeof(unsigned long)];
 
 typedef pte_t *pte_addr_t;
 
+#  ifdef CONFIG_VIRTUAL_MEM_MAP
+  /* arch mem_map init routine is needed due to holes in a virtual mem_map */
+#   define __HAVE_ARCH_MEMMAP_INIT
+    extern void memmap_init (struct page *start, unsigned long size, int nid, unsigned long zone,
+			     unsigned long start_pfn);
+#  endif /* CONFIG_VIRTUAL_MEM_MAP */
 # endif /* !__ASSEMBLY__ */
 
 /*
