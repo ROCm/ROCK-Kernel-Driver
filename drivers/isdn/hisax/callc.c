@@ -918,7 +918,7 @@ static void stat_redir_result(struct IsdnCardState *cs, int chan, ulong result)
 	ic.driver = cs->myid;
 	ic.command = ISDN_STAT_REDIR;
 	ic.arg = chan; 
-	(ulong)(ic.parm.num[0]) = result;
+	ic.parm.num[0] = result;
 	cs->iif.statcallb(&ic);
 } /* stat_redir_result */
 

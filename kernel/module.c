@@ -32,6 +32,7 @@
 #include <linux/err.h>
 #include <linux/vermagic.h>
 #include <linux/notifier.h>
+#include <linux/kthread.h>
 #include <asm/uaccess.h>
 #include <asm/semaphore.h>
 #include <asm/pgalloc.h>
@@ -457,6 +458,40 @@ static void module_unload_free(struct module *mod)
 	}
 }
 
+#ifdef CONFIG_MODULE_FORCE_UNLOAD
+static inline int try_force(unsigned int flags)
+{
+	int ret = (flags & O_TRUNC);
+	if (ret)
+		tainted |= TAINT_FORCED_MODULE;
+	return ret;
+}
+#else
+static inline int try_force(unsigned int flags)
+{
+	return 0;
+}
+#endif /* CONFIG_MODULE_FORCE_UNLOAD */
+
+static int try_stop_module_local(struct module *mod, int flags, int *forced)
+{
+	local_irq_disable();
+
+	/* If it's not unused, quit unless we are told to block. */
+	if ((flags & O_NONBLOCK) && module_refcount(mod) != 0) {
+		if (!(*forced = try_force(flags))) {
+			local_irq_enable();
+			return -EWOULDBLOCK;
+		}
+	}
+
+	/* Mark it as dying. */
+	mod->waiter = current;
+	mod->state = MODULE_STATE_GOING;
+	local_irq_enable();
+	return 0;
+}
+
 #ifdef CONFIG_SMP
 /* Thread to stop each CPU in user context. */
 enum stopref_state {
@@ -475,13 +510,6 @@ static int stopref(void *cpu)
 	int irqs_disabled = 0;
 	int prepared = 0;
 
-	sprintf(current->comm, "kmodule%lu\n", (unsigned long)cpu);
-
-	/* Highest priority we can manage, and move to right CPU. */
-#if 0 /* FIXME */
-	struct sched_param param = { .sched_priority = MAX_RT_PRIO-1 };
-	setscheduler(current->pid, SCHED_FIFO, &param);
-#endif
 	set_cpus_allowed(current, cpumask_of_cpu((int)(long)cpu));
 
 	/* Ack: we are alive */
@@ -535,29 +563,33 @@ static void stopref_set_state(enum stopref_state state, int sleep)
 	}
 }
 
-/* Stop the machine.  Disables irqs. */
-static int stop_refcounts(void)
+struct stopref
 {
-	unsigned int i, cpu;
-	cpumask_t old_allowed;
+	struct module *mod;
+	int flags;
+	int *forced;
+	struct completion started;
+};
+
+static int spawn_stopref(void *data)
+{
+	struct stopref *sref = data;
+	struct sched_param param = { .sched_priority = MAX_RT_PRIO-1 };
+	unsigned int i, cpu = smp_processor_id();
 	int ret = 0;
 
-	/* One thread per cpu.  We'll do our own. */
-	cpu = smp_processor_id();
+	complete(&sref->started);
 
-	/* FIXME: racy with set_cpus_allowed. */
-	old_allowed = current->cpus_allowed;
+	/* One high-prio thread per cpu.  We'll do one (any one). */
 	set_cpus_allowed(current, cpumask_of_cpu(cpu));
+	sys_sched_setscheduler(current->pid, SCHED_FIFO, &param);
 
 	atomic_set(&stopref_thread_ack, 0);
 	stopref_num_threads = 0;
 	stopref_state = STOPREF_WAIT;
 
-	/* No CPUs can come up or down during this. */
-	lock_cpu_hotplug();
-
-	for (i = 0; i < NR_CPUS; i++) {
-		if (i == cpu || !cpu_online(i))
+	for_each_online_cpu(i) {
+		if (i == cpu)
 			continue;
 		ret = kernel_thread(stopref, (void *)(long)i, CLONE_KERNEL);
 		if (ret < 0)
@@ -572,40 +604,57 @@ static int stop_refcounts(void)
 	/* If some failed, kill them all. */
 	if (ret < 0) {
 		stopref_set_state(STOPREF_EXIT, 1);
-		unlock_cpu_hotplug();
-		return ret;
+		goto out;
 	}
 
 	/* Don't schedule us away at this point, please. */
 	preempt_disable();
 
-	/* Now they are all scheduled, make them hold the CPUs, ready. */
+	/* Now they are all started, make them hold the CPUs, ready. */
 	stopref_set_state(STOPREF_PREPARE, 0);
 
 	/* Make them disable irqs. */
 	stopref_set_state(STOPREF_DISABLE_IRQ, 0);
 
-	local_irq_disable();
-	return 0;
+	/* Atomically disable module if possible */
+	ret = try_stop_module_local(sref->mod, sref->flags, sref->forced);
+
+	stopref_set_state(STOPREF_EXIT, 0);
+	preempt_enable();
+
+out:
+	/* Wait for kthread_stop */
+	while (!kthread_should_stop()) {
+		__set_current_state(TASK_INTERRUPTIBLE);
+		schedule();
+	}
+	return ret;
 }
 
-/* Restart the machine.  Re-enables irqs. */
-static void restart_refcounts(void)
+static int try_stop_module(struct module *mod, int flags, int *forced)
 {
-	stopref_set_state(STOPREF_EXIT, 0);
-	local_irq_enable();
-	preempt_enable();
+	struct task_struct *p;
+	struct stopref sref = { mod, flags, forced };
+	int ret;
+
+	init_completion(&sref.started);
+
+	/* No CPUs can come up or down during this. */
+	lock_cpu_hotplug();
+	p = kthread_run(spawn_stopref, &sref, "krmmod");
+	if (IS_ERR(p))
+		ret = PTR_ERR(p);
+	else {
+		wait_for_completion(&sref.started);
+		ret = kthread_stop(p);
+	}
 	unlock_cpu_hotplug();
+	return ret;
 }
 #else /* ...!SMP */
-static inline int stop_refcounts(void)
+static inline int try_stop_module(struct module *mod, int flags, int *forced)
 {
-	local_irq_disable();
-	return 0;
-}
-static inline void restart_refcounts(void)
-{
-	local_irq_enable();
+	return try_stop_module_local(mod, flags, forced);
 }
 #endif
 
@@ -621,21 +670,6 @@ EXPORT_SYMBOL(module_refcount);
 
 /* This exists whether we can unload or not */
 static void free_module(struct module *mod);
-
-#ifdef CONFIG_MODULE_FORCE_UNLOAD
-static inline int try_force(unsigned int flags)
-{
-	int ret = (flags & O_TRUNC);
-	if (ret)
-		tainted |= TAINT_FORCED_MODULE;
-	return ret;
-}
-#else
-static inline int try_force(unsigned int flags)
-{
-	return 0;
-}
-#endif /* CONFIG_MODULE_FORCE_UNLOAD */
 
 /* Stub function for modules which don't have an exitfn */
 void cleanup_module(void)
@@ -706,26 +740,9 @@ sys_delete_module(const char __user *name_user, unsigned int flags)
 			goto out;
 		}
 	}
-	/* Stop the machine so refcounts can't move: irqs disabled. */
-	DEBUGP("Stopping refcounts...\n");
-	ret = stop_refcounts();
-	if (ret != 0)
-		goto out;
 
-	/* If it's not unused, quit unless we are told to block. */
-	if ((flags & O_NONBLOCK) && module_refcount(mod) != 0) {
-		forced = try_force(flags);
-		if (!forced) {
-			ret = -EWOULDBLOCK;
-			restart_refcounts();
-			goto out;
-		}
-	}
-
-	/* Mark it as dying. */
-	mod->waiter = current;
-	mod->state = MODULE_STATE_GOING;
-	restart_refcounts();
+	/* Stop the machine so refcounts can't move and disable module. */
+	ret = try_stop_module(mod, flags, &forced);
 
 	/* Never wait if forced. */
 	if (!forced && module_refcount(mod) != 0)

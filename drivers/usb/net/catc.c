@@ -838,7 +838,7 @@ static int catc_probe(struct usb_interface *intf, const struct usb_device_id *id
 			usb_free_urb(catc->rx_urb);
 		if (catc->irq_urb)
 			usb_free_urb(catc->irq_urb);
-		kfree(netdev);
+		free_netdev(netdev);
 		kfree(catc);
 		return -ENOMEM;
 	}
@@ -943,7 +943,7 @@ static int catc_probe(struct usb_interface *intf, const struct usb_device_id *id
 		usb_free_urb(catc->tx_urb);
 		usb_free_urb(catc->rx_urb);
 		usb_free_urb(catc->irq_urb);
-		kfree(netdev);
+		free_netdev(netdev);
 		kfree(catc);
 		return -EIO;
 	}

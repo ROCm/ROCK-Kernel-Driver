@@ -1895,7 +1895,7 @@ static int release_journal_dev( struct super_block *super,
 	journal -> j_dev_file = NULL;
 	journal -> j_dev_bd = NULL;
     } else if( journal -> j_dev_bd != NULL ) {
-	result = blkdev_put( journal -> j_dev_bd, BDEV_FS );
+	result = blkdev_put( journal -> j_dev_bd );
 	journal -> j_dev_bd = NULL;
     }
 
@@ -1926,7 +1926,7 @@ static int journal_init_dev( struct super_block *super,
 
 	/* there is no "jdev" option and journal is on separate device */
 	if( ( !jdev_name || !jdev_name[ 0 ] ) ) {
-		journal->j_dev_bd = open_by_devnum(jdev, blkdev_mode, BDEV_FS);
+		journal->j_dev_bd = open_by_devnum(jdev, blkdev_mode);
 		if (IS_ERR(journal->j_dev_bd)) {
 			result = PTR_ERR(journal->j_dev_bd);
 			journal->j_dev_bd = NULL;

@@ -216,13 +216,6 @@ chmod 0644 /dev/cpu/microcode
 as root before you can use this.  You'll probably also want to
 get the user-space microcode_ctl utility to use with this.
 
-If you have compiled the driver as a module you may need to add
-the following line:
-
-alias char-major-10-184 microcode
-
-to your /etc/modules.conf file.
-
 Powertweak
 ----------
 
@@ -258,17 +251,6 @@ which can be made by:
 mknod /dev/ppp c 108 0
 
 as root.
-
-If you build ppp support as modules, you will need the following in
-your /etc/modules.conf file:
-
-alias char-major-108	ppp_generic
-alias /dev/ppp		ppp_generic
-alias tty-ldisc-3	ppp_async
-alias tty-ldisc-14	ppp_synctty
-alias ppp-compress-21	bsd_comp
-alias ppp-compress-24	ppp_deflate
-alias ppp-compress-26	ppp_deflate
 
 If you use devfsd and build ppp support as modules, you will need
 the following in your /etc/devfsd.conf file:

@@ -2599,10 +2599,8 @@ static int mpi_map_card(struct airo_info *ai, struct pci_dev *pci,
 	return rc;
 }
 
-static void wifi_setup(struct net_device *dev, struct net_device *ethdev)
+static void wifi_setup(struct net_device *dev)
 {
-	struct airo_info *ai = ethdev->priv;
-	dev->priv = ai;
 	dev->hard_header        = 0;
 	dev->rebuild_header     = 0;
 	dev->hard_header_cache  = 0;
@@ -2620,14 +2618,11 @@ static void wifi_setup(struct net_device *dev, struct net_device *ethdev)
 	dev->change_mtu = &airo_change_mtu;
 	dev->open = &airo_open;
 	dev->stop = &airo_close;
-	dev->irq = ethdev->irq;
-	dev->base_addr = ethdev->base_addr;
 
 	dev->type               = ARPHRD_IEEE80211;
 	dev->hard_header_len    = ETH_HLEN;
 	dev->mtu                = 2312;
 	dev->addr_len           = ETH_ALEN;
-	memcpy(dev->dev_addr, ethdev->dev_addr, dev->addr_len);
 	dev->tx_queue_len       = 100; 
 
 	memset(dev->broadcast,0xFF, ETH_ALEN);
@@ -2639,17 +2634,17 @@ static struct net_device *init_wifidev(struct airo_info *ai,
 					struct net_device *ethdev)
 {
 	int err;
-	struct net_device *dev = (struct net_device*)kmalloc(sizeof *dev,GFP_KERNEL);
-	if (!dev) return 0;
-	memset(dev, 0, sizeof(*dev));
-
-	strcpy(dev->name, "wifi%d");
-	dev->priv = ai;
-	wifi_setup(dev, ethdev);
+	struct net_device *dev = alloc_netdev(0, "wifi%d", wifi_setup);
+	if (!dev)
+		return NULL;
+	dev->priv = ethdev->priv;
+	dev->irq = ethdev->irq;
+	dev->base_addr = ethdev->base_addr;
+	memcpy(dev->dev_addr, ethdev->dev_addr, dev->addr_len);
 	err = register_netdev(dev);
 	if (err<0) {
-		kfree(dev);
-		return 0;
+		free_netdev(dev);
+		return NULL;
 	}
 	return dev;
 }
@@ -2809,7 +2804,7 @@ err_out_thr:
 	kill_proc(ai->thr_pid, SIGTERM, 1);
 	wait_for_completion(&ai->thr_exited);
 err_out_free:
-	kfree(dev);
+	free_netdev(dev);
 	return NULL;
 }
 

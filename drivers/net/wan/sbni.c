@@ -210,7 +210,6 @@ sbni_isa_probe( struct net_device  *dev )
 static void __init sbni_devsetup(struct net_device *dev)
 {
 	ether_setup( dev );
-	dev->init 		= &sbni_init;
 	dev->open		= &sbni_open;
 	dev->stop		= &sbni_close;
 	dev->hard_start_xmit	= &sbni_start_xmit;
@@ -234,8 +233,15 @@ int __init sbni_probe(int unit)
 	sprintf(dev->name, "sbni%d", unit);
 	netdev_boot_setup_check(dev);
 
+	err = sbni_init(dev);
+	if (err) {
+		free_netdev(dev);
+		return err;
+	}
+
 	err = register_netdev(dev);
 	if (err) {
+		release_region( dev->base_addr, SBNI_IO_EXTENT );
 		free_netdev(dev);
 		return err;
 	}
@@ -304,8 +310,13 @@ sbni_pci_probe( struct net_device  *dev )
 		/* Avoid already found cards from previous calls */
 		if( !request_region( pci_ioaddr, SBNI_IO_EXTENT, dev->name ) ) {
 			pci_read_config_word( pdev, PCI_SUBSYSTEM_ID, &subsys );
-			if( subsys != 2  ||	/* Dual adapter is present */
-			    check_region( pci_ioaddr += 4, SBNI_IO_EXTENT ) )
+
+			if (subsys != 2)
+				continue;
+
+			/* Dual adapter is present */
+			if (!request_region(pci_ioaddr += 4, SBNI_IO_EXTENT,
+							dev->name ) )
 				continue;
 		}
 
@@ -318,8 +329,10 @@ sbni_pci_probe( struct net_device  *dev )
 				pci_irq_line );
 
 		/* avoiding re-enable dual adapters */
-		if( (pci_ioaddr & 7) == 0  &&  pci_enable_device( pdev ) )
+		if( (pci_ioaddr & 7) == 0  &&  pci_enable_device( pdev ) ) {
+			release_region( pci_ioaddr, SBNI_IO_EXTENT );
 			return  -EIO;
+		}
 		if( sbni_probe1( dev, pci_ioaddr, pci_irq_line ) )
 			return  0;
 	}
@@ -1482,19 +1495,25 @@ int
 init_module( void )
 {
 	struct net_device  *dev;
+	int err;
 
 	while( num < SBNI_MAX_NUM_CARDS ) {
 		dev = alloc_netdev(sizeof(struct net_local), 
 				   "sbni%d", sbni_devsetup);
-		if( !dev) {
-			printk( KERN_ERR "sbni: unable to allocate device!\n" );
-			return  -ENOMEM;
-		}
+		if( !dev)
+			break;
 
 		sprintf( dev->name, "sbni%d", num );
 
+		err = sbni_init(dev);
+		if (err) {
+			free_netdev(dev);
+			break;
+		}
+
 		if( register_netdev( dev ) ) {
-			kfree( dev );
+			release_region( dev->base_addr, SBNI_IO_EXTENT );
+			free_netdev( dev );
 			break;
 		}
 	}

@@ -8,12 +8,6 @@
 #ifndef _ASM_IA64_SN_MODULE_H
 #define _ASM_IA64_SN_MODULE_H
 
-#ifdef	__cplusplus
-extern "C" {
-#endif
-
-
-#include <asm/semaphore.h>
 #include <asm/sn/klconfig.h>
 #include <asm/sn/ksys/elsc.h>
 

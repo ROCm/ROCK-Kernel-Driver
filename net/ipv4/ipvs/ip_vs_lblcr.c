@@ -39,14 +39,10 @@
  *
  */
 
-#include <linux/config.h>
 #include <linux/module.h>
-#include <linux/init.h>
-#include <linux/types.h>
 #include <linux/kernel.h>
-#include <linux/errno.h>
 
-/* for systcl */
+/* for sysctl */
 #include <linux/fs.h>
 #include <linux/sysctl.h>
 /* for proc_net_create/proc_net_remove */
@@ -69,7 +65,7 @@
  *    entries that haven't been touched for a day.
  */
 #define COUNT_FOR_FULL_EXPIRATION   30
-int sysctl_ip_vs_lblcr_expiration = 24*60*60*HZ;
+static int sysctl_ip_vs_lblcr_expiration = 24*60*60*HZ;
 
 
 /*

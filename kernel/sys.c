@@ -1089,10 +1089,178 @@ out:
 /*
  * Supplementary group IDs
  */
-asmlinkage long sys_getgroups(int gidsetsize, gid_t __user *grouplist)
+
+/* init to 2 - one for init_task, one to ensure it is never freed */
+struct group_info init_groups = { .usage = ATOMIC_INIT(2) };
+
+struct group_info *groups_alloc(int gidsetsize)
+{
+	struct group_info *group_info;
+	int nblocks;
+	int i;
+
+	nblocks = (gidsetsize/NGROUPS_PER_BLOCK) +
+	    (gidsetsize%NGROUPS_PER_BLOCK?1:0);
+	group_info = kmalloc(sizeof(*group_info) + nblocks*sizeof(gid_t *),
+	    GFP_USER);
+	if (!group_info)
+		return NULL;
+	group_info->ngroups = gidsetsize;
+	group_info->nblocks = nblocks;
+	atomic_set(&group_info->usage, 1);
+
+	if (gidsetsize <= NGROUPS_SMALL) {
+		group_info->blocks[0] = group_info->small_block;
+	} else {
+		for (i = 0; i < nblocks; i++) {
+			gid_t *b;
+			b = (void *)__get_free_page(GFP_USER);
+			if (!b)
+				goto out_undo_partial_alloc;
+			group_info->blocks[i] = b;
+		}
+	}
+	return group_info;
+
+out_undo_partial_alloc:
+	while (--i >= 0) {
+		free_page((unsigned long)group_info->blocks[i]);
+	}
+	kfree(group_info);
+	return NULL;
+}
+
+EXPORT_SYMBOL(groups_alloc);
+
+void groups_free(struct group_info *group_info)
+{
+	if (group_info->blocks[0] != group_info->small_block) {
+		int i;
+		for (i = 0; i < group_info->nblocks; i++)
+			free_page((unsigned long)group_info->blocks[i]);
+	}
+	kfree(group_info);
+}
+
+EXPORT_SYMBOL(groups_free);
+
+/* export the group_info to a user-space array */
+static int groups_to_user(gid_t __user *grouplist,
+    struct group_info *group_info)
 {
 	int i;
-	
+	int count = group_info->ngroups;
+
+	for (i = 0; i < group_info->nblocks; i++) {
+		int cp_count = min(NGROUPS_PER_BLOCK, count);
+		int off = i * NGROUPS_PER_BLOCK;
+		int len = cp_count * sizeof(*grouplist);
+
+		if (copy_to_user(grouplist+off, group_info->blocks[i], len))
+			return -EFAULT;
+
+		count -= cp_count;
+	}
+	return 0;
+}
+
+/* fill a group_info from a user-space array - it must be allocated already */
+static int groups_from_user(struct group_info *group_info,
+    gid_t __user *grouplist)
+ {
+	int i;
+	int count = group_info->ngroups;
+
+	for (i = 0; i < group_info->nblocks; i++) {
+		int cp_count = min(NGROUPS_PER_BLOCK, count);
+		int off = i * NGROUPS_PER_BLOCK;
+		int len = cp_count * sizeof(*grouplist);
+
+		if (copy_from_user(group_info->blocks[i], grouplist+off, len))
+			return -EFAULT;
+
+		count -= cp_count;
+	}
+	return 0;
+}
+
+/* a simple shell-metzner sort */
+static void groups_sort(struct group_info *group_info)
+{
+	int base, max, stride;
+	int gidsetsize = group_info->ngroups;
+
+	for (stride = 1; stride < gidsetsize; stride = 3 * stride + 1)
+		; /* nothing */
+	stride /= 3;
+
+	while (stride) {
+		max = gidsetsize - stride;
+		for (base = 0; base < max; base++) {
+			int left = base;
+			int right = left + stride;
+			gid_t tmp = GROUP_AT(group_info, right);
+
+			while (left >= 0 && GROUP_AT(group_info, left) > tmp) {
+				GROUP_AT(group_info, right) =
+				    GROUP_AT(group_info, left);
+				right = left;
+				left -= stride;
+			}
+			GROUP_AT(group_info, right) = tmp;
+		}
+		stride /= 3;
+	}
+}
+
+/* a simple bsearch */
+static int groups_search(struct group_info *group_info, gid_t grp)
+{
+	int left, right;
+
+	if (!group_info)
+		return 0;
+
+	left = 0;
+	right = group_info->ngroups;
+	while (left < right) {
+		int mid = (left+right)/2;
+		int cmp = grp - GROUP_AT(group_info, mid);
+		if (cmp > 0)
+			left = mid + 1;
+		else if (cmp < 0)
+			right = mid;
+		else
+			return 1;
+	}
+	return 0;
+}
+
+/* validate and set current->group_info */
+int set_current_groups(struct group_info *group_info)
+{
+	int retval;
+	struct group_info *old_info;
+
+	retval = security_task_setgroups(group_info);
+	if (retval)
+		return retval;
+
+	groups_sort(group_info);
+	get_group_info(group_info);
+	old_info = current->group_info;
+	current->group_info = group_info;
+	put_group_info(old_info);
+
+	return 0;
+}
+
+EXPORT_SYMBOL(set_current_groups);
+
+asmlinkage long sys_getgroups(int gidsetsize, gid_t __user *grouplist)
+{
+	int i = 0;
+
 	/*
 	 *	SMP: Nobody else can change our grouplist. Thus we are
 	 *	safe.
@@ -1100,54 +1268,52 @@ asmlinkage long sys_getgroups(int gidsetsize, gid_t __user *grouplist)
 
 	if (gidsetsize < 0)
 		return -EINVAL;
-	i = current->ngroups;
+
+	get_group_info(current->group_info);
+	i = current->group_info->ngroups;
 	if (gidsetsize) {
-		if (i > gidsetsize)
-			return -EINVAL;
-		if (copy_to_user(grouplist, current->groups, sizeof(gid_t)*i))
-			return -EFAULT;
+		if (i > gidsetsize) {
+			i = -EINVAL;
+			goto out;
+		}
+		if (groups_to_user(grouplist, current->group_info)) {
+			i = -EFAULT;
+			goto out;
+		}
 	}
+out:
+	put_group_info(current->group_info);
 	return i;
 }
 
 /*
- *	SMP: Our groups are not shared. We can copy to/from them safely
+ *	SMP: Our groups are copy-on-write. We can set them safely
  *	without another task interfering.
  */
  
 asmlinkage long sys_setgroups(int gidsetsize, gid_t __user *grouplist)
 {
-	gid_t groups[NGROUPS];
+	struct group_info *group_info;
 	int retval;
 
 	if (!capable(CAP_SETGID))
 		return -EPERM;
-	if ((unsigned) gidsetsize > NGROUPS)
+	if ((unsigned)gidsetsize > NGROUPS_MAX)
 		return -EINVAL;
-	if (copy_from_user(groups, grouplist, gidsetsize * sizeof(gid_t)))
-		return -EFAULT;
-	retval = security_task_setgroups(gidsetsize, groups);
-	if (retval)
+
+	group_info = groups_alloc(gidsetsize);
+	if (!group_info)
+		return -ENOMEM;
+	retval = groups_from_user(group_info, grouplist);
+	if (retval) {
+		put_group_info(group_info);
 		return retval;
-	memcpy(current->groups, groups, gidsetsize * sizeof(gid_t));
-	current->ngroups = gidsetsize;
-	return 0;
-}
-
-static int supplemental_group_member(gid_t grp)
-{
-	int i = current->ngroups;
-
-	if (i) {
-		gid_t *groups = current->groups;
-		do {
-			if (*groups == grp)
-				return 1;
-			groups++;
-			i--;
-		} while (i);
 	}
-	return 0;
+
+	retval = set_current_groups(group_info);
+	put_group_info(group_info);
+
+	return retval;
 }
 
 /*
@@ -1156,8 +1322,11 @@ static int supplemental_group_member(gid_t grp)
 int in_group_p(gid_t grp)
 {
 	int retval = 1;
-	if (grp != current->fsgid)
-		retval = supplemental_group_member(grp);
+	if (grp != current->fsgid) {
+		get_group_info(current->group_info);
+		retval = groups_search(current->group_info, grp);
+		put_group_info(current->group_info);
+	}
 	return retval;
 }
 
@@ -1166,8 +1335,11 @@ EXPORT_SYMBOL(in_group_p);
 int in_egroup_p(gid_t grp)
 {
 	int retval = 1;
-	if (grp != current->egid)
-		retval = supplemental_group_member(grp);
+	if (grp != current->egid) {
+		get_group_info(current->group_info);
+		retval = groups_search(current->group_info, grp);
+		put_group_info(current->group_info);
+	}
 	return retval;
 }
 

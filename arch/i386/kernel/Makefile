@@ -33,8 +33,6 @@ obj-$(CONFIG_HPET_TIMER) 	+= time_hpet.o
 obj-$(CONFIG_EFI) 		+= efi.o efi_stub.o
 obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
 
-early_printk-y := ../../x86_64/kernel/early_printk.o
-
 EXTRA_AFLAGS   := -traditional
 
 obj-$(CONFIG_SCx200)		+= scx200.o

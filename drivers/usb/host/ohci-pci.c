@@ -13,6 +13,16 @@
  *
  * This file is licenced under the GPL.
  */
+ 
+#ifdef CONFIG_PMAC_PBOOK
+#include <asm/machdep.h>
+#include <asm/pmac_feature.h>
+#include <asm/pci-bridge.h>
+#include <asm/prom.h>
+#ifndef CONFIG_PM
+#	define CONFIG_PM
+#endif
+#endif
 
 #ifndef CONFIG_PCI
 #error "This file is PCI bus glue.  CONFIG_PCI must be defined."
@@ -35,28 +45,19 @@ ohci_pci_start (struct usb_hcd *hcd)
 	struct ohci_hcd	*ohci = hcd_to_ohci (hcd);
 	int		ret;
 
-	if (hcd->pdev) {
-#if 1
-		u16 status;
+	ohci->hcca = dma_alloc_coherent (hcd->self.controller,
+			sizeof *ohci->hcca, &ohci->hcca_dma, 0);
+	if (!ohci->hcca)
+		return -ENOMEM;
 
-		pci_read_config_word(hcd->pdev, PCI_STATUS, &status);
-		printk(KERN_ERR "OHCI PCI Status: 0x%04x\n", status);
-		if (status & 0xf900) {
-			printk(KERN_ERR "Initial error ! clearing ...\n");
-			pci_write_config_word(hcd->pdev, PCI_STATUS, status);
-		}
-#endif
-
-		ohci->hcca = pci_alloc_consistent (hcd->pdev,
-				sizeof *ohci->hcca, &ohci->hcca_dma);
-		if (!ohci->hcca)
-			return -ENOMEM;
+	if(hcd->self.controller && hcd->self.controller->bus == &pci_bus_type) {
+		struct pci_dev *pdev = to_pci_dev(hcd->self.controller);
 
 		/* AMD 756, for most chips (early revs), corrupts register
 		 * values on read ... so enable the vendor workaround.
 		 */
-		if (hcd->pdev->vendor == PCI_VENDOR_ID_AMD
-				&& hcd->pdev->device == 0x740c) {
+		if (pdev->vendor == PCI_VENDOR_ID_AMD
+				&& pdev->device == 0x740c) {
 			ohci->flags = OHCI_QUIRK_AMD756;
 			ohci_info (ohci, "AMD756 erratum 4 workaround\n");
 		}
@@ -69,8 +70,8 @@ ohci_pci_start (struct usb_hcd *hcd)
 		 * for this chip.  Evidently control and bulk lists
 		 * can get confused.  (B&W G3 models, and ...)
 		 */
-		else if (hcd->pdev->vendor == PCI_VENDOR_ID_OPTI
-				&& hcd->pdev->device == 0xc861) {
+		else if (pdev->vendor == PCI_VENDOR_ID_OPTI
+				&& pdev->device == 0xc861) {
 			ohci_info (ohci,
 				"WARNING: OPTi workarounds unavailable\n");
 		}
@@ -79,12 +80,11 @@ ohci_pci_start (struct usb_hcd *hcd)
 		 * identify the USB (fn2). This quirk might apply to more or
 		 * even all NSC stuff.
 		 */
-		else if (hcd->pdev->vendor == PCI_VENDOR_ID_NS) {
-			struct pci_dev	*b, *hc;
+		else if (pdev->vendor == PCI_VENDOR_ID_NS) {
+			struct pci_dev	*b;
 
-			hc = hcd->pdev;
-			b  = pci_find_slot (hc->bus->number,
-					PCI_DEVFN (PCI_SLOT (hc->devfn), 1));
+			b  = pci_find_slot (pdev->bus->number,
+					PCI_DEVFN (PCI_SLOT (pdev->devfn), 1));
 			if (b && b->device == PCI_DEVICE_ID_NS_87560_LIO
 					&& b->vendor == PCI_VENDOR_ID_NS) {
 				ohci->flags |= OHCI_QUIRK_SUPERIO;
@@ -143,6 +143,12 @@ static int ohci_pci_suspend (struct usb_hcd *hcd, u32 state)
 	mdelay (1);
 	if (!readl (&ohci->regs->intrstatus) & OHCI_INTR_SF)
 		mdelay (1);
+		
+#ifdef CONFIG_PMAC_PBOOK
+	if (_machine == _MACH_Pmac)
+		disable_irq ((to_pci_dev(hcd->self.controller))->irq);
+ 	/* else, 2.4 assumes shared irqs -- don't disable */
+#endif
 
 	/* Enable remote wakeup */
 	writel (readl (&ohci->regs->intrenable) | OHCI_INTR_RD,
@@ -174,10 +180,21 @@ static int ohci_pci_suspend (struct usb_hcd *hcd, u32 state)
 	 * memory during sleep. We disable its bus master bit during
 	 * suspend
 	 */
-	pci_read_config_word (hcd->pdev, PCI_COMMAND, &cmd);
+	pci_read_config_word (to_pci_dev(hcd->self.controller), PCI_COMMAND, 
+				&cmd);
 	cmd &= ~PCI_COMMAND_MASTER;
-	pci_write_config_word (hcd->pdev, PCI_COMMAND, cmd);
-
+	pci_write_config_word (to_pci_dev(hcd->self.controller), PCI_COMMAND, 
+				cmd);
+#ifdef CONFIG_PMAC_PBOOK
+	{
+	   	struct device_node	*of_node;
+ 
+		/* Disable USB PAD & cell clock */
+		of_node = pci_device_to_OF_node (to_pci_dev(hcd->self.controller));
+		if (of_node)
+			pmac_call_feature(PMAC_FTR_USB_ENABLE, of_node, 0, 0);
+	}
+#endif
 	return 0;
 }
 
@@ -188,6 +205,16 @@ static int ohci_pci_resume (struct usb_hcd *hcd)
 	int			temp;
 	int			retval = 0;
 
+#ifdef CONFIG_PMAC_PBOOK
+	{
+		struct device_node *of_node;
+
+		/* Re-enable USB PAD & cell clock */
+		of_node = pci_device_to_OF_node (to_pci_dev(hcd->self.controller));
+		if (of_node)
+			pmac_call_feature (PMAC_FTR_USB_ENABLE, of_node, 0, 1);
+	}
+#endif
 	/* did we suspend, or were we powered off? */
 	ohci->hc_control = readl (&ohci->regs->control);
 	temp = ohci->hc_control & OHCI_CTRL_HCFS;
@@ -198,7 +225,7 @@ static int ohci_pci_resume (struct usb_hcd *hcd)
 #endif
 
 	/* Re-enable bus mastering */
-	pci_set_master (ohci->hcd.pdev);
+	pci_set_master (to_pci_dev(ohci->hcd.self.controller));
 	
 	switch (temp) {
 
@@ -256,6 +283,10 @@ restart:
 		(void) readl (&ohci->regs->intrdisable);
 		spin_unlock_irq (&ohci->lock);
 
+#ifdef CONFIG_PMAC_PBOOK
+		if (_machine == _MACH_Pmac)
+			enable_irq (to_pci_dev(hcd->self.controller)->irq);
+#endif
 
 		/* Check for a pending done list */
 		if (ohci->hcca->done_head)

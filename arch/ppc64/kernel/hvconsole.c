@@ -24,17 +24,19 @@
 #include <asm/prom.h>
 #include <asm/hvconsole.h>
 
-/* map console index (e.g. 0) to vterm number (e.g. 0x30000000) */
-static int vtermnos[MAX_NR_HVC_CONSOLES];
+struct vtty_struct {
+	u32 vtermno;
+	int (*get_chars)(struct vtty_struct *vtty, char *buf, int count);
+	int (*put_chars)(struct vtty_struct *vtty, const char *buf, int count);
+	int (*ioctl)(struct vtty_struct *vtty, unsigned int cmd, unsigned long val);
+};
+static struct vtty_struct vttys[MAX_NR_HVC_CONSOLES];
 
-int hvc_get_chars(int index, char *buf, int count)
+int hvterm_get_chars(struct vtty_struct *vtty, char *buf, int count)
 {
 	unsigned long got;
 
-	if (index > MAX_NR_HVC_CONSOLES)
-		return -1;
-
-	if (plpar_hcall(H_GET_TERM_CHAR, vtermnos[index], 0, 0, 0, &got,
+	if (plpar_hcall(H_GET_TERM_CHAR, vtty->vtermno, 0, 0, 0, &got,
 		(unsigned long *)buf, (unsigned long *)buf+1) == H_Success) {
 		/*
 		 * Work around a HV bug where it gives us a null
@@ -56,21 +58,38 @@ int hvc_get_chars(int index, char *buf, int count)
 	return 0;
 }
 
-int hvc_put_chars(int index, const char *buf, int count)
+int hvterm_put_chars(struct vtty_struct *vtty, const char *buf, int count)
 {
 	unsigned long *lbuf = (unsigned long *) buf;
 	long ret;
 
-	if (index > MAX_NR_HVC_CONSOLES)
-		return -1;
-
-	ret = plpar_hcall_norets(H_PUT_TERM_CHAR, vtermnos[index], count, lbuf[0],
+	ret = plpar_hcall_norets(H_PUT_TERM_CHAR, vtty->vtermno, count, lbuf[0],
 				 lbuf[1]);
 	if (ret == H_Success)
 		return count;
 	if (ret == H_Busy)
 		return 0;
 	return -1;
+}
+
+int hvc_get_chars(int index, char *buf, int count)
+{
+	struct vtty_struct *vtty = &vttys[index];
+
+	if (index >= MAX_NR_HVC_CONSOLES)
+		return -1;
+
+	return vtty->get_chars(vtty, buf, count);
+}
+
+int hvc_put_chars(int index, const char *buf, int count)
+{
+	struct vtty_struct *vtty = &vttys[index];
+
+	if (index >= MAX_NR_HVC_CONSOLES)
+		return -1;
+
+	return vtty->put_chars(vtty, buf, count);
 }
 
 int hvc_find_vterms(void)
@@ -80,6 +99,7 @@ int hvc_find_vterms(void)
 
 	for (vty = of_find_node_by_name(NULL, "vty"); vty != NULL;
 			vty = of_find_node_by_name(vty, "vty")) {
+		struct vtty_struct *vtty;
 		u32 *vtermno;
 
 		vtermno = (u32 *)get_property(vty, "reg", NULL);
@@ -89,8 +109,12 @@ int hvc_find_vterms(void)
 		if (count >= MAX_NR_HVC_CONSOLES)
 			break;
 
+		vtty = &vttys[count];
 		if (device_is_compatible(vty, "hvterm1")) {
-			vtermnos[count] = *vtermno;
+			vtty->vtermno = *vtermno;
+			vtty->get_chars = hvterm_get_chars;
+			vtty->put_chars = hvterm_put_chars;
+			vtty->ioctl = NULL;
 			hvc_instantiate();
 			count++;
 		}

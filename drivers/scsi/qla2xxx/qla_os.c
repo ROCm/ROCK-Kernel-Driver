@@ -70,7 +70,7 @@ MODULE_PARM_DESC(ql2xretrycount,
 int displayConfig;
 module_param(displayConfig, int, 0);
 MODULE_PARM_DESC(displayConfig,
-		"If 1 then display the configuration used in /etc/modules.conf.");
+		"If 1 then display the configuration used in /etc/modprobe.conf.");
 
 int ql2xplogiabsentdevice;
 module_param(ql2xplogiabsentdevice, int, 0);

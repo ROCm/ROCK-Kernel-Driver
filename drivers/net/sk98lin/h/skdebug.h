@@ -2,6 +2,8 @@
  *
  * Name:	skdebug.h
  * Project:	Gigabit Ethernet Adapters, Common Modules
+ * Version:	$Revision: 1.14 $
+ * Date:	$Date: 2003/05/13 17:26:00 $
  * Purpose:	SK specific DEBUG support
  *
  ******************************************************************************/

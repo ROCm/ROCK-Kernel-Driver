@@ -88,7 +88,6 @@ int __init iSeries_allocate_IRQ(HvBusNumber busNumber,
 #define IRQ_TO_IDSEL(irq)	(((((irq) - 1) >> 3) & 7) + 1)
 #define IRQ_TO_FUNC(irq)	(((irq) - 1) & 7)
 
-
 /* This is called by iSeries_activate_IRQs */
 static unsigned int iSeries_startup_IRQ(unsigned int irq)
 {
@@ -109,6 +108,11 @@ static unsigned int iSeries_startup_IRQ(unsigned int irq)
 				bus, subBus, deviceId, irq);
 	return 0;
 }
+
+/*
+ * Temporary hack
+ */
+#define get_irq_desc(irq)	&irq_desc[(irq)]
 
 /*
  * This is called out of iSeries_fixup to activate interrupt

@@ -98,6 +98,11 @@ tlb_finish_mmu(struct mmu_gather *tlb, unsigned long start, unsigned long end)
 	check_pgt_cache();
 }
 
+static inline unsigned int
+tlb_is_full_mm(struct mmu_gather *tlb)
+{
+	return tlb->fullmm;
+}
 
 /* tlb_remove_page
  *	Must perform the equivalent to __free_pte(pte_get_and_clear(ptep)), while

@@ -194,7 +194,7 @@ EXPORT_SYMBOL(atomic_dec_and_lock);
 
 EXPORT_SYMBOL(die_chain);
 
-#ifdef CONFIG_SMP_
+#ifdef CONFIG_SMP
 EXPORT_SYMBOL(cpu_sibling_map);
 #endif
 

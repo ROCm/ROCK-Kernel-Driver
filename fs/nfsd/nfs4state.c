@@ -244,7 +244,7 @@ copy_cred(struct svc_cred *target, struct svc_cred *source) {
 
 	target->cr_uid = source->cr_uid;
 	target->cr_gid = source->cr_gid;
-	for(i = 0; i < NGROUPS; i++)
+	for(i = 0; i < SVC_CRED_NGROUPS; i++)
 		target->cr_groups[i] = source->cr_groups[i];
 }
 

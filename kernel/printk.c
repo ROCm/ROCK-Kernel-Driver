@@ -521,7 +521,7 @@ asmlinkage int printk(const char *fmt, ...)
 
 	/* Emit the output into the temporary buffer */
 	va_start(args, fmt);
-	printed_len = vsnprintf(printk_buf, sizeof(printk_buf), fmt, args);
+	printed_len = vscnprintf(printk_buf, sizeof(printk_buf), fmt, args);
 	va_end(args);
 
 	/*

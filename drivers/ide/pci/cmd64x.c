@@ -667,7 +667,7 @@ static unsigned int __init init_chipset_cmd64x (struct pci_dev *dev, const char 
 
 	if (!cmd64x_proc) {
 		cmd64x_proc = 1;
-		ide_pci_register_host_proc(&cmd64x_procs[0]);
+		ide_pci_create_host_proc("cmd64x", cmd64x_get_info);
 	}
 #endif /* DISPLAY_CMD64X_TIMINGS && CONFIG_PROC_FS */
 

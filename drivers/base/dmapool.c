@@ -52,7 +52,7 @@ show_pools (struct device *dev, char *buf)
 	next = buf;
 	size = PAGE_SIZE;
 
-	temp = snprintf (next, size, "poolinfo - 0.1\n");
+	temp = scnprintf(next, size, "poolinfo - 0.1\n");
 	size -= temp;
 	next += temp;
 
@@ -67,7 +67,7 @@ show_pools (struct device *dev, char *buf)
 		}
 
 		/* per-pool info, no real statistics yet */
-		temp = snprintf (next, size, "%-16s %4u %4Zu %4Zu %2u\n",
+		temp = scnprintf(next, size, "%-16s %4u %4Zu %4Zu %2u\n",
 				pool->name,
 				blocks, pages * pool->blocks_per_page,
 				pool->size, pages);

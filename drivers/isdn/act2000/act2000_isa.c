@@ -64,7 +64,7 @@ act2000_isa_detect(unsigned short portbase)
 
 	if (request_region(portbase, ACT2000_PORTLEN, "act2000isa")) {
                 ret = act2000_isa_reset(portbase);
-		release_region(portbase, ISA_REGION);                
+		release_region(portbase, ISA_REGION);
 	}
         return ret;
 }

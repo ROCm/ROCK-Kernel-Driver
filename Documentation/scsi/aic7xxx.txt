@@ -186,7 +186,7 @@ The following information is available in this file:
                  INCORRECTLY CAN RENDER YOUR SYSTEM INOPERABLE.
                  USE THEM WITH CAUTION. 
 
-   Edit the file "modules.conf" in the directory /etc and add/edit a
+   Edit the file "modprobe.conf" in the directory /etc and add/edit a
    line containing 'options aic7xxx aic7xxx=[command[,command...]]' where
    'command' is one or more of the following:
    -----------------------------------------------------------------

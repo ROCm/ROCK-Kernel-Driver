@@ -49,6 +49,8 @@
 #include <asm/page.h>
 #include <asm/system.h>
 #include <asm/numa.h>
+#include <asm/sal.h>
+#include <asm/cyclone.h>
 
 
 #define PREFIX			"ACPI: "
@@ -304,6 +306,22 @@ acpi_parse_nmi_src (acpi_table_entry_header *header)
 	return 0;
 }
 
+/* Hook from generic ACPI tables.c */
+void __init acpi_madt_oem_check(char *oem_id, char *oem_table_id)
+{
+	if (!strncmp(oem_id, "IBM", 3) &&
+	    (!strncmp(oem_table_id, "SERMOW", 6))){
+
+		/* Unfortunatly ITC_DRIFT is not yet part of the
+		 * official SAL spec, so the ITC_DRIFT bit is not
+		 * set by the BIOS on this hardware.
+		 */
+		sal_platform_features |= IA64_SAL_PLATFORM_FEATURE_ITC_DRIFT;
+
+		/*Start cyclone clock*/
+		cyclone_setup(0);
+	}
+}
 
 static int __init
 acpi_parse_madt (unsigned long phys_addr, unsigned long size)
@@ -327,6 +345,10 @@ acpi_parse_madt (unsigned long phys_addr, unsigned long size)
 		ipi_base_addr = (unsigned long) ioremap(acpi_madt->lapic_address, 0);
 
 	printk(KERN_INFO PREFIX "Local APIC address 0x%lx\n", ipi_base_addr);
+
+	acpi_madt_oem_check(acpi_madt->header.oem_id,
+		acpi_madt->header.oem_table_id);
+
 	return 0;
 }
 

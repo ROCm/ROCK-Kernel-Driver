@@ -2006,7 +2006,6 @@ isdn_ppp_dev_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		return -EINVAL;
 
 	switch (cmd) {
-
 #define PPP_VERSION "2.3.7"
 		case SIOCGPPPVER:
 			r = (char *) ifr->ifr_ifru.ifru_data;

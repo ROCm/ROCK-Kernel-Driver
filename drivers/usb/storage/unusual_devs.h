@@ -108,6 +108,15 @@ UNUSUAL_DEV(  0x0482, 0x0103, 0x0100, 0x0100,
 		"Finecam S5",
 		US_SC_DEVICE, US_PR_DEVICE, NULL, US_FL_FIX_INQUIRY),
 
+/* Patch for Kyocera Finecam L3
+ * Submitted by Michael Krauth <michael.krauth@web.de>
+ */
+UNUSUAL_DEV(  0x0482, 0x0105, 0x0100, 0x0100,
+		"Kyocera",
+		"Finecam L3",
+		US_SC_SCSI, US_PR_BULK, NULL,
+		US_FL_FIX_INQUIRY),
+
 /* Reported by Paul Stewart <stewart@wetlogic.net>
  * This entry is needed because the device reports Sub=ff */
 UNUSUAL_DEV(  0x04a4, 0x0004, 0x0001, 0x0001,
@@ -132,7 +141,7 @@ UNUSUAL_DEV(  0x04b8, 0x0602, 0x0110, 0x0110,
 UNUSUAL_DEV(  0x04cb, 0x0100, 0x0000, 0x2210,
 		"Fujifilm",
 		"FinePix 1400Zoom",
-		US_SC_DEVICE, US_PR_DEVICE, NULL, US_FL_FIX_INQUIRY),
+		US_SC_UFI, US_PR_DEVICE, NULL, US_FL_FIX_INQUIRY),
 
 /* Reported by Peter Wächtler <pwaechtler@loewe-komp.de>
  * The device needs the flags only.
@@ -171,7 +180,7 @@ UNUSUAL_DEV(  0x04e6, 0x0001, 0x0200, 0x0200,
 UNUSUAL_DEV(  0x04e6, 0x0002, 0x0100, 0x0100, 
 		"Shuttle",
 		"eUSCSI Bridge",
-		US_SC_SCSI, US_PR_BULK, usb_stor_euscsi_init, 
+		US_SC_DEVICE, US_PR_DEVICE, usb_stor_euscsi_init, 
 		US_FL_SCM_MULT_TARG ), 
 
 #ifdef CONFIG_USB_STORAGE_SDDR09
@@ -285,6 +294,13 @@ UNUSUAL_DEV(  0x054c, 0x0032, 0x0000, 0x9999,
 		"Memorystick MSC-U01N",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_SINGLE_LUN ),
+
+/* Submitted by Michal Mlotek <mlotek@foobar.pl> */
+UNUSUAL_DEV(  0x054c, 0x0058, 0x0000, 0x9999,
+		"Sony",
+		"PEG N760c Memorystick",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_FIX_INQUIRY ),
 		
 UNUSUAL_DEV(  0x054c, 0x0069, 0x0000, 0x9999,
 		"Sony",
@@ -414,6 +430,28 @@ UNUSUAL_DEV(  0x066b, 0x0105, 0x0100, 0x0100,
 		US_FL_SINGLE_LUN ),
 #endif
 
+/* Following three Minolta cameras reported by Martin Pool
+ * <mbp@sourcefrog.net>.  Originally discovered by Kedar Petankar,
+ * Matthew Geier, Mikael Lofj"ard, Marcel de Boer.
+ */
+UNUSUAL_DEV( 0x0686, 0x4006, 0x0001, 0x0001,
+		"Minolta",
+		"DiMAGE 7",
+		US_SC_SCSI, US_PR_DEVICE, NULL,
+		0 ),
+
+UNUSUAL_DEV( 0x0686, 0x400b, 0x0001, 0x0001,
+		"Minolta",
+		"DiMAGE 7i",
+		US_SC_SCSI, US_PR_DEVICE, NULL,
+		0 ),
+
+UNUSUAL_DEV( 0x0686, 0x400f, 0x0001, 0x0001,
+		"Minolta",
+		"DiMAGE 7Hi",
+		US_SC_SCSI, US_PR_DEVICE, NULL,
+		0 ),
+
 /* Submitted by Benny Sjostrand <benny@hostmobility.com> */
 UNUSUAL_DEV( 0x0686, 0x4011, 0x0001, 0x0001,
 		"Minolta",
@@ -425,28 +463,6 @@ UNUSUAL_DEV(  0x0686, 0x4017, 0x0001, 0x0001,
                 "Minolta",
                 "DIMAGE E223",
                 US_SC_SCSI, US_PR_DEVICE, NULL, 0 ),
-
-/* Following three Minolta cameras reported by Martin Pool
- * <mbp@sourcefrog.net>.  Originally discovered by Kedar Petankar,
- * Matthew Geier, Mikael Lofj"ard, Marcel de Boer.
- */
-UNUSUAL_DEV( 0x0686, 0x4006, 0x0001, 0x0001,
-             "Minolta",
-             "DiMAGE 7",
-             US_SC_SCSI, US_PR_DEVICE, NULL,
-             0 ),
-
-UNUSUAL_DEV( 0x0686, 0x400b, 0x0001, 0x0001,
-             "Minolta",
-             "DiMAGE 7i",
-             US_SC_SCSI, US_PR_DEVICE, NULL,
-             0 ),
-
-UNUSUAL_DEV( 0x0686, 0x400f, 0x0001, 0x0001,
-             "Minolta",
-             "DiMAGE 7Hi",
-             US_SC_SCSI, US_PR_DEVICE, NULL,
-             0 ),
 
 UNUSUAL_DEV(  0x0693, 0x0002, 0x0100, 0x0100, 
 		"Hagiwara",
@@ -607,7 +623,7 @@ UNUSUAL_DEV(  0x07c4, 0xa400, 0x0000, 0xffff,
 UNUSUAL_DEV( 0x07cf, 0x1001, 0x1000, 0x9009,
 		"Casio",
 		"QV DigitalCamera",
-		US_SC_8070, US_PR_CB, NULL,
+		US_SC_DEVICE, US_PR_CB, NULL,
 		US_FL_FIX_INQUIRY ),
 
 /* Later Casio cameras apparently tell the truth */
@@ -631,15 +647,6 @@ UNUSUAL_DEV(  0x08ca, 0x2011, 0x0000, 0x9999,
 		"AIPTEK",
 		"PocketCAM 3Mega",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		US_FL_MODE_XLATE ),
-
-/*Medion 6047 Digital Camera
-Davide Andrian <_nessuno_@katamail.com>
-*/
-UNUSUAL_DEV( 0x08ca, 0x2011, 0x0001, 0x0001,
-		"3MegaCam",
-		"3MegaCam",
-		US_SC_DEVICE, US_PR_BULK, NULL,
 		US_FL_MODE_XLATE ),
 
 /* Trumpion Microelectronics MP3 player (felipe_alfaro@linuxmail.org) */
@@ -719,6 +726,17 @@ UNUSUAL_DEV(  0x0d96, 0x5200, 0x0001, 0x0200,
 		"Jenoptik",
 		"JD 5200 z3",
 		US_SC_DEVICE, US_PR_DEVICE, NULL, US_FL_FIX_INQUIRY),
+
+/* Reported by Lubomir Blaha <tritol@trilogic.cz>
+ * I _REALLY_ don't know what 3rd, 4th number and all defines mean, but this
+ * works for me. Can anybody correct these values? (I able to test corrected
+ * version.)
+ */
+UNUSUAL_DEV( 0x0dd8, 0x1060, 0x0000, 0xffff,
+		"Netac",
+		"USB-CF-Card",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_FIX_INQUIRY ),
 
 /* Submitted by Antoine Mairesse <antoine.mairesse@free.fr> */
 UNUSUAL_DEV( 0x0ed1, 0x6660, 0x0100, 0x0300,

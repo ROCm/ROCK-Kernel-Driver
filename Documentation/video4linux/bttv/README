@@ -22,7 +22,7 @@ very likely specified the wrong (or no) card type.  A list of supported
 cards is in CARDLIST.bttv
 
 If bttv takes very long to load (happens sometimes with the cheap
-cards which have no tuner), try adding this to your modules.conf:
+cards which have no tuner), try adding this to your modprobe.conf:
 	options i2c-algo-bit bit_test=1
 
 For the WinTV/PVR you need one firmware file from the driver CD:

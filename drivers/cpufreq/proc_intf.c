@@ -139,7 +139,7 @@ static int cpufreq_proc_read (
 				break;
 			} 
 		} else
-			p += snprintf(p, CPUFREQ_NAME_LEN, "%s\n", policy.governor->name);
+			p += scnprintf(p, CPUFREQ_NAME_LEN, "%s\n", policy.governor->name);
 	}
 end:
 	len = (p - page);

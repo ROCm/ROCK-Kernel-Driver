@@ -1150,7 +1150,7 @@ err_tx_and_rx:
 err_only_tx:
 	usb_free_urb(kaweth->tx_urb);
 err_no_urb:
-	kfree(netdev);
+	free_netdev(netdev);
 err_no_netdev:
 	kfree(kaweth);
 	return -EIO;

@@ -56,8 +56,8 @@
 
 #define DRV_MODULE_NAME		"tg3"
 #define PFX DRV_MODULE_NAME	": "
-#define DRV_MODULE_VERSION	"2.6"
-#define DRV_MODULE_RELDATE	"February 3, 2004"
+#define DRV_MODULE_VERSION	"2.7"
+#define DRV_MODULE_RELDATE	"February 17, 2004"
 
 #define TG3_DEF_MAC_MODE	0
 #define TG3_DEF_RX_MODE		0
@@ -213,8 +213,30 @@ static void tg3_write_indirect_reg32(struct tg3 *tp, u32 off, u32 val)
 	}
 }
 
+
+static inline void _tw32_rx_mbox(struct tg3 *tp, u32 off, u32 val)
+{
+	unsigned long mbox = tp->regs + off;
+	writel(val, mbox);
+	if (tp->tg3_flags & TG3_FLAG_MBOX_WRITE_REORDER)
+		readl(mbox);
+}
+
+static inline void _tw32_tx_mbox(struct tg3 *tp, u32 off, u32 val)
+{
+	unsigned long mbox = tp->regs + off;
+	writel(val, mbox);
+	if (tp->tg3_flags & TG3_FLAG_TXD_MBOX_HWBUG)
+		writel(val, mbox);
+	if (tp->tg3_flags & TG3_FLAG_MBOX_WRITE_REORDER)
+		readl(mbox);
+}
+
+#define tw32_mailbox(reg, val)  writel(((val) & 0xffffffff), tp->regs + (reg))
+#define tw32_rx_mbox(reg, val)  _tw32_rx_mbox(tp, reg, val)
+#define tw32_tx_mbox(reg, val)  _tw32_tx_mbox(tp, reg, val)
+
 #define tw32(reg,val)		tg3_write_indirect_reg32(tp,(reg),(val))
-#define tw32_mailbox(reg, val)	writel(((val) & 0xffffffff), tp->regs + (reg))
 #define tw16(reg,val)		writew(((val) & 0xffff), tp->regs + (reg))
 #define tw8(reg,val)		writeb(((val) & 0xff), tp->regs + (reg))
 #define tr32(reg)		readl(tp->regs + (reg))
@@ -656,6 +678,18 @@ static int tg3_phy_reset(struct tg3 *tp, int force)
 		return err;
 
 out:
+	if (tp->tg3_flags2 & TG3_FLG2_PHY_ADC_BUG) {
+		tg3_writephy(tp, MII_TG3_AUX_CTRL, 0x0c00);
+		tg3_writephy(tp, MII_TG3_DSP_ADDRESS, 0x201f);
+		tg3_writephy(tp, MII_TG3_DSP_RW_PORT, 0x2aaa);
+		tg3_writephy(tp, MII_TG3_DSP_ADDRESS, 0x000a);
+		tg3_writephy(tp, MII_TG3_DSP_RW_PORT, 0x0323);
+		tg3_writephy(tp, MII_TG3_AUX_CTRL, 0x0400);
+	}
+	if (tp->tg3_flags2 & TG3_FLG2_PHY_5704_A0_BUG) {
+		tg3_writephy(tp, 0x1c, 0x8d68);
+		tg3_writephy(tp, 0x1c, 0x8d68);
+	}
 	tg3_phy_set_wirespeed(tp);
 	return 0;
 }
@@ -1211,9 +1245,13 @@ static int tg3_setup_copper_phy(struct tg3 *tp)
 	u8 current_duplex;
 	int i, err;
 
+	tw32(MAC_EVENT, 0);
+
 	tw32(MAC_STATUS,
 	     (MAC_STATUS_SYNC_CHANGED |
-	      MAC_STATUS_CFG_CHANGED));
+	      MAC_STATUS_CFG_CHANGED |
+	      MAC_STATUS_MI_COMPLETION |
+	      MAC_STATUS_LNKSTATE_CHANGED));
 	tr32(MAC_STATUS);
 	udelay(40);
 
@@ -2325,25 +2363,19 @@ next_pkt_nopost:
 
 	/* ACK the status ring. */
 	tp->rx_rcb_ptr = rx_rcb_ptr;
-	tw32_mailbox(MAILBOX_RCVRET_CON_IDX_0 + TG3_64BIT_REG_LOW,
+	tw32_rx_mbox(MAILBOX_RCVRET_CON_IDX_0 + TG3_64BIT_REG_LOW,
 		     (rx_rcb_ptr % TG3_RX_RCB_RING_SIZE(tp)));
-	if (tp->tg3_flags & TG3_FLAG_MBOX_WRITE_REORDER)
-		tr32(MAILBOX_RCVRET_CON_IDX_0 + TG3_64BIT_REG_LOW);
 
 	/* Refill RX ring(s). */
 	if (work_mask & RXD_OPAQUE_RING_STD) {
 		sw_idx = tp->rx_std_ptr % TG3_RX_RING_SIZE;
-		tw32_mailbox(MAILBOX_RCV_STD_PROD_IDX + TG3_64BIT_REG_LOW,
+		tw32_rx_mbox(MAILBOX_RCV_STD_PROD_IDX + TG3_64BIT_REG_LOW,
 			     sw_idx);
-		if (tp->tg3_flags & TG3_FLAG_MBOX_WRITE_REORDER)
-			tr32(MAILBOX_RCV_STD_PROD_IDX + TG3_64BIT_REG_LOW);
 	}
 	if (work_mask & RXD_OPAQUE_RING_JUMBO) {
 		sw_idx = tp->rx_jumbo_ptr % TG3_RX_JUMBO_RING_SIZE;
-		tw32_mailbox(MAILBOX_RCV_JUMBO_PROD_IDX + TG3_64BIT_REG_LOW,
+		tw32_rx_mbox(MAILBOX_RCV_JUMBO_PROD_IDX + TG3_64BIT_REG_LOW,
 			     sw_idx);
-		if (tp->tg3_flags & TG3_FLAG_MBOX_WRITE_REORDER)
-			tr32(MAILBOX_RCV_JUMBO_PROD_IDX + TG3_64BIT_REG_LOW);
 	}
 
 	return received;
@@ -2795,32 +2827,17 @@ static int tg3_start_xmit_4gbug(struct sk_buff *skb, struct net_device *dev)
 
 	/* Packets are ready, update Tx producer idx local and on card. */
 	if (tp->tg3_flags & TG3_FLAG_HOST_TXDS) {
-		tw32_mailbox((MAILBOX_SNDHOST_PROD_IDX_0 +
+		tw32_tx_mbox((MAILBOX_SNDHOST_PROD_IDX_0 +
 			      TG3_64BIT_REG_LOW), entry);
-		if (tp->tg3_flags & TG3_FLAG_TXD_MBOX_HWBUG)
-			tw32_mailbox((MAILBOX_SNDHOST_PROD_IDX_0 +
-				      TG3_64BIT_REG_LOW), entry);
-		if (tp->tg3_flags & TG3_FLAG_MBOX_WRITE_REORDER)
-			tr32(MAILBOX_SNDHOST_PROD_IDX_0 +
-			     TG3_64BIT_REG_LOW);
 	} else {
 		/* First, make sure tg3 sees last descriptor fully
 		 * in SRAM.
 		 */
 		if (tp->tg3_flags & TG3_FLAG_MBOX_WRITE_REORDER)
-			tr32(MAILBOX_SNDNIC_PROD_IDX_0 +
-			     TG3_64BIT_REG_LOW);
+			tr32(MAILBOX_SNDNIC_PROD_IDX_0 + TG3_64BIT_REG_LOW);
 
-		tw32_mailbox((MAILBOX_SNDNIC_PROD_IDX_0 +
+		tw32_tx_mbox((MAILBOX_SNDNIC_PROD_IDX_0 +
 			      TG3_64BIT_REG_LOW), entry);
-		if (tp->tg3_flags & TG3_FLAG_TXD_MBOX_HWBUG)
-			tw32_mailbox((MAILBOX_SNDNIC_PROD_IDX_0 +
-				      TG3_64BIT_REG_LOW), entry);
-
-		/* Now post the mailbox write itself.  */
-		if (tp->tg3_flags & TG3_FLAG_MBOX_WRITE_REORDER)
-			tr32(MAILBOX_SNDNIC_PROD_IDX_0 +
-			     TG3_64BIT_REG_LOW);
 	}
 
 	tp->tx_prod = entry;
@@ -2965,11 +2982,8 @@ static int tg3_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	 * the double-write bug tests.
 	 */
 	if (tp->tg3_flags & TG3_FLAG_HOST_TXDS) {
-		tw32_mailbox((MAILBOX_SNDHOST_PROD_IDX_0 +
+		tw32_tx_mbox((MAILBOX_SNDHOST_PROD_IDX_0 +
 			      TG3_64BIT_REG_LOW), entry);
-		if (tp->tg3_flags & TG3_FLAG_MBOX_WRITE_REORDER)
-			tr32(MAILBOX_SNDHOST_PROD_IDX_0 +
-			     TG3_64BIT_REG_LOW);
 	} else {
 		/* First, make sure tg3 sees last descriptor fully
 		 * in SRAM.
@@ -2978,13 +2992,8 @@ static int tg3_start_xmit(struct sk_buff *skb, struct net_device *dev)
 			tr32(MAILBOX_SNDNIC_PROD_IDX_0 +
 			     TG3_64BIT_REG_LOW);
 
-		tw32_mailbox((MAILBOX_SNDNIC_PROD_IDX_0 +
+		tw32_tx_mbox((MAILBOX_SNDNIC_PROD_IDX_0 +
 			      TG3_64BIT_REG_LOW), entry);
-
-		/* Now post the mailbox write itself.  */
-		if (tp->tg3_flags & TG3_FLAG_MBOX_WRITE_REORDER)
-			tr32(MAILBOX_SNDNIC_PROD_IDX_0 +
-			     TG3_64BIT_REG_LOW);
 	}
 
 	tp->tx_prod = entry;
@@ -3420,7 +3429,10 @@ static int tg3_abort_hw(struct tg3 *tp)
 	if (err)
 		goto out;
 
-	memset(tp->hw_status, 0, TG3_HW_STATUS_SIZE);
+	if (tp->hw_status)
+		memset(tp->hw_status, 0, TG3_HW_STATUS_SIZE);
+	if (tp->hw_stats)
+		memset(tp->hw_stats, 0, sizeof(struct tg3_hw_stats));
 
 out:
 	return err;
@@ -4794,9 +4806,7 @@ static int tg3_reset_hw(struct tg3 *tp)
 	tp->tx_prod = 0;
 	tp->tx_cons = 0;
 	tw32_mailbox(MAILBOX_SNDHOST_PROD_IDX_0 + TG3_64BIT_REG_LOW, 0);
-	tw32_mailbox(MAILBOX_SNDNIC_PROD_IDX_0 + TG3_64BIT_REG_LOW, 0);
-	if (tp->tg3_flags & TG3_FLAG_MBOX_WRITE_REORDER)
-		tr32(MAILBOX_SNDNIC_PROD_IDX_0 + TG3_64BIT_REG_LOW);
+	tw32_tx_mbox(MAILBOX_SNDNIC_PROD_IDX_0 + TG3_64BIT_REG_LOW, 0);
 
 	if (tp->tg3_flags & TG3_FLAG_HOST_TXDS) {
 		tg3_set_bdinfo(tp, NIC_SRAM_SEND_RCB,
@@ -4823,9 +4833,7 @@ static int tg3_reset_hw(struct tg3 *tp)
 	}
 
 	tp->rx_rcb_ptr = 0;
-	tw32_mailbox(MAILBOX_RCVRET_CON_IDX_0 + TG3_64BIT_REG_LOW, 0);
-	if (tp->tg3_flags & TG3_FLAG_MBOX_WRITE_REORDER)
-		tr32(MAILBOX_RCVRET_CON_IDX_0 + TG3_64BIT_REG_LOW);
+	tw32_rx_mbox(MAILBOX_RCVRET_CON_IDX_0 + TG3_64BIT_REG_LOW, 0);
 
 	tg3_set_bdinfo(tp, NIC_SRAM_RCV_RET_RCB,
 		       tp->rx_rcb_mapping,
@@ -4834,19 +4842,13 @@ static int tg3_reset_hw(struct tg3 *tp)
 		       0);
 
 	tp->rx_std_ptr = tp->rx_pending;
-	tw32_mailbox(MAILBOX_RCV_STD_PROD_IDX + TG3_64BIT_REG_LOW,
+	tw32_rx_mbox(MAILBOX_RCV_STD_PROD_IDX + TG3_64BIT_REG_LOW,
 		     tp->rx_std_ptr);
-	if (tp->tg3_flags & TG3_FLAG_MBOX_WRITE_REORDER)
-		tr32(MAILBOX_RCV_STD_PROD_IDX + TG3_64BIT_REG_LOW);
 
-	if (tp->tg3_flags & TG3_FLAG_JUMBO_ENABLE)
-		tp->rx_jumbo_ptr = tp->rx_jumbo_pending;
-	else
-		tp->rx_jumbo_ptr = 0;
-	tw32_mailbox(MAILBOX_RCV_JUMBO_PROD_IDX + TG3_64BIT_REG_LOW,
+	tp->rx_jumbo_ptr = (tp->tg3_flags & TG3_FLAG_JUMBO_ENABLE) ?
+						tp->rx_jumbo_pending : 0;
+	tw32_rx_mbox(MAILBOX_RCV_JUMBO_PROD_IDX + TG3_64BIT_REG_LOW,
 		     tp->rx_jumbo_ptr);
-	if (tp->tg3_flags & TG3_FLAG_MBOX_WRITE_REORDER)
-		tr32(MAILBOX_RCV_JUMBO_PROD_IDX + TG3_64BIT_REG_LOW);
 
 	/* Initialize MAC address and backoff seed. */
 	__tg3_set_mac_addr(tp);
@@ -6919,6 +6921,12 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 	     (tp->pci_chip_rev_id != CHIPREV_ID_5705_A1)))
 		tp->tg3_flags2 |= TG3_FLG2_NO_ETH_WIRE_SPEED;
 
+	if (GET_CHIP_REV(tp->pci_chip_rev_id) == CHIPREV_5703_AX ||
+	    GET_CHIP_REV(tp->pci_chip_rev_id) == CHIPREV_5704_AX)
+		tp->tg3_flags2 |= TG3_FLG2_PHY_ADC_BUG;
+	if (tp->pci_chip_rev_id == CHIPREV_ID_5704_A0)
+		tp->tg3_flags2 |= TG3_FLG2_PHY_5704_A0_BUG;
+
 	/* Only 5701 and later support tagged irq status mode.
 	 * Also, 5788 chips cannot use tagged irq status.
 	 *
@@ -7421,8 +7429,8 @@ static int __devinit tg3_test_dma(struct tg3 *tp)
 		for (i = 0; i < TEST_BUFFER_SIZE / sizeof(u32); i++) {
 			u32 val;
 			tg3_read_mem(tp, 0x2100 + (i*4), &val);
-			if (val != p[i]) {
-				printk( KERN_ERR "  tg3_test_dma()  Card buffer currupted on write! (%d != %d)\n", val, i);
+			if (le32_to_cpu(val) != p[i]) {
+				printk(KERN_ERR "  tg3_test_dma()  Card buffer corrupted on write! (%d != %d)\n", val, i);
 				/* ret = -ENODEV here? */
 			}
 			p[i] = 0;
@@ -7523,23 +7531,24 @@ static char * __devinit tg3_phy_string(struct tg3 *tp)
 
 static struct pci_dev * __devinit tg3_find_5704_peer(struct tg3 *tp)
 {
-	struct pci_dev *peer = NULL;
-	unsigned int func;
+	struct pci_dev *peer;
+	unsigned int func, devnr = tp->pdev->devfn & ~7;
 
-	for (func = 0; func < 7; func++) {
-		unsigned int devfn = tp->pdev->devfn;
-
-		devfn &= ~7;
-		devfn |= func;
-
-		if (devfn == tp->pdev->devfn)
-			continue;
-		peer = pci_find_slot(tp->pdev->bus->number, devfn);
-		if (peer)
+	for (func = 0; func < 8; func++) {
+		peer = pci_get_slot(tp->pdev->bus, devnr | func);
+		if (peer && peer != tp->pdev)
 			break;
+		pci_dev_put(peer);
 	}
 	if (!peer || peer == tp->pdev)
 		BUG();
+
+	/*
+	 * We don't need to keep the refcount elevated; there's no way
+	 * to remove one half of this device without removing the other
+	 */
+	pci_dev_put(peer);
+
 	return peer;
 }
 
@@ -7747,6 +7756,18 @@ static int __devinit tg3_init_one(struct pci_dev *pdev,
 		printk(KERN_ERR PFX "Could not obtain valid ethernet address, "
 		       "aborting.\n");
 		goto err_out_iounmap;
+	}
+
+	/*
+	 * Reset chip in case UNDI or EFI driver did not shutdown
+	 * DMA self test will enable WDMAC and we'll see (spurious)
+	 * pending DMA on the PCI bus at that point.
+	 */
+	if ((tr32(HOSTCC_MODE) & HOSTCC_MODE_ENABLE) ||
+	    (tr32(WDMAC_MODE) & WDMAC_MODE_ENABLE)) {
+		pci_save_state(tp->pdev, tp->pci_cfg_state);
+		tw32(MEMARB_MODE, MEMARB_MODE_ENABLE);
+		tg3_halt(tp);
 	}
 
 	err = tg3_test_dma(tp);

@@ -11,7 +11,6 @@
 #include <asm/sn/types.h>
 #include <asm/sn/sgi.h>
 #include <asm/sn/driver.h>
-#include <asm/sn/iograph.h>
 #include <asm/param.h>
 #include <asm/sn/pio.h>
 #include <asm/sn/xtalk/xwidget.h>

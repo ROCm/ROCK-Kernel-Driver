@@ -501,7 +501,7 @@ static int rfcomm_sock_sendmsg(struct kiocb *iocb, struct socket *sock,
 	lock_sock(sk);
 
 	while (len) {
-		size_t size = min(len, d->mtu);
+		size_t size = min_t(size_t, len, d->mtu);
 		
 		skb = sock_alloc_send_skb(sk, size + RFCOMM_SKB_RESERVE,
 				msg->msg_flags & MSG_DONTWAIT, &err);

@@ -151,6 +151,16 @@ static inline unsigned long dm_div_up(unsigned long n, unsigned long size)
 	return dm_round_up(n, size) / size;
 }
 
+static inline sector_t to_sector(unsigned long n)
+{
+	return (n >> 9);
+}
+
+static inline unsigned long to_bytes(sector_t n)
+{
+	return (n << 9);
+}
+
 /*
  * The device-mapper can be driven through one of two interfaces;
  * ioctl or filesystem, depending which patch you have applied.
@@ -166,5 +176,7 @@ void dm_linear_exit(void);
 
 int dm_stripe_init(void);
 void dm_stripe_exit(void);
+
+void *dm_vcalloc(unsigned long nmemb, unsigned long elem_size);
 
 #endif

@@ -300,7 +300,6 @@ ide_startstop_t ide_error (ide_drive_t *drive, const char *msg, u8 stat)
 	if (rq->flags & REQ_DRIVE_TASKFILE) {
 		rq->errors = 1;
 		ide_end_drive_cmd(drive, stat, err);
-//		ide_end_taskfile(drive, stat, err);
 		return ide_stopped;
 	}
 
@@ -387,7 +386,6 @@ ide_startstop_t ide_abort(ide_drive_t *drive, const char *msg)
 	if (rq->flags & REQ_DRIVE_TASKFILE) {
 		rq->errors = 1;
 		ide_end_drive_cmd(drive, BUSY_STAT, 0);
-//		ide_end_taskfile(drive, BUSY_STAT, 0);
 		return ide_stopped;
 	}
 

@@ -8,10 +8,7 @@
  * Copyright (C) 2000-2003 Silicon Graphics, Inc. All rights reserved.
  */
 
-#include <linux/config.h>
-#include <asm/smp.h>
 #include <asm/sn/addrs.h>
-#include <asm/sn/sn_cpuid.h>
 #include <asm/sn/pda.h>
 #include <asm/sn/sn2/shub.h>
 
@@ -23,7 +20,7 @@
 #define LED_ALWAYS_SET		0x00
 
 /*
- * Basic macros for flashing the LEDS on an SGI, SN1.
+ * Basic macros for flashing the LEDS on an SGI SN.
  */
 
 static __inline__ void

@@ -219,66 +219,6 @@ ide_startstop_t do_rw_taskfile (ide_drive_t *drive, ide_task_t *task)
 EXPORT_SYMBOL(do_rw_taskfile);
 
 /*
- * Clean up after success/failure of an explicit taskfile operation.
- */
-void ide_end_taskfile (ide_drive_t *drive, u8 stat, u8 err)
-{
-	ide_hwif_t *hwif = HWIF(drive);
-	unsigned long flags;
-	struct request *rq;
-	ide_task_t *args;
-	task_ioreg_t command;
-
-	spin_lock_irqsave(&ide_lock, flags);
-	rq = HWGROUP(drive)->rq;
-	spin_unlock_irqrestore(&ide_lock, flags);
-	args = (ide_task_t *) rq->special;
-
-	command = args->tfRegister[IDE_COMMAND_OFFSET];
-
-	if (rq->errors == 0)
-		rq->errors = !OK_STAT(stat,READY_STAT,BAD_STAT);
-
-	if (args->tf_in_flags.b.data) {
-		u16 data = hwif->INW(IDE_DATA_REG);
-		args->tfRegister[IDE_DATA_OFFSET] = (data) & 0xFF;
-		args->hobRegister[IDE_DATA_OFFSET_HOB]	= (data >> 8) & 0xFF;
-	}
-	args->tfRegister[IDE_ERROR_OFFSET]   = err;
-	args->tfRegister[IDE_NSECTOR_OFFSET] = hwif->INB(IDE_NSECTOR_REG);
-	args->tfRegister[IDE_SECTOR_OFFSET]  = hwif->INB(IDE_SECTOR_REG);
-	args->tfRegister[IDE_LCYL_OFFSET]    = hwif->INB(IDE_LCYL_REG);
-	args->tfRegister[IDE_HCYL_OFFSET]    = hwif->INB(IDE_HCYL_REG);
-	args->tfRegister[IDE_SELECT_OFFSET]  = hwif->INB(IDE_SELECT_REG);
-	args->tfRegister[IDE_STATUS_OFFSET]  = stat;
-	if ((drive->id->command_set_2 & 0x0400) &&
-	    (drive->id->cfs_enable_2 & 0x0400) &&
-	    (drive->addressing == 1)) {
-		hwif->OUTB(drive->ctl|0x80, IDE_CONTROL_REG_HOB);
-		args->hobRegister[IDE_FEATURE_OFFSET_HOB] = hwif->INB(IDE_FEATURE_REG);
-		args->hobRegister[IDE_NSECTOR_OFFSET_HOB] = hwif->INB(IDE_NSECTOR_REG);
-		args->hobRegister[IDE_SECTOR_OFFSET_HOB]  = hwif->INB(IDE_SECTOR_REG);
-		args->hobRegister[IDE_LCYL_OFFSET_HOB]    = hwif->INB(IDE_LCYL_REG);
-		args->hobRegister[IDE_HCYL_OFFSET_HOB]    = hwif->INB(IDE_HCYL_REG);
-	}
-
-#if 0
-/*	taskfile_settings_update(drive, args, command); */
-
-	if (args->posthandler != NULL)
-		args->posthandler(drive, args);
-#endif
-
-	spin_lock_irqsave(&ide_lock, flags);
-	blkdev_dequeue_request(rq);
-	HWGROUP(drive)->rq = NULL;
-	end_that_request_last(rq);
-	spin_unlock_irqrestore(&ide_lock, flags);
-}
-
-EXPORT_SYMBOL(ide_end_taskfile);
-
-/*
  * set_multmode_intr() is invoked on completion of a WIN_SETMULT cmd.
  */
 ide_startstop_t set_multmode_intr (ide_drive_t *drive)
@@ -1669,7 +1609,6 @@ EXPORT_SYMBOL(ide_wait_cmd);
  */
 int ide_cmd_ioctl (ide_drive_t *drive, unsigned int cmd, unsigned long arg)
 {
-#if 1
 	int err = 0;
 	u8 args[4], *argbuf = args;
 	u8 xfer_rate = 0;
@@ -1720,70 +1659,6 @@ abort:
 	if (argsize > 4)
 		kfree(argbuf);
 	return err;
-
-#else
-
-	int err = -EIO;
-	u8 args[4], *argbuf = args;
-	u8 xfer_rate = 0;
-	int argsize = 0;
-	ide_task_t tfargs;
-
-	if (NULL == (void *) arg) {
-		struct request rq;
-		ide_init_drive_cmd(&rq);
-		return ide_do_drive_cmd(drive, &rq, ide_wait);
-	}
-
-	if (copy_from_user(args, (void *)arg, 4))
-		return -EFAULT;
-
-	memset(&tfargs, 0, sizeof(ide_task_t));
-	tfargs.tfRegister[IDE_FEATURE_OFFSET] = args[2];
-	tfargs.tfRegister[IDE_NSECTOR_OFFSET] = args[3];
-	tfargs.tfRegister[IDE_SECTOR_OFFSET]  = args[1];
-	tfargs.tfRegister[IDE_LCYL_OFFSET]    = 0x00;
-	tfargs.tfRegister[IDE_HCYL_OFFSET]    = 0x00;
-	tfargs.tfRegister[IDE_SELECT_OFFSET]  = 0x00;
-	tfargs.tfRegister[IDE_COMMAND_OFFSET] = args[0];
-
-	if (args[3]) {
-		argsize = (SECTOR_WORDS * 4 * args[3]);
-		argbuf = kmalloc(argsize, GFP_KERNEL);
-		if (argbuf == NULL)
-			return -ENOMEM;
-	}
-
-	if (set_transfer(drive, &tfargs)) {
-		xfer_rate = args[1];
-		if (ide_ata66_check(drive, &tfargs))
-			goto abort;
-	}
-
-	tfargs.command_type = ide_cmd_type_parser(&tfargs);
-	err = ide_raw_taskfile(drive, &tfargs, argbuf);
-
-	if (!err && xfer_rate) {
-		/* active-retuning-calls future */
-		ide_set_xfer_rate(driver, xfer_rate);
-		ide_driveid_update(drive);
-	}
-abort:
-	args[0] = tfargs.tfRegister[IDE_COMMAND_OFFSET];
-	args[1] = tfargs.tfRegister[IDE_FEATURE_OFFSET];
-	args[2] = tfargs.tfRegister[IDE_NSECTOR_OFFSET];
-	args[3] = 0;
-
-	if (copy_to_user((void *)arg, argbuf, 4))
-		err = -EFAULT;
-	if (argbuf != NULL) {
-		if (copy_to_user((void *)arg, argbuf + 4, argsize))
-			err = -EFAULT;
-		kfree(argbuf);
-	}
-	return err;
-
-#endif
 }
 
 EXPORT_SYMBOL(ide_cmd_ioctl);

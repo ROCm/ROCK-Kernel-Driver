@@ -32,8 +32,8 @@ extern cpumask_t cpu_possible_map;
 #define for_each_online_cpu(cpu) for (cpu = 0; cpu < 1; cpu++)
 #endif
 
-#define cpumask_snprintf(buf, buflen, map)				\
-	bitmap_snprintf(buf, buflen, cpus_addr(map), NR_CPUS)
+#define cpumask_scnprintf(buf, buflen, map)				\
+	bitmap_scnprintf(buf, buflen, cpus_addr(map), NR_CPUS)
 
 #define cpumask_parse(buf, buflen, map)					\
 	bitmap_parse(buf, buflen, cpus_addr(map), NR_CPUS)

@@ -72,6 +72,9 @@ extern int vsprintf(char *buf, const char *, va_list);
 extern int snprintf(char * buf, size_t size, const char * fmt, ...)
 	__attribute__ ((format (printf, 3, 4)));
 extern int vsnprintf(char *buf, size_t size, const char *fmt, va_list args);
+extern int scnprintf(char * buf, size_t size, const char * fmt, ...)
+	__attribute__ ((format (printf, 3, 4)));
+extern int vscnprintf(char *buf, size_t size, const char *fmt, va_list args);
 
 extern int sscanf(const char *, const char *, ...)
 	__attribute__ ((format (scanf,2,3)));

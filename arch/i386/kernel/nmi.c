@@ -42,7 +42,7 @@ extern void show_registers(struct pt_regs *regs);
  *     be enabled
  * -1: the lapic NMI watchdog is disabled, but can be enabled
  */
-static int nmi_active;
+int nmi_active;
 
 #define K7_EVNTSEL_ENABLE	(1 << 22)
 #define K7_EVNTSEL_INT		(1 << 20)
@@ -462,6 +462,7 @@ void nmi_watchdog_tick (struct pt_regs * regs)
 	}
 }
 
+EXPORT_SYMBOL(nmi_active);
 EXPORT_SYMBOL(nmi_watchdog);
 EXPORT_SYMBOL(disable_lapic_nmi_watchdog);
 EXPORT_SYMBOL(enable_lapic_nmi_watchdog);

@@ -776,7 +776,7 @@ static struct ehci_qh *qh_append_tds (
 	qh = (struct ehci_qh *) *ptr;
 	if (unlikely (qh == 0)) {
 		/* can't sleep here, we have ehci->lock... */
-		qh = qh_make (ehci, urb, SLAB_ATOMIC);
+		qh = qh_make (ehci, urb, GFP_ATOMIC);
 		*ptr = qh;
 	}
 	if (likely (qh != 0)) {

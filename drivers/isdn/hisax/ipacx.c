@@ -751,11 +751,11 @@ bch_int(struct IsdnCardState *cs, u_char hscx)
 					spin_unlock_irqrestore(&bcs->aclock, flags);
 					schedule_event(bcs, B_ACKPENDING);
 				}
-			}  
+			}
 			dev_kfree_skb_irq(bcs->tx_skb);
-			bcs->hw.hscx.count = 0; 
+			bcs->hw.hscx.count = 0;
 			bcs->tx_skb = NULL;
-    		}    
+    		}
 		if ((bcs->tx_skb = skb_dequeue(&bcs->squeue))) {
 			bcs->hw.hscx.count = 0;
 			set_bit(BC_FLG_BUSY, &bcs->Flag);

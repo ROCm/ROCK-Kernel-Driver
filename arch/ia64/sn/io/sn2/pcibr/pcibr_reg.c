@@ -8,7 +8,6 @@
 
 #include <linux/types.h>
 #include <asm/sn/sgi.h>
-#include <asm/sn/iograph.h>
 #include <asm/sn/addrs.h>
 #include <asm/sn/pci/pcibr.h>
 #include <asm/sn/pci/pcibr_private.h>

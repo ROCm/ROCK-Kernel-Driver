@@ -574,7 +574,7 @@ static unsigned int __init init_chipset_pdcnew (struct pci_dev *dev, const char 
 
 	if (!pdcnew_proc) {
 		pdcnew_proc = 1;
-		ide_pci_register_host_proc(&pdcnew_procs[0]);
+		ide_pci_create_host_proc("pdcnew", pdcnew_get_info);
 	}
 #endif /* DISPLAY_PDC202XX_TIMINGS && CONFIG_PROC_FS */
 

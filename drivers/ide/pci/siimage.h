@@ -21,26 +21,6 @@
 #define siiprintk(x...)
 #endif
 
-
-#if defined(DISPLAY_SIIMAGE_TIMINGS) && defined(CONFIG_PROC_FS)
-#include <linux/stat.h>
-#include <linux/proc_fs.h>
-
-static char * print_siimage_get_info(char *, struct pci_dev *, int);
-static int siimage_get_info(char *, char **, off_t, int);
-
-static u8 siimage_proc;
-
-static ide_pci_host_proc_t siimage_procs[] = {
-	{
-		.name		= "siimage",
-		.set		= 1,
-		.get_info	= siimage_get_info,
-		.parent		= NULL,
-	},
-};
-#endif /* DISPLAY_SIIMAGE_TIMINGS && CONFIG_PROC_FS */	
-
 static unsigned int init_chipset_siimage(struct pci_dev *, const char *);
 static void init_iops_siimage(ide_hwif_t *);
 static void init_hwif_siimage(ide_hwif_t *);

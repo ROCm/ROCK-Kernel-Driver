@@ -2,6 +2,8 @@
  *
  * Name:	skrlmt.c
  * Project:	GEnesis, PCI Gigabit Ethernet Adapter
+ * Version:	$Revision: 1.69 $
+ * Date:	$Date: 2003/04/15 09:39:22 $
  * Purpose:	Manage links on SK-NET Adapters, esp. redundant ones.
  *
  ******************************************************************************/

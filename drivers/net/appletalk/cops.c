@@ -262,7 +262,7 @@ struct net_device * __init cops_probe(int unit)
 out1:
 	cleanup_card(dev);
 out:
-	kfree(dev);
+	free_netdev(dev);
 	return ERR_PTR(err);
 }
 

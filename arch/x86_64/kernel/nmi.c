@@ -39,7 +39,7 @@
  *     be enabled
  * -1: the lapic NMI watchdog is disabled, but can be enabled
  */
-static int nmi_active;
+int nmi_active;		/* oprofile uses this */
 static int panic_on_timeout;
 
 unsigned int nmi_watchdog = NMI_LOCAL_APIC;
@@ -380,6 +380,7 @@ void unset_nmi_callback(void)
 	nmi_callback = dummy_nmi_callback;
 }
 
+EXPORT_SYMBOL(nmi_active);
 EXPORT_SYMBOL(nmi_watchdog);
 EXPORT_SYMBOL(disable_lapic_nmi_watchdog);
 EXPORT_SYMBOL(enable_lapic_nmi_watchdog);

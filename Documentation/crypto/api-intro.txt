@@ -68,7 +68,7 @@ Many real examples are available in the regression test module (tcrypt.c).
 CONFIGURATION NOTES
 
 As Triple DES is part of the DES module, for those using modular builds,
-add the following line to /etc/modules.conf:
+add the following line to /etc/modprobe.conf:
 
   alias des3_ede des
 

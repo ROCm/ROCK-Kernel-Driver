@@ -49,12 +49,19 @@
 #define   USBPORTSC_CSC		0x0002	/* Connect Status Change */
 #define   USBPORTSC_PE		0x0004	/* Port Enable */
 #define   USBPORTSC_PEC		0x0008	/* Port Enable Change */
-#define   USBPORTSC_LS		0x0030	/* Line Status */
+#define   USBPORTSC_DPLUS	0x0010	/* D+ high (line status) */
+#define   USBPORTSC_DMINUS	0x0020	/* D- high (line status) */
 #define   USBPORTSC_RD		0x0040	/* Resume Detect */
+#define   USBPORTSC_RES1	0x0080	/* reserved, always 1 */
 #define   USBPORTSC_LSDA	0x0100	/* Low Speed Device Attached */
 #define   USBPORTSC_PR		0x0200	/* Port Reset */
+/* OC and OCC from Intel 430TX and later (not UHCI 1.1d spec) */
 #define   USBPORTSC_OC		0x0400	/* Over Current condition */
+#define   USBPORTSC_OCC		0x0800	/* Over Current Change R/WC */
 #define   USBPORTSC_SUSP	0x1000	/* Suspend */
+#define   USBPORTSC_RES2	0x2000	/* reserved, write zeroes */
+#define   USBPORTSC_RES3	0x4000	/* reserved, write zeroes */
+#define   USBPORTSC_RES4	0x8000	/* reserved, write zeroes */
 
 /* Legacy support register */
 #define USBLEGSUP		0xc0
@@ -200,8 +207,8 @@ struct uhci_td {
  * The UHCI driver places Interrupt, Control and Bulk into QH's both
  * to group together TD's for one transfer, and also to faciliate queuing
  * of URB's. To make it easy to insert entries into the schedule, we have
- * a skeleton of QH's for each predefined Interrupt latency, low speed
- * control, high speed control and terminating QH (see explanation for
+ * a skeleton of QH's for each predefined Interrupt latency, low-speed
+ * control, full-speed control and terminating QH (see explanation for
  * the terminating QH below).
  *
  * When we want to add a new QH, we add it to the end of the list for the
@@ -216,9 +223,9 @@ struct uhci_td {
  * skel int32 QH
  * ...
  * skel int1 QH
- * skel low speed control QH
+ * skel low-speed control QH
  * dev 5 control QH
- * skel high speed control QH
+ * skel full-speed control QH
  * skel bulk QH
  * dev 1 bulk QH
  * dev 2 bulk QH
@@ -227,7 +234,7 @@ struct uhci_td {
  * The terminating QH is used for 2 reasons:
  * - To place a terminating TD which is used to workaround a PIIX bug
  *   (see Intel errata for explanation)
- * - To loop back to the high speed control queue for full speed bandwidth
+ * - To loop back to the full-speed control queue for full-speed bandwidth
  *   reclamation
  *
  * Isochronous transfers are stored before the start of the skeleton
@@ -308,6 +315,7 @@ enum uhci_state {
 };
 
 #define hcd_to_uhci(hcd_ptr) container_of(hcd_ptr, struct uhci_hcd, hcd)
+#define uhci_dev(u)	((u)->hcd.self.controller)
 
 /*
  * This describes the full uhci information.
@@ -326,8 +334,8 @@ struct uhci_hcd {
 	/* Grabbed from PCI */
 	unsigned long io_addr;
 
-	struct pci_pool *qh_pool;
-	struct pci_pool *td_pool;
+	struct dma_pool *qh_pool;
+	struct dma_pool *td_pool;
 
 	struct usb_bus *bus;
 
@@ -336,7 +344,7 @@ struct uhci_hcd {
 
 	spinlock_t frame_list_lock;
 	struct uhci_frame_list *fl;		/* P: uhci->frame_list_lock */
-	int fsbr;				/* Full speed bandwidth reclamation */
+	int fsbr;				/* Full-speed bandwidth reclamation */
 	unsigned long fsbrtimeout;		/* FSBR delay */
 
 	enum uhci_state state;			/* FIXME: needs a spinlock */
@@ -383,13 +391,10 @@ struct urb_priv {
 					/*  a control transfer, retrigger */
 					/*  the status phase */
 
-	int status;			/* Final status */
-
 	unsigned long inserttime;	/* In jiffies */
 	unsigned long fsbrtime;		/* In jiffies */
 
 	struct list_head queue_list;	/* P: uhci->frame_list_lock */
-	struct list_head complete_list;	/* P: uhci->complete_list_lock */
 };
 
 /*
@@ -418,4 +423,3 @@ struct urb_priv {
  */
 
 #endif
-

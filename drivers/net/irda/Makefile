@@ -9,6 +9,7 @@
 obj-$(CONFIG_IRPORT_SIR)	+= 		irport.o
 # FIR drivers
 obj-$(CONFIG_USB_IRDA)		+= irda-usb.o
+obj-$(CONFIG_SIGMATEL_FIR)	+= stir4200.o
 obj-$(CONFIG_NSC_FIR)		+= nsc-ircc.o
 obj-$(CONFIG_WINBOND_FIR)	+= w83977af_ir.o
 obj-$(CONFIG_SA1100_FIR)	+= sa1100_ir.o

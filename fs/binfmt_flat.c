@@ -179,7 +179,7 @@ static int decompress_exec(
 	unsigned char *buf;
 	z_stream strm;
 	loff_t fpos;
-	int ret;
+	int ret, retval;
 
 	DBG_FLT("decompress_exec(offset=%x,buf=%x,len=%x)\n",(int)offset, (int)dst, (int)len);
 
@@ -192,7 +192,8 @@ static int decompress_exec(
 	buf = kmalloc(LBUFSIZE, GFP_KERNEL);
 	if (buf == NULL) {
 		DBG_FLT("binfmt_flat: no memory for read buffer\n");
-		return -ENOMEM;
+		retval = -ENOMEM;
+		goto out_free;
 	}
 
 	/* Read in first chunk of data and parse gzip header. */
@@ -203,28 +204,30 @@ static int decompress_exec(
 	strm.avail_in = ret;
 	strm.total_in = 0;
 
+	retval = -ENOEXEC;
+
 	/* Check minimum size -- gzip header */
 	if (ret < 10) {
 		DBG_FLT("binfmt_flat: file too small?\n");
-		return -ENOEXEC;
+		goto out_free_buf;
 	}
 
 	/* Check gzip magic number */
 	if ((buf[0] != 037) || ((buf[1] != 0213) && (buf[1] != 0236))) {
 		DBG_FLT("binfmt_flat: unknown compression magic?\n");
-		return -ENOEXEC;
+		goto out_free_buf;
 	}
 
 	/* Check gzip method */
 	if (buf[2] != 8) {
 		DBG_FLT("binfmt_flat: unknown compression method?\n");
-		return -ENOEXEC;
+		goto out_free_buf;
 	}
 	/* Check gzip flags */
 	if ((buf[3] & ENCRYPTED) || (buf[3] & CONTINUATION) ||
 	    (buf[3] & RESERVED)) {
 		DBG_FLT("binfmt_flat: unknown flags?\n");
-		return -ENOEXEC;
+		goto out_free_buf;
 	}
 
 	ret = 10;
@@ -232,7 +235,7 @@ static int decompress_exec(
 		ret += 2 + buf[10] + (buf[11] << 8);
 		if (unlikely(LBUFSIZE == ret)) {
 			DBG_FLT("binfmt_flat: buffer overflow (EXTRA)?\n");
-			return -ENOEXEC;
+			goto out_free_buf;
 		}
 	}
 	if (buf[3] & ORIG_NAME) {
@@ -240,7 +243,7 @@ static int decompress_exec(
 			;
 		if (unlikely(LBUFSIZE == ret)) {
 			DBG_FLT("binfmt_flat: buffer overflow (ORIG_NAME)?\n");
-			return -ENOEXEC;
+			goto out_free_buf;
 		}
 	}
 	if (buf[3] & COMMENT) {
@@ -248,7 +251,7 @@ static int decompress_exec(
 			;
 		if (unlikely(LBUFSIZE == ret)) {
 			DBG_FLT("binfmt_flat: buffer overflow (COMMENT)?\n");
-			return -ENOEXEC;
+			goto out_free_buf;
 		}
 	}
 
@@ -261,7 +264,7 @@ static int decompress_exec(
 
 	if (zlib_inflateInit2(&strm, -MAX_WBITS) != Z_OK) {
 		DBG_FLT("binfmt_flat: zlib init failed?\n");
-		return -ENOEXEC;
+		goto out_free_buf;
 	}
 
 	while ((ret = zlib_inflate(&strm, Z_NO_FLUSH)) == Z_OK) {
@@ -280,13 +283,18 @@ static int decompress_exec(
 	if (ret < 0) {
 		DBG_FLT("binfmt_flat: decompression failed (%d), %s\n",
 			ret, strm.msg);
-		return -ENOEXEC;
+		goto out_zlib;
 	}
 
+	retval = 0;
+out_zlib:
 	zlib_inflateEnd(&strm);
+out_free_buf:
 	kfree(buf);
+out_free:
 	kfree(strm.workspace);
-	return 0;
+out:
+	return retval;
 }
 
 #endif /* CONFIG_BINFMT_ZFLAT */

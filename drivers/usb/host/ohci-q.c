@@ -375,7 +375,7 @@ static struct ed *ed_get (
 	if (!(ed = dev->ep [ep])) {
 		struct td	*td;
 
-		ed = ed_alloc (ohci, SLAB_ATOMIC);
+		ed = ed_alloc (ohci, GFP_ATOMIC);
 		if (!ed) {
 			/* out of memory */
 			goto done;
@@ -383,7 +383,7 @@ static struct ed *ed_get (
 		dev->ep [ep] = ed;
 
   		/* dummy td; end of td list for ed */
-		td = td_alloc (ohci, SLAB_ATOMIC);
+		td = td_alloc (ohci, GFP_ATOMIC);
  		if (!td) {
 			/* out of memory */
 			ed_free (ohci, ed);

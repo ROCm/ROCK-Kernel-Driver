@@ -189,16 +189,15 @@ Here's my autoconf.h SOUND section:
 6) How do I configure my card ?
 ************************************************************
 
-You need to edit /etc/modules.conf. Here's mine (edited to show the
+You need to edit /etc/modprobe.conf. Here's mine (edited to show the
 relevant details):
 
   # Sound system
-  alias char-major-14 wavefront
+  alias char-major-14-* wavefront
   alias synth0 wavefront
   alias mixer0 cs4232
   alias audio0 cs4232
-  pre-install wavefront modprobe "-k" "cs4232"
-  post-install wavefront modprobe "-k" "opl3"
+  install wavefront /sbin/modprobe cs4232 && /sbin/modprobe -i wavefront && /sbin/modprobe opl3
   options wavefront io=0x200 irq=9
   options cs4232 synthirq=9 synthio=0x200 io=0x530 irq=5 dma=1 dma2=0
   options opl3 io=0x388

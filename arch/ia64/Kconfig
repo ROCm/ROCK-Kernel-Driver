@@ -245,6 +245,12 @@ config IA64_MCA
 	  Say Y here to enable machine check support for IA-64.  If you're
 	  unsure, answer Y.
 
+config IA64_CYCLONE
+	bool "Support Cyclone(EXA) Time Source"
+	help
+		Say Y here to enable support for IBM EXA Cyclone time source.
+		If you're unsure, answer N.
+
 config PM
 	bool "Power Management support"
 	depends on IA64_GENERIC || IA64_DIG || IA64_HP_ZX1

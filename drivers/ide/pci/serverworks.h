@@ -23,24 +23,6 @@ const char *svwks_bad_ata100[] = {
 
 #define DISPLAY_SVWKS_TIMINGS	1
 
-#if defined(DISPLAY_SVWKS_TIMINGS) && defined(CONFIG_PROC_FS)
-#include <linux/stat.h>
-#include <linux/proc_fs.h>
-
-static u8 svwks_proc;
-
-static int svwks_get_info(char *, char **, off_t, int);
-
-static ide_pci_host_proc_t svwks_procs[] = {
-{
-		.name		= "svwks",
-		.set		= 1,
-		.get_info	= svwks_get_info,
-		.parent		= NULL,
-	},
-};
-#endif  /* defined(DISPLAY_SVWKS_TIMINGS) && defined(CONFIG_PROC_FS) */
-
 static void init_setup_svwks(struct pci_dev *, ide_pci_device_t *);
 static void init_setup_csb6(struct pci_dev *, ide_pci_device_t *);
 static unsigned int init_chipset_svwks(struct pci_dev *, const char *);

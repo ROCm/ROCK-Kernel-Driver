@@ -2539,7 +2539,7 @@ static int selinux_task_getsid(struct task_struct *p)
 	return task_has_perm(current, p, PROCESS__GETSESSION);
 }
 
-static int selinux_task_setgroups(int gidsetsize, gid_t *grouplist)
+static int selinux_task_setgroups(struct group_info *group_info)
 {
 	/* See the comment for setuid above. */
 	return 0;

@@ -332,6 +332,10 @@ static int get_eventscan_parms(void)
 		printk(KERN_ERR "rtasd: truncated error log from %d to %d bytes\n", rtas_error_log_max, RTAS_ERROR_LOG_MAX);
 		rtas_error_log_max = RTAS_ERROR_LOG_MAX;
 	}
+
+	/* Make room for the sequence number */
+	rtas_error_log_buffer_max = rtas_error_log_max + sizeof(int);
+
 	of_node_put(node);
 
 	return 0;
@@ -457,9 +461,6 @@ static int __init rtas_init(void)
 
 	if (kernel_thread(rtasd, 0, CLONE_FS) < 0)
 		printk(KERN_ERR "Failed to start RTAS daemon\n");
-
-	/* Make room for the sequence number */
-	rtas_error_log_buffer_max = rtas_error_log_max + sizeof(int);
 
 	return 0;
 }

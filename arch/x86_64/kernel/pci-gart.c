@@ -538,6 +538,7 @@ void pci_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_addr,
 		return;
 	}
 #endif
+
 	if (dma_addr < iommu_bus_base + EMERGENCY_PAGES*PAGE_SIZE || 
 	    dma_addr >= iommu_bus_base + iommu_size)
 		return;

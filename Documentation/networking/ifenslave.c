@@ -89,13 +89,13 @@
  *	   while it is running. It was already set during enslave. To
  *	   simplify things, it is now handeled separately.
  *
- *    - 2003/09/24 - Shmulik Hen <shmulik.hen at intel dot com>
+ *    - 2003/12/01 - Shmulik Hen <shmulik.hen at intel dot com>
  *	 - Code cleanup and style changes
  *	   set version to 1.1.0
  */
 
 #define APP_VERSION	"1.1.0"
-#define APP_RELDATE	"Septemer 24, 2003"
+#define APP_RELDATE	"December 1, 2003"
 #define APP_NAME	"ifenslave"
 
 static char *version =

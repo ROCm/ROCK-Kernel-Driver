@@ -28,6 +28,8 @@
 #include "services.h"
 #include "mls.h"
 
+extern void selnl_notify_policyload(u32 seqno);
+
 static rwlock_t policy_rwlock = RW_LOCK_UNLOCKED;
 #define POLICY_RDLOCK read_lock(&policy_rwlock)
 #define POLICY_WRLOCK write_lock_irq(&policy_rwlock)
@@ -1052,6 +1054,7 @@ int security_load_policy(void *data, size_t len)
 	sidtab_destroy(&oldsidtab);
 
 	avc_ss_reset(seqno);
+	selnl_notify_policyload(seqno);
 
 	return 0;
 

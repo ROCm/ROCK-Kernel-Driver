@@ -70,24 +70,6 @@ struct chipset_bus_clock_list_entry aec6xxx_34_base [] = {
 #define BUSCLOCK(D)	\
 	((struct chipset_bus_clock_list_entry *) pci_get_drvdata((D)))
 
-#if defined(DISPLAY_AEC62XX_TIMINGS) && defined(CONFIG_PROC_FS)
-#include <linux/stat.h>
-#include <linux/proc_fs.h>
-
-static u8 aec62xx_proc;
-
-static int aec62xx_get_info(char *, char **, off_t, int);
-
-static ide_pci_host_proc_t aec62xx_procs[] = {
-	{
-		.name		= "aec62xx",
-		.set		= 1,
-		.get_info	= aec62xx_get_info,
-		.parent		= NULL,
-	},
-};
-#endif /* DISPLAY_AEC62XX_TIMINGS && CONFIG_PROC_FS */
-
 static void init_setup_aec6x80(struct pci_dev *, ide_pci_device_t *);
 static void init_setup_aec62xx(struct pci_dev *, ide_pci_device_t *);
 static unsigned int init_chipset_aec62xx(struct pci_dev *, const char *);

@@ -325,6 +325,7 @@ int cache_clean(void)
 	
 	if (current_detail && current_index < current_detail->hash_size) {
 		struct cache_head *ch, **cp;
+		struct cache_detail *d;
 		
 		write_lock(&current_detail->hash_lock);
 
@@ -354,12 +355,14 @@ int cache_clean(void)
 			rv = 1;
 		}
 		write_unlock(&current_detail->hash_lock);
-		if (ch)
-			current_detail->cache_put(ch, current_detail);
-		else
+		d = current_detail;
+		if (!ch)
 			current_index ++;
-	}
-	spin_unlock(&cache_list_lock);
+		spin_unlock(&cache_list_lock);
+		if (ch)
+			d->cache_put(ch, d);
+	} else
+		spin_unlock(&cache_list_lock);
 
 	return rv;
 }

@@ -162,7 +162,7 @@ modprobe opl3sa2 io=0x370 mss_io=0x530 mpu_io=0x330 irq=5 dma=0 dma2=1
 modprobe opl3 io=0x388
 
 See the section "Automatic Module Loading" below for how to set up
-/etc/modules.conf to automate this.
+/etc/modprobe.conf to automate this.
 
 An important thing to remember that the opl3sa2 module's io argument is
 for it's own control port, which handles the card's master mixer for
@@ -196,7 +196,7 @@ Automatic Module Loading
 
 Lastly, if you're using modules and want to set up automatic module
 loading with kmod, the kernel module loader, here is the section I
-currently use in my modules.conf file:
+currently use in my modprobe.conf file:
 
 # Sound
 alias sound-slot-0 opl3sa2

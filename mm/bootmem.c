@@ -91,8 +91,11 @@ static void __init reserve_bootmem_core(bootmem_data_t *bdata, unsigned long add
 	if (end > bdata->node_low_pfn)
 		BUG();
 	for (i = sidx; i < eidx; i++)
-		if (test_and_set_bit(i, bdata->node_bootmem_map))
+		if (test_and_set_bit(i, bdata->node_bootmem_map)) {
+#ifdef CONFIG_DEBUG_BOOTMEM
 			printk("hm, page %08lx reserved twice.\n", i*PAGE_SIZE);
+#endif
+		}
 }
 
 static void __init free_bootmem_core(bootmem_data_t *bdata, unsigned long addr, unsigned long size)

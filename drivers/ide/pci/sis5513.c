@@ -881,7 +881,7 @@ static unsigned int __init init_chipset_sis5513 (struct pci_dev *dev, const char
 		if (!sis_proc) {
 			sis_proc = 1;
 			bmide_dev = dev;
-			ide_pci_register_host_proc(&sis_procs[0]);
+			ide_pci_create_host_proc("sis", sis_get_info);
 		}
 #endif
 	}

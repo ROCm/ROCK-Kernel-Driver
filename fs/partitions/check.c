@@ -369,7 +369,7 @@ void register_disk(struct gendisk *disk)
 		return;
 
 	bdev = bdget_disk(disk, 0);
-	if (blkdev_get(bdev, FMODE_READ, 0, BDEV_RAW) < 0)
+	if (blkdev_get(bdev, FMODE_READ, 0) < 0)
 		return;
 	state = check_partition(disk, bdev);
 	if (state) {
@@ -387,7 +387,7 @@ void register_disk(struct gendisk *disk)
 		}
 		kfree(state);
 	}
-	blkdev_put(bdev, BDEV_RAW);
+	blkdev_put(bdev);
 }
 
 int rescan_partitions(struct gendisk *disk, struct block_device *bdev)

@@ -39,7 +39,7 @@ are automatically detected.
 KMod
 ----
 
-If you use kmod, you will find it useful to edit /etc/modules.conf.
+If you use kmod, you will find it useful to edit /etc/modprobe.conf.
 Here is an example of the lines that need to be added:
 
 	alias parport_lowlevel parport_pc

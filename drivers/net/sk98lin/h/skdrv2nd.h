@@ -2,6 +2,8 @@
  *
  * Name:	skdrv2nd.h
  * Project:	GEnesis, PCI Gigabit Ethernet Adapter
+ * Version:	$Revision: 1.10 $
+ * Date:	$Date: 2003/12/11 16:04:45 $
  * Purpose:	Second header file for driver and all other modules
  *
  ******************************************************************************/
@@ -76,7 +78,13 @@
     /* Marvell (0x11ab) */     \
     } else if (pdev->vendor == 0x11ab) {     \
         /* Gigabit Ethernet Adapter (0x4320) */     \
-        if ((pdev->device == 0x4320)) { \
+        /* Gigabit Ethernet Adapter (0x4360) */     \
+        /* Gigabit Ethernet Adapter (0x4361) */     \
+        /* Belkin (0x5005) */     \
+        if ((pdev->device == 0x4320) || \
+            (pdev->device == 0x4360) || \
+            (pdev->device == 0x4361) || \
+            (pdev->device == 0x5005)) { \
             result = SK_TRUE;     \
         }     \
     /* CNet (0x1371) */     \

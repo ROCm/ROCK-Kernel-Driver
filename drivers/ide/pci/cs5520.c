@@ -196,7 +196,7 @@ static unsigned int __devinit init_chipset_cs5520(struct pci_dev *dev, const cha
 	if (!cs5520_proc) {
 		cs5520_proc = 1;
 		bmide_dev = dev;
-		ide_pci_register_host_proc(&cs5520_procs[0]);
+		ide_pci_create_host_proc("cs5520", cs5520_get_info);
 	}
 #endif /* DISPLAY_CS5520_TIMINGS && CONFIG_PROC_FS */
 	return 0;

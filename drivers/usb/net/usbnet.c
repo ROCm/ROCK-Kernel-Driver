@@ -2981,7 +2981,7 @@ static void usbnet_disconnect (struct usb_interface *intf)
 	if (dev->driver_info->unbind)
 		dev->driver_info->unbind (dev, intf);
 
-	kfree(dev->net);
+	free_netdev(dev->net);
 	kfree (dev);
 	usb_put_dev (xdev);
 }
@@ -3111,7 +3111,7 @@ out3:
 	if (info->unbind)
 		info->unbind (dev, udev);
 out2:
-	kfree(net);
+	free_netdev(net);
 out1:
 	kfree(dev);
 out:

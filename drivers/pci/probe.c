@@ -55,7 +55,7 @@ static ssize_t pci_bus_show_cpuaffinity(struct class_device *class_dev, char *bu
 	cpumask_t cpumask = pcibus_to_cpumask((to_pci_bus(class_dev))->number);
 	int ret;
 
-	ret = cpumask_snprintf(buf, PAGE_SIZE, cpumask);
+	ret = cpumask_scnprintf(buf, PAGE_SIZE, cpumask);
 	if (ret < PAGE_SIZE)
 		buf[ret++] = '\n';
 	return ret;

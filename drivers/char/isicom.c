@@ -29,7 +29,7 @@
  *	You can find the original tools for this direct from Multitech
  *		ftp://ftp.multitech.com/ISI-Cards/
  *
- *	Having installed the cards the module options (/etc/modules.conf)
+ *	Having installed the cards the module options (/etc/modprobe.conf)
  *
  *	options isicom   io=card1,card2,card3,card4 irq=card1,card2,card3,card4
  *

@@ -24,12 +24,12 @@
 #define	LAPB_DCE		0x04
 
 struct lapb_register_struct {
-	void (*connect_confirmation)(void *token, int reason);
-	void (*connect_indication)(void *token, int reason);
-	void (*disconnect_confirmation)(void *token, int reason);
-	void (*disconnect_indication)(void *token, int reason);
-	int  (*data_indication)(void *token, struct sk_buff *skb);
-	void (*data_transmit)(void *token, struct sk_buff *skb);
+	void (*connect_confirmation)(struct net_device *dev, int reason);
+	void (*connect_indication)(struct net_device *dev, int reason);
+	void (*disconnect_confirmation)(struct net_device *dev, int reason);
+	void (*disconnect_indication)(struct net_device *dev, int reason);
+	int  (*data_indication)(struct net_device *dev, struct sk_buff *skb);
+	void (*data_transmit)(struct net_device *dev, struct sk_buff *skb);
 };
 
 struct lapb_parms_struct {
@@ -44,13 +44,13 @@ struct lapb_parms_struct {
 	unsigned int mode;
 };
 
-extern int lapb_register(void *token, struct lapb_register_struct *callbacks);
-extern int lapb_unregister(void *token);
-extern int lapb_getparms(void *token, struct lapb_parms_struct *parms);
-extern int lapb_setparms(void *token, struct lapb_parms_struct *parms);
-extern int lapb_connect_request(void *token);
-extern int lapb_disconnect_request(void *token);
-extern int lapb_data_request(void *token, struct sk_buff *skb);
-extern int lapb_data_received(void *token, struct sk_buff *skb);
+extern int lapb_register(struct net_device *dev, struct lapb_register_struct *callbacks);
+extern int lapb_unregister(struct net_device *dev);
+extern int lapb_getparms(struct net_device *dev, struct lapb_parms_struct *parms);
+extern int lapb_setparms(struct net_device *dev, struct lapb_parms_struct *parms);
+extern int lapb_connect_request(struct net_device *dev);
+extern int lapb_disconnect_request(struct net_device *dev);
+extern int lapb_data_request(struct net_device *dev, struct sk_buff *skb);
+extern int lapb_data_received(struct net_device *dev, struct sk_buff *skb);
 
 #endif

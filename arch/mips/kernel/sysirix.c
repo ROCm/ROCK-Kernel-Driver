@@ -368,7 +368,7 @@ asmlinkage int irix_syssgi(struct pt_regs *regs)
 			retval = HZ;
 			goto out;
 		case 4:
-			retval = NGROUPS;
+			retval = NGROUPS_MAX;
 			goto out;
 		case 5:
 			retval = NR_OPEN;

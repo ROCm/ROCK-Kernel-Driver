@@ -672,6 +672,10 @@ static int __init am79c961_init(void)
 	dev->base_addr = 0x220;
 	dev->irq = IRQ_EBSA110_ETHERNET;
 
+    	ret = -ENODEV;
+	if (!request_region(dev->base_addr, 0x18, dev->name))
+		goto nodev;
+
 	/*
 	 * Reset the device.
 	 */
@@ -682,14 +686,10 @@ static int __init am79c961_init(void)
 	 * Check the manufacturer part of the
 	 * ether address.
 	 */
-    	ret = -ENODEV;
 	if (inb(dev->base_addr) != 0x08 ||
 	    inb(dev->base_addr + 2) != 0x00 ||
 	    inb(dev->base_addr + 4) != 0x2b)
-	    	goto nodev;
-
-	if (!request_region(dev->base_addr, 0x18, dev->name))
-		goto nodev;
+	    	goto release;
 
 	am79c961_banner();
 	printk(KERN_INFO "%s: ether address ", dev->name);

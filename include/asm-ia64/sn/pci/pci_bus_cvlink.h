@@ -31,22 +31,26 @@
 #define MAX_PCI_XWIDGET 256
 #define MAX_ATE_MAPS 1024
 
+#define SN_DEVICE_SYSDATA(dev) \
+	((struct sn_device_sysdata *) \
+	(((struct pci_controller *) ((dev)->sysdata))->platform_data))
+
 #define IS_PCI32G(dev)	((dev)->dma_mask >= 0xffffffff)
 #define IS_PCI32L(dev)	((dev)->dma_mask < 0xffffffff)
 
 #define PCIDEV_VERTEX(pci_dev) \
-	(((struct sn_device_sysdata *)((pci_dev)->sysdata))->vhdl)
-
-#define PCIBUS_VERTEX(pci_bus) \
-	(((struct sn_widget_sysdata *)((pci_bus)->sysdata))->vhdl)
+	((SN_DEVICE_SYSDATA(pci_dev))->vhdl)
 
 struct sn_widget_sysdata {
         vertex_hdl_t  vhdl;
 };
 
 struct sn_device_sysdata {
-        vertex_hdl_t  vhdl;
+        vertex_hdl_t		vhdl;
 	pciio_provider_t	*pci_provider;
+	pciio_intr_t		intr_handle;
+	struct sn_flush_device_list *dma_flush_list;
+        pciio_piomap_t		pio_map[PCI_ROM_RESOURCE];
 };
 
 struct ioports_to_tlbs_s {

@@ -25,6 +25,7 @@
 #define FTDI_VID	0x0403	/* Vendor Id */
 #define FTDI_SIO_PID	0x8372	/* Product Id SIO application of 8U100AX  */
 #define FTDI_8U232AM_PID 0x6001 /* Similar device to SIO above */
+#define FTDI_8U232AM_ALT_PID 0x6006 /* FTDI's alternate PID for above */
 #define FTDI_RELAIS_PID	0xFA10  /* Relais device from Rudolf Gugler */
 #define FTDI_NF_RIC_VID	0x0DCD	/* Vendor Id */
 #define FTDI_NF_RIC_PID	0x0001	/* Product Id */
@@ -131,6 +132,9 @@
 /* USB-UIRT - An infrared receiver and transmitter using the 8U232AM chip */
 /* http://home.earthlink.net/~jrhees/USBUIRT/index.htm */
 #define FTDI_USB_UIRT_PID	0xF850	/* Product Id */
+
+/* ELV USB Module UO100 (PID sent by Stefan Frings) */
+#define FTDI_ELV_UO100_PID	0xFB58	/* Product Id */
 
 /*
  * Definitions for ID TECH (www.idt-net.com) devices

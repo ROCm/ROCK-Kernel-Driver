@@ -188,22 +188,107 @@ static void __devinit pci_fixup_transparent_bridge(struct pci_dev *dev)
 }
 
 struct pci_fixup pcibios_fixups[] = {
-	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82451NX,	pci_fixup_i450nx },
-	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82454GX,	pci_fixup_i450gx },
-	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_UMC,	PCI_DEVICE_ID_UMC_UM8886BF,	pci_fixup_umc_ide },
-	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_SI,	PCI_DEVICE_ID_SI_5513,		pci_fixup_ide_trash },
-	{ PCI_FIXUP_HEADER,	PCI_ANY_ID,		PCI_ANY_ID,			pci_fixup_ide_bases },
-	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_SI,	PCI_DEVICE_ID_SI_5597,		pci_fixup_latency },
-	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_SI,	PCI_DEVICE_ID_SI_5598,		pci_fixup_latency },
- 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82371AB_3,	pci_fixup_piix4_acpi },
- 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82801CA_10,	pci_fixup_ide_trash },
- 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82801CA_11,	pci_fixup_ide_trash },
- 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82801DB_9,	pci_fixup_ide_trash },
-	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_8363_0,	pci_fixup_via_northbridge_bug },
-	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_8622,	        pci_fixup_via_northbridge_bug },
-	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_8361,	        pci_fixup_via_northbridge_bug },
-	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_8367_0,	pci_fixup_via_northbridge_bug },
-	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_NCR,	PCI_DEVICE_ID_NCR_53C810,	pci_fixup_ncr53c810 },
-	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_ANY_ID,			pci_fixup_transparent_bridge },
-	{ 0 }
+	{
+		.pass		= PCI_FIXUP_HEADER,
+		.vendor		= PCI_VENDOR_ID_INTEL,
+		.device		= PCI_DEVICE_ID_INTEL_82451NX,
+		.hook		= pci_fixup_i450nx
+	},
+	{
+		.pass		= PCI_FIXUP_HEADER,
+		.vendor		= PCI_VENDOR_ID_INTEL,
+		.device		= PCI_DEVICE_ID_INTEL_82454GX,
+		.hook		= pci_fixup_i450gx
+	},
+	{
+		.pass		= PCI_FIXUP_HEADER,
+		.vendor		= PCI_VENDOR_ID_UMC,
+		.device		= PCI_DEVICE_ID_UMC_UM8886BF,
+		.hook		= pci_fixup_umc_ide
+	},
+	{
+		.pass		= PCI_FIXUP_HEADER,
+		.vendor		= PCI_VENDOR_ID_SI,
+		.device		= PCI_DEVICE_ID_SI_5513,
+		.hook		= pci_fixup_ide_trash
+	},
+	{
+		.pass		= PCI_FIXUP_HEADER,
+		.vendor		= PCI_ANY_ID,
+		.device		= PCI_ANY_ID,
+		.hook		= pci_fixup_ide_bases
+	},
+	{
+		.pass		= PCI_FIXUP_HEADER,
+		.vendor		= PCI_VENDOR_ID_SI,
+		.device		= PCI_DEVICE_ID_SI_5597,
+		.hook		= pci_fixup_latency
+	},
+	{
+		.pass		= PCI_FIXUP_HEADER,
+		.vendor		= PCI_VENDOR_ID_SI,
+		.device		= PCI_DEVICE_ID_SI_5598,
+		.hook		= pci_fixup_latency
+	},
+ 	{
+		.pass		= PCI_FIXUP_HEADER,
+		.vendor		= PCI_VENDOR_ID_INTEL,
+		.device		= PCI_DEVICE_ID_INTEL_82371AB_3,
+		.hook		= pci_fixup_piix4_acpi
+	},
+ 	{
+		.pass		= PCI_FIXUP_HEADER,
+		.vendor		= PCI_VENDOR_ID_INTEL,
+		.device		= PCI_DEVICE_ID_INTEL_82801CA_10,
+		.hook		= pci_fixup_ide_trash
+	},
+ 	{
+		.pass		= PCI_FIXUP_HEADER,
+		.vendor		= PCI_VENDOR_ID_INTEL,
+		.device		= PCI_DEVICE_ID_INTEL_82801CA_11,
+		.hook		= pci_fixup_ide_trash
+	},
+ 	{
+		.pass		= PCI_FIXUP_HEADER,
+		.vendor		= PCI_VENDOR_ID_INTEL,
+		.device		= PCI_DEVICE_ID_INTEL_82801DB_9,
+		.hook		= pci_fixup_ide_trash
+	},
+	{
+		.pass		= PCI_FIXUP_HEADER,
+		.vendor		= PCI_VENDOR_ID_VIA,
+		.device		= PCI_DEVICE_ID_VIA_8363_0,
+		.hook		= pci_fixup_via_northbridge_bug
+	},
+	{
+		.pass		= PCI_FIXUP_HEADER,
+		.vendor		= PCI_VENDOR_ID_VIA,
+		.device		= PCI_DEVICE_ID_VIA_8622,
+		.hook		= pci_fixup_via_northbridge_bug
+	},
+	{
+		.pass		= PCI_FIXUP_HEADER,
+		.vendor		= PCI_VENDOR_ID_VIA,
+		.device		= PCI_DEVICE_ID_VIA_8361,
+		.hook		= pci_fixup_via_northbridge_bug
+	},
+	{
+		.pass		= PCI_FIXUP_HEADER,
+		.vendor		= PCI_VENDOR_ID_VIA,
+		.device		= PCI_DEVICE_ID_VIA_8367_0,
+		.hook		= pci_fixup_via_northbridge_bug
+	},
+	{
+		.pass		= PCI_FIXUP_HEADER,
+		.vendor		= PCI_VENDOR_ID_NCR,
+		.device		= PCI_DEVICE_ID_NCR_53C810,
+		.hook		= pci_fixup_ncr53c810
+	},
+	{
+		.pass		= PCI_FIXUP_HEADER,
+		.vendor		= PCI_VENDOR_ID_INTEL,
+		.device		= PCI_ANY_ID,
+		.hook		= pci_fixup_transparent_bridge
+	},
+	{ .pass = 0 }
 };

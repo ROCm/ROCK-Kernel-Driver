@@ -220,7 +220,7 @@ static unsigned int __init longrun_determine_freqs(unsigned int *low_freq,
 }
 
 
-static int longrun_cpu_init(struct cpufreq_policy *policy)
+static int __init longrun_cpu_init(struct cpufreq_policy *policy)
 {
 	int                     result = 0;
 

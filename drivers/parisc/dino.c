@@ -475,7 +475,7 @@ dino_card_setup(struct pci_bus *bus, unsigned long base_addr)
 
 	res = &dino_dev->hba.lmmio_space;
 	res->flags = IORESOURCE_MEM;
-	size = snprintf(name, sizeof(name), "Dino LMMIO (%s)", bus->bridge->bus_id);
+	size = scnprintf(name, sizeof(name), "Dino LMMIO (%s)", bus->bridge->bus_id);
 	res->name = kmalloc(size+1, GFP_KERNEL);
 	if(res->name)
 		strcpy((char *)res->name, name);

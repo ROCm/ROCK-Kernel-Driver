@@ -360,7 +360,7 @@ lcs_cleanup_card(struct lcs_card *card)
 		kfree(ipm_list);
 	}
 #endif
-	kfree(card->dev);
+	free_netdev(card->dev);
 	/* Cleanup channels. */
 	lcs_cleanup_channel(&card->write);
 	lcs_cleanup_channel(&card->read);
@@ -1858,8 +1858,7 @@ lcs_new_device(struct ccwgroup_device *ccwgdev)
 	lcs_stopcard(card);
 	return 0;
 out:
-	lcs_cleanup_channel(&card->read);
-	lcs_cleanup_channel(&card->write);
+	lcs_cleanup_card(card);
 	lcs_free_card(card);
 	return -ENODEV;
 }

@@ -222,7 +222,7 @@ static int rawv6_bind(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 		}
 		
 		/* ipv4 addr of the socket is invalid.  Only the
-		 * unpecified and mapped address have a v4 equivalent.
+		 * unspecified and mapped address have a v4 equivalent.
 		 */
 		v4addr = LOOPBACK4_IPV6;
 		if (!(addr_type & IPV6_ADDR_MULTICAST))	{
@@ -306,7 +306,7 @@ static inline int rawv6_rcv_skb(struct sock * sk, struct sk_buff * skb)
  *	This is next to useless... 
  *	if we demultiplex in network layer we don't need the extra call
  *	just to queue the skb... 
- *	maybe we could have the network decide uppon a hint if it 
+ *	maybe we could have the network decide upon a hint if it 
  *	should call raw_rcv for demultiplexing
  */
 int rawv6_rcv(struct sock *sk, struct sk_buff *skb)
@@ -627,7 +627,7 @@ static int rawv6_sendmsg(struct kiocb *iocb, struct sock *sk,
 
 	if (ipv6_addr_any(daddr)) {
 		/* 
-		 * unspecfied destination address 
+		 * unspecified destination address 
 		 * treated as error... is this correct ?
 		 */
 		fl6_sock_release(flowlabel);

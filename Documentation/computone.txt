@@ -41,11 +41,11 @@ Hardware - If you have an ISA card, find a free interrupt and io port.
 
 	Note the hardware address from the Computone ISA cards installed into
 		the system.  These are required for editing ip2.c or editing
-		/etc/modules.conf, or for specification on the modprobe
+		/etc/modprobe.conf, or for specification on the modprobe
 		command line.
 
-	Note that the /etc/modules.conf file is named /etc/conf.modules
-		with older versions of the module utilities.
+	Note that the /etc/modules.conf should be used for older (pre-2.6)
+		kernels.
 
 Software -
 
@@ -58,7 +58,7 @@ b) Run "make config" or "make menuconfig" or "make xconfig"
 c) Set address on ISA cards then:
    edit /usr/src/linux/drivers/char/ip2.c if needed 
 	or
-   edit /etc/modules.conf if needed (module).
+   edit /etc/modprobe.conf if needed (module).
 	or both to match this setting.
 d) Run "make modules"
 e) Run "make modules_install"
@@ -145,11 +145,11 @@ the irqs are not specified the driver uses the default in ip2.c (which
 selects polled mode). If no base addresses are specified the defaults in 
 ip2.c are used. If you are autoloading the driver module with kerneld or
 kmod the base addresses and interrupt number must also be set in ip2.c
-and recompile or just insert and options line in /etc/modules.conf or both. 
+and recompile or just insert and options line in /etc/modprobe.conf or both.
 The options line is equivalent to the command line and takes precidence over 
 what is in ip2.c. 
 
-/etc/modules.conf sample:
+/etc/modprobe.conf sample:
 	options ip2 io=1,0x328 irq=1,10
 	alias char-major-71 ip2
 	alias char-major-72 ip2

@@ -198,12 +198,11 @@ drivers can always be compiled as loadable modules, the chipset drivers
 can only be compiled into the kernel, and the core code (ide.c) can be
 compiled as a loadable module provided no chipset support is needed.
 
-When using ide.c/ide-tape.c as modules in combination with kerneld, add:
+When using ide.c as a module in combination with kmod, add:
 
 	alias block-major-3 ide-probe
-	alias char-major-37 ide-tape
 
-respectively to /etc/modules.conf.
+to /etc/modprobe.conf.
 
 When ide.c is used as a module, you can pass command line parameters to the
 driver using the "options=" keyword to insmod, while replacing any ',' with
@@ -231,9 +230,10 @@ Summary of ide driver parameters for kernel command line
  
  "hdx=cyl,head,sect"	: disk drive is present, with specified geometry
 
- "hdx=remap"		: remap access of sector 0 to sector 1 (for EZD)
+ "hdx=remap"		: remap access of sector 0 to sector 1 (for EZDrive)
 
- "hdx=remap63"		: remap the drive: shift all by 63 sectors (for DM)
+ "hdx=remap63"		: remap the drive: add 63 to all sector numbers
+			  (for DM OnTrack)
  
  "hdx=autotune"		: driver will attempt to tune interface speed
 			  to the fastest PIO mode supported,
@@ -242,16 +242,9 @@ Summary of ide driver parameters for kernel command line
 			  and quite likely to cause trouble with
 			  older/odd IDE drives.
 
- "hdx=slow"		: insert a huge pause after each access to the data
-			  port. Should be used only as a last resort.
-
  "hdx=swapdata"		: when the drive is a disk, byte swap all data
 
  "hdx=bswap"		: same as above..........
-
- "hdx=flash"		: allows for more than one ata_flash disk to be
- 			  registered. In most cases, only one device
- 			  will be present.
 
  "hdx=scsi"		: the return of the ide-scsi flag, this is useful for
  			  allowing ide-floppy, ide-tape, and ide-cdrom|writers

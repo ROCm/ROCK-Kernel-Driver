@@ -550,7 +550,7 @@ static void free_device(struct blkmtd_dev *dev)
 
 		if(dev->blkdev) {
 			invalidate_inode_pages(dev->blkdev->bd_inode->i_mapping);
-			close_bdev_excl(dev->blkdev, BDEV_RAW);
+			close_bdev_excl(dev->blkdev);
 		}
 		kfree(dev);
 	}
@@ -637,10 +637,10 @@ static struct blkmtd_dev *add_device(char *devname, int readonly, int erase_size
 
 #ifdef MODULE
 	mode = (readonly) ? O_RDONLY : O_RDWR;
-	bdev = open_bdev_excl(devname, mode, BDEV_RAW, NULL);
+	bdev = open_bdev_excl(devname, mode, NULL);
 #else
 	mode = (readonly) ? FMODE_READ : FMODE_WRITE;
-	bdev = open_by_devnum(name_to_dev_t(devname), mode, BDEV_RAW);
+	bdev = open_by_devnum(name_to_dev_t(devname), mode);
 #endif
 	if(IS_ERR(bdev)) {
 		err("error: cannot open device %s", devname);
@@ -653,13 +653,13 @@ static struct blkmtd_dev *add_device(char *devname, int readonly, int erase_size
 
 	if(MAJOR(bdev->bd_dev) == MTD_BLOCK_MAJOR) {
 		err("attempting to use an MTD device as a block device");
-		blkdev_put(bdev, BDEV_RAW);
+		blkdev_put(bdev);
 		return NULL;
 	}
 
 	dev = kmalloc(sizeof(struct blkmtd_dev), GFP_KERNEL);
 	if(dev == NULL) {
-		blkdev_put(bdev, BDEV_RAW);
+		blkdev_put(bdev);
 		return NULL;
 	}
 

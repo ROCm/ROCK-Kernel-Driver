@@ -48,12 +48,14 @@ config EARLY_PRINTK
 	bool
 	default y
 	help
-	  Write kernel log output directly into the VGA buffer. This is useful
-	  for kernel debugging when your machine crashes very early before
-	  the console code is initialized. For normal operation it is not
-	  recommended because it looks ugly and doesn't cooperate with 
-	  klogd/syslogd or the X server. You should normally N here, unless
-	  you want to debug such a crash.
+	  Write kernel log output directly into the VGA buffer or to a serial
+	  port.
+
+	  This is useful for kernel debugging when your machine crashes very
+	  early before the console code is initialized. For normal operation
+	  it is not recommended because it looks ugly and doesn't cooperate
+	  with klogd/syslogd or the X server. You should normally N here,
+	  unless you want to debug such a crash.
 	  
 config HPET_TIMER
 	bool

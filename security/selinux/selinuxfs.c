@@ -17,6 +17,8 @@
 #include "security.h"
 #include "objsec.h"
 
+extern void selnl_notify_setenforce(int val);
+
 /* Check whether a task is allowed to use a security operation. */
 int task_has_security(struct task_struct *tsk,
 		      u32 perms)
@@ -54,7 +56,7 @@ static ssize_t sel_read_enforce(struct file *filp, char *buf,
 		return -ENOMEM;
 	memset(page, 0, PAGE_SIZE);
 
-	length = snprintf(page, PAGE_SIZE, "%d", selinux_enforcing);
+	length = scnprintf(page, PAGE_SIZE, "%d", selinux_enforcing);
 	if (length < 0) {
 		free_page((unsigned long)page);
 		return length;
@@ -111,6 +113,7 @@ static ssize_t sel_write_enforce(struct file * file, const char * buf,
 		selinux_enforcing = new_value;
 		if (selinux_enforcing)
 			avc_ss_reset(0);
+		selnl_notify_setenforce(selinux_enforcing);
 	}
 	length = count;
 out:
@@ -139,7 +142,7 @@ static ssize_t sel_read_policyvers(struct file *filp, char *buf,
 		return -ENOMEM;
 	memset(page, 0, PAGE_SIZE);
 
-	length = snprintf(page, PAGE_SIZE, "%u", POLICYDB_VERSION);
+	length = scnprintf(page, PAGE_SIZE, "%u", POLICYDB_VERSION);
 	if (length < 0) {
 		free_page((unsigned long)page);
 		return length;
@@ -404,7 +407,7 @@ static ssize_t sel_write_access(struct file * file, char *buf, size_t size)
 	if (length < 0)
 		goto out2;
 
-	length = snprintf(buf, PAYLOAD_SIZE, "%x %x %x %x %u",
+	length = scnprintf(buf, PAYLOAD_SIZE, "%x %x %x %x %u",
 			  avd.allowed, avd.decided,
 			  avd.auditallow, avd.auditdeny,
 			  avd.seqno);

@@ -168,11 +168,19 @@ resubmit:
 		
 		smp_read_barrier_depends();
 		if (ipprot->flags & INET6_PROTO_FINAL) {
+			struct ipv6hdr *hdr;	
+
 			if (!cksum_sub && skb->ip_summed == CHECKSUM_HW) {
 				skb->csum = csum_sub(skb->csum,
 						     csum_partial(skb->nh.raw, skb->h.raw-skb->nh.raw, 0));
 				cksum_sub++;
 			}
+			hdr = skb->nh.ipv6h;
+			if (ipv6_addr_is_multicast(&hdr->daddr) &&
+			    !ipv6_chk_mcast_addr(skb->dev, &hdr->daddr,
+			    &hdr->saddr) &&
+			    !ipv6_is_mld(skb, nexthdr))
+				goto discard;
 		}
 		if (!(ipprot->flags & INET6_PROTO_NOPOLICY) &&
 		    !xfrm6_policy_check(NULL, XFRM_POLICY_IN, skb)) 
@@ -211,15 +219,14 @@ int ip6_input(struct sk_buff *skb)
 
 int ip6_mc_input(struct sk_buff *skb)
 {
-	struct ipv6hdr *hdr;	
-	int deliver = 0;
-	int discard = 1;
+	struct ipv6hdr *hdr;
+	int deliver;
 
 	IP6_INC_STATS_BH(Ip6InMcastPkts);
 
 	hdr = skb->nh.ipv6h;
-	if (ipv6_chk_mcast_addr(skb->dev, &hdr->daddr, &hdr->saddr))
-		deliver = 1;
+	deliver = likely(!(skb->dev->flags & (IFF_PROMISC|IFF_ALLMULTI))) ||
+	    ipv6_chk_mcast_addr(skb->dev, &hdr->daddr, NULL);
 
 	/*
 	 *	IPv6 multicast router mode isnt currently supported.
@@ -238,23 +245,21 @@ int ip6_mc_input(struct sk_buff *skb)
 			
 			if (deliver) {
 				skb2 = skb_clone(skb, GFP_ATOMIC);
+				dst_output(skb2);
 			} else {
-				discard = 0;
-				skb2 = skb;
+				dst_output(skb);
+				return 0;
 			}
-
-			dst_output(skb2);
 		}
 	}
 #endif
 
-	if (deliver) {
-		discard = 0;
+	if (likely(deliver)) {
 		ip6_input(skb);
+		return 0;
 	}
-
-	if (discard)
-		kfree_skb(skb);
+	/* discard */
+	kfree_skb(skb);
 
 	return 0;
 }

@@ -37,7 +37,7 @@ extern int dn_nsp_rx(struct sk_buff *);
 extern int dn_nsp_backlog_rcv(struct sock *sk, struct sk_buff *skb);
 
 extern struct sk_buff *dn_alloc_skb(struct sock *sk, int size, int pri);
-extern struct sk_buff *dn_alloc_send_skb(struct sock *sk, int *size, int noblock, int *err);
+extern struct sk_buff *dn_alloc_send_skb(struct sock *sk, size_t *size, int noblock, int *err);
 
 #define NSP_REASON_OK 0		/* No error */
 #define NSP_REASON_NR 1		/* No resources */

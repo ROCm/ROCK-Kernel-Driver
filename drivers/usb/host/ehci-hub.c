@@ -113,7 +113,7 @@ ehci_hub_descriptor (
 	u16		temp;
 
 	desc->bDescriptorType = 0x29;
-	desc->bPwrOn2PwrGood = 10;	/* FIXME: f(system power) */
+	desc->bPwrOn2PwrGood = 10;	/* ehci 1.0, 2.3.9 says 20ms max */
 	desc->bHubContrCurrent = 0;
 
 	desc->bNbrPorts = ports;

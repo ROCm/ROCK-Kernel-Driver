@@ -574,9 +574,10 @@ int unmap_vmas(struct mmu_gather **tlbp, struct mm_struct *mm,
 			if ((long)zap_bytes > 0)
 				continue;
 			if (need_resched()) {
+				int fullmm = tlb_is_full_mm(*tlbp);
 				tlb_finish_mmu(*tlbp, tlb_start, start);
 				cond_resched_lock(&mm->page_table_lock);
-				*tlbp = tlb_gather_mmu(mm, 0);
+				*tlbp = tlb_gather_mmu(mm, fullmm);
 				tlb_start_valid = 0;
 			}
 			zap_bytes = ZAP_BLOCK_SIZE;
@@ -747,7 +748,8 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 		spin_lock(&mm->page_table_lock);
 		do {
 			struct page *map;
-			while (!(map = follow_page(mm, start, write))) {
+			int lookup_write = write;
+			while (!(map = follow_page(mm, start, lookup_write))) {
 				spin_unlock(&mm->page_table_lock);
 				switch (handle_mm_fault(mm,vma,start,write)) {
 				case VM_FAULT_MINOR:
@@ -763,6 +765,14 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 				default:
 					BUG();
 				}
+				/*
+				 * Now that we have performed a write fault
+				 * and surely no longer have a shared page we
+				 * shouldn't write, we shouldn't ignore an
+				 * unwritable page in the page table if
+				 * we are forcing write access.
+				 */
+				lookup_write = write && !force;
 				spin_lock(&mm->page_table_lock);
 			}
 			if (pages) {
@@ -952,6 +962,19 @@ int remap_page_range(struct vm_area_struct *vma, unsigned long from, unsigned lo
 EXPORT_SYMBOL(remap_page_range);
 
 /*
+ * Do pte_mkwrite, but only if the vma says VM_WRITE.  We do this when
+ * servicing faults for write access.  In the normal case, do always want
+ * pte_mkwrite.  But get_user_pages can cause write faults for mappings
+ * that do not have writing enabled, when used by access_process_vm.
+ */
+static inline pte_t maybe_mkwrite(pte_t pte, struct vm_area_struct *vma)
+{
+	if (likely(vma->vm_flags & VM_WRITE))
+		pte = pte_mkwrite(pte);
+	return pte;
+}
+
+/*
  * We hold the mm semaphore for reading and vma->vm_mm->page_table_lock
  */
 static inline void break_cow(struct vm_area_struct * vma, struct page * new_page, unsigned long address, 
@@ -960,7 +983,8 @@ static inline void break_cow(struct vm_area_struct * vma, struct page * new_page
 	pte_t entry;
 
 	flush_cache_page(vma, address);
-	entry = pte_mkwrite(pte_mkdirty(mk_pte(new_page, vma->vm_page_prot)));
+	entry = maybe_mkwrite(pte_mkdirty(mk_pte(new_page, vma->vm_page_prot)),
+			      vma);
 	ptep_establish(vma, address, page_table, entry);
 	update_mmu_cache(vma, address, entry);
 }
@@ -1012,7 +1036,8 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 		unlock_page(old_page);
 		if (reuse) {
 			flush_cache_page(vma, address);
-			entry = pte_mkyoung(pte_mkdirty(pte_mkwrite(pte)));
+			entry = maybe_mkwrite(pte_mkyoung(pte_mkdirty(pte)),
+					      vma);
 			ptep_establish(vma, address, page_table, entry);
 			update_mmu_cache(vma, address, entry);
 			pte_unmap(page_table);
@@ -1251,7 +1276,7 @@ static int do_swap_page(struct mm_struct * mm,
 	mark_page_accessed(page);
 	pte_chain = pte_chain_alloc(GFP_KERNEL);
 	if (!pte_chain) {
-		ret = -ENOMEM;
+		ret = VM_FAULT_OOM;
 		goto out;
 	}
 	lock_page(page);
@@ -1280,7 +1305,7 @@ static int do_swap_page(struct mm_struct * mm,
 	mm->rss++;
 	pte = mk_pte(page, vma->vm_page_prot);
 	if (write_access && can_share_swap_page(page))
-		pte = pte_mkdirty(pte_mkwrite(pte));
+		pte = maybe_mkwrite(pte_mkdirty(pte), vma);
 	unlock_page(page);
 
 	flush_icache_page(vma, page);
@@ -1347,7 +1372,9 @@ do_anonymous_page(struct mm_struct *mm, struct vm_area_struct *vma,
 			goto out;
 		}
 		mm->rss++;
-		entry = pte_mkwrite(pte_mkdirty(mk_pte(page, vma->vm_page_prot)));
+		entry = maybe_mkwrite(pte_mkdirty(mk_pte(page,
+							 vma->vm_page_prot)),
+				      vma);
 		lru_cache_add_active(page);
 		mark_page_accessed(page);
 	}
@@ -1463,7 +1490,7 @@ retry:
 		flush_icache_page(vma, new_page);
 		entry = mk_pte(new_page, vma->vm_page_prot);
 		if (write_access)
-			entry = pte_mkwrite(pte_mkdirty(entry));
+			entry = maybe_mkwrite(pte_mkdirty(entry), vma);
 		set_pte(page_table, entry);
 		pte_chain = page_add_rmap(new_page, page_table, pte_chain);
 		pte_unmap(page_table);

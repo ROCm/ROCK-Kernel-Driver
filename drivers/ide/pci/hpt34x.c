@@ -282,7 +282,7 @@ static unsigned int __init init_chipset_hpt34x (struct pci_dev *dev, const char 
 
 	if (!hpt34x_proc) {
 		hpt34x_proc = 1;
-		ide_pci_register_host_proc(&hpt34x_procs[0]);
+		ide_pci_create_host_proc("hpt34x", hpt34x_get_info);
 	}
 #endif /* DISPLAY_HPT34X_TIMINGS && CONFIG_PROC_FS */
 

@@ -8,7 +8,7 @@
 
 #include <asm/types.h>		/* For __uXX types */
 
-#define IP_VS_VERSION_CODE	0x010108
+#define IP_VS_VERSION_CODE	0x010200
 #define NVERSION(version)			\
 	(version >> 16) & 0xFF,			\
 	(version >> 8) & 0xFF,			\

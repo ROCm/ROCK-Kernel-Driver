@@ -724,7 +724,7 @@ struct ctrl_ctx {
 	int			last;
 };
 
-#define NUM_SUBCASES	13		/* how many test subcases here? */
+#define NUM_SUBCASES	15		/* how many test subcases here? */
 
 struct subcase {
 	struct usb_ctrlrequest	setup;
@@ -952,7 +952,24 @@ test_ctrl_queue (struct usbtest_dev *dev, struct usbtest_param *param)
 			req.wValue = cpu_to_le16 (USB_DT_STRING << 8);
 			// string == 0, for language IDs
 			len = sizeof (struct usb_interface_descriptor);
+			// may succeed when > 4 languages
 			expected = EREMOTEIO;	// or EPIPE, if no strings
+			break;
+		case 13:	// short read, resembling case 10
+			req.wValue = cpu_to_le16 ((USB_DT_CONFIG << 8) | 0);
+			// last data packet "should" be DATA1, not DATA0
+			len = 1024 - udev->epmaxpacketin [0];
+			expected = -EREMOTEIO;
+			break;
+		case 14:	// short read; try to fill the last packet
+			req.wValue = cpu_to_le16 ((USB_DT_DEVICE << 8) | 0);
+			// device descriptor size == 18 bytes 
+			len = udev->epmaxpacketin [0];
+			switch (len) {
+			case 8:		len = 24; break;
+			case 16:	len = 32; break;
+			}
+			expected = -EREMOTEIO;
 			break;
 		default:
 			err ("bogus number of ctrl queue testcases!");

@@ -1161,7 +1161,7 @@ static int udsl_usb_probe (struct usb_interface *intf, const struct usb_device_i
 	buf += i;
 	length -= i;
 
-	i = snprintf (buf, length, " (");
+	i = scnprintf (buf, length, " (");
 	buf += i;
 	length -= i;
 

@@ -637,6 +637,8 @@ extern void scheduling_functions_start_here(void);
 extern void scheduling_functions_end_here(void);
 #define first_sched	((unsigned long) scheduling_functions_start_here)
 #define last_sched	((unsigned long) scheduling_functions_end_here)
+#define top_esp                (THREAD_SIZE - sizeof(unsigned long))
+#define top_ebp                (THREAD_SIZE - 2*sizeof(unsigned long))
 
 unsigned long get_wchan(struct task_struct *p)
 {
@@ -647,12 +649,12 @@ unsigned long get_wchan(struct task_struct *p)
 		return 0;
 	stack_page = (unsigned long)p->thread_info;
 	esp = p->thread.esp;
-	if (!stack_page || esp < stack_page || esp > 8188+stack_page)
+	if (!stack_page || esp < stack_page || esp > top_esp+stack_page)
 		return 0;
 	/* include/asm-i386/system.h:switch_to() pushes ebp last. */
 	ebp = *(unsigned long *) esp;
 	do {
-		if (ebp < stack_page || ebp > 8184+stack_page)
+		if (ebp < stack_page || ebp > top_ebp+stack_page)
 			return 0;
 		eip = *(unsigned long *) (ebp+4);
 		if (eip < first_sched || eip >= last_sched)

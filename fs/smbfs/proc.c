@@ -1015,12 +1015,6 @@ smb_setup_header(struct smb_request *req, __u8 command, __u16 wct, __u16 bcc)
 	p += 19;
 	p += 8;
 
-	/* FIXME: the request will fail if the 'tid' is changed. This
-	   should perhaps be set just before transmitting ... */
-	WSET(req->rq_header, smb_tid, server->opt.tid);
-	WSET(req->rq_header, smb_pid, 1);
-	WSET(req->rq_header, smb_uid, server->opt.server_uid);
-
 	if (server->opt.protocol > SMB_PROTOCOL_CORE) {
 		int flags = SMB_FLAGS_CASELESS_PATHNAMES;
 		int flags2 = SMB_FLAGS2_LONG_PATH_COMPONENTS |

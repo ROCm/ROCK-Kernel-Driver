@@ -149,7 +149,7 @@ static int setup_btree_index(unsigned int l, struct dm_table *t)
 	return 0;
 }
 
-static void *dm_vcalloc(unsigned long nmemb, unsigned long elem_size)
+void *dm_vcalloc(unsigned long nmemb, unsigned long elem_size)
 {
 	unsigned long size;
 	void *addr;
@@ -205,7 +205,7 @@ static int alloc_targets(struct dm_table *t, unsigned int num)
 
 int dm_table_create(struct dm_table **result, int mode, unsigned num_targets)
 {
-	struct dm_table *t = kmalloc(sizeof(*t), GFP_NOIO);
+	struct dm_table *t = kmalloc(sizeof(*t), GFP_KERNEL);
 
 	if (!t)
 		return -ENOMEM;
@@ -353,12 +353,12 @@ static int open_dev(struct dm_dev *d, dev_t dev)
 	if (d->bdev)
 		BUG();
 
-	bdev = open_by_devnum(dev, d->mode, BDEV_RAW);
+	bdev = open_by_devnum(dev, d->mode);
 	if (IS_ERR(bdev))
 		return PTR_ERR(bdev);
 	r = bd_claim(bdev, _claim_ptr);
 	if (r)
-		blkdev_put(bdev, BDEV_RAW);
+		blkdev_put(bdev);
 	else
 		d->bdev = bdev;
 	return r;
@@ -373,7 +373,7 @@ static void close_dev(struct dm_dev *d)
 		return;
 
 	bd_release(d->bdev);
-	blkdev_put(d->bdev, BDEV_RAW);
+	blkdev_put(d->bdev);
 	d->bdev = NULL;
 }
 
@@ -655,6 +655,11 @@ int dm_table_add_target(struct dm_table *t, const char *type,
 	memset(tgt, 0, sizeof(*tgt));
 	set_default_limits(&tgt->limits);
 
+	if (!len) {
+		tgt->error = "zero-length target";
+		return -EINVAL;
+	}
+
 	tgt->type = dm_get_target_type(type);
 	if (!tgt->type) {
 		tgt->error = "unknown target type";
@@ -858,6 +863,7 @@ void dm_table_resume_targets(struct dm_table *t)
 }
 
 
+EXPORT_SYMBOL(dm_vcalloc);
 EXPORT_SYMBOL(dm_get_device);
 EXPORT_SYMBOL(dm_put_device);
 EXPORT_SYMBOL(dm_table_event);

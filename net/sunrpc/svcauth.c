@@ -150,7 +150,13 @@ DefineCacheLookup(struct auth_domain,
 		  &auth_domain_cache,
 		  auth_domain_hash(item),
 		  auth_domain_match(tmp, item),
-		  kfree(new); if(!set) return NULL;
+		  kfree(new); if(!set) {
+			if (new)
+				write_unlock(&auth_domain_cache.hash_lock);
+			else
+				read_unlock(&auth_domain_cache.hash_lock);
+			return NULL;
+		  }
 		  new=item; atomic_inc(&new->h.refcnt),
 		  /* no update */,
 		  0 /* no inplace updates */

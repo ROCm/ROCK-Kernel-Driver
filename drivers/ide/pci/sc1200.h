@@ -7,24 +7,6 @@
 
 #define DISPLAY_SC1200_TIMINGS
 
-#if defined(DISPLAY_SC1200_TIMINGS) && defined(CONFIG_PROC_FS)
-#include <linux/stat.h>
-#include <linux/proc_fs.h>
-
-static u8 sc1200_proc;
-
-static int sc1200_get_info(char *, char **, off_t, int);
-
-static ide_pci_host_proc_t sc1200_procs[] = {
-	{
-		.name		= "sc1200",
-		.set		= 1,
-		.get_info	= sc1200_get_info,
-		.parent		= NULL,
-	},
-};
-#endif /* DISPLAY_SC1200_TIMINGS && CONFIG_PROC_FS */
-
 static unsigned int init_chipset_sc1200(struct pci_dev *, const char *);
 static void init_hwif_sc1200(ide_hwif_t *);
 

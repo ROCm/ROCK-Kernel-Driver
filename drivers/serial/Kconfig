@@ -256,6 +256,27 @@ config SERIAL_CLPS711X_OLD_NAME
 	help
 	  ::: To be written :::
 
+config SERIAL_DZ
+	bool "DECstation DZ serial driver"
+	depends on DECSTATION
+	select SERIAL_CORE
+	help
+	  DZ11-family serial controllers for VAXstations, including the
+	  DC7085, M7814, and M7819.
+
+config SERIAL_DZ_CONSOLE
+	bool "Support console on DECstation DZ serial driver"
+	depends on SERIAL_DZ=y
+	select SERIAL_CORE_CONSOLE
+	help
+	  If you say Y here, it will be possible to use a serial port as the
+	  system console (the system console is the device which receives all
+	  kernel messages and warnings and which allows logins in single user
+	  mode).  Note that the firmware uses ttyS0 as the serial console on
+	  the Maxine and ttyS2 on the others.
+
+	  If unsure, say Y.
+
 config SERIAL_21285
 	tristate "DC21285 serial port support"
 	depends on ARM && FOOTBRIDGE
@@ -422,6 +443,20 @@ config SERIAL_SUNSAB_CONSOLE
 	  on your Sparc system as the console, you can do so by answering
 	  Y to this option.
 
+config SERIAL_IP22_ZILOG
+	tristate "IP22 Zilog8530 serial support"
+	depends on SGI_IP22
+	select SERIAL_CORE
+	help
+	  This driver supports the Zilog8530 serial ports found on SGI IP22
+	  systems.  Say Y or M if you want to be able to these serial ports.
+
+config SERIAL_IP22_ZILOG_CONSOLE
+	bool "Console on IP22 Zilog8530 serial port"
+	depends on SERIAL_IP22_ZILOG=y
+	select SERIAL_CORE_CONSOLE
+	help
+
 config V850E_UART
 	bool "NEC V850E on-chip UART support"
 	depends on V850E_MA1 || V850E_ME2 || V850E_TEG || V850E2_ANNA || V850E_AS85EP1
@@ -450,6 +485,22 @@ config SERIAL98_CONSOLE
         bool "Support for console on PC-9800 standard serial port"
         depends on SERIAL98=y
 	select SERIAL_CORE_CONSOLE
+
+config SERIAL_AU1X00
+	bool "Enable Au1x00 UART Support"
+	depends on MIPS && SOC_AU1X00
+	select SERIAL_CORE
+	help
+	  If you have an Alchemy AU1X00 processor (MIPS based) and you want
+	  to use serial ports, say Y.  Otherwise, say N.
+
+config SERIAL_AU1X00_CONSOLE
+	bool "Enable Au1x00 serial console"
+	depends on SERIAL_AU1X00
+	select SERIAL_CORE_CONSOLE
+	help
+	  If you have an Alchemy AU1X00 processor (MIPS based) and you want
+	  to use a console on a serial port, say Y.  Otherwise, say N.
 
 config SERIAL_CORE
 	tristate

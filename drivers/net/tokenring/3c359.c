@@ -641,7 +641,20 @@ static int xl_open(struct net_device *dev)
 	 */
 	/* These MUST be on 8 byte boundaries */
 	xl_priv->xl_tx_ring = kmalloc((sizeof(struct xl_tx_desc) * XL_TX_RING_SIZE) + 7, GFP_DMA | GFP_KERNEL) ; 
+	if (xl_priv->xl_tx_ring == NULL) {
+		printk(KERN_WARNING "%s: Not enough memory to allocate rx buffers.\n",
+				     dev->name);
+		free_irq(dev->irq,dev);
+		return -ENOMEM;
+	}
 	xl_priv->xl_rx_ring = kmalloc((sizeof(struct xl_rx_desc) * XL_RX_RING_SIZE) +7, GFP_DMA | GFP_KERNEL) ; 
+	if (xl_priv->xl_tx_ring == NULL) {
+		printk(KERN_WARNING "%s: Not enough memory to allocate rx buffers.\n",
+				     dev->name);
+		free_irq(dev->irq,dev);
+		kfree(xl_priv->xl_tx_ring);
+		return -ENOMEM;
+	}
 	memset(xl_priv->xl_tx_ring,0,sizeof(struct xl_tx_desc) * XL_TX_RING_SIZE) ; 
 	memset(xl_priv->xl_rx_ring,0,sizeof(struct xl_rx_desc) * XL_RX_RING_SIZE) ; 
 
@@ -1129,7 +1142,7 @@ static irqreturn_t xl_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 				xl_freemem(dev) ; 
 				free_irq(dev->irq,dev); 
 				unregister_netdev(dev) ; 
-				kfree(dev) ;  
+				free_netdev(dev) ;  
 				xl_reset(dev) ; 
 				writel(ACK_INTERRUPT | LATCH_ACK, xl_mmio + MMIO_COMMAND) ; 
 				spin_unlock(&xl_priv->xl_lock) ; 

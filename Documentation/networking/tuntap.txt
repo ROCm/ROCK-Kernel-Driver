@@ -45,13 +45,10 @@ Copyright (C) 1999-2000 Maxim Krasnyansky <max_mk@yahoo.com>
      bogus network interfaces to trick firewalls or administrators.
 
   Driver module autoloading
-     Make sure that "Kernel module loader" - module auto-loading support is enabled 
-     in your kernel. 
 
-     Add the following line to the /etc/modules.conf:
-	alias char-major-10-200 tun
-     and run
-        depmod -a 
+     Make sure that "Kernel module loader" - module auto-loading
+     support is enabled in your kernel.  The kernel should load it on
+     first access.
   
   Manual loading 
      insert the module by hand:

@@ -85,6 +85,9 @@ unsigned long long __attribute__((weak)) sched_clock(void)
  */
 static inline void do_profile(struct pt_regs *regs)
 {
+
+	profile_hook(regs);
+
 	if (!user_mode(regs) &&
 	    prof_buffer &&
 	    current->pid) {

@@ -90,10 +90,15 @@ pic_bus1_widget_info_dup(vertex_hdl_t conn_v, vertex_hdl_t peer_conn_v,
     		peer_widget_info->w_efunc = 0;
     		peer_widget_info->w_einfo = 0;
 		peer_widget_info->w_name = kmalloc(strlen(peer_path) + 1, GFP_KERNEL);
+		if (!peer_widget_info->w_name) {
+			kfree(peer_widget_info);
+			return -ENOMEM;
+		}
 		strcpy(peer_widget_info->w_name, peer_path);
 
 		if (hwgraph_info_add_LBL(peer_conn_v, INFO_LBL_XWIDGET,
 			(arbitrary_info_t)peer_widget_info) != GRAPH_SUCCESS) {
+			kfree(peer_widget_info->w_name);
 				kfree(peer_widget_info);
 				return 0;
 		}
@@ -359,6 +364,9 @@ pic_attach2(vertex_hdl_t xconn_vhdl, void *bridge,
 
     s = dev_to_name(pcibr_vhdl, devnm, MAXDEVNAME);
     pcibr_soft->bs_name = kmalloc(strlen(s) + 1, GFP_KERNEL);
+    if (!pcibr_soft->bs_name)
+	    return -ENOMEM;
+
     strcpy(pcibr_soft->bs_name, s);
 
     pcibr_soft->bs_conn = xconn_vhdl;

@@ -118,12 +118,10 @@ static struct net_device_stats *tun_net_stats(struct net_device *dev)
 }
 
 /* Initialize net device. */
-int tun_net_init(struct net_device *dev)
+static void tun_net_init(struct net_device *dev)
 {
 	struct tun_struct *tun = (struct tun_struct *)dev->priv;
    
-	DBG(KERN_INFO "%s: tun_net_init\n", tun->dev->name);
-
 	switch (tun->flags & TUN_TYPE_MASK) {
 	case TUN_TUN_DEV:
 		/* Point-to-Point TUN Device */
@@ -147,9 +145,7 @@ int tun_net_init(struct net_device *dev)
 
 		ether_setup(dev);
 		break;
-	};
-
-	return 0;
+	}
 }
 
 /* Character device part */
@@ -351,7 +347,6 @@ static void tun_setup(struct net_device *dev)
 	init_waitqueue_head(&tun->read_wait);
 
 	tun->owner = -1;
-	dev->init = tun_net_init;
 
 	SET_MODULE_OWNER(dev);
 	dev->open = tun_net_open;
@@ -421,6 +416,8 @@ static int tun_set_iff(struct file *file, struct ifreq *ifr)
 		tun = dev->priv;
 		tun->dev = dev;
 		tun->flags = flags;
+
+		tun_net_init(dev);
 
 		if (strchr(dev->name, '%')) {
 			err = dev_alloc_name(dev, dev->name);

@@ -223,6 +223,20 @@ config RADIO_SF16FMI
 	  To compile this driver as a module, choose M here: the
 	  module will be called radio-sf16fmi.
 
+config RADIO_SF16FMR2
+	tristate "SF16FMR2 Radio"
+	depends on ISA && VIDEO_DEV
+	---help---
+	  Choose Y here if you have one of these FM radio cards.
+
+	  In order to control your radio card, you will need to use programs
+	  that are compatible with the Video For Linux API.  Information on
+	  this API and pointers to "v4l" programs may be found on the WWW at
+	  <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called radio-sf16fmr2.
+
 config RADIO_TERRATEC
 	tristate "TerraTec ActiveRadio ISA Standalone"
 	depends on ISA && VIDEO_DEV

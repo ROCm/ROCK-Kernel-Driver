@@ -56,7 +56,10 @@ CFLAGS += -Wno-sign-compare
 ifneq ($(CONFIG_DEBUG_INFO),y)
 CFLAGS += -fno-asynchronous-unwind-tables
 endif
-#CFLAGS += $(call check_gcc,-funit-at-a-time,)
+
+# Enable unit-at-a-time mode when possible. It shrinks the
+# kernel considerably.
+CFLAGS += $(call check_gcc,-funit-at-a-time,)
 
 head-y := arch/x86_64/kernel/head.o arch/x86_64/kernel/head64.o arch/x86_64/kernel/init_task.o
 
