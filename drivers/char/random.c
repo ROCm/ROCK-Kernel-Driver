@@ -535,14 +535,14 @@ static void clear_entropy_store(struct entropy_store *r)
 	r->extract_count = 0;
 	memset(r->pool, 0, r->poolinfo.POOLBYTES);
 }
-
+#ifdef CONFIG_SYSCTL
 static void free_entropy_store(struct entropy_store *r)
 {
 	if (r->pool)
 		kfree(r->pool);
 	kfree(r);
 }
-
+#endif
 /*
  * This function adds a byte into the entropy "pool".  It does not
  * update the entropy estimate.  The caller should call
