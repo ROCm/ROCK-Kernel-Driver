@@ -423,7 +423,7 @@ restart:
 				up_read(&sb->s_umount);
 			}
 			spin_lock(&sb_lock);
-			if (__put_super(sb))
+			if (__put_super_and_need_restart(sb))
 				goto restart;
 		}
 		if (wbc->nr_to_write <= 0)
