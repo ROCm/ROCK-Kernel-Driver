@@ -381,7 +381,6 @@ static irqreturn_t mthca_msi_x_interrupt(int irq, void *eq_ptr,
 	struct mthca_eq  *eq  = eq_ptr;
 	struct mthca_dev *dev = eq->dev;
 
-	writel(eq->ecr_mask, dev->hcr + MTHCA_ECR_CLR_OFFSET + 4);
 	mthca_eq_int(dev, eq);
 
 	/* MSI-X vectors always belong to us */
