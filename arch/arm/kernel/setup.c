@@ -132,21 +132,21 @@ static struct resource io_res[] = {
 #define lp2 io_res[2]
 
 static const char *cache_types[16] = {
-	"VIVT write-through",
-	"VIVT write-back",
-	"VIVT write-back",
+	"write-through",
+	"write-back",
+	"write-back",
 	"undefined 3",
 	"undefined 4",
 	"undefined 5",
-	"VIVT write-back",
-	"VIVT write-back",
+	"write-back",
+	"write-back",
 	"undefined 8",
 	"undefined 9",
 	"undefined 10",
 	"undefined 11",
 	"undefined 12",
 	"undefined 13",
-	"VIPT write-back",
+	"write-back",
 	"undefined 15",
 };
 
@@ -236,7 +236,8 @@ static void __init dump_cpu_info(void)
 	unsigned int info = read_cpuid(CPUID_CACHETYPE);
 
 	if (info != processor_id) {
-		printk("CPU: D %s cache\n", cache_types[CACHE_TYPE(info)]);
+		printk("CPU: D %s %s cache\n", cache_is_vivt() ? "VIVT" : "VIPT",
+		       cache_types[CACHE_TYPE(info)]);
 		if (CACHE_S(info)) {
 			dump_cache("CPU: I cache", CACHE_ISIZE(info));
 			dump_cache("CPU: D cache", CACHE_DSIZE(info));
