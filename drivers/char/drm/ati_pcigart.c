@@ -52,7 +52,7 @@
 # define ATI_MAX_PCIGART_PAGES		8192	/**< 32 MB aperture, 4K pages */
 # define ATI_PCIGART_PAGE_SIZE		4096	/**< PCI GART page size */
 
-static inline unsigned long drm_ati_alloc_pcigart_table( void )
+unsigned long drm_ati_alloc_pcigart_table( void )
 {
 	unsigned long address;
 	struct page *page;
@@ -75,7 +75,7 @@ static inline unsigned long drm_ati_alloc_pcigart_table( void )
 	return address;
 }
 
-static inline void drm_ati_free_pcigart_table( unsigned long address )
+static void drm_ati_free_pcigart_table( unsigned long address )
 {
 	struct page *page;
 	int i;
@@ -91,7 +91,7 @@ static inline void drm_ati_free_pcigart_table( unsigned long address )
 	free_pages( address, ATI_PCIGART_TABLE_ORDER );
 }
 
-static inline int drm_ati_pcigart_cleanup( drm_device_t *dev,
+int drm_ati_pcigart_cleanup( drm_device_t *dev,
 			      unsigned long addr,
 			      dma_addr_t bus_addr)
 {
@@ -126,8 +126,9 @@ static inline int drm_ati_pcigart_cleanup( drm_device_t *dev,
 
 	return 1;
 }
+EXPORT_SYMBOL(drm_ati_pcigart_cleanup);
 
-static inline int drm_ati_pcigart_init( drm_device_t *dev,
+int drm_ati_pcigart_init( drm_device_t *dev,
 			   unsigned long *addr,
 			   dma_addr_t *bus_addr)
 {
@@ -204,4 +205,4 @@ done:
 	*bus_addr = bus_address;
 	return ret;
 }
-
+EXPORT_SYMBOL(drm_ati_pcigart_init);

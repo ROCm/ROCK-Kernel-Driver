@@ -34,7 +34,6 @@
 #include "drm.h"
 #include "r128_drm.h"
 #include "r128_drv.h"
-#include "ati_pcigart.h"
 
 #include "drm_pciids.h"
 
