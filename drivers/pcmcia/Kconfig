@@ -69,6 +69,13 @@ config CARDBUS
 	depends on YENTA
 	default y if YENTA
 
+config PD6729
+	tristate "Cirrus PD6729 compatible bridge support"
+	depends on PCMCIA && PCI
+	help
+	  This provides support for the Cirrus PD6729 PCI-to-PCMCIA bridge
+	  device, found in some older laptops and PCMCIA card readers.
+
 config I82092
 	tristate "i82092 compatible bridge support"
 	depends on PCMCIA && PCI
