@@ -29,8 +29,8 @@
    will still try to figure out what type of chip is present. This is useful
    if for some reasons the detect for SMBus or ISA address space filled
    fails.
-   probe: insmod parameter. Initialize this list with SENSORS_I2C_END values.
-     A list of pairs. The first value is a bus number (SENSORS_ISA_BUS for
+   probe: insmod parameter. Initialize this list with I2C_CLIENT_ISA_END values.
+     A list of pairs. The first value is a bus number (ANY_I2C_ISA_BUS for
      the ISA bus, -1 for any I2C bus), the second is the address. 
    kind: The kind of chip. 0 equals any chip.
 */
@@ -40,10 +40,10 @@ struct i2c_force_data {
 };
 
 /* A structure containing the detect information.
-   normal_i2c: filled in by the module writer. Terminated by SENSORS_I2C_END.
+   normal_i2c: filled in by the module writer. Terminated by I2C_CLIENT_ISA_END.
      A list of I2C addresses which should normally be examined.
    normal_i2c_range: filled in by the module writer. Terminated by 
-     SENSORS_I2C_END
+     I2C_CLIENT_ISA_END
      A list of pairs of I2C addresses, each pair being an inclusive range of
      addresses which should normally be examined.
    normal_isa: filled in by the module writer. Terminated by SENSORS_ISA_END.
@@ -54,24 +54,24 @@ struct i2c_force_data {
      range of addresses which should normally be examined. The third is the
      modulo parameter: only addresses which are 0 module this value relative
      to the first address of the range are actually considered.
-   probe: insmod parameter. Initialize this list with SENSORS_I2C_END values.
-     A list of pairs. The first value is a bus number (SENSORS_ISA_BUS for
+   probe: insmod parameter. Initialize this list with I2C_CLIENT_ISA_END values.
+     A list of pairs. The first value is a bus number (ANY_I2C_ISA_BUS for
      the ISA bus, -1 for any I2C bus), the second is the address. These
      addresses are also probed, as if they were in the 'normal' list.
-   probe_range: insmod parameter. Initialize this list with SENSORS_I2C_END 
+   probe_range: insmod parameter. Initialize this list with I2C_CLIENT_ISA_END 
      values.
-     A list of triples. The first value is a bus number (SENSORS_ISA_BUS for
+     A list of triples. The first value is a bus number (ANY_I2C_ISA_BUS for
      the ISA bus, -1 for any I2C bus), the second and third are addresses. 
      These form an inclusive range of addresses that are also probed, as
      if they were in the 'normal' list.
-   ignore: insmod parameter. Initialize this list with SENSORS_I2C_END values.
-     A list of pairs. The first value is a bus number (SENSORS_ISA_BUS for
+   ignore: insmod parameter. Initialize this list with I2C_CLIENT_ISA_END values.
+     A list of pairs. The first value is a bus number (ANY_I2C_ISA_BUS for
      the ISA bus, -1 for any I2C bus), the second is the I2C address. These
      addresses are never probed. This parameter overrules 'normal' and 
      'probe', but not the 'force' lists.
-   ignore_range: insmod parameter. Initialize this list with SENSORS_I2C_END 
+   ignore_range: insmod parameter. Initialize this list with I2C_CLIENT_ISA_END 
       values.
-     A list of triples. The first value is a bus number (SENSORS_ISA_BUS for
+     A list of triples. The first value is a bus number (ANY_I2C_ISA_BUS for
      the ISA bus, -1 for any I2C bus), the second and third are addresses. 
      These form an inclusive range of I2C addresses that are never probed.
      This parameter overrules 'normal' and 'probe', but not the 'force' lists.
@@ -90,74 +90,35 @@ struct i2c_address_data {
 	struct i2c_force_data *forces;
 };
 
-/* Internal numbers to terminate lists */
-#define SENSORS_I2C_END 0xfffe
-#define SENSORS_ISA_END 0xfffefffe
-
-/* The numbers to use to set an ISA or I2C bus address */
-#define SENSORS_ISA_BUS 9191
-#define SENSORS_ANY_I2C_BUS 0xffff
-
-/* The length of the option lists */
-#define SENSORS_MAX_OPTS 48
-
-/* Default fill of many variables */
-#define SENSORS_DEFAULTS {SENSORS_I2C_END, SENSORS_I2C_END, SENSORS_I2C_END, \
-                          SENSORS_I2C_END, SENSORS_I2C_END, SENSORS_I2C_END, \
-                          SENSORS_I2C_END, SENSORS_I2C_END, SENSORS_I2C_END, \
-                          SENSORS_I2C_END, SENSORS_I2C_END, SENSORS_I2C_END, \
-                          SENSORS_I2C_END, SENSORS_I2C_END, SENSORS_I2C_END, \
-                          SENSORS_I2C_END, SENSORS_I2C_END, SENSORS_I2C_END, \
-                          SENSORS_I2C_END, SENSORS_I2C_END, SENSORS_I2C_END, \
-                          SENSORS_I2C_END, SENSORS_I2C_END, SENSORS_I2C_END, \
-                          SENSORS_I2C_END, SENSORS_I2C_END, SENSORS_I2C_END, \
-                          SENSORS_I2C_END, SENSORS_I2C_END, SENSORS_I2C_END, \
-                          SENSORS_I2C_END, SENSORS_I2C_END, SENSORS_I2C_END, \
-                          SENSORS_I2C_END, SENSORS_I2C_END, SENSORS_I2C_END, \
-                          SENSORS_I2C_END, SENSORS_I2C_END, SENSORS_I2C_END, \
-                          SENSORS_I2C_END, SENSORS_I2C_END, SENSORS_I2C_END, \
-                          SENSORS_I2C_END, SENSORS_I2C_END, SENSORS_I2C_END, \
-                          SENSORS_I2C_END, SENSORS_I2C_END, SENSORS_I2C_END}
-
-/* This is ugly. We need to evaluate SENSORS_MAX_OPTS before it is 
-   stringified */
-#define SENSORS_MODPARM_AUX1(x) "1-" #x "h"
-#define SENSORS_MODPARM_AUX(x) SENSORS_MODPARM_AUX1(x)
-#define SENSORS_MODPARM SENSORS_MODPARM_AUX(SENSORS_MAX_OPTS)
-
-/* SENSORS_MODULE_PARM creates a module parameter, and puts it in the
-   module header */
-#define SENSORS_MODULE_PARM(var,desc) \
-  static unsigned short var[SENSORS_MAX_OPTS] = SENSORS_DEFAULTS; \
-  MODULE_PARM(var,SENSORS_MODPARM); \
-  MODULE_PARM_DESC(var,desc)
-
-/* SENSORS_MODULE_PARM creates a 'force_*' module parameter, and puts it in
-   the module header */
 #define SENSORS_MODULE_PARM_FORCE(name) \
-  SENSORS_MODULE_PARM(force_ ## name, \
+  I2C_CLIENT_MODULE_PARM(force_ ## name, \
                       "List of adapter,address pairs which are unquestionably" \
                       " assumed to contain a `" # name "' chip")
 
 
 /* This defines several insmod variables, and the addr_data structure */
 #define SENSORS_INSMOD \
-  SENSORS_MODULE_PARM(probe, \
+  I2C_CLIENT_MODULE_PARM(probe, \
                       "List of adapter,address pairs to scan additionally"); \
-  SENSORS_MODULE_PARM(probe_range, \
+  I2C_CLIENT_MODULE_PARM(probe_range, \
                       "List of adapter,start-addr,end-addr triples to scan " \
                       "additionally"); \
-  SENSORS_MODULE_PARM(ignore, \
+  I2C_CLIENT_MODULE_PARM(ignore, \
                       "List of adapter,address pairs not to scan"); \
-  SENSORS_MODULE_PARM(ignore_range, \
+  I2C_CLIENT_MODULE_PARM(ignore_range, \
                       "List of adapter,start-addr,end-addr triples not to " \
                       "scan"); \
-  static struct i2c_address_data addr_data = \
-                                       {normal_i2c, normal_i2c_range, \
-                                        normal_isa, normal_isa_range, \
-                                        probe, probe_range, \
-                                        ignore, ignore_range, \
-                                        forces}
+	static struct i2c_address_data addr_data = {			\
+			.normal_i2c =		normal_i2c,		\
+			.normal_i2c_range =	normal_i2c_range,	\
+			.normal_isa =		normal_isa,		\
+			.normal_isa_range =	normal_isa_range,	\
+			.probe =		probe,			\
+			.probe_range =		probe_range,		\
+			.ignore =		ignore,			\
+			.ignore_range =		ignore_range,		\
+			.forces =		forces,			\
+		}
 
 /* The following functions create an enum with the chip names as elements. 
    The first element of the enum is any_chip. These are the only macros
@@ -165,7 +126,7 @@ struct i2c_address_data {
 
 #define SENSORS_INSMOD_0 \
   enum chips { any_chip }; \
-  SENSORS_MODULE_PARM(force, \
+  I2C_CLIENT_MODULE_PARM(force, \
                       "List of adapter,address pairs to boldly assume " \
                       "to be present"); \
   static struct i2c_force_data forces[] = {{force,any_chip},{NULL}}; \
@@ -173,7 +134,7 @@ struct i2c_address_data {
 
 #define SENSORS_INSMOD_1(chip1) \
   enum chips { any_chip, chip1 }; \
-  SENSORS_MODULE_PARM(force, \
+  I2C_CLIENT_MODULE_PARM(force, \
                       "List of adapter,address pairs to boldly assume " \
                       "to be present"); \
   SENSORS_MODULE_PARM_FORCE(chip1); \
@@ -184,7 +145,7 @@ struct i2c_address_data {
 
 #define SENSORS_INSMOD_2(chip1,chip2) \
   enum chips { any_chip, chip1, chip2 }; \
-  SENSORS_MODULE_PARM(force, \
+  I2C_CLIENT_MODULE_PARM(force, \
                       "List of adapter,address pairs to boldly assume " \
                       "to be present"); \
   SENSORS_MODULE_PARM_FORCE(chip1); \
@@ -197,7 +158,7 @@ struct i2c_address_data {
 
 #define SENSORS_INSMOD_3(chip1,chip2,chip3) \
   enum chips { any_chip, chip1, chip2, chip3 }; \
-  SENSORS_MODULE_PARM(force, \
+  I2C_CLIENT_MODULE_PARM(force, \
                       "List of adapter,address pairs to boldly assume " \
                       "to be present"); \
   SENSORS_MODULE_PARM_FORCE(chip1); \
@@ -212,7 +173,7 @@ struct i2c_address_data {
 
 #define SENSORS_INSMOD_4(chip1,chip2,chip3,chip4) \
   enum chips { any_chip, chip1, chip2, chip3, chip4 }; \
-  SENSORS_MODULE_PARM(force, \
+  I2C_CLIENT_MODULE_PARM(force, \
                       "List of adapter,address pairs to boldly assume " \
                       "to be present"); \
   SENSORS_MODULE_PARM_FORCE(chip1); \
@@ -229,7 +190,7 @@ struct i2c_address_data {
 
 #define SENSORS_INSMOD_5(chip1,chip2,chip3,chip4,chip5) \
   enum chips { any_chip, chip1, chip2, chip3, chip4, chip5 }; \
-  SENSORS_MODULE_PARM(force, \
+  I2C_CLIENT_MODULE_PARM(force, \
                       "List of adapter,address pairs to boldly assume " \
                       "to be present"); \
   SENSORS_MODULE_PARM_FORCE(chip1); \
@@ -248,7 +209,7 @@ struct i2c_address_data {
 
 #define SENSORS_INSMOD_6(chip1,chip2,chip3,chip4,chip5,chip6) \
   enum chips { any_chip, chip1, chip2, chip3, chip4, chip5, chip6 }; \
-  SENSORS_MODULE_PARM(force, \
+  I2C_CLIENT_MODULE_PARM(force, \
                       "List of adapter,address pairs to boldly assume " \
                       "to be present"); \
   SENSORS_MODULE_PARM_FORCE(chip1); \
@@ -269,7 +230,7 @@ struct i2c_address_data {
 
 #define SENSORS_INSMOD_7(chip1,chip2,chip3,chip4,chip5,chip6,chip7) \
   enum chips { any_chip, chip1, chip2, chip3, chip4, chip5, chip6, chip7 }; \
-  SENSORS_MODULE_PARM(force, \
+  I2C_CLIENT_MODULE_PARM(force, \
                       "List of adapter,address pairs to boldly assume " \
                       "to be present"); \
   SENSORS_MODULE_PARM_FORCE(chip1); \
@@ -292,7 +253,7 @@ struct i2c_address_data {
 
 #define SENSORS_INSMOD_8(chip1,chip2,chip3,chip4,chip5,chip6,chip7,chip8) \
   enum chips { any_chip, chip1, chip2, chip3, chip4, chip5, chip6, chip7, chip8 }; \
-  SENSORS_MODULE_PARM(force, \
+  I2C_CLIENT_MODULE_PARM(force, \
                       "List of adapter,address pairs to boldly assume " \
                       "to be present"); \
   SENSORS_MODULE_PARM_FORCE(chip1); \

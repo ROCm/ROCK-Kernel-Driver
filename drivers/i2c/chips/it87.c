@@ -40,10 +40,10 @@
 
 
 /* Addresses to scan */
-static unsigned short normal_i2c[] = { SENSORS_I2C_END };
-static unsigned short normal_i2c_range[] = { 0x20, 0x2f, SENSORS_I2C_END };
-static unsigned int normal_isa[] = { 0x0290, SENSORS_ISA_END };
-static unsigned int normal_isa_range[] = { SENSORS_ISA_END };
+static unsigned short normal_i2c[] = { I2C_CLIENT_END };
+static unsigned short normal_i2c_range[] = { 0x20, 0x2f, I2C_CLIENT_END };
+static unsigned int normal_isa[] = { 0x0290, I2C_CLIENT_ISA_END };
+static unsigned int normal_isa_range[] = { I2C_CLIENT_ISA_END };
 
 /* Insmod parameters */
 SENSORS_INSMOD_4(it87, it8705, it8712, sis950);

@@ -290,10 +290,12 @@ struct i2c_client_address_data {
 };
 
 /* Internal numbers to terminate lists */
-#define I2C_CLIENT_END 0xfffe
+#define I2C_CLIENT_END		0xfffe
+#define I2C_CLIENT_ISA_END	0xfffefffe
 
 /* The numbers to use to set I2C bus address */
-#define ANY_I2C_BUS 0xffff
+#define ANY_I2C_BUS		0xffff
+#define ANY_I2C_ISA_BUS		9191
 
 /* The length of the option lists */
 #define I2C_CLIENT_MAX_OPTS 48
@@ -556,11 +558,15 @@ union i2c_smbus_data {
   I2C_CLIENT_MODULE_PARM(force, \
                       "List of adapter,address pairs to boldly assume " \
                       "to be present"); \
-  static struct i2c_client_address_data addr_data = \
-                                       {normal_i2c, normal_i2c_range, \
-                                        probe, probe_range, \
-                                        ignore, ignore_range, \
-                                        force}
+	static struct i2c_client_address_data addr_data = {		\
+			.normal_i2c = 		normal_i2c,		\
+			.normal_i2c_range =	normal_i2c_range,	\
+			.probe =		probe,			\
+			.probe_range =		probe_range,		\
+			.ignore =		ignore,			\
+			.ignore_range =		ignore_range,		\
+			.force =		force,			\
+		}
 
 /* Detect whether we are on the isa bus. If this returns true, all i2c
    access will fail! */
