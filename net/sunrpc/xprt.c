@@ -87,7 +87,7 @@ static void	xprt_connect_status(struct rpc_task *task);
 static struct rpc_xprt * xprt_setup(int proto, struct sockaddr_in *ap,
 						struct rpc_timeout *to);
 static struct socket *xprt_create_socket(struct rpc_xprt *, int, int);
-static void	xprt_bind_socket(struct rpc_xprt *, struct socket *);
+static int	xprt_bind_socket(struct rpc_xprt *, struct socket *);
 static int      __xprt_get_cong(struct rpc_xprt *, struct rpc_task *);
 
 #ifdef RPC_DEBUG_DATA
@@ -389,26 +389,33 @@ xprt_adjust_timeout(struct rpc_timeout *to)
 static void
 xprt_close(struct rpc_xprt *xprt, int reconnecting)
 {
-	struct socket	*sock = xprt->sock;
-	struct sock	*sk = xprt->inet;
-
-	if (!sk)
-		return;
-
-	write_lock_bh(&sk->sk_callback_lock);
+	struct socket	*sock;
+	struct sock	*sk;
+	
+	spin_lock_bh(&xprt->sock_lock);
+	if ((sk = xprt->inet) != NULL)
+		sock_hold(sk);
 	xprt->inet = NULL;
-	xprt->sock = NULL;
 
-	sk->sk_user_data    = NULL;
-	sk->sk_data_ready   = xprt->old_data_ready;
-	sk->sk_state_change = xprt->old_state_change;
-	sk->sk_write_space  = xprt->old_write_space;
-	write_unlock_bh(&sk->sk_callback_lock);
+	sock = xprt->sock;
+	xprt->sock = NULL;
+	spin_unlock_bh(&xprt->sock_lock);
+
+	if (sk != NULL) {
+		write_lock_bh(&sk->sk_callback_lock);
+		sk->sk_user_data    = NULL;
+		sk->sk_data_ready   = xprt->old_data_ready;
+		sk->sk_state_change = xprt->old_state_change;
+		sk->sk_write_space  = xprt->old_write_space;
+		sk->sk_no_check	 = 0;
+		write_unlock_bh(&sk->sk_callback_lock);
+		sock_put(sk);
+	}
 
 	xprt_disconnect(xprt, reconnecting);
-	sk->sk_no_check	 = 0;
 
-	sock_release(sock);
+	if (sock)
+		sock_release(sock);
 }
 
 static void
@@ -481,7 +488,10 @@ static void xprt_socket_connect(void *args)
 		goto out_err;
 		return;
 	}
-	xprt_bind_socket(xprt, sock);
+	if (xprt_bind_socket(xprt, sock) < 0) {
+		sock_release(sock);
+		goto out_err;
+	}
 	xprt_sock_setbufsize(xprt);
 
 	if (!xprt->stream)
@@ -1515,13 +1525,17 @@ static inline int xprt_bindresvport(struct rpc_xprt *xprt, struct socket *sock)
 	return err;
 }
 
-static void
+static int
 xprt_bind_socket(struct rpc_xprt *xprt, struct socket *sock)
 {
 	struct sock	*sk = sock->sk;
+	int		error = -EBUSY;
 
+	/* Can it happen that xprt->inet is non-null when we
+	 * get here? If so we should indicate an error so
+	 * that the caller can drop the newly created socket */
 	if (xprt->inet)
-		return;
+		goto out;
 
 	write_lock_bh(&sk->sk_callback_lock);
 	sk->sk_user_data = xprt;
@@ -1540,13 +1554,19 @@ xprt_bind_socket(struct rpc_xprt *xprt, struct socket *sock)
 		xprt_clear_connected(xprt);
 	}
 	sk->sk_write_space = xprt_write_space;
-
-	/* Reset to new socket */
-	xprt->sock = sock;
-	xprt->inet = sk;
 	write_unlock_bh(&sk->sk_callback_lock);
 
-	return;
+	/* Reset to new socket */
+	spin_lock_bh(&xprt->sock_lock);
+	if (xprt->inet == NULL) {
+		xprt->sock = sock;
+		xprt->inet = sk;
+		error = 0;
+	}
+	spin_unlock_bh(&xprt->sock_lock);
+
+out:
+	return error;
 }
 
 /*
