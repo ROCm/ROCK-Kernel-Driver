@@ -145,6 +145,7 @@
 	{0x121a, 0x0005, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0}, \
 	{0x121a, 0x0007, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0}, \
 	{0x121a, 0x0009, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0}, \
+	{0x121a, 0x000b, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0}, \
 	{0, 0, 0}
 
 #define viadrv_PCI_IDS \
@@ -196,3 +197,7 @@
 	{0x5333, 0x8d02, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0}, \
 	{0x5333, 0x8d04, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0}, \
 	{0, 0, 0}
+
+#define ffb_PCI_IDS \
+	{0, 0, 0}
+
