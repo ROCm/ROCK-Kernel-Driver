@@ -519,8 +519,7 @@ static void end_buffer_async_read(struct buffer_head *bh, int uptodate)
 		if (buffer_async_read(tmp)) {
 			if (buffer_locked(tmp))
 				goto still_busy;
-			if (!buffer_mapped(bh))
-				BUG();
+			BUG();
 		}
 		tmp = tmp->b_this_page;
 	} while (tmp != bh);
@@ -570,8 +569,7 @@ static void end_buffer_async_write(struct buffer_head *bh, int uptodate)
 		if (buffer_async_write(tmp)) {
 			if (buffer_locked(tmp))
 				goto still_busy;
-			if (!buffer_mapped(bh))
-				BUG();
+			BUG();
 		}
 		tmp = tmp->b_this_page;
 	}
