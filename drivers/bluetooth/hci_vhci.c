@@ -139,7 +139,10 @@ static inline ssize_t hci_vhci_get_user(struct hci_vhci_struct *hci_vhci, const 
 	if (!(skb = bluez_skb_alloc(count, GFP_KERNEL)))
 		return -ENOMEM;
 	
-	copy_from_user(skb_put(skb, count), buf, count); 
+	if (copy_from_user(skb_put(skb, count), buf, count)) {
+		kfree_skb(skb);
+		return -EFAULT;
+	}
 
 	skb->dev = (void *) &hci_vhci->hdev;
 	skb->pkt_type = *((__u8 *) skb->data);
@@ -170,7 +173,8 @@ static inline ssize_t hci_vhci_put_user(struct hci_vhci_struct *hci_vhci,
 	char *ptr = buf;
 
 	len = MIN(skb->len, len); 
-	copy_to_user(ptr, skb->data, len); 
+	if (copy_to_user(ptr, skb->data, len))
+		return -EFAULT;
 	total += len;
 
 	hci_vhci->hdev.stat.byte_tx += len;

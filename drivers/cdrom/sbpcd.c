@@ -4255,9 +4255,9 @@ static int sbpcd_dev_ioctl(struct cdrom_device_info *cdi, u_int cmd,
 		if (D_S[d].has_data>1) RETURN_UP(-EBUSY);
 #endif /* SAFE_MIXED */ 
 		if (D_S[d].aud_buf==NULL) RETURN_UP(-EINVAL);
-		i=verify_area(VERIFY_READ, (void *) arg, sizeof(struct cdrom_read_audio));
-		if (i) RETURN_UP(i);
-		copy_from_user(&read_audio, (void *) arg, sizeof(struct cdrom_read_audio));
+		if (copy_from_user(&read_audio, (void *)arg,
+				   sizeof(struct cdrom_read_audio)))
+			RETURN_UP(-EFAULT);
 		if (read_audio.nframes < 0 || read_audio.nframes>D_S[d].sbp_audsiz) RETURN_UP(-EINVAL);
 		i=verify_area(VERIFY_WRITE, read_audio.buf,
 			      read_audio.nframes*CD_FRAMESIZE_RAW);
@@ -4454,9 +4454,10 @@ static int sbpcd_dev_ioctl(struct cdrom_device_info *cdi, u_int cmd,
 				msg(DBG_AUD,"read_audio: cc_ReadError was necessary after read: %02X\n",i);
 				continue;
 			}
-			copy_to_user((u_char *) read_audio.buf,
-				    (u_char *) D_S[d].aud_buf,
-				    read_audio.nframes*CD_FRAMESIZE_RAW);
+			if (copy_to_user((u_char *)read_audio.buf,
+					 (u_char *) D_S[d].aud_buf,
+					 read_audio.nframes * CD_FRAMESIZE_RAW))
+				RETURN_UP(-EFAULT);
 			msg(DBG_AUD,"read_audio: copy_to_user done.\n");
 			break;
 		}

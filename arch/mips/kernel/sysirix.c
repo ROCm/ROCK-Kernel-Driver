@@ -1048,10 +1048,7 @@ asmlinkage int irix_sgikopt(char *istring, char *ostring, int len)
 
 asmlinkage int irix_gettimeofday(struct timeval *tv)
 {
-	int retval;
-
-	retval = copy_to_user(tv, &xtime, sizeof(*tv)) ? -EFAULT : 0;
-	return retval;
+	return copy_to_user(tv, &xtime, sizeof(*tv)) ? -EFAULT : 0;
 }
 
 #define IRIX_MAP_AUTOGROW 0x40

@@ -2619,13 +2619,14 @@ static int read_audio(struct cdrom_read_audio *ra)
 						retval = -EIO;
 						goto exit_read_audio;
 					}
-				} else {
-					copy_to_user((char *) (ra->buf +
+				} else if (copy_to_user((char *)(ra->buf +
 							       (CD_FRAMESIZE_RAW
 								* cframe)),
-						     (char *)
-						     readahead_buffer,
-						     CD_FRAMESIZE_RAW);
+							(char *)
+							       readahead_buffer,
+							CD_FRAMESIZE_RAW)) {
+					retval = -EFAULT;
+					goto exit_read_audio;
 				}
 			} else {
 				printk
@@ -2635,12 +2636,12 @@ static int read_audio(struct cdrom_read_audio *ra)
 				retval = -EIO;
 				goto exit_read_audio;
 			}
-		} else {
-			copy_to_user((char *) (ra->buf +
-					       (CD_FRAMESIZE_RAW *
-						cframe)),
-				     (char *) readahead_buffer,
-				     CD_FRAMESIZE_RAW);
+		} else if (copy_to_user((char *)(ra->buf + (CD_FRAMESIZE_RAW *
+							    cframe)),
+					(char *)readahead_buffer,
+					CD_FRAMESIZE_RAW)) {
+			retval = -EFAULT;
+			goto exit_read_audio;
 		}
 
 		cframe++;

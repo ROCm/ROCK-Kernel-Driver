@@ -950,7 +950,10 @@ int mf_setVmlinuxChunk(const char *buffer, int size, int offset, u64 side)
 	return -ENOMEM;
     }
 
-    copy_from_user(page, buffer, size);
+    if (copy_from_user(page, buffer, size)) {
+	    rc = -EFAULT;
+	    goto out;
+    }
     memset(&myVspCmd, 0, sizeof(myVspCmd));
 
     myVspCmd.xCmd = 30;
@@ -973,7 +976,7 @@ int mf_setVmlinuxChunk(const char *buffer, int size, int offset, u64 side)
 	    rc = -ENOMEM;
 	}
     }
-
+out:
     pci_free_consistent(NULL, size, page, dma_addr);
 
     return rc;
