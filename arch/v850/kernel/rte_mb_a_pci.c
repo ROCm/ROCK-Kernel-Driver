@@ -1,8 +1,8 @@
 /*
  * arch/v850/kernel/mb_a_pci.c -- PCI support for Midas lab RTE-MOTHER-A board
  *
- *  Copyright (C) 2001,02  NEC Corporation
- *  Copyright (C) 2001,02  Miles Bader <miles@gnu.org>
+ *  Copyright (C) 2001,02,03  NEC Electronics Corporation
+ *  Copyright (C) 2001,02,03  Miles Bader <miles@gnu.org>
  *
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file COPYING in the main directory of this
@@ -165,7 +165,6 @@ static int __devinit pcibios_init (void)
 			"PCI: PLX Technology PCI9080 HOST/PCI bridge\n");
 
 		MB_A_PCI_PCICR = 0x147;
-		MB_A_PCI_DMLBAM = 0x0;
 
 		MB_A_PCI_PCIBAR0 = 0x007FFF00;
 		MB_A_PCI_PCIBAR1 = 0x0000FF00;
@@ -179,11 +178,28 @@ static int __devinit pcibios_init (void)
 
 		/* Reprogram the motherboard's IO/config address space,
 		   as we don't support the GCS7 address space that the
-		   default uses.  Note that we have to give the address
-		   from the motherboard's point of view, which is
-		   different than the CPU's.  */
-		MB_A_PCI_DMLBAI = MB_A_PCI_IO_ADDR - GCS5_ADDR;
+		   default uses.  */
+
+		/* Significant address bits used for decoding PCI GCS5 space
+		   accessess.  */
 		MB_A_PCI_DMRR = ~(MB_A_PCI_MEM_SIZE - 1);
+
+		/* I don't understand this, but the SolutionGear example code
+		   uses such an offset, and it doesn't work without it.  XXX */
+#if GCS5_SIZE == 0x00800000
+#define GCS5_CFG_OFFS 0x00800000
+#else
+#define GCS5_CFG_OFFS 0
+#endif
+
+		/* Address bit values for matching.  Note that we have to give
+		   the address from the motherboard's point of view, which is
+		   different than the CPU's.  */
+		/* PCI memory space.  */
+		MB_A_PCI_DMLBAM = GCS5_CFG_OFFS + 0x0;
+		/* PCI I/O space.  */
+		MB_A_PCI_DMLBAI =
+			GCS5_CFG_OFFS + (MB_A_PCI_IO_ADDR - GCS5_ADDR);
 
 		mb_pci_bus = pci_scan_bus (0, &mb_pci_config_ops, 0);
 

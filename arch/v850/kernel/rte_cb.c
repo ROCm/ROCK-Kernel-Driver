@@ -1,8 +1,8 @@
 /*
  * include/asm-v850/rte_cb.c -- Midas lab RTE-CB series of evaluation boards
  *
- *  Copyright (C) 2001,02  NEC Corporation
- *  Copyright (C) 2001,02  Miles Bader <miles@gnu.org>
+ *  Copyright (C) 2001,02,03  NEC Electronics Corporation
+ *  Copyright (C) 2001,02,03  Miles Bader <miles@gnu.org>
  *
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file COPYING in the main directory of this
@@ -32,28 +32,11 @@ extern void multi_init (void);
 #endif
 
 
-#ifdef CONFIG_ROM_KERNEL
-/* Initialization for kernel in ROM.  */
-static inline rom_kernel_init (void)
-{
-	/* If the kernel is in ROM, we have to copy any initialized data
-	   from ROM into RAM.  */
-	extern unsigned long _data_load_start, _sdata, _edata;
-	register unsigned long *src = &_data_load_start;
-	register unsigned long *dst = &_sdata, *end = &_edata;
-
-	while (dst != end)
-		*dst++ = *src++;
-}
-#endif /* CONFIG_ROM_KERNEL */
-
-void __init mach_early_init (void)
+void __init rte_cb_early_init (void)
 {
 	nb85e_intc_disable_irqs ();
 
-#if defined (CONFIG_ROM_KERNEL)
-	rom_kernel_init ();
-#elif defined (CONFIG_RTE_CB_MULTI)
+#ifdef CONFIG_RTE_CB_MULTI
 	multi_init ();
 #endif
 }

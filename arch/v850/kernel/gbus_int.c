@@ -26,7 +26,9 @@
 /* For each GINT interrupt, how many GBUS interrupts are using it.  */
 static unsigned gint_num_active_irqs[NUM_GINTS] = { 0 };
 
-/* A table of GINTn interrupts we actually use.  */
+/* A table of GINTn interrupts we actually use.
+   Note that we don't use GINT0 because all the boards we support treat it
+   specially.  */
 struct used_gint {
 	unsigned gint;
 	unsigned priority;
