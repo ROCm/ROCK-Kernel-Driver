@@ -25,6 +25,7 @@
 #include <linux/fs.h>
 #include <linux/sysv_fs.h>
 #include <linux/init.h>
+#include <linux/slab.h>
 
 /*
  * The following functions try to recognize specific filesystems.
@@ -344,26 +345,32 @@ static int complete_read_super(struct super_block *sb, int silent, int size)
 
 static int sysv_fill_super(struct super_block *sb, void *data, int silent)
 {
-	struct sysv_sb_info *sbi = SYSV_SB(sb);
-	struct buffer_head *bh1;
-	struct buffer_head *bh = NULL;
+	struct buffer_head *bh1, *bh = NULL;
+	struct sysv_sb_info *sbi;
 	unsigned long blocknr;
-	int size = 0;
-	int i;
+	int size = 0, i;
 	
 	if (1024 != sizeof (struct xenix_super_block))
-		panic("Xenix FS: bad super-block size");
-	if ((512 != sizeof (struct sysv4_super_block))
-            || (512 != sizeof (struct sysv2_super_block)))
-		panic("SystemV FS: bad super-block size");
+		panic("Xenix FS: bad superblock size");
+	if (512 != sizeof (struct sysv4_super_block))
+		panic("SystemV FS: bad superblock size");
+	if (512 != sizeof (struct sysv2_super_block))
+		panic("SystemV FS: bad superblock size");
 	if (500 != sizeof (struct coh_super_block))
-		panic("Coherent FS: bad super-block size");
+		panic("Coherent FS: bad superblock size");
 	if (64 != sizeof (struct sysv_inode))
-		panic("sysv fs: bad i-node size");
-	sb_set_blocksize(sb, BLOCK_SIZE);
+		panic("sysv fs: bad inode size");
+
+	sbi = kmalloc(sizeof(struct sysv_sb_info), GFP_KERNEL);
+	if (!sbi)
+		return -ENOMEM;
+	memset(sbi, 0, sizeof(struct sysv_sb_info));
 
 	sbi->s_sb = sb;
 	sbi->s_block_base = 0;
+	sb->u.generic_sbp = sbi;
+	
+	sb_set_blocksize(sb, BLOCK_SIZE);
 
 	for (i = 0; i < sizeof(flavours)/sizeof(flavours[0]) && !size; i++) {
 		brelse(bh);
@@ -409,6 +416,7 @@ static int sysv_fill_super(struct super_block *sb, void *data, int silent)
 	sb_set_blocksize(sb, BLOCK_SIZE);
 	printk("oldfs: cannot read superblock\n");
 failed:
+	kfree(sbi);
 	return -EINVAL;
 
 Eunknown:
@@ -427,7 +435,7 @@ Ebadsize:
 
 static int v7_fill_super(struct super_block *sb, void *data, int silent)
 {
-	struct sysv_sb_info *sbi = SYSV_SB(sb);
+	struct sysv_sb_info *sbi;
 	struct buffer_head *bh, *bh2 = NULL;
 	struct v7_super_block *v7sb;
 	struct sysv_inode *v7i;
@@ -437,11 +445,18 @@ static int v7_fill_super(struct super_block *sb, void *data, int silent)
 	if (64 != sizeof (struct sysv_inode))
 		panic("sysv fs: bad i-node size");
 
+	sbi = kmalloc(sizeof(struct sysv_sb_info), GFP_KERNEL);
+	if (!sbi)
+		return -ENOMEM;
+	memset(sbi, 0, sizeof(struct sysv_sb_info));
+
 	sbi->s_sb = sb;
+	sbi->s_block_base = 0;
 	sbi->s_type = FSTYPE_V7;
 	sbi->s_bytesex = BYTESEX_PDP;
-
-	sb_set_blocksize(sb, 512);
+	sb->u.generic_sbp = sbi;
+	
+	sb_set_blocksize(sb, BLOCK_SIZE);
 
 	if ((bh = sb_bread(sb, 1)) == NULL) {
 		if (!silent)
@@ -476,6 +491,7 @@ static int v7_fill_super(struct super_block *sb, void *data, int silent)
 failed:
 	brelse(bh2);
 	brelse(bh);
+	kfree(sbi);
 	return -EINVAL;
 }
 

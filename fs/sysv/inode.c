@@ -69,6 +69,8 @@ static void sysv_put_super(struct super_block *sb)
 	brelse(sbi->s_bh1);
 	if (sbi->s_bh1 != sbi->s_bh2)
 		brelse(sbi->s_bh2);
+
+	kfree(sbi);
 }
 
 static int sysv_statfs(struct super_block *sb, struct statfs *buf)
