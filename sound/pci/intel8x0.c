@@ -198,6 +198,11 @@ DEFINE_REGSET(SP, 0x60);	/* SPDIF out */
 
 /* global block */
 #define ICH_REG_GLOB_CNT		0x2c	/* dword - global control */
+#define   ICH_PCM_SPDIF_MASK	0xc0000000	/* s/pdif pcm slot mask (ICH4) */
+#define   ICH_PCM_SPDIF_NONE	0x00000000	/* reserved - undefined */
+#define   ICH_PCM_SPDIF_78	0x40000000	/* s/pdif pcm on slots 7&8 */
+#define   ICH_PCM_SPDIF_69	0x80000000	/* s/pdif pcm on slots 6&9 */
+#define   ICH_PCM_SPDIF_1011	0xc0000000	/* s/pdif pcm on slots 10&11 */
 #define   ICH_PCM_20BIT		0x00400000	/* 20-bit samples (ICH4) */
 #define   ICH_PCM_246_MASK	0x00300000	/* 6 channels (not all chips) */
 #define   ICH_PCM_6		0x00200000	/* 6 channels (not all chips) */
