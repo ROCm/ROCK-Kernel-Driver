@@ -87,11 +87,14 @@ unsigned long p_mapped_by_bats(unsigned long pa)
 	return 0;
 }
 
-void __init bat_mapin_ram(void)
+unsigned long __init mmu_mapin_ram(void)
 {
 	unsigned long tot, bl, done;
 	unsigned long max_size = (256<<20);
 	unsigned long align;
+
+	if (__map_without_bats)
+		return 0;
 
 	/* Set up BAT2 and if necessary BAT3 to cover RAM. */
 
@@ -119,7 +122,10 @@ void __init bat_mapin_ram(void)
 				break;
 		setbat(3, KERNELBASE+done, PPC_MEMSTART+done, bl,
 		       _PAGE_KERNEL);
+		done = (unsigned long)bat_addrs[3].limit - KERNELBASE + 1;
 	}
+
+	return done;
 }
 
 /*
