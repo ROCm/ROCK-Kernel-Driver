@@ -289,6 +289,7 @@ static int idescsi_check_condition(ide_drive_t *drive, struct request *failed_co
 	pc->timeout = jiffies + WAIT_READY;
 	/* NOTE! Save the failed packet command in "rq->buffer" */
 	rq->buffer = (void *) failed_command->special;
+	pc->scsi_cmd = ((idescsi_pc_t *) failed_command->special)->scsi_cmd;
 	if (test_bit(IDESCSI_LOG_CMD, &scsi->log)) {
 		printk ("ide-scsi: %s: queue cmd = ", drive->name);
 		hexdump(pc->c, 6);
@@ -877,7 +878,8 @@ int idescsi_abort (Scsi_Cmnd *cmd)
 			/* is cmd active?
 			 *  need to lock so this stuff doesn't change under us */
 			spin_lock_irqsave(&ide_lock, flags);
-			if (scsi->pc && scsi->pc->scsi_cmd->serial_number == cmd->serial_number) {
+			if (scsi->pc && scsi->pc->scsi_cmd && 
+					scsi->pc->scsi_cmd->serial_number == cmd->serial_number) {
 				/* yep - let's give it some more time - 
 				 * we can do that, we're in _our_ error kernel thread */
 				spin_unlock_irqrestore(&ide_lock, flags);
