@@ -590,6 +590,7 @@ static void idescsi_setup (ide_drive_t *drive, idescsi_scsi_t *scsi, int id)
 	set_bit(IDESCSI_LOG_CMD, &scsi->log);
 #endif /* IDESCSI_DEBUG_LOG */
 	idescsi_add_settings(drive);
+	DRIVER(drive)->busy--;
 }
 
 static int idescsi_cleanup (ide_drive_t *drive)
@@ -995,7 +996,7 @@ static void __exit exit_idescsi_module(void)
 	for (id = 0; id < MAX_HWIFS * MAX_DRIVES; id++) {
 		drive = idescsi_drives[id];
 		if (drive)
-			DRIVER(drive)->busy--;
+			DRIVER(drive)->busy = 0;
 	}
 	scsi_unregister   (idescsi_host);
 	device_unregister(&idescsi_primary);

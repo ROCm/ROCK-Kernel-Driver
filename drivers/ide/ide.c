@@ -1346,6 +1346,7 @@ int ata_attach(ide_drive_t *drive)
 	spin_unlock(&drivers_lock);
 	spin_lock(&drives_lock);
 	list_add_tail(&drive->list, &ata_unused);
+	drive->gendev.driver = NULL;
 	spin_unlock(&drives_lock);
 	return 1;
 }
@@ -2307,6 +2308,8 @@ void ide_unregister_driver(ide_driver_t *driver)
 	spin_lock(&drivers_lock);
 	list_del(&driver->drivers);
 	spin_unlock(&drivers_lock);
+
+	driver_unregister(&driver->gen_driver);
 
 	while(!list_empty(&driver->drives)) {
 		drive = list_entry(driver->drives.next, ide_drive_t, list);
