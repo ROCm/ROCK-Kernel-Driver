@@ -29,6 +29,8 @@ int load_initrd(char *filename, void *buf, int size)
 		       filename, -n);
 		return(-1);
 	}
+
+	os_close_file(fd);
 	return(0);
 }
 

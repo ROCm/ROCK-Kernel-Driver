@@ -1,5 +1,4 @@
 /*
- *  linux/include/asm-arm/arch-arc/uncompress.h
  *
  *  Copyright (C) 1996 Russell King
  *

@@ -9,6 +9,8 @@
 #ifndef __ASM_ARM_CHECKSUM_H
 #define __ASM_ARM_CHECKSUM_H
 
+#include <linux/in6.h>
+
 /*
  * computes the checksum of a memory block at buff, length len,
  * and adds in "sum" (32-bit)
@@ -35,13 +37,13 @@ unsigned int
 csum_partial_copy_nocheck(const char *src, char *dst, int len, int sum);
 
 unsigned int
-csum_partial_copy_from_user(const char *src, char *dst, int len, int sum, int *err_ptr);
+csum_partial_copy_from_user(const char __user *src, char *dst, int len, int sum, int *err_ptr);
 
 /*
- * These are the old (and unsafe) way of doing checksums, a warning message will be
- * printed if they are used and an exception occurs.
+ * This is the old (and unsafe) way of doing checksums, a warning message will
+ * be printed if it is used and an exception occurs.
  *
- * these functions should go away after some time.
+ * this functions should go away after some time.
  */
 #define csum_partial_copy(src,dst,len,sum)	csum_partial_copy_nocheck(src,dst,len,sum)
 
@@ -105,7 +107,7 @@ csum_tcpudp_nofold(unsigned long saddr, unsigned long daddr, unsigned short len,
 	adcs	%0, %0, %5					\n\
 	adc	%0, %0, #0"
 	: "=&r"(sum)
-	: "r" (sum), "r" (daddr), "r" (saddr), "r" (ntohs(len) << 16), "Ir" (proto << 8)
+	: "r" (sum), "r" (daddr), "r" (saddr), "r" (ntohs(len)), "Ir" (ntohs(proto))
 	: "cc");
 	return sum;
 }	
@@ -127,7 +129,7 @@ csum_tcpudp_magic(unsigned long saddr, unsigned long daddr, unsigned short len,
 	addcs	%0, %0, #0x10000				\n\
 	mvn	%0, %0"
 	: "=&r"(sum)
-	: "r" (sum), "r" (daddr), "r" (saddr), "r" (ntohs(len)), "Ir" (proto << 8)
+	: "r" (sum), "r" (daddr), "r" (saddr), "r" (ntohs(len)), "Ir" (ntohs(proto))
 	: "cc");
 	return sum >> 16;
 }

@@ -14,6 +14,7 @@
 struct uml_net {
 	struct list_head list;
 	struct net_device *dev;
+	struct platform_device pdev;
 	int index;
 	unsigned char mac[ETH_ALEN];
 	int have_mac;

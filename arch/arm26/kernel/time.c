@@ -32,7 +32,7 @@
 #include <asm/hardware.h>
 #include <asm/io.h>
 #include <asm/irq.h>
-#include <asm/leds.h>
+#include <asm/ioc.h>
 
 u64 jiffies_64 = INITIAL_JIFFIES;
 
@@ -56,16 +56,53 @@ static int dummy_set_rtc(void)
  */
 int (*set_rtc)(void) = dummy_set_rtc;
 
-static unsigned long dummy_gettimeoffset(void)
+/*
+ * Get time offset based on IOCs timer.
+ * FIXME - if this is called with interrutps off, why the shennanigans
+ * below ?
+ */
+static unsigned long gettimeoffset(void)
 {
-	return 0;
+        unsigned int count1, count2, status;
+        long offset;
+
+        ioc_writeb (0, IOC_T0LATCH);
+        barrier ();
+        count1 = ioc_readb(IOC_T0CNTL) | (ioc_readb(IOC_T0CNTH) << 8);
+        barrier ();
+        status = ioc_readb(IOC_IRQREQA);
+        barrier ();
+        ioc_writeb (0, IOC_T0LATCH);
+        barrier ();
+        count2 = ioc_readb(IOC_T0CNTL) | (ioc_readb(IOC_T0CNTH) << 8);
+
+        offset = count2;
+        if (count2 < count1) {
+                /*
+                 * We have not had an interrupt between reading count1
+                 * and count2.
+                 */
+                if (status & (1 << 5))
+                        offset -= LATCH;
+        } else if (count2 > count1) {
+                /*
+                 * We have just had another interrupt between reading
+                 * count1 and count2.
+                 */
+                offset -= LATCH;
+        }
+
+        offset = (LATCH - offset) * (tick_nsec / 1000);
+        return (offset + LATCH/2) / LATCH;
 }
 
 /*
- * hook for getting the time offset.  Note that it is
- * always called with interrupts disabled.
+ * Scheduler clock - returns current time in nanosec units.
  */
-unsigned long (*gettimeoffset)(void) = dummy_gettimeoffset;
+unsigned long long sched_clock(void)
+{
+	return (unsigned long long)jiffies * (1000000000 / HZ);
+}
 
 static unsigned long next_rtc_update;
 
@@ -187,7 +224,10 @@ extern void ioctime_init(void);
  */
 void __init time_init(void)
 {
-        ioctime_init();
+	ioc_writeb(LATCH & 255, IOC_T0LTCHL);
+        ioc_writeb(LATCH >> 8, IOC_T0LTCHH);
+        ioc_writeb(0, IOC_T0GO);
+
 
         setup_irq(IRQ_TIMER, &timer_irq);
 }

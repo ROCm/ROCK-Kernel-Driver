@@ -135,7 +135,7 @@ void __iomem * __ioremap(unsigned long phys_addr, unsigned long size, unsigned l
 	/*
 	 * Don't allow anybody to remap normal RAM that we're using..
 	 */
-	if (phys_addr < virt_to_phys(high_memory)) {
+	if (phys_addr <= virt_to_phys(high_memory - 1)) {
 		char *t_addr, *t_end;
 		struct page *page;
 
@@ -202,7 +202,7 @@ void __iomem *ioremap_nocache (unsigned long phys_addr, unsigned long size)
 	/* Guaranteed to be > phys_addr, as per __ioremap() */
 	last_addr = phys_addr + size - 1;
 
-	if (last_addr < virt_to_phys(high_memory)) { 
+	if (last_addr < virt_to_phys(high_memory) - 1) {
 		struct page *ppage = virt_to_page(__va(phys_addr));		
 		unsigned long npages;
 
@@ -237,7 +237,7 @@ void iounmap(volatile void __iomem *addr)
 		return;
 	} 
 
-	if (p->flags && p->phys_addr < virt_to_phys(high_memory)) { 
+	if (p->flags && p->phys_addr < virt_to_phys(high_memory) - 1) {
 		change_page_attr(virt_to_page(__va(p->phys_addr)),
 				 p->size >> PAGE_SHIFT,
 				 PAGE_KERNEL); 				 

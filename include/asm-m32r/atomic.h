@@ -10,22 +10,13 @@
  */
 
 #include <linux/config.h>
+#include <asm/assembler.h>
 #include <asm/system.h>
 
 /*
  * Atomic operations that C can't guarantee us.  Useful for
  * resource counting etc..
  */
-
-#undef LOAD
-#undef STORE
-#ifdef CONFIG_SMP
-#define LOAD	"lock"
-#define STORE	"unlock"
-#else
-#define LOAD	"ld"
-#define STORE	"st"
-#endif
 
 /*
  * Make sure gcc doesn't try to be clever and move things around
@@ -60,7 +51,7 @@ typedef struct { volatile int counter; } atomic_t;
  *
  * Atomically adds @i to @v and return (@i + @v).
  */
-static inline int atomic_add_return(int i, atomic_t *v)
+static __inline__ int atomic_add_return(int i, atomic_t *v)
 {
 	unsigned long flags;
 	int result;
@@ -69,9 +60,9 @@ static inline int atomic_add_return(int i, atomic_t *v)
 	__asm__ __volatile__ (
 		"# atomic_add_return		\n\t"
 		DCACHE_CLEAR("%0", "r4", "%1")
-		LOAD"	%0, @%1;		\n\t"
+		M32R_LOCK" %0, @%1;		\n\t"
 		"add	%0, %2;			\n\t"
-		STORE"	%0, @%1;		\n\t"
+		M32R_UNLOCK" %0, @%1;		\n\t"
 		: "=&r" (result)
 		: "r" (&v->counter), "r" (i)
 		: "memory"
@@ -91,7 +82,7 @@ static inline int atomic_add_return(int i, atomic_t *v)
  *
  * Atomically subtracts @i from @v and return (@v - @i).
  */
-static inline int atomic_sub_return(int i, atomic_t *v)
+static __inline__ int atomic_sub_return(int i, atomic_t *v)
 {
 	unsigned long flags;
 	int result;
@@ -100,9 +91,9 @@ static inline int atomic_sub_return(int i, atomic_t *v)
 	__asm__ __volatile__ (
 		"# atomic_sub_return		\n\t"
 		DCACHE_CLEAR("%0", "r4", "%1")
-		LOAD"	%0, @%1;		\n\t"
+		M32R_LOCK" %0, @%1;		\n\t"
 		"sub	%0, %2;			\n\t"
-		STORE"	%0, @%1;		\n\t"
+		M32R_UNLOCK" %0, @%1;		\n\t"
 		: "=&r" (result)
 		: "r" (&v->counter), "r" (i)
 		: "memory"
@@ -150,7 +141,7 @@ static inline int atomic_sub_return(int i, atomic_t *v)
  *
  * Atomically increments @v by 1 and returns the result.
  */
-static inline int atomic_inc_return(atomic_t *v)
+static __inline__ int atomic_inc_return(atomic_t *v)
 {
 	unsigned long flags;
 	int result;
@@ -159,9 +150,9 @@ static inline int atomic_inc_return(atomic_t *v)
 	__asm__ __volatile__ (
 		"# atomic_inc_return		\n\t"
 		DCACHE_CLEAR("%0", "r4", "%1")
-		LOAD"	%0, @%1;		\n\t"
+		M32R_LOCK" %0, @%1;		\n\t"
 		"addi	%0, #1;			\n\t"
-		STORE"	%0, @%1;		\n\t"
+		M32R_UNLOCK" %0, @%1;		\n\t"
 		: "=&r" (result)
 		: "r" (&v->counter)
 		: "memory"
@@ -180,7 +171,7 @@ static inline int atomic_inc_return(atomic_t *v)
  *
  * Atomically decrements @v by 1 and returns the result.
  */
-static inline int atomic_dec_return(atomic_t *v)
+static __inline__ int atomic_dec_return(atomic_t *v)
 {
 	unsigned long flags;
 	int result;
@@ -189,9 +180,9 @@ static inline int atomic_dec_return(atomic_t *v)
 	__asm__ __volatile__ (
 		"# atomic_dec_return		\n\t"
 		DCACHE_CLEAR("%0", "r4", "%1")
-		LOAD"	%0, @%1;		\n\t"
+		M32R_LOCK" %0, @%1;		\n\t"
 		"addi	%0, #-1;		\n\t"
-		STORE"	%0, @%1;		\n\t"
+		M32R_UNLOCK" %0, @%1;		\n\t"
 		: "=&r" (result)
 		: "r" (&v->counter)
 		: "memory"
@@ -251,7 +242,7 @@ static inline int atomic_dec_return(atomic_t *v)
  */
 #define atomic_add_negative(i,v) (atomic_add_return((i), (v)) < 0)
 
-static inline void atomic_clear_mask(unsigned long  mask, atomic_t *addr)
+static __inline__ void atomic_clear_mask(unsigned long  mask, atomic_t *addr)
 {
 	unsigned long flags;
 	unsigned long tmp;
@@ -260,9 +251,9 @@ static inline void atomic_clear_mask(unsigned long  mask, atomic_t *addr)
 	__asm__ __volatile__ (
 		"# atomic_clear_mask		\n\t"
 		DCACHE_CLEAR("%0", "r5", "%1")
-		LOAD"	%0, @%1;		\n\t"
+		M32R_LOCK" %0, @%1;		\n\t"
 		"and	%0, %2;			\n\t"
-		STORE"	%0, @%1;		\n\t"
+		M32R_UNLOCK" %0, @%1;		\n\t"
 		: "=&r" (tmp)
 		: "r" (addr), "r" (~mask)
 		: "memory"
@@ -273,7 +264,7 @@ static inline void atomic_clear_mask(unsigned long  mask, atomic_t *addr)
 	local_irq_restore(flags);
 }
 
-static inline void atomic_set_mask(unsigned long  mask, atomic_t *addr)
+static __inline__ void atomic_set_mask(unsigned long  mask, atomic_t *addr)
 {
 	unsigned long flags;
 	unsigned long tmp;
@@ -282,9 +273,9 @@ static inline void atomic_set_mask(unsigned long  mask, atomic_t *addr)
 	__asm__ __volatile__ (
 		"# atomic_set_mask		\n\t"
 		DCACHE_CLEAR("%0", "r5", "%1")
-		LOAD"	%0, @%1;		\n\t"
+		M32R_LOCK" %0, @%1;		\n\t"
 		"or	%0, %2;			\n\t"
-		STORE"	%0, @%1;		\n\t"
+		M32R_UNLOCK" %0, @%1;		\n\t"
 		: "=&r" (tmp)
 		: "r" (addr), "r" (mask)
 		: "memory"
@@ -302,4 +293,3 @@ static inline void atomic_set_mask(unsigned long  mask, atomic_t *addr)
 #define smp_mb__after_atomic_inc()	barrier()
 
 #endif	/* _ASM_M32R_ATOMIC_H */
-

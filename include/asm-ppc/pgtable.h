@@ -433,7 +433,7 @@ extern unsigned long bad_call_to_PMD_PAGE_SIZE(void);
 #define pte_pfn(x)		(pte_val(x) >> PAGE_SHIFT)
 #define pte_page(x)		pfn_to_page(pte_pfn(x))
 
-#define pfn_pte(pfn, prot)	__pte(((pfn) << PAGE_SHIFT) | pgprot_val(prot))
+#define pfn_pte(pfn, prot)	__pte(((pte_t)(pfn) << PAGE_SHIFT) | pgprot_val(prot))
 #define mk_pte(page, prot)	pfn_pte(page_to_pfn(page), prot)
 
 /*
@@ -716,8 +716,22 @@ extern void kernel_set_cachemode (unsigned long address, unsigned long size,
 /* Needs to be defined here and not in linux/mm.h, as it is arch dependent */
 #define kern_addr_valid(addr)	(1)
 
+#ifdef CONFIG_PHYS_64BIT
+extern int remap_pfn_range(struct vm_area_struct *vma, unsigned long from,
+			unsigned long paddr, unsigned long size, pgprot_t prot);
+static inline int io_remap_page_range(struct vm_area_struct *vma,
+					unsigned long vaddr,
+					unsigned long paddr,
+					unsigned long size,
+					pgprot_t prot)
+{
+	phys_addr_t paddr64 = fixup_bigphys_addr(paddr, size);
+	return remap_pfn_range(vma, vaddr, paddr64 >> PAGE_SHIFT, size, prot);
+}
+#else
 #define io_remap_page_range(vma, vaddr, paddr, size, prot)		\
 		remap_pfn_range(vma, vaddr, (paddr) >> PAGE_SHIFT, size, prot)
+#endif
 
 /*
  * No page table caches to initialise

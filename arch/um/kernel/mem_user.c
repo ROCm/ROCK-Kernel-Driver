@@ -101,6 +101,8 @@ void check_tmpexec(void)
 	}
 	printf("OK\n");
 	munmap(addr, UM_KERN_PAGE_SIZE);
+
+	os_close_file(fd);
 }
 
 static int have_devanon = 0;

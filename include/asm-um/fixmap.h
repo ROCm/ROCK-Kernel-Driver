@@ -3,6 +3,7 @@
 
 #include <linux/config.h>
 #include <asm/kmap_types.h>
+#include <asm/archparam.h>
 
 /*
  * Here we define all the compile-time 'special' virtual
@@ -34,7 +35,6 @@ enum fixed_addresses {
 	FIX_KMAP_BEGIN,	/* reserved pte's for temporary kernel mappings */
 	FIX_KMAP_END = FIX_KMAP_BEGIN+(KM_TYPE_NR*NR_CPUS)-1,
 #endif
-	FIX_VSYSCALL,
 	__end_of_fixed_addresses
 };
 
@@ -68,8 +68,8 @@ extern unsigned long get_kmem_end(void);
  * This is the range that is readable by user mode, and things
  * acting like user mode such as get_user_pages.
  */
-#define FIXADDR_USER_START	(__fix_to_virt(FIX_VSYSCALL))
-#define FIXADDR_USER_END	(FIXADDR_USER_START + PAGE_SIZE)
+#define FIXADDR_USER_START	VSYSCALL_BASE
+#define FIXADDR_USER_END	VSYSCALL_END
 
 extern void __this_fixmap_does_not_exist(void);
 

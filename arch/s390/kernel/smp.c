@@ -535,7 +535,7 @@ __init smp_check_cpus(unsigned int max_cpus)
 extern void init_cpu_timer(void);
 extern void init_cpu_vtimer(void);
 extern int pfault_init(void);
-extern int pfault_token(void);
+extern void pfault_fini(void);
 
 int __devinit start_secondary(void *cpuvoid)
 {
@@ -571,6 +571,8 @@ static void __init smp_create_idle(unsigned int cpu)
 	p = fork_idle(cpu);
 	if (IS_ERR(p))
 		panic("failed fork for CPU %u: %li", cpu, PTR_ERR(p));
+	atomic_inc(&init_mm.mm_count);
+	p->active_mm = &init_mm;
 	current_set[cpu] = p;
 }
 
@@ -694,6 +696,11 @@ __cpu_disable(void)
 		spin_unlock_irqrestore(&smp_reserve_lock, flags);
 		return -EBUSY;
 	}
+
+#ifdef CONFIG_PFAULT
+	/* Disable pfault pseudo page faults on this cpu. */
+	pfault_fini();
+#endif
 
 	/* disable all external interrupts */
 

@@ -19,6 +19,7 @@
 #include <linux/module.h>
 #include <platforms/4xx/ibm440gp.h>
 #include <asm/ocp.h>
+#include <asm/ppc4xx_pic.h>
 
 static struct ocp_func_emac_data ibm440gp_emac0_def = {
 	.rgmii_idx	= -1,           /* No RGMII */
@@ -148,4 +149,16 @@ struct ocp_def core_ocp[] = {
 	},
 	{ .vendor	= OCP_VENDOR_INVALID
 	}
+};
+
+/* Polarity and triggering settings for internal interrupt sources */
+struct ppc4xx_uic_settings ppc4xx_core_uic_cfg[] __initdata = {
+	{ .polarity 	= 0xfffffe03,
+	  .triggering	= 0x01c00000,
+	  .ext_irq_mask	= 0x000001fc,	/* IRQ0 - IRQ6 */
+	},
+	{ .polarity 	= 0xffffc0ff,
+	  .triggering	= 0x00ff8000,
+	  .ext_irq_mask	= 0x00003f00,	/* IRQ7 - IRQ12 */
+	},
 };

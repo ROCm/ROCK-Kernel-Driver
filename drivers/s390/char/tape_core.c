@@ -349,6 +349,11 @@ tape_generic_online(struct tape_device *device,
 
 	/* Let the discipline have a go at the device. */
 	device->discipline = discipline;
+	if (!try_module_get(discipline->owner)) {
+		PRINT_ERR("Cannot get module. Module gone.\n");
+		return -EINVAL;
+	}
+
 	rc = discipline->setup_device(device);
 	if (rc)
 		goto out;
@@ -377,6 +382,7 @@ out_discipline:
 out_minor:
 	tape_remove_minor(device);
 out:
+	module_put(discipline->owner);
 	return rc;
 }
 
@@ -386,6 +392,7 @@ tape_cleanup_device(struct tape_device *device)
 	tapeblock_cleanup_device(device);
 	tapechar_cleanup_device(device);
 	device->discipline->cleanup_device(device);
+	module_put(device->discipline->owner);
 	tape_remove_minor(device);
 	tape_med_state_set(device, MS_UNKNOWN);
 }
@@ -1184,7 +1191,7 @@ tape_init (void)
 #ifdef DBF_LIKE_HELL
 	debug_set_level(TAPE_DBF_AREA, 6);
 #endif
-	DBF_EVENT(3, "tape init: ($Revision: 1.50 $)\n");
+	DBF_EVENT(3, "tape init: ($Revision: 1.51 $)\n");
 	tape_proc_init();
 	tapechar_init ();
 	tapeblock_init ();
@@ -1209,7 +1216,7 @@ tape_exit(void)
 MODULE_AUTHOR("(C) 2001 IBM Deutschland Entwicklung GmbH by Carsten Otte and "
 	      "Michael Holzheu (cotte@de.ibm.com,holzheu@de.ibm.com)");
 MODULE_DESCRIPTION("Linux on zSeries channel attached "
-		   "tape device driver ($Revision: 1.50 $)");
+		   "tape device driver ($Revision: 1.51 $)");
 MODULE_LICENSE("GPL");
 
 module_init(tape_init);

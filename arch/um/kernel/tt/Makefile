@@ -8,7 +8,7 @@ clean-files := unmap_tmp.o
 
 obj-y = exec_kern.o exec_user.o gdb.o ksyms.o mem.o mem_user.o process_kern.o \
 	syscall_kern.o syscall_user.o time.o tlb.o tracer.o trap_user.o \
-	uaccess.o uaccess_user.o sys-$(SUBARCH)/
+	uaccess.o uaccess_user.o
 
 obj-$(CONFIG_PT_PROXY) += gdb_kern.o ptproxy/
 

@@ -433,7 +433,12 @@ static ide_hwif_t *ide_hwif_configure(struct pci_dev *dev, ide_pci_device_t *d, 
 	if (hwif->io_ports[IDE_DATA_OFFSET] != base ||
 	    hwif->io_ports[IDE_CONTROL_OFFSET] != (ctl | 2)) {
 		memset(&hwif->hw, 0, sizeof(hwif->hw));
+#ifndef IDE_ARCH_OBSOLETE_INIT
+		ide_std_init_ports(&hwif->hw, base, (ctl | 2));
+		hwif->hw.io_ports[IDE_IRQ_OFFSET] = 0;
+#else
 		ide_init_hwif_ports(&hwif->hw, base, (ctl | 2), NULL);
+#endif
 		memcpy(hwif->io_ports, hwif->hw.io_ports, sizeof(hwif->io_ports));
 		hwif->noprobe = !hwif->io_ports[IDE_DATA_OFFSET];
 	}

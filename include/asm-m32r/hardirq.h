@@ -1,3 +1,4 @@
+#ifdef __KERNEL__
 #ifndef __ASM_HARDIRQ_H
 #define __ASM_HARDIRQ_H
 
@@ -40,4 +41,11 @@ do {									\
 		preempt_enable_no_resched();				\
 } while (0)
 
+static inline void ack_bad_irq(int irq)
+{
+	printk(KERN_CRIT "unexpected IRQ trap at vector %02x\n", irq);
+	BUG();
+}
+
 #endif /* __ASM_HARDIRQ_H */
+#endif /* __KERNEL__ */

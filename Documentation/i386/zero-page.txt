@@ -74,6 +74,10 @@ Offset	Type		Description
 0x21c	unsigned long	INITRD_SIZE, size in bytes of ramdisk image
 0x220	4 bytes		(setup.S)
 0x224	unsigned short	setup.S heap end pointer
+0x226   unsigned short	zero_pad
+0x228   unsigned long	cmd_line_ptr
+0x22c   unsigned long	ramdisk_max
+0x230   16 bytes 	trampoline
 0x290 - 0x2cf		EDD_MBR_SIG_BUFFER (edd.S)
 0x2d0 - 0x600		E820MAP
 0x600 - 0x7ff		EDDBUF (edd.S) for disk signature read sector

@@ -411,7 +411,6 @@ void __init mem_init(void)
 	unsigned long highmem_mapnr;
 
 	highmem_mapnr = total_lowmem >> PAGE_SHIFT;
-	highmem_start_page = mem_map + highmem_mapnr;
 #endif /* CONFIG_HIGHMEM */
 	max_mapnr = total_memory >> PAGE_SHIFT;
 

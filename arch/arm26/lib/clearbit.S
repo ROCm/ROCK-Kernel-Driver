@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/lib/clearbit.S
+ *  linux/arch/arm26/lib/clearbit.S
  *
  *  Copyright (C) 1995-1996 Russell King
  *

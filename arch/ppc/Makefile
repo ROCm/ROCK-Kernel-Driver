@@ -42,6 +42,9 @@ cpu-as-$(CONFIG_E500)		+= -Wa,-me500
 AFLAGS += $(cpu-as-y)
 CFLAGS += $(cpu-as-y)
 
+# Default to the common case.
+KBUILD_DEFCONFIG := common_defconfig
+
 head-y				:= arch/ppc/kernel/head.o
 head-$(CONFIG_8xx)		:= arch/ppc/kernel/head_8xx.o
 head-$(CONFIG_4xx)		:= arch/ppc/kernel/head_4xx.o
@@ -68,7 +71,7 @@ BOOT_TARGETS = zImage zImage.initrd znetboot znetboot.initrd vmlinux.sm
 
 .PHONY: $(BOOT_TARGETS)
 
-all: zImage
+all: uImage zImage
 
 CPPFLAGS_vmlinux.lds	:= -Upowerpc
 

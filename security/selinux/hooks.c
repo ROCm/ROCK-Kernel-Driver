@@ -1494,9 +1494,9 @@ static int selinux_quotactl(int cmds, int type, int id, struct super_block *sb)
 	return rc;
 }
 
-static int selinux_quota_on(struct file *f)
+static int selinux_quota_on(struct dentry *dentry)
 {
-	return file_has_perm(current, f, FILE__QUOTAON);
+	return dentry_has_perm(current, NULL, dentry, FILE__QUOTAON);
 }
 
 static int selinux_syslog(int type)

@@ -54,7 +54,7 @@ static int reiserfs_file_release (struct inode * inode, struct file * filp)
     /* freeing preallocation only involves relogging blocks that
      * are already in the current transaction.  preallocation gets
      * freed at the end of each transaction, so it is impossible for
-     * us to log any additional blocks
+     * us to log any additional blocks (including quota blocks)
      */
     err = journal_begin(&th, inode->i_sb, 1);
     if (err) {
@@ -201,7 +201,7 @@ int reiserfs_allocate_blocks_for_region(
     /* If we came here, it means we absolutely need to open a transaction,
        since we need to allocate some blocks */
     reiserfs_write_lock(inode->i_sb); // Journaling stuff and we need that.
-    res = journal_begin(th, inode->i_sb, JOURNAL_PER_BALANCE_CNT * 3 + 1); // Wish I know if this number enough
+    res = journal_begin(th, inode->i_sb, JOURNAL_PER_BALANCE_CNT * 3 + 1 + 2 * REISERFS_QUOTA_TRANS_BLOCKS); // Wish I know if this number enough
     if (res)
         goto error_exit;
     reiserfs_update_inode_transaction(inode) ;
@@ -576,7 +576,7 @@ error_exit:
         int err;
         // update any changes we made to blk count
         reiserfs_update_sd(th, inode);
-        err = journal_end(th, inode->i_sb, JOURNAL_PER_BALANCE_CNT * 3 + 1);
+        err = journal_end(th, inode->i_sb, JOURNAL_PER_BALANCE_CNT * 3 + 1 + 2 * REISERFS_QUOTA_TRANS_BLOCKS);
         if (err)
             res = err;
     }

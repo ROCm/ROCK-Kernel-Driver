@@ -177,7 +177,7 @@ static __inline__ int DQUOT_OFF(struct super_block *sb)
 {
 	int ret = -ENOSYS;
 
-	if (sb->s_qcop && sb->s_qcop->quota_off)
+	if (sb_any_quota_enabled(sb) && sb->s_qcop && sb->s_qcop->quota_off)
 		ret = sb->s_qcop->quota_off(sb, -1);
 	return ret;
 }

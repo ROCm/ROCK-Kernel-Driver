@@ -128,9 +128,6 @@ ENTRY(startup_32_smp)
 	movl %eax,%fs
 	movl %eax,%gs
 
-	xorl %ebx,%ebx
-	incl %ebx				/* This is a secondary processor (AP) */
-
 /*
  *	New page tables may be in 4Mbyte page mode and may
  *	be using the global pages. 
@@ -148,7 +145,7 @@ ENTRY(startup_32_smp)
 #define cr4_bits mmu_cr4_features-__PAGE_OFFSET
 	movl cr4_bits,%edx
 	andl %edx,%edx
-	jz 3f
+	jz 6f
 	movl %cr4,%eax		# Turn on paging options (PSE,PAE,..)
 	orl %edx,%eax
 	movl %eax,%cr4
@@ -176,9 +173,10 @@ ENTRY(startup_32_smp)
 	wrmsr
 
 6:
-	/* cpuid clobbered ebx, set it up again: */
+	/* This is a secondary processor (AP) */
 	xorl %ebx,%ebx
 	incl %ebx
+
 3:
 #endif /* CONFIG_SMP */
 

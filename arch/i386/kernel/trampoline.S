@@ -51,8 +51,14 @@ r_base = .
 	movl	$0xA5A5A5A5, trampoline_data - r_base
 				# write marker for master knows we're running
 
-	lidt	boot_idt - r_base	# load idt with 0, 0
-	lgdt	boot_gdt - r_base	# load gdt with whatever is appropriate
+	/* GDT tables in non default location kernel can be beyond 16MB and
+	 * lgdt will not be able to load the address as in real mode default
+	 * operand size is 16bit. Use lgdtl instead to force operand size
+	 * to 32 bit.
+	 */
+
+	lidtl	boot_idt - r_base	# load idt with 0, 0
+	lgdtl	boot_gdt - r_base	# load gdt with whatever is appropriate
 
 	xor	%ax, %ax
 	inc	%ax		# protected mode (PE) bit

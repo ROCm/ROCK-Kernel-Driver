@@ -609,7 +609,7 @@ static ctl_table ip_ct_net_table[] = {
 static struct ctl_table_header *ip_ct_sysctl_header;
 #endif
 
-int __init init(void)
+static int __init init(void)
 {
 	int ret;
 
@@ -622,6 +622,7 @@ int __init init(void)
 #ifdef CONFIG_SYSCTL
 	ip_ct_sysctl_header = register_sysctl_table(ip_ct_net_table, 0);
 	if (ip_ct_sysctl_header == NULL) {
+		ret = -ENOMEM;
 		printk("ip_conntrack_proto_sctp: can't register to sysctl.\n");
 		goto cleanup;
 	}
@@ -639,7 +640,7 @@ int __init init(void)
 	return ret;
 }
 
-void __exit fini(void)
+static void __exit fini(void)
 {
 	ip_conntrack_protocol_unregister(&ip_conntrack_protocol_sctp);
 #ifdef CONFIG_SYSCTL

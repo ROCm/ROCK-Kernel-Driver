@@ -212,6 +212,8 @@ static int is_errata93(struct pt_regs *regs, unsigned long address)
 
 int unhandled_signal(struct task_struct *tsk, int sig)
 {
+	if (tsk->pid == 1)
+		return 1;
 	/* Warn for strace, but not for gdb */
 	if (!test_ti_thread_flag(tsk->thread_info, TIF_SYSCALL_TRACE) &&
 	    (tsk->ptrace & PT_PTRACED))
@@ -483,8 +485,9 @@ bad_area_nosemaphore:
 			return;
 
 		if (exception_trace && unhandled_signal(tsk, SIGSEGV)) {
-			printk(KERN_INFO
-		       "%s[%d]: segfault at %016lx rip %016lx rsp %016lx error %lx\n",
+			printk(
+		       "%s%s[%d]: segfault at %016lx rip %016lx rsp %016lx error %lx\n",
+					tsk->pid > 1 ? KERN_INFO : KERN_EMERG,
 					tsk->comm, tsk->pid, address, regs->rip,
 					regs->rsp, error_code);
 		}

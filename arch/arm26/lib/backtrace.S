@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/lib/backtrace.S
+ *  linux/arch/arm26/lib/backtrace.S
  *
  *  Copyright (C) 1995, 1996 Russell King
  *

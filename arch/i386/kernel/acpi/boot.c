@@ -810,13 +810,16 @@ acpi_process_madt(void)
 }
 
 /*
- * acpi_boot_init()
+ * acpi_boot_table_init() and acpi_boot_init()
  *  called from setup_arch(), always.
  *	1. checksums all tables
  *	2. enumerates lapics
  *	3. enumerates io-apics
  *
- * side effects:
+ * acpi_table_init() is separate to allow reading SRAT without
+ * other side effects.
+ *
+ * side effects of acpi_boot_init:
  *	acpi_lapic = 1 if LAPIC found
  *	acpi_ioapic = 1 if IOAPIC found
  *	if (acpi_lapic && acpi_ioapic) smp_found_config = 1;
@@ -830,7 +833,7 @@ acpi_process_madt(void)
  */
 
 int __init
-acpi_boot_init (void)
+acpi_boot_table_init(void)
 {
 	int error;
 
@@ -871,6 +874,21 @@ acpi_boot_init (void)
 			return error;
 		}
 	}
+
+	return 0;
+}
+
+
+int __init acpi_boot_init(void)
+{
+	/*
+	 * If acpi_disabled, bail out
+	 * One exception: acpi=ht continues far enough to enumerate LAPICs
+	 */
+	if (acpi_disabled && !acpi_ht)
+		 return 1;
+
+	acpi_table_parse(ACPI_BOOT, acpi_parse_sbf);
 
 	/*
 	 * set sci_int and PM timer address
