@@ -70,30 +70,6 @@ static void udf_update_extents(struct inode *,
 static int udf_get_block(struct inode *, sector_t, struct buffer_head *, int);
 
 /*
- * udf_put_inode
- *
- * PURPOSE
- *
- * DESCRIPTION
- *	This routine is called whenever the kernel no longer needs the inode.
- *
- * HISTORY
- *	July 1, 1997 - Andrew E. Mileski
- *	Written, tested, and released.
- *
- *  Called at each iput()
- */
-void udf_put_inode(struct inode * inode)
-{
-	if (!(inode->i_sb->s_flags & MS_RDONLY))
-	{
-		lock_kernel();
-		udf_discard_prealloc(inode);
-		unlock_kernel();
-	}
-}
-
-/*
  * udf_delete_inode
  *
  * PURPOSE
@@ -129,6 +105,12 @@ no_delete:
 
 void udf_clear_inode(struct inode *inode)
 {
+	if (!(inode->i_sb->s_flags & MS_RDONLY)) {
+		lock_kernel();
+		udf_discard_prealloc(inode);
+		unlock_kernel();
+	}
+
 	kfree(UDF_I_DATA(inode));
 	UDF_I_DATA(inode) = NULL;
 }

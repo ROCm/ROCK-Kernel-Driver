@@ -163,7 +163,6 @@ static struct super_operations udf_sb_ops = {
 	.alloc_inode		= udf_alloc_inode,
 	.destroy_inode		= udf_destroy_inode,
 	.write_inode		= udf_write_inode,
-	.put_inode		= udf_put_inode,
 	.delete_inode		= udf_delete_inode,
 	.clear_inode		= udf_clear_inode,
 	.put_super		= udf_put_super,
