@@ -879,17 +879,25 @@ linvfs_direct_IO(
 
 			pg_count = (size + page_offset + PAGE_CACHE_SIZE - 1)
 					>> PAGE_CACHE_SHIFT;
-			pb = pagebuf_lookup(map.pbm_target, inode, offset,
-							size, pb_flags);
+			if ((pb = pagebuf_lookup(map.pbm_target, inode, offset,
+						size, pb_flags)) == NULL) {
+				error = -ENOMEM;
+				break;
+			}
 			/* Need to hook up pagebuf to kiobuf pages */
 			pb->pb_pages = &maplist[pg_index];
 			pb->pb_offset = page_offset;
 			pb->pb_page_count = pg_count;
 
 			pb->pb_bn = map.pbm_bn + (map.pbm_delta >> 9);
-			pagebuf_iostart(pb, pb_flags);
+			error = pagebuf_iostart(pb, pb_flags);
 			pb->pb_flags &= ~_PBF_LOCKABLE;
 			pagebuf_rele(pb);
+			if (error != 0) {
+				if (error > 0)
+					error = -error;
+				break;
+			}
 
 			page_offset = (page_offset + size) & ~PAGE_CACHE_MASK;
 			if (page_offset)
@@ -901,7 +909,7 @@ linvfs_direct_IO(
 		length -= size;
 	}
 
-	return error ? error : total - length;
+	return (error ? error : (int)(total - length));
 }
 #endif
 

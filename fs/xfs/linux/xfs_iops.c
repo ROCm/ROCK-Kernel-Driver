@@ -264,7 +264,7 @@ linvfs_symlink(
 
 	bzero(&va, sizeof(va));
 	va.va_type = VLNK;
-	va.va_mode = S_IRWXUGO;
+	va.va_mode = 0777 & ~current->fs->umask;
 	va.va_mask = AT_TYPE|AT_MODE; /* AT_PROJID? */
 
 	error = 0;
