@@ -61,6 +61,14 @@ extern const struct linux_logo logo_linux_clut224;
 #endif
 
 /*
+ * Properties whose value is longer than this get excluded from our
+ * copy of the device tree. This value does need to be big enough to
+ * ensure that we don't lose things like the interrupt-map property
+ * on a PCI-PCI bridge.
+ */
+#define MAX_PROPERTY_LENGTH	(1UL * 1024 * 1024)
+
+/*
  * prom_init() is called very early on, before the kernel text
  * and data have been mapped to KERNELBASE.  At this point the code
  * is running at whatever address it has been loaded at, so
@@ -908,9 +916,11 @@ prom_initialize_tce_table(void)
 			*tce_entryp = tce_entry;
 		}
 
+		/* It seems OF doesn't null-terminate the path :-( */
+		memset(path, 0, sizeof(path));
 		/* Call OF to setup the TCE hardware */
 		if (call_prom(RELOC("package-to-path"), 3, 1, node,
-                             path, 255) <= 0) {
+                             path, sizeof(path)-1) <= 0) {
                         prom_print(RELOC("package-to-path failed\n"));
                 } else {
                         prom_print(RELOC("opened "));
@@ -1687,6 +1697,11 @@ check_display(unsigned long mem)
 		/* It seems OF doesn't null-terminate the path :-( */
 		path = (char *) mem;
 		memset(path, 0, 256);
+
+		/*
+		 * leave some room at the end of the path for appending extra
+		 * arguments
+		 */
 		if ((long) call_prom(RELOC("package-to-path"), 3, 1,
 				    node, path, 250) < 0)
 			continue;
@@ -1794,8 +1809,7 @@ copy_device_tree(unsigned long mem_start)
 	return new_start;
 }
 
-__init
-static unsigned long
+static unsigned long __init
 inspect_node(phandle node, struct device_node *dad,
 	     unsigned long mem_start, unsigned long mem_end,
 	     struct device_node ***allnextpp)
@@ -1843,6 +1857,22 @@ inspect_node(phandle node, struct device_node *dad,
 				  valp, mem_end - mem_start);
 		if (pp->length < 0)
 			continue;
+		if (pp->length > MAX_PROPERTY_LENGTH) {
+			char path[128];
+
+			prom_print(RELOC("WARNING: ignoring large property "));
+			/* It seems OF doesn't null-terminate the path :-( */
+			memset(path, 0, sizeof(path));
+			if (call_prom(RELOC("package-to-path"), 3, 1, node,
+                            path, sizeof(path)-1) > 0)
+				prom_print(path);
+			prom_print(namep);
+			prom_print(RELOC(" length 0x"));
+			prom_print_hex(pp->length);
+			prom_print_nl();
+
+			continue;
+		}
 		mem_start = DOUBLEWORD_ALIGN(mem_start + pp->length);
 		*prev_propp = PTRUNRELOC(pp);
 		prev_propp = &pp->next;
