@@ -30,7 +30,6 @@ static u32 w1_ids = 1;
 extern struct device_driver w1_driver;
 extern struct bus_type w1_bus_type;
 extern struct device w1_device;
-extern struct device_attribute w1_master_attribute;
 extern int w1_max_slave_count;
 extern struct list_head w1_masters;
 extern spinlock_t w1_mlock;
@@ -133,7 +132,7 @@ int w1_add_master_device(struct w1_bus_master *master)
 		goto err_out_free_dev;
 	}
 
-	retval = device_create_file(&dev->dev, &w1_master_attribute);
+	retval =  w1_create_master_attributes(dev);
 	if (retval)
 		goto err_out_kill_thread;
 

@@ -107,6 +107,9 @@ struct w1_master
 	struct sock 		*nls;
 };
 
+int w1_create_master_attributes(struct w1_master *);
+void w1_destroy_master_attributes(struct w1_master *);
+
 #endif /* __KERNEL__ */
 
 #endif /* __W1_H */
