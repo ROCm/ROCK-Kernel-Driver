@@ -895,15 +895,17 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 					cpu_set(i, cpu_sibling_map[cpu]);
 				}
 			}
-		} else {
+		} else { 
 			siblings++;
 			cpu_set(cpu, cpu_sibling_map[cpu]);
 		}
 
-		if (siblings != smp_num_siblings)
-			printk(KERN_WARNING
-	       "WARNING: %d siblings found for CPU%d, should be %d\n",
+		if (siblings != smp_num_siblings) {
+			printk(KERN_WARNING 
+	       "WARNING: %d siblings found for CPU%d, should be %d\n", 
 			       siblings, cpu, smp_num_siblings);
+			smp_num_siblings = siblings;
+		}       
 	}
 
 	Dprintk("Boot done.\n");

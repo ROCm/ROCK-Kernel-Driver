@@ -79,7 +79,7 @@ extern unsigned long vm_force_exec32;
 #define __VIRTUAL_MASK_SHIFT	48
 #define __VIRTUAL_MASK		((1UL << __VIRTUAL_MASK_SHIFT) - 1)
 
-#define KERNEL_TEXT_SIZE  (40UL*1024*1024)
+#define KERNEL_TEXT_SIZE  (10UL*1024*1024)
 #define KERNEL_TEXT_START 0xffffffff80000000UL 
 
 #ifndef __ASSEMBLY__

@@ -96,8 +96,7 @@ static inline void save_page(unsigned long address, struct page *fpage)
  * No more special protections in this 2/4MB area - revert to a
  * large page again. 
  */
-static void revert_page(struct page *kpte_page, unsigned long address, 
-			pgprot_t ref_prot)
+static void revert_page(unsigned long address, pgprot_t ref_prot)
 {
        pgd_t *pgd;
        pmd_t *pmd; 
@@ -145,7 +144,7 @@ __change_page_attr(unsigned long address, struct page *page, pgprot_t prot,
 
 	if (page_count(kpte_page) == 1) {
 		save_page(address, kpte_page); 		     
-		revert_page(kpte_page, address, ref_prot);
+		revert_page(address, ref_prot);
 	} 
 	return 0;
 } 
@@ -176,9 +175,11 @@ int change_page_attr(struct page *page, int numpages, pgprot_t prot)
 			break; 
 		/* Handle kernel mapping too which aliases part of the
 		 * lowmem */
-		if (page_to_phys(page) < KERNEL_TEXT_SIZE) {		
+		/* Disabled right now. Fixme */ 
+		if (0 && page_to_phys(page) < KERNEL_TEXT_SIZE) {		
 			unsigned long addr2;
 			addr2 = __START_KERNEL_map + page_to_phys(page);
+			__pgprot(prot) &= ~_PAGE_NX;
 			err = __change_page_attr(addr2, page, prot, 
 						 PAGE_KERNEL_EXECUTABLE);
 		} 

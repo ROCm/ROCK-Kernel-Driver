@@ -306,7 +306,6 @@ asmlinkage long sys32_rt_sigreturn(struct pt_regs regs)
 {
 	struct rt_sigframe *frame = (struct rt_sigframe *)(regs.rsp - 4);
 	sigset_t set;
-	stack_t st;
 	unsigned int eax;
 
 	if (verify_area(VERIFY_READ, frame, sizeof(*frame)))
@@ -323,8 +322,8 @@ asmlinkage long sys32_rt_sigreturn(struct pt_regs regs)
 	if (ia32_restore_sigcontext(&regs, &frame->uc.uc_mcontext, &eax))
 		goto badframe;
 
-	if (sys32_sigaltstack(&frame->uc.uc_stack, NULL, regs) == -EFAULT)
-		goto badframe;
+ 	if (sys32_sigaltstack(&frame->uc.uc_stack, NULL, regs) == -EFAULT)
+  		goto badframe;
 
 	return eax;
 
