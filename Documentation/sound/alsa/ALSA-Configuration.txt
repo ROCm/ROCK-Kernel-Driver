@@ -184,6 +184,8 @@ Module parameters
     Module for ATI IXP 150/200/250 AC97 controllers.
 
     ac97_clock		- AC'97 clock (defalut = 48000)
+    ac97_quirk		- AC'97 workaround for strange hardware
+			  See the description of intel8x0 module for details.
     spdif_aclink	- S/PDIF transfer over AC-link (default = 1)
 
     This module supports up to 8 cards and autoprobe.
