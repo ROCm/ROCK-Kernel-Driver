@@ -16,7 +16,6 @@ static int scsi_debug_device_reset(struct scsi_cmnd *);
 static int scsi_debug_host_reset(struct scsi_cmnd *);
 static int scsi_debug_proc_info(char *, char **, off_t, int, int, int);
 static const char * scsi_debug_info(struct Scsi_Host *);
-static int scsi_debug_release(struct Scsi_Host *);
 
 /*
  * This driver is written for the lk 2.5 series
