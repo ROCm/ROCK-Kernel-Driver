@@ -342,7 +342,6 @@ static u32 add_index(tid_t tid, struct inode *ip, s64 bn, int slot)
 	struct metapage *mp;
 	s64 offset;
 	uint page_offset;
-	int rc;
 	struct tlock *tlck;
 	s64 xaddr;
 
@@ -396,11 +395,11 @@ static u32 add_index(tid_t tid, struct inode *ip, s64 bn, int slot)
 		 * Allocate the first block & add it to the xtree
 		 */
 		xaddr = 0;
-		if ((rc =
-		     xtInsert(tid, ip, 0, 0, sbi->nbperpage,
-			      &xaddr, 0))) {
+		if (xtInsert(tid, ip, 0, 0, sbi->nbperpage, &xaddr, 0)) {
 			jfs_warn("add_index: xtInsert failed!");
-			return -EPERM;
+			memcpy(&jfs_ip->i_dirtable, temp_table,
+			       sizeof (temp_table));
+			goto clean_up;
 		}
 		ip->i_size = PSIZE;
 		ip->i_blocks += LBLK2PBLK(sb, sbi->nbperpage);
@@ -408,7 +407,9 @@ static u32 add_index(tid_t tid, struct inode *ip, s64 bn, int slot)
 		if ((mp = get_index_page(ip, 0)) == 0) {
 			jfs_err("add_index: get_metapage failed!");
 			xtTruncate(tid, ip, 0, COMMIT_PWMAP);
-			return -EPERM;
+			memcpy(&jfs_ip->i_dirtable, temp_table,
+			       sizeof (temp_table));
+			goto clean_up;
 		}
 		tlck = txLock(tid, ip, mp, tlckDATA);
 		llck = (struct linelock *) & tlck->lock;
@@ -438,12 +439,9 @@ static u32 add_index(tid_t tid, struct inode *ip, s64 bn, int slot)
 		 * This will be the beginning of a new page
 		 */
 		xaddr = 0;
-		if ((rc =
-		     xtInsert(tid, ip, 0, blkno, sbi->nbperpage,
-			      &xaddr, 0))) {
+		if (xtInsert(tid, ip, 0, blkno, sbi->nbperpage, &xaddr, 0)) {
 			jfs_warn("add_index: xtInsert failed!");
-			jfs_ip->next_index--;
-			return -EPERM;
+			goto clean_up;
 		}
 		ip->i_size += PSIZE;
 		ip->i_blocks += LBLK2PBLK(sb, sbi->nbperpage);
@@ -457,7 +455,7 @@ static u32 add_index(tid_t tid, struct inode *ip, s64 bn, int slot)
 
 	if (mp == 0) {
 		jfs_err("add_index: get/read_metapage failed!");
-		return -EPERM;
+		goto clean_up;
 	}
 
 	lock_index(tid, ip, mp, index);
@@ -472,6 +470,12 @@ static u32 add_index(tid_t tid, struct inode *ip, s64 bn, int slot)
 	release_metapage(mp);
 
 	return index;
+
+      clean_up:
+
+	jfs_ip->next_index--;
+
+	return 0;
 }
 
 /*
