@@ -13,21 +13,6 @@
 #include <linux/skbuff.h>
 #include <net/xfrm.h>
 
-static int xfrm_tunnel_check_size(struct sk_buff *skb, unsigned short family)
-{
-	struct xfrm_state_afinfo *afinfo;
-	int err;
-
-	afinfo = xfrm_state_get_afinfo(family);
-	if (unlikely(afinfo == NULL))
-		return -EAFNOSUPPORT;
-
-	err = afinfo->tunnel_check_size(skb);
-	xfrm_state_put_afinfo(afinfo);
-
-	return err;
-}
-
 int xfrm_check_output(struct xfrm_state *x,
                       struct sk_buff *skb, unsigned short family)
 {
@@ -38,7 +23,19 @@ int xfrm_check_output(struct xfrm_state *x,
 		goto out;
 		
 	if (x->props.mode) {
-		err = xfrm_tunnel_check_size(skb, family);
+		switch (family) {
+		case AF_INET:
+			err = xfrm4_tunnel_check_size(skb);
+			break;
+			
+		case AF_INET6:
+			err = xfrm6_tunnel_check_size(skb);
+			break;
+			
+		default:
+			err = -EINVAL;
+		}
+		
 		if (err)
 			goto out;
 	}

@@ -38,19 +38,14 @@ EXPORT_SYMBOL(in6_dev_finish_destroy);
 EXPORT_SYMBOL(ip6_find_1stfragopt);
 #ifdef CONFIG_XFRM
 EXPORT_SYMBOL(xfrm6_rcv);
-EXPORT_SYMBOL(xfrm6_tunnel_register);
-EXPORT_SYMBOL(xfrm6_tunnel_deregister);
-EXPORT_SYMBOL(xfrm6_tunnel_check_size);
-EXPORT_SYMBOL(xfrm6_tunnel_alloc_spi);
-EXPORT_SYMBOL(xfrm6_tunnel_spi_lookup);
 #endif
 EXPORT_SYMBOL(rt6_lookup);
 EXPORT_SYMBOL(fl6_sock_lookup);
 EXPORT_SYMBOL(ip6_append_data);
 EXPORT_SYMBOL(ip6_flush_pending_frames);
 EXPORT_SYMBOL(ip6_push_pending_frames);
-EXPORT_SYMBOL(ip6_dst_lookup);
 EXPORT_SYMBOL(ipv6_push_nfrag_opts);
+EXPORT_SYMBOL(ip6_dst_lookup);
 
 EXPORT_SYMBOL(addrconf_add_ifaddr);
 EXPORT_SYMBOL(addrconf_del_ifaddr);

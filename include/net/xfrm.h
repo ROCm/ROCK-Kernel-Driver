@@ -196,7 +196,6 @@ struct xfrm_state_afinfo {
 	struct xfrm_state	*(*find_acq)(u8 mode, u32 reqid, u8 proto, 
 					     xfrm_address_t *daddr, xfrm_address_t *saddr, 
 					     int create);
-	int			(*tunnel_check_size)(struct sk_buff *skb);
 };
 
 extern int xfrm_state_register_afinfo(struct xfrm_state_afinfo *afinfo);
@@ -498,6 +497,10 @@ xfrm_selector_match(struct xfrm_selector *sel, struct flowi *fl,
 	return 0;
 }
 
+/* placeholder until xfrm6_tunnel.c is written */
+static inline int xfrm6_tunnel_check_size(struct sk_buff *skb)
+{ return 0; }
+
 /* A struct encoding bundle of transformations to apply to some set of flow.
  *
  * dst->child points to the next element of bundle.
@@ -780,12 +783,6 @@ struct xfrm_tunnel {
 	void (*err_handler)(struct sk_buff *skb, void *info);
 };
 
-struct xfrm6_tunnel {
-	int (*handler)(struct sk_buff **pskb, unsigned int *nhoffp);
-	void (*err_handler)(struct sk_buff *skb, struct inet6_skb_parm *opt,
-				int type, int code, int offset, __u32 info);
-};
-
 extern void xfrm_init(void);
 extern void xfrm4_init(void);
 extern void xfrm4_fini(void);
@@ -820,11 +817,6 @@ extern int xfrm4_rcv(struct sk_buff *skb);
 extern int xfrm4_tunnel_register(struct xfrm_tunnel *handler);
 extern int xfrm4_tunnel_deregister(struct xfrm_tunnel *handler);
 extern int xfrm4_tunnel_check_size(struct sk_buff *skb);
-extern int xfrm6_tunnel_register(struct xfrm6_tunnel *handler);
-extern int xfrm6_tunnel_deregister(struct xfrm6_tunnel *handler);
-extern int xfrm6_tunnel_check_size(struct sk_buff *skb);
-extern u32 xfrm6_tunnel_alloc_spi(xfrm_address_t *saddr);
-extern u32 xfrm6_tunnel_spi_lookup(xfrm_address_t *saddr);
 extern int xfrm6_rcv(struct sk_buff **pskb, unsigned int *nhoffp);
 
 #ifdef CONFIG_XFRM

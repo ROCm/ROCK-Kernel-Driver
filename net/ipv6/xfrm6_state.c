@@ -124,7 +124,6 @@ static struct xfrm_state_afinfo xfrm6_state_afinfo = {
 	.init_tempsel		= __xfrm6_init_tempsel,
 	.state_lookup		= __xfrm6_state_lookup,
 	.find_acq		= __xfrm6_find_acq,
-	.tunnel_check_size	= xfrm6_tunnel_check_size,
 };
 
 void __init xfrm6_state_init(void)

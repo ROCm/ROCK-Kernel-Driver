@@ -14,7 +14,7 @@ ifeq ($(CONFIG_IPV6_MOBILITY),m)
 	ipv6-objs += mipglue.o
 endif
 
-ipv6-$(CONFIG_XFRM) += xfrm6_policy.o xfrm6_state.o xfrm6_input.o xfrm6_tunnel.o
+ipv6-$(CONFIG_XFRM) += xfrm6_policy.o xfrm6_state.o xfrm6_input.o
 ipv6-objs += $(ipv6-y)
 
 obj-$(CONFIG_INET6_AH) += ah6.o
