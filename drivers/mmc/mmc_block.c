@@ -332,6 +332,18 @@ static struct mmc_blk_data *mmc_blk_alloc(struct mmc_card *card)
 		md->disk->queue = md->queue.queue;
 		md->disk->driverfs_dev = &card->dev;
 
+		/*
+		 * As discussed on lkml, GENHD_FL_REMOVABLE should:
+		 *
+		 * - be set for removable media with permanent block devices
+		 * - be unset for removable block devices with permanent media
+		 *
+		 * Since MMC block devices clearly fall under the second
+		 * case, we do not set GENHD_FL_REMOVABLE.  Userspace
+		 * should use the block device creation/destruction hotplug
+		 * messages to tell when the card is present.
+		 */
+
 		sprintf(md->disk->disk_name, "mmcblk%d", devidx);
 		sprintf(md->disk->devfs_name, "mmc/blk%d", devidx);
 

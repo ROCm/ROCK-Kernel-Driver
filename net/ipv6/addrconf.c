@@ -99,9 +99,6 @@ static void addrconf_sysctl_register(struct inet6_dev *idev, struct ipv6_devconf
 static void addrconf_sysctl_unregister(struct ipv6_devconf *p);
 #endif
 
-int inet6_dev_count;
-int inet6_ifa_count;
-
 #ifdef CONFIG_IPV6_PRIVACY
 static int __ipv6_regen_rndid(struct inet6_dev *idev);
 static int __ipv6_try_regen_rndid(struct inet6_dev *idev, struct in6_addr *tmpaddr); 
@@ -191,7 +188,9 @@ static struct ipv6_devconf ipv6_devconf_dflt = {
 };
 
 /* IPv6 Wildcard Address and Loopback Address defined by RFC2553 */
+#if 0
 const struct in6_addr in6addr_any = IN6ADDR_ANY_INIT;
+#endif
 const struct in6_addr in6addr_loopback = IN6ADDR_LOOPBACK_INIT;
 
 int ipv6_addr_type(const struct in6_addr *addr)
@@ -310,7 +309,6 @@ void in6_dev_finish_destroy(struct inet6_dev *idev)
 		return;
 	}
 	snmp6_unregister_dev(idev);
-	inet6_dev_count--;
 	kfree(idev);
 }
 
@@ -338,7 +336,6 @@ static struct inet6_dev * ipv6_add_dev(struct net_device *dev)
 			kfree(ndev);
 			return NULL;
 		}
-		inet6_dev_count++;
 		/* We refer to the device */
 		dev_hold(dev);
 
@@ -475,7 +472,6 @@ void inet6_ifa_finish_destroy(struct inet6_ifaddr *ifp)
 	}
 	dst_release(&ifp->rt->u.dst);
 
-	inet6_ifa_count--;
 	kfree(ifp);
 }
 
@@ -530,7 +526,6 @@ ipv6_add_addr(struct inet6_dev *idev, const struct in6_addr *addr, int pfxlen,
 	ifa->flags = flags | IFA_F_TENTATIVE;
 	ifa->cstamp = ifa->tstamp = jiffies;
 
-	inet6_ifa_count++;
 	ifa->idev = idev;
 	in6_dev_hold(idev);
 	/* For caller */

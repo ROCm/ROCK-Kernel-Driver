@@ -723,7 +723,6 @@ typedef struct ide_drive_s {
 	unsigned scsi		: 1;	/* 0=default, 1=ide-scsi emulation */
 
         u8	quirk_list;	/* considered quirky, set for a specific host */
-        u8	suspend_reset;	/* drive suspend mode flag, soft-reset recovers */
         u8	init_speed;	/* transfer rate set at boot */
         u8	pio_speed;      /* unused by core, used by some drivers for fallback from DMA */
         u8	current_speed;	/* current transfer rate set */
@@ -1250,8 +1249,6 @@ extern int ide_do_drive_cmd(ide_drive_t *, struct request *, ide_action_t);
  */
 extern void ide_end_drive_cmd(ide_drive_t *, u8, u8);
 
-extern void try_to_flush_leftover_data(ide_drive_t *);
-
 /*
  * Issue ATA command and wait for completion.
  * Use for implementing commands in kernel
@@ -1444,12 +1441,12 @@ int __ide_dma_good_drive(ide_drive_t *);
 int ide_use_dma(ide_drive_t *);
 int __ide_dma_off(ide_drive_t *);
 void ide_dma_verbose(ide_drive_t *);
+ide_startstop_t ide_dma_intr(ide_drive_t *);
 
 #ifdef CONFIG_BLK_DEV_IDEDMA_PCI
 extern int ide_build_sglist(ide_drive_t *, struct request *);
 extern int ide_build_dmatable(ide_drive_t *, struct request *);
 extern void ide_destroy_dmatable(ide_drive_t *);
-extern ide_startstop_t ide_dma_intr(ide_drive_t *);
 extern int ide_release_dma(ide_hwif_t *);
 extern void ide_setup_dma(ide_hwif_t *, unsigned long, unsigned int);
 

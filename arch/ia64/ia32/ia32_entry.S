@@ -387,7 +387,7 @@ ia32_syscall_table:
 	data8 sys32_rt_sigaction
 	data8 sys32_rt_sigprocmask /* 175 */
 	data8 sys_rt_sigpending
-	data8 compat_rt_sigtimedwait
+	data8 compat_sys_rt_sigtimedwait
 	data8 sys32_rt_sigqueueinfo
 	data8 sys32_rt_sigsuspend
 	data8 sys32_pread	  /* 180 */

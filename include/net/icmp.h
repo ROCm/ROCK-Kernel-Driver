@@ -46,16 +46,15 @@ extern void	icmp_init(struct net_proto_family *ops);
 /* Move into dst.h ? */
 extern int 	xrlim_allow(struct dst_entry *dst, int timeout);
 
-struct raw_opt {
+struct raw_sock {
+	/* inet_sock has to be the first member */
+	struct inet_sock   inet;
 	struct icmp_filter filter;
 };
 
-/* WARNING: don't change the layout of the members in raw_sock! */
-struct raw_sock {
-	struct inet_sock  inet;
-	struct raw_opt	  raw4;
-};
-
-#define raw4_sk(__sk) (&((struct raw_sock *)__sk)->raw4)
+static inline struct raw_sock *raw_sk(const struct sock *sk)
+{
+	return (struct raw_sock *)sk;
+}
 
 #endif	/* _ICMP_H */

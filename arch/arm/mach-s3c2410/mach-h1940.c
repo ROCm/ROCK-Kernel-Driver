@@ -22,6 +22,7 @@
  *     04-Nov-2004 BJD  Change for new serial clock
  *     04-Jan-2005 BJD  Updated uart init call
  *     10-Jan-2005 BJD  Removed include of s3c2410.h
+ *     14-Jan-2005 BJD  Added clock init
 */
 
 #include <linux/kernel.h>
@@ -103,6 +104,7 @@ static struct s3c24xx_board h1940_board __initdata = {
 void __init h1940_map_io(void)
 {
 	s3c24xx_init_io(h1940_iodesc, ARRAY_SIZE(h1940_iodesc));
+	s3c24xx_init_clocks(0);
 	s3c24xx_init_uarts(h1940_uartcfgs, ARRAY_SIZE(h1940_uartcfgs));
 	s3c24xx_set_board(&h1940_board);
 }

@@ -701,7 +701,7 @@ sigset_from_compat (sigset_t *set, compat_sigset_t *compat)
 }
 
 asmlinkage long
-compat_rt_sigtimedwait (compat_sigset_t __user *uthese,
+compat_sys_rt_sigtimedwait (compat_sigset_t __user *uthese,
 		struct compat_siginfo __user *uinfo,
 		struct compat_timespec __user *uts, compat_size_t sigsetsize)
 {
