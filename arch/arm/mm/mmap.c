@@ -40,7 +40,7 @@ arch_get_unmapped_area(struct file *filp, unsigned long addr,
 	 */
 	cache_type = read_cpuid(CPUID_CACHETYPE);
 	if (cache_type != read_cpuid(CPUID_ID)) {
-		aliasing = (cache_type | cache_type >> 12) & (1 << 9);
+		aliasing = (cache_type | cache_type >> 12) & (1 << 11);
 		if (aliasing)
 			do_align = filp || flags & MAP_SHARED;
 	}

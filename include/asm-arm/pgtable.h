@@ -312,6 +312,13 @@ PTE_BIT_FUNC(mkyoung,   |= L_PTE_YOUNG);
 		flush_pmd_entry(pmdp);	\
 	} while (0)
 
+#define copy_pmd(pmdpd,pmdps)		\
+	do {				\
+		pmdpd[0] = pmdps[0];	\
+		pmdpd[1] = pmdps[1];	\
+		flush_pmd_entry(pmdpd);	\
+	} while (0)
+
 #define pmd_clear(pmdp)			\
 	do {				\
 		pmdp[0] = __pmd(0);	\
