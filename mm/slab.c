@@ -473,7 +473,7 @@ enum {
 	FULL
 } g_cpucache_up;
 
-static struct timer_list reap_timer[NR_CPUS];
+static struct timer_list reap_timers[NR_CPUS];
 
 static void reap_timer_fnc(unsigned long data);
 
@@ -507,58 +507,24 @@ static void cache_estimate (unsigned long gfporder, size_t size,
 	*left_over = wastage;
 }
 
-static void do_timerstart(void *arg)
+/*
+ * Start the reap timer running on the target CPU.  We run at around 1 to 2Hz.
+ * Add the CPU number into the expiry time to minimize the possibility of the
+ * CPUs getting into lockstep and contending for the global cache chain lock.
+ */
+static void start_cpu_timer(int cpu)
 {
-	int cpu = smp_processor_id();
-	if (reap_timer[cpu].function == 0) {
-		printk(KERN_INFO "slab: reap timer started for cpu %d.\n", cpu);
-		init_timer(&reap_timer[cpu]);
-		reap_timer[cpu].expires = jiffies + HZ + 3*cpu;
-		reap_timer[cpu].function = reap_timer_fnc;
-		add_timer(&reap_timer[cpu]);
+	struct timer_list *rt = &reap_timers[cpu];
+
+	if (rt->function == NULL) {
+		printk(KERN_INFO "slab: reap timer started for cpu %d\n", cpu);
+		init_timer(rt);
+		rt->expires = jiffies + HZ + 3*cpu;
+		rt->function = reap_timer_fnc;
+		add_timer_on(rt, cpu);
 	}
 }
 
-/* This doesn't belong here, should be somewhere in kernel/ */
-struct cpucall_info {
-	int cpu;
-	void (*fnc)(void*arg);
-	void *arg;
-};
-
-static int cpucall_thread(void *__info)
-{
-	struct cpucall_info *info = (struct cpucall_info *)__info;
-
-	/* Migrate to the right CPU */
-	daemonize();
-	set_cpus_allowed(current, 1UL << info->cpu);
-	BUG_ON(smp_processor_id() != info->cpu);
-
-	info->fnc(info->arg);
-	kfree(info);
-	return 0;
-}
-
-static int do_cpucall(void (*fnc)(void *arg), void *arg, int cpu)
-{
-	struct cpucall_info *info;
-	info = kmalloc(sizeof(*info), GFP_KERNEL);
-	if (!info) {
-		printk(KERN_INFO "do_cpucall for cpu %d, callback %p failed at kmalloc.\n",
-				cpu, fnc);
-		return -1;
-	}
-	info->cpu = cpu;
-	info->fnc = fnc;
-	info->arg = arg;
-	if (kernel_thread(cpucall_thread, info, CLONE_KERNEL) < 0) {
-		printk(KERN_INFO "do_cpucall for cpu %d, callback %p failed at kernel_thread.\n",
-				cpu, fnc);
-		return -1;
-	}
-	return 0;
-}
 /*
  * Note: if someone calls kmem_cache_alloc() on the new
  * cpu before the cpuup callback had a chance to allocate
@@ -598,7 +564,7 @@ static int __devinit cpuup_callback(struct notifier_block *nfb,
 		}
 
 		if (g_cpucache_up == FULL)
-			do_cpucall(do_timerstart, NULL, cpu);
+			start_cpu_timer(cpu);
 		up(&cache_chain_sem);
 	}
 
@@ -699,7 +665,7 @@ void __init kmem_cache_sizes_init(void)
 int __init cpucache_init(void)
 {
 	kmem_cache_t *cachep;
-	int i;
+	int cpu;
 
 	down(&cache_chain_sem);
 	g_cpucache_up = FULL;
@@ -712,9 +678,9 @@ int __init cpucache_init(void)
 	 * pages to gfp.
 	 */
 
-	for (i=0;i<NR_CPUS;i++) {
-		if (cpu_online(i))
-			do_cpucall(do_timerstart, NULL, i);
+	for (cpu = 0; cpu < NR_CPUS; cpu++) {
+		if (cpu_online(cpu))
+			start_cpu_timer(cpu);
 	}
 	up(&cache_chain_sem);
 
@@ -1991,8 +1957,8 @@ static void enable_cpucache (kmem_cache_t *cachep)
  *
  * Called from a timer, every few seconds
  * Purpuse:
- * - clear the per-cpu caches
- * - return freeable pages to gfp.
+ * - clear the per-cpu caches for this CPU.
+ * - return freeable pages to the main free memory pool.
  */
 static inline void cache_reap (void)
 {
@@ -2076,12 +2042,18 @@ next:
 	read_unlock(&cache_chain_lock);
 }
 
+/*
+ * This is a timer handler.  There is on per CPU.  It is called periodially
+ * to shrink this CPU's caches.  Otherwise there could be memory tied up
+ * for long periods (or for ever) due to load changes.
+ */
 static void reap_timer_fnc(unsigned long data)
 {
-	cache_reap();
+	int cpu = smp_processor_id();
+	struct timer_list *rt = &reap_timers[cpu];
 
-	reap_timer[smp_processor_id()].expires = jiffies + REAPTIMEOUT_CPUC;
-	add_timer(&reap_timer[smp_processor_id()]);
+	cache_reap();
+	mod_timer(rt, jiffies + REAPTIMEOUT_CPUC + cpu);
 }
 
 #ifdef CONFIG_PROC_FS
