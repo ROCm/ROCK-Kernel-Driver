@@ -76,10 +76,10 @@
 # define XFS_BIGFS_STRING
 #endif
 
-#ifdef CONFIG_XFS_VNODE_TRACING
-# define XFS_VNTRACE_STRING	"VN-trace, "
+#ifdef CONFIG_XFS_TRACE
+# define XFS_TRACE_STRING	"tracing, "
 #else
-# define XFS_VNTRACE_STRING
+# define XFS_TRACE_STRING
 #endif
 
 #ifdef XFSDEBUG
@@ -91,7 +91,7 @@
 #define XFS_BUILD_OPTIONS	XFS_ACL_STRING \
 				XFS_REALTIME_STRING \
 				XFS_BIGFS_STRING \
-				XFS_VNTRACE_STRING \
+				XFS_TRACE_STRING \
 				XFS_DBG_STRING /* DBG must be last */
 
 #define LINVFS_GET_VFS(s) \

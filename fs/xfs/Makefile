@@ -35,7 +35,7 @@ EXTRA_CFLAGS +=	 -Ifs/xfs -funsigned-char
 ifeq ($(CONFIG_XFS_DEBUG),y)
 	EXTRA_CFLAGS += -g -DSTATIC="" -DDEBUG -DXFSDEBUG
 endif
-ifeq ($(CONFIG_PAGEBUF_DEBUG),y)
+ifeq ($(CONFIG_XFS_TRACE),y)
 	EXTRA_CFLAGS += -DPAGEBUF_TRACE
 endif
 
