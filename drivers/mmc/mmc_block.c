@@ -166,10 +166,9 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 {
 	struct mmc_blk_data *md = mq->data;
 	struct mmc_card *card = md->queue.card;
-	int err, sz = 0;
+	int ret;
 
-	err = mmc_card_claim_host(card);
-	if (err)
+	if (mmc_card_claim_host(card))
 		goto cmd_err;
 
 	do {
@@ -204,33 +203,26 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 
 		mmc_wait_for_req(card->host, &brq.mrq);
 		if (brq.cmd.error) {
-			err = brq.cmd.error;
 			printk(KERN_ERR "%s: error %d sending read/write command\n",
-			       req->rq_disk->disk_name, err);
+			       req->rq_disk->disk_name, brq.cmd.error);
 			goto cmd_err;
 		}
 
-		if (rq_data_dir(req) == READ) {
-			sz = brq.data.bytes_xfered;
-		} else {
-			sz = 0;
-		}
-
 		if (brq.data.error) {
-			err = brq.data.error;
 			printk(KERN_ERR "%s: error %d transferring data\n",
-			       req->rq_disk->disk_name, err);
+			       req->rq_disk->disk_name, brq.data.error);
 			goto cmd_err;
 		}
 
 		if (brq.stop.error) {
-			err = brq.stop.error;
 			printk(KERN_ERR "%s: error %d sending stop command\n",
-			       req->rq_disk->disk_name, err);
+			       req->rq_disk->disk_name, brq.stop.error);
 			goto cmd_err;
 		}
 
 		do {
+			int err;
+
 			cmd.opcode = MMC_SEND_STATUS;
 			cmd.arg = card->rca << 16;
 			cmd.flags = MMC_RSP_SHORT | MMC_RSP_CRC;
@@ -246,13 +238,25 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 		if (cmd.resp[0] & ~0x00000900)
 			printk(KERN_ERR "%s: status = %08x\n",
 			       req->rq_disk->disk_name, cmd.resp[0]);
-		err = mmc_decode_status(cmd.resp);
-		if (err)
+		if (mmc_decode_status(cmd.resp))
 			goto cmd_err;
 #endif
 
-		sz = brq.data.bytes_xfered;
-	} while (end_that_request_chunk(req, 1, sz));
+		/*
+		 * A block was successfully transferred.
+		 */
+		spin_lock_irq(&md->lock);
+		ret = end_that_request_chunk(req, 1, brq.data.bytes_xfered);
+		if (!ret) {
+			/*
+			 * The whole request completed successfully.
+			 */
+			add_disk_randomness(req->rq_disk);
+			blkdev_dequeue_request(req);
+			end_that_request_last(req);
+		}
+		spin_unlock_irq(&md->lock);
+	} while (ret);
 
 	mmc_card_release_host(card);
 
@@ -261,8 +265,22 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
  cmd_err:
 	mmc_card_release_host(card);
 
-	end_that_request_chunk(req, 1, sz);
-	req->errors = err;
+	/*
+	 * This is a little draconian, but until we get proper
+	 * error handling sorted out here, its the best we can
+	 * do - especially as some hosts have no idea how much
+	 * data was transferred before the error occurred.
+	 */
+	spin_lock_irq(&md->lock);
+	do {
+		ret = end_that_request_chunk(req, 0,
+				req->current_nr_sectors << 9);
+	} while (ret);
+
+	add_disk_randomness(req->rq_disk);
+	blkdev_dequeue_request(req);
+	end_that_request_last(req);
+	spin_unlock_irq(&md->lock);
 
 	return 0;
 }

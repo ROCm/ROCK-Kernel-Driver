@@ -57,7 +57,6 @@ static int mmc_queue_thread(void *d)
 	struct mmc_queue *mq = d;
 	struct request_queue *q = mq->queue;
 	DECLARE_WAITQUEUE(wait, current);
-	int ret;
 
 	/*
 	 * Set iothread to ensure that we aren't put to sleep by
@@ -76,10 +75,10 @@ static int mmc_queue_thread(void *d)
 	complete(&mq->thread_complete);
 
 	add_wait_queue(&mq->thread_wq, &wait);
-	spin_lock_irq(q->queue_lock);
 	do {
 		struct request *req = NULL;
 
+		spin_lock_irq(q->queue_lock);
 		set_current_state(TASK_INTERRUPTIBLE);
 		if (!blk_queue_plugged(q))
 			mq->req = req = elv_next_request(q);
@@ -93,10 +92,7 @@ static int mmc_queue_thread(void *d)
 		}
 		set_current_state(TASK_RUNNING);
 
-		ret = mq->issue_fn(mq, req);
-
-		spin_lock_irq(q->queue_lock);
-		end_request(req, ret);
+		mq->issue_fn(mq, req);
 	} while (1);
 	remove_wait_queue(&mq->thread_wq, &wait);
 

@@ -286,7 +286,10 @@ static int pxamci_data_done(struct pxamci_host *host, unsigned int stat)
 	 * This means that if there was an error on any block, we mark all
 	 * data blocks as being in error.
 	 */
-	data->bytes_xfered = data->blocks << data->blksz_bits;
+	if (data->error == MMC_ERR_NONE)
+		data->bytes_xfered = data->blocks << data->blksz_bits;
+	else
+		data->bytes_xfered = 0;
 
 	pxamci_disable_irq(host, DATA_TRAN_DONE);
 
