@@ -1084,6 +1084,7 @@ imsttfb_copyarea(struct fb_info *info, const struct fb_copyarea *area)
 	while(read_reg_le32(par->dc_regs, SSTATUS) & 0x40);
 }
 
+#if 0
 static int
 imsttfb_load_cursor_image(struct imstt_par *par, int width, int height, __u8 fgc)
 {
@@ -1191,7 +1192,6 @@ imstt_set_cursor(struct imstt_par *par, struct fb_image *d, int on)
 	}
 }
 
-#if 0
 static int 
 imsttfb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 {
