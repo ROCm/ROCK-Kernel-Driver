@@ -314,67 +314,57 @@ static void ipi_cpu_stop(unsigned int cpu)
  *
  *  Bit 0 - Inter-processor function call
  */
-void do_IPI(unsigned int ipimask, struct pt_regs *regs)
+void do_IPI(struct pt_regs *regs)
 {
 	unsigned int cpu = smp_processor_id();
 	struct ipi_data *ipi = &per_cpu(ipi_data, cpu);
 
 	ipi->ipi_count++;
 
-	if (ipimask & (1 << 0)) {
-		for (;;) {
-			unsigned long msgs;
+	for (;;) {
+		unsigned long msgs;
 
-			spin_lock(&ipi->lock);
-			msgs = ipi->bits;
-			ipi->bits = 0;
-			spin_unlock(&ipi->lock);
+		spin_lock(&ipi->lock);
+		msgs = ipi->bits;
+		ipi->bits = 0;
+		spin_unlock(&ipi->lock);
 
-			if (!msgs)
+		if (!msgs)
+			break;
+
+		do {
+			unsigned nextmsg;
+
+			nextmsg = msgs & -msgs;
+			msgs &= ~nextmsg;
+			nextmsg = ffz(~nextmsg);
+
+			switch (nextmsg) {
+			case IPI_TIMER:
+				ipi_timer(regs);
 				break;
 
-			do {
-				unsigned nextmsg;
+			case IPI_RESCHEDULE:
+				/*
+				 * nothing more to do - eveything is
+				 * done on the interrupt return path
+				 */
+				break;
 
-				nextmsg = msgs & -msgs;
-				msgs &= ~nextmsg;
-				nextmsg = ffz(~nextmsg);
+			case IPI_CALL_FUNC:
+				ipi_call_function(cpu);
+				break;
 
-				switch (nextmsg) {
-				case IPI_TIMER:
-					ipi_timer(regs);
-					break;
+			case IPI_CPU_STOP:
+				ipi_cpu_stop(cpu);
+				break;
 
-				case IPI_RESCHEDULE:
-					/*
-					 * nothing more to do - eveything is
-					 * done on the interrupt return path
-					 */
-					break;
-
-				case IPI_CALL_FUNC:
-					ipi_call_function(cpu);
-					break;
-
-				case IPI_CPU_STOP:
-					ipi_cpu_stop(cpu);
-					break;
-
-				default:
-					printk(KERN_CRIT "CPU%u: Unknown IPI message 0x%x\n",
-					       cpu, nextmsg);
-					break;
-				}
-			} while (msgs);
-		}
-
-		ipimask &= ~0x01;
-	}
-
-	if (ipimask) {
-		printk(KERN_CRIT "CPU %d: Unknown IPI signal %x!\n",
-		       cpu, ipimask);
-		BUG();
+			default:
+				printk(KERN_CRIT "CPU%u: Unknown IPI message 0x%x\n",
+				       cpu, nextmsg);
+				break;
+			}
+		} while (msgs);
 	}
 }
 
