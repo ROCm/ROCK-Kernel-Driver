@@ -402,10 +402,11 @@ void mls_user_destroy(struct user_datum *usrdatum)
 
 int mls_read_perm(struct perm_datum *perdatum, void *fp)
 {
-	u32 *buf;
+	u32 buf[1];
+	int rc;
 
-	buf = next_entry(fp, sizeof(u32));
-	if (!buf)
+	rc = next_entry(buf, fp, sizeof buf);
+	if (rc < 0)
 		return -EINVAL;
 	perdatum->base_perms = le32_to_cpu(buf[0]);
 	return 0;
@@ -418,7 +419,8 @@ int mls_read_perm(struct perm_datum *perdatum, void *fp)
 struct mls_level *mls_read_level(void *fp)
 {
 	struct mls_level *l;
-	u32 *buf;
+	u32 buf[1];
+	int rc;
 
 	l = kmalloc(sizeof(*l), GFP_ATOMIC);
 	if (!l) {
@@ -427,8 +429,8 @@ struct mls_level *mls_read_level(void *fp)
 	}
 	memset(l, 0, sizeof(*l));
 
-	buf = next_entry(fp, sizeof(u32));
-	if (!buf) {
+	rc = next_entry(buf, fp, sizeof buf);
+	if (rc < 0) {
 		printk(KERN_ERR "security: mls: truncated level\n");
 		goto bad;
 	}
@@ -453,16 +455,21 @@ bad:
  */
 static int mls_read_range_helper(struct mls_range *r, void *fp)
 {
-	u32 *buf;
-	int items, rc = -EINVAL;
+	u32 buf[2], items;
+	int rc;
 
-	buf = next_entry(fp, sizeof(u32));
-	if (!buf)
+	rc = next_entry(buf, fp, sizeof(u32));
+	if (rc < 0)
 		goto out;
 
 	items = le32_to_cpu(buf[0]);
-	buf = next_entry(fp, sizeof(u32) * items);
-	if (!buf) {
+	if (items > ARRAY_SIZE(buf)) {
+		printk(KERN_ERR "security: mls:  range overflow\n");
+		rc = -EINVAL;
+		goto out;
+	}
+	rc = next_entry(buf, fp, sizeof(u32) * items);
+	if (rc < 0) {
 		printk(KERN_ERR "security: mls:  truncated range\n");
 		goto out;
 	}
@@ -515,10 +522,11 @@ int mls_read_range(struct context *c, void *fp)
 int mls_read_class(struct class_datum *cladatum, void *fp)
 {
 	struct mls_perms *p = &cladatum->mlsperms;
-	u32 *buf;
+	u32 buf[4];
+	int rc;
 
-	buf = next_entry(fp, sizeof(u32)*4);
-	if (!buf) {
+	rc = next_entry(buf, fp, sizeof buf);
+	if (rc < 0) {
 		printk(KERN_ERR "security: mls:  truncated mls permissions\n");
 		return -EINVAL;
 	}
@@ -532,15 +540,13 @@ int mls_read_class(struct class_datum *cladatum, void *fp)
 int mls_read_user(struct user_datum *usrdatum, void *fp)
 {
 	struct mls_range_list *r, *l;
-	int rc = 0;
+	int rc;
 	u32 nel, i;
-	u32 *buf;
+	u32 buf[1];
 
-	buf = next_entry(fp, sizeof(u32));
-	if (!buf) {
-		rc = -EINVAL;
+	rc = next_entry(buf, fp, sizeof buf);
+	if (rc < 0)
 		goto out;
-	}
 	nel = le32_to_cpu(buf[0]);
 	l = NULL;
 	for (i = 0; i < nel; i++) {
@@ -569,10 +575,11 @@ out:
 
 int mls_read_nlevels(struct policydb *p, void *fp)
 {
-	u32 *buf;
+	u32 buf[1];
+	int rc;
 
-	buf = next_entry(fp, sizeof(u32));
-	if (!buf)
+	rc = next_entry(buf, fp, sizeof buf);
+	if (rc < 0)
 		return -EINVAL;
 	p->nlevels = le32_to_cpu(buf[0]);
 	return 0;
@@ -657,7 +664,7 @@ int sens_read(struct policydb *p, struct hashtab *h, void *fp)
 	char *key = NULL;
 	struct level_datum *levdatum;
 	int rc;
-	u32 *buf, len;
+	u32 buf[2], len;
 
 	levdatum = kmalloc(sizeof(*levdatum), GFP_ATOMIC);
 	if (!levdatum) {
@@ -666,26 +673,21 @@ int sens_read(struct policydb *p, struct hashtab *h, void *fp)
 	}
 	memset(levdatum, 0, sizeof(*levdatum));
 
-	buf = next_entry(fp, sizeof(u32)*2);
-	if (!buf) {
-		rc = -EINVAL;
+	rc = next_entry(buf, fp, sizeof buf);
+	if (rc < 0)
 		goto bad;
-	}
 
 	len = le32_to_cpu(buf[0]);
 	levdatum->isalias = le32_to_cpu(buf[1]);
 
-	buf = next_entry(fp, len);
-	if (!buf) {
-		rc = -EINVAL;
-		goto bad;
-	}
 	key = kmalloc(len + 1,GFP_ATOMIC);
 	if (!key) {
 		rc = -ENOMEM;
 		goto bad;
 	}
-	memcpy(key, buf, len);
+	rc = next_entry(key, fp, len);
+	if (rc < 0)
+		goto bad;
 	key[len] = 0;
 
 	levdatum->level = mls_read_level(fp);
@@ -710,7 +712,7 @@ int cat_read(struct policydb *p, struct hashtab *h, void *fp)
 	char *key = NULL;
 	struct cat_datum *catdatum;
 	int rc;
-	u32 *buf, len;
+	u32 buf[3], len;
 
 	catdatum = kmalloc(sizeof(*catdatum), GFP_ATOMIC);
 	if (!catdatum) {
@@ -719,27 +721,22 @@ int cat_read(struct policydb *p, struct hashtab *h, void *fp)
 	}
 	memset(catdatum, 0, sizeof(*catdatum));
 
-	buf = next_entry(fp, sizeof(u32)*3);
-	if (!buf) {
-		rc = -EINVAL;
+	rc = next_entry(buf, fp, sizeof buf);
+	if (rc < 0)
 		goto bad;
-	}
 
 	len = le32_to_cpu(buf[0]);
 	catdatum->value = le32_to_cpu(buf[1]);
 	catdatum->isalias = le32_to_cpu(buf[2]);
 
-	buf = next_entry(fp, len);
-	if (!buf) {
-		rc = -EINVAL;
-		goto bad;
-	}
 	key = kmalloc(len + 1,GFP_ATOMIC);
 	if (!key) {
 		rc = -ENOMEM;
 		goto bad;
 	}
-	memcpy(key, buf, len);
+	rc = next_entry(key, fp, len);
+	if (rc < 0)
+		goto bad;
 	key[len] = 0;
 
 	rc = hashtab_insert(h, key, catdatum);

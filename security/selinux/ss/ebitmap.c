@@ -239,13 +239,13 @@ int ebitmap_read(struct ebitmap *e, void *fp)
 {
 	int rc = -EINVAL;
 	struct ebitmap_node *n, *l;
-	u32 *buf, mapsize, count, i;
+	u32 buf[3], mapsize, count, i;
 	u64 map;
 
 	ebitmap_init(e);
 
-	buf = next_entry(fp, sizeof(u32)*3);
-	if (!buf)
+	rc = next_entry(buf, fp, sizeof buf);
+	if (rc < 0)
 		goto out;
 
 	mapsize = le32_to_cpu(buf[0]);
@@ -269,8 +269,8 @@ int ebitmap_read(struct ebitmap *e, void *fp)
 	}
 	l = NULL;
 	for (i = 0; i < count; i++) {
-		buf = next_entry(fp, sizeof(u32));
-		if (!buf) {
+		rc = next_entry(buf, fp, sizeof(u32));
+		if (rc < 0) {
 			printk(KERN_ERR "security: ebitmap: truncated map\n");
 			goto bad;
 		}
@@ -296,12 +296,11 @@ int ebitmap_read(struct ebitmap *e, void *fp)
 			       n->startbit, (e->highbit - MAPSIZE));
 			goto bad_free;
 		}
-		buf = next_entry(fp, sizeof(u64));
-		if (!buf) {
+		rc = next_entry(&map, fp, sizeof(u64));
+		if (rc < 0) {
 			printk(KERN_ERR "security: ebitmap: truncated map\n");
 			goto bad_free;
 		}
-		memcpy(&map, buf, sizeof(u64));
 		n->map = le64_to_cpu(map);
 
 		if (!n->map) {
