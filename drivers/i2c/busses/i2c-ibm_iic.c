@@ -69,14 +69,14 @@ MODULE_PARM_DESC(iic_fast_poll, "Force fast mode (400 kHz)");
 #endif
 
 #if DBG_LEVEL > 0
-#  define DBG(x...)	printk(KERN_DEBUG "ibm-iic" ##x)
+#  define DBG(f,x...)	printk(KERN_DEBUG "ibm-iic" f, ##x)
 #else
-#  define DBG(x...)	((void)0)
+#  define DBG(f,x...)	((void)0)
 #endif
 #if DBG_LEVEL > 1
-#  define DBG2(x...) 	DBG( ##x )
+#  define DBG2(f,x...) 	DBG(f, ##x)
 #else
-#  define DBG2(x...) 	((void)0)
+#  define DBG2(f,x...) 	((void)0)
 #endif
 #if DBG_LEVEL > 2
 static void dump_iic_regs(const char* header, struct ibm_iic_private* dev)
