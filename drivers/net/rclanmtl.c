@@ -301,13 +301,13 @@ RCInitI2OMsgLayer (struct net_device *dev,
 	PPAB pPab;
 	U32 pciBaseAddr = dev->base_addr;
 	PDPA pDpa = dev->priv;
-	PU8 p_msgbuf = pDpa->PLanApiPA;
-	PU8 p_phymsgbuf = (PU8) virt_to_bus ((void *) p_msgbuf);
+	PU8 p_msgbuf = pDpa->msgbuf;
+	PU8 p_phymsgbuf = (PU8) pDpa->msgbuf_dma;
 
 	dprintk
-	    ("InitI2O: Adapter:0x%04ux ATU:0x%08ulx msgbuf:0x%08ulx phymsgbuf:0x%08ulx\n"
+	    ("InitI2O: Adapter:0x%04ux ATU:0x%08ulx msgbuf:%p phymsgbuf:0x%08ulx\n"
 	     "TransmitCallbackFunction:0x%08ulx  ReceiveCallbackFunction:0x%08ulx\n",
-	     pDpa->id, pciBaseAddr, (u32) p_msgbuf, (u32) p_phymsgbuf,
+	     pDpa->id, pciBaseAddr, p_msgbuf, (u32) p_phymsgbuf,
 	     (u32) TransmitCallbackFunction, (u32) ReceiveCallbackFunction);
 
 	/* Check if this interface already initialized - if so, shut it down */
