@@ -439,13 +439,13 @@ acpi_processor_set_power_policy (
 
 		if (higher) {
 			cx->promotion.state  = higher;
-			cx->demotion.threshold.ticks = cx->latency_ticks;
+			cx->promotion.threshold.ticks = cx->latency_ticks;
 			if (cx->type >= ACPI_STATE_C2)
 				cx->promotion.threshold.count = 4;
 			else
 				cx->promotion.threshold.count = 10;
 			if (higher->type == ACPI_STATE_C3)
-				cx->demotion.threshold.bm = 0x0F;
+				cx->promotion.threshold.bm = 0x0F;
 		}
 
 		higher = cx;
