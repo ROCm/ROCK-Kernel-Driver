@@ -316,7 +316,6 @@ static void speedtch_handle_int(struct urb *urb, struct pt_regs *regs)
 		del_timer(&instance->poll_timer);
 		printk(KERN_NOTICE "DSL line goes up\n");
 	} else if (!memcmp(down_int, instance->int_data, 6)) {
-		del_timer(&instance->poll_timer);
 		printk(KERN_NOTICE "DSL line goes down\n");
 	} else {
 		int i;
@@ -464,7 +463,6 @@ static void speedtch_timer_poll(unsigned long data)
 }
 
 #ifdef USE_FW_LOADER
-
 static void speedtch_upload_firmware(struct speedtch_instance_data *instance,
 				     const struct firmware *fw1,
 				     const struct firmware *fw2)
@@ -639,6 +637,13 @@ static int speedtch_load_firmware(void *arg)
 		release_firmware(fw1);
 	}
 
+	/* In case we failed, set state back to NO_FIRMWARE so that
+	   another later attempt may work. Otherwise, we never actually
+	   manage to recover if, for example, the firmware is on /usr and
+	   we look for it too early. */
+	speedtch_got_firmware(instance, 0);
+
+	module_put(THIS_MODULE);
 	udsl_put_instance(&instance->u);
 	return 0;
 }
@@ -662,9 +667,10 @@ static void speedtch_firmware_start(struct speedtch_instance_data *instance)
 	instance->u.status = UDSL_LOADING_FIRMWARE;
 	up(&instance->u.serialize);
 
-	udsl_get_instance(&instance->u);
-
 #ifdef USE_FW_LOADER
+	udsl_get_instance(&instance->u);
+	try_module_get(THIS_MODULE);
+
 	ret = kernel_thread(speedtch_load_firmware, instance,
 			    CLONE_FS | CLONE_FILES);
 
@@ -673,10 +679,12 @@ static void speedtch_firmware_start(struct speedtch_instance_data *instance)
 
 	dbg("speedtch_firmware_start: kernel_thread failed (%d)!", ret);
 
+	module_put(THIS_MODULE);
+	udsl_put_instance(&instance->u);
 	/* Just pretend it never happened... hope modem_run happens */
 #endif				/* USE_FW_LOADER */
+
 	speedtch_got_firmware(instance, 0);
-	udsl_put_instance(&instance->u);
 }
 
 static int speedtch_firmware_wait(struct udsl_instance_data *instance)

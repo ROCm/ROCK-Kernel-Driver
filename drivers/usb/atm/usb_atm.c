@@ -97,7 +97,7 @@
 #ifdef DEBUG
 #define UDSL_ASSERT(x)	BUG_ON(!(x))
 #else
-#define UDSL_ASSERT(x)	warn("failed assertion '" #x "' at line %d", __LINE__)
+#define UDSL_ASSERT(x)	do { if (!(x)) warn("failed assertion '" #x "' at line %d", __LINE__); } while(0)
 #endif
 
 #ifdef VERBOSE_DEBUG
@@ -1166,7 +1166,12 @@ static int __init udsl_usb_init(void)
 	return 0;
 }
 
+static void __exit udsl_usb_exit(void)
+{
+}
+
 module_init(udsl_usb_init);
+module_exit(udsl_usb_exit);
 
 MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);
