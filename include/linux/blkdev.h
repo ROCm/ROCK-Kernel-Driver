@@ -327,7 +327,7 @@ extern struct backing_dev_info *blk_get_backing_dev_info(struct block_device *bd
 extern int blk_rq_map_sg(request_queue_t *, struct request *, struct scatterlist *);
 extern void blk_dump_rq_flags(struct request *, char *);
 extern void generic_unplug_device(void *);
-
+extern long nr_blockdev_pages(void);
 
 /*
  * tag stuff
