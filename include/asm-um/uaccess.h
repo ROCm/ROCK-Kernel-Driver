@@ -55,7 +55,7 @@
 
 #define get_user(x, ptr) \
 ({ \
-        const __typeof__((*ptr)) *private_ptr = (ptr); \
+        const __typeof__((*(ptr))) *private_ptr = (ptr); \
         (access_ok(VERIFY_READ, private_ptr, sizeof(*private_ptr)) ? \
 	 __get_user(x, private_ptr) : ((x) = 0, -EFAULT)); \
 })

@@ -850,7 +850,7 @@ static inline u16 ether1394_type_trans(struct sk_buff *skb,
 
 	skb->mac.raw = skb->data;
 	skb_pull (skb, ETH1394_HLEN);
-	eth = (struct eth1394hdr*)skb->mac.raw;
+	eth = eth1394_hdr(skb);
 
 	if (*eth->h_dest & 1) {
 		if (memcmp(eth->h_dest, dev->broadcast, dev->addr_len)==0)

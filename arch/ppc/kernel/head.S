@@ -800,7 +800,7 @@ load_up_fpu:
 	tophys(r6,0)			/* get __pa constant */
 	addis	r3,r6,last_task_used_math@ha
 	lwz	r4,last_task_used_math@l(r3)
-	cmpi	0,r4,0
+	cmpwi	0,r4,0
 	beq	1f
 	add	r4,r4,r6
 	addi	r4,r4,THREAD		/* want last_task_used_math->thread */
@@ -927,7 +927,7 @@ load_up_altivec:
 	tophys(r6,0)
 	addis	r3,r6,last_task_used_altivec@ha
 	lwz	r4,last_task_used_altivec@l(r3)
-	cmpi	0,r4,0
+	cmpwi	0,r4,0
 	beq	1f
 	add	r4,r4,r6
 	addi	r4,r4,THREAD	/* want THREAD of last_task_used_altivec */
@@ -992,11 +992,11 @@ giveup_altivec:
 	SYNC
 	MTMSRD(r5)			/* enable use of AltiVec now */
 	isync
-	cmpi	0,r3,0
+	cmpwi	0,r3,0
 	beqlr-				/* if no previous owner, done */
 	addi	r3,r3,THREAD		/* want THREAD of task */
 	lwz	r5,PT_REGS(r3)
-	cmpi	0,r5,0
+	cmpwi	0,r5,0
 	SAVE_32VR(0, r4, r3)
 	mfvscr	vr0
 	li	r4,THREAD_VSCR
@@ -1030,11 +1030,11 @@ giveup_fpu:
 	MTMSRD(r5)			/* enable use of fpu now */
 	SYNC_601
 	isync
-	cmpi	0,r3,0
+	cmpwi	0,r3,0
 	beqlr-				/* if no previous owner, done */
 	addi	r3,r3,THREAD	        /* want THREAD of task */
 	lwz	r5,PT_REGS(r3)
-	cmpi	0,r5,0
+	cmpwi	0,r5,0
 	SAVE_32FPRS(0, r3)
 	mffs	fr0
 	stfd	fr0,THREAD_FPSCR-4(r3)
@@ -1539,7 +1539,7 @@ initial_bats:
 #ifndef CONFIG_PPC64BRIDGE
 	mfspr	r9,PVR
 	rlwinm	r9,r9,16,16,31		/* r9 = 1 for 601, 4 for 604 */
-	cmpi	0,r9,1
+	cmpwi	0,r9,1
 	bne	4f
 	ori	r11,r11,4		/* set up BAT registers for 601 */
 	li	r8,0x7f			/* valid, block length = 8MB */
@@ -1591,7 +1591,7 @@ setup_disp_bat:
 	lwz	r8,4(r8)
 	mfspr	r9,PVR
 	rlwinm	r9,r9,16,16,31		/* r9 = 1 for 601, 4 for 604 */
-	cmpi	0,r9,1
+	cmpwi	0,r9,1
 	beq	1f
 	mtspr	DBAT3L,r8
 	mtspr	DBAT3U,r11

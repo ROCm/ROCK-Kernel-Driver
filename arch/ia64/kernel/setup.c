@@ -680,7 +680,7 @@ cpu_init (void)
 			break;
 	}
 
-	if (ia64_pal_rse_info(&num_phys_stacked, 0) != 0) {
+	if (ia64_pal_rse_info(&num_phys_stacked, NULL) != 0) {
 		printk(KERN_WARNING "cpu_init: PAL RSE info failed; assuming 96 physical "
 		       "stacked regs\n");
 		num_phys_stacked = 96;

@@ -25,7 +25,7 @@ static __inline__ int set_inUse( struct ItLpQueue * lpQueue )
 
 	__asm__ __volatile__("\n\
 1:	lwarx	%0,0,%2		\n\
-	cmpi	0,%0,0		\n\
+	cmpwi	0,%0,0		\n\
 	li	%0,0		\n\
 	bne-	2f		\n\
 	addi	%0,%0,1		\n\

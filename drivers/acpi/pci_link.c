@@ -448,7 +448,7 @@ acpi_pci_link_set (
 #define PIRQ_PENALTY_ISA_USED		(16*16*16*16*16)
 #define PIRQ_PENALTY_ISA_ALWAYS		(16*16*16*16*16*16)
 
-static int __initdata acpi_irq_penalty[ACPI_MAX_IRQS] = {
+static int acpi_irq_penalty[ACPI_MAX_IRQS] = {
 	PIRQ_PENALTY_ISA_ALWAYS,	/* IRQ0 timer */
 	PIRQ_PENALTY_ISA_ALWAYS,	/* IRQ1 keyboard */
 	PIRQ_PENALTY_ISA_ALWAYS,	/* IRQ2 cascade */
@@ -468,7 +468,7 @@ static int __initdata acpi_irq_penalty[ACPI_MAX_IRQS] = {
 			/* >IRQ15 */
 };
 
-int
+int __init
 acpi_irq_penalty_init(void)
 {
 	struct list_head	*node = NULL;

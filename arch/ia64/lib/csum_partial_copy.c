@@ -1,7 +1,7 @@
 /*
  * Network Checksum & Copy routine
  *
- * Copyright (C) 1999, 2003 Hewlett-Packard Co
+ * Copyright (C) 1999, 2003-2004 Hewlett-Packard Co
  *	Stephane Eranian <eranian@hpl.hp.com>
  *
  * Most of the code has been imported from Linux/Alpha
@@ -105,7 +105,7 @@ out:
 extern unsigned long do_csum(const unsigned char *, long);
 
 static unsigned int
-do_csum_partial_copy_from_user (const char *src, char *dst, int len,
+do_csum_partial_copy_from_user (const char __user *src, char *dst, int len,
 				unsigned int psum, int *errp)
 {
 	unsigned long result;
@@ -129,10 +129,10 @@ do_csum_partial_copy_from_user (const char *src, char *dst, int len,
 }
 
 unsigned int
-csum_partial_copy_from_user(const char *src, char *dst, int len,
-			    unsigned int sum, int *errp)
+csum_partial_copy_from_user (const char __user *src, char *dst, int len,
+			     unsigned int sum, int *errp)
 {
-	if (!access_ok(src, len, VERIFY_READ)) {
+	if (!access_ok(VERIFY_READ, src, len)) {
 		*errp = -EFAULT;
 		memset(dst, 0, len);
 		return sum;
@@ -142,7 +142,7 @@ csum_partial_copy_from_user(const char *src, char *dst, int len,
 }
 
 unsigned int
-csum_partial_copy_nocheck(const char *src, char *dst, int len, unsigned int sum)
+csum_partial_copy_nocheck(const char __user *src, char *dst, int len, unsigned int sum)
 {
 	return do_csum_partial_copy_from_user(src, dst, len, sum, NULL);
 }

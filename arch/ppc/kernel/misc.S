@@ -214,7 +214,7 @@ _GLOBAL(low_choose_750fx_pll)
 	mtmsr	r0
 
 	/* If switching to PLL1, disable HID0:BTIC */
-	cmpli	cr0,r3,0
+	cmplwi	cr0,r3,0
 	beq	1f
 	mfspr	r5,HID0
 	rlwinm	r5,r5,0,27,25
@@ -239,7 +239,7 @@ _GLOBAL(low_choose_750fx_pll)
 	stw	r4,nap_save_hid1@l(r6)
 
 	/* If switching to PLL0, enable HID0:BTIC */
-	cmpli	cr0,r3,0
+	cmplwi	cr0,r3,0
 	bne	1f
 	mfspr	r5,HID0
 	ori	r5,r5,HID0_BTIC
@@ -470,7 +470,7 @@ _GLOBAL(_tlbia)
 	ori	r9,r9,mmu_hash_lock@l
 	tophys(r9,r9)
 10:	lwarx	r7,0,r9
-	cmpi	0,r7,0
+	cmpwi	0,r7,0
 	bne-	10b
 	stwcx.	r8,0,r9
 	bne-	10b
@@ -551,7 +551,7 @@ _GLOBAL(_tlbie)
 	ori	r9,r9,mmu_hash_lock@l
 	tophys(r9,r9)
 10:	lwarx	r7,0,r9
-	cmpi	0,r7,0
+	cmpwi	0,r7,0
 	bne-	10b
 	stwcx.	r8,0,r9
 	bne-	10b
@@ -599,7 +599,7 @@ _GLOBAL(flush_instruction_cache)
 #else
 	mfspr	r3,PVR
 	rlwinm	r3,r3,16,16,31
-	cmpi	0,r3,1
+	cmpwi	0,r3,1
 	beqlr			/* for 601, do nothing */
 	/* 603/604 processor - use invalidate-all bit in HID0 */
 	mfspr	r3,HID0
@@ -1141,7 +1141,7 @@ _GLOBAL(kernel_thread)
 	li	r4,0		/* new sp (unused) */
 	li	r0,__NR_clone
 	sc
-	cmpi	0,r3,0		/* parent or child? */
+	cmpwi	0,r3,0		/* parent or child? */
 	bne	1f		/* return if parent */
 	li	r0,0		/* make top-level stack frame */
 	stwu	r0,-16(r1)

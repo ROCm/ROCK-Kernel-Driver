@@ -48,7 +48,7 @@ static efi_status_t										  \
 prefix##_get_time (efi_time_t *tm, efi_time_cap_t *tc)						  \
 {												  \
 	struct ia64_fpreg fr[6];								  \
-	efi_time_cap_t *atc = 0;								  \
+	efi_time_cap_t *atc = NULL;								  \
 	efi_status_t ret;									  \
 												  \
 	if (tc)											  \
@@ -91,7 +91,7 @@ static efi_status_t										\
 prefix##_set_wakeup_time (efi_bool_t enabled, efi_time_t *tm)					\
 {												\
 	struct ia64_fpreg fr[6];								\
-	efi_time_t *atm = 0;									\
+	efi_time_t *atm = NULL;									\
 	efi_status_t ret;									\
 												\
 	if (tm)											\
@@ -109,7 +109,7 @@ prefix##_get_variable (efi_char16_t *name, efi_guid_t *vendor, u32 *attr,		\
 		       unsigned long *data_size, void *data)				\
 {											\
 	struct ia64_fpreg fr[6];							\
-	u32 *aattr = 0;									\
+	u32 *aattr = NULL;									\
 	efi_status_t ret;								\
 											\
 	if (attr)									\
@@ -172,7 +172,7 @@ prefix##_reset_system (int reset_type, efi_status_t status,			\
 		       unsigned long data_size, efi_char16_t *data)		\
 {										\
 	struct ia64_fpreg fr[6];						\
-	efi_char16_t *adata = 0;						\
+	efi_char16_t *adata = NULL;						\
 										\
 	if (data)								\
 		adata = adjust_arg(data);					\
@@ -214,7 +214,7 @@ efi_gettimeofday (struct timespec *ts)
 	efi_time_t tm;
 
 	memset(ts, 0, sizeof(ts));
-	if ((*efi.get_time)(&tm, 0) != EFI_SUCCESS)
+	if ((*efi.get_time)(&tm, NULL) != EFI_SUCCESS)
 		return;
 
 	ts->tv_sec = mktime(tm.year, tm.month, tm.day, tm.hour, tm.minute, tm.second);

@@ -453,14 +453,15 @@ void acpi_pci_unregister_driver(struct acpi_pci_driver *driver);
 
 #ifdef CONFIG_ACPI_EC
 
-int ec_read(u8 addr, u8 *val);
-int ec_write(u8 addr, u8 val);
+extern int ec_read(u8 addr, u8 *val);
+extern int ec_write(u8 addr, u8 val);
 
 #endif /*CONFIG_ACPI_EC*/
 
 #ifdef CONFIG_ACPI_INTERPRETER
 
-int acpi_blacklisted(void);
+extern int acpi_blacklisted(void);
+extern void acpi_bios_year(char *s);
 
 #else /*!CONFIG_ACPI_INTERPRETER*/
 

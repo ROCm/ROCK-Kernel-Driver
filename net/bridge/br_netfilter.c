@@ -255,7 +255,7 @@ bridged_dnat:
 					       1);
 				return 0;
 			}
-			memcpy(skb->mac.ethernet->h_dest, dev->dev_addr,
+			memcpy(eth_hdr(skb)->h_dest, dev->dev_addr,
 			       ETH_ALEN);
 			skb->pkt_type = PACKET_HOST;
 		}
@@ -412,8 +412,7 @@ static unsigned int br_nf_pre_routing(unsigned int hook, struct sk_buff **pskb,
 	__u32 len;
 	struct sk_buff *skb = *pskb;
 	struct nf_bridge_info *nf_bridge;
-	struct vlan_ethhdr *hdr = (struct vlan_ethhdr *)
-				   ((*pskb)->mac.ethernet);
+	struct vlan_ethhdr *hdr = vlan_eth_hdr(*pskb);
 
 	if (skb->protocol == __constant_htons(ETH_P_IPV6) || IS_VLAN_IPV6) {
 #ifdef CONFIG_SYSCTL
@@ -516,7 +515,7 @@ static int br_nf_forward_finish(struct sk_buff *skb)
 {
 	struct nf_bridge_info *nf_bridge = skb->nf_bridge;
 	struct net_device *in;
-	struct vlan_ethhdr *hdr = (struct vlan_ethhdr *)(skb->mac.ethernet);
+	struct vlan_ethhdr *hdr = vlan_eth_hdr(skb);
 
 #ifdef CONFIG_NETFILTER_DEBUG
 	skb->nf_debug ^= (1 << NF_BR_FORWARD);
@@ -551,7 +550,7 @@ static unsigned int br_nf_forward_ip(unsigned int hook, struct sk_buff **pskb,
 {
 	struct sk_buff *skb = *pskb;
 	struct nf_bridge_info *nf_bridge;
-	struct vlan_ethhdr *hdr = (struct vlan_ethhdr *)(skb->mac.ethernet);
+	struct vlan_ethhdr *hdr = vlan_eth_hdr(skb);
 	int pf;
 
 	if (!skb->nf_bridge)
@@ -591,7 +590,7 @@ static unsigned int br_nf_forward_arp(unsigned int hook, struct sk_buff **pskb,
    int (*okfn)(struct sk_buff *))
 {
 	struct sk_buff *skb = *pskb;
-	struct vlan_ethhdr *hdr = (struct vlan_ethhdr *)(skb->mac.ethernet);
+	struct vlan_ethhdr *hdr = vlan_eth_hdr(skb);
 	struct net_device **d = (struct net_device **)(skb->cb);
 
 #ifdef CONFIG_SYSCTL
@@ -669,7 +668,7 @@ static unsigned int br_nf_local_out(unsigned int hook, struct sk_buff **pskb,
 	struct net_device *realindev, *realoutdev;
 	struct sk_buff *skb = *pskb;
 	struct nf_bridge_info *nf_bridge;
-	struct vlan_ethhdr *hdr = (struct vlan_ethhdr *)(skb->mac.ethernet);
+	struct vlan_ethhdr *hdr = vlan_eth_hdr(skb);
 	int pf;
 
 	if (!skb->nf_bridge)
@@ -753,7 +752,7 @@ static unsigned int br_nf_post_routing(unsigned int hook, struct sk_buff **pskb,
 {
 	struct sk_buff *skb = *pskb;
 	struct nf_bridge_info *nf_bridge = (*pskb)->nf_bridge;
-	struct vlan_ethhdr *hdr = (struct vlan_ethhdr *)(skb->mac.ethernet);
+	struct vlan_ethhdr *hdr = vlan_eth_hdr(skb);
 	struct net_device *realoutdev = bridge_parent(skb->dev);
 	int pf;
 
@@ -848,8 +847,7 @@ static unsigned int ip_sabotage_out(unsigned int hook, struct sk_buff **pskb,
 
 #ifdef CONFIG_SYSCTL
 	if (!skb->nf_bridge) {
-		struct vlan_ethhdr *hdr =
-		   (struct vlan_ethhdr *)(skb->mac.ethernet);
+		struct vlan_ethhdr *hdr = vlan_eth_hdr(skb);
 
 		if (skb->protocol == __constant_htons(ETH_P_IP) ||
 		    IS_VLAN_IP) {

@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/blacklist.c
  *   S/390 common I/O routines -- blacklisting of specific devices
- *   $Revision: 1.31 $
+ *   $Revision: 1.33 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *			      IBM Corporation
@@ -229,7 +229,7 @@ s390_redo_validation (void)
 	unsigned int irq;
 
 	CIO_TRACE_EVENT (0, "redoval");
-	for (irq = 0; irq <= __MAX_SUBCHANNELS; irq++) {
+	for (irq = 0; irq < __MAX_SUBCHANNELS; irq++) {
 		int ret;
 		struct subchannel *sch;
 

@@ -109,9 +109,9 @@ static int pc110pad_open(struct input_dev *dev)
 
 static int __init pc110pad_init(void)
 {
-	if (request_region(pc110pad_io, 4, "pc110pad"))
-	{
-		printk(KERN_ERR "pc110pad: I/O area %#x-%#x in use.\n", pc110pad_io, pc110pad_io + 4);
+	if (!request_region(pc110pad_io, 4, "pc110pad")) {
+		printk(KERN_ERR "pc110pad: I/O area %#x-%#x in use.\n",
+				pc110pad_io, pc110pad_io + 4);
 		return -EBUSY;
 	}
 

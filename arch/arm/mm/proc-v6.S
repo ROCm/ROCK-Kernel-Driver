@@ -189,12 +189,10 @@ cpu_v6_name:
  *	- cache type register is implemented
  */
 __v6_setup:
-	mrc	p15, 0, r10, c0, c0, 1		@ read cache type register
-	tst	r10, #1 << 24			@ Harvard cache?
 	mov	r10, #0
-	mcrne	p15, 0, r10, c7, c14, 0		@ clean+invalidate D cache
-	mcrne	p15, 0, r10, c7, c5, 0		@ invalidate I cache
-	mcreq	p15, 0, r10, c7, c15, 0		@ clean+invalidate cache
+	mcr	p15, 0, r10, c7, c14, 0		@ clean+invalidate D cache
+	mcr	p15, 0, r10, c7, c5, 0		@ invalidate I cache
+	mcr	p15, 0, r10, c7, c15, 0		@ clean+invalidate cache
 	mcr	p15, 0, r10, c7, c10, 4		@ drain write buffer
 	mcr	p15, 0, r10, c8, c7, 0		@ invalidate I + D TLBs
 	mcr	p15, 0, r10, c2, c0, 2		@ TTB control register

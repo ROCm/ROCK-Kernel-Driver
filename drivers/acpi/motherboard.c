@@ -170,4 +170,8 @@ static int __init acpi_motherboard_init(void)
 	return 0;
 }
 
-subsys_initcall(acpi_motherboard_init);
+/**
+ * Reserve motherboard resources after PCI claim BARs,
+ * but before PCI assign resources for uninitialized PCI devices
+ */
+fs_initcall(acpi_motherboard_init);

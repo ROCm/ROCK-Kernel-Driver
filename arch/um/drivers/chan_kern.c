@@ -19,6 +19,7 @@
 #include "line.h"
 #include "os.h"
 
+#ifdef CONFIG_NOCONFIG_CHAN
 static void *not_configged_init(char *str, int device, struct chan_opts *opts)
 {
 	printk(KERN_ERR "Using a channel type which is configured out of "
@@ -87,6 +88,7 @@ static struct chan_ops not_configged_ops = {
 	.free		= not_configged_free,
 	.winch		= 0,
 };
+#endif /* CONFIG_NOCONFIG_CHAN */
 
 void generic_close(int fd, void *unused)
 {

@@ -39,7 +39,7 @@ extern struct smp_boot_data {
 extern char no_int_routing __devinitdata;
 
 extern cpumask_t cpu_online_map;
-extern unsigned long ipi_base_addr;
+extern void __iomem *ipi_base_addr;
 extern unsigned char smp_int_redirect;
 
 extern volatile int ia64_cpu_to_sapicid[];
@@ -73,21 +73,21 @@ static inline void
 min_xtp (void)
 {
 	if (smp_int_redirect & SMP_IRQ_REDIRECTION)
-		writeb(0x00, ipi_base_addr | XTP_OFFSET); /* XTP to min */
+		writeb(0x00, ipi_base_addr + XTP_OFFSET); /* XTP to min */
 }
 
 static inline void
 normal_xtp (void)
 {
 	if (smp_int_redirect & SMP_IRQ_REDIRECTION)
-		writeb(0x08, ipi_base_addr | XTP_OFFSET); /* XTP normal */
+		writeb(0x08, ipi_base_addr + XTP_OFFSET); /* XTP normal */
 }
 
 static inline void
 max_xtp (void)
 {
 	if (smp_int_redirect & SMP_IRQ_REDIRECTION)
-		writeb(0x0f, ipi_base_addr | XTP_OFFSET); /* Set XTP to max */
+		writeb(0x0f, ipi_base_addr + XTP_OFFSET); /* Set XTP to max */
 }
 
 static inline unsigned int

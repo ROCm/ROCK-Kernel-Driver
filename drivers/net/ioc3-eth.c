@@ -506,7 +506,7 @@ static struct net_device_stats *ioc3_get_stats(struct net_device *dev)
 
 static void ioc3_tcpudp_checksum(struct sk_buff *skb, uint32_t hwsum, int len)
 {
-	struct ethhdr *eh = skb->mac.ethernet;
+	struct ethhdr *eh = eth_hdr(skb);
 	uint32_t csum, ehsum;
 	unsigned int proto;
 	struct iphdr *ih;
@@ -1333,7 +1333,7 @@ static int ioc3_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		uint32_t csum, ehsum;
 		uint16_t *eh;
 
-		/* The MAC header.  skb->mac.ethernet seem the logic approach
+		/* The MAC header.  skb->mac seem the logic approach
 		   to find the MAC header - except it's a NULL pointer ...  */
 		eh = (uint16_t *) skb->data;
 

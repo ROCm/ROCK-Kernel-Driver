@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
-# Linux kernel version: 2.6.9-rc2
-# Mon Sep 20 17:16:38 2004
+# Linux kernel version: 2.6.9-rc3
+# Fri Oct  8 19:17:35 2004
 #
 CONFIG_MMU=y
 CONFIG_RWSEM_XCHGADD_ALGORITHM=y
@@ -520,7 +520,7 @@ CONFIG_CRYPTO=y
 # CONFIG_CRYPTO_SHA1_Z990 is not set
 # CONFIG_CRYPTO_SHA256 is not set
 # CONFIG_CRYPTO_SHA512 is not set
-# CONFIG_CRYPTO_WHIRLPOOL is not set
+# CONFIG_CRYPTO_WP512 is not set
 # CONFIG_CRYPTO_DES is not set
 # CONFIG_CRYPTO_DES_Z990 is not set
 # CONFIG_CRYPTO_BLOWFISH is not set

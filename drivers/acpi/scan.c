@@ -204,6 +204,8 @@ acpi_bus_extract_wakeup_device_power_package (
 		return AE_BAD_PARAMETER;
 
 	element = &(package->package.elements[0]);
+	if (!element)
+		return AE_BAD_PARAMETER;
 	if (element->type == ACPI_TYPE_PACKAGE) {
 		if ((element->package.count < 2) ||
 			(element->package.elements[0].type != ACPI_TYPE_LOCAL_REFERENCE) ||

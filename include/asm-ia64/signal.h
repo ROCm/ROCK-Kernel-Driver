@@ -144,10 +144,10 @@
 struct siginfo;
 
 /* Type of a signal handler.  */
-typedef void (*__sighandler_t)(int);
+typedef void __user (*__sighandler_t)(int);
 
 typedef struct sigaltstack {
-	void *ss_sp;
+	void __user *ss_sp;
 	int ss_flags;
 	size_t ss_size;
 } stack_t;

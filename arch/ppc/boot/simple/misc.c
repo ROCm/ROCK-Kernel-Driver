@@ -96,7 +96,7 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum)
 #endif
 	char *cp;
 	struct bi_record *rec;
-	unsigned long initrd_loc, TotalMemory = 0;
+	unsigned long initrd_loc = 0, TotalMemory = 0;
 
 #ifdef CONFIG_SERIAL_8250_CONSOLE
 	com_port = serial_init(0, NULL);

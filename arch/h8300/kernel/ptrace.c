@@ -107,7 +107,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 
 	/* read the word at location addr in the USER area. */
 		case PTRACE_PEEKUSR: {
-			unsigned long tmp;
+			unsigned long tmp = 0;
 			
 			if ((addr & 3) || addr < 0 || addr >= sizeof(struct user)) {
 				ret = -EIO;

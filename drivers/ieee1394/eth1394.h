@@ -81,7 +81,14 @@ struct eth1394hdr {
 	unsigned short	h_proto;		/* packet type ID field	*/
 }  __attribute__((packed));
 
+#ifdef __KERNEL__
+#include <linux/skbuff.h>
 
+static inline struct eth1394hdr *eth1394_hdr(const struct sk_buff *skb)
+{
+	return (struct eth1394hdr *)skb->mac.raw;
+}
+#endif
 
 typedef enum {ETH1394_GASP, ETH1394_WRREQ} eth1394_tx_type;
 

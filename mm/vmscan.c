@@ -851,6 +851,9 @@ shrink_caches(struct zone **zones, struct scan_control *sc)
 	for (i = 0; zones[i] != NULL; i++) {
 		struct zone *zone = zones[i];
 
+		if (zone->present_pages == 0)
+			continue;
+
 		zone->temp_priority = sc->priority;
 		if (zone->prev_priority > sc->priority)
 			zone->prev_priority = sc->priority;
@@ -1004,6 +1007,9 @@ loop_again:
 			for (i = pgdat->nr_zones - 1; i >= 0; i--) {
 				struct zone *zone = pgdat->node_zones + i;
 
+				if (zone->present_pages == 0)
+					continue;
+
 				if (zone->all_unreclaimable &&
 						priority != DEF_PRIORITY)
 					continue;
@@ -1035,6 +1041,9 @@ scan:
 		 */
 		for (i = 0; i <= end_zone; i++) {
 			struct zone *zone = pgdat->node_zones + i;
+
+			if (zone->present_pages == 0)
+				continue;
 
 			if (zone->all_unreclaimable && priority != DEF_PRIORITY)
 				continue;
@@ -1159,6 +1168,8 @@ static int kswapd(void *p)
  */
 void wakeup_kswapd(struct zone *zone)
 {
+	if (zone->present_pages == 0)
+		return;
 	if (zone->free_pages > zone->pages_low)
 		return;
 	if (!waitqueue_active(&zone->zone_pgdat->kswapd_wait))

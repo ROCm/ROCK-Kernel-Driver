@@ -6,7 +6,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.37 $
+ * $Revision: 1.38 $
  */
 
 #include <linux/config.h>
@@ -304,8 +304,11 @@ dasd_diag_check_device(struct dasd_device *device)
 			    (device->bp_block >> 10),
 			    (device->blocks << device->s2b_shift) >> 1);
 		rc = 0;
-	} else
+	} else {
+		DEV_MESSAGE(KERN_WARNING, device, "%s",
+			    "volume has incompatible disk layout");
 		rc = -EMEDIUMTYPE;
+	}
 	free_page((long) label);
 	return rc;
 }

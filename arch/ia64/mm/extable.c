@@ -77,7 +77,7 @@ search_extable (const struct exception_table_entry *first,
                 else
                         last = mid - 1;
         }
-        return 0;
+        return NULL;
 }
 
 void

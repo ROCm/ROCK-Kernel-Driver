@@ -130,7 +130,7 @@ acpi_ex_setup_region (
 	if (rgn_desc->region.length < (obj_desc->common_field.base_byte_offset
 			   + field_datum_byte_offset
 			   + obj_desc->common_field.access_byte_width)) {
-		if (acpi_gbl_enable_interpeter_slack) {
+		if (acpi_gbl_enable_interpreter_slack) {
 			/*
 			 * Slack mode only:  We will go ahead and allow access to this
 			 * field if it is within the region length rounded up to the next
@@ -169,40 +169,7 @@ acpi_ex_setup_region (
 			field_datum_byte_offset, obj_desc->common_field.access_byte_width,
 			acpi_ut_get_node_name (rgn_desc->region.node), rgn_desc->region.length));
 
-		if (!acpi_strict) {
-			/*
-			 * Allow access to the field if it is within the region size
-			 * rounded up to a multiple of the access byte width.  This
-			 * overcomes "off-by-one" programming errors in the AML often
-			 * found in Toshiba laptops.  These errors were allowed by
-			 * the Microsoft ASL compiler.
-			 */
-			u32 rounded_length = ACPI_ROUND_UP(rgn_desc->region.length,
-									obj_desc->common_field.access_byte_width);
-
-			if (rounded_length < (obj_desc->common_field.base_byte_offset
-						+ field_datum_byte_offset
-						+ obj_desc->common_field.access_byte_width)) {
-				return_ACPI_STATUS (AE_AML_REGION_LIMIT);
-			} else {
-				static int	warn_once = 1;
-				if (warn_once) {
-					// Could also associate a flag with each field, and
-					// warn once for each field.
-					ACPI_REPORT_WARNING((
-						"The ACPI AML in your computer contains errors, "
-						"please nag the manufacturer to correct it.\n"));
-					ACPI_REPORT_WARNING((
-						"Allowing relaxed access to fields; "
-						"turn on CONFIG_ACPI_DEBUG for details.\n"));
-					warn_once = 0;
-				}
-				return_ACPI_STATUS (AE_OK);
-			}
-		}
-		else {
-			return_ACPI_STATUS (AE_AML_REGION_LIMIT);
-		}
+		return_ACPI_STATUS (AE_AML_REGION_LIMIT);
 	}
 
 	return_ACPI_STATUS (AE_OK);
