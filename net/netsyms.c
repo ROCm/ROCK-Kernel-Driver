@@ -215,8 +215,6 @@ EXPORT_SYMBOL(unregister_inetaddr_notifier);
 #ifdef CONFIG_PROC_FS
 EXPORT_SYMBOL(udp_proc_register);
 EXPORT_SYMBOL(udp_proc_unregister);
-EXPORT_SYMBOL(tcp_proc_register);
-EXPORT_SYMBOL(tcp_proc_unregister);
 #endif
 
 /* needed for ip_gre -cw */
@@ -249,8 +247,6 @@ EXPORT_SYMBOL(inet_sock_destruct);
 EXPORT_SYMBOL(inet_sock_release);
 
 /* Socket demultiplexing. */
-EXPORT_SYMBOL(tcp_hashinfo);
-EXPORT_SYMBOL(tcp_listen_wlock);
 EXPORT_SYMBOL(udp_hash);
 EXPORT_SYMBOL(udp_hash_lock);
 
@@ -258,13 +254,11 @@ EXPORT_SYMBOL(tcp_destroy_sock);
 EXPORT_SYMBOL(ip_queue_xmit);
 EXPORT_SYMBOL(memcpy_fromiovecend);
 EXPORT_SYMBOL(csum_partial_copy_fromiovecend);
-EXPORT_SYMBOL(tcp_v4_lookup_listener);
 /* UDP/TCP exported functions for TCPv6 */
 EXPORT_SYMBOL(udp_ioctl);
 EXPORT_SYMBOL(udp_connect);
 EXPORT_SYMBOL(udp_disconnect);
 EXPORT_SYMBOL(udp_sendmsg);
-EXPORT_SYMBOL(tcp_bind_hash);
 EXPORT_SYMBOL(tcp_close);
 EXPORT_SYMBOL(tcp_disconnect);
 EXPORT_SYMBOL(tcp_accept);
@@ -288,21 +282,9 @@ EXPORT_SYMBOL(tcp_rcv_state_process);
 EXPORT_SYMBOL(tcp_timewait_state_process);
 EXPORT_SYMBOL(tcp_timewait_cachep);
 EXPORT_SYMBOL(tcp_sendmsg);
-EXPORT_SYMBOL(tcp_v4_rebuild_header);
-EXPORT_SYMBOL(tcp_v4_send_check);
-EXPORT_SYMBOL(tcp_v4_conn_request);
 EXPORT_SYMBOL(tcp_create_openreq_child);
-EXPORT_SYMBOL(tcp_bucket_create);
-EXPORT_SYMBOL(tcp_put_port);
-EXPORT_SYMBOL(tcp_inherit_port);
-EXPORT_SYMBOL(tcp_v4_syn_recv_sock);
-EXPORT_SYMBOL(tcp_v4_do_rcv);
-EXPORT_SYMBOL(tcp_v4_connect);
-EXPORT_SYMBOL(tcp_unhash);
 EXPORT_SYMBOL(udp_prot);
-EXPORT_SYMBOL(tcp_prot);
 EXPORT_SYMBOL(tcp_openreq_cachep);
-EXPORT_SYMBOL(ipv4_specific);
 EXPORT_SYMBOL(tcp_simple_retransmit);
 EXPORT_SYMBOL(tcp_transmit_skb);
 EXPORT_SYMBOL(tcp_connect);
@@ -310,8 +292,6 @@ EXPORT_SYMBOL(tcp_make_synack);
 EXPORT_SYMBOL(tcp_tw_deschedule);
 EXPORT_SYMBOL(tcp_delete_keepalive_timer);
 EXPORT_SYMBOL(tcp_reset_keepalive_timer);
-EXPORT_SYMBOL(sysctl_local_port_range);
-EXPORT_SYMBOL(tcp_port_rover);
 EXPORT_SYMBOL(udp_port_rover);
 EXPORT_SYMBOL(tcp_sync_mss);
 EXPORT_SYMBOL(net_statistics); 
@@ -323,17 +303,14 @@ EXPORT_SYMBOL(sysctl_tcp_wmem);
 EXPORT_SYMBOL(sysctl_tcp_ecn);
 EXPORT_SYMBOL(tcp_cwnd_application_limited);
 EXPORT_SYMBOL(tcp_sendpage);
-EXPORT_SYMBOL(sysctl_tcp_low_latency);
 
 EXPORT_SYMBOL(tcp_write_xmit);
 
-EXPORT_SYMBOL(tcp_v4_remember_stamp); 
 
 extern int sysctl_tcp_tw_recycle;
 
 #ifdef CONFIG_SYSCTL
 EXPORT_SYMBOL(sysctl_tcp_tw_recycle); 
-EXPORT_SYMBOL(sysctl_max_syn_backlog);
 #endif
 
 EXPORT_SYMBOL(ip_generic_getfrag);
