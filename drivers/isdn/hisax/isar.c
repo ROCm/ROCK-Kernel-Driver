@@ -28,7 +28,7 @@ const u_char faxmodulation[] = {3,24,48,72,73,74,96,97,98,121,122,145,146};
 void isar_setup(struct IsdnCardState *cs);
 static void isar_pump_cmd(struct BCState *bcs, u_char cmd, u_char para);
 static inline void ll_deliver_faxstat(struct BCState *bcs, u_char status);
-
+static spinlock_t isar_lock = SPIN_LOCK_UNLOCKED;
 static inline int
 waitforHIA(struct IsdnCardState *cs, int timeout)
 {
@@ -47,7 +47,7 @@ int
 sendmsg(struct IsdnCardState *cs, u_char his, u_char creg, u_char len,
 	u_char *msg)
 {
-	long flags;
+	unsigned long flags;
 	int i;
 	
 	if (!waitforHIA(cs, 4000))
@@ -56,8 +56,7 @@ sendmsg(struct IsdnCardState *cs, u_char his, u_char creg, u_char len,
 	if (cs->debug & L1_DEB_HSCX)
 		debugl1(cs, "sendmsg(%02x,%02x,%d)", his, creg, len);
 #endif
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&isar_lock, flags);
 	cs->BC_Write_Reg(cs, 0, ISAR_CTRL_H, creg);
 	cs->BC_Write_Reg(cs, 0, ISAR_CTRL_L, len);
 	cs->BC_Write_Reg(cs, 0, ISAR_WADR, 0);
@@ -81,7 +80,7 @@ sendmsg(struct IsdnCardState *cs, u_char his, u_char creg, u_char len,
 #endif
 	}
 	cs->BC_Write_Reg(cs, 1, ISAR_HIS, his);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&isar_lock, flags);
 	waitforHIA(cs, 10000);
 	return(1);
 }
@@ -134,7 +133,7 @@ waitrecmsg(struct IsdnCardState *cs, u_char *len,
 	u_char *msg, int maxdelay)
 {
 	int timeout = 0;
-	long flags;
+	unsigned long flags;
 	struct isar_reg *ir = cs->bcs[0].hw.isar.reg;
 	
 	
@@ -145,12 +144,11 @@ waitrecmsg(struct IsdnCardState *cs, u_char *len,
 		printk(KERN_WARNING"isar recmsg IRQSTA timeout\n");
 		return(0);
 	}
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&isar_lock, flags);
 	get_irq_infos(cs, ir);
 	rcv_mbox(cs, ir, msg);
 	*len = ir->clsb;
-	restore_flags(flags);
+	spin_unlock_irqrestore(&isar_lock, flags);
 	return(1);
 }
 
@@ -192,7 +190,7 @@ isar_load_firmware(struct IsdnCardState *cs, u_char *buf)
 	u_short sadr, left, *sp;
 	u_char *p = buf;
 	u_char *msg, *tmpmsg, *mp, tmp[64];
-	long flags;
+	unsigned long flags;
 	struct isar_reg *ireg = cs->bcs[0].hw.isar.reg;
 	
 	struct {u_short sadr;
@@ -346,8 +344,7 @@ isar_load_firmware(struct IsdnCardState *cs, u_char *buf)
 	/* NORMAL mode entered */
 	/* Enable IRQs of ISAR */
 	cs->BC_Write_Reg(cs, 0, ISAR_IRQBIT, ISAR_IRQSTA);
-	save_flags(flags);
-	sti();
+	spin_lock_irqsave(&isar_lock, flags);
 	cnt = 1000; /* max 1s */
 	while ((!ireg->bstat) && cnt) {
 		udelay(1000);
@@ -415,7 +412,7 @@ isar_load_firmware(struct IsdnCardState *cs, u_char *buf)
 	isar_setup(cs);
 	ret = 0;
 reterrflg:
-	restore_flags(flags);
+	spin_unlock_irqrestore(&isar_lock, flags);
 reterror:
 	cs->debug = debug;
 	if (ret)
@@ -669,7 +666,7 @@ isar_fill_fifo(struct BCState *bcs)
 	int count;
 	u_char msb;
 	u_char *ptr;
-	long flags;
+	unsigned long flags;
 
 	if ((cs->debug & L1_DEB_HSCX) && !(cs->debug & L1_DEB_HSCX_FIFO))
 		debugl1(cs, "isar_fill_fifo");
@@ -687,8 +684,7 @@ isar_fill_fifo(struct BCState *bcs)
 		count = bcs->tx_skb->len;
 		msb = HDLC_FED;
 	}
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&isar_lock, flags);
 	ptr = bcs->tx_skb->data;
 	if (!bcs->hw.isar.txcnt) {
 		msb |= HDLC_FST;
@@ -739,7 +735,7 @@ isar_fill_fifo(struct BCState *bcs)
 			printk(KERN_ERR"isar_fill_fifo mode(%x) error\n", bcs->mode);
 			break;
 	}
-	restore_flags(flags);
+	spin_unlock_irqrestore(&isar_lock, flags);
 }
 
 inline
@@ -1163,12 +1159,11 @@ static char debbuf[128];
 void
 isar_int_main(struct IsdnCardState *cs)
 {
-	long flags;
+	unsigned long flags;
 	struct isar_reg *ireg = cs->bcs[0].hw.isar.reg;
 	struct BCState *bcs;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&isar_lock, flags);
 	get_irq_infos(cs, ireg);
 	switch (ireg->iis & ISAR_IIS_MSCMSD) {
 		case ISAR_IIS_RDATA:
@@ -1254,7 +1249,7 @@ isar_int_main(struct IsdnCardState *cs)
 					ireg->iis, ireg->cmsb, ireg->clsb);
 			break;
 	}
-	restore_flags(flags);
+	spin_unlock_irqrestore(&isar_lock, flags);
 }
 
 static void
@@ -1568,22 +1563,21 @@ void
 isar_l2l1(struct PStack *st, int pr, void *arg)
 {
 	struct sk_buff *skb = arg;
-	long flags;
+	unsigned long flags;
 
 	switch (pr) {
 		case (PH_DATA | REQUEST):
-			save_flags(flags);
-			cli();
+			spin_lock_irqsave(&isar_lock, flags);
 			if (st->l1.bcs->tx_skb) {
 				skb_queue_tail(&st->l1.bcs->squeue, skb);
-				restore_flags(flags);
+				spin_unlock_irqrestore(&isar_lock, flags);
 			} else {
 				st->l1.bcs->tx_skb = skb;
 				test_and_set_bit(BC_FLG_BUSY, &st->l1.bcs->Flag);
 				if (st->l1.bcs->cs->debug & L1_DEB_HSCX)
 					debugl1(st->l1.bcs->cs, "DRQ set BC_FLG_BUSY");
 				st->l1.bcs->hw.isar.txcnt = 0;
-				restore_flags(flags);
+				spin_unlock_irqrestore(&isar_lock, flags);
 				st->l1.bcs->cs->BC_Send_Data(st->l1.bcs);
 			}
 			break;

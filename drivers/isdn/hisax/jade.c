@@ -18,6 +18,7 @@
 #include "isdnl1.h"
 #include <linux/interrupt.h>
 
+static spinlock_t jade_lock = SPIN_LOCK_UNLOCKED;
 
 int __init
 JadeVersion(struct IsdnCardState *cs, char *s)
@@ -50,10 +51,9 @@ static void
 jade_write_indirect(struct IsdnCardState *cs, u_char reg, u_char value)
 {
     int to = 50;
-    long flags;
+    unsigned long flags;
     u_char ret;
-    save_flags(flags);
-    cli();
+    spin_lock_irqsave(&jade_lock, flags);
     /* Write the data */
     cs->BC_Write_Reg(cs, -1, COMM_JADE+1, value);
     /* Say JADE we wanna write indirect reg 'reg' */
@@ -68,12 +68,12 @@ jade_write_indirect(struct IsdnCardState *cs, u_char reg, u_char value)
 	    /* Got acknowledge */
 	    break;
 	if (!to) {
-	    restore_flags(flags);
+	    spin_unlock_irqrestore(&jade_lock, flags);
     	    printk(KERN_INFO "Can not see ready bit from JADE DSP (reg=0x%X, value=0x%X)\n", reg, value);
 	    return;
 	}
     }
-    restore_flags(flags);
+    spin_unlock_irqrestore(&jade_lock, flags);
 }
 
 
@@ -145,20 +145,19 @@ static void
 jade_l2l1(struct PStack *st, int pr, void *arg)
 {
     struct sk_buff *skb = arg;
-    long flags;
+    unsigned long flags;
 
     switch (pr) {
 	case (PH_DATA | REQUEST):
-		save_flags(flags);
-		cli();
+		spin_lock_irqsave(&jade_lock, flags);
 		if (st->l1.bcs->tx_skb) {
 			skb_queue_tail(&st->l1.bcs->squeue, skb);
-			restore_flags(flags);
+			spin_unlock_irqrestore(&jade_lock, flags);
 		} else {
 			st->l1.bcs->tx_skb = skb;
 			test_and_set_bit(BC_FLG_BUSY, &st->l1.bcs->Flag);
 			st->l1.bcs->hw.hscx.count = 0;
-			restore_flags(flags);
+			spin_unlock_irqrestore(&jade_lock, flags);
 			st->l1.bcs->cs->BC_Send_Data(st->l1.bcs);
 		}
 		break;

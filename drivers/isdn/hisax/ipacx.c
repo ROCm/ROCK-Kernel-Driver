@@ -23,7 +23,7 @@
 #define MAX_DFRAME_LEN_L1 300
 #define B_FIFO_SIZE       64
 #define D_FIFO_SIZE       32
-
+static spinlock_t ipacx_lock = SPIN_LOCK_UNLOCKED;
 
 // ipacx interrupt mask values    
 #define _MASK_IMASK     0x2E  // global mask
@@ -314,7 +314,7 @@ dch_sched_event(struct IsdnCardState *cs, int event)
 static void 
 dch_empty_fifo(struct IsdnCardState *cs, int count)
 {
-	long flags;
+	unsigned long flags;
 	u_char *ptr;
 
 	if ((cs->debug &L1_DEB_ISAC) && !(cs->debug &L1_DEB_ISAC_FIFO))
@@ -332,11 +332,10 @@ dch_empty_fifo(struct IsdnCardState *cs, int count)
 	ptr = cs->rcvbuf + cs->rcvidx;
 	cs->rcvidx += count;
   
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&ipacx_lock, flags);
 	cs->readisacfifo(cs, ptr, count);
 	cs->writeisac(cs, IPACX_CMDRD, 0x80); // RMC
-	restore_flags(flags);
+	spin_unlock_irqrestore(&ipacx_lock, flags);
   
 	if (cs->debug &L1_DEB_ISAC_FIFO) {
 		char *t = cs->dlog;
@@ -353,7 +352,7 @@ dch_empty_fifo(struct IsdnCardState *cs, int count)
 static void 
 dch_fill_fifo(struct IsdnCardState *cs)
 {
-	long flags;
+	unsigned long flags;
 	int count;
 	u_char cmd, *ptr;
 
@@ -371,8 +370,7 @@ dch_fill_fifo(struct IsdnCardState *cs)
 		cmd   = 0x0A; // XTF | XME
 	}
   
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&ipacx_lock, flags);
 	ptr = cs->tx_skb->data;
 	skb_pull(cs->tx_skb, count);
 	cs->tx_cnt += count;
@@ -387,7 +385,7 @@ dch_fill_fifo(struct IsdnCardState *cs)
 	init_timer(&cs->dbusytimer);
 	cs->dbusytimer.expires = jiffies + ((DBUSY_TIMER_VALUE * HZ)/1000);
 	add_timer(&cs->dbusytimer);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&ipacx_lock, flags);
   
 	if (cs->debug &L1_DEB_ISAC_FIFO) {
 		char *t = cs->dlog;
@@ -406,7 +404,7 @@ dch_int(struct IsdnCardState *cs)
 {
 	struct sk_buff *skb;
 	u_char istad, rstad;
-	long flags;
+	unsigned long flags;
 	int count;
 
 	istad = cs->readisac(cs, IPACX_ISTAD);
@@ -430,8 +428,7 @@ dch_int(struct IsdnCardState *cs)
 			count &= D_FIFO_SIZE-1;
 			if (count == 0) count = D_FIFO_SIZE;
 			dch_empty_fifo(cs, count);
-			save_flags(flags);
-			cli();
+			spin_lock_irqsave(&ipacx_lock, flags);
 			if ((count = cs->rcvidx) > 0) {
 	      cs->rcvidx = 0;
 				if (!(skb = dev_alloc_skb(count)))
@@ -441,7 +438,7 @@ dch_int(struct IsdnCardState *cs)
 					skb_queue_tail(&cs->rq, skb);
 				}
 			}
-			restore_flags(flags);
+			spin_unlock_irqrestore(&ipacx_lock, flags);
     }
 	  cs->rcvidx = 0;
 		dch_sched_event(cs, D_RCVBUFREADY);
@@ -535,20 +532,19 @@ static void
 bch_l2l1(struct PStack *st, int pr, void *arg)
 {
 	struct sk_buff *skb = arg;
-	long flags;
+	unsigned long flags;
 
 	switch (pr) {
 		case (PH_DATA | REQUEST):
-			save_flags(flags);
-			cli();
+			spin_lock_irqsave(&ipacx_lock, flags);
 			if (st->l1.bcs->tx_skb) {
 				skb_queue_tail(&st->l1.bcs->squeue, skb);
-				restore_flags(flags);
+				spin_unlock_irqrestore(&ipacx_lock, flags);
 			} else {
 				st->l1.bcs->tx_skb = skb;
 				set_bit(BC_FLG_BUSY, &st->l1.bcs->Flag);
 				st->l1.bcs->hw.hscx.count = 0;
-				restore_flags(flags);
+				spin_unlock_irqrestore(&ipacx_lock, flags);
         bch_fill_fifo(st->l1.bcs);
 			}
 			break;
@@ -604,7 +600,7 @@ bch_empty_fifo(struct BCState *bcs, int count)
 {
 	u_char *ptr, hscx;
 	struct IsdnCardState *cs;
-	long flags;
+	unsigned long flags;
 	int cnt;
 
 	cs = bcs->cs;
@@ -622,8 +618,7 @@ bch_empty_fifo(struct BCState *bcs, int count)
 	}
   
   // Read data uninterruptible
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&ipacx_lock, flags);
 	ptr = bcs->hw.hscx.rcvbuf + bcs->hw.hscx.rcvidx;
 	cnt = count;
 	while (cnt--) *ptr++ = cs->BC_Read_Reg(cs, hscx, IPACX_RFIFOB); 
@@ -631,7 +626,7 @@ bch_empty_fifo(struct BCState *bcs, int count)
   
 	ptr = bcs->hw.hscx.rcvbuf + bcs->hw.hscx.rcvidx;
 	bcs->hw.hscx.rcvidx += count;
-	restore_flags(flags);
+	spin_unlock_irqrestore(&ipacx_lock, flags);
   
 	if (cs->debug &L1_DEB_HSCX_FIFO) {
 		char *t = bcs->blog;
@@ -651,7 +646,7 @@ bch_fill_fifo(struct BCState *bcs)
 	struct IsdnCardState *cs;
 	int more, count, cnt;
 	u_char *ptr, *p, hscx;
-	long flags;
+	unsigned long flags;
 
 	cs = bcs->cs;
 	if ((cs->debug &L1_DEB_HSCX) && !(cs->debug &L1_DEB_HSCX_FIFO))
@@ -670,15 +665,14 @@ bch_fill_fifo(struct BCState *bcs)
 	}  
 	cnt = count;
     
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&ipacx_lock, flags);
 	p = ptr = bcs->tx_skb->data;
 	skb_pull(bcs->tx_skb, count);
 	bcs->tx_cnt -= count;
 	bcs->hw.hscx.count += count;
 	while (cnt--) cs->BC_Write_Reg(cs, hscx, IPACX_XFIFOB, *p++); 
 	cs->BC_Write_Reg(cs, hscx, IPACX_CMDRB, (more ? 0x08 : 0x0a));
-	restore_flags(flags);
+	spin_unlock_irqrestore(&ipacx_lock, flags);
   
 	if (cs->debug &L1_DEB_HSCX_FIFO) {
 		char *t = bcs->blog;

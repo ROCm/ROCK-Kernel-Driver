@@ -20,6 +20,7 @@
 extern const char *CardType[];
 
 static const char *ISurf_revision = "$Revision: 1.10.6.2 $";
+static spinlock_t isurf_lock = SPIN_LOCK_UNLOCKED;
 
 #define byteout(addr,val) outb(val,addr)
 #define bytein(addr) inb(addr)

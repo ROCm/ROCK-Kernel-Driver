@@ -22,6 +22,7 @@
 
 extern const char *CardType[];
 const char *gazel_revision = "$Revision: 2.11.6.7 $";
+static spinlock_t gazel_lock = SPIN_LOCK_UNLOCKED;
 
 #define R647      1
 #define R685      2
@@ -72,26 +73,24 @@ static inline u_char
 readreg_ipac(unsigned int adr, u_short off)
 {
 	register u_char ret;
-	long flags;
+	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&gazel_lock, flags);
 	byteout(adr, off);
 	ret = bytein(adr + 4);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&gazel_lock, flags);
 	return ret;
 }
 
 static inline void
 writereg_ipac(unsigned int adr, u_short off, u_char data)
 {
-	long flags;
+	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&gazel_lock, flags);
 	byteout(adr, off);
 	byteout(adr + 4, data);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&gazel_lock, flags);
 }
 
 
@@ -357,18 +356,17 @@ release_io_gazel(struct IsdnCardState *cs)
 static int
 reset_gazel(struct IsdnCardState *cs)
 {
-	long flags;
+	unsigned long flags;
 	unsigned long plxcntrl, addr = cs->hw.gazel.cfg_reg;
 
 	switch (cs->subtyp) {
 		case R647:
-			save_flags(flags);
-			cli();
+			spin_lock_irqsave(&gazel_lock, flags);
 			writereg(addr, 0, 0);
 			HZDELAY(10);
 			writereg(addr, 0, 1);
 			HZDELAY(2);
-			restore_flags(flags);
+			spin_unlock_irqrestore(&gazel_lock, flags);
 			break;
 		case R685:
 			plxcntrl = inl(addr + PLX_CNTRL);

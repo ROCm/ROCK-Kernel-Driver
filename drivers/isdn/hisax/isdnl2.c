@@ -20,7 +20,7 @@
 #include "isdnl2.h"
 
 const char *l2_revision = "$Revision: 2.25.6.4 $";
-
+static spinlock_t isdnl2_lock = SPIN_LOCK_UNLOCKED;
 static void l2m_debug(struct FsmInst *fi, char *fmt, ...);
 
 static struct Fsm l2fsm;
@@ -1256,7 +1256,7 @@ l2_pull_iqueue(struct FsmInst *fi, int event, void *arg)
 	u_char header[MAX_HEADER_LEN];
 	int i;
 	int unsigned p1;
-	long flags;
+	unsigned long flags;
 
 	if (!cansend(st))
 		return;
@@ -1265,8 +1265,7 @@ l2_pull_iqueue(struct FsmInst *fi, int event, void *arg)
 	if (!skb)
 		return;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&isdnl2_lock, flags);
 	if(test_bit(FLG_MOD128, &l2->flag))
 		p1 = (l2->vs - l2->va) % 128;
 	else
@@ -1289,7 +1288,7 @@ l2_pull_iqueue(struct FsmInst *fi, int event, void *arg)
 		header[i++] = (l2->vr << 5) | (l2->vs << 1);
 		l2->vs = (l2->vs + 1) % 8;
 	}
-	restore_flags(flags);
+	spin_unlock_irqrestore(&isdnl2_lock, flags);
 
 	p1 = skb->data - skb->head;
 	if (p1 >= i)

@@ -50,6 +50,7 @@
 #include <linux/isapnp.h>
 
 extern const char *CardType[];
+static spinlock_t sedlbauer_lock = SPIN_LOCK_UNLOCKED; 
 
 const char *Sedlbauer_revision = "$Revision: 1.25.6.6 $";
 
@@ -121,13 +122,12 @@ static inline u_char
 readreg(unsigned int ale, unsigned int adr, u_char off)
 {
 	register u_char ret;
-	long flags;
+	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&sedlbauer_lock, flags);
 	byteout(ale, off);
 	ret = bytein(adr);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&sedlbauer_lock, flags);
 	return (ret);
 }
 
@@ -144,13 +144,12 @@ readfifo(unsigned int ale, unsigned int adr, u_char off, u_char * data, int size
 static inline void
 writereg(unsigned int ale, unsigned int adr, u_char off, u_char data)
 {
-	long flags;
+	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&sedlbauer_lock, flags);
 	byteout(ale, off);
 	byteout(adr, data);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&sedlbauer_lock, flags);
 }
 
 static inline void
@@ -552,7 +551,7 @@ setup_sedlbauer(struct IsdnCard *card)
 	struct IsdnCardState *cs = card->cs;
 	char tmp[64];
 	u16 sub_vendor_id, sub_id;
-	long flags;
+	unsigned long flags;
 
 	strcpy(tmp, Sedlbauer_revision);
 	printk(KERN_INFO "HiSax: Sedlbauer driver Rev. %s\n", HiSax_getrev(tmp));

@@ -25,7 +25,7 @@
 #define	ATTEMPT_PCI_REMAPPING	/* Required for PLX rev 1 */
 
 extern const char *CardType[];
-
+static spinlock_t bkm_a8_lock = SPIN_LOCK_UNLOCKED;
 const char sct_quadro_revision[] = "$Revision: 1.14.6.7 $";
 
 static const char *sct_quadro_subtypes[] =
@@ -45,12 +45,11 @@ static inline u_char
 readreg(unsigned int ale, unsigned int adr, u_char off)
 {
 	register u_char ret;
-	long flags;
-	save_flags(flags);
-	cli();
+	unsigned long flags;
+	spin_lock_irqsave(&bkm_a8_lock, flags);
 	wordout(ale, off);
 	ret = wordin(adr) & 0xFF;
-	restore_flags(flags);
+	spin_unlock_irqrestore(&bkm_a8_lock, flags);
 	return (ret);
 }
 
@@ -68,12 +67,11 @@ readfifo(unsigned int ale, unsigned int adr, u_char off, u_char * data, int size
 static inline void
 writereg(unsigned int ale, unsigned int adr, u_char off, u_char data)
 {
-	long flags;
-	save_flags(flags);
-	cli();
+	unsigned long flags;
+	spin_lock_irqsave(&bkm_a8_lock, flags);
 	wordout(ale, off);
 	wordout(adr, data);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&bkm_a8_lock, flags);
 }
 
 static inline void

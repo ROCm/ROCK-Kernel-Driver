@@ -99,6 +99,7 @@ const char *CardType[] = {
 };
 
 void HiSax_closecard(int cardnr);
+static spinlock_t hisax_config_lock = SPIN_LOCK_UNLOCKED;
 
 #ifdef CONFIG_HISAX_ELSA
 #define DEFAULT_CARD ISDN_CTYPE_ELSA
@@ -708,14 +709,13 @@ void VHiSax_putstatus(struct IsdnCardState *cs, char *head, char *fmt,
 {
 	/* if head == NULL the fmt contains the full info */
 
-	long flags;
+	unsigned long flags;
 	int count, i;
 	u_char *p;
 	isdn_ctrl ic;
 	int len;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&hisax_config_lock, flags);
 	p = tmpbuf;
 	if (head) {
 		p += jiftime(p, jiffies);
@@ -732,13 +732,13 @@ void VHiSax_putstatus(struct IsdnCardState *cs, char *head, char *fmt,
 	if (!cs) {
 		printk(KERN_WARNING "HiSax: No CardStatus for message %s",
 		       p);
-		restore_flags(flags);
+		spin_unlock_irqrestore(&hisax_config_lock, flags);
 		return;
 	}
 	if (len > HISAX_STATUS_BUFSIZE) {
 		printk(KERN_WARNING "HiSax: status overflow %d/%d\n",
 		       len, HISAX_STATUS_BUFSIZE);
-		restore_flags(flags);
+		spin_unlock_irqrestore(&hisax_config_lock, flags);
 		return;
 	}
 	count = len;
@@ -767,7 +767,7 @@ void VHiSax_putstatus(struct IsdnCardState *cs, char *head, char *fmt,
 		count++;
 	}
 #endif
-	restore_flags(flags);
+	spin_unlock_irqrestore(&hisax_config_lock, flags);
 	if (count) {
 		ic.command = ISDN_STAT_STAVAIL;
 		ic.driver = cs->myid;
@@ -787,16 +787,15 @@ void HiSax_putstatus(struct IsdnCardState *cs, char *head, char *fmt, ...)
 
 int ll_run(struct IsdnCardState *cs, int addfeatures)
 {
-	long flags;
+	unsigned long flags;
 	isdn_ctrl ic;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&hisax_config_lock, flags);
 	ic.driver = cs->myid;
 	ic.command = ISDN_STAT_RUN;
 	cs->iif.features |= addfeatures;
 	cs->iif.statcallb(&ic);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&hisax_config_lock, flags);
 	return 0;
 }
 
@@ -857,28 +856,26 @@ static void closecard(int cardnr)
 static int __devinit init_card(struct IsdnCardState *cs)
 {
 	int irq_cnt, cnt = 3;
-	long flags;
+	unsigned long flags;
 
 	if (!cs->irq)
 		return cs->cardmsg(cs, CARD_INIT, NULL);
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&hisax_config_lock, flags);
 	irq_cnt = kstat_irqs(cs->irq);
 	printk(KERN_INFO "%s: IRQ %d count %d\n", CardType[cs->typ],
 	       cs->irq, irq_cnt);
 	if (request_irq(cs->irq, cs->irq_func, cs->irq_flags, "HiSax", cs)) {
 		printk(KERN_WARNING "HiSax: couldn't get interrupt %d\n",
 		       cs->irq);
-		restore_flags(flags);
+		spin_unlock_irqrestore(&hisax_config_lock, flags);
 		return 1;
 	}
 	while (cnt) {
 		cs->cardmsg(cs, CARD_INIT, NULL);
-		sti();
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		/* Timeout 10ms */
 		schedule_timeout((10 * HZ) / 1000);
-		restore_flags(flags);
+		spin_unlock_irqrestore(&hisax_config_lock, flags);
 		printk(KERN_INFO "%s: IRQ %d count %d\n",
 		       CardType[cs->typ], cs->irq, kstat_irqs(cs->irq));
 		if (kstat_irqs(cs->irq) == irq_cnt) {
@@ -897,19 +894,18 @@ static int __devinit init_card(struct IsdnCardState *cs)
 			return 0;
 		}
 	}
-	restore_flags(flags);
+	spin_unlock_irqrestore(&hisax_config_lock, flags);
 	return 3;
 }
 
 static int __devinit checkcard(int cardnr, char *id, int *busy_flag)
 {
-	long flags;
+	unsigned long flags;
 	int ret = 0;
 	struct IsdnCard *card = cards + cardnr;
 	struct IsdnCardState *cs;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&hisax_config_lock, flags);
 	cs = kmalloc(sizeof(struct IsdnCardState), GFP_ATOMIC);
 	if (!cs) {
 		printk(KERN_WARNING
@@ -1216,7 +1212,7 @@ static int __devinit checkcard(int cardnr, char *id, int *busy_flag)
 	kfree(cs);
 	card->cs = NULL;
  out:
-	restore_flags(flags);
+	spin_unlock_irqrestore(&hisax_config_lock, flags);
 	return ret;
 }
 
@@ -1542,10 +1538,9 @@ static int __init HiSax_init(void)
 static void __exit HiSax_exit(void)
 {
 	int cardnr = nrcards - 1;
-	long flags;
+	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&hisax_config_lock, flags);
 	while (cardnr >= 0)
 		HiSax_closecard(cardnr--);
 	Isdnl1Free();
@@ -1553,7 +1548,7 @@ static void __exit HiSax_exit(void)
 	Isdnl2Free();
 	Isdnl3Free();
 	CallcFree();
-	restore_flags(flags);
+	spin_unlock_irqrestore(&hisax_config_lock, flags);
 	printk(KERN_INFO "HiSax module removed\n");
 }
 

@@ -20,6 +20,7 @@
 
 extern const char *CardType[];
 const char *sportster_revision = "$Revision: 1.14.6.2 $";
+static spinlock_t sportster_lock = SPIN_LOCK_UNLOCKED;
 
 #define byteout(addr,val) outb(val,addr)
 #define bytein(addr) inb(addr)

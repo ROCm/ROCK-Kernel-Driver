@@ -21,6 +21,7 @@
 #include "bkm_ax.h"
 
 extern const char *CardType[];
+static spinlock_t bkm_a4t_lock = SPIN_LOCK_UNLOCKED;
 
 const char *bkm_a4t_revision = "$Revision: 1.13.6.6 $";
 
@@ -29,16 +30,15 @@ static inline u_char
 readreg(unsigned int ale, unsigned long adr, u_char off)
 {
 	register u_int ret;
-	long flags;
+	unsigned long flags;
 	unsigned int *po = (unsigned int *) adr;	/* Postoffice */
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&bkm_a4t_lock, flags);
 	*po = (GCS_2 | PO_WRITE | off);
 	__WAITI20__(po);
 	*po = (ale | PO_READ);
 	__WAITI20__(po);
 	ret = *po;
-	restore_flags(flags);
+	spin_unlock_irqrestore(&bkm_a4t_lock, flags);
 	return ((unsigned char) ret);
 }
 
@@ -56,15 +56,14 @@ readfifo(unsigned int ale, unsigned long adr, u_char off, u_char * data, int siz
 static inline void
 writereg(unsigned int ale, unsigned long adr, u_char off, u_char data)
 {
-	long flags;
+	unsigned long flags;
 	unsigned int *po = (unsigned int *) adr;	/* Postoffice */
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&bkm_a4t_lock, flags);
 	*po = (GCS_2 | PO_WRITE | off);
 	__WAITI20__(po);
 	*po = (ale | PO_WRITE | data);
 	__WAITI20__(po);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&bkm_a4t_lock, flags);
 }
 
 
