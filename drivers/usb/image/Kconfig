@@ -1,0 +1,55 @@
+#
+# USB Imageing devices configuration
+#
+comment "USB Imaging devices"
+	depends on USB
+
+config USB_MDC800
+	tristate "USB Mustek MDC800 Digital Camera support (EXPERIMENTAL)"
+	depends on USB && EXPERIMENTAL
+	---help---
+	  Say Y here if you want to connect this type of still camera to
+	  your computer's USB port. This driver can be used with gphoto 0.4.3
+	  and higher (look at <http://www.gphoto.org/>).
+	  To use it create a device node with "mknod /dev/mustek c 180 32" and
+	  configure it in your software.
+
+	  This code is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called mdc800.o. If you want to compile it as a
+	  module, say M here and read <file:Documentation/modules.txt>.
+
+config USB_SCANNER
+	tristate "USB Scanner support"
+	depends on USB
+	help
+	  Say Y here if you want to connect a USB scanner to your computer's
+	  USB port. Please read <file:Documentation/usb/scanner.txt> and
+	  <file:Documentation/usb/scanner-hp-sane.txt> for more information.
+
+	  This code is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called scanner.o. If you want to compile it as
+	  a module, say M here and read <file:Documentation/modules.txt>.
+
+config USB_MICROTEK
+	tristate "Microtek X6USB scanner support"
+	depends on USB && SCSI
+	help
+	  Say Y here if you want support for the Microtek X6USB and
+	  possibly the Phantom 336CX, Phantom C6 and ScanMaker V6U(S)L.
+	  Support for anything but the X6 is experimental.
+	  Please report failures and successes.
+	  The scanner will appear as a scsi generic device to the rest
+	  of the system. Scsi support is required.
+	  This driver can be compiled as a module, called microtek.o.
+
+config USB_HPUSBSCSI
+	tristate "HP53xx USB scanner support (EXPERIMENTAL)"
+	depends on USB && SCSI && EXPERIMENTAL
+	help
+	  Say Y here if you want support for the HP 53xx series of scanners
+	  and the Minolta Scan Dual. This driver is experimental.
+	  The scanner will be accessible as a SCSI device.
+	  This can be compiled as a module, called hpusbscsi.o.
+
