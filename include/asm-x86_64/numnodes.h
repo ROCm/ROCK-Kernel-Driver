@@ -3,6 +3,10 @@
 
 #include <linux/config.h>
 
+#ifdef CONFIG_NUMA
 #define NODES_SHIFT	6
+#else
+#define NODES_SHIFT	0
+#endif
 
 #endif

@@ -60,6 +60,13 @@ static inline int is_kernel(unsigned long addr)
 	return in_gate_area_no_task(addr);
 }
 
+static inline int is_kernel(unsigned long addr)
+{
+	if (addr >= (unsigned long)_stext && addr <= (unsigned long)_end)
+		return 1;
+	return in_gate_area_no_task(addr);
+}
+
 /* expand a compressed symbol data into the resulting uncompressed string,
    given the offset to where the symbol is in the compressed stream */
 static unsigned int kallsyms_expand_symbol(unsigned int off, char *result)
@@ -161,7 +168,7 @@ const char *kallsyms_lookup(unsigned long addr,
 	namebuf[0] = 0;
 
 	if ((all_var && is_kernel(addr)) ||
-	    (!all_var && is_kernel_text(addr) || is_kernel_inittext(addr))) {
+	    (!all_var && (is_kernel_text(addr) || is_kernel_inittext(addr)))) {
 		unsigned long symbol_end=0;
 
 		/* do a binary search on the sorted kallsyms_addresses array */

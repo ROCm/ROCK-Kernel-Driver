@@ -46,6 +46,12 @@
 #include <asm/system.h>
 #include <asm/uaccess.h>
 
+#if __GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR__ >= 4)
+#warning This file requires GCC 3.3.x or older to build.  Alternatively,
+#warning please talk to GCC people to resolve the issues with the
+#warning assembly clobber list.
+#endif
+
 static unsigned long no_fiq_insn;
 
 /* Default reacquire function
@@ -89,16 +95,15 @@ void set_fiq_handler(void *start, unsigned int length)
  */
 void set_fiq_regs(struct pt_regs *regs)
 {
-	register unsigned long tmp, tmp2;
+	register unsigned long tmp;
 	__asm__ volatile (
 	"mrs	%0, cpsr\n\
-	mov	%1, %3\n\
-	msr	cpsr_c, %1	@ select FIQ mode\n\
+	msr	cpsr_c, %2	@ select FIQ mode\n\
 	mov	r0, r0\n\
-	ldmia	%2, {r8 - r14}\n\
+	ldmia	%1, {r8 - r14}\n\
 	msr	cpsr_c, %0	@ return to SVC mode\n\
 	mov	r0, r0"
-	: "=&r" (tmp), "=&r" (tmp2)
+	: "=&r" (tmp)
 	: "r" (&regs->ARM_r8), "I" (PSR_I_BIT | PSR_F_BIT | FIQ_MODE)
 	/* These registers aren't modified by the above code in a way
 	   visible to the compiler, but we mark them as clobbers anyway
@@ -109,16 +114,15 @@ void set_fiq_regs(struct pt_regs *regs)
 
 void get_fiq_regs(struct pt_regs *regs)
 {
-	register unsigned long tmp, tmp2;
+	register unsigned long tmp;
 	__asm__ volatile (
 	"mrs	%0, cpsr\n\
-	mov	%1, %3\n\
-	msr	cpsr_c, %1	@ select FIQ mode\n\
+	msr	cpsr_c, %2	@ select FIQ mode\n\
 	mov	r0, r0\n\
-	stmia	%2, {r8 - r14}\n\
+	stmia	%1, {r8 - r14}\n\
 	msr	cpsr_c, %0	@ return to SVC mode\n\
 	mov	r0, r0"
-	: "=&r" (tmp), "=&r" (tmp2)
+	: "=&r" (tmp)
 	: "r" (&regs->ARM_r8), "I" (PSR_I_BIT | PSR_F_BIT | FIQ_MODE)
 	/* These registers aren't modified by the above code in a way
 	   visible to the compiler, but we mark them as clobbers anyway
