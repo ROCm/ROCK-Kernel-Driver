@@ -2645,6 +2645,10 @@ static int __devinit es1370_probe(struct pci_dev *pcidev, const struct pci_devic
 	outl(s->sctrl, s->io+ES1370_REG_SERIAL_CONTROL);
 	/* point phantom write channel to "bugbuf" */
 	s->bugbuf_cpu = pci_alloc_consistent(pcidev,16,&s->bugbuf_dma);
+	if (!s->bugbuf_cpu) {
+		ret = -ENOMEM;
+		goto err_dev5;
+	}
 	outl((ES1370_REG_PHANTOM_FRAMEADR >> 8) & 15, s->io+ES1370_REG_MEMPAGE);
 	outl(s->bugbuf_dma, s->io+(ES1370_REG_PHANTOM_FRAMEADR & 0xff));
 	outl(0, s->io+(ES1370_REG_PHANTOM_FRAMECNT & 0xff));
@@ -2676,6 +2680,8 @@ static int __devinit es1370_probe(struct pci_dev *pcidev, const struct pci_devic
 		devindex++;
 	return 0;
 
+ err_dev5:
+	unregister_sound_midi(s->dev_midi);
  err_dev4:
 	unregister_sound_dsp(s->dev_dac);
  err_dev3:
