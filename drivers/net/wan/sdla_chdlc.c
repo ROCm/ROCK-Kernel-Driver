@@ -4401,6 +4401,7 @@ int wanpipe_tty_init(sdla_t *card)
 		
 		memset(&serial_driver, 0, sizeof(struct tty_driver));
 		serial_driver.magic = TTY_DRIVER_MAGIC;
+		serial_driver.owner = THIS_MODULE;
 		serial_driver.driver_name = "wanpipe_tty"; 
 		serial_driver.name = "ttyW";
 		serial_driver.major = WAN_TTY_MAJOR;
