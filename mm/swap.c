@@ -41,11 +41,10 @@ void put_page(struct page *page)
 	if (unlikely(PageCompound(page))) {
 		page = (struct page *)page->private;
 		if (put_page_testzero(page)) {
-			if (page[1].mapping) {	/* destructor? */
-				(*(void (*)(struct page *))page[1].mapping)(page);
-			} else {
-				__page_cache_release(page);
-			}
+			void (*dtor)(struct page *page);
+
+			dtor = (void (*)(struct page *))page[1].mapping;
+			(*dtor)(page);
 		}
 		return;
 	}
