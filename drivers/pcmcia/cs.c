@@ -742,7 +742,7 @@ void pcmcia_parse_events(struct pcmcia_socket *s, u_int events)
 ======================================================================*/
 
 static int alloc_io_space(struct pcmcia_socket *s, u_int attr, ioaddr_t *base,
-			  ioaddr_t num, u_int lines, char *name)
+			  ioaddr_t num, u_int lines)
 {
     int i;
     ioaddr_t try, align;
@@ -774,7 +774,7 @@ static int alloc_io_space(struct pcmcia_socket *s, u_int attr, ioaddr_t *base,
 	    return 1;
     for (i = 0; i < MAX_IO_WIN; i++) {
 	if (s->io[i].NumPorts == 0) {
-	    s->io[i].res = find_io_region(*base, num, align, name, s);
+	    s->io[i].res = find_io_region(*base, num, align, s);
 	    if (s->io[i].res) {
 		s->io[i].Attributes = attr;
 		s->io[i].BasePort = *base = s->io[i].res->start;
@@ -1497,14 +1497,12 @@ int pcmcia_request_io(client_handle_t handle, io_req_t *req)
 	return CS_BAD_ATTRIBUTE;
 
     if (alloc_io_space(s, req->Attributes1, &req->BasePort1,
-		       req->NumPorts1, req->IOAddrLines,
-		       handle->dev_info))
+		       req->NumPorts1, req->IOAddrLines))
 	return CS_IN_USE;
 
     if (req->NumPorts2) {
 	if (alloc_io_space(s, req->Attributes2, &req->BasePort2,
-			   req->NumPorts2, req->IOAddrLines,
-			   handle->dev_info)) {
+			   req->NumPorts2, req->IOAddrLines)) {
 	    release_io_space(s, req->BasePort1, req->NumPorts1);
 	    return CS_IN_USE;
 	}
@@ -1644,8 +1642,7 @@ int pcmcia_request_window(client_handle_t *handle, win_req_t *req, window_handle
 
     if (!(s->features & SS_CAP_STATIC_MAP)) {
 	win->ctl.res = find_mem_region(req->Base, req->Size, align,
-				       (req->Attributes & WIN_MAP_BELOW_1MB),
-				       (*handle)->dev_info, s);
+				       (req->Attributes & WIN_MAP_BELOW_1MB), s);
 	if (!win->ctl.res)
 	    return CS_IN_USE;
     }
