@@ -2070,7 +2070,7 @@ static irqreturn_t rtl8139_interrupt (int irq, void *dev_instance,
 		RTL_W16 (IntrStatus, ackstat);
 
 		DPRINTK ("%s: interrupt  status=%#4.4x ackstat=%#4.4x new intstat=%#4.4x.\n",
-			 dev->name, ackstat, status, RTL_R16 (IntrStatus));
+			 dev->name, status, ackstat, RTL_R16 (IntrStatus));
 
 		if (netif_running (dev) && (status & RxAckBits))
 			rtl8139_rx_interrupt (dev, tp, ioaddr);

@@ -224,6 +224,5 @@ struct e1000_adapter {
 
 
 	uint32_t pci_state[16];
-	char ifname[IFNAMSIZ];
 };
 #endif /* _E1000_H_ */
