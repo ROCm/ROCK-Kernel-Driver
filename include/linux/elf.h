@@ -35,6 +35,8 @@ typedef __s64	Elf64_Sxword;
 #define PT_HIPROC  0x7fffffff
 #define PT_GNU_EH_FRAME		0x6474e550
 
+#define PT_GNU_STACK	(PT_LOOS + 0x474e551)
+
 /* These constants define the different elf file types */
 #define ET_NONE   0
 #define ET_REL    1
