@@ -1083,9 +1083,9 @@ asmlinkage int do_signal(sigset_t *oldset, struct pt_regs *regs)
 				info.si_signo = signr;
 				info.si_errno = 0;
 				info.si_code = SI_USER;
-				info.si_pid = current->p_pptr->pid;
-				info.si_uid = current->p_pptr->uid;
-				info.si_uid16 = high2lowuid(current->p_pptr->uid);
+				info.si_pid = current->parent->pid;
+				info.si_uid = current->parent->uid;
+				info.si_uid16 = high2lowuid(current->parent->uid);
 			}
 
 			/* If the (new) signal is now blocked, requeue it.  */
@@ -1121,14 +1121,17 @@ asmlinkage int do_signal(sigset_t *oldset, struct pt_regs *regs)
 					continue;
 				/* FALLTHRU */
 
-			case SIGSTOP:
+			case SIGSTOP: {
+				struct signal_struct *sig;
 				current->state = TASK_STOPPED;
 				current->exit_code = signr;
-				if (!(current->p_pptr->sig->action[SIGCHLD-1]
-				      .sa.sa_flags & SA_NOCLDSTOP))
+				sig = current->parent->sig;
+				if (sig && !(sig->action[SIGCHLD-1].sa.sa_flags 
+					     & SA_NOCLDSTOP))
 					notify_parent(current, SIGCHLD);
 				schedule();
 				continue;
+			}
 
 			case SIGQUIT: case SIGILL: case SIGTRAP:
 			case SIGIOT: case SIGFPE: case SIGSEGV:
