@@ -27,7 +27,7 @@ create_params (unsigned long *buffer)
 	/* Head of the taglist */
 	tag->hdr.tag  = ATAG_CORE;
 	tag->hdr.size = tag_size(tag_core);
-	tag->u.core.flags = FLAG_READONLY;
+	tag->u.core.flags = 1;
 	tag->u.core.pagesize = PAGE_SIZE;
 	tag->u.core.rootdev = 0;
 
