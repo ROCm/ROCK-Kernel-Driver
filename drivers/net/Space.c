@@ -382,6 +382,12 @@ static int __init ethif_probe(struct net_device *dev)
 	return -ENODEV;
 }
 
+/*  Statically configured drivers -- order matters here. */
+void probe_old_netdevs(void)
+{
+
+}
+
 #ifdef CONFIG_SDLA
 extern int sdla_init(struct net_device *);
 static struct net_device sdla0_dev = {

@@ -498,6 +498,7 @@ extern struct net_device		loopback_dev;		/* The loopback */
 extern struct net_device		*dev_base;		/* All devices */
 extern rwlock_t				dev_base_lock;		/* Device list lock */
 
+extern void		probe_old_netdevs(void);
 extern int			netdev_boot_setup_add(char *name, struct ifmap *map);
 extern int 			netdev_boot_setup_check(struct net_device *dev);
 extern struct net_device    *dev_getbyhwaddr(unsigned short type, char *hwaddr);
