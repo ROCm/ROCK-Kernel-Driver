@@ -531,9 +531,11 @@ int log_space_left (journal_t *journal)
  */
 tid_t log_start_commit (journal_t *journal, transaction_t *transaction)
 {
-	tid_t target = journal->j_commit_request;
+	tid_t target;
 
 	lock_kernel(); /* Protect journal->j_running_transaction */
+
+	target = journal->j_commit_request;
 	
 	/*
 	 * A NULL transaction asks us to commit the currently running
@@ -968,10 +970,12 @@ void journal_update_superblock(journal_t *journal, int wait)
 	 * any future commit will have to be careful to update the
 	 * superblock again to re-record the true start of the log. */
 
+	lock_kernel();
 	if (sb->s_start)
 		journal->j_flags &= ~JFS_FLUSHED;
 	else
 		journal->j_flags |= JFS_FLUSHED;
+	unlock_kernel();
 }
 
 
@@ -1437,10 +1441,12 @@ void __journal_abort_hard (journal_t *journal)
 	printk (KERN_ERR "Aborting journal on device %s.\n",
 		journal_dev_name(journal, b));
 
+	lock_kernel();
 	journal->j_flags |= JFS_ABORT;
 	transaction = journal->j_running_transaction;
 	if (transaction)
 		log_start_commit(journal, transaction);
+	unlock_kernel();
 }
 
 /* Soft abort: record the abort error status in the journal superblock,
@@ -1450,6 +1456,7 @@ void __journal_abort_soft (journal_t *journal, int errno)
 	if (journal->j_flags & JFS_ABORT)
 		return;
 
+	lock_kernel();
 	if (!journal->j_errno)
 		journal->j_errno = errno;
 
@@ -1457,6 +1464,7 @@ void __journal_abort_soft (journal_t *journal, int errno)
 
 	if (errno)
 		journal_update_superblock(journal, 1);
+	unlock_kernel();
 }
 
 /**
@@ -1528,10 +1536,12 @@ int journal_errno (journal_t *journal)
 	int err;
 
 	lock_journal(journal);
+	lock_kernel();
 	if (journal->j_flags & JFS_ABORT)
 		err = -EROFS;
 	else
 		err = journal->j_errno;
+	unlock_kernel();
 	unlock_journal(journal);
 	return err;
 }
@@ -1549,10 +1559,12 @@ int journal_clear_err (journal_t *journal)
 	int err = 0;
 
 	lock_journal(journal);
+	lock_kernel();
 	if (journal->j_flags & JFS_ABORT)
 		err = -EROFS;
 	else
 		journal->j_errno = 0;
+	unlock_kernel();
 	unlock_journal(journal);
 	return err;
 }
@@ -1567,8 +1579,10 @@ int journal_clear_err (journal_t *journal)
 void journal_ack_err (journal_t *journal)
 {
 	lock_journal(journal);
+	lock_kernel();
 	if (journal->j_errno)
 		journal->j_flags |= JFS_ACK_ERR;
+	unlock_kernel();
 	unlock_journal(journal);
 }
 

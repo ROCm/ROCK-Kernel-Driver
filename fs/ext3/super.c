@@ -1777,9 +1777,7 @@ int ext3_force_commit(struct super_block *sb)
 
 	journal = EXT3_SB(sb)->s_journal;
 	sb->s_dirt = 0;
-	lock_kernel();	/* important: lock down j_running_transaction */
 	ret = ext3_journal_force_commit(journal);
-	unlock_kernel();
 	return ret;
 }
 
@@ -1794,24 +1792,20 @@ int ext3_force_commit(struct super_block *sb)
 
 void ext3_write_super (struct super_block * sb)
 {
-	lock_kernel();	
 	if (down_trylock(&sb->s_lock) == 0)
 		BUG();
 	sb->s_dirt = 0;
 	log_start_commit(EXT3_SB(sb)->s_journal, NULL);
-	unlock_kernel();
 }
 
 static int ext3_sync_fs(struct super_block *sb, int wait)
 {
 	tid_t target;
 
-	lock_kernel();	
 	sb->s_dirt = 0;
 	target = log_start_commit(EXT3_SB(sb)->s_journal, NULL);
 	if (wait)
 		log_wait_commit(EXT3_SB(sb)->s_journal, target);
-	unlock_kernel();
 	return 0;
 }
 
@@ -1823,7 +1817,6 @@ void ext3_write_super_lockfs(struct super_block *sb)
 {
 	sb->s_dirt = 0;
 
-	lock_kernel();		/* 2.4.5 forgot to do this for us */
 	if (!(sb->s_flags & MS_RDONLY)) {
 		journal_t *journal = EXT3_SB(sb)->s_journal;
 
@@ -1835,7 +1828,6 @@ void ext3_write_super_lockfs(struct super_block *sb)
 		EXT3_CLEAR_INCOMPAT_FEATURE(sb, EXT3_FEATURE_INCOMPAT_RECOVER);
 		ext3_commit_super(sb, EXT3_SB(sb)->s_es, 1);
 	}
-	unlock_kernel();
 }
 
 /*
@@ -1845,14 +1837,12 @@ void ext3_write_super_lockfs(struct super_block *sb)
 void ext3_unlockfs(struct super_block *sb)
 {
 	if (!(sb->s_flags & MS_RDONLY)) {
-		lock_kernel();
 		lock_super(sb);
 		/* Reser the needs_recovery flag before the fs is unlocked. */
 		EXT3_SET_INCOMPAT_FEATURE(sb, EXT3_FEATURE_INCOMPAT_RECOVER);
 		ext3_commit_super(sb, EXT3_SB(sb)->s_es, 1);
 		unlock_super(sb);
 		journal_unlock_updates(EXT3_SB(sb)->s_journal);
-		unlock_kernel();
 	}
 }
 
@@ -1997,7 +1987,9 @@ static int (*old_sync_dquot)(struct dquot *dquot);
 
 static int ext3_sync_dquot(struct dquot *dquot)
 {
-	int nblocks, ret;
+	int nblocks;
+	int ret;
+	int err;
 	handle_t *handle;
 	struct quota_info *dqops = sb_dqopt(dquot->dq_sb);
 	struct inode *qinode;
@@ -2012,18 +2004,17 @@ static int ext3_sync_dquot(struct dquot *dquot)
 		default:
 			nblocks = EXT3_MAX_TRANS_DATA;
 	}
-	lock_kernel();
 	qinode = dqops->files[dquot->dq_type]->f_dentry->d_inode;
 	handle = ext3_journal_start(qinode, nblocks);
 	if (IS_ERR(handle)) {
-		unlock_kernel();
-		return PTR_ERR(handle);
+		ret = PTR_ERR(handle);
+		goto out;
 	}
-	unlock_kernel();
 	ret = old_sync_dquot(dquot);
-	lock_kernel();
-	ret = ext3_journal_stop(handle);
-	unlock_kernel();
+	err = ext3_journal_stop(handle);
+	if (ret == 0)
+		ret = err;
+out:
 	return ret;
 }
 #endif

@@ -256,13 +256,14 @@ handle_t *journal_start(journal_t *journal, int nblocks)
 
 	current->journal_info = handle;
 
+	lock_kernel();
 	err = start_this_handle(journal, handle);
+	unlock_kernel();
 	if (err < 0) {
 		jbd_free_handle(handle);
 		current->journal_info = NULL;
-		return ERR_PTR(err);
+		handle = ERR_PTR(err);
 	}
-
 	return handle;
 }
 
@@ -307,19 +308,20 @@ int journal_extend (handle_t *handle, int nblocks)
 			  "transaction not running\n", handle, nblocks);
 		goto error_out;
 	}
-	
+
+	lock_kernel();	
 	wanted = transaction->t_outstanding_credits + nblocks;
 	
 	if (wanted > journal->j_max_transaction_buffers) {
 		jbd_debug(3, "denied handle %p %d blocks: "
 			  "transaction too large\n", handle, nblocks);
-		goto error_out;
+		goto unlock;
 	}
 
 	if (wanted > log_space_left(journal)) {
 		jbd_debug(3, "denied handle %p %d blocks: "
 			  "insufficient log space\n", handle, nblocks);
-		goto error_out;
+		goto unlock;
 	}
 	
 	handle->h_buffer_credits += nblocks;
@@ -327,7 +329,8 @@ int journal_extend (handle_t *handle, int nblocks)
 	result = 0;
 
 	jbd_debug(3, "extended handle %p by %d\n", handle, nblocks);
-	
+unlock:
+	unlock_kernel();
 error_out:
 	unlock_journal (journal);
 	return result;
@@ -366,6 +369,7 @@ int journal_restart(handle_t *handle, int nblocks)
 	J_ASSERT (transaction->t_updates > 0);
 	J_ASSERT (journal_current_handle() == handle);
 
+	lock_kernel();
 	transaction->t_outstanding_credits -= handle->h_buffer_credits;
 	transaction->t_updates--;
 
@@ -377,6 +381,7 @@ int journal_restart(handle_t *handle, int nblocks)
 
 	handle->h_buffer_credits = nblocks;
 	ret = start_this_handle(journal, handle);
+	unlock_kernel();
 	return ret;
 }
 
@@ -394,7 +399,10 @@ int journal_restart(handle_t *handle, int nblocks)
 void journal_lock_updates (journal_t *journal)
 {
 	lock_journal(journal);
+
+	lock_kernel();
 	++journal->j_barrier_count;
+	unlock_kernel();
 
 	/* Wait until there are no running updates */
 	while (1) {
@@ -433,7 +441,9 @@ void journal_unlock_updates (journal_t *journal)
 	J_ASSERT (journal->j_barrier_count != 0);
 	
 	up(&journal->j_barrier);
+	lock_kernel();
 	--journal->j_barrier_count;
+	unlock_kernel();
 	wake_up(&journal->j_wait_transaction_locked);
 	unlock_journal(journal);
 }
@@ -710,7 +720,9 @@ int journal_get_write_access (handle_t *handle, struct buffer_head *bh)
 	 * log thread also manipulates.  Make sure that the buffer
 	 * completes any outstanding IO before proceeding. */
 	lock_journal(journal);
+	lock_kernel();
 	rc = do_get_write_access(handle, jh, 0);
+	unlock_kernel();
 	journal_unlock_journal_head(jh);
 	unlock_journal(journal);
 	return rc;
@@ -786,8 +798,10 @@ int journal_get_create_access (handle_t *handle, struct buffer_head *bh)
 	 * which hits an assertion error.
 	 */
 	JBUFFER_TRACE(jh, "cancelling revoke");
+	lock_kernel();
 	journal_cancel_revoke(handle, jh);
 	journal_unlock_journal_head(jh);
+	unlock_kernel();
 out:
 	unlock_journal(journal);
 	return err;
@@ -832,6 +846,7 @@ int journal_get_undo_access (handle_t *handle, struct buffer_head *bh)
 	/* Do this first --- it can drop the journal lock, so we want to
 	 * make sure that obtaining the committed_data is done
 	 * atomically wrt. completion of any outstanding commits. */
+	lock_kernel();
 	err = do_get_write_access (handle, jh, 1);
 	if (err)
 		goto out;
@@ -855,6 +870,7 @@ int journal_get_undo_access (handle_t *handle, struct buffer_head *bh)
 	}
 
 out:
+	unlock_kernel();
 	if (!err)
 		J_ASSERT_JH(jh, jh->b_committed_data);
 	journal_unlock_journal_head(jh);
@@ -1302,8 +1318,10 @@ void journal_callback_set(handle_t *handle,
 			  void (*func)(struct journal_callback *jcb, int error),
 			  struct journal_callback *jcb)
 {
+	lock_kernel();
 	list_add_tail(&jcb->jcb_list, &handle->h_jcb);
 	jcb->jcb_func = func;
+	unlock_kernel();
 }
 
 
@@ -1366,6 +1384,7 @@ int journal_stop(handle_t *handle)
 	}
 
 	current->journal_info = NULL;
+	lock_kernel();
 	transaction->t_outstanding_credits -= handle->h_buffer_credits;
 	transaction->t_updates--;
 	if (!transaction->t_updates) {
@@ -1404,6 +1423,7 @@ int journal_stop(handle_t *handle)
 		if (handle->h_sync && !(current->flags & PF_MEMALLOC))
 			err = log_wait_commit(journal, tid);
 	}
+	unlock_kernel();
 	jbd_free_handle(handle);
 	return err;
 }
@@ -1985,7 +2005,6 @@ void __journal_refile_buffer(struct journal_head *jh)
 	int was_dirty;
 
 	assert_spin_locked(&journal_datalist_lock);
-	J_ASSERT_JH(jh, kernel_locked());
 
 	/* If the buffer is now unused, just drop it. */
 	if (jh->b_next_transaction == NULL) {

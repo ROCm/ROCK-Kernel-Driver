@@ -199,7 +199,6 @@ void ext3_delete_inode (struct inode * inode)
 	if (is_bad_inode(inode))
 		goto no_delete;
 
-	lock_kernel();
 	handle = start_transaction(inode);
 	if (IS_ERR(handle)) {
 		/* If we're going to skip the normal cleanup, we still
@@ -208,7 +207,6 @@ void ext3_delete_inode (struct inode * inode)
 		ext3_orphan_del(NULL, inode);
 
 		ext3_std_error(inode->i_sb, PTR_ERR(handle));
-		unlock_kernel();
 		goto no_delete;
 	}
 	
@@ -241,7 +239,6 @@ void ext3_delete_inode (struct inode * inode)
 	else
 		ext3_free_inode(handle, inode);
 	ext3_journal_stop(handle);
-	unlock_kernel();
 	return;
 no_delete:
 	clear_inode(inode);	/* We must guarantee clearing of inode... */
@@ -251,7 +248,6 @@ void ext3_discard_prealloc (struct inode * inode)
 {
 #ifdef EXT3_PREALLOCATE
 	struct ext3_inode_info *ei = EXT3_I(inode);
-	lock_kernel();
 	/* Writer: ->i_prealloc* */
 	if (ei->i_prealloc_count) {
 		unsigned short total = ei->i_prealloc_count;
@@ -261,7 +257,6 @@ void ext3_discard_prealloc (struct inode * inode)
 		/* Writer: end */
 		ext3_free_blocks (inode, block, total);
 	}
-	unlock_kernel();
 #endif
 }
 
@@ -781,7 +776,6 @@ ext3_get_block_handle(handle_t *handle, struct inode *inode, sector_t iblock,
 	if (depth == 0)
 		goto out;
 
-	lock_kernel();
 reread:
 	partial = ext3_get_branch(inode, depth, offsets, chain, &err);
 
@@ -806,7 +800,6 @@ cleanup:
 			partial--;
 		}
 		BUFFER_TRACE(bh_result, "returned");
-		unlock_kernel();
 out:
 		return err;
 	}
@@ -894,7 +887,6 @@ ext3_direct_io_get_blocks(struct inode *inode, sector_t iblock,
 	handle_t *handle = journal_current_handle();
 	int ret = 0;
 
-	lock_kernel();
 	if (handle && handle->h_buffer_credits <= EXT3_RESERVE_TRANS_BLOCKS) {
 		/*
 		 * Getting low on buffer credits...
@@ -911,7 +903,6 @@ ext3_direct_io_get_blocks(struct inode *inode, sector_t iblock,
 					bh_result, create, 0);
 	if (ret == 0)
 		bh_result->b_size = (1 << inode->i_blkbits);
-	unlock_kernel();
 	return ret;
 }
 
@@ -944,7 +935,6 @@ struct buffer_head *ext3_getblk(handle_t *handle, struct inode * inode,
 			   For now, regular file writes use
 			   ext3_get_block instead, so it's not a
 			   problem. */
-			lock_kernel();
 			lock_buffer(bh);
 			BUFFER_TRACE(bh, "call get_create_access");
 			fatal = ext3_journal_get_create_access(handle, bh);
@@ -957,7 +947,6 @@ struct buffer_head *ext3_getblk(handle_t *handle, struct inode * inode,
 			BUFFER_TRACE(bh, "call ext3_journal_dirty_metadata");
 			err = ext3_journal_dirty_metadata(handle, bh);
 			if (!fatal) fatal = err;
-			unlock_kernel();
 		} else {
 			BUFFER_TRACE(bh, "not a new buffer");
 		}
@@ -1094,15 +1083,12 @@ static int ext3_prepare_write(struct file *file, struct page *page,
 	int ret, needed_blocks = ext3_writepage_trans_blocks(inode);
 	handle_t *handle;
 
-	lock_kernel();
 	handle = ext3_journal_start(inode, needed_blocks);
 	if (IS_ERR(handle)) {
 		ret = PTR_ERR(handle);
 		goto out;
 	}
-	unlock_kernel();
 	ret = block_prepare_write(page, from, to, ext3_get_block);
-	lock_kernel();
 	if (ret != 0)
 		goto prepare_write_failed;
 
@@ -1114,7 +1100,6 @@ prepare_write_failed:
 	if (ret)
 		ext3_journal_stop(handle);
 out:
-	unlock_kernel();
 	return ret;
 }
 
@@ -1150,7 +1135,6 @@ static int ext3_commit_write(struct file *file, struct page *page,
 	struct inode *inode = page->mapping->host;
 	int ret = 0, ret2;
 
-	lock_kernel();
 	if (ext3_should_journal_data(inode)) {
 		/*
 		 * Here we duplicate the generic_commit_write() functionality
@@ -1192,7 +1176,6 @@ static int ext3_commit_write(struct file *file, struct page *page,
 		}
 	}
 	ret2 = ext3_journal_stop(handle);
-	unlock_kernel();
 	if (!ret)
 		ret = ret2;
 	return ret;
@@ -1334,7 +1317,6 @@ static int ext3_writepage(struct page *page, struct writeback_control *wbc)
 	 * for a different filesystem.  One *could* look for a
 	 * nested transaction opportunity.
 	 */
-	lock_kernel();
 	if (ext3_journal_current_handle())
 		goto out_fail;
 
@@ -1348,8 +1330,6 @@ static int ext3_writepage(struct page *page, struct writeback_control *wbc)
 
 	order_data = ext3_should_order_data(inode) ||
 			ext3_should_journal_data(inode);
-
-	unlock_kernel();
 
 	page_bufs = NULL;	/* Purely to prevent compiler warning */
 
@@ -1377,7 +1357,6 @@ static int ext3_writepage(struct page *page, struct writeback_control *wbc)
 	 */
 
 	handle = ext3_journal_current_handle();
-	lock_kernel();
 
 	/*
 	 * And attach them to the current transaction.  But only if 
@@ -1399,13 +1378,10 @@ static int ext3_writepage(struct page *page, struct writeback_control *wbc)
 	err = ext3_journal_stop(handle);
 	if (!ret)
 		ret = err;
-	unlock_kernel();
 	return ret;
 
 out_fail:
 	
-	unlock_kernel();
-
 	/*
 	 * We have to fail this writepage to avoid cross-fs transactions.
 	 * Put the page back on mapping->dirty_pages.  The page's buffers'
@@ -1463,17 +1439,13 @@ static int ext3_direct_IO(int rw, struct kiocb *iocb,
 	if (rw == WRITE) {
 		loff_t final_size = offset + count;
 
-		lock_kernel();
 		handle = ext3_journal_start(inode, DIO_CREDITS);
-		unlock_kernel();
 		if (IS_ERR(handle)) {
 			ret = PTR_ERR(handle);
 			goto out;
 		}
 		if (final_size > inode->i_size) {
-			lock_kernel();
 			ret = ext3_orphan_add(handle, inode);
-			unlock_kernel();
 			if (ret)
 				goto out_stop;
 			orphan = 1;
@@ -1488,7 +1460,6 @@ out_stop:
 	if (handle) {
 		int err;
 
-		lock_kernel();
 		if (orphan) 
 			ext3_orphan_del(handle, inode);
 		if (orphan && ret > 0) {
@@ -1504,7 +1475,6 @@ out_stop:
 		err = ext3_journal_stop(handle);
 		if (ret == 0)
 			ret = err;
-		unlock_kernel();
 	}
 out:
 	return ret;
@@ -2034,12 +2004,10 @@ void ext3_truncate(struct inode * inode)
 	if (IS_APPEND(inode) || IS_IMMUTABLE(inode))
 		return;
 
-	lock_kernel();
 	ext3_discard_prealloc(inode);
 
 	handle = start_transaction(inode);
 	if (IS_ERR(handle)) {
-		unlock_kernel();
 		return;		/* AKPM: return what? */
 	}
 
@@ -2163,7 +2131,6 @@ out_stop:
 		ext3_orphan_del(handle, inode);
 
 	ext3_journal_stop(handle);
-	unlock_kernel();
 }
 
 /* 
@@ -2560,8 +2527,6 @@ int ext3_setattr(struct dentry *dentry, struct iattr *attr)
 			return error;
 	}
 
-	lock_kernel();
-
 	if (S_ISREG(inode->i_mode) &&
 	    attr->ia_valid & ATTR_SIZE && attr->ia_size < inode->i_size) {
 		handle_t *handle;
@@ -2593,7 +2558,6 @@ int ext3_setattr(struct dentry *dentry, struct iattr *attr)
 
 err_out:
 	ext3_std_error(inode->i_sb, error);
-	unlock_kernel();
 	if (!error)
 		error = rc;
 	return error;
@@ -2739,7 +2703,6 @@ void ext3_dirty_inode(struct inode *inode)
 	handle_t *current_handle = ext3_journal_current_handle();
 	handle_t *handle;
 
-	lock_kernel();
 	handle = ext3_journal_start(inode, 2);
 	if (IS_ERR(handle))
 		goto out;
@@ -2755,7 +2718,7 @@ void ext3_dirty_inode(struct inode *inode)
 	}
 	ext3_journal_stop(handle);
 out:
-	unlock_kernel();
+	return;
 }
 
 #ifdef AKPM
