@@ -93,16 +93,17 @@ int async_wrap_skb(struct sk_buff *skb, __u8 *tx_buff, int buffsize)
 		 * Nothing to worry about, but we set the default number of
 		 * BOF's
 		 */
-		IRDA_DEBUG(1, __FUNCTION__ "(), wrong magic in skb!\n");
+		IRDA_DEBUG(1, "%s(), wrong magic in skb!\n", __FUNCTION__);
 		xbofs = 10;
 	} else
 		xbofs = cb->xbofs + cb->xbofs_delay;
 
-	IRDA_DEBUG(4, __FUNCTION__ "(), xbofs=%d\n", xbofs);
+	IRDA_DEBUG(4, "%s(), xbofs=%d\n", __FUNCTION__, xbofs);
 
 	/* Check that we never use more than 115 + 48 xbofs */
 	if (xbofs > 163) {
-		IRDA_DEBUG(0, __FUNCTION__ "(), too many xbofs (%d)\n", xbofs);
+		IRDA_DEBUG(0, "%s(), too many xbofs (%d)\n", __FUNCTION__,
+			   xbofs);
 		xbofs = 163;
 	}
 
@@ -265,7 +266,7 @@ static void state_begin_frame(struct net_device *dev,
 	case EOF:
 		/* Abort frame */
 		rx_buff->state = OUTSIDE_FRAME;
-		IRDA_DEBUG(1, __FUNCTION__ "(), abort frame\n");
+		IRDA_DEBUG(1, "%s(), abort frame\n", __FUNCTION__);
 		stats->rx_errors++;
 		stats->rx_frame_errors++;
 		break;
@@ -289,8 +290,8 @@ static void state_link_escape(struct net_device *dev,
 {
 	switch (byte) {
 	case BOF: /* New frame? */
-		IRDA_DEBUG(1, __FUNCTION__
-			   "(), Discarding incomplete frame\n");
+		IRDA_DEBUG(1, "%s(), Discarding incomplete frame\n",
+			   __FUNCTION__);
 		rx_buff->state = BEGIN_FRAME;
 		irda_device_set_media_busy(dev, TRUE);
 		break;
@@ -311,7 +312,8 @@ static void state_link_escape(struct net_device *dev,
 			rx_buff->fcs = irda_fcs(rx_buff->fcs, byte);
 			rx_buff->state = INSIDE_FRAME;
 		} else {
-			IRDA_DEBUG(1, __FUNCTION__ "(), rx buffer overflow\n");
+			IRDA_DEBUG(1, "%s(), rx buffer overflow\n",
+				   __FUNCTION__);
 			rx_buff->state = OUTSIDE_FRAME;
 		}
 		break;
@@ -332,8 +334,8 @@ static void state_inside_frame(struct net_device *dev,
 
 	switch (byte) {
 	case BOF: /* New frame? */
-		IRDA_DEBUG(1, __FUNCTION__
-			   "(), Discarding incomplete frame\n");
+		IRDA_DEBUG(1, "%s(), Discarding incomplete frame\n",
+			   __FUNCTION__);
 		rx_buff->state = BEGIN_FRAME;
 		irda_device_set_media_busy(dev, TRUE);
 		break;
@@ -354,7 +356,7 @@ static void state_inside_frame(struct net_device *dev,
 			/* Wrong CRC, discard frame!  */
 			irda_device_set_media_busy(dev, TRUE);
 
-			IRDA_DEBUG(1, __FUNCTION__ "(), crc error\n");
+			IRDA_DEBUG(1, "%s(), crc error\n", __FUNCTION__);
 			stats->rx_errors++;
 			stats->rx_crc_errors++;
 		}
@@ -364,8 +366,8 @@ static void state_inside_frame(struct net_device *dev,
 			rx_buff->data[rx_buff->len++] = byte;
 			rx_buff->fcs = irda_fcs(rx_buff->fcs, byte);
 		} else {
-			IRDA_DEBUG(1, __FUNCTION__
-			      "(), Rx buffer overflow, aborting\n");
+			IRDA_DEBUG(1, "%s(), Rx buffer overflow, aborting\n",
+				   __FUNCTION__);
 			rx_buff->state = OUTSIDE_FRAME;
 		}
 		break;
