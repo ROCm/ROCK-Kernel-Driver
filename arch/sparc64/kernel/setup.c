@@ -506,7 +506,7 @@ void __init setup_arch(char **cmdline_p)
 		extern unsigned int irqsz_patchme[1];
 		irqsz_patchme[0] |= ((i == SMP_CACHE_BYTES) ? SMP_CACHE_BYTES_SHIFT : \
 							SMP_CACHE_BYTES_SHIFT + 1);
-		flushi((long)&irqsz_patchme[1]);
+		flushi((long)&irqsz_patchme[0]);
 	} else {
 		prom_printf("Unexpected size of irq_stat[] elements\n");
 		prom_halt();
