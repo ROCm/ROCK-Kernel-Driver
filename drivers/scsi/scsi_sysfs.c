@@ -23,20 +23,16 @@
  * Return:
  *     number of bytes written into page.
  **/
-static ssize_t scsi_host_class_name_show(struct device *dev, char *page,
-	size_t count, loff_t off)
+static ssize_t scsi_host_class_name_show(struct device *dev, char *page)
 {
 	struct Scsi_Host *shost;
-
-	if (off)
-		return 0;
 
 	shost = to_scsi_host(dev);
 
 	if (!shost)
 		return 0;
 	
-	return snprintf(page, count, "scsi%d\n", shost->host_no);
+	return snprintf(page, 20, "scsi%d\n", shost->host_no);
 }
 
 DEVICE_ATTR(class_name, S_IRUGO, scsi_host_class_name_show, NULL);
@@ -138,13 +134,11 @@ void scsi_upper_driver_unregister(struct Scsi_Device_Template *sdev_tp)
  */
 #define show_function(field, format_string)				\
 static ssize_t								\
-show_##field (struct device *dev, char *buf, size_t count, loff_t off)	\
+show_##field (struct device *dev, char *buf)				\
 {									\
 	struct scsi_device *sdev;					\
-	if (off)							\
-		return 0;						\
 	sdev = to_scsi_device(dev);					\
-	return snprintf (buf, count, format_string, sdev->field);	\
+	return snprintf (buf, 20, format_string, sdev->field);		\
 }									\
 
 /*
@@ -164,14 +158,12 @@ static DEVICE_ATTR(field, S_IRUGO, show_##field, NULL)
 	show_function(field, format_string)				\
 									\
 static ssize_t								\
-store_##field (struct device *dev, const char *buf, size_t count, loff_t off)\
+store_##field (struct device *dev, const char *buf)			\
 {									\
 	struct scsi_device *sdev;					\
-									\
-	if (off)							\
-		return 0;						\
 	sdev = to_scsi_device(dev);					\
-	return snscanf (buf, count, format_string, &sdev->field);	\
+	snscanf (buf, 20, format_string, &sdev->field);			\
+	return strlen(buf);						\
 }									\
 static DEVICE_ATTR(field, S_IRUGO | S_IWUSR, show_##field, store_##field)
 
@@ -183,18 +175,15 @@ static DEVICE_ATTR(field, S_IRUGO | S_IWUSR, show_##field, store_##field)
 	show_function(field, "%d\n")					\
 									\
 static ssize_t								\
-store_##field (struct device *dev, const char *buf, size_t count, loff_t off)\
+store_##field (struct device *dev, const char *buf)			\
 {									\
 	int ret;							\
 	struct scsi_device *sdev;					\
-									\
-	if (off)							\
-		return 0;						\
 	ret = scsi_sdev_check_buf_bit(buf);				\
 	if (ret >= 0)	{						\
 		sdev = to_scsi_device(dev);				\
 		sdev->field = ret;					\
-		ret = count;						\
+		ret = strlen(buf);					\
 	}								\
 	return ret;							\
 }									\

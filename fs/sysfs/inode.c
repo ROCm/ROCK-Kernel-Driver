@@ -72,6 +72,7 @@ static struct inode *sysfs_get_inode(struct super_block *sb, int mode, int dev)
 			init_special_inode(inode, mode, dev);
 			break;
 		case S_IFREG:
+			inode->i_size = PAGE_SIZE;
 			inode->i_fop = &sysfs_file_operations;
 			break;
 		case S_IFDIR:
@@ -153,27 +154,27 @@ static int sysfs_symlink(struct inode * dir, struct dentry *dentry, const char *
  * These operations allow subsystems to have files that can be 
  * read/written. 
  */
-ssize_t subsys_attr_show(struct kobject * kobj, struct attribute * attr, 
-			 char * page, size_t count, loff_t off)
+static ssize_t 
+subsys_attr_show(struct kobject * kobj, struct attribute * attr, char * page)
 {
 	struct subsystem * s = to_subsys(kobj);
 	struct subsys_attribute * sattr = to_sattr(attr);
 	ssize_t ret = 0;
 
 	if (sattr->show)
-		ret = sattr->show(s,page,count,off);
+		ret = sattr->show(s,page);
 	return ret;
 }
 
-ssize_t subsys_attr_store(struct kobject * kobj, struct attribute * attr,
-			  const char * page, size_t count, loff_t off)
+static ssize_t 
+subsys_attr_store(struct kobject * kobj, struct attribute * attr, const char * page)
 {
 	struct subsystem * s = to_subsys(kobj);
 	struct subsys_attribute * sattr = to_sattr(attr);
 	ssize_t ret = 0;
 
 	if (sattr->store)
-		ret = sattr->store(s,page,count,off);
+		ret = sattr->store(s,page);
 	return ret;
 }
 
@@ -181,6 +182,73 @@ static struct sysfs_ops subsys_sysfs_ops = {
 	.show	= subsys_attr_show,
 	.store	= subsys_attr_store,
 };
+
+
+struct sysfs_buffer {
+	size_t			count;
+	loff_t			pos;
+	char			* page;
+	struct sysfs_ops	* ops;
+};
+
+
+/**
+ *	fill_read_buffer - allocate and fill buffer from object.
+ *	@file:		file pointer.
+ *	@buffer:	data buffer for file.
+ *
+ *	Allocate @buffer->page, if it hasn't been already, then call the
+ *	kobject's show() method to fill the buffer with this attribute's 
+ *	data. 
+ *	This is called only once, on the file's first read. 
+ */
+static int fill_read_buffer(struct file * file, struct sysfs_buffer * buffer)
+{
+	struct attribute * attr = file->f_dentry->d_fsdata;
+	struct kobject * kobj = file->f_dentry->d_parent->d_fsdata;
+	struct sysfs_ops * ops = buffer->ops;
+	int ret = 0;
+	size_t count;
+
+	if (!buffer->page)
+		buffer->page = (char *) __get_free_page(GFP_KERNEL);
+	if (!buffer->page)
+		return -ENOMEM;
+
+	count = ops->show(kobj,attr,buffer->page);
+	if (count >= 0)
+		buffer->count = count;
+	else
+		ret = count;
+	return ret;
+}
+
+
+/**
+ *	flush_read_buffer - push buffer to userspace.
+ *	@buffer:	data buffer for file.
+ *	@userbuf:	user-passed buffer.
+ *	@count:		number of bytes requested.
+ *	@ppos:		file position.
+ *
+ *	Copy the buffer we filled in fill_read_buffer() to userspace.
+ *	This is done at the reader's leisure, copying and advancing 
+ *	the amount they specify each time.
+ *	This may be called continuously until the buffer is empty.
+ */
+static int flush_read_buffer(struct sysfs_buffer * buffer, char * buf, 
+			     size_t count, loff_t * ppos)
+{
+	int error;
+
+	if (count > (buffer->count - *ppos))
+		count = buffer->count - *ppos;
+
+	error = copy_to_user(buf,buffer->page + *ppos,count);
+	if (!error)
+		*ppos += count;
+	return error ? error : count;
+}
 
 /**
  *	sysfs_read_file - read an attribute. 
@@ -191,54 +259,78 @@ static struct sysfs_ops subsys_sysfs_ops = {
  *
  *	Userspace wants to read an attribute file. The attribute descriptor
  *	is in the file's ->d_fsdata. The target object is in the directory's
- *	->d_fsdata. 
+ *	->d_fsdata.
  *
- *	We allocate a %PAGE_SIZE buffer, and pass it to the object's ->show()
- *	method (along with the object). We loop doing this until @count is 
- *	satisfied, or ->show() returns %0. 
+ *	We call fill_read_buffer() to allocate and fill the buffer from the
+ *	object's show() method exactly once (if the read is happening from
+ *	the beginning of the file). That should fill the entire buffer with
+ *	all the data the object has to offer for that attribute.
+ *	We then call flush_read_buffer() to copy the buffer to userspace
+ *	in the increments specified.
  */
 
 static ssize_t
 sysfs_read_file(struct file *file, char *buf, size_t count, loff_t *ppos)
 {
-	struct attribute * attr = file->f_dentry->d_fsdata;
-	struct sysfs_ops * ops = file->private_data;
-	struct kobject * kobj = file->f_dentry->d_parent->d_fsdata;
-	unsigned char *page;
+	struct sysfs_buffer * buffer = file->private_data;
 	ssize_t retval = 0;
 
-	if (count > PAGE_SIZE)
-		count = PAGE_SIZE;
+	if (!*ppos) {
+		if ((retval = fill_read_buffer(file,buffer)))
+			return retval;
+	}
+	pr_debug("%s: count = %d, ppos = %lld, buf = %s\n",
+		 __FUNCTION__,count,*ppos,buffer->page);
+	return flush_read_buffer(buffer,buf,count,ppos);
+}
 
-	page = (unsigned char*)__get_free_page(GFP_KERNEL);
-	if (!page)
+
+/**
+ *	fill_write_buffer - copy buffer from userspace.
+ *	@buffer:	data buffer for file.
+ *	@userbuf:	data from user.
+ *	@count:		number of bytes in @userbuf.
+ *
+ *	Allocate @buffer->page if it hasn't been already, then
+ *	copy the user-supplied buffer into it.
+ */
+
+static int 
+fill_write_buffer(struct sysfs_buffer * buffer, const char * buf, size_t count)
+{
+	int error;
+
+	if (!buffer->page)
+		buffer->page = (char *)__get_free_page(GFP_KERNEL);
+	if (!buffer->page)
 		return -ENOMEM;
 
-	while (count > 0) {
-		ssize_t len;
-
-		len = ops->show(kobj,attr,page,count,*ppos);
-
-		if (len <= 0) {
-			if (len < 0)
-				retval = len;
-			break;
-		} else if (len > count)
-			len = count;
-
-		if (copy_to_user(buf,page,len)) {
-			retval = -EFAULT;
-			break;
-		}
-
-		*ppos += len;
-		count -= len;
-		buf += len;
-		retval += len;
-	}
-	free_page((unsigned long)page);
-	return retval;
+	if (count >= PAGE_SIZE)
+		count = PAGE_SIZE - 1;
+	error = copy_from_user(buffer->page,buf,count);
+	return error ? error : count;
 }
+
+
+/**
+ *	flush_write_buffer - push buffer to kobject.
+ *	@file:		file pointer.
+ *	@buffer:	data buffer for file.
+ *
+ *	Get the correct pointers for the kobject and the attribute we're
+ *	dealing with, then call the store() method for the attribute, 
+ *	passing the buffer that we acquired in fill_write_buffer().
+ */
+
+static int flush_write_buffer(struct file * file, struct sysfs_buffer * buffer)
+{
+	struct attribute * attr = file->f_dentry->d_fsdata;
+	struct kobject * kobj = file->f_dentry->d_parent->d_fsdata;
+	struct sysfs_ops * ops = buffer->ops;
+
+	return ops->store(kobj,attr,buffer->page);
+}
+
 
 /**
  *	sysfs_write_file - write an attribute.
@@ -247,56 +339,34 @@ sysfs_read_file(struct file *file, char *buf, size_t count, loff_t *ppos)
  *	@count:	number of bytes
  *	@ppos:	starting offset
  *
- *	Identical to sysfs_read_file(), though going the opposite direction.
- *	We allocate a %PAGE_SIZE buffer and copy in the userspace buffer. We
- *	pass that to the object's ->store() method until we reach @count or 
- *	->store() returns %0 or less.
+ *	Similar to sysfs_read_file(), though working in the opposite direction.
+ *	We allocate and fill the data from the user in fill_write_buffer(),
+ *	then push it to the kobject in flush_write_buffer().
+ *	There is no easy way for us to know if userspace is only doing a partial
+ *	write, so we don't support them. We expect the entire buffer to come
+ *	on the first write. 
+ *	Hint: if you're writing a value, first read the file, modify only the
+ *	the value you're changing, then write entire buffer back. 
  */
 
 static ssize_t
 sysfs_write_file(struct file *file, const char *buf, size_t count, loff_t *ppos)
 {
-	struct attribute * attr = file->f_dentry->d_fsdata;
-	struct sysfs_ops * ops = file->private_data;
-	struct kobject * kobj = file->f_dentry->d_parent->d_fsdata;
-	ssize_t retval = 0;
-	char * page;
+	struct sysfs_buffer * buffer = file->private_data;
 
-
-	page = (char *)__get_free_page(GFP_KERNEL);
-	if (!page)
-		return -ENOMEM;
-
-	if (count >= PAGE_SIZE)
-		count = PAGE_SIZE - 1;
-	if (copy_from_user(page,buf,count))
-		goto done;
-	*(page + count) = '\0';
-
-	while (count > 0) {
-		ssize_t len;
-
-		len = ops->store(kobj,attr,page + retval,count,*ppos);
-
-		if (len <= 0) {
-			if (len < 0)
-				retval = len;
-			break;
-		}
-		retval += len;
-		count -= len;
-		*ppos += len;
-		buf += len;
-	}
- done:
-	free_page((unsigned long)page);
-	return retval;
+	count = fill_write_buffer(buffer,buf,count);
+	if (count > 0)
+		count = flush_write_buffer(file,buffer);
+	if (count > 0)
+		*ppos += count;
+	return count;
 }
 
 static int check_perm(struct inode * inode, struct file * file)
 {
 	struct kobject * kobj = kobject_get(file->f_dentry->d_parent->d_fsdata);
 	struct attribute * attr = file->f_dentry->d_fsdata;
+	struct sysfs_buffer * buffer;
 	struct sysfs_ops * ops = NULL;
 	int error = 0;
 
@@ -343,10 +413,16 @@ static int check_perm(struct inode * inode, struct file * file)
 			goto Eaccess;
 	}
 
-	/* No error? Great, store the ops in file->private_data
-	 * for easy access in the read/write functions.
+	/* No error? Great, allocate a buffer for the file, and store it
+	 * it in file->private_data for easy access.
 	 */
-	file->private_data = ops;
+	buffer = kmalloc(sizeof(struct sysfs_buffer),GFP_KERNEL);
+	if (buffer) {
+		memset(buffer,0,sizeof(struct sysfs_buffer));
+		buffer->ops = ops;
+		file->private_data = buffer;
+	} else
+		error = -ENOMEM;
 	goto Done;
 
  Einval:
@@ -358,6 +434,8 @@ static int check_perm(struct inode * inode, struct file * file)
  Eperm:
 	error = -EPERM;
  Done:
+	if (error && kobj)
+		kobject_put(kobj);
 	return error;
 }
 
@@ -369,8 +447,16 @@ static int sysfs_open_file(struct inode * inode, struct file * filp)
 static int sysfs_release(struct inode * inode, struct file * filp)
 {
 	struct kobject * kobj = filp->f_dentry->d_parent->d_fsdata;
+	struct sysfs_buffer * buffer = filp->private_data;
+
 	if (kobj) 
 		kobject_put(kobj);
+
+	if (buffer) {
+		if (buffer->page)
+			free_page((unsigned long)buffer->page);
+		kfree(buffer);
+	}
 	return 0;
 }
 
@@ -618,7 +704,19 @@ static void hash_and_remove(struct dentry * dir, const char * name)
 		    (victim->d_parent->d_inode == dir->d_inode)) {
 			simple_unlink(dir->d_inode,victim);
 			d_delete(victim);
+
+			pr_debug("sysfs: Removing %s (%d)\n", victim->d_name.name,
+				 atomic_read(&victim->d_count));
+			/**
+			 * Drop reference from initial get_dentry().
+			 */
+			dput(victim);
 		}
+		
+		/**
+		 * Drop the reference acquired from get_dentry() above.
+		 */
+		dput(victim);
 	}
 	up(&dir->d_inode->i_sem);
 }
@@ -662,29 +760,60 @@ void sysfs_remove_link(struct kobject * kobj, char * name)
 void sysfs_remove_dir(struct kobject * kobj)
 {
 	struct list_head * node, * next;
-	struct dentry * dentry = kobj->dentry;
+	struct dentry * dentry = dget(kobj->dentry);
 	struct dentry * parent;
 
 	if (!dentry)
 		return;
 
+	pr_debug("sysfs %s: removing dir\n",dentry->d_name.name);
 	parent = dget(dentry->d_parent);
 	down(&parent->d_inode->i_sem);
 	down(&dentry->d_inode->i_sem);
 
 	list_for_each_safe(node,next,&dentry->d_subdirs) {
-		struct dentry * d = list_entry(node,struct dentry,d_child);
-		/* make sure dentry is still there */
+		struct dentry * d = dget(list_entry(node,struct dentry,d_child));
+		/** 
+		 * Make sure dentry is still there 
+		 */
+		pr_debug(" o %s: ",d->d_name.name);
 		if (d->d_inode) {
+
+			pr_debug("removing");
+			/**
+			 * Unlink and unhash.
+			 */
 			simple_unlink(dentry->d_inode,d);
-			d_delete(dentry);
+			d_delete(d);
+
+			/**
+			 * Drop reference from initial get_dentry().
+			 */
+			dput(d);
 		}
+		pr_debug(" done (%d)\n",atomic_read(&d->d_count));
+		/**
+		 * drop reference from dget() above.
+		 */
+		dput(d);
 	}
 
 	up(&dentry->d_inode->i_sem);
 	d_invalidate(dentry);
 	simple_rmdir(parent->d_inode,dentry);
 	d_delete(dentry);
+
+	pr_debug(" o %s removing done (%d)\n",dentry->d_name.name,
+		 atomic_read(&dentry->d_count));
+	/**
+	 * Drop reference from initial get_dentry().
+	 */
+	dput(dentry);
+
+	/**
+	 * Drop reference from dget() on entrance.
+	 */
+	dput(dentry);
 	up(&parent->d_inode->i_sem);
 	dput(parent);
 }

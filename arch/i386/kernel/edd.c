@@ -61,7 +61,7 @@ MODULE_LICENSE("GPL");
 #define EDD_DEVICE_NAME_SIZE 16
 #define REPORT_URL "http://domsch.com/linux/edd30/results.html"
 
-#define left (count - (p - buf) - 1)
+#define left (PAGE_SIZE - (p - buf) - 1)
 
 struct edd_device {
 	struct edd_info *info;
@@ -70,8 +70,7 @@ struct edd_device {
 
 struct edd_attribute {
 	struct attribute attr;
-	ssize_t(*show) (struct edd_device * edev, char *buf, size_t count,
-			loff_t off);
+	ssize_t(*show) (struct edd_device * edev, char *buf);
 	int (*test) (struct edd_device * edev);
 };
 
@@ -104,15 +103,14 @@ edd_dev_set_info(struct edd_device *edev, struct edd_info *info)
 #define to_edd_device(obj) container_of(obj,struct edd_device,kobj)
 
 static ssize_t
-edd_attr_show(struct kobject * kobj, struct attribute *attr,
-	      char *buf, size_t count, loff_t off)
+edd_attr_show(struct kobject * kobj, struct attribute *attr, char *buf)
 {
 	struct edd_device *dev = to_edd_device(kobj);
 	struct edd_attribute *edd_attr = to_edd_attr(attr);
 	ssize_t ret = 0;
 
 	if (edd_attr->show)
-		ret = edd_attr->show(dev, buf, count, off);
+		ret = edd_attr->show(dev, buf);
 	return ret;
 }
 
@@ -156,13 +154,13 @@ edd_dump_raw_data(char *b, int count, void *data, int length)
 }
 
 static ssize_t
-edd_show_host_bus(struct edd_device *edev, char *buf, size_t count, loff_t off)
+edd_show_host_bus(struct edd_device *edev, char *buf)
 {
 	struct edd_info *info = edd_dev_get_info(edev);
 	char *p = buf;
 	int i;
 
-	if (!edev || !info || !buf || off) {
+	if (!edev || !info || !buf) {
 		return 0;
 	}
 
@@ -200,13 +198,13 @@ edd_show_host_bus(struct edd_device *edev, char *buf, size_t count, loff_t off)
 }
 
 static ssize_t
-edd_show_interface(struct edd_device *edev, char *buf, size_t count, loff_t off)
+edd_show_interface(struct edd_device *edev, char *buf)
 {
 	struct edd_info *info = edd_dev_get_info(edev);
 	char *p = buf;
 	int i;
 
-	if (!edev || !info || !buf || off) {
+	if (!edev || !info || !buf) {
 		return 0;
 	}
 
@@ -262,7 +260,7 @@ edd_show_interface(struct edd_device *edev, char *buf, size_t count, loff_t off)
  * Returns: number of bytes written, or 0 on failure
  */
 static ssize_t
-edd_show_raw_data(struct edd_device *edev, char *buf, size_t count, loff_t off)
+edd_show_raw_data(struct edd_device *edev, char *buf)
 {
 	struct edd_info *info = edd_dev_get_info(edev);
 	int i, rc, warn_padding = 0, email = 0, nonzero_path = 0,
@@ -271,7 +269,7 @@ edd_show_raw_data(struct edd_device *edev, char *buf, size_t count, loff_t off)
 	char *p = buf;
 	struct pci_dev *pci_dev=NULL;
 	struct scsi_device *sd;
-	if (!edev || !info || !buf || off) {
+	if (!edev || !info || !buf) {
 		return 0;
 	}
 
@@ -372,11 +370,11 @@ out:
 }
 
 static ssize_t
-edd_show_version(struct edd_device *edev, char *buf, size_t count, loff_t off)
+edd_show_version(struct edd_device *edev, char *buf)
 {
 	struct edd_info *info = edd_dev_get_info(edev);
 	char *p = buf;
-	if (!edev || !info || !buf || off) {
+	if (!edev || !info || !buf) {
 		return 0;
 	}
 
@@ -385,12 +383,11 @@ edd_show_version(struct edd_device *edev, char *buf, size_t count, loff_t off)
 }
 
 static ssize_t
-edd_show_extensions(struct edd_device *edev, char *buf, size_t count,
-		    loff_t off)
+edd_show_extensions(struct edd_device *edev, char *buf)
 {
 	struct edd_info *info = edd_dev_get_info(edev);
 	char *p = buf;
-	if (!edev || !info || !buf || off) {
+	if (!edev || !info || !buf) {
 		return 0;
 	}
 
@@ -410,12 +407,11 @@ edd_show_extensions(struct edd_device *edev, char *buf, size_t count,
 }
 
 static ssize_t
-edd_show_info_flags(struct edd_device *edev, char *buf, size_t count,
-		    loff_t off)
+edd_show_info_flags(struct edd_device *edev, char *buf)
 {
 	struct edd_info *info = edd_dev_get_info(edev);
 	char *p = buf;
-	if (!edev || !info || !buf || off) {
+	if (!edev || !info || !buf) {
 		return 0;
 	}
 
@@ -439,12 +435,11 @@ edd_show_info_flags(struct edd_device *edev, char *buf, size_t count,
 }
 
 static ssize_t
-edd_show_default_cylinders(struct edd_device *edev, char *buf, size_t count,
-			   loff_t off)
+edd_show_default_cylinders(struct edd_device *edev, char *buf)
 {
 	struct edd_info *info = edd_dev_get_info(edev);
 	char *p = buf;
-	if (!edev || !info || !buf || off) {
+	if (!edev || !info || !buf) {
 		return 0;
 	}
 
@@ -453,12 +448,11 @@ edd_show_default_cylinders(struct edd_device *edev, char *buf, size_t count,
 }
 
 static ssize_t
-edd_show_default_heads(struct edd_device *edev, char *buf, size_t count,
-		       loff_t off)
+edd_show_default_heads(struct edd_device *edev, char *buf)
 {
 	struct edd_info *info = edd_dev_get_info(edev);
 	char *p = buf;
-	if (!edev || !info || !buf || off) {
+	if (!edev || !info || !buf) {
 		return 0;
 	}
 
@@ -467,12 +461,11 @@ edd_show_default_heads(struct edd_device *edev, char *buf, size_t count,
 }
 
 static ssize_t
-edd_show_default_sectors_per_track(struct edd_device *edev, char *buf,
-				   size_t count, loff_t off)
+edd_show_default_sectors_per_track(struct edd_device *edev, char *buf)
 {
 	struct edd_info *info = edd_dev_get_info(edev);
 	char *p = buf;
-	if (!edev || !info || !buf || off) {
+	if (!edev || !info || !buf) {
 		return 0;
 	}
 
@@ -481,11 +474,11 @@ edd_show_default_sectors_per_track(struct edd_device *edev, char *buf,
 }
 
 static ssize_t
-edd_show_sectors(struct edd_device *edev, char *buf, size_t count, loff_t off)
+edd_show_sectors(struct edd_device *edev, char *buf)
 {
 	struct edd_info *info = edd_dev_get_info(edev);
 	char *p = buf;
-	if (!edev || !info || !buf || off) {
+	if (!edev || !info || !buf) {
 		return 0;
 	}
 
