@@ -1493,7 +1493,7 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 	sbi->s_rsv_window_head.rsv_end = EXT3_RESERVE_WINDOW_NOT_ALLOCATED;
 	atomic_set(&sbi->s_rsv_window_head.rsv_alloc_hit, 0);
 	atomic_set(&sbi->s_rsv_window_head.rsv_goal_size, 0);
-	rsv_window_add(sb, &sbi->s_rsv_window_head);
+	ext3_rsv_window_add(sb, &sbi->s_rsv_window_head);
 
 	/*
 	 * set up enough so that it can read an inode
