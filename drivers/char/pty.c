@@ -64,8 +64,6 @@ static struct termios *pts_termios_locked[UNIX98_NR_MAJORS][NR_PTYS];
 static struct pty_struct ptm_state[UNIX98_NR_MAJORS][NR_PTYS];
 #endif
 
-#define MIN(a,b)	((a) < (b) ? (a) : (b))
-
 static void pty_close(struct tty_struct * tty, struct file * filp)
 {
 	if (!tty)
@@ -156,7 +154,7 @@ static int pty_write(struct tty_struct * tty, int from_user,
 				n = count;
 			if (!n) break;
 
-			n  = MIN(n, PTY_BUF_SIZE);
+			n  = min(n, PTY_BUF_SIZE);
 			n -= copy_from_user(temp_buffer, buf, n);
 			if (!n) {
 				if (!c)

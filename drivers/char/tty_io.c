@@ -159,13 +159,6 @@ extern void tx3912_console_init(void);
 extern void tx3912_rs_init(void);
 extern void hvc_console_init(void);
 
-#ifndef MIN
-#define MIN(a,b)	((a) < (b) ? (a) : (b))
-#endif
-#ifndef MAX
-#define MAX(a,b)	((a) < (b) ? (b) : (a))
-#endif
-
 static struct tty_struct *alloc_tty_struct(void)
 {
 	struct tty_struct *tty;
@@ -714,7 +707,7 @@ static inline ssize_t do_tty_write(
 		unlock_kernel();
 	} else {
 		for (;;) {
-			unsigned long size = MAX(PAGE_SIZE*2,16384);
+			unsigned long size = max((unsigned long)PAGE_SIZE*2, 16384UL);
 			if (size > count)
 				size = count;
 			lock_kernel();
