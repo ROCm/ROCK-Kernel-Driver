@@ -982,7 +982,9 @@ static int dtSplitUp(tid_t tid,
 		split->pxdlist = &pxdlist;
 		rc = dtSplitRoot(tid, ip, split, &rmp);
 
-		DT_PUTPAGE(rmp);
+		if (!rc)
+			DT_PUTPAGE(rmp);
+
 		DT_PUTPAGE(smp);
 
 		goto freeKeyName;
@@ -1876,6 +1878,9 @@ static int dtSplitRoot(tid_t tid,
 	xlen = lengthPXD(pxd);
 	xsize = xlen << JFS_SBI(sb)->l2bsize;
 	rmp = get_metapage(ip, rbn, xsize, 1);
+	if (!rmp)
+		return -EIO;
+
 	rp = rmp->data;
 
 	BT_MARK_DIRTY(rmp, ip);
