@@ -87,11 +87,6 @@ static aper_size_info_16 intel_7505_sizes[7] =
 	{4, 1024, 0, 0xf3f}
 };
 
-static void i7505_setup (u32 mode)
-{
-	if ((agp_generic_agp_3_0_enable)==FALSE)
-		agp_generic_agp_enable(mode);
-}
 
 static int __init intel_7505_setup (struct pci_dev *pdev)
 {
@@ -106,7 +101,7 @@ static int __init intel_7505_setup (struct pci_dev *pdev)
 	agp_bridge->cleanup = intel_7505_cleanup;
 	agp_bridge->tlb_flush = intel_7505_tlbflush;
 	agp_bridge->mask_memory = intel_mask_memory;
-	agp_bridge->agp_enable = i7505_enable;
+	agp_bridge->agp_enable = agp_generic_agp_enable;
 	agp_bridge->cache_flush = global_cache_flush;
 	agp_bridge->create_gatt_table = agp_generic_create_gatt_table;
 	agp_bridge->free_gatt_table = agp_generic_free_gatt_table;

@@ -186,7 +186,7 @@ static int __init via_generic_agp3_setup (struct pci_dev *pdev)
 	agp_bridge->num_aperture_sizes = 10;
 	agp_bridge->dev_private_data = NULL;
 	agp_bridge->needs_scratch_page = FALSE;
-	agp_bridge->agp_enable = agp_generic_agp_3_0_enable;
+	agp_bridge->agp_enable = agp_generic_agp_enable;
 	agp_bridge->configure = via_configure_agp3;
 	agp_bridge->fetch_size = via_fetch_size_agp3;
 	agp_bridge->cleanup = via_cleanup_agp3;
