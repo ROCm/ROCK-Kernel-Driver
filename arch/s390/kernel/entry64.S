@@ -19,6 +19,7 @@
 #include <asm/thread_info.h>
 #include <asm/offsets.h>
 #include <asm/unistd.h>
+#include <asm/page.h>
 
 /*
  * Stack layout for the system_call stack entry.
@@ -47,6 +48,9 @@ SP_ORIG_R2   =  STACK_FRAME_OVERHEAD + __PT_ORIG_GPR2
 SP_ILC       =  STACK_FRAME_OVERHEAD + __PT_ILC
 SP_TRAP      =  STACK_FRAME_OVERHEAD + __PT_TRAP
 SP_SIZE      =  STACK_FRAME_OVERHEAD + __PT_SIZE
+
+STACK_SHIFT = PAGE_SHIFT + THREAD_ORDER
+STACK_SIZE  = 1 << STACK_SHIFT
 
 _TIF_WORK_SVC = (_TIF_SIGPENDING | _TIF_NEED_RESCHED | \
 		 _TIF_RESTART_SVC | _TIF_SINGLE_STEP )
@@ -85,10 +89,16 @@ _TIF_WORK_INT = (_TIF_SIGPENDING | _TIF_NEED_RESCHED)
 	jnz	1f
 0:	lg	%r14,__LC_ASYNC_STACK	# are we already on the async. stack ?
 	slgr	%r14,%r15
-	srag	%r14,%r14,14
+	srag	%r14,%r14,STACK_SHIFT
 	jz	2f
 1:	lg	%r15,__LC_ASYNC_STACK	# load async stack
 	.endif
+#ifdef CONFIG_CHECK_STACK
+	j	3f
+2:	tml	%r15,STACK_SIZE - CONFIG_STACK_GUARD
+	jz	stack_overflow
+3:
+#endif
 2:	aghi    %r15,-SP_SIZE		# make room for registers & psw
 	mvc     SP_PSW(16,%r15),0(%r12)	# move user PSW to stack
 	la	%r12,\psworg
@@ -98,7 +108,7 @@ _TIF_WORK_INT = (_TIF_SIGPENDING | _TIF_NEED_RESCHED)
 	st	%r12,SP_ILC(%r15)
 	mvc	SP_R12(32,%r15),\savearea # move %r12-%r15 to stack
 	la	%r12,0
-	stg	%r12,0(%r15)
+	stg	%r12,__SF_BACKCHAIN(%r15)
         .endm
 
 	.macro	RESTORE_ALL sync
@@ -121,19 +131,19 @@ _TIF_WORK_INT = (_TIF_SIGPENDING | _TIF_NEED_RESCHED)
 __switch_to:
 	tm	__THREAD_per+4(%r3),0xe8 # is the new process using per ?
 	jz	__switch_to_noper		# if not we're fine
-        stctg   %c9,%c11,48(%r15)       # We are using per stuff
-        clc     __THREAD_per(24,%r3),48(%r15)
+        stctg   %c9,%c11,__SF_EMPTY(%r15)# We are using per stuff
+        clc     __THREAD_per(24,%r3),__SF_EMPTY(%r15)
         je      __switch_to_noper            # we got away without bashing TLB's
         lctlg   %c9,%c11,__THREAD_per(%r3)	# Nope we didn't
 __switch_to_noper:
-        stmg    %r6,%r15,48(%r15)       # store __switch_to registers of prev task
+        stmg    %r6,%r15,__SF_GPRS(%r15)# store __switch_to registers of prev task
 	stg	%r15,__THREAD_ksp(%r2)	# store kernel stack to prev->tss.ksp
 	lg	%r15,__THREAD_ksp(%r3)	# load kernel stack from next->tss.ksp
-        lmg     %r6,%r15,48(%r15)       # load __switch_to registers of next task
+        lmg     %r6,%r15,__SF_GPRS(%r15)# load __switch_to registers of next task
 	stg	%r3,__LC_CURRENT	# __LC_CURRENT = current task struct
 	lg	%r3,__THREAD_info(%r3)  # load thread_info from task struct
 	stg	%r3,__LC_THREAD_INFO
-	aghi	%r3,16384
+	aghi	%r3,STACK_SIZE
 	stg	%r3,__LC_KERNEL_STACK	# __LC_KERNEL_STACK = new kernel stack
 	br	%r14
 
@@ -143,19 +153,19 @@ __switch_to_noper:
  */
 	.global do_call_softirq
 do_call_softirq:
-	stnsm	48(%r15),0xfc
-	stmg	%r12,%r15,56(%r15)
+	stnsm	__SF_EMPTY(%r15),0xfc
+	stmg	%r12,%r15,__SF_GPRS(%r15)
 	lgr	%r12,%r15
 	lg	%r0,__LC_ASYNC_STACK
 	slgr    %r0,%r15
-	srag	%r0,%r0,14
+	srag	%r0,%r0,STACK_SHIFT
 	je	0f
 	lg	%r15,__LC_ASYNC_STACK
 0:	aghi	%r15,-STACK_FRAME_OVERHEAD
-	stg	%r12,0(%r15)		# store back chain
+	stg	%r12,__SF_BACKCHAIN(%r15)	# store back chain
 	brasl	%r14,do_softirq
-	lmg	%r12,%r15,56(%r12)
-	ssm	48(%r15)
+	lmg	%r12,%r15,__SF_GPRS(%r12)
+	ssm	__SF_EMPTY(%r15)
 	br	%r14
 
 __critical_start:
@@ -507,7 +517,7 @@ pgm_svcper:
 	mvc	__THREAD_per+__PER_address(8,%r1),__LC_PER_ADDRESS
 	mvc	__THREAD_per+__PER_access_id(1,%r1),__LC_PER_ACCESS_ID
 	oi	__TI_flags+7(%r9),_TIF_SINGLE_STEP # set TIF_SINGLE_STEP
-	stosm	48(%r15),0x03		# reenable interrupts
+	stosm	__SF_EMPTY(%r15),0x03	# reenable interrupts
 	j	sysc_do_svc
 
 /*
@@ -542,16 +552,16 @@ io_preempt:
 	lg	%r1,SP_R15(%r15)
 	aghi	%r1,-SP_SIZE
 	mvc	SP_PTREGS(__PT_SIZE,%r1),SP_PTREGS(%r15)
-        xc      0(8,%r1),0(%r1)        # clear back chain
+        xc      __SF_BACKCHAIN(8,%r1),__SF_BACKCHAIN(%r1) # clear back chain
 	lgr	%r15,%r1
 io_resume_loop:
 	tm	__TI_flags+7(%r9),_TIF_NEED_RESCHED
 	jno	io_leave
 	larl    %r1,.Lc_pactive
 	mvc     __TI_precount(4,%r9),0(%r1)
-        stosm   48(%r15),0x03          # reenable interrupts
+        stosm   __SF_EMPTY(%r15),0x03   # reenable interrupts
 	brasl   %r14,schedule          # call schedule
-        stnsm   48(%r15),0xfc          # disable I/O and ext. interrupts
+        stnsm   __SF_EMPTY(%r15),0xfc   # disable I/O and ext. interrupts
 	xc      __TI_precount(4,%r9),__TI_precount(%r9)
 	j	io_resume_loop
 #endif
@@ -563,7 +573,7 @@ io_work:
 	lg	%r1,__LC_KERNEL_STACK
 	aghi	%r1,-SP_SIZE
 	mvc	SP_PTREGS(__PT_SIZE,%r1),SP_PTREGS(%r15)
-        xc      0(8,%r1),0(%r1)        # clear back chain
+        xc      __SF_BACKCHAIN(8,%r1),__SF_BACKCHAIN(%r1) # clear back chain
 	lgr	%r15,%r1
 #
 # One of the work bits is on. Find out which one.
@@ -580,23 +590,23 @@ io_work_loop:
 # _TIF_NEED_RESCHED is set, call schedule
 #	
 io_reschedule:        
-        stosm   48(%r15),0x03       # reenable interrupts
-        brasl   %r14,schedule       # call scheduler
-        stnsm   48(%r15),0xfc       # disable I/O and ext. interrupts
+	stosm   __SF_EMPTY(%r15),0x03	# reenable interrupts
+	brasl   %r14,schedule		# call scheduler
+	stnsm   __SF_EMPTY(%r15),0xfc	# disable I/O and ext. interrupts
 	tm	__TI_flags+7(%r9),_TIF_WORK_INT
-	jz	io_leave               # there is no work to do
+	jz	io_leave		# there is no work to do
 	j	io_work_loop
 
 #
 # _TIF_SIGPENDING is set, call do_signal
 #
 io_sigpending:     
-        stosm   48(%r15),0x03       # reenable interrupts
-        la      %r2,SP_PTREGS(%r15) # load pt_regs
-        slgr    %r3,%r3             # clear *oldset
-	brasl	%r14,do_signal      # call do_signal
-        stnsm   48(%r15),0xfc       # disable I/O and ext. interrupts
-	j	sysc_leave          # out of here, do NOT recheck
+	stosm   __SF_EMPTY(%r15),0x03	# reenable interrupts
+	la      %r2,SP_PTREGS(%r15)	# load pt_regs
+	slgr    %r3,%r3			# clear *oldset
+	brasl	%r14,do_signal		# call do_signal
+	stnsm   __SF_EMPTY(%r15),0xfc	# disable I/O and ext. interrupts
+	j	sysc_leave		# out of here, do NOT recheck
 
 /*
  * External interrupt handler routine
@@ -635,7 +645,7 @@ restart_int_handler:
         lghi    %r10,__LC_AREGS_SAVE_AREA
         lam     %a0,%a15,0(%r10)
         stosm   0(%r15),0x04           # now we can turn dat on
-        lmg     %r6,%r15,48(%r15)      # load registers from clone
+        lmg     %r6,%r15,__SF_GPRS(%r15) # load registers from clone
 	jg      start_secondary
 #else
 /*
@@ -650,6 +660,29 @@ restart_base:
 restart_crash:
         .long  0x000a0000,0x00000000,0x00000000,0x00000000
 restart_go:
+#endif
+
+#ifdef CONFIG_CHECK_STACK
+/*
+ * The synchronous or the asynchronous stack overflowed. We are dead.
+ * No need to properly save the registers, we are going to panic anyway.
+ * Setup a pt_regs so that show_trace can provide a good call trace.
+ */
+stack_overflow:
+	lg	%r15,__LC_PANIC_STACK	# change to panic stack
+	aghi	%r1,-SP_SIZE
+	mvc	SP_PSW(16,%r15),0(%r12)	# move user PSW to stack
+	stmg	%r0,%r11,SP_R0(%r15)	# store gprs %r0-%r11 to kernel stack
+	la	%r1,__LC_SAVE_AREA
+	chi	%r12,__LC_SVC_OLD_PSW
+	je	0f
+	chi	%r12,__LC_PGM_OLD_PSW
+	je	0f
+	la	%r1,__LC_SAVE_AREA+16
+0:	mvc	SP_R12(32,%r15),0(%r1)  # move %r12-%r15 to stack
+        xc      __SF_BACKCHAIN(8,%r15),__SF_BACKCHAIN(%r15) # clear back chain
+        la      %r2,SP_PTREGS(%r15)	# load pt_regs
+	jg	kernel_stack_overflow
 #endif
 
 cleanup_table_system_call:

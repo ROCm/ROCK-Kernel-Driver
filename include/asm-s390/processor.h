@@ -103,6 +103,25 @@ struct thread_struct {
 
 typedef struct thread_struct thread_struct;
 
+/*
+ * Stack layout of a C stack frame.
+ */
+#ifndef __PACK_STACK
+struct stack_frame {
+	unsigned long back_chain;
+	unsigned long empty1[5];
+	unsigned long gprs[10];
+	unsigned int  empty2[8];
+};
+#else
+struct stack_frame {
+	unsigned long empty1[5];
+	unsigned int  empty2[8];
+	unsigned long gprs[10];
+	unsigned long back_chain;
+};
+#endif
+
 #define ARCH_MIN_TASKALIGN	8
 
 #ifndef __s390x__

@@ -741,7 +741,7 @@ cpu_die(void)
 
 void __init smp_prepare_cpus(unsigned int max_cpus)
 {
-	unsigned long async_stack;
+	unsigned long stack;
 	unsigned int cpu;
         int i;
 
@@ -761,12 +761,18 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 		lowcore_ptr[i] = (struct _lowcore *)
 			__get_free_pages(GFP_KERNEL|GFP_DMA, 
 					sizeof(void*) == 8 ? 1 : 0);
-		async_stack = __get_free_pages(GFP_KERNEL,ASYNC_ORDER);
-		if (lowcore_ptr[i] == NULL || async_stack == 0ULL)
+		stack = __get_free_pages(GFP_KERNEL,ASYNC_ORDER);
+		if (lowcore_ptr[i] == NULL || stack == 0ULL)
 			panic("smp_boot_cpus failed to allocate memory\n");
 
 		*(lowcore_ptr[i]) = S390_lowcore;
-		lowcore_ptr[i]->async_stack = async_stack + (ASYNC_SIZE);
+		lowcore_ptr[i]->async_stack = stack + (ASYNC_SIZE);
+#ifdef CONFIG_CHECK_STACK
+		stack = __get_free_pages(GFP_KERNEL,0);
+		if (stack == 0ULL)
+			panic("smp_boot_cpus failed to allocate memory\n");
+		lowcore_ptr[i]->panic_stack = stack + (PAGE_SIZE);
+#endif
 	}
 	set_prefix((u32)(unsigned long) lowcore_ptr[smp_processor_id()]);
 

@@ -48,33 +48,6 @@ config ARCH_S390_31
 	depends on ARCH_S390X = 'n'
 	default y
 
-choice
-	prompt "Processor type"
-	default MARCH_G5
-
-config MARCH_G5
-	bool "S/390 model G5 and G6"
-	depends on ARCH_S390_31
-	help
-	  Select this to build a 31 bit kernel that works
-	  on all S/390 and zSeries machines.
-
-config MARCH_Z900
-	bool "IBM eServer zSeries model z800 and z900"
-	help
-	  Select this to optimize for zSeries machines. This
-	  will enable some optimizations that are not available
-	  on older 31 bit only CPUs.
-
-config MARCH_Z990
-	bool "IBM eServer zSeries model z890 and z990"
-	help
-	  Select this enable optimizations for model z890/z990.
-	  This will be slightly faster but does not work on
-	  older machines such as the z900.
-
-endchoice
-
 config SMP
 	bool "Symmetric multi-processing support"
 	---help---
@@ -148,6 +121,105 @@ config BINFMT_ELF32
 	help
 	  This allows you to run 32-bit Linux/ELF binaries on your zSeries
 	  in 64 bit mode. Everybody wants this; say Y.
+
+comment "Code generation options"
+
+choice
+	prompt "Processor type"
+	default MARCH_G5
+
+config MARCH_G5
+	bool "S/390 model G5 and G6"
+	depends on ARCH_S390_31
+	help
+	  Select this to build a 31 bit kernel that works
+	  on all S/390 and zSeries machines.
+
+config MARCH_Z900
+	bool "IBM eServer zSeries model z800 and z900"
+	help
+	  Select this to optimize for zSeries machines. This
+	  will enable some optimizations that are not available
+	  on older 31 bit only CPUs.
+
+config MARCH_Z990
+	bool "IBM eServer zSeries model z890 and z990"
+	help
+	  Select this enable optimizations for model z890/z990.
+	  This will be slightly faster but does not work on
+	  older machines such as the z900.
+
+endchoice
+
+config PACK_STACK
+	bool "Pack kernel stack"
+	help
+	  This option enables the compiler option -mkernel-backchain if it
+	  is available. If the option is available the compiler supports
+	  the new stack layout which dramatically reduces the minimum stack
+	  frame size. With an old compiler a non-leaf function needs a
+	  minimum of 96 bytes on 31 bit and 160 bytes on 64 bit. With
+	  -mkernel-backchain the minimum size drops to 16 byte on 31 bit
+	  and 24 byte on 64 bit.
+
+	  Say Y if you are unsure.
+
+config SMALL_STACK
+	bool "Use 4kb/8kb for kernel stack instead of 8kb/16kb"
+	depends on PACK_STACK
+	help
+	  If you say Y here and the compiler supports the -mkernel-backchain
+	  option the kernel will use a smaller kernel stack size. For 31 bit
+	  the reduced size is 4kb instead of 8kb and for 64 bit it is 8kb
+	  instead of 16kb. This allows to run more thread on a system and
+	  reduces the pressure on the memory management for higher order
+	  page allocations.
+
+	  Say N if you are unsure.
+
+
+config CHECK_STACK
+	bool "Detect kernel stack overflow"
+	help
+	  This option enables the compiler option -mstack-guard and
+	  -mstack-size if they are available. If the compiler supports them
+	  it will emit additional code to each function prolog to trigger
+	  an illegal operation if the kernel stack is about to overflow.
+
+	  Say N if you are unsure.
+
+config STACK_GUARD
+	int "Size of the guard area (128-1024)"
+	range 128 1024
+	depends on CHECK_STACK
+	default "256"
+	help
+	  This allows you to specify the size of the guard area at the lower
+	  end of the kernel stack. If the kernel stack points into the guard
+	  area on function entry an illegal operation is triggered. The size
+	  needs to be a power of 2. Please keep in mind that the size of an
+	  interrupt frame is 184 bytes for 31 bit and 328 bytes on 64 bit.
+	  The minimum size for the stack guard should be 256 for 31 bit and
+	  512 for 64 bit.
+
+config WARN_STACK
+	bool "Emit compiler warnings for function with broken stack usage"
+	help
+	  This option enables the compiler options -mwarn-framesize and
+	  -mwarn-dynamicstack. If the compiler supports these options it
+	  will generate warnings for function which either use alloca or
+	  create a stack frame bigger then CONFIG_WARN_STACK_SIZE.
+
+	  Say N if you are unsure.
+
+config WARN_STACK_SIZE
+	int "Maximum frame size considered safe (128-2048)"
+	range 128 2048
+	depends on WARN_STACK
+	default "256"
+	help
+	  This allows you to specify the maximum frame size a function may
+	  have without the compiler complaining about it.
 
 comment "I/O subsystem configuration"
 
