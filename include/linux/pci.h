@@ -514,8 +514,6 @@ struct pci_driver {
 #define	to_pci_driver(drv) container_of(drv,struct pci_driver, driver)
 
 
-
-
 /* these external functions are only available when PCI support is enabled */
 #ifdef CONFIG_PCI
 
@@ -777,8 +775,6 @@ static inline int pci_enable_wake(struct pci_dev *dev, u32 state, int enable) { 
 	for(dev = NULL; 0; )
 
 #define	isa_bridge	((struct pci_dev *)NULL)
-
-
 
 #else
 
