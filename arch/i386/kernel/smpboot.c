@@ -849,11 +849,7 @@ static void __init do_boot_cpu (int apicid)
 	/*
 	 * Starting actual IPI sequence...
 	 */
-
-	if (clustered_apic_mode)
-		boot_error = wakeup_secondary_via_NMI(apicid);
-	else 
-		boot_error = wakeup_secondary_via_INIT(apicid, start_eip);
+	wakeup_secondary_cpu(apicid, start_eip);
 
 	if (!boot_error) {
 		/*
@@ -1061,15 +1057,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	if (GET_APIC_ID(apic_read(APIC_ID)) != boot_cpu_physical_apicid)
 		BUG();
 
-        if (clustered_apic_mode && (numnodes > 1)) {
-                printk("Remapping cross-quad port I/O for %d quads\n",
-			numnodes);
-                xquad_portio = ioremap (XQUAD_PORTIO_BASE, 
-			numnodes * XQUAD_PORTIO_QUAD);
-                printk("xquad_portio vaddr 0x%08lx, len %08lx\n",
-                        (u_long) xquad_portio, 
-			(u_long) numnodes * XQUAD_PORTIO_QUAD);
-        }
+	setup_portio_remap();
 
 	/*
 	 * Scan the CPU present map and fire up the other CPUs via do_boot_cpu

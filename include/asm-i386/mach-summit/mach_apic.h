@@ -40,12 +40,25 @@ static inline int cpu_present_to_apicid(int mps_cpu)
 		return mps_cpu;
 }
 
+static inline ulong ioapic_phys_id_map(ulong phys_map)
+{
+	/* For clustered we don't have a good way to do this yet - hack */
+	return (x86_summit ? 0x0F : phys_map);
+}
+
 static inline unsigned long apicid_to_phys_cpu_present(int apicid)
 {
 	if (x86_summit)
 		return (1ul << (((apicid >> 4) << 2) | (apicid & 0x3)));
 	else
 		return (1ul << apicid);
+}
+
+#define wakeup_secondary_cpu(apicid, start_eip) \
+	wakeup_secondary_via_INIT(apicid, start_eip)
+
+static inline void setup_portio_remap(void)
+{
 }
 
 #endif /* __ASM_MACH_APIC_H */

@@ -37,6 +37,11 @@ static inline void init_apic_ldr(void)
 	apic_write_around(APIC_LDR, val);
 }
 
+static inline ulong ioapic_phys_id_map(ulong phys_map)
+{
+	return phys_map;
+}
+
 static inline void clustered_apic_check(void)
 {
 	printk("Enabling APIC mode:  %s.  Using %d I/O APICs\n",
@@ -66,6 +71,13 @@ static inline int mpc_apic_id(struct mpc_config_processor *m, int quad)
 			(m->mpc_cpufeature & CPU_MODEL_MASK) >> 4,
 			m->mpc_apicver);
 	return (m->mpc_apicid);
+}
+
+#define wakeup_secondary_cpu(apicid, start_eip) \
+	wakeup_secondary_via_INIT(apicid, start_eip)
+
+static inline void setup_portio_remap(void)
+{
 }
 
 #endif /* __ASM_MACH_APIC_H */

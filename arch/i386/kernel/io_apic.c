@@ -1135,7 +1135,7 @@ void disable_IO_APIC(void)
 static void __init setup_ioapic_ids_from_mpc (void)
 {
 	struct IO_APIC_reg_00 reg_00;
-	unsigned long phys_id_present_map = phys_cpu_present_map;
+	unsigned long phys_id_present_map;
 	int apic;
 	int i;
 	unsigned char old_id;
@@ -1145,9 +1145,8 @@ static void __init setup_ioapic_ids_from_mpc (void)
 		/* This gets done during IOAPIC enumeration for ACPI. */
 		return;
 
-	if (clustered_apic_mode)
-		/* We don't have a good way to do this yet - hack */
-		phys_id_present_map = (u_long) 0xf;
+	phys_id_present_map = ioapic_phys_id_map(phys_cpu_present_map);
+
 	/*
 	 * Set the IOAPIC ID to the value stored in the MPC table.
 	 */
