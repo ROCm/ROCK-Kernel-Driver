@@ -514,8 +514,8 @@ cifs_partialpagewrite(struct page *page,unsigned from, unsigned to)
 	cifsInode = CIFS_I(mapping->host);
 	read_lock(&GlobalSMBSeslock);
 	list_for_each_safe(tmp, tmp1, &cifsInode->openFileList) {            
-		open_file = list_entry(tmp,struct cifsFileInfo, flist);           
-	/* We could check if file is open for writing first */
+		open_file = list_entry(tmp,struct cifsFileInfo, flist);
+		/* We check if file is open for writing first */
 		if((open_file->pfile) && 
 		   ((open_file->pfile->f_flags & O_RDWR) || 
 			(open_file->pfile->f_flags & O_WRONLY))) {
@@ -1098,6 +1098,10 @@ construct_dentry(struct qstr *qstring, struct file *file,
 		cFYI(0, (" existing dentry with inode 0x%p", tmp_dentry->d_inode));
 		*ptmp_inode = tmp_dentry->d_inode;
 		/* BB overwrite the old name? i.e. tmp_dentry->d_name and tmp_dentry->d_name.len ?? */
+		if(*ptmp_inode == NULL) {
+	                *ptmp_inode = new_inode(file->f_dentry->d_sb);
+			d_instantiate(tmp_dentry, *ptmp_inode);
+		}
 	} else {
 		tmp_dentry = d_alloc(file->f_dentry, qstring);
 		*ptmp_inode = new_inode(file->f_dentry->d_sb);

@@ -481,8 +481,9 @@ CIFSSMBOpen(const int xid, struct cifsTconInfo *tcon,
 	pSMB->hdr.smb_buf_length += pSMB->ByteCount;
 
 	pSMB->ByteCount = cpu_to_le16(pSMB->ByteCount);
+	/* long_op set to 1 to allow for oplock break timeouts */
 	rc = SendReceive(xid, tcon->ses, (struct smb_hdr *) pSMB,
-			 (struct smb_hdr *) pSMBr, &bytes_returned, 0);
+			 (struct smb_hdr *) pSMBr, &bytes_returned, 1);
 	if (rc) {
 		cFYI(1, ("Error in Open = %d", rc));
 	} else {

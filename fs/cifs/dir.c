@@ -181,11 +181,26 @@ cifs_create(struct inode *inode, struct dentry *direntry, int mode,
 			direntry->d_op = &cifs_dentry_ops;
 			d_instantiate(direntry, newinode);
 		}
-        
-		if(newinode) {
-		    newinode->i_mode = mode;
-		    pCifsFile = (struct cifsFileInfo *)
-			kmalloc(sizeof (struct cifsFileInfo), GFP_KERNEL);
+		if((nd->flags & LOOKUP_OPEN) == FALSE) {
+			/* mknod case - do not leave file open */
+			CIFSSMBClose(xid, pTcon, fileHandle);
+			if(newinode)
+				newinode->i_mode = mode;
+			if (cifs_sb->tcon->ses->capabilities & CAP_UNIX)
+				CIFSSMBUnixSetPerms(xid, pTcon, full_path, mode,
+						(__u64)-1,
+						(__u64)-1,
+						0 /* dev */,
+						cifs_sb->local_nls);
+			else { /* BB implement via Windows security descriptors */
+                        /* eg CIFSSMBWinSetPerms(xid,pTcon,full_path,mode,-1,-1,local_nls);*/
+                        /* in the meantime could set r/o dos attribute when perms are eg:
+                                        mode & 0222 == 0 */
+			}
+		} else if(newinode) {
+			newinode->i_mode = mode;
+			pCifsFile = (struct cifsFileInfo *)
+			   kmalloc(sizeof (struct cifsFileInfo), GFP_KERNEL);
 		
 			if (pCifsFile) {
 				memset((char *)pCifsFile, 0,
@@ -220,8 +235,6 @@ cifs_create(struct inode *inode, struct dentry *direntry, int mode,
 				}
 			}			
 		}
-
-
 	} 
 
 	if (buf)

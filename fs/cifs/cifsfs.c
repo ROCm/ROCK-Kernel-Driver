@@ -441,6 +441,8 @@ static int cifs_oplock_thread(void * dummyarg)
 	struct list_head * tmp1;
 	struct oplock_q_entry * oplock_item;
 	struct cifsTconInfo *pTcon;
+	struct inode * inode;
+	__u16  netfid;
 	int rc;
 
 	daemonize("cifsoplockd");
@@ -457,15 +459,16 @@ static int cifs_oplock_thread(void * dummyarg)
 							       qhead);
 			if(oplock_item) {
 				pTcon = oplock_item->tcon;
+				inode = oplock_item->pinode;
+				netfid = oplock_item->netfid;
 				DeleteOplockQEntry(oplock_item);
 				write_unlock(&GlobalMid_Lock);
-				rc = filemap_fdatawrite(oplock_item->pinode->i_mapping);
+				rc = filemap_fdatawrite(inode->i_mapping);
 				if(rc)
-					CIFS_I(oplock_item->pinode)->write_behind_rc 
+					CIFS_I(inode)->write_behind_rc 
 						= rc;
-				cFYI(1,("Oplock flush inode %p rc %d",oplock_item->pinode,rc));
-				rc = CIFSSMBLock(0, pTcon, 
-					oplock_item->netfid,
+				cFYI(1,("Oplock flush inode %p rc %d",inode,rc));
+				rc = CIFSSMBLock(0, pTcon, netfid,
 					0 /* len */ , 0 /* offset */, 0, 
 					0, LOCKING_ANDX_OPLOCK_RELEASE,
 					0 /* wait flag */);

@@ -216,7 +216,8 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 	if (long_op > 1) /* writes past end of file can take looooong time */
 		timeout = 300 * HZ;
 	else if (long_op == 1)
-		timeout = 60 * HZ;
+		timeout = 45 * HZ; /* should be greater than 
+			servers oplock break timeout (about 43 seconds) */
 	else
 		timeout = 15 * HZ;
 	/* wait for 15 seconds or until woken up due to response arriving or 
@@ -235,6 +236,7 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 			receive_len =
 			    be32_to_cpu(midQ->resp_buf->smb_buf_length);
 		else {
+			cFYI(1,("No response buffer"));
 			DeleteMidQEntry(midQ);
 			return -EIO;
 		}
@@ -287,8 +289,10 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 			    4 /* do not count RFC1001 header */  +
 			    (2 * out_buf->WordCount) + 2 /* bcc */ )
 				BCC(out_buf) = le16_to_cpu(BCC(out_buf));
-		} else
+		} else {
 			rc = -EIO;
+			cFYI(1,("Bad MID state? "));
+		}
 	}
 cifs_no_response_exit:
 	DeleteMidQEntry(midQ);	/* BB what if process is killed?
