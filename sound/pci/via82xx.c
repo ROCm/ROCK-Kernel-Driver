@@ -1984,7 +1984,7 @@ static int __devinit check_dxs_list(struct pci_dev *pci)
 		{ .vendor = 0x14ff, .device = 0x0403, .action = VIA_DXS_ENABLE }, /* Twinhead mobo */
 		{ .vendor = 0x1462, .device = 0x7120, .action = VIA_DXS_ENABLE }, /* MSI KT4V */
 		{ .vendor = 0x1695, .device = 0x3005, .action = VIA_DXS_ENABLE }, /* EPoX EP-8K9A */
-		{ .vendor = 0x1849, .device = 0x3059, .action = VIA_DXS_DISABLE }, /* ASRock K7VM2 */
+		{ .vendor = 0x1849, .device = 0x3059, .action = VIA_DXS_NO_VRA }, /* ASRock K7VM2 */
 		{ } /* terminator */
 	};
 	struct dxs_whitelist *w;
