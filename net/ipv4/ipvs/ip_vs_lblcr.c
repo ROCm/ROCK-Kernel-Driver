@@ -777,11 +777,12 @@ is_overloaded(struct ip_vs_dest *dest, struct ip_vs_service *svc)
  *    Locality-Based (weighted) Least-Connection scheduling
  */
 static struct ip_vs_dest *
-ip_vs_lblcr_schedule(struct ip_vs_service *svc, struct iphdr *iph)
+ip_vs_lblcr_schedule(struct ip_vs_service *svc, const struct sk_buff *skb)
 {
 	struct ip_vs_dest *dest;
 	struct ip_vs_lblcr_table *tbl;
 	struct ip_vs_lblcr_entry *en;
+	struct iphdr *iph = skb->nh.iph;
 
 	IP_VS_DBG(6, "ip_vs_lblcr_schedule(): Scheduling...\n");
 

@@ -362,29 +362,18 @@ static inline void vs_seq_update(struct ip_vs_conn *cp, struct ip_vs_seq *vseq,
 	spin_unlock(&cp->lock);
 }
 
-
-/*
- *	Output pkt hook. Will call bound ip_vs_app specific function
- *	called by ipvs packet handler, assumes previously checked cp!=NULL
- *	returns (new - old) skb->len diff.
- */
-int ip_vs_app_pkt_out(struct ip_vs_conn *cp, struct sk_buff *skb)
+static inline int app_tcp_pkt_out(struct ip_vs_conn *cp, struct sk_buff **pskb,
+				  struct ip_vs_app *app)
 {
-	struct ip_vs_app *app;
 	int diff;
-	struct iphdr *iph;
+	unsigned int tcp_offset = (*pskb)->nh.iph->ihl*4;
 	struct tcphdr *th;
 	__u32 seq;
 
-	/*
-	 *	check if application module is bound to
-	 *	this ip_vs_conn.
-	 */
-	if ((app = cp->app) == NULL)
+	if (!ip_vs_make_skb_writable(pskb, tcp_offset + sizeof(*th)))
 		return 0;
 
-	iph = skb->nh.iph;
-	th = (struct tcphdr *)&(((char *)iph)[iph->ihl*4]);
+	th = (struct tcphdr *)((*pskb)->nh.raw + tcp_offset);
 
 	/*
 	 *	Remember seq number in case this pkt gets resized
@@ -394,54 +383,72 @@ int ip_vs_app_pkt_out(struct ip_vs_conn *cp, struct sk_buff *skb)
 	/*
 	 *	Fix seq stuff if flagged as so.
 	 */
-	if (cp->protocol == IPPROTO_TCP) {
-		if (cp->flags & IP_VS_CONN_F_OUT_SEQ)
-			vs_fix_seq(&cp->out_seq, th);
-		if (cp->flags & IP_VS_CONN_F_IN_SEQ)
-			vs_fix_ack_seq(&cp->in_seq, th);
-	}
+	if (cp->flags & IP_VS_CONN_F_OUT_SEQ)
+		vs_fix_seq(&cp->out_seq, th);
+	if (cp->flags & IP_VS_CONN_F_IN_SEQ)
+		vs_fix_ack_seq(&cp->in_seq, th);
 
 	/*
 	 *	Call private output hook function
 	 */
 	if (app->pkt_out == NULL)
-		return 0;
+		return 1;
 
-	diff = app->pkt_out(app, cp, skb);
+	if (!app->pkt_out(app, cp, pskb, &diff))
+		return 0;
 
 	/*
 	 *	Update ip_vs seq stuff if len has changed.
 	 */
-	if (diff != 0 && cp->protocol == IPPROTO_TCP)
+	if (diff != 0)
 		vs_seq_update(cp, &cp->out_seq,
 			      IP_VS_CONN_F_OUT_SEQ, seq, diff);
 
-	return diff;
+	return 1;
 }
 
-
 /*
- *	Input pkt hook. Will call bound ip_vs_app specific function
- *	called by ipvs packet handler, assumes previously checked cp!=NULL.
- *	returns (new - old) skb->len diff.
+ *	Output pkt hook. Will call bound ip_vs_app specific function
+ *	called by ipvs packet handler, assumes previously checked cp!=NULL
+ *	returns false if it can't handle packet (oom)
  */
-int ip_vs_app_pkt_in(struct ip_vs_conn *cp, struct sk_buff *skb)
+int ip_vs_app_pkt_out(struct ip_vs_conn *cp, struct sk_buff **pskb)
 {
 	struct ip_vs_app *app;
-	int diff;
-	struct iphdr *iph;
-	struct tcphdr *th;
-	__u32 seq;
 
 	/*
 	 *	check if application module is bound to
 	 *	this ip_vs_conn.
 	 */
 	if ((app = cp->app) == NULL)
+		return 1;
+
+	/* TCP is complicated */
+	if (cp->protocol == IPPROTO_TCP)
+		return app_tcp_pkt_out(cp, pskb, app);
+
+	/*
+	 *	Call private output hook function
+	 */
+	if (app->pkt_out == NULL)
+		return 1;
+
+	return app->pkt_out(app, cp, pskb, NULL);
+}
+
+
+static inline int app_tcp_pkt_in(struct ip_vs_conn *cp, struct sk_buff **pskb,
+				 struct ip_vs_app *app)
+{
+	int diff;
+	unsigned int tcp_offset = (*pskb)->nh.iph->ihl*4;
+	struct tcphdr *th;
+	__u32 seq;
+
+	if (!ip_vs_make_skb_writable(pskb, tcp_offset + sizeof(*th)))
 		return 0;
 
-	iph = skb->nh.iph;
-	th = (struct tcphdr *)&(((char *)iph)[iph->ihl*4]);
+	th = (struct tcphdr *)((*pskb)->nh.raw + tcp_offset);
 
 	/*
 	 *	Remember seq number in case this pkt gets resized
@@ -451,29 +458,57 @@ int ip_vs_app_pkt_in(struct ip_vs_conn *cp, struct sk_buff *skb)
 	/*
 	 *	Fix seq stuff if flagged as so.
 	 */
-	if (cp->protocol == IPPROTO_TCP) {
-		if (cp->flags & IP_VS_CONN_F_IN_SEQ)
-			vs_fix_seq(&cp->in_seq, th);
-		if (cp->flags & IP_VS_CONN_F_OUT_SEQ)
-			vs_fix_ack_seq(&cp->out_seq, th);
-	}
+	if (cp->flags & IP_VS_CONN_F_IN_SEQ)
+		vs_fix_seq(&cp->in_seq, th);
+	if (cp->flags & IP_VS_CONN_F_OUT_SEQ)
+		vs_fix_ack_seq(&cp->out_seq, th);
 
 	/*
 	 *	Call private input hook function
 	 */
 	if (app->pkt_in == NULL)
-		return 0;
+		return 1;
 
-	diff = app->pkt_in(app, cp, skb);
+	if (!app->pkt_in(app, cp, pskb, &diff))
+		return 0;
 
 	/*
 	 *	Update ip_vs seq stuff if len has changed.
 	 */
-	if (diff != 0 && cp->protocol == IPPROTO_TCP)
+	if (diff != 0)
 		vs_seq_update(cp, &cp->in_seq,
 			      IP_VS_CONN_F_IN_SEQ, seq, diff);
 
-	return diff;
+	return 1;
+}
+
+/*
+ *	Input pkt hook. Will call bound ip_vs_app specific function
+ *	called by ipvs packet handler, assumes previously checked cp!=NULL.
+ *	returns false if can't handle packet (oom).
+ */
+int ip_vs_app_pkt_in(struct ip_vs_conn *cp, struct sk_buff **pskb)
+{
+	struct ip_vs_app *app;
+
+	/*
+	 *	check if application module is bound to
+	 *	this ip_vs_conn.
+	 */
+	if ((app = cp->app) == NULL)
+		return 1;
+
+	/* TCP is complicated */
+	if (cp->protocol == IPPROTO_TCP)
+		return app_tcp_pkt_in(cp, pskb, app);
+
+	/*
+	 *	Call private input hook function
+	 */
+	if (app->pkt_in == NULL)
+		return 1;
+
+	return app->pkt_in(app, cp, pskb, NULL);
 }
 
 
@@ -490,7 +525,7 @@ static struct ip_vs_app *ip_vs_app_idx(loff_t pos)
 		list_for_each_entry(inc, &app->incs_list, a_list) {
 			if (pos-- == 0)
 				return inc;
-		}	
+		}
 	}
 	return NULL;
 
@@ -499,7 +534,7 @@ static struct ip_vs_app *ip_vs_app_idx(loff_t pos)
 static void *ip_vs_app_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	down(&__ip_vs_app_mutex);
-	
+
 	return *pos ? ip_vs_app_idx(*pos - 1) : SEQ_START_TOKEN;
 }
 
@@ -511,7 +546,7 @@ static void *ip_vs_app_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 	++*pos;
 	if (v == SEQ_START_TOKEN)
 		return ip_vs_app_idx(0);
-	
+
 	inc = v;
 	app = inc->app;
 
@@ -563,8 +598,8 @@ static int ip_vs_app_open(struct inode *inode, struct file *file)
 
 static struct file_operations ip_vs_app_fops = {
 	.owner	 = THIS_MODULE,
-	.open    = ip_vs_app_open,
-	.read    = seq_read,
+	.open	 = ip_vs_app_open,
+	.read	 = seq_read,
 	.llseek  = seq_lseek,
 	.release = seq_release,
 };

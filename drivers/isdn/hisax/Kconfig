@@ -367,7 +367,7 @@ config HISAX_DEBUG
 
 config HISAX_SEDLBAUER_CS
 	tristate "Sedlbauer PCMCIA cards"
-	depends on PCMCIA
+	depends on PCMCIA && HISAX_SEDLBAUER
 	help
 	  This enables the PCMCIA client driver for the Sedlbauer Speed Star
 	  and Speed Star II cards.

@@ -119,7 +119,7 @@ static void set_queue_congested(request_queue_t *q, int rw)
 
 /**
  * blk_get_backing_dev_info - get the address of a queue's backing_dev_info
- * @dev:	device
+ * @bdev:	device
  *
  * Locates the passed device's request queue and returns the address of its
  * backing_dev_info
@@ -414,8 +414,8 @@ void blk_queue_segment_boundary(request_queue_t *q, unsigned long mask)
 
 /**
  * blk_queue_dma_alignment - set dma length and memory alignment
- * @q:  the request queue for the device
- * @dma_mask:  alignment mask
+ * @q:     the request queue for the device
+ * @mask:  alignment mask
  *
  * description:
  *    set required memory and length aligment for direct dma transactions.
@@ -1152,7 +1152,7 @@ void blk_stop_queue(request_queue_t *q)
 
 /**
  * blk_run_queue - run a single device queue
- * @q	The queue to run
+ * @q:	The queue to run
  */
 void blk_run_queue(struct request_queue *q)
 {

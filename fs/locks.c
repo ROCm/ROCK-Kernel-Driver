@@ -928,10 +928,10 @@ int locks_mandatory_locked(struct inode *inode)
  * locks_mandatory_area - Check for a conflicting lock
  * @read_write: %FLOCK_VERIFY_WRITE for exclusive access, %FLOCK_VERIFY_READ
  *		for shared
- * @inode: the file to check
- * @file: how the file was opened (if it was)
- * @offset: start of area to check
- * @count: length of area to check
+ * @inode:      the file to check
+ * @filp:       how the file was opened (if it was)
+ * @offset:     start of area to check
+ * @count:      length of area to check
  *
  * Searches the inode's list of locks to find any POSIX locks which conflict.
  * This function is called from locks_verify_area() and
@@ -1119,6 +1119,7 @@ out:
 /**
  *	lease_get_mtime
  *	@inode: the inode
+ *      @time:  pointer to a timespec which will contain the last modified time
  *
  * This is to force NFS clients to flush their caches for files with
  * exclusive leases.  The justification is that if someone has an
@@ -1726,6 +1727,7 @@ posix_block_lock(struct file_lock *blocker, struct file_lock *waiter)
 
 /**
  *	posix_unblock_lock - stop waiting for a file lock
+ *      @filp:   how the file was opened
  *	@waiter: the lock which was waiting
  *
  *	lockd needs to block waiting for locks.

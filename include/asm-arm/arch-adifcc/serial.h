@@ -21,8 +21,6 @@
 
 #ifdef CONFIG_ARCH_ADI_EVB
 
-#define RS_TABLE_SIZE 1
-
 /*
  * One serial port, int goes to FIQ, so we run in polled mode
  */

@@ -107,6 +107,7 @@ calls.  Though the mount of filesystem will be required for using mmaps.
 #include <sys/shm.h>
 #include <sys/types.h>
 #include <sys/mman.h>
+#include <errno.h>
 
 extern int errno;
 #define SHM_HUGETLB 04000
@@ -167,6 +168,7 @@ main()
 #include <stdio.h>
 #include <sys/mman.h>
 #include <fcntl.h>
+#include <errno.h>
 
 #define FILE_NAME "/mnt/hugepagefile"
 #define LENGTH (256*1024*1024)

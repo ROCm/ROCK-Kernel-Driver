@@ -2,7 +2,7 @@ Intro
 =====
 
 This document is designed to provide a list of the minimum levels of
-software necessary to run the 2.5 kernels, as well as provide brief
+software necessary to run the 2.6 kernels, as well as provide brief
 instructions regarding any other "Gotchas" users may encounter when
 trying life on the Bleeding Edge.  If upgrading from a pre-2.4.x
 kernel, please consult the Changes file included with 2.4.x kernels for
@@ -142,7 +142,7 @@ version of ksymoops to decode the report; see REPORTING-BUGS in the
 root of the Linux source for more information.
 
 Module-Init-Tools
---------
+-----------------
 
 A new module loader is now in the kernel that requires module-init-tools
 to use.  It is backward compatible with the 2.4.x series kernels.
@@ -337,8 +337,8 @@ Ksymoops
 --------
 o  <ftp://ftp.kernel.org/pub/linux/utils/kernel/ksymoops/v2.4/>
 
-Modutils
---------
+Module-Init-Tools
+-----------------
 o  <ftp://ftp.kernel.org/pub/linux/kernel/people/rusty/modules/>
 
 Mkinitrd

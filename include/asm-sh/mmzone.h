@@ -10,14 +10,14 @@
 
 #include <linux/config.h>
 
+#ifdef CONFIG_DISCONTIGMEM
+
 /* Currently, just for HP690 */
 #define PHYSADDR_TO_NID(phys)	((((phys) - __MEMORY_START) >= 0x01000000)?1:0)
-#define NR_NODES 2
 
-extern pg_data_t discontig_page_data[NR_NODES];
-extern bootmem_data_t discontig_node_bdata[NR_NODES];
+extern pg_data_t discontig_page_data[MAX_NUMNODES];
+extern bootmem_data_t discontig_node_bdata[MAX_NUMNODES];
 
-#ifdef CONFIG_DISCONTIGMEM
 /*
  * Following are macros that each numa implmentation must define.
  */
@@ -46,7 +46,7 @@ static inline int is_valid_page(struct page *page)
 {
 	unsigned int i;
 
-	for (i = 0; i < NR_NODES; i++) {
+	for (i = 0; i < MAX_NUMNODES; i++) {
 		if (page >= NODE_MEM_MAP(i) &&
 		    page < NODE_MEM_MAP(i) + NODE_DATA(i)->node_size)
 			return 1;

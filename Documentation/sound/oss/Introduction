@@ -431,8 +431,7 @@ options bttv  card=0 radio=0 pll=0
 
 For More Information (RTFM):
 ============================
-1)  Information on kernel modules:  linux/Documentation/modules.txt
-    and manual pages for insmod and modprobe.
+1)  Information on kernel modules: manual pages for insmod and modprobe.
 
 2)  Information on PnP, RTFM manual pages for isapnp.
 

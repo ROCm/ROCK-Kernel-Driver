@@ -272,7 +272,6 @@ Using sbpcd as a "loadable module":
 
 If you do NOT select "Matsushita/Panasonic CDROM driver support" during the
 "make config" of your kernel, you can build the "loadable module" sbpcd.o.
-Read /usr/src/linux/Documentation/modules.txt on this.
 
 If sbpcd gets used as a module, the support of more than one interface
 card (i.e. drives 4...15) is disabled.

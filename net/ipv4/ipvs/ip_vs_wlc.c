@@ -71,7 +71,7 @@ ip_vs_wlc_dest_overhead(struct ip_vs_dest *dest)
  *	Weighted Least Connection scheduling
  */
 static struct ip_vs_dest *
-ip_vs_wlc_schedule(struct ip_vs_service *svc, struct iphdr *iph)
+ip_vs_wlc_schedule(struct ip_vs_service *svc, const struct sk_buff *skb)
 {
 	struct ip_vs_dest *dest, *least;
 	unsigned int loh, doh;

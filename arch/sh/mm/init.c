@@ -51,8 +51,8 @@ unsigned long mmu_context_cache = NO_CONTEXT;
 #endif
 
 #ifdef CONFIG_DISCONTIGMEM
-pg_data_t discontig_page_data[NR_NODES];
-bootmem_data_t discontig_node_bdata[NR_NODES];
+pg_data_t discontig_page_data[MAX_NUMNODES];
+bootmem_data_t discontig_node_bdata[MAX_NUMNODES];
 #endif
 
 void show_mem(void)

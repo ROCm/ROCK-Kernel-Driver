@@ -29,15 +29,11 @@
 #ifdef CONFIG_HD64465
 #include <asm/hd64465.h>
 
-#define RS_TABLE_SIZE  1
-
 #define STD_SERIAL_PORT_DEFNS                   \
         /* UART CLK   PORT IRQ     FLAGS        */                      \
         { 0, BASE_BAUD, 0x3F8, HD64465_IRQ_UART, STD_COM_FLAGS }  /* ttyS0 */
 
 #else
-
-#define RS_TABLE_SIZE  2
 
 #define STD_SERIAL_PORT_DEFNS			\
 	/* UART CLK   PORT IRQ     FLAGS        */			\

@@ -164,22 +164,33 @@ const char * ip_vs_state_name(__u16 proto, int state)
 
 
 void
-tcpudp_debug_packet(struct ip_vs_protocol *pp, struct iphdr *iph, char *msg)
+ip_vs_tcpudp_debug_packet(struct ip_vs_protocol *pp,
+			  const struct sk_buff *skb,
+			  int offset,
+			  const char *msg)
 {
 	char buf[128];
-	union ip_vs_tphdr h;
+	__u16 ports[2];
+	struct iphdr iph;
 
-	h.raw = (char *) iph + iph->ihl * 4;
-	if (iph->frag_off & __constant_htons(IP_OFFSET))
+	if (skb_copy_bits(skb, offset, &iph, sizeof(iph)) < 0)
+		sprintf(buf, "%s TRUNCATED", pp->name);
+	else if (iph.frag_off & __constant_htons(IP_OFFSET))
 		sprintf(buf, "%s %u.%u.%u.%u->%u.%u.%u.%u frag",
-			pp->name, NIPQUAD(iph->saddr), NIPQUAD(iph->daddr));
+			pp->name, NIPQUAD(iph.saddr),
+			NIPQUAD(iph.daddr));
+	else if (skb_copy_bits(skb, offset + iph.ihl*4, ports, sizeof(ports)) < 0)
+		sprintf(buf, "%s TRUNCATED %u.%u.%u.%u->%u.%u.%u.%u",
+			pp->name,
+			NIPQUAD(iph.saddr),
+			NIPQUAD(iph.daddr));
 	else
 		sprintf(buf, "%s %u.%u.%u.%u:%u->%u.%u.%u.%u:%u",
 			pp->name,
-			NIPQUAD(iph->saddr),
-			ntohs(h.portp[0]),
-			NIPQUAD(iph->daddr),
-			ntohs(h.portp[1]));
+			NIPQUAD(iph.saddr),
+			ntohs(ports[0]),
+			NIPQUAD(iph.daddr),
+			ntohs(ports[1]));
 
 	printk(KERN_DEBUG "IPVS: %s: %s\n", msg, buf);
 }

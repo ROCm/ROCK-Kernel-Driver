@@ -1844,6 +1844,7 @@ static void via_ac97_cleanup (struct via_info *card)
 
 /**
  *	via_intr_channel - handle an interrupt for a single channel
+ *      @card: unused
  *	@chan: handle interrupt for this channel
  *
  *	This is the "meat" of the interrupt handler,

@@ -107,7 +107,7 @@
 #include <linux/hdlc.h>
 
 /* Version */
-static const char version[] = "$Id: dscc4.c,v 1.159 2002/04/10 22:05:17 romieu Exp $ for Linux\n";
+static const char version[] = "$Id: dscc4.c,v 1.173 2003/09/20 23:55:34 romieu Exp $ for Linux\n";
 static int debug;
 static int quartz;
 
@@ -592,7 +592,7 @@ static inline int dscc4_xpr_ack(struct dscc4_dev_priv *dpriv)
 	return (i >= 0 ) ? i : -EAGAIN;
 }
 
-#if 0
+#if 0 /* dscc4_{rx/tx}_reset are both unreliable - more tweak needed */
 static void dscc4_rx_reset(struct dscc4_dev_priv *dpriv, struct net_device *dev)
 {
 	unsigned long flags;
@@ -864,7 +864,7 @@ static int dscc4_found1(struct pci_dev *pdev, unsigned long ioaddr)
 {
 	struct dscc4_pci_priv *ppriv;
 	struct dscc4_dev_priv *root;
-	int i = 0;
+	int i, ret = -ENOMEM;
 
 	root = (struct dscc4_dev_priv *)
 		kmalloc(dev_per_card*sizeof(*root), GFP_KERNEL);
@@ -905,7 +905,8 @@ static int dscc4_found1(struct pci_dev *pdev, unsigned long ioaddr)
 		hdlc->xmit = dscc4_start_xmit;
 		hdlc->attach = dscc4_hdlc_attach;
 
-	        if (register_hdlc_device(hdlc)) {
+		ret = register_hdlc_device(hdlc);
+		if (ret < 0) {
 			printk(KERN_ERR "%s: unable to register\n", DRV_NAME);
 			goto err_unregister;
 	        }
@@ -913,17 +914,20 @@ static int dscc4_found1(struct pci_dev *pdev, unsigned long ioaddr)
 		dscc4_init_registers(dpriv, d);
 		dpriv->parity = PARITY_CRC16_PR0_CCITT;
 		dpriv->encoding = ENCODING_NRZ;
-		if (dscc4_init_ring(d)) {
+
+		ret = dscc4_init_ring(d);
+		if (ret < 0) {
 			unregister_hdlc_device(hdlc);
 			goto err_unregister;
 		}
 	}
-	if (dscc4_set_quartz(root, quartz) < 0)
+	ret = dscc4_set_quartz(root, quartz);
+	if (ret < 0)
 		goto err_unregister;
 	ppriv->root = root;
 	spin_lock_init(&ppriv->lock);
 	pci_set_drvdata(pdev, ppriv);
-	return 0;
+	return ret;
 
 err_unregister:
 	while (--i >= 0) {
@@ -934,7 +938,7 @@ err_unregister:
 err_free_dev:
 	kfree(root);
 err_out:
-	return -1;
+	return ret;
 };
 
 /* FIXME: get rid of the unneeded code */
@@ -1098,7 +1102,6 @@ done:
 err_disable_scc_events:
 	scc_writel(0xffffffff, dpriv, dev, IMR);
 	scc_patchl(PowerUp | Vis, 0, dpriv, dev, CCR0);
-	dscc4_release_ring(dpriv);
 err_out:
 	hdlc_close(hdlc);
 err:
@@ -1164,7 +1167,6 @@ static int dscc4_close(struct net_device *dev)
 	dpriv->flags |= FakeReset;
 
 	hdlc_close(hdlc);
-	dscc4_release_ring(dpriv);
 
 	return 0;
 }

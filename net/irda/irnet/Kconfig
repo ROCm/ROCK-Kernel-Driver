@@ -2,11 +2,10 @@ config IRNET
 	tristate "IrNET protocol"
 	depends on IRDA && PPP
 	help
-	  Say Y here if you want to build support for the IrNET protocol.  If
-	  you want to compile it as a module (irnet), say M here and read
-	  <file:Documentation/modules.txt>.  IrNET is a PPP driver, so you
-	  will also need a working PPP subsystem (driver, daemon and
-	  config)...
+	  Say Y here if you want to build support for the IrNET protocol.
+	  To compile it as a module, choose M here: the module will be
+	  called irnet.  IrNET is a PPP driver, so you will also need a
+	  working PPP subsystem (driver, daemon and config)...
 
 	  IrNET is an alternate way to tranfer TCP/IP traffic over IrDA.  It
 	  uses synchronous PPP over a set of point to point IrDA sockets.  You
