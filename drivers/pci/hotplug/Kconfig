@@ -122,5 +122,72 @@ config HOTPLUG_PCI_CPCI_GENERIC
 
 	  When in doubt, say N.
 
+config HOTPLUG_PCI_PCIE
+	tristate "PCI Express Hotplug driver"
+	depends on HOTPLUG_PCI
+	help
+	  Say Y here if you have a motherboard that supports PCI Express Native
+	  Hotplug
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called pciehp.
+
+	  When in doubt, say N.
+
+config HOTPLUG_PCI_PCIE_POLL_EVENT_MODE
+	bool "Use polling mechanism for hot-plug events."
+	depends on HOTPLUG_PCI_PCIE
+	help
+	  Say Y here if you want to use the polling mechanism for hot-plug 
+	  events.
+	   
+	  When in doubt, say N.
+
+config HOTPLUG_PCI_PCIE_PHPRM_NONACPI
+	bool "Non-ACPI: Use $HPRT for resource/configuration"
+	depends on HOTPLUG_PCI_PCIE
+	help
+	  Say Y here if Hotplug resource/configuration information is provided
+	  by platform BIOS $HPRT or bridge resource information, not by ACPI.
+
+	  When in doubt, say N.
+
+config HOTPLUG_PCI_SHPC
+	tristate "SHPC PCI Hotplug driver"
+	depends on HOTPLUG_PCI
+	help
+	  Say Y here if you have a motherboard with a SHPC PCI Hotplug
+	  controller.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called shpchp.
+
+	  When in doubt, say N.
+
+config HOTPLUG_PCI_SHPC_POLL_EVENT_MODE
+	bool "Use polling mechanism for hot-plug events"
+	depends on HOTPLUG_PCI_SHPC
+	help
+	  Say Y here if you want to use the polling mechanism for hot-plug 
+	  events.
+
+	  When in doubt, say N.
+
+config HOTPLUG_PCI_SHPC_PHPRM_NONACPI
+	bool "Non-ACPI: Use $HPRT for resource/configuration"
+	depends on HOTPLUG_PCI_SHPC
+	help
+	  Say Y here if Hotplug resource/configuration information is provided
+	  by platform BIOS $HPRT or bridge resource information, not by ACPI.
+
+	  When in doubt, say N.
+
+config HOTPLUG_PCI_SHPC_PHPRM_LEGACY
+	bool "For AMD SHPC only: Use $HRT for resource/configuration"
+	depends on HOTPLUG_PCI_SHPC && HOTPLUG_PCI_SHPC_PHPRM_NONACPI
+	help
+	  Say Y here for AMD SHPC. You have to select this option if you are 
+	  using this driver on AMD platform with SHPC.
+
 endmenu
 
