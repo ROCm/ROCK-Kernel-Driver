@@ -37,6 +37,7 @@ struct kiocb {
 	void			*ki_data;	/* for use by the the file */
 	void			*ki_user_obj;	/* pointer to userland's iocb */
 	__u64			ki_user_data;	/* user's data for completion */
+	loff_t			ki_pos;
 
 	long			private[KIOCB_PRIVATE_SIZE/sizeof(long)];
 };
