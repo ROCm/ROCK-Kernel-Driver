@@ -31,7 +31,7 @@
 #include <linux/rtnetlink.h>
 #include <linux/init.h>
 #include <net/sock.h>
-#include <net/pkt_sched.h>
+#include <net/act_api.h>
 
 #define L2T(p,L)   ((p)->R_tab->data[(L)>>(p)->R_tab->rate.cell_log])
 #define L2T_P(p,L) ((p)->P_tab->data[(L)>>(p)->P_tab->rate.cell_log])

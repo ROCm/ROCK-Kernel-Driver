@@ -80,8 +80,6 @@ static struct socket *netlink_kernel[MAX_LINKS];
 static int netlink_dump(struct sock *sk);
 static void netlink_destroy_callback(struct netlink_callback *cb);
 
-atomic_t netlink_sock_nr;
-
 static rwlock_t nl_table_lock = RW_LOCK_UNLOCKED;
 static atomic_t nl_table_users = ATOMIC_INIT(0);
 
@@ -100,11 +98,6 @@ static void netlink_sock_destruct(struct sock *sk)
 	BUG_TRAP(!nlk_sk(sk)->cb);
 
 	kfree(nlk_sk(sk));
-
-	atomic_dec(&netlink_sock_nr);
-#ifdef NETLINK_REFCNT_DEBUG
-	printk(KERN_DEBUG "NETLINK %p released, %d are still alive\n", sk, atomic_read(&netlink_sock_nr));
-#endif
 }
 
 /* This lock without WQ_FLAG_EXCLUSIVE is good on UP and it is _very_ bad on SMP.
@@ -240,7 +233,6 @@ static int netlink_create(struct socket *sock, int protocol)
 	spin_lock_init(&nlk->cb_lock);
 	init_waitqueue_head(&nlk->wait);
 	sk->sk_destruct = netlink_sock_destruct;
-	atomic_inc(&netlink_sock_nr);
 
 	sk->sk_protocol = protocol;
 	return 0;
@@ -876,7 +868,10 @@ netlink_kernel_create(int unit, void (*input)(struct sock *sk, int len))
 	if (input)
 		nlk_sk(sk)->data_ready = input;
 
-	netlink_insert(sk, 0);
+	if (netlink_insert(sk, 0)) {
+		sock_release(sock);
+		return NULL;
+	}
 	return sk;
 }
 

@@ -31,7 +31,8 @@
 #include <linux/init.h>
 #include <linux/kmod.h>
 #include <net/sock.h>
-#include <net/pkt_sched.h>
+#include <net/sch_generic.h>
+#include <net/act_api.h>
 
 #if 1 /* control */
 #define DPRINTK(format,args...) printk(KERN_DEBUG format,##args)

@@ -1954,9 +1954,7 @@ static void hdlcdev_rx(SLMP_INFO *info, char *buf, int size)
 
 	memcpy(skb_put(skb, size),buf,size);
 
-	skb->dev      = info->netdev;
-	skb->mac.raw  = skb->data;
-	skb->protocol = hdlc_type_trans(skb, skb->dev);
+	skb->protocol = hdlc_type_trans(skb, info->netdev);
 
 	stats->rx_packets++;
 	stats->rx_bytes += size;

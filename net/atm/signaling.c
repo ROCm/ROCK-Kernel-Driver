@@ -136,6 +136,7 @@ static int sigd_send(struct atm_vcc *vcc,struct sk_buff *skb)
 			if (vcc->sk->sk_ack_backlog ==
 			    vcc->sk->sk_max_ack_backlog) {
 				sigd_enq(NULL,as_reject,vcc,NULL,NULL);
+				dev_kfree_skb(skb);
 				goto as_indicate_complete;
 			}
 			vcc->sk->sk_ack_backlog++;
@@ -148,7 +149,7 @@ as_indicate_complete:
 		case as_close:
 			set_bit(ATM_VF_RELEASED,&vcc->flags);
 			vcc_release_async(vcc, msg->reply);
-			break;
+			goto out;
 		case as_modify:
 			modify_qos(vcc,msg);
 			break;
@@ -163,6 +164,7 @@ as_indicate_complete:
 			return -EINVAL;
 	}
 	vcc->sk->sk_state_change(vcc->sk);
+out:
 	dev_kfree_skb(skb);
 	return 0;
 }
