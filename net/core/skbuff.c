@@ -324,7 +324,9 @@ void __kfree_skb(struct sk_buff *skb)
 	}
 
 	dst_release(skb->dst);
+#ifdef CONFIG_INET
 	secpath_put(skb->sp);
+#endif
 	if(skb->destructor) {
 		if (in_irq())
 			printk(KERN_WARNING "Warning: kfree_skb on "
@@ -378,7 +380,9 @@ struct sk_buff *skb_clone(struct sk_buff *skb, int gfp_mask)
 	C(dst);
 	dst_clone(n->dst);
 	C(sp);
+#ifdef CONFIG_INET
 	secpath_get(n->sp);
+#endif
 	memcpy(n->cb, skb->cb, sizeof(skb->cb));
 	C(len);
 	C(data_len);
@@ -438,7 +442,9 @@ static void copy_skb_header(struct sk_buff *new, const struct sk_buff *old)
 	new->priority	= old->priority;
 	new->protocol	= old->protocol;
 	new->dst	= dst_clone(old->dst);
+#ifdef CONFIG_INET
 	new->sp		= secpath_get(old->sp);
+#endif
 	new->h.raw	= old->h.raw + offset;
 	new->nh.raw	= old->nh.raw + offset;
 	new->mac.raw	= old->mac.raw + offset;

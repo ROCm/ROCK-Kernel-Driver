@@ -27,12 +27,17 @@
 #ifndef _ASM_I386_TOPOLOGY_H
 #define _ASM_I386_TOPOLOGY_H
 
-#ifdef CONFIG_X86_NUMAQ
+#ifdef CONFIG_NUMA
 
-#include <asm/smpboot.h>
+/* Mappings between logical cpu number and node number */
+extern volatile unsigned long node_2_cpu_mask[];
+extern volatile int cpu_2_node[];
 
 /* Returns the number of the node containing CPU 'cpu' */
-#define __cpu_to_node(cpu) (cpu_to_logical_apicid(cpu) >> 4)
+static inline int __cpu_to_node(int cpu)
+{ 
+	return cpu_2_node[cpu];
+}
 
 /* Returns the number of the node containing MemBlk 'memblk' */
 #define __memblk_to_node(memblk) (memblk)
@@ -41,49 +46,22 @@
    so it is a pretty simple function! */
 #define __parent_node(node) (node)
 
-/* Returns the number of the first CPU on Node 'node'.
- * This should be changed to a set of cached values
- * but this will do for now.
- */
-static inline int __node_to_first_cpu(int node)
-{
-	int i, cpu, logical_apicid = node << 4;
-
-	for(i = 1; i < 16; i <<= 1)
-		/* check to see if the cpu is in the system */
-		if ((cpu = logical_apicid_to_cpu(logical_apicid | i)) >= 0)
-			/* if yes, return it to caller */
-			return cpu;
-
-	BUG(); /* couldn't find a cpu on given node */
-	return -1;
-}
-
-/* Returns a bitmask of CPUs on Node 'node'.
- * This should be changed to a set of cached bitmasks
- * but this will do for now.
- */
+/* Returns a bitmask of CPUs on Node 'node'. */
 static inline unsigned long __node_to_cpu_mask(int node)
 {
-	int i, cpu, logical_apicid = node << 4;
-	unsigned long mask = 0UL;
+	return node_2_cpu_mask[node];
+}
 
-	if (sizeof(unsigned long) * 8 < NR_CPUS)
-		BUG();
-
-	for(i = 1; i < 16; i <<= 1)
-		/* check to see if the cpu is in the system */
-		if ((cpu = logical_apicid_to_cpu(logical_apicid | i)) >= 0)
-			/* if yes, add to bitmask */
-			mask |= 1 << cpu;
-
-	return mask;
+/* Returns the number of the first CPU on Node 'node'. */
+static inline int __node_to_first_cpu(int node)
+{ 
+	return __ffs(__node_to_cpu_mask(node));
 }
 
 /* Returns the number of the first MemBlk on Node 'node' */
 #define __node_to_memblk(node) (node)
 
-#else /* !CONFIG_X86_NUMAQ */
+#else /* !CONFIG_NUMA */
 /*
  * Other i386 platforms should define their own version of the 
  * above macros here.
@@ -91,6 +69,6 @@ static inline unsigned long __node_to_cpu_mask(int node)
 
 #include <asm-generic/topology.h>
 
-#endif /* CONFIG_X86_NUMAQ */
+#endif /* CONFIG_NUMA */
 
 #endif /* _ASM_I386_TOPOLOGY_H */

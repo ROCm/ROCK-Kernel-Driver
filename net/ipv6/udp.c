@@ -51,7 +51,7 @@
 
 #include <net/checksum.h>
 
-struct udp_mib udp_stats_in6[NR_CPUS*2];
+DEFINE_SNMP_STAT(struct udp_mib, udp_stats_in6);
 
 /* XXX This is identical to tcp_ipv6.c:ipv6_rcv_saddr_equal, put
  * XXX it somewhere common. -DaveM

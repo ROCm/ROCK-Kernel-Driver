@@ -17,7 +17,7 @@
 
 #define to_dev(node) container_of(node,struct device,kobj.entry)
 
-extern struct subsystem device_subsys;
+extern struct subsystem devices_subsys;
 
 /**
  * device_suspend - suspend/remove all devices on the device ree
@@ -37,8 +37,8 @@ int device_suspend(u32 state, u32 level)
 
 	printk(KERN_EMERG "Suspending devices\n");
 
-	down_write(&device_subsys.rwsem);
-	list_for_each(node,&device_subsys.list) {
+	down_write(&devices_subsys.rwsem);
+	list_for_each(node,&devices_subsys.kset.list) {
 		struct device * dev = to_dev(node);
 		if (dev->driver && dev->driver->suspend) {
 			pr_debug("suspending device %s\n",dev->name);
@@ -47,7 +47,7 @@ int device_suspend(u32 state, u32 level)
 				printk(KERN_ERR "%s: suspend returned %d\n",dev->name,error);
 		}
 	}
-	up_write(&device_subsys.rwsem);
+	up_write(&devices_subsys.rwsem);
 	return error;
 }
 
@@ -63,15 +63,15 @@ void device_resume(u32 level)
 {
 	struct list_head * node;
 
-	down_write(&device_subsys.rwsem);
-	list_for_each_prev(node,&device_subsys.list) {
+	down_write(&devices_subsys.rwsem);
+	list_for_each_prev(node,&devices_subsys.kset.list) {
 		struct device * dev = to_dev(node);
 		if (dev->driver && dev->driver->resume) {
 			pr_debug("resuming device %s\n",dev->name);
 			dev->driver->resume(dev,level);
 		}
 	}
-	up_write(&device_subsys.rwsem);
+	up_write(&devices_subsys.rwsem);
 
 	printk(KERN_EMERG "Devices Resumed\n");
 }
@@ -85,15 +85,15 @@ void device_shutdown(void)
 	
 	printk(KERN_EMERG "Shutting down devices\n");
 
-	down_write(&device_subsys.rwsem);
-	list_for_each(entry,&device_subsys.list) {
+	down_write(&devices_subsys.rwsem);
+	list_for_each(entry,&devices_subsys.kset.list) {
 		struct device * dev = to_dev(entry);
 		if (dev->driver && dev->driver->shutdown) {
 			pr_debug("shutting down %s\n",dev->name);
 			dev->driver->shutdown(dev);
 		}
 	}
-	up_write(&device_subsys.rwsem);
+	up_write(&devices_subsys.rwsem);
 }
 
 EXPORT_SYMBOL(device_suspend);

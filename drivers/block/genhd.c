@@ -27,12 +27,8 @@
 #include <linux/kmod.h>
 
 
-static rwlock_t gendisk_lock;
+static struct subsystem block_subsys;
 
-/*
- * Global kernel list of partitioning information.
- */
-static LIST_HEAD(gendisk_list);
 
 struct blk_probe {
 	struct blk_probe *next;
@@ -63,19 +59,19 @@ void blk_register_region(dev_t dev, unsigned long range, struct module *module,
 	p->dev = dev;
 	p->range = range;
 	p->data = data;
-	write_lock(&gendisk_lock);
+	down_write(&block_subsys.rwsem);
 	for (s = &probes[index]; *s && (*s)->range < range; s = &(*s)->next)
 		;
 	p->next = *s;
 	*s = p;
-	write_unlock(&gendisk_lock);
+	up_write(&block_subsys.rwsem);
 }
 
 void blk_unregister_region(dev_t dev, unsigned long range)
 {
 	int index = dev_to_index(dev);
 	struct blk_probe **s;
-	write_lock(&gendisk_lock);
+	down_write(&block_subsys.rwsem);
 	for (s = &probes[index]; *s; s = &(*s)->next) {
 		struct blk_probe *p = *s;
 		if (p->dev == dev || p->range == range) {
@@ -84,7 +80,7 @@ void blk_unregister_region(dev_t dev, unsigned long range)
 			break;
 		}
 	}
-	write_unlock(&gendisk_lock);
+	up_write(&block_subsys.rwsem);
 }
 
 EXPORT_SYMBOL(blk_register_region);
@@ -112,9 +108,6 @@ static int exact_lock(dev_t dev, void *data)
  */
 void add_disk(struct gendisk *disk)
 {
-	write_lock(&gendisk_lock);
-	list_add_tail(&disk->full_list, &gendisk_list);
-	write_unlock(&gendisk_lock);
 	disk->flags |= GENHD_FL_UP;
 	blk_register_region(MKDEV(disk->major, disk->first_minor), disk->minors,
 			NULL, exact_match, exact_lock, disk);
@@ -126,9 +119,6 @@ EXPORT_SYMBOL(del_gendisk);
 
 void unlink_gendisk(struct gendisk *disk)
 {
-	write_lock(&gendisk_lock);
-	list_del_init(&disk->full_list);
-	write_unlock(&gendisk_lock);
 	blk_unregister_region(MKDEV(disk->major, disk->first_minor),
 			      disk->minors);
 }
@@ -149,7 +139,7 @@ get_gendisk(dev_t dev, int *part)
 	unsigned best = ~0U;
 
 retry:
-	read_lock(&gendisk_lock);
+	down_read(&block_subsys.rwsem);
 	for (p = probes[index]; p; p = p->next) {
 		struct gendisk *(*probe)(dev_t, int *, void *);
 		struct module *owner;
@@ -157,7 +147,7 @@ retry:
 		if (p->dev > dev || p->dev + p->range <= dev)
 			continue;
 		if (p->range >= best) {
-			read_unlock(&gendisk_lock);
+			up_read(&block_subsys.rwsem);
 			return NULL;
 		}
 		if (!try_module_get(p->owner))
@@ -171,7 +161,7 @@ retry:
 			module_put(owner);
 			continue;
 		}
-		read_unlock(&gendisk_lock);
+		up_read(&block_subsys.rwsem);
 		disk = probe(dev, part, data);
 		/* Currently ->owner protects _only_ ->probe() itself. */
 		module_put(owner);
@@ -179,7 +169,7 @@ retry:
 			return disk;
 		goto retry;
 	}
-	read_unlock(&gendisk_lock);
+	up_read(&block_subsys.rwsem);
 	return NULL;
 }
 
@@ -190,23 +180,24 @@ static void *part_start(struct seq_file *part, loff_t *pos)
 	struct list_head *p;
 	loff_t l = *pos;
 
-	read_lock(&gendisk_lock);
-	list_for_each(p, &gendisk_list)
+	down_read(&block_subsys.rwsem);
+	list_for_each(p, &block_subsys.kset.list)
 		if (!l--)
-			return list_entry(p, struct gendisk, full_list);
+			return list_entry(p, struct gendisk, kobj.entry);
 	return NULL;
 }
 
 static void *part_next(struct seq_file *part, void *v, loff_t *pos)
 {
-	struct list_head *p = ((struct gendisk *)v)->full_list.next;
+	struct list_head *p = ((struct gendisk *)v)->kobj.entry.next;
 	++*pos;
-	return p==&gendisk_list ? NULL : list_entry(p, struct gendisk, full_list);
+	return p==&block_subsys.kset.list ? NULL : 
+		list_entry(p, struct gendisk, kobj.entry);
 }
 
 static void part_stop(struct seq_file *part, void *v)
 {
-	read_unlock(&gendisk_lock);
+	up_read(&block_subsys.rwsem);
 }
 
 static int show_partition(struct seq_file *part, void *v)
@@ -215,7 +206,7 @@ static int show_partition(struct seq_file *part, void *v)
 	int n;
 	char buf[64];
 
-	if (&sgp->full_list == gendisk_list.next)
+	if (&sgp->kobj.entry == block_subsys.kset.list.next)
 		seq_puts(part, "major minor  #blocks  name\n\n");
 
 	/* Don't show non-partitionable devices or empty devices */
@@ -258,13 +249,10 @@ static struct gendisk *base_probe(dev_t dev, int *part, void *data)
 	return NULL;
 }
 
-struct subsystem block_subsys;
-
 int __init device_init(void)
 {
 	struct blk_probe *base = kmalloc(sizeof(struct blk_probe), GFP_KERNEL);
 	int i;
-	rwlock_init(&gendisk_lock);
 	memset(base, 0, sizeof(struct blk_probe));
 	base->dev = MKDEV(1,0);
 	base->range = MKDEV(MAX_BLKDEV-1, 255) - base->dev + 1;
@@ -384,12 +372,16 @@ static void disk_release(struct kobject * kobj)
 	kfree(disk);
 }
 
-struct subsystem block_subsys = {
-	.kobj	= { .name = "block" },
+static struct kobj_type ktype_block = {
 	.release	= disk_release,
 	.sysfs_ops	= &disk_sysfs_ops,
 	.default_attrs	= default_attrs,
 };
+
+
+/* declare block_subsys. */
+static decl_subsys(block,&ktype_block);
+
 
 struct gendisk *alloc_disk(int minors)
 {
@@ -408,9 +400,8 @@ struct gendisk *alloc_disk(int minors)
 		disk->minors = minors;
 		while (minors >>= 1)
 			disk->minor_shift++;
-		disk->kobj.subsys = &block_subsys;
+		kobj_set_kset_s(disk,block_subsys);
 		kobject_init(&disk->kobj);
-		INIT_LIST_HEAD(&disk->full_list);
 		rand_initialize_disk(disk);
 	}
 	return disk;

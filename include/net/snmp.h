@@ -62,7 +62,7 @@ struct ip_mib
  	unsigned long	IpFragFails;
  	unsigned long	IpFragCreates;
 	unsigned long   __pad[0]; 
-} ____cacheline_aligned;
+};
  
 struct ipv6_mib
 {
@@ -89,7 +89,7 @@ struct ipv6_mib
  	unsigned long	Ip6InMcastPkts;
  	unsigned long	Ip6OutMcastPkts;
 	unsigned long   __pad[0]; 
-} ____cacheline_aligned;
+};
  
 struct icmp_mib
 {
@@ -121,7 +121,7 @@ struct icmp_mib
  	unsigned long	IcmpOutAddrMaskReps;
 	unsigned long	dummy;
 	unsigned long   __pad[0]; 
-} ____cacheline_aligned;
+};
 
 struct icmpv6_mib
 {
@@ -159,7 +159,7 @@ struct icmpv6_mib
 	unsigned long	Icmp6OutGroupMembResponses;
 	unsigned long	Icmp6OutGroupMembReductions;
 	unsigned long   __pad[0]; 
-} ____cacheline_aligned;
+};
  
 struct tcp_mib
 {
@@ -178,7 +178,7 @@ struct tcp_mib
  	unsigned long	TcpInErrs;
  	unsigned long	TcpOutRsts;
 	unsigned long   __pad[0]; 
-} ____cacheline_aligned;
+};
  
 struct udp_mib
 {
@@ -187,7 +187,7 @@ struct udp_mib
  	unsigned long	UdpInErrors;
  	unsigned long	UdpOutDatagrams;
 	unsigned long   __pad[0];
-} ____cacheline_aligned; 
+}; 
 
 /* draft-ietf-sigtran-sctp-mib-07.txt */
 struct sctp_mib
@@ -216,7 +216,7 @@ struct sctp_mib
 	unsigned long   SctpValCookieLife;
 	unsigned long   SctpMaxInitRetr;
 	unsigned long   __pad[0];
-} ____cacheline_aligned;
+};
 
 struct linux_mib 
 {
@@ -286,7 +286,7 @@ struct linux_mib
 	unsigned long	TCPAbortFailed;
 	unsigned long	TCPMemoryPressures;
 	unsigned long   __pad[0];
-} ____cacheline_aligned;
+};
 
 
 /* 
@@ -294,8 +294,25 @@ struct linux_mib
  * addl $1,memory is atomic against interrupts (but atomic_inc would be overkill because of the lock 
  * cycles). Wants new nonlocked_atomic_inc() primitives -AK
  */ 
-#define SNMP_INC_STATS(mib, field) ((mib)[2*smp_processor_id()+!in_softirq()].field++)
-#define SNMP_INC_STATS_BH(mib, field) ((mib)[2*smp_processor_id()].field++)
-#define SNMP_INC_STATS_USER(mib, field) ((mib)[2*smp_processor_id()+1].field++)
+#define DEFINE_SNMP_STAT(type, name)	\
+	__typeof__(type) *name[2]
+#define DECLARE_SNMP_STAT(type, name)	\
+	extern __typeof__(type) *name[2]
+
+#define SNMP_STAT_USRPTR(name)	(name[0])
+#define SNMP_STAT_BHPTR(name)	(name[1])
+
+#define SNMP_INC_STATS_BH(mib, field) 	\
+	(per_cpu_ptr(mib[0], smp_processor_id())->field++)
+#define SNMP_INC_STATS_USER(mib, field) \
+	(per_cpu_ptr(mib[1], smp_processor_id())->field++)
+#define SNMP_INC_STATS(mib, field) 	\
+	(per_cpu_ptr(mib[!in_softirq()], smp_processor_id())->field++)
+#define SNMP_DEC_STATS(mib, field) 	\
+	(per_cpu_ptr(mib[!in_softirq()], smp_processor_id())->field--)
+#define SNMP_ADD_STATS_BH(mib, field, addend) 	\
+	(per_cpu_ptr(mib[0], smp_processor_id())->field += addend)
+#define SNMP_ADD_STATS_USER(mib, field, addend) 	\
+	(per_cpu_ptr(mib[1], smp_processor_id())->field += addend)
  	
 #endif

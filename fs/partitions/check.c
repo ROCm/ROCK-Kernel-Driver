@@ -19,7 +19,6 @@
 #include <linux/blk.h>
 #include <linux/kmod.h>
 #include <linux/ctype.h>
-#include <../drivers/base/fs/fs.h>	/* Eeeeewwwww */
 
 #include "check.h"
 
@@ -345,18 +344,10 @@ static struct attribute * default_attrs[] = {
 
 extern struct subsystem block_subsys;
 
-static struct subsystem part_subsys = {
-	.parent		= &block_subsys,
+static struct kobj_type ktype_part = {
 	.default_attrs	= default_attrs,
 	.sysfs_ops	= &part_sysfs_ops,
 };
-
-static int __init part_subsys_init(void)
-{
-	return subsystem_register(&part_subsys);
-}
-
-__initcall(part_subsys_init);
 
 void delete_partition(struct gendisk *disk, int part)
 {
@@ -379,7 +370,7 @@ void add_partition(struct gendisk *disk, int part, sector_t start, sector_t len)
 	devfs_register_partition(disk, part);
 	snprintf(p->kobj.name,KOBJ_NAME_LEN,"%s%d",disk->kobj.name,part);
 	p->kobj.parent = &disk->kobj;
-	p->kobj.subsys = &part_subsys;
+	p->kobj.ktype = &ktype_part;
 	kobject_register(&p->kobj);
 }
 
@@ -399,13 +390,15 @@ void register_disk(struct gendisk *disk)
 	struct block_device *bdev;
 	char *s;
 	int j;
+	int err;
 
 	strncpy(disk->kobj.name,disk->disk_name,KOBJ_NAME_LEN);
 	/* ewww... some of these buggers have / in name... */
 	s = strchr(disk->kobj.name, '/');
 	if (s)
 		*s = '!';
-	kobject_add(&disk->kobj);
+	if ((err = kobject_add(&disk->kobj)))
+		return;
 	disk_sysfs_symlinks(disk);
 
 	if (disk->flags & GENHD_FL_CD)

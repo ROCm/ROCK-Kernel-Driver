@@ -28,6 +28,7 @@
 #include <linux/tcp.h>
 #include <linux/slab.h>
 #include <linux/cache.h>
+#include <linux/percpu.h>
 #include <net/checksum.h>
 #include <net/sock.h>
 #if defined(CONFIG_IPV6) || defined (CONFIG_IPV6_MODULE)
@@ -630,10 +631,11 @@ extern __inline int between(__u32 seq1, __u32 seq2, __u32 seq3)
 
 extern struct proto tcp_prot;
 
-extern struct tcp_mib tcp_statistics[NR_CPUS*2];
+DECLARE_SNMP_STAT(struct tcp_mib, tcp_statistics);
 #define TCP_INC_STATS(field)		SNMP_INC_STATS(tcp_statistics, field)
 #define TCP_INC_STATS_BH(field)		SNMP_INC_STATS_BH(tcp_statistics, field)
 #define TCP_INC_STATS_USER(field) 	SNMP_INC_STATS_USER(tcp_statistics, field)
+#define TCP_DEC_STATS(field)		SNMP_DEC_STATS(tcp_statistics, field)
 
 extern void			tcp_put_port(struct sock *sk);
 extern void			__tcp_put_port(struct sock *sk);
@@ -1399,7 +1401,7 @@ static __inline__ void tcp_set_state(struct sock *sk, int state)
 		/* fall through */
 	default:
 		if (oldstate==TCP_ESTABLISHED)
-			tcp_statistics[smp_processor_id()*2+!in_softirq()].TcpCurrEstab--;
+			TCP_DEC_STATS(TcpCurrEstab);
 	}
 
 	/* Change state AFTER socket is unhashed to avoid closed

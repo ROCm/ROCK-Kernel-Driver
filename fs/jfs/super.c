@@ -382,6 +382,17 @@ static struct super_block *jfs_get_sb(struct file_system_type *fs_type,
 	return get_sb_bdev(fs_type, flags, dev_name, data, jfs_fill_super);
 }
 
+static int jfs_sync_fs(struct super_block *sb, int wait)
+{
+	struct jfs_log *log = JFS_SBI(sb)->log;
+
+	/* log == NULL indicates read-only mount */
+	if (log)
+		jfs_flush_journal(log, wait);
+
+	return 0;
+}
+
 static struct super_operations jfs_super_operations = {
 	.alloc_inode	= jfs_alloc_inode,
 	.destroy_inode	= jfs_destroy_inode,
@@ -389,6 +400,7 @@ static struct super_operations jfs_super_operations = {
 	.write_inode	= jfs_write_inode,
 	.delete_inode	= jfs_delete_inode,
 	.put_super	= jfs_put_super,
+	.sync_fs	= jfs_sync_fs,
 	.write_super_lockfs = jfs_write_super_lockfs,
 	.unlockfs       = jfs_unlockfs,
 	.statfs		= jfs_statfs,

@@ -85,8 +85,6 @@ struct gendisk {
 	struct request_queue *queue;
 	void *private_data;
 	sector_t capacity;
-	struct list_head list;
-	struct list_head full_list;
 
 	int flags;
 	int number;			/* devfs crap */

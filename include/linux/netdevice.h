@@ -28,6 +28,7 @@
 #include <linux/if.h>
 #include <linux/if_ether.h>
 #include <linux/if_packet.h>
+#include <linux/kobject.h>
 
 #include <asm/atomic.h>
 #include <asm/cache.h>
@@ -65,7 +66,7 @@ struct vlan_group;
 
 #endif
 
-#define MAX_ADDR_LEN	8		/* Largest hardware address length */
+#define MAX_ADDR_LEN	32		/* Largest hardware address length */
 
 /*
  *	Compute the worst case header length according to the protocols
@@ -438,6 +439,9 @@ struct net_device
 	/* this will get initialized at each interface type init routine */
 	struct divert_blk	*divert;
 #endif /* CONFIG_NET_DIVERT */
+
+	/* generic object representation */
+	struct kobject kobj;
 };
 
 

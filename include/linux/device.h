@@ -66,10 +66,8 @@ struct bus_type {
 	char			* name;
 
 	struct subsystem	subsys;
-	struct subsystem	drvsubsys;
-	struct subsystem	devsubsys;
-	struct list_head	devices;
-	struct list_head	drivers;
+	struct kset		drivers;
+	struct kset		devices;
 
 	int		(*match)(struct device * dev, struct device_driver * drv);
 	struct device * (*add)	(struct device * parent, char * bus_id);
@@ -84,6 +82,7 @@ extern void bus_unregister(struct bus_type * bus);
 extern struct bus_type * get_bus(struct bus_type * bus);
 extern void put_bus(struct bus_type * bus);
 
+extern struct bus_type * find_bus(char * name);
 
 /* iterator helpers for buses */
 
@@ -119,7 +118,6 @@ struct device_driver {
 
 	struct semaphore	unload_sem;
 	struct kobject		kobj;
-	struct list_head	bus_list;
 	struct list_head	class_list;
 	struct list_head	devices;
 
@@ -165,10 +163,8 @@ struct device_class {
 	u32			devnum;
 
 	struct subsystem	subsys;
-	struct subsystem	devsubsys;
-	struct subsystem	drvsubsys;
-	struct list_head	drivers;
-	struct list_head	devices;
+	struct kset		devices;
+	struct kset		drivers;
 
 	int	(*add_device)(struct device *);
 	void	(*remove_device)(struct device *);
@@ -217,7 +213,7 @@ struct device_interface {
 	char			* name;
 	struct device_class	* devclass;
 
-	struct subsystem	subsys;
+	struct kset		kset;
 	u32			devnum;
 
 	int (*add_device)	(struct device *);
@@ -310,6 +306,14 @@ extern void device_unregister(struct device * dev);
 extern void device_initialize(struct device * dev);
 extern int device_add(struct device * dev);
 extern void device_del(struct device * dev);
+
+/*
+ * Manual binding of a device to driver. See drivers/base/bus.c 
+ * for information on use.
+ */
+extern void device_bind_driver(struct device * dev);
+extern void device_release_driver(struct device * dev);
+
 
 /* driverfs interface for exporting device attributes */
 

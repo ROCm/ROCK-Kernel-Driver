@@ -47,12 +47,12 @@
 #include <linux/mc146818rtc.h>
 #include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
-#include <asm/smpboot.h>
 #include <asm/desc.h>
 #include <asm/arch_hooks.h>
 #include "smpboot_hooks.h"
 
 #include <mach_apic.h>
+#include <mach_wakecpu.h>
 
 /* Set if we find a B stepping CPU */
 static int __initdata smp_b_stepping;
@@ -348,8 +348,7 @@ void __init smp_callin(void)
 	 * our local APIC.  We have to wait for the IPI or we'll
 	 * lock up on an APIC access.
 	 */
-	if (!clustered_apic_mode) 
-		while (!atomic_read(&init_deasserted));
+	wait_for_init_deassert(&init_deasserted);
 
 	/*
 	 * (This works even if the APIC is not enabled.)
@@ -398,13 +397,9 @@ void __init smp_callin(void)
 	 */
 
 	Dprintk("CALLIN, before setup_local_APIC().\n");
-	/*
-	 * Because we use NMIs rather than the INIT-STARTUP sequence to
-	 * bootstrap the CPUs, the APIC may be in a weird state. Kick it.
-	 */
-	if (clustered_apic_mode)
-		clear_local_APIC();
+	smp_callin_clear_local_apic();
 	setup_local_APIC();
+	map_cpu_to_logical_apicid();
 
 	local_irq_enable();
 
@@ -503,63 +498,58 @@ static struct task_struct * __init fork_by_hand(void)
 	return do_fork(CLONE_VM|CLONE_IDLETASK, 0, &regs, 0, NULL, NULL);
 }
 
-/* which physical APIC ID maps to which logical CPU number */
-volatile int physical_apicid_2_cpu[MAX_APICID];
-/* which logical CPU number maps to which physical APIC ID */
-volatile int cpu_2_physical_apicid[NR_CPUS];
+#ifdef CONFIG_NUMA
 
-/* which logical APIC ID maps to which logical CPU number */
-volatile int logical_apicid_2_cpu[MAX_APICID];
-/* which logical CPU number maps to which logical APIC ID */
-volatile int cpu_2_logical_apicid[NR_CPUS];
+/* which logical CPUs are on which nodes */
+volatile unsigned long node_2_cpu_mask[MAX_NR_NODES] = 
+						{ [0 ... MAX_NR_NODES-1] = 0 };
+/* which node each logical CPU is on */
+volatile int cpu_2_node[NR_CPUS] = { [0 ... NR_CPUS-1] = 0 };
 
-static inline void init_cpu_to_apicid(void)
-/* Initialize all maps between cpu number and apicids */
+/* set up a mapping between cpu and node. */
+static inline void map_cpu_to_node(int cpu, int node)
 {
-	int apicid, cpu;
-
-	for (apicid = 0; apicid < MAX_APICID; apicid++) {
-		physical_apicid_2_cpu[apicid] = -1;
-		logical_apicid_2_cpu[apicid] = -1;
-	}
-	for (cpu = 0; cpu < NR_CPUS; cpu++) {
-		cpu_2_physical_apicid[cpu] = -1;
-		cpu_2_logical_apicid[cpu] = -1;
-	}
+	printk("Mapping cpu %d to node %d\n", cpu, node);
+	node_2_cpu_mask[node] |= (1 << cpu);
+	cpu_2_node[cpu] = node;
 }
 
-static inline void map_cpu_to_boot_apicid(int cpu, int apicid)
-/* 
- * set up a mapping between cpu and apicid. Uses logical apicids for multiquad,
- * else physical apic ids
- */
+/* undo a mapping between cpu and node. */
+static inline void unmap_cpu_to_node(int cpu)
 {
-	if (clustered_apic_mode) {
-		logical_apicid_2_cpu[apicid] = cpu;	
-		cpu_2_logical_apicid[cpu] = apicid;
-	} else {
-		physical_apicid_2_cpu[apicid] = cpu;	
-		cpu_2_physical_apicid[cpu] = apicid;
-	}
+	int node;
+
+	printk("Unmapping cpu %d from all nodes\n", cpu);
+	for (node = 0; node < MAX_NR_NODES; node ++)
+		node_2_cpu_mask[node] &= ~(1 << cpu);
+	cpu_2_node[cpu] = -1;
+}
+#else /* !CONFIG_NUMA */
+
+#define map_cpu_to_node(cpu, node)	({})
+#define unmap_cpu_to_node(cpu)	({})
+
+#endif /* CONFIG_NUMA */
+
+volatile u8 cpu_2_logical_apicid[NR_CPUS] = { [0 ... NR_CPUS-1] = BAD_APICID };
+
+void map_cpu_to_logical_apicid(void)
+{
+	int cpu = smp_processor_id();
+	int apicid = logical_smp_processor_id();
+
+	cpu_2_logical_apicid[cpu] = apicid;
+	map_cpu_to_node(cpu, apicid_to_node(apicid));
 }
 
-static inline void unmap_cpu_to_boot_apicid(int cpu, int apicid)
-/* 
- * undo a mapping between cpu and apicid. Uses logical apicids for multiquad,
- * else physical apic ids
- */
+void unmap_cpu_to_logical_apicid(int cpu)
 {
-	if (clustered_apic_mode) {
-		logical_apicid_2_cpu[apicid] = -1;	
-		cpu_2_logical_apicid[cpu] = -1;
-	} else {
-		physical_apicid_2_cpu[apicid] = -1;	
-		cpu_2_physical_apicid[cpu] = -1;
-	}
+	cpu_2_logical_apicid[cpu] = BAD_APICID;
+	unmap_cpu_to_node(cpu);
 }
 
 #if APIC_DEBUG
-static inline void inquire_remote_apic(int apicid)
+static inline void __inquire_remote_apic(int apicid)
 {
 	int i, regs[] = { APIC_ID >> 4, APIC_LVR >> 4, APIC_SPIV >> 4 };
 	char *names[] = { "ID", "VERSION", "SPIV" };
@@ -653,6 +643,15 @@ wakeup_secondary_cpu(int phys_apicid, unsigned long start_eip)
 {
 	unsigned long send_status = 0, accept_status = 0;
 	int maxlvt, timeout, num_starts, j;
+
+	/*
+	 * Be paranoid about clearing APIC errors.
+	 */
+	if (APIC_INTEGRATED(apic_version[phys_apicid])) {
+		apic_read_around(APIC_SPIV);
+		apic_write(APIC_ESR, 0);
+		apic_read(APIC_ESR);
+	}
 
 	Dprintk("Asserting INIT.\n");
 
@@ -775,17 +774,18 @@ wakeup_secondary_cpu(int phys_apicid, unsigned long start_eip)
 
 extern unsigned long cpu_initialized;
 
-static void __init do_boot_cpu (int apicid) 
+static int __init do_boot_cpu(int apicid)
 /*
  * NOTE - on most systems this is a PHYSICAL apic ID, but on multiquad
  * (ie clustered apic addressing mode), this is a LOGICAL apic ID.
+ * Returns zero if CPU booted OK, else error code from wakeup_secondary_cpu.
  */
 {
 	struct task_struct *idle;
-	unsigned long boot_error = 0;
+	unsigned long boot_error;
 	int timeout, cpu;
 	unsigned long start_eip;
-	unsigned short nmi_high, nmi_low;
+	unsigned short nmi_high = 0, nmi_low = 0;
 
 	cpu = ++cpucount;
 	/*
@@ -801,8 +801,6 @@ static void __init do_boot_cpu (int apicid)
 	 * once we got the process:
 	 */
 	init_idle(idle, cpu);
-
-	map_cpu_to_boot_apicid(cpu, apicid);
 
 	idle->thread.eip = (unsigned long) start_secondary;
 
@@ -825,11 +823,7 @@ static void __init do_boot_cpu (int apicid)
 
 	Dprintk("Setting warm reset code and vector.\n");
 
-	if (clustered_apic_mode) {
-		/* stash the current NMI vector, so we can put things back */
-		nmi_high = *((volatile unsigned short *) TRAMPOLINE_HIGH);
-		nmi_low = *((volatile unsigned short *) TRAMPOLINE_LOW);
-	} 
+	store_NMI_vector(&nmi_high, &nmi_low);
 
 	CMOS_WRITE(0xa, 0xf);
 	local_flush_tlb();
@@ -840,23 +834,9 @@ static void __init do_boot_cpu (int apicid)
 	Dprintk("3.\n");
 
 	/*
-	 * Be paranoid about clearing APIC errors.
-	 */
-	if (!clustered_apic_mode && APIC_INTEGRATED(apic_version[apicid])) {
-		apic_read_around(APIC_SPIV);
-		apic_write(APIC_ESR, 0);
-		apic_read(APIC_ESR);
-	}
-
-	/*
-	 * Status is now clean
-	 */
-	boot_error = 0;
-
-	/*
 	 * Starting actual IPI sequence...
 	 */
-	wakeup_secondary_cpu(apicid, start_eip);
+	boot_error = wakeup_secondary_cpu(apicid, start_eip);
 
 	if (!boot_error) {
 		/*
@@ -890,15 +870,12 @@ static void __init do_boot_cpu (int apicid)
 			else
 				/* trampoline code not run */
 				printk("Not responding.\n");
-#if APIC_DEBUG
-			if (!clustered_apic_mode)
-				inquire_remote_apic(apicid);
-#endif
+			inquire_remote_apic(apicid);
 		}
 	}
 	if (boot_error) {
 		/* Try to put things back the way they were before ... */
-		unmap_cpu_to_boot_apicid(cpu, apicid);
+		unmap_cpu_to_logical_apicid(cpu);
 		clear_bit(cpu, &cpu_callout_map); /* was set here (do_boot_cpu()) */
 		clear_bit(cpu, &cpu_initialized); /* was set by cpu_init() */
 		cpucount--;
@@ -907,11 +884,7 @@ static void __init do_boot_cpu (int apicid)
 	/* mark "stuck" area as not stuck */
 	*((volatile unsigned long *)trampoline_base) = 0;
 
-	if(clustered_apic_mode) {
-		printk("Restoring NMI vector\n");
-		*((volatile unsigned short *) TRAMPOLINE_HIGH) = nmi_high;
-		*((volatile unsigned short *) TRAMPOLINE_LOW) = nmi_low;
-	}
+	return boot_error;
 }
 
 cycles_t cacheflush_time;
@@ -987,8 +960,6 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 		prof_multiplier[cpu] = 1;
 	}
 
-	init_cpu_to_apicid();
-
 	/*
 	 * Setup boot CPU information
 	 */
@@ -997,7 +968,6 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	print_cpu_info(&cpu_data[0]);
 
 	boot_cpu_logical_apicid = logical_smp_processor_id();
-	map_cpu_to_boot_apicid(0, boot_cpu_apicid);
 
 	current_thread_info()->cpu = 0;
 	smp_tune_scheduling();
@@ -1021,10 +991,9 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	 * CPU too, but we do it for the sake of robustness anyway.
 	 * Makes no sense to do this check in clustered apic mode, so skip it
 	 */
-	if (!clustered_apic_mode && 
-	    !test_bit(boot_cpu_physical_apicid, &phys_cpu_present_map)) {
+	if (!check_phys_apicid_present(boot_cpu_physical_apicid)) {
 		printk("weird, boot CPU (#%d) not listed by the BIOS.\n",
-							boot_cpu_physical_apicid);
+				boot_cpu_physical_apicid);
 		phys_cpu_present_map |= (1 << hard_smp_processor_id());
 	}
 
@@ -1055,6 +1024,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 
 	connect_bsp_APIC();
 	setup_local_APIC();
+	map_cpu_to_logical_apicid();
 
 	if (GET_APIC_ID(apic_read(APIC_ID)) != boot_cpu_physical_apicid)
 		BUG();
@@ -1083,13 +1053,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 		if (max_cpus <= cpucount+1)
 			continue;
 
-		do_boot_cpu(apicid);
-
-		/*
-		 * Make sure we unmap all failed CPUs
-		 */
-		if ((boot_apicid_to_cpu(apicid) == -1) &&
-				(phys_cpu_present_map & (1 << bit)))
+		if (do_boot_cpu(apicid))
 			printk("CPU #%d not responding - cannot use it.\n",
 								apicid);
 	}

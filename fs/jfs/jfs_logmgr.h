@@ -424,6 +424,7 @@ struct jfs_log {
 #define log_INLINELOG	1
 #define log_SYNCBARRIER	2
 #define log_QUIESCE	3
+#define log_FLUSH	4
 
 /*
  * group commit flag
@@ -501,11 +502,11 @@ struct logsyncblk {
 }
 
 extern int lmLogOpen(struct super_block *sb, struct jfs_log ** log);
-extern void lmLogWait(struct jfs_log * log);
 extern int lmLogClose(struct super_block *sb, struct jfs_log * log);
 extern int lmLogSync(struct jfs_log * log, int nosyncwait);
 extern int lmLogShutdown(struct jfs_log * log);
 extern int lmLogInit(struct jfs_log * log);
 extern int lmLogFormat(struct jfs_log *log, s64 logAddress, int logSize);
+extern void jfs_flush_journal(struct jfs_log * log, int wait);
 
 #endif				/* _H_JFS_LOGMGR */
