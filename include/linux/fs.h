@@ -701,6 +701,9 @@ extern int vfs_rename(struct inode *, struct dentry *, struct inode *, struct de
 
 /*
  * File types
+ *
+ * NOTE! These match bits 12..15 of stat.st_mode
+ * (ie "(i_mode >> 12) & 15").
  */
 #define DT_UNKNOWN	0
 #define DT_FIFO		1
