@@ -101,6 +101,8 @@ static struct acpi_driver acpi_processor_driver = {
 			},
 };
 
+static int c2 = -1;
+static int c3 = -1;
 
 struct acpi_processor_errata {
 	u8			smp;
@@ -110,8 +112,6 @@ struct acpi_processor_errata {
 		u8			reserved:6;
 		u32			bmisx;
 	}			piix4;
-	int c2;
-	int c3;
 };
 
 static struct file_operations acpi_processor_info_fops = {
@@ -143,12 +143,9 @@ static struct file_operations acpi_processor_limit_fops = {
 };
 
 static struct acpi_processor	*processors[NR_CPUS];
-static struct acpi_processor_errata errata = { 
-	.c2 = -1,
-	.c3 = -1,
-};
-module_param_named(c2, errata.c2, bool, 0);
-module_param_named(c3, errata.c3, bool, 0);
+static struct acpi_processor_errata errata;
+module_param_named(c2, c2, bool, 0);
+module_param_named(c3, c3, bool, 0);
 static void (*pm_idle_save)(void);
 
 
@@ -662,7 +659,7 @@ acpi_processor_get_power_info (
 				"C2 not supported in SMP mode\n"));
 
 
-		else if (!errata.c2) 
+		else if (!c2) 
 			printk(KERN_INFO "C2 disabled\n");
 
 		/*
@@ -720,7 +717,7 @@ acpi_processor_get_power_info (
 			ACPI_DEBUG_PRINT((ACPI_DB_INFO,
 				"C3 not supported on PIIX4 with Type-F DMA\n"));
 		}
-		else if (!errata.c3)
+		else if (!c3)
 			printk(KERN_INFO "C3 disabled\n");
 
 		/*
@@ -2488,6 +2485,7 @@ acpi_processor_init (void)
 	ACPI_FUNCTION_TRACE("acpi_processor_init");
 
 	memset(&processors, 0, sizeof(processors));
+	memset(&errata, 0, sizeof(errata));
 
 	acpi_processor_dir = proc_mkdir(ACPI_PROCESSOR_CLASS, acpi_root_dir);
 	if (!acpi_processor_dir)
