@@ -29,7 +29,10 @@ extern spinlock_t journal_datalist_lock;
 static void journal_end_buffer_io_sync(struct buffer_head *bh, int uptodate)
 {
 	BUFFER_TRACE(bh, "");
-	mark_buffer_uptodate(bh, uptodate);
+	if (uptodate)
+		set_buffer_uptodate(bh);
+	else
+		clear_buffer_uptodate(bh);
 	unlock_buffer(bh);
 }
 
@@ -210,7 +213,6 @@ write_out_data_locked:
 				__journal_unfile_buffer(jh);
 				jh->b_transaction = NULL;
 				__journal_remove_journal_head(bh);
-				refile_buffer(bh);
 				__brelse(bh);
 			}
 		}
@@ -291,10 +293,6 @@ sync_datalist_empty:
 			jh->b_transaction = NULL;
 			__journal_remove_journal_head(bh);
 			BUFFER_TRACE(bh, "finished async writeout: refile");
-			/* It can sometimes be on BUF_LOCKED due to migration
-			 * from syncdata to asyncdata */
-			if (bh->b_list != BUF_CLEAN)
-				refile_buffer(bh);
 			__brelse(bh);
 		}
 	}
@@ -452,8 +450,9 @@ start_journal_io:
 			unlock_journal(journal);
 			for (i=0; i<bufs; i++) {
 				struct buffer_head *bh = wbuf[i];
-				set_bit(BH_Lock, &bh->b_state);
-				clear_bit(BH_Dirty, &bh->b_state);
+				set_buffer_locked(bh);
+				clear_buffer_dirty(bh);
+				set_buffer_uptodate(bh);
 				bh->b_end_io = journal_end_buffer_io_sync;
 				submit_bh(WRITE, bh);
 			}
@@ -514,7 +513,7 @@ start_journal_io:
 		journal_unlock_journal_head(jh);
 		__brelse(bh);
 		J_ASSERT_BH(bh, atomic_read(&bh->b_count) == 0);
-		put_unused_buffer_head(bh);
+		free_buffer_head(bh);
 
 		/* We also have to unlock and free the corresponding
                    shadowed buffer */
@@ -531,7 +530,7 @@ start_journal_io:
 		journal_file_buffer(jh, commit_transaction, BJ_Forget);
 		/* Wake up any transactions which were waiting for this
 		   IO to complete */
-		wake_up(&bh->b_wait);
+		wake_up_buffer(bh);
 		JBUFFER_TRACE(jh, "brelse shadowed buffer");
 		__brelse(bh);
 	}
@@ -592,6 +591,7 @@ start_journal_io:
 	JBUFFER_TRACE(descriptor, "write commit block");
 	{
 		struct buffer_head *bh = jh2bh(descriptor);
+		set_buffer_uptodate(bh);
 		ll_rw_block(WRITE, 1, &bh);
 		wait_on_buffer(bh);
 		__brelse(bh);		/* One for getblk() */

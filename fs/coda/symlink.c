@@ -40,13 +40,13 @@ static int coda_symlink_filler(struct file *file, struct page *page)
 		goto fail;
 	SetPageUptodate(page);
 	kunmap(page);
-	UnlockPage(page);
+	unlock_page(page);
 	return 0;
 
 fail:
 	SetPageError(page);
 	kunmap(page);
-	UnlockPage(page);
+	unlock_page(page);
 	return error;
 }
 

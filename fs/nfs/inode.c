@@ -749,7 +749,8 @@ printk("nfs_notify_change: revalidate failed, error=%d\n", error);
 	if (!S_ISREG(inode->i_mode))
 		attr->ia_valid &= ~ATTR_SIZE;
 
-	filemap_fdatasync(inode->i_mapping);
+	filemap_fdatawait(inode->i_mapping);
+	filemap_fdatawrite(inode->i_mapping);
 	error = nfs_wb_all(inode);
 	filemap_fdatawait(inode->i_mapping);
 	if (error)

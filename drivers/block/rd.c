@@ -106,19 +106,19 @@ int rd_blocksize = BLOCK_SIZE;			/* blocksize of the RAM disks */
  */
 static int ramdisk_readpage(struct file *file, struct page * page)
 {
-	if (!Page_Uptodate(page)) {
+	if (!PageUptodate(page)) {
 		memset(kmap(page), 0, PAGE_CACHE_SIZE);
 		kunmap(page);
 		flush_dcache_page(page);
 		SetPageUptodate(page);
 	}
-	UnlockPage(page);
+	unlock_page(page);
 	return 0;
 }
 
 static int ramdisk_prepare_write(struct file *file, struct page *page, unsigned offset, unsigned to)
 {
-	if (!Page_Uptodate(page)) {
+	if (!PageUptodate(page)) {
 		void *addr = page_address(page);
 		memset(addr, 0, PAGE_CACHE_SIZE);
 		flush_dcache_page(page);
@@ -173,7 +173,7 @@ static int rd_blkdev_pagecache_IO(int rw, struct bio_vec *vec,
 				goto out;
 			err = 0;
 
-			if (!Page_Uptodate(page)) {
+			if (!PageUptodate(page)) {
 				memset(kmap(page), 0, PAGE_CACHE_SIZE);
 				kunmap(page);
 				SetPageUptodate(page);
@@ -206,7 +206,7 @@ static int rd_blkdev_pagecache_IO(int rw, struct bio_vec *vec,
 			SetPageDirty(page);
 		}
 		if (unlock)
-			UnlockPage(page);
+			unlock_page(page);
 		__free_page(page);
 	} while (size);
 

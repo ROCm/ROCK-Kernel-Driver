@@ -4,6 +4,7 @@
  */
 
 #include <linux/pagemap.h>
+#include <linux/smp_lock.h>
 
 int simple_statfs(struct super_block *sb, struct statfs *buf)
 {
@@ -40,6 +41,8 @@ int dcache_readdir(struct file * filp, void * dirent, filldir_t filldir)
 	int i;
 	struct dentry *dentry = filp->f_dentry;
 
+	lock_kernel();
+
 	i = filp->f_pos;
 	switch (i) {
 		case 0:
@@ -64,6 +67,7 @@ int dcache_readdir(struct file * filp, void * dirent, filldir_t filldir)
 			for (;;) {
 				if (list == &dentry->d_subdirs) {
 					spin_unlock(&dcache_lock);
+					unlock_kernel();
 					return 0;
 				}
 				if (!j)
@@ -94,6 +98,7 @@ int dcache_readdir(struct file * filp, void * dirent, filldir_t filldir)
 			}
 		}
 	}
+	unlock_kernel();
 	return 0;
 }
 

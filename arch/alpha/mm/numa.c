@@ -426,5 +426,5 @@ show_mem(void)
 	printk("%ld pages shared\n",shared);
 	printk("%ld pages swap cached\n",cached);
 	printk("%ld pages in page table cache\n",pgtable_cache_size);
-	show_buffers();
+	printk("%ld buffermem pages\n", nr_buffermem_pages());
 }

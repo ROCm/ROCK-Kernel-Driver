@@ -200,7 +200,7 @@ show_mem(void)
 			pgdat = pgdat->node_next;
 		} while (pgdat);
 		printk("Total of %ld pages in page table cache\n", pgtable_cache_size);
-		show_buffers();
+		printk("%ld buffermem pages\n", nr_buffermem_pages());
 		printk("%d free buffer pages\n", nr_free_buffer_pages());
 	}
 #else /* !CONFIG_DISCONTIGMEM */
@@ -220,7 +220,7 @@ show_mem(void)
 	printk("%d pages shared\n", shared);
 	printk("%d pages swap cached\n", cached);
 	printk("%ld pages in page table cache\n", pgtable_cache_size);
-	show_buffers();
+	printk("%ld buffermem pages\n", nr_buffermem_pages());
 #endif /* !CONFIG_DISCONTIGMEM */
 }
 

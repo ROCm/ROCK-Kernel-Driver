@@ -759,7 +759,7 @@ static int cmd64x_config_drive_for_dma (ide_drive_t *drive)
 	ide_dma_action_t dma_func = ide_dma_on;
 
 	pci_read_config_dword(dev, PCI_CLASS_REVISION, &class_rev);
-	class_rev &= 0xff;	
+	class_rev &= 0xff;
 
 	switch(dev->device) {
 		case PCI_DEVICE_ID_CMD_680:
@@ -777,13 +777,13 @@ static int cmd64x_config_drive_for_dma (ide_drive_t *drive)
 			can_ultra_100 = 0;
 			break;
 		default:
-			return hwif->dmaproc(ide_dma_off, drive);
+			return hwif->udma(ide_dma_off, drive, NULL);
 	}
 
 	if ((id != NULL) && ((id->capability & 1) != 0) &&
 	    hwif->autodma && (drive->type == ATA_DISK)) {
 		/* Consult the list of known "bad" drives */
-		if (ide_dmaproc(ide_dma_bad_drive, drive)) {
+		if (ide_dmaproc(ide_dma_bad_drive, drive, NULL)) {
 			dma_func = ide_dma_off;
 			goto fast_ata_pio;
 		}
@@ -805,7 +805,7 @@ try_dma_modes:
 				if (dma_func != ide_dma_on)
 					goto no_dma_set;
 			}
-		} else if (ide_dmaproc(ide_dma_good_drive, drive)) {
+		} else if (ide_dmaproc(ide_dma_good_drive, drive, NULL)) {
 			if (id->eide_dma_time > 150) {
 				goto no_dma_set;
 			}
@@ -822,10 +822,10 @@ fast_ata_pio:
 no_dma_set:
 		config_chipset_for_pio(drive, 1);
 	}
-	return drive->channel->dmaproc(dma_func, drive);
+	return drive->channel->udma(dma_func, drive, NULL);
 }
 
-static int cmd680_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
+static int cmd680_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct request *rq)
 {
 	switch (func) {
 		case ide_dma_check:
@@ -834,10 +834,10 @@ static int cmd680_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 			break;
 	}
 	/* Other cases are done by generic IDE-DMA code. */
-        return ide_dmaproc(func, drive);
+        return ide_dmaproc(func, drive, rq);
 }
 
-static int cmd64x_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
+static int cmd64x_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct request *rq)
 {
 	byte dma_stat		= 0;
 	byte dma_alt_stat	= 0;
@@ -882,14 +882,14 @@ static int cmd64x_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 			break;
 	}
 	/* Other cases are done by generic IDE-DMA code. */
-	return ide_dmaproc(func, drive);
+	return ide_dmaproc(func, drive, rq);
 }
 
 /*
  * ASUS P55T2P4D with CMD646 chipset revision 0x01 requires the old
  * event order for DMA transfers.
  */
-static int cmd646_1_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
+static int cmd646_1_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct request *rq)
 {
 	struct ata_channel *hwif = drive->channel;
 	unsigned long dma_base = hwif->dma_base;
@@ -910,7 +910,7 @@ static int cmd646_1_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 	}
 
 	/* Other cases are done by generic IDE-DMA code. */
-	return ide_dmaproc(func, drive);
+	return ide_dmaproc(func, drive, rq);
 }
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 
@@ -1125,7 +1125,7 @@ void __init ide_init_cmd64x(struct ata_channel *hwif)
 	switch(dev->device) {
 		case PCI_DEVICE_ID_CMD_680:
 			hwif->busproc	= &cmd680_busproc;
-			hwif->dmaproc	= &cmd680_dmaproc;
+			hwif->udma	= &cmd680_dmaproc;
 			hwif->resetproc = &cmd680_reset;
 			hwif->speedproc	= &cmd680_tune_chipset;
 			hwif->tuneproc	= &cmd680_tuneproc;
@@ -1133,16 +1133,16 @@ void __init ide_init_cmd64x(struct ata_channel *hwif)
 		case PCI_DEVICE_ID_CMD_649:
 		case PCI_DEVICE_ID_CMD_648:
 		case PCI_DEVICE_ID_CMD_643:
-			hwif->dmaproc	= &cmd64x_dmaproc;
+			hwif->udma	= &cmd64x_dmaproc;
 			hwif->tuneproc	= &cmd64x_tuneproc;
 			hwif->speedproc = &cmd64x_tune_chipset;
 			break;
 		case PCI_DEVICE_ID_CMD_646:
 			hwif->chipset = ide_cmd646;
 			if (class_rev == 0x01) {
-				hwif->dmaproc = &cmd646_1_dmaproc;
+				hwif->udma = &cmd646_1_dmaproc;
 			} else {
-				hwif->dmaproc = &cmd64x_dmaproc;
+				hwif->udma = &cmd64x_dmaproc;
 			}
 			hwif->tuneproc	= &cmd64x_tuneproc;
 			hwif->speedproc	= &cmd64x_tune_chipset;

@@ -156,7 +156,6 @@ static  void receive_chars(struct tty_struct *tty, struct pt_regs *regs)
 				continue;
 			} else if ( seen_esc == 2 ) {
 				if ( ch == 'P' ) show_state();		/* F1 key */
-				if ( ch == 'Q' ) show_buffers();	/* F2 key */
 #ifdef CONFIG_KDB
 				if ( ch == 'S' )
 					kdb(KDB_REASON_KEYBOARD, 0, (kdb_eframe_t) regs);

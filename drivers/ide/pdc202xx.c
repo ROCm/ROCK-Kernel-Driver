@@ -929,7 +929,7 @@ static int config_drive_xfer_rate (ide_drive_t *drive)
 
 	if (id && (id->capability & 1) && hwif->autodma) {
 		/* Consult the list of known "bad" drives */
-		if (ide_dmaproc(ide_dma_bad_drive, drive)) {
+		if (ide_dmaproc(ide_dma_bad_drive, drive, NULL)) {
 			dma_func = ide_dma_off;
 			goto fast_ata_pio;
 		}
@@ -951,7 +951,7 @@ try_dma_modes:
 				if (dma_func != ide_dma_on)
 					goto no_dma_set;
 			}
-		} else if (ide_dmaproc(ide_dma_good_drive, drive)) {
+		} else if (ide_dmaproc(ide_dma_good_drive, drive, NULL)) {
 			if (id->eide_dma_time > 150) {
 				goto no_dma_set;
 			}
@@ -969,7 +969,7 @@ no_dma_set:
 		(void) config_chipset_for_pio(drive, 5);
 	}
 
-	return drive->channel->dmaproc(dma_func, drive);
+	return drive->channel->udma(dma_func, drive, NULL);
 }
 
 int pdc202xx_quirkproc (ide_drive_t *drive)
@@ -980,7 +980,7 @@ int pdc202xx_quirkproc (ide_drive_t *drive)
 /*
  * pdc202xx_dmaproc() initiates/aborts (U)DMA read/write operations on a drive.
  */
-int pdc202xx_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
+int pdc202xx_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct request *rq)
 {
 	byte dma_stat		= 0;
 	byte sc1d		= 0;
@@ -1060,7 +1060,7 @@ somebody_else:
 		default:
 			break;
 	}
-	return ide_dmaproc(func, drive);	/* use standard DMA stuff */
+	return ide_dmaproc(func, drive, rq);	/* use standard DMA stuff */
 }
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 
@@ -1268,7 +1268,7 @@ void __init ide_init_pdc202xx(struct ata_channel *hwif)
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (hwif->dma_base) {
-		hwif->dmaproc = &pdc202xx_dmaproc;
+		hwif->udma = pdc202xx_dmaproc;
 		hwif->highmem = 1;
 		if (!noautodma)
 			hwif->autodma = 1;

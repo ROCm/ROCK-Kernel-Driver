@@ -69,7 +69,7 @@ void show_mem(void)
 	printk("%d reserved pages\n",reserved);
 	printk("%d pages shared\n",shared);
 	printk("%d pages swap cached\n",cached);
-	show_buffers();
+	printk("%ld buffermem pages\n", nr_buffermem_pages());
 }
 
 /* References to section boundaries */

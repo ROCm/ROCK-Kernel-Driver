@@ -45,7 +45,7 @@ hfs_buffer hfs_buffer_get(hfs_sysmdb sys_mdb, int block, int read) {
 	} else {
 		tmp = sb_getblk(sys_mdb, block);
 		if (tmp) {
-			mark_buffer_uptodate(tmp, 1);
+			set_buffer_uptodate(tmp);
 		}
 	}
 	if (!tmp) {

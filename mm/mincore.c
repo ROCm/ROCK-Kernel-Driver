@@ -31,7 +31,7 @@ static unsigned char mincore_page(struct vm_area_struct * vma,
 
 	page = find_get_page(as, pgoff);
 	if (page) {
-		present = Page_Uptodate(page);
+		present = PageUptodate(page);
 		page_cache_release(page);
 	}
 

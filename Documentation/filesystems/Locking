@@ -254,7 +254,7 @@ locking rules:
 llseek:		yes	(see below)
 read:		no
 write:		no
-readdir:	yes	(see below)
+readdir: 	no	
 poll:		no
 ioctl:		yes	(see below)
 mmap:		no

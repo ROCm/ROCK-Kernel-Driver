@@ -260,7 +260,7 @@ int journal_recover(journal_t *journal)
 	journal->j_transaction_sequence = ++info.end_transaction;
 		
 	journal_clear_revoke(journal);
-	fsync_no_super(journal->j_fs_dev);
+	sync_blockdev(journal->j_fs_dev);
 	return err;
 }
 
@@ -484,7 +484,7 @@ static int do_one_pass(journal_t *journal,
 					BUFFER_TRACE(nbh, "marking dirty");
 					mark_buffer_dirty(nbh);
 					BUFFER_TRACE(nbh, "marking uptodate");
-					mark_buffer_uptodate(nbh, 1);
+					set_buffer_uptodate(nbh);
 					++info->nr_replays;
 					/* ll_rw_block(WRITE, 1, &nbh); */
 					unlock_buffer(nbh);

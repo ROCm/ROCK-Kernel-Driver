@@ -182,13 +182,15 @@ static int dbl_readdir(struct file * filp,
         struct hfs_cat_entry *entry;
 	struct inode *dir = filp->f_dentry->d_inode;
 
+	lock_kernel();
+
 	entry = HFS_I(dir)->entry;
 
 	if (filp->f_pos == 0) {
 		/* Entry 0 is for "." */
 		if (filldir(dirent, DOT->Name, DOT_LEN, 0, dir->i_ino,
 			    DT_DIR)) {
-			return 0;
+			goto out;
 		}
 		filp->f_pos = 1;
 	}
@@ -197,7 +199,7 @@ static int dbl_readdir(struct file * filp,
 		/* Entry 1 is for ".." */
 		if (filldir(dirent, DOT_DOT->Name, DOT_DOT_LEN, 1,
 			    hfs_get_hl(entry->key.ParID), DT_DIR)) {
-			return 0;
+			goto out;	
 		}
 		filp->f_pos = 2;
 	}
@@ -209,7 +211,7 @@ static int dbl_readdir(struct file * filp,
 		if (hfs_cat_open(entry, &brec) ||
 		    hfs_cat_next(entry, &brec, (filp->f_pos - 1) >> 1,
 				 &cnid, &type)) {
-			return 0;
+			goto out;
 		}
 
 		while (filp->f_pos < (dir->i_size - 1)) {
@@ -226,7 +228,7 @@ static int dbl_readdir(struct file * filp,
 			} else {
 				if (hfs_cat_next(entry, &brec, 1,
 							&cnid, &type)) {
-					return 0;
+					goto out;
 				}
 				ino = ntohl(cnid);
 				len = hfs_namein(dir, tmp_name,
@@ -236,7 +238,7 @@ static int dbl_readdir(struct file * filp,
 			if (filldir(dirent, tmp_name, len, filp->f_pos, ino,
 				    DT_UNKNOWN)) {
 				hfs_cat_close(entry, &brec);
-				return 0;
+				goto out;
 			}
 			++filp->f_pos;
 		}
@@ -250,12 +252,14 @@ static int dbl_readdir(struct file * filp,
 				    PCNT_ROOTINFO_LEN, filp->f_pos,
 				    ntohl(entry->cnid) | HFS_DBL_HDR,
 				    DT_UNKNOWN)) {
-				return 0;
+				goto out;
 			}
 		}
 		++filp->f_pos;
 	}
 
+out:
+	unlock_kernel();
 	return 0;
 }
 

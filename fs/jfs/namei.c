@@ -969,7 +969,7 @@ int jfs_symlink(struct inode *dip, struct dentry *dentry, const char *name)
 				memcpy(mp->data, name, copy_size);
 				flush_metapage(mp);
 #if 0
-				mark_buffer_uptodate(bp, 1);
+				set_buffer_uptodate(bp);
 				mark_buffer_dirty(bp, 1);
 				if (IS_SYNC(dip)) {
 					ll_rw_block(WRITE, 1, &bp);

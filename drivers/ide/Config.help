@@ -299,13 +299,6 @@ CONFIG_IDEDMA_IVB
 
   It is normally safe to answer Y; however, the default is N.
 
-CONFIG_IDEDMA_PCI_WIP
-  If you enable this you will be able to use and test highly
-  developmental projects. If you say N, the configurator will
-  simply skip those options.
-
-  It is SAFEST to say N to this question.
-
 CONFIG_BLK_DEV_PDC_ADMA
   Please read the comments at the top of <file:drivers/ide/ide-pci.c>.
 

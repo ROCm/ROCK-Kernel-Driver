@@ -406,11 +406,12 @@ int journal_cancel_revoke(handle_t *handle, struct journal_head *jh)
 	 * buffer_head?  If so, we'd better make sure we clear the
 	 * revoked status on any hashed alias too, otherwise the revoke
 	 * state machine will get very upset later on. */
-	if (need_cancel && !bh->b_pprev) {
+	if (need_cancel) {
 		struct buffer_head *bh2;
 		bh2 = __get_hash_table(bh->b_bdev, bh->b_blocknr, bh->b_size);
 		if (bh2) {
-			clear_bit(BH_Revoked, &bh2->b_state);
+			if (bh2 != bh)
+				clear_bit(BH_Revoked, &bh2->b_state);
 			__brelse(bh2);
 		}
 	}
@@ -540,6 +541,7 @@ static void flush_descriptor(journal_t *journal,
 	{
 		struct buffer_head *bh = jh2bh(descriptor);
 		BUFFER_TRACE(bh, "write");
+		set_buffer_uptodate(bh);
 		ll_rw_block (WRITE, 1, &bh);
 	}
 }

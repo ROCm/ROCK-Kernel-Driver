@@ -966,9 +966,15 @@ int lmLogSync(log_t * log, int nosyncwait)
 		 * We need to make sure all of the "written" metapages
 		 * actually make it to disk
 		 */
-		fsync_inode_data_buffers(sbi->ipbmap);
-		fsync_inode_data_buffers(sbi->ipimap);
-		fsync_inode_data_buffers(sbi->direct_inode);
+		filemap_fdatawait(sbi->ipbmap->i_mapping);
+		filemap_fdatawait(sbi->ipimap->i_mapping);
+		filemap_fdatawait(sbi->direct_inode->i_mapping);
+		filemap_fdatawrite(sbi->ipbmap->i_mapping);
+		filemap_fdatawrite(sbi->ipimap->i_mapping);
+		filemap_fdatawrite(sbi->direct_inode->i_mapping);
+		filemap_fdatawait(sbi->ipbmap->i_mapping);
+		filemap_fdatawait(sbi->ipimap->i_mapping);
+		filemap_fdatawait(sbi->direct_inode->i_mapping);
 
 		lrd.logtid = 0;
 		lrd.backchain = 0;
@@ -1426,7 +1432,7 @@ static int lmLogShutdown(log_t * log)
 	 * We need to make sure all of the "written" metapages
 	 * actually make it to disk
 	 */
-	fsync_no_super(log->sb->s_bdev);
+	sync_blockdev(log->sb->s_bdev);
 
 	/*
 	 * write the last SYNCPT record with syncpoint = 0

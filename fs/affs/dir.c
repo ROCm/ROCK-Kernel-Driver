@@ -22,6 +22,7 @@
 #include <linux/string.h>
 #include <linux/mm.h>
 #include <linux/amigaffs.h>
+#include <linux/smp_lock.h>
 
 static int affs_readdir(struct file *, void *, filldir_t);
 
@@ -63,6 +64,8 @@ affs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	int			 stored;
 	int			 res;
 
+	lock_kernel();
+	
 	pr_debug("AFFS: readdir(ino=%lu,f_pos=%lx)\n",inode->i_ino,(unsigned long)filp->f_pos);
 
 	stored = 0;
@@ -158,6 +161,7 @@ readdir_out:
 	affs_brelse(dir_bh);
 	affs_brelse(fh_bh);
 	affs_unlock_dir(inode);
+	unlock_kernel();
 	pr_debug("AFFS: readdir()=%d\n", stored);
 	return res;
 }

@@ -273,13 +273,15 @@ romfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	int stored = 0;
 	char fsname[ROMFS_MAXFN];	/* XXX dynamic? */
 
+	lock_kernel();
+	
 	maxoff = i->i_sb->u.romfs_sb.s_maxsize;
 
 	offset = filp->f_pos;
 	if (!offset) {
 		offset = i->i_ino & ROMFH_MASK;
 		if (romfs_copyfrom(i, &ri, offset, ROMFH_SIZE) <= 0)
-			return stored;
+			goto out;
 		offset = ntohl(ri.spec) & ROMFH_MASK;
 	}
 
@@ -288,17 +290,17 @@ romfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		if (!offset || offset >= maxoff) {
 			offset = maxoff;
 			filp->f_pos = offset;
-			return stored;
+			goto out;
 		}
 		filp->f_pos = offset;
 
 		/* Fetch inode info */
 		if (romfs_copyfrom(i, &ri, offset, ROMFH_SIZE) <= 0)
-			return stored;
+			goto out;
 
 		j = romfs_strnlen(i, offset+ROMFH_SIZE, sizeof(fsname)-1);
 		if (j < 0)
-			return stored;
+			goto out;
 
 		fsname[j]=0;
 		romfs_copyfrom(i, fsname, offset+ROMFH_SIZE, j);
@@ -309,11 +311,14 @@ romfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 			ino = ntohl(ri.spec);
 		if (filldir(dirent, fsname, j, offset, ino,
 			    romfs_dtype_table[nextfh & ROMFH_TYPE]) < 0) {
-			return stored;
+			goto out;
 		}
 		stored++;
 		offset = nextfh & ROMFH_MASK;
 	}
+out:
+	unlock_kernel();
+	return stored;
 }
 
 static struct dentry *
@@ -432,7 +437,7 @@ romfs_readpage(struct file *file, struct page * page)
 	}
 	flush_dcache_page(page);
 
-	UnlockPage(page);
+	unlock_page(page);
 
 	kunmap(page);
 err_out:

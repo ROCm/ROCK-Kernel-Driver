@@ -21,6 +21,7 @@
 #include <linux/time.h>
 #include <linux/locks.h>
 #include <linux/config.h>
+#include <linux/smp_lock.h>
 
 #include <asm/uaccess.h>
 
@@ -253,6 +254,8 @@ static int isofs_readdir(struct file *filp,
 	struct iso_directory_record * tmpde;
 	struct inode *inode = filp->f_dentry->d_inode;
 
+	lock_kernel();
+
 	tmpname = (char *) __get_free_page(GFP_KERNEL);
 	if (!tmpname)
 		return -ENOMEM;
@@ -261,5 +264,6 @@ static int isofs_readdir(struct file *filp,
 	result = do_isofs_readdir(inode, filp, dirent, filldir, tmpname, tmpde);
 
 	free_page((unsigned long) tmpname);
+	unlock_kernel();
 	return result;
 }

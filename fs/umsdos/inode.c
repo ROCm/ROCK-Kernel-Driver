@@ -300,7 +300,7 @@ dentry->d_parent->d_name.name, dentry->d_name.name, UMSDOS_I(inode)->i_patched))
 	 * EMD file. The msdos fs is not even called.
 	 */
 out_unlock:
-	UnlockPage(page);
+	unlock_page(page);
 	page_cache_release(page);
 out_dput:
 	dput(demd);

@@ -62,19 +62,26 @@ int hpfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	long old_pos;
 	char *tempname;
 	int c1, c2 = 0;
+	int ret = 0;
 
 	if (inode->i_sb->s_hpfs_chk) {
-		if (hpfs_chk_sectors(inode->i_sb, inode->i_ino, 1, "dir_fnode"))
-			return -EFSERROR;
-		if (hpfs_chk_sectors(inode->i_sb, hpfs_inode->i_dno, 4, "dir_dnode"))
-			return -EFSERROR;
+		if (hpfs_chk_sectors(inode->i_sb, inode->i_ino, 1, "dir_fnode")) {
+			ret = -EFSERROR;
+			goto out;
+		}
+		if (hpfs_chk_sectors(inode->i_sb, hpfs_inode->i_dno, 4, "dir_dnode")) {
+			ret = -EFSERROR;
+			goto out;
+		}
 	}
 	if (inode->i_sb->s_hpfs_chk >= 2) {
 		struct buffer_head *bh;
 		struct fnode *fno;
 		int e = 0;
-		if (!(fno = hpfs_map_fnode(inode->i_sb, inode->i_ino, &bh)))
-			return -EIOERROR;
+		if (!(fno = hpfs_map_fnode(inode->i_sb, inode->i_ino, &bh))) {
+			ret = -EIOERROR;
+			goto out;
+		}
 		if (!fno->dirflag) {
 			e = 1;
 			hpfs_error(inode->i_sb, "not a directory, fnode %08x",inode->i_ino);
@@ -84,14 +91,20 @@ int hpfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 			hpfs_error(inode->i_sb, "corrupted inode: i_dno == %08x, fnode -> dnode == %08x", hpfs_inode->i_dno, fno->u.external[0].disk_secno);
 		}
 		brelse(bh);
-		if (e) return -EFSERROR;
+		if (e) {
+			ret = -EFSERROR;
+			goto out;
+		}
 	}
 	lc = inode->i_sb->s_hpfs_lowercase;
 	if (filp->f_pos == 12) { /* diff -r requires this (note, that diff -r */
 		filp->f_pos = 13; /* also fails on msdos filesystem in 2.0) */
-		return 0;
+		goto out;
 	}
-	if (filp->f_pos == 13) return -ENOENT;
+	if (filp->f_pos == 13) {
+		ret = -ENOENT;
+		goto out;
+	}
 	
 	hpfs_lock_inode(inode);
 	
@@ -103,28 +116,29 @@ int hpfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		if (inode->i_sb->s_hpfs_chk)
 			if (hpfs_stop_cycles(inode->i_sb, filp->f_pos, &c1, &c2, "hpfs_readdir")) {
 				hpfs_unlock_inode(inode);
-				return -EFSERROR;
+				ret = -EFSERROR;
+				goto out;
 			}
 		if (filp->f_pos == 12) {
 			hpfs_unlock_inode(inode);
-			return 0;
+			goto out;
 		}
 		if (filp->f_pos == 3 || filp->f_pos == 4 || filp->f_pos == 5) {
 			printk("HPFS: warning: pos==%d\n",(int)filp->f_pos);
 			hpfs_unlock_inode(inode);
-			return 0;
+			goto out;
 		}
 		if (filp->f_pos == 0) {
 			if (filldir(dirent, ".", 1, filp->f_pos, inode->i_ino, DT_DIR) < 0) {
 				hpfs_unlock_inode(inode);
-				return 0;
+				goto out;
 			}
 			filp->f_pos = 11;
 		}
 		if (filp->f_pos == 11) {
 			if (filldir(dirent, "..", 2, filp->f_pos, hpfs_inode->i_parent_dir, DT_DIR) < 0) {
 				hpfs_unlock_inode(inode);
-				return 0;
+				goto out;
 			}
 			filp->f_pos = 1;
 		}
@@ -135,12 +149,14 @@ int hpfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		}
 			/*if (filp->f_version != inode->i_version) {
 				hpfs_unlock_inode(inode);
-				return -ENOENT;
+				ret = -ENOENT;
+				goto out;
 			}*/	
 			old_pos = filp->f_pos;
 			if (!(de = map_pos_dirent(inode, &filp->f_pos, &qbh))) {
 				hpfs_unlock_inode(inode);
-				return -EIOERROR;
+				ret = -EIOERROR;
+				goto out;
 			}
 			if (de->first || de->last) {
 				if (inode->i_sb->s_hpfs_chk) {
@@ -156,11 +172,14 @@ int hpfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 				if (tempname != (char *)de->name) kfree(tempname);
 				hpfs_brelse4(&qbh);
 				hpfs_unlock_inode(inode);
-				return 0;
+				goto out;
 			}
 			if (tempname != (char *)de->name) kfree(tempname);
 			hpfs_brelse4(&qbh);
 	}
+out:
+	unlock_kernel();
+	return ret;
 }
 
 /*
