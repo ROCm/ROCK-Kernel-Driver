@@ -253,7 +253,7 @@ config SCSI_ACARD
 
 config SCSI_AHA152X
 	tristate "Adaptec AHA152X/2825 support"
-	depends on ISA && SCSI
+	depends on ISA && SCSI && !64BIT
 	---help---
 	  This is a driver for the AHA-1510, AHA-1520, AHA-1522, and AHA-2825
 	  SCSI host adapters. It also works for the AVA-1505, but the IRQ etc.
@@ -911,37 +911,34 @@ config SCSI_SYM53C8XX_DMA_ADDRESSING_MODE
 	depends on SCSI_SYM53C8XX_2
 	default "1"
 	---help---
-	  This option only applies to PCI-SCSI chip that are PCI DAC capable 
-	  (875A, 895A, 896, 1010-33, 1010-66, 1000).
+	  This option only applies to PCI-SCSI chips that are PCI DAC
+	  capable (875A, 895A, 896, 1010-33, 1010-66, 1000).
 
-	  When set to 0, only PCI 32 bit DMA addressing (SAC) will be performed.
-	  When set to 1, 40 bit DMA addressing (with upper 24 bits of address 
-	  set to zero) is supported. The addressable range is here 1 TB.
-	  When set to 2, full 64 bits of address for DMA are supported, but only
-	  16 segments of 4 GB can be addressed. The addressable range is so 
-	  limited to 64 GB.
+	  When set to 0, the driver will program the chip to only perform
+	  32-bit DMA.  When set to 1, the chip will be able to perform DMA
+	  to addresses up to 1TB.  When set to 2, the driver supports the
+	  full 64-bit DMA address range, but can only address 16 segments
+	  of 4 GB each.  This limits the total addressable range to 64 GB.
 
-	  The safest value is 0 (32 bit DMA addressing) that is guessed to still 
-	  fit most of real machines.
+	  Most machines with less than 4GB of memory should use a setting
+	  of 0 for best performance.  If your machine has 4GB of memory
+	  or more, you should set this option to 1 (the default).
 
-	  The preferred value 1 (40 bit DMA addressing) should make happy 
-	  properly engineered PCI DAC capable host bridges. You may configure
-	  this option for Intel platforms with more than 4 GB of memory.
-
-	  The still experimental value 2 (64 bit DMA addressing with 16 x 4GB 
-	  segments limitation) can be used on systems that require PCI address 
-	  bits past bit 39 to be set for the addressing of memory using PCI 
-	  DAC cycles.
+	  The still experimental value 2 (64 bit DMA addressing with 16
+	  x 4GB segments limitation) can be used on systems that require
+	  PCI address bits past bit 39 to be set for the addressing of
+	  memory using PCI DAC cycles.
 
 config SCSI_SYM53C8XX_DEFAULT_TAGS
 	int "default tagged command queue depth"
 	depends on SCSI_SYM53C8XX_2
 	default "16"
 	help
-	  This is the default value of the command queue depth the driver will 
-	  announce to the generic SCSI layer for devices that support tagged 
-	  command queueing. This value can be changed from the boot command line.
-	  This is a soft limit that cannot exceed CONFIG_SCSI_SYM53C8XX_MAX_TAGS.
+	  This is the default value of the command queue depth the
+	  driver will announce to the generic SCSI layer for devices
+	  that support tagged command queueing. This value can be changed
+	  from the boot command line.  This is a soft limit that cannot
+	  exceed CONFIG_SCSI_SYM53C8XX_MAX_TAGS.
 
 config SCSI_SYM53C8XX_MAX_TAGS
 	int "maximum number of queued commands"
@@ -954,11 +951,12 @@ config SCSI_SYM53C8XX_MAX_TAGS
 	  This value is used as a compiled-in hard limit.
 
 config SCSI_SYM53C8XX_IOMAPPED
-	bool "use normal IO"
+	bool "use port IO"
 	depends on SCSI_SYM53C8XX_2
 	help
-	  If you say Y here, the driver will preferently use normal IO rather than 
-	  memory mapped IO.
+	  If you say Y here, the driver will use port IO to access
+	  the card.  This is significantly slower then using memory
+	  mapped IO.  Most people should answer N.
 
 config SCSI_ZALON
 	tristate "Zalon SCSI support"
@@ -1274,7 +1272,7 @@ config SCSI_DC395x
 
 config SCSI_DC390T
 	tristate "Tekram DC390(T) and Am53/79C974 SCSI support"
-	depends on PCI && SCSI && BROKEN
+	depends on PCI && SCSI
 	---help---
 	  This driver supports PCI SCSI host adapters based on the Am53C974A
 	  chip, e.g. Tekram DC390(T), DawiControl 2974 and some onboard

@@ -1235,8 +1235,8 @@ W:	http://ldm.sourceforge.net
 S:	Maintained
 
 LSILOGIC/SYMBIOS/NCR 53C8XX and 53C1010 PCI-SCSI drivers
-P:	Gerard Roudier
-M:	groudier@free.fr
+P:	Matthew Wilcox
+M:	matthew@wil.cx
 L:	linux-scsi@vger.kernel.org
 S:	Maintained
 

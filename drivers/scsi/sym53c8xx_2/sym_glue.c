@@ -167,34 +167,16 @@ struct sym_ucmd {		/* Override the SCSI pointer structure */
 #define SYM_SCMD_PTR(ucmd) sym_que_entry(ucmd, struct scsi_cmnd, SCp)
 #define SYM_SOFTC_PTR(cmd) (((struct host_data *)cmd->device->host->hostdata)->ncb)
 
-/*
- *  Deal with DMA mapping/unmapping.
- */
-#define	bus_unmap_sg(pdev, sgptr, sgcnt, dir)		\
-	pci_unmap_sg(pdev, sgptr, sgcnt, dir)
-#define	bus_unmap_single(pdev, mapping, bufptr, dir)	\
-	pci_unmap_single(pdev, mapping, bufptr, dir)
-#define	bus_map_single(pdev, bufptr, bufsiz, dir)	\
-	pci_map_single(pdev, bufptr, bufsiz, dir)
-#define	bus_map_sg(pdev, sgptr, sgcnt, dir)		\
-	pci_map_sg(pdev, sgptr, sgcnt, dir)
-#define	bus_dma_sync_sg(pdev, sgptr, sgcnt, dir)	\
-	pci_dma_sync_sg(pdev, sgptr, sgcnt, dir)
-#define	bus_dma_sync_single(pdev, mapping, bufsiz, dir)	\
-	pci_dma_sync_single(pdev, mapping, bufsiz, dir)
-#define bus_sg_dma_address(sc)	sg_dma_address(sc)
-#define bus_sg_dma_len(sc)	sg_dma_len(sc)
-
 static void __unmap_scsi_data(struct pci_dev *pdev, struct scsi_cmnd *cmd)
 {
 	int dma_dir = scsi_to_pci_dma_dir(cmd->sc_data_direction);
 
 	switch(SYM_UCMD_PTR(cmd)->data_mapped) {
 	case 2:
-		bus_unmap_sg(pdev, cmd->buffer, cmd->use_sg, dma_dir);
+		pci_unmap_sg(pdev, cmd->buffer, cmd->use_sg, dma_dir);
 		break;
 	case 1:
-		bus_unmap_single(pdev, SYM_UCMD_PTR(cmd)->data_mapping,
+		pci_unmap_single(pdev, SYM_UCMD_PTR(cmd)->data_mapping,
 				 cmd->request_bufflen, dma_dir);
 		break;
 	}
@@ -206,7 +188,7 @@ static dma_addr_t __map_scsi_single_data(struct pci_dev *pdev, struct scsi_cmnd 
 	dma_addr_t mapping;
 	int dma_dir = scsi_to_pci_dma_dir(cmd->sc_data_direction);
 
-	mapping = bus_map_single(pdev, cmd->request_buffer,
+	mapping = pci_map_single(pdev, cmd->request_buffer,
 				 cmd->request_bufflen, dma_dir);
 	if (mapping) {
 		SYM_UCMD_PTR(cmd)->data_mapped  = 1;
@@ -221,7 +203,7 @@ static int __map_scsi_sg_data(struct pci_dev *pdev, struct scsi_cmnd *cmd)
 	int use_sg;
 	int dma_dir = scsi_to_pci_dma_dir(cmd->sc_data_direction);
 
-	use_sg = bus_map_sg(pdev, cmd->buffer, cmd->use_sg, dma_dir);
+	use_sg = pci_map_sg(pdev, cmd->buffer, cmd->use_sg, dma_dir);
 	if (use_sg > 0) {
 		SYM_UCMD_PTR(cmd)->data_mapped  = 2;
 		SYM_UCMD_PTR(cmd)->data_mapping = use_sg;
@@ -236,10 +218,10 @@ static void __sync_scsi_data(struct pci_dev *pdev, struct scsi_cmnd *cmd)
 
 	switch(SYM_UCMD_PTR(cmd)->data_mapped) {
 	case 2:
-		bus_dma_sync_sg(pdev, cmd->buffer, cmd->use_sg, dma_dir);
+		pci_dma_sync_sg(pdev, cmd->buffer, cmd->use_sg, dma_dir);
 		break;
 	case 1:
-		bus_dma_sync_single(pdev, SYM_UCMD_PTR(cmd)->data_mapping,
+		pci_dma_sync_single(pdev, SYM_UCMD_PTR(cmd)->data_mapping,
 				    cmd->request_bufflen, dma_dir);
 		break;
 	}
@@ -469,8 +451,8 @@ static int sym_scatter(struct sym_hcb *np, struct sym_ccb *cp, struct scsi_cmnd 
 		data = &cp->phys.data[SYM_CONF_MAX_SG - use_sg];
 
 		for (segment = 0; segment < use_sg; segment++) {
-			dma_addr_t baddr = bus_sg_dma_address(&scatter[segment]);
-			unsigned int len = bus_sg_dma_len(&scatter[segment]);
+			dma_addr_t baddr = sg_dma_address(&scatter[segment]);
+			unsigned int len = sg_dma_len(&scatter[segment]);
 
 			sym_build_sge(np, &data[segment], baddr, len);
 			cp->data_len += len;
@@ -1595,10 +1577,8 @@ static void sym_free_resources(struct sym_hcb *np)
 	if (np->s.mmio_va)
 		iounmap(np->s.mmio_va);
 #endif
-#ifndef SYM_OPT_NO_BUS_MEMORY_MAPPING
 	if (np->s.ram_va)
 		iounmap(np->s.ram_va);
-#endif
 	/*
 	 *  Free O/S independent resources.
 	 */
@@ -1650,14 +1630,13 @@ out_err32:
  *  If all is OK, install interrupt handling and
  *  start the timer daemon.
  */
-static int __devinit 
-sym_attach (struct scsi_host_template *tpnt, int unit, struct sym_device *dev)
+static struct Scsi_Host * __devinit sym_attach(struct scsi_host_template *tpnt,
+		int unit, struct sym_device *dev)
 {
 	struct host_data *host_data;
 	struct sym_hcb *np = NULL;
 	struct Scsi_Host *instance = NULL;
 	unsigned long flags;
-	struct sym_nvram *nvram = dev->nvram;
 	struct sym_fw *fw;
 
 	printk(KERN_INFO
@@ -1762,20 +1741,18 @@ sym_attach (struct scsi_host_template *tpnt, int unit, struct sym_device *dev)
 			np->ram_ws = 8192;
 		else
 			np->ram_ws = 4096;
-#ifndef SYM_OPT_NO_BUS_MEMORY_MAPPING
 		np->s.ram_va = ioremap(dev->s.base_2_c, np->ram_ws);
 		if (!np->s.ram_va) {
 			printf_err("%s: can't map PCI MEMORY region\n",
 				sym_name(np));
 			goto attach_failed;
 		}
-#endif
 	}
 
 	/*
 	 *  Perform O/S independent stuff.
 	 */
-	if (sym_hcb_attach(np, fw, nvram))
+	if (sym_hcb_attach(np, fw, dev->nvram))
 		goto attach_failed;
 
 
@@ -1843,13 +1820,7 @@ sym_attach (struct scsi_host_template *tpnt, int unit, struct sym_device *dev)
 
 	spin_unlock_irqrestore(instance->host_lock, flags);
 
-	/*
-	 *  Now let the generic SCSI driver
-	 *  look for the SCSI devices on the bus ..
-	 */
-	scsi_add_host(instance, &dev->pdev->dev); /* XXX: handle failure */
-	scsi_scan_host(instance);
-	return 0;
+	return instance;
 
  reset_failed:
 	printf_err("%s: FATAL ERROR: CHECK SCSI BUS - CABLES, "
@@ -1857,13 +1828,13 @@ sym_attach (struct scsi_host_template *tpnt, int unit, struct sym_device *dev)
 	spin_unlock_irqrestore(instance->host_lock, flags);
  attach_failed:
 	if (!instance)
-		return -1;
+		return NULL;
 	printf_info("%s: giving up ...\n", sym_name(np));
 	if (np)
 		sym_free_resources(np);
 	scsi_host_put(instance);
 
-	return -1;
+	return NULL;
  }
 
 
@@ -2115,7 +2086,7 @@ sym53c8xx_pci_init(struct pci_dev *pdev, struct sym_device *device)
 	 *  Ignore Symbios chips controlled by various RAID controllers.
 	 *  These controllers set value 0x52414944 at RAM end - 16.
 	 */
-#if defined(__i386__) && !defined(SYM_OPT_NO_BUS_MEMORY_MAPPING)
+#if defined(__i386__)
 	if (base_2_c) {
 		unsigned int ram_size, ram_val;
 		void *ram_ptr;
@@ -2202,12 +2173,9 @@ sym53c8xx_pci_init(struct pci_dev *pdev, struct sym_device *device)
 
 
 /*
- *  Linux release module stuff.
- *
  *  Called before unloading the module.
  *  Detach the host.
  *  We have to free resources and halt the NCR chip.
- *
  */
 static int __devexit sym_detach(struct sym_hcb *np)
 {
@@ -2216,18 +2184,15 @@ static int __devexit sym_detach(struct sym_hcb *np)
 	del_timer_sync(&np->s.timer);
 
 	/*
-	 *  Reset NCR chip.
-	 *  We should use sym_soft_reset(), but we donnot want to do 
-	 *  so, since we may not be safe if interrupts occur.
+	 * Reset NCR chip.
+	 * We should use sym_soft_reset(), but we don't want to do 
+	 * so, since we may not be safe if interrupts occur.
 	 */
 	printk("%s: resetting chip\n", sym_name(np));
 	OUTB (nc_istat, SRST);
 	UDELAY (10);
 	OUTB (nc_istat, 0);
 
-	/*
-	 *  Free host resources
-	 */
 	sym_free_resources(np);
 
 	return 1;
@@ -2336,6 +2301,7 @@ static int __devinit sym2_probe(struct pci_dev *pdev,
 {
 	struct sym_device sym_dev;
 	struct sym_nvram nvram;
+	struct Scsi_Host *instance;
 
 	memset(&sym_dev, 0, sizeof(sym_dev));
 	memset(&nvram, 0, sizeof(nvram));
@@ -2354,12 +2320,20 @@ static int __devinit sym2_probe(struct pci_dev *pdev,
 
 	sym_get_nvram(&sym_dev, &nvram);
 
-	if (sym_attach(&sym2_template, attach_count, &sym_dev))
+	instance = sym_attach(&sym2_template, attach_count, &sym_dev);
+	if (!instance)
 		goto free;
 
+	if (scsi_add_host(instance, &pdev->dev))
+		goto detach;
+	scsi_scan_host(instance);
+
 	attach_count++;
+
 	return 0;
 
+ detach:
+	sym_detach(pci_get_drvdata(pdev));
  free:
 	pci_release_regions(pdev);
  disable:
@@ -2369,7 +2343,13 @@ static int __devinit sym2_probe(struct pci_dev *pdev,
 
 static void __devexit sym2_remove(struct pci_dev *pdev)
 {
-	sym_detach(pci_get_drvdata(pdev));
+	struct sym_hcb *np = pci_get_drvdata(pdev);
+	struct Scsi_Host *host = np->s.host;
+
+	scsi_remove_host(host);
+	scsi_host_put(host);
+
+	sym_detach(np);
 
 	pci_release_regions(pdev);
 	pci_disable_device(pdev);

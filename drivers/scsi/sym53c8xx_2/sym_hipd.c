@@ -50,7 +50,7 @@
  * SUCH DAMAGE.
  */
 
-#define SYM_DRIVER_NAME	"sym-2.1.18b"
+#define SYM_DRIVER_NAME	"sym-2.1.18f"
 
 #ifdef __FreeBSD__
 #include <dev/sym/sym_glue.h>
@@ -750,8 +750,6 @@ static u32 parisc_setup_hcb(hcb_p np, u32 period)
 	if (!pdc_get_initiator(&hwpath, &np->myaddr, &pdc_period,
 				&np->maxwide, &scsi_mode))
 		return period;
-
-	printk("scsi_mode = %d, period = %ld\n", scsi_mode, pdc_period);
 
 	if (scsi_mode >= 0) {
 		/* C3000 PDC reports period/mode */
@@ -1962,13 +1960,6 @@ void sym_start_up (hcb_p np, int reason)
 		if (sym_verbose >= 2)
 			printf ("%s: Downloading SCSI SCRIPTS.\n",
 				sym_name(np));
-#ifdef SYM_OPT_NO_BUS_MEMORY_MAPPING
-		np->fw_patch(np);
-		if (np->ram_ws == 8192)
-			phys = SCRIPTZ_BA (np, start_ram64);
-		else
-			phys = SCRIPTZ_BA (np, start_ram);
-#else
 		if (np->ram_ws == 8192) {
 			OUTRAM_OFF(4096, np->scriptb0, np->scriptb_sz);
 			phys =  scr_to_cpu(np->scr_ram_seg);
@@ -1980,7 +1971,6 @@ void sym_start_up (hcb_p np, int reason)
 		else
 			phys = SCRIPTA_BA (np, init);
 		OUTRAM_OFF(0, np->scripta0, np->scripta_sz);
-#endif
 	}
 	else
 		phys = SCRIPTA_BA (np, init);
@@ -4151,8 +4141,10 @@ sym_ppr_nego_check(hcb_p np, int req, int target)
 	/*
 	 *  Check values against our limits.
 	 */
-	if (wide > np->maxwide)
-		{chg = 1; wide = np->maxwide;}
+	if (wide > np->maxwide) {
+		chg = 1;
+		wide = np->maxwide;
+	}
 	if (!wide || !(np->features & FE_ULTRA3))
 		dt &= ~PPR_OPT_DT;
 	if (req) {
@@ -4306,8 +4298,10 @@ sym_wide_nego_check(hcb_p np, int req, int target)
 	/*
 	 *  Check values against our limits.
 	 */
-	if (wide > np->maxwide)
-		{chg = 1; wide = np->maxwide;}
+	if (wide > np->maxwide) {
+		chg = 1;
+		wide = np->maxwide;
+	}
 	if (req) {
 		if (wide > tp->tinfo.user.width)
 			{chg = 1; wide = tp->tinfo.user.width;}

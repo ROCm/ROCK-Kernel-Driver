@@ -228,14 +228,6 @@ struct SYM_FWB_SCR {
 struct SYM_FWZ_SCR {
 	u32 snooptest		[  6];
 	u32 snoopend		[  2];
-#ifdef SYM_OPT_NO_BUS_MEMORY_MAPPING
-	u32 start_ram		[  1];
-	u32 scripta0_ba		[  4];
-	u32 start_ram64		[  3];
-	u32 scripta0_ba64	[  3];
-	u32 scriptb0_ba64	[  6];
-	u32 ram_seg64		[  1];
-#endif
 };
 
 static struct SYM_FWA_SCR SYM_FWA_SCR = {
@@ -1944,51 +1936,5 @@ static struct SYM_FWZ_SCR SYM_FWZ_SCR = {
 	 */
 	SCR_INT,
 		99,
-#ifdef SYM_OPT_NO_BUS_MEMORY_MAPPING
-	/*
-	 *  We may use MEMORY MOVE instructions to load the on chip-RAM,
-	 *  if it happens that mapping PCI memory is not possible.
-	 *  But writing the RAM from the CPU is the preferred method, 
-	 *  since PCI 2.2 seems to disallow PCI self-mastering.
-	 */
-}/*-------------------------< START_RAM >------------------------*/,{
-	/*
-	 *  Load the script into on-chip RAM, 
-	 *  and jump to start point.
-	 */
-	SCR_COPY (sizeof(struct SYM_FWA_SCR)),
-}/*-------------------------< SCRIPTA0_BA >----------------------*/,{
-		0,
-		PADDR_A (start),
-	SCR_JUMP,
-		PADDR_A (init),
-}/*-------------------------< START_RAM64 >----------------------*/,{
-	/*
-	 *  Load the RAM and start for 64 bit PCI (895A,896).
-	 *  Both scripts (script and scripth) are loaded into 
-	 *  the RAM which is 8K (4K for 825A/875/895).
-	 *  We also need to load some 32-63 bit segments 
-	 *  address of the SCRIPTS processor.
-	 *  LOAD/STORE ABSOLUTE always refers to on-chip RAM 
-	 *  in our implementation. The main memory is 
-	 *  accessed using LOAD/STORE DSA RELATIVE.
-	 */
-	SCR_LOAD_REL (mmws, 4),
-		offsetof (struct sym_hcb, scr_ram_seg),
-	SCR_COPY (sizeof(struct SYM_FWA_SCR)),
-}/*-------------------------< SCRIPTA0_BA64 >--------------------*/,{
-		0,
-		PADDR_A (start),
-	SCR_COPY (sizeof(struct SYM_FWB_SCR)),
-}/*-------------------------< SCRIPTB0_BA64 >--------------------*/,{
-		0,
-		PADDR_B  (start64),
-	SCR_LOAD_REL (mmrs, 4),
-		offsetof (struct sym_hcb, scr_ram_seg),
-	SCR_JUMP64,
-		PADDR_B (start64),
-}/*-------------------------< RAM_SEG64 >------------------------*/,{
-		0,
-#endif /* SYM_OPT_NO_BUS_MEMORY_MAPPING */
 }/*-------------------------<>-----------------------------------*/
 };

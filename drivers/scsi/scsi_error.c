@@ -164,14 +164,11 @@ int scsi_delete_timer(struct scsi_cmnd *scmd)
  **/
 void scsi_times_out(struct scsi_cmnd *scmd)
 {
+	scsi_log_completion(scmd, TIMEOUT);
 	if (unlikely(!scsi_eh_scmd_add(scmd, SCSI_EH_CANCEL_CMD))) {
 		panic("Error handler thread not present at %p %p %s %d",
 		      scmd, scmd->device->host, __FILE__, __LINE__);
 	}
-
-	SCSI_LOG_TIMEOUT(3, printk("Command timed out busy=%d failed=%d\n",
-				   scmd->device->host->host_busy,
-				   scmd->device->host->host_failed));
 }
 
 /**
@@ -446,10 +443,12 @@ static int scsi_send_eh_cmnd(struct scsi_cmnd *scmd, int timeout)
 	scmd->request->rq_status = RQ_SCSI_BUSY;
 
 	spin_lock_irqsave(scmd->device->host->host_lock, flags);
+	scsi_log_send(scmd);
 	host->hostt->queuecommand(scmd, scsi_eh_done);
 	spin_unlock_irqrestore(scmd->device->host->host_lock, flags);
 
 	down(&sem);
+	scsi_log_completion(scmd, SUCCESS);
 
 	scmd->device->host->eh_action = NULL;
 

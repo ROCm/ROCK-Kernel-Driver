@@ -204,18 +204,9 @@ static void __sym_mfree(m_pool_p mp, void *ptr, int size, char *name)
 /*
  *  Default memory pool we donnot need to involve in DMA.
  *
- *  If DMA abtraction is not needed, the generic allocator 
- *  calls directly some kernel allocator.
- *
  *  With DMA abstraction, we use functions (methods), to 
  *  distinguish between non DMAable memory and DMAable memory.
  */
-#ifndef	SYM_OPT_BUS_DMA_ABSTRACTION
-
-static struct sym_m_pool mp0;
-
-#else
-
 static m_addr_t ___mp0_get_mem_cluster(m_pool_p mp)
 {
 	m_addr_t m = (m_addr_t) sym_get_mem_cluster();
@@ -240,8 +231,6 @@ static struct sym_m_pool mp0 =
 	{0, ___mp0_get_mem_cluster};
 #endif
 
-#endif	/* SYM_OPT_BUS_DMA_ABSTRACTION */
-
 /*
  * Actual memory allocation routine for non-DMAed memory.
  */
@@ -260,7 +249,6 @@ void sym_mfree_unlocked(void *ptr, int size, char *name)
 	__sym_mfree(&mp0, ptr, size, name);
 }
 
-#ifdef	SYM_OPT_BUS_DMA_ABSTRACTION
 /*
  *  Methods that maintains DMAable pools according to user allocations.
  *  New pools are created on the fly when a new pool id is provided.
@@ -417,5 +405,3 @@ u32 __vtobus_unlocked(m_pool_ident_t dev_dmat, void *m)
 		panic("sym: VTOBUS FAILED!\n");
 	return (u32)(vp ? vp->baddr + (((m_addr_t) m) - a) : 0);
 }
-
-#endif	/* SYM_OPT_BUS_DMA_ABSTRACTION */
