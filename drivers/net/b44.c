@@ -799,12 +799,13 @@ static int b44_poll(struct net_device *netdev, int *budget)
 	return (done ? 0 : 1);
 }
 
-static void b44_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t b44_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = dev_id;
 	struct b44 *bp = dev->priv;
 	unsigned long flags;
 	u32 istat, imask;
+	int handled = 0;
 
 	spin_lock_irqsave(&bp->lock, flags);
 
@@ -816,6 +817,7 @@ static void b44_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	 */
 	istat &= imask;
 	if (istat) {
+		handled = 1;
 		if (netif_rx_schedule_prep(dev)) {
 			/* NOTE: These writes are posted by the readback of
 			 *       the ISTAT register below.
@@ -832,6 +834,7 @@ static void b44_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		br32(B44_ISTAT);
 	}
 	spin_unlock_irqrestore(&bp->lock, flags);
+	return IRQ_RETVAL(handled);
 }
 
 static void b44_tx_timeout(struct net_device *dev)

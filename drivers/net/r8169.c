@@ -295,7 +295,7 @@ MODULE_PARM(media, "1-" __MODULE_STRING(MAX_UNITS) "i");
 
 static int rtl8169_open(struct net_device *dev);
 static int rtl8169_start_xmit(struct sk_buff *skb, struct net_device *dev);
-static void rtl8169_interrupt(int irq, void *dev_instance,
+static irqreturn_t rtl8169_interrupt(int irq, void *dev_instance,
 			      struct pt_regs *regs);
 static void rtl8169_init_ring(struct net_device *dev);
 static void rtl8169_hw_start(struct net_device *dev);
@@ -958,7 +958,7 @@ rtl8169_rx_interrupt(struct net_device *dev, struct rtl8169_private *tp,
 }
 
 /* The interrupt handler does all of the Rx thread work and cleans up after the Tx thread. */
-static void
+static irqreturn_t
 rtl8169_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *) dev_instance;
@@ -966,6 +966,7 @@ rtl8169_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 	int boguscnt = max_interrupt_work;
 	void *ioaddr = tp->mmio_addr;
 	int status = 0;
+	int handled = 0;
 
 	do {
 		status = RTL_R16(IntrStatus);
@@ -974,6 +975,7 @@ rtl8169_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 		if (status == 0xFFFF)
 			break;
 
+		handled = 1;
 /*
 		if (status & RxUnderrun)
 			link_changed = RTL_R16 (CSCR) & CSCR_LinkChangeBit;
@@ -1006,6 +1008,7 @@ rtl8169_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 		/* Clear all interrupt sources. */
 		RTL_W16(IntrStatus, 0xffff);
 	}
+	return IRQ_RETVAL(handled);
 }
 
 static int
