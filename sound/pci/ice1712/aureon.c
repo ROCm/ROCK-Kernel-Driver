@@ -273,23 +273,27 @@ static int wm_dac_vol_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontr
 }
 
 /* digital master volume */
+#define MASTER_0dB 0xff
+#define MASTER_RES 128	/* -64dB */
+#define MASTER_MIN (MASTER_0dB - MASTER_RES)
 static int wm_master_vol_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
 {
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
 	uinfo->count = 1;
-	uinfo->value.integer.min = 0;		/* mute (-127.5dB) */
-	uinfo->value.integer.max = 0xff;	/* 0dB */
+	uinfo->value.integer.min = 0;		/* mute (-64dB) */
+	uinfo->value.integer.max = MASTER_RES;	/* 0dB */
 	return 0;
 }
 
 static int wm_master_vol_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
 {
 	ice1712_t *ice = snd_kcontrol_chip(kcontrol);
-	unsigned short vol;
+	unsigned short val;
 
 	down(&ice->gpio_mutex);
-	vol = wm_get(ice, WM_DAC_DIG_MASTER_ATTEN) & 0xff;
-	ucontrol->value.integer.value[0] = 0xff - vol;
+	val = wm_get(ice, WM_DAC_DIG_MASTER_ATTEN) & 0xff;
+	val = val > MASTER_MIN ? (val - MASTER_MIN) : 0;
+	ucontrol->value.integer.value[0] = val;
 	up(&ice->gpio_mutex);
 	return 0;
 }
@@ -301,7 +305,8 @@ static int wm_master_vol_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *uco
 	int change = 0;
 
 	snd_ice1712_save_gpio_status(ice);
-	nvol = 0xff - ucontrol->value.integer.value[0];
+	nvol = ucontrol->value.integer.value[0];
+	nvol = (nvol ? (nvol + MASTER_MIN) : 0) & 0xff;
 	ovol = wm_get(ice, WM_DAC_DIG_MASTER_ATTEN) & 0xff;
 	if (ovol != nvol) {
 		wm_put(ice, WM_DAC_DIG_MASTER_ATTEN, nvol); /* prelatch */
