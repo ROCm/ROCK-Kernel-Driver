@@ -348,9 +348,19 @@ static struct {
 };
 
 /* This is strictly temporary, until PCMCIA devices get integrated into the device model. */
-static struct device atmel_device = {
-        .bus_id    = "pcmcia",
-};
+static struct device *atmel_device(void)
+{
+	static char *kobj_name = "atmel_cs";
+
+	static struct device dev = {
+		.bus_id    = "pcmcia",
+	};
+	dev.kobj.k_name = kmalloc(strlen(kobj_name)+1, GFP_KERNEL);
+	strcpy(dev.kobj.k_name, kobj_name);
+	kobject_init(&dev.kobj);
+	
+	return &dev;
+}
 
 static void atmel_config(dev_link_t *link)
 {
@@ -537,12 +547,12 @@ static void atmel_config(dev_link_t *link)
 		       "atmel: cannot assign IRQ: check that CONFIG_ISA is set in kernel config.");
 		goto cs_failed;
 	}
-	
+       
 	((local_info_t*)link->priv)->eth_dev = 
 		init_atmel_card(link->irq.AssignedIRQ,
 				link->io.BasePort1,
 				card_index == -1 ? NULL :  card_table[card_index].firmware,
-				&atmel_device,
+				atmel_device(),
 				card_present, 
 				link);
 	if (!((local_info_t*)link->priv)->eth_dev) 
