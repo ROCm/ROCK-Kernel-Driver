@@ -725,7 +725,7 @@ static int stv680_stop_stream (struct usb_stv *stv680)
 
 	for (i = 0; i < STV680_NUMSBUF; i++)
 		if (stv680->urb[i]) {
-			usb_unlink_urb (stv680->urb[i]);
+			usb_kill_urb (stv680->urb[i]);
 			usb_free_urb (stv680->urb[i]);
 			stv680->urb[i] = NULL;
 			kfree (stv680->sbuf[i].data);
@@ -1457,7 +1457,7 @@ static inline void usb_stv680_remove_disconnected (struct usb_stv *stv680)
 
 	for (i = 0; i < STV680_NUMSBUF; i++)
 		if (stv680->urb[i]) {
-			usb_unlink_urb (stv680->urb[i]);
+			usb_kill_urb (stv680->urb[i]);
 			usb_free_urb (stv680->urb[i]);
 			stv680->urb[i] = NULL;
 			kfree (stv680->sbuf[i].data);
