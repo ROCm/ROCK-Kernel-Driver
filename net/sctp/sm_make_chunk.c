@@ -68,29 +68,6 @@
 
 /* RFC 2960 3.3.2 Initiation (INIT) (1)
  *
- * Note 4: This parameter, when present, specifies all the
- * address types the sending endpoint can support. The absence
- * of this parameter indicates that the sending endpoint can
- * support any address type.
- */
-static const sctp_supported_addrs_param_t sat_param = {
-	{
-		SCTP_PARAM_SUPPORTED_ADDRESS_TYPES,
-		__constant_htons(SCTP_SAT_LEN),
-	}
-};
-
-/* gcc 3.2 doesn't allow initialization of zero-length arrays. So the above
- * structure is split and the address types array is initialized using a
- * fixed length array.
- */
-static const __u16 sat_addr_types[2] = {
-	SCTP_PARAM_IPV4_ADDRESS,
-	SCTP_V6(SCTP_PARAM_IPV6_ADDRESS,)
-};
-
-/* RFC 2960 3.3.2 Initiation (INIT) (1)
- *
  * Note 2: The ECN capable field is reserved for future use of
  * Explicit Congestion Notification.
  */
@@ -174,7 +151,10 @@ sctp_chunk_t *sctp_make_init(const sctp_association_t *asoc,
 	union sctp_params addrs;
 	size_t chunksize;
 	sctp_chunk_t *retval = NULL;
-	int addrs_len = 0;
+	int num_types, addrs_len = 0;
+	struct sctp_opt *sp;
+	sctp_supported_addrs_param_t sat;
+	__u16 types[2];
 
 	/* RFC 2960 3.3.2 Initiation (INIT) (1)
 	 *
@@ -195,7 +175,11 @@ sctp_chunk_t *sctp_make_init(const sctp_association_t *asoc,
 	init.num_inbound_streams   = htons(asoc->c.sinit_max_instreams);
 	init.initial_tsn	   = htonl(asoc->c.initial_tsn);
 
-	chunksize = sizeof(init) + addrs_len + SCTP_SAT_LEN;
+	/* How many address types are needed? */
+	sp = sctp_sk(asoc->base.sk);
+	num_types = sp->pf->supported_addrs(sp, types);
+
+	chunksize = sizeof(init) + addrs_len + SCTP_SAT_LEN(num_types);
 	chunksize += sizeof(ecap_param);
 	chunksize += vparam_len;
 
@@ -220,11 +204,19 @@ sctp_chunk_t *sctp_make_init(const sctp_association_t *asoc,
 	retval->param_hdr.v =
 		sctp_addto_chunk(retval, addrs_len, addrs.v);
 
-	sctp_addto_chunk(retval, sizeof(sctp_paramhdr_t), &sat_param);
-	sctp_addto_chunk(retval, sizeof(sat_addr_types), sat_addr_types);
+	/* RFC 2960 3.3.2 Initiation (INIT) (1)
+	 *
+	 * Note 4: This parameter, when present, specifies all the
+	 * address types the sending endpoint can support. The absence
+	 * of this parameter indicates that the sending endpoint can
+	 * support any address type.
+	 */
+	sat.param_hdr.type = SCTP_PARAM_SUPPORTED_ADDRESS_TYPES;
+	sat.param_hdr.length = htons(SCTP_SAT_LEN(num_types));
+	sctp_addto_chunk(retval, sizeof(sat), &sat);
+	sctp_addto_chunk(retval, num_types * sizeof(__u16), &types);
 
 	sctp_addto_chunk(retval, sizeof(ecap_param), &ecap_param);
-
 nodata:
 	if (addrs.v)
 		kfree(addrs.v);
@@ -245,7 +237,8 @@ sctp_chunk_t *sctp_make_init_ack(const sctp_association_t *asoc,
 
 	retval = NULL;
 
-	addrs = sctp_bind_addrs_to_raw(&asoc->base.bind_addr, &addrs_len, priority);
+	addrs = sctp_bind_addrs_to_raw(&asoc->base.bind_addr, &addrs_len, 
+				       priority);
 	if (!addrs.v)
 		goto nomem_rawaddr;
 
@@ -586,14 +579,12 @@ sctp_chunk_t *sctp_make_sack(const sctp_association_t *asoc)
 	sctp_gap_ack_block_t gab;
 	int length;
 	__u32 ctsn;
-	sctp_tsnmap_iter_t iter;
-	__u16 num_gabs;
-	__u16 num_dup_tsns = asoc->peer.next_dup_tsn;
-	const sctp_tsnmap_t *map = &asoc->peer.tsn_map;
+	struct sctp_tsnmap_iter iter;
+	__u16 num_gabs, num_dup_tsns;
+	struct sctp_tsnmap *map = (struct sctp_tsnmap *)&asoc->peer.tsn_map;
 
 	ctsn = sctp_tsnmap_get_ctsn(map);
-	SCTP_DEBUG_PRINTK("make_sack: sackCTSNAck sent is 0x%x.\n",
-			  ctsn);
+	SCTP_DEBUG_PRINTK("sackCTSNAck sent is 0x%x.\n", ctsn);
 
 	/* Count the number of Gap Ack Blocks.  */
 	sctp_tsnmap_iter_init(map, &iter);
@@ -603,15 +594,17 @@ sctp_chunk_t *sctp_make_sack(const sctp_association_t *asoc)
 		/* Do nothing. */
 	}
 
+	num_dup_tsns = sctp_tsnmap_num_dups(map);
+
 	/* Initialize the SACK header.  */
 	sack.cum_tsn_ack	    = htonl(ctsn);
 	sack.a_rwnd 		    = htonl(asoc->rwnd);
 	sack.num_gap_ack_blocks     = htons(num_gabs);
-	sack.num_dup_tsns  = htons(num_dup_tsns);
+	sack.num_dup_tsns           = htons(num_dup_tsns);
 
 	length = sizeof(sack)
 		+ sizeof(sctp_gap_ack_block_t) * num_gabs
-		+ sizeof(sctp_dup_tsn_t) * num_dup_tsns;
+		+ sizeof(__u32) * num_dup_tsns;
 
 	/* Create the chunk.  */
 	retval = sctp_make_chunk(asoc, SCTP_CID_SACK, 0, length);
@@ -658,21 +651,18 @@ sctp_chunk_t *sctp_make_sack(const sctp_association_t *asoc)
 	while(sctp_tsnmap_next_gap_ack(map, &iter, &gab.start, &gab.end)) {
 		gab.start = htons(gab.start);
 		gab.end = htons(gab.end);
-		sctp_addto_chunk(retval,
-				 sizeof(sctp_gap_ack_block_t),
-				 &gab);
+		sctp_addto_chunk(retval, sizeof(sctp_gap_ack_block_t), &gab);
 	}
 
 	/* Register the duplicates.  */
-	sctp_addto_chunk(retval,
-			 sizeof(sctp_dup_tsn_t) * num_dup_tsns,
-			 &asoc->peer.dup_tsns);
+	sctp_addto_chunk(retval, sizeof(__u32) * num_dup_tsns,
+			 sctp_tsnmap_get_dups(map));
 
 nodata:
 	return retval;
 }
 
-/* FIXME: Comments. */
+/* Make a SHUTDOWN chunk. */
 sctp_chunk_t *sctp_make_shutdown(const sctp_association_t *asoc)
 {
 	sctp_chunk_t *retval;
@@ -689,7 +679,6 @@ sctp_chunk_t *sctp_make_shutdown(const sctp_association_t *asoc)
 
 	retval->subh.shutdown_hdr =
 		sctp_addto_chunk(retval, sizeof(shut), &shut);
-
 nodata:
 	return retval;
 }
@@ -1180,6 +1169,9 @@ int sctp_datachunks_from_user(sctp_association_t *asoc,
 	over = msg_len % max;
 	offset = 0;
 
+	if (whole && over)
+		SCTP_INC_STATS_USER(SctpFragUsrMsgs);
+
 	/* Create chunks for all the full sized DATA chunks. */
 	for (i=0, len=first_len; i < whole; i++) {
 		frag = SCTP_DATA_MIDDLE_FRAG;
@@ -1284,7 +1276,7 @@ void sctp_chunk_assign_tsn(sctp_chunk_t *chunk)
 		 * assign a TSN.
 		 */
 		chunk->subh.data_hdr->tsn =
-			htonl(__sctp_association_get_next_tsn(chunk->asoc));
+			htonl(sctp_association_get_next_tsn(chunk->asoc));
 		chunk->has_tsn = 1;
 	}
 }

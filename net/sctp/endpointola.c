@@ -65,7 +65,7 @@ static void sctp_endpoint_bh_rcv(sctp_endpoint_t *ep);
 /* Create a sctp_endpoint_t with all that boring stuff initialized.
  * Returns NULL if there isn't enough memory.
  */
-sctp_endpoint_t *sctp_endpoint_new(sctp_protocol_t *proto,
+sctp_endpoint_t *sctp_endpoint_new(struct sctp_protocol *proto,
 				   struct sock *sk, int priority)
 {
 	sctp_endpoint_t *ep;
@@ -89,10 +89,11 @@ fail:
 /*
  * Initialize the base fields of the endpoint structure.
  */
-sctp_endpoint_t *sctp_endpoint_init(sctp_endpoint_t *ep, sctp_protocol_t *proto,
+sctp_endpoint_t *sctp_endpoint_init(sctp_endpoint_t *ep, 
+				    struct sctp_protocol *proto,
 				    struct sock *sk, int priority)
 {
-	sctp_opt_t *sp = sctp_sk(sk);
+	struct sctp_opt *sp = sctp_sk(sk);
 	memset(ep, 0, sizeof(sctp_endpoint_t));
 
 	/* Initialize the base structure. */
@@ -105,10 +106,10 @@ sctp_endpoint_t *sctp_endpoint_init(sctp_endpoint_t *ep, sctp_protocol_t *proto,
 	ep->base.malloced = 1;
 
 	/* Create an input queue.  */
-	sctp_inqueue_init(&ep->base.inqueue);
+	sctp_inq_init(&ep->base.inqueue);
 
 	/* Set its top-half handler */
-	sctp_inqueue_set_th_handler(&ep->base.inqueue,
+	sctp_inq_set_th_handler(&ep->base.inqueue,
 				    (void (*)(void *))sctp_endpoint_bh_rcv,
 				    ep);
 
@@ -198,7 +199,7 @@ void sctp_endpoint_destroy(sctp_endpoint_t *ep)
 	sctp_unhash_endpoint(ep);
 
 	/* Cleanup the inqueue. */
-	sctp_inqueue_free(&ep->base.inqueue);
+	sctp_inq_free(&ep->base.inqueue);
 
 	sctp_bind_addr_free(&ep->base.bind_addr);
 
@@ -333,7 +334,7 @@ static void sctp_endpoint_bh_rcv(sctp_endpoint_t *ep)
 	struct sock *sk;
 	struct sctp_transport *transport;
 	sctp_chunk_t *chunk;
-	sctp_inqueue_t *inqueue;
+	struct sctp_inq *inqueue;
 	sctp_subtype_t subtype;
 	sctp_state_t state;
 	int error = 0;
@@ -345,7 +346,7 @@ static void sctp_endpoint_bh_rcv(sctp_endpoint_t *ep)
 	inqueue = &ep->base.inqueue;
 	sk = ep->base.sk;
 
-	while (NULL != (chunk = sctp_pop_inqueue(inqueue))) {		
+	while (NULL != (chunk = sctp_inq_pop(inqueue))) {		
 		subtype.chunk = chunk->chunk_hdr->type;
 
 		/* We might have grown an association since last we
@@ -369,6 +370,8 @@ static void sctp_endpoint_bh_rcv(sctp_endpoint_t *ep)
 		 */
 		if (asoc && sctp_chunk_is_data(chunk))
 			asoc->peer.last_data_from = chunk->transport;
+		else
+			SCTP_INC_STATS(SctpInCtrlChunks);
 
 		if (chunk->transport)
 			chunk->transport->last_time_heard = jiffies;

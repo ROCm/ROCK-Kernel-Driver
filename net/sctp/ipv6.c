@@ -131,6 +131,8 @@ static inline int sctp_v6_xmit(struct sk_buff *skb,
 			  __FUNCTION__, skb, skb->len, NIP6(fl.fl6_src),
 			  NIP6(fl.fl6_dst));
 
+	SCTP_INC_STATS(SctpOutSCTPPacks);
+
 	return ip6_xmit(sk, skb, &fl, np->opt);
 }
 
@@ -443,7 +445,7 @@ static void sctp_inet6_msgname(char *msgname, int *addr_len)
 }
 
 /* Initialize a PF_INET msgname from a ulpevent. */
-static void sctp_inet6_event_msgname(sctp_ulpevent_t *event, char *msgname,
+static void sctp_inet6_event_msgname(struct sctp_ulpevent *event, char *msgname,
 				     int *addrlen)
 {
 	struct sockaddr_in6 *sin6, *sin6from;
@@ -562,6 +564,20 @@ static int sctp_inet6_bind_verify(struct sctp_opt *opt, union sctp_addr *addr)
 	return af->available(addr);
 }
 
+/* Fill in Supported Address Type information for INIT and INIT-ACK
+ * chunks.   Note: In the future, we may want to look at sock options
+ * to determine whether a PF_INET6 socket really wants to have IPV4
+ * addresses.  
+ * Returns number of addresses supported.
+ */
+static int sctp_inet6_supported_addrs(const struct sctp_opt *opt,
+				      __u16 *types) 
+{
+	types[0] = SCTP_PARAM_IPV4_ADDRESS;
+	types[1] = SCTP_PARAM_IPV6_ADDRESS;
+	return 2;
+}
+
 static struct proto_ops inet6_seqpacket_ops = {
 	.family     = PF_INET6,
 	.release    = inet6_release,
@@ -624,6 +640,7 @@ static struct sctp_pf sctp_pf_inet6_specific = {
 	.af_supported  = sctp_inet6_af_supported,
 	.cmp_addr      = sctp_inet6_cmp_addr,
 	.bind_verify   = sctp_inet6_bind_verify,
+	.supported_addrs = sctp_inet6_supported_addrs,
 	.af            = &sctp_ipv6_specific,
 };
 
