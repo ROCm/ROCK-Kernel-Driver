@@ -4,6 +4,10 @@
  *
  * ipc helper functions (c) 1999 Manfred Spraul <manfreds@colorfullife.com>
  */
+
+#ifndef _IPC_UTIL_H
+#define _IPC_UTIL_H
+
 #define USHRT_MAX 0xffff
 #define SEQ_MULTIPLIER	(IPCMNI)
 
@@ -61,4 +65,10 @@ void ipc64_perm_to_ipc_perm(struct ipc64_perm *in, struct ipc_perm *out);
 # define ipc_parse_version(cmd)	IPC_64
 #else
 int ipc_parse_version (int *cmd);
+#endif
+
+extern void free_msg(struct msg_msg *msg);
+extern struct msg_msg *load_msg(void __user *src, int len);
+extern int store_msg(void __user *dest, struct msg_msg *msg, int len);
+
 #endif

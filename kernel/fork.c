@@ -21,6 +21,7 @@
 #include <linux/completion.h>
 #include <linux/namespace.h>
 #include <linux/personality.h>
+#include <linux/sem.h>
 #include <linux/file.h>
 #include <linux/binfmts.h>
 #include <linux/mman.h>
@@ -38,9 +39,6 @@
 #include <asm/mmu_context.h>
 #include <asm/cacheflush.h>
 #include <asm/tlbflush.h>
-
-extern int copy_semundo(unsigned long clone_flags, struct task_struct *tsk);
-extern void exit_sem(struct task_struct *tsk);
 
 /* The idle threads do not count..
  * Protected by write_lock_irq(&tasklist_lock)
