@@ -238,18 +238,18 @@
 static const char   ips_name[] = "ips";
 static struct Scsi_Host *ips_sh[IPS_MAX_ADAPTERS];   /* Array of host controller structures */
 static ips_ha_t    *ips_ha[IPS_MAX_ADAPTERS];        /* Array of HA structures */
-static unsigned int ips_next_controller = 0;
-static unsigned int ips_num_controllers = 0;
-static unsigned int ips_released_controllers = 0;
+static unsigned int ips_next_controller;
+static unsigned int ips_num_controllers;
+static unsigned int ips_released_controllers;
 static int          ips_hotplug;
 static int          ips_cmd_timeout = 60;
 static int          ips_reset_timeout = 60 * 5;
 static int          ips_force_memio = 1;             /* Always use Memory Mapped I/O    */
 static int          ips_force_i2o = 1;               /* Always use I2O command delivery */
 static int          ips_ioctlsize = IPS_IOCTL_SIZE;  /* Size of the ioctl buffer        */
-static int          ips_cd_boot = 0;                 /* Booting from Manager CD         */
+static int          ips_cd_boot;                     /* Booting from Manager CD         */
 static char        *ips_FlashData = NULL;            /* CD Boot - Flash Data Buffer      */
-static long         ips_FlashDataInUse = 0;          /* CD Boot - Flash Data In Use Flag */
+static long         ips_FlashDataInUse;              /* CD Boot - Flash Data In Use Flag */
 static uint32_t     MaxLiteCmds = 32;                /* Max Active Cmds for a Lite Adapter */  
 static Scsi_Host_Template ips_driver_template = {
 	.detect			= ips_detect,
@@ -585,8 +585,6 @@ ips_detect(Scsi_Host_Template *SHT) {
          printk( KERN_WARNING "ERROR: Can't Allocate Large Buffer for Flashing\n" );
       }
    }                                                                               
-   if (!pci_present())
-      return (0);
 
    SHT->proc_info = ips_proc_info;
    SHT->proc_name = "ips";
@@ -2426,6 +2424,7 @@ ips_get_bios_version(ips_ha_t *ha, int intr) {
          minor    = buffer[0x1fe + 0xC0];  /* Offset 0x1fe after the header (0xc0) */
          subminor = buffer[0x1fd + 0xC0];  /* Offset 0x1fd after the header (0xc0) */
       } else {
+         kfree(buffer);
          return;
       }
 
