@@ -1,11 +1,9 @@
 #ifndef _FS_PT_LDM_H_
 #define _FS_PT_LDM_H_
 /*
- * $Id: ldm.h,v 1.13 2001/07/23 19:49:49 antona Exp $
- *
  * ldm - Part of the Linux-NTFS project.
  *
- * Copyright (C) 2001 Richard Russon <ntfs@flatcap.org>
+ * Copyright (C) 2001 Richard Russon <ldm@flatcap.org>
  * Copyright (C) 2001 Anton Altaparmakov <antona@users.sf.net>
  *
  * Documentation is available at http://linux-ntfs.sf.net/ldm
@@ -25,7 +23,7 @@
  * in the file COPYING); if not, write to the Free Software Foundation,
  * Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-#include <asm/types.h>
+#include <linux/types.h>
 #include <asm/unaligned.h>
 #include <asm/byteorder.h>
 #include <linux/genhd.h>
@@ -45,8 +43,10 @@
 /* The defined vblk types. */
 #define VBLK_COMP		0x32		/* Component */
 #define VBLK_PART		0x33		/* Partition */
-#define VBLK_DISK		0x34		/* Disk */
-#define VBLK_DGRP		0x45		/* Disk Group */
+#define VBLK_DSK1		0x34		/* Disk */
+#define VBLK_DSK2		0x44		/* Disk */
+#define VBLK_DGR1		0x35		/* Disk Group */
+#define VBLK_DGR2		0x45		/* Disk Group */
 #define VBLK_VOLU		0x51		/* Volume */
 
 /* Other constants. */
@@ -142,6 +142,12 @@ struct vblk {
 	u64	disk_id;
 	u64	start_sector;
 	u64	num_sectors;
+};
+
+struct ldm_part {
+	struct list_head part_list;
+	unsigned long start;
+	unsigned long size;
 };
 
 int ldm_partition(struct gendisk *hd, struct block_device *bdev,

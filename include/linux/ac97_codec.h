@@ -239,6 +239,7 @@ extern int ac97_read_proc (char *page_out, char **start, off_t off,
 extern int ac97_probe_codec(struct ac97_codec *);
 extern unsigned int ac97_set_adc_rate(struct ac97_codec *codec, unsigned int rate);
 extern unsigned int ac97_set_dac_rate(struct ac97_codec *codec, unsigned int rate);
-
+extern int ac97_save_state(struct ac97_codec *codec);
+extern int ac97_restore_state(struct ac97_codec *codec);
 
 #endif /* _AC97_CODEC_H_ */

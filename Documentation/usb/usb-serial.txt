@@ -44,28 +44,33 @@ ConnectTech WhiteHEAT 4 port converter
   device, including providing a unit to test with. This driver will end up
   being fully supported.
 
-Current status:
-  The device's firmware is downloaded on connection, the new firmware 
-  runs properly and all four ports are successfully recognized and connected.
-  Data can be sent and received through the device on all ports.
-  Hardware flow control needs to be implemented.
+  Current status:
+    The device's firmware is downloaded on connection, the new firmware 
+    runs properly and all four ports are successfully recognized and connected.
+    Data can be sent and received through the device on all ports.
+    Hardware flow control needs to be implemented.
+
+  For any questions or problems with this driver, please contact Greg
+  Kroah-Hartman at greg@kroah.com
 
 
-HandSpring Visor USB docking station
+HandSpring Visor, Palm USB, and Clié USB driver
 
-Current status:
-  Only when the Visor tries to connect to the host, does the docking
-  station show up as a valid USB device. When this happens, the device is
+  This driver works with all HandSpring USB, Palm USB, and Sony Clié USB
+  devices.
+
+  Only when the device tries to connect to the host, will the device show
+  up to the host as a valid USB device. When this happens, the device is
   properly enumerated, assigned a port, and then communication _should_ be
   possible. The driver cleans up properly when the device is removed, or
-  the connection is canceled on the Visor.
+  the connection is canceled on the device.
 
   NOTE:
-    This means that in order to talk to the Visor, the sync button must be
-    pressed BEFORE trying to get any program to communicate to the Visor.
+    This means that in order to talk to the device, the sync button must be
+    pressed BEFORE trying to get any program to communicate to the device.
     This goes against the current documentation for pilot-xfer and other
     packages, but is the only way that it will work due to the hardware
-    in the Visor.
+    in the device.
   
   When the device is connected, try talking to it on the second port
   (this is usually /dev/ttyUSB1 if you do not have any other usb-serial
@@ -73,13 +78,21 @@ Current status:
   the port to use for the HotSync transfer. The "Generic" port can be used
   for other device communication, such as a PPP link.
 
+  For some Sony Clié devices, /dev/ttyUSB0 must be used to talk to the
+  device.  This is true for all OS version 3.5 devices, and most devices
+  that have had a flash upgrade to a newer version of the OS.  See the
+  kernel system log for information on which is the correct port to use.
+
   If after pressing the sync button, nothing shows up in the system log,
-  try resetting the Visor, first a hot reset, and then a cold reset if
-  necessary.  Some Visors need this before they can talk to the USB port
+  try resetting the device, first a hot reset, and then a cold reset if
+  necessary.  Some devices need this before they can talk to the USB port
   properly.
   
-  There is a webpage and mailing lists for this portion of the driver at: 
+  There is a webpage and mailing lists for this portion of the driver at:
   http://usbvisor.sourceforge.net/
+
+  For any questions or problems with this driver, please contact Greg
+  Kroah-Hartman at greg@kroah.com
 
 
 Keyspan PDA Serial Adapter
@@ -87,23 +100,27 @@ Keyspan PDA Serial Adapter
   Single port DB-9 serial adapter, pushed as a PDA adapter for iMacs (mostly
   sold in Macintosh catalogs, comes in a translucent white/green dongle).
   Fairly simple device. Firmware is homebrew.
+  This driver also works for the Xircom/Entrgra single port serial adapter.
 
-Current status:
- Things that work:
-   basic input/output (tested with 'cu')
-   blocking write when serial line can't keep up
-   changing baud rates (up to 115200)
-   getting/setting modem control pins (TIOCM{GET,SET,BIS,BIC})
-   sending break (although duration looks suspect)
- Things that don't:
-   device strings (as logged by kernel) have trailing binary garbage
-   device ID isn't right, might collide with other Keyspan products
-   changing baud rates ought to flush tx/rx to avoid mangled half characters
- Big Things on the todo list:
-   parity, 7 vs 8 bits per char, 1 or 2 stop bits
-   HW flow control
-   not all of the standard USB descriptors are handled: Get_Status, Set_Feature
-   O_NONBLOCK, select()
+  Current status:
+   Things that work:
+     basic input/output (tested with 'cu')
+     blocking write when serial line can't keep up
+     changing baud rates (up to 115200)
+     getting/setting modem control pins (TIOCM{GET,SET,BIS,BIC})
+     sending break (although duration looks suspect)
+   Things that don't:
+     device strings (as logged by kernel) have trailing binary garbage
+     device ID isn't right, might collide with other Keyspan products
+     changing baud rates ought to flush tx/rx to avoid mangled half characters
+   Big Things on the todo list:
+     parity, 7 vs 8 bits per char, 1 or 2 stop bits
+     HW flow control
+     not all of the standard USB descriptors are handled: Get_Status, Set_Feature
+     O_NONBLOCK, select()
+
+  For any questions or problems with this driver, please contact Brian
+  Warner at warner@lothar.com 
 
 
 Keyspan USA-series Serial Adapters
@@ -111,25 +128,31 @@ Keyspan USA-series Serial Adapters
   Single, Dual and Quad port adapters - driver uses Keyspan supplied 
   firmware and is being developed with their support.
   
-Current status:
-  The USA-18X, USA-28X, USA-19, USA-19W and USA-49W are supported and
-  have been pretty throughly tested at various baud rates with 8-N-1
-  character settings.  Other character lengths and parity setups are
-  presently untested.
+  Current status:
+    The USA-18X, USA-28X, USA-19, USA-19W and USA-49W are supported and
+    have been pretty throughly tested at various baud rates with 8-N-1
+    character settings.  Other character lengths and parity setups are
+    presently untested.
 
-  The USA-28 isn't yet supported though doing so should be pretty
-  straightforward.  Contact the maintainer if you require this
-  functionality.
+    The USA-28 isn't yet supported though doing so should be pretty
+    straightforward.  Contact the maintainer if you require this
+    functionality.
   
   More information is available at:
-        http://www.linuxcare.com.au/hugh/keyspan.html
+        http://misc.nu/hugh/keyspan.html
    
+  For any questions or problems with this driver, please contact Hugh
+  Blemings at hugh@misc.nu
+
 
 FTDI Single Port Serial Driver
 
   This is a single port DB-25 serial adapter. More information about this
   device and the Linux driver can be found at:
 	http://reality.sgi.com/bryder_wellington/ftdi_sio/
+
+  For any questions or problems with this driver, please contact Bill Ryder
+  at bryder@sgi.com
 
 
 ZyXEL omni.net lcd plus ISDN TA
@@ -162,65 +185,71 @@ Digi AccelePort Driver
 Belkin USB Serial Adapter F5U103
 
   Single port DB-9/PS-2 serial adapter from Belkin with firmware by eTEK Labs.
-  The Peracom single port serial adapter also works with this driver.
+  The Peracom single port serial adapter also works with this driver, as
+  well as the GoHubs adapter.
 
-Current status:
-  The following have been tested and work:
-    Baud rate    300-230400               
-    Data bits    5-8
-    Stop bits    1-2
-    Parity       N,E,O,M,S
-    Handshake    None, Software (XON/XOFF), Hardware (CTSRTS,CTSDTR)*
-    Break        Set and clear
-    Line contrl  Input/Output query and control **
+  Current status:
+    The following have been tested and work:
+      Baud rate    300-230400               
+      Data bits    5-8
+      Stop bits    1-2
+      Parity       N,E,O,M,S
+      Handshake    None, Software (XON/XOFF), Hardware (CTSRTS,CTSDTR)*
+      Break        Set and clear
+      Line contrl  Input/Output query and control **
 
-    *  Hardware input flow control is only enabled for firmware
-       levels above 2.06.  Read source code comments describing Belkin
-       firmware errata.  Hardware output flow control is working for all
-       firmware versions.
-    ** Queries of inputs (CTS,DSR,CD,RI) show the last
-       reported state.  Queries of outputs (DTR,RTS) show the last
-       requested state and may not reflect current state as set by
-       automatic hardware flow control.
+      *  Hardware input flow control is only enabled for firmware
+         levels above 2.06.  Read source code comments describing Belkin
+         firmware errata.  Hardware output flow control is working for all
+         firmware versions.
+      ** Queries of inputs (CTS,DSR,CD,RI) show the last
+         reported state.  Queries of outputs (DTR,RTS) show the last
+         requested state and may not reflect current state as set by
+         automatic hardware flow control.
 
-TO DO List:
-  -- Add true modem contol line query capability.  Currently tracks the
-     states reported by the interrupt and the states requested.
-  -- Add error reporting back to application for UART error conditions.
-  -- Add support for flush ioctls.
-  -- Add everything else that is missing :)
+  TO DO List:
+    -- Add true modem contol line query capability.  Currently tracks the
+       states reported by the interrupt and the states requested.
+    -- Add error reporting back to application for UART error conditions.
+    -- Add support for flush ioctls.
+    -- Add everything else that is missing :)
+
+  For any questions or problems with this driver, please contact William
+  Greathouse at wgreathouse@smva.com
 
 
-Empeg empeg-car Mark I/II Driver (empeg.c)
+Empeg empeg-car Mark I/II Driver
 
   This is an experimental driver to provide connectivity support for the
   client synchronization tools for an Empeg empeg-car mp3 player.
 
   Tips:
-
     * Don't forget to create the device nodes for ttyUSB{0,1,2,...}
     * modprobe empeg (modprobe is your friend)
     * emptool --usb /dev/ttyUSB0 (or whatever you named your device node)
 
-  The driver is still pretty new, so some testing 'in the wild' would be
-  helpful. :)
+  For any questions or problems with this driver, please contact Gary
+  Brubaker at xavyer@ix.netcom.com
 
 
 MCT USB Single Port Serial Adapter U232
 
- This driver is for the MCT USB-RS232 Converter (25 pin, Model No.
- U232-P25) from Magic Control Technology Corp. (there is also a 9 pin
- Model No. U232-P9). More information about this device can be found
- at the manufacture's web-site: http://www.mct.com.tw.
+  This driver is for the MCT USB-RS232 Converter (25 pin, Model No.
+  U232-P25) from Magic Control Technology Corp. (there is also a 9 pin
+  Model No. U232-P9). More information about this device can be found at
+  the manufacture's web-site: http://www.mct.com.tw.
 
- The driver is generally working, though it still needs some more
- testing. It is derived from the Belkin USB Serial Adapter F5U103
- driver and its TODO list is valid for this driver as well.
+  The driver is generally working, though it still needs some more testing.
+  It is derived from the Belkin USB Serial Adapter F5U103 driver and its
+  TODO list is valid for this driver as well.
 
- This driver has also been found to work for other products, which have 
- the same Vendor ID but different Product IDs. Sitecom's U232-P25 
- serial converter uses Product ID 0x230 and Vendor ID 0x711 and works with 
- this driver. Also, D-Link's DU-H3SP USB BAY also works with this driver.
+  This driver has also been found to work for other products, which have
+  the same Vendor ID but different Product IDs. Sitecom's U232-P25 serial
+  converter uses Product ID 0x230 and Vendor ID 0x711 and works with this
+  driver. Also, D-Link's DU-H3SP USB BAY also works with this driver.
+
+  For any questions or problems with this driver, please contact Wolfgang
+  Grandegger at wolfgang@ces.ch
 
 
 Inside Out Networks Edgeport Driver
@@ -244,17 +273,34 @@ Inside Out Networks Edgeport Driver
        Edgeport/4 DIN
        Edgeport/16 Dual
 
+  For any questions or problems with this driver, please contact Greg
+  Kroah-Hartman at greg@kroah.com
+
 
 REINER SCT cyberJack pinpad/e-com USB chipcard reader
    
   Interface to ISO 7816 compatible contactbased chipcards, e.g. GSM SIMs.
   
-Current status:
-  This is the kernel part of the driver for this USB card reader.
-  There is also a user part for a CT-API driver available. A site
-  for downloading is TBA. For now, you can request it from the
-  maintainer (linux-usb@sii.li).
+  Current status:
+    This is the kernel part of the driver for this USB card reader.
+    There is also a user part for a CT-API driver available. A site
+    for downloading is TBA. For now, you can request it from the
+    maintainer (linux-usb@sii.li).
 
+  For any questions or problems with this driver, please contact
+  linux-usb@sii.li
+
+
+Prolific PL2303 Driver
+
+  This driver support any device that has the PL2303 chip from Prolific
+  in it.  This includes a number of single port USB to serial
+  converters and USB GPS devices.  Devices from Aten (the UC-232) and
+  IO-Data work with this driver.
+
+  For any questions or problems with this driver, please contact Greg
+  Kroah-Hartman at greg@kroah.com
+  
 
 Generic Serial driver
 
@@ -275,13 +321,17 @@ Generic Serial driver
   development board, providing a way to develop USB firmware without
   having to write a custom driver.
 
+  For any questions or problems with this driver, please contact Greg
+  Kroah-Hartman at greg@kroah.com
+
 
 CONTACT:
 
-  If anyone has any problems using this driver, with any of the above
-  specified products, please contact me, or join the Linux-USB mailing
-  list (information on joining the mailing list, as well as a link to its
-  searchable archive is at http://www.linux-usb.org/ )
+  If anyone has any problems using these drivers, with any of the above
+  specified products, please contact the specific driver's author listed
+  above, or join the Linux-USB mailing list (information on joining the
+  mailing list, as well as a link to its searchable archive is at
+  http://www.linux-usb.org/ )
 
 
 Greg Kroah-Hartman

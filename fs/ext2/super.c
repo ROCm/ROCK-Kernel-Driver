@@ -640,9 +640,9 @@ struct super_block * ext2_read_super (struct super_block * sb, void * data,
 		if (sb->s_root) {
 			dput(sb->s_root);
 			sb->s_root = NULL;
-			printk ("EXT2-fs: corrupt root inode, run e2fsck\n");
+			printk(KERN_ERR "EXT2-fs: corrupt root inode, run e2fsck\n");
 		} else
-			printk ("EXT2-fs: get root inode failed\n");
+			printk(KERN_ERR "EXT2-fs: get root inode failed\n");
 		goto failed_mount2;
 	}
 	ext2_setup_super (sb, es, sb->s_flags & MS_RDONLY);

@@ -162,6 +162,14 @@ struct isapnp_device_id {
 	unsigned long driver_data;	/* data private to the driver */
 };
 
+struct isapnp_driver {
+	struct list_head node;
+	char *name;
+	const struct isapnp_device_id *id_table;	/* NULL if wants all devices */
+	int  (*probe)  (struct pci_dev *dev, const struct isapnp_device_id *id);	/* New device inserted */
+	void (*remove) (struct pci_dev *dev);	/* Device removed (NULL if not a hot-plug capable driver) */
+};
+
 #if defined(CONFIG_ISAPNP) || (defined(CONFIG_ISAPNP_MODULE) && defined(MODULE))
 
 #define __ISAPNP__
@@ -214,6 +222,9 @@ extern struct list_head isapnp_devices;
 #define isapnp_for_each_dev(dev) \
 	for(dev = pci_dev_g(isapnp_devices.next); dev != pci_dev_g(&isapnp_devices); dev = pci_dev_g(dev->global_list.next))
 
+int isapnp_register_driver(struct isapnp_driver *drv);
+void isapnp_unregister_driver(struct isapnp_driver *drv);
+
 #else /* !CONFIG_ISAPNP */
 
 /* lowlevel configuration */
@@ -248,6 +259,10 @@ static inline void isapnp_resource_change(struct resource *resource,
 					  unsigned long start,
 					  unsigned long size) { ; }
 static inline int isapnp_activate_dev(struct pci_dev *dev, const char *name) { return -ENODEV; }
+
+static inline int isapnp_register_driver(struct isapnp_driver *drv) { return 0; }
+
+static inline void isapnp_unregister_driver(struct isapnp_driver *drv) { }
 
 #endif /* CONFIG_ISAPNP */
 

@@ -25,6 +25,9 @@
  *  2001-06-03  Added release_region calls to correspond with
  *		request_region calls when a failure occurs.  Also
  *		added KERN_* constants to printk() calls.
+ *  2001-11-07  Added isapnp_{,un}register_driver calls along the lines
+ *              of the pci driver interface
+ *              Kai Germaschewski <kai.germaschewski@gmx.de>
  */
 
 #include <linux/config.h>
@@ -2162,6 +2165,89 @@ static void isapnp_free_all_resources(void)
 #endif
 }
 
+static int isapnp_announce_device(struct isapnp_driver *drv, 
+				  struct pci_dev *dev)
+{
+	const struct isapnp_device_id *id;
+	int ret = 0;
+
+	if (drv->id_table) {
+		id = isapnp_match_dev(drv->id_table, dev);
+		if (!id) {
+			ret = 0;
+			goto out;
+		}
+	} else
+		id = NULL;
+
+	if (drv->probe(dev, id) >= 0) {
+		dev->driver = (struct pci_driver *) drv;
+		ret = 1;
+	}
+out:
+	return ret;
+}
+
+/**
+ * isapnp_dev_driver - get the isapnp_driver of a device
+ * @dev: the device to query
+ *
+ * Returns the appropriate isapnp_driver structure or %NULL if there is no 
+ * registered driver for the device.
+ */
+static struct isapnp_driver *isapnp_dev_driver(const struct pci_dev *dev)
+{
+	return (struct isapnp_driver *) dev->driver;
+}
+
+static LIST_HEAD(isapnp_drivers);
+
+/**
+ * isapnp_register_driver - register a new ISAPnP driver
+ * @drv: the driver structure to register
+ * 
+ * Adds the driver structure to the list of registered ISAPnP drivers
+ * Returns the number of isapnp devices which were claimed by the driver
+ * during registration.  The driver remains registered even if the
+ * return value is zero.
+ */
+int isapnp_register_driver(struct isapnp_driver *drv)
+{
+	struct pci_dev *dev;
+	int count = 0;
+
+	list_add_tail(&drv->node, &isapnp_drivers);
+
+	isapnp_for_each_dev(dev) {
+		if (!isapnp_dev_driver(dev))
+			count += isapnp_announce_device(drv, dev);
+	}
+	return count;
+}
+
+/**
+ * isapnp_unregister_driver - unregister an isapnp driver
+ * @drv: the driver structure to unregister
+ * 
+ * Deletes the driver structure from the list of registered ISAPnP drivers,
+ * gives it a chance to clean up by calling its remove() function for
+ * each device it was responsible for, and marks those devices as
+ * driverless.
+ */
+void isapnp_unregister_driver(struct isapnp_driver *drv)
+{
+	struct pci_dev *dev;
+
+	list_del(&drv->node);
+	isapnp_for_each_dev(dev) {
+		if (dev->driver == (struct pci_driver *) drv) {
+			if (drv->remove)
+				drv->remove(dev);
+			dev->driver = NULL;
+		}
+	}
+}
+
 EXPORT_SYMBOL(isapnp_cards);
 EXPORT_SYMBOL(isapnp_devices);
 EXPORT_SYMBOL(isapnp_present);
@@ -2183,6 +2269,8 @@ EXPORT_SYMBOL(isapnp_probe_cards);
 EXPORT_SYMBOL(isapnp_probe_devs);
 EXPORT_SYMBOL(isapnp_activate_dev);
 EXPORT_SYMBOL(isapnp_resource_change);
+EXPORT_SYMBOL(isapnp_register_driver);
+EXPORT_SYMBOL(isapnp_unregister_driver);
 
 int __init isapnp_init(void)
 {

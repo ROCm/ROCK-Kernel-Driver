@@ -60,14 +60,6 @@
 #include <pcmcia/cisreg.h>
 #include <pcmcia/bus_ops.h>
 #include "cs_internal.h"
-#include "rsrc_mgr.h"
-
-#ifdef PCMCIA_DEBUG
-int pc_debug = PCMCIA_DEBUG;
-MODULE_PARM(pc_debug, "i");
-static const char *version =
-"cs.c 1.271 2000/10/02 20:27:49 (David Hinds)";
-#endif
 
 #ifdef CONFIG_PCI
 #define PCI_OPT " [pci]"
@@ -93,14 +85,14 @@ static const char *version =
 static const char *release = "Linux Kernel Card Services " CS_RELEASE;
 static const char *options = "options: " OPTIONS;
 
+/*====================================================================*/
+
+/* Module parameters */
+
 MODULE_AUTHOR("David Hinds <dahinds@users.sourceforge.net>");
 MODULE_DESCRIPTION("Linux Kernel Card Services " CS_RELEASE
 		   "\n  options:" OPTIONS);
 MODULE_LICENSE("Dual MPL/GPL");	  
-
-/*====================================================================*/
-
-/* Parameters that can be set with 'insmod' */
 
 #define INT_MODULE_PARM(n, v) static int n = v; MODULE_PARM(n, "i")
 
@@ -126,6 +118,12 @@ INT_MODULE_PARM(do_apm,		1);
 INT_MODULE_PARM(do_apm,		0);
 #endif
 
+#ifdef PCMCIA_DEBUG
+INT_MODULE_PARM(pc_debug, PCMCIA_DEBUG);
+static const char *version =
+"cs.c 1.279 2001/10/13 00:08:28 (David Hinds)";
+#endif
+ 
 /*====================================================================*/
 
 socket_state_t dead_socket = {
@@ -472,6 +470,15 @@ static void shutdown_socket(socket_info_t *s)
 	kfree(s->fake_cis);
 	s->fake_cis = NULL;
     }
+    /* Should not the socket be forced quiet as well?  e.g. turn off Vcc */
+    /* Without these changes, the socket is left hot, even though card-services */
+    /* realizes that no card is in place. */
+    s->socket.flags &= ~SS_OUTPUT_ENA;
+    s->socket.Vpp = 0;
+    s->socket.Vcc = 0;
+    s->socket.io_irq = 0;
+    set_socket(s, &s->socket);
+    /* */
 #ifdef CONFIG_CARDBUS
     cb_release_cis_mem(s);
     cb_free(s);
@@ -622,7 +629,7 @@ static void unreset_socket(socket_info_t *s)
 
     The central event handler.  Send_event() sends an event to all
     valid clients.  Parse_events() interprets the event bits from
-    a card status change report.  Do_shotdown() handles the high
+    a card status change report.  Do_shutdown() handles the high
     priority stuff associated with a card removal.
     
 ======================================================================*/
@@ -1508,7 +1515,7 @@ int pcmcia_release_configuration(client_handle_t handle)
     if (!(handle->state & CLIENT_STALE)) {
 	config_t *c = CONFIG(handle);
 	if (--(s->lock_count) == 0) {
-	    s->socket.flags = SS_OUTPUT_ENA;
+	    s->socket.flags = SS_OUTPUT_ENA;   /* Is this correct? */
 	    s->socket.Vpp = 0;
 	    s->socket.io_irq = 0;
 	    set_socket(s, &s->socket);

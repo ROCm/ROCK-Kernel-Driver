@@ -24,6 +24,9 @@
  *   Basic tests have been performed with minicom/zmodem transfers and
  *   modem dialing under Linux 2.4.0-test10 (for me it works fine).
  *
+ * 10-Nov-2001 Wolfgang Grandegger
+ *   - Fixed an endianess problem with the baudrate selection for PowerPC.
+ *
  * 30-May-2001 Greg Kroah-Hartman
  *	switched from using spinlock to a semaphore, which fixes lots of problems.
  *
@@ -263,7 +266,7 @@ static int mct_u232_set_baud_rate(struct usb_serial *serial, int value)
 {
 	unsigned int divisor;
         int rc;
-	divisor = mct_u232_calculate_baud_rate(serial, value);
+	divisor = cpu_to_le32(mct_u232_calculate_baud_rate(serial, value));
         rc = usb_control_msg(serial->dev, usb_sndctrlpipe(serial->dev, 0),
                              MCT_U232_SET_BAUD_RATE_REQUEST,
 			     MCT_U232_SET_REQUEST_TYPE,

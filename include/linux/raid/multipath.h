@@ -7,14 +7,11 @@ struct multipath_info {
 	int		number;
 	int		raid_disk;
 	kdev_t		dev;
-	int		sect_limit;
-	int		head_position;
 
 	/*
 	 * State bits:
 	 */
 	int		operational;
-	int		write_only;
 	int		spare;
 
 	int		used_slot;
@@ -36,22 +33,10 @@ struct multipath_private_data {
 	 * multipath_bh that are pre-allocated have MPBH_PreAlloc set.
 	 * All these variable are protected by device_lock
 	 */
-	struct buffer_head	*freebh;
-	int			freebh_cnt;	/* how many are on the list */
 	struct multipath_bh	*freer1;
-	struct multipath_bh	*freebuf; 	/* each bh_req has a page allocated */
+	int			freer1_blocked;
+	int			freer1_cnt;
 	md_wait_queue_head_t	wait_buffer;
-
-	/* for use when syncing multipaths: */
-	unsigned long	start_active, start_ready,
-		start_pending, start_future;
-	int	cnt_done, cnt_active, cnt_ready,
-		cnt_pending, cnt_future;
-	int	phase;
-	int	window;
-	md_wait_queue_head_t	wait_done;
-	md_wait_queue_head_t	wait_ready;
-	md_spinlock_t		segment_lock;
 };
 
 typedef struct multipath_private_data multipath_conf_t;
@@ -76,9 +61,8 @@ struct multipath_bh {
 	unsigned long		state;
 	mddev_t			*mddev;
 	struct buffer_head	*master_bh;
-	struct buffer_head	*multipath_bh_list;
 	struct buffer_head	bh_req;
-	struct multipath_bh	*next_r1;	/* next for retry or in free list */
+	struct multipath_bh	*next_mp; /* next for retry or in free list */
 };
 /* bits for multipath_bh.state */
 #define	MPBH_Uptodate	1

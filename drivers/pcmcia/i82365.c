@@ -66,11 +66,6 @@
 #include "ricoh.h"
 #include "o2micro.h"
 
-/* PCI-bus controllers */
-#include "old-yenta.h"
-#include "smc34c90.h"
-#include "topic.h"
-
 #ifdef PCMCIA_DEBUG
 static int pc_debug = PCMCIA_DEBUG;
 MODULE_PARM(pc_debug, "i");

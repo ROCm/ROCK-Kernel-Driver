@@ -499,6 +499,9 @@ struct speedo_private {
 	unsigned short phy[2];				/* PHY media interfaces available. */
 	unsigned short advertising;			/* Current PHY advertised caps. */
 	unsigned short partner;				/* Link partner caps. */
+#ifdef CONFIG_PM
+	u32 pm_state[16];
+#endif
 };
 
 /* The parameters for a CmdConfigure operation.
@@ -2193,7 +2196,10 @@ static void set_rx_mode(struct net_device *dev)
 static int eepro100_suspend(struct pci_dev *pdev, u32 state)
 {
 	struct net_device *dev = pci_get_drvdata (pdev);
+	struct speedo_private *sp = (struct speedo_private *)dev->priv;
 	long ioaddr = dev->base_addr;
+
+	pci_save_state(pdev, sp->pm_state);
 
 	if (!netif_running(dev))
 		return 0;
@@ -2210,6 +2216,8 @@ static int eepro100_resume(struct pci_dev *pdev)
 	struct net_device *dev = pci_get_drvdata (pdev);
 	struct speedo_private *sp = (struct speedo_private *)dev->priv;
 	long ioaddr = dev->base_addr;
+
+	pci_restore_state(pdev, sp->pm_state);
 
 	if (!netif_running(dev))
 		return 0;

@@ -25,6 +25,7 @@
  *
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  *
+ * $Id: acpitable.c,v 1.7 2001/11/04 12:21:18 fenrus Exp $
  */
 #include <linux/config.h>
 #include <linux/kernel.h>
@@ -40,244 +41,13 @@
 #include <asm/page.h>
 #include <asm/pgtable.h>
 
-#define SELF_CONTAINED_ACPI
-
-#ifdef SELF_CONTAINED_ACPI
-/*
- * The following codes are cut&pasted from drivers/acpi. Part of the code
- * there can be not updated or delivered yet.
- * To avoid conflicts when CONFIG_ACPI is defined, the following codes are
- * modified so that they are self-contained in this file.
- * -- jun
- */
-#define dprintk printk
-typedef unsigned int ACPI_TBLPTR;
-
-#define AE_CODE_ENVIRONMENTAL           0x0000
-#define AE_OK				(u32) 0x0000
-#define AE_ERROR			(u32) (0x0001 | AE_CODE_ENVIRONMENTAL)
-#define AE_NO_ACPI_TABLES		(u32) (0x0002 | AE_CODE_ENVIRONMENTAL)
-#define AE_NOT_FOUND                    (u32) (0x0005 | AE_CODE_ENVIRONMENTAL)
-
-typedef struct {		/* ACPI common table header */
-	char signature[4];	/* identifies type of table */
-	u32 length;		/* length of table,
-				   in bytes, * including header */
-	u8 revision;		/* specification minor version # */
-	u8 checksum;		/* to make sum of entire table == 0 */
-	char oem_id[6];		/* OEM identification */
-	char oem_table_id[8];	/* OEM table identification */
-	u32 oem_revision;	/* OEM revision number */
-	char asl_compiler_id[4];	/* ASL compiler vendor ID */
-	u32 asl_compiler_revision;	/* ASL compiler revision number */
-} acpi_table_header __attribute__ ((packed));;
-
-enum {
-	ACPI_APIC = 0,
-	ACPI_BOOT,
-	ACPI_DBGP,
-	ACPI_DSDT,
-	ACPI_ECDT,
-	ACPI_ETDT,
-	ACPI_FACP,
-	ACPI_FACS,
-	ACPI_OEMX,
-	ACPI_PSDT,
-	ACPI_SBST,
-	ACPI_SLIT,
-	ACPI_SPCR,
-	ACPI_SRAT,
-	ACPI_SSDT,
-	ACPI_SPMI,
-	ACPI_XSDT,
-	ACPI_TABLE_COUNT
-};
-
-static char *acpi_table_signatures[ACPI_TABLE_COUNT] = {
-	"APIC",
-	"BOOT",
-	"DBGP",
-	"DSDT",
-	"ECDT",
-	"ETDT",
-	"FACP",
-	"FACS",
-	"OEM",
-	"PSDT",
-	"SBST",
-	"SLIT",
-	"SPCR",
-	"SRAT",
-	"SSDT",
-	"SPMI",
-	"XSDT"
-};
-
-struct acpi_table_madt {
-	acpi_table_header header;
-	u32 lapic_address;
-	struct {
-		u32 pcat_compat:1;
-		u32 reserved:31;
-	} flags __attribute__ ((packed));
-} __attribute__ ((packed));;
-
-enum {
-	ACPI_MADT_LAPIC = 0,
-	ACPI_MADT_IOAPIC,
-	ACPI_MADT_INT_SRC_OVR,
-	ACPI_MADT_NMI_SRC,
-	ACPI_MADT_LAPIC_NMI,
-	ACPI_MADT_LAPIC_ADDR_OVR,
-	ACPI_MADT_IOSAPIC,
-	ACPI_MADT_LSAPIC,
-	ACPI_MADT_PLAT_INT_SRC,
-	ACPI_MADT_ENTRY_COUNT
-};
-
-#define RSDP_SIG			"RSD PTR "
-#define RSDT_SIG 			"RSDT"
-
-#define ACPI_DEBUG_PRINT(pl)
-
-#define ACPI_MEMORY_MODE                0x01
-#define ACPI_LOGICAL_ADDRESSING         0x00
-#define ACPI_PHYSICAL_ADDRESSING        0x01
-
-#define LO_RSDP_WINDOW_BASE         	0	/* Physical Address */
-#define HI_RSDP_WINDOW_BASE         	0xE0000	/* Physical Address */
-#define LO_RSDP_WINDOW_SIZE         	0x400
-#define HI_RSDP_WINDOW_SIZE         	0x20000
-#define RSDP_SCAN_STEP			16
-#define RSDP_CHECKSUM_LENGTH		20
-
-typedef int (*acpi_table_handler) (acpi_table_header * header, unsigned long);
+#include "acpitable.h"
 
 static acpi_table_handler acpi_boot_ops[ACPI_TABLE_COUNT];
 
-struct acpi_table_rsdp {
-	char signature[8];
-	u8 checksum;
-	char oem_id[6];
-	u8 revision;
-	u32 rsdt_address;
-} __attribute__ ((packed));
-
-struct acpi_table_rsdt {
-	acpi_table_header header;
-	u32 entry[ACPI_TABLE_COUNT];
-} __attribute__ ((packed));
-
-typedef struct {
-	u8 type;
-	u8 length;
-} acpi_madt_entry_header __attribute__ ((packed));
-
-typedef struct {
-	u16 polarity:2;
-	u16 trigger:2;
-	u16 reserved:12;
-} acpi_madt_int_flags __attribute__ ((packed));
-
-struct acpi_table_lapic {
-	acpi_madt_entry_header header;
-	u8 acpi_id;
-	u8 id;
-	struct {
-		u32 enabled:1;
-		u32 reserved:31;
-	} flags __attribute__ ((packed));
-} __attribute__ ((packed));
-
-struct acpi_table_ioapic {
-	acpi_madt_entry_header header;
-	u8 id;
-	u8 reserved;
-	u32 address;
-	u32 global_irq_base;
-} __attribute__ ((packed));
-
-struct acpi_table_int_src_ovr {
-	acpi_madt_entry_header header;
-	u8 bus;
-	u8 bus_irq;
-	u32 global_irq;
-	acpi_madt_int_flags flags;
-} __attribute__ ((packed));
-
-struct acpi_table_nmi_src {
-	acpi_madt_entry_header header;
-	acpi_madt_int_flags flags;
-	u32 global_irq;
-} __attribute__ ((packed));
-
-struct acpi_table_lapic_nmi {
-	acpi_madt_entry_header header;
-	u8 acpi_id;
-	acpi_madt_int_flags flags;
-	u8 lint;
-} __attribute__ ((packed));
-
-struct acpi_table_lapic_addr_ovr {
-	acpi_madt_entry_header header;
-	u8 reserved[2];
-	u64 address;
-} __attribute__ ((packed));
-
-struct acpi_table_iosapic {
-	acpi_madt_entry_header header;
-	u8 id;
-	u8 reserved;
-	u32 global_irq_base;
-	u64 address;
-} __attribute__ ((packed));
-
-struct acpi_table_lsapic {
-	acpi_madt_entry_header header;
-	u8 acpi_id;
-	u8 id;
-	u8 eid;
-	u8 reserved[3];
-	struct {
-		u32 enabled:1;
-		u32 reserved:31;
-	} flags;
-} __attribute__ ((packed));
-
-struct acpi_table_plat_int_src {
-	acpi_madt_entry_header header;
-	acpi_madt_int_flags flags;
-	u8 type;
-	u8 id;
-	u8 eid;
-	u8 iosapic_vector;
-	u32 global_irq;
-	u32 reserved;
-} __attribute__ ((packed));
-
-/*
- * ACPI Table Descriptor.  One per ACPI table
- */
-typedef struct acpi_table_desc {
-	struct acpi_table_desc *prev;
-	struct acpi_table_desc *next;
-	struct acpi_table_desc *installed_desc;
-	acpi_table_header *pointer;
-	void *base_pointer;
-	u8 *aml_pointer;
-	u64 physical_address;
-	u32 aml_length;
-	u32 length;
-	u32 count;
-	u16 table_id;
-	u8 type;
-	u8 allocation;
-	u8 loaded_into_namespace;
-
-} acpi_table_desc __attribute__ ((packed));;
 
 static unsigned char __init
-acpi_tb_checksum(void *buffer, int length)
+acpi_checksum(void *buffer, int length)
 {
 	int i;
 	unsigned char *bytebuffer;
@@ -292,24 +62,6 @@ acpi_tb_checksum(void *buffer, int length)
 		sum += *(bytebuffer++);
 
 	return sum;
-}
-
-static int __init
-acpi_table_checksum(acpi_table_header * header)
-{
-	u8 *p = (u8 *) header;
-	int length = 0;
-	int sum = 0;
-
-	if (!header)
-		return -EINVAL;
-
-	length = header->length;
-
-	while (length--)
-		sum += *p++;
-
-	return sum & 0xFF;
 }
 
 static void __init
@@ -328,19 +80,19 @@ acpi_print_table_header(acpi_table_header * header)
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_tb_scan_memory_for_rsdp
+ * FUNCTION:    acpi_tb_scan_memory_for_rsdp
  *
- * PARAMETERS:  Start_address       - Starting pointer for search
- *              Length              - Maximum length to search
+ * PARAMETERS:  address       - Starting pointer for search
+ *              length        - Maximum length to search
  *
- * RETURN:      Pointer to the RSDP if found, otherwise NULL.
+ * RETURN:      Pointer to the RSDP if found and valid, otherwise NULL.
  *
  * DESCRIPTION: Search a block of memory for the RSDP signature
  *
  ******************************************************************************/
 
-static unsigned char *__init
-acpi_tb_scan_memory_for_rsdp(unsigned char *address, int length)
+static void *__init
+acpi_tb_scan_memory_for_rsdp(void *address, int length)
 {
 	u32 offset;
 
@@ -354,10 +106,9 @@ acpi_tb_scan_memory_for_rsdp(unsigned char *address, int length)
 	while (offset < length) {
 		/* The signature must match and the checksum must be correct */
 		if (strncmp(address, RSDP_SIG, sizeof(RSDP_SIG) - 1) == 0 &&
-		    acpi_tb_checksum(address, RSDP_CHECKSUM_LENGTH) == 0) {
+		    acpi_checksum(address, RSDP_CHECKSUM_LENGTH) == 0) {
 			/* If so, we have found the RSDP */
-			printk(KERN_INFO
-			       "ACPI: RSDP located at physical address %p\n",
+			printk(KERN_INFO "ACPI: RSDP located at physical address %p\n",
 			       address);
 			return address;
 		}
@@ -372,13 +123,11 @@ acpi_tb_scan_memory_for_rsdp(unsigned char *address, int length)
 
 /*******************************************************************************
  *
- * FUNCTION:    acpi_tb_find_rsdp
+ * FUNCTION:    acpi_find_root_pointer
  *
- * PARAMETERS:  *Table_info             - Where the table info is returned
- *              Flags                   - Current memory mode (logical vs.
- *                                        physical addressing)
+ * PARAMETERS:  none
  *
- * RETURN:      Status
+ * RETURN:      physical address of the RSDP 
  *
  * DESCRIPTION: Search lower 1_mbyte of memory for the root system descriptor
  *              pointer structure.  If it is found, set *RSDP to point to it.
@@ -389,80 +138,38 @@ acpi_tb_scan_memory_for_rsdp(unsigned char *address, int length)
  *
  ******************************************************************************/
 
-static int __init
-acpi_tb_find_rsdp(acpi_table_desc * table_info, u32 flags)
+static struct acpi_table_rsdp * __init
+acpi_find_root_pointer(void)
 {
-	unsigned char *address;
+	struct acpi_table_rsdp * rsdp;
 
 	/*
-	 * Physical address is given.
+	 * Physical address is given
 	 */
 	/*
 	 * Region 1) Search EBDA (low memory) paragraphs
 	 */
-	address =
-	    acpi_tb_scan_memory_for_rsdp(__va(LO_RSDP_WINDOW_BASE),
+	rsdp = acpi_tb_scan_memory_for_rsdp(__va(LO_RSDP_WINDOW_BASE),
 					 LO_RSDP_WINDOW_SIZE);
 
-	if (address) {
-		/* Found it, return the physical address */
-		table_info->physical_address = (ACPI_TBLPTR) __pa(address);
-		return AE_OK;
-	}
+	if (rsdp)
+		return rsdp;
 
 	/*
 	 * Region 2) Search upper memory: 16-byte boundaries in E0000h-F0000h
 	 */
-	address = acpi_tb_scan_memory_for_rsdp(__va(HI_RSDP_WINDOW_BASE),
+	rsdp = acpi_tb_scan_memory_for_rsdp(__va(HI_RSDP_WINDOW_BASE),
 					       HI_RSDP_WINDOW_SIZE);
-	if (address) {
-		/* Found it, return the physical address */
-		table_info->physical_address = (ACPI_TBLPTR) __pa(address);
-		return AE_OK;
-	}
 
-	/* RSDP signature was not found */
-	return AE_NOT_FOUND;
+	
+					     
+	if (rsdp)
+		return rsdp;
+
+	printk(KERN_ERR "ACPI: System description tables not found\n");
+	return NULL;
 }
 
-static unsigned long __init
-acpi_find_root_pointer(u32 flags)
-{
-	acpi_table_desc table_info;
-	int status;
-
-	/* Get the RSDP */
-
-	status = acpi_tb_find_rsdp(&table_info, flags);
-	if (status)
-		return 0;
-
-	return table_info.physical_address;
-}
-
-static unsigned long __init
-acpi_os_get_root_pointer(u32 flags)
-{
-	unsigned long address;
-
-#ifndef CONFIG_ACPI_EFI
-
-	address = acpi_find_root_pointer(flags);
-
-#else
-	if (efi.acpi20)
-		address = (unsigned long) efi.acpi20;
-	else if (efi.acpi)
-		address = (unsigned long) efi.acpi;
-	else
-		address = 0;
-#endif				/*CONFIG_ACPI_EFI */
-
-	if (address == 0)
-		printk(KERN_ERR "ACPI: System description tables not found\n");
-
-	return address;
-}
 
 /*
  * Temporarily use the virtual area starting from FIX_IO_APIC_BASE_0,
@@ -506,29 +213,23 @@ __va_range(unsigned long phys, unsigned long size)
 static int __init acpi_tables_init(void)
 {
 	int result = -ENODEV;
-	int status = AE_OK;
-	unsigned long rsdp_addr = 0;
 	acpi_table_header *header = NULL;
 	struct acpi_table_rsdp *rsdp = NULL;
-#ifndef CONFIG_IA64
 	struct acpi_table_rsdt *rsdt = NULL;
 	struct acpi_table_rsdt saved_rsdt;
-#else
-	struct acpi071_table_rsdt *rsdt = NULL;
-#endif
 	int tables = 0;
 	int type = 0;
 	int i = 0;
 
-	rsdp_addr = acpi_os_get_root_pointer(ACPI_PHYSICAL_ADDRESSING);
 
-	if (!rsdp_addr)
+	rsdp = (struct acpi_table_rsdp *) acpi_find_root_pointer();
+
+	if (!rsdp)
 		return -ENODEV;
-
-	rsdp = (struct acpi_table_rsdp *) rsdp_addr;
-
+		
 	printk(KERN_INFO "%.8s v%d [%.6s]\n", rsdp->signature, rsdp->revision,
 	       rsdp->oem_id);
+	       
 	if (strncmp(rsdp->signature, RSDP_SIG,strlen(RSDP_SIG))) {
 		printk(KERN_WARNING "RSDP table signature incorrect\n");
 		return -EINVAL;
@@ -537,54 +238,53 @@ static int __init acpi_tables_init(void)
 	rsdt = (struct acpi_table_rsdt *)
 	    __va_range(rsdp->rsdt_address, sizeof(struct acpi_table_rsdt));
 
-	if (rsdt) {
-		header = (acpi_table_header *) & rsdt->header;
-		acpi_print_table_header(header);
-		if (strncmp(header->signature, RSDT_SIG, strlen(RSDT_SIG))) {
-			printk(KERN_WARNING "ACPI: RSDT signature incorrect\n");
-			rsdt = NULL;
-		} else {
-			/* 
-			 * The number of tables is computed by taking the 
-			 * size of all entries (header size minus total 
-			 * size of RSDT) divided by the size of each entry
-			 * (4-byte table pointers).
-			 */
-			tables =
-			    (header->length - sizeof(acpi_table_header)) / 4;
-		}
-	}
-
 	if (!rsdt) {
-		printk(KERN_WARNING
-		       "ACPI: Invalid root system description tables (RSDT)\n");
+		printk(KERN_WARNING "ACPI: Invalid root system description tables (RSDT)\n");
 		return -ENODEV;
 	}
-
+	
+	header = & rsdt->header;
+	acpi_print_table_header(header);
+	
+	if (strncmp(header->signature, RSDT_SIG, strlen(RSDT_SIG))) {
+		printk(KERN_WARNING "ACPI: RSDT signature incorrect\n");
+		return -ENODEV;
+	}
+		
+	/* 
+	 * The number of tables is computed by taking the 
+	 * size of all entries (header size minus total 
+	 * size of RSDT) divided by the size of each entry
+	 * (4-byte table pointers).
+	 */
+	tables = (header->length - sizeof(acpi_table_header)) / 4;
+		    
 	memcpy(&saved_rsdt, rsdt, sizeof(saved_rsdt));
 
 	if (saved_rsdt.header.length > sizeof(saved_rsdt)) {
-		printk(KERN_WARNING "ACPI: Too big length in RSDT: %d\n",
-		       saved_rsdt.header.length);
+		printk(KERN_WARNING "ACPI: Too big length in RSDT: %d\n", saved_rsdt.header.length);
 		return -ENODEV;
 	}
 
 	for (i = 0; i < tables; i++) {
 
-		if (rsdt) {
-			header = (acpi_table_header *)
+		header = (acpi_table_header *)
 			    __va_range(saved_rsdt.entry[i],
 				       sizeof(acpi_table_header));
-		}
 
 		if (!header)
 			break;
 
 		acpi_print_table_header(header);
-
+		
+		if (acpi_checksum(header,header->length)) {
+			printk(KERN_WARNING "ACPI %s has invalid checksum\n", 
+				acpi_table_signatures[i]);
+			continue;
+		}
+		
 		for (type = 0; type < ACPI_TABLE_COUNT; type++)
-			if (!strncmp
-			    ((char *) &header->signature,
+			if (!strncmp((char *) &header->signature,
 			     acpi_table_signatures[type],strlen(acpi_table_signatures[type])))
 				break;
 
@@ -594,22 +294,17 @@ static int __init acpi_tables_init(void)
 			continue;
 		}
 
-		if (acpi_table_checksum(header)) {
-			printk(KERN_WARNING "ACPI %s has invalid checksum\n",
-			       acpi_table_signatures[i]);
-			continue;
-		}
 
-		if (acpi_boot_ops && acpi_boot_ops[type])
-			result =
-			    acpi_boot_ops[type] (header,
+		if (!acpi_boot_ops[type])
+			continue;
+			
+		result = acpi_boot_ops[type] (header,
 						 (unsigned long) saved_rsdt.
 						 entry[i]);
 	}
 
 	return result;
 }
-#endif				/* SELF_CONTAINED_ACPI */
 
 static int total_cpus __initdata = 0;
 int have_acpi_tables;
@@ -625,10 +320,10 @@ acpi_parse_lapic(struct acpi_table_lapic *local_apic)
 	if (!local_apic)
 		return;
 
-	dprintk(KERN_INFO "LAPIC (acpi_id[0x%04x] id[0x%x] enabled[%d])\n",
+	printk(KERN_INFO "LAPIC (acpi_id[0x%04x] id[0x%x] enabled[%d])\n",
 		local_apic->acpi_id, local_apic->id, local_apic->flags.enabled);
 
-	dprintk("CPU %d (0x%02x00)", total_cpus, local_apic->id);
+	printk(KERN_INFO "CPU %d (0x%02x00)", total_cpus, local_apic->id);
 
 	if (local_apic->flags.enabled) {
 		printk(" enabled");
@@ -652,9 +347,9 @@ acpi_parse_lapic(struct acpi_table_lapic *local_apic)
 			proc_entry.mpc_cpuflag |= CPU_BOOTPROCESSOR;
 		}
 		proc_entry.mpc_cpufeature =
-		    (boot_cpu_data.x86 << 8) | (boot_cpu_data.
-						x86_model << 4) | boot_cpu_data.
-		    x86_mask;
+		    (boot_cpu_data.x86 << 8) | 
+		    (boot_cpu_data.x86_model << 4) | 
+		     boot_cpu_data.x86_mask;
 		proc_entry.mpc_featureflag = boot_cpu_data.x86_capability[0];
 		proc_entry.mpc_reserved[0] = 0;
 		proc_entry.mpc_reserved[1] = 0;
@@ -684,18 +379,17 @@ acpi_parse_ioapic(struct acpi_table_ioapic *ioapic)
 		printk(KERN_WARNING
 		       "Max # of I/O APICs (%d) exceeded (found %d).\n",
 		       MAX_IO_APICS, nr_ioapics);
-		panic("Recompile kernel with bigger MAX_IO_APICS!\n");
+/*		panic("Recompile kernel with bigger MAX_IO_APICS!\n");   */
 	}
 }
 
+
+/* Interrupt source overrides inform the machine about exceptions
+   to the normal "PIC" mode interrupt routing */
+   
 static void __init
 acpi_parse_int_src_ovr(struct acpi_table_int_src_ovr *intsrc)
 {
-	/*
-	   static int first_time_switch = 0;
-	   struct mpc_config_intsrc my_intsrc;
-	   int i;
-	 */
 	if (!intsrc)
 		return;
 
@@ -743,33 +437,6 @@ acpi_parse_lapic_addr_ovr(struct acpi_table_lapic_addr_ovr *lapic_addr_ovr)
 
 }
 
-#ifdef CONFIG_IA64
-static void __init
-acpi_parse_iosapic(struct acpi_table_iosapic *iosapic)
-{
-	if (!iosapic)
-		return;
-
-	printk(KERN_INFO "IOSAPIC (id[%x] global_irq_base[%x] address[%lx])\n",
-	       iosapic->id, iosapic->global_irq_base,
-	       (unsigned long) iosapic->address);
-
-	return 0;
-}
-static void __init
-acpi_parse_lsapic(struct acpi_table_lsapic *lsapic)
-{
-	if (!lsapic)
-		return;
-
-	printk(KERN_INFO
-	       "LSAPIC (acpi_id[0x%04x] id[0x%x] eid[0x%x] enabled[%d])\n",
-	       lsapic->acpi_id, lsapic->id, lsapic->eid, lsapic->flags.enabled);
-
-	if (!lsapic->flags.enabled)
-		return;
-}
-#endif
 static void __init
 acpi_parse_plat_int_src(struct acpi_table_plat_int_src *plintsrc)
 {
@@ -786,10 +453,11 @@ static int __init
 acpi_parse_madt(acpi_table_header * header, unsigned long phys)
 {
 
-	struct acpi_table_madt *madt =
-	    (struct acpi_table_madt *) __va_range(phys, header->length);
-	acpi_madt_entry_header *entry_header = NULL;
-	int table_size = 0;
+	struct acpi_table_madt *madt;	    
+	acpi_madt_entry_header *entry_header;
+	int table_size;
+	
+	madt = (struct acpi_table_madt *) __va_range(phys, header->length);
 
 	if (!madt)
 		return -EINVAL;
@@ -825,16 +493,6 @@ acpi_parse_madt(acpi_table_header * header, unsigned long phys)
 						   acpi_table_lapic_addr_ovr *)
 						  entry_header);
 			break;
-#ifdef CONFIG_IA64
-		case ACPI_MADT_IOSAPIC:
-			acpi_parse_iosapic((struct acpi_table_iosapic *)
-					   entry_header);
-			break;
-		case ACPI_MADT_LSAPIC:
-			acpi_parse_lsapic((struct acpi_table_lsapic *)
-					  entry_header);
-			break;
-#endif
 		case ACPI_MADT_PLAT_INT_SRC:
 			acpi_parse_plat_int_src((struct acpi_table_plat_int_src
 						 *) entry_header);
@@ -877,20 +535,15 @@ extern int enable_acpi_smp_table;
 void __init
 config_acpi_tables(void)
 {
-	int result = 0;
+
+	memset(&acpi_boot_ops, 0, sizeof(acpi_boot_ops));
+	acpi_boot_ops[ACPI_APIC] = acpi_parse_madt;
 
 	/*
 	 * Only do this when requested, either because of CPU/Bios type or from the command line
 	 */
-	if (!enable_acpi_smp_table) {
-		return;
-	}
 
-	memset(&acpi_boot_ops, 0, sizeof(acpi_boot_ops));
-	acpi_boot_ops[ACPI_APIC] = acpi_parse_madt;
-	result = acpi_tables_init();
-
-	if (!result) {
+	if (enable_acpi_smp_table && !acpi_tables_init()) {
 		have_acpi_tables = 1;
 		printk("Enabling the CPU's according to the ACPI table\n");
 	}

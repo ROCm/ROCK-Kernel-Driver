@@ -12,6 +12,10 @@
  *
  * See Documentation/usb/usb-serial.txt for more information on using this driver
  * 
+ * (11/11/2001) gkh
+ *	Added support for the m125 devices, and added check to prevent oopses
+ *	for Clié devices that lie about the number of ports they have.
+ *
  * (08/30/2001) gkh
  *	Added support for the Clie devices, both the 3.5 and 4.0 os versions.
  *	Many thanks to Daniel Burke, and Bryan Payne for helping with this.
@@ -123,9 +127,9 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v1.4"
+#define DRIVER_VERSION "v1.5"
 #define DRIVER_AUTHOR "Greg Kroah-Hartman <greg@kroah.com>"
-#define DRIVER_DESC "USB HandSpring Visor, Palm m50x, Sony Clie driver"
+#define DRIVER_DESC "USB HandSpring Visor, Palm m50x, Sony Clié driver"
 
 /* function prototypes for a handspring visor */
 static int  visor_open		(struct usb_serial_port *port, struct file *filp);
@@ -148,13 +152,10 @@ static __devinitdata struct usb_device_id visor_id_table [] = {
 	{ }					/* Terminating entry */
 };
 
-static __devinitdata struct usb_device_id palm_m500_id_table [] = {
+static __devinitdata struct usb_device_id palm_4_0_id_table [] = {
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M500_ID) },
-	{ }					/* Terminating entry */
-};
-
-static __devinitdata struct usb_device_id palm_m505_id_table [] = {
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M505_ID) },
+	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M125_ID) },
 	{ }					/* Terminating entry */
 };
 
@@ -172,6 +173,7 @@ static __devinitdata struct usb_device_id id_table [] = {
 	{ USB_DEVICE(HANDSPRING_VENDOR_ID, HANDSPRING_VISOR_ID) },
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M500_ID) },
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M505_ID) },
+	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M125_ID) },
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_3_5_ID) },
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_4_0_ID) },
 	{ }					/* Terminating entry */
@@ -207,10 +209,10 @@ struct usb_serial_device_type handspring_device = {
 	read_bulk_callback:	visor_read_bulk_callback,
 };
 
-/* device info for the Palm M500 */
-struct usb_serial_device_type palm_m500_device = {
-	name:			"Palm M500",
-	id_table:		palm_m500_id_table,
+/* device info for the Palm 4.0 devices */
+struct usb_serial_device_type palm_4_0_device = {
+	name:			"Palm 4.0",
+	id_table:		palm_4_0_id_table,
 	needs_interrupt_in:	MUST_HAVE_NOT,		/* this device must not have an interrupt in endpoint */
 	needs_bulk_in:		MUST_HAVE,		/* this device must have a bulk in endpoint */
 	needs_bulk_out:		MUST_HAVE,		/* this device must have a bulk out endpoint */
@@ -233,35 +235,10 @@ struct usb_serial_device_type palm_m500_device = {
 	read_bulk_callback:	visor_read_bulk_callback,
 };
 
-/* device info for the Palm M505 */
-struct usb_serial_device_type palm_m505_device = {
-	name:			"Palm M505",
-	id_table:		palm_m505_id_table,
-	needs_interrupt_in:	MUST_HAVE_NOT,		/* this device must not have an interrupt in endpoint */
-	needs_bulk_in:		MUST_HAVE,		/* this device must have a bulk in endpoint */
-	needs_bulk_out:		MUST_HAVE,		/* this device must have a bulk out endpoint */
-	num_interrupt_in:	0,
-	num_bulk_in:		2,
-	num_bulk_out:		2,
-	num_ports:		2,
-	open:			visor_open,
-	close:			visor_close,
-	throttle:		visor_throttle,
-	unthrottle:		visor_unthrottle,
-	startup:		visor_startup,
-	shutdown:		visor_shutdown,
-	ioctl:			visor_ioctl,
-	set_termios:		visor_set_termios,
-	write:			visor_write,
-	write_room:		visor_write_room,
-	chars_in_buffer:	visor_chars_in_buffer,
-	write_bulk_callback:	visor_write_bulk_callback,
-	read_bulk_callback:	visor_read_bulk_callback,
-};
 
 /* device info for the Sony Clie OS version 3.5 */
 static struct usb_serial_device_type clie_3_5_device = {
-	name:			"Sony Clie 3.5",
+	name:			"Sony Clié 3.5",
 	id_table:		clie_id_3_5_table,
 	needs_interrupt_in:	MUST_HAVE_NOT,		/* this device must not have an interrupt in endpoint */
 	needs_bulk_in:		MUST_HAVE,		/* this device must have a bulk in endpoint */
@@ -285,7 +262,7 @@ static struct usb_serial_device_type clie_3_5_device = {
 
 /* device info for the Sony Clie OS version 4.0 */
 static struct usb_serial_device_type clie_4_0_device = {
-	name:			"Sony Clie 4.0",
+	name:			"Sony Clié 4.0",
 	id_table:		clie_id_4_0_table,
 	needs_interrupt_in:	MUST_HAVE_NOT,		/* this device must not have an interrupt in endpoint */
 	needs_bulk_in:		MUST_HAVE,		/* this device must have a bulk in endpoint */
@@ -329,6 +306,11 @@ static int visor_open (struct usb_serial_port *port, struct file *filp)
 		return -ENODEV;
 	
 	dbg(__FUNCTION__ " - port %d", port->number);
+
+	if (!port->read_urb) {
+		err ("Device lied about number of ports, please use a lower one.");
+		return -ENODEV;
+	}
 
 	down (&port->sem);
 	
@@ -819,8 +801,7 @@ static int __init visor_init (void)
 	int i;
 
 	usb_serial_register (&handspring_device);
-	usb_serial_register (&palm_m500_device);
-	usb_serial_register (&palm_m505_device);
+	usb_serial_register (&palm_4_0_device);
 	usb_serial_register (&clie_3_5_device);
 	usb_serial_register (&clie_4_0_device);
 	
@@ -854,8 +835,7 @@ static void __exit visor_exit (void)
 	unsigned long flags;
 
 	usb_serial_deregister (&handspring_device);
-	usb_serial_deregister (&palm_m500_device);
-	usb_serial_deregister (&palm_m505_device);
+	usb_serial_deregister (&palm_4_0_device);
 	usb_serial_deregister (&clie_3_5_device);
 	usb_serial_deregister (&clie_4_0_device);
 

@@ -100,11 +100,11 @@ static void unexpected_machine_check(struct pt_regs * regs, long error_code)
 
 /*
  *	Call the installed machine check handler for this CPU setup.
- */ 
- 
+ */
+
 static void (*machine_check_vector)(struct pt_regs *, long error_code) = unexpected_machine_check;
 
-void do_machine_check(struct pt_regs * regs, long error_code)
+asmlinkage void do_machine_check(struct pt_regs * regs, long error_code)
 {
 	machine_check_vector(regs, error_code);
 }

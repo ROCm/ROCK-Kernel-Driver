@@ -5,9 +5,10 @@
  * initial implementation -- AV, Oct 2001.
  */
 
-#include <linux/malloc.h>
 #include <linux/fs.h>
 #include <linux/seq_file.h>
+#include <linux/slab.h>
+
 #include <asm/uaccess.h>
 
 /**

@@ -16,6 +16,9 @@ if [ "$CONFIG_SERIAL" = "y" ]; then
       tristate '   Dual serial port support' CONFIG_DUALSP_SERIAL
    fi
 fi
+if [ "$CONFIG_ACPI" = "y" ]; then
+   bool '  Support for serial ports defined by ACPI tables' CONFIG_SERIAL_ACPI
+fi
 dep_mbool 'Extended dumb serial driver options' CONFIG_SERIAL_EXTENDED $CONFIG_SERIAL
 if [ "$CONFIG_SERIAL_EXTENDED" = "y" ]; then
    bool '  Support more than 4 serial ports' CONFIG_SERIAL_MANY_PORTS
@@ -155,17 +158,18 @@ if [ "$CONFIG_WATCHDOG" != "n" ]; then
    tristate '  Berkshire Products PC Watchdog' CONFIG_PCWATCHDOG
    tristate '  Acquire SBC Watchdog Timer' CONFIG_ACQUIRE_WDT
    tristate '  Advantech SBC Watchdog Timer' CONFIG_ADVANTECH_WDT
-   tristate '  IB700 SBC Watchdog Timer' CONFIG_IB700_WDT
-   tristate '  SBC-60XX Watchdog Timer' CONFIG_60XX_WDT
-   tristate '  W83877F (EMACS) Watchdog Timer' CONFIG_W83877F_WDT
-   tristate '  Mixcom Watchdog' CONFIG_MIXCOMWD 
-   tristate '  Intel i810 TCO timer / Watchdog' CONFIG_I810_TCO
    if [ "$CONFIG_FOOTBRIDGE" = "y" ]; then
       tristate '  DC21285 watchdog' CONFIG_21285_WATCHDOG
       if [ "$CONFIG_ARCH_NETWINDER" = "y" ]; then
          tristate '  NetWinder WB83C977 watchdog' CONFIG_977_WATCHDOG
       fi
    fi
+   tristate '  Eurotech CPU-1220/1410 Watchdog Timer' CONFIG_EUROTECH_WDT
+   tristate '  IB700 SBC Watchdog Timer' CONFIG_IB700_WDT
+   tristate '  Intel i810 TCO timer / Watchdog' CONFIG_I810_TCO
+   tristate '  Mixcom Watchdog' CONFIG_MIXCOMWD 
+   tristate '  SBC-60XX Watchdog Timer' CONFIG_60XX_WDT
+   tristate '  W83877F (EMACS) Watchdog Timer' CONFIG_W83877F_WDT
    tristate '  ZF MachZ Watchdog' CONFIG_MACHZ_WDT
 fi
 endmenu

@@ -356,7 +356,7 @@ static void *hub_probe(struct usb_device *dev, unsigned int i,
 
 	INIT_LIST_HEAD(&hub->event_list);
 	hub->dev = dev;
-	atomic_set(&hub->refcnt, 1);
+	init_MUTEX(&hub->khubd_sem);
 
 	/* Record the new hub's existence */
 	spin_lock_irqsave(&hub_event_lock, flags);
@@ -385,33 +385,10 @@ static void *hub_probe(struct usb_device *dev, unsigned int i,
 	return NULL;
 }
 
-static void hub_get(struct usb_hub *hub)
-{
-	atomic_inc(&hub->refcnt);
-}
-
-static void hub_put(struct usb_hub *hub)
-{
-	if (atomic_dec_and_test(&hub->refcnt)) {
-		if (hub->descriptor) {
-			kfree(hub->descriptor);
-			hub->descriptor = NULL;
-		}
-
-		kfree(hub);
-	}
-}
-
 static void hub_disconnect(struct usb_device *dev, void *ptr)
 {
 	struct usb_hub *hub = (struct usb_hub *)ptr;
 	unsigned long flags;
-
-	if (hub->urb) {
-		usb_unlink_urb(hub->urb);
-		usb_free_urb(hub->urb);
-		hub->urb = NULL;
-	}
 
 	spin_lock_irqsave(&hub_event_lock, flags);
 
@@ -423,7 +400,22 @@ static void hub_disconnect(struct usb_device *dev, void *ptr)
 
 	spin_unlock_irqrestore(&hub_event_lock, flags);
 
-	hub_put(hub);
+	down(&hub->khubd_sem); /* Wait for khubd to leave this hub alone. */
+	up(&hub->khubd_sem);
+
+	if (hub->urb) {
+		usb_unlink_urb(hub->urb);
+		usb_free_urb(hub->urb);
+		hub->urb = NULL;
+	}
+
+	if (hub->descriptor) {
+		kfree(hub->descriptor);
+		hub->descriptor = NULL;
+	}
+
+	/* Free the memory */
+	kfree(hub);
 }
 
 static int hub_ioctl(struct usb_device *hub, unsigned int code, void *user_data)
@@ -533,10 +525,6 @@ static int usb_hub_port_wait_reset(struct usb_device *hub, int port,
 		portchange = le16_to_cpu(portsts.wPortChange);
 		dbg("port %d, portstatus %x, change %x, %s", port + 1,
 			portstatus, portchange, portspeed (portstatus));
-
-		/* Device went away? */
-		if (!(portstatus & USB_PORT_STAT_CONNECTION))
-			return 1;
 
 		/* bomb out completely if something weird happened */
 		if ((portchange & USB_PORT_STAT_C_CONNECTION))
@@ -745,7 +733,7 @@ static void usb_hub_events(void)
 		list_del(tmp);
 		INIT_LIST_HEAD(tmp);
 
-		hub_get(hub);
+		down(&hub->khubd_sem); /* never blocks, we were on list */
 		spin_unlock_irqrestore(&hub_event_lock, flags);
 
 		if (hub->error) {
@@ -753,8 +741,8 @@ static void usb_hub_events(void)
 
 			if (usb_hub_reset(hub)) {
 				err("error resetting hub %d - disconnecting", dev->devnum);
+				up(&hub->khubd_sem);
 				usb_hub_disconnect(dev);
-				hub_put(hub);
 				continue;
 			}
 
@@ -830,7 +818,7 @@ static void usb_hub_events(void)
                         	usb_hub_power_on(hub);
 			}
 		}
-		hub_put(hub);
+		up(&hub->khubd_sem);
         } /* end while (1) */
 
 	spin_unlock_irqrestore(&hub_event_lock, flags);

@@ -2,7 +2,7 @@
 
     PCMCIA Card Information Structure parser
 
-    cistpl.c 1.91 2000/09/16 03:48:28
+    cistpl.c 1.97 2001/10/04 03:33:49
 
     The contents of this file are subject to the Mozilla Public
     License Version 1.1 (the "License"); you may not use this file
@@ -19,8 +19,8 @@
     are Copyright (C) 1999 David A. Hinds.  All Rights Reserved.
 
     Alternatively, the contents of this file may be used under the
-    terms of the GNU General Public License version 2 (the "GPL"), in which
-    case the provisions of the GPL are applicable instead of the
+    terms of the GNU General Public License version 2 (the "GPL"), in
+    which case the provisions of the GPL are applicable instead of the
     above.  If you wish to allow the use of your version of this file
     only under the terms of the GPL and not to allow others to use
     your version of this file under the MPL, indicate your decision
@@ -46,6 +46,7 @@
 #include <linux/pci.h>
 #include <linux/ioport.h>
 #include <asm/io.h>
+#include <asm/byteorder.h>
 
 #include <pcmcia/cs_types.h>
 #include <pcmcia/bus_ops.h>
@@ -55,7 +56,6 @@
 #include <pcmcia/cisreg.h>
 #include <pcmcia/cistpl.h>
 #include "cs_internal.h"
-#include "rsrc_mgr.h"
 
 static const u_char mantissa[] = {
     10, 12, 13, 15, 20, 25, 30, 35,
@@ -644,8 +644,6 @@ static int parse_device(tuple_t *tuple, cistpl_device_t *device)
 	case 4: device->dev[i].speed = 100; break;
 	case 7:
 	    if (++p == q) return CS_BAD_TUPLE;
-	    if (p == q)
-		return CS_BAD_TUPLE;
 	    device->dev[i].speed = SPEED_CVT(*p);
 	    while (*p & 0x80)
 		if (++p == q) return CS_BAD_TUPLE;

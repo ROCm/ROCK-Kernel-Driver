@@ -50,7 +50,6 @@
  * have a way to deal with that gracefully. Right now I used straightforward
  * wrappers, but this needs further analysis wrt potential overflows.
  */
-extern int get_cpuinfo(char *);
 extern int get_hardware_list(char *);
 extern int get_stram_list(char *);
 #ifdef CONFIG_DEBUG_MALLOC
@@ -208,12 +207,17 @@ static int version_read_proc(char *page, char **start, off_t off,
 	return proc_calc_metrics(page, start, off, count, eof, len);
 }
 
-static int cpuinfo_read_proc(char *page, char **start, off_t off,
-				 int count, int *eof, void *data)
+extern struct seq_operations cpuinfo_op;
+static int cpuinfo_open(struct inode *inode, struct file *file)
 {
-	int len = get_cpuinfo(page);
-	return proc_calc_metrics(page, start, off, count, eof, len);
+	return seq_open(file, &cpuinfo_op);
 }
+static struct file_operations proc_cpuinfo_operations = {
+	open:		cpuinfo_open,
+	read:		seq_read,
+	llseek:		seq_lseek,
+	release:	seq_release,
+};
 
 #ifdef CONFIG_PROC_HARDWARE
 static int hardware_read_proc(char *page, char **start, off_t off,
@@ -526,7 +530,6 @@ void __init proc_misc_init(void)
 		{"uptime",	uptime_read_proc},
 		{"meminfo",	meminfo_read_proc},
 		{"version",	version_read_proc},
-		{"cpuinfo",	cpuinfo_read_proc},
 #ifdef CONFIG_PROC_HARDWARE
 		{"hardware",	hardware_read_proc},
 #endif
@@ -568,9 +571,14 @@ void __init proc_misc_init(void)
 	entry = create_proc_entry("mounts", 0, NULL);
 	if (entry)
 		entry->proc_fops = &proc_mounts_operations;
+	entry = create_proc_entry("cpuinfo", 0, NULL);
+	if (entry)
+		entry->proc_fops = &proc_cpuinfo_operations;
+#ifdef CONFIG_MODULES
 	entry = create_proc_entry("ksyms", 0, NULL);
 	if (entry)
 		entry->proc_fops = &proc_ksyms_operations;
+#endif
 	proc_root_kcore = create_proc_entry("kcore", S_IRUSR, NULL);
 	if (proc_root_kcore) {
 		proc_root_kcore->proc_fops = &proc_kcore_operations;

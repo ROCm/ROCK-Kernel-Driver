@@ -1019,4 +1019,31 @@ unsigned int ac97_set_adc_rate(struct ac97_codec *codec, unsigned int rate)
 }
 
 EXPORT_SYMBOL(ac97_set_adc_rate);
+
+int ac97_save_state(struct ac97_codec *codec)
+{
+	return 0;	
+}
+
+EXPORT_SYMBOL(ac97_save_state);
+
+int ac97_restore_state(struct ac97_codec *codec)
+{
+	int i;
+	unsigned int left, right, val;
+
+	for (i = 0; i < SOUND_MIXER_NRDEVICES; i++) {
+		if (!supported_mixer(codec, i)) 
+			continue;
+
+		val = codec->mixer_state[i];
+		right = val >> 8;
+		left = val  & 0xff;
+		codec->write_mixer(codec, i, left, right);
+	}
+	return 0;
+}
+
+EXPORT_SYMBOL(ac97_restore_state);
+
 MODULE_LICENSE("GPL");

@@ -12,8 +12,17 @@
  *
  * See Documentation/usb/usb-serial.txt for more information on using this driver
  *
- * See http://reality.sgi.com/bryder_wellington/ftdi_sio for upto date testing info
+ * See http://ftdi-usb-sio.sourceforge.net for upto date testing info
  *     and extra documentation
+ * 
+ * (04/Nov/2001) Bill Ryder
+ *     Fixed bug in read_bulk_callback where incorrect urb buffer was used.
+ *     cleaned up write offset calculation
+ *     added write_room since default values can be incorrect for sio
+ *     changed write_bulk_callback to use same queue_task as other drivers
+ *       (the previous version caused panics)
+ *     Removed port iteration code since the device only has one I/O port and it 
+ *       was wrong anyway.
  * 
  * (31/May/2001) gkh
  *	switched from using spinlock to a semaphore, which fixes lots of problems.
@@ -97,7 +106,6 @@
 #include <linux/module.h>
 #include <linux/spinlock.h>
 #include <linux/usb.h>
-
 #ifdef CONFIG_USB_SERIAL_DEBUG
 	static int debug = 1;
 #else
@@ -111,7 +119,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v1.1.0"
+#define DRIVER_VERSION "v1.2.0"
 #define DRIVER_AUTHOR "Greg Kroah-Hartman <greg@kroah.com>, Bill Ryder <bryder@sgi.com>"
 #define DRIVER_DESC "USB FTDI RS232 Converters Driver"
 
@@ -146,6 +154,7 @@ MODULE_DEVICE_TABLE (usb, id_table_combined);
 struct ftdi_private {
 	ftdi_type_t ftdi_type;
 	__u16 last_set_data_urb_value ; /* the last data state set - needed for doing a break */
+        int write_offset;
 };
 /* function prototypes for a FTDI serial converter */
 static int  ftdi_sio_startup		(struct usb_serial *serial);
@@ -154,6 +163,7 @@ static void ftdi_sio_shutdown		(struct usb_serial *serial);
 static int  ftdi_sio_open		(struct usb_serial_port *port, struct file *filp);
 static void ftdi_sio_close		(struct usb_serial_port *port, struct file *filp);
 static int  ftdi_sio_write		(struct usb_serial_port *port, int from_user, const unsigned char *buf, int count);
+static int  ftdi_sio_write_room		(struct usb_serial_port *port);
 static void ftdi_sio_write_bulk_callback (struct urb *urb);
 static void ftdi_sio_read_bulk_callback	(struct urb *urb);
 static void ftdi_sio_set_termios	(struct usb_serial_port *port, struct termios * old);
@@ -176,6 +186,7 @@ struct usb_serial_device_type ftdi_sio_device = {
 	open:			ftdi_sio_open,
 	close:			ftdi_sio_close,
 	write:			ftdi_sio_write,
+	write_room:		ftdi_sio_write_room,
 	read_bulk_callback:	ftdi_sio_read_bulk_callback,
 	write_bulk_callback:	ftdi_sio_write_bulk_callback,
 	ioctl:			ftdi_sio_ioctl,
@@ -198,6 +209,7 @@ struct usb_serial_device_type ftdi_8U232AM_device = {
 	open:			ftdi_sio_open,
 	close:			ftdi_sio_close,
 	write:			ftdi_sio_write,
+	write_room:		ftdi_sio_write_room,
 	read_bulk_callback:	ftdi_sio_read_bulk_callback,
 	write_bulk_callback:	ftdi_sio_write_bulk_callback,
 	ioctl:			ftdi_sio_ioctl,
@@ -252,7 +264,6 @@ static int ftdi_sio_startup (struct usb_serial *serial)
 {
 	struct ftdi_private *priv;
 	
-	init_waitqueue_head(&serial->port[0].write_wait);
 	
 	priv = serial->port->private = kmalloc(sizeof(struct ftdi_private), GFP_KERNEL);
 	if (!priv){
@@ -261,6 +272,7 @@ static int ftdi_sio_startup (struct usb_serial *serial)
 	}
 
 	priv->ftdi_type = sio;
+	priv->write_offset = 1;
 	
 	return (0);
 }
@@ -270,7 +282,6 @@ static int ftdi_8U232AM_startup (struct usb_serial *serial)
 {
 	struct ftdi_private *priv;
  
-	init_waitqueue_head(&serial->port[0].write_wait);
 
 	priv = serial->port->private = kmalloc(sizeof(struct ftdi_private), GFP_KERNEL);
 	if (!priv){
@@ -279,6 +290,7 @@ static int ftdi_8U232AM_startup (struct usb_serial *serial)
 	}
 
 	priv->ftdi_type = F8U232AM;
+	priv->write_offset = 0;
 	
 	return (0);
 }
@@ -288,13 +300,14 @@ static void ftdi_sio_shutdown (struct usb_serial *serial)
 	
 	dbg (__FUNCTION__);
 
-	/* Close ports if they are open */
+
+	/* stop reads and writes on all ports */
 	while (serial->port[0].open_count > 0) {
-		ftdi_sio_close (&serial->port[0], NULL);
+	        ftdi_sio_close (&serial->port[0], NULL);
 	}
-	if (serial->port->private){
-		kfree(serial->port->private);
-		serial->port->private = NULL;
+	if (serial->port[0].private){
+		kfree(serial->port[0].private);
+		serial->port[0].private = NULL;
 	}
 }
 
@@ -361,7 +374,7 @@ static int  ftdi_sio_open (struct usb_serial_port *port, struct file *filp)
 
 static void ftdi_sio_close (struct usb_serial_port *port, struct file *filp)
 { /* ftdi_sio_close */
-	struct usb_serial *serial = port->serial;
+	struct usb_serial *serial = port->serial; /* Checked in usbserial.c */
 	unsigned int c_cflag = port->tty->termios->c_cflag;
 	char buf[1];
 
@@ -393,6 +406,7 @@ static void ftdi_sio_close (struct usb_serial_port *port, struct file *filp)
 			} /* Note change no line is hupcl is off */
 
 			/* shutdown our bulk reads and writes */
+			/* ***CHECK*** behaviour when there is nothing queued */
 			usb_unlink_urb (port->write_urb);
 			usb_unlink_urb (port->read_urb);
 		}
@@ -403,7 +417,6 @@ static void ftdi_sio_close (struct usb_serial_port *port, struct file *filp)
 		if (!(port->tty->termios->c_cflag & CLOCAL)){
 			tty_hangup(port->tty);
 		}
-		
 	}
 
 	up (&port->sem);
@@ -423,10 +436,10 @@ static int ftdi_sio_write (struct usb_serial_port *port, int from_user,
 { /* ftdi_sio_write */
 	struct usb_serial *serial = port->serial;
 	struct ftdi_private *priv = (struct ftdi_private *)port->private;
+	unsigned char *first_byte = port->write_urb->transfer_buffer;
+	unsigned char dbug_byte;
 	int data_offset ;
-	int rc; 
 	int result;
-	DECLARE_WAITQUEUE(wait, current);
 	
 	dbg(__FUNCTION__ " port %d, %d bytes", port->number, count);
 
@@ -435,95 +448,70 @@ static int ftdi_sio_write (struct usb_serial_port *port, int from_user,
 		return 0;
 	}
 	
-	if (priv->ftdi_type == sio){
-		data_offset = 1;
-	} else {
-		data_offset = 0;
-	}
+	data_offset = priv->write_offset;
         dbg("data_offset set to %d",data_offset);
 
-	/* only do something if we have a bulk out endpoint */
-	if (serial->num_bulk_out) {
-		unsigned char *first_byte = port->write_urb->transfer_buffer;
+	if (port->write_urb->status == -EINPROGRESS) {
+		dbg (__FUNCTION__ " - already writing");
+		return (0);
+	}		
 
-		/* Was seeing a race here, got a read callback, then write callback before
-		   hitting interuptible_sleep_on  - so wrapping in a wait_queue */
+	down(&port->sem);
 
-		add_wait_queue(&port->write_wait, &wait);
-		set_current_state (TASK_INTERRUPTIBLE);
-		while (port->write_urb->status == -EINPROGRESS) {
-			dbg(__FUNCTION__ " write in progress - retrying");
-			if (signal_pending(current)) {
-				set_current_state(TASK_RUNNING);
-				remove_wait_queue(&port->write_wait, &wait);
-				rc = -ERESTARTSYS;
-				goto err;
-			}
-			schedule();
-		}		
-		remove_wait_queue(&port->write_wait, &wait);
-		set_current_state(TASK_RUNNING);
-
-		count += data_offset;
-		count = (count > port->bulk_out_size) ? port->bulk_out_size : count;
-		if (count == 0) {
-			return 0;
-		}
+	count += data_offset;
+	count = (count > port->bulk_out_size) ? port->bulk_out_size : count;
 
 		/* Copy in the data to send */
-		if (from_user) {
-			if (copy_from_user(port->write_urb->transfer_buffer + data_offset,
-					   buf, count - data_offset ))
-				return -EFAULT;
+	if (from_user) {
+		if (copy_from_user(port->write_urb->transfer_buffer + data_offset,
+				   buf, count - data_offset )){
+			up (&port->sem);
+			return -EFAULT;
 		}
-		else {
-			memcpy(port->write_urb->transfer_buffer + data_offset,
-			       buf, count - data_offset );
-		}  
+	} else {
+		memcpy(port->write_urb->transfer_buffer + data_offset,
+		       buf, count - data_offset );
+	}  
 
-		first_byte = port->write_urb->transfer_buffer;
-		if (data_offset > 0){
-			/* Write the control byte at the front of the packet*/
-			*first_byte = 1 | ((count-data_offset) << 2) ; 
-		}
-
-		dbg(__FUNCTION__ " Bytes: %d, First Byte: 0o%03o",count, first_byte[0]);
-		usb_serial_debug_data (__FILE__, __FUNCTION__, count, first_byte);
-		
-		/* send the data out the bulk port */
-		FILL_BULK_URB(port->write_urb, serial->dev, 
-			      usb_sndbulkpipe(serial->dev, port->bulk_out_endpointAddress),
-			      port->write_urb->transfer_buffer, count,
-			      ftdi_sio_write_bulk_callback, port);
-		
-		result = usb_submit_urb(port->write_urb);
-		if (result) {
-			err(__FUNCTION__ " - failed submitting write urb, error %d", result);
-			return 0;
-		}
-
-		dbg(__FUNCTION__ " write returning: %d", count - data_offset);
-		return (count - data_offset);
+	first_byte = port->write_urb->transfer_buffer;
+	if (data_offset > 0){
+		/* Write the control byte at the front of the packet*/
+		*first_byte = 1 | ((count-data_offset) << 2) ; 
 	}
-	
-	/* no bulk out, so return 0 bytes written */
-	return 0;
- err: /* error exit */
-	return(rc);
+
+	dbg(__FUNCTION__ " Bytes: %d, First Byte: 0x%02x",count, first_byte[0]);
+	usb_serial_debug_data (__FILE__, __FUNCTION__, count, first_byte);
+		
+	/* send the data out the bulk port */
+	FILL_BULK_URB(port->write_urb, serial->dev, 
+		      usb_sndbulkpipe(serial->dev, port->bulk_out_endpointAddress),
+		      port->write_urb->transfer_buffer, count,
+		      ftdi_sio_write_bulk_callback, port);
+		
+	result = usb_submit_urb(port->write_urb);
+	if (result) {
+		err(__FUNCTION__ " - failed submitting write urb, error %d", result);
+		up (&port->sem);
+		return 0;
+	}
+	up (&port->sem);
+
+	dbg(__FUNCTION__ " write returning: %d", count - data_offset);
+	return (count - data_offset);
+
 } /* ftdi_sio_write */
 
 static void ftdi_sio_write_bulk_callback (struct urb *urb)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
 	struct usb_serial *serial;
-       	struct tty_struct *tty = port->tty;
 
 	dbg("ftdi_sio_write_bulk_callback");
 
 	if (port_paranoia_check (port, "ftdi_sio_write_bulk_callback")) {
 		return;
 	}
-
+	
 	serial = port->serial;
 	if (serial_paranoia_check (serial, "ftdi_sio_write_bulk_callback")) {
 		return;
@@ -533,15 +521,28 @@ static void ftdi_sio_write_bulk_callback (struct urb *urb)
 		dbg("nonzero write bulk status received: %d", urb->status);
 		return;
 	}
+	queue_task(&port->tqueue, &tq_immediate);
+	mark_bh(IMMEDIATE_BH);
 
-	wake_up_interruptible(&port->write_wait);
-	if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) && tty->ldisc.write_wakeup)
-		(tty->ldisc.write_wakeup)(tty);
-
-	wake_up_interruptible(&tty->write_wait);
-	
 	return;
 } /* ftdi_sio_write_bulk_callback */
+
+
+static int ftdi_sio_write_room( struct usb_serial_port *port )
+{
+	struct ftdi_private *priv = (struct ftdi_private *)port->private;
+	int room;
+	if ( port->write_urb->status == -EINPROGRESS) {
+		/* There is a race here with the _write routines but it won't hurt */
+		room = 0;
+	} else { 
+		room = port->bulk_out_size - priv->write_offset;
+	}
+	return(room);
+
+
+} /* ftdi_sio_write_room */
+
 
 static void ftdi_sio_read_bulk_callback (struct urb *urb)
 { /* ftdi_sio_serial_buld_callback */
@@ -555,7 +556,7 @@ static void ftdi_sio_read_bulk_callback (struct urb *urb)
 	int i;
 	int result;
 
-	dbg(__FUNCTION__);
+	dbg(__FUNCTION__ " - port %d", port->number);
 
 	if (port_paranoia_check (port, "ftdi_sio_read_bulk_callback")) {
 		return;
@@ -647,12 +648,12 @@ static void ftdi_sio_read_bulk_callback (struct urb *urb)
 #endif
 
 	/* Continue trying to always read  */
-	FILL_BULK_URB(urb, serial->dev, 
+	FILL_BULK_URB(port->read_urb, serial->dev, 
 		      usb_rcvbulkpipe(serial->dev, port->bulk_in_endpointAddress),
-		      urb->transfer_buffer, urb->transfer_buffer_length,
+		      port->read_urb->transfer_buffer, port->read_urb->transfer_buffer_length,
 		      ftdi_sio_read_bulk_callback, port);
 
-	result = usb_submit_urb(urb);
+	result = usb_submit_urb(port->read_urb);
 	if (result)
 		err(__FUNCTION__ " - failed resubmitting read urb, error %d", result);
 

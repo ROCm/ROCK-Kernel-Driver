@@ -33,6 +33,7 @@ subdir-$(CONFIG_ZLIB_FS_INFLATE) += inflate_fs
 subdir-$(CONFIG_CRAMFS)		+= cramfs
 subdir-$(CONFIG_RAMFS)		+= ramfs
 subdir-$(CONFIG_CODA_FS)	+= coda
+subdir-$(CONFIG_INTERMEZZO_FS)	+= intermezzo
 subdir-$(CONFIG_MINIX_FS)	+= minix
 subdir-$(CONFIG_FAT_FS)		+= fat
 subdir-$(CONFIG_UMSDOS_FS)	+= umsdos

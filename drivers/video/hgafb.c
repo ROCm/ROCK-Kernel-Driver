@@ -312,8 +312,8 @@ static void hga_blank(int blank_mode)
 static int __init hga_card_detect(void)
 {
 	int count=0;
-	unsigned char p, p_save;
-	unsigned char q, q_save;
+	unsigned long p, q;
+	unsigned short p_save, q_save;
 
 	hga_vram_base = 0xb0000;
 	hga_vram_len  = 0x08000;

@@ -500,10 +500,9 @@ out:
 int lvm_snapshot_alloc(lv_t * lv_snap)
 {
 	int ret, max_sectors;
-	int nbhs = KIO_MAX_SECTORS;
 
 	/* allocate kiovec to do chunk io */
-	ret = alloc_kiovec_sz(1, &lv_snap->lv_iobuf, &nbhs);
+	ret = alloc_kiovec(1, &lv_snap->lv_iobuf);
 	if (ret) goto out;
 
 	max_sectors = KIO_MAX_SECTORS << (PAGE_SHIFT-9);
@@ -512,7 +511,7 @@ int lvm_snapshot_alloc(lv_t * lv_snap)
 	if (ret) goto out_free_kiovec;
 
 	/* allocate kiovec to do exception table io */
-	ret = alloc_kiovec_sz(1, &lv_snap->lv_COW_table_iobuf, &nbhs);
+	ret = alloc_kiovec(1, &lv_snap->lv_COW_table_iobuf);
 	if (ret) goto out_free_kiovec;
 
 	ret = lvm_snapshot_alloc_iobuf_pages(lv_snap->lv_COW_table_iobuf,
@@ -528,12 +527,12 @@ out:
 
 out_free_both_kiovecs:
 	unmap_kiobuf(lv_snap->lv_COW_table_iobuf);
-	free_kiovec_sz(1, &lv_snap->lv_COW_table_iobuf, &nbhs);
+	free_kiovec(1, &lv_snap->lv_COW_table_iobuf);
 	lv_snap->lv_COW_table_iobuf = NULL;
 
 out_free_kiovec:
 	unmap_kiobuf(lv_snap->lv_iobuf);
-	free_kiovec_sz(1, &lv_snap->lv_iobuf, &nbhs);
+	free_kiovec(1, &lv_snap->lv_iobuf);
 	lv_snap->lv_iobuf = NULL;
 	if (lv_snap->lv_snapshot_hash_table != NULL)
 		vfree(lv_snap->lv_snapshot_hash_table);
@@ -560,14 +559,14 @@ void lvm_snapshot_release(lv_t * lv)
 	{
 	        kiobuf_wait_for_io(lv->lv_iobuf);
 		unmap_kiobuf(lv->lv_iobuf);
-		free_kiovec_sz(1, &lv->lv_iobuf, &nbhs);
+		free_kiovec(1, &lv->lv_iobuf);
 		lv->lv_iobuf = NULL;
 	}
 	if (lv->lv_COW_table_iobuf)
 	{
                kiobuf_wait_for_io(lv->lv_COW_table_iobuf);
                unmap_kiobuf(lv->lv_COW_table_iobuf);
-               free_kiovec_sz(1, &lv->lv_COW_table_iobuf, &nbhs);
+               free_kiovec(1, &lv->lv_COW_table_iobuf);
                lv->lv_COW_table_iobuf = NULL;
 	}
 }

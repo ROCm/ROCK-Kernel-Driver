@@ -515,7 +515,7 @@ needs_resched:
 #endif /* CONFIG_SMP */
 }
 
-void schedule_tail(struct task_struct *prev)
+asmlinkage void schedule_tail(struct task_struct *prev)
 {
 	__schedule_tail(prev);
 }

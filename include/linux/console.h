@@ -112,6 +112,7 @@ extern struct console *console_drivers;
 extern void acquire_console_sem(void);
 extern void release_console_sem(void);
 extern void console_conditional_schedule(void);
+extern void console_unblank(void);
 
 /* VESA Blanking Levels */
 #define VESA_NO_BLANKING        0

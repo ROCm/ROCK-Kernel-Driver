@@ -43,6 +43,7 @@ static inline int pers_to_level (int pers)
 static inline int level_to_pers (int level)
 {
 	switch (level) {
+		case -4: return MULTIPATH;
 		case -3: return HSM;
 		case -2: return TRANSLUCENT;
 		case -1: return LINEAR;

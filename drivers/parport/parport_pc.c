@@ -3047,6 +3047,12 @@ int init_module(void)
 			case PARPORT_IRQ_NONE:
 			case PARPORT_IRQ_AUTO:
 				irqval[0] = val;
+				break;
+			default:
+				printk (KERN_WARNING
+					"parport_pc: irq specified "
+					"without base address.  Use 'io=' "
+					"to specify one\n");
 			}
 
 		if (dma[0] && !parport_parse_dmas (1, dma, &val))
@@ -3054,6 +3060,12 @@ int init_module(void)
 			case PARPORT_DMA_NONE:
 			case PARPORT_DMA_AUTO:
 				dmaval[0] = val;
+				break;
+			default:
+				printk (KERN_WARNING
+					"parport_pc: dma specified "
+					"without base address.  Use 'io=' "
+					"to specify one\n");
 			}
 	}
 

@@ -14,6 +14,7 @@ if [ "$CONFIG_NET_PCMCIA" = "y" ]; then
    dep_tristate '  New Media PCMCIA support' CONFIG_PCMCIA_NMCLAN $CONFIG_PCMCIA
    dep_tristate '  SMC 91Cxx PCMCIA support' CONFIG_PCMCIA_SMC91C92 $CONFIG_PCMCIA
    dep_tristate '  Xircom 16-bit PCMCIA support' CONFIG_PCMCIA_XIRC2PS $CONFIG_PCMCIA
+   dep_tristate '  broken NS8390-cards support' CONFIG_PCMCIA_AXNET $CONFIG_PCMCIA
    dep_tristate '  COM20020 ARCnet PCMCIA support' CONFIG_ARCNET_COM20020_CS $CONFIG_ARCNET_COM20020 $CONFIG_ARCNET $CONFIG_PCMCIA
    if [ "$CONFIG_IBMTR" != "y" ]; then
       dep_tristate '  IBM PCMCIA tokenring adapter support' CONFIG_PCMCIA_IBMTR $CONFIG_TR $CONFIG_PCMCIA

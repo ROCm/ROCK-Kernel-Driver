@@ -17,8 +17,12 @@
  * Portions of this driver were taken from drivers/net/irda/irda-usb.c, which
  * was written by Roman Weissgaerber <weissg@vienna.at>, Dag Brattli
  * <dag@brattli.net>, and Jean Tourrilhes <jt@hpl.hp.com>
-
+ *
  * See Documentation/usb/usb-serial.txt for more information on using this driver
+ *
+ * 2001_Nov_08  greg kh
+ *	Changed the irda_usb_find_class_desc() function based on comments and
+ *	code from Martin Diehl.
  *
  * 2001_Nov_01	greg kh
  *	Added support for more IrDA USB devices.
@@ -58,7 +62,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v0.2"
+#define DRIVER_VERSION "v0.3"
 #define DRIVER_AUTHOR "Greg Kroah-Hartman <greg@kroah.com>"
 #define DRIVER_DESC "USB IR Dongle driver"
 
@@ -128,12 +132,12 @@ static inline void irda_usb_dump_class_desc(struct irda_class_desc *desc)
  * The class descriptor is some extra info that IrDA USB devices will
  * offer to us, describing their IrDA characteristics. We will use that in
  * irda_usb_init_qos()
+ *
+ * Based on the same function in drivers/net/irda/irda-usb.c
  */
 static struct irda_class_desc *irda_usb_find_class_desc(struct usb_device *dev, unsigned int ifnum)
 {
-	struct usb_interface_descriptor *interface;
 	struct irda_class_desc *desc;
-	struct irda_class_desc *ptr;
 	int ret;
 		
 	desc = kmalloc(sizeof (struct irda_class_desc), GFP_KERNEL);
@@ -141,28 +145,27 @@ static struct irda_class_desc *irda_usb_find_class_desc(struct usb_device *dev, 
 		return NULL;
 	memset(desc, 0, sizeof(struct irda_class_desc));
 	
-	ret = usb_get_class_descriptor(dev, ifnum, USB_DT_IRDA, 0, (void *) desc, sizeof(struct irda_class_desc));
-	dbg(__FUNCTION__ " -  ret=%d", ret);
-	if (ret)
-		dbg(__FUNCTION__ " - usb_get_class_descriptor failed (0x%x)", ret);
-
-	/* Check if we found it? */
-	if (desc->bDescriptorType == USB_DT_IRDA)
-		goto exit;
-
-	dbg(__FUNCTION__ " - parsing extra descriptors...");
+	ret = usb_control_msg(dev, usb_rcvctrlpipe(dev,0),
+			IU_REQ_GET_CLASS_DESC,
+			USB_DIR_IN | USB_TYPE_CLASS | USB_RECIP_INTERFACE,
+			0, ifnum, desc, sizeof(*desc), MSECS_TO_JIFFIES(500));
 	
-	/* Check if the class descriptor is interleaved with standard descriptors */
-	interface = &dev->actconfig->interface[ifnum].altsetting[0];
-	ret = usb_get_extra_descriptor(interface, USB_DT_IRDA, &ptr);
-	if (ret) {
-		kfree(desc);
-		return NULL;
+	dbg(__FUNCTION__ " -  ret=%d", ret);
+	if (ret < sizeof(*desc)) {
+		dbg(__FUNCTION__ " - class descriptor read %s (%d)",
+				(ret<0) ? "failed" : "too short", ret);
+		goto error;
 	}
-	*desc = *ptr;
-exit:
+	if (desc->bDescriptorType != USB_DT_IRDA) {
+		dbg(__FUNCTION__ " - bad class descriptor type");
+		goto error;
+	}
+	
 	irda_usb_dump_class_desc(desc);
 	return desc;
+error:
+	kfree(desc);
+	return NULL;
 }
 
 static int ir_startup (struct usb_serial *serial)

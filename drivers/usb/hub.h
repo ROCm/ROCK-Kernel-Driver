@@ -135,7 +135,7 @@ struct usb_hub {
 
 	struct usb_hub_descriptor *descriptor;
 
-	atomic_t refcnt;
+	struct semaphore khubd_sem;
 };
 
-#endif
+#endif /* __LINUX_HUB_H */

@@ -1824,7 +1824,7 @@ static int ymf_open(struct inode *inode, struct file *file)
 	}
 
 	unit = NULL;	/* gcc warns */
-	for (list = ymf_devs.next; list != &ymf_devs; list = list->next) {
+	list_for_each(list, &ymf_devs) {
 		unit = list_entry(list, ymfpci_t, ymf_devs);
 		if (((unit->dev_audio ^ minor) & ~0x0F) == 0)
 			break;
@@ -1935,7 +1935,7 @@ static int ymf_open_mixdev(struct inode *inode, struct file *file)
 	struct list_head *list;
 	ymfpci_t *unit;
 
-	for (list = ymf_devs.next; list != &ymf_devs; list = list->next) {
+	list_for_each(list, &ymf_devs) {
 		unit = list_entry(list, ymfpci_t, ymf_devs);
 		for (i = 0; i < NR_AC97; i++) {
 			if (unit->ac97_codec[i] != NULL &&
@@ -1990,15 +1990,24 @@ static /*const*/ struct file_operations ymf_mixer_fops = {
 
 static int ymf_suspend(struct pci_dev *pcidev, u32 unused)
 {
+	int i;
 	struct ymf_unit *unit = pci_get_drvdata(pcidev);
 	unsigned long flags;
 	struct ymf_dmabuf *dmabuf;
 	struct list_head *p;
 	struct ymf_state *state;
+	struct ac97_codec *codec;
 
 	spin_lock_irqsave(&unit->reg_lock, flags);
 
 	unit->suspended = 1;
+
+	for (i = 0; i < NR_AC97; i++) {
+		codec = unit->ac97_codec[i];
+		if (!codec)
+			continue;
+		ac97_save_state(codec);
+	}
 
 	list_for_each(p, &unit->states) {
 		state = list_entry(p, struct ymf_state, chain);
@@ -2024,13 +2033,22 @@ static int ymf_suspend(struct pci_dev *pcidev, u32 unused)
 
 static int ymf_resume(struct pci_dev *pcidev)
 {
+	int i;
 	struct ymf_unit *unit = pci_get_drvdata(pcidev);
 	unsigned long flags;
 	struct list_head *p;
 	struct ymf_state *state;
+	struct ac97_codec *codec;
 
 	ymfpci_aclink_reset(unit->pci);
 	ymfpci_codec_ready(unit, 0, 1);		/* prints diag if not ready. */
+
+	for (i = 0; i < NR_AC97; i++) {
+		codec = unit->ac97_codec[i];
+		if (!codec)
+			continue;
+		ac97_restore_state(codec);
+	}
 
 #ifdef CONFIG_SOUND_YMFPCI_LEGACY
 	/* XXX At this time the legacy registers are probably deprogrammed. */

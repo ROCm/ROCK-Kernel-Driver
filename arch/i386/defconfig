@@ -469,6 +469,7 @@ CONFIG_PCMCIA_PCNET=y
 # CONFIG_PCMCIA_NMCLAN is not set
 # CONFIG_PCMCIA_SMC91C92 is not set
 # CONFIG_PCMCIA_XIRC2PS is not set
+# CONFIG_PCMCIA_AXNET is not set
 # CONFIG_ARCNET_COM20020_CS is not set
 # CONFIG_PCMCIA_IBMTR is not set
 # CONFIG_PCMCIA_XIRCOM is not set
@@ -644,6 +645,7 @@ CONFIG_EXT2_FS=y
 # Network File Systems
 #
 # CONFIG_CODA_FS is not set
+# CONFIG_INTERMEZZO_FS is not set
 CONFIG_NFS_FS=y
 # CONFIG_NFS_V3 is not set
 # CONFIG_ROOT_NFS is not set
