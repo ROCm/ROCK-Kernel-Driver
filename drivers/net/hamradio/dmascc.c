@@ -250,8 +250,6 @@ struct scc_info {
 
 
 /* Function declarations */
-
-int dmascc_init(void) __init;
 static int setup_adapter(int card_base, int type, int n) __init;
 
 static void write_scc(struct scc_priv *priv, int reg, int val);
@@ -299,23 +297,12 @@ static struct scc_info *first;
 static unsigned long rand;
 
 
-/* Module functions */
-
-#ifdef MODULE
-
-
 MODULE_AUTHOR("Klaus Kudielka");
 MODULE_DESCRIPTION("Driver for high-speed SCC boards");
 MODULE_PARM(io, "1-" __MODULE_STRING(MAX_NUM_DEVS) "i");
 MODULE_LICENSE("GPL");
 
-
-int init_module(void) {
-  return dmascc_init();
-}
-
-
-void cleanup_module(void) {
+static void __exit dmascc_exit(void) {
   int i;
   struct scc_info *info;
 
@@ -341,24 +328,16 @@ void cleanup_module(void) {
   }
 }
 
-
-#else
-
-
+#ifndef MODULE
 void __init dmascc_setup(char *str, int *ints) {
    int i;
 
    for (i = 0; i < MAX_NUM_DEVS && i < ints[0]; i++)
       io[i] = ints[i+1];
 }
-
-
 #endif
 
-
-/* Initialization functions */
-
-int __init dmascc_init(void) {
+static int __init dmascc_init(void) {
   int h, i, j, n;
   int base[MAX_NUM_DEVS], tcmd[MAX_NUM_DEVS], t0[MAX_NUM_DEVS],
     t1[MAX_NUM_DEVS];
@@ -460,6 +439,9 @@ int __init dmascc_init(void) {
   printk(KERN_INFO "dmascc: no adapters found\n");
   return -EIO;
 }
+
+module_init(dmascc_init);
+module_exit(dmascc_exit);
 
 
 int __init setup_adapter(int card_base, int type, int n) {
@@ -580,6 +562,7 @@ int __init setup_adapter(int card_base, int type, int n) {
     if (sizeof(dev->name) == sizeof(char *)) dev->name = priv->name;
 #endif
     sprintf(dev->name, "dmascc%i", 2*n+i);
+    SET_MODULE_OWNER(dev);
     dev->base_addr = card_base;
     dev->irq = irq;
     dev->open = scc_open;
@@ -707,12 +690,9 @@ static int scc_open(struct net_device *dev) {
   struct scc_info *info = priv->info;
   int card_base = priv->card_base;
 
-  MOD_INC_USE_COUNT;
-
   /* Request IRQ if not already used by other channel */
   if (!info->irq_used) {
     if (request_irq(dev->irq, scc_isr, 0, "dmascc", info)) {
-      MOD_DEC_USE_COUNT;
       return -EAGAIN;
     }
   }
@@ -722,7 +702,6 @@ static int scc_open(struct net_device *dev) {
   if (priv->param.dma >= 0) {
     if (request_dma(priv->param.dma, "dmascc")) {
       if (--info->irq_used == 0) free_irq(dev->irq, info);
-      MOD_DEC_USE_COUNT;
       return -EAGAIN;
     } else {
       unsigned long flags = claim_dma_lock();
@@ -866,7 +845,6 @@ static int scc_close(struct net_device *dev) {
   }
   if (--info->irq_used == 0) free_irq(dev->irq, info);
 
-  MOD_DEC_USE_COUNT;
   return 0;
 }
 
