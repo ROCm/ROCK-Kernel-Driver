@@ -44,7 +44,7 @@ drivers-$(CONFIG_4xx)		+= arch/ppc/4xx_io/
 drivers-$(CONFIG_8260)		+= arch/ppc/8260_io/
 drivers-$(CONFIG_OCP)		+= arch/ppc/ocp/
 
-BOOT_TARGETS = zImage zImage.initrd znetboot znetboot.initrd pImage vmlinux.sm
+BOOT_TARGETS = zImage zImage.initrd znetboot znetboot.initrd vmlinux.sm
 
 .PHONY: $(BOOT_TARGETS)
 
@@ -55,8 +55,17 @@ AFLAGS_vmlinux.lds.o	:= -Upowerpc
 # All the instructions talk about "make bzImage".
 bzImage: zImage
 
+boot := arch/$(ARCH)/boot
+
 $(BOOT_TARGETS): vmlinux
-	$(Q)$(MAKE) $(build)=arch/ppc/boot $@
+	$(Q)$(MAKE) $(build)=$(boot) $@
+
+uImage: vmlinux
+	$(Q)$(MAKE) $(build)=$(boot)/images $(boot)/images/$@
+
+define archhelp
+  @echo '  uImage          - Create a bootable image for U-Boot / PPCBoot'
+endef
 
 archclean:
 	$(Q)$(MAKE) $(clean)=arch/ppc/boot
