@@ -159,10 +159,10 @@ ahc_linux_eisa_init(void)
 void
 ahc_linux_eisa_exit(void)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
-	eisa_driver_unregister(&aic7770_driver);
-	free(aic7770_driver.id_table, M_DEVBUF);
-#endif
+	if(aic7xxx_probe_eisa_vl != 0 && aic7770_driver.id_table != NULL) {
+		eisa_driver_unregister(&aic7770_driver);
+		free(aic7770_driver.id_table, M_DEVBUF);
+	}
 }
 
 static int

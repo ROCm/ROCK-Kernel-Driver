@@ -843,7 +843,8 @@ static int
 ahc_linux_detect(Scsi_Host_Template *template)
 {
 	struct	ahc_softc *ahc;
-	int     found;
+	int     found = 0;
+	int	eisa_err, pci_err;
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
 	/*
@@ -891,21 +892,12 @@ ahc_linux_detect(Scsi_Host_Template *template)
 	 */
 	ahc_list_lockinit();
 
-#ifdef CONFIG_PCI
-	found = ahc_linux_pci_init();
-	if (found)
-		goto out;
-#endif
+	pci_err = ahc_linux_pci_init();
+	eisa_err = ahc_linux_eisa_init();
 
-#ifdef CONFIG_EISA
-	found = ahc_linux_eisa_init();
-	if (found) {
-#ifdef CONFIG_PCI
-		ahc_linux_pci_exit();
-#endif
+	if(pci_err && eisa_err)
 		goto out;
-	}
-#endif
+
 
 	/*
 	 * Register with the SCSI layer all
@@ -916,12 +908,13 @@ ahc_linux_detect(Scsi_Host_Template *template)
 		if (ahc_linux_register_host(ahc, template) == 0)
 			found++;
 	}
+out:
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
 	spin_lock_irq(&io_request_lock);
 #endif
 	aic7xxx_detect_complete++;
 
-out:
 	return (found);
 }
 
@@ -5078,7 +5071,7 @@ ahc_platform_dump_card_state(struct ahc_softc *ahc)
 	}
 }
 
-static void __exit ahc_linux_exit(void);
+static void ahc_linux_exit(void);
 
 static int __init
 ahc_linux_init(void)
@@ -5101,7 +5094,7 @@ ahc_linux_init(void)
 #endif
 }
 
-static void __exit
+static void
 ahc_linux_exit(void)
 {
 	struct ahc_softc *ahc;
@@ -5128,12 +5121,8 @@ ahc_linux_exit(void)
 	 */
 	scsi_unregister_module(MODULE_SCSI_HA, &aic7xxx_driver_template);
 #endif
-#ifdef CONFIG_PCI
 	ahc_linux_pci_exit();
-#endif
-#ifdef CONFIG_EISA
 	ahc_linux_eisa_exit();
-#endif
 }
 
 module_init(ahc_linux_init);
