@@ -1,0 +1,34 @@
+ifeq ($(CONFIG_HOST_2G_2G), y)
+TOP_ADDR = 0x80000000
+else
+TOP_ADDR = 0xc0000000
+endif
+
+ARCH_CFLAGS = -U__$(SUBARCH)__ -U$(SUBARCH)
+ELF_ARCH = $(SUBARCH)
+ELF_FORMAT = elf32-$(SUBARCH)
+
+
+SYS_HEADERS = $(ARCH_DIR)/include/sysdep-i386/sc.h \
+	$(ARCH_DIR)/include/sysdep-i386/thread.h
+
+$(ARCH_DIR)/include/sysdep-i386/sc.h : $(ARCH_DIR)/sys-i386/util/mk_sc \
+	include/asm
+	$(ARCH_DIR)/sys-i386/util/mk_sc > $@
+
+$(ARCH_DIR)/include/sysdep-i386/thread.h : $(ARCH_DIR)/sys-i386/util/mk_thread\
+	include/asm
+	$(ARCH_DIR)/sys-i386/util/mk_thread > $@
+
+$(ARCH_DIR)/sys-i386/util/mk_sc : $(ARCH_DIR)/sys-i386/util/mk_sc.c \
+	include/asm
+	$(MAKE) -C $(ARCH_DIR)/sys-i386/util mk_sc
+
+$(ARCH_DIR)/sys-i386/util/mk_thread : \
+	$(ARCH_DIR)/sys-i386/util/mk_thread_user.c \
+	$(ARCH_DIR)/sys-i386/util/mk_thread_kern.c
+	$(MAKE) -C $(ARCH_DIR)/sys-i386/util mk_thread
+
+sysclean :
+	rm -f $(SYS_HEADERS)
+	make -C $(ARCH_DIR)/sys-i386/util clean
