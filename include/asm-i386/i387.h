@@ -26,7 +26,9 @@ extern void restore_fpu( struct task_struct *tsk );
 extern void kernel_fpu_begin(void);
 #define kernel_fpu_end() do { stts(); preempt_enable(); } while(0)
 
-
+/*
+ * These must be called with preempt disabled
+ */
 static inline void __save_init_fpu( struct task_struct *tsk )
 {
 	if ( cpu_has_fxsr ) {
@@ -39,19 +41,12 @@ static inline void __save_init_fpu( struct task_struct *tsk )
 	tsk->thread_info->status &= ~TS_USEDFPU;
 }
 
-static inline void save_init_fpu( struct task_struct *tsk )
-{
-	__save_init_fpu(tsk);
-	stts();
-}
-
-
-#define unlazy_fpu( tsk ) do { \
+#define __unlazy_fpu( tsk ) do { \
 	if ((tsk)->thread_info->status & TS_USEDFPU) \
 		save_init_fpu( tsk ); \
 } while (0)
 
-#define clear_fpu( tsk )					\
+#define __clear_fpu( tsk )					\
 do {								\
 	if ((tsk)->thread_info->status & TS_USEDFPU) {		\
 		asm volatile("fwait");				\
@@ -60,6 +55,30 @@ do {								\
 	}							\
 } while (0)
 
+
+/*
+ * These disable preemption on their own and are safe
+ */
+static inline void save_init_fpu( struct task_struct *tsk )
+{
+	preempt_disable();
+	__save_init_fpu(tsk);
+	stts();
+	preempt_enable();
+}
+
+#define unlazy_fpu( tsk ) do {	\
+	preempt_disable();	\
+	__unlazy_fpu(tsk);	\
+	preempt_enable();	\
+} while (0)
+
+#define clear_fpu( tsk ) do {	\
+	preempt_disable();	\
+	__clear_fpu( tsk );	\
+	preempt_enable();	\
+} while (0)
+					\
 /*
  * FPU state interaction...
  */

@@ -452,7 +452,7 @@ struct task_struct * __switch_to(struct task_struct *prev_p, struct task_struct 
 
 	/* never put a printk in __switch_to... printk() calls wake_up*() indirectly */
 
-	unlazy_fpu(prev_p);
+	__unlazy_fpu(prev_p);
 
 	/*
 	 * Reload esp0, LDT and the page table pointer:
