@@ -431,22 +431,10 @@ get_tuple(int fn, client_handle_t handle, tuple_t *tuple, cisparse_t *parse)
 #define PutByte(reg,value) outb((value), ioaddr+(reg))
 #define PutWord(reg,value) outw((value), ioaddr+(reg))
 
-static void
-busy_loop(u_long len)
-{
-    if (in_interrupt()) {
-	u_long timeout = jiffies + len;
-	u_long flags;
-	save_flags(flags);
-	sti();
-	while (time_before_eq(jiffies, timeout))
-	    ;
-	restore_flags(flags);
-    } else {
-	__set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(len);
-    }
-}
+#define Wait(n) do { \
+	set_current_state(TASK_UNINTERRUPTIBLE); \
+	schedule_timeout(n); \
+} while (0)
 
 /*====== Functions used for debugging =================================*/
 #if defined(PCMCIA_DEBUG) && 0 /* reading regs may change system status */
@@ -1780,12 +1768,12 @@ hardreset(struct net_device *dev)
     SelectPage(4);
     udelay(1);
     PutByte(XIRCREG4_GPR1, 0);	     /* clear bit 0: power down */
-    busy_loop(HZ/25);		     /* wait 40 msec */
+    Wait(HZ/25);		     /* wait 40 msec */
     if (local->mohawk)
 	PutByte(XIRCREG4_GPR1, 1);	 /* set bit 0: power up */
     else
 	PutByte(XIRCREG4_GPR1, 1 | 4);	 /* set bit 0: power up, bit 2: AIC */
-    busy_loop(HZ/50);		     /* wait 20 msec */
+    Wait(HZ/50);		     /* wait 20 msec */
 }
 
 static void
@@ -1799,9 +1787,9 @@ do_reset(struct net_device *dev, int full)
 
     hardreset(dev);
     PutByte(XIRCREG_CR, SoftReset); /* set */
-    busy_loop(HZ/50);		     /* wait 20 msec */
+    Wait(HZ/50);		     /* wait 20 msec */
     PutByte(XIRCREG_CR, 0);	     /* clear */
-    busy_loop(HZ/25);		     /* wait 40 msec */
+    Wait(HZ/25);		     /* wait 40 msec */
     if (local->mohawk) {
 	SelectPage(4);
 	/* set pin GP1 and GP2 to output  (0x0c)
@@ -1812,7 +1800,7 @@ do_reset(struct net_device *dev, int full)
     }
 
     /* give the circuits some time to power up */
-    busy_loop(HZ/2);		/* about 500ms */
+    Wait(HZ/2);		/* about 500ms */
 
     local->last_ptr_value = 0;
     local->silicon = local->mohawk ? (GetByte(XIRCREG4_BOV) & 0x70) >> 4
@@ -1831,7 +1819,7 @@ do_reset(struct net_device *dev, int full)
 	SelectPage(0x42);
 	PutByte(XIRCREG42_SWC1, 0x80);
     }
-    busy_loop(HZ/25);		     /* wait 40 msec to let it complete */
+    Wait(HZ/25);		     /* wait 40 msec to let it complete */
 
   #ifdef PCMCIA_DEBUG
     if (pc_debug) {
@@ -1890,7 +1878,7 @@ do_reset(struct net_device *dev, int full)
 	    printk(KERN_INFO "%s: MII selected\n", dev->name);
 	    SelectPage(2);
 	    PutByte(XIRCREG2_MSR, GetByte(XIRCREG2_MSR) | 0x08);
-	    busy_loop(HZ/50);
+	    Wait(HZ/50);
 	} else {
 	    printk(KERN_INFO "%s: MII detected; using 10mbs\n",
 		   dev->name);
@@ -1899,7 +1887,7 @@ do_reset(struct net_device *dev, int full)
 		PutByte(XIRCREG42_SWC1, 0xC0);
 	    else  /* enable 10BaseT */
 		PutByte(XIRCREG42_SWC1, 0x80);
-	    busy_loop(HZ/25);	/* wait 40 msec to let it complete */
+	    Wait(HZ/25);	/* wait 40 msec to let it complete */
 	}
 	if (full_duplex)
 	    PutByte(XIRCREG1_ECR, GetByte(XIRCREG1_ECR | FullDuplex));
@@ -1992,7 +1980,7 @@ init_mii(struct net_device *dev)
 	 * Fixme: Better to use a timer here!
 	 */
 	for (i=0; i < 35; i++) {
-	    busy_loop(HZ/10);	 /* wait 100 msec */
+	    Wait(HZ/10);	 /* wait 100 msec */
 	    status = mii_rd(ioaddr,  0, 1);
 	    if ((status & 0x0020) && (status & 0x0004))
 		break;
