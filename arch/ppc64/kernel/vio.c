@@ -432,7 +432,7 @@ dma_addr_t vio_map_single(struct vio_dev *dev, void *vaddr,
 	tbl = dev->iommu_table;
 
 	if (tbl) {
-		dma_handle = iommu_alloc(tbl, vaddr, npages, direction, NULL);
+		dma_handle = iommu_alloc(tbl, vaddr, npages, direction);
 		dma_handle |= (uaddr & ~PAGE_MASK);
 	}
 
@@ -461,7 +461,6 @@ int vio_map_sg(struct vio_dev *vdev, struct scatterlist *sglist, int nelems,
 	       int direction)
 {
 	struct iommu_table *tbl;
-	unsigned long handle;
 
 	BUG_ON(direction == PCI_DMA_NONE);
 
@@ -472,7 +471,7 @@ int vio_map_sg(struct vio_dev *vdev, struct scatterlist *sglist, int nelems,
 	if (!tbl)
 		return 0;
 
-	return iommu_alloc_sg(tbl, sglist, nelems, direction, &handle);
+	return iommu_alloc_sg(tbl, &vdev->dev, sglist, nelems, direction);
 }
 EXPORT_SYMBOL(vio_map_sg);
 
@@ -485,7 +484,7 @@ void vio_unmap_sg(struct vio_dev *vdev, struct scatterlist *sglist, int nelems,
 
 	tbl = vdev->iommu_table;
 	if (tbl)
-		iommu_free_sg(tbl, sglist, nelems, direction);
+		iommu_free_sg(tbl, sglist, nelems);
 }
 EXPORT_SYMBOL(vio_unmap_sg);
 
@@ -517,7 +516,7 @@ void *vio_alloc_consistent(struct vio_dev *dev, size_t size,
 			/* Page allocation succeeded */
 			memset(ret, 0, npages << PAGE_SHIFT);
 			/* Set up tces to cover the allocated range */
-			tce = iommu_alloc(tbl, ret, npages, PCI_DMA_BIDIRECTIONAL, NULL);
+			tce = iommu_alloc(tbl, ret, npages, PCI_DMA_BIDIRECTIONAL);
 			if (tce == NO_TCE) {
 				PPCDBG(PPCDBG_TCE, "vio_alloc_consistent: iommu_alloc failed\n" );
 				free_pages((unsigned long)ret, order);

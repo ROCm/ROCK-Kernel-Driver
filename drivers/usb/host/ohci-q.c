@@ -187,6 +187,7 @@ static int ed_schedule (struct ohci_hcd *ohci, struct ed *ed)
 	switch (ed->type) {
 	case PIPE_CONTROL:
 		if (ohci->ed_controltail == NULL) {
+			WARN_ON (ohci->hc_control & OHCI_CTRL_CLE);
 			writel (ed->dma, &ohci->regs->ed_controlhead);
 		} else {
 			ohci->ed_controltail->ed_next = ed;
@@ -203,6 +204,7 @@ static int ed_schedule (struct ohci_hcd *ohci, struct ed *ed)
 
 	case PIPE_BULK:
 		if (ohci->ed_bulktail == NULL) {
+			WARN_ON (ohci->hc_control & OHCI_CTRL_BLE);
 			writel (ed->dma, &ohci->regs->ed_bulkhead);
 		} else {
 			ohci->ed_bulktail->ed_next = ed;
@@ -271,27 +273,56 @@ static void periodic_unlink (struct ohci_hcd *ohci, struct ed *ed)
  * just the link to the ed is unlinked.
  * the link from the ed still points to another operational ed or 0
  * so the HC can eventually finish the processing of the unlinked ed
+ * (assuming it already started that, which needn't be true).
+ *
+ * ED_UNLINK is a transient state: the HC may still see this ED, but soon
+ * it won't.  ED_SKIP means the HC will finish its current transaction,
+ * but won't start anything new.  The TD queue may still grow; device
+ * drivers don't know about this HCD-internal state.
+ *
+ * When the HC can't see the ED, something changes ED_UNLINK to one of:
+ *
+ *  - ED_OPER: when there's any request queued, the ED gets rescheduled
+ *    immediately.  HC should be working on them.
+ *
+ *  - ED_IDLE:  when there's no TD queue. there's no reason for the HC
+ *    to care about this ED; safe to disable the endpoint.
+ *
+ * When finish_unlinks() runs later, after SOF interrupt, it will often
+ * complete one or more URB unlinks before making that state change.
  */
 static void ed_deschedule (struct ohci_hcd *ohci, struct ed *ed) 
 {
 	ed->hwINFO |= ED_SKIP;
+	wmb ();
+	ed->state = ED_UNLINK;
 
+	/* To deschedule something from the control or bulk list, just
+	 * clear CLE/BLE and wait.  There's no safe way to scrub out list
+	 * head/current registers until later, and "later" isn't very
+	 * tightly specified.  Figure 6-5 and Section 6.4.2.2 show how
+	 * the HC is reading the ED queues (while we modify them).
+	 *
+	 * For now, ed_schedule() is "later".  It might be good paranoia
+	 * to scrub those registers in finish_unlinks(), in case of bugs
+	 * that make the HC try to use them.
+	 */
 	switch (ed->type) {
 	case PIPE_CONTROL:
+		/* remove ED from the HC's list: */
 		if (ed->ed_prev == NULL) {
 			if (!ed->hwNextED) {
 				ohci->hc_control &= ~OHCI_CTRL_CLE;
 				writel (ohci->hc_control, &ohci->regs->control);
-				writel (0, &ohci->regs->ed_controlcurrent);
-				// post those pci writes
-				(void) readl (&ohci->regs->control);
-			}
-			writel (le32_to_cpup (&ed->hwNextED),
-				&ohci->regs->ed_controlhead);
+				// a readl() later syncs CLE with the HC
+			} else
+				writel (le32_to_cpup (&ed->hwNextED),
+					&ohci->regs->ed_controlhead);
 		} else {
 			ed->ed_prev->ed_next = ed->ed_next;
 			ed->ed_prev->hwNextED = ed->hwNextED;
 		}
+		/* remove ED from the HCD's list: */
 		if (ohci->ed_controltail == ed) {
 			ohci->ed_controltail = ed->ed_prev;
 			if (ohci->ed_controltail)
@@ -302,20 +333,20 @@ static void ed_deschedule (struct ohci_hcd *ohci, struct ed *ed)
 		break;
 
 	case PIPE_BULK:
+		/* remove ED from the HC's list: */
 		if (ed->ed_prev == NULL) {
 			if (!ed->hwNextED) {
 				ohci->hc_control &= ~OHCI_CTRL_BLE;
 				writel (ohci->hc_control, &ohci->regs->control);
-				writel (0, &ohci->regs->ed_bulkcurrent);
-				// post those pci writes
-				(void) readl (&ohci->regs->control);
-			}
-			writel (le32_to_cpup (&ed->hwNextED),
-				&ohci->regs->ed_bulkhead);
+				// a readl() later syncs BLE with the HC
+			} else
+				writel (le32_to_cpup (&ed->hwNextED),
+					&ohci->regs->ed_bulkhead);
 		} else {
 			ed->ed_prev->ed_next = ed->ed_next;
 			ed->ed_prev->hwNextED = ed->hwNextED;
 		}
+		/* remove ED from the HCD's list: */
 		if (ohci->ed_bulktail == ed) {
 			ohci->ed_bulktail = ed->ed_prev;
 			if (ohci->ed_bulktail)
@@ -330,19 +361,6 @@ static void ed_deschedule (struct ohci_hcd *ohci, struct ed *ed)
 	default:
 		periodic_unlink (ohci, ed);
 		break;
-	}
-
-	/* NOTE: Except for a couple of exceptionally clean unlink cases
-	 * (like unlinking the only c/b ED, with no TDs) HCs may still be
-	 * caching this operational ED (or its address).  Safe unlinking
-	 * involves not marking it ED_IDLE till INTR_SF; we always do that
-	 * if td_list isn't empty.  Otherwise the race is small; but ...
-	 */
-	if (ed->state == ED_OPER) {
-		ed->state = ED_IDLE;
-		ed->hwINFO &= ~(ED_SKIP | ED_DEQUEUE);
-		ed->hwHeadP &= ~ED_H;
-		wmb ();
 	}
 }
 
@@ -439,12 +457,24 @@ done:
 /* request unlinking of an endpoint from an operational HC.
  * put the ep on the rm_list
  * real work is done at the next start frame (SF) hardware interrupt
+ * caller guarantees HCD is running, so hardware access is safe,
+ * and that ed->state is ED_OPER
  */
 static void start_ed_unlink (struct ohci_hcd *ohci, struct ed *ed)
 {    
 	ed->hwINFO |= ED_DEQUEUE;
-	ed->state = ED_UNLINK;
 	ed_deschedule (ohci, ed);
+
+	/* rm_list is just singly linked, for simplicity */
+	ed->ed_next = ohci->ed_rm_list;
+	ed->ed_prev = 0;
+	ohci->ed_rm_list = ed;
+
+	/* enable SOF interrupt */
+	writel (OHCI_INTR_SF, &ohci->regs->intrstatus);
+	writel (OHCI_INTR_SF, &ohci->regs->intrenable);
+	// flush those writes, and get latest HCCA contents
+	(void) readl (&ohci->regs->control);
 
 	/* SF interrupt might get delayed; record the frame counter value that
 	 * indicates when the HC isn't looking at it, so concurrent unlinks
@@ -453,18 +483,6 @@ static void start_ed_unlink (struct ohci_hcd *ohci, struct ed *ed)
 	 */
 	ed->tick = OHCI_FRAME_NO(ohci->hcca) + 1;
 
-	/* rm_list is just singly linked, for simplicity */
-	ed->ed_next = ohci->ed_rm_list;
-	ed->ed_prev = 0;
-	ohci->ed_rm_list = ed;
-
-	/* enable SOF interrupt */
-	if (HCD_IS_RUNNING (ohci->hcd.state)) {
-		writel (OHCI_INTR_SF, &ohci->regs->intrstatus);
-		writel (OHCI_INTR_SF, &ohci->regs->intrenable);
-		// flush those pci writes
-		(void) readl (&ohci->regs->control);
-	}
 }
 
 /*-------------------------------------------------------------------------*
@@ -665,6 +683,7 @@ static void td_submit_urb (
 
 	/* start periodic dma if needed */
 	if (periodic) {
+		wmb ();
 		ohci->hc_control |= OHCI_CTRL_PLE|OHCI_CTRL_IE;
 		writel (ohci->hc_control, &ohci->regs->control);
 	}
@@ -806,8 +825,6 @@ ed_halted (struct ohci_hcd *ohci, struct td *td, int cc, struct td *rev)
 		next->next_dl_td = rev;	
 		rev = next;
 
-		if (ed->hwTailP == cpu_to_le32 (next->td_dma))
-			ed->hwTailP = next->hwNextTD;
 		ed->hwHeadP = next->hwNextTD | toggle;
 	}
 
@@ -934,6 +951,10 @@ skip_ed:
 		/* unlink urbs as requested, but rescan the list after
 		 * we call a completion since it might have unlinked
 		 * another (earlier) urb
+		 *
+		 * When we get here, the HC doesn't see this ed.  But it
+		 * must not be rescheduled until all completed URBs have
+		 * been given back to the driver.
 		 */
 rescan_this:
 		completed = 0;
@@ -953,12 +974,7 @@ rescan_this:
 				continue;
 			}
 
-			/* patch pointers hc uses ... tail, if we're removing
-			 * an otherwise active td, and whatever td pointer
-			 * points to this td
-			 */
-			if (ed->hwTailP == cpu_to_le32 (td->td_dma))
-				ed->hwTailP = td->hwNextTD;
+			/* patch pointer hc uses */
 			savebits = *prev & ~cpu_to_le32 (TD_MASK);
 			*prev = td->hwNextTD | savebits;
 
@@ -977,9 +993,10 @@ rescan_this:
 
 		/* ED's now officially unlinked, hc doesn't see */
 		ed->state = ED_IDLE;
-		ed->hwINFO &= ~(ED_SKIP | ED_DEQUEUE);
 		ed->hwHeadP &= ~ED_H;
 		ed->hwNextED = 0;
+		wmb ();
+		ed->hwINFO &= ~(ED_SKIP | ED_DEQUEUE);
 
 		/* but if there's work queued, reschedule */
 		if (!list_empty (&ed->td_list)) {
@@ -1052,8 +1069,8 @@ dl_done_list (struct ohci_hcd *ohci, struct td *td, struct pt_regs *regs)
   			finish_urb (ohci, urb, regs);
 
 		/* clean schedule:  unlink EDs that are no longer busy */
-		if (list_empty (&ed->td_list))
-			ed_deschedule (ohci, ed);
+		if (list_empty (&ed->td_list) && ed->state == ED_OPER)
+			start_ed_unlink (ohci, ed);
 		/* ... reenabling halted EDs only after fault cleanup */
 		else if ((ed->hwINFO & (ED_SKIP | ED_DEQUEUE)) == ED_SKIP) {
 			td = list_entry (ed->td_list.next, struct td, td_list);

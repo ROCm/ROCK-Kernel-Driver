@@ -2222,7 +2222,7 @@ static int dv1394_init(struct ti_ohci *ohci, enum pal_or_ntsc format, enum modes
 	video->ohci = ohci;
 	/* lower 2 bits of id indicate which of four "plugs"
 	   per host */
-	video->id = ohci->id << 2; 
+	video->id = ohci->host->id << 2; 
 	if (format == DV1394_NTSC)
 		video->id |= mode;
 	else
@@ -2302,47 +2302,49 @@ static void dv1394_un_init(struct video_card *video)
 		);
 
 	devfs_remove("ieee1394/%s", buf);
-	list_del(&video->list);
 	kfree(video);
 }
 
 	
 static void dv1394_remove_host (struct hpsb_host *host)
 {
-	struct ti_ohci *ohci;
-	struct video_card *video = NULL;
+	struct video_card *video;
 	unsigned long flags;
-	struct list_head *lh, *templh;
-	int	n;
+	int id = host->id;
 	
 	/* We only work with the OHCI-1394 driver */
 	if (strcmp(host->driver->name, OHCI1394_DRIVER_NAME))
 		return;
 
-	ohci = (struct ti_ohci *)host->hostdata;
-
-
 	/* find the corresponding video_cards */
-	spin_lock_irqsave(&dv1394_cards_lock, flags);
-	if (!list_empty(&dv1394_cards)) {
-		list_for_each_safe(lh, templh, &dv1394_cards) {
-			video = list_entry(lh, struct video_card, list);
-			if ((video->id >> 2) == ohci->id)
-				dv1394_un_init(video);
+	do {
+		struct video_card *tmp_vid;
+
+		video = NULL;
+
+		spin_lock_irqsave(&dv1394_cards_lock, flags);
+		list_for_each_entry(tmp_vid, &dv1394_cards, list) {
+			if ((tmp_vid->id >> 2) == id) {
+				list_del(&tmp_vid->list);
+				video = tmp_vid;
+				break;
+			}
 		}
-	}
-	spin_unlock_irqrestore(&dv1394_cards_lock, flags);
+		spin_unlock_irqrestore(&dv1394_cards_lock, flags);
 
-	n = (video->id >> 2);
+		if (video)
+			dv1394_un_init(video);
+	} while (video != NULL);
 
-	devfs_remove("ieee1394/dv/host%d/NTSC", n);
-	devfs_remove("ieee1394/dv/host%d/PAL", n);
-	devfs_remove("ieee1394/dv/host%d", n);
+	devfs_remove("ieee1394/dv/host%d/NTSC", id);
+	devfs_remove("ieee1394/dv/host%d/PAL", id);
+	devfs_remove("ieee1394/dv/host%d", id);
 }
 
 static void dv1394_add_host (struct hpsb_host *host)
 {
 	struct ti_ohci *ohci;
+	int id = host->id;
 
 	/* We only work with the OHCI-1394 driver */
 	if (strcmp(host->driver->name, OHCI1394_DRIVER_NAME))
@@ -2350,9 +2352,9 @@ static void dv1394_add_host (struct hpsb_host *host)
 
 	ohci = (struct ti_ohci *)host->hostdata;
 
-	devfs_mk_dir("ieee1394/dv/host%d", ohci->id);
-	devfs_mk_dir("ieee1394/dv/host%d/NTSC", ohci->id);
-	devfs_mk_dir("ieee1394/dv/host%d/PAL", ohci->id);
+	devfs_mk_dir("ieee1394/dv/host%d", id);
+	devfs_mk_dir("ieee1394/dv/host%d/NTSC", id);
+	devfs_mk_dir("ieee1394/dv/host%d/PAL", id);
 	
 	dv1394_init(ohci, DV1394_NTSC, MODE_RECEIVE);
 	dv1394_init(ohci, DV1394_NTSC, MODE_TRANSMIT);
@@ -2369,7 +2371,7 @@ static void dv1394_add_host (struct hpsb_host *host)
 static void dv1394_host_reset(struct hpsb_host *host)
 {
 	struct ti_ohci *ohci;
-	struct video_card *video = NULL;
+	struct video_card *video = NULL, *tmp_vid;
 	unsigned long flags;
 	
 	/* We only work with the OHCI-1394 driver */
@@ -2381,10 +2383,10 @@ static void dv1394_host_reset(struct hpsb_host *host)
 
 	/* find the corresponding video_cards */
 	spin_lock_irqsave(&dv1394_cards_lock, flags);
-	if (!list_empty(&dv1394_cards)) {
-		list_for_each_entry(video, &dv1394_cards, list) {
-			if ((video->id >> 2) == ohci->id)
-				break;
+	list_for_each_entry(tmp_vid, &dv1394_cards, list) {
+		if ((tmp_vid->id >> 2) == host->id) {
+			video = tmp_vid;
+			break;
 		}
 	}
 	spin_unlock_irqrestore(&dv1394_cards_lock, flags);

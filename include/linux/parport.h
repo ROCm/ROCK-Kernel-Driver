@@ -294,7 +294,7 @@ struct parport {
 	struct pardevice *waithead;
 	struct pardevice *waittail;
 	
-	struct parport *next;
+	struct list_head list;
 	unsigned int flags;
 
 	void *sysctl_table;
@@ -313,6 +313,7 @@ struct parport {
 	atomic_t ref_count;
 
 	struct list_head full_list;
+	struct parport *slaves[3];
 };
 
 #define DEFAULT_SPIN_TIME 500 /* us */
@@ -321,7 +322,7 @@ struct parport_driver {
 	const char *name;
 	void (*attach) (struct parport *);
 	void (*detach) (struct parport *);
-	struct parport_driver *next;
+	struct list_head list;
 };
 
 /* parport_register_port registers a new parallel port at the given
@@ -339,12 +340,7 @@ struct parport *parport_register_port(unsigned long base, int irq, int dma,
 void parport_announce_port (struct parport *port);
 
 /* Unregister a port. */
-extern void parport_unregister_port(struct parport *port);
-
-/* parport_enumerate returns a pointer to the linked list of all the
-   ports in this machine.  DON'T USE THIS.  Use
-   parport_register_driver instead. */
-struct parport *parport_enumerate(void);
+extern void parport_remove_port(struct parport *port);
 
 /* Register a new high-level driver. */
 extern int parport_register_driver (struct parport_driver *);
@@ -451,9 +447,6 @@ static __inline__ int parport_yield_blocking(struct pardevice *dev)
 
 #define PARPORT_FLAG_EXCL		(1<<1)	/* EXCL driver registered. */
 
-extern int parport_parse_irqs(int, const char *[], int irqval[]);
-extern int parport_parse_dmas(int, const char *[], int dmaval[]);
-
 /* IEEE1284 functions */
 extern void parport_ieee1284_interrupt (int, void *, struct pt_regs *);
 extern int parport_negotiate (struct parport *, int mode);
@@ -538,8 +531,6 @@ extern int parport_proc_register(struct parport *pp);
 extern int parport_proc_unregister(struct parport *pp);
 extern int parport_device_proc_register(struct pardevice *device);
 extern int parport_device_proc_unregister(struct pardevice *device);
-extern int parport_default_proc_register(void);
-extern int parport_default_proc_unregister(void);
 
 /* If PC hardware is the only type supported, we can optimise a bit.  */
 #if (defined(CONFIG_PARPORT_PC) || defined(CONFIG_PARPORT_PC_MODULE)) && !(defined(CONFIG_PARPORT_ARC) || defined(CONFIG_PARPORT_ARC_MODULE)) && !(defined(CONFIG_PARPORT_AMIGA) || defined(CONFIG_PARPORT_AMIGA_MODULE)) && !(defined(CONFIG_PARPORT_MFC3) || defined(CONFIG_PARPORT_MFC3_MODULE)) && !(defined(CONFIG_PARPORT_ATARI) || defined(CONFIG_PARPORT_ATARI_MODULE)) && !(defined(CONFIG_USB_USS720) || defined(CONFIG_USB_USS720_MODULE)) && !(defined(CONFIG_PARPORT_SUNBPP) || defined(CONFIG_PARPORT_SUNBPP_MODULE)) && !defined(CONFIG_PARPORT_OTHER)

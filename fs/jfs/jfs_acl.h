@@ -22,8 +22,6 @@
 
 #include <linux/xattr_acl.h>
 
-struct posix_acl *jfs_get_acl(struct inode *, int);
-int jfs_set_acl(struct inode *, int, struct posix_acl *);
 int jfs_permission(struct inode *, int, struct nameidata *);
 int jfs_init_acl(struct inode *, struct inode *);
 int jfs_setattr(struct dentry *, struct iattr *);

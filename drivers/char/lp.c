@@ -862,10 +862,9 @@ static void lp_detach (struct parport *port)
 }
 
 static struct parport_driver lp_driver = {
-	"lp",
-	lp_attach,
-	lp_detach,
-	NULL
+	.name = "lp",
+	.attach = lp_attach,
+	.detach = lp_detach,
 };
 
 int __init lp_init (void)

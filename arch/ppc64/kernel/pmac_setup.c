@@ -95,6 +95,7 @@ void __pmac pmac_show_cpuinfo(struct seq_file *m)
 					PMAC_MB_INFO_MODEL, 0);
 	unsigned int mbflags = pmac_call_feature(PMAC_FTR_GET_MB_INFO, NULL,
 						 PMAC_MB_INFO_FLAGS, 0);
+	extern unsigned long ppc_tb_freq;
 
 	if (pmac_call_feature(PMAC_FTR_GET_MB_INFO, NULL, PMAC_MB_INFO_NAME,
 			      (long)&mbname) != 0)
@@ -127,20 +128,11 @@ void __pmac pmac_show_cpuinfo(struct seq_file *m)
 	seq_printf(m, "detected as\t: %d (%s)\n", mbmodel, mbname);
 	seq_printf(m, "pmac flags\t: %08x\n", mbflags);
 
-	/* Checks "l2cr-value" property in the registry */
-	np = find_devices("cpus");	
-	if (np == 0)
-		np = find_type_devices("cpu");	
-	if (np != 0) {
-		unsigned int *l2cr = (unsigned int *)
-			get_property(np, "l2cr-value", NULL);
-		if (l2cr != 0) {
-			seq_printf(m, "l2cr override\t: 0x%x\n", *l2cr);
-		}
-	}
-
 	/* Indicate newworld */
 	seq_printf(m, "pmac-generation\t: NewWorld\n");
+
+	/* Indicate timebase value */
+	seq_printf(m, "timebase\t: %lu\n", ppc_tb_freq);
 }
 
 

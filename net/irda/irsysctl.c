@@ -29,7 +29,7 @@
 #include <linux/sysctl.h>
 #include <linux/init.h>
 
-#include <net/irda/irda.h>
+#include <net/irda/irda.h>		/* irda_debug */
 #include <net/irda/irias_object.h>
 
 #define NET_IRDA 412 /* Random number */
@@ -52,10 +52,6 @@ extern int  sysctl_max_tx_window;
 extern int  sysctl_max_noreply_time;
 extern int  sysctl_warn_noreply_time;
 extern int  sysctl_lap_keepalive_time;
-
-#ifdef CONFIG_IRDA_DEBUG
-extern unsigned int irda_debug;
-#endif
 
 /* this is needed for the proc_dointvec_minmax - Jean II */
 static int max_discovery_slots = 16;		/* ??? */

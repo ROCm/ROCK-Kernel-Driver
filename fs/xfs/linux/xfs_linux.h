@@ -85,6 +85,7 @@
 #include <linux/seq_file.h>
 #include <linux/init.h>
 #include <linux/proc_fs.h>
+#include <linux/version.h>
 
 #include <asm/page.h>
 #include <asm/div64.h>
@@ -138,6 +139,8 @@ static inline void set_buffer_unwritten_io(struct buffer_head *bh)
 #define xfs_inherit_sync	xfs_params.inherit_sync.val
 #define xfs_inherit_nodump	xfs_params.inherit_nodump.val
 #define xfs_inherit_noatime	xfs_params.inherit_noatim.val
+#define xfs_flush_interval	xfs_params.flush_interval.val
+#define xfs_age_buffer		xfs_params.age_buffer.val
 
 #define current_cpu()		smp_processor_id()
 #define current_pid()		(current->pid)

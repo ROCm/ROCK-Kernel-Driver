@@ -13,15 +13,16 @@
  * A lot of the I2O message side code from this is taken from the 
  * Red Creek RCPCI45 adapter driver by Red Creek Communications 
  * 
- * Fixes by: 
- *		Philipp Rumpf 
- *		Juha Sievänen <Juha.Sievanen@cs.Helsinki.FI> 
- *		Auvo Häkkinen <Auvo.Hakkinen@cs.Helsinki.FI> 
- *		Deepak Saxena <deepak@plexity.net> 
- *		Boji T Kannanthanam <boji.t.kannanthanam@intel.com>
- *
- * Ported to Linux 2.5 by
- *		Alan Cox	<alan@redhat.com>
+ * Fixes/additions:
+ *	Philipp Rumpf
+ *	Juha Sievänen <Juha.Sievanen@cs.Helsinki.FI>
+ *	Auvo Häkkinen <Auvo.Hakkinen@cs.Helsinki.FI>
+ *	Deepak Saxena <deepak@plexity.net>
+ *	Boji T Kannanthanam <boji.t.kannanthanam@intel.com>
+ *	Alan Cox <alan@redhat.com>:
+ *		Ported to Linux 2.5.
+ *	Markus Lidel <Markus.Lidel@shadowconnect.com>:
+ *		Minor fixes for 2.6.
  * 
  */
 
@@ -502,6 +503,7 @@ int i2o_install_controller(struct i2o_controller *c)
 			c->unit = i;
 			c->page_frame = NULL;
 			c->hrt = NULL;
+			c->hrt_len = 0;
 			c->lct = NULL;
 			c->status_block = NULL;
 			sprintf(c->name, "i2o/iop%d", i);
@@ -564,7 +566,7 @@ int i2o_delete_controller(struct i2o_controller *c)
 	 * If this is shutdown time, the thread's already been killed
 	 */
 	if(c->lct_running) {
-		stat = kill_proc(c->lct_pid, SIGTERM, 1);
+		stat = kill_proc(c->lct_pid, SIGKILL, 1);
 		if(!stat) {
 			int count = 10 * 100;
 			while(c->lct_running && --count) {
@@ -1861,31 +1863,36 @@ int i2o_hrt_get(struct i2o_controller *c)
 {
 	u32 msg[6];
 	int ret, size = sizeof(i2o_hrt);
+	int loops = 3;	/* we only try 3 times to get the HRT, this should be
+			   more then enough. Worst case should be 2 times.*/
 
 	/* First read just the header to figure out the real size */
 
 	do  {
+		/* first we allocate the memory for the HRT */
 		if (c->hrt == NULL) {
 			c->hrt=pci_alloc_consistent(c->pdev, size, &c->hrt_phys);
 			if (c->hrt == NULL) {
 				printk(KERN_CRIT "%s: Hrt Get failed; Out of memory.\n", c->name);
 				return -ENOMEM;
 			}
+			c->hrt_len = size;
 		}
 
 		msg[0]= SIX_WORD_MSG_SIZE| SGL_OFFSET_4;
 		msg[1]= I2O_CMD_HRT_GET<<24 | HOST_TID<<12 | ADAPTER_TID;
 		msg[3]= 0;
-		msg[4]= (0xD0000000 | size);	/* Simple transaction */
+		msg[4]= (0xD0000000 | c->hrt_len);	/* Simple transaction */
 		msg[5]= c->hrt_phys;		/* Dump it here */
 
-		ret = i2o_post_wait_mem(c, msg, sizeof(msg), 20, c->hrt, NULL, c->hrt_phys, 0, size, 0);
+		ret = i2o_post_wait_mem(c, msg, sizeof(msg), 20, c->hrt, NULL, c->hrt_phys, 0, c->hrt_len, 0);
 		
 		if(ret == -ETIMEDOUT)
 		{
 			/* The HRT block we used is in limbo somewhere. When the iop wakes up
 			   we will recover it */
 			c->hrt = NULL;
+			c->hrt_len = 0;
 			return ret;
 		}
 		
@@ -1896,13 +1903,20 @@ int i2o_hrt_get(struct i2o_controller *c)
 			return ret;
 		}
 
-		if (c->hrt->num_entries * c->hrt->entry_len << 2 > size) {
-			int new_size = c->hrt->num_entries * c->hrt->entry_len << 2;
-			pci_free_consistent(c->pdev, size, c->hrt, c->hrt_phys);
-			size = new_size;
+		if (c->hrt->num_entries * c->hrt->entry_len << 2 > c->hrt_len) {
+			size = c->hrt->num_entries * c->hrt->entry_len << 2;
+			pci_free_consistent(c->pdev, c->hrt_len, c->hrt, c->hrt_phys);
+			c->hrt_len = 0;
 			c->hrt = NULL;
 		}
-	} while (c->hrt == NULL);
+		loops --;
+	} while (c->hrt == NULL && loops > 0);
+
+	if(c->hrt == NULL)
+	{
+		printk(KERN_ERR "%s: Unable to get HRT after three tries, giving up\n", c->name);
+		return -1;
+	}
 
 	i2o_parse_hrt(c); // just for debugging
 
@@ -3628,8 +3642,6 @@ int __init i2o_pci_install(struct pci_dev *dev)
 	return 0;	
 }
 
-static int dpt;
-
 /**
  *	i2o_pci_scan	-	Scan the pci bus for controllers
  *	
@@ -3654,14 +3666,7 @@ int __init i2o_pci_scan(void)
 	{
 		if((dev->class>>8)!=PCI_CLASS_INTELLIGENT_I2O)
 			continue;
-		if(dev->vendor == PCI_VENDOR_ID_DPT && !dpt)
-		{
-			if(dev->device == 0xA501 || dev->device == 0xA511)
-			{
-				printk(KERN_INFO "i2o: Skipping Adaptec/DPT I2O raid with preferred native driver.\n");
-				continue;
-			}
-		}
+
 		if((dev->class&0xFF)>1)
 		{
 			printk(KERN_INFO "i2o: I2O Controller found but does not support I2O 1.5 (skipping).\n");
@@ -3735,22 +3740,19 @@ static void i2o_core_exit(void)
 	 */
 	if(evt_running) {
 		printk("Terminating i2o threads...");
-		stat = kill_proc(evt_pid, SIGTERM, 1);
+		stat = kill_proc(evt_pid, SIGKILL, 1);
 		if(!stat) {
-			printk("waiting...");
+			printk("waiting...\n");
 			wait_for_completion(&evt_dead);
 		}
 		printk("done.\n");
 	}
 	i2o_remove_handler(&i2o_core_handler);
-	unregister_reboot_notifier(&i2o_reboot_notifier);
 }
 
 module_init(i2o_core_init);
 module_exit(i2o_core_exit);
 
-MODULE_PARM(dpt, "i");
-MODULE_PARM_DESC(dpt, "Set this if you want to drive DPT cards normally handled by dpt_i2o");
 MODULE_PARM(verbose, "i");
 MODULE_PARM_DESC(verbose, "Verbose diagnostics");
 

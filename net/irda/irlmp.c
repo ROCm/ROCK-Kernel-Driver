@@ -25,6 +25,7 @@
  ********************************************************************/
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/skbuff.h>
@@ -49,11 +50,12 @@ struct irlmp_cb *irlmp = NULL;
 /* These can be altered by the sysctl interface */
 int  sysctl_discovery         = 0;
 int  sysctl_discovery_timeout = 3; /* 3 seconds by default */
+EXPORT_SYMBOL(sysctl_discovery_timeout);
 int  sysctl_discovery_slots   = 6; /* 6 slots by default */
 int  sysctl_lap_keepalive_time = LM_IDLE_TIMEOUT * 1000 / HZ;
 char sysctl_devname[65];
 
-char *lmp_reasons[] = {
+const char *irlmp_reasons[] = {
 	"ERROR, NOT USED",
 	"LM_USER_REQUEST",
 	"LM_LAP_DISCONNECT",
@@ -62,8 +64,7 @@ char *lmp_reasons[] = {
 	"LM_INIT_DISCONNECT",
 	"ERROR, NOT USED",
 };
-
-__u8 *irlmp_hint_to_service(__u8 *hint);
+EXPORT_SYMBOL(irlmp_reasons);
 
 /*
  * Function irlmp_init (void)
@@ -189,6 +190,7 @@ struct lsap_cb *irlmp_open_lsap(__u8 slsap_sel, notify_t *notify, __u8 pid)
 
 	return self;
 }
+EXPORT_SYMBOL(irlmp_open_lsap);
 
 /*
  * Function __irlmp_close_lsap (self)
@@ -264,6 +266,7 @@ void irlmp_close_lsap(struct lsap_cb *self)
 	}
 	__irlmp_close_lsap(self);
 }
+EXPORT_SYMBOL(irlmp_close_lsap);
 
 /*
  * Function irlmp_register_irlap (saddr, notify)
@@ -496,6 +499,7 @@ err:
 		dev_kfree_skb(tx_skb);
 	return ret;
 }
+EXPORT_SYMBOL(irlmp_connect_request);
 
 /*
  * Function irlmp_connect_indication (self)
@@ -569,6 +573,7 @@ int irlmp_connect_response(struct lsap_cb *self, struct sk_buff *userdata)
 
 	return 0;
 }
+EXPORT_SYMBOL(irlmp_connect_response);
 
 /*
  * Function irlmp_connect_confirm (handle, skb)
@@ -667,6 +672,7 @@ struct lsap_cb *irlmp_dup(struct lsap_cb *orig, void *instance)
 
 	return new;
 }
+EXPORT_SYMBOL(irlmp_dup);
 
 /*
  * Function irlmp_disconnect_request (handle, userdata)
@@ -729,6 +735,7 @@ int irlmp_disconnect_request(struct lsap_cb *self, struct sk_buff *userdata)
 
 	return 0;
 }
+EXPORT_SYMBOL(irlmp_disconnect_request);
 
 /*
  * Function irlmp_disconnect_indication (reason, userdata)
@@ -740,7 +747,7 @@ void irlmp_disconnect_indication(struct lsap_cb *self, LM_REASON reason,
 {
 	struct lsap_cb *lsap;
 
-	IRDA_DEBUG(1, "%s(), reason=%s\n", __FUNCTION__, lmp_reasons[reason]);
+	IRDA_DEBUG(1, "%s(), reason=%s\n", __FUNCTION__, irlmp_reasons[reason]);
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == LMP_LSAP_MAGIC, return;);
 
@@ -900,6 +907,7 @@ void irlmp_discovery_request(int nslots)
 		 * Jean II */
 	}
 }
+EXPORT_SYMBOL(irlmp_discovery_request);
 
 /*
  * Function irlmp_get_discoveries (pn, mask, slots)
@@ -931,6 +939,7 @@ struct irda_device_info *irlmp_get_discoveries(int *pn, __u16 mask, int nslots)
 	/* Return current cached discovery log */
 	return(irlmp_copy_discoveries(irlmp->cachelog, pn, mask, TRUE));
 }
+EXPORT_SYMBOL(irlmp_get_discoveries);
 
 /*
  * Function irlmp_notify_client (log)
@@ -1122,6 +1131,7 @@ int irlmp_data_request(struct lsap_cb *self, struct sk_buff *userdata)
 
 	return ret;
 }
+EXPORT_SYMBOL(irlmp_data_request);
 
 /*
  * Function irlmp_data_indication (handle, skb)
@@ -1433,7 +1443,7 @@ __u8 *irlmp_hint_to_service(__u8 *hint)
 }
 #endif
 
-const __u16 service_hint_mapping[S_END][2] = {
+static const __u16 service_hint_mapping[S_END][2] = {
 	{ HINT_PNP,		0 },			/* S_PNP */
 	{ HINT_PDA,		0 },			/* S_PDA */
 	{ HINT_COMPUTER,	0 },			/* S_COMPUTER */
@@ -1463,6 +1473,7 @@ __u16 irlmp_service_to_hint(int service)
 
 	return hint.word;
 }
+EXPORT_SYMBOL(irlmp_service_to_hint);
 
 /*
  * Function irlmp_register_service (service)
@@ -1490,6 +1501,7 @@ void *irlmp_register_service(__u16 hints)
 
 	return (void *)service;
 }
+EXPORT_SYMBOL(irlmp_register_service);
 
 /*
  * Function irlmp_unregister_service (handle)
@@ -1532,6 +1544,7 @@ int irlmp_unregister_service(void *handle)
 	spin_unlock_irqrestore(&irlmp->services->hb_spinlock, flags);
 	return 0;
 }
+EXPORT_SYMBOL(irlmp_unregister_service);
 
 /*
  * Function irlmp_register_client (hint_mask, callback1, callback2)
@@ -1568,6 +1581,7 @@ void *irlmp_register_client(__u16 hint_mask, DISCOVERY_CALLBACK1 disco_clb,
 
 	return (void *) client;
 }
+EXPORT_SYMBOL(irlmp_register_client);
 
 /*
  * Function irlmp_update_client (handle, hint_mask, callback1, callback2)
@@ -1599,6 +1613,7 @@ int irlmp_update_client(void *handle, __u16 hint_mask,
 
 	return 0;
 }
+EXPORT_SYMBOL(irlmp_update_client);
 
 /*
  * Function irlmp_unregister_client (handle)
@@ -1628,6 +1643,7 @@ int irlmp_unregister_client(void *handle)
 
 	return 0;
 }
+EXPORT_SYMBOL(irlmp_unregister_client);
 
 /*
  * Function irlmp_slsap_inuse (slsap)
@@ -1763,22 +1779,6 @@ LM_REASON irlmp_convert_lap_reason( LAP_REASON lap_reason)
 	}
 
 	return reason;
-}
-
-__u32 irlmp_get_saddr(struct lsap_cb *self)
-{
-	ASSERT(self != NULL, return 0;);
-	ASSERT(self->lap != NULL, return 0;);
-
-	return self->lap->saddr;
-}
-
-__u32 irlmp_get_daddr(struct lsap_cb *self)
-{
-	ASSERT(self != NULL, return 0;);
-	ASSERT(self->lap != NULL, return 0;);
-
-	return self->lap->daddr;
 }
 
 #ifdef CONFIG_PROC_FS

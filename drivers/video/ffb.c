@@ -466,6 +466,7 @@ static __inline__ void ffb_rop(struct ffb_par *par, u32 rop)
 static void ffb_switch_from_graph(struct ffb_par *par)
 {
 	struct ffb_fbc *fbc = par->fbc;
+	struct ffb_dac *dac = par->dac;
 	unsigned long flags;
 
 	spin_lock_irqsave(&par->lock, flags);
@@ -482,6 +483,14 @@ static void ffb_switch_from_graph(struct ffb_par *par)
 	upa_writel(par->fg_cache, &fbc->fg);
 	upa_writel(par->bg_cache, &fbc->bg);
 	FFBWait(par);
+
+	/* Disable cursor.  */
+	upa_writel(0x100, &dac->type2);
+	if (par->dac_rev <= 2)
+		upa_writel(0, &dac->value2);
+	else
+		upa_writel(3, &dac->value2);
+
 	spin_unlock_irqrestore(&par->lock, flags);
 }
 

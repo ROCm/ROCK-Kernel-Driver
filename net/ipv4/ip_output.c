@@ -80,6 +80,7 @@
 #include <net/inetpeer.h>
 #include <linux/igmp.h>
 #include <linux/netfilter_ipv4.h>
+#include <linux/netfilter_bridge.h>
 #include <linux/mroute.h>
 #include <linux/netlink.h>
 
@@ -442,7 +443,7 @@ int ip_fragment(struct sk_buff *skb, int (*output)(struct sk_buff*))
 	int ptr;
 	struct net_device *dev;
 	struct sk_buff *skb2;
-	unsigned int mtu, hlen, left, len; 
+	unsigned int mtu, hlen, left, len, ll_rs;
 	int offset;
 	int not_last_frag;
 	struct rtable *rt = (struct rtable*)skb->dst;
@@ -563,6 +564,14 @@ slow_path:
 	left = skb->len - hlen;		/* Space per frame */
 	ptr = raw + hlen;		/* Where to start from */
 
+#ifdef CONFIG_BRIDGE_NETFILTER
+	/* for bridged IP traffic encapsulated inside f.e. a vlan header,
+	 * we need to make room for the encapsulating header */
+	ll_rs = LL_RESERVED_SPACE(rt->u.dst.dev + nf_bridge_pad(skb));
+	mtu -= nf_bridge_pad(skb);
+#else
+	ll_rs = LL_RESERVED_SPACE(rt->u.dst.dev);
+#endif
 	/*
 	 *	Fragment the datagram.
 	 */
@@ -588,7 +597,7 @@ slow_path:
 		 *	Allocate buffer.
 		 */
 
-		if ((skb2 = alloc_skb(len+hlen+LL_RESERVED_SPACE(rt->u.dst.dev), GFP_ATOMIC)) == NULL) {
+		if ((skb2 = alloc_skb(len+hlen+ll_rs, GFP_ATOMIC)) == NULL) {
 			NETDEBUG(printk(KERN_INFO "IP: frag: no memory for new fragment!\n"));
 			err = -ENOMEM;
 			goto fail;
@@ -599,7 +608,7 @@ slow_path:
 		 */
 
 		ip_copy_metadata(skb2, skb);
-		skb_reserve(skb2, LL_RESERVED_SPACE(rt->u.dst.dev));
+		skb_reserve(skb2, ll_rs);
 		skb_put(skb2, len + hlen);
 		skb2->nh.raw = skb2->data;
 		skb2->h.raw = skb2->data + hlen;
@@ -752,8 +761,11 @@ int ip_append_data(struct sock *sk,
 		 */
 		opt = ipc->opt;
 		if (opt) {
-			if (inet->cork.opt == NULL)
+			if (inet->cork.opt == NULL) {
 				inet->cork.opt = kmalloc(sizeof(struct ip_options) + 40, sk->sk_allocation);
+				if (unlikely(inet->cork.opt == NULL))
+					return -ENOBUFS;
+			}
 			memcpy(inet->cork.opt, opt, sizeof(struct ip_options)+opt->optlen);
 			inet->cork.flags |= IPCORK_OPT;
 			inet->cork.addr = ipc->addr;

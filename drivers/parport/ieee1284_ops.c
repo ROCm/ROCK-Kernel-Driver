@@ -15,6 +15,7 @@
 
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/parport.h>
 #include <linux/delay.h>
 #include <linux/sched.h>
@@ -908,4 +909,13 @@ size_t parport_ieee1284_epp_read_addr (struct parport *port,
 	return ret;
 }
 
-
+EXPORT_SYMBOL(parport_ieee1284_ecp_write_data);
+EXPORT_SYMBOL(parport_ieee1284_ecp_read_data);
+EXPORT_SYMBOL(parport_ieee1284_ecp_write_addr);
+EXPORT_SYMBOL(parport_ieee1284_write_compat);
+EXPORT_SYMBOL(parport_ieee1284_read_nibble);
+EXPORT_SYMBOL(parport_ieee1284_read_byte);
+EXPORT_SYMBOL(parport_ieee1284_epp_write_data);
+EXPORT_SYMBOL(parport_ieee1284_epp_read_data);
+EXPORT_SYMBOL(parport_ieee1284_epp_write_addr);
+EXPORT_SYMBOL(parport_ieee1284_epp_read_addr);

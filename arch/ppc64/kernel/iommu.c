@@ -1,12 +1,12 @@
 /*
- * arch/ppc64/kernel/pci_iommu.c
+ * arch/ppc64/kernel/iommu.c
  * Copyright (C) 2001 Mike Corrigan & Dave Engebretsen, IBM Corporation
  * 
  * Rewrite, cleanup, new allocation schemes, virtual merging: 
  * Copyright (C) 2004 Olof Johansson, IBM Corporation
  *               and  Ben. Herrenschmidt, IBM Corporation
  *
- * Dynamic DMA mapping support, platform-independent parts.
+ * Dynamic DMA mapping support, bus-independent parts.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -60,41 +60,57 @@ static int __init setup_iommu(char *str)
 __setup("iommu=", setup_iommu);
 
 static unsigned long iommu_range_alloc(struct iommu_table *tbl, unsigned long npages,
-			      unsigned long *handle)
+				       unsigned long *handle)
 { 
 	unsigned long n, end, i, start;
-	unsigned long hint;
 	unsigned long limit;
 	int largealloc = npages > 15;
+	int pass = 0;
+
+	/* This allocator was derived from x86_64's bit string search */
+
+	/* Sanity check */
+	if (unlikely(npages) == 0) {
+		if (printk_ratelimit())
+			WARN_ON(1);
+		return NO_TCE;
+	}
 
 	if (handle && *handle)
-		hint = *handle;
+		start = *handle;
 	else
-		hint = largealloc ? tbl->it_largehint : tbl->it_hint;
+		start = largealloc ? tbl->it_largehint : tbl->it_hint;
 
-	/* Most of this is stolen from x86_64's bit string search function */
+	/* Use only half of the table for small allocs (15 pages or less) */
+	limit = largealloc ? tbl->it_mapsize : tbl->it_halfpoint;
 
-	start = hint;
+	if (largealloc && start < tbl->it_halfpoint)
+		start = tbl->it_halfpoint;
 
-	/* Use only half of the table for small allocs (less than 15 pages). */
-
-	limit = largealloc ? tbl->it_mapsize : tbl->it_mapsize >> 1; 
-
-	if (largealloc && start < (tbl->it_mapsize >> 1))
-		start = tbl->it_mapsize >> 1;
+	/* The case below can happen if we have a small segment appended
+	 * to a large, or when the previous alloc was at the very end of
+	 * the available space. If so, go back to the initial start.
+	 */
+	if (start >= limit)
+		start = largealloc ? tbl->it_largehint : tbl->it_hint;
 	
  again:
 
 	n = find_next_zero_bit(tbl->it_map, limit, start);
-
 	end = n + npages;
-	if (end >= limit) {
-		if (hint) {
-			start = largealloc ? tbl->it_mapsize >> 1 : 0;
-			hint = 0;
+
+	if (unlikely(end >= limit)) {
+		if (likely(pass++ < 2)) {
+			/* First failure, just rescan the half of the table.
+			 * Second failure, rescan the other half of the table.
+			 */
+			start = (largealloc ^ pass) ? tbl->it_halfpoint : 0;
+			limit = pass ? tbl->it_mapsize : limit;
 			goto again;
-		} else
+		} else {
+			/* Third failure, give up */
 			return NO_TCE;
+		}
 	}
 
 	for (i = n; i < end; i++)
@@ -106,16 +122,17 @@ static unsigned long iommu_range_alloc(struct iommu_table *tbl, unsigned long np
 	for (i = n; i < end; i++)
 		__set_bit(i, tbl->it_map);
 
-	/* Bump the hint to a new PHB cache line, which
-	 * is 16 entries wide on all pSeries machines.
-	 */
-	if (largealloc)
-		tbl->it_largehint = (end+tbl->it_blocksize-1) &
-					~(tbl->it_blocksize-1);
-	else 
-		tbl->it_hint = (end+tbl->it_blocksize-1) &
-				~(tbl->it_blocksize-1);
+	/* Bump the hint to a new block for small allocs. */
+	if (largealloc) {
+		/* Don't bump to new block to avoid fragmentation */
+		tbl->it_largehint = end;
+	} else {
+		/* Overflow will be taken care of at the next allocation */
+		tbl->it_hint = (end + tbl->it_blocksize - 1) &
+		                ~(tbl->it_blocksize - 1);
+	}
 
+	/* Update handle for SG allocations */
 	if (handle)
 		*handle = end;
 
@@ -123,35 +140,38 @@ static unsigned long iommu_range_alloc(struct iommu_table *tbl, unsigned long np
 }
 
 dma_addr_t iommu_alloc(struct iommu_table *tbl, void *page,
-		       unsigned int npages, int direction, 
-		       unsigned long *handle)
+		       unsigned int npages, int direction)
 {
 	unsigned long entry, flags;
-	dma_addr_t retTce = NO_TCE;
+	dma_addr_t ret = NO_TCE;
 	
 	spin_lock_irqsave(&(tbl->it_lock), flags);
 
-	/* Allocate a range of entries into the table */
-	entry = iommu_range_alloc(tbl, npages, handle);
+	entry = iommu_range_alloc(tbl, npages, NULL);
+
 	if (unlikely(entry == NO_TCE)) {
 		spin_unlock_irqrestore(&(tbl->it_lock), flags);
 		return NO_TCE;
 	}
-	
-	/* We got the tces we wanted */
+
 	entry += tbl->it_offset;	/* Offset into real TCE table */
-	retTce = entry << PAGE_SHIFT;	/* Set the return dma address */
+	ret = entry << PAGE_SHIFT;	/* Set the return dma address */
 
 	/* Put the TCEs in the HW table */
-	ppc_md.tce_build(tbl, entry, npages, (unsigned long)page & PAGE_MASK, direction);
+	ppc_md.tce_build(tbl, entry, npages, (unsigned long)page & PAGE_MASK,
+			 direction);
 
-	/* Flush/invalidate TLBs if necessary */
+
+	/* Flush/invalidate TLB caches if necessary */
 	if (ppc_md.tce_flush)
 		ppc_md.tce_flush(tbl);
 
 	spin_unlock_irqrestore(&(tbl->it_lock), flags);
 
-	return retTce;
+	/* Make sure updates are seen by hardware */
+	mb();
+
+	return ret;
 }
 
 static void __iommu_free(struct iommu_table *tbl, dma_addr_t dma_addr, 
@@ -168,7 +188,7 @@ static void __iommu_free(struct iommu_table *tbl, dma_addr_t dma_addr,
 		if (printk_ratelimit()) {
 			printk(KERN_INFO "iommu_free: invalid entry\n");
 			printk(KERN_INFO "\tentry     = 0x%lx\n", entry); 
-			printk(KERN_INFO "\tdma_ddr   = 0x%lx\n", (u64)dma_addr); 
+			printk(KERN_INFO "\tdma_addr  = 0x%lx\n", (u64)dma_addr);
 			printk(KERN_INFO "\tTable     = 0x%lx\n", (u64)tbl);
 			printk(KERN_INFO "\tbus#      = 0x%lx\n", (u64)tbl->it_busno);
 			printk(KERN_INFO "\tmapsize   = 0x%lx\n", (u64)tbl->it_mapsize);
@@ -194,68 +214,30 @@ void iommu_free(struct iommu_table *tbl, dma_addr_t dma_addr,
 
 	__iommu_free(tbl, dma_addr, npages);
 
-	/* Flush/invalidate TLBs if necessary */
+	/* Make sure TLB cache is flushed if the HW needs it. We do
+	 * not do an mb() here on purpose, it is not needed on any of
+	 * the current platforms.
+	 */
 	if (ppc_md.tce_flush)
 		ppc_md.tce_flush(tbl);
 
 	spin_unlock_irqrestore(&(tbl->it_lock), flags);
 }
 
-/* 
- * Build a iommu_table structure.  This contains a bit map which
- * is used to manage allocation of the tce space.
- */
-struct iommu_table *iommu_init_table(struct iommu_table *tbl)
-{
-	unsigned long sz;
-	static int welcomed = 0;
-
-	/* it_size is in pages, it_mapsize in number of entries */
-	tbl->it_mapsize = tbl->it_size * tbl->it_entrysize;
-
-	if (systemcfg->platform == PLATFORM_POWERMAC)
-		tbl->it_mapsize = tbl->it_size * (PAGE_SIZE / sizeof(unsigned int));
-	else
-		tbl->it_mapsize = tbl->it_size * (PAGE_SIZE / sizeof(union tce_entry));
-
-	/* sz is the number of bytes needed for the bitmap */
-	sz = (tbl->it_mapsize + 7) >> 3;
-
-	tbl->it_map = (unsigned long *)__get_free_pages(GFP_ATOMIC, get_order(sz));
-	
-	if (!tbl->it_map)
-		panic("iommu_init_table: Can't allocate memory, size %ld bytes\n", sz);
-
-	memset(tbl->it_map, 0, sz);
-
-	tbl->it_hint = 0;
-	tbl->it_largehint = 0;
-	spin_lock_init(&tbl->it_lock);
-
-	if (!welcomed) {
-		printk(KERN_INFO "IOMMU table initialized, virtual merging %s\n",
-		       novmerge ? "disabled" : "enabled");
-		welcomed = 1;
-	}
-
-	return tbl;
-}
-
-
-int iommu_alloc_sg(struct iommu_table *tbl, struct scatterlist *sglist, int nelems,
-		   int direction, unsigned long *handle)
+int iommu_alloc_sg(struct iommu_table *tbl, struct device *dev,
+		   struct scatterlist *sglist, int nelems, int direction)
 {
 	dma_addr_t dma_next, dma_addr;
-	unsigned long flags, vaddr, npages, entry;
-	struct scatterlist *s, *outs, *segstart, *ps;
+	unsigned long flags;
+	struct scatterlist *s, *outs, *segstart;
 	int outcount;
+	unsigned long handle;
 
-	/* Initialize some stuffs */
 	outs = s = segstart = &sglist[0];
 	outcount = 1;
-	ps = NULL;
+	handle = 0;
 
-	/* Init first segment length for error handling */
+	/* Init first segment length for backout at failure */
 	outs->dma_length = 0;
 
 	DBG("mapping %d elements:\n", nelems);
@@ -263,13 +245,21 @@ int iommu_alloc_sg(struct iommu_table *tbl, struct scatterlist *sglist, int nele
 	spin_lock_irqsave(&(tbl->it_lock), flags);
 
 	for (s = outs; nelems; nelems--, s++) {
+		unsigned long vaddr, npages, entry, slen;
+
+		slen = s->length;
+		/* Sanity check */
+		if (slen == 0) {
+			dma_next = 0;
+			continue;
+		}
 		/* Allocate iommu entries for that segment */
 		vaddr = (unsigned long)page_address(s->page) + s->offset;
-		npages = PAGE_ALIGN(vaddr + s->length) - (vaddr & PAGE_MASK);
+		npages = PAGE_ALIGN(vaddr + slen) - (vaddr & PAGE_MASK);
 		npages >>= PAGE_SHIFT;
-		entry = iommu_range_alloc(tbl, npages, handle);
+		entry = iommu_range_alloc(tbl, npages, &handle);
 
-		DBG("  - vaddr: %lx, size: %lx\n", vaddr, s->length);
+		DBG("  - vaddr: %lx, size: %lx\n", vaddr, slen);
 
 		/* Handle failure */
 		if (unlikely(entry == NO_TCE)) {
@@ -293,13 +283,10 @@ int iommu_alloc_sg(struct iommu_table *tbl, struct scatterlist *sglist, int nele
 		/* If we are in an open segment, try merging */
 		if (segstart != s) {
 			DBG("  - trying merge...\n");
-			/* We cannot merge is:
+			/* We cannot merge if:
 			 * - allocated dma_addr isn't contiguous to previous allocation
-			 * - current entry has an offset into the page
-			 * - previous entry didn't end on a page boundary
 			 */
-			if (novmerge || (dma_addr != dma_next) || s->offset ||
-			    (ps->offset + ps->length) % PAGE_SIZE) {
+			if (novmerge || (dma_addr != dma_next)) {
 				/* Can't merge: create a new segment */
 				segstart = s;
 				outcount++; outs++;
@@ -310,30 +297,27 @@ int iommu_alloc_sg(struct iommu_table *tbl, struct scatterlist *sglist, int nele
 			}
 		}
 
-		/* If we are beginning a new segment, fill entries */
 		if (segstart == s) {
+			/* This is a new segment, fill entries */
 			DBG("  - filling new segment.\n");
 			outs->dma_address = dma_addr;
-			outs->dma_length = s->length;
+			outs->dma_length = slen;
 		}
 
 		/* Calculate next page pointer for contiguous check */
-		dma_next = (dma_addr & PAGE_MASK) + (npages << PAGE_SHIFT);
+		dma_next = dma_addr + slen;
 
 		DBG("  - dma next is: %lx\n", dma_next);
-
-		/* Keep a pointer to the previous entry */
-		ps = s;
 	}
 
-	/* Make sure the update is visible to hardware. */
-	mb();
-
-	/* Flush/invalidate TLBs if necessary */
+	/* Flush/invalidate TLB caches if necessary */
 	if (ppc_md.tce_flush)
 		ppc_md.tce_flush(tbl);
 
 	spin_unlock_irqrestore(&(tbl->it_lock), flags);
+
+	/* Make sure updates are seen by hardware */
+	mb();
 
 	DBG("mapped %d elements:\n", outcount);
 
@@ -348,25 +332,26 @@ int iommu_alloc_sg(struct iommu_table *tbl, struct scatterlist *sglist, int nele
 	return outcount;
 
  failure:
-	spin_unlock_irqrestore(&(tbl->it_lock), flags);
 	for (s = &sglist[0]; s <= outs; s++) {
 		if (s->dma_length != 0) {
+			unsigned long vaddr, npages;
+
 			vaddr = s->dma_address & PAGE_MASK;
 			npages = (PAGE_ALIGN(s->dma_address + s->dma_length) - vaddr)
 				>> PAGE_SHIFT;
-			iommu_free(tbl, vaddr, npages);
+			__iommu_free(tbl, vaddr, npages);
 		}
 	}
+	spin_unlock_irqrestore(&(tbl->it_lock), flags);
 	return 0;
 }
 
 
-void iommu_free_sg(struct iommu_table *tbl, struct scatterlist *sglist, int nelems,
-		   int direction)
+void iommu_free_sg(struct iommu_table *tbl, struct scatterlist *sglist,
+		   int nelems)
 {
 	unsigned long flags;
 
-	/* Lock the whole operation to try to free as a "chunk" */
 	spin_lock_irqsave(&(tbl->it_lock), flags);
 
 	while (nelems--) {
@@ -381,9 +366,49 @@ void iommu_free_sg(struct iommu_table *tbl, struct scatterlist *sglist, int nele
 		sglist++;
 	}
 
-	/* Flush/invalidate TLBs if necessary */
+	/* Flush/invalidate TLBs if necessary. As for iommu_free(), we
+	 * do not do an mb() here, the affected platforms do not need it
+	 * when freeing.
+	 */
 	if (ppc_md.tce_flush)
 		ppc_md.tce_flush(tbl);
 
 	spin_unlock_irqrestore(&(tbl->it_lock), flags);
+}
+
+/*
+ * Build a iommu_table structure.  This contains a bit map which
+ * is used to manage allocation of the tce space.
+ */
+struct iommu_table *iommu_init_table(struct iommu_table *tbl)
+{
+	unsigned long sz;
+	static int welcomed = 0;
+
+	/* it_size is in pages, it_mapsize in number of entries */
+	tbl->it_mapsize = (tbl->it_size << PAGE_SHIFT) / tbl->it_entrysize;
+
+	/* Set aside 1/4 of the table for large allocations. */
+	tbl->it_halfpoint = tbl->it_mapsize * 3 / 4;
+
+	/* number of bytes needed for the bitmap */
+	sz = (tbl->it_mapsize + 7) >> 3;
+
+	tbl->it_map = (unsigned long *)__get_free_pages(GFP_ATOMIC, get_order(sz));
+	if (!tbl->it_map)
+		panic("iommu_init_table: Can't allocate %ld bytes\n", sz);
+
+	memset(tbl->it_map, 0, sz);
+
+	tbl->it_hint = 0;
+	tbl->it_largehint = tbl->it_halfpoint;
+	spin_lock_init(&tbl->it_lock);
+
+	if (!welcomed) {
+		printk(KERN_INFO "IOMMU table initialized, virtual merging %s\n",
+		       novmerge ? "disabled" : "enabled");
+		welcomed = 1;
+	}
+
+	return tbl;
 }

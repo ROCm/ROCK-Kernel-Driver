@@ -759,8 +759,9 @@ xfs_log_move_tail(xfs_mount_t	*mp,
 	/* Also an invalid lsn.  1 implies that we aren't passing in a valid
 	 * tail_lsn.
 	 */
-	if (tail_lsn != 1)
+	if (tail_lsn != 1) {
 		log->l_tail_lsn = tail_lsn;
+	}
 
 	if ((tic = log->l_write_headq)) {
 #ifdef DEBUG
@@ -866,10 +867,11 @@ xlog_assign_tail_lsn(xfs_mount_t *mp)
 
 	tail_lsn = xfs_trans_tail_ail(mp);
 	s = GRANT_LOCK(log);
-	if (tail_lsn != 0)
+	if (tail_lsn != 0) {
 		log->l_tail_lsn = tail_lsn;
-	else
+	} else {
 		tail_lsn = log->l_tail_lsn = log->l_last_sync_lsn;
+	}
 	GRANT_UNLOCK(log, s);
 
 	return tail_lsn;
@@ -921,10 +923,8 @@ xlog_space_left(xlog_t *log, int cycle, int bytes)
 		 * In this case we just want to return the size of the
 		 * log as the amount of space left.
 		 */
-/* This assert does not take into account padding from striped log writes *
 		ASSERT((tail_cycle == (cycle + 1)) ||
 		       ((bytes + log->l_roundoff) >= tail_bytes));
-*/
 		free_bytes = log->l_logsize;
 	}
 	return free_bytes;
@@ -1183,14 +1183,6 @@ xlog_alloc_log(xfs_mount_t	*mp,
 	log->l_grant_reserve_cycle = 1;
 	log->l_grant_write_cycle = 1;
 
-	if (XFS_SB_VERSION_HASLOGV2(&mp->m_sb)) {
-		if (mp->m_sb.sb_logsunit <= 1) {
-			log->l_stripemask = 1;
-		} else {
-			log->l_stripemask = 1 <<
-				xfs_highbit32(mp->m_sb.sb_logsunit >> BBSHIFT);
-		}
-	}
 	if (XFS_SB_VERSION_HASSECTOR(&mp->m_sb)) {
 		log->l_sectbb_log = mp->m_sb.sb_logsectlog - BBSHIFT;
 		ASSERT(log->l_sectbb_log <= mp->m_sectbb_log);
@@ -1235,7 +1227,7 @@ xlog_alloc_log(xfs_mount_t	*mp,
 			  kmem_zalloc(sizeof(xlog_in_core_t), KM_SLEEP);
 		iclog = *iclogp;
 		iclog->hic_data = (xlog_in_core_2_t *)
-			  kmem_alloc(iclogsize, KM_SLEEP);
+			  kmem_zalloc(iclogsize, KM_SLEEP);
 
 		iclog->ic_prev = prev_iclog;
 		prev_iclog = iclog;
@@ -1401,45 +1393,35 @@ xlog_sync(xlog_t		*log,
 	xfs_caddr_t	dptr;		/* pointer to byte sized element */
 	xfs_buf_t	*bp;
 	int		i, ops;
-	uint		roundup;
 	uint		count;		/* byte count of bwrite */
+	uint		count_init;	/* initial count before roundup */
 	int		split = 0;	/* split write into two regions */
 	int		error;
 
 	XFS_STATS_INC(xs_log_writes);
 	ASSERT(iclog->ic_refcnt == 0);
 
+	/* Add for LR header */
+	count_init = log->l_iclog_hsize + iclog->ic_offset;
+
 	/* Round out the log write size */
-	if (iclog->ic_offset & BBMASK) {
-		/* count of 0 is already accounted for up in
-		 * xlog_state_sync_all().  Once in this routine,
-		 * operations on the iclog are single threaded.
-		 *
-		 * Difference between rounded up size and size
-		 */
-		count = iclog->ic_offset & BBMASK;
-		iclog->ic_roundoff += BBSIZE - count;
+	if (XFS_SB_VERSION_HASLOGV2(&log->l_mp->m_sb) &&
+	    log->l_mp->m_sb.sb_logsunit > 1) {
+		/* we have a v2 stripe unit to use */
+		count = XLOG_LSUNITTOB(log, XLOG_BTOLSUNIT(log, count_init));
+	} else {
+		count = BBTOB(BTOBB(count_init));
 	}
-	if (XFS_SB_VERSION_HASLOGV2(&log->l_mp->m_sb)) {
-		unsigned sunit = BTOBB(log->l_mp->m_sb.sb_logsunit);
-		if (!sunit)
-			sunit = 1;
-
-		count = BTOBB(log->l_iclog_hsize + iclog->ic_offset);
-		if (count & (sunit - 1)) {
-			roundup = sunit - (count & (sunit - 1));
-		} else {
-			roundup = 0;
-		}
-		iclog->ic_offset += BBTOB(roundup);
-	}
-
+	iclog->ic_roundoff = count - count_init;
 	log->l_roundoff += iclog->ic_roundoff;
 
 	xlog_pack_data(log, iclog);       /* put cycle number in every block */
 
 	/* real byte length */
-	INT_SET(iclog->ic_header.h_len, ARCH_CONVERT, iclog->ic_offset);
+	INT_SET(iclog->ic_header.h_len, 
+		ARCH_CONVERT,
+		iclog->ic_offset + iclog->ic_roundoff);
+
 	/* put ops count in correct order */
 	ops = iclog->ic_header.h_num_logops;
 	INT_SET(iclog->ic_header.h_num_logops, ARCH_CONVERT, ops);
@@ -1449,12 +1431,6 @@ xlog_sync(xlog_t		*log,
 	XFS_BUF_SET_FSPRIVATE2(bp, (unsigned long)2);
 	XFS_BUF_SET_ADDR(bp, BLOCK_LSN(iclog->ic_header.h_lsn, ARCH_CONVERT));
 
-	/* Count is already rounded up to a BBSIZE above */
-	count = iclog->ic_offset + iclog->ic_roundoff;
-	ASSERT((count & BBMASK) == 0);
-
-	/* Add for LR header */
-	count += log->l_iclog_hsize;
 	XFS_STATS_ADD(xs_log_blocks, BTOBB(count));
 
 	/* Do we need to split this write into 2 parts? */
@@ -2783,8 +2759,6 @@ xlog_state_switch_iclogs(xlog_t		*log,
 			 xlog_in_core_t *iclog,
 			 int		eventual_size)
 {
-	uint roundup;
-
 	ASSERT(iclog->ic_state == XLOG_STATE_ACTIVE);
 	if (!eventual_size)
 		eventual_size = iclog->ic_offset;
@@ -2797,14 +2771,10 @@ xlog_state_switch_iclogs(xlog_t		*log,
 	log->l_curr_block += BTOBB(eventual_size)+BTOBB(log->l_iclog_hsize);
 
 	/* Round up to next log-sunit */
-	if (XFS_SB_VERSION_HASLOGV2(&log->l_mp->m_sb)) {
-		if (log->l_curr_block & (log->l_stripemask - 1)) {
-			roundup = log->l_stripemask -
-				(log->l_curr_block & (log->l_stripemask - 1));
-		} else {
-			roundup = 0;
-		}
-		log->l_curr_block += roundup;
+	if (XFS_SB_VERSION_HASLOGV2(&log->l_mp->m_sb) &&
+	    log->l_mp->m_sb.sb_logsunit > 1) {
+		__uint32_t sunit_bb = BTOBB(log->l_mp->m_sb.sb_logsunit);
+		log->l_curr_block = roundup(log->l_curr_block, sunit_bb);
 	}
 
 	if (log->l_curr_block >= log->l_logBBsize) {
