@@ -105,7 +105,7 @@ static inline int clear_user(void *mem, int len)
  * On exception, returns 0.
  * If the string is too long, returns a value greater than @n.
  */
-static inline int strnlen_user(const void *str, int len)
+static inline int strnlen_user(const void *str, long len)
 {
 	return(CHOOSE_MODE_PROC(strnlen_user_tt, strnlen_user_skas, str, len));
 }

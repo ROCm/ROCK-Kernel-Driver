@@ -73,11 +73,12 @@ DECLARE_WORK(mconsole_work, mc_work_proc, NULL);
 static irqreturn_t mconsole_interrupt(int irq, void *dev_id,
 				      struct pt_regs *regs)
 {
-	int fd;
+	/* long to avoid size mismatch warnings from gcc */
+	long fd;
 	struct mconsole_entry *new;
 	struct mc_request req;
 
-	fd = (int) dev_id;
+	fd = (long) dev_id;
 	while (mconsole_get_request(fd, &req)){
 		if(req.cmd->context == MCONSOLE_INTR)
 			(*req.cmd->handler)(&req);
@@ -457,7 +458,9 @@ static char *notify_socket = NULL;
 
 int mconsole_init(void)
 {
-	int err, sock;
+	/* long to avoid size mismatch warnings from gcc */
+	long sock;
+	int err;
 	char file[256];
 
 	if(umid_file_name("mconsole", file, sizeof(file))) return(-1);
