@@ -53,12 +53,13 @@ would simply type "make install").
 
 If you do not have the utility mount.cifs (in the Samba 3.0 source tree and on 
 the CIFS VFS web site) copy it to the same directory in which mount.smbfs and 
-similar files reside (usually /sbin).  Although the helper software is required, 
-mount.cifs is recommended.  Eventually the Samba 3.0 utility program "net" may 
-also be helpful since it may someday provide easier mount syntax for users used 
-to Windows e.g.  net use <mount point> <UNC name or cifs URL> Note that running 
-Winbind on all of your Linux clients is useful in in mapping Uids and Gids 
-consistently to the proper network user.  The mount.cifs mount helper can be
+similar files reside (usually /sbin).  Although the helper software is not  
+required, mount.cifs is recommended.  Eventually the Samba 3.0 utility program 
+"net" may also be helpful since it may someday provide easier mount syntax for
+users who are used to Windows e.g.  net use <mount point> <UNC name or cifs URL>  
+Note that running the Winbind pam/nss module (logon service) on all of your
+Linux clients is useful in mapping Uids and Gids consistently across the
+domain to the proper network user.  The mount.cifs mount helper can be
 trivially built from Samba 3.0 or later source e.g. by executing:
 
 	gcc samba/source/client/mount.cifs.c -o mount.cifs
@@ -73,7 +74,7 @@ supports the SNIA CIFS Unix Extensions standard (e.g.  Samba 2.2.5 or later or
 Samba 3.0) but the CIFS vfs works fine with a wide variety of CIFS servers.  
 Note that uid, gid and file permissions will display default values if you do 
 not have a server that supports the Unix extensions for CIFS (such as Samba 
-2.2.3 or later).  To enable the Unix CIFS Extensions in the Samba server, add 
+2.2.5 or later).  To enable the Unix CIFS Extensions in the Samba server, add 
 the line: 
 
 	unix extensions = yes

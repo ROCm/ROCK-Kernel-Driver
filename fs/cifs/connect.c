@@ -811,18 +811,17 @@ ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket)
 		rc = (*csocket)->ops->connect(*csocket,
 				(struct sockaddr *) psin_server,
 				sizeof (struct sockaddr_in),0);
-		if (rc >= 0) {
-			return rc;
-		}
 	}
 
-	/* do not retry on the same port we just failed on */
-	if(psin_server->sin_port != htons(CIFS_PORT)) {
-		psin_server->sin_port = htons(CIFS_PORT);
+	if(rc < 0) {
+		/* do not retry on the same port we just failed on */
+		if(psin_server->sin_port != htons(CIFS_PORT)) {
+			psin_server->sin_port = htons(CIFS_PORT);
 
-		rc = (*csocket)->ops->connect(*csocket,
+			rc = (*csocket)->ops->connect(*csocket,
 					(struct sockaddr *) psin_server,
 					sizeof (struct sockaddr_in),0);
+		}
 	}
 	if (rc < 0) {
 		psin_server->sin_port = htons(RFC1001_PORT);
@@ -840,6 +839,7 @@ ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket)
 		the default. sock_setsockopt not used because it expects 
 		user space buffer */
 	(*csocket)->sk->sk_rcvtimeo = 7 * HZ;
+	cFYI(1,("timeout addr: %p ",&((*csocket)->sk->sk_rcvtimeo))); /* BB removeme BB */
 		
 	return rc;
 }
