@@ -28,6 +28,8 @@
 #ifndef NCR5380_H
 #define NCR5380_H
 
+#include <linux/interrupt.h>
+
 #define NCR5380_PUBLIC_RELEASE 7
 #define NCR53C400_PUBLIC_RELEASE 2
 
@@ -295,7 +297,7 @@ static int NCR5380_probe_irq(struct Scsi_Host *instance, int possible);
 static int NCR5380_init(struct Scsi_Host *instance, int flags);
 static void NCR5380_information_transfer(struct Scsi_Host *instance);
 #ifndef DONT_USE_INTR
-static void NCR5380_intr(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t NCR5380_intr(int irq, void *dev_id, struct pt_regs *regs);
 #endif
 static void NCR5380_main(void *ptr);
 static void NCR5380_print_options(struct Scsi_Host *instance);

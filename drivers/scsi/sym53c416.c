@@ -327,7 +327,8 @@ static __inline__ unsigned int sym53c416_write(int base, unsigned char *buffer, 
 	return orig_len - len;
 }
 
-static void sym53c416_intr_handle(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t sym53c416_intr_handle(int irq, void *dev_id,
+					struct pt_regs *regs)
 {
 	struct Scsi_Host *dev = dev_id;
 	int base = 0;
@@ -348,7 +349,7 @@ static void sym53c416_intr_handle(int irq, void *dev_id, struct pt_regs *regs)
 	if(!base)
 	{
 		printk(KERN_ERR "sym53c416: No host adapter defined for interrupt %d\n", irq);
-		return;
+		return IRQ_NONE;
 	}
 	/* Now we have the base address and we can start handling the interrupt */
 
@@ -367,7 +368,7 @@ static void sym53c416_intr_handle(int irq, void *dev_id, struct pt_regs *regs)
 		spin_lock_irqsave(dev->host_lock, flags);
 		current_command->scsi_done(current_command);
 		spin_unlock_irqrestore(dev->host_lock, flags);
-		return;
+		goto out;
 	}
 	if(int_reg & ILCMD)       /* Illegal Command */
 	{
@@ -377,7 +378,7 @@ static void sym53c416_intr_handle(int irq, void *dev_id, struct pt_regs *regs)
 		spin_lock_irqsave(dev->host_lock, flags);
 		current_command->scsi_done(current_command);
 		spin_unlock_irqrestore(dev->host_lock, flags);
-		return;
+		goto out;
 	}
 	if(status_reg & GE)         /* Gross Error */
 	{
@@ -387,7 +388,7 @@ static void sym53c416_intr_handle(int irq, void *dev_id, struct pt_regs *regs)
 		spin_lock_irqsave(dev->host_lock, flags);
 		current_command->scsi_done(current_command);
 		spin_unlock_irqrestore(dev->host_lock, flags);
-		return;
+		goto out;
 	}
 	if(status_reg & PE)         /* Parity Error */
 	{
@@ -397,7 +398,7 @@ static void sym53c416_intr_handle(int irq, void *dev_id, struct pt_regs *regs)
 		spin_lock_irqsave(dev->host_lock, flags);
 		current_command->scsi_done(current_command);
 		spin_unlock_irqrestore(dev->host_lock, flags);
-		return;
+		goto out;
 	}
 	if(pio_int_reg & (CE | OUE))
 	{
@@ -407,7 +408,7 @@ static void sym53c416_intr_handle(int irq, void *dev_id, struct pt_regs *regs)
 		spin_lock_irqsave(dev->host_lock, flags);
 		current_command->scsi_done(current_command);
 		spin_unlock_irqrestore(dev->host_lock, flags);
-		return;
+		goto out;
 	}
 	if(int_reg & DIS)           /* Disconnect */
 	{
@@ -419,7 +420,7 @@ static void sym53c416_intr_handle(int irq, void *dev_id, struct pt_regs *regs)
 		spin_lock_irqsave(dev->host_lock, flags);
 		current_command->scsi_done(current_command);
 		spin_unlock_irqrestore(dev->host_lock, flags);
-		return;
+		goto out;
 	}
 	/* Now we handle SCSI phases         */
 
@@ -518,6 +519,8 @@ static void sym53c416_intr_handle(int irq, void *dev_id, struct pt_regs *regs)
 			break;
 		}
 	}
+out:
+	return IRQ_HANDLED;
 }
 
 static void sym53c416_init(int base, int scsi_id)

@@ -372,11 +372,7 @@
 
 static void gdth_delay(int milliseconds);
 static void gdth_eval_mapping(ulong32 size, int *cyls, int *heads, int *secs);
-#if LINUX_VERSION_CODE >= 0x010346
-static void gdth_interrupt(int irq,void *dev_id,struct pt_regs *regs);
-#else
-static void gdth_interrupt(int irq,struct pt_regs *regs);
-#endif
+static irqreturn_t gdth_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static int gdth_sync_event(int hanum,int service,unchar index,Scsi_Cmnd *scp);
 static int gdth_async_event(int hanum);
 static void gdth_log_event(gdth_evt_data *dvr, char *buffer);
@@ -1925,11 +1921,7 @@ static int gdth_wait(int hanum,int index,ulong32 time)
 
     gdth_from_wait = TRUE;
     do {
-#if LINUX_VERSION_CODE >= 0x010346
         gdth_interrupt((int)ha->irq,ha,NULL);
-#else
-        gdth_interrupt((int)ha->irq,NULL);
-#endif
         if (wait_hanum==hanum && wait_index==index) {
             answer_found = TRUE;
             break;
@@ -3362,11 +3354,7 @@ static void gdth_clear_events()
 
 /* SCSI interface functions */
 
-#if LINUX_VERSION_CODE >= 0x010346
-static void gdth_interrupt(int irq,void *dev_id,struct pt_regs *regs)
-#else
-static void gdth_interrupt(int irq,struct pt_regs *regs)
-#endif
+static irqreturn_t gdth_interrupt(int irq,void *dev_id,struct pt_regs *regs)
 {
     register gdth_ha_str *ha;
     gdt6m_dpram_str *dp6m_ptr;
@@ -3383,7 +3371,7 @@ static void gdth_interrupt(int irq,struct pt_regs *regs)
     /* if polling and not from gdth_wait() -> return */
     if (gdth_polling) {
         if (!gdth_from_wait) {
-            return;
+            return IRQ_HANDLED;
         }
     }
 
@@ -3396,7 +3384,7 @@ static void gdth_interrupt(int irq,struct pt_regs *regs)
         /* spurious interrupt */
         if (!gdth_polling)
             GDTH_UNLOCK_HA((gdth_ha_str *)dev_id,flags);
-        return;
+        return IRQ_HANDLED;
     }
 
 #ifdef GDTH_STATISTICS
@@ -3492,7 +3480,7 @@ static void gdth_interrupt(int irq,struct pt_regs *regs)
         TRACE2(("gdth_interrupt() unknown controller type\n"));
         if (!gdth_polling)
             GDTH_UNLOCK_HA((gdth_ha_str *)dev_id,flags);
-        return;
+        return IRQ_HANDLED;
     }
 
     TRACE(("gdth_interrupt() index %d stat %d info %d\n",
@@ -3509,7 +3497,7 @@ static void gdth_interrupt(int irq,struct pt_regs *regs)
         if (!gdth_polling)
             GDTH_UNLOCK_HA((gdth_ha_str *)dev_id,flags);
         gdth_next(hanum);
-        return;
+        return IRQ_HANDLED;
     } 
 
     if (IStatus == SPEZINDEX) {
@@ -3519,7 +3507,7 @@ static void gdth_interrupt(int irq,struct pt_regs *regs)
         gdth_store_event(ha, ES_DRIVER, 4, &ha->dvr);
         if (!gdth_polling)
             GDTH_UNLOCK_HA((gdth_ha_str *)dev_id,flags);
-        return;
+        return IRQ_HANDLED;
     }
     scp     = ha->cmd_tab[IStatus-2].cmnd;
     Service = ha->cmd_tab[IStatus-2].service;
@@ -3532,13 +3520,13 @@ static void gdth_interrupt(int irq,struct pt_regs *regs)
         gdth_store_event(ha, ES_DRIVER, 1, &ha->dvr);
         if (!gdth_polling)
             GDTH_UNLOCK_HA((gdth_ha_str *)dev_id,flags);
-        return;
+        return IRQ_HANDLED;
     }
     if (scp == INTERNAL_CMND) {
         TRACE(("gdth_interrupt() answer to internal command\n"));
         if (!gdth_polling)
             GDTH_UNLOCK_HA((gdth_ha_str *)dev_id,flags);
-        return;
+        return IRQ_HANDLED;
     }
 
     TRACE(("gdth_interrupt() sync. status\n"));
@@ -3563,6 +3551,7 @@ static void gdth_interrupt(int irq,struct pt_regs *regs)
 #endif
     }
     gdth_next(hanum);
+    return IRQ_HANDLED;
 }
 
 static int gdth_sync_event(int hanum,int service,unchar index,Scsi_Cmnd *scp)

@@ -39,13 +39,14 @@
 #include <linux/blk.h>
 #include <linux/delay.h>
 #include <linux/completion.h>
+#include <linux/interrupt.h>
 #include <asm/semaphore.h>
 #include "scsi.h"
 #include "hosts.h"
 
 #include "aacraid.h"
 
-static void aac_rx_intr(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t aac_rx_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct aac_dev *dev = dev_id;
 	unsigned long bellbits;
@@ -81,7 +82,9 @@ static void aac_rx_intr(int irq, void *dev_id, struct pt_regs *regs)
 			rx_writel(dev, MUnit.ODR, DoorBellAdapterNormCmdNotFull);
 			rx_writel(dev, MUnit.ODR, DoorBellAdapterNormRespNotFull);
 		}
+		return IRQ_HANDLED;
 	}
+	return IRQ_NONE;
 }
 
 /**

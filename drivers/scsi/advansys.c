@@ -4208,7 +4208,7 @@ STATIC PortAddr     _asc_def_iop_base[];
  * advansys.h contains function prototypes for functions global to Linux.
  */
 
-STATIC void       advansys_interrupt(int, void *, struct pt_regs *);
+STATIC irqreturn_t advansys_interrupt(int, void *, struct pt_regs *);
 STATIC int	  advansys_slave_configure(Scsi_Device *);
 STATIC void       asc_scsi_done_list(Scsi_Cmnd *, int from_isr);
 STATIC int        asc_execute_scsi_cmnd(Scsi_Cmnd *);
@@ -6220,7 +6220,7 @@ Scsi_Host_Template driver_template = ADVANSYS;
  * to the AdvanSys driver which is for a device sharing an interrupt with
  * an AdvanSys adapter.
  */
-STATIC void
+STATIC irqreturn_t
 advansys_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
     ulong           flags;
@@ -6310,7 +6310,7 @@ advansys_interrupt(int irq, void *dev_id, struct pt_regs *regs)
     asc_scsi_done_list(done_scp, 1);
 
     ASC_DBG(1, "advansys_interrupt: end\n");
-    return;
+    return IRQ_HANDLED;
 }
 
 /*
@@ -8344,7 +8344,6 @@ asc_prt_driver_conf(struct Scsi_Host *shp, char *cp, int cplen)
     int                    totlen;
     int                    len;
     int                    chip_scsi_id;
-    int                    i;
 
     boardp = ASC_BOARDP(shp);
 
