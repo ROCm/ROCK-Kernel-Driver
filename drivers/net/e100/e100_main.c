@@ -693,13 +693,14 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
 	
 	/* Check if WoL is enabled on EEPROM */
 	if (e100_eeprom_read(bdp, EEPROM_ID_WORD) & BIT_5) {
+		/* Magic Packet WoL is enabled on device by default */
+		/* if EEPROM WoL bit is TRUE                        */
+		bdp->wolsupported = WAKE_MAGIC;
+		bdp->wolopts = WAKE_MAGIC;
 		if (bdp->rev_id >= D101A4_REV_ID)
 			bdp->wolsupported = WAKE_PHY | WAKE_MAGIC;
 		if (bdp->rev_id >= D101MA_REV_ID)
 			bdp->wolsupported |= WAKE_UCAST | WAKE_ARP;
-		/* Magic Packet WoL is enabled on device by default */
-		/* if EEPROM WoL bit is TRUE                        */
-		bdp->wolopts = WAKE_MAGIC;
 	}
 
 	printk(KERN_NOTICE "\n");
