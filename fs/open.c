@@ -57,9 +57,18 @@ static int vfs_statfs_native(struct super_block *sb, struct statfs *buf)
 		memcpy(buf, &st, sizeof(st));
 	else {
 		if (sizeof buf->f_blocks == 4) {
-			if ((st.f_blocks | st.f_bfree |
-			     st.f_bavail | st.f_files | st.f_ffree) &
+			if ((st.f_blocks | st.f_bfree | st.f_bavail) &
 			    0xffffffff00000000ULL)
+				return -EOVERFLOW;
+			/*
+			 * f_files and f_ffree may be -1; it's okay to stuff
+			 * that into 32 bits
+			 */
+			if (st.f_files != 0xffffffffffffffffULL &&
+			    (st.f_files & 0xffffffff00000000ULL))
+				return -EOVERFLOW;
+			if (st.f_ffree != 0xffffffffffffffffULL &&
+			    (st.f_ffree & 0xffffffff00000000ULL))
 				return -EOVERFLOW;
 		}
 
