@@ -238,9 +238,6 @@ static void qlogic_config(dev_link_t * link)
 		outb(0x04, link->io.BasePort1 + 0xd);
 	}
 
-	/* A bad hack... */
-	release_region(link->io.BasePort1, link->io.NumPorts1);
-
 	/* The KXL-810AN has a bigger IO port window */
 	if (link->io.NumPorts1 == 32)
 		qlogicfas_preset(link->io.BasePort1 + 16, link->irq.AssignedIRQ);
