@@ -331,7 +331,7 @@ static void _tw32_flush(struct tg3 *tp, u32 off, u32 val)
 		pci_write_config_dword(tp->pdev, TG3PCI_REG_DATA, val);
 		spin_unlock_irqrestore(&tp->indirect_lock, flags);
 	} else {
-		unsigned long dest = tp->regs + off;
+		void __iomem *dest = tp->regs + off;
 		writel(val, dest);
 		readl(dest);    /* always flush PCI write */
 	}
@@ -339,7 +339,7 @@ static void _tw32_flush(struct tg3 *tp, u32 off, u32 val)
 
 static inline void _tw32_rx_mbox(struct tg3 *tp, u32 off, u32 val)
 {
-	unsigned long mbox = tp->regs + off;
+	void __iomem *mbox = tp->regs + off;
 	writel(val, mbox);
 	if (tp->tg3_flags & TG3_FLAG_MBOX_WRITE_REORDER)
 		readl(mbox);
@@ -347,7 +347,7 @@ static inline void _tw32_rx_mbox(struct tg3 *tp, u32 off, u32 val)
 
 static inline void _tw32_tx_mbox(struct tg3 *tp, u32 off, u32 val)
 {
-	unsigned long mbox = tp->regs + off;
+	void __iomem *mbox = tp->regs + off;
 	writel(val, mbox);
 	if (tp->tg3_flags & TG3_FLAG_TXD_MBOX_HWBUG)
 		writel(val, mbox);
@@ -3013,7 +3013,11 @@ static int tg3_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	 * So we really do need to disable interrupts when taking
 	 * tx_lock here.
 	 */
-	spin_lock_irqsave(&tp->tx_lock, flags);
+	local_irq_save(flags);
+	if (!spin_trylock(&tp->tx_lock)) { 
+		local_irq_restore(flags);
+		return -1; 
+	} 
 
 	/* This is a hard error, log it. */
 	if (unlikely(TX_BUFFS_AVAIL(tp) <= (skb_shinfo(skb)->nr_frags + 1))) {
@@ -6226,7 +6230,9 @@ static void tg3_set_rx_mode(struct net_device *dev)
 	struct tg3 *tp = netdev_priv(dev);
 
 	spin_lock_irq(&tp->lock);
+	spin_lock(&tp->tx_lock);
 	__tg3_set_rx_mode(dev);
+	spin_unlock(&tp->tx_lock);
 	spin_unlock_irq(&tp->lock);
 }
 
@@ -7545,7 +7551,7 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 		    chiprevid == CHIPREV_ID_5701_B0 ||
 		    chiprevid == CHIPREV_ID_5701_B2 ||
 		    chiprevid == CHIPREV_ID_5701_B5) {
-			unsigned long sram_base;
+			void __iomem *sram_base;
 
 			/* Write some dummy words into the SRAM status block
 			 * area, see if it reads back correctly.  If the return
@@ -8173,6 +8179,7 @@ static int __devinit tg3_init_one(struct pci_dev *pdev,
 
 	if (pci_using_dac)
 		dev->features |= NETIF_F_HIGHDMA;
+	dev->features |= NETIF_F_LLTX;
 #if TG3_VLAN_TAG_USED
 	dev->features |= NETIF_F_HW_VLAN_TX | NETIF_F_HW_VLAN_RX;
 	dev->vlan_rx_register = tg3_vlan_rx_register;
@@ -8218,7 +8225,7 @@ static int __devinit tg3_init_one(struct pci_dev *pdev,
 	spin_lock_init(&tp->indirect_lock);
 	INIT_WORK(&tp->reset_task, tg3_reset_task, tp);
 
-	tp->regs = (unsigned long) ioremap(tg3reg_base, tg3reg_len);
+	tp->regs = ioremap(tg3reg_base, tg3reg_len);
 	if (tp->regs == 0UL) {
 		printk(KERN_ERR PFX "Cannot map device registers, "
 		       "aborting.\n");
@@ -8380,7 +8387,7 @@ static int __devinit tg3_init_one(struct pci_dev *pdev,
 	return 0;
 
 err_out_iounmap:
-	iounmap((void *) tp->regs);
+	iounmap(tp->regs);
 
 err_out_free_dev:
 	free_netdev(dev);
@@ -8402,7 +8409,7 @@ static void __devexit tg3_remove_one(struct pci_dev *pdev)
 		struct tg3 *tp = netdev_priv(dev);
 
 		unregister_netdev(dev);
-		iounmap((void *)tp->regs);
+		iounmap(tp->regs);
 		free_netdev(dev);
 		pci_release_regions(pdev);
 		pci_disable_device(pdev);
