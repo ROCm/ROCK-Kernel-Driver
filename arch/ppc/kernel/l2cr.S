@@ -255,7 +255,7 @@ END_FTR_SECTION_IFCLR(CPU_FTR_L3CR)
 	isync
 
 	/* Stop DST streams */
-	dssall	0
+	dssall
 	
 	/* Get the current enable bit of the L3CR into r4 */
 	mfspr	r4,SPRN_L3CR

@@ -1550,7 +1550,7 @@ _GLOBAL(set_context)
 #endif
 	li	r4,0
 BEGIN_FTR_SECTION
-	dssall	0
+	dssall
 	sync
 END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
 3:
