@@ -754,7 +754,7 @@ xfs_root(
 STATIC int
 xfs_statvfs(
 	bhv_desc_t	*bdp,
-	struct statfs	*statp,
+	struct kstatfs	*statp,
 	vnode_t		*vp)
 {
 	__uint64_t	fakeinos;
@@ -784,7 +784,7 @@ xfs_statvfs(
 		if (!mp->m_inoadd)
 #endif
 			statp->f_files =
-			    MIN(statp->f_files, (long)mp->m_maxicount);
+			    min_t(sector_t, statp->f_files, mp->m_maxicount);
 	statp->f_ffree = statp->f_files - (sbp->sb_icount - sbp->sb_ifree);
 	XFS_SB_UNLOCK(mp, s);
 

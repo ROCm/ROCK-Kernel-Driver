@@ -439,8 +439,8 @@ repeat:
 /*
  * Timekeeping variables
  */
-unsigned long tick_usec = TICK_USEC; 		/* ACTHZ   period (usec) */
-unsigned long tick_nsec = TICK_NSEC;		/* USER_HZ period (nsec) */
+unsigned long tick_usec = TICK_USEC; 		/* USER_HZ period (usec) */
+unsigned long tick_nsec = TICK_NSEC;		/* ACTHZ period (nsec) */
 
 /* 
  * The current time 

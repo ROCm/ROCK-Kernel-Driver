@@ -49,12 +49,12 @@ config ACPI_HT_ONLY
 	  Full ACPI support (CONFIG_ACPI) is preferred.  Use this option 
 	  only if you wish to limit ACPI's role to processor enumeration.
 
-	  There is no command-line option to disable this, but the kernel
-	  will fall back to the MPS table if the MADT is not present.
+	  In this configuration, ACPI defaults to off. It must be enabled
+	  on the command-line with the "acpismp=force" option.
 
 config ACPI_BOOT
 	bool
-	depends on IA64 && (!IA64_HP_SIM || IA64_SGI_SN) || X86 && ACPI && !ACPI_HT_ONLY || X86 && ACPI
+	depends on IA64 && (!IA64_HP_SIM || IA64_SGI_SN) || X86 && ACPI && !ACPI_HT_ONLY
 	default y
 
 config ACPI_SLEEP
@@ -135,6 +135,31 @@ config ACPI_NUMA
 	bool "NUMA support" if NUMA && (IA64 && !IA64_HP_SIM || X86 && ACPI && !ACPI_HT_ONLY && !X86_64)
 	default y if IA64 && IA64_SGI_SN
 
+config ACPI_ASUS
+        tristate "ASUS/Medion Laptop Extras"
+        depends on X86 && ACPI && !ACPI_HT_ONLY
+        ---help---
+          This driver provides support for extra features of ACPI-compatible
+          ASUS laptops. As some of Medion laptops are made by ASUS, it may also
+          support some Medion laptops (such as 9675 for example).  It makes all
+          the extra buttons generate standard ACPI events that go through
+          /proc/acpi/events, and (on some models) adds support for changing the
+          display brightness and output, switching the LCD backlight on and off,
+          and most importantly, allows you to blink those fancy LEDs intended
+          for reporting mail and wireless status.
+          
+          All settings are changed via /proc/acpi/asus directory entries. Owner
+          and group for these entries can be set with asus_uid and asus_gid
+          parameters.
+          
+          More information and a userspace daemon for handling the extra buttons
+          at <http://sourceforge.net/projects/acpi4asus/>.
+          
+          If you have an ACPI-compatible ASUS laptop, say Y or M here. This
+          driver is still under development, so if your laptop is unsupported or
+          something works not quite as expected, please use the mailing list
+          available on the above page (acpi4asus-user@lists.sourceforge.net)
+          
 config ACPI_TOSHIBA
 	tristate "Toshiba Laptop Extras"
 	depends on X86 && ACPI && !ACPI_HT_ONLY

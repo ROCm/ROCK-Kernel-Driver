@@ -690,6 +690,9 @@ static void __init asus_hides_smbus_hostbridge(struct pci_dev *dev)
 	if ((dev->device == PCI_DEVICE_ID_INTEL_82850_HB) &&
 	    (dev->subsystem_device == 0x8030)) /* P4T533 */
 		asus_hides_smbus = 1;
+	if ((dev->device == PCI_DEVICE_ID_INTEL_7205_0) &&
+	    (dev->subsystem_device == 0x8070)) /* P4G8X Deluxe */
+		asus_hides_smbus = 1;
 	return;
 }
 
@@ -838,6 +841,7 @@ static struct pci_fixup pci_fixups[] __devinitdata = {
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82845_HB,	asus_hides_smbus_hostbridge },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82845G_HB,	asus_hides_smbus_hostbridge },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82850_HB,	asus_hides_smbus_hostbridge },
+	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_7205_0,	asus_hides_smbus_hostbridge },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82801DB_0,	asus_hides_smbus_lpc },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82801BA_0,	asus_hides_smbus_lpc },
 

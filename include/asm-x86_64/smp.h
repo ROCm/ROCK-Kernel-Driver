@@ -66,12 +66,12 @@ extern volatile unsigned long cpu_callout_map;
 	    cpu = __ffs(mask), mask != 0; \
 	    mask &= ~(1UL<<cpu))
 
-extern inline int any_online_cpu(unsigned int mask)
+extern inline unsigned int any_online_cpu(unsigned int mask)
 {
 	if (mask & cpu_online_map)
 		return __ffs(mask & cpu_online_map);
 
-		return -1; 
+	return NR_CPUS; 
 } 
 
 extern inline unsigned int num_online_cpus(void)

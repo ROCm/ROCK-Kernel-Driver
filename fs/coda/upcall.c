@@ -585,7 +585,7 @@ int venus_pioctl(struct super_block *sb, struct ViceFid *fid,
 	return error;
 }
 
-int venus_statfs(struct super_block *sb, struct statfs *sfs) 
+int venus_statfs(struct super_block *sb, struct kstatfs *sfs) 
 { 
         union inputArgs *inp;
         union outputArgs *outp;

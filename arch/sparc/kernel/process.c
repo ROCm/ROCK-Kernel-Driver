@@ -287,17 +287,14 @@ void show_regs(struct pt_regs *r)
 	       rw->ins[4], rw->ins[5], rw->ins[6], rw->ins[7]);
 }
 
-void show_trace_task(struct task_struct *tsk)
+void show_stack(struct task_struct *tsk, unsigned long *_ksp)
 {
 	unsigned long pc, fp;
 	unsigned long task_base = (unsigned long) tsk;
 	struct reg_window *rw;
 	int count = 0;
 
-	if (!tsk)
-		return;
-
-	fp = tsk->thread_info->ksp;
+	fp = (unsigned long) _ksp;
 	do {
 		/* Bogus frame pointer? */
 		if (fp < (task_base + sizeof(struct task_struct)) ||
@@ -309,6 +306,13 @@ void show_trace_task(struct task_struct *tsk)
 		fp = rw->ins[6];
 	} while (++count < 16);
 	printk("\n");
+}
+
+void show_trace_task(struct task_struct *tsk)
+{
+	if (tsk)
+		show_stack(tsk,
+			   (unsigned long *) tsk->thread_info->ksp);
 }
 
 /*

@@ -20,6 +20,7 @@
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
 #include <linux/spinlock.h>
+#include <linux/suspend.h>
 
 #include <linux/sunrpc/clnt.h>
 #include <linux/sunrpc/xprt.h>
@@ -969,6 +970,8 @@ rpciod(void *ptr)
 			flush_signals(current);
 		}
 		__rpc_schedule();
+		if (current->flags & PF_FREEZE)
+			refrigerator(PF_IOTHREAD);
 
 		if (++rounds >= 64) {	/* safeguard */
 			schedule();

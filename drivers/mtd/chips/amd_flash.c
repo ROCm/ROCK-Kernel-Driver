@@ -3,7 +3,7 @@
  *
  * Author: Jonas Holmberg <jonas.holmberg@axis.com>
  *
- * $Id: amd_flash.c,v 1.22 2003/05/28 13:47:19 dwmw2 Exp $
+ * $Id: amd_flash.c,v 1.23 2003/06/12 09:24:13 dwmw2 Exp $
  *
  * Copyright (c) 2001 Axis Communications AB
  *
@@ -19,6 +19,7 @@
 #include <linux/slab.h>
 #include <linux/delay.h>
 #include <linux/interrupt.h>
+#include <linux/init.h>
 #include <linux/mtd/map.h>
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/flashchip.h>

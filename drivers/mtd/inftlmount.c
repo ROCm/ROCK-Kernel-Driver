@@ -8,7 +8,7 @@
  * Author: Fabrice Bellard (fabrice.bellard@netgem.com) 
  * Copyright (C) 2000 Netgem S.A.
  *
- * $Id: inftlmount.c,v 1.9 2003/05/23 11:35:07 dwmw2 Exp $
+ * $Id: inftlmount.c,v 1.11 2003/06/23 07:39:21 dwmw2 Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -25,7 +25,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#define __NO_VERSION__
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <asm/errno.h>
@@ -42,7 +41,7 @@
 #include <linux/mtd/inftl.h>
 #include <linux/mtd/compatmac.h>
 
-char inftlmountrev[]="$Revision: 1.9 $";
+char inftlmountrev[]="$Revision: 1.11 $";
 
 /*
  * find_boot_record: Find the INFTL Media Header and its Spare copy which
@@ -242,7 +241,7 @@ static int find_boot_record(struct INFTLrecord *inftl)
 			}
 			if ((ip->lastUnit - ip->firstUnit + 1) < ip->virtualUnits) {
 				printk(KERN_WARNING "INFTL: Media Header "
-					"Parition %d sanity check failed\n"
+					"Partition %d sanity check failed\n"
 					"    firstUnit %d : lastUnit %d  >  "
 					"virtualUnits %d\n", i, ip->lastUnit,
 					ip->firstUnit, ip->Reserved0);
@@ -250,7 +249,7 @@ static int find_boot_record(struct INFTLrecord *inftl)
 			}
 			if (ip->Reserved1 != 0) {
 				printk(KERN_WARNING "INFTL: Media Header "
-					"Parition %d sanity check failed: "
+					"Partition %d sanity check failed: "
 					"Reserved1 %d != 0\n",
 					i, ip->Reserved1);
 				return -1;
@@ -261,7 +260,7 @@ static int find_boot_record(struct INFTLrecord *inftl)
 		}
 
 		if (i >= 4) {
-			printk(KERN_WARNING "INFTL: Media Header Parition "
+			printk(KERN_WARNING "INFTL: Media Header Partition "
 				"sanity check failed:\n       No partition "
 				"marked as Disk Partition\n");
 			return -1;
@@ -630,7 +629,7 @@ int INFTL_mount(struct INFTLrecord *s)
 			if (prev_block < s->nb_blocks)
 				prev_block += s->firstEUN;
 
-			/* Already explored paritial chain? */
+			/* Already explored partial chain? */
 			if (s->PUtable[block] != BLOCK_NOTEXPLORED) {
 				/* Check if chain for this logical */
 				if (logical_block == first_logical_block) {

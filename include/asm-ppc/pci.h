@@ -269,6 +269,13 @@ pci_dac_dma_sync_single(struct pci_dev *pdev, dma64_addr_t dma_addr, size_t len,
 /* Return the index of the PCI controller for device PDEV. */
 #define pci_domain_nr(bus) ((struct pci_controller *)(bus)->sysdata)->index
 
+/* Set the name of the bus as it appears in /proc/bus/pci */
+static inline int pci_name_bus(char *name, struct pci_bus *bus)
+{
+	sprintf(name, "%02x", bus->number);
+	return 0;
+}
+
 /* Map a range of PCI memory or I/O space for a device into user space */
 int pci_mmap_page_range(struct pci_dev *pdev, struct vm_area_struct *vma,
 			enum pci_mmap_state mmap_state, int write_combine);

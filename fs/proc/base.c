@@ -1362,10 +1362,11 @@ struct dentry *proc_pid_lookup(struct inode *dir, struct dentry * dentry)
 
 	inode = proc_pid_make_inode(dir->i_sb, task, PROC_PID_INO);
 
-	put_task_struct(task);
 
-	if (!inode)
+	if (!inode) {
+		put_task_struct(task);
 		goto out;
+	}
 	inode->i_mode = S_IFDIR|S_IRUGO|S_IXUGO;
 	inode->i_op = &proc_base_inode_operations;
 	inode->i_fop = &proc_base_operations;
@@ -1379,6 +1380,7 @@ struct dentry *proc_pid_lookup(struct inode *dir, struct dentry * dentry)
 	d_add(dentry, inode);
 	spin_unlock(&task->proc_lock);
 
+	put_task_struct(task);
 	return NULL;
 out:
 	return ERR_PTR(-ENOENT);

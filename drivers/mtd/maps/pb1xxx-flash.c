@@ -3,7 +3,7 @@
  * 
  * (C) 2001 Pete Popov <ppopov@mvista.com>
  * 
- * $Id: pb1xxx-flash.c,v 1.8 2003/05/21 12:45:19 dwmw2 Exp $
+ * $Id: pb1xxx-flash.c,v 1.9 2003/06/23 11:48:18 dwmw2 Exp $
  */
 
 #include <linux/config.h>
@@ -131,9 +131,6 @@ static struct mtd_partition pb1xxx_partitions[] = {
 #error Unsupported board
 #endif
 
-
-#define NB_OF(x)  (sizeof(x)/sizeof(x[0]))
-
 static struct mtd_partition *parsed_parts;
 static struct mtd_info *mymtd;
 
@@ -151,7 +148,7 @@ int __init pb1xxx_mtd_init(void)
 	 */
 	part_type = "static";
 	parts = pb1xxx_partitions;
-	nb_parts = NB_OF(pb1xxx_partitions);
+	nb_parts = ARRAY_SIZE(pb1xxx_partitions);
 	pb1xxx_map.size = flash_size;
 
 	/*

@@ -23,23 +23,85 @@
 
 #define special_file(m) (S_ISCHR(m)||S_ISBLK(m)||S_ISFIFO(m)||S_ISSOCK(m))
 
-int vfs_statfs(struct super_block *sb, struct statfs *buf)
+int vfs_statfs(struct super_block *sb, struct kstatfs *buf)
 {
 	int retval = -ENODEV;
 
 	if (sb) {
 		retval = -ENOSYS;
 		if (sb->s_op->statfs) {
-			memset(buf, 0, sizeof(struct statfs));
+			memset(buf, 0, sizeof(*buf));
 			retval = security_sb_statfs(sb);
 			if (retval)
 				return retval;
 			retval = sb->s_op->statfs(sb, buf);
+			if (retval == 0 && buf->f_frsize == 0)
+				buf->f_frsize = buf->f_bsize;
 		}
 	}
 	return retval;
 }
 
+static int vfs_statfs_native(struct super_block *sb, struct statfs *buf)
+{
+	struct kstatfs st;
+	int retval;
+
+	retval = vfs_statfs(sb, &st);
+	if (retval)
+		return retval;
+
+	if (sizeof(*buf) == sizeof(st))
+		memcpy(buf, &st, sizeof(st));
+	else {
+		if (sizeof buf->f_blocks == 4) {
+			if ((st.f_blocks | st.f_bfree |
+			     st.f_bavail | st.f_files | st.f_ffree) &
+			    0xffffffff00000000ULL)
+				return -EOVERFLOW;
+		}
+
+		buf->f_type = st.f_type;
+		buf->f_bsize = st.f_bsize;
+		buf->f_blocks = st.f_blocks;
+		buf->f_bfree = st.f_bfree;
+		buf->f_bavail = st.f_bavail;
+		buf->f_files = st.f_files;
+		buf->f_ffree = st.f_ffree;
+		buf->f_fsid = st.f_fsid;
+		buf->f_namelen = st.f_namelen;
+		buf->f_frsize = st.f_frsize;
+		memset(buf->f_spare, 0, sizeof(buf->f_spare));
+	}
+	return 0;
+}
+
+static int vfs_statfs64(struct super_block *sb, struct statfs64 *buf)
+{
+	struct kstatfs st;
+	int retval;
+
+	retval = vfs_statfs(sb, &st);
+	if (retval)
+		return retval;
+
+	if (sizeof(*buf) == sizeof(st))
+		memcpy(buf, &st, sizeof(st));
+	else {
+		buf->f_type = st.f_type;
+		buf->f_bsize = st.f_bsize;
+		buf->f_blocks = st.f_blocks;
+		buf->f_bfree = st.f_bfree;
+		buf->f_bavail = st.f_bavail;
+		buf->f_files = st.f_files;
+		buf->f_ffree = st.f_ffree;
+		buf->f_fsid = st.f_fsid;
+		buf->f_namelen = st.f_namelen;
+		buf->f_frsize = st.f_frsize;
+		memset(buf->f_spare, 0, sizeof(buf->f_spare));
+	}
+	return 0;
+}
 
 asmlinkage long sys_statfs(const char __user * path, struct statfs __user * buf)
 {
@@ -49,13 +111,33 @@ asmlinkage long sys_statfs(const char __user * path, struct statfs __user * buf)
 	error = user_path_walk(path, &nd);
 	if (!error) {
 		struct statfs tmp;
-		error = vfs_statfs(nd.dentry->d_inode->i_sb, &tmp);
-		if (!error && copy_to_user(buf, &tmp, sizeof(struct statfs)))
+		error = vfs_statfs_native(nd.dentry->d_inode->i_sb, &tmp);
+		if (!error && copy_to_user(buf, &tmp, sizeof(tmp)))
 			error = -EFAULT;
 		path_release(&nd);
 	}
 	return error;
 }
+
+
+asmlinkage long sys_statfs64(const char __user *path, size_t sz, struct statfs64 __user *buf)
+{
+	struct nameidata nd;
+	long error;
+
+	if (sz != sizeof(*buf))
+		return -EINVAL;
+	error = user_path_walk(path, &nd);
+	if (!error) {
+		struct statfs64 tmp;
+		error = vfs_statfs64(nd.dentry->d_inode->i_sb, &tmp);
+		if (!error && copy_to_user(buf, &tmp, sizeof(tmp)))
+			error = -EFAULT;
+		path_release(&nd);
+	}
+	return error;
+}
+
 
 asmlinkage long sys_fstatfs(unsigned int fd, struct statfs __user * buf)
 {
@@ -67,8 +149,29 @@ asmlinkage long sys_fstatfs(unsigned int fd, struct statfs __user * buf)
 	file = fget(fd);
 	if (!file)
 		goto out;
-	error = vfs_statfs(file->f_dentry->d_inode->i_sb, &tmp);
-	if (!error && copy_to_user(buf, &tmp, sizeof(struct statfs)))
+	error = vfs_statfs_native(file->f_dentry->d_inode->i_sb, &tmp);
+	if (!error && copy_to_user(buf, &tmp, sizeof(tmp)))
+		error = -EFAULT;
+	fput(file);
+out:
+	return error;
+}
+
+asmlinkage long sys_fstatfs64(unsigned int fd, size_t sz, struct statfs64 __user *buf)
+{
+	struct file * file;
+	struct statfs64 tmp;
+	int error;
+
+	if (sz != sizeof(*buf))
+		return -EINVAL;
+
+	error = -EBADF;
+	file = fget(fd);
+	if (!file)
+		goto out;
+	error = vfs_statfs64(file->f_dentry->d_inode->i_sb, &tmp);
+	if (!error && copy_to_user(buf, &tmp, sizeof(tmp)))
 		error = -EFAULT;
 	fput(file);
 out:

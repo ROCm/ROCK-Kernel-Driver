@@ -1061,6 +1061,7 @@ static int pppoe_seq_open(struct inode *inode, struct file *file)
 }
 
 static struct file_operations pppoe_seq_fops = {
+	.owner		= THIS_MODULE,
 	.open		= pppoe_seq_open,
 	.read		= seq_read,
 	.llseek		= seq_lseek,

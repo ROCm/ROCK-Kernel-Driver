@@ -15,15 +15,23 @@
 	.globl bcopy
 	.ent bcopy
 bcopy:
+	ldgp $29, 0($27)
+	.prologue 1
 	mov $16,$0
 	mov $17,$16
 	mov $0,$17
+	br  $31, memmove	!samegp
 	.end bcopy
 
 	.align 4
 	.globl memmove
 	.ent memmove
 memmove:
+	ldgp $29, 0($27)
+	unop
+	nop
+	.prologue 1
+
 	addq $16,$18,$4
 	addq $17,$18,$5
 	cmpule $4,$17,$1		/*  dest + n <= src  */
@@ -32,7 +40,7 @@ memmove:
 	bis $1,$2,$1
 	mov $16,$0
 	xor $16,$17,$2
-	bne $1,memcpy
+	bne $1,memcpy			!samegp
 
 	and $2,7,$2			/* Test for src/dest co-alignment.  */
 	and $16,7,$1

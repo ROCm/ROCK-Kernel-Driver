@@ -53,12 +53,12 @@ extern inline unsigned int num_online_cpus(void)
 	return hweight32(cpu_online_map);
 }
 
-extern inline int any_online_cpu(unsigned int mask)
+extern inline unsigned int any_online_cpu(unsigned int mask)
 {
 	if (mask & cpu_online_map)
 		return __ffs(mask & cpu_online_map);
 
-	return -1;
+	return NR_CPUS;
 }
 
 extern int __cpu_up(unsigned int cpu);

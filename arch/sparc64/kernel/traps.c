@@ -1569,11 +1569,14 @@ void user_instruction_dump (unsigned int *pc)
 	printk("\n");
 }
 
-void show_trace_raw(struct thread_info *tp, unsigned long ksp)
+void show_stack(struct task_struct *tsk, unsigned long *_ksp)
 {
-	unsigned long pc, fp, thread_base;
+	unsigned long pc, fp, thread_base, ksp;
+	struct thread_info *tp = tsk->thread_info;
 	struct reg_window *rw;
 	int count = 0;
+
+	ksp = (unsigned long) _ksp;
 
 	if (tp == current_thread_info())
 		flushw_all();
@@ -1596,17 +1599,17 @@ void show_trace_raw(struct thread_info *tp, unsigned long ksp)
 void show_trace_task(struct task_struct *tsk)
 {
 	if (tsk)
-		show_trace_raw(tsk->thread_info,
-			       tsk->thread_info->ksp);
+		show_stack(tsk,
+			   (unsigned long *) tsk->thread_info->ksp);
 }
 
 void dump_stack(void)
 {
-	unsigned long ksp;
+	unsigned long *ksp;
 
 	__asm__ __volatile__("mov	%%fp, %0"
 			     : "=r" (ksp));
-	show_trace_raw(current_thread_info(), ksp);
+	show_stack(current, ksp);
 }
 
 void die_if_kernel(char *str, struct pt_regs *regs)

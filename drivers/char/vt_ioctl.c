@@ -872,6 +872,8 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
 			return -EINVAL;
 		    
 		for (i = 0; i < MAX_NR_CONSOLES; i++) {
+			if (!vc_cons[i].d)
+				continue;
 			if (vlin)
 				vc_cons[i].d->vc_scan_lines = vlin;
 			if (clin)

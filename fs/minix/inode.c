@@ -19,7 +19,7 @@
 
 static void minix_read_inode(struct inode * inode);
 static void minix_write_inode(struct inode * inode, int wait);
-static int minix_statfs(struct super_block *sb, struct statfs *buf);
+static int minix_statfs(struct super_block *sb, struct kstatfs *buf);
 static int minix_remount (struct super_block * sb, int * flags, char * data);
 
 static void minix_delete_inode(struct inode *inode)
@@ -294,7 +294,7 @@ out_bad_sb:
 	return -EINVAL;
 }
 
-static int minix_statfs(struct super_block *sb, struct statfs *buf)
+static int minix_statfs(struct super_block *sb, struct kstatfs *buf)
 {
 	struct minix_sb_info *sbi = minix_sb(sb);
 	buf->f_type = sb->s_magic;

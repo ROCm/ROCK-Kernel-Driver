@@ -25,8 +25,8 @@ static  inline void arch_setup_pc9800(void)
 {
 	CLOCK_TICK_RATE = PC9800_8MHz_P() ? 1996800 : 2457600;
 	printk(KERN_DEBUG "CLOCK_TICK_RATE = %d\n", CLOCK_TICK_RATE);
-	tick_usec = TICK_USEC; 		/* ACTHZ          period (usec) */
-	tick_nsec = TICK_NSEC;		/* USER_HZ period (nsec) */
+	tick_usec = TICK_USEC; 		/* USER_HZ period (usec) */
+	tick_nsec = TICK_NSEC;		/* ACTHZ period (nsec) */
 
 	pc9800_misc_flags = PC9800_MISC_FLAGS;
 #ifdef CONFIG_SMP

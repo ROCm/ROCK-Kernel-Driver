@@ -75,6 +75,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/types.h>
 #include <linux/sched.h>
 #include <linux/tty.h>
 #include <linux/tty_flip.h>
@@ -2279,7 +2280,7 @@ int tioclinux(struct tty_struct *tty, unsigned long arg)
 			ret = fg_console;
 			break;
 		case TIOCL_SCROLLCONSOLE:
-			if (get_user(lines, (char *)arg+1)) {
+			if (get_user(lines, (s32 *)((char *)arg+4))) {
 				ret = -EFAULT;
 			} else {
 				scrollfront(lines);

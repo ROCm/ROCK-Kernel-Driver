@@ -22,6 +22,7 @@
 #include <linux/if_ether.h>
 #include <linux/netfilter_bridge.h>
 #include <linux/netfilter_ipv4.h>
+#include <linux/netfilter_arp.h>
 #include <linux/in_route.h>
 #include <net/ip.h>
 #include <asm/uaccess.h>
@@ -304,31 +305,36 @@ static unsigned int br_nf_local_in(unsigned int hook, struct sk_buff **pskb,
 	return NF_ACCEPT;
 }
 
-
 /* PF_BRIDGE/FORWARD *************************************************/
 static int br_nf_forward_finish(struct sk_buff *skb)
 {
 	struct nf_bridge_info *nf_bridge = skb->nf_bridge;
+	struct net_device *in;
 
 #ifdef CONFIG_NETFILTER_DEBUG
 	skb->nf_debug ^= (1 << NF_BR_FORWARD);
 #endif
 
-	if (nf_bridge->mask & BRNF_PKT_TYPE) {
-		skb->pkt_type = PACKET_OTHERHOST;
-		nf_bridge->mask ^= BRNF_PKT_TYPE;
+	if (skb->protocol == __constant_htons(ETH_P_IP)) {
+		in = nf_bridge->physindev;
+		if (nf_bridge->mask & BRNF_PKT_TYPE) {
+			skb->pkt_type = PACKET_OTHERHOST;
+			nf_bridge->mask ^= BRNF_PKT_TYPE;
+		}
+	} else {
+		in = *((struct net_device **)(skb->cb));
 	}
 
-	NF_HOOK_THRESH(PF_BRIDGE, NF_BR_FORWARD, skb, nf_bridge->physindev,
+	NF_HOOK_THRESH(PF_BRIDGE, NF_BR_FORWARD, skb, in,
 			skb->dev, br_forward_finish, 1);
-
 	return 0;
 }
 
-/* This is the 'purely bridged' case.  We pass the packet to
+/* This is the 'purely bridged' case.  For IP, we pass the packet to
  * netfilter with indev and outdev set to the bridge device,
  * but we are still able to filter on the 'real' indev/outdev
- * because of the ipt_physdev.c module.
+ * because of the ipt_physdev.c module. For ARP, indev and outdev are the
+ * bridge ports.
  */
 static unsigned int br_nf_forward(unsigned int hook, struct sk_buff **pskb,
    const struct net_device *in, const struct net_device *out,
@@ -337,24 +343,33 @@ static unsigned int br_nf_forward(unsigned int hook, struct sk_buff **pskb,
 	struct sk_buff *skb = *pskb;
 	struct nf_bridge_info *nf_bridge;
 
-	if (skb->protocol != __constant_htons(ETH_P_IP))
+	if (skb->protocol != __constant_htons(ETH_P_IP) &&
+	    skb->protocol != __constant_htons(ETH_P_ARP))
 		return NF_ACCEPT;
 
 #ifdef CONFIG_NETFILTER_DEBUG
 	skb->nf_debug ^= (1 << NF_BR_FORWARD);
 #endif
+	if (skb->protocol == __constant_htons(ETH_P_IP)) {
+		nf_bridge = skb->nf_bridge;
+		if (skb->pkt_type == PACKET_OTHERHOST) {
+			skb->pkt_type = PACKET_HOST;
+			nf_bridge->mask |= BRNF_PKT_TYPE;
+		}
 
-	nf_bridge = skb->nf_bridge;
-	if (skb->pkt_type == PACKET_OTHERHOST) {
-		skb->pkt_type = PACKET_HOST;
-		nf_bridge->mask |= BRNF_PKT_TYPE;
+		/* The physdev module checks on this */
+		nf_bridge->mask |= BRNF_BRIDGED;
+		nf_bridge->physoutdev = skb->dev;
+
+		NF_HOOK(PF_INET, NF_IP_FORWARD, skb, bridge_parent(in),
+			bridge_parent(out), br_nf_forward_finish);
+	} else {
+		struct net_device **d = (struct net_device **)(skb->cb);
+
+		*d = (struct net_device *)in;
+		NF_HOOK(NF_ARP, NF_ARP_FORWARD, skb, (struct net_device *)in,
+			(struct net_device *)out, br_nf_forward_finish);
 	}
-
-	nf_bridge->mask |= BRNF_BRIDGED; /* The physdev module checks on this */
-	nf_bridge->physoutdev = skb->dev;
-
-	NF_HOOK(PF_INET, NF_IP_FORWARD, skb, bridge_parent(nf_bridge->physindev),
-			bridge_parent(skb->dev), br_nf_forward_finish);
 
 	return NF_STOLEN;
 }

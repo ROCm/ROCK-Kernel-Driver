@@ -9,6 +9,8 @@
  * Authors:	Martin Devera, <devik@cdi.cz>
  *
  * Credits (in time order) for older HTB versions:
+ *              Stef Coene <stef.coene@docum.org>
+ *			HTB support at LARTC mailing list
  *		Ondrej Kraus, <krauso@barr.cz> 
  *			found missing INIT_QDISC(htb)
  *		Vladimir Smelhaus, Aamer Akhter, Bert Hubert
@@ -19,7 +21,7 @@
  *			created test case so that I was able to fix nasty bug
  *		and many others. thanks.
  *
- * $Id: sch_htb.c,v 1.17 2003/01/29 09:22:18 devik Exp devik $
+ * $Id: sch_htb.c,v 1.20 2003/06/18 19:55:49 devik Exp devik $
  */
 #include <linux/config.h>
 #include <linux/module.h>
@@ -71,7 +73,7 @@
 #define HTB_HYSTERESIS 1/* whether to use mode hysteresis for speedup */
 #define HTB_QLOCK(S) spin_lock_bh(&(S)->dev->queue_lock)
 #define HTB_QUNLOCK(S) spin_unlock_bh(&(S)->dev->queue_lock)
-#define HTB_VER 0x3000a	/* major must be matched with number suplied by TC as version */
+#define HTB_VER 0x3000c	/* major must be matched with number suplied by TC as version */
 
 #if HTB_VER >> 16 != TC_HTB_PROTOVER
 #error "Mismatched sch_htb.c and pkt_sch.h"
@@ -217,6 +219,9 @@ struct htb_sched
     /* time of nearest event per level (row) */
     unsigned long near_ev_cache[TC_HTB_MAXDEPTH];
 
+    /* cached value of jiffies in dequeue */
+    unsigned long jiffies;
+
     /* whether we hit non-work conserving class during this dequeue; we use */
     int nwc_hit;	/* this to disable mindelay complaint in dequeue */
 
@@ -336,7 +341,7 @@ static void htb_next_rb_node(struct rb_node **n);
 static void htb_debug_dump (struct htb_sched *q)
 {
 	int i,p;
-	printk(KERN_DEBUG "htb*g j=%lu\n",jiffies);
+	printk(KERN_DEBUG "htb*g j=%lu lj=%lu\n",jiffies,q->jiffies);
 	/* rows */
 	for (i=TC_HTB_MAXDEPTH-1;i>=0;i--) {
 		printk(KERN_DEBUG "htb*r%d m=%x",i,q->row_mask[i]);
@@ -419,8 +424,8 @@ static void htb_add_to_wait_tree (struct htb_sched *q,
 	if ((delay <= 0 || delay > cl->mbuffer) && net_ratelimit())
 		printk(KERN_ERR "HTB: suspicious delay in wait_tree d=%ld cl=%X h=%d\n",delay,cl->classid,debug_hint);
 #endif
-	cl->pq_key = jiffies + PSCHED_US2JIFFIE(delay);
-	if (cl->pq_key == jiffies)
+	cl->pq_key = q->jiffies + PSCHED_US2JIFFIE(delay);
+	if (cl->pq_key == q->jiffies)
 		cl->pq_key++;
 
 	/* update the nearest event cache */
@@ -587,7 +592,7 @@ htb_class_mode(struct htb_class *cl,long *diff)
     long toks;
 
     if ((toks = (cl->ctokens + *diff)) < (
-#ifdef HTB_HYSTERESIS
+#if HTB_HYSTERESIS
 	    cl->cmode != HTB_CANT_SEND ? -cl->cbuffer :
 #endif
        	    0)) {
@@ -595,7 +600,7 @@ htb_class_mode(struct htb_class *cl,long *diff)
 	    return HTB_CANT_SEND;
     }
     if ((toks = (cl->tokens + *diff)) >= (
-#ifdef HTB_HYSTERESIS
+#if HTB_HYSTERESIS
 	    cl->cmode == HTB_CAN_SEND ? -cl->buffer :
 #endif
 	    0))
@@ -798,7 +803,7 @@ static void htb_charge_class(struct htb_sched *q,struct htb_class *cl,
 				       cl->classid, diff,
 				       (unsigned long long) q->now,
 				       (unsigned long long) cl->t_c,
-				       jiffies);
+				       q->jiffies);
 			diff = 1000;
 		}
 #endif
@@ -841,6 +846,7 @@ static void htb_charge_class(struct htb_sched *q,struct htb_class *cl,
  *
  * Scans event queue for pending events and applies them. Returns jiffies to
  * next pending event (0 for no event in pq).
+ * Note: Aplied are events whose have cl->pq_key <= jiffies.
  */
 static long htb_do_events(struct htb_sched *q,int level)
 {
@@ -855,9 +861,9 @@ static long htb_do_events(struct htb_sched *q,int level)
 		while (p->rb_left) p = p->rb_left;
 
 		cl = rb_entry(p, struct htb_class, pq_node);
-		if (cl->pq_key - (jiffies+1) < 0x80000000) {
-			HTB_DBG(8,3,"htb_do_ev_ret delay=%ld\n",cl->pq_key - jiffies);
-			return cl->pq_key - jiffies;
+		if (cl->pq_key - (q->jiffies+1) < 0x80000000) {
+			HTB_DBG(8,3,"htb_do_ev_ret delay=%ld\n",cl->pq_key - q->jiffies);
+			return cl->pq_key - q->jiffies;
 		}
 		htb_safe_rb_erase(p,q->wait_pq+level);
 		diff = PSCHED_TDIFF_SAFE(q->now, cl->t_c, (u32)cl->mbuffer, 0);
@@ -868,7 +874,7 @@ static long htb_do_events(struct htb_sched *q,int level)
 				       cl->classid, diff,
 				       (unsigned long long) q->now,
 				       (unsigned long long) cl->t_c,
-				       jiffies);
+				       q->jiffies);
 			diff = 1000;
 		}
 #endif
@@ -975,7 +981,8 @@ static void htb_delay_by(struct Qdisc *sch,long delay)
 			printk(KERN_INFO "HTB delay %ld > 5sec\n", delay);
 		delay = 5*HZ;
 	}
-	mod_timer(&q->timer, jiffies + delay);
+	/* why don't use jiffies here ? because expires can be in past */
+	mod_timer(&q->timer, q->jiffies + delay);
 	sch->flags |= TCQ_F_THROTTLED;
 	sch->stats.overlimits++;
 	HTB_DBG(3,1,"htb_deq t_delay=%ld\n",delay);
@@ -991,6 +998,7 @@ static struct sk_buff *htb_dequeue(struct Qdisc *sch)
 	int evs_used = 0;
 #endif
 
+	q->jiffies = jiffies;
 	HTB_DBG(3,1,"htb_deq dircnt=%d qlen=%d\n",skb_queue_len(&q->direct_queue),
 			sch->q.qlen);
 
@@ -1010,14 +1018,14 @@ static struct sk_buff *htb_dequeue(struct Qdisc *sch)
 		/* common case optimization - skip event handler quickly */
 		int m;
 		long delay;
-		if (jiffies - q->near_ev_cache[level] < 0x80000000 || 0) {
+		if (q->jiffies - q->near_ev_cache[level] < 0x80000000 || 0) {
 			delay = htb_do_events(q,level);
-			q->near_ev_cache[level] += delay ? delay : HZ;
+			q->near_ev_cache[level] = q->jiffies + (delay ? delay : HZ);
 #ifdef HTB_DEBUG
 			evs_used++;
 #endif
 		} else
-			delay = q->near_ev_cache[level] - jiffies;	
+			delay = q->near_ev_cache[level] - q->jiffies;	
 		
 		if (delay && min_delay > delay) 
 			min_delay = delay;
@@ -1036,8 +1044,8 @@ static struct sk_buff *htb_dequeue(struct Qdisc *sch)
 #ifdef HTB_DEBUG
 	if (!q->nwc_hit && min_delay >= 10*HZ && net_ratelimit()) {
 		if (min_delay == LONG_MAX) {
-			printk(KERN_ERR "HTB: dequeue bug (%d), report it please !\n",
-					evs_used);
+			printk(KERN_ERR "HTB: dequeue bug (%d,%lu,%lu), report it please !\n",
+					evs_used,q->jiffies,jiffies);
 			htb_debug_dump(q);
 		} else 
 			printk(KERN_WARNING "HTB: mindelay=%ld, some class has "
@@ -1046,7 +1054,7 @@ static struct sk_buff *htb_dequeue(struct Qdisc *sch)
 #endif
 	htb_delay_by (sch,min_delay > 5*HZ ? 5*HZ : min_delay);
 fin:
-	HTB_DBG(3,1,"htb_deq_end %s j=%lu skb=%p\n",sch->dev->name,jiffies,skb);
+	HTB_DBG(3,1,"htb_deq_end %s j=%lu skb=%p\n",sch->dev->name,q->jiffies,skb);
 	return skb;
 }
 
@@ -1409,7 +1417,7 @@ static int htb_change_class(struct Qdisc *sch, u32 classid,
 	parent = parentid == TC_H_ROOT ? NULL : htb_find (parentid,sch);
 
 	hopt = RTA_DATA(tb[TCA_HTB_PARMS-1]);
-	HTB_DBG(0,1,"htb_chg cl=%p, clid=%X, opt/prio=%d, rate=%u, buff=%d, quant=%d\n", cl,cl?cl->classid:0,(int)hopt->prio,hopt->rate.rate,hopt->buffer,hopt->quantum);
+	HTB_DBG(0,1,"htb_chg cl=%p(%X), clid=%X, parid=%X, opt/prio=%d, rate=%u, buff=%d, quant=%d\n", cl,cl?cl->classid:0,classid,parentid,(int)hopt->prio,hopt->rate.rate,hopt->buffer,hopt->quantum);
 	rtab = qdisc_get_rtab(&hopt->rate, tb[TCA_HTB_RTAB-1]);
 	ctab = qdisc_get_rtab(&hopt->ceil, tb[TCA_HTB_CTAB-1]);
 	if (!rtab || !ctab) goto failure;

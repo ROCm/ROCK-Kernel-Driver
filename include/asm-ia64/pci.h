@@ -102,6 +102,16 @@ struct pci_controller {
 #define PCI_CONTROLLER(busdev) ((struct pci_controller *) busdev->sysdata)
 #define pci_domain_nr(busdev)    (PCI_CONTROLLER(busdev)->segment)
 
+static inline int pci_name_bus(char *name, struct pci_bus *bus)
+{
+	if (pci_domain_nr(bus) == 0) {
+		sprintf(name, "%02x", bus->number);
+	} else {
+		sprintf(name, "%04x:%02x", pci_domain_nr(bus), bus->number);
+	}
+	return 0;
+}
+
 /* generic pci stuff */
 #include <asm-generic/pci.h>
 

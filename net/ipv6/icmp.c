@@ -613,12 +613,6 @@ static int icmpv6_rcv(struct sk_buff **pskb, unsigned int *nhoffp)
 	case NDISC_NEIGHBOUR_SOLICITATION:
 	case NDISC_NEIGHBOUR_ADVERTISEMENT:
 	case NDISC_REDIRECT:
-		if (skb_is_nonlinear(skb) &&
-		    skb_linearize(skb, GFP_ATOMIC) != 0) {
-			kfree_skb(skb);
-			return 0;
-		}
-
 		ndisc_rcv(skb);
 		break;
 

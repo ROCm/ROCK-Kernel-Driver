@@ -2,7 +2,7 @@
  *  linux/drivers/block/loop.c
  *
  *  Written by Theodore Ts'o, 3/29/93
- * 
+ *
  * Copyright 1993 by Theodore Ts'o.  Redistribution of this file is
  * permitted under the GNU General Public License.
  *
@@ -21,12 +21,12 @@
  * Loadable modules and other fixes by AK, 1998
  *
  * Make real block number available to downstream transfer functions, enables
- * CBC (and relatives) mode encryption requiring unique IVs per data block. 
+ * CBC (and relatives) mode encryption requiring unique IVs per data block.
  * Reed H. Petty, rhp@draper.net
  *
  * Maximum number of loop devices now dynamic via max_loop module parameter.
  * Russell Kroll <rkroll@exploits.org> 19990701
- * 
+ *
  * Maximum number of loop devices when compiled-in now selectable by passing
  * max_loop=<1-255> to the kernel on boot.
  * Erik I. Bolsø, <eriki@himolde.no>, Oct 31, 1999
@@ -40,19 +40,19 @@
  * Heinz Mauelshagen <mge@sistina.com>, Feb 2002
  *
  * Still To Fix:
- * - Advisory locking is ignored here. 
- * - Should use an own CAP_* category instead of CAP_SYS_ADMIN 
+ * - Advisory locking is ignored here.
+ * - Should use an own CAP_* category instead of CAP_SYS_ADMIN
  *
  * WARNING/FIXME:
  * - The block number as IV passing to low level transfer functions is broken:
  *   it passes the underlying device's block number instead of the
- *   offset. This makes it change for a given block when the file is 
- *   moved/restored/copied and also doesn't work over NFS. 
+ *   offset. This makes it change for a given block when the file is
+ *   moved/restored/copied and also doesn't work over NFS.
  * AV, Feb 12, 2000: we pass the logical block number now. It fixes the
  *   problem above. Encryption modules that used to rely on the old scheme
  *   should just call ->i_mapping->bmap() to calculate the physical block
  *   number.
- */ 
+ */
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -60,12 +60,10 @@
 #include <linux/sched.h>
 #include <linux/fs.h>
 #include <linux/file.h>
-#include <linux/bio.h>
 #include <linux/stat.h>
 #include <linux/errno.h>
 #include <linux/major.h>
 #include <linux/wait.h>
-#include <linux/blk.h>
 #include <linux/blkpg.h>
 #include <linux/init.h>
 #include <linux/devfs_fs_kernel.h>
@@ -127,24 +125,25 @@ static int xor_status(struct loop_device *lo, const struct loop_info64 *info)
 	return 0;
 }
 
-struct loop_func_table none_funcs = { 
+struct loop_func_table none_funcs = {
 	.number = LO_CRYPT_NONE,
 	.transfer = transfer_none,
 }; 	
 
-struct loop_func_table xor_funcs = { 
+struct loop_func_table xor_funcs = {
 	.number = LO_CRYPT_XOR,
 	.transfer = transfer_xor,
 	.init = xor_status
 }; 	
 
-/* xfer_funcs[0] is special - its release function is never called */ 
+/* xfer_funcs[0] is special - its release function is never called */
 struct loop_func_table *xfer_funcs[MAX_LO_CRYPT] = {
 	&none_funcs,
-	&xor_funcs  
+	&xor_funcs
 };
 
-static int figure_loop_size(struct loop_device *lo)
+static int
+figure_loop_size(struct loop_device *lo)
 {
 	loff_t size = lo->lo_backing_file->f_dentry->d_inode->i_mapping->host->i_size;
 	sector_t x;
@@ -154,15 +153,17 @@ static int figure_loop_size(struct loop_device *lo)
 	 */
 	size = (size - lo->lo_offset) >> 9;
 	x = (sector_t)size;
+
 	if ((loff_t)x != size)
 		return -EFBIG;
 
-	set_capacity(disks[lo->lo_number], size);
+	set_capacity(disks[lo->lo_number], x);
 	return 0;					
 }
 
-static inline int lo_do_transfer(struct loop_device *lo, int cmd, char *rbuf,
-				 char *lbuf, int size, sector_t rblock)
+static inline int
+lo_do_transfer(struct loop_device *lo, int cmd, char *rbuf,
+	       char *lbuf, int size, sector_t rblock)
 {
 	if (!lo->transfer)
 		return 0;
@@ -614,9 +615,12 @@ static int loop_thread(void *data)
 
 	daemonize("loop%d", lo->lo_number);
 
-	current->flags |= PF_IOTHREAD;	/* loop can be used in an encrypted device
-					   hence, it mustn't be stopped at all because it could
-					   be indirectly used during suspension */
+	/*
+	 * loop can be used in an encrypted device,
+	 * hence, it mustn't be stopped at all
+	 * because it could be indirectly used during suspension
+	 */
+	current->flags |= PF_IOTHREAD;
 
 	set_user_nice(current, -20);
 
@@ -771,36 +775,42 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 	return error;
 }
 
-static int loop_release_xfer(struct loop_device *lo)
+static int
+loop_release_xfer(struct loop_device *lo)
 {
-	int err = 0; 
-	if (lo->lo_encrypt_type) {
-		struct loop_func_table *xfer= xfer_funcs[lo->lo_encrypt_type]; 
-		if (xfer && xfer->release)
-			err = xfer->release(lo); 
-		if (xfer && xfer->unlock)
-			xfer->unlock(lo); 
-		lo->lo_encrypt_type = 0;
+	int err = 0;
+	struct loop_func_table *xfer = lo->lo_encryption;
+
+	if (xfer) {
+		if (xfer->release)
+			err = xfer->release(lo);
+		lo->transfer = NULL;
+		lo->lo_encryption = NULL;
+		module_put(xfer->owner);
 	}
 	return err;
 }
 
 static int
-loop_init_xfer(struct loop_device *lo, int type, const struct loop_info64 *i)
+loop_init_xfer(struct loop_device *lo, struct loop_func_table *xfer,
+	       const struct loop_info64 *i)
 {
-	int err = 0; 
-	if (type) {
-		struct loop_func_table *xfer = xfer_funcs[type]; 
+	int err = 0;
+
+	if (xfer) {
+		struct module *owner = xfer->owner;
+
+		if (!try_module_get(owner))
+			return -EINVAL;
 		if (xfer->init)
 			err = xfer->init(lo, i);
-		if (!err) { 
-			lo->lo_encrypt_type = type;
-			if (xfer->lock)
-				xfer->lock(lo);
-		}
+		if (err)
+			module_put(owner);
+		else
+			lo->lo_encryption = xfer;
 	}
 	return err;
-}  
+}
 
 static int loop_clr_fd(struct loop_device *lo, struct block_device *bdev)
 {
@@ -809,9 +819,11 @@ static int loop_clr_fd(struct loop_device *lo, struct block_device *bdev)
 
 	if (lo->lo_state != Lo_bound)
 		return -ENXIO;
+
 	if (lo->lo_refcnt > 1)	/* we needed one fd for the ioctl */
 		return -EBUSY;
-	if (filp==NULL)
+
+	if (filp == NULL)
 		return -EINVAL;
 
 	spin_lock_irq(&lo->lo_lock);
@@ -828,7 +840,7 @@ static int loop_clr_fd(struct loop_device *lo, struct block_device *bdev)
 	lo->transfer = NULL;
 	lo->ioctl = NULL;
 	lo->lo_device = NULL;
-	lo->lo_encrypt_type = 0;
+	lo->lo_encryption = NULL;
 	lo->lo_offset = 0;
 	lo->lo_encrypt_key_size = 0;
 	lo->lo_flags = 0;
@@ -849,49 +861,55 @@ static int
 loop_set_status(struct loop_device *lo, const struct loop_info64 *info)
 {
 	int err;
-	unsigned int type;
-	loff_t offset;
+	struct loop_func_table *xfer;
 
-	if (lo->lo_encrypt_key_size && lo->lo_key_owner != current->uid && 
+	if (lo->lo_encrypt_key_size && lo->lo_key_owner != current->uid &&
 	    !capable(CAP_SYS_ADMIN))
 		return -EPERM;
 	if (lo->lo_state != Lo_bound)
 		return -ENXIO;
 	if ((unsigned int) info->lo_encrypt_key_size > LO_KEY_SIZE)
 		return -EINVAL;
-	type = info->lo_encrypt_type; 
-	if (type >= MAX_LO_CRYPT || xfer_funcs[type] == NULL)
-		return -EINVAL;
-	if (type == LO_CRYPT_XOR && info->lo_encrypt_key_size == 0)
-		return -EINVAL;
 
 	err = loop_release_xfer(lo);
-	if (!err) 
-		err = loop_init_xfer(lo, type, info);
-
-	offset = lo->lo_offset;
-	if (offset != info->lo_offset) {
-		lo->lo_offset = info->lo_offset;
-		if (figure_loop_size(lo)){
-			err = -EFBIG;
-			lo->lo_offset = offset;
-		}
-	}
-
 	if (err)
-		return err;	
+		return err;
+
+	if (info->lo_encrypt_type) {
+		unsigned int type = info->lo_encrypt_type;
+
+		if (type >= MAX_LO_CRYPT)
+			return -EINVAL;
+		xfer = xfer_funcs[type];
+		if (xfer == NULL)
+			return -EINVAL;
+	} else
+		xfer = NULL;
+
+	err = loop_init_xfer(lo, xfer, info);
+	if (err)
+		return err;
+
+	if (lo->lo_offset != info->lo_offset) {
+		lo->lo_offset = info->lo_offset;
+		if (figure_loop_size(lo))
+			return -EFBIG;
+	}
 
 	strlcpy(lo->lo_name, info->lo_name, LO_NAME_SIZE);
 
-	lo->transfer = xfer_funcs[type]->transfer;
-	lo->ioctl = xfer_funcs[type]->ioctl;
+	if (!xfer)
+		xfer = &none_funcs;
+	lo->transfer = xfer->transfer;
+	lo->ioctl = xfer->ioctl;
+
 	lo->lo_encrypt_key_size = info->lo_encrypt_key_size;
 	lo->lo_init[0] = info->lo_init[0];
 	lo->lo_init[1] = info->lo_init[1];
 	if (info->lo_encrypt_key_size) {
-		memcpy(lo->lo_encrypt_key, info->lo_encrypt_key, 
+		memcpy(lo->lo_encrypt_key, info->lo_encrypt_key,
 		       info->lo_encrypt_key_size);
-		lo->lo_key_owner = current->uid; 
+		lo->lo_key_owner = current->uid;
 	}	
 
 	return 0;
@@ -917,7 +935,8 @@ loop_get_status(struct loop_device *lo, struct loop_info64 *info)
 	info->lo_offset = lo->lo_offset;
 	info->lo_flags = lo->lo_flags;
 	strlcpy(info->lo_name, lo->lo_name, LO_NAME_SIZE);
-	info->lo_encrypt_type = lo->lo_encrypt_type;
+	info->lo_encrypt_type =
+		lo->lo_encryption ? lo->lo_encryption->number : 0;
 	if (lo->lo_encrypt_key_size && capable(CAP_SYS_ADMIN)) {
 		info->lo_encrypt_key_size = lo->lo_encrypt_key_size;
 		memcpy(info->lo_encrypt_key, lo->lo_encrypt_key,
@@ -1060,30 +1079,22 @@ static int lo_ioctl(struct inode * inode, struct file * file,
 static int lo_open(struct inode *inode, struct file *file)
 {
 	struct loop_device *lo = inode->i_bdev->bd_disk->private_data;
-	int type;
 
 	down(&lo->lo_ctl_mutex);
-
-	type = lo->lo_encrypt_type; 
-	if (type && xfer_funcs[type] && xfer_funcs[type]->lock)
-		xfer_funcs[type]->lock(lo);
 	lo->lo_refcnt++;
 	up(&lo->lo_ctl_mutex);
+
 	return 0;
 }
 
 static int lo_release(struct inode *inode, struct file *file)
 {
 	struct loop_device *lo = inode->i_bdev->bd_disk->private_data;
-	int type;
 
 	down(&lo->lo_ctl_mutex);
-	type = lo->lo_encrypt_type;
 	--lo->lo_refcnt;
-	if (xfer_funcs[type] && xfer_funcs[type]->unlock)
-		xfer_funcs[type]->unlock(lo);
-
 	up(&lo->lo_ctl_mutex);
+
 	return 0;
 }
 
@@ -1103,34 +1114,41 @@ MODULE_LICENSE("GPL");
 
 int loop_register_transfer(struct loop_func_table *funcs)
 {
-	if ((unsigned)funcs->number > MAX_LO_CRYPT || xfer_funcs[funcs->number])
+	unsigned int n = funcs->number;
+
+	if (n >= MAX_LO_CRYPT || xfer_funcs[n])
 		return -EINVAL;
-	xfer_funcs[funcs->number] = funcs;
-	return 0; 
+	xfer_funcs[n] = funcs;
+	return 0;
 }
 
 int loop_unregister_transfer(int number)
 {
-	struct loop_device *lo; 
+	unsigned int n = number;
+	struct loop_device *lo;
+	struct loop_func_table *xfer;
 
-	if ((unsigned)number >= MAX_LO_CRYPT)
-		return -EINVAL; 
-	for (lo = &loop_dev[0]; lo < &loop_dev[max_loop]; lo++) { 
-		int type = lo->lo_encrypt_type;
-		if (type == number) { 
-			xfer_funcs[type]->release(lo);
-			lo->transfer = NULL; 
-			lo->lo_encrypt_type = 0; 
-		}
+	if (n == 0 || n >= MAX_LO_CRYPT || (xfer = xfer_funcs[n]) == NULL)
+		return -EINVAL;
+
+	xfer_funcs[n] = NULL;
+
+	for (lo = &loop_dev[0]; lo < &loop_dev[max_loop]; lo++) {
+		down(&lo->lo_ctl_mutex);
+
+		if (lo->lo_encryption == xfer)
+			loop_release_xfer(lo);
+
+		up(&lo->lo_ctl_mutex);
 	}
-	xfer_funcs[number] = NULL; 
-	return 0; 
+
+	return 0;
 }
 
 EXPORT_SYMBOL(loop_register_transfer);
 EXPORT_SYMBOL(loop_unregister_transfer);
 
-int __init loop_init(void) 
+int __init loop_init(void)
 {
 	int	i;
 
@@ -1190,9 +1208,10 @@ out_mem:
 	return -ENOMEM;
 }
 
-void loop_exit(void) 
+void loop_exit(void)
 {
 	int i;
+
 	for (i = 0; i < max_loop; i++) {
 		del_gendisk(disks[i]);
 		put_disk(disks[i]);

@@ -61,7 +61,7 @@ int ext3_ioctl (struct inode * inode, struct file * filp, unsigned int cmd,
 			if (!capable(CAP_LINUX_IMMUTABLE))
 				return -EPERM;
 		}
-		
+
 		/*
 		 * The JOURNAL_DATA flag can only be changed by
 		 * the relevant capability.
@@ -80,7 +80,7 @@ int ext3_ioctl (struct inode * inode, struct file * filp, unsigned int cmd,
 		err = ext3_reserve_inode_write(handle, inode, &iloc);
 		if (err)
 			goto flags_err;
-		
+
 		flags = flags & EXT3_FL_USER_MODIFIABLE;
 		flags |= oldflags & ~EXT3_FL_USER_MODIFIABLE;
 		ei->i_flags = flags;
@@ -93,7 +93,7 @@ flags_err:
 		ext3_journal_stop(handle);
 		if (err)
 			return err;
-		
+
 		if ((jflag ^ oldflags) & (EXT3_JOURNAL_DATA_FL))
 			err = ext3_change_inode_journal_flag(inode, jflag);
 		return err;

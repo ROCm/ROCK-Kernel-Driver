@@ -161,7 +161,7 @@ loop:
 		del_timer_sync(journal->j_commit_timer);
 		journal_commit_transaction(journal);
 		spin_lock(&journal->j_state_lock);
-		goto loop;
+		goto end_loop;
 	}
 
 	wake_up(&journal->j_wait_done_commit);
@@ -175,7 +175,6 @@ loop:
 		spin_unlock(&journal->j_state_lock);
 		refrigerator(PF_IOTHREAD);
 		spin_lock(&journal->j_state_lock);
-		jbd_debug(1, "Resuming kjournald\n");						
 	} else {
 		/*
 		 * We assume on resume that commits are already there,
@@ -185,7 +184,7 @@ loop:
 		int should_sleep = 1;
 
 		prepare_to_wait(&journal->j_wait_commit, &wait,
-				TASK_INTERRUPTIBLE);		
+				TASK_INTERRUPTIBLE);
 		if (journal->j_commit_sequence != journal->j_commit_request)
 			should_sleep = 0;
 		transaction = journal->j_running_transaction;
@@ -210,7 +209,7 @@ loop:
 		journal->j_commit_request = transaction->t_tid;
 		jbd_debug(1, "woke because of timeout\n");
 	}
-
+end_loop:
 	if (!(journal->j_flags & JFS_UNMOUNT))
 		goto loop;
 
@@ -230,12 +229,16 @@ static void journal_start_thread(journal_t *journal)
 
 static void journal_kill_thread(journal_t *journal)
 {
+	spin_lock(&journal->j_state_lock);
 	journal->j_flags |= JFS_UNMOUNT;
 
 	while (journal->j_task) {
 		wake_up(&journal->j_wait_commit);
+		spin_unlock(&journal->j_state_lock);
 		wait_event(journal->j_wait_done_commit, journal->j_task == 0);
+		spin_lock(&journal->j_state_lock);
 	}
+	spin_unlock(&journal->j_state_lock);
 }
 
 /*
@@ -729,7 +732,7 @@ journal_t * journal_init_inode (struct inode *inode)
 		kfree(journal);
 		return NULL;
 	}
-	
+
 	bh = __getblk(journal->j_dev, blocknr, journal->j_blocksize);
 	J_ASSERT(bh != NULL);
 	journal->j_sb_buffer = bh;
@@ -868,6 +871,22 @@ void journal_update_superblock(journal_t *journal, int wait)
 	journal_superblock_t *sb = journal->j_superblock;
 	struct buffer_head *bh = journal->j_sb_buffer;
 
+	/*
+	 * As a special case, if the on-disk copy is already marked as needing
+	 * no recovery (s_start == 0) and there are no outstanding transactions
+	 * in the filesystem, then we can safely defer the superblock update
+	 * until the next commit by setting JFS_FLUSHED.  This avoids
+	 * attempting a write to a potential-readonly device.
+	 */
+	if (sb->s_start == 0 && journal->j_tail_sequence ==
+				journal->j_transaction_sequence) {
+		jbd_debug(1,"JBD: Skipping superblock update on recovered sb "
+			"(start %ld, seq %d, errno %d)\n",
+			journal->j_tail, journal->j_tail_sequence, 
+			journal->j_errno);
+		goto out;
+	}
+
 	spin_lock(&journal->j_state_lock);
 	jbd_debug(1,"JBD: updating superblock (start %ld, seq %d, errno %d)\n",
 		  journal->j_tail, journal->j_tail_sequence, journal->j_errno);
@@ -884,6 +903,7 @@ void journal_update_superblock(journal_t *journal, int wait)
 	else
 		ll_rw_block(WRITE, 1, &bh);
 
+out:
 	/* If we have just flushed the log (by marking s_start==0), then
 	 * any future commit will have to be careful to update the
 	 * superblock again to re-record the true start of the log. */
@@ -906,7 +926,7 @@ static int journal_get_superblock(journal_t *journal)
 	struct buffer_head *bh;
 	journal_superblock_t *sb;
 	int err = -EIO;
-	
+
 	bh = journal->j_sb_buffer;
 
 	J_ASSERT(bh != NULL);
@@ -923,7 +943,7 @@ static int journal_get_superblock(journal_t *journal)
 	sb = journal->j_superblock;
 
 	err = -EINVAL;
-	
+
 	if (sb->s_header.h_magic != htonl(JFS_MAGIC_NUMBER) ||
 	    sb->s_blocksize != htonl(journal->j_blocksize)) {
 		printk(KERN_WARNING "JBD: no valid journal superblock found\n");
@@ -1242,7 +1262,7 @@ int journal_flush(journal_t *journal)
 	unsigned long old_tail;
 
 	spin_lock(&journal->j_state_lock);
-	
+
 	/* Force everything buffered to the log... */
 	if (journal->j_running_transaction) {
 		transaction = journal->j_running_transaction;
@@ -1520,7 +1540,7 @@ int journal_blocks_per_page(struct inode *inode)
  */
 void * __jbd_kmalloc (const char *where, size_t size, int flags, int retry)
 {
-	return kmalloc(size, flags | (retry ? __GFP_NOFAIL : 0));	
+	return kmalloc(size, flags | (retry ? __GFP_NOFAIL : 0));
 }
 
 /*

@@ -4,7 +4,7 @@
  * Copyright (c) 1995,2001 Compaq Computer Corporation
  * Copyright (c) 2001 Greg Kroah-Hartman (greg@kroah.com)
  * Copyright (c) 2001,2002 IBM Corp.
- * Copyright (c) 2002 Takayoshi Kochi (t-kouchi@cq.jp.nec.com)
+ * Copyright (c) 2002 Takayoshi Kochi (t-kochi@bq.jp.nec.com)
  * Copyright (c) 2002 Hiroshi Aono (h-aono@ap.jp.nec.com)
  * Copyright (c) 2002 NEC Corporation
  *
@@ -25,7 +25,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * Send feedback to <t-kouchi@cq.jp.nec.com>
+ * Send feedback to <t-kochi@bq.jp.nec.com>
  *
  */
 

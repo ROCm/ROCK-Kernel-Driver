@@ -16,7 +16,7 @@ int simple_getattr(struct vfsmount *mnt, struct dentry *dentry,
 	return 0;
 }
 
-int simple_statfs(struct super_block *sb, struct statfs *buf)
+int simple_statfs(struct super_block *sb, struct kstatfs *buf)
 {
 	buf->f_type = sb->s_magic;
 	buf->f_bsize = PAGE_CACHE_SIZE;

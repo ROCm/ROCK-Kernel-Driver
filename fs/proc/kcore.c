@@ -451,8 +451,20 @@ static ssize_t read_kcore(struct file *file, char *buffer, size_t buflen, loff_t
 			kfree(elf_buf);
 		} else {
 			if (kern_addr_valid(start)) {
-				if (copy_to_user(buffer, (char *)start, tsz))
-					return -EFAULT;
+				unsigned long n;
+
+				n = copy_to_user(buffer, (char *)start, tsz);
+				/*
+				 * We cannot distingush between fault on source
+				 * and fault on destination. When this happens
+				 * we clear too and hope it will trigger the
+				 * EFAULT again.
+				 */
+				if (n) { 
+					if (clear_user(buffer + tsz - n,
+								tsz - n))
+						return -EFAULT;
+				}
 			} else {
 				if (clear_user(buffer, tsz))
 					return -EFAULT;

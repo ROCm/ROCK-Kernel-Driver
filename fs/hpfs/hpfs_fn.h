@@ -310,7 +310,7 @@ int hpfs_stop_cycles(struct super_block *, int, int *, int *, char *);
 int hpfs_remount_fs(struct super_block *, int *, char *);
 void hpfs_put_super(struct super_block *);
 unsigned hpfs_count_one_bitmap(struct super_block *, secno);
-int hpfs_statfs(struct super_block *, struct statfs *);
+int hpfs_statfs(struct super_block *, struct kstatfs *);
 
 extern struct address_space_operations hpfs_aops;
 

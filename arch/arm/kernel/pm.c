@@ -11,6 +11,8 @@
 #include <linux/config.h>
 #include <linux/pm.h>
 #include <linux/device.h>
+#include <linux/errno.h>
+#include <linux/sched.h>
 
 #include <asm/leds.h>
 #include <asm/system.h>

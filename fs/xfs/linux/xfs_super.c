@@ -477,7 +477,7 @@ linvfs_write_super(
 STATIC int
 linvfs_statfs(
 	struct super_block	*sb,
-	struct statfs		*statp)
+	struct kstatfs		*statp)
 {
 	vfs_t			*vfsp = LINVFS_GET_VFS(sb);
 	int			error;
@@ -673,7 +673,7 @@ linvfs_fill_super(
 	vnode_t			*rootvp;
 	struct vfs		*vfsp = vfs_allocate();
 	struct xfs_mount_args	*args = args_allocate(sb);
-	struct statfs		statvfs;
+	struct kstatfs		statvfs;
 	int			error;
 
 	vfsp->vfs_super = sb;

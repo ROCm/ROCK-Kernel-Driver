@@ -12,13 +12,12 @@
    Copyright 1992 - 2003 Kai Makisara
    email Kai.Makisara@kolumbus.fi
 
-   Last modified: Sun Apr 13 10:17:18 2003 by makisara
    Some small formal changes - aeb, 950809
 
    Last modified: 18-JAN-1998 Richard Gooch <rgooch@atnf.csiro.au> Devfs support
  */
 
-static char *verstr = "20030413";
+static char *verstr = "20030622";
 
 #include <linux/module.h>
 
@@ -1555,6 +1554,7 @@ static ssize_t
 				}
 			} else {
 				filp->f_pos -= do_count;
+				count += do_count;
 				STps->drv_block = (-1);		/* Too cautious? */
 				retval = (-EIO);
 			}

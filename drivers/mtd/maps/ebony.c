@@ -1,5 +1,5 @@
 /*
- * $Id: ebony.c,v 1.7 2003/05/21 12:45:18 dwmw2 Exp $
+ * $Id: ebony.c,v 1.8 2003/06/23 11:48:18 dwmw2 Exp $
  * 
  * Mapping for Ebony user flash
  *
@@ -60,8 +60,6 @@ static struct mtd_partition ebony_large_partitions[] = {
 	}
 };
 
-#define NB_OF(x)  (sizeof(x)/sizeof(x[0]))
-
 int __init init_ebony(void)
 {
 	u8 fpga0_reg;
@@ -109,7 +107,7 @@ int __init init_ebony(void)
 	if (flash) {
 		flash->owner = THIS_MODULE;
 		add_mtd_partitions(flash, ebony_small_partitions,
-					NB_OF(ebony_small_partitions));
+					ARRAY_SIZE(ebony_small_partitions));
 	} else {
 		printk("map probe failed for flash\n");
 		return -ENXIO;
@@ -131,7 +129,7 @@ int __init init_ebony(void)
 	if (flash) {
 		flash->owner = THIS_MODULE;
 		add_mtd_partitions(flash, ebony_large_partitions,
-					NB_OF(ebony_large_partitions));
+					ARRAY_SIZE(ebony_large_partitions));
 	} else {
 		printk("map probe failed for flash\n");
 		return -ENXIO;

@@ -62,6 +62,9 @@ extern int cifs_umount(struct super_block *, struct cifs_sb_info *);
 void cifs_proc_init(void);
 void cifs_proc_clean(void);
 
+static DECLARE_COMPLETION(cifs_oplock_exited);
+
+
 static int
 cifs_read_super(struct super_block *sb, void *data,
 		const char *devname, int silent)
@@ -143,7 +146,7 @@ cifs_put_super(struct super_block *sb)
 }
 
 int
-cifs_statfs(struct super_block *sb, struct statfs *buf)
+cifs_statfs(struct super_block *sb, struct kstatfs *buf)
 {
 	int xid, rc;
 	struct cifs_sb_info *cifs_sb;
@@ -427,7 +430,8 @@ cifs_destroy_mids(void)
 		       "cifs_destroy_mids: error not all structures were freed\n");
 	if (kmem_cache_destroy(cifs_oplock_cachep))
 		printk(KERN_WARNING
-		       "error not all oplock structures were freed\n");}
+		       "error not all oplock structures were freed\n");
+}
 
 static int cifs_oplock_thread(void * dummyarg)
 {
@@ -439,14 +443,13 @@ static int cifs_oplock_thread(void * dummyarg)
 	int rc;
 
 	daemonize("cifsoplockd");
-	allow_signal(SIGKILL);
+	allow_signal(SIGTERM);
 
 	oplockThread = current;
-	while (1) {
+	do {
 		set_current_state(TASK_INTERRUPTIBLE);
 		schedule_timeout(100*HZ);
 		/* BB add missing code */
-		cFYI(1,("oplock thread woken up - flush inode")); /* BB remove */
 		write_lock(&GlobalMid_Lock); 
 		list_for_each_safe(tmp, tmp1, &GlobalOplock_Q) {
 			oplock_item = list_entry(tmp, struct oplock_q_entry,
@@ -466,11 +469,10 @@ static int cifs_oplock_thread(void * dummyarg)
 				write_lock(&GlobalMid_Lock);
 			} else
 				break;
-			cFYI(1,("next time through list")); /* BB remove */
 		}
 		write_unlock(&GlobalMid_Lock);
-		cFYI(1,("next time through while loop")); /* BB remove */
-	}
+	} while(!signal_pending(current));
+	complete_and_exit (&cifs_oplock_exited, 0);
 }
 
 static int __init
@@ -532,8 +534,10 @@ exit_cifs(void)
 	cifs_destroy_inodecache();
 	cifs_destroy_mids();
 	cifs_destroy_request_bufs();
-	if(oplockThread)
-		send_sig(SIGKILL, oplockThread, 1);
+	if(oplockThread) {
+		send_sig(SIGTERM, oplockThread, 1);
+		wait_for_completion(&cifs_oplock_exited);
+	}
 }
 
 MODULE_AUTHOR("Steve French <sfrench@us.ibm.com>");

@@ -6,7 +6,7 @@
  *  Derived from drivers/mtd/spia.c
  * 	 Copyright (C) 2000 Steven J. Hill (sjhill@realitydiluted.com)
  * 
- * $Id: autcpu12.c,v 1.10 2003/04/20 07:24:40 gleixner Exp $
+ * $Id: autcpu12.c,v 1.11 2003/06/04 17:04:09 gleixner Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -28,6 +28,7 @@
  */
 
 #include <linux/slab.h>
+#include <linux/init.h>
 #include <linux/module.h>
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/nand.h>

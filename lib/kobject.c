@@ -100,6 +100,9 @@ static void fill_kobj_path(struct kset *kset, struct kobject *kobj, char *path, 
 
 #define BUFFER_SIZE	1024	/* should be enough memory for the env */
 #define NUM_ENVP	32	/* number of env pointers */
+static unsigned long sequence_num;
+static spinlock_t sequence_lock = SPIN_LOCK_UNLOCKED;
+
 static void kset_hotplug(const char *action, struct kset *kset,
 			 struct kobject *kobj)
 {
@@ -112,6 +115,7 @@ static void kset_hotplug(const char *action, struct kset *kset,
 	int kobj_path_length;
 	char *kobj_path = NULL;
 	char *name = NULL;
+	unsigned long seq;
 
 	/* If the kset has a filter operation, call it. If it returns
 	   failure, no hotplug event is required. */
@@ -151,6 +155,13 @@ static void kset_hotplug(const char *action, struct kset *kset,
 
 	envp [i++] = scratch;
 	scratch += sprintf(scratch, "ACTION=%s", action) + 1;
+
+	spin_lock(&sequence_lock);
+	seq = sequence_num++;
+	spin_unlock(&sequence_lock);
+
+	envp [i++] = scratch;
+	scratch += sprintf(scratch, "SEQNUM=%ld", seq) + 1;
 
 	kobj_path_length = get_kobj_path_length (kset, kobj);
 	kobj_path = kmalloc (kobj_path_length, GFP_KERNEL);
