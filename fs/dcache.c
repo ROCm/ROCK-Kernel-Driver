@@ -51,7 +51,9 @@ static struct list_head *dentry_hashtable;
 static LIST_HEAD(dentry_unused);
 
 /* Statistics gathering. */
-struct dentry_stat_t dentry_stat = {0, 0, 45, 0,};
+struct dentry_stat_t dentry_stat = {
+	.age_limit = 45,
+};
 
 /* no dcache_lock, please */
 static inline void d_free(struct dentry *dentry)
@@ -1352,7 +1354,7 @@ static void __init dcache_init(unsigned long mempages)
 			__get_free_pages(GFP_ATOMIC, order);
 	} while (dentry_hashtable == NULL && --order >= 0);
 
-	printk("Dentry-cache hash table entries: %d (order: %ld, %ld bytes)\n",
+	printk(KERN_INFO "Dentry cache hash table entries: %d (order: %ld, %ld bytes)\n",
 			nr_hash, order, (PAGE_SIZE << order));
 
 	if (!dentry_hashtable)
