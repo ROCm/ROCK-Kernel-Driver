@@ -58,7 +58,6 @@ MODULE_DESCRIPTION("Adaptec I2O RAID Driver");
 #include <linux/timer.h>
 #include <linux/string.h>
 #include <linux/ioport.h>
-#include <linux/stat.h>
 
 #include <asm/processor.h>	/* for boot_cpu_data */
 #include <asm/pgtable.h>

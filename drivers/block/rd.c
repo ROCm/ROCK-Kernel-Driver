@@ -53,7 +53,6 @@
 #include <linux/pagemap.h>
 #include <linux/blkdev.h>
 #include <linux/genhd.h>
-#include <linux/bio.h>
 #include <linux/buffer_head.h>		/* for invalidate_bdev() */
 #include <linux/backing-dev.h>
 #include <linux/blkpg.h>

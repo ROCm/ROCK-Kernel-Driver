@@ -120,7 +120,6 @@ static int options[] = {-1, -1, -1, -1, -1, -1, -1, -1};
 #include <linux/rtnetlink.h>
 #include <linux/skbuff.h>
 #include <linux/ethtool.h>
-#include <linux/mii.h>
 
 /* enable PIO instead of MMIO, if CONFIG_EEPRO100_PIO is selected */
 #ifdef CONFIG_EEPRO100_PIO

@@ -55,7 +55,6 @@
 #include <asm/iommu.h>
 #include <asm/vio.h>
 #include <asm/uaccess.h>
-#include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 
 #include "ibmveth.h"
