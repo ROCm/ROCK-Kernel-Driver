@@ -93,6 +93,7 @@ write_src(void)
 {
 	unsigned long long last_addr;
 	int i, valid = 0;
+	char *prev;
 
 	printf(".data\n");
 
@@ -121,15 +122,22 @@ write_src(void)
 	printf(".globl kallsyms_names\n");
 	printf("\t.align 8\n");
 	printf("kallsyms_names:\n");
+	prev = ""; 
 	for (i = 0, last_addr = 0; i < cnt; i++) {
+		int k;
+
 		if (!symbol_valid(&table[i]))
 			continue;
 		
 		if (table[i].addr == last_addr)
 			continue;
 
-		printf("\t.asciz\t\"%s\"\n", table[i].sym);
+		for (k = 0; table[i].sym[k] && table[i].sym[k] == prev[k]; ++k)
+			; 
+
+		printf("\t.asciz\t\"\\x%02x%s\"\n", k, table[i].sym + k);
 		last_addr = table[i].addr;
+		prev = table[i].sym;
 	}
 	printf("\n");
 }

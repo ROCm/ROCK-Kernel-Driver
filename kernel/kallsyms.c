@@ -4,6 +4,7 @@
  * Rewritten and vastly simplified by Rusty Russell for in-kernel
  * module loader:
  *   Copyright 2002 Rusty Russell <rusty@rustcorp.com.au> IBM Corporation
+ * Stem compression by Andi Kleen.
  */
 #include <linux/kallsyms.h>
 #include <linux/module.h>
@@ -22,13 +23,15 @@ extern char _stext[], _etext[];
 const char *kallsyms_lookup(unsigned long addr,
 			    unsigned long *symbolsize,
 			    unsigned long *offset,
-			    char **modname)
+			    char **modname, char *namebuf)
 {
 	unsigned long i, best = 0;
 
 	/* This kernel should never had been booted. */
 	if ((void *)kallsyms_addresses == &kallsyms_dummy)
 		BUG();
+
+	namebuf[127] = 0;
 
 	if (addr >= (unsigned long)_stext && addr <= (unsigned long)_etext) {
 		unsigned long symbol_end;
@@ -42,8 +45,11 @@ const char *kallsyms_lookup(unsigned long addr,
 		}
 
 		/* Grab name */
-		for (i = 0; i < best; i++)
+		for (i = 0; i < best; i++) { 
+			++name;
+			strncpy(namebuf + name[-1], name, 127); 
 			name += strlen(name)+1;
+		} 
 
 		/* Base symbol size on next symbol. */
 		if (best + 1 < kallsyms_num_syms)
@@ -54,7 +60,7 @@ const char *kallsyms_lookup(unsigned long addr,
 		*symbolsize = symbol_end - kallsyms_addresses[best];
 		*modname = NULL;
 		*offset = addr - kallsyms_addresses[best];
-		return name;
+		return namebuf;
 	}
 
 	return module_address_lookup(addr, symbolsize, offset, modname);
@@ -66,8 +72,9 @@ void __print_symbol(const char *fmt, unsigned long address)
 	char *modname;
 	const char *name;
 	unsigned long offset, size;
+	char namebuf[128];
 
-	name = kallsyms_lookup(address, &size, &offset, &modname);
+	name = kallsyms_lookup(address, &size, &offset, &modname, namebuf);
 
 	if (!name) {
 		char addrstr[sizeof("0x%lx") + (BITS_PER_LONG*3/10)];
