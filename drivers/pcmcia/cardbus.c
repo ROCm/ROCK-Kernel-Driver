@@ -279,8 +279,7 @@ int cb_alloc(socket_info_t * s)
 		pci_readw(dev, PCI_DEVICE_ID, &dev->device);
 		dev->hdr_type = hdr & 0x7f;
 
-		dev->dev.parent = bus->device;
-		dev->dev.sysdata = bus->sysdata;
+		dev->dev.parent = bus->dev;
 		strcpy(dev->dev.name, dev->name);
 		strcpy(dev->dev.bus_id, dev->slot_name);
 		device_register(&dev->dev);
