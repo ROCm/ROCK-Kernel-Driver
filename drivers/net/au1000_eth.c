@@ -36,10 +36,10 @@
 #include <linux/skbuff.h>
 #include <linux/delay.h>
 #include <linux/crc32.h>
+#include <linux/bitops.h>
 
 #include <asm/mipsregs.h>
 #include <asm/irq.h>
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/au1000.h>
 

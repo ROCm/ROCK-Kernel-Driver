@@ -13,7 +13,7 @@
 #include <linux/stat.h>
 #include <linux/tty.h>
 #include <linux/seq_file.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 
 static int tty_ldiscs_read_proc(char *page, char **start, off_t off,
 				int count, int *eof, void *data);

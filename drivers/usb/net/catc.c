@@ -43,7 +43,7 @@
 #include <linux/spinlock.h>
 #include <linux/ethtool.h>
 #include <linux/crc32.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <asm/uaccess.h>
 
 #undef DEBUG

@@ -69,7 +69,8 @@ void fat_clusters_flush(struct super_block *sb)
 		printk(KERN_ERR "FAT: Did not find valid FSINFO signature.\n"
 		       "     Found signature1 0x%08x signature2 0x%08x"
 		       " (sector = %lu)\n",
-		       CF_LE_L(fsinfo->signature1), CF_LE_L(fsinfo->signature2),
+		       le32_to_cpu(fsinfo->signature1),
+		       le32_to_cpu(fsinfo->signature2),
 		       sbi->fsinfo_sector);
 	} else {
 		if (sbi->free_clusters != -1)
@@ -155,7 +156,7 @@ int fat_add_cluster(struct inode *inode)
 		ret = fat_access(sb, last, new_dclus);
 		if (ret < 0)
 			return ret;
-		fat_cache_add(inode, new_fclus, new_dclus);
+//		fat_cache_add(inode, new_fclus, new_dclus);
 	} else {
 		MSDOS_I(inode)->i_start = new_dclus;
 		MSDOS_I(inode)->i_logstart = new_dclus;

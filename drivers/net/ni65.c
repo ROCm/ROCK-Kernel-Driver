@@ -73,8 +73,8 @@
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 #include <linux/module.h>
+#include <linux/bitops.h>
 
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
 

@@ -1157,7 +1157,7 @@ static int video1394_ioctl(struct inode *inode, struct file *file,
  *
  *  FIXME:
  *  - PAGE_READONLY should suffice!?
- *  - remap_page_range is kind of inefficient for page by page remapping.
+ *  - remap_pfn_range is kind of inefficient for page by page remapping.
  *    But e.g. pte_alloc() does not work in modules ... :-(
  */
 

@@ -183,7 +183,7 @@ MODULE_PARM_DESC(force_palette, "Force the palette to a specific value");
 module_param(backlight, int, 0);
 MODULE_PARM_DESC(backlight, "For objects that are lit from behind");
 static int num_uv;
-module_param_array(unit_video, int, num_uv, 0);
+module_param_array(unit_video, int, &num_uv, 0);
 MODULE_PARM_DESC(unit_video,
   "Force use of specific minor number(s). 0 is not allowed.");
 module_param(remove_zeros, int, 0);
@@ -324,21 +324,6 @@ static struct symbolic_list urb_errlist[] = {
 /**********************************************************************
  * Memory management
  **********************************************************************/
-
-/* Here we want the physical address of the memory.
- * This is used when initializing the contents of the area.
- */
-static inline unsigned long
-kvirt_to_pa(unsigned long adr)
-{
-	unsigned long kva, ret;
-
-	kva = (unsigned long) page_address(vmalloc_to_page((void *)adr));
-	kva |= adr & (PAGE_SIZE-1); /* restore the offset */
-	ret = __pa(kva);
-	return ret;
-}
-
 static void *
 rvmalloc(unsigned long size)
 {
@@ -4771,9 +4756,8 @@ ov51x_v4l1_mmap(struct file *file, struct vm_area_struct *vma)
 
 	pos = (unsigned long)ov->fbuf;
 	while (size > 0) {
-		page = kvirt_to_pa(pos);
-		if (remap_page_range(vma, start, page, PAGE_SIZE,
-				     PAGE_SHARED)) {
+		page = page_to_pfn(vmalloc_to_page((void *)pos));
+		if (remap_pfn_range(vma, start, page, PAGE_SIZE, PAGE_SHARED)) {
 			up(&ov->lock);
 			return -EAGAIN;
 		}

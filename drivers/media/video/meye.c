@@ -115,19 +115,6 @@ static inline int meye_emptyq(struct meye_queue *queue, int *elem) {
 /****************************************************************************/
 /* Memory allocation routines (stolen from bttv-driver.c)                   */
 /****************************************************************************/
-
-/* Here we want the physical address of the memory.
- * This is used when initializing the contents of the area.
- */
-static inline unsigned long kvirt_to_pa(unsigned long adr) {
-        unsigned long kva, ret;
-
-        kva = (unsigned long) page_address(vmalloc_to_page((void *)adr));
-	kva |= adr & (PAGE_SIZE-1); /* restore the offset */
-	ret = __pa(kva);
-        return ret;
-}
-
 static void *rvmalloc(unsigned long size) {
 	void *mem;
 	unsigned long adr;
@@ -1201,8 +1188,8 @@ static int meye_mmap(struct file *file, struct vm_area_struct *vma) {
 	pos = (unsigned long)meye.grab_fbuffer;
 
 	while (size > 0) {
-		page = kvirt_to_pa(pos);
-		if (remap_page_range(vma, start, page, PAGE_SIZE, PAGE_SHARED)) {
+		page = page_to_pfn(vmalloc_to_page((void *)pos));
+		if (remap_pfn_range(vma, start, page, PAGE_SIZE, PAGE_SHARED)) {
 			up(&meye.lock);
 			return -EAGAIN;
 		}

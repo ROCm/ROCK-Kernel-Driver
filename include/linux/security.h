@@ -40,6 +40,7 @@ struct ctl_table;
  * as the default capabilities functions
  */
 extern int cap_capable (struct task_struct *tsk, int cap);
+extern int cap_settime (struct timespec *ts, struct timezone *tz);
 extern int cap_ptrace (struct task_struct *parent, struct task_struct *child);
 extern int cap_capget (struct task_struct *target, kernel_cap_t *effective, kernel_cap_t *inheritable, kernel_cap_t *permitted);
 extern int cap_capset_check (struct task_struct *target, kernel_cap_t *effective, kernel_cap_t *inheritable, kernel_cap_t *permitted);
@@ -1001,6 +1002,12 @@ struct swap_info_struct;
  *	See the syslog(2) manual page for an explanation of the @type values.  
  *	@type contains the type of action.
  *	Return 0 if permission is granted.
+ * @settime:
+ *	Check permission to change the system time.
+ *	struct timespec and timezone are defined in include/linux/time.h
+ *	@ts contains new time
+ *	@tz contains new timezone
+ *	Return 0 if permission is granted.
  * @vm_enough_memory:
  *	Check permissions for allocating a new virtual mapping.
  *      @pages contains the number of pages.
@@ -1036,6 +1043,7 @@ struct security_operations {
 	int (*quotactl) (int cmds, int type, int id, struct super_block * sb);
 	int (*quota_on) (struct file * f);
 	int (*syslog) (int type);
+	int (*settime) (struct timespec *ts, struct timezone *tz);
 	int (*vm_enough_memory) (long pages);
 
 	int (*bprm_alloc_security) (struct linux_binprm * bprm);
@@ -1290,6 +1298,12 @@ static inline int security_syslog(int type)
 {
 	return security_ops->syslog(type);
 }
+
+static inline int security_settime(struct timespec *ts, struct timezone *tz)
+{
+	return security_ops->settime(ts, tz);
+}
+
 
 static inline int security_vm_enough_memory(long pages)
 {
@@ -1961,6 +1975,11 @@ static inline int security_quota_on (struct file * file)
 static inline int security_syslog(int type)
 {
 	return cap_syslog(type);
+}
+
+static inline int security_settime(struct timespec *ts, struct timezone *tz)
+{
+	return cap_settime(ts, tz);
 }
 
 static inline int security_vm_enough_memory(long pages)

@@ -1,4 +1,6 @@
 /*
+    $Id: bttv-gpio.c,v 1.3 2004/09/15 16:15:24 kraxel Exp $
+
     bttv-gpio.c  --  gpio sub drivers
 
     sysfs-based sub driver interface for bttv

@@ -9,39 +9,6 @@
 #include <string.h>
 #include "modpost.h"
 
-/* Parse tag=value strings from .modinfo section */
-static char *next_string(char *string, unsigned long *secsize)
-{
-	/* Skip non-zero chars */
-	while (string[0]) {
-		string++;
-		if ((*secsize)-- <= 1)
-			return NULL;
-	}
-
-	/* Skip any zero padding. */
-	while (!string[0]) {
-		string++;
-		if ((*secsize)-- <= 1)
-			return NULL;
-	}
-	return string;
-}
-
-static char *get_modinfo(void *modinfo, unsigned long modinfo_len,
-			 const char *tag)
-{
-	char *p;
-	unsigned int taglen = strlen(tag);
-	unsigned long size = modinfo_len;
-
-	for (p = modinfo; p; p = next_string(p, &size)) {
-		if (strncmp(p, tag, taglen) == 0 && p[taglen] == '=')
-			return p + taglen + 1;
-	}
-	return NULL;
-}
-
 /*
  * Stolen form Cryptographic API.
  *
@@ -408,11 +375,11 @@ out:
 	return ret;
 }
 
-static int get_version(const char *modname, char sum[])
+/* Calc and record src checksum. */
+void get_src_version(const char *modname, char sum[], unsigned sumlen)
 {
 	void *file;
 	unsigned long len;
-	int ret = 0;
 	struct md4_ctx md;
 	char *sources, *end, *fname;
 	const char *basename;
@@ -432,7 +399,7 @@ static int get_version(const char *modname, char sum[])
 	if (!file) {
 		fprintf(stderr, "Warning: could not find versions for %s\n",
 			filelist);
-		return 0;
+		return;
 	}
 
 	sources = strchr(file, '\n');
@@ -457,12 +424,9 @@ static int get_version(const char *modname, char sum[])
 			goto release;
 	}
 
-	/* sum is of form \0<padding>. */
-	md4_final_ascii(&md, sum, 1 + strlen(sum+1));
-	ret = 1;
+	md4_final_ascii(&md, sum, sumlen);
 release:
 	release_file(file, len);
-	return ret;
 }
 
 static void write_version(const char *filename, const char *sum,
@@ -492,12 +456,12 @@ out:
 	close(fd);
 }
 
-void strip_rcs_crap(char *version)
+static int strip_rcs_crap(char *version)
 {
 	unsigned int len, full_len;
 
 	if (strncmp(version, "$Revision", strlen("$Revision")) != 0)
-		return;
+		return 0;
 
 	/* Space for version string follows. */
 	full_len = strlen(version) + strlen(version + strlen(version) + 1) + 2;
@@ -518,31 +482,15 @@ void strip_rcs_crap(char *version)
 		len++;
 	memmove(version + len, version + strlen(version),
 		full_len - strlen(version));
+	return 1;
 }
 
-/* If the modinfo contains a "version" value, then set this. */
-void maybe_frob_version(const char *modfilename,
-			void *modinfo,
-			unsigned long modinfo_len,
-			unsigned long modinfo_offset)
+/* Clean up RCS-style version numbers. */
+void maybe_frob_rcs_version(const char *modfilename,
+			    char *version,
+			    void *modinfo,
+			    unsigned long version_offset)
 {
-	char *version, *csum;
-
-	version = get_modinfo(modinfo, modinfo_len, "version");
-	if (!version)
-		return;
-
-	/* RCS $Revision gets stripped out. */
-	strip_rcs_crap(version);
-
-	/* Check against double sumversion */
-	if (strchr(version, ' '))
-		return;
-
-	/* Version contains embedded NUL: second half has space for checksum */
-	csum = version + strlen(version);
-	*(csum++) = ' ';
-	if (get_version(modfilename, csum))
-		write_version(modfilename, version,
-			      modinfo_offset + (version - (char *)modinfo));
+	if (strip_rcs_crap(version))
+		write_version(modfilename, version, version_offset);
 }

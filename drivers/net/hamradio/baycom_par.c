@@ -83,9 +83,9 @@
 #include <linux/hdlcdrv.h>
 #include <linux/baycom.h>
 #include <linux/parport.h>
+#include <linux/bitops.h>
 
 #include <asm/system.h>
-#include <asm/bitops.h>
 #include <asm/uaccess.h>
 
 /* --------------------------------------------------------------------- */

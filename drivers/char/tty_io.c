@@ -93,10 +93,10 @@
 #include <linux/device.h>
 #include <linux/idr.h>
 #include <linux/wait.h>
+#include <linux/bitops.h>
 
 #include <asm/uaccess.h>
 #include <asm/system.h>
-#include <asm/bitops.h>
 
 #include <linux/kbd_kern.h>
 #include <linux/vt_kern.h>

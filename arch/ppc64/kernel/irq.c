@@ -42,9 +42,9 @@
 #include <linux/random.h>
 #include <linux/kallsyms.h>
 #include <linux/profile.h>
+#include <linux/bitops.h>
 
 #include <asm/uaccess.h>
-#include <asm/bitops.h>
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/pgtable.h>

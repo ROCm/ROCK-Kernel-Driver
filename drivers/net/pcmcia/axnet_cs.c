@@ -936,7 +936,7 @@ module_exit(exit_axnet_cs);
 static const char *version_8390 =
     "8390.c:v1.10cvs 9/23/94 Donald Becker (becker@scyld.com)\n";
 
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <asm/irq.h>
 #include <linux/fcntl.h>
 #include <linux/in.h>

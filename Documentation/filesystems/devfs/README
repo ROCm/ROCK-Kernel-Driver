@@ -1349,47 +1349,6 @@ This will cause devfsd to create (and destroy) symbolic links which
 point to the kernel-supplied names.
 
 
-SCSI Host Probing Issues
-
-Devfs allows you to identify SCSI discs based in part on SCSI host
-numbers. If you have only one SCSI host (card) in your computer, then
-clearly it will be given host number 0. Life is not always that easy
-is you have multiple SCSI hosts. Unfortunately, it can sometimes be
-difficult to guess what the probing order of SCSI hosts is. You need
-to know the probe order before you can use device names. To make this
-easy, there is a kernel boot parameter called "scsihosts". This allows
-you to specify the probe order for different types of SCSI hosts. The
-syntax of this parameter is:
-
-scsihosts=<name_1>:<name_2>:<name_3>:...:<name_n>
-
-where <name_1>,<name_2>,...,<name_n> are the names
-of drivers used in the /proc filesystem. For example:
-
-    scsihosts=aha1542:ppa:aha1542::ncr53c7xx
-
-
-means that devices connected to
-
-- first aha1542 controller   - will be /dev/scsi/host0/bus#/target#/lun#
-- first parallel port ZIP    - will be /dev/scsi/host1/bus#/target#/lun#
-- second aha1542 controller  - will be /dev/scsi/host2/bus#/target#/lun#
-- first NCR53C7xx controller - will be /dev/scsi/host4/bus#/target#/lun#
-- any extra controller       - will be /dev/scsi/host5/bus#/target#/lun#,
-                                       /dev/scsi/host6/bus#/target#/lun#, etc
-- if any of above controllers will not be found - the reserved names will
-  not be used by any other device.
-- /dev/scsi/host3/bus#/target#/lun# names will never be used
-
-
-You can use ',' instead of ':' as the separator character if you
-wish. I have used the devfsd naming scheme
-here.
-
-Note that this scheme does not address the SCSI host order if you have
-multiple cards of the same type (such as NCR53c8xx). In this case you
-need to use the driver-specific boot parameters to control this.
-
 -----------------------------------------------------------------------------
 
 
@@ -1951,12 +1910,6 @@ explores the SCSI subsystem and how it interacts with devfs
 
 
 Douglas Gilbert has written another useful document at
-
-http://www.torque.net/scsi/scsihosts.html which
-discusses the scsihosts= boot option
-
-
-Douglas Gilbert has written yet another useful document at
 
 http://www.torque.net/scsi/SCSI-2.4-HOWTO/ which
 discusses the Linux SCSI subsystem in 2.4.

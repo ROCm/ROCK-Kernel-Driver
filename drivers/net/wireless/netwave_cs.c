@@ -54,6 +54,7 @@
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
+#include <linux/bitops.h>
 #ifdef CONFIG_NET_RADIO
 #include <linux/wireless.h>
 #if WIRELESS_EXT > 12
@@ -70,7 +71,6 @@
 #include <pcmcia/mem_op.h>
 
 #include <asm/system.h>
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
 

@@ -355,6 +355,12 @@ tcp_default_win_scale - INTEGER
 	conections.
 	Default: 7
 
+tcp_tso_win_divisor - INTEGER
+       This allows control over what percentage of the congestion window
+       can be consumed by a single TSO frame.
+       The setting of this parameter is a choice between burstiness and
+       building larger TSO frames.
+       Default: 8
 
 tcp_frto - BOOLEAN
 	Enables F-RTO, an enhanced recovery algorithm for TCP retransmission

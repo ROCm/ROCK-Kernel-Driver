@@ -10,6 +10,7 @@
 #include <linux/init.h>
 #include <linux/kernel_stat.h>
 #include <linux/sysdev.h>
+#include <linux/bitops.h>
 
 #include <asm/8253pit.h>
 #include <asm/atomic.h>
@@ -17,7 +18,6 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/timer.h>
-#include <asm/bitops.h>
 #include <asm/pgtable.h>
 #include <asm/delay.h>
 #include <asm/desc.h>

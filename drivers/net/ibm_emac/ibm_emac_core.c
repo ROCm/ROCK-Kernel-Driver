@@ -40,9 +40,9 @@
 #include <linux/dma-mapping.h>
 #include <linux/ethtool.h>
 #include <linux/mii.h>
+#include <linux/bitops.h>
 
 #include <asm/processor.h>
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
 #include <asm/irq.h>

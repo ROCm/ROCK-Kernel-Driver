@@ -140,7 +140,6 @@ static u32 *
 xdr_encode_common(struct rpc_rqst *rqstp, u32 *p, struct nsm_args *argp)
 {
 	char	buffer[20];
-	u32	addr = ntohl(argp->addr);
 
 	/*
 	 * Use the dotted-quad IP address of the remote host as
@@ -148,8 +147,7 @@ xdr_encode_common(struct rpc_rqst *rqstp, u32 *p, struct nsm_args *argp)
 	 * hostname first for whatever remote hostname it receives,
 	 * so this works alright.
 	 */
-	sprintf(buffer, "%d.%d.%d.%d", (addr>>24) & 0xff, (addr>>16) & 0xff,
-				 	(addr>>8) & 0xff,  (addr) & 0xff);
+	sprintf(buffer, "%u.%u.%u.%u", NIPQUAD(argp->addr));
 	if (!(p = xdr_encode_string(p, buffer))
 	 || !(p = xdr_encode_string(p, system_utsname.nodename)))
 		return ERR_PTR(-EIO);

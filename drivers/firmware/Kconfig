@@ -18,6 +18,17 @@ config EDD
           obscure configurations. Most disk controller BIOS vendors do
           not yet implement this feature.
 
+config EDD_SKIP_MBR
+	bool "EDD: Skip Master Boot Record read"
+	depends on EDD
+        default n
+	help
+	  Most controller BIOSs properly implement real-mode legacy
+	  READ SECTORS commands.  A few don't.
+
+	  If your controller hangs during the kernel's real-mode
+	  startup routine, say Y here.
+
 config EFI_VARS
 	tristate "EFI Variable Support via sysfs"
 	depends on EFI

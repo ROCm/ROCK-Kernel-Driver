@@ -40,10 +40,10 @@
 #include <net/ip.h>
 #include <linux/spinlock.h>
 #include <linux/rcupdate.h>
+#include <linux/bitops.h>
 
 #include <asm/uaccess.h>
 #include <asm/system.h>
-#include <asm/bitops.h>
 
 static struct proto_ops econet_ops;
 static struct hlist_head econet_sklist;

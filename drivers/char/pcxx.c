@@ -65,6 +65,7 @@
 #include <linux/tty_driver.h>
 #include <linux/slab.h>
 #include <linux/init.h>
+#include <linux/bitops.h>
 
 #ifndef MODULE
 #include <linux/ctype.h> /* We only need it for parsing the "digi="-line */
@@ -73,7 +74,6 @@
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
-#include <asm/bitops.h>
 #include <asm/semaphore.h>
 
 #define VERSION 	"1.6.3"

@@ -69,13 +69,13 @@ static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;		/* Enable this card 
 static char *model[SNDRV_CARDS];
 static int boot_devs;
 
-module_param_array(index, int, boot_devs, 0444);
+module_param_array(index, int, &boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for ICE1724 soundcard.");
-module_param_array(id, charp, boot_devs, 0444);
+module_param_array(id, charp, &boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for ICE1724 soundcard.");
-module_param_array(enable, bool, boot_devs, 0444);
+module_param_array(enable, bool, &boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable ICE1724 soundcard.");
-module_param_array(model, charp, boot_devs, 0444);
+module_param_array(model, charp, &boot_devs, 0444);
 MODULE_PARM_DESC(model, "Use the given board model.");
 
 #ifndef PCI_VENDOR_ID_ICE

@@ -135,28 +135,27 @@ static int enable_mpu[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 2};
 #ifdef SUPPORT_JOYSTICK
 static int joystick[SNDRV_CARDS];
 #endif
-static int boot_devs;
 
-module_param_array(index, int, boot_devs, 0444);
+module_param_array(index, int, NULL, 0444);
 MODULE_PARM_DESC(index, "Index value for " CARD_NAME " soundcard.");
-module_param_array(id, charp, boot_devs, 0444);
+module_param_array(id, charp, NULL, 0444);
 MODULE_PARM_DESC(id, "ID string for " CARD_NAME " soundcard.");
-module_param_array(enable, bool, boot_devs, 0444);
+module_param_array(enable, bool, NULL, 0444);
 MODULE_PARM_DESC(enable, "Enable " CARD_NAME " soundcard.");
-module_param_array(total_bufsize, int, boot_devs, 0444);
+module_param_array(total_bufsize, int, NULL, 0444);
 MODULE_PARM_DESC(total_bufsize, "Total buffer size in kB.");
-module_param_array(pcm_substreams_p, int, boot_devs, 0444);
+module_param_array(pcm_substreams_p, int, NULL, 0444);
 MODULE_PARM_DESC(pcm_substreams_p, "PCM Playback substreams for " CARD_NAME " soundcard.");
-module_param_array(pcm_substreams_c, int, boot_devs, 0444);
+module_param_array(pcm_substreams_c, int, NULL, 0444);
 MODULE_PARM_DESC(pcm_substreams_c, "PCM Capture substreams for " CARD_NAME " soundcard.");
-module_param_array(clock, int, boot_devs, 0444);
+module_param_array(clock, int, NULL, 0444);
 MODULE_PARM_DESC(clock, "Clock on " CARD_NAME " soundcard.  (0 = auto-detect)");
-module_param_array(use_pm, int, boot_devs, 0444);
+module_param_array(use_pm, int, NULL, 0444);
 MODULE_PARM_DESC(use_pm, "Toggle power-management.  (0 = off, 1 = on, 2 = auto)");
-module_param_array(enable_mpu, int, boot_devs, 0444);
+module_param_array(enable_mpu, int, NULL, 0444);
 MODULE_PARM_DESC(enable_mpu, "Enable MPU401.  (0 = off, 1 = on, 2 = auto)");
 #ifdef SUPPORT_JOYSTICK
-module_param_array(joystick, bool, boot_devs, 0444);
+module_param_array(joystick, bool, NULL, 0444);
 MODULE_PARM_DESC(joystick, "Enable joystick.");
 #endif
 

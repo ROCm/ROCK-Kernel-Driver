@@ -97,6 +97,7 @@ static char version[] =
 #include <linux/delay.h>
 #include <linux/timer.h>
 #include <linux/init.h>
+#include <linux/bitops.h>
 
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
@@ -105,7 +106,6 @@ static char version[] =
 #include <asm/setup.h>
 #include <asm/pgtable.h>
 #include <asm/system.h>
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
 #include <asm/atarihw.h>

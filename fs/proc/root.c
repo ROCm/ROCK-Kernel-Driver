@@ -15,7 +15,7 @@
 #include <linux/config.h>
 #include <linux/init.h>
 #include <linux/module.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <linux/smp_lock.h>
 
 struct proc_dir_entry *proc_net, *proc_net_stat, *proc_bus, *proc_root_fs, *proc_root_driver;

@@ -51,21 +51,20 @@ static int acpipnp[SNDRV_CARDS] = { [0 ... (SNDRV_CARDS-1)] = 1 };
 #endif
 static long port[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;	/* MPU-401 port number */
 static int irq[SNDRV_CARDS] = SNDRV_DEFAULT_IRQ;	/* MPU-401 IRQ */
-static int boot_devs;
 
-module_param_array(index, int, boot_devs, 0444);
+module_param_array(index, int, NULL, 0444);
 MODULE_PARM_DESC(index, "Index value for MPU-401 device.");
-module_param_array(id, charp, boot_devs, 0444);
+module_param_array(id, charp, NULL, 0444);
 MODULE_PARM_DESC(id, "ID string for MPU-401 device.");
-module_param_array(enable, bool, boot_devs, 0444);
+module_param_array(enable, bool, NULL, 0444);
 MODULE_PARM_DESC(enable, "Enable MPU-401 device.");
 #ifdef USE_ACPI_PNP
-module_param_array(acpipnp, bool, boot_devs, 0444);
+module_param_array(acpipnp, bool, NULL, 0444);
 MODULE_PARM_DESC(acpipnp, "ACPI PnP detection for MPU-401 device.");
 #endif
-module_param_array(port, long, boot_devs, 0444);
+module_param_array(port, long, NULL, 0444);
 MODULE_PARM_DESC(port, "Port # for MPU-401 device.");
-module_param_array(irq, int, boot_devs, 0444);
+module_param_array(irq, int, NULL, 0444);
 MODULE_PARM_DESC(irq, "IRQ # for MPU-401 device.");
 
 #ifndef CONFIG_ACPI_BUS

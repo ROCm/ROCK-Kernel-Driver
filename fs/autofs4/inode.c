@@ -15,7 +15,7 @@
 #include <linux/file.h>
 #include <linux/pagemap.h>
 #include <linux/parser.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include "autofs_i.h"
 #include <linux/module.h>
 

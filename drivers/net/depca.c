@@ -255,9 +255,9 @@
 #include <linux/ctype.h>
 #include <linux/moduleparam.h>
 #include <linux/device.h>
+#include <linux/bitops.h>
 
 #include <asm/uaccess.h>
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
 

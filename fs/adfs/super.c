@@ -19,8 +19,8 @@
 #include <linux/buffer_head.h>
 #include <linux/vfs.h>
 #include <linux/parser.h>
+#include <linux/bitops.h>
 
-#include <asm/bitops.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
 

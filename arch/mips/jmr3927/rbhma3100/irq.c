@@ -45,8 +45,8 @@
 #include <linux/random.h>
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
+#include <linux/bitops.h>
 
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/mipsregs.h>
 #include <asm/system.h>

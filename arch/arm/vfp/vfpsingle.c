@@ -31,7 +31,7 @@
  * ===========================================================================
  */
 #include <linux/kernel.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <asm/ptrace.h>
 #include <asm/vfp.h>
 

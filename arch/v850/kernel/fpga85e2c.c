@@ -20,11 +20,11 @@
 #include <linux/swap.h>
 #include <linux/bootmem.h>
 #include <linux/irq.h>
+#include <linux/bitops.h>
 
 #include <asm/atomic.h>
 #include <asm/page.h>
 #include <asm/machdep.h>
-#include <asm/bitops.h>
 
 #include "mach.h"
 

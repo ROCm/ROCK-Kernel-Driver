@@ -36,8 +36,8 @@
 #include <linux/serio.h>
 #include <linux/interrupt.h>
 #include <linux/err.h>
+#include <linux/bitops.h>
 
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
 #include <asm/q40_master.h>

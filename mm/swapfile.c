@@ -648,11 +648,12 @@ static int try_to_unuse(unsigned int type)
 	 *
 	 * A simpler strategy would be to start at the last mm we
 	 * freed the previous entry from; but that would take less
-	 * advantage of mmlist ordering (now preserved by swap_out()),
-	 * which clusters forked address spaces together, most recent
-	 * child immediately after parent.  If we race with dup_mmap(),
-	 * we very much want to resolve parent before child, otherwise
-	 * we may miss some entries: using last mm would invert that.
+	 * advantage of mmlist ordering, which clusters forked mms
+	 * together, child after parent.  If we race with dup_mmap(), we
+	 * prefer to resolve parent before child, lest we miss entries
+	 * duplicated after we scanned child: using last mm would invert
+	 * that.  Though it's only a serious concern when an overflowed
+	 * swap count is reset from SWAP_MAP_MAX, preventing a rescan.
 	 */
 	start_mm = &init_mm;
 	atomic_inc(&init_mm.mm_users);
@@ -660,15 +661,7 @@ static int try_to_unuse(unsigned int type)
 	/*
 	 * Keep on scanning until all entries have gone.  Usually,
 	 * one pass through swap_map is enough, but not necessarily:
-	 * mmput() removes mm from mmlist before exit_mmap() and its
-	 * zap_page_range().  That's not too bad, those entries are
-	 * on their way out, and handled faster there than here.
-	 * do_munmap() behaves similarly, taking the range out of mm's
-	 * vma list before zap_page_range().  But unfortunately, when
-	 * unmapping a part of a vma, it takes the whole out first,
-	 * then reinserts what's left after (might even reschedule if
-	 * open() method called) - so swap entries may be invisible
-	 * to swapoff for a while, then reappear - but that is rare.
+	 * there are races when an instance of an entry might be missed.
 	 */
 	while ((i = find_next_to_unuse(si, i)) != 0) {
 		if (signal_pending(current)) {
@@ -720,7 +713,7 @@ static int try_to_unuse(unsigned int type)
 		wait_on_page_writeback(page);
 
 		/*
-		 * Remove all references to entry, without blocking.
+		 * Remove all references to entry.
 		 * Whenever we reach init_mm, there's no address space
 		 * to search, but use it as a reminder to search shmem.
 		 */
@@ -745,7 +738,10 @@ static int try_to_unuse(unsigned int type)
 			while (*swap_map > 1 && !retval &&
 					(p = p->next) != &start_mm->mmlist) {
 				mm = list_entry(p, struct mm_struct, mmlist);
-				atomic_inc(&mm->mm_users);
+				if (atomic_inc_return(&mm->mm_users) == 1) {
+					atomic_dec(&mm->mm_users);
+					continue;
+				}
 				spin_unlock(&mmlist_lock);
 				mmput(prev_mm);
 				prev_mm = mm;
@@ -856,6 +852,26 @@ static int try_to_unuse(unsigned int type)
 		swap_overflow = 0;
 	}
 	return retval;
+}
+
+/*
+ * After a successful try_to_unuse, if no swap is now in use, we know we
+ * can empty the mmlist.  swap_list_lock must be held on entry and exit.
+ * Note that mmlist_lock nests inside swap_list_lock, and an mm must be
+ * added to the mmlist just after page_duplicate - before would be racy.
+ */
+static void drain_mmlist(void)
+{
+	struct list_head *p, *next;
+	unsigned int i;
+
+	for (i = 0; i < nr_swapfiles; i++)
+		if (swap_info[i].inuse_pages)
+			return;
+	spin_lock(&mmlist_lock);
+	list_for_each_safe(p, next, &init_mm.mmlist)
+		list_del_init(p);
+	spin_unlock(&mmlist_lock);
 }
 
 /*
@@ -1172,6 +1188,7 @@ asmlinkage long sys_swapoff(const char __user * specialfile)
 	}
 	down(&swapon_sem);
 	swap_list_lock();
+	drain_mmlist();
 	swap_device_lock(p);
 	swap_file = p->swap_file;
 	p->swap_file = NULL;

@@ -56,12 +56,12 @@ static char version[] = "atarilance.c: v1.3 04/04/96 "
 #include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
+#include <linux/bitops.h>
 
 #include <asm/setup.h>
 #include <asm/irq.h>
 #include <asm/atarihw.h>
 #include <asm/atariints.h>
-#include <asm/bitops.h>
 #include <asm/io.h>
 
 /* Debug level:

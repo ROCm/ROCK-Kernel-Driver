@@ -1,4 +1,6 @@
 /* 
+    $Id: cx88-reg.h,v 1.5 2004/09/15 16:15:24 kraxel Exp $
+
     cx88x-hw.h - CX2388x register offsets
 
     Copyright (C) 1996,97,98 Ralph Metzler (rjkm@thp.uni-koeln.de)
@@ -502,12 +504,6 @@
 
 #define MO_GPHSTD_DMA       0x350000 // {64}RWp Host downstream
 #define MO_GPHSTU_DMA       0x350008 // {64}RWp Host upstream
-#define MO_GPHSTD_GPCNT     0x35C020 // Host down general purpose counter
-#define MO_GPHSTU_GPCNT     0x35C024 // Host up general purpose counter
-#define MO_GPHSTD_GPCNTRL   0x38C030 // Host down general purpose control
-#define MO_GPHSTU_GPCNTRL   0x38C034 // Host up general purpose control
-#define MO_GPHST_DMACNTRL   0x38C040 // Host DMA control
-#define MO_GPHST_XFR_STAT   0x38C044 // Host transfer status
 #define MO_GPHSTU_CNTRL     0x380048 // Host upstream control #1
 #define MO_GPHSTD_CNTRL     0x38004C // Host downstream control #2
 #define MO_GPHSTD_LNGTH     0x380050 // Host downstream line length
@@ -517,6 +513,14 @@
 #define MO_GPHST_HDSHK      0x380060 // Host peripheral handshake
 #define MO_GPHST_MUX16      0x380064 // Host muxed 16-bit transfer parameters
 #define MO_GPHST_MODE       0x380068 // Host mode select
+
+#define MO_GPHSTD_GPCNT     0x35C020 // Host down general purpose counter
+#define MO_GPHSTU_GPCNT     0x35C024 // Host up general purpose counter
+#define MO_GPHSTD_GPCNTRL   0x38C030 // Host down general purpose control
+#define MO_GPHSTU_GPCNTRL   0x38C034 // Host up general purpose control
+#define MO_GPHST_DMACNTRL   0x38C040 // Host DMA control
+#define MO_GPHST_XFR_STAT   0x38C044 // Host transfer status
+#define MO_GPHST_SOFT_RST   0x38C06C // Host software reset
 
 
 /* ---------------------------------------------------------------------- */

@@ -22,9 +22,9 @@
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
+#include <linux/bitops.h>
 
 #include <asm/auxio.h>
-#include <asm/bitops.h>
 #include <asm/byteorder.h>
 #include <asm/dma.h>
 #include <asm/idprom.h>

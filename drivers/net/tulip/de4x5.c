@@ -467,8 +467,8 @@
 #include <linux/ctype.h>
 #include <linux/dma-mapping.h>
 #include <linux/moduleparam.h>
+#include <linux/bitops.h>
 
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
 #include <asm/byteorder.h>

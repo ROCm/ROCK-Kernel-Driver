@@ -18,8 +18,8 @@
 #include <linux/init.h>
 #include <linux/idr.h>
 #include <linux/namei.h>
+#include <linux/bitops.h>
 #include <asm/uaccess.h>
-#include <asm/bitops.h>
 
 static ssize_t proc_file_read(struct file *file, char __user *buf,
 			      size_t nbytes, loff_t *ppos);

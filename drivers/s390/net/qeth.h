@@ -15,7 +15,8 @@
 #include <net/addrconf.h>
 
 
-#include <asm/bitops.h>
+#include <linux/bitops.h>
+
 #include <asm/debug.h>
 #include <asm/qdio.h>
 #include <asm/ccwdev.h>

@@ -491,8 +491,8 @@
 #include <linux/socket.h>
 #include <linux/ctype.h>
 #include <linux/inet.h>
+#include <linux/bitops.h>
 #include <asm/system.h>
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
 #include <asm/uaccess.h>

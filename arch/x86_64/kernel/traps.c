@@ -900,3 +900,11 @@ static int __init oops_dummy(char *s)
 	return -1; 
 } 
 __setup("oops=", oops_dummy); 
+
+static int __init kstack_setup(char *s)
+{
+	kstack_depth_to_print = simple_strtoul(s,NULL,0);
+	return 0;
+}
+__setup("kstack=", kstack_setup);
+
