@@ -359,7 +359,7 @@ show_list (struct ohci_hcd *ohci, char *buf, size_t count, struct ed *ed)
 			scratch,
 			(info & ED_SKIP) ? " s" : "",
 			(ed->hwHeadP & ED_H) ? " H" : "",
-			(ed->hwHeadP & ED_C) ? "data1" : "data0");
+			(ed->hwHeadP & ED_C) ? data1 : data0);
 		size -= temp;
 		buf += temp;
 
