@@ -32,6 +32,18 @@ void sn_dma_flush_init(unsigned long start, unsigned long end, int idx, int pin,
 #define IS_ALTIX(nasid) (cbrick_type_get_nasid(nasid) == MODULE_CBRICK)
 
 /*
+ * Init the provider asic for a given device
+ */
+
+static void
+set_pci_provider(struct sn_device_sysdata *device_sysdata)
+{
+	pciio_info_t pciio_info = pciio_info_get(device_sysdata->vhdl);
+
+	device_sysdata->pci_provider = pciio_info_pops_get(pciio_info);
+}
+
+/*
  * pci_bus_cvlink_init() - To be called once during initialization before 
  *	SGI IO Infrastructure init is called.
  */
@@ -329,6 +341,7 @@ sn_pci_fixup(int arg)
 	struct sn_widget_sysdata *widget_sysdata;
 	struct sn_device_sysdata *device_sysdata;
 	pcibr_intr_t intr_handle;
+	pciio_provider_t *pci_provider;
 	int cpuid;
 	vertex_hdl_t device_vertex;
 	pciio_intr_line_t lines;
@@ -404,6 +417,7 @@ sn_pci_fixup(int arg)
 		device_vertex = device_sysdata->vhdl;
 
 		device_dev->sysdata = (void *) device_sysdata;
+		set_pci_provider(device_sysdata);
 
 		/*
 		 * Set the xbridge Device(X) Write Buffer Flush and Xbow Flush 
@@ -445,17 +459,19 @@ sn_pci_fixup(int arg)
 		cmd |= PCI_COMMAND_MASTER; /* If the device doesn't support */
 					   /* bit gets dropped .. no harm */
 		pci_write_config_word(device_dev, PCI_COMMAND, cmd);
-		
+
 		pci_read_config_byte(device_dev, PCI_INTERRUPT_PIN,
 				     (unsigned char *)&lines);
-	 
+		device_sysdata = (struct sn_device_sysdata *)device_dev->sysdata;
+		device_vertex = device_sysdata->vhdl;
+		pci_provider = device_sysdata->pci_provider;
+ 
 		irqpdaindr->curr = device_dev;
-		intr_handle = pcibr_intr_alloc(device_vertex, NULL, lines, device_vertex);
+		intr_handle = (pci_provider->intr_alloc)(device_vertex, NULL, lines, device_vertex);
 
 		irq = intr_handle->bi_irq;
 		irqpdaindr->device_dev[irq] = device_dev;
-		cpuid = intr_handle->bi_cpu;
-		pcibr_intr_connect(intr_handle, (intr_func_t)0, (intr_arg_t)0);
+		(pci_provider->intr_connect)(intr_handle, (intr_func_t)0, (intr_arg_t)0);
 		device_dev->irq = irq;
 		register_pcibr_intr(irq, intr_handle);
 

@@ -53,6 +53,7 @@ struct sn_device_sysdata {
 	int		isa64;
 	volatile unsigned int *dma_buf_sync;
 	volatile unsigned int *xbow_buf_sync;
+	pciio_provider_t	*pci_provider;
 };
 
 struct ioports_to_tlbs_s {
