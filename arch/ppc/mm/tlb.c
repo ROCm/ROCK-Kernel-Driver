@@ -62,7 +62,7 @@ void flush_hash_one_pte(pte_t *ptep)
 	ptepage = virt_to_page(ptep);
 	mm = (struct mm_struct *) ptepage->mapping;
 	ptephys = __pa(ptep) & PAGE_MASK;
-	addr = ptepage->index + (((unsigned long)ptep & ~PAGE_MASK) << 9);
+	addr = ptepage->index + (((unsigned long)ptep & ~PAGE_MASK) << 10);
 	flush_hash_pages(mm->context, addr, ptephys, 1);
 }
 
