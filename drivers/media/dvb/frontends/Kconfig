@@ -115,3 +115,23 @@ config DVB_VES1820
 	  DVB adapter simply enable all supported frontends, the 
 	  right one will get autodetected.
 
+config DVB_TDA1004X
+	tristate "Frontends with external TDA1004X demodulators (OFDM)"
+	depends on DVB_CORE
+	help
+	  A DVB-T tuner module. Say Y when you want to support this frontend.
+
+	  If you don't know what tuner module is soldered on your
+	  DVB adapter simply enable all supported frontends, the
+	  right one will get autodetected.
+
+config DVB_TDA1004X_FIRMWARE_FILE
+        string "Full pathname of tda1004x.bin firmware file"
+        depends on DVB_TDA1004X
+        default "/etc/dvb/tda1004x.bin"
+        help
+          The TDA1004X requires additional firmware in order to function.
+          The firmware file can obtained as follows:
+            wget http://www.technotrend.de/new/215/TTweb_215a_budget_20_05_2003.zip
+            unzip -j TTweb_215a_budget_20_05_2003.zip Software/Oem/PCI/App/ttlcdacc.dll
+            mv ttlcdacc.dll /etc/dvb/tda1004x.bin
