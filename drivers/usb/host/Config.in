@@ -20,5 +20,6 @@ fi
 #fi
 #dep_tristate '  OHCI (Compaq, iMacs, OPTi, SiS, ALi, ...) support' CONFIG_USB_OHCI $CONFIG_USB
 if [ "$CONFIG_ARM" = "y" ]; then
+   dep_tristate '  SA1111 OHCI-compatible host interface support' CONFIG_USB_OHCI_SA1111 $CONFIG_USB
    dep_tristate '  SL811HS support' CONFIG_USB_SL811HS $CONFIG_USB
 fi
