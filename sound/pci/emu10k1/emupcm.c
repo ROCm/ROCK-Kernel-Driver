@@ -666,8 +666,11 @@ static snd_pcm_uframes_t snd_emu10k1_playback_pointer(snd_pcm_substream_t * subs
 #else	/* EMU10K1 Open Source code from Creative */
 	if (ptr < epcm->ccca_start_addr)
 		ptr += runtime->buffer_size - epcm->ccca_start_addr;
-	else
+	else {
 		ptr -= epcm->ccca_start_addr;
+		if (ptr >= runtime->buffer_size)
+			ptr -= runtime->buffer_size;
+	}
 #endif
 	// printk("ptr = 0x%x, buffer_size = 0x%x, period_size = 0x%x\n", ptr, runtime->buffer_size, runtime->period_size);
 	return ptr;

@@ -1235,6 +1235,7 @@ static void __devinit snd_emu10k1_init_stereo_onoff_control(emu10k1_fx8010_contr
  */
 
 #define A_GPR_ACCU 0xd6
+#define A_GPR_COND 0xd7
 
 static int __devinit _snd_emu10k1_audigy_init_efx(emu10k1_t *emu)
 {
@@ -1502,13 +1503,7 @@ A_OP(icode, &ptr, iMAC0, A_GPR(var), A_GPR(var), A_GPR(vol), A_EXTIN(input))
 		A_OP(icode, &ptr, iMAC0, A_GPR(playback+1+SND_EMU10K1_PLAYBACK_CHANNELS), A_C_00000000, A_GPR(gpr+1), A_GPR(playback+1+SND_EMU10K1_PLAYBACK_CHANNELS));
 		snd_emu10k1_init_stereo_control(&controls[nctl++], "Wave Master Playback Volume", gpr, 0);
 		gpr += 2;
-	}
-
-	/* digital outputs */
-	A_PUT_STEREO_OUTPUT(A_EXTOUT_FRONT_L, A_EXTOUT_FRONT_R, playback + SND_EMU10K1_PLAYBACK_CHANNELS);
-	A_PUT_STEREO_OUTPUT(A_EXTOUT_REAR_L, A_EXTOUT_REAR_R, playback+2 + SND_EMU10K1_PLAYBACK_CHANNELS);
-	A_PUT_OUTPUT(A_EXTOUT_CENTER, playback+4 + SND_EMU10K1_PLAYBACK_CHANNELS);
-	A_PUT_OUTPUT(A_EXTOUT_LFE, playback+5 + SND_EMU10K1_PLAYBACK_CHANNELS);
+	}	
 
 	/* analog speakers */
 	if (emu->revision == 4) { /* audigy2 */
@@ -1522,6 +1517,29 @@ A_OP(icode, &ptr, iMAC0, A_GPR(var), A_GPR(var), A_GPR(vol), A_EXTIN(input))
 
 	/* headphone */
 	A_PUT_STEREO_OUTPUT(A_EXTOUT_HEADPHONE_L, A_EXTOUT_HEADPHONE_R, playback + SND_EMU10K1_PLAYBACK_CHANNELS);
+
+	/* digital outputs */
+//	A_PUT_STEREO_OUTPUT(A_EXTOUT_FRONT_L, A_EXTOUT_FRONT_R, playback + SND_EMU10K1_PLAYBACK_CHANNELS);
+
+	/* IEC958 Optical Raw Playback Switch */ 
+	icode->gpr_map[gpr++] = 0x1008;
+	icode->gpr_map[gpr++] = 0xffff0000;
+	for (z = 0; z < 2; z++) {
+		A_OP(icode, &ptr, iMAC0, A_GPR(tmp + 2), A_FXBUS(FXBUS_PT_LEFT + z), A_C_00000000, A_C_00000000);
+		A_OP(icode, &ptr, iSKIP, A_GPR_COND, A_GPR_COND, A_GPR(gpr - 2), A_C_00000001);
+		A_OP(icode, &ptr, iACC3, A_GPR(tmp + 2), A_C_00000000, A_C_00010000, A_GPR(tmp + 2));
+		A_OP(icode, &ptr, iANDXOR, A_GPR(tmp + 2), A_GPR(tmp + 2), A_GPR(gpr - 1), A_C_00000000);
+		A_SWITCH(icode, &ptr, tmp + 0, tmp + 2, gpr + z);
+		A_SWITCH_NEG(icode, &ptr, tmp + 1, gpr + z);
+		A_SWITCH(icode, &ptr, tmp + 1, playback + SND_EMU10K1_PLAYBACK_CHANNELS + z, tmp + 1);
+		A_OP(icode, &ptr, iACC3, A_EXTOUT(A_EXTOUT_FRONT_L + z), A_GPR(tmp + 0), A_GPR(tmp + 1), A_C_00000000);
+	}
+	snd_emu10k1_init_stereo_onoff_control(controls + nctl++, "IEC958 Optical Raw Playback Switch", gpr, 0);
+	gpr += 2;
+	
+	A_PUT_STEREO_OUTPUT(A_EXTOUT_REAR_L, A_EXTOUT_REAR_R, playback+2 + SND_EMU10K1_PLAYBACK_CHANNELS);
+	A_PUT_OUTPUT(A_EXTOUT_CENTER, playback+4 + SND_EMU10K1_PLAYBACK_CHANNELS);
+	A_PUT_OUTPUT(A_EXTOUT_LFE, playback+5 + SND_EMU10K1_PLAYBACK_CHANNELS);
 
 	/* ADC buffer */
 	A_PUT_OUTPUT(A_EXTOUT_ADC_CAP_L, capture);
