@@ -57,4 +57,13 @@ sysfs_create_link(struct kobject * kobj, struct kobject * target, char * name);
 extern void
 sysfs_remove_link(struct kobject *, char * name);
 
+
+struct attribute_group {
+	char			* name;
+	struct attribute	* attrs;
+};
+
+int sysfs_create_group(struct kobject *, struct attribute_group *);
+void sysfs_remove_group(struct kobject *, struct attribute_group *);
+
 #endif /* _SYSFS_H_ */
