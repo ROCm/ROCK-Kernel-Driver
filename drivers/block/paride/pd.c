@@ -866,13 +866,26 @@ static struct block_device_operations pd_fops = {
 
 static int pd_probe_drive(struct pd_unit *disk)
 {
+	struct gendisk *p = alloc_disk(1 << PD_BITS);
+	if (!p)
+		return 0;
+	strcpy(p->disk_name, disk->name);
+	p->fops = &pd_fops;
+	p->major = major;
+	p->first_minor = (disk - pd) << PD_BITS;
+	disk->gd = p;
+	p->private_data = disk;
+	p->queue = pd_queue;
+
 	if (disk->drive == -1) {
 		for (disk->drive = 0; disk->drive <= 1; disk->drive++)
 			if (pd_identify(disk))
 				return 1;
-		return 0;
-	}
-	return pd_identify(disk);
+	} else if (pd_identify(disk))
+		return 1;
+	disk->gd = NULL;
+	put_disk(p);
+	return 0;
 }
 
 static int pd_detect(void)
@@ -910,21 +923,8 @@ static int pd_detect(void)
 	}
 	for (unit = 0, disk = pd; unit < PD_UNITS; unit++, disk++) {
 		if (disk->present) {
-			struct gendisk *p = alloc_disk(1 << PD_BITS);
-			if (!p) {
-				disk->present = 0;
-				k--;
-				continue;
-			}
-			strcpy(p->disk_name, disk->name);
-			p->fops = &pd_fops;
-			p->major = major;
-			p->first_minor = unit << PD_BITS;
-			set_capacity(p, disk->capacity);
-			disk->gd = p;
-			p->private_data = disk;
-			p->queue = pd_queue;
-			add_disk(p);
+			set_capacity(disk->gd, disk->capacity);
+			add_disk(disk->gd);
 		}
 	}
 	if (k)
