@@ -618,6 +618,26 @@ UNUSUAL_DEV(  0x1065, 0x2136, 0x0000, 0x0001,
 		US_SC_SCSI, US_PR_BULK, NULL,
 		US_FL_MODE_XLATE | US_FL_START_STOP | US_FL_FIX_INQUIRY ),
 
+/* This Pentax still camera is not conformant
+ * to the USB storage specification: -
+ * - It does not like the INQUIRY command. So we must handle this command
+ *   of the SCSI layer ourselves.
+ * Tested on Rev. 10.00 (0x1000)
+ * Submitted by James Courtier-Dutton <James@superbug.demon.co.uk>
+ */
+UNUSUAL_DEV( 0x0a17, 0x0004, 0x1000, 0x1000,
+                "Pentax",
+                "Optio 2/3/400",
+                US_SC_8070, US_PR_CBI, NULL,
+                US_FL_FIX_INQUIRY ),
+
+/* Submitted by Per Winkvist <per.winkvist@uk.com> */
+UNUSUAL_DEV( 0x0a17, 0x006, 0x1000, 0x9009,
+                "Pentax",
+                "Optio S",
+                US_SC_8070, US_PR_CBI, NULL,
+                US_FL_FIX_INQUIRY ),
+
 /* Submitted by Brian Hall <brihall@pcisys.net>
  * Needed for START_STOP flag */
 UNUSUAL_DEV(  0x0c76, 0x0003, 0x0100, 0x0100,
