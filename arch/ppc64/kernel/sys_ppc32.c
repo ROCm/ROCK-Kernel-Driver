@@ -901,15 +901,6 @@ out_nofds:
 	return ret;
 }
 
-
-
-
-/*
- * Due to some executables calling the wrong select we sometimes
- * get wrong args.  This determines how the args are being passed
- * (a single ptr to them all args passed) then calls
- * sys_select() with the appropriate args. -- Cort
- */
 /* Note: it is necessary to treat n as an unsigned int, 
  * with the corresponding cast to a signed int to insure that the 
  * proper conversion (sign extension) between the register representation of a signed int (msr in 32-bit mode)
@@ -917,13 +908,8 @@ out_nofds:
  */
 asmlinkage int ppc32_select(u32 n, u32* inp, u32* outp, u32* exp, u32 tvp_x)
 {
-	if ((unsigned int)n >= 4096)
-		panic("ppc32_select - wrong arguments were passed in \n");
-
 	return sys32_select((int)n, inp, outp, exp, tvp_x);
 }
-
-
 
 static int cp_new_stat32(struct kstat *stat, struct stat32 *statbuf)
 {
