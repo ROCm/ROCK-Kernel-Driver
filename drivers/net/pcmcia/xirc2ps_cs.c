@@ -2096,7 +2096,7 @@ static int __init setup_xirc2ps_cs(char *str)
 	MAYBE_SET(irq_list[1], 7);
 	MAYBE_SET(irq_list[2], 8);
 	MAYBE_SET(irq_list[3], 9);
-#undef  MAYBE_SET(X,Y)
+#undef  MAYBE_SET
 
 	return 0;
 }
