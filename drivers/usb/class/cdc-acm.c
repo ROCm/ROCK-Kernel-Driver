@@ -223,12 +223,14 @@ static void acm_write_bulk(struct urb *urb, struct pt_regs *regs)
 	struct acm *acm = (struct acm *)urb->context;
 
 	if (!ACM_READY(acm))
-		return;
+		goto out;
 
 	if (urb->status)
 		dbg("nonzero write bulk status received: %d", urb->status);
 
 	schedule_work(&acm->work);
+out:
+	acm->ready_for_write = 1;
 }
 
 static void acm_softint(void *private)
@@ -328,7 +330,7 @@ static int acm_tty_write(struct tty_struct *tty, int from_user, const unsigned c
 
 	if (!ACM_READY(acm))
 		return -EINVAL;
-	if (acm->writeurb->status == -EINPROGRESS)
+	if (!acm->ready_for_write)
 		return 0;
 	if (!count)
 		return 0;
@@ -344,10 +346,11 @@ static int acm_tty_write(struct tty_struct *tty, int from_user, const unsigned c
 	acm->writeurb->transfer_buffer_length = count;
 	acm->writeurb->dev = acm->dev;
 
-	/* GFP_KERNEL probably works if from_user */
-	stat = usb_submit_urb(acm->writeurb, GFP_ATOMIC);
+	acm->ready_for_write = 0;
+	stat = usb_submit_urb(acm->writeurb, GFP_NOIO);
 	if (stat < 0) {
 		dbg("usb_submit_urb(write bulk) failed");
+		acm->ready_for_write = 1;
 		return stat;
 	}
 
@@ -359,7 +362,7 @@ static int acm_tty_write_room(struct tty_struct *tty)
 	struct acm *acm = tty->driver_data;
 	if (!ACM_READY(acm))
 		return -EINVAL;
-	return acm->writeurb->status == -EINPROGRESS ? 0 : acm->writesize;
+	return !acm->ready_for_write ? 0 : acm->writesize;
 }
 
 static int acm_tty_chars_in_buffer(struct tty_struct *tty)
@@ -367,7 +370,7 @@ static int acm_tty_chars_in_buffer(struct tty_struct *tty)
 	struct acm *acm = tty->driver_data;
 	if (!ACM_READY(acm))
 		return -EINVAL;
-	return acm->writeurb->status == -EINPROGRESS ? acm->writeurb->transfer_buffer_length : 0;
+	return !acm->ready_for_write ? acm->writeurb->transfer_buffer_length : 0;
 }
 
 static void acm_tty_throttle(struct tty_struct *tty)
@@ -610,6 +613,7 @@ next_desc:
 	acm->bh.func = acm_rx_tasklet;
 	acm->bh.data = (unsigned long) acm;
 	INIT_WORK(&acm->work, acm_softint, acm);
+	acm->ready_for_write = 1;
 
 
 	if (!(buf = kmalloc(ctrlsize + readsize + acm->writesize, GFP_KERNEL))) {

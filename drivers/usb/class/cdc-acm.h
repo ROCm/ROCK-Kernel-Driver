@@ -96,6 +96,7 @@ struct acm {
 	unsigned int minor;				/* acm minor number */
 	unsigned char throttle;				/* throttled by tty layer */
 	unsigned char clocal;				/* termios CLOCAL */
+	unsigned char ready_for_write;			/* write urb can be used */
 };
 
 /* "Union Functional Descriptor" from CDC spec 5.2.3.X */
