@@ -29,6 +29,7 @@ memory <idx> <value>	- set memory 0-3 to value
 poke <reg> <value>	- poke configuration byte to selected register
 pokew <reg> <value>	- poke configuration word to selected register
 poked <reg> <value>	- poke configuration dword to selected register
+allow_dma0 <value>	- allow dma channel 0 during auto activation: 0=off, 1=on
 
 Explanation:
 	- variable <idx> begins with zero
