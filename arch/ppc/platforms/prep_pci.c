@@ -836,52 +836,52 @@ struct mot_info {
 void __init
 ibm_prep_init(void)
 {
-#ifdef CONFIG_PREP_RESIDUAL
-	u32 addr, real_addr, len;
-	PPC_DEVICE *mpic;
-	PnP_TAG_PACKET *pkt;
+	if (have_residual_data) {
+		u32 addr, real_addr, len;
+		PPC_DEVICE *mpic;
+		PnP_TAG_PACKET *pkt;
 
-	/* Use the PReP residual data to determine if an OpenPIC is
-	 * present.  If so, get the large vendor packet which will
-	 * tell us the base address and length in memory.
-	 * If we are successful, ioremap the memory area and set
-	 * OpenPIC_Addr (this indicates that the OpenPIC was found).
-	 */
-	mpic = residual_find_device(-1, NULL, SystemPeripheral,
-			    ProgrammableInterruptController, MPIC, 0);
-	if (!mpic)
-		return;
+		/* Use the PReP residual data to determine if an OpenPIC is
+		 * present.  If so, get the large vendor packet which will
+		 * tell us the base address and length in memory.
+		 * If we are successful, ioremap the memory area and set
+		 * OpenPIC_Addr (this indicates that the OpenPIC was found).
+		 */
+		mpic = residual_find_device(-1, NULL, SystemPeripheral,
+				    ProgrammableInterruptController, MPIC, 0);
+		if (!mpic)
+			return;
 
-	pkt = PnP_find_large_vendor_packet(res->DevicePnPHeap +
-			mpic->AllocatedOffset, 9, 0);
+		pkt = PnP_find_large_vendor_packet(res->DevicePnPHeap +
+				mpic->AllocatedOffset, 9, 0);
 
-	if (!pkt)
-		return;
+		if (!pkt)
+			return;
 
 #define p pkt->L4_Pack.L4_Data.L4_PPCPack
-	if (!((p.PPCData[0] == 2) && (p.PPCData[1] == 32)))
-		return; /* not a 32-bit memory address */
+		if (!((p.PPCData[0] == 2) && (p.PPCData[1] == 32)))
+			return; /* not a 32-bit memory address */
 
-	real_addr = ld_le32((unsigned int *) (p.PPCData + 4));
-	if (real_addr == 0xffffffff)
-		return;
+		real_addr = ld_le32((unsigned int *) (p.PPCData + 4));
+		if (real_addr == 0xffffffff)
+			return;
 
-	/* Adjust address to be as seen by CPU */
-	addr = real_addr + PREP_ISA_MEM_BASE;
+		/* Adjust address to be as seen by CPU */
+		addr = real_addr + PREP_ISA_MEM_BASE;
 
-	len = ld_le32((unsigned int *) (p.PPCData + 12));
-	if (!len)
-		return;
+		len = ld_le32((unsigned int *) (p.PPCData + 12));
+		if (!len)
+			return;
 #undef p
-	OpenPIC_Addr = ioremap(addr, len);
-	ppc_md.get_irq = openpic_get_irq;
+		OpenPIC_Addr = ioremap(addr, len);
+		ppc_md.get_irq = openpic_get_irq;
 
-	OpenPIC_InitSenses = prep_openpic_initsenses;
-	OpenPIC_NumInitSenses = sizeof(prep_openpic_initsenses);
+		OpenPIC_InitSenses = prep_openpic_initsenses;
+		OpenPIC_NumInitSenses = sizeof(prep_openpic_initsenses);
 
-	printk(KERN_INFO "MPIC at 0x%08x (0x%08x), length 0x%08x "
-	       "mapped to 0x%p\n", addr, real_addr, len, OpenPIC_Addr);
-#endif
+		printk(KERN_INFO "MPIC at 0x%08x (0x%08x), length 0x%08x "
+		       "mapped to 0x%p\n", addr, real_addr, len, OpenPIC_Addr);
+	}
 }
 
 static void __init
@@ -1262,8 +1262,8 @@ prep_find_bridges(void)
 			   PREP_ISA_IO_BASE + 0xcfc);
 
 	printk("PReP architecture\n");
-#ifdef CONFIG_PREP_RESIDUAL
-	{
+
+	if (have_residual_data) {
 		PPC_DEVICE *hostbridge;
 
 		hostbridge = residual_find_device(PROCESSORDEVICE, NULL,
@@ -1284,7 +1284,6 @@ prep_find_bridges(void)
 				setup_indirect_pci(hose, 0x80000cf8, 0x80000cfc);
 		}
 	}
-#endif /* CONFIG_PREP_RESIDUAL */
 
 	ppc_md.pcibios_fixup = prep_pcibios_fixup;
 	ppc_md.pcibios_after_init = prep_pcibios_after_init;

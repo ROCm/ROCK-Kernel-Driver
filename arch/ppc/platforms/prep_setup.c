@@ -193,9 +193,8 @@ prep_ibm_cpuinfo(struct seq_file *m)
 		seq_printf(m, "bad");
 	seq_printf(m, "\n");
 
-#ifdef CONFIG_PREP_RESIDUAL
 	/* print info about SIMMs */
-	if (res->ResidualLength != 0) {
+	if (have_residual_data) {
 		int i;
 		seq_printf(m, "simms\t\t: ");
 		for (i = 0; (res->ActualNumMemories) && (i < MAX_MEMS); i++) {
@@ -207,7 +206,6 @@ prep_ibm_cpuinfo(struct seq_file *m)
 		}
 		seq_printf(m, "\n");
 	}
-#endif
 }
 
 static int __prep
@@ -431,9 +429,8 @@ prep_mot_cpuinfo(struct seq_file *m)
 	}
 
 no_l2:
-#ifdef CONFIG_PREP_RESIDUAL
 	/* print info about SIMMs */
-	if (res->ResidualLength != 0) {
+	if (have_residual_data) {
 		int i;
 		seq_printf(m, "simms\t\t: ");
 		for (i = 0; (res->ActualNumMemories) && (i < MAX_MEMS); i++) {
@@ -445,7 +442,6 @@ no_l2:
 		}
 		seq_printf(m, "\n");
 	}
-#endif
 
 	return 0;
 }
@@ -561,14 +557,12 @@ prep_show_percpuinfo(struct seq_file *m, int i)
 {
 	/* PREP's without residual data will give incorrect values here */
 	seq_printf(m, "clock\t\t: ");
-#ifdef CONFIG_PREP_RESIDUAL
-	if (res->ResidualLength)
+	if (have_residual_data)
 		seq_printf(m, "%ldMHz\n",
 			   (res->VitalProductData.ProcessorHz > 1024) ?
 			   res->VitalProductData.ProcessorHz / 1000000 :
 			   res->VitalProductData.ProcessorHz);
 	else
-#endif /* CONFIG_PREP_RESIDUAL */
 		seq_printf(m, "???\n");
 
 	return 0;
@@ -598,9 +592,10 @@ static void __init prep_init_sound(void)
 	 * Get the needed resource informations from residual data.
 	 *
 	 */
-#ifdef CONFIG_PREP_RESIDUAL
-	audiodevice = residual_find_device(~0, NULL, MultimediaController,
-			AudioController, -1, 0);
+	if (have_residual_data)
+		audiodevice = residual_find_device(~0, NULL,
+				MultimediaController, AudioController, -1, 0);
+
 	if (audiodevice != NULL) {
 		PnP_TAG_PACKET *pkt;
 
@@ -613,7 +608,6 @@ static void __init prep_init_sound(void)
 		if (pkt != NULL)
 			ppc_cs4232_dma2 = masktoint(pkt->S5_Pack.DMAMask);
 	}
-#endif
 
 	/*
 	 * These are the PReP specs' defaults for the cs4231.  We use these
@@ -649,13 +643,14 @@ static void __init prep_init_sound(void)
 static void __init
 prep_init_vesa(void)
 {
-#if defined(CONFIG_PREP_RESIDUAL) && \
-	(defined(CONFIG_FB_VGA16) || defined(CONFIG_FB_VGA_16_MODULE) || \
+#if     (defined(CONFIG_FB_VGA16) || defined(CONFIG_FB_VGA_16_MODULE) || \
 	 defined(CONFIG_FB_VESA))
-	PPC_DEVICE *vgadev;
+	PPC_DEVICE *vgadev = NULL;
 
-	vgadev = residual_find_device(~0, NULL, DisplayController, SVGAController,
-									-1, 0);
+	if (have_residual_data)
+		vgadev = residual_find_device(~0, NULL, DisplayController,
+							SVGAController, -1, 0);
+
 	if (vgadev != NULL) {
 		PnP_TAG_PACKET *pkt;
 
@@ -680,7 +675,7 @@ prep_init_vesa(void)
 			}
 		}
 	}
-#endif /* CONFIG_PREP_RESIDUAL */
+#endif
 }
 
 static void __init
@@ -819,18 +814,19 @@ prep_setup_arch(void)
 static void __init
 prep_calibrate_decr(void)
 {
-#ifdef CONFIG_PREP_RESIDUAL
-	unsigned long freq, divisor = 4;
+	if (have_residual_data) {
+		unsigned long freq, divisor = 4;
 
-	if ( res->VitalProductData.ProcessorBusHz ) {
-		freq = res->VitalProductData.ProcessorBusHz;
-		printk("time_init: decrementer frequency = %lu.%.6lu MHz\n",
-				(freq/divisor)/1000000,
-				(freq/divisor)%1000000);
-		tb_to_us = mulhwu_scale_factor(freq/divisor, 1000000);
-		tb_ticks_per_jiffy = freq / HZ / divisor;
-	} else
-#endif
+		if ( res->VitalProductData.ProcessorBusHz ) {
+			freq = res->VitalProductData.ProcessorBusHz;
+			printk("time_init: decrementer frequency = %lu.%.6lu MHz\n",
+					(freq/divisor)/1000000,
+					(freq/divisor)%1000000);
+			tb_to_us = mulhwu_scale_factor(freq/divisor, 1000000);
+			tb_ticks_per_jiffy = freq / HZ / divisor;
+		}
+	}
+	else
 		todc_calibrate_decr();
 }
 
@@ -998,15 +994,14 @@ prep_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	DMA_MODE_WRITE = 0x48;
 
 	/* figure out what kind of prep workstation we are */
-#ifdef CONFIG_PREP_RESIDUAL
-	if ( res->ResidualLength != 0 ) {
+	if (have_residual_data) {
 		if ( !strncmp(res->VitalProductData.PrintableModel,"IBM",3) )
 			_prep_type = _PREP_IBM;
 		else
 			_prep_type = _PREP_Motorola;
-	} else /* assume motorola if no residual (netboot?) */
-#endif
-	{
+	}
+	else {
+		/* assume motorola if no residual (netboot?) */
 		_prep_type = _PREP_Motorola;
 	}
 

@@ -504,7 +504,7 @@ void __init print_residual_device_info(void)
 #define did dev->DeviceId
 
 	/* make sure we have residual data first */
-	if ( res->ResidualLength == 0 )
+	if (!have_residual_data)
 		return;
 
 	printk("Residual: %ld devices\n", res->ActualNumDevices);
@@ -639,7 +639,7 @@ void print_residual_device_info(void)
 #define did dev->DeviceId
 
 	/* make sure we have residual data first */
-	if ( res->ResidualLength == 0 )
+	if (!have_residual_data)
 		return;
 	printk("Residual: %ld devices\n", res->ActualNumDevices);
 	for ( i = 0;
@@ -790,7 +790,7 @@ PPC_DEVICE __init *residual_find_device(unsigned long BusMask,
 			 int n)
 {
 	int i;
-	if ( !res->ResidualLength ) return NULL;
+	if (!have_residual_data) return NULL;
 	for (i=0; i<res->ActualNumDevices; i++) {
 #define Dev res->Devices[i].DeviceId
 		if ( (Dev.BusId&BusMask)                                  &&
@@ -813,7 +813,7 @@ PPC_DEVICE __init *residual_find_device_id(unsigned long BusMask,
 			 int n)
 {
 	int i;
-	if ( !res->ResidualLength ) return NULL;
+	if (!have_residual_data) return NULL;
 	for (i=0; i<res->ActualNumDevices; i++) {
 #define Dev res->Devices[i].DeviceId
 		if ( (Dev.BusId&BusMask)                                  &&
@@ -901,7 +901,7 @@ static int proc_prep_residual_read(char * buf, char ** start, off_t off,
 int __init
 proc_prep_residual_init(void)
 {
-	if (res->ResidualLength)
+	if (have_residual_data)
 		create_proc_read_entry("residual", S_IRUGO, NULL,
 					proc_prep_residual_read, NULL);
 	return 0;

@@ -328,6 +328,13 @@ extern PnP_TAG_PACKET *PnP_find_small_vendor_packet(unsigned char *p,
 extern PnP_TAG_PACKET *PnP_find_large_vendor_packet(unsigned char *p,
 						    unsigned packet_type,
 						    int n);
+
+#ifdef CONFIG_PREP_RESIDUAL
+#define have_residual_data	(res && res->ResidualLength)
+#else
+#define have_residual_data	0
+#endif
+
 #endif /* __ASSEMBLY__ */
 #endif  /* ndef _RESIDUAL_ */
 
