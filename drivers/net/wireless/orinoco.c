@@ -372,6 +372,7 @@
 #include <linux/if_arp.h>
 #include <linux/etherdevice.h>
 #include <linux/wireless.h>
+#include <linux/tqueue.h>
 
 #include "hermes.h"
 #include "hermes_rid.h"
