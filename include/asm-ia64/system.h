@@ -397,13 +397,17 @@ extern void ia64_load_extra (struct task_struct *task);
 } while (0)
 
 #ifdef CONFIG_SMP
-  /*
-   * In the SMP case, we save the fph state when context-switching
-   * away from a thread that modified fph.  This way, when the thread
-   * gets scheduled on another CPU, the CPU can pick up the state from
-   * task->thread.fph, avoiding the complication of having to fetch
-   * the latest fph state from another CPU.
-   */
+
+/* Return true if this CPU can call the console drivers in printk() */
+#define arch_consoles_callable() (cpu_online_map & (1UL << smp_processor_id()))
+
+/*
+ * In the SMP case, we save the fph state when context-switching
+ * away from a thread that modified fph.  This way, when the thread
+ * gets scheduled on another CPU, the CPU can pick up the state from
+ * task->thread.fph, avoiding the complication of having to fetch
+ * the latest fph state from another CPU.
+ */
 # define switch_to(prev,next) do {						\
 	if (ia64_psr(ia64_task_regs(prev))->mfh) {				\
 		ia64_psr(ia64_task_regs(prev))->mfh = 0;			\

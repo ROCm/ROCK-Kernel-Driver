@@ -98,7 +98,7 @@ void
 handle_IPI (int irq, void *dev_id, struct pt_regs *regs)
 {
 	int this_cpu = smp_processor_id();
-	unsigned long *pending_ipis = &ipi_operation;
+	unsigned long *pending_ipis = &this_cpu(ipi_operation);
 	unsigned long ops;
 
 	/* Count this now; we may make a call that never returns. */
@@ -158,7 +158,7 @@ handle_IPI (int irq, void *dev_id, struct pt_regs *regs)
 static inline void
 send_IPI_single (int dest_cpu, int op)
 {
-	set_bit(op, &ipi_operation);
+	set_bit(op, &per_cpu(ipi_operation, dest_cpu));
 	platform_send_ipi(dest_cpu, IA64_IPI_VECTOR, IA64_IPI_DM_INT, 0);
 }
 

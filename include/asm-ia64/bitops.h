@@ -9,6 +9,8 @@
  *	    scheduler patch
  */
 
+#include <linux/types.h>
+
 #include <asm/system.h>
 
 /**
@@ -97,7 +99,7 @@ clear_bit (int nr, volatile void *addr)
 static __inline__ void
 __clear_bit (int nr, volatile void *addr)
 {
-	volatile __u32 *p = (__u32 *) addr + (nr >> 5);;
+	volatile __u32 *p = (__u32 *) addr + (nr >> 5);
 	__u32 m = 1 << (nr & 31);
 	*p &= ~m;
 }

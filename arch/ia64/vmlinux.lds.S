@@ -66,6 +66,11 @@ SECTIONS
   machvec_end = .;
 #endif
 
+  __start___ksymtab = .;	/* Kernel symbol table */
+  __ksymtab : AT(ADDR(__ksymtab) - PAGE_OFFSET)
+	{ *(__ksymtab) }
+  __stop___ksymtab = .;
+
   /* Unwind info & table: */
   . = ALIGN(8);
   .IA_64.unwind_info : AT(ADDR(.IA_64.unwind_info) - PAGE_OFFSET)
