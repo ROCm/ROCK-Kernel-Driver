@@ -49,7 +49,7 @@ static u8 find_sec_number (u8 primary_busno, u8 slotno);
  */
 static void assign_alt_irq (struct pci_func * cur_func, u8 class_code)
 {
-	int j = 0;
+	int j;
 	for (j = 0; j < 4; j++) {
 		if (cur_func->irq[j] == 0xff) {
 			switch (class_code) {
