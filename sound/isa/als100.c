@@ -116,10 +116,8 @@ MODULE_DEVICE_TABLE(pnp_card, snd_als100_pnpids);
 
 #define DRIVER_NAME	"snd-card-als100"
 
-static struct pnp_card_driver als100_pnpc_driver;
-
 static int __devinit snd_card_als100_isapnp(int dev, struct snd_card_als100 *acard,
-					    struct pnp_card *card,
+					    struct pnp_card_link *card,
 					    const struct pnp_card_id *id)
 {
 	struct pnp_dev *pdev;
@@ -127,13 +125,13 @@ static int __devinit snd_card_als100_isapnp(int dev, struct snd_card_als100 *aca
 	int err;
 	if (!cfg)
 		return -ENOMEM;
-	acard->dev = pnp_request_card_device(&als100_pnpc_driver, card, id->devs[0].id, NULL);
+	acard->dev = pnp_request_card_device(card, id->devs[0].id, NULL);
 	if (acard->dev == NULL) {
 		kfree(cfg);
 		return -ENODEV;
 	}
-	acard->devmpu = pnp_request_card_device(&als100_pnpc_driver, card, id->devs[1].id, acard->dev);
-	acard->devopl = pnp_request_card_device(&als100_pnpc_driver, card, id->devs[2].id, acard->devmpu);
+	acard->devmpu = pnp_request_card_device(card, id->devs[1].id, acard->dev);
+	acard->devopl = pnp_request_card_device(card, id->devs[2].id, acard->devmpu);
 
 	pdev = acard->dev;
 
@@ -210,7 +208,7 @@ static int __devinit snd_card_als100_isapnp(int dev, struct snd_card_als100 *aca
 }
 
 static int __init snd_card_als100_probe(int dev,
-					struct pnp_card *pcard,
+					struct pnp_card_link *pcard,
 					const struct pnp_card_id *pid)
 {
 	int error;
@@ -288,7 +286,7 @@ static int __init snd_card_als100_probe(int dev,
 	return 0;
 }
 
-static int __devinit snd_als100_pnp_detect(struct pnp_card *card,
+static int __devinit snd_als100_pnp_detect(struct pnp_card_link *card,
 					   const struct pnp_card_id *id)
 {
 	static int dev;
@@ -306,7 +304,7 @@ static int __devinit snd_als100_pnp_detect(struct pnp_card *card,
 	return -ENODEV;
 }
 
-static void __devexit snd_als100_pnp_remove(struct pnp_card * pcard)
+static void __devexit snd_als100_pnp_remove(struct pnp_card_link * pcard)
 {
 	snd_card_t *card = (snd_card_t *) pnp_get_card_drvdata(pcard);
 

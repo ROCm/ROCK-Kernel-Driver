@@ -32,14 +32,21 @@ static const struct pnp_card_id * match_card(struct pnp_card_driver * drv, struc
 	return NULL;
 }
 
-static void generic_card_remove_handler(struct pnp_dev * dev)
+static void generic_card_remove(struct pnp_dev * dev)
+{
+	dev->card_link = NULL;
+}
+
+static void generic_card_remove_first(struct pnp_dev * dev)
 {
 	struct pnp_card_driver * drv = to_pnp_card_driver(dev->driver);
 	if (!dev->card || !drv)
 		return;
 	if (drv->remove)
-		drv->remove(dev->card);
-	drv->link.remove = NULL;
+		drv->remove(dev->card_link);
+	drv->link.remove = &generic_card_remove;
+	kfree(dev->card_link);
+	generic_card_remove(dev);
 }
 
 /**
@@ -81,6 +88,13 @@ static void pnp_free_card_ids(struct pnp_card * card)
 	}
 }
 
+static void pnp_release_card(struct device *dmdev)
+{
+	struct pnp_card * card = to_pnp_card(dmdev);
+	pnp_free_card_ids(card);
+	kfree(card);
+}
+
 /**
  * pnp_add_card - adds a PnP card to the PnP Layer
  * @card: pointer to the card to add
@@ -88,23 +102,31 @@ static void pnp_free_card_ids(struct pnp_card * card)
 
 int pnp_add_card(struct pnp_card * card)
 {
-	int error = 0;
+	int error;
 	struct list_head * pos;
 	if (!card || !card->protocol)
 		return -EINVAL;
 
-	spin_lock(&pnp_lock);
-	list_add_tail(&card->global_list, &pnp_cards);
-	list_add_tail(&card->protocol_list, &card->protocol->cards);
-	spin_unlock(&pnp_lock);
+	sprintf(card->dev.bus_id, "%02x:%02x", card->protocol->number, card->number);
+	card->dev.parent = &card->protocol->dev;
+	card->dev.bus = NULL;
+	card->dev.release = &pnp_release_card;
+	error = device_register(&card->dev);
+	if (error == 0) {
+		spin_lock(&pnp_lock);
+		list_add_tail(&card->global_list, &pnp_cards);
+		list_add_tail(&card->protocol_list, &card->protocol->cards);
+		spin_unlock(&pnp_lock);
 
-	/* we wait until now to add devices in order to ensure the drivers
-	 * will be able to use all of the related devices on the card 
-	 * without waiting any unresonable length of time */
-	list_for_each(pos,&card->devices){
-		struct pnp_dev *dev = card_to_pnp_dev(pos);
-		__pnp_add_device(dev);
-	}
+		/* we wait until now to add devices in order to ensure the drivers
+		 * will be able to use all of the related devices on the card
+		 * without waiting any unresonable length of time */
+		list_for_each(pos,&card->devices){
+			struct pnp_dev *dev = card_to_pnp_dev(pos);
+			__pnp_add_device(dev);
+		}
+	} else
+		pnp_err("sysfs failure, card '%s' will be unavailable", card->dev.bus_id);
 	return error;
 }
 
@@ -127,8 +149,6 @@ void pnp_remove_card(struct pnp_card * card)
 		struct pnp_dev *dev = card_to_pnp_dev(pos);
 		pnp_remove_card_device(dev);
 	}
-	pnp_free_card_ids(card);
-	kfree(card);
 }
 
 /**
@@ -141,7 +161,8 @@ int pnp_add_card_device(struct pnp_card * card, struct pnp_dev * dev)
 {
 	if (!card || !dev || !dev->protocol)
 		return -EINVAL;
-	dev->dev.parent = &dev->protocol->dev;
+	dev->dev.parent = &card->dev;
+	dev->card_link = NULL;
 	snprintf(dev->dev.bus_id, BUS_ID_SIZE, "%02x:%02x.%02x", dev->protocol->number,
 		 card->number,dev->number);
 	spin_lock(&pnp_lock);
@@ -168,18 +189,21 @@ void pnp_remove_card_device(struct pnp_dev * dev)
 
 /**
  * pnp_request_card_device - Searches for a PnP device under the specified card
- * @drv: pointer to the driver requesting the card
- * @card: pointer to the card to search under, cannot be NULL
+ * @lcard: pointer to the card link, cannot be NULL
  * @id: pointer to a PnP ID structure that explains the rules for finding the device
  * @from: Starting place to search from. If NULL it will start from the begining.
  */
 
-struct pnp_dev * pnp_request_card_device(struct pnp_card_driver * drv, struct pnp_card *card, const char * id, struct pnp_dev * from)
+struct pnp_dev * pnp_request_card_device(struct pnp_card_link *clink, const char * id, struct pnp_dev * from)
 {
 	struct list_head * pos;
 	struct pnp_dev * dev;
-	if (!card || !id || !drv)
+	struct pnp_card_driver * drv;
+	struct pnp_card * card;
+	if (!clink || !id)
 		goto done;
+	card = clink->card;
+	drv = clink->driver;
 	if (!from) {
 		pos = card->devices.next;
 	} else {
@@ -189,7 +213,7 @@ struct pnp_dev * pnp_request_card_device(struct pnp_card_driver * drv, struct pn
 	}
 	while (pos != &card->devices) {
 		dev = card_to_pnp_dev(pos);
-		if (compare_pnp_id(dev->id,id))
+		if ((!dev->card_link) && compare_pnp_id(dev->id,id))
 			goto found;
 		pos = pos->next;
 	}
@@ -199,6 +223,7 @@ done:
 
 found:
 	down_write(&dev->dev.bus->subsys.rwsem);
+	dev->card_link = clink;
 	dev->dev.driver = &drv->link.driver;
 	if (drv->link.driver.probe) {
 		if (drv->link.driver.probe(&dev->dev)) {
@@ -219,13 +244,13 @@ found:
 
 void pnp_release_card_device(struct pnp_dev * dev)
 {
-	struct pnp_card_driver * drv = to_pnp_card_driver(to_pnp_driver(dev->dev.driver));
+	struct pnp_card_driver * drv = dev->card_link->driver;
 	if (!drv)
 		return;
 	down_write(&dev->dev.bus->subsys.rwsem);
-	drv->link.remove = NULL;
+	drv->link.remove = &generic_card_remove;
 	device_release_driver(&dev->dev);
-	drv->link.remove = &generic_card_remove_handler;
+	drv->link.remove = &generic_card_remove_first;
 	up_write(&dev->dev.bus->subsys.rwsem);
 }
 
@@ -243,7 +268,7 @@ int pnp_register_card_driver(struct pnp_card_driver * drv)
 	drv->link.id_table = NULL;	/* this will disable auto matching */
 	drv->link.flags = drv->flags;
 	drv->link.probe = NULL;
-	drv->link.remove = &generic_card_remove_handler;
+	drv->link.remove = &generic_card_remove_first;
 
 	pnp_register_driver(&drv->link);
 
@@ -251,8 +276,13 @@ int pnp_register_card_driver(struct pnp_card_driver * drv)
 		struct pnp_card *card = list_entry(pos, struct pnp_card, global_list);
 		const struct pnp_card_id *id = match_card(drv,card);
 		if (id) {
+			struct pnp_card_link * clink = pnp_alloc(sizeof(struct pnp_card_link));
+			if (!clink)
+				continue;
+			clink->card = card;
+			clink->driver = drv;
 			if (drv->probe) {
-				if (drv->probe(card, id)>=0)
+				if (drv->probe(clink, id)>=0)
 					count++;
 			} else
 				count++;

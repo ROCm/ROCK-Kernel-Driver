@@ -32,9 +32,9 @@
 #include "sound_config.h"
 #include "sb_mixer.h"
 #include "sb.h"
-#ifdef CONFIG_PNP_CARD
+#ifdef CONFIG_PNP
 #include <linux/pnp.h>
-#endif
+#endif /* CONFIG_PNP */
 #include "sb_card.h"
 
 MODULE_DESCRIPTION("OSS Soundblaster ISA PnP and legacy sound driver");
@@ -54,7 +54,7 @@ static int __initdata sm_games 	= 0; /* Logitech soundman games? */
 
 struct sb_card_config *legacy = NULL;
 
-#ifdef CONFIG_PNP_CARD
+#ifdef CONFIG_PNP
 static int __initdata pnp       = 1;
 /*
 static int __initdata uart401	= 0;
@@ -85,7 +85,7 @@ module_param(acer, int, 000);
 MODULE_PARM_DESC(acer,	   "Set this to detect cards in some ACER notebooks "\
 		 "(doesn't work with pnp)");
 
-#ifdef CONFIG_PNP_CARD
+#ifdef CONFIG_PNP
 module_param(pnp, int, 000);
 MODULE_PARM_DESC(pnp,     "Went set to 0 will disable detection using PnP. "\
 		  "Default is 1.\n");
@@ -95,7 +95,7 @@ module_param(uart401, int, 000);
 MODULE_PARM_DESC(uart401,  "When set to 1, will attempt to detect and enable"\
 		 "the mpu on some clones");
 */
-#endif /* CONFIG_PNP_CARD */
+#endif /* CONFIG_PNP */
 
 /* OSS subsystem card registration shared by PnP and legacy routines */
 static int sb_register_oss(struct sb_card_config *scc, struct sb_module_options *sbmo)
@@ -157,7 +157,7 @@ static int sb_init_legacy(void)
 	return sb_register_oss(legacy, &sbmo);
 }
 
-#ifdef CONFIG_PNP_CARD
+#ifdef CONFIG_PNP
 
 /* Populate the OSS subsystem structures with information from PnP */
 static void sb_dev2cfg(struct pnp_dev *dev, struct sb_card_config *scc)
@@ -224,7 +224,7 @@ static void sb_dev2cfg(struct pnp_dev *dev, struct sb_card_config *scc)
 }
 
 /* Probe callback function for the PnP API */
-static int sb_pnp_probe(struct pnp_card *card, const struct pnp_card_id *card_id)
+static int sb_pnp_probe(struct pnp_card_link *card, const struct pnp_card_id *card_id)
 {
 	struct sb_card_config *scc;
 	struct sb_module_options sbmo = {0}; /* Default to 0 for PnP */
@@ -257,7 +257,7 @@ static int sb_pnp_probe(struct pnp_card *card, const struct pnp_card_id *card_id
 	return sb_register_oss(scc, &sbmo);
 }
 
-static void sb_pnp_remove(struct pnp_card *card)
+static void sb_pnp_remove(struct pnp_card_link *card)
 {
 	struct sb_card_config *scc = pnp_get_card_drvdata(card);
 
@@ -275,7 +275,7 @@ static struct pnp_card_driver sb_pnp_driver = {
 	.probe         = sb_pnp_probe,
 	.remove        = sb_pnp_remove,
 };
-#endif /* CONFIG_PNP_CARD */
+#endif /* CONFIG_PNP */
 
 static int __init sb_init(void)
 {
@@ -293,7 +293,7 @@ static int __init sb_init(void)
 		printk(KERN_ERR "sb: Error: At least io, irq, and dma "\
 		       "must be set for legacy cards.\n");
 
-#ifdef CONFIG_PNP_CARD
+#ifdef CONFIG_PNP
 	if(pnp) {
 		pres = pnp_register_card_driver(&sb_pnp_driver);
 	}
@@ -315,7 +315,7 @@ static void __exit sb_exit(void)
 		sb_unload(legacy);
 	}
 
-#ifdef CONFIG_PNP_CARD
+#ifdef CONFIG_PNP
 	pnp_unregister_card_driver(&sb_pnp_driver);
 #endif
 

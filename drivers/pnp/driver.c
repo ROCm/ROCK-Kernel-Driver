@@ -106,7 +106,8 @@ static int pnp_device_probe(struct device *dev)
 			if (error < 0)
 				return error;
 		}
-	} else if (pnp_drv->flags & PNP_DRIVER_RES_DISABLE) {
+	} else if ((pnp_drv->flags & PNP_DRIVER_RES_DISABLE)
+		    == PNP_DRIVER_RES_DISABLE) {
 		error = pnp_disable_dev(pnp_dev);
 		if (error < 0)
 			return error;

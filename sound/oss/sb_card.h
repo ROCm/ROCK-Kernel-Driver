@@ -16,7 +16,7 @@ struct sb_card_config {
 	int                 mpu;
 };
 
-#ifdef CONFIG_PNP_CARD
+#ifdef CONFIG_PNP
 
 /*
  * SoundBlaster PnP tables and structures.

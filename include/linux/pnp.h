@@ -138,7 +138,6 @@ struct pnp_card {
 	struct list_head global_list;	/* node in global list of cards */
 	struct list_head protocol_list;	/* node in protocol's list of cards */
 	struct list_head devices;	/* devices attached to the card */
-	int status;
 
 	struct pnp_protocol * protocol;
 	struct pnp_id * id;		/* contains supported EISA IDs*/
@@ -159,16 +158,6 @@ struct pnp_card {
 	(card) != global_to_pnp_card(&pnp_cards); \
 	(card) = global_to_pnp_card((card)->global_list.next))
 
-static inline void *pnp_get_card_drvdata (struct pnp_card *pcard)
-{
-	return dev_get_drvdata(&pcard->dev);
-}
-
-static inline void pnp_set_card_drvdata (struct pnp_card *pcard, void *data)
-{
-	dev_set_drvdata(&pcard->dev, data);
-}
-
 static inline void *pnp_get_card_protodata (struct pnp_card *pcard)
 {
 	return pcard->protocol_data;
@@ -177,6 +166,22 @@ static inline void *pnp_get_card_protodata (struct pnp_card *pcard)
 static inline void pnp_set_card_protodata (struct pnp_card *pcard, void *data)
 {
 	pcard->protocol_data = data;
+}
+
+struct pnp_card_link {
+	struct pnp_card * card;
+	struct pnp_card_driver * driver;
+	void * driver_data;
+};
+
+static inline void *pnp_get_card_drvdata (struct pnp_card_link *pcard)
+{
+	return pcard->driver_data;
+}
+
+static inline void pnp_set_card_drvdata (struct pnp_card_link *pcard, void *data)
+{
+	pcard->driver_data = data;
 }
 
 struct pnp_dev {
@@ -194,6 +199,7 @@ struct pnp_dev {
 	struct pnp_protocol * protocol;
 	struct pnp_card * card;		/* card the device is attached to, none if NULL */
 	struct pnp_driver * driver;
+	struct pnp_card_link * card_link;
 
 	struct pnp_id		      * id;		/* supported EISA IDs*/
 	struct pnp_resource_table	res;		/* contains the currently chosen resources */
@@ -312,8 +318,8 @@ struct pnp_card_driver {
 	char * name;
 	const struct pnp_card_id *id_table;
 	unsigned int flags;
-	int  (*probe)  (struct pnp_card *card, const struct pnp_card_id *card_id);
-	void (*remove) (struct pnp_card *card);
+	int  (*probe)  (struct pnp_card_link *card, const struct pnp_card_id *card_id);
+	void (*remove) (struct pnp_card_link *card);
 	struct pnp_driver link;
 };
 
@@ -372,7 +378,7 @@ void pnp_remove_card(struct pnp_card *card);
 int pnp_add_card_device(struct pnp_card *card, struct pnp_dev *dev);
 void pnp_remove_card_device(struct pnp_dev *dev);
 int pnp_add_card_id(struct pnp_id *id, struct pnp_card *card);
-struct pnp_dev * pnp_request_card_device(struct pnp_card_driver * drv, struct pnp_card *card, const char * id, struct pnp_dev * from);
+struct pnp_dev * pnp_request_card_device(struct pnp_card_link *clink, const char * id, struct pnp_dev * from);
 void pnp_release_card_device(struct pnp_dev * dev);
 int pnp_register_card_driver(struct pnp_card_driver * drv);
 void pnp_unregister_card_driver(struct pnp_card_driver * drv);
@@ -427,7 +433,7 @@ static inline void pnp_remove_card(struct pnp_card *card) { ; }
 static inline int pnp_add_card_device(struct pnp_card *card, struct pnp_dev *dev) { return -ENODEV; }
 static inline void pnp_remove_card_device(struct pnp_dev *dev) { ; }
 static inline int pnp_add_card_id(struct pnp_id *id, struct pnp_card *card) { return -ENODEV; }
-static inline struct pnp_dev * pnp_request_card_device(struct pnp_card_driver * drv, struct pnp_card *card, const char * id, struct pnp_dev * from) { return -ENODEV; }
+static inline struct pnp_dev * pnp_request_card_device(struct pnp_card_link *clink, const char * id, struct pnp_dev * from) { return -ENODEV; }
 static inline void pnp_release_card_device(struct pnp_dev * dev) { ; }
 static inline int pnp_register_card_driver(struct pnp_card_driver * drv) { return -ENODEV; }
 static inline void pnp_unregister_card_driver(struct pnp_card_driver * drv) { ; }
