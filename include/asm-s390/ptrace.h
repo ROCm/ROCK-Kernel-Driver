@@ -303,6 +303,7 @@ typedef struct
  */
 struct pt_regs 
 {
+	unsigned long args[1];
 	psw_t psw;
 	unsigned long gprs[NUM_GPRS];
 	unsigned long orig_gpr2;
