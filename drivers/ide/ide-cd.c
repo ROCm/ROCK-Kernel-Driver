@@ -2372,7 +2372,7 @@ static int cdrom_read_toc(ide_drive_t *drive, struct request_sense *sense)
 
 	/* Now try to get the total cdrom capacity. */
 	stat = cdrom_get_last_written(cdi, &last_written);
-	if (!stat && last_written) {
+	if (!stat && (last_written > toc->capacity)) {
 		toc->capacity = last_written;
 		set_capacity(drive->disk, toc->capacity * sectors_per_frame);
 	}
