@@ -1771,6 +1771,7 @@ int of_add_node(const char *path, struct property *proplist)
 	np->properties = proplist;
 	OF_MARK_DYNAMIC(np);
 	kref_init(&np->kref);
+	of_node_get(np);
 	np->parent = derive_parent(path);
 	if (!np->parent) {
 		kfree(np);
