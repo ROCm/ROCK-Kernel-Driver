@@ -62,7 +62,7 @@ foreach $object (keys(%object)) {
 		$l = read(OBJECT, $comment, $size);
 		die "read $size bytes from $object .comment failed" if ($l != $size);
 		close(OBJECT);
-		if ($comment =~ /GCC\:.*GCC\:/m) {
+		if ($comment =~ /GCC\:.*GCC\:/m || $object =~ /built-in\.o/) {
 			++$ignore;
 			delete($object{$object});
 		}
