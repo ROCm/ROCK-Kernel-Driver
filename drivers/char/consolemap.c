@@ -450,12 +450,6 @@ int con_clear_unimap(int con, struct unimapinit *ui)
 	struct vc_data *conp = vc_cons[con].d;
   
 	p = (struct uni_pagedir *)*conp->vc_uni_pagedir_loc;
-	/* FIXME */
-	if (!p) {
-		printk(KERN_ERR "p == NULL\n");
-		WARN_ON(1);
-		return -ENODEV;
-	}
 	if (p && p->readonly) return -EIO;
 	if (!p || --p->refcount) {
 		q = (struct uni_pagedir *)kmalloc(sizeof(*p), GFP_KERNEL);
