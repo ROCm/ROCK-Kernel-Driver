@@ -1778,10 +1778,8 @@ nfsd4_encode_dirent_fattr(struct nfsd4_readdir *cd,
 	int nfserr;
 
 	dentry = lookup_one_len(name, cd->rd_fhp->fh_dentry, namlen);
-	if (IS_ERR(dentry)) {
-		nfserr = nfserrno(PTR_ERR(dentry));
-		return nfserr;
-	}
+	if (IS_ERR(dentry))
+		return nfserrno(PTR_ERR(dentry));
 
 	exp_get(exp);
 	if (d_mountpoint(dentry)) {
@@ -1793,10 +1791,8 @@ nfsd4_encode_dirent_fattr(struct nfsd4_readdir *cd,
 		 * options on exp.  When the answer comes back,
 		 * this call will be retried.
 		 */
-			dput(dentry);
-			exp_put(exp);
 			nfserr = nfserr_dropit;
-			return nfserr;
+			goto out_put;
 		}
 
 	}
@@ -1804,6 +1800,7 @@ nfsd4_encode_dirent_fattr(struct nfsd4_readdir *cd,
 	nfserr = nfsd4_encode_fattr(NULL, exp,
 			dentry, p, buflen, cd->rd_bmval,
 			cd->rd_rqstp);
+out_put:
 	dput(dentry);
 	exp_put(exp);
 	return nfserr;
