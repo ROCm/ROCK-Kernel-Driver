@@ -228,6 +228,9 @@ extern inline unsigned int cpuid_edx(unsigned int op)
 
 /* VIA Cyrix defined MSRs*/
 #define MSR_VIA_FCR			0x1107
+#define MSR_VIA_LONGHAUL		0x110a
+#define MSR_VIA_RNG			0x110b
+#define MSR_VIA_BCR2			0x1147
 
 /* Intel defined MSRs. */
 #define MSR_IA32_P5_MC_ADDR		0
