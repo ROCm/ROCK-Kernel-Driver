@@ -673,7 +673,7 @@ emulate_load_updates (update_t type, load_store_t ld, struct pt_regs *regs, unsi
 	 */
 	if (ld.x6_op == 1 || ld.x6_op == 3) {
 		printk(KERN_ERR "%s: register update on speculative load, error\n", __FUNCTION__);
-		die_if_kernel("unaligned reference on specualtive load with register update\n",
+		die_if_kernel("unaligned reference on speculative load with register update\n",
 			      regs, 30);
 	}
 
