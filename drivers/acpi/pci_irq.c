@@ -229,7 +229,7 @@ acpi_pci_irq_add_prt (
                           PCI Interrupt Routing Support
    -------------------------------------------------------------------------- */
 
-static int
+int
 acpi_pci_irq_lookup (
 	int			segment,
 	int			bus,
