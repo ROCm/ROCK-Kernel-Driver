@@ -400,25 +400,24 @@ int pnp_manual_config_dev(struct pnp_dev *dev, struct pnp_resource_table * res, 
 	dev->res = *res;
 	if (!(mode & PNP_CONFIG_FORCE)) {
 		for (i = 0; i < PNP_MAX_PORT; i++) {
-			if(pnp_check_port(dev,i))
+			if(!pnp_check_port(dev,i))
 				goto fail;
 		}
 		for (i = 0; i < PNP_MAX_MEM; i++) {
-			if(pnp_check_mem(dev,i))
+			if(!pnp_check_mem(dev,i))
 				goto fail;
 		}
 		for (i = 0; i < PNP_MAX_IRQ; i++) {
-			if(pnp_check_irq(dev,i))
+			if(!pnp_check_irq(dev,i))
 				goto fail;
 		}
 		for (i = 0; i < PNP_MAX_DMA; i++) {
-			if(pnp_check_dma(dev,i))
+			if(!pnp_check_dma(dev,i))
 				goto fail;
 		}
 	}
 	up(&pnp_res_mutex);
 
-	pnp_auto_config_dev(dev);
 	kfree(bak);
 	return 0;
 
