@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -47,9 +47,9 @@
 
 void
 acpi_ds_scope_stack_clear (
-	acpi_walk_state         *walk_state)
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_generic_state      *scope_info;
+	union acpi_generic_state        *scope_info;
 
 	ACPI_FUNCTION_NAME ("ds_scope_stack_clear");
 
@@ -81,12 +81,12 @@ acpi_ds_scope_stack_clear (
 
 acpi_status
 acpi_ds_scope_stack_push (
-	acpi_namespace_node     *node,
-	acpi_object_type        type,
-	acpi_walk_state         *walk_state)
+	struct acpi_namespace_node      *node,
+	acpi_object_type                type,
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_generic_state      *scope_info;
-	acpi_generic_state      *old_scope_info;
+	union acpi_generic_state        *scope_info;
+	union acpi_generic_state        *old_scope_info;
 
 
 	ACPI_FUNCTION_TRACE ("ds_scope_stack_push");
@@ -168,10 +168,10 @@ acpi_ds_scope_stack_push (
 
 acpi_status
 acpi_ds_scope_stack_pop (
-	acpi_walk_state         *walk_state)
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_generic_state      *scope_info;
-	acpi_generic_state      *new_scope_info;
+	union acpi_generic_state        *scope_info;
+	union acpi_generic_state        *new_scope_info;
 
 
 	ACPI_FUNCTION_TRACE ("ds_scope_stack_pop");

@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -47,8 +47,8 @@
 
 void
 acpi_ns_print_pathname (
-	u32                     num_segments,
-	char                    *pathname)
+	u32                             num_segments,
+	char                            *pathname)
 {
 	ACPI_FUNCTION_NAME ("ns_print_pathname");
 
@@ -91,10 +91,10 @@ acpi_ns_print_pathname (
 
 void
 acpi_ns_dump_pathname (
-	acpi_handle             handle,
-	char                    *msg,
-	u32                     level,
-	u32                     component)
+	acpi_handle                     handle,
+	char                            *msg,
+	u32                             level,
+	u32                             component)
 {
 
 	ACPI_FUNCTION_TRACE ("ns_dump_pathname");
@@ -129,19 +129,19 @@ acpi_ns_dump_pathname (
 
 acpi_status
 acpi_ns_dump_one_object (
-	acpi_handle             obj_handle,
-	u32                     level,
-	void                    *context,
-	void                    **return_value)
+	acpi_handle                     obj_handle,
+	u32                             level,
+	void                            *context,
+	void                            **return_value)
 {
-	acpi_walk_info          *info = (acpi_walk_info *) context;
-	acpi_namespace_node     *this_node;
-	acpi_operand_object     *obj_desc = NULL;
-	acpi_object_type        obj_type;
-	acpi_object_type        type;
-	u32                     bytes_to_dump;
-	u32                     dbg_level;
-	u32                     i;
+	struct acpi_walk_info           *info = (struct acpi_walk_info *) context;
+	struct acpi_namespace_node      *this_node;
+	union acpi_operand_object       *obj_desc = NULL;
+	acpi_object_type                obj_type;
+	acpi_object_type                type;
+	u32                             bytes_to_dump;
+	u32                             dbg_level;
+	u32                             i;
 
 
 	ACPI_FUNCTION_NAME ("ns_dump_one_object");
@@ -335,7 +335,7 @@ acpi_ns_dump_one_object (
 
 		case ACPI_TYPE_LOCAL_ALIAS:
 
-			acpi_os_printf ("Target %4.4s (%p)\n", ((acpi_namespace_node *) obj_desc)->name.ascii, obj_desc);
+			acpi_os_printf ("Target %4.4s (%p)\n", ((struct acpi_namespace_node *) obj_desc)->name.ascii, obj_desc);
 			break;
 
 		default:
@@ -444,7 +444,7 @@ acpi_ns_dump_one_object (
 		case ACPI_DESC_TYPE_NAMED:
 
 			acpi_os_printf ("(Ptr to Node)\n");
-			bytes_to_dump = sizeof (acpi_namespace_node);
+			bytes_to_dump = sizeof (struct acpi_namespace_node);
 			break;
 
 
@@ -459,7 +459,7 @@ acpi_ns_dump_one_object (
 			else {
 				acpi_os_printf ("(Ptr to ACPI Object type %s, %X)\n",
 						   acpi_ut_get_type_name (obj_type), obj_type);
-				bytes_to_dump = sizeof (acpi_operand_object);
+				bytes_to_dump = sizeof (union acpi_operand_object);
 			}
 			break;
 
@@ -492,7 +492,7 @@ acpi_ns_dump_one_object (
 			break;
 
 		case ACPI_TYPE_BUFFER_FIELD:
-			obj_desc = (acpi_operand_object *) obj_desc->buffer_field.buffer_obj;
+			obj_desc = (union acpi_operand_object *) obj_desc->buffer_field.buffer_obj;
 			break;
 
 		case ACPI_TYPE_PACKAGE:
@@ -546,13 +546,13 @@ cleanup:
 
 void
 acpi_ns_dump_objects (
-	acpi_object_type        type,
-	u8                      display_type,
-	u32                     max_depth,
-	u32                     owner_id,
-	acpi_handle             start_handle)
+	acpi_object_type                type,
+	u8                              display_type,
+	u32                             max_depth,
+	u32                             owner_id,
+	acpi_handle                     start_handle)
 {
-	acpi_walk_info          info;
+	struct acpi_walk_info           info;
 
 
 	ACPI_FUNCTION_ENTRY ();
@@ -584,10 +584,10 @@ acpi_ns_dump_objects (
 
 void
 acpi_ns_dump_tables (
-	acpi_handle             search_base,
-	u32                     max_depth)
+	acpi_handle                     search_base,
+	u32                             max_depth)
 {
-	acpi_handle             search_handle = search_base;
+	acpi_handle                     search_handle = search_base;
 
 
 	ACPI_FUNCTION_TRACE ("ns_dump_tables");
@@ -629,10 +629,10 @@ acpi_ns_dump_tables (
 
 void
 acpi_ns_dump_entry (
-	acpi_handle             handle,
-	u32                     debug_level)
+	acpi_handle                     handle,
+	u32                             debug_level)
 {
-	acpi_walk_info          info;
+	struct acpi_walk_info           info;
 
 
 	ACPI_FUNCTION_ENTRY ();

@@ -263,7 +263,7 @@ static void usb_hub_power_on(struct usb_hub *hub)
 	int i;
 
 	/* Enable power to the ports */
-	dev_dbg(*hubdev(interface_to_usbdev(hub->intf)),
+	dev_dbg(hubdev(interface_to_usbdev(hub->intf)),
 		"enabling power on all ports\n");
 	dev = interface_to_usbdev(hub->intf);
 	for (i = 0; i < hub->descriptor->bNbrPorts; i++)
@@ -307,7 +307,7 @@ static int usb_hub_configure(struct usb_hub *hub,
 
 	hub_dev = hubdev(dev);
 	dev->maxchild = hub->descriptor->bNbrPorts;
-	dev_info (*hub_dev, "%d port%s detected\n", dev->maxchild,
+	dev_info (hub_dev, "%d port%s detected\n", dev->maxchild,
 		(dev->maxchild == 1) ? "" : "s");
 
 	le16_to_cpus(&hub->descriptor->wHubCharacteristics);
@@ -321,33 +321,33 @@ static int usb_hub_configure(struct usb_hub *hub,
 				    [((i + 1) / 8)] & (1 << ((i + 1) % 8))
 				? 'F' : 'R';
 		portstr[dev->maxchild] = 0;
-		dev_dbg(*hub_dev, "compound device; port removable status: %s\n", portstr);
+		dev_dbg(hub_dev, "compound device; port removable status: %s\n", portstr);
 	} else
-		dev_dbg(*hub_dev, "standalone hub\n");
+		dev_dbg(hub_dev, "standalone hub\n");
 
 	switch (hub->descriptor->wHubCharacteristics & HUB_CHAR_LPSM) {
 		case 0x00:
-			dev_dbg(*hub_dev, "ganged power switching\n");
+			dev_dbg(hub_dev, "ganged power switching\n");
 			break;
 		case 0x01:
-			dev_dbg(*hub_dev, "individual port power switching\n");
+			dev_dbg(hub_dev, "individual port power switching\n");
 			break;
 		case 0x02:
 		case 0x03:
-			dev_dbg(*hub_dev, "unknown reserved power switching mode\n");
+			dev_dbg(hub_dev, "unknown reserved power switching mode\n");
 			break;
 	}
 
 	switch (hub->descriptor->wHubCharacteristics & HUB_CHAR_OCPM) {
 		case 0x00:
-			dev_dbg(*hub_dev, "global over-current protection\n");
+			dev_dbg(hub_dev, "global over-current protection\n");
 			break;
 		case 0x08:
-			dev_dbg(*hub_dev, "individual port over-current protection\n");
+			dev_dbg(hub_dev, "individual port over-current protection\n");
 			break;
 		case 0x10:
 		case 0x18:
-			dev_dbg(*hub_dev, "no over-current protection\n");
+			dev_dbg(hub_dev, "no over-current protection\n");
                         break;
 	}
 
@@ -358,16 +358,16 @@ static int usb_hub_configure(struct usb_hub *hub,
 		case 0:
 			break;
 		case 1:
-			dev_dbg(*hub_dev, "Single TT\n");
+			dev_dbg(hub_dev, "Single TT\n");
 			hub->tt.hub = dev;
 			break;
 		case 2:
-			dev_dbg(*hub_dev, "TT per port\n");
+			dev_dbg(hub_dev, "TT per port\n");
 			hub->tt.hub = dev;
 			hub->tt.multi = 1;
 			break;
 		default:
-			dev_dbg(*hub_dev, "Unrecognized hub protocol %d\n",
+			dev_dbg(hub_dev, "Unrecognized hub protocol %d\n",
 				dev->descriptor.bDeviceProtocol);
 			break;
 	}
@@ -375,26 +375,26 @@ static int usb_hub_configure(struct usb_hub *hub,
 	switch (hub->descriptor->wHubCharacteristics & HUB_CHAR_TTTT) {
 		case 0x00:
 			if (dev->descriptor.bDeviceProtocol != 0)
-				dev_dbg(*hub_dev, "TT requires at most 8 FS bit times\n");
+				dev_dbg(hub_dev, "TT requires at most 8 FS bit times\n");
 			break;
 		case 0x20:
-			dev_dbg(*hub_dev, "TT requires at most 16 FS bit times\n");
+			dev_dbg(hub_dev, "TT requires at most 16 FS bit times\n");
 			break;
 		case 0x40:
-			dev_dbg(*hub_dev, "TT requires at most 24 FS bit times\n");
+			dev_dbg(hub_dev, "TT requires at most 24 FS bit times\n");
 			break;
 		case 0x60:
-			dev_dbg(*hub_dev, "TT requires at most 32 FS bit times\n");
+			dev_dbg(hub_dev, "TT requires at most 32 FS bit times\n");
 			break;
 	}
 
-	dev_dbg(*hub_dev, "Port indicators are %s supported\n", 
+	dev_dbg(hub_dev, "Port indicators are %s supported\n", 
 	    (hub->descriptor->wHubCharacteristics & HUB_CHAR_PORTIND)
 	    	? "" : "not");
 
-	dev_dbg(*hub_dev, "power on to power good time: %dms\n",
+	dev_dbg(hub_dev, "power on to power good time: %dms\n",
 		hub->descriptor->bPwrOn2PwrGood * 2);
-	dev_dbg(*hub_dev, "hub controller current requirement: %dmA\n",
+	dev_dbg(hub_dev, "hub controller current requirement: %dmA\n",
 		hub->descriptor->bHubContrCurrent);
 
 	ret = usb_get_hub_status(dev, &hubstatus);
@@ -405,11 +405,11 @@ static int usb_hub_configure(struct usb_hub *hub,
 
 	le16_to_cpus(&hubstatus.wHubStatus);
 
-	dev_dbg(*hub_dev, "local power source is %s\n",
+	dev_dbg(hub_dev, "local power source is %s\n",
 		(hubstatus.wHubStatus & HUB_STATUS_LOCAL_POWER)
 		? "lost (inactive)" : "good");
 
-	dev_dbg(*hub_dev, "%sover-current condition exists\n",
+	dev_dbg(hub_dev, "%sover-current condition exists\n",
 		(hubstatus.wHubStatus & HUB_STATUS_OVERCURRENT) ? "" : "no ");
 
 	/* Start the interrupt endpoint */
@@ -442,7 +442,7 @@ static int usb_hub_configure(struct usb_hub *hub,
 	return 0;
 
 fail:
-	dev_err (hub->intf->dev, "config failed, %s (err %d)\n",
+	dev_err (&hub->intf->dev, "config failed, %s (err %d)\n",
 			message, ret);
 	/* hub_disconnect() frees urb and descriptor */
 	return ret;
@@ -505,7 +505,7 @@ static int hub_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	if ((desc->desc.bInterfaceSubClass != 0) &&
 	    (desc->desc.bInterfaceSubClass != 1)) {
 descriptor_error:
-		dev_err (intf->dev, "bad descriptor, ignoring hub\n");
+		dev_err (&intf->dev, "bad descriptor, ignoring hub\n");
 		return -EIO;
 	}
 
@@ -529,7 +529,7 @@ descriptor_error:
 	}
 
 	/* We found a hub */
-	dev_info (*hubdev (dev), "USB hub found\n");
+	dev_info (hubdev (dev), "USB hub found\n");
 
 	hub = kmalloc(sizeof(*hub), GFP_KERNEL);
 	if (!hub) {
@@ -714,7 +714,7 @@ static int usb_hub_port_wait_reset(struct usb_device *hub, int port,
 		if (delay_time >= 2 * HUB_SHORT_RESET_TIME)
 			delay = HUB_LONG_RESET_TIME;
 
-		dev_dbg (*hubdev (hub),
+		dev_dbg (hubdev (hub),
 			"port %d not reset yet, waiting %dms\n",
 			port + 1, delay);
 	}
@@ -740,13 +740,13 @@ static int usb_hub_port_reset(struct usb_device *hub, int port,
 			return status;
 		}
 
-		dev_dbg (*hubdev (hub),
+		dev_dbg (hubdev (hub),
 			"port %d not enabled, trying reset again...\n",
 			port + 1);
 		delay = HUB_LONG_RESET_TIME;
 	}
 
-	dev_err (*hubdev (hub),
+	dev_err (hubdev (hub),
 		"Cannot enable port %i.  Maybe the USB cable is bad?\n",
 		port + 1);
 
@@ -814,7 +814,7 @@ static int usb_hub_port_debounce(struct usb_device *hub, int port)
 	}
 
 	/* XXX Replace this with dbg() when 2.6 is about to ship. */
-	dev_info (*hubdev (hub),
+	dev_info (hubdev (hub),
 		"debounce: port %d: delay %dms stable %d status 0x%x\n",
 		port + 1, delay_time, stable_count, portstatus);
 
@@ -829,7 +829,7 @@ static void usb_hub_port_connect_change(struct usb_hub *hubstate, int port,
 	unsigned int delay = HUB_SHORT_RESET_TIME;
 	int i;
 
-	dev_dbg (hubstate->intf->dev,
+	dev_dbg (&hubstate->intf->dev,
 		"port %d, status %x, change %x, %s\n",
 		port + 1, portstatus, portchange, portspeed (portstatus));
 
@@ -849,7 +849,7 @@ static void usb_hub_port_connect_change(struct usb_hub *hubstate, int port,
 	}
 
 	if (usb_hub_port_debounce(hub, port)) {
-		dev_err (hubstate->intf->dev,
+		dev_err (&hubstate->intf->dev,
 			"connect-debounce failed, port %d disabled\n",
 			port+1);
 		usb_hub_port_disable(hub, port);
@@ -870,7 +870,7 @@ static void usb_hub_port_connect_change(struct usb_hub *hubstate, int port,
 		/* Allocate a new device struct */
 		dev = usb_alloc_dev(hub, hub->bus);
 		if (!dev) {
-			dev_err (hubstate->intf->dev,
+			dev_err (&hubstate->intf->dev,
 				"couldn't allocate usb_device\n");
 			break;
 		}
@@ -914,10 +914,10 @@ static void usb_hub_port_connect_change(struct usb_hub *hubstate, int port,
 			len = snprintf (dev->devpath, sizeof dev->devpath,
 				"%d", port + 1);
 		if (len == sizeof dev->devpath)
-			dev_err (hubstate->intf->dev,
+			dev_err (&hubstate->intf->dev,
 				"devpath size! usb/%03d/%03d path %s\n",
 				dev->bus->busnum, dev->devnum, dev->devpath);
-		dev_info (hubstate->intf->dev,
+		dev_info (&hubstate->intf->dev,
 			"new USB device on port %d, assigned address %d\n",
 			port + 1, dev->devnum);
 
@@ -1006,7 +1006,7 @@ static void usb_hub_events(void)
 			if (portchange & USB_PORT_STAT_C_CONNECTION) {
 				usb_hub_port_connect_change(hub, i, portstatus, portchange);
 			} else if (portchange & USB_PORT_STAT_C_ENABLE) {
-				dev_dbg (*hubdev (dev),
+				dev_dbg (hubdev (dev),
 					"port %d enable change, status %x\n",
 					i + 1, portstatus);
 				usb_clear_port_feature(dev,

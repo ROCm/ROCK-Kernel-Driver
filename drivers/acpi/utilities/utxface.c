@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -51,7 +51,7 @@ acpi_status
 acpi_initialize_subsystem (
 	void)
 {
-	acpi_status             status;
+	acpi_status                     status;
 
 	ACPI_FUNCTION_TRACE ("acpi_initialize_subsystem");
 
@@ -117,9 +117,9 @@ acpi_initialize_subsystem (
 
 acpi_status
 acpi_enable_subsystem (
-	u32                     flags)
+	u32                             flags)
 {
-	acpi_status             status = AE_OK;
+	acpi_status                     status = AE_OK;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_enable_subsystem");
@@ -211,9 +211,9 @@ acpi_enable_subsystem (
 
 acpi_status
 acpi_initialize_objects (
-	u32                     flags)
+	u32                             flags)
 {
-	acpi_status             status = AE_OK;
+	acpi_status                     status = AE_OK;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_initialize_objects");
@@ -272,7 +272,7 @@ acpi_initialize_objects (
 acpi_status
 acpi_terminate (void)
 {
-	acpi_status         status;
+	acpi_status                 status;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_terminate");
@@ -353,11 +353,11 @@ acpi_subsystem_status (void)
 
 acpi_status
 acpi_get_system_info (
-	acpi_buffer             *out_buffer)
+	struct acpi_buffer              *out_buffer)
 {
-	acpi_system_info        *info_ptr;
-	u32                     i;
-	acpi_status             status;
+	struct acpi_system_info         *info_ptr;
+	u32                             i;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_get_system_info");
@@ -372,7 +372,7 @@ acpi_get_system_info (
 
 	/* Validate/Allocate/Clear caller buffer */
 
-	status = acpi_ut_initialize_buffer (out_buffer, sizeof (acpi_system_info));
+	status = acpi_ut_initialize_buffer (out_buffer, sizeof (struct acpi_system_info));
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}
@@ -380,7 +380,7 @@ acpi_get_system_info (
 	/*
 	 * Populate the return buffer
 	 */
-	info_ptr = (acpi_system_info *) out_buffer->pointer;
+	info_ptr = (struct acpi_system_info *) out_buffer->pointer;
 
 	info_ptr->acpi_ca_version   = ACPI_CA_VERSION;
 
@@ -437,8 +437,8 @@ acpi_get_system_info (
 
 acpi_status
 acpi_install_initialization_handler (
-	acpi_init_handler       handler,
-	u32                     function)
+	acpi_init_handler               handler,
+	u32                             function)
 {
 
 	if (!handler) {

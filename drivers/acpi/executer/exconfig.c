@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -52,13 +52,13 @@
 
 acpi_status
 acpi_ex_add_table (
-	acpi_table_header       *table,
-	acpi_namespace_node     *parent_node,
-	acpi_operand_object     **ddb_handle)
+	struct acpi_table_header        *table,
+	struct acpi_namespace_node      *parent_node,
+	union acpi_operand_object       **ddb_handle)
 {
-	acpi_status             status;
-	acpi_table_desc         table_info;
-	acpi_operand_object     *obj_desc;
+	acpi_status                     status;
+	struct acpi_table_desc          table_info;
+	union acpi_operand_object       *obj_desc;
 
 
 	ACPI_FUNCTION_TRACE ("ex_add_table");
@@ -121,16 +121,16 @@ cleanup:
 
 acpi_status
 acpi_ex_load_table_op (
-	acpi_walk_state         *walk_state,
-	acpi_operand_object     **return_desc)
+	struct acpi_walk_state          *walk_state,
+	union acpi_operand_object       **return_desc)
 {
-	acpi_status             status;
-	acpi_operand_object     **operand = &walk_state->operands[0];
-	acpi_table_header       *table;
-	acpi_namespace_node     *parent_node;
-	acpi_namespace_node     *start_node;
-	acpi_namespace_node     *parameter_node = NULL;
-	acpi_operand_object     *ddb_handle;
+	acpi_status                     status;
+	union acpi_operand_object       **operand = &walk_state->operands[0];
+	struct acpi_table_header        *table;
+	struct acpi_namespace_node      *parent_node;
+	struct acpi_namespace_node      *start_node;
+	struct acpi_namespace_node      *parameter_node = NULL;
+	union acpi_operand_object       *ddb_handle;
 
 
 	ACPI_FUNCTION_TRACE ("ex_load_table_op");
@@ -225,7 +225,7 @@ acpi_ex_load_table_op (
 	if (parameter_node) {
 		/* Store the parameter data into the optional parameter object */
 
-		status = acpi_ex_store (operand[5], ACPI_CAST_PTR (acpi_operand_object, parameter_node),
+		status = acpi_ex_store (operand[5], ACPI_CAST_PTR (union acpi_operand_object, parameter_node),
 				 walk_state);
 		if (ACPI_FAILURE (status)) {
 			(void) acpi_ex_unload_table (ddb_handle);
@@ -253,17 +253,17 @@ acpi_ex_load_table_op (
 
 acpi_status
 acpi_ex_load_op (
-	acpi_operand_object     *obj_desc,
-	acpi_operand_object     *target,
-	acpi_walk_state         *walk_state)
+	union acpi_operand_object       *obj_desc,
+	union acpi_operand_object       *target,
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_status             status;
-	acpi_operand_object     *ddb_handle;
-	acpi_operand_object     *buffer_desc = NULL;
-	acpi_table_header       *table_ptr = NULL;
-	u8                      *table_data_ptr;
-	acpi_table_header       table_header;
-	u32                     i;
+	acpi_status                     status;
+	union acpi_operand_object       *ddb_handle;
+	union acpi_operand_object       *buffer_desc = NULL;
+	struct acpi_table_header        *table_ptr = NULL;
+	u8                              *table_data_ptr;
+	struct acpi_table_header        table_header;
+	u32                             i;
 
 	ACPI_FUNCTION_TRACE ("ex_load_op");
 
@@ -279,7 +279,7 @@ acpi_ex_load_op (
 		/* Get the table header */
 
 		table_header.length = 0;
-		for (i = 0; i < sizeof (acpi_table_header); i++) {
+		for (i = 0; i < sizeof (struct acpi_table_header); i++) {
 			status = acpi_ev_address_space_dispatch (obj_desc, ACPI_READ,
 					   (acpi_physical_address) i, 8,
 					   ((u8 *) &table_header) + i);
@@ -297,8 +297,8 @@ acpi_ex_load_op (
 
 		/* Copy the header to the buffer */
 
-		ACPI_MEMCPY (table_ptr, &table_header, sizeof (acpi_table_header));
-		table_data_ptr = ACPI_PTR_ADD (u8, table_ptr, sizeof (acpi_table_header));
+		ACPI_MEMCPY (table_ptr, &table_header, sizeof (struct acpi_table_header));
+		table_data_ptr = ACPI_PTR_ADD (u8, table_ptr, sizeof (struct acpi_table_header));
 
 		/* Get the table from the op region */
 
@@ -331,7 +331,7 @@ acpi_ex_load_op (
 			goto cleanup;
 		}
 
-		table_ptr = ACPI_CAST_PTR (acpi_table_header, buffer_desc->buffer.pointer);
+		table_ptr = ACPI_CAST_PTR (struct acpi_table_header, buffer_desc->buffer.pointer);
 		break;
 
 
@@ -397,11 +397,11 @@ cleanup:
 
 acpi_status
 acpi_ex_unload_table (
-	acpi_operand_object     *ddb_handle)
+	union acpi_operand_object       *ddb_handle)
 {
-	acpi_status             status = AE_NOT_IMPLEMENTED;
-	acpi_operand_object     *table_desc = ddb_handle;
-	acpi_table_desc         *table_info;
+	acpi_status                     status = AE_NOT_IMPLEMENTED;
+	union acpi_operand_object       *table_desc = ddb_handle;
+	struct acpi_table_desc          *table_info;
 
 
 	ACPI_FUNCTION_TRACE ("ex_unload_table");
@@ -421,7 +421,7 @@ acpi_ex_unload_table (
 
 	/* Get the actual table descriptor from the ddb_handle */
 
-	table_info = (acpi_table_desc *) table_desc->reference.object;
+	table_info = (struct acpi_table_desc *) table_desc->reference.object;
 
 	/*
 	 * Delete the entire namespace under this table Node

@@ -314,59 +314,71 @@ EXPORT_SYMBOL(uart_update_timeout);
  *	uart_get_baud_rate - return baud rate for a particular port
  *	@port: uart_port structure describing the port in question.
  *	@termios: desired termios settings.
+ *	@old: old termios (or NULL)
+ *	@min: minimum acceptable baud rate
+ *	@max: maximum acceptable baud rate
  *
  *	Decode the termios structure into a numeric baud rate,
  *	taking account of the magic 38400 baud rate (with spd_*
  *	flags), and mapping the %B0 rate to 9600 baud.
  */
 unsigned int
-uart_get_baud_rate(struct uart_port *port, struct termios *termios)
+uart_get_baud_rate(struct uart_port *port, struct termios *termios,
+		   struct termios *old, unsigned int min, unsigned int max)
 {
-	unsigned int baud = tty_termios_baud_rate(termios);
+	unsigned int try, baud, altbaud = 38400;
+	unsigned int flags = port->flags & UPF_SPD_MASK;
 
-	/*
-	 * The spd_hi, spd_vhi, spd_shi, spd_warp kludge...
-	 * Die! Die! Die!
-	 */
-	if (baud == 38400) {
-		unsigned int flags = port->flags & UPF_SPD_MASK;
+	if (flags == UPF_SPD_HI)
+		altbaud = 57600;
+	if (flags == UPF_SPD_VHI)
+		altbaud = 115200;
+	if (flags == UPF_SPD_SHI)
+		altbaud = 230400;
+	if (flags == UPF_SPD_WARP)
+		altbaud = 460800;
 
-		if (flags == UPF_SPD_HI)
-			baud = 57600;
-		if (flags == UPF_SPD_VHI)
-			baud = 115200;
-		if (flags == UPF_SPD_SHI)
-			baud = 230400;
-		if (flags == UPF_SPD_WARP)
-			baud = 460800;
+	for (try = 0; try < 2; try++) {
+		baud = tty_termios_baud_rate(termios);
+
+		/*
+		 * The spd_hi, spd_vhi, spd_shi, spd_warp kludge...
+		 * Die! Die! Die!
+		 */
+		if (baud == 38400)
+			baud = altbaud;
+
+		/*
+		 * Special case: B0 rate.
+		 */
+		if (baud == 0)
+			baud = 9600;
+
+		if (baud >= min && baud <= max)
+			return baud;
+
+		/*
+		 * Oops, the quotient was zero.  Try again with
+		 * the old baud rate if possible.
+		 */
+		termios->c_cflag &= ~CBAUD;
+		if (old) {
+			termios->c_cflag |= old->c_cflag & CBAUD;
+			old = NULL;
+			continue;
+		}
+
+		/*
+		 * As a last resort, if the quotient is zero,
+		 * default to 9600 bps
+		 */
+		termios->c_cflag |= B9600;
 	}
 
-	/*
-	 * Special case: B0 rate.
-	 */
-	if (baud == 0)
-		baud = 9600;
-
-	return baud;
+	return 0;
 }
 
 EXPORT_SYMBOL(uart_get_baud_rate);
-
-static inline unsigned int
-uart_calculate_quot(struct uart_port *port, unsigned int baud)
-{
-	unsigned int quot;
-
-	/*
-	 * Old custom speed handling.
-	 */
-	if (baud == 38400 && (port->flags & UPF_SPD_MASK) == UPF_SPD_CUST)
-		quot = port->custom_divisor;
-	else
-		quot = port->uartclk / (16 * baud);
-
-	return quot;
-}
 
 /**
  *	uart_get_divisor - return uart clock divisor
@@ -387,34 +399,18 @@ unsigned int
 uart_get_divisor(struct uart_port *port, struct termios *termios,
 		 struct termios *old_termios)
 {
-	unsigned int quot, try;
+	unsigned int quot, baud, max = port->uartclk / 16;
 
-	for (try = 0; try < 3; try ++) {
-		unsigned int baud;
+	/* Determine divisor based on baud rate */
+	baud = uart_get_baud_rate(port, termios, old_termios, 0, max);
 
-		/* Determine divisor based on baud rate */
-		baud = uart_get_baud_rate(port, termios);
-		quot = uart_calculate_quot(port, baud);
-		if (quot)
-			return quot;
-
-		/*
-		 * Oops, the quotient was zero.  Try again with
-		 * the old baud rate if possible.
-		 */
-		termios->c_cflag &= ~CBAUD;
-		if (old_termios) {
-			termios->c_cflag |= old_termios->c_cflag & CBAUD;
-			old_termios = NULL;
-			continue;
-		}
-
-		/*
-		 * As a last resort, if the quotient is zero,
-		 * default to 9600 bps
-		 */
-		termios->c_cflag |= B9600;
-	}
+	/*
+	 * Old custom speed handling.
+	 */
+	if (baud == 38400 && (port->flags & UPF_SPD_MASK) == UPF_SPD_CUST)
+		quot = port->custom_divisor;
+	else
+		quot = port->uartclk / (16 * baud);
 
 	return quot;
 }
@@ -427,7 +423,6 @@ uart_change_speed(struct uart_info *info, struct termios *old_termios)
 	struct tty_struct *tty = info->tty;
 	struct uart_port *port = info->port;
 	struct termios *termios;
-	unsigned int quot;
 
 	/*
 	 * If we have no tty, termios, or the port does not exist,
@@ -451,10 +446,7 @@ uart_change_speed(struct uart_info *info, struct termios *old_termios)
 	else
 		info->flags |= UIF_CHECK_CD;
 
-	quot = uart_get_divisor(port, termios, old_termios);
-	uart_update_timeout(port, termios->c_cflag, quot);
-
-	port->ops->change_speed(port, termios->c_cflag, termios->c_iflag, quot);
+	port->ops->set_termios(port, termios, old_termios);
 }
 
 static inline void
@@ -827,7 +819,7 @@ uart_set_info(struct uart_info *info, struct serial_struct *newinfo)
 
 	port->irq              = new_serial.irq;
 	port->uartclk          = new_serial.baud_base * 16;
-	port->flags            = new_serial.flags & UPF_FLAGS;
+	port->flags            = new_serial.flags & UPF_CHANGE_MASK;
 	port->custom_divisor   = new_serial.custom_divisor;
 	state->close_delay     = new_serial.close_delay * HZ / 100;
 	state->closing_wait    = new_serial.closing_wait * HZ / 100;
@@ -1267,7 +1259,6 @@ static void uart_close(struct tty_struct *tty, struct file *filp)
 	if (tty->ldisc.flush_buffer)
 		tty->ldisc.flush_buffer(tty);
 	tty->closing = 0;
-	info->event = 0;
 	info->tty = NULL;
 	if (info->blocked_open) {
 		if (info->state->close_delay) {
@@ -1376,7 +1367,6 @@ static void uart_hangup(struct tty_struct *tty)
 		return;
 	}
 	uart_shutdown(info);
-	info->event = 0;
 	state->count = 0;
 	info->flags &= ~UIF_NORMAL_ACTIVE;
 	info->tty = NULL;
@@ -1859,9 +1849,12 @@ int __init
 uart_set_options(struct uart_port *port, struct console *co,
 		 int baud, int parity, int bits, int flow)
 {
-	unsigned int cflag = CREAD | HUPCL | CLOCAL;
-	unsigned int quot;
+	struct termios termios;
 	int i;
+
+	memset(&termios, 0, sizeof(struct termios));
+
+	termios.c_cflag = CREAD | HUPCL | CLOCAL;
 
 	/*
 	 * Construct a cflag setting.
@@ -1870,28 +1863,27 @@ uart_set_options(struct uart_port *port, struct console *co,
 		if (baud_rates[i].rate <= baud)
 			break;
 
-	cflag |= baud_rates[i].cflag;
+	termios.c_cflag |= baud_rates[i].cflag;
 
 	if (bits == 7)
-		cflag |= CS7;
+		termios.c_cflag |= CS7;
 	else
-		cflag |= CS8;
+		termios.c_cflag |= CS8;
 
 	switch (parity) {
 	case 'o': case 'O':
-		cflag |= PARODD;
+		termios.c_cflag |= PARODD;
 		/*fall through*/
 	case 'e': case 'E':
-		cflag |= PARENB;
+		termios.c_cflag |= PARENB;
 		break;
 	}
 
 	if (flow == 'r')
-		cflag |= CRTSCTS;
+		termios.c_cflag |= CRTSCTS;
 
-	co->cflag = cflag;
-	quot = (port->uartclk / (16 * baud));
-	port->ops->change_speed(port, cflag, 0, quot);
+	port->ops->set_termios(port, &termios, NULL);
+	co->cflag = termios.c_cflag;
 
 	return 0;
 }

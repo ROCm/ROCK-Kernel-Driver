@@ -285,7 +285,7 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
          * and such will hang. */
         US_DEBUGP("Device indicates that it has %d bytes available\n",
                         le16_to_cpu (fst->Count));
-        US_DEBUGP("SCSI requested %d\n", usb_stor_transfer_length(srb));
+        US_DEBUGP("SCSI requested %d\n", srb->request_bufflen);
 
         /* Find the length we desire to read. */
 	switch (srb->cmnd[0]) {
@@ -296,7 +296,7 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
 			length = fst->Count;
 			break;
 		default:
- 			length = usb_stor_transfer_length (srb);
+ 			length = srb->request_bufflen;
 	}
 
 	/* verify that this amount is legal */

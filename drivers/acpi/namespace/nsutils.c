@@ -6,7 +6,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -50,14 +50,14 @@
 
 void
 acpi_ns_report_error (
-	char                    *module_name,
-	u32                     line_number,
-	u32                     component_id,
-	char                    *internal_name,
-	acpi_status             lookup_status)
+	char                            *module_name,
+	u32                             line_number,
+	u32                             component_id,
+	char                            *internal_name,
+	acpi_status                     lookup_status)
 {
-	acpi_status             status;
-	char                    *name;
+	acpi_status                     status;
+	char                            *name;
 
 
 	/* Convert path to external format */
@@ -102,16 +102,16 @@ acpi_ns_report_error (
 
 void
 acpi_ns_report_method_error (
-	char                    *module_name,
-	u32                     line_number,
-	u32                     component_id,
-	char                    *message,
-	acpi_namespace_node     *prefix_node,
-	char                    *path,
-	acpi_status             method_status)
+	char                            *module_name,
+	u32                             line_number,
+	u32                             component_id,
+	char                            *message,
+	struct acpi_namespace_node      *prefix_node,
+	char                            *path,
+	acpi_status                     method_status)
 {
-	acpi_status             status;
-	acpi_namespace_node     *node = prefix_node;
+	acpi_status                     status;
+	struct acpi_namespace_node      *node = prefix_node;
 
 
 	if (path) {
@@ -142,11 +142,11 @@ acpi_ns_report_method_error (
 
 void
 acpi_ns_print_node_pathname (
-	acpi_namespace_node     *node,
-	char                    *msg)
+	struct acpi_namespace_node      *node,
+	char                            *msg)
 {
-	acpi_buffer             buffer;
-	acpi_status             status;
+	struct acpi_buffer              buffer;
+	acpi_status                     status;
 
 
 	/* Convert handle to a full pathname and print it (with supplied message) */
@@ -175,7 +175,7 @@ acpi_ns_print_node_pathname (
 
 u8
 acpi_ns_valid_root_prefix (
-	char                    prefix)
+	char                            prefix)
 {
 
 	return ((u8) (prefix == '\\'));
@@ -196,7 +196,7 @@ acpi_ns_valid_root_prefix (
 
 u8
 acpi_ns_valid_path_separator (
-	char                    sep)
+	char                            sep)
 {
 
 	return ((u8) (sep == '.'));
@@ -215,7 +215,7 @@ acpi_ns_valid_path_separator (
 
 acpi_object_type
 acpi_ns_get_type (
-	acpi_namespace_node     *node)
+	struct acpi_namespace_node      *node)
 {
 	ACPI_FUNCTION_TRACE ("ns_get_type");
 
@@ -242,7 +242,7 @@ acpi_ns_get_type (
 
 u32
 acpi_ns_local (
-	acpi_object_type        type)
+	acpi_object_type                type)
 {
 	ACPI_FUNCTION_TRACE ("ns_local");
 
@@ -274,10 +274,10 @@ acpi_ns_local (
 
 void
 acpi_ns_get_internal_name_length (
-	acpi_namestring_info    *info)
+	struct acpi_namestring_info     *info)
 {
-	char                    *next_external_char;
-	u32                     i;
+	char                            *next_external_char;
+	u32                             i;
 
 
 	ACPI_FUNCTION_ENTRY ();
@@ -348,13 +348,13 @@ acpi_ns_get_internal_name_length (
 
 acpi_status
 acpi_ns_build_internal_name (
-	acpi_namestring_info    *info)
+	struct acpi_namestring_info     *info)
 {
-	u32                     num_segments = info->num_segments;
-	char                    *internal_name = info->internal_name;
-	char                    *external_name = info->next_external_char;
-	char                    *result = NULL;
-	acpi_native_uint        i;
+	u32                             num_segments = info->num_segments;
+	char                            *internal_name = info->internal_name;
+	char                            *external_name = info->next_external_char;
+	char                            *result = NULL;
+	acpi_native_uint                i;
 
 
 	ACPI_FUNCTION_TRACE ("ns_build_internal_name");
@@ -469,12 +469,12 @@ acpi_ns_build_internal_name (
 
 acpi_status
 acpi_ns_internalize_name (
-	char                    *external_name,
-	char                    **converted_name)
+	char                            *external_name,
+	char                            **converted_name)
 {
-	char                    *internal_name;
-	acpi_namestring_info    info;
-	acpi_status             status;
+	char                            *internal_name;
+	struct acpi_namestring_info     info;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("ns_internalize_name");
@@ -529,17 +529,17 @@ acpi_ns_internalize_name (
 
 acpi_status
 acpi_ns_externalize_name (
-	u32                     internal_name_length,
-	char                    *internal_name,
-	u32                     *converted_name_length,
-	char                    **converted_name)
+	u32                             internal_name_length,
+	char                            *internal_name,
+	u32                             *converted_name_length,
+	char                            **converted_name)
 {
-	acpi_native_uint        names_index = 0;
-	acpi_native_uint        num_segments = 0;
-	acpi_native_uint        required_length;
-	acpi_native_uint        prefix_length = 0;
-	acpi_native_uint        i = 0;
-	acpi_native_uint        j = 0;
+	acpi_native_uint                names_index = 0;
+	acpi_native_uint                num_segments = 0;
+	acpi_native_uint                required_length;
+	acpi_native_uint                prefix_length = 0;
+	acpi_native_uint                i = 0;
+	acpi_native_uint                j = 0;
 
 
 	ACPI_FUNCTION_TRACE ("ns_externalize_name");
@@ -686,9 +686,9 @@ acpi_ns_externalize_name (
  *
  ******************************************************************************/
 
-acpi_namespace_node *
+struct acpi_namespace_node *
 acpi_ns_map_handle_to_node (
-	acpi_handle             handle)
+	acpi_handle                     handle)
 {
 
 	ACPI_FUNCTION_ENTRY ();
@@ -711,7 +711,7 @@ acpi_ns_map_handle_to_node (
 		return (NULL);
 	}
 
-	return ((acpi_namespace_node *) handle);
+	return ((struct acpi_namespace_node *) handle);
 }
 
 
@@ -729,7 +729,7 @@ acpi_ns_map_handle_to_node (
 
 acpi_handle
 acpi_ns_convert_entry_to_handle (
-	acpi_namespace_node         *node)
+	struct acpi_namespace_node          *node)
 {
 
 
@@ -772,8 +772,8 @@ acpi_ns_convert_entry_to_handle (
 void
 acpi_ns_terminate (void)
 {
-	acpi_operand_object     *obj_desc;
-	acpi_namespace_node     *this_node;
+	union acpi_operand_object       *obj_desc;
+	struct acpi_namespace_node      *this_node;
 
 
 	ACPI_FUNCTION_TRACE ("ns_terminate");
@@ -824,7 +824,7 @@ acpi_ns_terminate (void)
 
 u32
 acpi_ns_opens_scope (
-	acpi_object_type        type)
+	acpi_object_type                type)
 {
 	ACPI_FUNCTION_TRACE_STR ("ns_opens_scope", acpi_ut_get_type_name (type));
 
@@ -864,14 +864,14 @@ acpi_ns_opens_scope (
 
 acpi_status
 acpi_ns_get_node_by_path (
-	char                    *pathname,
-	acpi_namespace_node     *start_node,
-	u32                     flags,
-	acpi_namespace_node     **return_node)
+	char                            *pathname,
+	struct acpi_namespace_node      *start_node,
+	u32                             flags,
+	struct acpi_namespace_node      **return_node)
 {
-	acpi_generic_state      scope_info;
-	acpi_status             status;
-	char                    *internal_path = NULL;
+	union acpi_generic_state        scope_info;
+	acpi_status                     status;
+	char                            *internal_path = NULL;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ns_get_node_by_path", pathname);
@@ -935,9 +935,9 @@ acpi_ns_get_node_by_path (
 
 acpi_name
 acpi_ns_find_parent_name (
-	acpi_namespace_node     *child_node)
+	struct acpi_namespace_node      *child_node)
 {
-	acpi_namespace_node     *parent_node;
+	struct acpi_namespace_node      *parent_node;
 
 
 	ACPI_FUNCTION_TRACE ("ns_find_parent_name");
@@ -978,9 +978,9 @@ acpi_ns_find_parent_name (
  ******************************************************************************/
 
 
-acpi_namespace_node *
+struct acpi_namespace_node *
 acpi_ns_get_parent_node (
-	acpi_namespace_node     *node)
+	struct acpi_namespace_node      *node)
 {
 	ACPI_FUNCTION_ENTRY ();
 
@@ -1020,9 +1020,9 @@ acpi_ns_get_parent_node (
  ******************************************************************************/
 
 
-acpi_namespace_node *
+struct acpi_namespace_node *
 acpi_ns_get_next_valid_node (
-	acpi_namespace_node     *node)
+	struct acpi_namespace_node      *node)
 {
 
 	/* If we are at the end of this peer list, return NULL */

@@ -181,7 +181,7 @@ static int empeg_open (struct usb_serial_port *port, struct file *filp)
 	result = usb_submit_urb(port->read_urb, GFP_KERNEL);
 
 	if (result)
-		dev_err(port->dev, "%s - failed submitting read urb, error %d\n", __FUNCTION__, result);
+		dev_err(&port->dev, "%s - failed submitting read urb, error %d\n", __FUNCTION__, result);
 
 	return result;
 }
@@ -205,7 +205,7 @@ static void empeg_close (struct usb_serial_port *port, struct file * filp)
 		usb_unlink_urb (port->read_urb);
 	}
 	/* Uncomment the following line if you want to see some statistics in your syslog */
-	/* dev_info (port->dev, "Bytes In = %d  Bytes Out = %d\n", bytes_in, bytes_out); */
+	/* dev_info (&port->dev, "Bytes In = %d  Bytes Out = %d\n", bytes_in, bytes_out); */
 }
 
 
@@ -248,7 +248,7 @@ static int empeg_write (struct usb_serial_port *port, int from_user, const unsig
 		if (urb->transfer_buffer == NULL) {
 			urb->transfer_buffer = kmalloc (URB_TRANSFER_BUFFER_SIZE, GFP_ATOMIC);
 			if (urb->transfer_buffer == NULL) {
-				dev_err(port->dev, "%s no more kernel memory...\n", __FUNCTION__);
+				dev_err(&port->dev, "%s no more kernel memory...\n", __FUNCTION__);
 				goto exit;
 			}
 		}
@@ -278,7 +278,7 @@ static int empeg_write (struct usb_serial_port *port, int from_user, const unsig
 		/* send it down the pipe */
 		status = usb_submit_urb(urb, GFP_ATOMIC);
 		if (status) {
-			dev_err(port->dev, "%s - usb_submit_urb(write bulk) failed with status = %d\n", __FUNCTION__, status);
+			dev_err(&port->dev, "%s - usb_submit_urb(write bulk) failed with status = %d\n", __FUNCTION__, status);
 			bytes_sent = status;
 			break;
 		}
@@ -426,7 +426,7 @@ static void empeg_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 	result = usb_submit_urb(port->read_urb, GFP_ATOMIC);
 
 	if (result)
-		dev_err(urb->dev->dev, "%s - failed resubmitting read urb, error %d\n", __FUNCTION__, result);
+		dev_err(&urb->dev->dev, "%s - failed resubmitting read urb, error %d\n", __FUNCTION__, result);
 
 	return;
 
@@ -451,7 +451,7 @@ static void empeg_unthrottle (struct usb_serial_port *port)
 	result = usb_submit_urb(port->read_urb, GFP_ATOMIC);
 
 	if (result)
-		dev_err(port->dev, "%s - failed submitting read urb, error %d\n", __FUNCTION__, result);
+		dev_err(&port->dev, "%s - failed submitting read urb, error %d\n", __FUNCTION__, result);
 
 	return;
 }

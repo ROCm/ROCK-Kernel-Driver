@@ -6,7 +6,7 @@
  ******************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -55,14 +55,14 @@
 
 acpi_status
 acpi_evaluate_object_typed (
-	acpi_handle             handle,
-	acpi_string             pathname,
-	acpi_object_list        *external_params,
-	acpi_buffer             *return_buffer,
-	acpi_object_type        return_type)
+	acpi_handle                     handle,
+	acpi_string                     pathname,
+	struct acpi_object_list         *external_params,
+	struct acpi_buffer              *return_buffer,
+	acpi_object_type                return_type)
 {
-	acpi_status             status;
-	u8                      must_free = FALSE;
+	acpi_status                     status;
+	u8                              must_free = FALSE;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_evaluate_object_typed");
@@ -102,7 +102,7 @@ acpi_evaluate_object_typed (
 
 	/* Examine the object type returned from evaluate_object */
 
-	if (((acpi_object *) return_buffer->pointer)->type == return_type) {
+	if (((union acpi_object *) return_buffer->pointer)->type == return_type) {
 		return_ACPI_STATUS (AE_OK);
 	}
 
@@ -110,7 +110,7 @@ acpi_evaluate_object_typed (
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 		"Incorrect return type [%s] requested [%s]\n",
-		acpi_ut_get_type_name (((acpi_object *) return_buffer->pointer)->type),
+		acpi_ut_get_type_name (((union acpi_object *) return_buffer->pointer)->type),
 		acpi_ut_get_type_name (return_type)));
 
 	if (must_free) {
@@ -147,16 +147,16 @@ acpi_evaluate_object_typed (
 
 acpi_status
 acpi_evaluate_object (
-	acpi_handle             handle,
-	acpi_string             pathname,
-	acpi_object_list        *external_params,
-	acpi_buffer             *return_buffer)
+	acpi_handle                     handle,
+	acpi_string                     pathname,
+	struct acpi_object_list         *external_params,
+	struct acpi_buffer              *return_buffer)
 {
-	acpi_status             status;
-	acpi_operand_object     **internal_params = NULL;
-	acpi_operand_object     *internal_return_obj = NULL;
-	acpi_size               buffer_space_needed;
-	u32                     i;
+	acpi_status                     status;
+	union acpi_operand_object       **internal_params = NULL;
+	union acpi_operand_object       *internal_return_obj = NULL;
+	acpi_size                       buffer_space_needed;
+	u32                             i;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_evaluate_object");
@@ -357,14 +357,14 @@ acpi_evaluate_object (
 
 acpi_status
 acpi_walk_namespace (
-	acpi_object_type        type,
-	acpi_handle             start_object,
-	u32                     max_depth,
-	acpi_walk_callback      user_function,
-	void                    *context,
-	void                    **return_value)
+	acpi_object_type                type,
+	acpi_handle                     start_object,
+	u32                             max_depth,
+	acpi_walk_callback              user_function,
+	void                            *context,
+	void                            **return_value)
 {
-	acpi_status             status;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_walk_namespace");
@@ -413,17 +413,17 @@ acpi_walk_namespace (
 
 static acpi_status
 acpi_ns_get_device_callback (
-	acpi_handle             obj_handle,
-	u32                     nesting_level,
-	void                    *context,
-	void                    **return_value)
+	acpi_handle                     obj_handle,
+	u32                             nesting_level,
+	void                            *context,
+	void                            **return_value)
 {
-	acpi_status             status;
-	acpi_namespace_node     *node;
-	u32                     flags;
-	acpi_device_id          hid;
-	acpi_device_id          cid;
-	acpi_get_devices_info   *info;
+	acpi_status                     status;
+	struct acpi_namespace_node      *node;
+	u32                             flags;
+	struct acpi_device_id           hid;
+	struct acpi_device_id           cid;
+	struct acpi_get_devices_info    *info;
 
 
 	info = context;
@@ -517,13 +517,13 @@ acpi_ns_get_device_callback (
 
 acpi_status
 acpi_get_devices (
-	char                    *HID,
-	acpi_walk_callback      user_function,
-	void                    *context,
-	void                    **return_value)
+	char                            *HID,
+	acpi_walk_callback              user_function,
+	void                            *context,
+	void                            **return_value)
 {
-	acpi_status             status;
-	acpi_get_devices_info   info;
+	acpi_status                     status;
+	struct acpi_get_devices_info    info;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_get_devices");
@@ -581,12 +581,12 @@ acpi_get_devices (
 
 acpi_status
 acpi_attach_data (
-	acpi_handle             obj_handle,
-	acpi_object_handler     handler,
-	void                    *data)
+	acpi_handle                     obj_handle,
+	acpi_object_handler             handler,
+	void                            *data)
 {
-	acpi_namespace_node     *node;
-	acpi_status             status;
+	struct acpi_namespace_node      *node;
+	acpi_status                     status;
 
 
 	/* Parameter validation */
@@ -633,11 +633,11 @@ unlock_and_exit:
 
 acpi_status
 acpi_detach_data (
-	acpi_handle             obj_handle,
-	acpi_object_handler     handler)
+	acpi_handle                     obj_handle,
+	acpi_object_handler             handler)
 {
-	acpi_namespace_node     *node;
-	acpi_status             status;
+	struct acpi_namespace_node      *node;
+	acpi_status                     status;
 
 
 	/* Parameter validation */
@@ -684,12 +684,12 @@ unlock_and_exit:
 
 acpi_status
 acpi_get_data (
-	acpi_handle             obj_handle,
-	acpi_object_handler     handler,
-	void                    **data)
+	acpi_handle                     obj_handle,
+	acpi_object_handler             handler,
+	void                            **data)
 {
-	acpi_namespace_node     *node;
-	acpi_status             status;
+	struct acpi_namespace_node      *node;
+	acpi_status                     status;
 
 
 	/* Parameter validation */

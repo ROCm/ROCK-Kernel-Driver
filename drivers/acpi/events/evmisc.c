@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -47,7 +47,7 @@
 
 u8
 acpi_ev_is_notify_object (
-	acpi_namespace_node     *node)
+	struct acpi_namespace_node      *node)
 {
 	switch (node->type) {
 	case ACPI_TYPE_DEVICE:
@@ -80,7 +80,7 @@ acpi_ev_is_notify_object (
 
 u32
 acpi_ev_get_gpe_register_index (
-	u32                     gpe_number)
+	u32                             gpe_number)
 {
 
 	if (gpe_number > acpi_gbl_gpe_number_max) {
@@ -106,7 +106,7 @@ acpi_ev_get_gpe_register_index (
 
 u32
 acpi_ev_get_gpe_number_index (
-	u32                     gpe_number)
+	u32                             gpe_number)
 {
 
 	if (gpe_number > acpi_gbl_gpe_number_max) {
@@ -132,13 +132,13 @@ acpi_ev_get_gpe_number_index (
 
 acpi_status
 acpi_ev_queue_notify_request (
-	acpi_namespace_node     *node,
-	u32                     notify_value)
+	struct acpi_namespace_node      *node,
+	u32                             notify_value)
 {
-	acpi_operand_object     *obj_desc;
-	acpi_operand_object     *handler_obj = NULL;
-	acpi_generic_state      *notify_info;
-	acpi_status             status = AE_OK;
+	union acpi_operand_object       *obj_desc;
+	union acpi_operand_object       *handler_obj = NULL;
+	union acpi_generic_state        *notify_info;
+	acpi_status                     status = AE_OK;
 
 
 	ACPI_FUNCTION_NAME ("ev_queue_notify_request");
@@ -250,12 +250,12 @@ acpi_ev_queue_notify_request (
 
 void ACPI_SYSTEM_XFACE
 acpi_ev_notify_dispatch (
-	void                    *context)
+	void                            *context)
 {
-	acpi_generic_state      *notify_info = (acpi_generic_state *) context;
-	acpi_notify_handler     global_handler = NULL;
-	void                    *global_context = NULL;
-	acpi_operand_object     *handler_obj;
+	union acpi_generic_state        *notify_info = (union acpi_generic_state *) context;
+	acpi_notify_handler             global_handler = NULL;
+	void                            *global_context = NULL;
+	union acpi_operand_object       *handler_obj;
 
 
 	ACPI_FUNCTION_ENTRY ();
@@ -316,9 +316,9 @@ acpi_ev_notify_dispatch (
 
 static void ACPI_SYSTEM_XFACE
 acpi_ev_global_lock_thread (
-	void                    *context)
+	void                            *context)
 {
-	acpi_status             status;
+	acpi_status                     status;
 
 
 	/* Signal threads that are waiting for the lock */
@@ -349,10 +349,10 @@ acpi_ev_global_lock_thread (
 
 static u32
 acpi_ev_global_lock_handler (
-	void                    *context)
+	void                            *context)
 {
-	u8                      acquired = FALSE;
-	acpi_status             status;
+	u8                              acquired = FALSE;
+	acpi_status                     status;
 
 
 	/*
@@ -395,7 +395,7 @@ acpi_ev_global_lock_handler (
 acpi_status
 acpi_ev_init_global_lock_handler (void)
 {
-	acpi_status             status;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("ev_init_global_lock_handler");
@@ -433,10 +433,10 @@ acpi_ev_init_global_lock_handler (void)
 
 acpi_status
 acpi_ev_acquire_global_lock (
-	u16                     timeout)
+	u16                             timeout)
 {
-	acpi_status             status = AE_OK;
-	u8                      acquired = FALSE;
+	acpi_status                     status = AE_OK;
+	u8                              acquired = FALSE;
 
 
 	ACPI_FUNCTION_TRACE ("ev_acquire_global_lock");
@@ -499,8 +499,8 @@ acpi_ev_acquire_global_lock (
 acpi_status
 acpi_ev_release_global_lock (void)
 {
-	u8                      pending = FALSE;
-	acpi_status             status = AE_OK;
+	u8                              pending = FALSE;
+	acpi_status                     status = AE_OK;
 
 
 	ACPI_FUNCTION_TRACE ("ev_release_global_lock");
@@ -554,8 +554,8 @@ acpi_ev_release_global_lock (void)
 void
 acpi_ev_terminate (void)
 {
-	acpi_native_uint        i;
-	acpi_status             status;
+	acpi_native_uint                i;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("ev_terminate");

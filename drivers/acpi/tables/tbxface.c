@@ -6,7 +6,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -49,8 +49,8 @@
 acpi_status
 acpi_load_tables (void)
 {
-	acpi_pointer            rsdp_address;
-	acpi_status             status;
+	struct acpi_pointer             rsdp_address;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_load_tables");
@@ -136,11 +136,11 @@ error_exit:
 
 acpi_status
 acpi_load_table (
-	acpi_table_header       *table_ptr)
+	struct acpi_table_header        *table_ptr)
 {
-	acpi_status             status;
-	acpi_table_desc         table_info;
-	acpi_pointer            address;
+	acpi_status                     status;
+	struct acpi_table_desc          table_info;
+	struct acpi_pointer             address;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_load_table");
@@ -214,9 +214,9 @@ acpi_load_table (
 
 acpi_status
 acpi_unload_table (
-	acpi_table_type         table_type)
+	acpi_table_type                 table_type)
 {
-	acpi_table_desc         *list_head;
+	struct acpi_table_desc          *list_head;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_unload_table");
@@ -259,11 +259,11 @@ acpi_unload_table (
  *              Instance        - the non zero instance of the table, allows
  *                                support for multiple tables of the same type
  *                                see acpi_gbl_acpi_table_flag
- *              out_table_header - pointer to the acpi_table_header if successful
+ *              out_table_header - pointer to the struct acpi_table_header if successful
  *
  * DESCRIPTION: This function is called to get an ACPI table header.  The caller
  *              supplies an pointer to a data area sufficient to contain an ACPI
- *              acpi_table_header structure.
+ *              struct acpi_table_header structure.
  *
  *              The header contains a length field that can be used to determine
  *              the size of the buffer needed to contain the entire table.  This
@@ -274,12 +274,12 @@ acpi_unload_table (
 
 acpi_status
 acpi_get_table_header (
-	acpi_table_type         table_type,
-	u32                     instance,
-	acpi_table_header       *out_table_header)
+	acpi_table_type                 table_type,
+	u32                             instance,
+	struct acpi_table_header        *out_table_header)
 {
-	acpi_table_header       *tbl_ptr;
-	acpi_status             status;
+	struct acpi_table_header        *tbl_ptr;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_get_table_header");
@@ -318,7 +318,7 @@ acpi_get_table_header (
 	 * Copy the header to the caller's buffer
 	 */
 	ACPI_MEMCPY ((void *) out_table_header, (void *) tbl_ptr,
-			 sizeof (acpi_table_header));
+			 sizeof (struct acpi_table_header));
 
 	return_ACPI_STATUS (status);
 }
@@ -349,13 +349,13 @@ acpi_get_table_header (
 
 acpi_status
 acpi_get_table (
-	acpi_table_type         table_type,
-	u32                     instance,
-	acpi_buffer             *ret_buffer)
+	acpi_table_type                 table_type,
+	u32                             instance,
+	struct acpi_buffer              *ret_buffer)
 {
-	acpi_table_header       *tbl_ptr;
-	acpi_status             status;
-	acpi_size               table_length;
+	struct acpi_table_header        *tbl_ptr;
+	acpi_status                     status;
+	acpi_size                       table_length;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_get_table");
@@ -402,7 +402,7 @@ acpi_get_table (
 		/*
 		 *  RSD PTR is the only "table" without a header
 		 */
-		table_length = sizeof (rsdp_descriptor);
+		table_length = sizeof (struct rsdp_descriptor);
 	}
 	else {
 		table_length = (acpi_size) tbl_ptr->length;

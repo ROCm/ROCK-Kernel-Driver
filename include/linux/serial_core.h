@@ -86,8 +86,8 @@ struct uart_ops {
 	void		(*break_ctl)(struct uart_port *, int ctl);
 	int		(*startup)(struct uart_port *);
 	void		(*shutdown)(struct uart_port *);
-	void		(*change_speed)(struct uart_port *, unsigned int cflag,
-				        unsigned int iflag, unsigned int quot);
+	void		(*set_termios)(struct uart_port *, struct termios *new,
+				       struct termios *old);
 	void		(*pm)(struct uart_port *, unsigned int state,
 			      unsigned int oldstate);
 	int		(*set_wake)(struct uart_port *, unsigned int state);
@@ -179,7 +179,7 @@ struct uart_port {
 #define UPF_RESOURCES		(1 << 30)
 #define UPF_IOREMAP		(1 << 31)
 
-#define UPF_FLAGS		(0x7fff)
+#define UPF_CHANGE_MASK		(0x7fff)
 #define UPF_USR_MASK		(UPF_SPD_MASK|UPF_LOW_LATENCY)
 
 	unsigned int		mctrl;			/* current modem ctrl settings */
@@ -242,7 +242,6 @@ struct uart_info {
 	unsigned char		*tmpbuf;
 	struct semaphore	tmpbuf_sem;
 
-	unsigned long		event;
 	int			blocked_open;
 
 	struct tasklet_struct	tlet;
@@ -275,12 +274,31 @@ struct uart_driver {
 };
 
 void uart_write_wakeup(struct uart_port *port);
+
+/*
+ * Baud rate helpers.
+ */
+void uart_update_timeout(struct uart_port *port, unsigned int cflag,
+			 unsigned int quot);
+unsigned int uart_get_baud_rate(struct uart_port *port, struct termios *termios,
+				struct termios *old, unsigned int min,
+				unsigned int max);
+unsigned int uart_get_divisor(struct uart_port *port, struct termios *termios,
+			      struct termios *old_termios);
+
+/*
+ * Console helpers.
+ */
 struct uart_port *uart_get_console(struct uart_port *ports, int nr,
 				   struct console *c);
 void uart_parse_options(char *options, int *baud, int *parity, int *bits,
 			int *flow);
 int uart_set_options(struct uart_port *port, struct console *co, int baud,
 		     int parity, int bits, int flow);
+
+/*
+ * Port/driver registration/removal
+ */
 int uart_register_driver(struct uart_driver *uart);
 void uart_unregister_driver(struct uart_driver *uart);
 void uart_unregister_port(struct uart_driver *reg, int line);

@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -47,10 +47,10 @@
 
 u32
 acpi_tb_get_table_count (
-	rsdp_descriptor         *RSDP,
-	acpi_table_header       *RSDT)
+	struct rsdp_descriptor          *RSDP,
+	struct acpi_table_header        *RSDT)
 {
-	u32                     pointer_size;
+	u32                             pointer_size;
 
 
 	ACPI_FUNCTION_ENTRY ();
@@ -73,7 +73,7 @@ acpi_tb_get_table_count (
 	 * pointers contained within the RSDT/XSDT.  The size of the pointers
 	 * is architecture-dependent.
 	 */
-	return ((RSDT->length - sizeof (acpi_table_header)) / pointer_size);
+	return ((RSDT->length - sizeof (struct acpi_table_header)) / pointer_size);
 }
 
 
@@ -91,11 +91,11 @@ acpi_tb_get_table_count (
 
 acpi_status
 acpi_tb_convert_to_xsdt (
-	acpi_table_desc         *table_info)
+	struct acpi_table_desc          *table_info)
 {
-	acpi_size               table_size;
-	u32                     i;
-	xsdt_descriptor         *new_table;
+	acpi_size                       table_size;
+	u32                             i;
+	XSDT_DESCRIPTOR         *new_table;
 
 
 	ACPI_FUNCTION_ENTRY ();
@@ -104,7 +104,7 @@ acpi_tb_convert_to_xsdt (
 	/* Compute size of the converted XSDT */
 
 	table_size = ((acpi_size) acpi_gbl_rsdt_table_count * sizeof (u64)) +
-			  sizeof (acpi_table_header);
+			  sizeof (struct acpi_table_header);
 
 	/* Allocate an XSDT */
 
@@ -115,7 +115,7 @@ acpi_tb_convert_to_xsdt (
 
 	/* Copy the header and set the length */
 
-	ACPI_MEMCPY (new_table, table_info->pointer, sizeof (acpi_table_header));
+	ACPI_MEMCPY (new_table, table_info->pointer, sizeof (struct acpi_table_header));
 	new_table->header.length = (u32) table_size;
 
 	/* Copy the table pointers */
@@ -123,11 +123,11 @@ acpi_tb_convert_to_xsdt (
 	for (i = 0; i < acpi_gbl_rsdt_table_count; i++) {
 		if (acpi_gbl_RSDP->revision < 2) {
 			ACPI_STORE_ADDRESS (new_table->table_offset_entry[i],
-				((RSDT_DESCRIPTOR_REV1 *) table_info->pointer)->table_offset_entry[i]);
+				((struct rsdt_descriptor_rev1 *) table_info->pointer)->table_offset_entry[i]);
 		}
 		else {
 			new_table->table_offset_entry[i] =
-				((xsdt_descriptor *) table_info->pointer)->table_offset_entry[i];
+				((XSDT_DESCRIPTOR *) table_info->pointer)->table_offset_entry[i];
 		}
 	}
 
@@ -137,7 +137,7 @@ acpi_tb_convert_to_xsdt (
 
 	/* Point the table descriptor to the new table */
 
-	table_info->pointer     = (acpi_table_header *) new_table;
+	table_info->pointer     = (struct acpi_table_header *) new_table;
 	table_info->length      = table_size;
 	table_info->allocation  = ACPI_MEM_ALLOCATED;
 
@@ -160,8 +160,8 @@ acpi_tb_convert_to_xsdt (
 
 static void
 acpi_tb_convert_fadt1 (
-	fadt_descriptor_rev2   *local_fadt,
-	fadt_descriptor_rev1   *original_fadt)
+	struct fadt_descriptor_rev2    *local_fadt,
+	struct fadt_descriptor_rev1    *original_fadt)
 {
 
 
@@ -174,7 +174,7 @@ acpi_tb_convert_fadt1 (
 	 * The 2.0 table is an extension of the 1.0 table, so the entire 1.0
 	 * table can be copied first, then expand some fields to 64 bits.
 	 */
-	ACPI_MEMCPY (local_fadt, original_fadt, sizeof (fadt_descriptor_rev1));
+	ACPI_MEMCPY (local_fadt, original_fadt, sizeof (struct fadt_descriptor_rev1));
 
 	/* Convert table pointers to 64-bit fields */
 
@@ -242,13 +242,13 @@ acpi_tb_convert_fadt1 (
 
 static void
 acpi_tb_convert_fadt2 (
-	fadt_descriptor_rev2   *local_fadt,
-	fadt_descriptor_rev2   *original_fadt)
+	struct fadt_descriptor_rev2    *local_fadt,
+	struct fadt_descriptor_rev2    *original_fadt)
 {
 
 	/* We have an ACPI 2.0 FADT but we must copy it to our local buffer */
 
-	ACPI_MEMCPY (local_fadt, original_fadt, sizeof (fadt_descriptor_rev2));
+	ACPI_MEMCPY (local_fadt, original_fadt, sizeof (struct fadt_descriptor_rev2));
 
 	/*
 	 * "X" fields are optional extensions to the original V1.0 fields, so
@@ -323,8 +323,8 @@ acpi_tb_convert_fadt2 (
 acpi_status
 acpi_tb_convert_table_fadt (void)
 {
-	fadt_descriptor_rev2   *local_fadt;
-	acpi_table_desc        *table_desc;
+	struct fadt_descriptor_rev2    *local_fadt;
+	struct acpi_table_desc         *table_desc;
 
 
 	ACPI_FUNCTION_TRACE ("tb_convert_table_fadt");
@@ -334,7 +334,7 @@ acpi_tb_convert_table_fadt (void)
 	 * acpi_gbl_FADT is valid
 	 * Allocate and zero the 2.0 FADT buffer
 	 */
-	local_fadt = ACPI_MEM_CALLOCATE (sizeof (fadt_descriptor_rev2));
+	local_fadt = ACPI_MEM_CALLOCATE (sizeof (struct fadt_descriptor_rev2));
 	if (local_fadt == NULL) {
 		return_ACPI_STATUS (AE_NO_MEMORY);
 	}
@@ -343,13 +343,13 @@ acpi_tb_convert_table_fadt (void)
 	 * FADT length and version validation.  The table must be at least as
 	 * long as the version 1.0 FADT
 	 */
-	if (acpi_gbl_FADT->header.length < sizeof (fadt_descriptor_rev1)) {
+	if (acpi_gbl_FADT->header.length < sizeof (struct fadt_descriptor_rev1)) {
 		ACPI_REPORT_ERROR (("Invalid FADT table length: 0x%X\n", acpi_gbl_FADT->header.length));
 		return_ACPI_STATUS (AE_INVALID_TABLE_LENGTH);
 	}
 
 	if (acpi_gbl_FADT->header.revision >= FADT2_REVISION_ID) {
-		if (acpi_gbl_FADT->header.length < sizeof (fadt_descriptor_rev2)) {
+		if (acpi_gbl_FADT->header.length < sizeof (struct fadt_descriptor_rev2)) {
 			/* Length is too short to be a V2.0 table */
 
 			ACPI_REPORT_WARNING (("Inconsistent FADT length (0x%X) and revision (0x%X), using FADT V1.0 portion of table\n",
@@ -382,9 +382,9 @@ acpi_tb_convert_table_fadt (void)
 
 	/* Install the new table */
 
-	table_desc->pointer     = (acpi_table_header *) acpi_gbl_FADT;
+	table_desc->pointer     = (struct acpi_table_header *) acpi_gbl_FADT;
 	table_desc->allocation  = ACPI_MEM_ALLOCATED;
-	table_desc->length      = sizeof (fadt_descriptor_rev2);
+	table_desc->length      = sizeof (struct fadt_descriptor_rev2);
 
 	/* Dump the entire FADT */
 
@@ -412,7 +412,7 @@ acpi_tb_convert_table_fadt (void)
 
 acpi_status
 acpi_tb_build_common_facs (
-	acpi_table_desc         *table_info)
+	struct acpi_table_desc          *table_info)
 {
 
 	ACPI_FUNCTION_TRACE ("tb_build_common_facs");

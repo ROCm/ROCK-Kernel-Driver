@@ -41,7 +41,7 @@ static u32 roothub_portstatus (struct ohci_hcd *hc, int i)
 /*-------------------------------------------------------------------------*/
 
 #define dbg_port(hc,label,num,value) \
-	dev_dbg (*hc->hcd.controller, \
+	dev_dbg (hc->hcd.controller, \
 		"%s roothub.portstatus [%d] " \
 		"= 0x%08x%s%s%s%s%s%s%s%s%s%s%s%s\n", \
 		label, num, temp, \

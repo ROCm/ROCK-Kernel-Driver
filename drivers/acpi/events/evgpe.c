@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -45,14 +45,14 @@
 acpi_status
 acpi_ev_gpe_initialize (void)
 {
-	acpi_native_uint        i;
-	acpi_native_uint        j;
-	u32                     gpe_block;
-	u32                     gpe_register;
-	u32                     gpe_number_index;
-	u32                     gpe_number;
-	acpi_gpe_register_info  *gpe_register_info;
-	acpi_status             status;
+	acpi_native_uint                i;
+	acpi_native_uint                j;
+	u32                             gpe_block;
+	u32                             gpe_register;
+	u32                             gpe_number_index;
+	u32                             gpe_number;
+	struct acpi_gpe_register_info   *gpe_register_info;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("ev_gpe_initialize");
@@ -148,7 +148,7 @@ acpi_ev_gpe_initialize (void)
 	/* Allocate the GPE number-to-index translation table */
 
 	acpi_gbl_gpe_number_to_index = ACPI_MEM_CALLOCATE (
-			   sizeof (acpi_gpe_index_info) *
+			   sizeof (struct acpi_gpe_index_info) *
 			   ((acpi_size) acpi_gbl_gpe_number_max + 1));
 	if (!acpi_gbl_gpe_number_to_index) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
@@ -159,13 +159,13 @@ acpi_ev_gpe_initialize (void)
 	/* Set the Gpe index table to GPE_INVALID */
 
 	ACPI_MEMSET (acpi_gbl_gpe_number_to_index, (int) ACPI_GPE_INVALID,
-			sizeof (acpi_gpe_index_info) * ((acpi_size) acpi_gbl_gpe_number_max + 1));
+			sizeof (struct acpi_gpe_index_info) * ((acpi_size) acpi_gbl_gpe_number_max + 1));
 
 	/* Allocate the GPE register information block */
 
 	acpi_gbl_gpe_register_info = ACPI_MEM_CALLOCATE (
 			  (acpi_size) acpi_gbl_gpe_register_count *
-			  sizeof (acpi_gpe_register_info));
+			  sizeof (struct acpi_gpe_register_info));
 	if (!acpi_gbl_gpe_register_info) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 			"Could not allocate the gpe_register_info table\n"));
@@ -178,7 +178,7 @@ acpi_ev_gpe_initialize (void)
 	 */
 	acpi_gbl_gpe_number_info = ACPI_MEM_CALLOCATE (
 			  ((acpi_size) acpi_gbl_gpe_register_count * ACPI_GPE_REGISTER_WIDTH) *
-			  sizeof (acpi_gpe_number_info));
+			  sizeof (struct acpi_gpe_number_info));
 	if (!acpi_gbl_gpe_number_info) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Could not allocate the gpe_number_info table\n"));
 		goto error_exit2;
@@ -301,16 +301,16 @@ error_exit1:
 
 static acpi_status
 acpi_ev_save_method_info (
-	acpi_handle             obj_handle,
-	u32                     level,
-	void                    *obj_desc,
-	void                    **return_value)
+	acpi_handle                     obj_handle,
+	u32                             level,
+	void                            *obj_desc,
+	void                            **return_value)
 {
-	u32                     gpe_number;
-	u32                     gpe_number_index;
-	char                    name[ACPI_NAME_SIZE + 1];
-	u8                      type;
-	acpi_status             status;
+	u32                             gpe_number;
+	u32                             gpe_number_index;
+	char                            name[ACPI_NAME_SIZE + 1];
+	u8                              type;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_NAME ("ev_save_method_info");
@@ -319,7 +319,7 @@ acpi_ev_save_method_info (
 	/* Extract the name from the object and convert to a string */
 
 	ACPI_MOVE_UNALIGNED32_TO_32 (name,
-			 &((acpi_namespace_node *) obj_handle)->name.integer);
+			 &((struct acpi_namespace_node *) obj_handle)->name.integer);
 	name[ACPI_NAME_SIZE] = 0;
 
 	/*
@@ -369,7 +369,7 @@ acpi_ev_save_method_info (
 	 * for use during dispatch of this GPE.
 	 */
 	acpi_gbl_gpe_number_info [gpe_number_index].type  = type;
-	acpi_gbl_gpe_number_info [gpe_number_index].method_node = (acpi_namespace_node *) obj_handle;
+	acpi_gbl_gpe_number_info [gpe_number_index].method_node = (struct acpi_namespace_node *) obj_handle;
 
 	/*
 	 * Enable the GPE (SCIs should be disabled at this point)
@@ -401,7 +401,7 @@ acpi_ev_save_method_info (
 acpi_status
 acpi_ev_init_gpe_control_methods (void)
 {
-	acpi_status             status;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("ev_init_gpe_control_methods");
@@ -440,14 +440,14 @@ acpi_ev_init_gpe_control_methods (void)
 u32
 acpi_ev_gpe_detect (void)
 {
-	u32                     int_status = ACPI_INTERRUPT_NOT_HANDLED;
-	u32                     i;
-	u32                     j;
-	u8                      enabled_status_byte;
-	u8                      bit_mask;
-	acpi_gpe_register_info  *gpe_register_info;
-	u32                     in_value;
-	acpi_status             status;
+	u32                             int_status = ACPI_INTERRUPT_NOT_HANDLED;
+	u32                             i;
+	u32                             j;
+	u8                              enabled_status_byte;
+	u8                              bit_mask;
+	struct acpi_gpe_register_info   *gpe_register_info;
+	u32                             in_value;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_NAME ("ev_gpe_detect");
@@ -528,12 +528,12 @@ acpi_ev_gpe_detect (void)
 
 static void ACPI_SYSTEM_XFACE
 acpi_ev_asynch_execute_gpe_method (
-	void                    *context)
+	void                            *context)
 {
-	u32                     gpe_number = (u32) ACPI_TO_INTEGER (context);
-	u32                     gpe_number_index;
-	acpi_gpe_number_info    gpe_info;
-	acpi_status             status;
+	u32                             gpe_number = (u32) ACPI_TO_INTEGER (context);
+	u32                             gpe_number_index;
+	struct acpi_gpe_number_info     gpe_info;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("ev_asynch_execute_gpe_method");
@@ -607,11 +607,11 @@ acpi_ev_asynch_execute_gpe_method (
 
 u32
 acpi_ev_gpe_dispatch (
-	u32                     gpe_number)
+	u32                             gpe_number)
 {
-	u32                     gpe_number_index;
-	acpi_gpe_number_info    *gpe_info;
-	acpi_status             status;
+	u32                             gpe_number_index;
+	struct acpi_gpe_number_info     *gpe_info;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("ev_gpe_dispatch");

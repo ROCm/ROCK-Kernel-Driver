@@ -153,7 +153,7 @@ static inline int unix_may_send(unix_socket *sk, unix_socket *osk)
 	return (unix_peer(osk) == NULL || unix_our_peer(sk, osk));
 }
 
-static inline unix_socket * unix_peer_get(unix_socket *s)
+static unix_socket *unix_peer_get(unix_socket *s)
 {
 	unix_socket *peer;
 

@@ -84,19 +84,19 @@ int usb_device_probe(struct device *dev)
 	const struct usb_device_id *id;
 	int error = -ENODEV;
 
-	dev_dbg(*dev, "%s\n", __FUNCTION__);
+	dev_dbg(dev, "%s\n", __FUNCTION__);
 
 	if (!driver->probe)
 		return error;
 
 	if (!try_module_get(driver->owner)) {
-		dev_err (*dev, "Can't get a module reference for %s\n", driver->name);
+		dev_err (dev, "Can't get a module reference for %s\n", driver->name);
 		return error;
 	}
 
 	id = usb_match_id (intf, driver->id_table);
 	if (id) {
-		dev_dbg (*dev, "%s - got id\n", __FUNCTION__);
+		dev_dbg (dev, "%s - got id\n", __FUNCTION__);
 		down (&driver->serialize);
 		error = driver->probe (intf, id);
 		up (&driver->serialize);
@@ -118,7 +118,7 @@ int usb_device_remove(struct device *dev)
 	driver = to_usb_driver(dev->driver);
 
 	if (!driver) {
-		dev_err(*dev, "%s does not have a valid driver to work with!",
+		dev_err(dev, "%s does not have a valid driver to work with!",
 		    __FUNCTION__);
 		return -ENODEV;
 	}
@@ -126,7 +126,7 @@ int usb_device_remove(struct device *dev)
 	if (!try_module_get(driver->owner)) {
 		// FIXME this happens even when we just rmmod
 		// drivers that aren't in active use...
-		dev_err(*dev, "Dieing driver still bound to device.\n");
+		dev_err(dev, "Dieing driver still bound to device.\n");
 		return -EIO;
 	}
 
@@ -827,7 +827,7 @@ void usb_disconnect(struct usb_device **pdev)
 
 	*pdev = NULL;
 
-	dev_info (dev->dev, "USB disconnect, address %d\n", dev->devnum);
+	dev_info (&dev->dev, "USB disconnect, address %d\n", dev->devnum);
 
 	/* Free up all the children before we remove this device */
 	for (i = 0; i < USB_MAXCHILDREN; i++) {
@@ -836,7 +836,7 @@ void usb_disconnect(struct usb_device **pdev)
 			usb_disconnect(child);
 	}
 
-	dev_dbg (dev->dev, "unregistering interfaces\n");
+	dev_dbg (&dev->dev, "unregistering interfaces\n");
 	if (dev->actconfig) {
 		for (i = 0; i < dev->actconfig->desc.bNumInterfaces; i++) {
 			struct usb_interface *interface = &dev->actconfig->interface[i];
@@ -846,7 +846,7 @@ void usb_disconnect(struct usb_device **pdev)
 		}
 	}
 
-	dev_dbg (dev->dev, "unregistering device\n");
+	dev_dbg (&dev->dev, "unregistering device\n");
 	/* Free the device number and remove the /proc/bus/usb entry */
 	if (dev->devnum > 0) {
 		clear_bit(dev->devnum, dev->bus->devmap.devicemap);
@@ -931,7 +931,7 @@ static void set_device_description (struct usb_device *dev)
 
 	if (prod && usb_string (dev, prod, prod_str, 256) > 0) {
 #ifdef DEBUG
-		dev_printk (KERN_INFO, dev->dev, "Product: %s\n", prod_str);
+		dev_printk (KERN_INFO, &dev->dev, "Product: %s\n", prod_str);
 #endif
 	} else {
 		prod_str = 0;
@@ -939,7 +939,7 @@ static void set_device_description (struct usb_device *dev)
 
 	if (mfgr && usb_string (dev, mfgr, mfgr_str, 256) > 0) {
 #ifdef DEBUG
-		dev_printk (KERN_INFO, dev->dev, "Manufacturer: %s\n", mfgr_str);
+		dev_printk (KERN_INFO, &dev->dev, "Manufacturer: %s\n", mfgr_str);
 #endif
 	} else {
 		mfgr_str = 0;
@@ -1042,7 +1042,7 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 			wait_ms(200);
 		}
 		if (err < 0) {
-			dev_err(dev->dev, "USB device not accepting new address=%d (error=%d)\n",
+			dev_err(&dev->dev, "USB device not accepting new address=%d (error=%d)\n",
 				dev->devnum, err);
 			clear_bit(dev->devnum, dev->bus->devmap.devicemap);
 			dev->devnum = -1;
@@ -1060,9 +1060,9 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 
 	if (err < 8) {
 		if (err < 0)
-			dev_err(dev->dev, "USB device not responding, giving up (error=%d)\n", err);
+			dev_err(&dev->dev, "USB device not responding, giving up (error=%d)\n", err);
 		else
-			dev_err(dev->dev, "USB device descriptor short read (expected %i, got %i)\n", 8, err);
+			dev_err(&dev->dev, "USB device descriptor short read (expected %i, got %i)\n", 8, err);
 		clear_bit(dev->devnum, dev->bus->devmap.devicemap);
 		dev->devnum = -1;
 		return 1;
@@ -1077,9 +1077,9 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 	err = usb_get_device_descriptor(dev);
 	if (err < (signed)sizeof(dev->descriptor)) {
 		if (err < 0)
-			dev_err(dev->dev, "unable to get device descriptor (error=%d)\n", err);
+			dev_err(&dev->dev, "unable to get device descriptor (error=%d)\n", err);
 		else
-			dev_err(dev->dev, "USB device descriptor short read (expected %Zi, got %i)\n",
+			dev_err(&dev->dev, "USB device descriptor short read (expected %Zi, got %i)\n",
 				sizeof(dev->descriptor), err);
 	
 		clear_bit(dev->devnum, dev->bus->devmap.devicemap);
@@ -1089,7 +1089,7 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 
 	err = usb_get_configuration(dev);
 	if (err < 0) {
-		dev_err(dev->dev, "unable to get device %d configuration (error=%d)\n",
+		dev_err(&dev->dev, "unable to get device %d configuration (error=%d)\n",
 			dev->devnum, err);
 		clear_bit(dev->devnum, dev->bus->devmap.devicemap);
 		dev->devnum = -1;
@@ -1099,7 +1099,7 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 	/* we set the default configuration here */
 	err = usb_set_configuration(dev, dev->config[0].desc.bConfigurationValue);
 	if (err) {
-		dev_err(dev->dev, "failed to set device %d default configuration (error=%d)\n",
+		dev_err(&dev->dev, "failed to set device %d default configuration (error=%d)\n",
 			dev->devnum, err);
 		clear_bit(dev->devnum, dev->bus->devmap.devicemap);
 		dev->devnum = -1;
@@ -1108,7 +1108,7 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 
 	/* USB device state == configured ... tell the world! */
 
-	dev_dbg(dev->dev, "new device strings: Mfr=%d, Product=%d, SerialNumber=%d\n",
+	dev_dbg(&dev->dev, "new device strings: Mfr=%d, Product=%d, SerialNumber=%d\n",
 		dev->descriptor.iManufacturer, dev->descriptor.iProduct, dev->descriptor.iSerialNumber);
 	set_device_description (dev);
 
@@ -1151,7 +1151,7 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 				dev->bus->bus_name, dev->devpath,
 				desc->bInterfaceNumber);
 		}
-		dev_dbg (dev->dev, "%s - registering interface %s\n", __FUNCTION__, interface->dev.bus_id);
+		dev_dbg (&dev->dev, "%s - registering interface %s\n", __FUNCTION__, interface->dev.bus_id);
 		device_add (&interface->dev);
 		usb_create_driverfs_intf_files (interface);
 	}

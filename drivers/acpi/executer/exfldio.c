@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -51,11 +51,11 @@
 
 acpi_status
 acpi_ex_setup_region (
-	acpi_operand_object     *obj_desc,
-	u32                     field_datum_byte_offset)
+	union acpi_operand_object       *obj_desc,
+	u32                             field_datum_byte_offset)
 {
-	acpi_status             status = AE_OK;
-	acpi_operand_object     *rgn_desc;
+	acpi_status                     status = AE_OK;
+	union acpi_operand_object       *rgn_desc;
 
 
 	ACPI_FUNCTION_TRACE_U32 ("ex_setup_region", field_datum_byte_offset);
@@ -147,14 +147,14 @@ acpi_ex_setup_region (
 
 acpi_status
 acpi_ex_access_region (
-	acpi_operand_object     *obj_desc,
-	u32                     field_datum_byte_offset,
-	acpi_integer            *value,
-	u32                     function)
+	union acpi_operand_object       *obj_desc,
+	u32                             field_datum_byte_offset,
+	acpi_integer                    *value,
+	u32                             function)
 {
-	acpi_status             status;
-	acpi_operand_object     *rgn_desc;
-	acpi_physical_address   address;
+	acpi_status                     status;
+	union acpi_operand_object       *rgn_desc;
+	acpi_physical_address           address;
 
 
 	ACPI_FUNCTION_TRACE ("ex_access_region");
@@ -240,8 +240,8 @@ acpi_ex_access_region (
 
 u8
 acpi_ex_register_overflow (
-	acpi_operand_object     *obj_desc,
-	acpi_integer            value)
+	union acpi_operand_object       *obj_desc,
+	acpi_integer                    value)
 {
 
 	if (obj_desc->common_field.bit_length >= ACPI_INTEGER_BIT_SIZE) {
@@ -286,13 +286,13 @@ acpi_ex_register_overflow (
 
 acpi_status
 acpi_ex_field_datum_io (
-	acpi_operand_object     *obj_desc,
-	u32                     field_datum_byte_offset,
-	acpi_integer            *value,
-	u32                     read_write)
+	union acpi_operand_object       *obj_desc,
+	u32                             field_datum_byte_offset,
+	acpi_integer                    *value,
+	u32                             read_write)
 {
-	acpi_status             status;
-	acpi_integer            local_value;
+	acpi_status                     status;
+	acpi_integer                    local_value;
 
 
 	ACPI_FUNCTION_TRACE_U32 ("ex_field_datum_io", field_datum_byte_offset);
@@ -465,14 +465,14 @@ acpi_ex_field_datum_io (
 
 acpi_status
 acpi_ex_write_with_update_rule (
-	acpi_operand_object     *obj_desc,
-	acpi_integer            mask,
-	acpi_integer            field_value,
-	u32                     field_datum_byte_offset)
+	union acpi_operand_object       *obj_desc,
+	acpi_integer                    mask,
+	acpi_integer                    field_value,
+	u32                             field_datum_byte_offset)
 {
-	acpi_status             status = AE_OK;
-	acpi_integer            merged_value;
-	acpi_integer            current_value;
+	acpi_status                     status = AE_OK;
+	acpi_integer                    merged_value;
+	acpi_integer                    current_value;
 
 
 	ACPI_FUNCTION_TRACE_U32 ("ex_write_with_update_rule", mask);
@@ -562,10 +562,10 @@ acpi_ex_write_with_update_rule (
 
 void
 acpi_ex_get_buffer_datum(
-	acpi_integer            *datum,
-	void                    *buffer,
-	u32                     byte_granularity,
-	u32                     offset)
+	acpi_integer                    *datum,
+	void                            *buffer,
+	u32                             byte_granularity,
+	u32                             offset)
 {
 
 	ACPI_FUNCTION_ENTRY ();
@@ -618,10 +618,10 @@ acpi_ex_get_buffer_datum(
 
 void
 acpi_ex_set_buffer_datum (
-	acpi_integer            merged_datum,
-	void                    *buffer,
-	u32                     byte_granularity,
-	u32                     offset)
+	acpi_integer                    merged_datum,
+	void                            *buffer,
+	u32                             byte_granularity,
+	u32                             offset)
 {
 
 	ACPI_FUNCTION_ENTRY ();
@@ -670,18 +670,18 @@ acpi_ex_set_buffer_datum (
 
 acpi_status
 acpi_ex_extract_from_field (
-	acpi_operand_object     *obj_desc,
-	void                    *buffer,
-	u32                     buffer_length)
+	union acpi_operand_object       *obj_desc,
+	void                            *buffer,
+	u32                             buffer_length)
 {
-	acpi_status             status;
-	u32                     field_datum_byte_offset;
-	u32                     datum_offset;
-	acpi_integer            previous_raw_datum;
-	acpi_integer            this_raw_datum = 0;
-	acpi_integer            merged_datum = 0;
-	u32                     byte_field_length;
-	u32                     datum_count;
+	acpi_status                     status;
+	u32                             field_datum_byte_offset;
+	u32                             datum_offset;
+	acpi_integer                    previous_raw_datum;
+	acpi_integer                    this_raw_datum = 0;
+	acpi_integer                    merged_datum = 0;
+	u32                             byte_field_length;
+	u32                             datum_count;
 
 
 	ACPI_FUNCTION_TRACE ("ex_extract_from_field");
@@ -846,19 +846,19 @@ acpi_ex_extract_from_field (
 
 acpi_status
 acpi_ex_insert_into_field (
-	acpi_operand_object     *obj_desc,
-	void                    *buffer,
-	u32                     buffer_length)
+	union acpi_operand_object       *obj_desc,
+	void                            *buffer,
+	u32                             buffer_length)
 {
-	acpi_status             status;
-	u32                     field_datum_byte_offset;
-	u32                     datum_offset;
-	acpi_integer            mask;
-	acpi_integer            merged_datum;
-	acpi_integer            previous_raw_datum;
-	acpi_integer            this_raw_datum;
-	u32                     byte_field_length;
-	u32                     datum_count;
+	acpi_status                     status;
+	u32                             field_datum_byte_offset;
+	u32                             datum_offset;
+	acpi_integer                    mask;
+	acpi_integer                    merged_datum;
+	acpi_integer                    previous_raw_datum;
+	acpi_integer                    this_raw_datum;
+	u32                             byte_field_length;
+	u32                             datum_count;
 
 
 	ACPI_FUNCTION_TRACE ("ex_insert_into_field");

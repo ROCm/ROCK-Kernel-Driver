@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -90,13 +90,13 @@ typedef COMPILER_DEPENDENT_UINT64       UINT64;
 
 /*! [End] no source code translation !*/
 
-typedef s64                             acpi_native_int;
-typedef u64                             acpi_native_uint;
+typedef s64                                     acpi_native_int;
+typedef u64                                     acpi_native_uint;
 
-typedef u64                             acpi_table_ptr;
-typedef u64                             acpi_io_address;
-typedef u64                             acpi_physical_address;
-typedef u64                             acpi_size;
+typedef u64                                     acpi_table_ptr;
+typedef u64                                     acpi_io_address;
+typedef u64                                     acpi_physical_address;
+typedef u64                                     acpi_size;
 
 #define ALIGNED_ADDRESS_BOUNDARY        0x00000008      /* No hardware alignment support in IA64 */
 #define ACPI_USE_NATIVE_DIVIDE                          /* Native 64-bit integer support */
@@ -118,22 +118,21 @@ typedef long                            INT32;
 typedef int                             INT16;
 typedef unsigned long                   UINT32;
 
-typedef struct
+struct
 {
 	UINT32                                  Lo;
 	UINT32                                  Hi;
-
-} UINT64;
+};
 
 /*! [End] no source code translation !*/
 
-typedef u16                             acpi_native_uint;
-typedef s16                             acpi_native_int;
+typedef u16                                     acpi_native_uint;
+typedef s16                                     acpi_native_int;
 
-typedef u32                             acpi_table_ptr;
-typedef u32                             acpi_io_address;
-typedef char                            *acpi_physical_address;
-typedef u16                             acpi_size;
+typedef u32                                     acpi_table_ptr;
+typedef u32                                     acpi_io_address;
+typedef char                                    *acpi_physical_address;
+typedef u16                                     acpi_size;
 
 #define ALIGNED_ADDRESS_BOUNDARY        0x00000002
 #define _HW_ALIGNMENT_SUPPORT
@@ -165,13 +164,13 @@ typedef COMPILER_DEPENDENT_UINT64       UINT64;
 
 /*! [End] no source code translation !*/
 
-typedef s32                             acpi_native_int;
-typedef u32                             acpi_native_uint;
+typedef s32                                     acpi_native_int;
+typedef u32                                     acpi_native_uint;
 
-typedef u64                             acpi_table_ptr;
-typedef u32                             acpi_io_address;
-typedef u64                             acpi_physical_address;
-typedef u32                             acpi_size;
+typedef u64                                     acpi_table_ptr;
+typedef u32                                     acpi_io_address;
+typedef u64                                     acpi_physical_address;
+typedef u32                                     acpi_size;
 
 #define ALIGNED_ADDRESS_BOUNDARY        0x00000004
 #define _HW_ALIGNMENT_SUPPORT
@@ -186,27 +185,25 @@ typedef u32                             acpi_size;
 /*
  * Miscellaneous common types
  */
-typedef u32                             UINT32_BIT;
-typedef acpi_native_uint                ACPI_PTRDIFF;
+typedef u32                                     UINT32_BIT;
+typedef acpi_native_uint                        ACPI_PTRDIFF;
 
 /*
  * Pointer overlays to avoid lots of typecasting for
  * code that accepts both physical and logical pointers.
  */
-typedef union acpi_ptrs
+union acpi_pointers
 {
-	acpi_physical_address       physical;
-	void                        *logical;
-	acpi_table_ptr              value;
+	acpi_physical_address               physical;
+	void                                *logical;
+	acpi_table_ptr                      value;
+};
 
-} acpi_pointers;
-
-typedef struct acpi_pointer
+struct acpi_pointer
 {
-	u32                         pointer_type;
-	union acpi_ptrs             pointer;
-
-} acpi_pointer;
+	u32                                 pointer_type;
+	union acpi_pointers                 pointer;
+};
 
 /* pointer_types for above */
 
@@ -245,31 +242,28 @@ typedef struct acpi_pointer
 /*
  * Local datatypes
  */
-typedef u32                             acpi_status;    /* All ACPI Exceptions */
-typedef u32                             acpi_name;      /* 4-byte ACPI name */
-typedef char*                           acpi_string;    /* Null terminated ASCII string */
-typedef void*                           acpi_handle;    /* Actually a ptr to an Node */
+typedef u32                                     acpi_status;    /* All ACPI Exceptions */
+typedef u32                                     acpi_name;      /* 4-byte ACPI name */
+typedef char *                                  acpi_string;    /* Null terminated ASCII string */
+typedef void *                                  acpi_handle;    /* Actually a ptr to an Node */
 
-typedef struct
+struct uint64_struct
 {
-	u32                         lo;
-	u32                         hi;
+	u32                                 lo;
+	u32                                 hi;
+};
 
-} uint64_struct;
-
-typedef union
+union uint64_overlay
 {
-	u64                         full;
-	uint64_struct               part;
+	u64                                 full;
+	struct uint64_struct                part;
+};
 
-} uint64_overlay;
-
-typedef struct
+struct uint32_struct
 {
-	u32                         lo;
-	u32                         hi;
-
-} uint32_struct;
+	u32                                 lo;
+	u32                                 hi;
+};
 
 
 /*
@@ -283,7 +277,7 @@ typedef struct
 
 /* 32-bit integers only, no 64-bit support */
 
-typedef u32                             acpi_integer;
+typedef u32                                     acpi_integer;
 #define ACPI_INTEGER_MAX                ACPI_UINT32_MAX
 #define ACPI_INTEGER_BIT_SIZE           32
 #define ACPI_MAX_BCD_VALUE              99999999
@@ -297,7 +291,7 @@ typedef u32                             acpi_integer;
 
 /* 64-bit integers */
 
-typedef u64                             acpi_integer;
+typedef u64                                     acpi_integer;
 #define ACPI_INTEGER_MAX                ACPI_UINT64_MAX
 #define ACPI_INTEGER_BIT_SIZE           64
 #define ACPI_MAX_BCD_VALUE              9999999999999999
@@ -384,7 +378,7 @@ typedef u64                             acpi_integer;
 /*
  *  Table types.  These values are passed to the table related APIs
  */
-typedef u32                             acpi_table_type;
+typedef u32                                     acpi_table_type;
 
 #define ACPI_TABLE_RSDP                 (acpi_table_type) 0
 #define ACPI_TABLE_DSDT                 (acpi_table_type) 1
@@ -406,7 +400,7 @@ typedef u32                             acpi_table_type;
  * Types must be kept in sync with the global acpi_ns_properties
  * and acpi_ns_type_names arrays.
  */
-typedef u32                             acpi_object_type;
+typedef u32                                     acpi_object_type;
 
 #define ACPI_TYPE_ANY                   0x00
 #define ACPI_TYPE_INTEGER               0x01  /* Byte/Word/Dword/Zero/One/Ones */
@@ -450,7 +444,7 @@ typedef u32                             acpi_object_type;
 
 /*
  * These are special object types that never appear in
- * a Namespace node, only in an acpi_operand_object
+ * a Namespace node, only in an union acpi_operand_object
  */
 #define ACPI_TYPE_LOCAL_EXTRA           0x1B
 #define ACPI_TYPE_LOCAL_DATA            0x1C
@@ -505,7 +499,7 @@ typedef u32                             acpi_object_type;
 /*
  * acpi_event Types: Fixed & General Purpose
  */
-typedef u32                             acpi_event_type;
+typedef u32                                     acpi_event_type;
 
 #define ACPI_EVENT_FIXED                0
 #define ACPI_EVENT_GPE                  1
@@ -550,7 +544,7 @@ typedef u32                             acpi_event_type;
  *          |     +----- Set?
  *          +----------- <Reserved>
  */
-typedef u32                             acpi_event_status;
+typedef u32                                     acpi_event_status;
 
 #define ACPI_EVENT_FLAG_DISABLED        (acpi_event_status) 0x00
 #define ACPI_EVENT_FLAG_ENABLED         (acpi_event_status) 0x01
@@ -569,7 +563,7 @@ typedef u32                             acpi_event_status;
 
 /* Address Space (Operation Region) Types */
 
-typedef u8                              acpi_adr_space_type;
+typedef u8                                      acpi_adr_space_type;
 
 #define ACPI_ADR_SPACE_SYSTEM_MEMORY    (acpi_adr_space_type) 0
 #define ACPI_ADR_SPACE_SYSTEM_IO        (acpi_adr_space_type) 1
@@ -579,6 +573,7 @@ typedef u8                              acpi_adr_space_type;
 #define ACPI_ADR_SPACE_CMOS             (acpi_adr_space_type) 5
 #define ACPI_ADR_SPACE_PCI_BAR_TARGET   (acpi_adr_space_type) 6
 #define ACPI_ADR_SPACE_DATA_TABLE       (acpi_adr_space_type) 7
+#define ACPI_ADR_SPACE_FIXED_HARDWARE   (acpi_adr_space_type) 127
 
 
 /*
@@ -616,70 +611,68 @@ typedef u8                              acpi_adr_space_type;
 /*
  * External ACPI object definition
  */
-typedef union acpi_obj
+union acpi_object
 {
-	acpi_object_type            type;   /* See definition of acpi_ns_type for values */
+	acpi_object_type                    type;   /* See definition of acpi_ns_type for values */
 	struct
 	{
-		acpi_object_type            type;
-		acpi_integer                value;      /* The actual number */
+		acpi_object_type                    type;
+		acpi_integer                        value;      /* The actual number */
 	} integer;
 
 	struct
 	{
-		acpi_object_type            type;
-		u32                         length;     /* # of bytes in string, excluding trailing null */
-		char                        *pointer;   /* points to the string value */
+		acpi_object_type                    type;
+		u32                                 length;     /* # of bytes in string, excluding trailing null */
+		char                                *pointer;   /* points to the string value */
 	} string;
 
 	struct
 	{
-		acpi_object_type            type;
-		u32                         length;     /* # of bytes in buffer */
-		u8                          *pointer;   /* points to the buffer */
+		acpi_object_type                    type;
+		u32                                 length;     /* # of bytes in buffer */
+		u8                                  *pointer;   /* points to the buffer */
 	} buffer;
 
 	struct
 	{
-		acpi_object_type            type;
-		u32                         fill1;
-		acpi_handle                 handle;     /* object reference */
+		acpi_object_type                    type;
+		u32                                 fill1;
+		acpi_handle                         handle;     /* object reference */
 	} reference;
 
 	struct
 	{
-		acpi_object_type            type;
-		u32                         count;      /* # of elements in package */
-		union acpi_obj              *elements;  /* Pointer to an array of ACPI_OBJECTs */
+		acpi_object_type                    type;
+		u32                                 count;      /* # of elements in package */
+		union acpi_object                   *elements;  /* Pointer to an array of ACPI_OBJECTs */
 	} package;
 
 	struct
 	{
-		acpi_object_type            type;
-		u32                         proc_id;
-		acpi_io_address             pblk_address;
-		u32                         pblk_length;
+		acpi_object_type                    type;
+		u32                                 proc_id;
+		acpi_io_address                     pblk_address;
+		u32                                 pblk_length;
 	} processor;
 
 	struct
 	{
-		acpi_object_type            type;
-		u32                         system_level;
-		u32                         resource_order;
+		acpi_object_type                    type;
+		u32                                 system_level;
+		u32                                 resource_order;
 	} power_resource;
-
-} acpi_object;
+};
 
 
 /*
  * List of objects, used as a parameter list for control method evaluation
  */
-typedef struct acpi_obj_list
+struct acpi_object_list
 {
-	u32                         count;
-	acpi_object                 *pointer;
-
-} acpi_object_list;
+	u32                                 count;
+	union acpi_object                   *pointer;
+};
 
 
 /*
@@ -689,12 +682,11 @@ typedef struct acpi_obj_list
 #define ACPI_ALLOCATE_BUFFER        (acpi_size) (-1)
 #define ACPI_ALLOCATE_LOCAL_BUFFER  (acpi_size) (-2)
 
-typedef struct
+struct acpi_buffer
 {
-	acpi_size                   length;         /* Length in bytes of the buffer */
-	void                        *pointer;       /* pointer to buffer */
-
-} acpi_buffer;
+	acpi_size                           length;         /* Length in bytes of the buffer */
+	void                                *pointer;       /* pointer to buffer */
+};
 
 
 /*
@@ -717,29 +709,27 @@ typedef struct
 /*
  * ACPI Table Info.  One per ACPI table _type_
  */
-typedef struct acpi_table_info
+struct acpi_table_info
 {
-	u32                         count;
-
-} acpi_table_info;
+	u32                                 count;
+};
 
 
 /*
  * System info returned by acpi_get_system_info()
  */
-typedef struct _acpi_sys_info
+struct acpi_system_info
 {
-	u32                         acpi_ca_version;
-	u32                         flags;
-	u32                         timer_resolution;
-	u32                         reserved1;
-	u32                         reserved2;
-	u32                         debug_level;
-	u32                         debug_layer;
-	u32                         num_table_types;
-	acpi_table_info             table_info [NUM_ACPI_TABLES];
-
-} acpi_system_info;
+	u32                                 acpi_ca_version;
+	u32                                 flags;
+	u32                                 timer_resolution;
+	u32                                 reserved1;
+	u32                                 reserved2;
+	u32                                 debug_level;
+	u32                                 debug_layer;
+	u32                                 num_table_types;
+	struct acpi_table_info              table_info [NUM_ACPI_TABLES];
+};
 
 
 /*
@@ -747,28 +737,28 @@ typedef struct _acpi_sys_info
  */
 typedef
 u32 (*acpi_event_handler) (
-	void                        *context);
+	void                                *context);
 
 typedef
 void (*acpi_gpe_handler) (
-	void                        *context);
+	void                                *context);
 
 typedef
 void (*acpi_notify_handler) (
-	acpi_handle                 device,
-	u32                         value,
-	void                        *context);
+	acpi_handle                         device,
+	u32                                 value,
+	void                                *context);
 
 typedef
 void (*acpi_object_handler) (
-	acpi_handle                 object,
-	u32                         function,
-	void                        *data);
+	acpi_handle                         object,
+	u32                                 function,
+	void                                *data);
 
 typedef
 acpi_status (*acpi_init_handler) (
-	acpi_handle                 object,
-	u32                         function);
+	acpi_handle                         object,
+	u32                                 function);
 
 #define ACPI_INIT_DEVICE_INI        1
 
@@ -777,32 +767,32 @@ acpi_status (*acpi_init_handler) (
 
 typedef
 acpi_status (*acpi_adr_space_handler) (
-	u32                         function,
-	acpi_physical_address       address,
-	u32                         bit_width,
-	acpi_integer                *value,
-	void                        *handler_context,
-	void                        *region_context);
+	u32                                 function,
+	acpi_physical_address               address,
+	u32                                 bit_width,
+	acpi_integer                        *value,
+	void                                *handler_context,
+	void                                *region_context);
 
 #define ACPI_DEFAULT_HANDLER        NULL
 
 
 typedef
 acpi_status (*acpi_adr_space_setup) (
-	acpi_handle                 region_handle,
-	u32                         function,
-	void                        *handler_context,
-	void                        **region_context);
+	acpi_handle                         region_handle,
+	u32                                 function,
+	void                                *handler_context,
+	void                                **region_context);
 
 #define ACPI_REGION_ACTIVATE    0
 #define ACPI_REGION_DEACTIVATE  1
 
 typedef
 acpi_status (*acpi_walk_callback) (
-	acpi_handle                 obj_handle,
-	u32                         nesting_level,
-	void                        *context,
-	void                        **return_value);
+	acpi_handle                         obj_handle,
+	u32                                 nesting_level,
+	void                                *context,
+	void                                **return_value);
 
 
 /* Interrupt handler return values */
@@ -820,47 +810,47 @@ acpi_status (*acpi_walk_callback) (
 
 
 #define ACPI_COMMON_OBJ_INFO \
-	acpi_object_type            type;           /* ACPI object type */ \
-	acpi_name                   name            /* ACPI object Name */
+	acpi_object_type                    type;           /* ACPI object type */ \
+	acpi_name                           name            /* ACPI object Name */
 
 
-typedef struct
+struct acpi_obj_info_header
 {
 	ACPI_COMMON_OBJ_INFO;
-} acpi_obj_info_header;
+};
 
 
-typedef struct
+struct acpi_device_info
 {
 	ACPI_COMMON_OBJ_INFO;
 
-	u32                         valid;              /*  Are the next bits legit? */
-	char                        hardware_id[9];     /*  _HID value if any */
-	char                        unique_id[9];       /*  _UID value if any */
-	acpi_integer                address;            /*  _ADR value if any */
-	u32                         current_status;     /*  _STA value */
-} acpi_device_info;
+	u32                                 valid;              /*  Are the next bits legit? */
+	char                                hardware_id[9];     /*  _HID value if any */
+	char                                unique_id[9];       /*  _UID value if any */
+	acpi_integer                        address;            /*  _ADR value if any */
+	u32                                 current_status;     /*  _STA value */
+};
 
 
 /* Context structs for address space handlers */
 
-typedef struct
+struct acpi_pci_id
 {
-	u16                         segment;
-	u16                         bus;
-	u16                         device;
-	u16                         function;
-} acpi_pci_id;
+	u16                                 segment;
+	u16                                 bus;
+	u16                                 device;
+	u16                                 function;
+};
 
 
-typedef struct
+struct acpi_mem_space_context
 {
-	u32                         length;
-	acpi_physical_address       address;
-	acpi_physical_address       mapped_physical_address;
-	u8                          *mapped_logical_address;
-	acpi_size                   mapped_length;
-} acpi_mem_space_context;
+	u32                                 length;
+	acpi_physical_address               address;
+	acpi_physical_address               mapped_physical_address;
+	u8                                  *mapped_logical_address;
+	acpi_size                           mapped_length;
+};
 
 
 /*
@@ -947,195 +937,176 @@ typedef struct
 /*
  *  Structures used to describe device resources
  */
-typedef struct
+struct acpi_resource_irq
 {
-	u32                         edge_level;
-	u32                         active_high_low;
-	u32                         shared_exclusive;
-	u32                         number_of_interrupts;
-	u32                         interrupts[1];
+	u32                                 edge_level;
+	u32                                 active_high_low;
+	u32                                 shared_exclusive;
+	u32                                 number_of_interrupts;
+	u32                                 interrupts[1];
+};
 
-} acpi_resource_irq;
-
-typedef struct
+struct acpi_resource_dma
 {
-	u32                         type;
-	u32                         bus_master;
-	u32                         transfer;
-	u32                         number_of_channels;
-	u32                         channels[1];
+	u32                                 type;
+	u32                                 bus_master;
+	u32                                 transfer;
+	u32                                 number_of_channels;
+	u32                                 channels[1];
+};
 
-} acpi_resource_dma;
-
-typedef struct
+struct acpi_resource_start_dpf
 {
-	u32                         compatibility_priority;
-	u32                         performance_robustness;
-
-} acpi_resource_start_dpf;
+	u32                                 compatibility_priority;
+	u32                                 performance_robustness;
+};
 
 /*
  * END_DEPENDENT_FUNCTIONS_RESOURCE struct is not
  * needed because it has no fields
  */
 
-typedef struct
+struct acpi_resource_io
 {
-	u32                         io_decode;
-	u32                         min_base_address;
-	u32                         max_base_address;
-	u32                         alignment;
-	u32                         range_length;
+	u32                                 io_decode;
+	u32                                 min_base_address;
+	u32                                 max_base_address;
+	u32                                 alignment;
+	u32                                 range_length;
+};
 
-} acpi_resource_io;
-
-typedef struct
+struct acpi_resource_fixed_io
 {
-	u32                         base_address;
-	u32                         range_length;
+	u32                                 base_address;
+	u32                                 range_length;
+};
 
-} acpi_resource_fixed_io;
-
-typedef struct
+struct acpi_resource_vendor
 {
-	u32                         length;
-	u8                          reserved[1];
+	u32                                 length;
+	u8                                  reserved[1];
+};
 
-} acpi_resource_vendor;
-
-typedef struct
+struct acpi_resource_end_tag
 {
-	u8                          checksum;
+	u8                                  checksum;
+};
 
-} acpi_resource_end_tag;
-
-typedef struct
+struct acpi_resource_mem24
 {
-	u32                         read_write_attribute;
-	u32                         min_base_address;
-	u32                         max_base_address;
-	u32                         alignment;
-	u32                         range_length;
+	u32                                 read_write_attribute;
+	u32                                 min_base_address;
+	u32                                 max_base_address;
+	u32                                 alignment;
+	u32                                 range_length;
+};
 
-} acpi_resource_mem24;
-
-typedef struct
+struct acpi_resource_mem32
 {
-	u32                         read_write_attribute;
-	u32                         min_base_address;
-	u32                         max_base_address;
-	u32                         alignment;
-	u32                         range_length;
+	u32                                 read_write_attribute;
+	u32                                 min_base_address;
+	u32                                 max_base_address;
+	u32                                 alignment;
+	u32                                 range_length;
+};
 
-} acpi_resource_mem32;
-
-typedef struct
+struct acpi_resource_fixed_mem32
 {
-	u32                         read_write_attribute;
-	u32                         range_base_address;
-	u32                         range_length;
+	u32                                 read_write_attribute;
+	u32                                 range_base_address;
+	u32                                 range_length;
+};
 
-} acpi_resource_fixed_mem32;
-
-typedef struct
+struct acpi_memory_attribute
 {
-	u16                         cache_attribute;
-	u16                         read_write_attribute;
+	u16                                 cache_attribute;
+	u16                                 read_write_attribute;
+};
 
-} acpi_memory_attribute;
-
-typedef struct
+struct acpi_io_attribute
 {
-	u16                         range_attribute;
-	u16                         reserved;
+	u16                                 range_attribute;
+	u16                                 reserved;
+};
 
-} acpi_io_attribute;
-
-typedef struct
+struct acpi_bus_attribute
 {
-	u16                         reserved1;
-	u16                         reserved2;
+	u16                                 reserved1;
+	u16                                 reserved2;
+};
 
-} acpi_bus_attribute;
-
-typedef union
+union acpi_resource_attribute
 {
-	acpi_memory_attribute       memory;
-	acpi_io_attribute           io;
-	acpi_bus_attribute          bus;
+	struct acpi_memory_attribute        memory;
+	struct acpi_io_attribute            io;
+	struct acpi_bus_attribute           bus;
+};
 
-} acpi_resource_attribute;
-
-typedef struct
+struct acpi_resource_source
 {
-	u32                         index;
-	u32                         string_length;
-	char                        *string_ptr;
+	u32                                 index;
+	u32                                 string_length;
+	char                                *string_ptr;
+};
 
-} acpi_resource_source;
-
-typedef struct
+struct acpi_resource_address16
 {
-	u32                         resource_type;
-	u32                         producer_consumer;
-	u32                         decode;
-	u32                         min_address_fixed;
-	u32                         max_address_fixed;
-	acpi_resource_attribute     attribute;
-	u32                         granularity;
-	u32                         min_address_range;
-	u32                         max_address_range;
-	u32                         address_translation_offset;
-	u32                         address_length;
-	acpi_resource_source        resource_source;
+	u32                                 resource_type;
+	u32                                 producer_consumer;
+	u32                                 decode;
+	u32                                 min_address_fixed;
+	u32                                 max_address_fixed;
+	union acpi_resource_attribute       attribute;
+	u32                                 granularity;
+	u32                                 min_address_range;
+	u32                                 max_address_range;
+	u32                                 address_translation_offset;
+	u32                                 address_length;
+	struct acpi_resource_source         resource_source;
+};
 
-} acpi_resource_address16;
-
-typedef struct
+struct acpi_resource_address32
 {
-	u32                         resource_type;
-	u32                         producer_consumer;
-	u32                         decode;
-	u32                         min_address_fixed;
-	u32                         max_address_fixed;
-	acpi_resource_attribute     attribute;
-	u32                         granularity;
-	u32                         min_address_range;
-	u32                         max_address_range;
-	u32                         address_translation_offset;
-	u32                         address_length;
-	acpi_resource_source        resource_source;
+	u32                                 resource_type;
+	u32                                 producer_consumer;
+	u32                                 decode;
+	u32                                 min_address_fixed;
+	u32                                 max_address_fixed;
+	union acpi_resource_attribute       attribute;
+	u32                                 granularity;
+	u32                                 min_address_range;
+	u32                                 max_address_range;
+	u32                                 address_translation_offset;
+	u32                                 address_length;
+	struct acpi_resource_source         resource_source;
+};
 
-} acpi_resource_address32;
-
-typedef struct
+struct acpi_resource_address64
 {
-	u32                         resource_type;
-	u32                         producer_consumer;
-	u32                         decode;
-	u32                         min_address_fixed;
-	u32                         max_address_fixed;
-	acpi_resource_attribute     attribute;
-	u64                         granularity;
-	u64                         min_address_range;
-	u64                         max_address_range;
-	u64                         address_translation_offset;
-	u64                         address_length;
-	acpi_resource_source        resource_source;
+	u32                                 resource_type;
+	u32                                 producer_consumer;
+	u32                                 decode;
+	u32                                 min_address_fixed;
+	u32                                 max_address_fixed;
+	union acpi_resource_attribute       attribute;
+	u64                                 granularity;
+	u64                                 min_address_range;
+	u64                                 max_address_range;
+	u64                                 address_translation_offset;
+	u64                                 address_length;
+	struct acpi_resource_source         resource_source;
+};
 
-} acpi_resource_address64;
-
-typedef struct
+struct acpi_resource_ext_irq
 {
-	u32                         producer_consumer;
-	u32                         edge_level;
-	u32                         active_high_low;
-	u32                         shared_exclusive;
-	u32                         number_of_interrupts;
-	acpi_resource_source        resource_source;
-	u32                         interrupts[1];
-
-} acpi_resource_ext_irq;
+	u32                                 producer_consumer;
+	u32                                 edge_level;
+	u32                                 active_high_low;
+	u32                                 shared_exclusive;
+	u32                                 number_of_interrupts;
+	struct acpi_resource_source         resource_source;
+	u32                                 interrupts[1];
+};
 
 
 /* ACPI_RESOURCE_TYPEs */
@@ -1156,41 +1127,39 @@ typedef struct
 #define ACPI_RSTYPE_ADDRESS64           13
 #define ACPI_RSTYPE_EXT_IRQ             14
 
-typedef u32                             acpi_resource_type;
+typedef u32                                     acpi_resource_type;
 
-typedef union
+union acpi_resource_data
 {
-	acpi_resource_irq           irq;
-	acpi_resource_dma           dma;
-	acpi_resource_start_dpf     start_dpf;
-	acpi_resource_io            io;
-	acpi_resource_fixed_io      fixed_io;
-	acpi_resource_vendor        vendor_specific;
-	acpi_resource_end_tag       end_tag;
-	acpi_resource_mem24         memory24;
-	acpi_resource_mem32         memory32;
-	acpi_resource_fixed_mem32   fixed_memory32;
-	acpi_resource_address16     address16;
-	acpi_resource_address32     address32;
-	acpi_resource_address64     address64;
-	acpi_resource_ext_irq       extended_irq;
+	struct acpi_resource_irq            irq;
+	struct acpi_resource_dma            dma;
+	struct acpi_resource_start_dpf      start_dpf;
+	struct acpi_resource_io             io;
+	struct acpi_resource_fixed_io       fixed_io;
+	struct acpi_resource_vendor         vendor_specific;
+	struct acpi_resource_end_tag        end_tag;
+	struct acpi_resource_mem24          memory24;
+	struct acpi_resource_mem32          memory32;
+	struct acpi_resource_fixed_mem32    fixed_memory32;
+	struct acpi_resource_address16      address16;
+	struct acpi_resource_address32      address32;
+	struct acpi_resource_address64      address64;
+	struct acpi_resource_ext_irq        extended_irq;
+};
 
-} acpi_resource_data;
-
-typedef struct acpi_resource
+struct acpi_resource
 {
-	acpi_resource_type          id;
-	u32                         length;
-	acpi_resource_data          data;
-
-} acpi_resource;
+	acpi_resource_type                  id;
+	u32                                 length;
+	union acpi_resource_data            data;
+};
 
 #define ACPI_RESOURCE_LENGTH                12
 #define ACPI_RESOURCE_LENGTH_NO_DATA        8       /* Id + Length fields */
 
 #define ACPI_SIZEOF_RESOURCE(type)          (ACPI_RESOURCE_LENGTH_NO_DATA + sizeof (type))
 
-#define ACPI_NEXT_RESOURCE(res)             (acpi_resource *)((u8 *) res + res->length)
+#define ACPI_NEXT_RESOURCE(res)             (struct acpi_resource *)((u8 *) res + res->length)
 
 #ifdef _HW_ALIGNMENT_SUPPORT
 #define ACPI_ALIGN_RESOURCE_SIZE(length)    (length)
@@ -1203,15 +1172,14 @@ typedef struct acpi_resource
  */
 
 
-typedef struct acpi_pci_routing_table
+struct acpi_pci_routing_table
 {
-	u32                         length;
-	u32                         pin;
-	acpi_integer                address;        /* here for 64-bit alignment */
-	u32                         source_index;
-	char                        source[4];      /* pad to 64 bits so sizeof() works in all cases */
-
-} acpi_pci_routing_table;
+	u32                                 length;
+	u32                                 pin;
+	acpi_integer                        address;        /* here for 64-bit alignment */
+	u32                                 source_index;
+	char                                source[4];      /* pad to 64 bits so sizeof() works in all cases */
+};
 
 /*
  * END: of definitions for PCI Routing tables

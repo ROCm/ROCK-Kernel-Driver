@@ -314,14 +314,24 @@ static void uart00_break_ctl(struct uart_port *port, int break_state)
 }
 
 static void
-uart00_change_speed(struct uart_port *port, unsigned int cflag,
-		    unsigned int iflag, unsigned int quot)
+uart00_set_termios(struct uart_port *port, struct termios *termios,
+		   struct termios *old)
 {
-	unsigned int uart_mc, old_ies;
+	unsigned int uart_mc, old_ies, quot;
 	unsigned long flags;
 
+	/*
+	 * We don't support CREAD (yet)
+	 */
+	termios->c_cflag |= CREAD;
+
+	/*
+	 * Ask the core to calculate the divisor for us.
+	 */
+	quot = uart_get_divisor(port, termios, old);
+
 	/* byte size and parity */
-	switch (cflag & CSIZE) {
+	switch (termios->c_cflag & CSIZE) {
 	case CS5:
 		uart_mc = UART_MC_CLS_CHARLEN_5;
 		break;
@@ -335,41 +345,47 @@ uart00_change_speed(struct uart_port *port, unsigned int cflag,
 		uart_mc = UART_MC_CLS_CHARLEN_8;
 		break;
 	}
-	if (cflag & CSTOPB)
+	if (termios->c_cflag & CSTOPB)
 		uart_mc|= UART_MC_ST_TWO;
-	if (cflag & PARENB) {
+	if (termios->c_cflag & PARENB) {
 		uart_mc |= UART_MC_PE_MSK;
-		if (!(cflag & PARODD))
+		if (!(termios->c_cflag & PARODD))
 			uart_mc |= UART_MC_EP_MSK;
 	}
 
+	spin_lock_irqsave(&port->lock, flags);
+
+	/*
+	 * Update the per-port timeout.
+	 */
+	uart_update_timeout(port, termios->c_cflag, quot);
+
 	port->read_status_mask = UART_RDS_OE_MSK;
-	if (iflag & INPCK)
+	if (termios->c_iflag & INPCK)
 		port->read_status_mask |= UART_RDS_FE_MSK | UART_RDS_PE_MSK;
-	if (iflag & (BRKINT | PARMRK))
+	if (termios->c_iflag & (BRKINT | PARMRK))
 		port->read_status_mask |= UART_RDS_BI_MSK;
 
 	/*
 	 * Characters to ignore
 	 */
 	port->ignore_status_mask = 0;
-	if (iflag & IGNPAR)
+	if (termios->c_iflag & IGNPAR)
 		port->ignore_status_mask |= UART_RDS_FE_MSK | UART_RDS_PE_MSK;
-	if (iflag & IGNBRK) {
+	if (termios->c_iflag & IGNBRK) {
 		port->ignore_status_mask |= UART_RDS_BI_MSK;
 		/*
 		 * If we're ignoring parity and break indicators,
 		 * ignore overruns to (for real raw support).
 		 */
-		if (iflag & IGNPAR)
+		if (termios->c_iflag & IGNPAR)
 			port->ignore_status_mask |= UART_RDS_OE_MSK;
 	}
 
 	/* first, disable everything */
-	spin_lock_irqsave(&port->lock, flags);
 	old_ies = UART_GET_IES(port); 
 
-	if (UART_ENABLE_MS(port, cflag))
+	if (UART_ENABLE_MS(port, termios->c_cflag))
 		old_ies |= UART_IES_ME_MSK;
 
 	/* Set baud rate */
@@ -495,7 +511,7 @@ static struct uart_ops uart00_pops = {
 	.break_ctl	= uart00_break_ctl,
 	.startup	= uart00_startup,
 	.shutdown	= uart00_shutdown,
-	.change_speed	= uart00_change_speed,
+	.set_termios	= uart00_set_termios,
 	.type		= uart00_type,
 	.release_port	= uart00_release_port,
 	.request_port	= uart00_request_port,

@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -45,10 +45,10 @@
 
 const char *
 acpi_format_exception (
-	acpi_status             status)
+	acpi_status                     status)
 {
-	const char              *exception = "UNKNOWN_STATUS_CODE";
-	acpi_status             sub_status;
+	const char                      *exception = "UNKNOWN_STATUS_CODE";
+	acpi_status                     sub_status;
 
 
 	ACPI_FUNCTION_NAME ("format_exception");
@@ -125,34 +125,34 @@ unknown:
 /* Debug switch - level and trace mask */
 
 #ifdef ACPI_DEBUG_OUTPUT
-u32                         acpi_dbg_level = ACPI_DEBUG_DEFAULT;
+u32                                 acpi_dbg_level = ACPI_DEBUG_DEFAULT;
 #else
-u32                         acpi_dbg_level = ACPI_NORMAL_DEFAULT;
+u32                                 acpi_dbg_level = ACPI_NORMAL_DEFAULT;
 #endif
 
 /* Debug switch - layer (component) mask */
 
-u32                         acpi_dbg_layer = ACPI_COMPONENT_DEFAULT;
-u32                         acpi_gbl_nesting_level = 0;
+u32                                 acpi_dbg_layer = ACPI_COMPONENT_DEFAULT;
+u32                                 acpi_gbl_nesting_level = 0;
 
 
 /* Debugger globals */
 
-u8                          acpi_gbl_db_terminate_threads = FALSE;
-u8                          acpi_gbl_abort_method = FALSE;
-u8                          acpi_gbl_method_executing = FALSE;
+u8                                  acpi_gbl_db_terminate_threads = FALSE;
+u8                                  acpi_gbl_abort_method = FALSE;
+u8                                  acpi_gbl_method_executing = FALSE;
 
 /* System flags */
 
-u32                         acpi_gbl_startup_flags = 0;
+u32                                 acpi_gbl_startup_flags = 0;
 
 /* System starts uninitialized */
 
-u8                          acpi_gbl_shutdown = TRUE;
+u8                                  acpi_gbl_shutdown = TRUE;
 
-const u8                    acpi_gbl_decode_to8bit [8] = {1,2,4,8,16,32,64,128};
+const u8                            acpi_gbl_decode_to8bit [8] = {1,2,4,8,16,32,64,128};
 
-const char                  *acpi_gbl_db_sleep_states[ACPI_S_STATE_COUNT] = {
+const char                          *acpi_gbl_db_sleep_states[ACPI_S_STATE_COUNT] = {
 			  "\\_S0_",
 			  "\\_S1_",
 			  "\\_S2_",
@@ -179,7 +179,7 @@ const char                  *acpi_gbl_db_sleep_states[ACPI_S_STATE_COUNT] = {
  *    during the initialization sequence.
  */
 
-const acpi_predefined_names     acpi_gbl_pre_defined_names[] =
+const struct acpi_predefined_names      acpi_gbl_pre_defined_names[] =
 { {"_GPE",    ACPI_TYPE_LOCAL_SCOPE,      NULL},
 	{"_PR_",    ACPI_TYPE_LOCAL_SCOPE,      NULL},
 	{"_SB_",    ACPI_TYPE_DEVICE,           NULL},
@@ -201,7 +201,7 @@ const acpi_predefined_names     acpi_gbl_pre_defined_names[] =
  * The table is indexed by values of acpi_object_type
  */
 
-const u8                        acpi_gbl_ns_properties[] =
+const u8                                acpi_gbl_ns_properties[] =
 {
 	ACPI_NS_NORMAL,                     /* 00 Any              */
 	ACPI_NS_NORMAL,                     /* 01 Number           */
@@ -238,7 +238,7 @@ const u8                        acpi_gbl_ns_properties[] =
 
 /* Hex to ASCII conversion table */
 
-static const char           acpi_gbl_hex_to_ascii[] =
+static const char                   acpi_gbl_hex_to_ascii[] =
 			  {'0','1','2','3','4','5','6','7',
 					 '8','9','A','B','C','D','E','F'};
 
@@ -258,8 +258,8 @@ static const char           acpi_gbl_hex_to_ascii[] =
 
 char
 acpi_ut_hex_to_ascii_char (
-	acpi_integer            integer,
-	u32                     position)
+	acpi_integer                    integer,
+	u32                             position)
 {
 
 	return (acpi_gbl_hex_to_ascii[(integer >> position) & 0xF]);
@@ -280,10 +280,10 @@ acpi_ut_hex_to_ascii_char (
  ******************************************************************************/
 
 
-acpi_table_desc             acpi_gbl_acpi_tables[NUM_ACPI_TABLES];
+struct acpi_table_desc              acpi_gbl_acpi_tables[NUM_ACPI_TABLES];
 
 
-ACPI_TABLE_SUPPORT          acpi_gbl_acpi_table_data[NUM_ACPI_TABLES] =
+struct acpi_table_support           acpi_gbl_acpi_table_data[NUM_ACPI_TABLES] =
 {
 	/***********    Name,   Signature, Global typed pointer     Signature size,      Type                  How many allowed?,    Contains valid AML? */
 
@@ -303,7 +303,7 @@ ACPI_TABLE_SUPPORT          acpi_gbl_acpi_table_data[NUM_ACPI_TABLES] =
  *
  ******************************************************************************/
 
-acpi_bit_register_info      acpi_gbl_bit_register_info[ACPI_NUM_BITREG] =
+struct acpi_bit_register_info       acpi_gbl_bit_register_info[ACPI_NUM_BITREG] =
 {
 	/* Name                                     Parent Register             Register Bit Position                   Register Bit Mask       */
 
@@ -333,7 +333,7 @@ acpi_bit_register_info      acpi_gbl_bit_register_info[ACPI_NUM_BITREG] =
 };
 
 
-acpi_fixed_event_info       acpi_gbl_fixed_event_info[ACPI_NUM_FIXED_EVENTS] =
+struct acpi_fixed_event_info        acpi_gbl_fixed_event_info[ACPI_NUM_FIXED_EVENTS] =
 {
 	/* ACPI_EVENT_PMTIMER       */  {ACPI_BITREG_TIMER_STATUS,          ACPI_BITREG_TIMER_ENABLE,        ACPI_BITMASK_TIMER_STATUS,          ACPI_BITMASK_TIMER_ENABLE},
 	/* ACPI_EVENT_GLOBAL        */  {ACPI_BITREG_GLOBAL_LOCK_STATUS,    ACPI_BITREG_GLOBAL_LOCK_ENABLE,  ACPI_BITMASK_GLOBAL_LOCK_STATUS,    ACPI_BITMASK_GLOBAL_LOCK_ENABLE},
@@ -356,7 +356,7 @@ acpi_fixed_event_info       acpi_gbl_fixed_event_info[ACPI_NUM_FIXED_EVENTS] =
 
 /* Region type decoding */
 
-const char        *acpi_gbl_region_types[ACPI_NUM_PREDEFINED_REGIONS] =
+const char                *acpi_gbl_region_types[ACPI_NUM_PREDEFINED_REGIONS] =
 {
 	"system_memory",
 	"system_iO",
@@ -371,7 +371,7 @@ const char        *acpi_gbl_region_types[ACPI_NUM_PREDEFINED_REGIONS] =
 
 char *
 acpi_ut_get_region_name (
-	u8                      space_id)
+	u8                              space_id)
 {
 
 	if (space_id >= ACPI_USER_REGION_BEGIN)
@@ -402,7 +402,7 @@ acpi_ut_get_region_name (
 
 /* Event type decoding */
 
-static const char        *acpi_gbl_event_types[ACPI_NUM_FIXED_EVENTS] =
+static const char                *acpi_gbl_event_types[ACPI_NUM_FIXED_EVENTS] =
 {
 	"PM_Timer",
 	"global_lock",
@@ -414,7 +414,7 @@ static const char        *acpi_gbl_event_types[ACPI_NUM_FIXED_EVENTS] =
 
 char *
 acpi_ut_get_event_name (
-	u32                     event_id)
+	u32                             event_id)
 {
 
 	if (event_id > ACPI_EVENT_MAX)
@@ -447,10 +447,10 @@ acpi_ut_get_event_name (
  * indicatewhat type is actually going to be stored for this entry.
  */
 
-static const char           acpi_gbl_bad_type[] = "UNDEFINED";
+static const char                   acpi_gbl_bad_type[] = "UNDEFINED";
 #define TYPE_NAME_LENGTH    12                           /* Maximum length of each string */
 
-static const char           *acpi_gbl_ns_type_names[] = /* printable names of ACPI types */
+static const char                   *acpi_gbl_ns_type_names[] = /* printable names of ACPI types */
 {
 	/* 00 */ "Untyped",
 	/* 01 */ "Integer",
@@ -487,7 +487,7 @@ static const char           *acpi_gbl_ns_type_names[] = /* printable names of AC
 
 char *
 acpi_ut_get_type_name (
-	acpi_object_type        type)
+	acpi_object_type                type)
 {
 
 	if (type > ACPI_TYPE_INVALID)
@@ -501,7 +501,7 @@ acpi_ut_get_type_name (
 
 char *
 acpi_ut_get_object_type_name (
-	acpi_operand_object     *obj_desc)
+	union acpi_operand_object       *obj_desc)
 {
 
 	if (!obj_desc)
@@ -534,7 +534,7 @@ acpi_ut_get_object_type_name (
 
 char *
 acpi_ut_get_mutex_name (
-	u32                     mutex_id)
+	u32                             mutex_id)
 {
 
 	if (mutex_id > MAX_MTX)
@@ -563,7 +563,7 @@ acpi_ut_get_mutex_name (
 
 u8
 acpi_ut_valid_object_type (
-	acpi_object_type        type)
+	acpi_object_type                type)
 {
 
 	if (type > ACPI_TYPE_LOCAL_MAX)
@@ -589,9 +589,9 @@ acpi_ut_valid_object_type (
 
 acpi_owner_id
 acpi_ut_allocate_owner_id (
-	u32                     id_type)
+	u32                             id_type)
 {
-	acpi_owner_id           owner_id = 0xFFFF;
+	acpi_owner_id                   owner_id = 0xFFFF;
 
 
 	ACPI_FUNCTION_TRACE ("ut_allocate_owner_id");
@@ -651,27 +651,27 @@ void
 acpi_ut_init_globals (
 	void)
 {
-	u32                     i;
+	u32                             i;
 
 
 	ACPI_FUNCTION_TRACE ("ut_init_globals");
 
 	/* Memory allocation and cache lists */
 
-	ACPI_MEMSET (acpi_gbl_memory_lists, 0, sizeof (acpi_memory_list) * ACPI_NUM_MEM_LISTS);
+	ACPI_MEMSET (acpi_gbl_memory_lists, 0, sizeof (struct acpi_memory_list) * ACPI_NUM_MEM_LISTS);
 
-	acpi_gbl_memory_lists[ACPI_MEM_LIST_STATE].link_offset      = (u16) ACPI_PTR_DIFF (&(((acpi_generic_state *) NULL)->common.next), NULL);
-	acpi_gbl_memory_lists[ACPI_MEM_LIST_PSNODE].link_offset     = (u16) ACPI_PTR_DIFF (&(((acpi_parse_object *) NULL)->common.next), NULL);
-	acpi_gbl_memory_lists[ACPI_MEM_LIST_PSNODE_EXT].link_offset = (u16) ACPI_PTR_DIFF (&(((acpi_parse_object *) NULL)->common.next), NULL);
-	acpi_gbl_memory_lists[ACPI_MEM_LIST_OPERAND].link_offset    = (u16) ACPI_PTR_DIFF (&(((acpi_operand_object *) NULL)->cache.next), NULL);
-	acpi_gbl_memory_lists[ACPI_MEM_LIST_WALK].link_offset       = (u16) ACPI_PTR_DIFF (&(((acpi_walk_state *) NULL)->next), NULL);
+	acpi_gbl_memory_lists[ACPI_MEM_LIST_STATE].link_offset      = (u16) ACPI_PTR_DIFF (&(((union acpi_generic_state *) NULL)->common.next), NULL);
+	acpi_gbl_memory_lists[ACPI_MEM_LIST_PSNODE].link_offset     = (u16) ACPI_PTR_DIFF (&(((union acpi_parse_object *) NULL)->common.next), NULL);
+	acpi_gbl_memory_lists[ACPI_MEM_LIST_PSNODE_EXT].link_offset = (u16) ACPI_PTR_DIFF (&(((union acpi_parse_object *) NULL)->common.next), NULL);
+	acpi_gbl_memory_lists[ACPI_MEM_LIST_OPERAND].link_offset    = (u16) ACPI_PTR_DIFF (&(((union acpi_operand_object *) NULL)->cache.next), NULL);
+	acpi_gbl_memory_lists[ACPI_MEM_LIST_WALK].link_offset       = (u16) ACPI_PTR_DIFF (&(((struct acpi_walk_state *) NULL)->next), NULL);
 
-	acpi_gbl_memory_lists[ACPI_MEM_LIST_NSNODE].object_size     = sizeof (acpi_namespace_node);
-	acpi_gbl_memory_lists[ACPI_MEM_LIST_STATE].object_size      = sizeof (acpi_generic_state);
-	acpi_gbl_memory_lists[ACPI_MEM_LIST_PSNODE].object_size     = sizeof (acpi_parse_obj_common);
-	acpi_gbl_memory_lists[ACPI_MEM_LIST_PSNODE_EXT].object_size = sizeof (acpi_parse_obj_named);
-	acpi_gbl_memory_lists[ACPI_MEM_LIST_OPERAND].object_size    = sizeof (acpi_operand_object);
-	acpi_gbl_memory_lists[ACPI_MEM_LIST_WALK].object_size       = sizeof (acpi_walk_state);
+	acpi_gbl_memory_lists[ACPI_MEM_LIST_NSNODE].object_size     = sizeof (struct acpi_namespace_node);
+	acpi_gbl_memory_lists[ACPI_MEM_LIST_STATE].object_size      = sizeof (union acpi_generic_state);
+	acpi_gbl_memory_lists[ACPI_MEM_LIST_PSNODE].object_size     = sizeof (struct acpi_parse_obj_common);
+	acpi_gbl_memory_lists[ACPI_MEM_LIST_PSNODE_EXT].object_size = sizeof (struct acpi_parse_obj_named);
+	acpi_gbl_memory_lists[ACPI_MEM_LIST_OPERAND].object_size    = sizeof (union acpi_operand_object);
+	acpi_gbl_memory_lists[ACPI_MEM_LIST_WALK].object_size       = sizeof (struct acpi_walk_state);
 
 	acpi_gbl_memory_lists[ACPI_MEM_LIST_STATE].max_cache_depth  = ACPI_MAX_STATE_CACHE_DEPTH;
 	acpi_gbl_memory_lists[ACPI_MEM_LIST_PSNODE].max_cache_depth = ACPI_MAX_PARSE_CACHE_DEPTH;

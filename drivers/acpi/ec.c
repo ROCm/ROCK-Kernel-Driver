@@ -79,14 +79,14 @@ static struct acpi_driver acpi_ec_driver = {
 };
 
 struct acpi_ec {
-	acpi_handle		handle;
-	unsigned long		uid;
-	unsigned long		gpe_bit;
-	acpi_generic_address	status_addr;
-	acpi_generic_address	command_addr;
-	acpi_generic_address	data_addr;
-	unsigned long		global_lock;
-	spinlock_t		lock;
+	acpi_handle			handle;
+	unsigned long			uid;
+	unsigned long			gpe_bit;
+	struct acpi_generic_address	status_addr;
+	struct acpi_generic_address	command_addr;
+	struct acpi_generic_address	data_addr;
+	unsigned long			global_lock;
+	spinlock_t			lock;
 };
 
 /* If we find an EC via the ECDT, we need to keep a ptr to its context */
@@ -652,8 +652,8 @@ acpi_ec_start (
 	int			result = 0;
 	acpi_status		status = AE_OK;
 	struct acpi_ec		*ec = NULL;
-	acpi_buffer		buffer = {ACPI_ALLOCATE_BUFFER, NULL};
-	acpi_resource		*resource = NULL;
+	struct acpi_buffer	buffer = {ACPI_ALLOCATE_BUFFER, NULL};
+	struct acpi_resource	*resource = NULL;
 
 	ACPI_FUNCTION_TRACE("acpi_ec_start");
 
@@ -674,7 +674,7 @@ acpi_ec_start (
 		return_VALUE(-ENODEV);
 	}
 
-	resource = (acpi_resource *) buffer.pointer;
+	resource = (struct acpi_resource *) buffer.pointer;
 	if (!resource || (resource->id != ACPI_RSTYPE_IO)) {
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Invalid or missing resource\n"));
 		result = -ENODEV;
@@ -761,7 +761,7 @@ acpi_ec_ecdt_probe (void)
 	struct acpi_table_ecdt 	*ecdt_ptr;
 
 	status = acpi_get_firmware_table("ECDT", 1, ACPI_LOGICAL_ADDRESSING, 
-		(acpi_table_header **) &ecdt_ptr);
+		(struct acpi_table_header **) &ecdt_ptr);
 	if (ACPI_FAILURE(status))
 		return 0;
 

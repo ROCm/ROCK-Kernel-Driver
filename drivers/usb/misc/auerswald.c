@@ -1946,9 +1946,6 @@ static int auerswald_probe (struct usb_interface *intf,
         if (intf->altsetting->desc.bInterfaceNumber != 0)
 		return -ENODEV;
 
-	/* prevent module unloading while sleeping */
-	MOD_INC_USE_COUNT;
-
 	/* allocate memory for our device and intialize it */
 	cp = kmalloc (sizeof(auerswald_t), GFP_KERNEL);
 	if (cp == NULL) {
@@ -2066,7 +2063,6 @@ static int auerswald_probe (struct usb_interface *intf,
 
 	/* Error exit: clean up the memory */
 pfail:	auerswald_delete (cp);
-	MOD_DEC_USE_COUNT;
 	return -EIO;
 }
 
@@ -2138,9 +2134,6 @@ static void auerswald_disconnect (struct usb_interface *intf)
 			if (scp) scp->disconnect( scp);
 		}
 	}
-
-	/* The device releases this module */
-	MOD_DEC_USE_COUNT;
 }
 
 /* Descriptor for the devices which are served by this driver.

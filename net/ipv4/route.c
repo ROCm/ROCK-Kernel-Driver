@@ -201,7 +201,7 @@ struct rt_cache_stat *rt_cache_stat;
 static int rt_intern_hash(unsigned hash, struct rtable *rth,
 				struct rtable **res);
 
-static __inline__ unsigned rt_hash_code(u32 daddr, u32 saddr, u8 tos)
+static unsigned rt_hash_code(u32 daddr, u32 saddr, u8 tos)
 {
 	unsigned hash = ((daddr & 0xF0F0F0F0) >> 4) |
 			((daddr & 0x0F0F0F0F) << 4);
@@ -430,7 +430,7 @@ static __inline__ int rt_valuable(struct rtable *rth)
 		rth->u.dst.expires;
 }
 
-static __inline__ int rt_may_expire(struct rtable *rth, int tmo1, int tmo2)
+static int rt_may_expire(struct rtable *rth, int tmo1, int tmo2)
 {
 	int age;
 	int ret = 0;

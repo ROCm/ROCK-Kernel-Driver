@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -43,7 +43,7 @@
 	 ACPI_MODULE_NAME    ("psparse")
 
 
-static u32                  acpi_gbl_depth = 0;
+static u32                          acpi_gbl_depth = 0;
 
 
 /*******************************************************************************
@@ -60,7 +60,7 @@ static u32                  acpi_gbl_depth = 0;
 
 u32
 acpi_ps_get_opcode_size (
-	u32                     opcode)
+	u32                             opcode)
 {
 
 	/* Extended (2-byte) opcode if > 255 */
@@ -89,10 +89,10 @@ acpi_ps_get_opcode_size (
 
 u16
 acpi_ps_peek_opcode (
-	acpi_parse_state        *parser_state)
+	struct acpi_parse_state         *parser_state)
 {
-	u8                      *aml;
-	u16                     opcode;
+	u8                              *aml;
+	u16                             opcode;
 
 
 	aml = parser_state->aml;
@@ -125,13 +125,13 @@ acpi_ps_peek_opcode (
 
 void
 acpi_ps_complete_this_op (
-	acpi_walk_state         *walk_state,
-	acpi_parse_object       *op)
+	struct acpi_walk_state          *walk_state,
+	union acpi_parse_object         *op)
 {
-	acpi_parse_object       *prev;
-	acpi_parse_object       *next;
-	const acpi_opcode_info  *parent_info;
-	acpi_parse_object       *replacement_op = NULL;
+	union acpi_parse_object         *prev;
+	union acpi_parse_object         *next;
+	const struct acpi_opcode_info   *parent_info;
+	union acpi_parse_object         *replacement_op = NULL;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ps_complete_this_op", op);
@@ -281,12 +281,12 @@ acpi_ps_complete_this_op (
 
 acpi_status
 acpi_ps_next_parse_state (
-	acpi_walk_state         *walk_state,
-	acpi_parse_object       *op,
-	acpi_status             callback_status)
+	struct acpi_walk_state          *walk_state,
+	union acpi_parse_object         *op,
+	acpi_status                     callback_status)
 {
-	acpi_parse_state        *parser_state = &walk_state->parser_state;
-	acpi_status             status = AE_CTRL_PENDING;
+	struct acpi_parse_state         *parser_state = &walk_state->parser_state;
+	acpi_status                     status = AE_CTRL_PENDING;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ps_next_parse_state", op);
@@ -402,14 +402,14 @@ acpi_ps_next_parse_state (
 
 acpi_status
 acpi_ps_parse_loop (
-	acpi_walk_state         *walk_state)
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_status             status = AE_OK;
-	acpi_parse_object       *op = NULL;     /* current op */
-	acpi_parse_object       *arg = NULL;
-	acpi_parse_object       pre_op;
-	acpi_parse_state        *parser_state;
-	u8                      *aml_op_start = NULL;
+	acpi_status                     status = AE_OK;
+	union acpi_parse_object         *op = NULL;     /* current op */
+	union acpi_parse_object         *arg = NULL;
+	union acpi_parse_object         pre_op;
+	struct acpi_parse_state         *parser_state;
+	u8                              *aml_op_start = NULL;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ps_parse_loop", walk_state);
@@ -1029,13 +1029,13 @@ close_this_op:
 
 acpi_status
 acpi_ps_parse_aml (
-	acpi_walk_state         *walk_state)
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_status             status;
-	acpi_status             terminate_status;
-	acpi_thread_state       *thread;
-	acpi_thread_state       *prev_walk_list = acpi_gbl_current_walk_list;
-	acpi_walk_state         *previous_walk_state;
+	acpi_status                     status;
+	acpi_status                     terminate_status;
+	struct acpi_thread_state        *thread;
+	struct acpi_thread_state        *prev_walk_list = acpi_gbl_current_walk_list;
+	struct acpi_walk_state          *previous_walk_state;
 
 
 	ACPI_FUNCTION_TRACE ("ps_parse_aml");
@@ -1175,7 +1175,7 @@ acpi_ps_parse_aml (
 	/* Normal exit */
 
 	acpi_ex_release_all_mutexes (thread);
-	acpi_ut_delete_generic_state (ACPI_CAST_PTR (acpi_generic_state, thread));
+	acpi_ut_delete_generic_state (ACPI_CAST_PTR (union acpi_generic_state, thread));
 	acpi_gbl_current_walk_list = prev_walk_list;
 	return_ACPI_STATUS (status);
 }

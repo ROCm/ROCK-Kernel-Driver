@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -50,12 +50,12 @@
 
 static acpi_status
 acpi_ut_copy_isimple_to_esimple (
-	acpi_operand_object     *internal_object,
-	acpi_object             *external_object,
-	u8                      *data_space,
-	acpi_size               *buffer_space_used)
+	union acpi_operand_object       *internal_object,
+	union acpi_object               *external_object,
+	u8                              *data_space,
+	acpi_size                       *buffer_space_used)
 {
-	acpi_status             status = AE_OK;
+	acpi_status                     status = AE_OK;
 
 
 	ACPI_FUNCTION_TRACE ("ut_copy_isimple_to_esimple");
@@ -73,7 +73,7 @@ acpi_ut_copy_isimple_to_esimple (
 
 	/* Always clear the external object */
 
-	ACPI_MEMSET (external_object, 0, sizeof (acpi_object));
+	ACPI_MEMSET (external_object, 0, sizeof (union acpi_object));
 
 	/*
 	 * In general, the external object will be the same type as
@@ -177,24 +177,24 @@ acpi_ut_copy_isimple_to_esimple (
 
 acpi_status
 acpi_ut_copy_ielement_to_eelement (
-	u8                      object_type,
-	acpi_operand_object     *source_object,
-	acpi_generic_state      *state,
-	void                    *context)
+	u8                              object_type,
+	union acpi_operand_object       *source_object,
+	union acpi_generic_state        *state,
+	void                            *context)
 {
-	acpi_status             status = AE_OK;
-	acpi_pkg_info           *info = (acpi_pkg_info *) context;
-	acpi_size               object_space;
-	u32                     this_index;
-	acpi_object             *target_object;
+	acpi_status                     status = AE_OK;
+	struct acpi_pkg_info            *info = (struct acpi_pkg_info *) context;
+	acpi_size                       object_space;
+	u32                             this_index;
+	union acpi_object               *target_object;
 
 
 	ACPI_FUNCTION_ENTRY ();
 
 
 	this_index   = state->pkg.index;
-	target_object = (acpi_object *)
-			  &((acpi_object *)(state->pkg.dest_object))->package.elements[this_index];
+	target_object = (union acpi_object *)
+			  &((union acpi_object *)(state->pkg.dest_object))->package.elements[this_index];
 
 	switch (object_type) {
 	case ACPI_COPY_TYPE_SIMPLE:
@@ -217,7 +217,7 @@ acpi_ut_copy_ielement_to_eelement (
 		 */
 		target_object->type             = ACPI_TYPE_PACKAGE;
 		target_object->package.count    = source_object->package.count;
-		target_object->package.elements = ACPI_CAST_PTR (acpi_object, info->free_space);
+		target_object->package.elements = ACPI_CAST_PTR (union acpi_object, info->free_space);
 
 		/*
 		 * Pass the new package object back to the package walk routine
@@ -229,7 +229,7 @@ acpi_ut_copy_ielement_to_eelement (
 		 * update the buffer length counter
 		 */
 		object_space = ACPI_ROUND_UP_TO_NATIVE_WORD (
-				   (acpi_size) target_object->package.count * sizeof (acpi_object));
+				   (acpi_size) target_object->package.count * sizeof (union acpi_object));
 		break;
 
 
@@ -264,13 +264,13 @@ acpi_ut_copy_ielement_to_eelement (
 
 static acpi_status
 acpi_ut_copy_ipackage_to_epackage (
-	acpi_operand_object     *internal_object,
-	u8                      *buffer,
-	acpi_size               *space_used)
+	union acpi_operand_object       *internal_object,
+	u8                              *buffer,
+	acpi_size                       *space_used)
 {
-	acpi_object             *external_object;
-	acpi_status             status;
-	acpi_pkg_info           info;
+	union acpi_object               *external_object;
+	acpi_status                     status;
+	struct acpi_pkg_info            info;
 
 
 	ACPI_FUNCTION_TRACE ("ut_copy_ipackage_to_epackage");
@@ -279,28 +279,28 @@ acpi_ut_copy_ipackage_to_epackage (
 	/*
 	 * First package at head of the buffer
 	 */
-	external_object = ACPI_CAST_PTR (acpi_object, buffer);
+	external_object = ACPI_CAST_PTR (union acpi_object, buffer);
 
 	/*
 	 * Free space begins right after the first package
 	 */
-	info.length      = ACPI_ROUND_UP_TO_NATIVE_WORD (sizeof (acpi_object));
-	info.free_space  = buffer + ACPI_ROUND_UP_TO_NATIVE_WORD (sizeof (acpi_object));
+	info.length      = ACPI_ROUND_UP_TO_NATIVE_WORD (sizeof (union acpi_object));
+	info.free_space  = buffer + ACPI_ROUND_UP_TO_NATIVE_WORD (sizeof (union acpi_object));
 	info.object_space = 0;
 	info.num_packages = 1;
 
 	external_object->type            = ACPI_GET_OBJECT_TYPE (internal_object);
 	external_object->package.count   = internal_object->package.count;
-	external_object->package.elements = ACPI_CAST_PTR (acpi_object, info.free_space);
+	external_object->package.elements = ACPI_CAST_PTR (union acpi_object, info.free_space);
 
 	/*
 	 * Leave room for an array of ACPI_OBJECTS in the buffer
 	 * and move the free space past it
 	 */
 	info.length    += (acpi_size) external_object->package.count *
-			 ACPI_ROUND_UP_TO_NATIVE_WORD (sizeof (acpi_object));
+			 ACPI_ROUND_UP_TO_NATIVE_WORD (sizeof (union acpi_object));
 	info.free_space += external_object->package.count *
-			 ACPI_ROUND_UP_TO_NATIVE_WORD (sizeof (acpi_object));
+			 ACPI_ROUND_UP_TO_NATIVE_WORD (sizeof (union acpi_object));
 
 	status = acpi_ut_walk_package_tree (internal_object, external_object,
 			 acpi_ut_copy_ielement_to_eelement, &info);
@@ -326,10 +326,10 @@ acpi_ut_copy_ipackage_to_epackage (
 
 acpi_status
 acpi_ut_copy_iobject_to_eobject (
-	acpi_operand_object     *internal_object,
-	acpi_buffer             *ret_buffer)
+	union acpi_operand_object       *internal_object,
+	struct acpi_buffer              *ret_buffer)
 {
-	acpi_status             status;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("ut_copy_iobject_to_eobject");
@@ -348,15 +348,15 @@ acpi_ut_copy_iobject_to_eobject (
 		 * Build a simple object (no nested objects)
 		 */
 		status = acpi_ut_copy_isimple_to_esimple (internal_object,
-				  (acpi_object *) ret_buffer->pointer,
+				  (union acpi_object *) ret_buffer->pointer,
 				  ((u8 *) ret_buffer->pointer +
-				  ACPI_ROUND_UP_TO_NATIVE_WORD (sizeof (acpi_object))),
+				  ACPI_ROUND_UP_TO_NATIVE_WORD (sizeof (union acpi_object))),
 				  &ret_buffer->length);
 		/*
 		 * build simple does not include the object size in the length
 		 * so we add it in here
 		 */
-		ret_buffer->length += sizeof (acpi_object);
+		ret_buffer->length += sizeof (union acpi_object);
 	}
 
 	return_ACPI_STATUS (status);
@@ -381,10 +381,10 @@ acpi_ut_copy_iobject_to_eobject (
 
 acpi_status
 acpi_ut_copy_esimple_to_isimple (
-	acpi_object             *external_object,
-	acpi_operand_object     **ret_internal_object)
+	union acpi_object               *external_object,
+	union acpi_operand_object       **ret_internal_object)
 {
-	acpi_operand_object     *internal_object;
+	union acpi_operand_object       *internal_object;
 
 
 	ACPI_FUNCTION_TRACE ("ut_copy_esimple_to_isimple");
@@ -488,17 +488,17 @@ acpi_ut_copy_esimple_to_isimple (
 
 static acpi_status
 acpi_ut_copy_epackage_to_ipackage (
-	acpi_operand_object     *internal_object,
-	u8                      *buffer,
-	u32                     *space_used)
+	union acpi_operand_object       *internal_object,
+	u8                              *buffer,
+	u32                             *space_used)
 {
-	u8                      *free_space;
-	acpi_object             *external_object;
-	u32                     length = 0;
-	u32                     this_index;
-	u32                     object_space = 0;
-	acpi_operand_object     *this_internal_obj;
-	acpi_object             *this_external_obj;
+	u8                              *free_space;
+	union acpi_object               *external_object;
+	u32                             length = 0;
+	u32                             this_index;
+	u32                             object_space = 0;
+	union acpi_operand_object       *this_internal_obj;
+	union acpi_object               *this_external_obj;
 
 
 	ACPI_FUNCTION_TRACE ("ut_copy_epackage_to_ipackage");
@@ -507,23 +507,23 @@ acpi_ut_copy_epackage_to_ipackage (
 	/*
 	 * First package at head of the buffer
 	 */
-	external_object = (acpi_object *)buffer;
+	external_object = (union acpi_object *)buffer;
 
 	/*
 	 * Free space begins right after the first package
 	 */
-	free_space = buffer + sizeof(acpi_object);
+	free_space = buffer + sizeof(union acpi_object);
 
 
 	external_object->type              = ACPI_GET_OBJECT_TYPE (internal_object);
 	external_object->package.count     = internal_object->package.count;
-	external_object->package.elements  = (acpi_object *)free_space;
+	external_object->package.elements  = (union acpi_object *)free_space;
 
 	/*
 	 * Build an array of ACPI_OBJECTS in the buffer
 	 * and move the free space past it
 	 */
-	free_space += external_object->package.count * sizeof(acpi_object);
+	free_space += external_object->package.count * sizeof(union acpi_object);
 
 
 	/* Call walk_package */
@@ -548,10 +548,10 @@ acpi_ut_copy_epackage_to_ipackage (
 
 acpi_status
 acpi_ut_copy_eobject_to_iobject (
-	acpi_object             *external_object,
-	acpi_operand_object     **internal_object)
+	union acpi_object               *external_object,
+	union acpi_operand_object       **internal_object)
 {
-	acpi_status             status;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("ut_copy_eobject_to_iobject");
@@ -594,11 +594,11 @@ acpi_ut_copy_eobject_to_iobject (
 
 acpi_status
 acpi_ut_copy_simple_object (
-	acpi_operand_object     *source_desc,
-	acpi_operand_object     *dest_desc)
+	union acpi_operand_object       *source_desc,
+	union acpi_operand_object       *dest_desc)
 {
-	u16                     reference_count;
-	acpi_operand_object     *next_object;
+	u16                             reference_count;
+	union acpi_operand_object       *next_object;
 
 
 	/* Save fields from destination that we don't want to overwrite */
@@ -609,7 +609,7 @@ acpi_ut_copy_simple_object (
 	/* Copy the entire source object over the destination object*/
 
 	ACPI_MEMCPY ((char *) dest_desc, (char *) source_desc,
-			  sizeof (acpi_operand_object));
+			  sizeof (union acpi_operand_object));
 
 	/* Restore the saved fields */
 
@@ -685,22 +685,22 @@ acpi_ut_copy_simple_object (
 
 acpi_status
 acpi_ut_copy_ielement_to_ielement (
-	u8                      object_type,
-	acpi_operand_object     *source_object,
-	acpi_generic_state      *state,
-	void                    *context)
+	u8                              object_type,
+	union acpi_operand_object       *source_object,
+	union acpi_generic_state        *state,
+	void                            *context)
 {
-	acpi_status             status = AE_OK;
-	u32                     this_index;
-	acpi_operand_object     **this_target_ptr;
-	acpi_operand_object     *target_object;
+	acpi_status                     status = AE_OK;
+	u32                             this_index;
+	union acpi_operand_object       **this_target_ptr;
+	union acpi_operand_object       *target_object;
 
 
 	ACPI_FUNCTION_ENTRY ();
 
 
 	this_index    = state->pkg.index;
-	this_target_ptr = (acpi_operand_object **)
+	this_target_ptr = (union acpi_operand_object **)
 			   &state->pkg.dest_object->package.elements[this_index];
 
 	switch (object_type) {
@@ -794,11 +794,11 @@ acpi_ut_copy_ielement_to_ielement (
 
 acpi_status
 acpi_ut_copy_ipackage_to_ipackage (
-	acpi_operand_object     *source_obj,
-	acpi_operand_object     *dest_obj,
-	acpi_walk_state         *walk_state)
+	union acpi_operand_object       *source_obj,
+	union acpi_operand_object       *dest_obj,
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_status             status = AE_OK;
+	acpi_status                     status = AE_OK;
 
 
 	ACPI_FUNCTION_TRACE ("ut_copy_ipackage_to_ipackage");
@@ -852,11 +852,11 @@ acpi_ut_copy_ipackage_to_ipackage (
 
 acpi_status
 acpi_ut_copy_iobject_to_iobject (
-	acpi_operand_object     *source_desc,
-	acpi_operand_object     **dest_desc,
-	acpi_walk_state         *walk_state)
+	union acpi_operand_object       *source_desc,
+	union acpi_operand_object       **dest_desc,
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_status             status = AE_OK;
+	acpi_status                     status = AE_OK;
 
 
 	ACPI_FUNCTION_TRACE ("ut_copy_iobject_to_iobject");

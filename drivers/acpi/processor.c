@@ -915,9 +915,9 @@ acpi_processor_get_performance_control (
 {
 	int			result = 0;
 	acpi_status		status = 0;
-	acpi_buffer		buffer = {ACPI_ALLOCATE_BUFFER, NULL};
-	acpi_object		*pct = NULL;
-	acpi_object		obj = {0};
+	struct acpi_buffer	buffer = {ACPI_ALLOCATE_BUFFER, NULL};
+	union acpi_object	*pct = NULL;
+	union acpi_object	obj = {0};
 	struct acpi_pct_register *reg = NULL;
 
 	ACPI_FUNCTION_TRACE("acpi_processor_get_performance_control");
@@ -928,7 +928,7 @@ acpi_processor_get_performance_control (
 		return_VALUE(-ENODEV);
 	}
 
-	pct = (acpi_object *) buffer.pointer;
+	pct = (union acpi_object *) buffer.pointer;
 	if (!pct || (pct->type != ACPI_TYPE_PACKAGE) 
 		|| (pct->package.count != 2)) {
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Invalid _PCT data\n"));
@@ -1008,10 +1008,10 @@ acpi_processor_get_performance_states (
 {
 	int			result = 0;
 	acpi_status		status = AE_OK;
-	acpi_buffer		buffer = {ACPI_ALLOCATE_BUFFER, NULL};
-	acpi_buffer		format = {sizeof("NNNNNN"), "NNNNNN"};
-	acpi_buffer		state = {0, NULL};
-	acpi_object 		*pss = NULL;
+	struct acpi_buffer	buffer = {ACPI_ALLOCATE_BUFFER, NULL};
+	struct acpi_buffer	format = {sizeof("NNNNNN"), "NNNNNN"};
+	struct acpi_buffer	state = {0, NULL};
+	union acpi_object 	*pss = NULL;
 	int			i = 0;
 
 	ACPI_FUNCTION_TRACE("acpi_processor_get_performance_states");
@@ -1022,7 +1022,7 @@ acpi_processor_get_performance_states (
 		return_VALUE(-ENODEV);
 	}
 
-	pss = (acpi_object *) buffer.pointer;
+	pss = (union acpi_object *) buffer.pointer;
 	if (!pss || (pss->type != ACPI_TYPE_PACKAGE)) {
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Invalid _PSS data\n"));
 		result = -EFAULT;
@@ -1658,7 +1658,6 @@ static int
 acpi_cpufreq_setpolicy (
 	struct cpufreq_policy   *policy)
 {
-	unsigned int cpu = 0;
 	unsigned int i = 0;
 	struct acpi_processor *pr = NULL;
 	unsigned int next_state = 0;
@@ -1669,24 +1668,9 @@ acpi_cpufreq_setpolicy (
 	if (!policy)
 		return_VALUE(-EINVAL);
 
-	/* get a present, initialized CPU */
-	if (policy->cpu == CPUFREQ_ALL_CPUS)
-	{
-		for (i=0; i<NR_CPUS; i++) {
-			if (processors[i] != NULL) {
-				cpu = i;
-				pr = processors[cpu];
-				break;
-			}
-		}
-	}
-	else
-	{
-		cpu = policy->cpu;
-		pr = processors[cpu];
-		if (!pr)
-			return_VALUE(-EINVAL);
-	}
+	pr = processors[policy->cpu];
+	if (!pr)
+		return_VALUE(-EINVAL);
 
 	/* select appropriate P-State */
 	if (policy->policy == CPUFREQ_POLICY_POWERSAVE)
@@ -1715,19 +1699,9 @@ acpi_cpufreq_setpolicy (
 	}
 
 	/* set one or all CPUs to the new state */
-	if (policy->cpu == CPUFREQ_ALL_CPUS) {
-		for (i=0; i<NR_CPUS; i++)
-		{
-			pr = processors[cpu];
-			if (!pr || !cpu_online(cpu))
-				continue;
-			result = acpi_processor_set_performance (pr, next_state);
-		}
-	} else {
-		result = acpi_processor_set_performance (pr, next_state);
-	}
+	result = acpi_processor_set_performance (pr, next_state);
 
-	return_VALUE(0);
+	return_VALUE(result);
 }
 
 
@@ -1735,7 +1709,6 @@ static int
 acpi_cpufreq_verify (
 	struct cpufreq_policy   *policy)
 {
-	unsigned int cpu = 0;
 	unsigned int i = 0;
 	struct acpi_processor *pr = NULL;
 	unsigned int number_states = 0;
@@ -1746,24 +1719,9 @@ acpi_cpufreq_verify (
 	if (!policy)
 		return_VALUE(-EINVAL);
 
-	/* get a present, initialized CPU */
-	if (policy->cpu == CPUFREQ_ALL_CPUS)
-	{
-		for (i=0; i<NR_CPUS; i++) {
-			if (processors[i] != NULL) {
-				cpu = i;
-				pr = processors[cpu];
-				break;
-			}
-		}
-	}
-	else
-	{
-		cpu = policy->cpu;
-		pr = processors[cpu];
-		if (!pr)
-			return_VALUE(-EINVAL);
-	}
+	pr = processors[policy->cpu];
+	if (!pr)
+		return_VALUE(-EINVAL);
 
 	/* first check if min and max are within valid limits */
 	cpufreq_verify_within_limits(
@@ -1786,6 +1744,11 @@ acpi_cpufreq_verify (
 		/* round up now */
 		policy->max = pr->performance.states[next_larger_state].core_frequency * 1000;
 	}
+
+	cpufreq_verify_within_limits(
+		policy, 
+		pr->performance.states[pr->performance.state_count - 1].core_frequency * 1000,
+		pr->performance.states[pr->limit.state.px].core_frequency * 1000);
 
 	return_VALUE(0);
 }
@@ -2366,8 +2329,8 @@ acpi_processor_get_info (
 	struct acpi_processor	*pr)
 {
 	acpi_status		status = 0;
-	acpi_object		object = {0};
-	acpi_buffer		buffer = {sizeof(acpi_object), &object};
+	union acpi_object	object = {0};
+	struct acpi_buffer	buffer = {sizeof(union acpi_object), &object};
 	static int		cpu_count = 0;
 
 	ACPI_FUNCTION_TRACE("acpi_processor_get_info");

@@ -7,7 +7,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -50,12 +50,12 @@
 
 acpi_status
 acpi_ex_resolve_object (
-	acpi_operand_object     **source_desc_ptr,
-	acpi_object_type        target_type,
-	acpi_walk_state         *walk_state)
+	union acpi_operand_object       **source_desc_ptr,
+	acpi_object_type                target_type,
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_operand_object     *source_desc = *source_desc_ptr;
-	acpi_status             status = AE_OK;
+	union acpi_operand_object       *source_desc = *source_desc_ptr;
+	acpi_status                     status = AE_OK;
 
 
 	ACPI_FUNCTION_TRACE ("ex_resolve_object");
@@ -171,13 +171,13 @@ acpi_ex_resolve_object (
 
 acpi_status
 acpi_ex_store_object_to_object (
-	acpi_operand_object     *source_desc,
-	acpi_operand_object     *dest_desc,
-	acpi_operand_object     **new_desc,
-	acpi_walk_state         *walk_state)
+	union acpi_operand_object       *source_desc,
+	union acpi_operand_object       *dest_desc,
+	union acpi_operand_object       **new_desc,
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_operand_object     *actual_src_desc;
-	acpi_status             status = AE_OK;
+	union acpi_operand_object       *actual_src_desc;
+	acpi_status                     status = AE_OK;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ex_store_object_to_object", source_desc);

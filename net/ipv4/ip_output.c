@@ -198,7 +198,7 @@ static inline int ip_finish_output2(struct sk_buff *skb)
 	return -EINVAL;
 }
 
-__inline__ int ip_finish_output(struct sk_buff *skb)
+int ip_finish_output(struct sk_buff *skb)
 {
 	struct net_device *dev = skb->dst->dev;
 
@@ -685,7 +685,7 @@ skb_can_coalesce(struct sk_buff *skb, int i, struct page *page, int off)
 	return 0;
 }
 
-static inline void
+static void
 skb_fill_page_desc(struct sk_buff *skb, int i, struct page *page, int off, int size)
 {
 	skb_frag_t *frag = &skb_shinfo(skb)->frags[i];

@@ -6,7 +6,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -40,7 +40,7 @@
  * FUNCTION:    acpi_ex_resolve_to_value
  *
  * PARAMETERS:  **stack_ptr         - Points to entry on obj_stack, which can
- *                                    be either an (acpi_operand_object *)
+ *                                    be either an (union acpi_operand_object *)
  *                                    or an acpi_handle.
  *              walk_state          - Current method state
  *
@@ -52,10 +52,10 @@
 
 acpi_status
 acpi_ex_resolve_to_value (
-	acpi_operand_object     **stack_ptr,
-	acpi_walk_state         *walk_state)
+	union acpi_operand_object       **stack_ptr,
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_status             status;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ex_resolve_to_value", stack_ptr);
@@ -68,8 +68,8 @@ acpi_ex_resolve_to_value (
 
 	/*
 	 * The entity pointed to by the stack_ptr can be either
-	 * 1) A valid acpi_operand_object, or
-	 * 2) A acpi_namespace_node (named_obj)
+	 * 1) A valid union acpi_operand_object, or
+	 * 2) A struct acpi_namespace_node (named_obj)
 	 */
 	if (ACPI_GET_DESCRIPTOR_TYPE (*stack_ptr) == ACPI_DESC_TYPE_OPERAND) {
 		status = acpi_ex_resolve_object_to_value (stack_ptr, walk_state);
@@ -84,7 +84,7 @@ acpi_ex_resolve_to_value (
 	 */
 	if (ACPI_GET_DESCRIPTOR_TYPE (*stack_ptr) == ACPI_DESC_TYPE_NAMED) {
 		status = acpi_ex_resolve_node_to_value (
-				  ACPI_CAST_INDIRECT_PTR (acpi_namespace_node, stack_ptr),
+				  ACPI_CAST_INDIRECT_PTR (struct acpi_namespace_node, stack_ptr),
 				  walk_state);
 		if (ACPI_FAILURE (status)) {
 			return_ACPI_STATUS (status);
@@ -113,14 +113,14 @@ acpi_ex_resolve_to_value (
 
 acpi_status
 acpi_ex_resolve_object_to_value (
-	acpi_operand_object     **stack_ptr,
-	acpi_walk_state         *walk_state)
+	union acpi_operand_object       **stack_ptr,
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_status             status = AE_OK;
-	acpi_operand_object     *stack_desc;
-	void                    *temp_node;
-	acpi_operand_object     *obj_desc;
-	u16                     opcode;
+	acpi_status                     status = AE_OK;
+	union acpi_operand_object       *stack_desc;
+	void                            *temp_node;
+	union acpi_operand_object       *obj_desc;
+	u16                             opcode;
 
 
 	ACPI_FUNCTION_TRACE ("ex_resolve_object_to_value");
@@ -128,7 +128,7 @@ acpi_ex_resolve_object_to_value (
 
 	stack_desc = *stack_ptr;
 
-	/* This is an acpi_operand_object  */
+	/* This is an union acpi_operand_object    */
 
 	switch (ACPI_GET_OBJECT_TYPE (stack_desc)) {
 	case ACPI_TYPE_LOCAL_REFERENCE:
@@ -298,14 +298,14 @@ acpi_ex_resolve_object_to_value (
 
 acpi_status
 acpi_ex_resolve_multiple (
-	acpi_walk_state         *walk_state,
-	acpi_operand_object     *operand,
-	acpi_object_type        *return_type,
-	acpi_operand_object     **return_desc)
+	struct acpi_walk_state          *walk_state,
+	union acpi_operand_object       *operand,
+	acpi_object_type                *return_type,
+	union acpi_operand_object       **return_desc)
 {
-	acpi_operand_object     *obj_desc = (void *) operand;
-	acpi_namespace_node     *node;
-	acpi_object_type        type;
+	union acpi_operand_object       *obj_desc = (void *) operand;
+	struct acpi_namespace_node      *node;
+	acpi_object_type                type;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_ex_resolve_multiple");
