@@ -867,6 +867,7 @@ repeat:
 		info->alloced++;
 		spin_unlock(&info->lock);
 		clear_highpage(page);
+		flush_dcache_page(page);
 		SetPageUptodate(page);
 	}
 
