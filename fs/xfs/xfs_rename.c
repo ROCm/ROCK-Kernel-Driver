@@ -269,11 +269,7 @@ xfs_rename(
 		return XFS_ERROR(EXDEV);
 	}
 	src_namelen = VNAMELEN(src_dentry);
-	if (src_namelen >= MAXNAMELEN)
-		return XFS_ERROR(ENAMETOOLONG);
 	target_namelen = VNAMELEN(target_dentry);
-	if (target_namelen >= MAXNAMELEN)
-		return XFS_ERROR(ENAMETOOLONG);
 	src_dp = XFS_BHVTOI(src_dir_bdp);
 	target_dp = XFS_BHVTOI(target_dir_bdp);
 	if (DM_EVENT_ENABLED(src_dir_vp->v_vfsp, src_dp, DM_EVENT_RENAME) ||
