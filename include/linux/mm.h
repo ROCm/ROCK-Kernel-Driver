@@ -415,9 +415,27 @@ void page_address_init(void);
  * address_space which maps the page from disk; whereas "page_mapped"
  * refers to user virtual address space into which the page is mapped.
  */
+extern struct address_space swapper_space;
 static inline struct address_space *page_mapping(struct page *page)
 {
-	return PageAnon(page)? NULL: page->mapping;
+	struct address_space *mapping = NULL;
+
+	if (unlikely(PageSwapCache(page)))
+		mapping = &swapper_space;
+	else if (likely(!PageAnon(page)))
+		mapping = page->mapping;
+	return mapping;
+}
+
+/*
+ * Return the pagecache index of the passed page.  Regular pagecache pages
+ * use ->index whereas swapcache pages use ->private
+ */
+static inline pgoff_t page_index(struct page *page)
+{
+	if (unlikely(PageSwapCache(page)))
+		return page->private;
+	return page->index;
 }
 
 /*

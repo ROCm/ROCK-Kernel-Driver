@@ -560,16 +560,17 @@ int __set_page_dirty_nobuffers(struct page *page)
 	int ret = 0;
 
 	if (!TestSetPageDirty(page)) {
-		struct address_space *mapping = page->mapping;
+		struct address_space *mapping = page_mapping(page);
 
 		if (mapping) {
 			spin_lock_irq(&mapping->tree_lock);
-			if (page->mapping) {	/* Race with truncate? */
-				BUG_ON(page->mapping != mapping);
+			mapping = page_mapping(page);
+			if (mapping) {	/* Race with truncate? */
+				BUG_ON(page_mapping(page) != mapping);
 				if (!mapping->backing_dev_info->memory_backed)
 					inc_page_state(nr_dirty);
 				radix_tree_tag_set(&mapping->page_tree,
-					page->index, PAGECACHE_TAG_DIRTY);
+					page_index(page), PAGECACHE_TAG_DIRTY);
 			}
 			spin_unlock_irq(&mapping->tree_lock);
 			if (!PageSwapCache(page))
@@ -600,14 +601,16 @@ EXPORT_SYMBOL(redirty_page_for_writepage);
 int fastcall set_page_dirty(struct page *page)
 {
 	struct address_space *mapping = page_mapping(page);
-	int (*spd)(struct page *);
 
-	if (!mapping) {
-		SetPageDirty(page);
-		return 0;
+	if (likely(mapping)) {
+		int (*spd)(struct page *) = mapping->a_ops->set_page_dirty;
+		if (spd)
+			return (*spd)(page);
+		return __set_page_dirty_buffers(page);
 	}
-	spd = mapping->a_ops->set_page_dirty;
-	return spd? (*spd)(page): __set_page_dirty_buffers(page);
+	if (!PageDirty(page))
+		SetPageDirty(page);
+	return 0;
 }
 EXPORT_SYMBOL(set_page_dirty);
 
@@ -644,7 +647,8 @@ int test_clear_page_dirty(struct page *page)
 	if (mapping) {
 		spin_lock_irqsave(&mapping->tree_lock, flags);
 		if (TestClearPageDirty(page)) {
-			radix_tree_tag_clear(&mapping->page_tree, page->index,
+			radix_tree_tag_clear(&mapping->page_tree,
+						page_index(page),
 						PAGECACHE_TAG_DIRTY);
 			spin_unlock_irqrestore(&mapping->tree_lock, flags);
 			if (!mapping->backing_dev_info->memory_backed)
@@ -700,7 +704,8 @@ int __clear_page_dirty(struct page *page)
 
 		spin_lock_irqsave(&mapping->tree_lock, flags);
 		if (TestClearPageDirty(page)) {
-			radix_tree_tag_clear(&mapping->page_tree, page->index,
+			radix_tree_tag_clear(&mapping->page_tree,
+						page_index(page),
 						PAGECACHE_TAG_DIRTY);
 			spin_unlock_irqrestore(&mapping->tree_lock, flags);
 			return 1;
@@ -722,7 +727,8 @@ int test_clear_page_writeback(struct page *page)
 		spin_lock_irqsave(&mapping->tree_lock, flags);
 		ret = TestClearPageWriteback(page);
 		if (ret)
-			radix_tree_tag_clear(&mapping->page_tree, page->index,
+			radix_tree_tag_clear(&mapping->page_tree,
+						page_index(page),
 						PAGECACHE_TAG_WRITEBACK);
 		spin_unlock_irqrestore(&mapping->tree_lock, flags);
 	} else {
@@ -742,10 +748,12 @@ int test_set_page_writeback(struct page *page)
 		spin_lock_irqsave(&mapping->tree_lock, flags);
 		ret = TestSetPageWriteback(page);
 		if (!ret)
-			radix_tree_tag_set(&mapping->page_tree, page->index,
+			radix_tree_tag_set(&mapping->page_tree,
+						page_index(page),
 						PAGECACHE_TAG_WRITEBACK);
 		if (!PageDirty(page))
-			radix_tree_tag_clear(&mapping->page_tree, page->index,
+			radix_tree_tag_clear(&mapping->page_tree,
+						page_index(page),
 						PAGECACHE_TAG_DIRTY);
 		spin_unlock_irqrestore(&mapping->tree_lock, flags);
 	} else {

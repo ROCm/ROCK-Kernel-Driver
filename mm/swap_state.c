@@ -12,6 +12,7 @@
 #include <linux/swap.h>
 #include <linux/init.h>
 #include <linux/pagemap.h>
+#include <linux/buffer_head.h>
 #include <linux/backing-dev.h>
 
 #include <asm/pgtable.h>
@@ -22,6 +23,7 @@
  */
 static struct address_space_operations swap_aops = {
 	.writepage	= swap_writepage,
+	.set_page_dirty	= __set_page_dirty_nobuffers,
 };
 
 static struct backing_dev_info swap_backing_dev_info = {
