@@ -1564,6 +1564,9 @@ static int ndisc_netdev_event(struct notifier_block *this, unsigned long event, 
 		neigh_changeaddr(&nd_tbl, dev);
 		fib6_run_gc(0);
 		break;
+	case NETDEV_UNREGISTER:
+		fib6_run_gc(0);
+		break;
 	default:
 		break;
 	}
