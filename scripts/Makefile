@@ -25,7 +25,7 @@ $(addprefix $(obj)/,$(filter-out fixdep,$(build-targets))): $(obj)/fixdep
 $(obj)/modpost.o $(obj)/file2alias.o: $(obj)/elfconfig.h
 
 quiet_cmd_elfconfig = MKELF   $@
-      cmd_elfconfig = $(obj)/mk_elfconfig < $< > $@
+      cmd_elfconfig = $(obj)/mk_elfconfig $(ARCH) < $< > $@
 
 $(obj)/elfconfig.h: $(obj)/empty.o $(obj)/mk_elfconfig FORCE
 	$(call if_changed,elfconfig)

@@ -265,6 +265,9 @@ parse_elf_finish(struct elf_info *info)
 	munmap(info->hdr, info->size);
 }
 
+#define CRC_PFX     MODULE_SYMBOL_PREFIX "__crc_"
+#define KSYMTAB_PFX MODULE_SYMBOL_PREFIX "__ksymtab_"
+
 void
 handle_modversions(struct module *mod, struct elf_info *info,
 		   Elf_Sym *sym, const char *symname)
@@ -279,9 +282,10 @@ handle_modversions(struct module *mod, struct elf_info *info,
 		break;
 	case SHN_ABS:
 		/* CRC'd symbol */
-		if (memcmp(symname, "__crc_", 6) == 0) {
+		if (memcmp(symname, CRC_PFX, strlen(CRC_PFX)) == 0) {
 			crc = (unsigned int) sym->st_value;
-			add_exported_symbol(symname+6, mod, &crc);
+			add_exported_symbol(symname + strlen(CRC_PFX),
+					    mod, &crc);
 			modversions = 1;
 		}
 		break;
@@ -290,15 +294,20 @@ handle_modversions(struct module *mod, struct elf_info *info,
 		if (ELF_ST_BIND(sym->st_info) != STB_GLOBAL)
 			break;
 		
-		s = alloc_symbol(symname);
-		/* add to list */
-		s->next = mod->unres;
-		mod->unres = s;
+		if (memcmp(symname, MODULE_SYMBOL_PREFIX,
+			   strlen(MODULE_SYMBOL_PREFIX)) == 0) {
+			s = alloc_symbol(symname + 
+					 strlen(MODULE_SYMBOL_PREFIX));
+			/* add to list */
+			s->next = mod->unres;
+			mod->unres = s;
+		}
 		break;
 	default:
 		/* All exported symbols */
-		if (memcmp(symname, "__ksymtab_", 10) == 0) {
-			add_exported_symbol(symname+10, mod, NULL);
+		if (memcmp(symname, KSYMTAB_PFX, strlen(KSYMTAB_PFX)) == 0) {
+			add_exported_symbol(symname + strlen(KSYMTAB_PFX),
+					    mod, NULL);
 		}
 		break;
 	}
