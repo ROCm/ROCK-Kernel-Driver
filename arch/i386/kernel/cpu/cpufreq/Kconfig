@@ -54,7 +54,7 @@ config X86_ACPI_CPUFREQ_PROC_INTF
 
 config ELAN_CPUFREQ
 	tristate "AMD Elan"
-	depends on CPU_FREQ_TABLE && MELAN
+	depends on CPU_FREQ_TABLE && X86_ELAN
 	---help---
 	  This adds the CPUFreq driver for AMD Elan SC400 and SC410
 	  processors.
