@@ -1834,7 +1834,6 @@ xfs_dir_leaf_moveents(xfs_dir_leafblock_t *leaf_s, int start_s,
 	entry_d = &leaf_d->entries[start_d];
 	for (i = 0; i < count; entry_s++, entry_d++, i++) {
 		ASSERT(INT_GET(entry_s->nameidx, ARCH_CONVERT) >= INT_GET(hdr_s->firstused, ARCH_CONVERT));
-		ASSERT(entry_s->namelen < MAXNAMELEN);
 		tmp = XFS_DIR_LEAF_ENTSIZE_BYENTRY(entry_s);
 		INT_MOD(hdr_d->firstused, ARCH_CONVERT, -(tmp));
 		entry_d->hashval = entry_s->hashval; /* INT_: direct copy */
