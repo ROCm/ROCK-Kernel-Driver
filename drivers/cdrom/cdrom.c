@@ -234,6 +234,12 @@
   -- Mt Rainier support
   -- DVD-RAM write open fixes
 
+  Nov 5 2001, Aug 8 2002. Modified by Andy Polyakov
+  <appro@fy.chalmers.se> to support MMC-3 compliant DVD+RW units.
+
+  Modified by Nigel Kukard <nkukard@lbsd.net> - support DVD+RW
+  2.4.x patch by Andy Polyakov <appro@fy.chalmers.se>
+
 -------------------------------------------------------------------------*/
 
 #define REVISION "Revision: 3.20"
