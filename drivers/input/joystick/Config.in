@@ -31,3 +31,5 @@ dep_tristate '  Multisystem joysticks via TurboGraFX device' CONFIG_JOYSTICK_TUR
 if [ "$CONFIG_AMIGA" = "y" ]; then
    dep_tristate '  Amiga joysticks' CONFIG_JOYSTICK_AMIJOY $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK
 fi
+
+dep_tristate '  Gameport data dumper' CONFIG_INPUT_JOYDUMP $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK
