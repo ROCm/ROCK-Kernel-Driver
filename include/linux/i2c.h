@@ -240,7 +240,8 @@ struct i2c_adapter {
 
 	int timeout;
 	int retries;
-	struct device dev;	/* the adapter device */
+	struct device dev;		/* the adapter device */
+	struct class_device class_dev;	/* the class device */
 
 #ifdef CONFIG_PROC_FS 
 	/* No need to set this when you initialize the adapter          */
