@@ -35,9 +35,6 @@
 
 /* For resume= kernel option */
 static char resume_file[256] = CONFIG_PM_DISK_PARTITION;
-
-static dev_t resume_device;
-
 extern suspend_pagedir_t *pagedir_save;
 
 /*
@@ -73,14 +70,6 @@ static int suspend_save_image(void)
 }
 
 
-/* More restore stuff */
-
-extern struct block_device * resume_bdev;
-
-extern dev_t __init name_to_dev_t(const char *line);
-
-
-
 /**
  *	pmdisk_write - Write saved memory image to swap.
  *
@@ -95,38 +84,6 @@ int pmdisk_write(void)
 {
 	return suspend_save_image();
 }
-
-
-/**
- *	pmdisk_read - Read saved image from swap.
- */
-
-int __init pmdisk_read(void)
-{
-	extern int read_suspend_image(void);
-	int error;
-
-	if (!strlen(resume_file))
-		return -ENOENT;
-
-	resume_device = name_to_dev_t(resume_file);
-	pr_debug("pmdisk: Resume From Partition: %s\n", resume_file);
-
-	resume_bdev = open_by_devnum(resume_device, FMODE_READ);
-	if (!IS_ERR(resume_bdev)) {
-		set_blocksize(resume_bdev, PAGE_SIZE);
-		error = read_suspend_image();
-		blkdev_put(resume_bdev);
-	} else
-		error = PTR_ERR(resume_bdev);
-
-	if (!error)
-		pr_debug("Reading resume file was successful\n");
-	else
-		pr_debug("pmdisk: Error %d resuming\n", error);
-	return error;
-}
-
 
 /**
  *	pmdisk_free - Free memory allocated to hold snapshot.

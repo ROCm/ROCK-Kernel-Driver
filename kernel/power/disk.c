@@ -25,7 +25,7 @@ extern struct pm_ops * pm_ops;
 
 extern int swsusp_suspend(void);
 extern int pmdisk_write(void);
-extern int pmdisk_read(void);
+extern int swsusp_read(void);
 extern int swsusp_resume(void);
 extern int pmdisk_free(void);
 
@@ -205,7 +205,7 @@ static int pm_resume(void)
 
 	pr_debug("PM: Reading pmdisk image.\n");
 
-	if ((error = pmdisk_read()))
+	if ((error = swsusp_read()))
 		goto Done;
 
 	pr_debug("PM: Preparing system for restore.\n");

@@ -1145,7 +1145,7 @@ static void wait_io(void)
 }
 
 
-struct block_device * resume_bdev;
+static struct block_device * resume_bdev;
 
 /**
  *	submit - submit BIO request.
@@ -1331,7 +1331,7 @@ static int __init read_pagedir(void)
 	return error;
 }
 
-int __init read_suspend_image(void)
+static int __init read_suspend_image(void)
 {
 	int error = 0;
 
@@ -1345,13 +1345,20 @@ int __init read_suspend_image(void)
 	return error;
 }
 
-static int __init __read_suspend_image(const char * specialfile)
+/**
+ *	pmdisk_read - Read saved image from swap.
+ */
+
+int __init swsusp_read(void)
 {
 	int error;
-	char b[BDEVNAME_SIZE];
 
-	resume_device = name_to_dev_t(specialfile);
-	printk("Resuming from device %s\n", __bdevname(resume_device, b));
+	if (!strlen(resume_file))
+		return -ENOENT;
+
+	resume_device = name_to_dev_t(resume_file);
+	pr_debug("swsusp: Resume From Partition: %s\n", resume_file);
+
 	resume_bdev = open_by_devnum(resume_device, FMODE_READ);
 	if (!IS_ERR(resume_bdev)) {
 		set_blocksize(resume_bdev, PAGE_SIZE);
@@ -1359,7 +1366,11 @@ static int __init __read_suspend_image(const char * specialfile)
 		blkdev_put(resume_bdev);
 	} else
 		error = PTR_ERR(resume_bdev);
-	MDELAY(1000);
+
+	if (!error)
+		pr_debug("Reading resume file was successful\n");
+	else
+		pr_debug("pmdisk: Error %d resuming\n", error);
 	return error;
 }
 
@@ -1398,13 +1409,7 @@ static int __init software_resume(void)
 	if (pm_prepare_console())
 		printk("swsusp: Can't allocate a console... proceeding\n");
 
-	if (!resume_file[0] && resume_status == RESUME_SPECIFIED) {
-		printk( "suspension device unspecified\n" );
-		return -EINVAL;
-	}
-
-	printk( "resuming from %s\n", resume_file);
-	if (__read_suspend_image(resume_file))
+	if (swsusp_read())
 		goto read_failure;
 	/* FIXME: Should we stop processes here, just to be safer? */
 	disable_nonboot_cpus();
