@@ -202,6 +202,11 @@ static struct agp_device_ids via_agp_device_ids[] __initdata =
 		.chipset	= VIA_VT8605,
 		.chipset_name	= "Apollo ProSavage PM133"
 	},
+	{
+		.device_id	= PCI_DEVICE_ID_VIA_8235_0,
+		.chipset	= VIA_P4X400,
+		.chipset_name	= "P4X400"
+	},
 	{ }, /* dummy final entry, always present */
 };
 
