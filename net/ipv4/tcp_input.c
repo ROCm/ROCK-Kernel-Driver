@@ -3093,13 +3093,7 @@ static void tcp_check_urg(struct sock * sk, struct tcphdr * th)
 		return;
 
 	/* Tell the world about our new urgent pointer. */
-	if (sk->proc != 0) {
-		if (sk->proc > 0)
-			kill_proc(sk->proc, SIGURG, 1);
-		else
-			kill_pg(-sk->proc, SIGURG, 1);
-		sk_wake_async(sk, 3, POLL_PRI);
-	}
+	sk_send_sigurg(sk);
 
 	/* We may be adding urgent data when the last byte read was
 	 * urgent. To do this requires some care. We cannot just ignore

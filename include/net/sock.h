@@ -132,7 +132,6 @@ struct sock {
 	unsigned char		rcvtstamp;
 	/* Hole of 1 byte. Try to pack. */
 	int			route_caps;
-	int			proc;
 	unsigned long	        lingertime;
 
 	int			hashent;
@@ -292,7 +291,6 @@ static __inline__ void sock_prot_dec_use(struct proto *prot)
 #define SOCK_BINDADDR_LOCK	4
 #define SOCK_BINDPORT_LOCK	8
 
-#include <linux/fs.h>	/* just for inode - yeuch.*/
 
 
 /* Used by processes to "lock" a socket state, so that
@@ -362,6 +360,7 @@ extern struct sk_buff 		*sock_alloc_send_pskb(struct sock *sk,
 						      int *errcode);
 extern void *sock_kmalloc(struct sock *sk, int size, int priority);
 extern void sock_kfree_s(struct sock *sk, void *mem, int size);
+extern void sk_send_sigurg(struct sock *sk);
 
 /*
  * Functions to fill in entries in struct proto_ops when a protocol
@@ -388,8 +387,6 @@ extern int			sock_no_getsockopt(struct socket *, int , int,
 						   char *, int *);
 extern int			sock_no_setsockopt(struct socket *, int, int,
 						   char *, int);
-extern int 			sock_no_fcntl(struct socket *, 
-					      unsigned int, unsigned long);
 extern int                      sock_no_sendmsg(struct socket *,
 						struct msghdr *, int,
 						struct scm_cookie *);

@@ -432,6 +432,7 @@ static inline struct inode *SOCK_INODE(struct socket *socket)
 #include <linux/efs_fs_i.h>
 
 struct fown_struct {
+	rwlock_t lock;          /* protects pid, uid, euid fields */
 	int pid;		/* pid or -pgrp where SIGIO should be sent */
 	uid_t uid, euid;	/* uid/euid of process setting the owner */
 	int signum;		/* posix.1b rt signal to be delivered on IO */
@@ -614,6 +615,10 @@ extern int fasync_helper(int, struct file *, int, struct fasync_struct **);
 extern void kill_fasync(struct fasync_struct **, int, int);
 /* only for net: no internal synchronization */
 extern void __kill_fasync(struct fasync_struct *, int, int);
+
+extern int f_setown(struct file *filp, unsigned long arg, int force);
+extern void f_delown(struct file *filp);
+extern int send_sigurg(struct fown_struct *fown);
 
 /*
  *	Umount options
