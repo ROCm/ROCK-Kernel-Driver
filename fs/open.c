@@ -81,11 +81,9 @@ int do_truncate(struct dentry *dentry, loff_t length)
 	if (length < 0)
 		return -EINVAL;
 
-	down(&inode->i_sem);
 	newattrs.ia_size = length;
 	newattrs.ia_valid = ATTR_SIZE | ATTR_CTIME;
 	error = notify_change(dentry, &newattrs);
-	up(&inode->i_sem);
 	return error;
 }
 

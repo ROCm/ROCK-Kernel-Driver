@@ -592,6 +592,8 @@ int ncp_notify_change(struct dentry *dentry, struct iattr *attr)
 
 	result = -EIO;
 
+	lock_kernel();	
+
 	server = NCP_SERVER(inode);
 	if ((!server) || !ncp_conn_valid(server))
 		goto out;
@@ -636,7 +638,8 @@ int ncp_notify_change(struct dentry *dentry, struct iattr *attr)
 				info.attributes |=  (aRONLY|aRENAMEINHIBIT|aDELETEINHIBIT);
                 } else if (!S_ISREG(inode->i_mode))
                 {
-                        return -EPERM;
+			result = -EPERM;
+			goto out;
                 }
                 else
                 {
@@ -722,7 +725,8 @@ int ncp_notify_change(struct dentry *dentry, struct iattr *attr)
 			attr->ia_size);
 
 		if ((result = ncp_make_open(inode, O_WRONLY)) < 0) {
-			return -EACCES;
+			result = -EACCES;
+			goto out;
 		}
 		ncp_write_kernel(NCP_SERVER(inode), NCP_FINFO(inode)->file_handle,
 			  attr->ia_size, 0, "", &written);
@@ -735,6 +739,7 @@ int ncp_notify_change(struct dentry *dentry, struct iattr *attr)
 			result = vmtruncate(inode, attr->ia_size);
 	}
 out:
+	unlock_kernel();
 	return result;
 }
 

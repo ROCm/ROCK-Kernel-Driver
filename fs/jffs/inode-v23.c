@@ -196,11 +196,13 @@ jffs_setattr(struct dentry *dentry, struct iattr *iattr)
 	struct jffs_file *f;
 	struct jffs_node *new_node;
 	int update_all;
-	int res;
+	int res = 0;
 	int recoverable = 0;
 
-	if ((res = inode_change_ok(inode, iattr)))
-		return res;
+	lock_kernel();
+
+	if ((res = inode_change_ok(inode, iattr))) 
+		goto out;
 
 	c = (struct jffs_control *)inode->i_sb->u.generic_sbp;
 	fmc = c->fmc;
@@ -215,7 +217,8 @@ jffs_setattr(struct dentry *dentry, struct iattr *iattr)
 		       inode->i_ino);
 		D3(printk (KERN_NOTICE "notify_change(): up biglock\n"));
 		up(&fmc->biglock);
-		return -EINVAL;
+		res = -EINVAL;
+		goto out;
 	});
 
 	D1(printk("***jffs_setattr(): file: \"%s\", ino: %u\n",
@@ -235,7 +238,8 @@ jffs_setattr(struct dentry *dentry, struct iattr *iattr)
 		D(printk("jffs_setattr(): Allocation failed!\n"));
 		D3(printk (KERN_NOTICE "notify_change(): up biglock\n"));
 		up(&fmc->biglock);
-		return -ENOMEM;
+		res = -ENOMEM;
+		goto out;
 	}
 
 	new_node->data_offset = 0;
@@ -321,7 +325,7 @@ jffs_setattr(struct dentry *dentry, struct iattr *iattr)
 		jffs_free_node(new_node);
 		D3(printk (KERN_NOTICE "n_c(): up biglock\n"));
 		up(&c->fmc->biglock);
-		return res;
+		goto out;
 	}
 
 	jffs_insert_node(c, f, &raw_inode, 0, new_node);
@@ -329,7 +333,9 @@ jffs_setattr(struct dentry *dentry, struct iattr *iattr)
 	mark_inode_dirty(inode);
 	D3(printk (KERN_NOTICE "n_c(): up biglock\n"));
 	up(&c->fmc->biglock);
-	return 0;
+out:
+	unlock_kernel();
+	return res;
 } /* jffs_notify_change()  */
 
 

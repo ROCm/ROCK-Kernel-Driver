@@ -733,6 +733,8 @@ nfs_notify_change(struct dentry *dentry, struct iattr *attr)
 	struct nfs_fattr fattr;
 	int error;
 
+	lock_kernel();
+
 	/*
 	 * Make sure the inode is up-to-date.
 	 */
@@ -781,6 +783,7 @@ printk("nfs_notify_change: revalidate failed, error=%d\n", error);
 	NFS_CACHEINV(inode);
 	error = nfs_refresh_inode(inode, &fattr);
 out:
+	unlock_kernel();
 	return error;
 }
 
