@@ -323,6 +323,8 @@ static int eth_configure(int n, void *init, char *mac,
 	dev->set_config = NULL;
 	dev->accept_fastpath = 0;
 	dev->br_port = 0;
+ 	dev->mem_start = 0;
+ 	dev->mem_end = 0;
 
 	rtnl_lock();
 	err = register_netdevice(dev);

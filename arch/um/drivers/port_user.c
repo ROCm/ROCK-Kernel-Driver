@@ -118,7 +118,7 @@ int port_listen_fd(int port)
 		goto out;
 	}
   
-	if(listen(fd, 1) < 0){
+	if((listen(fd, 1) < 0) || (os_set_fd_block(fd, 0))){
 		err = -errno;
 		goto out;
 	}
@@ -190,7 +190,8 @@ int port_connection(int fd, int *socket, int *pid_out)
 			 "/usr/lib/uml/port-helper", NULL };
 	struct port_pre_exec_data data;
 
-	if((new = accept(fd, NULL, 0)) < 0) return(-errno);
+	if((new = os_accept_connection(fd)) < 0)
+		return(-errno);
 
 	err = os_pipe(socket, 0, 0);
 	if(err) goto out_close;
