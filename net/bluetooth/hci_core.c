@@ -237,6 +237,9 @@ static void hci_init_req(struct hci_dev *hdev, unsigned long opt)
 	/* Read BD Address */
 	hci_send_cmd(hdev, OGF_INFO_PARAM, OCF_READ_BD_ADDR, 0, NULL);
 
+	/* Read Voice Setting */
+	hci_send_cmd(hdev, OGF_HOST_CTL, OCF_READ_VOICE_SETTING, 0, NULL);
+
 	/* Optional initialization */
 
 	/* Clear Event Filters */
