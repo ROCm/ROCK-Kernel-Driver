@@ -157,8 +157,11 @@ struct page {
 					   updated asynchronously */
 	struct list_head lru;		/* Pageout list, eg. active_list;
 					   protected by pagemap_lru_lock !! */
-	struct pte_chain * pte_chain;	/* Reverse pte mapping pointer.
+	union {
+		struct pte_chain * chain;	/* Reverse pte mapping pointer.
 					 * protected by PG_chainlock */
+		pte_t		 * direct;
+	} pte;
 	unsigned long private;		/* mapping-private opaque data */
 
 	/*

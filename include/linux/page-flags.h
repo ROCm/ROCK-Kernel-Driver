@@ -64,8 +64,10 @@
 
 #define PG_private		12	/* Has something at ->private */
 #define PG_writeback		13	/* Page is under writeback */
-#define PG_nosave		15	/* Used for system suspend/resume */
-#define PG_chainlock		16	/* lock bit for ->pte_chain */
+#define PG_nosave		14	/* Used for system suspend/resume */
+#define PG_chainlock		15	/* lock bit for ->pte_chain */
+
+#define PG_direct		16	/* ->pte_chain points directly at pte */
 
 /*
  * Global page accounting.  One instance per CPU.
@@ -216,6 +218,12 @@ extern void get_page_state(struct page_state *ret);
 #define TestSetPageNosave(page)	test_and_set_bit(PG_nosave, &(page)->flags)
 #define ClearPageNosave(page)		clear_bit(PG_nosave, &(page)->flags)
 #define TestClearPageNosave(page)	test_and_clear_bit(PG_nosave, &(page)->flags)
+
+#define PageDirect(page)	test_bit(PG_direct, &(page)->flags)
+#define SetPageDirect(page)	set_bit(PG_direct, &(page)->flags)
+#define TestSetPageDirect(page)	test_and_set_bit(PG_direct, &(page)->flags)
+#define ClearPageDirect(page)		clear_bit(PG_direct, &(page)->flags)
+#define TestClearPageDirect(page)	test_and_clear_bit(PG_direct, &(page)->flags)
 
 /*
  * inlines for acquisition and release of PG_chainlock
