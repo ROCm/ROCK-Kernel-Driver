@@ -368,7 +368,6 @@ extern int pagebuf_ispin(		/* check if buffer is pinned	*/
 /* Delayed Write Buffer Routines */
 
 #define PBDF_WAIT    0x01
-#define PBDF_TRYLOCK 0x02
 extern void pagebuf_delwri_flush(
 		pb_target_t *,
 		unsigned long,
