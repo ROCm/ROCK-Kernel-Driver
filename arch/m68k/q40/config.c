@@ -162,42 +162,6 @@ static void q40_get_model(char *model)
     sprintf(model, "Q40");
 }
 
-/* pasted code to make parport_pc happy */
-extern __inline__ int __get_order(unsigned long size)
-{
-	int order;
-
-	size = (size-1) >> (PAGE_SHIFT-1);
-	order = -1;
-	do {
-		size >>= 1;
-		order++;
-	} while (size);
-	return order;
-}
-void *pci_alloc_consistent(void *hwdev, size_t size,
-			   dma_addr_t *dma_handle)
-{
-	void *ret;
-	int gfp = GFP_ATOMIC;
-
-	ret = (void *)__get_free_pages(gfp, __get_order(size));
-
-	if (ret != NULL) {
-		memset(ret, 0, size);
-		*dma_handle = virt_to_bus(ret);
-	}
-	return ret;
-}
-
-void pci_free_consistent(void *hwdev, size_t size,
-			 void *vaddr, dma_addr_t dma_handle)
-{
-	free_pages((unsigned long)vaddr, __get_order(size));
-}
-/* end pasted code */
-
-
 /* No hardware options on Q40? */
 
 static int q40_get_hardware_list(char *buffer)
