@@ -245,7 +245,6 @@ alcor_kill_arch(int mode)
  * The System Vectors
  */
 
-#if defined(CONFIG_ALPHA_GENERIC) || defined(CONFIG_ALPHA_ALCOR)
 struct alpha_machine_vector alcor_mv __initmv = {
 	.vector_name		= "Alcor",
 	DO_EV5_MMU,
@@ -273,9 +272,7 @@ struct alpha_machine_vector alcor_mv __initmv = {
 	}}
 };
 ALIAS_MV(alcor)
-#endif
 
-#if defined(CONFIG_ALPHA_GENERIC) || defined(CONFIG_ALPHA_XLT)
 struct alpha_machine_vector xlt_mv __initmv = {
 	.vector_name		= "XLT",
 	DO_EV5_MMU,
@@ -302,5 +299,6 @@ struct alpha_machine_vector xlt_mv __initmv = {
 	    .gru_int_req_bits	= XLT_GRU_INT_REQ_BITS
 	}}
 };
-ALIAS_MV(xlt)
-#endif
+
+/* No alpha_mv alias for XLT, since we compile it in unconditionally
+   with ALCOR; setup_arch knows how to cope.  */
