@@ -83,10 +83,10 @@ void tulip_timer(unsigned long data)
 					       medianame[mleaf->media & MEDIA_MASK]);
 				if ((p[2] & 0x61) == 0x01)	/* Bogus Znyx board. */
 					goto actually_mii;
-				/* netif_carrier_on(dev); */
+				netif_carrier_on(dev);
 				break;
 			}
-			/* netif_carrier_off(dev); */
+			netif_carrier_off(dev);
 			if (tp->medialock)
 				break;
 	  select_next_media:
@@ -110,11 +110,13 @@ void tulip_timer(unsigned long data)
 		}
 		case 1:  case 3:		/* 21140, 21142 MII */
 		actually_mii:
-			if (tulip_check_duplex(dev) < 0)
-				{ /* netif_carrier_off(dev); */ }
-			else
-				{ /* netif_carrier_on(dev); */ }
-			next_tick = 60*HZ;
+			if (tulip_check_duplex(dev) < 0) {
+				netif_carrier_off(dev);
+				next_tick = 3*HZ;
+			} else {
+				netif_carrier_on(dev);
+				next_tick = 60*HZ;
+			}
 			break;
 		case 2:					/* 21142 serial block has no link beat. */
 		default:
