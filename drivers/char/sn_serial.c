@@ -1009,7 +1009,7 @@ sn_sal_console_write(struct console *co, const char *s, unsigned count)
 		}
 		sn_func->sal_puts(s, count);
 	}
-	else
+	else {
 		/* Output '\r' before each '\n' */
 		while ((s1 = memchr(s, '\n', count)) != NULL) {
 			sn_sal_write(NULL, 0, s, s1 - s);
@@ -1018,6 +1018,7 @@ sn_sal_console_write(struct console *co, const char *s, unsigned count)
 			s = s1 + 1;
 		}
 		sn_sal_write(NULL, 0, s, count);
+	}
 }
 
 static struct tty_driver *
