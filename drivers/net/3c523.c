@@ -304,13 +304,13 @@ static int __init check586(struct net_device *dev, unsigned long where, unsigned
 	char *iscp_addrs[2];
 	int i = 0;
 
-	p->base = (unsigned long) bus_to_virt((unsigned long)where) + size - 0x01000000;
-	p->memtop = bus_to_virt((unsigned long)where) + size;
+	p->base = (unsigned long) isa_bus_to_virt((unsigned long)where) + size - 0x01000000;
+	p->memtop = isa_bus_to_virt((unsigned long)where) + size;
 	p->scp = (struct scp_struct *)(p->base + SCP_DEFAULT_ADDRESS);
 	memset((char *) p->scp, 0, sizeof(struct scp_struct));
 	p->scp->sysbus = SYSBUSVAL;	/* 1 = 8Bit-Bus, 0 = 16 Bit */
 
-	iscp_addrs[0] = bus_to_virt((unsigned long)where);
+	iscp_addrs[0] = isa_bus_to_virt((unsigned long)where);
 	iscp_addrs[1] = (char *) p->scp - sizeof(struct iscp_struct);
 
 	for (i = 0; i < 2; i++) {
@@ -347,7 +347,7 @@ void alloc586(struct net_device *dev)
 	DELAY(2);
 
 	p->scp = (struct scp_struct *) (p->base + SCP_DEFAULT_ADDRESS);
-	p->scb = (struct scb_struct *) bus_to_virt(dev->mem_start);
+	p->scb = (struct scb_struct *) isa_bus_to_virt(dev->mem_start);
 	p->iscp = (struct iscp_struct *) ((char *) p->scp - sizeof(struct iscp_struct));
 
 	memset((char *) p->iscp, 0, sizeof(struct iscp_struct));
@@ -529,8 +529,8 @@ int __init elmc_probe(struct net_device *dev)
 	}
 	dev->mem_end = dev->mem_start + size;	/* set mem_end showed by 'ifconfig' */
 
-	pr->memtop = bus_to_virt(dev->mem_start) + size;
-	pr->base = (unsigned long) bus_to_virt(dev->mem_start) + size - 0x01000000;
+	pr->memtop = isa_bus_to_virt(dev->mem_start) + size;
+	pr->base = (unsigned long) isa_bus_to_virt(dev->mem_start) + size - 0x01000000;
 	alloc586(dev);
 
 	elmc_id_reset586();	/* make sure it doesn't generate spurious ints */

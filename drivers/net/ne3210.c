@@ -213,10 +213,10 @@ static int __init ne3210_probe1(struct net_device *dev, int ioaddr)
 	   the card mem within the region covered by `normal' RAM  !!!
 	*/
 	if (dev->mem_start > 1024*1024) {	/* phys addr > 1MB */
-		if (dev->mem_start < virt_to_bus(high_memory)) {
+		if (dev->mem_start < virt_to_phys(high_memory)) {
 			printk(KERN_CRIT "ne3210.c: Card RAM overlaps with normal memory!!!\n");
 			printk(KERN_CRIT "ne3210.c: Use EISA SCU to set card memory below 1MB,\n");
-			printk(KERN_CRIT "ne3210.c: or to an address above 0x%lx.\n", virt_to_bus(high_memory));
+			printk(KERN_CRIT "ne3210.c: or to an address above 0x%lx.\n", virt_to_phys(high_memory));
 			printk(KERN_CRIT "ne3210.c: Driver NOT installed.\n");
 			retval = -EINVAL;
 			goto out2;

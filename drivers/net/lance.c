@@ -495,15 +495,15 @@ static int __init lance_probe1(struct net_device *dev, int ioaddr, int irq, int 
 		lp->init_block.phys_addr[i] = dev->dev_addr[i];
 	lp->init_block.filter[0] = 0x00000000;
 	lp->init_block.filter[1] = 0x00000000;
-	lp->init_block.rx_ring = ((u32)virt_to_bus(lp->rx_ring) & 0xffffff) | RX_RING_LEN_BITS;
-	lp->init_block.tx_ring = ((u32)virt_to_bus(lp->tx_ring) & 0xffffff) | TX_RING_LEN_BITS;
+	lp->init_block.rx_ring = ((u32)isa_virt_to_bus(lp->rx_ring) & 0xffffff) | RX_RING_LEN_BITS;
+	lp->init_block.tx_ring = ((u32)isa_virt_to_bus(lp->tx_ring) & 0xffffff) | TX_RING_LEN_BITS;
 
 	outw(0x0001, ioaddr+LANCE_ADDR);
 	inw(ioaddr+LANCE_ADDR);
-	outw((short) (u32) virt_to_bus(&lp->init_block), ioaddr+LANCE_DATA);
+	outw((short) (u32) isa_virt_to_bus(&lp->init_block), ioaddr+LANCE_DATA);
 	outw(0x0002, ioaddr+LANCE_ADDR);
 	inw(ioaddr+LANCE_ADDR);
-	outw(((u32)virt_to_bus(&lp->init_block)) >> 16, ioaddr+LANCE_DATA);
+	outw(((u32)isa_virt_to_bus(&lp->init_block)) >> 16, ioaddr+LANCE_DATA);
 	outw(0x0000, ioaddr+LANCE_ADDR);
 	inw(ioaddr+LANCE_ADDR);
 
@@ -704,16 +704,16 @@ lance_open(struct net_device *dev)
 	if (lance_debug > 1)
 		printk("%s: lance_open() irq %d dma %d tx/rx rings %#x/%#x init %#x.\n",
 			   dev->name, dev->irq, dev->dma,
-		           (u32) virt_to_bus(lp->tx_ring),
-		           (u32) virt_to_bus(lp->rx_ring),
-			   (u32) virt_to_bus(&lp->init_block));
+		           (u32) isa_virt_to_bus(lp->tx_ring),
+		           (u32) isa_virt_to_bus(lp->rx_ring),
+			   (u32) isa_virt_to_bus(&lp->init_block));
 
 	lance_init_ring(dev, GFP_KERNEL);
 	/* Re-initialize the LANCE, and start it when done. */
 	outw(0x0001, ioaddr+LANCE_ADDR);
-	outw((short) (u32) virt_to_bus(&lp->init_block), ioaddr+LANCE_DATA);
+	outw((short) (u32) isa_virt_to_bus(&lp->init_block), ioaddr+LANCE_DATA);
 	outw(0x0002, ioaddr+LANCE_ADDR);
-	outw(((u32)virt_to_bus(&lp->init_block)) >> 16, ioaddr+LANCE_DATA);
+	outw(((u32)isa_virt_to_bus(&lp->init_block)) >> 16, ioaddr+LANCE_DATA);
 
 	outw(0x0004, ioaddr+LANCE_ADDR);
 	outw(0x0915, ioaddr+LANCE_DATA);
@@ -735,7 +735,7 @@ lance_open(struct net_device *dev)
 
 	if (lance_debug > 2)
 		printk("%s: LANCE open after %d ticks, init block %#x csr0 %4.4x.\n",
-			   dev->name, i, (u32) virt_to_bus(&lp->init_block), inw(ioaddr+LANCE_DATA));
+			   dev->name, i, (u32) isa_virt_to_bus(&lp->init_block), inw(ioaddr+LANCE_DATA));
 
 	return 0;					/* Always succeed */
 }
@@ -799,7 +799,7 @@ lance_init_ring(struct net_device *dev, int gfp)
 		if (rx_buff == NULL)
 			lp->rx_ring[i].base = 0;
 		else
-			lp->rx_ring[i].base = (u32)virt_to_bus(rx_buff) | 0x80000000;
+			lp->rx_ring[i].base = (u32)isa_virt_to_bus(rx_buff) | 0x80000000;
 		lp->rx_ring[i].buf_length = -PKT_BUF_SZ;
 	}
 	/* The Tx buffer address is filled in as needed, but we do need to clear
@@ -814,8 +814,8 @@ lance_init_ring(struct net_device *dev, int gfp)
 		lp->init_block.phys_addr[i] = dev->dev_addr[i];
 	lp->init_block.filter[0] = 0x00000000;
 	lp->init_block.filter[1] = 0x00000000;
-	lp->init_block.rx_ring = ((u32)virt_to_bus(lp->rx_ring) & 0xffffff) | RX_RING_LEN_BITS;
-	lp->init_block.tx_ring = ((u32)virt_to_bus(lp->tx_ring) & 0xffffff) | TX_RING_LEN_BITS;
+	lp->init_block.rx_ring = ((u32)isa_virt_to_bus(lp->rx_ring) & 0xffffff) | RX_RING_LEN_BITS;
+	lp->init_block.tx_ring = ((u32)isa_virt_to_bus(lp->tx_ring) & 0xffffff) | TX_RING_LEN_BITS;
 }
 
 static void
@@ -904,17 +904,17 @@ static int lance_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	/* If any part of this buffer is >16M we must copy it to a low-memory
 	   buffer. */
-	if ((u32)virt_to_bus(skb->data) + skb->len > 0x01000000) {
+	if ((u32)isa_virt_to_bus(skb->data) + skb->len > 0x01000000) {
 		if (lance_debug > 5)
 			printk("%s: bouncing a high-memory packet (%#x).\n",
-				   dev->name, (u32)virt_to_bus(skb->data));
+				   dev->name, (u32)isa_virt_to_bus(skb->data));
 		memcpy(&lp->tx_bounce_buffs[entry], skb->data, skb->len);
 		lp->tx_ring[entry].base =
-			((u32)virt_to_bus((lp->tx_bounce_buffs + entry)) & 0xffffff) | 0x83000000;
+			((u32)isa_virt_to_bus((lp->tx_bounce_buffs + entry)) & 0xffffff) | 0x83000000;
 		dev_kfree_skb(skb);
 	} else {
 		lp->tx_skbuff[entry] = skb;
-		lp->tx_ring[entry].base = ((u32)virt_to_bus(skb->data) & 0xffffff) | 0x83000000;
+		lp->tx_ring[entry].base = ((u32)isa_virt_to_bus(skb->data) & 0xffffff) | 0x83000000;
 	}
 	lp->cur_tx++;
 
@@ -1112,7 +1112,7 @@ lance_rx(struct net_device *dev)
 				skb_reserve(skb,2);	/* 16 byte align */
 				skb_put(skb,pkt_len);	/* Make room */
 				eth_copy_and_sum(skb,
-					(unsigned char *)bus_to_virt((lp->rx_ring[entry].base & 0x00ffffff)),
+					(unsigned char *)isa_bus_to_virt((lp->rx_ring[entry].base & 0x00ffffff)),
 					pkt_len,0);
 				skb->protocol=eth_type_trans(skb,dev);
 				netif_rx(skb);

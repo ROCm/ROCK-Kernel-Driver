@@ -685,7 +685,6 @@ _static int init_skel (uhci_t *s)
 	insert_td_horizontal (s, s->int_chain[5], td);
 
 	mb();
-	//uhci_show_queue(s->control_chain);   
 	dbg("init_skel exit");
 	return 0;
 
@@ -800,7 +799,6 @@ _static int uhci_submit_control_urb (struct urb *urb)
 
 	qh->hw.qh.element &= cpu_to_le32(~UHCI_PTR_TERM);
 
-	//uhci_show_queue(qh);
 	/* Start it up... put low speed first */
 	if (urb->dev->speed == USB_SPEED_LOW)
 		insert_qh (s, s->control_chain, qh, 0);
@@ -949,7 +947,6 @@ _static int uhci_submit_bulk_urb (struct urb *urb, struct urb *bulk_urb)
 			insert_qh (s, s->chain_end, qh, 0);
 	}
 	
-	//uhci_show_queue(s->bulk_chain);
 	//dbg("uhci_submit_bulk_urb: exit\n");
 	return 0;
 }

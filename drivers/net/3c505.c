@@ -630,7 +630,7 @@ static void receive_packet(struct net_device *dev, int len)
 	disable_dma(dev->dma);
 	clear_dma_ff(dev->dma);
 	set_dma_mode(dev->dma, 0x04);	/* dma read */
-	set_dma_addr(dev->dma, virt_to_bus(target));
+	set_dma_addr(dev->dma, isa_virt_to_bus(target));
 	set_dma_count(dev->dma, rlen);
 	enable_dma(dev->dma);
 	release_dma_lock(flags);
@@ -1029,10 +1029,10 @@ static int send_packet(struct net_device *dev, struct sk_buff *skb)
 
 	if ((unsigned long)(skb->data + nlen) >= MAX_DMA_ADDRESS) {
 		memcpy(adapter->dma_buffer, skb->data, nlen);
-		target = virt_to_bus(adapter->dma_buffer);
+		target = isa_virt_to_bus(adapter->dma_buffer);
 	}
 	else {
-		target = virt_to_bus(skb->data);
+		target = isa_virt_to_bus(skb->data);
 	}
 	adapter->current_dma.skb = skb;
 

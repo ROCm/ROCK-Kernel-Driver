@@ -214,7 +214,7 @@ static int usbat_bulk_transport(struct us_data *us,
 		sg = (struct scatterlist *)data;
 		for (i=0; i<use_sg && transferred<len; i++) {
 			result = usbat_raw_bulk(us, direction,
-				sg[i].address, 
+				page_address(sg[i].page) + sg[i].offset,
 				len-transferred > sg[i].length ?
 					sg[i].length : len-transferred);
 			if (result!=US_BULK_TRANSFER_GOOD)
@@ -733,17 +733,19 @@ int usbat_handle_read10(struct us_data *us,
 			while (amount<len) {
 				if (len - amount >= 
 					  sg[sg_segment].length-sg_offset) {
-				  memcpy(sg[sg_segment].address + sg_offset,
-					buffer + amount,
-					sg[sg_segment].length - sg_offset);
+				  memcpy(page_address(sg[sg_segment].page) +
+					 sg[sg_segment].offset + sg_offset,
+					 buffer + amount,
+					 sg[sg_segment].length - sg_offset);
 				  amount += 
 					  sg[sg_segment].length-sg_offset;
 				  sg_segment++;
 				  sg_offset=0;
 				} else {
-				  memcpy(sg[sg_segment].address + sg_offset,
-					buffer + amount,
-					len - amount);
+				  memcpy(page_address(sg[sg_segment].page) +
+					 sg[sg_segment].offset + sg_offset,
+					 buffer + amount,
+					 len - amount);
 				  sg_offset += (len - amount);
 				  amount = len;
 				}

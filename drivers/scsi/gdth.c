@@ -295,6 +295,8 @@
  * phase:                       Service/parameter/return code special command
  */
 
+#error Please convert me to Documentation/DMA-mapping.txt
+
 #include <linux/module.h>
 
 #include <linux/version.h>

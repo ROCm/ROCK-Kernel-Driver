@@ -475,7 +475,7 @@ static void do_ps2esdi_request(request_queue_t * q)
 	   list + sanity checks.                     */
 	INIT_REQUEST;
 
-	if (virt_to_bus(CURRENT->buffer + CURRENT->current_nr_sectors * 512) > 16 * MB) {
+	if (isa_virt_to_bus(CURRENT->buffer + CURRENT->current_nr_sectors * 512) > 16 * MB) {
 		printk("%s: DMA above 16MB not supported\n", DEVICE_NAME);
 		end_request(FAIL);
 	}			/* check for above 16Mb dmas */
@@ -663,7 +663,7 @@ static void ps2esdi_prep_dma(char *buffer, u_short length, u_char dma_xmode)
 
 	mca_disable_dma(dma_arb_level);
 
-	mca_set_dma_addr(dma_arb_level, virt_to_bus(buffer));
+	mca_set_dma_addr(dma_arb_level, isa_virt_to_bus(buffer));
 
 	mca_set_dma_count(dma_arb_level, length * 512 / 2);
 

@@ -199,6 +199,8 @@
  *		Feb 2001	davej		PCI enable cleanups.
  */
 
+#error Please convert me to Documentation/DMA-mapping.txt
+
 /* Include files */
 
 #include <linux/module.h>

@@ -286,8 +286,8 @@ static int check586(struct net_device *dev,char *where,unsigned size)
 	char *iscp_addrs[2];
 	int i;
 
-	p->base = (unsigned long) bus_to_virt((unsigned long)where) + size - 0x01000000;
-	p->memtop = bus_to_virt((unsigned long)where) + size;
+	p->base = (unsigned long) isa_bus_to_virt((unsigned long)where) + size - 0x01000000;
+	p->memtop = isa_bus_to_virt((unsigned long)where) + size;
 	p->scp = (struct scp_struct *)(p->base + SCP_DEFAULT_ADDRESS);
 	memset((char *)p->scp,0, sizeof(struct scp_struct));
 	for(i=0;i<sizeof(struct scp_struct);i++) /* memory was writeable? */
@@ -297,7 +297,7 @@ static int check586(struct net_device *dev,char *where,unsigned size)
 	if(p->scp->sysbus != SYSBUSVAL)
 		return 0;
 
-	iscp_addrs[0] = bus_to_virt((unsigned long)where);
+	iscp_addrs[0] = isa_bus_to_virt((unsigned long)where);
 	iscp_addrs[1]= (char *) p->scp - sizeof(struct iscp_struct);
 
 	for(i=0;i<2;i++)
@@ -329,7 +329,7 @@ static void alloc586(struct net_device *dev)
 	DELAY(1);
 
 	p->scp	= (struct scp_struct *)	(p->base + SCP_DEFAULT_ADDRESS);
-	p->scb	= (struct scb_struct *)	bus_to_virt(dev->mem_start);
+	p->scb	= (struct scb_struct *)	isa_bus_to_virt(dev->mem_start);
 	p->iscp = (struct iscp_struct *) ((char *)p->scp - sizeof(struct iscp_struct));
 
 	memset((char *) p->iscp,0,sizeof(struct iscp_struct));
@@ -477,8 +477,8 @@ static int __init ni52_probe1(struct net_device *dev,int ioaddr)
 																	/* warning: we don't free it on errors */
 	memset((char *) dev->priv,0,sizeof(struct priv));
 
-	((struct priv *) (dev->priv))->memtop = bus_to_virt(dev->mem_start) + size;
-	((struct priv *) (dev->priv))->base =	(unsigned long) bus_to_virt(dev->mem_start) + size - 0x01000000;
+	((struct priv *) (dev->priv))->memtop = isa_bus_to_virt(dev->mem_start) + size;
+	((struct priv *) (dev->priv))->base =	(unsigned long) isa_bus_to_virt(dev->mem_start) + size - 0x01000000;
 	alloc586(dev);
 
 	/* set number of receive-buffs according to memsize */

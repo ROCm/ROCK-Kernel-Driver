@@ -25,6 +25,8 @@
  * 2 of the License, or (at your option) any later version.
  */
 
+#error Please convert me to Documentation/DMA-mapping.txt
+
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/pci.h>

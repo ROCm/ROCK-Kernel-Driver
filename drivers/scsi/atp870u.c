@@ -14,6 +14,8 @@
  *		   support atp880 chip lvd u160 2001/05/15 (7.1)
  */
 
+#error Please convert me to Documentation/DMA-mapping.txt
+
 #include <linux/module.h>
 
 #include <linux/kernel.h>

@@ -254,12 +254,6 @@
 
 #include <linux/config.h>        /* for CONFIG_PCI */
 
-/*
- * To generate the correct addresses for the controller to issue
- * on the bus.  Originally added for DEC Alpha support.
- */
-#define VIRT_TO_BUS(a) (unsigned int)virt_to_bus((void *)(a))
-
 #define AIC7XXX_C_VERSION  "5.2.4"
 
 #define NUMBER(arr)     (sizeof(arr) / sizeof(arr[0]))
@@ -2841,17 +2835,9 @@ aic7xxx_done(struct aic7xxx_host *p, struct aic7xxx_scb *scb)
         char *buffer;
 
         if(cmd->use_sg)
-        {
-          struct scatterlist *sg;
+          BUG();
 
-          sg = (struct scatterlist *)cmd->request_buffer;
-          buffer = (char *)sg[0].address;
-        }
-        else
-        {
-          buffer = (char *)cmd->request_buffer;
-        }
-
+        buffer = (char *)cmd->request_buffer;
 
         if ( (buffer[7] & WIDE_INQUIRY_BITS) &&
              (p->features & AHC_WIDE) )

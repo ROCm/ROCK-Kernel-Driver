@@ -40,6 +40,8 @@
  *		Serial number scanning to find duplicates for FC multipathing
  */
 
+#error Please convert me to Documentation/DMA-mapping.txt
+
 #include <linux/major.h>
 
 #include <linux/module.h>

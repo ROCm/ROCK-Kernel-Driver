@@ -470,16 +470,16 @@ static int __init mc32_probe1(struct net_device *dev, int slot)
 		base|=(inb(dev->base_addr)<<(8*i));
 	}
 	
-	lp->exec_box=bus_to_virt(dev->mem_start+base);
+	lp->exec_box=isa_bus_to_virt(dev->mem_start+base);
 	
 	base=lp->exec_box->data[1]<<16|lp->exec_box->data[0];  
 	
 	lp->base = dev->mem_start+base;
 	
-	lp->rx_box=bus_to_virt(lp->base + lp->exec_box->data[2]); 
-	lp->tx_box=bus_to_virt(lp->base + lp->exec_box->data[3]);
+	lp->rx_box=isa_bus_to_virt(lp->base + lp->exec_box->data[2]); 
+	lp->tx_box=isa_bus_to_virt(lp->base + lp->exec_box->data[3]);
 	
-	lp->stats = bus_to_virt(lp->base + lp->exec_box->data[5]);
+	lp->stats = isa_bus_to_virt(lp->base + lp->exec_box->data[5]);
 
 	/*
 	 *	Descriptor chains (card relative)
@@ -781,10 +781,10 @@ static int mc32_load_rx_ring(struct net_device *dev)
 			return -ENOBUFS;
 		}
 		
-		p=bus_to_virt(lp->base+rx_base);
+		p=isa_bus_to_virt(lp->base+rx_base);
 				
 		p->control=0;
-		p->data=virt_to_bus(lp->rx_ring[i].skb->data);
+		p->data=isa_virt_to_bus(lp->rx_ring[i].skb->data);
 		p->status=0;
 		p->length=1532;
 	
@@ -854,7 +854,7 @@ static void mc32_load_tx_ring(struct net_device *dev)
 
 	for(i=0;i<lp->tx_len;i++) 
 	{
-		p=bus_to_virt(lp->base+tx_base);
+		p=isa_bus_to_virt(lp->base+tx_base);
 		lp->tx_ring[i].p=p; 
 		lp->tx_ring[i].skb=NULL;
 
@@ -1080,7 +1080,7 @@ static int mc32_send_packet(struct sk_buff *skb, struct net_device *dev)
    	   
 	np->length = (skb->len < ETH_ZLEN) ? ETH_ZLEN : skb->len; 
 			
-	np->data	= virt_to_bus(skb->data);
+	np->data	= isa_virt_to_bus(skb->data);
 	np->status	= 0;
 	np->control     = CONTROL_EOP | CONTROL_EOL;     
 	wmb();
@@ -1197,7 +1197,7 @@ static void mc32_rx_ring(struct net_device *dev)
 				
 				skb_reserve(newskb,18); 
 				lp->rx_ring[rx_ring_tail].skb=newskb;  
-				p->data=virt_to_bus(newskb->data);  
+				p->data=isa_virt_to_bus(newskb->data);  
 			} 
 			else 
 			{

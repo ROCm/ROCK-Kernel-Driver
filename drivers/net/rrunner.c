@@ -21,6 +21,8 @@
  * ODS/Essential.
  */
 
+#error Please convert me to Documentation/DMA-mapping.txt
+
 #define DEBUG 1
 #define RX_DMA_SKBUFF 1
 #define PKT_COPY_THRESHOLD 512

@@ -1,16 +1,10 @@
-/* $Id: scatterlist.h,v 1.7 2001/10/30 04:34:57 davem Exp $ */
+/* $Id: scatterlist.h,v 1.8 2001/12/17 07:05:15 davem Exp $ */
 #ifndef _SPARC_SCATTERLIST_H
 #define _SPARC_SCATTERLIST_H
 
 #include <linux/types.h>
 
 struct scatterlist {
-	/* This will disappear in 2.5.x */
-	char *address;
-
-	/* These two are only valid if ADDRESS member of this
-	 * struct is NULL.
-	 */
 	struct page *page;
 	unsigned int offset;
 

@@ -844,7 +844,7 @@ static int corkscrew_open(struct net_device *dev)
 			struct sk_buff *skb;
 			if (i < (RX_RING_SIZE - 1))
 				vp->rx_ring[i].next =
-				    virt_to_bus(&vp->rx_ring[i + 1]);
+				    isa_virt_to_bus(&vp->rx_ring[i + 1]);
 			else
 				vp->rx_ring[i].next = 0;
 			vp->rx_ring[i].status = 0;	/* Clear complete bit. */
@@ -855,10 +855,10 @@ static int corkscrew_open(struct net_device *dev)
 				break;	/* Bad news!  */
 			skb->dev = dev;	/* Mark as being used by this device. */
 			skb_reserve(skb, 2);	/* Align IP on 16 byte boundaries */
-			vp->rx_ring[i].addr = virt_to_bus(skb->tail);
+			vp->rx_ring[i].addr = isa_virt_to_bus(skb->tail);
 		}
-		vp->rx_ring[i - 1].next = virt_to_bus(&vp->rx_ring[0]);	/* Wrap the ring. */
-		outl(virt_to_bus(&vp->rx_ring[0]), ioaddr + UpListPtr);
+		vp->rx_ring[i - 1].next = isa_virt_to_bus(&vp->rx_ring[0]);	/* Wrap the ring. */
+		outl(isa_virt_to_bus(&vp->rx_ring[0]), ioaddr + UpListPtr);
 	}
 	if (vp->full_bus_master_tx) {	/* Boomerang bus master Tx. */
 		vp->cur_tx = vp->dirty_tx = 0;
@@ -1053,7 +1053,7 @@ static int corkscrew_start_xmit(struct sk_buff *skb,
 		/* vp->tx_full = 1; */
 		vp->tx_skbuff[entry] = skb;
 		vp->tx_ring[entry].next = 0;
-		vp->tx_ring[entry].addr = virt_to_bus(skb->data);
+		vp->tx_ring[entry].addr = isa_virt_to_bus(skb->data);
 		vp->tx_ring[entry].length = skb->len | 0x80000000;
 		vp->tx_ring[entry].status = skb->len | 0x80000000;
 
@@ -1066,9 +1066,9 @@ static int corkscrew_start_xmit(struct sk_buff *skb,
 			    0) break;
 		if (prev_entry)
 			prev_entry->next =
-			    virt_to_bus(&vp->tx_ring[entry]);
+			    isa_virt_to_bus(&vp->tx_ring[entry]);
 		if (inl(ioaddr + DownListPtr) == 0) {
-			outl(virt_to_bus(&vp->tx_ring[entry]),
+			outl(isa_virt_to_bus(&vp->tx_ring[entry]),
 			     ioaddr + DownListPtr);
 			queued_packet++;
 		}
@@ -1205,7 +1205,7 @@ static void corkscrew_interrupt(int irq, void *dev_id,
 			while (lp->cur_tx - dirty_tx > 0) {
 				int entry = dirty_tx % TX_RING_SIZE;
 				if (inl(ioaddr + DownListPtr) ==
-				    virt_to_bus(&lp->tx_ring[entry]))
+				    isa_virt_to_bus(&lp->tx_ring[entry]))
 					break;	/* It still hasn't been processed. */
 				if (lp->tx_skbuff[entry]) {
 					dev_kfree_skb_irq(lp->
@@ -1414,7 +1414,7 @@ static int boomerang_rx(struct net_device *dev)
 				skb_reserve(skb, 2);	/* Align IP on 16 byte boundaries */
 				/* 'skb_put()' points to the start of sk_buff data area. */
 				memcpy(skb_put(skb, pkt_len),
-				       bus_to_virt(vp->rx_ring[entry].
+				       isa_bus_to_virt(vp->rx_ring[entry].
 						   addr), pkt_len);
 				rx_copy++;
 			} else {
@@ -1424,11 +1424,11 @@ static int boomerang_rx(struct net_device *dev)
 				vp->rx_skbuff[entry] = NULL;
 				temp = skb_put(skb, pkt_len);
 				/* Remove this checking code for final release. */
-				if (bus_to_virt(vp->rx_ring[entry].addr) != temp)
+				if (isa_bus_to_virt(vp->rx_ring[entry].addr) != temp)
 					    printk("%s: Warning -- the skbuff addresses do not match"
 					     " in boomerang_rx: %p vs. %p / %p.\n",
 					     dev->name,
-					     bus_to_virt(vp->
+					     isa_bus_to_virt(vp->
 							 rx_ring[entry].
 							 addr), skb->head,
 					     temp);
@@ -1451,7 +1451,7 @@ static int boomerang_rx(struct net_device *dev)
 				break;	/* Bad news!  */
 			skb->dev = dev;	/* Mark as being used by this device. */
 			skb_reserve(skb, 2);	/* Align IP on 16 byte boundaries */
-			vp->rx_ring[entry].addr = virt_to_bus(skb->tail);
+			vp->rx_ring[entry].addr = isa_virt_to_bus(skb->tail);
 			vp->rx_skbuff[entry] = skb;
 		}
 		vp->rx_ring[entry].status = 0;	/* Clear complete bit. */

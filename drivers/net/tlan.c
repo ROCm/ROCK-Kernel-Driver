@@ -160,6 +160,7 @@
  *
  *******************************************************************************/
 
+#error Please convert me to Documentation/DMA-mapping.txt
                                                                                 
 #include <linux/module.h>
 

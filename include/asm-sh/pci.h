@@ -149,7 +149,7 @@ static inline int pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg,
 	int i;
 
 	for (i=0; i<nents; i++)
-		dma_cache_wback_inv(sg[i].address, sg[i].length);
+		dma_cache_wback_inv(page_address(sg[i].page) + sg[i].offset, sg[i].length);
 #endif
 	if (direction == PCI_DMA_NONE)
                 BUG();
@@ -206,7 +206,7 @@ static inline void pci_dma_sync_sg(struct pci_dev *hwdev,
 	int i;
 
 	for (i=0; i<nelems; i++)
-		dma_cache_wback_inv(sg[i].address, sg[i].length);
+		dma_cache_wback_inv(page_address(sg[i].page) + sg[i].offset, sg[i].length);
 #endif
 }
 

@@ -1408,7 +1408,7 @@ static inline void dma_transfer(void)
 	clear_dma_ff(QIC02_TAPE_DMA);
 	set_dma_mode(QIC02_TAPE_DMA, dma_mode);
 	set_dma_addr(QIC02_TAPE_DMA,
-		     virt_to_bus(buffaddr) + dma_bytes_done);
+		     isa_virt_to_bus(buffaddr) + dma_bytes_done);
 	set_dma_count(QIC02_TAPE_DMA, TAPE_BLKSIZE);
 
 	/* start tape DMA controller */

@@ -232,7 +232,7 @@ void aha1740_intr_handle(int irq, void *dev_id, struct pt_regs * regs)
     {
 	DEB(printk("aha1740_intr top of loop.\n"));
 	adapstat = inb(G2INTST(base));
-	ecbptr = (struct ecb *) bus_to_virt(inl(MBOXIN0(base)));
+	ecbptr = (struct ecb *) isa_bus_to_virt(inl(MBOXIN0(base)));
 	outb(G2CNTRL_IRST,G2CNTRL(base)); /* interrupt reset */
       
 	switch ( adapstat & G2INTST_MASK )
@@ -397,10 +397,10 @@ int aha1740_queuecommand(Scsi_Cmnd * SCpnt, void (*done)(Scsi_Cmnd *))
 	for(i=0; i<SCpnt->use_sg; i++)
 	{
 	    cptr[i].datalen = sgpnt[i].length;
-	    cptr[i].dataptr = virt_to_bus(sgpnt[i].address);
+	    cptr[i].dataptr = isa_virt_to_bus(sgpnt[i].address);
 	}
 	host->ecb[ecbno].datalen = SCpnt->use_sg * sizeof(struct aha1740_chain);
-	host->ecb[ecbno].dataptr = virt_to_bus(cptr);
+	host->ecb[ecbno].dataptr = isa_virt_to_bus(cptr);
 #ifdef DEBUG
 	printk("cptr %x: ",cptr);
 	ptr = (unsigned char *) cptr;
@@ -411,15 +411,15 @@ int aha1740_queuecommand(Scsi_Cmnd * SCpnt, void (*done)(Scsi_Cmnd *))
     {
 	SCpnt->host_scribble = NULL;
 	host->ecb[ecbno].datalen = bufflen;
-	host->ecb[ecbno].dataptr = virt_to_bus(buff);
+	host->ecb[ecbno].dataptr = isa_virt_to_bus(buff);
     }
     host->ecb[ecbno].lun = SCpnt->lun;
     host->ecb[ecbno].ses = 1;	/* Suppress underrun errors */
     host->ecb[ecbno].dir = direction;
     host->ecb[ecbno].ars = 1;  /* Yes, get the sense on an error */
     host->ecb[ecbno].senselen = 12;
-    host->ecb[ecbno].senseptr = virt_to_bus(host->ecb[ecbno].sense);
-    host->ecb[ecbno].statusptr = virt_to_bus(host->ecb[ecbno].status);
+    host->ecb[ecbno].senseptr = isa_virt_to_bus(host->ecb[ecbno].sense);
+    host->ecb[ecbno].statusptr = isa_virt_to_bus(host->ecb[ecbno].status);
     host->ecb[ecbno].done = done;
     host->ecb[ecbno].SCpnt = SCpnt;
 #ifdef DEBUG
@@ -459,7 +459,7 @@ int aha1740_queuecommand(Scsi_Cmnd * SCpnt, void (*done)(Scsi_Cmnd *))
 	    if (loopcnt == LOOPCNT_MAX)
 		panic("aha1740.c: mbxout busy!\n");
 	}
-	outl(virt_to_bus(host->ecb + ecbno), MBOXOUT0(base));
+	outl(isa_virt_to_bus(host->ecb + ecbno), MBOXOUT0(base));
 	for (loopcnt = 0; ; loopcnt++) {
 	    if (! (inb(G2STAT(base)) & G2STAT_BUSY)) break;
 	    if (loopcnt == LOOPCNT_WARN) {

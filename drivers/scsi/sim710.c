@@ -572,11 +572,11 @@ sim710_driver_init (struct Scsi_Host *host)
     hostdata->running = NULL;
     memcpy (hostdata->script, SCRIPT, sizeof(SCRIPT));
     for (i = 0; i < PATCHES; i++)
-	hostdata->script[LABELPATCHES[i]] += virt_to_bus(hostdata->script);
+	hostdata->script[LABELPATCHES[i]] += isa_virt_to_bus(hostdata->script);
     patch_abs_32 (hostdata->script, 0, reselected_identify, 
-    	virt_to_bus((void *)&(hostdata->reselected_identify)));
+    	isa_virt_to_bus((void *)&(hostdata->reselected_identify)));
     patch_abs_32 (hostdata->script, 0, msgin_buf, 
-    	virt_to_bus((void *)&(hostdata->msgin_buf[0])));
+    	isa_virt_to_bus((void *)&(hostdata->msgin_buf[0])));
     hostdata->state = STATE_INITIALISED;
     hostdata->negotiate = 0xff;
 }
@@ -670,7 +670,7 @@ handle_idd (struct Scsi_Host * host, Scsi_Cmnd * cmd)
     struct sim710_target *targdata = hostdata->target + cmd->target;
     u32 resume_offset = 0, index;
 
-    index = (u32)((u32 *)(bus_to_virt(NCR_read32(DSP_REG))) - hostdata->script);
+    index = (u32)((u32 *)(isa_bus_to_virt(NCR_read32(DSP_REG))) - hostdata->script);
 
     switch (index) {
     case Ent_wait_disc_complete/4 + 2:
@@ -717,7 +717,7 @@ handle_phase_mismatch (struct Scsi_Host * host, Scsi_Cmnd * cmd)
     unsigned char sbcl;
 
     sbcl = NCR_read8(SBCL_REG) & SBCL_PHASE_MASK;
-    index = (u32)((u32 *)(bus_to_virt(NCR_read32(DSP_REG))) - hostdata->script);
+    index = (u32)((u32 *)(isa_bus_to_virt(NCR_read32(DSP_REG))) - hostdata->script);
 
     DEB(DEB_PMM, printk("scsi%d: Phase mismatch, phase %s (%x) at script[0x%x]\n",
 	host->host_no, sbcl_to_phase(sbcl), sbcl, index));
@@ -754,7 +754,7 @@ handle_phase_mismatch (struct Scsi_Host * host, Scsi_Cmnd * cmd)
 
 	sg_id = (index - Ent_patch_input_data/4 - 4) / 2;
 	targdata->data_in_jump = hostdata->script[Ent_patch_input_data/4+1] =
-		virt_to_bus(hostdata->script + Ent_patch_input_data/4 + sg_id * 2 + 2);
+		isa_virt_to_bus(hostdata->script + Ent_patch_input_data/4 + sg_id * 2 + 2);
 	olen  = targdata->dsa[DSA_DATAIN + sg_id * 2];
 	oaddr = targdata->dsa[DSA_DATAIN + sg_id * 2 + 1];
 	residual = datapath_residual (host);
@@ -783,7 +783,7 @@ handle_phase_mismatch (struct Scsi_Host * host, Scsi_Cmnd * cmd)
 
 	sg_id = (index - Ent_patch_output_data/4 - 4) / 2;
 	targdata->data_out_jump = hostdata->script[Ent_patch_output_data/4+1] =
-		virt_to_bus(hostdata->script + Ent_patch_output_data/4 + sg_id * 2 + 2);
+		isa_virt_to_bus(hostdata->script + Ent_patch_output_data/4 + sg_id * 2 + 2);
 	olen  = targdata->dsa[DSA_DATAOUT + sg_id * 2];
 	oaddr = targdata->dsa[DSA_DATAOUT + sg_id * 2 + 1];
 	residual = datapath_residual (host);
@@ -860,7 +860,7 @@ handle_script_int(struct Scsi_Host * host, Scsi_Cmnd * cmd)
     case A_int_reselected:
 	hostdata->script[Ent_patch_output_data/4+1] = targdata->data_out_jump;
 	hostdata->script[Ent_patch_input_data/4+1] = targdata->data_in_jump;
-	NCR_write32(DSA_REG, virt_to_bus(targdata->dsa));
+	NCR_write32(DSA_REG, isa_virt_to_bus(targdata->dsa));
 	resume_offset = targdata->resume_offset;
 	break;
     case A_int_data_bad_phase:
@@ -944,7 +944,7 @@ sim710_intr_handle(int irq, void *dev_id, struct pt_regs *regs)
 	DEB(DEB_INTS, printk("scsi%d: Int %d, istat %02x, sstat0 %02x "
 		"dstat %02x, dsp [%04x], scratch %02x\n",
 	    host->host_no, sim710_intrs, istat, sstat0, dstat,
-	    (u32 *)(bus_to_virt(NCR_read32(DSP_REG))) - hostdata->script,
+	    (u32 *)(isa_bus_to_virt(NCR_read32(DSP_REG))) - hostdata->script,
 	    NCR_read32(SCRATCH_REG)));
 	if ((dstat & DSTAT_SIR) && dsps == A_int_reselected) {
 	    /* Reselected.  Identify the target from LCRC_REG, and
@@ -991,7 +991,7 @@ sim710_intr_handle(int irq, void *dev_id, struct pt_regs *regs)
 	    printk("scsi%d: Int %d, istat %02x, sstat0 %02x "
 		"dstat %02x, dsp [%04x], scratch %02x, dsps %08x\n",
 		host->host_no, sim710_intrs, istat, sstat0, dstat,
-		(u32 *)(bus_to_virt(NCR_read32(DSP_REG))) - hostdata->script,
+		(u32 *)(isa_bus_to_virt(NCR_read32(DSP_REG))) - hostdata->script,
 		NCR_read32(SCRATCH_REG), dsps);
 	    /* resume_offset is zero, which will cause a host reset */
 	}
@@ -1044,7 +1044,7 @@ sim710_intr_handle(int irq, void *dev_id, struct pt_regs *regs)
 #ifdef DEBUG_LIMIT_INTS
 	if (sim710_intrs < DEBUG_LIMIT_INTS)
 #endif
-	NCR_write32(DSP_REG, virt_to_bus(hostdata->script+resume_offset/4));
+	NCR_write32(DSP_REG, isa_virt_to_bus(hostdata->script+resume_offset/4));
 	if (resume_offset == Ent_reselect)
 	    run_process_issue_queue(hostdata);
     }
@@ -1122,48 +1122,47 @@ run_command (struct sim710_hostdata *hostdata, Scsi_Cmnd *cmd)
     targdata->dsa_status[0] = 0xff;
 
     targdata->dsa[DSA_SELECT]		= (1 << cmd->target) << 16;
-    targdata->dsa[DSA_MSGOUT+1]		= virt_to_bus(targdata->dsa_msgout);
+    targdata->dsa[DSA_MSGOUT+1]		= isa_virt_to_bus(targdata->dsa_msgout);
     targdata->dsa[DSA_CMND]		= cmd->cmd_len;
-    targdata->dsa[DSA_CMND+1]		= virt_to_bus(targdata->dsa_cdb);
+    targdata->dsa[DSA_CMND+1]		= isa_virt_to_bus(targdata->dsa_cdb);
     targdata->dsa[DSA_STATUS]		= 1;
-    targdata->dsa[DSA_STATUS+1]		= virt_to_bus(targdata->dsa_status);
+    targdata->dsa[DSA_STATUS+1]		= isa_virt_to_bus(targdata->dsa_status);
     targdata->dsa[DSA_MSGIN]		= 1;
-    targdata->dsa[DSA_MSGIN+1]		= virt_to_bus(targdata->dsa_msgin);
+    targdata->dsa[DSA_MSGIN+1]		= isa_virt_to_bus(targdata->dsa_msgin);
 
     sg_start = (MAX_SG - (cmd->use_sg ? cmd->use_sg : 1)) * 2;
     dip = targdata->dsa + DSA_DATAIN + sg_start;
     dop = targdata->dsa + DSA_DATAOUT + sg_start;
 
     for (i = 0; cmd->use_sg ? (i < cmd->use_sg) : !i; i++) {
-	u32 vbuf = cmd->use_sg ?
-		(u32)(((struct scatterlist *)cmd->buffer)[i].address) :
-		(u32)(cmd->request_buffer);
-	u32 bbuf = virt_to_bus((void *)vbuf);
-	u32 cnt = cmd->use_sg ?
-		((struct scatterlist *)cmd->buffer)[i].length :
-		cmd->request_bufflen;
+	struct scatterlist *sgl = &((struct scatterlist *)cmd->buffer)[i];
+	void *vbuf = cmd->use_sg ?
+		(page_address(sgl->page) + sgl->offset) :
+		(cmd->request_buffer);
+	u32 bbuf = isa_virt_to_bus(vbuf);
+	u32 cnt = cmd->use_sg ? sgl->length : cmd->request_bufflen;
 
 	if (datain) {
 #ifdef CONFIG_TP34V_SCSI
-	    cache_clear(virt_to_phys((void *)vbuf), cnt);
+	    cache_clear(virt_to_phys(vbuf, cnt);
 #endif
 	    *dip++	= cnt;
 	    *dip++	= bbuf;
 	}
 	if (dataout) {
 #ifdef CONFIG_TP34V_SCSI
-	    cache_push(virt_to_phys((void *)vbuf), cnt);
+	    cache_push(virt_to_phys(vbuf, cnt);
 #endif
 	    *dop++	= cnt;
 	    *dop++	= bbuf;
 	}
     }
     targdata->data_out_jump = hostdata->script[Ent_patch_output_data/4+1] =
-	virt_to_bus(hostdata->script + Ent_patch_output_data/4 + sg_start + 2);
+	isa_virt_to_bus(hostdata->script + Ent_patch_output_data/4 + sg_start + 2);
     targdata->data_in_jump = hostdata->script[Ent_patch_input_data/4+1] =
-	virt_to_bus(hostdata->script + Ent_patch_input_data/4 + sg_start + 2);
+	isa_virt_to_bus(hostdata->script + Ent_patch_input_data/4 + sg_start + 2);
 
-    for (i = 0, dsa = virt_to_bus(targdata->dsa); i < 4; i++) {
+    for (i = 0, dsa = isa_virt_to_bus(targdata->dsa); i < 4; i++) {
 	u32 v = hostdata->script[Ent_patch_new_dsa/4 + i * 2];
 
 	v &= ~0x0000ff00;
@@ -1508,7 +1507,7 @@ sim710_detect(Scsi_Host_Template * tpnt)
 #endif
 	    chips++;
 	}
-	NCR_write32(DSP_REG, virt_to_bus(hostdata->script+Ent_reselect/4));
+	NCR_write32(DSP_REG, isa_virt_to_bus(hostdata->script+Ent_reselect/4));
 	hostdata->state = STATE_IDLE;
     }
     return chips;
@@ -1562,7 +1561,7 @@ full_reset(struct Scsi_Host * host)
     ncr_halt(host);
     printk("scsi%d: dsp = %08x (script[0x%04x]), scratch = %08x\n",
 	host->host_no, NCR_read32(DSP_REG),
-	((u32)bus_to_virt(NCR_read32(DSP_REG)) - (u32)hostdata->script)/4,
+	((u32)isa_bus_to_virt(NCR_read32(DSP_REG)) - (u32)hostdata->script)/4,
 	NCR_read32(SCRATCH_REG));
 
     for (target = 0; target < 7; target++) {
@@ -1578,7 +1577,7 @@ full_reset(struct Scsi_Host * host)
     sim710_soft_reset(host);
     sim710_driver_init(host);
 
-    NCR_write32(DSP_REG, virt_to_bus(hostdata->script+Ent_reselect/4));
+    NCR_write32(DSP_REG, isa_virt_to_bus(hostdata->script+Ent_reselect/4));
     hostdata->state = STATE_IDLE;
 
     run_process_issue_queue(hostdata);

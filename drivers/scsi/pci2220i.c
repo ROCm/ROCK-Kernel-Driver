@@ -34,6 +34,8 @@
  *
  ****************************************************************************/
 
+#error Convert me to understand page+offset based scatterlists
+
 //#define DEBUG 1
 
 #include <linux/module.h>

@@ -6,6 +6,8 @@
  ***********************************************************************/
 /* $Id: scsiiom.c,v 2.55.2.17 2000/12/20 00:39:37 garloff Exp $ */
 
+#error Please convert me to Documentation/DMA-mapping.txt
+
 static void __inline__
 dc390_freetag (PDCB pDCB, PSRB pSRB)
 {

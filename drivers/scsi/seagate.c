@@ -1061,8 +1061,9 @@ static int internal_command (unsigned char target, unsigned char lun,
 				     hostno, nobuffs);
 				for (i = 0; i < nobuffs; ++i)
 					printk
-					    ("scsi%d : buffer %d address = %08x length = %d\n",
-					     hostno, i, buffer[i].address,
+					    ("scsi%d : buffer %d address = %p length = %d\n",
+					     hostno, i,
+					     page_address(buffer[i].page) + buffer[i].offset,
 					     buffer[i].length);
 			}
 #endif

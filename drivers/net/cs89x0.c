@@ -1109,7 +1109,7 @@ net_open(struct net_device *dev)
 				printk(	"%s: dma %lx %lx\n",
 					dev->name,
 					(unsigned long)lp->dma_buff,
-					(unsigned long)virt_to_bus(lp->dma_buff));
+					(unsigned long)isa_virt_to_bus(lp->dma_buff));
 			}
 			if ((unsigned long) lp->dma_buff >= MAX_DMA_ADDRESS ||
 			    !dma_page_eq(lp->dma_buff, lp->dma_buff+lp->dmasize*1024-1)) {
@@ -1128,7 +1128,7 @@ net_open(struct net_device *dev)
 			disable_dma(dev->dma);
 			clear_dma_ff(dev->dma);
 			set_dma_mode(dev->dma, 0x14); /* auto_init as well */
-			set_dma_addr(dev->dma, virt_to_bus(lp->dma_buff));
+			set_dma_addr(dev->dma, isa_virt_to_bus(lp->dma_buff));
 			set_dma_count(dev->dma, lp->dmasize*1024);
 			enable_dma(dev->dma);
 			spin_unlock_irqrestore(&lp->lock, flags);

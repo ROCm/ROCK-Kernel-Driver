@@ -108,6 +108,8 @@
                  Fix get_param for specific units.
 */
 
+#error Please convert me to Documentation/DMA-mapping.txt
+
 #include <linux/module.h>
 
 MODULE_AUTHOR ("3ware Inc.");

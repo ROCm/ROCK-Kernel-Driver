@@ -44,6 +44,8 @@
 **
 ***************************************************************************/
 
+#error Please convert me to Documentation/DMA-mapping.txt
+
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>

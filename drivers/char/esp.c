@@ -392,7 +392,7 @@ static _INLINE_ void receive_chars_dma(struct esp_struct *info, int num_bytes)
         disable_dma(dma);
         clear_dma_ff(dma);
         set_dma_mode(dma, DMA_MODE_READ);
-        set_dma_addr(dma, virt_to_bus(dma_buffer));
+        set_dma_addr(dma, isa_virt_to_bus(dma_buffer));
         set_dma_count(dma, dma_bytes);
         enable_dma(dma);
         release_dma_lock(flags);
@@ -569,7 +569,7 @@ static _INLINE_ void transmit_chars_dma(struct esp_struct *info, int num_bytes)
         disable_dma(dma);
         clear_dma_ff(dma);
         set_dma_mode(dma, DMA_MODE_WRITE);
-        set_dma_addr(dma, virt_to_bus(dma_buffer));
+        set_dma_addr(dma, isa_virt_to_bus(dma_buffer));
         set_dma_count(dma, dma_bytes);
         enable_dma(dma);
         release_dma_lock(flags);
@@ -599,7 +599,7 @@ static _INLINE_ void transmit_chars_dma_done(struct esp_struct *info)
         	disable_dma(dma);
         	clear_dma_ff(dma);
         	set_dma_mode(dma, DMA_MODE_WRITE);
-        	set_dma_addr(dma, virt_to_bus(dma_buffer));
+        	set_dma_addr(dma, isa_virt_to_bus(dma_buffer));
         	set_dma_count(dma, dma_bytes);
         	enable_dma(dma);
         	release_dma_lock(flags);

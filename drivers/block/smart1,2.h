@@ -252,6 +252,7 @@ static unsigned long smart1_completed(ctlr_info_t *h)
 
 		outb(CHANNEL_CLEAR, h->ioaddr + SMART1_LOCAL_DOORBELL);
 
+#error Please convert me to Documentation/DMA-mapping.txt
 		if (cmd) ((cmdlist_t*)bus_to_virt(cmd))->req.hdr.rcode = status;
 	} else {
 		cmd = 0;

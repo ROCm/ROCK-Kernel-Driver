@@ -1111,7 +1111,7 @@ void wd7000_intr_handle (int irq, void *dev_id, struct pt_regs *regs)
 		return;
 	    }
 	    /* Aaaargh! (Zaga) */
-	    scb = bus_to_virt(scsi2int ((unchar *) icmbs[icmb].scbptr));
+	    scb = isa_bus_to_virt(scsi2int ((unchar *) icmbs[icmb].scbptr));
 	    icmbs[icmb].status = 0;
 	    if (!(scb->op & ICB_OP_MASK)) {	/* an SCB is done */
 		SCpnt = scb->SCpnt;
@@ -1187,13 +1187,14 @@ int wd7000_queuecommand (Scsi_Cmnd *SCpnt, void (*done) (Scsi_Cmnd *))
 	any2scsi (scb->maxlen, SCpnt->use_sg * sizeof (Sgb));
 
 	for (i = 0; i < SCpnt->use_sg; i++) {
-	    any2scsi (sgb[i].ptr, (int) sg[i].address);
+	    any2scsi (sgb[i].ptr,
+		      isa_page_to_bus(sg[i].page) + sg[i].offset);
 	    any2scsi (sgb[i].len, sg[i].length);
 	}
     }
     else {
 	scb->op = 0;
-	any2scsi (scb->dataptr, (int) SCpnt->request_buffer);
+	any2scsi (scb->dataptr, isa_virt_to_bus(SCpnt->request_buffer));
 	any2scsi (scb->maxlen, SCpnt->request_bufflen);
     }
 

@@ -140,6 +140,8 @@
  * ioctlsize            - Initial size of the IOCTL buffer
  */
  
+#error Please convert me to Documentation/DMA-mapping.txt
+
 #include <asm/io.h>
 #include <asm/byteorder.h>
 #include <asm/page.h>

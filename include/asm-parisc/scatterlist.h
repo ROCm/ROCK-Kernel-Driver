@@ -2,7 +2,8 @@
 #define _ASM_PARISC_SCATTERLIST_H
 
 struct scatterlist {
-	char *  address;    /* Location data is to be transferred to */
+	struct page *page;
+	unsigned int offset;
 	unsigned int length;
 
 	/* an IOVA can be 64-bits on some PA-Risc platforms. */

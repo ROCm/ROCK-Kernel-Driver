@@ -67,13 +67,10 @@ void fix_inquiry_data(Scsi_Cmnd *srb)
 	US_DEBUGP("Fixing INQUIRY data to show SCSI rev 2\n");
 
 	/* find the location of the data */
-	if (srb->use_sg) {
-		struct scatterlist *sg;
+	if (srb->use_sg)
+		BUG();
 
-		sg = (struct scatterlist *) srb->request_buffer;
-		data_ptr = (unsigned char *) sg[0].address;
-	} else
-		data_ptr = (unsigned char *)srb->request_buffer;
+	data_ptr = (unsigned char *) srb->request_buffer;
 
 	/* Change the SCSI revision number */
 	data_ptr[2] = (data_ptr[2] & ~7) | 2;

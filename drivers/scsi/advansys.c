@@ -752,6 +752,7 @@
 
 */
 
+#error Please convert me to Documentation/DMA-mapping.txt
 
 /*
  * --- Linux Version

@@ -29,6 +29,7 @@
 #define BusLogic_DriverVersion		"2.1.15"
 #define BusLogic_DriverDate		"17 August 1998"
 
+#error Please convert me to Documentation/DMA-mapping.txt
 
 #include <linux/version.h>
 #include <linux/module.h>

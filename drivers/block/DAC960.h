@@ -2573,39 +2573,7 @@ void DAC960_ReleaseControllerLockIH(DAC960_Controller_T *Controller,
   spin_unlock_irqrestore(&Controller->RequestQueue->queue_lock, *ProcessorFlags);
 }
 
-
-/*
-  Virtual_to_Bus32 maps from Kernel Virtual Addresses to 32 Bit PCI Bus
-  Addresses.
-*/
-
-static inline DAC960_BusAddress32_T Virtual_to_Bus32(void *VirtualAddress)
-{
-  return (DAC960_BusAddress32_T) virt_to_bus(VirtualAddress);
-}
-
-
-/*
-  Bus32_to_Virtual maps from 32 Bit PCI Bus Addresses to Kernel Virtual
-  Addresses.
-*/
-
-static inline void *Bus32_to_Virtual(DAC960_BusAddress32_T BusAddress)
-{
-  return (void *) bus_to_virt(BusAddress);
-}
-
-
-/*
-  Virtual_to_Bus64 maps from Kernel Virtual Addresses to 64 Bit PCI Bus
-  Addresses.
-*/
-
-static inline DAC960_BusAddress64_T Virtual_to_Bus64(void *VirtualAddress)
-{
-  return (DAC960_BusAddress64_T) virt_to_bus(VirtualAddress);
-}
-
+#error I am a non-portable driver, please convert me to use the Documentation/DMA-mapping.txt interfaces
 
 /*
   Define the DAC960 BA Series Controller Interface Register Offsets.

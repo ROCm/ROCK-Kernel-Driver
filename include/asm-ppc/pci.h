@@ -157,15 +157,10 @@ static inline int pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg,
 	 * temporary 2.4 hack
 	 */
 	for (i = 0; i < nents; i++) {
-		if (sg[i].address && sg[i].page)
-			BUG();
-		else if (!sg[i].address && !sg[i].page)
+		if (!sg[i].page)
 			BUG();
 
-		if (sg[i].address)
-			sg[i].dma_address = virt_to_bus(sg[i].address);
-		else
-			sg[i].dma_address = page_to_bus(sg[i].page) + sg[i].offset;
+		sg[i].dma_address = page_to_bus(sg[i].page) + sg[i].offset;
 	}
 
 	return nents;

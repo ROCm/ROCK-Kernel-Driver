@@ -401,6 +401,8 @@
  *  the driver sets host->wish_block = TRUE for all ISA boards.
  */
 
+#error Please convert me to Documentation/DMA-mapping.txt
+
 #include <linux/version.h>
 
 #ifndef LinuxVersionCode

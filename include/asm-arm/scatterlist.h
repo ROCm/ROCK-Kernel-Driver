@@ -4,9 +4,8 @@
 #include <asm/types.h>
 
 struct scatterlist {
-	char		*address;	/* virtual address		 */
-	struct page	*page;		/* Location for highmem page, if any */
-	unsigned int	offset;		/* for highmem, page offset	 */
+	struct page	*page;		/* buffer page			 */
+	unsigned int	offset;		/* buffer offset		 */
 	dma_addr_t	dma_address;	/* dma address			 */
 	unsigned int	length;		/* length			 */
 	char		*__address;	/* for set_dma_addr		 */

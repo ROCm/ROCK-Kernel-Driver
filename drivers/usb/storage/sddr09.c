@@ -239,7 +239,7 @@ static int sddr09_bulk_transport(struct us_data *us,
 		sg = (struct scatterlist *)data;
 		for (i=0; i<use_sg && transferred<len; i++) {
 			result = sddr09_raw_bulk(us, direction,
-				sg[i].address, 
+				page_address(sg[i].page) + sg[i].offset, 
 				len-transferred > sg[i].length ?
 					sg[i].length : len-transferred);
 			if (result!=US_BULK_TRANSFER_GOOD)
@@ -384,7 +384,7 @@ int sddr09_read_data(struct us_data *us,
 	if (use_sg) {
 		transferred = 0;
 		for (i=0; i<use_sg && transferred<len; i++) {
-			memcpy(sg[i].address, buffer+transferred,
+			memcpy(page_address(sg[i].page) + sg[i].offset, buffer+transferred,
 				len-transferred > sg[i].length ?
 					sg[i].length : len-transferred);
 			transferred += sg[i].length;
@@ -636,21 +636,24 @@ int sddr09_read_map(struct us_data *us) {
 
 	for (i=0; i<alloc_blocks; i++) {
 		if (i<alloc_blocks-1) {
-			sg[i].address = kmalloc( (1<<17), GFP_NOIO );
-			sg[i].page = NULL;
+			char *vaddr = kmalloc(1 << 17, GFP_NOIO);
+			sg[i].page = virt_to_page(vaddr);
+			sg[i].offset = ((unsigned long)vaddr & ~PAGE_MASK);
 			sg[i].length = (1<<17);
 		} else {
-			sg[i].address = kmalloc(alloc_len, GFP_NOIO);
-			sg[i].page = NULL;
+			char *vaddr = kmalloc(alloc_len, GFP_NOIO);
+			sg[i].page = virt_to_page(vaddr);
+			sg[i].offset = ((unsigned long)vaddr & ~PAGE_MASK);
 			sg[i].length = alloc_len;
 		}
 		alloc_len -= sg[i].length;
 	}
+
 	for (i=0; i<alloc_blocks; i++)
-		if (sg[i].address == NULL) {
+		if (sg[i].page == NULL) {
 			for (i=0; i<alloc_blocks; i++)
-				if (sg[i].address != NULL)
-					kfree(sg[i].address);
+				if (sg[i].page != NULL)
+					kfree(page_address(sg[i].page) + sg[i].offset);
 			kfree(sg);
 			return 0;
 		}
@@ -661,7 +664,7 @@ int sddr09_read_map(struct us_data *us) {
 			(unsigned char *)sg, alloc_blocks)) !=
 			USB_STOR_TRANSPORT_GOOD) {
 		for (i=0; i<alloc_blocks; i++)
-			kfree(sg[i].address);
+			kfree(page_address(sg[i].page) + sg[i].offset);
 		kfree(sg);
 		return -1;
 	}
@@ -683,7 +686,7 @@ int sddr09_read_map(struct us_data *us) {
 		info->lba_to_pba = NULL;
 		info->pba_to_lba = NULL;
 		for (i=0; i<alloc_blocks; i++)
-			kfree(sg[i].address);
+			kfree(page_address(sg[i].page) + sg[i].offset);
 		kfree(sg);
 		return 0;
 	}
@@ -695,7 +698,7 @@ int sddr09_read_map(struct us_data *us) {
 	// scatterlist block i*64/128k = i*(2^6)*(2^-17) = i*(2^-11)
 
 	for (i=0; i<numblocks; i++) {
-		ptr = sg[i>>11].address+((i&0x7ff)<<6);
+		ptr = page_address(sg[i>>11].page)+sg[i>>11].offset+((i&0x7ff)<<6);
 		if (ptr[0]!=0xFF || ptr[1]!=0xFF || ptr[2]!=0xFF ||
 		    ptr[3]!=0xFF || ptr[4]!=0xFF || ptr[5]!=0xFF) {
 			US_DEBUGP("PBA %04X has no logical mapping: reserved area = "
@@ -748,7 +751,7 @@ int sddr09_read_map(struct us_data *us) {
 	}
 
 	for (i=0; i<alloc_blocks; i++)
-		kfree(sg[i].address);
+		kfree(page_address(sg[i].page)+sg[i].offset);
 	kfree(sg);
 	return 0;
 }

@@ -28,6 +28,8 @@
 
 #define ADDR32 (0)
 
+#error Please convert me to Documentation/DMA-mapping.txt
+
 #include <linux/version.h>
 #include <linux/module.h>
 

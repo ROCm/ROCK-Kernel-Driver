@@ -792,6 +792,7 @@ debug_pkt_dump (struct netdev_private *np, int pkt_len)
 	}
 	if (np->rx_debug == 7) {
 
+#error Please convert me to Documentation/DMA-mapping.txt
 		phead =
 		    bus_to_virt (le64_to_cpu (desc->fraginfo & 0xffffffffff));
 		for (pchar = phead, i = 0; i < pkt_len; i++, pchar++) {

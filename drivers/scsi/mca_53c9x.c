@@ -227,7 +227,7 @@ int mca_esp_detect(Scsi_Host_Template *tpnt)
 
 			esp->esp_command = (volatile unsigned char*)
 			  cmd_buffer;
-	 		esp->esp_command_dvma = virt_to_bus(cmd_buffer);
+	 		esp->esp_command_dvma = isa_virt_to_bus(cmd_buffer);
 
 			/* SCSI chip speed */
 

@@ -1184,7 +1184,7 @@ static int __init i82596_probe(struct net_device *dev, int options)
 			printk("%s: Couldn't get shared memory\n", dev->name);
 			return -ENOMEM;
 		}
-		dma_addr = virt_to_bus(dev->mem_start);
+		dma_addr = virt_to_phys(dev->mem_start);
 	}
 
 	ether_setup(dev);

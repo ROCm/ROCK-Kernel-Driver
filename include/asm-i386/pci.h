@@ -75,7 +75,7 @@ static inline dma_addr_t pci_map_single(struct pci_dev *hwdev, void *ptr,
 	if (direction == PCI_DMA_NONE)
 		BUG();
 	flush_write_buffers();
-	return virt_to_bus(ptr);
+	return virt_to_phys(ptr);
 }
 
 /* Unmap a single streaming mode DMA translation.  The dma_addr and size
@@ -144,22 +144,14 @@ static inline int pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg,
 
 	if (direction == PCI_DMA_NONE)
 		BUG();
- 
- 	/*
- 	 * temporary 2.4 hack
- 	 */
- 	for (i = 0; i < nents; i++ ) {
- 		if (sg[i].address && sg[i].page)
- 			BUG();
- 		else if (!sg[i].address && !sg[i].page)
- 			BUG();
- 
- 		if (sg[i].address)
- 			sg[i].dma_address = virt_to_bus(sg[i].address);
- 		else
- 			sg[i].dma_address = page_to_bus(sg[i].page) + sg[i].offset;
- 	}
- 
+
+	for (i = 0; i < nents; i++ ) {
+		if (!sg[i].page)
+			BUG();
+
+		sg[i].dma_address = page_to_phys(sg[i].page) + sg[i].offset;
+	}
+
 	flush_write_buffers();
 	return nents;
 }
@@ -233,7 +225,7 @@ static inline int pci_dma_supported(struct pci_dev *hwdev, u64 mask)
 static __inline__ dma64_addr_t
 pci_dac_page_to_dma(struct pci_dev *pdev, struct page *page, unsigned long offset, int direction)
 {
-	return ((dma64_addr_t) page_to_bus(page) +
+	return ((dma64_addr_t) page_to_phys(page) +
 		(dma64_addr_t) offset);
 }
 

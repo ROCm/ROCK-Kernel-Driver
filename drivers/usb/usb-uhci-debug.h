@@ -78,60 +78,6 @@ static void uhci_show_td (puhci_desc_t td)
 #endif
 
 #ifdef DEBUG
-static void __attribute__((__unused__)) uhci_show_td_queue (puhci_desc_t td)
-{
-	//dbg("uhci_show_td_queue %p (%08lX):", td, td->dma_addr);
-#if 1
-	return;
-#else
-	while (1) {
-		uhci_show_td (td);
-		if (td->hw.td.link & UHCI_PTR_TERM)
-			break;
-		if (td != bus_to_virt (td->hw.td.link & ~UHCI_PTR_BITS))
-			td = bus_to_virt (td->hw.td.link & ~UHCI_PTR_BITS);
-		else {
-			dbg("td points to itself!");
-			break;
-		}
-	}
-#endif
-}
-
-static void __attribute__((__unused__)) uhci_show_queue (puhci_desc_t qh)
-{
-#if 0
-	uhci_desc_t *start_qh=qh;
-#endif
-
-	dbg("uhci_show_queue %p:", qh);
-#if 1
-	return;
-#else
-	while (1) {
-		uhci_show_qh (qh);
-
-		if (!(qh->hw.qh.element & UHCI_PTR_TERM))
-			uhci_show_td_queue (bus_to_virt (qh->hw.qh.element & ~UHCI_PTR_BITS));
-
-		if (qh->hw.qh.head & UHCI_PTR_TERM)
-			break;
-
-		if (qh != bus_to_virt (qh->hw.qh.head & ~UHCI_PTR_BITS))
-			qh = bus_to_virt (qh->hw.qh.head & ~UHCI_PTR_BITS);
-		else {
-			dbg("qh points to itself!");
-			break;
-		}
-		
-		if (qh==start_qh) { // avoid loop
-			dbg("Loop detect");
-			break;
-		}
-	}		
-#endif
-}
-
 static void __attribute__((__unused__)) uhci_show_sc (int port, unsigned short status)
 {
 	dbg("  stat%d     =     %04x   %s%s%s%s%s%s%s%s",

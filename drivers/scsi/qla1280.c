@@ -182,6 +182,7 @@ END OF TERMS AND CONDITIONS
     -   Initial Beta Release.  
 *****************************************************************************/
 
+#error Please convert me to Documentation/DMA-mapping.txt
 
 #ifdef MODULE
 #include <linux/module.h>

@@ -4,11 +4,6 @@
 #include <asm/page.h>
   
 struct scatterlist {
-	/* This will disappear in 2.5.x */
-	char *address;
-
-	/* These two are only valid if ADDRESS member of this
-	   struct is NULL.  */
 	struct page *page;
 	unsigned int offset;
 

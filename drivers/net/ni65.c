@@ -507,10 +507,10 @@ static void ni65_init_lance(struct priv *p,unsigned char *daddr,int filter,int m
 		p->ib.filter[i] = filter;
 	p->ib.mode = mode;
 
-	p->ib.trp = (u32) virt_to_bus(p->tmdhead) | TMDNUMMASK;
-	p->ib.rrp = (u32) virt_to_bus(p->rmdhead) | RMDNUMMASK;
+	p->ib.trp = (u32) isa_virt_to_bus(p->tmdhead) | TMDNUMMASK;
+	p->ib.rrp = (u32) isa_virt_to_bus(p->rmdhead) | RMDNUMMASK;
 	writereg(0,CSR3);	/* busmaster/no word-swap */
-	pib = (u32) virt_to_bus(&p->ib);
+	pib = (u32) isa_virt_to_bus(&p->ib);
 	writereg(pib & 0xffff,CSR1);
 	writereg(pib >> 16,CSR2);
 
@@ -551,7 +551,7 @@ static void *ni65_alloc_mem(struct net_device *dev,char *what,int size,int type)
 			return NULL;
 		}
 	}
-	if( (u32) virt_to_bus(ptr+size) > 0x1000000) {
+	if( (u32) virt_to_phys(ptr+size) > 0x1000000) {
 		printk("%s: unable to allocate %s memory in lower 16MB!\n",dev->name,what);
 		if(type)
 			kfree_skb(skb);
@@ -683,7 +683,7 @@ static void ni65_stop_start(struct net_device *dev,struct priv *p)
 #ifdef XMT_VIA_SKB
 			skb_save[i] = p->tmd_skb[i];
 #endif
-			buffer[i] = (u32) bus_to_virt(tmdp->u.buffer);
+			buffer[i] = (u32) isa_bus_to_virt(tmdp->u.buffer);
 			blen[i] = tmdp->blen;
 			tmdp->u.s.status = 0x0;
 		}
@@ -697,7 +697,7 @@ static void ni65_stop_start(struct net_device *dev,struct priv *p)
 
 		for(i=0;i<TMDNUM;i++) {
 			int num = (i + p->tmdlast) & (TMDNUM-1);
-			p->tmdhead[i].u.buffer = (u32) virt_to_bus((char *)buffer[num]); /* status is part of buffer field */
+			p->tmdhead[i].u.buffer = (u32) isa_virt_to_bus((char *)buffer[num]); /* status is part of buffer field */
 			p->tmdhead[i].blen = blen[num];
 			if(p->tmdhead[i].u.s.status & XMIT_OWN) {
 				 p->tmdnum = (p->tmdnum + 1) & (TMDNUM-1);
@@ -766,9 +766,9 @@ static int ni65_lance_reinit(struct net_device *dev)
 	 {
 		 struct rmd *rmdp = p->rmdhead + i;
 #ifdef RCV_VIA_SKB
-		 rmdp->u.buffer = (u32) virt_to_bus(p->recv_skb[i]->data);
+		 rmdp->u.buffer = (u32) isa_virt_to_bus(p->recv_skb[i]->data);
 #else
-		 rmdp->u.buffer = (u32) virt_to_bus(p->recvbounce[i]);
+		 rmdp->u.buffer = (u32) isa_virt_to_bus(p->recvbounce[i]);
 #endif
 		 rmdp->blen = -(R_BUF_SIZE-8);
 		 rmdp->mlen = 0;
@@ -1033,7 +1033,7 @@ static void ni65_recv_intr(struct net_device *dev,int csr0)
 					struct sk_buff *skb1 = p->recv_skb[p->rmdnum];
 					skb_put(skb,R_BUF_SIZE);
 					p->recv_skb[p->rmdnum] = skb;
-					rmdp->u.buffer = (u32) virt_to_bus(skb->data);
+					rmdp->u.buffer = (u32) isa_virt_to_bus(skb->data);
 					skb = skb1;
 					skb_trim(skb,len);
 				}
@@ -1115,7 +1115,7 @@ static int ni65_send_packet(struct sk_buff *skb, struct net_device *dev)
 			cli();
 
 			tmdp = p->tmdhead + p->tmdnum;
-			tmdp->u.buffer = (u32) virt_to_bus(p->tmdbounce[p->tmdbouncenum]);
+			tmdp->u.buffer = (u32) isa_virt_to_bus(p->tmdbounce[p->tmdbouncenum]);
 			p->tmdbouncenum = (p->tmdbouncenum + 1) & (TMDNUM - 1);
 
 #ifdef XMT_VIA_SKB
@@ -1125,7 +1125,7 @@ static int ni65_send_packet(struct sk_buff *skb, struct net_device *dev)
 			cli();
 
 			tmdp = p->tmdhead + p->tmdnum;
-			tmdp->u.buffer = (u32) virt_to_bus(skb->data);
+			tmdp->u.buffer = (u32) isa_virt_to_bus(skb->data);
 			p->tmd_skb[p->tmdnum] = skb;
 		}
 #endif

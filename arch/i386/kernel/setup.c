@@ -232,7 +232,7 @@ static void __init probe_roms(void)
 
 	/* Video ROM is standard at C000:0000 - C7FF:0000, check signature */
 	for (base = 0xC0000; base < 0xE0000; base += 2048) {
-		romstart = bus_to_virt(base);
+		romstart = isa_bus_to_virt(base);
 		if (!romsignature(romstart))
 			continue;
 		request_resource(&iomem_resource, rom_resources + roms);
@@ -244,7 +244,7 @@ static void __init probe_roms(void)
 	for (base = 0xC8000; base < 0xE0000; base += 2048) {
 		unsigned long length;
 
-		romstart = bus_to_virt(base);
+		romstart = isa_bus_to_virt(base);
 		if (!romsignature(romstart))
 			continue;
 		length = romstart[2] * 512;
@@ -273,7 +273,7 @@ static void __init probe_roms(void)
 
 	/* Final check for motherboard extension rom at E000:0000 */
 	base = 0xE0000;
-	romstart = bus_to_virt(base);
+	romstart = isa_bus_to_virt(base);
 
 	if (romsignature(romstart)) {
 		rom_resources[roms].start = base;
@@ -692,10 +692,10 @@ void __init setup_arch(char **cmdline_p)
 	init_mm.end_data = (unsigned long) &_edata;
 	init_mm.brk = (unsigned long) &_end;
 
-	code_resource.start = virt_to_bus(&_text);
-	code_resource.end = virt_to_bus(&_etext)-1;
-	data_resource.start = virt_to_bus(&_etext);
-	data_resource.end = virt_to_bus(&_edata)-1;
+	code_resource.start = virt_to_phys(&_text);
+	code_resource.end = virt_to_phys(&_etext)-1;
+	data_resource.start = virt_to_phys(&_etext);
+	data_resource.end = virt_to_phys(&_edata)-1;
 
 	parse_mem_cmdline(cmdline_p);
 

@@ -454,7 +454,8 @@ static void scatter_gather_callback(struct urb *u)
                 u,
                 hpusbscsi->dev,
                 hpusbscsi->current_data_pipe,
-                sg[hpusbscsi->fragment].address,
+                page_address(sg[hpusbscsi->fragment].page) +
+		sg[hpusbscsi->fragment].offset,
                 sg[hpusbscsi->fragment++].length,
                 callback,
                 hpusbscsi

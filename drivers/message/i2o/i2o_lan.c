@@ -25,6 +25,8 @@
  *	TODO:		tests for other LAN classes (Token Ring, Fibre Channel)
  */
 
+#error Please convert me to Documentation/DMA-mapping.txt
+
 #include <linux/config.h>
 #include <linux/module.h>
 

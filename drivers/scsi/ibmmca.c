@@ -766,12 +766,12 @@ static int device_inquiry(int host_index, int ldn)
       scb->enable = IM_REPORT_TSB_ONLY_ON_ERROR | IM_READ_CONTROL | IM_SUPRESS_EXCEPTION_SHORT | IM_RETRY_ENABLE | IM_BYPASS_BUFFER;
       last_scsi_command(host_index)[ldn] = IM_DEVICE_INQUIRY_CMD;
       last_scsi_type(host_index)[ldn] = IM_SCB;
-      scb->sys_buf_adr = virt_to_bus(buf);
+      scb->sys_buf_adr = isa_virt_to_bus(buf);
       scb->sys_buf_length = 255; /* maximum bufferlength gives max info */
-      scb->tsb_adr = virt_to_bus(tsb);
+      scb->tsb_adr = isa_virt_to_bus(tsb);
       /* issue scb to passed ldn, and busy wait for interrupt */
       got_interrupt(host_index) = 0;
-      issue_cmd (host_index, virt_to_bus(scb), IM_SCB | ldn);
+      issue_cmd (host_index, isa_virt_to_bus(scb), IM_SCB | ldn);
       while (!got_interrupt(host_index))
 	barrier ();
 
@@ -804,12 +804,12 @@ static int read_capacity(int host_index, int ldn)
       scb->enable = IM_REPORT_TSB_ONLY_ON_ERROR | IM_READ_CONTROL | IM_RETRY_ENABLE | IM_BYPASS_BUFFER;
       last_scsi_command(host_index)[ldn] = IM_READ_CAPACITY_CMD;
       last_scsi_type(host_index)[ldn] = IM_SCB;
-      scb->sys_buf_adr = virt_to_bus(buf);
+      scb->sys_buf_adr = isa_virt_to_bus(buf);
       scb->sys_buf_length = 8;
-      scb->tsb_adr = virt_to_bus(tsb);
+      scb->tsb_adr = isa_virt_to_bus(tsb);
       /*issue scb to passed ldn, and busy wait for interrupt */
       got_interrupt(host_index) = 0;
-      issue_cmd (host_index, virt_to_bus(scb), IM_SCB | ldn);
+      issue_cmd (host_index, isa_virt_to_bus(scb), IM_SCB | ldn);
       while (!got_interrupt(host_index))
 	barrier ();
 
@@ -842,15 +842,15 @@ static int get_pos_info(int host_index)
       scb->enable = IM_READ_CONTROL | IM_REPORT_TSB_ONLY_ON_ERROR | IM_RETRY_ENABLE | IM_BYPASS_BUFFER;
       last_scsi_command(host_index)[MAX_LOG_DEV] = IM_GET_POS_INFO_CMD;
       last_scsi_type(host_index)[MAX_LOG_DEV] = IM_SCB;
-      scb->sys_buf_adr = virt_to_bus(buf);
+      scb->sys_buf_adr = isa_virt_to_bus(buf);
       if (special(host_index)==IBM_SCSI2_FW)
 	scb->sys_buf_length = 256; /* get all info from F/W adapter */
       else
 	scb->sys_buf_length = 18; /* get exactly 18 bytes for other SCSI */
-      scb->tsb_adr = virt_to_bus(tsb);
+      scb->tsb_adr = isa_virt_to_bus(tsb);
       /*issue scb to ldn=15, and busy wait for interrupt */
       got_interrupt(host_index) = 0;
-      issue_cmd (host_index, virt_to_bus(scb), IM_SCB | MAX_LOG_DEV);
+      issue_cmd (host_index, isa_virt_to_bus(scb), IM_SCB | MAX_LOG_DEV);
       while (!got_interrupt(host_index))
 	barrier ();
 
@@ -1992,7 +1992,7 @@ int ibmmca_queuecommand (Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *))
    scb = &(ld(host_index)[ldn].scb);
    ld(host_index)[ldn].tsb.dev_status = 0;
    scb->enable = IM_REPORT_TSB_ONLY_ON_ERROR | IM_RETRY_ENABLE;
-   scb->tsb_adr = virt_to_bus(&(ld(host_index)[ldn].tsb));
+   scb->tsb_adr = isa_virt_to_bus(&(ld(host_index)[ldn].tsb));
    scsi_cmd = cmd->cmnd[0];
 
    if (cmd->use_sg) {
@@ -2001,14 +2001,14 @@ int ibmmca_queuecommand (Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *))
       if (i > 16)
 	panic ("IBM MCA SCSI: scatter-gather list too long.\n");
       while (--i >= 0) {
-	 ld(host_index)[ldn].sge[i].address = (void *)(virt_to_bus(sl[i].address));
+	 ld(host_index)[ldn].sge[i].address = (void *)(isa_page_to_bus(sl[i].page) + sl[i].offset);
 	 ld(host_index)[ldn].sge[i].byte_length = sl[i].length;
       }
       scb->enable |= IM_POINTER_TO_LIST;
-      scb->sys_buf_adr = virt_to_bus(&(ld(host_index)[ldn].sge[0]));
+      scb->sys_buf_adr = isa_virt_to_bus(&(ld(host_index)[ldn].sge[0]));
       scb->sys_buf_length = cmd->use_sg * sizeof (struct im_sge);
    } else {
-      scb->sys_buf_adr = virt_to_bus(cmd->request_buffer);
+      scb->sys_buf_adr = isa_virt_to_bus(cmd->request_buffer);
       /* recent Linux midlevel SCSI places 1024 byte for inquiry
        * command. Far too much for old PS/2 hardware. */
       switch (scsi_cmd) {
@@ -2165,10 +2165,10 @@ int ibmmca_queuecommand (Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *))
      PS2_DISK_LED_ON (shpnt->host_no, target);
 
    if (last_scsi_type(host_index)[ldn] == IM_LONG_SCB) {
-      issue_cmd (host_index, virt_to_bus(scb), IM_LONG_SCB | ldn);
+      issue_cmd (host_index, isa_virt_to_bus(scb), IM_LONG_SCB | ldn);
       IBM_DS(host_index).long_scbs++;
    } else {
-      issue_cmd (host_index, virt_to_bus(scb), IM_SCB | ldn);
+      issue_cmd (host_index, isa_virt_to_bus(scb), IM_SCB | ldn);
       IBM_DS(host_index).scbs++;
    }
    return 0;

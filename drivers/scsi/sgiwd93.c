@@ -120,9 +120,13 @@ static int dma_setup(Scsi_Cmnd *cmd, int datainp)
 #endif
 		for(i = 0; i <= cmd->SCp.buffers_residual; i++) {
 #ifdef DEBUG_DMA
-			printk("[%p,%d]", slp[i].address, slp[i].length);
+			printk("[%p,%d]",
+			       page_address(slp[i].page) + slp[i].offset,
+			       slp[i].length);
 #endif
-			fill_hpc_entries (&hcp, slp[i].address, slp[i].length);
+			fill_hpc_entries (&hcp,
+					  page_address(slp[i].page) + slp[i].offset,
+					  slp[i].length);
 			totlen += slp[i].length;
 		}
 #ifdef DEBUG_DMA
@@ -227,7 +231,7 @@ static void dma_stop(struct Scsi_Host *instance, Scsi_Cmnd *SCpnt,
 		}
 		SCpnt->SCp.buffer = &slp[i];
 		SCpnt->SCp.buffers_residual = SCpnt->SCp.buffers_residual - i;
-		SCpnt->SCp.ptr = (char *) slp[i].address;
+		SCpnt->SCp.ptr = (char *) page_address(slp[i].page) + slp[i].offset;
 		SCpnt->SCp.this_residual = slp[i].length;
 	}
 #ifdef DEBUG_DMA

@@ -60,6 +60,8 @@
 #  define BREAKPOINT() { }
 #endif
 
+#error Please convert me to Documentation/DMA-mapping.txt
+
 #define MAX_ISA_DEVICES 10
 #define MAX_PCI_DEVICES 10
 #define MAX_TOTAL_DEVICES 20

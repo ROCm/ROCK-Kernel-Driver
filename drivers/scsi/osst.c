@@ -479,7 +479,8 @@ static int osst_verify_frame(OS_Scsi_Tape * STp, int frame_seq_number, int quiet
 	if (STp->raw) {
 		if (STp->buffer->syscall_result) {
 			for (i=0; i < STp->buffer->sg_segs; i++)
-				memset(STp->buffer->sg[i].address, 0, STp->buffer->sg[i].length);
+				memset(page_address(STp->buffer->sg[i].page),
+				       0, STp->buffer->sg[i].length);
 			strcpy(STp->buffer->b_data, "READ ERROR ON FRAME");
 		}
 		return 1;
@@ -4375,12 +4376,12 @@ static int os_scsi_tape_open(struct inode * inode, struct file * filp)
 		for (i = 0, b_size = 0; 
 		     i < STp->buffer->sg_segs && (b_size + STp->buffer->sg[i].length) <= OS_DATA_SIZE; 
 		     b_size += STp->buffer->sg[i++].length);
-		STp->buffer->aux = (os_aux_t *) (STp->buffer->sg[i].address + OS_DATA_SIZE - b_size);
+		STp->buffer->aux = (os_aux_t *) (page_address(STp->buffer->sg[i].page) + OS_DATA_SIZE - b_size);
 #if DEBUG
 		printk(OSST_DEB_MSG "osst%d:D: b_data points to %p in segment 0 at %p\n", dev,
-			STp->buffer->b_data, STp->buffer->sg[0].address);
+			STp->buffer->b_data, page_address(STp->buffer->sg[0].page));
 		printk(OSST_DEB_MSG "osst%d:D: AUX points to %p in segment %d at %p\n", dev,
-			 STp->buffer->aux, i, STp->buffer->sg[i].address);
+			 STp->buffer->aux, i, page_address(STp->buffer->sg[i].page));
 #endif
 	} else
 		STp->buffer->aux = NULL; /* this had better never happen! */
@@ -4933,15 +4934,14 @@ static OSST_buffer * new_tape_buffer( int from_initialization, int need_dma )
 		     b_size *= 2,                 order++ );
 
 		for ( ; b_size >= PAGE_SIZE; order--, b_size /= 2) {
-			tb->sg[0].address =
-			    (unsigned char *)__get_free_pages(priority, order);
-			if (tb->sg[0].address != NULL) {
-			    tb->sg[0].page = NULL;
+			tb->sg[0].page = alloc_pages(priority, order);
+			tb->sg[0].offset = 0;
+			if (tb->sg[0].page != NULL) {
 			    tb->sg[0].length = b_size;
 			    break;
 			}
 		}
-		if (tb->sg[segs].address == NULL) {
+		if (tb->sg[segs].page == NULL) {
 			kfree(tb);
 			tb = NULL;
 		}
@@ -4953,9 +4953,9 @@ static OSST_buffer * new_tape_buffer( int from_initialization, int need_dma )
 
 			for (segs=1, got=tb->sg[0].length;
 			     got < osst_buffer_size && segs < OSST_FIRST_SG; ) {
-			    tb->sg[segs].address =
-				(unsigned char *)__get_free_pages(priority, order);
-			    if (tb->sg[segs].address == NULL) {
+			    tb->sg[segs].page = alloc_pages(priority, order);
+			    tb->sg[segs].offset = 0;
+			    if (tb->sg[segs].page == NULL) {
 				if (osst_buffer_size - got <=
 				    (OSST_FIRST_SG - segs) * b_size / 2) {
 				    b_size /= 2; /* Large enough for the rest of the buffers */
@@ -4985,7 +4985,7 @@ static OSST_buffer * new_tape_buffer( int from_initialization, int need_dma )
 		return NULL;
 	}
 	tb->sg_segs = tb->orig_sg_segs = segs;
-	tb->b_data = tb->sg[0].address;
+	tb->b_data = page_address(tb->sg[0].page);
 
 #if DEBUG
 	if (debugging) {
@@ -5030,9 +5030,9 @@ static int enlarge_buffer(OSST_buffer *STbuffer, int new_size, int need_dma)
 
 	for (segs=STbuffer->sg_segs, got=STbuffer->buffer_size;
 	     segs < max_segs && got < new_size; ) {
-		STbuffer->sg[segs].address =
-			  (unsigned char *)__get_free_pages(priority, order);
-		if (STbuffer->sg[segs].address == NULL) {
+		STbuffer->sg[segs].page = alloc_pages(priority, order);
+		STbuffer->sg[segs].offset = 0;
+		if (STbuffer->sg[segs].page == NULL) {
 			if (new_size - got <= (max_segs - segs) * b_size / 2) {
 				b_size /= 2;  /* Large enough for the rest of the buffers */
 				order--;
@@ -5080,7 +5080,7 @@ static void normalize_buffer(OSST_buffer *STbuffer)
 		     b_size < STbuffer->sg[i].length;
 		     b_size *= 2, order++);
 
-		free_pages((unsigned long)STbuffer->sg[i].address, order);
+		__free_pages(STbuffer->sg[i].page, order);
 		STbuffer->buffer_size -= STbuffer->sg[i].length;
 	}
 #if DEBUG
@@ -5108,7 +5108,7 @@ static int append_to_buffer(const char *ubp, OSST_buffer *st_bp, int do_count)
 	for ( ; i < st_bp->sg_segs && do_count > 0; i++) {
 		cnt = st_bp->sg[i].length - offset < do_count ?
 		      st_bp->sg[i].length - offset : do_count;
-		res = copy_from_user(st_bp->sg[i].address + offset, ubp, cnt);
+		res = copy_from_user(page_address(st_bp->sg[i].page) + offset, ubp, cnt);
 		if (res)
 			return (-EFAULT);
 		do_count -= cnt;
@@ -5141,7 +5141,7 @@ static int from_buffer(OSST_buffer *st_bp, char *ubp, int do_count)
 	for ( ; i < st_bp->sg_segs && do_count > 0; i++) {
 		cnt = st_bp->sg[i].length - offset < do_count ?
 		      st_bp->sg[i].length - offset : do_count;
-		res = copy_to_user(ubp, st_bp->sg[i].address + offset, cnt);
+		res = copy_to_user(ubp, page_address(st_bp->sg[i].page) + offset, cnt);
 		if (res)
 			return (-EFAULT);
 		do_count -= cnt;
@@ -5174,7 +5174,7 @@ static int osst_zero_buffer_tail(OSST_buffer *st_bp)
 	     i < st_bp->sg_segs && do_count > 0; i++) {
 		cnt = st_bp->sg[i].length - offset < do_count ?
 		      st_bp->sg[i].length - offset : do_count ;
-		memset(st_bp->sg[i].address + offset, 0, cnt);
+		memset(page_address(st_bp->sg[i].page) + offset, 0, cnt);
 		do_count -= cnt;
 		offset = 0;
 	}
@@ -5194,7 +5194,7 @@ static int osst_copy_to_buffer(OSST_buffer *st_bp, unsigned char *ptr)
 	for (i = 0; i < st_bp->sg_segs && do_count > 0; i++) {
 		cnt = st_bp->sg[i].length < do_count ?
 		      st_bp->sg[i].length : do_count ;
-		memcpy(st_bp->sg[i].address, ptr, cnt);
+		memcpy(page_address(st_bp->sg[i].page), ptr, cnt);
 		do_count -= cnt;
 		ptr      += cnt;
 	}
@@ -5215,7 +5215,7 @@ static int osst_copy_from_buffer(OSST_buffer *st_bp, unsigned char *ptr)
 	for (i = 0; i < st_bp->sg_segs && do_count > 0; i++) {
 		cnt = st_bp->sg[i].length < do_count ?
 		      st_bp->sg[i].length : do_count ;
-		memcpy(ptr, st_bp->sg[i].address, cnt);
+		memcpy(ptr, page_address(st_bp->sg[i].page), cnt);
 		do_count -= cnt;
 		ptr      += cnt;
 	}

@@ -2,7 +2,8 @@
 #define _M68K_SCATTERLIST_H
 
 struct scatterlist {
-    char *  address;    /* Location data is to be transferred to */
+    struct page *page;
+    unsigned int offset;
     unsigned int length;
     unsigned long dvma_address;
 };

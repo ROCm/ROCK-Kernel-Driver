@@ -108,6 +108,8 @@
 
 #define CVT_LINUX_VERSION(V,P,S)        (V * 65536 + P * 256 + S)
 
+#error Please convert me to Documentation/DMA-mapping.txt
+
 #ifndef LINUX_VERSION_CODE
 #include <linux/version.h>
 #endif

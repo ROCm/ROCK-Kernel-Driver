@@ -83,6 +83,8 @@
 **
 */
 
+#error Please convert me to Documentation/DMA-mapping.txt
+
 #define HP100_DEFAULT_PRIORITY_TX 0
 
 #undef HP100_DEBUG

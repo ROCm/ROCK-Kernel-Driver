@@ -3404,15 +3404,14 @@ static ST_buffer *
 		     order++, b_size *= 2)
 			;
 		for ( ; b_size >= PAGE_SIZE; order--, b_size /= 2) {
-			tb->sg[0].address =
-			    (unsigned char *) __get_free_pages(priority, order);
-			if (tb->sg[0].address != NULL) {
+			tb->sg[0].page = alloc_pages(priority, order);
+			tb->sg[0].offset = 0;
+			if (tb->sg[0].page != NULL) {
 				tb->sg[0].length = b_size;
 				break;
 			}
 		}
-		tb->sg[0].page = NULL;
-		if (tb->sg[segs].address == NULL) {
+		if (tb->sg[segs].page == NULL) {
 			kfree(tb);
 			tb = NULL;
 		} else {	/* Got something, continue */
@@ -3424,10 +3423,9 @@ static ST_buffer *
 				;
 			for (segs = 1, got = tb->sg[0].length;
 			     got < st_buffer_size && segs < ST_FIRST_SG;) {
-				tb->sg[segs].address =
-					(unsigned char *) __get_free_pages(priority,
-									   order);
-				if (tb->sg[segs].address == NULL) {
+				tb->sg[segs].page = alloc_pages(priority, order);
+				tb->sg[segs].offset = 0;
+				if (tb->sg[segs].page == NULL) {
 					if (st_buffer_size - got <=
 					    (ST_FIRST_SG - segs) * b_size / 2) {
 						b_size /= 2; /* Large enough for the
@@ -3443,7 +3441,6 @@ static ST_buffer *
 					tb = NULL;
 					break;
 				}
-				tb->sg[segs].page = NULL;
 				tb->sg[segs].length = b_size;
 				got += b_size;
 				segs++;
@@ -3457,7 +3454,7 @@ static ST_buffer *
 		return NULL;
 	}
 	tb->sg_segs = tb->orig_sg_segs = segs;
-	tb->b_data = tb->sg[0].address;
+	tb->b_data = page_address(tb->sg[0].page);
 
         DEBC(printk(ST_DEB_MSG
                     "st: Allocated tape buffer %d (%d bytes, %d segments, dma: %d, a: %p).\n",
@@ -3503,9 +3500,9 @@ static int enlarge_buffer(ST_buffer * STbuffer, int new_size, int need_dma)
 
 	for (segs = STbuffer->sg_segs, got = STbuffer->buffer_size;
 	     segs < max_segs && got < new_size;) {
-		STbuffer->sg[segs].address =
-			(unsigned char *) __get_free_pages(priority, order);
-		if (STbuffer->sg[segs].address == NULL) {
+		STbuffer->sg[segs].page = alloc_pages(priority, order);
+		STbuffer->sg[segs].offset = 0;
+		if (STbuffer->sg[segs].page == NULL) {
 			if (new_size - got <= (max_segs - segs) * b_size / 2) {
 				b_size /= 2; /* Large enough for the rest of the buffers */
 				order--;
@@ -3517,7 +3514,6 @@ static int enlarge_buffer(ST_buffer * STbuffer, int new_size, int need_dma)
 			normalize_buffer(STbuffer);
 			return FALSE;
 		}
-		STbuffer->sg[segs].page = NULL;
 		STbuffer->sg[segs].length = b_size;
 		STbuffer->sg_segs += 1;
 		got += b_size;
@@ -3541,13 +3537,13 @@ static void normalize_buffer(ST_buffer * STbuffer)
 		for (b_size=PAGE_SIZE, order=0; b_size < STbuffer->sg[i].length;
 		     order++, b_size *= 2)
 			; /* empty */
-		free_pages((unsigned long)(STbuffer->sg[i].address), order);
+		__free_pages(STbuffer->sg[i].page, order);
 		STbuffer->buffer_size -= STbuffer->sg[i].length;
 	}
         DEB(
 	if (debugging && STbuffer->orig_sg_segs < STbuffer->sg_segs)
 		printk(ST_DEB_MSG "st: Buffer at %p normalized to %d bytes (segs %d).\n",
-		       STbuffer->sg[0].address, STbuffer->buffer_size,
+		       page_address(STbuffer->sg[0].page), STbuffer->buffer_size,
 		       STbuffer->sg_segs);
         ) /* end DEB */
 	STbuffer->sg_segs = STbuffer->orig_sg_segs;
@@ -3570,7 +3566,7 @@ static int append_to_buffer(const char *ubp, ST_buffer * st_bp, int do_count)
 	for (; i < st_bp->sg_segs && do_count > 0; i++) {
 		cnt = st_bp->sg[i].length - offset < do_count ?
 		    st_bp->sg[i].length - offset : do_count;
-		res = copy_from_user(st_bp->sg[i].address + offset, ubp, cnt);
+		res = copy_from_user(page_address(st_bp->sg[i].page) + offset, ubp, cnt);
 		if (res)
 			return (-EFAULT);
 		do_count -= cnt;
@@ -3603,7 +3599,7 @@ static int from_buffer(ST_buffer * st_bp, char *ubp, int do_count)
 	for (; i < st_bp->sg_segs && do_count > 0; i++) {
 		cnt = st_bp->sg[i].length - offset < do_count ?
 		    st_bp->sg[i].length - offset : do_count;
-		res = copy_to_user(ubp, st_bp->sg[i].address + offset, cnt);
+		res = copy_to_user(ubp, page_address(st_bp->sg[i].page) + offset, cnt);
 		if (res)
 			return (-EFAULT);
 		do_count -= cnt;

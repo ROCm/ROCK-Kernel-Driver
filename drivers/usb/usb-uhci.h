@@ -100,7 +100,6 @@ static __inline__ void uhci_wait_ms(unsigned int ms)
 
 #define uhci_status_bits(ctrl_sts)	(ctrl_sts & 0xFE0000)
 #define uhci_actual_length(ctrl_sts)	((ctrl_sts + 1) & TD_CTRL_ACTLEN_MASK)	/* 1-based */
-#define uhci_ptr_to_virt(x)	bus_to_virt(x & ~UHCI_PTR_BITS)
 
 /*
  * for TD <flags>:

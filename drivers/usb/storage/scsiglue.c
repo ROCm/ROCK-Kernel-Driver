@@ -564,7 +564,12 @@ int usb_stor_scsiSense10to6( Scsi_Cmnd* the10 )
 	    }
 
 	  /* copy one byte */
-	  sg[db].address[di] = sg[sb].address[si];
+	  {
+		  char *src = page_address(sg[sb].page) + sg[sb].offset + si;
+		  char *dst = page_address(sg[db].page) + sg[db].offset + di;
+
+		  *dst = *src;
+	  }
 
 	  /* get next destination */
 	  if ( sg[db].length-1 == di )
@@ -602,7 +607,7 @@ int usb_stor_scsiSense10to6( Scsi_Cmnd* the10 )
 	      break;
 	    }
 
-	  sg[db].address[di] = 0;
+	  *(char *)(page_address(sg[db].page) + sg[db].offset) = 0;
 
 	  /* get next destination */
 	  if ( sg[db].length-1 == di )
@@ -752,7 +757,12 @@ int usb_stor_scsiSense6to10( Scsi_Cmnd* the6 )
 	    }
 
 	  /* copy one byte */
-	  sg[db].address[di] = sg[sb].address[si];
+	  {
+		  char *src = page_address(sg[sb].page) + sg[sb].offset + si;
+		  char *dst = page_address(sg[db].page) + sg[db].offset + di;
+
+		  *dst = *src;
+	  }
 
 	  /* get next destination */
 	  if ( di == 0 )
@@ -789,7 +799,11 @@ int usb_stor_scsiSense6to10( Scsi_Cmnd* the6 )
 	      break;
 	    }
 
-	  sg[db].address[di] = tempBuffer[element-USB_STOR_SCSI_SENSE_HDRSZ];
+	  {
+		  char *dst = page_address(sg[db].page) + sg[db].offset + di;
+
+		  *dst = tempBuffer[element-USB_STOR_SCSI_SENSE_HDRSZ];
+	  }
 
 	  /* get next destination */
 	  if ( di == 0 )
@@ -839,13 +853,19 @@ void usb_stor_scsiSenseParseBuffer( Scsi_Cmnd* srb, Usb_Stor_Scsi_Sense_Hdr_u* t
 		  if ( element < USB_STOR_SCSI_SENSE_HDRSZ )
 		    {
 		      /* fill in the pointers for both header types */
-		      the6->array[element] = &(sg[i].address[j]);
-		      the10->array[element] = &(sg[i].address[j]);
+		      the6->array[element] =
+			      page_address(sg[i].page) +
+			      sg[i].offset + j;
+		      the10->array[element] =
+			      page_address(sg[i].page) +
+			      sg[i].offset + j;
 		    }
 		  else if ( element < USB_STOR_SCSI_SENSE_10_HDRSZ )
 		    {
 		      /* only the longer headers still cares now */
-		      the10->array[element] = &(sg[i].address[j]);
+		      the10->array[element] =
+			      page_address(sg[i].page) +
+			      sg[i].offset + j;
 		    }
 		  /* increase element counter */
 		  element++;

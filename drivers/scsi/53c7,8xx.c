@@ -62,6 +62,8 @@
  *  the fourth byte from 50 to 25.
  */
 
+#error Please convert me to Documentation/DMA-mapping.txt
+
 #include <linux/config.h>
 
 #ifdef CONFIG_SCSI_NCR53C7xx_sync

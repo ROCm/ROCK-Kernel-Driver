@@ -95,11 +95,20 @@ static inline void * ioremap_nocache (unsigned long offset, unsigned long size)
 extern void iounmap(void *addr);
 
 /*
- * IO bus memory addresses are also 1:1 with the physical address
+ * ISA I/O bus memory addresses are 1:1 with the physical address.
  */
-#define virt_to_bus virt_to_phys
-#define bus_to_virt phys_to_virt
-#define page_to_bus page_to_phys
+#define isa_virt_to_bus virt_to_phys
+#define isa_page_to_bus page_to_phys
+#define isa_bus_to_virt phys_to_virt
+
+/*
+ * However PCI ones are not necessarily 1:1 and therefore these interfaces
+ * are forbidden in portable PCI drivers.
+ */
+extern unsigned long virt_to_bus_not_defined_use_pci_map(volatile void *addr);
+#define virt_to_bus virt_to_bus_not_defined_use_pci_map
+extern unsigned long bus_to_virt_not_defined_use_pci_map(volatile void *addr);
+#define bus_to_virt bus_to_virt_not_defined_use_pci_map
 
 /*
  * readX/writeX() are used to access memory mapped devices. On some
