@@ -614,9 +614,7 @@ int scsi_dispatch_cmd(struct scsi_cmnd *cmd)
 				printk("queuecommand : command too long.\n"));
 		cmd->result = (DID_ABORT << 16);
 
-		spin_lock_irqsave(host->host_lock, flags);
 		scsi_done(cmd);
-		spin_unlock_irqrestore(host->host_lock, flags);
 		goto out;
 	}
 
