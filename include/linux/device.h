@@ -240,6 +240,7 @@ struct device_interface {
 	char			* name;
 	struct device_class	* devclass;
 
+	struct kobject		kobj;
 	struct list_head	node;
 	struct list_head	devices;
 	struct driver_dir_entry	dir;

@@ -11,6 +11,26 @@
 
 #define to_intf(node) container_of(node,struct device_interface,node)
 
+/**
+ * intf_dev_link - symlink from interface's directory to device's directory
+ *
+ */
+int intf_dev_link(struct intf_data * data)
+{
+	char	linkname[16];
+
+	snprintf(linkname,16,"%u",data->intf_num);
+	return sysfs_create_link(&data->intf->kobj,&data->dev->kobj,linkname);
+}
+
+void intf_dev_unlink(struct intf_data * data)
+{
+	char	linkname[16];
+	snprintf(linkname,16,"%u",data->intf_num);
+	sysfs_remove_link(&data->intf->kobj,linkname);
+}
+
+
 int interface_register(struct device_interface * intf)
 {
 	struct device_class * cls = intf->devclass;
@@ -19,6 +39,12 @@ int interface_register(struct device_interface * intf)
 		pr_debug("register interface '%s' with class '%s\n",
 			 intf->name,cls->name);
 		intf_make_dir(intf);
+
+		kobject_init(&intf->kobj);
+		strncpy(intf->kobj.name,intf->name,KOBJ_NAME_LEN);
+		intf->kobj.subsys = &cls->subsys;
+		kobject_register(&intf->kobj);
+
 		spin_lock(&device_lock);
 		list_add_tail(&intf->node,&cls->intf_list);
 		spin_unlock(&device_lock);
@@ -31,6 +57,7 @@ void interface_unregister(struct device_interface * intf)
 {
 	pr_debug("unregistering interface '%s' from class '%s'\n",
 		 intf->name,intf->devclass->name);
+	kobject_unregister(&intf->kobj);
 	spin_lock(&device_lock);
 	list_del_init(&intf->node);
 	spin_unlock(&device_lock);
