@@ -398,8 +398,8 @@ extern inline pid_t wait(int * wait_stat)
 /*
  * "Conditional" syscalls
  */
-#define cond_syscall(name)						\
-  asm (".weak\t" C_SYMBOL_STRING(name) ";"				\
+#define cond_syscall(name)						      \
+  asm (".weak\t" C_SYMBOL_STRING(name) ";"				      \
        ".set\t" C_SYMBOL_STRING(name) "," C_SYMBOL_STRING(sys_ni_syscall));
 #if 0
 /* This doesn't work if there's a function prototype for NAME visible,
