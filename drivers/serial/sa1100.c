@@ -327,7 +327,7 @@ static void sa1100_int(int irq, void *dev_id, struct pt_regs *regs)
 			sa1100_rx_chars(sport, regs);
 		}
 
-		/* Clear the relevent break bits */
+		/* Clear the relevant break bits */
 		if (status & (UTSR0_RBB | UTSR0_REB))
 			UART_PUT_UTSR0(sport, status & (UTSR0_RBB | UTSR0_REB));
 

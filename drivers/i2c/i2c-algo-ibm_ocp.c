@@ -758,7 +758,7 @@ static int iic_xfer(struct i2c_adapter *i2c_adap,
         // Check to see if the bus is busy
         //
         ret = iic_inb(adap, iic->extsts);
-        // Mask off the irrelevent bits
+        // Mask off the irrelevant bits
         ret = ret & 0x70;
         // When the bus is free, the BCS bits in the EXTSTS register are 0b100
         if(ret != 0x40) return IIC_ERR_LOST_ARB;

@@ -521,7 +521,7 @@ int RIORouteRup( struct rio_info *p, uint Rup, struct Host *HostP, PKT *PacketP 
       /*
       ** If either of the modules on this unit is read-only or write-only
       ** or none-xprint, then we need to transfer that info over to the
-      ** relevent ports.
+      ** relevant ports.
       */
       if ( HostP->Mapping[ThisUnit].SysPort != NO_PORT )
       {

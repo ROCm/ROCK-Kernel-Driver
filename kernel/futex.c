@@ -39,7 +39,7 @@
 
 /*
  * We use this hashed waitqueue instead of a normal wait_queue_t, so
- * we can wake only the relevent ones (hashed queues may be shared):
+ * we can wake only the relevant ones (hashed queues may be shared):
  */
 struct futex_q {
 	struct list_head list;

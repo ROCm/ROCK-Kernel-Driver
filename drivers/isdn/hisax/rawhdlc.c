@@ -34,7 +34,7 @@
  * end-of-frame would occur), so the transmitter performs
  * "bit-stuffing" - inserting a zero bit after every five one bits,
  * irregardless of the original bit after the five ones.  Byte
- * ordering is irrelevent at this point - the data is treated as a
+ * ordering is irrelevant at this point - the data is treated as a
  * string of bits, not bytes.  Since no more than 5 ones may now occur
  * in a row, the flag sequence, with its 6 ones, is unique.
  *

@@ -111,7 +111,7 @@ static char *_rio_list_h_sccs = "@(#)list.h	1.9" ;
 /*
 ** can_remove_receive( PacketP, PortP ) returns non-zero if PKT_IN_USE is set
 ** for the next packet on the queue. It will also set PacketP to point to the
-** relevent packet, [having cleared the PKT_IN_USE bit]. If PKT_IN_USE is clear,
+** relevant packet, [having cleared the PKT_IN_USE bit]. If PKT_IN_USE is clear,
 ** then can_remove_receive() returns 0.
 */
 #if defined(MIPS) || defined(nx6000) || defined(drs6000) || defined(UWsparc)
