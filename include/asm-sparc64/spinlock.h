@@ -134,7 +134,7 @@ typedef struct {
 	unsigned int writer_pc, writer_cpu;
 	unsigned int reader_pc[NR_CPUS];
 } rwlock_t;
-#define RW_LOCK_UNLOCKED	(rwlock_t) { 0, 0, 0xff, { 0, 0, 0, 0 } }
+#define RW_LOCK_UNLOCKED	(rwlock_t) { 0, 0, 0xff, { } }
 #define rwlock_init(lp) do { *(lp) = RW_LOCK_UNLOCKED; } while(0)
 #define rwlock_is_locked(x) ((x)->lock != 0)
 
