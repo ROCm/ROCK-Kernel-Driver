@@ -538,12 +538,6 @@ struct bio *bio_map_user(struct block_device *bdev, unsigned long uaddr,
 	bio = __bio_map_user(bdev, uaddr, len, write_to_vm);
 
 	if (bio) {
-		if (bio->bi_size < len) {
-			bio_endio(bio, bio->bi_size, 0);
-			bio_unmap_user(bio, 0);
-			return NULL;
-		}
-
 		/*
 		 * subtle -- if __bio_map_user() ended up bouncing a bio,
 		 * it would normally disappear when its bi_end_io is run.
@@ -551,6 +545,12 @@ struct bio *bio_map_user(struct block_device *bdev, unsigned long uaddr,
 		 * reference to it
 		 */
 		bio_get(bio);
+
+		if (bio->bi_size < len) {
+			bio_endio(bio, bio->bi_size, 0);
+			bio_unmap_user(bio, 0);
+			return NULL;
+		}
 	}
 
 	return bio;
