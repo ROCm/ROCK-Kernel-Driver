@@ -14,14 +14,6 @@
 #define CARD_NAME "Aureal Vortex 3D Sound Processor"
 #define CARD_NAME_SHORT "au8820"
 
-#ifndef PCI_VENDOR_ID_AUREAL
-#define PCI_VENDOR_ID_AUREAL 0x12eb
-#endif
-
-#ifndef PCI_VENDOR_ID_AUREAL_VORTEX
-#define PCI_DEVICE_ID_AUREAL_VORTEX 0x0001
-#endif
-
 /* Number of ADB and WT channels */
 #define NR_ADB		0x10
 #define NR_WT		0x20

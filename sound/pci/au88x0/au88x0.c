@@ -336,28 +336,34 @@ snd_vortex_probe(struct pci_dev *pci, const struct pci_device_id *pci_id)
 	sprintf(card->longname, "%s at 0x%lx irq %i",
 		card->shortname, chip->io, chip->irq);
 
+	if ((err = pci_read_config_word(pci, PCI_DEVICE_ID,
+				  &(chip->device))) < 0) {
+		snd_card_free(card);
+		return err;
+	}	
+	if ((err = pci_read_config_word(pci, PCI_VENDOR_ID,
+				  &(chip->vendor))) < 0) {
+		snd_card_free(card);
+		return err;
+	}
+	if ((err = pci_read_config_byte(pci, PCI_REVISION_ID,
+				  &(chip->rev))) < 0) {
+		snd_card_free(card);
+		return err;
+	}
 #ifdef CHIP_AU8830
-	{
-		unsigned char revision;
-		if ((err =
-		     pci_read_config_byte(pci, PCI_REVISION_ID,
-					  &revision)) < 0) {
-			snd_card_free(card);
-			return err;
-		}
-
-		if (revision != 0xfe && revision != 0xfa) {
-			printk(KERN_ALERT
-			       "vortex: The revision (%x) of your card has not been seen before.\n",
-			       revision);
-			printk(KERN_ALERT
-			       "vortex: Please email the results of 'lspci -vv' to openvortex-dev@nongnu.org.\n");
-			snd_card_free(card);
-			err = -ENODEV;
-			return err;
-		}
+	if ((chip->rev) != 0xfe && (chip->rev) != 0xfa) {
+		printk(KERN_ALERT
+		       "vortex: The revision (%x) of your card has not been seen before.\n",
+		       chip->rev);
+		printk(KERN_ALERT
+		       "vortex: Please email the results of 'lspci -vv' to openvortex-dev@nongnu.org.\n");
+		snd_card_free(card);
+		err = -ENODEV;
+		return err;
 	}
 #endif
+
 	// (6)
 	if ((err = snd_card_register(card)) < 0) {
 		snd_card_free(card);

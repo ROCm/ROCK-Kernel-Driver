@@ -1,14 +1,19 @@
 /*
-    Aureal Vortex Soundcard driver.
-
-    IO addr collected from asp4core.vxd:
-    function    address
-    0005D5A0    13004
-    00080674    14004
-    00080AFF    12818
-
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU Library General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program; if not, write to the Free Software
+ *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
-
+ 
 #ifndef __SOUND_AU88X0_H
 #define __SOUND_AU88X0_H
 
@@ -24,20 +29,20 @@
 #include <sound/hwdep.h>
 #include <sound/ac97_codec.h>
 
-/*
+
 #ifndef	PCI_VENDOR_ID_AUREAL
 #define	PCI_VENDOR_ID_AUREAL 0x12eb
 #endif
-#ifndef	PCI_VENDOR_ID_AUREAL_VORTEX
+#ifndef	PCI_DEVICE_ID_AUREAL_VORTEX
 #define	PCI_DEVICE_ID_AUREAL_VORTEX 0x0001
 #endif
-#ifndef	PCI_VENDOR_ID_AUREAL_VORTEX2
+#ifndef	PCI_DEVICE_ID_AUREAL_VORTEX2
 #define	PCI_DEVICE_ID_AUREAL_VORTEX2 0x0002
 #endif
-#ifndef	PCI_VENDOR_ID_AUREAL_ADVANTAGE
+#ifndef	PCI_DEVICE_ID_AUREAL_ADVANTAGE
 #define	PCI_DEVICE_ID_AUREAL_ADVANTAGE 0x0003
 #endif
-*/
+
 #endif
 
 #ifndef CHIP_AU8820
@@ -90,6 +95,12 @@
 
 /* Check for SDAC bit in "Extended audio ID" AC97 register */
 #define VORTEX_IS_QUAD(x) ((x->codec == NULL) ?  0 : (x->codec->ext_id|0x80))
+/* Check if chip has bug. */
+#define IS_BAD_CHIP(x) (\
+	(x->rev < 3 && x->device == PCI_DEVICE_ID_AUREAL_VORTEX) || \
+	(x->rev < 0xfe && x->device == PCI_DEVICE_ID_AUREAL_VORTEX2) || \
+	(x->rev < 0xfe && x->device == PCI_DEVICE_ID_AUREAL_ADVANTAGE))
+
 
 /* PCM devices */
 #define VORTEX_PCM_ADB		0
