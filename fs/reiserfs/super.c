@@ -296,10 +296,11 @@ void add_save_link (struct reiserfs_transaction_handle * th,
 
     /* put "save" link inot tree */
     retval = reiserfs_insert_item (th, &path, &key, &ih, (char *)&link);
-    if (retval)
-	reiserfs_warning ("vs-2120: add_save_link: insert_item returned %d\n",
+    if (retval) {
+	if (retval != -ENOSPC)
+	    reiserfs_warning ("vs-2120: add_save_link: insert_item returned %d\n",
 			  retval);
-    else {
+    } else {
 	if( truncate )
 	    REISERFS_I(inode) -> i_flags |= i_link_saved_truncate_mask;
 	else
