@@ -1482,15 +1482,29 @@ static __inline__ int handle_bridge(struct sk_buff *skb,
 
 #endif
 
-#ifdef CONFIG_NET_DIVERT
-static inline int handle_diverter(struct sk_buff *skb)
+static inline void handle_diverter(struct sk_buff *skb)
 {
+#ifdef CONFIG_NET_DIVERT
 	/* if diversion is supported on device, then divert */
 	if (skb->dev->divert && skb->dev->divert->divert)
 		divert_frame(skb);
+#endif
+}
+
+static inline int __handle_bridge(struct sk_buff *skb,
+			struct packet_type **pt_prev, int *ret)
+{
+#if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
+	if (skb->dev->br_port) {
+		*ret = handle_bridge(skb, *pt_prev);
+		if (br_handle_frame_hook(skb) == 0)
+			return 1;
+
+		*pt_prev = NULL;
+	}
+#endif
 	return 0;
 }
-#endif   /* CONFIG_NET_DIVERT */
 
 int netif_receive_skb(struct sk_buff *skb)
 {
@@ -1532,20 +1546,10 @@ int netif_receive_skb(struct sk_buff *skb)
 		}
 	}
 
-#ifdef CONFIG_NET_DIVERT
-	if (skb->dev->divert && skb->dev->divert->divert)
-		ret = handle_diverter(skb);
-#endif /* CONFIG_NET_DIVERT */
+	handle_diverter(skb);
 
-#if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
-	if (skb->dev->br_port) {
-		ret = handle_bridge(skb, pt_prev);
-		if (br_handle_frame_hook(skb) == 0) 
-			goto out;
-
-		pt_prev = NULL;
-	}
-#endif
+	if (__handle_bridge(skb, &pt_prev, &ret))
+		goto out;
 
 	list_for_each_entry_rcu(ptype, &ptype_base[ntohs(type)&15], list) {
 		if (ptype->type == type &&
@@ -1578,7 +1582,7 @@ int netif_receive_skb(struct sk_buff *skb)
 		ret = NET_RX_DROP;
 	}
 
- out:
+out:
 	rcu_read_unlock();
 	return ret;
 }
