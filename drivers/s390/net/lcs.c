@@ -11,7 +11,7 @@
  *			  Frank Pavlic (pavlic@de.ibm.com) and
  *		 	  Martin Schwidefsky <schwidefsky@de.ibm.com>
  *
- *    $Revision: 1.74.2.3 $	 $Date: 2004/05/14 14:00:16 $
+ *    $Revision: 1.74.2.4 $	 $Date: 2004/06/20 23:48:23 $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -58,7 +58,7 @@
 /**
  * initialization string for output
  */
-#define VERSION_LCS_C  "$Revision: 1.74.2.3 $"
+#define VERSION_LCS_C  "$Revision: 1.74.2.4 $"
 
 static char version[] __initdata = "LCS driver ("VERSION_LCS_C "/" VERSION_LCS_H ")";
 static char debug_buffer[255];
@@ -2037,6 +2037,44 @@ static struct ccwgroup_driver lcs_group_driver = {
 };
 
 /**
+ * multicast notifier stuff
+ */
+
+static int
+lcs_verify_dev(struct net_device *dev)
+{
+        return (dev->hard_start_xmit==lcs_start_xmit);
+}
+
+/**
+ * multicast notifier structures
+ */
+#ifdef CONFIG_IP_MULTICAST
+static int lcs_mc_event(struct notifier_block *this,
+                       unsigned long event,void *ptr)
+{
+        struct ip_mc_list *mc  = (struct ip_mc_list *) ptr;
+        struct net_device *dev = mc->interface->dev;
+        struct lcs_card *card;
+
+        LCS_DBF_TEXT(3,trace,"mcevent");
+
+        if (!lcs_verify_dev(dev))
+                return NOTIFY_DONE;
+        card  = (struct lcs_card *) dev->priv;
+        if (!card)
+                return NOTIFY_DONE;
+        lcs_set_multicast_list(dev);
+        return NOTIFY_DONE;
+}
+
+static struct notifier_block lcs_mc_notifier = {
+       lcs_mc_event,
+       0
+};
+#endif
+
+/**
  *  LCS Module/Kernel initialization function
  */
 static int
@@ -2058,6 +2096,13 @@ __init lcs_init_module(void)
 		return rc;
 	}
 
+#ifdef CONFIG_IP_MULTICAST
+        if (register_multicast_notifier(&lcs_mc_notifier)) {
+                PRINT_ERR("register_multicast_notifier failed, maybe not " \
+                          "all multicast addresses will be registered\n");
+        }
+#endif
+
 	return 0;
 }
 
@@ -2070,6 +2115,9 @@ __exit lcs_cleanup_module(void)
 {
 	PRINT_INFO("Terminating lcs module.\n");
 	LCS_DBF_TEXT(0, trace, "cleanup");
+#ifdef CONFIG_IP_MULTICAST
+	        unregister_multicast_notifier(&lcs_mc_notifier);
+#endif
 	unregister_cu3088_discipline(&lcs_group_driver);
 	lcs_unregister_debug_facility();
 }

@@ -1,6 +1,6 @@
 /*
  * 
- * linux/drivers/s390/net/qeth_main.c ($Revision: 1.77.2.18 $)
+ * linux/drivers/s390/net/qeth_main.c ($Revision: 1.77.2.20 $)
  *
  * Linux on zSeries OSA Express and HiperSockets support
  *
@@ -12,7 +12,7 @@
  *			  Frank Pavlic (pavlic@de.ibm.com) and
  *		 	  Thomas Spatzier <tspat@de.ibm.com>
  *
- *    $Revision: 1.77.2.18 $	 $Date: 2004/06/04 13:02:34 $
+ *    $Revision: 1.77.2.20 $	 $Date: 2004/06/21 01:01:28 $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -78,7 +78,7 @@ qeth_eyecatcher(void)
 #include "qeth_mpc.h"
 #include "qeth_fs.h"
 
-#define VERSION_QETH_C "$Revision: 1.77.2.18 $"
+#define VERSION_QETH_C "$Revision: 1.77.2.20 $"
 static const char *version = "qeth S/390 OSA-Express driver";
 
 /**
@@ -2347,13 +2347,17 @@ qeth_init_input_buffer(struct qeth_card *card, struct qeth_qdio_buffer *buf)
 }
 
 static inline void
-qeth_clear_output_buffer(struct qeth_card *card,
+qeth_clear_output_buffer(struct qeth_qdio_out_q *queue, 
 			 struct qeth_qdio_out_buffer *buf)
 {
 	int i;
 	struct sk_buff *skb;
 
-	for(i = 0; i < QETH_MAX_BUFFER_ELEMENTS(card); ++i){
+	/* is PCI flag set on buffer? */
+	if (buf->buffer->element[0].flags & 0x40)
+		atomic_dec(&queue->set_pci_flags_count);
+
+	for(i = 0; i < QETH_MAX_BUFFER_ELEMENTS(queue->card); ++i){
 		buf->buffer->element[i].length = 0;
 		buf->buffer->element[i].addr = NULL;
 		buf->buffer->element[i].flags = 0;
@@ -2363,7 +2367,7 @@ qeth_clear_output_buffer(struct qeth_card *card,
 		}
 	}
 	buf->next_element_to_fill = 0;
-	buf->state = QETH_QDIO_BUF_EMPTY;
+	atomic_set(&buf->state, QETH_QDIO_BUF_EMPTY);
 }
 
 static inline void
@@ -2580,8 +2584,17 @@ qeth_flush_buffers(struct qeth_qdio_out_q *queue, int under_int,
 		QETH_DBF_TEXT(trace, 2, "flushbuf");
 		QETH_DBF_TEXT_(trace, 2, " err%d", rc);
 		queue->card->stats.tx_errors += count;
+		/* ok, since do_QDIO went wrong the buffers have not been given
+		 * to the hardware. they still belong to us, so we can clear
+		 * them and reuse then, i.e. set back next_buf_to_fill*/
+		for (i = index; i < index + count; ++i) {
+			buf = &queue->bufs[i % QDIO_MAX_BUFFERS_PER_Q];
+			qeth_clear_output_buffer(queue, buf);
+		}
+		queue->next_buf_to_fill = index;
 		return;
 	}
+	atomic_add(count, &queue->used_buffers);
 #ifdef CONFIG_QETH_PERF_STATS
 	queue->card->perf_stats.bufs_sent += count;
 #endif
@@ -2619,11 +2632,11 @@ qeth_switch_packing_state(struct qeth_qdio_out_q *queue)
 			queue->do_pack = 0;
 			/* flush packing buffers */
 			buffer = &queue->bufs[queue->next_buf_to_fill];
-			BUG_ON(buffer->state == QETH_QDIO_BUF_PRIMED);
-			if (buffer->next_element_to_fill > 0) {
-				buffer->state = QETH_QDIO_BUF_PRIMED;
+			if ((atomic_read(&buffer->state) ==
+						QETH_QDIO_BUF_EMPTY) &&
+			    (buffer->next_element_to_fill > 0)) {
+				atomic_set(&buffer->state,QETH_QDIO_BUF_PRIMED);
 				flush_count++;
-				atomic_inc(&queue->used_buffers);
 				queue->next_buf_to_fill =
 					(queue->next_buf_to_fill + 1) %
 					QDIO_MAX_BUFFERS_PER_Q;
@@ -2637,17 +2650,17 @@ static inline void
 qeth_flush_buffers_on_no_pci(struct qeth_qdio_out_q *queue, int under_int)
 {
 	struct qeth_qdio_out_buffer *buffer;
-	
-	buffer = &queue->bufs[queue->next_buf_to_fill];
-	BUG_ON(buffer->state == QETH_QDIO_BUF_PRIMED);
-	if (buffer->next_element_to_fill > 0){
+	int index;
+
+	index = queue->next_buf_to_fill;
+	buffer = &queue->bufs[index];
+	if((atomic_read(&buffer->state) == QETH_QDIO_BUF_EMPTY) &&
+	   (buffer->next_element_to_fill > 0)){
 		/* it's a packing buffer */
-		buffer->state = QETH_QDIO_BUF_PRIMED;
-		atomic_inc(&queue->used_buffers);
-		qeth_flush_buffers(queue, under_int, queue->next_buf_to_fill,
-				   1);
+		atomic_set(&buffer->state, QETH_QDIO_BUF_PRIMED);
 		queue->next_buf_to_fill =
 			(queue->next_buf_to_fill + 1) % QDIO_MAX_BUFFERS_PER_Q;
+		qeth_flush_buffers(queue, under_int, index, 1);
 	}
 }
 
@@ -2690,13 +2703,9 @@ qeth_qdio_output_handler(struct ccw_device * ccwdev, unsigned int status,
 			qeth_schedule_recovery(card);
 			return;
 		}
-		/* is PCI flag set on buffer? */
-		if (buffer->buffer->element[0].flags & 0x40)
-			atomic_dec(&queue->set_pci_flags_count);
-
-		qeth_clear_output_buffer(card, buffer);
-		atomic_dec(&queue->used_buffers);
+		qeth_clear_output_buffer(queue, buffer);
 	}
+	atomic_sub(count, &queue->used_buffers);
 
 	netif_wake_queue(card->dev);
 #ifdef CONFIG_QETH_PERF_STATS
@@ -2889,8 +2898,8 @@ qeth_free_qdio_buffers(struct qeth_card *card)
 	/* free outbound qdio_qs */
 	for (i = 0; i < card->qdio.no_out_queues; ++i){
 		for (j = 0; j < QDIO_MAX_BUFFERS_PER_Q; ++j)
-			qeth_clear_output_buffer(card, &card->qdio.
-						out_qs[i]->bufs[j]);
+			qeth_clear_output_buffer(card->qdio.out_qs[i],
+					&card->qdio.out_qs[i]->bufs[j]);
 		kfree(card->qdio.out_qs[i]);
 	}
 	kfree(card->qdio.out_qs);
@@ -2907,8 +2916,8 @@ qeth_clear_qdio_buffers(struct qeth_card *card)
 	for (i = 0; i < card->qdio.no_out_queues; ++i)
 		if (card->qdio.out_qs[i]){
 			for (j = 0; j < QDIO_MAX_BUFFERS_PER_Q; ++j)
-				qeth_clear_output_buffer(card, &card->qdio.
-						out_qs[i]->bufs[j]);
+				qeth_clear_output_buffer(card->qdio.out_qs[i],
+						&card->qdio.out_qs[i]->bufs[j]);
 		}
 }
 
@@ -2960,8 +2969,8 @@ qeth_init_qdio_queues(struct qeth_card *card)
 		memset(card->qdio.out_qs[i]->qdio_bufs, 0,
 		       QDIO_MAX_BUFFERS_PER_Q * sizeof(struct qdio_buffer));
 		for (j = 0; j < QDIO_MAX_BUFFERS_PER_Q; ++j){
-			qeth_clear_output_buffer(card, &card->qdio.
-						 out_qs[i]->bufs[j]);
+			qeth_clear_output_buffer(card->qdio.out_qs[i],
+					&card->qdio.out_qs[i]->bufs[j]);
 		}
 		card->qdio.out_qs[i]->card = card;
 		card->qdio.out_qs[i]->next_buf_to_fill = 0;
@@ -3674,7 +3683,7 @@ qeth_fill_buffer(struct qeth_qdio_out_q *queue, struct qeth_qdio_out_buffer *buf
 	if (!queue->do_pack) {
 		QETH_DBF_TEXT(trace, 6, "fillbfnp");
 		/* set state to PRIMED -> will be flushed */
-		buf->state = QETH_QDIO_BUF_PRIMED;
+		atomic_set(&buf->state, QETH_QDIO_BUF_PRIMED);
 	} else {
 		QETH_DBF_TEXT(trace, 6, "fillbfpa");
 #ifdef CONFIG_QETH_PERF_STATS
@@ -3686,7 +3695,7 @@ qeth_fill_buffer(struct qeth_qdio_out_q *queue, struct qeth_qdio_out_buffer *buf
 			 * packed buffer if full -> set state PRIMED
 			 * -> will be flushed
 			 */
-			buf->state = QETH_QDIO_BUF_PRIMED;
+			atomic_set(&buf->state, QETH_QDIO_BUF_PRIMED);
 		}
 	}
 	return 0;
@@ -3699,32 +3708,27 @@ qeth_do_send_packet_fast(struct qeth_card *card, struct qeth_qdio_out_q *queue,
 {
 	struct qeth_qdio_out_buffer *buffer;
 	int index;
-	int rc = 0;
 
 	QETH_DBF_TEXT(trace, 6, "dosndpfa");
 
 	spin_lock(&queue->lock);
-	/* do we have empty buffers? */
-	if (atomic_read(&queue->used_buffers) >= (QDIO_MAX_BUFFERS_PER_Q - 1)){
-		card->stats.tx_dropped++;
-		rc = -EBUSY;
-		spin_unlock(&queue->lock);
-		goto out;
-	}
 	index = queue->next_buf_to_fill;
 	buffer = &queue->bufs[queue->next_buf_to_fill];
-	BUG_ON(buffer->state == QETH_QDIO_BUF_PRIMED);
+	/*
+	 * check if buffer is empty to make sure that we do not 'overtake'
+	 * ourselves and try to fill a buffer that is already primed
+	 */
+	if (atomic_read(&buffer->state) != QETH_QDIO_BUF_EMPTY) {
+		card->stats.tx_dropped++;
+		spin_unlock(&queue->lock);
+		return -EBUSY;
+	}
 	queue->next_buf_to_fill = (queue->next_buf_to_fill + 1) %
 				  QDIO_MAX_BUFFERS_PER_Q;
-	atomic_inc(&queue->used_buffers);
-	spin_unlock(&queue->lock);
-
-	/* go on sending ... */
-	netif_wake_queue(skb->dev);
 	qeth_fill_buffer(queue, buffer, (char *)hdr, skb);
 	qeth_flush_buffers(queue, 0, index, 1);
-out:
-	return rc;
+	spin_unlock(&queue->lock);
+	return 0;
 }
 
 static inline int
@@ -3740,35 +3744,43 @@ qeth_do_send_packet(struct qeth_card *card, struct qeth_qdio_out_q *queue,
 	QETH_DBF_TEXT(trace, 6, "dosndpkt");
 
 	spin_lock(&queue->lock);
-	/* do we have empty buffers? */
-	if (atomic_read(&queue->used_buffers) >= (QDIO_MAX_BUFFERS_PER_Q - 2)){
-		card->stats.tx_dropped++;
-		rc = -EBUSY;
-		goto out;
-	}
 	start_index = queue->next_buf_to_fill;
 	buffer = &queue->bufs[queue->next_buf_to_fill];
-	BUG_ON(buffer->state == QETH_QDIO_BUF_PRIMED);
+	/*
+	 * check if buffer is empty to make sure that we do not 'overtake'
+	 * ourselves and try to fill a buffer that is already primed
+	 */
+	if (atomic_read(&buffer->state) != QETH_QDIO_BUF_EMPTY){
+		card->stats.tx_dropped++;
+		spin_unlock(&queue->lock);
+		return -EBUSY;
+	}
 	if (queue->do_pack){
 		/* does packet fit in current buffer? */
-		if((QETH_MAX_BUFFER_ELEMENTS(card) - buffer->next_element_to_fill)
-				< elements_needed){
+		if((QETH_MAX_BUFFER_ELEMENTS(card) -
+		    buffer->next_element_to_fill) < elements_needed){
 			/* ... no -> set state PRIMED */
-			buffer->state = QETH_QDIO_BUF_PRIMED;
+			atomic_set(&buffer->state, QETH_QDIO_BUF_PRIMED);
 			flush_count++;
-			atomic_inc(&queue->used_buffers);
 			queue->next_buf_to_fill =
 				(queue->next_buf_to_fill + 1) %
 				QDIO_MAX_BUFFERS_PER_Q;
 			buffer = &queue->bufs[queue->next_buf_to_fill];
+			/* we did a step forward, so check buffer state again */
+			if (atomic_read(&buffer->state) != QETH_QDIO_BUF_EMPTY){
+				card->stats.tx_dropped++;
+				qeth_flush_buffers(queue, 0, start_index, 1);
+				spin_unlock(&queue->lock);
+				/* return EBUSY because we sent old packet, not
+				 * the current one */
+				return -EBUSY;
+			}
 		}
 	}
-
 	qeth_fill_buffer(queue, buffer, (char *)hdr, skb);
-	if (buffer->state == QETH_QDIO_BUF_PRIMED){
+	if (atomic_read(&buffer->state) == QETH_QDIO_BUF_PRIMED){
 		/* next time fill the next buffer */
 		flush_count++;
-		atomic_inc(&queue->used_buffers);
 		queue->next_buf_to_fill = (queue->next_buf_to_fill + 1) %
 			QDIO_MAX_BUFFERS_PER_Q;
 	}
@@ -3780,7 +3792,7 @@ qeth_do_send_packet(struct qeth_card *card, struct qeth_qdio_out_q *queue,
 
 	if (!atomic_read(&queue->set_pci_flags_count))
 		qeth_flush_buffers_on_no_pci(queue, 0);
-out:
+
 	spin_unlock(&queue->lock);
 	
 	return rc;
@@ -6956,6 +6968,28 @@ static struct notifier_block qeth_ip_notifier = {
 	0
 };
 
+static int
+qeth_multicast_event(struct notifier_block *this,
+                    unsigned long event, void *ptr)
+{
+       struct qeth_card *card;
+       struct ip_mc_list *mc  = (struct ip_mc_list *) ptr;
+       struct net_device *dev = mc->interface->dev;
+      
+       QETH_DBF_TEXT(trace,3,"mcevent");
+       card = qeth_get_card_from_dev(dev);
+       if (!card)
+	       return NOTIFY_DONE;
+
+       qeth_set_multicast_list(dev);
+       return NOTIFY_DONE;
+}
+
+static struct notifier_block qeth_mc_notifier = {
+        qeth_multicast_event,
+        0
+};
+
 #ifdef CONFIG_QETH_IPV6
 /**
  * IPv6 event handler
@@ -7008,6 +7042,32 @@ static struct notifier_block qeth_ip6_notifier = {
 	qeth_ip6_event,
 	0
 };
+
+
+static int
+qeth_multicast6_event(struct notifier_block *this,
+                    unsigned long event, void *ptr)
+{
+	struct qeth_card *card;
+	struct ifmcaddr6 *mc  = (struct ifmcaddr6 *) ptr;
+	struct net_device *dev = mc->idev->dev;
+
+	QETH_DBF_TEXT(trace,3,"mc6event");
+	card = qeth_get_card_from_dev(dev);
+	if (!card)
+		return NOTIFY_DONE;
+	if (!qeth_is_supported(card, IPA_IPV6))
+		return NOTIFY_DONE;
+
+	qeth_set_multicast_list(dev);
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block qeth_mc6_notifier = {
+	qeth_multicast6_event,
+	0
+};
+
 #endif
 
 static int
@@ -7042,19 +7102,27 @@ qeth_register_notifiers(void)
 	QETH_DBF_TEXT(trace,5,"regnotif");
 	if ((r = register_reboot_notifier(&qeth_reboot_notifier)))
 		return r;
+	if ((r = register_multicast_notifier(&qeth_mc_notifier)))
+		goto out_mc;
 	if ((r = register_inetaddr_notifier(&qeth_ip_notifier)))
 		goto out_reboot;
 #ifdef CONFIG_QETH_IPV6
-	if ((r = register_inet6addr_notifier(&qeth_ip6_notifier)))
+	if ((r = register_multicast6_notifier(&qeth_mc6_notifier)))
 		goto out_ipv4;
+	if ((r = register_inet6addr_notifier(&qeth_ip6_notifier)))
+		goto out_ipv6;
 #endif 
 	return 0;
 	
 #ifdef CONFIG_QETH_IPV6
+out_ipv6:
+	unregister_multicast6_notifier(&qeth_mc6_notifier);
 out_ipv4:
 	unregister_inetaddr_notifier(&qeth_ip_notifier);
 #endif
 out_reboot:
+	unregister_multicast_notifier(&qeth_mc_notifier);
+out_mc:
 	unregister_reboot_notifier(&qeth_reboot_notifier);
 	return r;
 }
@@ -7069,7 +7137,9 @@ qeth_unregister_notifiers(void)
 	QETH_DBF_TEXT(trace,5,"unregnot");
 	BUG_ON(unregister_reboot_notifier(&qeth_reboot_notifier));
 	BUG_ON(unregister_inetaddr_notifier(&qeth_ip_notifier));
+	BUG_ON(unregister_multicast_notifier(&qeth_mc_notifier));
 #ifdef CONFIG_QETH_IPV6
+	BUG_ON(unregister_multicast6_notifier(&qeth_mc6_notifier));
 	BUG_ON(unregister_inet6addr_notifier(&qeth_ip6_notifier));
 #endif /* QETH_IPV6 */
 

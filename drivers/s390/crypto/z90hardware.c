@@ -5,7 +5,7 @@
  *
  *  Copyright (C)  2001, 2004 IBM Corporation
  *  Author(s): Robert Burroughs (burrough@us.ibm.com)
- *	       Eric Rossman (edrossma@us.ibm.com)
+ *             Eric Rossman (edrossma@us.ibm.com)
  *
  *  Hotplug & misc device support: Jochen Roehrig (roehrig@de.ibm.com)
  *
@@ -16,7 +16,7 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
@@ -32,7 +32,7 @@
 #include "z90crypt.h"
 #include "z90common.h"
 
-#define VERSION_Z90HARDWARE_C "$Revision: 1.19 $"
+#define VERSION_Z90HARDWARE_C "$Revision: 1.19.2.2 $"
 
 char z90chardware_version[] __initdata =
 	"z90hardware.o (" VERSION_Z90HARDWARE_C "/"
@@ -224,7 +224,7 @@ struct type6_hdr {
 	unsigned char right[4];		
 	unsigned char reserved3[2];	
 	unsigned char reserved4[2];	
-	unsigned char pfs[4];		
+	unsigned char apfs[4];		
 	unsigned int  offset1;		
 	unsigned int  offset2;		
 	unsigned int  offset3;		
@@ -276,39 +276,6 @@ struct CPRB {
 	unsigned char resv3[18];	
 	unsigned char svr_namel[2];	
 	unsigned char svr_name[8];	
-};
-
-struct CPRBX {
-	unsigned short cprb_len;	
-	unsigned char  cprb_ver_id;	
-	unsigned char  pad_000[3];	
-	unsigned char  func_id[2];	
-	unsigned char  cprb_flags[4];	
-	unsigned int   req_parml;	
-	unsigned int   req_datal;	
-	unsigned int   rpl_msgbl;	
-	unsigned int   rpld_parml;	
-	unsigned int   rpl_datal;	
-	unsigned int   rpld_datal;	
-	unsigned int   req_extbl;	
-	unsigned char  pad_001[4];	
-	unsigned int   rpld_extbl;	
-	unsigned char  req_parmb[16];	
-	unsigned char  req_datab[16];	
-	unsigned char  rpl_parmb[16];	
-	unsigned char  rpl_datab[16];	
-	unsigned char  req_extb[16];	
-	unsigned char  rpl_extb[16];	
-	unsigned short ccp_rtcode;	
-	unsigned short ccp_rscode;	
-	unsigned int   mac_data_len;	
-	unsigned char  logon_id[8];	
-	unsigned char  mac_value[8];	
-	unsigned char  mac_content_flgs;
-	unsigned char  pad_002;		
-	unsigned short domain;		
-	unsigned char  pad_003[12];	
-	unsigned char  pad_004[36];	
 };
 
 struct type6_msg {
@@ -379,7 +346,7 @@ struct type86_fmt2_msg {
 	unsigned int	  offset2;	
 	unsigned int	  count3;	
 	unsigned int	  offset3;	
-	unsigned int	  ount4;	
+	unsigned int	  count4;	
 	unsigned int	  offset4;	
 };
 
@@ -701,11 +668,9 @@ static struct cca_public_sec static_cca_pub_sec = {
 
 #define FIXED_TYPE6_CR_LENX 0x000001E3
 
-#ifndef MAX_RESPONSE_SIZE
 #define MAX_RESPONSE_SIZE 0x00000710
 
 #define MAX_RESPONSEX_SIZE 0x0000077C
-#endif
 
 #define RESPONSE_CPRB_SIZE  0x000006B8 
 #define RESPONSE_CPRBX_SIZE 0x00000724 
@@ -1170,18 +1135,11 @@ reset_device(int deviceNr, int cdx, int resetNr)
 			switch (stat_word.response_code) {
 			case AP_RESPONSE_NORMAL:
 				stat = DEV_ONLINE;
-				if (stat_word.q_stat_flags &
-				    AP_Q_STATUS_EMPTY)
+				if (stat_word.q_stat_flags & AP_Q_STATUS_EMPTY)
 					break_out = 1;
 				break;
 			case AP_RESPONSE_Q_NOT_AVAIL:
-				stat = DEV_GONE;
-				break_out = 1;
-				break;
 			case AP_RESPONSE_DECONFIGURED:
-				stat = DEV_GONE;
-				break_out = 1;
-				break;
 			case AP_RESPONSE_CHECKSTOPPED:
 				stat = DEV_GONE;
 				break_out = 1;
@@ -1251,7 +1209,7 @@ send_to_AP(int dev_nr, int cdx, int msg_len, unsigned char *msg_ext)
 	       msg_ext[0], msg_ext[1], msg_ext[2], msg_ext[3],
 	       msg_ext[4], msg_ext[5], msg_ext[6], msg_ext[7],
 	       msg_ext[8], msg_ext[9], msg_ext[10], msg_ext[11]);
-	print_buffer(msg_ext+12, msg_len);
+	print_buffer(msg_ext+CALLER_HEADER, msg_len);
 #endif
 
 	ccode = sen(msg_len, msg_ext, &stat_word);
@@ -1289,8 +1247,8 @@ send_to_AP(int dev_nr, int cdx, int msg_len, unsigned char *msg_ext)
 }
 
 enum devstat
-receive_from_AP(int dev_nr, int cdx, int resplen,
-		unsigned char *resp, unsigned char *psmid)
+receive_from_AP(int dev_nr, int cdx, int resplen, unsigned char *resp,
+		unsigned char *psmid)
 {
 	int ccode;
 	struct ap_status_word stat_word;
@@ -1543,6 +1501,7 @@ ICAMEX_msg_to_type6MEX_de_msg(struct ica_rsa_modexpo *icaMsg_p, int cdx,
 	struct type6_hdr *tp6Hdr_p;
 	struct CPRB *cprb_p;
 	struct cca_private_ext_ME *key_p;
+	static int deprecated_msg_count = 0;
 
 	mod_len = icaMsg_p->inputdatalength;
 	tmp_size = FIXED_TYPE6_ME_LEN + mod_len;
@@ -1593,13 +1552,19 @@ ICAMEX_msg_to_type6MEX_de_msg(struct ica_rsa_modexpo *icaMsg_p, int cdx,
 		return SEN_USER_ERROR;
 
 	if (is_common_public_key(temp, mod_len)) {
-		PRINTK("Common public key used for modex decrypt\n");
+		if (deprecated_msg_count < 20) {
+			PRINTK("Common public key used for modex decrypt\n");
+			deprecated_msg_count++;
+			if (deprecated_msg_count == 20)
+				PRINTK("No longer issuing messages about common"
+				       " public key for modex decrypt.\n");
+		}
 		return SEN_NOT_AVAIL;
 	}
 
 	temp = key_p->pvtMESec.modulus + sizeof(key_p->pvtMESec.modulus)
 	       - mod_len;
-	if (copy_from_user(temp, icaMsg_p->n_modulus, mod_len) != 0)
+	if (copy_from_user(temp, icaMsg_p->n_modulus, mod_len))
 		return SEN_RELEASED;
 	if (is_empty(temp, mod_len))
 		return SEN_USER_ERROR;
@@ -1669,7 +1634,7 @@ ICAMEX_msg_to_type6MEX_en_msg(struct ica_rsa_modexpo *icaMsg_p, int cdx,
 		return SEN_RELEASED;
 	if (is_empty(temp, mod_len))
 		return SEN_USER_ERROR;
-	if (temp[0] != 0x00 || temp[1] != 0x02)
+	if ((temp[0] != 0x00) || (temp[1] != 0x02))
 		return SEN_NOT_AVAIL;
 	for (i = 2; i < mod_len; i++)
 		if (temp[i] == 0x00)
@@ -1697,7 +1662,7 @@ ICAMEX_msg_to_type6MEX_en_msg(struct ica_rsa_modexpo *icaMsg_p, int cdx,
 	key_p->pubSec.modulus_bit_len = 8 * mod_len;
 	key_p->pubSec.modulus_byte_len = mod_len;
 	key_p->pubSec.exponent_len = exp_len;
-	key_p->pubSec.section_length = 12 + mod_len + exp_len;
+	key_p->pubSec.section_length = CALLER_HEADER + mod_len + exp_len;
 	key_len = key_p->pubSec.section_length + sizeof(struct cca_token_hdr);
 	key_p->pubHdr.token_length = key_len;
 	key_len += 4;
@@ -1893,7 +1858,7 @@ ICAMEX_msg_to_type6MEX_msgX(struct ica_rsa_modexpo *icaMsg_p, int cdx,
 	key_p->pubSec.modulus_bit_len = 8 * mod_len;
 	key_p->pubSec.modulus_byte_len = mod_len;
 	key_p->pubSec.exponent_len = exp_len;
-	key_p->pubSec.section_length = 12 + mod_len + exp_len;
+	key_p->pubSec.section_length = CALLER_HEADER + mod_len + exp_len;
 	key_len = key_p->pubSec.section_length + sizeof(struct cca_token_hdr);
 	key_p->pubHdr.token_length = key_len;
 	key_len += 4;

@@ -31,7 +31,7 @@
 #define ZFCP_LOG_AREA			ZFCP_LOG_AREA_SCSI
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_SCSI_REVISION "$Revision: 1.59.2.3 $"
+#define ZFCP_SCSI_REVISION "$Revision: 1.59.2.4 $"
 
 #include "zfcp_ext.h"
 
@@ -435,8 +435,8 @@ zfcp_scsi_eh_abort_handler(struct scsi_cmnd *scpnt)
 	       scpnt->cmnd,
 	       min(scpnt->cmd_len, (unsigned char) ZFCP_ABORT_DBF_LENGTH));
 
-	ZFCP_LOG_INFO("aborting scsi_cmnd=%p on adapter %s\n",
-		      scpnt, zfcp_get_busid_by_adapter(adapter));
+	ZFCP_LOG_DEBUG("aborting scsi_cmnd=%p on adapter %s\n",
+		       scpnt, zfcp_get_busid_by_adapter(adapter));
 
 	spin_unlock_irq(scsi_host->host_lock);
 
@@ -508,8 +508,7 @@ zfcp_scsi_eh_abort_handler(struct scsi_cmnd *scpnt)
 	ZFCP_LOG_DEBUG("unit 0x%016Lx (%p)\n", unit->fcp_lun, unit);
 
 	/*
-	 * The 'Abort FCP Command' routine may block (call schedule)
-	 * because it may wait for a free SBAL.
+	 * We block (call schedule)
 	 * That's why we must release the lock and enable the
 	 * interrupts before.
 	 * On the other hand we do not need the lock anymore since
@@ -518,8 +517,7 @@ zfcp_scsi_eh_abort_handler(struct scsi_cmnd *scpnt)
 	write_unlock_irqrestore(&adapter->abort_lock, flags);
 	/* call FSF routine which does the abort */
 	new_fsf_req = zfcp_fsf_abort_fcp_command((unsigned long) old_fsf_req,
-						 adapter,
-						 unit, ZFCP_WAIT_FOR_SBAL);
+						 adapter, unit, 0);
 	ZFCP_LOG_DEBUG("new_fsf_req=%p\n", new_fsf_req);
 	if (!new_fsf_req) {
 		retval = FAILED;
@@ -657,7 +655,7 @@ zfcp_task_management_function(struct zfcp_unit *unit, u8 tm_flags)
 
 	/* issue task management function */
 	fsf_req = zfcp_fsf_send_fcp_command_task_management
-	    (adapter, unit, tm_flags, ZFCP_WAIT_FOR_SBAL);
+		(adapter, unit, tm_flags, 0);
 	if (!fsf_req) {
 		ZFCP_LOG_INFO("error: creation of task management request "
 			      "failed for unit 0x%016Lx on port 0x%016Lx on  "

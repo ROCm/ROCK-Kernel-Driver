@@ -29,7 +29,7 @@
  */
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_AUX_REVISION "$Revision: 1.105.2.2 $"
+#define ZFCP_AUX_REVISION "$Revision: 1.105.2.3 $"
 
 #include "zfcp_ext.h"
 
@@ -427,7 +427,7 @@ zfcp_cfdc_dev_ioctl(struct inode *inode, struct file *file,
 		retval = -ENOMEM;
 		goto out;
 	}
-	sg_list->count = 0;
+	memset(sg_list, 0, sizeof(*sg_list));
 
 	if (command != ZFCP_CFDC_IOC) {
 		ZFCP_LOG_INFO("IOC request code 0x%x invalid\n", command);
@@ -612,6 +612,7 @@ zfcp_sg_list_alloc(struct zfcp_sg_list *sg_list, size_t size)
 	sg_list->sg = kmalloc(sg_list->count * sizeof(struct scatterlist),
 			      GFP_KERNEL);
 	if (sg_list->sg == NULL) {
+		sg_list->count = 0;
 		retval = -ENOMEM;
 		goto out;
 	}
@@ -648,10 +649,12 @@ zfcp_sg_list_free(struct zfcp_sg_list *sg_list)
 	unsigned int i;
 	int retval = 0;
 
-	BUG_ON((sg_list->sg == NULL) || (sg_list == NULL));
+	BUG_ON(sg_list == NULL);
 
 	for (i = 0, sg = sg_list->sg; i < sg_list->count; i++, sg++)
 		__free_pages(sg->page, 0);
+
+	kfree(sg_list->sg);
 
 	return retval;
 }

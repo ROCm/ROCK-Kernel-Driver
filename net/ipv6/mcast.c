@@ -128,6 +128,20 @@ static rwlock_t ipv6_sk_mc_lock = RW_LOCK_UNLOCKED;
 
 static struct socket *igmp6_socket;
 
+
+static struct notifier_block *multicast_chain;
+
+int register_multicast6_notifier(struct notifier_block *nb)
+{
+        return notifier_chain_register(&multicast_chain, nb);
+}
+
+int unregister_multicast6_notifier(struct notifier_block *nb)
+{
+        return notifier_chain_unregister(&multicast_chain,nb);
+}
+
+
 static void igmp6_join_group(struct ifmcaddr6 *ma);
 static void igmp6_leave_group(struct ifmcaddr6 *ma);
 static void igmp6_timer_handler(unsigned long data);
@@ -863,6 +877,7 @@ int ipv6_dev_mc_inc(struct net_device *dev, struct in6_addr *addr)
 
 	mld_del_delrec(idev, &mc->mca_addr);
 	igmp6_group_added(mc);
+	notifier_call_chain(&multicast_chain, NETDEV_REGISTER, mc);
 	ma_put(mc);
 	return 0;
 }
@@ -882,6 +897,8 @@ static int __ipv6_dev_mc_dec(struct net_device *dev, struct inet6_dev *idev, str
 				write_unlock_bh(&idev->lock);
 
 				igmp6_group_dropped(ma);
+				notifier_call_chain(&multicast_chain,
+						    NETDEV_UNREGISTER, ma);
 
 				ma_put(ma);
 				return 0;

@@ -5,7 +5,7 @@
  *
  *  Copyright (C)  2001, 2004 IBM Corporation
  *  Author(s): Robert Burroughs (burrough@us.ibm.com)
- *	       Eric Rossman (edrossma@us.ibm.com)
+ *             Eric Rossman (edrossma@us.ibm.com)
  *
  *  Hotplug & misc device support: Jochen Roehrig (roehrig@de.ibm.com)
  *
@@ -16,7 +16,7 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
@@ -27,7 +27,7 @@
 #ifndef _Z90COMMON_
 #define _Z90COMMON_
 
-#define VERSION_Z90COMMON_H "$Revision: 1.8 $"
+#define VERSION_Z90COMMON_H "$Revision: 1.8.2.1 $"
 
 
 #define RESPBUFFSIZE 256
@@ -89,18 +89,52 @@ enum hdstat {
 #define TSQ_FATAL_ERROR 34
 #define RSQ_FATAL_ERROR 35
 
-#define PCICA	0
-#define PCICC	1
-#define PCIXCC	2
-#define NILDEV	-1
-#define ANYDEV	-1
+#define Z90CRYPT_NUM_TYPES	3
+#define PCICA		0
+#define PCICC		1
+#define PCIXCC		2
+#define NILDEV		-1
+#define ANYDEV		-1
 
 enum hdevice_type {
 	PCICC_HW  = 3,
 	PCICA_HW  = 4,
 	PCIXCC_HW = 5,
 	OTHER_HW  = 6,	
-	OTHER2_HW = 7	
+	OTHER2_HW  = 7	
+};
+
+struct CPRBX {
+	unsigned short cprb_len;	
+	unsigned char  cprb_ver_id;	
+	unsigned char  pad_000[3];	
+	unsigned char  func_id[2];	
+	unsigned char  cprb_flags[4];	
+	unsigned int   req_parml;	
+	unsigned int   req_datal;	
+	unsigned int   rpl_msgbl;	
+	unsigned int   rpld_parml;	
+	unsigned int   rpl_datal;	
+	unsigned int   rpld_datal;	
+	unsigned int   req_extbl;	
+	unsigned char  pad_001[4];	
+	unsigned int   rpld_extbl;	
+	unsigned char  req_parmb[16];	
+	unsigned char  req_datab[16];	
+	unsigned char  rpl_parmb[16];	
+	unsigned char  rpl_datab[16];	
+	unsigned char  req_extb[16];	
+	unsigned char  rpl_extb[16];	
+	unsigned short ccp_rtcode;	
+	unsigned short ccp_rscode;	
+	unsigned int   mac_data_len;	
+	unsigned char  logon_id[8];	
+	unsigned char  mac_value[8];	
+	unsigned char  mac_content_flgs;
+	unsigned char  pad_002;		
+	unsigned short domain;		
+	unsigned char  pad_003[12];	
+	unsigned char  pad_004[36];	
 };
 
 #ifndef DEV_NAME

@@ -156,6 +156,19 @@ static void ip_ma_put(struct ip_mc_list *im)
 
 #ifdef CONFIG_IP_MULTICAST
 
+static struct notifier_block *multicast_chain;
+
+int register_multicast_notifier(struct notifier_block *nb)
+{
+	        return notifier_chain_register(&multicast_chain, nb);
+}
+
+int unregister_multicast_notifier(struct notifier_block *nb)
+{
+	        return notifier_chain_unregister(&multicast_chain,nb);
+}
+
+
 /*
  *	Timer management
  */
@@ -1176,6 +1189,8 @@ void ip_mc_inc_group(struct in_device *in_dev, u32 addr)
 	igmp_group_added(im);
 	if (!in_dev->dead)
 		ip_rt_multicast_event(in_dev);
+	notifier_call_chain(&multicast_chain, NETDEV_REGISTER, im);
+		
 out:
 	return;
 }
@@ -1200,7 +1215,10 @@ void ip_mc_dec_group(struct in_device *in_dev, u32 addr)
 
 				if (!in_dev->dead)
 					ip_rt_multicast_event(in_dev);
-
+			
+				notifier_call_chain(&multicast_chain,
+						    NETDEV_UNREGISTER,
+						    i);
 				ip_ma_put(i);
 				return;
 			}
@@ -2461,6 +2479,8 @@ int __init igmp_mc_proc_init(void)
 }
 #endif
 
+EXPORT_SYMBOL(register_multicast_notifier);
+EXPORT_SYMBOL(unregister_multicast_notifier);
 EXPORT_SYMBOL(ip_mc_dec_group);
 EXPORT_SYMBOL(ip_mc_inc_group);
 EXPORT_SYMBOL(ip_mc_join_group);

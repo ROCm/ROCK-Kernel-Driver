@@ -82,6 +82,10 @@ extern void			addrconf_leave_solict(struct net_device *dev,
 /*
  *	multicast prototypes (mcast.c)
  */
+
+extern int register_multicast6_notifier(struct notifier_block *nb);
+extern int unregister_multicast6_notifier(struct notifier_block *nb);
+
 extern int ipv6_sock_mc_join(struct sock *sk, int ifindex, 
 		  struct in6_addr *addr);
 extern int ipv6_sock_mc_drop(struct sock *sk, int ifindex, 
