@@ -146,7 +146,7 @@ static int change_mode(struct parport *pp, int m)
 	if (m <= ECR_PS2 && !(priv->reg[1] & 0x20)) {
 		/* This mode resets the FIFO, so we may
 		 * have to wait for it to drain first. */
-		long expire = jiffies + pp->physport->cad->timeout;
+		unsigned long expire = jiffies + pp->physport->cad->timeout;
 		switch (mode) {
 		case ECR_PPF: /* Parallel Port FIFO mode */
 		case ECR_ECP: /* ECP Parallel Port mode */
