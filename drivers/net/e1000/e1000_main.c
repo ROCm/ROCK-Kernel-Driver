@@ -847,7 +847,7 @@ e1000_configure_tx(struct e1000_adapter *adapter)
 {
 	uint64_t tdba = adapter->tx_ring.dma;
 	uint32_t tdlen = adapter->tx_ring.count * sizeof(struct e1000_tx_desc);
-	uint32_t tctl, tipg;
+	uint32_t tctl, tipg, tspmt;
 
 	E1000_WRITE_REG(&adapter->hw, TDBAL, (tdba & 0x00000000ffffffffULL));
 	E1000_WRITE_REG(&adapter->hw, TDBAH, (tdba >> 32));
@@ -858,6 +858,10 @@ e1000_configure_tx(struct e1000_adapter *adapter)
 
 	E1000_WRITE_REG(&adapter->hw, TDH, 0);
 	E1000_WRITE_REG(&adapter->hw, TDT, 0);
+
+	tspmt = E1000_READ_REG(&adapter->hw, TSPMT);
+        tspmt |= 0x0C000000;
+        E1000_WRITE_REG(&adapter->hw, TSPMT, tspmt);
 
 	/* Set the default values for the Tx Inter Packet Gap timer */
 
@@ -2237,8 +2241,7 @@ e1000_clean_tx_irq(struct e1000_adapter *adapter)
 	unsigned int i, eop;
 	boolean_t cleaned = FALSE;
 
-
-
+	spin_lock(&adapter->tx_lock);
 
 	i = tx_ring->next_to_clean;
 	eop = tx_ring->buffer_info[i].next_to_watch;
@@ -2256,8 +2259,6 @@ e1000_clean_tx_irq(struct e1000_adapter *adapter)
 					       buffer_info->dma,
 					       buffer_info->length,
 					       PCI_DMA_TODEVICE);
-
-				wmb();
 
 				buffer_info->dma = 0;
 			}
@@ -2282,8 +2283,6 @@ e1000_clean_tx_irq(struct e1000_adapter *adapter)
 	}
 
 	tx_ring->next_to_clean = i;
-
-	spin_lock(&adapter->tx_lock);
 
 	if(cleaned && netif_queue_stopped(netdev) && netif_carrier_ok(netdev))
 		netif_wake_queue(netdev);
