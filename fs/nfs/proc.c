@@ -140,12 +140,13 @@ nfs_proc_lookup(struct inode *dir, struct qstr *name,
 	return status;
 }
 
-static int
-nfs_proc_readlink(struct inode *inode, struct page *page)
+static int nfs_proc_readlink(struct inode *inode, struct page *page,
+		unsigned int pgbase, unsigned int pglen)
 {
 	struct nfs_readlinkargs	args = {
 		.fh		= NFS_FH(inode),
-		.count		= PAGE_CACHE_SIZE,
+		.pgbase		= pgbase,
+		.pglen		= pglen,
 		.pages		= &page
 	};
 	int			status;

@@ -202,13 +202,14 @@ static int nfs3_proc_access(struct inode *inode, struct nfs_access_entry *entry)
 	return status;
 }
 
-static int
-nfs3_proc_readlink(struct inode *inode, struct page *page)
+static int nfs3_proc_readlink(struct inode *inode, struct page *page,
+		unsigned int pgbase, unsigned int pglen)
 {
 	struct nfs_fattr	fattr;
 	struct nfs3_readlinkargs args = {
 		.fh		= NFS_FH(inode),
-		.count		= PAGE_CACHE_SIZE,
+		.pgbase		= pgbase,
+		.pglen		= pglen,
 		.pages		= &page
 	};
 	int			status;
