@@ -58,11 +58,12 @@ EXPORT_SYMBOL(disable_irq_nosync);
 EXPORT_SYMBOL(probe_irq_mask);
 EXPORT_SYMBOL(screen_info);
 EXPORT_SYMBOL(perf_irq);
-#ifdef CONFIG_ALPHA_SRM
 EXPORT_SYMBOL(callback_getenv);
 EXPORT_SYMBOL(callback_setenv);
 EXPORT_SYMBOL(callback_save_env);
-#endif /* CONFIG_ALPHA_SRM */
+#ifdef CONFIG_ALPHA_GENERIC
+EXPORT_SYMBOL(alpha_using_srm);
+#endif /* CONFIG_ALPHA_GENERIC */
 
 /* platform dependent support */
 EXPORT_SYMBOL(_inb);

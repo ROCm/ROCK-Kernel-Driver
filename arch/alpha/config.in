@@ -259,7 +259,7 @@ if [ "$CONFIG_PROC_FS" = "y" ]; then
 	"ELF		CONFIG_KCORE_ELF	\
 	 A.OUT		CONFIG_KCORE_AOUT" ELF
 fi
-if [ "$CONFIG_PROC_FS" != "n" -a "$CONFIG_ALPHA_SRM" = "y" ]; then
+if [ "$CONFIG_PROC_FS" != "n" ]; then
    tristate 'SRM environment through procfs' CONFIG_SRM_ENV
 fi
  
