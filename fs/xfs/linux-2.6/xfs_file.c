@@ -116,18 +116,10 @@ __linvfs_write(
 	ssize_t		rval;
 
 	BUG_ON(iocb->ki_pos != pos);
-	/* Kludge for now - unlocked O_DIRECT is still unsafe */
-	if (0 && unlikely(file->f_flags & O_DIRECT)) {
+	if (unlikely(file->f_flags & O_DIRECT))
 		ioflags |= IO_ISDIRECT;
-		VOP_WRITE(vp, iocb, &iov, 1, &iocb->ki_pos,
-				ioflags, NULL, rval);
-	} else {
-		down(&inode->i_sem);
-		VOP_WRITE(vp, iocb, &iov, 1, &iocb->ki_pos,
-				ioflags, NULL, rval);
-		up(&inode->i_sem);
-	}
 
+	VOP_WRITE(vp, iocb, &iov, 1, &iocb->ki_pos, ioflags, NULL, rval);
 	return rval;
 }
 
@@ -172,8 +164,6 @@ __linvfs_readv(
 	if (unlikely(file->f_flags & O_DIRECT))
 		ioflags |= IO_ISDIRECT;
 	VOP_READ(vp, &kiocb, iov, nr_segs, &kiocb.ki_pos, ioflags, NULL, rval);
-	if (rval == -EIOCBQUEUED)
-		rval = wait_on_sync_kiocb(&kiocb);
 
 	*ppos = kiocb.ki_pos;
 	return rval;
@@ -215,20 +205,10 @@ __linvfs_writev(
 
 	init_sync_kiocb(&kiocb, file);
 	kiocb.ki_pos = *ppos;
-	/* kludge for now - unlocked O_DIRECT is still unsafe */
-	if (0 && unlikely(file->f_flags & O_DIRECT)) {
+	if (unlikely(file->f_flags & O_DIRECT))
 		ioflags |= IO_ISDIRECT;
-		VOP_WRITE(vp, &kiocb, iov, nr_segs, &kiocb.ki_pos,
-				ioflags, NULL, rval);
-	} else {
-		down(&inode->i_sem);
-		VOP_WRITE(vp, &kiocb, iov, nr_segs, &kiocb.ki_pos,
-				ioflags, NULL, rval);
-		up(&inode->i_sem);
-	}
 
-	if (rval == -EIOCBQUEUED)
-		rval = wait_on_sync_kiocb(&kiocb);
+	VOP_WRITE(vp, &kiocb, iov, nr_segs, &kiocb.ki_pos, ioflags, NULL, rval);
 
 	*ppos = kiocb.ki_pos;
 	return rval;
@@ -261,7 +241,7 @@ linvfs_sendfile(
 	loff_t			*ppos,
 	size_t			count,
 	read_actor_t		actor,
-	void			__user *target)
+	void			*target)
 {
 	vnode_t			*vp = LINVFS_GET_VP(filp->f_dentry->d_inode);
 	ssize_t			rval;

@@ -452,9 +452,13 @@ xfs_trans_apply_dquot_deltas(
 				INT_MOD(d->d_rtbcount, ARCH_CONVERT, (xfs_qcnt_t)totalrtbdelta);
 
 			/*
+			 * Get any default limits in use.
 			 * Start/reset the timer(s) if needed.
 			 */
-			xfs_qm_adjust_dqtimers(tp->t_mountp, d);
+			if (!INT_ISZERO(d->d_id, ARCH_CONVERT)) {
+				xfs_qm_adjust_dqlimits(tp->t_mountp, d);
+				xfs_qm_adjust_dqtimers(tp->t_mountp, d);
+			}
 
 			dqp->dq_flags |= XFS_DQ_DIRTY;
 			/*
@@ -625,6 +629,7 @@ xfs_trans_unreserve_and_mod_dquots(
 STATIC int
 xfs_trans_dqresv(
 	xfs_trans_t	*tp,
+	xfs_mount_t	*mp,
 	xfs_dquot_t	*dqp,
 	long		nblks,
 	long		ninos,
@@ -635,6 +640,7 @@ xfs_trans_dqresv(
 	xfs_qcnt_t	softlimit;
 	time_t		btimer;
 	xfs_qcnt_t	*resbcountp;
+	xfs_quotainfo_t	*q = mp->m_quotainfo;
 
 	if (! (flags & XFS_QMOPT_DQLOCK)) {
 		xfs_dqlock(dqp);
@@ -642,13 +648,21 @@ xfs_trans_dqresv(
 	ASSERT(XFS_DQ_IS_LOCKED(dqp));
 	if (flags & XFS_TRANS_DQ_RES_BLKS) {
 		hardlimit = INT_GET(dqp->q_core.d_blk_hardlimit, ARCH_CONVERT);
+		if (!hardlimit)
+			hardlimit = q->qi_bhardlimit;
 		softlimit = INT_GET(dqp->q_core.d_blk_softlimit, ARCH_CONVERT);
+		if (!softlimit)
+			softlimit = q->qi_bsoftlimit;
 		btimer = INT_GET(dqp->q_core.d_btimer, ARCH_CONVERT);
 		resbcountp = &dqp->q_res_bcount;
 	} else {
 		ASSERT(flags & XFS_TRANS_DQ_RES_RTBLKS);
 		hardlimit = INT_GET(dqp->q_core.d_rtb_hardlimit, ARCH_CONVERT);
+		if (!hardlimit)
+			hardlimit = q->qi_rtbhardlimit;
 		softlimit = INT_GET(dqp->q_core.d_rtb_softlimit, ARCH_CONVERT);
+		if (!softlimit)
+			softlimit = q->qi_rtbsoftlimit;
 		btimer = INT_GET(dqp->q_core.d_rtbtimer, ARCH_CONVERT);
 		resbcountp = &dqp->q_res_rtbcount;
 	}
@@ -689,14 +703,18 @@ xfs_trans_dqresv(
 			}
 		}
 		if (ninos > 0) {
-			if (INT_GET(dqp->q_core.d_ino_hardlimit, ARCH_CONVERT) > 0ULL &&
-			    INT_GET(dqp->q_core.d_icount, ARCH_CONVERT) >=
-			    INT_GET(dqp->q_core.d_ino_hardlimit, ARCH_CONVERT)) {
+			hardlimit = INT_GET(dqp->q_core.d_ino_hardlimit, ARCH_CONVERT);
+			if (!hardlimit)
+				hardlimit = q->qi_ihardlimit;
+			softlimit = INT_GET(dqp->q_core.d_ino_softlimit, ARCH_CONVERT);
+			if (!softlimit)
+				softlimit = q->qi_isoftlimit;
+			if (hardlimit > 0ULL &&
+			    INT_GET(dqp->q_core.d_icount, ARCH_CONVERT) >= hardlimit) {
 				error = EDQUOT;
 				goto error_return;
-			} else if (INT_GET(dqp->q_core.d_ino_softlimit, ARCH_CONVERT) > 0ULL &&
-				   INT_GET(dqp->q_core.d_icount, ARCH_CONVERT) >=
-				   INT_GET(dqp->q_core.d_ino_softlimit, ARCH_CONVERT)) {
+			} else if (softlimit > 0ULL &&
+				   INT_GET(dqp->q_core.d_icount, ARCH_CONVERT) >= softlimit) {
 				/*
 				 * If timer or warnings has expired,
 				 * return EDQUOT
@@ -786,19 +804,20 @@ xfs_trans_reserve_quota_bydquots(
 	resvd = 0;
 
 	if (udqp) {
-		if (xfs_trans_dqresv(tp, udqp, nblks, ninos, flags))
+		if (xfs_trans_dqresv(tp, mp, udqp, nblks, ninos, flags))
 			return (EDQUOT);
 		resvd = 1;
 	}
 
 	if (gdqp) {
-		if (xfs_trans_dqresv(tp, gdqp, nblks, ninos, flags)) {
+		if (xfs_trans_dqresv(tp, mp, gdqp, nblks, ninos, flags)) {
 			/*
 			 * can't do it, so backout previous reservation
 			 */
 			if (resvd) {
-				xfs_trans_dqresv(tp, udqp,  -nblks, -ninos,
-						 flags);
+				flags |= XFS_QMOPT_FORCE_RES;
+				xfs_trans_dqresv(tp, mp, udqp,
+						 -nblks, -ninos, flags);
 			}
 			return (EDQUOT);
 		}

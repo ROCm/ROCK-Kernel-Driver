@@ -1,7 +1,6 @@
 config REISER4_FS
 	tristate "Reiser4 (EXPERIMENTAL very fast general purpose filesystem)"
 	depends on EXPERIMENTAL && !4KSTACKS
-	default y
 	---help---
 	  Reiser4 is more than twice as fast for both reads and writes as
 	  ReiserFS V3, and is the fastest Linux filesystem, by a lot,
