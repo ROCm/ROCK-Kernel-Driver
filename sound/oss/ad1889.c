@@ -1,5 +1,5 @@
 /*
- *  Copyright 2001 Randolph Chung <tausq@debian.org>
+ *  Copyright 2001-2004 Randolph Chung <tausq@debian.org>
  *
  *  Analog Devices 1889 PCI audio driver (AD1819 AC97-compatible codec)
  *
@@ -61,6 +61,7 @@
 #define AD1889_WRITEL(dev,reg,val) writel((val), dev->regbase + reg)
 
 //now 100ms
+/* #define WAIT_10MS()	schedule_timeout(HZ/10) */
 #define WAIT_10MS()	do { int __i; for (__i = 0; __i < 100; __i++) udelay(1000); } while(0)
 
 /* currently only support a single device */
@@ -69,25 +70,43 @@ static ad1889_dev_t *ad1889_dev = NULL;
 /************************* helper routines ***************************** */
 static inline void ad1889_set_wav_rate(ad1889_dev_t *dev, int rate)
 {
+	struct ac97_codec *ac97_codec = dev->ac97_codec;
+
+	DBG("Setting WAV rate to %d\n", rate);
 	dev->state[AD_WAV_STATE].dmabuf.rate = rate;
 	AD1889_WRITEW(dev, AD_DSWAS, rate);
+
+	/* Cycle the DAC to enable the new rate */
+	ac97_codec->codec_write(dev->ac97_codec, AC97_POWER_CONTROL, 0x0200);
+	WAIT_10MS();
+	ac97_codec->codec_write(dev->ac97_codec, AC97_POWER_CONTROL, 0);
 }
 
 static inline void ad1889_set_adc_rate(ad1889_dev_t *dev, int rate)
 {
+	struct ac97_codec *ac97_codec = dev->ac97_codec;
+
+	DBG("Setting ADC rate to %d\n", rate);
 	dev->state[AD_ADC_STATE].dmabuf.rate = rate;
 	AD1889_WRITEW(dev, AD_DSRES, rate);
+
+	/* Cycle the ADC to enable the new rate */
+	ac97_codec->codec_write(dev->ac97_codec, AC97_POWER_CONTROL, 0x0100);
+	WAIT_10MS();
+	ac97_codec->codec_write(dev->ac97_codec, AC97_POWER_CONTROL, 0);
 }
 
 static inline void ad1889_set_wav_fmt(ad1889_dev_t *dev, int fmt)
 {
 	u16 tmp;
 
+	DBG("Setting WAV format to 0x%x\n", fmt);
+
 	tmp = AD1889_READW(ad1889_dev, AD_DSWSMC);
-	if (fmt == AFMT_S16_LE) {
+	if (fmt & AFMT_S16_LE) {
 		//tmp |= 0x0100; /* set WA16 */
 		tmp |= 0x0300; /* set WA16 stereo */
-	} else if (fmt == AFMT_U8) {
+	} else if (fmt & AFMT_U8) {
 		tmp &= ~0x0100; /* clear WA16 */
 	} 
 	AD1889_WRITEW(ad1889_dev, AD_DSWSMC, tmp);
@@ -97,10 +116,12 @@ static inline void ad1889_set_adc_fmt(ad1889_dev_t *dev, int fmt)
 {
 	u16 tmp;
 
+	DBG("Setting ADC format to 0x%x\n", fmt);
+
 	tmp = AD1889_READW(ad1889_dev, AD_DSRAMC);
-	if (fmt == AFMT_S16_LE) {
+	if (fmt & AFMT_S16_LE) {
 		tmp |= 0x0100; /* set WA16 */
-	} else if (fmt == AFMT_U8) {
+	} else if (fmt & AFMT_U8) {
 		tmp &= ~0x0100; /* clear WA16 */
 	} 
 	AD1889_WRITEW(ad1889_dev, AD_DSRAMC, tmp);
@@ -132,6 +153,9 @@ static void ad1889_start_wav(ad1889_state_t *state)
 					cnt, PCI_DMA_TODEVICE);
 	dmabuf->dma_len = cnt;
 	dmabuf->ready = 1;
+
+	DBG("Starting playback at 0x%p for %ld bytes\n", dmabuf->rawbuf +
+	    dmabuf->rd_ptr, dmabuf->dma_len);
 
         /* load up the current register set */
 	AD1889_WRITEL(ad1889_dev, AD_DMAWAVCC, cnt);
@@ -243,7 +267,7 @@ static ad1889_dev_t *ad1889_alloc_dev(struct pci_dev *pci)
 		dmabuf->dma_handle = 0;
 		dmabuf->rd_ptr = dmabuf->wr_ptr = dmabuf->dma_len = 0UL;
 		dmabuf->ready = 0;
-		dmabuf->rate = 44100;
+		dmabuf->rate = 48000;
 	}
 	return dev;
 
@@ -472,7 +496,6 @@ static ssize_t ad1889_write(struct file *file, const char __user *buffer, size_t
 		long cnt = count;
 		unsigned long flags;
 
-
 		for (;;) {
 			long used_bytes;
 			long timeout;	/* max time for DMA in jiffies */
@@ -498,17 +521,11 @@ static ssize_t ad1889_write(struct file *file, const char __user *buffer, size_t
 			}
 
 			set_current_state(TASK_INTERRUPTIBLE);
-			if (!schedule_timeout(timeout + 1))
-				printk(KERN_WARNING "AD1889 timeout(%ld) r/w %lx/%lx len %lx\n",
-				    timeout+1,
-				    dmabuf->rd_ptr, dmabuf->wr_ptr,
-				    dmabuf->dma_len);
-
+			schedule_timeout(timeout + 1);
 			if (signal_pending(current)) {
 				ret = -ERESTARTSYS;
 				goto err2;
 			}
-
 		}
 
 		/* watch out for wrapping around static buffer */
@@ -616,6 +633,8 @@ static int ad1889_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 	audio_buf_info abinfo;
 	int __user *p = (int __user *)arg;
 
+	DBG("ad1889_ioctl cmd 0x%x arg %lu\n", cmd, arg);
+
 	switch (cmd)
 	{
 	case OSS_GETVERSION:
@@ -674,11 +693,15 @@ static int ad1889_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 		if (get_user(val, p))
 			return -EFAULT;
 
-		if (file->f_mode & FMODE_READ) 
-			ad1889_set_adc_fmt(dev, val);
+		if (val == 0) {
+			if (file->f_mode & FMODE_READ) 
+				ad1889_set_adc_fmt(dev, val);
 
-		if (file->f_mode & FMODE_WRITE) 
-			ad1889_set_wav_fmt(dev, val);
+			if (file->f_mode & FMODE_WRITE) 
+				ad1889_set_wav_fmt(dev, val);
+		} else {
+			val = AFMT_S16_LE | AFMT_U8;
+		}
 
 		return put_user(val, p);
 
@@ -758,7 +781,7 @@ static int ad1889_open(struct inode *inode, struct file *file)
 	
 	file->private_data = ad1889_dev;
 
-	ad1889_set_wav_rate(ad1889_dev, 44100);
+	ad1889_set_wav_rate(ad1889_dev, 48000);
 	ad1889_set_wav_fmt(ad1889_dev, AFMT_S16_LE);
 	AD1889_WRITEW(ad1889_dev, AD_DSWADA, 0x0404); /* attenuation */
 	return nonseekable_open(inode, file);
@@ -938,7 +961,6 @@ static irqreturn_t ad1889_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			ad1889_stop_wav(&dev->state[AD_WAV_STATE]);	/* clean up */
 			ad1889_start_wav(&dev->state[AD_WAV_STATE]);	/* start new */
 		}
-
 	}
 
 	if ((stat & 0x2) && dev->state[AD_ADC_STATE].dmabuf.ready) { /* ADCI */
@@ -952,18 +974,19 @@ static irqreturn_t ad1889_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 static void ad1889_initcfg(ad1889_dev_t *dev)
 {
-	u16 tmp;
+	u16 tmp16;
+	u32 tmp32;
 
 	/* make sure the interrupt bits are setup the way we want */
-	tmp = AD1889_READW(dev, AD_DMAWAVCTRL);
-	tmp &= ~0x00ff; /* flat dma, no sg, mask out the intr bits */
-	tmp |= 0x0004;  /* intr on count, loop */
-	AD1889_WRITEW(dev, AD_DMAWAVCTRL, tmp);
+	tmp32 = AD1889_READL(dev, AD_DMAWAVCTRL);
+	tmp32 &= ~0xff; /* flat dma, no sg, mask out the intr bits */
+	tmp32 |= 0x6;  /* intr on count, loop */
+	AD1889_WRITEL(dev, AD_DMAWAVCTRL, tmp32);
 
 	/* unmute... */
-	tmp = AD1889_READW(dev, AD_DSWADA);
-	tmp &= ~0x8080;
-	AD1889_WRITEW(dev, AD_DSWADA, tmp);
+	tmp16 = AD1889_READW(dev, AD_DSWADA);
+	tmp16 &= ~0x8080;
+	AD1889_WRITEW(dev, AD_DSWADA, tmp16);
 }
 
 static int __devinit ad1889_probe(struct pci_dev *pcidev, const struct pci_device_id *ent)

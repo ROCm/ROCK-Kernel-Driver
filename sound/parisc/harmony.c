@@ -6,7 +6,7 @@
  *
  *	Harmony is found in HP 712s, 715/new and many other GSC based machines.
  *	On older 715 machines you'll find the technically identical chip 
- *	called 'Vivace'. Both Harmony and Vicace are supported by this driver.
+ *	called 'Vivace'. Both Harmony and Vivace are supported by this driver.
  *
  *  this ALSA driver is based on OSS driver by:
  *	Copyright 2000 (c) Linuxcare Canada, Alex deVries <alex@linuxcare.com>
@@ -43,7 +43,7 @@
  * to be recorded is put in RNXTADD. There is 2 read-only registers, PCURADD and 
  * RCURADD that provides adress of current page.
  * 
- * Harmony has no way to controll full duplex or half duplex mode. It means
+ * Harmony has no way to control full duplex or half duplex mode. It means
  * that we always need to provide adresses of playback and capture data, even
  * when this is not needed. That's why we statically alloc one graveyard
  * buffer (to put recorded data in play-only mode) and a silence buffer.
@@ -556,7 +556,7 @@ static int snd_card_harmony_playback_prepare(snd_pcm_substream_t * substream)
 	harmony->sample_rate = snd_card_harmony_rate_bits(runtime->rate);
 
 	/* data format */
-	harmony->data_format = snd_harmony_set_data_format(haromny, runtime->format);
+	harmony->data_format = snd_harmony_set_data_format(harmony, runtime->format);
 
 	/* number of channels */
 	if (runtime->channels == 2)
@@ -587,7 +587,7 @@ static int snd_card_harmony_capture_prepare(snd_pcm_substream_t * substream)
 	harmony->sample_rate = snd_card_harmony_rate_bits(runtime->rate);
 	
 	/* data format */
-	harmony->data_format = snd_harmony_set_data_format(haromny, runtime->format);
+	harmony->data_format = snd_harmony_set_data_format(harmony, runtime->format);
 	
 	/* number of channels */
 	if (runtime->channels == 1)
