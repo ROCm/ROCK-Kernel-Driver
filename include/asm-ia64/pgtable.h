@@ -489,6 +489,6 @@ typedef pte_t *pte_addr_t;
 
 /* These tell get_user_pages() that the first gate page is accessible from user-level.  */
 #define FIXADDR_START	GATE_ADDR
-#define FIXADDR_TOP	(GATE_ADDR + PAGE_SIZE)
+#define FIXADDR_TOP	(GATE_ADDR + 2*PAGE_SIZE)
 
 #endif /* _ASM_IA64_PGTABLE_H */

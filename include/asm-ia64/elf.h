@@ -224,7 +224,6 @@ do {										\
 		struct elf_phdr phdr = gate_phdrs[i];				\
 		if (phdr.p_type == PT_LOAD) {					\
 			ofs = phdr.p_offset = offset;				\
-			phdr.p_filesz = PAGE_SIZE; /* just cover RO-data */	\
 			offset += phdr.p_filesz;				\
 		} else								\
 			phdr.p_offset += ofs;					\

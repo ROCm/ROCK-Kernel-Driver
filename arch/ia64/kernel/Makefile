@@ -23,7 +23,7 @@ AFLAGS_gate.lds.o += -P -C -U$(ARCH)
 arch/ia64/kernel/gate.lds.s: %.s: %.S scripts FORCE
 	$(call if_changed_dep,as_s_S)
 $(obj)/gate.so: $(src)/gate.lds.s $(obj)/gate.o
-	$(CC) -nostdlib -shared -Wl,-soname=linux-gate.so.1 \
+	$(CC) -nostdlib -shared -s -Wl,-soname=linux-gate.so.1 \
 		-o $@ -Wl,-T,$^
 extra-y += gate.so
 

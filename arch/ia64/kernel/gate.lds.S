@@ -1,8 +1,7 @@
 /*
- * Linker script for gate DSO.  The gate pages are an ELF shared
- * object prelinked to its virtual address, with only one read-only
- * segment and one execute-only segment (both fit in one page).
- * This script controls its layout.
+ * Linker script for gate DSO.  The gate pages are an ELF shared object prelinked to its
+ * virtual address, with only one read-only segment and one execute-only segment (both fit
+ * in one page).  This script controls its layout.
  */
 
 #include <linux/config.h>
@@ -19,20 +18,17 @@ SECTIONS
   .gnu.version			: { *(.gnu.version) }
   .gnu.version_d		: { *(.gnu.version_d) }
   .gnu.version_r		: { *(.gnu.version_r) }
-  .rela.dyn			: { *(.rela*) }
-  .dynamic			: { *(.dynamic) }				:rodata :dynamic
-  .data.patch.mckinley_e9	: { *(.data.patch.mckinley_e9) }		:rodata
+  .data.patch.mckinley_e9	: { *(.data.patch.mckinley_e9) }
   .data.patch.fsyscall_table	: { *(.data.patch.fsyscall_table) }
   .data.patch.vtop		: { *(.data.patch.vtop) }
   .data.patch.brl_fsys_bubble_down : { *(.data.patch.brl_fsys_bubble_down) }
   .IA_64.unwind_info		: { *(.IA_64.unwind_info*) }
   .IA_64.unwind			: { *(.IA_64.unwind*) }				:rodata :unwind
+  .dynamic			: { *(.dynamic) }				:rodata :dynamic
 
-  . = GATE_ADDR + PAGE_SIZE;
+  .text	(GATE_ADDR + PAGE_SIZE)	: { *(.text) }					:rodata
 
-  .text				: { *(.text) }					:rodata
-
-  .useless			: {
+  /DISCARD/			: {
   	*(.got.plt) *(.got)
 	*(.data .data.* .gnu.linkonce.d.*)
 	*(.dynbss)
@@ -47,9 +43,9 @@ SECTIONS
  */
 PHDRS
 {
-  rodata	PT_LOAD	FILEHDR	PHDRS	FLAGS(4);	/* PF_R */
-  dynamic	PT_DYNAMIC		FLAGS(4);	/* PF_R */
-  unwind	0x70000001;				/* PT_IA_64_UNWIND */
+  rodata  PT_LOAD	FILEHDR	PHDRS	FLAGS(4);	/* PF_R */
+  dynamic PT_DYNAMIC			FLAGS(4);	/* PF_R */
+  unwind  0x70000001;					/* PT_IA_64_UNWIND */
 }
 
 /*

@@ -162,8 +162,8 @@ SECTIONS
 	  *(.data.gate)
 	  __stop_gate_section = .;
 	}
+  . = ALIGN(PAGE_SIZE);		/* make sure the gate page doesn't expose kernel data */
 
-  . = ALIGN(SMP_CACHE_BYTES);
   .data.cacheline_aligned : AT(ADDR(.data.cacheline_aligned) - LOAD_OFFSET)
         { *(.data.cacheline_aligned) }
 
