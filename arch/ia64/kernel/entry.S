@@ -179,17 +179,19 @@ GLOBAL_ENTRY(ia64_switch_to)
 	.body
 
 	adds r22=IA64_TASK_THREAD_KSP_OFFSET,r13
+	movl r25=init_task
 	mov r27=IA64_KR(CURRENT_STACK)
+	adds r21=IA64_TASK_THREAD_KSP_OFFSET,in0
 	dep r20=0,in0,61,3		// physical address of "current"
 	;;
 	st8 [r22]=sp			// save kernel stack pointer of old task
 	shr.u r26=r20,IA64_GRANULE_SHIFT
-	adds r21=IA64_TASK_THREAD_KSP_OFFSET,in0
+	cmp.eq p7,p6=r25,in0
 	;;
 	/*
 	 * If we've already mapped this task's page, we can skip doing it again.
 	 */
-	cmp.eq p7,p6=r26,r27
+(p6)	cmp.eq p7,p6=r26,r27
 (p6)	br.cond.dpnt .map
 	;;
 .done:

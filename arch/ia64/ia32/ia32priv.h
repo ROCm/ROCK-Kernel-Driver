@@ -1,5 +1,5 @@
-#ifndef _ASM_IA64_IA32_H
-#define _ASM_IA64_IA32_H
+#ifndef _ASM_IA64_IA32_PRIV_H
+#define _ASM_IA64_IA32_PRIV_H
 
 #include <linux/config.h>
 
@@ -9,6 +9,7 @@
 
 #include <linux/binfmts.h>
 #include <linux/compat.h>
+#include <linux/rbtree.h>
 
 #include <asm/processor.h>
 
@@ -16,11 +17,38 @@
  * 32 bit structures for IA32 support.
  */
 
-#define IA32_PAGE_SHIFT		12	/* 4KB pages */
 #define IA32_PAGE_SIZE		(1UL << IA32_PAGE_SHIFT)
 #define IA32_PAGE_MASK		(~(IA32_PAGE_SIZE - 1))
 #define IA32_PAGE_ALIGN(addr)	(((addr) + IA32_PAGE_SIZE - 1) & IA32_PAGE_MASK)
 #define IA32_CLOCKS_PER_SEC	100	/* Cast in stone for IA32 Linux */
+
+/*
+ * partially mapped pages provide precise accounting of which 4k sub pages
+ * are mapped and which ones are not, thereby improving IA-32 compatibility.
+ */
+struct partial_page {
+	struct partial_page	*next; /* linked list, sorted by address */
+	struct rb_node		pp_rb;
+	/* 64K is the largest "normal" page supported by ia64 ABI. So 4K*32
+	 * should suffice.*/
+	unsigned int		bitmap;
+	unsigned int		base;
+};
+
+struct partial_page_list {
+	struct partial_page	*pp_head; /* list head, points to the lowest
+					   * addressed partial page */
+	struct rb_root		ppl_rb;
+	struct partial_page	*pp_hint; /* pp_hint->next is the last
+					   * accessed partial page */
+	atomic_t		pp_count; /* reference count */
+};
+
+#if PAGE_SHIFT > IA32_PAGE_SHIFT
+struct partial_page_list* ia32_init_pp_list (void);
+#else
+# define ia32_init_pp_list()	0
+#endif
 
 /* sigcontext.h */
 /*
@@ -528,4 +556,4 @@ extern int save_ia32_fpxstate (struct task_struct *tsk, struct ia32_user_fxsr_st
 
 #endif /* !CONFIG_IA32_SUPPORT */
 
-#endif /* _ASM_IA64_IA32_H */
+#endif /* _ASM_IA64_IA32_PRIV_H */
