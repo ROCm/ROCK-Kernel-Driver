@@ -23,6 +23,9 @@ targets += gate.so gate-syms.o
 
 extra-y += gate.so gate-syms.o gate.lds.s gate.o
 
+# fp_emulate() expects f2-f5,f16-f31 to contain the user-level state.
+CFLAGS_traps.o  += -mfixed-range=f2-f5,f16-f31
+
 AFLAGS_gate.lds.o += -P -C -U$(ARCH)
 
 quiet_cmd_gate = GATE $@

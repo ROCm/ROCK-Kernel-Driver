@@ -228,11 +228,9 @@ read_version_entry(char *page, char **start, off_t off, int count, int *eof,
 {
 	int len = 0;
 
-	MOD_INC_USE_COUNT;
 	/* data holds the pointer to this node's FIT */
 	len = dump_version(page, (unsigned long *)data);
 	len = proc_calc_metrics(page, start, off, count, eof, len);
-	MOD_DEC_USE_COUNT;
 	return len;
 }
 
@@ -242,11 +240,9 @@ read_fit_entry(char *page, char **start, off_t off, int count, int *eof,
 {
 	int len = 0;
 
-	MOD_INC_USE_COUNT;
 	/* data holds the pointer to this node's FIT */
 	len = dump_fit(page, (unsigned long *)data);
 	len = proc_calc_metrics(page, start, off, count, eof, len);
-	MOD_DEC_USE_COUNT;
 
 	return len;
 }
@@ -310,6 +306,7 @@ int __init
 prominfo_init(void)
 {
 	struct proc_dir_entry **entp;
+	struct proc_dir_entry *p;
 	cnodeid_t cnodeid;
 	nasid_t nasid;
 	char name[NODE_NAME_LEN];
@@ -333,12 +330,16 @@ prominfo_init(void)
 		sprintf(name, "node%d", cnodeid);
 		*entp = proc_mkdir(name, sgi_prominfo_entry);
 		nasid = cnodeid_to_nasid(cnodeid);
-		create_proc_read_entry(
+		p = create_proc_read_entry(
 			"fit", 0, *entp, read_fit_entry,
 			lookup_fit(nasid));
-		create_proc_read_entry(
+		if (p)
+			p->owner = THIS_MODULE;
+		p = create_proc_read_entry(
 			"version", 0, *entp, read_version_entry,
 			lookup_fit(nasid));
+		if (p)
+			p->owner = THIS_MODULE;
 	}
 
 	return 0;
