@@ -156,9 +156,9 @@ copy_siginfo_to_user32 (siginfo_t32 *to, siginfo_t *from)
 
 /*
  *  SAVE and RESTORE of ia32 fpstate info, from ia64 current state
- *  Used in exception handler to pass the fpstate to the user, and restore 
+ *  Used in exception handler to pass the fpstate to the user, and restore
  *  the fpstate while returning from the exception handler.
- *  
+ *
  *    fpstate info and their mapping to IA64 regs:
  *    fpstate    REG(BITS)      Attribute    Comments
  *    cw         ar.fcr(0:12)                with bits 7 and 6 not used
@@ -169,11 +169,11 @@ copy_siginfo_to_user32 (siginfo_t32 *to, siginfo_t *from)
  *    cssel      ar.fir(32:47)  RO
  *    dataoff    ar.fdr(0:31)   RO
  *    datasel    ar.fdr(32:47)  RO
- *    
+ *
  *    _st[(0+TOS)%8]   f8
  *    _st[(1+TOS)%8]   f9                    (f8, f9 from ptregs)
  *      : :            :                     (f10..f15 from live reg)
- *      : :            :                     
+ *      : :            :
  *    _st[(7+TOS)%8]   f15                   TOS=sw.top(bits11:13)
  *
  *    status     Same as sw     RO
@@ -181,34 +181,34 @@ copy_siginfo_to_user32 (siginfo_t32 *to, siginfo_t *from)
  *    mxcsr      Bits(7:15)=ar.fcr(39:47)
  *               Bits(0:5) =ar.fsr(32:37)    with bit 6 reserved
  *    _xmm[0..7] f16..f31                    (live registers)
- *                                           with _xmm[0] 
+ *                                           with _xmm[0]
  *                                             Bit(64:127)=f17(0:63)
  *                                             Bit(0:63)=f16(0:63)
  *    All other fields unused...
  */
 
-#define __ldfe(regnum, x)					\
-({								\
- 	register double __f__ asm ("f"#regnum);			\
-	__asm__ __volatile__ ("ldfe %0=[%1] ;;" :"=f"(__f__): "r"(x)); \
+#define __ldfe(regnum, x)						\
+({									\
+ 	register double __f__ asm ("f"#regnum);				\
+	__asm__ __volatile__ ("ldfe %0=[%1] ;;" :"=f"(__f__): "r"(x));	\
 })
 
-#define __ldf8(regnum, x)					\
-({								\
- 	register double __f__ asm ("f"#regnum);			\
-	__asm__ __volatile__ ("ldf8 %0=[%1] ;;" :"=f"(__f__): "r"(x)); \
+#define __ldf8(regnum, x)						\
+({									\
+ 	register double __f__ asm ("f"#regnum);				\
+	__asm__ __volatile__ ("ldf8 %0=[%1] ;;" :"=f"(__f__): "r"(x));	\
 })
 
-#define __stfe(x, regnum)					\
-({								\
- 	register double __f__ asm ("f"#regnum);			\
-	__asm__ __volatile__ ("stfe [%0]=%1" :: "r"(x), "f"(__f__) : "memory");									\
+#define __stfe(x, regnum)							\
+({										\
+ 	register double __f__ asm ("f"#regnum);					\
+	__asm__ __volatile__ ("stfe [%0]=%1" :: "r"(x), "f"(__f__) : "memory");	\
 })
 
-#define __stf8(x, regnum)					\
-({								\
- 	register double __f__ asm ("f"#regnum);			\
-	__asm__ __volatile__ ("stf8 [%0]=%1" :: "r"(x), "f"(__f__) : "memory");									\
+#define __stf8(x, regnum)							\
+({										\
+ 	register double __f__ asm ("f"#regnum);					\
+	__asm__ __volatile__ ("stf8 [%0]=%1" :: "r"(x), "f"(__f__) : "memory");	\
 })
 
 static int
@@ -233,11 +233,11 @@ save_ia32_fpstate_live (struct _fpstate_ia32 *save)
 	asm volatile ( "mov %0=ar.fir;" : "=r"(fir));
 	asm volatile ( "mov %0=ar.fdr;" : "=r"(fdr));
 	/*
-	 * We need to clear the exception state before calling the signal
-	 * handler. Clear the bits 15, bits 0-7 in fp status word. Similar
-	 * to the functionality of fnclex instruction.
-	 */ 
-	new_fsr = fsr & (~0x80ff) ;
+	 * We need to clear the exception state before calling the signal handler. Clear
+	 * the bits 15, bits 0-7 in fp status word. Similar to the functionality of fnclex
+	 * instruction.
+	 */
+	new_fsr = fsr & ~0x80ff;
 	asm volatile ( "mov ar.fsr=%0;" :: "r"(new_fsr));
 
 	__put_user(fcr & 0xffff, &save->cw);
@@ -253,14 +253,14 @@ save_ia32_fpstate_live (struct _fpstate_ia32 *save)
 	__put_user(mxcsr & 0xffff, &save->mxcsr);
 	__put_user( 0, &save->magic); //#define X86_FXSR_MAGIC   0x0000
 
-	/* 
+	/*
 	 * save f8 and f9  from pt_regs
-	 * save f10..f15 from live register set 
+	 * save f10..f15 from live register set
 	 */
 	/*
-	 *  Find the location where f8 has to go in fp reg stack 
-	 *  This depends on TOP(11:13) field of sw. Other f reg continue 
-	 *  sequentially from where f8 maps to.
+	 *  Find the location where f8 has to go in fp reg stack.  This depends on
+	 *  TOP(11:13) field of sw. Other f reg continue sequentially from where f8 maps
+	 *  to.
 	 */
 	fp_tos = (fsr>>11)&0x7;
 	fr8_st_map = (8-fp_tos)&0x7;
@@ -335,9 +335,9 @@ restore_ia32_fpstate_live (struct _fpstate_ia32 *save)
 		return(-EFAULT);
 
 	/*
-	 * Updating fsr, fcr, fir, fdr. 
+	 * Updating fsr, fcr, fir, fdr.
 	 * Just a bit more complicated than save.
-	 * - Need to make sure that we dont write any value other than the 
+	 * - Need to make sure that we dont write any value other than the
 	 *   specific fpstate info
 	 * - Need to make sure that the untouched part of frs, fdr, fir, fcr
 	 *   should remain same while writing.
@@ -363,14 +363,14 @@ restore_ia32_fpstate_live (struct _fpstate_ia32 *save)
 
 	asm volatile ( "mov ar.fsr=%0;" :: "r"(fsr));
 	asm volatile ( "mov ar.fcr=%0;" :: "r"(fcr));
-	/* 
+	/*
 	 * restore f8, f9 onto pt_regs
 	 * restore f10..f15 onto live registers
 	 */
 	/*
-	 *  Find the location where f8 has to go in fp reg stack 
-	 *  This depends on TOP(11:13) field of sw. Other f reg continue 
-	 *  sequentially from where f8 maps to.
+	 *  Find the location where f8 has to go in fp reg stack.  This depends on
+	 *  TOP(11:13) field of sw. Other f reg continue sequentially from where f8 maps
+	 *  to.
 	 */
 	fp_tos = (fsr>>11)&0x7;
 	fr8_st_map = (8-fp_tos)&0x7;
@@ -686,7 +686,7 @@ setup_sigcontext_ia32 (struct sigcontext_ia32 *sc, struct _fpstate_ia32 *fpstate
 	err |= __put_user(regs->r12, &sc->esp_at_signal);
 	err |= __put_user((regs->r17 >> 16) & 0xffff, (unsigned int *)&sc->ss);
 
-	if ( save_ia32_fpstate_live(fpstate) < 0 ) 
+	if ( save_ia32_fpstate_live(fpstate) < 0 )
 		err = -EFAULT;
 	else
 		err |= __put_user((u32)(u64)fpstate, &sc->fpstate);
