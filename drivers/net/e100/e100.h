@@ -889,7 +889,6 @@ struct e100_private {
 	struct driver_stats drv_stats;
 
 	u8 rev_id;		/* adapter PCI revision ID */
-	unsigned long device_type;	/* device type from e100_vendor.h */
 
 	unsigned int phy_addr;	/* address of PHY component */
 	unsigned int PhyId;	/* ID of PHY component */
@@ -925,8 +924,6 @@ struct e100_private {
 	u8 ifs_value;
 
 	struct cfg_params params;	/* adapter's command line parameters */
-
-	char *id_string;
 
 	u32 speed_duplex_caps;	/* adapter's speed/duplex capabilities */
 

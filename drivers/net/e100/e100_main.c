@@ -86,7 +86,6 @@
 #include "e100_ucode.h"
 #include "e100_config.h"
 #include "e100_phy.h"
-#include "e100_vendor.h"
 
 static char e100_gstrings_stats[][ETH_GSTRING_LEN] = {
 	"rx_packets", "tx_packets", "rx_bytes", "tx_bytes", "rx_errors",
@@ -194,7 +193,6 @@ static void e100_print_brd_conf(struct e100_private *);
 static void e100_set_multi(struct net_device *);
 void e100_set_speed_duplex(struct e100_private *);
 
-char *e100_get_brand_msg(struct e100_private *);
 static u8 e100_pci_setup(struct pci_dev *, struct e100_private *);
 static u8 e100_sw_init(struct e100_private *);
 static void e100_tco_workaround(struct e100_private *);
@@ -681,12 +679,10 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
         memcpy(bdp->ifname, dev->name, IFNAMSIZ);
         bdp->ifname[IFNAMSIZ-1] = 0;	
 
-	bdp->device_type = ent->driver_data;
 	printk(KERN_NOTICE
 	       "e100: %s: %s\n", 
-	       bdp->device->name, e100_get_brand_msg(bdp));
+	       bdp->device->name, "Intel(R) PRO/100 Network Connection");
 	e100_print_brd_conf(bdp);
-	bdp->id_string = e100_get_brand_msg(bdp);
 
 	bdp->wolsupported = 0;
 	bdp->wolopts = 0;
@@ -765,6 +761,34 @@ e100_remove1(struct pci_dev *pcid)
 	--e100nics;
 }
 
+static struct pci_device_id e100_id_table[] __devinitdata = {
+	{0x8086, 0x1229, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
+	{0x8086, 0x2449, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
+	{0x8086, 0x1059, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
+	{0x8086, 0x1209, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
+  	{0x8086, 0x1029, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
+	{0x8086, 0x1030, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },	
+	{0x8086, 0x1031, PCI_ANY_ID, PCI_ANY_ID, 0, 0, }, 
+	{0x8086, 0x1032, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
+	{0x8086, 0x1033, PCI_ANY_ID, PCI_ANY_ID, 0, 0, }, 
+	{0x8086, 0x1034, PCI_ANY_ID, PCI_ANY_ID, 0, 0, }, 
+	{0x8086, 0x1038, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
+	{0x8086, 0x1039, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
+	{0x8086, 0x103A, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
+	{0x8086, 0x103B, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
+	{0x8086, 0x103C, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
+	{0x8086, 0x103D, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
+	{0x8086, 0x103E, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
+	{0x8086, 0x1050, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
+	{0x8086, 0x1051, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
+	{0x8086, 0x1052, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
+	{0x8086, 0x1053, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
+	{0x8086, 0x1054, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
+	{0x8086, 0x1055, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
+	{0x8086, 0x2459, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
+	{0x8086, 0x245D, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
+	{0,} /* This has to be the last entry*/
+};
 MODULE_DEVICE_TABLE(pci, e100_id_table);
 
 static struct pci_driver e100_driver = {
@@ -2914,27 +2938,6 @@ e100_print_brd_conf(struct e100_private *bdp)
 
 	if ((bdp->flags & DF_UCODE_LOADED))
 		printk(KERN_NOTICE "  cpu cycle saver enabled\n");
-}
-
-/**
- * e100_get_brand_msg
- * @bdp: atapter's private data struct
- *
- * This routine checks if there is specified branding message for a given board
- * type and returns a pointer to the string containing the branding message.
- */
-char *
-e100_get_brand_msg(struct e100_private *bdp)
-{
-	int i;
-
-	for (i = 0; e100_vendor_info_array[i].idstr != NULL; i++) {
-		if (e100_vendor_info_array[i].device_type == bdp->device_type) {
-			return e100_vendor_info_array[i].idstr;
-		}
-	}
-
-	return e100_vendor_info_array[E100_ALL_BOARDS].idstr;
 }
 
 /**
