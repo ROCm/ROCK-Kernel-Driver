@@ -143,10 +143,6 @@ static int amdtco_fop_open(struct inode *inode, struct file *file)
 	if (down_trylock(&open_sem))
 		return -EBUSY;
 
-#ifdef CONFIG_WATCHDOG_NOWAYOUT	
-	MOD_INC_USE_COUNT;
-#endif
-
 	if (timeout > MAX_TIMEOUT)
 		timeout = MAX_TIMEOUT;
 

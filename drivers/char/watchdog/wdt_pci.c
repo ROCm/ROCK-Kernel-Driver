@@ -365,9 +365,6 @@ static int wdtpci_open(struct inode *inode, struct file *file)
 			if (down_trylock(&open_sem))
 				return -EBUSY;
 
-			if (nowayout) {
-				MOD_INC_USE_COUNT;
-			}
 			/*
 			 *	Activate 
 			 */

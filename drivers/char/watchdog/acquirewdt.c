@@ -141,8 +141,6 @@ static int acq_open(struct inode *inode, struct file *file)
 			spin_unlock(&acq_lock);
 			return -EBUSY;
 		}
-		if (nowayout)
-			MOD_INC_USE_COUNT;
 
 		/* Activate */
 		acq_is_open=1;
