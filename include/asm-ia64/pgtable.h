@@ -8,7 +8,7 @@
  * This hopefully works with any (fixed) IA-64 page-size, as defined
  * in <asm/page.h> (currently 8192).
  *
- * Copyright (C) 1998-2002 Hewlett-Packard Co
+ * Copyright (C) 1998-2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
@@ -75,6 +75,8 @@
 #define _PAGE_SIZE_16M	24
 #define _PAGE_SIZE_64M	26
 #define _PAGE_SIZE_256M	28
+#define _PAGE_SIZE_1G	30
+#define _PAGE_SIZE_4G	32
 
 #define __ACCESS_BITS		_PAGE_ED | _PAGE_A | _PAGE_P | _PAGE_MA_WB
 #define __DIRTY_BITS_NO_ED	_PAGE_A | _PAGE_P | _PAGE_D | _PAGE_MA_WB
@@ -202,16 +204,21 @@ ia64_phys_addr_valid (unsigned long addr)
 #define set_pte(ptep, pteval)	(*(ptep) = (pteval))
 
 #define RGN_SIZE	(1UL << 61)
-#define RGN_MAP_LIMIT	((1UL << (4*PAGE_SHIFT - 12)) - PAGE_SIZE)	/* per region addr limit */
 #define RGN_KERNEL	7
 
-#define VMALLOC_START		(0xa000000000000000 + 3*PERCPU_PAGE_SIZE)
+#define VMALLOC_START		0xa000000200000000
 #define VMALLOC_VMADDR(x)	((unsigned long)(x))
-#define VMALLOC_END		(0xa000000000000000 + (1UL << (4*PAGE_SHIFT - 9)))
+#ifdef CONFIG_VIRTUAL_MEM_MAP
+# define VMALLOC_END_INIT	(0xa000000000000000 + (1UL << (4*PAGE_SHIFT - 9)))
+# define VMALLOC_END		vmalloc_end
+  extern unsigned long vmalloc_end;
+#else
+# define VMALLOC_END		(0xa000000000000000 + (1UL << (4*PAGE_SHIFT - 9)))
+#endif
 
 /* fs/proc/kcore.c */
-#define	kc_vaddr_to_offset(v) ((v) - 0xA000000000000000)
-#define	kc_offset_to_vaddr(o) ((o) + 0xA000000000000000)
+#define	kc_vaddr_to_offset(v) ((v) - 0xa000000000000000)
+#define	kc_offset_to_vaddr(o) ((o) + 0xa000000000000000)
 
 /*
  * Conversion functions: convert page frame number (pfn) and a protection value to a page
@@ -255,6 +262,7 @@ ia64_phys_addr_valid (unsigned long addr)
 /*
  * The following have defined behavior only work if pte_present() is true.
  */
+#define pte_user(pte)		((pte_val(pte) & _PAGE_PL_MASK) == _PAGE_PL_3)
 #define pte_read(pte)		(((pte_val(pte) & _PAGE_AR_MASK) >> _PAGE_AR_SHIFT) < 6)
 #define pte_write(pte)	((unsigned) (((pte_val(pte) & _PAGE_AR_MASK) >> _PAGE_AR_SHIFT) - 2) <= 4)
 #define pte_exec(pte)		((pte_val(pte) & _PAGE_AR_RX) != 0)
@@ -274,10 +282,9 @@ ia64_phys_addr_valid (unsigned long addr)
 #define pte_mkdirty(pte)	(__pte(pte_val(pte) | _PAGE_D))
 
 /*
- * Macro to make mark a page protection value as "uncacheable".  Note
- * that "protection" is really a misnomer here as the protection value
- * contains the memory attribute bits, dirty bits, and various other
- * bits as well.
+ * Macro to a page protection value as "uncacheable".  Note that "protection" is really a
+ * misnomer here as the protection value contains the memory attribute bits, dirty bits,
+ * and various other bits as well.
  */
 #define pgprot_noncached(prot)		__pgprot((pgprot_val(prot) & ~_PAGE_MA_MASK) | _PAGE_MA_UC)
 
@@ -446,13 +453,20 @@ extern void paging_init (void);
  * for zero-mapped memory areas etc..
  */
 extern unsigned long empty_zero_page[PAGE_SIZE/sizeof(unsigned long)];
-#define ZERO_PAGE(vaddr) (virt_to_page(empty_zero_page))
+extern struct page *zero_page_memmap_ptr;
+#define ZERO_PAGE(vaddr) (zero_page_memmap_ptr)
 
 /* We provide our own get_unmapped_area to cope with VA holes for userland */
 #define HAVE_ARCH_UNMAPPED_AREA
 
 typedef pte_t *pte_addr_t;
 
+#  ifdef CONFIG_VIRTUAL_MEM_MAP
+  /* arch mem_map init routine is needed due to holes in a virtual mem_map */
+#   define __HAVE_ARCH_MEMMAP_INIT
+    extern void memmap_init (struct page *start, unsigned long size, int nid, unsigned long zone,
+			     unsigned long start_pfn);
+#  endif /* CONFIG_VIRTUAL_MEM_MAP */
 # endif /* !__ASSEMBLY__ */
 
 /*
@@ -471,11 +485,14 @@ typedef pte_t *pte_addr_t;
  */
 #define KERNEL_TR_PAGE_SHIFT	_PAGE_SIZE_64M
 #define KERNEL_TR_PAGE_SIZE	(1 << KERNEL_TR_PAGE_SHIFT)
-#define KERNEL_TR_PAGE_NUM	((KERNEL_START - PAGE_OFFSET) / KERNEL_TR_PAGE_SIZE)
 
 /*
  * No page table caches to initialise
  */
 #define pgtable_cache_init()	do { } while (0)
+
+/* These tell get_user_pages() that the first gate page is accessible from user-level.  */
+#define FIXADDR_USER_START	GATE_ADDR
+#define FIXADDR_USER_END	(GATE_ADDR + 2*PAGE_SIZE)
 
 #endif /* _ASM_IA64_PGTABLE_H */

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2002-2003 Silicon Graphics, Inc.  All Rights Reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it 
  * under the terms of version 2 of the GNU General Public License 
@@ -30,32 +30,5 @@
  * http://oss.sgi.com/projects/GenInfo/NoticeExplan
  */
 
-#include <linux/config.h>
-
-#ifdef CONFIG_IA64_SGI_SN1
-#define MACHVEC_PLATFORM_NAME		sn1
-#define MACHVEC_PLATFORM_HEADER		<asm/machvec_sn1.h>
-#else CONFIG_IA64_SGI_SN1
-#define MACHVEC_PLATFORM_NAME		sn2
-#define MACHVEC_PLATFORM_HEADER		<asm/machvec_sn2.h>
-#else
-#error "unknown platform"
-#endif
-
+#define MACHVEC_PLATFORM_NAME	sn2
 #include <asm/machvec_init.h>
-#include <asm/io.h>
-#include <linux/pci.h>
-void*
-sn_mk_io_addr_MACRO
-
-dma_addr_t
-sn_pci_map_single_MACRO
-
-int
-sn_pci_map_sg_MACRO
-
-unsigned long
-sn_virt_to_phys_MACRO
-
-void *
-sn_phys_to_virt_MACRO

@@ -63,7 +63,7 @@ struct mmu_gather {
 };
 
 /* Users of the generic TLB shootdown code must declare this storage space. */
-extern struct mmu_gather	mmu_gathers[NR_CPUS];
+DECLARE_PER_CPU(struct mmu_gather, mmu_gathers);
 
 /*
  * Flush the TLB for address range START to END and, if not in fast mode, release the
@@ -125,7 +125,7 @@ ia64_tlb_flush_mmu (struct mmu_gather *tlb, unsigned long start, unsigned long e
 static inline struct mmu_gather *
 tlb_gather_mmu (struct mm_struct *mm, unsigned int full_mm_flush)
 {
-	struct mmu_gather *tlb = &mmu_gathers[smp_processor_id()];
+	struct mmu_gather *tlb = &per_cpu(mmu_gathers, smp_processor_id());
 
 	tlb->mm = mm;
 	/*

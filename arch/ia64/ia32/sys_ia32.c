@@ -53,7 +53,8 @@
 #include <asm/types.h>
 #include <asm/uaccess.h>
 #include <asm/semaphore.h>
-#include <asm/ia32.h>
+
+#include "ia32priv.h"
 
 #include <net/scm.h>
 #include <net/sock.h>
@@ -206,9 +207,8 @@ int cp_compat_stat(struct kstat *stat, struct compat_stat *ubuf)
 
 
 static int
-get_page_prot (unsigned long addr)
+get_page_prot (struct vm_area_struct *vma, unsigned long addr)
 {
-	struct vm_area_struct *vma = find_vma(current->mm, addr);
 	int prot = 0;
 
 	if (!vma || vma->vm_start > addr)
@@ -231,14 +231,26 @@ static unsigned long
 mmap_subpage (struct file *file, unsigned long start, unsigned long end, int prot, int flags,
 	      loff_t off)
 {
-	void *page = (void *) get_zeroed_page(GFP_KERNEL);
+	void *page = NULL;
 	struct inode *inode;
-	unsigned long ret;
-	int old_prot = get_page_prot(start);
+	unsigned long ret = 0;
+	struct vm_area_struct *vma = find_vma(current->mm, start);
+	int old_prot = get_page_prot(vma, start);
 
 	DBG("mmap_subpage(file=%p,start=0x%lx,end=0x%lx,prot=%x,flags=%x,off=0x%llx)\n",
 	    file, start, end, prot, flags, off);
 
+
+	/* Optimize the case where the old mmap and the new mmap are both anonymous */
+	if ((old_prot & PROT_WRITE) && (flags & MAP_ANONYMOUS) && !vma->vm_file) {
+		if (clear_user((void *) start, end - start)) {
+			ret = -EFAULT;
+			goto out;
+		}
+		goto skip_mmap;
+	}
+
+	page = (void *) get_zeroed_page(GFP_KERNEL);
 	if (!page)
 		return -ENOMEM;
 
@@ -263,6 +275,7 @@ mmap_subpage (struct file *file, unsigned long start, unsigned long end, int pro
 			copy_to_user((void *) end, page + PAGE_OFF(end),
 				     PAGE_SIZE - PAGE_OFF(end));
 	}
+
 	if (!(flags & MAP_ANONYMOUS)) {
 		/* read the file contents */
 		inode = file->f_dentry->d_inode;
@@ -273,10 +286,13 @@ mmap_subpage (struct file *file, unsigned long start, unsigned long end, int pro
 			goto out;
 		}
 	}
+
+ skip_mmap:
 	if (!(prot & PROT_WRITE))
 		ret = sys_mprotect(PAGE_START(start), PAGE_SIZE, prot | old_prot);
   out:
-	free_page((unsigned long) page);
+	if (page)
+		free_page((unsigned long) page);
 	return ret;
 }
 
@@ -532,11 +548,12 @@ static long
 mprotect_subpage (unsigned long address, int new_prot)
 {
 	int old_prot;
+	struct vm_area_struct *vma;
 
 	if (new_prot == PROT_NONE)
 		return 0;		/* optimize case where nothing changes... */
-
-	old_prot = get_page_prot(address);
+	vma = find_vma(current->mm, address);
+	old_prot = get_page_prot(vma, address);
 	return sys_mprotect(address, PAGE_SIZE, new_prot | old_prot);
 }
 
@@ -836,9 +853,8 @@ sys32_select (int n, fd_set *inp, fd_set *outp, fd_set *exp, struct compat_timev
 		}
 	}
 
-	size = FDS_BYTES(n);
 	ret = -EINVAL;
-	if (n < 0 || size < n)
+	if (n < 0)
 		goto out_nofds;
 
 	if (n > current->files->max_fdset)
@@ -850,6 +866,7 @@ sys32_select (int n, fd_set *inp, fd_set *outp, fd_set *exp, struct compat_timev
 	 * long-words.
 	 */
 	ret = -ENOMEM;
+	size = FDS_BYTES(n);
 	bits = kmalloc(6 * size, GFP_KERNEL);
 	if (!bits)
 		goto out_nofds;
@@ -1102,7 +1119,7 @@ struct shmid_ds32 {
 };
 
 struct shmid64_ds32 {
-	struct ipc64_perm shm_perm;
+	struct ipc64_perm32 shm_perm;
 	compat_size_t shm_segsz;
 	compat_time_t   shm_atime;
 	unsigned int __unused1;
@@ -1320,7 +1337,6 @@ static int
 msgctl32 (int first, int second, void *uptr)
 {
 	int err = -EINVAL, err2;
-	struct msqid_ds m;
 	struct msqid64_ds m64;
 	struct msqid_ds32 *up32 = (struct msqid_ds32 *)uptr;
 	struct msqid64_ds32 *up64 = (struct msqid64_ds32 *)uptr;
@@ -1336,21 +1352,21 @@ msgctl32 (int first, int second, void *uptr)
 
 	      case IPC_SET:
 		if (version == IPC_64) {
-			err = get_user(m.msg_perm.uid, &up64->msg_perm.uid);
-			err |= get_user(m.msg_perm.gid, &up64->msg_perm.gid);
-			err |= get_user(m.msg_perm.mode, &up64->msg_perm.mode);
-			err |= get_user(m.msg_qbytes, &up64->msg_qbytes);
+			err = get_user(m64.msg_perm.uid, &up64->msg_perm.uid);
+			err |= get_user(m64.msg_perm.gid, &up64->msg_perm.gid);
+			err |= get_user(m64.msg_perm.mode, &up64->msg_perm.mode);
+			err |= get_user(m64.msg_qbytes, &up64->msg_qbytes);
 		} else {
-			err = get_user(m.msg_perm.uid, &up32->msg_perm.uid);
-			err |= get_user(m.msg_perm.gid, &up32->msg_perm.gid);
-			err |= get_user(m.msg_perm.mode, &up32->msg_perm.mode);
-			err |= get_user(m.msg_qbytes, &up32->msg_qbytes);
+			err = get_user(m64.msg_perm.uid, &up32->msg_perm.uid);
+			err |= get_user(m64.msg_perm.gid, &up32->msg_perm.gid);
+			err |= get_user(m64.msg_perm.mode, &up32->msg_perm.mode);
+			err |= get_user(m64.msg_qbytes, &up32->msg_qbytes);
 		}
 		if (err)
 			break;
 		old_fs = get_fs();
 		set_fs(KERNEL_DS);
-		err = sys_msgctl(first, second, &m);
+		err = sys_msgctl(first, second, &m64);
 		set_fs(old_fs);
 		break;
 
@@ -1430,7 +1446,7 @@ static int
 shmctl32 (int first, int second, void *uptr)
 {
 	int err = -EFAULT, err2;
-	struct shmid_ds s;
+
 	struct shmid64_ds s64;
 	struct shmid_ds32 *up32 = (struct shmid_ds32 *)uptr;
 	struct shmid64_ds32 *up64 = (struct shmid64_ds32 *)uptr;
@@ -1482,19 +1498,19 @@ shmctl32 (int first, int second, void *uptr)
 
 	      case IPC_SET:
 		if (version == IPC_64) {
-			err = get_user(s.shm_perm.uid, &up64->shm_perm.uid);
-			err |= get_user(s.shm_perm.gid, &up64->shm_perm.gid);
-			err |= get_user(s.shm_perm.mode, &up64->shm_perm.mode);
+			err = get_user(s64.shm_perm.uid, &up64->shm_perm.uid);
+			err |= get_user(s64.shm_perm.gid, &up64->shm_perm.gid);
+			err |= get_user(s64.shm_perm.mode, &up64->shm_perm.mode);
 		} else {
-			err = get_user(s.shm_perm.uid, &up32->shm_perm.uid);
-			err |= get_user(s.shm_perm.gid, &up32->shm_perm.gid);
-			err |= get_user(s.shm_perm.mode, &up32->shm_perm.mode);
+			err = get_user(s64.shm_perm.uid, &up32->shm_perm.uid);
+			err |= get_user(s64.shm_perm.gid, &up32->shm_perm.gid);
+			err |= get_user(s64.shm_perm.mode, &up32->shm_perm.mode);
 		}
 		if (err)
 			break;
 		old_fs = get_fs();
 		set_fs(KERNEL_DS);
-		err = sys_shmctl(first, second, &s);
+		err = sys_shmctl(first, second, &s64);
 		set_fs(old_fs);
 		break;
 
@@ -1798,12 +1814,16 @@ put_fpreg (int regno, struct _fpreg_ia32 *reg, struct pt_regs *ptp, struct switc
 		ia64f2ia32f(f, &ptp->f9);
 		break;
 	      case 2:
+		ia64f2ia32f(f, &ptp->f10);
+		break;
 	      case 3:
+		ia64f2ia32f(f, &ptp->f11);
+		break;
 	      case 4:
 	      case 5:
 	      case 6:
 	      case 7:
-		ia64f2ia32f(f, &swp->f10 + (regno - 2));
+		ia64f2ia32f(f, &swp->f12 + (regno - 4));
 		break;
 	}
 	copy_to_user(reg, f, sizeof(*reg));
@@ -1824,12 +1844,16 @@ get_fpreg (int regno, struct _fpreg_ia32 *reg, struct pt_regs *ptp, struct switc
 		copy_from_user(&ptp->f9, reg, sizeof(*reg));
 		break;
 	      case 2:
+		copy_from_user(&ptp->f10, reg, sizeof(*reg));
+		break;
 	      case 3:
+		copy_from_user(&ptp->f11, reg, sizeof(*reg));
+		break;
 	      case 4:
 	      case 5:
 	      case 6:
 	      case 7:
-		copy_from_user(&swp->f10 + (regno - 2), reg, sizeof(*reg));
+		copy_from_user(&swp->f12 + (regno - 4), reg, sizeof(*reg));
 		break;
 	}
 	return;
@@ -1860,7 +1884,7 @@ save_ia32_fpstate (struct task_struct *tsk, struct ia32_user_i387_struct *save)
 	ptp = ia64_task_regs(tsk);
 	tos = (tsk->thread.fsr >> 11) & 7;
 	for (i = 0; i < 8; i++)
-		put_fpreg(i, (struct _fpreg_ia32 *)&save->st_space[4*i], ptp, swp, tos);
+		put_fpreg(i, &save->st_space[i], ptp, swp, tos);
 	return 0;
 }
 
@@ -1893,7 +1917,7 @@ restore_ia32_fpstate (struct task_struct *tsk, struct ia32_user_i387_struct *sav
 	ptp = ia64_task_regs(tsk);
 	tos = (tsk->thread.fsr >> 11) & 7;
 	for (i = 0; i < 8; i++)
-		get_fpreg(i, (struct _fpreg_ia32 *)&save->st_space[4*i], ptp, swp, tos);
+		get_fpreg(i, &save->st_space[i], ptp, swp, tos);
 	return 0;
 }
 

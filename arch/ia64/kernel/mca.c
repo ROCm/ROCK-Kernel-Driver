@@ -322,7 +322,7 @@ fetch_min_state (pal_min_state_area_t *ms, struct pt_regs *pt, struct switch_sta
 }
 
 void
-init_handler_platform (sal_log_processor_info_t *proc_ptr,
+init_handler_platform (pal_min_state_area_t *ms,
 		       struct pt_regs *pt, struct switch_stack *sw)
 {
 	struct unw_frame_info info;
@@ -337,15 +337,18 @@ init_handler_platform (sal_log_processor_info_t *proc_ptr,
 	 */
 	printk("Delaying for 5 seconds...\n");
 	udelay(5*1000000);
-	show_min_state(&SAL_LPI_PSI_INFO(proc_ptr)->min_state_area);
+	show_min_state(ms);
 
 	printk("Backtrace of current task (pid %d, %s)\n", current->pid, current->comm);
-	fetch_min_state(&SAL_LPI_PSI_INFO(proc_ptr)->min_state_area, pt, sw);
+	fetch_min_state(ms, pt, sw);
 	unw_init_from_interruption(&info, current, pt, sw);
 	ia64_do_show_stack(&info, NULL);
 
+#ifdef CONFIG_SMP
+	/* read_trylock() would be handy... */
 	if (!tasklist_lock.write_lock)
 		read_lock(&tasklist_lock);
+#endif
 	{
 		struct task_struct *g, *t;
 		do_each_thread (g, t) {
@@ -353,11 +356,13 @@ init_handler_platform (sal_log_processor_info_t *proc_ptr,
 				continue;
 
 			printk("\nBacktrace of pid %d (%s)\n", t->pid, t->comm);
-			show_stack(t);
+			show_stack(t, NULL);
 		} while_each_thread (g, t);
 	}
+#ifdef CONFIG_SMP
 	if (!tasklist_lock.write_lock)
 		read_unlock(&tasklist_lock);
+#endif
 
 	printk("\nINIT dump complete.  Please reboot now.\n");
 	while (1);			/* hang city if no debugger */
@@ -657,17 +662,17 @@ ia64_mca_init(void)
 
 	IA64_MCA_DEBUG("ia64_mca_init: registered mca rendezvous spinloop and wakeup mech.\n");
 
-	ia64_mc_info.imi_mca_handler        = __pa(mca_hldlr_ptr->fp);
+	ia64_mc_info.imi_mca_handler        = ia64_tpa(mca_hldlr_ptr->fp);
 	/*
 	 * XXX - disable SAL checksum by setting size to 0; should be
-	 *	__pa(ia64_os_mca_dispatch_end) - __pa(ia64_os_mca_dispatch);
+	 *	ia64_tpa(ia64_os_mca_dispatch_end) - ia64_tpa(ia64_os_mca_dispatch);
 	 */
 	ia64_mc_info.imi_mca_handler_size	= 0;
 
 	/* Register the os mca handler with SAL */
 	if ((rc = ia64_sal_set_vectors(SAL_VECTOR_OS_MCA,
 				       ia64_mc_info.imi_mca_handler,
-				       mca_hldlr_ptr->gp,
+				       ia64_tpa(mca_hldlr_ptr->gp),
 				       ia64_mc_info.imi_mca_handler_size,
 				       0, 0, 0)))
 	{
@@ -677,15 +682,15 @@ ia64_mca_init(void)
 	}
 
 	IA64_MCA_DEBUG("ia64_mca_init: registered os mca handler with SAL at 0x%lx, gp = 0x%lx\n",
-		       ia64_mc_info.imi_mca_handler, mca_hldlr_ptr->gp);
+		       ia64_mc_info.imi_mca_handler, ia64_tpa(mca_hldlr_ptr->gp));
 
 	/*
 	 * XXX - disable SAL checksum by setting size to 0, should be
 	 * IA64_INIT_HANDLER_SIZE
 	 */
-	ia64_mc_info.imi_monarch_init_handler		= __pa(mon_init_ptr->fp);
+	ia64_mc_info.imi_monarch_init_handler		= ia64_tpa(mon_init_ptr->fp);
 	ia64_mc_info.imi_monarch_init_handler_size	= 0;
-	ia64_mc_info.imi_slave_init_handler		= __pa(slave_init_ptr->fp);
+	ia64_mc_info.imi_slave_init_handler		= ia64_tpa(slave_init_ptr->fp);
 	ia64_mc_info.imi_slave_init_handler_size	= 0;
 
 	IA64_MCA_DEBUG("ia64_mca_init: os init handler at %lx\n",
@@ -694,10 +699,10 @@ ia64_mca_init(void)
 	/* Register the os init handler with SAL */
 	if ((rc = ia64_sal_set_vectors(SAL_VECTOR_OS_INIT,
 				       ia64_mc_info.imi_monarch_init_handler,
-				       __pa(ia64_get_gp()),
+				       ia64_tpa(ia64_get_gp()),
 				       ia64_mc_info.imi_monarch_init_handler_size,
 				       ia64_mc_info.imi_slave_init_handler,
-				       __pa(ia64_get_gp()),
+				       ia64_tpa(ia64_get_gp()),
 				       ia64_mc_info.imi_slave_init_handler_size)))
 	{
 		printk(KERN_ERR "ia64_mca_init: Failed to register m/s init handlers with SAL. "
@@ -1235,32 +1240,19 @@ device_initcall(ia64_mca_late_init);
 void
 ia64_init_handler (struct pt_regs *pt, struct switch_stack *sw)
 {
-	sal_log_processor_info_t *proc_ptr;
-	ia64_err_rec_t *plog_ptr;
+	pal_min_state_area_t *ms;
 
-	printk(KERN_INFO "Entered OS INIT handler\n");
-
-	/* Get the INIT processor log */
-	if (!ia64_log_get(SAL_INFO_TYPE_INIT, (prfunc_t)printk))
-		return;                 // no record retrieved
-
-#ifdef IA64_DUMP_ALL_PROC_INFO
-	ia64_log_print(SAL_INFO_TYPE_INIT, (prfunc_t)printk);
-#endif
+	printk(KERN_INFO "Entered OS INIT handler. PSP=%lx\n",
+		ia64_sal_to_os_handoff_state.proc_state_param);
 
 	/*
-	 * get pointer to min state save area
-	 *
+	 * Address of minstate area provided by PAL is physical,
+	 * uncacheable (bit 63 set). Convert to Linux virtual
+	 * address in region 6.
 	 */
-	plog_ptr=(ia64_err_rec_t *)IA64_LOG_CURR_BUFFER(SAL_INFO_TYPE_INIT);
-	proc_ptr = &plog_ptr->proc_err;
+	ms = (pal_min_state_area_t *)(ia64_sal_to_os_handoff_state.pal_min_state | (6ul<<61));
 
-	ia64_process_min_state_save(&SAL_LPI_PSI_INFO(proc_ptr)->min_state_area);
-
-	/* Clear the INIT SAL logs now that they have been saved in the OS buffer */
-	ia64_sal_clear_state_info(SAL_INFO_TYPE_INIT);
-
-	init_handler_platform(proc_ptr, pt, sw);	/* call platform specific routines */
+	init_handler_platform(ms, pt, sw);	/* call platform specific routines */
 }
 
 /*
