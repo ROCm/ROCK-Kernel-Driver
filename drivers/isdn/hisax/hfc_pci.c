@@ -65,7 +65,7 @@ static const PCI_ENTRY id_list[] =
 };
 
 
-#if CONFIG_PCI
+#ifdef CONFIG_PCI
 
 /******************************************/
 /* free hardware resources used by driver */
@@ -1655,7 +1655,7 @@ setup_hfcpci(struct IsdnCard *card)
 #endif
 	strcpy(tmp, hfcpci_revision);
 	printk(KERN_INFO "HiSax: HFC-PCI driver Rev. %s\n", HiSax_getrev(tmp));
-#if CONFIG_PCI
+#ifdef CONFIG_PCI
 	cs->hw.hfcpci.int_s1 = 0;
 	cs->dc.hfcpci.ph_state = 0;
 	cs->hw.hfcpci.fifo = 255;

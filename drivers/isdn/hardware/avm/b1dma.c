@@ -839,8 +839,6 @@ u16 b1dma_send_message(struct capi_ctr *ctrl, struct sk_buff *skb)
 	}
 	if (retval == CAPI_NOERROR) 
 		b1dma_queue_tx(card, skb);
-	else
-		dev_kfree_skb_any(skb);
 
 	return retval;
 }

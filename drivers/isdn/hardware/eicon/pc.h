@@ -143,6 +143,7 @@ struct dual
 #define N_DATA_ACK      12      /* data ack ind for D-bit procedure */
 #define N_EDATA_ACK     13      /* data ack ind for INTERRUPT       */
 #define N_XON           15      /* clear RNR state */
+#define N_COMBI_IND     N_XON   /* combined indication              */
 #define N_Q_BIT         0x10    /* Q-bit for req/ind                */
 #define N_M_BIT         0x20    /* M-bit for req/ind                */
 #define N_D_BIT         0x40    /* D-bit for req/ind                */
@@ -228,6 +229,10 @@ struct dual
 #define VSWITCH_IND 66        /* capifunctions for D-CH-switching   */
 #define MWI_POLL 67     /* Message Waiting Status Request fkt */
 #define CALL_PEND_NOTIFY 68 /* notify capi to set new listen        */
+#define DO_NOTHING 69       /* dont do somethin if you get this     */
+#define INT_CT_REJ 70       /* ECT rejected internal command        */
+#define CALL_HOLD_COMPLETE 71 /* In NT Mode indicate hold complete  */
+#define CALL_RETRIEVE_COMPLETE 72 /* In NT Mode indicate retrieve complete  */
 /*------------------------------------------------------------------*/
 /* management service primitives                                    */
 /*------------------------------------------------------------------*/
@@ -241,6 +246,7 @@ struct dual
 #define MAN_INFO_IND    2
 #define MAN_EVENT_IND   3
 #define MAN_TRACE_IND   4
+#define MAN_COMBI_IND   9
 #define MAN_ESC         0x80
 /*------------------------------------------------------------------*/
 /* return code coding                                               */
@@ -265,6 +271,7 @@ struct dual
 /*------------------------------------------------------------------*/
 #define SHIFT 0x90              /* codeset shift                    */
 #define MORE 0xa0               /* more data                        */
+#define SDNCMPL 0xa1            /* sending complete                 */
 #define CL 0xb0                 /* congestion level                 */
         /* codeset 0                                                */
 #define SMSG 0x00               /* segmented message                */
@@ -288,6 +295,8 @@ struct dual
 #define RDX 0x73                /* redirecting number extended      */
 #define RDN 0x74                /* redirecting number               */
 #define RIN 0x76                /* redirection number               */
+#define IUP 0x76                /* VN6 rerouter->PCS (codeset 6)    */
+#define IPU 0x77                /* VN6 PCS->rerouter (codeset 6)    */
 #define RI  0x79                /* restart indicator                */
 #define MIE 0x7a                /* management info element          */
 #define LLC 0x7c                /* low layer compatibility          */
@@ -296,6 +305,8 @@ struct dual
 #define ESC 0x7f                /* escape extension                 */
 #define DLC 0x20                /* data link layer configuration    */
 #define NLC 0x21                /* network layer configuration      */
+#define REDIRECT_IE     0x22    /* redirection request/indication data */
+#define REDIRECT_NET_IE 0x23    /* redirection network override data   */
         /* codeset 6                                                */
 #define SIN 0x01                /* service indicator                */
 #define CIF 0x02                /* charging information             */
@@ -306,6 +317,7 @@ struct dual
 /*------------------------------------------------------------------*/
 #define MSGTYPEIE        0x7a   /* Messagetype info element         */
 #define CRIE             0x7b   /* INFO info element                */
+#define CODESET6IE       0xec   /* Tunnel for Codeset 6 IEs         */
 #define VSWITCHIE        0xed   /* VSwitch info element             */
 #define SSEXTIE          0xee   /* Supplem. Service info element    */
 #define PROFILEIE        0xef   /* Profile info element             */
@@ -344,6 +356,13 @@ struct dual
 #define CCBS_REQUEST              0x32
 #define CCBS_DEACTIVATE           0x33
 #define CCBS_INTERROGATE          0x34
+#define CCBS_STATUS               0x35
+#define CCBS_ERASE                0x36
+#define CCBS_B_FREE               0x37
+#define CCNR_INFO_RETAIN          0x38
+#define CCBS_REMOTE_USER_FREE     0x39
+#define CCNR_REQUEST              0x3a
+#define CCNR_INTERROGATE          0x3b
 #define GET_SUPPORTED_SERVICES    0xff
 #define DIVERSION_PROCEDURE_CFU     0x70
 #define DIVERSION_PROCEDURE_CFB     0x71
@@ -362,6 +381,7 @@ struct dual
 #define SMASK_3PTY                 0x00000008
 #define SMASK_CALL_FORWARDING      0x00000010
 #define SMASK_CALL_DEFLECTION      0x00000020
+#define SMASK_MCID                 0x00000040
 #define SMASK_CCBS                 0x00000080
 #define SMASK_MWI                  0x00000100
 #define SMASK_CCNR                 0x00000200
@@ -406,6 +426,8 @@ struct dual
 #define RTPL2_IN       13       /* RTP layer-2 protocol, incomming  */
 #define RTPL2          14       /* RTP layer-2 protocol             */
 #define V120_V42BIS    15       /* V.120 asynchronous mode supporting V.42bis compression */
+#define LISTENER       27       /* Layer 2 to listen line */
+#define MTP2           28       /* MTP2 Layer 2 */
 #define PIAFS_CRC      29       /* PIAFS Layer 2 with CRC calculation at L2 */
 /* ------------------------------------------------------
    PIAFS DLC DEFINITIONS
@@ -506,6 +528,22 @@ Byte | 8 7 6 5 4 3 2 1
 |                     |      |                        data transfer.   |
 +---------------------+------+-----------------------------------------+
 */
+/* ------------------------------------------------------
+   LISTENER DLC DEFINITIONS
+   ------------------------------------------------------ */
+#define LISTENER_FEATURE_MASK_CUMMULATIVE            0x0001
+/* ------------------------------------------------------
+   LISTENER META-FRAME CODE/PRIMITIVE DEFINITIONS
+   ------------------------------------------------------ */
+#define META_CODE_LL_UDATA_RX 0x01
+#define META_CODE_LL_UDATA_TX 0x02
+#define META_CODE_LL_DATA_RX  0x03
+#define META_CODE_LL_DATA_TX  0x04
+#define META_CODE_LL_MDATA_RX 0x05
+#define META_CODE_LL_MDATA_TX 0x06
+#define META_CODE_EMPTY       0x10
+#define META_CODE_LOST_FRAMES 0x11
+#define META_FLAG_TRUNCATED   0x0001
 /*------------------------------------------------------------------*/
 /* CAPI-like profile to indicate features on LAW_REQ                */
 /*------------------------------------------------------------------*/
@@ -577,6 +615,14 @@ Byte | 8 7 6 5 4 3 2 1
 #define MANUFACTURER_FEATURE_DMACONNECT           0x04000000L
 #define MANUFACTURER_FEATURE_AUDIO_TAP            0x08000000L
 #define MANUFACTURER_FEATURE_FAX_NONSTANDARD      0x10000000L
+#define MANUFACTURER_FEATURE_SS7                  0x20000000L
+#define MANUFACTURER_FEATURE_MADAPTER             0x40000000L
+#define MANUFACTURER_FEATURE_MEASURE              0x80000000L
+#define MANUFACTURER_FEATURE2_LISTENING           0x00000001L
+#define MANUFACTURER_FEATURE2_SS_DIFFCONTPOSSIBLE 0x00000002L
+#define MANUFACTURER_FEATURE2_GENERIC_TONE        0x00000004L
+#define MANUFACTURER_FEATURE2_COLOR_FAX           0x00000008L
+#define MANUFACTURER_FEATURE2_SS_ECT_DIFFCONTPOSSIBLE 0x00000010L
 #define RTP_PRIM_PAYLOAD_PCMU_8000     0
 #define RTP_PRIM_PAYLOAD_1016_8000     1
 #define RTP_PRIM_PAYLOAD_G726_32_8000  2
@@ -624,6 +670,15 @@ Byte | 8 7 6 5 4 3 2 1
 #define VSINVOKEID    4
 #define VSCLMRKS       5
 #define VSTBCTIDENT    6
+#define VSETSILINKID   7
+#define VSSAMECONTROLLER 8
+/* Errorcodes for VSETSILINKID begin */
+#define VSETSILINKIDRRWC      1
+#define VSETSILINKIDREJECT    2
+#define VSETSILINKIDTIMEOUT   3
+#define VSETSILINKIDFAILCOUNT 4
+#define VSETSILINKIDERROR     5
+/* Errorcodes for VSETSILINKID end */
 /* -----------------------------------------------------------**
 ** The PROTOCOL_FEATURE_STRING in feature.h (included         **
 ** in prstart.sx and astart.sx) defines capabilities and      **
@@ -647,5 +702,37 @@ Byte | 8 7 6 5 4 3 2 1
 #define PROTCAP_FREE13    0x2000  /* not used                            */
 #define PROTCAP_FREE14    0x4000  /* not used                            */
 #define PROTCAP_EXTENSION 0x8000  /* used for future extentions          */
+/* -----------------------------------------------------------* */
+/* Onhook data transmission ETS30065901 */
+/* Message Type */
+/*#define RESERVED4                 0x4*/
+#define CALL_SETUP                0x80
+#define MESSAGE_WAITING_INDICATOR 0x82
+/*#define RESERVED84                0x84*/
+/*#define RESERVED85                0x85*/
+#define ADVICE_OF_CHARGE          0x86
+/*1111 0001
+to
+1111 1111
+F1H - Reserved for network operator use
+to
+FFH*/
+/* Parameter Types */
+#define DATE_AND_TIME                                           1
+#define CLI_PARAMETER_TYPE                                      2
+#define CALLED_DIRECTORY_NUMBER_PARAMETER_TYPE                  3
+#define REASON_FOR_ABSENCE_OF_CLI_PARAMETER_TYPE                4
+#define NAME_PARAMETER_TYPE                                     7
+#define REASON_FOR_ABSENCE_OF_CALLING_PARTY_NAME_PARAMETER_TYPE 8
+#define VISUAL_INDICATOR_PARAMETER_TYPE                         0xb
+#define COMPLEMENTARY_CLI_PARAMETER_TYPE                        0x10
+#define CALL_TYPE_PARAMETER_TYPE                                0x11
+#define FIRST_CALLED_LINE_DIRECTORY_NUMBER_PARAMETER_TYPE       0x12
+#define NETWORK_MESSAGE_SYSTEM_STATUS_PARAMETER_TYPE            0x13
+#define FORWARDED_CALL_TYPE_PARAMETER_TYPE                      0x15
+#define TYPE_OF_CALLING_USER_PARAMETER_TYPE                     0x16
+#define REDIRECTING_NUMBER_PARAMETER_TYPE                       0x1a
+#define EXTENSION_FOR_NETWORK_OPERATOR_USE_PARAMETER_TYPE       0xe0
+/* -----------------------------------------------------------* */
 #else
 #endif /* PC_H_INCLUDED  } */

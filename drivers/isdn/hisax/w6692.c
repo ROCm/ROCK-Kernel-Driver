@@ -1012,7 +1012,7 @@ setup_w6692(struct IsdnCard *card)
 	printk(KERN_INFO "HiSax: W6692 driver Rev. %s\n", HiSax_getrev(tmp));
 	if (cs->typ != ISDN_CTYPE_W6692)
 		return (0);
-#if CONFIG_PCI
+#ifdef CONFIG_PCI
 	while (id_list[id_idx].vendor_id) {
 		dev_w6692 = pci_find_device(id_list[id_idx].vendor_id,
 					    id_list[id_idx].device_id,

@@ -512,7 +512,8 @@ static void send_message(capidrv_contr * card, _cmsg * cmsg)
 	len = CAPIMSG_LEN(cmsg->buf);
 	skb = alloc_skb(len, GFP_ATOMIC);
 	memcpy(skb_put(skb, len), cmsg->buf, len);
-	capi20_put_message(&global.ap, skb);
+	if (capi20_put_message(&global.ap, skb) != CAPI_NOERROR)
+		kfree_skb(skb);
 }
 
 /* -------- state machine -------------------------------------------- */

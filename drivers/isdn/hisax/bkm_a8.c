@@ -21,7 +21,7 @@
 #include <linux/pci.h>
 #include "bkm_ax.h"
 
-#if CONFIG_PCI
+#ifdef CONFIG_PCI
 
 #define	ATTEMPT_PCI_REMAPPING	/* Required for PLX rev 1 */
 
@@ -285,7 +285,7 @@ static u_char pci_irq __initdata = 0;
 int __init
 setup_sct_quadro(struct IsdnCard *card)
 {
-#if CONFIG_PCI
+#ifdef CONFIG_PCI
 	struct IsdnCardState *cs = card->cs;
 	char tmp[64];
 	u_char pci_rev_id;

@@ -49,6 +49,8 @@ typedef struct _diva_strace_path2action {
 	void*							 variable; /* Variable that will receive value */
 } diva_strace_path2action_t;
 
+#define DIVA_MAX_MANAGEMENT_TRANSFER_SIZE 4096
+
 typedef struct _diva_strace_context {
 	diva_strace_library_interface_t	instance;
 
@@ -62,7 +64,7 @@ typedef struct _diva_strace_context {
   IDI_CALL request;
   BUFFERS  XData;
   BUFFERS  RData;
-	byte buffer[2048+512+1];
+	byte buffer[DIVA_MAX_MANAGEMENT_TRANSFER_SIZE + 1];
   int removal_state;
   int general_b_ch_event;
   int general_fax_event;
