@@ -609,15 +609,15 @@ static struct miscdevice tun_miscdev = {
 
 int __init tun_init(void)
 {
+	int ret = 0;
+
 	printk(KERN_INFO "Universal TUN/TAP device driver %s " 
 	       "(C)1999-2002 Maxim Krasnyansky\n", TUN_VER);
 
-	if (misc_register(&tun_miscdev)) {
+	ret = misc_register(&tun_miscdev);
+	if (ret)
 		printk(KERN_ERR "tun: Can't register misc device %d\n", TUN_MINOR);
-		return -EIO;
-	}
-
-	return 0;
+	return ret;
 }
 
 void tun_cleanup(void)
