@@ -28,7 +28,6 @@
 #include <asm/mach/serial_sa1100.h>
 
 #include "generic.h"
-#include "sa1111.h"
 
 static int __init adsbitsy_init(void)
 {
@@ -53,7 +52,7 @@ static int __init adsbitsy_init(void)
 	/*
 	 * Probe for SA1111.
 	 */
-	ret = sa1111_init(NULL, 0x18000000, IRQ_GPIO0);
+	ret = sa1111_init(0x18000000, IRQ_GPIO0);
 	if (ret < 0)
 		return ret;
 

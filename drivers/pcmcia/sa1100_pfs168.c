@@ -7,10 +7,11 @@
  */
 #include <linux/kernel.h>
 #include <linux/sched.h>
+#include <linux/delay.h>
 #include <linux/init.h>
 
-#include <asm/delay.h>
 #include <asm/hardware.h>
+#include <asm/mach-types.h>
 #include <asm/irq.h>
 
 #include "sa1100_generic.h"

@@ -552,7 +552,7 @@ S:	Maintained
 EMU10K1 SOUND DRIVER
 P:	Rui Sousa	
 M:	rui.p.m.sousa@clix.pt	
-L:	emu10k1-devel@opensource.creative.com
+L:	emu10k1-devel@lists.sourceforge.net
 W:	http://opensource.creative.com/
 S:	Maintained
 
@@ -575,14 +575,12 @@ M:	miku@iki.fi
 S:	Maintained
 
 EXT2 FILE SYSTEM
-P:	Remy Card
-M:	Remy.Card@linux.org
-L:	linux-kernel@vger.kernel.org
+L:	ext2-devel@lists.sourceforge.net
 S:	Maintained
 
 EXT3 FILE SYSTEM
-P:	Remy Card, Stephen Tweedie
-M:	sct@redhat.com, akpm@zip.com.au, adilger@turbolinux.com
+P:	Stephen Tweedie, Andrew Morton
+M:	sct@redhat.com, akpm@zip.com.au, adilger@clusterfs.com
 L:	ext3-users@redhat.com
 S:	Maintained
 
@@ -708,7 +706,7 @@ S:	Maintained
 
 i386 BOOT CODE
 P:	Riley H. Williams
-M:	rhw@memalpha.cx
+M:	Riley@Williams.Name
 L:	Linux-Kernel@vger.kernel.org
 S:	Maintained
 
@@ -739,9 +737,9 @@ W:	http://www.uni-mainz.de/~langm000/linux.html
 S:	Maintained
 
 IBM ServeRAID RAID DRIVER
-P: 	Jack Hammer
+P:	Jack Hammer
 P:	Dave Jeffrey	
-M:	ipslinux@us.ibm.com
+M:	ipslinux@adaptec.com
 W:	http://www.developer.ibm.com/welcome/netfinity/serveraid.html
 S:	Supported 
 
@@ -839,7 +837,7 @@ S:	Maintained
 IOC3 DRIVER
 P:	Ralf Baechle
 M:	ralf@oss.sgi.com
-L:	linux-mips@oss.sgi.com
+L:	linux-mips@linux-mips.org
 S:	Maintained
 
 IP MASQUERADING:
@@ -1052,7 +1050,7 @@ MIPS
 P:	Ralf Baechle
 M:	ralf@gnu.org
 W:	http://oss.sgi.com/mips/mips-howto.html
-L:	linux-mips@oss.sgi.com
+L:	linux-mips@linux-mips.org
 S:	Maintained
 
 MISCELLANEOUS MCA-SUPPORT
@@ -1084,8 +1082,8 @@ S:	Maintained
 
 NATSEMI ETHERNET DRIVER (DP8381x)
 P: 	Tim Hockin
-M:  thockin@hockin.org
-S:  Maintained
+M:	thockin@hockin.org
+S:	Maintained
 
 NCP FILESYSTEM
 P:	Petr Vandrovec
@@ -1333,10 +1331,10 @@ W:	http://www.alarsen.net/linux/qnx4fs/
 S:	Maintained
 
 RADEON FRAMEBUFFER DISPLAY DRIVER
-P:  Ani Joshi
-M:  ajoshi@shell.unixbox.com
-L:  linux-fbdev-devel@lists.sourceforge.net
-S:  Maintained
+P:	Ani Joshi
+M:	ajoshi@shell.unixbox.com
+L:	linux-fbdev-devel@lists.sourceforge.net
+S:	Maintained
 
 RAGE128 FRAMEBUFFER DISPLAY DRIVER
 P:	Ani Joshi

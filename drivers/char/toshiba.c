@@ -84,8 +84,6 @@ static int tosh_fn = 0;
 
 MODULE_PARM(tosh_fn, "i");
 
-MODULE_LICENSE("GPL");
-
 
 static int tosh_get_info(char *, char **, off_t, int);
 static int tosh_ioctl(struct inode *, struct file *, unsigned int,
@@ -517,3 +515,10 @@ void cleanup_module(void)
 	misc_deregister(&tosh_device);
 }
 #endif
+
+MODULE_LICENSE("GPL");
+MODULE_PARM_DESC(tosh_fn, "User specified Fn key detection port");
+MODULE_AUTHOR("Jonathan Buzzard <jonathan@buzzard.org.uk>");
+MODULE_DESCRIPTION("Toshiba laptop SMM driver");
+MODULE_SUPPORTED_DEVICE("toshiba");
+

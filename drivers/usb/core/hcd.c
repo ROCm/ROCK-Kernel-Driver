@@ -1024,6 +1024,11 @@ static int hcd_submit_urb (struct urb *urb, int mem_flags)
 	 */
 	urb = usb_get_urb (urb);
 	if (urb->dev == hcd->self.root_hub) {
+		/* NOTE:  requirement on hub callers (usbfs and the hub
+		 * driver, for now) that URBs' urb->transfer_buffer be
+		 * valid and usb_buffer_{sync,unmap}() not be needed, since
+		 * they could clobber root hub response data.
+		 */
 		urb->transfer_flags |= URB_NO_DMA_MAP;
 		return rh_urb_enqueue (hcd, urb);
 	}
@@ -1132,11 +1137,11 @@ static int hcd_unlink_urb (struct urb *urb)
 		goto done;
 	}
 
-	/* For non-periodic transfers, any status except -EINPROGRESS means
-	 * the HCD has already started to unlink this URB from the hardware.
-	 * In that case, there's no more work to do.
+	/* Except for interrupt transfers, any status except -EINPROGRESS
+	 * means the HCD already started to unlink this URB from the hardware.
+	 * So there's no more work to do.
 	 *
-	 * For periodic transfers, this is the only way to trigger unlinking
+	 * For interrupt transfers, this is the only way to trigger unlinking
 	 * from the hardware.  Since we (currently) overload urb->status to
 	 * tell the driver to unlink, error status might get clobbered ...
 	 * unless that transfer hasn't yet restarted.  One such case is when
@@ -1144,13 +1149,10 @@ static int hcd_unlink_urb (struct urb *urb)
 	 *
 	 * FIXME use an URB_UNLINKED flag to match URB_TIMEOUT_KILLED
 	 */
-	switch (usb_pipetype (urb->pipe)) {
-	case PIPE_CONTROL:
-	case PIPE_BULK:
-		if (urb->status != -EINPROGRESS) {
-			retval = -EINVAL;
-			goto done;
-		}
+	if (urb->status != -EINPROGRESS
+			&& usb_pipetype (urb->pipe) != PIPE_INTERRUPT) {
+		retval = -EINVAL;
+		goto done;
 	}
 
 	/* maybe set up to block on completion notification */

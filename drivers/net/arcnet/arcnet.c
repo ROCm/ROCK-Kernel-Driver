@@ -186,7 +186,7 @@ void cleanup_module(void)
 void arcnet_dump_skb(struct net_device *dev, struct sk_buff *skb, char *desc)
 {
 	int i;
-       unsigned long flags;
+	unsigned long flags;
 
 	save_flags(flags);
 	cli();
@@ -212,7 +212,7 @@ void arcnet_dump_packet(struct net_device *dev, int bufnum, char *desc)
 {
 	struct arcnet_local *lp = (struct arcnet_local *) dev->priv;
 	int i, length;
-       unsigned long flags;
+	unsigned long flags;
 	static uint8_t buf[512];
 
 	save_flags(flags);

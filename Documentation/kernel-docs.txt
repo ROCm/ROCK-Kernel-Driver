@@ -41,7 +41,7 @@
        
      * Title: "The Linux Kernel"
        Author: David A. Rusling.
-       URL: http://www.linuxdoc.org/LDP/tlk/tlk.html
+       URL: http://www.tldp.org/LDP/tlk/tlk.html
        Keywords: everything!, book.
        Description: On line, 200 pages book describing most aspects of
        the Linux Kernel. Probably, the first reference for beginners.
@@ -57,7 +57,7 @@
        
      * Title: "The Linux Kernel Hackers' Guide"
        Author: Michael K.Johnson and others.
-       URL: http://www.linuxdoc.org/LDP/khg/HyperNews/get/khg.html
+       URL: http://www.tldp.org/LDP/khg/HyperNews/get/khg.html
        Keywords: everything!
        Description: No more Postscript book-like version. Only HTML now.
        Many people have contributed. The interface is similar to web
@@ -277,7 +277,7 @@
        
      * Title: "Linux Kernel Module Programming Guide"
        Author: Ori Pomerantz.
-       URL: http://www.linuxdoc.org/LDP/lkmpg/mpg.html
+       URL: http://www.tldp.org/LDP/lkmpg/mpg.html
        Keywords: modules, GPL book, /proc, ioctls, system calls,
        interrupt handlers .
        Description: Very nice 92 pages GPL book on the topic of modules

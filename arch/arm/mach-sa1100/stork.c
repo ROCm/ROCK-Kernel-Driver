@@ -284,6 +284,17 @@ storkInitTSandDtoA(void)
     storkClockShortToDtoA(0x0A00);	/* turn on the brightness */
 }
 
+static void stork_lcd_power(int on)
+{
+	if (on) {
+		storkSetLCDCPLD(0, 1);
+		storkSetLatchA(STORK_LCD_BACKLIGHT_INVERTER_ON);
+	} else {
+		storkSetLCDCPLD(0, 0);
+		storkClearLatchA(STORK_LCD_BACKLIGHT_INVERTER_ON);
+	}
+}
+
 struct map_desc stork_io_desc[] __initdata = {
  /* virtual     physical    length      type */
   { STORK_VM_BASE_CS1, STORK_VM_OFF_CS1, 0x01000000, MT_DEVICE }, /* EGPIO 0 */
@@ -311,6 +322,8 @@ stork_map_io(void)
     storkSetLatchA(STORK_LCD_3V3_POWER_ON);
 
     storkInitTSandDtoA();
+
+    sa1100fb_lcd_power = stork_lcd_power;
 
     return 0;
 }
