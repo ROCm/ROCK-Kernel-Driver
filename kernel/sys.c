@@ -226,6 +226,8 @@ cond_syscall(sys_shutdown)
 cond_syscall(sys_sendmsg)
 cond_syscall(sys_recvmsg)
 cond_syscall(sys_socketcall)
+cond_syscall(sys_futex)
+cond_syscall(compat_sys_futex)
 
 static int set_one_prio(struct task_struct *p, int niceval, int error)
 {
