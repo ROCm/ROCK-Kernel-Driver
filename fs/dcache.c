@@ -1275,7 +1275,7 @@ void d_move(struct dentry * dentry, struct dentry * target)
  * the string " (deleted)" is appended. Note that this is ambiguous. Returns
  * the buffer.
  *
- * "buflen" should be %PAGE_SIZE or more. Caller holds the dcache_lock.
+ * "buflen" should be positive. Caller holds the dcache_lock.
  */
 static char * __d_path( struct dentry *dentry, struct vfsmount *vfsmnt,
 			struct dentry *root, struct vfsmount *rootmnt,
@@ -1290,9 +1290,13 @@ static char * __d_path( struct dentry *dentry, struct vfsmount *vfsmnt,
 	if (!IS_ROOT(dentry) && d_unhashed(dentry)) {
 		buflen -= 10;
 		end -= 10;
+		if (buflen < 0)
+			goto Elong;
 		memcpy(end, " (deleted)", 10);
 	}
 
+	if (buflen < 1)
+		goto Elong;
 	/* Get '/' right */
 	retval = end-1;
 	*retval = '/';
@@ -1315,7 +1319,7 @@ static char * __d_path( struct dentry *dentry, struct vfsmount *vfsmnt,
 		namelen = dentry->d_name.len;
 		buflen -= namelen + 1;
 		if (buflen < 0)
-			return ERR_PTR(-ENAMETOOLONG);
+			goto Elong;
 		end -= namelen;
 		memcpy(end, dentry->d_name.name, namelen);
 		*--end = '/';
@@ -1328,12 +1332,13 @@ static char * __d_path( struct dentry *dentry, struct vfsmount *vfsmnt,
 global_root:
 	namelen = dentry->d_name.len;
 	buflen -= namelen;
-	if (buflen >= 0) {
-		retval -= namelen-1;	/* hit the slash */
-		memcpy(retval, dentry->d_name.name, namelen);
-	} else
-		retval = ERR_PTR(-ENAMETOOLONG);
+	if (buflen < 0)
+		goto Elong;
+	retval -= namelen-1;	/* hit the slash */
+	memcpy(retval, dentry->d_name.name, namelen);
 	return retval;
+Elong:
+	return ERR_PTR(-ENAMETOOLONG);
 }
 
 /* write full pathname into buffer and return start of pathname */
