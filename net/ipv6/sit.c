@@ -814,18 +814,19 @@ int __init sit_init(void)
 					   ipip6_tunnel_setup);
 	if (!ipip6_fb_tunnel_dev) {
 		err = -ENOMEM;
-		goto fail;
+		goto err1;
 	}
 
 	ipip6_fb_tunnel_dev->init = ipip6_fb_tunnel_init;
 
 	if ((err =  register_netdev(ipip6_fb_tunnel_dev)))
-		goto fail;
+		goto err2;
 
  out:
 	return err;
- fail:
-	inet_del_protocol(&sit_protocol, IPPROTO_IPV6);
+ err2:
 	free_netdev(ipip6_fb_tunnel_dev);
+ err1:
+	inet_del_protocol(&sit_protocol, IPPROTO_IPV6);
 	goto out;
 }
