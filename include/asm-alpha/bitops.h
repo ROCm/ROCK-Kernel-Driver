@@ -3,6 +3,7 @@
 
 #include <linux/config.h>
 #include <linux/kernel.h>
+#include <asm/compiler.h>
 
 /*
  * Copyright 1994, Linus Torvalds.
@@ -60,14 +61,14 @@ clear_bit(unsigned long nr, volatile void * addr)
 
 	__asm__ __volatile__(
 	"1:	ldl_l %0,%3\n"
-	"	and %0,%2,%0\n"
+	"	bic %0,%2,%0\n"
 	"	stl_c %0,%1\n"
 	"	beq %0,2f\n"
 	".subsection 2\n"
 	"2:	br 1b\n"
 	".previous"
 	:"=&r" (temp), "=m" (*m)
-	:"Ir" (~(1UL << (nr & 31))), "m" (*m));
+	:"Ir" (1UL << (nr & 31)), "m" (*m));
 }
 
 /*
@@ -246,12 +247,15 @@ test_bit(int nr, volatile void * addr)
  */
 static inline unsigned long ffz_b(unsigned long x)
 {
-	unsigned long sum = 0;
+	unsigned long sum, x1, x2, x4;
 
 	x = ~x & -~x;		/* set first 0 bit, clear others */
-	if (x & 0xF0) sum += 4;
-	if (x & 0xCC) sum += 2;
-	if (x & 0xAA) sum += 1;
+	x1 = x & 0xAA;
+	x2 = x & 0xCC;
+	x4 = x & 0xF0;
+	sum = x2 ? 2 : 0;
+	sum += (x4 != 0) * 4;
+	sum += (x1 != 0);
 
 	return sum;
 }
@@ -268,7 +272,7 @@ static inline unsigned long ffz(unsigned long word)
 
 	__asm__("cmpbge %1,%2,%0" : "=r"(bits) : "r"(word), "r"(~0UL));
 	qofs = ffz_b(bits);
-	__asm__("extbl %1,%2,%0" : "=r"(bits) : "r"(word), "r"(qofs));
+	bits = __kernel_extbl(word, qofs);
 	bofs = ffz_b(bits);
 
 	return qofs*8 + bofs;
@@ -290,7 +294,7 @@ static inline unsigned long __ffs(unsigned long word)
 
 	__asm__("cmpbge $31,%1,%0" : "=r"(bits) : "r"(word));
 	qofs = ffz_b(bits);
-	__asm__("extbl %1,%2,%0" : "=r"(bits) : "r"(word), "r"(qofs));
+	bits = __kernel_extbl(word, qofs);
 	bofs = ffz_b(~bits);
 
 	return qofs*8 + bofs;
@@ -349,6 +353,14 @@ static inline unsigned long hweight64(unsigned long w)
 #define hweight16(x) hweight64((x) & 0xfffful)
 #define hweight8(x)  hweight64((x) & 0xfful)
 #else
+static inline unsigned long hweight64(unsigned long w)
+{
+	unsigned long result;
+	for (result = 0; w ; w >>= 1)
+		result += (w & 1);
+	return result;
+}
+
 #define hweight32(x) generic_hweight32(x)
 #define hweight16(x) generic_hweight16(x)
 #define hweight8(x)  generic_hweight8(x)
