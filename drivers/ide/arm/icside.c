@@ -215,8 +215,6 @@ static void icside_build_sglist(ide_drive_t *drive, struct request *rq)
 	struct scatterlist *sg = hwif->sg_table;
 	int nents;
 
-	BUG_ON(hwif->sg_dma_active);
-
 	if (rq->flags & REQ_DRIVE_TASKFILE) {
 		ide_task_t *args = rq->special;
 
@@ -401,8 +399,6 @@ static int icside_dma_end(ide_drive_t *drive)
 	dma_unmap_sg(state->dev, hwif->sg_table, hwif->sg_nents,
 		     hwif->sg_dma_direction);
 
-	hwif->sg_dma_active = 0;
-
 	return get_dma_residue(hwif->hw.dma) != 0;
 }
 
@@ -454,7 +450,6 @@ icside_dma_common(ide_drive_t *drive, struct request *rq,
 	/*
 	 * We can not enable DMA on both channels.
 	 */
-	BUG_ON(hwif->sg_dma_active);
 	BUG_ON(dma_channel_active(hwif->hw.dma));
 
 	icside_build_sglist(drive, rq);
