@@ -253,10 +253,6 @@ static int Fip_firmware_size;
 /***********************/
 
 /* Global module entry functions */
-#ifdef MODULE
-int init_module(void);
-void cleanup_module(void);
-#endif
 
 /* Private (static) functions */
 static int  ip2_open(PTTY, struct file *);
