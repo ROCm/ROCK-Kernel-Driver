@@ -1001,8 +1001,10 @@ int usb_reset_configuration(struct usb_device *dev)
 	int			i, retval;
 	struct usb_host_config	*config;
 
-	/* dev->serialize guards all config changes */
-	down(&dev->serialize);
+	/* caller must own dev->serialize (config won't change)
+	 * and the usb bus readlock (so driver bindings are stable);
+	 * so calls during probe() are fine
+	 */
 
 	for (i = 1; i < 16; ++i) {
 		usb_disable_endpoint(dev, i);
@@ -1016,7 +1018,7 @@ int usb_reset_configuration(struct usb_device *dev)
 			NULL, 0, HZ * USB_CTRL_SET_TIMEOUT);
 	if (retval < 0) {
 		dev->state = USB_STATE_ADDRESS;
-		goto done;
+		return retval;
 	}
 
 	dev->toggle[0] = dev->toggle[1] = 0;
@@ -1029,9 +1031,7 @@ int usb_reset_configuration(struct usb_device *dev)
 		intf->act_altsetting = 0;
 		usb_enable_interface(dev, intf);
 	}
-done:
-	up(&dev->serialize);
-	return (retval < 0) ? retval : 0;
+	return 0;
 }
 
 /**
