@@ -12,6 +12,7 @@
 #include <linux/netdevice.h>
 #include <net/datalink.h>
 #include <linux/ipx.h>
+#include <linux/list.h>
 
 struct ipx_address {
 	__u32   net;
@@ -66,7 +67,7 @@ struct ipx_interface {
 	unsigned char		if_internal;
 	unsigned char		if_primary;
 	
-	struct ipx_interface	*if_next;
+	struct list_head	node; /* node in ipx_interfaces list */
 };
 
 struct ipx_route {
@@ -113,7 +114,8 @@ struct ipx_opt {
 extern struct ipx_route *ipx_routes;
 extern rwlock_t ipx_routes_lock;
 
-extern struct ipx_interface *ipx_interfaces;
+extern struct list_head ipx_interfaces;
+extern struct ipx_interface *ipx_interfaces_head(void);
 extern spinlock_t ipx_interfaces_lock;
 
 extern struct ipx_interface *ipx_primary_net;
