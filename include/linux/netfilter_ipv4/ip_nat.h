@@ -86,7 +86,7 @@ struct ip_nat_info
 	/* Manipulations to be done on this conntrack. */
 	struct ip_nat_info_manip manips[IP_NAT_MAX_MANIPS];
 
-	struct list_head bysource, byipsproto;
+	struct list_head bysource;
 
 	/* Helper (NULL if none). */
 	struct ip_nat_helper *helper;

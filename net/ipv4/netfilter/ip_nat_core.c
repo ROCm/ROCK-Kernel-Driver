@@ -20,6 +20,7 @@
 #include <net/tcp.h>  /* For tcp_prot in getorigdst */
 #include <linux/icmp.h>
 #include <linux/udp.h>
+#include <linux/jhash.h>
 
 #define ASSERT_READ_LOCK(x) MUST_BE_READ_LOCKED(&ip_nat_lock)
 #define ASSERT_WRITE_LOCK(x) MUST_BE_WRITE_LOCKED(&ip_nat_lock)
@@ -47,7 +48,6 @@ DECLARE_RWLOCK_EXTERN(ip_conntrack_lock);
 static unsigned int ip_nat_htable_size;
 
 static struct list_head *bysource;
-static struct list_head *byipsproto;
 struct ip_nat_protocol *ip_nat_protos[MAX_IP_NAT_PROTO];
 
 
@@ -87,7 +87,6 @@ static void ip_nat_cleanup_conntrack(struct ip_conntrack *conn)
 
 	WRITE_LOCK(&ip_nat_lock);
 	list_del(&info->bysource);
-	list_del(&info->byipsproto);
 	WRITE_UNLOCK(&ip_nat_lock);
 }
 
@@ -198,38 +197,6 @@ find_appropriate_src(const struct ip_conntrack_tuple *tuple,
 	return 0;
 }
 
-/* Simple way to iterate through all. */
-static inline int fake_cmp(const struct ip_conntrack *ct,
-			   u_int32_t src, u_int32_t dst, u_int16_t protonum,
-			   unsigned int *score, const struct ip_conntrack *ct2)
-{
-	/* Compare backwards: we're dealing with OUTGOING tuples, and
-           inside the conntrack is the REPLY tuple.  Don't count this
-           conntrack. */
-	if (ct != ct2
-	    && ct->tuplehash[IP_CT_DIR_REPLY].tuple.src.ip == dst
-	    && ct->tuplehash[IP_CT_DIR_REPLY].tuple.dst.ip == src
-	    && (ct->tuplehash[IP_CT_DIR_REPLY].tuple.dst.protonum == protonum))
-		(*score)++;
-	return 0;
-}
-
-static inline unsigned int
-count_maps(u_int32_t src, u_int32_t dst, u_int16_t protonum,
-	   const struct ip_conntrack *conntrack)
-{
-	struct ip_conntrack *ct;
-	unsigned int score = 0;
-	unsigned int h;
-
-	MUST_BE_READ_LOCKED(&ip_nat_lock);
-	h = hash_by_ipsproto(src, dst, protonum);
-	list_for_each_entry(ct, &byipsproto[h], nat.info.byipsproto)
-		fake_cmp(ct, src, dst, protonum, &score, conntrack);
-
-	return score;
-}
-
 /* For [FUTURE] fragmentation handling, we want the least-used
    src-ip/dst-ip/proto triple.  Fairness doesn't come into it.  Thus
    if the range specifies 1.2.3.4 ports 10000-10005 and 1.2.3.5 ports
@@ -242,10 +209,7 @@ find_best_ips_proto(struct ip_conntrack_tuple *tuple,
 		    const struct ip_conntrack *conntrack,
 		    unsigned int hooknum)
 {
-	unsigned int best_score = 0xFFFFFFFF;
-	struct ip_conntrack_tuple best_tuple = *tuple;
 	u_int32_t *var_ipp;
-	static unsigned int randomness;
 	/* Host order */
 	u_int32_t minip, maxip, j;
 
@@ -264,33 +228,16 @@ find_best_ips_proto(struct ip_conntrack_tuple *tuple,
 		return;
 	}
 
+	/* Hashing source and destination IPs gives a fairly even
+	 * spread in practice (if there are a small number of IPs
+	 * involved, there usually aren't that many connections
+	 * anyway).  The consistency means that servers see the same
+	 * client coming from the same IP (some Internet Backing sites
+	 * like this), even across reboots. */
 	minip = ntohl(range->min_ip);
 	maxip = ntohl(range->max_ip);
-
-	/* FIXME: use hash of ips like ipt_SAME, not randomness.
-	   This way same pairs get same IP: think Internet Banking.
-	 */
-	randomness++;
-	for (j = 0; j < maxip - minip + 1; j++) {
-		unsigned int score;
-
-		*var_ipp = htonl(minip + (randomness + j) 
-				 % (maxip - minip + 1));
-
-		/* Count how many others map onto this. */
-		score = count_maps(tuple->src.ip, tuple->dst.ip,
-				   tuple->dst.protonum, conntrack);
-		if (score < best_score) {
-			/* Optimization: doesn't get any better than
-			   this. */
-			if (score == 0)
-				return;
-
-			best_score = score;
-			best_tuple = *tuple;
-		}
-	}
-	*tuple = best_tuple;
+	j = jhash_2words(tuple->src.ip, tuple->dst.ip, 0);
+	*var_ipp = htonl(minip + j % (maxip - minip + 1));
 }
 
 /* Manipulate the tuple into the range given.  For NF_IP_POST_ROUTING,
@@ -492,19 +439,8 @@ void replace_in_hashes(struct ip_conntrack *conntrack,
 			      .tuple.src,
 			      conntrack->tuplehash[IP_CT_DIR_ORIGINAL]
 			      .tuple.dst.protonum);
-	/* We place packet as seen OUTGOUNG in byips_proto hash
-           (ie. reverse dst and src of reply packet. */
-	unsigned int ipsprotohash
-		= hash_by_ipsproto(conntrack->tuplehash[IP_CT_DIR_REPLY]
-				   .tuple.dst.ip,
-				   conntrack->tuplehash[IP_CT_DIR_REPLY]
-				   .tuple.src.ip,
-				   conntrack->tuplehash[IP_CT_DIR_REPLY]
-				   .tuple.dst.protonum);
-
 	MUST_BE_WRITE_LOCKED(&ip_nat_lock);
 	list_move(&info->bysource, &bysource[srchash]);
-	list_move(&info->byipsproto, &byipsproto[ipsprotohash]);
 }
 
 void place_in_hashes(struct ip_conntrack *conntrack,
@@ -515,19 +451,8 @@ void place_in_hashes(struct ip_conntrack *conntrack,
 			      .tuple.src,
 			      conntrack->tuplehash[IP_CT_DIR_ORIGINAL]
 			      .tuple.dst.protonum);
-	/* We place packet as seen OUTGOUNG in byips_proto hash
-           (ie. reverse dst and src of reply packet. */
-	unsigned int ipsprotohash
-		= hash_by_ipsproto(conntrack->tuplehash[IP_CT_DIR_REPLY]
-				   .tuple.dst.ip,
-				   conntrack->tuplehash[IP_CT_DIR_REPLY]
-				   .tuple.src.ip,
-				   conntrack->tuplehash[IP_CT_DIR_REPLY]
-				   .tuple.dst.protonum);
-
 	MUST_BE_WRITE_LOCKED(&ip_nat_lock);
 	list_add(&info->bysource, &bysource[srchash]);
-	list_add(&info->byipsproto, &byipsproto[ipsprotohash]);
 }
 
 /* Returns true if succeeded. */
@@ -845,11 +770,9 @@ int __init ip_nat_init(void)
 	ip_nat_htable_size = ip_conntrack_htable_size;
 
 	/* One vmalloc for both hash tables */
-	bysource = vmalloc(sizeof(struct list_head) * ip_nat_htable_size*2);
-	if (!bysource) {
+	bysource = vmalloc(sizeof(struct list_head) * ip_nat_htable_size);
+	if (!bysource)
 		return -ENOMEM;
-	}
-	byipsproto = bysource + ip_nat_htable_size;
 
 	/* Sew in builtin protocols. */
 	WRITE_LOCK(&ip_nat_lock);
@@ -862,7 +785,6 @@ int __init ip_nat_init(void)
 
 	for (i = 0; i < ip_nat_htable_size; i++) {
 		INIT_LIST_HEAD(&bysource[i]);
-		INIT_LIST_HEAD(&byipsproto[i]);
 	}
 
 	/* FIXME: Man, this is a hack.  <SIGH> */
