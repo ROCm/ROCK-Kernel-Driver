@@ -2962,7 +2962,7 @@ static struct {
 		ISAPNP_VENDOR('G','R','V'), ISAPNP_DEVICE(0x0001),
 		ISAPNP_VENDOR('G','R','V'), ISAPNP_FUNCTION(0x0000),
 		0, 0, 0, 1, 0},
-	{0}
+	{NULL}
 };
 
 static struct isapnp_device_id id_table[] __devinitdata = {

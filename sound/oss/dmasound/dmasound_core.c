@@ -425,7 +425,7 @@ static int sq_allocate_buffers(struct sound_queue *sq, int num, int size)
 			while (i--)
 				dmasound.mach.dma_free(sq->buffers[i], size);
 			kfree(sq->buffers);
-			sq->buffers = 0;
+			sq->buffers = NULL;
 			return -ENOMEM;
 		}
 	}
@@ -447,7 +447,7 @@ static void sq_release_buffers(struct sound_queue *sq)
 
 static int sq_setup(struct sound_queue *sq)
 {
-	int (*setup_func)(void) = 0;
+	int (*setup_func)(void) = NULL;
 	int hard_frame ;
 
 	if (sq->locked) { /* are we already set? - and not changeable */

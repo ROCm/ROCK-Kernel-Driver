@@ -165,7 +165,7 @@ static struct {
 	{ 0x0E, "Bad MIDI channel number" },
 	{ 0x10, "Download Record Error" },
 	{ 0x80, "Success" },
-	{ 0x0, 0x0 }
+	{ 0x0 }
 };
 
 #define NEEDS_ACK 1
@@ -361,7 +361,7 @@ snd_wavefront_cmd (snd_wavefront_t *dev,
 
 	if (cmd == WFC_DOWNLOAD_MULTISAMPLE) {
 		wfcmd->write_cnt = (unsigned long) rbuf;
-		rbuf = 0;
+		rbuf = NULL;
 	}
 
 	DPRINT (WF_DEBUG_CMD, "0x%x [%s] (%d,%d,%d)\n",
@@ -612,7 +612,7 @@ wavefront_delete_sample (snd_wavefront_t *dev, int sample_num)
 	wbuf[0] = sample_num & 0x7f;
 	wbuf[1] = sample_num >> 7;
 
-	if ((x = snd_wavefront_cmd (dev, WFC_DELETE_SAMPLE, 0, wbuf)) == 0) {
+	if ((x = snd_wavefront_cmd (dev, WFC_DELETE_SAMPLE, NULL, wbuf)) == 0) {
 		dev->sample_status[sample_num] = WF_ST_EMPTY;
 	}
 
@@ -798,7 +798,7 @@ wavefront_send_patch (snd_wavefront_t *dev, wavefront_patch_info *header)
 	bptr = munge_int32 (header->number, buf, 2);
 	munge_buf ((unsigned char *)&header->hdr.p, bptr, WF_PATCH_BYTES);
     
-	if (snd_wavefront_cmd (dev, WFC_DOWNLOAD_PATCH, 0, buf)) {
+	if (snd_wavefront_cmd (dev, WFC_DOWNLOAD_PATCH, NULL, buf)) {
 		snd_printk ("download patch failed\n");
 		return -(EIO);
 	}
@@ -836,7 +836,7 @@ wavefront_send_program (snd_wavefront_t *dev, wavefront_patch_info *header)
 	buf[0] = header->number;
 	munge_buf ((unsigned char *)&header->hdr.pr, &buf[1], WF_PROGRAM_BYTES);
     
-	if (snd_wavefront_cmd (dev, WFC_DOWNLOAD_PROGRAM, 0, buf)) {
+	if (snd_wavefront_cmd (dev, WFC_DOWNLOAD_PROGRAM, NULL, buf)) {
 		snd_printk ("download patch failed\n");	
 		return -(EIO);
 	}
@@ -850,7 +850,7 @@ wavefront_freemem (snd_wavefront_t *dev)
 {
 	char rbuf[8];
 
-	if (snd_wavefront_cmd (dev, WFC_REPORT_FREE_MEMORY, rbuf, 0)) {
+	if (snd_wavefront_cmd (dev, WFC_REPORT_FREE_MEMORY, rbuf, NULL)) {
 		snd_printk ("can't get memory stats.\n");
 		return -1;
 	} else {
@@ -876,7 +876,7 @@ wavefront_send_sample (snd_wavefront_t *dev,
 
 	u16 sample_short;
 	u32 length;
-	u16 __user *data_end = 0;
+	u16 __user *data_end = NULL;
 	unsigned int i;
 	const unsigned int max_blksize = 4096/2;
 	unsigned int written;
@@ -1053,7 +1053,7 @@ wavefront_send_sample (snd_wavefront_t *dev,
 	if (snd_wavefront_cmd (dev, 
 			   header->size ?
 			   WFC_DOWNLOAD_SAMPLE : WFC_DOWNLOAD_SAMPLE_HEADER,
-			   0, sample_hdr)) {
+			   NULL, sample_hdr)) {
 		snd_printk ("sample %sdownload refused.\n",
 			    header->size ? "" : "header ");
 		return -(EIO);
@@ -1079,7 +1079,7 @@ wavefront_send_sample (snd_wavefront_t *dev,
 			blocksize = ((length-written+7)&~0x7);
 		}
 
-		if (snd_wavefront_cmd (dev, WFC_DOWNLOAD_BLOCK, 0, 0)) {
+		if (snd_wavefront_cmd (dev, WFC_DOWNLOAD_BLOCK, NULL, NULL)) {
 			snd_printk ("download block "
 				    "request refused.\n");
 			return -(EIO);
@@ -1186,7 +1186,7 @@ wavefront_send_alias (snd_wavefront_t *dev, wavefront_patch_info *header)
 	munge_int32 (header->hdr.a.FrequencyBias, &alias_hdr[20], 3);
 	munge_int32 (*(&header->hdr.a.FrequencyBias+1), &alias_hdr[23], 2);
 
-	if (snd_wavefront_cmd (dev, WFC_DOWNLOAD_SAMPLE_ALIAS, 0, alias_hdr)) {
+	if (snd_wavefront_cmd (dev, WFC_DOWNLOAD_SAMPLE_ALIAS, NULL, alias_hdr)) {
 		snd_printk ("download alias failed.\n");
 		return -(EIO);
 	}
@@ -1314,7 +1314,7 @@ wavefront_send_drum (snd_wavefront_t *dev, wavefront_patch_info *header)
 		munge_int32 (((unsigned char *)drum)[i], &drumbuf[1+(i*2)], 2);
 	}
 
-	if (snd_wavefront_cmd (dev, WFC_DOWNLOAD_EDRUM_PROGRAM, 0, drumbuf)) {
+	if (snd_wavefront_cmd (dev, WFC_DOWNLOAD_EDRUM_PROGRAM, NULL, drumbuf)) {
 		snd_printk ("download drum failed.\n");
 		return -(EIO);
 	}
@@ -2085,7 +2085,7 @@ wavefront_do_reset (snd_wavefront_t *dev)
 
 	voices[0] = 32;
 
-	if (snd_wavefront_cmd (dev, WFC_SET_NVOICES, 0, voices)) {
+	if (snd_wavefront_cmd (dev, WFC_SET_NVOICES, NULL, voices)) {
 		snd_printk ("cannot set number of voices to 32.\n");
 		goto gone_bad;
 	}
