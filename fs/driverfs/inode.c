@@ -558,6 +558,16 @@ int __init init_driverfs_fs(void)
 	return register_filesystem(&driverfs_fs_type);
 }
 
+static struct dentry * get_dentry(struct dentry * parent, const char * name)
+{
+	struct qstr qstr;
+
+	qstr.name = name;
+	qstr.len = strlen(name);
+	qstr.hash = full_name_hash(name,qstr.len);
+	return lookup_hash(&qstr,parent);
+}
+
 /**
  * driverfs_create_dir - create a directory in the filesystem
  * @entry:	directory entry
@@ -569,7 +579,6 @@ driverfs_create_dir(struct driver_dir_entry * entry,
 {
 	struct dentry * dentry = NULL;
 	struct dentry * parent_dentry;
-	struct qstr qstr;
 	int error = 0;
 
 	if (!entry)
@@ -589,10 +598,7 @@ driverfs_create_dir(struct driver_dir_entry * entry,
 	}
 
 	down(&parent_dentry->d_inode->i_sem);
-	qstr.name = entry->name;
-	qstr.len = strlen(entry->name);
-	qstr.hash = full_name_hash(entry->name,qstr.len);
-	dentry = lookup_hash(&qstr,parent_dentry);
+	dentry = get_dentry(parent_dentry,entry->name);
 	if (!IS_ERR(dentry)) {
 		dentry->d_fsdata = (void *) entry;
 		entry->dentry = dentry;
@@ -616,7 +622,6 @@ driverfs_create_file(struct driver_file_entry * entry,
 		     struct driver_dir_entry * parent)
 {
 	struct dentry * dentry;
-	struct qstr qstr;
 	int error = 0;
 
 	if (!entry || !parent)
@@ -631,10 +636,7 @@ driverfs_create_file(struct driver_file_entry * entry,
 	}
 
 	down(&parent->dentry->d_inode->i_sem);
-	qstr.name = entry->name;
-	qstr.len = strlen(entry->name);
-	qstr.hash = full_name_hash(entry->name,qstr.len);
-	dentry = lookup_hash(&qstr,parent->dentry);
+	dentry = get_dentry(parent->dentry,entry->name);
 	if (!IS_ERR(dentry)) {
 		dentry->d_fsdata = (void *)entry;
 		error = driverfs_create(parent->dentry->d_inode,dentry,entry->mode);
@@ -658,7 +660,6 @@ int driverfs_create_symlink(struct driver_dir_entry * parent,
 			    char * target)
 {
 	struct dentry * dentry;
-	struct qstr qstr;
 	int error = 0;
 
 	if (!entry || !parent)
@@ -671,10 +672,7 @@ int driverfs_create_symlink(struct driver_dir_entry * parent,
 		return -EINVAL;
 	}
 	down(&parent->dentry->d_inode->i_sem);
-	qstr.name = entry->name;
-	qstr.len = strlen(entry->name);
-	qstr.hash = full_name_hash(entry->name,qstr.len);
-	dentry = lookup_hash(&qstr,parent->dentry);
+	dentry = get_dentry(parent->dentry,entry->name);
 	if (!IS_ERR(dentry)) {
 		dentry->d_fsdata = (void *)entry;
 		error = driverfs_symlink(parent->dentry->d_inode,dentry,target);
@@ -697,17 +695,12 @@ int driverfs_create_symlink(struct driver_dir_entry * parent,
 void driverfs_remove_file(struct driver_dir_entry * dir, const char * name)
 {
 	struct dentry * dentry;
-	struct qstr qstr;
 
 	if (!dir->dentry)
 		return;
 
 	down(&dir->dentry->d_inode->i_sem);
-	qstr.name = name;
-	qstr.len = strlen(name);
-	qstr.hash = full_name_hash(name,qstr.len);
-	dentry = lookup_hash(&qstr,dir->dentry);
-
+	dentry = get_dentry(dir->dentry,name);
 	if (!IS_ERR(dentry)) {
 		/* make sure dentry is really there */
 		if (dentry->d_inode && 
