@@ -787,7 +787,7 @@ static void edge_interrupt_callback (struct urb *urb)
 
 					/* we have pending bytes on the bulk in pipe, send a request */
 					edge_serial->read_urb->dev = edge_serial->serial->dev;
-					result = usb_submit_urb(edge_serial->read_urb);
+					result = usb_submit_urb(edge_serial->read_urb, GFP_KERNEL);
 					if (result) {
 						dbg(__FUNCTION__" - usb_submit_urb(read bulk) failed with result = %d", result);
 					}
@@ -864,7 +864,7 @@ static void edge_bulk_in_callback (struct urb *urb)
 
 			/* there is, so resubmit our urb */
 			edge_serial->read_urb->dev = edge_serial->serial->dev;
-			status = usb_submit_urb(edge_serial->read_urb);
+			status = usb_submit_urb(edge_serial->read_urb, GFP_KERNEL);
 			if (status) {
 				err(__FUNCTION__" - usb_submit_urb(read bulk) failed, status = %d", status);
 			}
@@ -1031,7 +1031,7 @@ static int edge_open (struct usb_serial_port *port, struct file * filp)
 
 			/* start interrupt read for this edgeport
 			 * this interrupt will continue as long as the edgeport is connected */
-			response = usb_submit_urb (edge_serial->interrupt_read_urb);
+			response = usb_submit_urb (edge_serial->interrupt_read_urb, GFP_KERNEL);
 			if (response) {
 				err(__FUNCTION__" - Error %d submitting control urb", response);
 			}
@@ -1471,7 +1471,7 @@ static void send_more_port_data(struct edgeport_serial *edge_serial, struct edge
 	urb->transfer_flags |= USB_QUEUE_BULK;
 
 	urb->dev = edge_serial->serial->dev;
-	status = usb_submit_urb(urb);
+	status = usb_submit_urb(urb, GFP_KERNEL);
 	if (status) {
 		/* something went wrong */
 		dbg(__FUNCTION__" - usb_submit_urb(write bulk) failed");
@@ -2477,7 +2477,7 @@ static int write_cmd_usb (struct edgeport_port *edge_port, unsigned char *buffer
 	urb->transfer_flags |= USB_QUEUE_BULK;
 
 	edge_port->commandPending = TRUE;
-	status = usb_submit_urb(urb);
+	status = usb_submit_urb(urb, GFP_KERNEL);
 
 	if (status) {
 		/* something went wrong */

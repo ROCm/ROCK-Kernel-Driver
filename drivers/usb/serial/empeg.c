@@ -182,7 +182,7 @@ static int empeg_open (struct usb_serial_port *port, struct file *filp)
 
 		port->read_urb->transfer_flags |= USB_QUEUE_BULK;
 
-		result = usb_submit_urb(port->read_urb);
+		result = usb_submit_urb(port->read_urb, GFP_KERNEL);
 
 		if (result)
 			err(__FUNCTION__ " - failed submitting read urb, error %d", result);
@@ -296,7 +296,7 @@ static int empeg_write (struct usb_serial_port *port, int from_user, const unsig
 		urb->transfer_flags |= USB_QUEUE_BULK;
 
 		/* send it down the pipe */
-		status = usb_submit_urb(urb);
+		status = usb_submit_urb(urb, GFP_KERNEL);
 		if (status) {
 			err(__FUNCTION__ " - usb_submit_urb(write bulk) failed with status = %d", status);
 			bytes_sent = status;
@@ -449,7 +449,7 @@ static void empeg_read_bulk_callback (struct urb *urb)
 
 	port->read_urb->transfer_flags |= USB_QUEUE_BULK;
 
-	result = usb_submit_urb(port->read_urb);
+	result = usb_submit_urb(port->read_urb, GFP_KERNEL);
 
 	if (result)
 		err(__FUNCTION__ " - failed resubmitting read urb, error %d", result);
@@ -484,7 +484,7 @@ static void empeg_unthrottle (struct usb_serial_port *port)
 
 	port->read_urb->dev = port->serial->dev;
 
-	result = usb_submit_urb(port->read_urb);
+	result = usb_submit_urb(port->read_urb, GFP_KERNEL);
 
 	if (result)
 		err(__FUNCTION__ " - failed submitting read urb, error %d", result);

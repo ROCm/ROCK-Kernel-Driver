@@ -171,7 +171,7 @@ static int ipaq_open(struct usb_serial_port *port, struct file *filp)
 			      usb_rcvbulkpipe(serial->dev, port->bulk_in_endpointAddress),
 			      port->read_urb->transfer_buffer, port->read_urb->transfer_buffer_length,
 			      ipaq_read_bulk_callback, port);
-		result = usb_submit_urb(port->read_urb);
+		result = usb_submit_urb(port->read_urb, GFP_KERNEL);
 		if (result) {
 			err(__FUNCTION__ " - failed submitting read urb, error %d", result);
 		}
@@ -288,7 +288,7 @@ static void ipaq_read_bulk_callback(struct urb *urb)
 		      usb_rcvbulkpipe(serial->dev, port->bulk_in_endpointAddress),
 		      port->read_urb->transfer_buffer, port->read_urb->transfer_buffer_length,
 		      ipaq_read_bulk_callback, port);
-	result = usb_submit_urb(port->read_urb);
+	result = usb_submit_urb(port->read_urb, GFP_KERNEL);
 	if (result)
 		err(__FUNCTION__ " - failed resubmitting read urb, error %d", result);
 	return;
@@ -403,7 +403,7 @@ static int ipaq_write_flush(struct usb_serial_port *port)
 		      usb_sndbulkpipe(serial->dev, port->bulk_out_endpointAddress),
 		      port->write_urb->transfer_buffer, count, ipaq_write_bulk_callback,
 		      port);
-	result = usb_submit_urb(urb);
+	result = usb_submit_urb(urb, GFP_KERNEL);
 	if (result) {
 		err(__FUNCTION__ " - failed submitting write urb, error %d", result);
 	}

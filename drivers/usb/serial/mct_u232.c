@@ -384,14 +384,14 @@ static int  mct_u232_open (struct usb_serial_port *port, struct file *filp)
 		}
 
 		port->read_urb->dev = port->serial->dev;
-		retval = usb_submit_urb(port->read_urb);
+		retval = usb_submit_urb(port->read_urb, GFP_KERNEL);
 		if (retval) {
 			err("usb_submit_urb(read bulk) failed");
 			goto exit;
 		}
 
 		port->interrupt_in_urb->dev = port->serial->dev;
-		retval = usb_submit_urb(port->interrupt_in_urb);
+		retval = usb_submit_urb(port->interrupt_in_urb, GFP_KERNEL);
 		if (retval)
 			err(" usb_submit_urb(read int) failed");
 
@@ -482,7 +482,7 @@ static int mct_u232_write (struct usb_serial_port *port, int from_user,
 			      port);
 		
 		/* send the data out the bulk port */
-		result = usb_submit_urb(port->write_urb);
+		result = usb_submit_urb(port->write_urb, GFP_KERNEL);
 		if (result) {
 			err(__FUNCTION__
 			    " - failed submitting write urb, error %d", result);
