@@ -472,7 +472,6 @@ static void __exit exit_nfsd(void)
 	remove_proc_entry("fs/nfs", NULL);
 	nfsd_stat_shutdown();
 	nfsd_lockd_shutdown();
-	nfs4_state_shutdown();
 	unregister_filesystem(&nfsd_fs_type);
 }
 

@@ -141,6 +141,7 @@ struct nfsd4_open {
 	struct nfsd4_change_info  op_cinfo; /* response */
 	u32		op_rflags;          /* response */
 	int		op_truncate;        /* used during processing */
+	struct nfs4_stateowner *op_stateowner; /* used during processing */
 
 };
 #define op_iattr	u.iattr
@@ -322,7 +323,8 @@ int nfsd4_encode_fattr(struct svc_fh *fhp, struct svc_export *exp,
 		       struct dentry *dentry, u32 *buffer, int *countp, u32 *bmval);
 extern int nfsd4_setclientid(struct svc_rqst *rqstp, struct nfsd4_setclientid *setclid);
 extern int nfsd4_setclientid_confirm(struct svc_rqst *rqstp, struct nfsd4_setclientid_confirm *setclientid_confirm);
-
+extern int nfsd4_process_open1(struct nfsd4_open *open);
+extern int nfsd4_process_open2(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_open *open);
 #endif
 
 /*
