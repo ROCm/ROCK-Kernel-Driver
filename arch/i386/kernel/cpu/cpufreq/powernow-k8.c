@@ -521,11 +521,12 @@ static void print_basics(struct powernow_k8_data *data)
 {
 	int j;
 	for (j = 0; j < data->numps; j++) {
-		printk(KERN_INFO PFX "   %d : fid 0x%x (%d MHz), vid 0x%x (%d mV)\n", j,
-			data->powernow_table[j].index & 0xff,
-			data->powernow_table[j].frequency/1000,
-			data->powernow_table[j].index >> 8,
-			find_millivolts_from_vid(data, data->powernow_table[j].index >> 8));
+		if (data->powernow_table[j].frequency != CPUFREQ_ENTRY_INVALID)
+			printk(KERN_INFO PFX "   %d : fid 0x%x (%d MHz), vid 0x%x (%d mV)\n", j,
+				data->powernow_table[j].index & 0xff,
+				data->powernow_table[j].frequency/1000,
+				data->powernow_table[j].index >> 8,
+				find_millivolts_from_vid(data, data->powernow_table[j].index >> 8));
 	}
 	if (data->batps)
 		printk(KERN_INFO PFX "Only %d pstates on battery\n", data->batps);
@@ -720,7 +721,7 @@ static int powernow_k8_cpu_init_acpi(struct powernow_k8_data *data)
 		/* verify frequency is OK */
 		if ((powernow_table[i].frequency > (MAX_FREQ * 1000)) ||
 			(powernow_table[i].frequency < (MIN_FREQ * 1000))) {
-			dprintk(KERN_INFO PFX "invalid freq %u kHz\n", powernow_table[i].frequency);
+			dprintk(KERN_INFO PFX "invalid freq %u kHz, ignoring\n", powernow_table[i].frequency);
 			powernow_table[i].frequency = CPUFREQ_ENTRY_INVALID;
 			continue;
 		}
