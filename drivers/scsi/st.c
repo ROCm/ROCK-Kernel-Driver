@@ -232,7 +232,7 @@ static char * st_incompatible(Scsi_Device* SDp)
 
 static inline char *tape_name(Scsi_Tape *tape)
 {
-	return tape->name;
+	return tape->disk->disk_name;
 }
 
 /* Convert the result to success code */
@@ -329,14 +329,10 @@ static int st_chk_result(Scsi_Tape *STp, Scsi_Request * SRpnt)
 /* Wakeup from interrupt */
 static void st_sleep_done(Scsi_Cmnd * SCpnt)
 {
-	unsigned int st_nbr;
 	int remainder;
-	Scsi_Tape *STp;
+	Scsi_Tape *STp = container_of(SCpnt->request->rq_disk->private_data,
+				    Scsi_Tape, driver);
 
-	st_nbr = TAPE_NR(SCpnt->request->rq_dev);
-	read_lock(&st_dev_arr_lock);
-	STp = scsi_tapes[st_nbr];
-	read_unlock(&st_dev_arr_lock);
 	if ((STp->buffer)->writing &&
 	    (SCpnt->sense_buffer[0] & 0x70) == 0x70 &&
 	    (SCpnt->sense_buffer[2] & 0x40)) {
@@ -397,7 +393,9 @@ static Scsi_Request *
 	SRpnt->sr_cmd_len = 0;
 	SRpnt->sr_request->waiting = &(STp->wait);
 	SRpnt->sr_request->rq_status = RQ_SCSI_BUSY;
-	SRpnt->sr_request->rq_dev = STp->devt;
+	SRpnt->sr_request->rq_dev = mk_kdev(STp->disk->major,
+					    STp->disk->first_minor);
+	SRpnt->sr_request->rq_disk = STp->disk;
 
 	scsi_do_req(SRpnt, (void *) cmd, bp, bytes,
 		    st_sleep_done, timeout, retries);
@@ -3650,6 +3648,7 @@ static struct file_operations st_fops =
 
 static int st_attach(Scsi_Device * SDp)
 {
+	struct gendisk *disk;
 	Scsi_Tape *tpnt;
 	ST_mode *STm;
 	ST_partstat *STps;
@@ -3677,6 +3676,12 @@ static int st_attach(Scsi_Device * SDp)
 		return 1;
 	}
 
+	disk = alloc_disk(1);
+	if (!disk) {
+		printk(KERN_ERR "st: out of memory. Device not attached.\n");
+		return 1;
+	}
+
 	write_lock(&st_dev_arr_lock);
 	if (st_template.nr_dev >= st_template.dev_max) {
 		Scsi_Tape **tmp_da;
@@ -3691,6 +3696,7 @@ static int st_attach(Scsi_Device * SDp)
 			write_unlock(&st_dev_arr_lock);
 			printk(KERN_ERR "st: Too many tape devices (max. %d).\n",
 			       ST_MAX_TAPES);
+			put_disk(disk);
 			return 1;
 		}
 
@@ -3704,6 +3710,7 @@ static int st_attach(Scsi_Device * SDp)
 			SDp->attached--;
 			write_unlock(&st_dev_arr_lock);
 			printk(KERN_ERR "st: Can't extend device array.\n");
+			put_disk(disk);
 			return 1;
 		}
 
@@ -3729,10 +3736,16 @@ static int st_attach(Scsi_Device * SDp)
 		SDp->attached--;
 		write_unlock(&st_dev_arr_lock);
 		printk(KERN_ERR "st: Can't allocate device descriptor.\n");
+		put_disk(disk);
 		return 1;
 	}
 	memset(tpnt, 0, sizeof(Scsi_Tape));
-	sprintf(tpnt->name, "st%d", i);
+	tpnt->disk = disk;
+	disk->major = SCSI_TAPE_MAJOR;	/* yeah, yeah */
+	disk->first_minor = i;
+	sprintf(disk->disk_name, "st%d", i);
+	disk->private_data = &tpnt->driver;
+	tpnt->driver = &st_template;
 	scsi_tapes[i] = tpnt;
 	dev_num = i;
 
@@ -3744,8 +3757,7 @@ static int st_attach(Scsi_Device * SDp)
 
 	tpnt->buffer = buffer;
 
-        tpnt->inited = 0;
-	tpnt->devt = mk_kdev(SCSI_TAPE_MAJOR, i);
+	tpnt->inited = 0;
 	tpnt->dirty = 0;
 	tpnt->in_use = 0;
 	tpnt->drv_buffer = 1;	/* Try buffering if no mode sense */
@@ -3919,6 +3931,7 @@ static void st_detach(Scsi_Device * SDp)
 				normalize_buffer(tpnt->buffer);
 				kfree(tpnt->buffer);
 			}
+			put_disk(tpnt->disk);
 			kfree(tpnt);
 			return;
 		}
@@ -3955,8 +3968,10 @@ static void __exit exit_st(void)
 	unregister_chrdev(SCSI_TAPE_MAJOR, "st");
 	if (scsi_tapes != NULL) {
 		for (i=0; i < st_template.dev_max; ++i)
-			if (scsi_tapes[i])
+			if (scsi_tapes[i]) {
+				put_disk(scsi_tapes[i]->disk);
 				kfree(scsi_tapes[i]);
+			}
 		kfree(scsi_tapes);
 	}
 	st_template.dev_max = 0;
