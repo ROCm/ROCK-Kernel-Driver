@@ -506,6 +506,17 @@ no_voyager:
 	movw	$0xAA, (0x1ff)			# device present
 no_psmouse:
 
+#if defined(CONFIG_X86_SPEEDSTEP_SMI) || defined(CONFIG_X86_SPEEDSTEP_SMI_MODULE)
+	movl	$0x0000E980, %eax		# IST Support 
+	movl	$0x47534943, %edx		# Request value
+	int	$0x15
+
+	movl	%eax, (96)
+	movl	%ebx, (100)
+	movl	%ecx, (104)
+	movl	%edx, (108)
+#endif
+
 #if defined(CONFIG_APM) || defined(CONFIG_APM_MODULE)
 # Then check for an APM BIOS...
 						# %ds points to the bootsector

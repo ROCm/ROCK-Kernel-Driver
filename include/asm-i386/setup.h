@@ -26,6 +26,7 @@
 #define E820_MAP_NR (*(char*) (PARAM+E820NR))
 #define E820_MAP    ((struct e820entry *) (PARAM+E820MAP))
 #define APM_BIOS_INFO (*(struct apm_bios_info *) (PARAM+0x40))
+#define IST_INFO   (*(struct ist_info *) (PARAM+0x60))
 #define DRIVE_INFO (*(struct drive_info_struct *) (PARAM+0x80))
 #define SYS_DESC_TABLE (*(struct sys_desc_table_struct*)(PARAM+0xa0))
 #define MOUNT_ROOT_RDONLY (*(unsigned short *) (PARAM+0x1F2))

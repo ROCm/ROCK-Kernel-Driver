@@ -99,19 +99,6 @@ config X86_GX_SUSPMOD
 
 	 If in doubt, say N.
 
-config X86_SPEEDSTEP_ICH
-	tristate "Intel Speedstep"
-	depends on CPU_FREQ_TABLE
-	help
-	  This adds the CPUFreq driver for certain mobile Intel Pentium III
-	  (Coppermine), all mobile Intel Pentium III-M (Tualatin) and all
-	  mobile Intel Pentium 4 P4-Ms, with an Intel ICH2, ICH3,
-	  or ICH4 southbridge.
-
-	  For details, take a look at linux/Documentation/cpu-freq. 
-
-	  If in doubt, say N.
-
 config X86_SPEEDSTEP_CENTRINO
 	tristate "Intel Enhanced SpeedStep"
 	depends on CPU_FREQ_TABLE
@@ -123,10 +110,35 @@ config X86_SPEEDSTEP_CENTRINO
 	  
 	  If in doubt, say N.
 
+config X86_SPEEDSTEP_ICH
+	tristate "Intel Speedstep on ICH-M chipsets (ioport interface)"
+	depends on CPU_FREQ_TABLE
+	help
+	  This adds the CPUFreq driver for certain mobile Intel Pentium III
+	  (Coppermine), all mobile Intel Pentium III-M (Tualatin) and all
+	  mobile Intel Pentium 4 P4-M on systems which have an Intel ICH2, 
+	  ICH3 or ICH4 southbridge.
+
+	  For details, take a look at linux/Documentation/cpu-freq. 
+
+	  If in doubt, say N.
+
+config X86_SPEEDSTEP_SMI
+	tristate "Intel SpeedStep on 440BX/ZX/MX chipsets (SMI interface)"
+	depends on CPU_FREQ_TABLE && EXPERIMENTAL
+	help
+	  This adds the CPUFreq driver for certain mobile Intel Pentium III
+	  (Coppermine), all mobile Intel Pentium III-M (Tualatin)  
+	  on systems which have an Intel 440BX/ZX/MX southbridge.
+
+	  For details, take a look at linux/Documentation/cpu-freq.
+
+	  If in doubt, say N.
+
 config X86_SPEEDSTEP_LIB
-       tristate
-       depends on X86_SPEEDSTEP_ICH
-       default X86_SPEEDSTEP_ICH
+	tristate
+	depends on (X86_SPEEDSTEP_ICH || X86_SPEEDSTEP_SMI)
+	default (X86_SPEEDSTEP_ICH || X86_SPEEDSTEP_SMI)
 
 config X86_P4_CLOCKMOD
 	tristate "Intel Pentium 4 clock modulation"
