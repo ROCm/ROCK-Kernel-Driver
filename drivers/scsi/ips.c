@@ -164,7 +164,6 @@
 #include <linux/pci.h>
 #include <linux/proc_fs.h>
 #include <linux/reboot.h>
-#include <linux/tqueue.h>
 #include <linux/interrupt.h>
 
 #include <linux/blk.h>
