@@ -54,10 +54,9 @@
 int smp_threads_ready;
 unsigned long cache_decay_ticks;
 
-/* Initialised so it doesn't end up in bss */
-cpumask_t cpu_possible_map    = CPU_MASK_NONE;
+cpumask_t cpu_possible_map = CPU_MASK_NONE;
 cpumask_t cpu_online_map = CPU_MASK_NONE;
-cpumask_t cpu_available_map   = CPU_MASK_NONE;
+cpumask_t cpu_available_map = CPU_MASK_NONE;
 cpumask_t cpu_present_at_boot = CPU_MASK_NONE;
 
 EXPORT_SYMBOL(cpu_online_map);
@@ -71,14 +70,12 @@ extern unsigned char stab_array[];
 
 extern int cpu_idle(void *unused);
 void smp_call_function_interrupt(void);
-void smp_message_pass(int target, int msg, unsigned long data, int wait);
 extern long register_vpa(unsigned long flags, unsigned long proc,
 			 unsigned long vpa);
 
-#define smp_message_pass(t,m,d,w) smp_ops->message_pass((t),(m),(d),(w))
-
 /* Low level assembly function used to backup CPU 0 state */
 extern void __save_cpu_setup(void);
+
 #ifdef CONFIG_PPC_ISERIES
 static unsigned long iSeries_smp_message[NR_CPUS];
 
@@ -101,8 +98,7 @@ static inline void smp_iSeries_do_message(int cpu, int msg)
 	HvCall_sendIPI(&(paca[cpu]));
 }
 
-static void
-smp_iSeries_message_pass(int target, int msg, long data, int wait)
+static void smp_iSeries_message_pass(int target, int msg)
 {
 	int i;
 
@@ -155,7 +151,7 @@ static int smp_iSeries_probe(void)
 
 static void smp_iSeries_kick_cpu(int nr)
 {
-	struct ItLpPaca * lpPaca;
+	struct ItLpPaca *lpPaca;
 
 	BUG_ON(nr < 0 || nr >= NR_CPUS);
 
@@ -192,7 +188,7 @@ void __init smp_init_iSeries(void)
 #endif
 
 #ifdef CONFIG_PPC_PSERIES
-void smp_openpic_message_pass(int target, int msg, unsigned long data, int wait)
+void smp_openpic_message_pass(int target, int msg)
 {
 	/* make sure we're sending something that translates to an IPI */
 	if ( msg > 0x3 ){
@@ -279,7 +275,7 @@ static inline void smp_xics_do_message(int cpu, int msg)
 	xics_cause_IPI(cpu);
 }
 
-static void smp_xics_message_pass(int target, int msg, unsigned long data, int wait)
+static void smp_xics_message_pass(int target, int msg)
 {
 	unsigned int i;
 
@@ -405,13 +401,13 @@ void smp_message_recv(int msg, struct pt_regs *regs)
 
 void smp_send_reschedule(int cpu)
 {
-	smp_message_pass(cpu, PPC_MSG_RESCHEDULE, 0, 0);
+	smp_ops->message_pass(cpu, PPC_MSG_RESCHEDULE);
 }
 
 #ifdef CONFIG_DEBUGGER
 void smp_send_debugger_break(int cpu)
 {
-	smp_message_pass(cpu, PPC_MSG_DEBUGGER_BREAK, 0, 0);
+	smp_ops->message_pass(cpu, PPC_MSG_DEBUGGER_BREAK);
 }
 #endif
 
@@ -481,7 +477,7 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 	call_data = &data;
 	wmb();
 	/* Send a message to all other CPUs and wait for them to respond */
-	smp_message_pass(MSG_ALL_BUT_SELF, PPC_MSG_CALL_FUNCTION, 0, 0);
+	smp_ops->message_pass(MSG_ALL_BUT_SELF, PPC_MSG_CALL_FUNCTION);
 
 	/* Wait for response */
 	timeout = SMP_CALL_TIMEOUT;
@@ -537,6 +533,9 @@ void smp_call_function_interrupt(void)
 	info = call_data->info;
 	wait = call_data->wait;
 
+	if (!wait)
+		smp_mb__before_atomic_inc();
+
 	/*
 	 * Notify initiating CPU that I've grabbed the data and am
 	 * about to execute the function
@@ -546,8 +545,10 @@ void smp_call_function_interrupt(void)
 	 * At this point the info structure may be out of scope unless wait==1
 	 */
 	(*func)(info);
-	if (wait)
+	if (wait) {
+		smp_mb__before_atomic_inc();
 		atomic_inc(&call_data->finished);
+	}
 }
 
 extern unsigned long decr_overclock;
