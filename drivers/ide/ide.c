@@ -2115,10 +2115,7 @@ done:
 static void __init probe_for_hwifs (void)
 {
 #ifdef CONFIG_BLK_DEV_IDEPCI
-	if (pci_present())
-	{
-		ide_scan_pcibus(ide_scan_direction);
-	}
+	ide_scan_pcibus(ide_scan_direction);
 #endif /* CONFIG_BLK_DEV_IDEPCI */
 
 #ifdef CONFIG_ETRAX_IDE
