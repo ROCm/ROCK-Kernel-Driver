@@ -639,8 +639,9 @@ CIFSSMBLock(const int xid, struct cifsTconInfo *tcon,
 	if (rc)
 		return rc;
 
-	if(lockType == LOCKING_ANDX_OPLOCK_RELEASE)
+	if(lockType == LOCKING_ANDX_OPLOCK_RELEASE) {
 		timeout = -1; /* no response expected */
+	}
 
 	pSMB->NumberOfLocks = cpu_to_le32(numLock);
 	pSMB->NumberOfUnlocks = cpu_to_le32(numUnlock);
@@ -754,7 +755,7 @@ CIFSSMBRename(const int xid, struct cifsTconInfo *tcon,
 	rc = SendReceive(xid, tcon->ses, (struct smb_hdr *) pSMB,
 			 (struct smb_hdr *) pSMBr, &bytes_returned, 0);
 	if (rc) {
-		cFYI(1, ("Send error in RMDir = %d", rc));
+		cFYI(1, ("Send error in rename = %d", rc));
 	}
 	if (pSMB)
 		buf_release(pSMB);
@@ -762,18 +763,19 @@ CIFSSMBRename(const int xid, struct cifsTconInfo *tcon,
 	return rc;
 }
 
-int CIFSSMBDummyRenameOpenFile(const int xid,struct cifsTconInfo *pTcon, 
-		int netfid, const struct nls_table * nls_codepage) 
+int CIFSSMBRenameOpenFile(const int xid,struct cifsTconInfo *pTcon, 
+		int netfid, char * target_name, const struct nls_table * nls_codepage) 
 {
         struct smb_com_transaction2_sfi_req *pSMB  = NULL;
         struct smb_com_transaction2_sfi_rsp *pSMBr = NULL;
 	struct set_file_rename * rename_info;
         char *data_offset;
+	char dummy_string[30];
         int rc = 0;
         int bytes_returned = 0;
 	int len_of_str;
 
-        cFYI(1, ("Rename to Dummy Random File Name"));
+        cFYI(1, ("Rename to File by handle"));
 
         rc = smb_init(SMB_COM_TRANSACTION2, 15, pTcon, (void **) &pSMB,
                       (void **) &pSMBr);
@@ -805,12 +807,19 @@ int CIFSSMBDummyRenameOpenFile(const int xid,struct cifsTconInfo *pTcon,
 	/* construct random name ".cifs_tmp<inodenum><mid>" */
 	rename_info->overwrite = cpu_to_le32(1);
 	rename_info->root_fid  = 0;
-        len_of_str = cifs_strtoUCS((wchar_t *) rename_info->target_name, ".cifs", 12, nls_codepage);
+	/* unicode only call */
+	if(target_name == NULL) {
+		sprintf(dummy_string,"cifs%x",pSMB->hdr.Mid);
+	        len_of_str = cifs_strtoUCS((wchar_t *) rename_info->target_name, dummy_string, 24, nls_codepage);
+	} else {
+		len_of_str = cifs_strtoUCS((wchar_t *) rename_info->target_name, target_name, 530, nls_codepage);
+	}
+	cFYI(1,("len of str: %d", len_of_str)); /* BB removeme BB */
+	rename_info->target_name_len = cpu_to_le32(2 * len_of_str);
 	pSMB->DataCount = 12 /* sizeof(struct set_file_rename) */ + (2 * len_of_str);
         pSMB->ByteCount += pSMB->DataCount;
         pSMB->DataCount = cpu_to_le16(pSMB->DataCount);
         pSMB->Fid = netfid;
-	/* should we check the passthrough bit ? */
 	pSMB->InformationLevel =
 		cpu_to_le16(SMB_SET_FILE_RENAME_INFORMATION);
         pSMB->Reserved4 = 0;
@@ -819,7 +828,7 @@ int CIFSSMBDummyRenameOpenFile(const int xid,struct cifsTconInfo *pTcon,
         rc = SendReceive(xid, pTcon->ses, (struct smb_hdr *) pSMB,
                          (struct smb_hdr *) pSMBr, &bytes_returned, 0);
         if (rc) {
-                cFYI(1,("Send error in DummyRename = %d", rc));
+                cFYI(1,("Send error in Rename (by file handle) = %d", rc));
         }
 
         if (pSMB)

@@ -169,7 +169,10 @@ smb_send(struct socket *ssocket, struct smb_hdr *smb_buffer,
 	temp_fs = get_fs();	/* we must turn off socket api parm checking */
 	set_fs(get_ds());
 	rc = sock_sendmsg(ssocket, &smb_msg, smb_buf_length + 4);
-
+	while(rc == -ENOSPC) {
+		schedule_timeout(HZ/2);
+		rc = sock_sendmsg(ssocket, &smb_msg, smb_buf_length + 4);
+	}
 	set_fs(temp_fs);
 
 	if (rc < 0) {

@@ -353,8 +353,8 @@ cifs_unlink(struct inode *inode, struct dentry *direntry)
 				CREATE_NOT_DIR | CREATE_DELETE_ON_CLOSE,
 				&netfid, &oplock, NULL, cifs_sb->local_nls);
 		if(rc==0) {
-			CIFSSMBDummyRenameOpenFile(xid,pTcon,netfid,
-				cifs_sb->local_nls);
+			CIFSSMBRenameOpenFile(xid,pTcon,netfid,
+				NULL, cifs_sb->local_nls);
 			CIFSSMBClose(xid, pTcon, netfid);
 			direntry->d_inode->i_nlink--;
 		}
@@ -381,7 +381,7 @@ cifs_unlink(struct inode *inode, struct dentry *direntry)
                                 	CREATE_NOT_DIR | CREATE_DELETE_ON_CLOSE,
 	                                &netfid, &oplock, NULL, cifs_sb->local_nls);
 				if(rc==0) {
-					CIFSSMBDummyRenameOpenFile(xid,pTcon,netfid,cifs_sb->local_nls);
+					CIFSSMBRenameOpenFile(xid,pTcon,netfid,NULL,cifs_sb->local_nls);
 					CIFSSMBClose(xid, pTcon, netfid);
 		                        direntry->d_inode->i_nlink--;
 				}
@@ -525,6 +525,20 @@ cifs_rename(struct inode *source_inode, struct dentry *source_direntry,
 		cifs_unlink(target_inode, target_direntry);
 		rc = CIFSSMBRename(xid, pTcon, fromName, toName,
 				   cifs_sb_source->local_nls);
+	}
+
+	if((rc == -EIO)||(rc == -EEXIST)) {
+                int oplock = FALSE;
+                __u16 netfid;
+
+                rc = CIFSSMBOpen(xid, pTcon, fromName, FILE_OPEN, GENERIC_READ,
+                                CREATE_NOT_DIR,
+                                &netfid, &oplock, NULL, cifs_sb_source->local_nls);
+                if(rc==0) {
+                        CIFSSMBRenameOpenFile(xid,pTcon,netfid,
+                                toName, cifs_sb_source->local_nls);
+                        CIFSSMBClose(xid, pTcon, netfid);
+                }
 	}
 	if (fromName)
 		kfree(fromName);
