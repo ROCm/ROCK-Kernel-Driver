@@ -82,13 +82,17 @@ static struct linux_binfmt elf_format = {
 
 #define BAD_ADDR(x)	((unsigned long)(x) > TASK_SIZE)
 
-static void set_brk(unsigned long start, unsigned long end)
+static int set_brk(unsigned long start, unsigned long end)
 {
 	start = ELF_PAGEALIGN(start);
 	end = ELF_PAGEALIGN(end);
-	if (end > start)
-		do_brk(start, end - start);
+	if (end > start) {
+		unsigned long addr = do_brk(start, end - start);
+		if (BAD_ADDR(addr))
+			return addr;
+	}
 	current->mm->start_brk = current->mm->brk = end;
+	return 0;
 }
 
 
@@ -381,8 +385,11 @@ static unsigned long load_elf_interp(struct elfhdr * interp_elf_ex,
 	elf_bss = ELF_PAGESTART(elf_bss + ELF_MIN_ALIGN - 1);	/* What we have mapped so far */
 
 	/* Map the last of the bss segment */
-	if (last_bss > elf_bss)
-		do_brk(elf_bss, last_bss - elf_bss);
+	if (last_bss > elf_bss) {
+		error = do_brk(elf_bss, last_bss - elf_bss);
+		if (BAD_ADDR(error))
+			goto out_close;
+	}
 
 	*interp_load_addr = load_addr;
 	error = ((unsigned long) interp_elf_ex->e_entry) + load_addr;
@@ -691,7 +698,12 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 			/* There was a PT_LOAD segment with p_memsz > p_filesz
 			   before this one. Map anonymous pages, if needed,
 			   and clear the area.  */
-			set_brk (elf_bss + load_bias, elf_brk + load_bias);
+			retval = set_brk (elf_bss + load_bias,
+					  elf_brk + load_bias);
+			if (retval) {
+				send_sig(SIGKILL, current, 0);
+				goto out_free_dentry;
+			}
 			nbyte = ELF_PAGEOFFSET(elf_bss);
 			if (nbyte) {
 				nbyte = ELF_MIN_ALIGN - nbyte;
@@ -756,6 +768,18 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 	start_data += load_bias;
 	end_data += load_bias;
 
+	/* Calling set_brk effectively mmaps the pages that we need
+	 * for the bss and break sections.  We must do this before
+	 * mapping in the interpreter, to make sure it doesn't wind
+	 * up getting placed where the bss needs to go.
+	 */
+	retval = set_brk(elf_bss, elf_brk);
+	if (retval) {
+		send_sig(SIGKILL, current, 0);
+		goto out_free_dentry;
+	}
+	padzero(elf_bss);
+
 	if (elf_interpreter) {
 		if (interpreter_type == INTERPRETER_AOUT)
 			elf_entry = load_aout_interp(&interp_ex,
@@ -798,13 +822,6 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 	current->mm->start_data = start_data;
 	current->mm->end_data = end_data;
 	current->mm->start_stack = bprm->p;
-
-	/* Calling set_brk effectively mmaps the pages that we need
-	 * for the bss and break sections
-	 */
-	set_brk(elf_bss, elf_brk);
-
-	padzero(elf_bss);
 
 	if (current->personality & MMAP_PAGE_ZERO) {
 		/* Why this, you ask???  Well SVr4 maps page 0 as read-only,
