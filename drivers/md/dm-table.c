@@ -591,7 +591,7 @@ int dm_table_add_target(struct dm_table *t, const char *type,
 	tgt->type = dm_get_target_type(type);
 	if (!tgt->type) {
 		tgt->error = "unknown target type";
-		goto bad;
+		return r;
 	}
 
 	tgt->table = t;
