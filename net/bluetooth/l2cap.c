@@ -191,8 +191,7 @@ static struct sock *__l2cap_get_sock_by_addr(u16 psm, bdaddr_t *src)
 {
 	struct sock *sk;
 	for (sk = l2cap_sk_list.head; sk; sk = sk->next) {
-		if (l2cap_pi(sk)->psm == psm &&
-				!bacmp(&bt_sk(sk)->src, src))
+		if (l2cap_pi(sk)->sport == psm && !bacmp(&bt_sk(sk)->src, src))
 			break;
 	}
 	return sk;
@@ -416,7 +415,8 @@ static int l2cap_sock_bind(struct socket *sock, struct sockaddr *addr, int addr_
 	} else {
 		/* Save source address */
 		bacpy(&bt_sk(sk)->src, &la->l2_bdaddr);
-		l2cap_pi(sk)->psm = la->l2_psm;
+		l2cap_pi(sk)->psm   = la->l2_psm;
+		l2cap_pi(sk)->sport = la->l2_psm;
 		sk->state = BT_BOUND;
 	}
 	write_unlock_bh(&l2cap_sk_list.lock);
