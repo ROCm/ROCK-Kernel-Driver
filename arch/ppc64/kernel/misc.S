@@ -930,7 +930,6 @@ _GLOBAL(sys_call_table)
 	.llong .sys_vfork
 	.llong .sys_getrlimit	        /* 190 */
 	.llong .sys_readahead
-	.llong .sys_ni_syscall		/* 191 */	/* Unused */
 	.llong .sys_ni_syscall		/* 192 - reserved - mmap2 */
 	.llong .sys_ni_syscall		/* 193 - reserved - truncate64 */
 	.llong .sys_ni_syscall		/* 194 - reserved - ftruncate64 */
