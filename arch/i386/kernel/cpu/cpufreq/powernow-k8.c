@@ -637,8 +637,8 @@ static int find_psb_table(struct powernow_k8_data *data)
 		dprintk("isochronous relief time: %d\n", data->irt);
 		dprintk("maximum voltage step: %d - 0x%x\n", mvs, data->vidmvs);
 
-		dprintk("numpst: 0x%x\n", psb->numps);
-		cpst = psb->numps;
+		dprintk("numpst: 0x%x\n", psb->num_tables);
+		cpst = psb->num_tables;
 		if ((psb->cpuid == 0x00000fc0) || (psb->cpuid == 0x00000fe0) ){
 			thiscpuid = cpuid_eax(CPUID_PROCESSOR_SIGNATURE);
 			if ((thiscpuid == 0x00000fc0) || (thiscpuid == 0x00000fe0) ) {
