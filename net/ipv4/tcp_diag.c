@@ -466,16 +466,26 @@ static int tcpdiag_bc_audit(const void *bytecode, int bytecode_len)
 	return len == 0 ? 0 : -EINVAL;
 }
 
+static int tcpdiag_dump_sock(struct sk_buff *skb, struct sock *sk,
+			     struct netlink_callback *cb)
+{
+	struct tcpdiagreq *r = NLMSG_DATA(cb->nlh);
+
+	if (cb->nlh->nlmsg_len > 4 + NLMSG_SPACE(sizeof(*r))) {
+		struct rtattr *bc = (struct rtattr *)(r + 1);
+		if (!tcpdiag_bc_run(RTA_DATA(bc), RTA_PAYLOAD(bc), sk))
+			return 0;
+	}
+
+	return tcpdiag_fill(skb, sk, r->tcpdiag_ext, NETLINK_CB(cb->skb).pid,
+			    cb->nlh->nlmsg_seq);
+}
 
 static int tcpdiag_dump(struct sk_buff *skb, struct netlink_callback *cb)
 {
 	int i, num;
 	int s_i, s_num;
 	struct tcpdiagreq *r = NLMSG_DATA(cb->nlh);
-	struct rtattr *bc = NULL;
-
-	if (cb->nlh->nlmsg_len > 4+NLMSG_SPACE(sizeof(struct tcpdiagreq)))
-		bc = (struct rtattr*)(r+1);
 
 	s_i = cb->args[1];
 	s_num = num = cb->args[2];
@@ -502,11 +512,7 @@ static int tcpdiag_dump(struct sk_buff *skb, struct netlink_callback *cb)
 				if (r->id.tcpdiag_sport != inet->sport &&
 				    r->id.tcpdiag_sport)
 					goto next_listen;
-				if (bc && !tcpdiag_bc_run(RTA_DATA(bc), RTA_PAYLOAD(bc), sk))
-					goto next_listen;
-				if (tcpdiag_fill(skb, sk, r->tcpdiag_ext,
-						 NETLINK_CB(cb->skb).pid,
-						 cb->nlh->nlmsg_seq) <= 0) {
+				if (tcpdiag_dump_sock(skb, sk, cb) < 0) {
 					tcp_listen_unlock();
 					goto done;
 				}
@@ -546,11 +552,7 @@ skip_listen_ht:
 				goto next_normal;
 			if (r->id.tcpdiag_dport != inet->dport && r->id.tcpdiag_dport)
 				goto next_normal;
-			if (bc && !tcpdiag_bc_run(RTA_DATA(bc), RTA_PAYLOAD(bc), sk))
-				goto next_normal;
-			if (tcpdiag_fill(skb, sk, r->tcpdiag_ext,
-					 NETLINK_CB(cb->skb).pid,
-					 cb->nlh->nlmsg_seq) <= 0) {
+			if (tcpdiag_dump_sock(skb, sk, cb) < 0) {
 				read_unlock_bh(&head->lock);
 				goto done;
 			}
@@ -571,11 +573,7 @@ next_normal:
 				if (r->id.tcpdiag_dport != inet->dport &&
 				    r->id.tcpdiag_dport)
 					goto next_dying;
-				if (bc && !tcpdiag_bc_run(RTA_DATA(bc), RTA_PAYLOAD(bc), sk))
-					goto next_dying;
-				if (tcpdiag_fill(skb, sk, r->tcpdiag_ext,
-						 NETLINK_CB(cb->skb).pid,
-						 cb->nlh->nlmsg_seq) <= 0) {
+				if (tcpdiag_dump_sock(skb, sk, cb) < 0) {
 					read_unlock_bh(&head->lock);
 					goto done;
 				}
