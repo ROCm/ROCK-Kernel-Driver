@@ -17,6 +17,7 @@
 #define _LINUX_CRYPTO_H
 
 #include <linux/module.h>
+#include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/list.h>
 #include <linux/string.h>
