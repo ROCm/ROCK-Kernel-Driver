@@ -163,15 +163,18 @@ int fastcall attach_pid(task_t *task, enum pid_type type, int nr)
 	return 0;
 }
 
-static inline int __detach_pid(task_t *task, enum pid_type type)
+static fastcall int __detach_pid(task_t *task, enum pid_type type)
 {
 	struct pid *pid, *pid_next;
-	int nr;
+	int nr = 0;
 
 	pid = &task->pids[type];
 	if (!hlist_unhashed(&pid->pid_chain)) {
 		hlist_del(&pid->pid_chain);
-		if (!list_empty(&pid->pid_list)) {
+
+		if (list_empty(&pid->pid_list))
+			nr = pid->nr;
+		else {
 			pid_next = list_entry(pid->pid_list.next,
 						struct pid, pid_list);
 			/* insert next pid from pid_list to hash */
@@ -179,8 +182,8 @@ static inline int __detach_pid(task_t *task, enum pid_type type)
 				&pid_hash[type][pid_hashfn(pid_next->nr)]);
 		}
 	}
+
 	list_del(&pid->pid_list);
-	nr = pid->nr;
 	pid->nr = 0;
 
 	return nr;
