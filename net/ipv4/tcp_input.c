@@ -2065,7 +2065,6 @@ static void init_westwood(struct sock *sk)
 {
         struct tcp_opt *tp = tcp_sk(sk);
 
-        tp->westwood.bw_sample = 0;
         tp->westwood.bw_ns_est = 0;
         tp->westwood.bw_est = 0;
         tp->westwood.accounted = 0;
@@ -2088,14 +2087,13 @@ static inline __u32 westwood_do_filter(__u32 a, __u32 b)
 static void westwood_filter(struct sock *sk, __u32 delta)
 {
 	struct tcp_opt *tp = tcp_sk(sk);
-	__u32 sample = tp->westwood.bk / delta;
 
 	tp->westwood.bw_ns_est =
-		westwood_do_filter(tp->westwood.bw_ns_est, sample);
+		westwood_do_filter(tp->westwood.bw_ns_est, 
+				   tp->westwood.bk / delta);
 	tp->westwood.bw_est =
 		westwood_do_filter(tp->westwood.bw_est,
 				   tp->westwood.bw_ns_est);
-	tp->westwood.bw_sample = sample;
 }
 
 /* @westwood_update_rttmin
