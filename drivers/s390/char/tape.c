@@ -152,7 +152,6 @@ const char* tape_op_verbose[TO_SIZE] = {
  *******************************************************************/
 
 #ifdef CONFIG_DEVFS_FS
-devfs_handle_t tape_devfs_root_entry;
 
 /*
  * Create devfs root entry (devno in hex) for device td
@@ -163,7 +162,7 @@ tape_mkdevfsroot (tape_dev_t* td)
 {
     char devno [10];
     sprintf (devno,"tape/%04x",td->devinfo.devno);
-    return (td->devfs_dir=devfs_mk_dir (NULL, devno, NULL));
+    return devfs_mk_dir(NULL, devno, NULL);
 }
 
 /*
@@ -173,8 +172,7 @@ tape_mkdevfsroot (tape_dev_t* td)
 static inline void
 tape_rmdevfsroot (tape_dev_t* td)
 {
-    if (td->devfs_dir)
-            devfs_unregister (td->devfs_dir);
+    devfs_remove("tape/%04x", td->devinfo.devno);
 }
 
 #endif
@@ -1715,7 +1713,7 @@ tape_init (void)
         tape_split_parm_string(tape_parm_string);
 #endif
 #ifdef CONFIG_DEVFS_FS
-        tape_devfs_root_entry=devfs_mk_dir (NULL, "tape", NULL);
+        devfs_mk_dir (NULL, "tape", NULL);
 #endif /* CONFIG_DEVFS_FS */
 
         tape_sprintf_event (tape_dbf_area,3,"dev detect\n");
@@ -1816,7 +1814,7 @@ cleanup_module (void)
         tape_sprintf_event (tape_dbf_area,6,"cleaup mod");
 	tape_cleanup_disciplines();
 #ifdef CONFIG_DEVFS_FS
-	devfs_unregister (tape_devfs_root_entry); /* devfs checks for NULL */
+	devfs_remove("tape"); /* devfs checks for NULL */
 #endif CONFIG_DEVFS_FS
 #ifdef CONFIG_PROC_FS
 	tape_proc_cleanup();
