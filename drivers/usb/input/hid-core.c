@@ -1545,12 +1545,12 @@ fail:
 
 static void hid_disconnect(struct usb_interface *intf)
 {
-	struct hid_device *hid = dev_get_drvdata(&intf->dev);
+	struct hid_device *hid = usb_get_intfdata (intf);
 
 	if (!hid)
 		return;
 
-	dev_set_drvdata (&intf->dev, NULL);
+	usb_set_intfdata(intf, NULL);
 	usb_unlink_urb(hid->urbin);
 	usb_unlink_urb(hid->urbout);
 	usb_unlink_urb(hid->urbctrl);
@@ -1592,7 +1592,7 @@ static int hid_probe (struct usb_interface *intf, const struct usb_device_id *id
 	if (!hiddev_connect(hid))
 		hid->claimed |= HID_CLAIMED_HIDDEV;
 
-	dev_set_drvdata(&intf->dev, hid);
+	usb_set_intfdata(intf, hid);
 
 	if (!hid->claimed) {
 		printk ("HID device not claimed by input or hiddev\n");
