@@ -4,3 +4,4 @@
 
 obj-$(CONFIG_USB_AX8817X)	+= mii.o
 obj-$(CONFIG_USB_PEGASUS)	+= mii.o
+obj-$(CONFIG_USB_USBNET)	+= mii.o

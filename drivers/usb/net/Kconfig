@@ -7,7 +7,7 @@ comment "USB Network adaptors"
 comment "Networking support is needed for USB Networking device support"
 	depends on USB && !NET
 
-config USB_AX8817X
+config USB_AX8817X_STANDALONE
 	tristate "USB ASIX AX8817X Ethernet device support (EXPERIMENTAL)"
 	depends on USB && NET && EXPERIMENTAL
 	---help---
@@ -121,15 +121,15 @@ config USB_RTL8150
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config USB_USBNET
-	tristate "Host-to-Host Networking for Cables and Smart Devices"
+	tristate "Multi-purpose USB Networking Framework"
 	depends on USB && NET
 	---help---
 	  This driver supports several kinds of network links over USB,
 	  with "minidrivers" built around a common network driver core
-	  that supports deep queues for efficient transfers.
-
-	  Typically, these links involves only two network hosts.  The
-	  host runs "usbnet", and the other end of the link might be:
+	  that supports deep queues for efficient transfers.  (This gives
+	  better performance with small packets and at high speeds).
+	  
+	  The USB host runs "usbnet", and the other end of the link might be:
 
 	  - Another USB host, when using USB "network" or "data transfer"
 	    cables.  These are often used to network laptops to PCs, like
@@ -140,6 +140,9 @@ config USB_USBNET
 	    These include PDAs running Linux (iPaq, Yopy, Zaurus, and
 	    others), and devices that interoperate using the standard
 	    CDC-Ethernet specification (including many cable modems).
+
+	  - Network adapter hardware (like those for 10/100 Ethernet) which
+	    uses this driver framework.
 
 	  The link will appear with a name like "usb0", when the link is
 	  a two-node link, or "eth0" for most CDC-Ethernet devices.  Those
@@ -265,4 +268,30 @@ config USB_CDCETHER
 	  what other networking devices you have in use.  However, if the
 	  IEEE 802 "local assignment" bit is set in the address, a "usbX"
 	  name is used instead.
+
+comment "USB Network Adapters"
+	depends on USB_USBNET
+
+config USB_AX8817X
+	boolean "ASIX AX88172 Based USB 2.0 Ethernet Devices"
+	depends on USB_USBNET && EXPERIMENTAL
+	default y
+	help
+
+	  This option adds support for ASIX AX88172 based USB 2.0
+	  10/100 Ethernet devices.
+
+ 	  This driver should work with at least the following devices:
+	    * ASIX AX88172
+	    * D-Link DUB-E100
+	    * Hawking UF200
+	    * Linksys USB200M
+	    * Netgear FA120
+	    * Intellinet
+	    * ST Lab USB Ethernet
+	    * TrendNet TU2-ET100
+
+	  This driver creates an interface named "ethX", where X depends on
+	  what other networking devices you have in use.  
+
 
