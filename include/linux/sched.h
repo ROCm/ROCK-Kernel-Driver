@@ -264,7 +264,7 @@ struct task_struct {
 	int lock_depth;		/* Lock depth */
 
 	int prio, static_prio;
-	list_t run_list;
+	struct list_head run_list;
 	prio_array_t *array;
 
 	unsigned long sleep_avg;

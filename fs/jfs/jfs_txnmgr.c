@@ -2763,7 +2763,6 @@ int jfs_lazycommit(void *arg)
 	lock_kernel();
 
 	daemonize();
-	current->tty = NULL;
 	strcpy(current->comm, "jfsCommit");
 
 	unlock_kernel();
@@ -2961,7 +2960,6 @@ int jfs_sync(void *arg)
 	lock_kernel();
 
 	daemonize();
-	current->tty = NULL;
 	strcpy(current->comm, "jfsSync");
 
 	unlock_kernel();

@@ -202,7 +202,6 @@ reclaimer(void *ptr)
 	struct inode *inode;
 
 	daemonize();
-	reparent_to_init();
 	snprintf(current->comm, sizeof(current->comm),
 		 "%s-reclaim",
 		 host->h_name);

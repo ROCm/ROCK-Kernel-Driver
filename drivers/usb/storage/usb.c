@@ -309,7 +309,6 @@ static int usb_stor_control_thread(void * __us)
 	 * so get rid of all our resources..
 	 */
 	daemonize();
-	reparent_to_init();
 
 	/* avoid getting signals */
 	spin_lock_irq(&current->sigmask_lock);

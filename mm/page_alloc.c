@@ -237,7 +237,7 @@ int is_head_of_free_region(struct page *page)
         struct zone *zone = page_zone(page);
         unsigned long flags;
 	int order;
-	list_t *curr;
+	struct list_head *curr;
 
 	/*
 	 * Should not matter as we need quiescent system for
@@ -652,7 +652,7 @@ void show_free_areas(void)
 
 	for (pgdat = pgdat_list; pgdat; pgdat = pgdat->pgdat_next)
 		for (type = 0; type < MAX_NR_ZONES; type++) {
-			list_t *elem;
+			struct list_head *elem;
 			struct zone *zone = &pgdat->node_zones[type];
  			unsigned long nr, flags, order, total = 0;
 

@@ -2114,7 +2114,6 @@ int jfsIOWait(void *arg)
 	lock_kernel();
 
 	daemonize();
-	current->tty = NULL;
 	strcpy(current->comm, "jfsIO");
 
 	unlock_kernel();

@@ -1582,8 +1582,7 @@ static int rtl8139_thread (void *data)
 	struct rtl8139_private *tp = dev->priv;
 	unsigned long timeout;
 
-	daemonize ();
-	reparent_to_init();
+	daemonize();
 	spin_lock_irq(&current->sigmask_lock);
 	sigemptyset(&current->blocked);
 	recalc_sigpending();

@@ -1417,7 +1417,7 @@ void sctp_process_init(sctp_association_t *asoc, sctp_cid_t cid,
 	sctpParam_t param;
 	__u8 *end;
 	sctp_transport_t *transport;
-	list_t *pos, *temp;
+	struct list_head *pos, *temp;
 
 	/* We must include the address that the INIT packet came from.
 	 * This is the only address that matters for an INIT packet.
