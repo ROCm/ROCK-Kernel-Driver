@@ -114,7 +114,7 @@ MODULE_LICENSE("GPL");
 
 static inline u64 veth_dma_addr(void *p)
 {
-	return 0x8000000000000000LL | virt_to_absolute((unsigned long) p);
+	return 0x8000000000000000LL | virt_to_abs((unsigned long) p);
 }
 
 #define VETHSTACK(T) \
