@@ -1564,3 +1564,36 @@ int r128_cce_indirect( DRM_IOCTL_ARGS )
 
 	return 0;
 }
+
+int r128_getparam( DRM_IOCTL_ARGS )
+{
+	DRM_DEVICE;
+	drm_r128_private_t *dev_priv = dev->dev_private;
+	drm_r128_getparam_t param;
+	int value;
+
+	if ( !dev_priv ) {
+		DRM_ERROR( "%s called with no initialization\n", __FUNCTION__ );
+		return DRM_ERR(EINVAL);
+	}
+
+	DRM_COPY_FROM_USER_IOCTL( param, (drm_r128_getparam_t *)data,
+			     sizeof(param) );
+
+	DRM_DEBUG( "pid=%d\n", DRM_CURRENTPID );
+
+	switch( param.param ) {
+	case R128_PARAM_IRQ_NR:
+		value = dev->irq;
+		break;
+	default:
+		return DRM_ERR(EINVAL);
+	}
+
+	if ( DRM_COPY_TO_USER( param.value, &value, sizeof(int) ) ) {
+		DRM_ERROR( "copy_to_user\n" );
+		return DRM_ERR(EFAULT);
+	}
+	
+	return 0;
+}

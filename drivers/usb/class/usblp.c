@@ -1,9 +1,9 @@
 /*
- * usblp.c  Version 0.12
+ * usblp.c  Version 0.13
  *
  * Copyright (c) 1999 Michael Gee	<michael@linuxspecific.com>
  * Copyright (c) 1999 Pavel Machek	<pavel@suse.cz>
- * Copyright (c) 2000 Randy Dunlap	<randy.dunlap@intel.com>
+ * Copyright (c) 2000 Randy Dunlap	<rddunlap@osdl.org>
  * Copyright (c) 2000 Vojtech Pavlik	<vojtech@suse.cz>
  # Copyright (c) 2001 Pete Zaitcev	<zaitcev@redhat.com>
  # Copyright (c) 2001 David Paschal	<paschal@rcsis.com>
@@ -25,6 +25,8 @@
  *	v0.10- remove sleep_on, fix error on oom (oliver@neukum.org)
  *	v0.11 - add proto_bias option (Pete Zaitcev)
  *	v0.12 - add hpoj.sourceforge.net ioctls (David Paschal)
+ *	v0.13 - alloc space for statusbuf (<status> not on stack);
+ *		use usb_buffer_alloc() for read buf & write buf;
  */
 
 /*
@@ -59,7 +61,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v0.12"
+#define DRIVER_VERSION "v0.13"
 #define DRIVER_AUTHOR "Michael Gee, Pavel Machek, Vojtech Pavlik, Randy Dunlap, Pete Zaitcev, David Paschal"
 #define DRIVER_DESC "USB Printer Device Class driver"
 
@@ -120,11 +122,19 @@ MFG:HEWLETT-PACKARD;MDL:DESKJET 970C;CMD:MLC,PCL,PML;CLASS:PRINTER;DESCRIPTION:H
 #define USBLP_LAST_PROTOCOL	3
 #define USBLP_MAX_PROTOCOLS	(USBLP_LAST_PROTOCOL+1)
 
+/*
+ * some arbitrary status buffer size;
+ * need a status buffer that is allocated via kmalloc(), not on stack
+ */
+#define STATUS_BUF_SIZE		8
+
 struct usblp {
 	struct usb_device 	*dev;			/* USB device */
 	devfs_handle_t		devfs;			/* devfs device */
 	struct semaphore	sem;			/* locks this struct, especially "dev" */
-	char			*buf;		/* writeurb->transfer_buffer */
+	char			*writebuf;		/* write transfer_buffer */
+	char			*readbuf;		/* read transfer_buffer */
+	char			*statusbuf;		/* status transfer_buffer */
 	struct urb		*readurb, *writeurb;	/* The urbs */
 	wait_queue_head_t	wait;			/* Zzzzz ... */
 	int			readcount;		/* Counter for reads */
@@ -289,13 +299,14 @@ static int usblp_check_status(struct usblp *usblp, int err)
 	unsigned char status, newerr = 0;
 	int error;
 
-	error = usblp_read_status (usblp, &status);
+	error = usblp_read_status (usblp, usblp->statusbuf);
 	if (error < 0) {
 		err("usblp%d: error %d reading printer status",
 			usblp->minor, error);
 		return 0;
 	}
 
+	status = *usblp->statusbuf;
 	if (~status & LP_PERRORP) {
 		newerr = 3;
 		if (status & LP_POUTPA) newerr = 1;
@@ -375,8 +386,12 @@ static void usblp_cleanup (struct usblp *usblp)
 	usb_deregister_dev (1, usblp->minor);
 	info("usblp%d: removed", usblp->minor);
 
-	kfree (usblp->writeurb->transfer_buffer);
+	usb_buffer_free (usblp->dev, USBLP_BUF_SIZE,
+			usblp->writebuf, usblp->writeurb->transfer_dma);
+	usb_buffer_free (usblp->dev, USBLP_BUF_SIZE,
+			usblp->readbuf, usblp->writeurb->transfer_dma);
 	kfree (usblp->device_id_string);
+	kfree (usblp->statusbuf);
 	usb_free_urb(usblp->writeurb);
 	usb_free_urb(usblp->readurb);
 	kfree (usblp);
@@ -841,11 +856,27 @@ static int usblp_probe(struct usb_interface *intf,
 		goto abort_minor;
 	}
 
-	/* Malloc write/read buffers in one chunk.  We somewhat wastefully
+	usblp->writebuf = usblp->readbuf = NULL;
+	usblp->writeurb->transfer_flags = URB_NO_DMA_MAP;
+	usblp->readurb->transfer_flags = URB_NO_DMA_MAP;
+	/* Malloc write & read buffers.  We somewhat wastefully
 	 * malloc both regardless of bidirectionality, because the
 	 * alternate setting can be changed later via an ioctl. */
-	if (!(usblp->buf = kmalloc(2 * USBLP_BUF_SIZE, GFP_KERNEL))) {
-		err("out of memory for buf");
+	if (!(usblp->writebuf = usb_buffer_alloc(dev, USBLP_BUF_SIZE,
+				GFP_KERNEL, &usblp->writeurb->transfer_dma))) {
+		err("out of memory for write buf");
+		goto abort_minor;
+	}
+	if (!(usblp->readbuf = usb_buffer_alloc(dev, USBLP_BUF_SIZE,
+				GFP_KERNEL, &usblp->readurb->transfer_dma))) {
+		err("out of memory for read buf");
+		goto abort_minor;
+	}
+
+	/* Allocate buffer for printer status */
+	usblp->statusbuf = kmalloc(STATUS_BUF_SIZE, GFP_KERNEL);
+	if (!usblp->statusbuf) {
+		err("out of memory for statusbuf");
 		goto abort_minor;
 	}
 
@@ -900,10 +931,16 @@ abort_minor:
 	usb_deregister_dev (1, usblp->minor);
 abort:
 	if (usblp) {
+		if (usblp->writebuf)
+			usb_buffer_free (usblp->dev, USBLP_BUF_SIZE,
+				usblp->writebuf, usblp->writeurb->transfer_dma);
+		if (usblp->readbuf)
+			usb_buffer_free (usblp->dev, USBLP_BUF_SIZE,
+				usblp->readbuf, usblp->writeurb->transfer_dma);
+		if (usblp->statusbuf) kfree(usblp->statusbuf);
+		if (usblp->device_id_string) kfree(usblp->device_id_string);
 		usb_free_urb(usblp->writeurb);
 		usb_free_urb(usblp->readurb);
-		if (usblp->buf) kfree(usblp->buf);
-		if (usblp->device_id_string) kfree(usblp->device_id_string);
 		kfree(usblp);
 	}
 	return -EIO;
@@ -1020,16 +1057,16 @@ static int usblp_set_protocol(struct usblp *usblp, int protocol)
 
 	usb_fill_bulk_urb(usblp->writeurb, usblp->dev,
 		usb_sndbulkpipe(usblp->dev,
-		 usblp->protocol[protocol].epwrite->bEndpointAddress),
-		usblp->buf, 0,
+		  usblp->protocol[protocol].epwrite->bEndpointAddress),
+		usblp->writebuf, 0,
 		usblp_bulk_write, usblp);
 
 	usblp->bidir = (usblp->protocol[protocol].epread != 0);
 	if (usblp->bidir)
 		usb_fill_bulk_urb(usblp->readurb, usblp->dev,
 			usb_rcvbulkpipe(usblp->dev,
-			 usblp->protocol[protocol].epread->bEndpointAddress),
-			usblp->buf + USBLP_BUF_SIZE, USBLP_BUF_SIZE,
+			  usblp->protocol[protocol].epread->bEndpointAddress),
+			usblp->readbuf, USBLP_BUF_SIZE,
 			usblp_bulk_read, usblp);
 
 	usblp->current_protocol = protocol;

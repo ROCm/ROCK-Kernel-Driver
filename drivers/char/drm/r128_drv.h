@@ -124,6 +124,7 @@ extern int r128_cce_idle( DRM_IOCTL_ARGS );
 extern int r128_engine_reset( DRM_IOCTL_ARGS );
 extern int r128_fullscreen( DRM_IOCTL_ARGS );
 extern int r128_cce_buffers( DRM_IOCTL_ARGS );
+extern int r128_getparam( DRM_IOCTL_ARGS );
 
 extern void r128_freelist_reset( drm_device_t *dev );
 extern drm_buf_t *r128_freelist_get( drm_device_t *dev );
@@ -213,6 +214,11 @@ extern int r128_cce_indirect( DRM_IOCTL_ARGS );
 #define R128_DST_PITCH_OFFSET_C		0x1c80
 #	define R128_DST_TILE			(1 << 31)
 
+#define R128_GEN_INT_CNTL		0x0040
+#	define R128_CRTC_VBLANK_INT_EN		(1 <<  0)
+#define R128_GEN_INT_STATUS		0x0044
+#	define R128_CRTC_VBLANK_INT		(1 <<  0)
+#	define R128_CRTC_VBLANK_INT_AK		(1 <<  0)
 #define R128_GEN_RESET_CNTL		0x00f0
 #	define R128_SOFT_RESET_GUI		(1 <<  0)
 

@@ -71,7 +71,7 @@ struct page *DRM(vm_nopage)(struct vm_area_struct *vma,
          * Find the right map
          */
 
-	if(!dev->agp->cant_use_aperture) goto vm_nopage_error;
+	if(!dev->agp || !dev->agp->cant_use_aperture) goto vm_nopage_error;
 
 	list_for_each(list, &dev->maplist->head) {
 		r_list = (drm_map_list_t *)list;

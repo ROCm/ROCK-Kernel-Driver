@@ -58,19 +58,23 @@ static void ehci_hcd_free (struct usb_hcd *hcd)
 
 /* Allocate the key transfer structures from the previously allocated pool */
 
+static void ehci_qtd_init (struct ehci_qtd *qtd, dma_addr_t dma)
+{
+	memset (qtd, 0, sizeof *qtd);
+	qtd->qtd_dma = dma;
+	qtd->hw_next = EHCI_LIST_END;
+	qtd->hw_alt_next = EHCI_LIST_END;
+	INIT_LIST_HEAD (&qtd->qtd_list);
+}
+
 static struct ehci_qtd *ehci_qtd_alloc (struct ehci_hcd *ehci, int flags)
 {
 	struct ehci_qtd		*qtd;
 	dma_addr_t		dma;
 
 	qtd = pci_pool_alloc (ehci->qtd_pool, flags, &dma);
-	if (qtd != 0) {
-		memset (qtd, 0, sizeof *qtd);
-		qtd->qtd_dma = dma;
-		qtd->hw_next = EHCI_LIST_END;
-		qtd->hw_alt_next = EHCI_LIST_END;
-		INIT_LIST_HEAD (&qtd->qtd_list);
-	}
+	if (qtd != 0)
+		ehci_qtd_init (qtd, dma);
 	return qtd;
 }
 
@@ -87,12 +91,21 @@ static struct ehci_qh *ehci_qh_alloc (struct ehci_hcd *ehci, int flags)
 
 	qh = (struct ehci_qh *)
 		pci_pool_alloc (ehci->qh_pool, flags, &dma);
-	if (qh) {
-		memset (qh, 0, sizeof *qh);
-		atomic_set (&qh->refcount, 1);
-		qh->qh_dma = dma;
-		// INIT_LIST_HEAD (&qh->qh_list);
-		INIT_LIST_HEAD (&qh->qtd_list);
+	if (!qh)
+		return qh;
+
+	memset (qh, 0, sizeof *qh);
+	atomic_set (&qh->refcount, 1);
+	qh->qh_dma = dma;
+	// INIT_LIST_HEAD (&qh->qh_list);
+	INIT_LIST_HEAD (&qh->qtd_list);
+
+	/* dummy td enables safe urb queuing */
+	qh->dummy = ehci_qtd_alloc (ehci, flags);
+	if (qh->dummy == 0) {
+		dbg ("no dummy td");
+		pci_pool_free (ehci->qh_pool, qh, qh->qh_dma);
+		qh = 0;
 	}
 	return qh;
 }
@@ -115,6 +128,8 @@ static void qh_put (struct ehci_hcd *ehci, struct ehci_qh *qh)
 		dbg ("unused qh not empty!");
 		BUG ();
 	}
+	if (qh->dummy)
+		ehci_qtd_free (ehci, qh->dummy);
 	pci_pool_free (ehci->qh_pool, qh, qh->qh_dma);
 }
 

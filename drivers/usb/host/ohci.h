@@ -349,11 +349,6 @@ struct hash_list_t {
 struct ohci_hcd {
 	spinlock_t		lock;
 
-        /*
-	 * parent device
-	 */
-        struct device		*parent_dev;
-
 	/*
 	 * I/O memory used to communicate with the HC (dma-consistent)
 	 */

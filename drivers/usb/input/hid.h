@@ -306,7 +306,7 @@ struct hid_report_enum {
 #define HID_REPORT_TYPES 3
 
 #define HID_BUFFER_SIZE		32
-#define HID_CONTROL_FIFO_SIZE	64
+#define HID_CONTROL_FIFO_SIZE	256		/* to init devices with >100 reports */
 #define HID_OUTPUT_FIFO_SIZE	64
 
 struct hid_control_fifo {

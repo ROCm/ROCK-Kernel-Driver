@@ -272,29 +272,6 @@ static int i830_dma_get_buffer(drm_device_t *dev, drm_i830_dma_t *d,
 	return retcode;
 }
 
-static unsigned long i830_alloc_page(drm_device_t *dev)
-{
-	unsigned long address;
-   
-	address = __get_free_page(GFP_KERNEL);
-	if(address == 0UL) 
-		return 0;
-	
-	get_page(virt_to_page(address));
-	LockPage(virt_to_page(address));
-	return address;
-}
-
-static void i830_free_page(drm_device_t *dev, unsigned long page)
-{
-	if (page) {
-		struct page *p = virt_to_page(page);
-		put_page(p);
-		UnlockPage(p);
-		free_page(page);
-	}
-}
-
 static int i830_dma_cleanup(drm_device_t *dev)
 {
 	drm_device_dma_t *dma = dev->dma;
@@ -309,7 +286,9 @@ static int i830_dma_cleanup(drm_device_t *dev)
 					 dev_priv->ring.Size);
 		}
 	   	if(dev_priv->hw_status_page != 0UL) {
-		   	i830_free_page(dev, dev_priv->hw_status_page);
+		   	pci_free_consistent(dev->pdev, PAGE_SIZE,
+					    (void *)dev_priv->hw_status_page,
+					    dev_priv->dma_status_page);
 		   	/* Need to rewrite hardware status page */
 		   	I830_WRITE(0x02080, 0x1ffff000);
 		}
@@ -483,7 +462,9 @@ static int i830_dma_initialize(drm_device_t *dev,
 	dev_priv->depth_pitch = init->depth_pitch;
 
    	/* Program Hardware Status Page */
-   	dev_priv->hw_status_page = i830_alloc_page(dev);
+   	dev_priv->hw_status_page =
+		(unsigned long) pci_alloc_consistent(dev->pdev, PAGE_SIZE,
+						&dev_priv->dma_status_page);
    	if(dev_priv->hw_status_page == 0UL) {
 		dev->dev_private = (void *)dev_priv;
 		i830_dma_cleanup(dev);
@@ -493,7 +474,7 @@ static int i830_dma_initialize(drm_device_t *dev,
    	memset((void *) dev_priv->hw_status_page, 0, PAGE_SIZE);
 	DRM_DEBUG("hw status page @ %lx\n", dev_priv->hw_status_page);
    
-   	I830_WRITE(0x02080, virt_to_bus((void *)dev_priv->hw_status_page));
+	I830_WRITE(0x02080, dev_priv->dma_status_page);
 	DRM_DEBUG("Enabled hardware status page\n");
    
    	/* Now we need to init our freelist */
