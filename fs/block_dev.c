@@ -531,7 +531,7 @@ static void bd_set_size(struct block_device *bdev, loff_t size)
 	bdev->bd_inode->i_blkbits = blksize_bits(bsize);
 }
 
-static int do_open(struct block_device *bdev, struct inode *inode, struct file *file)
+static int do_open(struct block_device *bdev, struct file *file)
 {
 	struct module *owner = NULL;
 	struct gendisk *disk;
@@ -554,7 +554,7 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 		if (!part) {
 			struct backing_dev_info *bdi;
 			if (disk->fops->open) {
-				ret = disk->fops->open(inode, file);
+				ret = disk->fops->open(bdev->bd_inode, file);
 				if (ret)
 					goto out_first;
 			}
@@ -599,7 +599,7 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 		module_put(owner);
 		if (bdev->bd_contains == bdev) {
 			if (bdev->bd_disk->fops->open) {
-				ret = bdev->bd_disk->fops->open(inode, file);
+				ret = bdev->bd_disk->fops->open(bdev->bd_inode, file);
 				if (ret)
 					goto out;
 			}
@@ -647,7 +647,7 @@ int blkdev_get(struct block_device *bdev, mode_t mode, unsigned flags, int kind)
 	fake_file.f_dentry = &fake_dentry;
 	fake_dentry.d_inode = bdev->bd_inode;
 
-	return do_open(bdev, bdev->bd_inode, &fake_file);
+	return do_open(bdev, &fake_file);
 }
 
 EXPORT_SYMBOL(blkdev_get);
@@ -668,7 +668,7 @@ int blkdev_open(struct inode * inode, struct file * filp)
 	bd_acquire(inode);
 	bdev = inode->i_bdev;
 
-	res = do_open(bdev, inode, filp);
+	res = do_open(bdev, filp);
 	if (res)
 		return res;
 
