@@ -886,7 +886,7 @@ static irqreturn_t schizo_pcierr_intr_other(struct pci_pbm_info *pbm)
 		       SCHIZO_PCICTRL_TTO_ERR |
 		       SCHIZO_PCICTRL_RTRY_ERR |
 		       SCHIZO_PCICTRL_DTO_ERR |
-		       SCHIZO_PCICTRL_SBH_ERR |
+		       /*SCHIZO_PCICTRL_SBH_ERR |*/
 		       SCHIZO_PCICTRL_SERR);
 	if (csr_error_bits) {
 		/* Clear the errors.  */
@@ -1370,7 +1370,7 @@ static void __init schizo_register_error_handlers(struct pci_controller_info *p)
 		    SCHIZO_PCICTRL_ESLCK |
 		    SCHIZO_PCICTRL_TTO_ERR |
 		    SCHIZO_PCICTRL_RTRY_ERR |
-		    SCHIZO_PCICTRL_SBH_ERR |
+		    /*SCHIZO_PCICTRL_SBH_ERR |*/
 		    SCHIZO_PCICTRL_SERR |
 		    SCHIZO_PCICTRL_SBH_INT |
 		    SCHIZO_PCICTRL_EEN);
