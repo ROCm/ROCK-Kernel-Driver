@@ -326,17 +326,18 @@ static struct file_operations tiglusb_fops = {
 
 /* --- initialisation code ------------------------------------- */
 
-static void *
-tiglusb_probe (struct usb_device *dev, unsigned int ifnum,
+static int
+tiglusb_probe (struct usb_interface *intf,
 	       const struct usb_device_id *id)
 {
+	struct usb_device *dev = interface_to_usbdev(intf);
 	int minor = -1;
 	int i;
 	ptiglusb_t s;
 	char name[8];
 
-	dbg ("probing vendor id 0x%x, device id 0x%x ifnum:%d",
-	     dev->descriptor.idVendor, dev->descriptor.idProduct, ifnum);
+	dbg ("probing vendor id 0x%x, device id 0x%x",
+	     dev->descriptor.idVendor, dev->descriptor.idProduct);
 
 	/*
 	 * We don't handle multiple configurations. As of version 0x0103 of
@@ -344,15 +345,15 @@ tiglusb_probe (struct usb_device *dev, unsigned int ifnum,
 	 */
 
 	if (dev->descriptor.bNumConfigurations != 1)
-		return NULL;
+		return -ENODEV;
 
 	if ((dev->descriptor.idProduct != 0xe001)
 	    && (dev->descriptor.idVendor != 0x451))
-		return NULL;
+		return -ENODEV;
 
 	if (usb_set_configuration (dev, dev->config[0].bConfigurationValue) < 0) {
 		err ("tiglusb_probe: set_configuration failed");
-		return NULL;
+		return -ENODEV;
 	}
 
 	/*
@@ -367,7 +368,7 @@ tiglusb_probe (struct usb_device *dev, unsigned int ifnum,
 	}
 
 	if (minor == -1)
-		return NULL;
+		return -ENODEV;
 
 	s = &tiglusb[minor];
 
@@ -375,7 +376,7 @@ tiglusb_probe (struct usb_device *dev, unsigned int ifnum,
 	s->remove_pending = 0;
 	s->dev = dev;
 	up (&s->mutex);
-	dbg ("bound to interface: %d", ifnum);
+	dbg ("bound to interface");
 
 	sprintf (name, "%d", s->minor);
 	dbg ("registering to devfs : major = %d, minor = %d, node = %s",
@@ -390,16 +391,20 @@ tiglusb_probe (struct usb_device *dev, unsigned int ifnum,
 		dev->descriptor.bcdDevice >> 8,
 		dev->descriptor.bcdDevice & 0xff);
 
-	return s;
+	dev_set_drvdata (&intf->dev, s);
+	return 0;
 }
 
 static void
-tiglusb_disconnect (struct usb_device *dev, void *drv_context)
+tiglusb_disconnect (struct usb_interface *intf)
 {
-	ptiglusb_t s = (ptiglusb_t) drv_context;
+	ptiglusb_t s = dev_get_drvdata (&intf->dev);
 
-	if (!s || !s->dev)
+	dev_set_drvdata (&intf->dev, NULL);
+	if (!s || !s->dev) {
 		info ("bogus disconnect");
+		return;
+	}
 
 	s->remove_pending = 1;
 	wake_up (&s->wait);

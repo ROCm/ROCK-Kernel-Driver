@@ -83,6 +83,13 @@ static struct usb_device_id id_table [] = {
 
 MODULE_DEVICE_TABLE (usb, id_table);
 
+static struct usb_driver omninet_driver = {
+	.name =		"omninet",
+	.probe =	usb_serial_probe,
+	.disconnect =	usb_serial_disconnect,
+	.id_table =	id_table,
+};
+
 
 static struct usb_serial_device_type zyxel_omninet_device = {
 	.owner =		THIS_MODULE,
@@ -370,6 +377,7 @@ static void omninet_shutdown (struct usb_serial *serial)
 static int __init omninet_init (void)
 {
 	usb_serial_register (&zyxel_omninet_device);
+	usb_register (&omninet_driver);
 	info(DRIVER_VERSION ":" DRIVER_DESC);
 	return 0;
 }
@@ -377,6 +385,7 @@ static int __init omninet_init (void)
 
 static void __exit omninet_exit (void)
 {
+	usb_deregister (&omninet_driver);
 	usb_serial_deregister (&zyxel_omninet_device);
 }
 

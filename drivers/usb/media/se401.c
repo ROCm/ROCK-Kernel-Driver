@@ -1420,9 +1420,10 @@ static int se401_init(struct usb_se401 *se401, int button)
         return 0;
 }
 
-static void* se401_probe(struct usb_device *dev, unsigned int ifnum,
+static int se401_probe(struct usb_interface *intf,
 	const struct usb_device_id *id)
 {
+	struct usb_device *dev = interface_to_usbdev(intf);
         struct usb_interface_descriptor *interface;
         struct usb_se401 *se401;
         char *camera_name=NULL;
@@ -1430,9 +1431,9 @@ static void* se401_probe(struct usb_device *dev, unsigned int ifnum,
 
         /* We don't handle multi-config cameras */
         if (dev->descriptor.bNumConfigurations != 1)
-                return NULL;
+                return -ENODEV;
 
-        interface = &dev->actconfig->interface[ifnum].altsetting[0];
+        interface = &intf->altsetting[0];
 
         /* Is it an se401? */
         if (dev->descriptor.idVendor == 0x03e8 &&
@@ -1452,20 +1453,20 @@ static void* se401_probe(struct usb_device *dev, unsigned int ifnum,
 		camera_name="Kensington VideoCAM 67016";
 		button=0;
 	} else
-		return NULL;
+		return -ENODEV;
 
         /* Checking vendor/product should be enough, but what the hell */
         if (interface->bInterfaceClass != 0x00)
-                return NULL;
+		return -ENODEV;
         if (interface->bInterfaceSubClass != 0x00)
-                return NULL;
+		return -ENODEV;
 
         /* We found one */
         info("SE401 camera found: %s", camera_name);
 
         if ((se401 = kmalloc(sizeof(*se401), GFP_KERNEL)) == NULL) {
                 err("couldn't kmalloc se401 struct");
-                return NULL;
+		return -ENOMEM;
         }
 
         memset(se401, 0, sizeof(*se401));
@@ -1478,7 +1479,7 @@ static void* se401_probe(struct usb_device *dev, unsigned int ifnum,
 
         if (se401_init(se401, button)) {
 		kfree(se401);
-		return NULL;
+		return -EIO;
 	}
 
 	memcpy(&se401->vdev, &se401_template, sizeof(se401_template));
@@ -1490,43 +1491,46 @@ static void* se401_probe(struct usb_device *dev, unsigned int ifnum,
 	if (video_register_device(&se401->vdev, VFL_TYPE_GRABBER, video_nr) == -1) {
 		kfree(se401);
 		err("video_register_device failed");
-		return NULL;
+		return -EIO;
 	}
 #if defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS)
         create_proc_se401_cam(se401);
 #endif
 	info("registered new video device: video%d", se401->vdev.minor);
 
-        return se401;
+	dev_set_drvdata (&intf->dev, se401);
+        return 0;
 }
 
-static void se401_disconnect(struct usb_device *dev, void *ptr)
+static void se401_disconnect(struct usb_interface *intf)
 {
-	struct usb_se401 *se401 = (struct usb_se401 *) ptr;
+	struct usb_se401 *se401 = dev_get_drvdata (&intf->dev);
 
-	video_unregister_device(&se401->vdev);
-	if (!se401->user){
-		usb_se401_remove_disconnected(se401);
-	} else {
-		se401->frame[0].grabstate = FRAME_ERROR;
-		se401->frame[0].grabstate = FRAME_ERROR;
+	dev_set_drvdata (&intf->dev, NULL);
+	if (se401) {
+		video_unregister_device(&se401->vdev);
+		if (!se401->user){
+			usb_se401_remove_disconnected(se401);
+		} else {
+			se401->frame[0].grabstate = FRAME_ERROR;
+			se401->frame[0].grabstate = FRAME_ERROR;
 
-		se401->streaming = 0;
-		
-		wake_up_interruptible(&se401->wq);
-		se401->removed = 1;
-	}
+			se401->streaming = 0;
+
+			wake_up_interruptible(&se401->wq);
+			se401->removed = 1;
+		}
 #if defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS)
-	destroy_proc_se401_cam(se401);
+		destroy_proc_se401_cam(se401);
 #endif
-
+	}
 }
 
 static struct usb_driver se401_driver = {
         .name		= "se401",
         .id_table	= device_table,
-	.probe =	se401_probe,
-        .disconnect	= se401_disconnect
+	.probe		= se401_probe,
+        .disconnect	= se401_disconnect,
 };
 
 

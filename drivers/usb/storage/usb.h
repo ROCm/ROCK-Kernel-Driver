@@ -106,6 +106,7 @@ struct us_unusual_dev {
 
 #define US_FL_DEV_ATTACHED    0x00010000 /* is the device attached?	    */
 #define US_FLIDX_IP_WANTED   17  /* 0x00020000	is an IRQ expected?	    */
+#define US_FLIDX_CAN_CANCEL  18  /* 0x00040000  okay to cancel current_urb? */
 
 
 /* processing state machine states */
@@ -177,7 +178,6 @@ struct us_data {
 	unsigned char		irqdata[2];	 /* data from USB IRQ	 */
 
 	/* control and bulk communications data */
-	struct semaphore	current_urb_sem; /* protect current_urb  */
 	struct urb		*current_urb;	 /* non-int USB requests */
 	struct usb_ctrlrequest	*dr;		 /* control requests	 */
 
@@ -206,7 +206,6 @@ extern void fill_inquiry_response(struct us_data *us,
  * single queue element srb for write access */
 #define scsi_unlock(host)	spin_unlock_irq(host->host_lock)
 #define scsi_lock(host)		spin_lock_irq(host->host_lock)
-
-#define sg_address(psg)		(page_address((psg)->page) + (psg)->offset)
+#define sg_address(psg)		(page_address((psg).page) + (psg).offset)
 
 #endif

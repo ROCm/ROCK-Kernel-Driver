@@ -1,5 +1,5 @@
 /*
- * linux/drivers/ide/sis5513.c		Version 0.14	July 24, 2002
+ * linux/drivers/ide/sis5513.c		Version 0.14ac	Sept 11, 2002
  *
  * Copyright (C) 1999-2000	Andre Hedrick <andre@linux-ide.org>
  * Copyright (C) 2002		Lionel Bouton <Lionel.Bouton@inet6.fr>, Maintainer
@@ -34,6 +34,7 @@
 
 #include <linux/config.h>
 #include <linux/types.h>
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/delay.h>
 #include <linux/timer.h>
@@ -1022,26 +1023,56 @@ static void __init init_dma_sis5513 (ide_hwif_t *hwif, unsigned long dmabase)
 
 extern void ide_setup_pci_device(struct pci_dev *, ide_pci_device_t *);
 
-static void __init init_setup_sis5513 (struct pci_dev *dev, ide_pci_device_t *d)
+
+static int __devinit sis5513_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
+	ide_pci_device_t *d = &sis5513_chipsets[id->driver_data];
+	if (dev->device != d->device)
+		BUG();
 	ide_setup_pci_device(dev, d);
-}
-
-int __init sis5513_scan_pcidev (struct pci_dev *dev)
-{
-	ide_pci_device_t *d;
-
-	if (dev->vendor != PCI_VENDOR_ID_SI)
-		return 0;
-
-	for (d = sis5513_chipsets; d && d->vendor && d->device; ++d) {
-		if (((d->vendor == dev->vendor) &&
-		     (d->device == dev->device)) &&
-		    (d->init_setup)) {
-			d->init_setup(dev, d);
-			return 1;
-		}
-	}
 	return 0;
 }
 
+/**
+ *	sis5513_remove_one	-	called when SIS IDE is unplugged
+ *	@dev: the device that was removed
+ *
+ *	Disconnect a SIS IDE device that has been unplugged either by hotplug
+ *	or by a more civilized notification scheme. Not yet supported.
+ */
+ 
+static void sis5513_remove_one(struct pci_dev *dev)
+{
+	panic("SIS IDE removal not yet supported");
+}
+
+static struct pci_device_id sis5513_pci_tbl[] __devinitdata = {
+	{ PCI_VENDOR_ID_SI, PCI_DEVICE_ID_SI_5513, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{ 0, },
+};
+
+static struct pci_driver driver = {
+	name:		"SIS IDE",
+	id_table:	sis5513_pci_tbl,
+	probe:		sis5513_init_one,
+	remove:		__devexit_p(sis5513_remove_one),
+};
+
+static int sis5513_ide_init(void)
+{
+	return ide_pci_register_driver(&driver);
+}
+
+static void sis5513_ide_exit(void)
+{
+	ide_pci_unregister_driver(&driver);
+}
+
+module_init(sis5513_ide_init);
+module_exit(sis5513_ide_exit);
+
+MODULE_AUTHOR("Lionel Bouton, L C Chang, Andre Hedrick");
+MODULE_DESCRIPTION("PCI driver module for SIS IDE");
+MODULE_LICENSE("GPL");
+
+EXPORT_NO_SYMBOLS;

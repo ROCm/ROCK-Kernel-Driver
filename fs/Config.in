@@ -101,6 +101,13 @@ dep_mbool '  UDF write support (DANGEROUS)' CONFIG_UDF_RW $CONFIG_UDF_FS $CONFIG
 tristate 'UFS file system support (read only)' CONFIG_UFS_FS
 dep_mbool '  UFS file system write support (DANGEROUS)' CONFIG_UFS_FS_WRITE $CONFIG_UFS_FS $CONFIG_EXPERIMENTAL
 
+tristate 'XFS filesystem support' CONFIG_XFS_FS
+dep_mbool    '  Realtime support (EXPERIMENTAL)' CONFIG_XFS_RT $CONFIG_XFS_FS $CONFIG_EXPERIMENTAL
+dep_mbool    '  Quota support' CONFIG_XFS_QUOTA $CONFIG_XFS_FS
+if [ "$CONFIG_XFS_QUOTA" = "y" ]; then
+   define_bool CONFIG_QUOTACTL y
+fi
+
 if [ "$CONFIG_NET" = "y" ]; then
 
    mainmenu_option next_comment

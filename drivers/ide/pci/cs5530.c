@@ -1,5 +1,5 @@
 /*
- * linux/drivers/ide/cs5530.c		Version 0.6	Mar. 18, 2000
+ * linux/drivers/ide/cs5530.c		Version 0.7	Sept 10, 2002
  *
  * Copyright (C) 2000			Andre Hedrick <andre@linux-ide.org>
  * Ditto of GNU General Public License.
@@ -12,6 +12,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/delay.h>
@@ -419,44 +420,56 @@ static void __init init_dma_cs5530 (ide_hwif_t *hwif, unsigned long dmabase)
 
 extern void ide_setup_pci_device(struct pci_dev *, ide_pci_device_t *);
 
-/**
- *	init_setup_cs5530	-	set up a CS5530 IDE
- *	@dev: PCI device
- *	@d: PCI ide device info
- *
- *	FIXME: this function can go away too
- */
- 
-static void __init init_setup_cs5530 (struct pci_dev *dev, ide_pci_device_t *d)
+
+static int __devinit cs5530_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
+	ide_pci_device_t *d = &cs5530_chipsets[id->driver_data];
+	if (dev->device != d->device)
+		BUG();
 	ide_setup_pci_device(dev, d);
-}
-
-
-/**
- *	cs5530_scan_pcidev	-	set up any CS5530 device
- *	@dev:	pci device to check
- *
- *	Check if the device is a 5530 IDE controller. If it is then 
- *	claim and set up the interface.  Return 1 if we claimed the
- *	interface or zero if it is not ours
- */
- 
-int __init cs5530_scan_pcidev (struct pci_dev *dev)
-{
-	ide_pci_device_t *d;
-
-	if (dev->vendor != PCI_VENDOR_ID_CYRIX)
-		return 0;
-
-	for (d = cs5530_chipsets; d && d->vendor && d->device; ++d) {
-		if (((d->vendor == dev->vendor) &&
-		     (d->device == dev->device)) &&
-		    (d->init_setup)) {
-			d->init_setup(dev, d);
-			return 1;
-		}
-	}
 	return 0;
 }
 
+/**
+ *	cs5530_remove_one	-	called when a CS5530 is unplugged
+ *	@dev: the device that was removed
+ *
+ *	Disconnect an Cyrix device that has been unplugged either by hotplug
+ *	or by a more civilized notification scheme. Not yet supported.
+ */
+ 
+static void cs5530_remove_one(struct pci_dev *dev)
+{
+	panic("Cyrix removal not yet supported");
+}
+
+static struct pci_device_id cs5530_pci_tbl[] __devinitdata = {
+	{ PCI_VENDOR_ID_CYRIX, PCI_DEVICE_ID_CYRIX_5530_IDE, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{ 0, },
+};
+
+static struct pci_driver driver = {
+	name:		"CS5530 IDE",
+	id_table:	cs5530_pci_tbl,
+	probe:		cs5530_init_one,
+	remove:		__devexit_p(cs5530_remove_one),
+};
+
+static int cs5530_ide_init(void)
+{
+	return ide_pci_register_driver(&driver);
+}
+
+static void cs5530_ide_exit(void)
+{
+	ide_pci_unregister_driver(&driver);
+}
+
+module_init(cs5530_ide_init);
+module_exit(cs5530_ide_exit);
+
+MODULE_AUTHOR("Mark Lord");
+MODULE_DESCRIPTION("PCI driver module for Cyrix/NS 5530 IDE");
+MODULE_LICENSE("GPL");
+
+EXPORT_NO_SYMBOLS;

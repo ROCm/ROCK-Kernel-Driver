@@ -105,9 +105,9 @@ MODULE_PARM_DESC(raw_voltage, "Parameter for the call to SET_DISPLAY_VOLTAGE");
 #endif
 
 /* Prototypes */
-static void *brlvger_probe (struct usb_device *dev, unsigned ifnum,
-			    const struct usb_device_id *id);
-static void brlvger_disconnect(struct usb_device *dev, void *ptr);
+static int brlvger_probe (struct usb_interface *intf,
+			  const struct usb_device_id *id);
+static void brlvger_disconnect(struct usb_interface *intf);
 static int brlvger_open(struct inode *inode, struct file *file);
 static int brlvger_release(struct inode *inode, struct file *file);
 static ssize_t brlvger_write(struct file *file, const char *buffer,
@@ -281,10 +281,11 @@ module_exit (brlvger_cleanup);
 
 /* Probe and disconnect functions */
 
-static void *
-brlvger_probe (struct usb_device *dev, unsigned ifnum,
+static int
+brlvger_probe (struct usb_interface *intf,
 	       const struct usb_device_id *id)
 {
+	struct usb_device *dev = interface_to_usbdev(intf);
 	struct brlvger_priv *priv = NULL;
 	int i;
 	int retval;
@@ -301,14 +302,14 @@ brlvger_probe (struct usb_device *dev, unsigned ifnum,
 			|| dev->config->bNumInterfaces != 1 
 			|| actifsettings->bNumEndpoints != 1 ) {
 		err ("Bogus braille display config info");
-		return NULL;
+		return -ENODEV;
 	}
 
 	endpoint = actifsettings->endpoint;
 	if (!(endpoint->bEndpointAddress & 0x80) ||
 		((endpoint->bmAttributes & 3) != 0x03)) {
 		err ("Bogus braille display config info, wrong endpoints");
-		return NULL;
+		return -ENODEV;
 	}
 
 	down(&reserve_sem);
@@ -404,15 +405,20 @@ brlvger_probe (struct usb_device *dev, unsigned ifnum,
 
  out:
 	up(&reserve_sem);
-	return priv;
+	if (priv) {
+		dev_set_drvdata (&intf->dev, priv);
+		return 0;
+	}
+	return -EIO;
 }
 
 static void
-brlvger_disconnect(struct usb_device *dev, void *ptr)
+brlvger_disconnect(struct usb_interface *intf)
 {
-	struct brlvger_priv *priv = (struct brlvger_priv *)ptr;
+	struct brlvger_priv *priv = dev_get_drvdata (&intf->dev);
 	int r;
 
+	dev_set_drvdata (&intf->dev, NULL);
 	if(priv){
 		info("Display %d disconnecting", priv->subminor);
 

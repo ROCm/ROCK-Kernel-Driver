@@ -22,6 +22,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/pci.h>
@@ -623,9 +624,11 @@ static unsigned int __init init_chipset_ali15x3 (struct pci_dev *dev, const char
 
 	/*
 	 * We should only tune the 1533 enable if we are using an ALi
-	 * North bridge
+	 * North bridge. We might have no north found on some zany
+	 * box without a device at 0:0.0. The ALi bridge will be at
+	 * 0:0.0 so if we didn't find one we know what is cooking.
 	 */
-	if (north->vendor != PCI_VENDOR_ID_AL) {
+	if (north && north->vendor != PCI_VENDOR_ID_AL) {
 		local_irq_restore(flags);
 	        return 0;
 	}
@@ -841,45 +844,64 @@ extern void ide_setup_pci_device(struct pci_dev *, ide_pci_device_t *);
 
 
 /**
- *	init_setup_ali15x3	-	set up an ALi15x3 IDE controller
+ *	alim15x3_init_one	-	set up an ALi15x3 IDE controller
  *	@dev: PCI device to set up
- *	@d: IDE PCI structures
  *
- *	Perform the actual set up for the ALi15x3.
+ *	Perform the actual set up for an ALi15x3 that has been found by the
+ *	hot plug layer.
  */
  
-static void __init init_setup_ali15x3 (struct pci_dev *dev, ide_pci_device_t *d)
+static int __devinit alim15x3_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
+	ide_pci_device_t *d = &ali15x3_chipsets[id->driver_data];
 #if defined(CONFIG_SPARC64)
 	d->init_hwif = init_hwif_common_ali15x3;
 #endif /* CONFIG_SPARC64 */
 	ide_setup_pci_device(dev, d);
-}
-
-/**
- *	ali15x3_scan_pcidev	-	check for ali pci ide
- *	@dev: device found by IDE ordered scan
- *
- *	If the device is a known ALi IDE controller we set it up and
- *	then return 1. If we do not know it, or set up fails we return 0
- *	and it will be offered to other drivers or taken generic
- */
- 
-int __init ali15x3_scan_pcidev (struct pci_dev *dev)
-{
-	ide_pci_device_t *d;
-
-	if (dev->vendor != PCI_VENDOR_ID_AL)
-		return 0;
-
-	for (d = ali15x3_chipsets; d && d->vendor && d->device; ++d) {
-		if (((d->vendor == dev->vendor) &&
-		     (d->device == dev->device)) &&
-		    (d->init_setup)) {
-			d->init_setup(dev, d);
-			return 1;
-		}
-	}
 	return 0;
 }
 
+
+/**
+ *	ali15x3_remove_one	-	called with an ALi is unplugged
+ *	@dev: the device that was removed
+ *
+ *	Disconnect an ALi device that has been unplugged either by hotplug
+ *	or by a more civilized notification scheme. Not yet supported.
+ */
+ 
+static void ali15x3_remove_one(struct pci_dev *dev)
+{
+	panic("ALi removal not yet supported");
+}
+
+static struct pci_device_id alim15x3_pci_tbl[] __devinitdata = {
+	{ PCI_VENDOR_ID_AL, PCI_DEVICE_ID_AL_M5229, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
+	{ 0, },
+};
+
+static struct pci_driver driver = {
+	name:		"ALI15x3 IDE",
+	id_table:	alim15x3_pci_tbl,
+	probe:		alim15x3_init_one,
+	remove:		__devexit_p(ali15x3_remove_one),
+};
+
+static int ali15x3_ide_init(void)
+{
+	return ide_pci_register_driver(&driver);
+}
+
+static void ali15x3_ide_exit(void)
+{
+	ide_pci_unregister_driver(&driver);
+}
+
+module_init(ali15x3_ide_init);
+module_exit(ali15x3_ide_exit);
+
+MODULE_AUTHOR("Michael Aubry, Andrzej Krzysztofowicz, CJ, Andre Hedrick, Alan Cox");
+MODULE_DESCRIPTION("PCI driver module for ALi 15x3 IDE");
+MODULE_LICENSE("GPL");
+
+EXPORT_NO_SYMBOLS;

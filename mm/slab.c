@@ -487,7 +487,7 @@ void __init kmem_cache_sizes_init(void)
 		/* Inc off-slab bufctl limit until the ceiling is hit. */
 		if (!(OFF_SLAB(sizes->cs_cachep))) {
 			offslab_limit = sizes->cs_size-sizeof(slab_t);
-			offslab_limit /= 2;
+			offslab_limit /= sizeof(kmem_bufctl_t);
 		}
 		sizes->cs_dmacachep = kmem_cache_create(
 		    cache_names[sizes-cache_sizes].name_dma, 

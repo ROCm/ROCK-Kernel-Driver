@@ -795,9 +795,10 @@ static struct file_operations usblp_fops = {
 	.release =	usblp_release,
 };
 
-static void *usblp_probe(struct usb_device *dev, unsigned int ifnum,
-			 const struct usb_device_id *id)
+static int usblp_probe(struct usb_interface *intf,
+		       const struct usb_device_id *id)
 {
+	struct usb_device *dev = interface_to_usbdev (intf);
 	struct usblp *usblp = 0;
 	int protocol;
 	int retval;
@@ -813,7 +814,7 @@ static void *usblp_probe(struct usb_device *dev, unsigned int ifnum,
 	usblp->dev = dev;
 	init_MUTEX (&usblp->sem);
 	init_waitqueue_head(&usblp->wait);
-	usblp->ifnum = ifnum;
+	usblp->ifnum = intf->altsetting->bInterfaceNumber;
 
 	retval = usb_register_dev(&usblp_fops, USBLP_MINOR_BASE, 1, &usblp->minor);
 	if (retval) {
@@ -886,12 +887,14 @@ static void *usblp_probe(struct usb_device *dev, unsigned int ifnum,
 
 	info("usblp%d: USB %sdirectional printer dev %d "
 		"if %d alt %d proto %d vid 0x%4.4X pid 0x%4.4X",
-		usblp->minor, usblp->bidir ? "Bi" : "Uni", dev->devnum, ifnum,
+		usblp->minor, usblp->bidir ? "Bi" : "Uni", dev->devnum,
+		usblp->ifnum,
 		usblp->protocol[usblp->current_protocol].alt_setting,
 		usblp->current_protocol, usblp->dev->descriptor.idVendor,
 		usblp->dev->descriptor.idProduct);
 
-	return usblp;
+	dev_set_drvdata (&intf->dev, usblp);
+	return 0;
 
 abort_minor:
 	usb_deregister_dev (1, usblp->minor);
@@ -903,7 +906,7 @@ abort:
 		if (usblp->device_id_string) kfree(usblp->device_id_string);
 		kfree(usblp);
 	}
-	return NULL;
+	return -EIO;
 }
 
 /*
@@ -1065,9 +1068,9 @@ static int usblp_cache_device_id_string(struct usblp *usblp)
 	return length;
 }
 
-static void usblp_disconnect(struct usb_device *dev, void *ptr)
+static void usblp_disconnect(struct usb_interface *intf)
 {
-	struct usblp *usblp = ptr;
+	struct usblp *usblp = dev_get_drvdata (&intf->dev);
 
 	if (!usblp || !usblp->dev) {
 		err("bogus disconnect");
@@ -1077,6 +1080,7 @@ static void usblp_disconnect(struct usb_device *dev, void *ptr)
 	down (&usblp->sem);
 	lock_kernel();
 	usblp->dev = NULL;
+	dev_set_drvdata (&intf->dev, NULL);
 
 	usblp_unlink_urbs(usblp);
 

@@ -70,7 +70,7 @@ static void add_host(struct hpsb_host *host)
 {
         host->csr.lock = SPIN_LOCK_UNLOCKED;
 
-        host->csr.rom_size = host->ops->get_rom(host, &host->csr.rom);
+        host->csr.rom_size = host->driver->get_rom(host, &host->csr.rom);
 
         host->csr.state                 = 0;
         host->csr.node_ids              = 0;
@@ -152,7 +152,7 @@ static int read_regs(struct hpsb_host *host, int nodeid, quadlet_t *buf,
         case CSR_CYCLE_TIME:
                 oldcycle = host->csr.cycle_time;
                 host->csr.cycle_time =
-                        host->ops->devctl(host, GET_CYCLE_COUNTER, 0);
+                        host->driver->devctl(host, GET_CYCLE_COUNTER, 0);
 
                 if (oldcycle > host->csr.cycle_time) {
                         /* cycle time wrapped around */
@@ -163,7 +163,7 @@ static int read_regs(struct hpsb_host *host, int nodeid, quadlet_t *buf,
         case CSR_BUS_TIME:
                 oldcycle = host->csr.cycle_time;
                 host->csr.cycle_time =
-                        host->ops->devctl(host, GET_CYCLE_COUNTER, 0);
+                        host->driver->devctl(host, GET_CYCLE_COUNTER, 0);
 
                 if (oldcycle > host->csr.cycle_time) {
                         /* cycle time wrapped around */
@@ -181,32 +181,32 @@ static int read_regs(struct hpsb_host *host, int nodeid, quadlet_t *buf,
                 return RCODE_ADDRESS_ERROR;
 
         case CSR_BUS_MANAGER_ID:
-                if (host->ops->hw_csr_reg)
-                        ret = host->ops->hw_csr_reg(host, 0, 0, 0);
+                if (host->driver->hw_csr_reg)
+                        ret = host->driver->hw_csr_reg(host, 0, 0, 0);
                 else
                         ret = host->csr.bus_manager_id;
 
                 *(buf++) = cpu_to_be32(ret);
                 out;
         case CSR_BANDWIDTH_AVAILABLE:
-                if (host->ops->hw_csr_reg)
-                        ret = host->ops->hw_csr_reg(host, 1, 0, 0);
+                if (host->driver->hw_csr_reg)
+                        ret = host->driver->hw_csr_reg(host, 1, 0, 0);
                 else
                         ret = host->csr.bandwidth_available;
 
                 *(buf++) = cpu_to_be32(ret);
                 out;
         case CSR_CHANNELS_AVAILABLE_HI:
-                if (host->ops->hw_csr_reg)
-                        ret = host->ops->hw_csr_reg(host, 2, 0, 0);
+                if (host->driver->hw_csr_reg)
+                        ret = host->driver->hw_csr_reg(host, 2, 0, 0);
                 else
                         ret = host->csr.channels_available_hi;
 
                 *(buf++) = cpu_to_be32(ret);
                 out;
         case CSR_CHANNELS_AVAILABLE_LO:
-                if (host->ops->hw_csr_reg)
-                        ret = host->ops->hw_csr_reg(host, 3, 0, 0);
+                if (host->driver->hw_csr_reg)
+                        ret = host->driver->hw_csr_reg(host, 3, 0, 0);
                 else
                         ret = host->csr.channels_available_lo;
 
@@ -244,7 +244,7 @@ static int write_regs(struct hpsb_host *host, int nodeid, int destid,
                 host->csr.node_ids &= NODE_MASK << 16;
                 host->csr.node_ids |= be32_to_cpu(*(data++)) & (BUS_MASK << 16);
                 host->node_id = host->csr.node_ids >> 16;
-                host->ops->devctl(host, SET_BUS_ID, host->node_id >> 6);
+                host->driver->devctl(host, SET_BUS_ID, host->node_id >> 6);
                 out;
 
         case CSR_RESET_START:
@@ -269,7 +269,7 @@ static int write_regs(struct hpsb_host *host, int nodeid, int destid,
         case CSR_CYCLE_TIME:
                 /* should only be set by cycle start packet, automatically */
                 host->csr.cycle_time = be32_to_cpu(*data);
-                host->ops->devctl(host, SET_CYCLE_COUNTER,
+                host->driver->devctl(host, SET_CYCLE_COUNTER,
                                        be32_to_cpu(*(data++)));
                 out;
         case CSR_BUS_TIME:
@@ -318,10 +318,10 @@ static int lock_regs(struct hpsb_host *host, int nodeid, quadlet_t *store,
         data = be32_to_cpu(data);
         arg = be32_to_cpu(arg);
 
-        if (host->ops->hw_csr_reg) {
+        if (host->driver->hw_csr_reg) {
                 quadlet_t old;
 
-                old = host->ops->
+                old = host->driver->
                         hw_csr_reg(host, (csraddr - CSR_BUS_MANAGER_ID) >> 2,
                                    data, arg);
 
@@ -402,23 +402,23 @@ static int write_fcp(struct hpsb_host *host, int nodeid, int dest,
 
 
 static struct hpsb_highlevel_ops csr_ops = {
-        add_host: add_host,
-        host_reset: host_reset,
+	.add_host =	add_host,
+        .host_reset =	host_reset,
 };
 
 
 static struct hpsb_address_ops map_ops = {
-        read: read_maps,
+        .read = read_maps,
 };
 
 static struct hpsb_address_ops fcp_ops = {
-        write: write_fcp,
+        .write = write_fcp,
 };
 
 static struct hpsb_address_ops reg_ops = {
-        read: read_regs,
-        write: write_regs,
-        lock: lock_regs,
+        .read = read_regs,
+        .write = write_regs,
+        .lock = lock_regs,
 };
 
 static struct hpsb_highlevel *hl;

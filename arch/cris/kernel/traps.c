@@ -230,8 +230,12 @@ watchdog_bite_hook(struct pt_regs *regs)
 #endif	
 }
 
-/* This is normally the 'Oops' routine */
+void dump_stack(void)
+{
+	show_stack(NULL);
+}
 
+/* This is normally the 'Oops' routine */
 void 
 die_if_kernel(const char * str, struct pt_regs * regs, long err)
 {

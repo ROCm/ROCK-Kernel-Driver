@@ -729,8 +729,8 @@ int ext3_orphan_add(handle_t *handle, struct inode *inode)
 	J_ASSERT ((S_ISREG(inode->i_mode) || S_ISDIR(inode->i_mode) ||
 		S_ISLNK(inode->i_mode)) || inode->i_nlink == 0);
 
-	BUFFER_TRACE(sb->u.ext3_sb.s_sbh, "get_write_access");
-	err = ext3_journal_get_write_access(handle, sb->u.ext3_sb.s_sbh);
+	BUFFER_TRACE(EXT3_SB(sb)->s_sbh, "get_write_access");
+	err = ext3_journal_get_write_access(handle, EXT3_SB(sb)->s_sbh);
 	if (err)
 		goto out_unlock;
 	
@@ -741,7 +741,7 @@ int ext3_orphan_add(handle_t *handle, struct inode *inode)
 	/* Insert this inode at the head of the on-disk orphan list... */
 	NEXT_ORPHAN(inode) = le32_to_cpu(EXT3_SB(sb)->s_es->s_last_orphan);
 	EXT3_SB(sb)->s_es->s_last_orphan = cpu_to_le32(inode->i_ino);
-	err = ext3_journal_dirty_metadata(handle, sb->u.ext3_sb.s_sbh);
+	err = ext3_journal_dirty_metadata(handle, EXT3_SB(sb)->s_sbh);
 	rc = ext3_mark_iloc_dirty(handle, inode, &iloc);
 	if (!err)
 		err = rc;

@@ -25,18 +25,16 @@ static ide_pci_host_proc_t ali_procs[] __initdata = {
 };
 #endif /* DISPLAY_ALI_TIMINGS && CONFIG_PROC_FS */
 
-static void init_setup_ali15x3(struct pci_dev *, ide_pci_device_t *);
 static unsigned int init_chipset_ali15x3(struct pci_dev *, const char *);
 static void init_hwif_common_ali15x3(ide_hwif_t *);
 static void init_hwif_ali15x3(ide_hwif_t *);
 static void init_dma_ali15x3(ide_hwif_t *, unsigned long);
 
 static ide_pci_device_t ali15x3_chipsets[] __initdata = {
-	{
+	{	/* 0 */
 		vendor:		PCI_VENDOR_ID_AL,
 		device:		PCI_DEVICE_ID_AL_M5229,
 		name:		"ALI15X3",
-		init_setup:	init_setup_ali15x3,
 		init_chipset:	init_chipset_ali15x3,
 		init_iops:	NULL,
 		init_hwif:	init_hwif_ali15x3,

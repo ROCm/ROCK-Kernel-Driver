@@ -985,20 +985,20 @@ static int raw1394_release(struct inode *inode, struct file *file)
 }
 
 static struct hpsb_highlevel_ops hl_ops = {
-        add_host:     add_host,
-        remove_host:  remove_host,
-        host_reset:   host_reset,
-        iso_receive:  iso_receive,
-        fcp_request:  fcp_request,
+        .add_host =    add_host,
+        .remove_host = remove_host,
+        .host_reset =  host_reset,
+        .iso_receive = iso_receive,
+        .fcp_request = fcp_request,
 };
 
 static struct file_operations file_ops = {
-	owner:		THIS_MODULE,
-        read:		raw1394_read, 
-        write:		raw1394_write, 
-        poll:		raw1394_poll, 
-        open:		raw1394_open, 
-        release:	raw1394_release, 
+	.owner =	THIS_MODULE,
+        .read =		raw1394_read, 
+        .write =	raw1394_write, 
+        .poll =		raw1394_poll, 
+        .open =		raw1394_open, 
+        .release =	raw1394_release, 
 };
 
 static int __init init_raw1394(void)

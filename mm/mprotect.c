@@ -321,6 +321,11 @@ asmlinkage long sys_mprotect(unsigned long start, size_t len, unsigned long prot
 
 		/* Here we know that  vma->vm_start <= nstart < vma->vm_end. */
 
+		if (is_vm_hugetlb_page(vma)) {
+			error = -EACCES;
+			goto out;
+		}
+
 		newflags = prot | (vma->vm_flags & ~(PROT_READ | PROT_WRITE | PROT_EXEC));
 		if ((newflags & ~(newflags >> 4)) & 0xf) {
 			error = -EACCES;

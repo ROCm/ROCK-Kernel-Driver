@@ -226,7 +226,7 @@ static void init_hwif_pdc202xx(ide_hwif_t *);
 static void init_dma_pdc202xx(ide_hwif_t *, unsigned long);
 
 static ide_pci_device_t pdc202xx_chipsets[] __initdata = {
-	{
+	{	/* 0 */
 		vendor:		PCI_VENDOR_ID_PROMISE,
 		device:		PCI_DEVICE_ID_PROMISE_20246,
 		name:		"PDC20246",
@@ -244,7 +244,7 @@ static ide_pci_device_t pdc202xx_chipsets[] __initdata = {
 #endif
 		bootable:	OFF_BOARD,
 		extra:		16,
-	},{
+	},{	/* 1 */
 		vendor:		PCI_VENDOR_ID_PROMISE,
 		device:		PCI_DEVICE_ID_PROMISE_20262,
 		name:		"PDC20262",
@@ -262,7 +262,7 @@ static ide_pci_device_t pdc202xx_chipsets[] __initdata = {
 #endif
 		bootable:	OFF_BOARD,
 		extra:		48,
-	},{
+	},{	/* 2 */
 		vendor:		PCI_VENDOR_ID_PROMISE,
 		device:		PCI_DEVICE_ID_PROMISE_20263,
 		name:		"PDC20263",
@@ -280,7 +280,7 @@ static ide_pci_device_t pdc202xx_chipsets[] __initdata = {
 #endif
 		bootable:	OFF_BOARD,
 		extra:		48,
-	},{
+	},{	/* 3 */
 		vendor:		PCI_VENDOR_ID_PROMISE,
 		device:		PCI_DEVICE_ID_PROMISE_20265,
 		name:		"PDC20265",
@@ -297,7 +297,7 @@ static ide_pci_device_t pdc202xx_chipsets[] __initdata = {
 #endif
 		bootable:	OFF_BOARD,
 		extra:		48,
-	},{
+	},{	/* 4 */
 		vendor:		PCI_VENDOR_ID_PROMISE,
 		device:		PCI_DEVICE_ID_PROMISE_20267,
 		name:		"PDC20267",

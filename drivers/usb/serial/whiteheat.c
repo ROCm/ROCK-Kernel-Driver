@@ -110,13 +110,20 @@ static struct usb_device_id id_table_prerenumeration [] = {
 	{ }						/* Terminating entry */
 };
 
-static __devinitdata struct usb_device_id id_table_combined [] = {
+static struct usb_device_id id_table_combined [] = {
 	{ USB_DEVICE(CONNECT_TECH_VENDOR_ID, CONNECT_TECH_WHITE_HEAT_ID) },
 	{ USB_DEVICE(CONNECT_TECH_VENDOR_ID, CONNECT_TECH_FAKE_WHITE_HEAT_ID) },
 	{ }						/* Terminating entry */
 };
 
 MODULE_DEVICE_TABLE (usb, id_table_combined);
+
+static struct usb_driver whiteheat_driver = {
+	.name =		"whiteheat",
+	.probe =	usb_serial_probe,
+	.disconnect =	usb_serial_disconnect,
+	.id_table =	id_table_combined,
+};
 
 /* function prototypes for the Connect Tech WhiteHEAT serial converter */
 static int  whiteheat_open		(struct usb_serial_port *port, struct file *filp);
@@ -674,6 +681,7 @@ static int __init whiteheat_init (void)
 {
 	usb_serial_register (&whiteheat_fake_device);
 	usb_serial_register (&whiteheat_device);
+	usb_register (&whiteheat_driver);
 	info(DRIVER_DESC " " DRIVER_VERSION);
 	return 0;
 }
@@ -681,6 +689,7 @@ static int __init whiteheat_init (void)
 
 static void __exit whiteheat_exit (void)
 {
+	usb_deregister (&whiteheat_driver);
 	usb_serial_deregister (&whiteheat_fake_device);
 	usb_serial_deregister (&whiteheat_device);
 }

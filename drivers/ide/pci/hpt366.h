@@ -442,7 +442,7 @@ static void init_hwif_hpt366(ide_hwif_t *);
 static void init_dma_hpt366(ide_hwif_t *, unsigned long);
 
 static ide_pci_device_t hpt366_chipsets[] __initdata = {
-	{
+	{	/* 0 */
 		vendor:		PCI_VENDOR_ID_TTI,
 		device:		PCI_DEVICE_ID_TTI_HPT366,
 		name:		"HPT366",
@@ -456,7 +456,7 @@ static ide_pci_device_t hpt366_chipsets[] __initdata = {
 		enablebits:	{{0x00,0x00,0x00}, {0x00,0x00,0x00}},
 		bootable:	OFF_BOARD,
 		extra:		240
-	},{
+	},{	/* 1 */
 		vendor:		PCI_VENDOR_ID_TTI,
 		device:		PCI_DEVICE_ID_TTI_HPT372,
 		name:		"HPT372A",
@@ -470,7 +470,7 @@ static ide_pci_device_t hpt366_chipsets[] __initdata = {
 		enablebits:	{{0x00,0x00,0x00}, {0x00,0x00,0x00}},
 		bootable:	OFF_BOARD,
 		extra:		0
-	},{
+	},{	/* 2 */
 		vendor:		PCI_VENDOR_ID_TTI,
 		device:		PCI_DEVICE_ID_TTI_HPT302,
 		name:		"HPT302",
@@ -484,7 +484,7 @@ static ide_pci_device_t hpt366_chipsets[] __initdata = {
 		enablebits:	{{0x00,0x00,0x00}, {0x00,0x00,0x00}},
 		bootable:	OFF_BOARD,
 		extra:		0
-	},{
+	},{	/* 3 */
 		vendor:		PCI_VENDOR_ID_TTI,
 		device:		PCI_DEVICE_ID_TTI_HPT371,
 		name:		"HPT371",
@@ -498,7 +498,7 @@ static ide_pci_device_t hpt366_chipsets[] __initdata = {
 		enablebits:	{{0x00,0x00,0x00}, {0x00,0x00,0x00}},
 		bootable:	OFF_BOARD,
 		extra:		0
-	},{
+	},{	/* 4 */
 		vendor:		PCI_VENDOR_ID_TTI,
 		device:		PCI_DEVICE_ID_TTI_HPT374,
 		name:		"HPT374",

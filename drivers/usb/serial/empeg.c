@@ -110,6 +110,13 @@ static struct usb_device_id id_table [] = {
 
 MODULE_DEVICE_TABLE (usb, id_table);
 
+static struct usb_driver empeg_driver = {
+	.name =		"empeg",
+	.probe =	usb_serial_probe,
+	.disconnect =	usb_serial_disconnect,
+	.id_table =	id_table,
+};
+
 static struct usb_serial_device_type empeg_device = {
 	.owner =		THIS_MODULE,
 	.name =			"Empeg",
@@ -550,8 +557,6 @@ static int __init empeg_init (void)
 	struct urb *urb;
 	int i;
 
-	usb_serial_register (&empeg_device);
-
 	/* create our write urb pool and transfer buffers */ 
 	spin_lock_init (&write_urb_pool_lock);
 	for (i = 0; i < NUM_URBS; ++i) {
@@ -571,10 +576,12 @@ static int __init empeg_init (void)
 		}
 	}
 
+	usb_serial_register (&empeg_device);
+	usb_register (&empeg_driver);
+
 	info(DRIVER_VERSION ":" DRIVER_DESC);
 
 	return 0;
-
 }
 
 
@@ -583,6 +590,7 @@ static void __exit empeg_exit (void)
 	int i;
 	unsigned long flags;
 
+	usb_register (&empeg_driver);
 	usb_serial_deregister (&empeg_device);
 
 	spin_lock_irqsave (&write_urb_pool_lock, flags);
@@ -600,7 +608,6 @@ static void __exit empeg_exit (void)
 	}
 
 	spin_unlock_irqrestore (&write_urb_pool_lock, flags);
-
 }
 
 

@@ -136,16 +136,8 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 	struct sysinfo i;
 	int len, committed;
 	struct page_state ps;
-	int cpu;
 	unsigned long inactive;
 	unsigned long active;
-	unsigned long flushes = 0;
-	unsigned long non_flushes = 0;
-
-	for (cpu = 0; cpu < NR_CPUS; cpu++) {
-		flushes += mmu_gathers[cpu].flushes;
-		non_flushes += mmu_gathers[cpu].avoided_flushes;
-	}
 
 	get_page_state(&ps);
 	get_zone_counts(&active, &inactive);
@@ -165,6 +157,7 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 		"MemTotal:     %8lu kB\n"
 		"MemFree:      %8lu kB\n"
 		"MemShared:    %8lu kB\n"
+		"Buffers:      %8lu kB\n"
 		"Cached:       %8lu kB\n"
 		"SwapCached:   %8lu kB\n"
 		"Active:       %8lu kB\n"
@@ -177,15 +170,15 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 		"SwapFree:     %8lu kB\n"
 		"Dirty:        %8lu kB\n"
 		"Writeback:    %8lu kB\n"
+		"Mapped:       %8lu kB\n"
 		"Committed_AS: %8u kB\n"
 		"PageTables:   %8lu kB\n"
-		"ReverseMaps:  %8lu\n"
-		"TLB flushes:  %8lu\n"
-		"non flushes:  %8lu\n",
+		"ReverseMaps:  %8lu\n",
 		K(i.totalram),
 		K(i.freeram),
 		K(i.sharedram),
-		K(ps.nr_pagecache-swapper_space.nrpages),
+		K(i.bufferram),
+		K(ps.nr_pagecache-swapper_space.nrpages-i.bufferram),
 		K(swapper_space.nrpages),
 		K(active),
 		K(inactive),
@@ -197,13 +190,25 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 		K(i.freeswap),
 		K(ps.nr_dirty),
 		K(ps.nr_writeback),
+		K(ps.nr_mapped),
 		K(committed),
 		K(ps.nr_page_table_pages),
-		ps.nr_reverse_maps,
-		flushes,
-		non_flushes
+		ps.nr_reverse_maps
 		);
 
+#ifdef CONFIG_HUGETLB_PAGE
+	{
+		extern unsigned long htlbpagemem, htlbzone_pages;
+		len += sprintf(page + len,
+				"HugePages:    %8lu\n"
+				"Available:    %8lu\n"
+				"Size:         %8lu kB\n",
+				htlbzone_pages,
+				htlbpagemem,
+				HPAGE_SIZE/1024);
+	}
+
+#endif
 	return proc_calc_metrics(page, start, off, count, eof, len);
 #undef K
 }

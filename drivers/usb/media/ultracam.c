@@ -537,67 +537,71 @@ static void ultracam_configure_video(struct uvd *uvd)
  * 12-Nov-2000 Reworked to comply with new probe() signature.
  * 23-Jan-2001 Added compatibility with 2.2.x kernels.
  */
-static void *ultracam_probe(struct usb_device *dev, unsigned int ifnum ,const struct usb_device_id *devid)
+static int ultracam_probe(struct usb_interface *intf, const struct usb_device_id *devid)
 {
+	struct usb_device *dev = interface_to_usbdev(intf);
 	struct uvd *uvd = NULL;
 	int i, nas;
 	int actInterface=-1, inactInterface=-1, maxPS=0;
 	unsigned char video_ep = 0;
 
 	if (debug >= 1)
-		info("ultracam_probe(%p,%u.)", dev, ifnum);
+		info("ultracam_probe(%p)", intf);
 
 	/* We don't handle multi-config cameras */
 	if (dev->descriptor.bNumConfigurations != 1)
-		return NULL;
+		return -ENODEV;
 
 	/* Is it an IBM camera? */
 	if ((dev->descriptor.idVendor != ULTRACAM_VENDOR_ID) ||
 	    (dev->descriptor.idProduct != ULTRACAM_PRODUCT_ID))
-		return NULL;
+		return -ENODEV;
 
 	info("IBM Ultra camera found (rev. 0x%04x)", dev->descriptor.bcdDevice);
 
 	/* Validate found interface: must have one ISO endpoint */
-	nas = dev->actconfig->interface[ifnum].num_altsetting;
+	nas = intf->num_altsetting;
 	if (debug > 0)
 		info("Number of alternate settings=%d.", nas);
 	if (nas < 8) {
 		err("Too few alternate settings for this camera!");
-		return NULL;
+		return -ENODEV;
 	}
 	/* Validate all alternate settings */
 	for (i=0; i < nas; i++) {
 		const struct usb_interface_descriptor *interface;
 		const struct usb_endpoint_descriptor *endpoint;
 
-		interface = &dev->actconfig->interface[ifnum].altsetting[i];
+		interface = &intf->altsetting[i];
 		if (interface->bNumEndpoints != 1) {
 			err("Interface %d. has %u. endpoints!",
-			    ifnum, (unsigned)(interface->bNumEndpoints));
-			return NULL;
+			    interface->bInterfaceNumber,
+			    (unsigned)(interface->bNumEndpoints));
+			return -ENODEV;
 		}
 		endpoint = &interface->endpoint[0];
 		if (video_ep == 0)
 			video_ep = endpoint->bEndpointAddress;
 		else if (video_ep != endpoint->bEndpointAddress) {
 			err("Alternate settings have different endpoint addresses!");
-			return NULL;
+			return -ENODEV;
 		}
 		if ((endpoint->bmAttributes & 0x03) != 0x01) {
-			err("Interface %d. has non-ISO endpoint!", ifnum);
-			return NULL;
+			err("Interface %d. has non-ISO endpoint!",
+			    interface->bInterfaceNumber);
+			return -ENODEV;
 		}
 		if ((endpoint->bEndpointAddress & 0x80) == 0) {
-			err("Interface %d. has ISO OUT endpoint!", ifnum);
-			return NULL;
+			err("Interface %d. has ISO OUT endpoint!",
+			    interface->bInterfaceNumber);
+			return -ENODEV;
 		}
 		if (endpoint->wMaxPacketSize == 0) {
 			if (inactInterface < 0)
 				inactInterface = i;
 			else {
 				err("More than one inactive alt. setting!");
-				return NULL;
+				return -ENODEV;
 			}
 		} else {
 			if (actInterface < 0) {
@@ -621,7 +625,7 @@ static void *ultracam_probe(struct usb_device *dev, unsigned int ifnum ,const st
 	}
 	if ((maxPS <= 0) || (actInterface < 0) || (inactInterface < 0)) {
 		err("Failed to recognize the camera!");
-		return NULL;
+		return -ENODEV;
 	}
 
 	/* Code below may sleep, need to lock module while we are here */
@@ -632,7 +636,7 @@ static void *ultracam_probe(struct usb_device *dev, unsigned int ifnum ,const st
 		uvd->flags = flags;
 		uvd->debug = debug;
 		uvd->dev = dev;
-		uvd->iface = ifnum;
+		uvd->iface = intf->altsetting->bInterfaceNumber;
 		uvd->ifaceAltInactive = inactInterface;
 		uvd->ifaceAltActive = actInterface;
 		uvd->video_endp = video_ep;
@@ -656,7 +660,12 @@ static void *ultracam_probe(struct usb_device *dev, unsigned int ifnum ,const st
 		}
 	}
 	MOD_DEC_USE_COUNT;
-	return uvd;
+
+	if (uvd) {
+		dev_set_drvdata (&intf->dev, uvd);
+		return 0;
+	}
+	return -EIO;
 }
 
 

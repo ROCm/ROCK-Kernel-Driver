@@ -207,10 +207,10 @@ static void usb_kbd_free_mem(struct usb_device *dev, struct usb_kbd *kbd)
 		usb_buffer_free(dev, 1, kbd->leds, kbd->leds_dma);
 }
 
-static void *usb_kbd_probe(struct usb_device *dev, unsigned int ifnum,
-			   const struct usb_device_id *id)
+static int usb_kbd_probe(struct usb_interface *iface, 
+			 const struct usb_device_id *id)
 {
-	struct usb_interface *iface;
+	struct usb_device * dev = interface_to_usbdev(iface);
 	struct usb_interface_descriptor *interface;
 	struct usb_endpoint_descriptor *endpoint;
 	struct usb_kbd *kbd;
@@ -218,25 +218,28 @@ static void *usb_kbd_probe(struct usb_device *dev, unsigned int ifnum,
 	char path[64];
 	char *buf;
 
-	iface = &dev->actconfig->interface[ifnum];
 	interface = &iface->altsetting[iface->act_altsetting];
 
-	if (interface->bNumEndpoints != 1) return NULL;
+	if (interface->bNumEndpoints != 1)
+		return -ENODEV;
 
 	endpoint = interface->endpoint + 0;
-	if (!(endpoint->bEndpointAddress & 0x80)) return NULL;
-	if ((endpoint->bmAttributes & 3) != 3) return NULL;
+	if (!(endpoint->bEndpointAddress & 0x80))
+		return -ENODEV;
+	if ((endpoint->bmAttributes & 3) != 3)
+		return -ENODEV;
 
 	pipe = usb_rcvintpipe(dev, endpoint->bEndpointAddress);
 	maxp = usb_maxpacket(dev, pipe, usb_pipeout(pipe));
 
-	if (!(kbd = kmalloc(sizeof(struct usb_kbd), GFP_KERNEL))) return NULL;
+	if (!(kbd = kmalloc(sizeof(struct usb_kbd), GFP_KERNEL)))
+		return -ENOMEM;
 	memset(kbd, 0, sizeof(struct usb_kbd));
 
 	if (usb_kbd_alloc_mem(dev, kbd)) {
 		usb_kbd_free_mem(dev, kbd);
 		kfree(kbd);
-		return NULL;
+		return -ENOMEM;
 	}
 
 	kbd->usbdev = dev;
@@ -279,7 +282,7 @@ static void *usb_kbd_probe(struct usb_device *dev, unsigned int ifnum,
 		usb_free_urb(kbd->irq);
 		usb_kbd_free_buffers(dev, kbd);
 		kfree(kbd);
-		return NULL;
+		return -ENOMEM;
 	}
 
 	if (dev->descriptor.iManufacturer &&
@@ -306,16 +309,21 @@ static void *usb_kbd_probe(struct usb_device *dev, unsigned int ifnum,
 
 	printk(KERN_INFO "input: %s on %s\n", kbd->name, path);
 
-	return kbd;
+	dev_set_drvdata(&iface->dev, kbd);
+	return 0;
 }
 
-static void usb_kbd_disconnect(struct usb_device *dev, void *ptr)
+static void usb_kbd_disconnect(struct usb_interface *intf)
 {
-	struct usb_kbd *kbd = ptr;
-	usb_unlink_urb(kbd->irq);
-	input_unregister_device(&kbd->dev);
-	usb_kbd_free_buffers(dev, kbd);
-	kfree(kbd);
+	struct usb_kbd *kbd = dev_get_drvdata(&intf->dev);
+	
+	dev_set_drvdata(&intf->dev, NULL);
+	if (kbd) {
+		usb_unlink_urb(kbd->irq);
+		input_unregister_device(&kbd->dev);
+		usb_kbd_free_buffers(interface_to_usbdev(intf), kbd);
+		kfree(kbd);
+	}
 }
 
 static struct usb_device_id usb_kbd_id_table [] = {

@@ -19,9 +19,6 @@ extern unsigned long max_mapnr;
 extern unsigned long num_physpages;
 extern void * high_memory;
 extern int page_cluster;
-/* The inactive_clean lists are per zone. */
-extern struct list_head active_list;
-extern struct list_head inactive_list;
 
 #include <asm/page.h>
 #include <asm/pgtable.h>
@@ -54,7 +51,7 @@ struct vm_area_struct {
 	pgprot_t vm_page_prot;		/* Access permissions of this VMA. */
 	unsigned long vm_flags;		/* Flags, listed below. */
 
-	rb_node_t vm_rb;
+	struct rb_node vm_rb;
 
 	/*
 	 * For areas with an address space and backing store,
@@ -104,6 +101,7 @@ struct vm_area_struct {
 #define VM_DONTEXPAND	0x00040000	/* Cannot expand with mremap() */
 #define VM_RESERVED	0x00080000	/* Don't unmap it from swap_out */
 #define VM_ACCOUNT	0x00100000	/* Is a VM accounted object */
+#define VM_HUGETLB	0x00400000	/* Huge TLB Page VM */
 
 #define VM_STACK_FLAGS	(0x00000100 | VM_DATA_DEFAULT_FLAGS | VM_ACCOUNT)
 
@@ -376,6 +374,20 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm, unsigned long 
 
 int __set_page_dirty_buffers(struct page *page);
 int __set_page_dirty_nobuffers(struct page *page);
+
+#ifdef CONFIG_HUGETLB_PAGE
+#define is_vm_hugetlb_page(vma) (vma->vm_flags & VM_HUGETLB)
+extern int copy_hugetlb_page_range(struct mm_struct *, struct mm_struct *, struct vm_area_struct *);
+extern int follow_hugetlb_page(struct mm_struct *, struct vm_area_struct *, struct page **, struct vm_area_struct **, unsigned long *, int *, int);
+extern	int free_hugepages(struct vm_area_struct *);
+
+#else
+#define is_vm_hugetlb_page(vma) (0)
+#define follow_hugetlb_page(mm, vma, pages, vmas, start, len, i) (0)
+#define copy_hugetlb_page_range(dst, src, vma) (0)
+#define free_hugepages(mpnt)  do { } while(0)
+#endif
+
 
 /*
  * If the mapping doesn't provide a set_page_dirty a_op, then

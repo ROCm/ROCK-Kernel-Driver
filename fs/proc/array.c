@@ -487,7 +487,18 @@ int proc_pid_statm(struct task_struct *task, char * buffer)
 		while (vma) {
 			pgd_t *pgd = pgd_offset(mm, vma->vm_start);
 			int pages = 0, shared = 0, dirty = 0, total = 0;
+			if (is_vm_hugetlb_page(vma)) {
+				int num_pages = ((vma->vm_end - vma->vm_start)/PAGE_SIZE);
 
+				resident += num_pages;
+				if (!(vma->vm_flags & VM_DONTCOPY))
+					share += num_pages;
+				if (vma->vm_flags & VM_WRITE)
+					dt += num_pages;
+				drs += num_pages;
+				vma = vma->vm_next;
+				continue;
+			}
 			statm_pgd_range(pgd, vma->vm_start, vma->vm_end, &pages, &shared, &dirty, &total);
 			resident += pages;
 			share += shared;

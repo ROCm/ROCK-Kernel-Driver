@@ -197,7 +197,7 @@ static struct usb_device_id clie_id_3_5_table [] = {
 	{ }					/* Terminating entry */
 };
 
-static __devinitdata struct usb_device_id id_table_combined [] = {
+static struct usb_device_id id_table_combined [] = {
 	{ USB_DEVICE(HANDSPRING_VENDOR_ID, HANDSPRING_VISOR_ID) },
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M500_ID) },
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M505_ID) },
@@ -214,7 +214,12 @@ static __devinitdata struct usb_device_id id_table_combined [] = {
 
 MODULE_DEVICE_TABLE (usb, id_table_combined);
 
-
+static struct usb_driver visor_driver = {
+	.name =		"visor",
+	.probe =	usb_serial_probe,
+	.disconnect =	usb_serial_disconnect,
+	.id_table =	id_table_combined,
+};
 
 /* All of the device info needed for the Handspring Visor, and Palm 4.0 devices */
 static struct usb_serial_device_type handspring_device = {
@@ -763,6 +768,7 @@ static int __init visor_init (void)
 {
 	usb_serial_register (&handspring_device);
 	usb_serial_register (&clie_3_5_device);
+	usb_register (&visor_driver);
 	info(DRIVER_DESC " " DRIVER_VERSION);
 
 	return 0;
@@ -771,6 +777,7 @@ static int __init visor_init (void)
 
 static void __exit visor_exit (void)
 {
+	usb_deregister (&visor_driver);
 	usb_serial_deregister (&handspring_device);
 	usb_serial_deregister (&clie_3_5_device);
 }

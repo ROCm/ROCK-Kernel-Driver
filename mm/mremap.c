@@ -311,6 +311,10 @@ unsigned long do_mremap(unsigned long addr,
 	vma = find_vma(current->mm, addr);
 	if (!vma || vma->vm_start > addr)
 		goto out;
+	if (is_vm_hugetlb_page(vma)) {
+		ret = -EINVAL;
+		goto out;
+	}
 	/* We can't remap across vm area boundaries */
 	if (old_len > vma->vm_end - addr)
 		goto out;

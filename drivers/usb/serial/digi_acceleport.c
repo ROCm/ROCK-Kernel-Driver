@@ -477,7 +477,7 @@ static int digi_read_oob_callback( struct urb *urb );
 
 /* Statics */
 
-static __devinitdata struct usb_device_id id_table_combined [] = {
+static struct usb_device_id id_table_combined [] = {
 	{ USB_DEVICE(DIGI_VENDOR_ID, DIGI_2_ID) },
 	{ USB_DEVICE(DIGI_VENDOR_ID, DIGI_4_ID) },
 	{ }						/* Terminating entry */
@@ -494,6 +494,14 @@ static struct usb_device_id id_table_4 [] = {
 };
 
 MODULE_DEVICE_TABLE (usb, id_table_combined);
+
+static struct usb_driver digi_driver = {
+	.name =		"digi_acceleport",
+	.probe =	usb_serial_probe,
+	.disconnect =	usb_serial_disconnect,
+	.id_table =	id_table_combined,
+};
+
 
 /* device info needed for the Digi serial converter */
 
@@ -2025,6 +2033,7 @@ static int __init digi_init (void)
 {
 	usb_serial_register (&digi_acceleport_2_device);
 	usb_serial_register (&digi_acceleport_4_device);
+	usb_register (&digi_driver);
 	info(DRIVER_VERSION ":" DRIVER_DESC);
 	return 0;
 }
@@ -2032,6 +2041,7 @@ static int __init digi_init (void)
 
 static void __exit digi_exit (void)
 {
+	usb_deregister (&digi_driver);
 	usb_serial_deregister (&digi_acceleport_2_device);
 	usb_serial_deregister (&digi_acceleport_4_device);
 }

@@ -25,17 +25,15 @@ static ide_pci_host_proc_t amd74xx_procs[] __initdata = {
 };
 #endif  /* defined(DISPLAY_VIPER_TIMINGS) && defined(CONFIG_PROC_FS) */
 
-static void init_setup_amd74xx(struct pci_dev *, ide_pci_device_t *);
 static unsigned int init_chipset_amd74xx(struct pci_dev *, const char *);
 static void init_hwif_amd74xx(ide_hwif_t *);
 static void init_dma_amd74xx(ide_hwif_t *, unsigned long);
 
 static ide_pci_device_t amd74xx_chipsets[] __initdata = {
-	{
+	{	/* 0 */
 		vendor:		PCI_VENDOR_ID_AMD,
 		device:		PCI_DEVICE_ID_AMD_COBRA_7401,
 		name:		"AMD7401",
-		init_setup:	init_setup_amd74xx,
 		init_chipset:	init_chipset_amd74xx,
 		init_iops:	NULL,
 		init_hwif:	init_hwif_amd74xx,
@@ -45,11 +43,10 @@ static ide_pci_device_t amd74xx_chipsets[] __initdata = {
 		enablebits:	{{0x40,0x01,0x01}, {0x40,0x02,0x02}},
 		bootable:	ON_BOARD,
 		extra:		0
-	},{
+	},{	/* 1 */
 		vendor:		PCI_VENDOR_ID_AMD,
 		device:		PCI_DEVICE_ID_AMD_VIPER_7409,
 		name:		"AMD7409",
-		init_setup:	init_setup_amd74xx,
 		init_chipset:	init_chipset_amd74xx,
 		init_iops:	NULL,
 		init_hwif:	init_hwif_amd74xx,
@@ -59,11 +56,10 @@ static ide_pci_device_t amd74xx_chipsets[] __initdata = {
 		enablebits:	{{0x40,0x01,0x01}, {0x40,0x02,0x02}},
 		bootable:	ON_BOARD,
 		extra:		0
-	},{
+	},{	/* 2 */
 		vendor:		PCI_VENDOR_ID_AMD,
 		device:		PCI_DEVICE_ID_AMD_VIPER_7411,
 		name:		"AMD7411",
-		init_setup:	init_setup_amd74xx,
 		init_chipset:	init_chipset_amd74xx,
 		init_iops:	NULL,
 		init_hwif:	init_hwif_amd74xx,
@@ -73,11 +69,10 @@ static ide_pci_device_t amd74xx_chipsets[] __initdata = {
 		enablebits:	{{0x40,0x01,0x01}, {0x40,0x02,0x02}},
 		bootable:	ON_BOARD,
 		extra:		0
-	},{
+	},{	/* 3 */
 		vendor:		PCI_VENDOR_ID_AMD,
 		device:		PCI_DEVICE_ID_AMD_OPUS_7441,
 		name:		"AMD7441",
-		init_setup:	init_setup_amd74xx,
 		init_chipset:	init_chipset_amd74xx,
 		init_iops:	NULL,
 		init_hwif:	init_hwif_amd74xx,
@@ -87,11 +82,10 @@ static ide_pci_device_t amd74xx_chipsets[] __initdata = {
 		enablebits:	{{0x40,0x01,0x01}, {0x40,0x02,0x02}},
 		bootable:	ON_BOARD,
 		extra:		0
-	},{
+	},{	/* 4 */
 		vendor:		PCI_VENDOR_ID_AMD,
 		device:		PCI_DEVICE_ID_AMD_8111_IDE,
 		name:		"AMD8111",
-		init_setup:	init_setup_amd74xx,
 		init_chipset:	init_chipset_amd74xx,
 		init_iops:	NULL,
 		init_hwif:	init_hwif_amd74xx,
