@@ -242,7 +242,7 @@ void kd_mksound(unsigned int hz, unsigned int ticks)
 	del_timer(&kd_mksound_timer);
 
 	if (hz) {
-		list_for_each(node,&kbd_handler.h_list) {
+		list_for_each_prev(node,&kbd_handler.h_list) {
 			struct input_handle *handle = to_handle_h(node);
 			if (test_bit(EV_SND, handle->dev->evbit)) {
 				if (test_bit(SND_TONE, handle->dev->sndbit)) {
