@@ -1034,7 +1034,7 @@ struct trans2_resp {
 	/* struct smb_hdr hdr precedes. Note wct = 10 + setup count */
 	__le16 TotalParameterCount;
 	__le16 TotalDataCount;
-	__le16 Reserved;
+	__u16 Reserved;
 	__le16 ParameterCount;
 	__le16 ParameterOffset;
 	__le16 ParameterDisplacement;
@@ -1134,17 +1134,7 @@ typedef struct smb_com_transaction2_qpi_req {
 
 typedef struct smb_com_transaction2_qpi_rsp {
 	struct smb_hdr hdr;	/* wct = 10 + SetupCount */
-	__le16 TotalParameterCount;
-	__le16 TotalDataCount;
-	__le16 Reserved;
-	__le16 ParameterCount;
-	__le16 ParameterOffset;
-	__le16 ParameterDisplacement;
-	__le16 DataCount;
-	__le16 DataOffset;
-	__le16 DataDisplacement;
-	__u8 SetupCount;
-	__u8 Reserved1;		/* should be zero setup words following */
+	struct trans2_resp t2;
 	__u16 ByteCount;
 	__u16 Reserved2;	/* parameter word reserved - present for infolevels > 100 */
 } TRANSACTION2_QPI_RSP;
@@ -1177,17 +1167,7 @@ typedef struct smb_com_transaction2_spi_req {
 
 typedef struct smb_com_transaction2_spi_rsp {
 	struct smb_hdr hdr;	/* wct = 10 + SetupCount */
-	__le16 TotalParameterCount;
-	__le16 TotalDataCount;
-	__u16 Reserved;
-	__le16 ParameterCount;
-	__le16 ParameterOffset;
-	__le16 ParameterDisplacement;
-	__le16 DataCount;
-	__le16 DataOffset;
-	__le16 DataDisplacement;
-	__u8 SetupCount;
-	__u8 Reserved1;		/* should be zero setup words following */
+	struct trans2_resp t2;
 	__u16 ByteCount;
 	__u16 Reserved2;	/* parameter word reserved - present for infolevels > 100 */
 } TRANSACTION2_SPI_RSP;
@@ -1227,17 +1207,7 @@ struct smb_com_transaction2_sfi_req {
 
 struct smb_com_transaction2_sfi_rsp {
 	struct smb_hdr hdr;	/* wct = 10 + SetupCount */
-	__le16 TotalParameterCount;
-	__le16 TotalDataCount;
-	__u16 Reserved;
-	__le16 ParameterCount;
-	__le16 ParameterOffset;
-	__le16 ParameterDisplacement;
-	__le16 DataCount;
-	__le16 DataOffset;
-	__le16 DataDisplacement;
-	__u8 SetupCount;
-	__u8 Reserved1;		/* should be zero setup words following */
+	struct trans2_resp t2;
 	__u16 ByteCount;
 	__u16 Reserved2;	/* parameter word reserved - present for infolevels > 100 */
 };
@@ -1421,17 +1391,7 @@ typedef struct dfs_referral_level_3 {
 
 typedef struct smb_com_transaction_get_dfs_refer_rsp {
 	struct smb_hdr hdr;	/* wct = 10 */
-	__le16 TotalParameterCount;
-	__le16 TotalDataCount;
-	__u16 Reserved;
-	__le16 ParameterCount;
-	__le16 ParameterOffset;
-	__le16 ParameterDisplacement;
-	__le16 DataCount;
-	__le16 DataOffset;
-	__le16 DataDisplacement;
-	__u8 SetupCount;
-	__u8 Reserved1;		/* zero setup words following */
+	struct trans2_resp t2;
 	__u16 ByteCount;
 	__u8 Pad;
 	__le16 PathConsumed;

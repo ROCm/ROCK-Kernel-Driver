@@ -1464,8 +1464,8 @@ querySymLinkRetry:
 	if (rc) {
 		cFYI(1, ("Send error in QuerySymLinkInfo = %d", rc));
 	} else {		/* decode response */
-		__u16 data_offset = le16_to_cpu(pSMBr->DataOffset);
-		__u16 count = le16_to_cpu(pSMBr->DataCount);
+		__u16 data_offset = le16_to_cpu(pSMBr->t2.DataOffset);
+		__u16 count = le16_to_cpu(pSMBr->t2.DataCount);
 		if ((pSMBr->ByteCount < 2) || (data_offset > 512))
 		/* BB also check enough total bytes returned */
 			rc = -EIO;	/* bad smb */
@@ -1644,7 +1644,7 @@ QPathInfoRetry:
 	if (rc) {
 		cFYI(1, ("Send error in QPathInfo = %d", rc));
 	} else {		/* decode response */
-		__u16 data_offset = le16_to_cpu(pSMBr->DataOffset);
+		__u16 data_offset = le16_to_cpu(pSMBr->t2.DataOffset);
 		/* BB also check enough total bytes returned */
 		/* BB we need to improve the validity checking
 		of these trans2 responses */
@@ -1729,7 +1729,7 @@ UnixQPathInfoRetry:
 	if (rc) {
 		cFYI(1, ("Send error in QPathInfo = %d", rc));
 	} else {		/* decode response */
-		__u16 data_offset = le16_to_cpu(pSMBr->DataOffset);
+		__u16 data_offset = le16_to_cpu(pSMBr->t2.DataOffset);
 		/* BB also check if enough total bytes returned */
 		if ((pSMBr->ByteCount < sizeof(FILE_UNIX_BASIC_INFO)) || 
 			(data_offset > 512) || 
@@ -2321,8 +2321,8 @@ getDFSRetry:
 		cFYI(1, ("Send error in GetDFSRefer = %d", rc));
 	} else {		/* decode response */
 /* BB Add logic to parse referrals here */
-		__u16 data_offset = le16_to_cpu(pSMBr->DataOffset);
-		__u16 data_count = le16_to_cpu(pSMBr->DataCount);
+		__u16 data_offset = le16_to_cpu(pSMBr->t2.DataOffset);
+		__u16 data_count = le16_to_cpu(pSMBr->t2.DataCount);
 		cFYI(1,
 		     ("Decoding GetDFSRefer response.  BCC: %d  Offset %d",
 		      pSMBr->ByteCount, data_offset));
@@ -3253,7 +3253,7 @@ QAllEAsRetry:
 	if (rc) {
 		cFYI(1, ("Send error in QueryAllEAs = %d", rc));
 	} else {		/* decode response */
-		__u16 data_offset = le16_to_cpu(pSMBr->DataOffset);
+		__u16 data_offset = le16_to_cpu(pSMBr->t2.DataOffset);
 		/* BB also check enough total bytes returned */
 		/* BB we need to improve the validity checking
 		of these trans2 responses */
@@ -3395,7 +3395,7 @@ QEARetry:
 	if (rc) {
 		cFYI(1, ("Send error in Query EA = %d", rc));
 	} else {		/* decode response */
-		__u16 data_offset = le16_to_cpu(pSMBr->DataOffset);
+		__u16 data_offset = le16_to_cpu(pSMBr->t2.DataOffset);
 		/* BB also check enough total bytes returned */
 		/* BB we need to improve the validity checking
 		of these trans2 responses */
