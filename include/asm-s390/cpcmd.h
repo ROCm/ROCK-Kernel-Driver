@@ -27,6 +27,8 @@ typedef struct CPCmd_Dev {
    unsigned long count;      /* Length of the command          */
    unsigned long size;       /* Length of the response         */
    int rc;                   /* Return code from CP command    */
+   int flag;                /* Options flag                   */
+#define UPCASE 0x80         /* Only command is uppercased     */
 } CPCmd_Dev;
 
 /*
