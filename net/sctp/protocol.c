@@ -59,6 +59,7 @@
 /* Global data structures. */
 sctp_protocol_t sctp_proto;
 struct proc_dir_entry	*proc_net_sctp;
+struct sctp_mib sctp_statistics[NR_CPUS * 2];
 
 /* This is the global socket data structure used for responding to
  * the Out-of-the-blue (OOTB) packets.  A control sock will be created
