@@ -59,7 +59,7 @@ int __init k8_scan_nodes(unsigned long start, unsigned long end)
 	printk(KERN_INFO "Scanning NUMA topology in Northbridge %d\n", nb); 
 
 	reg = read_pci_config(0, nb, 0, 0x60); 
-	numnodes = ((reg >> 4) & 7) + 1;
+	numnodes = ((reg >> 4) & 0xF) + 1;
 
 	printk(KERN_INFO "Number of nodes %d\n", numnodes);
 
