@@ -1,6 +1,6 @@
 /*
  *
- * linux/drivers/s390/net/qeth_main.c ($Revision: 1.125 $)
+ * linux/drivers/s390/net/qeth_main.c ($Revision: 1.127 $)
  *
  * Linux on zSeries OSA Express and HiperSockets support
  *
@@ -12,7 +12,7 @@
  *			  Frank Pavlic (pavlic@de.ibm.com) and
  *		 	  Thomas Spatzier <tspat@de.ibm.com>
  *
- *    $Revision: 1.125 $	 $Date: 2004/06/29 17:28:24 $
+ *    $Revision: 1.127 $	 $Date: 2004/07/14 21:46:40 $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -78,7 +78,7 @@ qeth_eyecatcher(void)
 #include "qeth_mpc.h"
 #include "qeth_fs.h"
 
-#define VERSION_QETH_C "$Revision: 1.125 $"
+#define VERSION_QETH_C "$Revision: 1.127 $"
 static const char *version = "qeth S/390 OSA-Express driver";
 
 /**
@@ -3853,7 +3853,8 @@ qeth_mdio_read(struct net_device *dev, int phy_id, int regnum)
 	switch(regnum){
 	case MII_BMCR: /* Basic mode control register */
 		rc = BMCR_FULLDPLX;
-		if(card->info.link_type != QETH_LINK_TYPE_GBIT_ETH)
+		if ((card->info.link_type != QETH_LINK_TYPE_GBIT_ETH)&&
+		    (card->info.link_type != QETH_LINK_TYPE_10GBIT_ETH))
 			rc |= BMCR_SPEED100;
 		break;
 	case MII_BMSR: /* Basic mode status register */

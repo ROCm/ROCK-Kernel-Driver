@@ -85,7 +85,6 @@ struct fastlane_dma_registers {
 
 static int  dma_bytes_sent(struct NCR_ESP *esp, int fifo_count);
 static int  dma_can_transfer(struct NCR_ESP *esp, Scsi_Cmnd *sp);
-static inline void dma_clear(struct NCR_ESP *esp);
 static void dma_dump_state(struct NCR_ESP *esp);
 static void dma_init_read(struct NCR_ESP *esp, __u32 addr, int length);
 static void dma_init_write(struct NCR_ESP *esp, __u32 vaddr, int length);
@@ -109,6 +108,21 @@ static volatile unsigned char cmd_buffer[16];
 				 * before they are transferred to the ESP chip
 				 * via PIO.
 				 */
+
+static inline void dma_clear(struct NCR_ESP *esp)
+{
+	struct fastlane_dma_registers *dregs =
+		(struct fastlane_dma_registers *) (esp->dregs);
+	unsigned long *t;
+
+	ctrl_data = (ctrl_data & FASTLANE_DMA_MASK);
+	dregs->ctrl_reg = ctrl_data;
+
+	t = (unsigned long *)(esp->edev);
+
+	dregs->clear_strobe = 0;
+	*t = 0 ;
+}
 
 /***************************************************************** Detection */
 int __init fastlane_esp_detect(Scsi_Host_Template *tpnt)
@@ -295,21 +309,6 @@ static void dma_init_write(struct NCR_ESP *esp, __u32 addr, int length)
 		     FASTLANE_DMA_ENABLE |
 		     FASTLANE_DMA_WRITE);
 	dregs->ctrl_reg = ctrl_data;
-}
-
-static inline void dma_clear(struct NCR_ESP *esp)
-{
-	struct fastlane_dma_registers *dregs = 
-		(struct fastlane_dma_registers *) (esp->dregs);
-	unsigned long *t;
-
-	ctrl_data = (ctrl_data & FASTLANE_DMA_MASK);
-	dregs->ctrl_reg = ctrl_data;
-
-	t = (unsigned long *)(esp->edev);
-
-	dregs->clear_strobe = 0;
-	*t = 0 ;
 }
 
 

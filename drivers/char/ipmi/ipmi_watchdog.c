@@ -129,6 +129,12 @@
 #define	WDIOC_GET_PRETIMEOUT     _IOW(WATCHDOG_IOCTL_BASE, 22, int)
 #endif
 
+#ifdef CONFIG_WATCHDOG_NOWAYOUT
+static int nowayout = 1;
+#else
+static int nowayout;
+#endif
+
 static ipmi_user_t watchdog_user = NULL;
 
 /* Default the timeout to 10 seconds. */
@@ -175,6 +181,8 @@ MODULE_PARM_DESC(preop, "Pretimeout driver operation.  One of: "
 module_param(start_now, int, 0);
 MODULE_PARM_DESC(start_now, "Set to 1 to start the watchdog as"
 		 "soon as the driver is loaded.");
+module_param(nowayout, int, 0);
+MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CONFIG_WATCHDOG_NOWAYOUT)");
 
 /* Default state of the timer. */
 static unsigned char ipmi_watchdog_state = WDOG_TIMEOUT_NONE;
@@ -704,10 +712,10 @@ static int ipmi_close(struct inode *ino, struct file *filep)
 {
 	if (iminor(ino)==WATCHDOG_MINOR)
 	{
-#ifndef CONFIG_WATCHDOG_NOWAYOUT	
-		ipmi_watchdog_state = WDOG_TIMEOUT_NONE;
-		ipmi_set_timeout(IPMI_SET_TIMEOUT_NO_HB);
-#endif		
+		if (!nowayout) {
+			ipmi_watchdog_state = WDOG_TIMEOUT_NONE;
+			ipmi_set_timeout(IPMI_SET_TIMEOUT_NO_HB);
+		}
 	        ipmi_wdog_open = 0;
 	}
 

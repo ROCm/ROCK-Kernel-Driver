@@ -394,12 +394,3 @@ void *memset(void *s, int c, size_t n)
 	return s;
 }
 EXPORT_SYMBOL_NOVERS(memset);
-
-/*
- * missing exports for string functions defined in lib/string.c
- */
-EXPORT_SYMBOL_NOVERS(memmove);
-EXPORT_SYMBOL_NOVERS(strchr);
-EXPORT_SYMBOL_NOVERS(strnchr);
-EXPORT_SYMBOL_NOVERS(strncmp);
-EXPORT_SYMBOL_NOVERS(strpbrk);

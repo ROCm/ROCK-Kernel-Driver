@@ -203,7 +203,7 @@ config MOXA_SMARTIO
 
 config ISI
 	tristate "Multi-Tech multiport card support (EXPERIMENTAL)"
-	depends on SERIAL_NONSTANDARD && EXPERIMENTAL && BROKEN_ON_SMP && m
+	depends on SERIAL_NONSTANDARD && PCI && EXPERIMENTAL && BROKEN_ON_SMP && m
 	help
 	  This is a driver for the Multi-Tech cards which provide several
 	  serial ports.  The driver is experimental and can currently only be
@@ -212,7 +212,7 @@ config ISI
 
 config SYNCLINK
 	tristate "Microgate SyncLink card support"
-	depends on SERIAL_NONSTANDARD
+	depends on SERIAL_NONSTANDARD && PCI
 	help
 	  Provides support for the SyncLink ISA and PCI multiprotocol serial
 	  adapters. These adapters support asynchronous and HDLC bit
@@ -570,6 +570,23 @@ config HVC_CONSOLE
 	  console. This driver allows each pSeries partition to have a console
 	  which is accessed via the HMC.
 
+config HVCS
+	tristate "IBM Hypervisor Virtual Console Server support"
+	depends on PPC_PSERIES
+	help
+	  Partitionable IBM Power5 ppc64 machines allow hosting of
+	  firmware virtual consoles from one Linux partition by
+	  another Linux partition.  This driver allows console data
+	  from Linux partitions to be accessed through TTY device
+	  interfaces in the device tree of a Linux partition running
+	  this driver.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called hvcs.ko.  Additionally, this module
+	  will depend on arch specific APIs exported from hvcserver.ko
+	  which will also be compiled when this driver is built as a
+	  module.
+
 config QIC02_TAPE
 	tristate "QIC-02 tape support"
 	help
@@ -819,6 +836,7 @@ config R3964
 
 config APPLICOM
 	tristate "Applicom intelligent fieldbus card support"
+	depends on PCI
 	---help---
 	  This driver provides the kernel-side support for the intelligent
 	  fieldbus cards made by Applicom International. More information

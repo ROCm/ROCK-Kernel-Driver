@@ -321,6 +321,11 @@ pgd_offset (struct mm_struct *mm, unsigned long address)
 #define pgd_offset_k(addr) \
 	(init_mm.pgd + (((addr) >> PGDIR_SHIFT) & (PTRS_PER_PGD - 1)))
 
+/* Look up a pgd entry in the gate area.  On IA-64, the gate-area
+   resides in the kernel-mapped segment, hence we use pgd_offset_k()
+   here.  */
+#define pgd_offset_gate(mm, addr)	pgd_offset_k(addr)
+
 /* Find an entry in the second-level page table.. */
 #define pmd_offset(dir,addr) \
 	((pmd_t *) pgd_page(*(dir)) + (((addr) >> PMD_SHIFT) & (PTRS_PER_PMD - 1)))
@@ -552,6 +557,7 @@ do {											\
 #define __HAVE_ARCH_PTEP_SET_WRPROTECT
 #define __HAVE_ARCH_PTEP_MKDIRTY
 #define __HAVE_ARCH_PTE_SAME
+#define __HAVE_ARCH_PGD_OFFSET_GATE
 #include <asm-generic/pgtable.h>
 
 #endif /* _ASM_IA64_PGTABLE_H */

@@ -1068,7 +1068,7 @@ static void release_dev(struct file * filp)
 {
 	struct tty_struct *tty, *o_tty;
 	int	pty_master, tty_closing, o_tty_closing, do_sleep;
-	int	devpts_master;
+	int	devpts_master, devpts;
 	int	idx;
 	char	buf[64];
 	
@@ -1083,7 +1083,8 @@ static void release_dev(struct file * filp)
 	idx = tty->index;
 	pty_master = (tty->driver->type == TTY_DRIVER_TYPE_PTY &&
 		      tty->driver->subtype == PTY_TYPE_MASTER);
-	devpts_master = pty_master && (tty->driver->flags & TTY_DRIVER_DEVPTS_MEM);
+	devpts = (tty->driver->flags & TTY_DRIVER_DEVPTS_MEM) != 0;
+	devpts_master = pty_master && devpts;
 	o_tty = tty->link;
 
 #ifdef TTY_PARANOIA_CHECK
@@ -1308,7 +1309,7 @@ static void release_dev(struct file * filp)
 
 #ifdef CONFIG_UNIX98_PTYS
 	/* Make this pty number available for reallocation */
-	if (devpts_master) {
+	if (devpts) {
 		down(&allocated_ptys_lock);
 		idr_remove(&allocated_ptys, idx);
 		up(&allocated_ptys_lock);

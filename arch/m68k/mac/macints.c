@@ -545,7 +545,8 @@ void mac_free_irq(unsigned int irq, void *dev_id)
 #endif
 
 	if (irq < VIA1_SOURCE_BASE) {
-		return cpu_free_irq(irq, dev_id);
+		cpu_free_irq(irq, dev_id);
+		return;
 	}
 
 	if (irq >= NUM_MAC_SOURCES) {

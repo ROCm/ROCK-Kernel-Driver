@@ -300,6 +300,10 @@ void __cpu_die(unsigned int cpu)
 void cpu_die(void)
 {
 	local_irq_disable();
+	/* Some hardware requires clearing the CPPR, while other hardware does not
+	 * it is safe either way
+	 */
+	pSeriesLP_cppr_info(0, 0);
 	rtas_stop_self();
 	/* Should never get here... */
 	BUG();
@@ -422,7 +426,11 @@ static inline void look_for_more_cpus(void)
 	}
 
 	maxcpus = ireg[num_addr_cell + num_size_cell];
-	/* DRENG need to account for threads here too */
+
+	/* Double maxcpus for processors which have SMT capability */
+	if (cur_cpu_spec->cpu_features & CPU_FTR_SMT)
+		maxcpus *= 2;
+
 
 	if (maxcpus > NR_CPUS) {
 		printk(KERN_WARNING

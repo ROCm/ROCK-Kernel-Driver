@@ -1,9 +1,9 @@
 /*
- *  linux/drivers/sound/dmasound/trans_16.c
+ *  linux/sound/oss/dmasound/trans_16.c
  *
  *  16 bit translation routines.  Only used by Power mac at present.
  *
- *  See linux/drivers/sound/dmasound/dmasound_core.c for copyright and
+ *  See linux/sound/oss/dmasound/dmasound_core.c for copyright and
  *  history prior to 08/02/2001.
  *
  *  08/02/2001 Iain Sandoe

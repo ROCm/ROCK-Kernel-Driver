@@ -1685,6 +1685,9 @@ static int selinux_bprm_set_security(struct linux_binprm *bprm)
 		if (rc)
 			return rc;
 
+		/* Clear any possibly unsafe personality bits on exec: */
+		current->personality &= ~PER_CLEAR_ON_SETID;
+
 		/* Set the security field to the new SID. */
 		bsec->sid = newsid;
 	}
@@ -1894,9 +1897,6 @@ static void selinux_bprm_apply_creds(struct linux_binprm *bprm, int unsafe)
 			tsec->sid = sid;
 			task_unlock(current);
 		}
-
-		/* Clear any possibly unsafe personality bits on exec: */
-		current->personality &= ~PER_CLEAR_ON_SETID;
 
 		/* Close files for which the new task SID is not authorized. */
 		flush_unauthorized_files(current->files);

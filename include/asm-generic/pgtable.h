@@ -122,4 +122,8 @@ static inline void ptep_mkdirty(pte_t *ptep)
 #define page_test_and_clear_young(page) (0)
 #endif
 
+#ifndef __HAVE_ARCH_PGD_OFFSET_GATE
+#define pgd_offset_gate(mm, addr)	pgd_offset(mm, addr)
+#endif
+
 #endif /* _ASM_GENERIC_PGTABLE_H */

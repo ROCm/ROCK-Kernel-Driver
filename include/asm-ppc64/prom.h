@@ -269,6 +269,7 @@ extern unsigned char *get_property(struct device_node *node, const char *name,
 extern void print_properties(struct device_node *node);
 extern int prom_n_addr_cells(struct device_node* np);
 extern int prom_n_size_cells(struct device_node* np);
+extern int prom_n_intr_cells(struct device_node* np);
 extern void prom_get_irq_senses(unsigned char *senses, int off, int max);
 extern void prom_add_property(struct device_node* np, struct property* prop);
 

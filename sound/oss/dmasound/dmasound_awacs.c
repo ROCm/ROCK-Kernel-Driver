@@ -1,10 +1,10 @@
 /*
- *  linux/drivers/sound/dmasound/dmasound_awacs.c
+ *  linux/sound/oss/dmasound/dmasound_awacs.c
  *
  *  PowerMac `AWACS' and `Burgundy' DMA Sound Driver
  *  with some limited support for DACA & Tumbler
  *
- *  See linux/drivers/sound/dmasound/dmasound_core.c for copyright and
+ *  See linux/sound/oss/dmasound/dmasound_core.c for copyright and
  *  history prior to 2001/01/26.
  *
  *	26/01/2001 ed 0.1 Iain Sandoe

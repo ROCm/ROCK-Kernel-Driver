@@ -202,3 +202,30 @@ or an NFS share[Work In Progress]). Questions regarding suspend2
 should be sent to the mailing list available through the suspend2
 website, and not to the Linux Kernel Mailing List. We are working
 toward merging suspend2 into the mainline kernel.
+
+Q: Kernel thread must voluntarily freeze itself (call 'refrigerator'). But
+I found some kernel threads don't do it, and they don't freeze, and
+so the system can't sleep. Is this a known behavior?
+
+A: All such kernel threads need to be fixed, one by one. Select place
+where it is safe to be frozen (no kernel semaphores should be held at
+that point and it must be safe to sleep there), and add:
+
+            if (current->flags & PF_FREEZE)
+                    refrigerator(PF_FREEZE);
+
+Q: What is the difference between between "platform", "shutdown" and
+"firmware" in /sys/power/disk?
+
+A:
+
+shutdown: save state in linux, then tell bios to powerdown
+
+platform: save state in linux, then tell bios to powerdown and blink
+          "suspended led"
+
+firmware: tell bios to save state itself [needs BIOS-specific suspend
+	  partition, and has very little to do with swsusp]
+
+"platform" is actually right thing to do, but "shutdown" is most
+reliable.

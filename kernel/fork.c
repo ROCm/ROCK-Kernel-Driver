@@ -974,7 +974,6 @@ struct task_struct *copy_process(unsigned long clone_flags,
  	}
 #endif
 
-	retval = -ENOMEM;
 	if ((retval = security_task_alloc(p)))
 		goto bad_fork_cleanup_policy;
 	if ((retval = audit_alloc(p)))

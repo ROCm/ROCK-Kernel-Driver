@@ -12,7 +12,7 @@
 #ifndef __QETH_FS_H__
 #define __QETH_FS_H__
 
-#define VERSION_QETH_FS_H "$Revision: 1.8 $"
+#define VERSION_QETH_FS_H "$Revision: 1.9 $"
 
 extern const char *VERSION_QETH_PROC_C;
 extern const char *VERSION_QETH_SYS_C;
@@ -138,6 +138,8 @@ qeth_get_cardname_short(struct qeth_card *card)
 				return "HSTR";
 			case QETH_LINK_TYPE_GBIT_ETH:
 				return "OSD_1000";
+			case QETH_LINK_TYPE_10GBIT_ETH:
+				return "OSD_10GIG";
 			case QETH_LINK_TYPE_LANE_ETH100:
 				return "OSD_FE_LANE";
 			case QETH_LINK_TYPE_LANE_TR:

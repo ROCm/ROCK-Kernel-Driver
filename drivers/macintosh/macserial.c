@@ -158,10 +158,6 @@ static void dma_init(struct mac_serial * info);
 static void rxdma_start(struct mac_serial * info, int current);
 static void rxdma_to_tty(struct mac_serial * info);
 
-#ifndef MIN
-#define MIN(a,b)	((a) < (b) ? (a) : (b))
-#endif
-
 /*
  * tmp_buf is used as a temporary buffer by serial_write.  We need to
  * lock it in case the copy_from_user blocks while swapping in a page,
@@ -1485,9 +1481,8 @@ static int rs_write(struct tty_struct * tty, int from_user,
 	if (from_user) {
 		down(&tmp_buf_sem);
 		while (1) {
-			c = MIN(count,
-				MIN(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
-				    SERIAL_XMIT_SIZE - info->xmit_head));
+			c = min_t(int, count, min(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
+						  SERIAL_XMIT_SIZE - info->xmit_head));
 			if (c <= 0)
 				break;
 
@@ -1498,8 +1493,8 @@ static int rs_write(struct tty_struct * tty, int from_user,
 				break;
 			}
 			spin_lock_irqsave(&info->lock, flags);
-			c = MIN(c, MIN(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
-				       SERIAL_XMIT_SIZE - info->xmit_head));
+			c = min_t(int, c, min(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
+					      SERIAL_XMIT_SIZE - info->xmit_head));
 			memcpy(info->xmit_buf + info->xmit_head, tmp_buf, c);
 			info->xmit_head = ((info->xmit_head + c) &
 					   (SERIAL_XMIT_SIZE-1));
@@ -1513,9 +1508,8 @@ static int rs_write(struct tty_struct * tty, int from_user,
 	} else {
 		while (1) {
 			spin_lock_irqsave(&info->lock, flags);
-			c = MIN(count,
-				MIN(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
-				    SERIAL_XMIT_SIZE - info->xmit_head));
+			c = min_t(int, count, min(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
+						  SERIAL_XMIT_SIZE - info->xmit_head));
 			if (c <= 0) {
 				spin_unlock_irqrestore(&info->lock, flags);
 				break;
@@ -2052,7 +2046,7 @@ static void rs_wait_until_sent(struct tty_struct *tty, int timeout)
 	} else if (char_time == 0)
 		char_time = 1;
 	if (timeout)
-		char_time = MIN(char_time, timeout);
+		char_time = min_t(unsigned long, char_time, timeout);
 	while ((read_zsreg(info->zs_channel, 1) & ALL_SNT) == 0) {
 		current->state = TASK_INTERRUPTIBLE;
 		schedule_timeout(char_time);

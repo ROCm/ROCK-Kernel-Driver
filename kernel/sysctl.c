@@ -1436,7 +1436,7 @@ static int do_proc_dointvec(ctl_table *table, int write, struct file *filp,
 			      int write, void *data),
 		  void *data)
 {
-#define TMPBUFLEN 20
+#define TMPBUFLEN 21
 	int *i, vleft, first=1, neg, val;
 	unsigned long lval;
 	size_t left, len;
@@ -1676,7 +1676,7 @@ static int do_proc_doulongvec_minmax(ctl_table *table, int write,
 				     unsigned long convmul,
 				     unsigned long convdiv)
 {
-#define TMPBUFLEN 20
+#define TMPBUFLEN 21
 	unsigned long *i, *min, *max, val;
 	int vleft, first=1, neg;
 	size_t len, left;

@@ -440,10 +440,6 @@ struct page * find_get_page(struct address_space *mapping, unsigned long offset)
 {
 	struct page *page;
 
-	/*
-	 * We scan the hash list read-only. Addition to and removal from
-	 * the hash-list needs a held write-lock.
-	 */
 	spin_lock_irq(&mapping->tree_lock);
 	page = radix_tree_lookup(&mapping->page_tree, offset);
 	if (page)

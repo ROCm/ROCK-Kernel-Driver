@@ -70,7 +70,7 @@ int bvme6000_parse_bootinfo(const struct bi_record *bi)
 		return 1;
 }
 
-void bvme6000_reset()
+void bvme6000_reset(void)
 {
 	volatile PitRegsPtr pit = (PitRegsPtr)BVME_PIT_BASE;
 

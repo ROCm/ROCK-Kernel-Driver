@@ -563,7 +563,7 @@ static inline unsigned safe_shift(unsigned d, int n)
 	return n < 0 ? d >> -n : d << n;
 }
 
-static void __init fb_set_logocmap(struct fb_info *info,
+static void fb_set_logocmap(struct fb_info *info,
 				   const struct linux_logo *logo)
 {
 	struct fb_cmap palette_cmap;
@@ -597,7 +597,7 @@ static void __init fb_set_logocmap(struct fb_info *info,
 	}
 }
 
-static void  __init fb_set_logo_truepalette(struct fb_info *info,
+static void  fb_set_logo_truepalette(struct fb_info *info,
 					    const struct linux_logo *logo,
 					    u32 *palette)
 {
@@ -627,7 +627,7 @@ static void  __init fb_set_logo_truepalette(struct fb_info *info,
 	}
 }
 
-static void __init fb_set_logo_directpalette(struct fb_info *info,
+static void fb_set_logo_directpalette(struct fb_info *info,
 					     const struct linux_logo *logo,
 					     u32 *palette)
 {
@@ -642,7 +642,7 @@ static void __init fb_set_logo_directpalette(struct fb_info *info,
 		palette[i] = i << redshift | i << greenshift | i << blueshift;
 }
 
-static void __init fb_set_logo(struct fb_info *info,
+static void fb_set_logo(struct fb_info *info,
 			       const struct linux_logo *logo, u8 *dst,
 			       int depth)
 {

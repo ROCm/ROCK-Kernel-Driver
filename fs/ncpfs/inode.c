@@ -957,7 +957,7 @@ int ncp_notify_change(struct dentry *dentry, struct iattr *attr)
 #endif
 	}
 	if (!result)
-		inode_setattr(inode, attr);
+		result = inode_setattr(inode, attr);
 out:
 	unlock_kernel();
 	return result;

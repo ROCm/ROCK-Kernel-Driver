@@ -1747,7 +1747,7 @@ static inline void check_timer(void)
 		return;
 	}
 	printk(" failed :(.\n");
-	panic("IO-APIC + timer doesn't work! pester mingo@redhat.com");
+	panic("IO-APIC + timer doesn't work! Try using the 'noapic' kernel parameter\n");
 }
 
 /*
