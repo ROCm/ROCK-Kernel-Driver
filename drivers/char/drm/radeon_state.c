@@ -1440,7 +1440,8 @@ static int radeon_cp_dispatch_texture( DRMFILE filp,
 		}
 		if ( !buf ) {
 			DRM_DEBUG("radeon_cp_dispatch_texture: EAGAIN\n");
-			DRM_COPY_TO_USER( tex->image, image, sizeof(*image) );
+			if (DRM_COPY_TO_USER( tex->image, image, sizeof(*image) ))
+				return DRM_ERR(EFAULT);
 			return DRM_ERR(EAGAIN);
 		}
 

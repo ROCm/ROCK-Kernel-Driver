@@ -39,10 +39,8 @@
 
 /**
  * Cut down version of drm_memory_debug.h, which used to be called
- * drm_memory.h.  If you want the debug functionality, change 0 to 1
- * below.
+ * drm_memory.h.  
  */
-#define DEBUG_MEMORY 0
 
 #if __OS_HAS_AGP
 
@@ -197,7 +195,7 @@ static inline void drm_ioremapfree(void *pt, unsigned long size, drm_device_t *d
 }
 
 
-#if DEBUG_MEMORY
+#ifdef DEBUG_MEMORY
 #include "drm_memory_debug.h"
 #else
 
@@ -226,13 +224,7 @@ int DRM(mem_info)(char *buf, char **start, off_t offset,
 }
 
 /** Wrapper around kmalloc() */
-void *DRM(alloc)(size_t size, int area)
-{
-	return kmalloc(size, GFP_KERNEL);
-}
-
-/** Wrapper around kmalloc() */
-void *DRM(calloc)(size_t size, size_t nmemb, int area)
+void *DRM(calloc)(size_t nmemb, size_t size, int area)
 {
 	void *addr;
 
@@ -254,12 +246,6 @@ void *DRM(realloc)(void *oldpt, size_t oldsize, size_t size, int area)
 		kfree(oldpt);
 	}
 	return pt;
-}
-
-/** Wrapper around kfree() */
-void DRM(free)(void *pt, size_t size, int area)
-{
-	kfree(pt);
 }
 
 /**
