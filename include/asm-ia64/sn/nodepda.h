@@ -87,7 +87,7 @@ struct irqpda_s {
 	char irq_flags[NR_IRQS];
 	struct pci_dev *device_dev[NR_IRQS];
 	char share_count[NR_IRQS];
-	struct pci_dev *current;
+	struct pci_dev *curr;
 };
 
 typedef struct irqpda_s irqpda_t;
