@@ -927,19 +927,11 @@ static int hwif_init (ide_hwif_t *hwif)
 	return hwif->present;
 }
 
-int ideprobe_init (void);
-static ide_module_t ideprobe_module = {
-	IDE_PROBE_MODULE,
-	ideprobe_init,
-	NULL
-};
-
 int ideprobe_init (void)
 {
 	unsigned int index;
 	int probe[MAX_HWIFS];
 	
-	MOD_INC_USE_COUNT;
 	memset(probe, 0, MAX_HWIFS * sizeof(int));
 	for (index = 0; index < MAX_HWIFS; ++index)
 		probe[index] = !ide_hwifs[index].present;
@@ -953,31 +945,5 @@ int ideprobe_init (void)
 	for (index = 0; index < MAX_HWIFS; ++index)
 		if (probe[index])
 			hwif_init(&ide_hwifs[index]);
-	if (!ide_probe)
-		ide_probe = &ideprobe_module;
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
-
-#ifdef MODULE
-extern int (*ide_xlate_1024_hook)(kdev_t, int, int, const char *);
-
-int init_module (void)
-{
-	unsigned int index;
-	
-	for (index = 0; index < MAX_HWIFS; ++index)
-		ide_unregister(index);
-	ideprobe_init();
-	create_proc_ide_interfaces();
-	ide_xlate_1024_hook = ide_xlate_1024;
-	return 0;
-}
-
-void cleanup_module (void)
-{
-	ide_probe = NULL;
-	ide_xlate_1024_hook = 0;
-}
-MODULE_LICENSE("GPL");
-#endif /* MODULE */

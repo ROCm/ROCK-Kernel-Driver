@@ -2046,6 +2046,7 @@ static ide_proc_entry_t idefloppy_proc[] = {
 
 #endif	/* CONFIG_PROC_FS */
 
+int idefloppy_init(void);
 int idefloppy_reinit(ide_drive_t *drive);
 
 /*
@@ -2071,15 +2072,8 @@ static ide_driver_t idefloppy_driver = {
 	capacity:		idefloppy_capacity,
 	special:		NULL,
 	proc:			idefloppy_proc,
+	driver_init:		idefloppy_init,
 	driver_reinit:		idefloppy_reinit,
-};
-
-int idefloppy_init (void);
-static ide_module_t idefloppy_module = {
-	IDE_DRIVER_MODULE,
-	idefloppy_init,
-	&idefloppy_driver,
-	NULL
 };
 
 int idefloppy_reinit (ide_drive_t *drive)
@@ -2101,7 +2095,7 @@ int idefloppy_reinit (ide_drive_t *drive)
 			printk (KERN_ERR "ide-floppy: %s: Can't allocate a floppy structure\n", drive->name);
 			continue;
 		}
-		if (ide_register_subdriver (drive, &idefloppy_driver, IDE_SUBDRIVER_VERSION)) {
+		if (ide_register_subdriver (drive, &idefloppy_driver)) {
 			printk (KERN_ERR "ide-floppy: %s: Failed to register the driver with ide.c\n", drive->name);
 			kfree (floppy);
 			continue;
@@ -2111,7 +2105,7 @@ int idefloppy_reinit (ide_drive_t *drive)
 		DRIVER(drive)->busy--;
 		failed--;
 	}
-	ide_register_module(&idefloppy_module);
+	ide_register_module(&idefloppy_driver);
 	MOD_DEC_USE_COUNT;
 	return 0;
 }
@@ -2136,7 +2130,7 @@ static void __exit idefloppy_exit (void)
 			ide_remove_proc_entries(drive->proc, idefloppy_proc);
 #endif
 	}
-	ide_unregister_module(&idefloppy_module);
+	ide_unregister_module(&idefloppy_driver);
 }
 
 /*
@@ -2163,7 +2157,7 @@ int idefloppy_init (void)
 			printk (KERN_ERR "ide-floppy: %s: Can't allocate a floppy structure\n", drive->name);
 			continue;
 		}
-		if (ide_register_subdriver (drive, &idefloppy_driver, IDE_SUBDRIVER_VERSION)) {
+		if (ide_register_subdriver (drive, &idefloppy_driver)) {
 			printk (KERN_ERR "ide-floppy: %s: Failed to register the driver with ide.c\n", drive->name);
 			kfree (floppy);
 			continue;
@@ -2173,7 +2167,7 @@ int idefloppy_init (void)
 		DRIVER(drive)->busy--;
 		failed--;
 	}
-	ide_register_module(&idefloppy_module);
+	ide_register_module(&idefloppy_driver);
 	MOD_DEC_USE_COUNT;
 	return 0;
 }

@@ -6137,6 +6137,7 @@ static ide_proc_entry_t idetape_proc[] = {
 
 #endif
 
+int idetape_init (void);
 int idetape_reinit(ide_drive_t *drive);
 
 /*
@@ -6161,15 +6162,8 @@ static ide_driver_t idetape_driver = {
 	pre_reset:		idetape_pre_reset,
 	capacity:		NULL,
 	proc:			idetape_proc,
+	driver_init:		idetape_init,
 	driver_reinit:		idetape_reinit,
-};
-
-int idetape_init (void);
-static ide_module_t idetape_module = {
-	IDE_DRIVER_MODULE,
-	idetape_init,
-	&idetape_driver,
-	NULL
 };
 
 /*
@@ -6233,7 +6227,7 @@ int idetape_reinit (ide_drive_t *drive)
 			printk (KERN_ERR "ide-tape: %s: Can't allocate a tape structure\n", drive->name);
 			continue;
 		}
-		if (ide_register_subdriver (drive, &idetape_driver, IDE_SUBDRIVER_VERSION)) {
+		if (ide_register_subdriver (drive, &idetape_driver)) {
 			printk (KERN_ERR "ide-tape: %s: Failed to register the driver with ide.c\n", drive->name);
 			kfree (tape);
 			continue;
@@ -6283,7 +6277,7 @@ static void __exit idetape_exit (void)
 		if (drive != NULL && idetape_cleanup (drive))
 		printk (KERN_ERR "ide-tape: %s: cleanup_module() called while still busy\n", drive->name);
 	}
-	ide_unregister_module(&idetape_module);
+	ide_unregister_module(&idetape_driver);
 }
 
 /*
@@ -6304,7 +6298,7 @@ int idetape_init (void)
 			idetape_chrdevs[minor].drive = NULL;
 
 	if ((drive = ide_scan_devices (ide_tape, idetape_driver.name, NULL, failed++)) == NULL) {
-		ide_register_module (&idetape_module);
+		ide_register_module (&idetape_driver);
 		MOD_DEC_USE_COUNT;
 #if ONSTREAM_DEBUG
 		printk(KERN_INFO "ide-tape: MOD_DEC_USE_COUNT in idetape_init\n");
@@ -6338,7 +6332,7 @@ int idetape_init (void)
 			printk (KERN_ERR "ide-tape: %s: Can't allocate a tape structure\n", drive->name);
 			continue;
 		}
-		if (ide_register_subdriver (drive, &idetape_driver, IDE_SUBDRIVER_VERSION)) {
+		if (ide_register_subdriver (drive, &idetape_driver)) {
 			printk (KERN_ERR "ide-tape: %s: Failed to register the driver with ide.c\n", drive->name);
 			kfree (tape);
 			continue;
@@ -6363,7 +6357,7 @@ int idetape_init (void)
 		devfs_unregister_chrdev (IDETAPE_MAJOR, "ht");
 	} else
 		idetape_chrdev_present = 1;
-	ide_register_module (&idetape_module);
+	ide_register_module (&idetape_driver);
 	MOD_DEC_USE_COUNT;
 #if ONSTREAM_DEBUG
 	printk(KERN_INFO "ide-tape: MOD_DEC_USE_COUNT in idetape_init\n");

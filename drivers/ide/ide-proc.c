@@ -378,14 +378,10 @@ static int proc_ide_read_drivers
 {
 	char		*out = page;
 	int		len;
-	ide_module_t	*p = ide_modules;
-	ide_driver_t	*driver;
+	struct ide_driver_s * driver;
 
-	while (p) {
-		driver = (ide_driver_t *) p->info;
-		if (driver)
-			out += sprintf(out, "%s\n",driver->name);
-		p = p->next;
+	for (driver = ide_drivers; driver; driver = driver->next) {
+		out += sprintf(out, "%s\n",driver->name);
 	}
 	len = out - page;
 	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);

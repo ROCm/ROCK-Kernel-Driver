@@ -11,14 +11,14 @@
 O_TARGET := idedriver.o
 
 export-objs		:= ide-taskfile.o ide.o ide-features.o ide-probe.o ataraid.o
-list-multi		:= ide-mod.o ide-probe-mod.o
+list-multi		:= ide-mod.o
 
 obj-y		:=
 obj-m		:=
 ide-obj-y	:=
 
 obj-$(CONFIG_BLK_DEV_HD)	+= hd.o
-obj-$(CONFIG_BLK_DEV_IDE)       += ide-mod.o ide-probe-mod.o
+obj-$(CONFIG_BLK_DEV_IDE)       += ide-mod.o
 obj-$(CONFIG_BLK_DEV_IDECS)     += ide-cs.o
 obj-$(CONFIG_BLK_DEV_IDEDISK)   += ide-disk.o
 obj-$(CONFIG_BLK_DEV_IDECD)     += ide-cd.o
@@ -76,13 +76,9 @@ obj-$(CONFIG_BLK_DEV_ATARAID_HPT)	+= hptraid.o
 
 ide-obj-$(CONFIG_PROC_FS)		+= ide-proc.o
 
-ide-mod-objs		:= ide-taskfile.o ide.o ide-features.o $(ide-obj-y)
-ide-probe-mod-objs	:= ide-probe.o ide-geometry.o
+ide-mod-objs		:= ide-taskfile.o ide.o ide-probe.o ide-geometry.o ide-features.o $(ide-obj-y)
 
 include $(TOPDIR)/Rules.make
 
 ide-mod.o: $(ide-mod-objs)
 	$(LD) -r -o $@ $(ide-mod-objs)
-
-ide-probe-mod.o: $(ide-probe-mod-objs)
-	$(LD) -r -o $@ $(ide-probe-mod-objs)

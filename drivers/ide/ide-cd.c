@@ -2906,6 +2906,7 @@ int ide_cdrom_cleanup(ide_drive_t *drive)
 	return 0;
 }
 
+int ide_cdrom_init(void);
 int ide_cdrom_reinit (ide_drive_t *drive);
 
 static ide_driver_t ide_cdrom_driver = {
@@ -2928,15 +2929,8 @@ static ide_driver_t ide_cdrom_driver = {
 	capacity:		ide_cdrom_capacity,
 	special:		NULL,
 	proc:			NULL,
+	driver_init:		ide_cdrom_init,
 	driver_reinit:		ide_cdrom_reinit,
-};
-
-int ide_cdrom_init(void);
-static ide_module_t ide_cdrom_module = {
-	IDE_DRIVER_MODULE,
-	ide_cdrom_init,
-	&ide_cdrom_driver,
-	NULL
 };
 
 /* options */
@@ -2956,7 +2950,7 @@ int ide_cdrom_reinit (ide_drive_t *drive)
 		printk ("%s: Can't allocate a cdrom structure\n", drive->name);
 		return 1;
 	}
-	if (ide_register_subdriver (drive, &ide_cdrom_driver, IDE_SUBDRIVER_VERSION)) {
+	if (ide_register_subdriver (drive, &ide_cdrom_driver)) {
 		printk ("%s: Failed to register the driver with ide.c\n", drive->name);
 		kfree (info);
 		return 1;
@@ -2973,7 +2967,7 @@ int ide_cdrom_reinit (ide_drive_t *drive)
 	DRIVER(drive)->busy--;
 	failed--;
 
-	ide_register_module(&ide_cdrom_module);
+	ide_register_module(&ide_cdrom_driver);
 	MOD_DEC_USE_COUNT;
 	return 0;
 }
@@ -2988,7 +2982,7 @@ static void __exit ide_cdrom_exit(void)
 			printk ("%s: cleanup_module() called while still busy\n", drive->name);
 			failed++;
 		}
-	ide_unregister_module (&ide_cdrom_module);
+	ide_unregister_module (&ide_cdrom_driver);
 }
  
 int ide_cdrom_init(void)
@@ -3015,7 +3009,7 @@ int ide_cdrom_init(void)
 			printk ("%s: Can't allocate a cdrom structure\n", drive->name);
 			continue;
 		}
-		if (ide_register_subdriver (drive, &ide_cdrom_driver, IDE_SUBDRIVER_VERSION)) {
+		if (ide_register_subdriver (drive, &ide_cdrom_driver)) {
 			printk ("%s: Failed to register the driver with ide.c\n", drive->name);
 			kfree (info);
 			continue;
@@ -3032,7 +3026,7 @@ int ide_cdrom_init(void)
 		DRIVER(drive)->busy--;
 		failed--;
 	}
-	ide_register_module(&ide_cdrom_module);
+	ide_register_module(&ide_cdrom_driver);
 	MOD_DEC_USE_COUNT;
 	return 0;
 }

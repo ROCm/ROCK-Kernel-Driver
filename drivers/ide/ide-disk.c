@@ -1030,6 +1030,7 @@ static int idedisk_cleanup (ide_drive_t *drive)
 	return ide_unregister_subdriver(drive);
 }
 
+int idedisk_init (void);
 int idedisk_reinit(ide_drive_t *drive);
 
 /*
@@ -1055,15 +1056,8 @@ static ide_driver_t idedisk_driver = {
 	capacity:		idedisk_capacity,
 	special:		idedisk_special,
 	proc:			idedisk_proc,
+	driver_init:		idedisk_init,
 	driver_reinit:		idedisk_reinit,
-};
-
-int idedisk_init (void);
-static ide_module_t idedisk_module = {
-	IDE_DRIVER_MODULE,
-	idedisk_init,
-	&idedisk_driver,
-	NULL
 };
 
 MODULE_DESCRIPTION("ATA DISK Driver");
@@ -1074,7 +1068,7 @@ int idedisk_reinit (ide_drive_t *drive)
 
 	MOD_INC_USE_COUNT;
 
-	if (ide_register_subdriver (drive, &idedisk_driver, IDE_SUBDRIVER_VERSION)) {
+	if (ide_register_subdriver (drive, &idedisk_driver)) {
 		printk (KERN_ERR "ide-disk: %s: Failed to register the driver with ide.c\n", drive->name);
 		return 1;
 	}
@@ -1089,7 +1083,7 @@ int idedisk_reinit (ide_drive_t *drive)
 	DRIVER(drive)->busy--;
 	failed--;
 
-	ide_register_module(&idedisk_module);
+	ide_register_module(&idedisk_driver);
 	MOD_DEC_USE_COUNT;
 	return 0;
 }
@@ -1111,7 +1105,7 @@ static void __exit idedisk_exit (void)
 			ide_remove_proc_entries(drive->proc, idedisk_proc);
 #endif
 	}
-	ide_unregister_module(&idedisk_module);
+	ide_unregister_module(&idedisk_driver);
 }
 
 int idedisk_init (void)
@@ -1121,7 +1115,7 @@ int idedisk_init (void)
 	
 	MOD_INC_USE_COUNT;
 	while ((drive = ide_scan_devices (ide_disk, idedisk_driver.name, NULL, failed++)) != NULL) {
-		if (ide_register_subdriver (drive, &idedisk_driver, IDE_SUBDRIVER_VERSION)) {
+		if (ide_register_subdriver (drive, &idedisk_driver)) {
 			printk (KERN_ERR "ide-disk: %s: Failed to register the driver with ide.c\n", drive->name);
 			continue;
 		}
@@ -1136,7 +1130,7 @@ int idedisk_init (void)
 		DRIVER(drive)->busy--;
 		failed--;
 	}
-	ide_register_module(&idedisk_module);
+	ide_register_module(&idedisk_driver);
 	MOD_DEC_USE_COUNT;
 	return 0;
 }

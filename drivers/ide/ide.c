@@ -196,10 +196,9 @@ static int	ide_intr_lock;
 int noautodma = 0;
 
 /*
- * ide_modules keeps track of the available IDE chipset/probe/driver modules.
+ * This is the anchor of the single linked list of ide device type drivers.
  */
-ide_module_t *ide_modules;
-ide_module_t *ide_probe;
+struct ide_driver_s *ide_drivers;
 
 /*
  * This is declared extern in ide.h, for access by other IDE modules:
@@ -1864,30 +1863,23 @@ static void revalidate_drives (void)
 
 static void ide_probe_module (void)
 {
-	if (!ide_probe) {
-#if defined(CONFIG_KMOD) && defined(CONFIG_BLK_DEV_IDE_MODULE)
-		(void) request_module("ide-probe-mod");
-#endif /* (CONFIG_KMOD) && (CONFIG_BLK_DEV_IDE_MODULE) */
-	} else {
-		(void) ide_probe->init();
-	}
+	ideprobe_init();
 	revalidate_drives();
 }
 
 static void ide_driver_module (void)
 {
 	int index;
-	ide_module_t *module = ide_modules;
+	struct ide_driver_s *d;
 
 	for (index = 0; index < MAX_HWIFS; ++index)
 		if (ide_hwifs[index].present)
 			goto search;
 	ide_probe_module();
 search:
-	while (module) {
-		(void) module->init();
-		module = module->next;
-	}
+	for (d = ide_drivers; d != NULL; d = d->next)
+		d->driver_init();
+
 	revalidate_drives();
 }
 
@@ -3528,13 +3520,13 @@ ide_drive_t *ide_scan_devices (byte media, const char *name, ide_driver_t *drive
 	return NULL;
 }
 
-int ide_register_subdriver (ide_drive_t *drive, ide_driver_t *driver, int version)
+int ide_register_subdriver (ide_drive_t *drive, ide_driver_t *driver)
 {
 	unsigned long flags;
 
 	save_flags(flags);		/* all CPUs */
 	cli();				/* all CPUs */
-	if (version != IDE_SUBDRIVER_VERSION || !drive->present || drive->driver != NULL || drive->busy || drive->usage) {
+	if (!drive->present || drive->driver != NULL || drive->busy || drive->usage) {
 		restore_flags(flags);	/* all CPUs */
 		return 1;
 	}
@@ -3618,26 +3610,26 @@ int ide_unregister_subdriver (ide_drive_t *drive)
 	return 0;
 }
 
-int ide_register_module (ide_module_t *module)
+int ide_register_module (struct ide_driver_s *d)
 {
-	ide_module_t *p = ide_modules;
+	struct ide_driver_s *p = ide_drivers;
 
 	while (p) {
-		if (p == module)
+		if (p == d)
 			return 1;
 		p = p->next;
 	}
-	module->next = ide_modules;
-	ide_modules = module;
+	d->next = ide_drivers;
+	ide_drivers = d;
 	revalidate_drives();
 	return 0;
 }
 
-void ide_unregister_module (ide_module_t *module)
+void ide_unregister_module (struct ide_driver_s *d)
 {
-	ide_module_t **p;
+	struct ide_driver_s **p;
 
-	for (p = &ide_modules; (*p) && (*p) != module; p = &((*p)->next));
+	for (p = &ide_drivers; (*p) && (*p) != d; p = &((*p)->next));
 	if (*p)
 		*p = (*p)->next;
 }
@@ -3662,7 +3654,6 @@ EXPORT_SYMBOL(ide_spin_wait_hwgroup);
 devfs_handle_t ide_devfs_handle;
 
 EXPORT_SYMBOL(ide_lock);
-EXPORT_SYMBOL(ide_probe);
 EXPORT_SYMBOL(drive_is_flashcard);
 EXPORT_SYMBOL(ide_timer_expiry);
 EXPORT_SYMBOL(ide_intr);

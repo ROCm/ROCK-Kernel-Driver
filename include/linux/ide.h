@@ -99,8 +99,8 @@ typedef unsigned char	byte;	/* used everywhere */
 #undef REALLY_FAST_IO
 #endif
 
-#define HWIF(drive)		((ide_hwif_t *)((drive)->hwif))
-#define HWGROUP(drive)		((ide_hwgroup_t *)(HWIF(drive)->hwgroup))
+#define HWIF(drive)		((drive)->hwif)
+#define HWGROUP(drive)		(HWIF(drive)->hwgroup)
 
 /*
  * Definitions for accessing IDE controller registers
@@ -371,7 +371,7 @@ struct ide_settings_s;
 
 typedef struct ide_drive_s {
 	request_queue_t		 queue;	/* request queue */
-	struct ide_drive_s 	*next;	/* circular list of hwgroup drives */
+	struct ide_drive_s	*next;	/* circular list of hwgroup drives */
 	unsigned long sleep;		/* sleep until this time */
 	unsigned long service_start;	/* time we started last request */
 	unsigned long service_time;	/* service time of last request */
@@ -531,7 +531,7 @@ typedef struct ide_pci_devid_s {
 
 typedef struct hwif_s {
 	struct hwif_s	*next;		/* for linked-list in ide_hwgroup_t */
-	void		*hwgroup;	/* actually (ide_hwgroup_t *) */
+	struct hwgroup_s *hwgroup;	/* actually (ide_hwgroup_t *) */
 	ide_ioreg_t	io_ports[IDE_NR_PORTS];	/* task file registers */
 	hw_regs_t	hw;		/* Hardware info */
 	ide_drive_t	drives[MAX_DRIVES];	/* drive info */
@@ -702,10 +702,6 @@ read_proc_t proc_ide_read_geometry;
 /*
  * Subdrivers support.
  */
-#define IDE_SUBDRIVER_VERSION	1
-
-typedef void		(ide_setting_proc)(ide_drive_t *);
-
 typedef struct ide_driver_s {
 	const char			*name;
 	byte				media;
@@ -726,25 +722,15 @@ typedef struct ide_driver_s {
 	unsigned long (*capacity)(ide_drive_t *);
 	ide_startstop_t	(*special)(ide_drive_t *);
 	ide_proc_entry_t		*proc;
+	int (*driver_init)(void);
 	int (*driver_reinit)(ide_drive_t *);
+
+	/* FIXME: Single linked list of drivers for iteration.
+	 */
+	struct ide_driver_s *next;
 } ide_driver_t;
 
-#define DRIVER(drive)		((ide_driver_t *)((drive)->driver))
-
-/*
- * IDE modules.
- */
-#define IDE_CHIPSET_MODULE		0	/* not supported yet */
-#define IDE_PROBE_MODULE		1
-#define IDE_DRIVER_MODULE		2
-
-
-typedef struct ide_module_s {
-	int type;
-	int (*init)(void);
-	void *info;
-	struct ide_module_s *next;
-} ide_module_t;
+#define DRIVER(drive)		((drive)->driver)
 
 /*
  * ide_hwifs[] is the master data structure used to keep track
@@ -755,9 +741,8 @@ typedef struct ide_module_s {
  *
  */
 #ifndef _IDE_C
-extern	ide_hwif_t	ide_hwifs[];		/* master data repository */
-extern	ide_module_t	*ide_modules;
-extern	ide_module_t	*ide_probe;
+extern struct hwif_s ide_hwifs[];		/* master data repository */
+extern struct ide_driver_s *ide_drivers;
 #endif
 extern int noautodma;
 
@@ -1060,9 +1045,11 @@ extern ide_proc_entry_t generic_subdriver_entries[];
 int ide_reinit_drive (ide_drive_t *drive);
 
 #ifdef _IDE_C
-#ifdef CONFIG_BLK_DEV_IDE
-int ideprobe_init (void);
-#endif /* CONFIG_BLK_DEV_IDE */
+# ifdef CONFIG_BLK_DEV_IDE
+/* Probe for devices attached to the systems host controllers.
+ */
+extern int ideprobe_init (void);
+# endif
 #ifdef CONFIG_BLK_DEV_IDEDISK
 int idedisk_reinit (ide_drive_t *drive);
 int idedisk_init (void);
@@ -1085,12 +1072,12 @@ int idescsi_init (void);
 #endif /* CONFIG_BLK_DEV_IDESCSI */
 #endif /* _IDE_C */
 
-int ide_register_module (ide_module_t *module);
-void ide_unregister_module (ide_module_t *module);
+extern int ide_register_module (struct ide_driver_s *d);
+extern void ide_unregister_module (struct ide_driver_s *d);
 ide_drive_t *ide_scan_devices (byte media, const char *name, ide_driver_t *driver, int n);
-int ide_register_subdriver (ide_drive_t *drive, ide_driver_t *driver, int version);
-int ide_unregister_subdriver (ide_drive_t *drive);
-int ide_replace_subdriver(ide_drive_t *drive, const char *driver);
+extern int ide_register_subdriver(ide_drive_t *drive, ide_driver_t *driver);
+extern int ide_unregister_subdriver(ide_drive_t *drive);
+extern int ide_replace_subdriver(ide_drive_t *drive, const char *driver);
 
 #ifdef CONFIG_BLK_DEV_IDEPCI
 #define ON_BOARD		1

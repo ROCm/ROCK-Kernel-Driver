@@ -535,6 +535,7 @@ static int idescsi_cleanup (ide_drive_t *drive)
 	return 0;
 }
 
+int idescsi_init(void);
 int idescsi_reinit(ide_drive_t *drive);
 
 /*
@@ -560,15 +561,8 @@ static ide_driver_t idescsi_driver = {
 	capacity:		NULL,
 	special:		NULL,
 	proc:			NULL,
+	driver_init:		idescsi_init,
 	driver_reinit:		idescsi_reinit,
-};
-
-int idescsi_init (void);
-static ide_module_t idescsi_module = {
-	IDE_DRIVER_MODULE,
-	idescsi_init,
-	&idescsi_driver,
-	NULL
 };
 
 int idescsi_reinit (ide_drive_t *drive)
@@ -592,7 +586,7 @@ int idescsi_reinit (ide_drive_t *drive)
 				printk (KERN_ERR "ide-scsi: %s: Can't allocate a scsi structure\n", drive->name);
 				continue;
 			}
-			if (ide_register_subdriver (drive, &idescsi_driver, IDE_SUBDRIVER_VERSION)) {
+			if (ide_register_subdriver (drive, &idescsi_driver)) {
 				printk (KERN_ERR "ide-scsi: %s: Failed to register the driver with ide.c\n", drive->name);
 				kfree (scsi);
 				continue;
@@ -632,7 +626,7 @@ int idescsi_init (void)
 				printk (KERN_ERR "ide-scsi: %s: Can't allocate a scsi structure\n", drive->name);
 				continue;
 			}
-			if (ide_register_subdriver (drive, &idescsi_driver, IDE_SUBDRIVER_VERSION)) {
+			if (ide_register_subdriver (drive, &idescsi_driver)) {
 				printk (KERN_ERR "ide-scsi: %s: Failed to register the driver with ide.c\n", drive->name);
 				kfree (scsi);
 				continue;
@@ -642,7 +636,7 @@ int idescsi_init (void)
 			failed--;
 		}
 	}
-	ide_register_module(&idescsi_module);
+	ide_register_module(&idescsi_driver);
 	MOD_DEC_USE_COUNT;
 	return 0;
 }
@@ -912,7 +906,7 @@ static void __exit exit_idescsi_module(void)
 				failed++;
 			}
 	}
-	ide_unregister_module(&idescsi_module);
+	ide_unregister_module(&idescsi_driver);
 }
 
 module_init(init_idescsi_module);
