@@ -1659,6 +1659,7 @@ static inline void check_timer(void)
 
 	printk(KERN_INFO "...trying to set up timer as ExtINT IRQ...");
 
+	timer_ack = 0;
 	init_8259A(0);
 	make_8259A_irq(0);
 	apic_write_around(APIC_LVT0, APIC_DM_EXTINT);

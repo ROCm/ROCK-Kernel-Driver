@@ -340,6 +340,8 @@ struct page * __alloc_pages(unsigned int gfp_mask, unsigned int order, zonelist_
 
 	zone = zonelist->zones;
 	classzone = *zone;
+	if (classzone == NULL)
+		return NULL;
 	min = 1UL << order;
 	for (;;) {
 		zone_t *z = *(zone++);

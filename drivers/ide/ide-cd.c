@@ -669,6 +669,12 @@ static int cdrom_decode_status (ide_startstop_t *startstop, ide_drive_t *drive,
 			   request or data protect error.*/
 			ide_dump_status (drive, "command error", stat);
 			cdrom_end_request(drive, 0);
+		} else if (sense_key == MEDIUM_ERROR) {
+			/* No point in re-trying a zillion times on a bad
+			 * sector.  The error is not correctable at all.
+			 */
+			ide_dump_status (drive, "media error (bad sector)", stat);
+			cdrom_end_request(drive, 0);
 		} else if ((err & ~ABRT_ERR) != 0) {
 			/* Go to the default handler
 			   for other errors. */
