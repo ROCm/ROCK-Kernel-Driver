@@ -2300,8 +2300,8 @@ int fas216_eh_device_reset(Scsi_Cmnd *SCpnt)
 {
 	FAS216_Info *info = (FAS216_Info *)SCpnt->host->hostdata;
 
-	printk("scsi%d.%c: "__FUNCTION__": called\n",
-		info->host->host_no, '0' + SCpnt->target);
+	printk("scsi%d.%c: %s: called\n",
+		info->host->host_no, '0' + SCpnt->target, __FUNCTION__);
 	return FAILED;
 }
 
@@ -2320,8 +2320,8 @@ int fas216_eh_bus_reset(Scsi_Cmnd *SCpnt)
 
 	info->stats.bus_resets += 1;
 
-	printk("scsi%d.%c: "__FUNCTION__": resetting bus\n",
-		info->host->host_no, '0' + SCpnt->target);
+	printk("scsi%d.%c: %s: resetting bus\n",
+		info->host->host_no, '0' + SCpnt->target, __FUNCTION__);
 
 	/*
 	 * Attempt to stop all activity on this interface.
@@ -2381,8 +2381,8 @@ int fas216_eh_host_reset(Scsi_Cmnd *SCpnt)
 
 	fas216_checkmagic(info);
 
-	printk("scsi%d.%c: "__FUNCTION__": resetting host\n",
-		info->host->host_no, '0' + SCpnt->target);
+	printk("scsi%d.%c: %s: resetting host\n",
+		info->host->host_no, '0' + SCpnt->target, __FUNCTION__);
 
 	/*
 	 * Reset the SCSI chip.
