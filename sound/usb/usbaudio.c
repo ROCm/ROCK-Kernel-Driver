@@ -284,6 +284,16 @@ static int prepare_capture_urb(snd_usb_substream_t *subs,
 	urb->transfer_buffer = ctx->buf;
 	urb->transfer_buffer_length = offs;
 	urb->interval = 1;
+#if 0 // for check
+	if (! urb->bandwidth) {
+		int bustime;
+		bustime = usb_check_bandwidth(urb->dev, urb);
+		if (bustime < 0) 
+			return bustime;
+		printk("urb %d: bandwidth = %d (packets = %d)\n", ctx->index, bustime, urb->number_of_packets);
+		usb_claim_bandwidth(urb->dev, urb, bustime, 1);
+	}
+#endif // for check
 	return 0;
 }
 
@@ -305,8 +315,10 @@ static int retire_capture_urb(snd_usb_substream_t *subs,
 
 	for (i = 0; i < urb->number_of_packets; i++) {
 		cp = (unsigned char *)urb->transfer_buffer + urb->iso_frame_desc[i].offset;
-		if (urb->iso_frame_desc[i].status) /* active? hmm, skip this */
-			continue;
+		if (urb->iso_frame_desc[i].status) {
+			snd_printd(KERN_ERR "frame %d active: %d\n", i, urb->iso_frame_desc[i].status);
+			// continue;
+		}
 		len = urb->iso_frame_desc[i].actual_length / stride;
 		if (! len)
 			continue;
@@ -1009,6 +1021,7 @@ static int set_format(snd_usb_substream_t *subs, snd_pcm_runtime_t *runtime)
 	}
 	/* if endpoint has sampling rate control, set it */
 	if (fmt->attributes & EP_CS_ATTR_SAMPLE_RATE) {
+		int crate;
 		data[0] = runtime->rate;
 		data[1] = runtime->rate >> 8;
 		data[2] = runtime->rate >> 16;
@@ -1026,8 +1039,11 @@ static int set_format(snd_usb_substream_t *subs, snd_pcm_runtime_t *runtime)
 				   dev->devnum, subs->interface, fmt->altsetting, ep);
 			return err;
 		}
-		runtime->rate = data[0] | (data[1] << 8) | (data[2] << 16);
-		// printk("ok, getting back rate to %d\n", runtime->rate);
+		crate = data[0] | (data[1] << 8) | (data[2] << 16);
+		if (crate != runtime->rate) {
+			snd_printd(KERN_WARNING "current rate %d is different from the runtime rate %d\n", crate, runtime->rate);
+			// runtime->rate = crate;
+		}
 	}
 	/* always fill max packet size */
 	if (fmt->attributes & EP_CS_ATTR_FILL_MAX)
@@ -1292,14 +1308,16 @@ void *snd_usb_find_csint_desc(void *buffer, int buflen, void *after, u8 dsubtype
  * entry point for linux usb interface
  */
 
-#ifndef OLD_USB
+static void * _usb_audio_probe(struct usb_device *dev, unsigned int ifnum,
+			      const struct usb_device_id *id);
+static void _usb_audio_disconnect(struct usb_device *dev, void *ptr);
+#ifdef OLD_USB
+#define usb_audio_probe		_usb_audio_probe
+#define usb_audio_disconnect	_usb_audio_disconnect
+#else
 static int usb_audio_probe(struct usb_interface *intf,
 			   const struct usb_device_id *id);
 static void usb_audio_disconnect(struct usb_interface *intf);
-#else
-static void * usb_audio_probe(usb_device *dev, unsigned int ifnum,
-			      const struct usb_device_id *id);
-static void usb_audio_disconnect(struct usb_device *dev, void *ptr);
 #endif
 
 static struct usb_device_id usb_audio_ids [] = {
@@ -2050,18 +2068,9 @@ static int alloc_desc_buffer(struct usb_device *dev, int index, unsigned char **
  * only at the first time.  the successive calls of this function will
  * append the pcm interface to the corresponding card.
  */
-#ifndef OLD_USB
-static int usb_audio_probe(struct usb_interface *intf,
-			   const struct usb_device_id *id)
-#else
-static void *usb_audio_probe(struct usb_device *dev, unsigned int ifnum,
+static void *_usb_audio_probe(struct usb_device *dev, unsigned int ifnum,
 			     const struct usb_device_id *id)
-#endif
 {
-#ifndef OLD_USB
-	struct usb_device *dev = interface_to_usbdev(intf);
-	int ifnum = intf->altsetting->bInterfaceNumber;
-#endif
 	struct usb_config_descriptor *config = dev->actconfig;	
 	const snd_usb_audio_quirk_t *quirk = (const snd_usb_audio_quirk_t *)id->driver_info;
 	unsigned char *buffer;
@@ -2143,37 +2152,21 @@ static void *usb_audio_probe(struct usb_device *dev, unsigned int ifnum,
 	chip->num_interfaces++;
 	up(&register_mutex);
 	kfree(buffer);
-#ifndef OLD_USB
-	return 0;
-#else
 	return chip;
-#endif
 
  __error:
 	up(&register_mutex);
 	kfree(buffer);
  __err_val:
-#ifndef OLD_USB
-	return -EIO;
-#else
 	return NULL;
-#endif
 }
-
 
 /*
  * we need to take care of counter, since disconnection can be called also
  * many times as well as usb_audio_probe(). 
  */
-#ifndef OLD_USB
-static void usb_audio_disconnect(struct usb_interface *intf)
-#else
-static void usb_audio_disconnect(struct usb_device *dev, void *ptr)
-#endif
+static void _usb_audio_disconnect(struct usb_device *dev, void *ptr)
 {
-#ifndef OLD_USB
-	void *ptr = dev_get_drvdata(&intf->dev);
-#endif
 	snd_usb_audio_t *chip;
 
 	if (ptr == (void *)-1)
@@ -2184,6 +2177,34 @@ static void usb_audio_disconnect(struct usb_device *dev, void *ptr)
 	if (chip->num_interfaces <= 0)
 		snd_card_free(chip->card);
 }
+
+
+#ifndef OLD_USB
+/*
+ * new 2.5 USB kernel API
+ */
+
+static int usb_audio_probe(struct usb_interface *intf,
+			   const struct usb_device_id *id)
+{
+	void *chip;
+	chip = _usb_audio_probe(interface_to_usbdev(intf),
+				intf->altsetting->bInterfaceNumber, id);
+	if (chip) {
+		dev_set_drvdata(&intf->dev, chip);
+		return 0;
+	} else
+		return -EIO;
+}
+
+static void usb_audio_disconnect(struct usb_interface *intf)
+{
+	_usb_audio_disconnect(interface_to_usbdev(intf),
+			      dev_get_drvdata(&intf->dev));
+}
+#endif
+
+
 
 static int __init snd_usb_audio_init(void)
 {
