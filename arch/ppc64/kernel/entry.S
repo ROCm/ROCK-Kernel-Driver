@@ -194,7 +194,7 @@ _GLOBAL(ret_from_syscall_1)
 _GLOBAL(ret_from_syscall_2)
 	std	r3,RESULT(r1)	/* Save result */	
 	li	r10,-_LAST_ERRNO
-	cmpl	0,r3,r10
+	cmpld	0,r3,r10
 	blt	60f
 	neg	r3,r3
 57:	ld	r10,_CCR(r1)	/* Set SO bit in CR */
