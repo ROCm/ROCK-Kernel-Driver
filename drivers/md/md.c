@@ -847,7 +847,7 @@ static void sync_sbs(mddev_t * mddev)
 		MD_BUG();
 		return;
 	}
-	rdev = list_entry(&mddev->disks.next, mdk_rdev_t, same_set);
+	rdev = list_entry(mddev->disks.next, mdk_rdev_t, same_set);
 	sb = rdev->sb;
 
 	memset(sb, 0, sizeof(*sb));
@@ -1044,8 +1044,6 @@ static mdk_rdev_t *md_import_device(dev_t newdev, int on_disk)
 	}
 	INIT_LIST_HEAD(&rdev->same_set);
 
-	if (rdev->faulty && rdev->sb)
-		free_disk_sb(rdev);
 	return rdev;
 
 abort_free:
