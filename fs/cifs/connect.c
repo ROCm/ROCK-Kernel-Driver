@@ -1,7 +1,7 @@
 /*
  *   fs/cifs/connect.c
  *
- *   Copyright (C) International Business Machines  Corp., 2002,2003
+ *   Copyright (C) International Business Machines  Corp., 2002,2004
  *   Author(s): Steve French (sfrench@us.ibm.com)
  *
  *   This library is free software; you can redistribute it and/or modify
@@ -36,6 +36,7 @@
 #include "cifs_fs_sb.h"
 #include "ntlmssp.h"
 #include "nterr.h"
+#include "rfc1002pdu.h"
 
 #define CIFS_PORT 445
 #define RFC1001_PORT 139
@@ -249,23 +250,25 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 
 		temp = (char *) smb_buffer;
 		if (length > 3) {
-			if (temp[0] == (char) 0x85) {
+			if (temp[0] == (char) RFC1002_SESSION_KEEP_ALIVE) {
 				iov.iov_base = smb_buffer;
 				iov.iov_len = 4;
 				length = sock_recvmsg(csocket, &smb_msg, 4, 0);
-				cFYI(0,
-				     ("Received 4 byte keep alive packet "));
-			} else if ((temp[0] == (char) 0x83)
+				cFYI(0,("Received 4 byte keep alive packet"));
+			} else if (temp[0] == (char) RFC1002_POSITIVE_SESSION_RESPONSE) {
+				iov.iov_base = smb_buffer;
+					iov.iov_len = 4;
+					length = sock_recvmsg(csocket, &smb_msg, 4, 0);
+					cFYI(1,("Good RFC 1002 session rsp"));
+			} else if ((temp[0] == (char)RFC1002_NEGATIVE_SESSION_RESPONSE)
 				   && (length == 5)) {
 				/* we get this from Windows 98 instead of error on SMB negprot response */
 				cERROR(1,
-				       ("Negative RFC 1002 Session response. Error = 0x%x",
+					("Negative RFC 1002 Session response. Error = 0x%x",
 					temp[4]));
 				break;
-
 			} else if (temp[0] != (char) 0) {
-				cERROR(1,
-				       ("Unknown RFC 1001 frame not 0x00 nor 0x85"));
+				cERROR(1,("Unknown RFC 1002 frame"));
 				cifs_dump_mem(" Received Data: ", temp, length);
 				cifs_reconnect(server);
 				csocket = server->ssocket;
