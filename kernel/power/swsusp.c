@@ -985,6 +985,8 @@ static int __init swsusp_pagedir_relocate(void)
 		c = *c;
 		free_pages((unsigned long)f, pagedir_order);
 	}
+	if (ret)
+		return ret;
 	printk("|\n");
 	return check_pagedir();
 }
