@@ -1,8 +1,12 @@
 config VIDEO_SAA7146
-	def_tristate DVB_AV7110 || DVB_BUDGET || DVB_BUDGET_AV || \
-		     VIDEO_MXB || VIDEO_DPC || VIDEO_HEXIUM_ORION || \
-		     VIDEO_HEXIUM_GEMINI
-        depends on VIDEO_DEV && PCI && I2C
+        tristate
+	select I2C
+
+config VIDEO_SAA7146_VV
+        tristate
+	select VIDEO_BUF
+	select VIDEO_VIDEOBUF
+	select VIDEO_SAA7146
+
 config VIDEO_VIDEOBUF
-	def_tristate VIDEO_SAA7134 || VIDEO_BT848 || VIDEO_SAA7146
-        depends on VIDEO_DEV
+        tristate
