@@ -383,7 +383,7 @@ static void search_conf(char *pattern)
 		fprintf(fp, "No matches found.");
 	regfree(&re);
 	fclose(fp);
-	show_file(".search.tmp", "Search Results", rows, cols);
+	show_file(".search.tmp", "Search Results", 0, 0);
 	unlink(".search.tmp");
 }
 
@@ -686,7 +686,7 @@ static void show_textbox(const char *title, const char *text, int r, int c)
 
 static void show_helptext(const char *title, const char *text)
 {
-	show_textbox(title, text, rows, cols);
+	show_textbox(title, text, 0, 0);
 }
 
 static void show_help(struct menu *menu)
@@ -709,7 +709,7 @@ static void show_help(struct menu *menu)
 
 static void show_readme(void)
 {
-	show_file("scripts/README.Menuconfig", NULL, rows, cols);
+	show_file("scripts/README.Menuconfig", NULL, 0, 0);
 }
 
 static void show_file(const char *filename, const char *title, int r, int c)
@@ -722,8 +722,8 @@ static void show_file(const char *filename, const char *title, int r, int c)
 		}
 		cprint("--textbox");
 		cprint("%s", filename);
-		cprint("%d", r);
-		cprint("%d", c);
+		cprint("%d", r ? r : rows);
+		cprint("%d", c ? c : cols);
 	} while (exec_conf() < 0);
 }
 
