@@ -1207,6 +1207,14 @@ static int rfcomm_recv_rpn(struct rfcomm_session *s, int cr, int len, struct sk_
 	}
 	/* check for sane values: ignore/accept bit_rate, 8 bits, 1 stop bit, no parity,
 	                          no flow control lines, normal XON/XOFF chars */
+	if (rpn->param_mask & RFCOMM_RPN_PM_BITRATE) {
+		bit_rate = rpn->bit_rate;
+		if (bit_rate != RFCOMM_RPN_BR_115200) {
+			BT_DBG("RPN bit rate mismatch 0x%x", bit_rate);
+			bit_rate = RFCOMM_RPN_BR_115200;
+			rpn_mask ^= RFCOMM_RPN_PM_BITRATE;
+		}
+	}
 	if (rpn->param_mask & RFCOMM_RPN_PM_DATA) {
 		data_bits = __get_rpn_data_bits(rpn->line_settings);
 		if (data_bits != RFCOMM_RPN_DATA_8) {
