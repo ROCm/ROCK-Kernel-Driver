@@ -259,7 +259,7 @@ struct tty_flip_buffer {
  */
 struct tty_struct {
 	int	magic;
-	struct tty_driver driver;
+	struct tty_driver *driver;
 	struct tty_ldisc ldisc;
 	struct termios *termios, *termios_locked;
 	int pgrp;

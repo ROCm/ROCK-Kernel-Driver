@@ -578,7 +578,7 @@ static void uart_flush_buffer(struct tty_struct *tty)
 	unsigned long flags;
 
 	DPRINTK("uart_flush_buffer(%d) called\n",
-	        minor(tty->device) - tty->driver.minor_start);
+	        minor(tty->device) - tty->driver->minor_start);
 
 	spin_lock_irqsave(&port->lock, flags);
 	uart_circ_clear(&state->info->xmit);
@@ -839,7 +839,7 @@ uart_set_info(struct uart_state *state, struct serial_struct *newinfo)
 			 * need to rate-limit; it's CAP_SYS_ADMIN only. */
 			if (port->flags & UPF_SPD_MASK) {
 				printk(KERN_NOTICE "%s sets custom speed on %s%d. This is deprecated.\n",
-				       current->comm, state->info->tty->driver.name, 
+				       current->comm, state->info->tty->driver->name, 
 				       state->port->line);
 			}
 			uart_change_speed(state, NULL);
@@ -1234,7 +1234,7 @@ static void uart_close(struct tty_struct *tty, struct file *filp)
 	}
 	if (--state->count < 0) {
 		printk("rs_close: bad serial port count for %s%d: %d\n",
-		       tty->driver.name, port->line, state->count);
+		       tty->driver->name, port->line, state->count);
 		state->count = 0;
 	}
 	if (state->count)
@@ -1554,20 +1554,20 @@ static struct uart_state *uart_get(struct uart_driver *drv, int line)
  */
 static int uart_open(struct tty_struct *tty, struct file *filp)
 {
-	struct uart_driver *drv = (struct uart_driver *)tty->driver.driver_state;
+	struct uart_driver *drv = (struct uart_driver *)tty->driver->driver_state;
 	struct uart_state *state;
-	int retval, line = minor(tty->device) - tty->driver.minor_start;
+	int retval, line = minor(tty->device) - tty->driver->minor_start;
 
 	BUG_ON(!kernel_locked());
 	DPRINTK("uart_open(%d) called\n", line);
 
 	/*
-	 * tty->driver.num won't change, so we won't fail here with
+	 * tty->driver->num won't change, so we won't fail here with
 	 * tty->driver_data set to something non-NULL (and therefore
 	 * we won't get caught by uart_close()).
 	 */
 	retval = -ENODEV;
-	if (line >= tty->driver.num)
+	if (line >= tty->driver->num)
 		goto fail;
 
 	/*

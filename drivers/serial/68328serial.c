@@ -1198,8 +1198,8 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 	uart->ustcnt &= ~(USTCNT_RXEN | USTCNT_RX_INTR_MASK);
 
 	shutdown(info);
-	if (tty->driver.flush_buffer)
-		tty->driver.flush_buffer(tty);
+	if (tty->driver->flush_buffer)
+		tty->driver->flush_buffer(tty);
 	if (tty->ldisc.flush_buffer)
 		tty->ldisc.flush_buffer(tty);
 	tty->closing = 0;
@@ -1277,7 +1277,7 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 	 * If this is a callout device, then just make sure the normal
 	 * device isn't being used.
 	 */
-	if (tty->driver.subtype == SERIAL_TYPE_CALLOUT) {
+	if (tty->driver->subtype == SERIAL_TYPE_CALLOUT) {
 		if (info->flags & S_NORMAL_ACTIVE)
 			return -EBUSY;
 		if ((info->flags & S_CALLOUT_ACTIVE) &&
@@ -1374,7 +1374,7 @@ int rs_open(struct tty_struct *tty, struct file * filp)
 	struct m68k_serial	*info;
 	int 			retval, line;
 
-	line = minor(tty->device) - tty->driver.minor_start;
+	line = minor(tty->device) - tty->driver->minor_start;
 	
 	if (line >= NR_PORTS || line < 0) /* we have exactly one */
 		return -ENODEV;
@@ -1401,7 +1401,7 @@ int rs_open(struct tty_struct *tty, struct file * filp)
 	}
 
 	if ((info->count == 1) && (info->flags & S_SPLIT_TERMIOS)) {
-		if (tty->driver.subtype == SERIAL_TYPE_NORMAL)
+		if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
 			*tty->termios = info->normal_termios;
 		else 
 			*tty->termios = info->callout_termios;

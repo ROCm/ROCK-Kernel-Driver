@@ -62,7 +62,7 @@ static int irtty_chars_in_buffer(struct sir_dev *dev)
 	ASSERT(priv != NULL, return -1;);
 	ASSERT(priv->magic == IRTTY_MAGIC, return -1;);
 
-	return priv->tty->driver.chars_in_buffer(priv->tty);
+	return priv->tty->driver->chars_in_buffer(priv->tty);
 }
 
 /* Wait (sleep) until underlaying hardware finished transmission
@@ -91,9 +91,9 @@ static void irtty_wait_until_sent(struct sir_dev *dev)
 	ASSERT(priv->magic == IRTTY_MAGIC, return;);
 
 	tty = priv->tty;
-	if (tty->driver.wait_until_sent) {
+	if (tty->driver->wait_until_sent) {
 		lock_kernel();
-		tty->driver.wait_until_sent(tty, MSECS_TO_JIFFIES(100));
+		tty->driver->wait_until_sent(tty, MSECS_TO_JIFFIES(100));
 		unlock_kernel();
 	}
 	else {
@@ -161,8 +161,8 @@ static int irtty_change_speed(struct sir_dev *dev, unsigned speed)
 	}	
 
 	tty->termios->c_cflag = cflag;
-	if (tty->driver.set_termios)
-		tty->driver.set_termios(tty, &old_termios);
+	if (tty->driver->set_termios)
+		tty->driver->set_termios(tty, &old_termios);
 	unlock_kernel();
 
 	priv->io.speed = speed;
@@ -201,8 +201,8 @@ static int irtty_set_dtr_rts(struct sir_dev *dev, int dtr, int rts)
 	 * This function is not yet defined for all tty driver, so
 	 * let's be careful... Jean II
 	 */
-	ASSERT(priv->tty->driver.tiocmset != NULL, return -1;);
-	priv->tty->driver.tiocmset(priv->tty, NULL, set, clear);
+	ASSERT(priv->tty->driver->tiocmset != NULL, return -1;);
+	priv->tty->driver->tiocmset(priv->tty, NULL, set, clear);
 
 	return 0;
 }
@@ -231,17 +231,17 @@ static int irtty_do_write(struct sir_dev *dev, const unsigned char *ptr, size_t 
 	ASSERT(priv->magic == IRTTY_MAGIC, return -1;);
 
 	tty = priv->tty;
-	if (!tty->driver.write)
+	if (!tty->driver->write)
 		return 0;
 	tty->flags |= (1 << TTY_DO_WRITE_WAKEUP);
-	if (tty->driver.write_room) {
-		writelen = tty->driver.write_room(tty);
+	if (tty->driver->write_room) {
+		writelen = tty->driver->write_room(tty);
 		if (writelen > len)
 			writelen = len;
 	}
 	else
 		writelen = len;
-	return tty->driver.write(tty, 0, ptr, writelen);
+	return tty->driver->write(tty, 0, ptr, writelen);
 }
 
 /* ------------------------------------------------------- */
@@ -354,8 +354,8 @@ static inline void irtty_stop_receiver(struct tty_struct *tty, int stop)
 		cflag |= CREAD;
 
 	tty->termios->c_cflag = cflag;
-	if (tty->driver.set_termios)
-		tty->driver.set_termios(tty, &old_termios);
+	if (tty->driver->set_termios)
+		tty->driver->set_termios(tty, &old_termios);
 	unlock_kernel();
 }
 
@@ -381,8 +381,8 @@ static int irtty_start_dev(struct sir_dev *dev)
 
 	tty = priv->tty;
 
-	if (tty->driver.start)
-		tty->driver.start(tty);
+	if (tty->driver->start)
+		tty->driver->start(tty);
 	/* Make sure we can receive more data */
 	irtty_stop_receiver(tty, FALSE);
 
@@ -410,8 +410,8 @@ static int irtty_stop_dev(struct sir_dev *dev)
 
 	/* Make sure we don't receive more data */
 	irtty_stop_receiver(tty, TRUE);
-	if (tty->driver.stop)
-		tty->driver.stop(tty);
+	if (tty->driver->stop)
+		tty->driver->stop(tty);
 
 	up(&irtty_sem);
 
@@ -522,11 +522,11 @@ static int irtty_open(struct tty_struct *tty)
 
 	/* stop the underlying  driver */
 	irtty_stop_receiver(tty, TRUE);
-	if (tty->driver.stop)
-		tty->driver.stop(tty);
+	if (tty->driver->stop)
+		tty->driver->stop(tty);
 
-	if (tty->driver.flush_buffer)
-		tty->driver.flush_buffer(tty);
+	if (tty->driver->flush_buffer)
+		tty->driver->flush_buffer(tty);
 	
 /* from old irtty - but what is it good for?
  * we _are_ the ldisc and we _don't_ implement flush_buffer!
@@ -538,15 +538,15 @@ static int irtty_open(struct tty_struct *tty)
 
 	/* create device name - could we use tty_name() here? */
 
-	if (strchr(tty->driver.name, '%')) {
-		sprintf(hwname, tty->driver.name,
-			minor(tty->device) - tty->driver.minor_start +
-			tty->driver.name_base);
+	if (strchr(tty->driver->name, '%')) {
+		sprintf(hwname, tty->driver->name,
+			minor(tty->device) - tty->driver->minor_start +
+			tty->driver->name_base);
 	}
 	else {
-		sprintf(hwname, "%s%d", tty->driver.name,
-			minor(tty->device) - tty->driver.minor_start +
-			tty->driver.name_base);
+		sprintf(hwname, "%s%d", tty->driver->name,
+			minor(tty->device) - tty->driver->minor_start +
+			tty->driver->name_base);
 	}
 
 	/* apply mtt override */
@@ -625,8 +625,8 @@ static void irtty_close(struct tty_struct *tty)
 	/* Stop tty */
 	irtty_stop_receiver(tty, TRUE);
 	tty->flags &= ~(1 << TTY_DO_WRITE_WAKEUP);
-	if (tty->driver.stop)
-		tty->driver.stop(tty);
+	if (tty->driver->stop)
+		tty->driver->stop(tty);
 
 	kfree(priv);
 

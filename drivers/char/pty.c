@@ -68,7 +68,7 @@ static void pty_close(struct tty_struct * tty, struct file * filp)
 {
 	if (!tty)
 		return;
-	if (tty->driver.subtype == PTY_TYPE_MASTER) {
+	if (tty->driver->subtype == PTY_TYPE_MASTER) {
 		if (tty->count > 1)
 			printk("master pty_close: count = %d!!\n", tty->count);
 	} else {
@@ -84,14 +84,14 @@ static void pty_close(struct tty_struct * tty, struct file * filp)
 	wake_up_interruptible(&tty->link->read_wait);
 	wake_up_interruptible(&tty->link->write_wait);
 	set_bit(TTY_OTHER_CLOSED, &tty->link->flags);
-	if (tty->driver.subtype == PTY_TYPE_MASTER) {
+	if (tty->driver->subtype == PTY_TYPE_MASTER) {
 		set_bit(TTY_OTHER_CLOSED, &tty->flags);
 #ifdef CONFIG_UNIX98_PTYS
 		{
 			unsigned int major = major(tty->device) - UNIX98_PTY_MASTER_MAJOR;
 			if ( major < UNIX98_NR_MAJORS ) {
 				devpts_pty_kill( minor(tty->device)
-			  - tty->driver.minor_start + tty->driver.name_base );
+			  - tty->driver->minor_start + tty->driver->name_base );
 			}
 		}
 #endif
@@ -220,7 +220,7 @@ static int pty_chars_in_buffer(struct tty_struct *tty)
 	/* The ldisc must report 0 if no characters available to be read */
 	count = to->ldisc.chars_in_buffer(to);
 
-	if (tty->driver.subtype == PTY_TYPE_SLAVE) return count;
+	if (tty->driver->subtype == PTY_TYPE_SLAVE) return count;
 
 	/* Master side driver ... if the other side's read buffer is less than 
 	 * half full, return 0 to allow writers to proceed; otherwise return
@@ -239,7 +239,7 @@ static int pty_chars_in_buffer(struct tty_struct *tty)
 static int pty_get_device_number(struct tty_struct *tty, unsigned int *value)
 {
 	unsigned int result = minor(tty->device)
-		- tty->driver.minor_start + tty->driver.name_base;
+		- tty->driver->minor_start + tty->driver->name_base;
 	return put_user(result, value);
 }
 #endif
@@ -313,10 +313,10 @@ static int pty_open(struct tty_struct *tty, struct file * filp)
 	retval = -ENODEV;
 	if (!tty || !tty->link)
 		goto out;
-	line = minor(tty->device) - tty->driver.minor_start;
+	line = minor(tty->device) - tty->driver->minor_start;
 	if ((line < 0) || (line >= NR_PTYS))
 		goto out;
-	pty = (struct pty_struct *)(tty->driver.driver_state) + line;
+	pty = (struct pty_struct *)(tty->driver->driver_state) + line;
 	tty->driver_data = pty;
 
 	retval = -EIO;

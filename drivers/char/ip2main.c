@@ -1616,7 +1616,7 @@ ip2_open( PTTY tty, struct file *pFile )
 	 *    (These are the only tests the standard serial driver makes for
 	 *    callout devices.)
 	 */
-	if ( tty->driver.subtype == SERIAL_TYPE_CALLOUT ) {
+	if ( tty->driver->subtype == SERIAL_TYPE_CALLOUT ) {
 		if ( pCh->flags & ASYNC_NORMAL_ACTIVE ) {
 			return -EBUSY;
 		}
@@ -1719,7 +1719,7 @@ noblock:
 	if ( tty->count == 1 ) {
 		i2QueueCommands(PTYPE_INLINE, pCh, 0, 2, CMD_CTSFL_DSAB, CMD_RTSFL_DSAB);
 		if ( pCh->flags & ASYNC_SPLIT_TERMIOS ) {
-			if ( tty->driver.subtype == SERIAL_TYPE_NORMAL ) {
+			if ( tty->driver->subtype == SERIAL_TYPE_NORMAL ) {
 				*tty->termios = pCh->NormalTermios;
 			} else {
 				*tty->termios = pCh->CalloutTermios;
@@ -1827,8 +1827,8 @@ ip2_close( PTTY tty, struct file *pFile )
 
 	serviceOutgoingFifo ( pCh->pMyBord );
 
-	if ( tty->driver.flush_buffer ) 
-		tty->driver.flush_buffer(tty);
+	if ( tty->driver->flush_buffer ) 
+		tty->driver->flush_buffer(tty);
 	if ( tty->ldisc.flush_buffer )  
 		tty->ldisc.flush_buffer(tty);
 	tty->closing = 0;

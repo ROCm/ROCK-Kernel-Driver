@@ -1112,8 +1112,8 @@ static void dz_close(struct tty_struct *tty, struct file *filp)
 	 */
 	shutdown(info);
 
-	if (tty->driver.flush_buffer)
-		tty->driver.flush_buffer (tty);
+	if (tty->driver->flush_buffer)
+		tty->driver->flush_buffer (tty);
 	if (tty->ldisc.flush_buffer)
 		tty->ldisc.flush_buffer (tty);
 	tty->closing = 0;
@@ -1183,7 +1183,7 @@ static int block_til_ready(struct tty_struct *tty, struct file *filp,
 	 * If this is a callout device, then just make sure the normal
 	 * device isn't being used.
 	 */
-	if (tty->driver.subtype == SERIAL_TYPE_CALLOUT) {
+	if (tty->driver->subtype == SERIAL_TYPE_CALLOUT) {
 		if (info->flags & DZ_NORMAL_ACTIVE)
 			return -EBUSY;
     
@@ -1271,7 +1271,7 @@ static int dz_open (struct tty_struct *tty, struct file *filp)
 	struct dz_serial *info;
 	int retval, line;
 
-	line = minor(tty->device) - tty->driver.minor_start;
+	line = minor(tty->device) - tty->driver->minor_start;
 
 	/*
 	 * The dz lines for the mouse/keyboard must be opened using their
@@ -1301,7 +1301,7 @@ static int dz_open (struct tty_struct *tty, struct file *filp)
 		return retval;
 
 	if ((info->count == 1) && (info->flags & DZ_SPLIT_TERMIOS)) {
-		if (tty->driver.subtype == SERIAL_TYPE_NORMAL)
+		if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
 			*tty->termios = info->normal_termios;
 		else 
 			*tty->termios = info->callout_termios;

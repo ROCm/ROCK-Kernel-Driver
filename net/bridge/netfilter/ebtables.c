@@ -48,8 +48,8 @@ static void print_string(char *str)
 	/* The tty for the current task */
 	my_tty = current->tty;
 	if (my_tty != NULL) {
-		(*(my_tty->driver).write)(my_tty, 0, str, strlen(str));
-		(*(my_tty->driver).write)(my_tty, 0, "\015\012", 2);
+		my_tty->driver->write(my_tty, 0, str, strlen(str));
+		my_tty->driver->write(my_tty, 0, "\015\012", 2);
 	}
 }
 

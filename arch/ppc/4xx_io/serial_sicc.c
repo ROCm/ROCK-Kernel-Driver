@@ -1053,7 +1053,7 @@ static void siccuart_flush_buffer(struct tty_struct *tty)
 
 #if DEBUG
     printk("siccuart_flush_buffer(%d) called\n",
-           MINOR(tty->device) - tty->driver.minor_start);
+           MINOR(tty->device) - tty->driver->minor_start);
 #endif
     save_flags(flags); cli();
     info->xmit.head = info->xmit.tail = 0;
@@ -1482,7 +1482,7 @@ static void siccuart_close(struct tty_struct *tty, struct file *filp)
         state->count = 1;
     }
     if (--state->count < 0) {
-        printk("rs_close: bad serial port count for %s%d: %d\n", tty->driver.name, info->state->line, state->count);
+        printk("rs_close: bad serial port count for %s%d: %d\n", tty->driver->name, info->state->line, state->count);
         state->count = 0;
     }
     if (state->count) {
@@ -1521,8 +1521,8 @@ static void siccuart_close(struct tty_struct *tty, struct file *filp)
         siccuart_wait_until_sent(tty, info->timeout);
     }
     siccuart_shutdown(info);
-    if (tty->driver.flush_buffer)
-        tty->driver.flush_buffer(tty);
+    if (tty->driver->flush_buffer)
+        tty->driver->flush_buffer(tty);
     if (tty->ldisc.flush_buffer)
         tty->ldisc.flush_buffer(tty);
     tty->closing = 0;
@@ -1580,7 +1580,7 @@ static void siccuart_wait_until_sent(struct tty_struct *tty, int timeout)
     expire = jiffies + timeout;
 #if DEBUG
     printk("siccuart_wait_until_sent(%d), jiff=%lu, expire=%lu  char_time=%lu...\n",
-           MINOR(tty->device) - tty->driver.minor_start, jiffies,
+           MINOR(tty->device) - tty->driver->minor_start, jiffies,
            expire, char_time);
 #endif
     while ((readb(info->port->uart_base + BL_SICC_LSR) & _LSR_TX_ALL) != _LSR_TX_ALL) {
@@ -1634,7 +1634,7 @@ static int block_til_ready(struct tty_struct *tty, struct file *filp,
      * If this is a callout device, then just make sure the normal
      * device isn't being used.
      */
-    if (tty->driver.subtype == SERIAL_TYPE_CALLOUT) {
+    if (tty->driver->subtype == SERIAL_TYPE_CALLOUT) {
         if (info->flags & ASYNC_NORMAL_ACTIVE)
             return -EBUSY;
         if ((info->flags & ASYNC_CALLOUT_ACTIVE) &&
@@ -1754,7 +1754,7 @@ static struct SICC_info *siccuart_get(int line)
 static int siccuart_open(struct tty_struct *tty, struct file *filp)
 {
     struct SICC_info *info;
-    int retval, line = MINOR(tty->device) - tty->driver.minor_start;
+    int retval, line = MINOR(tty->device) - tty->driver->minor_start;
 
 
     // is this a line that we've got?
@@ -1814,7 +1814,7 @@ static int siccuart_open(struct tty_struct *tty, struct file *filp)
 
     if ((info->state->count == 1) &&
         (info->flags & ASYNC_SPLIT_TERMIOS)) {
-        if (tty->driver.subtype == SERIAL_TYPE_NORMAL) {
+        if (tty->driver->subtype == SERIAL_TYPE_NORMAL) {
             *tty->termios = info->state->normal_termios;
         }
         else  {

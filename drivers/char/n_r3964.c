@@ -418,9 +418,9 @@ static void put_char(struct r3964_info *pInfo, unsigned char ch)
    if(tty==NULL)
       return;
 
-   if(tty->driver.put_char)
+   if(tty->driver->put_char)
    {
-      tty->driver.put_char(tty, ch);
+      tty->driver->put_char(tty, ch);
    }
    pInfo->bcc ^= ch;
 }
@@ -432,9 +432,9 @@ static void flush(struct r3964_info *pInfo)
    if(tty==NULL)
       return;
 
-   if(tty->driver.flush_chars)
+   if(tty->driver->flush_chars)
    {
-      tty->driver.flush_chars(tty);
+      tty->driver->flush_chars(tty);
    }
 }
 
@@ -507,8 +507,8 @@ static void transmit_block(struct r3964_info *pInfo)
       return;
    }
 
-   if(tty->driver.write_room)
-      room=tty->driver.write_room(tty);
+   if(tty->driver->write_room)
+      room=tty->driver->write_room(tty);
 
    TRACE_PS("transmit_block %x, room %d, length %d", 
           (int)pBlock, room, pBlock->length);

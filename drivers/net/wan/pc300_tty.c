@@ -318,7 +318,7 @@ static int cpc_tty_open(struct tty_struct *tty, struct file *flip)
 		return -ENODEV;
 	} 
 
-	port = minor(tty->device) - tty->driver.minor_start; 
+	port = minor(tty->device) - tty->driver->minor_start; 
 
 	if ((port < 0) || (port >= CPC_TTY_NPORTS)){ 
 		CPC_TTY_DBG("pc300_tty: open invalid minor %i\n",MINOR(tty->device));

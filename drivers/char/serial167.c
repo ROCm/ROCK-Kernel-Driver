@@ -1913,8 +1913,8 @@ cy_close(struct tty_struct * tty, struct file * filp)
     if (info->flags & ASYNC_INITIALIZED)
 	tty_wait_until_sent(tty, 3000); /* 30 seconds timeout */
     shutdown(info);
-    if (tty->driver.flush_buffer)
-	tty->driver.flush_buffer(tty);
+    if (tty->driver->flush_buffer)
+	tty->driver->flush_buffer(tty);
     if (tty->ldisc.flush_buffer)
 	tty->ldisc.flush_buffer(tty);
     info->event = 0;
@@ -2008,7 +2008,7 @@ block_til_ready(struct tty_struct *tty, struct file * filp,
      * If this is a callout device, then just make sure the normal
      * device isn't being used.
      */
-    if (tty->driver.subtype == SERIAL_TYPE_CALLOUT) {
+    if (tty->driver->subtype == SERIAL_TYPE_CALLOUT) {
 	if (info->flags & ASYNC_NORMAL_ACTIVE){
 	    return -EBUSY;
 	}
@@ -2133,7 +2133,7 @@ cy_open(struct tty_struct *tty, struct file * filp)
   int retval, line;
 
 /* CP('O'); */
-    line = minor(tty->device) - tty->driver.minor_start;
+    line = minor(tty->device) - tty->driver->minor_start;
     if ((line < 0) || (NR_PORTS <= line)){
         return -ENODEV;
     }
@@ -2165,7 +2165,7 @@ cy_open(struct tty_struct *tty, struct file * filp)
     }
 
     if ((info->count == 1) && (info->flags & ASYNC_SPLIT_TERMIOS)) {
-	if (tty->driver.subtype == SERIAL_TYPE_NORMAL)
+	if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
 	    *tty->termios = info->normal_termios;
 	else 
 	    *tty->termios = info->callout_termios;

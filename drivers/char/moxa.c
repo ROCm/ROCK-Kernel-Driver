@@ -189,7 +189,7 @@ static struct mxser_mstatus GMStatus[MAX_PORTS];
 
 #define WAKEUP_CHARS		256
 
-#define PORTNO(x)		(minor((x)->device) - (x)->driver.minor_start)
+#define PORTNO(x)		(minor((x)->device) - (x)->driver->minor_start)
 
 static int verbose = 0;
 static int ttymajor = MOXAMAJOR;
@@ -585,7 +585,7 @@ static int moxa_open(struct tty_struct *tty, struct file *filp)
 	tty->driver_data = ch;
 	ch->tty = tty;
 	if (ch->count == 1 && (ch->asyncflags & ASYNC_SPLIT_TERMIOS)) {
-		if (tty->driver.subtype == SERIAL_TYPE_NORMAL)
+		if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
 			*tty->termios = ch->normal_termios;
 		else
 			*tty->termios = ch->callout_termios;
@@ -671,8 +671,8 @@ static void moxa_close(struct tty_struct *tty, struct file *filp)
 	shut_down(ch);
 	MoxaPortFlushData(port, 2);
 
-	if (tty->driver.flush_buffer)
-		tty->driver.flush_buffer(tty);
+	if (tty->driver->flush_buffer)
+		tty->driver->flush_buffer(tty);
 	if (tty->ldisc.flush_buffer)
 		tty->ldisc.flush_buffer(tty);
 	tty->closing = 0;
@@ -1094,7 +1094,7 @@ static int block_till_ready(struct tty_struct *tty, struct file *filp,
 	 * If this is a callout device, then just make sure the normal
 	 * device isn't being used.
 	 */
-	if (tty->driver.subtype == SERIAL_TYPE_CALLOUT) {
+	if (tty->driver->subtype == SERIAL_TYPE_CALLOUT) {
 		if (ch->asyncflags & ASYNC_NORMAL_ACTIVE)
 			return (-EBUSY);
 		if ((ch->asyncflags & ASYNC_CALLOUT_ACTIVE) &&

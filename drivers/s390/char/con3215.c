@@ -957,7 +957,7 @@ tty3215_open(struct tty_struct *tty, struct file * filp)
 	struct raw3215_info *raw;
 	int retval, line;
 
-	line = minor(tty->device) - tty->driver.minor_start;
+	line = minor(tty->device) - tty->driver->minor_start;
 	if ((line < 0) || (line >= NR_3215))
 		return -ENODEV;
 

@@ -48,8 +48,8 @@ static struct tty_struct *get_tty(int fd)
 
 static struct tty_struct *get_real_tty(struct tty_struct *tp)
 {
-	if (tp->driver.type == TTY_DRIVER_TYPE_PTY &&
-	   tp->driver.subtype == PTY_TYPE_MASTER)
+	if (tp->driver->type == TTY_DRIVER_TYPE_PTY &&
+	   tp->driver->subtype == PTY_TYPE_MASTER)
 		return tp->link;
 	else
 		return tp;

@@ -907,7 +907,7 @@ static int block_til_ready(struct tty_struct * tty, struct file * filp, struct i
 	
 	/* trying to open a callout device... check for constraints */
 	
-	if (tty->driver.subtype == SERIAL_TYPE_CALLOUT) {
+	if (tty->driver->subtype == SERIAL_TYPE_CALLOUT) {
 #ifdef ISICOM_DEBUG
 		printk(KERN_DEBUG "ISICOM: bl_ti_rdy: callout open.\n");	
 #endif		
@@ -1021,7 +1021,7 @@ static int isicom_open(struct tty_struct * tty, struct file * filp)
 #ifdef ISICOM_DEBUG	
 	printk(KERN_DEBUG "ISICOM: open start!!!.\n");
 #endif	
-	line = minor(tty->device) - tty->driver.minor_start;
+	line = minor(tty->device) - tty->driver->minor_start;
 	
 #ifdef ISICOM_DEBUG	
 	printk(KERN_DEBUG "line = %d.\n", line);
@@ -1072,7 +1072,7 @@ static int isicom_open(struct tty_struct * tty, struct file * filp)
 		return error;
 		
 	if ((port->count == 1) && (port->flags & ASYNC_SPLIT_TERMIOS)) {
-		if (tty->driver.subtype == SERIAL_TYPE_NORMAL)
+		if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
 			*tty->termios = port->normal_termios;
 		else 
 			*tty->termios = port->callout_termios;
@@ -1196,8 +1196,8 @@ static void isicom_close(struct tty_struct * tty, struct file * filp)
 		outw(card->port_status, card->base + 0x02);
 	}	
 	isicom_shutdown_port(port);
-	if (tty->driver.flush_buffer)
-		tty->driver.flush_buffer(tty);
+	if (tty->driver->flush_buffer)
+		tty->driver->flush_buffer(tty);
 	if (tty->ldisc.flush_buffer)
 		tty->ldisc.flush_buffer(tty);
 	tty->closing = 0;

@@ -1750,8 +1750,8 @@ static void rs_8xx_close(struct tty_struct *tty, struct file * filp)
 		rs_8xx_wait_until_sent(tty, info->timeout);
 	}
 	shutdown(info);
-	if (tty->driver.flush_buffer)
-		tty->driver.flush_buffer(tty);
+	if (tty->driver->flush_buffer)
+		tty->driver->flush_buffer(tty);
 	if (tty->ldisc.flush_buffer)
 		tty->ldisc.flush_buffer(tty);
 	tty->closing = 0;
@@ -1900,7 +1900,7 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 	 * If this is a callout device, then just make sure the normal
 	 * device isn't being used.
 	 */
-	if (tty->driver.subtype == SERIAL_TYPE_CALLOUT) {
+	if (tty->driver->subtype == SERIAL_TYPE_CALLOUT) {
 		if (info->flags & ASYNC_NORMAL_ACTIVE)
 			return -EBUSY;
 		if ((info->flags & ASYNC_CALLOUT_ACTIVE) &&
@@ -2035,7 +2035,7 @@ static int rs_8xx_open(struct tty_struct *tty, struct file * filp)
 	ser_info_t	*info;
 	int 		retval, line;
 
-	line = MINOR(tty->device) - tty->driver.minor_start;
+	line = MINOR(tty->device) - tty->driver->minor_start;
 	if ((line < 0) || (line >= NR_PORTS))
 		return -ENODEV;
 	retval = get_async_struct(line, &info);
@@ -2045,7 +2045,7 @@ static int rs_8xx_open(struct tty_struct *tty, struct file * filp)
 		return -ENODEV;
 
 #ifdef SERIAL_DEBUG_OPEN
-	printk("rs_open %s%d, count = %d\n", tty->driver.name, info->line,
+	printk("rs_open %s%d, count = %d\n", tty->driver->name, info->line,
 	       info->state->count);
 #endif
 	tty->driver_data = info;
@@ -2071,7 +2071,7 @@ static int rs_8xx_open(struct tty_struct *tty, struct file * filp)
 
 	if ((info->state->count == 1) &&
 	    (info->flags & ASYNC_SPLIT_TERMIOS)) {
-		if (tty->driver.subtype == SERIAL_TYPE_NORMAL)
+		if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
 			*tty->termios = info->state->normal_termios;
 		else 
 			*tty->termios = info->state->callout_termios;

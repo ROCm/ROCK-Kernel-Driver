@@ -1424,8 +1424,8 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 	}
 
 	shutdown(info);
-	if (tty->driver.flush_buffer)
-		tty->driver.flush_buffer(tty);
+	if (tty->driver->flush_buffer)
+		tty->driver->flush_buffer(tty);
 	if (tty->ldisc.flush_buffer)
 		tty->ldisc.flush_buffer(tty);
 	tty->closing = 0;
@@ -1527,7 +1527,7 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 	 * If this is a callout device, then just make sure the normal
 	 * device isn't being used.
 	 */
-	if (tty->driver.subtype == SERIAL_TYPE_CALLOUT) {
+	if (tty->driver->subtype == SERIAL_TYPE_CALLOUT) {
 		if (info->flags & ZILOG_NORMAL_ACTIVE)
 			return -EBUSY;
 		if ((info->flags & ZILOG_CALLOUT_ACTIVE) &&
@@ -1639,7 +1639,7 @@ int rs_open(struct tty_struct *tty, struct file * filp)
 	struct dec_serial	*info;
 	int 			retval, line;
 
-	line = MINOR(tty->device) - tty->driver.minor_start;
+	line = MINOR(tty->device) - tty->driver->minor_start;
 	if ((line < 0) || (line >= zs_channels_found))
 		return -ENODEV;
 	info = zs_soft + line;
@@ -1650,7 +1650,7 @@ int rs_open(struct tty_struct *tty, struct file * filp)
 	if (serial_paranoia_check(info, tty->device, "rs_open"))
 		return -ENODEV;
 #ifdef SERIAL_DEBUG_OPEN
-	printk("rs_open %s%d, count = %d\n", tty->driver.name, info->line,
+	printk("rs_open %s%d, count = %d\n", tty->driver->name, info->line,
 	       info->count);
 #endif
 
@@ -1690,7 +1690,7 @@ int rs_open(struct tty_struct *tty, struct file * filp)
 	}
 
 	if ((info->count == 1) && (info->flags & ZILOG_SPLIT_TERMIOS)) {
-		if (tty->driver.subtype == SERIAL_TYPE_NORMAL)
+		if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
 			*tty->termios = info->normal_termios;
 		else 
 			*tty->termios = info->callout_termios;

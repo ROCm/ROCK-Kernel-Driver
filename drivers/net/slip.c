@@ -428,7 +428,7 @@ sl_encaps(struct slip *sl, unsigned char *icp, int len)
 	 *       14 Oct 1994  Dmitry Gorodchanin.
 	 */
 	sl->tty->flags |= (1 << TTY_DO_WRITE_WAKEUP);
-	actual = sl->tty->driver.write(sl->tty, 0, sl->xbuff, count);
+	actual = sl->tty->driver->write(sl->tty, 0, sl->xbuff, count);
 #ifdef SL_CHECK_TRANSMIT
 	sl->dev->trans_start = jiffies;
 #endif
@@ -462,7 +462,7 @@ static void slip_write_wakeup(struct tty_struct *tty)
 		return;
 	}
 
-	actual = tty->driver.write(tty, 0, sl->xhead, sl->xleft);
+	actual = tty->driver->write(tty, 0, sl->xhead, sl->xleft);
 	sl->xleft -= actual;
 	sl->xhead += actual;
 }
@@ -488,7 +488,7 @@ static void sl_tx_timeout(struct net_device *dev)
 			goto out;
 		}
 		printk(KERN_WARNING "%s: transmit timed out, %s?\n", dev->name,
-		       (sl->tty->driver.chars_in_buffer(sl->tty) || sl->xleft) ?
+		       (sl->tty->driver->chars_in_buffer(sl->tty) || sl->xleft) ?
 		       "bad line quality" : "driver error");
 		sl->xleft = 0;
 		sl->tty->flags &= ~(1 << TTY_DO_WRITE_WAKEUP);
@@ -861,8 +861,8 @@ slip_open(struct tty_struct *tty)
 	tty->disc_data = sl;
 	sl->line = tty->device;
 	sl->pid = current->pid;
-	if (tty->driver.flush_buffer)
-		tty->driver.flush_buffer(tty);
+	if (tty->driver->flush_buffer)
+		tty->driver->flush_buffer(tty);
 	if (tty->ldisc.flush_buffer)
 		tty->ldisc.flush_buffer(tty);
 
@@ -1456,7 +1456,7 @@ static void sl_outfill(unsigned long sls)
 			if (!netif_queue_stopped(sl->dev))
 			{
 				/* if device busy no outfill */
-				sl->tty->driver.write(sl->tty, 0, &s, 1);
+				sl->tty->driver->write(sl->tty, 0, &s, 1);
 			}
 		}
 		else

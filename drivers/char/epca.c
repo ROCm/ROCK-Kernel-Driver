@@ -503,7 +503,7 @@ static void pc_close(struct tty_struct * tty, struct file * filp)
 	struct channel *ch;
 	unsigned long flags;
 
-	if (tty->driver.subtype == SERIAL_TYPE_INFO) 
+	if (tty->driver->subtype == SERIAL_TYPE_INFO) 
 	{
 		return;
 	}
@@ -574,8 +574,8 @@ static void pc_close(struct tty_struct * tty, struct file * filp)
 			tty_wait_until_sent(tty, 3000); /* 30 seconds timeout */
 		}
 	
-		if (tty->driver.flush_buffer)
-			tty->driver.flush_buffer(tty);
+		if (tty->driver->flush_buffer)
+			tty->driver->flush_buffer(tty);
 
 		if (tty->ldisc.flush_buffer)
 			tty->ldisc.flush_buffer(tty);
@@ -681,8 +681,8 @@ static void pc_hangup(struct tty_struct *tty)
 
 		save_flags(flags);
 		cli();
-		if (tty->driver.flush_buffer)
-			tty->driver.flush_buffer(tty);
+		if (tty->driver->flush_buffer)
+			tty->driver->flush_buffer(tty);
 
 		if (tty->ldisc.flush_buffer)
 			tty->ldisc.flush_buffer(tty);
@@ -729,7 +729,7 @@ static int pc_write(struct tty_struct * tty, int from_user,
 
 	/* Stop users from hurting themselves on control minor */
 
-	if (tty->driver.subtype == SERIAL_TYPE_INFO) 
+	if (tty->driver->subtype == SERIAL_TYPE_INFO) 
 	{
 		return (0) ;
 	}
@@ -1238,7 +1238,7 @@ static int block_til_ready(struct tty_struct *tty,
 	   device isn't being used.
 	-------------------------------------------------------------------- */
 
-	if (tty->driver.subtype == SERIAL_TYPE_CALLOUT) 
+	if (tty->driver->subtype == SERIAL_TYPE_CALLOUT) 
 	{ /* A cud device has been opened */
 		if (ch->asyncflags & ASYNC_NORMAL_ACTIVE)
 			return -EBUSY;
@@ -1368,12 +1368,12 @@ static int pc_open(struct tty_struct *tty, struct file * filp)
 
 	/* Nothing "real" happens in open of control device */
 
-	if (tty->driver.subtype == SERIAL_TYPE_INFO) 
+	if (tty->driver->subtype == SERIAL_TYPE_INFO) 
 	{
 		return (0) ;
 	}
 
-	line = minor(tty->device) - tty->driver.minor_start;
+	line = minor(tty->device) - tty->driver->minor_start;
 	if (line < 0 || line >= nbdevs) 
 	{
 		printk(KERN_ERR "<Error> - pc_open : line out of range in pc_open\n");
@@ -1453,7 +1453,7 @@ static int pc_open(struct tty_struct *tty, struct file * filp)
 	/* Should this be here except for SPLIT termios ? */
 	if (ch->count == 1) 
 	{
-		if (tty->driver.subtype == SERIAL_TYPE_NORMAL)
+		if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
 			*tty->termios = ch->normal_termios;
 		else 
 			*tty->termios = ch->callout_termios;
@@ -2712,7 +2712,7 @@ static void epcaparam(struct tty_struct *tty, struct channel *ch)
 			the driver will wait on carrier detect.
 		------------------------------------------------------------------- */
 
-		if ((ts->c_cflag & CLOCAL) || (tty->driver.subtype == SERIAL_TYPE_CALLOUT))
+		if ((ts->c_cflag & CLOCAL) || (tty->driver->subtype == SERIAL_TYPE_CALLOUT))
 		{ /* Begin it is a cud device or a ttyD device with CLOCAL on */
 			ch->asyncflags &= ~ASYNC_CHECK_CD;
 		} /* End it is a cud device or a ttyD device with CLOCAL on */
@@ -2960,7 +2960,7 @@ static int pc_ioctl(struct tty_struct *tty, struct file * file,
 	struct channel *ch = (struct channel *) tty->driver_data;
 	
 	/* The control device has it's own set of commands */
-	if (tty->driver.subtype == SERIAL_TYPE_INFO) 
+	if (tty->driver->subtype == SERIAL_TYPE_INFO) 
 	{ /* Begin if subtype is the control device */
 
 		switch (cmd) 

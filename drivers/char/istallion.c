@@ -1115,7 +1115,7 @@ static int stli_open(struct tty_struct *tty, struct file *filp)
  *	previous opens still in effect. If we are a normal serial device
  *	then also we might have to wait for carrier.
  */
-	if (tty->driver.subtype == STL_DRVTYPCALLOUT) {
+	if (tty->driver->subtype == STL_DRVTYPCALLOUT) {
 		if (portp->flags & ASYNC_NORMAL_ACTIVE)
 			return(-EBUSY);
 		if (portp->flags & ASYNC_CALLOUT_ACTIVE) {
@@ -1139,7 +1139,7 @@ static int stli_open(struct tty_struct *tty, struct file *filp)
 	}
 
 	if ((portp->refcount == 1) && (portp->flags & ASYNC_SPLIT_TERMIOS)) {
-		if (tty->driver.subtype == STL_DRVTYPSERIAL)
+		if (tty->driver->subtype == STL_DRVTYPSERIAL)
 			*tty->termios = portp->normaltermios;
 		else
 			*tty->termios = portp->callouttermios;

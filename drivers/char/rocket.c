@@ -710,7 +710,7 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 	 * If this is a callout device, then just make sure the normal
 	 * device isn't being used.
 	 */
-	if (tty->driver.subtype == SERIAL_TYPE_CALLOUT) {
+	if (tty->driver->subtype == SERIAL_TYPE_CALLOUT) {
 		if (info->flags & ROCKET_NORMAL_ACTIVE)
 			return -EBUSY;
 		if ((info->flags & ROCKET_CALLOUT_ACTIVE) &&
@@ -822,7 +822,7 @@ static int rp_open(struct tty_struct *tty, struct file * filp)
 	CHANNEL_t	*cp;
 	unsigned long page;
 	
-	line = minor(tty->device) - tty->driver.minor_start;
+	line = minor(tty->device) - tty->driver->minor_start;
 	if ((line < 0) || (line >= MAX_RP_PORTS))
 		return -ENODEV;
 	if (!tmp_buf) {
@@ -946,7 +946,7 @@ static int rp_open(struct tty_struct *tty, struct file * filp)
 	}
 
 	if ((info->count == 1) && (info->flags & ROCKET_SPLIT_TERMIOS)) {
-		if (tty->driver.subtype == SERIAL_TYPE_NORMAL)
+		if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
 			*tty->termios = info->normal_termios;
 		else 
 			*tty->termios = info->callout_termios;
@@ -1048,8 +1048,8 @@ static void rp_close(struct tty_struct *tty, struct file * filp)
 	if (C_HUPCL(tty)) {
 		sClrDTR(cp);
 	}
-	if (tty->driver.flush_buffer)
-		tty->driver.flush_buffer(tty);
+	if (tty->driver->flush_buffer)
+		tty->driver->flush_buffer(tty);
 	if (tty->ldisc.flush_buffer)
 		tty->ldisc.flush_buffer(tty);
 
@@ -1329,9 +1329,9 @@ static int rp_ioctl(struct tty_struct *tty, struct file * file,
 static char *rp_tty_name(struct tty_struct *tty, char *buf)
 {
 	if (tty)
-		sprintf(buf, "%s%d", tty->driver.name,
-			minor(tty->device) - tty->driver.minor_start +
-			tty->driver.name_base);
+		sprintf(buf, "%s%d", tty->driver->name,
+			minor(tty->device) - tty->driver->minor_start +
+			tty->driver->name_base);
 	else
 		strcpy(buf, "NULL tty");
 	return buf;

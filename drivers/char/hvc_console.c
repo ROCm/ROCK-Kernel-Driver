@@ -69,7 +69,7 @@ struct hvc_struct hvc_struct[MAX_NR_HVC_CONSOLES];
 
 static int hvc_open(struct tty_struct *tty, struct file * filp)
 {
-	int line = minor(tty->device) - tty->driver.minor_start;
+	int line = minor(tty->device) - tty->driver->minor_start;
 	struct hvc_struct *hp;
 	unsigned long flags;
 

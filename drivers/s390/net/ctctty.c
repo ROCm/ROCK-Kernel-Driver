@@ -973,7 +973,7 @@ ctc_tty_open(struct tty_struct *tty, struct file *filp)
 	int retval,
 	 line;
 
-	line = minor(tty->device) - tty->driver.minor_start;
+	line = minor(tty->device) - tty->driver->minor_start;
 	if (line < 0 || line > CTC_TTY_MAX_DEVICES)
 		return -ENODEV;
 	info = &driver->info[line];
@@ -982,7 +982,7 @@ ctc_tty_open(struct tty_struct *tty, struct file *filp)
 	if (!info->netdev)
 		return -ENODEV;
 #ifdef CTC_DEBUG_MODEM_OPEN
-	printk(KERN_DEBUG "ctc_tty_open %s%d, count = %d\n", tty->driver.name,
+	printk(KERN_DEBUG "ctc_tty_open %s%d, count = %d\n", tty->driver->name,
 	       info->line, info->count);
 #endif
 	spin_lock_irqsave(&ctc_tty_lock, saveflags);
@@ -1091,8 +1091,8 @@ ctc_tty_close(struct tty_struct *tty, struct file *filp)
 		}
 	}
 	ctc_tty_shutdown(info);
-	if (tty->driver.flush_buffer)
-		tty->driver.flush_buffer(tty);
+	if (tty->driver->flush_buffer)
+		tty->driver->flush_buffer(tty);
 	if (tty->ldisc.flush_buffer)
 		tty->ldisc.flush_buffer(tty);
 	info->tty = 0;

@@ -109,7 +109,7 @@ int line_write(struct line *lines, struct tty_struct *tty, int from_user,
 		buf = new;
 	}
 
-	i = minor(tty->device) - tty->driver.minor_start;
+	i = minor(tty->device) - tty->driver->minor_start;
 	line = &lines[i];
 
 	down(&line->sem);
@@ -219,7 +219,7 @@ int line_open(struct line *lines, struct tty_struct *tty,
 	int n, err = 0;
 
 	if(tty == NULL) n = 0;
-	else n = minor(tty->device) - tty->driver.minor_start;
+	else n = minor(tty->device) - tty->driver->minor_start;
 	line = &lines[n];
 
 	down(&line->sem);
@@ -267,7 +267,7 @@ void line_close(struct line *lines, struct tty_struct *tty)
 	int n;
 
 	if(tty == NULL) n = 0;
-	else n = minor(tty->device) - tty->driver.minor_start;
+	else n = minor(tty->device) - tty->driver->minor_start;
 	line = &lines[n];
 
 	down(&line->sem);

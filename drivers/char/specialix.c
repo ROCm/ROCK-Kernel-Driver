@@ -1349,7 +1349,7 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 	 * If this is a callout device, then just make sure the normal
 	 * device isn't being used.
 	 */
-	if (tty->driver.subtype == SPECIALIX_TYPE_CALLOUT) {
+	if (tty->driver->subtype == SPECIALIX_TYPE_CALLOUT) {
 		if (port->flags & ASYNC_NORMAL_ACTIVE)
 			return -EBUSY;
 		if ((port->flags & ASYNC_CALLOUT_ACTIVE) &&
@@ -1484,7 +1484,7 @@ static int sx_open(struct tty_struct * tty, struct file * filp)
 		return error;
 
 	if ((port->count == 1) && (port->flags & ASYNC_SPLIT_TERMIOS)) {
-		if (tty->driver.subtype == SPECIALIX_TYPE_NORMAL)
+		if (tty->driver->subtype == SPECIALIX_TYPE_NORMAL)
 			*tty->termios = port->normal_termios;
 		else
 			*tty->termios = port->callout_termios;
@@ -1576,8 +1576,8 @@ static void sx_close(struct tty_struct * tty, struct file * filp)
 
 	}
 	sx_shutdown_port(bp, port);
-	if (tty->driver.flush_buffer)
-		tty->driver.flush_buffer(tty);
+	if (tty->driver->flush_buffer)
+		tty->driver->flush_buffer(tty);
 	if (tty->ldisc.flush_buffer)
 		tty->ldisc.flush_buffer(tty);
 	tty->closing = 0;

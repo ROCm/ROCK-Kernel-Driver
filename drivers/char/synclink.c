@@ -3125,7 +3125,7 @@ static void mgsl_set_termios(struct tty_struct *tty, struct termios *old_termios
 	
 	if (debug_level >= DEBUG_LEVEL_INFO)
 		printk("%s(%d):mgsl_set_termios %s\n", __FILE__,__LINE__,
-			tty->driver.name );
+			tty->driver->name );
 	
 	/* just return if nothing has changed */
 	if ((tty->termios->c_cflag == old_termios->c_cflag)
@@ -3237,8 +3237,8 @@ static void mgsl_close(struct tty_struct *tty, struct file * filp)
  	if (info->flags & ASYNC_INITIALIZED)
  		mgsl_wait_until_sent(tty, info->timeout);
 
-	if (tty->driver.flush_buffer)
-		tty->driver.flush_buffer(tty);
+	if (tty->driver->flush_buffer)
+		tty->driver->flush_buffer(tty);
 		
 	if (tty->ldisc.flush_buffer)
 		tty->ldisc.flush_buffer(tty);
@@ -3264,7 +3264,7 @@ static void mgsl_close(struct tty_struct *tty, struct file * filp)
 cleanup:			
 	if (debug_level >= DEBUG_LEVEL_INFO)
 		printk("%s(%d):mgsl_close(%s) exit, count=%d\n", __FILE__,__LINE__,
-			tty->driver.name, info->count);
+			tty->driver->name, info->count);
 			
 }	/* end of mgsl_close() */
 
@@ -3397,9 +3397,9 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 	
 	if (debug_level >= DEBUG_LEVEL_INFO)
 		printk("%s(%d):block_til_ready on %s\n",
-			 __FILE__,__LINE__, tty->driver.name );
+			 __FILE__,__LINE__, tty->driver->name );
 
-	if (tty->driver.subtype == SERIAL_TYPE_CALLOUT) {
+	if (tty->driver->subtype == SERIAL_TYPE_CALLOUT) {
 		/* this is a callout device */
 		/* just verify that normal device is not in use */
 		if (info->flags & ASYNC_NORMAL_ACTIVE)
@@ -3445,7 +3445,7 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 	
 	if (debug_level >= DEBUG_LEVEL_INFO)
 		printk("%s(%d):block_til_ready before block on %s count=%d\n",
-			 __FILE__,__LINE__, tty->driver.name, info->count );
+			 __FILE__,__LINE__, tty->driver->name, info->count );
 
 	spin_lock_irqsave(&info->irq_spinlock, flags);
 	if (!tty_hung_up_p(filp)) {
@@ -3489,7 +3489,7 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 		
 		if (debug_level >= DEBUG_LEVEL_INFO)
 			printk("%s(%d):block_til_ready blocking on %s count=%d\n",
-				 __FILE__,__LINE__, tty->driver.name, info->count );
+				 __FILE__,__LINE__, tty->driver->name, info->count );
 				 
 		schedule();
 	}
@@ -3503,7 +3503,7 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 	
 	if (debug_level >= DEBUG_LEVEL_INFO)
 		printk("%s(%d):block_til_ready after blocking on %s count=%d\n",
-			 __FILE__,__LINE__, tty->driver.name, info->count );
+			 __FILE__,__LINE__, tty->driver->name, info->count );
 			 
 	if (!retval)
 		info->flags |= ASYNC_NORMAL_ACTIVE;
@@ -3530,7 +3530,7 @@ static int mgsl_open(struct tty_struct *tty, struct file * filp)
 	unsigned long flags;
 
 	/* verify range of specified line number */	
-	line = minor(tty->device) - tty->driver.minor_start;
+	line = minor(tty->device) - tty->driver->minor_start;
 	if ((line < 0) || (line >= mgsl_device_count)) {
 		printk("%s(%d):mgsl_open with illegal line #%d.\n",
 			__FILE__,__LINE__,line);
@@ -3554,7 +3554,7 @@ static int mgsl_open(struct tty_struct *tty, struct file * filp)
 		
 	if (debug_level >= DEBUG_LEVEL_INFO)
 		printk("%s(%d):mgsl_open(%s), old ref count = %d\n",
-			 __FILE__,__LINE__,tty->driver.name, info->count);
+			 __FILE__,__LINE__,tty->driver->name, info->count);
 
 	/* If port is closing, signal caller to try again */
 	if (tty_hung_up_p(filp) || info->flags & ASYNC_CLOSING){
@@ -3605,7 +3605,7 @@ static int mgsl_open(struct tty_struct *tty, struct file * filp)
 
 	if ((info->count == 1) &&
 	    info->flags & ASYNC_SPLIT_TERMIOS) {
-		if (tty->driver.subtype == SERIAL_TYPE_NORMAL)
+		if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
 			*tty->termios = info->normal_termios;
 		else 
 			*tty->termios = info->callout_termios;

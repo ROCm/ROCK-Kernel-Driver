@@ -1655,7 +1655,7 @@ isdn_tty_block_til_ready(struct tty_struct *tty, struct file *filp, modem_info *
 	 * If this is a callout device, then just make sure the normal
 	 * device isn't being used.
 	 */
-	if (tty->driver.subtype == ISDN_SERIAL_TYPE_CALLOUT) {
+	if (tty->driver->subtype == ISDN_SERIAL_TYPE_CALLOUT) {
 		if (info->flags & ISDN_ASYNC_NORMAL_ACTIVE)
 			return -EBUSY;
 		if ((info->flags & ISDN_ASYNC_CALLOUT_ACTIVE) &&
@@ -1766,14 +1766,14 @@ isdn_tty_open(struct tty_struct *tty, struct file *filp)
 
 	MOD_INC_USE_COUNT;
 
-	line = minor(tty->device) - tty->driver.minor_start;
+	line = minor(tty->device) - tty->driver->minor_start;
 	if (line < 0 || line > ISDN_MAX_CHANNELS)
 		return -ENODEV;
 	info = &isdn_mdm.info[line];
 	if (isdn_tty_paranoia_check(info, tty->device, "isdn_tty_open"))
 		return -ENODEV;
 #ifdef ISDN_DEBUG_MODEM_OPEN
-	printk(KERN_DEBUG "isdn_tty_open %s%d, count = %d\n", tty->driver.name,
+	printk(KERN_DEBUG "isdn_tty_open %s%d, count = %d\n", tty->driver->name,
 	       info->line, info->count);
 #endif
 	info->count++;
@@ -1797,7 +1797,7 @@ isdn_tty_open(struct tty_struct *tty, struct file *filp)
 		return retval;
 	}
 	if ((info->count == 1) && (info->flags & ISDN_ASYNC_SPLIT_TERMIOS)) {
-		if (tty->driver.subtype == ISDN_SERIAL_TYPE_NORMAL)
+		if (tty->driver->subtype == ISDN_SERIAL_TYPE_NORMAL)
 			*tty->termios = info->normal_termios;
 		else
 			*tty->termios = info->callout_termios;
@@ -1892,8 +1892,8 @@ isdn_tty_close(struct tty_struct *tty, struct file *filp)
 	}
 	dev->modempoll--;
 	isdn_tty_shutdown(info);
-	if (tty->driver.flush_buffer)
-		tty->driver.flush_buffer(tty);
+	if (tty->driver->flush_buffer)
+		tty->driver->flush_buffer(tty);
 	if (tty->ldisc.flush_buffer)
 		tty->ldisc.flush_buffer(tty);
 	info->tty = 0;

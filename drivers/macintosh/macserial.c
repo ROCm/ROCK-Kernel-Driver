@@ -2003,8 +2003,8 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 	   specific irqs */
 	spin_unlock_irqrestore(&info->lock, flags);
 
-	if (tty->driver.flush_buffer)
-		tty->driver.flush_buffer(tty);
+	if (tty->driver->flush_buffer)
+		tty->driver->flush_buffer(tty);
 	if (tty->ldisc.flush_buffer)
 		tty->ldisc.flush_buffer(tty);
 	tty->closing = 0;
@@ -2120,7 +2120,7 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 	 * If this is a callout device, then just make sure the normal
 	 * device isn't being used.
 	 */
-	if (tty->driver.subtype == SERIAL_TYPE_CALLOUT) {
+	if (tty->driver->subtype == SERIAL_TYPE_CALLOUT) {
 		if (info->flags & ZILOG_NORMAL_ACTIVE)
 			return -EBUSY;
 		if ((info->flags & ZILOG_CALLOUT_ACTIVE) &&
@@ -2229,7 +2229,7 @@ static int rs_open(struct tty_struct *tty, struct file * filp)
 	unsigned long		page;
 
 	MOD_INC_USE_COUNT;
-	line = minor(tty->device) - tty->driver.minor_start;
+	line = minor(tty->device) - tty->driver->minor_start;
 	if ((line < 0) || (line >= zs_channels_found)) {
 		MOD_DEC_USE_COUNT;
 		return -ENODEV;
@@ -2244,7 +2244,7 @@ static int rs_open(struct tty_struct *tty, struct file * filp)
 #endif
 	if (serial_paranoia_check(info, tty->device, "rs_open"))
 		return -ENODEV;
-	OPNDBG("rs_open %s%d, count = %d, tty=%p\n", tty->driver.name,
+	OPNDBG("rs_open %s%d, count = %d, tty=%p\n", tty->driver->name,
 	       info->line, info->count, tty);
 
 	info->count++;
@@ -2292,7 +2292,7 @@ static int rs_open(struct tty_struct *tty, struct file * filp)
 	}
 
 	if ((info->count == 1) && (info->flags & ZILOG_SPLIT_TERMIOS)) {
-		if (tty->driver.subtype == SERIAL_TYPE_NORMAL)
+		if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
 			*tty->termios = info->normal_termios;
 		else 
 			*tty->termios = info->callout_termios;

@@ -480,7 +480,7 @@ static int  a2232_open(struct tty_struct * tty, struct file * filp)
 	}
 
 	if ((port->gs.count == 1) && (port->gs.flags & ASYNC_SPLIT_TERMIOS)){
-		if (tty->driver.subtype == A2232_TTY_SUBTYPE_NORMAL)
+		if (tty->driver->subtype == A2232_TTY_SUBTYPE_NORMAL)
 			*tty->termios = port->gs.normal_termios;
 		else 
 			*tty->termios = port->gs.callout_termios;
