@@ -32,6 +32,7 @@ int is_aligned_hugepage_range(unsigned long addr, unsigned long len);
 int pmd_huge(pmd_t pmd);
 
 extern int htlbpage_max;
+extern int sysctl_hugetlb_shm_group;
 
 static inline void
 mark_mm_hugetlb(struct mm_struct *mm, struct vm_area_struct *vma)

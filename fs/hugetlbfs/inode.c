@@ -43,6 +43,8 @@ static struct backing_dev_info hugetlbfs_backing_dev_info = {
 	.memory_backed	= 1,	/* Does not contribute to dirty memory */
 };
 
+int sysctl_hugetlb_shm_group;
+
 static int hugetlbfs_file_mmap(struct file *file, struct vm_area_struct *vma)
 {
 	struct inode *inode = file->f_dentry->d_inode;
@@ -735,6 +737,12 @@ static unsigned long hugetlbfs_counter(void)
 	return ret;
 }
 
+static int can_do_hugetlb_shm(void)
+{
+	return likely(capable(CAP_IPC_LOCK) ||
+			in_group_p(sysctl_hugetlb_shm_group));
+}
+
 struct file *hugetlb_zero_setup(size_t size)
 {
 	int error;
@@ -744,7 +752,7 @@ struct file *hugetlb_zero_setup(size_t size)
 	struct qstr quick_string;
 	char buf[16];
 
-	if (!can_do_mlock())
+	if (!can_do_hugetlb_shm())
 		return ERR_PTR(-EPERM);
 
 	if (!is_hugepage_mem_enough(size))
