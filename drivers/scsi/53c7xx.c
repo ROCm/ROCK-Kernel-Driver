@@ -1463,9 +1463,9 @@ NCR53c7x0_init_fixup (struct Scsi_Host *host) {
     patch_abs_32 (hostdata->script, 0, test_src, 
 	virt_to_bus(&hostdata->test_source));
     patch_abs_32 (hostdata->script, 0, saved_dsa,
-	virt_to_bus(&hostdata->saved2_dsa));
+	virt_to_bus((void *)&hostdata->saved2_dsa));
     patch_abs_32 (hostdata->script, 0, emulfly,
-	virt_to_bus(&hostdata->emulated_intfly));
+	virt_to_bus((void *)&hostdata->emulated_intfly));
 
     patch_abs_rwri_data (hostdata->script, 0, dsa_check_reselect, 
 	(unsigned char)(Ent_dsa_code_check_reselect - Ent_dsa_zero));

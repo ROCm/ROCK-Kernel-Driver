@@ -142,8 +142,8 @@ int __init blz2060_esp_detect(Scsi_Host_Template *tpnt)
 		esp->eregs = (struct ESP_regs *)(address + BLZ2060_ESP_ADDR);
 		
 		/* Set the command buffer */
-		esp->esp_command = (volatile unsigned char*) cmd_buffer;
-		esp->esp_command_dvma = virt_to_bus(cmd_buffer);
+		esp->esp_command = cmd_buffer;
+		esp->esp_command_dvma = virt_to_bus((void *)cmd_buffer);
 
 		esp->irq = IRQ_AMIGA_PORTS;
 		request_irq(IRQ_AMIGA_PORTS, esp_intr, SA_SHIRQ,
