@@ -27,7 +27,6 @@
 #include "scsi.h"
 #include "hosts.h"
 #include "NCR53C9x.h"
-#include "mac_esp.h"
 
 #include <asm/io.h>
 
@@ -40,6 +39,8 @@
 #include <asm/pgtable.h>
 
 #include <asm/macintosh.h>
+
+/* #define DEBUG_MAC_ESP */
 
 #define mac_turnon_irq(x)	mac_enable_irq(x)
 #define mac_turnoff_irq(x)	mac_disable_irq(x)
@@ -710,7 +711,22 @@ static void dma_setup_quick(struct NCR_ESP * esp, __u32 addr, int count, int wri
 #endif
 }
 
-static Scsi_Host_Template driver_template = SCSI_MAC_ESP;
+static Scsi_Host_Template driver_template = {
+	.proc_name		= "esp",
+	.name			= "Mac 53C9x SCSI",
+	.detect			= mac_esp_detect,
+	.info			= esp_info,
+	/* .command		= esp_command, */
+	.queuecommand		= esp_queue,
+	.eh_abort_handler	= esp_abort,
+	.eh_bus_reset_handler	= esp_reset,
+	.can_queue		= 7,
+	.this_id		= 7,
+	.sg_tablesize		= SG_ALL,
+	.cmd_per_lun		= 1,
+	.use_clustering		= DISABLE_CLUSTERING
+};
+
 
 #include "scsi_module.c"
 

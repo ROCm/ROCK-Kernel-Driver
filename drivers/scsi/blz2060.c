@@ -29,7 +29,6 @@
 #include "scsi.h"
 #include "hosts.h"
 #include "NCR53C9x.h"
-#include "blz2060.h"
 
 #include <linux/zorro.h>
 #include <asm/irq.h>
@@ -37,6 +36,38 @@
 #include <asm/amigahw.h>
 
 #include <asm/pgtable.h>
+
+/* The controller registers can be found in the Z2 config area at these
+ * offsets:
+ */
+#define BLZ2060_ESP_ADDR 0x1ff00
+#define BLZ2060_DMA_ADDR 0x1ffe0
+
+
+/* The Blizzard 2060 DMA interface
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * Only two things can be programmed in the Blizzard DMA:
+ *  1) The data direction is controlled by the status of bit 31 (1 = write)
+ *  2) The source/dest address (word aligned, shifted one right) in bits 30-0
+ *
+ * Figure out interrupt status by reading the ESP status byte.
+ */
+struct blz2060_dma_registers {
+	volatile unsigned char dma_led_ctrl;	/* DMA led control   [0x000] */
+	unsigned char dmapad1[0x0f];
+	volatile unsigned char dma_addr0; 	/* DMA address (MSB) [0x010] */
+	unsigned char dmapad2[0x03];
+	volatile unsigned char dma_addr1; 	/* DMA address       [0x014] */
+	unsigned char dmapad3[0x03];
+	volatile unsigned char dma_addr2; 	/* DMA address       [0x018] */
+	unsigned char dmapad4[0x03];
+	volatile unsigned char dma_addr3; 	/* DMA address (LSB) [0x01c] */
+};
+
+#define BLZ2060_DMA_WRITE 0x80000000
+
+/* DMA control bits */
+#define BLZ2060_DMA_LED    0x02		/* HD led control 1 = off */
 
 static int  dma_bytes_sent(struct NCR_ESP *esp, int fifo_count);
 static int  dma_can_transfer(struct NCR_ESP *esp, Scsi_Cmnd *sp);
@@ -236,12 +267,6 @@ static void dma_setup(struct NCR_ESP *esp, __u32 addr, int count, int write)
 
 #define HOSTS_C
 
-#include "blz2060.h"
-
-static Scsi_Host_Template driver_template = SCSI_BLZ2060;
-
-#include "scsi_module.c"
-
 int blz2060_esp_release(struct Scsi_Host *instance)
 {
 #ifdef MODULE
@@ -254,5 +279,25 @@ int blz2060_esp_release(struct Scsi_Host *instance)
 #endif
 	return 1;
 }
+
+
+static Scsi_Host_Template driver_template = {
+	.proc_name		= "esp-blz2060",
+	.proc_info		= esp_proc_info,
+	.name			= "Blizzard2060 SCSI",
+	.detect			= blz2060_esp_detect,
+	.release		= blz2060_esp_release,
+	.queuecommand		= esp_queue,
+	.eh_abort_handler	= esp_abort,
+	.eh_bus_reset_handler	= esp_reset,
+	.can_queue		= 7,
+	.this_id		= 7,
+	.sg_tablesize		= SG_ALL,
+	.cmd_per_lun		= 1,
+	.use_clustering		= ENABLE_CLUSTERING
+};
+
+
+#include "scsi_module.c"
 
 MODULE_LICENSE("GPL");

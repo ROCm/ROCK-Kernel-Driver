@@ -715,6 +715,9 @@ void esp_initialize(struct NCR_ESP *esp)
 	esp->targets_present = 0;
 	esp->resetting_bus = 0;
 	esp->snip = 0;
+
+	init_waitqueue_head(&esp->reset_queue);
+
 	esp->fas_premature_intr_workaround = 0;
 	for(i = 0; i < 32; i++)
 		esp->espcmdlog[i] = 0;
@@ -1037,25 +1040,6 @@ static void esp_exec_cmd(struct NCR_ESP *esp)
 	lun = SCptr->lun;
 	target = SCptr->target;
 
-	/*
-	 * If esp_dev == NULL then we need to allocate a struct for our data
-	 */
-	if (!esp_dev) {
-		esp_dev = kmalloc(sizeof(struct esp_device), GFP_ATOMIC);
-		if (!esp_dev) {
-			/* We're SOL.  Print a message and bail */
-			printk(KERN_WARNING "esp: no mem for esp_device %d/%d\n",
-					target, lun);
-			esp->current_SC = NULL;
-			SCptr->result = DID_ERROR << 16;
-			SCptr->done(SCptr);
-			return;
-		}
-		memset(esp_dev, 0, sizeof(struct esp_device));
-		SDptr->hostdata = esp_dev;
-	}
-
-
 	esp->snip = 0;
 	esp->msgout_len = 0;
 
@@ -1371,7 +1355,7 @@ static void esp_dump_state(struct NCR_ESP *esp,
 	ESPLOG(("\n"));
 }
 
-/* Abort a command. */
+/* Abort a command.  The host_lock is acquired by caller. */
 int esp_abort(Scsi_Cmnd *SCptr)
 {
 	struct NCR_ESP *esp = (struct NCR_ESP *) SCptr->host->hostdata;
@@ -1392,7 +1376,7 @@ int esp_abort(Scsi_Cmnd *SCptr)
 		esp->msgout_len = 1;
 		esp->msgout_ctr = 0;
 		esp_cmd(esp, eregs, ESP_CMD_SATN);
-		return SCSI_ABORT_PENDING;
+		return SUCCESS;
 	}
 
 	/* If it is still in the issue queue then we can safely
@@ -1417,7 +1401,7 @@ int esp_abort(Scsi_Cmnd *SCptr)
 				this->done(this);
 				if(don)
 					esp->dma_ints_on(esp);
-				return SCSI_ABORT_SUCCESS;
+				return SUCCESS;
 			}
 		}
 	}
@@ -1430,19 +1414,19 @@ int esp_abort(Scsi_Cmnd *SCptr)
 	if(esp->current_SC) {
 		if(don)
 			esp->dma_ints_on(esp);
-		return SCSI_ABORT_BUSY;
+		return FAILED;
 	}
 
 	/* It's disconnected, we have to reconnect to re-establish
 	 * the nexus and tell the device to abort.  However, we really
-	 * cannot 'reconnect' per se, therefore we tell the upper layer
-	 * the safest thing we can.  This is, wait a bit, if nothing
-	 * happens, we are really hung so reset the bus.
+	 * cannot 'reconnect' per se.  Don't try to be fancy, just
+	 * indicate failure, which causes our caller to reset the whole
+	 * bus.
 	 */
 
 	if(don)
 		esp->dma_ints_on(esp);
-	return SCSI_ABORT_SNOOZE;
+	return FAILED;
 }
 
 /* We've sent ESP_CMD_RS to the ESP, the interrupt had just
@@ -1476,6 +1460,7 @@ static int esp_finish_reset(struct NCR_ESP *esp,
 
 	/* SCSI bus reset is complete. */
 	esp->resetting_bus = 0;
+	wake_up(&esp->reset_queue);
 
 	/* Ok, now it is safe to get commands going once more. */
 	if(esp->issue_SC)
@@ -1496,13 +1481,22 @@ static int esp_do_resetbus(struct NCR_ESP *esp,
 
 /* Reset ESP chip, reset hanging bus, then kill active and
  * disconnected commands for targets without soft reset.
+ *
+ * The host_lock is acquired by caller.
  */
-int esp_reset(Scsi_Cmnd *SCptr, unsigned int how)
+int esp_reset(Scsi_Cmnd *SCptr)
 {
 	struct NCR_ESP *esp = (struct NCR_ESP *) SCptr->host->hostdata;
 
 	(void) esp_do_resetbus(esp, esp->eregs);
-	return SCSI_RESET_PENDING;
+
+	spin_unlock_irq(esp->ehost->host_lock);
+
+	wait_event(esp->reset_queue, (esp->resetting_bus == 0));
+
+	spin_lock_irq(esp->ehost->host_lock);
+
+	return SUCCESS;
 }
 
 /* Internal ESP done function. */
