@@ -11,20 +11,7 @@
 
 #define DEVFS_SUPER_MAGIC                0x1373
 
-#define DEVFS_FL_NONE           0x000 /* This helps to make code more readable
-				         no, it doesn't  --hch */
-#define DEVFS_FL_DEFAULT        DEVFS_FL_NONE
-
-
-typedef struct devfs_entry * devfs_handle_t;
-
-struct gendisk;
-
 #ifdef CONFIG_DEVFS_FS
-extern devfs_handle_t devfs_register (devfs_handle_t dir, const char *name,
-				      unsigned int flags,
-				      unsigned int major, unsigned int minor,
-				      umode_t mode, void *ops, void *info);
 extern int devfs_mk_bdev(dev_t dev, umode_t mode, const char *fmt, ...)
 	__attribute__((format (printf, 3, 4)));
 extern int devfs_mk_cdev(dev_t dev, umode_t mode, const char *fmt, ...)
@@ -36,19 +23,8 @@ extern void devfs_remove(const char *fmt, ...)
 	__attribute__((format (printf, 1, 2)));
 extern int devfs_register_tape(const char *name);
 extern void devfs_unregister_tape(int num);
-extern void devfs_register_partition(struct gendisk *dev, int part);
 extern void mount_devfs_fs(void);
 #else  /*  CONFIG_DEVFS_FS  */
-static inline devfs_handle_t devfs_register (devfs_handle_t dir,
-					     const char *name,
-					     unsigned int flags,
-					     unsigned int major,
-					     unsigned int minor,
-					     umode_t mode,
-					     void *ops, void *info)
-{
-    return NULL;
-}
 static inline int devfs_mk_bdev(dev_t dev, umode_t mode, const char *fmt, ...)
 {
 	return 0;
@@ -73,9 +49,6 @@ static inline int devfs_register_tape (const char *name)
     return -1;
 }
 static inline void devfs_unregister_tape(int num)
-{
-}
-static inline void devfs_register_partition(struct gendisk *dev, int part)
 {
 }
 static inline void mount_devfs_fs (void)
