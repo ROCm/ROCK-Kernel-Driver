@@ -145,17 +145,23 @@ int cifs_setxattr(struct dentry * direntry, const char * ea_name,
 		temp = strncmp(ea_name,POSIX_ACL_XATTR_ACCESS,
 			strlen(POSIX_ACL_XATTR_ACCESS));
 		if (temp == 0) {
-			cFYI(1,("set POSIX ACL not supported yet"));
+#ifdef CONFIG_CIFS_POSIX
 			rc = CIFSSMBSetPosixACL(xid, pTcon,full_path,ea_value,
 				(const int)value_size, ACL_TYPE_ACCESS,
 				cifs_sb->local_nls);
-			cFYI(1,("set POSIX ACL rc %d",rc)); /* BB removeme BB */
+			cFYI(1,("set POSIX ACL rc %d",rc));
+#else
+			cFYI(1,("set POSIX ACL not supported"));
+#endif
 		} else if(strncmp(ea_name,POSIX_ACL_XATTR_DEFAULT,strlen(POSIX_ACL_XATTR_DEFAULT)) == 0) {
-			cFYI(1,("set default POSIX ACL not supported yet"));
+#ifdef CONFIG_CIFS_POSIX
 			rc = CIFSSMBSetPosixACL(xid, pTcon,full_path,ea_value,
 				(const int)value_size, ACL_TYPE_DEFAULT,
 				cifs_sb->local_nls);
-			cFYI(1,("set POSIX default ACL rc %d",rc)); /* BB removeme BB */
+			cFYI(1,("set POSIX default ACL rc %d",rc));
+#else
+			cFYI(1,("set default POSIX ACL not supported"));
+#endif
 		} else {
 			cFYI(1,("illegal xattr request %s (only user namespace supported)",ea_name));
 		  /* BB what if no namespace prefix? */
@@ -189,9 +195,8 @@ ssize_t cifs_getxattr(struct dentry * direntry, const char * ea_name,
 	sb = direntry->d_inode->i_sb;
 	if(sb == NULL)
 		return -EIO;
-	xid = GetXid();
 
-	cFYI(1,("getxattr %s with size %d",ea_name,buf_size));
+	xid = GetXid();
 
 	cifs_sb = CIFS_SB(sb);
 	pTcon = cifs_sb->tcon;

@@ -144,7 +144,7 @@
 #define SMBFLG2_KNOWS_EAS cpu_to_le16(2)
 #define SMBFLG2_SECURITY_SIGNATURE cpu_to_le16(4)
 #define SMBFLG2_IS_LONG_NAME cpu_to_le16(0x40)
-#define SMBFLG2_EXT_SEC cpu_to_le16(0x80)
+#define SMBFLG2_EXT_SEC cpu_to_le16(0x800)
 #define SMBFLG2_DFS cpu_to_le16(0x1000)
 #define SMBFLG2_PAGING_IO cpu_to_le16(0x2000)
 #define SMBFLG2_ERR_STATUS cpu_to_le16(0x4000)
