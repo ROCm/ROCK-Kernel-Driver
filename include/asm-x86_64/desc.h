@@ -95,12 +95,12 @@ static inline void _set_gate(void *adr, unsigned type, unsigned long func, unsig
 
 static inline void set_intr_gate(int nr, void *func) 
 { 
-	_set_gate(&idt_table[nr], GATE_INTERRUPT, (unsigned long) func, 3, 0); 
+	_set_gate(&idt_table[nr], GATE_INTERRUPT, (unsigned long) func, 0, 0); 
 } 
 
 static inline void set_intr_gate_ist(int nr, void *func, unsigned ist) 
 { 
-	_set_gate(&idt_table[nr], GATE_INTERRUPT, (unsigned long) func, 3, ist); 
+	_set_gate(&idt_table[nr], GATE_INTERRUPT, (unsigned long) func, 0, ist); 
 } 
 
 static inline void set_system_gate(int nr, void *func) 
