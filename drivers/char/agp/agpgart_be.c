@@ -22,6 +22,8 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE 
  * OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  *
+ * TODO: 
+ * - Allocate more than order 0 pages to avoid too much linear map splitting.
  */
 #include <linux/config.h>
 #include <linux/version.h>
@@ -43,6 +45,7 @@
 #include <asm/uaccess.h>
 #include <asm/io.h>
 #include <asm/page.h>
+#include <asm/agp.h>
 
 #include <linux/agp_backend.h>
 #include "agp.h"
@@ -59,56 +62,28 @@ EXPORT_SYMBOL(agp_enable);
 EXPORT_SYMBOL(agp_backend_acquire);
 EXPORT_SYMBOL(agp_backend_release);
 
-static void flush_cache(void);
-
 static struct agp_bridge_data agp_bridge;
 static int agp_try_unsupported __initdata = 0;
 
-
-static inline void flush_cache(void)
-{
-#if defined(__i386__) || defined(__x86_64__)
-	asm volatile ("wbinvd":::"memory");
-#elif defined(__alpha__) || defined(__ia64__) || defined(__sparc__)
-	/* ??? I wonder if we'll really need to flush caches, or if the
-	   core logic can manage to keep the system coherent.  The ARM
-	   speaks only of using `cflush' to get things in memory in
-	   preparation for power failure.
-
-	   If we do need to call `cflush', we'll need a target page,
-	   as we can only flush one page at a time.
-
-	   Ditto for IA-64. --davidm 00/08/07 */
-	mb();
-#else
-#error "Please define flush_cache."
-#endif
-}
-
 #ifdef CONFIG_SMP
-static atomic_t cpus_waiting;
-
 static void ipi_handler(void *null)
 {
-	flush_cache();
-	atomic_dec(&cpus_waiting);
-	while (atomic_read(&cpus_waiting) > 0)
-		barrier();
+	flush_agp_cache();
 }
 
 static void smp_flush_cache(void)
 {
-	atomic_set(&cpus_waiting, smp_num_cpus - 1);
-	if (smp_call_function(ipi_handler, NULL, 1, 0) != 0)
+	if (smp_call_function(ipi_handler, NULL, 1, 1) != 0)
 		panic(PFX "timed out waiting for the other CPUs!\n");
-	flush_cache();
-	while (atomic_read(&cpus_waiting) > 0)
-		barrier();
+	flush_agp_cache();
 }
 #define global_cache_flush smp_flush_cache
 #else				/* CONFIG_SMP */
-#define global_cache_flush flush_cache
-#endif				/* CONFIG_SMP */
+static void global_cache_flush(void)
+{
+	flush_agp_cache();
+}
+#endif				/* !CONFIG_SMP */
 
 int agp_backend_acquire(void)
 {
@@ -208,8 +183,7 @@ void agp_free_memory(agp_memory * curr)
 	if (curr->page_count != 0) {
 		for (i = 0; i < curr->page_count; i++) {
 			curr->memory[i] &= ~(0x00000fff);
-			agp_bridge.agp_destroy_page((unsigned long)
-					 phys_to_virt(curr->memory[i]));
+			agp_bridge.agp_destroy_page(phys_to_virt(curr->memory[i]));
 		}
 	}
 	agp_free_key(curr->key);
@@ -252,20 +226,21 @@ agp_memory *agp_allocate_memory(size_t page_count, u32 type)
 	      	MOD_DEC_USE_COUNT;
 		return NULL;
 	}
-	for (i = 0; i < page_count; i++) {
-		new->memory[i] = agp_bridge.agp_alloc_page();
 
-		if (new->memory[i] == 0) {
+	for (i = 0; i < page_count; i++) {
+		void *addr = agp_bridge.agp_alloc_page();
+
+		if (addr == NULL) {
 			/* Free this structure */
 			agp_free_memory(new);
 			return NULL;
 		}
 		new->memory[i] =
-		    agp_bridge.mask_memory(
-				   virt_to_phys((void *) new->memory[i]),
-						  type);
+		    agp_bridge.mask_memory(virt_to_phys(addr), type);
 		new->page_count++;
 	}
+
+	flush_agp_mappings();
 
 	return new;
 }
@@ -561,6 +536,7 @@ static int agp_generic_create_gatt_table(void)
 					    agp_bridge.current_size;
 					break;
 				}
+				temp = agp_bridge.current_size;	
 			} else {
 				agp_bridge.aperture_size_idx = i;
 			}
@@ -761,7 +737,7 @@ static void agp_generic_free_by_type(agp_memory * curr)
  * against a maximum value.
  */
 
-static unsigned long agp_generic_alloc_page(void)
+static void *agp_generic_alloc_page(void)
 {
 	struct page * page;
 	
@@ -769,24 +745,26 @@ static unsigned long agp_generic_alloc_page(void)
 	if (page == NULL)
 		return 0;
 
+	map_page_into_agp(page);
+
 	get_page(page);
 	SetPageLocked(page);
 	atomic_inc(&agp_bridge.current_memory_agp);
-	return (unsigned long)page_address(page);
+	return page_address(page);
 }
 
-static void agp_generic_destroy_page(unsigned long addr)
+static void agp_generic_destroy_page(void *addr)
 {
-	void *pt = (void *) addr;
 	struct page *page;
 
-	if (pt == NULL)
+	if (addr == NULL)
 		return;
 
-	page = virt_to_page(pt);
+	page = virt_to_page(addr);
+	unmap_page_from_agp(page);
 	put_page(page);
 	unlock_page(page);
-	free_page((unsigned long) pt);
+	free_page((unsigned long)addr);
 	atomic_dec(&agp_bridge.current_memory_agp);
 }
 
@@ -993,6 +971,7 @@ static agp_memory *intel_i810_alloc_by_type(size_t pg_count, int type)
 		return new;
 	}
 	if(type == AGP_PHYS_MEMORY) {
+		void *addr;
 		/* The I810 requires a physical address to program
 		 * it's mouse pointer into hardware.  However the
 		 * Xserver still writes to it through the agp
@@ -1007,17 +986,14 @@ static agp_memory *intel_i810_alloc_by_type(size_t pg_count, int type)
 			return NULL;
 		}
 	   	MOD_INC_USE_COUNT;
-		new->memory[0] = agp_bridge.agp_alloc_page();
+		addr = agp_bridge.agp_alloc_page();
 
-		if (new->memory[0] == 0) {
+		if (addr == NULL) {
 			/* Free this structure */
 			agp_free_memory(new);
 			return NULL;
 		}
-		new->memory[0] =
-		    agp_bridge.mask_memory(
-				   virt_to_phys((void *) new->memory[0]),
-						  type);
+		new->memory[0] = agp_bridge.mask_memory(virt_to_phys(addr), type);
 		new->page_count = 1;
 	   	new->num_scratch_pages = 1;
 	   	new->type = AGP_PHYS_MEMORY;
@@ -1032,7 +1008,7 @@ static void intel_i810_free_by_type(agp_memory * curr)
 {
 	agp_free_key(curr->key);
    	if(curr->type == AGP_PHYS_MEMORY) {
-	   	agp_bridge.agp_destroy_page((unsigned long)
+	   	agp_bridge.agp_destroy_page(
 				 phys_to_virt(curr->memory[0]));
 		vfree(curr->memory);
 	}
@@ -1291,7 +1267,7 @@ static agp_memory *intel_i830_alloc_by_type(size_t pg_count,int type)
 	if (type == AGP_DCACHE_MEMORY) return(NULL);
 
 	if (type == AGP_PHYS_MEMORY) {
-		unsigned long physical;
+		void *addr;
 
 		/* The i830 requires a physical address to program
 		 * it's mouse pointer into hardware. However the
@@ -1306,19 +1282,18 @@ static agp_memory *intel_i830_alloc_by_type(size_t pg_count,int type)
 		if (nw == NULL) return(NULL);
 
 		MOD_INC_USE_COUNT;
-		nw->memory[0] = agp_bridge.agp_alloc_page();
-		physical = nw->memory[0];
-		if (nw->memory[0] == 0) {
+		addr = agp_bridge.agp_alloc_page();
+		if (addr == NULL) {
 			/* free this structure */
 			agp_free_memory(nw);
 			return(NULL);
 		}
 
-		nw->memory[0] = agp_bridge.mask_memory(virt_to_phys((void *) nw->memory[0]),type);
+		nw->memory[0] = agp_bridge.mask_memory(virt_to_phys(addr),type);
 		nw->page_count = 1;
 		nw->num_scratch_pages = 1;
 		nw->type = AGP_PHYS_MEMORY;
-		nw->physical = virt_to_phys((void *) physical);
+		nw->physical = virt_to_phys(addr);
 		return(nw);
 	}
 
@@ -1849,16 +1824,17 @@ static int intel_i460_remove_memory(agp_memory * mem, off_t pg_start, int type)
  * Let's just hope nobody counts on the allocated AGP memory being there
  * before bind time (I don't think current drivers do)...
  */
-static unsigned long intel_i460_alloc_page(void)
+static void * intel_i460_alloc_page(void)
 {
 	if (intel_i460_cpk)
 		return agp_generic_alloc_page();
 
 	/* Returning NULL would cause problems */
-	return ~0UL;
+	/* AK: really dubious code. */
+	return (void *)~0UL;
 }
 
-static void intel_i460_destroy_page(unsigned long page)
+static void intel_i460_destroy_page(void *page)
 {
 	if (intel_i460_cpk)
 		agp_generic_destroy_page(page);
@@ -3298,38 +3274,29 @@ static void ali_cache_flush(void)
 	}
 }
 
-static unsigned long ali_alloc_page(void)
+static void *ali_alloc_page(void)
 {
-	struct page *page;
-	u32 temp;
+        void *adr = agp_generic_alloc_page();
+	unsigned temp;
 
-	page = alloc_page(GFP_KERNEL);
-	if (page == NULL)
+	if (adr == 0)
 		return 0;
-
-	get_page(page);
-	SetPageLocked(page);
-	atomic_inc(&agp_bridge.current_memory_agp);
-
-	global_cache_flush();
 
 	if (agp_bridge.type == ALI_M1541) {
 		pci_read_config_dword(agp_bridge.dev, ALI_CACHE_FLUSH_CTRL, &temp);
 		pci_write_config_dword(agp_bridge.dev, ALI_CACHE_FLUSH_CTRL,
 				(((temp & ALI_CACHE_FLUSH_ADDR_MASK) |
-				  virt_to_phys(page_address(page))) |
+				  virt_to_phys(adr)) |
 				    ALI_CACHE_FLUSH_EN ));
 	}
-	return (unsigned long)page_address(page);
+	return adr;
 }
 
-static void ali_destroy_page(unsigned long addr)
+static void ali_destroy_page(void * addr)
 {
 	u32 temp;
-	void *pt = (void *) addr;
-	struct page *page;
 
-	if (pt == NULL)
+	if (addr == NULL)
 		return;
 
 	global_cache_flush();
@@ -3338,15 +3305,11 @@ static void ali_destroy_page(unsigned long addr)
 		pci_read_config_dword(agp_bridge.dev, ALI_CACHE_FLUSH_CTRL, &temp);
 		pci_write_config_dword(agp_bridge.dev, ALI_CACHE_FLUSH_CTRL,
 				(((temp & ALI_CACHE_FLUSH_ADDR_MASK) |
-				  virt_to_phys((void *)pt)) |
+				  virt_to_phys(addr)) |
 				    ALI_CACHE_FLUSH_EN));
 	}
 
-	page = virt_to_page(pt);
-	put_page(page);
-	unlock_page(page);
-	free_page((unsigned long) pt);
-	atomic_dec(&agp_bridge.current_memory_agp);
+	agp_generic_destroy_page(addr);
 }
 
 /* Setup function */
@@ -5011,15 +4974,15 @@ static int __init agp_backend_initialize(void)
 	}
 
 	if (agp_bridge.needs_scratch_page == TRUE) {
-		agp_bridge.scratch_page = agp_bridge.agp_alloc_page();
+		void *addr;
+		addr = agp_bridge.agp_alloc_page();
 
-		if (agp_bridge.scratch_page == 0) {
+		if (addr == NULL) {
 			printk(KERN_ERR PFX "unable to get memory for "
 			       "scratch page.\n");
 			return -ENOMEM;
 		}
-		agp_bridge.scratch_page =
-		    virt_to_phys((void *) agp_bridge.scratch_page);
+		agp_bridge.scratch_page = virt_to_phys(addr);
 		agp_bridge.scratch_page =
 		    agp_bridge.mask_memory(agp_bridge.scratch_page, 0);
 	}
@@ -5064,8 +5027,7 @@ static int __init agp_backend_initialize(void)
 err_out:
 	if (agp_bridge.needs_scratch_page == TRUE) {
 		agp_bridge.scratch_page &= ~(0x00000fff);
-		agp_bridge.agp_destroy_page((unsigned long)
-				 phys_to_virt(agp_bridge.scratch_page));
+		agp_bridge.agp_destroy_page(phys_to_virt(agp_bridge.scratch_page));
 	}
 	if (got_gatt)
 		agp_bridge.free_gatt_table();
@@ -5084,8 +5046,7 @@ static void agp_backend_cleanup(void)
 
 	if (agp_bridge.needs_scratch_page == TRUE) {
 		agp_bridge.scratch_page &= ~(0x00000fff);
-		agp_bridge.agp_destroy_page((unsigned long)
-				 phys_to_virt(agp_bridge.scratch_page));
+		agp_bridge.agp_destroy_page(phys_to_virt(agp_bridge.scratch_page));
 	}
 }
 

@@ -6,6 +6,9 @@
 #define PAGE_SIZE	(1UL << PAGE_SHIFT)
 #define PAGE_MASK	(~(PAGE_SIZE-1))
 
+#define LARGE_PAGE_MASK (~(LARGE_PAGE_SIZE-1))
+#define LARGE_PAGE_SIZE (1UL << PMD_SHIFT)
+
 #ifdef __KERNEL__
 #ifndef __ASSEMBLY__
 
