@@ -9,6 +9,7 @@
 #include <linux/config.h>
 #include <linux/string.h>
 #include <linux/kernel.h>
+#include <linux/errno.h>
 #include <linux/sysrq.h>
 #include <asm/machdep.h>
 #include <asm/io.h>
@@ -29,11 +30,14 @@ static inline unsigned int readtb(void)
 	return ret;
 }
 
+#ifdef CONFIG_MAGIC_SYSRQ
+
 static void sysrq_handle_xmon(int key, struct pt_regs *pt_regs,
 			      struct tty_struct *tty) 
 {
 	xmon(pt_regs);
 }
+
 static struct sysrq_key_op sysrq_xmon_op = 
 {
 	.handler =	sysrq_handle_xmon,
@@ -41,11 +45,15 @@ static struct sysrq_key_op sysrq_xmon_op =
 	.action_msg =	"Entering xmon\n",
 };
 
+#endif /* CONFIG_MAGIC_SYSRQ */
+
 void
 xmon_map_scc(void)
 {
+#ifdef CONFIG_MAGIC_SYSRQ
 	/* This maybe isn't the best place to register sysrq 'x' */
 	__sysrq_put_key_op('x', &sysrq_xmon_op);
+#endif /* CONFIG_MAGIC_SYSRQ */
 }
 
 int
