@@ -617,11 +617,30 @@ write_map:
 	firstblock = NULLFSBLOCK;
 
 	/*
+	 * If mounted with the "-o swalloc" option, roundup the allocation
+	 * request to a stripe width boundary if the file size is >=
+	 * stripe width and we are allocating past the allocation eof.
+	 */
+	if (mp->m_swidth && (mp->m_flags & XFS_MOUNT_SWALLOC)
+	    && (isize >= XFS_FSB_TO_B(mp, mp->m_swidth)) && aeof) {
+		int eof;
+		xfs_fileoff_t new_last_fsb;
+
+		new_last_fsb = roundup_64(last_fsb, mp->m_swidth);
+		error = xfs_bmap_eof(ip, new_last_fsb, XFS_DATA_FORK, &eof);
+		if (error) {
+			return error;
+		}
+		if (eof) {
+			last_fsb = new_last_fsb;
+		}
+	/*
 	 * Roundup the allocation request to a stripe unit (m_dalign) boundary
 	 * if the file size is >= stripe unit size, and we are allocating past
 	 * the allocation eof.
 	 */
-	if (mp->m_dalign && (isize >= XFS_FSB_TO_B(mp, mp->m_dalign)) && aeof) {
+	} else if (mp->m_dalign && (isize >= XFS_FSB_TO_B(mp, mp->m_dalign))
+		   && aeof) {
 		int eof;
 		xfs_fileoff_t new_last_fsb;
 		new_last_fsb = roundup_64(last_fsb, mp->m_dalign);

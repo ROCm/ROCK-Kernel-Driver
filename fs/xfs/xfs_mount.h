@@ -416,6 +416,8 @@ typedef struct xfs_mount {
 #define XFS_MOUNT_NOUUID	0x00010000	/* ignore uuid during mount */
 #define XFS_MOUNT_NOLOGFLUSH	0x00020000
 #define XFS_MOUNT_IDELETE	0x00040000	/* delete empty inode clusters*/
+#define XFS_MOUNT_SWALLOC	0x00080000	/* turn on stripe width
+						 * allocation */
 
 /*
  * Default minimum read and write sizes.
