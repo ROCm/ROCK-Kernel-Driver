@@ -14,8 +14,11 @@
 #ifndef __V850_CURRENT_H__
 #define __V850_CURRENT_H__
 
+#ifndef __ASSEMBLY__ /* <linux/thread_info.h> is not asm-safe.  */
+#include <linux/thread_info.h>
+#endif
+
 #include <asm/macrology.h>
-#include <asm/thread_info.h>
 
 
 /* Register used to hold the current task pointer while in the kernel.

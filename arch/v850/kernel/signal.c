@@ -439,19 +439,23 @@ handle_signal(unsigned long sig, siginfo_t *info, sigset_t *oldset,
 	if (PT_REGS_SYSCALL (regs)) {
 		/* If so, check system call restarting.. */
 		switch (regs->gpr[GPR_RVAL]) {
-			case -ERESTARTNOHAND:
+		case -ERESTART_RESTARTBLOCK:
+			current_thread_info()->restart_block.fn =
+				do_no_restart_syscall;
+			/* fall through */
+		case -ERESTARTNOHAND:
+			regs->gpr[GPR_RVAL] = -EINTR;
+			break;
+
+		case -ERESTARTSYS:
+			if (!(ka->sa.sa_flags & SA_RESTART)) {
 				regs->gpr[GPR_RVAL] = -EINTR;
 				break;
-
-			case -ERESTARTSYS:
-				if (!(ka->sa.sa_flags & SA_RESTART)) {
-					regs->gpr[GPR_RVAL] = -EINTR;
-					break;
-				}
+			}
 			/* fallthrough */
-			case -ERESTARTNOINTR:
-				regs->gpr[12] = PT_REGS_SYSCALL (regs);
-				regs->pc -= 4; /* Size of `trap 0' insn.  */
+		case -ERESTARTNOINTR:
+			regs->gpr[12] = PT_REGS_SYSCALL (regs);
+			regs->pc -= 4; /* Size of `trap 0' insn.  */
 		}
 
 		PT_REGS_SET_SYSCALL (regs, 0);
@@ -510,12 +514,17 @@ int do_signal(struct pt_regs *regs, sigset_t *oldset)
 
 	/* Did we come from a system call? */
 	if (PT_REGS_SYSCALL (regs)) {
+		int rval = (int)regs->gpr[GPR_RVAL];
 		/* Restart the system call - no handlers present */
-		if (regs->gpr[GPR_RVAL] == (v850_reg_t)-ERESTARTNOHAND ||
-		    regs->gpr[GPR_RVAL] == (v850_reg_t)-ERESTARTSYS ||
-		    regs->gpr[GPR_RVAL] == (v850_reg_t)-ERESTARTNOINTR)
+		if (rval == -ERESTARTNOHAND
+		    || rval == -ERESTARTSYS
+		    || rval == -ERESTARTNOINTR)
 		{
 			regs->gpr[12] = PT_REGS_SYSCALL (regs);
+			regs->pc -= 4; /* Size of `trap 0' insn.  */
+		}
+		else if (rval == -ERESTART_RESTARTBLOCK) {
+			regs->gpr[12] = __NR_restart_syscall;
 			regs->pc -= 4; /* Size of `trap 0' insn.  */
 		}
 	}
