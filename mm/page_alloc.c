@@ -16,6 +16,7 @@
 #include <linux/interrupt.h>
 #include <linux/pagemap.h>
 #include <linux/bootmem.h>
+#include <linux/slab.h>
 
 int nr_swap_pages;
 int nr_active_pages;
@@ -303,7 +304,7 @@ struct page * __alloc_pages(zonelist_t *zonelist, unsigned long order)
 	 * an inactive page shortage, wake up kswapd.
 	 */
 	if (inactive_shortage() > inactive_target / 2 && free_shortage())
-		wakeup_kswapd(0);
+		wakeup_kswapd();
 	/*
 	 * If we are about to get low on free pages and cleaning
 	 * the inactive_dirty pages would fix the situation,
@@ -379,7 +380,7 @@ try_again:
 	 * - if we don't have __GFP_IO set, kswapd may be
 	 *   able to free some memory we can't free ourselves
 	 */
-	wakeup_kswapd(0);
+	wakeup_kswapd();
 	if (gfp_mask & __GFP_WAIT) {
 		__set_current_state(TASK_RUNNING);
 		current->policy |= SCHED_YIELD;
@@ -404,7 +405,7 @@ try_again:
 	 * - we're doing a higher-order allocation
 	 * 	--> move pages to the free list until we succeed
 	 * - we're /really/ tight on memory
-	 * 	--> wait on the kswapd waitqueue until memory is freed
+	 * 	--> try to free pages ourselves with page_launder
 	 */
 	if (!(current->flags & PF_MEMALLOC)) {
 		/*
@@ -443,36 +444,23 @@ try_again:
 		/*
 		 * When we arrive here, we are really tight on memory.
 		 *
-		 * We wake up kswapd and sleep until kswapd wakes us
-		 * up again. After that we loop back to the start.
-		 *
-		 * We have to do this because something else might eat
-		 * the memory kswapd frees for us and we need to be
-		 * reliable. Note that we don't loop back for higher
-		 * order allocations since it is possible that kswapd
-		 * simply cannot free a large enough contiguous area
-		 * of memory *ever*.
+		 * We try to free pages ourselves by:
+		 * 	- shrinking the i/d caches.
+		 * 	- reclaiming unused memory from the slab caches.
+		 * 	- swapping/syncing pages to disk (done by page_launder)
+		 * 	- moving clean pages from the inactive dirty list to
+		 * 	  the inactive clean list. (done by page_launder)
 		 */
-		if ((gfp_mask & (__GFP_WAIT|__GFP_IO)) == (__GFP_WAIT|__GFP_IO)) {
-			wakeup_kswapd(1);
-			memory_pressure++;
-			if (!order)
-				goto try_again;
-		/*
-		 * If __GFP_IO isn't set, we can't wait on kswapd because
-		 * kswapd just might need some IO locks /we/ are holding ...
-		 *
-		 * SUBTLE: The scheduling point above makes sure that
-		 * kswapd does get the chance to free memory we can't
-		 * free ourselves...
-		 */
-		} else if (gfp_mask & __GFP_WAIT) {
-			try_to_free_pages(gfp_mask);
-			memory_pressure++;
+		if (gfp_mask & __GFP_WAIT) {
+			shrink_icache_memory(6, gfp_mask);
+			shrink_dcache_memory(6, gfp_mask);
+			kmem_cache_reap(gfp_mask);
+
+			page_launder(gfp_mask, 1);
+
 			if (!order)
 				goto try_again;
 		}
-
 	}
 
 	/*

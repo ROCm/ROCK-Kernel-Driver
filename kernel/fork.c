@@ -134,7 +134,6 @@ static inline int dup_mmap(struct mm_struct * mm)
 	mm->mmap_cache = NULL;
 	mm->map_count = 0;
 	mm->cpu_vm_mask = 0;
-	mm->swap_cnt = 0;
 	mm->swap_address = 0;
 	pprev = &mm->mmap;
 	for (mpnt = current->mm->mmap ; mpnt ; mpnt = mpnt->vm_next) {

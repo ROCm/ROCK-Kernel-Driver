@@ -107,7 +107,7 @@ extern wait_queue_head_t kreclaimd_wait;
 extern int page_launder(int, int);
 extern int free_shortage(void);
 extern int inactive_shortage(void);
-extern void wakeup_kswapd(int);
+extern void wakeup_kswapd(void);
 extern int try_to_free_pages(unsigned int gfp_mask);
 
 /* linux/mm/page_io.c */

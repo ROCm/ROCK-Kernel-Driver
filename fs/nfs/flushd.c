@@ -71,16 +71,15 @@ int nfs_reqlist_init(struct nfs_server *server)
 	int			status = 0;
 
 	dprintk("NFS: writecache_init\n");
+
+	/* Create the RPC task */
+	if (!(task = rpc_new_task(server->client, NULL, RPC_TASK_ASYNC)))
+		return -ENOMEM;
+
 	spin_lock(&nfs_flushd_lock);
 	cache = server->rw_requests;
 
 	if (cache->task)
-		goto out_unlock;
-
-	/* Create the RPC task */
-	status = -ENOMEM;
-	task = rpc_new_task(server->client, NULL, RPC_TASK_ASYNC);
-	if (!task)
 		goto out_unlock;
 
 	task->tk_calldata = server;
@@ -99,6 +98,7 @@ int nfs_reqlist_init(struct nfs_server *server)
 	return 0;
  out_unlock:
 	spin_unlock(&nfs_flushd_lock);
+	rpc_release_task(task);
 	return status;
 }
 
@@ -195,7 +195,9 @@ void inode_remove_flushd(struct inode *inode)
 	if (*q) {
 		*q = inode->u.nfs_i.hash_next;
 		NFS_FLAGS(inode) &= ~NFS_INO_FLUSH;
+		spin_unlock(&nfs_flushd_lock);
 		iput(inode);
+		return;
 	}
  out:
 	spin_unlock(&nfs_flushd_lock);

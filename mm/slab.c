@@ -1702,7 +1702,7 @@ static void enable_all_cpucaches (void)
  * kmem_cache_reap - Reclaim memory from caches.
  * @gfp_mask: the type of memory required.
  *
- * Called from try_to_free_page().
+ * Called from do_try_to_free_pages() and __alloc_pages()
  */
 void kmem_cache_reap (int gfp_mask)
 {

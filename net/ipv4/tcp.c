@@ -954,7 +954,7 @@ int tcp_sendmsg(struct sock *sk, struct msghdr *msg, int size)
 			 */
 			skb = sk->write_queue.prev;
 			if (tp->send_head &&
-			    (mss_now - skb->len) > 0) {
+			    (mss_now > skb->len)) {
 				copy = skb->len;
 				if (skb_tailroom(skb) > 0) {
 					int last_byte_was_odd = (copy % 4);

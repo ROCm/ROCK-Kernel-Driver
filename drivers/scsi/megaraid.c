@@ -149,7 +149,6 @@
 #include <linux/version.h>
 
 #ifdef MODULE
-#include <linux/modversions.h>
 #include <linux/module.h>
 
 char kernel_version[] = UTS_RELEASE;

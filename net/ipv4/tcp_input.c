@@ -1705,7 +1705,7 @@ static __inline__ void tcp_ack_packets_out(struct sock *sk, struct tcp_opt *tp)
 
 		if ((__s32)when < (__s32)tp->rttvar)
 			when = tp->rttvar;
-		tcp_reset_xmit_timer(sk, TCP_TIME_RETRANS, when);
+		tcp_reset_xmit_timer(sk, TCP_TIME_RETRANS, min(when, TCP_RTO_MAX));
 	}
 }
 

@@ -219,7 +219,6 @@ struct mm_struct {
 	unsigned long rss, total_vm, locked_vm;
 	unsigned long def_flags;
 	unsigned long cpu_vm_mask;
-	unsigned long swap_cnt;	/* number of pages to swap on next pass */
 	unsigned long swap_address;
 
 	/* Architecture-specific MM context */

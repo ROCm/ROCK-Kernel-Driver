@@ -504,8 +504,8 @@ void ip_mc_inc_group(struct in_device *in_dev, u32 addr)
 	im->timer.function=&igmp_timer_expire;
 	im->unsolicit_count = IGMP_Unsolicited_Report_Count;
 	im->reporter = 0;
-	im->loaded = 0;
 #endif
+	im->loaded = 0;
 	write_lock_bh(&in_dev->lock);
 	im->next=in_dev->mc_list;
 	in_dev->mc_list=im;

@@ -222,8 +222,8 @@ int ppa_detect(Scsi_Host_Template * host)
 	    printk("  supported by the imm (ZIP Plus) driver. If the\n");
 	    printk("  cable is marked with \"AutoDetect\", this is what has\n");
 	    printk("  happened.\n");
-	    return 0;
 	    spin_lock_irq(&io_request_lock);
+	    return 0;
 	}
 	try_again = 1;
 	goto retry_entry;

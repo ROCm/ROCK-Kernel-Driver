@@ -35,45 +35,21 @@
  * using a process that no longer actually exists (it might
  * have died while we slept).
  */
-static int try_to_swap_out(struct mm_struct * mm, struct vm_area_struct* vma, unsigned long address, pte_t * page_table)
+static void try_to_swap_out(struct mm_struct * mm, struct vm_area_struct* vma, unsigned long address, pte_t * page_table, struct page *page)
 {
 	pte_t pte;
 	swp_entry_t entry;
-	struct page * page;
-	int onlist;
 
-	pte = *page_table;
-	if (!pte_present(pte))
-		goto out_failed;
-	page = pte_page(pte);
-	if ((!VALID_PAGE(page)) || PageReserved(page))
-		goto out_failed;
-
-	if (!mm->swap_cnt)
-		return 1;
-
-	mm->swap_cnt--;
-
-	onlist = PageActive(page);
 	/* Don't look at this pte if it's been accessed recently. */
 	if (ptep_test_and_clear_young(page_table)) {
-		age_page_up(page);
-		goto out_failed;
+		page->age += PAGE_AGE_ADV;
+		if (page->age > PAGE_AGE_MAX)
+			page->age = PAGE_AGE_MAX;
+		return;
 	}
-	if (!onlist)
-		/* The page is still mapped, so it can't be freeable... */
-		age_page_down_ageonly(page);
-
-	/*
-	 * If the page is in active use by us, or if the page
-	 * is in active use by others, don't unmap it or
-	 * (worse) start unneeded IO.
-	 */
-	if (page->age > 0)
-		goto out_failed;
 
 	if (TryLockPage(page))
-		goto out_failed;
+		return;
 
 	/* From this point on, the odds are that we're going to
 	 * nuke this pte, so read and clear the pte.  This hook
@@ -87,9 +63,6 @@ static int try_to_swap_out(struct mm_struct * mm, struct vm_area_struct* vma, un
 	 * Is the page already in the swap cache? If so, then
 	 * we can just drop our reference to it without doing
 	 * any IO - it's already up-to-date on disk.
-	 *
-	 * Return 0, as we didn't actually free any real
-	 * memory, and we should just continue our scan.
 	 */
 	if (PageSwapCache(page)) {
 		entry.val = page->index;
@@ -103,8 +76,7 @@ drop_pte:
 		mm->rss--;
 		deactivate_page(page);
 		page_cache_release(page);
-out_failed:
-		return 0;
+		return;
 	}
 
 	/*
@@ -153,34 +125,20 @@ out_failed:
 out_unlock_restore:
 	set_pte(page_table, pte);
 	UnlockPage(page);
-	return 0;
+	return;
 }
 
-/*
- * A new implementation of swap_out().  We do not swap complete processes,
- * but only a small number of blocks, before we continue with the next
- * process.  The number of blocks actually swapped is determined on the
- * number of page faults, that this process actually had in the last time,
- * so we won't swap heavily used processes all the time ...
- *
- * Note: the priority argument is a hint on much CPU to waste with the
- *       swap block search, not a hint, of how much blocks to swap with
- *       each process.
- *
- * (C) 1993 Kai Petzke, wpp@marie.physik.tu-berlin.de
- */
-
-static inline int swap_out_pmd(struct mm_struct * mm, struct vm_area_struct * vma, pmd_t *dir, unsigned long address, unsigned long end)
+static int swap_out_pmd(struct mm_struct * mm, struct vm_area_struct * vma, pmd_t *dir, unsigned long address, unsigned long end, int count)
 {
 	pte_t * pte;
 	unsigned long pmd_end;
 
 	if (pmd_none(*dir))
-		return 0;
+		return count;
 	if (pmd_bad(*dir)) {
 		pmd_ERROR(*dir);
 		pmd_clear(dir);
-		return 0;
+		return count;
 	}
 	
 	pte = pte_offset(dir, address);
@@ -190,28 +148,33 @@ static inline int swap_out_pmd(struct mm_struct * mm, struct vm_area_struct * vm
 		end = pmd_end;
 
 	do {
-		int result;
-		mm->swap_address = address + PAGE_SIZE;
-		result = try_to_swap_out(mm, vma, address, pte);
-		if (result)
-			return result;
+		if (pte_present(*pte)) {
+			struct page *page = pte_page(*pte);
+
+			if (VALID_PAGE(page) && !PageReserved(page)) {
+				try_to_swap_out(mm, vma, address, pte, page);
+				if (--count)
+					break;
+			}
+		}
 		address += PAGE_SIZE;
 		pte++;
 	} while (address && (address < end));
-	return 0;
+	mm->swap_address = address + PAGE_SIZE;
+	return count;
 }
 
-static inline int swap_out_pgd(struct mm_struct * mm, struct vm_area_struct * vma, pgd_t *dir, unsigned long address, unsigned long end)
+static inline int swap_out_pgd(struct mm_struct * mm, struct vm_area_struct * vma, pgd_t *dir, unsigned long address, unsigned long end, int count)
 {
 	pmd_t * pmd;
 	unsigned long pgd_end;
 
 	if (pgd_none(*dir))
-		return 0;
+		return count;
 	if (pgd_bad(*dir)) {
 		pgd_ERROR(*dir);
 		pgd_clear(dir);
-		return 0;
+		return count;
 	}
 
 	pmd = pmd_offset(dir, address);
@@ -221,23 +184,23 @@ static inline int swap_out_pgd(struct mm_struct * mm, struct vm_area_struct * vm
 		end = pgd_end;
 	
 	do {
-		int result = swap_out_pmd(mm, vma, pmd, address, end);
-		if (result)
-			return result;
+		count = swap_out_pmd(mm, vma, pmd, address, end, count);
+		if (!count)
+			break;
 		address = (address + PMD_SIZE) & PMD_MASK;
 		pmd++;
 	} while (address && (address < end));
-	return 0;
+	return count;
 }
 
-static int swap_out_vma(struct mm_struct * mm, struct vm_area_struct * vma, unsigned long address)
+static int swap_out_vma(struct mm_struct * mm, struct vm_area_struct * vma, unsigned long address, int count)
 {
 	pgd_t *pgdir;
 	unsigned long end;
 
 	/* Don't swap out areas which are locked down */
 	if (vma->vm_flags & (VM_LOCKED|VM_RESERVED))
-		return 0;
+		return count;
 
 	pgdir = pgd_offset(mm, address);
 
@@ -245,18 +208,17 @@ static int swap_out_vma(struct mm_struct * mm, struct vm_area_struct * vma, unsi
 	if (address >= end)
 		BUG();
 	do {
-		int result = swap_out_pgd(mm, vma, pgdir, address, end);
-		if (result)
-			return result;
+		count = swap_out_pgd(mm, vma, pgdir, address, end, count);
+		if (!count)
+			break;
 		address = (address + PGDIR_SIZE) & PGDIR_MASK;
 		pgdir++;
 	} while (address && (address < end));
-	return 0;
+	return count;
 }
 
-static int swap_out_mm(struct mm_struct * mm)
+static int swap_out_mm(struct mm_struct * mm, int count)
 {
-	int result = 0;
 	unsigned long address;
 	struct vm_area_struct* vma;
 
@@ -270,15 +232,14 @@ static int swap_out_mm(struct mm_struct * mm)
 	 */
 	spin_lock(&mm->page_table_lock);
 	address = mm->swap_address;
-	mm->swap_cnt = mm->rss >> 4;
 	vma = find_vma(mm, address);
 	if (vma) {
 		if (address < vma->vm_start)
 			address = vma->vm_start;
 
 		for (;;) {
-			result = swap_out_vma(mm, vma, address);
-			if (result)
+			count = swap_out_vma(mm, vma, address, count);
+			if (!count)
 				goto out_unlock;
 			vma = vma->vm_next;
 			if (!vma)
@@ -288,30 +249,39 @@ static int swap_out_mm(struct mm_struct * mm)
 	}
 	/* Reset to 0 when we reach the end of address space */
 	mm->swap_address = 0;
-	mm->swap_cnt = 0;
 
 out_unlock:
 	spin_unlock(&mm->page_table_lock);
-	return result;
+	return !count;
 }
 
 /*
- * Select the task with maximal swap_cnt and try to swap out a page.
  * N.B. This function returns only 0 or 1.  Return values != 1 from
  * the lower level routines result in continued processing.
  */
 #define SWAP_SHIFT 5
 #define SWAP_MIN 8
 
+static inline int swap_amount(struct mm_struct *mm)
+{
+	int nr = mm->rss >> SWAP_SHIFT;
+	return nr < SWAP_MIN ? SWAP_MIN : nr;
+}
+
 static int swap_out(unsigned int priority, int gfp_mask)
 {
 	int counter;
 	int retval = 0;
+	struct mm_struct *mm = current->mm;
 
+	/* Always start by trying to penalize the process that is allocating memory */
+	if (mm)
+		retval = swap_out_mm(mm, swap_amount(mm));
+
+	/* Then, look at the other mm's */
 	counter = mmlist_nr >> priority;
 	do {
 		struct list_head *p;
-		struct mm_struct *mm;
 
 		spin_lock(&mmlist_lock);
 		p = init_mm.mmlist.next;
@@ -327,13 +297,14 @@ static int swap_out(unsigned int priority, int gfp_mask)
 		atomic_inc(&mm->mm_users);
 		spin_unlock(&mmlist_lock);
 
-		retval |= swap_out_mm(mm);
+		/* Walk about 6% of the address space each time */
+		retval |= swap_out_mm(mm, swap_amount(mm));
 		mmput(mm);
 	} while (--counter >= 0);
 	return retval;
 
 empty:
-	spin_lock(&mmlist_lock);
+	spin_unlock(&mmlist_lock);
 	return 0;
 }
 
@@ -816,33 +787,35 @@ int inactive_shortage(void)
  * really care about latency. In that case we don't try
  * to free too many pages.
  */
+#define DEF_PRIORITY (6)
 static int refill_inactive(unsigned int gfp_mask, int user)
 {
-	int priority, count, start_count;
+	int count, start_count, maxtry;
 
 	count = inactive_shortage() + free_shortage();
 	if (user)
 		count = (1 << page_cluster);
 	start_count = count;
 
-	/* Always trim SLAB caches when memory gets low. */
-	kmem_cache_reap(gfp_mask);
-
-	priority = 6;
+	maxtry = 6;
 	do {
 		if (current->need_resched) {
 			__set_current_state(TASK_RUNNING);
 			schedule();
 		}
 
-		while (refill_inactive_scan(priority, 1)) {
+		while (refill_inactive_scan(DEF_PRIORITY, 1)) {
 			if (--count <= 0)
 				goto done;
 		}
 
 		/* If refill_inactive_scan failed, try to page stuff out.. */
-		swap_out(priority, gfp_mask);
-	} while (!inactive_shortage());
+		swap_out(DEF_PRIORITY, gfp_mask);
+
+		if (--maxtry <= 0)
+				return 0;
+		
+	} while (inactive_shortage());
 
 done:
 	return (count < start_count);
@@ -872,20 +845,14 @@ static int do_try_to_free_pages(unsigned int gfp_mask, int user)
 		ret += refill_inactive(gfp_mask, user);
 
 	/* 	
-	 * Delete pages from the inode and dentry cache 
-	 * if memory is low. 
+	 * Delete pages from the inode and dentry caches and 
+	 * reclaim unused slab cache if memory is low.
 	 */
 	if (free_shortage()) {
-		shrink_dcache_memory(6, gfp_mask);
-		shrink_icache_memory(6, gfp_mask);
-	} else { 
-
-		/*
-		 * Reclaim unused slab cache memory.
-		 */
+		shrink_dcache_memory(DEF_PRIORITY, gfp_mask);
+		shrink_icache_memory(DEF_PRIORITY, gfp_mask);
 		kmem_cache_reap(gfp_mask);
-		ret = 1;
-	}
+	} 
 
 	return ret;
 }
@@ -938,13 +905,8 @@ int kswapd(void *unused)
 		static int recalc = 0;
 
 		/* If needed, try to free some memory. */
-		if (inactive_shortage() || free_shortage()) {
-			int wait = 0;
-			/* Do we need to do some synchronous flushing? */
-			if (waitqueue_active(&kswapd_done))
-				wait = 1;
-			do_try_to_free_pages(GFP_KSWAPD, wait);
-		}
+		if (inactive_shortage() || free_shortage()) 
+			do_try_to_free_pages(GFP_KSWAPD, 0);
 
 		/*
 		 * Do some (very minimal) background scanning. This
@@ -952,7 +914,7 @@ int kswapd(void *unused)
 		 * every minute. This clears old referenced bits
 		 * and moves unused pages to the inactive list.
 		 */
-		refill_inactive_scan(6, 0);
+		refill_inactive_scan(DEF_PRIORITY, 0);
 
 		/* Once a second, recalculate some VM stats. */
 		if (time_after(jiffies, recalc + HZ)) {
@@ -960,11 +922,6 @@ int kswapd(void *unused)
 			recalculate_vm_stats();
 		}
 
-		/*
-		 * Wake up everybody waiting for free memory
-		 * and unplug the disk queue.
-		 */
-		wake_up_all(&kswapd_done);
 		run_task_queue(&tq_disk);
 
 		/* 
@@ -995,33 +952,10 @@ int kswapd(void *unused)
 	}
 }
 
-void wakeup_kswapd(int block)
+void wakeup_kswapd(void)
 {
-	DECLARE_WAITQUEUE(wait, current);
-
-	if (current == kswapd_task)
-		return;
-
-	if (!block) {
-		if (waitqueue_active(&kswapd_wait))
-			wake_up(&kswapd_wait);
-		return;
-	}
-
-	/*
-	 * Kswapd could wake us up before we get a chance
-	 * to sleep, so we have to be very careful here to
-	 * prevent SMP races...
-	 */
-	__set_current_state(TASK_UNINTERRUPTIBLE);
-	add_wait_queue(&kswapd_done, &wait);
-
-	if (waitqueue_active(&kswapd_wait))
-		wake_up(&kswapd_wait);
-	schedule();
-
-	remove_wait_queue(&kswapd_done, &wait);
-	__set_current_state(TASK_RUNNING);
+	if (current != kswapd_task)
+		wake_up_process(kswapd_task);
 }
 
 /*
@@ -1046,7 +980,7 @@ DECLARE_WAIT_QUEUE_HEAD(kreclaimd_wait);
 /*
  * Kreclaimd will move pages from the inactive_clean list to the
  * free list, in order to keep atomic allocations possible under
- * all circumstances. Even when kswapd is blocked on IO.
+ * all circumstances.
  */
 int kreclaimd(void *unused)
 {
