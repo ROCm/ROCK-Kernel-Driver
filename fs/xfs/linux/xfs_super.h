@@ -34,8 +34,8 @@
 
 #ifdef CONFIG_XFS_DMAPI
 # define vfs_insertdmapi(vfs)	vfs_insertops(vfsp, &xfs_dmops)
-# define vfs_initdmapi()	xfs_dm_init()
-# define vfs_exitdmapi()	xfs_dm_exit()
+# define vfs_initdmapi()	dmapi_init()
+# define vfs_exitdmapi()	dmapi_uninit()
 #else
 # define vfs_insertdmapi(vfs)	do { } while (0)
 # define vfs_initdmapi()	do { } while (0)
