@@ -131,13 +131,14 @@ static void write_inode(struct inode *inode, int sync)
  *
  * Called under inode_lock.
  */
-static void
+static int
 __sync_single_inode(struct inode *inode, struct writeback_control *wbc)
 {
 	unsigned dirty;
 	struct address_space *mapping = inode->i_mapping;
 	struct super_block *sb = inode->i_sb;
 	int wait = wbc->sync_mode == WB_SYNC_ALL;
+	int ret;
 
 	BUG_ON(inode->i_state & I_LOCK);
 
@@ -154,14 +155,17 @@ __sync_single_inode(struct inode *inode, struct writeback_control *wbc)
 
 	spin_unlock(&inode_lock);
 
-	do_writepages(mapping, wbc);
+	ret = do_writepages(mapping, wbc);
 
 	/* Don't write the inode if only I_DIRTY_PAGES was set */
 	if (dirty & (I_DIRTY_SYNC | I_DIRTY_DATASYNC))
 		write_inode(inode, wait);
 
-	if (wait)
-		filemap_fdatawait(mapping);
+	if (wait) {
+		int err = filemap_fdatawait(mapping);
+		if (ret == 0)
+			ret = err;
+	}
 
 	spin_lock(&inode_lock);
 	inode->i_state &= ~I_LOCK;
@@ -182,18 +186,19 @@ __sync_single_inode(struct inode *inode, struct writeback_control *wbc)
 		}
 	}
 	wake_up_inode(inode);
+	return ret;
 }
 
 /*
  * Write out an inode's dirty pages.  Called under inode_lock.
  */
-static void
+static int
 __writeback_single_inode(struct inode *inode,
 			struct writeback_control *wbc)
 {
 	if ((wbc->sync_mode != WB_SYNC_ALL) && (inode->i_state & I_LOCK)) {
 		list_move(&inode->i_list, &inode->i_sb->s_dirty);
-		return;
+		return 0;
 	}
 
 	/*
@@ -206,7 +211,7 @@ __writeback_single_inode(struct inode *inode,
 		iput(inode);
 		spin_lock(&inode_lock);
 	}
-	__sync_single_inode(inode, wbc);
+	return __sync_single_inode(inode, wbc);
 }
 
 /*
@@ -497,8 +502,29 @@ void write_inode_now(struct inode *inode, int sync)
 	if (sync)
 		wait_on_inode(inode);
 }
-
 EXPORT_SYMBOL(write_inode_now);
+
+/**
+ * sync_inode - write an inode and its pages to disk.
+ * @inode: the inode to sync
+ * @wbc: controls the writeback mode
+ *
+ * sync_inode() will write an inode and its pages to disk.  It will also
+ * correctly update the inode on its superblock's dirty inode lists and will
+ * update inode->i_state.
+ *
+ * The caller must have a ref on the inode.
+ */
+int sync_inode(struct inode *inode, struct writeback_control *wbc)
+{
+	int ret;
+
+	spin_lock(&inode_lock);
+	ret = __writeback_single_inode(inode, wbc);
+	spin_unlock(&inode_lock);
+	return ret;
+}
+EXPORT_SYMBOL(sync_inode);
 
 /**
  * generic_osync_inode - flush all dirty data for a given inode to disk
