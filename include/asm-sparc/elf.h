@@ -9,6 +9,7 @@
 #include <linux/config.h>
 #include <asm/ptrace.h>
 #include <asm/mbus.h>
+#include <asm/uaccess.h>
 
 /* For the most part we present code dumps in the format
  * Solaris does.
