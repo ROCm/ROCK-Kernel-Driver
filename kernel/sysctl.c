@@ -38,6 +38,7 @@
 #include <linux/security.h>
 #include <linux/initrd.h>
 #include <linux/times.h>
+#include <linux/limits.h>
 #include <asm/uaccess.h>
 
 #ifdef CONFIG_ROOT_NFS
@@ -67,6 +68,8 @@ extern int printk_ratelimit_burst;
 /* this is needed for the proc_dointvec_minmax for [fs_]overflow UID and GID */
 static int maxolduid = 65535;
 static int minolduid;
+
+static int ngroups_max = NGROUPS_MAX;
 
 #ifdef CONFIG_KMOD
 extern char modprobe_path[];
@@ -602,6 +605,14 @@ static ctl_table kern_table[] = {
 		.data		= &printk_ratelimit_burst,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{
+		.ctl_name	= KERN_NGROUPS_MAX,
+		.procname	= "ngroups_max",
+		.data		= &ngroups_max,
+		.maxlen		= sizeof (int),
+		.mode		= 0444,
 		.proc_handler	= &proc_dointvec,
 	},
 	{ .ctl_name = 0 }
