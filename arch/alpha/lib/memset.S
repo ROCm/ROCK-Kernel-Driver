@@ -120,8 +120,4 @@ __memsetw:
 
 	.end __memsetw
 
-#ifdef __ELF__
- .weak memset; memset = __memset
-#else
- .weakext memset, __memset
-#endif
+memset = __memset
