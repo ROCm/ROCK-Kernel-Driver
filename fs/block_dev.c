@@ -559,10 +559,10 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 			bdev->bd_contains = whole;
 			down(&whole->bd_sem);
 			whole->bd_part_count++;
-			p = disk->part + part - 1;
+			p = disk->part[part - 1];
 			bdev->bd_inode->i_data.backing_dev_info =
 			   whole->bd_inode->i_data.backing_dev_info;
-			if (!(disk->flags & GENHD_FL_UP) || !p->nr_sects) {
+			if (!(disk->flags & GENHD_FL_UP) || !p || !p->nr_sects) {
 				whole->bd_part_count--;
 				up(&whole->bd_sem);
 				ret = -ENXIO;

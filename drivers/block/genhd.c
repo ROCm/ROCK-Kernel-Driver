@@ -365,11 +365,13 @@ static int show_partition(struct seq_file *part, void *v)
 		(unsigned long long)get_capacity(sgp) >> 1,
 		disk_name(sgp, 0, buf));
 	for (n = 0; n < sgp->minors - 1; n++) {
-		if (sgp->part[n].nr_sects == 0)
+		if (!sgp->part[n])
+			continue;
+		if (sgp->part[n]->nr_sects == 0)
 			continue;
 		seq_printf(part, "%4d  %4d %10llu %s\n",
 			sgp->major, n + 1 + sgp->first_minor,
-			(unsigned long long)sgp->part[n].nr_sects >> 1 ,
+			(unsigned long long)sgp->part[n]->nr_sects >> 1 ,
 			disk_name(sgp, n + 1, buf));
 	}
 
@@ -552,7 +554,7 @@ struct gendisk *alloc_disk(int minors)
 			return NULL;
 		}
 		if (minors > 1) {
-			int size = (minors - 1) * sizeof(struct hd_struct);
+			int size = (minors - 1) * sizeof(struct hd_struct *);
 			disk->part = kmalloc(size, GFP_KERNEL);
 			if (!disk->part) {
 				kfree(disk);
@@ -604,8 +606,8 @@ void set_device_ro(struct block_device *bdev, int flag)
 	struct gendisk *disk = bdev->bd_disk;
 	if (bdev->bd_contains != bdev) {
 		int part = bdev->bd_dev - MKDEV(disk->major, disk->first_minor);
-		struct hd_struct *p = &disk->part[part-1];
-		p->policy = flag;
+		struct hd_struct *p = disk->part[part-1];
+		if (p) p->policy = flag;
 	} else
 		disk->policy = flag;
 }
@@ -615,7 +617,7 @@ void set_disk_ro(struct gendisk *disk, int flag)
 	int i;
 	disk->policy = flag;
 	for (i = 0; i < disk->minors - 1; i++)
-		disk->part[i].policy = flag;
+		if (disk->part[i]) disk->part[i]->policy = flag;
 }
 
 int bdev_read_only(struct block_device *bdev)
@@ -626,8 +628,9 @@ int bdev_read_only(struct block_device *bdev)
 	disk = bdev->bd_disk;
 	if (bdev->bd_contains != bdev) {
 		int part = bdev->bd_dev - MKDEV(disk->major, disk->first_minor);
-		struct hd_struct *p = &disk->part[part-1];
-		return p->policy;
+		struct hd_struct *p = disk->part[part-1];
+		if (p) return p->policy;
+		return 0;
 	} else
 		return disk->policy;
 }

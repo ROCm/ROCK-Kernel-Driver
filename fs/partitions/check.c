@@ -182,7 +182,7 @@ static struct sysfs_ops part_sysfs_ops = {
 static ssize_t part_dev_read(struct hd_struct * p, char *page)
 {
 	struct gendisk *disk = container_of(p->kobj.parent,struct gendisk,kobj);
-	int part = p - disk->part + 1;
+	int part = p->partno;
 	dev_t base = MKDEV(disk->major, disk->first_minor); 
 	return sprintf(page, "%04x\n", (unsigned)(base + part));
 }
@@ -234,7 +234,9 @@ struct kobj_type ktype_part = {
 
 void delete_partition(struct gendisk *disk, int part)
 {
-	struct hd_struct *p = disk->part + part - 1;
+	struct hd_struct *p = disk->part[part-1];
+	if (!p)
+		return;
 	if (!p->nr_sects)
 		return;
 	p->start_sect = 0;
@@ -242,14 +244,23 @@ void delete_partition(struct gendisk *disk, int part)
 	p->reads = p->writes = p->read_sectors = p->write_sectors = 0;
 	devfs_remove("%s/part%d", disk->devfs_name, part);
 	kobject_unregister(&p->kobj);
+	disk->part[part-1] = NULL;
+	kfree(p);
 }
 
 void add_partition(struct gendisk *disk, int part, sector_t start, sector_t len)
 {
-	struct hd_struct *p = disk->part + part - 1;
+	struct hd_struct *p;
 
+	p = kmalloc(sizeof(*p), GFP_KERNEL);
+	if (!p)
+		return;
+	
+	memset(p, 0, sizeof(*p));
 	p->start_sect = start;
 	p->nr_sects = len;
+	p->partno = part;
+	disk->part[part-1] = p;
 	devfs_register_partition(disk, part);
 	snprintf(p->kobj.name,KOBJ_NAME_LEN,"%s%d",disk->kobj.name,part);
 	p->kobj.parent = &disk->kobj;
