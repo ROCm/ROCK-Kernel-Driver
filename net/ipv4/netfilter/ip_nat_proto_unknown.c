@@ -39,7 +39,7 @@ static int unknown_unique_tuple(struct ip_conntrack_tuple *tuple,
 
 static int
 unknown_manip_pkt(struct sk_buff **pskb,
-		  unsigned int hdroff,
+		  unsigned int iphdroff,
 		  const struct ip_conntrack_manip *manip,
 		  enum ip_nat_manip_type maniptype)
 {

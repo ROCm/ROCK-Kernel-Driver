@@ -684,7 +684,7 @@ manip_pkt(u_int16_t proto,
 	iph = (void *)(*pskb)->data + iphdroff;
 
 	/* Manipulate protcol part. */
-	if (!ip_nat_find_proto(proto)->manip_pkt(pskb, iphdroff + iph->ihl*4,
+	if (!ip_nat_find_proto(proto)->manip_pkt(pskb, iphdroff,
 	                                         manip, maniptype))
 		return 0;
 
