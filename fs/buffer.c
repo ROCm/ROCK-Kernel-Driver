@@ -2868,20 +2868,26 @@ void ll_rw_block(int rw, int nr, struct buffer_head *bhs[])
 
 /*
  * For a data-integrity writeout, we need to wait upon any in-progress I/O
- * and then start new I/O and then wait upon it.
+ * and then start new I/O and then wait upon it.  The caller must have a ref on
+ * the buffer_head.
  */
-void sync_dirty_buffer(struct buffer_head *bh)
+int sync_dirty_buffer(struct buffer_head *bh)
 {
+	int ret = 0;
+
 	WARN_ON(atomic_read(&bh->b_count) < 1);
 	lock_buffer(bh);
 	if (test_clear_buffer_dirty(bh)) {
 		get_bh(bh);
 		bh->b_end_io = end_buffer_write_sync;
-		submit_bh(WRITE, bh);
+		ret = submit_bh(WRITE, bh);
 		wait_on_buffer(bh);
+		if (!ret && !buffer_uptodate(bh))
+			ret = -EIO;
 	} else {
 		unlock_buffer(bh);
 	}
+	return ret;
 }
 
 /*
