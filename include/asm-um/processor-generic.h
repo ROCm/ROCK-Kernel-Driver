@@ -80,21 +80,21 @@ struct thread_struct {
 
 #define INIT_THREAD \
 { \
-	forking:		0, \
-	kernel_stack:		0, \
-	nsyscalls:		0, \
-        regs:		   	EMPTY_REGS, \
-	cr2:			0, \
-	err:			0, \
-	fault_addr:		NULL, \
-	prev_sched:		NULL, \
-	temp_stack:		0, \
-	exec_buf:		NULL, \
-	arch:			INIT_ARCH_THREAD, \
-	request:		{ 0 } \
+	.forking		= 0, \
+	.kernel_stack		= 0, \
+	.nsyscalls		= 0, \
+        .regs		   	= EMPTY_REGS, \
+	.cr2			= 0, \
+	.err			= 0, \
+	.fault_addr		= NULL, \
+	.prev_sched		= NULL, \
+	.temp_stack		= 0, \
+	.exec_buf		= NULL, \
+	.arch			= INIT_ARCH_THREAD, \
+	.request		= { 0 } \
 }
 
-#define INIT_THREAD_SIZE (4 * PAGE_SIZE)
+#define THREAD_SIZE ((1 << CONFIG_KERNEL_STACK_ORDER) * PAGE_SIZE)
 
 typedef struct {
 	unsigned long seg;

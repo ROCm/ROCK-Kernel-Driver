@@ -13,7 +13,8 @@ struct thread_info;
 #include "linux/config.h"
 #include "asm/page.h"
 
-#define CURRENT_THREAD(dummy) (((unsigned long) &dummy) & (PAGE_MASK << 2))
+#define CURRENT_THREAD(dummy) (((unsigned long) &dummy) & \
+			        (PAGE_MASK << CONFIG_KERNEL_SACK_ORDER))
 
 #define current ({ int dummy; \
                    ((struct thread_info *) CURRENT_THREAD(dummy))->task; })
