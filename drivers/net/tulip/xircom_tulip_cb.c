@@ -116,6 +116,7 @@ KERN_INFO " unofficial 2.4.x kernel port, version " DRV_VERSION ", " DRV_RELDATE
 MODULE_AUTHOR("Donald Becker <becker@scyld.com>");
 MODULE_DESCRIPTION("Xircom CBE-100 ethernet driver");
 MODULE_LICENSE("GPL v2");
+MODULE_VERSION(DRV_VERSION);
 
 MODULE_PARM(debug, "i");
 MODULE_PARM(max_interrupt_work, "i");
