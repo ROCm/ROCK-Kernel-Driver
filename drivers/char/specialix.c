@@ -92,6 +92,7 @@
 #include <linux/delay.h>
 #include <linux/version.h>
 #include <linux/pci.h>
+#include <linux/init.h>
 #include <asm/uaccess.h>
 
 #include "specialix_io8.h"
