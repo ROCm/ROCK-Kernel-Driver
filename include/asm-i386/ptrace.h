@@ -57,7 +57,11 @@ struct pt_regs {
 #ifdef __KERNEL__
 #define user_mode(regs) ((VM_MASK & (regs)->eflags) || (3 & (regs)->xcs))
 #define instruction_pointer(regs) ((regs)->eip)
+#if defined(CONFIG_SMP) && defined(CONFIG_FRAME_POINTER)
+extern unsigned long profile_pc(struct pt_regs *regs);
+#else
 #define profile_pc(regs) instruction_pointer(regs)
+#endif
 #endif
 
 #endif
