@@ -29,15 +29,17 @@ struct ipppd {
 	int unit;
 	int minor;
 	unsigned long debug;
+	atomic_t refcnt;
 };
 
 /* Prototypes */
-static int isdn_ppp_fill_rq(unsigned char *buf, int len, int proto, int slot);
-static void isdn_ppp_closewait(isdn_net_dev *idev);
 static void isdn_ppp_push_higher(isdn_net_local *lp, isdn_net_dev *idev,
 				 struct sk_buff *skb, int proto);
 static int isdn_ppp_if_get_unit(char *namebuf);
 static int isdn_ppp_set_compressor(struct ipppd *is,struct isdn_ppp_comp_data *);
+
+static void
+ipppd_closewait(struct ipppd *ipppd);
 
 static void
 isdn_ppp_receive_ccp(isdn_net_dev * net_dev, isdn_net_local * lp,
@@ -85,15 +87,49 @@ char *isdn_ppp_revision = "$Revision: 1.85.6.9 $";
 static spinlock_t ipppds_lock = SPIN_LOCK_UNLOCKED;
 static struct ipppd *ipppds[NR_IPPPDS];
 
+static void
+ipppd_destroy(struct ipppd *ipppd)
+{
+	HERE;
+
+	ipppd->state = 0;
+}
+
+static inline struct ipppd *
+__ipppd_get(struct ipppd *ipppd)
+{
+	atomic_inc(&ipppd->refcnt);
+	printk("%s: %d\n", __FUNCTION__, atomic_read(&ipppd->refcnt));
+	return ipppd;
+}
+
 static inline struct ipppd *
 ipppd_get(int slot)
 {
-	return ipppds[slot];
+	unsigned long flags;
+	struct ipppd *ipppd;
+
+	if (slot < 0 || slot >= NR_IPPPDS)
+		return NULL;
+
+	spin_lock_irqsave(&ipppds_lock, flags);
+	ipppd = ipppds[slot];
+	if (!ipppd)
+		goto out;
+
+	__ipppd_get(ipppd);
+ out:
+	spin_unlock_irqrestore(&ipppds_lock, flags);
+	return ipppd;
 }
 
 static inline void 
 ipppd_put(struct ipppd *ipppd)
 {
+	printk("%s: %d\n", __FUNCTION__, atomic_read(&ipppd->refcnt));
+
+	if (atomic_dec_and_test(&ipppd->refcnt))
+		ipppd_destroy(ipppd);
 }
 
 /*
@@ -154,19 +190,11 @@ isdn_ppp_free(isdn_net_dev *idev)
 	
 	// FIXME much of this wants to rather happen when disconnected()
 
-	if (idev->ppp_slot < 0 || idev->ppp_slot > ISDN_MAX_CHANNELS) {
-		printk(KERN_ERR "%s: ppp_slot(%d) out of range\n",
-		       __FUNCTION__ , idev->ppp_slot);
-		return;
-	}
-
 	save_flags(flags);
 	cli();
 
 #ifdef CONFIG_ISDN_MPP
 	spin_lock(&idev->pb->lock);
-#endif
-#ifdef CONFIG_ISDN_MPP
 	if (lp->netdev->pb->ref_ct == 1)	/* last link in queue? */
 		isdn_ppp_mp_cleanup(lp);
 
@@ -184,7 +212,8 @@ isdn_ppp_free(isdn_net_dev *idev)
 		return;
 
 	if (is->state & IPPP_CONNECT)
-		isdn_ppp_closewait(idev);	/* force wakeup on ippp device */
+		ipppd_closewait(is);	/* force wakeup on ippp device */
+
 	else if (is->state & IPPP_ASSIGNED)
 		is->state = IPPP_OPEN;	/* fallback to 'OPEN but not ASSIGNED' state */
 
@@ -320,16 +349,10 @@ isdn_ppp_wakeup_daemon(isdn_net_dev *idev)
  * go into 'device waits for release' state
  */
 static void
-isdn_ppp_closewait(isdn_net_dev *idev)
+ipppd_closewait(struct ipppd *ipppd)
 {
-	struct ipppd *ipppd = ipppd_get(idev->ppp_slot);
-
-	if (!ipppd)
-		return;
-	
 	wake_up(&ipppd->wq);
 	ipppd->state = IPPP_CLOSEWAIT;
-	ipppd_put(ipppd);
 }
 
 /*
@@ -370,6 +393,7 @@ ipppd_open(struct inode *ino, struct file *file)
 
 	is = ipppds[slot];
 	file->private_data = is;
+	__ipppd_get(is);
 
 	printk(KERN_DEBUG "ippp, open, slot: %d, minor: %d, state: %04x\n", slot, minor, is->state);
 
@@ -377,9 +401,7 @@ ipppd_open(struct inode *ino, struct file *file)
 	is->unit = -1;          /* set, when we have our interface */
 	init_waitqueue_head(&is->wq);
 	is->minor = minor;
-
-	isdn_lock_drivers();
-
+	
 	return 0;
 }
 
@@ -410,11 +432,8 @@ ipppd_release(struct inode *ino, struct file *file)
 	}
 	skb_queue_purge(&is->rq);
 
-	/* this slot is ready for new connections */
-	is->state = 0;
+	ipppd_put(is);
 
-	isdn_unlock_drivers();
-	
 	unlock_kernel();
 	return 0;
 }
@@ -665,20 +684,15 @@ ipppd_poll(struct file *file, poll_table * wait)
 }
 
 /*
- *  fill up isdn_ppp_read() queue ..
+ * Queue packets for ipppd to read().
  */
 
 static int
-isdn_ppp_fill_rq(unsigned char *buf, int len, int proto, int slot)
+ipppd_queue_read(struct ipppd *is, u16 proto, unsigned char *buf, int len)
 {
 	struct sk_buff *skb;
 	unsigned char *p;
-	struct ipppd *is;
 	int retval;
-
-	is = ipppd_get(slot);
-	if (!is)
-		return -ENODEV;
 
 	if (!(is->state & IPPP_CONNECT)) {
 		printk(KERN_DEBUG "ippp: device not activated.\n");
@@ -707,7 +721,6 @@ isdn_ppp_fill_rq(unsigned char *buf, int len, int proto, int slot)
 
 	retval = len;
  out:
-	ipppd_put(is);
 	return retval;
 }
 
@@ -1098,7 +1111,8 @@ isdn_ppp_push_higher(isdn_net_local *lp, isdn_net_dev *idev,
 			}
 			/* fall through */
 		default:
-			isdn_ppp_fill_rq(skb->data, skb->len, proto, idev->ppp_slot);	/* push data to pppd device */
+			// FIXME use skb directly
+			ipppd_queue_read(is, proto, skb->data, skb->len);
 			kfree_skb(skb);
 			goto put;
 	}
@@ -1949,21 +1963,29 @@ isdn_ppp_hangup_slave(char *name)
 static void isdn_ppp_dev_kick_up(void *priv)
 {
 	isdn_net_dev *idev = priv;
+	struct ipppd *ipppd = ipppd_get(idev->ppp_slot);
 
-	isdn_ppp_fill_rq(NULL, 0, PPP_COMP, idev->ppp_slot);
+	if (!ipppd)
+		return;
+
+	ipppd_queue_read(ipppd, PPP_COMPFRAG, NULL, 0);
+	ipppd_put(ipppd);
 }
 
 static void isdn_ppp_lp_kick_up(void *priv)
 {
 	isdn_net_local *lp = priv;
 	isdn_net_dev *idev;
+	struct ipppd *ipppd;
 
 	if (list_empty(&lp->online)) {
 		isdn_BUG();
 		return;
 	}
 	idev = list_entry(lp->online.next, isdn_net_dev, online);
-	isdn_ppp_fill_rq(NULL, 0, PPP_COMP, idev->ppp_slot);
+	ipppd = ipppd_get(idev->ppp_slot);
+	ipppd_queue_read(ipppd, PPP_COMP, NULL, 0);
+	ipppd_put(ipppd);
 }
 
 /* Send a CCP Reset-Request or Reset-Ack directly from the kernel. */
@@ -2070,16 +2092,10 @@ isdn_ppp_receive_ccp(isdn_net_dev *idev, isdn_net_local *lp,
 
 static void isdn_ppp_send_ccp(isdn_net_dev *idev, isdn_net_local *lp, struct sk_buff *skb)
 {
-	struct ipppd *is;
 	int proto;
 	unsigned char *data;
 
 	if (!skb || skb->len < 3) {
-		isdn_BUG();
-		return;
-	}
-	is = ipppd_get(idev->ppp_slot);
-	if (!is) {
 		isdn_BUG();
 		return;
 	}
