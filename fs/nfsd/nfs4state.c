@@ -1956,6 +1956,20 @@ out:
 	return status;
 }
 
+static int
+nfs4_check_delegmode(struct nfs4_delegation *dp, int flags)
+{
+	int status = nfserr_openmode;
+
+	if ((flags & WR_STATE) & (dp->dl_type == NFS4_OPEN_DELEGATE_READ))
+		goto out;
+	if ((flags & RD_STATE) & (dp->dl_type == NFS4_OPEN_DELEGATE_WRITE))
+		goto out;
+	status = nfs_ok;
+out:
+	return status;
+}
+
 /*
 * Checks for stateid operations
 */
