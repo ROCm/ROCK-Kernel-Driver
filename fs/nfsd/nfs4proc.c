@@ -135,9 +135,11 @@ do_open_fhandle(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_
 {
 	int status;
 
-	dprintk("NFSD: do_open_fhandle\n");
+	/* Only reclaims from previously confirmed clients are valid */
+	if ((status = nfs4_check_open_reclaim(&open->op_clientid)))
+		return status;
 
-	/* we don't know the target directory, and therefore can not
+	/* We don't know the target directory, and therefore can not
 	* set the change info
 	*/
 
@@ -172,8 +174,7 @@ nfsd4_open(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_open 
 	if (nfs4_in_grace() && open->op_claim_type != NFS4_OPEN_CLAIM_PREVIOUS)
 		return nfserr_grace;
 
-	if (nfs4_in_no_grace() &&
-		           open->op_claim_type == NFS4_OPEN_CLAIM_PREVIOUS)
+	if (!nfs4_in_grace() && open->op_claim_type == NFS4_OPEN_CLAIM_PREVIOUS)
 		return nfserr_no_grace;
 
 	/* This check required by spec. */
