@@ -1733,7 +1733,7 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 		}
 
 		spin_unlock_irqrestore(&state->card->lock, flags);
-		synchronize_irq();
+		synchronize_irq(state->card->irq);
 		dmabuf->ready = 0;
 		dmabuf->swptr = dmabuf->hwptr = 0;
 		dmabuf->count = dmabuf->total_bytes = 0;
@@ -2814,15 +2814,14 @@ static void __init i810_configure_clocking (void)
 		}
 		dmabuf->count = dmabuf->dmasize;
 		outb(31,card->iobase+dmabuf->write_channel->port+OFF_LVI);
-		save_flags(flags);
-		cli();
+		local_irq_save(flags);
 		start_dac(state);
 		offset = i810_get_dma_addr(state, 0);
 		mdelay(50);
 		new_offset = i810_get_dma_addr(state, 0);
 		stop_dac(state);
 		outb(2,card->iobase+dmabuf->write_channel->port+OFF_CR);
-		restore_flags(flags);
+		local_irq_restore(flags);
 		i = new_offset - offset;
 #ifdef DEBUG
 		printk("i810_audio: %d bytes in 50 milliseconds\n", i);
