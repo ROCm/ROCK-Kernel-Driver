@@ -35,14 +35,6 @@
 
 #include "powernow-k7.h"
 
-#define DEBUG
-
-#ifdef DEBUG
-#define dprintk(msg...) printk(msg)
-#else
-#define dprintk(msg...) do { } while(0)
-#endif
-
 #define PFX "powernow: "
 
 
@@ -96,6 +88,7 @@ static int fid_codes[32] = {
  */
 
 static int acpi_force;
+static int debug;
 
 static struct cpufreq_frequency_table *powernow_table;
 
@@ -107,6 +100,21 @@ static unsigned int number_scales;
 static unsigned int fsb;
 static unsigned int latency;
 static char have_a0;
+
+static void dprintk(const char *fmt, ...)
+{
+	char s[256];
+	va_list args;
+
+	if (debug==0)
+		return;
+
+	va_start(args,fmt);
+	vsprintf(s, fmt, args);
+	printk(s);
+	va_end(args);
+}
+
 
 static int check_fsb(unsigned int fsbspeed)
 {
@@ -653,8 +661,10 @@ static void __exit powernow_exit (void)
 		kfree(powernow_table);
 }
 
+module_param(debug, int, 0444);
+MODULE_PARM_DESC(debug, "enable debug output.");
 module_param(acpi_force,  int, 0444);
-MODULE_PARM_DESC(acpi_force, "Force ACPI to be used");
+MODULE_PARM_DESC(acpi_force, "Force ACPI to be used.");
 
 MODULE_AUTHOR ("Dave Jones <davej@codemonkey.org.uk>");
 MODULE_DESCRIPTION ("Powernow driver for AMD K7 processors.");
