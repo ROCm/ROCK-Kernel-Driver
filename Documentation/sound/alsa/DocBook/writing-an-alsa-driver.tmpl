@@ -2725,10 +2725,10 @@ struct _snd_pcm_runtime {
         <para>
           Another note is that this callback is non-atomic
         (schedulable). This is important, because the
-        <structfield>prepare</structfield> callback 
+        <structfield>trigger</structfield> callback 
         is atomic (non-schedulable). That is, mutex or any
-        schedule-related functions are available only in
-        <structfield>hw_params</structfield> callback. 
+        schedule-related functions are not available in
+        <structfield>trigger</structfield> callback.
 	Please see the subsection
 	<link linkend="pcm-interface-atomicity"><citetitle>
 	Atomicity</citetitle></link> for details.
@@ -2794,7 +2794,8 @@ struct _snd_pcm_runtime {
         </para>
 
         <para>
-          As mentioned above, this callback is atomic.
+	Note that this callback became non-atomic since the recent version.
+	You can use schedule-related fucntions safely in this callback now.
         </para>
 
         <para>
@@ -2879,7 +2880,12 @@ struct _snd_pcm_runtime {
         </para>
 
         <para>
-          This callback is also atomic.
+          As mentioned, this callback is atomic.  You cannot call
+	  the function going to sleep.
+	  The trigger callback should be as minimal as possible,
+	  just really triggering the DMA.  The other stuff should be
+	  initialized hw_params and prepare callbacks properly
+	  beforehand.
         </para>
       </section>
 
@@ -3125,7 +3131,7 @@ struct _snd_pcm_runtime {
       <para>
       As already seen, some pcm callbacks are atomic and some are
       not.  For example, <parameter>hw_params</parameter> callback is
-      non-atomic, while <parameter>prepare</parameter> callback is
+      non-atomic, while <parameter>trigger</parameter> callback is
       atomic.  This means, the latter is called already in a spinlock
       held by the PCM middle layer. Please take this atomicity into
       account when you use a spinlock or a semaphore in the callbacks.
@@ -3136,7 +3142,7 @@ struct _snd_pcm_runtime {
       <function>schedule</function> or go to
       <function>sleep</function>.  The semaphore and mutex do sleep,
       and hence they cannot be used inside the atomic callbacks
-      (e.g. <parameter>prepare</parameter> callback).
+      (e.g. <parameter>trigger</parameter> callback).
       For taking a certain delay in such a callback, please use
       <function>udelay()</function> or <function>mdelay()</function>.
       </para>

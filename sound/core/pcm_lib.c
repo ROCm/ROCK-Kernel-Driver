@@ -1765,12 +1765,14 @@ static int snd_pcm_lib_ioctl_reset(snd_pcm_substream_t *substream,
 				   void *arg)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
+	unsigned long flags;
+	snd_pcm_stream_lock_irqsave(substream, flags);
 	if (snd_pcm_running(substream) &&
-	    snd_pcm_update_hw_ptr(substream) >= 0) {
+	    snd_pcm_update_hw_ptr(substream) >= 0)
 		runtime->status->hw_ptr %= runtime->buffer_size;
-		return 0;
-	}
-	runtime->status->hw_ptr = 0;
+	else
+		runtime->status->hw_ptr = 0;
+	snd_pcm_stream_unlock_irqrestore(substream, flags);
 	return 0;
 }
 
