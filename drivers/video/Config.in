@@ -10,9 +10,6 @@ bool 'Support for frame buffer devices (EXPERIMENTAL)' CONFIG_FB
 if [ "$CONFIG_FB" = "y" ]; then
    define_bool CONFIG_DUMMY_CONSOLE y
    if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
-      if [ "$CONFIG_PCI" = "y" ]; then
-         tristate '  nVidia Riva support (EXPERIMENTAL)' CONFIG_FB_RIVA
-      fi
       if [ "$CONFIG_AMIGA" = "y" -o "$CONFIG_PCI" = "y" ]; then
 	 tristate '  Cirrus Logic support (EXPERIMENTAL)' CONFIG_FB_CLGEN
 	 tristate '  Permedia2 support (EXPERIMENTAL)' CONFIG_FB_PM2
@@ -127,6 +124,7 @@ if [ "$CONFIG_FB" = "y" ]; then
    fi
    if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
       if [ "$CONFIG_PCI" != "n" ]; then
+	 tristate '  nVidia Riva support (EXPERIMENTAL)' CONFIG_FB_RIVA
 	 tristate '  Matrox acceleration (EXPERIMENTAL)' CONFIG_FB_MATROX
 	 if [ "$CONFIG_FB_MATROX" != "n" ]; then
 	    bool '    Millennium I/II support' CONFIG_FB_MATROX_MILLENIUM
@@ -156,8 +154,8 @@ if [ "$CONFIG_FB" = "y" ]; then
 	 tristate '  NeoMagic display support (EXPERIMENTAL)' CONFIG_FB_NEOMAGIC
 	 tristate '  3Dfx Banshee/Voodoo3 display support (EXPERIMENTAL)' CONFIG_FB_3DFX
 	 tristate '  3Dfx Voodoo Graphics (sst1) support (EXPERIMENTAL)' CONFIG_FB_VOODOO1
-         tristate '  Trident support (EXPERIMENTAL)' CONFIG_FB_TRIDENT
-         tristate '  Permedia3 support (EXPERIMENTAL)' CONFIG_FB_PM3
+	 tristate '  Trident support (EXPERIMENTAL)' CONFIG_FB_TRIDENT
+	 tristate '  Permedia3 support (EXPERIMENTAL)' CONFIG_FB_PM3
       fi
    fi
    if [ "$ARCH" = "sparc" -o "$ARCH" = "sparc64" ]; then
@@ -268,10 +266,10 @@ if [ "$CONFIG_FB" = "y" ]; then
       if [ "$CONFIG_FB_ACORN" = "y" -o "$CONFIG_FB_ATARI" = "y" -o \
 	   "$CONFIG_FB_ATY" = "y" -o "$CONFIG_FB_MAC" = "y" -o \
 	   "$CONFIG_FB_OF" = "y" -o "$CONFIG_FB_TGA" = "y" -o \
-	   "$CONFIG_FB_NEOMAGIC" = "y" -o "$CONFIG_FB_VIRTUAL" = "y" -o \
+	   "$CONFIG_FB_NEOMAGIC" = "y" -o "$CONFIG_FB_PM3" = "y" -o \
 	   "$CONFIG_FB_TCX" = "y" -o "$CONFIG_FB_CGTHREE" = "y" -o \
 	   "$CONFIG_FB_CONTROL" = "y" -o "$CONFIG_FB_CLGEN" = "y" -o \
-	   "$CONFIG_FB_CGFOURTEEN" = "y" -o "$CONFIG_FB_G364" = "y" -o \
+	   "$CONFIG_FB_CGFOURTEEN" = "y" -o "$CONFIG_FB_TRIDENT" = "y" -o \
 	   "$CONFIG_FB_VIRGE" = "y" -o "$CONFIG_FB_CYBER" = "y" -o \
 	   "$CONFIG_FB_VALKYRIE" = "y" -o "$CONFIG_FB_PLATINUM" = "y" -o \
            "$CONFIG_FB_IGA" = "y" -o "$CONFIG_FB_MATROX" = "y" -o \
@@ -282,17 +280,16 @@ if [ "$CONFIG_FB" = "y" ]; then
 	   "$CONFIG_FB_SA1100" = "y" -o "$CONFIG_FB_3DFX" = "y" -o \
 	   "$CONFIG_FB_PMAG_BA" = "y" -o "$CONFIG_FB_PMAGB_B" = "y" -o \
 	   "$CONFIG_FB_MAXINE" = "y" -o "$CONFIG_FB_TX3912" = "y" -o \
-	   "$CONFIG_FB_SIS" = "y" -o "$CONFIG_FB_PM3" = "y" -o \
-	   "$CONFIG_FB_TRIDENT" = "y" ]; then
+	   "$CONFIG_FB_SIS" = "y" ]; then 
 	 define_tristate CONFIG_FBCON_CFB8 y
       else
 	 if [ "$CONFIG_FB_ACORN" = "m" -o "$CONFIG_FB_ATARI" = "m" -o \
 	      "$CONFIG_FB_ATY" = "m" -o "$CONFIG_FB_MAC" = "m" -o \
 	      "$CONFIG_FB_OF" = "m" -o "$CONFIG_FB_TGA" = "m" -o \
-	      "$CONFIG_FB_NEOMAGIC" = "m" -o "$CONFIG_FB_VIRTUAL" = "m" -o \
+	      "$CONFIG_FB_NEOMAGIC" = "m" -o "$CONFIG_FB_PM3" = "m" -o \
 	      "$CONFIG_FB_TCX" = "m" -o "$CONFIG_FB_CGTHREE" = "m" -o \
 	      "$CONFIG_FB_CONTROL" = "m" -o "$CONFIG_FB_CLGEN" = "m" -o \
-	      "$CONFIG_FB_CGFOURTEEN" = "m" -o "$CONFIG_FB_G364" = "m" -o \
+	      "$CONFIG_FB_CGFOURTEEN" = "m" -o "$CONFIG_FB_TRIDENT" = "m" -o \
 	      "$CONFIG_FB_VIRGE" = "m" -o "$CONFIG_FB_CYBER" = "m" -o \
 	      "$CONFIG_FB_VALKYRIE" = "m" -o "$CONFIG_FB_PLATINUM" = "m" -o \
               "$CONFIG_FB_IGA" = "m" -o "$CONFIG_FB_MATROX" = "m" -o \
@@ -303,14 +300,13 @@ if [ "$CONFIG_FB" = "y" ]; then
 	      "$CONFIG_FB_PMAG_BA" = "m" -o "$CONFIG_FB_PMAGB_B" = "m" -o \
 	      "$CONFIG_FB_MAXINE" = "m" -o "$CONFIG_FB_RADEON" = "m" -o \
 	      "$CONFIG_FB_SA1100" = "m" -o "$CONFIG_FB_SIS" = "m" -o \
-	      "$CONFIG_FB_TX3912" = "m" -o "$CONFIG_FB_PM3" = "m" -o \
-	      "$CONFIG_FB_TRIDENT" = "m" ]; then
+	      "$CONFIG_FB_TX3912" = "m" ]; then 
 	    define_tristate CONFIG_FBCON_CFB8 m
 	 fi
       fi
       if [ "$CONFIG_FB_ATARI" = "y" -o "$CONFIG_FB_ATY" = "y" -o \
 	   "$CONFIG_FB_MAC" = "y" -o "$CONFIG_FB_NEOMAGIC" = "y" -o \
-	   "$CONFIG_FB_VIRTUAL" = "y" -o "$CONFIG_FB_TBOX" = "y" -o \
+	   "$CONFIG_FB_TRIDENT" = "y" -o "$CONFIG_FB_TBOX" = "y" -o \
 	   "$CONFIG_FB_VOODOO1" = "y" -o "$CONFIG_FB_RADEON" = "y" -o \
 	   "$CONFIG_FB_CONTROL" = "y" -o "$CONFIG_FB_CLGEN" = "y" -o \
 	   "$CONFIG_FB_VIRGE" = "y" -o "$CONFIG_FB_CYBER" = "y" -o \
@@ -320,13 +316,12 @@ if [ "$CONFIG_FB" = "y" ]; then
 	   "$CONFIG_FB_RIVA" = "y" -o "$CONFIG_FB_ATY128" = "y" -o \
 	   "$CONFIG_FB_CYBER2000" = "y" -o "$CONFIG_FB_3DFX" = "y"  -o \
 	   "$CONFIG_FB_SIS" = "y" -o "$CONFIG_FB_SA1100" = "y" -o \
-	   "$CONFIG_FB_PVR2" = "y" -o "$CONFIG_FB_PM3" = "y" -o \
-	   "$CONFIG_FB_TRIDENT" = "y" ]; then 
+	   "$CONFIG_FB_PVR2" = "y" -o "$CONFIG_FB_PM3" = "y" ]; then 
 	 define_tristate CONFIG_FBCON_CFB16 y
       else
 	 if [ "$CONFIG_FB_ATARI" = "m" -o "$CONFIG_FB_ATY" = "m" -o \
 	      "$CONFIG_FB_MAC" = "m" -o "$CONFIG_FB_NEOMAGIC" = "m" -o \
-	      "$CONFIG_FB_VIRTUAL" = "m" -o "$CONFIG_FB_TBOX" = "m" -o \
+	      "$CONFIG_FB_TRIDENT" = "m" -o "$CONFIG_FB_TBOX" = "m" -o \
 	      "$CONFIG_FB_VOODOO1" = "m" -o "$CONFIG_FB_3DFX" = "m" -o \
 	      "$CONFIG_FB_CONTROL" = "m" -o "$CONFIG_FB_CLGEN" = "m" -o \
 	      "$CONFIG_FB_VIRGE" = "m" -o "$CONFIG_FB_CYBER" = "m" -o \
@@ -336,8 +331,7 @@ if [ "$CONFIG_FB" = "y" ]; then
 	      "$CONFIG_FB_RIVA" = "m" -o "$CONFIG_FB_ATY128" = "m" -o \
 	      "$CONFIG_FB_CYBER2000" = "m" -o "$CONFIG_FB_SIS" = "m" -o \
 	      "$CONFIG_FB_SA1100" = "m" -o "$CONFIG_FB_RADEON" = "m" -o \
-	      "$CONFIG_FB_PVR2" = "m" -o "$CONFIG_FB_PM3" = "m" -o \
-	      "$CONFIG_FB_TRIDENT" = "m" ]; then 
+	      "$CONFIG_FB_PVR2" = "m" -o "$CONFIG_FB_PM3" = "m" ]; then 
 	    define_tristate CONFIG_FBCON_CFB16 m
 	 fi
       fi
@@ -359,36 +353,36 @@ if [ "$CONFIG_FB" = "y" ]; then
 	 fi
       fi
       if [ "$CONFIG_FB_ATARI" = "y" -o "$CONFIG_FB_ATY" = "y" -o \
-	   "$CONFIG_FB_VOODOO1" = "y" -o "$CONFIG_FB_VIRTUAL" = "y" -o \
+	   "$CONFIG_FB_VOODOO1" = "y" -o "$CONFIG_FB_TRIDENT" = "y" -o \
 	   "$CONFIG_FB_CONTROL" = "y" -o "$CONFIG_FB_CLGEN" = "y" -o \
 	   "$CONFIG_FB_TGA" = "y" -o "$CONFIG_FB_PLATINUM" = "y" -o \
 	   "$CONFIG_FB_MATROX" = "y" -o "$CONFIG_FB_PM2" = "y" -o \
 	   "$CONFIG_FB_RIVA" = "y" -o "$CONFIG_FB_ATY128" = "y" -o \
 	   "$CONFIG_FB_SIS" = "y" -o "$CONFIG_FB_SGIVW" = "y" -o \
 	   "$CONFIG_FB_RADEON" = "y" -o "$CONFIG_FB_PVR2" = "y" -o \
-	   "$CONFIG_FB_3DFX" = "y" -o "$CONFIG_FB_PM3" = "y" -o \
-	   "$CONFIG_FB_TRIDENT" = "y" ]; then 
+	   "$CONFIG_FB_3DFX" = "y" -o "$CONFIG_FB_PM3" = "y" ]; then
 	 define_tristate CONFIG_FBCON_CFB32 y
       else
 	 if [ "$CONFIG_FB_ATARI" = "m" -o "$CONFIG_FB_ATY" = "m" -o \
-	      "$CONFIG_FB_VOODOO1" = "m" -o "$CONFIG_FB_VIRTUAL" = "m" -o \
+	      "$CONFIG_FB_VOODOO1" = "m" -o "$CONFIG_FB_TRIDENT" = "m" -o \
 	      "$CONFIG_FB_CONTROL" = "m" -o "$CONFIG_FB_CLGEN" = "m" -o \
 	      "$CONFIG_FB_TGA" = "m" -o "$CONFIG_FB_PLATINUM" = "m" -o \
 	      "$CONFIG_FB_MATROX" = "m" -o "$CONFIG_FB_PM2" = "m" -o \
 	      "$CONFIG_FB_RIVA" = "m" -o "$CONFIG_FB_ATY128" = "m" -o \
 	      "$CONFIG_FB_3DFX" = "m" -o "$CONFIG_FB_RADEON" = "m" -o \
 	      "$CONFIG_FB_SGIVW" = "m" -o "$CONFIG_FB_SIS" = "m" -o \
-	      "$CONFIG_FB_PVR2" = "m" -o "$CONFIG_FB_PM3" = "y"-o \
-	      "$CONFIG_FB_TRIDENT" = "m" ]; then
+	      "$CONFIG_FB_PVR2" = "m" -o "$CONFIG_FB_PM3" = "y" ]; then
 	    define_tristate CONFIG_FBCON_CFB32 m
 	 fi
       fi
       if [ "$CONFIG_FB_VESA" = "y" -o "$CONFIG_FB_Q40" = "y" -o \
 	   "$CONFIG_FB_FM2" = "y" -o "$CONFIG_FB_HIT" = "y" -o \
-	   "$CONFIG_FB_ANAKIN" = "y" ]; then
+	   "$CONFIG_FB_ANAKIN" = "y" -o "$CONFIG_FB_G364" = "y" -o \
+	   "$CONFIG_FB_VIRTUAL" = "y" ]; then
 	 define_tristate CONFIG_FBCON_ACCEL y
       else
-	 if [ "$CONFIG_FB_HIT" = "m" ]; then
+	 if [ "$CONFIG_FB_HIT" = "m" -o "$CONFIG_FB_G364" = "m" -o \
+	      "$CONFIG_FB_VIRTUAL" = "m" ]; then
 	    define_tristate CONFIG_FBCON_ACCEL m
          fi       
       fi
@@ -414,10 +408,10 @@ if [ "$CONFIG_FB" = "y" ]; then
 #	    define_tristate CONFIG_FBCON_IPLAN2P16 m
 	 fi
       fi
-      if [ "$CONFIG_FB_MAC" = "y" -o "$CONFIG_FB_VIRTUAL" = "y" ]; then
+      if [ "$CONFIG_FB_MAC" = "y" ]; then
 	 define_tristate CONFIG_FBCON_MAC  y
       else
-	 if [ "$CONFIG_FB_MAC" = "m" -o "$CONFIG_FB_VIRTUAL" = "m" ]; then
+	 if [ "$CONFIG_FB_MAC" = "m" ]; then
 	    define_tristate CONFIG_FBCON_MAC  m
 	 fi
       fi
