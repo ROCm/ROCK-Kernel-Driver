@@ -154,7 +154,7 @@ typedef elf_fpreg_t elf_fpregset_t;
    now struct_user_regs, they are different) */
 
 #define ELF_CORE_COPY_REGS(pr_reg, regs)  \
-	memcpy((char *)&pr_reg, (char *)&regs, sizeof (struct pt_regs));
+	memcpy((char *)pr_reg, (char *)regs, sizeof (struct pt_regs));
 
 /* This yields a mask that user programs can use to figure out what
    instruction set this CPU supports.  */
