@@ -48,6 +48,7 @@ extern struct dentry *smb_dget_fpos(struct dentry *dentry, struct dentry *parent
 extern int smb_fill_cache(struct file *filp, void *dirent, filldir_t filldir, struct smb_cache_control *ctrl, struct qstr *qname, struct smb_fattr *entry);
 /* sock.c */
 extern void smb_data_ready(struct sock *sk, int len);
+extern void smb_write_space(struct sock *sk);
 extern int smb_valid_socket(struct inode *inode);
 extern void smb_close_socket(struct smb_sb_info *server);
 extern int smb_recv_available(struct smb_sb_info *server);
