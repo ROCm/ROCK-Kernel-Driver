@@ -16,6 +16,7 @@ export-objs := dma.o generic.o pcipool.o pm.o sa1111.o sa1111-pcibuf.o
 ifeq ($(CONFIG_CPU_FREQ),y)
 obj-$(CONFIG_SA1100_ASSABET)		+= cpu-sa1110.o
 obj-$(CONFIG_SA1100_CERF)		+= cpu-sa1110.o
+obj-$(CONFIG_SA1100_HACKKIT)		+= cpu-sa1110.o
 obj-$(CONFIG_SA1100_LART)		+= cpu-sa1100.o
 obj-$(CONFIG_SA1100_PT_SYSTEM3)		+= cpu-sa1110.o
 endif
@@ -59,6 +60,9 @@ led-$(CONFIG_SA1100_GRAPHICSMASTER)	+= leds-graphicsmaster.o
 
 obj-$(CONFIG_SA1100_H3600)		+= h3600.o
 export-objs				+= h3600.o
+
+obj-$(CONFIG_SA1100_HACKKIT)		+= hackkit.o
+led-$(CONFIG_SA1100_HACKKIT)		+= leds-hackkit.o
 
 obj-$(CONFIG_SA1100_HUW_WEBPANEL)	+= huw_webpanel.o
 export-objs				+= huw_webpanel.o

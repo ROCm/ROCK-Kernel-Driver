@@ -165,6 +165,13 @@ config SA1100_JORNADA720
 	  handheld computer.  See <http://www.hp.com/jornada/products/720>
 	  for details.
 
+config SA1100_HACKKIT
+	bool "HackKit Core CPU Board"
+	depends on ARCH_SA1100
+	help
+	  Say Y here to support the HackKit Core CPU Board
+	  <http://hackkit.eletztrick.de>;
+
 config SA1100_HUW_WEBPANEL
 	bool "HuW WebPanel"
 	depends on ARCH_SA1100

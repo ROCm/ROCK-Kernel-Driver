@@ -29,6 +29,8 @@ sa1100_leds_init(void)
 		leds_event = flexanet_leds_event;
 	if (machine_is_graphicsclient())
 		leds_event = graphicsclient_leds_event;
+	if (machine_is_hackkit())
+		leds_event = hackkit_leds_event;
 	if (machine_is_lart())
 		leds_event = lart_leds_event;
 	if (machine_is_pfs168())
