@@ -519,12 +519,14 @@ static void load_balance(runqueue_t *this_rq, int idle)
 	busiest = NULL;
 	max_load = 1;
 	for (i = 0; i < smp_num_cpus; i++) {
-		rq_src = cpu_rq(cpu_logical_map(i));
-		if (idle || (rq_src->nr_running < this_rq->prev_nr_running[i]))
+		int logical = cpu_logical_map(i);
+
+		rq_src = cpu_rq(logical);
+		if (idle || (rq_src->nr_running < this_rq->prev_nr_running[logical]))
 			load = rq_src->nr_running;
 		else
-			load = this_rq->prev_nr_running[i];
-		this_rq->prev_nr_running[i] = rq_src->nr_running;
+			load = this_rq->prev_nr_running[logical];
+		this_rq->prev_nr_running[logical] = rq_src->nr_running;
 
 		if ((load > max_load) && (rq_src != this_rq)) {
 			busiest = rq_src;
@@ -1657,18 +1659,25 @@ repeat:
 
 void __init migration_init(void)
 {
+	unsigned long tmp;
 	int cpu;
 
-	for (cpu = 0; cpu < smp_num_cpus; cpu++)
+	tmp = 0;
+	for (cpu = 0; cpu < smp_num_cpus; cpu++) {
 		if (kernel_thread(migration_thread, NULL,
 				CLONE_FS | CLONE_FILES | CLONE_SIGNAL) < 0)
 			BUG();
+		tmp |= (1UL << cpu_logical_map(cpu));
+	}
 
-	migration_mask = (1 << smp_num_cpus) - 1;
+	migration_mask = tmp;
 
-	for (cpu = 0; cpu < smp_num_cpus; cpu++)
-		while (!cpu_rq(cpu)->migration_thread)
+	for (cpu = 0; cpu < smp_num_cpus; cpu++) {
+		int logical = cpu_logical_map(cpu);
+
+		while (!cpu_rq(logical)->migration_thread)
 			schedule_timeout(2);
+	}
 	if (migration_mask)
 		BUG();
 }
