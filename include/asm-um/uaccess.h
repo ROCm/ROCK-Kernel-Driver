@@ -164,7 +164,7 @@ static inline int clear_user(void *mem, int len)
 extern int __do_strnlen_user(const char *str, unsigned long n,
 			     void **fault_addr, void **fault_catcher);
 
-static inline int strnlen_user(void *str, int len)
+static inline int strnlen_user(const void *str, int len)
 {
 	return(__do_strnlen_user(str, len,
 				 &current->thread.fault_addr,
