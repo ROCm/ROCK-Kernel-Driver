@@ -1061,10 +1061,11 @@ static inline runqueue_t *find_busiest_queue(runqueue_t *this_rq, int this_cpu, 
 	 * the lock held.
 	 *
 	 * We fend off statistical fluctuations in runqueue lengths by
-	 * saving the runqueue length during the previous load-balancing
-	 * operation and using the smaller one the current and saved lengths.
-	 * If a runqueue is long enough for a longer amount of time then
-	 * we recognize it and pull tasks from it.
+	 * saving the runqueue length (as seen by the balancing CPU) during
+	 * the previous load-balancing operation and using the smaller one
+	 * of the current and saved lengths. If a runqueue is long enough
+	 * for a longer amount of time then we recognize it and pull tasks
+	 * from it.
 	 *
 	 * The 'current runqueue length' is a statistical maximum variable,
 	 * for that one we take the longer one - to avoid fluctuations in
