@@ -98,7 +98,7 @@ static struct usb_busmap busmap;
 DECLARE_MUTEX (usb_bus_list_lock);	/* exported only for usbfs */
 
 /* used when updating hcd data */
-static spinlock_t hcd_data_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(hcd_data_lock);
 
 /* wait queue for synchronous unlinks */
 DECLARE_WAIT_QUEUE_HEAD(usb_kill_urb_queue);

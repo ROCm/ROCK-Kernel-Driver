@@ -39,10 +39,10 @@
 /* Protect struct usb_device->state and ->children members
  * Note: Both are also protected by ->serialize, except that ->state can
  * change to USB_STATE_NOTATTACHED even when the semaphore isn't held. */
-static spinlock_t device_state_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(device_state_lock);
 
 /* khubd's worklist and its lock */
-static spinlock_t hub_event_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(hub_event_lock);
 static LIST_HEAD(hub_event_list);	/* List of hubs needing servicing */
 
 /* Wakes up khubd */
