@@ -270,6 +270,8 @@ int conf_write(const char *name)
 	int type, l;
 	const char *str;
 	time_t now;
+	int use_timestamp = 1;
+	char *env;
 
 	dirname[0] = 0;
 	if (name && name[0]) {
@@ -306,22 +308,28 @@ int conf_write(const char *name)
 	sym = sym_lookup("KERNELRELEASE", 0);
 	sym_calc_value(sym);
 	time(&now);
+	env = getenv("NOTIMESTAMP");
+	if (env)
+		use_timestamp = 0;
+
 	fprintf(out, "#\n"
 		     "# Automatically generated make config: don't edit\n"
 		     "# Linux kernel version: %s\n"
-		     "# %s"
+		     "%s%s"
 		     "#\n",
 		     sym_get_string_value(sym),
-		     ctime(&now));
+		     use_timestamp ? "# " : "",
+		     use_timestamp ? ctime(&now) : "");
 	if (out_h)
 		fprintf(out_h, "/*\n"
 			       " * Automatically generated C config: don't edit\n"
 			       " * Linux kernel version: %s\n"
-			       " * %s"
+			       "%s%s"
 			       " */\n"
 			       "#define AUTOCONF_INCLUDED\n",
 			       sym_get_string_value(sym),
-			       ctime(&now));
+			       use_timestamp ? " * " : "",
+			       use_timestamp ? ctime(&now) : "");
 
 	if (!sym_change_count)
 		sym_clear_all_valid();
