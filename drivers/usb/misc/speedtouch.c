@@ -852,8 +852,7 @@ static int udsl_usb_data_exit (struct udsl_instance_data *instance)
 		if ((!ctx->urb) || (!ctx->skb))
 			continue;
 
-		if (ctx->urb->status == -EINPROGRESS)
-			usb_unlink_urb (ctx->urb);
+		usb_unlink_urb (ctx->urb);
 
 		usb_free_urb (ctx->urb);
 		kfree_skb (ctx->skb);
@@ -863,8 +862,7 @@ static int udsl_usb_data_exit (struct udsl_instance_data *instance)
 	for (i = 0; i < UDSL_NUMBER_SND_URBS; i++) {
 		struct udsl_usb_send_data_context *ctx = &(instance->send_ctx[i]);
 
-		if (ctx->urb->status == -EINPROGRESS)
-			usb_unlink_urb (ctx->urb);
+		usb_unlink_urb (ctx->urb);
 
 		if (ctx->skb)
 			ctx->vcc->pop (ctx->vcc, ctx->skb);
