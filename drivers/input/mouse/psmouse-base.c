@@ -43,9 +43,9 @@ int psmouse_smartscroll = 1;
 module_param_named(smartscroll, psmouse_smartscroll, bool, 0);
 MODULE_PARM_DESC(smartscroll, "Logitech Smartscroll autorepeat, 1 = enabled (default), 0 = disabled.");
 
-unsigned int psmouse_resetafter;
+static unsigned int psmouse_resetafter;
 module_param_named(resetafter, psmouse_resetafter, uint, 0);
-MODULE_PARM_DESC(resetafter, "Reset Synaptics Touchpad after so many bad packets (0 = never).");
+MODULE_PARM_DESC(resetafter, "Reset device after so many bad packets (0 = never).");
 
 __obsolete_setup("psmouse_noext");
 __obsolete_setup("psmouse_resolution=");
@@ -56,14 +56,21 @@ __obsolete_setup("psmouse_rate=");
 static char *psmouse_protocols[] = { "None", "PS/2", "PS2++", "PS2T++", "GenPS/2", "ImPS/2", "ImExPS/2", "SynPS/2"};
 
 /*
- * psmouse_process_packet() analyzes the PS/2 mouse packet contents and
- * reports relevant events to the input module.
+ * psmouse_process_byte() analyzes the PS/2 data stream and reports
+ * relevant events to the input module once full packet has arrived.
  */
 
-static void psmouse_process_packet(struct psmouse *psmouse, struct pt_regs *regs)
+static psmouse_ret_t psmouse_process_byte(struct psmouse *psmouse, struct pt_regs *regs)
 {
 	struct input_dev *dev = &psmouse->dev;
 	unsigned char *packet = psmouse->packet;
+
+	if (psmouse->pktcnt < 3 + (psmouse->type >= PSMOUSE_GENPS))
+		return PSMOUSE_GOOD_DATA;
+
+/*
+ * Full packet accumulated, process it
+ */
 
 	input_regs(dev, regs);
 
@@ -112,6 +119,8 @@ static void psmouse_process_packet(struct psmouse *psmouse, struct pt_regs *regs
 	input_report_rel(dev, REL_Y, packet[2] ? (int) ((packet[0] << 3) & 0x100) - (int) packet[2] : 0);
 
 	input_sync(dev);
+
+	return PSMOUSE_FULL_PACKET;
 }
 
 /*
@@ -123,6 +132,7 @@ static irqreturn_t psmouse_interrupt(struct serio *serio,
 		unsigned char data, unsigned int flags, struct pt_regs *regs)
 {
 	struct psmouse *psmouse = serio->private;
+	psmouse_ret_t rc;
 
 	if (psmouse->state == PSMOUSE_IGNORE)
 		goto out;
@@ -193,19 +203,33 @@ static irqreturn_t psmouse_interrupt(struct serio *serio,
 		}
 	}
 
-	if (psmouse->type == PSMOUSE_SYNAPTICS) {
-		/*
-		 * The synaptics driver has its own resync logic,
-		 * so it needs to receive all bytes one at a time.
-		 */
-		synaptics_process_byte(psmouse, regs);
-		goto out;
-	}
+	rc = psmouse->type == PSMOUSE_SYNAPTICS ?
+		synaptics_process_byte(psmouse, regs) : psmouse_process_byte(psmouse, regs);
 
-	if (psmouse->pktcnt == 3 + (psmouse->type >= PSMOUSE_GENPS)) {
-		psmouse_process_packet(psmouse, regs);
-		psmouse->pktcnt = 0;
-		goto out;
+	switch (rc) {
+		case PSMOUSE_BAD_DATA:
+			printk(KERN_WARNING "psmouse.c: %s at %s lost sync at byte %d\n",
+				psmouse->name, psmouse->phys, psmouse->pktcnt);
+			psmouse->pktcnt = 0;
+
+			if (++psmouse->out_of_sync == psmouse_resetafter) {
+				psmouse->state = PSMOUSE_IGNORE;
+				printk(KERN_NOTICE "psmouse.c: issuing reconnect request\n");
+				serio_reconnect(psmouse->serio);
+			}
+			break;
+
+		case PSMOUSE_FULL_PACKET:
+			psmouse->pktcnt = 0;
+			if (psmouse->out_of_sync) {
+				psmouse->out_of_sync = 0;
+				printk(KERN_NOTICE "psmouse.c: %s at %s - driver resynched.\n",
+					psmouse->name, psmouse->phys);
+			}
+			break;
+
+		case PSMOUSE_GOOD_DATA:
+			break;
 	}
 out:
 	return IRQ_HANDLED;
@@ -677,7 +701,8 @@ static int psmouse_reconnect(struct serio *serio)
 	old_type = psmouse->type;
 
 	psmouse->state = PSMOUSE_CMD_MODE;
-	psmouse->type = psmouse->acking = psmouse->cmdcnt = psmouse->pktcnt = 0;
+	psmouse->type = psmouse->acking = 0;
+	psmouse->cmdcnt = psmouse->pktcnt = psmouse->out_of_sync = 0;
 	if (psmouse->reconnect) {
 	       if (psmouse->reconnect(psmouse))
 			return -1;

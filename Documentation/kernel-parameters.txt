@@ -879,8 +879,8 @@ running once the system is up.
 	psmouse.rate=	[HW,MOUSE] Set desired mouse report rate, in reports
 			per second.
 	psmouse.resetafter=
-			[HW,MOUSE] Try to reset Synaptics Touchpad after so many
-			bad packets (0 = never).
+			[HW,MOUSE] Try to reset the device after so many bad packets
+			(0 = never).
 	psmouse.resolution=
 			[HW,MOUSE] Set desired mouse resolution, in dpi.
 	psmouse.smartscroll=

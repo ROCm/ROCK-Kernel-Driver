@@ -599,6 +599,9 @@ static int synaptics_validate_byte(unsigned char packet[], int idx, unsigned cha
 	static unsigned char oldabs_mask[]	= { 0xC0, 0x60, 0x00, 0xC0, 0x60 };
 	static unsigned char oldabs_rslt[]	= { 0xC0, 0x00, 0x00, 0x80, 0x00 };
 
+	if (idx < 0 || idx > 4)
+		return 0;
+
 	switch (pkt_type) {
 		case SYN_NEWABS:
 		case SYN_NEWABS_RELAXED:
@@ -629,7 +632,7 @@ static unsigned char synaptics_detect_pkt_type(struct psmouse *psmouse)
 	return SYN_NEWABS_STRICT;
 }
 
-void synaptics_process_byte(struct psmouse *psmouse, struct pt_regs *regs)
+psmouse_ret_t synaptics_process_byte(struct psmouse *psmouse, struct pt_regs *regs)
 {
 	struct input_dev *dev = &psmouse->dev;
 	struct synaptics_data *priv = psmouse->private;
@@ -637,11 +640,6 @@ void synaptics_process_byte(struct psmouse *psmouse, struct pt_regs *regs)
 	input_regs(dev, regs);
 
 	if (psmouse->pktcnt >= 6) { /* Full packet received */
-		if (priv->out_of_sync) {
-			priv->out_of_sync = 0;
-			printk(KERN_NOTICE "Synaptics driver resynced.\n");
-		}
-
 		if (unlikely(priv->pkt_type == SYN_NEWABS))
 			priv->pkt_type = synaptics_detect_pkt_type(psmouse);
 
@@ -649,16 +647,10 @@ void synaptics_process_byte(struct psmouse *psmouse, struct pt_regs *regs)
 			synaptics_pass_pt_packet(&psmouse->ptport->serio, psmouse->packet);
 		else
 			synaptics_process_packet(psmouse);
-		psmouse->pktcnt = 0;
 
-	} else if (psmouse->pktcnt &&
-		   !synaptics_validate_byte(psmouse->packet, psmouse->pktcnt - 1, priv->pkt_type)) {
-		printk(KERN_WARNING "Synaptics driver lost sync at byte %d\n", psmouse->pktcnt);
-		psmouse->pktcnt = 0;
-		if (++priv->out_of_sync == psmouse_resetafter) {
-			psmouse->state = PSMOUSE_IGNORE;
-			printk(KERN_NOTICE "synaptics: issuing reconnect request\n");
-			serio_reconnect(psmouse->serio);
-		}
+		return PSMOUSE_FULL_PACKET;
 	}
+
+	return synaptics_validate_byte(psmouse->packet, psmouse->pktcnt - 1, priv->pkt_type) ?
+		PSMOUSE_GOOD_DATA : PSMOUSE_BAD_DATA;
 }

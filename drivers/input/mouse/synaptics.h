@@ -9,7 +9,7 @@
 #ifndef _SYNAPTICS_H
 #define _SYNAPTICS_H
 
-extern void synaptics_process_byte(struct psmouse *psmouse, struct pt_regs *regs);
+extern psmouse_ret_t synaptics_process_byte(struct psmouse *psmouse, struct pt_regs *regs);
 extern int synaptics_detect(struct psmouse *psmouse);
 extern int synaptics_init(struct psmouse *psmouse);
 extern void synaptics_reset(struct psmouse *psmouse);
@@ -103,7 +103,6 @@ struct synaptics_data {
 	unsigned long int identity;		/* Identification */
 
 	/* Data for normal processing */
-	unsigned int out_of_sync;		/* # of packets out of sync */
 	int old_w;				/* Previous w value */
 	unsigned char pkt_type;			/* packet type - old, new, etc */
 };
