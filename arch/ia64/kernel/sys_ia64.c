@@ -21,12 +21,6 @@
 #include <asm/shmparam.h>
 #include <asm/uaccess.h>
 
-#ifdef CONFIG_HUGETLB_PAGE
-# define SHMLBA_HPAGE		HPAGE_SIZE
-# define COLOR_HALIGN(addr)	(((addr) + SHMLBA_HPAGE - 1) & ~(SHMLBA_HPAGE - 1))
-# define TASK_HPAGE_BASE	((REGION_HPAGE << REGION_SHIFT) | HPAGE_SIZE)
-#endif
-
 unsigned long
 arch_get_unmapped_area (struct file *filp, unsigned long addr, unsigned long len,
 			unsigned long pgoff, unsigned long flags)
@@ -37,6 +31,20 @@ arch_get_unmapped_area (struct file *filp, unsigned long addr, unsigned long len
 
 	if (len > RGN_MAP_LIMIT)
 		return -ENOMEM;
+
+#ifdef CONFIG_HUGETLB_PAGE
+#define COLOR_HALIGN(addr) ((addr + HPAGE_SIZE - 1) & ~(HPAGE_SIZE - 1))
+#define TASK_HPAGE_BASE ((REGION_HPAGE << REGION_SHIFT) | HPAGE_SIZE)
+	if (filp && is_file_hugepages(filp)) {
+		if ((REGION_NUMBER(addr) != REGION_HPAGE) || (addr & (HPAGE_SIZE -1)))
+			addr = TASK_HPAGE_BASE;
+		addr = COLOR_HALIGN(addr);
+	}
+	else {
+		if (REGION_NUMBER(addr) == REGION_HPAGE)
+			addr = 0;
+	}
+#endif
 	if (!addr)
 		addr = TASK_UNMAPPED_BASE;
 
@@ -243,80 +251,6 @@ sys_mmap (unsigned long addr, unsigned long len, int prot, int flags, int fd, lo
 		force_successful_syscall_return();
 	return addr;
 }
-
-#ifdef CONFIG_HUGETLB_PAGE
-
-asmlinkage unsigned long
-sys_alloc_hugepages (int key, unsigned long addr, size_t len, int prot, int flag)
-{
-	struct mm_struct *mm = current->mm;
-	long retval;
-	extern int alloc_hugetlb_pages (int, unsigned long, unsigned long, int, int);
-
-	if ((key < 0) || (len & (HPAGE_SIZE - 1)))
-		return -EINVAL;
-
-	if (addr && ((REGION_NUMBER(addr) != REGION_HPAGE) || (addr & (HPAGE_SIZE - 1))))
-		addr = TASK_HPAGE_BASE;
-
-	if (!addr)
-		addr = TASK_HPAGE_BASE;
-	down_write(&mm->mmap_sem);
-	{
-		retval = arch_get_unmapped_area(NULL, COLOR_HALIGN(addr), len, 0, 0);
-		if (retval != -ENOMEM)
-			retval = alloc_hugetlb_pages(key, retval, len, prot, flag);
-	}
-	up_write(&mm->mmap_sem);
-
-	if (IS_ERR((void *) retval))
-		return retval;
-
-	force_successful_syscall_return();
-	return retval;
-}
-
-asmlinkage int
-sys_free_hugepages (unsigned long  addr)
-{
-	struct mm_struct *mm = current->mm;
-	struct vm_area_struct *vma;
-	extern int free_hugepages(struct vm_area_struct *);
-	int retval;
-
-	down_write(&mm->mmap_sem);
-	{
-		vma = find_vma(mm, addr);
-		if (!vma || !is_vm_hugetlb_page(vma) || (vma->vm_start != addr))
-			retval = -EINVAL;
-			goto out;
-
-		spin_lock(&mm->page_table_lock);
-		{
-			retval = free_hugepages(vma);
-		}
-		spin_unlock(&mm->page_table_lock);
-	}
-out:
-	up_write(&mm->mmap_sem);
-	return retval;
-}
-
-#else /* !CONFIG_HUGETLB_PAGE */
-
-asmlinkage unsigned long
-sys_alloc_hugepages (int key, size_t addr, unsigned long len, int prot, int flag)
-{
-	return -ENOSYS;
-}
-
-asmlinkage unsigned long
-sys_free_hugepages (unsigned long  addr)
-{
-	return -ENOSYS;
-}
-
-#endif /* !CONFIG_HUGETLB_PAGE */
 
 asmlinkage unsigned long
 ia64_mremap (unsigned long addr, unsigned long old_len, unsigned long new_len, unsigned long flags,
