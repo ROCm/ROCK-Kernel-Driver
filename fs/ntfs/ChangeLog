@@ -23,6 +23,7 @@ ToDo:
 2.1.7 - WIP
 
 	- Set i_generation in the VFS inode from the seq_no of the NTFS inode.
+	- Make ntfs_lookup() NFS export safe, i.e. use d_splice_alias(), etc.
 
 2.1.6 - Fix minor bug in handling of compressed directories.
 
