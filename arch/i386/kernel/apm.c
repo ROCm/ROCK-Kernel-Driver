@@ -788,7 +788,7 @@ static void apm_do_busy(void)
 #define IDLE_CALC_LIMIT   (HZ * 100)
 #define IDLE_LEAKY_MAX    16
 
-static void (*sys_idle)(void);
+static void (*original_pm_idle)(void);
 
 extern void default_idle(void);
 
@@ -806,10 +806,9 @@ static void apm_cpu_idle(void)
 	static unsigned int last_jiffies; /* = 0 */
 	static unsigned int last_stime; /* = 0 */
 
-	int apm_is_idle = 0;
+	int apm_idle_done = 0;
 	unsigned int jiffies_since_last_check = jiffies - last_jiffies;
-	unsigned int t1;
-
+	unsigned int bucket;
 
 recalc:
 	if (jiffies_since_last_check > IDLE_CALC_LIMIT) {
@@ -827,7 +826,7 @@ recalc:
 		last_stime = current->times.tms_stime;
 	}
 
-	t1 = IDLE_LEAKY_MAX;
+	bucket = IDLE_LEAKY_MAX;
 
 	while (!need_resched()) {
 		if (use_apm_idle) {
@@ -835,23 +834,24 @@ recalc:
 
 			t = jiffies;
 			switch (apm_do_idle()) {
-			case 0: apm_is_idle = 1;
+			case 0: apm_idle_done = 1;
 				if (t != jiffies) {
-					if (t1) {
-						t1 = IDLE_LEAKY_MAX;
+					if (bucket) {
+						bucket = IDLE_LEAKY_MAX;
 						continue;
 					}
-				} else if (t1) {
-					t1--;
+				} else if (bucket) {
+					bucket--;
 					continue;
 				}
 				break;
-			case 1: apm_is_idle = 1;
+			case 1: apm_idle_done = 1;
 				break;
+			default: /* BIOS refused */
 			}
 		}
-		if (sys_idle)
-			sys_idle();
+		if (original_pm_idle)
+			original_pm_idle();
 		else
 			default_idle();
 		jiffies_since_last_check = jiffies - last_jiffies;
@@ -859,7 +859,7 @@ recalc:
 			goto recalc;
 	}
 
-	if (apm_is_idle)
+	if (apm_idle_done)
 		apm_do_busy();
 }
 
@@ -1967,7 +1967,7 @@ static int __init apm_init(void)
 	if (HZ != 100)
 		idle_period = (idle_period * HZ) / 100;
 	if (idle_threshold < 100) {
-		sys_idle = pm_idle;
+		original_pm_idle = pm_idle;
 		pm_idle  = apm_cpu_idle;
 		set_pm_idle = 1;
 	}
@@ -1980,7 +1980,7 @@ static void __exit apm_exit(void)
 	int	error;
 
 	if (set_pm_idle)
-		pm_idle = sys_idle;
+		pm_idle = original_pm_idle;
 	if (((apm_info.bios.flags & APM_BIOS_DISENGAGED) == 0)
 	    && (apm_info.connection_version > 0x0100)) {
 		error = apm_engage_power_management(APM_DEVICE_ALL, 0);
