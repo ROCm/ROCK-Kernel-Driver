@@ -90,6 +90,22 @@ static struct hotplug_slot_ops shpchp_hotplug_slot_ops = {
   	.get_cur_bus_speed =	get_cur_bus_speed,
 };
 
+/**
+ * release_slot - free up the memory used by a slot
+ * @hotplug_slot: slot to free
+ */
+static void release_slot(struct hotplug_slot *hotplug_slot)
+{
+	struct slot *slot = (struct slot *)hotplug_slot->private;
+
+	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
+
+	kfree(slot->hotplug_slot->info);
+	kfree(slot->hotplug_slot->name);
+	kfree(slot->hotplug_slot);
+	kfree(slot);
+}
+
 static int init_slots(struct controller *ctrl)
 {
 	struct slot *new_slot;
@@ -150,7 +166,8 @@ static int init_slots(struct controller *ctrl)
 
 		/* register this slot with the hotplug pci core */
 		new_slot->hotplug_slot->private = new_slot;
-		make_slot_name (new_slot->hotplug_slot->name, SLOT_NAME_SIZE, new_slot);
+		make_slot_name(new_slot->hotplug_slot->name, SLOT_NAME_SIZE, new_slot);
+		new_slot->hotplug_slot->release = &release_slot;
 		new_slot->hotplug_slot->ops = &shpchp_hotplug_slot_ops;
 
 		new_slot->hpc_ops->get_power_status(new_slot, &(new_slot->hotplug_slot->info->power_status));
@@ -178,29 +195,20 @@ static int init_slots(struct controller *ctrl)
 		slot_number += ctrl->slot_num_inc;
 	}
 
-	return(0);
+	return 0;
 }
 
-
-static int cleanup_slots (struct controller * ctrl)
+static void cleanup_slots(const struct controller *ctrl)
 {
-	struct slot *old_slot, *next_slot;
+	struct slot *old_slot;
 
 	old_slot = ctrl->slot;
 	ctrl->slot = NULL;
 
 	while (old_slot) {
-		next_slot = old_slot->next;
-		pci_hp_deregister (old_slot->hotplug_slot);
-		kfree(old_slot->hotplug_slot->info);
-		kfree(old_slot->hotplug_slot->name);
-		kfree(old_slot->hotplug_slot);
-		kfree(old_slot);
-		old_slot = next_slot;
+		pci_hp_deregister(old_slot->hotplug_slot);
+		old_slot = old_slot->next;
 	}
-
-
-	return(0);
 }
 
 static int get_ctlr_slot_config(struct controller *ctrl)
