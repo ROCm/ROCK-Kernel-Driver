@@ -216,8 +216,6 @@ typedef long		psched_tdiff_t;
 typedef u64	psched_time_t;
 typedef long	psched_tdiff_t;
 
-extern psched_time_t	psched_time_base;
-
 #if PSCHED_CLOCK_SOURCE == PSCHED_JIFFIES
 
 #if HZ < 96
@@ -256,6 +254,7 @@ extern int psched_clock_scale;
 
 #define PSCHED_WATCHER u32
 
+extern psched_time_t psched_time_base;
 extern PSCHED_WATCHER psched_time_mark;
 
 #define PSCHED_GET_TIME(stamp) \
