@@ -554,7 +554,7 @@ find_match_lock(const char *name, int *error, struct semaphore *mutex)
 	return find_inlist_lock(&ip6t_match, name, "ip6t_", error, mutex);
 }
 
-struct ip6t_target *
+static struct ip6t_target *
 ip6t_find_target_lock(const char *name, int *error, struct semaphore *mutex)
 {
 	return find_inlist_lock(&ip6t_target, name, "ip6t_", error, mutex);
@@ -1972,7 +1972,6 @@ static void __exit fini(void)
 EXPORT_SYMBOL(ip6t_register_table);
 EXPORT_SYMBOL(ip6t_unregister_table);
 EXPORT_SYMBOL(ip6t_do_table);
-EXPORT_SYMBOL(ip6t_find_target_lock);
 EXPORT_SYMBOL(ip6t_register_match);
 EXPORT_SYMBOL(ip6t_unregister_match);
 EXPORT_SYMBOL(ip6t_register_target);
