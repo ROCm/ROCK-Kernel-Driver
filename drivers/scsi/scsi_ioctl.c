@@ -322,7 +322,7 @@ int scsi_ioctl_send_command(struct scsi_device *sdev,
 	}
 
 	sreq = scsi_allocate_request(sdev);
-        if (sreq) {
+        if (!sreq) {
                 result = -EINTR;
                 goto error;
         }
