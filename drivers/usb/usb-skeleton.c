@@ -295,7 +295,7 @@ static int skel_release (struct inode *inode, struct file *file)
 	if (atomic_read (&dev->write_busy))
 		wait_for_completion (&dev->write_finished);
 
-	dev->open = 0;
+	--dev->open;
 
 	if (!dev->present) {
 		/* the device was unplugged before the file was released */
