@@ -127,7 +127,7 @@ enum {
  *                                                                           *
  *****************************************************************************/
 
-#define SNDRV_PCM_VERSION			SNDRV_PROTOCOL_VERSION(2, 0, 0)
+#define SNDRV_PCM_VERSION		SNDRV_PROTOCOL_VERSION(2, 0, 1)
 
 typedef unsigned long sndrv_pcm_uframes_t;
 typedef long sndrv_pcm_sframes_t;
@@ -411,6 +411,7 @@ enum {
 	SNDRV_PCM_IOCTL_PAUSE = _IOW('A', 0x45, int),
 	SNDRV_PCM_IOCTL_REWIND = _IOW('A', 0x46, sndrv_pcm_uframes_t),
 	SNDRV_PCM_IOCTL_RESUME = _IO('A', 0x47),
+	SNDRV_PCM_IOCTL_XRUN = _IO('A', 0x48),
 	SNDRV_PCM_IOCTL_WRITEI_FRAMES = _IOW('A', 0x50, struct sndrv_xferi),
 	SNDRV_PCM_IOCTL_READI_FRAMES = _IOR('A', 0x51, struct sndrv_xferi),
 	SNDRV_PCM_IOCTL_WRITEN_FRAMES = _IOW('A', 0x52, struct sndrv_xfern),
@@ -578,7 +579,7 @@ struct sndrv_timer_read {
  *                                                                          *
  ****************************************************************************/
 
-#define SNDRV_CTL_VERSION			SNDRV_PROTOCOL_VERSION(2, 0, 0)
+#define SNDRV_CTL_VERSION		SNDRV_PROTOCOL_VERSION(2, 0, 0)
 
 struct sndrv_ctl_card_info {
 	int card;			/* card number */

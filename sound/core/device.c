@@ -58,11 +58,11 @@ int snd_device_free(snd_card_t *card, void *device_data)
 		list_del(&dev->list);
 		if (dev->state == SNDRV_DEV_REGISTERED && dev->ops->dev_unregister) {
 			if (dev->ops->dev_unregister(dev))
-				snd_printk("device unregister failure\n");
+				snd_printk(KERN_ERR "device unregister failure\n");
 		} else {
 			if (dev->ops->dev_free) {
 				if (dev->ops->dev_free(dev))
-					snd_printk("device free failure\n");
+					snd_printk(KERN_ERR "device free failure\n");
 			}
 		}
 		snd_magic_kfree(dev);

@@ -316,7 +316,7 @@ static int __init snd_gusextreme_probe(int dev)
 
 	if (snd_opl3_create(card, es1688->port, es1688->port + 2,
 			    OPL3_HW_OPL3, 0, &opl3) < 0) {
-		snd_printk("opl3 not detected at 0x%lx\n", es1688->port);
+		printk(KERN_ERR "gusextreme: opl3 not detected at 0x%lx\n", es1688->port);
 	} else {
 		if ((err = snd_opl3_hwdep_new(opl3, 0, 2, NULL)) < 0) {
 			snd_card_free(card);
@@ -376,7 +376,7 @@ static int __init alsa_card_gusextreme_init(void)
 	cards += snd_legacy_auto_probe(possible_ports, snd_gusextreme_legacy_auto_probe);
 	if (!cards) {
 #ifdef MODULE
-		snd_printk("GUS Extreme soundcard not found or device busy\n");
+		printk(KERN_ERR "GUS Extreme soundcard not found or device busy\n");
 #endif
 		return -ENODEV;
 	}

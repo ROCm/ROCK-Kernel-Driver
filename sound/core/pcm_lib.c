@@ -104,7 +104,7 @@ int snd_pcm_update_hw_ptr_interrupt(snd_pcm_substream_t *substream)
 		snd_timestamp_now((snd_timestamp_t*)&runtime->status->tstamp);
 #ifdef CONFIG_SND_DEBUG
 	if (pos > runtime->buffer_size) {
-		snd_printk("BUG: stream = %i, pos = 0x%lx, buffer size = 0x%lx, period size = 0x%lx\n", substream->stream, pos, runtime->buffer_size, runtime->period_size);
+		snd_printk(KERN_ERR  "BUG: stream = %i, pos = 0x%lx, buffer size = 0x%lx, period size = 0x%lx\n", substream->stream, pos, runtime->buffer_size, runtime->period_size);
 	} else
 #endif
 	snd_runtime_check(pos <= runtime->buffer_size, return 0);
@@ -170,7 +170,7 @@ int snd_pcm_update_hw_ptr(snd_pcm_substream_t *substream)
 		snd_timestamp_now((snd_timestamp_t*)&runtime->status->tstamp);
 #ifdef CONFIG_SND_DEBUG
 	if (pos > runtime->buffer_size) {
-		snd_printk("BUG: stream = %i, pos = 0x%lx, buffer size = 0x%lx, period size = 0x%lx\n", substream->stream, pos, runtime->buffer_size, runtime->period_size);
+		snd_printk(KERN_ERR "BUG: stream = %i, pos = 0x%lx, buffer size = 0x%lx, period size = 0x%lx\n", substream->stream, pos, runtime->buffer_size, runtime->period_size);
 	} else
 #endif
 	snd_runtime_check(pos <= runtime->buffer_size, return 0);

@@ -173,7 +173,7 @@ snd_seq_oss_midi_check_new_port(snd_seq_port_info_t *pinfo)
 	 * allocate midi info record
 	 */
 	if ((mdev = snd_kcalloc(sizeof(*mdev), GFP_KERNEL)) == NULL) {
-		snd_printk("can't malloc midi info\n");
+		snd_printk(KERN_ERR "can't malloc midi info\n");
 		return -ENOMEM;
 	}
 
@@ -190,7 +190,7 @@ snd_seq_oss_midi_check_new_port(snd_seq_port_info_t *pinfo)
 
 	/* create MIDI coder */
 	if (snd_midi_event_new(MAX_MIDI_EVENT_BUF, &mdev->coder) < 0) {
-		snd_printk("can't malloc midi coder\n");
+		snd_printk(KERN_ERR "can't malloc midi coder\n");
 		kfree(mdev);
 		return -ENOMEM;
 	}

@@ -562,7 +562,7 @@ static int __init alsa_card_dummy_init(void)
 	for (dev = cards = 0; dev < SNDRV_CARDS && snd_enable[dev]; dev++) {
 		if (snd_card_dummy_probe(dev) < 0) {
 #ifdef MODULE
-			snd_printk("Dummy soundcard #%i not found or device busy\n", dev + 1);
+			printk(KERN_ERR "Dummy soundcard #%i not found or device busy\n", dev + 1);
 #endif
 			break;
 		}
@@ -570,7 +570,7 @@ static int __init alsa_card_dummy_init(void)
 	}
 	if (!cards) {
 #ifdef MODULE
-		snd_printk("Dummy soundcard not found or device busy\n");
+		printk(KERN_ERR "Dummy soundcard not found or device busy\n");
 #endif
 		return -ENODEV;
 	}

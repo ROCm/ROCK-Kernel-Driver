@@ -837,6 +837,42 @@ static int snd_pcm_resume(snd_pcm_substream_t *substream)
 
 #endif /* CONFIG_PM */
 
+static int snd_pcm_xrun(snd_pcm_substream_t *substream)
+{
+	snd_card_t *card = substream->pcm->card;
+	snd_pcm_runtime_t *runtime = substream->runtime;
+	int result;
+
+	snd_power_lock(card);
+	spin_lock_irq(&runtime->lock);
+       _xrun_recovery:
+	switch (runtime->status->state) {
+	case SNDRV_PCM_STATE_XRUN:
+		result = 0;	/* already there */
+		break;
+	case SNDRV_PCM_STATE_RUNNING:
+		result = snd_pcm_stop(substream, SNDRV_PCM_STATE_XRUN);
+		break;
+	case SNDRV_PCM_STATE_SUSPENDED:
+		while (snd_power_get_state(card) != SNDRV_CTL_POWER_D0) {
+			if (substream->ffile->f_flags & O_NONBLOCK) {
+				result = -EAGAIN;
+				goto _end;
+			}
+			spin_unlock_irq(&runtime->lock);
+			snd_power_wait(card);
+			spin_lock_irq(&runtime->lock);
+		}
+		goto _xrun_recovery;
+	default:
+		result = -EBADFD;
+	}
+       _end:
+	spin_unlock_irq(&runtime->lock);
+	snd_power_unlock(card);
+	return result;
+}
+
 static inline int snd_pcm_pre_reset(snd_pcm_substream_t * substream, int state)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
@@ -1999,6 +2035,10 @@ static int snd_pcm_common_ioctl1(snd_pcm_substream_t *substream,
 		return snd_pcm_link(substream, (long) arg);
 	case SNDRV_PCM_IOCTL_UNLINK:
 		return snd_pcm_unlink(substream);
+	case SNDRV_PCM_IOCTL_RESUME:
+		return snd_pcm_resume(substream);
+	case SNDRV_PCM_IOCTL_XRUN:
+		return snd_pcm_xrun(substream);
 	}
 	snd_printd("unknown ioctl = 0x%x\n", cmd);
 	return -ENOTTY;
@@ -2071,8 +2111,6 @@ static int snd_pcm_playback_ioctl1(snd_pcm_substream_t *substream,
 		return snd_pcm_playback_drop(substream);
 	case SNDRV_PCM_IOCTL_DELAY:
 		return snd_pcm_playback_delay(substream, (snd_pcm_sframes_t*) arg);
-	case SNDRV_PCM_IOCTL_RESUME:
-		return snd_pcm_resume(substream);
 	}
 	return snd_pcm_common_ioctl1(substream, cmd, arg);
 }
@@ -2136,8 +2174,6 @@ static int snd_pcm_capture_ioctl1(snd_pcm_substream_t *substream,
 		return snd_pcm_capture_drop(substream);
 	case SNDRV_PCM_IOCTL_DELAY:
 		return snd_pcm_capture_delay(substream, (snd_pcm_sframes_t*) arg);
-	case SNDRV_PCM_IOCTL_RESUME:
-		return snd_pcm_resume(substream);
 	}
 	return snd_pcm_common_ioctl1(substream, cmd, arg);
 }

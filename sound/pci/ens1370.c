@@ -2049,7 +2049,7 @@ static int __init alsa_card_ens137x_init(void)
 
 	if ((err = pci_module_init(&driver)) < 0) {
 #ifdef MODULE
-		snd_printk("Ensoniq AudioPCI soundcard not found or device busy\n");
+		printk(KERN_ERR "Ensoniq AudioPCI soundcard not found or device busy\n");
 #endif
 		return err;
 	}

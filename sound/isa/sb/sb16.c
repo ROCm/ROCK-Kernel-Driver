@@ -43,6 +43,12 @@
 
 #define chip_t sb_t
 
+#ifdef SNDRV_SBAWE
+#define PFX "sbawe: "
+#else
+#define PFX "sb16: "
+#endif
+
 #ifndef SNDRV_SBAWE
 EXPORT_NO_SYMBOLS;
 #endif
@@ -296,7 +302,7 @@ static int __init snd_sb16_isapnp(int dev, struct snd_sb16 *acard)
 	if (snd_irq[dev] != SNDRV_AUTO_IRQ)
 		isapnp_resource_change(&pdev->irq_resource[0], snd_irq[dev], 1);
 	if (pdev->activate(pdev) < 0) {
-		snd_printk("isapnp configure failure (out of resources?)\n");
+		printk(KERN_ERR PFX "isapnp configure failure (out of resources?)\n");
 		return -EBUSY;
 	}
 	snd_port[dev] = pdev->resource[0].start;
@@ -322,7 +328,7 @@ static int __init snd_sb16_isapnp(int dev, struct snd_sb16 *acard)
 		isapnp_resource_change(&pdev->resource[2], snd_awe_port[dev] + 0x800, 4);
 	}
 	if (pdev->activate(pdev)<0) {
-		snd_printk("WaveTable isapnp configure failure (out of resources?)\n");
+		printk(KERN_ERR PFX "WaveTable isapnp configure failure (out of resources?)\n");
 		acard->dev->deactivate(acard->dev);		
 		return -EBUSY;
 	}
@@ -402,21 +408,21 @@ static int __init snd_sb16_probe(int dev)
 	if (irq == SNDRV_AUTO_IRQ) {
 		if ((irq = snd_legacy_find_free_irq(possible_irqs)) < 0) {
 			snd_card_free(card);
-			snd_printk("unable to find a free IRQ\n");
+			printk(KERN_ERR PFX "unable to find a free IRQ\n");
 			return -EBUSY;
 		}
 	}
 	if (dma8 == SNDRV_AUTO_DMA) {
 		if ((dma8 = snd_legacy_find_free_dma(possible_dmas8)) < 0) {
 			snd_card_free(card);
-			snd_printk("unable to find a free 8-bit DMA\n");
+			printk(KERN_ERR PFX "unable to find a free 8-bit DMA\n");
 			return -EBUSY;
 		}
 	}
 	if (dma16 == SNDRV_AUTO_DMA) {
 		if ((dma16 = snd_legacy_find_free_dma(possible_dmas16)) < 0) {
 			snd_card_free(card);
-			snd_printk("unable to find a free 16-bit DMA\n");
+			printk(KERN_ERR PFX "unable to find a free 16-bit DMA\n");
 			return -EBUSY;
 		}
 	}
@@ -475,7 +481,7 @@ static int __init snd_sb16_probe(int dev)
 		if (snd_opl3_create(card, snd_fm_port[dev], snd_fm_port[dev] + 2,
 				    OPL3_HW_OPL3, snd_fm_port[dev] == snd_port[dev],
 				    &opl3) < 0) {
-			snd_printk("no OPL device at 0x%lx-0x%lx\n",
+			printk(KERN_ERR PFX "no OPL device at 0x%lx-0x%lx\n",
 				   snd_fm_port[dev], snd_fm_port[dev] + 2);
 		} else {
 #ifdef SNDRV_SBAWE_EMU8000
@@ -503,7 +509,7 @@ static int __init snd_sb16_probe(int dev)
 			chip->csp = csp->private_data;
 			chip->hardware = SB_HW_16CSP;
 		} else {
-			snd_printk("warning - CSP chip not detected on soundcard #%i\n", dev + 1);
+			printk(KERN_INFO PFX "warning - CSP chip not detected on soundcard #%i\n", dev + 1);
 		}
 	}
 #endif
@@ -511,7 +517,7 @@ static int __init snd_sb16_probe(int dev)
 	if (snd_awe_port[dev] > 0) {
 		if (snd_emu8000_new(card, 1, snd_awe_port[dev],
 				    snd_seq_ports[dev], NULL) < 0) {
-			snd_printk("fatal error - EMU-8000 synthesizer not detected at 0x%lx\n", snd_awe_port[dev]);
+			printk(KERN_ERR PFX "fatal error - EMU-8000 synthesizer not detected at 0x%lx\n", snd_awe_port[dev]);
 			snd_card_free(card);
 			return -ENXIO;
 		}
@@ -612,7 +618,7 @@ static int __init alsa_card_sb16_init(void)
 			continue;
 		}
 #ifdef MODULE
-		snd_printk("Sound Blaster 16+ soundcard #%i not found at 0x%lx or device busy\n", dev, snd_port[dev]);
+		printk(KERN_ERR "Sound Blaster 16+ soundcard #%i not found at 0x%lx or device busy\n", dev, snd_port[dev]);
 #endif			
 	}
 	/* legacy auto configured cards */
@@ -624,11 +630,11 @@ static int __init alsa_card_sb16_init(void)
 
 	if (!cards) {
 #ifdef MODULE
-		snd_printk("Sound Blaster 16 soundcard not found or device busy\n");
+		printk(KERN_ERR "Sound Blaster 16 soundcard not found or device busy\n");
 #ifdef SNDRV_SBAWE_EMU8000
-		snd_printk("In case, if you have non-AWE card, try snd-card-sb16 module\n");
+		printk(KERN_ERR "In case, if you have non-AWE card, try snd-card-sb16 module\n");
 #else
-		snd_printk("In case, if you have AWE card, try snd-card-sbawe module\n");
+		printk(KERN_ERR "In case, if you have AWE card, try snd-card-sbawe module\n");
 #endif
 #endif
 		return -ENODEV;

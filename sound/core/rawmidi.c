@@ -769,7 +769,7 @@ static int snd_rawmidi_ioctl(struct inode *inode, struct file *file,
 	}
 #ifdef CONFIG_SND_DEBUG
 	default:
-		snd_printk("rawmidi: unknown command = 0x%x\n", cmd);
+		snd_printk(KERN_WARNING "rawmidi: unknown command = 0x%x\n", cmd);
 #endif
 	}
 	return -ENOTTY;
@@ -1408,7 +1408,7 @@ static int snd_rawmidi_dev_register(snd_device_t *device)
 	if ((err = snd_register_device(SNDRV_DEVICE_TYPE_RAWMIDI,
 				       rmidi->card, rmidi->device,
 				       &snd_rawmidi_reg, name)) < 0) {
-		snd_printk("unable to register rawmidi device %i:%i\n", rmidi->card->number, rmidi->device);
+		snd_printk(KERN_ERR "unable to register rawmidi device %i:%i\n", rmidi->card->number, rmidi->device);
 		snd_rawmidi_devices[idx] = NULL;
 		up(&register_mutex);
 		return err;
@@ -1425,7 +1425,7 @@ static int snd_rawmidi_dev_register(snd_device_t *device)
 	if (rmidi->device == snd_midi_map[rmidi->card->number]) {
 		if (snd_register_oss_device(SNDRV_OSS_DEVICE_TYPE_MIDI,
 					    rmidi->card, 0, &snd_rawmidi_reg, name) < 0) {
-			snd_printk("unable to register OSS rawmidi device %i:%i\n", rmidi->card->number, 0);
+			snd_printk(KERN_ERR "unable to register OSS rawmidi device %i:%i\n", rmidi->card->number, 0);
 		} else {
 			rmidi->ossreg++;
 			snd_oss_info_register(SNDRV_OSS_INFO_DEV_MIDI, rmidi->card->number, rmidi->name);
@@ -1434,7 +1434,7 @@ static int snd_rawmidi_dev_register(snd_device_t *device)
 	if (rmidi->device == snd_amidi_map[rmidi->card->number]) {
 		if (snd_register_oss_device(SNDRV_OSS_DEVICE_TYPE_MIDI,
 					    rmidi->card, 1, &snd_rawmidi_reg, name) < 0) {
-			snd_printk("unable to register OSS rawmidi device %i:%i\n", rmidi->card->number, 1);
+			snd_printk(KERN_ERR "unable to register OSS rawmidi device %i:%i\n", rmidi->card->number, 1);
 		} else {
 			rmidi->ossreg++;
 		}
@@ -1532,11 +1532,11 @@ static int __init alsa_rawmidi_init(void)
 	/* check device map table */
 	for (i = 0; i < SNDRV_CARDS; i++) {
 		if (snd_midi_map[i] < 0 || snd_midi_map[i] >= SNDRV_RAWMIDI_DEVICES) {
-			snd_printk("invalid midi_map[%d] = %d\n", i, snd_midi_map[i]);
+			snd_printk(KERN_ERR "invalid midi_map[%d] = %d\n", i, snd_midi_map[i]);
 			snd_midi_map[i] = 0;
 		}
 		if (snd_amidi_map[i] < 0 || snd_amidi_map[i] >= SNDRV_RAWMIDI_DEVICES) {
-			snd_printk("invalid amidi_map[%d] = %d\n", i, snd_amidi_map[i]);
+			snd_printk(KERN_ERR "invalid amidi_map[%d] = %d\n", i, snd_amidi_map[i]);
 			snd_amidi_map[i] = 1;
 		}
 	}

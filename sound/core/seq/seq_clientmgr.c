@@ -265,7 +265,7 @@ static void seq_free_client(client_t * client)
 	down(&register_mutex);
 	switch (client->type) {
 	case NO_CLIENT:
-		snd_printk("Seq: Trying to free unused client %d\n", client->number);
+		snd_printk(KERN_WARNING "Seq: Trying to free unused client %d\n", client->number);
 		break;
 	case USER_CLIENT:
 	case KERNEL_CLIENT:
@@ -274,7 +274,7 @@ static void seq_free_client(client_t * client)
 		break;
 
 	default:
-		snd_printk("Seq: Trying to free client %d with undefined type = %d\n", client->number, client->type);
+		snd_printk(KERN_ERR "Seq: Trying to free client %d with undefined type = %d\n", client->number, client->type);
 	}
 	up(&register_mutex);
 

@@ -1718,7 +1718,7 @@ static int __devinit snd_ice1712_pcm(ice1712_t * ice, int device, snd_pcm_t ** r
 	if (rpcm)
 		*rpcm = pcm;
 
-	printk("Consumer PCM code does not work well at the moment --jk\n");
+	printk(KERN_WARNING "Consumer PCM code does not work well at the moment --jk\n");
 
 	return 0;
 }
@@ -2410,7 +2410,7 @@ static int __devinit snd_ice1712_ac97_mixer(ice1712_t * ice)
 		ac97.private_data = ice;
 		ac97.private_free = snd_ice1712_mixer_free_ac97;
 		if ((err = snd_ac97_mixer(ice->card, &ac97, &ice->ac97)) < 0) {
-			snd_printk("ice1712: cannot initialize ac97 for consumer, skipped\n");
+			printk(KERN_WARNING "ice1712: cannot initialize ac97 for consumer, skipped\n");
 			// return err;
 		} else {
 			if ((err = snd_ctl_add(ice->card, snd_ctl_new1(&snd_ice1712_mixer_digmix_route_ac97, ice))) < 0)
@@ -2428,7 +2428,7 @@ static int __devinit snd_ice1712_ac97_mixer(ice1712_t * ice)
 		ac97.private_data = ice;
 		ac97.private_free = snd_ice1712_mixer_free_ac97;
 		if ((err = snd_ac97_mixer(ice->card, &ac97, &ice->ac97)) < 0) {
-			snd_printk("ice1712: cannot initialize pro ac97, skipped\n");
+			printk(KERN_WARNING "ice1712: cannot initialize pro ac97, skipped\n");
 			// return err;
 		}
 		return 0;
@@ -4329,7 +4329,7 @@ static int __init alsa_card_ice1712_init(void)
 
 	if ((err = pci_module_init(&driver)) < 0) {
 #ifdef MODULE
-		snd_printk("ICE1712 soundcard not found or device busy\n");
+		printk(KERN_ERR "ICE1712 soundcard not found or device busy\n");
 #endif
 		return err;
 	}

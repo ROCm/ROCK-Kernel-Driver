@@ -893,7 +893,7 @@ static int __init alsa_card_opl3sa2_init(void)
 #endif
 	if (!cards) {
 #ifdef MODULE
-		snd_printk("Yamaha OPL3-SA soundcard not found or device busy\n");
+		printk(KERN_ERR "Yamaha OPL3-SA soundcard not found or device busy\n");
 #endif
 		return -ENODEV;
 	}

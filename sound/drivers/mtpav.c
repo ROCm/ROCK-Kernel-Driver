@@ -761,7 +761,7 @@ static int __init alsa_card_mtpav_init(void)
 
 	snd_mtpav_portscan(mtp_card);
 
-	snd_printk("Motu MidiTimePiece on parallel port irq: %d ioport: 0x%lx\n", snd_irq, snd_port);
+	printk(KERN_INFO "Motu MidiTimePiece on parallel port irq: %d ioport: 0x%lx\n", snd_irq, snd_port);
 
 	return 0;
 

@@ -74,7 +74,7 @@ snd_card_t *snd_card_new(int idx, const char *xid,
 	if (idx < 0 || idx >= snd_ecards_limit) {
 		write_unlock(&snd_card_rwlock);
 		if (idx >= snd_ecards_limit)
-			snd_printk("card %i is out of range (0-%i)\n", idx, snd_ecards_limit-1);
+			snd_printk(KERN_ERR "card %i is out of range (0-%i)\n", idx, snd_ecards_limit-1);
 		goto __error;
 	}
 	snd_cards_lock |= 1 << idx;		/* lock it */
@@ -140,26 +140,26 @@ int snd_card_free(snd_card_t * card)
 		snd_mixer_oss_notify_callback(card, 1);
 #endif
 	if (snd_device_free_all(card, SNDRV_DEV_CMD_PRE) < 0) {
-		snd_printk("unable to free all devices (pre)\n");
+		snd_printk(KERN_ERR "unable to free all devices (pre)\n");
 		/* Fatal, but this situation should never occur */
 	}
 	if (snd_device_free_all(card, SNDRV_DEV_CMD_NORMAL) < 0) {
-		snd_printk("unable to free all devices (normal)\n");
+		snd_printk(KERN_ERR "unable to free all devices (normal)\n");
 		/* Fatal, but this situation should never occur */
 	}
 	if (snd_ctl_unregister(card) < 0) {
-		snd_printk("unable to unregister control minors\n");
+		snd_printk(KERN_ERR "unable to unregister control minors\n");
 		/* Not fatal error */
 	}
 	if (snd_device_free_all(card, SNDRV_DEV_CMD_POST) < 0) {
-		snd_printk("unable to free all devices (post)\n");
+		snd_printk(KERN_ERR "unable to free all devices (post)\n");
 		/* Fatal, but this situation should never occur */
 	}
 	if (card->private_free)
 		card->private_free(card);
 	snd_info_free_entry(card->proc_id);
 	if (snd_info_card_unregister(card) < 0) {
-		snd_printk("unable to unregister card info\n");
+		snd_printk(KERN_WARNING "unable to unregister card info\n");
 		/* Not fatal error */
 	}
 	write_lock(&snd_card_rwlock);

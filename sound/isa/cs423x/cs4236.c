@@ -309,7 +309,7 @@ static int __init snd_card_cs4236_isapnp(int dev, struct snd_card_cs4236 *acard)
 	if (snd_dma2[dev] != SNDRV_AUTO_DMA)
 		isapnp_resource_change(&pdev->dma_resource[1], snd_dma2[dev] < 0 ? 4 : snd_dma2[dev], 1);
 	if (pdev->activate(pdev)<0) {
-		snd_printk(IDENT " isapnp configure failed for WSS (out of resources?)\n");
+		printk(KERN_ERR IDENT " isapnp configure failed for WSS (out of resources?)\n");
 		return -EBUSY;
 	}
 	snd_port[dev] = pdev->resource[0].start;
@@ -331,7 +331,7 @@ static int __init snd_card_cs4236_isapnp(int dev, struct snd_card_cs4236 *acard)
 	if (snd_cport[dev] != SNDRV_AUTO_PORT)
 		isapnp_resource_change(&pdev->resource[0], snd_cport[dev], 8);
 	if (pdev->activate(pdev)<0) {
-		snd_printk(IDENT " isapnp configure failed for control (out of resources?)\n");
+		printk(KERN_ERR IDENT " isapnp configure failed for control (out of resources?)\n");
 		acard->wss->deactivate(acard->wss);
 		return -EBUSY;
 	}
@@ -352,7 +352,7 @@ static int __init snd_card_cs4236_isapnp(int dev, struct snd_card_cs4236 *acard)
 		if (pdev->activate(pdev)<0) {
 			snd_mpu_port[dev] = SNDRV_AUTO_PORT;
 			snd_mpu_irq[dev] = SNDRV_AUTO_IRQ;
-			snd_printk(IDENT " isapnp configure failed for MPU (out of resources?)\n");
+			printk(KERN_ERR IDENT " isapnp configure failed for MPU (out of resources?)\n");
 		} else {
 			snd_mpu_port[dev] = pdev->resource[0].start;
 			if (pdev->irq_resource[0].flags & IORESOURCE_IRQ) {
@@ -429,7 +429,7 @@ static int __init snd_card_cs4236_probe(int dev)
 	card->private_free = snd_card_cs4236_free;
 #ifdef __ISAPNP__
 	if (snd_isapnp[dev] && (err = snd_card_cs4236_isapnp(dev, acard))<0) {
-		snd_printk("isapnp detection failed and probing for " IDENT " is not supported\n");
+		printk(KERN_ERR "isapnp detection failed and probing for " IDENT " is not supported\n");
 		snd_card_free(card);
 		return -ENXIO;
 	}
@@ -442,7 +442,7 @@ static int __init snd_card_cs4236_probe(int dev)
 		snd_sb_port[dev] = SNDRV_AUTO_PORT;
 	if (snd_sb_port[dev] != SNDRV_AUTO_PORT)
 		if ((acard->res_sb_port = request_region(snd_sb_port[dev], 16, IDENT " SB")) == NULL) {
-			snd_printk("unable to register SB port at 0x%lx\n", snd_sb_port[dev]);
+			printk(KERN_ERR IDENT ": unable to register SB port at 0x%lx\n", snd_sb_port[dev]);
 			snd_card_free(card);
 			return -ENOMEM;
 		}
@@ -501,7 +501,7 @@ static int __init snd_card_cs4236_probe(int dev)
 		if (snd_opl3_create(card,
 				    snd_fm_port[dev], snd_fm_port[dev] + 2,
 				    OPL3_HW_OPL3_CS, 0, &opl3) < 0) {
-			snd_printk(IDENT ": OPL3 not detected\n");
+			printk(KERN_ERR IDENT ": OPL3 not detected\n");
 		} else {
 			if ((err = snd_opl3_hwdep_new(opl3, 0, 1, NULL)) < 0) {
 				snd_card_free(card);
@@ -515,7 +515,7 @@ static int __init snd_card_cs4236_probe(int dev)
 					snd_mpu_port[dev], 0,
 					snd_mpu_irq[dev],
 					snd_mpu_irq[dev] >= 0 ? SA_INTERRUPT : 0, NULL) < 0)
-			snd_printk(IDENT ": MPU401 not detected\n");
+			printk(KERN_ERR IDENT ": MPU401 not detected\n");
 	}
 	strcpy(card->driver, pcm->name);
 	strcpy(card->shortname, pcm->name);
@@ -575,7 +575,7 @@ static int __init alsa_card_cs423x_init(void)
 #endif
 	if (!cards) {
 #ifdef MODULE
-		snd_printk(IDENT " soundcard not found or device busy\n");
+		printk(KERN_ERR IDENT " soundcard not found or device busy\n");
 #endif
 		return -ENODEV;
 	}

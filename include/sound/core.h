@@ -292,13 +292,21 @@ unsigned int snd_dma_residue(unsigned long dma);
 /* misc.c */
 
 int snd_task_name(struct task_struct *task, char *name, size_t size);
+#ifdef CONFIG_SND_VERBOSE_PRINTK
+int snd_verbose_printk(const char *file, int line, const char *format);
+#endif
 
 /* --- */
 
+#ifdef CONFIG_SND_VERBOSE_PRINTK
 #define snd_printk(format, args...) do { \
-	printk("ALSA %s:%d: ", __FILE__, __LINE__); \
+	printk(snd_verbose_printk(__FILE__, __LINE__, format) ? format + 3 : format, ##args); \
+} while (0)
+#else
+#define snd_printk(format, args...) do { \
 	printk(format, ##args); \
 } while (0)
+#endif
 
 #ifdef CONFIG_SND_DEBUG
 

@@ -1953,27 +1953,27 @@ static int __init snd_korg1212_create(korg1212_t *korg1212)
 
         korg1212->res_iomem = request_mem_region(korg1212->iomem, iomem_size, "korg1212");
         if (korg1212->res_iomem == NULL) {
-                PRINTK("unable to grab region 0x%lx-0x%lx\n",
+		snd_printk("unable to grab region 0x%lx-0x%lx\n",
                            korg1212->iomem, korg1212->iomem + iomem_size - 1);
                 return -EBUSY;
         }
 
         korg1212->res_ioport = request_region(korg1212->ioport, ioport_size, "korg1212");
         if (korg1212->res_ioport == NULL) {
-                PRINTK("unable to grab region 0x%lx-0x%lx\n",
+		snd_printk("unable to grab region 0x%lx-0x%lx\n",
                            korg1212->ioport, korg1212->ioport + ioport_size - 1);
                 return -EBUSY;
         }
 
         korg1212->res_iomem2 = request_mem_region(korg1212->iomem2, iomem2_size, "korg1212");
         if (korg1212->res_iomem2 == NULL) {
-                PRINTK("unable to grab region 0x%lx-0x%lx\n",
+		snd_printk("unable to grab region 0x%lx-0x%lx\n",
                            korg1212->iomem2, korg1212->iomem2 + iomem2_size - 1);
                 return -EBUSY;
         }
 
         if ((korg1212->iobase = (unsigned long) ioremap(korg1212->iomem, iomem_size)) == 0) {
-                PRINTK("unable to remap memory region 0x%lx-0x%lx\n", korg1212->iobase,
+		snd_printk("unable to remap memory region 0x%lx-0x%lx\n", korg1212->iobase,
                            korg1212->iobase + iomem_size - 1);
                 return -EBUSY;
         }
@@ -1983,7 +1983,7 @@ static int __init snd_korg1212_create(korg1212_t *korg1212)
                           "korg1212", (void *) korg1212);
 
         if (err) {
-                PRINTK("unable to grab IRQ %d\n", pci->irq);
+		snd_printk("unable to grab IRQ %d\n", pci->irq);
                 return -EBUSY;
         }
 
@@ -2034,7 +2034,7 @@ static int __init snd_korg1212_create(korg1212_t *korg1212)
 	korg1212->sharedBufferPhy = (unsigned long)phys_addr;
 
         if (korg1212->sharedBufferPtr == NULL) {
-                PRINTK("can not allocate shared buffer memory (%d bytes)\n", sizeof(KorgSharedBuffer));
+		snd_printk("can not allocate shared buffer memory (%d bytes)\n", sizeof(KorgSharedBuffer));
                 return -ENOMEM;
         }
 
@@ -2050,7 +2050,7 @@ static int __init snd_korg1212_create(korg1212_t *korg1212)
 	korg1212->PlayDataPhy = (u32)phys_addr;
 
         if (korg1212->playDataBufsPtr == NULL) {
-                PRINTK("can not allocate play data buffer memory (%d bytes)\n", korg1212->DataBufsSize);
+		snd_printk("can not allocate play data buffer memory (%d bytes)\n", korg1212->DataBufsSize);
                 return -ENOMEM;
         }
 
@@ -2063,7 +2063,7 @@ static int __init snd_korg1212_create(korg1212_t *korg1212)
 	korg1212->RecDataPhy = (u32)phys_addr;
 
         if (korg1212->recordDataBufsPtr == NULL) {
-                PRINTK("can not allocate record data buffer memory (%d bytes)\n", korg1212->DataBufsSize);
+		snd_printk("can not allocate record data buffer memory (%d bytes)\n", korg1212->DataBufsSize);
                 return -ENOMEM;
         }
 
@@ -2091,7 +2091,7 @@ static int __init snd_korg1212_create(korg1212_t *korg1212)
 	korg1212->dspMemPhy = (u32)phys_addr;
 
         if (korg1212->dspMemPtr == NULL) {
-                PRINTK("can not allocate dsp code memory (%d bytes)\n", korg1212->dspCodeSize);
+		snd_printk("can not allocate dsp code memory (%d bytes)\n", korg1212->dspCodeSize);
                 return -ENOMEM;
         }
 
@@ -2114,7 +2114,7 @@ static int __init snd_korg1212_create(korg1212_t *korg1212)
         if (snd_korg1212_downloadDSPCode(korg1212))
         	return -EBUSY;
 
-        PRINTK("dspMemPhy       = %08x U[%08x]\n"
+	printk(KERN_INFO "dspMemPhy       = %08x U[%08x]\n"
                "PlayDataPhy     = %08x L[%08x]\n"
                "RecDataPhy      = %08x L[%08x]\n"
                "VolumeTablePhy  = %08x L[%08x]\n"
@@ -2312,7 +2312,7 @@ static int __init alsa_card_korg1212_init(void)
 
 	if ((err = pci_module_init(&driver)) < 0) {
 #ifdef MODULE
-		PRINTK("No Korg 1212IO cards found\n");
+		printk(KERN_ERR "No Korg 1212IO cards found\n");
 #endif
 		return err;
 	}

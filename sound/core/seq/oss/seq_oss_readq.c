@@ -47,12 +47,12 @@ snd_seq_oss_readq_new(seq_oss_devinfo_t *dp, int maxlen)
 	seq_oss_readq_t *q;
 
 	if ((q = snd_kcalloc(sizeof(*q), GFP_KERNEL)) == NULL) {
-		snd_printk("can't malloc read queue\n");
+		snd_printk(KERN_ERR "can't malloc read queue\n");
 		return NULL;
 	}
 
 	if ((q->q = snd_kcalloc(sizeof(evrec_t) * maxlen, GFP_KERNEL)) == NULL) {
-		snd_printk("can't malloc read queue buffer\n");
+		snd_printk(KERN_ERR "can't malloc read queue buffer\n");
 		kfree(q);
 		return NULL;
 	}

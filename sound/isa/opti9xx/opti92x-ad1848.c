@@ -2154,9 +2154,9 @@ static int __init alsa_card_opti9xx_init(void)
 	if ((error = snd_card_opti9xx_probe())) {
 #ifdef MODULE
 #ifdef OPTi93X
-		snd_printk("no OPTi 82C93x soundcard found\n");
+		printk(KERN_ERR "no OPTi 82C93x soundcard found\n");
 #else
-		snd_printk("no OPTi 82C92x soundcard found\n");
+		printk(KERN_ERR "no OPTi 82C92x soundcard found\n");
 #endif	/* OPTi93X */
 #endif
 		return error;

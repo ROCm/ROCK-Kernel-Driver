@@ -197,7 +197,7 @@ static int __devinit snd_card_ymfpci_probe(struct pci_dev *pci,
 		if ((err = snd_mpu401_uart_new(card, 0, MPU401_HW_YMFPCI,
 					       snd_mpu_port[dev], 0,
 					       pci->irq, 0, &chip->rawmidi)) < 0) {
-			printk(KERN_INFO "ymfpci: cannot initialize MPU401 at 0x%lx, skipping...\n", snd_mpu_port[dev]);
+			printk(KERN_WARNING "ymfpci: cannot initialize MPU401 at 0x%lx, skipping...\n", snd_mpu_port[dev]);
 		} else {
 			legacy_ctrl &= ~0x10; /* disable MPU401 irq */
 			pci_write_config_word(pci, PCIR_DSXG_LEGACY, legacy_ctrl);
@@ -208,7 +208,7 @@ static int __devinit snd_card_ymfpci_probe(struct pci_dev *pci,
 					   snd_fm_port[dev],
 					   snd_fm_port[dev] + 2,
 					   OPL3_HW_OPL3, 0, &opl3)) < 0) {
-			printk(KERN_INFO "ymfpci: cannot initialize FM OPL3 at 0x%lx, skipping...\n", snd_fm_port[dev]);
+			printk(KERN_WARNING "ymfpci: cannot initialize FM OPL3 at 0x%lx, skipping...\n", snd_fm_port[dev]);
 		} else if ((err = snd_opl3_hwdep_new(opl3, 0, 1, NULL)) < 0) {
 			snd_card_free(card);
 			snd_printk("cannot create opl3 hwdep\n");
@@ -216,7 +216,7 @@ static int __devinit snd_card_ymfpci_probe(struct pci_dev *pci,
 		}
 	}
 	if ((err = snd_ymfpci_joystick(chip)) < 0) {
-		printk(KERN_INFO "ymfpci: cannot initialize joystick, skipping...\n");
+		printk(KERN_WARNING "ymfpci: cannot initialize joystick, skipping...\n");
 	}
 	strcpy(card->driver, str);
 	sprintf(card->shortname, "Yamaha DS-XG PCI (%s)", str);
@@ -287,7 +287,7 @@ static int __init alsa_card_ymfpci_init(void)
 
 	if ((err = pci_module_init(&driver)) < 0) {
 #ifdef MODULE
-		snd_printk("Yamaha DS-XG PCI soundcard not found or device busy\n");
+		printk(KERN_ERR "Yamaha DS-XG PCI soundcard not found or device busy\n");
 #endif
 		return err;
 	}

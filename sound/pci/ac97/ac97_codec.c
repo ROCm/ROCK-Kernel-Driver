@@ -115,7 +115,7 @@ static const ac97_codec_id_t snd_ac97_codec_ids[] = {
 { 0x43525960, 0xfffffff8, "CS4291",		NULL },
 { 0x48525300, 0xffffff00, "HMP9701",		NULL },
 { 0x49434501, 0xffffffff, "ICE1230",		NULL },
-{ 0x49434511, 0xffffffff, "ICE1232",		NULL }, // only guess --jk
+{ 0x49434511, 0xffffffff, "ICE1232",		NULL }, // alias VIA VT1611A?
 { 0x4e534300, 0xffffffff, "LM4540/43/45/46/48",	NULL }, // only guess --jk
 { 0x4e534331, 0xffffffff, "LM4549",		NULL },
 { 0x53494c22, 0xffffffff, "Si3036",		NULL },
@@ -1393,28 +1393,31 @@ int snd_ac97_mixer(snd_card_t * card, ac97_t * _ac97, ac97_t ** rac97)
 	ac97->card = card;
 	spin_lock_init(&ac97->reg_lock);
 	snd_ac97_write(ac97, AC97_RESET, 0);	/* reset to defaults */
-	udelay(50);
+	if (ac97->wait)
+		ac97->wait(ac97);
+	else {
+		udelay(50);
 
-	/* it's necessary to wait awhile until registers are accessible after RESET */
-	/* because the PCM or MASTER volume registers can be modified, */
-	/* the REC_GAIN register is used for tests */
-	end_time = jiffies + (HZ / 2);
-	do {
-		/* use preliminary reads to settle the communication */
-		snd_ac97_read(ac97, AC97_RESET);
-		snd_ac97_read(ac97, AC97_VENDOR_ID1);
-		snd_ac97_read(ac97, AC97_VENDOR_ID2);
-		/* test if we can write to the PCM volume register */
-		snd_ac97_write_cache(ac97, AC97_REC_GAIN, 0x8a05);
-		if ((err = snd_ac97_read(ac97, AC97_REC_GAIN)) == 0x8a05)
-			goto __access_ok;
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(HZ/100);
-	} while (end_time - (signed long)jiffies >= 0);
-	snd_printd("AC'97 %d:%d does not respond - RESET [REC_GAIN = 0x%x]\n", ac97->num, ac97->addr, err);
-	snd_ac97_free(ac97);
-	return -ENXIO;
-
+		/* it's necessary to wait awhile until registers are accessible after RESET */
+		/* because the PCM or MASTER volume registers can be modified, */
+		/* the REC_GAIN register is used for tests */
+		end_time = jiffies + HZ;
+		do {
+			/* use preliminary reads to settle the communication */
+			snd_ac97_read(ac97, AC97_RESET);
+			snd_ac97_read(ac97, AC97_VENDOR_ID1);
+			snd_ac97_read(ac97, AC97_VENDOR_ID2);
+			/* test if we can write to the PCM volume register */
+			snd_ac97_write_cache(ac97, AC97_REC_GAIN, 0x8a05);
+			if ((err = snd_ac97_read(ac97, AC97_REC_GAIN)) == 0x8a05)
+				goto __access_ok;
+			set_current_state(TASK_UNINTERRUPTIBLE);
+			schedule_timeout(HZ/100);
+		} while (end_time - (signed long)jiffies >= 0);
+		snd_printd("AC'97 %d:%d does not respond - RESET [REC_GAIN = 0x%x]\n", ac97->num, ac97->addr, err);
+		snd_ac97_free(ac97);
+		return -ENXIO;
+	}
       __access_ok:
 	ac97->caps = snd_ac97_read(ac97, AC97_RESET);
 	ac97->id = snd_ac97_read(ac97, AC97_VENDOR_ID1) << 16;

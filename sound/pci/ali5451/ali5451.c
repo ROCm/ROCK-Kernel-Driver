@@ -2253,7 +2253,7 @@ static int __init alsa_card_ali_init(void)
 
 	if ((err = pci_module_init(&driver)) < 0) {
 #ifdef MODULE
-		snd_printk("ALi pci audio not found or device busy.\n");
+		printk(KERN_ERR "ALi pci audio not found or device busy.\n");
 #endif
 		return err;
 	}

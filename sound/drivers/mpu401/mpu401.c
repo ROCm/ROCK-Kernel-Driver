@@ -81,7 +81,7 @@ static int __init snd_card_mpu401_probe(int dev)
 	if (snd_mpu401_uart_new(card, 0, MPU401_HW_MPU401,
 				snd_port[dev], 0,
 				snd_irq[dev], snd_irq[dev] >= 0 ? SA_INTERRUPT : 0, NULL) < 0) {
-		snd_printk("MPU401 not detected at 0x%lx\n", snd_port[dev]);
+		printk(KERN_ERR "MPU401 not detected at 0x%lx\n", snd_port[dev]);
 		snd_card_free(card);
 		return -ENODEV;
 	}
@@ -113,7 +113,7 @@ static int __init alsa_card_mpu401_init(void)
 	}
 	if (!cards) {
 #ifdef MODULE
-		snd_printk("MPU-401 device not found or device busy\n");
+		printk(KERN_ERR "MPU-401 device not found or device busy\n");
 #endif
 		return -ENODEV;
 	}

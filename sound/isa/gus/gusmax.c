@@ -292,13 +292,13 @@ static int __init snd_gusmax_probe(int dev)
 	}
 	if (!gus->max_flag) {
 		snd_card_free(card);
-		snd_printk("GUS MAX soundcard was not detected at 0x%lx\n", gus->gf1.port);
+		printk(KERN_ERR "GUS MAX soundcard was not detected at 0x%lx\n", gus->gf1.port);
 		return -ENODEV;
 	}
 
 	if (request_irq(irq, snd_gusmax_interrupt, SA_INTERRUPT, "GUS MAX", (void *)maxcard)) {
 		snd_card_free(card);
-		snd_printk("unable to grab IRQ %d\n", irq);
+		printk(KERN_ERR "gusmax: unable to grab IRQ %d\n", irq);
 		return -EBUSY;
 	}
 	maxcard->irq = irq;
@@ -387,7 +387,7 @@ static int __init alsa_card_gusmax_init(void)
 	cards += snd_legacy_auto_probe(possible_ports, snd_gusmax_legacy_auto_probe);
 	if (!cards) {
 #ifdef MODULE
-		snd_printk("GUS MAX soundcard not found or device busy\n");
+		printk(KERN_ERR "GUS MAX soundcard not found or device busy\n");
 #endif
 		return -ENODEV;
 	}
