@@ -2289,7 +2289,7 @@ int __init pm2fb_init(void) {
 		return -EINVAL;
 	}
 	printk(KERN_INFO "fb%d: %s (%s), using %uK of video memory.\n",
-				GET_FB_IDX(fb_info.gen.info.node),
+				minor(fb_info.gen.info.node),
 				board_table[fb_info.board].name,
 				permedia2_name,
 				(u32 )(fb_info.regions.fb_size>>10));

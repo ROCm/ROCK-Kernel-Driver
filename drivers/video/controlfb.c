@@ -96,13 +96,11 @@ static inline int VAR_MATCH(struct fb_var_screeninfo *x, struct fb_var_screeninf
 }
 
 struct fb_info_control {
-	struct fb_info			info;
-	struct display			display;
-	struct fb_par_control		par;
-	struct {
-		__u8 red, green, blue;
-	}			palette[256];
-	
+	struct fb_info		info;
+	struct display		display; /* Will disappear */
+	struct fb_par_control	par;
+	u32			pseudo_palette[17];
+		
 	struct cmap_regs	*cmap_regs;
 	unsigned long		cmap_regs_phys;
 	
@@ -118,14 +116,6 @@ struct fb_info_control {
 	int			control_use_bank2;
 	unsigned long		total_vram;
 	unsigned char		vram_attr;
-	union {
-#ifdef FBCON_HAS_CFB16
-		u16 cfb16[16];
-#endif
-#ifdef FBCON_HAS_CFB32
-		u32 cfb32[16];
-#endif
-	} fbcon_cmap;
 };
 
 /* control register access macro */
@@ -136,46 +126,21 @@ struct fb_info_control {
 /*
  * struct fb_ops
  */
-static int control_get_fix(struct fb_fix_screeninfo *fix, int con,
-	struct fb_info *info);
-static int control_get_var(struct fb_var_screeninfo *var, int con,
-	struct fb_info *info);
-static int control_set_var(struct fb_var_screeninfo *var, int con,
-	struct fb_info *info);
-static int control_pan_display(struct fb_var_screeninfo *var, int con,
-	struct fb_info *info);
-static int control_get_cmap(struct fb_cmap *cmap, int kspc, int con,
+static int controlfb_pan_display(struct fb_var_screeninfo *var, int con,
 	struct fb_info *info);
 static int controlfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 	u_int transp, struct fb_info *info);
 static int controlfb_blank(int blank_mode, struct fb_info *info);
-static int control_mmap(struct fb_info *info, struct file *file,
+static int controlfb_mmap(struct fb_info *info, struct file *file,
 	struct vm_area_struct *vma);
-
-/*
- * low level fbcon ops
- */
-static int controlfb_switch(int con, struct fb_info *info);
-static int controlfb_updatevar(int con, struct fb_info *info);
-
-/*
- * low level cmap set/get ops
- */
-static int controlfb_getcolreg(u_int regno, u_int *red, u_int *green,
-	u_int *blue, u_int *transp, struct fb_info *info);
+static int controlfb_set_par (struct fb_info *info);
+static int controlfb_check_var (struct fb_var_screeninfo *var, struct fb_info *info);
 
 /*
  * inititialization
  */
 int control_init(void);
 void control_setup(char *);
-
-/*
- * low level fbcon revc ops
- */
-static void control_cfb16_revc(struct display *p, int xx, int yy);
-static void control_cfb32_revc(struct display *p, int xx, int yy);
-
 
 /******************** Prototypes for internal functions **********************/
 
@@ -184,10 +149,6 @@ static int init_control(struct fb_info_control *p);
 static void control_set_hardware(struct fb_info_control *p,
 	struct fb_par_control *par);
 static int control_of_init(struct device_node *dp);
-static void control_par_to_fix(struct fb_par_control *par,
-	struct fb_fix_screeninfo *fix, struct fb_info_control *p);
-static void control_set_dispsw(struct display *disp, int cmode,
-	struct fb_info_control *p);
 static void find_vram_size(struct fb_info_control *p);
 static int read_control_sense(struct fb_info_control *p);
 static int calc_clock_params(unsigned long clk, unsigned char *param);
@@ -195,13 +156,6 @@ static int control_var_to_par(struct fb_var_screeninfo *var,
 	struct fb_par_control *par, const struct fb_info *fb_info);
 static inline void control_par_to_var(struct fb_par_control *par,
 	struct fb_var_screeninfo *var);
-static void control_par_to_fix(struct fb_par_control *par,
-	struct fb_fix_screeninfo *fix, struct fb_info_control *p);
-static void control_par_to_display(struct fb_par_control *par,
-	struct display *disp, struct fb_fix_screeninfo *fix,
-	struct fb_info_control *p);
-static void control_set_dispsw(struct display *disp, int cmode,
-	struct fb_info_control *p);
 static void control_init_info(struct fb_info *info, struct fb_info_control *p);
 static void control_cleanup(void);
 
@@ -216,16 +170,19 @@ static int default_cmode __initdata = CMODE_NVRAM;
 
 
 static struct fb_ops controlfb_ops = {
-	.owner =	THIS_MODULE,
-	.fb_get_fix =	control_get_fix,
-	.fb_get_var =	control_get_var,
-	.fb_set_var =	control_set_var,
-	.fb_get_cmap =	control_get_cmap,
-	.fb_set_cmap =	gen_set_cmap,
-	.fb_setcolreg =	controlfb_setcolreg,
-	.fb_pan_display =control_pan_display,
-	.fb_blank =	controlfb_blank,
-	.fb_mmap =	control_mmap,
+	.owner		= THIS_MODULE,
+	.fb_set_var	= gen_set_var,
+	.fb_check_var	= controlfb_check_var,
+	.fb_set_par	= controlfb_set_par,
+	.fb_get_cmap	= gen_get_cmap,
+	.fb_set_cmap	= gen_set_cmap,
+	.fb_setcolreg	= controlfb_setcolreg,
+	.fb_pan_display = controlfb_pan_display,
+	.fb_blank	= controlfb_blank,
+	.fb_mmap	= controlfb_mmap,
+	.fb_fillrect	= cfb_fillrect,
+	.fb_copyarea	= cfb_copyarea,
+	.fb_imageblit	= cfb_imageblit,
 };
 
 
@@ -251,86 +208,47 @@ void cleanup_module(void)
 }
 #endif
 
-/*********** Providing our information to the user ************/
-
-static int control_get_fix(struct fb_fix_screeninfo *fix, int con,
-			 struct fb_info *info)
+/*
+ * Checks a var structure
+ */
+static int controlfb_check_var (struct fb_var_screeninfo *var, struct fb_info *info)
 {
-	struct fb_info_control *p = (struct fb_info_control *) info;
+	struct fb_par_control par;
+	int err;
 
-	if(con == -1) {
-		control_par_to_fix(&p->par, fix, p);
-	} else {
-		struct fb_par_control par;
-		
-		control_var_to_par(&fb_display[con].var, &par, info);
-		control_par_to_fix(&par, fix, p);
-	}
+	err = control_var_to_par(var, &par, info);
+	if (err)
+		return err;	
+	control_par_to_var(&par, var);
+
 	return 0;
 }
-
-static int control_get_var(struct fb_var_screeninfo *var, int con,
-			 struct fb_info *info)
-{
-	struct fb_info_control *p = (struct fb_info_control *) info;
-
-	if(con == -1) {
-		control_par_to_var(&p->par, var);
-	} else {
-		*var = fb_display[con].var;
-	}
-	return 0;
-}
-
 
 /*
- * Sets everything according to var
+ * Applies current var to display
  */
-static int control_set_var(struct fb_var_screeninfo *var, int con,
-			 struct fb_info *info)
+static int controlfb_set_par (struct fb_info *info)
 {
 	struct fb_info_control *p = (struct fb_info_control *) info;
-	struct display *disp;
 	struct fb_par_control par;
-	int depthchange, err;
-	int activate = var->activate;
+	int err;
 
-	if((err = control_var_to_par(var, &par, info))) {
-		if (con < 0)
-			printk (KERN_ERR "control_set_var: error calling"
-					 " control_var_to_par: %d.\n", err);
+	if((err = control_var_to_par(&info->var, &par, info))) {
+		printk (KERN_ERR "controlfb_set_par: error calling"
+				 " control_var_to_par: %d.\n", err);
 		return err;
 	}
 	
-	control_par_to_var(&par, var);
-	
-	if ((activate & FB_ACTIVATE_MASK) != FB_ACTIVATE_NOW)
-		return 0;
+	control_set_hardware(p, &par);
 
-	disp = (con >= 0) ? &fb_display[con] : info->disp;
-
-	depthchange = (disp->var.bits_per_pixel != var->bits_per_pixel);
-	if(!VAR_MATCH(&disp->var, var)) {
-		struct fb_fix_screeninfo	fix;
-		control_par_to_fix(&par, &fix, p);
-		control_par_to_display(&par, disp, &fix, p);
-		if(info->changevar)
-			(*info->changevar)(con);
-	} else
-		disp->var = *var;
-
-	if (con == info->currcon) {
-		control_set_hardware(p, &par);
-		if(depthchange) {
-			if((err = fb_alloc_cmap(&disp->cmap, 0, 0)))
-				return err;
-			do_install_cmap(con, info);
-		}
-	}
+	info->fix.visual = (p->par.cmode == CMODE_8) ?
+		FB_VISUAL_PSEUDOCOLOR : FB_VISUAL_DIRECTCOLOR;
+	info->fix.line_length = p->par.pitch;
+	info->fix.xpanstep = 32 >> p->par.cmode;
+	info->fix.ypanstep = 1;
 
 	return 0;
 }
-
 
 /*
  * Set screen start address according to var offset values
@@ -347,7 +265,7 @@ static inline void set_screen_start(int xoffset, int yoffset,
 }
 
 
-static int control_pan_display(struct fb_var_screeninfo *var, int con,
+static int controlfb_pan_display(struct fb_var_screeninfo *var, int con,
 			     struct fb_info *info)
 {
 	unsigned int xoffset, hstep;
@@ -369,48 +287,30 @@ static int control_pan_display(struct fb_var_screeninfo *var, int con,
 	return 0;
 }
 
-static int control_get_cmap(struct fb_cmap *cmap, int kspc, int con,
-			  struct fb_info *info)
-{
-	if (con == info->currcon)		/* current console? */
-		return fb_get_cmap(cmap, kspc, controlfb_getcolreg, info);
-	if (fb_display[con].cmap.len)	/* non default colormap? */
-		fb_copy_cmap(&fb_display[con].cmap, cmap, kspc ? 0: 2);
-	else {
-		int size = fb_display[con].var.bits_per_pixel == 16 ? 32 : 256;
-		fb_copy_cmap(fb_default_cmap(size), cmap, kspc ? 0 : 2);
-	}
-	return 0;
-}
 
 /*
  * Private mmap since we want to have a different caching on the framebuffer
  * for controlfb.
  * Note there's no locking in here; it's done in fb_mmap() in fbmem.c.
  */
-static int control_mmap(struct fb_info *info, struct file *file,
+static int controlfb_mmap(struct fb_info *info, struct file *file,
                        struct vm_area_struct *vma)
 {
-       struct fb_ops *fb = info->fbops;
-       struct fb_fix_screeninfo fix;
-       struct fb_var_screeninfo var;
        unsigned long off, start;
        u32 len;
 
-       fb->fb_get_fix(&fix, PROC_CONSOLE(info), info);
        off = vma->vm_pgoff << PAGE_SHIFT;
 
        /* frame buffer memory */
-       start = fix.smem_start;
-       len = PAGE_ALIGN((start & ~PAGE_MASK)+fix.smem_len);
+       start = info->fix.smem_start;
+       len = PAGE_ALIGN((start & ~PAGE_MASK)+info->fix.smem_len);
        if (off >= len) {
                /* memory mapped io */
                off -= len;
-               fb->fb_get_var(&var, PROC_CONSOLE(info), info);
-               if (var.accel_flags)
+               if (info->var.accel_flags)
                        return -EINVAL;
-               start = fix.mmio_start;
-               len = PAGE_ALIGN((start & ~PAGE_MASK)+fix.mmio_len);
+               start = info->fix.mmio_start;
+               len = PAGE_ALIGN((start & ~PAGE_MASK)+info->fix.mmio_len);
                pgprot_val(vma->vm_page_prot) |= _PAGE_NO_CACHE|_PAGE_GUARDED;
        } else {
                /* framebuffer */
@@ -427,44 +327,6 @@ static int control_mmap(struct fb_info *info, struct file *file,
 
        return 0;
 }
-
-
-/********************  End of controlfb_ops implementation  ******************/
-
-/*
- * low level fbcon ops
- */
-
-static int controlfb_switch(int con, struct fb_info *info)
-{
-	struct fb_info_control	*p = (struct fb_info_control *)info;
-	struct fb_par_control	par;
-
-	if (info->currcon >= 0 && fb_display[info->currcon].cmap.len)
-		fb_get_cmap(&fb_display[info->currcon].cmap, 1, controlfb_getcolreg,
-			    info);
-	info->currcon = con;
-
-	fb_display[con].var.activate = FB_ACTIVATE_NOW;
-	control_var_to_par(&fb_display[con].var, &par, info);
-	control_set_hardware(p, &par);
-	control_set_dispsw(&fb_display[con], par.cmode, p);
-	do_install_cmap(con, info);
-
-	return 1;
-}
-
-
-static int controlfb_updatevar(int con, struct fb_info *info)
-{
-	struct fb_var_screeninfo *var = &fb_display[con].var;
-	struct fb_info_control *p = (struct fb_info_control *) info;
-
-	set_screen_start(var->xoffset, var->yoffset, p);
-
-	return 0;
-}
-
 
 static int controlfb_blank(int blank_mode, struct fb_info *info)
 {
@@ -498,30 +360,10 @@ static int controlfb_blank(int blank_mode, struct fb_info *info)
 	return 0;
 }
 
-
-/*
- * low level cmap set/get ops
- */
-
-static int controlfb_getcolreg(u_int regno, u_int *red, u_int *green,
-			     u_int *blue, u_int *transp, struct fb_info *info)
-{
-	struct fb_info_control *p = (struct fb_info_control *) info;
-
-	if (regno > 255)
-		return 1;
-	*red = (p->palette[regno].red<<8) | p->palette[regno].red;
-	*green = (p->palette[regno].green<<8) | p->palette[regno].green;
-	*blue = (p->palette[regno].blue<<8) | p->palette[regno].blue;
-	*transp = 0;
-	return 0;
-}
-
 static int controlfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 			     u_int transp, struct fb_info *info)
 {
 	struct fb_info_control *p = (struct fb_info_control *) info;
-	u_int i;
 	__u8 r, g, b;
 
 	if (regno > 255)
@@ -531,31 +373,33 @@ static int controlfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 	g = green >> 8;
 	b = blue >> 8;
 
-	p->palette[regno].red = r;
-	p->palette[regno].green = g;
-	p->palette[regno].blue = b;
-
 	out_8(&p->cmap_regs->addr, regno);	/* tell clut what addr to fill	*/
 	out_8(&p->cmap_regs->lut, r);		/* send one color channel at	*/
 	out_8(&p->cmap_regs->lut, g);		/* a time...			*/
 	out_8(&p->cmap_regs->lut, b);
 
-	if (regno < 16)
+	if (regno < 16) {
+		int i;
 		switch (p->par.cmode) {
-#ifdef FBCON_HAS_CFB16
-			case CMODE_16:
-				p->fbcon_cmap.cfb16[regno] = (regno << 10) | (regno << 5) | regno;
-				break;
-#endif
-#ifdef FBCON_HAS_CFB32
-			case CMODE_32:
-				i = (regno << 8) | regno;
-				p->fbcon_cmap.cfb32[regno] = (i << 16) | i;
-				break;
-#endif
+		case CMODE_16:
+			((u16 *) (info->pseudo_palette))[regno] =
+			    (regno << 10) | (regno << 5) | regno;
+			break;
+		case CMODE_32:
+			i = (regno << 8) | regno;
+			((u32 *) (info->pseudo_palette))[regno] =
+			    (i << 16) | i;
+			break;
 		}
+	}
+
 	return 0;
 }
+
+
+/********************  End of controlfb_ops implementation  ******************/
+
+
 
 static void set_control_clock(unsigned char *params)
 {
@@ -580,7 +424,8 @@ static int __init init_control(struct fb_info_control *p)
 {
 	int full, sense, vmode, cmode, vyres;
 	struct fb_var_screeninfo var;
-
+	int rc;
+	
 	printk(KERN_INFO "controlfb: ");
 
 	full = p->total_vram == 0x400000;
@@ -613,6 +458,10 @@ static int __init init_control(struct fb_info_control *p)
 		}
 	}
 
+	/* Initialize info structure */
+	control_init_info(&p->info, p);
+
+	/* Setup default var */
 	if (mac_vmode_to_var(vmode, cmode, &var) < 0) {
 		/* This shouldn't happen! */
 		printk("mac_vmode_to_var(%d, %d,) failed\n", vmode, cmode);
@@ -631,18 +480,14 @@ try_again:
 	if (vyres > var.yres)
 		var.yres_virtual = vyres;
 
-	control_init_info(&p->info, p);
-	p->info.currcon = -1;
+	/* Apply default var */
+	p->info.var = var;
 	var.activate = FB_ACTIVATE_NOW;
+	rc = gen_set_var(&var, -1, &p->info);
+	if (rc && (vmode != VMODE_640_480_60 || cmode != CMODE_8))
+		goto try_again;
 
-	if (control_set_var(&var, -1, &p->info) < 0) {
-		if (vmode != VMODE_640_480_60 || cmode != CMODE_8)
-			goto try_again;
-		printk(KERN_ERR "controlfb: initilization failed\n");
-		return -ENXIO;
-	}
-
-	p->info.flags = FBINFO_FLAG_DEFAULT;
+	/* Register with fbdev layer */
 	if (register_framebuffer(&p->info) < 0)
 		return -ENXIO;
 	
@@ -820,7 +665,7 @@ static int __init control_of_init(struct device_node *dp)
 		printk(KERN_ERR "expecting 2 address for control (got %d)", dp->n_addrs);
 		return -ENXIO;
 	}
-	p = kmalloc(sizeof(*p), GFP_ATOMIC);
+	p = kmalloc(sizeof(*p), GFP_KERNEL);
 	if (p == 0)
 		return -ENXIO;
 	control_fb = p;	/* save it for cleanups */
@@ -1164,171 +1009,41 @@ static void control_par_to_var(struct fb_par_control *par, struct fb_var_screeni
 	var->pixclock >>= par->regvals.clock_params[2];
 }
 
-
-/*
- * init fix according to given par
- */
-static void control_par_to_fix(struct fb_par_control *par, struct fb_fix_screeninfo *fix,
-	struct fb_info_control *p)
-{
-	memset(fix, 0, sizeof(*fix));
-	strcpy(fix->id, "control");
-	fix->mmio_start = p->control_regs_phys;
-	fix->mmio_len = sizeof(struct control_regs);
-	fix->type = FB_TYPE_PACKED_PIXELS;
-	
-	fix->xpanstep = 32 >> par->cmode;
-	fix->ypanstep = 1;
-
-	fix->smem_start = p->frame_buffer_phys + CTRLFB_OFF;
-	fix->smem_len = p->total_vram - CTRLFB_OFF;
-	fix->visual = (par->cmode == CMODE_8) ?
-		FB_VISUAL_PSEUDOCOLOR : FB_VISUAL_DIRECTCOLOR;
-	fix->line_length = par->pitch;
-}
-
-/*
- * initialize a portion of struct display which low level driver is responsible
- * for.
- */
-static void control_par_to_display(struct fb_par_control *par,
-  struct display *disp, struct fb_fix_screeninfo *fix, struct fb_info_control *p)
-{
-	disp->type = fix->type;
-	disp->can_soft_blank = 1;
-	disp->scrollmode = SCROLL_YNOMOVE | SCROLL_YNOPARTIAL;
-	disp->ypanstep = fix->ypanstep;
-	disp->ywrapstep = fix->ywrapstep;
-
-	control_par_to_var(par, &disp->var);
-	p->info.screen_base = (char *) p->frame_buffer + CTRLFB_OFF;
-	disp->visual = fix->visual;
-	disp->line_length = fix->line_length;
-	control_set_dispsw(disp, par->cmode, p);
-}
-
-
-/*
- * our own _revc() routines since generic routines don't work for DIRECT Color
- * devices like control
- */
-static void control_cfb16_revc(struct display *p, int xx, int yy)
-{
-    u8 *dest;
-    int bytes = p->next_line, rows;
-
-    dest = p->fb_info->screen_base + yy * fontheight(p) * bytes + xx * fontwidth(p)*2;
-    for (rows = fontheight(p); rows--; dest += bytes) {
-       switch (fontwidth(p)) {
-       case 16:
-           ((u32 *)dest)[6] ^= 0x3def3def; ((u32 *)dest)[7] ^= 0x3def3def;
-           /* FALL THROUGH */
-       case 12:
-           ((u32 *)dest)[4] ^= 0x3def3def; ((u32 *)dest)[5] ^= 0x3def3def;
-           /* FALL THROUGH */
-       case 8:
-           ((u32 *)dest)[2] ^= 0x3def3def; ((u32 *)dest)[3] ^= 0x3def3def;
-           /* FALL THROUGH */
-       case 4:
-           ((u32 *)dest)[0] ^= 0x3def3def; ((u32 *)dest)[1] ^= 0x3def3def;
-       }
-    }
-}
-
-static void control_cfb32_revc(struct display *p, int xx, int yy)
-{
-    u8 *dest;
-    int bytes = p->next_line, rows;
-
-    dest = p->fb_info->screen_base + yy * fontheight(p) * bytes + xx * fontwidth(p) * 4;
-    for (rows = fontheight(p); rows--; dest += bytes) {
-       switch (fontwidth(p)) {
-       case 16:
-           ((u32 *)dest)[12] ^= 0x0f0f0f0f; ((u32 *)dest)[13] ^= 0x0f0f0f0f;
-           ((u32 *)dest)[14] ^= 0x0f0f0f0f; ((u32 *)dest)[15] ^= 0x0f0f0f0f;
-           /* FALL THROUGH */
-       case 12:
-           ((u32 *)dest)[8] ^= 0x0f0f0f0f; ((u32 *)dest)[9] ^= 0x0f0f0f0f;
-           ((u32 *)dest)[10] ^= 0x0f0f0f0f; ((u32 *)dest)[11] ^= 0x0f0f0f0f;
-           /* FALL THROUGH */
-       case 8:
-           ((u32 *)dest)[4] ^= 0x0f0f0f0f; ((u32 *)dest)[5] ^= 0x0f0f0f0f;
-           ((u32 *)dest)[6] ^= 0x0f0f0f0f; ((u32 *)dest)[7] ^= 0x0f0f0f0f;
-           /* FALL THROUGH */
-       case 4:
-           ((u32 *)dest)[0] ^= 0x0f0f0f0f; ((u32 *)dest)[1] ^= 0x0f0f0f0f;
-           ((u32 *)dest)[2] ^= 0x0f0f0f0f; ((u32 *)dest)[3] ^= 0x0f0f0f0f;
-           /* FALL THROUGH */
-       }
-    }
-}
-
-static struct display_switch control_cfb16 = {
-    setup:		fbcon_cfb16_setup,
-    bmove:		fbcon_cfb16_bmove,
-    clear:		fbcon_cfb16_clear,
-    putc:		fbcon_cfb16_putc,
-    putcs:		fbcon_cfb16_putcs,
-    revc:		control_cfb16_revc,
-    clear_margins:	fbcon_cfb16_clear_margins,
-    fontwidthmask:	FONTWIDTH(4)|FONTWIDTH(8)|FONTWIDTH(12)|FONTWIDTH(16)
-};
-
-static struct display_switch control_cfb32 = {
-    setup:		fbcon_cfb32_setup,
-    bmove:		fbcon_cfb32_bmove,
-    clear:		fbcon_cfb32_clear,
-    putc:		fbcon_cfb32_putc,
-    putcs:		fbcon_cfb32_putcs,
-    revc:		control_cfb32_revc,
-    clear_margins:	fbcon_cfb32_clear_margins,
-    fontwidthmask:	FONTWIDTH(4)|FONTWIDTH(8)|FONTWIDTH(12)|FONTWIDTH(16)
-};
-
-
-/*
- * Set struct dispsw according to given cmode
- */
-static void control_set_dispsw(struct display *disp, int cmode, struct fb_info_control *p)
-{
-	switch (cmode) {
-#ifdef FBCON_HAS_CFB8
-		case CMODE_8:
-			disp->dispsw = &fbcon_cfb8;
-			break;
-#endif
-#ifdef FBCON_HAS_CFB16
-		case CMODE_16:
-			disp->dispsw = &control_cfb16;
-			disp->dispsw_data = p->fbcon_cmap.cfb16;
-			break;
-#endif
-#ifdef FBCON_HAS_CFB32
-		case CMODE_32:
-			disp->dispsw = &control_cfb32;
-			disp->dispsw_data = p->fbcon_cmap.cfb32;
-			break;
-#endif
-		default:
-			disp->dispsw = &fbcon_dummy;
-			break;
-	}
-}
-
-
 /*
  * Set misc info vars for this driver
  */
 static void __init control_init_info(struct fb_info *info, struct fb_info_control *p)
 {
+	/* Fill fb_info */
 	strcpy(info->modename, "control");
+	info->currcon = -1;
+	info->par = &p->par;
 	info->node = NODEV;
 	info->fbops = &controlfb_ops;
 	info->disp = &p->display;
-	strcpy(info->fontname, fontname);
+	info->pseudo_palette = p->pseudo_palette;
+        info->flags = FBINFO_FLAG_DEFAULT;
+        strncpy (info->fontname, fontname, sizeof (info->fontname));
+        info->fontname[sizeof (info->fontname) - 1] = 0;
 	info->changevar = NULL;
-	info->switch_con = &controlfb_switch;
-	info->updatevar = &controlfb_updatevar;
+        info->display_fg = NULL;
+	info->screen_base = (char *) p->frame_buffer + CTRLFB_OFF;
+	info->changevar  = NULL;
+	info->switch_con = gen_switch;
+	info->updatevar  = gen_update_var;
+
+	fb_alloc_cmap(&info->cmap, 256, 0);
+
+	/* Fill fix common fields */
+	strcpy(info->fix.id, "control");
+	info->fix.mmio_start = p->control_regs_phys;
+	info->fix.mmio_len = sizeof(struct control_regs);
+	info->fix.type = FB_TYPE_PACKED_PIXELS;
+	info->fix.smem_start = p->frame_buffer_phys + CTRLFB_OFF;
+	info->fix.smem_len = p->total_vram - CTRLFB_OFF;
+        info->fix.ywrapstep = 0;
+        info->fix.type_aux = 0;
+        info->fix.accel = FB_ACCEL_NONE;
 }
 
 
