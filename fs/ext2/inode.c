@@ -43,8 +43,7 @@ static int ext2_update_inode(struct inode * inode, int do_sync);
  */
 void ext2_put_inode (struct inode * inode)
 {
-	if (atomic_read(&inode->i_count) < 2)	/* final iput? */
-		ext2_discard_prealloc (inode);
+	ext2_discard_prealloc (inode);
 }
 
 /*
