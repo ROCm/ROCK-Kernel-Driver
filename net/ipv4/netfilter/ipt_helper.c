@@ -9,6 +9,7 @@
  */
 #include <linux/module.h>
 #include <linux/skbuff.h>
+#include <linux/netfilter.h>
 #include <linux/netfilter_ipv4/ip_conntrack.h>
 #include <linux/netfilter_ipv4/ip_conntrack_core.h>
 #include <linux/netfilter_ipv4/ip_conntrack_helper.h>
