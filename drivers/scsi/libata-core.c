@@ -1836,7 +1836,7 @@ static void ata_fill_sg(struct ata_queued_cmd *qc)
 
 	idx = 0;
 	for (nelem = qc->n_elem; nelem; nelem--,sg++) {
-		u32 addr, boundary;
+		u32 addr, offset;
 		u32 sg_len, len;
 
 		/* determine if physical DMA addr spans 64K boundary.
@@ -1847,10 +1847,10 @@ static void ata_fill_sg(struct ata_queued_cmd *qc)
 		sg_len = sg_dma_len(sg);
 
 		while (sg_len) {
-			boundary = (addr & ~0xffff) + (0xffff + 1);
+			offset = addr & 0xffff;
 			len = sg_len;
-			if ((addr + sg_len) > boundary)
-				len = boundary - addr;
+			if ((offset + sg_len) > 0x10000)
+				len = 0x10000 - offset;
 
 			ap->prd[idx].addr = cpu_to_le32(addr);
 			ap->prd[idx].flags_len = cpu_to_le32(len & 0xffff);
