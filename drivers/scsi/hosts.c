@@ -491,38 +491,6 @@ int scsi_unregister_host(Scsi_Host_Template *shost_tp)
 }
 
 /**
- * *scsi_host_get_next - get scsi host and inc ref count
- * @shost:	pointer to a Scsi_Host or NULL to start.
- *
- * Return value:
- * 	A pointer to next Scsi_Host in list or NULL.
- **/
-struct Scsi_Host *scsi_host_get_next(struct Scsi_Host *shost)
-{
-	struct list_head *lh = NULL;
-
-	spin_lock(&scsi_host_list_lock);
-	if (shost) {
-		/* XXX Dec ref on cur shost */
-		lh = shost->sh_list.next;
-	} else {
-		lh = scsi_host_list.next;
-	}
-
-	if (lh == &scsi_host_list) {
-		shost = (struct Scsi_Host *)NULL;
-		goto done;
-	}
-
-	shost = list_entry(lh, struct Scsi_Host, sh_list);
-	/* XXX Inc ref count */
-
-done:
-	spin_unlock(&scsi_host_list_lock);
-	return shost;
-}
-
-/**
  * scsi_host_lookup - get a reference to a Scsi_Host by host no
  *
  * @hostnum:	host number to locate

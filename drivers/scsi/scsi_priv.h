@@ -55,7 +55,6 @@ struct scsi_target {
 /* hosts.c */
 extern void scsi_host_busy_inc(struct Scsi_Host *, Scsi_Device *);
 extern void scsi_host_busy_dec_and_test(struct Scsi_Host *, Scsi_Device *);
-extern struct Scsi_Host *scsi_host_get_next(struct Scsi_Host *);
 extern struct Scsi_Host *scsi_host_lookup(unsigned short);
 extern void scsi_host_put(struct Scsi_Host *);
 extern void scsi_host_init(void);
