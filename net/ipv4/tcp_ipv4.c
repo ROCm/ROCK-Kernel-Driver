@@ -1445,8 +1445,7 @@ int tcp_v4_conn_request(struct sock *sk, struct sk_buff *skb)
 
 #ifdef CONFIG_ACCEPT_QUEUES
 	class = (skb->nfmark <= 0) ? 0 :
-		((skb->nfmark > NUM_ACCEPT_QUEUES) ? NUM_ACCEPT_QUEUES:
-		 skb->nfmark);
+		((skb->nfmark >= NUM_ACCEPT_QUEUES) ? 0: skb->nfmark);
 	/*
 	 * Accept only if the class has shares set or if the default class
 	 * i.e. class 0 has shares
