@@ -1,4 +1,4 @@
-/* $Id$
+/*
  * bagetlance.c: Ethernet driver for VME Lance cards on Baget/MIPS
  *      This code stealed and adopted from linux/drivers/net/atarilance.c
  *      See that for author info

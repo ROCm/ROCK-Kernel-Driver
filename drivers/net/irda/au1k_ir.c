@@ -1,12 +1,9 @@
 /*
- *
  * Alchemy Semi Au1000 IrDA driver
  *
  * Copyright 2001 MontaVista Software Inc.
  * Author: MontaVista Software, Inc.
  *         	ppopov@mvista.com or source@mvista.com
- *
- * ########################################################################
  *
  *  This program is free software; you can distribute it and/or modify it
  *  under the terms of the GNU General Public License (Version 2) as
@@ -20,17 +17,7 @@
  *  You should have received a copy of the GNU General Public License along
  *  with this program; if not, write to the Free Software Foundation, Inc.,
  *  59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
- *
- * ########################################################################
- *
- * 
  */
-
-#ifndef __mips__
-#error This driver only works with MIPS architectures!
-#endif
-
-
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/types.h>
@@ -46,7 +33,13 @@
 #include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/au1000.h>
+#if defined(CONFIG_MIPS_PB1000) || defined(CONFIG_MIPS_PB1100)
 #include <asm/pb1000.h>
+#elif defined(CONFIG_MIPS_DB1000) || defined(CONFIG_MIPS_DB1100)
+#include <asm/db1x00.h>
+#else 
+#error au1k_ir: unsupported board
+#endif
 
 #include <net/irda/irda.h>
 #include <net/irda/irmod.h>
@@ -71,9 +64,13 @@ static void dma_free(void *, size_t);
 static int qos_mtt_bits = 0x07;  /* 1 ms or more */
 static struct net_device *ir_devs[NUM_IR_IFF];
 static char version[] __devinitdata =
-    "au1k_ircc:1.0 ppopov@mvista.com\n";
+    "au1k_ircc:1.2 ppopov@mvista.com\n";
 
 #define RUN_AT(x) (jiffies + (x))
+
+#if defined(CONFIG_MIPS_DB1000) || defined(CONFIG_MIPS_DB1100)
+static BCSR * const bcsr = (BCSR *)0xAE000000;
+#endif
 
 static spinlock_t ir_lock = SPIN_LOCK_UNLOCKED;
 
@@ -128,7 +125,7 @@ static void *dma_alloc(size_t size, dma_addr_t * dma_handle)
 	if (ret != NULL) {
 		memset(ret, 0, size);
 		*dma_handle = virt_to_bus(ret);
-		ret = KSEG0ADDR(ret);
+		ret = (void *)KSEG0ADDR(ret);
 	}
 	return ret;
 }
@@ -136,7 +133,7 @@ static void *dma_alloc(size_t size, dma_addr_t * dma_handle)
 
 static void dma_free(void *vaddr, size_t size)
 {
-	vaddr = KSEG0ADDR(vaddr);
+	vaddr = (void *)KSEG0ADDR(vaddr);
 	free_pages((unsigned long) vaddr, get_order(size));
 }
 
@@ -180,7 +177,7 @@ static int au1k_irda_init(void)
 	return 0;
 
 out1:
-	aup = dev->priv;
+	aup = netdev_priv(dev);
 	dma_free((void *)aup->db[0].vaddr,
 		MAX_BUF_SIZE * 2*NUM_IR_DESC);
 	dma_free((void *)aup->rx_ring[0],
@@ -205,10 +202,10 @@ static int au1k_irda_init_iobuf(iobuff_t *io, int size)
 
 static int au1k_irda_net_init(struct net_device *dev)
 {
-	struct au1k_private *aup = dev->priv;
+	struct au1k_private *aup = netdev_priv(dev);
 	int i, retval = 0, err;
 	db_dest_t *pDB, *pDBfree;
-	unsigned long temp;
+	dma_addr_t temp;
 
 	err = au1k_irda_init_iobuf(&aup->rx_buff, 14384);
 	if (err)
@@ -281,6 +278,14 @@ static int au1k_irda_net_init(struct net_device *dev)
 		aup->tx_ring[i]->flags = 0;
 		aup->tx_db_inuse[i] = pDB;
 	}
+
+#if defined(CONFIG_MIPS_DB1000) || defined(CONFIG_MIPS_DB1100)
+	/* power on */
+	bcsr->resets &= ~BCSR_RESETS_IRDA_MODE_MASK;
+	bcsr->resets |= BCSR_RESETS_IRDA_MODE_FULL;
+	au_sync();
+#endif
+
 	return 0;
 
 out3:
@@ -296,7 +301,7 @@ out1:
 
 static int au1k_init(struct net_device *dev)
 {
-	struct au1k_private *aup = (struct au1k_private *) dev->priv;
+	struct au1k_private *aup = netdev_priv(dev);
 	int i;
 	u32 control;
 	u32 ring_address;
@@ -340,13 +345,10 @@ static int au1k_irda_start(struct net_device *dev)
 {
 	int retval;
 	char hwname[32];
-	struct au1k_private *aup = (struct au1k_private *) dev->priv;
-
-	MOD_INC_USE_COUNT;
+	struct au1k_private *aup = netdev_priv(dev);
 
 	if ((retval = au1k_init(dev))) {
 		printk(KERN_ERR "%s: error in au1k_init\n", dev->name);
-		MOD_DEC_USE_COUNT;
 		return retval;
 	}
 
@@ -354,7 +356,6 @@ static int au1k_irda_start(struct net_device *dev)
 					0, dev->name, dev))) {
 		printk(KERN_ERR "%s: unable to get IRQ %d\n", 
 				dev->name, dev->irq);
-		MOD_DEC_USE_COUNT;
 		return retval;
 	}
 	if ((retval = request_irq(AU1000_IRDA_RX_INT, &au1k_irda_interrupt, 
@@ -362,7 +363,6 @@ static int au1k_irda_start(struct net_device *dev)
 		free_irq(AU1000_IRDA_TX_INT, dev);
 		printk(KERN_ERR "%s: unable to get IRQ %d\n", 
 				dev->name, dev->irq);
-		MOD_DEC_USE_COUNT;
 		return retval;
 	}
 
@@ -380,7 +380,7 @@ static int au1k_irda_start(struct net_device *dev)
 
 static int au1k_irda_stop(struct net_device *dev)
 {
-	struct au1k_private *aup = (struct au1k_private *) dev->priv;
+	struct au1k_private *aup = netdev_priv(dev);
 
 	/* disable interrupts */
 	writel(read_ir_reg(IR_CONFIG_2) & ~(1<<8), IR_CONFIG_2);
@@ -399,14 +399,13 @@ static int au1k_irda_stop(struct net_device *dev)
 	/* disable the interrupt */
 	free_irq(AU1000_IRDA_TX_INT, dev);
 	free_irq(AU1000_IRDA_RX_INT, dev);
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
 static void __exit au1k_irda_exit(void)
 {
 	struct net_device *dev = ir_devs[0];
-	struct au1k_private *aup = (struct au1k_private *) dev->priv;
+	struct au1k_private *aup = netdev_priv(dev);
 
 	unregister_netdev(dev);
 
@@ -422,7 +421,7 @@ static void __exit au1k_irda_exit(void)
 static inline void 
 update_tx_stats(struct net_device *dev, u32 status, u32 pkt_len)
 {
-	struct au1k_private *aup = (struct au1k_private *) dev->priv;
+	struct au1k_private *aup = netdev_priv(dev);
 	struct net_device_stats *ps = &aup->stats;
 
 	ps->tx_packets++;
@@ -437,7 +436,7 @@ update_tx_stats(struct net_device *dev, u32 status, u32 pkt_len)
 
 static void au1k_tx_ack(struct net_device *dev)
 {
-	struct au1k_private *aup = (struct au1k_private *) dev->priv;
+	struct au1k_private *aup = netdev_priv(dev);
 	volatile ring_dest_t *ptxd;
 
 	ptxd = aup->tx_ring[aup->tx_tail];
@@ -480,7 +479,7 @@ static void au1k_tx_ack(struct net_device *dev)
  */
 static int au1k_irda_hard_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	struct au1k_private *aup = (struct au1k_private *) dev->priv;
+	struct au1k_private *aup = netdev_priv(dev);
 	int speed = irda_get_next_speed(skb);
 	volatile ring_dest_t *ptxd;
 	u32 len;
@@ -505,13 +504,13 @@ static int au1k_irda_hard_xmit(struct sk_buff *skb, struct net_device *dev)
 	flags = ptxd->flags;
 
 	if (flags & AU_OWN) {
-		printk(KERN_INFO "%s: tx_full\n", dev->name);
+		printk(KERN_DEBUG "%s: tx_full\n", dev->name);
 		netif_stop_queue(dev);
 		aup->tx_full = 1;
 		return 1;
 	}
 	else if (((aup->tx_head + 1) & (NUM_IR_DESC - 1)) == aup->tx_tail) {
-		printk(KERN_INFO "%s: tx_full\n", dev->name);
+		printk(KERN_DEBUG "%s: tx_full\n", dev->name);
 		netif_stop_queue(dev);
 		aup->tx_full = 1;
 		return 1;
@@ -531,6 +530,7 @@ static int au1k_irda_hard_xmit(struct sk_buff *skb, struct net_device *dev)
 		memcpy((void *)pDB->vaddr, skb->data, skb->len);
 		ptxd->count_0 = skb->len & 0xff;
 		ptxd->count_1 = (skb->len >> 8) & 0xff;
+
 	}
 	else {
 		/* SIR */
@@ -538,6 +538,7 @@ static int au1k_irda_hard_xmit(struct sk_buff *skb, struct net_device *dev)
 		ptxd->count_0 = len & 0xff;
 		ptxd->count_1 = (len >> 8) & 0xff;
 		ptxd->flags |= IR_DIS_CRC;
+		au_writel(au_readl(0xae00000c) & ~(1<<13), 0xae00000c);
 	}
 	ptxd->flags |= AU_OWN;
 	au_sync();
@@ -556,7 +557,7 @@ static int au1k_irda_hard_xmit(struct sk_buff *skb, struct net_device *dev)
 static inline void 
 update_rx_stats(struct net_device *dev, u32 status, u32 count)
 {
-	struct au1k_private *aup = (struct au1k_private *) dev->priv;
+	struct au1k_private *aup = netdev_priv(dev);
 	struct net_device_stats *ps = &aup->stats;
 
 	ps->rx_packets++;
@@ -579,7 +580,7 @@ update_rx_stats(struct net_device *dev, u32 status, u32 count)
  */
 static int au1k_irda_rx(struct net_device *dev)
 {
-	struct au1k_private *aup = (struct au1k_private *) dev->priv;
+	struct au1k_private *aup = netdev_priv(dev);
 	struct sk_buff *skb;
 	volatile ring_dest_t *prxd;
 	u32 flags, count;
@@ -650,7 +651,7 @@ void au1k_irda_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 static void au1k_tx_timeout(struct net_device *dev)
 {
 	u32 speed;
-	struct au1k_private *aup = (struct au1k_private *) dev->priv;
+	struct au1k_private *aup = netdev_priv(dev);
 
 	printk(KERN_ERR "%s: tx timeout\n", dev->name);
 	speed = aup->speed;
@@ -668,10 +669,13 @@ static int
 au1k_irda_set_speed(struct net_device *dev, int speed)
 {
 	unsigned long flags;
-	struct au1k_private *aup = (struct au1k_private *) dev->priv;
+	struct au1k_private *aup = netdev_priv(dev);
 	u32 control;
 	int ret = 0, timeout = 10, i;
 	volatile ring_dest_t *ptxd;
+#if defined(CONFIG_MIPS_DB1000) || defined(CONFIG_MIPS_DB1100)
+	unsigned long irda_resets;
+#endif
 
 	if (speed == aup->speed)
 		return ret;
@@ -717,10 +721,20 @@ au1k_irda_set_speed(struct net_device *dev, int speed)
 		ptxd->flags = AU_OWN;
 	}
 
-	if (speed == 4000000)
+	if (speed == 4000000) {
+#if defined(CONFIG_MIPS_DB1000) || defined(CONFIG_MIPS_DB1100)
+		bcsr->resets |= BCSR_RESETS_FIR_SEL;
+#else /* Pb1000 and Pb1100 */
 		writel(1<<13, CPLD_AUX1);
-	else
+#endif
+	}
+	else {
+#if defined(CONFIG_MIPS_DB1000) || defined(CONFIG_MIPS_DB1100)
+		bcsr->resets &= ~BCSR_RESETS_FIR_SEL;
+#else /* Pb1000 and Pb1100 */
 		writel(readl(CPLD_AUX1) & ~(1<<13), CPLD_AUX1);
+#endif
+	}
 
 	switch (speed) {
 	case 9600:	
@@ -766,15 +780,15 @@ au1k_irda_set_speed(struct net_device *dev, int speed)
 	}
 	else {
 		if (control & (1<<11))
-			printk(KERN_INFO "%s Valid SIR config\n", dev->name);
+			printk(KERN_DEBUG "%s Valid SIR config\n", dev->name);
 		if (control & (1<<12))
-			printk(KERN_INFO "%s Valid MIR config\n", dev->name);
+			printk(KERN_DEBUG "%s Valid MIR config\n", dev->name);
 		if (control & (1<<13))
-			printk(KERN_INFO "%s Valid FIR config\n", dev->name);
+			printk(KERN_DEBUG "%s Valid FIR config\n", dev->name);
 		if (control & (1<<10))
-			printk(KERN_INFO "%s TX enabled\n", dev->name);
+			printk(KERN_DEBUG "%s TX enabled\n", dev->name);
 		if (control & (1<<9))
-			printk(KERN_INFO "%s RX enabled\n", dev->name);
+			printk(KERN_DEBUG "%s RX enabled\n", dev->name);
 	}
 
 	spin_unlock_irqrestore(&ir_lock, flags);
@@ -785,7 +799,7 @@ static int
 au1k_irda_ioctl(struct net_device *dev, struct ifreq *ifreq, int cmd)
 {
 	struct if_irda_req *rq = (struct if_irda_req *)ifreq;
-	struct au1k_private *aup = dev->priv;
+	struct au1k_private *aup = netdev_priv(dev);
 	int ret = -EOPNOTSUPP;
 
 	switch (cmd) {
@@ -826,14 +840,12 @@ au1k_irda_ioctl(struct net_device *dev, struct ifreq *ifreq, int cmd)
 
 static struct net_device_stats *au1k_irda_stats(struct net_device *dev)
 {
-	struct au1k_private *aup = (struct au1k_private *) dev->priv;
+	struct au1k_private *aup = netdev_priv(dev);
 	return &aup->stats;
 }
 
-#ifdef MODULE
 MODULE_AUTHOR("Pete Popov <ppopov@mvista.com>");
 MODULE_DESCRIPTION("Au1000 IrDA Device Driver");
 
 module_init(au1k_irda_init);
 module_exit(au1k_irda_exit);
-#endif /* MODULE */

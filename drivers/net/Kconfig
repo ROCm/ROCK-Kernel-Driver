@@ -471,10 +471,31 @@ config SGI_IOC3_ETH
 	bool "SGI IOC3 Ethernet"
 	depends on NET_ETHERNET && SGI_IP27
 	select CRC32
+	select MII
 	help
 	  If you have a network (Ethernet) card of this type, say Y and read
 	  the Ethernet-HOWTO, available from
 	  <http://www.tldp.org/docs.html#howto>.
+
+config SGI_IOC3_ETH_HW_RX_CSUM
+	bool "Receive hardware checksums"
+	depends on SGI_IOC3_ETH && INET
+	default y
+	help
+	  The SGI IOC3 network adapter supports TCP and UDP checksums in
+	  hardware to offload processing of these checksums from the CPU.  At
+	  the moment only acceleration of IPv4 is supported.  This option
+	  enables offloading for checksums on receive.  If unsure, say Y.
+
+config SGI_IOC3_ETH_HW_TX_CSUM
+	bool "Transmit hardware checksums"
+	depends on SGI_IOC3_ETH && INET
+	default y
+	help
+	  The SGI IOC3 network adapter supports TCP and UDP checksums in
+	  hardware to offload processing of these checksums from the CPU.  At
+	  the moment only acceleration of IPv4 is supported.  This option
+	  enables offloading for checksums on transmit.  If unsure, say Y.
 
 config SGI_O2MACE_ETH
 	tristate "SGI O2 MACE Fast Ethernet support"
@@ -1777,7 +1798,7 @@ config SGISEEQ
 
 config DECLANCE
 	tristate "DEC LANCE ethernet controller support"
-	depends on NET_ETHERNET && DECSTATION
+	depends on NET_ETHERNET && MACH_DECSTATION
 	select CRC32
 	help
 	  This driver is for the series of Ethernet controllers produced by
