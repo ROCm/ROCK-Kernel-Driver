@@ -370,7 +370,7 @@ static int do_task_stat(struct task_struct *task, char * buffer, int whole)
 			stime += task->signal->stime;
 		}
 	}
-	ppid = task->pid ? task->real_parent->pid : 0;
+	ppid = task->pid ? task->group_leader->real_parent->tgid : 0;
 	read_unlock(&tasklist_lock);
 
 	if (!whole || num_threads<2)

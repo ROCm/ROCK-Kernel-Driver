@@ -139,7 +139,7 @@ int class_register(struct class * cls)
 
 	INIT_LIST_HEAD(&cls->children);
 	INIT_LIST_HEAD(&cls->interfaces);
-	error = kobject_set_name(&cls->subsys.kset.kobj, cls->name);
+	error = kobject_set_name(&cls->subsys.kset.kobj, "%s", cls->name);
 	if (error)
 		return error;
 
@@ -368,7 +368,7 @@ int class_device_add(struct class_device *class_dev)
 		 class_dev->class_id);
 
 	/* first, register with generic layer. */
-	kobject_set_name(&class_dev->kobj, class_dev->class_id);
+	kobject_set_name(&class_dev->kobj, "%s", class_dev->class_id);
 	if (parent)
 		class_dev->kobj.parent = &parent->subsys.kset.kobj;
 

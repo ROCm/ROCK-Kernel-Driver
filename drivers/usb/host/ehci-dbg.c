@@ -185,7 +185,7 @@ dbg_sitd (const char *label, struct ehci_hcd *ehci, struct ehci_sitd *sitd)
 }
 
 static int __attribute__((__unused__))
-dbg_status_buf (char *buf, unsigned len, char *label, u32 status)
+dbg_status_buf (char *buf, unsigned len, const char *label, u32 status)
 {
 	return scnprintf (buf, len,
 		"%s%sstatus %04x%s%s%s%s%s%s%s%s%s%s",
@@ -204,7 +204,7 @@ dbg_status_buf (char *buf, unsigned len, char *label, u32 status)
 }
 
 static int __attribute__((__unused__))
-dbg_intr_buf (char *buf, unsigned len, char *label, u32 enable)
+dbg_intr_buf (char *buf, unsigned len, const char *label, u32 enable)
 {
 	return scnprintf (buf, len,
 		"%s%sintrenable %02x%s%s%s%s%s%s",
@@ -221,7 +221,8 @@ dbg_intr_buf (char *buf, unsigned len, char *label, u32 enable)
 static const char *const fls_strings [] =
     { "1024", "512", "256", "??" };
 
-static int dbg_command_buf (char *buf, unsigned len, char *label, u32 command)
+static int
+dbg_command_buf (char *buf, unsigned len, const char *label, u32 command)
 {
 	return scnprintf (buf, len,
 		"%s%scommand %06x %s=%d ithresh=%d%s%s%s%s period=%s%s %s",
@@ -240,7 +241,7 @@ static int dbg_command_buf (char *buf, unsigned len, char *label, u32 command)
 }
 
 static int
-dbg_port_buf (char *buf, unsigned len, char *label, int port, u32 status)
+dbg_port_buf (char *buf, unsigned len, const char *label, int port, u32 status)
 {
 	char	*sig;
 
@@ -276,19 +277,19 @@ dbg_qh (char *label, struct ehci_hcd *ehci, struct ehci_qh *qh)
 {}
 
 static inline int __attribute__((__unused__))
-dbg_status_buf (char *buf, unsigned len, char *label, u32 status)
+dbg_status_buf (char *buf, unsigned len, const char *label, u32 status)
 { return 0; }
 
 static inline int __attribute__((__unused__))
-dbg_command_buf (char *buf, unsigned len, char *label, u32 command)
+dbg_command_buf (char *buf, unsigned len, const char *label, u32 command)
 { return 0; }
 
 static inline int __attribute__((__unused__))
-dbg_intr_buf (char *buf, unsigned len, char *label, u32 enable)
+dbg_intr_buf (char *buf, unsigned len, const char *label, u32 enable)
 { return 0; }
 
 static inline int __attribute__((__unused__))
-dbg_port_buf (char *buf, unsigned len, char *label, int port, u32 status)
+dbg_port_buf (char *buf, unsigned len, const char *label, int port, u32 status)
 { return 0; }
 
 #endif	/* DEBUG */

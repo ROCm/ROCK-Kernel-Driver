@@ -2320,7 +2320,7 @@ eth_bind (struct usb_gadget *gadget)
 	} else if (gadget_is_lh7a40x(gadget)) {
 		device_desc.bcdDevice = __constant_cpu_to_le16 (0x0209);
 	} else if (gadget_is_n9604(gadget)) {
-		device_desc.bcdDevice = __constant_cpu_to_le16 (0x020a);
+		device_desc.bcdDevice = __constant_cpu_to_le16 (0x0210);
 	} else {
 		/* can't assume CDC works.  don't want to default to
 		 * anything less functional on CDC-capable hardware,

@@ -181,7 +181,7 @@ int sysfs_rename_dir(struct kobject * kobj, const char *new_name)
 	new_dentry = sysfs_get_dentry(parent, new_name);
 	if (!IS_ERR(new_dentry)) {
   		if (!new_dentry->d_inode) {
-			error = kobject_set_name(kobj,new_name);
+			error = kobject_set_name(kobj, "%s", new_name);
 			if (!error)
 				d_move(kobj->dentry, new_dentry);
 		}

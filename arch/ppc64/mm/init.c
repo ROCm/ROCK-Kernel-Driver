@@ -265,7 +265,7 @@ int __ioremap_explicit(unsigned long pa, unsigned long ea,
 	} else {
 		area = im_get_area(ea, size, IM_REGION_UNUSED|IM_REGION_SUBSET);
 		if (area == NULL) {
-			printk(KERN_ERR "could not obtain imalloc area for ea 0x%lx\n", ea);
+			/* Expected when PHB-dlpar is in play */
 			return 1;
 		}
 		if (ea != (unsigned long) area->addr) {

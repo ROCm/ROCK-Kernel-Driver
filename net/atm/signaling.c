@@ -147,12 +147,15 @@ as_indicate_complete:
 			return 0;
 		case as_close:
 			set_bit(ATM_VF_RELEASED,&vcc->flags);
-			clear_bit(ATM_VF_READY,&vcc->flags);
-			vcc->sk->sk_err = -msg->reply;
-			clear_bit(ATM_VF_WAITING, &vcc->flags);
+			vcc_release_async(vcc, msg->reply);
 			break;
 		case as_modify:
 			modify_qos(vcc,msg);
+			break;
+		case as_addparty:
+		case as_dropparty:
+			vcc->sk->sk_err_soft = msg->reply;	/* < 0 failure, otherwise ep_ref */
+			clear_bit(ATM_VF_WAITING, &vcc->flags);
 			break;
 		default:
 			printk(KERN_ALERT "sigd_send: bad message type %d\n",
@@ -171,6 +174,7 @@ void sigd_enq2(struct atm_vcc *vcc,enum atmsvc_msg_type type,
 {
 	struct sk_buff *skb;
 	struct atmsvc_msg *msg;
+	static unsigned session = 0;
 
 	DPRINTK("sigd_enq %d (0x%p)\n",(int) type,vcc);
 	while (!(skb = alloc_skb(sizeof(struct atmsvc_msg),GFP_KERNEL)))
@@ -186,6 +190,11 @@ void sigd_enq2(struct atm_vcc *vcc,enum atmsvc_msg_type type,
 	if (svc) msg->svc = *svc;
 	if (vcc) msg->local = vcc->local;
 	if (pvc) msg->pvc = *pvc;
+	if (vcc) {
+		if (type == as_connect && test_bit(ATM_VF_SESSION, &vcc->flags))
+			msg->session = ++session;
+			/* every new pmp connect gets the next session number */
+	}
 	sigd_put_skb(skb);
 	if (vcc) set_bit(ATM_VF_REGIS,&vcc->flags);
 }
@@ -205,9 +214,7 @@ static void purge_vcc(struct atm_vcc *vcc)
 	if (vcc->sk->sk_family == PF_ATMSVC &&
 	    !test_bit(ATM_VF_META,&vcc->flags)) {
 		set_bit(ATM_VF_RELEASED,&vcc->flags);
-		vcc->sk->sk_err = EUNATCH;
-		clear_bit(ATM_VF_WAITING, &vcc->flags);
-		vcc->sk->sk_state_change(vcc->sk);
+		vcc_release_async(vcc, -EUNATCH);
 	}
 }
 

@@ -577,12 +577,12 @@ unsigned long timer_data_to_ns(unsigned long timer_data);
 static void change_speed(struct e100_serial *info);
 static void rs_throttle(struct tty_struct * tty);
 static void rs_wait_until_sent(struct tty_struct *tty, int timeout);
-static int rs_write(struct tty_struct * tty, int from_user,
+static int rs_write(struct tty_struct * tty,
                     const unsigned char *buf, int count);
-extern _INLINE_ int rs_raw_write(struct tty_struct * tty, int from_user,
+extern _INLINE_ int rs_raw_write(struct tty_struct * tty,
                             const unsigned char *buf, int count);
 #ifdef CONFIG_ETRAX_RS485
-static int e100_write_rs485(struct tty_struct * tty, int from_user,
+static int e100_write_rs485(struct tty_struct * tty,
                             const unsigned char *buf, int count);
 #endif
 static int get_lsr_info(struct e100_serial * info, unsigned int *value);
@@ -1786,7 +1786,7 @@ e100_enable_rs485(struct tty_struct *tty,struct rs485_control *r)
 }
 
 static int
-e100_write_rs485(struct tty_struct *tty, int from_user,
+e100_write_rs485(struct tty_struct *tty,
                  const unsigned char *buf, int count)
 {
 	struct e100_serial * info = (struct e100_serial *)tty->driver_data;
@@ -1799,7 +1799,7 @@ e100_write_rs485(struct tty_struct *tty, int from_user,
 	 */
 	info->rs485.enabled = 1;
 	/* rs_write now deals with RS485 if enabled */
-	count = rs_write(tty, from_user, buf, count);
+	count = rs_write(tty, buf, count);
 	info->rs485.enabled = old_enabled;
 	return count;
 }
@@ -3614,7 +3614,7 @@ rs_flush_chars(struct tty_struct *tty)
 }
 
 extern _INLINE_ int
-rs_raw_write(struct tty_struct * tty, int from_user,
+rs_raw_write(struct tty_struct * tty,
 	  const unsigned char *buf, int count)
 {
 	int	c, ret = 0;
@@ -3649,60 +3649,25 @@ rs_raw_write(struct tty_struct * tty, int from_user,
 	 * atomic operation... this could perhaps be avoided by more clever
 	 * design.
 	 */
-	if (from_user) {
-		down(&tmp_buf_sem);
-		while (1) {
-			int c1;
-			c = CIRC_SPACE_TO_END(info->xmit.head,
-					      info->xmit.tail,
-					      SERIAL_XMIT_SIZE);
-			if (count < c)
-				c = count;
-			if (c <= 0)
-				break;
+	cli();	
+	while (1) {
+		c = CIRC_SPACE_TO_END(info->xmit.head,
+				      info->xmit.tail,
+				      SERIAL_XMIT_SIZE);
 
-			c -= copy_from_user(tmp_buf, buf, c);
-			if (!c) {
-				if (!ret)
-					ret = -EFAULT;
-				break;
-			}
-			cli();
-			c1 = CIRC_SPACE_TO_END(info->xmit.head,
-					       info->xmit.tail,
-					       SERIAL_XMIT_SIZE);
-			if (c1 < c)
-				c = c1;
-			memcpy(info->xmit.buf + info->xmit.head, tmp_buf, c);
-			info->xmit.head = ((info->xmit.head + c) &
-					   (SERIAL_XMIT_SIZE-1));
-			restore_flags(flags);
-			buf += c;
-			count -= c;
-			ret += c;
-		}
-		up(&tmp_buf_sem);
-	} else {
-		cli();	
-		while (1) {
-			c = CIRC_SPACE_TO_END(info->xmit.head,
-					      info->xmit.tail,
-					      SERIAL_XMIT_SIZE);
-
-			if (count < c)
-				c = count;
-			if (c <= 0)
-				break;
+		if (count < c)
+			c = count;
+		if (c <= 0)
+			break;
 		
-			memcpy(info->xmit.buf + info->xmit.head, buf, c);
-			info->xmit.head = (info->xmit.head + c) &
-				(SERIAL_XMIT_SIZE-1);
-			buf += c;
-			count -= c;
-			ret += c;
-		}
-		restore_flags(flags);
+		memcpy(info->xmit.buf + info->xmit.head, buf, c);
+		info->xmit.head = (info->xmit.head + c) &
+			(SERIAL_XMIT_SIZE-1);
+		buf += c;
+		count -= c;
+		ret += c;
 	}
+	restore_flags(flags);
 	
 	/* enable transmitter if not running, unless the tty is stopped
 	 * this does not need IRQ protection since if tr_running == 0
@@ -3721,7 +3686,7 @@ rs_raw_write(struct tty_struct * tty, int from_user,
 } /* raw_raw_write() */
 
 static int 
-rs_write(struct tty_struct * tty, int from_user,
+rs_write(struct tty_struct * tty,
 	 const unsigned char *buf, int count)
 {
 #if defined(CONFIG_ETRAX_RS485)
@@ -3750,7 +3715,7 @@ rs_write(struct tty_struct * tty, int from_user,
 	}
 #endif /* CONFIG_ETRAX_RS485 */
 
-	count = rs_raw_write(tty, from_user, buf, count);
+	count = rs_raw_write(tty, buf, count);
 
 #if defined(CONFIG_ETRAX_RS485)
 	if (info->rs485.enabled)

@@ -452,18 +452,12 @@ static void destroy_serial(struct kref *kref)
 			port = serial->port[i];
 			if (!port)
 				continue;
-			if (port->read_urb) {
-				usb_kill_urb(port->read_urb);
-				usb_free_urb(port->read_urb);
-			}
-			if (port->write_urb) {
-				usb_kill_urb(port->write_urb);
-				usb_free_urb(port->write_urb);
-			}
-			if (port->interrupt_in_urb) {
-				usb_kill_urb(port->interrupt_in_urb);
-				usb_free_urb(port->interrupt_in_urb);
-			}
+			usb_kill_urb(port->read_urb);
+			usb_free_urb(port->read_urb);
+			usb_kill_urb(port->write_urb);
+			usb_free_urb(port->write_urb);
+			usb_kill_urb(port->interrupt_in_urb);
+			usb_free_urb(port->interrupt_in_urb);
 			kfree(port->bulk_in_buffer);
 			kfree(port->bulk_out_buffer);
 			kfree(port->interrupt_in_buffer);
@@ -554,7 +548,7 @@ static void serial_close(struct tty_struct *tty, struct file * filp)
 	kref_put(&port->serial->kref, destroy_serial);
 }
 
-static int serial_write (struct tty_struct * tty, int from_user, const unsigned char *buf, int count)
+static int serial_write (struct tty_struct * tty, const unsigned char *buf, int count)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *) tty->driver_data;
 	int retval = -EINVAL;
@@ -567,7 +561,7 @@ static int serial_write (struct tty_struct * tty, int from_user, const unsigned 
 	}
 
 	/* pass on to the driver specific version of this function */
-	retval = port->serial->type->write(port, from_user, buf, count);
+	retval = port->serial->type->write(port, buf, count);
 
 exit:
 	return retval;
@@ -799,18 +793,12 @@ static void port_release(struct device *dev)
 	struct usb_serial_port *port = to_usb_serial_port(dev);
 
 	dbg ("%s - %s", __FUNCTION__, dev->bus_id);
-	if (port->read_urb) {
-		usb_kill_urb(port->read_urb);
-		usb_free_urb(port->read_urb);
-	}
-	if (port->write_urb) {
-		usb_kill_urb(port->write_urb);
-		usb_free_urb(port->write_urb);
-	}
-	if (port->interrupt_in_urb) {
-		usb_kill_urb(port->interrupt_in_urb);
-		usb_free_urb(port->interrupt_in_urb);
-	}
+	usb_kill_urb(port->read_urb);
+	usb_free_urb(port->read_urb);
+	usb_kill_urb(port->write_urb);
+	usb_free_urb(port->write_urb);
+	usb_kill_urb(port->interrupt_in_urb);
+	usb_free_urb(port->interrupt_in_urb);
 	kfree(port->bulk_in_buffer);
 	kfree(port->bulk_out_buffer);
 	kfree(port->interrupt_in_buffer);

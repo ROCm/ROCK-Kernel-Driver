@@ -554,12 +554,6 @@ static int siimage_mmio_ide_dma_test_irq (ide_drive_t *drive)
 	return 0;
 }
 
-static int siimage_mmio_ide_dma_verbose (ide_drive_t *drive)
-{
-	int temp = __ide_dma_verbose(drive);
-	return temp;
-}
-
 /**
  *	siimage_busproc		-	bus isolation ioctl
  *	@drive: drive to isolate/restore
@@ -1077,7 +1071,6 @@ static void __devinit init_hwif_siimage(ide_hwif_t *hwif)
 
 	if (hwif->mmio) {
 		hwif->ide_dma_test_irq = &siimage_mmio_ide_dma_test_irq;
-		hwif->ide_dma_verbose = &siimage_mmio_ide_dma_verbose;
 	} else {
 		hwif->ide_dma_test_irq = & siimage_io_ide_dma_test_irq;
 	}

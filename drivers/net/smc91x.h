@@ -173,6 +173,11 @@ SMC_outw(u16 val, unsigned long ioaddr, int reg)
 #define SMC_insw(a, r, p, l)	insw((a) + (r) - 0xa0000000, p, l)
 #define SMC_outsw(a, r, p, l)	outsw((a) + (r) - 0xa0000000, p, l)
 
+#define set_irq_type(irq, type)	do {} while(0)
+
+#define RPC_LSA_DEFAULT		RPC_LED_TX_RX
+#define RPC_LSB_DEFAULT		RPC_LED_100_10
+
 #else
 
 #define SMC_CAN_USE_8BIT	1
@@ -202,8 +207,9 @@ SMC_outw(u16 val, unsigned long ioaddr, int reg)
  * different and probably not worth it for that reason, and not as critical
  * as RX which can overrun memory and lose packets.
  */
-#include <linux/pci.h>
+#include <linux/dma-mapping.h>
 #include <asm/dma.h>
+#include <asm/arch/pxa-regs.h>
 
 #ifdef SMC_insl
 #undef SMC_insl
@@ -223,19 +229,21 @@ smc_pxa_dma_insl(u_long ioaddr, u_long physaddr, int reg, int dma,
 
 	/* 64 bit alignment is required for memory to memory DMA */
 	if ((long)buf & 4) {
-		*((u32 *)buf)++ = SMC_inl(ioaddr, reg);
+		*((u32 *)buf) = SMC_inl(ioaddr, reg);
+		buf += 4;
 		len--;
 	}
 
 	len *= 4;
-	dmabuf = dma_map_single(NULL, buf, len, PCI_DMA_FROMDEVICE);
+	dmabuf = dma_map_single(NULL, buf, len, DMA_FROM_DEVICE);
 	DCSR(dma) = DCSR_NODESC;
 	DTADR(dma) = dmabuf;
 	DSADR(dma) = physaddr + reg;
 	DCMD(dma) = (DCMD_INCTRGADDR | DCMD_BURST32 |
 		     DCMD_WIDTH4 | (DCMD_LENGTH & len));
 	DCSR(dma) = DCSR_NODESC | DCSR_RUN;
-	while (!(DCSR(dma) & DCSR_STOPSTATE));
+	while (!(DCSR(dma) & DCSR_STOPSTATE))
+		cpu_relax();
 	DCSR(dma) = 0;
 	dma_unmap_single(NULL, dmabuf, len, PCI_DMA_FROMDEVICE);
 }
@@ -259,7 +267,8 @@ smc_pxa_dma_insw(u_long ioaddr, u_long physaddr, int reg, int dma,
 
 	/* 64 bit alignment is required for memory to memory DMA */
 	while ((long)buf & 6) {
-		*((u16 *)buf)++ = SMC_inw(ioaddr, reg);
+		*((u16 *)buf) = SMC_inw(ioaddr, reg);
+		buf += 2;
 		len--;
 	}
 
@@ -271,9 +280,10 @@ smc_pxa_dma_insw(u_long ioaddr, u_long physaddr, int reg, int dma,
 	DCMD(dma) = (DCMD_INCTRGADDR | DCMD_BURST32 |
 		     DCMD_WIDTH2 | (DCMD_LENGTH & len));
 	DCSR(dma) = DCSR_NODESC | DCSR_RUN;
-	while (!(DCSR(dma) & DCSR_STOPSTATE));
+	while (!(DCSR(dma) & DCSR_STOPSTATE))
+		cpu_relax();
 	DCSR(dma) = 0;
-	dma_unmap_single(NULL, dmabuf, len, PCI_DMA_FROMDEVICE);
+	dma_unmap_single(NULL, dmabuf, len, DMA_FROM_DEVICE);
 }
 #endif
 
@@ -762,16 +772,9 @@ static const char * chip_ids[ 16 ] =  {
 		SMC_outw( addr[4]|(addr[5] << 8), ioaddr, ADDR2_REG );	\
 	} while (0)
 
-#define SMC_CLEAR_MCAST()						\
-	do {								\
-		SMC_outw( 0, ioaddr, MCAST_REG1 );			\
-		SMC_outw( 0, ioaddr, MCAST_REG2 );			\
-		SMC_outw( 0, ioaddr, MCAST_REG3 );			\
-		SMC_outw( 0, ioaddr, MCAST_REG4 );			\
-	} while (0)
 #define SMC_SET_MCAST(x)						\
 	do {								\
-		unsigned char *mt = (x);				\
+		const unsigned char *mt = (x);				\
 		SMC_outw( mt[0] | (mt[1] << 8), ioaddr, MCAST_REG1 );	\
 		SMC_outw( mt[2] | (mt[3] << 8), ioaddr, MCAST_REG2 );	\
 		SMC_outw( mt[4] | (mt[5] << 8), ioaddr, MCAST_REG3 );	\

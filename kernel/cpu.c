@@ -57,34 +57,6 @@ static inline void check_for_tasks(int cpu)
 	write_unlock_irq(&tasklist_lock);
 }
 
-/* Notify userspace when a cpu event occurs, by running '/sbin/hotplug
- * cpu' with certain environment variables set.  */
-static int cpu_run_sbin_hotplug(unsigned int cpu, const char *action)
-{
-	char *argv[3], *envp[6], cpu_str[12], action_str[32], devpath_str[40];
-	int i;
-
-	sprintf(cpu_str, "CPU=%d", cpu);
-	sprintf(action_str, "ACTION=%s", action);
-	sprintf(devpath_str, "DEVPATH=devices/system/cpu/cpu%d", cpu);
-	
-	i = 0;
-	argv[i++] = hotplug_path;
-	argv[i++] = "cpu";
-	argv[i] = NULL;
-
-	i = 0;
-	/* minimal command environment */
-	envp[i++] = "HOME=/";
-	envp[i++] = "PATH=/sbin:/bin:/usr/sbin:/usr/bin";
-	envp[i++] = cpu_str;
-	envp[i++] = action_str;
-	envp[i++] = devpath_str;
-	envp[i] = NULL;
-
-	return call_usermodehelper(argv[0], argv, envp, 0);
-}
-
 /* Take this CPU down. */
 static int take_cpu_down(void *unused)
 {
@@ -170,8 +142,6 @@ int cpu_down(unsigned int cpu)
 
 	check_for_tasks(cpu);
 
-	cpu_run_sbin_hotplug(cpu, "offline");
-
 out_thread:
 	err = kthread_stop(p);
 out_allowed:
@@ -179,11 +149,6 @@ out_allowed:
 out:
 	unlock_cpu_hotplug();
 	return err;
-}
-#else
-static inline int cpu_run_sbin_hotplug(unsigned int cpu, const char *action)
-{
-	return 0;
 }
 #endif /*CONFIG_HOTPLUG_CPU*/
 

@@ -4,7 +4,7 @@
  *
  * (C) 2000 Red Hat. GPL'd
  *
- * $Id: cfi_cmdset_0001.c,v 1.154 2004/08/09 13:19:43 dwmw2 Exp $
+ * $Id: cfi_cmdset_0001.c,v 1.157 2004/10/15 20:00:26 nico Exp $
  *
  * 
  * 10/10/2000	Nicolas Pitre <nico@cam.org>
@@ -39,6 +39,12 @@
 // debugging, turns off buffer write mode if set to 1
 #define FORCE_WORD_WRITE 0
 
+#define MANUFACTURER_INTEL	0x0089
+#define I82802AB	0x00ad
+#define I82802AC	0x00ac
+#define MANUFACTURER_ST         0x0020
+#define M50LPW080       0x002F
+
 static int cfi_intelext_read (struct mtd_info *, loff_t, size_t, size_t *, u_char *);
 //static int cfi_intelext_read_user_prot_reg (struct mtd_info *, loff_t, size_t, size_t *, u_char *);
 //static int cfi_intelext_read_fact_prot_reg (struct mtd_info *, loff_t, size_t, size_t *, u_char *);
@@ -55,13 +61,18 @@ static void cfi_intelext_destroy(struct mtd_info *);
 
 struct mtd_info *cfi_cmdset_0001(struct map_info *, int);
 
-static struct mtd_info *cfi_intelext_setup (struct map_info *);
+static struct mtd_info *cfi_intelext_setup (struct mtd_info *);
 static int cfi_intelext_partition_fixup(struct map_info *, struct cfi_private **);
 
 static int cfi_intelext_point (struct mtd_info *mtd, loff_t from, size_t len,
 		     size_t *retlen, u_char **mtdbuf);
 static void cfi_intelext_unpoint (struct mtd_info *mtd, u_char *addr, loff_t from,
 			size_t len);
+
+static int get_chip(struct map_info *map, struct flchip *chip, unsigned long adr, int mode);
+static void put_chip(struct map_info *map, struct flchip *chip, unsigned long adr);
+#include "fwh_lock.h"
+
 
 
 /*
@@ -123,8 +134,9 @@ static void cfi_tell_features(struct cfi_pri_intelext *extp)
 
 #ifdef CMDSET0001_DISABLE_ERASE_SUSPEND_ON_WRITE
 /* Some Intel Strata Flash prior to FPO revision C has bugs in this area */ 
-static void fixup_intel_strataflash(struct map_info *map, void* param)
+static void fixup_intel_strataflash(struct mtd_info *mtd, void* param)
 {
+	struct map_info *map = mtd->priv;
 	struct cfi_private *cfi = map->fldrv_priv;
 	struct cfi_pri_amdstd *extp = cfi->cmdset_priv;
 
@@ -134,16 +146,18 @@ static void fixup_intel_strataflash(struct map_info *map, void* param)
 }
 #endif
 
-static void fixup_st_m28w320ct(struct map_info *map, void* param)
+static void fixup_st_m28w320ct(struct mtd_info *mtd, void* param)
 {
+	struct map_info *map = mtd->priv;
 	struct cfi_private *cfi = map->fldrv_priv;
 	
 	cfi->cfiq->BufWriteTimeoutTyp = 0;	/* Not supported */
 	cfi->cfiq->BufWriteTimeoutMax = 0;	/* Not supported */
 }
 
-static void fixup_st_m28w320cb(struct map_info *map, void* param)
+static void fixup_st_m28w320cb(struct mtd_info *mtd, void* param)
 {
+	struct map_info *map = mtd->priv;
 	struct cfi_private *cfi = map->fldrv_priv;
 	
 	/* Note this is done after the region info is endian swapped */
@@ -151,24 +165,51 @@ static void fixup_st_m28w320cb(struct map_info *map, void* param)
 		(cfi->cfiq->EraseRegionInfo[1] & 0xffff0000) | 0x3e;
 };
 
-static struct cfi_fixup fixup_table[] = {
-#ifdef CMDSET0001_DISABLE_ERASE_SUSPEND_ON_WRITE
-	{
-		CFI_MFR_ANY, CFI_ID_ANY,
-		fixup_intel_strataflash, NULL
-	}, 
-#endif
-	{
-		0x0020,	/* STMicroelectronics */
-		0x00ba,	/* M28W320CT */
-		fixup_st_m28w320ct, NULL
-	}, {
-		0x0020,	/* STMicroelectronics */
-		0x00bb,	/* M28W320CB */
-		fixup_st_m28w320cb, NULL
-	}, {
-		0, 0, NULL, NULL
+static void fixup_use_point(struct mtd_info *mtd, void *param)
+{
+	struct map_info *map = mtd->priv;
+	if (!mtd->point && map_is_linear(map)) {
+		mtd->point   = cfi_intelext_point;
+		mtd->unpoint = cfi_intelext_unpoint;
 	}
+}
+
+static void fixup_use_write_buffers(struct mtd_info *mtd, void *param)
+{
+	struct map_info *map = mtd->priv;
+	struct cfi_private *cfi = map->fldrv_priv;
+	if (cfi->cfiq->BufWriteTimeoutTyp) {
+		printk(KERN_INFO "Using buffer write method\n" );
+		mtd->write = cfi_intelext_write_buffers;
+	}
+}
+
+static struct cfi_fixup cfi_fixup_table[] = {
+#ifdef CMDSET0001_DISABLE_ERASE_SUSPEND_ON_WRITE
+	{ CFI_MFR_ANY, CFI_ID_ANY, fixup_intel_strataflash, NULL }, 
+#endif
+#if !FORCE_WORD_WRITE
+	{ CFI_MFR_ANY, CFI_ID_ANY, fixup_use_write_buffers, NULL },
+#endif
+	{ CFI_MFR_ST, 0x00ba, /* M28W320CT */ fixup_st_m28w320ct, NULL },
+	{ CFI_MFR_ST, 0x00bb, /* M28W320CB */ fixup_st_m28w320cb, NULL },
+	{ 0, 0, NULL, NULL }
+};
+
+static struct cfi_fixup jedec_fixup_table[] = {
+	{ MANUFACTURER_INTEL, I82802AB,   fixup_use_fwh_lock, NULL, },
+	{ MANUFACTURER_INTEL, I82802AC,   fixup_use_fwh_lock, NULL, },
+	{ MANUFACTURER_ST,    M50LPW080,  fixup_use_fwh_lock, NULL, },
+	{ 0, 0, NULL, NULL }
+};
+static struct cfi_fixup fixup_table[] = {
+	/* The CFI vendor ids and the JEDEC vendor IDs appear
+	 * to be common.  It is like the devices id's are as
+	 * well.  This table is to pick all cases where
+	 * we know that is the case.
+	 */
+	{ CFI_MFR_ANY, CFI_ID_ANY, fixup_use_point, NULL },
+	{ 0, 0, NULL, NULL }
 };
 
 /* This routine is made available to other mtd code via
@@ -181,8 +222,30 @@ static struct cfi_fixup fixup_table[] = {
 struct mtd_info *cfi_cmdset_0001(struct map_info *map, int primary)
 {
 	struct cfi_private *cfi = map->fldrv_priv;
+	struct mtd_info *mtd;
 	int i;
 
+	mtd = kmalloc(sizeof(*mtd), GFP_KERNEL);
+	if (!mtd) {
+		printk(KERN_ERR "Failed to allocate memory for MTD device\n");
+		return NULL;
+	}
+	memset(mtd, 0, sizeof(*mtd));
+	mtd->priv = map;
+	mtd->type = MTD_NORFLASH;
+
+	/* Fill in the default mtd operations */
+	mtd->erase   = cfi_intelext_erase_varsize;
+	mtd->read    = cfi_intelext_read;
+	mtd->write   = cfi_intelext_write_words;
+	mtd->sync    = cfi_intelext_sync;
+	mtd->lock    = cfi_intelext_lock;
+	mtd->unlock  = cfi_intelext_unlock;
+	mtd->suspend = cfi_intelext_suspend;
+	mtd->resume  = cfi_intelext_resume;
+	mtd->flags   = MTD_CAP_NORFLASH;
+	mtd->name    = map->name;
+	
 	if (cfi->cfi_mode == CFI_MODE_CFI) {
 		/* 
 		 * It's a real CFI chip, not one for which the probe
@@ -193,8 +256,10 @@ struct mtd_info *cfi_cmdset_0001(struct map_info *map, int primary)
 		struct cfi_pri_intelext *extp;
 
 		extp = (struct cfi_pri_intelext*)cfi_read_pri(map, adr, sizeof(*extp), "Intel/Sharp");
-		if (!extp)
+		if (!extp) {
+			kfree(mtd);
 			return NULL;
+		}
 		
 		/* Do some byteswapping if necessary */
 		extp->FeatureSupport = le32_to_cpu(extp->FeatureSupport);
@@ -204,7 +269,7 @@ struct mtd_info *cfi_cmdset_0001(struct map_info *map, int primary)
 		/* Install our own private info structure */
 		cfi->cmdset_priv = extp;	
 
-		cfi_fixup(map, fixup_table);
+		cfi_fixup(mtd, cfi_fixup_table);
 			
 #ifdef DEBUG_CFI_FEATURES
 		/* Tell the user about it in lots of lovely detail */
@@ -215,6 +280,12 @@ struct mtd_info *cfi_cmdset_0001(struct map_info *map, int primary)
 			printk(KERN_NOTICE "cfi_cmdset_0001: Erase suspend on write enabled\n");
 		}
 	}
+	else if (cfi->cfi_mode == CFI_MODE_JEDEC) {
+		/* Apply jedec specific fixups */
+		cfi_fixup(mtd, jedec_fixup_table);
+	}
+	/* Apply generic fixups */
+	cfi_fixup(mtd, fixup_table);
 
 	for (i=0; i< cfi->numchips; i++) {
 		cfi->chips[i].word_write_time = 1<<cfi->cfiq->WordWriteTimeoutTyp;
@@ -225,28 +296,19 @@ struct mtd_info *cfi_cmdset_0001(struct map_info *map, int primary)
 
 	map->fldrv = &cfi_intelext_chipdrv;
 	
-	return cfi_intelext_setup(map);
+	return cfi_intelext_setup(mtd);
 }
 
-static struct mtd_info *cfi_intelext_setup(struct map_info *map)
+static struct mtd_info *cfi_intelext_setup(struct mtd_info *mtd)
 {
+	struct map_info *map = mtd->priv;
 	struct cfi_private *cfi = map->fldrv_priv;
-	struct mtd_info *mtd;
 	unsigned long offset = 0;
 	int i,j;
 	unsigned long devsize = (1<<cfi->cfiq->DevSize) * cfi->interleave;
 
-	mtd = kmalloc(sizeof(*mtd), GFP_KERNEL);
 	//printk(KERN_DEBUG "number of CFI chips: %d\n", cfi->numchips);
 
-	if (!mtd) {
-		printk(KERN_ERR "Failed to allocate memory for MTD device\n");
-		goto setup_err;
-	}
-
-	memset(mtd, 0, sizeof(*mtd));
-	mtd->priv = map;
-	mtd->type = MTD_NORFLASH;
 	mtd->size = devsize * cfi->numchips;
 
 	mtd->numeraseregions = cfi->cfiq->NumEraseRegions * cfi->numchips;
@@ -286,34 +348,10 @@ static struct mtd_info *cfi_intelext_setup(struct map_info *map)
 		       mtd->eraseregions[i].numblocks);
 	}
 
-	/* Also select the correct geometry setup too */ 
-	mtd->erase = cfi_intelext_erase_varsize;
-	mtd->read = cfi_intelext_read;
-
-	if (map_is_linear(map)) {
-		mtd->point = cfi_intelext_point;
-		mtd->unpoint = cfi_intelext_unpoint;
-	}
-
-	if ( cfi->cfiq->BufWriteTimeoutTyp && !FORCE_WORD_WRITE) {
-		printk(KERN_INFO "Using buffer write method\n" );
-		mtd->write = cfi_intelext_write_buffers;
-	} else {
-		printk(KERN_INFO "Using word write method\n" );
-		mtd->write = cfi_intelext_write_words;
-	}
 #if 0
 	mtd->read_user_prot_reg = cfi_intelext_read_user_prot_reg;
 	mtd->read_fact_prot_reg = cfi_intelext_read_fact_prot_reg;
 #endif
-	mtd->sync = cfi_intelext_sync;
-	mtd->lock = cfi_intelext_lock;
-	mtd->unlock = cfi_intelext_unlock;
-	mtd->suspend = cfi_intelext_suspend;
-	mtd->resume = cfi_intelext_resume;
-	mtd->flags = MTD_CAP_NORFLASH;
-	map->fldrv = &cfi_intelext_chipdrv;
-	mtd->name = map->name;
 
 	/* This function has the potential to distort the reality
 	   a bit and therefore should be called last. */
@@ -515,7 +553,8 @@ static int get_chip(struct map_info *map, struct flchip *chip, unsigned long adr
 		return 0;
 
 	case FL_ERASING:
-		if (!(cfip->FeatureSupport & 2) ||
+		if (!cfip ||
+		    !(cfip->FeatureSupport & 2) ||
 		    !(mode == FL_READY || mode == FL_POINT ||
 		     (mode == FL_WRITING && (cfip->SuspendCmdSupport & 1))))
 			goto sleep;
@@ -884,7 +923,7 @@ static int cfi_intelext_read_user_prot_reg (struct mtd_info *mtd, loff_t from, s
 	int base_offst,reg_sz;
 	
 	/* Check that we actually have some protection registers */
-	if(!(extp->FeatureSupport&64)){
+	if(!extp || !(extp->FeatureSupport&64)){
 		printk(KERN_WARNING "%s: This flash device has no protection data to read!\n",map->name);
 		return 0;
 	}
@@ -903,7 +942,7 @@ static int cfi_intelext_read_fact_prot_reg (struct mtd_info *mtd, loff_t from, s
 	int base_offst,reg_sz;
 	
 	/* Check that we actually have some protection registers */
-	if(!(extp->FeatureSupport&64)){
+	if(!extp || !(extp->FeatureSupport&64)){
 		printk(KERN_WARNING "%s: This flash device has no protection data to read!\n",map->name);
 		return 0;
 	}
@@ -1308,102 +1347,6 @@ static int cfi_intelext_write_buffers (struct mtd_info *mtd, loff_t to,
 	return 0;
 }
 
-typedef int (*varsize_frob_t)(struct map_info *map, struct flchip *chip,
-			      unsigned long adr, int len, void *thunk);
-
-static int cfi_intelext_varsize_frob(struct mtd_info *mtd, varsize_frob_t frob,
-				     loff_t ofs, size_t len, void *thunk)
-{
-	struct map_info *map = mtd->priv;
-	struct cfi_private *cfi = map->fldrv_priv;
-	unsigned long adr;
-	int chipnum, ret = 0;
-	int i, first;
-	struct mtd_erase_region_info *regions = mtd->eraseregions;
-
-	if (ofs > mtd->size)
-		return -EINVAL;
-
-	if ((len + ofs) > mtd->size)
-		return -EINVAL;
-
-	/* Check that both start and end of the requested erase are
-	 * aligned with the erasesize at the appropriate addresses.
-	 */
-
-	i = 0;
-
-	/* Skip all erase regions which are ended before the start of 
-	   the requested erase. Actually, to save on the calculations,
-	   we skip to the first erase region which starts after the
-	   start of the requested erase, and then go back one.
-	*/
-	
-	while (i < mtd->numeraseregions && ofs >= regions[i].offset)
-	       i++;
-	i--;
-
-	/* OK, now i is pointing at the erase region in which this 
-	   erase request starts. Check the start of the requested
-	   erase range is aligned with the erase size which is in
-	   effect here.
-	*/
-
-	if (ofs & (regions[i].erasesize-1))
-		return -EINVAL;
-
-	/* Remember the erase region we start on */
-	first = i;
-
-	/* Next, check that the end of the requested erase is aligned
-	 * with the erase region at that address.
-	 */
-
-	while (i<mtd->numeraseregions && (ofs + len) >= regions[i].offset)
-		i++;
-
-	/* As before, drop back one to point at the region in which
-	   the address actually falls
-	*/
-	i--;
-	
-	if ((ofs + len) & (regions[i].erasesize-1))
-		return -EINVAL;
-
-	chipnum = ofs >> cfi->chipshift;
-	adr = ofs - (chipnum << cfi->chipshift);
-
-	i=first;
-
-	while(len) {
-		unsigned long chipmask;
-		int size = regions[i].erasesize;
-
-		ret = (*frob)(map, &cfi->chips[chipnum], adr, size, thunk);
-		
-		if (ret)
-			return ret;
-
-		adr += size;
-		len -= size;
-
-		chipmask = (1 << cfi->chipshift) - 1;
-		if ((adr & chipmask) == ((regions[i].offset + size * regions[i].numblocks) & chipmask))
-			i++;
-
-		if (adr >> cfi->chipshift) {
-			adr = 0;
-			chipnum++;
-			
-			if (chipnum >= cfi->numchips)
-			break;
-		}
-	}
-
-	return 0;
-}
-
-
 static int do_erase_oneblock(struct map_info *map, struct flchip *chip,
 			     unsigned long adr, int len, void *thunk)
 {
@@ -1550,7 +1493,7 @@ int cfi_intelext_erase_varsize(struct mtd_info *mtd, struct erase_info *instr)
 	ofs = instr->addr;
 	len = instr->len;
 
-	ret = cfi_intelext_varsize_frob(mtd, do_erase_oneblock, ofs, len, NULL);
+	ret = cfi_varsize_frob(mtd, do_erase_oneblock, ofs, len, NULL);
 	if (ret)
 		return ret;
 
@@ -1695,18 +1638,18 @@ static int cfi_intelext_lock(struct mtd_info *mtd, loff_t ofs, size_t len)
 #ifdef DEBUG_LOCK_BITS
 	printk(KERN_DEBUG "%s: lock status before, ofs=0x%08llx, len=0x%08X\n",
 	       __FUNCTION__, ofs, len);
-	cfi_intelext_varsize_frob(mtd, do_printlockstatus_oneblock,
-				  ofs, len, 0);
+	cfi_varsize_frob(mtd, do_printlockstatus_oneblock,
+		ofs, len, 0);
 #endif
 
-	ret = cfi_intelext_varsize_frob(mtd, do_xxlock_oneblock, 
-					ofs, len, DO_XXLOCK_ONEBLOCK_LOCK);
+	ret = cfi_varsize_frob(mtd, do_xxlock_oneblock, 
+		ofs, len, DO_XXLOCK_ONEBLOCK_LOCK);
 	
 #ifdef DEBUG_LOCK_BITS
 	printk(KERN_DEBUG "%s: lock status after, ret=%d\n",
 	       __FUNCTION__, ret);
-	cfi_intelext_varsize_frob(mtd, do_printlockstatus_oneblock,
-				  ofs, len, 0);
+	cfi_varsize_frob(mtd, do_printlockstatus_oneblock,
+		ofs, len, 0);
 #endif
 
 	return ret;
@@ -1719,18 +1662,18 @@ static int cfi_intelext_unlock(struct mtd_info *mtd, loff_t ofs, size_t len)
 #ifdef DEBUG_LOCK_BITS
 	printk(KERN_DEBUG "%s: lock status before, ofs=0x%08llx, len=0x%08X\n",
 	       __FUNCTION__, ofs, len);
-	cfi_intelext_varsize_frob(mtd, do_printlockstatus_oneblock,
-				  ofs, len, 0);
+	cfi_varsize_frob(mtd, do_printlockstatus_oneblock,
+		ofs, len, 0);
 #endif
 
-	ret = cfi_intelext_varsize_frob(mtd, do_xxlock_oneblock,
+	ret = cfi_varsize_frob(mtd, do_xxlock_oneblock,
 					ofs, len, DO_XXLOCK_ONEBLOCK_UNLOCK);
 	
 #ifdef DEBUG_LOCK_BITS
 	printk(KERN_DEBUG "%s: lock status after, ret=%d\n",
 	       __FUNCTION__, ret);
-	cfi_intelext_varsize_frob(mtd, do_printlockstatus_oneblock, 
-				  ofs, len, 0);
+	cfi_varsize_frob(mtd, do_printlockstatus_oneblock, 
+		ofs, len, 0);
 #endif
 	
 	return ret;

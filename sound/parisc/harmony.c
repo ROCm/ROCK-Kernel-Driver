@@ -135,11 +135,11 @@ static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE;
 
 module_param_array(index, int, NULL, 0444);
-MODULE_PARM_DESC(index, "Index value for Sun CS4231 soundcard.");
+MODULE_PARM_DESC(index, "Index value for Harmony device.");
 module_param_array(id, charp, NULL, 0444);
-MODULE_PARM_DESC(id, "ID string for Sun CS4231 soundcard.");
+MODULE_PARM_DESC(id, "ID string for Harmony device.");
 module_param_array(enable, bool, NULL, 0444);
-MODULE_PARM_DESC(enable, "Enable Sun CS4231 soundcard.");
+MODULE_PARM_DESC(enable, "Enable Harmony device.");
 
 /* Register offset (from base hpa) */
 #define REG_ID		0x00
@@ -275,7 +275,7 @@ static unsigned int snd_card_harmony_rate_bits(int rate)
 {
 	unsigned int idx;
 	
-	for (idx = 0; idx <= ARRAY_SIZE(snd_card_harmony_rates); idx++)
+	for (idx = 0; idx < ARRAY_SIZE(snd_card_harmony_rates); idx++)
 		if (snd_card_harmony_rates[idx] == rate)
 			return rate_bits[idx];
 	return HARMONY_SR_44KHZ; /* fallback */
@@ -741,9 +741,10 @@ static int snd_card_harmony_hw_params(snd_pcm_substream_t *substream,
 	                   snd_pcm_hw_params_t * hw_params)
 {
 	int err;
+	snd_card_harmony_t *harmony = snd_pcm_substream_chip(substream);
 	
 	err = snd_pcm_lib_malloc_pages(substream, params_buffer_bytes(hw_params));
-	if (err > 0 && substream->dma_device.type == SNDRV_DMA_TYPE_CONTINUOUS)
+	if (err > 0 && harmony->dma_dev.type == SNDRV_DMA_TYPE_CONTINUOUS)
 		substream->runtime->dma_addr = __pa(substream->runtime->dma_area);
 	DPRINTK(KERN_INFO PFX "HW Params returned %d, dma_addr %lx\n", err,
 			(unsigned long)substream->runtime->dma_addr);
@@ -1131,11 +1132,13 @@ static void __exit alsa_card_harmony_exit(void)
 		{	
 			DPRINTK(KERN_INFO PFX "Freeing card %d\n", idx);
 			harmony = snd_harmony_cards[idx]->private_data;
-			free_irq(harmony->irq, snd_card_harmony_interrupt);
+			free_irq(harmony->irq, harmony);
 			printk(KERN_INFO PFX "Card unloaded %d, irq=%d\n", idx, harmony->irq);
 			snd_card_free(snd_harmony_cards[idx]);
 		}
 	}	
+	if (unregister_parisc_driver(&snd_card_harmony_driver) < 0)
+		printk(KERN_ERR PFX "Failed to unregister Harmony driver\n");
 }
 
 module_init(alsa_card_harmony_init)

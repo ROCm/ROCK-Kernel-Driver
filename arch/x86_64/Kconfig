@@ -346,6 +346,10 @@ config GENERIC_HARDIRQS
 	bool
 	default y
 
+config GENERIC_IRQ_PROBE
+	bool
+	default y
+
 menu "Power management options"
 
 source kernel/power/Kconfig

@@ -433,10 +433,11 @@ static int irlap_state_ndm(struct irlap_cb *self, IRLAP_EVENT event,
 				self->frame_sent = FALSE;
 
 			/*
-			 * Remember to multiply the query timeout value with
-			 * the number of slots used
+			 * Go to reply state until end of discovery to
+			 * inhibit our own transmissions. Set the timer
+			 * to not stay forever there... Jean II
 			 */
-			irlap_start_query_timer(self, QUERY_TIMEOUT*info->S);
+			irlap_start_query_timer(self, info->S, info->s);
 			irlap_next_state(self, LAP_REPLY);
 		} else {
 		/* This is the final slot. How is it possible ?
@@ -452,6 +453,9 @@ static int irlap_state_ndm(struct irlap_cb *self, IRLAP_EVENT event,
 		 * Not much. It's too late to answer those discovery frames,
 		 * so we just pass the info to IrLMP who will put it in the
 		 * log (and post an event).
+		 * Another cause would be devices that do discovery much
+		 * slower than us, however the latest fixes should minimise
+		 * those cases...
 		 * Jean II
 		 */
 			IRDA_DEBUG(1, "%s(), Receiving final discovery request, missed the discovery slots :-(\n", __FUNCTION__);
@@ -691,7 +695,7 @@ static int irlap_state_reply(struct irlap_cb *self, IRLAP_EVENT event,
 
 	switch (event) {
 	case QUERY_TIMER_EXPIRED:
-		IRDA_DEBUG(2, "%s(), QUERY_TIMER_EXPIRED <%ld>\n",
+		IRDA_DEBUG(0, "%s(), QUERY_TIMER_EXPIRED <%ld>\n",
 			   __FUNCTION__, jiffies);
 		irlap_next_state(self, LAP_NDM);
 		break;
@@ -707,16 +711,26 @@ static int irlap_state_reply(struct irlap_cb *self, IRLAP_EVENT event,
 			irlap_next_state(self, LAP_NDM);
 
 			irlap_discovery_indication(self, info->discovery);
-		} else if ((info->s >= self->slot) && (!self->frame_sent)) {
-			discovery_rsp = irlmp_get_discovery_response();
-			discovery_rsp->data.daddr = info->daddr;
+		} else {
+			/* If it's our slot, send our reply */
+			if ((info->s >= self->slot) && (!self->frame_sent)) {
+				discovery_rsp = irlmp_get_discovery_response();
+				discovery_rsp->data.daddr = info->daddr;
 
-			irlap_send_discovery_xid_frame(self, info->S,
-						       self->slot, FALSE,
-						       discovery_rsp);
+				irlap_send_discovery_xid_frame(self, info->S,
+							       self->slot,
+							       FALSE,
+							       discovery_rsp);
 
-			self->frame_sent = TRUE;
-			irlap_next_state(self, LAP_REPLY);
+				self->frame_sent = TRUE;
+			}
+			/* Readjust our timer to accomodate devices
+			 * doing faster or slower discovery than us...
+			 * Jean II */
+			irlap_start_query_timer(self, info->S, info->s);
+
+			/* Keep state */
+			//irlap_next_state(self, LAP_REPLY);
 		}
 		break;
 	default:

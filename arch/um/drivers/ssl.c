@@ -111,10 +111,10 @@ static void ssl_close(struct tty_struct *tty, struct file * filp)
 	line_close(serial_lines, tty);
 }
 
-static int ssl_write(struct tty_struct * tty, int from_user,
+static int ssl_write(struct tty_struct * tty,
 		     const unsigned char *buf, int count)
 {
-	return(line_write(serial_lines, tty, from_user, buf, count));
+	return(line_write(serial_lines, tty, buf, count));
 }
 
 static void ssl_put_char(struct tty_struct *tty, unsigned char ch)

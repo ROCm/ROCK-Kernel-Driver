@@ -1047,7 +1047,7 @@ static void rs_360_put_char(struct tty_struct *tty, unsigned char ch)
 
 }
 
-static int rs_360_write(struct tty_struct * tty, int from_user,
+static int rs_360_write(struct tty_struct * tty,
 		    const unsigned char *buf, int count)
 {
 	int	c, ret = 0;
@@ -1079,16 +1079,8 @@ static int rs_360_write(struct tty_struct * tty, int from_user,
 			break;
 		}
 
-		if (from_user) {
-			if (copy_from_user((void *)bdp->buf, buf, c)) {
-				if (!ret)
-					ret = -EFAULT;
-				break;
-			}
-		} else {
-			/* memcpy(__va(bdp->buf), buf, c); */
-			memcpy((void *)bdp->buf, buf, c);
-		}
+		/* memcpy(__va(bdp->buf), buf, c); */
+		memcpy((void *)bdp->buf, buf, c);
 
 		bdp->length = c;
 		bdp->status |= BD_SC_READY;

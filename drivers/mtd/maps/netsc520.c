@@ -3,7 +3,7 @@
  * Copyright (C) 2001 Mark Langsdorf (mark.langsdorf@amd.com)
  *	based on sc520cdp.c by Sysgo Real-Time Solutions GmbH
  *
- * $Id: netsc520.c,v 1.10 2004/07/12 21:59:44 dwmw2 Exp $
+ * $Id: netsc520.c,v 1.11 2004/09/16 23:27:13 gleixner Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -95,7 +95,7 @@ static struct mtd_info *mymtd;
 static int __init init_netsc520(void)
 {
 	printk(KERN_NOTICE "NetSc520 flash device: 0x%lx at 0x%lx\n", netsc520_map.size, netsc520_map.phys);
-	netsc520_map.virt = (unsigned long)ioremap_nocache(netsc520_map.phys, netsc520_map.size);
+	netsc520_map.virt = (void __iomem *)ioremap_nocache(netsc520_map.phys, netsc520_map.size);
 
 	if (!netsc520_map.virt) {
 		printk("Failed to ioremap_nocache\n");

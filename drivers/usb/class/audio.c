@@ -3119,12 +3119,18 @@ static void prepmixch(struct consmixstate *state)
 {
 	struct usb_device *dev = state->s->usbdev;
 	struct mixerchannel *ch;
-	unsigned char buf[2];
+	unsigned char *buf;
 	__s16 v1;
 	unsigned int v2, v3;
 
 	if (!state->nrmixch || state->nrmixch > SOUND_MIXER_NRDEVICES)
 		return;
+	buf = kmalloc(sizeof(*buf) * 2, GFP_KERNEL);
+	if (!buf) {
+		printk(KERN_ERR "prepmixch: out of memory\n") ;
+		return;
+	}
+
 	ch = &state->mixch[state->nrmixch-1];
 	switch (ch->selector) {
 	case 0:  /* mixer unit request */
@@ -3236,13 +3242,16 @@ static void prepmixch(struct consmixstate *state)
 	default:
 		goto err;
 	}
-	return;
 
+ freebuf:
+	kfree(buf);
+	return;
  err:
 	printk(KERN_ERR "usbaudio: mixer request device %u if %u unit %u ch %u selector %u failed\n", 
 	       dev->devnum, state->ctrlif, ch->unitid, ch->chnum, ch->selector);
 	if (state->nrmixch)
 		state->nrmixch--;
+	goto freebuf;
 }
 
 

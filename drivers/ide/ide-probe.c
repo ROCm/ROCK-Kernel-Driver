@@ -180,12 +180,6 @@ static inline void do_identify (ide_drive_t *drive, u8 cmd)
 	if (cmd == WIN_PIDENTIFY) {
 		u8 type = (id->config >> 8) & 0x1f;
 		printk("ATAPI ");
-#ifdef CONFIG_BLK_DEV_PDC4030
-		if (hwif->channel == 1 && hwif->chipset == ide_pdc4030) {
-			printk(" -- not supported on 2nd Promise port\n");
-			goto err_misc;
-		}
-#endif /* CONFIG_BLK_DEV_PDC4030 */
 		switch (type) {
 			case ide_floppy:
 				if (!strstr(id->model, "CD-ROM")) {
@@ -297,13 +291,9 @@ static int actual_try_to_identify (ide_drive_t *drive, u8 cmd)
 		/* disable dma & overlap */
 		hwif->OUTB(0, IDE_FEATURE_REG);
 
-	if (hwif->identify != NULL) {
-		if (hwif->identify(drive))
-			return 1;
-	} else {
-		/* ask drive for ID */
-		hwif->OUTB(cmd, IDE_COMMAND_REG);
-	}
+	/* ask drive for ID */
+	hwif->OUTB(cmd, IDE_COMMAND_REG);
+
 	timeout = ((cmd == WIN_IDENTIFY) ? WAIT_WORSTCASE : WAIT_PIDENTIFY) / 2;
 	timeout += jiffies;
 	do {
@@ -676,9 +666,6 @@ static void probe_hwif(ide_hwif_t *hwif)
 		return;
 
 	if ((hwif->chipset != ide_4drives || !hwif->mate || !hwif->mate->present) &&
-#ifdef CONFIG_BLK_DEV_PDC4030
-	    (hwif->chipset != ide_pdc4030 || hwif->channel == 0) &&
-#endif /* CONFIG_BLK_DEV_PDC4030 */
 	    (ide_hwif_request_regions(hwif))) {
 		u16 msgout = 0;
 		for (unit = 0; unit < MAX_DRIVES; ++unit) {

@@ -222,7 +222,7 @@ static struct semaphore moxaBuffSem;
 static void do_moxa_softint(void *);
 static int moxa_open(struct tty_struct *, struct file *);
 static void moxa_close(struct tty_struct *, struct file *);
-static int moxa_write(struct tty_struct *, int, const unsigned char *, int);
+static int moxa_write(struct tty_struct *, const unsigned char *, int);
 static int moxa_write_room(struct tty_struct *);
 static void moxa_flush_buffer(struct tty_struct *);
 static int moxa_chars_in_buffer(struct tty_struct *);
@@ -632,7 +632,7 @@ static void moxa_close(struct tty_struct *tty, struct file *filp)
 	wake_up_interruptible(&ch->close_wait);
 }
 
-static int moxa_write(struct tty_struct *tty, int from_user,
+static int moxa_write(struct tty_struct *tty,
 		      const unsigned char *buf, int count)
 {
 	struct moxa_str *ch;
@@ -644,25 +644,9 @@ static int moxa_write(struct tty_struct *tty, int from_user,
 		return (0);
 	port = ch->port;
 	save_flags(flags);
-	if (from_user) {
-		if (count > PAGE_SIZE)
-			count = PAGE_SIZE;
-		down(&moxaBuffSem);
-		if (copy_from_user(moxaXmitBuff, buf, count)) {
-			len = -EFAULT;
-		} else {
-			cli();
-			len = MoxaPortWriteData(port, moxaXmitBuff, count);
-			restore_flags(flags);
-		}
-		up(&moxaBuffSem);
-		if (len < 0)
-			return len;
-	} else {
-		cli();
-		len = MoxaPortWriteData(port, (unsigned char *) buf, count);
-		restore_flags(flags);
-	}
+	cli();
+	len = MoxaPortWriteData(port, (unsigned char *) buf, count);
+	restore_flags(flags);
 
 	/*********************************************
 	if ( !(ch->statusflags & LOWWAIT) &&

@@ -42,6 +42,7 @@ struct Qdisc_class_ops
 
 	/* rtnetlink specific */
 	int			(*dump)(struct Qdisc *, unsigned long, struct sk_buff *skb, struct tcmsg*);
+	int			(*dump_stats)(struct Qdisc *, unsigned long, struct gnet_dump *);
 };
 
 struct module;
@@ -64,6 +65,7 @@ struct Qdisc_ops
 	int			(*change)(struct Qdisc *, struct rtattr *arg);
 
 	int			(*dump)(struct Qdisc *, struct sk_buff *);
+	int			(*dump_stats)(struct Qdisc *, struct gnet_dump *);
 
 	struct module		*owner;
 };

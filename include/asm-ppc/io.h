@@ -3,6 +3,7 @@
 #define _PPC_IO_H
 
 #include <linux/config.h>
+#include <linux/string.h>
 #include <linux/types.h>
 
 #include <asm/page.h>
@@ -41,34 +42,170 @@
 #define PCI_DRAM_OFFSET	pci_dram_offset
 #endif /* Platform-dependent I/O */
 
+#define ___IO_BASE ((void __iomem *)_IO_BASE)
 extern unsigned long isa_io_base;
 extern unsigned long isa_mem_base;
 extern unsigned long pci_dram_offset;
 
-#define readb(addr) in_8((volatile u8 *)(addr))
-#define writeb(b,addr) out_8((volatile u8 *)(addr), (b))
+/*
+ * 8, 16 and 32 bit, big and little endian I/O operations, with barrier.
+ *
+ * Read operations have additional twi & isync to make sure the read
+ * is actually performed (i.e. the data has come back) before we start
+ * executing any following instructions.
+ */
+extern inline int in_8(volatile unsigned char __iomem *addr)
+{
+	int ret;
+
+	__asm__ __volatile__(
+		"lbz%U1%X1 %0,%1;\n"
+		"twi 0,%0,0;\n"
+		"isync" : "=r" (ret) : "m" (*addr));
+	return ret;
+}
+
+extern inline void out_8(volatile unsigned char __iomem *addr, int val)
+{
+	__asm__ __volatile__("stb%U0%X0 %1,%0; eieio" : "=m" (*addr) : "r" (val));
+}
+
+extern inline int in_le16(volatile unsigned short __iomem *addr)
+{
+	int ret;
+
+	__asm__ __volatile__("lhbrx %0,0,%1;\n"
+			     "twi 0,%0,0;\n"
+			     "isync" : "=r" (ret) :
+			      "r" (addr), "m" (*addr));
+	return ret;
+}
+
+extern inline int in_be16(volatile unsigned short __iomem *addr)
+{
+	int ret;
+
+	__asm__ __volatile__("lhz%U1%X1 %0,%1;\n"
+			     "twi 0,%0,0;\n"
+			     "isync" : "=r" (ret) : "m" (*addr));
+	return ret;
+}
+
+extern inline void out_le16(volatile unsigned short __iomem *addr, int val)
+{
+	__asm__ __volatile__("sthbrx %1,0,%2; eieio" : "=m" (*addr) :
+			      "r" (val), "r" (addr));
+}
+
+extern inline void out_be16(volatile unsigned short __iomem *addr, int val)
+{
+	__asm__ __volatile__("sth%U0%X0 %1,%0; eieio" : "=m" (*addr) : "r" (val));
+}
+
+extern inline unsigned in_le32(volatile unsigned __iomem *addr)
+{
+	unsigned ret;
+
+	__asm__ __volatile__("lwbrx %0,0,%1;\n"
+			     "twi 0,%0,0;\n"
+			     "isync" : "=r" (ret) :
+			     "r" (addr), "m" (*addr));
+	return ret;
+}
+
+extern inline unsigned in_be32(volatile unsigned __iomem *addr)
+{
+	unsigned ret;
+
+	__asm__ __volatile__("lwz%U1%X1 %0,%1;\n"
+			     "twi 0,%0,0;\n"
+			     "isync" : "=r" (ret) : "m" (*addr));
+	return ret;
+}
+
+extern inline void out_le32(volatile unsigned __iomem *addr, int val)
+{
+	__asm__ __volatile__("stwbrx %1,0,%2; eieio" : "=m" (*addr) :
+			     "r" (val), "r" (addr));
+}
+
+extern inline void out_be32(volatile unsigned __iomem *addr, int val)
+{
+	__asm__ __volatile__("stw%U0%X0 %1,%0; eieio" : "=m" (*addr) : "r" (val));
+}
+
+static inline __u8 readb(volatile void __iomem *addr)
+{
+	return in_8(addr);
+}
+static inline void writeb(__u8 b, volatile void __iomem *addr)
+{
+	out_8(addr, b);
+}
 #if defined(CONFIG_APUS)
-#define readw(addr) (*(volatile u16 *) (addr))
-#define readl(addr) (*(volatile u32 *) (addr))
-#define writew(b,addr) ((*(volatile u16 *) (addr)) = (b))
-#define writel(b,addr) ((*(volatile u32 *) (addr)) = (b))
+static inline __u16 readw(volatile void __iomem *addr)
+{
+	return *(__force volatile __u16 *)(addr);
+}
+static inline __u32 readl(volatile void __iomem *addr)
+{
+	return *(__force volatile __u32 *)(addr);
+}
+static inline void writew(__u16 b, volatile void __iomem *addr)
+{
+	*(__force volatile __u16 *)(addr) = b;
+}
+static inline void writel(__u32 b, volatile void __iomem *addr)
+{
+	*(__force volatile __u32 *)(addr) = b;
+}
 #else
-#define readw(addr) in_le16((volatile u16 *)(addr))
-#define readl(addr) in_le32((volatile u32 *)(addr))
-#define writew(b,addr) out_le16((volatile u16 *)(addr),(b))
-#define writel(b,addr) out_le32((volatile u32 *)(addr),(b))
+static inline __u16 readw(volatile void __iomem *addr)
+{
+	return in_le16(addr);
+}
+static inline __u32 readl(volatile void __iomem *addr)
+{
+	return in_le32(addr);
+}
+static inline void writew(__u16 b, volatile void __iomem *addr)
+{
+	out_le16(addr, b);
+}
+static inline void writel(__u32 b, volatile void __iomem *addr)
+{
+	out_le32(addr, b);
+}
 #endif /* CONFIG_APUS */
 
 #define readb_relaxed(addr) readb(addr)
 #define readw_relaxed(addr) readw(addr)
 #define readl_relaxed(addr) readl(addr)
 
-#define __raw_readb(addr)	(*(volatile unsigned char *)(addr))
-#define __raw_readw(addr)	(*(volatile unsigned short *)(addr))
-#define __raw_readl(addr)	(*(volatile unsigned int *)(addr))
-#define __raw_writeb(v, addr)	(*(volatile unsigned char *)(addr) = (v))
-#define __raw_writew(v, addr)	(*(volatile unsigned short *)(addr) = (v))
-#define __raw_writel(v, addr)	(*(volatile unsigned int *)(addr) = (v))
+static inline __u8 __raw_readb(volatile void __iomem *addr)
+{
+	return *(__force volatile __u8 *)(addr);
+}
+static inline __u16 __raw_readw(volatile void __iomem *addr)
+{
+	return *(__force volatile __u16 *)(addr);
+}
+static inline __u32 __raw_readl(volatile void __iomem *addr)
+{
+	return *(__force volatile __u32 *)(addr);
+}
+static inline void __raw_writeb(__u8 b, volatile void __iomem *addr)
+{
+	*(__force volatile __u8 *)(addr) = b;
+}
+static inline void __raw_writew(__u16 b, volatile void __iomem *addr)
+{
+	*(__force volatile __u16 *)(addr) = b;
+}
+static inline void __raw_writel(__u32 b, volatile void __iomem *addr)
+{
+	*(__force volatile __u32 *)(addr) = b;
+}
 
 /*
  * The insw/outsw/insl/outsl macros don't do byte-swapping.
@@ -76,12 +213,12 @@ extern unsigned long pci_dram_offset;
  * are arrays of bytes, and byte-swapping is not appropriate in
  * that case.  - paulus
  */
-#define insb(port, buf, ns)	_insb((u8 *)((port)+_IO_BASE), (buf), (ns))
-#define outsb(port, buf, ns)	_outsb((u8 *)((port)+_IO_BASE), (buf), (ns))
-#define insw(port, buf, ns)	_insw_ns((u16 *)((port)+_IO_BASE), (buf), (ns))
-#define outsw(port, buf, ns)	_outsw_ns((u16 *)((port)+_IO_BASE), (buf), (ns))
-#define insl(port, buf, nl)	_insl_ns((u32 *)((port)+_IO_BASE), (buf), (nl))
-#define outsl(port, buf, nl)	_outsl_ns((u32 *)((port)+_IO_BASE), (buf), (nl))
+#define insb(port, buf, ns)	_insb((port)+___IO_BASE, (buf), (ns))
+#define outsb(port, buf, ns)	_outsb((port)+___IO_BASE, (buf), (ns))
+#define insw(port, buf, ns)	_insw_ns((port)+___IO_BASE, (buf), (ns))
+#define outsw(port, buf, ns)	_outsw_ns((port)+___IO_BASE, (buf), (ns))
+#define insl(port, buf, nl)	_insl_ns((port)+___IO_BASE, (buf), (nl))
+#define outsl(port, buf, nl)	_outsl_ns((port)+___IO_BASE, (buf), (nl))
 
 /*
  * On powermacs, we will get a machine check exception if we
@@ -121,7 +258,7 @@ extern __inline__ unsigned int name(unsigned int port)	\
 		"	.long	3b,5b\n"		\
 		".previous"				\
 		: "=&r" (x)				\
-		: "r" (port + _IO_BASE));		\
+		: "r" (port + ___IO_BASE));		\
 	return x;					\
 }
 
@@ -136,7 +273,7 @@ extern __inline__ void name(unsigned int val, unsigned int port) \
 		"	.align	2\n"			\
 		"	.long	1b,2b\n"		\
 		".previous"				\
-		: : "r" (val), "r" (port + _IO_BASE));	\
+		: : "r" (val), "r" (port + ___IO_BASE));	\
 }
 
 __do_out_asm(outb, "stbx")
@@ -148,9 +285,9 @@ __do_out_asm(outl,"stw%U0%X0")
 __do_out_asm(outw, "sth%U0%X0")
 #elif defined (CONFIG_8260_PCI9)
 /* in asm cannot be defined if PCI9 workaround is used */
-#define inb(port)		in_8((u8 *)((port)+_IO_BASE))
-#define inw(port)		in_le16((u16 *)((port)+_IO_BASE))
-#define inl(port)		in_le32((u32 *)((port)+_IO_BASE))
+#define inb(port)		in_8((port)+___IO_BASE)
+#define inw(port)		in_le16((port)+___IO_BASE)
+#define inl(port)		in_le32((port)+___IO_BASE)
 __do_out_asm(outw, "sthbrx")
 __do_out_asm(outl, "stwbrx")
 #else
@@ -169,46 +306,55 @@ __do_out_asm(outl, "stwbrx")
 #define inl_p(port)		inl((port))
 #define outl_p(val, port)	outl((val), (port))
 
-extern void _insb(volatile u8 *port, void *buf, int ns);
-extern void _outsb(volatile u8 *port, const void *buf, int ns);
-extern void _insw(volatile u16 *port, void *buf, int ns);
-extern void _outsw(volatile u16 *port, const void *buf, int ns);
-extern void _insl(volatile u32 *port, void *buf, int nl);
-extern void _outsl(volatile u32 *port, const void *buf, int nl);
-extern void _insw_ns(volatile u16 *port, void *buf, int ns);
-extern void _outsw_ns(volatile u16 *port, const void *buf, int ns);
-extern void _insl_ns(volatile u32 *port, void *buf, int nl);
-extern void _outsl_ns(volatile u32 *port, const void *buf, int nl);
+extern void _insb(volatile u8 __iomem *port, void *buf, int ns);
+extern void _outsb(volatile u8 __iomem *port, const void *buf, int ns);
+extern void _insw(volatile u16 __iomem *port, void *buf, int ns);
+extern void _outsw(volatile u16 __iomem *port, const void *buf, int ns);
+extern void _insl(volatile u32 __iomem *port, void *buf, int nl);
+extern void _outsl(volatile u32 __iomem *port, const void *buf, int nl);
+extern void _insw_ns(volatile u16 __iomem *port, void *buf, int ns);
+extern void _outsw_ns(volatile u16 __iomem *port, const void *buf, int ns);
+extern void _insl_ns(volatile u32 __iomem *port, void *buf, int nl);
+extern void _outsl_ns(volatile u32 __iomem *port, const void *buf, int nl);
 
 /*
  * The *_ns versions below don't do byte-swapping.
  * Neither do the standard versions now, these are just here
  * for older code.
  */
-#define insw_ns(port, buf, ns)	_insw_ns((u16 *)((port)+_IO_BASE), (buf), (ns))
-#define outsw_ns(port, buf, ns)	_outsw_ns((u16 *)((port)+_IO_BASE), (buf), (ns))
-#define insl_ns(port, buf, nl)	_insl_ns((u32 *)((port)+_IO_BASE), (buf), (nl))
-#define outsl_ns(port, buf, nl)	_outsl_ns((u32 *)((port)+_IO_BASE), (buf), (nl))
+#define insw_ns(port, buf, ns)	_insw_ns((port)+___IO_BASE, (buf), (ns))
+#define outsw_ns(port, buf, ns)	_outsw_ns((port)+___IO_BASE, (buf), (ns))
+#define insl_ns(port, buf, nl)	_insl_ns((port)+___IO_BASE, (buf), (nl))
+#define outsl_ns(port, buf, nl)	_outsl_ns((port)+___IO_BASE, (buf), (nl))
 
 
 #define IO_SPACE_LIMIT ~0
 
-#define memset_io(a,b,c)       memset((void *)(a),(b),(c))
-#define memcpy_fromio(a,b,c)   memcpy((a),(void *)(b),(c))
-#define memcpy_toio(a,b,c)	memcpy((void *)(a),(b),(c))
+static inline void memset_io(volatile void __iomem *addr, unsigned char val, int count)
+{
+	memset((void __force *)addr, val, count);
+}
+static inline void memcpy_fromio(void *dst, volatile void __iomem *src, int count)
+{
+	memcpy(dst, (void __force *) src, count);
+}
+static inline void memcpy_toio(volatile void __iomem *dst, const void *src, int count)
+{
+	memcpy((void __force *) dst, src, count);
+}
 
 /*
  * Map in an area of physical address space, for accessing
  * I/O devices etc.
  */
-extern void *__ioremap(phys_addr_t address, unsigned long size,
+extern void __iomem *__ioremap(phys_addr_t address, unsigned long size,
 		       unsigned long flags);
-extern void *ioremap(phys_addr_t address, unsigned long size);
+extern void __iomem *ioremap(phys_addr_t address, unsigned long size);
 #ifdef CONFIG_44x
-extern void *ioremap64(unsigned long long address, unsigned long size);
+extern void __iomem *ioremap64(unsigned long long address, unsigned long size);
 #endif
 #define ioremap_nocache(addr, size)	ioremap((addr), (size))
-extern void iounmap(void *addr);
+extern void iounmap(volatile void __iomem *addr);
 extern unsigned long iopa(unsigned long addr);
 extern unsigned long mm_ptov(unsigned long addr) __attribute_const__;
 extern void io_block_mapping(unsigned long virt, phys_addr_t phys,
@@ -288,94 +434,7 @@ extern inline void eieio(void)
 #define iobarrier_r()  eieio()
 #define iobarrier_w()  eieio()
 
-/*
- * 8, 16 and 32 bit, big and little endian I/O operations, with barrier.
- *
- * Read operations have additional twi & isync to make sure the read
- * is actually performed (i.e. the data has come back) before we start
- * executing any following instructions.
- */
-extern inline int in_8(volatile unsigned char *addr)
-{
-	int ret;
-
-	__asm__ __volatile__(
-		"lbz%U1%X1 %0,%1;\n"
-		"twi 0,%0,0;\n"
-		"isync" : "=r" (ret) : "m" (*addr));
-	return ret;
-}
-
-extern inline void out_8(volatile unsigned char *addr, int val)
-{
-	__asm__ __volatile__("stb%U0%X0 %1,%0; eieio" : "=m" (*addr) : "r" (val));
-}
-
-extern inline int in_le16(volatile unsigned short *addr)
-{
-	int ret;
-
-	__asm__ __volatile__("lhbrx %0,0,%1;\n"
-			     "twi 0,%0,0;\n"
-			     "isync" : "=r" (ret) :
-			      "r" (addr), "m" (*addr));
-	return ret;
-}
-
-extern inline int in_be16(volatile unsigned short *addr)
-{
-	int ret;
-
-	__asm__ __volatile__("lhz%U1%X1 %0,%1;\n"
-			     "twi 0,%0,0;\n"
-			     "isync" : "=r" (ret) : "m" (*addr));
-	return ret;
-}
-
-extern inline void out_le16(volatile unsigned short *addr, int val)
-{
-	__asm__ __volatile__("sthbrx %1,0,%2; eieio" : "=m" (*addr) :
-			      "r" (val), "r" (addr));
-}
-
-extern inline void out_be16(volatile unsigned short *addr, int val)
-{
-	__asm__ __volatile__("sth%U0%X0 %1,%0; eieio" : "=m" (*addr) : "r" (val));
-}
-
-extern inline unsigned in_le32(volatile unsigned *addr)
-{
-	unsigned ret;
-
-	__asm__ __volatile__("lwbrx %0,0,%1;\n"
-			     "twi 0,%0,0;\n"
-			     "isync" : "=r" (ret) :
-			     "r" (addr), "m" (*addr));
-	return ret;
-}
-
-extern inline unsigned in_be32(volatile unsigned *addr)
-{
-	unsigned ret;
-
-	__asm__ __volatile__("lwz%U1%X1 %0,%1;\n"
-			     "twi 0,%0,0;\n"
-			     "isync" : "=r" (ret) : "m" (*addr));
-	return ret;
-}
-
-extern inline void out_le32(volatile unsigned *addr, int val)
-{
-	__asm__ __volatile__("stwbrx %1,0,%2; eieio" : "=m" (*addr) :
-			     "r" (val), "r" (addr));
-}
-
-extern inline void out_be32(volatile unsigned *addr, int val)
-{
-	__asm__ __volatile__("stw%U0%X0 %1,%0; eieio" : "=m" (*addr) : "r" (val));
-}
-
-static inline int check_signature(unsigned long io_addr,
+static inline int check_signature(volatile void __iomem * io_addr,
 	const unsigned char *signature, int length)
 {
 	int retval = 0;

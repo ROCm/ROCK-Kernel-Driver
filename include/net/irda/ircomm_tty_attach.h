@@ -72,7 +72,6 @@ extern char *ircomm_tty_state[];
 
 int ircomm_tty_do_event(struct ircomm_tty_cb *self, IRCOMM_TTY_EVENT event,
 			struct sk_buff *skb, struct ircomm_tty_info *info);
-void ircomm_tty_next_state(struct ircomm_tty_cb *self, IRCOMM_TTY_STATE state);
 
 
 int  ircomm_tty_attach_cable(struct ircomm_tty_cb *self);

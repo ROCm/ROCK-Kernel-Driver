@@ -1265,7 +1265,7 @@ static void rs_flush_chars(struct tty_struct *tty)
 	restore_flags(flags);
 }
 
-static int rs_write(struct tty_struct * tty, int from_user,
+static int rs_write(struct tty_struct * tty,
 		    const unsigned char *buf, int count)
 {
 	int	c, t, ret = 0;
@@ -1278,9 +1278,6 @@ static int rs_write(struct tty_struct * tty, int from_user,
 	if (!tty || !info->xmit_buf || !tmp_buf)
 		return 0;
 	    
-	if (from_user)
-		down(&tmp_buf_sem);
-
 	while (1) {
 		/* Thanks to R. Wolff for suggesting how to do this with */
 		/* interrupts enabled */
@@ -1299,18 +1296,7 @@ static int rs_write(struct tty_struct * tty, int from_user,
 		if (c <= 0)
 			break;
 
-		if (from_user) {
-			c -= copy_from_user(tmp_buf, buf, c);
-
-			if (!c) {
-				if (!ret)
-					ret = -EFAULT;
-				break;
-			}
-
-			memcpy(info->xmit_buf + info->xmit_head, tmp_buf, c);
-		} else
-			memcpy(info->xmit_buf + info->xmit_head, buf, c);
+		memcpy(info->xmit_buf + info->xmit_head, buf, c);
 
 		info->xmit_head = (info->xmit_head + c) & (ESP_XMIT_SIZE-1);
 		info->xmit_cnt += c;
@@ -1319,9 +1305,6 @@ static int rs_write(struct tty_struct * tty, int from_user,
 		ret += c;
 	}
 
-	if (from_user)
-		up(&tmp_buf_sem);
-	
 	save_flags(flags); cli();
 
 	if (info->xmit_cnt && !tty->stopped && !(info->IER & UART_IER_THRI)) {

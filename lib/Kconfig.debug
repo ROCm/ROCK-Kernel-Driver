@@ -64,6 +64,13 @@ config DEBUG_SPINLOCK_SLEEP
 	  If you say Y here, various routines which may sleep will become very
 	  noisy if they are called with a spinlock held.
 
+config DEBUG_KOBJECT
+	bool "kobject debugging"
+	depends on DEBUG_KERNEL
+	help
+	  If you say Y here, some extra kobject debugging messages will be sent
+	  to the syslog. 
+
 config DEBUG_HIGHMEM
 	bool "Highmem debugging"
 	depends on DEBUG_KERNEL && HIGHMEM && (X86 || PPC32 || MIPS || SPARC32)

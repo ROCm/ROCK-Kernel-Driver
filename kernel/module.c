@@ -1120,7 +1120,7 @@ static int mod_sysfs_setup(struct module *mod,
 		return -ENOMEM;
 
 	memset(&mod->mkobj->kobj, 0, sizeof(mod->mkobj->kobj));
-	err = kobject_set_name(&mod->mkobj->kobj, mod->name);
+	err = kobject_set_name(&mod->mkobj->kobj, "%s", mod->name);
 	if (err)
 		goto out;
 	kobj_set_kset_s(mod->mkobj, module_subsys);

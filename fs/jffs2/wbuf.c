@@ -9,7 +9,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: wbuf.c,v 1.70 2004/07/13 08:58:25 dwmw2 Exp $
+ * $Id: wbuf.c,v 1.72 2004/09/11 19:22:43 gleixner Exp $
  *
  */
 
@@ -225,7 +225,7 @@ static void jffs2_wbuf_recover(struct jffs2_sb_info *c)
 
 		/* Do the read... */
 		ret = c->mtd->read_ecc(c->mtd, start, c->wbuf_ofs - start, &retlen, buf, NULL, c->oobinfo);
-		if (ret == -EIO && retlen == c->wbuf_ofs - start) {
+		if (ret == -EBADMSG && retlen == c->wbuf_ofs - start) {
 			/* ECC recovered */
 			ret = 0;
 		}
@@ -791,7 +791,7 @@ int jffs2_flash_read(struct jffs2_sb_info *c, loff_t ofs, size_t len, size_t *re
 	if (!jffs2_can_mark_obsolete(c)) {
 		ret = c->mtd->read_ecc(c->mtd, ofs, len, retlen, buf, NULL, c->oobinfo);
 
-		if ( (ret == -EIO) && (*retlen == len) ) {
+		if ( (ret == -EBADMSG) && (*retlen == len) ) {
 			printk(KERN_WARNING "mtd->read(0x%zx bytes from 0x%llx) returned ECC error\n",
 			       len, ofs);
 			/* 
@@ -1047,7 +1047,7 @@ int jffs2_nand_set_oobinfo(struct jffs2_sb_info *c)
 	if (oinfo && oinfo->useecc == MTD_NANDECC_AUTOPLACE) {
 		D1(printk(KERN_DEBUG "JFFS2 using autoplace on NAND\n"));
 		/* Get the position of the free bytes */
-		if (!oinfo->oobfree[0][0]) {
+		if (!oinfo->oobfree[0][1]) {
 			printk (KERN_WARNING "jffs2_nand_set_oobinfo(): Eeep. Autoplacement selected and no empty space in oob\n");
 			return -ENOSPC;
 		}

@@ -222,6 +222,7 @@ gred_requeue(struct sk_buff *skb, struct Qdisc* sch)
 
 	__skb_queue_head(&sch->q, skb);
 	sch->qstats.backlog += skb->len;
+	sch->qstats.requeues++;
 	q->backlog += skb->len;
 	return 0;
 }

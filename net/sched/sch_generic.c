@@ -353,6 +353,7 @@ pfifo_fast_requeue(struct sk_buff *skb, struct Qdisc* qdisc)
 
 	__skb_queue_head(list, skb);
 	qdisc->q.qlen++;
+	qdisc->qstats.requeues++;
 	return 0;
 }
 

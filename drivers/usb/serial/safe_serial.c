@@ -273,7 +273,7 @@ static void safe_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 	}
 }
 
-static int safe_write (struct usb_serial_port *port, int from_user, const unsigned char *buf, int count)
+static int safe_write (struct usb_serial_port *port, const unsigned char *buf, int count)
 {
 	unsigned char *data;
 	int result;
@@ -314,12 +314,7 @@ static int safe_write (struct usb_serial_port *port, int from_user, const unsign
 	data = port->write_urb->transfer_buffer;
 	memset (data, '0', packet_length);
 
-	if (from_user) {
-		if (copy_from_user (data, buf, count))
-			return -EFAULT;
-	} else {
-		memcpy (data, buf, count);
-	}
+	memcpy (data, buf, count);
 
 	if (safe) {
 		__u16 fcs;

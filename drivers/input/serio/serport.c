@@ -42,7 +42,7 @@ struct serport {
 static int serport_serio_write(struct serio *serio, unsigned char data)
 {
 	struct serport *serport = serio->port_data;
-	return -(serport->tty->driver->write(serport->tty, 0, &data, 1) != 1);
+	return -(serport->tty->driver->write(serport->tty, &data, 1) != 1);
 }
 
 static void serport_serio_close(struct serio *serio)

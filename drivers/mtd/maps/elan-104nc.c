@@ -16,7 +16,7 @@
    along with this program; if not, write to the Free Software
    Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
 
-   $Id: elan-104nc.c,v 1.21 2004/07/12 22:38:29 dwmw2 Exp $
+   $Id: elan-104nc.c,v 1.22 2004/09/16 23:27:13 gleixner Exp $
 
 The ELAN-104NC has up to 8 Mibyte of Intel StrataFlash (28F320/28F640) in x16
 mode.  This drivers uses the CFI probe and Intel Extended Command Set drivers.
@@ -53,7 +53,7 @@ always fail.  So we don't do it.  I just hope it doesn't break anything.
 #define PAGE_IO_SIZE 2
 
 static volatile int page_in_window = -1; // Current page in window.
-static unsigned long iomapadr;
+static void __iomem *iomapadr;
 static spinlock_t elan_104nc_spin = SPIN_LOCK_UNLOCKED;
 
 /* partition_info gives details on the logical partitions that the split the 
@@ -190,7 +190,7 @@ int __init init_elan_104nc(void)
 	/* Urg! We use I/O port 0x22 without request_region()ing it,
 	   because it's already allocated to the PIC. */
 
-  	iomapadr = (unsigned long)ioremap(WINDOW_START, WINDOW_LENGTH);
+  	iomapadr = (void __iomem *)ioremap(WINDOW_START, WINDOW_LENGTH);
 	if (!iomapadr) {
 		printk( KERN_ERR"%s: failed to ioremap memory region\n",
 			elan_104nc_map.name );

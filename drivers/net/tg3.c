@@ -60,8 +60,8 @@
 
 #define DRV_MODULE_NAME		"tg3"
 #define PFX DRV_MODULE_NAME	": "
-#define DRV_MODULE_VERSION	"3.10"
-#define DRV_MODULE_RELDATE	"September 14, 2004"
+#define DRV_MODULE_VERSION	"3.11"
+#define DRV_MODULE_RELDATE	"October 20, 2004"
 
 #define TG3_DEF_MAC_MODE	0
 #define TG3_DEF_RX_MODE		0
@@ -143,6 +143,7 @@ MODULE_DESCRIPTION("Broadcom Tigon3 ethernet driver");
 MODULE_LICENSE("GPL");
 MODULE_PARM(tg3_debug, "i");
 MODULE_PARM_DESC(tg3_debug, "Tigon3 bitmapped debugging message enable value");
+MODULE_VERSION(DRV_MODULE_VERSION);
 
 static int tg3_debug = -1;	/* -1 == use TG3_DEF_MSG_ENABLE as value */
 
@@ -6319,8 +6320,8 @@ static int tg3_get_eeprom_len(struct net_device *dev)
 	return EEPROM_CHIP_SIZE;
 }
 
-static int __devinit tg3_nvram_read_using_eeprom(struct tg3 *tp,
-						 u32 offset, u32 *val);
+static int tg3_nvram_read_using_eeprom(struct tg3 *tp,
+					u32 offset, u32 *val);
 static int tg3_get_eeprom(struct net_device *dev, struct ethtool_eeprom *eeprom, u8 *data)
 {
 	struct tg3 *tp = dev->priv;
@@ -6851,8 +6852,8 @@ static void __devinit tg3_nvram_init(struct tg3 *tp)
 	}
 }
 
-static int __devinit tg3_nvram_read_using_eeprom(struct tg3 *tp,
-						 u32 offset, u32 *val)
+static int tg3_nvram_read_using_eeprom(struct tg3 *tp,
+					u32 offset, u32 *val)
 {
 	u32 tmp;
 	int i;

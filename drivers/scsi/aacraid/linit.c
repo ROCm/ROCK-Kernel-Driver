@@ -630,7 +630,7 @@ out_deinit:
 	pci_free_consistent(aac->pdev, aac->comm_size, aac->comm_addr, aac->comm_phys);
 	kfree(aac->queues);
 	free_irq(pdev->irq, aac);
-	iounmap((void * )aac->regs.sa);
+	iounmap(aac->regs.sa);
  out_free_fibs:
 	kfree(aac->fibs);
 	kfree(aac->fsa_dev);
@@ -659,7 +659,7 @@ static void __devexit aac_remove_one(struct pci_dev *pdev)
 	kfree(aac->queues);
 
 	free_irq(pdev->irq, aac);
-	iounmap((void * )aac->regs.sa);
+	iounmap(aac->regs.sa);
 	
 	kfree(aac->fibs);
 	

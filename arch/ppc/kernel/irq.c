@@ -71,6 +71,11 @@ unsigned long ppc_cached_irq_mask[NR_MASK_WORDS];
 unsigned long ppc_lost_interrupts[NR_MASK_WORDS];
 atomic_t ppc_n_lost_interrupts;
 
+#ifdef CONFIG_TAU_INT
+extern int tau_initialized;
+extern int tau_interrupts(int);
+#endif
+
 int show_interrupts(struct seq_file *p, void *v)
 {
 	int i = *(loff_t *) v, j;

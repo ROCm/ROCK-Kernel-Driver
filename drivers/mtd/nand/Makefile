@@ -1,7 +1,7 @@
 #
 # linux/drivers/nand/Makefile
 #
-# $Id: Makefile.common,v 1.9 2004/07/12 16:07:31 dwmw2 Exp $
+# $Id: Makefile.common,v 1.13 2004/09/28 22:04:23 bjd Exp $
 
 obj-$(CONFIG_MTD_NAND)			+= nand.o nand_ecc.o
 obj-$(CONFIG_MTD_NAND_IDS)		+= nand_ids.o
@@ -14,6 +14,9 @@ obj-$(CONFIG_MTD_NAND_TX4925NDFMC)	+= tx4925ndfmc.o
 obj-$(CONFIG_MTD_NAND_TX4938NDFMC)	+= tx4938ndfmc.o
 obj-$(CONFIG_MTD_NAND_AU1550)		+= au1550nd.o
 obj-$(CONFIG_MTD_NAND_PPCHAMELEONEVB)	+= ppchameleonevb.o
+obj-$(CONFIG_MTD_NAND_S3C2410)		+= s3c2410.o
 obj-$(CONFIG_MTD_NAND_DISKONCHIP)	+= diskonchip.o
+obj-$(CONFIG_MTD_NAND_H1900)		+= h1910.o
+obj-$(CONFIG_MTD_NAND_RTC_FROM4)	+= rtc_from4.o
 
 nand-objs = nand_base.o nand_bbt.o

@@ -207,8 +207,8 @@ int register_chrdev(unsigned int major, const char *name,
 
 	cdev->owner = fops->owner;
 	cdev->ops = fops;
-	strcpy(cdev->kobj.name, name);
-	for (s = strchr(cdev->kobj.name, '/'); s; s = strchr(s, '/'))
+	kobject_set_name(&cdev->kobj, "%s", name);
+	for (s = strchr(kobject_name(&cdev->kobj),'/'); s; s = strchr(s, '/'))
 		*s = '!';
 		
 	err = cdev_add(cdev, MKDEV(cd->major, 0), 256);

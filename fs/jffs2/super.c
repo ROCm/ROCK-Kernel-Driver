@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: super.c,v 1.99 2004/08/24 07:59:57 dwmw2 Exp $
+ * $Id: super.c,v 1.100 2004/10/21 00:03:50 dwmw2 Exp $
  *
  */
 

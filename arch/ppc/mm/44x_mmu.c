@@ -55,10 +55,8 @@
 #include <asm/setup.h>
 
 #include "mmu_decl.h"
-#include "mem_pieces.h"
 
 extern char etext[], _stext[];
-extern struct mem_pieces phys_avail;
 
 /* Used by the 44x TLB replacement exception handler.
  * Just needed it declared someplace.
@@ -104,16 +102,6 @@ unsigned long __init mmu_mapin_ram(void)
 {
 	unsigned int pinned_tlbs = 1;
 	int i;
-
-	/*
-	 * If lowmem is not on a pin tlb entry size boundary,
-	 * then reserve the last page of system memory. This
-	 * eliminates the possibility of a speculative dcache
-	 * fetch past the end of system memory that would
-	 * result in a machine check exception.
-	 */
-	if (total_lowmem | (PPC44x_PIN_SIZE - 1))
-		mem_pieces_remove(&phys_avail, total_lowmem - PAGE_SIZE, PAGE_SIZE, 1);
 
 	/* Determine number of entries necessary to cover lowmem */
 	pinned_tlbs = (unsigned int)

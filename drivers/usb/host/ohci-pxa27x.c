@@ -22,6 +22,7 @@
 #include <linux/device.h>
 #include <asm/mach-types.h>
 #include <asm/hardware.h>
+#include <asm/arch/pxa-regs.h>
 
 
 #define PMM_NPS_MODE           1

@@ -405,7 +405,7 @@ int aac_rkt_init(struct aac_dev *dev)
 	/*
 	 *	Map in the registers from the adapter.
 	 */
-	if((dev->regs.rkt = (struct rkt_registers *)ioremap((unsigned long)dev->scsi_host_ptr->base, 8192))==NULL)
+	if((dev->regs.rkt = ioremap((unsigned long)dev->scsi_host_ptr->base, 8192))==NULL)
 	{	
 		printk(KERN_WARNING "aacraid: unable to map i960.\n" );
 		goto error_iounmap;

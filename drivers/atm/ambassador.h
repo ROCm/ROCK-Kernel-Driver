@@ -649,7 +649,7 @@ struct amb_dev {
   
   struct atm_dev * atm_dev;
   struct pci_dev * pci_dev;
-  struct amb_dev * prev;
+  struct timer_list housekeeping;
 };
 
 typedef struct amb_dev amb_dev;

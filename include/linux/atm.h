@@ -78,6 +78,9 @@
 			    /* Service Access Point */
 #define SO_ATMPVC	__SO_ENCODE(SOL_ATM,4,struct sockaddr_atmpvc)
 			    /* "PVC" address (also for SVCs); get only */
+#define SO_MULTIPOINT	__SO_ENCODE(SOL_ATM, 5, int)
+			    /* make this vc a p2mp */
+
 
 /*
  * Note @@@: since the socket layers don't really distinguish the control and

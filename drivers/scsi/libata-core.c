@@ -831,17 +831,17 @@ static u8 ata_dev_try_classify(struct ata_port *ap, unsigned int device)
  *	caller.
  */
 
-void ata_dev_id_string(struct ata_device *dev, unsigned char *s,
+void ata_dev_id_string(u16 *id, unsigned char *s,
 		       unsigned int ofs, unsigned int len)
 {
 	unsigned int c;
 
 	while (len > 0) {
-		c = dev->id[ofs] >> 8;
+		c = id[ofs] >> 8;
 		*s = c;
 		s++;
 
-		c = dev->id[ofs] & 0xff;
+		c = id[ofs] & 0xff;
 		*s = c;
 		s++;
 
@@ -1084,7 +1084,7 @@ retry:
 	 */
 
 	/* we require LBA and DMA support (bits 8 & 9 of word 49) */
-	if (!ata_id_has_dma(dev) || !ata_id_has_lba(dev)) {
+	if (!ata_id_has_dma(dev->id) || !ata_id_has_lba(dev->id)) {
 		printk(KERN_DEBUG "ata%u: no dma/lba\n", ap->id);
 		goto err_out_nosup;
 	}
@@ -1102,7 +1102,7 @@ retry:
 
 	/* ATA-specific feature tests */
 	if (dev->class == ATA_DEV_ATA) {
-		if (!ata_id_is_ata(dev))	/* sanity check */
+		if (!ata_id_is_ata(dev->id))	/* sanity check */
 			goto err_out_nosup;
 
 		tmp = dev->id[ATA_ID_MAJOR_VER];
@@ -1116,11 +1116,11 @@ retry:
 			goto err_out_nosup;
 		}
 
-		if (ata_id_has_lba48(dev)) {
+		if (ata_id_has_lba48(dev->id)) {
 			dev->flags |= ATA_DFLAG_LBA48;
-			dev->n_sectors = ata_id_u64(dev, 100);
+			dev->n_sectors = ata_id_u64(dev->id, 100);
 		} else {
-			dev->n_sectors = ata_id_u32(dev, 60);
+			dev->n_sectors = ata_id_u32(dev->id, 60);
 		}
 
 		ap->host->max_cmd_len = 16;
@@ -1135,7 +1135,7 @@ retry:
 
 	/* ATAPI-specific feature tests */
 	else {
-		if (ata_id_is_ata(dev))		/* sanity check */
+		if (ata_id_is_ata(dev->id))		/* sanity check */
 			goto err_out_nosup;
 
 		rc = atapi_cdb_len(dev->id);
@@ -3785,3 +3785,4 @@ EXPORT_SYMBOL_GPL(ata_scsi_release);
 EXPORT_SYMBOL_GPL(ata_host_intr);
 EXPORT_SYMBOL_GPL(ata_dev_classify);
 EXPORT_SYMBOL_GPL(ata_dev_id_string);
+EXPORT_SYMBOL_GPL(ata_scsi_simulate);

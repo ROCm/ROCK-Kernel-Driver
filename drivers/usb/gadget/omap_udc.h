@@ -146,11 +146,14 @@ struct omap_ep {
 	u8				bmAttributes;
 	unsigned			double_buf:1;
 	unsigned			stopped:1;
-	unsigned			ackwait:1;
+	unsigned			fnf:1;
 	unsigned			has_dma:1;
+	u8				ackwait;
 	u8				dma_channel;
+	u16				dma_counter;
 	int				lch;
 	struct omap_udc			*udc;
+	struct timer_list		timer;
 };
 
 struct omap_udc {
@@ -168,7 +171,6 @@ struct omap_udc {
 	unsigned			ep0_set_config:1;
 	unsigned			ep0_reset_config:1;
 	unsigned			ep0_setup:1;
-	unsigned			hmc:6;
 
 	struct completion		*done;
 };

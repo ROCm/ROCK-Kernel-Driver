@@ -139,6 +139,7 @@ prio_requeue(struct sk_buff *skb, struct Qdisc* sch)
 
 	if ((ret = qdisc->ops->requeue(skb, qdisc)) == 0) {
 		sch->q.qlen++;
+		sch->qstats.requeues++;
 		return 0;
 	}
 dropped:

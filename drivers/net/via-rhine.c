@@ -1957,6 +1957,7 @@ static int rhine_suspend(struct pci_dev *pdev, u32 state)
 	rhine_shutdown(&pdev->dev);
 	spin_unlock_irqrestore(&rp->lock, flags);
 
+	free_irq(dev->irq, dev);
 	return 0;
 }
 
@@ -1969,6 +1970,9 @@ static int rhine_resume(struct pci_dev *pdev)
 
 	if (!netif_running(dev))
 		return 0;
+
+        if (request_irq(dev->irq, rhine_interrupt, SA_SHIRQ, dev->name, dev))
+		printk(KERN_ERR "via-rhine %s: request_irq failed\n", dev->name);
 
 	ret = pci_set_power_state(pdev, 0);
 	if (debug > 1)

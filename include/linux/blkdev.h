@@ -125,13 +125,7 @@ struct request {
 	/* no. of sectors left to complete in the current segment */
 	unsigned int hard_cur_sectors;
 
-	/* no. of segments left to submit in the current bio */
-	unsigned short nr_cbio_segments;
-	/* no. of sectors left to submit in the current bio */
-	unsigned long nr_cbio_sectors;
-
-	struct bio *cbio;		/* next bio to submit */
-	struct bio *bio;		/* next unfinished bio to complete */
+	struct bio *bio;
 	struct bio *biotail;
 
 	void *elevator_private;
@@ -465,32 +459,6 @@ static inline void blk_clear_queue_full(struct request_queue *q, int rw)
  */
 #define blk_queue_headactive(q, head_active)
 
-/* current index into bio being processed for submission */
-#define blk_rq_idx(rq)	((rq)->cbio->bi_vcnt - (rq)->nr_cbio_segments)
-
-/* current bio vector being processed */
-#define blk_rq_vec(rq)	(bio_iovec_idx((rq)->cbio, blk_rq_idx(rq)))
-
-/* current offset with respect to start of the segment being submitted */
-#define blk_rq_offset(rq) \
-	(((rq)->hard_cur_sectors - (rq)->current_nr_sectors) << 9)
-
-/*
- * temporarily mapping a (possible) highmem bio (typically for PIO transfer)
- */
-
-/* Assumes rq->cbio != NULL */
-static inline char * rq_map_buffer(struct request *rq, unsigned long *flags)
-{
-	return (__bio_kmap_irq(rq->cbio, blk_rq_idx(rq), flags)
-		+ blk_rq_offset(rq));
-}
-
-static inline void rq_unmap_buffer(char *buffer, unsigned long *flags)
-{
-	__bio_kunmap_irq(buffer, flags);
-}
-
 /*
  * q->prep_rq_fn return values
  */
@@ -589,7 +557,6 @@ static inline void blk_run_address_space(struct address_space *mapping)
 extern int end_that_request_first(struct request *, int, int);
 extern int end_that_request_chunk(struct request *, int, int);
 extern void end_that_request_last(struct request *);
-extern int process_that_request_first(struct request *, unsigned int);
 extern void end_request(struct request *req, int uptodate);
 
 /*
@@ -660,7 +627,6 @@ extern void blk_queue_invalidate_tags(request_queue_t *);
 extern long blk_congestion_wait(int rw, long timeout);
 
 extern void blk_rq_bio_prep(request_queue_t *, struct request *, struct bio *);
-extern void blk_rq_prep_restart(struct request *);
 extern int blkdev_issue_flush(struct block_device *, sector_t *);
 
 #define MAX_PHYS_SEGMENTS 128

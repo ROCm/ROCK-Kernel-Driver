@@ -660,7 +660,7 @@ static unsigned long	stli_atol(char *str);
 int		stli_init(void);
 static int	stli_open(struct tty_struct *tty, struct file *filp);
 static void	stli_close(struct tty_struct *tty, struct file *filp);
-static int	stli_write(struct tty_struct *tty, int from_user, const unsigned char *buf, int count);
+static int	stli_write(struct tty_struct *tty, const unsigned char *buf, int count);
 static void	stli_putchar(struct tty_struct *tty, unsigned char ch);
 static void	stli_flushchars(struct tty_struct *tty);
 static int	stli_writeroom(struct tty_struct *tty);
@@ -1543,7 +1543,7 @@ static int stli_waitcarrier(stlibrd_t *brdp, stliport_t *portp, struct file *fil
  *	service bits for this port.
  */
 
-static int stli_write(struct tty_struct *tty, int from_user, const unsigned char *buf, int count)
+static int stli_write(struct tty_struct *tty, const unsigned char *buf, int count)
 {
 	volatile cdkasy_t	*ap;
 	volatile cdkhdr_t	*hdrp;
@@ -1555,8 +1555,8 @@ static int stli_write(struct tty_struct *tty, int from_user, const unsigned char
 	unsigned long		flags;
 
 #ifdef DEBUG
-	printk("stli_write(tty=%x,from_user=%d,buf=%x,count=%d)\n",
-		(int) tty, from_user, (int) buf, count);
+	printk("stli_write(tty=%x,buf=%x,count=%d)\n",
+		(int) tty, (int) buf, count);
 #endif
 
 	if ((tty == (struct tty_struct *) NULL) ||
@@ -1573,38 +1573,6 @@ static int stli_write(struct tty_struct *tty, int from_user, const unsigned char
 	if (brdp == (stlibrd_t *) NULL)
 		return(0);
 	chbuf = (unsigned char *) buf;
-
-/*
- *	If copying direct from user space we need to be able to handle page
- *	faults while we are copying. To do this copy as much as we can now
- *	into a kernel buffer. From there we copy it into shared memory. The
- *	big problem is that we do not want shared memory enabled when we are
- *	sleeping (other boards may be serviced while asleep). Something else
- *	to note here is the reading of the tail twice. Since the boards
- *	shared memory can be on an 8-bit bus then we need to be very careful
- *	reading 16 bit quantities - since both the board (slave) and host
- *	could be writing and reading at the same time.
- */
-	if (from_user) {
-		save_flags(flags);
-		cli();
-		EBRDENABLE(brdp);
-		ap = (volatile cdkasy_t *) EBRDGETMEMPTR(brdp, portp->addr);
-		head = (unsigned int) ap->txq.head;
-		tail = (unsigned int) ap->txq.tail;
-		if (tail != ((unsigned int) ap->txq.tail))
-			tail = (unsigned int) ap->txq.tail;
-		len = (head >= tail) ? (portp->txsize - (head - tail) - 1) :
-			(tail - head - 1);
-		count = MIN(len, count);
-		EBRDDISABLE(brdp);
-		restore_flags(flags);
-
-		down(&stli_tmpwritesem);
-		if (copy_from_user(stli_tmpwritebuf, chbuf, count)) 
-			return -EFAULT;
-		chbuf = &stli_tmpwritebuf[0];
-	}
 
 /*
  *	All data is now local, shove as much as possible into shared memory.
@@ -1656,8 +1624,6 @@ static int stli_write(struct tty_struct *tty, int from_user, const unsigned char
 	set_bit(ST_TXBUSY, &portp->state);
 	EBRDDISABLE(brdp);
 
-	if (from_user)
-		up(&stli_tmpwritesem);
 	restore_flags(flags);
 
 	return(count);

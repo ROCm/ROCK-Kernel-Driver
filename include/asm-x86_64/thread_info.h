@@ -125,7 +125,7 @@ static inline struct thread_info *stack_thread_info(void)
 /* work to do on any return to user space */
 #define _TIF_ALLWORK_MASK 0x0000FFFF	
 
-#define PREEMPT_ACTIVE     0x4000000
+#define PREEMPT_ACTIVE     0x10000000
 
 /*
  * Thread-synchronous status.

@@ -20,6 +20,7 @@
 #include <linux/init.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
+#include <linux/param.h>		/* for HZ */
 #include <asm/paca.h>
 #include <asm/processor.h>
 #include <asm/time.h>

@@ -493,7 +493,7 @@ static int keyspan_pda_ioctl(struct usb_serial_port *port, struct file *file,
 	return -ENOIOCTLCMD;
 }
 
-static int keyspan_pda_write(struct usb_serial_port *port, int from_user, 
+static int keyspan_pda_write(struct usb_serial_port *port, 
 			     const unsigned char *buf, int count)
 {
 	struct usb_serial *serial = port->serial;
@@ -567,16 +567,7 @@ static int keyspan_pda_write(struct usb_serial_port *port, int from_user,
 
 	if (count) {
 		/* now transfer data */
-		if (from_user) {
-			if( copy_from_user(port->write_urb->transfer_buffer,
-			buf, count) ) {
-				rc = -EFAULT;
-				goto exit;
-			}
-		}
-		else {
-			memcpy (port->write_urb->transfer_buffer, buf, count);
-		}  
+		memcpy (port->write_urb->transfer_buffer, buf, count);
 		/* send the data out the bulk port */
 		port->write_urb->transfer_buffer_length = count;
 		

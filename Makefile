@@ -1,8 +1,8 @@
 VERSION = 2
 PATCHLEVEL = 6
-SUBLEVEL = 9
-EXTRAVERSION =
-NAME=Zonked Quokka
+SUBLEVEL = 10
+EXTRAVERSION =-rc1
+NAME=Woozy Numbat
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"

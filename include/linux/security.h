@@ -1903,7 +1903,7 @@ static inline int security_netlink_recv(struct sk_buff * skb)
 }
 
 /* prototypes */
-extern int security_scaffolding_startup	(void);
+extern int security_init	(void);
 extern int register_security	(struct security_operations *ops);
 extern int unregister_security	(struct security_operations *ops);
 extern int mod_reg_security	(const char *name, struct security_operations *ops);
@@ -1917,7 +1917,7 @@ extern int mod_unreg_security	(const char *name, struct security_operations *ops
  * are just stubbed out, but a few must call the proper capable code.
  */
 
-static inline int security_scaffolding_startup (void)
+static inline int security_init(void)
 {
 	return 0;
 }

@@ -316,7 +316,7 @@ static void tul_do_pause(unsigned amount)
 /*******************************************************************
 	Use memeory refresh time        ~ 15us * 2
 ********************************************************************/
-void tul_se2_wait()
+void tul_se2_wait(void)
 {
 #if 1
 	udelay(30);
@@ -815,7 +815,7 @@ void tul_release_scb(HCS * hcsp, SCB * scbp)
 	printk("Release SCB %lx; ", (ULONG) scbp);
 #endif
 	spin_lock_irqsave(&(hcsp->HCS_AvailLock), flags);
-	scbp->SCB_Srb = 0;
+	scbp->SCB_Srb = NULL;
 	scbp->SCB_Status = 0;
 	scbp->SCB_NxtScb = NULL;
 	if (hcsp->HCS_LastAvail != NULL) {
@@ -1231,7 +1231,7 @@ int tul_device_reset(HCS * pCurHcb, struct scsi_cmnd *pSrb,
 	pScb->SCB_Target = target;
 	pScb->SCB_Mode = 0;
 
-	pScb->SCB_Srb = 0;
+	pScb->SCB_Srb = NULL;
 	if (ResetFlags & SCSI_RESET_SYNCHRONOUS) {
 		pScb->SCB_Srb = pSrb;
 	}
@@ -2535,8 +2535,8 @@ int tul_post_scsi_rst(HCS * pCurHcb)
 	TCS *pCurTcb;
 	int i;
 
-	pCurHcb->HCS_ActScb = 0;
-	pCurHcb->HCS_ActTcs = 0;
+	pCurHcb->HCS_ActScb = NULL;
+	pCurHcb->HCS_ActTcs = NULL;
 	pCurHcb->HCS_Flags = 0;
 
 	while ((pCurScb = tul_pop_busy_scb(pCurHcb)) != NULL) {

@@ -23,6 +23,7 @@
 #include <linux/kobject.h>
 #include <net/sock.h>
 
+#if defined(CONFIG_KOBJECT_UEVENT) || defined(CONFIG_HOTPLUG)
 static char *action_to_string(enum kobject_action action)
 {
 	switch (action) {
@@ -36,10 +37,13 @@ static char *action_to_string(enum kobject_action action)
 		return "mount";
 	case KOBJ_UMOUNT:
 		return "umount";
+	case KOBJ_OFFLINE:
+		return "offline";
 	default:
 		return NULL;
 	}
 }
+#endif
 
 #ifdef CONFIG_KOBJECT_UEVENT
 static struct sock *uevent_sock;
@@ -187,6 +191,8 @@ void kobject_hotplug(struct kobject *kobj, enum kobject_action action)
 	u64 seq;
 	struct kobject *top_kobj = kobj;
 	struct kset *kset;
+	static struct kset_hotplug_ops null_hotplug_ops;
+	struct kset_hotplug_ops *hotplug_ops = &null_hotplug_ops;
 
 	if (!top_kobj->kset && top_kobj->parent) {
 		do {
@@ -194,15 +200,18 @@ void kobject_hotplug(struct kobject *kobj, enum kobject_action action)
 		} while (!top_kobj->kset && top_kobj->parent);
 	}
 
-	if (top_kobj->kset && top_kobj->kset->hotplug_ops)
+	if (top_kobj->kset)
 		kset = top_kobj->kset;
 	else
 		return;
 
+	if (kset->hotplug_ops)
+		hotplug_ops = kset->hotplug_ops;
+
 	/* If the kset has a filter operation, call it.
 	   Skip the event, if the filter returns zero. */
-	if (kset->hotplug_ops->filter) {
-		if (!kset->hotplug_ops->filter(kset, kobj))
+	if (hotplug_ops->filter) {
+		if (!hotplug_ops->filter(kset, kobj))
 			return;
 	}
 
@@ -221,8 +230,8 @@ void kobject_hotplug(struct kobject *kobj, enum kobject_action action)
 	if (!buffer)
 		goto exit;
 
-	if (kset->hotplug_ops->name)
-		name = kset->hotplug_ops->name(kset, kobj);
+	if (hotplug_ops->name)
+		name = hotplug_ops->name(kset, kobj);
 	if (name == NULL)
 		name = kset->kobj.name;
 
@@ -246,19 +255,12 @@ void kobject_hotplug(struct kobject *kobj, enum kobject_action action)
 	envp [i++] = scratch;
 	scratch += sprintf (scratch, "DEVPATH=%s", kobj_path) + 1;
 
-	spin_lock(&sequence_lock);
-	seq = ++hotplug_seqnum;
-	spin_unlock(&sequence_lock);
-
-	envp [i++] = scratch;
-	scratch += sprintf(scratch, "SEQNUM=%lld", (long long)seq) + 1;
-
 	envp [i++] = scratch;
 	scratch += sprintf(scratch, "SUBSYSTEM=%s", name) + 1;
 
-	if (kset->hotplug_ops->hotplug) {
+	if (hotplug_ops->hotplug) {
 		/* have the kset specific function add its stuff */
-		retval = kset->hotplug_ops->hotplug (kset, kobj,
+		retval = hotplug_ops->hotplug (kset, kobj,
 				  &envp[i], NUM_ENVP - i, scratch,
 				  BUFFER_SIZE - (scratch - buffer));
 		if (retval) {
@@ -268,7 +270,15 @@ void kobject_hotplug(struct kobject *kobj, enum kobject_action action)
 		}
 	}
 
-	pr_debug ("%s: %s %s %s %s %s %s %s\n", __FUNCTION__, argv[0], argv[1],
+	spin_lock(&sequence_lock);
+	seq = ++hotplug_seqnum;
+	spin_unlock(&sequence_lock);
+
+	envp [i++] = scratch;
+	scratch += sprintf(scratch, "SEQNUM=%lld", (long long)seq) + 1;
+
+	pr_debug ("%s: %s %s seq=%lld %s %s %s %s %s\n",
+		  __FUNCTION__, argv[0], argv[1], (long long)seq,
 		  envp[0], envp[1], envp[2], envp[3], envp[4]);
 
 	send_uevent(action_string, kobj_path, buffer, scratch - buffer, GFP_KERNEL);

@@ -1411,7 +1411,8 @@ int do_coredump(long signr, int exit_code, struct pt_regs * regs)
 
 	retval = binfmt->core_dump(signr, regs, file);
 
-	current->signal->group_exit_code |= 0x80;
+	if (retval)
+		current->signal->group_exit_code |= 0x80;
 close_fail:
 	filp_close(file, NULL);
 fail_unlock:

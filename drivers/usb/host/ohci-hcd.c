@@ -154,6 +154,11 @@ static int power_switching = 0;
 module_param (power_switching, bool, 0);
 MODULE_PARM_DESC (power_switching, "true (not default) to switch port power");
 
+/* Some boards leave IR set wrongly, since they fail BIOS/SMM handshakes */
+static int no_handshake = 0;
+module_param (no_handshake, bool, 0);
+MODULE_PARM_DESC (no_handshake, "true (not default) disables BIOS handshake");
+
 /*-------------------------------------------------------------------------*/
 
 /*
@@ -426,7 +431,7 @@ static int ohci_init (struct ohci_hcd *ohci)
 
 #ifndef IR_DISABLE
 	/* SMM owns the HC?  not for long! */
-	if (ohci_readl (&ohci->regs->control) & OHCI_CTRL_IR) {
+	if (!no_handshake && ohci_readl (&ohci->regs->control) & OHCI_CTRL_IR) {
 		ohci_dbg (ohci, "USB HC TakeOver from BIOS/SMM\n");
 
 		/* this timeout is arbitrary.  we make it long, so systems

@@ -65,7 +65,7 @@ static inline struct thread_info *current_thread_info(void)
  */
 #define THREAD_SIZE		8192	/* 2 pages */
 
-#define PREEMPT_ACTIVE		0x4000000
+#define PREEMPT_ACTIVE		0x10000000
 
 /*
  * thread information flag bit numbers

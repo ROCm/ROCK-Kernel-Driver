@@ -327,9 +327,10 @@ static void death_by_timeout(unsigned long ul_conntrack)
 {
 	struct ip_conntrack *ct = (void *)ul_conntrack;
 
-	CONNTRACK_STAT_INC(delete_list);
-
 	WRITE_LOCK(&ip_conntrack_lock);
+	/* Inside lock so preempt is disabled on module removal path.
+	 * Otherwise we can get spurious warnings. */
+	CONNTRACK_STAT_INC(delete_list);
 	clean_from_lists(ct);
 	WRITE_UNLOCK(&ip_conntrack_lock);
 	ip_conntrack_put(ct);
@@ -594,6 +595,9 @@ init_conntrack(const struct ip_conntrack_tuple *tuple,
 		__set_bit(IPS_EXPECTED_BIT, &conntrack->status);
 		conntrack->master = expected;
 		expected->sibling = conntrack;
+#if CONFIG_IP_NF_CONNTRACK_MARK
+		conntrack->mark = expected->expectant->mark;
+#endif
 		LIST_DELETE(&ip_conntrack_expect_list, expected);
 		expected->expectant->expecting--;
 		nf_conntrack_get(&master_ct(conntrack)->ct_general);

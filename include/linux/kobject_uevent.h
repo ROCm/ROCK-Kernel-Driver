@@ -22,6 +22,7 @@ enum kobject_action {
 	KOBJ_CHANGE	= (__force kobject_action_t) 0x03,	/* a sysfs attribute file has changed */
 	KOBJ_MOUNT	= (__force kobject_action_t) 0x04,	/* mount event for block devices */
 	KOBJ_UMOUNT	= (__force kobject_action_t) 0x05,	/* umount event for block devices */
+	KOBJ_OFFLINE	= (__force kobject_action_t) 0x06,	/* offline event for hotplug devices */
 };
 
 
