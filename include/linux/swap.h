@@ -142,6 +142,19 @@ struct sysinfo;
 struct address_space;
 struct zone_t;
 
+/* linux/mm/rmap.c */
+extern int FASTCALL(page_referenced(struct page *));
+extern void FASTCALL(page_add_rmap(struct page *, pte_t *));
+extern void FASTCALL(page_remove_rmap(struct page *, pte_t *));
+extern int FASTCALL(try_to_unmap(struct page *));
+extern int FASTCALL(page_over_rsslimit(struct page *));
+
+/* return values of try_to_unmap */
+#define	SWAP_SUCCESS	0
+#define	SWAP_AGAIN	1
+#define	SWAP_FAIL	2
+#define	SWAP_ERROR	3
+
 /* linux/mm/swap.c */
 extern void FASTCALL(lru_cache_add(struct page *));
 extern void FASTCALL(__lru_cache_del(struct page *));
@@ -168,6 +181,7 @@ int rw_swap_page_sync(int rw, swp_entry_t entry, struct page *page);
 extern void show_swap_cache_info(void);
 #endif
 extern int add_to_swap_cache(struct page *, swp_entry_t);
+extern int add_to_swap(struct page *);
 extern void __delete_from_swap_cache(struct page *page);
 extern void delete_from_swap_cache(struct page *page);
 extern int move_to_swap_cache(struct page *page, swp_entry_t entry);

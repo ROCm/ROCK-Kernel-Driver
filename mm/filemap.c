@@ -176,14 +176,13 @@ static inline void truncate_partial_page(struct page *page, unsigned partial)
  */
 static void truncate_complete_page(struct page *page)
 {
-	/* Leave it on the LRU if it gets converted into anonymous buffers */
-	if (!PagePrivate(page) || do_invalidatepage(page, 0)) {
-		lru_cache_del(page);
-	} else {
+	/* Drop fs-specific data so the page might become freeable. */
+	if (PagePrivate(page) && !do_invalidatepage(page, 0)) {
 		if (current->flags & PF_INVALIDATE)
 			printk("%s: buffer heads were leaked\n",
 				current->comm);
 	}
+
 	ClearPageDirty(page);
 	ClearPageUptodate(page);
 	remove_inode_page(page);
@@ -660,7 +659,7 @@ EXPORT_SYMBOL(wait_on_page_bit);
  * But that's OK - sleepers in wait_on_page_writeback() just go back to sleep.
  *
  * The first mb is necessary to safely close the critical section opened by the
- * TryLockPage(), the second mb is necessary to enforce ordering between
+ * TestSetPageLocked(), the second mb is necessary to enforce ordering between
  * the clear_bit and the read of the waitqueue (to avoid SMP races with a
  * parallel wait_on_page_locked()).
  */

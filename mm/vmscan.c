@@ -42,347 +42,23 @@ static inline int is_page_cache_freeable(struct page * page)
 	return page_count(page) - !!PagePrivate(page) == 1;
 }
 
-/*
- * On the swap_out path, the radix-tree node allocations are performing
- * GFP_ATOMIC allocations under PF_MEMALLOC.  They can completely
- * exhaust the page allocator.  This is bad; some pages should be left
- * available for the I/O system to start sending the swapcache contents
- * to disk.
- *
- * So PF_MEMALLOC is dropped here.  This causes the slab allocations to fail
- * earlier, so radix-tree nodes will then be allocated from the mempool
- * reserves.
- *
- * We're still using __GFP_HIGH for radix-tree node allocations, so some of
- * the emergency pools are available - just not all of them.
- */
-static inline int
-swap_out_add_to_swap_cache(struct page *page, swp_entry_t entry)
+/* Must be called with page's pte_chain_lock held. */
+static inline int page_mapping_inuse(struct page * page)
 {
-	int flags = current->flags;
-	int ret;
+	struct address_space *mapping = page->mapping;
 
-	current->flags &= ~PF_MEMALLOC;
-	current->flags |= PF_NOWARN;
-	ClearPageUptodate(page);		/* why? */
-	ClearPageReferenced(page);		/* why? */
-	ret = add_to_swap_cache(page, entry);
-	current->flags = flags;
-	return ret;
-}
+	/* Page is in somebody's page tables. */
+	if (page->pte_chain)
+		return 1;
 
-/*
- * The swap-out function returns 1 if it successfully
- * scanned all the pages it was asked to (`count').
- * It returns zero if it couldn't do anything,
- *
- * rss may decrease because pages are shared, but this
- * doesn't count as having freed a page.
- */
-
-/* mm->page_table_lock is held. mmap_sem is not held */
-static inline int try_to_swap_out(struct mm_struct * mm, struct vm_area_struct* vma, unsigned long address, pte_t * page_table, struct page *page, zone_t * classzone)
-{
-	pte_t pte;
-	swp_entry_t entry;
-
-	/* Don't look at this pte if it's been accessed recently. */
-	if ((vma->vm_flags & VM_LOCKED) || ptep_test_and_clear_young(page_table)) {
-		mark_page_accessed(page);
-		return 0;
-	}
-
-	/* Don't bother unmapping pages that are active */
-	if (PageActive(page))
+	/* XXX: does this happen ? */
+	if (!mapping)
 		return 0;
 
-	/* Don't bother replenishing zones not under pressure.. */
-	if (!memclass(page_zone(page), classzone))
-		return 0;
+	/* File is mmap'd by somebody. */
+	if (!list_empty(&mapping->i_mmap) || !list_empty(&mapping->i_mmap_shared))
+		return 1;
 
-	if (TestSetPageLocked(page))
-		return 0;
-
-	if (PageWriteback(page))
-		goto out_unlock;
-
-	/* From this point on, the odds are that we're going to
-	 * nuke this pte, so read and clear the pte.  This hook
-	 * is needed on CPUs which update the accessed and dirty
-	 * bits in hardware.
-	 */
-	flush_cache_page(vma, address);
-	pte = ptep_get_and_clear(page_table);
-	flush_tlb_page(vma, address);
-
-	if (pte_dirty(pte))
-		set_page_dirty(page);
-
-	/*
-	 * Is the page already in the swap cache? If so, then
-	 * we can just drop our reference to it without doing
-	 * any IO - it's already up-to-date on disk.
-	 */
-	if (PageSwapCache(page)) {
-		entry.val = page->index;
-		swap_duplicate(entry);
-set_swap_pte:
-		set_pte(page_table, swp_entry_to_pte(entry));
-drop_pte:
-		mm->rss--;
-		unlock_page(page);
-		{
-			int freeable = page_count(page) -
-				!!PagePrivate(page) <= 2;
-			page_cache_release(page);
-			return freeable;
-		}
-	}
-
-	/*
-	 * Is it a clean page? Then it must be recoverable
-	 * by just paging it in again, and we can just drop
-	 * it..  or if it's dirty but has backing store,
-	 * just mark the page dirty and drop it.
-	 *
-	 * However, this won't actually free any real
-	 * memory, as the page will just be in the page cache
-	 * somewhere, and as such we should just continue
-	 * our scan.
-	 *
-	 * Basically, this just makes it possible for us to do
-	 * some real work in the future in "refill_inactive()".
-	 */
-	if (page->mapping)
-		goto drop_pte;
-	if (!PageDirty(page))
-		goto drop_pte;
-
-	/*
-	 * Anonymous buffercache pages can be left behind by
-	 * concurrent truncate and pagefault.
-	 */
-	if (PagePrivate(page))
-		goto preserve;
-
-	/*
-	 * This is a dirty, swappable page.  First of all,
-	 * get a suitable swap entry for it, and make sure
-	 * we have the swap cache set up to associate the
-	 * page with that swap entry.
-	 */
-	for (;;) {
-		entry = get_swap_page();
-		if (!entry.val)
-			break;
-		/* Add it to the swap cache and mark it dirty
-		 * (adding to the page cache will clear the dirty
-		 * and uptodate bits, so we need to do it again)
-		 */
-		switch (swap_out_add_to_swap_cache(page, entry)) {
-		case 0:				/* Success */
-			SetPageUptodate(page);
-			set_page_dirty(page);
-			goto set_swap_pte;
-		case -ENOMEM:			/* radix-tree allocation */
-			swap_free(entry);
-			goto preserve;
-		default:			/* ENOENT: raced */
-			break;
-		}
-		/* Raced with "speculative" read_swap_cache_async */
-		swap_free(entry);
-	}
-
-	/* No swap space left */
-preserve:
-	set_pte(page_table, pte);
-out_unlock:
-	unlock_page(page);
-	return 0;
-}
-
-/* mm->page_table_lock is held. mmap_sem is not held */
-static inline int swap_out_pmd(struct mm_struct * mm, struct vm_area_struct * vma, pmd_t *dir, unsigned long address, unsigned long end, int count, zone_t * classzone)
-{
-	pte_t * pte;
-	unsigned long pmd_end;
-
-	if (pmd_none(*dir))
-		return count;
-	if (pmd_bad(*dir)) {
-		pmd_ERROR(*dir);
-		pmd_clear(dir);
-		return count;
-	}
-	
-	pte = pte_offset_map(dir, address);
-	
-	pmd_end = (address + PMD_SIZE) & PMD_MASK;
-	if (end > pmd_end)
-		end = pmd_end;
-
-	do {
-		if (pte_present(*pte)) {
-			unsigned long pfn = pte_pfn(*pte);
-			struct page *page = pfn_to_page(pfn);
-
-			if (pfn_valid(pfn) && !PageReserved(page)) {
-				count -= try_to_swap_out(mm, vma, address, pte, page, classzone);
-				if (!count) {
-					address += PAGE_SIZE;
-					pte++;
-					break;
-				}
-			}
-		}
-		address += PAGE_SIZE;
-		pte++;
-	} while (address && (address < end));
-	pte_unmap(pte - 1);
-	mm->swap_address = address;
-	return count;
-}
-
-/* mm->page_table_lock is held. mmap_sem is not held */
-static inline int swap_out_pgd(struct mm_struct * mm, struct vm_area_struct * vma, pgd_t *dir, unsigned long address, unsigned long end, int count, zone_t * classzone)
-{
-	pmd_t * pmd;
-	unsigned long pgd_end;
-
-	if (pgd_none(*dir))
-		return count;
-	if (pgd_bad(*dir)) {
-		pgd_ERROR(*dir);
-		pgd_clear(dir);
-		return count;
-	}
-
-	pmd = pmd_offset(dir, address);
-
-	pgd_end = (address + PGDIR_SIZE) & PGDIR_MASK;	
-	if (pgd_end && (end > pgd_end))
-		end = pgd_end;
-	
-	do {
-		count = swap_out_pmd(mm, vma, pmd, address, end, count, classzone);
-		if (!count)
-			break;
-		address = (address + PMD_SIZE) & PMD_MASK;
-		pmd++;
-	} while (address && (address < end));
-	return count;
-}
-
-/* mm->page_table_lock is held. mmap_sem is not held */
-static inline int swap_out_vma(struct mm_struct * mm, struct vm_area_struct * vma, unsigned long address, int count, zone_t * classzone)
-{
-	pgd_t *pgdir;
-	unsigned long end;
-
-	/* Don't swap out areas which are reserved */
-	if (vma->vm_flags & VM_RESERVED)
-		return count;
-
-	pgdir = pgd_offset(mm, address);
-
-	end = vma->vm_end;
-	if (address >= end)
-		BUG();
-	do {
-		count = swap_out_pgd(mm, vma, pgdir, address, end, count, classzone);
-		if (!count)
-			break;
-		address = (address + PGDIR_SIZE) & PGDIR_MASK;
-		pgdir++;
-	} while (address && (address < end));
-	return count;
-}
-
-/* Placeholder for swap_out(): may be updated by fork.c:mmput() */
-struct mm_struct *swap_mm = &init_mm;
-
-/*
- * Returns remaining count of pages to be swapped out by followup call.
- */
-static inline int swap_out_mm(struct mm_struct * mm, int count, int * mmcounter, zone_t * classzone)
-{
-	unsigned long address;
-	struct vm_area_struct* vma;
-
-	/*
-	 * Find the proper vm-area after freezing the vma chain 
-	 * and ptes.
-	 */
-	spin_lock(&mm->page_table_lock);
-	address = mm->swap_address;
-	if (address == TASK_SIZE || swap_mm != mm) {
-		/* We raced: don't count this mm but try again */
-		++*mmcounter;
-		goto out_unlock;
-	}
-	vma = find_vma(mm, address);
-	if (vma) {
-		if (address < vma->vm_start)
-			address = vma->vm_start;
-
-		for (;;) {
-			count = swap_out_vma(mm, vma, address, count, classzone);
-			vma = vma->vm_next;
-			if (!vma)
-				break;
-			if (!count)
-				goto out_unlock;
-			address = vma->vm_start;
-		}
-	}
-	/* Indicate that we reached the end of address space */
-	mm->swap_address = TASK_SIZE;
-
-out_unlock:
-	spin_unlock(&mm->page_table_lock);
-	return count;
-}
-
-static int FASTCALL(swap_out(unsigned int priority, unsigned int gfp_mask, zone_t * classzone));
-static int swap_out(unsigned int priority, unsigned int gfp_mask, zone_t * classzone)
-{
-	int counter, nr_pages = SWAP_CLUSTER_MAX;
-	struct mm_struct *mm;
-
-	counter = mmlist_nr;
-	do {
-		if (need_resched()) {
-			__set_current_state(TASK_RUNNING);
-			schedule();
-		}
-
-		spin_lock(&mmlist_lock);
-		mm = swap_mm;
-		while (mm->swap_address == TASK_SIZE || mm == &init_mm) {
-			mm->swap_address = 0;
-			mm = list_entry(mm->mmlist.next, struct mm_struct, mmlist);
-			if (mm == swap_mm)
-				goto empty;
-			swap_mm = mm;
-		}
-
-		/* Make sure the mm doesn't disappear when we drop the lock.. */
-		atomic_inc(&mm->mm_users);
-		spin_unlock(&mmlist_lock);
-
-		nr_pages = swap_out_mm(mm, nr_pages, &counter, classzone);
-
-		mmput(mm);
-
-		if (!nr_pages)
-			return 1;
-	} while (--counter >= 0);
-
-	return 0;
-
-empty:
-	spin_unlock(&mmlist_lock);
 	return 0;
 }
 
@@ -392,7 +68,6 @@ shrink_cache(int nr_pages, zone_t *classzone,
 {
 	struct list_head * entry;
 	struct address_space *mapping;
-	int max_mapped = nr_pages << (9 - priority);
 
 	spin_lock(&pagemap_lru_lock);
 	while (--max_scan >= 0 &&
@@ -428,10 +103,6 @@ shrink_cache(int nr_pages, zone_t *classzone,
 		if (!memclass(page_zone(page), classzone))
 			continue;
 
-		/* Racy check to avoid trylocking when not worthwhile */
-		if (!PagePrivate(page) && (page_count(page) != 1 || !page->mapping))
-			goto page_mapped;
-
 		/*
 		 * swap activity never enters the filesystem and is safe
 		 * for GFP_NOFS allocations.
@@ -461,6 +132,59 @@ shrink_cache(int nr_pages, zone_t *classzone,
 			continue;
 		}
 
+		/*
+		 * The page is in active use or really unfreeable. Move to
+		 * the active list.
+		 */
+		pte_chain_lock(page);
+		if (page_referenced(page) && page_mapping_inuse(page)) {
+			del_page_from_inactive_list(page);
+			add_page_to_active_list(page);
+			pte_chain_unlock(page);
+			unlock_page(page);
+			continue;
+		}
+
+		/*
+		 * Anonymous process memory without backing store. Try to
+		 * allocate it some swap space here.
+		 *
+		 * XXX: implement swap clustering ?
+		 */
+		if (page->pte_chain && !page->mapping && !PagePrivate(page)) {
+			page_cache_get(page);
+			pte_chain_unlock(page);
+			spin_unlock(&pagemap_lru_lock);
+			if (!add_to_swap(page)) {
+				activate_page(page);
+				unlock_page(page);
+				page_cache_release(page);
+				spin_lock(&pagemap_lru_lock);
+				continue;
+			}
+			page_cache_release(page);
+			spin_lock(&pagemap_lru_lock);
+			pte_chain_lock(page);
+		}
+
+		/*
+		 * The page is mapped into the page tables of one or more
+		 * processes. Try to unmap it here.
+		 */
+		if (page->pte_chain) {
+			switch (try_to_unmap(page)) {
+				case SWAP_ERROR:
+				case SWAP_FAIL:
+					goto page_active;
+				case SWAP_AGAIN:
+					pte_chain_unlock(page);
+					unlock_page(page);
+					continue;
+				case SWAP_SUCCESS:
+					; /* try to free the page below */
+			}
+		}
+		pte_chain_unlock(page);
 		mapping = page->mapping;
 
 		if (PageDirty(page) && is_page_cache_freeable(page) &&
@@ -469,7 +193,7 @@ shrink_cache(int nr_pages, zone_t *classzone,
 			 * It is not critical here to write it only if
 			 * the page is unmapped beause any direct writer
 			 * like O_DIRECT would set the page's dirty bitflag
-			 * on the phisical page after having successfully
+			 * on the physical page after having successfully
 			 * pinned it and after the I/O to the page is finished,
 			 * so the direct writes to the page cannot get lost.
 			 */
@@ -557,18 +281,7 @@ shrink_cache(int nr_pages, zone_t *classzone,
 			write_unlock(&mapping->page_lock);
 		}
 		unlock_page(page);
-page_mapped:
-		if (--max_mapped >= 0)
-			continue;
-
-		/*
-		 * Alert! We've found too many mapped pages on the
-		 * inactive list, so we start swapping out now!
-		 */
-		spin_unlock(&pagemap_lru_lock);
-		swap_out(priority, gfp_mask, classzone);
-		return nr_pages;
-
+		continue;
 page_freeable:
 		/*
 		 * It is critical to check PageDirty _after_ we made sure
@@ -597,13 +310,21 @@ page_freeable:
 
 		/* effectively free the page here */
 		page_cache_release(page);
-
 		if (--nr_pages)
 			continue;
-		break;
+		goto out;
+page_active:
+		/*
+		 * OK, we don't know what to do with the page.
+		 * It's no use keeping it here, so we move it to
+		 * the active list.
+		 */
+		del_page_from_inactive_list(page);
+		add_page_to_active_list(page);
+		pte_chain_unlock(page);
+		unlock_page(page);
 	}
-	spin_unlock(&pagemap_lru_lock);
-
+out:	spin_unlock(&pagemap_lru_lock);
 	return nr_pages;
 }
 
@@ -611,8 +332,8 @@ page_freeable:
  * This moves pages from the active list to
  * the inactive list.
  *
- * We move them the other way when we see the
- * reference bit on the page.
+ * We move them the other way if the page is 
+ * referenced by one or more processes, from rmap
  */
 static void refill_inactive(int nr_pages)
 {
@@ -625,15 +346,17 @@ static void refill_inactive(int nr_pages)
 
 		page = list_entry(entry, struct page, lru);
 		entry = entry->prev;
-		if (TestClearPageReferenced(page)) {
+
+		pte_chain_lock(page);
+		if (page->pte_chain && page_referenced(page)) {
 			list_del(&page->lru);
 			list_add(&page->lru, &active_list);
+			pte_chain_unlock(page);
 			continue;
 		}
-
 		del_page_from_active_list(page);
 		add_page_to_inactive_list(page);
-		SetPageReferenced(page);
+		pte_chain_unlock(page);
 	}
 	spin_unlock(&pagemap_lru_lock);
 }

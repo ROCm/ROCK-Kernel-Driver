@@ -130,6 +130,9 @@ struct vm_operations_struct {
 	struct page * (*nopage)(struct vm_area_struct * area, unsigned long address, int unused);
 };
 
+/* forward declaration; pte_chain is meant to be internal to rmap.c */
+struct pte_chain;
+
 /*
  * Each physical page in the system has a struct page associated with
  * it to keep track of whatever it is we are using the page for at the
@@ -154,6 +157,8 @@ struct page {
 					   updated asynchronously */
 	struct list_head lru;		/* Pageout list, eg. active_list;
 					   protected by pagemap_lru_lock !! */
+	struct pte_chain * pte_chain;	/* Reverse pte mapping pointer.
+					 * protected by PG_chainlock */
 	unsigned long private;		/* mapping-private opaque data */
 
 	/*

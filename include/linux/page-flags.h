@@ -47,7 +47,7 @@
  * locked- and dirty-page accounting.  The top eight bits of page->flags are
  * used for page->zone, so putting flag bits there doesn't work.
  */
-#define PG_locked	 0	/* Page is locked. Don't touch. */
+#define PG_locked	 	 0	/* Page is locked. Don't touch. */
 #define PG_error		 1
 #define PG_referenced		 2
 #define PG_uptodate		 3
@@ -65,6 +65,7 @@
 #define PG_private		12	/* Has something at ->private */
 #define PG_writeback		13	/* Page is under writeback */
 #define PG_nosave		15	/* Used for system suspend/resume */
+#define PG_chainlock		16	/* lock bit for ->pte_chain */
 
 /*
  * Global page accounting.  One instance per CPU.
@@ -215,6 +216,31 @@ extern void get_page_state(struct page_state *ret);
 #define TestSetPageNosave(page)	test_and_set_bit(PG_nosave, &(page)->flags)
 #define ClearPageNosave(page)		clear_bit(PG_nosave, &(page)->flags)
 #define TestClearPageNosave(page)	test_and_clear_bit(PG_nosave, &(page)->flags)
+
+/*
+ * inlines for acquisition and release of PG_chainlock
+ */
+static inline void pte_chain_lock(struct page *page)
+{
+	/*
+	 * Assuming the lock is uncontended, this never enters
+	 * the body of the outer loop. If it is contended, then
+	 * within the inner loop a non-atomic test is used to
+	 * busywait with less bus contention for a good time to
+	 * attempt to acquire the lock bit.
+	 */
+	preempt_disable();
+	while (test_and_set_bit(PG_chainlock, &page->flags)) {
+		while (test_bit(PG_chainlock, &page->flags))
+			cpu_relax();
+	}
+}
+
+static inline void pte_chain_unlock(struct page *page)
+{
+	clear_bit(PG_chainlock, &page->flags);
+	preempt_enable();
+}
 
 /*
  * The PageSwapCache predicate doesn't use a PG_flag at this time,
