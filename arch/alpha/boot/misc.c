@@ -205,3 +205,15 @@ decompress_kernel(void *output_start,
 /*	puts(" done, booting the kernel.\n"); */
 	return output_ptr;
 }
+
+/* dummy-up printk */
+asmlinkage int printk(const char *fmt, ...)
+{
+        va_list args;
+	long ret;
+
+        va_start(args, fmt);
+        ret = srm_printk(fmt, args);
+        va_end(args);
+	return ret;
+}
