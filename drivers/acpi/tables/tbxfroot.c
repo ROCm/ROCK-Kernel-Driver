@@ -389,14 +389,17 @@ acpi_tb_scan_memory_for_rsdp (
  *              Flags                   - Current memory mode (logical vs.
  *                                        physical addressing)
  *
- * RETURN:      Status
+ * RETURN:      Status, RSDP physical address
  *
  * DESCRIPTION: search lower 1_mbyte of memory for the root system descriptor
  *              pointer structure.  If it is found, set *RSDP to point to it.
  *
- *              NOTE: The RSDp must be either in the first 1_k of the Extended
- *              BIOS Data Area or between E0000 and FFFFF (ACPI 1.0 section
- *              5.2.2; assertion #421).
+ *              NOTE1: The RSDp must be either in the first 1_k of the Extended
+ *              BIOS Data Area or between E0000 and FFFFF (From ACPI Spec.)
+ *              Only a 32-bit physical address is necessary.
+ *
+ *              NOTE2: This function is always available, regardless of the
+ *              initialization state of the rest of ACPI.
  *
  ******************************************************************************/
 
@@ -407,8 +410,8 @@ acpi_tb_find_rsdp (
 {
 	u8                              *table_ptr;
 	u8                              *mem_rover;
-	u64                             phys_addr;
-	acpi_status                     status = AE_OK;
+	u32                             physical_address;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("tb_find_rsdp");
@@ -419,36 +422,57 @@ acpi_tb_find_rsdp (
 	 */
 	if ((flags & ACPI_MEMORY_MODE) == ACPI_LOGICAL_ADDRESSING) {
 		/*
-		 * 1) Search EBDA (low memory) paragraphs
+		 * 1a) Get the location of the EBDA
 		 */
-		status = acpi_os_map_memory ((u64) ACPI_LO_RSDP_WINDOW_BASE, ACPI_LO_RSDP_WINDOW_SIZE,
+		status = acpi_os_map_memory ((acpi_physical_address) ACPI_EBDA_PTR_LOCATION,
+				  ACPI_EBDA_PTR_LENGTH,
 				  (void *) &table_ptr);
 		if (ACPI_FAILURE (status)) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Could not map memory at %X for length %X\n",
-				ACPI_LO_RSDP_WINDOW_BASE, ACPI_LO_RSDP_WINDOW_SIZE));
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Could not map memory at %8.8X for length %X\n",
+				ACPI_EBDA_PTR_LOCATION, ACPI_EBDA_PTR_LENGTH));
 			return_ACPI_STATUS (status);
 		}
 
-		mem_rover = acpi_tb_scan_memory_for_rsdp (table_ptr, ACPI_LO_RSDP_WINDOW_SIZE);
-		acpi_os_unmap_memory (table_ptr, ACPI_LO_RSDP_WINDOW_SIZE);
+		ACPI_MOVE_16_TO_32 (&physical_address, table_ptr);
+		physical_address <<= 4;                 /* Convert segment to physical address */
+		acpi_os_unmap_memory (table_ptr, ACPI_EBDA_PTR_LENGTH);
 
-		if (mem_rover) {
-			/* Found it, return the physical address */
+		/* EBDA present? */
 
-			phys_addr = ACPI_LO_RSDP_WINDOW_BASE;
-			phys_addr += ACPI_PTR_DIFF (mem_rover,table_ptr);
+		if (physical_address > 0x400) {
+			/*
+			 * 1b) Search EBDA paragraphs (EBDa is required to be a minimum of 1_k length)
+			 */
+			status = acpi_os_map_memory ((acpi_physical_address) physical_address,
+					  ACPI_EBDA_WINDOW_SIZE,
+					  (void *) &table_ptr);
+			if (ACPI_FAILURE (status)) {
+				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Could not map memory at %8.8X for length %X\n",
+					physical_address, ACPI_EBDA_WINDOW_SIZE));
+				return_ACPI_STATUS (status);
+			}
 
-			table_info->physical_address = phys_addr;
-			return_ACPI_STATUS (AE_OK);
+			mem_rover = acpi_tb_scan_memory_for_rsdp (table_ptr, ACPI_EBDA_WINDOW_SIZE);
+			acpi_os_unmap_memory (table_ptr, ACPI_EBDA_WINDOW_SIZE);
+
+			if (mem_rover) {
+				/* Found it, return the physical address */
+
+				physical_address += ACPI_PTR_DIFF (mem_rover, table_ptr);
+
+				table_info->physical_address = (acpi_physical_address) physical_address;
+				return_ACPI_STATUS (AE_OK);
+			}
 		}
 
 		/*
-		 * 2) Search upper memory: 16-byte boundaries in E0000h-F0000h
+		 * 2) Search upper memory: 16-byte boundaries in E0000h-FFFFFh
 		 */
-		status = acpi_os_map_memory ((u64) ACPI_HI_RSDP_WINDOW_BASE, ACPI_HI_RSDP_WINDOW_SIZE,
+		status = acpi_os_map_memory ((acpi_physical_address) ACPI_HI_RSDP_WINDOW_BASE,
+				  ACPI_HI_RSDP_WINDOW_SIZE,
 				  (void *) &table_ptr);
 		if (ACPI_FAILURE (status)) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Could not map memory at %X for length %X\n",
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Could not map memory at %8.8X for length %X\n",
 				ACPI_HI_RSDP_WINDOW_BASE, ACPI_HI_RSDP_WINDOW_SIZE));
 			return_ACPI_STATUS (status);
 		}
@@ -459,10 +483,9 @@ acpi_tb_find_rsdp (
 		if (mem_rover) {
 			/* Found it, return the physical address */
 
-			phys_addr = ACPI_HI_RSDP_WINDOW_BASE;
-			phys_addr += ACPI_PTR_DIFF (mem_rover, table_ptr);
+			physical_address = ACPI_HI_RSDP_WINDOW_BASE + ACPI_PTR_DIFF (mem_rover, table_ptr);
 
-			table_info->physical_address = phys_addr;
+			table_info->physical_address = (acpi_physical_address) physical_address;
 			return_ACPI_STATUS (AE_OK);
 		}
 	}
@@ -472,19 +495,29 @@ acpi_tb_find_rsdp (
 	 */
 	else {
 		/*
-		 * 1) Search EBDA (low memory) paragraphs
+		 * 1a) Get the location of the EBDA
 		 */
-		mem_rover = acpi_tb_scan_memory_for_rsdp (ACPI_PHYSADDR_TO_PTR (ACPI_LO_RSDP_WINDOW_BASE),
-				  ACPI_LO_RSDP_WINDOW_SIZE);
-		if (mem_rover) {
-			/* Found it, return the physical address */
+		ACPI_MOVE_16_TO_32 (&physical_address, ACPI_EBDA_PTR_LOCATION);
+		physical_address <<= 4;     /* Convert segment to physical address */
 
-			table_info->physical_address = ACPI_TO_INTEGER (mem_rover);
-			return_ACPI_STATUS (AE_OK);
+		/* EBDA present? */
+
+		if (physical_address > 0x400) {
+			/*
+			 * 1b) Search EBDA paragraphs (EBDa is required to be a minimum of 1_k length)
+			 */
+			mem_rover = acpi_tb_scan_memory_for_rsdp (ACPI_PHYSADDR_TO_PTR (physical_address),
+					  ACPI_EBDA_WINDOW_SIZE);
+			if (mem_rover) {
+				/* Found it, return the physical address */
+
+				table_info->physical_address = ACPI_TO_INTEGER (mem_rover);
+				return_ACPI_STATUS (AE_OK);
+			}
 		}
 
 		/*
-		 * 2) Search upper memory: 16-byte boundaries in E0000h-F0000h
+		 * 2) Search upper memory: 16-byte boundaries in E0000h-FFFFFh
 		 */
 		mem_rover = acpi_tb_scan_memory_for_rsdp (ACPI_PHYSADDR_TO_PTR (ACPI_HI_RSDP_WINDOW_BASE),
 				  ACPI_HI_RSDP_WINDOW_SIZE);

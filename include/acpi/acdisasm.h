@@ -52,6 +52,13 @@
 #define BLOCK_BRACE             2
 #define BLOCK_COMMA_LIST        4
 
+struct acpi_external_list
+{
+	char                                *path;
+	struct acpi_external_list           *next;
+};
+
+extern struct acpi_external_list        *acpi_gbl_external_list;
 extern const char                       *acpi_gbl_io_decode[2];
 extern const char                       *acpi_gbl_word_decode[4];
 extern const char                       *acpi_gbl_consume_decode[2];
@@ -398,5 +405,13 @@ acpi_dm_vendor_small_descriptor (
 	u32                             length,
 	u32                             level);
 
+
+/*
+ * dmutils
+ */
+
+void
+acpi_dm_add_to_external_list (
+	char                            *path);
 
 #endif  /* __ACDISASM_H__ */

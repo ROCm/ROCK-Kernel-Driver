@@ -187,15 +187,15 @@ acpi_ex_resolve_object_to_value (
 				return_ACPI_STATUS (status);
 			}
 
+			ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[Arg/Local %X] value_obj is %p\n",
+				stack_desc->reference.offset, obj_desc));
+
 			/*
 			 * Now we can delete the original Reference Object and
-			 * replace it with the resolve value
+			 * replace it with the resolved value
 			 */
 			acpi_ut_remove_reference (stack_desc);
 			*stack_ptr = obj_desc;
-
-			ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[Arg/Local %d] value_obj is %p\n",
-				stack_desc->reference.offset, obj_desc));
 			break;
 
 
