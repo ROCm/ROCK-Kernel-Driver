@@ -33,10 +33,11 @@ struct kernel_stat kstat;
  * Timekeeping variables
  */
 
-long tick = (1000000 + HZ/2) / HZ;	/* timer interrupt period */
+unsigned long tick_usec = TICK_USEC; 		/* ACTHZ          period (usec) */
+unsigned long tick_nsec = TICK_NSEC(TICK_USEC);	/* USER_HZ period (nsec) */
 
 /* The current time */
-struct timeval xtime __attribute__ ((aligned (16)));
+struct timespec xtime __attribute__ ((aligned (16)));
 
 /* Don't completely fail for HZ > 500.  */
 int tickadj = 500/HZ ? : 1;		/* microsecs */
@@ -63,7 +64,6 @@ long time_adj;				/* tick adjust (scaled 1 / HZ)	*/
 long time_reftime;			/* time at last adjustment (s)	*/
 
 long time_adjust;
-long time_adjust_step;
 
 unsigned long event;
 
@@ -465,6 +465,8 @@ static void second_overflow(void)
 /* in the NTP reference this is called "hardclock()" */
 static void update_wall_time_one_tick(void)
 {
+	long time_adjust_step;
+
 	if ( (time_adjust_step = time_adjust) != 0 ) {
 	    /* We are doing an adjtime thing. 
 	     *
@@ -483,21 +485,21 @@ static void update_wall_time_one_tick(void)
 	    /* Reduce by this step the amount of time left  */
 	    time_adjust -= time_adjust_step;
 	}
-	xtime.tv_usec += tick + time_adjust_step;
+	xtime.tv_nsec += tick_nsec + time_adjust_step * 1000;
 	/*
 	 * Advance the phase, once it gets to one microsecond, then
 	 * advance the tick more.
 	 */
 	time_phase += time_adj;
 	if (time_phase <= -FINEUSEC) {
-		long ltemp = -time_phase >> SHIFT_SCALE;
-		time_phase += ltemp << SHIFT_SCALE;
-		xtime.tv_usec -= ltemp;
+		long ltemp = -time_phase >> (SHIFT_SCALE - 10);
+		time_phase += ltemp << (SHIFT_SCALE - 10);
+		xtime.tv_nsec -= ltemp;
 	}
 	else if (time_phase >= FINEUSEC) {
-		long ltemp = time_phase >> SHIFT_SCALE;
-		time_phase -= ltemp << SHIFT_SCALE;
-		xtime.tv_usec += ltemp;
+		long ltemp = time_phase >> (SHIFT_SCALE - 10);
+		time_phase -= ltemp << (SHIFT_SCALE - 10);
+		xtime.tv_nsec += ltemp;
 	}
 }
 
@@ -515,8 +517,8 @@ static void update_wall_time(unsigned long ticks)
 		update_wall_time_one_tick();
 	} while (ticks);
 
-	if (xtime.tv_usec >= 1000000) {
-	    xtime.tv_usec -= 1000000;
+	if (xtime.tv_nsec >= 1000000000) {
+	    xtime.tv_nsec -= 1000000000;
 	    xtime.tv_sec++;
 	    second_overflow();
 	}

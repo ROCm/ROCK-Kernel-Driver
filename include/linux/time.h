@@ -113,7 +113,7 @@ mktime (unsigned int year, unsigned int mon,
 	)*60 + sec; /* finally seconds */
 }
 
-extern struct timeval xtime;
+extern struct timespec xtime;
 
 #define CURRENT_TIME (xtime.tv_sec)
 

@@ -155,6 +155,28 @@
 /* LATCH is used in the interval timer and ftape setup. */
 #define LATCH  ((CLOCK_TICK_RATE + HZ/2) / HZ)	/* For divider */
 
+/* Suppose we want to devide two numbers NOM and DEN: NOM/DEN, the we can
+ * improve accuracy by shifting LSH bits, hence calculating:
+ *     (NOM << LSH) / DEN
+ * This however means trouble for large NOM, because (NOM << LSH) may no
+ * longer fit in 32 bits. The following way of calculating this gives us
+ * some slack, under the following onditions:
+ *   - (NOM / DEN) fits in (32 - LSH) bits.
+ *   - (NOM % DEN) fits in (32 - LSH) bits.
+ */
+#define SH_DIV(NOM,DEN,LSH) (   ((NOM / DEN) << LSH)                    \
+                             + (((NOM % DEN) << LSH) + DEN / 2) / DEN)
+
+/* HZ is the requested value. ACTHZ is actual HZ ("<< 8" is for accuracy) */
+#define ACTHZ (SH_DIV (CLOCK_TICK_RATE, LATCH, 8))
+
+/* TICK_USEC is the time between ticks in usec assuming fake USER_HZ */
+#define TICK_USEC ((1000000UL + USER_HZ/2) / USER_HZ)
+
+/* TICK_NSEC is the time between ticks in nsec assuming real ACTHZ and	*/
+/* a value TUSEC for TICK_USEC (can be set bij adjtimex)		*/
+#define TICK_NSEC(TUSEC) (SH_DIV (TUSEC * USER_HZ * 1000, ACTHZ, 8))
+
 /*
  * syscall interface - used (mainly by NTP daemon)
  * to discipline kernel clock oscillator
@@ -251,7 +273,8 @@ struct timex {
  * Note: maximum error = NTP synch distance = dispersion + delay / 2;
  * estimated error = NTP dispersion.
  */
-extern long tick;                      /* timer interrupt period */
+extern unsigned long tick_usec;		/* USER_HZ period (usec) */
+extern unsigned long tick_nsec;		/* ACTHZ          period (nsec) */
 extern int tickadj;			/* amount of adjustment per tick */
 
 /*

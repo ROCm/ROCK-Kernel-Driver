@@ -82,7 +82,7 @@ asmlinkage long sys_stime(int * tptr)
 		return -EFAULT;
 	write_lock_irq(&xtime_lock);
 	xtime.tv_sec = value;
-	xtime.tv_usec = 0;
+	xtime.tv_nsec = 0;
 	last_time_offset = 0;
 	time_adjust = 0;	/* stop active adjtime() */
 	time_status |= STA_UNSYNC;
@@ -231,7 +231,8 @@ int do_adjtimex(struct timex *txc)
 
 	/* if the quartz is off by more than 10% something is VERY wrong ! */
 	if (txc->modes & ADJ_TICK)
-		if (txc->tick < 900000/HZ || txc->tick > 1100000/HZ)
+		if (txc->tick <  900000/USER_HZ ||
+		    txc->tick > 1100000/USER_HZ)
 			return -EINVAL;
 
 	write_lock_irq(&xtime_lock);
@@ -344,13 +345,8 @@ int do_adjtimex(struct timex *txc)
 		} /* STA_PLL || STA_PPSTIME */
 	    } /* txc->modes & ADJ_OFFSET */
 	    if (txc->modes & ADJ_TICK) {
-		/* if the quartz is off by more than 10% something is
-		   VERY wrong ! */
-		if (txc->tick < 900000/HZ || txc->tick > 1100000/HZ) {
-		    result = -EINVAL;
-		    goto leave;
-		}
-		tick = txc->tick;
+		tick_usec = txc->tick;
+		tick_nsec = TICK_NSEC(tick_usec);
 	    }
 	} /* txc->modes */
 leave:	if ((time_status & (STA_UNSYNC|STA_CLOCKERR)) != 0
@@ -380,7 +376,7 @@ leave:	if ((time_status & (STA_UNSYNC|STA_CLOCKERR)) != 0
 	txc->constant	   = time_constant;
 	txc->precision	   = time_precision;
 	txc->tolerance	   = time_tolerance;
-	txc->tick	   = tick;
+	txc->tick	   = tick_usec;
 	txc->ppsfreq	   = pps_freq;
 	txc->jitter	   = pps_jitter >> PPS_AVG;
 	txc->shift	   = pps_shift;

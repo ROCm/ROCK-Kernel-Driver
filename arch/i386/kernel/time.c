@@ -115,7 +115,7 @@ static inline unsigned long do_fast_gettimeoffset(void)
 	return delay_at_last_interrupt + edx;
 }
 
-#define TICK_SIZE tick
+#define TICK_SIZE (tick_nsec / 1000)
 
 spinlock_t i8253_lock = SPIN_LOCK_UNLOCKED;
 EXPORT_SYMBOL(i8253_lock);
@@ -280,7 +280,7 @@ void do_gettimeofday(struct timeval *tv)
 			usec += lost * (1000000 / HZ);
 	}
 	sec = xtime.tv_sec;
-	usec += xtime.tv_usec;
+	usec += (xtime.tv_nsec / 1000);
 	read_unlock_irqrestore(&xtime_lock, flags);
 
 	while (usec >= 1000000) {
@@ -309,7 +309,8 @@ void do_settimeofday(struct timeval *tv)
 		tv->tv_sec--;
 	}
 
-	xtime = *tv;
+	xtime.tv_sec = tv->tv_sec;
+	xtime.tv_nsec = (tv->tv_usec * 1000);
 	time_adjust = 0;		/* stop active adjtime() */
 	time_status |= STA_UNSYNC;
 	time_maxerror = NTP_PHASE_LIMIT;
@@ -437,8 +438,8 @@ static inline void do_timer_interrupt(int irq, void *dev_id, struct pt_regs *reg
 	 */
 	if ((time_status & STA_UNSYNC) == 0 &&
 	    xtime.tv_sec > last_rtc_update + 660 &&
-	    xtime.tv_usec >= 500000 - ((unsigned) tick) / 2 &&
-	    xtime.tv_usec <= 500000 + ((unsigned) tick) / 2) {
+	    (xtime.tv_nsec / 1000) >= 500000 - ((unsigned) TICK_SIZE) / 2 &&
+	    (xtime.tv_nsec / 1000) <= 500000 + ((unsigned) TICK_SIZE) / 2) {
 		if (set_rtc_mmss(xtime.tv_sec) == 0)
 			last_rtc_update = xtime.tv_sec;
 		else
@@ -655,7 +656,7 @@ void __init time_init(void)
 	extern int x86_udelay_tsc;
 	
 	xtime.tv_sec = get_cmos_time();
-	xtime.tv_usec = 0;
+	xtime.tv_nsec = 0;
 
 /*
  * If we have APM enabled or the CPU clock speed is variable
