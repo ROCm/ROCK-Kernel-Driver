@@ -10,7 +10,6 @@
 
 /* these maximums are arbitrary */
 #define USB_MAXCONFIG			8
-#define USB_ALTSETTINGALLOC		4
 #define USB_MAXINTERFACES		32
 
 static int usb_parse_endpoint(struct usb_host_endpoint *endpoint, unsigned char *buffer, int size)
@@ -108,42 +107,26 @@ static int usb_parse_interface(struct usb_interface *interface, unsigned char *b
 	struct usb_host_interface *ifp;
 	unsigned char *begin;
 
-	interface->max_altsetting = USB_ALTSETTINGALLOC;
-	interface->altsetting = kmalloc(sizeof(*interface->altsetting) * interface->max_altsetting,
-					GFP_KERNEL);
-	if (!interface->altsetting) {
-		err("couldn't kmalloc interface->altsetting");
-		return -ENOMEM;
-	}
-
-	while (size > 0) {
+	ifp = interface->altsetting;
+	while (size >= sizeof(struct usb_descriptor_header)) {
 		struct usb_interface_descriptor	*d;
 
-		if (interface->num_altsetting >= interface->max_altsetting) {
-			struct usb_host_interface *ptr;
-			int oldmas;
+		d = (struct usb_interface_descriptor *) buffer;
+		if (d->bAlternateSetting >= interface->num_altsetting) {
 
-			oldmas = interface->max_altsetting;
-			interface->max_altsetting += USB_ALTSETTINGALLOC;
-			if (interface->max_altsetting > USB_MAXALTSETTING) {
-				warn("too many alternate settings (incr %d max %d)\n",
-					USB_ALTSETTINGALLOC, USB_MAXALTSETTING);
-				return -EINVAL;
-			}
+			/* Skip to the next interface descriptor */
+			buffer += d->bLength;
+			size -= d->bLength;
+			while (size >= sizeof(struct usb_descriptor_header)) {
+				header = (struct usb_descriptor_header *) buffer;
 
-			ptr = kmalloc(sizeof(*ptr) * interface->max_altsetting, GFP_KERNEL);
-			if (ptr == NULL) {
-				err("couldn't kmalloc interface->altsetting");
-				return -ENOMEM;
+				if (header->bDescriptorType == USB_DT_INTERFACE)
+					break;
+				buffer += header->bLength;
+				size -= header->bLength;
 			}
-			memcpy(ptr, interface->altsetting, sizeof(*interface->altsetting) * oldmas);
-			kfree(interface->altsetting);
-			interface->altsetting = ptr;
+			continue;
 		}
-
-		ifp = interface->altsetting + interface->num_altsetting;
-		memset(ifp, 0, sizeof(*ifp));
-		interface->num_altsetting++;
 
 		memcpy(&ifp->desc, buffer, USB_DT_INTERFACE_SIZE);
 
@@ -216,6 +199,8 @@ static int usb_parse_interface(struct usb_interface *interface, unsigned char *b
 				|| d->bDescriptorType != USB_DT_INTERFACE
 				|| !d->bAlternateSetting)
 			break;
+
+		++ifp;
 	}
 
 	return buffer - buffer0;
@@ -223,7 +208,7 @@ static int usb_parse_interface(struct usb_interface *interface, unsigned char *b
 
 int usb_parse_configuration(struct usb_host_config *config, char *buffer)
 {
-	int nintf;
+	int nintf, nintf_orig;
 	int i, j, size;
 	struct usb_interface *interface;
 	char *buffer2;
@@ -237,7 +222,7 @@ int usb_parse_configuration(struct usb_host_config *config, char *buffer)
 	le16_to_cpus(&config->desc.wTotalLength);
 	size = config->desc.wTotalLength;
 
-	nintf = config->desc.bNumInterfaces;
+	nintf = nintf_orig = config->desc.bNumInterfaces;
 	if (nintf > USB_MAXINTERFACES) {
 		warn("too many interfaces (%d max %d)",
 		    nintf, USB_MAXINTERFACES);
@@ -260,7 +245,8 @@ int usb_parse_configuration(struct usb_host_config *config, char *buffer)
 		get_device(&interface->dev);
 	}
 
-	/* Go through the descriptors, checking their length */
+	/* Go through the descriptors, checking their length and counting the
+	 * number of altsettings for each interface */
 	buffer2 = buffer;
 	size2 = size;
 	j = 0;
@@ -272,10 +258,21 @@ int usb_parse_configuration(struct usb_host_config *config, char *buffer)
 		}
 
 		if (header->bDescriptorType == USB_DT_INTERFACE) {
+			struct usb_interface_descriptor *d;
+
 			if (header->bLength < USB_DT_INTERFACE_SIZE) {
 				warn("invalid interface descriptor");
 				return -EINVAL;
 			}
+			d = (struct usb_interface_descriptor *) header;
+			i = d->bInterfaceNumber;
+			if (i >= nintf_orig) {
+				warn("invalid interface number (%d/%d)",
+				    i, nintf_orig);
+				return -EINVAL;
+			}
+			if (i < nintf)
+				++config->interface[i]->num_altsetting;
 
 		} else if ((header->bDescriptorType == USB_DT_DEVICE ||
 		    header->bDescriptorType == USB_DT_CONFIG) && j) {
@@ -286,6 +283,28 @@ int usb_parse_configuration(struct usb_host_config *config, char *buffer)
 		j = 1;
 		buffer2 += header->bLength;
 		size2 -= header->bLength;
+	}
+
+	/* Allocate the altsetting arrays */
+	for (i = 0; i < config->desc.bNumInterfaces; ++i) {
+		interface = config->interface[i];
+		if (interface->num_altsetting > USB_MAXALTSETTING) {
+			warn("too many alternate settings for interface %d (%d max %d)\n",
+			    i, interface->num_altsetting, USB_MAXALTSETTING);
+			return -EINVAL;
+		}
+		if (interface->num_altsetting == 0) {
+			warn("no alternate settings for interface %d", i);
+			return -EINVAL;
+		}
+
+		len = sizeof(*interface->altsetting) * interface->num_altsetting;
+		interface->altsetting = kmalloc(len, GFP_KERNEL);
+		if (!interface->altsetting) {
+			err("couldn't kmalloc interface->altsetting");
+			return -ENOMEM;
+		}
+		memset(interface->altsetting, 0, len);
 	}
 
 	buffer += config->desc.bLength;
@@ -325,7 +344,7 @@ int usb_parse_configuration(struct usb_host_config *config, char *buffer)
 	}
 
 	/* Parse all the interface/altsetting descriptors */
-	for (i = 0; i < nintf; i++) {
+	for (i = 0; i < nintf_orig; i++) {
 		retval = usb_parse_interface(config->interface[i], buffer, size);
 		if (retval < 0)
 			return retval;
