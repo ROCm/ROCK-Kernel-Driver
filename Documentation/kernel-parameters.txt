@@ -393,7 +393,7 @@ running once the system is up.
 			See Documentation/ide.txt.
 
 	idle=		[HW]
-			Format: poll
+			Format: idle=poll or idle=halt
  
 	in2000=		[HW,SCSI]
 			See header of drivers/scsi/in2000.c.
