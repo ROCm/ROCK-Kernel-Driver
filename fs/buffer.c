@@ -91,6 +91,7 @@ void wake_up_buffer(struct buffer_head *bh)
 {
 	wait_queue_head_t *wq = bh_waitq_head(bh);
 
+	smp_mb();
 	if (waitqueue_active(wq))
 		wake_up_all(wq);
 }
