@@ -535,14 +535,16 @@ gss_verify_header(struct svc_rqst *rqstp, struct rsc *rsci,
 		  u32 *rpcstart, struct rpc_gss_wire_cred *gc, u32 *authp)
 {
 	struct gss_ctx		*ctx_id = rsci->mechctx;
-	struct xdr_netobj	rpchdr;
+	struct xdr_buf		rpchdr;
 	struct xdr_netobj	checksum;
 	u32			flavor = 0;
 	struct iovec		*argv = &rqstp->rq_arg.head[0];
+	struct iovec		iov;
 
 	/* data to compute the checksum over: */
-	rpchdr.data = (u8 *)rpcstart;
-	rpchdr.len = (u8 *)argv->iov_base - (u8 *)rpcstart;
+	iov.iov_base = rpcstart;
+	iov.iov_len = (u8 *)argv->iov_base - (u8 *)rpcstart;
+	xdr_buf_from_iov(&iov, &rpchdr);
 
 	*authp = rpc_autherr_badverf;
 	if (argv->iov_len < 4)
@@ -580,15 +582,17 @@ gss_write_verf(struct svc_rqst *rqstp, struct gss_ctx *ctx_id, u32 seq)
 {
 	u32			xdr_seq;
 	u32			maj_stat;
-	struct xdr_netobj	verf_data;
+	struct xdr_buf		verf_data;
 	struct xdr_netobj	mic;
 	u32			*p;
+	struct iovec		iov;
 
 	svc_putu32(rqstp->rq_res.head, htonl(RPC_AUTH_GSS));
 	xdr_seq = htonl(seq);
 
-	verf_data.data = (u8 *)&xdr_seq;
-	verf_data.len = sizeof(xdr_seq);
+	iov.iov_base = &xdr_seq;
+	iov.iov_len = sizeof(xdr_seq);
+	xdr_buf_from_iov(&iov, &verf_data);
 	p = rqstp->rq_res.head->iov_base + rqstp->rq_res.head->iov_len;
 	maj_stat = gss_get_mic(ctx_id, 0, &verf_data, &mic);
 	if (maj_stat != GSS_S_COMPLETE)

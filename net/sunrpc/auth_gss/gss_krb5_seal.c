@@ -169,8 +169,5 @@ krb5_make_token(struct krb5_ctx *ctx, int qop_req,
 	return ((ctx->endtime < now) ? GSS_S_CONTEXT_EXPIRED : GSS_S_COMPLETE);
 out_err:
 	if (md5cksum.data) kfree(md5cksum.data);
-	if (token->data) kfree(token->data);
-	token->data = 0;
-	token->len = 0;
 	return GSS_S_FAILURE;
 }
