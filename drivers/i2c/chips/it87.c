@@ -450,7 +450,7 @@ static ssize_t set_sensor_##offset (struct device *dev, 		\
 {									\
 	return set_sensor(dev, buf, count, 0x##offset - 1);		\
 }									\
-static DEVICE_ATTR(sensor##offset, S_IRUGO | S_IWUSR,	 		\
+static DEVICE_ATTR(temp##offset##_type, S_IRUGO | S_IWUSR,	 		\
 		show_sensor_##offset, set_sensor_##offset)
 
 show_sensor_offset(1);
@@ -737,9 +737,9 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 	device_create_file(&new_client->dev, &dev_attr_temp1_min);
 	device_create_file(&new_client->dev, &dev_attr_temp2_min);
 	device_create_file(&new_client->dev, &dev_attr_temp3_min);
-	device_create_file(&new_client->dev, &dev_attr_sensor1);
-	device_create_file(&new_client->dev, &dev_attr_sensor2);
-	device_create_file(&new_client->dev, &dev_attr_sensor3);
+	device_create_file(&new_client->dev, &dev_attr_temp1_type);
+	device_create_file(&new_client->dev, &dev_attr_temp2_type);
+	device_create_file(&new_client->dev, &dev_attr_temp3_type);
 	device_create_file(&new_client->dev, &dev_attr_fan1_input);
 	device_create_file(&new_client->dev, &dev_attr_fan2_input);
 	device_create_file(&new_client->dev, &dev_attr_fan3_input);

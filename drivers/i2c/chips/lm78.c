@@ -372,7 +372,7 @@ static ssize_t set_temp_hyst(struct device *dev, const char *buf, size_t count)
 static DEVICE_ATTR(temp1_input, S_IRUGO, show_temp, NULL)
 static DEVICE_ATTR(temp1_max, S_IRUGO | S_IWUSR,
 		show_temp_over, set_temp_over)
-static DEVICE_ATTR(temp1_hyst, S_IRUGO | S_IWUSR,
+static DEVICE_ATTR(temp1_max_hyst, S_IRUGO | S_IWUSR,
 		show_temp_hyst, set_temp_hyst)
 
 /* 3 Fans */
@@ -495,7 +495,7 @@ static ssize_t show_vid(struct device *dev, char *buf)
 	lm78_update_client(client);
 	return sprintf(buf, "%d\n", VID_FROM_REG(data->vid));
 }
-static DEVICE_ATTR(vid, S_IRUGO, show_vid, NULL);
+static DEVICE_ATTR(in0_ref, S_IRUGO, show_vid, NULL);
 
 /* Alarms */
 static ssize_t show_alarms(struct device *dev, char *buf)
@@ -680,7 +680,7 @@ int lm78_detect(struct i2c_adapter *adapter, int address, int kind)
 	device_create_file(&new_client->dev, &dev_attr_in6_max);
 	device_create_file(&new_client->dev, &dev_attr_temp1_input);
 	device_create_file(&new_client->dev, &dev_attr_temp1_max);
-	device_create_file(&new_client->dev, &dev_attr_temp1_hyst);
+	device_create_file(&new_client->dev, &dev_attr_temp1_max_hyst);
 	device_create_file(&new_client->dev, &dev_attr_fan1_input);
 	device_create_file(&new_client->dev, &dev_attr_fan1_min);
 	device_create_file(&new_client->dev, &dev_attr_fan1_div);
@@ -691,7 +691,7 @@ int lm78_detect(struct i2c_adapter *adapter, int address, int kind)
 	device_create_file(&new_client->dev, &dev_attr_fan3_min);
 	device_create_file(&new_client->dev, &dev_attr_fan3_div);
 	device_create_file(&new_client->dev, &dev_attr_alarms);
-	device_create_file(&new_client->dev, &dev_attr_vid);
+	device_create_file(&new_client->dev, &dev_attr_in0_ref);
 
 	return 0;
 

@@ -205,7 +205,7 @@ sysfs_r(kind, sub, 0, reg) \
 static DEVICE_ATTR(kind, S_IRUGO, show_##kind##0##sub, NULL);
 
 #define sysfs_fan(offset, reg_status, reg_min, reg_ripple, reg_act) \
-sysfs_rw_n(pwm,        , offset, reg_min) \
+sysfs_rw_n(fan, _pwm   , offset, reg_min) \
 sysfs_rw_n(fan, _status, offset, reg_status) \
 sysfs_rw_n(fan, _div   , offset, reg_ripple) \
 sysfs_ro_n(fan, _input , offset, reg_act)
@@ -254,7 +254,7 @@ sysfs_watchdog(FSCHER_REG_WDOG_CONTROL, FSCHER_REG_WDOG_STATE, FSCHER_REG_WDOG_P
 #define device_create_file_fan(client, offset) \
 do { \
 	device_create_file(&client->dev, &dev_attr_fan##offset##_status); \
-	device_create_file(&client->dev, &dev_attr_pwm##offset); \
+	device_create_file(&client->dev, &dev_attr_fan##offset##_pwm); \
 	device_create_file(&client->dev, &dev_attr_fan##offset##_div); \
 	device_create_file(&client->dev, &dev_attr_fan##offset##_input); \
 } while (0)
@@ -489,7 +489,7 @@ static ssize_t show_fan_status(struct fscher_data *data, char *buf, int nr)
 	return sprintf(buf, "%u\n", data->fan_status[FAN_INDEX_FROM_NUM(nr)] & 0x04);
 }
 
-static ssize_t set_pwm(struct i2c_client *client, struct fscher_data *data,
+static ssize_t set_fan_pwm(struct i2c_client *client, struct fscher_data *data,
 		       const char *buf, size_t count, int nr, int reg)
 {
 	data->fan_min[FAN_INDEX_FROM_NUM(nr)] = simple_strtoul(buf, NULL, 10) & 0xff;
@@ -498,7 +498,7 @@ static ssize_t set_pwm(struct i2c_client *client, struct fscher_data *data,
 	return count;
 }
 
-static ssize_t show_pwm (struct fscher_data *data, char *buf, int nr)
+static ssize_t show_fan_pwm (struct fscher_data *data, char *buf, int nr)
 {
 	return sprintf(buf, "%u\n", data->fan_min[FAN_INDEX_FROM_NUM(nr)]);
 }

@@ -247,10 +247,10 @@ struct w83781d_data {
 	u8 fan_min[3];		/* Register value */
 	u8 temp;
 	u8 temp_max;		/* Register value */
-	u8 temp_hyst;		/* Register value */
+	u8 temp_max_hyst;	/* Register value */
 	u16 temp_add[2];	/* Register value */
 	u16 temp_max_add[2];	/* Register value */
-	u16 temp_hyst_add[2];	/* Register value */
+	u16 temp_max_hyst_add[2];	/* Register value */
 	u8 fan_div[3];		/* Register encoding, shifted right */
 	u8 vid;			/* Register encoding, combined */
 	u32 alarms;		/* Register encoding, combined */
@@ -448,7 +448,7 @@ static ssize_t show_##reg (struct device *dev, char *buf, int nr) \
 }
 show_temp_reg(temp);
 show_temp_reg(temp_max);
-show_temp_reg(temp_hyst);
+show_temp_reg(temp_max_hyst);
 
 #define store_temp_reg(REG, reg) \
 static ssize_t store_temp_##reg (struct device *dev, const char *buf, size_t count, int nr) \
@@ -476,7 +476,7 @@ static ssize_t store_temp_##reg (struct device *dev, const char *buf, size_t cou
 	return count; \
 }
 store_temp_reg(OVER, max);
-store_temp_reg(HYST, hyst);
+store_temp_reg(HYST, max_hyst);
 
 #define sysfs_temp_offset(offset) \
 static ssize_t \
@@ -500,7 +500,7 @@ static DEVICE_ATTR(temp##offset##_##reg, S_IRUGO| S_IWUSR, show_regs_temp_##reg#
 #define sysfs_temp_offsets(offset) \
 sysfs_temp_offset(offset); \
 sysfs_temp_reg_offset(max, offset); \
-sysfs_temp_reg_offset(hyst, offset);
+sysfs_temp_reg_offset(max_hyst, offset);
 
 sysfs_temp_offsets(1);
 sysfs_temp_offsets(2);
@@ -510,7 +510,7 @@ sysfs_temp_offsets(3);
 do { \
 device_create_file(&client->dev, &dev_attr_temp##offset##_input); \
 device_create_file(&client->dev, &dev_attr_temp##offset##_max); \
-device_create_file(&client->dev, &dev_attr_temp##offset##_hyst); \
+device_create_file(&client->dev, &dev_attr_temp##offset##_max_hyst); \
 } while (0)
 
 static ssize_t
@@ -525,9 +525,9 @@ show_vid_reg(struct device *dev, char *buf)
 }
 
 static
-DEVICE_ATTR(vid, S_IRUGO, show_vid_reg, NULL)
+DEVICE_ATTR(in0_ref, S_IRUGO, show_vid_reg, NULL)
 #define device_create_file_vid(client) \
-device_create_file(&client->dev, &dev_attr_vid);
+device_create_file(&client->dev, &dev_attr_in0_ref);
 static ssize_t
 show_vrm_reg(struct device *dev, char *buf)
 {
@@ -808,7 +808,7 @@ static ssize_t store_regs_pwm_##offset (struct device *dev, const char *buf, siz
 { \
 	return store_pwm_reg(dev, buf, count, offset); \
 } \
-static DEVICE_ATTR(pwm##offset, S_IRUGO | S_IWUSR, show_regs_pwm_##offset, store_regs_pwm_##offset)
+static DEVICE_ATTR(fan##offset##_pwm, S_IRUGO | S_IWUSR, show_regs_pwm_##offset, store_regs_pwm_##offset)
 
 #define sysfs_pwmenable(offset) \
 static ssize_t show_regs_pwmenable_##offset (struct device *dev, char *buf) \
@@ -819,7 +819,7 @@ static ssize_t store_regs_pwmenable_##offset (struct device *dev, const char *bu
 { \
 	return store_pwmenable_reg(dev, buf, count, offset); \
 } \
-static DEVICE_ATTR(pwm##offset##_enable, S_IRUGO | S_IWUSR, show_regs_pwmenable_##offset, store_regs_pwmenable_##offset)
+static DEVICE_ATTR(fan##offset##_pwm_enable, S_IRUGO | S_IWUSR, show_regs_pwmenable_##offset, store_regs_pwmenable_##offset)
 
 sysfs_pwm(1);
 sysfs_pwm(2);
@@ -829,12 +829,12 @@ sysfs_pwm(4);
 
 #define device_create_file_pwm(client, offset) \
 do { \
-device_create_file(&client->dev, &dev_attr_pwm##offset); \
+device_create_file(&client->dev, &dev_attr_fan##offset##_pwm); \
 } while (0)
 
 #define device_create_file_pwmenable(client, offset) \
 do { \
-device_create_file(&client->dev, &dev_attr_pwm##offset##_enable); \
+device_create_file(&client->dev, &dev_attr_fan##offset##_pwm_enable); \
 } while (0)
 
 static ssize_t
@@ -901,7 +901,7 @@ static ssize_t store_regs_sensor_##offset (struct device *dev, const char *buf, 
 { \
     return store_sensor_reg(dev, buf, count, offset); \
 } \
-static DEVICE_ATTR(sensor##offset, S_IRUGO | S_IWUSR, show_regs_sensor_##offset, store_regs_sensor_##offset)
+static DEVICE_ATTR(temp##offset##_type, S_IRUGO | S_IWUSR, show_regs_sensor_##offset, store_regs_sensor_##offset)
 
 sysfs_sensor(1);
 sysfs_sensor(2);
@@ -909,7 +909,7 @@ sysfs_sensor(3);
 
 #define device_create_file_sensor(client, offset) \
 do { \
-device_create_file(&client->dev, &dev_attr_sensor##offset); \
+device_create_file(&client->dev, &dev_attr_temp##offset##_type); \
 } while (0)
 
 #ifdef W83781D_RT
@@ -1698,13 +1698,13 @@ w83781d_update_client(struct i2c_client *client)
 		data->temp = w83781d_read_value(client, W83781D_REG_TEMP(1));
 		data->temp_max =
 		    w83781d_read_value(client, W83781D_REG_TEMP_OVER(1));
-		data->temp_hyst =
+		data->temp_max_hyst =
 		    w83781d_read_value(client, W83781D_REG_TEMP_HYST(1));
 		data->temp_add[0] =
 		    w83781d_read_value(client, W83781D_REG_TEMP(2));
 		data->temp_max_add[0] =
 		    w83781d_read_value(client, W83781D_REG_TEMP_OVER(2));
-		data->temp_hyst_add[0] =
+		data->temp_max_hyst_add[0] =
 		    w83781d_read_value(client, W83781D_REG_TEMP_HYST(2));
 		if (data->type != w83783s && data->type != w83697hf) {
 			data->temp_add[1] =
@@ -1712,7 +1712,7 @@ w83781d_update_client(struct i2c_client *client)
 			data->temp_max_add[1] =
 			    w83781d_read_value(client,
 					       W83781D_REG_TEMP_OVER(3));
-			data->temp_hyst_add[1] =
+			data->temp_max_hyst_add[1] =
 			    w83781d_read_value(client,
 					       W83781D_REG_TEMP_HYST(3));
 		}

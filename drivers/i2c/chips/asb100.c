@@ -505,7 +505,7 @@ static ssize_t set_temp_hyst##num(struct device *dev, const char *buf, \
 { \
 	return set_temp_hyst(dev, buf, count, num-1); \
 } \
-static DEVICE_ATTR(temp##num##_hyst, S_IRUGO | S_IWUSR, \
+static DEVICE_ATTR(temp##num##_max_hyst, S_IRUGO | S_IWUSR, \
 		show_temp_hyst##num, set_temp_hyst##num)
 
 sysfs_temp(1)
@@ -517,7 +517,7 @@ sysfs_temp(4)
 #define device_create_file_temp(client, num) do { \
 	device_create_file(&client->dev, &dev_attr_temp##num##_input); \
 	device_create_file(&client->dev, &dev_attr_temp##num##_max); \
-	device_create_file(&client->dev, &dev_attr_temp##num##_hyst); \
+	device_create_file(&client->dev, &dev_attr_temp##num##_max_hyst); \
 } while (0)
 
 static ssize_t show_vid(struct device *dev, char *buf)
@@ -526,9 +526,9 @@ static ssize_t show_vid(struct device *dev, char *buf)
 	return sprintf(buf, "%d\n", vid_from_reg(data->vid, data->vrm));
 }
 
-static DEVICE_ATTR(vid, S_IRUGO, show_vid, NULL)
+static DEVICE_ATTR(in0_ref, S_IRUGO, show_vid, NULL)
 #define device_create_file_vid(client) \
-device_create_file(&client->dev, &dev_attr_vid)
+device_create_file(&client->dev, &dev_attr_in0_ref)
 
 /* VRM */
 static ssize_t show_vrm(struct device *dev, char *buf)
@@ -597,12 +597,12 @@ static ssize_t set_pwm_enable1(struct device *dev, const char *buf,
 	return count;
 }
 
-static DEVICE_ATTR(pwm1, S_IRUGO | S_IWUSR, show_pwm1, set_pwm1)
-static DEVICE_ATTR(pwm1_enable, S_IRUGO | S_IWUSR,
+static DEVICE_ATTR(fan1_pwm, S_IRUGO | S_IWUSR, show_pwm1, set_pwm1)
+static DEVICE_ATTR(fan1_pwm_enable, S_IRUGO | S_IWUSR,
 		show_pwm_enable1, set_pwm_enable1)
 #define device_create_file_pwm1(client) do { \
-	device_create_file(&new_client->dev, &dev_attr_pwm1); \
-	device_create_file(&new_client->dev, &dev_attr_pwm1_enable); \
+	device_create_file(&new_client->dev, &dev_attr_fan1_pwm); \
+	device_create_file(&new_client->dev, &dev_attr_fan1_pwm_enable); \
 } while (0)
 
 /* This function is called when:

@@ -559,7 +559,7 @@ static ssize_t set_temp_##offset##_hyst (struct device *dev, 		\
 static DEVICE_ATTR(temp##offset##_input, S_IRUGO, show_temp_##offset, NULL) \
 static DEVICE_ATTR(temp##offset##_max, S_IRUGO | S_IWUSR, 		\
 		show_temp_##offset##_over, set_temp_##offset##_over) 	\
-static DEVICE_ATTR(temp##offset##_hyst, S_IRUGO | S_IWUSR, 		\
+static DEVICE_ATTR(temp##offset##_max_hyst, S_IRUGO | S_IWUSR, 		\
 		show_temp_##offset##_hyst, set_temp_##offset##_hyst)	
 
 show_temp_offset(1);
@@ -763,9 +763,9 @@ static int via686a_detect(struct i2c_adapter *adapter, int address, int kind)
 	device_create_file(&new_client->dev, &dev_attr_temp1_max);
 	device_create_file(&new_client->dev, &dev_attr_temp2_max);
 	device_create_file(&new_client->dev, &dev_attr_temp3_max);
-	device_create_file(&new_client->dev, &dev_attr_temp1_hyst);
-	device_create_file(&new_client->dev, &dev_attr_temp2_hyst);
-	device_create_file(&new_client->dev, &dev_attr_temp3_hyst);
+	device_create_file(&new_client->dev, &dev_attr_temp1_max_hyst);
+	device_create_file(&new_client->dev, &dev_attr_temp2_max_hyst);
+	device_create_file(&new_client->dev, &dev_attr_temp3_max_hyst);
 	device_create_file(&new_client->dev, &dev_attr_fan1_input);
 	device_create_file(&new_client->dev, &dev_attr_fan2_input);
 	device_create_file(&new_client->dev, &dev_attr_fan1_min);

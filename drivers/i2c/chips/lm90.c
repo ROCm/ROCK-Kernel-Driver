@@ -259,9 +259,9 @@ static DEVICE_ATTR(temp1_crit, S_IWUSR | S_IRUGO, show_temp_crit1,
 	set_temp_crit1);
 static DEVICE_ATTR(temp2_crit, S_IWUSR | S_IRUGO, show_temp_crit2,
 	set_temp_crit2);
-static DEVICE_ATTR(temp1_hyst, S_IWUSR | S_IRUGO, show_temp_hyst1,
+static DEVICE_ATTR(temp1_crit_hyst, S_IWUSR | S_IRUGO, show_temp_hyst1,
 	set_temp_hyst1);
-static DEVICE_ATTR(temp2_hyst, S_IRUGO, show_temp_hyst2, NULL);
+static DEVICE_ATTR(temp2_crit_hyst, S_IRUGO, show_temp_hyst2, NULL);
 static DEVICE_ATTR(alarms, S_IRUGO, show_alarms, NULL);
 
 /*
@@ -389,8 +389,8 @@ static int lm90_detect(struct i2c_adapter *adapter, int address, int kind)
 	device_create_file(&new_client->dev, &dev_attr_temp2_max);
 	device_create_file(&new_client->dev, &dev_attr_temp1_crit);
 	device_create_file(&new_client->dev, &dev_attr_temp2_crit);
-	device_create_file(&new_client->dev, &dev_attr_temp1_hyst);
-	device_create_file(&new_client->dev, &dev_attr_temp2_hyst);
+	device_create_file(&new_client->dev, &dev_attr_temp1_crit_hyst);
+	device_create_file(&new_client->dev, &dev_attr_temp2_crit_hyst);
 	device_create_file(&new_client->dev, &dev_attr_alarms);
 
 	return 0;

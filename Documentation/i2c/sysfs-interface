@@ -107,7 +107,7 @@ in[0-8]_input	Voltage input value.
 			in7_*	varies
 			in8_*	varies
 
-vid		CPU core voltage.
+in0_ref		CPU core reference voltage.
 		Read only.
 		Fixed point value in form XXXX corresponding to CPU core
 		voltage as told to the sensor chip.  Divide by 1000 to
@@ -138,14 +138,15 @@ fan[1-3]_div	Fan divisor.
 		Some chips only support values 1,2,4,8.
 		See doc/fan-divisors for details.
 
-pwm[1-3]	Pulse width modulation fan control.
+fan[1-3]_pwm	Pulse width modulation fan control.
 		Integer 0 - 255
 		Read/Write
 		255 is max or 100%.
 		Corresponds to the fans 1-3.
 
-pwm[1-3]_enable pwm enable
-		not always present even if pwm* is.
+fan[1-3]_pwm_enable
+		Switch PWM on and off.
+		Not always present even if fan*_pwm is.
 		0 to turn off
 		1 to turn on
 		Read/Write
@@ -155,7 +156,7 @@ pwm[1-3]_enable pwm enable
 * Temperatures *
 ****************
 
-sensor[1-3]	Sensor type selection.
+temp[1-3]_type	Sensor type selection.
 		Integers 1,2,3, or thermistor Beta value (3435)
 		Read/Write.
 
@@ -169,7 +170,8 @@ temp[1-3]_min	Temperature min value.
 		1000 to get degrees Celsius.
 		Read/Write value.
 
-temp[1-3]_hyst	Temperature hysteresis value.
+temp[1-3]_max_hyst
+		Temperature hysteresis value for max limit.
 		Fixed point value in form XXXXX and should be divided by
 		1000 to get degrees Celsius.  Must be reported as an
 		absolute temperature, NOT a delta from the max value.
@@ -180,11 +182,17 @@ temp[1-4]_input Temperature input value.
 		1000 to get degrees Celsius.
 		Read only value.
 
-temp_crit	Temperature critical value, typically greater than all
-		temp_max values.
+temp[1-4]_crit	Temperature critical value, typically greater than
+		corresponding temp_max values.
 		Fixed point value in form XXXXX and should be divided by
 		1000 to get degrees Celsius.
-		Common to all temperature channels.
+		Read/Write value.
+
+temp[1-2]_crit_hyst
+		Temperature hysteresis value for critical limit.
+		Fixed point value in form XXXXX and should be divided by
+		1000 to get degrees Celsius.  Must be reported as an
+		absolute temperature, NOT a delta from the critical value.
 		Read/Write value.
 
 		If there are multiple temperature sensors, temp1_* is
