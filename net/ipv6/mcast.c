@@ -128,6 +128,8 @@ static rwlock_t ipv6_sk_mc_lock = RW_LOCK_UNLOCKED;
 
 static struct socket *igmp6_socket;
 
+static int __ipv6_dev_mc_dec(struct inet6_dev *idev, struct in6_addr *addr);
+
 static void igmp6_join_group(struct ifmcaddr6 *ma);
 static void igmp6_leave_group(struct ifmcaddr6 *ma);
 static void igmp6_timer_handler(unsigned long data);
@@ -256,9 +258,9 @@ int ipv6_sock_mc_drop(struct sock *sk, int ifindex, struct in6_addr *addr)
 
 				if (idev) {
 					(void) ip6_mc_leave_src(sk,mc_lst,idev);
+					__ipv6_dev_mc_dec(idev, &mc_lst->addr);
 					in6_dev_put(idev);
 				}
-				ipv6_dev_mc_dec(dev, &mc_lst->addr);
 				dev_put(dev);
 			}
 			sock_kfree_s(sk, mc_lst, sizeof(*mc_lst));
@@ -322,9 +324,9 @@ void ipv6_sock_mc_close(struct sock *sk)
 
 			if (idev) {
 				(void) ip6_mc_leave_src(sk, mc_lst, idev);
+				__ipv6_dev_mc_dec(idev, &mc_lst->addr);
 				in6_dev_put(idev);
 			}
-			ipv6_dev_mc_dec(dev, &mc_lst->addr);
 			dev_put(dev);
 		}
 
