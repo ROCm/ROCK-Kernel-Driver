@@ -443,8 +443,7 @@ static inline void timer_check_rtc(void)
 
 void sparc64_do_profile(struct pt_regs *regs)
 {
-	unsigned long pc = regs->tpc;
-	unsigned long o7 = regs->u_regs[UREG_RETPC];
+	unsigned long pc;
 
 	profile_hook(regs);
 
@@ -454,32 +453,14 @@ void sparc64_do_profile(struct pt_regs *regs)
 	if (!prof_buffer)
 		return;
 
-	{
-		extern int rwlock_impl_begin, rwlock_impl_end;
-		extern int atomic_impl_begin, atomic_impl_end;
-		extern int __memcpy_begin, __memcpy_end;
-		extern int __bzero_begin, __bzero_end;
-		extern int __bitops_begin, __bitops_end;
+	pc = regs->tpc;
 
-		if ((pc >= (unsigned long) &atomic_impl_begin &&
-		     pc < (unsigned long) &atomic_impl_end) ||
-		    (pc >= (unsigned long) &rwlock_impl_begin &&
-		     pc < (unsigned long) &rwlock_impl_end) ||
-		    (pc >= (unsigned long) &__memcpy_begin &&
-		     pc < (unsigned long) &__memcpy_end) ||
-		    (pc >= (unsigned long) &__bzero_begin &&
-		     pc < (unsigned long) &__bzero_end) ||
-		    (pc >= (unsigned long) &__bitops_begin &&
-		     pc < (unsigned long) &__bitops_end))
-			pc = o7;
+	pc -= (unsigned long) _stext;
+	pc >>= prof_shift;
 
-		pc -= (unsigned long) _stext;
-		pc >>= prof_shift;
-
-		if(pc >= prof_len)
-			pc = prof_len - 1;
-		atomic_inc((atomic_t *)&prof_buffer[pc]);
-	}
+	if(pc >= prof_len)
+		pc = prof_len - 1;
+	atomic_inc((atomic_t *)&prof_buffer[pc]);
 }
 
 static irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)

@@ -7,12 +7,9 @@
 	.text
 	.align	64
 
-	.globl	rwlock_impl_begin, rwlock_impl_end
-
 	/* The non-contention read lock usage is 2 cache lines. */
 
 	.globl	__read_lock, __read_unlock
-rwlock_impl_begin:
 __read_lock: /* %o0 = lock_ptr */
 	ldsw		[%o0], %g5
 	brlz,pn		%g5, __read_wait_for_writer
@@ -85,5 +82,4 @@ __write_trylock_succeed:
 __write_trylock_fail:
 	retl
 	 mov		0, %o0
-rwlock_impl_end:
 

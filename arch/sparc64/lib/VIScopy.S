@@ -303,9 +303,6 @@
 		.type			bcopy,@function
 
 #ifdef __KERNEL__
-		.globl			__memcpy_begin
-__memcpy_begin:
-
 memcpy_private:
 memcpy:		mov		ASI_P, asi_src			! IEU0	Group
 		brnz,pt		%o2, __memcpy_entry		! CTI
@@ -1055,9 +1052,6 @@ fpu_retl:
 	FPU_RETL
 
 #ifdef __KERNEL__
-	.globl		__memcpy_end
-__memcpy_end:
-
 		.section	.fixup
 		.align		4
 VIScopyfixup_reto2:
