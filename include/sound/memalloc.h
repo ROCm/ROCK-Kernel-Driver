@@ -174,19 +174,4 @@ static inline dma_addr_t snd_sgbuf_get_addr(struct snd_sg_buf *sgbuf, size_t off
 }
 #endif /* CONFIG_PCI */
 
-
-/*
- * wrappers
- */
-
-#ifdef CONFIG_PCI
-#if defined(__i386__) || defined(__ppc__) || defined(__x86_64__)
-#define HACK_PCI_ALLOC_CONSISTENT
-/* a hack for 2.4/5 kernels for better allocation of large buffers */
-void *snd_pci_hack_alloc_consistent(struct pci_dev *hwdev, size_t size,
-				    dma_addr_t *dma_handle);
-#endif /* arch */
-#endif /* CONFIG_PCI */
-
-
 #endif /* __SOUND_MEMALLOC_H */

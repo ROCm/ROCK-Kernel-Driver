@@ -904,7 +904,7 @@ static int snd_rme32_playback_spdif_open(snd_pcm_substream_t * substream)
 				   &hw_constraints_period_bytes);
 
 	rme32->wcreg_spdif_stream = rme32->wcreg_spdif;
-	rme32->spdif_ctl->access &= ~SNDRV_CTL_ELEM_ACCESS_INACTIVE;
+	rme32->spdif_ctl->vd[0].access &= ~SNDRV_CTL_ELEM_ACCESS_INACTIVE;
 	snd_ctl_notify(rme32->card, SNDRV_CTL_EVENT_MASK_VALUE |
 		       SNDRV_CTL_EVENT_MASK_INFO, &rme32->spdif_ctl->id);
 	return 0;
@@ -1037,7 +1037,7 @@ static int snd_rme32_playback_close(snd_pcm_substream_t * substream)
 	spdif = (rme32->wcreg & RME32_WCR_ADAT) == 0;
 	spin_unlock_irqrestore(&rme32->lock, flags);
 	if (spdif) {
-		rme32->spdif_ctl->access |= SNDRV_CTL_ELEM_ACCESS_INACTIVE;
+		rme32->spdif_ctl->vd[0].access |= SNDRV_CTL_ELEM_ACCESS_INACTIVE;
 		snd_ctl_notify(rme32->card, SNDRV_CTL_EVENT_MASK_VALUE |
 			       SNDRV_CTL_EVENT_MASK_INFO,
 			       &rme32->spdif_ctl->id);

@@ -33,6 +33,7 @@ static inline int should_deliver(struct net_bridge_port *p, struct sk_buff *skb)
 int br_dev_queue_push_xmit(struct sk_buff *skb)
 {
 #ifdef CONFIG_NETFILTER
+	/* FIXME: skb bas not been linearized: is this valid?? --RR */
 	if (skb->nf_bridge)
 		memcpy(skb->data - 16, skb->nf_bridge->hh, 16);
 #endif

@@ -2,7 +2,7 @@
  * Copyright 2001-2003 SuSE Labs.
  * Distributed under the GNU public license, v2.
  * 
- * This is a GART driver for the AMD64 on-CPU northbridge.
+ * This is a GART driver for the AMD Opteron/Athlon64 on-CPU northbridge.
  * It also includes support for the AMD 8151 AGP bridge,
  * although it doesn't actually do much, as all the real
  * work is done in the northbridge(s).
@@ -340,7 +340,7 @@ static int __init agp_amdk8_probe (struct pci_dev *dev, const struct pci_device_
 	if (cap_ptr == 0)
 		return -ENODEV;
 
-	printk (KERN_INFO PFX "Detected AMD64 on-CPU GART\n");
+	printk (KERN_INFO PFX "Detected Opteron/Athlon64 on-CPU GART\n");
 
 	agp_bridge->dev = dev;
 	agp_bridge->capndx = cap_ptr;

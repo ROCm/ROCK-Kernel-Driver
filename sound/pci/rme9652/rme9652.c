@@ -2403,7 +2403,7 @@ static int snd_rme9652_playback_open(snd_pcm_substream_t *substream)
 			     SNDRV_PCM_HW_PARAM_CHANNELS, -1);
 
 	rme9652->creg_spdif_stream = rme9652->creg_spdif;
-	rme9652->spdif_ctl->access &= ~SNDRV_CTL_ELEM_ACCESS_INACTIVE;
+	rme9652->spdif_ctl->vd[0].access &= ~SNDRV_CTL_ELEM_ACCESS_INACTIVE;
 	snd_ctl_notify(rme9652->card, SNDRV_CTL_EVENT_MASK_VALUE |
 		       SNDRV_CTL_EVENT_MASK_INFO, &rme9652->spdif_ctl->id);
 	return 0;
@@ -2421,7 +2421,7 @@ static int snd_rme9652_playback_release(snd_pcm_substream_t *substream)
 
 	spin_unlock_irqrestore(&rme9652->lock, flags);
 
-	rme9652->spdif_ctl->access |= SNDRV_CTL_ELEM_ACCESS_INACTIVE;
+	rme9652->spdif_ctl->vd[0].access |= SNDRV_CTL_ELEM_ACCESS_INACTIVE;
 	snd_ctl_notify(rme9652->card, SNDRV_CTL_EVENT_MASK_VALUE |
 		       SNDRV_CTL_EVENT_MASK_INFO, &rme9652->spdif_ctl->id);
 	return 0;
