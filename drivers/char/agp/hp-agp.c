@@ -369,7 +369,7 @@ static int __init agp_find_supported_device(struct pci_dev *dev)
 }
 
 static struct agp_driver hp_agp_driver = {
-	.owner = THIS_MODULE;
+	.owner = THIS_MODULE,
 };
 
 static int __init agp_hp_probe (struct pci_dev *dev, const struct pci_device_id *ent)
@@ -394,7 +394,7 @@ static struct pci_device_id agp_hp_pci_table[] __initdata = {
 	{ }
 };
 
-MODULE_DEVICE_TABLE(pci, agp_pci_table);
+MODULE_DEVICE_TABLE(pci, agp_hp_pci_table);
 
 static struct __initdata pci_driver agp_hp_pci_driver = {
 	.name		= "agpgart-hp",

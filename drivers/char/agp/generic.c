@@ -34,6 +34,7 @@
 #include <linux/miscdevice.h>
 #include <linux/pm.h>
 #include <linux/agp_backend.h>
+#include <linux/vmalloc.h>
 #include "agp.h"
 
 __u32 *agp_gatt_table; 

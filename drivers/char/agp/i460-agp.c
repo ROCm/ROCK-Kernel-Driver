@@ -560,7 +560,7 @@ static int __init intel_i460_setup (struct pci_dev *pdev __attribute__((unused))
 }
 
 static struct agp_driver i460_agp_driver = {
-	.owner = THIS_MODULE;
+	.owner = THIS_MODULE,
 };
 
 static int __init agp_intel_i460_probe (struct pci_dev *dev, const struct pci_device_id *ent)
