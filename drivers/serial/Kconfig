@@ -77,6 +77,15 @@ config SERIAL_8250_CS
 	  a module, say M here and read <file:Documentation/modules.txt>.
 	  If unsure, say N.
 
+config SERIAL_HCDP
+	bool "8250/16550 device discovery support via EFI HCDP table"
+	depends on IA64
+	---help---
+	  If you wish to make the serial console port described by the EFI
+	  HCDP table available for use as serial console or general
+	  purpose port, say Y here. See
+	  <http://www.dig64.org/specifications/DIG64_HCDPv10a_01.pdf>.
+
 config SERIAL_8250_EXTENDED
 	bool "Extended 8250/16550 serial driver options"
 	depends on SERIAL_8250
