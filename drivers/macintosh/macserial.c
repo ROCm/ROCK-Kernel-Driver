@@ -76,6 +76,8 @@ static struct pmu_sleep_notifier serial_sleep_notifier = {
    in the order we want. */
 #define RECOVERY_DELAY	eieio()
 
+static struct tty_driver *serial_driver;
+
 struct mac_zschannel zs_channels[NUM_CHANNELS];
 
 struct mac_serial zs_soft[NUM_CHANNELS];
@@ -2093,12 +2095,7 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 	 */
 	if (info->flags & ZILOG_CLOSING) {
 		interruptible_sleep_on(&info->close_wait);
-#ifdef SERIAL_DO_RESTART
-		return ((info->flags & ZILOG_HUP_NOTIFY) ?
-			-EAGAIN : -ERESTARTSYS);
-#else
 		return -EAGAIN;
-#endif
 	}
 
 	/*
@@ -2139,14 +2136,7 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 		set_current_state(TASK_INTERRUPTIBLE);
 		if (tty_hung_up_p(filp) ||
 		    !(info->flags & ZILOG_INITIALIZED)) {
-#ifdef SERIAL_DO_RESTART
-			if (info->flags & ZILOG_HUP_NOTIFY)
-				retval = -EAGAIN;
-			else
-				retval = -ERESTARTSYS;
-#else
 			retval = -EAGAIN;
-#endif
 			break;
 		}
 		if (!(info->flags & ZILOG_CLOSING) &&
@@ -2222,12 +2212,7 @@ static int rs_open(struct tty_struct *tty, struct file * filp)
 	    (info->flags & ZILOG_CLOSING)) {
 		if (info->flags & ZILOG_CLOSING)
 			interruptible_sleep_on(&info->close_wait);
-#ifdef SERIAL_DO_RESTART
-		return ((info->flags & ZILOG_HUP_NOTIFY) ?
-			-EAGAIN : -ERESTARTSYS);
-#else
 		return -EAGAIN;
-#endif
 	}
 
 	/*

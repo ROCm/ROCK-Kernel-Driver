@@ -306,6 +306,16 @@ int register_quota_format(struct quota_format_type *fmt);
 void unregister_quota_format(struct quota_format_type *fmt);
 void init_dquot_operations(struct dquot_operations *fsdqops);
 
+struct quota_module_name {
+	int qm_fmt_id;
+	char *qm_mod_name;
+};
+
+#define INIT_QUOTA_MODULE_NAMES {\
+	{QFMT_VFS_OLD, "quota_v1"},\
+	{QFMT_VFS_V0, "quota_v2"},\
+	{0, NULL}}
+
 #else
 
 # /* nodep */ include <sys/cdefs.h>

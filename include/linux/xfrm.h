@@ -119,7 +119,9 @@ enum
 #define XFRM_MSG_UPDPOLICY	(XFRM_MSG_BASE + 9)
 #define XFRM_MSG_UPDSA		(XFRM_MSG_BASE + 10)
 
-#define XFRM_MSG_MAX		(XFRM_MSG_UPDSA+1)
+#define XFRM_MSG_POLEXPIRE	(XFRM_MSG_BASE + 11)
+
+#define XFRM_MSG_MAX		(XFRM_MSG_POLEXPIRE+1)
 
 struct xfrm_user_tmpl {
 	struct xfrm_id		id;
@@ -214,6 +216,11 @@ struct xfrm_user_acquire {
 
 struct xfrm_user_expire {
 	struct xfrm_usersa_info		state;
+	__u8				hard;
+};
+
+struct xfrm_user_polexpire {
+	struct xfrm_userpolicy_info	pol;
 	__u8				hard;
 };
 

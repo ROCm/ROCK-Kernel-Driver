@@ -876,5 +876,6 @@ ENTRY(sys_call_table)
  	.long sys_clock_nanosleep
 	.long sys_statfs64
 	.long sys_fstatfs64	
+	.long sys_tgkill
  
 nr_syscalls=(.-sys_call_table)/4

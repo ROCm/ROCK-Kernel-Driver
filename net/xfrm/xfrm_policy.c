@@ -80,22 +80,24 @@ int xfrm_unregister_type(struct xfrm_type *type, unsigned short family)
 
 struct xfrm_type *xfrm_get_type(u8 proto, unsigned short family)
 {
-	struct xfrm_policy_afinfo *afinfo = xfrm_policy_get_afinfo(family);
+	struct xfrm_policy_afinfo *afinfo;
 	struct xfrm_type_map *typemap;
 	struct xfrm_type *type;
 	int modload_attempted = 0;
 
+retry:
+	afinfo = xfrm_policy_get_afinfo(family);
 	if (unlikely(afinfo == NULL))
 		return NULL;
 	typemap = afinfo->type_map;
 
-retry:
 	read_lock(&typemap->lock);
 	type = typemap->map[proto];
 	if (unlikely(type && !try_module_get(type->owner)))
 		type = NULL;
 	read_unlock(&typemap->lock);
 	if (!type && !modload_attempted) {
+		xfrm_policy_put_afinfo(afinfo);
 		request_module("xfrm-type-%d-%d",
 			       (int) family, (int) proto);
 		modload_attempted = 1;
@@ -141,10 +143,13 @@ static void xfrm_policy_timer(unsigned long data)
 	struct xfrm_policy *xp = (struct xfrm_policy*)data;
 	unsigned long now = (unsigned long)xtime.tv_sec;
 	long next = LONG_MAX;
-	u32 index;
+	int warn = 0;
+	int dir;
 
 	if (xp->dead)
 		goto out;
+
+	dir = xp->index & 7;
 
 	if (xp->lft.hard_add_expires_seconds) {
 		long tmo = xp->lft.hard_add_expires_seconds +
@@ -154,6 +159,37 @@ static void xfrm_policy_timer(unsigned long data)
 		if (tmo < next)
 			next = tmo;
 	}
+	if (xp->lft.hard_use_expires_seconds) {
+		long tmo = xp->lft.hard_use_expires_seconds +
+			(xp->curlft.use_time ? : xp->curlft.add_time) - now;
+		if (tmo <= 0)
+			goto expired;
+		if (tmo < next)
+			next = tmo;
+	}
+	if (xp->lft.soft_add_expires_seconds) {
+		long tmo = xp->lft.soft_add_expires_seconds +
+			xp->curlft.add_time - now;
+		if (tmo <= 0) {
+			warn = 1;
+			tmo = XFRM_KM_TIMEOUT;
+		}
+		if (tmo < next)
+			next = tmo;
+	}
+	if (xp->lft.soft_use_expires_seconds) {
+		long tmo = xp->lft.soft_use_expires_seconds +
+			(xp->curlft.use_time ? : xp->curlft.add_time) - now;
+		if (tmo <= 0) {
+			warn = 1;
+			tmo = XFRM_KM_TIMEOUT;
+		}
+		if (tmo < next)
+			next = tmo;
+	}
+
+	if (warn)
+		km_policy_expired(xp, dir, 0);
 	if (next != LONG_MAX &&
 	    !mod_timer(&xp->timer, jiffies + make_jiffies(next)))
 		xfrm_pol_hold(xp);
@@ -163,14 +199,9 @@ out:
 	return;
 
 expired:
-	index = xp->index;
+	km_policy_expired(xp, dir, 1);
+	xfrm_policy_delete(xp, dir);
 	xfrm_pol_put(xp);
-
-	/* Not 100% correct. id can be recycled in theory */
-	xp = xfrm_policy_byid(0, index, 1);
-	if (xp) {
-		xfrm_policy_kill(xp);
-	}
 }
 
 
@@ -321,8 +352,7 @@ int xfrm_policy_insert(int dir, struct xfrm_policy *policy, int excl)
 	policy->index = delpol ? delpol->index : xfrm_gen_index(dir);
 	policy->curlft.add_time = (unsigned long)xtime.tv_sec;
 	policy->curlft.use_time = 0;
-	if (policy->lft.hard_add_expires_seconds &&
-	    !mod_timer(&policy->timer, jiffies + HZ))
+	if (!mod_timer(&policy->timer, jiffies + HZ))
 		xfrm_pol_hold(policy);
 	write_unlock_bh(&xfrm_policy_lock);
 
@@ -340,18 +370,18 @@ struct xfrm_policy *xfrm_policy_bysel(int dir, struct xfrm_selector *sel,
 	write_lock_bh(&xfrm_policy_lock);
 	for (p = &xfrm_policy_list[dir]; (pol=*p)!=NULL; p = &pol->next) {
 		if (memcmp(sel, &pol->selector, sizeof(*sel)) == 0) {
+			xfrm_pol_hold(pol);
 			if (delete)
 				*p = pol->next;
 			break;
 		}
 	}
-	if (pol) {
-		if (delete)
-			atomic_inc(&flow_cache_genid);
-		else
-			xfrm_pol_hold(pol);
-	}
 	write_unlock_bh(&xfrm_policy_lock);
+
+	if (pol && delete) {
+		atomic_inc(&flow_cache_genid);
+		xfrm_policy_kill(pol);
+	}
 	return pol;
 }
 
@@ -362,18 +392,18 @@ struct xfrm_policy *xfrm_policy_byid(int dir, u32 id, int delete)
 	write_lock_bh(&xfrm_policy_lock);
 	for (p = &xfrm_policy_list[id & 7]; (pol=*p)!=NULL; p = &pol->next) {
 		if (pol->index == id) {
+			xfrm_pol_hold(pol);
 			if (delete)
 				*p = pol->next;
 			break;
 		}
 	}
-	if (pol) {
-		if (delete)
-			atomic_inc(&flow_cache_genid);
-		else
-			xfrm_pol_hold(pol);
-	}
 	write_unlock_bh(&xfrm_policy_lock);
+
+	if (pol && delete) {
+		atomic_inc(&flow_cache_genid);
+		xfrm_policy_kill(pol);
+	}
 	return pol;
 }
 
@@ -473,25 +503,36 @@ struct xfrm_policy *xfrm_sk_policy_lookup(struct sock *sk, int dir, struct flowi
 	return pol;
 }
 
-void xfrm_sk_policy_link(struct xfrm_policy *pol, int dir)
+static void __xfrm_policy_link(struct xfrm_policy *pol, int dir)
 {
-	pol->next = xfrm_policy_list[XFRM_POLICY_MAX+dir];
-	xfrm_policy_list[XFRM_POLICY_MAX+dir] = pol;
+	pol->next = xfrm_policy_list[dir];
+	xfrm_policy_list[dir] = pol;
 	xfrm_pol_hold(pol);
 }
 
-void xfrm_sk_policy_unlink(struct xfrm_policy *pol, int dir)
+static struct xfrm_policy *__xfrm_policy_unlink(struct xfrm_policy *pol,
+						int dir)
 {
 	struct xfrm_policy **polp;
 
-	for (polp = &xfrm_policy_list[XFRM_POLICY_MAX+dir];
+	for (polp = &xfrm_policy_list[dir];
 	     *polp != NULL; polp = &(*polp)->next) {
 		if (*polp == pol) {
 			*polp = pol->next;
 			atomic_dec(&pol->refcnt);
-			return;
+			return pol;
 		}
 	}
+	return NULL;
+}
+
+void xfrm_policy_delete(struct xfrm_policy *pol, int dir)
+{
+	write_lock_bh(&xfrm_policy_lock);
+	pol = __xfrm_policy_unlink(pol, dir);
+	write_unlock_bh(&xfrm_policy_lock);
+	if (pol)
+		xfrm_policy_kill(pol);
 }
 
 int xfrm_sk_policy_insert(struct sock *sk, int dir, struct xfrm_policy *pol)
@@ -504,10 +545,10 @@ int xfrm_sk_policy_insert(struct sock *sk, int dir, struct xfrm_policy *pol)
 	if (pol) {
 		pol->curlft.add_time = (unsigned long)xtime.tv_sec;
 		pol->index = xfrm_gen_index(XFRM_POLICY_MAX+dir);
-		xfrm_sk_policy_link(pol, dir);
+		__xfrm_policy_link(pol, XFRM_POLICY_MAX+dir);
 	}
 	if (old_pol)
-		xfrm_sk_policy_unlink(old_pol, dir);
+		__xfrm_policy_unlink(old_pol, XFRM_POLICY_MAX+dir);
 	write_unlock_bh(&xfrm_policy_lock);
 
 	if (old_pol) {
@@ -531,7 +572,7 @@ static struct xfrm_policy *clone_policy(struct xfrm_policy *old, int dir)
 		memcpy(newp->xfrm_vec, old->xfrm_vec,
 		       newp->xfrm_nr*sizeof(struct xfrm_tmpl));
 		write_lock_bh(&xfrm_policy_lock);
-		xfrm_sk_policy_link(newp, dir);
+		__xfrm_policy_link(newp, XFRM_POLICY_MAX+dir);
 		write_unlock_bh(&xfrm_policy_lock);
 	}
 	return newp;
@@ -548,15 +589,6 @@ int __xfrm_sk_clone_policy(struct sock *sk)
 	if (p1 && (sk->sk_policy[1] = clone_policy(p1, 1)) == NULL)
 		return -ENOMEM;
 	return 0;
-}
-
-void __xfrm_sk_free_policy(struct xfrm_policy *pol, int dir)
-{
-	write_lock_bh(&xfrm_policy_lock);
-	xfrm_sk_policy_unlink(pol, dir);
-	write_unlock_bh(&xfrm_policy_lock);
-
-	xfrm_policy_kill(pol);
 }
 
 /* Resolve list of templates for the flow, given policy. */

@@ -2,7 +2,7 @@
  *  linux/arch/arm/kernel/dma.c
  *
  *  Copyright (C) 1995-2000 Russell King
- *                2003-?    Ian Molton
+ *                2003      Ian Molton
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as

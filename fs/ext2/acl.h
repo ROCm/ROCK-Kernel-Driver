@@ -60,7 +60,6 @@ static inline int ext2_acl_count(size_t size)
 
 /* acl.c */
 extern int ext2_permission (struct inode *, int, struct nameidata *);
-extern int ext2_permission_locked (struct inode *, int);
 extern int ext2_acl_chmod (struct inode *);
 extern int ext2_init_acl (struct inode *, struct inode *);
 

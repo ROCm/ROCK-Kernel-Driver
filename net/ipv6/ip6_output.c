@@ -1239,7 +1239,6 @@ int ip6_append_data(struct sock *sk, int getfrag(void *from, char *to, int offse
 			memcpy(np->cork.opt, opt, opt->tot_len);
 			inet->cork.flags |= IPCORK_OPT;
 			/* need source address above miyazawa*/
-			exthdrlen += opt->opt_flen ? opt->opt_flen : 0;
 		}
 		dst_hold(&rt->u.dst);
 		np->cork.rt = rt;
@@ -1252,6 +1251,7 @@ int ip6_append_data(struct sock *sk, int getfrag(void *from, char *to, int offse
 			length += exthdrlen;
 			transhdrlen += exthdrlen;
 		}
+		exthdrlen += opt ? opt->opt_flen : 0;
 	} else {
 		rt = np->cork.rt;
 		if (inet->cork.flags & IPCORK_OPT)

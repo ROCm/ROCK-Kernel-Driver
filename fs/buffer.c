@@ -1454,24 +1454,13 @@ EXPORT_SYMBOL(__getblk);
 /*
  * Do async read-ahead on a buffer..
  */
-void
-__breadahead(struct block_device *bdev, sector_t block, int size)
+void __breadahead(struct block_device *bdev, sector_t block, int size)
 {
 	struct buffer_head *bh = __getblk(bdev, block, size);
-	if (!test_set_buffer_locked(bh)) {
-		if (!buffer_uptodate(bh)) {
-			/*
-			 * This eats the bh count from __getblk() and
-			 * unlocks when the read is done.
-			 */
-			bh->b_end_io = end_buffer_io_sync;
-			submit_bh(READ, bh);
-			return;
-		}
-		unlock_buffer(bh);
-	}
+	ll_rw_block(READA, 1, &bh);
 	brelse(bh);
 }
+EXPORT_SYMBOL(__breadahead);
 
 /**
  *  __bread() - reads a specified block and returns the bh

@@ -1256,10 +1256,21 @@ void format_corename(char *corename, const char *pattern, long signr)
 static void zap_threads (struct mm_struct *mm)
 {
 	struct task_struct *g, *p;
+	struct task_struct *tsk = current;
+	struct completion *vfork_done = tsk->vfork_done;
+
+	/*
+	 * Make sure nobody is waiting for us to release the VM,
+	 * otherwise we can deadlock when we wait on each other
+	 */
+	if (vfork_done) {
+		tsk->vfork_done = NULL;
+		complete(vfork_done);
+	}
 
 	read_lock(&tasklist_lock);
 	do_each_thread(g,p)
-		if (mm == p->mm && p != current) {
+		if (mm == p->mm && p != tsk) {
 			force_sig_specific(SIGKILL, p);
 			mm->core_waiters++;
 		}

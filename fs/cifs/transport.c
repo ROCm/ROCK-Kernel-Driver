@@ -154,12 +154,8 @@ smb_send(struct socket *ssocket, struct smb_hdr *smb_buffer,
 
 	/* smb header is converted in header_assemble. bcc and rest of SMB word
 	   area, and byte area if necessary, is converted to littleendian in 
-	   cifssmb.c and RFC1001 len is converted to bigendian in smb_send */
-	if (smb_buf_length > 12)
-		smb_buffer->Flags2 = cpu_to_le16(smb_buffer->Flags2);
-
-	/* if(smb_buffer->Flags2 & SMBFLG2_SECURITY_SIGNATURE)
-		sign_smb(smb_buffer); */ /* BB enable when signing tested more */
+	   cifssmb.c and RFC1001 len is converted to bigendian in smb_send 
+	   Flags2 is converted in SendReceive */
 
 	smb_buffer->smb_buf_length = cpu_to_be32(smb_buffer->smb_buf_length);
 	cFYI(1, ("Sending smb of length %d ", smb_buf_length));
@@ -200,6 +196,12 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 		DeleteMidQEntry(midQ);
 		return -EIO;
 	}
+
+        if (in_buf->smb_buf_length > 12)
+                in_buf->Flags2 = cpu_to_le16(in_buf->Flags2);
+
+        rc = cifs_sign_smb(in_buf, ses, &midQ->sequence_number);
+
 	midQ->midState = MID_REQUEST_SUBMITTED;
 	rc = smb_send(ses->server->ssocket, in_buf, in_buf->smb_buf_length,
 		      (struct sockaddr *) &(ses->server->sockAddr));
@@ -247,11 +249,18 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 			memcpy(out_buf, midQ->resp_buf,
 			       receive_len +
 			       4 /* include 4 byte RFC1001 header */ );
-			/* convert the length back to a form that we can use */
 
 			dump_smb(out_buf, 92);
+			/* convert the length into a more usable form */
 			out_buf->smb_buf_length =
 			    be32_to_cpu(out_buf->smb_buf_length);
+			if((out_buf->smb_buf_length > 24) &&
+			   (ses->server->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))) {
+				rc = cifs_verify_signature(out_buf, ses->mac_signing_key,midQ->sequence_number); /* BB fix BB */
+				if(rc)
+					cFYI(1,("Unexpected signature received from server"));
+			}
+
 			if (out_buf->smb_buf_length > 12)
 				out_buf->Flags2 = le16_to_cpu(out_buf->Flags2);
 			if (out_buf->smb_buf_length > 28)

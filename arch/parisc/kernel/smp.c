@@ -456,7 +456,7 @@ smp_cpu_init(int cpunum)
 	current->active_mm = &init_mm;
 	if(current->mm)
 		BUG();
-	enter_lazy_tlb(&init_mm, current, cpunum);
+	enter_lazy_tlb(&init_mm, current);
 
 	init_IRQ();   /* make sure no IRQ's are enabled or pending */
 }

@@ -1989,9 +1989,7 @@ static int pfkey_spddelete(struct sock *sk, struct sk_buff *skb, struct sadb_msg
 	err = 0;
 
 out:
-	if (xp) {
-		xfrm_policy_kill(xp);
-	}
+	xfrm_pol_put(xp);
 	return err;
 }
 
@@ -2031,12 +2029,7 @@ static int pfkey_spdget(struct sock *sk, struct sk_buff *skb, struct sadb_msg *h
 	err = 0;
 
 out:
-	if (xp) {
-		if (hdr->sadb_msg_type == SADB_X_SPDDELETE2)
-			xfrm_policy_kill(xp);
-		else
-			xfrm_pol_put(xp);
-	}
+	xfrm_pol_put(xp);
 	return err;
 }
 

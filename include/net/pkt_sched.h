@@ -61,7 +61,7 @@ struct Qdisc_ops
 	int 			(*enqueue)(struct sk_buff *, struct Qdisc *);
 	struct sk_buff *	(*dequeue)(struct Qdisc *);
 	int 			(*requeue)(struct sk_buff *, struct Qdisc *);
-	int			(*drop)(struct Qdisc *);
+	unsigned int		(*drop)(struct Qdisc *);
 
 	int			(*init)(struct Qdisc *, struct rtattr *arg);
 	void			(*reset)(struct Qdisc *);

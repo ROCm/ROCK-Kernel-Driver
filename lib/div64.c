@@ -12,12 +12,16 @@
  * The fast case for (n>>32 == 0) is handled inline by do_div(). 
  *
  * Code generated for this function might be very inefficient
- * for some CPUs. div64_32() can be overridden by linking arch-specific
+ * for some CPUs. __div64_32() can be overridden by linking arch-specific
  * assembly versions such as arch/ppc/lib/div64.S and arch/sh/lib/div64.S.
  */
 
 #include <linux/types.h>
+#include <linux/module.h>
 #include <asm/div64.h>
+
+/* Not needed on 64bit architectures */
+#if BITS_PER_LONG == 32
 
 uint32_t __div64_32(uint64_t *n, uint32_t base)
 {
@@ -43,3 +47,6 @@ uint32_t __div64_32(uint64_t *n, uint32_t base)
 	return rem;
 }
 
+EXPORT_SYMBOL(__div64_32);
+
+#endif /* BITS_PER_LONG == 32 */

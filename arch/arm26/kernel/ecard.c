@@ -11,9 +11,8 @@
  *  Find all installed expansion cards, and handle interrupts from them.
  *
  *  Created from information from Acorns RiscOS3 PRMs
- *
- *  08-Dec-1996	RMK	Added code for the 9'th expansion card - the ether
- *			podule slot.
+ *  15-Jun-2003 IM      Modified from ARM32 (RiscPC capable) version
+ *  10-Jan-1999	RMK	Run loaders in a simulated RISC OS environment.
  *  06-May-1997	RMK	Added blacklist for cards whose loader doesn't work.
  *  12-Sep-1997	RMK	Created new handling of interrupt enables/disables
  *			- cards can now register their own routine to control
@@ -21,10 +20,7 @@
  *  29-Sep-1997	RMK	Expansion card interrupt hardware not being re-enabled
  *			on reset from Linux. (Caused cards not to respond
  *			under RiscOS without hard reset).
- *  15-Feb-1998	RMK	Added DMA support
- *  12-Sep-1998	RMK	Added EASI support
- *  10-Jan-1999	RMK	Run loaders in a simulated RISC OS environment.
- *  17-Apr-1999	RMK	Support for EASI Type C cycles.
+ *
  */
 #define ECARD_C
 
@@ -527,8 +523,7 @@ static int ecard_prints(char *buffer, ecard_t *ec)
 {
 	char *start = buffer;
 
-	buffer += sprintf(buffer, "  %d: %s ", ec->slot_no,
-			  ec->type == ECARD_EASI ? "EASI" : "    ");
+	buffer += sprintf(buffer, "  %d: ", ec->slot_no);
 
 	if (ec->cid.id == 0) {
 		struct in_chunk_dir incd;
@@ -674,7 +669,7 @@ ecard_probe(int slot, card_type_t type)
 	memset(ec, 0, sizeof(ecard_t));
 
 	ec->slot_no	= slot;
-	ec->type	= type;
+	ec->type        = type;
 	ec->irq		= NO_IRQ;
 	ec->fiq		= NO_IRQ;
 	ec->dma		= NO_DMA;
@@ -770,9 +765,8 @@ static int __init ecard_init(void)
 
 	printk("Probing expansion cards\n");
 
-	for (slot = 0; slot < 8; slot ++) {
-		if (ecard_probe(slot, ECARD_EASI) == -ENODEV)
-			ecard_probe(slot, ECARD_IOC);
+	for (slot = 0; slot < 4; slot ++) {
+		ecard_probe(slot, ECARD_IOC);
 	}
 
 	irqhw = ecard_probeirqhw();

@@ -394,17 +394,25 @@ static void do_acct_process(long exitcode, struct file *file)
 /*
  * acct_process - now just a wrapper around do_acct_process
  */
-int acct_process(long exitcode)
+void acct_process(long exitcode)
 {
 	struct file *file = NULL;
+
+	/*
+	 * accelerate the common fastpath:
+	 */
+	if (!acct_globals.file)
+		return;
+
 	spin_lock(&acct_globals.lock);
-	if (acct_globals.file) {
-		file = acct_globals.file;
-		get_file(file);
+	file = acct_globals.file;
+	if (unlikely(!file)) {
 		spin_unlock(&acct_globals.lock);
-		do_acct_process(exitcode, file);
-		fput(file);
-	} else
-		spin_unlock(&acct_globals.lock);
-	return 0;
+		return;
+	}
+	get_file(file);
+	spin_unlock(&acct_globals.lock);
+
+	do_acct_process(exitcode, file);
+	fput(file);
 }

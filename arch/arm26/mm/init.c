@@ -32,7 +32,7 @@
 #include <asm/setup.h>
 #include <asm/tlb.h>
 
-#include <asm/arch.h>
+//#include <asm/arch.h>
 #include <asm/map.h>
 
 #define TABLE_SIZE	PTRS_PER_PTE * sizeof(pte_t))

@@ -12,6 +12,7 @@
 #include <linux/config.h>
 #include <linux/sched.h>  /* for jiffies */
 #include <linux/kernel.h>
+#include <linux/kallsyms.h>
 #include <linux/signal.h>
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
@@ -1644,7 +1645,9 @@ void die_if_kernel(char *str, struct pt_regs *regs)
 		       (char *) rw < ((char *) current)
 		       + sizeof (union thread_union) 		&&
 		       !(((unsigned long) rw) & 0x7)) {
-			printk("Caller[%016lx]\n", rw->ins[7]);
+			printk("Caller[%016lx]", rw->ins[7]);
+			print_symbol(": %s\n", rw->ins[7]);
+			printk("\n");
 			lastrw = rw;
 			rw = (struct reg_window *)
 				(rw->ins[6] + STACK_BIAS);

@@ -43,6 +43,13 @@ static inline unsigned int _swapl(volatile unsigned long v)
 #define writew(b,addr) (void)((*(volatile unsigned short *) (addr)) = (b))
 #define writel(b,addr) (void)((*(volatile unsigned int *) (addr)) = (b))
 
+#define __raw_readb readb
+#define __raw_readw readw
+#define __raw_readl readl
+#define __raw_writeb writeb
+#define __raw_writew writew
+#define __raw_writel writel
+
 static inline void io_outsb(unsigned int addr, void *buf, int len)
 {
 	volatile unsigned char *ap = (volatile unsigned char *) addr;
@@ -100,7 +107,7 @@ static inline void io_insl(unsigned int addr, void *buf, int len)
 #define memcpy_fromio(a,b,c)	memcpy((a),(void *)(b),(c))
 #define memcpy_toio(a,b,c)	memcpy((void *)(a),(b),(c))
 
-#define inb(addr)      readb(addr)
+#define inb(addr)    readb(addr)
 #define inw(addr)    readw(addr)
 #define inl(addr)    readl(addr)
 #define outb(x,addr) ((void) writeb(x,addr))

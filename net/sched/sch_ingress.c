@@ -190,7 +190,7 @@ static int ingress_requeue(struct sk_buff *skb,struct Qdisc *sch)
 	return 0;
 }
 
-static int ingress_drop(struct Qdisc *sch)
+static unsigned int ingress_drop(struct Qdisc *sch)
 {
 #ifdef DEBUG_INGRESS
 	struct ingress_qdisc_data *p = PRIV(sch);

@@ -3,7 +3,7 @@
 
 #include <linux/config.h>
 
-static inline void enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk, unsigned cpu)
+static inline void enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk)
 {
 }
 
@@ -79,7 +79,7 @@ extern inline void switch_mm_0460(struct mm_struct *mm)
 	asm volatile (".chip 68k");
 }
 
-static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next, struct task_struct *tsk, unsigned cpu)
+static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next, struct task_struct *tsk)
 {
 	if (prev != next) {
 		if (CPU_IS_020_OR_030)
@@ -137,7 +137,7 @@ static inline void activate_context(struct mm_struct *mm)
 	sun3_put_context(mm->context);
 }
 
-static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next, struct task_struct *tsk, unsigned cpu)
+static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next, struct task_struct *tsk)
 {
 	activate_context(tsk->mm);
 }

@@ -179,7 +179,7 @@ extern struct page *empty_zero_page;
 /* Is pmd_page supposed to return a pointer to a page in some arches? ours seems to
  * return a pointer to memory (no special alignment)
  */
-#define pmd_page(pmd)  ((unsigned long)(pmd_val((pmd)) & ~_PMD_PRESENT))
+#define pmd_page(pmd)  ((struct page *)(pmd_val((pmd)) & ~_PMD_PRESENT))
 #define pmd_page_kernel(pmd) ((pte_t *)(pmd_val((pmd)) & ~_PMD_PRESENT))
 
 #define pte_offset_kernel(dir,addr)     (pmd_page_kernel(*(dir)) + __pte_index(addr))

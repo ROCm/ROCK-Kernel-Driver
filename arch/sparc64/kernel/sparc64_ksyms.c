@@ -116,6 +116,14 @@ extern unsigned long pfn_base;
 
 extern unsigned int sys_call_table[];
 
+extern void xor_vis_2(unsigned long, unsigned long *, unsigned long *);
+extern void xor_vis_3(unsigned long, unsigned long *, unsigned long *,
+		      unsigned long *);
+extern void xor_vis_4(unsigned long, unsigned long *, unsigned long *,
+		      unsigned long *, unsigned long *);
+extern void xor_vis_5(unsigned long, unsigned long *, unsigned long *,
+		      unsigned long *, unsigned long *, unsigned long *);
+
 /* used by various drivers */
 #ifdef CONFIG_SMP
 #ifndef CONFIG_DEBUG_SPINLOCK
@@ -376,3 +384,8 @@ EXPORT_SYMBOL(ns87303_lock);
 EXPORT_SYMBOL_GPL(sys_call_table);
 
 EXPORT_SYMBOL(tick_ops);
+
+EXPORT_SYMBOL(xor_vis_2);
+EXPORT_SYMBOL(xor_vis_3);
+EXPORT_SYMBOL(xor_vis_4);
+EXPORT_SYMBOL(xor_vis_5);

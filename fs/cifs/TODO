@@ -1,4 +1,4 @@
-version 0.6.5 February 15, 2003
+version 0.8.1 July 4th, 2003
 
 A Partial List of Known Problems and Missing Features
 =====================================================
@@ -19,10 +19,9 @@ d) Kerberos/SPNEGO session setup support - (started)
 
 e) NTLMv2 authentication and MD5-HMAC signing SMB PDUs - (mostly implemented)
 	signing necessary for some Windows 2003 servers in domain 
-	controller mode.
+	mode.
 
-f) oplock support (ie safe CIFS distributed file caching) is not quite complete.
-In addition Directory entry caching relies on a 1 second timer, rather than 
+f) Directory entry caching relies on a 1 second timer, rather than 
 using FindNotify or equivalent.  - (started)
 
 g) There may be a few additional changes that could be done to take advantage
@@ -47,15 +46,16 @@ m) finish support for IPv6
 n) send oplock break response when sent (oplock currently disabled in
 /proc/fs/cifs)
 
-o) remove calls to set end of file by name when we already have file open
-(use the existing handle since some servers only support that and it
-reduces the oplock breaks coming from windows).  Piggyback identical
+o) reduces the oplock breaks coming from windows).  Piggyback identical
 file opens on top of each other by incrementing reference count rather
 than resending (helps reduce server resource utilization and avoid
 spurious oplock breaks).
 
+p) Improve performance of readpages by sending more than one read
+at a time when 8 pages or more are requested.
 
-KNOWN BUGS (updated May 16, 2003)
+
+KNOWN BUGS (updated July 4th, 2003)
 ====================================
 1) existing symbolic links (Windows reparse points) are recognized but
 can not be created remotely. They are implemented for Samba and those that
@@ -74,8 +74,8 @@ Misc testing to do
 1) check out max path names and max path name components against various server
 types.
 
-2) Run dbench
+2) Run dbench. Modify file portion of ltp so it can run against a mounted network
+share and run it against cifs vfs.
 
-3) Finish high stress fsx testing on SMP clients
+3) Additional performance testing and optimization using iozone and similar tools.
 
-4) Additional performance testing and optimization

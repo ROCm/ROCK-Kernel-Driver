@@ -1344,6 +1344,7 @@ do_link:
 	 * stored in nd->last.name and we will have to putname() it when we
 	 * are done. Procfs-like symlinks just set LAST_BIND.
 	 */
+	nd->flags |= LOOKUP_PARENT;
 	error = security_inode_follow_link(dentry, nd);
 	if (error)
 		goto exit_dput;
@@ -1352,6 +1353,7 @@ do_link:
 	dput(dentry);
 	if (error)
 		return error;
+	nd->flags &= ~LOOKUP_PARENT;
 	if (nd->last_type == LAST_BIND) {
 		dentry = nd->dentry;
 		goto ok;

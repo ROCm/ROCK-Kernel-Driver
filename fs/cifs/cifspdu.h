@@ -307,7 +307,13 @@ struct smb_hdr {
 	__u8 Flags;
 	__u16 Flags2;		/* note: le */
 	__u16 PidHigh;		/* note: le */
-	__u8 SecuritySignature[8];	/* note le */
+	union {
+		struct {
+			__u32 SequenceNumber;  /* le */
+			__u32 Reserved; /* zero */
+		} Sequence;
+		__u8 SecuritySignature[8];	/* le */
+	} Signature;
 	__u8 pad[2];
 	__u16 Tid;
 	__u16 Pid;		/* note: le */

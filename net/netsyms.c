@@ -641,6 +641,7 @@ EXPORT_SYMBOL(qdisc_tree_lock);
 #ifdef CONFIG_NET_SCHED
 PSCHED_EXPORTLIST;
 EXPORT_SYMBOL(pfifo_qdisc_ops);
+EXPORT_SYMBOL(bfifo_qdisc_ops);
 EXPORT_SYMBOL(register_qdisc);
 EXPORT_SYMBOL(unregister_qdisc);
 EXPORT_SYMBOL(qdisc_get_rtab);

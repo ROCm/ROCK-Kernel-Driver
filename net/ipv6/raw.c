@@ -624,6 +624,7 @@ static int rawv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 	if (msg->msg_controllen) {
 		opt = &opt_space;
 		memset(opt, 0, sizeof(struct ipv6_txoptions));
+		opt->tot_len = sizeof(struct ipv6_txoptions);
 
 		err = datagram_send_ctl(msg, &fl, opt, &hlimit);
 		if (err < 0) {
@@ -913,7 +914,7 @@ struct raw6_iter_state {
 	int bucket;
 };
 
-#define raw6_seq_private(seq) ((struct raw6_iter_state *)&seq->private)
+#define raw6_seq_private(seq) ((struct raw6_iter_state *)(seq)->private)
 
 static struct sock *raw6_get_first(struct seq_file *seq)
 {
