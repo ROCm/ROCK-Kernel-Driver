@@ -114,12 +114,6 @@ iCfgParam lpfc_icfgparam[LPFC_TOTAL_NUM_OF_CFG_PARAM] = {
 	 (ushort) CFG_DYNAMIC,
 	 "Verbose logging bit-mask"},
 
-	{"log-only",
-	 0, 1, 1, 0,
-	 (ushort) (CFG_IGNORE),
-	 (ushort) CFG_DYNAMIC,
-	 "Log messages to system logger only, not console"},
-
 	{"num_iocbs",
 	 LPFC_MIN_NUM_IOCBS, LPFC_MAX_NUM_IOCBS, LPFC_DFT_NUM_IOCBS, 0,
 	 (ushort) (CFG_EXPORT),
@@ -149,14 +143,6 @@ iCfgParam lpfc_icfgparam[LPFC_TOTAL_NUM_OF_CFG_PARAM] = {
 	 (ushort) (CFG_EXPORT),
 	 (ushort) CFG_DYNAMIC,
 	 "Extra FCP command timeout"},
-
-	{"first-check",
-	 0, 1,
-	 FALSE,
-	 0,
-	 (ushort) EXPORT_AIX,
-	 (ushort) CFG_DYNAMIC,
-	 "Retry the first 29xx check condition for FCP devices during discovery"},
 
 	{"no_device_delay",
 	 0, LPFC_MAX_NO_DEVICE_DELAY, LPFC_DFT_NO_DEVICE_DELAY, 0,
@@ -207,7 +193,7 @@ iCfgParam lpfc_icfgparam[LPFC_TOTAL_NUM_OF_CFG_PARAM] = {
 	 "Increment the current Q depth by dqfull-throttle-up-inc"},
 
 	{"max_lun",
-	 0, 256, 256, 0,
+	 0, 127, 127, 0,
 	 (ushort) (CFG_EXPORT),
 	 (ushort) CFG_DYNAMIC,
 	 "The maximun LUN number a target can support"},

@@ -37,7 +37,11 @@
 #include <linux/string.h>
 #include <linux/init.h>
 #include <linux/errno.h>
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+#include <linux/blk.h>
+#else
 #include <linux/blkdev.h>
+#endif
 #include <linux/string.h>
 #include <linux/ioport.h>
 #include <linux/pci.h>
@@ -53,8 +57,13 @@
 #include <asm/io.h>
 #include <asm/dma.h>
 #include <asm/irq.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 #include <scsi/scsi_device.h>
 #include <asm/pci.h>
+#else
+/* From drivers/scsi */
+#include "sd.h"
+#endif
 #include "hosts.h"
 
 #include "elx_os.h"
@@ -87,7 +96,6 @@
 
 #ifdef powerpc
 #ifndef BITS_PER_LONG
-#error include types.h
 #define BITS_PER_LONG 64
 #endif
 #endif
@@ -99,34 +107,61 @@
 #include "lpfc_diag.h"
 #include "lpfc_cfgparm.h"
 #include "lpfc_module_param.h"
-
-/* This file needs to be included from /etc */
 #include "lpfc.conf"
 
+#define LPFC_DRIVER_NAME    "lpfc"
+
 #ifndef LPFC_DRIVER_VERSION
-#define LPFC_DRIVER_VERSION "2.10a"
+#define LPFC_DRIVER_VERSION "2.10c"
 #define OSGT_DRIVER_VERSION "1.08"
-#endif				/* LPFC_DRIVER_VERSION */
+#endif
+
+#define  LPFC_MODULE_DESC "Emulex LightPulse FC SCSI " LPFC_DRIVER_VERSION
+
+char *elx_drvr_name = LPFC_DRIVER_NAME;
+char *lpfc_release_version = LPFC_DRIVER_VERSION;
 
 MODULE_DESCRIPTION("Emulex LightPulse Fibre Channel driver - Open Source");
 MODULE_AUTHOR("Emulex Corporation - tech.support@emulex.com");
 
-char *lpfc_release_version = LPFC_DRIVER_VERSION;
 char lpfc_os_name_version[256];
 #define FC_EXTEND_TRANS_A 1
 #define ScsiResult(host_code, scsi_code) (((host_code) << 16) | scsi_code)
 
+/* Linux 2.4 compatibility */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+typedef void irqreturn_t;
+#define IRQ_NONE
+#define IRQ_HANDLED
+#endif				/* < 2.6.0 */
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+int lpfc_detect(Scsi_Host_Template *);
+int lpfc_DetectInstance(int, struct pci_dev *, uint32_t, Scsi_Host_Template *);
+#endif
 int lpfc_diag_init(void);
 int lpfc_linux_attach(int, Scsi_Host_Template *, struct pci_dev *);
 int lpfc_get_bind_type(elxHBA_t *);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+int lpfc_release(struct Scsi_Host *host);
+#endif
 int lpfc_diag_uninit(void);
 int lpfc_linux_detach(int);
 
-const char *lpfc_info(struct Scsi_Host *);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+void lpfc_select_queue_depth(struct Scsi_Host *, Scsi_Device *);
+#else
 static int lpfc_slave_configure(Scsi_Device *);
+#endif
+
+const char *lpfc_info(struct Scsi_Host *);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+static int lpfc_proc_info(char *, char **, off_t, int, int, int);
+#else
 static int lpfc_proc_info(struct Scsi_Host *, char *, char **, off_t, int, int);
+#endif
+
 int lpfc_device_queue_depth(elxHBA_t *, Scsi_Device *);
 irqreturn_t lpfc_intr_handler(int, void *, struct pt_regs *);
 void lpfc_local_timeout(unsigned long);
@@ -150,9 +185,12 @@ extern struct elx_mem_pool *elx_mem_dmapool[MAX_ELX_BRDS];
 extern int elx_idx_dmapool[MAX_ELX_BRDS];
 extern int elx_size_dmapool[MAX_ELX_BRDS];
 extern spinlock_t elx_kmem_lock;
-extern char lpfc_fwrevision[32];
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 extern int elx_biosparam(struct scsi_device *, struct block_device *,
 			 sector_t capacity, int ip[]);
+#else
+extern int elx_biosparam(Disk *, kdev_t, int[]);
+#endif
 extern int elx_pci_getadd(struct pci_dev *, int, unsigned long *);
 extern void elx_scsi_add_timer(Scsi_Cmnd *, int);
 
@@ -162,13 +200,52 @@ int lpfc_mem_poolinit(elxHBA_t *);
 #define FC_MAX_DID_STRING       6
 #define FC_MAX_WW_NN_PN_STRING 16
 
-#define LPFC_DRIVER_NAME    "lpfc"
-char *elx_drvr_name = LPFC_DRIVER_NAME;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+
+#if VARYIO == 20
+#define VARYIO_ENTRY .can_do_varyio = 1,
+#elif VARYIO == 3
+#define VARYIO_ENTRY .vary_io =1,
+#else
+#define VARYIO_ENTRY
+#endif
+
+#if defined CONFIG_HIGHMEM
+#if USE_HIGHMEM_IO ==2		// i386 & Redhat 2.1
+#define HIGHMEM_ENTRY .can_dma_32 = 1,
+#define SINGLE_SG_OK .single_sg_ok = 1,
+#else
+#if USE_HIGHMEM_IO ==3		// Redhat 3.0, Suse
+#define HIGHMEM_ENTRY .highmem_io = 1,
+#define SINGLE_SG_OK
+#else				// any other
+#define HIGHMEM_ENTRY
+#define SINGLE_SG_OK
+#endif
+#endif
+#else				// no highmem config
+#define HIGHMEM_ENTRY
+#define SINGLE_SG_OK
+#endif
+#endif
 
 static Scsi_Host_Template driver_template = {
-	.proc_info = lpfc_proc_info,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+	.next = NULL,
+	.command = NULL,
+	.slave_attach = NULL,
+	.use_new_eh_code = 1,
+	.proc_dir = NULL,
+	.detect = lpfc_detect,
+	.release = lpfc_release,
+	VARYIO_ENTRY
+	HIGHMEM_ENTRY
+	SINGLE_SG_OK
+#else
 	.slave_configure = lpfc_slave_configure,
+#endif
 	.proc_name = LPFC_DRIVER_NAME,
+	.proc_info = lpfc_proc_info,
 	.module = THIS_MODULE,
 	.name = LPFC_DRIVER_NAME,
 	.info = lpfc_info,
@@ -247,8 +324,123 @@ extern char *lpfc_fcp_bind_DID[];
 /* This is to export entry points needed for IP interface */
 int lpfc_xmit(elxHBA_t *, struct sk_buff *);
 int lpfc_ipioctl(int, void *);
+#ifdef MODVERSIONS
 EXPORT_SYMBOL(lpfc_xmit);
 EXPORT_SYMBOL(lpfc_ipioctl);
+#else
+EXPORT_SYMBOL_NOVERS(lpfc_xmit);
+EXPORT_SYMBOL_NOVERS(lpfc_ipioctl);
+#endif				/* MODVERSIONS */
+
+#if LINUX_VERSION_CODE <  KERNEL_VERSION(2,6,0)
+
+int
+lpfc_detect(Scsi_Host_Template * tmpt)
+{
+	struct pci_dev *pdev = NULL;
+	int instance = 0;
+	int i;
+	/* To add another, add a line before the last element.
+	 * Leave last element 0.
+	 */
+	uint32_t sType[] = {
+		PCI_DEVICE_ID_VIPER,
+		PCI_DEVICE_ID_THOR,
+		PCI_DEVICE_ID_PEGASUS,
+		PCI_DEVICE_ID_CENTAUR,
+		PCI_DEVICE_ID_DRAGONFLY,
+		PCI_DEVICE_ID_SUPERFLY,
+		PCI_DEVICE_ID_RFLY,
+		PCI_DEVICE_ID_PFLY,
+		PCI_DEVICE_ID_TFLY,
+		PCI_DEVICE_ID_LP101,
+		0
+	};
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+#if VARYIO == 21
+#ifdef SCSI_HOST_VARYIO
+	SCSI_HOST_VARYIO(tmpt) = 1;
+#endif
+#endif
+#endif
+	printk(LPFC_MODULE_DESC "\n");
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+
+	/* Release the io_request_lock lock and reenable interrupts allowing
+	 * the driver to sleep if necessary.
+	 */
+	spin_unlock(&io_request_lock);
+#endif
+
+	memset((char *)&elxDRVR, 0, sizeof (elxDRVR_t));
+	memset((char *)&lpfcdrvr, 0, sizeof (LINUX_DRVR_t));
+	elxDRVR.pDrvrOSEnv = &lpfcdrvr;
+	for (i = 0; i < MAX_ELX_BRDS; i++) {
+		lpfc_instance[i] = -1;
+	}
+
+	/* Initialize all per Driver locks */
+	elx_clk_init_lock(0);
+
+	/* Search for all Device IDs supported */
+	i = 0;
+	while (sType[i]) {
+		instance = lpfc_DetectInstance(instance, pdev, sType[i], tmpt);
+		i++;
+	}
+
+	if (instance) {
+		lpfc_diag_init();	/* Initialize diagnostic interface */
+	}
+
+	/* This covers the case where the lpfn driver gets loaded before the
+	 * lpfc driver detect completes.
+	 */
+	if (lpfc_detect_called == 2) {
+		lpfc_detect_called = 1;
+		if (lpfn_probe != NULL)
+			lpfn_probe();
+
+	} else
+		lpfc_detect_called = 1;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+
+	/* reacquire io_request_lock as the midlayer was holding it when it
+	   called us */
+	spin_lock(&io_request_lock);
+#endif
+	return (instance);
+}
+
+int
+lpfc_DetectInstance(int instance,
+		    struct pci_dev *pdev, uint type, Scsi_Host_Template * tmpt)
+{
+
+	/* PCI_SUBSYSTEM_IDS supported */
+	while ((pdev = pci_find_subsys(PCI_VENDOR_ID_EMULEX, type,
+				       PCI_ANY_ID, PCI_ANY_ID, pdev))) {
+		if (pci_enable_device(pdev)) {
+			continue;
+		}
+		if (pci_request_regions(pdev, LPFC_DRIVER_NAME)) {
+			printk("lpfc pci I/O region is already in use. \n");
+			printk
+			    ("a driver for lpfc is already loaded on this system\n");
+			continue;
+		}
+
+		if (lpfc_linux_attach(instance, tmpt, pdev)) {
+			pci_release_regions(pdev);
+			continue;
+		}
+		instance++;
+	}
+
+	return (instance);
+}
+#endif				/* LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0) */
 
 int
 lpfc_diag_init(void)
@@ -264,6 +456,27 @@ lpfc_diag_init(void)
 
 	return (0);
 }
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+
+int
+lpfc_release(struct Scsi_Host *host)
+{
+	elxHBA_t *phba;
+	int instance;
+	phba = (elxHBA_t *) host->hostdata[0];
+	instance = phba->brd_no;
+
+	/*
+	 * detach the board 
+	 */
+	lpfc_linux_detach(instance);
+
+	lpfc_diag_uninit();
+
+	return (0);
+}
+#endif				/* LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0) */
 
 int
 lpfc_diag_uninit(void)
@@ -518,7 +731,11 @@ lpfc_linux_attach(int instance, Scsi_Host_Template * tmpt, struct pci_dev *pdev)
 	/* 
 	 * Register this board
 	 */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+	host = scsi_register(tmpt, sizeof (unsigned long));
+#else
 	host = scsi_host_alloc(tmpt, sizeof (unsigned long));
+#endif
 	plxhba->host = host;
 
 	host->can_queue = clp[ELX_CFG_DFT_HBA_Q_DEPTH].a_current;
@@ -574,13 +791,24 @@ lpfc_linux_attach(int instance, Scsi_Host_Template * tmpt, struct pci_dev *pdev)
 	 * Queue depths per lun
 	 */
 	host->cmd_per_lun = 1;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+
+	host->select_queue_depths = lpfc_select_queue_depth;
+#endif
+
 	/*
 	 * Save a pointer to device control in host and increment board
 	 */
 	host->hostdata[0] = (unsigned long)phba;
+#if ((LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,4)) && \
+      LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0))
+	scsi_set_pci_device(host, pdev);
+#endif
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,0)
 	pci_set_drvdata(pdev, host);
 	scsi_add_host(host, &pdev->dev);
 	scsi_scan_host(host);
+#endif
 
 	return (0);
 }
@@ -590,11 +818,11 @@ lpfc_linux_detach(int instance)
 {
 	elxHBA_t *phba;
 	ELX_SLI_t *psli;
+	LINUX_HBA_t *plxhba;
+	LPFCHBA_t *plhba;
 	MBUF_INFO_t *buf_info;
 	MBUF_INFO_t bufinfo;
 	unsigned long iflag;
-	LINUX_HBA_t *plxhba;
-	LPFCHBA_t *plhba;
 
 	buf_info = &bufinfo;
 
@@ -604,8 +832,13 @@ lpfc_linux_detach(int instance)
 	}
 	plxhba = (LINUX_HBA_t *) phba->pHbaOSEnv;
 	psli = &phba->sli;
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+	scsi_unregister(plxhba->host);
+#else
 	scsi_remove_host(plxhba->host);
 	scsi_host_put(plxhba->host);
+#endif
 
 	ELX_DRVR_LOCK(phba, iflag);
 	elx_sli_hba_down(phba);	/* Bring down the SLI Layer */
@@ -625,6 +858,8 @@ lpfc_linux_detach(int instance)
 
 	lpfc_unmemmap(phba);
 
+	ELX_DRVR_UNLOCK(phba, iflag);
+
 	if (phba->pHbaOSEnv)
 		elx_kmem_free(phba->pHbaOSEnv, sizeof (LINUX_HBA_t));
 	plhba = (LPFCHBA_t *) phba->pHbaProto;
@@ -637,7 +872,6 @@ lpfc_linux_detach(int instance)
 	if (phba->config)
 		elx_kmem_free(phba->config, sizeof (lpfc_icfgparam));
 
-	ELX_DRVR_UNLOCK(phba, iflag);
 	elx_kmem_free(phba, sizeof (elxHBA_t));
 
 	/* Free memory that managed the HBA dma pool.  This next section
@@ -649,6 +883,8 @@ lpfc_linux_detach(int instance)
 		elxDRVR.pHba[instance] = elxDRVR.pHba[instance + 1];
 		elxDRVR.pHba[instance]->brd_no = instance;
 		elx_mem_dmapool[instance] = elx_mem_dmapool[instance + 1];
+		elx_idx_dmapool[instance] = elx_idx_dmapool[instance + 1];
+		elx_size_dmapool[instance] = elx_size_dmapool[instance + 1];
 	}
 
 	elxDRVR.pHba[instance] = 0;
@@ -681,179 +917,140 @@ lpfc_addr_sprintf(register uint8_t * ap)
 const char *
 lpfc_info(struct Scsi_Host *host)
 {
-	static char buf[4096];
 	elxHBA_t *phba;
 	LINUX_HBA_t *plxhba;
 	LPFCHBA_t *plhba;
 	struct pci_dev *pdev;
-	char *multip;
 	elx_vpd_t *vp;
-	LPFC_NODELIST_t *nlp;
-	int idx, i, j, incr;
-	char hdw[9];
+	int idx = 0;
 
-	buf[0] = '\0';
+	static char lpfcinfobuf[128];
+	const char fmtstring[] =
+	    "HBA: Emulex LightPulse LP%s (%d Gigabit) on PCI bus %02x device %02x irq %d";
+	struct devName {
+		uint32_t pcid;
+		char *name;
+		int speed;
+	} devNameTab[] = {
+		{
+		PCI_DEVICE_ID_THOR, "10000", 2}, {
+		PCI_DEVICE_ID_PEGASUS, "9802", 2}, {
+		PCI_DEVICE_ID_CENTAUR, "9000", 1}, {
+		PCI_DEVICE_ID_CENTAUR, "9002", 2}, {
+		PCI_DEVICE_ID_DRAGONFLY, "8000", 1}, {
+		PCI_DEVICE_ID_SUPERFLY, "7000", 1}, {
+		PCI_DEVICE_ID_SUPERFLY, "7000E", 1}, {
+		PCI_DEVICE_ID_RFLY, "952", 1}, {
+		PCI_DEVICE_ID_PFLY, "982", 2}, {
+		PCI_DEVICE_ID_TFLY, "1050", 2}, {
+		PCI_DEVICE_ID_LP101, "101", 2}, {
+		0, ""}
+	};
+
+	lpfcinfobuf[0] = '\0';
 	phba = (elxHBA_t *) host->hostdata[0];
 	plhba = (LPFCHBA_t *) phba->pHbaProto;
 	plxhba = (LINUX_HBA_t *) phba->pHbaOSEnv;
 	vp = &phba->vpd;
 	if (!phba || !plhba || !plxhba)
-		return buf;
+		return lpfcinfobuf;
 	pdev = plxhba->pcidev;
 
-	for (idx = 0; idx < MAX_ELX_BRDS; idx++) {
-		if ((phba == elxDRVR.pHba[idx]))
-			break;
-	}
-
-	if (!(phba->hba_flag & FC_FULL_INFO_CALL)) {
-		if (pdev != NULL) {
-			switch (pdev->device) {
-			case PCI_DEVICE_ID_CENTAUR:
-				if (FC_JEDEC_ID(vp->rev.biuRev) ==
-				    CENTAUR_2G_JEDEC_ID) {
-					sprintf(&buf[strlen(buf)],
-						"HBA: Emulex LightPulse LP9002 on PCI bus %02x device %02x irq %d",
-						plxhba->pcidev->bus->number,
-						plxhba->pcidev->devfn,
-						plxhba->pcidev->irq);
-				} else {
-					sprintf(&buf[strlen(buf)],
-						"HBA: Emulex LightPulse LP9000 on PCI bus %02x device %02x irq %d",
-						plxhba->pcidev->bus->number,
-						plxhba->pcidev->devfn,
-						plxhba->pcidev->irq);
-				}
-				break;
-			case PCI_DEVICE_ID_RFLY:
-				sprintf(&buf[strlen(buf)],
-					"HBA: Emulex LightPulse LP952 on PCI bus %02x device %02x irq %d",
-					plxhba->pcidev->bus->number,
-					plxhba->pcidev->devfn,
-					plxhba->pcidev->irq);
-				break;
-			case PCI_DEVICE_ID_DRAGONFLY:
-				sprintf(&buf[strlen(buf)],
-					"HBA: Emulex LightPulse LP8000 on PCI bus %02x device %02x irq %d",
-					plxhba->pcidev->bus->number,
-					plxhba->pcidev->devfn,
-					plxhba->pcidev->irq);
-				break;
-			case PCI_DEVICE_ID_SUPERFLY:
-				if ((vp->rev.biuRev >= 1)
-				    && (vp->rev.biuRev <= 3))
-					sprintf(&buf[strlen(buf)],
-						"HBA: Emulex LightPulse LP7000 on PCI bus %02x device %02x irq %d",
-						plxhba->pcidev->bus->number,
-						plxhba->pcidev->devfn,
-						plxhba->pcidev->irq);
-				else
-					sprintf(&buf[strlen(buf)],
-						"HBA: Emulex LightPulse LP7000E on PCI bus %02x device %02x irq %d",
-						plxhba->pcidev->bus->number,
-						plxhba->pcidev->devfn,
-						plxhba->pcidev->irq);
-				break;
-			case PCI_DEVICE_ID_PEGASUS:
-				sprintf(&buf[strlen(buf)],
-					"HBA: Emulex LightPulse LP9802 on PCI bus %02x device %02x irq %d",
-					plxhba->pcidev->bus->number,
-					plxhba->pcidev->devfn,
-					plxhba->pcidev->irq);
-				break;
-			case PCI_DEVICE_ID_PFLY:
-				sprintf(&buf[strlen(buf)],
-					"HBA: Emulex LightPulse LP982 on PCI bus %02x device %02x irq %d",
-					plxhba->pcidev->bus->number,
-					plxhba->pcidev->devfn,
-					plxhba->pcidev->irq);
-				break;
-			case PCI_DEVICE_ID_THOR:
-				sprintf(&buf[strlen(buf)],
-					"HBA: Emulex LightPulse LP10000 on PCI bus %02x device %02x irq %d",
-					plxhba->pcidev->bus->number,
-					plxhba->pcidev->devfn,
-					plxhba->pcidev->irq);
-				break;
-			case PCI_DEVICE_ID_TFLY:
-				sprintf(&buf[strlen(buf)],
-					"HBA: Emulex LightPulse LP1050 on PCI bus %02x device %02x irq %d",
-					plxhba->pcidev->bus->number,
-					plxhba->pcidev->devfn,
-					plxhba->pcidev->irq);
-				break;
-			default:
-				sprintf(&buf[strlen(buf)],
-					"HBA: Emulex LightPulse on PCI bus %02x device %02x irq %d",
-					plxhba->pcidev->bus->number,
-					plxhba->pcidev->devfn,
-					plxhba->pcidev->irq);
-			}
-		}
-		phba->hba_flag |= FC_FULL_INFO_CALL;
-		return (buf);
-	}
-
-	multip = "LPFC";
-
-	sprintf(buf, "Emulex LightPulse %s Driver Version: %s\n",
-		multip, lpfc_release_version);
-
 	if (pdev != NULL) {
-		switch (pdev->device) {
-		case PCI_DEVICE_ID_CENTAUR:
-			if (FC_JEDEC_ID(vp->rev.biuRev) == CENTAUR_2G_JEDEC_ID) {
-				sprintf(&buf[strlen(buf)],
-					"HBA: Emulex LightPulse LP9002 2 Gigabit PCI Fibre Channel Adapter\n");
-			} else {
-				sprintf(&buf[strlen(buf)],
-					"HBA: Emulex LightPulse LP9000 1 Gigabit PCI Fibre Channel Adapter\n");
-			}
-			break;
-		case PCI_DEVICE_ID_RFLY:
-			sprintf(&buf[strlen(buf)],
-				"HBA: Emulex LightPulse LP952 1 Gigabit PCI Fibre Channel Adapter\n");
-			break;
-		case PCI_DEVICE_ID_DRAGONFLY:
-			sprintf(&buf[strlen(buf)],
-				"HBA: Emulex LightPulse LP8000 1 Gigabit PCI Fibre Channel Adapter\n");
-			break;
-		case PCI_DEVICE_ID_SUPERFLY:
-			if ((vp->rev.biuRev >= 1) && (vp->rev.biuRev <= 3))
-				sprintf(&buf[strlen(buf)],
-					"HBA: Emulex LightPulse LP7000 1 Gigabit PCI Fibre Channel Adapter\n");
-			else
-				sprintf(&buf[strlen(buf)],
-					"HBA: Emulex LightPulse LP7000E 1 Gigabit PCI Fibre Channel Adapter\n");
-			break;
-		case PCI_DEVICE_ID_PEGASUS:
-			sprintf(&buf[strlen(buf)],
-				"HBA: Emulex LightPulse LP9802 2 Gigabit PCI Fibre Channel Adapter\n");
-			break;
-		case PCI_DEVICE_ID_PFLY:
-			sprintf(&buf[strlen(buf)],
-				"HBA: Emulex LightPulse LP982 2 Gigabit PCI Fibre Channel Adapter\n");
-			break;
-		case PCI_DEVICE_ID_THOR:
-			sprintf(&buf[strlen(buf)],
-				"HBA: Emulex LightPulse LP10000 2 Gigabit PCI Fibre Channel Adapter\n");
-			break;
-		case PCI_DEVICE_ID_TFLY:
-			sprintf(&buf[strlen(buf)],
-				"HBA: Emulex LightPulse LP1050 2 Gigabit PCI Fibre Channel Adapter\n");
-			break;
-		default:
-			sprintf(&buf[strlen(buf)],
-				"HBA: Emulex LightPulse PCI Fibre Channel Adapter\n");
+		while (devNameTab[idx].pcid) {
+			if (devNameTab[idx].pcid == pdev->device)
+				break;
+			idx++;
 		}
+		if (devNameTab[idx].pcid == PCI_DEVICE_ID_CENTAUR) {
+			if (FC_JEDEC_ID(vp->rev.biuRev) == CENTAUR_2G_JEDEC_ID)
+				idx++;	/* print 9002 string */
+		} else if (devNameTab[idx].pcid == PCI_DEVICE_ID_SUPERFLY) {
+			if (!((vp->rev.biuRev >= 1) && (vp->rev.biuRev <= 3)))
+				idx++;	/* print 7000E string */
+		}
+		if (devNameTab[idx].pcid == 0) {
+			sprintf(lpfcinfobuf,
+				"HBA: Emulex LightPulse on PCI bus %02x device %02x irq %d",
+				plxhba->pcidev->bus->number,
+				plxhba->pcidev->devfn, plxhba->pcidev->irq);
+		} else
+			sprintf(lpfcinfobuf,
+				fmtstring,
+				devNameTab[idx].name,
+				devNameTab[idx].speed,
+				plxhba->pcidev->bus->number,
+				plxhba->pcidev->devfn, plxhba->pcidev->irq);
 	}
+	return (lpfcinfobuf);
+}
 
-	sprintf(&buf[strlen(buf)], "SerialNum: %s\n", phba->SerialNumber);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+static int
+lpfc_proc_info(char *buf,
+	       char **start, off_t offset, int length, int hostnum, int rw)
+#else
+static int
+lpfc_proc_info(struct Scsi_Host *host,
+	       char *buf, char **start, off_t offset, int count, int rw)
+#endif
+{
 
-	multip = lpfc_decode_firmware_rev(phba);
-	sprintf(&buf[strlen(buf)], "Firmware Version: %s\n", multip);
+	elxHBA_t *phba;
+	LINUX_HBA_t *plxhba;
+	LPFCHBA_t *plhba;
+	struct pci_dev *pdev;
+	char fwrev[32];
+	elx_vpd_t *vp;
+	LPFC_NODELIST_t *nlp;
+	int idx, i, j, incr;
+	char hdw[9];
+	int len = 0;
 
-	sprintf(&buf[strlen(buf)], "Hdw: ");
+	/* If rw = 0, then read info
+	 * If rw = 1, then write info (NYI)
+	 */
+	if (rw)
+		return -EINVAL;
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+	for (idx = 0; idx < MAX_ELX_BRDS; idx++) {
+		phba = elxDRVR.pHba[idx];
+		plhba = (LPFCHBA_t *) phba->pHbaProto;
+		plxhba = (LINUX_HBA_t *) phba->pHbaOSEnv;
+		if (plxhba->host->host_no == hostnum)
+			break;
+	}
+#else
+	phba = (elxHBA_t *) host->hostdata[0];
+	plhba = (LPFCHBA_t *) phba->pHbaProto;
+	plxhba = (LINUX_HBA_t *) phba->pHbaOSEnv;
+	for (idx = 0; idx < MAX_ELX_BRDS; idx++) {
+		if (phba == elxDRVR.pHba[idx])
+			break;
+	}
+#endif
+	if (idx == MAX_ELX_BRDS)
+		return sprintf(buf,
+			       "Cannot find adapter for requested host number.\n");
+
+	if (!phba || !plhba || !plxhba)
+		return len;	/*len = 0 */
+
+	vp = &phba->vpd;
+	pdev = plxhba->pcidev;
+
+	len += sprintf(buf, LPFC_MODULE_DESC "\n");
+
+	len += sprintf(buf + len, lpfc_info(plxhba->host));
+	buf[len++] = '\n';
+
+	len += sprintf(buf + len, "SerialNum: %s\n", phba->SerialNumber);
+
+	lpfc_decode_firmware_rev(phba, fwrev, 1);
+	sprintf(&buf[strlen(buf)], "Firmware Version: %s\n", fwrev);
+
+	len += sprintf(buf + len, "Hdw: ");
 	/* Convert JEDEC ID to ascii for hardware version */
 	incr = vp->rev.biuRev;
 	for (i = 0; i < 8; i++) {
@@ -866,27 +1063,31 @@ lpfc_info(struct Scsi_Host *host)
 		incr = (incr >> 4);
 	}
 	hdw[8] = 0;
-	strcat(buf, hdw);
+	len += sprintf(buf + len, hdw);
 
-	sprintf(&buf[strlen(buf)], "\nVendorId: 0x%x\n",
-		((((uint32_t) pdev->device) << 16) | (uint32_t) (pdev->
-								 vendor)));
+	len += sprintf(buf + len, "\nVendorId: 0x%x\n",
+		       ((((uint32_t) pdev->device) << 16) | (uint32_t) (pdev->
+									vendor)));
 
-	sprintf(&buf[strlen(buf)], "Portname: ");
-	strcat(buf, lpfc_addr_sprintf((uint8_t *) & plhba->fc_portname));
+	len += sprintf(buf + len, "Portname: ");
+	len +=
+	    sprintf(buf + len,
+		    lpfc_addr_sprintf((uint8_t *) & plhba->fc_portname));
 
-	sprintf(&buf[strlen(buf)], "   Nodename: ");
-	strcat(buf, lpfc_addr_sprintf((uint8_t *) & plhba->fc_nodename));
+	len += sprintf(buf + len, "   Nodename: ");
+	len +=
+	    sprintf(buf + len,
+		    lpfc_addr_sprintf((uint8_t *) & plhba->fc_nodename));
 
 	switch (phba->hba_state) {
 	case ELX_INIT_START:
 	case ELX_INIT_MBX_CMDS:
 	case ELX_LINK_DOWN:
-		sprintf(&buf[strlen(buf)], "\n\nLink Down\n");
+		len += sprintf(buf + len, "\n\nLink Down\n");
 		break;
 	case ELX_LINK_UP:
 	case ELX_LOCAL_CFG_LINK:
-		sprintf(&buf[strlen(buf)], "\n\nLink Up\n");
+		len += sprintf(buf + len, "\n\nLink Up\n");
 		break;
 	case ELX_FLOGI:
 	case ELX_FABRIC_CFG_LINK:
@@ -895,68 +1096,58 @@ lpfc_info(struct Scsi_Host *host)
 	case ELX_BUILD_DISC_LIST:
 	case ELX_DISC_AUTH:
 	case ELX_CLEAR_LA:
-		sprintf(&buf[strlen(buf)], "\n\nLink Up - Discovery\n");
+		len += sprintf(buf + len, "\n\nLink Up - Discovery\n");
 		break;
 	case ELX_HBA_READY:
-		sprintf(&buf[strlen(buf)], "\n\nLink Up - Ready:\n");
-		sprintf(&buf[strlen(buf)], "   PortID 0x%x\n", plhba->fc_myDID);
+		len += sprintf(buf + len, "\n\nLink Up - Ready:\n");
+		len += sprintf(buf + len, "   PortID 0x%x\n", plhba->fc_myDID);
 		if (plhba->fc_topology == TOPOLOGY_LOOP) {
 			if (plhba->fc_flag & FC_PUBLIC_LOOP)
-				sprintf(&buf[strlen(buf)], "   Public Loop\n");
+				len += sprintf(buf + len, "   Public Loop\n");
 			else
-				sprintf(&buf[strlen(buf)], "   Private Loop\n");
+				len += sprintf(buf + len, "   Private Loop\n");
 		} else {
 			if (plhba->fc_flag & FC_FABRIC)
-				sprintf(&buf[strlen(buf)], "   Fabric\n");
+				len += sprintf(buf + len, "   Fabric\n");
 			else
-				sprintf(&buf[strlen(buf)],
-					"   Point-2-Point\n");
+				len += sprintf(buf + len, "   Point-2-Point\n");
 		}
 
 		if (plhba->fc_linkspeed == LA_2GHZ_LINK)
-			sprintf(&buf[strlen(buf)], "   Current speed 2G\n");
+			len += sprintf(buf + len, "   Current speed 2G\n");
 		else
-			sprintf(&buf[strlen(buf)], "   Current speed 1G\n");
+			len += sprintf(buf + len, "   Current speed 1G\n");
 
 		nlp = plhba->fc_nlpmap_start;
 		while (nlp != (LPFC_NODELIST_t *) & plhba->fc_nlpmap_start) {
 			if (nlp->nlp_state == NLP_STE_MAPPED_NODE) {
-				sprintf(&buf[strlen(buf)],
-					"\nlpfc%dt%02x DID %06x WWPN ", idx,
-					FC_SCSID(nlp->nlp_pan, nlp->nlp_sid),
-					nlp->nlp_DID);
-				strcat(buf,
-				       lpfc_addr_sprintf((uint8_t *) & nlp->
-							 nlp_portname));
-				strcat(buf, " WWNN ");
-				strcat(buf,
-				       lpfc_addr_sprintf((uint8_t *) & nlp->
-							 nlp_nodename));
+				len +=
+				    sprintf(buf + len,
+					    "\nlpfc%dt%02x DID %06x WWPN ", idx,
+					    FC_SCSID(nlp->nlp_pan,
+						     nlp->nlp_sid),
+					    nlp->nlp_DID);
+				len +=
+				    sprintf(buf + len,
+					    lpfc_addr_sprintf((uint8_t *) &
+							      nlp->
+							      nlp_portname));
+				len += sprintf(buf + len, " WWNN ");
+				len +=
+				    sprintf(buf + len,
+					    lpfc_addr_sprintf((uint8_t *) &
+							      nlp->
+							      nlp_nodename));
 			}
-			if ((4096 - strlen(buf)) < 90)
+			if ((4096 - len) < 90)
 				break;
 			nlp = (LPFC_NODELIST_t *) nlp->nle.nlp_listp_next;
 		}
 		if (nlp != (LPFC_NODELIST_t *) & plhba->fc_nlpmap_start)
-			strcat(buf, "\n....\n");
+			len += sprintf(buf, "\n....");
+		buf[len++] = '\n';
 	}
-
-	return (buf);
-}
-
-
-static int
-lpfc_proc_info(struct Scsi_Host *host,
-	       char *buffer, char **start, off_t offset, int count, int rw)
-{
-	/* If rw = 0, then read info
-	 * If rw = 1, then write info (NYI)
-	 */
-	if (rw) {
-		return -EINVAL;
-	} else {
-		return sprintf(buffer, "%s\n", lpfc_info(host));
-	}
+	return (len);
 }
 
 uint32_t
@@ -1133,9 +1324,20 @@ lpfc_reset_bus_handler(Scsi_Cmnd * cmnd)
 	unsigned long iflag;
 	int rc, tgt, lun;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+
+	/* release io_request_lock */
+	spin_unlock_irq(&io_request_lock);
+#endif
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 	phba = (elxHBA_t *) cmnd->device->host->hostdata[0];
 	tgt = cmnd->device->id;
 	lun = cmnd->device->lun;
+#else
+	phba = (elxHBA_t *) cmnd->host->hostdata[0];
+	tgt = cmnd->target;
+	lun = cmnd->lun;
+#endif
 	ELX_DRVR_LOCK(phba, iflag);
 
 	rc = 0;
@@ -1151,11 +1353,31 @@ lpfc_reset_bus_handler(Scsi_Cmnd * cmnd)
 		       tgt, lun, rc);	/* end varargs */
 
 	ELX_DRVR_UNLOCK(phba, iflag);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+
+	/* reacquire io_request_lock for midlayer */
+	spin_lock_irq(&io_request_lock);
+#endif
 
 	return (SUCCESS);
 
 }				/* lpfc_reset_bus_handler */
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+
+void
+lpfc_select_queue_depth(struct Scsi_Host *host, Scsi_Device * scsi_devs)
+{
+	Scsi_Device *device;
+	elxHBA_t *phba;
+
+	phba = (elxHBA_t *) host->hostdata[0];
+	for (device = scsi_devs; device != NULL; device = device->next) {
+		if (device->host == host)
+			lpfc_device_queue_depth(phba, device);
+	}
+}
+#else
 int
 lpfc_slave_configure(Scsi_Device * scsi_devs)
 {
@@ -1164,12 +1386,16 @@ lpfc_slave_configure(Scsi_Device * scsi_devs)
 	lpfc_device_queue_depth(phba, scsi_devs);
 	return 0;
 }
+#endif
 
 int
 lpfc_device_queue_depth(elxHBA_t * phba, Scsi_Device * device)
 {
 
 	if (device->tagged_supported) {
+#if LINUX_VERSION_CODE 	< KERNEL_VERSION(2,6,0)
+		device->tagged_queue = 1;
+#endif
 		device->current_tag = 0;
 		device->queue_depth = 32;	/* Substitute configuration parameter */
 	} else {
@@ -1224,16 +1450,24 @@ lpfcdiag_ioctl(struct inode *inode,
 int
 lpfcdiag_open(struct inode *inode, struct file *file)
 {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+	MOD_INC_USE_COUNT;
+#else
 	if (!try_module_get(THIS_MODULE)) {
 		return (-ENODEV);
 	}
+#endif
 	return (0);
 }
 
 int
 lpfcdiag_release(struct inode *inode, struct file *file)
 {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+	MOD_DEC_USE_COUNT;
+#else
 	module_put(THIS_MODULE);
+#endif
 	return (0);
 }
 
@@ -2114,8 +2348,7 @@ lpfc_config_setup(elxHBA_t * phba)
 		clp[i].a_current =
 		    (uint32_t) ((ulong) fc_get_cfg_param(brd, i));
 
-		if (i == ELX_CFG_DFT_HBA_Q_DEPTH || i == ELX_CFG_LOG_ONLY
-		    || i == ELX_CFG_FIRST_CHECK)
+		if (i == ELX_CFG_DFT_HBA_Q_DEPTH)
 			continue;
 
 		if ((clp[i].a_current >= clp[i].a_low) &&
@@ -2426,6 +2659,7 @@ elx_initpci(struct dfc_info *di, elxHBA_t * phba)
 	LPFCHBA_t *plhba;
 	LINUX_HBA_t *plxhba;
 	struct pci_dev *pdev;
+	char lpfc_fwrevision[32];
 
 	plhba = (LPFCHBA_t *) phba->pHbaProto;
 	plxhba = (LINUX_HBA_t *) phba->pHbaOSEnv;
@@ -2463,7 +2697,7 @@ elx_initpci(struct dfc_info *di, elxHBA_t * phba)
 	di->fc_ba.a_devid = (uint32_t) (pdev->devfn);
 
 	memcpy(di->fc_ba.a_drvrid, (void *)lpfc_release_version, 8);
-	lpfc_decode_firmware_rev(phba);
+	lpfc_decode_firmware_rev(phba, lpfc_fwrevision, 1);
 	memcpy(di->fc_ba.a_fwname, (void *)lpfc_fwrevision, 32);
 
 	return (0);
@@ -2690,6 +2924,9 @@ lpfc_ipioctl(int cmd, void *s)
 
 					/* New-style flags */
 					dev->flags = IFF_BROADCAST;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+					dev_init_buffers(dev);
+#endif
 					register_netdevice(dev);
 					rtnl_unlock();
 
@@ -8811,6 +9048,7 @@ fc_get_cfg_param(int brd, int param)
 	return (value);
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 static struct pci_device_id lpfc_id_table[] __devinitdata = {
 	{PCI_VENDOR_ID_EMULEX, PCI_DEVICE_ID_VIPER, PCI_ANY_ID, PCI_ANY_ID, 0,
 	 0, 0UL},
@@ -8893,8 +9131,8 @@ lpfc_init(void)
 {
 	int rc, i;
 
-	printk("Emulex LightPulse FC SCSI/IP: %s    Osgt: %s\n",
-	       lpfc_release_version, OSGT_DRIVER_VERSION);
+	printk(LPFC_MODULE_DESC "\n");
+
 	memset((char *)&elxDRVR, 0, sizeof (elxDRVR_t));
 	memset((char *)&lpfcdrvr, 0, sizeof (LINUX_DRVR_t));
 	elxDRVR.pDrvrOSEnv = &lpfcdrvr;
@@ -8928,6 +9166,12 @@ lpfc_exit(void)
 	pci_unregister_driver(&lpfc_driver);
 	lpfc_diag_uninit();
 }
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+#include "scsi_module.c"
+#else
 module_init(lpfc_init);
 module_exit(lpfc_exit);
+#endif
 MODULE_LICENSE("GPL");

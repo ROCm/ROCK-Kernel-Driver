@@ -228,12 +228,9 @@ typedef struct lpfcHba {
 	uint32_t fc_myDID;	/* fibre channel S_ID */
 	uint32_t fc_prevDID;	/* previous fibre channel S_ID */
 
-	/* The next three structures get DMA'ed directly into,
-	 * so they must be in the first page of the adapter structure!
-	 */
-	volatile SERV_PARM fc_sparam;	/* buffer for our service parameters */
-	volatile SERV_PARM fc_fabparam;	/* fabric service parameters buffer */
-	volatile uint8_t alpa_map[128];	/* AL_PA map from READ_LA */
+	SERV_PARM fc_sparam;	/* buffer for our service parameters */
+	SERV_PARM fc_fabparam;	/* fabric service parameters buffer */
+	uint8_t alpa_map[128];	/* AL_PA map from READ_LA */
 
 	uint8_t fc_ns_retry;	/* retries for fabric nameserver */
 	uint32_t fc_nlp_cnt;	/* outstanding NODELIST requests */

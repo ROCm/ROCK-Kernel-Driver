@@ -2665,7 +2665,7 @@ msgName: elx_mes0441
 message:  VPD not present on adapter, mbxCmd <cmd> DUMP VPD, mbxStatus <status>
 descript: DUMP_VPD mailbox command failed.
 data:     None
-severity: Warning
+severity: Information
 log:      LOG_INIT verbose
 action:   This error could indicate a hardware or firmware problem. If 
           problems persist report these to Technical Support.
@@ -10842,12 +10842,10 @@ elx_printf_log(int brdno, msgLogDef * msg,	/* Pointer to LOG msg structure */
 {
 	uint8_t str2[MAX_IO_SIZE + MAX_TBUFF];	/* extra room to convert numbers */
 	int iocnt;
-	int log_only;
 	va_list args;
 	va_start(args, control);
 
-	log_only = 0;
-	if (elx_log_chk_msg_disabled(brdno, msg, &log_only))
+	if (elx_log_chk_msg_disabled(brdno, msg))
 		return (0);	/* This LOG message disabled */
 
 	/* 
@@ -10858,13 +10856,12 @@ elx_printf_log(int brdno, msgLogDef * msg,	/* Pointer to LOG msg structure */
 	str2[0] = '\0';
 	iocnt = elx_sprintf_fargs(str2, control, args);
 	va_end(args);
-	return (elx_printf_log_msgblk(brdno, msg, (char *)str2, log_only));
+	return (elx_printf_log_msgblk(brdno, msg, (char *)str2));
 }
 
 int
-elx_log_chk_msg_disabled(int brdno, msgLogDef * msg,	/* Pointer to LOG msg structure */
-			 int *log_only)
-{
+elx_log_chk_msg_disabled(int brdno, msgLogDef * msg)
+{				/* Pointer to LOG msg structure */
 	elxHBA_t *phba;
 	elxCfgParam_t *clp;
 	int verbose;
@@ -10876,7 +10873,6 @@ elx_log_chk_msg_disabled(int brdno, msgLogDef * msg,	/* Pointer to LOG msg struc
 
 	if ((phba = elxDRVR.pHba[brdno])) {
 		clp = &phba->config[0];
-		*log_only = (int)(clp[ELX_CFG_LOG_ONLY].a_current);
 		verbose = clp[ELX_CFG_LOG_VERBOSE].a_current;
 	}
 

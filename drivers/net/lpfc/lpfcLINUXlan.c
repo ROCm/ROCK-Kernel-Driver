@@ -36,7 +36,11 @@
 #include <linux/string.h>
 #include <linux/init.h>
 #include <linux/errno.h>
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+#include <linux/blk.h>
+#else
 #include <linux/blkdev.h>
+#endif
 #include <linux/string.h>
 #include <linux/ioport.h>
 #include <linux/pci.h>
@@ -52,7 +56,11 @@
 #include <asm/io.h>
 #include <asm/dma.h>
 #include <asm/irq.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,17)
 #include <linux/spinlock.h>
+#else
+#include <asm/spinlock.h>
+#endif
 #include <linux/smp.h>
 #include <asm/byteorder.h>
 
@@ -84,7 +92,7 @@ MODULE_DESCRIPTION("Emulex LightPulse Fibre Channel driver - Open Source");
 MODULE_AUTHOR("Emulex Corporation - tech.support@emulex.com");
 
 #ifndef LPFN_DRIVER_VERSION
-#define LPFN_DRIVER_VERSION "2.10a"
+#define LPFN_DRIVER_VERSION "2.10c"
 #endif				/* LPFC_DRIVER_VERSION */
 
 char *lpfn_release_version = LPFN_DRIVER_VERSION;
@@ -97,10 +105,18 @@ extern int lpfc_xmit(elxHBA_t *, struct sk_buff *);
 extern int lpfc_ipioctl(int, void *);
 
 void lpfn_receive(elxHBA_t *, void *, uint32_t);
+#ifdef MODVERSIONS
 EXPORT_SYMBOL(lpfn_receive);
+#else
+EXPORT_SYMBOL_NOVERS(lpfn_receive);
+#endif				/* MODVERSIONS */
 
 int lpfn_probe(void);
+#ifdef MODVERSIONS
 EXPORT_SYMBOL(lpfn_probe);
+#else
+EXPORT_SYMBOL_NOVERS(lpfn_probe);
+#endif				/* MODVERSIONS */
 
 static int
 lpfn_open(NETDEVICE * dev)
@@ -284,11 +300,15 @@ lpfn_coalesce_skbuff(elxHBA_t * phba, void *ip_buff, uint32_t pktsize)
 		while (tmp_ip_buff) {
 			tmp_skb = (struct sk_buff *)tmp_ip_buff->ipbuf;
 			tmp_ip_buff->ipbuf = NULL;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 			if (in_irq()) {
 				dev_kfree_skb_irq(tmp_skb);
 			} else {
 				dev_kfree_skb(tmp_skb);
 			}
+#else
+			dev_kfree_skb(tmp_skb);
+#endif
 			tmp_ip_buff = (DMABUFIP_t *) tmp_ip_buff->dma.next;
 		}
 		return;
@@ -306,11 +326,15 @@ lpfn_coalesce_skbuff(elxHBA_t * phba, void *ip_buff, uint32_t pktsize)
 		tmp_ip_buff = (DMABUFIP_t *) tmp_ip_buff->dma.next;
 
 		/* Free the skb here */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 		if (in_irq()) {
 			dev_kfree_skb_irq(tmp_skb);
 		} else {
 			dev_kfree_skb(tmp_skb);
 		}
+#else
+		dev_kfree_skb(tmp_skb);
+#endif
 
 	}
 

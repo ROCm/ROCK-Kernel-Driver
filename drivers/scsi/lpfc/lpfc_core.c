@@ -889,6 +889,7 @@ lpfc_fdmi_cmd(elxHBA_t * phba, LPFC_NODELIST_t * ndlp, int cmdcode)
 		{
 			elx_vpd_t *vp;
 			char *str;
+			char lpfc_fwrevision[32];
 			uint32_t i, j, incr;
 			int len;
 			uint8_t HWrev[8];
@@ -1358,9 +1359,9 @@ lpfc_fdmi_cmd(elxHBA_t * phba, LPFC_NODELIST_t * ndlp, int cmdcode)
 			/* #9 HBA attribute entry */
 			ae = (ATTRIBUTE_ENTRY *) ((uint8_t *) rh + size);
 			ae->ad.bits.AttrType = SWAP_DATA16(FIRMWARE_VERSION);
-			str = lpfc_decode_firmware_rev(phba);
+			lpfc_decode_firmware_rev(phba, lpfc_fwrevision, 1);
 			elx_str_cpy((char *)ae->un.FirmwareVersion,
-				    (char *)str);
+				    (char *)lpfc_fwrevision);
 			len = elx_str_len((char *)ae->un.FirmwareVersion);
 			len += (len & 3) ? (4 - (len & 3)) : 4;
 			ae->ad.bits.AttrLen = SWAP_DATA16(FOURBYTES + len);
@@ -9384,7 +9385,6 @@ extern int elx_initpci(struct dfc_info *, elxHBA_t *);
 /*************************************************************************/
 /*  Global data structures                                               */
 /*************************************************************************/
-char lpfc_fwrev_short[16];
 
 uint32_t fc_dbg_flag;
 
@@ -9581,7 +9581,8 @@ lpfc_ioctl_found_port(elxHBA_t * phba,
 		return ENOMEM;
 	}
 
-	if ((mboxq = (ELX_MBOXQ_t *) elx_mem_get(phba, MEM_MBOX | MEM_PRI))) {
+	if ((mboxq =
+	     (ELX_MBOXQ_t *) elx_mem_get(phba, MEM_MBOX | MEM_PRI)) == 0) {
 		elx_mem_put(phba, MEM_BUF, (uint8_t *) mp);
 		return ENOMEM;
 	}
@@ -10039,7 +10040,8 @@ lpfc_ioctl_lip(elxHBA_t * phba, ELXCMDINPUT_t * cip, struct dfc_mem *dm)
 
 	rc = 0;
 
-	if ((pmboxq = (ELX_MBOXQ_t *) elx_mem_get(phba, MEM_MBOX | MEM_PRI))) {
+	if ((pmboxq =
+	     (ELX_MBOXQ_t *) elx_mem_get(phba, MEM_MBOX | MEM_PRI)) == 0) {
 		return ENOMEM;
 	}
 
@@ -11939,6 +11941,7 @@ lpfc_ioctl_hba_adapterattributes(elxHBA_t * phba,
 {
 	HBA_ADAPTERATTRIBUTES *ha;
 	char *pNodeSymbolicName;
+	char fwrev[32];
 	struct dfc_mem NodeSymbolicName_dm;
 	LPFCHBA_t *plhba;
 	uint32_t incr;
@@ -11962,7 +11965,8 @@ lpfc_ioctl_hba_adapterattributes(elxHBA_t * phba,
 	ha->NumberOfPorts = 1;
 	ha->VendorSpecificID = di->fc_ba.a_pci;
 	memcpy(ha->DriverVersion, di->fc_ba.a_drvrid, 16);
-	memcpy(ha->FirmwareVersion, di->fc_ba.a_fwname, 32);
+	lpfc_decode_firmware_rev(phba, fwrev, 1);
+	memcpy(ha->FirmwareVersion, fwrev, 32);
 	memcpy((uint8_t *) & ha->NodeWWN,
 	       (uint8_t *) & plhba->fc_sparam.nodeName, sizeof (HBA_WWN));
 	memcpy(ha->Manufacturer, "Emulex Corporation", 20);
@@ -12136,7 +12140,8 @@ lpfc_ioctl_hba_portstatistics(elxHBA_t * phba,
 	unsigned long iflag;
 	int rc = 0;
 
-	if ((pmboxq = (ELX_MBOXQ_t *) elx_mem_get(phba, MEM_MBOX | MEM_PRI))) {
+	if ((pmboxq =
+	     (ELX_MBOXQ_t *) elx_mem_get(phba, MEM_MBOX | MEM_PRI)) == 0) {
 		return ENOMEM;
 	}
 
@@ -14812,10 +14817,8 @@ dfc_cmd_data_free(elxHBA_t * phba, DMABUFEXT_t * mlist)
 	return (0);
 }
 
-char lpfc_fwrevision[32];
-
-char *
-lpfc_decode_firmware_rev(elxHBA_t * phba)
+void
+lpfc_decode_firmware_rev(elxHBA_t * phba, char *fwrevision, int flag)
 {
 	ELX_SLI_t *psli;
 	elx_vpd_t *vp;
@@ -14876,16 +14879,22 @@ lpfc_decode_firmware_rev(elxHBA_t * phba)
 		}
 
 		if (c == 0) {
-			elx_str_sprintf(lpfc_fwrev_short, "%d.%d%d", (int)b1,
-					(int)b2, (int)b3);
-			elx_str_sprintf(lpfc_fwrevision, "%d.%d%d (%s)",
-					(int)b1, (int)b2, (int)b3, (char *)str);
+			if (flag)
+				elx_str_sprintf(fwrevision, "%d.%d%d (%s)",
+						(int)b1, (int)b2, (int)b3,
+						(char *)str);
+			else
+				elx_str_sprintf(fwrevision, "%d.%d%d", (int)b1,
+						(int)b2, (int)b3);
 		} else {
-			elx_str_sprintf(lpfc_fwrev_short, "%d.%d%d%c%d",
-					(int)b1, (int)b2, (int)b3, c, (int)b4);
-			elx_str_sprintf(lpfc_fwrevision, "%d.%d%d%c%d (%s)",
-					(int)b1, (int)b2, (int)b3, c, (int)b4,
-					(char *)str);
+			if (flag)
+				elx_str_sprintf(fwrevision, "%d.%d%d%c%d (%s)",
+						(int)b1, (int)b2, (int)b3, c,
+						(int)b4, (char *)str);
+			else
+				elx_str_sprintf(fwrevision, "%d.%d%d%c%d",
+						(int)b1, (int)b2, (int)b3, c,
+						(int)b4);
 		}
 	} else {
 		rev = vp->rev.smFwRev;
@@ -14896,12 +14905,14 @@ lpfc_decode_firmware_rev(elxHBA_t * phba)
 		c = (char)((rev & 0x0000ff00) >> 8);
 		b4 = (rev & 0x000000ff);
 
-		elx_str_sprintf(lpfc_fwrev_short, "%d.%d%d%c%d ", (int)b1,
-				(int)b2, (int)b3, c, (int)b4);
-		elx_str_sprintf(lpfc_fwrevision, "%d.%d%d%c%d ", (int)b1,
-				(int)b2, (int)b3, c, (int)b4);
+		if (flag)
+			elx_str_sprintf(fwrevision, "%d.%d%d%c%d ", (int)b1,
+					(int)b2, (int)b3, c, (int)b4);
+		else
+			elx_str_sprintf(fwrevision, "%d.%d%d%c%d ", (int)b1,
+					(int)b2, (int)b3, c, (int)b4);
 	}
-	return (lpfc_fwrevision);
+	return;
 }
 
 int
@@ -15302,11 +15313,12 @@ void
 lpfc_get_hba_SymbNodeName(elxHBA_t * phba, uint8_t * symbp)
 {
 	uint8_t buf[16];
+	char fwrev[16];
 
-	lpfc_decode_firmware_rev(phba);
+	lpfc_decode_firmware_rev(phba, fwrev, 0);
 	lpfc_get_hba_model_desc(phba, buf, NULL);
 	elx_str_sprintf(symbp, "Emulex %s FV%s DV%s",
-			buf, lpfc_fwrev_short, lpfc_release_version);
+			buf, fwrev, lpfc_release_version);
 }
 
 #include "lpfc_ip.h"

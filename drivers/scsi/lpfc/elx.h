@@ -164,7 +164,6 @@ typedef struct elxHBA {
 	uint32_t fc_ipri;	/* save priority */
 	uint32_t hba_flag;	/* device flags */
 #define FC_SCHED_CFG_INIT   0x2	/* schedule a call to fc_cfg_init() */
-#define FC_FULL_INFO_CALL   0x4	/* set if fc_info() can return full info */
 #define FC_STOP_IO          0x8	/* set for offline call */
 #define FC_POLL_CMD         0x10	/* indicate to poll for command completion */
 #define FC_LFR_ACTIVE       0x20	/* Link Failure recovery activated */

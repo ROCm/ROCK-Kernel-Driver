@@ -20,16 +20,17 @@
 
 #include "elx_util.h"
 
-
-#ifdef powerpc
-#include <asm/iommu.h>
-/* On powerpc, 0 is a valid physical address */
-#ifdef NO_TCE
-#define INVALID_PHYS       NO_TCE
-#else
-#define INVALID_PHYS       0
+#if defined(RED_HAT_LINUX_KERNEL) && (LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,9))
+#define KERNEL_HAS_PCI_MAP_PAGE
+#endif
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,12))
+#define KERNEL_HAS_PCI_MAP_PAGE
 #endif
 
+#ifdef powerpc
+/* On powerpc, 0 is a valid physical address and the DMA mapping calls
+   return -1 on failure */
+#define INVALID_PHYS       -1
 #else
 #define INVALID_PHYS       0
 #endif				/* powerpc */
@@ -99,10 +100,22 @@ typedef uint32_t elx_lun_t;
 typedef struct sc_buf T_SCSIBUF;
 #define SET_ADAPTER_STATUS(bp, val) bp->general_card_status = val;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,17)
 #define  NETDEVICE struct net_device
+#else
+#define  NETDEVICE struct device
+#endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,43)
+#define netif_start_queue(dev)  clear_bit(0, (void*)&dev->tbusy)
+#define netif_stop_queue(dev)   set_bit(0, (void*)&dev->tbusy)
+#define netdevice_start(dev)    dev->start = 1
+#define netdevice_stop(dev)     dev->start = 0
+#define dev_kfree_skb_irq(a)    dev_kfree_skb(a)
+#else
 #define netdevice_start(dev)
 #define netdevice_stop(dev)
+#endif
 
 /* forward declaration for compiler */
 struct elxHBA;
@@ -124,5 +137,11 @@ struct lpfn_probe {
 #define LPFN_DFC    3
 
 /* SCSI Layer io_request locking macros */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+ /* io_request_lock is not present in 2.6.0 */
+#define LPFC_LOCK_SCSI_DONE    spin_lock_irqsave(&io_request_lock, sflag)
+#define LPFC_UNLOCK_SCSI_DONE  spin_unlock_irqrestore(&io_request_lock, sflag)
+#else
 #define LPFC_LOCK_SCSI_DONE    spin_lock_irqsave(host->host_lock, sflag)
 #define LPFC_UNLOCK_SCSI_DONE  spin_unlock_irqrestore(host->host_lock, sflag)
+#endif

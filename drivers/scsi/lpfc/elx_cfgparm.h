@@ -25,24 +25,22 @@
 /* The order of the ELX_CFG defs must match that of icfgparam[] entries */
 
 #define ELX_CFG_LOG_VERBOSE               0	/* log-verbose */
-#define ELX_CFG_LOG_ONLY                  1	/* log-only */
-#define ELX_CFG_NUM_IOCBS                 2	/* num-iocbs */
-#define ELX_CFG_NUM_BUFS                  3	/* num-bufs */
-#define ELX_CFG_DFT_TGT_Q_DEPTH           4	/* tgt_queue_depth */
-#define ELX_CFG_DFT_LUN_Q_DEPTH           5	/* lun_queue_depth */
-#define ELX_CFG_EXTRA_IO_TMO              6	/* extra-io-tmo */
-#define ELX_CFG_FIRST_CHECK               7	/* first-check */
-#define ELX_CFG_NO_DEVICE_DELAY           8	/* no-device-delay */
-#define ELX_CFG_LINKDOWN_TMO              9	/* linkdown-tmo */
-#define ELX_CFG_HOLDIO                   10	/* nodev-holdio */
-#define ELX_CFG_DELAY_RSP_ERR            11	/* delay-rsp-err */
-#define ELX_CFG_CHK_COND_ERR             12	/* check-cond-err */
-#define ELX_CFG_NODEV_TMO                13	/* nodev-tmo */
-#define ELX_CFG_DQFULL_THROTTLE_UP_TIME  14	/* dqfull-throttle-up-time */
-#define ELX_CFG_DQFULL_THROTTLE_UP_INC   15	/* dqfull-throttle-up-inc */
-#define ELX_CFG_MAX_LUN                  16	/* max-lun */
-#define ELX_CFG_DFT_HBA_Q_DEPTH          17	/* dft_hba_q_depth */
-#define ELX_CFG_LUN_SKIP		 18
-#define ELX_CORE_NUM_OF_CFG_PARAM        19
+#define ELX_CFG_NUM_IOCBS                 1	/* num-iocbs */
+#define ELX_CFG_NUM_BUFS                  2	/* num-bufs */
+#define ELX_CFG_DFT_TGT_Q_DEPTH           3	/* tgt_queue_depth */
+#define ELX_CFG_DFT_LUN_Q_DEPTH           4	/* lun_queue_depth */
+#define ELX_CFG_EXTRA_IO_TMO              5	/* extra-io-tmo */
+#define ELX_CFG_NO_DEVICE_DELAY           6	/* no-device-delay */
+#define ELX_CFG_LINKDOWN_TMO              7	/* linkdown-tmo */
+#define ELX_CFG_HOLDIO                    8	/* nodev-holdio */
+#define ELX_CFG_DELAY_RSP_ERR             9	/* delay-rsp-err */
+#define ELX_CFG_CHK_COND_ERR             10	/* check-cond-err */
+#define ELX_CFG_NODEV_TMO                11	/* nodev-tmo */
+#define ELX_CFG_DQFULL_THROTTLE_UP_TIME  12	/* dqfull-throttle-up-time */
+#define ELX_CFG_DQFULL_THROTTLE_UP_INC   13	/* dqfull-throttle-up-inc */
+#define ELX_CFG_MAX_LUN                  14	/* max-lun */
+#define ELX_CFG_DFT_HBA_Q_DEPTH          15	/* dft_hba_q_depth */
+#define ELX_CFG_LUN_SKIP		 16	/* lun_skip */
 
+#define ELX_CORE_NUM_OF_CFG_PARAM	17
 #endif				/* _H_ELX_CFGPARAM */

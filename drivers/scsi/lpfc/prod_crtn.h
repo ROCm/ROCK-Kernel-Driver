@@ -32,7 +32,6 @@
 uint8_t *elx_malloc(elxHBA_t *, struct mbuf_info *);
 void elx_free(elxHBA_t *, struct mbuf_info *);
 int elx_print(char *, void *, void *);
-int elx_printf_log_msgblk(int, msgLogDef *, char *, int);
 void elx_sleep_ms(elxHBA_t *, int);
 void elx_pci_dma_sync(void *, void *, int, int);
 void *elx_kmem_alloc(unsigned int, int);

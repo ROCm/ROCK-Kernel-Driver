@@ -329,7 +329,7 @@ void iptst(elxHBA_t *, void *, void *);
 
 /* For lpfc_ioctl.c */
 int lpfc_diag_ioctl(elxHBA_t *, ELXCMDINPUT_t *);
-char *lpfc_decode_firmware_rev(elxHBA_t *);
+void lpfc_decode_firmware_rev(elxHBA_t *, char *, int);
 int lpfc_sleep(elxHBA_t *, fcEVTHDR_t *);
 void lpfc_wakeup(elxHBA_t *, fcEVTHDR_t *);
 int lpfc_read_flash(elxHBA_t * phba, ELXCMDINPUT_t * cip, uint8_t * data);

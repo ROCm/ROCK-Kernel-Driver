@@ -48,8 +48,12 @@
 #include <asm/io.h>
 #include <asm/dma.h>
 #include <asm/irq.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 #include <scsi/scsi_device.h>
 #include <asm/pci.h>
+#else
+#include "sd.h"			/* From drivers/scsi */
+#endif
 
 #include "hosts.h"
 
@@ -337,29 +341,45 @@ elx_print(char *str, void *a1, void *a2)
 }
 
 int
-elx_printf_log_msgblk(int brdno, msgLogDef * msg, char *str,	/* String formatted by caller */
-		      int log_only)
-{
+elx_printf_log_msgblk(int brdno, msgLogDef * msg, char *str)
+{				/* String formatted by caller */
 	int ddiinst;
 	elxHBA_t *phba;
-	LINUX_HBA_t *plxhba;
+	LINUX_HBA_t *plxhba = NULL;
 
 	phba = elxDRVR.pHba[brdno];
-	plxhba = (LINUX_HBA_t *) phba->pHbaOSEnv;
+	if (phba != NULL)
+		plxhba = (LINUX_HBA_t *) phba->pHbaOSEnv;
+	if (plxhba == NULL || phba == NULL) {
+		/* Remove: This case should not occur. Sanitize anyway. More testing needed */
+		printk(KERN_WARNING "%s%d:%04d:%s\n", elx_drvr_name, brdno,
+		       msg->msgNum, str);
+		return 1;
+	}
 
 	ddiinst = brdno;	/* Board number = instance in LINUX */
 	switch (msg->msgType) {
 	case ELX_LOG_MSG_TYPE_INFO:
 	case ELX_LOG_MSG_TYPE_WARN:
 		/* These LOG messages appear in LOG file only */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+		printk(KERN_INFO "%s%d:%04d:%s\n", elx_drvr_name, ddiinst,
+		       msg->msgNum, str);
+#else
 		dev_info(&((plxhba->pcidev)->dev), "%d:%04d:%s\n", ddiinst,
 			 msg->msgNum, str);
+#endif
 		break;
 	case ELX_LOG_MSG_TYPE_ERR_CFG:
 	case ELX_LOG_MSG_TYPE_ERR:
 		/* These LOG messages appear on the monitor and in the LOG file */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+		printk(KERN_WARNING "%s%d:%04d:%s\n", elx_drvr_name, ddiinst,
+		       msg->msgNum, str);
+#else
 		dev_warn(&((plxhba->pcidev)->dev), "%d:%04d:%s\n", ddiinst,
 			 msg->msgNum, str);
+#endif
 		break;
 	case ELX_LOG_MSG_TYPE_PANIC:
 		panic("%s%d:%04d:%s\n", elx_drvr_name, ddiinst, msg->msgNum,
@@ -470,9 +490,15 @@ elx_free(elxHBA_t * phba, MBUF_INFO_t * buf_info)
 		}
 		break;
 	case ELX_MBUF_PHYSONLY:	/* LNX - convert virtual to dma-able */
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,4,12)
+		pci_unmap_single(plxhba->pcidev,
+				 buf_info->phys, buf_info->size,
+				 PCI_DMA_BIDIRECTIONAL);
+#else
 		pci_unmap_page(plxhba->pcidev,
 			       buf_info->phys, buf_info->size,
 			       PCI_DMA_BIDIRECTIONAL);
+#endif
 		break;
 	}
 }
@@ -935,11 +961,18 @@ elx_cnt_write_pci(elxHBA_t * phba,
 	}
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 int
 elx_biosparam(struct scsi_device *psdev,
 	      struct block_device *pbdev, sector_t capacity, int ip[])
 {
 	int size = capacity;
+#else
+int
+elx_biosparam(Disk * disk, kdev_t n, int ip[])
+{
+	int size = disk->capacity;
+#endif
 
 	ip[0] = 64;
 	ip[1] = 32;
@@ -1179,8 +1212,26 @@ elx_pci_map(elxHBA_t * phba, void *virt, int size, int dir)
 {
 	dma_addr_t physaddr;
 	LINUX_HBA_t *plxhba;
+#ifdef KERNEL_HAS_PCI_MAP_PAGE
+	struct page *page;
+	unsigned long offset;
+
+	plxhba = (LINUX_HBA_t *) phba->pHbaOSEnv;
+
+	page = virt_to_page(virt);
+	offset = ((unsigned long)virt & ~PAGE_MASK);
+	physaddr = 0;
+	while (physaddr == 0) {
+		physaddr =
+		    pci_map_page(plxhba->pcidev, page, offset, size, dir);
+#ifndef powerpc
+		break;
+#endif				/* endif powerpc */
+	}
+#else
 	plxhba = (LINUX_HBA_t *) phba->pHbaOSEnv;
 	physaddr = pci_map_single(plxhba->pcidev, virt, size, dir);
+#endif				/* KERNEL_HAS_PCI_MAP_PAGE */
 	return (uint64_t) physaddr;
 }
 
@@ -1198,6 +1249,10 @@ lpfc_get_pkt_data(void *buf)
 }
 
 /* Includes. */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+#include <linux/blk.h>
+#else
+#endif
 #include <scsi/scsi.h>
 #include <scsi.h>
 
@@ -1607,13 +1662,31 @@ elx_queuecommand(Scsi_Cmnd * cmnd, void (*done) (Scsi_Cmnd *))
 	elxCfgParam_t *clp;
 	struct Scsi_Host *host;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 	host = cmnd->device->host;
+#else
+	host = cmnd->host;
+#endif
 
 	phba = (elxHBA_t *) host->hostdata[0];
 	clp = &phba->config[0];
 	plxhba = (LINUX_HBA_t *) phba->pHbaOSEnv;
 	ELX_DRVR_LOCK(phba, iflag);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+	/* 
+	   if the hba is in blocked state and the command is a retry 
+	   queue the command and retry success 
+	 */
+	if (plxhba->in_retry) {
+		cmnd->scsi_done = done;
+		cmnd->reset_chain = plxhba->cmnd_retry_list;
+		plxhba->cmnd_retry_list = cmnd;
+		cmnd->host_scribble = 0;
+		ELX_DRVR_UNLOCK(phba, iflag);
+		return (0);
+	}
+#endif
 
 	elx_cmd = elx_get_scsi_buf(phba);
 	if (elx_cmd == 0) {
@@ -1631,38 +1704,47 @@ elx_queuecommand(Scsi_Cmnd * cmnd, void (*done) (Scsi_Cmnd *))
 			return (1);
 		}
 	}
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 	elx_cmd->scsi_bus = cmnd->device->channel;
 	elx_cmd->scsi_target = cmnd->device->id;
 	elx_cmd->scsi_lun = cmnd->device->lun;
+#else
+	elx_cmd->scsi_bus = cmnd->channel;
+	elx_cmd->scsi_target = cmnd->target;
+	elx_cmd->scsi_lun = cmnd->lun;
+#endif
 
-	targetp = lpfc_find_target(phba, elx_cmd->scsi_target);
-	if ((targetp) && (elx_cmd->scsi_lun >= targetp->max_lun)) {
-		elx_free_scsi_buf(elx_cmd);
-		ELX_DRVR_UNLOCK(phba, iflag);
-		/* error-out this command */
-		cmnd->result = ScsiResult(DID_NO_CONNECT, 0);
-		done(cmnd);
-		return (0);
-	}
-	if ((targetp) && (cmnd->cmnd[0] == FCP_SCSI_INQUIRY) &&
-	    (!lpfc_ValidLun(targetp, elx_cmd->scsi_lun))) {
-		int retcod;
-		uint8_t *buf;
-
-		elx_free_scsi_buf(elx_cmd);
-		if (clp[ELX_CFG_LUN_SKIP].a_current) {
-			buf = (uint8_t *) cmnd->request_buffer;
-			*buf = 0x3;
-			retcod = DID_OK;
-		} else {
-			retcod = DID_NO_CONNECT;
+	if ((targetp = lpfc_find_target(phba, elx_cmd->scsi_target))) {
+		if ((elx_cmd->scsi_lun >= targetp->max_lun) ||
+		    ((targetp->pcontext == 0)
+		     && !(targetp->targetFlags & FC_NPR_ACTIVE))) {
+			elx_free_scsi_buf(elx_cmd);
+			ELX_DRVR_UNLOCK(phba, iflag);
+			/* error-out this command */
+			cmnd->result = ScsiResult(DID_NO_CONNECT, 0);
+			done(cmnd);
+			return (0);
 		}
+		if ((cmnd->cmnd[0] == FCP_SCSI_INQUIRY) &&
+		    (!lpfc_ValidLun(targetp, elx_cmd->scsi_lun))) {
+			int retcod;
+			uint8_t *buf;
 
-		ELX_DRVR_UNLOCK(phba, iflag);
-		/* error-out this command */
-		cmnd->result = ScsiResult(retcod, 0);
-		done(cmnd);
-		return (0);
+			elx_free_scsi_buf(elx_cmd);
+			if (clp[ELX_CFG_LUN_SKIP].a_current) {
+				buf = (uint8_t *) cmnd->request_buffer;
+				*buf = 0x3;
+				retcod = DID_OK;
+			} else {
+				retcod = DID_NO_CONNECT;
+			}
+
+			ELX_DRVR_UNLOCK(phba, iflag);
+			/* error-out this command */
+			cmnd->result = ScsiResult(retcod, 0);
+			done(cmnd);
+			return (0);
+		}
 	}
 
 	/* store our command structure for later */
@@ -1724,7 +1806,17 @@ elx_abort_handler(Scsi_Cmnd * cmnd)
 	unsigned long iflag;
 	int rc;
 	LINUX_HBA_t *plxhba;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+	Scsi_Cmnd *prev_cmnd;
+
+	/* release io_request_lock */
+	spin_unlock_irq(&io_request_lock);
+#endif
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 	phba = (elxHBA_t *) cmnd->device->host->hostdata[0];
+#else
+	phba = (elxHBA_t *) cmnd->host->hostdata[0];
+#endif
 	plxhba = (LINUX_HBA_t *) phba->pHbaOSEnv;
 
 	ELX_DRVR_LOCK(phba, iflag);
@@ -1736,6 +1828,26 @@ elx_abort_handler(Scsi_Cmnd * cmnd)
 	   list.
 	 */
 	if (!elx_cmd) {
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+		if (plxhba->cmnd_retry_list) {
+			if (plxhba->cmnd_retry_list == cmnd) {
+				plxhba->cmnd_retry_list = cmnd->reset_chain;
+
+			} else {
+				prev_cmnd = plxhba->cmnd_retry_list;
+
+				while ((prev_cmnd->reset_chain != NULL) &&
+				       (prev_cmnd->reset_chain != cmnd))
+					prev_cmnd = prev_cmnd->reset_chain;
+
+				if (prev_cmnd->reset_chain)
+					prev_cmnd->reset_chain =
+					    cmnd->reset_chain;
+			}
+
+		}
+#endif
 		return (0);
 	}
 
@@ -1755,6 +1867,11 @@ elx_abort_handler(Scsi_Cmnd * cmnd)
 		       elx_cmd->scsi_target, elx_cmd->scsi_lun, elx_cmd->status, elx_cmd->result);	/* end varargs */
 
 	ELX_DRVR_UNLOCK(phba, iflag);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+
+	/* reacquire io_request_lock for midlayer */
+	spin_lock_irq(&io_request_lock);
+#endif
 
 	return ((rc == 0) ? SUCCESS : FAILURE);
 
@@ -1769,7 +1886,16 @@ elx_reset_lun_handler(Scsi_Cmnd * cmnd)
 	ELX_SCSI_BUF_t *elx_cmd;
 	unsigned long iflag;
 	int rc;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+
+	/* release io_request_lock */
+	spin_unlock_irq(&io_request_lock);
+#endif
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 	phba = (elxHBA_t *) cmnd->device->host->hostdata[0];
+#else
+	phba = (elxHBA_t *) cmnd->host->hostdata[0];
+#endif
 	ELX_DRVR_LOCK(phba, iflag);
 	elx_cmd = (ELX_SCSI_BUF_t *) cmnd->host_scribble;
 
@@ -1790,6 +1916,12 @@ elx_reset_lun_handler(Scsi_Cmnd * cmnd)
 		       elx_cmd->scsi_target, elx_cmd->scsi_lun, elx_cmd->status, elx_cmd->result);	/* end varargs */
 
 	ELX_DRVR_UNLOCK(phba, iflag);
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+
+	/* reacquire io_request_lock for midlayer */
+	spin_lock_irq(&io_request_lock);
+#endif
 
 	return ((rc == 0) ? SUCCESS : FAILURE);
 
@@ -2022,6 +2154,15 @@ elx_os_fcp_err_handle(ELX_SCSI_BUF_t * elx_cmd, elx_xlat_err_t * presult)
 		       fcprsp->rspStatus2, fcprsp->rspStatus3, SWAP_DATA(fcprsp->rspResId), SWAP_DATA(fcprsp->rspSnsLen), SWAP_DATA(fcprsp->rspRspLen), fcprsp->rspInfo3);	/* end varargs */
 
 	if (fcprsp->rspStatus2 & RSP_LEN_VALID) {
+		uint32_t rsplen;
+
+		rsplen = SWAP_DATA(fcprsp->rspRspLen);
+		if (rsplen > 8) {
+			presult->host_status = DID_ERROR;
+			scsi_status = (uint32_t) (fcprsp->rspStatus3);
+			fcprsp->rspSnsLen = 0;
+			return (scsi_status);
+		}
 		if (fcprsp->rspInfo3 != RSP_NO_FAILURE) {
 			presult->host_status = DID_ERROR;
 			scsi_status = (uint32_t) (fcprsp->rspStatus3);
@@ -2222,11 +2363,20 @@ elx_iodone(elxHBA_t * phba, ELX_SCSI_BUF_t * elx_cmd)
 			     lnx_cmnd->use_sg, scsi_to_pci_dma_dir(datadir));
 	} else if ((lnx_cmnd->request_bufflen)
 		   && (elx_cmd->OS_io_info.nonsg_phys)) {
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,4,12)
+		pci_unmap_single(plxhba->pcidev,
+				 (uint64_t) ((unsigned long)(elx_cmd->
+							     OS_io_info.
+							     nonsg_phys)),
+				 lnx_cmnd->request_bufflen,
+				 scsi_to_pci_dma_dir(datadir));
+#else
 		pci_unmap_page(plxhba->pcidev,
 			       (uint64_t) ((unsigned long)(elx_cmd->OS_io_info.
 							   nonsg_phys)),
 			       lnx_cmnd->request_bufflen,
 			       scsi_to_pci_dma_dir(datadir));
+#endif
 	}
 
 	elx_free_scsi_buf(elx_cmd);
@@ -2285,8 +2435,27 @@ void
 elx_unblock_requests(elxHBA_t * phba)
 {
 	LINUX_HBA_t *plxhba = (LINUX_HBA_t *) phba->pHbaOSEnv;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+	Scsi_Cmnd *cmnd, *next_cmnd;
+#endif
 	unsigned long iflag;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+	cmnd = plxhba->cmnd_retry_list;
+	plxhba->in_retry = 0;
+	while (cmnd) {
+		next_cmnd = cmnd->reset_chain;
+		cmnd->reset_chain = 0;
+		cmnd->result = ScsiResult(DID_RESET, 0);
+
+		ELX_DRVR_UNLOCK(phba, iflag);
+		cmnd->scsi_done(cmnd);
+		ELX_DRVR_LOCK(phba, iflag);
+
+		cmnd = next_cmnd;
+	}
+	plxhba->cmnd_retry_list = 0;
+#endif
 	iflag = phba->iflag;
 
 	ELX_DRVR_UNLOCK(phba, iflag);

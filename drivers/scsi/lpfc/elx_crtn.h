@@ -57,7 +57,7 @@ int elx_sli_abort_iocb_lun(elxHBA_t *, ELX_SLI_RING_t *, uint16_t, uint64_t);
 int elx_sli_abort_iocb_tgt(elxHBA_t *, ELX_SLI_RING_t *, uint16_t);
 int elx_sli_abort_iocb_hba(elxHBA_t *, ELX_SLI_RING_t *);
 
-int elx_log_chk_msg_disabled(int, msgLogDef *, int *);
+int elx_log_chk_msg_disabled(int, msgLogDef *);
 int elx_printf(void *, ...);
 int elx_printf_log(int, msgLogDef *, void *, ...);
 int elx_str_sprintf(void *, void *, ...);
@@ -88,7 +88,7 @@ uint8_t *elx_malloc(elxHBA_t *, struct mbuf_info *);
 void elx_free(elxHBA_t *, struct mbuf_info *);
 uint32_t elx_hba_init(elxHBA_t *, ELX_MBOXQ_t *);
 int elx_print(char *, void *, void *);
-int elx_printf_log_msgblk(int, msgLogDef *, char *, int);
+int elx_printf_log_msgblk(int, msgLogDef *, char *);
 void elx_sli_wake_iocb_wait(elxHBA_t *, ELX_IOCBQ_t *, ELX_IOCBQ_t *);
 int elx_sli_issue_iocb_wait(elxHBA_t *, ELX_SLI_RING_t *,
 			    ELX_IOCBQ_t *, uint32_t, ELX_IOCBQ_t *, uint32_t);
