@@ -599,7 +599,7 @@ static int __init pci_proc_init(void)
 	if (entry)
 		entry->proc_fops = &proc_bus_pci_dev_operations;
 	proc_initialized = 1;
-	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
+	while ((dev = pci_get_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 		pci_proc_attach_device(dev);
 	}
 	legacy_proc_init();
