@@ -1597,24 +1597,6 @@ config 8139_OLD_RX_RESET
 	  experience problems, you can enable this option to restore the
 	  old RX-reset behavior.  If unsure, say N.
 
-config 8139_RXBUF_IDX
-	int "Receive ring size (0 => 8K, 1 => 16K, 2 => 32K, 3 => 64K)"
-	depends on 8139TOO
-	range 0 3
-	default 1 if EMBEDDED || SH_DREAMCAST
-	default 2
-	help
-	   The 8139too driver has a fixed area of memory for receiving data.
-	   The default value is adequate for most systems. The 64KB 
-	   ring size has hardware issues that may cause problems.
-	   Values:
-		0  => 8 KB 
-		1  => 16 KB embedded systems
-		2  => 32 KB default for most systems
-		3  => 64 KB 
-	   If unsure, use the default 2.
-
-
 config SIS900
 	tristate "SiS 900/7016 PCI Fast Ethernet Adapter support"
 	depends on NET_PCI && PCI

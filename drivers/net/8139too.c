@@ -167,8 +167,12 @@ static int multicast_filter_limit = 32;
 /* bitmapped message enable number */
 static int debug = -1;
 
-/* Ring size is now a config option */
-#define RX_BUF_LEN	(8192 << CONFIG_8139_RXBUF_IDX)
+/*
+ * Receive ring size 
+ * Warning: 64K ring has hardware issues and may lock up.
+ */
+#define RX_BUF_IDX	2	/* 32K ring */
+#define RX_BUF_LEN	(8192 << RX_BUF_IDX)
 #define RX_BUF_PAD	16
 #define RX_BUF_WRAP_PAD 2048 /* spare padding to handle lack of packet wrap */
 
@@ -692,22 +696,22 @@ static const u16 rtl8139_norx_intr_mask =
 	PCIErr | PCSTimeout | RxUnderrun |
 	TxErr | TxOK | RxErr ;
 
-#if CONFIG_8139_RXBUF_IDX == 0
+#if RX_BUF_IDX == 0
 static const unsigned int rtl8139_rx_config =
 	RxCfgRcv8K | RxNoWrap |
 	(RX_FIFO_THRESH << RxCfgFIFOShift) |
 	(RX_DMA_BURST << RxCfgDMAShift);
-#elif CONFIG_8139_RXBUF_IDX == 1
+#elif RX_BUF_IDX == 1
 static const unsigned int rtl8139_rx_config =
 	RxCfgRcv16K | RxNoWrap |
 	(RX_FIFO_THRESH << RxCfgFIFOShift) |
 	(RX_DMA_BURST << RxCfgDMAShift);
-#elif CONFIG_8139_RXBUF_IDX == 2
+#elif RX_BUF_IDX == 2
 static const unsigned int rtl8139_rx_config =
 	RxCfgRcv32K | RxNoWrap |
 	(RX_FIFO_THRESH << RxCfgFIFOShift) |
 	(RX_DMA_BURST << RxCfgDMAShift);
-#elif CONFIG_8139_RXBUF_IDX == 3
+#elif RX_BUF_IDX == 3
 static const unsigned int rtl8139_rx_config =
 	RxCfgRcv64K |
 	(RX_FIFO_THRESH << RxCfgFIFOShift) |
@@ -1911,7 +1915,7 @@ static void rtl8139_rx_err (u32 rx_status, struct net_device *dev,
 #endif
 }
 
-#if CONFIG_8139_RXBUF_IDX == 3
+#if RX_BUF_IDX == 3
 static __inline__ void wrap_copy(struct sk_buff *skb, const unsigned char *ring,
 				 u32 offset, unsigned int size)
 {
@@ -1997,7 +2001,7 @@ static int rtl8139_rx(struct net_device *dev, struct rtl8139_private *tp,
 		if (likely(skb)) {
 			skb->dev = dev;
 			skb_reserve (skb, 2);	/* 16 byte align the IP fields. */
-#if CONFIG_8139_RXBUF_IDX == 3
+#if RX_BUF_IDX == 3
 			wrap_copy(skb, rx_ring, ring_offset+4, pkt_size);
 #else
 			eth_copy_and_sum (skb, &rx_ring[ring_offset + 4], pkt_size, 0);
