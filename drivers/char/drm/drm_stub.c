@@ -57,7 +57,7 @@ static int drm_fill_in_dev(drm_device_t *dev, struct pci_dev *pdev, const struct
 {
 	int retcode;
 
-	dev->count_lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&dev->count_lock);
 	init_timer( &dev->timer );
 	sema_init( &dev->struct_sem, 1 );
 	sema_init( &dev->ctxlist_sem, 1 );
