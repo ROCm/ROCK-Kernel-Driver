@@ -273,6 +273,8 @@ ChangeLog
 
 Note, a technical ChangeLog aimed at kernel hackers is in fs/ntfs/ChangeLog.
 
+2.1.9:
+	- Fix two bugs in handling of corner cases in the decompression engine.
 2.1.8:
 	- Read the $MFT mirror and compare it to the $MFT and if the two do not
 	  match, force a read-only mount and do not allow read-write remounts.

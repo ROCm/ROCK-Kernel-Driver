@@ -19,7 +19,19 @@ ToDo:
 	  sufficient for synchronisation here. We then just need to make sure
 	  ntfs_readpage/writepage/truncate interoperate properly with us.
 
-2.1.8 - Handle $MFT mirror and $LogFile, improve time ihandling, and cleanups.
+2.1.9 - Fix two bugs in decompression engine.
+
+	- Fix a bug where we would not always detect that we have reached the
+	  end of a compression block because we were ending at minus one byte
+	  which is effectively the same as being at the end.  The fix is to
+	  check whether the uncompressed buffer has been fully filled and if so
+	  we assume we have reached the end of the compression block.  A big
+	  thank you to Marcin Gibuła for the bug report, the assistance in
+	  tracking down the bug and testing the fix.
+	- Fix a possible bug where when a compressed read is truncated to the
+	  end of the file, the offset inside the last page was not truncated.
+
+2.1.8 - Handle $MFT mirror and $LogFile, improve time handling, and cleanups.
 
 	- Use get_bh() instead of manual atomic_inc() in fs/ntfs/compress.c.
 	- Modify fs/ntfs/time.c::ntfs2utc(), get_current_ntfs_time(), and
