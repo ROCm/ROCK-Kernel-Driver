@@ -124,6 +124,4 @@ struct rxrpc_ackpacket
 
 } __attribute__((packed));
 
-extern const char *rxrpc_acks[];
-
 #endif /* _LINUX_RXRPC_PACKET_H */

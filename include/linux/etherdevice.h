@@ -37,8 +37,6 @@ extern void		eth_header_cache_update(struct hh_cache *hh, struct net_device *dev
 						unsigned char * haddr);
 extern int		eth_header_cache(struct neighbour *neigh,
 					 struct hh_cache *hh);
-extern int		eth_header_parse(struct sk_buff *skb,
-					 unsigned char *haddr);
 
 extern struct net_device *alloc_etherdev(int sizeof_priv);
 static inline void eth_copy_and_sum (struct sk_buff *dest, 

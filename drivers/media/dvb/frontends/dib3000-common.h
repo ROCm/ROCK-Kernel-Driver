@@ -81,7 +81,7 @@ extern int dib3000_search_status(u16 irq,u16 lock);
 
 #define wr_foreach(a,v) { int i; \
 	if (sizeof(a) != sizeof(v)) \
-		err("sizeof: %d %d is different",sizeof(a),sizeof(v));\
+		err("sizeof: %zd %zd is different",sizeof(a),sizeof(v));\
 	for (i=0; i < sizeof(a)/sizeof(u16); i++) \
 		wr(a[i],v[i]); \
 	}

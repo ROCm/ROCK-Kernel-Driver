@@ -49,9 +49,6 @@
 # define RPCDBG_FACILITY	RPCDBG_AUTH
 #endif
 
-struct xdr_netobj gss_mech_spkm3_oid =
-   {7, "\053\006\001\005\005\001\003"};
-
 static inline int
 get_bytes(char **ptr, const char *end, void *res, int len)
 {
@@ -206,7 +203,7 @@ out_err:
 	return GSS_S_FAILURE;
 }
 
-void
+static void
 gss_delete_sec_context_spkm3(void *internal_ctx) {
 	struct spkm3_ctx *sctx = internal_ctx;
 
@@ -221,7 +218,7 @@ gss_delete_sec_context_spkm3(void *internal_ctx) {
 	kfree(sctx);
 }
 
-u32
+static u32
 gss_verify_mic_spkm3(struct gss_ctx		*ctx,
 			struct xdr_buf		*signbuf,
 			struct xdr_netobj	*checksum,
@@ -241,7 +238,7 @@ gss_verify_mic_spkm3(struct gss_ctx		*ctx,
 	return maj_stat;
 }
 
-u32
+static u32
 gss_get_mic_spkm3(struct gss_ctx	*ctx,
 		     u32		qop,
 		     struct xdr_buf	*message_buffer,

@@ -853,9 +853,7 @@ asmlinkage int solaris_getmsg(unsigned int fd, u32 arg1, u32 arg2, u32 arg3)
 	if(!filp) goto out;
 
 	ino = filp->f_dentry->d_inode;
-	if (!ino) goto out;
-
-	if (!ino->i_sock)
+	if (!ino || !S_ISSOCK(ino->i_mode))
 		goto out;
 
 	ctlptr = (struct strbuf __user *)A(arg1);
@@ -923,7 +921,7 @@ asmlinkage int solaris_putmsg(unsigned int fd, u32 arg1, u32 arg2, u32 arg3)
 	ino = filp->f_dentry->d_inode;
 	if (!ino) goto out;
 
-	if (!ino->i_sock &&
+	if (!S_ISSOCK(ino->i_mode) &&
 		(imajor(ino) != 30 || iminor(ino) != 1))
 		goto out;
 

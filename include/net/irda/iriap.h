@@ -97,21 +97,11 @@ void iriap_close(struct iriap_cb *self);
 int iriap_getvaluebyclass_request(struct iriap_cb *self, 
 				  __u32 saddr, __u32 daddr,
 				  char *name, char *attr);
-void iriap_getvaluebyclass_confirm(struct iriap_cb *self, struct sk_buff *skb);
 void iriap_connect_request(struct iriap_cb *self);
 void iriap_send_ack( struct iriap_cb *self);
 void iriap_call_indication(struct iriap_cb *self, struct sk_buff *skb);
 
 void iriap_register_server(void);
-
-void iriap_watchdog_timer_expired(void *data);
-
-static inline void iriap_start_watchdog_timer(struct iriap_cb *self, 
-					      int timeout) 
-{
-	irda_start_timer(&self->watchdog_timer, timeout, self, 
-			 iriap_watchdog_timer_expired);
-}
 
 #endif
 

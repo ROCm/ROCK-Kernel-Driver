@@ -416,14 +416,6 @@ struct xfrm_algo_desc *xfrm_ealg_get_byidx(unsigned int idx)
 	return &ealg_list[idx];
 }
 
-struct xfrm_algo_desc *xfrm_calg_get_byidx(unsigned int idx)
-{
-	if (idx >= calg_entries())
-		return NULL;
-
-	return &calg_list[idx];
-}
-
 /*
  * Probe for the availability of crypto algorithms, and set the available
  * flag for any algorithms found on the system.  This is typically called by

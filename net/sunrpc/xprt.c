@@ -90,6 +90,8 @@ static struct socket *xprt_create_socket(struct rpc_xprt *, int, int);
 static void	xprt_bind_socket(struct rpc_xprt *, struct socket *);
 static int      __xprt_get_cong(struct rpc_xprt *, struct rpc_task *);
 
+static int	xprt_clear_backlog(struct rpc_xprt *xprt);
+
 #ifdef RPC_DEBUG_DATA
 /*
  * Print the buffer contents (first 128 bytes only--just enough for
@@ -1397,7 +1399,7 @@ xprt_release(struct rpc_task *task)
 /*
  * Set default timeout parameters
  */
-void
+static void
 xprt_default_timeout(struct rpc_timeout *to, int proto)
 {
 	if (proto == IPPROTO_UDP)
@@ -1633,7 +1635,7 @@ xprt_create_proto(int proto, struct sockaddr_in *sap, struct rpc_timeout *to)
 /*
  * Prepare for transport shutdown.
  */
-void
+static void
 xprt_shutdown(struct rpc_xprt *xprt)
 {
 	xprt->shutdown = 1;
@@ -1648,7 +1650,7 @@ xprt_shutdown(struct rpc_xprt *xprt)
 /*
  * Clear the xprt backlog queue
  */
-int
+static int
 xprt_clear_backlog(struct rpc_xprt *xprt) {
 	rpc_wake_up_next(&xprt->backlog);
 	wake_up(&xprt->cong_wait);

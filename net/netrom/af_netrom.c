@@ -43,7 +43,7 @@
 #include <net/arp.h>
 #include <linux/init.h>
 
-int nr_ndevs = 4;
+static int nr_ndevs = 4;
 
 int sysctl_netrom_default_path_quality            = NR_DEFAULT_QUAL;
 int sysctl_netrom_obsolescence_count_initialiser  = NR_DEFAULT_OBS;

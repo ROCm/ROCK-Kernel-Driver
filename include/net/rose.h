@@ -162,7 +162,6 @@ extern int  rose_rx_call_request(struct sk_buff *, struct net_device *, struct r
 extern void rose_destroy_socket(struct sock *);
 
 /* rose_dev.c */
-extern int  rose_rx_ip(struct sk_buff *, struct net_device *);
 extern void  rose_setup(struct net_device *);
 
 /* rose_in.c */
@@ -170,15 +169,10 @@ extern int  rose_process_rx_frame(struct sock *, struct sk_buff *);
 
 /* rose_link.c */
 extern void rose_start_ftimer(struct rose_neigh *);
-extern void rose_start_t0timer(struct rose_neigh *);
 extern void rose_stop_ftimer(struct rose_neigh *);
 extern void rose_stop_t0timer(struct rose_neigh *);
 extern int  rose_ftimer_running(struct rose_neigh *);
-extern int  rose_t0timer_running(struct rose_neigh *);
 extern void rose_link_rx_restart(struct sk_buff *, struct rose_neigh *, unsigned short);
-extern void rose_transmit_restart_request(struct rose_neigh *);
-extern void rose_transmit_restart_confirmation(struct rose_neigh *);
-extern void rose_transmit_diagnostic(struct rose_neigh *, unsigned char);
 extern void rose_transmit_clear_request(struct rose_neigh *, unsigned int, unsigned char, unsigned char);
 extern void rose_transmit_link(struct sk_buff *, struct rose_neigh *);
 
@@ -205,7 +199,6 @@ extern void rose_link_device_down(struct net_device *);
 extern struct net_device *rose_dev_first(void);
 extern struct net_device *rose_dev_get(rose_address *);
 extern struct rose_route *rose_route_free_lci(unsigned int, struct rose_neigh *);
-extern struct net_device *rose_ax25_dev_get(char *);
 extern struct rose_neigh *rose_get_neigh(rose_address *, unsigned char *, unsigned char *);
 extern int  rose_rt_ioctl(unsigned int, void __user *);
 extern void rose_link_failed(ax25_cb *, int);
@@ -220,7 +213,6 @@ extern int  rose_validate_nr(struct sock *, unsigned short);
 extern void rose_write_internal(struct sock *, int);
 extern int  rose_decode(struct sk_buff *, int *, int *, int *, int *, int *);
 extern int  rose_parse_facilities(unsigned char *, struct rose_facilities_struct *);
-extern int  rose_create_facilities(unsigned char *, rose_cb *);
 extern void rose_disconnect(struct sock *, int, int, int);
 
 /* rose_timer.c */

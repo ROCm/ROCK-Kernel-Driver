@@ -133,7 +133,6 @@ void irlap_send_data_secondary_final(struct irlap_cb *, struct sk_buff *);
 void irlap_resend_rejected_frames(struct irlap_cb *, int command);
 void irlap_resend_rejected_frame(struct irlap_cb *self, int command);
 
-void irlap_send_i_frame(struct irlap_cb *, struct sk_buff *, int command);
 void irlap_send_ui_frame(struct irlap_cb *self, struct sk_buff *skb,
 			 __u8 caddr, int command);
 

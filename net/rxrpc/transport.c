@@ -150,16 +150,6 @@ int rxrpc_create_transport(unsigned short port,
 
 /*****************************************************************************/
 /*
- * clear the connections on a transport endpoint
- */
-void rxrpc_clear_transport(struct rxrpc_transport *trans)
-{
-	//struct rxrpc_connection *conn;
-
-} /* end rxrpc_clear_transport() */
-
-/*****************************************************************************/
-/*
  * destroy a transport endpoint
  */
 void rxrpc_put_transport(struct rxrpc_transport *trans)

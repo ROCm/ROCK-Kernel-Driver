@@ -28,16 +28,13 @@
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
 #include <asm/arch/irqs.h>
+#include <asm/arch/mux.h>
 #include <asm/arch/gpio.h>
 #include <asm/mach-types.h>
-#include <asm/arch/serial.h>
 
 #include "common.h"
 
-void h3_init_irq(void)
-{
-	omap_init_irq();
-}
+extern int omap_gpio_init(void);
 
 static int __initdata h3_serial_ports[OMAP_MAX_NR_PORTS] = {1, 1, 1};
 
@@ -48,8 +45,8 @@ static struct resource smc91x_resources[] = {
 		.flags	= IORESOURCE_MEM,
 	},
 	[1] = {
-		.start	= 0,
-		.end	= 0,
+		.start	= OMAP_GPIO_IRQ(40),
+		.end	= OMAP_GPIO_IRQ(40),
 		.flags	= IORESOURCE_IRQ,
 	},
 };
@@ -68,6 +65,23 @@ static struct platform_device *devices[] __initdata = {
 static void __init h3_init(void)
 {
 	(void) platform_add_devices(devices, ARRAY_SIZE(devices));
+}
+
+static void __init h3_init_smc91x(void)
+{
+	omap_cfg_reg(W15_1710_GPIO40);
+	if (omap_request_gpio(40) < 0) {
+		printk("Error requesting gpio 40 for smc91x irq\n");
+		return;
+	}
+	omap_set_gpio_edge_ctrl(40, OMAP_GPIO_FALLING_EDGE);
+}
+
+void h3_init_irq(void)
+{
+	omap_init_irq();
+	omap_gpio_init();
+	h3_init_smc91x();
 }
 
 static void __init h3_map_io(void)

@@ -64,7 +64,7 @@ struct ip_vs_aligned_lock
 } __attribute__((__aligned__(SMP_CACHE_BYTES)));
 
 /* lock array for conn table */
-struct ip_vs_aligned_lock
+static struct ip_vs_aligned_lock
 __ip_vs_conntbl_lock_array[CT_LOCKARRAY_SIZE] __cacheline_aligned;
 
 static inline void ct_read_lock(unsigned key)

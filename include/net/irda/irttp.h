@@ -167,9 +167,6 @@ int irttp_connect_response(struct tsap_cb *self, __u32 max_sdu_size,
 int irttp_disconnect_request(struct tsap_cb *self, struct sk_buff *skb,
 			     int priority);
 void irttp_flow_request(struct tsap_cb *self, LOCAL_FLOW flow);
-void irttp_status_indication(void *instance,
-			     LINK_STATUS link, LOCK_STATUS lock);
-void irttp_flow_indication(void *instance, void *sap, LOCAL_FLOW flow);
 struct tsap_cb *irttp_dup(struct tsap_cb *self, void *instance);
 
 static __inline __u32 irttp_get_saddr(struct tsap_cb *self)

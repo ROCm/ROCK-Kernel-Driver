@@ -566,7 +566,7 @@ void avc_audit(u32 ssid, u32 tsid,
 
 				switch (sk->sk_family) {
 				case AF_INET: {
-					struct inet_opt *inet = inet_sk(sk);
+					struct inet_sock *inet = inet_sk(sk);
 
 					avc_print_ipv4_addr(ab, inet->rcv_saddr,
 							    inet->sport,
@@ -577,7 +577,7 @@ void avc_audit(u32 ssid, u32 tsid,
 					break;
 				}
 				case AF_INET6: {
-					struct inet_opt *inet = inet_sk(sk);
+					struct inet_sock *inet = inet_sk(sk);
 					struct ipv6_pinfo *inet6 = inet6_sk(sk);
 
 					avc_print_ipv6_addr(ab, &inet6->rcv_saddr,

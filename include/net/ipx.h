@@ -139,14 +139,6 @@ static __inline__ void ipxitf_put(struct ipx_interface *intrfc)
 		ipxitf_down(intrfc);
 }
 
-extern void __ipxitf_down(struct ipx_interface *intrfc);
-
-static __inline__ void __ipxitf_put(struct ipx_interface *intrfc)
-{
-	if (atomic_dec_and_test(&intrfc->refcnt))
-		__ipxitf_down(intrfc);
-}
-
 static __inline__ void ipxrtr_hold(struct ipx_route *rt)
 {
 	        atomic_inc(&rt->refcnt);

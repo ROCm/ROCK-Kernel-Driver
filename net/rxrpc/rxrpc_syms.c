@@ -23,7 +23,6 @@ EXPORT_SYMBOL(rxrpc_put_call);
 EXPORT_SYMBOL(rxrpc_call_abort);
 EXPORT_SYMBOL(rxrpc_call_read_data);
 EXPORT_SYMBOL(rxrpc_call_write_data);
-EXPORT_SYMBOL(rxrpc_call_flush);
 
 /* connection.c */
 EXPORT_SYMBOL(rxrpc_create_connection);

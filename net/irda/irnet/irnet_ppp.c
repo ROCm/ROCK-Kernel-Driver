@@ -16,6 +16,12 @@
 #include "irnet_ppp.h"		/* Private header */
 /* Please put other headers in irnet.h - Thanks */
 
+/* Generic PPP callbacks (to call us) */
+static struct ppp_channel_ops irnet_ppp_ops = {
+	.start_xmit = ppp_irnet_send,
+	.ioctl = ppp_irnet_ioctl
+};
+
 /************************* CONTROL CHANNEL *************************/
 /*
  * When a pppd instance is not active on /dev/irnet, it acts as a control
@@ -1095,7 +1101,7 @@ irnet_init(void)
 /*
  * Module exit
  */
-void __exit
+static void __exit
 irnet_cleanup(void)
 {
   irda_irnet_cleanup();

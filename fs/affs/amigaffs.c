@@ -8,14 +8,7 @@
  *  Please send bug reports to: hjw@zvw.de
  */
 
-#include <stdarg.h>
-#include <linux/stat.h>
-#include <linux/time.h>
-#include <linux/affs_fs.h>
-#include <linux/string.h>
-#include <linux/mm.h>
-#include <linux/amigaffs.h>
-#include <linux/buffer_head.h>
+#include "affs.h"
 
 extern struct timezone sys_tz;
 

@@ -591,6 +591,8 @@ source "sound/Kconfig"
 
 source "drivers/usb/Kconfig"
 
+source "drivers/infiniband/Kconfig"
+
 source "drivers/char/watchdog/Kconfig"
 
 source "arch/sparc64/oprofile/Kconfig"

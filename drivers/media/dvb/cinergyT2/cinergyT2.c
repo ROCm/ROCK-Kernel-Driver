@@ -541,7 +541,7 @@ static int cinergyt2_ioctl (struct inode *inode, struct file *file,
 
 	switch (cmd) {
 	case FE_GET_INFO:
-		return copy_to_user((void*) arg, &cinergyt2_fe_info,
+		return copy_to_user((void __user*) arg, &cinergyt2_fe_info,
 				    sizeof(struct dvb_frontend_info));
 
 	case FE_READ_STATUS:
@@ -556,7 +556,7 @@ static int cinergyt2_ioctl (struct inode *inode, struct file *file,
 		if (stat->lock_bits & (1 << 1))
 			status |= FE_HAS_VITERBI;
 
-		return copy_to_user((void *) arg, &status, sizeof(status));
+		return copy_to_user((void  __user*) arg, &status, sizeof(status));
 
 	case FE_READ_BER:
 		return put_user(le32_to_cpu(stat->viterbi_error_rate),
@@ -584,7 +584,7 @@ static int cinergyt2_ioctl (struct inode *inode, struct file *file,
 		if ((file->f_flags & O_ACCMODE) == O_RDONLY)
 			return -EPERM;
 
-		if (copy_from_user(&p, (void *) arg, sizeof(p)))
+		if (copy_from_user(&p, (void  __user*) arg, sizeof(p)))
 			return -EFAULT;
 
 		if (down_interruptible(&cinergyt2->sem))
@@ -624,7 +624,7 @@ static int cinergyt2_ioctl (struct inode *inode, struct file *file,
 		 *  for now we only fill the status field. the parameters
 		 *  are trivial to fill as soon FE_GET_FRONTEND is done.
 		 */
-		struct dvb_frontend_event *e = (void *) arg;
+		struct dvb_frontend_event __user *e = (void __user *) arg;
 		if (cinergyt2->pending_fe_events == 0) {
 			if (file->f_flags & O_NONBLOCK)
 				return -EWOULDBLOCK;

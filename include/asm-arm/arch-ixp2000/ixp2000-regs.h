@@ -98,6 +98,7 @@
 #define	WDT_ENABLE			0x00000001
 #define	TIMER_DIVIDER_256		0x00000008
 #define	TIMER_ENABLE			0x00000080
+#define	IRQ_MASK_TIMER1         	(1 << 4)
 
 /*
  * Interrupt controller registers

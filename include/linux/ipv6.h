@@ -256,32 +256,26 @@ struct raw6_opt {
 
 /* WARNING: don't change the layout of the members in {raw,udp,tcp}6_sock! */
 struct raw6_sock {
-	struct sock	  sk;
-	struct ipv6_pinfo *pinet6;
-	struct inet_opt   inet;
+	struct inet_sock  inet;
 	struct raw6_opt   raw6;
 	struct ipv6_pinfo inet6;
 };
 
 struct udp6_sock {
-	struct sock	  sk;
-	struct ipv6_pinfo *pinet6;
-	struct inet_opt   inet;
+	struct inet_sock  inet;
 	struct udp_opt	  udp;
 	struct ipv6_pinfo inet6;
 };
 
 struct tcp6_sock {
-	struct sock	  sk;
-	struct ipv6_pinfo *pinet6;
-	struct inet_opt   inet;
+	struct inet_sock  inet;
 	struct tcp_opt	  tcp;
 	struct ipv6_pinfo inet6;
 };
 
 static inline struct ipv6_pinfo * inet6_sk(const struct sock *__sk)
 {
-	return ((struct raw6_sock *)__sk)->pinet6;
+	return inet_sk(__sk)->pinet6;
 }
 
 static inline struct raw6_opt * raw6_sk(const struct sock *__sk)

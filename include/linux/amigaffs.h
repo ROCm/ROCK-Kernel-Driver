@@ -2,132 +2,7 @@
 #define AMIGAFFS_H
 
 #include <linux/types.h>
-#include <linux/buffer_head.h>
-#include <linux/string.h>
 #include <asm/byteorder.h>
-
-/* AmigaOS allows file names with up to 30 characters length.
- * Names longer than that will be silently truncated. If you
- * want to disallow this, comment out the following #define.
- * Creating filesystem objects with longer names will then
- * result in an error (ENAMETOOLONG).
- */
-/*#define AFFS_NO_TRUNCATE */
-
-/* Ugly macros make the code more pretty. */
-
-#define GET_END_PTR(st,p,sz)		 ((st *)((char *)(p)+((sz)-sizeof(st))))
-#define AFFS_GET_HASHENTRY(data,hashkey) be32_to_cpu(((struct dir_front *)data)->hashtable[hashkey])
-#define AFFS_BLOCK(sb, bh, blk)		(AFFS_HEAD(bh)->table[AFFS_SB(sb)->s_hashsize-1-(blk)])
-
-static inline void
-affs_set_blocksize(struct super_block *sb, int size)
-{
-	sb_set_blocksize(sb, size);
-}
-static inline struct buffer_head *
-affs_bread(struct super_block *sb, int block)
-{
-	pr_debug("affs_bread: %d\n", block);
-	if (block >= AFFS_SB(sb)->s_reserved && block < AFFS_SB(sb)->s_partition_size)
-		return sb_bread(sb, block);
-	return NULL;
-}
-static inline struct buffer_head *
-affs_getblk(struct super_block *sb, int block)
-{
-	pr_debug("affs_getblk: %d\n", block);
-	if (block >= AFFS_SB(sb)->s_reserved && block < AFFS_SB(sb)->s_partition_size)
-		return sb_getblk(sb, block);
-	return NULL;
-}
-static inline struct buffer_head *
-affs_getzeroblk(struct super_block *sb, int block)
-{
-	struct buffer_head *bh;
-	pr_debug("affs_getzeroblk: %d\n", block);
-	if (block >= AFFS_SB(sb)->s_reserved && block < AFFS_SB(sb)->s_partition_size) {
-		bh = sb_getblk(sb, block);
-		lock_buffer(bh);
-		memset(bh->b_data, 0 , sb->s_blocksize);
-		set_buffer_uptodate(bh);
-		unlock_buffer(bh);
-		return bh;
-	}
-	return NULL;
-}
-static inline struct buffer_head *
-affs_getemptyblk(struct super_block *sb, int block)
-{
-	struct buffer_head *bh;
-	pr_debug("affs_getemptyblk: %d\n", block);
-	if (block >= AFFS_SB(sb)->s_reserved && block < AFFS_SB(sb)->s_partition_size) {
-		bh = sb_getblk(sb, block);
-		wait_on_buffer(bh);
-		set_buffer_uptodate(bh);
-		return bh;
-	}
-	return NULL;
-}
-static inline void
-affs_brelse(struct buffer_head *bh)
-{
-	if (bh)
-		pr_debug("affs_brelse: %lld\n", (long long) bh->b_blocknr);
-	brelse(bh);
-}
-
-static inline void
-affs_adjust_checksum(struct buffer_head *bh, u32 val)
-{
-	u32 tmp = be32_to_cpu(((__be32 *)bh->b_data)[5]);
-	((__be32 *)bh->b_data)[5] = cpu_to_be32(tmp - val);
-}
-static inline void
-affs_adjust_bitmapchecksum(struct buffer_head *bh, u32 val)
-{
-	u32 tmp = be32_to_cpu(((__be32 *)bh->b_data)[0]);
-	((__be32 *)bh->b_data)[0] = cpu_to_be32(tmp - val);
-}
-
-static inline void
-affs_lock_link(struct inode *inode)
-{
-	down(&AFFS_I(inode)->i_link_lock);
-}
-static inline void
-affs_unlock_link(struct inode *inode)
-{
-	up(&AFFS_I(inode)->i_link_lock);
-}
-static inline void
-affs_lock_dir(struct inode *inode)
-{
-	down(&AFFS_I(inode)->i_hash_lock);
-}
-static inline void
-affs_unlock_dir(struct inode *inode)
-{
-	up(&AFFS_I(inode)->i_hash_lock);
-}
-static inline void
-affs_lock_ext(struct inode *inode)
-{
-	down(&AFFS_I(inode)->i_ext_lock);
-}
-static inline void
-affs_unlock_ext(struct inode *inode)
-{
-	up(&AFFS_I(inode)->i_ext_lock);
-}
-
-#ifdef __LITTLE_ENDIAN
-#define BO_EXBITS	0x18UL
-#elif defined(__BIG_ENDIAN)
-#define BO_EXBITS	0x00UL
-#else
-#error Endianness must be known for affs to work.
-#endif
 
 #define FS_OFS		0x444F5300
 #define FS_FFS		0x444F5301
@@ -155,13 +30,6 @@ affs_unlock_ext(struct inode *inode)
 #define ST_LINKDIR	4
 
 #define AFFS_ROOT_BMAPS		25
-
-#define AFFS_HEAD(bh)		((struct affs_head *)(bh)->b_data)
-#define AFFS_TAIL(sb, bh)	((struct affs_tail *)((bh)->b_data+(sb)->s_blocksize-sizeof(struct affs_tail)))
-#define AFFS_ROOT_HEAD(bh)	((struct affs_root_head *)(bh)->b_data)
-#define AFFS_ROOT_TAIL(sb, bh)	((struct affs_root_tail *)((bh)->b_data+(sb)->s_blocksize-sizeof(struct affs_root_tail)))
-#define AFFS_DATA_HEAD(bh)	((struct affs_data_head *)(bh)->b_data)
-#define AFFS_DATA(bh)		(((struct affs_data_head *)(bh)->b_data)->data)
 
 struct affs_date {
 	__be32 days;
