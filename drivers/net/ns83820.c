@@ -1,9 +1,9 @@
-#define _VERSION "0.19"
+#define _VERSION "0.20"
 /* ns83820.c by Benjamin LaHaise with contributions.
  *
  * Questions/comments/discussion to linux-ns83820@kvack.org.
  *
- * $Revision: 1.34.2.20 $
+ * $Revision: 1.34.2.23 $
  *
  * Copyright 2001 Benjamin LaHaise.
  * Copyright 2001, 2002 Red Hat.
@@ -62,6 +62,7 @@
  *			     -	gmii bus probing
  *			     -	fix missed txok introduced during performance
  *				tuning
+ *			0.20 -	fix stupid RFEN thinko.  i am such a smurf.
  *
  * Driver Overview
  * ===============
@@ -1001,7 +1002,6 @@ static void ns83820_cleanup_tx(struct ns83820 *dev)
 					le32_to_cpu(desc[DESC_CMDSTS]) & CMDSTS_LEN_MASK,
 					PCI_DMA_TODEVICE);
 			dev_kfree_skb_irq(skb);
-			dev_kfree_skb(skb);
 			atomic_dec(&dev->nr_tx_skbs);
 		}
 	}
@@ -1524,8 +1524,9 @@ static void ns83820_set_multicast(struct net_device *_dev)
 {
 	struct ns83820 *dev = (void *)_dev;
 	u8 *rfcr = dev->base + RFCR;
-	u32 and_mask = 0xffffffff & ~RFCR_RFEN;
+	u32 and_mask = 0xffffffff;
 	u32 or_mask = 0;
+	u32 val;
 
 	if (dev->net_dev.flags & IFF_PROMISC)
 		or_mask |= RFCR_AAU | RFCR_AAM;
@@ -1538,7 +1539,10 @@ static void ns83820_set_multicast(struct net_device *_dev)
 		and_mask &= ~RFCR_AAM;
 
 	spin_lock_irq(&dev->misc_lock);
-	writel((readl(rfcr) & and_mask) | or_mask, rfcr);
+	val = (readl(rfcr) & and_mask) | or_mask;
+	/* Ramit : RFCR Write Fix doc says RFEN must be 0 modify other bits */
+	writel(val & ~RFCR_RFEN, rfcr);
+	writel(val, rfcr);
 	spin_unlock_irq(&dev->misc_lock);
 }
 
