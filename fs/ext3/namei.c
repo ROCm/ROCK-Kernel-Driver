@@ -1659,7 +1659,7 @@ static int ext3_mknod (struct inode * dir, struct dentry *dentry,
 	struct inode *inode;
 	int err;
 
-	if (!old_valid_dev(rdev))
+	if (!new_valid_dev(rdev))
 		return -EINVAL;
 
 	handle = ext3_journal_start(dir, EXT3_DATA_TRANS_BLOCKS +

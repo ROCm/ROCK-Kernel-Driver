@@ -5,6 +5,8 @@
 
 #define __ARCH_SI_BAND_T long
 
+#define SIGEV_PAD_SIZE ((SIGEV_MAX_SIZE/sizeof(int)) - 4)
+
 #include <asm-generic/siginfo.h>
 
 #endif

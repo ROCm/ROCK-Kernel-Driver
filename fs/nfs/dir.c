@@ -859,7 +859,7 @@ nfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t rdev)
 	dfprintk(VFS, "NFS: mknod(%s/%ld, %s\n", dir->i_sb->s_id,
 		dir->i_ino, dentry->d_name.name);
 
-	if (!old_valid_dev(rdev))
+	if (!new_valid_dev(rdev))
 		return -EINVAL;
 
 	attr.ia_mode = mode;

@@ -117,13 +117,13 @@ static int cp_old_stat(struct kstat *stat, struct __old_kernel_stat __user * sta
 	}
 
 	memset(&tmp, 0, sizeof(struct __old_kernel_stat));
-	tmp.st_dev = stat->dev;
+	tmp.st_dev = old_encode_dev(stat->dev);
 	tmp.st_ino = stat->ino;
 	tmp.st_mode = stat->mode;
 	tmp.st_nlink = stat->nlink;
 	SET_OLDSTAT_UID(tmp, stat->uid);
 	SET_OLDSTAT_GID(tmp, stat->gid);
-	tmp.st_rdev = stat->rdev;
+	tmp.st_rdev = old_encode_dev(stat->rdev);
 #if BITS_PER_LONG == 32
 	if (stat->size > MAX_NON_LFS)
 		return -EOVERFLOW;
@@ -172,14 +172,30 @@ static int cp_new_stat(struct kstat *stat, struct stat __user *statbuf)
 {
 	struct stat tmp;
 
+#if BITS_PER_LONG == 32
+	if (!old_valid_dev(stat->dev) || !old_valid_dev(stat->rdev))
+		return -EOVERFLOW;
+#else
+	if (!new_valid_dev(stat->dev) || !new_valid_dev(stat->rdev))
+		return -EOVERFLOW;
+#endif
+
 	memset(&tmp, 0, sizeof(tmp));
-	tmp.st_dev = stat->dev;
+#if BITS_PER_LONG == 32
+	tmp.st_dev = old_encode_dev(stat->dev);
+#else
+	tmp.st_dev = new_encode_dev(stat->dev);
+#endif
 	tmp.st_ino = stat->ino;
 	tmp.st_mode = stat->mode;
 	tmp.st_nlink = stat->nlink;
 	SET_STAT_UID(tmp, stat->uid);
 	SET_STAT_GID(tmp, stat->gid);
-	tmp.st_rdev = stat->rdev;
+#if BITS_PER_LONG == 32
+	tmp.st_rdev = old_encode_dev(stat->rdev);
+#else
+	tmp.st_rdev = new_encode_dev(stat->rdev);
+#endif
 #if BITS_PER_LONG == 32
 	if (stat->size > MAX_NON_LFS)
 		return -EOVERFLOW;
@@ -263,7 +279,16 @@ static long cp_new_stat64(struct kstat *stat, struct stat64 __user *statbuf)
 	struct stat64 tmp;
 
 	memset(&tmp, 0, sizeof(struct stat64));
-	tmp.st_dev = stat->dev;
+#ifdef CONFIG_MIPS
+	/* mips has weird padding, so we don't get 64 bits there */
+	if (!new_valid_dev(stat->dev) || !new_valid_dev(stat->rdev))
+		return -EOVERFLOW;
+	tmp.st_dev = new_encode_dev(stat->dev);
+	tmp.st_rdev = new_encode_dev(stat->rdev);
+#else
+	tmp.st_dev = huge_encode_dev(stat->dev);
+	tmp.st_rdev = huge_encode_dev(stat->rdev);
+#endif
 	tmp.st_ino = stat->ino;
 #ifdef STAT64_HAS_BROKEN_ST_INO
 	tmp.__st_ino = stat->ino;
@@ -272,7 +297,6 @@ static long cp_new_stat64(struct kstat *stat, struct stat64 __user *statbuf)
 	tmp.st_nlink = stat->nlink;
 	tmp.st_uid = stat->uid;
 	tmp.st_gid = stat->gid;
-	tmp.st_rdev = stat->rdev;
 	tmp.st_atime = stat->atime.tv_sec;
 	tmp.st_atime_nsec = stat->atime.tv_nsec;
 	tmp.st_mtime = stat->mtime.tv_sec;

@@ -16,7 +16,6 @@ typedef int                    __kernel_pid_t;
 typedef int                    __kernel_ipc_pid_t;
 typedef unsigned int           __kernel_uid_t;
 typedef unsigned int           __kernel_gid_t;
-typedef unsigned int           __kernel_dev_t;
 typedef unsigned long          __kernel_ino_t;
 typedef unsigned int           __kernel_mode_t;
 typedef unsigned short         __kernel_umode_t;

@@ -1,6 +1,6 @@
 /*
  * arch/ppc/platforms/powerpmc250.c
- * 
+ *
  * Board setup routines for Force PowerPMC-250 Processor PMC
  *
  * Author: Troy Benjegerdes <tbenjegerdes@mvista.com>
@@ -74,10 +74,10 @@ powerpmc250_setup_arch(void)
 {
 	/* init to some ~sane value until calibrate_delay() runs */
 	loops_per_jiffy = 50000000/HZ;
-	
+
 	/* Lookup PCI host bridges */
 	powerpmc250_find_bridges();
-	
+
 #ifdef CONFIG_BLK_DEV_INITRD
 	if (initrd_start)
 		ROOT_DEV = Root_RAM0;
@@ -155,7 +155,7 @@ unsigned long __init powerpmc250_get_bus_speed(void)
 }
 #endif
 
-static void __init 
+static void __init
 powerpmc250_calibrate_decr(void)
 {
 	unsigned long freq;
@@ -233,7 +233,7 @@ powerpmc250_find_end_of_memory(void)
 	/* yuck, better hope your ram size is a power of 2  -- paulus */
 	powerpmc250_set_bat();
 
-	return mpc10x_get_mem_size(MPC10X_MEM_MAP_B); 
+	return mpc10x_get_mem_size(MPC10X_MEM_MAP_B);
 }
 
 static void __init
@@ -262,10 +262,10 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 		*(char *)(r7 + KERNELBASE) = 0;
 		strcpy(cmd_line, (char *)(r6 + KERNELBASE));
 	}
-	
+
 	isa_io_base = MPC10X_MAPB_ISA_IO_BASE;
 	isa_mem_base = MPC10X_MAPB_ISA_MEM_BASE;
-	pci_dram_offset = MPC10X_MAPB_DRAM_OFFSET;	
+	pci_dram_offset = MPC10X_MAPB_DRAM_OFFSET;
 
 	ppc_md.setup_arch	= powerpmc250_setup_arch;
 	ppc_md.show_cpuinfo	= powerpmc250_show_cpuinfo;
@@ -274,7 +274,7 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 
 	ppc_md.find_end_of_memory = powerpmc250_find_end_of_memory;
 	ppc_md.setup_io_mappings = powerpmc250_map_io;
-	
+
 	ppc_md.restart		= powerpmc250_restart;
 	ppc_md.power_off	= powerpmc250_power_off;
 	ppc_md.halt		= powerpmc250_halt;
@@ -289,7 +289,7 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 
 /*
  * (This used to be arch/ppc/platforms/powerpmc250_pci.c)
- * 
+ *
  * PCI support for Force PowerPMC250
  *
  */
@@ -299,7 +299,7 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 #define DBG(x...) printk(x)
 #else
 #define DBG(x...)
-#endif /* DEBUG */ 
+#endif /* DEBUG */
 
 static inline int __init
 powerpmc250_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin)
@@ -308,7 +308,7 @@ powerpmc250_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin)
 	/*
 	 *      PCI IDSEL/INTPIN->INTLINE
 	 *      A       B       C       D
-	 */ 
+	 */
 	{
 		{17,	0,	0,	0},	/* Device 11 - 82559 */
 		{0,	0,	0,	0},	/* 12 */
@@ -321,7 +321,7 @@ powerpmc250_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin)
 	return PCI_IRQ_TABLE_LOOKUP;
 };
 
-static int                     
+static int
 powerpmc250_exclude_device(u_char bus, u_char devfn)
 {
 	/*
@@ -329,15 +329,15 @@ powerpmc250_exclude_device(u_char bus, u_char devfn)
 	 * device on the PCI Bus, will create an incorrect response and
 	 * later will respond incorrectly to Configuration read coming
 	 * from another device.
-	 * 
+	 *
 	 * The work around is that when doing a PCI Scan one
 	 * should skip its own device number in the scan.
-	 * 
+	 *
 	 * The top IDsel is AD13 and the middle is AD14.
 	 *
 	 * -- Note from force
 	 */
- 
+
 	if ((bus == 0) && (PCI_SLOT(devfn) == 13 || PCI_SLOT(devfn) == 14)) {
 		return PCIBIOS_DEVICE_NOT_FOUND;
 	}
@@ -368,10 +368,10 @@ powerpmc250_find_bridges(void)
 		hose->mem_resources[0].end = 0xffffffff;
 
 		hose->last_busno = pciauto_bus_scan(hose, hose->first_busno);
-	
+
 		/* ppc_md.pcibios_fixup = pcore_pcibios_fixup; */
 		ppc_md.pci_swizzle = common_swizzle;
-		
+
 		ppc_md.pci_exclude_device = powerpmc250_exclude_device;
 		ppc_md.pci_map_irq = powerpmc250_map_irq;
 	} else {

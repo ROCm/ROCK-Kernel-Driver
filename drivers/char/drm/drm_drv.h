@@ -848,7 +848,7 @@ int DRM(release)( struct inode *inode, struct file *filp )
 	 */
 
 	DRM_DEBUG( "pid = %d, device = 0x%lx, open_count = %d\n",
-		   current->pid, (long)dev->device, dev->open_count );
+		   current->pid, (long)old_encode_dev(dev->device), dev->open_count );
 
 	if ( priv->lock_count && dev->lock.hw_lock &&
 	     _DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock) &&
@@ -983,7 +983,7 @@ int DRM(ioctl)( struct inode *inode, struct file *filp,
 	++priv->ioctl_count;
 
 	DRM_DEBUG( "pid=%d, cmd=0x%02x, nr=0x%02x, dev 0x%lx, auth=%d\n",
-		   current->pid, cmd, nr, (long)dev->device, 
+		   current->pid, cmd, nr, (long)old_encode_dev(dev->device), 
 		   priv->authenticated );
 
 	if ( nr >= DRIVER_IOCTL_COUNT ) {

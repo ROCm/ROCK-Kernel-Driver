@@ -37,7 +37,7 @@ fcmpo(u32 *ccr, int crfD, void *frA, void *frB)
 
 	*ccr &= ~(15 << ((7 - crfD) << 2));
 	*ccr |= (cmp << ((7 - crfD) << 2));
- 
+
 #ifdef DEBUG
 	printk("CR: %08x\n", *ccr);
 #endif

@@ -257,13 +257,6 @@ config SERIAL_21285
 	  PCI bridge you can enable its onboard serial port by enabling this
 	  option.
 
-config SERIAL_21285_OLD
-	bool "Use /dev/ttyS0 device (OBSOLETE)"
-	depends on SERIAL_21285=y && OBSOLETE
-	help
-	  Use the old /dev/ttyS name, major 4 minor 64.  This is obsolete
-	  and will be removed during later 2.5 development.
-
 config SERIAL_21285_CONSOLE
 	bool "Console on DC21285 serial port"
 	depends on SERIAL_21285=y

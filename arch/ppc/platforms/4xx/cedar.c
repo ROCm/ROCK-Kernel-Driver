@@ -1,6 +1,6 @@
 /*
  * arch/ppc/platforms/4xx/cedar.c
- * 
+ *
  * Support for the IBM NP405L ceder eval board
  *
  * Author: Armin Kuster <akuster@mvista.com>

@@ -1,6 +1,6 @@
 /*
  * arch/ppc/platforms/prpmc800_serial.h
- * 
+ *
  * Definitions for Motorola MCG PRPMC800 cPCI board support
  *
  * Author: Dale Farnsworth	dale.farnsworth@mvista.com

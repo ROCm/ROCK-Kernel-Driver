@@ -1,6 +1,6 @@
 /*
  * Siemens Card Controller Module specific definitions
- * 
+ *
  * Copyright (C) 2001-2002 Wolfgang Denk (wd@denx.de)
  */
 
@@ -8,7 +8,7 @@
 #define __MACH_CCM_H
 
 #include <linux/config.h>
- 
+
 #include <asm/ppcboot.h>
 
 #define	CCM_IMMR_BASE    0xF0000000	/* phys. addr of IMMR			*/

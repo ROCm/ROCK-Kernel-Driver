@@ -1,6 +1,6 @@
 /*
  * include/asm-ppc/platforms/prpmc800.h
- * 
+ *
  * Definitions for Motorola PrPMC800 board support
  *
  * Author: Dale Farnsworth <dale.farnsworth@mvista.com>

@@ -7,7 +7,7 @@
  *  modify it under the terms of the GNU General Public License
  *  as published by the Free Software Foundation; either version
  *  2 of the License, or (at your option) any later version.
- *  
+ *
  *  Todo: - cleanup some coding horrors in the flash code
  *        - add support for the OF persistent properties
  */
@@ -114,7 +114,7 @@ core99_calc_adler(u8 *buffer)
 	}
 	low  %= 65521UL;
 	high %= 65521UL;
-  
+
 	return (high << 16) | low;
 }
 
@@ -126,7 +126,7 @@ core99_check(u8* datas)
 	if (hdr99->hdr.signature != CORE99_SIGNATURE) {
 #ifdef DEBUG
 		printk("Invalid signature\n");
-#endif		
+#endif
 		return 0;
 	}
 	if (hdr99->hdr.cksum != chrp_checksum(&hdr99->hdr)) {
@@ -148,9 +148,9 @@ static int __pmac
 core99_erase_bank(int bank)
 {
 	int stat, i;
-	
+
 	u8* base = (u8 *)nvram_data + core99_bank*NVRAM_SIZE;
-	
+
 	out_8(base, CORE99_FLASH_CMD_ERASE_SETUP);
 	out_8(base, CORE99_FLASH_CMD_ERASE_CONFIRM);
 	do { stat = in_8(base); }
@@ -172,9 +172,9 @@ static int __pmac
 core99_write_bank(int bank, u8* datas)
 {
 	int i, stat = 0;
-	
+
 	u8* base = (u8 *)nvram_data + core99_bank*NVRAM_SIZE;
-	
+
 	for (i=0; i<NVRAM_SIZE; i++) {
 		out_8(base+i, CORE99_FLASH_CMD_WRITE_SETUP);
 		out_8(base+i, datas[i]);
@@ -193,7 +193,7 @@ core99_write_bank(int bank, u8* datas)
 			printk("nvram: flash write failed !\n");
 			return -ENXIO;
 		}
-	return 0;	
+	return 0;
 }
 
 static void __init
@@ -208,7 +208,7 @@ lookup_partitions(void)
 		nvram_partitions[pmac_nvram_XPRAM] = -1;
 		nvram_partitions[pmac_nvram_NR] = -1;
 		hdr = (struct chrp_header *)buffer;
-	
+
 		offset = 0;
 		buffer[16] = 0;
 		do {
@@ -226,12 +226,12 @@ lookup_partitions(void)
 		nvram_partitions[pmac_nvram_OF] = 0x1800;
 		nvram_partitions[pmac_nvram_XPRAM] = 0x1300;
 		nvram_partitions[pmac_nvram_NR] = 0x1400;
-	}	
+	}
 #ifdef DEBUG
 	printk("nvram: OF partition at 0x%x\n", nvram_partitions[pmac_nvram_OF]);
 	printk("nvram: XP partition at 0x%x\n", nvram_partitions[pmac_nvram_XPRAM]);
 	printk("nvram: NR partition at 0x%x\n", nvram_partitions[pmac_nvram_NR]);
-#endif	
+#endif
 }
 
 void __init
@@ -251,7 +251,7 @@ pmac_nvram_init(void)
 	if (is_core_99) {
 		int i;
 		u32 gen_bank0, gen_bank1;
-		
+
 		if (nvram_naddrs < 1) {
 			printk(KERN_ERR "nvram: no address\n");
 			return;
@@ -299,7 +299,7 @@ void __pmac
 pmac_nvram_update(void)
 {
 	struct core99_header* hdr99;
-	
+
 	if (!is_core_99 || !nvram_data || !nvram_image)
 		return;
 	if (!memcmp(nvram_image, (u8*)nvram_data + core99_bank*NVRAM_SIZE,
@@ -392,10 +392,10 @@ u8 __pmac
 pmac_xpram_read(int xpaddr)
 {
 	int offset = nvram_partitions[pmac_nvram_XPRAM];
-	
+
 	if (offset < 0)
 		return 0;
-		
+
 	return pmac_nvram_read_byte(xpaddr + offset);
 }
 
@@ -403,9 +403,9 @@ void __pmac
 pmac_xpram_write(int xpaddr, u8 data)
 {
 	int offset = nvram_partitions[pmac_nvram_XPRAM];
-	
+
 	if (offset < 0)
 		return;
-		
+
 	pmac_nvram_write_byte(data, xpaddr + offset);
 }

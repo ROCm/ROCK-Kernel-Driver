@@ -5433,7 +5433,7 @@ static struct tty_operations cy_ops = {
     .read_proc = cyclades_get_proc_info,
 };
 
-int __init
+static int __init
 cy_init(void)
 {
   struct cyclades_port  *info;
@@ -5660,13 +5660,10 @@ cy_init(void)
     
 } /* cy_init */
 
-#ifdef MODULE
-void
+static void __exit
 cy_cleanup_module(void)
 {
-    int i;
-    int e1, e2;
-    unsigned long flags;
+    int i, e1;
 
 #ifndef CONFIG_CYZ_INTR
     if (cyz_timeron){
@@ -5702,11 +5699,10 @@ cy_cleanup_module(void)
     }
 } /* cy_cleanup_module */
 
-/* Module entry-points */
 module_init(cy_init);
 module_exit(cy_cleanup_module);
 
-#else /* MODULE */
+#ifndef MODULE
 /* called by linux/init/main.c to parse command line options */
 void
 cy_setup(char *str, int *ints)

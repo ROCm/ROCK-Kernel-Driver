@@ -37,7 +37,6 @@
 #include <asm/ptrace.h>
 
 extern void reset_vc(unsigned int);
-extern struct list_head super_blocks;
 
 /* Whether we react on sysrq keys or just ignore them */
 int sysrq_enabled = 1;

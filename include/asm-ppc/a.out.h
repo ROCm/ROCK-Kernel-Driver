@@ -1,7 +1,7 @@
 #ifndef __PPC_A_OUT_H__
 #define __PPC_A_OUT_H__
 
-/* grabbed from the intel stuff  */   
+/* grabbed from the intel stuff  */
 #define STACK_TOP TASK_SIZE
 
 

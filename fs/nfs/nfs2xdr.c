@@ -122,7 +122,7 @@ xdr_decode_fattr(u32 *p, struct nfs_fattr *fattr)
 	p = xdr_decode_time(p, &fattr->mtime);
 	p = xdr_decode_time(p, &fattr->ctime);
 	fattr->valid |= NFS_ATTR_FATTR;
-	fattr->rdev = old_decode_dev(rdev);
+	fattr->rdev = new_decode_dev(rdev);
 	if (fattr->type == NFCHR && rdev == NFS2_FIFO_DEV) {
 		fattr->type = NFFIFO;
 		fattr->mode = (fattr->mode & ~S_IFMT) | S_IFIFO;

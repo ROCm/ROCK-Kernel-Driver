@@ -194,13 +194,15 @@ static void bfs_put_super(struct super_block *s)
 static int bfs_statfs(struct super_block *s, struct kstatfs *buf)
 {
 	struct bfs_sb_info *info = BFS_SB(s);
+	u64 id = huge_encode_dev(s->s_bdev->bd_dev);
 	buf->f_type = BFS_MAGIC;
 	buf->f_bsize = s->s_blocksize;
 	buf->f_blocks = info->si_blocks;
 	buf->f_bfree = buf->f_bavail = info->si_freeb;
 	buf->f_files = info->si_lasti + 1 - BFS_ROOT_INO;
 	buf->f_ffree = info->si_freei;
-	buf->f_fsid.val[0] = s->s_dev;
+	buf->f_fsid.val[0] = (u32)id;
+	buf->f_fsid.val[1] = (u32)(id >> 32);
 	buf->f_namelen = BFS_NAMELEN;
 	return 0;
 }

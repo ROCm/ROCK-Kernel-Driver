@@ -1,7 +1,7 @@
 /*
  * arch/ppc/kernel/sys_ppc.c
  *
- *  PowerPC version 
+ *  PowerPC version
  *    Copyright (C) 1995-1996 Gary Thomas (gdt@linuxppc.org)
  *
  * Derived from "arch/i386/kernel/sys_i386.c"
@@ -125,7 +125,7 @@ sys_ipc (uint call, int first, int second, int third, void __user *ptr, long fif
 		ret = put_user (raddr, (ulong __user *) third);
 		break;
 		}
-	case SHMDT: 
+	case SHMDT:
 		ret = sys_shmdt ((char __user *)ptr);
 		break;
 	case SHMGET:
@@ -169,7 +169,7 @@ do_mmap2(unsigned long addr, size_t len,
 		if (!(file = fget(fd)))
 			goto out;
 	}
-	
+
 	down_write(&current->mm->mmap_sem);
 	ret = do_mmap_pgoff(file, addr, len, prot, flags, pgoff);
 	up_write(&current->mm->mmap_sem);
@@ -244,7 +244,7 @@ int sys_olduname(struct oldold_utsname __user * name)
 		return -EFAULT;
 	if (!access_ok(VERIFY_WRITE,name,sizeof(struct oldold_utsname)))
 		return -EFAULT;
-  
+
 	down_read(&uts_sem);
 	error = __copy_to_user(&name->sysname,&system_utsname.sysname,__OLD_UTS_LEN);
 	error -= __put_user(0,name->sysname+__OLD_UTS_LEN);

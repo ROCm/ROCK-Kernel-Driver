@@ -396,14 +396,10 @@ static int bvme6000_scc_init(void)
 #endif
 
 
-int vme_scc_init(void)
+static int vme_scc_init(void)
 {
 	int res = -ENODEV;
-	static int called = 0;
 
-	if (called)
-		return res;
-	called = 1;
 #ifdef CONFIG_MVME147_SCC
 	if (MACH_IS_MVME147)
 		res = mvme147_scc_init();
@@ -418,6 +414,8 @@ int vme_scc_init(void)
 #endif
 	return res;
 }
+
+module_init(vme_scc_init);
 
 
 /*---------------------------------------------------------------------------

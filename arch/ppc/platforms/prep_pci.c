@@ -41,7 +41,7 @@ static void Powerplus_Map_Non0(struct pci_dev *);
 /* Used for Motorola to store system config register */
 static unsigned long	*ProcInfo;
 
-/* Tables for known hardware */   
+/* Tables for known hardware */
 
 /* Motorola PowerStackII - Utah */
 static char Utah_pci_IRQ_map[23] __prepdata =
@@ -153,7 +153,7 @@ static char Blackhawk_pci_IRQ_routes[] __prepdata =
    	15,	/* Line 3 */
    	15	/* Line 4 */
 };
-   
+
 /* Motorola Mesquite */
 static char Mesquite_pci_IRQ_map[23] __prepdata =
 {
@@ -269,7 +269,7 @@ static char Raven_pci_IRQ_routes[] __prepdata =
 {
    	0,	/* This is a dummy structure */
 };
-   
+
 /* Motorola MVME16xx */
 static char Genesis_pci_IRQ_map[16] __prepdata =
 {
@@ -299,7 +299,7 @@ static char Genesis_pci_IRQ_routes[] __prepdata =
    	14,	/* Line 3 */
    	15	/* Line 4 */
 };
-   
+
 static char Genesis2_pci_IRQ_map[23] __prepdata =
 {
 	0,	/* Slot 0  - unused */
@@ -772,7 +772,7 @@ raven_init(void)
 	OpenPIC_NumInitSenses = sizeof(prep_openpic_initsenses);
 
 	ppc_md.get_irq = openpic_get_irq;
-	
+
 	/* If raven is present on Motorola store the system config register
 	 * for later use.
 	 */
@@ -948,7 +948,7 @@ prep_route_pci_interrupts(void)
 	unsigned char *ibc_pirq = (unsigned char *)0x80800860;
 	unsigned char *ibc_pcicon = (unsigned char *)0x80800840;
 	int i;
-	
+
 	if ( _prep_type == _PREP_Motorola)
 	{
 		unsigned short irq_mode;
@@ -1021,7 +1021,7 @@ prep_route_pci_interrupts(void)
 		printk("No known machine pci routing!\n");
 		return;
 	}
-	
+
 	/* Set up mapping from slots */
 	for (i = 1;  i <= 4;  i++)
 		ibc_pirq[i-1] = Motherboard_routes[i];
@@ -1042,7 +1042,7 @@ prep_pib_init(void)
 		 * Perform specific configuration for the Via Tech or
 		 * or Winbond PCI-ISA-Bridge part.
 		 */
-		if ((dev = pci_find_device(PCI_VENDOR_ID_VIA, 
+		if ((dev = pci_find_device(PCI_VENDOR_ID_VIA,
 					PCI_DEVICE_ID_VIA_82C586_1, dev))) {
 			/*
 			 * PPCBUG does not set the enable bits
@@ -1140,7 +1140,7 @@ Powerplus_Map_Non0(struct pci_dev *dev)
 	 * the devfn of the bus bridge with secondary inputs, use those.
 	 * Otherwise, assume it's a PMC site and get the interrupt line
 	 * value from the interrupt routing table.
-	 */ 
+	 */
 	if (mot_info[mot_entry].secondary_bridge_devfn) {
 		pbus = dev->bus;
 
@@ -1213,8 +1213,8 @@ prep_pcibios_after_init(void)
 {
 #if 0
 	struct pci_dev *dev;
-	
-	/* If there is a WD 90C, reset the IO BAR to 0x0 (it started that 
+
+	/* If there is a WD 90C, reset the IO BAR to 0x0 (it started that
 	 * way, but the PCI layer relocated it because it thought 0x0 was
 	 * invalid for a BAR).
 	 * If you don't do this, the card's VGA base will be <IO BAR>+0xc0000
@@ -1265,7 +1265,7 @@ prep_find_bridges(void)
 			   PREP_ISA_IO_BASE + 0xcfc);
 
 	printk("PReP architecture\n");
-#ifdef CONFIG_PREP_RESIDUAL	  
+#ifdef CONFIG_PREP_RESIDUAL
 	{
 		PPC_DEVICE *hostbridge;
 
@@ -1279,7 +1279,7 @@ prep_find_bridges(void)
 				3, 0);
 			if(pkt) {
 #define p pkt->L4_Pack.L4_Data.L4_PPCPack
-				setup_indirect_pci(hose, 
+				setup_indirect_pci(hose,
 					ld_le32((unsigned *) (p.PPCData)),
 					ld_le32((unsigned *) (p.PPCData+8)));
 #undef p

@@ -45,7 +45,7 @@
  * ocp_get_num - This determines how many OCP devices of a given
  * device are registered
  * @device: OCP device such as HOST, PCI, GPT, UART, OPB, IIC, GPIO, EMAC, ZMII,
- *  
+ *
  * The routine returns the number that devices which is registered
  */
 unsigned int ocp_get_num(unsigned int device)
@@ -63,11 +63,11 @@ unsigned int ocp_get_num(unsigned int device)
 }
 
 /**
- * ocp_get_dev - get ocp driver pointer for ocp device and instance of it 
+ * ocp_get_dev - get ocp driver pointer for ocp device and instance of it
  * @device: OCP device such as PCI, GPT, UART, OPB, IIC, GPIO, EMAC, ZMII
  * @dev_num: ocp device number whos paddr you want
- *  
- * The routine returns ocp device pointer 
+ *
+ * The routine returns ocp device pointer
  * in list based on device and instance of that device
  *
  */

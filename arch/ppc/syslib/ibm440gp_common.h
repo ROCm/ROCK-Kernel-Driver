@@ -29,17 +29,17 @@ struct ibm440gp_clocks {
 	unsigned int plb;	/* PLBClk */
 	unsigned int opb;	/* OPBClk */
 	unsigned int ebc;	/* PerClk */
-	unsigned int uart;	
+	unsigned int uart;
 };
 
 /*
  * Please, refer to the Figure 13.1 in 440GP user manual
- * 
+ *
  * if internal UART clock is used, ser_clk is ignored
  */
-void ibm440gp_get_clocks(struct ibm440gp_clocks*, unsigned int sys_clk, 
+void ibm440gp_get_clocks(struct ibm440gp_clocks*, unsigned int sys_clk,
 	unsigned int ser_clk) __init;
- 
+
 #endif /* __ASSEMBLY__ */
 #endif /* __PPC_SYSLIB_IBM440GP_COMMON_H */
 #endif /* __KERNEL__ */

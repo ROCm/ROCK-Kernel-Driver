@@ -152,7 +152,7 @@ void timer_interrupt(struct pt_regs * regs)
 		do_IRQ(regs);
 
 	irq_enter();
-	
+
 	while ((next_dec = tb_ticks_per_jiffy - tb_delta(&jiffy_stamp)) < 0) {
 		jiffy_stamp += tb_ticks_per_jiffy;
 		if (!user_mode(regs))
@@ -265,7 +265,7 @@ int do_settimeofday(struct timespec *tv)
 	 * harmful to relatively short timers.
 	 */
 
-	/* This works perfectly on SMP only if the tb are in sync but 
+	/* This works perfectly on SMP only if the tb are in sync but
 	 * guarantees an error < 1 jiffy even if they are off by eons,
 	 * still reasonable when gettimeofday resolution is 1 jiffy.
 	 */
@@ -280,7 +280,7 @@ int do_settimeofday(struct timespec *tv)
 	set_normalized_timespec(&xtime, new_sec, new_nsec);
 	set_normalized_timespec(&wall_to_monotonic, wtm_sec, wtm_nsec);
 
-	/* In case of a large backwards jump in time with NTP, we want the 
+	/* In case of a large backwards jump in time with NTP, we want the
 	 * clock to be updated as soon as the PLL is again in lock.
 	 */
 	last_rtc_update = new_sec - 658;
@@ -313,7 +313,7 @@ void __init time_init(void)
 		tb_to_ns_scale = mulhwu(tb_to_us, 1000 << 10);
 	}
 
-	/* Now that the decrementer is calibrated, it can be used in case the 
+	/* Now that the decrementer is calibrated, it can be used in case the
 	 * clock is stuck, but the fact that we have to handle the 601
 	 * makes things more complex. Repeatedly read the RTC until the
 	 * next second boundary to try to achieve some precision.  If there
@@ -325,7 +325,7 @@ void __init time_init(void)
 		sec = ppc_md.get_rtc_time();
 		elapsed = 0;
 		do {
-			old_stamp = stamp; 
+			old_stamp = stamp;
 			old_sec = sec;
 			stamp = get_native_tbl();
 			if (__USE_RTC() && stamp < old_stamp)

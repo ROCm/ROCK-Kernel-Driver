@@ -2,7 +2,7 @@
  * This file contains the routines for initializing the MMU
  * on the 4xx series of chips.
  *  -- paulus
- * 
+ *
  *  Derived from arch/ppc/mm/init.c:
  *    Copyright (C) 1995-1996 Gary Thomas (gdt@linuxppc.org)
  *
@@ -118,7 +118,7 @@ unsigned long __init mmu_mapin_ram(void)
 		p += LARGE_PAGE_SIZE_16M;
 		s += LARGE_PAGE_SIZE_16M;
 	}
-	
+
 	while (s <= (total_lowmem - LARGE_PAGE_SIZE_4M)) {
 		pmd_t *pmdp;
 		unsigned long val = p | _PMD_SIZE_4M | _PAGE_HWEXEC | _PAGE_HWWRITE;

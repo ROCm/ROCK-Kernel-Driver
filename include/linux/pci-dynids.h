@@ -1,6 +1,6 @@
 /*
  *	PCI defines and function prototypes
- *	Copyright 2003 Dell Computer Corporation
+ *	Copyright 2003 Dell Inc.
  *        by Matt Domsch <Matt_Domsch@dell.com>
  */
 

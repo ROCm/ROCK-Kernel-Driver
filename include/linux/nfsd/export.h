@@ -65,7 +65,7 @@ struct svc_expkey {
 
 	struct auth_domain *	ek_client;
 	int			ek_fsidtype;
-	u32			ek_fsid[2];
+	u32			ek_fsid[3];
 
 	struct svc_export *	ek_export;
 };

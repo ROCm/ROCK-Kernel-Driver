@@ -1108,14 +1108,26 @@ sd_read_cache_type(struct scsi_disk *sdkp, char *diskname,
 	/* cautiously ask */
 	res = sd_do_mode_sense(SRpnt, dbd, modepage, buffer, 4, &data);
 
-	if (scsi_status_is_good(res)) {
-		/* that went OK, now ask for the proper length */
-		len = data.length;
-		if (len > 128)
-			len = 128;
-		res = sd_do_mode_sense(SRpnt, dbd, modepage, buffer,
-				       len, &data);
-	}
+	if (!scsi_status_is_good(res))
+		goto bad_sense;
+
+	/* that went OK, now ask for the proper length */
+	len = data.length;
+
+	/*
+	 * We're only interested in the first three bytes, actually.
+	 * But the data cache page is defined for the first 20.
+	 */
+	if (len < 3)
+		goto bad_sense;
+	if (len > 20)
+		len = 20;
+
+	/* Take headers and block descriptors into account */
+	len += data.header_length + data.block_descriptor_length;
+
+	/* Get the data */
+	res = sd_do_mode_sense(SRpnt, dbd, modepage, buffer, len, &data);
 
 	if (scsi_status_is_good(res)) {
 		const char *types[] = {
@@ -1133,23 +1145,26 @@ sd_read_cache_type(struct scsi_disk *sdkp, char *diskname,
 
 		printk(KERN_NOTICE "SCSI device %s: drive cache: %s\n",
 		       diskname, types[ct]);
-	} else {
-		if ((SRpnt->sr_sense_buffer[0] & 0x70) == 0x70
-		     && (SRpnt->sr_sense_buffer[2] & 0x0f) == ILLEGAL_REQUEST
-		     /* ASC 0x24 ASCQ 0x00: Invalid field in CDB */
-		     && SRpnt->sr_sense_buffer[12] == 0x24
-		     && SRpnt->sr_sense_buffer[13] == 0x00) {
-			printk(KERN_NOTICE "%s: cache data unavailable\n",
-			       diskname);
-		} else {
-			printk(KERN_ERR "%s: asking for cache data failed\n",
-			       diskname);
-		}
-		printk(KERN_ERR "%s: assuming drive cache: write through\n",
-		       diskname);
-		sdkp->WCE = 0;
-		sdkp->RCD = 0;
+
+		return;
 	}
+
+bad_sense:
+	if ((SRpnt->sr_sense_buffer[0] & 0x70) == 0x70
+	     && (SRpnt->sr_sense_buffer[2] & 0x0f) == ILLEGAL_REQUEST
+	     /* ASC 0x24 ASCQ 0x00: Invalid field in CDB */
+	     && SRpnt->sr_sense_buffer[12] == 0x24
+	     && SRpnt->sr_sense_buffer[13] == 0x00) {
+		printk(KERN_NOTICE "%s: cache data unavailable\n",
+		       diskname);
+	} else {
+		printk(KERN_ERR "%s: asking for cache data failed\n",
+		       diskname);
+	}
+	printk(KERN_ERR "%s: assuming drive cache: write through\n",
+	       diskname);
+	sdkp->WCE = 0;
+	sdkp->RCD = 0;
 }
 
 /**

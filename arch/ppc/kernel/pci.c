@@ -69,7 +69,7 @@ struct pci_fixup pcibios_fixups[] = {
 	{ PCI_FIXUP_HEADER,	PCI_ANY_ID,		PCI_ANY_ID,			pcibios_fixup_resources },
 #ifdef CONFIG_PPC_PMAC
 	/* We should add per-machine fixup support in xxx_setup.c or xxx_pci.c */
-	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_TI,	PCI_ANY_ID,			pcibios_fixup_cardbus }, 
+	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_TI,	PCI_ANY_ID,			pcibios_fixup_cardbus },
 #endif /* CONFIG_PPC_PMAC */
  	{ 0 }
 };
@@ -173,7 +173,7 @@ pcibios_fixup_cardbus(struct pci_dev* dev)
 	    	/* Enable PCI interrupt */
 		if (pci_read_config_byte(dev, 0x91, &val) == 0)
 			pci_write_config_byte(dev, 0x91, val | 0x30);
-		/* Disable ISA interrupt mode */	
+		/* Disable ISA interrupt mode */
 		if (pci_read_config_byte(dev, 0x92, &val) == 0)
 			pci_write_config_byte(dev, 0x92, val & ~0x06);
 	}
@@ -185,7 +185,7 @@ pcibios_fixup_cardbus(struct pci_dev* dev)
 		   signal out the MFUNC0 pin */
 		if (pci_read_config_byte(dev, 0x8c, &val) == 0)
 			pci_write_config_byte(dev, 0x8c, (val & ~0x0f) | 2);
-		/* Disable ISA interrupt mode */	
+		/* Disable ISA interrupt mode */
 		if (pci_read_config_byte(dev, 0x92, &val) == 0)
 			pci_write_config_byte(dev, 0x92, val & ~0x06);
 	}
@@ -640,7 +640,7 @@ pcibios_enable_resources(struct pci_dev *dev, int mask)
 		/* Only set up the requested stuff */
 		if (!(mask & (1<<idx)))
 			continue;
-		
+	
 		r = &dev->resource[idx];
 		if (r->flags & IORESOURCE_UNSET) {
 			printk(KERN_ERR "PCI: Device %s not available because of resource collisions\n", pci_name(dev));
@@ -669,7 +669,7 @@ pcibios_alloc_controller(void)
 
 	hose = (struct pci_controller *)alloc_bootmem(sizeof(*hose));
 	memset(hose, 0, sizeof(struct pci_controller));
-	
+
 	*hose_tail = hose;
 	hose_tail = &hose->next;
 
@@ -687,7 +687,7 @@ make_one_node_map(struct device_node* node, u8 pci_bus)
 {
 	int *bus_range;
 	int len;
-	
+
 	if (pci_bus >= pci_bus_count)
 		return;
 	bus_range = (int *) get_property(node, "bus-range", &len);
@@ -697,11 +697,11 @@ make_one_node_map(struct device_node* node, u8 pci_bus)
 		return;
 	}
 	pci_to_OF_bus_map[pci_bus] = bus_range[0];
-	
+
 	for (node=node->child; node != 0;node = node->sibling) {
 		struct pci_dev* dev;
 		unsigned int *class_code, *reg;
-		
+	
 		class_code = (unsigned int *) get_property(node, "class-code", 0);
 		if (!class_code || ((*class_code >> 8) != PCI_CLASS_BRIDGE_PCI &&
 			(*class_code >> 8) != PCI_CLASS_BRIDGE_CARDBUS))
@@ -715,29 +715,29 @@ make_one_node_map(struct device_node* node, u8 pci_bus)
 		make_one_node_map(node, dev->subordinate->number);
 	}
 }
-		
+	
 void __openfirmware
 pcibios_make_OF_bus_map(void)
 {
 	int i;
 	struct pci_controller* hose;
 	u8* of_prop_map;
-	
+
 	pci_to_OF_bus_map = (u8*)kmalloc(pci_bus_count, GFP_KERNEL);
 	if (!pci_to_OF_bus_map) {
 		printk(KERN_ERR "Can't allocate OF bus map !\n");
 		return;
 	}
-	
+
 	/* We fill the bus map with invalid values, that helps
 	 * debugging.
 	 */
 	for (i=0; i<pci_bus_count; i++)
 		pci_to_OF_bus_map[i] = 0xff;
-	
+
 	/* For each hose, we begin searching bridges */
 	for(hose=hose_head; hose; hose=hose->next) {
-		struct device_node* node;		
+		struct device_node* node;	
 		node = (struct device_node *)hose->arch_data;
 		if (!node)
 			continue;
@@ -753,7 +753,7 @@ pcibios_make_OF_bus_map(void)
 			continue;
 		printk("%d -> %d\n", i, pci_to_OF_bus_map[i]);
 	}
-#endif	
+#endif
 }
 
 typedef int (*pci_OF_scan_iterator)(struct device_node* node, void* data);
@@ -762,10 +762,10 @@ static struct device_node* __openfirmware
 scan_OF_pci_childs(struct device_node* node, pci_OF_scan_iterator filter, void* data)
 {
 	struct device_node* sub_node;
-	
+
 	for (; node != 0;node = node->sibling) {
 		unsigned int *class_code;
-		
+	
 		if (filter(node, data))
 			return node;
 
@@ -791,7 +791,7 @@ scan_OF_pci_childs_iterator(struct device_node* node, void* data)
 {
 	unsigned int *reg;
 	u8* fdata = (u8*)data;
-		
+	
 	reg = (unsigned int *) get_property(node, "reg", 0);
 	if (reg && ((reg[0] >> 8) & 0xff) == fdata[1]
 		&& ((reg[0] >> 16) & 0xff) == fdata[0])
@@ -807,7 +807,7 @@ scan_OF_childs_for_device(struct device_node* node, u8 bus, u8 dev_fn)
 	return scan_OF_pci_childs(node, scan_OF_pci_childs_iterator, filter_data);
 }
 
-/* 
+/*
  * Scans the OF tree for a device node matching a PCI device
  */
 struct device_node *
@@ -816,10 +816,10 @@ pci_busdev_to_OF_node(struct pci_bus *bus, int devfn)
 	struct pci_controller *hose;
 	struct device_node *node;
 	int busnr;
-	
+
 	if (!have_of)
 		return NULL;
-		
+	
 	/* Lookup the hose */
 	busnr = bus->number;
 	hose = pci_bus_to_hose(busnr);
@@ -836,7 +836,7 @@ pci_busdev_to_OF_node(struct pci_bus *bus, int devfn)
 		busnr = pci_to_OF_bus_map[busnr];
 	if (busnr == 0xff)
 		return NULL;
-		
+	
 	/* Now, lookup childs of the hose */
 	return scan_OF_childs_for_device(node->child, busnr, devfn);
 }
@@ -875,7 +875,7 @@ find_OF_pci_device_filter(struct device_node* node, void* data)
 	return ((void *)node == data);
 }
 
-/* 
+/*
  * Returns the PCI device matching a given OF node
  */
 int
@@ -884,7 +884,7 @@ pci_device_from_OF_node(struct device_node* node, u8* bus, u8* devfn)
 	unsigned int *reg;
 	struct pci_controller* hose;
 	struct pci_dev* dev = NULL;
-		
+	
 	if (!have_of)
 		return -ENODEV;
 	/* Make sure it's really a PCI device */
@@ -1018,7 +1018,7 @@ void __init
 pci_create_OF_bus_map(void)
 {
 	struct property* of_prop;
-		
+	
 	of_prop = (struct property*) alloc_bootmem(sizeof(struct property) + 256);
 	if (of_prop && find_path_device("/")) {
 		memset(of_prop, -1, sizeof(struct property) + 256);
@@ -1034,13 +1034,13 @@ pci_create_OF_bus_map(void)
 /*
  * This set of routines checks for PCI<->PCI bridges that have closed
  * IO resources and have child devices. It tries to re-open an IO
- * window on them. 
- * 
+ * window on them.
+ *
  * This is a _temporary_ fix to workaround a problem with Apple's OF
  * closing IO windows on P2P bridges when the OF drivers of cards
  * below this bridge don't claim any IO range (typically ATI or
  * Adaptec).
- * 
+ *
  * A more complete fix would be to use drivers/pci/setup-bus.c, which
  * involves a working pcibios_fixup_pbus_ranges(), some more care about
  * ordering when creating the host bus resources, and maybe a few more
@@ -1056,7 +1056,7 @@ do_update_p2p_io_resource(struct pci_bus *bus, int enable_vga)
 	u32 l;
 	u16 w;
 	struct resource res;
-	
+
  	res = *(bus->resource[0]);
 
 	DBG("Remapping Bus %d, bridge: %s\n", bus->number, bridge->name);
@@ -1156,7 +1156,7 @@ do_fixup_p2p_level(struct pci_bus *bus)
 			break;
 	if (parent_io >= 4)
 		return;
-	
+
 	for (ln=bus->children.next; ln != &bus->children; ln=ln->next) {
 		struct pci_bus *b = pci_bus_b(ln);
 		struct pci_dev *d = b->self;
@@ -1174,7 +1174,7 @@ do_fixup_p2p_level(struct pci_bus *bus)
 		 */
 		if (tmp_res.start == 0)
 			tmp_res.start = 0x1000;
-		
+	
 		if (!list_empty(&b->devices) && res && res->flags == 0 &&
 		    res != bus->resource[parent_io] &&
 		    (d->class >> 8) == PCI_CLASS_BRIDGE_PCI &&
@@ -1203,7 +1203,7 @@ do_fixup_p2p_level(struct pci_bus *bus)
 			*res = tmp_res;
 			res->flags = IORESOURCE_IO;
 			res->name = b->name;
-			
+		
 			/* Find a resource in the parent where we can allocate */
 			for (i = 0 ; i < 4; i++) {
 				struct resource *r = bus->resource[i];
@@ -1214,7 +1214,7 @@ do_fixup_p2p_level(struct pci_bus *bus)
 				DBG("Trying to allocate from %08lx, size %08lx from parent"
 				    " res %d: %08lx -> %08lx\n",
 					res->start, res->end, i, r->start, r->end);
-				
+			
 				if (allocate_resource(r, res, res->end + 1, res->start, max,
 				    res->end + 1, NULL, NULL) < 0) {
 					DBG("Failed !\n");
@@ -1403,7 +1403,7 @@ int pcibios_enable_device(struct pci_dev *dev, int mask)
 	if (ppc_md.pcibios_enable_device_hook)
 		if (ppc_md.pcibios_enable_device_hook(dev, 0))
 			return -EINVAL;
-			
+		
 	pci_read_config_word(dev, PCI_COMMAND, &cmd);
 	old_cmd = cmd;
 	for (idx=0; idx<6; idx++) {
@@ -1670,7 +1670,7 @@ sys_pciconfig_iobase(long which, unsigned long bus, unsigned long devfn)
 
 	if (!hose)
 		return -ENODEV;
-	
+
 	switch (which) {
 	case IOBASE_BRIDGE_NUMBER:
 		return (long)hose->first_busno;

@@ -1,7 +1,7 @@
 #ifndef __PPC_IPC_H__
 #define __PPC_IPC_H__
 
-/* 
+/*
  * These are used to wrap system calls on PowerPC.
  *
  * See arch/ppc/kernel/syscalls.c for ugly details..

@@ -44,7 +44,7 @@
 static void beech_ebc_setup(void);
 static void beech_fpga_setup(void);
 
-/* 
+/*
    Beech board physical memory map:
 
    Main Memory (Initialized by the BIOS)
@@ -64,19 +64,19 @@ static void beech_fpga_setup(void);
    Touch Panel Controller     0xEF600A00
    DES Controller             0xEF600B00
 
-   
+
    EBC Space: (Mapped virtual = physical in ppc4xx_map_io(); EBC setup
                for PCMCIA left to 4xx_pccf)
    Space             EBC Bank    Physical Addresses  EBC Base Address
    =========================================================================
 
-   PCMCIA (32 MB)        x       F0000000 - F1FFFFFF  F0000000 
+   PCMCIA (32 MB)        x       F0000000 - F1FFFFFF  F0000000
 
    Expansion             2       F8000000 - F8FFFFFF  F8000000
    Linux Flash (16 MB)           F9000000 - F9FFFFFF
 
    NVRAM (32 KB)         1       FFE00000 - FFE07FFF  FFE00000
-   
+
 
    Ethernet(I/O)	 1	 FFE20300 - FFE2030F  FFE00000
            (MEM)	 	 FFE40000 - FFE40FFF
@@ -161,7 +161,7 @@ beech_ebc_setup(void)
 	   speed = 8 cycle access with 2 turnaround cycles (30 ns).
 
 	   These parameters will work for the SRAM as well, which is a 70 ns
-	   part. 
+	   part.
 
 	   NB: IBM BIOS sets this bank to burst, however bursting will never
 	   happen in Linux because this region is mapped non-cacheable and
@@ -181,7 +181,7 @@ beech_ebc_setup(void)
 
 	/*  EBC bank 1 is used for many purposes: NVRAM, Ethernet, and FPGA
 	   registers. This is a 1 MB, 16-bit bank. The access parameters must
-	   handle the worst case of all of the devices. 
+	   handle the worst case of all of the devices.
 
 	   The Ethernet chip needs 20 ns setup of the addresses to the I/O
 	   write signal (generated from the chip select), a minimum 150 ns

@@ -152,7 +152,7 @@ static inline int entry_matches(struct ppc_plt_entry *entry, Elf32_Addr val)
 
 /* Set up a trampoline in the PLT to bounce us to the distant function */
 static uint32_t do_plt_call(void *location,
-			    Elf32_Addr val, 
+			    Elf32_Addr val,
 			    Elf32_Shdr *sechdrs,
 			    struct module *mod)
 {
@@ -217,7 +217,7 @@ int apply_relocate_add(Elf32_Shdr *sechdrs,
 			/* Low half of the symbol */
 			*(uint16_t *)location = value;
 			break;
-			
+		
 		case R_PPC_ADDR16_HA:
 			/* Sign-adjusted lower 16 bits: PPC ELF ABI says:
 			   (((x >> 16) + ((x & 0x8000) ? 1 : 0))) & 0xFFFF.
@@ -237,7 +237,7 @@ int apply_relocate_add(Elf32_Shdr *sechdrs,
 			       value, (uint32_t)location);
 			DEBUGP("Location before: %08X.\n",
 			       *(uint32_t *)location);
-			*(uint32_t *)location 
+			*(uint32_t *)location
 				= (*(uint32_t *)location & ~0x03fffffc)
 				| ((value - (uint32_t)location)
 				   & 0x03fffffc);

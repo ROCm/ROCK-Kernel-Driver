@@ -1,10 +1,10 @@
 /*
  * include/asm-ppc/platforms/powerpmc250.h
- * 
+ *
  * Definitions for Force PowerPMC-250 board support
  *
  * Author: Troy Benjegerdes <tbenjegerdes@mvista.com>
- * 
+ *
  * Borrowed heavily from prpmc750.h by Matt Porter <mporter@mvista.com>
  *
  * 2001 (c) MontaVista, Software, Inc.  This file is licensed under

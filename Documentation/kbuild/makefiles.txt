@@ -256,7 +256,7 @@ more details, with real examples.
 
 	Example:
 		#fs/Makefile
-		obj-$(CONfIG_EXT2_FS) += ext2/
+		obj-$(CONFIG_EXT2_FS) += ext2/
 
 	If CONFIG_EXT2_FS is set to either 'y' (built-in) or 'm' (modular)
 	the corresponding obj- variable will be set, and kbuild will descend

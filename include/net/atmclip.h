@@ -67,7 +67,15 @@ struct atm_clip_ops {
 };
 
 void atm_clip_ops_set(struct atm_clip_ops *);
+#if defined(CONFIG_ATM_CLIP) || defined(CONFIG_ATM_CLIP_MODULE)
 int try_atm_clip_ops(void);
+#else
+static inline int try_atm_clip_ops(void)
+{
+	return 0;
+}
+#endif
+
 
 extern struct neigh_table *clip_tbl_hook;
 extern struct atm_clip_ops *atm_clip_ops;

@@ -1,7 +1,7 @@
 /*
  * FILE NAME: ocp-probe.c
  *
- * BRIEF MODULE DESCRIPTION: 
+ * BRIEF MODULE DESCRIPTION:
  * Device scanning & bus set routines
  * Based on drivers/pci/probe, Copyright (c) 1997--1999 Martin Mares
  *
@@ -57,7 +57,7 @@ ocp_setup_dev(struct ocp_def *odef, unsigned int index)
 	dev->current_state = 4;
 
 	sprintf(dev->name, "OCP device %04x:%04x", dev->vendor, dev->device);
-	
+
 	DBG("%s %s 0x%lx irq:%d pm:0x%lx \n", dev->slot_name, dev->name,
 	    (unsigned long) dev->paddr, dev->irq, dev->pm);
 

@@ -10,10 +10,10 @@ the original).
 
 Supported Cards/Chipsets
 -------------------------
-	Dell Computer Corporation PERC 2 Quad Channel
-	Dell Computer Corporation PERC 2/Si
-	Dell Computer Corporation PERC 3/Si
-	Dell Computer Corporation PERC 3/Di
+	Dell PERC 2 Quad Channel
+	Dell PERC 2/Si
+	Dell PERC 3/Si
+	Dell PERC 3/Di
 	HP NetRAID-4M
 	ADAPTEC 2120S
 	ADAPTEC 2200S

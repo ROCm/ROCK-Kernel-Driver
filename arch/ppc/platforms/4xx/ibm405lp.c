@@ -55,12 +55,12 @@ struct ocp_def core_ocp[]  __initdata = {
 
 #ifdef CONFIG_PM
 /* Set up the 405LP clock and power management unit for aggressive power
-   management.  
+   management.
 
    Briefly, there are 3 CPM "classes":
 
    Class 1 - Either completely asleep or awake.  The "force" state is
-             equivalent to the "enabled" state.  Many Class 1 units are 
+             equivalent to the "enabled" state.  Many Class 1 units are
              critical system components and are never power managed.
 
    Class 2 - Can be enabled for power management, where sleep requests are
@@ -69,20 +69,20 @@ struct ocp_def core_ocp[]  __initdata = {
 	     awaken the unit whenever it is targeted with a transaction.
 
    Class 3 - Can be enabled for power management, where sleep requests are
-             made by the CPM.  Power management for these units typically 
+             made by the CPM.  Power management for these units typically
              will require intelligence in a device driver.
 
    In the current implementation, the "force" bits are only used on Class 1
    devices, and only when the associated driver has the intelligence necessary
    to "unforce" the power management state.  A previous scheme, which tried to
    enable power management based on whether a particular driver was compiled
-   with the kernel, caused many problems and is never used here.  
+   with the kernel, caused many problems and is never used here.
 
    Class 2 devices with timeouts are normally initialized for the most
    aggressive values.  There is no power management benefit of "forcing" Class
    2 devices over letting their inactivity timeouts take effect.  Therefore,
    after being set up here, Class 2 device drivers don't need to worry about
-   CPM.  
+   CPM.
 
    No Class 3 devices are handled yet.  */
 
@@ -123,7 +123,7 @@ ibm405lp_setup_cpm(void)
 	enable |= IBM_CPM_DMA;
 
 	/* BRG - Class 2.  Seems to crash the system when enabled in 405LP Pass
-	   1 
+	   1
 
 	   DCP (CodePack) - Class 2.  The semantics of the sleep delay are not
 	   documented. We'll use 32 (what the heck). */
@@ -188,7 +188,7 @@ ibm405lp_setup_cpm(void)
 	mtdcri(DCRN_SLA0, SLPMD, sla0_slpmd.reg);
 	enable |= IBM_CPM_SLA;
 
-	/* CSI  - Class 1.  
+	/* CSI  - Class 1.
 	   TPC  - Class 1.
 	   TDES - Class 1.
 

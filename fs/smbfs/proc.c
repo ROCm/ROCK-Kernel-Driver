@@ -2112,6 +2112,9 @@ void smb_decode_unix_basic(struct smb_fattr *fattr, char *p)
 		__u64 minor = LVAL(p, 68);
 
 		fattr->f_rdev = MKDEV(major & 0xffffffff, minor & 0xffffffff);
+		if (MAJOR(fattr->f_rdev) != (major & 0xffffffff) ||
+		    MINOR(fattr->f_rdev) != (minor & 0xffffffff))
+			fattr->f_rdev = 0;
 	}
 	fattr->f_mode |= LVAL(p, 84);
 }

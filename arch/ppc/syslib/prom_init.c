@@ -434,9 +434,14 @@ setup_disp_fake_bi(ihandle dp)
 	if (strcmp(name, "valkyrie") == 0)
 		address += 0x1000;
 
+#ifdef CONFIG_POWER4
+	extern int boot_text_mapped;
 	btext_setup_display(width, height, depth, pitch, address);
-
+	boot_text_mapped = 0;
+#else
+	btext_setup_display(width, height, depth, pitch, address);
 	btext_prepare_BAT();
+#endif
 #endif /* CONFIG_BOOTX_TEXT */
 }
 
@@ -644,6 +649,72 @@ prom_hold_cpus(unsigned long mem)
 	}
 }
 
+#ifdef CONFIG_POWER4
+/*
+ * Set up a hash table with a set of entries in it to map the
+ * first 64MB of RAM.  This is used on 64-bit machines since
+ * some of them don't have BATs.
+ * We assume the PTE will fit in the primary PTEG.
+ */
+
+static inline void make_pte(unsigned long htab, unsigned int hsize,
+			    unsigned int va, unsigned int pa, int mode)
+{
+	unsigned int *pteg;
+	unsigned int hash, i, vsid;
+
+	vsid = ((va >> 28) * 0x111) << 12;
+	hash = ((va ^ vsid) >> 5) & 0x7fff80;
+	pteg = (unsigned int *)(htab + (hash & (hsize - 1)));
+	for (i = 0; i < 8; ++i, pteg += 4) {
+		if ((pteg[1] & 1) == 0) {
+			pteg[1] = vsid | ((va >> 16) & 0xf80) | 1;
+			pteg[3] = pa | mode;
+			break;
+		}
+	}
+}
+
+extern unsigned long _SDR1;
+extern PTE *Hash;
+extern unsigned long Hash_size;
+
+static void __init
+prom_alloc_htab(void)
+{
+	unsigned int hsize;
+	unsigned long htab;
+	unsigned int addr;
+
+	/*
+	 * Because of OF bugs we can't use the "claim" client
+	 * interface to allocate memory for the hash table.
+	 * This code is only used on 64-bit PPCs, and the only
+	 * 64-bit PPCs at the moment are RS/6000s, and their
+	 * OF is based at 0xc00000 (the 12M point), so we just
+	 * arbitrarily use the 0x800000 - 0xc00000 region for the
+	 * hash table.
+	 *  -- paulus.
+	 */
+	hsize = 4 << 20;	/* POWER4 has no BATs */
+	htab = (8 << 20);
+	call_prom("claim", 3, 1, htab, hsize, 0);
+	Hash = (void *)(htab + KERNELBASE);
+	Hash_size = hsize;
+	_SDR1 = htab + __ilog2(hsize) - 18;
+
+	/*
+	 * Put in PTEs for the first 64MB of RAM
+	 */
+	cacheable_memzero((void *)htab, hsize);
+	for (addr = 0; addr < 0x4000000; addr += 0x1000)
+		make_pte(htab, hsize, addr + KERNELBASE, addr,
+			 _PAGE_ACCESSED | _PAGE_COHERENT | PP_RWXX);
+	make_pte(htab, hsize, 0x80013000, 0x80013000,
+		 _PAGE_ACCESSED | _PAGE_NO_CACHE | _PAGE_GUARDED | PP_RWXX);
+}
+#endif /* CONFIG_POWER4 */
+
 static void __init
 prom_instantiate_rtas(void)
 {
@@ -745,6 +816,13 @@ prom_init(int r3, int r4, prom_entry pp)
 
 	prom_instantiate_rtas();
 
+#ifdef CONFIG_POWER4
+	/*
+	 * Find out how much memory we have and allocate a
+	 * suitably-sized hash table.
+	 */
+	prom_alloc_htab();
+#endif
 	mem = check_display(mem);
 
 	prom_print("copying OF device tree...");

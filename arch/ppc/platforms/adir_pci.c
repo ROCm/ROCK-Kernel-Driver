@@ -1,6 +1,6 @@
 /*
  * arch/ppc/platforms/adir_pci.c
- * 
+ *
  * PCI support for SBS Adirondack
  *
  * By Michael Sokolov <msokolov@ivan.Harhan.ORG>
@@ -74,7 +74,7 @@ adir_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin)
 	if (!hose->index) {
 		static char pci_irq_table[][4] =
 		/*
-		 *             PCI IDSEL/INTPIN->INTLINE 
+		 *             PCI IDSEL/INTPIN->INTLINE
 		 *             A          B          C          D
 		 */
 		{
@@ -89,7 +89,7 @@ adir_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin)
 	} else {
 		static char pci_irq_table[][4] =
 		/*
-		 *             PCI IDSEL/INTPIN->INTLINE 
+		 *             PCI IDSEL/INTPIN->INTLINE
 		 *             A          B          C          D
 		 */
 		{
@@ -112,7 +112,7 @@ adir_pcibios_fixup_resources(struct pci_dev *dev)
 
 	if ((dev->vendor == PCI_VENDOR_ID_IBM) &&
 			(dev->device == PCI_DEVICE_ID_IBM_CPC710_PCI64))
-	{	
+	{
 		DBG("Fixup CPC710 resources\n");
 		for (i=0; i<DEVICE_COUNT_RESOURCE; i++)
 		{
@@ -132,7 +132,7 @@ adir_pcibios_fixup_resources(struct pci_dev *dev)
  * procedure to hang the system, we have no choice but to introduce this hack
  * of knowingly avoiding device numbers > 21 on PCI0,
  */
-static int                     
+static int
 adir_exclude_device(u_char bus, u_char devfn)
 {
 	if ((bus == 0) && (PCI_SLOT(devfn) > 21))

@@ -1,6 +1,6 @@
 /*
  * include/asm-ppc/platforms/powerpmc250_serial.h
- * 
+ *
  * Motorola PrPMC750 serial support
  *
  * Author: Troy Benjegerdes <tbenjegerdes@mvista.com>

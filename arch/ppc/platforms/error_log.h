@@ -45,7 +45,7 @@
 #define TYPE_ECC_UNCORR		0x09
 #define TYPE_ECC_CORR		0x0a
 #define TYPE_EPOW		0x40
-/* I don't add PowerMGM events right now, this is a different topic */ 
+/* I don't add PowerMGM events right now, this is a different topic */
 #define TYPE_PMGM_POWER_SW_ON	0x60
 #define TYPE_PMGM_POWER_SW_OFF	0x61
 #define TYPE_PMGM_LID_OPEN	0x62

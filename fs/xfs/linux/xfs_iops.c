@@ -113,7 +113,11 @@ linvfs_mknod(
 	xattr_exists_t	test_default_acl = _ACL_DEFAULT_EXISTS;
 	int		error;
 
-	if (!old_valid_dev(rdev))
+	/*
+	 * Irix uses Missed'em'V split, but doesn't want to see
+	 * the upper 5 bits of (14bit) major.
+	 */
+	if (!sysv_valid_dev(rdev) || MAJOR(rdev) & ~0x1ff)
 		return -EINVAL;
 
 	if (test_default_acl && test_default_acl(dvp)) {
@@ -135,7 +139,7 @@ linvfs_mknod(
 
 	switch (mode & S_IFMT) {
 	case S_IFCHR: case S_IFBLK: case S_IFIFO: case S_IFSOCK:
-		va.va_rdev = XFS_MKDEV(MAJOR(rdev), MINOR(rdev));
+		va.va_rdev = sysv_encode_dev(rdev);
 		va.va_mask |= XFS_AT_RDEV;
 		/*FALLTHROUGH*/
 	case S_IFREG:

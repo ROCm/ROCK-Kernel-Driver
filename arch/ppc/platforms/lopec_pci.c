@@ -1,6 +1,6 @@
 /*
  * arch/ppc/platforms/lopec_pci.c
- * 
+ *
  * PCI setup routines for the Motorola LoPEC.
  *
  * Author: Dan Cox

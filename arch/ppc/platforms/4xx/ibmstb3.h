@@ -56,7 +56,7 @@
 #endif
 
  /* UART 0 is duped here so when the SICC is the default console
-  * then ttys1 is configured properly - armin 
+  * then ttys1 is configured properly - armin
   */
 
 #define UART1_INT		20

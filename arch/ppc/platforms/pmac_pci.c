@@ -1,6 +1,6 @@
 /*
  * Support for PCI bridges found on Power Macintoshes.
- * 
+ *
  * This includes support for bandit, chaos, grackle (motorola
  * MPC106), and uninorth
  *
@@ -51,7 +51,7 @@ fixup_one_level_bus_range(struct device_node *node, int higher)
 {
 	for (; node != 0;node = node->sibling) {
 		int * bus_range;
-		unsigned int *class_code;			
+		unsigned int *class_code;		
 		int len;
 
 		/* For PCI<->PCI bridges or CardBus bridges, we go down */
@@ -71,7 +71,7 @@ fixup_one_level_bus_range(struct device_node *node, int higher)
 
 /* This routine fixes the "bus-range" property of all bridges in the
  * system since they tend to have their "last" member wrong on macs
- * 
+ *
  * Note that the bus numbers manipulated here are OF bus numbers, they
  * are not Linux bus numbers.
  */
@@ -80,8 +80,8 @@ fixup_bus_range(struct device_node *bridge)
 {
 	int * bus_range;
 	int len;
-	
-	/* Lookup the "bus-range" property for the hose */		
+
+	/* Lookup the "bus-range" property for the hose */	
 	bus_range = (int *) get_property(bridge, "bus-range", &len);
 	if (bus_range == NULL || len < 2 * sizeof(int)) {
 		printk(KERN_WARNING "Can't get bus-range for %s\n",
@@ -93,11 +93,11 @@ fixup_bus_range(struct device_node *bridge)
 
 /*
  * Apple MacRISC (UniNorth, Bandit, Chaos) PCI controllers.
- * 
+ *
  * The "Bandit" version is present in all early PCI PowerMacs,
  * and up to the first ones using Grackle. Some machines may
  * have 2 bandit controllers (2 PCI busses).
- * 
+ *
  * "Chaos" is used in some "Bandit"-type machines as a bridge
  * for the separate display bus. It is accessed the same
  * way as bandit, but cannot be probed for devices. It therefore
@@ -118,19 +118,19 @@ fixup_bus_range(struct device_node *bridge)
 	|(((unsigned long)(devfn)) << 8) \
 	|(((unsigned long)(off)) & 0xFCUL) \
 	|1UL)
-	
+
 static unsigned int __pmac
 macrisc_cfg_access(struct pci_controller* hose, u8 bus, u8 dev_fn, u8 offset)
 {
 	unsigned int caddr;
-	
+
 	if (bus == hose->first_busno) {
 		if (dev_fn < (11 << 3))
 			return 0;
 		caddr = MACRISC_CFA0(dev_fn, offset);
 	} else
 		caddr = MACRISC_CFA1(bus, dev_fn, offset);
-	
+
 	/* Uninorth will return garbage if we don't read back the value ! */
 	do {
 		out_le32(hose->cfg_addr, caddr);
@@ -263,7 +263,7 @@ init_bandit(struct pci_controller *bp)
 	out_le32(bp->cfg_addr, (1UL << BANDIT_DEVNUM) + PCI_VENDOR_ID);
 	udelay(2);
 	vendev = in_le32((volatile unsigned int *)bp->cfg_data);
-	if (vendev == (PCI_DEVICE_ID_APPLE_BANDIT << 16) + 
+	if (vendev == (PCI_DEVICE_ID_APPLE_BANDIT << 16) +
 			PCI_VENDOR_ID_APPLE) {
 		/* read the revision id */
 		out_le32(bp->cfg_addr,
@@ -311,17 +311,17 @@ init_p2pbridge(void)
 	if (pci_device_from_OF_node(p2pbridge, &bus, &devfn) < 0) {
 #ifdef DEBUG
 		printk("Can't find PCI infos for PCI<->PCI bridge\n");
-#endif		
+#endif	
 		return;
 	}
-	/* Warning: At this point, we have not yet renumbered all busses. 
+	/* Warning: At this point, we have not yet renumbered all busses.
 	 * So we must use OF walking to find out hose
 	 */
 	hose = pci_find_hose_for_OF_device(p2pbridge);
 	if (!hose) {
 #ifdef DEBUG
 		printk("Can't find hose for PCI<->PCI bridge\n");
-#endif		
+#endif	
 		return;
 	}
 	if (early_read_config_word(hose, bus, devfn,
@@ -435,7 +435,7 @@ add_bridges(struct device_node *dev)
 	char* disp_name;
 	int *bus_range;
 	int first = 1, primary;
-	
+
 	for (; dev != NULL; dev = dev->next) {
 		addr = (struct reg_property *) get_property(dev, "reg", &len);
 		if (addr == NULL || len < sizeof(*addr)) {
@@ -448,7 +448,7 @@ add_bridges(struct device_node *dev)
 			printk(KERN_WARNING "Can't get bus-range for %s, assume bus 0\n",
 				       dev->full_name);
 		}
-		
+	
 		hose = pcibios_alloc_controller();
 		if (!hose)
 			continue;
@@ -478,8 +478,8 @@ add_bridges(struct device_node *dev)
 #ifdef DEBUG
 		printk(" ->Hose at 0x%08lx, cfg_addr=0x%08lx,cfg_data=0x%08lx\n",
 			hose, hose->cfg_addr, hose->cfg_data);
-#endif		
-		
+#endif	
+	
 		/* Interpret the "ranges" property */
 		/* This also maps the I/O region and sets isa_io/mem_base */
 		pci_process_bridge_OF_ranges(hose, dev, primary);
@@ -493,9 +493,9 @@ add_bridges(struct device_node *dev)
 
 static void __init
 pcibios_fixup_OF_interrupts(void)
-{	
+{
 	struct pci_dev* dev = NULL;
-	
+
 	/*
 	 * Open Firmware often doesn't initialize the
 	 * PCI_INTERRUPT_LINE config register properly, so we
@@ -540,19 +540,19 @@ pmac_pci_enable_device_hook(struct pci_dev *dev, int initial)
 
 	uninorth_child = node->parent &&
 		device_is_compatible(node->parent, "uni-north");
-		
+	
 	/* Firewire & GMAC were disabled after PCI probe, the driver is
 	 * claiming them, we must re-enable them now.
 	 */
-	if (uninorth_child && !strcmp(node->name, "firewire") && 
-	    (device_is_compatible(node, "pci106b,18") || 
+	if (uninorth_child && !strcmp(node->name, "firewire") &&
+	    (device_is_compatible(node, "pci106b,18") ||
 	     device_is_compatible(node, "pci106b,30") ||
 	     device_is_compatible(node, "pci11c1,5811"))) {
 		pmac_call_feature(PMAC_FTR_1394_CABLE_POWER, node, 0, 1);
 		pmac_call_feature(PMAC_FTR_1394_ENABLE, node, 0, 1);
 		updatecfg = 1;
 	}
-	if (uninorth_child && !strcmp(node->name, "ethernet") && 
+	if (uninorth_child && !strcmp(node->name, "ethernet") &&
 	    device_is_compatible(node, "gmac")) {
 		pmac_call_feature(PMAC_FTR_GMAC_ENABLE, node, 0, 1);
 		updatecfg = 1;
@@ -560,14 +560,14 @@ pmac_pci_enable_device_hook(struct pci_dev *dev, int initial)
 
 	if (updatecfg) {
 		u16 cmd;
-		
+	
 		/*
 		 * Make sure PCI is correctly configured
 		 *
 		 * We use old pci_bios versions of the function since, by
 		 * default, gmac is not powered up, and so will be absent
-		 * from the kernel initial PCI lookup. 
-		 * 
+		 * from the kernel initial PCI lookup.
+		 *
 		 * Should be replaced by 2.4 new PCI mecanisms and really
 		 * regiser the device.
 		 */
@@ -577,7 +577,7 @@ pmac_pci_enable_device_hook(struct pci_dev *dev, int initial)
     		pci_write_config_byte(dev, PCI_LATENCY_TIMER, 16);
     		pci_write_config_byte(dev, PCI_CACHE_LINE_SIZE, 8);
 	}
-	
+
 	return 0;
 }
 
@@ -594,12 +594,12 @@ pmac_pcibios_after_init(void)
 
 	/* OF fails to initialize IDE controllers on macs
 	 * (and maybe other machines)
-	 * 
+	 *
 	 * Ideally, this should be moved to the IDE layer, but we need
 	 * to check specifically with Andre Hedrick how to do it cleanly
 	 * since the common IDE code seem to care about the fact that the
 	 * BIOS may have disabled a controller.
-	 * 
+	 *
 	 * -- BenH
 	 */
 	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {

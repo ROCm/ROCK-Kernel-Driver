@@ -19,35 +19,13 @@
 /* Set EXTENT bits starting at BASE in BITMAP to value TURN_ON. */
 static void set_bitmap(unsigned long *bitmap, unsigned int base, unsigned int extent, int new_value)
 {
-	unsigned long mask;
-	unsigned long *bitmap_base = bitmap + (base / BITS_PER_LONG);
-	unsigned int low_index = base & (BITS_PER_LONG-1);
-	int length = low_index + extent;
-
-	if (low_index != 0) {
-		mask = (~0UL << low_index);
-		if (length < BITS_PER_LONG)
-			mask &= ~(~0UL << length);
+	int i;
 		if (new_value)
-			*bitmap_base++ |= mask;
+		for (i = base; i < base + extent; i++) 
+			__set_bit(i, bitmap); 
 		else
-			*bitmap_base++ &= ~mask;
-		length -= BITS_PER_LONG;
-	}
-
-	mask = (new_value ? ~0UL : 0UL);
-	while (length >= BITS_PER_LONG) {
-		*bitmap_base++ = mask;
-		length -= BITS_PER_LONG;
-	}
-
-	if (length > 0) {
-		mask = ~(~0UL << length);
-		if (new_value)
-			*bitmap_base++ |= mask;
-		else
-			*bitmap_base++ &= ~mask;
-	}
+		for (i = base; i < base + extent; i++) 
+			clear_bit(i, bitmap); 
 }
 
 

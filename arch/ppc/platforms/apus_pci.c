@@ -33,7 +33,7 @@
 #define DPRINTK(a,b...)	printk(KERN_DEBUG "apus_pci: %s: " a, __FUNCTION__ , ## b)
 #else
 #define DPRINTK(a,b...)
-#endif 
+#endif
 
 /*
  * The _DEFINITIVE_ memory mapping/unmapping functions.
@@ -147,9 +147,9 @@ static void __init apus_pcibios_fixup_bus(struct pci_bus *bus)
 }
 
 
-/* 
+/*
  * This is from pm2fb.c again
- * 
+ *
  * Check if PCI (B/CVisionPPC) is available, initialize it and set up
  * the pcibios_* pointers
  */

@@ -231,7 +231,9 @@ ifneq ($(findstring s,$(MAKEFLAGS)),)
   quiet=silent_
 endif
 
-export quiet Q KBUILD_VERBOSE
+check_gcc = $(shell if $(CC) $(CFLAGS) $(1) -S -o /dev/null -xc /dev/null > /dev/null 2>&1; then echo "$(1)"; else echo "$(2)"; fi ;)
+
+export quiet Q KBUILD_VERBOSE check_gcc
 
 # Look for make include files relative to root of kernel src
 MAKEFLAGS += --include-dir=$(srctree)
@@ -429,6 +431,9 @@ endif
 ifdef CONFIG_DEBUG_INFO
 CFLAGS		+= -g
 endif
+
+# warn about C99 declaration after statement
+CFLAGS += $(call check_gcc,-Wdeclaration-after-statement,)
 
 #
 # INSTALL_PATH specifies where to place the updated kernel and system map

@@ -47,9 +47,11 @@ static inline void extent_copy(efs_extent *src, efs_extent *dst) {
 	return;
 }
 
-void efs_read_inode(struct inode *inode) {
+void efs_read_inode(struct inode *inode)
+{
 	int i, inode_index;
 	dev_t device;
+	u32 rdev;
 	struct buffer_head *bh;
 	struct efs_sb_info    *sb = SUPER_INFO(inode->i_sb);
 	struct efs_inode_info *in = INODE_INFO(inode);
@@ -104,20 +106,15 @@ void efs_read_inode(struct inode *inode) {
 		inode->i_blocks = ((inode->i_size - 1) >> EFS_BLOCKSIZE_BITS) + 1;
 	}
 
-	/*
-	 * BUG: irix dev_t is 32-bits. linux dev_t is only 16-bits.
-	 *
-	 * apparently linux will change to 32-bit dev_t sometime during
-	 * linux 2.3.
-	 *
-	 * as is, this code maps devices that can't be represented in
-	 * 16-bits (ie major > 255 or minor > 255) to major = minor = 255.
-	 *
-	 * during 2.3 when 32-bit dev_t become available, we should test
-	 * to see whether odev contains 65535. if this is the case then we
-	 * should then do device = be32_to_cpu(efs_inode->di_u.di_dev.ndev).
-	 */
-    	device = old_decode_dev(be16_to_cpu(efs_inode->di_u.di_dev.odev));
+	rdev = be16_to_cpu(efs_inode->di_u.di_dev.odev);
+	if (rdev == 0xffff) {
+		rdev = be32_to_cpu(efs_inode->di_u.di_dev.ndev);
+		if (sysv_major(rdev) > 0xfff)
+			device = 0;
+		else
+			device = MKDEV(sysv_major(rdev), sysv_minor(rdev));
+	} else
+		device = old_decode_dev(rdev);
 
 	/* get the number of extents for this object */
 	in->numextents = be16_to_cpu(efs_inode->di_numextents);

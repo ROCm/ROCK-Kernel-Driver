@@ -47,10 +47,10 @@ struct pci_controller {
 	int first_busno;
 	int last_busno;
 	int bus_offset;
-        
+
 	void *io_base_virt;
 	unsigned long io_base_phys;
-	
+
 	/* Some machines (PReP) have a non 1:1 mapping of
 	 * the PCI memory space in the CPU bus space
 	 */
@@ -107,7 +107,7 @@ extern unsigned char common_swizzle(struct pci_dev *, unsigned char *);
  *   break this piece out separately.
  */
 static inline unsigned char bridge_swizzle(unsigned char pin,
-		unsigned char idsel) 
+		unsigned char idsel)
 {
 	return (((pin-1) + idsel) % 4) + 1;
 }

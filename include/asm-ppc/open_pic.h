@@ -6,7 +6,7 @@
  *  This file is subject to the terms and conditions of the GNU General Public
  *  License.  See the file COPYING in the main directory of this archive
  *  for more details.
- *  
+ *
  */
 
 #ifndef _PPC_KERNEL_OPEN_PIC_H
@@ -54,9 +54,9 @@ extern void smp_openpic_message_pass(int target, int msg, unsigned long data,
 
 extern inline int openpic_to_irq(int irq)
 {
-	/* IRQ 0 usually means 'disabled'.. don't mess with it 
-	 * exceptions to this (sandpoint maybe?) 
-	 * shouldn't use openpic_to_irq 
+	/* IRQ 0 usually means 'disabled'.. don't mess with it
+	 * exceptions to this (sandpoint maybe?)
+	 * shouldn't use openpic_to_irq
 	 */
 	if (irq != 0){
 		return irq += NUM_8259_INTERRUPTS;

@@ -1,6 +1,6 @@
 /*
  * arch/ppc/boot/common/misc-common.c
- * 
+ *
  * Misc. bootloader code (almost) all platforms can use
  *
  * Author: Johnnie Peters <jpeters@mvista.com>
@@ -75,7 +75,7 @@ void pause(void)
 void exit(void)
 {
 	puts("exit\n");
-	while(1); 
+	while(1);
 }
 
 int tstc(void)
@@ -103,7 +103,7 @@ int getc(void)
 	}
 }
 
-void 
+void
 putc(const char c)
 {
 	int x,y;
@@ -130,7 +130,7 @@ putc(const char c)
 			x--;
 		}
 	} else {
-		vidmem [ ( x + cols * y ) * 2 ] = c; 
+		vidmem [ ( x + cols * y ) * 2 ] = c;
 		if ( ++x >= cols ) {
 			x = 0;
 			if ( ++y >= lines ) {
@@ -171,7 +171,7 @@ void puts(const char *s)
 		    x--;
 		  }
 		} else {
-			vidmem [ ( x + cols * y ) * 2 ] = c; 
+			vidmem [ ( x + cols * y ) * 2 ] = c;
 			if ( ++x >= cols ) {
 				x = 0;
 				if ( ++y >= lines ) {
@@ -200,7 +200,7 @@ void error(char *x)
 void *zalloc(void *x, unsigned items, unsigned size)
 {
 	void *p = avail_ram;
-	
+
 	size *= items;
 	size = (size + 7) & -8;
 	avail_ram += size;
@@ -227,7 +227,7 @@ void gunzip(void *dst, int dstlen, unsigned char *src, int *lenp)
 {
 	z_stream s;
 	int r, i, flags;
-	
+
 	/* skip header */
 	i = 10;
 	flags = src[3];
@@ -249,7 +249,7 @@ void gunzip(void *dst, int dstlen, unsigned char *src, int *lenp)
 		puts("gunzip: ran out of data in header\n");
 		exit();
 	}
-	
+
 	s.zalloc = zalloc;
 	s.zfree = zfree;
 	r = inflateInit2(&s, -MAX_WBITS);

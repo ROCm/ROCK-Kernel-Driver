@@ -153,8 +153,9 @@
  * is less than 512 (PAGE_SIZE<<3), but greater than 256.
  */
 
-#define BUFCTL_END 0xffffFFFF
-#define	SLAB_LIMIT 0xffffFFFE
+#define BUFCTL_END	0xffffFFFF
+#define BUFCTL_FREE	0xffffFFFE
+#define	SLAB_LIMIT	0xffffFFFD
 typedef unsigned int kmem_bufctl_t;
 
 /* Max number of objs-per-slab for caches which use off-slab slabs.
@@ -1727,40 +1728,23 @@ static inline void check_slabp(kmem_cache_t *cachep, struct slab *slabp)
 	/* Check slab's freelist to see if this obj is there. */
 	for (i = slabp->free; i != BUFCTL_END; i = slab_bufctl(slabp)[i]) {
 		entries++;
-		BUG_ON(entries > cachep->num);
-		BUG_ON(i < 0 || i >= cachep->num);
+		if (entries > cachep->num || i < 0 || i >= cachep->num)
+			goto bad;
 	}
-	BUG_ON(entries != cachep->num - slabp->inuse);
+	if (entries != cachep->num - slabp->inuse) {
+		int i;
+bad:
+		printk(KERN_ERR "slab: Internal list corruption detected in cache '%s'(%d), slabp %p(%d). Hexdump:\n",
+				cachep->name, cachep->num, slabp, slabp->inuse);
+		for (i=0;i<sizeof(slabp)+cachep->num*sizeof(kmem_bufctl_t);i++) {
+			if ((i%16)==0)
+				printk("\n%03x:", i);
+			printk(" %02x", ((unsigned char*)slabp)[i]);
+		}
+		printk("\n");
+		BUG();
+	}
 #endif
-}
-
-static inline void * cache_alloc_one_tail (kmem_cache_t *cachep,
-						struct slab *slabp)
-{
-	void *objp;
-
-	check_spinlock_acquired(cachep);
-
-	STATS_INC_ALLOCED(cachep);
-	STATS_INC_ACTIVE(cachep);
-	STATS_SET_HIGH(cachep);
-
-	/* get obj pointer */
-	slabp->inuse++;
-	objp = slabp->s_mem + slabp->free*cachep->objsize;
-	slabp->free=slab_bufctl(slabp)[slabp->free];
-
-	return objp;
-}
-
-static inline void cache_alloc_listfixup(struct kmem_list3 *l3, struct slab *slabp)
-{
-	list_del(&slabp->list);
-	if (slabp->free == BUFCTL_END) {
-		list_add(&slabp->list, &l3->slabs_full);
-	} else {
-		list_add(&slabp->list, &l3->slabs_partial);
-	}
 }
 
 static void* cache_alloc_refill(kmem_cache_t* cachep, int flags)
@@ -1811,11 +1795,31 @@ retry:
 
 		slabp = list_entry(entry, struct slab, list);
 		check_slabp(cachep, slabp);
-		while (slabp->inuse < cachep->num && batchcount--)
-			ac_entry(ac)[ac->avail++] =
-				cache_alloc_one_tail(cachep, slabp);
+		check_spinlock_acquired(cachep);
+		while (slabp->inuse < cachep->num && batchcount--) {
+			kmem_bufctl_t next;
+			STATS_INC_ALLOCED(cachep);
+			STATS_INC_ACTIVE(cachep);
+			STATS_SET_HIGH(cachep);
+
+			/* get obj pointer */
+			ac_entry(ac)[ac->avail++] = slabp->s_mem + slabp->free*cachep->objsize;
+
+			slabp->inuse++;
+			next = slab_bufctl(slabp)[slabp->free];
+#if DEBUG
+			slab_bufctl(slabp)[slabp->free] = BUFCTL_FREE;
+#endif
+		       	slabp->free = next;
+		}
 		check_slabp(cachep, slabp);
-		cache_alloc_listfixup(l3, slabp);
+
+		/* move slabp to correct slabp list: */
+		list_del(&slabp->list);
+		if (slabp->free == BUFCTL_END)
+			list_add(&slabp->list, &l3->slabs_full);
+		else
+			list_add(&slabp->list, &l3->slabs_partial);
 	}
 
 must_grow:
@@ -1939,6 +1943,13 @@ static void free_block(kmem_cache_t *cachep, void **objpp, int nr_objects)
 		list_del(&slabp->list);
 		objnr = (objp - slabp->s_mem) / cachep->objsize;
 		check_slabp(cachep, slabp);
+#if DEBUG
+		if (slab_bufctl(slabp)[objnr] != BUFCTL_FREE) {
+			printk(KERN_ERR "slab: double free detected in cache '%s', objp %p.\n",
+						cachep->name, objp);
+			BUG();
+		}
+#endif
 		slab_bufctl(slabp)[objnr] = slabp->free;
 		slabp->free = objnr;
 		STATS_DEC_ACTIVE(cachep);
