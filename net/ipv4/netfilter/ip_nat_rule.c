@@ -181,7 +181,7 @@ static int ipt_snat_checkentry(const char *tablename,
 		return 0;
 	}
 
-	if (targinfosize != sizeof(struct ip_nat_multi_range_compat)) {
+	if (targinfosize != IPT_ALIGN(sizeof(struct ip_nat_multi_range_compat))) {
 		DEBUGP("SNAT: Target size %u wrong for %u ranges\n",
 		       targinfosize, mr->rangesize);
 		return 0;
@@ -214,7 +214,7 @@ static int ipt_dnat_checkentry(const char *tablename,
 		return 0;
 	}
 
-	if (targinfosize != sizeof(struct ip_nat_multi_range_compat)) {
+	if (targinfosize != IPT_ALIGN(sizeof(struct ip_nat_multi_range_compat))) {
 		DEBUGP("DNAT: Target size %u wrong for %u ranges\n",
 		       targinfosize, mr->rangesize);
 		return 0;

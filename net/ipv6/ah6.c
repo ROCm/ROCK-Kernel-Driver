@@ -375,7 +375,7 @@ static int ah6_init_state(struct xfrm_state *x, void *args)
 	 * we need for AH processing.  This lookup cannot fail here
 	 * after a successful crypto_alloc_tfm().
 	 */
-	aalg_desc = xfrm_aalg_get_byname(x->aalg->alg_name);
+	aalg_desc = xfrm_aalg_get_byname(x->aalg->alg_name, 0);
 	BUG_ON(!aalg_desc);
 
 	if (aalg_desc->uinfo.auth.icv_fullbits/8 !=

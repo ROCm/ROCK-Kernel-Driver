@@ -11,8 +11,8 @@ void vlan_proc_cleanup (void);
 
 #define vlan_proc_init()	(0)
 #define vlan_proc_cleanup()	do {} while(0)
-#define vlan_proc_add_dev(dev)	((void)(dev), 0)
-#define vlan_proc_rem_dev(dev)	((void)(dev), 0)
+#define vlan_proc_add_dev(dev)	({(void)(dev), 0;})
+#define vlan_proc_rem_dev(dev)	({(void)(dev), 0;})
 
 #endif
 

@@ -113,6 +113,7 @@ static int tun_net_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	/* Queue packet */
 	skb_queue_tail(&tun->readq, skb);
+	dev->trans_start = jiffies;
 
 	/* Notify and wake up reader process */
 	if (tun->flags & TUN_FASYNC)
@@ -259,6 +260,7 @@ static __inline__ ssize_t tun_get_user(struct tun_struct *tun, struct iovec *iv,
 		skb->ip_summed = CHECKSUM_UNNECESSARY;
  
 	netif_rx_ni(skb);
+	tun->dev->last_rx = jiffies;
    
 	tun->stats.rx_packets++;
 	tun->stats.rx_bytes += len;

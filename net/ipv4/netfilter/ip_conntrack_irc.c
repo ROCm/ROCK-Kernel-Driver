@@ -209,9 +209,14 @@ static int help(struct sk_buff **pskb,
 			DEBUGP("tcph->seq = %u\n", th->seq);
 			seq = ntohl(th->seq) + (addr_beg_p - ib_ptr);
 
+			/* We refer to the reverse direction ("!dir")
+			 * tuples here, because we're expecting
+			 * something in the other * direction.
+			 * Doesn't matter unless NAT is happening.  */
 			exp->tuple = ((struct ip_conntrack_tuple)
 				{ { 0, { 0 } },
-				  { ct->tuplehash[dir].tuple.src.ip, { .tcp = { htons(dcc_port) } },
+				  { ct->tuplehash[!dir].tuple.dst.ip,
+				    { .tcp = { htons(dcc_port) } },
 				    IPPROTO_TCP }});
 			exp->mask = ((struct ip_conntrack_tuple)
 				{ { 0, { 0 } },

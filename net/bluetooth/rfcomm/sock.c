@@ -117,8 +117,13 @@ static void rfcomm_sk_state_change(struct rfcomm_dlc *d, int err)
 
 	bh_unlock_sock(sk);
 
-	if (parent && sk->sk_zapped)
+	if (parent && sk->sk_zapped) {
+		/* We have to drop DLC lock here, otherwise
+		 * rfcomm_sock_destruct() will dead lock. */
+		rfcomm_dlc_unlock(d);
 		rfcomm_sock_kill(sk);
+		rfcomm_dlc_lock(d);
+	}
 }
 
 /* ---- Socket functions ---- */
@@ -184,7 +189,7 @@ static void rfcomm_sock_destruct(struct sock *sk)
 
 	rfcomm_dlc_lock(d);
 	rfcomm_pi(sk)->dlc = NULL;
-	
+
 	/* Detach DLC if it's owned by this socket */
 	if (d->owner == sk)
 		d->owner = NULL;
