@@ -14,6 +14,7 @@
 #include <linux/delay.h>	/* for mdelay() */
 #include <linux/interrupt.h>	/* for in_interrupt() */
 #include <linux/list.h>		/* for struct list_head */
+#include <linux/kref.h>		/* for struct kref */
 #include <linux/device.h>	/* for struct device */
 #include <linux/fs.h>		/* for struct file_operations */
 #include <linux/completion.h>	/* for struct completion */
@@ -731,8 +732,8 @@ typedef void (*usb_complete_t)(struct urb *, struct pt_regs *);
 struct urb
 {
 	/* private, usb core and host controller only fields in the urb */
+	struct kref kref;		/* reference count of the URB */
 	spinlock_t lock;		/* lock for the URB */
-	atomic_t count;			/* reference count of the URB */
 	void *hcpriv;			/* private data for host controller */
 	struct list_head urb_list;	/* list pointer to all active urbs */
 	int bandwidth;			/* bandwidth for INT/ISO request */
