@@ -690,7 +690,7 @@ unsigned int ata_scsiop_inq_std(struct ata_scsi_args *args, u8 *rbuf,
 		0,
 		0x5,	/* claim SPC-3 version compatibility */
 		2,
-		96 - 4
+		95 - 4
 	};
 
 	/* set scsi removeable (RMB) bit per ata bit */
@@ -701,7 +701,7 @@ unsigned int ata_scsiop_inq_std(struct ata_scsi_args *args, u8 *rbuf,
 
 	memcpy(rbuf, hdr, sizeof(hdr));
 
-	if (buflen > 36) {
+	if (buflen > 35) {
 		memcpy(&rbuf[8], "ATA     ", 8);
 		ata_dev_id_string(dev, &rbuf[16], ATA_ID_PROD_OFS, 16);
 		ata_dev_id_string(dev, &rbuf[32], ATA_ID_FW_REV_OFS, 4);
