@@ -85,23 +85,6 @@ void __set_irq_handler(unsigned int irq, irq_handler_t, int);
 void set_irq_chip(unsigned int irq, struct irqchip *);
 void set_irq_flags(unsigned int irq, unsigned int flags);
 
-#ifdef not_yet
-/*
- * This is to be used by the top-level machine IRQ decoder only.
- */
-static inline void call_irq(struct pt_regs *regs, unsigned int irq)
-{
-	struct irqdesc *desc = irq_desc + irq;
-
-	spin_lock(&irq_controller_lock);
-	desc->handle(irq, desc, regs);
-	spin_unlock(&irq_controller_lock);
-
-	if (softirq_pending(smp_processor_id()))
-		do_softirq();
-}
-#endif
-
 #define IRQF_VALID	(1 << 0)
 #define IRQF_PROBE	(1 << 1)
 #define IRQF_NOAUTOEN	(1 << 2)
