@@ -151,7 +151,7 @@
 #include <asm/timex.h>
 
 
-#define VERSION  "pktgen v2.57: Packet Generator for packet performance testing.\n"
+#define VERSION  "pktgen v2.58: Packet Generator for packet performance testing.\n"
 
 /* #define PG_DEBUG(a) a */
 #define PG_DEBUG(a) 
@@ -811,6 +811,7 @@ static int proc_if_write(struct file *file, const char __user *user_buffer,
         struct pktgen_dev *pkt_dev = (struct pktgen_dev*)(data);
         char* pg_result = NULL;
         int tmp = 0;
+	char buf[128];
         
         pg_result = &(pkt_dev->result[0]);
         
@@ -1071,7 +1072,6 @@ static int proc_if_write(struct file *file, const char __user *user_buffer,
 		return count;
 	}
 	if (!strcmp(name, "dst_min") || !strcmp(name, "dst")) {
-                char buf[IP_NAME_SZ];
 		len = strn_len(&user_buffer[i], sizeof(pkt_dev->dst_min) - 1);
                 if (len < 0) { return len; }
 
@@ -1091,7 +1091,6 @@ static int proc_if_write(struct file *file, const char __user *user_buffer,
 		return count;
 	}
 	if (!strcmp(name, "dst_max")) {
-                char buf[IP_NAME_SZ];
 		len = strn_len(&user_buffer[i], sizeof(pkt_dev->dst_max) - 1);
                 if (len < 0) { return len; }
 
@@ -1112,9 +1111,7 @@ static int proc_if_write(struct file *file, const char __user *user_buffer,
 		return count;
 	}
 	if (!strcmp(name, "dst6")) {
-                char buf[128];
-
-		len = strn_len(&user_buffer[i], 128 - 1);
+		len = strn_len(&user_buffer[i], sizeof(buf) - 1);
                 if (len < 0) return len; 
 
 		pkt_dev->flags |= F_IPV6;
@@ -1136,9 +1133,7 @@ static int proc_if_write(struct file *file, const char __user *user_buffer,
 		return count;
 	}
 	if (!strcmp(name, "dst6_min")) {
-                char buf[128];
-
-		len = strn_len(&user_buffer[i], 128 - 1);
+		len = strn_len(&user_buffer[i], sizeof(buf) - 1);
                 if (len < 0) return len; 
 
 		pkt_dev->flags |= F_IPV6;
@@ -1159,9 +1154,7 @@ static int proc_if_write(struct file *file, const char __user *user_buffer,
 		return count;
 	}
 	if (!strcmp(name, "dst6_max")) {
-                char buf[128];
-
-		len = strn_len(&user_buffer[i], 128 - 1);
+		len = strn_len(&user_buffer[i], sizeof(buf) - 1);
                 if (len < 0) return len; 
 
 		pkt_dev->flags |= F_IPV6;
@@ -1181,9 +1174,7 @@ static int proc_if_write(struct file *file, const char __user *user_buffer,
 		return count;
 	}
 	if (!strcmp(name, "src6")) {
-                char buf[128];
-
-		len = strn_len(&user_buffer[i], 128 - 1);
+		len = strn_len(&user_buffer[i], sizeof(buf) - 1);
                 if (len < 0) return len; 
 
 		pkt_dev->flags |= F_IPV6;
@@ -1205,7 +1196,6 @@ static int proc_if_write(struct file *file, const char __user *user_buffer,
 		return count;
 	}
 	if (!strcmp(name, "src_min")) {
-                char buf[IP_NAME_SZ];
 		len = strn_len(&user_buffer[i], sizeof(pkt_dev->src_min) - 1);
                 if (len < 0) { return len; }
                 if (copy_from_user(buf, &user_buffer[i], len))
@@ -1224,7 +1214,6 @@ static int proc_if_write(struct file *file, const char __user *user_buffer,
 		return count;
 	}
 	if (!strcmp(name, "src_max")) {
-                char buf[IP_NAME_SZ];
 		len = strn_len(&user_buffer[i], sizeof(pkt_dev->src_max) - 1);
                 if (len < 0) { return len; }
                 if (copy_from_user(buf, &user_buffer[i], len))
