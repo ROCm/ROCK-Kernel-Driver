@@ -38,7 +38,7 @@ config USB_BLUETOOTH_TTY
 
 config USB_MIDI
 	tristate "USB MIDI support"
-	depends on USB
+	depends on USB && SOUND
 	---help---
 	  Say Y here if you want to connect a USB MIDI device to your
 	  computer's USB port. This driver is for devices that comply with

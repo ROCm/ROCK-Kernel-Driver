@@ -31,6 +31,8 @@
  *
  * History:
  *
+ *  2002-10-19: Removed the specialized transfer routines.
+ *		(Alan Stern <stern@rowland.harvard.edu>)
  *  2001-02-24: Removed lots of duplicate code and simplified the structure.
  *              (bjorn@haxx.se)
  *  2002-01-16: Fixed endianness bug so it works on the ppc arch.
@@ -386,147 +388,6 @@ void isd200_build_sense(struct us_data *us, Scsi_Cmnd *srb)
         }
 }
 
-/***********************************************************************
- * Data transfer routines
- ***********************************************************************/
-
-
-/**************************************************************************
- * Transfer one SCSI scatter-gather buffer via bulk transfer
- *
- * Note that this function is necessary because we want the ability to
- * use scatter-gather memory.  Good performance is achieved by a combination
- * of scatter-gather and clustering (which makes each chunk bigger).
- *
- * Note that the lower layer will always retry when a NAK occurs, up to the
- * timeout limit.  Thus we don't have to worry about it for individual
- * packets.
- */
-static int isd200_transfer_partial( struct us_data *us, 
-				    unsigned char dataDirection,
-				    char *buf, int length )
-{
-        int result;
-        int partial;
-        unsigned int pipe;
-
-        /* calculate the appropriate pipe information */
-	if (dataDirection == SCSI_DATA_READ)
-                pipe = us->recv_bulk_pipe;
-        else
-                pipe = us->send_bulk_pipe;
-
-        /* transfer the data */
-        US_DEBUGP("isd200_transfer_partial(): xfer %d bytes\n", length);
-        result = usb_stor_bulk_msg(us, buf, pipe, length, &partial);
-        US_DEBUGP("usb_stor_bulk_msg() returned %d xferred %d/%d\n",
-                  result, partial, length);
-
-        /* if we stall, we need to clear it before we go on */
-        if (result == -EPIPE) {
-                US_DEBUGP("clearing endpoint halt for pipe 0x%x\n", pipe);
-                if (usb_stor_clear_halt(us, pipe) < 0)
-			return ISD200_TRANSPORT_FAILED;
-        }
-    
-        /* did we send all the data? */
-        if (partial == length) {
-                US_DEBUGP("isd200_transfer_partial(): transfer complete\n");
-                return ISD200_TRANSPORT_GOOD;
-        }
-
-	/* did we abort this command? */
-	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
-                US_DEBUGP("isd200_transfer_partial(): transfer aborted\n");
-		return ISD200_TRANSPORT_ABORTED;
-	}
-
-        /* uh oh... we have an error code, so something went wrong. */
-        if (result) {
-                /* NAK - that means we've retried a few times already */
-                if (result == -ETIMEDOUT) {
-                        US_DEBUGP("isd200_transfer_partial(): device NAKed\n");
-                        return ISD200_TRANSPORT_FAILED;
-                }
-
-                /* the catch-all case */
-                US_DEBUGP("isd200_transfer_partial(): unknown error\n");
-                return ISD200_TRANSPORT_FAILED;
-        }
-
-        /* no error code, so we must have transferred some data, 
-         * just not all of it */
-        return ISD200_TRANSPORT_SHORT;
-}
-
-
-/**************************************************************************
- * Transfer an entire SCSI command's worth of data payload over the bulk
- * pipe.
- *
- * Note that this uses us_transfer_partial to achieve it's goals -- this
- * function simply determines if we're going to use scatter-gather or not,
- * and acts appropriately.  For now, it also re-interprets the error codes.
- */
-static void isd200_transfer( struct us_data *us, Scsi_Cmnd *srb )
-{
-        int i;
-        int result = -1;
-        struct scatterlist *sg;
-        unsigned int total_transferred = 0;
-        unsigned int transfer_amount;
-
-        /* calculate how much we want to transfer */
-	int dir = srb->sc_data_direction;
-	srb->sc_data_direction = SCSI_DATA_WRITE;
-        transfer_amount = usb_stor_transfer_length(srb);
-	srb->sc_data_direction = dir;
-
-        /* was someone foolish enough to request more data than available
-         * buffer space? */
-        if (transfer_amount > srb->request_bufflen)
-                transfer_amount = srb->request_bufflen;
-
-        /* are we scatter-gathering? */
-        if (srb->use_sg) {
-
-                /* loop over all the scatter gather structures and 
-                 * make the appropriate requests for each, until done
-                 */
-                sg = (struct scatterlist *) srb->request_buffer;
-                for (i = 0; i < srb->use_sg; i++) {
-
-                        /* transfer the lesser of the next buffer or the
-                         * remaining data */
-                        if (transfer_amount - total_transferred >= 
-                            sg[i].length) {
-                                result = isd200_transfer_partial(us, 
-                                                                 srb->sc_data_direction,
-                                                                 sg_address(sg[i]), 
-                                                                 sg[i].length);
-                                total_transferred += sg[i].length;
-                        } else
-                                result = isd200_transfer_partial(us, 
-                                                                 srb->sc_data_direction,                            
-                                                                 sg_address(sg[i]), 
-                                                                 transfer_amount - total_transferred);
-
-                        /* if we get an error, end the loop here */
-                        if (result)
-                                break;
-                }
-        }
-        else
-                /* no scatter-gather, just make the request */
-                result = isd200_transfer_partial(us, 
-                                                 srb->sc_data_direction,
-                                                 srb->request_buffer, 
-                                                 transfer_amount);
-
-        /* return the result in the data structure itself */
-        srb->result = result;
-}
-
 
 /***********************************************************************
  * Transport routines
@@ -546,23 +407,21 @@ int isd200_Bulk_transport( struct us_data *us, Scsi_Cmnd *srb,
         struct bulk_cb_wrap bcb;
         struct bulk_cs_wrap bcs;
         int result;
-        int partial;
-        unsigned int transfer_amount;
+        unsigned int transfer_length;
 
 	int dir = srb->sc_data_direction;
 	srb->sc_data_direction = SCSI_DATA_WRITE;
-        transfer_amount = usb_stor_transfer_length(srb);
+        transfer_length = usb_stor_transfer_length(srb);
 	srb->sc_data_direction = dir;
     
         /* set up the command wrapper */
         bcb.Signature = cpu_to_le32(US_BULK_CB_SIGN);
-        bcb.DataTransferLength = cpu_to_le32(transfer_amount);
+        bcb.DataTransferLength = cpu_to_le32(transfer_length);
         bcb.Flags = srb->sc_data_direction == SCSI_DATA_READ ? 1 << 7 : 0;
         bcb.Tag = srb->serial_number;
         bcb.Lun = srb->cmnd[1] >> 5;
         if (us->flags & US_FL_SCM_MULT_TARG)
                 bcb.Lun |= srb->target << 4;
-
         bcb.Length = AtaCdbLength;
     
         /* copy the command payload */
@@ -572,33 +431,32 @@ int isd200_Bulk_transport( struct us_data *us, Scsi_Cmnd *srb,
         /* send it to out endpoint */
         US_DEBUGP("Bulk command S 0x%x T 0x%x Trg %d LUN %d L %d F %d CL %d\n",
                   le32_to_cpu(bcb.Signature), bcb.Tag,
-                  (bcb.Lun >> 4), (bcb.Lun & 0xFF), 
+                  (bcb.Lun >> 4), (bcb.Lun & 0x0F), 
                   le32_to_cpu(bcb.DataTransferLength), bcb.Flags, bcb.Length);
-        result = usb_stor_bulk_msg(us, &bcb, us->send_bulk_pipe,
-				US_BULK_CB_WRAP_LEN, &partial);
+	result = usb_stor_bulk_transfer_buf(us, us->send_bulk_pipe,
+				(char *) &bcb, US_BULK_CB_WRAP_LEN, NULL);
         US_DEBUGP("Bulk command transfer result=%d\n", result);
     
 	/* did we abort this command? */
 	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
 		return ISD200_TRANSPORT_ABORTED;
 	}
-
-	else if (result == -EPIPE) {
-		/* if we stall, we need to clear it before we go on */
-                US_DEBUGP("clearing endpoint halt for pipe 0x%x\n",
-				us->send_bulk_pipe);
-                if (usb_stor_clear_halt(us, us->send_bulk_pipe) < 0)
-			return ISD200_TRANSPORT_ERROR;
-	} else if (result)  
+	if (result != USB_STOR_XFER_GOOD)  
                 return ISD200_TRANSPORT_ERROR;
     
         /* if the command transfered well, then we go to the data stage */
-        if (!result && bcb.DataTransferLength) {
-		isd200_transfer(us, srb);
-		US_DEBUGP("Bulk data transfer result 0x%x\n", srb->result);
-		
-		if (srb->result == ISD200_TRANSPORT_ABORTED)
+	if (transfer_length) {
+		unsigned int pipe = srb->sc_data_direction == SCSI_DATA_READ ? 
+				us->recv_bulk_pipe : us->send_bulk_pipe;
+		result = usb_stor_bulk_transfer_srb(us, pipe, srb,
+					transfer_length);
+		US_DEBUGP("Bulk data transfer result 0x%x\n", result);
+
+		/* if it was aborted, we need to indicate that */
+		if (result == USB_STOR_XFER_ABORTED)
 			return ISD200_TRANSPORT_ABORTED;
+		if (result == USB_STOR_XFER_ERROR)
+			return ISD200_TRANSPORT_ERROR;
         }
     
         /* See flow chart on pg 15 of the Bulk Only Transport spec for
@@ -607,42 +465,31 @@ int isd200_Bulk_transport( struct us_data *us, Scsi_Cmnd *srb,
     
         /* get CSW for device status */
         US_DEBUGP("Attempting to get CSW...\n");
-        result = usb_stor_bulk_msg(us, &bcs, us->recv_bulk_pipe,
-				US_BULK_CS_WRAP_LEN, &partial);
+	result = usb_stor_bulk_transfer_buf(us, us->recv_bulk_pipe,
+				(char *) &bcs, US_BULK_CS_WRAP_LEN, NULL);
+
 	/* did we abort this command? */
 	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
 		return ISD200_TRANSPORT_ABORTED;
 	}
 
         /* did the attempt to read the CSW fail? */
-        if (result == -EPIPE) {
-                US_DEBUGP("clearing endpoint halt for pipe 0x%x\n",
-				us->recv_bulk_pipe);
-                if (usb_stor_clear_halt(us, us->recv_bulk_pipe) < 0)
-			return ISD200_TRANSPORT_ERROR;
+	if (result == USB_STOR_XFER_STALLED) {
            
                 /* get the status again */
                 US_DEBUGP("Attempting to get CSW (2nd try)...\n");
-                result = usb_stor_bulk_msg(us, &bcs, us->recv_bulk_pipe,
-                                           US_BULK_CS_WRAP_LEN, &partial);
+		result = usb_stor_bulk_transfer_buf(us, us->recv_bulk_pipe,
+				(char *) &bcs, US_BULK_CS_WRAP_LEN, NULL);
 
                 /* if the command was aborted, indicate that */
 		if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
 			return ISD200_TRANSPORT_ABORTED;
 		}
-        
-                /* if it fails again, we need a reset and return an error*/
-                if (result == -EPIPE) {
-                        US_DEBUGP("clearing halt for pipe 0x%x\n",
-					us->recv_bulk_pipe);
-                        usb_stor_clear_halt(us, us->recv_bulk_pipe);
-                        return ISD200_TRANSPORT_ERROR;
-                }
         }
     
         /* if we still have a failure at this point, we're in trouble */
         US_DEBUGP("Bulk status result = %d\n", result);
-        if (result)
+        if (result != USB_STOR_XFER_GOOD)
                 return ISD200_TRANSPORT_ERROR;
     
         /* check bulk status */
@@ -651,7 +498,7 @@ int isd200_Bulk_transport( struct us_data *us, Scsi_Cmnd *srb,
                   bcs.Residue, bcs.Status);
         if (bcs.Signature != cpu_to_le32(US_BULK_CS_SIGN) || 
             bcs.Tag != bcb.Tag || 
-            bcs.Status > US_BULK_STAT_PHASE || partial != 13) {
+            bcs.Status > US_BULK_STAT_PHASE) {
                 US_DEBUGP("Bulk logical error\n");
                 return ISD200_TRANSPORT_ERROR;
         }
@@ -660,6 +507,8 @@ int isd200_Bulk_transport( struct us_data *us, Scsi_Cmnd *srb,
         switch (bcs.Status) {
         case US_BULK_STAT_OK:
                 /* command good -- note that we could be short on data */
+		if (srb->resid > 0)
+			return ISD200_TRANSPORT_SHORT;
                 return ISD200_TRANSPORT_GOOD;
 
         case US_BULK_STAT_FAIL:
@@ -764,7 +613,8 @@ static int isd200_action( struct us_data *us, int action,
 	}
 
 	status = isd200_Bulk_transport(us, &srb, &ata, sizeof(ata.generic));
-	if (status != ISD200_TRANSPORT_GOOD) {
+	if (status != ISD200_TRANSPORT_GOOD &&
+			status != ISD200_TRANSPORT_SHORT) {
 		US_DEBUGP("   isd200_action(0x%02x) error: %d\n",action,status);
 		status = ISD200_ERROR;
 		/* need to reset device here */
@@ -815,10 +665,22 @@ void isd200_invoke_transport( struct us_data *us,
 {
 	int need_auto_sense = 0;
 	int transferStatus;
+	int result;
 
 	/* send the command to the transport layer */
+	srb->resid = 0;
 	transferStatus = isd200_Bulk_transport(us, srb, ataCdb,
 					       sizeof(ataCdb->generic));
+
+	/* if the command gets aborted by the higher layers, we need to
+	 * short-circuit all other processing
+	 */
+	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
+		US_DEBUGP("-- transport indicates command was aborted\n");
+		srb->result = DID_ABORT << 16;
+		return;
+	}
+
 	switch (transferStatus) {
 
 	case ISD200_TRANSPORT_GOOD:
@@ -845,6 +707,7 @@ void isd200_invoke_transport( struct us_data *us,
 		break;
 
 	case ISD200_TRANSPORT_SHORT:
+		srb->result = GOOD << 1;
 		if (!((srb->cmnd[0] == REQUEST_SENSE) ||
 		      (srb->cmnd[0] == INQUIRY) ||
 		      (srb->cmnd[0] == MODE_SENSE) ||
@@ -861,9 +724,14 @@ void isd200_invoke_transport( struct us_data *us,
        
 	}
 
-	if (need_auto_sense)
-		if (isd200_read_regs(us) == ISD200_GOOD)
+	if (need_auto_sense) {
+		result = isd200_read_regs(us);
+		if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
+			US_DEBUGP("-- auto-sense aborted\n");
+			srb->result = DID_ABORT << 16;
+		} else if (result == ISD200_GOOD)
 			isd200_build_sense(us, srb);
+	}
 
 	/* Regardless of auto-sense, if we _know_ we have an error
 	 * condition, show that in the result code

@@ -83,7 +83,7 @@ static int balance (struct ohci_hcd *ohci, int interval, int load)
 	 */
 	for (i = 0; i < interval ; i++) {
 		if (branch < 0 || ohci->load [branch] > ohci->load [i]) {
-#ifdef CONFIG_USB_BANDWIDTH
+#if 1	/* CONFIG_USB_BANDWIDTH */
 			int	j;
 
 			/* usb 1.1 says 90% of one frame */
@@ -276,7 +276,7 @@ static void ed_deschedule (struct ohci_hcd *ohci, struct ed *ed)
 			ohci->ed_controltail = ed->ed_prev;
 			if (ohci->ed_controltail)
 				ohci->ed_controltail->ed_next = 0;
-		} else {
+		} else if (ed->ed_next) {
 			ed->ed_next->ed_prev = ed->ed_prev;
 		}
 		break;
@@ -297,7 +297,7 @@ static void ed_deschedule (struct ohci_hcd *ohci, struct ed *ed)
 			ohci->ed_bulktail = ed->ed_prev;
 			if (ohci->ed_bulktail)
 				ohci->ed_bulktail->ed_next = 0;
-		} else {
+		} else if (ed->ed_next) {
 			ed->ed_next->ed_prev = ed->ed_prev;
 		}
 		break;
