@@ -14,6 +14,7 @@
 #include <linux/config.h>
 #include "ext2.h"
 #include <linux/quotaops.h>
+#include <linux/sched.h>
 
 /*
  * balloc.c contains the blocks allocation and deallocation routines
