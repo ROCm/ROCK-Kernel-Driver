@@ -1,8 +1,9 @@
 /*
  * tg3.c: Broadcom Tigon3 ethernet driver.
  *
- * Copyright (C) 2001, 2002, 2003 David S. Miller (davem@redhat.com)
+ * Copyright (C) 2001, 2002, 2003, 2004 David S. Miller (davem@redhat.com)
  * Copyright (C) 2001, 2002, 2003 Jeff Garzik (jgarzik@pobox.com)
+ * Copyright (C) 2004 Sun Microsystems Inc.
  */
 
 #include <linux/config.h>
@@ -1961,6 +1962,67 @@ static int tg3_fiber_aneg_smachine(struct tg3 *tp,
 	return ret;
 }
 
+static int fiber_autoneg(struct tg3 *tp, u32 *flags)
+{
+	int res = 0;
+
+	if (tp->tg3_flags2 & TG3_FLG2_HW_AUTONEG) {
+		u32 dig_status;
+
+		dig_status = tr32(SG_DIG_STATUS);
+		*flags = 0;
+		if (dig_status & SG_DIG_PARTNER_ASYM_PAUSE)
+			*flags |= MR_LP_ADV_ASYM_PAUSE;
+		if (dig_status & SG_DIG_PARTNER_PAUSE_CAPABLE)
+			*flags |= MR_LP_ADV_SYM_PAUSE;
+
+		if ((dig_status & SG_DIG_AUTONEG_COMPLETE) &&
+		    !(dig_status & (SG_DIG_AUTONEG_ERROR |
+				    SG_DIG_PARTNER_FAULT_MASK)))
+			res = 1;
+	} else {
+		struct tg3_fiber_aneginfo aninfo;
+		int status = ANEG_FAILED;
+		unsigned int tick;
+		u32 tmp;
+
+		tw32_f(MAC_TX_AUTO_NEG, 0);
+
+		tmp = tp->mac_mode & ~MAC_MODE_PORT_MODE_MASK;
+		tw32_f(MAC_MODE, tmp | MAC_MODE_PORT_MODE_GMII);
+		udelay(40);
+
+		tw32_f(MAC_MODE, tp->mac_mode | MAC_MODE_SEND_CONFIGS);
+		udelay(40);
+
+		memset(&aninfo, 0, sizeof(aninfo));
+		aninfo.flags |= MR_AN_ENABLE;
+		aninfo.state = ANEG_STATE_UNKNOWN;
+		aninfo.cur_time = 0;
+		tick = 0;
+		while (++tick < 195000) {
+			status = tg3_fiber_aneg_smachine(tp, &aninfo);
+			if (status == ANEG_DONE || status == ANEG_FAILED)
+				break;
+
+			udelay(1);
+		}
+
+		tp->mac_mode &= ~MAC_MODE_SEND_CONFIGS;
+		tw32_f(MAC_MODE, tp->mac_mode);
+		udelay(40);
+
+		*flags = aninfo.flags;
+
+		if (status == ANEG_DONE &&
+		    (aninfo.flags & (MR_AN_COMPLETE | MR_LINK_OK |
+				     MR_LP_ADV_FULL_DUPLEX)))
+			res = 1;
+	}
+
+	return res;
+}
+
 static int tg3_setup_fiber_phy(struct tg3 *tp, int force_reset)
 {
 	u32 orig_pause_cfg;
@@ -1979,6 +2041,20 @@ static int tg3_setup_fiber_phy(struct tg3 *tp, int force_reset)
 	tp->mac_mode |= MAC_MODE_PORT_MODE_TBI;
 	tw32_f(MAC_MODE, tp->mac_mode);
 	udelay(40);
+
+	if (tp->tg3_flags2 & TG3_FLG2_HW_AUTONEG) {
+		/* Allow time for the hardware to auto-negotiate (195ms) */
+		unsigned int tick = 0;
+
+		while (++tick < 195000) { 
+			if (tr32(SG_DIG_STATUS) & SG_DIG_AUTONEG_COMPLETE)
+				break;
+			udelay(1);
+		}
+		if (tick >= 195000)
+			printk(KERN_INFO PFX "%s: HW autoneg failed !\n",
+			    tp->dev->name);
+	}
 
 	/* Reset when initting first time or we have a link. */
 	if (!(tp->tg3_flags & TG3_FLAG_INIT_COMPLETE) ||
@@ -2031,53 +2107,18 @@ static int tg3_setup_fiber_phy(struct tg3 *tp, int force_reset)
 	udelay(40);
 
 	current_link_up = 0;
-	if (tr32(MAC_STATUS) & MAC_STATUS_PCS_SYNCED) {
-		if (tp->link_config.autoneg == AUTONEG_ENABLE &&
-		    !(tp->tg3_flags & TG3_FLAG_GOT_SERDES_FLOWCTL)) {
-			struct tg3_fiber_aneginfo aninfo;
-			int status = ANEG_FAILED;
-			unsigned int tick;
-			u32 tmp;
-
-			memset(&aninfo, 0, sizeof(aninfo));
-			aninfo.flags |= (MR_AN_ENABLE);
-
-			tw32(MAC_TX_AUTO_NEG, 0);
-
-			tmp = tp->mac_mode & ~MAC_MODE_PORT_MODE_MASK;
-			tw32_f(MAC_MODE, tmp | MAC_MODE_PORT_MODE_GMII);
-			udelay(40);
-
-			tw32_f(MAC_MODE, tp->mac_mode | MAC_MODE_SEND_CONFIGS);
-			udelay(40);
-
-			aninfo.state = ANEG_STATE_UNKNOWN;
-			aninfo.cur_time = 0;
-			tick = 0;
-			while (++tick < 195000) {
-				status = tg3_fiber_aneg_smachine(tp, &aninfo);
-				if (status == ANEG_DONE ||
-				    status == ANEG_FAILED)
-					break;
-
-				udelay(1);
-			}
-
-			tp->mac_mode &= ~MAC_MODE_SEND_CONFIGS;
-			tw32_f(MAC_MODE, tp->mac_mode);
-			udelay(40);
-
-			if (status == ANEG_DONE &&
-			    (aninfo.flags &
-			     (MR_AN_COMPLETE | MR_LINK_OK |
-			      MR_LP_ADV_FULL_DUPLEX))) {
+ 	if (tr32(MAC_STATUS) & MAC_STATUS_PCS_SYNCED) {
+		if (tp->link_config.autoneg == AUTONEG_ENABLE) {
+			u32 flags;
+  
+			if (fiber_autoneg(tp, &flags)) {
 				u32 local_adv, remote_adv;
 
 				local_adv = ADVERTISE_PAUSE_CAP;
 				remote_adv = 0;
-				if (aninfo.flags & MR_LP_ADV_SYM_PAUSE)
-					remote_adv |= LPA_PAUSE_CAP;
-				if (aninfo.flags & MR_LP_ADV_ASYM_PAUSE)
+				if (flags & MR_LP_ADV_SYM_PAUSE)
+  					remote_adv |= LPA_PAUSE_CAP;
+				if (flags & MR_LP_ADV_ASYM_PAUSE)
 					remote_adv |= LPA_PAUSE_ASYM;
 
 				tg3_setup_flow_control(tp, local_adv, remote_adv);
@@ -2104,8 +2145,10 @@ static int tg3_setup_fiber_phy(struct tg3 *tp, int force_reset)
 		} else {
 			/* Forcing 1000FD link up. */
 			current_link_up = 1;
+			tp->tg3_flags |= TG3_FLAG_GOT_SERDES_FLOWCTL;
 		}
-	}
+	} else
+		tp->tg3_flags &= ~TG3_FLAG_GOT_SERDES_FLOWCTL;
 
 	tp->mac_mode &= ~MAC_MODE_LINK_POLARITY;
 	tw32_f(MAC_MODE, tp->mac_mode);
@@ -5203,6 +5246,26 @@ static int tg3_reset_hw(struct tg3 *tp)
 	 */
 	tw32_f(MAC_LOW_WMARK_MAX_RX_FRAME, 2);
 
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704 &&
+	    tp->phy_id == PHY_ID_SERDES) {
+		/* Enable hardware link auto-negotiation */
+		u32 digctrl, txctrl;
+
+		digctrl = SG_DIG_USING_HW_AUTONEG | SG_DIG_CRC16_CLEAR_N |
+		    SG_DIG_LOCAL_DUPLEX_STATUS | SG_DIG_LOCAL_LINK_STATUS |
+		    (2 << SG_DIG_SPEED_STATUS_SHIFT) | SG_DIG_FIBER_MODE |
+		    SG_DIG_GBIC_ENABLE;
+
+		txctrl = tr32(MAC_SERDES_CFG);
+		tw32_f(MAC_SERDES_CFG, txctrl | MAC_SERDES_CFG_EDGE_SELECT);
+		tw32_f(SG_DIG_CTRL, digctrl | SG_DIG_SOFT_RESET);
+		tr32(SG_DIG_CTRL);
+		udelay(5);
+		tw32_f(SG_DIG_CTRL, digctrl);
+
+		tp->tg3_flags2 |= TG3_FLG2_HW_AUTONEG;
+	}
+
 	err = tg3_setup_phy(tp, 1);
 	if (err)
 		return err;
@@ -6536,6 +6599,9 @@ static int tg3_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	case SIOCGMIIREG: {
 		u32 mii_regval;
 
+		if (tp->phy_id == PHY_ID_SERDES)
+			break;			/* We have no PHY */
+
 		spin_lock_irq(&tp->lock);
 		err = tg3_readphy(tp, data->reg_num & 0x1f, &mii_regval);
 		spin_unlock_irq(&tp->lock);
@@ -6546,6 +6612,9 @@ static int tg3_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	}
 
 	case SIOCSMIIREG:
+		if (tp->phy_id == PHY_ID_SERDES)
+			break;			/* We have no PHY */
+
 		if (!capable(CAP_NET_ADMIN))
 			return -EPERM;
 
