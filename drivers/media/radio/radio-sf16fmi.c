@@ -132,8 +132,8 @@ static inline int fmi_getsigstr(struct fmi_device *dev)
 	return (res & 2) ? 0 : 0xFFFF;
 }
 
-static int fmi_ioctl(struct inode *inode, struct file *file,
-		     unsigned int cmd, void *arg)
+static int fmi_do_ioctl(struct inode *inode, struct file *file,
+			unsigned int cmd, void *arg)
 {
 	struct video_device *dev = video_devdata(file);
 	struct fmi_device *fmi=dev->priv;
@@ -230,13 +230,19 @@ static int fmi_ioctl(struct inode *inode, struct file *file,
 	}
 }
 
+static int fmi_ioctl(struct inode *inode, struct file *file,
+		     unsigned int cmd, unsigned long arg)
+{
+	return video_usercopy(inode, file, cmd, arg, fmi_do_ioctl);
+}
+
 static struct fmi_device fmi_unit;
 
 static struct file_operations fmi_fops = {
 	owner:		THIS_MODULE,
 	open:           video_exclusive_open,
 	release:        video_exclusive_release,
-	ioctl:		video_generic_ioctl,
+	ioctl:		fmi_ioctl,
 	llseek:         no_llseek,
 };
 
@@ -247,7 +253,6 @@ static struct video_device fmi_radio=
 	type:		VID_TYPE_TUNER,
 	hardware:	VID_HARDWARE_SF16MI,
 	fops:           &fmi_fops,
-	kernel_ioctl:   fmi_ioctl,
 };
 
 /* ladis: this is my card. does any other types exist? */

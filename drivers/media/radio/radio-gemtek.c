@@ -138,8 +138,8 @@ int gemtek_getsigstr(struct gemtek_device *dev)
 	return 1;		/* signal present */
 }
 
-static int gemtek_ioctl(struct inode *inode, struct file *file,
-			unsigned int cmd, void *arg)
+static int gemtek_do_ioctl(struct inode *inode, struct file *file,
+			   unsigned int cmd, void *arg)
 {
 	struct video_device *dev = video_devdata(file);
 	struct gemtek_device *rt=dev->priv;
@@ -220,13 +220,19 @@ static int gemtek_ioctl(struct inode *inode, struct file *file,
 	}
 }
 
+static int gemtek_ioctl(struct inode *inode, struct file *file,
+			unsigned int cmd, unsigned long arg)
+{
+	return video_usercopy(inode, file, cmd, arg, gemtek_do_ioctl);
+}
+
 static struct gemtek_device gemtek_unit;
 
 static struct file_operations gemtek_fops = {
 	owner:		THIS_MODULE,
 	open:           video_exclusive_open,
 	release:        video_exclusive_release,
-	ioctl:		video_generic_ioctl,
+	ioctl:		gemtek_ioctl,
 	llseek:         no_llseek,
 };
 
@@ -237,7 +243,6 @@ static struct video_device gemtek_radio=
 	type:		VID_TYPE_TUNER,
 	hardware:	VID_HARDWARE_GEMTEK,
 	fops:           &gemtek_fops,
-	kernel_ioctl:	gemtek_ioctl,
 };
 
 static int __init gemtek_init(void)

@@ -70,7 +70,7 @@ static void typhoon_mute(struct typhoon_device *dev);
 static void typhoon_unmute(struct typhoon_device *dev);
 static int typhoon_setvol(struct typhoon_device *dev, int vol);
 static int typhoon_ioctl(struct inode *inode, struct file *file,
-			 unsigned int cmd, void *arg);
+			 unsigned int cmd, unsigned long arg);
 #ifdef CONFIG_RADIO_TYPHOON_PROC_FS
 static int typhoon_get_info(char *buf, char **start, off_t offset, int len);
 #endif
@@ -163,8 +163,8 @@ static int typhoon_setvol(struct typhoon_device *dev, int vol)
 }
 
 
-static int typhoon_ioctl(struct inode *inode, struct file *file,
-			 unsigned int cmd, void *arg)
+static int typhoon_do_ioctl(struct inode *inode, struct file *file,
+			    unsigned int cmd, void *arg)
 {
 	struct video_device *dev = video_devdata(file);
 	struct typhoon_device *typhoon = dev->priv;
@@ -243,6 +243,12 @@ static int typhoon_ioctl(struct inode *inode, struct file *file,
 	}
 }
 
+static int typhoon_ioctl(struct inode *inode, struct file *file,
+			 unsigned int cmd, unsigned long arg)
+{
+	return video_usercopy(inode, file, cmd, arg, typhoon_do_ioctl);
+}
+
 static struct typhoon_device typhoon_unit =
 {
 	iobase:		CONFIG_RADIO_TYPHOON_PORT,
@@ -254,7 +260,7 @@ static struct file_operations typhoon_fops = {
 	owner:		THIS_MODULE,
 	open:           video_exclusive_open,
 	release:        video_exclusive_release,
-	ioctl:		video_generic_ioctl,
+	ioctl:		typhoon_ioctl,
 	llseek:         no_llseek,
 };
 
@@ -265,7 +271,6 @@ static struct video_device typhoon_radio =
 	type:		VID_TYPE_TUNER,
 	hardware:	VID_HARDWARE_TYPHOON,
 	fops:           &typhoon_fops,
-	kernel_ioctl:	typhoon_ioctl,
 };
 
 #ifdef CONFIG_RADIO_TYPHOON_PROC_FS

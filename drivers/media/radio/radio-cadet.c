@@ -384,8 +384,8 @@ static ssize_t cadet_read(struct file *file, char *data,
 
 
 
-static int cadet_ioctl(struct inode *inode, struct file *file,
-		       unsigned int cmd, void *arg)
+static int cadet_do_ioctl(struct inode *inode, struct file *file,
+			  unsigned int cmd, void *arg)
 {
 	switch(cmd)
 	{
@@ -497,6 +497,11 @@ static int cadet_ioctl(struct inode *inode, struct file *file,
 	}
 }
 
+static int cadet_ioctl(struct inode *inode, struct file *file,
+		       unsigned int cmd, unsigned long arg)
+{
+	return video_usercopy(inode, file, cmd, arg, cadet_do_ioctl);
+}
 
 static int cadet_open(struct inode *inode, struct file *file)
 {
@@ -523,7 +528,7 @@ static struct file_operations cadet_fops = {
 	open:		cadet_open,
 	release:       	cadet_release,
 	read:		cadet_read,
-	ioctl:		video_generic_ioctl,
+	ioctl:		cadet_ioctl,
 	llseek:         no_llseek,
 };
 
@@ -534,7 +539,6 @@ static struct video_device cadet_radio=
 	type:		VID_TYPE_TUNER,
 	hardware:	VID_HARDWARE_CADET,
 	fops:           &cadet_fops,
-	kernel_ioctl:	cadet_ioctl,
 };
 
 static int isapnp_cadet_probe(void)

@@ -65,13 +65,13 @@ static int radio_nr = -1;
 MODULE_PARM(radio_nr, "i");
 
 static int radio_ioctl(struct inode *inode, struct file *file,
-		       unsigned int cmd, void *arg);
+		       unsigned int cmd, unsigned long arg);
 
 static struct file_operations maestro_fops = {
 	owner:		THIS_MODULE,
 	open:           video_exclusive_open,
 	release:        video_exclusive_release,
-	ioctl:		video_generic_ioctl,
+	ioctl:		radio_ioctl,
 	llseek:         no_llseek,
 };
 
@@ -82,7 +82,6 @@ static struct video_device maestro_radio=
 	type:		VID_TYPE_TUNER,
 	hardware:	VID_HARDWARE_SF16MI,
 	fops:           &maestro_fops,
-	kernel_ioctl:	radio_ioctl,
 };
 
 static struct radio_device
@@ -175,10 +174,12 @@ static void radio_bits_set(struct radio_device *dev, __u32 data)
 	sleep_125ms();
 }
 
-inline static int radio_function(struct video_device *dev, 
+inline static int radio_function(struct inode *inode, struct file *file,
 				 unsigned int cmd, void *arg)
 {
+	struct video_device *dev = video_devdata(file);
 	struct radio_device *card=dev->priv;
+	
 	switch(cmd) {
 		case VIDIOCGCAP: {
 			struct video_capability *v = arg;
@@ -257,13 +258,14 @@ inline static int radio_function(struct video_device *dev,
 }
 
 static int radio_ioctl(struct inode *inode, struct file *file,
-		       unsigned int cmd, void *arg)
+		       unsigned int cmd, unsigned long arg)
 {
 	struct video_device *dev = video_devdata(file);
 	struct radio_device *card=dev->priv;
 	int ret;
+
 	down(&card->lock);
-	ret = radio_function(dev, cmd, arg);
+	ret = video_usercopy(inode, file, cmd, arg, radio_function);
 	up(&card->lock);
 	return ret;
 }

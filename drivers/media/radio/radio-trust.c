@@ -154,8 +154,8 @@ static void tr_setfreq(unsigned long f)
 	write_i2c(5, TSA6060T_ADDR, (f << 1) | 1, f >> 7, 0x60 | ((f >> 15) & 1), 0);
 }
 
-static int tr_ioctl(struct inode *inode, struct file *file,
-		    unsigned int cmd, void *arg)
+static int tr_do_ioctl(struct inode *inode, struct file *file,
+		       unsigned int cmd, void *arg)
 {
 	switch(cmd)
 	{
@@ -244,11 +244,17 @@ static int tr_ioctl(struct inode *inode, struct file *file,
 	}
 }
 
+static int tr_ioctl(struct inode *inode, struct file *file,
+		    unsigned int cmd, unsigned long arg)
+{
+	return video_usercopy(inode, file, cmd, arg, tr_do_ioctl);
+}
+
 static struct file_operations trust_fops = {
 	owner:		THIS_MODULE,
 	open:           video_exclusive_open,
 	release:        video_exclusive_release,
-	ioctl:		video_generic_ioctl,
+	ioctl:		tr_ioctl,
 	llseek:         no_llseek,
 };
 
@@ -259,7 +265,6 @@ static struct video_device trust_radio=
 	type:		VID_TYPE_TUNER,
 	hardware:	VID_HARDWARE_TRUST,
 	fops:           &trust_fops,
-	kernel_ioctl:	tr_ioctl,
 };
 
 static int __init trust_init(void)
