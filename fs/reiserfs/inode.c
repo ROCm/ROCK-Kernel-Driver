@@ -2105,9 +2105,47 @@ static int reiserfs_commit_write(struct file *f, struct page *page,
     return ret ;
 }
 
+/*
+ * Returns 1 if the page's buffers were dropped.  The page is locked.
+ *
+ * Takes j_dirty_buffers_lock to protect the b_assoc_buffers list_heads
+ * in the buffers at page_buffers(page).
+ *
+ * FIXME: Chris says the buffer list is not used with `mount -o notail',
+ * so in that case the fs can avoid the extra locking.  Create a second
+ * address_space_operations with a NULL ->releasepage and install that
+ * into new address_spaces.
+ */
+static int reiserfs_releasepage(struct page *page, int unused_gfp_flags)
+{
+    struct inode *inode = page->mapping->host ;
+    struct reiserfs_journal *j = SB_JOURNAL(inode->i_sb) ;
+    struct buffer_head *head ;
+    struct buffer_head *bh ;
+    int ret = 1 ;
+
+    spin_lock(&j->j_dirty_buffers_lock) ;
+    head = page_buffers(page) ;
+    bh = head ;
+    do {
+	if (!buffer_dirty(bh) && !buffer_locked(bh)) {
+		list_del_init(&bh->b_assoc_buffers) ;
+	} else {
+		ret = 0 ;
+		break ;
+	}
+	bh = bh->b_this_page ;
+    } while (bh != head) ;
+    if (ret)
+	ret = try_to_free_buffers(page) ;
+    spin_unlock(&j->j_dirty_buffers_lock) ;
+    return ret ;
+}
+
 struct address_space_operations reiserfs_address_space_operations = {
     writepage: reiserfs_writepage,
     readpage: reiserfs_readpage, 
+    releasepage: reiserfs_releasepage,
     sync_page: block_sync_page,
     prepare_write: reiserfs_prepare_write,
     commit_write: reiserfs_commit_write,
