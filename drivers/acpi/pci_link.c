@@ -516,9 +516,8 @@ acpi_pci_link_get_irq (
 		return_VALUE(0);
 	}
 
-	if (acpi_pci_link_allocate(link)) {
-		return -ENODEV;
-	}
+	if (acpi_pci_link_allocate(link))
+		return_VALUE(0);
 	   
 	if (!link->irq.active) {
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Link disabled\n"));
