@@ -17,6 +17,8 @@
 #include "security.h"
 #include "objsec.h"
 
+extern void selnl_notify_setenforce(int val);
+
 /* Check whether a task is allowed to use a security operation. */
 int task_has_security(struct task_struct *tsk,
 		      u32 perms)
@@ -111,6 +113,7 @@ static ssize_t sel_write_enforce(struct file * file, const char * buf,
 		selinux_enforcing = new_value;
 		if (selinux_enforcing)
 			avc_ss_reset(0);
+		selnl_notify_setenforce(selinux_enforcing);
 	}
 	length = count;
 out:
