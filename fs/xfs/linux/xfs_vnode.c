@@ -94,7 +94,7 @@ vn_reclaim(struct vnode *vp)
 
 	VN_LOCK(vp);
 	vp->v_flag &= (VRECLM|VWAIT);
-	VN_UNLOCK(vp);
+	VN_UNLOCK(vp, 0);
 
 	vp->v_type = VNON;
 	vp->v_fbhv = NULL;
@@ -115,7 +115,7 @@ vn_wakeup(struct vnode *vp)
 		sv_broadcast(vptosync(vp));
 	}
 	vp->v_flag &= ~(VRECLM|VWAIT|VMODIFIED);
-	VN_UNLOCK(vp);
+	VN_UNLOCK(vp, 0);
 }
 
 int
@@ -127,7 +127,7 @@ vn_wait(struct vnode *vp)
 		sv_wait(vptosync(vp), PINOD, &vp->v_lock, 0);
 		return 1;
 	}
-	VN_UNLOCK(vp);
+	VN_UNLOCK(vp, 0);
 	return 0;
 }
 
@@ -235,7 +235,7 @@ again:
 	 */
 	VN_LOCK(vp);
 	if (vp->v_number != vmap->v_number) {
-		VN_UNLOCK(vp);
+		VN_UNLOCK(vp, 0);
 		return;
 	}
 
@@ -256,13 +256,13 @@ again:
 	 * Another process could have raced in and gotten this vnode...
 	 */
 	if (vn_count(vp) > 0) {
-		VN_UNLOCK(vp);
+		VN_UNLOCK(vp, 0);
 		return;
 	}
 
 	XFS_STATS_DEC(xfsstats.vn_active);
 	vp->v_flag |= VRECLM;
-	VN_UNLOCK(vp);
+	VN_UNLOCK(vp, 0);
 
 	/*
 	 * Call VOP_RECLAIM and clean vp. The FSYNC_INVAL flag tells
@@ -292,7 +292,7 @@ vn_hold(struct vnode *vp)
 	VN_LOCK(vp);
 	inode = igrab(LINVFS_GET_IP(vp));
 	ASSERT(inode);
-	VN_UNLOCK(vp);
+	VN_UNLOCK(vp, 0);
 
 	return vp;
 }
@@ -324,7 +324,7 @@ vn_rele(struct vnode *vp)
 		 * until we turn off VINACT or VRECLM
 		 */
 		vp->v_flag |= VINACT;
-		VN_UNLOCK(vp);
+		VN_UNLOCK(vp, 0);
 
 		/*
 		 * Do not make the VOP_INACTIVE call if there
@@ -345,7 +345,7 @@ vn_rele(struct vnode *vp)
 
 	}
 
-	VN_UNLOCK(vp);
+	VN_UNLOCK(vp, 0);
 
 	vn_trace_exit(vp, "vn_rele", (inst_t *)__return_address);
 }
