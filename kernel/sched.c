@@ -203,7 +203,7 @@ struct runqueue {
 	task_t *curr, *idle;
 	struct mm_struct *prev_mm;
 	prio_array_t *active, *expired, arrays[2];
-	int prev_cpu_load[NR_CPUS];
+	int best_expired_prio, prev_cpu_load[NR_CPUS];
 #ifdef CONFIG_NUMA
 	atomic_t *node_nr_running;
 	int prev_node_load[MAX_NUMNODES];
@@ -1342,12 +1342,14 @@ EXPORT_PER_CPU_SYMBOL(kstat);
  * interactivity of a task if the first expired task had to wait more
  * than a 'reasonable' amount of time. This deadline timeout is
  * load-dependent, as the frequency of array switched decreases with
- * increasing number of running tasks:
+ * increasing number of running tasks. We also ignore the interactivity
+ * if a better static_prio task has expired:
  */
 #define EXPIRED_STARVING(rq) \
-		(STARVATION_LIMIT && ((rq)->expired_timestamp && \
+	((STARVATION_LIMIT && ((rq)->expired_timestamp && \
 		(jiffies - (rq)->expired_timestamp >= \
-			STARVATION_LIMIT * ((rq)->nr_running) + 1)))
+			STARVATION_LIMIT * ((rq)->nr_running) + 1))) || \
+				((rq)->curr->static_prio > (rq)->best_expired_prio))
 
 /*
  * This function gets called by the timer code, with HZ frequency.
@@ -1429,6 +1431,8 @@ void scheduler_tick(int user_ticks, int sys_ticks)
 			rq->expired_timestamp = jiffies;
 		if (!TASK_INTERACTIVE(p) || EXPIRED_STARVING(rq)) {
 			enqueue_task(p, rq->expired);
+			if (p->static_prio < rq->best_expired_prio)
+				rq->best_expired_prio = p->static_prio;
 		} else
 			enqueue_task(p, rq->active);
 	} else {
@@ -1549,6 +1553,7 @@ need_resched:
 		rq->expired = array;
 		array = rq->active;
 		rq->expired_timestamp = 0;
+		rq->best_expired_prio = MAX_PRIO;
 	}
 
 	idx = sched_find_first_bit(array->bitmap);
@@ -2811,6 +2816,8 @@ void __init sched_init(void)
 		rq = cpu_rq(i);
 		rq->active = rq->arrays;
 		rq->expired = rq->arrays + 1;
+		rq->best_expired_prio = MAX_PRIO;
+
 		spin_lock_init(&rq->lock);
 		INIT_LIST_HEAD(&rq->migration_queue);
 		atomic_set(&rq->nr_iowait, 0);
