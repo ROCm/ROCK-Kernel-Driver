@@ -65,6 +65,27 @@ static const struct pnp_device_id * match_device(struct pnp_driver *drv, struct 
 	return NULL;
 }
 
+int pnp_device_attach(struct pnp_dev *pnp_dev)
+{
+	spin_lock(&pnp_lock);
+	if(pnp_dev->status != PNP_READY){
+		spin_unlock(&pnp_lock);
+		return -EBUSY;
+	}
+	pnp_dev->status = PNP_ATTACHED;
+	spin_unlock(&pnp_lock);
+	return 0;
+}
+
+void pnp_device_detach(struct pnp_dev *pnp_dev)
+{
+	spin_lock(&pnp_lock);
+	if (pnp_dev->status == PNP_ATTACHED)
+		pnp_dev->status = PNP_READY;
+	spin_unlock(&pnp_lock);
+	pnp_disable_dev(pnp_dev);
+}
+
 static int pnp_device_probe(struct device *dev)
 {
 	int error;
@@ -76,13 +97,9 @@ static int pnp_device_probe(struct device *dev)
 
 	pnp_dbg("pnp: match found with the PnP device '%s' and the driver '%s'", dev->bus_id,pnp_drv->name);
 
-	spin_lock(&pnp_lock);
-	if(pnp_dev->status != PNP_READY){
-		spin_unlock(&pnp_lock);
-		return -EBUSY;
-	}
-	pnp_dev->status = PNP_ATTACHED;
-	spin_unlock(&pnp_lock);
+	error = pnp_device_attach(pnp_dev);
+	if (error < 0)
+		return error;
 
 	if (pnp_dev->active == 0) {
 		if (!(pnp_drv->flags & PNP_DRIVER_DO_NOT_ACTIVATE)) {
@@ -109,8 +126,7 @@ static int pnp_device_probe(struct device *dev)
 	return error;
 
 fail:
-	pnp_dev->status = PNP_READY;
-	pnp_disable_dev(pnp_dev);
+	pnp_device_detach(pnp_dev);
 	return error;
 }
 
@@ -124,11 +140,7 @@ static int pnp_device_remove(struct device *dev)
 			drv->remove(pnp_dev);
 		pnp_dev->driver = NULL;
 	}
-	spin_lock(&pnp_lock);
-	if (pnp_dev->status == PNP_ATTACHED)
-		pnp_dev->status = PNP_READY;
-	spin_unlock(&pnp_lock);
-	pnp_disable_dev(pnp_dev);
+	pnp_device_detach(pnp_dev);
 	return 0;
 }
 
@@ -206,3 +218,5 @@ int pnp_add_id(struct pnp_id *id, struct pnp_dev *dev)
 EXPORT_SYMBOL(pnp_register_driver);
 EXPORT_SYMBOL(pnp_unregister_driver);
 EXPORT_SYMBOL(pnp_add_id);
+EXPORT_SYMBOL(pnp_device_attach);
+EXPORT_SYMBOL(pnp_device_detach);

@@ -194,7 +194,7 @@ static int ns558_pnp_probe(struct pnp_dev *dev, const struct pnp_device_id *did)
 	int ioport, iolen;
 	struct ns558 *port;
 
-	if (!(dev->resource[0].flags & IORESOURCE_IO)) {
+	if (!pnp_port_valid(dev, 0)) {
 		printk(KERN_WARNING "ns558: No i/o ports on a gameport? Weird\n");
 		return -ENODEV;
 	}

@@ -671,9 +671,10 @@ static int pnp_dock_thread(void * unused)
 static void add_irqresource(struct pnp_dev *dev, int irq)
 {
 	int i = 0;
-	while (!(dev->irq_resource[i].flags & IORESOURCE_UNSET) && i < DEVICE_COUNT_IRQ) i++;
+	while (pnp_irq_valid(dev, i) && i < DEVICE_COUNT_IRQ) i++;
 	if (i < DEVICE_COUNT_IRQ) {
-		dev->irq_resource[i].start = (unsigned long) irq;
+		dev->irq_resource[i].start = 
+		dev->irq_resource[i].end = (unsigned long) irq;
 		dev->irq_resource[i].flags = IORESOURCE_IRQ;  // Also clears _UNSET flag
 	}
 }
@@ -681,9 +682,10 @@ static void add_irqresource(struct pnp_dev *dev, int irq)
 static void add_dmaresource(struct pnp_dev *dev, int dma)
 {
 	int i = 0;
-	while (!(dev->dma_resource[i].flags & IORESOURCE_UNSET) && i < DEVICE_COUNT_DMA) i++;
+	while (pnp_dma_valid(dev, i) && i < DEVICE_COUNT_DMA) i++;
 	if (i < DEVICE_COUNT_DMA) {
-		dev->dma_resource[i].start = (unsigned long) dma;
+		dev->dma_resource[i].start =
+		dev->dma_resource[i].end = (unsigned long) dma;
 		dev->dma_resource[i].flags = IORESOURCE_DMA;  // Also clears _UNSET flag
 	}
 }
@@ -691,22 +693,22 @@ static void add_dmaresource(struct pnp_dev *dev, int dma)
 static void add_ioresource(struct pnp_dev *dev, int io, int len)
 {
 	int i = 0;
-	while (!(dev->resource[i].flags & IORESOURCE_UNSET) && i < DEVICE_COUNT_RESOURCE) i++;
+	while (pnp_port_valid(dev, i) && i < DEVICE_COUNT_IO) i++;
 	if (i < DEVICE_COUNT_RESOURCE) {
-		dev->resource[i].start = (unsigned long) io;
-		dev->resource[i].end = (unsigned long)(io + len - 1);
-		dev->resource[i].flags = IORESOURCE_IO;  // Also clears _UNSET flag
+		dev->io_resource[i].start = (unsigned long) io;
+		dev->io_resource[i].end = (unsigned long)(io + len - 1);
+		dev->io_resource[i].flags = IORESOURCE_IO;  // Also clears _UNSET flag
 	}
 }
 
 static void add_memresource(struct pnp_dev *dev, int mem, int len)
 {
-	int i = 8;
-	while (!(dev->resource[i].flags & IORESOURCE_UNSET) && i < DEVICE_COUNT_RESOURCE) i++;
+	int i = 0;
+	while (pnp_mem_valid(dev, i) && i < DEVICE_COUNT_MEM) i++;
 	if (i < DEVICE_COUNT_RESOURCE) {
-		dev->resource[i].start = (unsigned long) mem;
-		dev->resource[i].end = (unsigned long)(mem + len - 1);
-		dev->resource[i].flags = IORESOURCE_MEM;  // Also clears _UNSET flag
+		dev->mem_resource[i].start = (unsigned long) mem;
+		dev->mem_resource[i].end = (unsigned long)(mem + len - 1);
+		dev->mem_resource[i].flags = IORESOURCE_MEM;  // Also clears _UNSET flag
 	}
 }
 
@@ -718,17 +720,25 @@ static unsigned char *node_current_resource_data_to_dev(struct pnp_bios_node *no
 	/*
 	 * First, set resource info to default values
 	 */
-	for (i=0;i<DEVICE_COUNT_RESOURCE;i++) {
-		dev->resource[i].start = 0;  // "disabled"
-		dev->resource[i].flags = IORESOURCE_UNSET;
+	for (i=0;i<DEVICE_COUNT_IO;i++) {
+		dev->io_resource[i].start = 0;
+		dev->io_resource[i].end = 0;
+		dev->io_resource[i].flags = IORESOURCE_IO|IORESOURCE_UNSET;
+	}
+	for (i=0;i<DEVICE_COUNT_MEM;i++) {
+		dev->mem_resource[i].start = 0;
+		dev->mem_resource[i].end = 0;
+		dev->mem_resource[i].flags = IORESOURCE_MEM|IORESOURCE_UNSET;
 	}
 	for (i=0;i<DEVICE_COUNT_IRQ;i++) {
-		dev->irq_resource[i].start = (unsigned long)-1;  // "disabled"
-		dev->irq_resource[i].flags = IORESOURCE_UNSET;
+		dev->irq_resource[i].start = (unsigned long)-1;
+		dev->irq_resource[i].end = (unsigned long)-1;
+		dev->irq_resource[i].flags = IORESOURCE_IRQ|IORESOURCE_UNSET;
 	}
 	for (i=0;i<DEVICE_COUNT_DMA;i++) {
-		dev->dma_resource[i].start = (unsigned long)-1;  // "disabled"
-		dev->dma_resource[i].flags = IORESOURCE_UNSET;
+		dev->dma_resource[i].start = (unsigned long)-1;
+		dev->dma_resource[i].end = (unsigned long)-1;
+		dev->dma_resource[i].flags = IORESOURCE_DMA|IORESOURCE_UNSET;
 	}
 
 	/*
@@ -815,10 +825,10 @@ static unsigned char *node_current_resource_data_to_dev(struct pnp_bios_node *no
 
         } /* while */
 	end:
-	if ((dev->resource[0].start == 0) &&
-	    (dev->resource[8].start == 0) &&
-	    (dev->irq_resource[0].start == -1) &&
-	    (dev->dma_resource[0].start == -1))
+	if (pnp_port_valid(dev, 0) == 0 &&
+	    pnp_mem_valid(dev, 0) == 0 &&
+	    pnp_irq_valid(dev, 0) == 0 &&
+	    pnp_dma_valid(dev, 0) == 0)
 		dev->active = 0;
 	else
 		dev->active = 1;
