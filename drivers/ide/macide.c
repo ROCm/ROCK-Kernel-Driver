@@ -69,7 +69,7 @@ static int macide_offsets[IDE_NR_PORTS] = {
     IDE_HCYL, IDE_SELECT, IDE_STATUS,  IDE_CONTROL
 };
 
-int macide_ack_intr(ide_hwif_t* hwif)
+int macide_ack_intr(struct ata_channel *hwif)
 {
 	if (*ide_ifr & 0x20) {
 		*ide_ifr &= ~0x20;

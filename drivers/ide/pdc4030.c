@@ -99,7 +99,7 @@ static void promise_selectproc (ide_drive_t *drive)
 {
 	unsigned int number;
 
-	number = (HWIF(drive)->channel << 1) + drive->select.b.unit;
+	number = (drive->channel->unit << 1) + drive->select.b.unit;
 	OUT_BYTE(number,IDE_FEATURE_REG);
 }
 
@@ -155,10 +155,10 @@ void __init init_pdc4030 (void)
  * setup_pdc4030()
  * Completes the setup of a Promise DC4030 controller card, once found.
  */
-int __init setup_pdc4030 (ide_hwif_t *hwif)
+int __init setup_pdc4030(struct ata_channel *hwif)
 {
         ide_drive_t *drive;
-	ide_hwif_t *hwif2;
+	struct ata_channel *hwif2;
 	struct dc_ident ident;
 	int i;
 	ide_startstop_t startstop;
@@ -226,13 +226,13 @@ int __init setup_pdc4030 (ide_hwif_t *hwif)
 	hwif->chipset	= hwif2->chipset = ide_pdc4030;
 	hwif->mate	= hwif2;
 	hwif2->mate	= hwif;
-	hwif2->channel	= 1;
+	hwif2->unit	= 1;
 	hwif->selectproc = hwif2->selectproc = &promise_selectproc;
 	hwif->serialized = hwif2->serialized = 1;
 
 /* Shift the remaining interfaces down by one */
 	for (i=MAX_HWIFS-1 ; i > hwif->index+1 ; i--) {
-		ide_hwif_t *h = &ide_hwifs[i];
+		struct ata_channel *h = &ide_hwifs[i];
 
 #ifdef DEBUG
 		printk(KERN_DEBUG "Shifting i/f %d values to i/f %d\n",i-1,i);
@@ -263,7 +263,7 @@ int __init setup_pdc4030 (ide_hwif_t *hwif)
  * Tests for the presence of a DC4030 Promise card on this interface
  * Returns: 1 if found, 0 if not found
  */
-int __init detect_pdc4030(ide_hwif_t *hwif)
+int __init detect_pdc4030(struct ata_channel *hwif)
 {
 	ide_drive_t *drive = &hwif->drives[0];
 
@@ -288,7 +288,7 @@ int __init detect_pdc4030(ide_hwif_t *hwif)
 void __init ide_probe_for_pdc4030(void)
 {
 	unsigned int	index;
-	ide_hwif_t	*hwif;
+	struct ata_channel *hwif;
 
 	if (enable_promise_support == 0)
 		return;
@@ -394,6 +394,7 @@ static ide_startstop_t promise_complete_pollfunc(ide_drive_t *drive)
 
 	if (GET_STAT() & BUSY_STAT) {
 		if (time_before(jiffies, hwgroup->poll_timeout)) {
+			BUG_ON(HWGROUP(drive)->handler);
 			ide_set_handler(drive, &promise_complete_pollfunc, HZ/100, NULL);
 			return ide_started; /* continue polling... */
 		}
@@ -476,6 +477,7 @@ static ide_startstop_t promise_write_pollfunc (ide_drive_t *drive)
 
 	if (IN_BYTE(IDE_NSECTOR_REG) != 0) {
 		if (time_before(jiffies, hwgroup->poll_timeout)) {
+			BUG_ON(HWGROUP(drive)->handler);
 			ide_set_handler (drive, &promise_write_pollfunc, HZ/100, NULL);
 			return ide_started; /* continue polling... */
 		}
@@ -489,6 +491,7 @@ static ide_startstop_t promise_write_pollfunc (ide_drive_t *drive)
 	 */
 	promise_multwrite(drive, 4);
 	hwgroup->poll_timeout = jiffies + WAIT_WORSTCASE;
+	BUG_ON(HWGROUP(drive)->handler);
 	ide_set_handler(drive, &promise_complete_pollfunc, HZ/100, NULL);
 #ifdef DEBUG_WRITE
 	printk(KERN_DEBUG "%s: Done last 4 sectors - status = %02x\n",
@@ -523,6 +526,7 @@ static ide_startstop_t promise_write (ide_drive_t *drive)
 		if (promise_multwrite(drive, rq->nr_sectors - 4))
 			return ide_stopped;
 		hwgroup->poll_timeout = jiffies + WAIT_WORSTCASE;
+		BUG_ON(HWGROUP(drive)->handler);
 		ide_set_handler (drive, &promise_write_pollfunc, HZ/100, NULL);
 		return ide_started;
 	} else {
@@ -533,6 +537,7 @@ static ide_startstop_t promise_write (ide_drive_t *drive)
 		if (promise_multwrite(drive, rq->nr_sectors))
 			return ide_stopped;
 		hwgroup->poll_timeout = jiffies + WAIT_WORSTCASE;
+		BUG_ON(HWGROUP(drive)->handler);
 		ide_set_handler(drive, &promise_complete_pollfunc, HZ/100, NULL);
 #ifdef DEBUG_WRITE
 		printk(KERN_DEBUG "%s: promise_write: <= 4 sectors, "
@@ -549,14 +554,21 @@ static ide_startstop_t promise_write (ide_drive_t *drive)
  */
 ide_startstop_t do_pdc4030_io (ide_drive_t *drive, ide_task_t *task)
 {
-	struct request *rq	= HWGROUP(drive)->rq;
-	task_struct_t *taskfile	= (task_struct_t *) task->tfRegister;
+	struct request *rq = HWGROUP(drive)->rq;
+	struct hd_drive_task_hdr *taskfile = &task->taskfile;
 	unsigned long timeout;
 	byte stat;
 
+	/* Check that it's a regular command. If not, bomb out early. */
+	if (!(rq->flags & REQ_CMD)) {
+		blk_dump_rq_flags(rq, "pdc4030 bad flags");
+		ide_end_request(drive, 0);
+		return ide_stopped;
+	}
+
 	if (IDE_CONTROL_REG)
 		OUT_BYTE(drive->ctl, IDE_CONTROL_REG);  /* clear nIEN */
-	SELECT_MASK(HWIF(drive), drive, 0);
+	SELECT_MASK(drive->channel, drive, 0);
 
 	OUT_BYTE(taskfile->feature, IDE_FEATURE_REG);
 	OUT_BYTE(taskfile->sector_count, IDE_NSECTOR_REG);
@@ -568,20 +580,12 @@ ide_startstop_t do_pdc4030_io (ide_drive_t *drive, ide_task_t *task)
 	OUT_BYTE(taskfile->device_head, IDE_SELECT_REG);
 	OUT_BYTE(taskfile->command, IDE_COMMAND_REG);
 
-/* Check that it's a regular command. If not, bomb out early. */
-	if (!(rq->flags & REQ_CMD)) {
-		blk_dump_rq_flags(rq, "pdc4030 bad flags");
-		ide_end_request(drive, 0);
-		return ide_stopped;
-	}
-
 	switch (rq_data_dir(rq)) {
 	case READ:
-		OUT_BYTE(PROMISE_READ, IDE_COMMAND_REG);
 /*
  * The card's behaviour is odd at this point. If the data is
  * available, DRQ will be true, and no interrupt will be
- * generated by the card. If this is the case, we need to call the 
+ * generated by the card. If this is the case, we need to call the
  * "interrupt" handler (promise_read_intr) directly. Otherwise, if
  * an interrupt is going to occur, bit0 of the SELECT register will
  * be high, so we can set the handler the just return and be interrupted.
@@ -600,6 +604,7 @@ ide_startstop_t do_pdc4030_io (ide_drive_t *drive, ide_task_t *task)
 				printk(KERN_DEBUG "%s: read: waiting for "
 				                  "interrupt\n", drive->name);
 #endif
+				BUG_ON(HWGROUP(drive)->handler);
 				ide_set_handler(drive, &promise_read_intr, WAIT_CMD, NULL);
 				return ide_started;
 			}
@@ -612,7 +617,6 @@ ide_startstop_t do_pdc4030_io (ide_drive_t *drive, ide_task_t *task)
 
 	case WRITE: {
 		ide_startstop_t startstop;
-		OUT_BYTE(PROMISE_WRITE, IDE_COMMAND_REG);
 /*
  * Strategy on write is:
  *	look for the DRQ that should have been immediately asserted
@@ -624,7 +628,7 @@ ide_startstop_t do_pdc4030_io (ide_drive_t *drive, ide_task_t *task)
 			printk(KERN_ERR "%s: no DRQ after issuing "
 			       "PROMISE_WRITE\n", drive->name);
 			return startstop;
-	    	}
+		}
 		if (!drive->unmask)
 			__cli();	/* local CPU only */
 		HWGROUP(drive)->wrq = *rq; /* scratchpad */
@@ -652,15 +656,13 @@ ide_startstop_t promise_rw_disk (ide_drive_t *drive, struct request *rq, unsigne
 	taskfile.device_head	= ((block>>8)&0x0f)|drive->select.all;
 	taskfile.command	= (rq_data_dir(rq)==READ)?PROMISE_READ:PROMISE_WRITE;
 
-	memcpy(args.tfRegister, &taskfile, sizeof(struct hd_drive_task_hdr));
-	memcpy(args.hobRegister, NULL, sizeof(struct hd_drive_hob_hdr));
+	args.taskfile = taskfile;
+	memset(&args.hobfile, 0, sizeof(struct hd_drive_hob_hdr));
+
 	ide_cmd_type_parser(&args);
 	/* We don't use the generic inerrupt handlers here? */
 	args.prehandler		= NULL;
 	args.handler		= NULL;
-	args.rq			= rq;
-	args.block		= block;
-	rq->special		= NULL;
 	rq->special		= &args;
 
 	return do_pdc4030_io(drive, &args);

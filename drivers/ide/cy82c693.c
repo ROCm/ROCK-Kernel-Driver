@@ -192,7 +192,7 @@ static void cy82c693_dma_enable (ide_drive_t *drive, int mode, int single)
 	if (mode > drive->id->tDMA)  /* to be absolutly sure we have a valid mode */
 		mode = drive->id->tDMA;
 	
-        index = (HWIF(drive)->channel==0) ? CY82_INDEX_CHANNEL0 : CY82_INDEX_CHANNEL1;
+        index = (drive->channel->unit == 0) ? CY82_INDEX_CHANNEL0 : CY82_INDEX_CHANNEL1;
 
 #if CY82C693_DEBUG_LOGS
        	/* for debug let's show the previous values */
@@ -200,7 +200,7 @@ static void cy82c693_dma_enable (ide_drive_t *drive, int mode, int single)
 	OUT_BYTE(index, CY82_INDEX_PORT);
 	data = IN_BYTE(CY82_DATA_PORT);
 
-	printk (KERN_INFO "%s (ch=%d, dev=%d): DMA mode is %d (single=%d)\n", drive->name, HWIF(drive)->channel, drive->select.b.unit, (data&0x3), ((data>>2)&1));
+	printk (KERN_INFO "%s (ch=%d, dev=%d): DMA mode is %d (single=%d)\n", drive->name, drive->channel->unit, drive->select.b.unit, (data&0x3), ((data>>2)&1));
 #endif /* CY82C693_DEBUG_LOGS */
 
 	data = (byte)mode|(byte)(single<<2);
@@ -209,7 +209,7 @@ static void cy82c693_dma_enable (ide_drive_t *drive, int mode, int single)
 	OUT_BYTE(data, CY82_DATA_PORT);
 
 #if CY82C693_DEBUG_INFO
-	printk (KERN_INFO "%s (ch=%d, dev=%d): set DMA mode to %d (single=%d)\n", drive->name, HWIF(drive)->channel, drive->select.b.unit, mode, single);
+	printk (KERN_INFO "%s (ch=%d, dev=%d): set DMA mode to %d (single=%d)\n", drive->name, drive->channel->unit, drive->select.b.unit, mode, single);
 #endif /* CY82C693_DEBUG_INFO */
 
 	/* 
@@ -271,7 +271,7 @@ static int cy82c693_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
  */
 static void cy82c693_tune_drive (ide_drive_t *drive, byte pio)
 {
-	ide_hwif_t *hwif = HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	struct pci_dev *dev = hwif->pci_dev;
 	pio_clocks_t pclk;
 	unsigned int addrCtrl;
@@ -318,7 +318,7 @@ static void cy82c693_tune_drive (ide_drive_t *drive, byte pio)
 		pci_read_config_byte(dev, CY82_IDE_SLAVE_8BIT, &pclk.time_8);
 	}
 
-	printk (KERN_INFO "%s (ch=%d, dev=%d): PIO timing is (addr=0x%X, ior=0x%X, iow=0x%X, 8bit=0x%X)\n", drive->name, hwif->channel, drive->select.b.unit, addrCtrl, pclk.time_16r, pclk.time_16w, pclk.time_8);
+	printk (KERN_INFO "%s (ch=%d, dev=%d): PIO timing is (addr=0x%X, ior=0x%X, iow=0x%X, 8bit=0x%X)\n", drive->name, hwif->unit, drive->select.b.unit, addrCtrl, pclk.time_16r, pclk.time_16w, pclk.time_8);
 #endif /* CY82C693_DEBUG_LOGS */
 
         /* first let's calc the pio modes */
@@ -371,7 +371,7 @@ static void cy82c693_tune_drive (ide_drive_t *drive, byte pio)
 	}	
 
 #if CY82C693_DEBUG_INFO
-	printk (KERN_INFO "%s (ch=%d, dev=%d): set PIO timing to (addr=0x%X, ior=0x%X, iow=0x%X, 8bit=0x%X)\n", drive->name, hwif->channel, drive->select.b.unit, addrCtrl, pclk.time_16r, pclk.time_16w, pclk.time_8);
+	printk (KERN_INFO "%s (ch=%d, dev=%d): set PIO timing to (addr=0x%X, ior=0x%X, iow=0x%X, 8bit=0x%X)\n", drive->name, hwif->unit, drive->select.b.unit, addrCtrl, pclk.time_16r, pclk.time_16w, pclk.time_8);
 #endif /* CY82C693_DEBUG_INFO */
 }
 
@@ -431,7 +431,7 @@ unsigned int __init pci_init_cy82c693(struct pci_dev *dev)
 /*
  * the init function - called for each ide channel once
  */
-void __init ide_init_cy82c693(ide_hwif_t *hwif)
+void __init ide_init_cy82c693(struct ata_channel *hwif)
 {
 	hwif->chipset = ide_cy82c693;
 	hwif->tuneproc = cy82c693_tune_drive;

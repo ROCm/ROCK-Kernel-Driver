@@ -217,6 +217,9 @@ static char * pdc202xx_info_new (char *buf, struct pci_dev *dev)
 		case PCI_DEVICE_ID_PROMISE_20275:
 			p += sprintf(p, "\n                                PDC20275 Chipset.\n");
 			break;
+		case PCI_DEVICE_ID_PROMISE_20276:
+			p += sprintf(p, "\n                                PDC20276 Chipset.\n");
+			break;
 		case PCI_DEVICE_ID_PROMISE_20269:
 			p += sprintf(p, "\n                                PDC20269 TX2 Chipset.\n");
 			break;
@@ -236,6 +239,7 @@ static int pdc202xx_get_info (char *buffer, char **addr, off_t offset, int count
 	char *p = buffer;
 	switch(bmide_dev->device) {
 		case PCI_DEVICE_ID_PROMISE_20275:
+		case PCI_DEVICE_ID_PROMISE_20276:
 		case PCI_DEVICE_ID_PROMISE_20269:
 		case PCI_DEVICE_ID_PROMISE_20268:
 		case PCI_DEVICE_ID_PROMISE_20268R:
@@ -395,8 +399,8 @@ static int check_in_drive_lists (ide_drive_t *drive, const char **list)
 
 static int pdc202xx_tune_chipset (ide_drive_t *drive, byte speed)
 {
-	ide_hwif_t *hwif	= HWIF(drive);
-	struct pci_dev *dev	= hwif->pci_dev;
+	struct ata_channel *hwif = drive->channel;
+	struct pci_dev *dev = hwif->pci_dev;
 
 	unsigned int		drive_conf;
 	int			err;
@@ -519,14 +523,14 @@ static int pdc202xx_tune_chipset (ide_drive_t *drive, byte speed)
 
 static int pdc202xx_new_tune_chipset (ide_drive_t *drive, byte speed)
 {
-	ide_hwif_t *hwif	= HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	unsigned long indexreg	= (hwif->dma_base + 1);
 	unsigned long datareg	= (hwif->dma_base + 3);
 #else
 	struct pci_dev *dev	= hwif->pci_dev;
 	unsigned long high_16	= pci_resource_start(dev, 4);
-	unsigned long indexreg	= high_16 + (hwif->channel ? 0x09 : 0x01);
+	unsigned long indexreg	= high_16 + (hwif->unit ? 0x09 : 0x01);
 	unsigned long datareg	= (indexreg + 2);
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 	byte thold		= 0x10;
@@ -660,6 +664,7 @@ static int pdc202xx_new_tune_chipset (ide_drive_t *drive, byte speed)
 			OUT_BYTE(0xac, datareg);
 			break;
 		default:
+			;
 	}
 
 	if (!drive->init_speed)
@@ -698,7 +703,7 @@ static void pdc202xx_tune_drive (ide_drive_t *drive, byte pio)
 static int config_chipset_for_dma (ide_drive_t *drive, byte ultra)
 {
 	struct hd_driveid *id	= drive->id;
-	ide_hwif_t *hwif	= HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	struct pci_dev *dev	= hwif->pci_dev;
 	unsigned long high_16   = pci_resource_start(dev, 4);
 	unsigned long dma_base  = hwif->dma_base;
@@ -720,8 +725,8 @@ static int config_chipset_for_dma (ide_drive_t *drive, byte ultra)
 	byte udma_66		= ((eighty_ninty_three(drive)) && udma_33) ? 1 : 0;
 	byte udma_100		= 0;
 	byte udma_133		= 0;
-	byte mask		= hwif->channel ? 0x08 : 0x02;
-	unsigned short c_mask	= hwif->channel ? (1<<11) : (1<<10);
+	byte mask		= hwif->unit ? 0x08 : 0x02;
+	unsigned short c_mask	= hwif->unit ? (1<<11) : (1<<10);
 
 	byte ultra_66		= ((id->dma_ultra & 0x0010) ||
 				   (id->dma_ultra & 0x0008)) ? 1 : 0;
@@ -732,6 +737,7 @@ static int config_chipset_for_dma (ide_drive_t *drive, byte ultra)
 
 	switch(dev->device) {
 		case PCI_DEVICE_ID_PROMISE_20275:
+		case PCI_DEVICE_ID_PROMISE_20276:
 		case PCI_DEVICE_ID_PROMISE_20269:
 			udma_133 = (udma_66) ? 1 : 0;
 			udma_100 = (udma_66) ? 1 : 0;
@@ -786,14 +792,14 @@ static int config_chipset_for_dma (ide_drive_t *drive, byte ultra)
 
 	if (((ultra_66) || (ultra_100) || (ultra_133)) && (cable)) {
 #ifdef DEBUG
-		printk("ULTRA66: %s channel of Ultra 66 requires an 80-pin cable for Ultra66 operation.\n", hwif->channel ? "Secondary" : "Primary");
+		printk("ULTRA66: %s channel of Ultra 66 requires an 80-pin cable for Ultra66 operation.\n", hwif->unit ? "Secondary" : "Primary");
 		printk("         Switching to Ultra33 mode.\n");
 #endif /* DEBUG */
 		/* Primary   : zero out second bit */
 		/* Secondary : zero out fourth bit */
 		if (!jumpbit)
 			OUT_BYTE(CLKSPD & ~mask, (high_16 + 0x11));
-		printk("Warning: %s channel requires an 80-pin cable for operation.\n", hwif->channel ? "Secondary":"Primary");
+		printk("Warning: %s channel requires an 80-pin cable for operation.\n", hwif->unit ? "Secondary":"Primary");
 		printk("%s reduced to Ultra33 mode.\n", drive->name);
 		udma_66 = 0; udma_100 = 0; udma_133 = 0;
 	} else {
@@ -918,7 +924,7 @@ jumpbit_is_set:
 static int config_drive_xfer_rate (ide_drive_t *drive)
 {
 	struct hd_driveid *id = drive->id;
-	ide_hwif_t *hwif = HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	ide_dma_action_t dma_func = ide_dma_off_quietly;
 
 	if (id && (id->capability & 1) && hwif->autodma) {
@@ -963,7 +969,7 @@ no_dma_set:
 		(void) config_chipset_for_pio(drive, 5);
 	}
 
-	return HWIF(drive)->dmaproc(dma_func, drive);
+	return drive->channel->dmaproc(dma_func, drive);
 }
 
 int pdc202xx_quirkproc (ide_drive_t *drive)
@@ -981,14 +987,15 @@ int pdc202xx_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 	byte newchip		= 0;
 	byte clock		= 0;
 	byte hardware48hack	= 0;
-	ide_hwif_t *hwif	= HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	struct pci_dev *dev	= hwif->pci_dev;
 	unsigned long high_16	= pci_resource_start(dev, 4);
-	unsigned long atapi_reg	= high_16 + (hwif->channel ? 0x24 : 0x00);
+	unsigned long atapi_reg	= high_16 + (hwif->unit ? 0x24 : 0x00);
 	unsigned long dma_base	= hwif->dma_base;
 
 	switch (dev->device) {
 		case PCI_DEVICE_ID_PROMISE_20275:
+		case PCI_DEVICE_ID_PROMISE_20276:
 		case PCI_DEVICE_ID_PROMISE_20269:
 		case PCI_DEVICE_ID_PROMISE_20268R:
 		case PCI_DEVICE_ID_PROMISE_20268:
@@ -1016,7 +1023,7 @@ int pdc202xx_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 				struct request *rq = HWGROUP(drive)->rq;
 				unsigned long word_count = 0;
 
-				outb(clock|(hwif->channel ? 0x08 : 0x02), high_16 + 0x11);
+				outb(clock|(hwif->unit ? 0x08 : 0x02), high_16 + 0x11);
 				word_count = (rq->nr_sectors << 8);
 				word_count = (rq_data_dir(rq) == READ) ? word_count | 0x05000000 : word_count | 0x06000000;
 				outl(word_count, atapi_reg);
@@ -1026,7 +1033,7 @@ int pdc202xx_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 			if ((drive->addressing) && (hardware48hack)) {
 				outl(0, atapi_reg);	/* zero out extra */
 				clock = IN_BYTE(high_16 + 0x11);
-				OUT_BYTE(clock & ~(hwif->channel ? 0x08:0x02), high_16 + 0x11);
+				OUT_BYTE(clock & ~(hwif->unit ? 0x08:0x02), high_16 + 0x11);
 			}
 			break;
 		case ide_dma_test_irq:	/* returns 1 if dma irq issued, 0 otherwise */
@@ -1035,7 +1042,7 @@ int pdc202xx_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 				return (dma_stat & 4) == 4;
 
 			sc1d = IN_BYTE(high_16 + 0x001d);
-			if (HWIF(drive)->channel) {
+			if (drive->channel->unit) {
 				if ((sc1d & 0x50) == 0x50) goto somebody_else;
 				else if ((sc1d & 0x40) == 0x40)
 					return (dma_stat & 4) == 4;
@@ -1048,8 +1055,8 @@ somebody_else:
 			return (dma_stat & 4) == 4;	/* return 1 if INTR asserted */
 		case ide_dma_lostirq:
 		case ide_dma_timeout:
-			if (HWIF(drive)->resetproc != NULL)
-				HWIF(drive)->resetproc(drive);
+			if (drive->channel->resetproc != NULL)
+				drive->channel->resetproc(drive);
 		default:
 			break;
 	}
@@ -1064,12 +1071,12 @@ void pdc202xx_new_reset (ide_drive_t *drive)
 	OUT_BYTE(0x00,IDE_CONTROL_REG);
 	mdelay(1000);
 	printk("PDC202XX: %s channel reset.\n",
-		HWIF(drive)->channel ? "Secondary" : "Primary");
+		drive->channel->unit ? "Secondary" : "Primary");
 }
 
 void pdc202xx_reset (ide_drive_t *drive)
 {
-	unsigned long high_16	= pci_resource_start(HWIF(drive)->pci_dev, 4);
+	unsigned long high_16	= pci_resource_start(drive->channel->pci_dev, 4);
 	byte udma_speed_flag	= IN_BYTE(high_16 + 0x001f);
 
 	OUT_BYTE(udma_speed_flag | 0x10, high_16 + 0x001f);
@@ -1077,7 +1084,7 @@ void pdc202xx_reset (ide_drive_t *drive)
 	OUT_BYTE(udma_speed_flag & ~0x10, high_16 + 0x001f);
 	mdelay(2000);		/* 2 seconds ?! */
 	printk("PDC202XX: %s channel reset.\n",
-		HWIF(drive)->channel ? "Secondary" : "Primary");
+		drive->channel->unit ? "Secondary" : "Primary");
 }
 
 /*
@@ -1088,7 +1095,7 @@ void pdc202xx_reset (ide_drive_t *drive)
 static int pdc202xx_tristate (ide_drive_t * drive, int state)
 {
 #if 0
-	ide_hwif_t *hwif	= HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	unsigned long high_16	= pci_resource_start(hwif->pci_dev, 4);
 	byte sc1f		= inb(high_16 + 0x001f);
 
@@ -1121,6 +1128,7 @@ unsigned int __init pci_init_pdc202xx(struct pci_dev *dev)
 
 	switch (dev->device) {
 		case PCI_DEVICE_ID_PROMISE_20275:
+		case PCI_DEVICE_ID_PROMISE_20276:
 		case PCI_DEVICE_ID_PROMISE_20269:
 		case PCI_DEVICE_ID_PROMISE_20268R:
 		case PCI_DEVICE_ID_PROMISE_20268:
@@ -1208,13 +1216,14 @@ fttk_tx_series:
 	return dev->irq;
 }
 
-unsigned int __init ata66_pdc202xx (ide_hwif_t *hwif)
+unsigned int __init ata66_pdc202xx(struct ata_channel *hwif)
 {
-	unsigned short mask = (hwif->channel) ? (1<<11) : (1<<10);
+	unsigned short mask = (hwif->unit) ? (1<<11) : (1<<10);
 	unsigned short CIS;
 
         switch(hwif->pci_dev->device) {
 		case PCI_DEVICE_ID_PROMISE_20275:
+		case PCI_DEVICE_ID_PROMISE_20276:
 		case PCI_DEVICE_ID_PROMISE_20269:
 		case PCI_DEVICE_ID_PROMISE_20268:
 		case PCI_DEVICE_ID_PROMISE_20268R:
@@ -1226,13 +1235,14 @@ unsigned int __init ata66_pdc202xx (ide_hwif_t *hwif)
 	}
 }
 
-void __init ide_init_pdc202xx (ide_hwif_t *hwif)
+void __init ide_init_pdc202xx(struct ata_channel *hwif)
 {
 	hwif->tuneproc  = &pdc202xx_tune_drive;
 	hwif->quirkproc = &pdc202xx_quirkproc;
 
         switch(hwif->pci_dev->device) {
 		case PCI_DEVICE_ID_PROMISE_20275:
+		case PCI_DEVICE_ID_PROMISE_20276:
 		case PCI_DEVICE_ID_PROMISE_20269:
 		case PCI_DEVICE_ID_PROMISE_20268:
 		case PCI_DEVICE_ID_PROMISE_20268R:

@@ -119,9 +119,10 @@ int autofs_fill_super(struct super_block *s, void *data, int silent)
 	struct autofs_sb_info *sbi;
 	int minproto, maxproto;
 
-	sbi = (struct autofs_sb_info *) kmalloc(sizeof(struct autofs_sb_info), GFP_KERNEL);
+	sbi = kmalloc(sizeof(*sbi), GFP_KERNEL);
 	if ( !sbi )
 		goto fail_unlock;
+	memset(sbi, 0, sizeof(*sbi));
 	DPRINTK(("autofs: starting up, sbi = %p\n",sbi));
 
 	s->u.generic_sbp = sbi;

@@ -84,7 +84,7 @@ int ide_doubler = 0;	/* support IDE doublers? */
      *  Check and acknowledge the interrupt status
      */
 
-static int gayle_ack_intr_a4000(ide_hwif_t *hwif)
+static int gayle_ack_intr_a4000(struct ata_channel *hwif)
 {
     unsigned char ch;
 
@@ -94,7 +94,7 @@ static int gayle_ack_intr_a4000(ide_hwif_t *hwif)
     return 1;
 }
 
-static int gayle_ack_intr_a1200(ide_hwif_t *hwif)
+static int gayle_ack_intr_a1200(struct ata_channel *hwif)
 {
     unsigned char ch;
 
