@@ -101,45 +101,49 @@ struct rcu_data {
         struct rcu_head **curtail;
         struct rcu_head *donelist;
         struct rcu_head **donetail;
+	int cpu;
 };
 
 DECLARE_PER_CPU(struct rcu_data, rcu_data);
 extern struct rcu_ctrlblk rcu_ctrlblk;
 
-#define RCU_quiescbatch(cpu)	(per_cpu(rcu_data, (cpu)).quiescbatch)
-#define RCU_qsctr(cpu) 		(per_cpu(rcu_data, (cpu)).qsctr)
-#define RCU_last_qsctr(cpu) 	(per_cpu(rcu_data, (cpu)).last_qsctr)
-#define RCU_qs_pending(cpu)	(per_cpu(rcu_data, (cpu)).qs_pending)
-#define RCU_batch(cpu) 		(per_cpu(rcu_data, (cpu)).batch)
-#define RCU_nxtlist(cpu) 	(per_cpu(rcu_data, (cpu)).nxtlist)
-#define RCU_curlist(cpu) 	(per_cpu(rcu_data, (cpu)).curlist)
-#define RCU_nxttail(cpu) 	(per_cpu(rcu_data, (cpu)).nxttail)
-#define RCU_curtail(cpu) 	(per_cpu(rcu_data, (cpu)).curtail)
-#define RCU_donelist(cpu) 	(per_cpu(rcu_data, (cpu)).donelist)
-#define RCU_donetail(cpu) 	(per_cpu(rcu_data, (cpu)).donetail)
+/*
+ * Increment the quiscent state counter.
+ */
+static inline void rcu_qsctr_inc(int cpu)
+{
+	struct rcu_data *rdp = &per_cpu(rcu_data, cpu);
+	rdp->qsctr++;
+}
 
-static inline int rcu_pending(int cpu) 
+static inline int __rcu_pending(struct rcu_ctrlblk *rcp,
+						struct rcu_data *rdp)
 {
 	/* This cpu has pending rcu entries and the grace period
 	 * for them has completed.
 	 */
-	if (RCU_curlist(cpu) &&
-		  !rcu_batch_before(rcu_ctrlblk.completed,RCU_batch(cpu)))
+	if (rdp->curlist && !rcu_batch_before(rcp->completed, rdp->batch))
 		return 1;
 
 	/* This cpu has no pending entries, but there are new entries */
-	if (!RCU_curlist(cpu) && RCU_nxtlist(cpu))
+	if (!rdp->curlist && rdp->nxtlist)
 		return 1;
 
-	if (RCU_donelist(cpu))
+	/* This cpu has finished callbacks to invoke */
+	if (rdp->donelist)
 		return 1;
 
 	/* The rcu core waits for a quiescent state from the cpu */
-	if (RCU_quiescbatch(cpu) != rcu_ctrlblk.cur || RCU_qs_pending(cpu))
+	if (rdp->quiescbatch != rcp->cur || rdp->qs_pending)
 		return 1;
 
 	/* nothing to do */
 	return 0;
+}
+
+static inline int rcu_pending(int cpu)
+{
+	return __rcu_pending(&rcu_ctrlblk, &per_cpu(rcu_data, cpu));
 }
 
 #define rcu_read_lock()		preempt_disable()
