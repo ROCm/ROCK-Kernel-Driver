@@ -1,5 +1,5 @@
 # Makefile for the Linux video drivers.
-# 5 Aug 1999, James Simmons, <mailto:jsimmons@edgeglobal.com>
+# 5 Aug 1999, James Simmons, <mailto:jsimmons@users.sf.net>
 # Rewritten to use lists instead of if-statements.
 
 O_TARGET := video.o
@@ -10,7 +10,7 @@ mod-subdirs	:= matrox
 # This list comes from 'grep -l EXPORT_SYMBOL *.[hc]'.
 
 export-objs    := fbmem.o fbcmap.o fbcon.o fbmon.o modedb.o \
-		  fbcon-afb.o fbcon-ilbm.o \
+		  fbcon-afb.o fbcon-ilbm.o fbcon-accel.o \
 		  fbcon-vga.o fbcon-iplan2p2.o fbcon-iplan2p4.o \
 		  fbcon-iplan2p8.o fbcon-vga-planes.o fbcon-cfb16.o \
 		  fbcon-cfb2.o fbcon-cfb24.o fbcon-cfb32.o fbcon-cfb4.o \
