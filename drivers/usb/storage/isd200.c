@@ -34,11 +34,11 @@
  *  2002-10-19: Removed the specialized transfer routines.
  *		(Alan Stern <stern@rowland.harvard.edu>)
  *  2001-02-24: Removed lots of duplicate code and simplified the structure.
- *              (bjorn@haxx.se)
+ *	      (bjorn@haxx.se)
  *  2002-01-16: Fixed endianness bug so it works on the ppc arch.
- *              (Luc Saillard <luc@saillard.org>)
+ *	      (Luc Saillard <luc@saillard.org>)
  *  2002-01-17: All bitfields removed.
- *              (bjorn@haxx.se)
+ *	      (bjorn@haxx.se)
  */
 
 
@@ -59,14 +59,14 @@
 
 /* Timeout defines (in Seconds) */
 
-#define ISD200_ENUM_BSY_TIMEOUT         35
+#define ISD200_ENUM_BSY_TIMEOUT		35
 #define ISD200_ENUM_DETECT_TIMEOUT      30
-#define ISD200_DEFAULT_TIMEOUT          30
+#define ISD200_DEFAULT_TIMEOUT		30
 
 /* device flags */
-#define DF_ATA_DEVICE               0x0001
-#define DF_MEDIA_STATUS_ENABLED     0x0002
-#define DF_REMOVABLE_MEDIA          0x0004
+#define DF_ATA_DEVICE		0x0001
+#define DF_MEDIA_STATUS_ENABLED	0x0002
+#define DF_REMOVABLE_MEDIA	0x0004
 
 /* capability bit definitions */
 #define CAPABILITY_DMA		0x01
@@ -82,46 +82,46 @@
 #define ATA_ADDRESS_DEVHEAD_SLAVE    0x10
 
 /* Action Select bits */
-#define ACTION_SELECT_0             0x01
-#define ACTION_SELECT_1             0x02
-#define ACTION_SELECT_2             0x04
-#define ACTION_SELECT_3             0x08
-#define ACTION_SELECT_4             0x10
-#define ACTION_SELECT_5             0x20
-#define ACTION_SELECT_6             0x40
-#define ACTION_SELECT_7             0x80
+#define ACTION_SELECT_0	     0x01
+#define ACTION_SELECT_1	     0x02
+#define ACTION_SELECT_2	     0x04
+#define ACTION_SELECT_3	     0x08
+#define ACTION_SELECT_4	     0x10
+#define ACTION_SELECT_5	     0x20
+#define ACTION_SELECT_6	     0x40
+#define ACTION_SELECT_7	     0x80
 
 /* Register Select bits */
-#define REG_ALTERNATE_STATUS 0x01
-#define REG_DEVICE_CONTROL   0x01
-#define REG_ERROR            0x02
-#define REG_FEATURES         0x02
-#define REG_SECTOR_COUNT     0x04
-#define REG_SECTOR_NUMBER    0x08
-#define REG_CYLINDER_LOW     0x10
-#define REG_CYLINDER_HIGH    0x20
-#define REG_DEVICE_HEAD      0x40
-#define REG_STATUS           0x80
-#define REG_COMMAND          0x80
+#define REG_ALTERNATE_STATUS	0x01
+#define REG_DEVICE_CONTROL	0x01
+#define REG_ERROR		0x02
+#define REG_FEATURES		0x02
+#define REG_SECTOR_COUNT	0x04
+#define REG_SECTOR_NUMBER	0x08
+#define REG_CYLINDER_LOW	0x10
+#define REG_CYLINDER_HIGH	0x20
+#define REG_DEVICE_HEAD		0x40
+#define REG_STATUS		0x80
+#define REG_COMMAND		0x80
 
 /* ATA error definitions not in <linux/hdreg.h> */
-#define ATA_ERROR_MEDIA_CHANGE       0x20
+#define ATA_ERROR_MEDIA_CHANGE		0x20
 
 /* ATA command definitions not in <linux/hdreg.h> */
-#define ATA_COMMAND_GET_MEDIA_STATUS        0xDA
-#define ATA_COMMAND_MEDIA_EJECT             0xED
+#define ATA_COMMAND_GET_MEDIA_STATUS	0xDA
+#define ATA_COMMAND_MEDIA_EJECT		0xED
 
 /* ATA drive control definitions */
-#define ATA_DC_DISABLE_INTERRUPTS    0x02
-#define ATA_DC_RESET_CONTROLLER      0x04
-#define ATA_DC_REENABLE_CONTROLLER   0x00
+#define ATA_DC_DISABLE_INTERRUPTS	0x02
+#define ATA_DC_RESET_CONTROLLER		0x04
+#define ATA_DC_REENABLE_CONTROLLER	0x00
 
 /*
  *  General purpose return codes
  */ 
 
-#define ISD200_ERROR                -1
-#define ISD200_GOOD                 0
+#define ISD200_ERROR		-1
+#define ISD200_GOOD		 0
 
 /*
  * Transport return codes
@@ -162,7 +162,7 @@ union ata_cdb {
 		unsigned char WriteData1F7;
 		unsigned char Reserved[3];
 	} generic;
-        
+
 	struct {
 		unsigned char SignatureByte0;
 		unsigned char SignatureByte1;
@@ -180,7 +180,7 @@ union ata_cdb {
 		unsigned char Reserved[3];
 	} read;
 
-        struct {
+	struct {
 		unsigned char SignatureByte0;
 		unsigned char SignatureByte1;
 		unsigned char ActionSelect;
@@ -211,8 +211,8 @@ union ata_cdb {
 /*
  * DeviceType field
  */
-#define DIRECT_ACCESS_DEVICE            0x00    /* disks */
-#define DEVICE_REMOVABLE                0x80
+#define DIRECT_ACCESS_DEVICE	    0x00    /* disks */
+#define DEVICE_REMOVABLE		0x80
 
 struct inquiry_data {
    	unsigned char DeviceType;
@@ -240,9 +240,9 @@ struct inquiry_data {
  * ISD200 CONFIG data struct
  */
 
-#define ATACFG_TIMING          0x0f
+#define ATACFG_TIMING	  0x0f
 #define ATACFG_ATAPI_RESET     0x10
-#define ATACFG_MASTER          0x20
+#define ATACFG_MASTER	  0x20
 #define ATACFG_BLOCKSIZE       0xa0
 
 #define ATACFGE_LAST_LUN       0x07
@@ -255,12 +255,12 @@ struct inquiry_data {
 #define CFG_CAPABILITY_SRST    0x01
 
 struct isd200_config {
-        unsigned char EventNotification;
-        unsigned char ExternalClock;
-        unsigned char ATAInitTimeout;
+	unsigned char EventNotification;
+	unsigned char ExternalClock;
+	unsigned char ATAInitTimeout;
 	unsigned char ATAConfig;
-        unsigned char ATAMajorCommand;
-        unsigned char ATAMinorCommand;
+	unsigned char ATAMajorCommand;
+	unsigned char ATAMinorCommand;
 	unsigned char ATAExtraConfig;
 	unsigned char Capability;
 }__attribute__ ((packed));
@@ -309,7 +309,7 @@ struct read_block_limits {
  * Sense Data Format
  */
 
-#define SENSE_ERRCODE           0x7f
+#define SENSE_ERRCODE	   0x7f
 #define SENSE_ERRCODE_VALID     0x80
 #define SENSE_FLAG_SENSE_KEY    0x0f
 #define SENSE_FLAG_BAD_LENGTH   0x20
@@ -319,13 +319,13 @@ struct sense_data {
 	unsigned char ErrorCode;
 	unsigned char SegmentNumber;
 	unsigned char Flags;
-        unsigned char Information[4];
-        unsigned char AdditionalSenseLength;
-        unsigned char CommandSpecificInformation[4];
-        unsigned char AdditionalSenseCode;
-        unsigned char AdditionalSenseCodeQualifier;
-        unsigned char FieldReplaceableUnitCode;
-        unsigned char SenseKeySpecific[3];
+	unsigned char Information[4];
+	unsigned char AdditionalSenseLength;
+	unsigned char CommandSpecificInformation[4];
+	unsigned char AdditionalSenseCode;
+	unsigned char AdditionalSenseCodeQualifier;
+	unsigned char FieldReplaceableUnitCode;
+	unsigned char SenseKeySpecific[3];
 } __attribute__ ((packed));
 
 /*
@@ -340,18 +340,18 @@ struct sense_data {
 
 /**************************************************************************
  * isd200_build_sense
- *                                                                         
+ *									 
  *  Builds an artificial sense buffer to report the results of a 
  *  failed command.
- *                                                                       
+ *								       
  * RETURNS:
  *    void
- */                                                                        
+ */
 void isd200_build_sense(struct us_data *us, Scsi_Cmnd *srb)
 {
-        struct isd200_info *info = (struct isd200_info *)us->extra;
-        struct sense_data *buf = (struct sense_data *) &srb->sense_buffer[0];
-        unsigned char error = info->ATARegs[IDE_ERROR_OFFSET];
+	struct isd200_info *info = (struct isd200_info *)us->extra;
+	struct sense_data *buf = (struct sense_data *) &srb->sense_buffer[0];
+	unsigned char error = info->ATARegs[IDE_ERROR_OFFSET];
 
 	if(error & ATA_ERROR_MEDIA_CHANGE) {
 		buf->ErrorCode = 0x70 | SENSE_ERRCODE_VALID;
@@ -359,31 +359,31 @@ void isd200_build_sense(struct us_data *us, Scsi_Cmnd *srb)
 		buf->Flags = UNIT_ATTENTION;
 		buf->AdditionalSenseCode = 0;
 		buf->AdditionalSenseCodeQualifier = 0;
-        } else if(error & MCR_ERR) {
+	} else if(error & MCR_ERR) {
 		buf->ErrorCode = 0x70 | SENSE_ERRCODE_VALID;
 		buf->AdditionalSenseLength = 0xb;
 		buf->Flags =  UNIT_ATTENTION;
 		buf->AdditionalSenseCode = 0;
 		buf->AdditionalSenseCodeQualifier = 0;
-        } else if(error & TRK0_ERR) {
+	} else if(error & TRK0_ERR) {
 		buf->ErrorCode = 0x70 | SENSE_ERRCODE_VALID;
 		buf->AdditionalSenseLength = 0xb;
 		buf->Flags =  NOT_READY;
 		buf->AdditionalSenseCode = 0;
 		buf->AdditionalSenseCodeQualifier = 0;
-        } else if(error & ECC_ERR) {
+	} else if(error & ECC_ERR) {
 		buf->ErrorCode = 0x70 | SENSE_ERRCODE_VALID;
 		buf->AdditionalSenseLength = 0xb;
 		buf->Flags =  DATA_PROTECT;
 		buf->AdditionalSenseCode = 0;
 		buf->AdditionalSenseCodeQualifier = 0;
-        } else {
+	} else {
 		buf->ErrorCode = 0;
 		buf->AdditionalSenseLength = 0;
 		buf->Flags =  0;
 		buf->AdditionalSenseCode = 0;
 		buf->AdditionalSenseCodeQualifier = 0;
-        }
+	}
 }
 
 
@@ -430,8 +430,8 @@ static int isd200_action( struct us_data *us, int action,
 	case ACTION_ENUM:
 		US_DEBUGP("   isd200_action(ENUM,0x%02x)\n",value);
 		ata.generic.ActionSelect = ACTION_SELECT_1|ACTION_SELECT_2|
-			                   ACTION_SELECT_3|ACTION_SELECT_4|
-		                           ACTION_SELECT_5;
+					   ACTION_SELECT_3|ACTION_SELECT_4|
+					   ACTION_SELECT_5;
 		ata.generic.RegisterSelect = REG_DEVICE_HEAD;
 		ata.write.DeviceHeadByte = value;
 		srb.sc_data_direction = SCSI_DATA_NONE;
@@ -440,7 +440,7 @@ static int isd200_action( struct us_data *us, int action,
 	case ACTION_RESET:
 		US_DEBUGP("   isd200_action(RESET)\n");
 		ata.generic.ActionSelect = ACTION_SELECT_1|ACTION_SELECT_2|
-			                   ACTION_SELECT_3|ACTION_SELECT_4;
+					   ACTION_SELECT_3|ACTION_SELECT_4;
 		ata.generic.RegisterSelect = REG_DEVICE_CONTROL;
 		ata.write.DeviceControlByte = ATA_DC_RESET_CONTROLLER;
 		srb.sc_data_direction = SCSI_DATA_NONE;
@@ -449,7 +449,7 @@ static int isd200_action( struct us_data *us, int action,
 	case ACTION_REENABLE:
 		US_DEBUGP("   isd200_action(REENABLE)\n");
 		ata.generic.ActionSelect = ACTION_SELECT_1|ACTION_SELECT_2|
-			                   ACTION_SELECT_3|ACTION_SELECT_4;
+					   ACTION_SELECT_3|ACTION_SELECT_4;
 		ata.generic.RegisterSelect = REG_DEVICE_CONTROL;
 		ata.write.DeviceControlByte = ATA_DC_REENABLE_CONTROLLER;
 		srb.sc_data_direction = SCSI_DATA_NONE;
@@ -493,12 +493,12 @@ static int isd200_action( struct us_data *us, int action,
 
 /**************************************************************************
  * isd200_read_regs
- *                                                                         
+ *									 
  * Read ATA Registers
  *
  * RETURNS:
  *    ISD status code
- */                                                                        
+ */
 int isd200_read_regs( struct us_data *us )
 {
 	struct isd200_info *info = (struct isd200_info *)us->extra;
@@ -512,10 +512,10 @@ int isd200_read_regs( struct us_data *us )
 	if (transferStatus != ISD200_TRANSPORT_GOOD) {
 		US_DEBUGP("   Error reading ATA registers\n");
 		retStatus = ISD200_ERROR;
-        } else {
+	} else {
 		US_DEBUGP("   Got ATA Register[IDE_ERROR_OFFSET] = 0x%x\n", 
 			  info->ATARegs[IDE_ERROR_OFFSET]);
-        }
+	}
 
 	return retStatus;
 }
@@ -649,12 +649,12 @@ static void isd200_log_config( struct isd200_info* info )
 
 /**************************************************************************
  * isd200_write_config
- *                                                                         
+ *									 
  * Write the ISD200 Configuraton data
  *
  * RETURNS:
  *    ISD status code
- */                                                                        
+ */
 int isd200_write_config( struct us_data *us ) 
 {
 	struct isd200_info *info = (struct isd200_info *)us->extra;
@@ -669,21 +669,21 @@ int isd200_write_config( struct us_data *us )
 
 	/* let's send the command via the control pipe */
 	result = usb_stor_ctrl_transfer(
-                us, 
-                us->send_ctrl_pipe,
-                0x01, 
-                USB_TYPE_VENDOR | USB_RECIP_DEVICE | USB_DIR_OUT,
-                0x0000, 
-                0x0002, 
-                (void *) &info->ConfigData, 
-                sizeof(info->ConfigData));
+		us, 
+		us->send_ctrl_pipe,
+		0x01, 
+		USB_TYPE_VENDOR | USB_RECIP_DEVICE | USB_DIR_OUT,
+		0x0000, 
+		0x0002, 
+		(void *) &info->ConfigData, 
+		sizeof(info->ConfigData));
 
 	if (result >= 0) {
 		US_DEBUGP("   ISD200 Config Data was written successfully\n");
-        } else {
+	} else {
 		US_DEBUGP("   Request to write ISD200 Config Data failed!\n");
 		retStatus = ISD200_ERROR;
-        }
+	}
 
 	US_DEBUGP("Leaving isd200_write_config %08X\n", retStatus);
 	return retStatus;
@@ -692,12 +692,12 @@ int isd200_write_config( struct us_data *us )
 
 /**************************************************************************
  * isd200_read_config
- *                                                                         
+ *									 
  * Reads the ISD200 Configuraton data
  *
  * RETURNS:
  *    ISD status code
- */                                                                        
+ */
 int isd200_read_config( struct us_data *us ) 
 {
 	struct isd200_info *info = (struct isd200_info *)us->extra;
@@ -707,17 +707,17 @@ int isd200_read_config( struct us_data *us )
 	US_DEBUGP("Entering isd200_read_config\n");
 
 	/* read the configuration information from ISD200.  Use this to */
-	/* determine what the special ATA CDB bytes are.                */
+	/* determine what the special ATA CDB bytes are.		*/
 
 	result = usb_stor_ctrl_transfer(
-                us, 
-                us->recv_ctrl_pipe,
-                0x02, 
-                USB_TYPE_VENDOR | USB_RECIP_DEVICE | USB_DIR_IN,
-                0x0000, 
-                0x0002, 
-                (void *) &info->ConfigData, 
-                sizeof(info->ConfigData));
+		us, 
+		us->recv_ctrl_pipe,
+		0x02, 
+		USB_TYPE_VENDOR | USB_RECIP_DEVICE | USB_DIR_IN,
+		0x0000, 
+		0x0002, 
+		(void *) &info->ConfigData, 
+		sizeof(info->ConfigData));
 
 
 	if (result >= 0) {
@@ -725,10 +725,10 @@ int isd200_read_config( struct us_data *us )
 #ifdef CONFIG_USB_STORAGE_DEBUG
 		isd200_log_config(info);
 #endif
-        } else {
+	} else {
 		US_DEBUGP("   Request to get ISD200 Config Data failed!\n");
 		retStatus = ISD200_ERROR;
-        }
+	}
 
 	US_DEBUGP("Leaving isd200_read_config %08X\n", retStatus);
 	return retStatus;
@@ -737,12 +737,12 @@ int isd200_read_config( struct us_data *us )
 
 /**************************************************************************
  * isd200_atapi_soft_reset
- *                                                                         
+ *									 
  * Perform an Atapi Soft Reset on the device
  *
  * RETURNS:
  *    NT status code
- */                                                                        
+ */
 int isd200_atapi_soft_reset( struct us_data *us ) 
 {
 	int retStatus = ISD200_GOOD;
@@ -754,7 +754,7 @@ int isd200_atapi_soft_reset( struct us_data *us )
 	if (transferStatus != ISD200_TRANSPORT_GOOD) {
 		US_DEBUGP("   Error issuing Atapi Soft Reset\n");
 		retStatus = ISD200_ERROR;
-        }
+	}
 
 	US_DEBUGP("Leaving isd200_atapi_soft_reset %08X\n", retStatus);
 	return retStatus;
@@ -763,12 +763,12 @@ int isd200_atapi_soft_reset( struct us_data *us )
 
 /**************************************************************************
  * isd200_srst
- *                                                                         
+ *									 
  * Perform an SRST on the device
  *
  * RETURNS:
  *    ISD status code
- */                                                                        
+ */
 int isd200_srst( struct us_data *us ) 
 {
 	int retStatus = ISD200_GOOD;
@@ -782,7 +782,7 @@ int isd200_srst( struct us_data *us )
 	if (transferStatus != ISD200_TRANSPORT_GOOD) {
 		US_DEBUGP("   Error issuing SRST\n");
 		retStatus = ISD200_ERROR;
-        } else {
+	} else {
 		/* delay 10ms to give the drive a chance to see it */
 		wait_ms(10);
 
@@ -794,7 +794,7 @@ int isd200_srst( struct us_data *us )
 			/* delay 50ms to give the drive a chance to recover after SRST */
 			wait_ms(50);
 		}
-        }
+	}
 
 	US_DEBUGP("Leaving isd200_srst %08X\n", retStatus);
 	return retStatus;
@@ -803,13 +803,13 @@ int isd200_srst( struct us_data *us )
 
 /**************************************************************************
  * isd200_try_enum
- *                                                                         
+ *									 
  * Helper function for isd200_manual_enum(). Does ENUM and READ_STATUS
  * and tries to analyze the status registers
  *
  * RETURNS:
  *    ISD status code
- */                                                                        
+ */
 static int isd200_try_enum(struct us_data *us, unsigned char master_slave,
 			   int detect )
 {
@@ -908,13 +908,13 @@ static int isd200_try_enum(struct us_data *us, unsigned char master_slave,
 
 /**************************************************************************
  * isd200_manual_enum
- *                                                                         
+ *									 
  * Determines if the drive attached is an ATA or ATAPI and if it is a
  * master or slave.
  *
  * RETURNS:
  *    ISD status code
- */                                                                        
+ */
 int isd200_manual_enum(struct us_data *us)
 {
 	struct isd200_info *info = (struct isd200_info *)us->extra;
@@ -1078,15 +1078,15 @@ int isd200_get_inquiry_data( struct us_data *us )
 			us->proto_handler = usb_stor_transparent_scsi_command;
 
 			US_DEBUGP("Protocol changed to: %s\n", us->protocol_name);
-            
-			/* Free driver structure */            
+	    
+			/* Free driver structure */	    
 			if (us->extra != NULL) {
 				kfree(us->extra);
 				us->extra = NULL;
 				us->extra_destructor = NULL;
 			}
 		}
-        }
+	}
 
 	US_DEBUGP("Leaving isd200_get_inquiry_data %08X\n", retStatus);
 
@@ -1096,12 +1096,12 @@ int isd200_get_inquiry_data( struct us_data *us )
 
 /**************************************************************************
  * isd200_data_copy
- *                                                                         
+ *									 
  * Copy data into the srb request buffer.  Use scatter gather if required.
  *
  * RETURNS:
  *    void
- */                                                                        
+ */
 void isd200_data_copy(Scsi_Cmnd *srb, char * src, int length)
 {
 	unsigned int len = length;
@@ -1150,13 +1150,13 @@ void isd200_data_copy(Scsi_Cmnd *srb, char * src, int length)
 
 /**************************************************************************
  * isd200_scsi_to_ata
- *                                                                         
+ *									 
  * Translate SCSI commands to ATA commands.
  *
  * RETURNS:
  *    TRUE if the command needs to be sent to the transport layer
  *    FALSE otherwise
- */                                                                        
+ */
 int isd200_scsi_to_ata(Scsi_Cmnd *srb, struct us_data *us, 
 		       union ata_cdb * ataCdb)
 {
@@ -1321,7 +1321,7 @@ int isd200_scsi_to_ata(Scsi_Cmnd *srb, struct us_data *us,
 
 		if (info->DeviceFlags & DF_REMOVABLE_MEDIA) {
 			US_DEBUGP("   srb->cmnd[4] = 0x%X\n", srb->cmnd[4]);
-            
+	    
 			ataCdb->generic.SignatureByte0 = info->ConfigData.ATAMajorCommand;
 			ataCdb->generic.SignatureByte1 = info->ConfigData.ATAMinorCommand;
 			ataCdb->generic.TransferBlockSize = 1;
@@ -1378,12 +1378,12 @@ int isd200_scsi_to_ata(Scsi_Cmnd *srb, struct us_data *us,
 
 /**************************************************************************
  * isd200_init_info
- *                                                                         
+ *									 
  * Allocates (if necessary) and initializes the driver structure.
  *
  * RETURNS:
  *    ISD status code
- */                                                                        
+ */
 int isd200_init_info(struct us_data *us)
 {
 	int retStatus = ISD200_GOOD;
@@ -1394,11 +1394,11 @@ int isd200_init_info(struct us_data *us)
 			US_DEBUGP("ERROR - kmalloc failure\n");
 			retStatus = ISD200_ERROR;
 		}
-        }
+	}
 
 	if (retStatus == ISD200_GOOD) {
 		memset(us->extra, 0, sizeof(struct isd200_info));
-        }
+	}
 
 	return(retStatus);
 }
@@ -1415,14 +1415,14 @@ int isd200_Initialization(struct us_data *us)
 
 	if (isd200_init_info(us) == ISD200_ERROR) {
 		US_DEBUGP("ERROR Initializing ISD200 Info struct\n");
-        } else {
+	} else {
 		/* Get device specific data */
 
 		if (isd200_get_inquiry_data(us) != ISD200_GOOD)
 			US_DEBUGP("ISD200 Initialization Failure\n");
 		else
 			US_DEBUGP("ISD200 Initialization complete\n");
-        }
+	}
 
 	return 0;
 }
