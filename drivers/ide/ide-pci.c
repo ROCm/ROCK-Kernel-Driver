@@ -229,6 +229,7 @@ static ide_pci_device_t pci_chipsets[] __initdata = {
 	{PCI_VENDOR_ID_PROMISE, PCI_DEVICE_ID_PROMISE_20268R, pci_init_pdc202xx, ata66_pdc202xx, ide_init_pdc202xx, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, OFF_BOARD, 0, ATA_F_IRQ  | ATA_F_DMA },
 	{PCI_VENDOR_ID_PROMISE, PCI_DEVICE_ID_PROMISE_20269, pci_init_pdc202xx, ata66_pdc202xx, ide_init_pdc202xx, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, OFF_BOARD, 0, ATA_F_IRQ | ATA_F_DMA },
 	{PCI_VENDOR_ID_PROMISE, PCI_DEVICE_ID_PROMISE_20275, pci_init_pdc202xx, ata66_pdc202xx,	ide_init_pdc202xx, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, OFF_BOARD, 0, ATA_F_IRQ | ATA_F_DMA },
+	{PCI_VENDOR_ID_PROMISE, PCI_DEVICE_ID_PROMISE_20276, pci_init_pdc202xx, ata66_pdc202xx,	ide_init_pdc202xx, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, OFF_BOARD, 0, ATA_F_IRQ | ATA_F_DMA },
 #endif
 #ifdef CONFIG_BLK_DEV_RZ1000
 	{PCI_VENDOR_ID_PCTECH, PCI_DEVICE_ID_PCTECH_RZ1000, NULL, NULL,	ide_init_rz1000, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0, 0 },

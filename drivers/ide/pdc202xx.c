@@ -217,6 +217,9 @@ static char * pdc202xx_info_new (char *buf, struct pci_dev *dev)
 		case PCI_DEVICE_ID_PROMISE_20275:
 			p += sprintf(p, "\n                                PDC20275 Chipset.\n");
 			break;
+		case PCI_DEVICE_ID_PROMISE_20276:
+			p += sprintf(p, "\n                                PDC20276 Chipset.\n");
+			break;
 		case PCI_DEVICE_ID_PROMISE_20269:
 			p += sprintf(p, "\n                                PDC20269 TX2 Chipset.\n");
 			break;
@@ -236,6 +239,7 @@ static int pdc202xx_get_info (char *buffer, char **addr, off_t offset, int count
 	char *p = buffer;
 	switch(bmide_dev->device) {
 		case PCI_DEVICE_ID_PROMISE_20275:
+		case PCI_DEVICE_ID_PROMISE_20276:
 		case PCI_DEVICE_ID_PROMISE_20269:
 		case PCI_DEVICE_ID_PROMISE_20268:
 		case PCI_DEVICE_ID_PROMISE_20268R:
@@ -732,6 +736,7 @@ static int config_chipset_for_dma (ide_drive_t *drive, byte ultra)
 
 	switch(dev->device) {
 		case PCI_DEVICE_ID_PROMISE_20275:
+		case PCI_DEVICE_ID_PROMISE_20276:
 		case PCI_DEVICE_ID_PROMISE_20269:
 			udma_133 = (udma_66) ? 1 : 0;
 			udma_100 = (udma_66) ? 1 : 0;
@@ -989,6 +994,7 @@ int pdc202xx_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 
 	switch (dev->device) {
 		case PCI_DEVICE_ID_PROMISE_20275:
+		case PCI_DEVICE_ID_PROMISE_20276:
 		case PCI_DEVICE_ID_PROMISE_20269:
 		case PCI_DEVICE_ID_PROMISE_20268R:
 		case PCI_DEVICE_ID_PROMISE_20268:
@@ -1121,6 +1127,7 @@ unsigned int __init pci_init_pdc202xx(struct pci_dev *dev)
 
 	switch (dev->device) {
 		case PCI_DEVICE_ID_PROMISE_20275:
+		case PCI_DEVICE_ID_PROMISE_20276:
 		case PCI_DEVICE_ID_PROMISE_20269:
 		case PCI_DEVICE_ID_PROMISE_20268R:
 		case PCI_DEVICE_ID_PROMISE_20268:
@@ -1215,6 +1222,7 @@ unsigned int __init ata66_pdc202xx (ide_hwif_t *hwif)
 
         switch(hwif->pci_dev->device) {
 		case PCI_DEVICE_ID_PROMISE_20275:
+		case PCI_DEVICE_ID_PROMISE_20276:
 		case PCI_DEVICE_ID_PROMISE_20269:
 		case PCI_DEVICE_ID_PROMISE_20268:
 		case PCI_DEVICE_ID_PROMISE_20268R:
@@ -1233,6 +1241,7 @@ void __init ide_init_pdc202xx (ide_hwif_t *hwif)
 
         switch(hwif->pci_dev->device) {
 		case PCI_DEVICE_ID_PROMISE_20275:
+		case PCI_DEVICE_ID_PROMISE_20276:
 		case PCI_DEVICE_ID_PROMISE_20269:
 		case PCI_DEVICE_ID_PROMISE_20268:
 		case PCI_DEVICE_ID_PROMISE_20268R:

@@ -771,35 +771,7 @@ typedef enum {
  */
 #define ide_rq_offset(rq) (((rq)->hard_cur_sectors - (rq)->current_nr_sectors) << 9)
 
-#define task_rq_offset(rq) \
-	(((rq)->nr_sectors - (rq)->current_nr_sectors) * SECTOR_SIZE)
-
-/*
- * This function issues a special IDE device request
- * onto the request queue.
- *
- * If action is ide_wait, then the rq is queued at the end of the
- * request queue, and the function sleeps until it has been processed.
- * This is for use when invoked from an ioctl handler.
- *
- * If action is ide_preempt, then the rq is queued at the head of
- * the request queue, displacing the currently-being-processed
- * request and this function returns immediately without waiting
- * for the new rq to be completed.  This is VERY DANGEROUS, and is
- * intended for careful use by the ATAPI tape/cdrom driver code.
- *
- * If action is ide_next, then the rq is queued immediately after
- * the currently-being-processed-request (if any), and the function
- * returns without waiting for the new rq to be completed.  As above,
- * This is VERY DANGEROUS, and is intended for careful use by the
- * ATAPI tape/cdrom driver code.
- *
- * If action is ide_end, then the rq is queued at the end of the
- * request queue, and the function returns immediately without waiting
- * for the new rq to be completed. This is again intended for careful
- * use by the ATAPI tape/cdrom driver code.
- */
-int ide_do_drive_cmd (ide_drive_t *drive, struct request *rq, ide_action_t action);
+extern int ide_do_drive_cmd(ide_drive_t *drive, struct request *rq, ide_action_t action);
 
 /*
  * Clean up after success/failure of an explicit drive cmd.
@@ -827,15 +799,12 @@ void atapi_output_bytes (ide_drive_t *drive, void *buffer, unsigned int bytecoun
 void taskfile_input_data (ide_drive_t *drive, void *buffer, unsigned int wcount);
 void taskfile_output_data (ide_drive_t *drive, void *buffer, unsigned int wcount);
 
-/*
- * taskfile io for disks for now...
- */
-ide_startstop_t do_rw_taskfile (ide_drive_t *drive, ide_task_t *task);
-
-/*
- * Builds request from ide_ioctl
- */
-void do_taskfile (ide_drive_t *drive, struct hd_drive_task_hdr *taskfile, struct hd_drive_hob_hdr *hobfile, ide_handler_t *handler);
+extern ide_startstop_t ata_taskfile(ide_drive_t *drive,
+		struct hd_drive_task_hdr *taskfile,
+		struct hd_drive_hob_hdr *hobfile,
+		ide_handler_t *handler,
+		ide_pre_handler_t *prehandler,
+		struct request *rq);
 
 /*
  * Special Flagged Register Validation Caller
@@ -871,7 +840,7 @@ extern int system_bus_speed;
  * idedisk_input_data() is a wrapper around ide_input_data() which copes
  * with byte-swapping the input data if required.
  */
-inline void idedisk_input_data (ide_drive_t *drive, void *buffer, unsigned int wcount);
+extern void idedisk_input_data(ide_drive_t *drive, void *buffer, unsigned int wcount);
 
 /*
  * ide_stall_queue() can be used by a drive to give excess bandwidth back

@@ -48,7 +48,7 @@ static inline char *ide_map_rq(struct request *rq, unsigned long *flags)
 	if (rq->bio)
 		return bio_kmap_irq(rq->bio, flags) + ide_rq_offset(rq);
 	else
-		return rq->buffer + task_rq_offset(rq);
+		return rq->buffer + ((rq)->nr_sectors - (rq)->current_nr_sectors) * SECTOR_SIZE;
 }
 
 static inline void ide_unmap_rq(struct request *rq, char *to,
@@ -341,27 +341,37 @@ static ide_startstop_t task_mulout_intr(ide_drive_t *drive)
 	pBuf = ide_map_rq(rq, &flags);
 	DTF("Multiwrite: %p, nsect: %d , rq->current_nr_sectors: %ld\n",
 		pBuf, nsect, rq->current_nr_sectors);
+
 	drive->io_32bit = 0;
 	taskfile_output_data(drive, pBuf, nsect * SECTOR_WORDS);
+
 	ide_unmap_rq(rq, pBuf, &flags);
+
 	drive->io_32bit = io_32bit;
+
 	rq->errors = 0;
 	/* Are we sure that this as all been already transfered? */
 	rq->current_nr_sectors -= nsect;
+
 	if (hwgroup->handler == NULL)
 		ide_set_handler(drive, &task_mulout_intr, WAIT_CMD, NULL);
+
 	return ide_started;
 }
 
-ide_startstop_t do_rw_taskfile(ide_drive_t *drive, ide_task_t *task)
+ide_startstop_t ata_taskfile(ide_drive_t *drive,
+		struct hd_drive_task_hdr *taskfile,
+		struct hd_drive_hob_hdr *hobfile,
+		ide_handler_t *handler,
+		ide_pre_handler_t *prehandler,
+		struct request *rq
+		)
 {
-	task_struct_t *taskfile = (task_struct_t *) task->tfRegister;
-	hob_struct_t *hobfile = (hob_struct_t *) task->hobRegister;
 	struct hd_driveid *id = drive->id;
-	byte HIHI = (drive->addressing) ? 0xE0 : 0xEF;
+	u8 HIHI = (drive->addressing) ? 0xE0 : 0xEF;
 
 	/* (ks/hs): Moved to start, do not use for multiple out commands */
-	if (task->handler != task_mulout_intr && task->handler != bio_mulout_intr) {
+	if (handler != task_mulout_intr && handler != bio_mulout_intr) {
 		if (IDE_CONTROL_REG)
 			OUT_BYTE(drive->ctl, IDE_CONTROL_REG);	/* clear nIEN */
 		SELECT_MASK(HWIF(drive), drive, 0);
@@ -386,65 +396,22 @@ ide_startstop_t do_rw_taskfile(ide_drive_t *drive, ide_task_t *task)
 	OUT_BYTE(taskfile->high_cylinder, IDE_HCYL_REG);
 
 	OUT_BYTE((taskfile->device_head & HIHI) | drive->select.all, IDE_SELECT_REG);
-	if (task->handler != NULL) {
-		ide_set_handler (drive, task->handler, WAIT_CMD, NULL);
+	if (handler != NULL) {
+		ide_set_handler(drive, handler, WAIT_CMD, NULL);
 		OUT_BYTE(taskfile->command, IDE_COMMAND_REG);
 		/*
 		 * Warning check for race between handler and prehandler for
 		 * writing first block of data.  however since we are well
 		 * inside the boundaries of the seek, we should be okay.
 		 */
-		if (task->prehandler != NULL) {
-			return task->prehandler(drive, task->rq);
-		}
+		if (prehandler != NULL)
+			return prehandler(drive, rq);
 	} else {
 		/* for dma commands we down set the handler */
 		if (drive->using_dma && !(HWIF(drive)->dmaproc(((taskfile->command == WIN_WRITEDMA) || (taskfile->command == WIN_WRITEDMA_EXT)) ? ide_dma_write : ide_dma_read, drive)));
 	}
 
 	return ide_started;
-}
-
-void do_taskfile(ide_drive_t *drive, struct hd_drive_task_hdr *taskfile,
-		struct hd_drive_hob_hdr *hobfile,
-		ide_handler_t *handler)
-{
-	struct hd_driveid *id = drive->id;
-	byte HIHI = (drive->addressing) ? 0xE0 : 0xEF;
-
-	/* (ks/hs): Moved to start, do not use for multiple out commands */
-	if (*handler != task_mulout_intr && handler != bio_mulout_intr) {
-		if (IDE_CONTROL_REG)
-			OUT_BYTE(drive->ctl, IDE_CONTROL_REG);  /* clear nIEN */
-		SELECT_MASK(HWIF(drive), drive, 0);
-	}
-
-	if ((id->command_set_2 & 0x0400) &&
-	    (id->cfs_enable_2 & 0x0400) &&
-	    (drive->addressing == 1)) {
-		OUT_BYTE(hobfile->feature, IDE_FEATURE_REG);
-		OUT_BYTE(hobfile->sector_count, IDE_NSECTOR_REG);
-		OUT_BYTE(hobfile->sector_number, IDE_SECTOR_REG);
-		OUT_BYTE(hobfile->low_cylinder, IDE_LCYL_REG);
-		OUT_BYTE(hobfile->high_cylinder, IDE_HCYL_REG);
-	}
-
-	OUT_BYTE(taskfile->feature, IDE_FEATURE_REG);
-	OUT_BYTE(taskfile->sector_count, IDE_NSECTOR_REG);
-	/* refers to number of sectors to transfer */
-	OUT_BYTE(taskfile->sector_number, IDE_SECTOR_REG);
-	/* refers to sector offset or start sector */
-	OUT_BYTE(taskfile->low_cylinder, IDE_LCYL_REG);
-	OUT_BYTE(taskfile->high_cylinder, IDE_HCYL_REG);
-
-	OUT_BYTE((taskfile->device_head & HIHI) | drive->select.all, IDE_SELECT_REG);
-	if (handler != NULL) {
-		ide_set_handler (drive, handler, WAIT_CMD, NULL);
-		OUT_BYTE(taskfile->command, IDE_COMMAND_REG);
-	} else {
-		/* for dma commands we down set the handler */
-		if (drive->using_dma && !(HWIF(drive)->dmaproc(((taskfile->command == WIN_WRITEDMA) || (taskfile->command == WIN_WRITEDMA_EXT)) ? ide_dma_write : ide_dma_read, drive)));
-	}
 }
 
 /*
@@ -1162,8 +1129,7 @@ EXPORT_SYMBOL(atapi_input_bytes);
 EXPORT_SYMBOL(atapi_output_bytes);
 EXPORT_SYMBOL(taskfile_input_data);
 EXPORT_SYMBOL(taskfile_output_data);
-EXPORT_SYMBOL(do_rw_taskfile);
-EXPORT_SYMBOL(do_taskfile);
+EXPORT_SYMBOL(ata_taskfile);
 
 EXPORT_SYMBOL(recal_intr);
 EXPORT_SYMBOL(set_geometry_intr);

@@ -978,7 +978,7 @@ static ide_startstop_t drive_cmd_intr (ide_drive_t *drive)
  * setting a timer to wake up at half second intervals thereafter,
  * until timeout is achieved, before timing out.
  */
-int ide_wait_stat (ide_startstop_t *startstop, ide_drive_t *drive, byte good, byte bad, unsigned long timeout) {
+int ide_wait_stat(ide_startstop_t *startstop, ide_drive_t *drive, byte good, byte bad, unsigned long timeout) {
 	byte stat;
 	int i;
 	unsigned long flags;
@@ -1017,90 +1017,6 @@ int ide_wait_stat (ide_startstop_t *startstop, ide_drive_t *drive, byte good, by
 	}
 	*startstop = ide_error(drive, "status error", stat);
 	return 1;
-}
-
-/*
- * execute_drive_cmd() issues a special drive command,
- * usually initiated by ioctl() from the external hdparm program.
- */
-static ide_startstop_t execute_drive_cmd (ide_drive_t *drive, struct request *rq)
-{
-	if (rq->flags & REQ_DRIVE_TASKFILE) {
-		ide_task_t *args = rq->special;
-
-		if (!(args))
-			goto args_error;
-
-		do_taskfile(drive,
-				(struct hd_drive_task_hdr *)&args->tfRegister,
-				(struct hd_drive_hob_hdr *)&args->hobRegister,
-				args->handler);
-
-		if (((args->command_type == IDE_DRIVE_TASK_RAW_WRITE) ||
-		     (args->command_type == IDE_DRIVE_TASK_OUT)) &&
-		      args->prehandler && args->handler)
-			return args->prehandler(drive, rq);
-		return ide_started;
-
-	} else if (rq->flags & REQ_DRIVE_TASK) {
-		byte *args = rq->buffer;
-		byte sel;
-
-		if (!(args)) goto args_error;
-#ifdef DEBUG
-			printk("%s: DRIVE_TASK_CMD ", drive->name);
-			printk("cmd=0x%02x ", args[0]);
-			printk("fr=0x%02x ", args[1]);
-			printk("ns=0x%02x ", args[2]);
-			printk("sc=0x%02x ", args[3]);
-			printk("lcyl=0x%02x ", args[4]);
-			printk("hcyl=0x%02x ", args[5]);
-			printk("sel=0x%02x\n", args[6]);
-#endif
-		OUT_BYTE(args[1], IDE_FEATURE_REG);
-		OUT_BYTE(args[3], IDE_SECTOR_REG);
-		OUT_BYTE(args[4], IDE_LCYL_REG);
-		OUT_BYTE(args[5], IDE_HCYL_REG);
-		sel = (args[6] & ~0x10);
-		if (drive->select.b.unit)
-			sel |= 0x10;
-		OUT_BYTE(sel, IDE_SELECT_REG);
-		ide_cmd(drive, args[0], args[2], &drive_cmd_intr);
-		return ide_started;
-	} else if (rq->flags & REQ_DRIVE_CMD) {
-
-		byte *args = rq->buffer;
-		if (!(args)) goto args_error;
-#ifdef DEBUG
-		printk("%s: DRIVE_CMD ", drive->name);
-		printk("cmd=0x%02x ", args[0]);
-		printk("sc=0x%02x ", args[1]);
-		printk("fr=0x%02x ", args[2]);
-		printk("xx=0x%02x\n", args[3]);
-#endif
-		if (args[0] == WIN_SMART) {
-			OUT_BYTE(0x4f, IDE_LCYL_REG);
-			OUT_BYTE(0xc2, IDE_HCYL_REG);
-			OUT_BYTE(args[2],IDE_FEATURE_REG);
-			OUT_BYTE(args[1],IDE_SECTOR_REG);
-			ide_cmd(drive, args[0], args[3], &drive_cmd_intr);
-			return ide_started;
-		}
-		OUT_BYTE(args[2],IDE_FEATURE_REG);
-		ide_cmd(drive, args[0], args[1], &drive_cmd_intr);
-		return ide_started;
-	}
-
-args_error:
-	/*
-	 * NULL is actually a valid way of waiting for
-	 * all current requests to be flushed from the queue.
-	 */
-#ifdef DEBUG
-	printk("%s: DRIVE_CMD (null)\n", drive->name);
-#endif
-	ide_end_drive_cmd(drive, GET_STAT(), GET_ERR());
-	return ide_stopped;
 }
 
 /*
@@ -1150,9 +1066,100 @@ static ide_startstop_t start_request (ide_drive_t *drive, struct request *rq)
 		printk(KERN_WARNING "%s: drive not ready for command\n", drive->name);
 		return startstop;
 	}
+
+	/* FIXME: We can see nicely here that all commands should be submitted
+	 * through the request queue and that the special field in drive should
+	 * go as soon as possible!
+	 */
+
 	if (!drive->special.all) {
-		if (rq->flags & (REQ_DRIVE_CMD | REQ_DRIVE_TASK | REQ_DRIVE_TASKFILE))
-			return execute_drive_cmd(drive, rq);
+		if (rq->flags & (REQ_DRIVE_CMD | REQ_DRIVE_TASK | REQ_DRIVE_TASKFILE)) {
+			/* This issues a special drive command, usually
+			 * initiated by ioctl() from the external hdparm
+			 * program.
+			 */
+
+			if (rq->flags & REQ_DRIVE_TASKFILE) {
+				ide_task_t *args = rq->special;
+
+				if (!(args))
+					goto args_error;
+
+				ata_taskfile(drive,
+						(struct hd_drive_task_hdr *)&args->tfRegister,
+						(struct hd_drive_hob_hdr *)&args->hobRegister,
+						args->handler, NULL, NULL);
+
+				if (((args->command_type == IDE_DRIVE_TASK_RAW_WRITE) ||
+							(args->command_type == IDE_DRIVE_TASK_OUT)) &&
+						args->prehandler && args->handler)
+					return args->prehandler(drive, rq);
+				return ide_started;
+
+			} else if (rq->flags & REQ_DRIVE_TASK) {
+				byte *args = rq->buffer;
+				byte sel;
+
+				if (!(args)) goto args_error;
+#ifdef DEBUG
+				printk("%s: DRIVE_TASK_CMD ", drive->name);
+				printk("cmd=0x%02x ", args[0]);
+				printk("fr=0x%02x ", args[1]);
+				printk("ns=0x%02x ", args[2]);
+				printk("sc=0x%02x ", args[3]);
+				printk("lcyl=0x%02x ", args[4]);
+				printk("hcyl=0x%02x ", args[5]);
+				printk("sel=0x%02x\n", args[6]);
+#endif
+				OUT_BYTE(args[1], IDE_FEATURE_REG);
+				OUT_BYTE(args[3], IDE_SECTOR_REG);
+				OUT_BYTE(args[4], IDE_LCYL_REG);
+				OUT_BYTE(args[5], IDE_HCYL_REG);
+				sel = (args[6] & ~0x10);
+				if (drive->select.b.unit)
+					sel |= 0x10;
+				OUT_BYTE(sel, IDE_SELECT_REG);
+				ide_cmd(drive, args[0], args[2], &drive_cmd_intr);
+				return ide_started;
+			} else if (rq->flags & REQ_DRIVE_CMD) {
+				byte *args = rq->buffer;
+				if (!(args)) goto args_error;
+#ifdef DEBUG
+				printk("%s: DRIVE_CMD ", drive->name);
+				printk("cmd=0x%02x ", args[0]);
+				printk("sc=0x%02x ", args[1]);
+				printk("fr=0x%02x ", args[2]);
+				printk("xx=0x%02x\n", args[3]);
+#endif
+				if (args[0] == WIN_SMART) {
+					OUT_BYTE(0x4f, IDE_LCYL_REG);
+					OUT_BYTE(0xc2, IDE_HCYL_REG);
+					OUT_BYTE(args[2],IDE_FEATURE_REG);
+					OUT_BYTE(args[1],IDE_SECTOR_REG);
+					ide_cmd(drive, args[0], args[3], &drive_cmd_intr);
+
+					return ide_started;
+				}
+				OUT_BYTE(args[2],IDE_FEATURE_REG);
+				ide_cmd(drive, args[0], args[1], &drive_cmd_intr);
+				return ide_started;
+			}
+
+args_error:
+			/*
+			 * NULL is actually a valid way of waiting for all
+			 * current requests to be flushed from the queue.
+			 */
+#ifdef DEBUG
+			printk("%s: DRIVE_CMD (null)\n", drive->name);
+#endif
+			ide_end_drive_cmd(drive, GET_STAT(), GET_ERR());
+			return ide_stopped;
+		}
+
+		/* The normal way of execution is to pass execute the request
+		 * handler.
+		 */
 
 		if (ata_ops(drive)) {
 			if (ata_ops(drive)->do_request)
@@ -1699,31 +1706,29 @@ void ide_init_drive_cmd (struct request *rq)
 }
 
 /*
- * This function issues a special IDE device request
- * onto the request queue.
+ * This function issues a special IDE device request onto the request queue.
  *
- * If action is ide_wait, then the rq is queued at the end of the
- * request queue, and the function sleeps until it has been processed.
- * This is for use when invoked from an ioctl handler.
+ * If action is ide_wait, then the rq is queued at the end of the request
+ * queue, and the function sleeps until it has been processed.  This is for use
+ * when invoked from an ioctl handler.
  *
- * If action is ide_preempt, then the rq is queued at the head of
- * the request queue, displacing the currently-being-processed
- * request and this function returns immediately without waiting
- * for the new rq to be completed.  This is VERY DANGEROUS, and is
- * intended for careful use by the ATAPI tape/cdrom driver code.
+ * If action is ide_preempt, then the rq is queued at the head of the request
+ * queue, displacing the currently-being-processed request and this function
+ * returns immediately without waiting for the new rq to be completed.  This is
+ * VERY DANGEROUS, and is intended for careful use by the ATAPI tape/cdrom
+ * driver code.
  *
- * If action is ide_next, then the rq is queued immediately after
- * the currently-being-processed-request (if any), and the function
- * returns without waiting for the new rq to be completed.  As above,
- * This is VERY DANGEROUS, and is intended for careful use by the
- * ATAPI tape/cdrom driver code.
+ * If action is ide_next, then the rq is queued immediately after the
+ * currently-being-processed-request (if any), and the function returns without
+ * waiting for the new rq to be completed.  As above, This is VERY DANGEROUS,
+ * and is intended for careful use by the ATAPI tape/cdrom driver code.
  *
- * If action is ide_end, then the rq is queued at the end of the
- * request queue, and the function returns immediately without waiting
- * for the new rq to be completed. This is again intended for careful
- * use by the ATAPI tape/cdrom driver code.
+ * If action is ide_end, then the rq is queued at the end of the request queue,
+ * and the function returns immediately without waiting for the new rq to be
+ * completed. This is again intended for careful use by the ATAPI tape/cdrom
+ * driver code.
  */
-int ide_do_drive_cmd (ide_drive_t *drive, struct request *rq, ide_action_t action)
+int ide_do_drive_cmd(ide_drive_t *drive, struct request *rq, ide_action_t action)
 {
 	unsigned long flags;
 	ide_hwgroup_t *hwgroup = HWGROUP(drive);
@@ -2403,7 +2408,7 @@ static int set_pio_mode (ide_drive_t *drive, int arg)
 	ide_init_drive_cmd(&rq);
 	drive->tune_req = (byte) arg;
 	drive->special.b.set_tune = 1;
-	(void) ide_do_drive_cmd (drive, &rq, ide_wait);
+	ide_do_drive_cmd(drive, &rq, ide_wait);
 	return 0;
 }
 

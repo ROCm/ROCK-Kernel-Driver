@@ -106,9 +106,209 @@ static int lba_capacity_is_ok (struct hd_driveid *id)
 	return 0;	/* lba_capacity value may be bad */
 }
 
-static ide_startstop_t chs_do_request(ide_drive_t *drive, struct request *rq, unsigned long block);
-static ide_startstop_t lba28_do_request(ide_drive_t *drive, struct request *rq, unsigned long block);
-static ide_startstop_t lba48_do_request(ide_drive_t *drive, struct request *rq, unsigned long long block);
+static task_ioreg_t get_command(ide_drive_t *drive, int cmd)
+{
+	int lba48bit = (drive->id->cfs_enable_2 & 0x0400) ? 1 : 0;
+
+#if 1
+	lba48bit = drive->addressing;
+#endif
+
+	if (lba48bit) {
+		if (cmd == READ) {
+			if (drive->using_dma)
+				return WIN_READDMA_EXT;
+			else if (drive->mult_count)
+				return WIN_MULTREAD_EXT;
+			else
+				return WIN_READ_EXT;
+		} else if (cmd == WRITE) {
+			if (drive->using_dma)
+				return WIN_WRITEDMA_EXT;
+			else if (drive->mult_count)
+				return WIN_MULTWRITE_EXT;
+			else
+				return WIN_WRITE_EXT;
+		}
+	} else {
+		if (cmd == READ) {
+			if (drive->using_dma)
+				return WIN_READDMA;
+			else if (drive->mult_count)
+				return WIN_MULTREAD;
+			else
+				return WIN_READ;
+		} else if (cmd == WRITE) {
+			if (drive->using_dma)
+				return WIN_WRITEDMA;
+			else if (drive->mult_count)
+				return WIN_MULTWRITE;
+			else
+				return WIN_WRITE;
+		}
+	}
+	return WIN_NOP;
+}
+
+static ide_startstop_t chs_do_request(ide_drive_t *drive, struct request *rq, unsigned long block)
+{
+	struct hd_drive_task_hdr	taskfile;
+	struct hd_drive_hob_hdr		hobfile;
+	ide_task_t			args;
+	int				sectors;
+
+	unsigned int track	= (block / drive->sect);
+	unsigned int sect	= (block % drive->sect) + 1;
+	unsigned int head	= (track % drive->head);
+	unsigned int cyl	= (track / drive->head);
+
+	memset(&taskfile, 0, sizeof(task_struct_t));
+	memset(&hobfile, 0, sizeof(hob_struct_t));
+
+	sectors = rq->nr_sectors;
+	if (sectors == 256)
+		sectors = 0;
+
+	taskfile.sector_count	= sectors;
+	taskfile.sector_number	= sect;
+	taskfile.low_cylinder	= cyl;
+	taskfile.high_cylinder	= (cyl>>8);
+	taskfile.device_head	= head;
+	taskfile.device_head	|= drive->select.all;
+	taskfile.command	=  get_command(drive, rq_data_dir(rq));
+
+#ifdef DEBUG
+	printk("%s: %sing: ", drive->name,
+		(rq_data_dir(rq)==READ) ? "read" : "writ");
+	if (lba)	printk("LBAsect=%lld, ", block);
+	else		printk("CHS=%d/%d/%d, ", cyl, head, sect);
+	printk("sectors=%ld, ", rq->nr_sectors);
+	printk("buffer=0x%08lx\n", (unsigned long) rq->buffer);
+#endif
+
+	memcpy(args.tfRegister, &taskfile, sizeof(struct hd_drive_task_hdr));
+	memcpy(args.hobRegister, &hobfile, sizeof(struct hd_drive_hob_hdr));
+	ide_cmd_type_parser(&args);
+	args.rq	= rq;
+	args.block = block;
+	rq->special = &args;
+
+	return ata_taskfile(drive,
+			(struct hd_drive_task_hdr *) &args.tfRegister,
+			(struct hd_drive_hob_hdr *) &args.hobRegister,
+			args.handler,
+			args.prehandler,
+			args.rq);
+}
+
+static ide_startstop_t lba28_do_request(ide_drive_t *drive, struct request *rq, unsigned long block)
+{
+	struct hd_drive_task_hdr	taskfile;
+	struct hd_drive_hob_hdr		hobfile;
+	ide_task_t			args;
+	int				sectors;
+
+	sectors = rq->nr_sectors;
+	if (sectors == 256)
+		sectors = 0;
+
+	memset(&taskfile, 0, sizeof(task_struct_t));
+	memset(&hobfile, 0, sizeof(hob_struct_t));
+
+	taskfile.sector_count	= sectors;
+	taskfile.sector_number	= block;
+	taskfile.low_cylinder	= (block>>=8);
+	taskfile.high_cylinder	= (block>>=8);
+	taskfile.device_head	= ((block>>8)&0x0f);
+	taskfile.device_head	|= drive->select.all;
+	taskfile.command	= get_command(drive, rq_data_dir(rq));
+
+#ifdef DEBUG
+	printk("%s: %sing: ", drive->name,
+		(rq_data_dir(rq)==READ) ? "read" : "writ");
+	if (lba)	printk("LBAsect=%lld, ", block);
+	else		printk("CHS=%d/%d/%d, ", cyl, head, sect);
+	printk("sectors=%ld, ", rq->nr_sectors);
+	printk("buffer=0x%08lx\n", (unsigned long) rq->buffer);
+#endif
+
+	memcpy(args.tfRegister, &taskfile, sizeof(struct hd_drive_task_hdr));
+	memcpy(args.hobRegister, &hobfile, sizeof(struct hd_drive_hob_hdr));
+	ide_cmd_type_parser(&args);
+	args.rq = rq;
+	args.block = block;
+	rq->special = &args;
+
+	return ata_taskfile(drive,
+			(struct hd_drive_task_hdr *) &args.tfRegister,
+			(struct hd_drive_hob_hdr *) &args.hobRegister,
+			args.handler,
+			args.prehandler,
+			args.rq);
+}
+
+/*
+ * 268435455  == 137439 MB or 28bit limit
+ * 320173056  == 163929 MB or 48bit addressing
+ * 1073741822 == 549756 MB or 48bit addressing fake drive
+ */
+
+static ide_startstop_t lba48_do_request(ide_drive_t *drive, struct request *rq, unsigned long long block)
+{
+	struct hd_drive_task_hdr	taskfile;
+	struct hd_drive_hob_hdr		hobfile;
+	ide_task_t			args;
+	int				sectors;
+
+	memset(&taskfile, 0, sizeof(task_struct_t));
+	memset(&hobfile, 0, sizeof(hob_struct_t));
+
+	sectors = rq->nr_sectors;
+	if (sectors == 65536)
+		sectors = 0;
+
+	taskfile.sector_count	= sectors;
+	hobfile.sector_count	= sectors >> 8;
+
+	if (rq->nr_sectors == 65536) {
+		taskfile.sector_count	= 0x00;
+		hobfile.sector_count	= 0x00;
+	}
+
+	taskfile.sector_number	= block;	/* low lba */
+	taskfile.low_cylinder	= (block>>=8);	/* mid lba */
+	taskfile.high_cylinder	= (block>>=8);	/* hi  lba */
+	hobfile.sector_number	= (block>>=8);	/* low lba */
+	hobfile.low_cylinder	= (block>>=8);	/* mid lba */
+	hobfile.high_cylinder	= (block>>=8);	/* hi  lba */
+	taskfile.device_head	= drive->select.all;
+	hobfile.device_head	= taskfile.device_head;
+	hobfile.control		= (drive->ctl|0x80);
+	taskfile.command	= get_command(drive, rq_data_dir(rq));
+
+#ifdef DEBUG
+	printk("%s: %sing: ", drive->name,
+		(rq_data_dir(rq)==READ) ? "read" : "writ");
+	if (lba)	printk("LBAsect=%lld, ", block);
+	else		printk("CHS=%d/%d/%d, ", cyl, head, sect);
+	printk("sectors=%ld, ", rq->nr_sectors);
+	printk("buffer=0x%08lx\n", (unsigned long) rq->buffer);
+#endif
+
+	memcpy(args.tfRegister, &taskfile, sizeof(struct hd_drive_task_hdr));
+	memcpy(args.hobRegister, &hobfile, sizeof(struct hd_drive_hob_hdr));
+	ide_cmd_type_parser(&args);
+	args.rq = rq;
+	args.block = block;
+	rq->special = &args;
+
+	return ata_taskfile(drive,
+			(struct hd_drive_task_hdr *) &args.tfRegister,
+			(struct hd_drive_hob_hdr *) &args.hobRegister,
+			args.handler,
+			args.prehandler,
+			args.rq);
+}
 
 /*
  * Issue a READ or WRITE command to a disk, using LBA if supported, or CHS
@@ -150,193 +350,19 @@ static ide_startstop_t idedisk_do_request(ide_drive_t *drive, struct request *rq
 	return chs_do_request(drive, rq, block);
 }
 
-static task_ioreg_t get_command(ide_drive_t *drive, int cmd)
-{
-	int lba48bit = (drive->id->cfs_enable_2 & 0x0400) ? 1 : 0;
-
-#if 1
-	lba48bit = drive->addressing;
-#endif
-
-	if (cmd == READ) {
-		if (drive->using_dma)
-			return (lba48bit) ? WIN_READDMA_EXT : WIN_READDMA;
-		else if (drive->mult_count)
-			return (lba48bit) ? WIN_MULTREAD_EXT : WIN_MULTREAD;
-		else
-			return (lba48bit) ? WIN_READ_EXT : WIN_READ;
-	} else if (cmd == WRITE) {
-		if (drive->using_dma)
-			return (lba48bit) ? WIN_WRITEDMA_EXT : WIN_WRITEDMA;
-		else if (drive->mult_count)
-			return (lba48bit) ? WIN_MULTWRITE_EXT : WIN_MULTWRITE;
-		else
-			return (lba48bit) ? WIN_WRITE_EXT : WIN_WRITE;
-	}
-	return WIN_NOP;
-}
-
-static ide_startstop_t chs_do_request(ide_drive_t *drive, struct request *rq, unsigned long block)
-{
-	struct hd_drive_task_hdr	taskfile;
-	struct hd_drive_hob_hdr		hobfile;
-	ide_task_t			args;
-	int				sectors;
-
-	task_ioreg_t command	= get_command(drive, rq_data_dir(rq));
-
-	unsigned int track	= (block / drive->sect);
-	unsigned int sect	= (block % drive->sect) + 1;
-	unsigned int head	= (track % drive->head);
-	unsigned int cyl	= (track / drive->head);
-
-	memset(&taskfile, 0, sizeof(task_struct_t));
-	memset(&hobfile, 0, sizeof(hob_struct_t));
-
-	sectors = rq->nr_sectors;
-	if (sectors == 256)
-		sectors = 0;
-
-	taskfile.sector_count	= sectors;
-	taskfile.sector_number	= sect;
-	taskfile.low_cylinder	= cyl;
-	taskfile.high_cylinder	= (cyl>>8);
-	taskfile.device_head	= head;
-	taskfile.device_head	|= drive->select.all;
-	taskfile.command	= command;
-
-#ifdef DEBUG
-	printk("%s: %sing: ", drive->name,
-		(rq_data_dir(rq)==READ) ? "read" : "writ");
-	if (lba)	printk("LBAsect=%lld, ", block);
-	else		printk("CHS=%d/%d/%d, ", cyl, head, sect);
-	printk("sectors=%ld, ", rq->nr_sectors);
-	printk("buffer=0x%08lx\n", (unsigned long) rq->buffer);
-#endif
-
-	memcpy(args.tfRegister, &taskfile, sizeof(struct hd_drive_task_hdr));
-	memcpy(args.hobRegister, &hobfile, sizeof(struct hd_drive_hob_hdr));
-	ide_cmd_type_parser(&args);
-	args.rq	= rq;
-	args.block = block;
-	rq->special = &args;
-
-	return do_rw_taskfile(drive, &args);
-}
-
-static ide_startstop_t lba28_do_request(ide_drive_t *drive, struct request *rq, unsigned long block)
-{
-	struct hd_drive_task_hdr	taskfile;
-	struct hd_drive_hob_hdr		hobfile;
-	ide_task_t			args;
-	int				sectors;
-
-	task_ioreg_t command	= get_command(drive, rq_data_dir(rq));
-
-	sectors = rq->nr_sectors;
-	if (sectors == 256)
-		sectors = 0;
-
-	memset(&taskfile, 0, sizeof(task_struct_t));
-	memset(&hobfile, 0, sizeof(hob_struct_t));
-
-	taskfile.sector_count	= sectors;
-	taskfile.sector_number	= block;
-	taskfile.low_cylinder	= (block>>=8);
-	taskfile.high_cylinder	= (block>>=8);
-	taskfile.device_head	= ((block>>8)&0x0f);
-	taskfile.device_head	|= drive->select.all;
-	taskfile.command	= command;
-
-#ifdef DEBUG
-	printk("%s: %sing: ", drive->name,
-		(rq_data_dir(rq)==READ) ? "read" : "writ");
-	if (lba)	printk("LBAsect=%lld, ", block);
-	else		printk("CHS=%d/%d/%d, ", cyl, head, sect);
-	printk("sectors=%ld, ", rq->nr_sectors);
-	printk("buffer=0x%08lx\n", (unsigned long) rq->buffer);
-#endif
-
-	memcpy(args.tfRegister, &taskfile, sizeof(struct hd_drive_task_hdr));
-	memcpy(args.hobRegister, &hobfile, sizeof(struct hd_drive_hob_hdr));
-	ide_cmd_type_parser(&args);
-	args.rq = rq;
-	args.block = block;
-	rq->special = &args;
-
-	return do_rw_taskfile(drive, &args);
-}
-
-/*
- * 268435455  == 137439 MB or 28bit limit
- * 320173056  == 163929 MB or 48bit addressing
- * 1073741822 == 549756 MB or 48bit addressing fake drive
- */
-
-static ide_startstop_t lba48_do_request(ide_drive_t *drive, struct request *rq, unsigned long long block)
-{
-	struct hd_drive_task_hdr	taskfile;
-	struct hd_drive_hob_hdr		hobfile;
-	ide_task_t			args;
-	int				sectors;
-
-	task_ioreg_t command	= get_command(drive, rq_data_dir(rq));
-
-	memset(&taskfile, 0, sizeof(task_struct_t));
-	memset(&hobfile, 0, sizeof(hob_struct_t));
-
-	sectors = rq->nr_sectors;
-	if (sectors == 65536)
-		sectors = 0;
-
-	taskfile.sector_count	= sectors;
-	hobfile.sector_count	= sectors >> 8;
-
-	if (rq->nr_sectors == 65536) {
-		taskfile.sector_count	= 0x00;
-		hobfile.sector_count	= 0x00;
-	}
-
-	taskfile.sector_number	= block;	/* low lba */
-	taskfile.low_cylinder	= (block>>=8);	/* mid lba */
-	taskfile.high_cylinder	= (block>>=8);	/* hi  lba */
-	hobfile.sector_number	= (block>>=8);	/* low lba */
-	hobfile.low_cylinder	= (block>>=8);	/* mid lba */
-	hobfile.high_cylinder	= (block>>=8);	/* hi  lba */
-	taskfile.device_head	= drive->select.all;
-	hobfile.device_head	= taskfile.device_head;
-	hobfile.control		= (drive->ctl|0x80);
-	taskfile.command	= command;
-
-#ifdef DEBUG
-	printk("%s: %sing: ", drive->name,
-		(rq_data_dir(rq)==READ) ? "read" : "writ");
-	if (lba)	printk("LBAsect=%lld, ", block);
-	else		printk("CHS=%d/%d/%d, ", cyl, head, sect);
-	printk("sectors=%ld, ", rq->nr_sectors);
-	printk("buffer=0x%08lx\n", (unsigned long) rq->buffer);
-#endif
-
-	memcpy(args.tfRegister, &taskfile, sizeof(struct hd_drive_task_hdr));
-	memcpy(args.hobRegister, &hobfile, sizeof(struct hd_drive_hob_hdr));
-	ide_cmd_type_parser(&args);
-	args.rq = rq;
-	args.block = block;
-	rq->special = &args;
-
-	return do_rw_taskfile(drive, &args);
-}
-
 static int idedisk_open (struct inode *inode, struct file *filp, ide_drive_t *drive)
 {
 	MOD_INC_USE_COUNT;
 	if (drive->removable && drive->usage == 1) {
 		struct hd_drive_task_hdr taskfile;
 		struct hd_drive_hob_hdr hobfile;
+
 		memset(&taskfile, 0, sizeof(struct hd_drive_task_hdr));
 		memset(&hobfile, 0, sizeof(struct hd_drive_hob_hdr));
+
 		check_disk_change(inode->i_rdev);
 		taskfile.command = WIN_DOORLOCK;
+
 		/*
 		 * Ignore the return code from door_lock,
 		 * since the open() has already succeeded,
@@ -355,11 +381,10 @@ static int idedisk_flushcache(ide_drive_t *drive)
 	struct hd_drive_hob_hdr hobfile;
 	memset(&taskfile, 0, sizeof(struct hd_drive_task_hdr));
 	memset(&hobfile, 0, sizeof(struct hd_drive_hob_hdr));
-	if (drive->id->cfs_enable_2 & 0x2400) {
+	if (drive->id->cfs_enable_2 & 0x2400)
 		taskfile.command	= WIN_FLUSH_CACHE_EXT;
-	} else {
+	else
 		taskfile.command	= WIN_FLUSH_CACHE;
-	}
 	return ide_wait_taskfile(drive, &taskfile, &hobfile, NULL);
 }
 
@@ -643,7 +668,7 @@ static ide_startstop_t idedisk_special (ide_drive_t *drive)
 			taskfile.command = WIN_SPECIFY;
 			handler	= set_geometry_intr;;
 		}
-		do_taskfile(drive, &taskfile, &hobfile, handler);
+		ata_taskfile(drive, &taskfile, &hobfile, handler, NULL, NULL);
 	} else if (s->b.recalibrate) {
 		s->b.recalibrate = 0;
 		if (!IS_PDC4030_DRIVE) {
@@ -653,7 +678,7 @@ static ide_startstop_t idedisk_special (ide_drive_t *drive)
 			memset(&hobfile, 0, sizeof(struct hd_drive_hob_hdr));
 			taskfile.sector_count	= drive->sect;
 			taskfile.command	= WIN_RESTORE;
-			do_taskfile(drive, &taskfile, &hobfile, recal_intr);
+			ata_taskfile(drive, &taskfile, &hobfile, recal_intr, NULL, NULL);
 		}
 	} else if (s->b.set_multmode) {
 		s->b.set_multmode = 0;
@@ -666,7 +691,7 @@ static ide_startstop_t idedisk_special (ide_drive_t *drive)
 			memset(&hobfile, 0, sizeof(struct hd_drive_hob_hdr));
 			taskfile.sector_count	= drive->mult_req;
 			taskfile.command	= WIN_SETMULT;
-			do_taskfile(drive, &taskfile, &hobfile, &set_multmode_intr);
+			ata_taskfile(drive, &taskfile, &hobfile, set_multmode_intr, NULL, NULL);
 		}
 	} else if (s->all) {
 		int special = s->all;
