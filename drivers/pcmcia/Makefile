@@ -9,6 +9,7 @@ endif
 obj-$(CONFIG_PCMCIA)				+= pcmcia_core.o ds.o
 obj-$(CONFIG_YENTA) 				+= yenta_socket.o
 
+obj-$(CONFIG_PD6729)				+= pd6729.o
 obj-$(CONFIG_I82365)				+= i82365.o
 obj-$(CONFIG_I82092)				+= i82092.o
 obj-$(CONFIG_TCIC)				+= tcic.o
