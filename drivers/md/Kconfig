@@ -180,5 +180,11 @@ config DM_CRYPT
 
 	  If unsure, say N.
 
+config DM_SNAPSHOT
+       tristate "Snapshot target (EXPERIMENTAL)"
+       depends on BLK_DEV_DM && EXPERIMENTAL
+       ---help---
+         Allow volume managers to take writeable snapshots of a device.
+
 endmenu
 
