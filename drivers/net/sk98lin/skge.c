@@ -1133,6 +1133,24 @@ SK_U32		IntSrc;		/* interrupts source register contents */
 		return SkIsrRetHandled;
 } /* SkGeIsrOnePort */
 
+#ifdef CONFIG_NET_POLL_CONTROLLER
+/****************************************************************************
+ *
+ * 	SkGePollController - polling receive, for netconsole
+ *
+ * Description:
+ *	Polling receive - used by netconsole and other diagnostic tools
+ *	to allow network i/o with interrupts disabled.
+ *
+ * Returns: N/A
+ */
+static void SkGePollController(struct net_device *dev)
+{
+	disable_irq(dev->irq);
+	SkGeIsr(dev->irq, dev, NULL);
+	enable_irq(dev->irq);
+}
+#endif
 
 /****************************************************************************
  *
@@ -4933,6 +4951,9 @@ static int __devinit skge_probe_one(struct pci_dev *pdev,
 	dev->set_mac_address =	&SkGeSetMacAddr;
 	dev->do_ioctl =		&SkGeIoctl;
 	dev->change_mtu =	&SkGeChangeMtu;
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	dev->poll_controller =	&SkGePollController;
+#endif
 	dev->flags &= 		~IFF_RUNNING;
 	SET_NETDEV_DEV(dev, &pdev->dev);
 
