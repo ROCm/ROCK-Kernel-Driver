@@ -276,6 +276,7 @@ struct hid_field {
 	__s32     unit_exponent;
 	unsigned  unit;
 	struct hid_report *report;	/* associated report */
+	unsigned index;			/* index into report->field[] */
 };
 
 #define HID_MAX_FIELDS 64
