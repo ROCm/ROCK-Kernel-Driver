@@ -5935,6 +5935,10 @@ static int tg3_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 					tp->link_config.phy_is_low_power)
 		return -EAGAIN;
 
+	spin_lock_irq(&tp->lock);
+	spin_lock(&tp->tx_lock);
+
+	tp->link_config.autoneg = cmd->autoneg;
 	if (cmd->autoneg == AUTONEG_ENABLE) {
 		tp->link_config.advertising = cmd->advertising;
 		tp->link_config.speed = SPEED_INVALID;
