@@ -348,6 +348,16 @@ struct scsi_host_template {
 	struct list_head legacy_hosts;
 };
 
+/*
+ * shost states
+ */
+enum {
+	SHOST_ADD,
+	SHOST_DEL,
+	SHOST_CANCEL,
+	SHOST_RECOVERY,
+};
+
 struct Scsi_Host {
 	struct list_head	my_devices;
 	struct scsi_host_cmd_pool *cmd_pool;
@@ -413,7 +423,6 @@ struct Scsi_Host {
 	short unsigned int sg_tablesize;
 	short unsigned int max_sectors;
 
-	unsigned in_recovery:1;
 	unsigned unchecked_isa_dma:1;
 	unsigned use_clustering:1;
 	unsigned highmem_io:1;
@@ -448,6 +457,9 @@ struct Scsi_Host {
 	unsigned char n_io_port;
 	unsigned char dma_channel;
 	unsigned int  irq;
+	
+
+	unsigned long shost_state;
 
 	/* ldm bits */
 	struct device		shost_gendev;
@@ -478,8 +490,8 @@ struct Scsi_Host {
 extern struct Scsi_Host *scsi_host_alloc(struct scsi_host_template *, int);
 extern int scsi_add_host(struct Scsi_Host *, struct device *);
 extern void scsi_scan_host(struct Scsi_Host *);
-extern int scsi_remove_host(struct Scsi_Host *);
-extern void scsi_host_get(struct Scsi_Host *);
+extern void scsi_remove_host(struct Scsi_Host *);
+extern struct Scsi_Host *scsi_host_get(struct Scsi_Host *);
 extern void scsi_host_put(struct Scsi_Host *t);
 extern struct Scsi_Host *scsi_host_lookup(unsigned short);
 

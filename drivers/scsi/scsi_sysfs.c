@@ -54,8 +54,28 @@ static struct class_device_attribute *scsi_sysfs_shost_attrs[] = {
 	NULL
 };
 
+static void scsi_host_cls_release(struct class_device *class_dev)
+{
+	struct Scsi_Host *shost;
+
+	shost = class_to_shost(class_dev);
+	put_device(&shost->shost_gendev);
+}
+
+static void scsi_host_dev_release(struct device *dev)
+{
+	struct Scsi_Host *shost;
+	struct device *parent;
+
+	parent = dev->parent;
+	shost = dev_to_shost(dev);
+	scsi_free_shost(shost);
+	put_device(parent);
+}
+
 struct class shost_class = {
 	.name		= "scsi_host",
+	.release	= scsi_host_cls_release,
 };
 
 static struct class sdev_class = {
@@ -346,16 +366,6 @@ int scsi_register_interface(struct class_interface *intf)
 	return class_interface_register(intf);
 }
 
-static void scsi_host_release(struct device *dev)
-{
-	struct Scsi_Host *shost;
-
-	shost = dev_to_shost(dev);
-	if (!shost)
-		return;
-
-	scsi_free_shost(shost);
-}
 
 void scsi_sysfs_init_host(struct Scsi_Host *shost)
 {
@@ -364,7 +374,7 @@ void scsi_sysfs_init_host(struct Scsi_Host *shost)
 		shost->host_no);
 	snprintf(shost->shost_gendev.name, DEVICE_NAME_SIZE, "%s",
 		shost->hostt->proc_name);
-	shost->shost_gendev.release = scsi_host_release;
+	shost->shost_gendev.release = scsi_host_dev_release;
 
 	class_device_initialize(&shost->shost_classdev);
 	shost->shost_classdev.dev = &shost->shost_gendev;
@@ -426,10 +436,14 @@ int scsi_sysfs_add_host(struct Scsi_Host *shost, struct device *dev)
 	if (error)
 		return error;
 
+	set_bit(SHOST_ADD, &shost->shost_state);
+	get_device(shost->shost_gendev.parent);
+
 	error = class_device_add(&shost->shost_classdev);
 	if (error)
 		goto clean_device;
 
+	get_device(&shost->shost_gendev);
 	if (shost->hostt->shost_attrs) {
 		for (i = 0; shost->hostt->shost_attrs[i]; i++) {
 			error = class_attr_add(&shost->shost_classdev,
@@ -465,6 +479,11 @@ clean_device:
  **/
 void scsi_sysfs_remove_host(struct Scsi_Host *shost)
 {
-	class_device_del(&shost->shost_classdev);
+	unsigned long flags;
+	spin_lock_irqsave(shost->host_lock, flags);
+	set_bit(SHOST_DEL, &shost->shost_state);
+	spin_unlock_irqrestore(shost->host_lock, flags);
+
+	class_device_unregister(&shost->shost_classdev);
 	device_del(&shost->shost_gendev);
 }

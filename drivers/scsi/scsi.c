@@ -370,7 +370,7 @@ int scsi_dispatch_cmd(struct scsi_cmnd *cmd)
 	struct Scsi_Host *host = cmd->device->host;
 	unsigned long flags = 0;
 	unsigned long timeout;
-	int rtn = 1;
+	int rtn = 0;
 
 	/* Assign a unique nonzero serial_number. */
 	/* XXX(hch): this is racy */
@@ -444,7 +444,12 @@ int scsi_dispatch_cmd(struct scsi_cmnd *cmd)
 				   host->hostt->queuecommand));
 
 	spin_lock_irqsave(host->host_lock, flags);
-	rtn = host->hostt->queuecommand(cmd, scsi_done);
+	if (unlikely(test_bit(SHOST_CANCEL, &host->shost_state))) {
+		cmd->result = (DID_NO_CONNECT << 16);
+		scsi_done(cmd);
+	} else {
+		rtn = host->hostt->queuecommand(cmd, scsi_done);
+	}
 	spin_unlock_irqrestore(host->host_lock, flags);
 	if (rtn) {
 		scsi_queue_insert(cmd,
@@ -901,13 +906,21 @@ void scsi_device_put(struct scsi_device *sdev)
 	module_put(sdev->host->hostt->module);
 }
 
+int scsi_device_cancel_cb(struct device *dev, void *data)
+{
+	struct scsi_device *sdev = to_scsi_device(dev);
+	int recovery = *(int *)data;
+
+	return scsi_device_cancel(sdev, recovery);
+}
+
 /**
- * scsi_set_device_offline - set scsi_device offline
- * @sdev:	pointer to struct scsi_device to offline. 
+ * scsi_device_cancel - cancel outstanding IO to this device
+ * @sdev:	pointer to struct scsi_device
+ * @data:	pointer to cancel value.
  *
- * Locks:	host_lock held on entry.
  **/
-void scsi_set_device_offline(struct scsi_device *sdev)
+int scsi_device_cancel(struct scsi_device *sdev, int recovery)
 {
 	struct scsi_cmnd *scmd;
 	LIST_HEAD(active_list);
@@ -934,11 +947,17 @@ void scsi_set_device_offline(struct scsi_device *sdev)
 	if (!list_empty(&active_list)) {
 		list_for_each_safe(lh, lh_sf, &active_list) {
 			scmd = list_entry(lh, struct scsi_cmnd, eh_entry);
-			scsi_eh_scmd_add(scmd, SCSI_EH_CANCEL_CMD);
+			list_del_init(lh);
+			if (recovery) {
+				scsi_eh_scmd_add(scmd, SCSI_EH_CANCEL_CMD);
+			} else {
+				scmd->result = (DID_ABORT << 16);
+				scsi_finish_command(scmd);
+			}
 		}
-	} else {
-		/* FIXME: Send online state change hotplug event */
 	}
+
+	return 0;
 }
 
 MODULE_DESCRIPTION("SCSI core");
