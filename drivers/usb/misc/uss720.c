@@ -44,6 +44,7 @@
 #include <linux/parport.h>
 #include <linux/init.h>
 #include <linux/usb.h>
+#include <linux/delay.h>
 
 /*
  * Version Information
@@ -159,8 +160,7 @@ static int change_mode(struct parport *pp, int m)
 				if (time_after_eq (jiffies, expire))
 					/* The FIFO is stuck. */
 					return -EBUSY;
-				set_current_state(TASK_INTERRUPTIBLE);
-				schedule_timeout((HZ + 99) / 100);
+				msleep_interruptible(10);
 				if (signal_pending (current))
 					break;
 			}
