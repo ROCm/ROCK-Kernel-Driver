@@ -456,9 +456,9 @@ static void agp_v3_parse_one(u32 *mode, u32 *cmd, u32 *tmp)
 
 	/* Clear out unwanted bits. */
 	if (*cmd & AGPSTAT3_8X)
-		*cmd *= ~(AGPSTAT3_4X | AGPSTAT3_RSVD);
+		*cmd = ~(AGPSTAT3_4X | AGPSTAT3_RSVD);
 	if (*cmd & AGPSTAT3_4X)
-		*cmd *= ~(AGPSTAT3_8X | AGPSTAT3_RSVD);
+		*cmd = ~(AGPSTAT3_8X | AGPSTAT3_RSVD);
 }
 
 //FIXME: This doesn't smell right.
