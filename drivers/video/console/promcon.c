@@ -457,12 +457,6 @@ promcon_cursor(struct vc_data *conp, int mode)
 }
 
 static int
-promcon_font_op(struct vc_data *conp, struct console_font_op *op)
-{
-	return -ENOSYS;
-}
-        
-static int
 promcon_blank(struct vc_data *conp, int blank, int mode_switch)
 {
 	if (blank) {
@@ -586,7 +580,6 @@ const struct consw prom_con = {
 	.con_bmove =		promcon_bmove,
 	.con_switch =		promcon_switch,
 	.con_blank =		promcon_blank,
-	.con_font_op =		promcon_font_op,
 	.con_set_palette =	DUMMY,
 	.con_scrolldelta =	DUMMY,
 #if !(PROMCON_COLOR)

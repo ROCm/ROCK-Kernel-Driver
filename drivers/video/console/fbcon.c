@@ -165,7 +165,6 @@ static void fbcon_bmove(struct vc_data *vc, int sy, int sx, int dy, int dx,
 			int height, int width);
 static int fbcon_switch(struct vc_data *vc);
 static int fbcon_blank(struct vc_data *vc, int blank, int mode_switch);
-static int fbcon_font_op(struct vc_data *vc, struct console_font_op *op);
 static int fbcon_set_palette(struct vc_data *vc, unsigned char *table);
 static int fbcon_scrolldelta(struct vc_data *vc, int lines);
 void accel_clear_margins(struct vc_data *vc, struct fb_info *info,
@@ -2001,7 +2000,7 @@ static void fbcon_free_font(struct display *p)
 	p->userfont = 0;
 }
 
-static inline int fbcon_get_font(struct vc_data *vc, struct console_font_op *op)
+static int fbcon_get_font(struct vc_data *vc, struct console_font_op *op)
 {
 	u8 *fontdata = vc->vc_font.data;
 	u8 *data = op->data;
@@ -2168,7 +2167,7 @@ static int fbcon_do_set_font(struct vc_data *vc, struct console_font_op *op,
 	return 0;
 }
 
-static inline int fbcon_copy_font(struct vc_data *vc, struct console_font_op *op)
+static int fbcon_copy_font(struct vc_data *vc, struct console_font_op *op)
 {
 	struct display *od;
 	int h = op->height;
@@ -2185,7 +2184,7 @@ static inline int fbcon_copy_font(struct vc_data *vc, struct console_font_op *op
 	return fbcon_do_set_font(vc, op, od->fontdata, od->userfont);
 }
 
-static inline int fbcon_set_font(struct vc_data *vc, struct console_font_op *op)
+static int fbcon_set_font(struct vc_data *vc, struct console_font_op *op)
 {
 	int w = op->width;
 	int h = op->height;
@@ -2273,7 +2272,7 @@ static inline int fbcon_set_font(struct vc_data *vc, struct console_font_op *op)
 	return fbcon_do_set_font(vc, op, new_data, 1);
 }
 
-static inline int fbcon_set_def_font(struct vc_data *vc, struct console_font_op *op)
+static int fbcon_set_def_font(struct vc_data *vc, struct console_font_op *op)
 {
 	struct fb_info *info = registered_fb[(int) con2fb_map[vc->vc_num]];
 	char name[MAX_FONT_NAME];
@@ -2291,22 +2290,6 @@ static inline int fbcon_set_def_font(struct vc_data *vc, struct console_font_op 
 	op->width = f->width;
 	op->height = f->height;
 	return fbcon_do_set_font(vc, op, f->data, 0);
-}
-
-static int fbcon_font_op(struct vc_data *vc, struct console_font_op *op)
-{
-	switch (op->op) {
-	case KD_FONT_OP_SET:
-		return fbcon_set_font(vc, op);
-	case KD_FONT_OP_GET:
-		return fbcon_get_font(vc, op);
-	case KD_FONT_OP_SET_DEFAULT:
-		return fbcon_set_def_font(vc, op);
-	case KD_FONT_OP_COPY:
-		return fbcon_copy_font(vc, op);
-	default:
-		return -ENOSYS;
-	}
 }
 
 static u16 palette_red[16];
@@ -2609,7 +2592,10 @@ const struct consw fb_con = {
 	.con_bmove 		= fbcon_bmove,
 	.con_switch 		= fbcon_switch,
 	.con_blank 		= fbcon_blank,
-	.con_font_op 		= fbcon_font_op,
+	.con_font_set 		= fbcon_set_font,
+	.con_font_get 		= fbcon_get_font,
+	.con_font_default	= fbcon_set_def_font,
+	.con_font_copy 		= fbcon_copy_font,
 	.con_set_palette 	= fbcon_set_palette,
 	.con_scrolldelta 	= fbcon_scrolldelta,
 	.con_set_origin 	= fbcon_set_origin,

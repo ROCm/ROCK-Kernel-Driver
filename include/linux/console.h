@@ -40,7 +40,10 @@ struct consw {
 	void	(*con_bmove)(struct vc_data *, int, int, int, int, int, int);
 	int	(*con_switch)(struct vc_data *);
 	int	(*con_blank)(struct vc_data *, int, int);
-	int	(*con_font_op)(struct vc_data *, struct console_font_op *);
+	int	(*con_font_set)(struct vc_data *, struct console_font_op *);
+	int	(*con_font_get)(struct vc_data *, struct console_font_op *);
+	int	(*con_font_default)(struct vc_data *, struct console_font_op *);
+	int	(*con_font_copy)(struct vc_data *, struct console_font_op *);
 	int	(*con_resize)(struct vc_data *, unsigned int, unsigned int);
 	int	(*con_set_palette)(struct vc_data *, unsigned char *);
 	int	(*con_scrolldelta)(struct vc_data *, int);

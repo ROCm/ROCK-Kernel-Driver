@@ -543,18 +543,14 @@ static int newport_set_def_font(int unit, struct console_font_op *op)
 	return 0;
 }
 
-static int newport_font_op(struct vc_data *vc, struct console_font_op *op)
+static int newport_font_default(struct vc_data *vc, struct console_font_op *op)
 {
-	int unit = vc->vc_num;
+	return newport_set_def_font(vc->vc_num, op);
+}
 
-	switch (op->op) {
-	case KD_FONT_OP_SET:
-		return newport_set_font(unit, op);
-	case KD_FONT_OP_SET_DEFAULT:
-		return newport_set_def_font(unit, op);
-	default:
-		return -ENOSYS;
-	}
+static int newport_font_set(struct vc_data *vc, struct console_font_op *op)
+{
+	return newport_set_font(vc->vc_num, op);
 }
 
 static int newport_set_palette(struct vc_data *vc, unsigned char *table)
@@ -717,7 +713,8 @@ const struct consw newport_con = {
     .con_bmove =	newport_bmove,
     .con_switch =	newport_switch,
     .con_blank =	newport_blank,
-    .con_font_op =	newport_font_op,
+    .con_font_set =	newport_font_set,
+    .con_font_default =	newport_font_default,
     .con_set_palette =	newport_set_palette,
     .con_scrolldelta =	newport_scrolldelta,
     .con_set_origin =	DUMMY,

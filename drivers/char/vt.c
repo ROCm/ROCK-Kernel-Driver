@@ -3023,96 +3023,165 @@ void reset_palette(int currcons)
 
 #define max_font_size 65536
 
-int con_font_op(int currcons, struct console_font_op *op)
+int con_font_get(int currcons, struct console_font_op *op)
 {
-	int rc = -EINVAL;
-	int size = max_font_size, set;
-	u8 *temp = NULL;
 	struct console_font_op old_op;
+	int rc = -EINVAL;
+	u8 *temp = NULL;
+	int c;
 
 	if (vt_cons[currcons]->vc_mode != KD_TEXT)
-		goto quit;
+		return -EINVAL;
+
 	memcpy(&old_op, op, sizeof(old_op));
-	if (op->op == KD_FONT_OP_SET) {
-		if (!op->data)
-			return -EINVAL;
-		if (op->charcount > 512)
-			goto quit;
-		if (!op->height) {		/* Need to guess font height [compat] */
-			int h, i;
-			u8 __user *charmap = op->data;
-			u8 tmp;
-			
-			/* If from KDFONTOP ioctl, don't allow things which can be done in userland,
-			   so that we can get rid of this soon */
-			if (!(op->flags & KD_FONT_FLAG_OLD))
-				goto quit;
-			rc = -EFAULT;
-			for (h = 32; h > 0; h--)
-				for (i = 0; i < op->charcount; i++) {
-					if (get_user(tmp, &charmap[32*i+h-1]))
-						goto quit;
-					if (tmp)
-						goto nonzero;
-				}
-			rc = -EINVAL;
-			goto quit;
-		nonzero:
-			rc = -EINVAL;
-			op->height = h;
-		}
-		if (op->width > 32 || op->height > 32)
-			goto quit;
-		size = (op->width+7)/8 * 32 * op->charcount;
-		if (size > max_font_size)
-			return -ENOSPC;
-		set = 1;
-	} else if (op->op == KD_FONT_OP_GET)
-		set = 0;
-	else {
-		acquire_console_sem();
-		rc = sw->con_font_op(vc_cons[currcons].d, op);
-		release_console_sem();
-		return rc;
-	}
 	if (op->data) {
-		temp = kmalloc(size, GFP_KERNEL);
+		temp = kmalloc(max_font_size, GFP_KERNEL);
 		if (!temp)
 			return -ENOMEM;
-		if (set && copy_from_user(temp, op->data, size)) {
-			rc = -EFAULT;
-			goto quit;
-		}
 		op->data = temp;
 	}
 
 	acquire_console_sem();
-	rc = sw->con_font_op(vc_cons[currcons].d, op);
+	if (sw->con_font_get)
+		rc = sw->con_font_get(vc_cons[currcons].d, op);
+	else
+		rc = -ENOSYS;
 	release_console_sem();
 
 	op->data = old_op.data;
-	if (!rc && !set) {
-		int c = (op->width+7)/8 * 32 * op->charcount;
-		
-		if (op->data && op->charcount > old_op.charcount)
+	if (rc)
+		goto out;
+
+	c = (op->width+7)/8 * 32 * op->charcount;
+	
+	if (op->data && op->charcount > old_op.charcount)
+		rc = -ENOSPC;
+	if (!(op->flags & KD_FONT_FLAG_OLD)) {
+		if (op->width > old_op.width || 
+		    op->height > old_op.height) 
 			rc = -ENOSPC;
-		if (!(op->flags & KD_FONT_FLAG_OLD)) {
-			if (op->width > old_op.width || 
-			    op->height > old_op.height)
-				rc = -ENOSPC;
-		} else {
-			if (op->width != 8)
-				rc = -EIO;
-			else if ((old_op.height && op->height > old_op.height) ||
-			         op->height > 32)
-				rc = -ENOSPC;
-		}
-		if (!rc && op->data && copy_to_user(op->data, temp, c))
-			rc = -EFAULT;
+	} else {
+		if (op->width != 8)
+			rc = -EIO;
+		else if ((old_op.height && op->height > old_op.height) ||
+			 op->height > 32)
+			rc = -ENOSPC;
 	}
-quit:	if (temp)
-		kfree(temp);
+	if (rc)
+		goto out;
+
+	if (op->data && copy_to_user(op->data, temp, c))
+		rc = -EFAULT;
+
+out:
+	kfree(temp);
 	return rc;
+}
+
+int con_font_set(int currcons, struct console_font_op *op)
+{
+	struct console_font_op old_op;
+	int rc = -EINVAL;
+	int size;
+	u8 *temp;
+
+	if (vt_cons[currcons]->vc_mode != KD_TEXT)
+		return -EINVAL;
+	memcpy(&old_op, op, sizeof(old_op));
+	if (!op->data)
+		return -EINVAL;
+	if (op->charcount > 512)
+		return -EINVAL;
+	if (!op->height) {		/* Need to guess font height [compat] */
+		int h, i;
+		u8 __user *charmap = op->data;
+		u8 tmp;
+		
+		/* If from KDFONTOP ioctl, don't allow things which can be done in userland,
+		   so that we can get rid of this soon */
+		if (!(op->flags & KD_FONT_FLAG_OLD))
+			return -EINVAL;
+		for (h = 32; h > 0; h--)
+			for (i = 0; i < op->charcount; i++) {
+				if (get_user(tmp, &charmap[32*i+h-1]))
+					return -EFAULT;
+				if (tmp)
+					goto nonzero;
+			}
+		return -EINVAL;
+	nonzero:
+		op->height = h;
+	}
+	if (op->width > 32 || op->height > 32)
+		return -EINVAL;
+	size = (op->width+7)/8 * 32 * op->charcount;
+	if (size > max_font_size)
+		return -ENOSPC;
+	temp = kmalloc(size, GFP_KERNEL);
+	if (!temp)
+		return -ENOMEM;
+	if (copy_from_user(temp, op->data, size)) {
+		rc = -EFAULT;
+		goto out;
+	}
+	op->data = temp;
+	acquire_console_sem();
+	if (sw->con_font_set)
+		rc = sw->con_font_set(vc_cons[currcons].d, op);
+	else
+		rc = -ENOSYS;
+	release_console_sem();
+	op->data = old_op.data;
+out:
+	kfree(temp);
+	return rc;
+}
+
+int con_font_default(int currcons, struct console_font_op *op)
+{
+	int rc;
+
+	if (vt_cons[currcons]->vc_mode != KD_TEXT)
+		return -EINVAL;
+
+	acquire_console_sem();
+	if (sw->con_font_default)
+		rc = sw->con_font_default(vc_cons[currcons].d, op);
+	else
+		rc = -ENOSYS;
+	release_console_sem();
+	return rc;
+}
+
+int con_font_copy(int currcons, struct console_font_op *op)
+{
+	int rc;
+
+	if (vt_cons[currcons]->vc_mode != KD_TEXT)
+		return -EINVAL;
+
+	acquire_console_sem();
+	if (sw->con_font_copy)
+		rc = sw->con_font_copy(vc_cons[currcons].d, op);
+	else
+		rc = -ENOSYS;
+	release_console_sem();
+	return rc;
+}
+
+int con_font_op(int currcons, struct console_font_op *op)
+{
+	switch (op->op) {
+	case KD_FONT_OP_SET:
+		return con_font_set(currcons, op);
+	case KD_FONT_OP_GET:
+		return con_font_get(currcons, op);
+	case KD_FONT_OP_SET_DEFAULT:
+		return con_font_default(currcons, op);
+	case KD_FONT_OP_COPY:
+		return con_font_copy(currcons, op);
+	}
+	return -ENOSYS;
 }
 
 /*
