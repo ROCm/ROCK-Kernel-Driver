@@ -114,7 +114,7 @@ static void frob_econtrol (struct parport *pb, unsigned char m,
 	outb ((ectr & ~m) ^ v, ECONTROL (pb));
 }
 
-static void __inline__ frob_set_mode (struct parport *p, int mode)
+static __inline__ void frob_set_mode (struct parport *p, int mode)
 {
 	frob_econtrol (p, ECR_MODE_MASK, mode << 5);
 }

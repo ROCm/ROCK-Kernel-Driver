@@ -49,13 +49,10 @@ int agp_backend_acquire(void)
 	if (agp_bridge.type == NOT_SUPPORTED)
 		return -EINVAL;
 
-	atomic_inc(&agp_bridge.agp_in_use);
-
-	if (atomic_read(&agp_bridge.agp_in_use) != 1) {
-		atomic_dec(&agp_bridge.agp_in_use);
+	if (atomic_read(&agp_bridge.agp_in_use) != 0)
 		return -EBUSY;
-	}
-	MOD_INC_USE_COUNT;
+
+	atomic_inc(&agp_bridge.agp_in_use);
 	return 0;
 }
 
@@ -65,7 +62,6 @@ void agp_backend_release(void)
 		return;
 
 	atomic_dec(&agp_bridge.agp_in_use);
-	MOD_DEC_USE_COUNT;
 }
 
 struct agp_max_table {

@@ -6,6 +6,8 @@
 
 #define DECLARE_BITMAP(name,bits) \
 	unsigned long name[((bits)+BITS_PER_LONG-1)/BITS_PER_LONG]
+#define CLEAR_BITMAP(name,bits) \
+	memset(name, 0, ((bits)+BITS_PER_LONG-1)/8)
 #endif
 
 #include <linux/posix_types.h>

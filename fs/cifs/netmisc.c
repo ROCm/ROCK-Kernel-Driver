@@ -187,7 +187,7 @@ inet_addr(char *cp)
 convert a NT status code to a dos class/code
  *****************************************************************************/
 /* NT status -> dos error map */
-const static struct {
+static const struct {
 	__u8 dos_class;
 	__u16 dos_code;
 	__u32 ntstatus;

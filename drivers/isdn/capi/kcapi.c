@@ -267,7 +267,7 @@ static void notify_down(u32 contr)
 
 /* ------------------------------------------------------------ */
 
-static void inline notify_doit(struct capi_notifier *np)
+static inline void notify_doit(struct capi_notifier *np)
 {
 	switch (np->cmd) {
 		case KCI_CONTRUP:

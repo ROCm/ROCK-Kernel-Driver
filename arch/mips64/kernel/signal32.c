@@ -425,7 +425,7 @@ badframe:
 	force_sig(SIGSEGV, current);
 }
 
-static int inline
+static inline int
 setup_sigcontext(struct pt_regs *regs, struct sigcontext *sc)
 {
 	int err = 0;

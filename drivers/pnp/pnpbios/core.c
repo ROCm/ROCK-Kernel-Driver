@@ -1035,7 +1035,7 @@ static unsigned char *node_possible_resource_data_to_dev(unsigned char *p, struc
 #define CHAR(id,a) (0x40 + (((id)>>a) & 31))
 //
 
-static void inline pnpid32_to_pnpid(u32 id, char *str)
+static inline void pnpid32_to_pnpid(u32 id, char *str)
 {
 	const char *hex = "0123456789abcdef";
 
@@ -1383,7 +1383,7 @@ static struct pnp_protocol pnpbios_protocol = {
 	.disable = pnpbios_disable_resources,
 };
 
-static int inline insert_device(struct pnp_dev *dev)
+static inline int insert_device(struct pnp_dev *dev)
 {
 	struct list_head * pos;
 	struct pnp_dev * pnp_dev;

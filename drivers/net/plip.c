@@ -1282,7 +1282,7 @@ MODULE_PARM_DESC(parport, "List of parport device numbers to use by plip");
 
 static struct net_device *dev_plip[PLIP_MAX] = { NULL, };
 
-static int inline 
+static inline int
 plip_searchfor(int list[], int a)
 {
 	int i;

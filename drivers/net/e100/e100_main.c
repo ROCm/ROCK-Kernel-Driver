@@ -1812,7 +1812,7 @@ e100intr(int irq, void *dev_inst, struct pt_regs *regs)
  *
  * This routine frees resources of TX skbs.
  */
-static void inline
+static inline void
 e100_tx_skb_free(struct e100_private *bdp, tcb_t *tcb)
 {
 	if (tcb->tcb_skb) {
