@@ -688,15 +688,23 @@ iosapic_parse_prt (void)
 	char pci_id[16];
 	struct hw_interrupt_type *irq_type = &irq_type_iosapic_level;
 	irq_desc_t *idesc;
+	int trigger = IOSAPIC_LEVEL;
+	int polarity = IOSAPIC_POL_LOW;
 
 	list_for_each(node, &acpi_prt.entries) {
 		entry = list_entry(node, struct acpi_prt_entry, node);
 
-		/* We're only interested in static (non-link) entries.  */
-		if (entry->link.handle)
-			continue;
+		/* Check for dynamic (PCI link) entry. */
+		if (entry->link.handle) {
+			gsi = acpi_pci_link_get_irq(entry->link.handle, entry->link.index, &trigger, &polarity);
+			if (!gsi)
+				continue;
 
-		gsi = entry->link.index;
+			if (trigger == ACPI_EDGE_SENSITIVE)
+				irq_type = &irq_type_iosapic_edge;
+		} else {
+			gsi = entry->link.index;
+		}
 
 		vector = gsi_to_vector(gsi);
 		if (vector < 0) {
@@ -710,8 +718,12 @@ iosapic_parse_prt (void)
 				/* new GSI; allocate a vector for it */
 				vector = ia64_alloc_vector();
 
-			register_intr(gsi, vector, IOSAPIC_LOWEST_PRIORITY, IOSAPIC_POL_LOW,
-				      IOSAPIC_LEVEL);
+			if (entry->link.handle)
+				register_intr(gsi, vector, IOSAPIC_LOWEST_PRIORITY, polarity,
+					      trigger);
+			else
+				register_intr(gsi, vector, IOSAPIC_LOWEST_PRIORITY, IOSAPIC_POL_LOW,
+					      IOSAPIC_LEVEL);
 		}
 		entry->irq = vector;
 		snprintf(pci_id, sizeof(pci_id), "%02x:%02x:%02x[%c]",
@@ -723,8 +735,8 @@ iosapic_parse_prt (void)
 		 */
 		idesc = irq_descp(vector);
 		if (idesc->handler != irq_type)
-			register_intr(gsi, vector, IOSAPIC_LOWEST_PRIORITY, IOSAPIC_POL_LOW,
-				      IOSAPIC_LEVEL);
+			register_intr(gsi, vector, IOSAPIC_LOWEST_PRIORITY, polarity,
+				      trigger);
 
 	}
 }
