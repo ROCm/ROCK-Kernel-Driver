@@ -62,6 +62,7 @@
 #include <linux/nfs_mount.h>
 #include <net/ipv6.h>
 #include <linux/hugetlb.h>
+#include <linux/major.h>
 
 #include "avc.h"
 #include "objsec.h"
@@ -1712,18 +1713,77 @@ static void selinux_bprm_free_security(struct linux_binprm *bprm)
 	kfree(bsec);
 }
 
+/* Create an open file that refers to the null device.
+   Derived from the OpenWall LSM. */
+struct file *open_devnull(void)
+{
+	struct inode *inode;
+	struct dentry *dentry;
+	struct file *file = NULL;
+	struct inode_security_struct *isec;
+	dev_t dev;
+
+	inode = new_inode(current->fs->rootmnt->mnt_sb);
+	if (!inode)
+		goto out;
+
+	dentry = dget(d_alloc_root(inode));
+	if (!dentry)
+		goto out_iput;
+
+	file = get_empty_filp();
+	if (!file)
+		goto out_dput;
+
+	dev = MKDEV(MEM_MAJOR, 3); /* null device */
+
+	inode->i_uid = current->fsuid;
+	inode->i_gid = current->fsgid;
+	inode->i_blksize = PAGE_SIZE;
+	inode->i_blocks = 0;
+	inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
+	inode->i_state = I_DIRTY; /* so that mark_inode_dirty won't touch us */
+
+	isec = inode->i_security;
+	isec->sid = SECINITSID_DEVNULL;
+	isec->sclass = SECCLASS_CHR_FILE;
+	isec->initialized = 1;
+
+	file->f_flags = O_RDWR;
+	file->f_mode = FMODE_READ | FMODE_WRITE;
+	file->f_dentry = dentry;
+	file->f_vfsmnt = mntget(current->fs->rootmnt);
+	file->f_pos = 0;
+
+	init_special_inode(inode, S_IFCHR | S_IRUGO | S_IWUGO, dev);
+	if (inode->i_fop->open(inode, file))
+		goto out_fput;
+
+out:
+	return file;
+out_fput:
+	mntput(file->f_vfsmnt);
+	put_filp(file);
+out_dput:
+	dput(dentry);
+out_iput:
+	iput(inode);
+	file = NULL;
+	goto out;
+}
+
 /* Derived from fs/exec.c:flush_old_files. */
 static inline void flush_unauthorized_files(struct files_struct * files)
 {
 	struct avc_audit_data ad;
-	struct file *file;
+	struct file *file, *devnull = NULL;
 	long j = -1;
 
 	AVC_AUDIT_DATA_INIT(&ad,FS);
 
 	spin_lock(&files->file_lock);
 	for (;;) {
-		unsigned long set, i;
+		unsigned long set, i, fd;
 
 		j++;
 		i = j * __NFDBITS;
@@ -1740,8 +1800,27 @@ static inline void flush_unauthorized_files(struct files_struct * files)
 					continue;
 				if (file_has_perm(current,
 						  file,
-						  file_to_av(file)))
+						  file_to_av(file))) {
 					sys_close(i);
+					fd = get_unused_fd();
+					if (fd != i) {
+						if (fd >= 0)
+							put_unused_fd(fd);
+						fput(file);
+						continue;
+					}
+					if (devnull) {
+						atomic_inc(&devnull->f_count);
+					} else {
+						devnull = open_devnull();
+						if (!devnull) {
+							put_unused_fd(fd);
+							fput(file);
+							continue;
+						}
+					}
+					fd_install(fd, devnull);
+				}
 				fput(file);
 			}
 		}
