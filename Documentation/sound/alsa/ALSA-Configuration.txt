@@ -668,6 +668,7 @@ Module parameters
                      2 = swap headphone and master controls
                      3 = for AD1985, turn on OMS bit and use headphone
                      4 = for ALC65x, turn on the jack sense mode
+                     5 = inverted EAPD implementation
     buggy_irq      - Enable workaround for buggy interrupts on some
                      motherboards (default off)
 

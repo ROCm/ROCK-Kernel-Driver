@@ -1752,6 +1752,12 @@ static struct ac97_quirk ac97_quirks[] __devinitdata = {
 		.name = "HP xw4200",	/* AD1981B*/
 		.type = AC97_TUNE_HP_ONLY
 	},
+	{
+		.vendor = 0x104d,
+		.device = 0x8197,
+		.name = "Sony S1XP",
+		.type = AC97_TUNE_INV_EAPD
+	},
  	{
 		.vendor = 0x1043,
 		.device = 0x80f3,

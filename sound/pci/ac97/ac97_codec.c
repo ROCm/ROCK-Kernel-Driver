@@ -749,6 +749,14 @@ AC97_DOUBLE("Surround Playback Volume", AC97_SURROUND_MASTER, 8, 0, 31, 1),
 static const snd_kcontrol_new_t snd_ac97_control_eapd =
 AC97_SINGLE("External Amplifier", AC97_POWERDOWN, 15, 1, 1);
 
+/* change the existing EAPD control as inverted */
+static void set_inv_eapd(ac97_t *ac97, snd_kcontrol_t *kctl)
+{
+	kctl->private_value = AC97_SINGLE_VALUE(AC97_POWERDOWN, 15, 1, 0);
+	snd_ac97_update_bits(ac97, AC97_POWERDOWN, (1<<15), (1<<15)); /* EAPD up */
+	ac97->scaps |= AC97_SCAP_INV_EAPD;
+}
+
 static int snd_ac97_spdif_mask_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_IEC958;
@@ -1610,7 +1618,12 @@ static int snd_ac97_mixer_build(ac97_t * ac97)
 			return err;
 
 	if (snd_ac97_try_bit(ac97, AC97_POWERDOWN, 15)) {
-		if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_control_eapd, ac97))) < 0)
+		kctl = snd_ac97_cnew(&snd_ac97_control_eapd, ac97);
+		if (! kctl)
+			return -ENOMEM;
+		if (ac97->scaps & AC97_SCAP_INV_EAPD)
+			set_inv_eapd(ac97, kctl);
+		if ((err = snd_ctl_add(card, kctl)) < 0)
 			return err;
 	}
 
@@ -2346,9 +2359,9 @@ int snd_ac97_swap_ctl(ac97_t *ac97, const char *s1, const char *s2, const char *
 
 static int swap_headphone(ac97_t *ac97, int remove_master)
 {
+	if (ctl_find(ac97, "Headphone Playback Switch", NULL) == NULL)
+		return -ENOENT;
 	if (remove_master) {
-		if (ctl_find(ac97, "Headphone Playback Switch", NULL) == NULL)
-			return 0;
 		snd_ac97_remove_ctl(ac97, "Master Playback", "Switch");
 		snd_ac97_remove_ctl(ac97, "Master Playback", "Volume");
 	} else
@@ -2359,9 +2372,9 @@ static int swap_headphone(ac97_t *ac97, int remove_master)
 
 static int swap_surround(ac97_t *ac97)
 {
-	/* FIXME: error checks.. */
-	snd_ac97_swap_ctl(ac97, "Master Playback", "Surround Playback", "Switch");
-	snd_ac97_swap_ctl(ac97, "Master Playback", "Surround Playback", "Volume");
+	if (snd_ac97_swap_ctl(ac97, "Master Playback", "Surround Playback", "Switch") ||
+	    snd_ac97_swap_ctl(ac97, "Master Playback", "Surround Playback", "Volume"))
+		return -ENOENT;
 	return 0;
 }
 
@@ -2392,6 +2405,15 @@ static int tune_alc_jack(ac97_t *ac97)
 	return snd_ctl_add(ac97->bus->card, snd_ac97_cnew(&snd_ac97_alc_jack_detect, ac97));
 }
 
+static int tune_inv_eapd(ac97_t *ac97)
+{
+	snd_kcontrol_t *kctl = ctl_find(ac97, "External Amplifier", NULL);
+	if (! kctl)
+		return -ENOENT;
+	set_inv_eapd(ac97, kctl);
+	return 0;
+}
+
 static int apply_quirk(ac97_t *ac97, int quirk)
 {
 	switch (quirk) {
@@ -2407,6 +2429,8 @@ static int apply_quirk(ac97_t *ac97, int quirk)
 		return tune_ad_sharing(ac97);
 	case AC97_TUNE_ALC_JACK:
 		return tune_alc_jack(ac97);
+	case AC97_TUNE_INV_EAPD:
+		return tune_inv_eapd(ac97);
 	}
 	return -EINVAL;
 }
