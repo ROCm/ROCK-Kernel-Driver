@@ -307,7 +307,7 @@ static void tx_dma_buf_pt_init(pc300_t * card, int ch)
 {
 	int i;
 	int ch_factor = ch * N_DMA_TX_BUF;
-	volatile pcsca_bd_t *ptdescr = (pcsca_bd_t *) (card->hw.rambase
+	volatile pcsca_bd_t __iomem *ptdescr = (card->hw.rambase
 			               + DMA_TX_BD_BASE + ch_factor * sizeof(pcsca_bd_t));
 
 	for (i = 0; i < N_DMA_TX_BUF; i++, ptdescr++) {
@@ -322,7 +322,7 @@ static void tx_dma_buf_init(pc300_t * card, int ch)
 {
 	int i;
 	int ch_factor = ch * N_DMA_TX_BUF;
-	volatile pcsca_bd_t *ptdescr = (pcsca_bd_t *) (card->hw.rambase
+	volatile pcsca_bd_t __iomem *ptdescr = (card->hw.rambase
 			       + DMA_TX_BD_BASE + ch_factor * sizeof(pcsca_bd_t));
 
 	for (i = 0; i < N_DMA_TX_BUF; i++, ptdescr++) {
@@ -337,7 +337,7 @@ static void rx_dma_buf_pt_init(pc300_t * card, int ch)
 {
 	int i;
 	int ch_factor = ch * N_DMA_RX_BUF;
-	volatile pcsca_bd_t *ptdescr = (pcsca_bd_t *) (card->hw.rambase
+	volatile pcsca_bd_t __iomem *ptdescr = (card->hw.rambase
 				       + DMA_RX_BD_BASE + ch_factor * sizeof(pcsca_bd_t));
 
 	for (i = 0; i < N_DMA_RX_BUF; i++, ptdescr++) {
@@ -352,7 +352,7 @@ static void rx_dma_buf_init(pc300_t * card, int ch)
 {
 	int i;
 	int ch_factor = ch * N_DMA_RX_BUF;
-	volatile pcsca_bd_t *ptdescr = (pcsca_bd_t *) (card->hw.rambase
+	volatile pcsca_bd_t __iomem *ptdescr = (card->hw.rambase
 				       + DMA_RX_BD_BASE + ch_factor * sizeof(pcsca_bd_t));
 
 	for (i = 0; i < N_DMA_RX_BUF; i++, ptdescr++) {
@@ -365,7 +365,7 @@ static void rx_dma_buf_init(pc300_t * card, int ch)
 
 static void tx_dma_buf_check(pc300_t * card, int ch)
 {
-	volatile pcsca_bd_t *ptdescr;
+	volatile pcsca_bd_t __iomem *ptdescr;
 	int i;
 	ucshort first_bd = card->chan[ch].tx_first_bd;
 	ucshort next_bd = card->chan[ch].tx_next_bd;
@@ -374,10 +374,10 @@ static void tx_dma_buf_check(pc300_t * card, int ch)
 	       first_bd, TX_BD_ADDR(ch, first_bd),
 	       next_bd, TX_BD_ADDR(ch, next_bd));
 	for (i = first_bd,
-	     ptdescr = (pcsca_bd_t *) (card->hw.rambase + TX_BD_ADDR(ch, first_bd));
+	     ptdescr = (card->hw.rambase + TX_BD_ADDR(ch, first_bd));
 	     i != ((next_bd + 1) & (N_DMA_TX_BUF - 1));
 	     i = (i + 1) & (N_DMA_TX_BUF - 1), 
-		 ptdescr = (pcsca_bd_t *) (card->hw.rambase + TX_BD_ADDR(ch, i))) {
+		 ptdescr = (card->hw.rambase + TX_BD_ADDR(ch, i))) {
 		printk("\n CH%d TX%d: next=0x%lx, ptbuf=0x%lx, ST=0x%x, len=%d",
 		       ch, i, (uclong) cpc_readl(&ptdescr->next),
 		       (uclong) cpc_readl(&ptdescr->ptbuf),
@@ -390,7 +390,7 @@ static void tx_dma_buf_check(pc300_t * card, int ch)
 /* Show all TX buffer descriptors */
 static void tx1_dma_buf_check(pc300_t * card, int ch)
 {
-	volatile pcsca_bd_t *ptdescr;
+	volatile pcsca_bd_t __iomem *ptdescr;
 	int i;
 	ucshort first_bd = card->chan[ch].tx_first_bd;
 	ucshort next_bd = card->chan[ch].tx_next_bd;
@@ -404,7 +404,7 @@ static void tx1_dma_buf_check(pc300_t * card, int ch)
 	       (uclong) cpc_readl(scabase + DTX_REG(CDAL, ch)),
 	       (uclong) cpc_readl(scabase + DTX_REG(EDAL, ch)));
 	for (i = 0; i < N_DMA_TX_BUF; i++) {
-		ptdescr = (pcsca_bd_t *) (card->hw.rambase + TX_BD_ADDR(ch, i));
+		ptdescr = (card->hw.rambase + TX_BD_ADDR(ch, i));
 		printk("\n CH%d TX%d: next=0x%lx, ptbuf=0x%lx, ST=0x%x, len=%d",
 		       ch, i, (uclong) cpc_readl(&ptdescr->next),
 		       (uclong) cpc_readl(&ptdescr->ptbuf),
@@ -416,7 +416,7 @@ static void tx1_dma_buf_check(pc300_t * card, int ch)
 			 
 static void rx_dma_buf_check(pc300_t * card, int ch)
 {
-	volatile pcsca_bd_t *ptdescr;
+	volatile pcsca_bd_t __iomem *ptdescr;
 	int i;
 	ucshort first_bd = card->chan[ch].rx_first_bd;
 	ucshort last_bd = card->chan[ch].rx_last_bd;
@@ -424,7 +424,7 @@ static void rx_dma_buf_check(pc300_t * card, int ch)
 
 	ch_factor = ch * N_DMA_RX_BUF;
 	printk("#CH%d: f_bd = %d, l_bd = %d\n", ch, first_bd, last_bd);
-	for (i = 0, ptdescr = (pcsca_bd_t *) (card->hw.rambase +
+	for (i = 0, ptdescr = (card->hw.rambase +
 					      DMA_RX_BD_BASE + ch_factor * sizeof(pcsca_bd_t));
 	     i < N_DMA_RX_BUF; i++, ptdescr++) {
 		if (cpc_readb(&ptdescr->status) & DST_OSB)
@@ -439,12 +439,12 @@ static void rx_dma_buf_check(pc300_t * card, int ch)
 
 int dma_get_rx_frame_size(pc300_t * card, int ch)
 {
-	volatile pcsca_bd_t *ptdescr;
+	volatile pcsca_bd_t __iomem *ptdescr;
 	ucshort first_bd = card->chan[ch].rx_first_bd;
 	int rcvd = 0;
 	volatile ucchar status;
 
-	ptdescr = (pcsca_bd_t *)(card->hw.rambase + RX_BD_ADDR(ch, first_bd));
+	ptdescr = (card->hw.rambase + RX_BD_ADDR(ch, first_bd));
 	while ((status = cpc_readb(&ptdescr->status)) & DST_OSB) {
 		rcvd += cpc_readw(&ptdescr->len);
 		first_bd = (first_bd + 1) & (N_DMA_RX_BUF - 1);
@@ -453,7 +453,7 @@ int dma_get_rx_frame_size(pc300_t * card, int ch)
 			* (dma_buf_read will clean the buffer descriptors in this case). */
 			return (rcvd);
 		}
-		ptdescr = (pcsca_bd_t *)(card->hw.rambase + cpc_readl(&ptdescr->next));
+		ptdescr = (card->hw.rambase + cpc_readl(&ptdescr->next));
 	}
 	return (-1);
 }
@@ -465,7 +465,7 @@ int dma_get_rx_frame_size(pc300_t * card, int ch)
 int dma_buf_write(pc300_t * card, int ch, ucchar * ptdata, int len)
 {
 	int i, nchar;
-	volatile pcsca_bd_t *ptdescr;
+	volatile pcsca_bd_t __iomem *ptdescr;
 	int tosend = len;
 	ucchar nbuf = ((len - 1) / BD_DEF_LEN) + 1;
 
@@ -474,11 +474,11 @@ int dma_buf_write(pc300_t * card, int ch, ucchar * ptdata, int len)
 	}
 
 	for (i = 0; i < nbuf; i++) {
-		ptdescr = (pcsca_bd_t *) (card->hw.rambase +
+		ptdescr = (card->hw.rambase +
 					  TX_BD_ADDR(ch, card->chan[ch].tx_next_bd));
 		nchar = cpc_min(BD_DEF_LEN, tosend);
 		if (cpc_readb(&ptdescr->status) & DST_OSB) {
-			memcpy_toio((void *)(card->hw.rambase + cpc_readl(&ptdescr->ptbuf)),
+			memcpy_toio((card->hw.rambase + cpc_readl(&ptdescr->ptbuf)),
 				    &ptdata[len - tosend], nchar);
 			cpc_writew(&ptdescr->len, nchar);
 			card->chan[ch].nfree_tx_bd--;
@@ -507,11 +507,11 @@ int dma_buf_read(pc300_t * card, int ch, struct sk_buff *skb)
 {
 	int nchar;
 	pc300ch_t *chan = (pc300ch_t *) & card->chan[ch];
-	volatile pcsca_bd_t *ptdescr;
+	volatile pcsca_bd_t __iomem *ptdescr;
 	int rcvd = 0;
 	volatile ucchar status;
 
-	ptdescr = (pcsca_bd_t *) (card->hw.rambase +
+	ptdescr = (card->hw.rambase +
 				  RX_BD_ADDR(ch, chan->rx_first_bd));
 	while ((status = cpc_readb(&ptdescr->status)) & DST_OSB) {
 		nchar = cpc_readw(&ptdescr->len);
@@ -527,7 +527,7 @@ int dma_buf_read(pc300_t * card, int ch, struct sk_buff *skb)
 				chan->rx_first_bd = (chan->rx_first_bd+1) & (N_DMA_RX_BUF-1);
 				if (status & DST_EOM)
 					break;
-				ptdescr = (pcsca_bd_t *) (card->hw.rambase +
+				ptdescr = (card->hw.rambase +
 							  cpc_readl(&ptdescr->next));
 				status = cpc_readb(&ptdescr->status);
 			}
@@ -536,7 +536,7 @@ int dma_buf_read(pc300_t * card, int ch, struct sk_buff *skb)
 		if (nchar != 0) {
 			if (skb) {
 				memcpy_fromio(skb_put(skb, nchar),
-				 (void *)(card->hw.rambase+cpc_readl(&ptdescr->ptbuf)),nchar);
+				 (card->hw.rambase+cpc_readl(&ptdescr->ptbuf)),nchar);
 			}
 			rcvd += nchar;
 		}
@@ -547,7 +547,7 @@ int dma_buf_read(pc300_t * card, int ch, struct sk_buff *skb)
 		if (status & DST_EOM)
 			break;
 
-		ptdescr = (pcsca_bd_t *) (card->hw.rambase + cpc_readl(&ptdescr->next));
+		ptdescr = (card->hw.rambase + cpc_readl(&ptdescr->next));
 	}
 
 	if (rcvd != 0) {
@@ -562,7 +562,7 @@ int dma_buf_read(pc300_t * card, int ch, struct sk_buff *skb)
 
 void tx_dma_stop(pc300_t * card, int ch)
 {
-	uclong scabase = card->hw.scabase;
+	void __iomem *scabase = card->hw.scabase;
 	ucchar drr_ena_bit = 1 << (5 + 2 * ch);
 	ucchar drr_rst_bit = 1 << (1 + 2 * ch);
 
@@ -573,7 +573,7 @@ void tx_dma_stop(pc300_t * card, int ch)
 
 void rx_dma_stop(pc300_t * card, int ch)
 {
-	uclong scabase = card->hw.scabase;
+	void __iomem *scabase = card->hw.scabase;
 	ucchar drr_ena_bit = 1 << (4 + 2 * ch);
 	ucchar drr_rst_bit = 1 << (2 * ch);
 
@@ -584,7 +584,7 @@ void rx_dma_stop(pc300_t * card, int ch)
 
 void rx_dma_start(pc300_t * card, int ch)
 {
-	uclong scabase = card->hw.scabase;
+	void __iomem *scabase = card->hw.scabase;
 	pc300ch_t *chan = (pc300ch_t *) & card->chan[ch];
 	
 	/* Start DMA */
@@ -609,7 +609,7 @@ void rx_dma_start(pc300_t * card, int ch)
 /*************************/
 void falc_issue_cmd(pc300_t * card, int ch, ucchar cmd)
 {
-	uclong falcbase = card->hw.falcbase;
+	void __iomem *falcbase = card->hw.falcbase;
 	unsigned long i = 0;
 
 	while (cpc_readb(falcbase + F_REG(SIS, ch)) & SIS_CEC) {
@@ -627,7 +627,7 @@ void falc_intr_enable(pc300_t * card, int ch)
 	pc300ch_t *chan = (pc300ch_t *) & card->chan[ch];
 	pc300chconf_t *conf = (pc300chconf_t *) & chan->conf;
 	falc_t *pfalc = (falc_t *) & chan->falc;
-	uclong falcbase = card->hw.falcbase;
+	void __iomem *falcbase = card->hw.falcbase;
 
 	/* Interrupt pins are open-drain */
 	cpc_writeb(falcbase + F_REG(IPC, ch),
@@ -674,7 +674,7 @@ void falc_intr_enable(pc300_t * card, int ch)
 
 void falc_open_timeslot(pc300_t * card, int ch, int timeslot)
 {
-	uclong falcbase = card->hw.falcbase;
+	void __iomem *falcbase = card->hw.falcbase;
 	ucchar tshf = card->chan[ch].falc.offset;
 
 	cpc_writeb(falcbase + F_REG((ICB1 + (timeslot - tshf) / 8), ch),
@@ -690,7 +690,7 @@ void falc_open_timeslot(pc300_t * card, int ch, int timeslot)
 
 void falc_close_timeslot(pc300_t * card, int ch, int timeslot)
 {
-	uclong falcbase = card->hw.falcbase;
+	void __iomem *falcbase = card->hw.falcbase;
 	ucchar tshf = card->chan[ch].falc.offset;
 
 	cpc_writeb(falcbase + F_REG((ICB1 + (timeslot - tshf) / 8), ch),
@@ -708,7 +708,7 @@ void falc_close_all_timeslots(pc300_t * card, int ch)
 {
 	pc300ch_t *chan = (pc300ch_t *) & card->chan[ch];
 	pc300chconf_t *conf = (pc300chconf_t *) & chan->conf;
-	uclong falcbase = card->hw.falcbase;
+	void __iomem *falcbase = card->hw.falcbase;
 
 	cpc_writeb(falcbase + F_REG(ICB1, ch), 0xff);
 	cpc_writeb(falcbase + F_REG(TTR1, ch), 0);
@@ -730,7 +730,7 @@ void falc_open_all_timeslots(pc300_t * card, int ch)
 {
 	pc300ch_t *chan = (pc300ch_t *) & card->chan[ch];
 	pc300chconf_t *conf = (pc300chconf_t *) & chan->conf;
-	uclong falcbase = card->hw.falcbase;
+	void __iomem *falcbase = card->hw.falcbase;
 
 	cpc_writeb(falcbase + F_REG(ICB1, ch), 0);
 	if (conf->fr_mode == PC300_FR_UNFRAMED) {
@@ -811,7 +811,7 @@ void falc_init_t1(pc300_t * card, int ch)
 	pc300ch_t *chan = (pc300ch_t *) & card->chan[ch];
 	pc300chconf_t *conf = (pc300chconf_t *) & chan->conf;
 	falc_t *pfalc = (falc_t *) & chan->falc;
-	uclong falcbase = card->hw.falcbase;
+	void __iomem *falcbase = card->hw.falcbase;
 	ucchar dja = (ch ? (LIM2_DJA2 | LIM2_DJA1) : 0);
 
 	/* Switch to T1 mode (PCM 24) */
@@ -980,7 +980,7 @@ void falc_init_e1(pc300_t * card, int ch)
 	pc300ch_t *chan = (pc300ch_t *) & card->chan[ch];
 	pc300chconf_t *conf = (pc300chconf_t *) & chan->conf;
 	falc_t *pfalc = (falc_t *) & chan->falc;
-	uclong falcbase = card->hw.falcbase;
+	void __iomem *falcbase = card->hw.falcbase;
 	ucchar dja = (ch ? (LIM2_DJA2 | LIM2_DJA1) : 0);
 
 	/* Switch to E1 mode (PCM 30) */
@@ -1157,7 +1157,7 @@ void falc_init_e1(pc300_t * card, int ch)
 
 void falc_init_hdlc(pc300_t * card, int ch)
 {
-	uclong falcbase = card->hw.falcbase;
+	void __iomem *falcbase = card->hw.falcbase;
 	pc300ch_t *chan = (pc300ch_t *) & card->chan[ch];
 	pc300chconf_t *conf = (pc300chconf_t *) & chan->conf;
 
@@ -1186,7 +1186,7 @@ void te_config(pc300_t * card, int ch)
 	pc300ch_t *chan = (pc300ch_t *) & card->chan[ch];
 	pc300chconf_t *conf = (pc300chconf_t *) & chan->conf;
 	falc_t *pfalc = (falc_t *) & chan->falc;
-	uclong falcbase = card->hw.falcbase;
+	void __iomem *falcbase = card->hw.falcbase;
 	ucchar dummy;
 	unsigned long flags;
 
@@ -1246,7 +1246,7 @@ void falc_check_status(pc300_t * card, int ch, unsigned char frs0)
 	pc300ch_t *chan = (pc300ch_t *) & card->chan[ch];
 	pc300chconf_t *conf = (pc300chconf_t *) & chan->conf;
 	falc_t *pfalc = (falc_t *) & chan->falc;
-	uclong falcbase = card->hw.falcbase;
+	void __iomem *falcbase = card->hw.falcbase;
 
 	/* Verify LOS */
 	if (frs0 & FRS0_LOS) {
@@ -1402,7 +1402,7 @@ void falc_update_stats(pc300_t * card, int ch)
 	pc300ch_t *chan = (pc300ch_t *) & card->chan[ch];
 	pc300chconf_t *conf = (pc300chconf_t *) & chan->conf;
 	falc_t *pfalc = (falc_t *) & chan->falc;
-	uclong falcbase = card->hw.falcbase;
+	void __iomem *falcbase = card->hw.falcbase;
 	ucshort counter;
 
 	counter = cpc_readb(falcbase + F_REG(FECL, ch));
@@ -1455,7 +1455,7 @@ void falc_remote_loop(pc300_t * card, int ch, int loop_on)
 	pc300ch_t *chan = (pc300ch_t *) & card->chan[ch];
 	pc300chconf_t *conf = (pc300chconf_t *) & chan->conf;
 	falc_t *pfalc = (falc_t *) & chan->falc;
-	uclong falcbase = card->hw.falcbase;
+	void __iomem *falcbase = card->hw.falcbase;
 
 	if (loop_on) {
 		// EVENT_FALC_ABNORMAL
@@ -1499,7 +1499,7 @@ void falc_local_loop(pc300_t * card, int ch, int loop_on)
 {
 	pc300ch_t *chan = (pc300ch_t *) & card->chan[ch];
 	falc_t *pfalc = (falc_t *) & chan->falc;
-	uclong falcbase = card->hw.falcbase;
+	void __iomem *falcbase = card->hw.falcbase;
 
 	if (loop_on) {
 		cpc_writeb(falcbase + F_REG(LIM0, ch),
@@ -1527,7 +1527,7 @@ void falc_payload_loop(pc300_t * card, int ch, int loop_on)
 	pc300ch_t *chan = (pc300ch_t *) & card->chan[ch];
 	pc300chconf_t *conf = (pc300chconf_t *) & chan->conf;
 	falc_t *pfalc = (falc_t *) & chan->falc;
-	uclong falcbase = card->hw.falcbase;
+	void __iomem *falcbase = card->hw.falcbase;
 
 	if (loop_on) {
 		// EVENT_FALC_ABNORMAL
@@ -1580,7 +1580,7 @@ void turn_off_xlu(pc300_t * card, int ch)
 {
 	pc300ch_t *chan = (pc300ch_t *) & card->chan[ch];
 	pc300chconf_t *conf = (pc300chconf_t *) & chan->conf;
-	uclong falcbase = card->hw.falcbase;
+	void __iomem *falcbase = card->hw.falcbase;
 
 	if (conf->media == IF_IFACE_T1) {
 		cpc_writeb(falcbase + F_REG(FMR5, ch),
@@ -1601,7 +1601,7 @@ void turn_off_xld(pc300_t * card, int ch)
 {
 	pc300ch_t *chan = (pc300ch_t *) & card->chan[ch];
 	pc300chconf_t *conf = (pc300chconf_t *) & chan->conf;
-	uclong falcbase = card->hw.falcbase;
+	void __iomem *falcbase = card->hw.falcbase;
 
 	if (conf->media == IF_IFACE_T1) {
 		cpc_writeb(falcbase + F_REG(FMR5, ch),
@@ -1624,7 +1624,7 @@ void falc_generate_loop_up_code(pc300_t * card, int ch)
 	pc300ch_t *chan = (pc300ch_t *) & card->chan[ch];
 	pc300chconf_t *conf = (pc300chconf_t *) & chan->conf;
 	falc_t *pfalc = (falc_t *) & chan->falc;
-	uclong falcbase = card->hw.falcbase;
+	void __iomem *falcbase = card->hw.falcbase;
 
 	if (conf->media == IF_IFACE_T1) {
 		cpc_writeb(falcbase + F_REG(FMR5, ch),
@@ -1657,7 +1657,7 @@ void falc_generate_loop_down_code(pc300_t * card, int ch)
 	pc300ch_t *chan = (pc300ch_t *) & card->chan[ch];
 	pc300chconf_t *conf = (pc300chconf_t *) & chan->conf;
 	falc_t *pfalc = (falc_t *) & chan->falc;
-	uclong falcbase = card->hw.falcbase;
+	void __iomem *falcbase = card->hw.falcbase;
 
 	if (conf->media == IF_IFACE_T1) {
 		cpc_writeb(falcbase + F_REG(FMR5, ch),
@@ -1687,7 +1687,7 @@ void falc_pattern_test(pc300_t * card, int ch, unsigned int activate)
 	pc300ch_t *chan = (pc300ch_t *) & card->chan[ch];
 	pc300chconf_t *conf = (pc300chconf_t *) & chan->conf;
 	falc_t *pfalc = (falc_t *) & chan->falc;
-	uclong falcbase = card->hw.falcbase;
+	void __iomem *falcbase = card->hw.falcbase;
 
 	if (activate) {
 		pfalc->prbs = 1;
@@ -1973,11 +1973,11 @@ static void sca_tx_intr(pc300dev_t *dev)
 	pc300ch_t *chan = (pc300ch_t *)dev->chan; 
 	pc300_t *card = (pc300_t *)chan->card; 
 	int ch = chan->channel; 
-	volatile pcsca_bd_t * ptdescr; 
+	volatile pcsca_bd_t __iomem * ptdescr; 
 	struct net_device_stats *stats = hdlc_stats(dev->dev);
 
     /* Clean up descriptors from previous transmission */
-	ptdescr = (pcsca_bd_t *)(card->hw.rambase +
+	ptdescr = (card->hw.rambase +
 						TX_BD_ADDR(ch,chan->tx_first_bd));
 	while ((cpc_readl(card->hw.scabase + DTX_REG(CDAL,ch)) != 
 							TX_BD_ADDR(ch,chan->tx_first_bd)) && 
@@ -1988,8 +1988,7 @@ static void sca_tx_intr(pc300dev_t *dev)
 		cpc_writew(&ptdescr->len, 0);
 		chan->nfree_tx_bd++;
 		chan->tx_first_bd = (chan->tx_first_bd + 1) & (N_DMA_TX_BUF - 1);
-		ptdescr = (pcsca_bd_t *)(card->hw.rambase +
-						TX_BD_ADDR(ch,chan->tx_first_bd));
+		ptdescr = (card->hw.rambase + TX_BD_ADDR(ch,chan->tx_first_bd));
     }
 
 #ifdef CONFIG_PC300_MLPPP
@@ -2006,7 +2005,7 @@ static void sca_tx_intr(pc300dev_t *dev)
 
 static void sca_intr(pc300_t * card)
 {
-	uclong scabase = card->hw.scabase;
+	void __iomem *scabase = card->hw.scabase;
 	volatile uclong status;
 	int ch;
 	int intr_count = 0;
@@ -2187,7 +2186,7 @@ static void falc_t1_loop_detection(pc300_t * card, int ch, ucchar frs1)
 {
 	pc300ch_t *chan = (pc300ch_t *) & card->chan[ch];
 	falc_t *pfalc = (falc_t *) & chan->falc;
-	uclong falcbase = card->hw.falcbase;
+	void __iomem *falcbase = card->hw.falcbase;
 
 	if (((cpc_readb(falcbase + F_REG(LCR1, ch)) & LCR1_XPRBS) == 0) &&
 	    !pfalc->loop_gen) {
@@ -2212,7 +2211,7 @@ static void falc_e1_loop_detection(pc300_t * card, int ch, ucchar rsp)
 {
 	pc300ch_t *chan = (pc300ch_t *) & card->chan[ch];
 	falc_t *pfalc = (falc_t *) & chan->falc;
-	uclong falcbase = card->hw.falcbase;
+	void __iomem *falcbase = card->hw.falcbase;
 
 	if (((cpc_readb(falcbase + F_REG(LCR1, ch)) & LCR1_XPRBS) == 0) &&
 	    !pfalc->loop_gen) {
@@ -2237,7 +2236,7 @@ static void falc_t1_intr(pc300_t * card, int ch)
 {
 	pc300ch_t *chan = (pc300ch_t *) & card->chan[ch];
 	falc_t *pfalc = (falc_t *) & chan->falc;
-	uclong falcbase = card->hw.falcbase;
+	void __iomem *falcbase = card->hw.falcbase;
 	ucchar isr0, isr3, gis;
 	ucchar dummy;
 
@@ -2284,7 +2283,7 @@ static void falc_e1_intr(pc300_t * card, int ch)
 {
 	pc300ch_t *chan = (pc300ch_t *) & card->chan[ch];
 	falc_t *pfalc = (falc_t *) & chan->falc;
-	uclong falcbase = card->hw.falcbase;
+	void __iomem *falcbase = card->hw.falcbase;
 	ucchar isr1, isr2, isr3, gis, rsp;
 	ucchar dummy;
 
@@ -2408,7 +2407,7 @@ static irqreturn_t cpc_intr(int irq, void *dev_id, struct pt_regs *regs)
 void cpc_sca_status(pc300_t * card, int ch)
 {
 	ucchar ilar;
-	uclong scabase = card->hw.scabase;
+	void __iomem *scabase = card->hw.scabase;
 	uclong flags;
 
 	tx_dma_buf_check(card, ch);
@@ -2544,7 +2543,7 @@ int cpc_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	int ch = chan->channel;
 	void __user *arg = ifr->ifr_data;
 	struct if_settings *settings = &ifr->ifr_settings;
-	uclong scabase = card->hw.scabase;
+	void __iomem *scabase = card->hw.scabase;
 
 	if (!capable(CAP_NET_ADMIN))
 		return -EPERM;
@@ -2863,8 +2862,8 @@ int ch_config(pc300dev_t * d)
 	pc300ch_t *chan = (pc300ch_t *) d->chan;
 	pc300chconf_t *conf = (pc300chconf_t *) & chan->conf;
 	pc300_t *card = (pc300_t *) chan->card;
-	uclong scabase = card->hw.scabase;
-	uclong plxbase = card->hw.plxbase;
+	void __iomem *scabase = card->hw.scabase;
+	void __iomem *plxbase = card->hw.plxbase;
 	int ch = chan->channel;
 	uclong clkrate = chan->conf.phys_settings.clock_rate;
 	uclong clktype = chan->conf.phys_settings.clock_type;
@@ -3010,7 +3009,7 @@ int rx_config(pc300dev_t * d)
 {
 	pc300ch_t *chan = (pc300ch_t *) d->chan;
 	pc300_t *card = (pc300_t *) chan->card;
-	uclong scabase = card->hw.scabase;
+	void __iomem *scabase = card->hw.scabase;
 	int ch = chan->channel;
 
 	cpc_writeb(scabase + DSR_RX(ch), 0);
@@ -3041,7 +3040,7 @@ int tx_config(pc300dev_t * d)
 {
 	pc300ch_t *chan = (pc300ch_t *) d->chan;
 	pc300_t *card = (pc300_t *) chan->card;
-	uclong scabase = card->hw.scabase;
+	void __iomem *scabase = card->hw.scabase;
 	int ch = chan->channel;
 
 	cpc_writeb(scabase + DSR_TX(ch), 0);
@@ -3105,7 +3104,7 @@ void cpc_opench(pc300dev_t * d)
 	pc300ch_t *chan = (pc300ch_t *) d->chan;
 	pc300_t *card = (pc300_t *) chan->card;
 	int ch = chan->channel;
-	uclong scabase = card->hw.scabase;
+	void __iomem *scabase = card->hw.scabase;
 
 	ch_config(d);
 
@@ -3211,7 +3210,7 @@ static uclong detect_ram(pc300_t * card)
 {
 	uclong i;
 	ucchar data;
-	uclong rambase = card->hw.rambase;
+	void __iomem *rambase = card->hw.rambase;
 
 	card->hw.ramsize = PC300_RAMSIZE;
 	/* Let's find out how much RAM is present on this board */
@@ -3227,7 +3226,7 @@ static uclong detect_ram(pc300_t * card)
 
 static void plx_init(pc300_t * card)
 {
-	struct RUNTIME_9050 *plx_ctl = (struct RUNTIME_9050 *) card->hw.plxbase;
+	struct RUNTIME_9050 __iomem *plx_ctl = card->hw.plxbase;
 
 	/* Reset PLX */
 	cpc_writel(&plx_ctl->init_ctrl,
@@ -3532,10 +3531,9 @@ cpc_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	if ((err = pci_enable_device(pdev)) != 0)
 		goto err_release_sca;
 
-	card->hw.plxbase = (uclong) ioremap(card->hw.plxphys, card->hw.plxsize);
-	card->hw.rambase = (uclong) ioremap(card->hw.ramphys,
-					    card->hw.alloc_ramsize);
-	card->hw.scabase = (uclong) ioremap(card->hw.scaphys, card->hw.scasize);
+	card->hw.plxbase = ioremap(card->hw.plxphys, card->hw.plxsize);
+	card->hw.rambase = ioremap(card->hw.ramphys, card->hw.alloc_ramsize);
+	card->hw.scabase = ioremap(card->hw.scaphys, card->hw.scasize);
 	switch (device_id) {
 		case PCI_DEVICE_ID_PC300_TE_1:
 		case PCI_DEVICE_ID_PC300_TE_2:
@@ -3543,14 +3541,13 @@ cpc_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 		case PCI_DEVICE_ID_PC300_TE_M_2:
 			request_mem_region(card->hw.falcphys, card->hw.falcsize,
 					   "FALC Registers");
-			card->hw.falcbase = (uclong) ioremap(card->hw.falcphys,
-							     card->hw.falcsize);
+			card->hw.falcbase = ioremap(card->hw.falcphys, card->hw.falcsize);
 			break;
 
 		case PCI_DEVICE_ID_PC300_RX_1:
 		case PCI_DEVICE_ID_PC300_RX_2:
 		default:
-			card->hw.falcbase = 0;
+			card->hw.falcbase = NULL;
 			break;
 	}
 
@@ -3616,11 +3613,11 @@ cpc_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	return 0;
 
 err_io_unmap:
-	iounmap((void *) card->hw.plxbase);
-	iounmap((void *) card->hw.scabase);
-	iounmap((void *) card->hw.rambase);
+	iounmap(card->hw.plxbase);
+	iounmap(card->hw.scabase);
+	iounmap(card->hw.rambase);
 	if (card->hw.type == PC300_TE) {
-		iounmap((void *) card->hw.falcbase);
+		iounmap(card->hw.falcbase);
 		release_mem_region(card->hw.falcphys, card->hw.falcsize);
 	}
 err_release_sca:
@@ -3649,15 +3646,15 @@ static void __devexit cpc_remove_one(struct pci_dev *pdev)
 		for (i = 0; i < card->hw.nchan; i++) {
 			unregister_hdlc_device(card->chan[i].d.dev);
 		}
-		iounmap((void *) card->hw.plxbase);
-		iounmap((void *) card->hw.scabase);
-		iounmap((void *) card->hw.rambase);
+		iounmap(card->hw.plxbase);
+		iounmap(card->hw.scabase);
+		iounmap(card->hw.rambase);
 		release_mem_region(card->hw.plxphys, card->hw.plxsize);
 		release_mem_region(card->hw.ramphys, card->hw.alloc_ramsize);
 		release_mem_region(card->hw.scaphys, card->hw.scasize);
 		release_region(card->hw.iophys, card->hw.iosize);
 		if (card->hw.type == PC300_TE) {
-			iounmap((void *) card->hw.falcbase);
+			iounmap(card->hw.falcbase);
 			release_mem_region(card->hw.falcphys, card->hw.falcsize);
 		}
 		for (i = 0; i < card->hw.nchan; i++)

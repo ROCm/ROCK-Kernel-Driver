@@ -164,9 +164,9 @@ typedef	unsigned char	ucchar;		/* 8 bits, unsigned */
  * (required to support Alpha systems) *
  ***************************************/
 #ifdef __KERNEL__
-#define cpc_writeb(port,val)	{writeb((ucchar)(val),(ulong)(port)); mb();}
-#define cpc_writew(port,val)	{writew((ushort)(val),(ulong)(port)); mb();}
-#define cpc_writel(port,val)	{writel((uclong)(val),(ulong)(port)); mb();}
+#define cpc_writeb(port,val)	{writeb((ucchar)(val),(port)); mb();}
+#define cpc_writew(port,val)	{writew((ushort)(val),(port)); mb();}
+#define cpc_writel(port,val)	{writel((uclong)(val),(port)); mb();}
 
 #define cpc_readb(port)		readb(port)
 #define cpc_readw(port)		readw(port)
@@ -358,17 +358,17 @@ typedef struct pc300hw {
 	uclong iophys;		/* PLX registers I/O base */
 	uclong iosize;		/* PLX registers I/O size */
 	uclong plxphys;		/* PLX registers MMIO base (physical) */
-	uclong plxbase;		/* PLX registers MMIO base (virtual) */
+	void __iomem * plxbase;	/* PLX registers MMIO base (virtual) */
 	uclong plxsize;		/* PLX registers MMIO size */
 	uclong scaphys;		/* SCA registers MMIO base (physical) */
-	uclong scabase;		/* SCA registers MMIO base (virtual) */
+	void __iomem * scabase;	/* SCA registers MMIO base (virtual) */
 	uclong scasize;		/* SCA registers MMIO size */
 	uclong ramphys;		/* On-board RAM MMIO base (physical) */
-	uclong rambase;		/* On-board RAM MMIO base (virtual) */
+	void __iomem * rambase;	/* On-board RAM MMIO base (virtual) */
 	uclong alloc_ramsize;	/* RAM MMIO size allocated by the PCI bridge */
 	uclong ramsize;		/* On-board RAM MMIO size */
 	uclong falcphys;	/* FALC registers MMIO base (physical) */
-	uclong falcbase;	/* FALC registers MMIO base (virtual) */
+	void __iomem * falcbase;/* FALC registers MMIO base (virtual) */
 	uclong falcsize;	/* FALC registers MMIO size */
 } pc300hw_t;
 
