@@ -318,14 +318,14 @@ acpi_system_write_sleep (
 	size_t			count,
 	loff_t			*ppos)
 {
-	acpi_status		status = AE_OK;
+	acpi_status		status = AE_ERROR;
 	char			state_string[12] = {'\0'};
 	u32			state = 0;
 
 	ACPI_FUNCTION_TRACE("acpi_system_write_sleep");
 
 	if (count > sizeof(state_string) - 1)
-		return_VALUE(-EINVAL);
+		goto Done;
 
 	if (copy_from_user(state_string, buffer, count))
 		return_VALUE(-EFAULT);
@@ -333,22 +333,25 @@ acpi_system_write_sleep (
 	state_string[count] = '\0';
 	
 	state = simple_strtoul(state_string, NULL, 0);
-	
+
+	if (state < 1 || state > 4)
+		goto Done;
+
 	if (!sleep_states[state])
 		return_VALUE(-ENODEV);
 
 #ifdef CONFIG_SOFTWARE_SUSPEND
 	if (state == 4) {
 		software_suspend();
-		return_VALUE(count);
+		goto Done;
 	}
 #endif
 	status = acpi_suspend(state);
-
+ Done:
 	if (ACPI_FAILURE(status))
-		return_VALUE(-ENODEV);
-	
-	return_VALUE(count);
+		return_VALUE(-EINVAL);
+	else
+		return_VALUE(count);
 }
 
 static int acpi_system_alarm_seq_show(struct seq_file *seq, void *offset)
