@@ -226,7 +226,7 @@ acpi_thermal_get_temperature (
 
 	status = acpi_evaluate_integer(tz->handle, "_TMP", NULL, &tz->temperature);
 	if (ACPI_FAILURE(status))
-		return -ENODEV;
+		return_VALUE(-ENODEV);
 
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Temperature is %lu dK\n", tz->temperature));
 
@@ -328,7 +328,7 @@ acpi_thermal_get_trip_points (
 	if (ACPI_FAILURE(status)) {
 		tz->trips.critical.flags.valid = 0;
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "No critical threshold\n"));
-		return -ENODEV;
+		return_VALUE(-ENODEV);
 	}
 	else {
 		tz->trips.critical.flags.valid = 1;
@@ -799,7 +799,7 @@ static int acpi_thermal_state_seq_show(struct seq_file *seq, void *offset)
 	}
 
 end:
-	return 0;
+	return_VALUE(0);
 }
 
 static int acpi_thermal_state_open_fs(struct inode *inode, struct file *file)
@@ -826,7 +826,7 @@ static int acpi_thermal_temp_seq_show(struct seq_file *seq, void *offset)
 		KELVIN_TO_CELSIUS(tz->temperature));
 
 end:
-	return 0;
+	return_VALUE(0);
 }
 
 static int acpi_thermal_temp_open_fs(struct inode *inode, struct file *file)
@@ -879,7 +879,7 @@ static int acpi_thermal_trip_seq_show(struct seq_file *seq, void *offset)
 	}
 
 end:
-	return 0;
+	return_VALUE(0);
 }
 
 static int acpi_thermal_trip_open_fs(struct inode *inode, struct file *file)
@@ -958,7 +958,7 @@ static int acpi_thermal_cooling_seq_show(struct seq_file *seq, void *offset)
 			tz->cooling_mode?"passive":"active");
 
 end:
-	return 0;
+	return_VALUE(0);
 }
 
 static int acpi_thermal_cooling_open_fs(struct inode *inode, struct file *file)
@@ -1021,7 +1021,7 @@ static int acpi_thermal_polling_seq_show(struct seq_file *seq, void *offset)
 		(tz->polling_frequency / 10));
 
 end:
-	return 0;
+	return_VALUE(0);
 }
 
 static int acpi_thermal_polling_open_fs(struct inode *inode, struct file *file)

@@ -117,11 +117,11 @@ int acpi_ac_seq_show(struct seq_file *seq, void *offset)
 	ACPI_FUNCTION_TRACE("acpi_ac_seq_show");
 
 	if (!ac)
-		return 0;
+		return_VALUE(0);
 
 	if (acpi_ac_get_state(ac)) {
 		seq_puts(seq, "ERROR: Unable to read AC Adapter state\n");
-		return 0;
+		return_VALUE(0);
 	}
 
 	seq_puts(seq, "state:                   ");
@@ -137,7 +137,7 @@ int acpi_ac_seq_show(struct seq_file *seq, void *offset)
 		break;
 	}
 
-	return 0;
+	return_VALUE(0);
 }
 	
 static int acpi_ac_open_fs(struct inode *inode, struct file *file)
@@ -212,7 +212,7 @@ acpi_ac_notify (
 	ACPI_FUNCTION_TRACE("acpi_ac_notify");
 
 	if (!ac)
-		return;
+		return_VOID;
 
 	if (acpi_bus_get_device(ac->handle, &device))
 		return_VOID;

@@ -1670,7 +1670,7 @@ acpi_video_bus_put_one_device(
 	ACPI_FUNCTION_TRACE("acpi_video_bus_put_one_device");
 
 	if (!device || !device->video)
-		return (-ENOENT);
+		return_VALUE(-ENOENT);
 
 	video = device->video;
 

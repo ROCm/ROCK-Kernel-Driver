@@ -62,7 +62,7 @@ acpi_reserve_io_ranges (struct acpi_resource *res, void *data)
 		struct acpi_resource_io *io_res = &res->data.io;
 
 		if (io_res->min_base_address != io_res->max_base_address)
-			return AE_OK;
+			return_VALUE(AE_OK);
 		if (IS_RESERVED_ADDR(io_res->min_base_address, io_res->range_length)) {
 			ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Motherboard resources 0x%08x - 0x%08x\n",
 				io_res->min_base_address, 
@@ -86,7 +86,7 @@ acpi_reserve_io_ranges (struct acpi_resource *res, void *data)
 
 	if (requested_res)
 		requested_res->flags &= ~IORESOURCE_BUSY;
-	return AE_OK;
+	return_VALUE(AE_OK);
 }
 
 static int acpi_motherboard_add (struct acpi_device *device)
