@@ -707,8 +707,11 @@ static int aha1542_queuecommand(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 		SCpnt->host_scribble = (unsigned char *) kmalloc(512, GFP_DMA);
 		sgpnt = (struct scatterlist *) SCpnt->request_buffer;
 		cptr = (struct chain *) SCpnt->host_scribble;
-		if (cptr == NULL)
-			panic("aha1542.c: unable to allocate DMA memory\n");
+		if (cptr == NULL) {
+			/* free the claimed mailbox slot */
+			HOSTDATA(SCpnt->device->host)->SCint[mbo] = NULL;
+			return SCSI_MLQUEUE_HOST_BUSY;
+		}
 		for (i = 0; i < SCpnt->use_sg; i++) {
 			if (sgpnt[i].length == 0 || SCpnt->use_sg > 16 ||
 			    (((int) sgpnt[i].offset) & 1) || (sgpnt[i].length & 1)) {
