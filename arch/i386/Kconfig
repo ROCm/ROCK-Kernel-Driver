@@ -1207,6 +1207,10 @@ config GENERIC_HARDIRQS
 	bool
 	default y
 
+config GENERIC_IRQ_PROBE
+	bool
+	default y
+
 config X86_SMP
 	bool
 	depends on SMP && !X86_VOYAGER
