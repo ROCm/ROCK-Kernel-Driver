@@ -1,7 +1,3 @@
-#if 0
-#define DEBUG_ZLIB 1
-#define verbose 1
-#endif
 /*
  * This file is derived from various .h and .c files from the zlib-0.95
  * distribution by Jean-loup Gailly and Mark Adler, with some additions
@@ -84,25 +80,21 @@ extern char *z_errmsg[]; /* indexed by 1-zlib_error */
          /* functions */
 
 #include <linux/string.h>
-#if 0
 #define zmemcpy memcpy
-#else
-#define zmemcpy(d,s,c)      { int i; for(i=0;i <c;i++)d[i]=s[i]; }
-#endif
 #define zmemzero(dest, len)	memset(dest, 0, len)
 
 /* Diagnostic functions */
 #ifdef DEBUG_ZLIB
-#  include <nonstdio.h>
+#  include <stdio.h>
 #  ifndef verbose
 #    define verbose 0
 #  endif
-#  define Assert(cond,msg) {if(!(cond)) printf(msg);}
-#  define Trace(x) printf x
-#  define Tracev(x) {if (verbose) printf x ;}
-#  define Tracevv(x) {if (verbose>1) printf x ;}
-#  define Tracec(c,x) {if (verbose && (c)) printf x ;}
-#  define Tracecv(c,x) {if (verbose>1 && (c)) printf x ;}
+#  define Assert(cond,msg) {if(!(cond)) z_error(msg);}
+#  define Trace(x) fprintf x
+#  define Tracev(x) {if (verbose) fprintf x ;}
+#  define Tracevv(x) {if (verbose>1) fprintf x ;}
+#  define Tracec(c,x) {if (verbose && (c)) fprintf x ;}
+#  define Tracecv(c,x) {if (verbose>1 && (c)) fprintf x ;}
 #else
 #  define Assert(cond,msg)
 #  define Trace(x)
@@ -319,7 +311,7 @@ int inflateReset(
   z->msg = Z_NULL;
   z->state->mode = z->state->nowrap ? BLOCKS : METHOD;
   inflate_blocks_reset(z->state->blocks, z, &c);
-  Trace(("inflate: reset\n"));
+  Trace((stderr, "inflate: reset\n"));
   return Z_OK;
 }
 
@@ -336,7 +328,7 @@ int inflateEnd(
     inflate_blocks_free(z->state->blocks, z, &c);
   ZFREE(z, z->state, sizeof(struct internal_state));
   z->state = Z_NULL;
-  Trace(("inflate: end\n"));
+  Trace((stderr, "inflate: end\n"));
   return Z_OK;
 }
 
@@ -380,7 +372,7 @@ int inflateInit2(
     inflateEnd(z);
     return Z_MEM_ERROR;
   }
-  Trace(("inflate: allocated\n"));
+  Trace((stderr, "inflate: allocated\n"));
 
   /* reset state */
   inflateReset(z);
@@ -445,7 +437,7 @@ int inflate(
         z->state->sub.marker = 5;       /* can't try inflateSync */
         break;
       }
-      Trace(("inflate: zlib header ok\n"));
+      Trace((stderr, "inflate: zlib header ok\n"));
       z->state->mode = BLOCKS;
     case BLOCKS:
       r = inflate_blocks(z->state->blocks, z, r);
@@ -490,7 +482,7 @@ int inflate(
         z->state->sub.marker = 5;       /* can't try inflateSync */
         break;
       }
-      Trace(("inflate: zlib check ok\n"));
+      Trace((stderr, "inflate: zlib check ok\n"));
       z->state->mode = DONE;
     case DONE:
       return Z_STREAM_END;
@@ -774,7 +766,7 @@ local void inflate_blocks_reset(
   s->read = s->write = s->window;
   if (s->checkfn != Z_NULL)
     s->check = (*s->checkfn)(0L, Z_NULL, 0);
-  Trace(("inflate:   blocks reset\n"));
+  Trace((stderr, "inflate:   blocks reset\n"));
 }
 
 
@@ -797,7 +789,7 @@ local inflate_blocks_statef *inflate_blocks_new(
   s->end = s->window + w;
   s->checkfn = c;
   s->mode = TYPE;
-  Trace(("inflate:   blocks allocated\n"));
+  Trace((stderr, "inflate:   blocks allocated\n"));
   inflate_blocks_reset(s, z, &s->check);
   return s;
 }
@@ -830,7 +822,7 @@ local int inflate_blocks(
       switch (t >> 1)
       {
         case 0:                         /* stored */
-          Trace(("inflate:     stored block%s\n",
+          Trace((stderr, "inflate:     stored block%s\n",
                  s->last ? " (last)" : ""));
           DUMPBITS(3)
           t = k & 7;                    /* go to byte boundary */
@@ -838,7 +830,7 @@ local int inflate_blocks(
           s->mode = LENS;               /* get length of stored block */
           break;
         case 1:                         /* fixed */
-          Trace(("inflate:     fixed codes block%s\n",
+          Trace((stderr, "inflate:     fixed codes block%s\n",
                  s->last ? " (last)" : ""));
           {
             uInt bl, bd;
@@ -858,7 +850,7 @@ local int inflate_blocks(
           s->mode = CODES;
           break;
         case 2:                         /* dynamic */
-          Trace(("inflate:     dynamic codes block%s\n",
+          Trace((stderr, "inflate:     dynamic codes block%s\n",
                  s->last ? " (last)" : ""));
           DUMPBITS(3)
           s->mode = TABLE;
@@ -882,7 +874,7 @@ local int inflate_blocks(
       }
       s->sub.left = (uInt)b & 0xffff;
       b = k = 0;                      /* dump bits */
-      Tracev(("inflate:       stored length %u\n", s->sub.left));
+      Tracev((stderr, "inflate:       stored length %u\n", s->sub.left));
       s->mode = s->sub.left ? STORED : TYPE;
       break;
     case STORED:
@@ -897,7 +889,7 @@ local int inflate_blocks(
       q += t;  m -= t;
       if ((s->sub.left -= t) != 0)
         break;
-      Tracev(("inflate:       stored end, %lu total out\n",
+      Tracev((stderr, "inflate:       stored end, %lu total out\n",
               z->total_out + (q >= s->read ? q - s->read :
               (s->end - s->read) + (q - s->window))));
       s->mode = s->last ? DRY : TYPE;
@@ -925,7 +917,7 @@ local int inflate_blocks(
       s->sub.trees.nblens = t;
       DUMPBITS(14)
       s->sub.trees.index = 0;
-      Tracev(("inflate:       table sizes ok\n"));
+      Tracev((stderr, "inflate:       table sizes ok\n"));
       s->mode = BTREE;
     case BTREE:
       while (s->sub.trees.index < 4 + (s->sub.trees.table >> 10))
@@ -947,7 +939,7 @@ local int inflate_blocks(
         LEAVE
       }
       s->sub.trees.index = 0;
-      Tracev(("inflate:       bits tree ok\n"));
+      Tracev((stderr, "inflate:       bits tree ok\n"));
       s->mode = DTREE;
     case DTREE:
       while (t = s->sub.trees.table,
@@ -1010,7 +1002,7 @@ local int inflate_blocks(
           r = t;
           LEAVE
         }
-        Tracev(("inflate:       trees ok\n"));
+        Tracev((stderr, "inflate:       trees ok\n"));
         if ((c = inflate_codes_new(bl, bd, tl, td, z)) == Z_NULL)
         {
           inflate_trees_free(td, z);
@@ -1033,7 +1025,7 @@ local int inflate_blocks(
       inflate_trees_free(s->sub.decode.td, z);
       inflate_trees_free(s->sub.decode.tl, z);
       LOAD
-      Tracev(("inflate:       codes end, %lu total out\n",
+      Tracev((stderr, "inflate:       codes end, %lu total out\n",
               z->total_out + (q >= s->read ? q - s->read :
               (s->end - s->read) + (q - s->window))));
       if (!s->last)
@@ -1076,7 +1068,7 @@ local int inflate_blocks_free(
   inflate_blocks_reset(s, z, c);
   ZFREE(z, s->window, s->end - s->window);
   ZFREE(z, s, sizeof(struct inflate_blocks_state));
-  Trace(("inflate:   blocks freed\n"));
+  Trace((stderr, "inflate:   blocks freed\n"));
   return Z_OK;
 }
 
@@ -1238,7 +1230,7 @@ local uInt cpdext[] = { /* Extra bits for distance codes */
 #define N_MAX 288       /* maximum number of codes in any set */
 
 #ifdef DEBUG_ZLIB
-  local uInt inflate_hufts;
+  uInt inflate_hufts;
 #endif
 
 local int huft_build(
@@ -1695,7 +1687,7 @@ local inflate_codes_statef *inflate_codes_new(
     c->dbits = (Byte)bd;
     c->ltree = tl;
     c->dtree = td;
-    Tracev(("inflate:       codes new\n"));
+    Tracev((stderr, "inflate:       codes new\n"));
   }
   return c;
 }
@@ -1751,7 +1743,7 @@ local int inflate_codes(
       if (e == 0)               /* literal */
       {
         c->sub.lit = t->base;
-        Tracevv((t->base >= 0x20 && t->base < 0x7f ?
+        Tracevv((stderr, t->base >= 0x20 && t->base < 0x7f ?
                  "inflate:         literal '%c'\n" :
                  "inflate:         literal 0x%02x\n", t->base));
         c->mode = LIT;
@@ -1772,7 +1764,7 @@ local int inflate_codes(
       }
       if (e & 32)               /* end of block */
       {
-        Tracevv(("inflate:         end of block\n"));
+        Tracevv((stderr, "inflate:         end of block\n"));
         c->mode = WASH;
         break;
       }
@@ -1787,7 +1779,7 @@ local int inflate_codes(
       DUMPBITS(j)
       c->sub.code.need = c->dbits;
       c->sub.code.tree = c->dtree;
-      Tracevv(("inflate:         length %u\n", c->len));
+      Tracevv((stderr, "inflate:         length %u\n", c->len));
       c->mode = DIST;
     case DIST:          /* i: get distance next */
       j = c->sub.code.need;
@@ -1817,7 +1809,7 @@ local int inflate_codes(
       NEEDBITS(j)
       c->sub.copy.dist += (uInt)b & inflate_mask[j];
       DUMPBITS(j)
-      Tracevv(("inflate:         distance %u\n", c->sub.copy.dist));
+      Tracevv((stderr, "inflate:         distance %u\n", c->sub.copy.dist));
       c->mode = COPY;
     case COPY:          /* o: copying bytes in window, waiting for space */
 #ifndef __TURBOC__ /* Turbo C bug for following expression */
@@ -1868,7 +1860,7 @@ local void inflate_codes_free(
 )
 {
   ZFREE(z, c, sizeof(struct inflate_codes_state));
-  Tracev(("inflate:       codes free\n"));
+  Tracev((stderr, "inflate:       codes free\n"));
 }
 
 /*+++++*/
@@ -2003,7 +1995,7 @@ local int inflate_fast(
     if ((e = (t = tl + ((uInt)b & ml))->exop) == 0)
     {
       DUMPBITS(t->bits)
-      Tracevv((t->base >= 0x20 && t->base < 0x7f ?
+      Tracevv((stderr, t->base >= 0x20 && t->base < 0x7f ?
                 "inflate:         * literal '%c'\n" :
                 "inflate:         * literal 0x%02x\n", t->base));
       *q++ = (Byte)t->base;
@@ -2018,7 +2010,7 @@ local int inflate_fast(
         e &= 15;
         c = t->base + ((uInt)b & inflate_mask[e]);
         DUMPBITS(e)
-        Tracevv(("inflate:         * length %u\n", c));
+        Tracevv((stderr, "inflate:         * length %u\n", c));
 
         /* decode distance base of block to copy */
         GRABBITS(15);           /* max bits for distance code */
@@ -2032,7 +2024,7 @@ local int inflate_fast(
             GRABBITS(e)         /* get extra bits (up to 13) */
             d = t->base + ((uInt)b & inflate_mask[e]);
             DUMPBITS(e)
-            Tracevv(("inflate:         * distance %u\n", d));
+            Tracevv((stderr, "inflate:         * distance %u\n", d));
 
             /* do the copy */
             m -= c;
@@ -2077,7 +2069,7 @@ local int inflate_fast(
         if ((e = (t = t->next + ((uInt)b & inflate_mask[e]))->exop) == 0)
         {
           DUMPBITS(t->bits)
-          Tracevv((t->base >= 0x20 && t->base < 0x7f ?
+          Tracevv((stderr, t->base >= 0x20 && t->base < 0x7f ?
                     "inflate:         * literal '%c'\n" :
                     "inflate:         * literal 0x%02x\n", t->base));
           *q++ = (Byte)t->base;
@@ -2087,7 +2079,7 @@ local int inflate_fast(
       }
       else if (e & 32)
       {
-        Tracevv(("inflate:         * end of block\n"));
+        Tracevv((stderr, "inflate:         * end of block\n"));
         UNGRAB
         UPDATE
         return Z_STREAM_END;
