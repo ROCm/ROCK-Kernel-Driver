@@ -11,27 +11,29 @@
 #define		APIC_DEFAULT_PHYS_BASE	0xfee00000
  
 #define		APIC_ID		0x20
-#define			APIC_ID_MASK		(0x0F<<24)
-#define			GET_APIC_ID(x)		(((x)>>24)&0x0F)
+#define			APIC_ID_MASK		(0xFFu<<24)
+#define			GET_APIC_ID(x)		(((x)>>24)&0xFFu)
 #define		APIC_LVR	0x30
 #define			APIC_LVR_MASK		0xFF00FF
-#define			GET_APIC_VERSION(x)	((x)&0xFF)
-#define			GET_APIC_MAXLVT(x)	(((x)>>16)&0xFF)
-#define			APIC_INTEGRATED(x)	((x)&0xF0)
+#define			GET_APIC_VERSION(x)	((x)&0xFFu)
+#define			GET_APIC_MAXLVT(x)	(((x)>>16)&0xFFu)
+#define			APIC_INTEGRATED(x)	((x)&0xF0u)
 #define		APIC_TASKPRI	0x80
-#define			APIC_TPRI_MASK		0xFF
+#define			APIC_TPRI_MASK		0xFFu
 #define		APIC_ARBPRI	0x90
-#define			APIC_ARBPRI_MASK	0xFF
+#define			APIC_ARBPRI_MASK	0xFFu
 #define		APIC_PROCPRI	0xA0
 #define		APIC_EOI	0xB0
 #define			APIC_EIO_ACK		0x0		/* Write this to the EOI register */
 #define		APIC_RRR	0xC0
 #define		APIC_LDR	0xD0
-#define			APIC_LDR_MASK		(0xFF<<24)
-#define			GET_APIC_LOGICAL_ID(x)	(((x)>>24)&0xFF)
+#define			APIC_LDR_MASK		(0xFFu<<24)
+#define			GET_APIC_LOGICAL_ID(x)	(((x)>>24)&0xFFu)
 #define			SET_APIC_LOGICAL_ID(x)	(((x)<<24))
-#define			APIC_ALL_CPUS		0xFF
+#define			APIC_ALL_CPUS		0xFFu
 #define		APIC_DFR	0xE0
+#define			APIC_DFR_CLUSTER		0x0FFFFFFFul
+#define			APIC_DFR_FLAT			0xFFFFFFFFul
 #define		APIC_SPIV	0xF0
 #define			APIC_SPIV_FOCUS_DISABLED	(1<<9)
 #define			APIC_SPIV_APIC_ENABLED		(1<<8)
@@ -58,6 +60,7 @@
 #define			APIC_INT_ASSERT		0x04000
 #define			APIC_ICR_BUSY		0x01000
 #define			APIC_DEST_LOGICAL	0x00800
+#define			APIC_DEST_PHYSICAL	0x00000
 #define			APIC_DM_FIXED		0x00000
 #define			APIC_DM_LOWEST		0x00100
 #define			APIC_DM_SMI		0x00200
@@ -86,6 +89,7 @@
 #define			APIC_LVT_REMOTE_IRR		(1<<14)
 #define			APIC_INPUT_POLARITY		(1<<13)
 #define			APIC_SEND_PENDING		(1<<12)
+#define			APIC_MODE_MASK			0x700
 #define			GET_APIC_DELIVERY_MODE(x)	(((x)>>8)&0x7)
 #define			SET_APIC_DELIVERY_MODE(x,y)	(((x)&~0x700)|((y)<<8))
 #define				APIC_MODE_FIXED		0x0
@@ -109,6 +113,18 @@
 #define APIC_BASE (fix_to_virt(FIX_APIC_BASE))
 
 #define MAX_IO_APICS 32
+
+/*
+ * All x86-64 systems are xAPIC compatible.
+ * In the following, "apicid" is a physical APIC ID.
+ */
+#define XAPIC_DEST_CPUS_SHIFT	4
+#define XAPIC_DEST_CPUS_MASK	((1u << XAPIC_DEST_CPUS_SHIFT) - 1)
+#define XAPIC_DEST_CLUSTER_MASK	(XAPIC_DEST_CPUS_MASK << XAPIC_DEST_CPUS_SHIFT)
+#define APIC_CLUSTER(apicid)	((apicid) & XAPIC_DEST_CLUSTER_MASK)
+#define APIC_CLUSTERID(apicid)	(APIC_CLUSTER(apicid) >> XAPIC_DEST_CPUS_SHIFT)
+#define APIC_CPUID(apicid)	((apicid) & XAPIC_DEST_CPUS_MASK)
+#define NUM_APIC_CLUSTERS	((BAD_APICID + 1) >> XAPIC_DEST_CPUS_SHIFT)
 
 /*
  * the local APIC register structure, memory mapped. Not terribly well

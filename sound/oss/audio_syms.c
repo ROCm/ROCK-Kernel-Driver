@@ -14,6 +14,3 @@ EXPORT_SYMBOL(DMAbuf_open_dma);
 EXPORT_SYMBOL(DMAbuf_close_dma);
 EXPORT_SYMBOL(DMAbuf_inputintr);
 EXPORT_SYMBOL(DMAbuf_outputintr);
-EXPORT_SYMBOL(dma_ioctl);
-EXPORT_SYMBOL(audio_open);
-EXPORT_SYMBOL(audio_release);

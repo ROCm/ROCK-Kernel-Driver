@@ -15,18 +15,19 @@ void sem_init (void);
 void msg_init (void);
 void shm_init (void);
 
-struct ipc_ids {
+struct ipc_id_ary {
 	int size;
+	struct kern_ipc_perm *p[0];
+};
+
+struct ipc_ids {
 	int in_use;
 	int max_id;
 	unsigned short seq;
 	unsigned short seq_max;
 	struct semaphore sem;	
-	struct ipc_id* entries;
-};
-
-struct ipc_id {
-	struct kern_ipc_perm* p;
+	struct ipc_id_ary nullentry;
+	struct ipc_id_ary* entries;
 };
 
 void __init ipc_init_ids(struct ipc_ids* ids, int size);

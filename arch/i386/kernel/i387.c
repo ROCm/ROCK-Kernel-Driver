@@ -519,21 +519,6 @@ int dump_fpu( struct pt_regs *regs, struct user_i387_struct *fpu )
 	return fpvalid;
 }
 
-int dump_extended_fpu( struct pt_regs *regs, struct user_fxsr_struct *fpu )
-{
-	int fpvalid;
-	struct task_struct *tsk = current;
-
-	fpvalid = tsk->used_math && cpu_has_fxsr;
-	if ( fpvalid ) {
-		unlazy_fpu( tsk );
-		memcpy( fpu, &tsk->thread.i387.fxsave,
-			sizeof(struct user_fxsr_struct) );
-	}
-
-	return fpvalid;
-}
-
 int dump_task_fpu(struct task_struct *tsk, struct user_i387_struct *fpu)
 {
 	int fpvalid = tsk->used_math;

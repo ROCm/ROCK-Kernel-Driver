@@ -99,7 +99,7 @@ static int sn_hwperf_geoid_to_cnode(char *location)
 		this_slot = MODULE_GET_BPOS(module_id);
 		this_slab = geo_slab(geoid);
 		if (rack == this_rack && slot == this_slot && slab == this_slab)
-				break;
+			break;
 	}
 
 	return cnode < numionodes ? cnode : -1;
@@ -121,41 +121,35 @@ static int sn_hwperf_generic_ordinal(struct sn_hwperf_object_info *obj,
 	for (ordinal=0, p=objs; p != obj; p++) {
 		if (SN_HWPERF_FOREIGN(p))
 			continue;
-		if (p->location[3] == obj->location[3])
+		if (SN_HWPERF_SAME_OBJTYPE(p, obj))
 			ordinal++;
 	}
 
 	return ordinal;
 }
 
-static struct {
-        char	*brick_chars;
-        char	*brick_name;
-} brick_names[] = {
-        {"c^jbf",   	"node"		},
-        {"r",   	"router"	},	
-	{NULL,		"?-brick"	}
-};
+static const char *slabname_node =	"node"; /* SHub asic */
+static const char *slabname_ionode =	"ionode"; /* TIO asic */
+static const char *slabname_router =	"router"; /* NL3R or NL4R */
+static const char *slabname_other =	"other"; /* unknown asic */
 
-static char *sn_hwperf_get_brickname(struct sn_hwperf_object_info *obj,
+static const char *sn_hwperf_get_slabname(struct sn_hwperf_object_info *obj,
 			struct sn_hwperf_object_info *objs, int *ordinal)
 {
-	int i;
+	int isnode;
+	const char *slabname = slabname_other;
 
-	for (i=0; brick_names[i].brick_chars; i++) {
-		if (strchr(brick_names[i].brick_chars, obj->location[3]))
-			break;
-	}
-
-	if (strcmp(brick_names[i].brick_name, "node") == 0)
+	if ((isnode = SN_HWPERF_IS_NODE(obj)) || SN_HWPERF_IS_IONODE(obj)) {
+	    	slabname = isnode ? slabname_node : slabname_ionode;
 		*ordinal = sn_hwperf_obj_to_cnode(obj);
+	}
 	else {
 		*ordinal = sn_hwperf_generic_ordinal(obj, objs);
-		if (!brick_names[i].brick_chars)
-			brick_names[i].brick_name[0] = obj->location[3];
+		if (SN_HWPERF_IS_ROUTER(obj))
+			slabname = slabname_router;
 	}
 
-	return brick_names[i].brick_name;
+	return slabname;
 }
 
 static int sn_topology_show(struct seq_file *s, void *d)
@@ -165,7 +159,7 @@ static int sn_topology_show(struct seq_file *s, void *d)
 	int e;
 	int i;
 	int j;
-	const char *brickname;
+	const char *slabname;
 	int ordinal;
 	cpumask_t cpumask;
 	char slice;
@@ -191,11 +185,11 @@ static int sn_topology_show(struct seq_file *s, void *d)
 			obj->name[i] = '_';
 	}
 
-	brickname = sn_hwperf_get_brickname(obj, objs, &ordinal);
-	seq_printf(s, "%s %d %s %s asic %s", brickname, ordinal, obj->location,
+	slabname = sn_hwperf_get_slabname(obj, objs, &ordinal);
+	seq_printf(s, "%s %d %s %s asic %s", slabname, ordinal, obj->location,
 		obj->sn_hwp_this_part ? "local" : "shared", obj->name);
 
-	if (strcmp(brickname, "node") != 0)
+	if (!SN_HWPERF_IS_NODE(obj) && !SN_HWPERF_IS_IONODE(obj))
 		seq_putc(s, '\n');
 	else {
 		seq_printf(s, ", nasid 0x%x", cnodeid_to_nasid(ordinal));
@@ -206,7 +200,7 @@ static int sn_topology_show(struct seq_file *s, void *d)
 		seq_putc(s, '\n');
 
 		/*
-		 * CPUs on this node
+		 * CPUs on this node, if any
 		 */
 		cpumask = node_to_cpumask(ordinal);
 		for_each_online_cpu(i) {
@@ -278,9 +272,8 @@ static int sn_topology_show(struct seq_file *s, void *d)
 			 */
 			seq_printf(s, " endpoint %s-%d, protocol %s\n",
 				p->location, ptdata[pt].conn_port,
-				strcmp(obj->name, "NL3Router") == 0 ||
-				strcmp(p->name, "NL3Router") == 0 ?
-				"LLP3" : "LLP4");
+				(SN_HWPERF_IS_NL3ROUTER(obj) ||
+				SN_HWPERF_IS_NL3ROUTER(p)) ?  "LLP3" : "LLP4");
 		}
 		vfree(ptdata);
 	}

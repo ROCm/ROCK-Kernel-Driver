@@ -7,10 +7,25 @@
 #endif /* CONFIG_PPC_OF */
 
 static struct fb_var_screeninfo radeonfb_default_var = {
-        640, 480, 640, 480, 0, 0, 8, 0,
-        {0, 6, 0}, {0, 6, 0}, {0, 6, 0}, {0, 0, 0},
-        0, 0, -1, -1, 0, 39721, 40, 24, 32, 11, 96, 2,
-        0, FB_VMODE_NONINTERLACED
+	.xres		= 640,
+	.yres		= 480,
+	.xres_virtual	= 640,
+	.yres_virtual	= 480,
+	.bits_per_pixel = 8,
+	.red		= { 0, 6, 0 },
+	.green		= { 0, 6, 0 },
+	.blue		= { 0, 6, 0 },
+	.activate	= FB_ACTIVATE_NOW,
+	.height		= -1,
+	.width		= -1,
+	.pixclock	= 39721,
+	.left_margin	= 40,
+	.right_margin	= 24,
+	.upper_margin	= 32,
+	.lower_margin	= 11,
+	.hsync_len	= 96,
+	.vsync_len	= 2,
+	.vmode		= FB_VMODE_NONINTERLACED
 };
 
 static char *radeon_get_mon_name(int type)

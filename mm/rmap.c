@@ -432,6 +432,8 @@ void page_add_anon_rmap(struct page *page,
 	BUG_ON(PageReserved(page));
 	BUG_ON(!anon_vma);
 
+	vma->vm_mm->anon_rss++;
+
 	anon_vma = (void *) anon_vma + PAGE_MAPPING_ANON;
 	index = (address - vma->vm_start) >> PAGE_SHIFT;
 	index += vma->vm_pgoff;
@@ -584,6 +586,7 @@ static int try_to_unmap_one(struct page *page, struct vm_area_struct *vma)
 		}
 		set_pte(pte, swp_entry_to_pte(entry));
 		BUG_ON(pte_file(*pte));
+		mm->anon_rss--;
 	}
 
 	mm->rss--;

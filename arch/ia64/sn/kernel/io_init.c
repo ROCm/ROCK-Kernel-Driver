@@ -204,10 +204,12 @@ static void sn_pci_fixup_slot(struct pci_dev *dev)
 	SN_PCIDEV_INFO(dev) = kmalloc(sizeof(struct pcidev_info), GFP_KERNEL);
 	if (SN_PCIDEV_INFO(dev) <= 0)
 		BUG();		/* Cannot afford to run out of memory */
+	memset(SN_PCIDEV_INFO(dev), 0, sizeof(struct pcidev_info));
 
 	sn_irq_info = kmalloc(sizeof(struct sn_irq_info), GFP_KERNEL);
 	if (sn_irq_info <= 0)
 		BUG();		/* Cannot afford to run out of memory */
+	memset(sn_irq_info, 0, sizeof(struct sn_irq_info));
 
 	/* Call to retrieve pci device information needed by kernel. */
 	status = sal_get_pcidev_info((u64) segment, (u64) dev->bus->number, 
@@ -248,7 +250,7 @@ static void sn_pci_fixup_slot(struct pci_dev *dev)
 	SN_PCIDEV_INFO(dev)->pdi_pcibus_info = SN_PCIBUS_BUSSOFT(dev->bus);
 
 	/* Only set up IRQ stuff if this device has a host bus context */
-	if (SN_PCIDEV_BUSSOFT(dev)) {
+	if (SN_PCIDEV_BUSSOFT(dev) && sn_irq_info->irq_irq) {
 		SN_PCIDEV_INFO(dev)->pdi_sn_irq_info = sn_irq_info;
 		dev->irq = SN_PCIDEV_INFO(dev)->pdi_sn_irq_info->irq_irq;
 		sn_irq_fixup(dev, sn_irq_info);

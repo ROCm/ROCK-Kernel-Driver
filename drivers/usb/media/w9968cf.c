@@ -2904,7 +2904,7 @@ static int w9968cf_mmap(struct file* filp, struct vm_area_struct *vma)
 		return -EINVAL;
 
 	while (vsize > 0) {
-		page = page_to_pfn(vmalloc_to_page((void *)pos));
+		page = vmalloc_to_pfn((void *)pos);
 		if (remap_pfn_range(vma, start, page + vma->vm_pgoff,
 						PAGE_SIZE, vma->vm_page_prot))
 			return -EAGAIN;

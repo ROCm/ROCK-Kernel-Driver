@@ -987,7 +987,6 @@ tty3215_write(struct tty_struct * tty,
 	      const unsigned char *buf, int count)
 {
 	struct raw3215_info *raw;
-	int length, ret;
 
 	if (!tty)
 		return 0;

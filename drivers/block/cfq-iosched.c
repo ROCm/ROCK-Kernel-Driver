@@ -1482,7 +1482,6 @@ out_lock:
 static void cfq_put_cfqd(struct cfq_data *cfqd)
 {
 	request_queue_t *q = cfqd->queue;
-	elevator_t *e = q->elevator;
 	struct cfq_queue *cfqq;
 
 	if (!atomic_dec_and_test(&cfqd->ref))
@@ -1500,7 +1499,6 @@ static void cfq_put_cfqd(struct cfq_data *cfqd)
 
 	blk_put_queue(q);
 
-	e->elevator_data = NULL;
 	mempool_destroy(cfqd->crq_pool);
 	kfree(cfqd->crq_hash);
 	kfree(cfqd->cfq_hash);

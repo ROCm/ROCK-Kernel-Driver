@@ -36,7 +36,7 @@
 #define NR_IRQ_VECTORS NR_IRQS
 #else
 #define NR_IRQS 224
-#define NR_IRQ_VECTORS NR_IRQS
+#define NR_IRQ_VECTORS 1024
 #endif
 
 static __inline__ int irq_canonicalize(int irq)

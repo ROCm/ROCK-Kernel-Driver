@@ -1,5 +1,5 @@
 /*
-    $Id: bttv-risc.c,v 1.8 2004/10/06 17:30:51 kraxel Exp $
+    $Id: bttv-risc.c,v 1.9 2004/10/13 10:39:00 kraxel Exp $
 
     bttv-risc.c  --  interfaces to other kernel modules
 
@@ -240,7 +240,7 @@ bttv_risc_overlay(struct bttv *btv, struct btcx_riscmem *risc,
 	/* skip list for window clipping */
 	if (NULL == (skips = kmalloc(sizeof(*skips) * ov->nclips,GFP_KERNEL)))
 		return -ENOMEM;
-	
+
 	/* estimate risc mem: worst case is (clip+1) * lines instructions
 	   + sync + jump (all 2 dwords) */
 	instructions  = (ov->nclips + 1) *
@@ -293,7 +293,7 @@ bttv_risc_overlay(struct bttv *btv, struct btcx_riscmem *risc,
 				ra = addr + (fmt->depth>>3)*start;
 			else
 				ra = 0;
-				
+
 			if (0 == start)
 				ri |= BT848_RISC_SOL;
 			if (ov->w.width == end)
@@ -413,7 +413,7 @@ bttv_set_dma(struct bttv *btv, int override)
 		 btv->curr.top     ? (unsigned long long)btv->curr.top->top.dma        : 0,
 		 btv->cvbi         ? (unsigned long long)btv->cvbi->bottom.dma         : 0,
 		 btv->curr.bottom  ? (unsigned long long)btv->curr.bottom->bottom.dma  : 0);
-	
+
 	cmd = BT848_RISC_JUMP;
 	if (btv->loop_irq) {
 		cmd |= BT848_RISC_IRQ;
@@ -426,7 +426,7 @@ bttv_set_dma(struct bttv *btv, int override)
 		del_timer(&btv->timeout);
 	}
         btv->main.cpu[RISC_SLOT_LOOP] = cpu_to_le32(cmd);
-	
+
 	btaor(capctl, ~0x0f, BT848_CAP_CTL);
 	if (capctl) {
 		if (btv->dma_on)
@@ -447,7 +447,7 @@ int
 bttv_risc_init_main(struct bttv *btv)
 {
 	int rc;
-	
+
 	if ((rc = btcx_riscmem_alloc(btv->c.pci,&btv->main,PAGE_SIZE)) < 0)
 		return rc;
 	dprintk(KERN_DEBUG "bttv%d: risc main @ %08Lx\n",
@@ -616,7 +616,7 @@ bttv_buffer_risc(struct bttv *btv, struct bttv_buffer *buf)
 
 		bttv_calc_geo(btv,&buf->geo,buf->vb.width,buf->vb.height,
 			      V4L2_FIELD_HAS_BOTH(buf->vb.field),buf->tvnorm);
-		
+
 		switch (buf->vb.field) {
 		case V4L2_FIELD_TOP:
 			bttv_risc_packed(btv,&buf->top,buf->vb.dma.sglist,

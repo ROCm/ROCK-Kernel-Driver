@@ -6,6 +6,7 @@
 #include "linux/sched.h"
 #include "linux/kernel.h"
 #include "linux/module.h"
+#include "linux/kallsyms.h"
 #include "asm/page.h"
 #include "asm/processor.h"
 #include "sysrq.h"
@@ -19,18 +20,17 @@ void show_trace(unsigned long * stack)
         if (!stack)
                 stack = (unsigned long*) &stack;
 
-        printk("Call Trace: ");
+        printk("Call Trace:\n");
         i = 1;
         while (((long) stack & (THREAD_SIZE-1)) != 0) {
                 addr = *stack++;
 		if (__kernel_text_address(addr)) {
-			if (i && ((i % 6) == 0))
-				printk("\n   ");
 			printk("[<%08lx>] ", addr);
+			print_symbol("%s", addr);
+			printk("\n");
 			i++;
                 }
         }
-        printk("\n");
 }
 
 /*
@@ -49,13 +49,3 @@ void show_stack(struct task_struct *task, unsigned long *sp)
 	show_trace(sp);
 }
 
-/*
- * Overrides for Emacs so that we follow Linus's tabbing style.
- * Emacs will notice this stuff at the end of the file and automatically
- * adjust the settings for this buffer only.  This must remain at the end
- * of the file.
- * ---------------------------------------------------------------------------
- * Local variables:
- * c-file-style: "linux"
- * End:
- */

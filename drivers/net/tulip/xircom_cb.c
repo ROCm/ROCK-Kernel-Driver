@@ -259,7 +259,7 @@ static int __devinit xircom_probe(struct pci_dev *pdev, const struct pci_device_
 	private->dev = dev;
 	private->pdev = pdev;
 	private->io_port = pci_resource_start(pdev, 0);
-	private->lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&private->lock);
 	dev->irq = pdev->irq;
 	dev->base_addr = private->io_port;
 	

@@ -206,7 +206,6 @@ void default_idle(void)
 		 * although we are an idle CPU, we do not want to
 		 * get into the scheduler unnecessarily.
 		 */
-		irq_stat[smp_processor_id()].idle_timestamp = jiffies;
 		if(need_resched())
 			schedule();
 		

@@ -1,5 +1,5 @@
 /*
-    $Id: bttvp.h,v 1.10 2004/10/06 17:30:51 kraxel Exp $
+    $Id: bttvp.h,v 1.11 2004/10/13 10:39:00 kraxel Exp $
 
     bttv - Bt848 frame grabber driver
 
@@ -145,7 +145,7 @@ struct bttv_overlay {
 struct bttv_fh {
 	struct bttv              *btv;
 	int resources;
-#ifdef VIDIOC_G_PRIORITY 
+#ifdef VIDIOC_G_PRIORITY
 	enum v4l2_priority       prio;
 #endif
 	enum v4l2_buf_type       type;
@@ -334,10 +334,10 @@ struct bttv {
         struct semaphore lock;
 	int resources;
         struct semaphore reslock;
-#ifdef VIDIOC_G_PRIORITY 
+#ifdef VIDIOC_G_PRIORITY
 	struct v4l2_prio_state prio;
 #endif
-	
+
 	/* video state */
 	unsigned int input;
 	unsigned int audio;

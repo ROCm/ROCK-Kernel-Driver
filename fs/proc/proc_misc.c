@@ -204,7 +204,6 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 		"Slab:         %8lu kB\n"
 		"CommitLimit:  %8lu kB\n"
 		"Committed_AS: %8lu kB\n"
-		"CommitAvail:  %8ld kB\n"
 		"PageTables:   %8lu kB\n"
 		"VmallocTotal: %8lu kB\n"
 		"VmallocUsed:  %8lu kB\n"
@@ -228,7 +227,6 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 		K(ps.nr_slab),
 		K(allowed),
 		K(committed),
-		K(allowed - committed),
 		K(ps.nr_page_table_pages),
 		vmtot,
 		vmi.used,

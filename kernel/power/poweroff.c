@@ -32,7 +32,7 @@ static void handle_poweroff(int key, struct pt_regs *pt_regs,
 static struct sysrq_key_op	sysrq_poweroff_op = {
 	.handler        = handle_poweroff,
 	.help_msg       = "powerOff",
-	.action_msg     = "Power Off\n"
+	.action_msg     = "Power Off"
 };
 
 static int pm_sysrq_init(void)

@@ -528,8 +528,6 @@ void getnstimeofday(struct timespec *tv)
 }
 #endif
 
-EXPORT_SYMBOL(getnstimeofday);
-
 #if (BITS_PER_LONG < 64)
 u64 get_jiffies_64(void)
 {

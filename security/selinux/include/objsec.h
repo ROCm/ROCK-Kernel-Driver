@@ -99,7 +99,6 @@ struct netif_security_struct {
 	struct net_device *dev;		/* back pointer */
 	u32 if_sid;			/* SID for this interface */
 	u32 msg_sid;			/* default SID for messages received on this interface */
-	struct avc_entry_ref avcr;	/* reference to permissions */
 };
 
 struct sk_security_struct {

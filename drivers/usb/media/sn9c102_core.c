@@ -1555,7 +1555,7 @@ static int sn9c102_mmap(struct file* filp, struct vm_area_struct *vma)
 
 	pos = (unsigned long)cam->frame[i].bufmem;
 	while (size > 0) { /* size is page-aligned */
-		page = page_to_pfn(vmalloc_to_page((void *)pos));
+		page = vmalloc_to_pfn((void *)pos);
 		if (remap_pfn_range(vma, start, page, PAGE_SIZE,
 		                     vma->vm_page_prot)) {
 			up(&cam->fileop_sem);
