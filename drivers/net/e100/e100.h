@@ -104,6 +104,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <linux/proc_fs.h>
 #include <linux/ip.h>
 
+#define E100_REGS_LEN 1
 /*
  *  Configure parameters for buffers per controller.
  *  If the machine this is being used on is a faster machine (i.e. > 150MHz)

@@ -145,6 +145,7 @@ static int e100_ethtool_eeprom(struct net_device *, struct ifreq *);
 
 #define E100_EEPROM_MAGIC 0x1234
 static int e100_ethtool_glink(struct net_device *, struct ifreq *);
+static int e100_ethtool_gregs(struct net_device *, struct ifreq *);
 static int e100_ethtool_nway_rst(struct net_device *, struct ifreq *);
 static int e100_ethtool_wol(struct net_device *, struct ifreq *);
 static unsigned char e100_setup_filter(struct e100_private *bdp);
@@ -1028,7 +1029,7 @@ e100_open(struct net_device *dev)
 
 	e100_start_ru(bdp);
 	if ((rc = request_irq(dev->irq, &e100intr, SA_SHIRQ,
-			      e100_short_driver_name, dev)) != 0) {
+			      dev->name, dev)) != 0) {
 		del_timer_sync(&bdp->watchdog_timer);
 		goto err_exit;
 	}
@@ -1243,7 +1244,7 @@ e100_set_multi(struct net_device *dev)
 	if (bdp->driver_isolated) {
 		goto exit;
 	}
-	promisc_enbl = (dev->flags & IFF_PROMISC);
+	promisc_enbl = ((dev->flags & IFF_PROMISC) == IFF_PROMISC);
 	mulcast_enbl = ((dev->flags & IFF_ALLMULTI) ||
 			(dev->mc_count > MAX_MULTICAST_ADDRS));
 
@@ -3343,6 +3344,9 @@ e100_do_ethtool_ioctl(struct net_device *dev, struct ifreq *ifr)
 	case ETHTOOL_GDRVINFO:
 		rc = e100_ethtool_get_drvinfo(dev, ifr);
 		break;
+	case ETHTOOL_GREGS:
+		rc = e100_ethtool_gregs(dev, ifr);
+		break;
 	case ETHTOOL_NWAY_RST:
 		rc = e100_ethtool_nway_rst(dev, ifr);
 		break;
@@ -3551,6 +3555,36 @@ exit:
 }
 
 static int
+e100_ethtool_gregs(struct net_device *dev, struct ifreq *ifr)
+{
+	struct e100_private *bdp;
+	u32 regs_buff[E100_REGS_LEN];
+	struct ethtool_regs regs = {ETHTOOL_GREGS};
+	void *addr = ifr->ifr_data;
+
+	if (!capable(CAP_NET_ADMIN))
+		return -EPERM;
+	bdp = dev->priv;
+
+	if(copy_from_user(&regs, addr, sizeof(regs)))
+		return -EFAULT;
+
+	regs.version = (1 << 24) | bdp->rev_id;
+	regs_buff[0] = readb(&(bdp->scb->scb_cmd_hi)) << 24 |
+		readb(&(bdp->scb->scb_cmd_low)) << 16 |
+		readw(&(bdp->scb->scb_status));
+
+	if(copy_to_user(addr, &regs, sizeof(regs)))
+		return -EFAULT;
+
+	addr += offsetof(struct ethtool_regs, data);
+	if(copy_to_user(addr, regs_buff, regs.len))
+		return -EFAULT;
+
+	return 0;
+}
+
+static int
 e100_ethtool_nway_rst(struct net_device *dev, struct ifreq *ifr)
 {
 	struct e100_private *bdp;
@@ -3581,10 +3615,11 @@ e100_ethtool_get_drvinfo(struct net_device *dev, struct ifreq *ifr)
 
 	strncpy(info.driver, e100_short_driver_name, sizeof (info.driver) - 1);
 	strncpy(info.version, e100_driver_version, sizeof (info.version) - 1);
-	strncpy(info.fw_version, e100_get_brand_msg(bdp),
+	strncpy(info.fw_version, "N/A",
 		sizeof (info.fw_version) - 1);
 	strncpy(info.bus_info, bdp->pdev->slot_name,
 		sizeof (info.bus_info) - 1);
+	info.regdump_len  = E100_REGS_LEN * sizeof(u32);
 	info.eedump_len = (bdp->eeprom_size << 1);	
 	info.testinfo_len = E100_MAX_TEST_RES;
 	if (copy_to_user(ifr->ifr_data, &info, sizeof (info)))
@@ -4154,16 +4189,28 @@ static int
 e100_notify_reboot(struct notifier_block *nb, unsigned long event, void *p)
 {
         struct pci_dev *pdev = NULL;
+	struct net_device *netdev;
+	struct e100_private *bdp;
+	
         switch(event) {
         case SYS_DOWN:
         case SYS_HALT:
         case SYS_POWER_OFF:
                 pci_for_each_dev(pdev) {
                         if(pci_dev_driver(pdev) == &e100_driver) {
+				netdev = pci_get_drvdata(pdev);
 				/* If net_device struct is allocated? */
-                                if (pci_get_drvdata(pdev))
-					e100_suspend(pdev, 3);
-                	}
+                                if (netdev) {
+					bdp = netdev->priv;
+					if (bdp->wolopts) {
+						bdp->ip_lbytes = 
+							e100_get_ip_lbytes(netdev);
+						e100_do_wol(pdev, bdp);
+						pci_enable_wake(pdev, 3, 1);
+						pci_set_power_state(pdev, 3);
+					}
+				}
+			}
 		}
         }
         return NOTIFY_DONE;
