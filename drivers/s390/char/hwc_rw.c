@@ -35,6 +35,8 @@
 #define MIN(a,b) (((a<b) ? a : b))
 #endif
 
+extern void ctrl_alt_del (void);
+
 #define HWC_RW_PRINT_HEADER "hwc low level driver: "
 
 #define  USE_VM_DETECTION
@@ -172,6 +174,7 @@ static struct {
 	unsigned char read_nonprio:1;
 	unsigned char read_prio:1;
 	unsigned char read_statechange:1;
+	unsigned char sig_quiesce:1;
 
 	unsigned char flags;
 
@@ -216,6 +219,7 @@ static struct {
 	    _page,
 	    0,
 	    NULL,
+	    0,
 	    0,
 	    0,
 	    0,
@@ -1529,6 +1533,19 @@ eval_hwc_send_mask (_hwcb_mask_t mask)
 				       HWC_RW_PRINT_HEADER
 				 "can not read state change notifications\n");
 
+	hwc_data.sig_quiesce
+	    = ((mask & ET_SigQuiesce_Mask) == ET_SigQuiesce_Mask);
+	if (hwc_data.sig_quiesce)
+		internal_print (
+				       DELAYED_WRITE,
+				       HWC_RW_PRINT_HEADER
+				       "can receive signal quiesce\n");
+	else
+		internal_print (
+				       DELAYED_WRITE,
+				       HWC_RW_PRINT_HEADER
+				       "can not receive signal quiesce\n");
+
 	hwc_data.read_nonprio
 	    = ((mask & ET_OpCmd_Mask) == ET_OpCmd_Mask);
 	if (hwc_data.read_nonprio)
@@ -1609,6 +1626,47 @@ eval_statechangebuf (statechangebuf_t * scbuf)
 	return retval;
 }
 
+#ifdef CONFIG_SMP
+static volatile unsigned long cpu_quiesce_map;
+
+static void 
+do_load_quiesce_psw (void)
+{
+	psw_t quiesce_psw;
+
+	clear_bit (smp_processor_id (), &cpu_quiesce_map);
+	if (smp_processor_id () == 0) {
+
+		while (cpu_quiesce_map != 0) ;
+
+		quiesce_psw.mask = PSW_BASE_BITS | PSW_MASK_WAIT;
+		quiesce_psw.addr = 0xfff;
+		__load_psw (quiesce_psw);
+	}
+	signal_processor (smp_processor_id (), sigp_stop);
+}
+
+static void 
+do_machine_quiesce (void)
+{
+	cpu_quiesce_map = cpu_online_map;
+	smp_call_function (do_load_quiesce_psw, NULL, 0, 0);
+	do_load_quiesce_psw ();
+}
+
+#else
+static void 
+do_machine_quiesce (void)
+{
+	psw_t quiesce_psw;
+
+	quiesce_psw.mask = PSW_BASE_BITS | PSW_MASK_WAIT;
+	queisce_psw.addr = 0xfff;
+	__load_psw (quiesce_psw);
+}
+
+#endif
+
 static int 
 process_evbufs (void *start, void *end)
 {
@@ -1643,6 +1701,13 @@ process_evbufs (void *start, void *end)
 		case ET_StateChange:
 			retval += eval_statechangebuf
 			    ((statechangebuf_t *) evbuf);
+			break;
+		case ET_SigQuiesce:
+
+			_machine_restart = do_machine_quiesce;
+			_machine_halt = do_machine_quiesce;
+			_machine_power_off = do_machine_quiesce;
+			ctrl_alt_del ();
 			break;
 		default:
 			internal_print (
