@@ -454,7 +454,7 @@ static int DRM(takedown)( drm_device_t *dev )
 					DRM_DEBUG( "mtrr_del=%d\n", retcode );
 				}
 #endif
-				DRM(ioremapfree)( map->handle, map->size, dev );
+				DRM(ioremapfree)( map->handle, map->size );
 				break;
 			case _DRM_SHM:
 				vfree(map->handle);

@@ -284,7 +284,7 @@
 #define  QL1280_TARGET_MODE_SUPPORT    0	/* Target mode support */
 #define  QL1280_LUN_SUPPORT            0
 #define  WATCHDOGTIMER                 0
-#define  MEMORY_MAPPED_IO              1
+#define  MEMORY_MAPPED_IO              0
 #define  DEBUG_QLA1280_INTR            0
 #define  USE_NVRAM_DEFAULTS	       0
 #define  DEBUG_PRINT_NVRAM             0
@@ -2634,7 +2634,7 @@ qla1280_pci_config(struct scsi_qla_host *ha)
 	/*
 	 * Get memory mapped I/O address.
 	 */
-	pci_read_config_dword (ha->pdev, PCI_BASE_ADDRESS_1, &mmapbase);
+	pci_read_config_word (ha->pdev, PCI_BASE_ADDRESS_1, &mmapbase);
 	mmapbase &= PCI_BASE_ADDRESS_MEM_MASK;
 
 	/*

@@ -150,6 +150,7 @@ static void ___sym_mfree(m_pool_p mp, void *ptr, int size)
 			((m_link_p) a)->next = h[i].next;
 			h[i].next = (m_link_p) a;
 #endif
+			break;
 		}
 		b = a ^ s;
 		q = &h[i];

@@ -56,13 +56,15 @@ typedef struct hw_interrupt_type  hw_irq_controller;
  *
  * Pad this out to 32 bytes for cache and indexing reasons.
  */
-typedef struct irq_desc {
+typedef struct {
 	unsigned int status;		/* IRQ status */
 	hw_irq_controller *handler;
 	struct irqaction *action;	/* IRQ action list */
 	unsigned int depth;		/* nested irq disables */
 	spinlock_t lock;
 } ____cacheline_aligned irq_desc_t;
+
+extern irq_desc_t irq_desc [NR_IRQS];
 
 #include <asm/hw_irq.h> /* the arch dependent stuff */
 
