@@ -57,7 +57,8 @@ struct dvb_net_priv {
 #define RX_MODE_MULTI 1
 #define RX_MODE_ALL_MULTI 2
 #define RX_MODE_PROMISC 3
-	struct work_struct wq;
+	struct work_struct set_multicast_list_wq;
+	struct work_struct restart_net_feed_wq;
 };
 
 
@@ -354,7 +355,7 @@ static int dvb_set_mc_filter (struct net_device *dev, struct dev_mc_list *mc)
 }
 
 
-static void tq_set_multicast_list (void *data)
+static void wq_set_multicast_list (void *data)
 {
 	struct net_device *dev = data;
 	struct dvb_net_priv *priv = (struct dvb_net_priv*) dev->priv;
@@ -393,7 +394,7 @@ static void tq_set_multicast_list (void *data)
 static void dvb_net_set_multicast_list (struct net_device *dev)
 {
 	struct dvb_net_priv *priv = (struct dvb_net_priv*) dev->priv;
-	schedule_work(&priv->wq);
+	schedule_work(&priv->set_multicast_list_wq);
 }
 
 
@@ -404,16 +405,28 @@ static int dvb_net_set_config(struct net_device *dev, struct ifmap *map)
 	return 0;
 }
 
-static int dvb_net_set_mac(struct net_device *dev, void *p)
-{
-	struct sockaddr *addr=p;
 
-	memcpy(dev->dev_addr, addr->sa_data, dev->addr_len);
+static void wq_restart_net_feed (void *data)
+{
+	struct net_device *dev = data;
 
 	if (netif_running(dev)) {
 		dvb_net_feed_stop(dev);
 		dvb_net_feed_start(dev);
 	}
+}
+
+
+static int dvb_net_set_mac (struct net_device *dev, void *p)
+{
+	struct dvb_net_priv *priv = (struct dvb_net_priv*) dev->priv;
+	struct sockaddr *addr=p;
+
+	memcpy(dev->dev_addr, addr->sa_data, dev->addr_len);
+
+	if (netif_running(dev))
+		schedule_work(&priv->restart_net_feed_wq);
+
 	return 0;
 }
 
@@ -493,10 +506,8 @@ static int dvb_net_add_if(struct dvb_net *dvbnet, u16 pid)
 	net=&dvbnet->device[if_num];
 	demux=dvbnet->demux;
 	
-	net->base_addr = 0;
-	net->irq       = 0;
-	net->dma       = 0;
-	net->mem_start = 0;
+	memset(net, 0, sizeof(struct net_device));
+
         memcpy(net->name, "dvb0_0", 7);
 	net->name[3]   = dvbnet->dvbdev->adapter->num + '0';
 	net->name[5]   = if_num + '0';
@@ -514,7 +525,8 @@ static int dvb_net_add_if(struct dvb_net *dvbnet, u16 pid)
         priv->pid = pid;
 	priv->rx_mode = RX_MODE_UNI;
 
-	INIT_WORK(&priv->wq, tq_set_multicast_list, net);
+	INIT_WORK(&priv->set_multicast_list_wq, wq_set_multicast_list, net);
+	INIT_WORK(&priv->restart_net_feed_wq, wq_restart_net_feed, net);
 
         net->base_addr = pid;
                 
@@ -536,6 +548,7 @@ static int dvb_net_remove_if(struct dvb_net *dvbnet, int num)
 		return -EBUSY;
 
 	dvb_net_stop(&dvbnet->device[num]);
+	flush_scheduled_work();
 	kfree(priv);
         unregister_netdev(&dvbnet->device[num]);
 	dvbnet->state[num]=0;

@@ -403,13 +403,16 @@ void dvb_dmx_swfilter(struct dvb_demux *demux, const u8 *buf, size_t count)
 {
 	int p = 0,i, j;
 	
+	spin_lock(&demux->lock);
+
 	if ((i = demux->tsbufp)) {
 		if (count < (j=188-i)) {
 			memcpy(&demux->tsbuf[i], buf, count);
 			demux->tsbufp += count;
-			return;
+			goto bailout;
 		}
 		memcpy(&demux->tsbuf[i], buf, j);
+		if (demux->tsbuf[0] == 0x47)
 		dvb_dmx_swfilter_packet(demux, demux->tsbuf);
 		demux->tsbufp = 0;
 		p += j;
@@ -424,11 +427,14 @@ void dvb_dmx_swfilter(struct dvb_demux *demux, const u8 *buf, size_t count)
 				i = count-p;
 				memcpy(demux->tsbuf, buf+p, i);
 				demux->tsbufp=i;
-				return;
+				goto bailout;
 			}
 		} else 
 			p++;
 	}
+
+bailout:
+	spin_unlock(&demux->lock);
 }
 
 
@@ -1030,9 +1036,11 @@ static int dvbdmx_write(struct dmx_demux *demux, const char *buf, size_t count)
 
 	if (down_interruptible (&dvbdemux->mutex))
 		return -ERESTARTSYS;
-
 	dvb_dmx_swfilter(dvbdemux, buf, count);
 	up(&dvbdemux->mutex);
+
+	if (signal_pending(current))
+		return -EINTR;
 	return count;
 }
 
