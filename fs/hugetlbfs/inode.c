@@ -524,10 +524,9 @@ hugetlbfs_fill_super(struct super_block *sb, void *data, int silent)
 	struct hugetlbfs_config config;
 
 	ret = hugetlbfs_parse_options(data, &config);
-	if (ret) {
-		printk("hugetlbfs: invalid mount options: %s.\n", data);
+	if (ret)
 		return ret;
-	}
+
 	sb->s_blocksize = PAGE_CACHE_SIZE;
 	sb->s_blocksize_bits = PAGE_CACHE_SHIFT;
 	sb->s_magic = HUGETLBFS_MAGIC;
