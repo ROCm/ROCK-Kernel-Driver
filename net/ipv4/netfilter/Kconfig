@@ -5,6 +5,7 @@
 menu "IP: Netfilter Configuration"
 	depends on INET && NETFILTER
 
+# connection tracking, helpers and protocols
 config IP_NF_CONNTRACK
 	tristate "Connection tracking (required for masq/NAT)"
 	---help---
@@ -18,6 +19,28 @@ config IP_NF_CONNTRACK
 	  below).
 
 	  To compile it as a module, choose M here.  If unsure, say N.
+
+config IP_NF_CT_ACCT
+	bool "Connection tracking flow accounting"
+	depends on IP_NF_CONNTRACK
+	help
+	  If this option is enabled, the connection tracking code will
+	  keep per-flow packet and byte counters.
+
+	  Those counters can be used for flow-based accounting or the
+	  `connbytes' match.
+
+	  If unsure, say `N'.
+
+config IP_NF_CT_PROTO_SCTP
+	tristate  'SCTP protocol connection tracking support (EXPERIMENTAL)'
+	depends on IP_NF_CONNTRACK && EXPERIMENTAL
+	help
+	  With this option enabled, the connection tracking code will
+	  be able to do state tracking on SCTP connections.
+
+	  If you want to compile it as a module, say M here and read
+	  Documentation/modules.txt.  If unsure, say `N'.
 
 config IP_NF_FTP
 	tristate "FTP protocol support"
@@ -86,7 +109,7 @@ config IP_NF_IPTABLES
 
 	  To compile it as a module, choose M here.  If unsure, say N.
 
-# The simple matches.
+# The matches.
 config IP_NF_MATCH_LIMIT
 	tristate "limit match support"
 	depends on IP_NF_IPTABLES
@@ -274,7 +297,42 @@ config IP_NF_MATCH_PHYSDEV
 
 	  To compile it as a module, choose M here.  If unsure, say N.
 
-# The targets
+config IP_NF_MATCH_ADDRTYPE
+	tristate  'address type match support'
+	depends on IP_NF_IPTABLES
+	help
+	  This option allows you to match what routing thinks of an address,
+	  eg. UNICAST, LOCAL, BROADCAST, ...
+	
+	  If you want to compile it as a module, say M here and read
+	  Documentation/modules.txt.  If unsure, say `N'.
+
+config IP_NF_MATCH_REALM
+	tristate  'realm match support'
+	depends on IP_NF_IPTABLES
+	select NET_CLS_ROUTE
+	help
+	  This option adds a `realm' match, which allows you to use the realm
+	  key from the routing subsytem inside iptables.
+	
+	  This match pretty much resembles the CONFIG_NET_CLS_ROUTE4 option 
+	  in tc world.
+	
+	  If you want to compile it as a module, say M here and read
+	  Documentation/modules.txt.  If unsure, say `N'.
+
+config IP_NF_MATCH_SCTP
+	tristate  'SCTP protocol match support'
+	depends on IP_NF_IPTABLES
+	help
+	  With this option enabled, you will be able to use the iptables
+	  `sctp' match in order to match on SCTP source/destination ports
+	  and SCTP chunk types.
+
+	  If you want to compile it as a module, say M here and read
+	  Documentation/modules.txt.  If unsure, say `N'.
+
+# `filter', generic and specific targets
 config IP_NF_FILTER
 	tristate "Packet filtering"
 	depends on IP_NF_IPTABLES
@@ -295,6 +353,56 @@ config IP_NF_TARGET_REJECT
 
 	  To compile it as a module, choose M here.  If unsure, say N.
 
+config IP_NF_TARGET_LOG
+	tristate "LOG target support"
+	depends on IP_NF_IPTABLES
+	help
+	  This option adds a `LOG' target, which allows you to create rules in
+	  any iptables table which records the packet header to the syslog.
+
+	  To compile it as a module, choose M here.  If unsure, say N.
+
+config IP_NF_TARGET_ULOG
+	tristate "ULOG target support"
+	depends on IP_NF_IPTABLES
+	---help---
+	  This option adds a `ULOG' target, which allows you to create rules in
+	  any iptables table. The packet is passed to a userspace logging
+	  daemon using netlink multicast sockets; unlike the LOG target
+	  which can only be viewed through syslog.
+
+	  The apropriate userspace logging daemon (ulogd) may be obtained from
+	  <http://www.gnumonks.org/projects/ulogd/>
+
+	  To compile it as a module, choose M here.  If unsure, say N.
+
+config IP_NF_TARGET_TCPMSS
+	tristate "TCPMSS target support"
+	depends on IP_NF_IPTABLES
+	---help---
+	  This option adds a `TCPMSS' target, which allows you to alter the
+	  MSS value of TCP SYN packets, to control the maximum size for that
+	  connection (usually limiting it to your outgoing interface's MTU
+	  minus 40).
+
+	  This is used to overcome criminally braindead ISPs or servers which
+	  block ICMP Fragmentation Needed packets.  The symptoms of this
+	  problem are that everything works fine from your Linux
+	  firewall/router, but machines behind it can never exchange large
+	  packets:
+	  	1) Web browsers connect, then hang with no data received.
+	  	2) Small mail works fine, but large emails hang.
+	  	3) ssh works fine, but scp hangs after initial handshaking.
+
+	  Workaround: activate this option and add a rule to your firewall
+	  configuration like:
+
+	  iptables -A FORWARD -p tcp --tcp-flags SYN,RST SYN \
+	  		 -j TCPMSS --clamp-mss-to-pmtu
+
+	  To compile it as a module, choose M here.  If unsure, say N.
+
+# NAT + specific targets
 config IP_NF_NAT
 	tristate "Full NAT"
 	depends on IP_NF_IPTABLES && IP_NF_CONNTRACK
@@ -408,6 +516,7 @@ config IP_NF_NAT_AMANDA
 	default IP_NF_NAT if IP_NF_AMANDA=y
 	default m if IP_NF_AMANDA=m
 
+# mangle + specific targets
 config IP_NF_MANGLE
 	tristate "Packet mangling"
 	depends on IP_NF_IPTABLES
@@ -478,55 +587,34 @@ config IP_NF_TARGET_CLASSIFY
 
 	  To compile it as a module, choose M here.  If unsure, say N.
 
-config IP_NF_TARGET_LOG
-	tristate "LOG target support"
+# raw + specific targets
+config IP_NF_RAW
+	tristate  'raw table support (required for NOTRACK/TRACE)'
 	depends on IP_NF_IPTABLES
 	help
-	  This option adds a `LOG' target, which allows you to create rules in
-	  any iptables table which records the packet header to the syslog.
+	  This option adds a `raw' table to iptables. This table is the very
+	  first in the netfilter framework and hooks in at the PREROUTING
+	  and OUTPUT chains.
+	
+	  If you want to compile it as a module, say M here and read
+	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  help
 
-	  To compile it as a module, choose M here.  If unsure, say N.
+config IP_NF_TARGET_NOTRACK
+	tristate  'NOTRACK target support'
+	depends on IP_NF_RAW
+	depends on IP_NF_CONNTRACK
+	help
+	  The NOTRACK target allows a select rule to specify
+	  which packets *not* to enter the conntrack/NAT
+	  subsystem with all the consequences (no ICMP error tracking,
+	  no protocol helpers for the selected packets).
+	
+	  If you want to compile it as a module, say M here and read
+	  <file:Documentation/modules.txt>.  If unsure, say `N'.
 
-config IP_NF_TARGET_ULOG
-	tristate "ULOG target support"
-	depends on IP_NF_IPTABLES
-	---help---
-	  This option adds a `ULOG' target, which allows you to create rules in
-	  any iptables table. The packet is passed to a userspace logging
-	  daemon using netlink multicast sockets; unlike the LOG target
-	  which can only be viewed through syslog.
 
-	  The apropriate userspace logging daemon (ulogd) may be obtained from
-	  <http://www.gnumonks.org/projects/ulogd/>
-
-	  To compile it as a module, choose M here.  If unsure, say N.
-
-config IP_NF_TARGET_TCPMSS
-	tristate "TCPMSS target support"
-	depends on IP_NF_IPTABLES
-	---help---
-	  This option adds a `TCPMSS' target, which allows you to alter the
-	  MSS value of TCP SYN packets, to control the maximum size for that
-	  connection (usually limiting it to your outgoing interface's MTU
-	  minus 40).
-
-	  This is used to overcome criminally braindead ISPs or servers which
-	  block ICMP Fragmentation Needed packets.  The symptoms of this
-	  problem are that everything works fine from your Linux
-	  firewall/router, but machines behind it can never exchange large
-	  packets:
-	  	1) Web browsers connect, then hang with no data received.
-	  	2) Small mail works fine, but large emails hang.
-	  	3) ssh works fine, but scp hangs after initial handshaking.
-
-	  Workaround: activate this option and add a rule to your firewall
-	  configuration like:
-
-	  iptables -A FORWARD -p tcp --tcp-flags SYN,RST SYN \
-	  		 -j TCPMSS --clamp-mss-to-pmtu
-
-	  To compile it as a module, choose M here.  If unsure, say N.
-
+# ARP tables
 config IP_NF_ARPTABLES
 	tristate "ARP tables support"
 	help
@@ -578,88 +666,6 @@ config IP_NF_COMPAT_IPFWADM
 	  the ipfwadm tool exactly as in 2.0 kernels.
 
 	  To compile it as a module, choose M here.  If unsure, say N.
-
-config IP_NF_TARGET_NOTRACK
-	tristate  'NOTRACK target support'
-	depends on IP_NF_RAW
-	depends on IP_NF_CONNTRACK
-	help
-	  The NOTRACK target allows a select rule to specify
-	  which packets *not* to enter the conntrack/NAT
-	  subsystem with all the consequences (no ICMP error tracking,
-	  no protocol helpers for the selected packets).
-	
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
-
-config IP_NF_RAW
-	tristate  'raw table support (required for NOTRACK/TRACE)'
-	depends on IP_NF_IPTABLES
-	help
-	  This option adds a `raw' table to iptables. This table is the very
-	  first in the netfilter framework and hooks in at the PREROUTING
-	  and OUTPUT chains.
-	
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
-	  help
-
-config IP_NF_MATCH_ADDRTYPE
-	tristate  'address type match support'
-	depends on IP_NF_IPTABLES
-	help
-	  This option allows you to match what routing thinks of an address,
-	  eg. UNICAST, LOCAL, BROADCAST, ...
-	
-	  If you want to compile it as a module, say M here and read
-	  Documentation/modules.txt.  If unsure, say `N'.
-
-config IP_NF_MATCH_REALM
-	tristate  'realm match support'
-	depends on IP_NF_IPTABLES
-	select NET_CLS_ROUTE
-	help
-	  This option adds a `realm' match, which allows you to use the realm
-	  key from the routing subsytem inside iptables.
-	
-	  This match pretty much resembles the CONFIG_NET_CLS_ROUTE4 option 
-	  in tc world.
-	
-	  If you want to compile it as a module, say M here and read
-	  Documentation/modules.txt.  If unsure, say `N'.
-
-config IP_NF_CT_ACCT
-	bool "Connection tracking flow accounting"
-	depends on IP_NF_CONNTRACK
-	help
-	  If this option is enabled, the connection tracking code will
-	  keep per-flow packet and byte counters.
-
-	  Those counters can be used for flow-based accounting or the
-	  `connbytes' match.
-
-	  If unsure, say `N'.
-
-config IP_NF_MATCH_SCTP
-	tristate  'SCTP protocol match support'
-	depends on IP_NF_IPTABLES
-	help
-	  With this option enabled, you will be able to use the iptables
-	  `sctp' match in order to match on SCTP source/destination ports
-	  and SCTP chunk types.
-
-	  If you want to compile it as a module, say M here and read
-	  Documentation/modules.txt.  If unsure, say `N'.
-
-config IP_NF_CT_PROTO_SCTP
-	tristate  'SCTP protocol connection tracking support (EXPERIMENTAL)'
-	depends on IP_NF_CONNTRACK && EXPERIMENTAL
-	help
-	  With this option enabled, the connection tracking code will
-	  be able to do state tracking on SCTP connections.
-
-	  If you want to compile it as a module, say M here and read
-	  Documentation/modules.txt.  If unsure, say `N'.
 
 endmenu
 
