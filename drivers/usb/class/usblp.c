@@ -54,7 +54,6 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/lp.h>
-#include <linux/devfs_fs_kernel.h>
 #undef DEBUG
 #include <linux/usb.h>
 
@@ -109,11 +108,7 @@ MFG:HEWLETT-PACKARD;MDL:DESKJET 970C;CMD:MLC,PCL,PML;CLASS:PRINTER;DESCRIPTION:H
 #define USBLP_REQ_RESET				0x02
 #define USBLP_REQ_HP_CHANNEL_CHANGE_REQUEST	0x00	/* HP Vendor-specific */
 
-#ifdef CONFIG_USB_DYNAMIC_MINORS
-#define USBLP_MINORS		256
-#else
 #define USBLP_MINORS		16
-#endif
 #define USBLP_MINOR_BASE	0
 
 #define USBLP_WRITE_TIMEOUT	(5*HZ)			/* 5 seconds */
@@ -324,7 +319,7 @@ static int usblp_open(struct inode *inode, struct file *file)
 	struct usb_interface *intf;
 	int retval;
 
-	if (minor < 0 || minor >= USBLP_MINORS)
+	if (minor < 0)
 		return -ENODEV;
 
 	lock_kernel();
@@ -380,8 +375,6 @@ out:
 
 static void usblp_cleanup (struct usblp *usblp)
 {
-	devfs_remove ("usb/lp%d", usblp->minor);
-	usb_deregister_dev (1, usblp->minor);
 	info("usblp%d: removed", usblp->minor);
 
 	usb_buffer_free (usblp->dev, USBLP_BUF_SIZE,
@@ -809,6 +802,13 @@ static struct file_operations usblp_fops = {
 	.release =	usblp_release,
 };
 
+static struct usb_class_driver usblp_class = {
+	.name =		"usb/lp%d",
+	.fops =		&usblp_fops,
+	.mode =		S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP,
+	.minor_base =	USBLP_MINOR_BASE,
+};
+
 static int usblp_probe(struct usb_interface *intf,
 		       const struct usb_device_id *id)
 {
@@ -816,7 +816,6 @@ static int usblp_probe(struct usb_interface *intf,
 	struct usblp *usblp = 0;
 	int protocol;
 	int retval;
-	char name[10];
 
 	/* Malloc and start initializing usblp structure so we can use it
 	 * directly. */
@@ -830,11 +829,12 @@ static int usblp_probe(struct usb_interface *intf,
 	init_waitqueue_head(&usblp->wait);
 	usblp->ifnum = intf->altsetting->desc.bInterfaceNumber;
 
-	retval = usb_register_dev(&usblp_fops, USBLP_MINOR_BASE, 1, &usblp->minor);
+	retval = usb_register_dev(intf, &usblp_class);
 	if (retval) {
 		err("Not able to get a minor for this device.");
 		goto abort;
 	}
+	usblp->minor = intf->minor;
 
 	usblp->writeurb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!usblp->writeurb) {
@@ -904,13 +904,6 @@ static int usblp_probe(struct usb_interface *intf,
 	usblp_check_status(usblp, 0);
 #endif
 
-	/* If we have devfs, create with perms=660. */
-	sprintf(name, "usb/lp%d", usblp->minor);
-	devfs_register(NULL, name, 0, USB_MAJOR,
-				      usblp->minor,
-				      S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP |
-				      S_IWGRP, &usblp_fops, NULL);
-
 	info("usblp%d: USB %sdirectional printer dev %d "
 		"if %d alt %d proto %d vid 0x%4.4X pid 0x%4.4X",
 		usblp->minor, usblp->bidir ? "Bi" : "Uni", dev->devnum,
@@ -920,12 +913,11 @@ static int usblp_probe(struct usb_interface *intf,
 		usblp->dev->descriptor.idProduct);
 
 	usb_set_intfdata (intf, usblp);
-	intf->minor = usblp->minor;
 
 	return 0;
 
 abort_minor:
-	usb_deregister_dev (1, usblp->minor);
+	usb_deregister_dev(intf, &usblp_class);
 abort:
 	if (usblp) {
 		if (usblp->writebuf)
@@ -1106,8 +1098,7 @@ static void usblp_disconnect(struct usb_interface *intf)
 {
 	struct usblp *usblp = usb_get_intfdata (intf);
 
-	/* remove device id to disable open() */
-	intf->minor = -1;
+	usb_deregister_dev(intf, &usblp_class);
 
 	if (!usblp || !usblp->dev) {
 		err("bogus disconnect");
