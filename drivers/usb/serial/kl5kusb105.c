@@ -105,6 +105,11 @@ static void klsi_105_unthrottle		 (struct usb_serial_port *port);
 static void klsi_105_break_ctl	         (struct usb_serial_port *port,
 					  int break_state );
  */
+static int  klsi_105_tiocmget	         (struct usb_serial_port *port,
+					  struct file *file);
+static int  klsi_105_tiocmset	         (struct usb_serial_port *port,
+					  struct file *file, unsigned int set,
+					  unsigned int clear);
 
 /*
  * All of the device info needed for the KLSI converters.
@@ -143,6 +148,8 @@ static struct usb_serial_device_type kl5kusb105d_device = {
 	.ioctl =	     klsi_105_ioctl,
 	.set_termios =	     klsi_105_set_termios,
 	/*.break_ctl =	     klsi_105_break_ctl,*/
+	.tiocmget =          klsi_105_tiocmget,
+	.tiocmset =          klsi_105_tiocmset,
 	.attach =	     klsi_105_startup,
 	.shutdown =	     klsi_105_shutdown,
 	.throttle =	     klsi_105_throttle,
@@ -879,68 +886,67 @@ static void mct_u232_break_ctl( struct usb_serial_port *port, int break_state )
 } /* mct_u232_break_ctl */
 #endif
 
-static int klsi_105_ioctl (struct usb_serial_port *port, struct file * file,
-			   unsigned int cmd, unsigned long arg)
+static int klsi_105_tiocmget (struct usb_serial_port *port, struct file *file)
 {
 	struct usb_serial *serial = port->serial;
 	struct klsi_105_private *priv = usb_get_serial_port_data(port);
-	int mask;
 	unsigned long flags;
+	int rc;
+	unsigned long line_state;
+	dbg("%s - request, just guessing", __FUNCTION__);
+
+	rc = klsi_105_get_line_state(serial, &line_state);
+	if (rc < 0) {
+		err("Reading line control failed (error = %d)", rc);
+		/* better return value? EAGAIN? */
+		return rc;
+	}
+
+	spin_lock_irqsave (&priv->lock, flags);
+	priv->line_state = line_state;
+	spin_unlock_irqrestore (&priv->lock, flags);
+	dbg("%s - read line state 0x%lx", __FUNCTION__, line_state);
+	return (int)line_state;
+}
+
+static int klsi_105_tiocmset (struct usb_serial_port *port, struct file *file,
+			      unsigned int set, unsigned int clear)
+{
+	int retval = -EINVAL;
+	
+	dbg("%s", __FUNCTION__);
+
+/* if this ever gets implemented, it should be done something like this:
+	struct usb_serial *serial = port->serial;
+	struct klsi_105_private *priv = usb_get_serial_port_data(port);
+	unsigned long flags;
+	int control;
+
+	spin_lock_irqsave (&priv->lock, flags);
+	if (set & TIOCM_RTS)
+		priv->control_state |= TIOCM_RTS;
+	if (set & TIOCM_DTR)
+		priv->control_state |= TIOCM_DTR;
+	if (clear & TIOCM_RTS)
+		priv->control_state &= ~TIOCM_RTS;
+	if (clear & TIOCM_DTR)
+		priv->control_state &= ~TIOCM_DTR;
+	control = priv->control_state;
+	spin_unlock_irqrestore (&priv->lock, flags);
+	retval = mct_u232_set_modem_ctrl(serial, control);
+*/
+	return retval;
+}
+					
+static int klsi_105_ioctl (struct usb_serial_port *port, struct file * file,
+			   unsigned int cmd, unsigned long arg)
+{
+	struct klsi_105_private *priv = usb_get_serial_port_data(port);
 	
 	dbg("%scmd=0x%x", __FUNCTION__, cmd);
 
 	/* Based on code from acm.c and others */
 	switch (cmd) {
-	case TIOCMGET: {
-		int rc;
-		unsigned long line_state;
-		dbg("%s - TIOCMGET request, just guessing", __FUNCTION__);
-
-		rc = klsi_105_get_line_state(serial, &line_state);
-		if (rc < 0) {
-			err("Reading line control failed (error = %d)", rc);
-			/* better return value? EAGAIN? */
-			return -ENOIOCTLCMD;
-		}
-		spin_lock_irqsave (&priv->lock, flags);
-		priv->line_state = line_state;
-		spin_unlock_irqrestore (&priv->lock, flags);
-		dbg("%s - read line state 0x%lx", __FUNCTION__, line_state);
-		return put_user(line_state, (unsigned long *) arg); 
-	       };
-
-	case TIOCMSET: /* Turns on and off the lines as specified by the mask */
-	case TIOCMBIS: /* turns on (Sets) the lines as specified by the mask */
-	case TIOCMBIC: /* turns off (Clears) the lines as specified by the mask */
-		if (get_user(mask, (unsigned long *) arg))
-			return -EFAULT;
-
-		if ((cmd == TIOCMSET) || (mask & TIOCM_RTS)) {
-			/* RTS needs set */
-			if( ((cmd == TIOCMSET) && (mask & TIOCM_RTS)) ||
-			    (cmd == TIOCMBIS) )
-				dbg("%s - set RTS not handled", __FUNCTION__);
-				/* priv->control_state |=  TIOCM_RTS; */
-			else
-				dbg("%s - clear RTS not handled", __FUNCTION__);
-				/* priv->control_state &= ~TIOCM_RTS; */
-		}
-
-		if ((cmd == TIOCMSET) || (mask & TIOCM_DTR)) {
-			/* DTR needs set */
-			if( ((cmd == TIOCMSET) && (mask & TIOCM_DTR)) ||
-			    (cmd == TIOCMBIS) )
-				dbg("%s - set DTR not handled", __FUNCTION__);
-			/*	priv->control_state |=  TIOCM_DTR; */
-			else
-				dbg("%s - clear DTR not handled", __FUNCTION__);
-				/* priv->control_state &= ~TIOCM_DTR; */
-		}
-		/*
-		mct_u232_set_modem_ctrl(serial, priv->control_state);
-		*/
-		break;
-					
 	case TIOCMIWAIT:
 		/* wait for any of the 4 modem inputs (DCD,RI,DSR,CTS)*/
 		/* TODO */

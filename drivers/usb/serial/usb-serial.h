@@ -251,6 +251,8 @@ struct usb_serial_device_type {
 	int  (*chars_in_buffer)	(struct usb_serial_port *port);
 	void (*throttle)	(struct usb_serial_port *port);
 	void (*unthrottle)	(struct usb_serial_port *port);
+	int  (*tiocmget)	(struct usb_serial_port *port, struct file *file);
+	int  (*tiocmset)	(struct usb_serial_port *port, struct file *file, unsigned int set, unsigned int clear);
 
 	void (*read_int_callback)(struct urb *urb, struct pt_regs *regs);
 	void (*read_bulk_callback)(struct urb *urb, struct pt_regs *regs);
