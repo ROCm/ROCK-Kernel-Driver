@@ -50,9 +50,9 @@ static void isa_unmask_pic_lo_irq(unsigned int irq)
 }
 
 static struct irqchip isa_lo_chip = {
-	ack:	isa_ack_pic_lo_irq,
-	mask:	isa_mask_pic_lo_irq,
-	unmask:	isa_unmask_pic_lo_irq,
+	.ack	= isa_ack_pic_lo_irq,
+	.mask	= isa_mask_pic_lo_irq,
+	.unmask = isa_unmask_pic_lo_irq,
 };
 
 static void isa_mask_pic_hi_irq(unsigned int irq)
@@ -79,9 +79,9 @@ static void isa_unmask_pic_hi_irq(unsigned int irq)
 }
 
 static struct irqchip isa_hi_chip = {
-	ack:	isa_ack_pic_hi_irq,
-	mask:	isa_mask_pic_hi_irq,
-	unmask:	isa_unmask_pic_hi_irq,
+	.ack	= isa_ack_pic_hi_irq,
+	.mask	= isa_mask_pic_hi_irq,
+	.unmask = isa_unmask_pic_hi_irq,
 };
 
 static void no_action(int irq, void *dev_id, struct pt_regs *regs)

@@ -57,7 +57,7 @@ static void simpad_uart_pm(struct uart_port *port, u_int state, u_int oldstate)
 }
 
 static struct sa1100_port_fns simpad_port_fns __initdata = {
-	pm:	simpad_uart_pm,
+	.pm	= simpad_uart_pm,
 };
 
 static void __init simpad_map_io(void)

@@ -54,9 +54,9 @@ static void lubbock_unmask_irq(unsigned int irq)
 }
 
 static struct irqchip lubbock_irq_chip = {
-	ack:		lubbock_ack_irq,
-	mask:		lubbock_mask_irq,
-	unmask:		lubbock_unmask_irq,
+	.ack		= lubbock_ack_irq,
+	.mask		= lubbock_mask_irq,
+	.unmask		= lubbock_unmask_irq,
 };
 
 void lubbock_irq_handler(unsigned int irq, struct irqdesc *desc,

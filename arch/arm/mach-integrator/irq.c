@@ -48,9 +48,9 @@ static void sc_unmask_irq(unsigned int irq)
 }
 
 static struct irqchip sc_chip = {
-	ack:	sc_mask_irq,
-	mask:	sc_mask_irq,
-	unmask:	sc_unmask_irq,
+	.ack	= sc_mask_irq,
+	.mask	= sc_mask_irq,
+	.unmask = sc_unmask_irq,
 };
  
 void __init integrator_init_irq(void)

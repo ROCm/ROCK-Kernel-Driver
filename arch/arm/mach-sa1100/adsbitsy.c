@@ -100,7 +100,7 @@ static int adsbitsy_uart_open(struct uart_port *port, struct uart_info *info)
 }
 
 static struct sa1100_port_fns adsbitsy_port_fns __initdata = {
-	open:	adsbitsy_uart_open,
+	.open	= adsbitsy_uart_open,
 };
 
 static void __init adsbitsy_map_io(void)

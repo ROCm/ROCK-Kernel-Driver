@@ -58,9 +58,9 @@ static void iop310_irq_unmask (unsigned int irq)
 }
 
 struct irqchip ext_chip = {
-	ack:	iop310_irq_mask,
-	mask:	iop310_irq_mask,
-	unmask:	iop310_irq_unmask,
+	.ack	= iop310_irq_mask,
+	.mask	= iop310_irq_mask,
+	.unmask = iop310_irq_unmask,
 };
 
 void

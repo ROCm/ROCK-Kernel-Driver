@@ -67,9 +67,9 @@ static void gc_unmask_irq1(unsigned int irq)
 }
 
 static struct irqchip gc_irq1_chip = {
-	ack:	gc_mask_irq1,
-	mask:	gc_mask_irq1,
-	unmask:	gc_unmask_irq1,
+	.ack	= gc_mask_irq1,
+	.mask	= gc_mask_irq1,
+	.unmask = gc_unmask_irq1,
 };
 
 static void gc_mask_irq2(unsigned int irq)
@@ -85,9 +85,9 @@ static void gc_unmask_irq2(unsigned int irq)
 }
 
 static struct irqchip gc_irq2_chip = {
-	ack:	gc_mask_irq2,
-	mask:	gc_mask_irq2,
-	unmask:	gc_unmask_irq2,
+	.ack	= gc_mask_irq2,
+	.mask	= gc_mask_irq2,
+	.unmask = gc_unmask_irq2,
 };
 
 static void __init graphicsclient_init_irq(void)
@@ -178,9 +178,9 @@ graphicsclient_uart_pm(struct uart_port *port, u_int state, u_int oldstate)
 }
 
 static struct sa1100_port_fns graphicsclient_port_fns __initdata = {
-	get_mctrl:	graphicsclient_get_mctrl,
-	set_mctrl:	graphicsclient_set_mctrl,
-	pm:		graphicsclient_uart_pm,
+	.get_mctrl	= graphicsclient_get_mctrl,
+	.set_mctrl	= graphicsclient_set_mctrl,
+	.pm		= graphicsclient_uart_pm,
 };
 
 static void __init graphicsclient_map_io(void)

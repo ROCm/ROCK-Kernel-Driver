@@ -63,9 +63,9 @@ static void int1_unmask(unsigned int irq)
 }
 
 static struct irqchip int1_chip = {
-	ack:	int1_ack,
-	mask:	int1_mask,
-	unmask:	int1_unmask,
+	.ack	= int1_ack,
+	.mask	= int1_mask,
+	.unmask = int1_unmask,
 };
 
 static void int2_mask(unsigned int irq)
@@ -100,9 +100,9 @@ static void int2_unmask(unsigned int irq)
 }
 
 static struct irqchip int2_chip = {
-	ack:	int2_ack,
-	mask:	int2_mask,
-	unmask:	int2_unmask,
+	.ack	= int2_ack,
+	.mask	= int2_mask,
+	.unmask = int2_unmask,
 };
 
 void __init clps711x_init_irq(void)

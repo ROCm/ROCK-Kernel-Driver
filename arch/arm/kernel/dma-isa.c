@@ -133,10 +133,10 @@ static void isa_disable_dma(dmach_t channel, dma_t *dma)
 }
 
 static struct dma_ops isa_dma_ops = {
-	type:		"ISA",
-	enable:		isa_enable_dma,
-	disable:	isa_disable_dma,
-	residue:	isa_get_dma_residue,
+	.type		= "ISA",
+	.enable		= isa_enable_dma,
+	.disable	= isa_disable_dma,
+	.residue	= isa_get_dma_residue,
 };
 
 static struct resource dma_resources[] = {

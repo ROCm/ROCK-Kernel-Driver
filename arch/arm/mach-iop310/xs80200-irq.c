@@ -47,9 +47,9 @@ static void xs80200_irq_unmask (unsigned int irq)
 }
 
 static struct irqchip xs80200_chip = {
-	ack:	xs80200_irq_mask,
-	mask:	xs80200_irq_mask,
-	unmask:	xs80200_irq_unmask,
+	.ack	= xs80200_irq_mask,
+	.mask	= xs80200_irq_mask,
+	.unmask = xs80200_irq_unmask,
 };
 
 void __init xs80200_init_irq(void)

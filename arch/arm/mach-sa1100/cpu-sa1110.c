@@ -51,53 +51,53 @@ struct sdram_info {
 };
 
 static struct sdram_params tc59sm716_cl2_params __initdata = {
-	rows:		    12,
-	tck:		    10,
-	trcd:		    20,
-	trp:		    20,
-	twr:		    10,
-	refresh:	 64000,
-	cas_latency:	     2,
+	.rows			= 12,
+	.tck			= 10,
+	.trcd			= 20,
+	.trp			= 20,
+	.twr			= 10,
+	.refresh		= 64000,
+	.cas_latency		= 2,
 };
 
 static struct sdram_params tc59sm716_cl3_params __initdata = {
-	rows:		    12,
-	tck:		     8,
-	trcd:		    20,
-	trp:		    20,
-	twr:		     8,
-	refresh:	 64000,
-	cas_latency:	     3,
+	.rows			= 12,
+	.tck			= 8,
+	.trcd			= 20,
+	.trp			= 20,
+	.twr			= 8,
+	.refresh		= 64000,
+	.cas_latency		= 3,
 };
 
 static struct sdram_params samsung_k4s641632d_tc75 __initdata = {
-	rows:		    14,
-	tck:		     9,
-	trcd:		    27,
-	trp:		    20,
-	twr:		     9,
-	refresh:	 64000,
-	cas_latency:	     3,
+	.rows			= 14,
+	.tck			= 9,
+	.trcd			= 27,
+	.trp			= 20,
+	.twr			= 9,
+	.refresh		= 64000,
+	.cas_latency		= 3,
 };
 
 static struct sdram_params samsung_km416s4030ct __initdata = {
-	rows:		    13,
-	tck:		     8,
-	trcd:		    24,	/* 3 CLKs */
-	trp:		    24,	/* 3 CLKs */
-	twr:		    16,	/* Trdl: 2 CLKs */
-	refresh:	 64000,
-	cas_latency:	     3,
+	.rows			= 13,
+	.tck			= 8,
+	.trcd			= 24,	/* 3 CLKs */
+	.trp			= 24,	/* 3 CLKs */
+	.twr			= 16,	/* Trdl: 2 CLKs */
+	.refresh		= 64000,
+	.cas_latency		= 3,
 };
 
 static struct sdram_params wbond_w982516ah75l_cl3_params __initdata = {
-	rows:		    16,
-	tck:		     8,
-	trcd:		    20,
-	trp:		    20,
-	twr:		     8,
-	refresh:	 64000,
-	cas_latency:	     3,
+	.rows			= 16,
+	.tck			= 8,
+	.trcd			= 20,
+	.trp			= 20,
+	.twr			= 8,
+	.refresh		= 64000,
+	.cas_latency		= 3,
 };
 
 static struct sdram_params sdram_params;

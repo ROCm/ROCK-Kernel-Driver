@@ -41,9 +41,9 @@ static void iq80310_irq_unmask(unsigned int irq)
 }
 
 static struct irqchip iq80310_irq_chip = {
-	ack:	iq80310_irq_mask,
-	mask:	iq80310_irq_mask,
-	unmask:	iq80310_irq_unmask,
+	.ack	= iq80310_irq_mask,
+	.mask	= iq80310_irq_mask,
+	.unmask = iq80310_irq_unmask,
 };
 
 extern struct irqchip ext_chip;

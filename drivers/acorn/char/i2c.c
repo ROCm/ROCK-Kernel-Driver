@@ -200,13 +200,13 @@ static int rtc_ioctl(struct inode *inode, struct file *file,
 }
 
 static struct file_operations rtc_fops = {
-	ioctl:	rtc_ioctl,
+	.ioctl	= rtc_ioctl,
 };
 
 static struct miscdevice rtc_dev = {
-	minor:	RTC_MINOR,
-	name:	"rtc",
-	fops:	&rtc_fops,
+	.minor	= RTC_MINOR,
+	.name	= "rtc",
+	.fops	= &rtc_fops,
 };
 
 /* IOC / IOMD i2c driver */
@@ -264,13 +264,13 @@ static int ioc_getsda(void *data)
 }
 
 static struct i2c_algo_bit_data ioc_data = {
-	setsda:		ioc_setsda,
-	setscl:		ioc_setscl,
-	getsda:		ioc_getsda,
-	getscl:		ioc_getscl,
-	udelay:		 80,
-	mdelay:		 80,
-	timeout:	100
+	.setsda		= ioc_setsda,
+	.setscl		= ioc_setscl,
+	.getsda		= ioc_getsda,
+	.getscl		= ioc_getscl,
+	.udelay		= 80,
+	.mdelay		= 80,
+	.timeout	= 100
 };
 
 static int ioc_client_reg(struct i2c_client *client)
@@ -303,11 +303,11 @@ static int ioc_client_unreg(struct i2c_client *client)
 }
 
 static struct i2c_adapter ioc_ops = {
-	name:			"IOC/IOMD",
-	id:			I2C_HW_B_IOC,
-	algo_data:		&ioc_data,
-	client_register:	ioc_client_reg,
-	client_unregister:	ioc_client_unreg
+	.name			= "IOC/IOMD",
+	.id			= I2C_HW_B_IOC,
+	.algo_data		= &ioc_data,
+	.client_register	= ioc_client_reg,
+	.client_unregister	= ioc_client_unreg
 };
 
 static int __init i2c_ioc_init(void)

@@ -1255,25 +1255,25 @@ void xd_set_geometry(struct block_device *bdev, unsigned char secsptrack,
 
 static struct gendisk mfm_gendisk[2] = {
 {
-	major:		MAJOR_NR,
-	first_minor:	0,
-	major_name:	"mfm",
-	minor_shift:	6,
-	part:		mfm,
+	.major		= MAJOR_NR,
+	.first_minor	= 0,
+	.major_name	= "mfm",
+	.minor_shift	= 6,
+	.part		= mfm,
 },
 {
-	major:		MAJOR_NR,
-	first_minor:	64,
-	major_name:	"mfm",
-	minor_shift:	6,
-	part:		mfm + 64,
+	.major		= MAJOR_NR,
+	.first_minor	= 64,
+	.major_name	= "mfm",
+	.minor_shift	= 6,
+	.part		= mfm + 64,
 };
 
 static struct block_device_operations mfm_fops =
 {
-	owner:		THIS_MODULE,
-	open:		mfm_open,
-	ioctl:		mfm_ioctl,
+	.owner		= THIS_MODULE,
+	.open		= mfm_open,
+	.ioctl		= mfm_ioctl,
 };
 
 static void mfm_geninit (void)

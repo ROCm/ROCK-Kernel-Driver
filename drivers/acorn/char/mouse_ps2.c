@@ -250,12 +250,12 @@ static unsigned int aux_poll(struct file *file, poll_table * wait)
 }
 
 struct file_operations psaux_fops = {
-	read:		read_aux,
-	write:		write_aux,
-	poll:		aux_poll,
-	open:		open_aux,
-	release:	release_aux,
-	fasync:		fasync_aux,
+	.read		= read_aux,
+	.write		= write_aux,
+	.poll		= aux_poll,
+	.open		= open_aux,
+	.release	= release_aux,
+	.fasync		= fasync_aux,
 };
 
 /*

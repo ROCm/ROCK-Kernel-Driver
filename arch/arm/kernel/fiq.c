@@ -87,8 +87,8 @@ static int fiq_def_op(void *ref, int relinquish)
 }
 
 static struct fiq_handler default_owner = {
-	name:	"default",
-	fiq_op:	fiq_def_op,
+	.name	= "default",
+	.fiq_op = fiq_def_op,
 };
 
 static struct fiq_handler *current_fiq = &default_owner;

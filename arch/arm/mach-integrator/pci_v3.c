@@ -382,26 +382,26 @@ static int v3_write_config_dword(struct pci_dev *dev, int where, u32 val)
 }
 
 static struct pci_ops pci_v3_ops = {
-	read_byte:	v3_read_config_byte,
-	read_word:	v3_read_config_word,
-	read_dword:	v3_read_config_dword,
-	write_byte:	v3_write_config_byte,
-	write_word:	v3_write_config_word,
-	write_dword:	v3_write_config_dword,
+	.read_byte	= v3_read_config_byte,
+	.read_word	= v3_read_config_word,
+	.read_dword	= v3_read_config_dword,
+	.write_byte	= v3_write_config_byte,
+	.write_word	= v3_write_config_word,
+	.write_dword	= v3_write_config_dword,
 };
 
 static struct resource non_mem = {
-	name:	"PCI non-prefetchable",
-	start:	PHYS_PCI_MEM_BASE + PCI_BUS_NONMEM_START,
-	end:	PHYS_PCI_MEM_BASE + PCI_BUS_NONMEM_START + PCI_BUS_NONMEM_SIZE - 1,
-	flags:	IORESOURCE_MEM,
+	.name	= "PCI non-prefetchable",
+	.start	= PHYS_PCI_MEM_BASE + PCI_BUS_NONMEM_START,
+	.end	= PHYS_PCI_MEM_BASE + PCI_BUS_NONMEM_START + PCI_BUS_NONMEM_SIZE - 1,
+	.flags	= IORESOURCE_MEM,
 };
 
 static struct resource pre_mem = {
-	name:	"PCI prefetchable",
-	start:	PHYS_PCI_MEM_BASE + PCI_BUS_PREMEM_START,
-	end:	PHYS_PCI_MEM_BASE + PCI_BUS_PREMEM_START + PCI_BUS_PREMEM_SIZE - 1,
-	flags:	IORESOURCE_MEM | IORESOURCE_PREFETCH,
+	.name	= "PCI prefetchable",
+	.start	= PHYS_PCI_MEM_BASE + PCI_BUS_PREMEM_START,
+	.end	= PHYS_PCI_MEM_BASE + PCI_BUS_PREMEM_START + PCI_BUS_PREMEM_SIZE - 1,
+	.flags	= IORESOURCE_MEM | IORESOURCE_PREFETCH,
 };
 
 static int __init pci_v3_setup_resources(struct resource **resource)

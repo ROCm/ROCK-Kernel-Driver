@@ -110,23 +110,23 @@ static void arc_disable_dma(dmach_t channel, dma_t *dma)
 }
 
 static struct dma_ops arc_floppy_data_dma_ops = {
-	type:		"FIQDMA",
-	enable:		arc_floppy_data_enable_dma,
-	disable:	arc_disable_dma,
-	residue:	arc_floppy_data_get_dma_residue,
+	.type		= "FIQDMA",
+	.enable		= arc_floppy_data_enable_dma,
+	.disable	= arc_disable_dma,
+	.residue	= arc_floppy_data_get_dma_residue,
 };
 
 static struct dma_ops arc_floppy_cmdend_dma_ops = {
-	type:		"FIQCMD",
-	enable:		arc_floppy_cmdend_enable_dma,
-	disable:	arc_disable_dma,
-	residue:	arc_floppy_cmdend_get_dma_residue,
+	.type		= "FIQCMD",
+	.enable		= arc_floppy_cmdend_enable_dma,
+	.disable	= arc_disable_dma,
+	.residue	= arc_floppy_cmdend_get_dma_residue,
 };
 #endif
 
 #ifdef CONFIG_ARCH_A5K
 static struct fiq_handler fh = {
-	name:	"floppydata"
+	.name	= "floppydata"
 };
 
 static int a5k_floppy_get_dma_residue(dmach_t channel, dma_t *dma)
@@ -175,10 +175,10 @@ static void a5k_floppy_disable_dma(dmach_t channel, dma_t *dma)
 }
 
 static struct dma_ops a5k_floppy_dma_ops = {
-	type:		"FIQDMA",
-	enable:		a5k_floppy_enable_dma,
-	disable:	a5k_floppy_disable_dma,
-	residue:	a5k_floppy_get_dma_residue,
+	.type		= "FIQDMA",
+	.enable		= a5k_floppy_enable_dma,
+	.disable	= a5k_floppy_disable_dma,
+	.residue	= a5k_floppy_get_dma_residue,
 };
 #endif
 
@@ -190,9 +190,9 @@ static void sound_enable_disable_dma(dmach_t channel, dma_t *dma)
 }
 
 static struct dma_ops sound_dma_ops = {
-	type:		"VIRTUAL",
-	enable:		sound_enable_disable_dma,
-	disable:	sound_enable_disable_dma,
+	.type		= "VIRTUAL",
+	.enable		= sound_enable_disable_dma,
+	.disable	= sound_enable_disable_dma,
 };
 
 void __init arch_dma_init(dma_t *dma)

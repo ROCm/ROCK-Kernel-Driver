@@ -36,17 +36,17 @@ extern void integrator_init_irq(void);
 
 #ifdef CONFIG_KMI_KEYB
 static struct kmi_info integrator_keyboard __initdata = {
-	base:	IO_ADDRESS(KMI0_BASE),
-	irq:	IRQ_KMIINT0,
-	divisor: 24 / 8 - 1,
-	type:	KMI_KEYBOARD,
+	.base		= IO_ADDRESS(KMI0_BASE),
+	.irq		= IRQ_KMIINT0,
+	.divisor	= 24 / 8 - 1,
+	.type		= KMI_KEYBOARD,
 };
 
 static struct kmi_info integrator_mouse __initdata = {
-	base:	IO_ADDRESS(KMI1_BASE),
-	irq:	IRQ_KMIINT1,
-	divisor: 24 / 8 - 1,
-	type:	KMI_MOUSE,
+	.base		= IO_ADDRESS(KMI1_BASE),
+	.irq		= IRQ_KMIINT1,
+	.divisor	= 24 / 8 - 1,
+	.type		= KMI_MOUSE,
 };
 #endif
 

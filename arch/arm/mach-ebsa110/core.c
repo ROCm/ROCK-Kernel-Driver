@@ -42,9 +42,9 @@ static void ebsa110_unmask_irq(unsigned int irq)
 }
 
 static struct irqchip ebsa110_irq_chip = {
-	ack:	ebsa110_mask_irq,
-	mask:	ebsa110_mask_irq,
-	unmask:	ebsa110_unmask_irq,
+	.ack	= ebsa110_mask_irq,
+	.mask	= ebsa110_mask_irq,
+	.unmask = ebsa110_unmask_irq,
 };
  
 static void __init ebsa110_init_irq(void)

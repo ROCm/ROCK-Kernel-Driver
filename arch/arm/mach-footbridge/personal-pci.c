@@ -38,12 +38,12 @@ static int __init personal_server_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 }
 
 static struct hw_pci personal_server_pci __initdata = {
-	map_irq:		personal_server_map_irq,
-	nr_controllers:		1,
-	setup:			dc21285_setup,
-	scan:			dc21285_scan_bus,
-	preinit:		dc21285_preinit,
-	postinit:		dc21285_postinit,
+	.map_irq		= personal_server_map_irq,
+	.nr_controllers		= 1,
+	.setup			= dc21285_setup,
+	.scan			= dc21285_scan_bus,
+	.preinit		= dc21285_preinit,
+	.postinit		= dc21285_postinit,
 };
 
 static int __init personal_pci_init(void)

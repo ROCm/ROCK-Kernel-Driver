@@ -428,10 +428,10 @@ static int h3600_uart_set_wake(struct uart_port *port, u_int enable)
 }
 
 static struct sa1100_port_fns h3600_port_fns __initdata = {
-	set_mctrl:	h3600_uart_set_mctrl,
-	get_mctrl:	h3600_uart_get_mctrl,
-	pm:		h3600_uart_pm,
-	set_wake:	h3600_uart_set_wake,
+	.set_mctrl	= h3600_uart_set_mctrl,
+	.get_mctrl	= h3600_uart_get_mctrl,
+	.pm		= h3600_uart_pm,
+	.set_wake	= h3600_uart_set_wake,
 };
 
 static struct map_desc h3600_io_desc[] __initdata = {

@@ -119,8 +119,8 @@ static void iq80310_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 extern unsigned long (*gettimeoffset)(void);
 
 static struct irqaction timer_irq = {
-	name:		"timer",
-	handler:	iq80310_timer_interrupt,
+	.name		= "timer",
+	.handler	= iq80310_timer_interrupt,
 };
 
 

@@ -379,21 +379,21 @@ static void do_fd_request(request_queue_t *);
 /************************* End of Prototypes **************************/
 
 static struct timer_list motor_off_timer = {
-	function:	fd_motor_off_timer,
+	.function	= fd_motor_off_timer,
 };
 
 #ifdef TRACKBUFFER
 static struct timer_list readtrack_timer = {
-	function: 	fd_readtrack_check,
+	.function 	= fd_readtrack_check,
 };
 #endif
 
 static struct timer_list timeout_timer = {
-	function:	fd_times_out,
+	.function	= fd_times_out,
 };
 
 static struct timer_list fd_timer = {
-	function:	check_change,
+	.function	= check_change,
 };
 
 /* DAG: Haven't got a clue what this is? */
@@ -1548,11 +1548,11 @@ static int floppy_release(struct inode *inode, struct file *filp)
 
 static struct block_device_operations floppy_fops =
 {
-	open:			floppy_open,
-	release:		floppy_release,
-	ioctl:			fd_ioctl,
-	check_media_change:	check_floppy_change,
-	revalidate:		floppy_revalidate,
+	.open			= floppy_open,
+	.release		= floppy_release,
+	.ioctl			= fd_ioctl,
+	.check_media_change	= check_floppy_change,
+	.revalidate		= floppy_revalidate,
 };
 
 

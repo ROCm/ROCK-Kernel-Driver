@@ -147,11 +147,11 @@ static void iq80310_preinit(void)
 }
 
 static struct hw_pci iq80310_pci __initdata = {
-	swizzle:	pci_std_swizzle,
-	nr_controllers:	2,
-	setup:		iq80310_setup,
-	scan:		iop310_scan_bus,
-	preinit:	iq80310_preinit,
+	.swizzle	= pci_std_swizzle,
+	.nr_controllers = 2,
+	.setup		= iq80310_setup,
+	.scan		= iop310_scan_bus,
+	.preinit	= iq80310_preinit,
 };
 
 static int __init iq80310_pci_init(void)

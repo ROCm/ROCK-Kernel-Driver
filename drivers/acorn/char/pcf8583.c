@@ -23,13 +23,13 @@ static unsigned short ignore[] = { I2C_CLIENT_END };
 static unsigned short normal_addr[] = { 0x50, I2C_CLIENT_END };
 
 static struct i2c_client_address_data addr_data = {
-	normal_i2c:		normal_addr,
-	normal_i2c_range:	ignore,
-	probe:			ignore,
-	probe_range:		ignore,
-	ignore:			ignore,
-	ignore_range:		ignore,
-	force:			ignore,
+	.normal_i2c		= normal_addr,
+	.normal_i2c_range	= ignore,
+	.probe			= ignore,
+	.probe_range		= ignore,
+	.ignore			= ignore,
+	.ignore_range		= ignore,
+	.force			= ignore,
 };
 
 #define DAT(x) ((unsigned int)(x->data))
@@ -224,12 +224,12 @@ pcf8583_command(struct i2c_client *client, unsigned int cmd, void *arg)
 }
 
 static struct i2c_driver pcf8583_driver = {
-	name:		"PCF8583",
-	id:		I2C_DRIVERID_PCF8583,
-	flags:		I2C_DF_NOTIFY,
-	attach_adapter:	pcf8583_probe,
-	detach_client:	pcf8583_detach,
-	command:	pcf8583_command
+	.name		= "PCF8583",
+	.id		= I2C_DRIVERID_PCF8583,
+	.flags		= I2C_DF_NOTIFY,
+	.attach_adapter	= pcf8583_probe,
+	.detach_client	= pcf8583_detach,
+	.command	= pcf8583_command
 };
 
 static __init int pcf8583_init(void)

@@ -3120,22 +3120,22 @@ int acornscsi_proc_info(char *buffer, char **start, off_t offset,
 }
 
 static Scsi_Host_Template acornscsi_template = {
-	module:			THIS_MODULE,
-	proc_info:		acornscsi_proc_info,
-	name:			"AcornSCSI",
-	detect:			acornscsi_detect,
-	release:		acornscsi_release,
-	info:			acornscsi_info,
-	queuecommand:		acornscsi_queuecmd,
-	abort:			acornscsi_abort,
-	reset:			acornscsi_reset,
-	bios_param:		scsicam_bios_param,
-	can_queue:		16,
-	this_id:		7,
-	sg_tablesize:		SG_ALL,
-	cmd_per_lun:		2,
-	unchecked_isa_dma:	0,
-	use_clustering:		DISABLE_CLUSTERING
+	.module			= THIS_MODULE,
+	.proc_info		= acornscsi_proc_info,
+	.name			= "AcornSCSI",
+	.detect			= acornscsi_detect,
+	.release		= acornscsi_release,
+	.info			= acornscsi_info,
+	.queuecommand		= acornscsi_queuecmd,
+	.abort			= acornscsi_abort,
+	.reset			= acornscsi_reset,
+	.bios_param		= scsicam_bios_param,
+	.can_queue		= 16,
+	.this_id		= 7,
+	.sg_tablesize		= SG_ALL,
+	.cmd_per_lun		= 2,
+	.unchecked_isa_dma	= 0,
+	.use_clustering		= DISABLE_CLUSTERING
 };
 
 static int __init acornscsi_init(void)
