@@ -155,102 +155,6 @@ static int ramfs_create(struct inode *dir, struct dentry *dentry, int mode)
 	return ramfs_mknod(dir, dentry, mode | S_IFREG, 0);
 }
 
-/*
- * Link a file..
- */
-static int ramfs_link(struct dentry *old_dentry, struct inode * dir, struct dentry * dentry)
-{
-	struct inode *inode = old_dentry->d_inode;
-
-	inode->i_nlink++;
-	atomic_inc(&inode->i_count);	/* New dentry reference */
-	dget(dentry);		/* Extra pinning count for the created dentry */
-	d_instantiate(dentry, inode);
-	return 0;
-}
-
-static inline int ramfs_positive(struct dentry *dentry)
-{
-	return dentry->d_inode && !d_unhashed(dentry);
-}
-
-/*
- * Check that a directory is empty (this works
- * for regular files too, they'll just always be
- * considered empty..).
- *
- * Note that an empty directory can still have
- * children, they just all have to be negative..
- */
-static int ramfs_empty(struct dentry *dentry)
-{
-	struct list_head *list;
-
-	spin_lock(&dcache_lock);
-	list = dentry->d_subdirs.next;
-
-	while (list != &dentry->d_subdirs) {
-		struct dentry *de = list_entry(list, struct dentry, d_child);
-
-		if (ramfs_positive(de)) {
-			spin_unlock(&dcache_lock);
-			return 0;
-		}
-		list = list->next;
-	}
-	spin_unlock(&dcache_lock);
-	return 1;
-}
-
-/*
- * Unlink a ramfs entry
- */
-static int ramfs_unlink(struct inode * dir, struct dentry *dentry)
-{
-	struct inode *inode = dentry->d_inode;
-
-	inode->i_nlink--;
-	dput(dentry);			/* Undo the count from "create" - this does all the work */
-	return 0;
-}
-
-static int ramfs_rmdir(struct inode * dir, struct dentry *dentry)
-{
-	int retval = -ENOTEMPTY;
-
-	if (ramfs_empty(dentry)) {
-		dentry->d_inode->i_nlink--;
-		ramfs_unlink(dir, dentry);
-		dir->i_nlink--;
-		retval = 0;
-	}
-	return retval;
-}
-
-/*
- * The VFS layer already does all the dentry stuff for rename,
- * we just have to decrement the usage count for the target if
- * it exists so that the VFS layer correctly free's it when it
- * gets overwritten.
- */
-static int ramfs_rename(struct inode * old_dir, struct dentry *old_dentry, struct inode * new_dir,struct dentry *new_dentry)
-{
-	int error = -ENOTEMPTY;
-
-	if (ramfs_empty(new_dentry)) {
-		struct inode *inode = new_dentry->d_inode;
-		if (inode) {
-			inode->i_nlink--;
-			dput(new_dentry);
-		}
-		if (S_ISDIR(old_dentry->d_inode->i_mode)) {
-			old_dir->i_nlink--;
-			new_dir->i_nlink++;
-		}
-		error = 0;
-	}
-	return error;
-}
 
 static int ramfs_symlink(struct inode * dir, struct dentry *dentry, const char * symname)
 {
@@ -270,11 +174,6 @@ static int ramfs_symlink(struct inode * dir, struct dentry *dentry, const char *
 	return error;
 }
 
-static int ramfs_sync_file(struct file * file, struct dentry *dentry, int datasync)
-{
-	return 0;
-}
-
 static struct address_space_operations ramfs_aops = {
 	.readpage	= ramfs_readpage,
 	.writepage	= fail_writepage,
@@ -286,20 +185,20 @@ static struct file_operations ramfs_file_operations = {
 	.read		= generic_file_read,
 	.write		= generic_file_write,
 	.mmap		= generic_file_mmap,
-	.fsync		= ramfs_sync_file,
+	.fsync		= simple_sync_file,
 	.sendfile	= generic_file_sendfile,
 };
 
 static struct inode_operations ramfs_dir_inode_operations = {
 	.create		= ramfs_create,
 	.lookup		= simple_lookup,
-	.link		= ramfs_link,
-	.unlink		= ramfs_unlink,
+	.link		= simple_link,
+	.unlink		= simple_unlink,
 	.symlink	= ramfs_symlink,
 	.mkdir		= ramfs_mkdir,
-	.rmdir		= ramfs_rmdir,
+	.rmdir		= simple_rmdir,
 	.mknod		= ramfs_mknod,
-	.rename		= ramfs_rename,
+	.rename		= simple_rename,
 };
 
 static struct super_operations ramfs_ops = {
