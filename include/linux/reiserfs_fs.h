@@ -1822,9 +1822,13 @@ void reiserfs_read_inode (struct inode * inode) ;
 void reiserfs_read_inode2(struct inode * inode, void *p) ;
 void reiserfs_delete_inode (struct inode * inode);
 void reiserfs_write_inode (struct inode * inode, int) ;
-struct dentry *reiserfs_fh_to_dentry(struct super_block *sb, __u32 *data,
-									 int len, int fhtype, int parent);
-int reiserfs_dentry_to_fh(struct dentry *dentry, __u32 *data, int *lenp, int need_parent);
+struct dentry *reiserfs_get_dentry(struct super_block *, void *) ;
+struct dentry *reiserfs_decode_fh(struct super_block *sb, __u32 *data,
+                                     int len, int fhtype,
+				  int (*acceptable)(void *contect, struct dentry *de),
+				  void *context) ;
+int reiserfs_encode_fh( struct dentry *dentry, __u32 *data, int *lenp, 
+						int connectable );
 
 int reiserfs_prepare_write(struct file *, struct page *, unsigned, unsigned) ;
 void reiserfs_truncate_file(struct inode *, int update_timestamps) ;
@@ -1849,6 +1853,7 @@ inline void set_de_name_and_namelen (struct reiserfs_dir_entry * de);
 int search_by_entry_key (struct super_block * sb, const struct cpu_key * key, 
 			 struct path * path, 
 			 struct reiserfs_dir_entry * de);
+struct dentry *reiserfs_get_parent(struct dentry *) ;
 /* procfs.c */
 
 #if defined( CONFIG_PROC_FS ) && defined( CONFIG_REISERFS_PROC_INFO )

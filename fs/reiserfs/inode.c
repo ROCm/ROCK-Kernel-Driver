@@ -1251,11 +1251,39 @@ struct inode * reiserfs_iget (struct super_block * s, const struct cpu_key * key
     return inode;
 }
 
-struct dentry *reiserfs_fh_to_dentry(struct super_block *sb, __u32 *data,
-				     int len, int fhtype, int parent) {
+struct dentry *reiserfs_get_dentry(struct super_block *sb, void *vobjp)
+{
+    __u32 *data = vobjp;
     struct cpu_key key ;
-    struct inode *inode = NULL ;
     struct dentry *result;
+    struct inode *inode;
+    
+    key.on_disk_key.k_objectid = data[0] ;
+    key.on_disk_key.k_dir_id = data[1] ;
+    inode = reiserfs_iget(sb, &key) ;
+    if (inode && !IS_ERR(inode) && data[2] != 0 &&
+	data[2] != inode->i_generation) {
+	    iput(inode) ;
+	    inode = NULL ;
+    }
+    if (!inode)
+	    inode = ERR_PTR(-ESTALE);
+    if (IS_ERR(inode))
+	    return ERR_PTR(PTR_ERR(inode));
+    result = d_alloc_anon(inode);
+    if (!result) {
+	    iput(inode);
+	    return ERR_PTR(-ENOMEM);
+    }
+    result->d_vfs_flags |= DCACHE_REFERENCED;
+    return result;
+}
+
+struct dentry *reiserfs_decode_fh(struct super_block *sb, __u32 *data,
+                                     int len, int fhtype,
+				  int (*acceptable)(void *contect, struct dentry *de),
+				  void *context) {
+    __u32 obj[3], parent[3];
 
     /* fhtype happens to reflect the number of u32s encoded.
      * due to a bug in earlier code, fhtype might indicate there
@@ -1275,51 +1303,25 @@ struct dentry *reiserfs_fh_to_dentry(struct super_block *sb, __u32 *data,
 			   fhtype, len);
 	    fhtype = 5;
     }
-    if (fhtype < 2 || (parent && fhtype < 4)) 
-	goto out ;
 
-    if (! parent) {
-	    /* this works for handles from old kernels because the default
-	    ** reiserfs generation number is the packing locality.
-	    */
-	    key.on_disk_key.k_objectid = data[0] ;
-	    key.on_disk_key.k_dir_id = data[1] ;
-	    inode = reiserfs_iget(sb, &key) ;
-	    if (inode && !IS_ERR(inode) && (fhtype == 3 || fhtype >= 5) &&
-		data[2] != inode->i_generation) {
-		    iput(inode) ;
-		    inode = NULL ;
-	    }
-    } else {
-	    key.on_disk_key.k_objectid = data[fhtype>=5?3:2] ;
-	    key.on_disk_key.k_dir_id = data[fhtype>=5?4:3] ;
-	    inode = reiserfs_iget(sb, &key) ;
-	    if (inode && !IS_ERR(inode) && fhtype == 6 &&
-		data[5] != inode->i_generation) {
-		    iput(inode) ;
-		    inode = NULL ;
-	    }
+    obj[0] = data[0];
+    obj[1] = data[1];
+    if (fhtype == 3 || fhtype >= 5)
+	    obj[2] = data[2];
+    else    obj[2] = 0; /* generation number */
+
+    if (fhtype >= 4) {
+	    parent[0] = data[fhtype>=5?3:2] ;
+	    parent[1] = data[fhtype>=5?4:3] ;
+	    if (fhtype == 6)
+		    parent[2] = data[5];
+	    else    parent[2] = 0;
     }
-out:
-    if (IS_ERR(inode))
-	return ERR_PTR(PTR_ERR(inode));
-    if (!inode)
-        return ERR_PTR(-ESTALE) ;
-
-    /* now to find a dentry.
-     * If possible, get a well-connected one
-     */
-    result = d_alloc_anon(inode);
-    if (result == NULL) {
-	    iput(inode);
-	    return ERR_PTR(-ENOMEM);
-    }
-    result->d_vfs_flags |= DCACHE_REFERENCED;
-    return result;
-
+    return sb->s_export_op->find_exported_dentry(sb, obj, fhtype < 4 ? NULL : parent,
+			       acceptable, context);
 }
 
-int reiserfs_dentry_to_fh(struct dentry *dentry, __u32 *data, int *lenp, int need_parent) {
+int reiserfs_encode_fh(struct dentry *dentry, __u32 *data, int *lenp, int need_parent) {
     struct inode *inode = dentry->d_inode ;
     int maxlen = *lenp;
     
