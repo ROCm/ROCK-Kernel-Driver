@@ -476,13 +476,19 @@ restart:
 	BACKTRACK();
 
 	if (!rt->rt6i_nexthop && !(rt->rt6i_flags & RTF_NONEXTHOP)) {
+		struct rt6_info *nrt;
+		dst_hold(&rt->u.dst);
 		read_unlock_bh(&rt6_lock);
 
-		rt = rt6_cow(rt, &skb->nh.ipv6h->daddr,
-			     &skb->nh.ipv6h->saddr);
-			
+		nrt = rt6_cow(rt, &skb->nh.ipv6h->daddr,
+			      &skb->nh.ipv6h->saddr);
+
+		dst_release(&rt->u.dst);
+		rt = nrt;
+
 		if (rt->u.dst.error != -EEXIST || --attempts <= 0)
 			goto out2;
+
 		/* Race condition! In the gap, when rt6_lock was
 		   released someone could insert this route.  Relookup.
 		*/
@@ -531,9 +537,14 @@ restart:
 	}
 
 	if (!rt->rt6i_nexthop && !(rt->rt6i_flags & RTF_NONEXTHOP)) {
+		struct rt6_info *nrt;
+		dst_hold(&rt->u.dst);
 		read_unlock_bh(&rt6_lock);
 
-		rt = rt6_cow(rt, &fl->fl6_dst, &fl->fl6_src);
+		nrt = rt6_cow(rt, &fl->fl6_dst, &fl->fl6_src);
+
+		dst_release(&rt->u.dst);
+		rt = nrt;
 
 		if (rt->u.dst.error != -EEXIST || --attempts <= 0)
 			goto out2;
