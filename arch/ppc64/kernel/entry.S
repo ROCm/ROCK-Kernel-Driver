@@ -122,7 +122,7 @@ SystemCall_common:
 	andi.	r11,r10,_TIF_SYSCALL_T_OR_A
 	bne-	syscall_dotrace
 syscall_dotrace_cont:
-	cmpli	0,r0,NR_syscalls
+	cmpldi	0,r0,NR_syscalls
 	bge-	syscall_enosys
 
 system_call:			/* label this so stack traces look sane */
@@ -204,7 +204,7 @@ syscall_enosys:
 
 syscall_error:
 	lbz	r11,TI_SC_NOERR(r12)
-	cmpi	0,r11,0
+	cmpwi	0,r11,0
 	bne-	syscall_error_cont
 	neg	r3,r3
 	oris	r5,r5,0x1000	/* Set SO bit in CR */
