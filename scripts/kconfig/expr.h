@@ -97,7 +97,7 @@ struct symbol {
 #define SYMBOL_HASHMASK		0xff
 
 enum prop_type {
-	P_UNKNOWN, P_PROMPT, P_COMMENT, P_MENU, P_ROOTMENU, P_DEFAULT, P_CHOICE
+	P_UNKNOWN, P_PROMPT, P_COMMENT, P_MENU, P_DEFAULT, P_CHOICE
 };
 
 struct property {
@@ -137,6 +137,7 @@ struct menu {
 };
 
 #define MENU_CHANGED		0x0001
+#define MENU_ROOT		0x0002
 
 #ifndef SWIG
 

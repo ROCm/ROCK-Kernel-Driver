@@ -616,8 +616,6 @@ const char *prop_get_type_name(enum prop_type type)
 		return "comment";
 	case P_MENU:
 		return "menu";
-	case P_ROOTMENU:
-		return "rootmenu";
 	case P_DEFAULT:
 		return "default";
 	case P_CHOICE:

@@ -164,8 +164,6 @@ const char *dbg_print_ptype(int val)
 		strcpy(buf, "comment");
 	if (val == P_MENU)
 		strcpy(buf, "menu");
-	if (val == P_ROOTMENU)
-		strcpy(buf, "rootmenu");
 	if (val == P_DEFAULT)
 		strcpy(buf, "default");
 	if (val == P_CHOICE)
@@ -798,7 +796,7 @@ void on_back_pressed(GtkButton * button, gpointer user_data)
 
 	current = current->parent;
 	ptype = current->prompt ? current->prompt->type : P_UNKNOWN;
-	if ((ptype != P_ROOTMENU) && (ptype != P_MENU))
+	if (ptype != P_MENU)
 		current = current->parent;
 	display_tree_part();
 
@@ -836,6 +834,8 @@ void on_split_clicked(GtkButton * button, gpointer user_data)
 	gtk_widget_show(tree1_w);
 	gtk_window_get_default_size(GTK_WINDOW(main_wnd), &w, &h);
 	gtk_paned_set_position(GTK_PANED(hpaned), w / 2);
+	if (tree2)	
+		gtk_tree_store_clear(tree2);
 	display_list();
 }
 
@@ -922,8 +922,10 @@ static void change_sym_value(struct menu *menu, gint col)
 		config_changed = TRUE;
 		if (view_mode == FULL_VIEW)
 			update_tree(&rootmenu, NULL);
-		else if (view_mode == SPLIT_VIEW)
+		else if (view_mode == SPLIT_VIEW) {
 			update_tree(current, NULL);
+			display_list();
+		}
 		else if (view_mode == SINGLE_VIEW)
 			display_tree_part();	//fixme: keep exp/coll
 		break;
@@ -949,8 +951,10 @@ static void toggle_sym_value(struct menu *menu)
 	sym_set_tristate_value(menu->sym, newval);
 	if (view_mode == FULL_VIEW)
 		update_tree(&rootmenu, NULL);
-	else if (view_mode == SPLIT_VIEW)
+	else if (view_mode == SPLIT_VIEW) {
 		update_tree(current, NULL);
+		display_list();
+	}
 	else if (view_mode == SINGLE_VIEW)
 		display_tree_part();	//fixme: keep exp/coll
 }
@@ -1035,8 +1039,7 @@ on_treeview2_button_press_event(GtkWidget * widget,
 		enum prop_type ptype;
 		ptype = menu->prompt ? menu->prompt->type : P_UNKNOWN;
 
-		if (((ptype == P_MENU) || (ptype == P_ROOTMENU)) &&
-		    (view_mode == SINGLE_VIEW) && (col == COL_OPTION)) {
+		if (ptype == P_MENU && view_mode != FULL_VIEW && col == COL_OPTION) {
 			// goes down into menu
 			current = menu;
 			display_tree_part();
@@ -1192,7 +1195,6 @@ static gchar **fill_row(struct menu *menu)
 	ptype = menu->prompt ? menu->prompt->type : P_UNKNOWN;
 	switch (ptype) {
 	case P_MENU:
-	case P_ROOTMENU:
 		row[COL_PIXBUF] = (gchar *) xpm_menu;
 		if (view_mode != FULL_VIEW)
 			row[COL_PIXVIS] = GINT_TO_POINTER(TRUE);
@@ -1477,11 +1479,11 @@ static void display_tree(struct menu *menu)
 		if (sym)
 			sym->flags &= ~SYMBOL_CHANGED;
 
-		if ((view_mode == SPLIT_VIEW) && (ptype != P_ROOTMENU) &&
+		if ((view_mode == SPLIT_VIEW) && !(child->flags & MENU_ROOT) &&
 		    (tree == tree1))
 			continue;
 
-		if ((view_mode == SPLIT_VIEW) && (ptype == P_ROOTMENU) &&
+		if ((view_mode == SPLIT_VIEW) && (child->flags & MENU_ROOT) &&
 		    (tree == tree2))
 			continue;
 
@@ -1503,7 +1505,7 @@ static void display_tree(struct menu *menu)
 		    && (tree == tree2))
 			continue;
 
-		if (((menu != &rootmenu) && (ptype != P_ROOTMENU)) ||
+		if (((menu != &rootmenu) && !(menu->flags & MENU_ROOT)) ||
 		    (view_mode == FULL_VIEW)
 		    || (view_mode == SPLIT_VIEW)) {
 			indent++;
@@ -1525,8 +1527,6 @@ static void display_tree_part(void)
 /* Display the list in the left frame (split view) */
 static void display_list(void)
 {
-	if (tree2)
-		gtk_tree_store_clear(tree2);
 	if (tree1)
 		gtk_tree_store_clear(tree1);
 
@@ -1542,7 +1542,7 @@ static void fixup_rootmenu(struct menu *menu)
 
 	if (!menu->prompt || menu->prompt->type != P_MENU)
 		return;
-	menu->prompt->type = P_ROOTMENU;
+	menu->flags |= MENU_ROOT;
 	for (child = menu->list; child; child = child->next)
 		fixup_rootmenu(child);
 }

@@ -65,11 +65,11 @@ void ConfigList::updateMenuList(P* parent, struct menu* menu)
 
 		switch (mode) {
 		case menuMode:
-			if (type != P_ROOTMENU)
+			if (!(child->flags & MENU_ROOT))
 				goto hide;
 			break;
 		case symbolMode:
-			if (type == P_ROOTMENU)
+			if (child->flags & MENU_ROOT)
 				goto hide;
 			break;
 		default:
@@ -83,8 +83,7 @@ void ConfigList::updateMenuList(P* parent, struct menu* menu)
 			else
 				item->testUpdateMenu(visible);
 
-			if (mode == fullMode || mode == menuMode ||
-			    (type != P_MENU && type != P_ROOTMENU))
+			if (mode == fullMode || mode == menuMode || type != P_MENU)
 				updateMenuList(item, child);
 			else
 				updateMenuList(item, 0);
@@ -140,7 +139,6 @@ void ConfigItem::updateMenu(void)
 
 	if (prop) switch (prop->type) {
 	case P_MENU:
-	case P_ROOTMENU:
 		if (list->mode == singleMode || list->mode == symbolMode) {
 			/* a menuconfig entry is displayed differently
 			 * depending whether it's at the view root or a child.
@@ -172,6 +170,7 @@ void ConfigItem::updateMenu(void)
 		char ch;
 
 		if (!sym_is_changable(sym) && !list->showAll) {
+			setPixmap(promptColIdx, 0);
 			setText(noColIdx, 0);
 			setText(modColIdx, 0);
 			setText(yesColIdx, 0);
@@ -288,7 +287,7 @@ void ConfigItem::init(void)
 ConfigItem::~ConfigItem(void)
 {
 	if (menu) {
-		ConfigItem** ip = &(ConfigItem*)menu->data;
+		ConfigItem** ip = (ConfigItem**)&menu->data;
 		for (; *ip; ip = &(*ip)->nextItem) {
 			if (*ip == this) {
 				*ip = nextItem;
@@ -333,7 +332,7 @@ ConfigList::ConfigList(ConfigView* p, ConfigMainWindow* cv)
 	  updateAll(false),
 	  symbolYesPix(xpm_symbol_yes), symbolModPix(xpm_symbol_mod), symbolNoPix(xpm_symbol_no),
 	  choiceYesPix(xpm_choice_yes), choiceNoPix(xpm_choice_no),
-	  menuPix(xpm_menu), menuInvPix(xpm_menu_inv), menuBackPix(xpm_menuback),
+	  menuPix(xpm_menu), menuInvPix(xpm_menu_inv), menuBackPix(xpm_menuback), voidPix(xpm_void),
 	  showAll(false), showName(false), showRange(false), showData(false),
 	  rootEntry(0)
 {
@@ -392,7 +391,7 @@ void ConfigList::updateSelection(void)
 	if (!menu)
 		return;
 	type = menu->prompt ? menu->prompt->type : P_UNKNOWN;
-	if (mode == menuMode && (type == P_MENU || type == P_ROOTMENU))
+	if (mode == menuMode && type == P_MENU)
 		emit menuSelected(menu);
 }
 
@@ -403,7 +402,8 @@ void ConfigList::updateList(ConfigItem* item)
 	if (!rootEntry)
 		goto update;
 
-	if ((mode == singleMode || mode == symbolMode) && rootEntry != &rootmenu) {
+	if (rootEntry != &rootmenu && (mode == singleMode ||
+	    (mode == symbolMode && rootEntry->parent != &rootmenu))) {
 		item = firstChild();
 		if (!item)
 			item = new ConfigItem(this, 0, true);
@@ -507,7 +507,7 @@ void ConfigList::setRootMenu(struct menu *menu)
 	if (rootEntry == menu)
 		return;
 	type = menu && menu->prompt ? menu->prompt->type : P_UNKNOWN;
-	if (type != P_MENU && type != P_ROOTMENU)
+	if (type != P_MENU)
 		return;
 	updateMenuList(this, 0);
 	rootEntry = menu;
@@ -518,13 +518,12 @@ void ConfigList::setRootMenu(struct menu *menu)
 void ConfigList::setParentMenu(void)
 {
 	ConfigItem* item;
-	struct menu *oldroot, *newroot;
+	struct menu *oldroot;
 
 	oldroot = rootEntry;
-	newroot = menu_get_parent_menu(oldroot);
-	if (newroot == oldroot)
+	if (rootEntry == &rootmenu)
 		return;
-	setRootMenu(newroot);
+	setRootMenu(menu_get_parent_menu(rootEntry->parent));
 
 	QListViewItemIterator it(this);
 	for (; (item = (ConfigItem*)it.current()); it++) {
@@ -566,7 +565,8 @@ void ConfigList::keyPressEvent(QKeyEvent* ev)
 		if (!menu)
 			break;
 		type = menu->prompt ? menu->prompt->type : P_UNKNOWN;
-		if ((type == P_MENU || type == P_ROOTMENU) && mode != fullMode) {
+		if (type == P_MENU && rootEntry != menu &&
+		    mode != fullMode && mode != menuMode) {
 			emit menuSelected(menu);
 			break;
 		}
@@ -601,6 +601,7 @@ void ConfigList::contentsMouseReleaseEvent(QMouseEvent* e)
 	QPoint p(contentsToViewport(e->pos()));
 	ConfigItem* item = (ConfigItem*)itemAt(p);
 	struct menu *menu;
+	enum prop_type ptype;
 	const QPixmap* pm;
 	int idx, x;
 
@@ -617,14 +618,17 @@ void ConfigList::contentsMouseReleaseEvent(QMouseEvent* e)
 			int off = header()->sectionPos(0) + itemMargin() +
 				treeStepSize() * (item->depth() + (rootIsDecorated() ? 1 : 0));
 			if (x >= off && x < off + pm->width()) {
-				if (item->goParent)
+				if (item->goParent) {
 					emit parentSelected();
-				else if (!menu)
 					break;
-				else if (menu->sym)
-					changeValue(item);
-				else
+				} else if (!menu)
+					break;
+				ptype = menu->prompt ? menu->prompt->type : P_UNKNOWN;
+				if (ptype == P_MENU && rootEntry != menu &&
+				    mode != fullMode && mode != menuMode)
 					emit menuSelected(menu);
+				else
+					changeValue(item);
 			}
 		}
 		break;
@@ -671,8 +675,7 @@ void ConfigList::contentsMouseDoubleClickEvent(QMouseEvent* e)
 	if (!menu)
 		goto skip;
 	ptype = menu->prompt ? menu->prompt->type : P_UNKNOWN;
-	if ((ptype == P_ROOTMENU || ptype == P_MENU) &&
-	    (mode == singleMode || mode == symbolMode))
+	if (ptype == P_MENU && (mode == singleMode || mode == symbolMode))
 		emit menuSelected(menu);
 	else if (menu->sym)
 		changeValue(item);
@@ -880,7 +883,6 @@ ConfigMainWindow::ConfigMainWindow(void)
 	connect(menuList, SIGNAL(gotFocus(void)),
 		SLOT(listFocusChanged(void)));
 
-	//showFullView();
 	showSplitView();
 }
 
@@ -1133,6 +1135,8 @@ void ConfigMainWindow::setShowName(bool b)
 		return;
 	configList->showName = b;
 	configList->reinit();
+	menuList->showName = b;
+	menuList->reinit();
 }
 
 void ConfigMainWindow::setShowRange(bool b)
@@ -1141,6 +1145,8 @@ void ConfigMainWindow::setShowRange(bool b)
 		return;
 	configList->showRange = b;
 	configList->reinit();
+	menuList->showRange = b;
+	menuList->reinit();
 }
 
 void ConfigMainWindow::setShowData(bool b)
@@ -1149,6 +1155,8 @@ void ConfigMainWindow::setShowData(bool b)
 		return;
 	configList->showData = b;
 	configList->reinit();
+	menuList->showData = b;
+	menuList->reinit();
 }
 
 /*
@@ -1206,12 +1214,25 @@ void ConfigMainWindow::showAbout(void)
 void fixup_rootmenu(struct menu *menu)
 {
 	struct menu *child;
+	static int menu_cnt = 0;
 
-	if (!menu->prompt || menu->prompt->type != P_MENU)
-		return;
-	menu->prompt->type = P_ROOTMENU;
-	for (child = menu->list; child; child = child->next)
-		fixup_rootmenu(child);
+	menu->flags |= MENU_ROOT;
+	for (child = menu->list; child; child = child->next) {
+		if (child->prompt && child->prompt->type == P_MENU) {
+			menu_cnt++;
+			fixup_rootmenu(child);
+			menu_cnt--;
+		} else if (!menu_cnt)
+			fixup_rootmenu(child);
+	}
+}
+
+static const char *progname;
+
+static void usage(void)
+{
+	printf("%s <config>\n", progname);
+	exit(0);
 }
 
 int main(int ac, char** av)
@@ -1223,23 +1244,23 @@ int main(int ac, char** av)
 	kconfig_load();
 #endif
 
+	progname = av[0];
 	configApp = new QApplication(ac, av);
 #if QT_VERSION >= 300
 	configSettings = new QSettings;
 #endif
 	if (ac > 1 && av[1][0] == '-') {
 		switch (av[1][1]) {
-		case 'a':
-			//showAll = 1;
-			break;
 		case 'h':
 		case '?':
-			printf("%s <config>\n", av[0]);
-			exit(0);
+			usage();
 		}
 		name = av[2];
 	} else
 		name = av[1];
+	if (!name)
+		usage();
+
 	conf_parse(name);
 	fixup_rootmenu(&rootmenu);
 	conf_read(NULL);
