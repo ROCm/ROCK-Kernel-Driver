@@ -433,6 +433,7 @@ xfs_write(
 	xfs_fsize_t	n, limit = XFS_MAX_FILE_OFFSET;
 	xfs_iocore_t	*io;
 	vnode_t		*vp;
+	struct iovec	iov;
 	int		iolock;
 	int		direct = file->f_flags & O_DIRECT;
 	int		eventsent = 0;
@@ -571,7 +572,10 @@ retry:
 		xfs_inval_cached_pages(vp, &xip->i_iocore, *offset, 1, 1);
 	}
 
-	ret = generic_file_write_nolock(file, buf, size, offset);
+	iov.iov_base = (void *)buf;
+	iov.iov_len = size;
+
+	ret = generic_file_write_nolock(file, &iov, 1, offset);
 
 	if ((ret == -ENOSPC) &&
 	    DM_EVENT_ENABLED(vp->v_vfsp, xip, DM_EVENT_NOSPACE) &&
