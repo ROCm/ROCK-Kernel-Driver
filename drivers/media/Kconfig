@@ -49,5 +49,11 @@ config VIDEO_BTCX
 	default VIDEO_BT848
 	depends on VIDEO_DEV
 
+config VIDEO_IR
+	tristate
+	default y if VIDEO_BT848=y || VIDEO_SAA7134=y
+	default m if VIDEO_BT848=m || VIDEO_SAA7134=m
+	depends on VIDEO_DEV
+
 endmenu
 
