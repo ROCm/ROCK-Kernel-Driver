@@ -2664,6 +2664,32 @@ static int snd_usb_create_quirk(snd_usb_audio_t *chip,
 
 
 /*
+ * common proc files to show the usb device info
+ */
+static void proc_audio_usbbus_read(snd_info_entry_t *entry, snd_info_buffer_t *buffer)
+{
+	snd_usb_audio_t *chip = snd_magic_cast(snd_usb_audio_t, entry->private_data, return);
+	if (! chip->shutdown)
+		snd_iprintf(buffer, "%03d/%03d\n", chip->dev->bus->busnum, chip->dev->devnum);
+}
+
+static void proc_audio_usbid_read(snd_info_entry_t *entry, snd_info_buffer_t *buffer)
+{
+	snd_usb_audio_t *chip = snd_magic_cast(snd_usb_audio_t, entry->private_data, return);
+	if (! chip->shutdown)
+		snd_iprintf(buffer, "%04x:%04x\n", chip->dev->descriptor.idVendor, chip->dev->descriptor.idProduct);
+}
+
+static void snd_usb_audio_create_proc(snd_usb_audio_t *chip)
+{
+	snd_info_entry_t *entry;
+	if (! snd_card_proc_new(chip->card, "usbbus", &entry))
+		snd_info_set_text_ops(entry, chip, 1024, proc_audio_usbbus_read);
+	if (! snd_card_proc_new(chip->card, "usbid", &entry))
+		snd_info_set_text_ops(entry, chip, 1024, proc_audio_usbid_read);
+}
+
+/*
  * free the chip instance
  *
  * here we have to do not much, since pcm and controls are already freed
@@ -2760,6 +2786,8 @@ static int snd_usb_audio_create(snd_card_t *card, struct usb_device *dev,
 
 	if (len < sizeof(card->longname))
 		usb_make_path(dev, card->longname + len, sizeof(card->longname) - len);
+
+	snd_usb_audio_create_proc(chip);
 
 	*rchip = chip;
 	return 0;
