@@ -226,8 +226,6 @@ static int ati_configure(void)
 	OUTREG32(ati_generic_private.registers, ATI_GART_BASE,
 		 agp_bridge->gatt_bus_addr);
 
-	/* Flush the tlb */
-	OUTREG32(ati_generic_private.registers, ATI_GART_CACHE_CNTRL, 1);
 	return 0;
 }
 
