@@ -160,6 +160,9 @@ config ACPI_ASUS
           display brightness and output, switching the LCD backlight on and off,
           and most importantly, allows you to blink those fancy LEDs intended
           for reporting mail and wireless status.
+
+	  Note: display switching code is currently considered EXPERIMENTAL,
+	  toying with these values may even lock your machine.
           
           All settings are changed via /proc/acpi/asus directory entries. Owner
           and group for these entries can be set with asus_uid and asus_gid

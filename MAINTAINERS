@@ -284,6 +284,16 @@ P:	Jonathan Layes
 L:	linux-net@vger.kernel.org
 S:	Maintained
 
+ASUS ACPI EXTRAS DRIVER
+P:	Karol Kozimor
+M:	sziwan@users.sourceforge.net
+P:	Julien Lerouge
+M:	julien.lerouge@free.fr
+L:	acpi4asus-user@lists.sourceforge.net
+W:	http://sourceforge.net/projects/acpi4asus
+W:	http://julien.lerouge.free.fr
+S:	Maintained
+
 ATM
 P:	Chas Williams
 M:	chas@cmf.nrl.navy.mil
