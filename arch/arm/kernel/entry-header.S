@@ -63,13 +63,7 @@
 #define S_OFF		8
 
 	.macro	set_cpsr_c, reg, mode
-#if 1
-	/* broken binutils */
-	mov	\reg, \mode
-	msr	cpsr_c, \reg
-#else
 	msr	cpsr_c, \mode
-#endif
 	.endm
 
 	.macro	disable_irq, temp
