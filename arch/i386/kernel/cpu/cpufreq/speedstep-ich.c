@@ -322,6 +322,10 @@ static int speedstep_cpu_exit(struct cpufreq_policy *policy)
 	return 0;
 }
 
+static unsigned int speedstep_get(unsigned int cpu)
+{
+	return speedstep_get_processor_frequency(speedstep_processor);
+}
 
 static struct freq_attr* speedstep_attr[] = {
 	&cpufreq_freq_attr_scaling_available_freqs,
@@ -335,6 +339,7 @@ static struct cpufreq_driver speedstep_driver = {
 	.target 	= speedstep_target,
 	.init		= speedstep_cpu_init,
 	.exit		= speedstep_cpu_exit,
+	.get		= speedstep_get,
 	.owner		= THIS_MODULE,
 	.attr		= speedstep_attr,
 };
