@@ -418,7 +418,7 @@ static ssize_t do_readv_writev(int type, struct file *file,
 		if (len < 0)	/* size_t not fitting an ssize_t .. */
 			goto out;
 		tot_len += len;
-		if (tot_len < tmp) /* maths overflow on the ssize_t */
+		if ((ssize_t)tot_len < tmp) /* maths overflow on the ssize_t */
 			goto out;
 	}
 	if (tot_len == 0) {
