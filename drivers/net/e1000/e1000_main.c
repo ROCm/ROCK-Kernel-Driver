@@ -494,11 +494,27 @@ e1000_probe(struct pci_dev *pdev,
 	 * enable the ACPI Magic Packet filter
 	 */
 
-	e1000_read_eeprom(&adapter->hw, EEPROM_INIT_CONTROL2_REG,1, &eeprom_data);
-	if((adapter->hw.mac_type >= e1000_82544) &&
-	   (eeprom_data & E1000_EEPROM_APME))
+	switch(adapter->hw.mac_type) {
+	case e1000_82542_rev2_0:
+	case e1000_82542_rev2_1:
+	case e1000_82543:
+		break;
+	case e1000_82546:
+	case e1000_82546_rev_3:
+		if((E1000_READ_REG(&adapter->hw, STATUS) & E1000_STATUS_FUNC_1)
+		   && (adapter->hw.media_type == e1000_media_type_copper)) {
+			e1000_read_eeprom(&adapter->hw,
+				EEPROM_INIT_CONTROL3_PORT_B, 1, &eeprom_data);
+			break;
+		}
+		/* Fall Through */
+	default:
+		e1000_read_eeprom(&adapter->hw,
+			EEPROM_INIT_CONTROL3_PORT_A, 1, &eeprom_data);
+		break;
+	}
+	if(eeprom_data & E1000_EEPROM_APME)
 		adapter->wol |= E1000_WUFC_MAG;
-
 
 	/* reset the hardware with the new settings */
 
