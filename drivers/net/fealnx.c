@@ -622,7 +622,7 @@ static int __devinit fealnx_init_one(struct pci_dev *pdev,
 		np->phys[0] = 32;
 /* 89/6/23 add, (begin) */
 		/* get phy type */
-		if (readl(dev->base_addr + PHYIDENTIFIER) == MysonPHYID)
+		if (readl(ioaddr + PHYIDENTIFIER) == MysonPHYID)
 			np->PHYType = MysonPHY;
 		else
 			np->PHYType = OtherPHY;
@@ -657,7 +657,7 @@ static int __devinit fealnx_init_one(struct pci_dev *pdev,
 		if (np->flags == HAS_MII_XCVR)
 			mdio_write(dev, np->phys[0], MII_ADVERTISE, ADVERTISE_FULL);
 		else
-			writel(ADVERTISE_FULL, dev->base_addr + ANARANLPAR);
+			writel(ADVERTISE_FULL, ioaddr + ANARANLPAR);
 		np->mii.force_media = 1;
 	}
 
@@ -957,7 +957,7 @@ static int netdev_open(struct net_device *dev)
 	if (dev->if_port == 0)
 		dev->if_port = np->default_port;
 
-	writel(0, dev->base_addr + RXPDR);
+	writel(0, ioaddr + RXPDR);
 // 89/9/1 modify,
 //   np->crvalue = 0x00e40001;    /* tx store and forward, tx/rx enable */
 	np->crvalue |= 0x00e40001;	/* tx store and forward, tx/rx enable */
@@ -1227,13 +1227,13 @@ static void tx_timeout(struct net_device *dev)
 
 	writel(np->bcrvalue, ioaddr + BCR);
 
-	writel(0, dev->base_addr + RXPDR);
+	writel(0, ioaddr + RXPDR);
 	set_rx_mode(dev);
 	/* Clear and Enable interrupts by setting the interrupt mask. */
 	writel(FBE | TUNF | CNTOVF | RBU | TI | RI, ioaddr + ISR);
 	writel(np->imrvalue, ioaddr + IMR);
 
-	writel(0, dev->base_addr + TXPDR);
+	writel(0, ioaddr + TXPDR);
 
 	dev->trans_start = jiffies;
 	np->stats.tx_errors++;
@@ -1421,16 +1421,14 @@ static irqreturn_t intr_handler(int irq, void *dev_instance, struct pt_regs *rgs
 {
 	struct net_device *dev = (struct net_device *) dev_instance;
 	struct netdev_private *np = dev->priv;
-	long ioaddr, boguscnt = max_interrupt_work;
+	long ioaddr = dev->base_addr;
+	long boguscnt = max_interrupt_work;
 	unsigned int num_tx = 0;
 	int handled = 0;
 
 	spin_lock(&np->lock);
 
-	writel(0, dev->base_addr + IMR);
-
-	ioaddr = dev->base_addr;
-	np = dev->priv;
+	writel(0, ioaddr + IMR);
 
 	do {
 		u32 intr_status = readl(ioaddr + ISR);
