@@ -695,12 +695,19 @@ try_to_free_pages(struct zone *classzone,
 }
 
 /*
- * kswapd will work across all this node's zones until they are all at
- * pages_high.
+ * For kswapd, balance_pgdat() will work across all this node's zones until
+ * they are all at pages_high.
+ *
+ * If `nr_pages' is non-zero then it is the number of pages which are to be
+ * reclaimed, regardless of the zone occupancies.  This is a software suspend
+ * special.
+ *
+ * Returns the number of pages which were actually freed.
  */
-static void kswapd_balance_pgdat(pg_data_t *pgdat)
+static int balance_pgdat(pg_data_t *pgdat, int nr_pages)
 {
-	int priority = DEF_PRIORITY;
+	int to_free = nr_pages;
+	int priority;
 	int i;
 
 	for (priority = DEF_PRIORITY; priority; priority--) {
@@ -713,20 +720,23 @@ static void kswapd_balance_pgdat(pg_data_t *pgdat)
 			int to_reclaim;
 
 			to_reclaim = zone->pages_high - zone->free_pages;
+			if (nr_pages && to_free > 0)
+				to_reclaim = min(to_free, SWAP_CLUSTER_MAX*8);
 			if (to_reclaim <= 0)
 				continue;
 			success = 0;
 			max_scan = zone->nr_inactive >> priority;
 			if (max_scan < to_reclaim * 2)
 				max_scan = to_reclaim * 2;
-			shrink_zone(zone, max_scan, GFP_KSWAPD,
+			to_free -= shrink_zone(zone, max_scan, GFP_KSWAPD,
 					to_reclaim, &nr_mapped);
 			shrink_slab(max_scan + nr_mapped, GFP_KSWAPD);
 		}
 		if (success)
-			break;	/* All zones are at pages_high */
+			break;
 		blk_congestion_wait(WRITE, HZ/4);
 	}
+	return nr_pages - to_free;
 }
 
 /*
@@ -773,10 +783,34 @@ int kswapd(void *p)
 		prepare_to_wait(&pgdat->kswapd_wait, &wait, TASK_INTERRUPTIBLE);
 		schedule();
 		finish_wait(&pgdat->kswapd_wait, &wait);
-		kswapd_balance_pgdat(pgdat);
+		balance_pgdat(pgdat, 0);
 		blk_run_queues();
 	}
 }
+
+#ifdef CONFIG_SOFTWARE_SUSPEND
+/*
+ * Try to free `nr_pages' of memory, system-wide.  Returns the number of freed
+ * pages.
+ */
+int shrink_all_memory(int nr_pages)
+{
+	pg_data_t *pgdat;
+	int nr_to_free = nr_pages;
+	int ret = 0;
+
+	for_each_pgdat(pgdat) {
+		int freed;
+
+		freed = balance_pgdat(pgdat, nr_to_free);
+		ret += freed;
+		nr_to_free -= freed;
+		if (nr_to_free <= 0)
+			break;
+	}
+	return ret;
+}
+#endif
 
 static int __init kswapd_init(void)
 {
