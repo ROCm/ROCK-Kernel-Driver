@@ -336,7 +336,7 @@ static int eth_configure(int n, void *init, char *mac,
 	snprintf(dev->name, sizeof(dev->name), "eth%d", n);
 	device->dev = dev;
 
-        dev->hard_header = uml_net_hard_header;
+//        dev->hard_header = uml_net_hard_header;
         dev->rebuild_header = uml_net_rebuild_header;
         dev->hard_header_cache = uml_net_header_cache;
         dev->header_cache_update= uml_net_header_cache_update;
