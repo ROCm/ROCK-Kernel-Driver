@@ -436,6 +436,11 @@ int		xfs_syncsub(xfs_mount_t *, int, int, int *);
 void		xfs_initialize_perag(xfs_mount_t *, int);
 void		xfs_xlatesb(void *, struct xfs_sb *, int, xfs_arch_t, __int64_t);
 
+int		xfs_blkdev_get(const char *, struct block_device **);
+void		xfs_blkdev_put(struct block_device *);
+struct xfs_buftarg *xfs_alloc_buftarg(struct block_device *);
+void		xfs_free_buftarg(struct xfs_buftarg *);
+
 /*
  * Flags for freeze operations.
  */

@@ -392,22 +392,53 @@ xfs_finish_flags(
 }
 
 /*
- * xfs_cmountfs
+ * xfs_mount
  *
- * This function is the common mount file system function for XFS.
+ * The file system configurations are:
+ *	(1) device (partition) with data and internal log
+ *	(2) logical volume with data and log subvolumes.
+ *	(3) logical volume with data, log, and realtime subvolumes.
+ *
+ * The Linux VFS took care of finding and opening the data volume for
+ * us.  We have to handle the other two (if present) here.
  */
 STATIC int
-xfs_cmountfs(
+xfs_mount(
 	vfs_t			*vfsp,
-	dev_t			ddev,
-	dev_t			logdev,
-	dev_t			rtdev,
-	struct xfs_mount_args	*ap,
-	struct cred		*cr)
+	struct xfs_mount_args	*args,
+	cred_t			*credp)
 {
 	xfs_mount_t		*mp;
+	struct block_device	*ddev, *logdev, *rtdev;
 	int			ronly = (vfsp->vfs_flag & VFS_RDONLY);
 	int			error = 0;
+
+	ddev = vfsp->vfs_super->s_bdev;
+	logdev = rtdev = NULL;
+
+	/*
+	 * Open real time and log devices - order is important.
+	 */
+	if (args->logname[0]) {
+		error = xfs_blkdev_get(args->logname, &logdev);
+		if (error)
+			return error;
+	}
+	if (args->rtname[0]) {
+		error = xfs_blkdev_get(args->rtname, &rtdev);
+		if (error) {
+			xfs_blkdev_put(logdev);
+			return error;
+		}
+
+		if (rtdev == ddev || rtdev == logdev) {
+			cmn_err(CE_WARN,
+	"XFS: Cannot mount filesystem with identical rtdev and ddev/logdev.");
+			xfs_blkdev_put(logdev);
+			xfs_blkdev_put(rtdev);
+			return EINVAL;
+		}
+	}
 
 	/*
 	 * Allocate VFS private data (xfs mount structure).
@@ -416,118 +447,57 @@ xfs_cmountfs(
 
 	vfs_insertbhv(vfsp, &mp->m_bhv, &xfs_vfsops, mp);
 
-	/*
-	 * Open data, real time, and log devices now - order is important.
-	 */
-	mp->m_ddev_targp = pagebuf_lock_enable(ddev, 0);
-	if (IS_ERR(mp->m_ddev_targp)) {
-		error = PTR_ERR(mp->m_ddev_targp);
-		goto error2;
+	mp->m_ddev_targp = xfs_alloc_buftarg(ddev);
+	if (rtdev != NULL) {
+		mp->m_rtdev_targp = xfs_alloc_buftarg(rtdev);
+		set_blocksize(rtdev, 512);
 	}
-
-	if (rtdev != 0) {
-		mp->m_rtdev_targp = pagebuf_lock_enable(rtdev, 1);
-		if (IS_ERR(mp->m_rtdev_targp)) {
-			error = PTR_ERR(mp->m_rtdev_targp);
-			pagebuf_lock_disable(mp->m_ddev_targp, 0);
-			goto error2;
-		}
-
-		if (rtdev == ddev || rtdev == logdev) {
-			cmn_err(CE_WARN,
-	"XFS: Cannot mount filesystem with identical rtdev and ddev/logdev.");
-			error = EINVAL;
-			pagebuf_lock_disable(mp->m_ddev_targp, 0);
-			goto error2;
-		}
-		
-		/* Set the realtime device's block size */
-		set_blocksize(mp->m_rtdev_targp->pbr_bdev, 512);
-	}
-
-	if (logdev != ddev) {
-		mp->m_logdev_targp = pagebuf_lock_enable(logdev, 1);
-		if (IS_ERR(mp->m_logdev_targp)) {
-			error = PTR_ERR(mp->m_logdev_targp);
-			pagebuf_lock_disable(mp->m_ddev_targp, 1);
-			if (mp->m_rtdev_targp)
-				pagebuf_lock_disable(mp->m_rtdev_targp, 1);
-			goto error2;
-		}
-
-		/* Set the log device's block size */
-		set_blocksize(mp->m_logdev_targp->pbr_bdev, 512);
+	if (logdev != NULL && logdev != ddev) {
+		mp->m_logdev_targp = xfs_alloc_buftarg(logdev);
+		set_blocksize(logdev, 512);
 	} else {
 		mp->m_logdev_targp = mp->m_ddev_targp;
 	}
 	
-	if ((error = xfs_start_flags(ap, mp, ronly)))
-		goto error3;
+	error = xfs_start_flags(args, mp, ronly);
+	if (error)
+		goto error;
 
-	if ((error = xfs_readsb(mp)))
-		goto error3;
+	error = xfs_readsb(mp);
+	if (error)
+		goto error;
 
-	if ((error = xfs_finish_flags(ap, mp, ronly))) {
+	error = xfs_finish_flags(args, mp, ronly);
+	if (error) {
 		xfs_freesb(mp);
-		goto error3;
+		goto error;
 	}
 
-	pagebuf_target_blocksize(mp->m_ddev_targp, mp->m_sb.sb_blocksize);
-	if (logdev != 0 && logdev != ddev)
-		pagebuf_target_blocksize(mp->m_logdev_targp,
-					mp->m_sb.sb_blocksize);
-	if (rtdev != 0)
-		pagebuf_target_blocksize(mp->m_rtdev_targp,
-					mp->m_sb.sb_blocksize);
-
-	mp->m_cxfstype = XFS_CXFS_NOT;
-	error = xfs_mountfs(vfsp, mp, ddev, 0);
-	if (error)
-		goto error3;
-	return 0;
-
- error3:
-	/* It's impossible to get here before buftargs are filled */
-	xfs_binval(mp->m_ddev_targp);
-	pagebuf_lock_disable(mp->m_ddev_targp, 0);
-	if (logdev && logdev != ddev) {
-		xfs_binval(mp->m_logdev_targp);
-		pagebuf_lock_disable(mp->m_logdev_targp, 1);
+	mp->m_ddev_targp->pbr_blocksize = mp->m_sb.sb_blocksize;
+	if (logdev != 0 && logdev != ddev) {
+		mp->m_logdev_targp->pbr_blocksize = mp->m_sb.sb_blocksize;
 	}
 	if (rtdev != 0) {
+		mp->m_rtdev_targp->pbr_blocksize = mp->m_sb.sb_blocksize;
+	}
+
+	mp->m_cxfstype = XFS_CXFS_NOT;
+	error = xfs_mountfs(vfsp, mp, ddev->bd_dev, 0);
+	if (error)
+		goto error;
+	return 0;
+
+ error:
+	xfs_binval(mp->m_ddev_targp);
+	if (logdev != NULL && logdev != ddev) {
+		xfs_binval(mp->m_logdev_targp);
+	}
+	if (rtdev != NULL) {
 		xfs_binval(mp->m_rtdev_targp);
-		pagebuf_lock_disable(mp->m_rtdev_targp, 1);
 	}
- error2:
-	if (error) {
-		xfs_mount_free(mp, 1);
-	}
+	xfs_unmountfs_close(mp, NULL);
+	xfs_mount_free(mp, 1);
 	return error;
-}
-
-/*
- * xfs_mount
- *
- * The file system configurations are:
- *	(1) device (partition) with data and internal log
- *	(2) logical volume with data and log subvolumes.
- *	(3) logical volume with data, log, and realtime subvolumes.
- */
-STATIC int
-xfs_mount(
-	vfs_t			*vfsp,
-	struct xfs_mount_args	*args,
-	cred_t			*credp)
-{
-	dev_t		ddev;
-	dev_t		logdev;
-	dev_t		rtdev;
-	int		error;
-
-	error = spectodevs(vfsp->vfs_super, args, &ddev, &logdev, &rtdev);
-	if (!error)
-		error = xfs_cmountfs(vfsp, ddev, logdev, rtdev, args, credp);
-	return (error);
 }
 
 /*

@@ -264,55 +264,6 @@ printk("XFS: osyncisdsync is now the default, and will soon be deprecated.\n");
 	return 0;
 }
 
-/*
- * Convert one device special file to a dev_t.
- * Helper routine, used only by spectodevs below.
- */
-STATIC int
-spectodev(
-	const char		*name,
-	const char		*id,
-	dev_t			*dev)
-{
-	struct nameidata	nd;
-	int			error;
-
-	error = path_lookup(name, LOOKUP_FOLLOW, &nd);
-	if (error)
-		return error;
-
-	*dev = kdev_t_to_nr(nd.dentry->d_inode->i_rdev);
-	path_release(&nd);
-	return 0;
-}
-
-/*
- * Convert device special files to dev_t for data, log, realtime.
- */
-int
-spectodevs(
-	struct super_block	*sb,
-	struct xfs_mount_args	*args,
-	dev_t			*ddevp,
-	dev_t			*logdevp,
-	dev_t			*rtdevp)
-{
-	int			rval = 0;
-
-	*ddevp = sb->s_dev;
-
-	if (args->logname[0])
-		rval = spectodev(args->logname, "log", logdevp);
-	else
-		*logdevp = sb->s_dev;
-
-	if (args->rtname[0] && !rval)
-		rval = spectodev(args->rtname, "realtime", rtdevp);
-	else
-		*rtdevp = 0;
-	return rval;
-}
-
 
 STATIC kmem_cache_t * linvfs_inode_cachep;
 

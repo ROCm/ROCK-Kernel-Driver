@@ -145,7 +145,6 @@ typedef struct pb_target {
 	struct block_device	*pbr_bdev;
 	struct address_space	*pbr_mapping;
 	unsigned int		pbr_blocksize;
-	unsigned int		pbr_blocksize_bits;
 } pb_target_t;
 
 /*
@@ -302,18 +301,6 @@ extern int pagebuf_lock_value(		/* return count on lock		*/
 
 extern int pagebuf_lock(		/* lock buffer			*/
 		page_buf_t *);		/* buffer to lock		*/
-
-extern void pagebuf_lock_disable(	/* disable buffer locking	*/
-		struct pb_target *,	/* inode for buffers		*/
-		int);			/* do blkdev_put?		*/
-
-extern struct pb_target *pagebuf_lock_enable(
-		dev_t,
-		int);			/* do blkdev_get?		*/
-
-extern void pagebuf_target_blocksize(
-		pb_target_t *,
-		unsigned int);		/* block size			*/
 
 extern void pagebuf_target_clear(struct pb_target *);
 
