@@ -287,7 +287,7 @@ EXPORT_SYMBOL(page_follow_link);
 EXPORT_SYMBOL(page_symlink_inode_operations);
 EXPORT_SYMBOL(page_symlink);
 EXPORT_SYMBOL(vfs_readdir);
-EXPORT_SYMBOL(__get_lease);
+EXPORT_SYMBOL(__break_lease);
 EXPORT_SYMBOL(lease_get_mtime);
 EXPORT_SYMBOL(lock_may_read);
 EXPORT_SYMBOL(lock_may_write);
