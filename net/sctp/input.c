@@ -134,6 +134,10 @@ int sctp_rcv(struct sk_buff *skb)
 
 	skb_pull(skb, sizeof(struct sctphdr));
 
+	/* Make sure we at least have chunk headers worth of data left. */
+	if (skb->len < sizeof(struct sctp_chunkhdr))
+		goto discard_it;
+
 	family = ipver2af(skb->nh.iph->version);
 	af = sctp_get_af_specific(family);
 	if (unlikely(!af))
@@ -515,10 +519,10 @@ int sctp_rcv_ootb(struct sk_buff *skb)
 	sctp_errhdr_t *err;
 
 	ch = (sctp_chunkhdr_t *) skb->data;
+	ch_end = ((__u8 *) ch) + WORD_ROUND(ntohs(ch->length));
 
 	/* Scan through all the chunks in the packet.  */
-	do {
-		ch_end = ((__u8 *) ch) + WORD_ROUND(ntohs(ch->length));
+	while (ch_end > (__u8 *)ch && ch_end < skb->tail) {
 
 		/* RFC 8.4, 2) If the OOTB packet contains an ABORT chunk, the
 		 * receiver MUST silently discard the OOTB packet and take no
@@ -549,7 +553,8 @@ int sctp_rcv_ootb(struct sk_buff *skb)
 		}
 
 		ch = (sctp_chunkhdr_t *) ch_end;
-	} while (ch_end < skb->tail);
+	        ch_end = ((__u8 *) ch) + WORD_ROUND(ntohs(ch->length));
+	}
 
 	return 0;
 
@@ -820,6 +825,14 @@ static struct sctp_association *__sctp_rcv_init_lookup(struct sk_buff *skb,
 	default:
 		return NULL;
 	}
+
+	/* The code below will attempt to walk the chunk and extract
+	 * parameter information.  Before we do that, we need to verify
+	 * that the chunk length doesn't cause overflow.  Otherwise, we'll
+	 * walk off the end.
+	 */
+	if (WORD_ROUND(ntohs(ch->length)) > skb->len)
+		return NULL;
 
 	/*
 	 * This code will NOT touch anything inside the chunk--it is

@@ -130,6 +130,7 @@ sctp_state_fn_t sctp_sf_do_ecne;
 sctp_state_fn_t sctp_sf_ootb;
 sctp_state_fn_t sctp_sf_pdiscard;
 sctp_state_fn_t sctp_sf_violation;
+sctp_state_fn_t sctp_sf_violation_chunklen;
 sctp_state_fn_t sctp_sf_discard_chunk;
 sctp_state_fn_t sctp_sf_do_5_2_1_siminit;
 sctp_state_fn_t sctp_sf_do_5_2_2_dupinit;
@@ -222,6 +223,10 @@ struct sctp_chunk *sctp_make_abort_no_data(const struct sctp_association *,
 struct sctp_chunk *sctp_make_abort_user(const struct sctp_association *,
 				   const struct sctp_chunk *,
 				   const struct msghdr *);
+struct sctp_chunk *sctp_make_abort_violation(const struct sctp_association *,
+				   const struct sctp_chunk *,
+				   const __u8 *,
+				   const size_t );
 struct sctp_chunk *sctp_make_heartbeat(const struct sctp_association *,
 				  const struct sctp_transport *,
 				  const void *payload,

@@ -848,6 +848,31 @@ err_chunk:
 	return retval;
 }
 
+/* Make an ABORT chunk with a PROTOCOL VIOLATION cause code. */ 
+struct sctp_chunk *sctp_make_abort_violation(
+	const struct sctp_association *asoc,
+	const struct sctp_chunk *chunk,
+	const __u8   *payload,
+	const size_t paylen)
+{
+	struct sctp_chunk  *retval;
+	struct sctp_paramhdr phdr;
+
+	retval = sctp_make_abort(asoc, chunk, sizeof(sctp_errhdr_t) + paylen
+					+ sizeof(sctp_chunkhdr_t));
+	if (!retval)
+		goto end;
+
+	sctp_init_cause(retval, SCTP_ERROR_PROTO_VIOLATION, payload, paylen);
+
+	phdr.type = htons(chunk->chunk_hdr->type);
+	phdr.length = chunk->chunk_hdr->length;
+	sctp_addto_chunk(retval, sizeof(sctp_paramhdr_t), &phdr);
+
+end:
+	return retval;
+}
+
 /* Make a HEARTBEAT chunk.  */
 struct sctp_chunk *sctp_make_heartbeat(const struct sctp_association *asoc,
 				  const struct sctp_transport *transport,
@@ -1000,7 +1025,6 @@ struct sctp_chunk *sctp_chunkify(struct sk_buff *skb,
 	INIT_LIST_HEAD(&retval->frag_list);
 	SCTP_DBG_OBJCNT_INC(chunk);
 	atomic_set(&retval->refcnt, 1);
-
 
 nodata:
 	return retval;
@@ -1515,6 +1539,30 @@ static int sctp_process_inv_mandatory(const struct sctp_association *asoc,
 	return 0;
 }
 
+static int sctp_process_inv_paramlength(const struct sctp_association *asoc,
+					struct sctp_paramhdr *param,
+					const struct sctp_chunk *chunk,
+					struct sctp_chunk **errp)
+{
+	char		error[] = "The following parameter had invalid length:";
+	size_t		payload_len = WORD_ROUND(sizeof(error)) + 
+						sizeof(sctp_paramhdr_t);
+
+
+	/* Create an error chunk and fill it in with our payload. */
+	if (!*errp)
+		*errp = sctp_make_op_error_space(asoc, chunk, payload_len);
+
+	if (*errp) {
+		sctp_init_cause(*errp, SCTP_ERROR_PROTO_VIOLATION, error,
+				sizeof(error));
+		sctp_addto_chunk(*errp, sizeof(sctp_paramhdr_t), param);
+	}
+
+	return 0;
+}
+
+
 /* Do not attempt to handle the HOST_NAME parm.  However, do
  * send back an indicator to the peer.
  */
@@ -1692,6 +1740,18 @@ int sctp_verify_init(const struct sctp_association *asoc,
 			has_cookie = 1;
 
 	} /* for (loop through all parameters) */
+
+	/* There is a possibility that a parameter length was bad and
+	 * in that case we would have stoped walking the parameters.
+	 * The current param.p would point at the bad one.
+	 * Current consensus on the mailing list is to generate a PROTOCOL
+	 * VIOLATION error.  We build the ERROR chunk here and let the normal
+	 * error handling code build and send the packet.
+	 */
+	if (param.v < (void*)chunk->chunk_end - sizeof(sctp_paramhdr_t)) {
+		sctp_process_inv_paramlength(asoc, param.p, chunk, errp);
+		return 0;
+	}
 
 	/* The only missing mandatory param possible today is
 	 * the state cookie for an INIT-ACK chunk.

@@ -364,7 +364,7 @@ typedef struct sctp_heartbeat_chunk {
  */
 typedef struct sctp_abort_chunk {
         sctp_chunkhdr_t uh;
-} __attribute__((packed)) sctp_abort_chunkt_t;
+} __attribute__((packed)) sctp_abort_chunk_t;
 
 
 /* For the graceful shutdown we must carry the tag (in common header)

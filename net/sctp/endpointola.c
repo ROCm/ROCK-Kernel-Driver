@@ -345,7 +345,7 @@ static void sctp_endpoint_bh_rcv(struct sctp_endpoint *ep)
 	sk = ep->base.sk;
 
 	while (NULL != (chunk = sctp_inq_pop(inqueue))) {
-		subtype.chunk = chunk->chunk_hdr->type;
+		subtype = SCTP_ST_CHUNK(chunk->chunk_hdr->type);
 
 		/* We might have grown an association since last we
 		 * looked, so try again.

@@ -841,7 +841,8 @@ static void sctp_assoc_bh_rcv(struct sctp_association *asoc)
 	struct sctp_chunk *chunk;
 	struct sock *sk;
 	struct sctp_inq *inqueue;
-	int state, subtype;
+	int state;
+	sctp_subtype_t subtype;
 	int error = 0;
 
 	/* The association should be held so we should be safe. */
@@ -852,7 +853,7 @@ static void sctp_assoc_bh_rcv(struct sctp_association *asoc)
 	sctp_association_hold(asoc);
 	while (NULL != (chunk = sctp_inq_pop(inqueue))) {
 		state = asoc->state;
-		subtype = chunk->chunk_hdr->type;
+		subtype = SCTP_ST_CHUNK(chunk->chunk_hdr->type);
 
 		/* Remember where the last DATA chunk came from so we
 		 * know where to send the SACK.
@@ -866,7 +867,7 @@ static void sctp_assoc_bh_rcv(struct sctp_association *asoc)
 			chunk->transport->last_time_heard = jiffies;
 
 		/* Run through the state machine. */
-		error = sctp_do_sm(SCTP_EVENT_T_CHUNK, SCTP_ST_CHUNK(subtype),
+		error = sctp_do_sm(SCTP_EVENT_T_CHUNK, subtype,
 				   state, ep, asoc, chunk, GFP_ATOMIC);
 
 		/* Check to see if the association is freed in response to
