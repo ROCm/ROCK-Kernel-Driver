@@ -1278,6 +1278,8 @@ P:	Pekka Savola (ipv6)
 M:	pekkas@netcore.fi
 P:	James Morris
 M:	jmorris@intercode.com.au
+P:	Hideaki YOSHIFUJI
+M:	yoshfuji@linux-ipv6.org
 L:	netdev@oss.sgi.com
 S:	Maintained
 
