@@ -146,10 +146,6 @@ struct pdc_host_priv {
 
 static u32 pdc_sata_scr_read (struct ata_port *ap, unsigned int sc_reg);
 static void pdc_sata_scr_write (struct ata_port *ap, unsigned int sc_reg, u32 val);
-static void pdc_sata_set_piomode (struct ata_port *ap, struct ata_device *adev,
-			      unsigned int pio);
-static void pdc_sata_set_udmamode (struct ata_port *ap, struct ata_device *adev,
-			      unsigned int udma);
 static int pdc_sata_init_one (struct pci_dev *pdev, const struct pci_device_id *ent);
 static void pdc_dma_start(struct ata_queued_cmd *qc);
 static void pdc20621_dma_start(struct ata_queued_cmd *qc);
@@ -200,8 +196,6 @@ static Scsi_Host_Template pdc_sata_sht = {
 
 static struct ata_port_operations pdc_sata_ops = {
 	.port_disable		= ata_port_disable,
-	.set_piomode		= pdc_sata_set_piomode,
-	.set_udmamode		= pdc_sata_set_udmamode,
 	.tf_load		= pdc_tf_load_mmio,
 	.tf_read		= ata_tf_read_mmio,
 	.check_status		= ata_check_status_mmio,
@@ -220,8 +214,6 @@ static struct ata_port_operations pdc_sata_ops = {
 
 static struct ata_port_operations pdc_20621_ops = {
 	.port_disable		= ata_port_disable,
-	.set_piomode		= pdc_sata_set_piomode,
-	.set_udmamode		= pdc_sata_set_udmamode,
 	.tf_load		= pdc_tf_load_mmio,
 	.tf_read		= ata_tf_read_mmio,
 	.check_status		= ata_check_status_mmio,
@@ -376,19 +368,6 @@ static void pdc_sata_scr_write (struct ata_port *ap, unsigned int sc_reg,
 	if (sc_reg > SCR_CONTROL)
 		return;
 	writel(val, (void *) ap->ioaddr.scr_addr + (sc_reg * 4));
-}
-
-static void pdc_sata_set_piomode (struct ata_port *ap, struct ata_device *adev,
-			      unsigned int pio)
-{
-	/* dummy */
-}
-
-
-static void pdc_sata_set_udmamode (struct ata_port *ap, struct ata_device *adev,
-			      unsigned int udma)
-{
-	/* dummy */
 }
 
 enum pdc_packet_bits {

@@ -1453,7 +1453,8 @@ static void ata_host_set_pio(struct ata_port *ap)
 		if (ata_dev_present(&ap->device[i])) {
 			ap->device[i].pio_mode = (pio == 3) ?
 				XFER_PIO_3 : XFER_PIO_4;
-			ap->ops->set_piomode(ap, &ap->device[i], pio);
+			if (ap->ops->set_piomode)
+				ap->ops->set_piomode(ap, &ap->device[i], pio);
 		}
 
 	return;
@@ -1517,7 +1518,9 @@ static void ata_host_set_udma(struct ata_port *ap)
 	for (i = 0; i < ATA_MAX_DEVICES; i++)
 		if (ata_dev_present(&ap->device[i])) {
 			ap->device[i].udma_mode = udma_mode;
-			ap->ops->set_udmamode(ap, &ap->device[i], udma_mode);
+			if (ap->ops->set_udmamode)
+				ap->ops->set_udmamode(ap, &ap->device[i],
+						      udma_mode);
 		}
 
 	return;

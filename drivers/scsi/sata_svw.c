@@ -149,24 +149,6 @@ static u8 k2_stat_check_status(struct ata_port *ap)
        	return readl((void *) ap->ioaddr.status_addr);
 }
 
-static void k2_sata_set_piomode (struct ata_port *ap, struct ata_device *adev,
-			      unsigned int pio)
-{
-	/* We need empty implementation, the core doesn't test for NULL
-	 * function pointer
-	 */
-}
-
-
-static void k2_sata_set_udmamode (struct ata_port *ap, struct ata_device *adev,
-			      unsigned int udma)
-{
-	/* We need empty implementation, the core doesn't test for NULL
-	 * function pointer
-	 */
-}
-
-
 #ifdef CONFIG_PPC_OF
 /*
  * k2_sata_proc_info
@@ -239,8 +221,6 @@ static Scsi_Host_Template k2_sata_sht = {
 
 static struct ata_port_operations k2_sata_ops = {
 	.port_disable		= ata_port_disable,
-	.set_piomode		= k2_sata_set_piomode,
-	.set_udmamode		= k2_sata_set_udmamode,
 	.tf_load		= k2_sata_tf_load,
 	.tf_read		= k2_sata_tf_read,
 	.check_status		= k2_stat_check_status,
