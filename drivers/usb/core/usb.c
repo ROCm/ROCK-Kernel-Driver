@@ -67,7 +67,7 @@ static void generic_release (struct device_driver * drv)
 }
 
 static struct device_driver usb_generic_driver = {
-	.name =	"generic",
+	.name =	"usb",
 	.bus = &usb_bus_type,
 	.probe = generic_probe,
 	.remove = generic_remove,
@@ -941,6 +941,24 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 	int i;
 	int j;
 
+	/*
+	 * Set the driver for the usb device to point to the "generic" driver.
+	 * This prevents the main usb device from being sent to the usb bus
+	 * probe function.  Yes, it's a hack, but a nice one :)
+	 *
+	 * Do it asap, so more driver model stuff (like the device.h message
+	 * utilities) can be used in hcd submit/unlink code paths.
+	 */
+	usb_generic_driver.bus = &usb_bus_type;
+	dev->dev.parent = parent;
+	dev->dev.driver = &usb_generic_driver;
+	dev->dev.bus = &usb_bus_type;
+	if (dev->dev.bus_id[0] == 0)
+		sprintf (&dev->dev.bus_id[0], "%d-%s",
+			 dev->bus->busnum, dev->devpath);
+
+	/* USB device state == default ... it's not usable yet */
+
 	/* USB 2.0 section 5.5.3 talks about ep0 maxpacket ...
 	 * it's fixed size except for full speed devices.
 	 */
@@ -1002,6 +1020,8 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 		dev->epmaxpacketout[0] = dev->descriptor.bMaxPacketSize0;
 	}
 
+	/* USB device state == addressed ... still not usable */
+
 	err = usb_get_device_descriptor(dev);
 	if (err < (signed)sizeof(dev->descriptor)) {
 		if (err < 0)
@@ -1034,6 +1054,8 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 		return 1;
 	}
 
+	/* USB device state == configured ... tell the world! */
+
 	dbg("new device strings: Mfr=%d, Product=%d, SerialNumber=%d",
 		dev->descriptor.iManufacturer, dev->descriptor.iProduct, dev->descriptor.iSerialNumber);
 	set_device_description (dev);
@@ -1043,23 +1065,10 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 		usb_show_string(dev, "SerialNumber", dev->descriptor.iSerialNumber);
 #endif
 
-	/*
-	 * Set the driver for the usb device to point to the "generic" driver.
-	 * This prevents the main usb device from being sent to the usb bus
-	 * probe function.  Yes, it's a hack, but a nice one :)
-	 */
-	usb_generic_driver.bus = &usb_bus_type;
-	dev->dev.parent = parent;
-	dev->dev.driver = &usb_generic_driver;
-	dev->dev.bus = &usb_bus_type;
-	if (dev->dev.bus_id[0] == 0)
-		sprintf (&dev->dev.bus_id[0], "%d-%s",
-			 dev->bus->busnum, dev->devpath);
+	/* put into sysfs, with device and config specific files */
 	err = device_register (&dev->dev);
 	if (err)
 		return err;
-
-	/* add the USB device specific driverfs files */
 	usb_create_driverfs_dev_files (dev);
 
 	/* Register all of the interfaces for this device with the driver core.
