@@ -37,8 +37,9 @@ typedef struct { unsigned long a,b; } __attribute__((aligned(16))) xmm_store_t;
 
 /* Doesn't use gcc to save the XMM registers, because there is no easy way to 
    tell it to do a clts before the register saving. */
-#define XMMS_SAVE				\
-	asm volatile ( 			\
+#define XMMS_SAVE do {				\
+	preempt_disable();			\
+	asm volatile (				\
 		"movq %%cr0,%0		;\n\t"	\
 		"clts			;\n\t"	\
 		"movups %%xmm0,(%1)	;\n\t"	\
@@ -47,10 +48,11 @@ typedef struct { unsigned long a,b; } __attribute__((aligned(16))) xmm_store_t;
 		"movups %%xmm3,0x30(%1)	;\n\t"	\
 		: "=r" (cr0)			\
 		: "r" (xmm_save) 		\
-		: "memory")
+		: "memory");			\
+} while(0)
 
 #define XMMS_RESTORE				\
-	asm volatile ( 			\
+	asm volatile (				\
 		"sfence			;\n\t"	\
 		"movups (%1),%%xmm0	;\n\t"	\
 		"movups 0x10(%1),%%xmm1	;\n\t"	\
@@ -59,7 +61,9 @@ typedef struct { unsigned long a,b; } __attribute__((aligned(16))) xmm_store_t;
 		"movq 	%0,%%cr0	;\n\t"	\
 		:				\
 		: "r" (cr0), "r" (xmm_save)	\
-		: "memory")
+		: "memory");			\
+	preempt_enable();			\
+} while(0)
 
 #define OFFS(x)		"16*("#x")"
 #define PF_OFFS(x)	"256+16*("#x")"
