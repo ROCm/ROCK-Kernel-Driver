@@ -7,6 +7,7 @@
 #include <linux/types.h>
 #include <linux/stddef.h>
 #include <linux/sched.h>
+#include <linux/ptrace.h>
 #include <asm/io.h>
 
 #define DEFINE(sym, val) \

@@ -14,6 +14,7 @@
 #include "linux/slab.h"
 #include "linux/tty.h"
 #include "linux/binfmts.h"
+#include "linux/ptrace.h"
 #include "asm/signal.h"
 #include "asm/uaccess.h"
 #include "asm/unistd.h"

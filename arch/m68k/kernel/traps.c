@@ -29,6 +29,7 @@
 #include <linux/string.h>
 #include <linux/linkage.h>
 #include <linux/init.h>
+#include <linux/ptrace.h>
 
 #include <asm/setup.h>
 #include <asm/fpu.h>

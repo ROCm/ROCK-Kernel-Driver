@@ -11,6 +11,7 @@
 #include <linux/stddef.h>
 #include <linux/sched.h>
 #include <linux/kernel_stat.h>
+#include <linux/ptrace.h>
 #include <asm/irq.h>
 #include <asm/hardirq.h>
 #include <asm/errno.h>

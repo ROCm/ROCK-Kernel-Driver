@@ -58,6 +58,7 @@
 #include <linux/dnotify.h>
 #include <linux/security.h>
 #include <linux/compat.h>
+#include <linux/ptrace.h>
 
 #include <asm/types.h>
 #include <asm/ipc.h>
