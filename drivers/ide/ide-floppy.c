@@ -989,6 +989,20 @@ static ide_startstop_t idefloppy_transfer_pc1 (ide_drive_t *drive)
 	return ide_started;
 }
 
+/**
+ * idefloppy_should_report_error()
+ *
+ * Supresses error messages resulting from Medium not present
+ */
+static inline int idefloppy_should_report_error(idefloppy_floppy_t *floppy)
+{
+	if (floppy->sense_key == 0x02 &&
+	    floppy->asc       == 0x3a &&
+	    floppy->ascq      == 0x00)
+		return 0;
+	return 1;
+}
+
 /*
  *	Issue a packet command
  */
@@ -1022,12 +1036,13 @@ static ide_startstop_t idefloppy_issue_pc (ide_drive_t *drive, idefloppy_pc_t *p
 		 */
 		if (!test_bit(PC_ABORT, &pc->flags)) {
 			if (!test_bit(PC_SUPPRESS_ERROR, &pc->flags)) {
-				printk(KERN_ERR "ide-floppy: %s: I/O error, "
-						"pc = %2x, key = %2x, "
-						"asc = %2x, ascq = %2x\n",
-						drive->name, pc->c[0],
-						floppy->sense_key,
-						floppy->asc, floppy->ascq);
+				if (idefloppy_should_report_error(floppy))
+					printk(KERN_ERR "ide-floppy: %s: I/O error, "
+					       "pc = %2x, key = %2x, "
+					       "asc = %2x, ascq = %2x\n",
+					       drive->name, pc->c[0],
+					       floppy->sense_key,
+					       floppy->asc, floppy->ascq);
 			}
 			/* Giving up */
 			pc->error = IDEFLOPPY_ERROR_GENERAL;
@@ -1238,11 +1253,13 @@ static ide_startstop_t idefloppy_do_request (ide_drive_t *drive, struct request 
 			rq->nr_sectors, rq->current_nr_sectors);
 
 	if (rq->errors >= ERROR_MAX) {
-		if (floppy->failed_pc != NULL)
-			printk(KERN_ERR "ide-floppy: %s: I/O error, pc = %2x,"
-					" key = %2x, asc = %2x, ascq = %2x\n",
-				drive->name, floppy->failed_pc->c[0],
-				floppy->sense_key, floppy->asc, floppy->ascq);
+		if (floppy->failed_pc != NULL) {
+			if (idefloppy_should_report_error(floppy))
+				printk(KERN_ERR "ide-floppy: %s: I/O error, pc = %2x,"
+				       " key = %2x, asc = %2x, ascq = %2x\n",
+				       drive->name, floppy->failed_pc->c[0],
+				       floppy->sense_key, floppy->asc, floppy->ascq);
+		}
 		else
 			printk(KERN_ERR "ide-floppy: %s: I/O error\n",
 				drive->name);
