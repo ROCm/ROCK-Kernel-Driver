@@ -137,6 +137,12 @@ svc_sock_enqueue(struct svc_sock *svsk)
 		printk(KERN_ERR
 			"svc_sock_enqueue: threads and sockets both waiting??\n");
 
+	if (test_bit(SK_DEAD, &svsk->sk_flags)) {
+		/* Don't enqueue dead sockets */
+		dprintk("svc: socket %p is dead, not enqueued\n", svsk->sk_sk);
+		goto out_unlock;
+	}
+
 	if (test_bit(SK_BUSY, &svsk->sk_flags)) {
 		/* Don't enqueue socket while daemon is receiving */
 		dprintk("svc: socket %p busy, not enqueued\n", svsk->sk_sk);
@@ -179,7 +185,6 @@ svc_sock_enqueue(struct svc_sock *svsk)
 	} else {
 		dprintk("svc: socket %p put into queue\n", svsk->sk_sk);
 		list_add_tail(&svsk->sk_ready, &serv->sv_sockets);
-		set_bit(SK_QUED, &svsk->sk_flags);
 	}
 
 out_unlock:
@@ -199,11 +204,10 @@ svc_sock_dequeue(struct svc_serv *serv)
 
 	svsk = list_entry(serv->sv_sockets.next,
 			  struct svc_sock, sk_ready);
-	list_del(&svsk->sk_ready);
+	list_del_init(&svsk->sk_ready);
 
 	dprintk("svc: socket %p dequeued, inuse=%d\n",
 		svsk->sk_sk, svsk->sk_inuse);
-	clear_bit(SK_QUED, &svsk->sk_flags);
 
 	return svsk;
 }
@@ -1176,8 +1180,8 @@ svc_recv(struct svc_serv *serv, struct svc_rqst *rqstp, long timeout)
 	if (test_bit(SK_TEMP, &svsk->sk_flags)) {
 		/* push active sockets to end of list */
 		spin_lock_bh(&serv->sv_lock);
-		list_del(&svsk->sk_list);
-		list_add_tail(&svsk->sk_list, &serv->sv_tempsocks);
+		if (!list_empty(&svsk->sk_list))
+			list_move_tail(&svsk->sk_list, &serv->sv_tempsocks);
 		spin_unlock_bh(&serv->sv_lock);
 	}
 
@@ -1273,6 +1277,7 @@ svc_setup_socket(struct svc_serv *serv, struct socket *sock,
 	svsk->sk_server = serv;
 	svsk->sk_lastrecv = get_seconds();
 	INIT_LIST_HEAD(&svsk->sk_deferred);
+	INIT_LIST_HEAD(&svsk->sk_ready);
 	sema_init(&svsk->sk_sem, 1);
 
 	/* Initialize the socket */
@@ -1368,14 +1373,11 @@ svc_delete_socket(struct svc_sock *svsk)
 
 	spin_lock_bh(&serv->sv_lock);
 
-	list_del(&svsk->sk_list);
-	if (test_bit(SK_TEMP, &svsk->sk_flags))
-		serv->sv_tmpcnt--;
-	if (test_bit(SK_QUED, &svsk->sk_flags))
-		list_del(&svsk->sk_ready);
-
-
-	set_bit(SK_DEAD, &svsk->sk_flags);
+	list_del_init(&svsk->sk_list);
+	list_del_init(&svsk->sk_ready);
+	if (!test_and_set_bit(SK_DEAD, &svsk->sk_flags))
+		if (test_bit(SK_TEMP, &svsk->sk_flags))
+			serv->sv_tmpcnt--;
 
 	if (!svsk->sk_inuse) {
 		spin_unlock_bh(&serv->sv_lock);
