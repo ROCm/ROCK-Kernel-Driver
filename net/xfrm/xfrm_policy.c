@@ -1043,10 +1043,9 @@ static void xfrm_dst_destroy(struct dst_entry *dst)
 	dst->xfrm = NULL;
 }
 
-static void xfrm_dst_ifdown(struct dst_entry *dst, int unregister)
+static void xfrm_dst_ifdown(struct dst_entry *dst, struct net_device *dev,
+			    int unregister)
 {
-	struct net_device *dev = dst->dev;
-
 	if (!unregister)
 		return;
 
