@@ -624,6 +624,22 @@ static inline void double_rq_unlock(runqueue_t *rq1, runqueue_t *rq2)
 		spin_unlock(&rq2->lock);
 }
 
+#ifdef CONFIG_NUMA
+
+static inline unsigned long cpus_to_balance(int this_cpu)
+{
+	return __node_to_cpu_mask(__cpu_to_node(this_cpu));
+}
+
+#else /* !CONFIG_NUMA */
+
+static inline unsigned long cpus_to_balance(int this_cpu)
+{
+	return cpu_online_map;
+}
+
+#endif /* CONFIG_NUMA */
+
 #if CONFIG_SMP
 
 /*
@@ -652,9 +668,9 @@ static inline unsigned int double_lock_balance(runqueue_t *this_rq,
 }
 
 /*
- * find_busiest_queue - find the busiest runqueue.
+ * find_busiest_queue - find the busiest runqueue among the cpus in cpumask.
  */
-static inline runqueue_t *find_busiest_queue(runqueue_t *this_rq, int this_cpu, int idle, int *imbalance)
+static inline runqueue_t *find_busiest_queue(runqueue_t *this_rq, int this_cpu, int idle, int *imbalance, unsigned long cpumask)
 {
 	int nr_running, load, max_load, i;
 	runqueue_t *busiest, *rq_src;
@@ -689,7 +705,7 @@ static inline runqueue_t *find_busiest_queue(runqueue_t *this_rq, int this_cpu, 
 	busiest = NULL;
 	max_load = 1;
 	for (i = 0; i < NR_CPUS; i++) {
-		if (!cpu_online(i))
+		if (!((1UL << i) & cpumask))
 			continue;
 
 		rq_src = cpu_rq(i);
@@ -764,7 +780,8 @@ static void load_balance(runqueue_t *this_rq, int idle)
 	struct list_head *head, *curr;
 	task_t *tmp;
 
-	busiest = find_busiest_queue(this_rq, this_cpu, idle, &imbalance);
+	busiest = find_busiest_queue(this_rq, this_cpu, idle, &imbalance,
+					cpus_to_balance(this_cpu));
 	if (!busiest)
 		goto out;
 
