@@ -164,5 +164,6 @@ int mpc10x_bridge_init(struct pci_controller *hose,
 		       uint phys_eumb_base);
 unsigned long mpc10x_get_mem_size(uint mem_map);
 int mpc10x_enable_store_gathering(struct pci_controller *hose);
+int mpc10x_disable_store_gathering(struct pci_controller *hose);
 
 #endif	/* __PPC_KERNEL_MPC10X_H */
