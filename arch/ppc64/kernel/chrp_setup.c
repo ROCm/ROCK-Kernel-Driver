@@ -66,7 +66,6 @@
 
 extern volatile unsigned char *chrp_int_ack_special;
 
-void chrp_setup_pci_ptrs(void);
 void chrp_progress(char *, unsigned short);
 void chrp_request_regions(void);
 
@@ -237,8 +236,6 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 #endif /* CONFIG_BLK_DEV_INITRD */
 #endif
 
-	ppc_md.ppc_machine = naca->platform;
-
 	ppc_md.setup_arch     = chrp_setup_arch;
 	ppc_md.setup_residual = NULL;
 	ppc_md.get_cpuinfo    = chrp_get_cpuinfo;
@@ -265,7 +262,6 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.power_off      = rtas_power_off;
 	ppc_md.halt           = rtas_halt;
 
-	ppc_md.time_init      = NULL;
 	ppc_md.get_boot_time  = pSeries_get_rtc_time;
 	ppc_md.get_rtc_time   = pSeries_get_rtc_time;
 	ppc_md.set_rtc_time   = pSeries_set_rtc_time;
