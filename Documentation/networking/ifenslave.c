@@ -38,6 +38,9 @@
  *         take care of this itself
  *       - Try the SIOC*** versions of the bonding ioctls before using the
  *         old versions
+ *    - 2002/02/18 Erik Habbinga <erik_habbinga @ hp dot com> :
+ *       - ifr2.ifr_flags was not initialized in the hwaddr_notset case,
+ *         SIOCGIFFLAGS now called before hwaddr_notset test
  */
 
 static char *version =
@@ -288,19 +291,19 @@ main(int argc, char **argv)
 			     hwaddr from it's first slave.
 			   - if !hwaddr_notset, assign the master's hwaddr to each slave
 			*/
-	
+
+			strncpy(ifr2.ifr_name, slave_ifname, IFNAMSIZ);
+			if (ioctl(skfd, SIOCGIFFLAGS, &ifr2) < 0) {
+				int saved_errno = errno;
+				fprintf(stderr, "SIOCGIFFLAGS on %s failed: %s\n", slave_ifname,
+						strerror(saved_errno));
+				return 1;
+			}
+
 			if (hwaddr_notset) { /* we do nothing */
 
 			}
 			else {  /* we'll assign master's hwaddr to this slave */
-				strncpy(ifr2.ifr_name, slave_ifname, IFNAMSIZ);
-				if (ioctl(skfd, SIOCGIFFLAGS, &ifr2) < 0) {
-					int saved_errno = errno;
-					fprintf(stderr, "SIOCGIFFLAGS on %s failed: %s\n", slave_ifname,
-							strerror(saved_errno));
-					return 1;
-				}
-	
 				if (ifr2.ifr_flags & IFF_UP) {
 					ifr2.ifr_flags &= ~IFF_UP;
 					if (ioctl(skfd, SIOCSIFFLAGS, &ifr2) < 0) {
