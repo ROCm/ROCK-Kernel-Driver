@@ -8,9 +8,9 @@
 #include <linux/config.h>
 #include <linux/linkage.h>
 
-#define rmap_lock(page) \
+#define page_map_lock(page) \
 	bit_spin_lock(PG_maplock, (unsigned long *)&(page)->flags)
-#define rmap_unlock(page) \
+#define page_map_unlock(page) \
 	bit_spin_unlock(PG_maplock, (unsigned long *)&(page)->flags)
 
 #ifdef CONFIG_MMU

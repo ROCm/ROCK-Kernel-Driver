@@ -276,11 +276,11 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 		if (PageWriteback(page))
 			goto keep_locked;
 
-		rmap_lock(page);
+		page_map_lock(page);
 		referenced = page_referenced(page);
 		if (referenced && page_mapping_inuse(page)) {
 			/* In active use or really unfreeable.  Activate it. */
-			rmap_unlock(page);
+			page_map_unlock(page);
 			goto activate_locked;
 		}
 
@@ -295,10 +295,10 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 		 * XXX: implement swap clustering ?
 		 */
 		if (PageAnon(page) && !PageSwapCache(page)) {
-			rmap_unlock(page);
+			page_map_unlock(page);
 			if (!add_to_swap(page))
 				goto activate_locked;
-			rmap_lock(page);
+			page_map_lock(page);
 		}
 		if (PageSwapCache(page)) {
 			mapping = &swapper_space;
@@ -313,16 +313,16 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 		if (page_mapped(page) && mapping) {
 			switch (try_to_unmap(page)) {
 			case SWAP_FAIL:
-				rmap_unlock(page);
+				page_map_unlock(page);
 				goto activate_locked;
 			case SWAP_AGAIN:
-				rmap_unlock(page);
+				page_map_unlock(page);
 				goto keep_locked;
 			case SWAP_SUCCESS:
 				; /* try to free the page below */
 			}
 		}
-		rmap_unlock(page);
+		page_map_unlock(page);
 
 		/*
 		 * If the page is dirty, only perform writeback if that write
@@ -663,13 +663,13 @@ refill_inactive_zone(struct zone *zone, const int nr_pages_in,
 				list_add(&page->lru, &l_active);
 				continue;
 			}
-			rmap_lock(page);
+			page_map_lock(page);
 			if (page_referenced(page)) {
-				rmap_unlock(page);
+				page_map_unlock(page);
 				list_add(&page->lru, &l_active);
 				continue;
 			}
-			rmap_unlock(page);
+			page_map_unlock(page);
 		}
 		/*
 		 * FIXME: need to consider page_count(page) here if/when we
