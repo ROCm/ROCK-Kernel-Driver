@@ -543,6 +543,8 @@ idmap_name_to_id(struct svc_rqst *rqstp, int type, const char *name, u32 namelen
 	key.name[namelen] = '\0';
 	strlcpy(key.authname, rqstp->rq_client->name, sizeof(key.authname));
 	ret = idmap_lookup(rqstp, nametoid_lookup, &key, &nametoid_cache, &item);
+	if (ret == -ENOENT)
+		ret = -ESRCH; /* nfserr_badname */
 	if (ret)
 		return ret;
 	*id = item->id;
@@ -561,6 +563,8 @@ idmap_id_to_name(struct svc_rqst *rqstp, int type, uid_t id, char *name)
 
 	strlcpy(key.authname, rqstp->rq_client->name, sizeof(key.authname));
 	ret = idmap_lookup(rqstp, idtoname_lookup, &key, &idtoname_cache, &item);
+	if (ret == -ENOENT)
+		return sprintf(name, "%u", id);
 	if (ret)
 		return ret;
 	ret = strlen(item->name);

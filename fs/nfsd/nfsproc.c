@@ -589,6 +589,7 @@ nfserrno (int errno)
 		{ nfserr_jukebox, -ETIMEDOUT },
 		{ nfserr_dropit, -EAGAIN },
 		{ nfserr_dropit, -ENOMEM },
+		{ nfserr_badname, -ESRCH },
 		{ -1, -EIO }
 	};
 	int	i;
