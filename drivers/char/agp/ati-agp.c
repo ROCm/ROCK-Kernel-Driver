@@ -22,7 +22,7 @@ static struct aper_size_info_lvl2 ati_generic_sizes[7] =
 
 static struct gatt_mask ati_generic_masks[] =
 {
-	{0x00000001, 0}
+	{ .mask = 1, .type = 0}
 };
 
 
@@ -236,12 +236,6 @@ static int ati_configure(void)
 	return 0;
 }
 
-static unsigned long ati_mask_memory(unsigned long addr, int type)
-{
-	/* Memory type is ignored */
-	return addr | agp_bridge->driver->masks[0].mask;
-}
-
 
 /*
  *Since we don't need contigious memory we just try
@@ -401,7 +395,7 @@ struct agp_bridge_driver ati_generic_bridge = {
 	.fetch_size		= ati_fetch_size,
 	.cleanup		= ati_cleanup,
 	.tlb_flush		= ati_tlbflush,
-	.mask_memory		= ati_mask_memory,
+	.mask_memory		= agp_generic_mask_memory,
 	.masks			= ati_generic_masks,
 	.agp_enable		= agp_generic_enable,
 	.cache_flush		= global_cache_flush,
