@@ -32,7 +32,7 @@ static void puts( const char *s )
 	} while (0);
 
 	for (; *s; s++) {
-		/* wait for space in the UART's transmiter */
+		/* wait for space in the UART's transmitter */
 		while (!(UART(UTSR1) & UTSR1_TNF));
 
 		/* send the character out. */
