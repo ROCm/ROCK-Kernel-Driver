@@ -379,6 +379,8 @@ qla2x00_start_scsi(srb_t *sp)
 			sg = (struct scatterlist *) cmd->request_buffer;
 			sp->tot_dsds = pci_map_sg(ha->pdev, sg, cmd->use_sg,
 			    cmd->sc_data_direction);
+			if (sp->tot_dsds == 0)
+				return (QLA_FUNCTION_FAILED);
 		} else if (cmd->request_bufflen) {
 		    sp->tot_dsds++;
 		}
