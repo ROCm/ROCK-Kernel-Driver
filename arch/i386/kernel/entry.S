@@ -49,6 +49,8 @@
 #include <asm/page.h>
 #include "irq_vectors.h"
 
+#define nr_syscalls ((syscall_table_size)/4)
+
 EBX		= 0x00
 ECX		= 0x04
 EDX		= 0x08
@@ -881,4 +883,4 @@ ENTRY(sys_call_table)
  	.long sys_fadvise64_64
 	.long sys_ni_syscall	/* sys_vserver */
 
-nr_syscalls=(.-sys_call_table)/4
+syscall_table_size=(.-sys_call_table)

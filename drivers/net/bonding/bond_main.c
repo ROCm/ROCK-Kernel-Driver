@@ -3047,6 +3047,10 @@ static int bond_ioctl(struct net_device *master_dev, struct ifreq *ifr, int cmd)
 		case SIOCBONDRELEASE:	
 			ret = bond_release(master_dev, slave_dev); 
 			break;
+		case BOND_SETHWADDR_OLD:
+		case SIOCBONDSETHWADDR:
+			ret = bond_sethwaddr(master_dev, slave_dev);
+			break;
 		case BOND_CHANGE_ACTIVE_OLD:
 		case SIOCBONDCHANGEACTIVE:
 			if (USES_PRIMARY(bond_mode)) {
@@ -3569,6 +3573,62 @@ static void bond_destroy_proc_info(struct bonding *bond)
 		bond->bond_proc_file = NULL;
 	}
 }
+
+/* Create the bonding directory under /proc/net, if doesn't exist yet.
+ * Caller must hold rtnl_lock.
+ */
+static void bond_create_proc_dir(void)
+{
+	int len = strlen(DRV_NAME);
+
+	for (bond_proc_dir = proc_net->subdir; bond_proc_dir;
+	     bond_proc_dir = bond_proc_dir->next) {
+		if ((bond_proc_dir->namelen == len) &&
+		    !memcmp(bond_proc_dir->name, DRV_NAME, len)) {
+			break;
+		}
+	}
+
+	if (!bond_proc_dir) {
+		bond_proc_dir = proc_mkdir(DRV_NAME, proc_net);
+		if (bond_proc_dir) {
+			bond_proc_dir->owner = THIS_MODULE;
+		} else {
+			printk(KERN_WARNING DRV_NAME
+				": Warning: cannot create /proc/net/%s\n",
+				DRV_NAME);
+		}
+	}
+}
+
+/* Destroy the bonding directory under /proc/net, if empty.
+ * Caller must hold rtnl_lock.
+ */
+static void bond_destroy_proc_dir(void)
+{
+	struct proc_dir_entry *de;
+
+	if (!bond_proc_dir) {
+		return;
+	}
+
+	/* verify that the /proc dir is empty */
+	for (de = bond_proc_dir->subdir; de; de = de->next) {
+		/* ignore . and .. */
+		if (*(de->name) != '.') {
+			break;
+		}
+	}
+
+	if (de) {
+		if (bond_proc_dir->owner == THIS_MODULE) {
+			bond_proc_dir->owner = NULL;
+		}
+	} else {
+		remove_proc_entry(DRV_NAME, proc_net);
+		bond_proc_dir = NULL;
+	}
+}
 #endif /* CONFIG_PROC_FS */
 
 /*
@@ -3824,6 +3884,9 @@ static struct notifier_block bond_netdev_notifier = {
 	.notifier_call = bond_netdev_event,
 };
 
+/* De-initialize device specific data.
+ * Caller must hold rtnl_lock.
+ */
 static inline void bond_deinit(struct net_device *dev)
 {
 	struct bonding *bond = dev->priv;
@@ -3835,6 +3898,9 @@ static inline void bond_deinit(struct net_device *dev)
 #endif
 }
 
+/* Unregister and free all bond devices.
+ * Caller must hold rtnl_lock.
+ */
 static void bond_free_all(void)
 {
 	struct bonding *bond, *nxt;
@@ -3842,16 +3908,13 @@ static void bond_free_all(void)
 	list_for_each_entry_safe(bond, nxt, &bond_dev_list, bond_list) {
 		struct net_device *dev = bond->device;
 
-		unregister_netdev(dev);
+		unregister_netdevice(dev);
 		bond_deinit(dev);
 		free_netdev(dev);
 	}
 
 #ifdef CONFIG_PROC_FS
-	if (bond_proc_dir) {
-		remove_proc_entry(DRV_NAME, proc_net);
-		bond_proc_dir = NULL;
-	}
+	bond_destroy_proc_dir();
 #endif
 }
 
@@ -4229,17 +4292,11 @@ static int __init bonding_init(void)
 		primary = NULL;
 	}
 
-#ifdef CONFIG_PROC_FS
-	bond_proc_dir = proc_mkdir(DRV_NAME, proc_net);
-	if (bond_proc_dir == NULL)  {
-		printk(KERN_WARNING
-		       "bonding_init(): can not create /proc/net/" DRV_NAME);
-	} else {
-		bond_proc_dir->owner = THIS_MODULE;
-	}
-#endif
-
 	rtnl_lock();
+
+#ifdef CONFIG_PROC_FS
+	bond_create_proc_dir();
+#endif
 
 	err = 0;
 	for (no = 0; no < max_bonds; no++) {
@@ -4283,10 +4340,10 @@ static int __init bonding_init(void)
 	return 0;
 
 out_err:
-	rtnl_unlock();
-
 	/* free and unregister all bonds that were successfully added */
 	bond_free_all();
+
+	rtnl_unlock();
 
 	return err;
 }
@@ -4294,7 +4351,10 @@ out_err:
 static void __exit bonding_exit(void)
 {
 	unregister_netdevice_notifier(&bond_netdev_notifier);
+
+	rtnl_lock();
 	bond_free_all();
+	rtnl_unlock();
 }
 
 module_init(bonding_init);

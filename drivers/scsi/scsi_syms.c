@@ -18,13 +18,14 @@
 #include <asm/irq.h>
 #include <asm/dma.h>
 
-#include "scsi.h"
 #include <scsi/scsi_driver.h>
+#include <scsi/scsi_host.h>
 #include <scsi/scsi_ioctl.h>
-#include "hosts.h"
+#include <scsi/scsicam.h>
+#include "scsi.h"
+
 #include "scsi_logging.h"
 
-#include <scsi/scsicam.h>
 
 /*
  * This source file contains the symbol table used by scsi loadable
@@ -82,8 +83,6 @@ EXPORT_SYMBOL(scsi_sleep);
 
 EXPORT_SYMBOL(scsi_io_completion);
 
-EXPORT_SYMBOL(scsi_device_get);
-EXPORT_SYMBOL(scsi_device_put);
 EXPORT_SYMBOL(scsi_add_device);
 EXPORT_SYMBOL(scsi_remove_device);
 EXPORT_SYMBOL(scsi_device_cancel);
