@@ -53,7 +53,13 @@ static inline int ioapic_setup_disabled(void) { return 0; }
 
 #define PREFIX			"ACPI: "
 
+#ifdef CONFIG_ACPI_PCI
 int acpi_noirq __initdata;	/* skip ACPI IRQ initialization */
+int acpi_pci_disabled __initdata; /* skip ACPI PCI scan and IRQ initialization */
+#else
+int acpi_noirq __initdata = 1;
+int acpi_pci_disabled __initdata = 1;
+#endif
 int acpi_ht __initdata = 1;	/* enable HT */
 
 int acpi_lapic;
@@ -62,6 +68,7 @@ int acpi_strict;
 
 acpi_interrupt_flags acpi_sci_flags __initdata;
 int acpi_sci_override_gsi __initdata;
+int acpi_skip_timer_override __initdata;
 
 #ifdef CONFIG_X86_LOCAL_APIC
 static u64 acpi_lapic_addr __initdata = APIC_DEFAULT_PHYS_BASE;
@@ -327,6 +334,12 @@ acpi_parse_int_src_ovr (
 		acpi_sci_ioapic_setup(intsrc->global_irq,
 			intsrc->flags.polarity, intsrc->flags.trigger);
 		return 0;
+	}
+
+	if (acpi_skip_timer_override &&
+		intsrc->bus_irq == 0 && intsrc->global_irq == 2) {
+			printk(PREFIX "BIOS IRQ0 pin2 override ignored.\n");
+			return 0;
 	}
 
 	mp_override_legacy_irq (
@@ -653,9 +666,6 @@ acpi_parse_madt_ioapic_entries(void)
 		return count;
 	}
 
-	/* Build a default routing table for legacy (ISA) interrupts. */
-	mp_config_acpi_legacy_irqs();
-
 	count = acpi_table_parse_madt(ACPI_MADT_INT_SRC_OVR, acpi_parse_int_src_ovr, NR_IRQ_VECTORS);
 	if (count < 0) {
 		printk(KERN_ERR PREFIX "Error parsing interrupt source overrides entry\n");
@@ -669,6 +679,9 @@ acpi_parse_madt_ioapic_entries(void)
 	 */
 	if (!acpi_sci_override_gsi)
 		acpi_sci_ioapic_setup(acpi_fadt.sci_int, 0, 0);
+
+	/* Fill in identity legacy mapings where no override */
+	mp_config_acpi_legacy_irqs();
 
 	count = acpi_table_parse_madt(ACPI_MADT_NMI_SRC, acpi_parse_nmi_src, NR_IRQ_VECTORS);
 	if (count < 0) {

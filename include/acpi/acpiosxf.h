@@ -188,14 +188,14 @@ acpi_os_get_physical_address (
 
 acpi_status
 acpi_os_install_interrupt_handler (
-	u32                             interrupt_number,
-	OSD_HANDLER             service_routine,
+	u32                             gsi,
+	OSD_HANDLER                     service_routine,
 	void                            *context);
 
 acpi_status
 acpi_os_remove_interrupt_handler (
 	u32                             interrupt_number,
-	OSD_HANDLER             service_routine);
+	OSD_HANDLER                     service_routine);
 
 
 /*

@@ -102,13 +102,14 @@ running once the system is up.
 
 	acpi=		[HW,ACPI] Advanced Configuration and Power Interface 
 			Format: { force | off | ht | strict }
-			force -- enables ACPI for systems with default off
-			off -- disabled ACPI for systems with default on
+			force -- enable ACPI if default was off
+			off -- disable ACPI if default was on
+			noirq -- do not use ACPI for IRQ routing
 			ht -- run only enough ACPI to enable Hyper Threading
 			strict --  Be less tolerant of platforms that are not
 				strictly ACPI specification compliant.
 
-			See also Documentation/pm.txt.
+			See also Documentation/pm.txt, pci=noacpi
 
 	acpi_sleep=	[HW,ACPI] Sleep options
 			Format: { s3_bios, s3_mode }
@@ -132,6 +133,10 @@ running once the system is up.
 	acpi_osi=	[HW,ACPI] empty param disables _OSI
 
 	acpi_serialize	[HW,ACPI] force serialization of AML methods
+
+	acpi_skip_timer_override [HW,ACPI]
+			Recognize and ignore IRQ0/pin2 Interrupt Override.
+			For broken nForce2 BIOS resulting in XT-PIC timer.
 
 	ad1816=		[HW,OSS]
 			Format: <io>,<irq>,<dma>,<dma2>
@@ -842,7 +847,8 @@ running once the system is up.
 					and Omnibook XE3 notebooks. This will
 					have no effect if ACPI IRQ routing is
 					enabled.
-		noacpi			[IA-32] Do not use ACPI for IRQ routing.
+		noacpi			[IA-32] Do not use ACPI for IRQ routing
+					or for PCI scanning.
 
 	pcmv=		[HW,PCMCIA] BadgePAD 4
 

@@ -7,6 +7,7 @@
 #include <linux/init.h>
 #include <linux/irq.h>
 #include <linux/interrupt.h>
+#include <asm/acpi.h>
 #include <asm/arch_hooks.h>
 
 /**
@@ -43,7 +44,8 @@ void __init intr_init_hook(void)
 	apic_intr_init();
 #endif
 
-	setup_irq(2, &irq2);
+	if (!acpi_ioapic)
+		setup_irq(2, &irq2);
 }
 
 /**
