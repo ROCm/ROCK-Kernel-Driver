@@ -65,7 +65,7 @@
 
 
 #define DRIVER_DESC	"USB Host+Gadget Emulator"
-#define DRIVER_VERSION	"29 Oct 2004"
+#define DRIVER_VERSION	"17 Dec 2004"
 
 static const char	driver_name [] = "dummy_hcd";
 static const char	driver_desc [] = "USB Host+Gadget Emulator";
@@ -143,6 +143,11 @@ static const char *const ep_name [] = {
 
 #define FIFO_SIZE		64
 
+struct urbp {
+	struct urb		*urb;
+	struct list_head	urbp_list;
+};
+
 struct dummy {
 	struct usb_hcd			hcd;		/* must come first! */
 	spinlock_t			lock;
@@ -168,6 +173,7 @@ struct dummy {
 	unsigned long			re_timeout;
 
 	struct usb_device		*udev;
+	struct list_head		urbp_list;
 };
 
 static inline struct dummy *hcd_to_dummy (struct usb_hcd *hcd)
@@ -830,15 +836,22 @@ EXPORT_SYMBOL (net2280_set_fifo_mode);
  */
 
 static int dummy_urb_enqueue (
-	struct usb_hcd	*hcd,
-	struct urb	*urb,
-	int		mem_flags
+	struct usb_hcd			*hcd,
+	struct usb_host_endpoint	*ep,
+	struct urb			*urb,
+	int				mem_flags
 ) {
 	struct dummy	*dum;
+	struct urbp	*urbp;
 	unsigned long	flags;
 
 	if (!urb->transfer_buffer && urb->transfer_buffer_length)
 		return -EINVAL;
+
+	urbp = kmalloc (sizeof *urbp, mem_flags);
+	if (!urbp)
+		return -ENOMEM;
+	urbp->urb = urb;
 
 	dum = hcd_to_dummy (hcd);
 	spin_lock_irqsave (&dum->lock, flags);
@@ -849,7 +862,8 @@ static int dummy_urb_enqueue (
 	} else if (unlikely (dum->udev != urb->dev))
 		dev_err (dummy_dev(dum), "usb_device address has changed!\n");
 
-	urb->hcpriv = dum;
+	list_add_tail (&urbp->urbp_list, &dum->urbp_list);
+	urb->hcpriv = urbp;
 	if (usb_pipetype (urb->pipe) == PIPE_CONTROL)
 		urb->error_count = 1;		/* mark as a new urb */
 
@@ -1055,8 +1069,7 @@ static struct dummy_ep *find_endpoint (struct dummy *dum, u8 address)
 static void dummy_timer (unsigned long _dum)
 {
 	struct dummy		*dum = (struct dummy *) _dum;
-	struct hcd_dev		*hdev;
-	struct list_head	*entry, *tmp;
+	struct urbp		*urbp, *tmp;
 	unsigned long		flags;
 	int			limit, total;
 	int			i;
@@ -1088,7 +1101,6 @@ static void dummy_timer (unsigned long _dum)
 		spin_unlock_irqrestore (&dum->lock, flags);
 		return;
 	}
-	hdev = dum->udev->hcpriv;
 
 	for (i = 0; i < DUMMY_ENDPOINTS; i++) {
 		if (!ep_name [i])
@@ -1097,14 +1109,14 @@ static void dummy_timer (unsigned long _dum)
 	}
 
 restart:
-	list_for_each_safe (entry, tmp, &hdev->urb_list) {
+	list_for_each_entry_safe (urbp, tmp, &dum->urbp_list, urbp_list) {
 		struct urb		*urb;
 		struct dummy_request	*req;
 		u8			address;
 		struct dummy_ep		*ep = 0;
 		int			type;
 
-		urb = list_entry (entry, struct urb, urb_list);
+		urb = urbp->urb;
 		if (urb->status != -EINPROGRESS) {
 			/* likely it was just unlinked */
 			goto return_urb;
@@ -1349,7 +1361,9 @@ restart:
 			continue;
 
 return_urb:
-		urb->hcpriv = 0;
+		urb->hcpriv = NULL;
+		list_del (&urbp->urbp_list);
+		kfree (urbp);
 		if (ep)
 			ep->already_seen = ep->setup_stage = 0;
 
@@ -1361,7 +1375,7 @@ return_urb:
 	}
 
 	/* want a 1 msec delay here */
-	if (!list_empty (&hdev->urb_list))
+	if (!list_empty (&dum->urbp_list))
 		mod_timer (&dum->timer, jiffies + msecs_to_jiffies(1));
 	else {
 		usb_put_dev (dum->udev);
@@ -1601,21 +1615,17 @@ show_urbs (struct device *dev, char *buf)
 {
 	struct usb_hcd		*hcd = dev_get_drvdata (dev);
 	struct dummy		*dum = hcd_to_dummy (hcd);
-	struct urb		*urb;
+	struct urbp		*urbp;
 	size_t			size = 0;
 	unsigned long		flags;
-	struct hcd_dev		*hdev;
 
 	spin_lock_irqsave (&dum->lock, flags);
-	if (dum->udev) {
-		hdev = dum->udev->hcpriv;
-		list_for_each_entry (urb, &hdev->urb_list, urb_list) {
-			size_t		temp;
+	list_for_each_entry (urbp, &dum->urbp_list, urbp_list) {
+		size_t		temp;
 
-			temp = show_urb (buf, PAGE_SIZE - size, urb);
-			buf += temp;
-			size += temp;
-		}
+		temp = show_urb (buf, PAGE_SIZE - size, urbp->urb);
+		buf += temp;
+		size += temp;
 	}
 	spin_unlock_irqrestore (&dum->lock, flags);
 
@@ -1641,6 +1651,8 @@ static int dummy_start (struct usb_hcd *hcd)
 	init_timer (&dum->timer);
 	dum->timer.function = dummy_timer;
 	dum->timer.data = (unsigned long) dum;
+
+	INIT_LIST_HEAD (&dum->urbp_list);
 
 	root = usb_alloc_dev (0, &hcd->self, 0);
 	if (!root)
@@ -1754,8 +1766,6 @@ static int dummy_probe (struct device *dev)
 	hcd->self.hcpriv = hcd;
 	hcd->self.bus_name = dev->bus_id;
 	hcd->product_desc = "Dummy host controller";
-
-	INIT_LIST_HEAD (&hcd->dev_list);
 
 	usb_register_bus (&hcd->self);
 
