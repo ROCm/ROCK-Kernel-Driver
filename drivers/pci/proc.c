@@ -371,6 +371,47 @@ static struct seq_operations proc_bus_pci_devices_op = {
 
 static struct proc_dir_entry *proc_bus_pci_dir;
 
+/* driverfs files */
+static ssize_t pci_show_irq(struct device * dev, char * buf, size_t count, loff_t off)
+{
+	struct pci_dev * pci_dev = list_entry(dev,struct pci_dev,dev);
+	return off ? 0 : sprintf(buf,"%u",pci_dev->irq);
+}
+
+static struct driver_file_entry pci_irq_entry = {
+	name:	"irq",
+	mode:	S_IRUGO,
+	show:	pci_show_irq,
+};
+
+static ssize_t pci_show_resources(struct device * dev, char * buf, size_t count, loff_t off)
+{
+	struct pci_dev * pci_dev = list_entry(dev,struct pci_dev,dev);
+	char * str = buf;
+	int i;
+
+	if (off && off < DEVICE_COUNT_RESOURCE) {
+		str += sprintf(str,LONG_FORMAT LONG_FORMAT LONG_FORMAT "\n",
+				       pci_resource_start(pci_dev,off),
+				       pci_resource_end(pci_dev,off),
+				       pci_resource_flags(pci_dev,off));
+	} else if (!off) {
+		for (i = 0; i < DEVICE_COUNT_RESOURCE && pci_resource_start(pci_dev,i); i++) {
+			str += sprintf(str,LONG_FORMAT LONG_FORMAT LONG_FORMAT "\n",
+				       pci_resource_start(pci_dev,i),
+				       pci_resource_end(pci_dev,i),
+				       pci_resource_flags(pci_dev,i));
+		}
+	}
+	return (str - buf);
+}
+
+static struct driver_file_entry pci_resource_entry = {
+	name:	"resources",
+	mode:	S_IRUGO,
+	show:	pci_show_resources,
+};
+
 int pci_proc_attach_device(struct pci_dev *dev)
 {
 	struct pci_bus *bus = dev->bus;
@@ -390,6 +431,9 @@ int pci_proc_attach_device(struct pci_dev *dev)
 	e->proc_fops = &proc_bus_pci_operations;
 	e->data = dev;
 	e->size = PCI_CFG_SPACE_SIZE;
+
+	device_create_file(&dev->dev,&pci_irq_entry);
+	device_create_file(&dev->dev,&pci_resource_entry);
 	return 0;
 }
 
