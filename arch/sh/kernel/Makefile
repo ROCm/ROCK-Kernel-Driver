@@ -17,11 +17,5 @@ obj-$(CONFIG_SH_KGDB)		+= kgdb_stub.o kgdb_jmp.o
 obj-$(CONFIG_SH_CPU_FREQ)	+= cpufreq.o
 obj-$(CONFIG_MODULES)		+= module.o
 
-ifneq ($(CONFIG_SH_DREAMCAST),y)
-obj-$(CONFIG_PCI)		+= pci-dma.o
-endif
-obj-$(CONFIG_PCI)		+= pci.o
-obj-$(CONFIG_PCI_AUTO)		+= pci_auto.o
-
 USE_STANDARD_AS_RULE := true
 

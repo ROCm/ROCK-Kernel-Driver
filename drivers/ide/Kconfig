@@ -97,7 +97,7 @@ comment "Please see Documentation/ide.txt for help/info on IDE drives"
 
 config BLK_DEV_HD_IDE
 	bool "Use old disk-only driver on primary interface"
-	depends on X86 && X86_PC9800!=y
+	depends on ((X86 && X86_PC9800!=y) || SH_MPC1211)
 	---help---
 	  There are two drivers for MFM/RLL/IDE disks.  Most people use just
 	  the new enhanced driver by itself.  This option however installs the

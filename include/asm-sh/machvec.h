@@ -15,13 +15,12 @@
 #include <linux/time.h>
 
 #include <asm/machtypes.h>
+#include <asm/machvec_init.h>
 
 struct timeval;
 
 struct sh_machine_vector
 {
-	const char *mv_name;
-
 	int mv_nr_irqs;
 
 	unsigned char (*mv_inb)(unsigned long);
@@ -59,15 +58,10 @@ struct sh_machine_vector
 
 	int (*mv_irq_demux)(int irq);
 
-	void (*mv_init_arch)(void);
 	void (*mv_init_irq)(void);
 	void (*mv_init_pci)(void);
-	void (*mv_kill_arch)(int);
 
 	void (*mv_heartbeat)(void);
-
-	void (*mv_rtc_gettimeofday)(struct timespec *ts);
-	int (*mv_rtc_settimeofday)(const time_t secs);
 };
 
 extern struct sh_machine_vector sh_mv;

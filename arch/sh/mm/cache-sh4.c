@@ -1,4 +1,4 @@
-/* $Id: cache-sh4.c,v 1.20 2003/05/10 03:22:05 sugioka Exp $
+/* $Id: cache-sh4.c,v 1.24 2003/10/12 19:40:12 lethal Exp $
  *
  *  linux/arch/sh/mm/cache-sh4.c
  *
@@ -26,10 +26,7 @@ extern void __flush_cache_4096_all(unsigned long start);
 static void __flush_cache_4096_all_ex(unsigned long start);
 extern void __flush_dcache_all(void);
 static void __flush_dcache_all_ex(void);
-/*
- * FIXME: Add ST40STB1 probe support (and clean up the manual overdrive stuff)
- * seems to rely on some quirky PVR shifting .. stuart? ++paulm
- */
+
 int __init detect_cpu_and_cache_system(void)
 {
 	unsigned long pvr, prr, ccr;
@@ -37,9 +34,9 @@ int __init detect_cpu_and_cache_system(void)
 	pvr = (ctrl_inl(CCN_PVR) >> 8) & 0xffff;
 	prr = (ctrl_inl(CCN_PRR) >> 4) & 0xff;
 
-		/*
+	/*
 	 * Setup some sane SH-4 defaults for the icache
-		 */
+	 */
 	cpu_data->icache.way_shift	= 13;
 	cpu_data->icache.entry_shift	= 5;
 	cpu_data->icache.entry_mask	= 0x1fe0;
@@ -64,9 +61,17 @@ int __init detect_cpu_and_cache_system(void)
 	switch (pvr) {
 	case 0x205:
 		cpu_data->type = CPU_SH7750;
+		set_bit(CPU_HAS_P2_FLUSH_BUG, &(cpu_data->flags));
 		break;
 	case 0x206:
 		cpu_data->type = CPU_SH7750S;
+
+		/* 
+		 * FIXME: This is needed for 7750, but do we need it for the
+		 * 7750S and 7750R too? For now, assume we do.. -- PFM
+		 */
+		set_bit(CPU_HAS_P2_FLUSH_BUG, &(cpu_data->flags));
+
 		break;
 	case 0x1100:
 		cpu_data->type = CPU_SH7751;
@@ -77,28 +82,46 @@ int __init detect_cpu_and_cache_system(void)
 	case 0x8100:
 		cpu_data->type = CPU_ST40GX1;
 		break;
-	case 0x500:
-		if (prr == 0x10)
-			cpu_data->type = CPU_SH7750R;
-		else
-			cpu_data->type = CPU_SH7751R;
+	case 0x700:
+		/* XXX: Add proper CVR probing */
+		cpu_data->type = CPU_SH4_501;
+		break;
+	case 0x600:
+		cpu_data->type = CPU_SH4_202;
+		/* fall */
+	case 0x500 ... 0x501:
+		switch (prr) {
+		    case 0x10: cpu_data->type = CPU_SH7750R; break;
+		    case 0x11: cpu_data->type = CPU_SH7751R; break;
+		    case 0x50: cpu_data->type = CPU_SH7760;  break;
+		}
+
+		if (cpu_data->type == CPU_SH7750R)
+			set_bit(CPU_HAS_P2_FLUSH_BUG, &(cpu_data->flags));
+
 		jump_to_P2();
 		ccr = ctrl_inl(CCR);
-		back_to_P1();
-		if(ccr & CCR_CACHE_EMODE) {
-			cpu_data->icache.ways = 2;
-			cpu_data->dcache.ways = 2;
+
+		/* Force EMODE */
+		if (!(ccr & CCR_CACHE_EMODE)) {
+			ccr |= CCR_CACHE_EMODE;
+			ctrl_outl(ccr, CCR);
 		}
+
+		back_to_P1();
+
+		cpu_data->icache.ways = 2;
+		cpu_data->dcache.ways = 2;
+
 		break;
 	default:
 		cpu_data->type = CPU_SH_NONE;
 		break;
 	}
 
-	/*
-	 * For now, all SH-4's have an FPU ..
-	 */
-	cpu_data->flags |= CPU_HAS_FPU;
+	/* No FPU on the SH4-500 series.. */
+	if (cpu_data->type != CPU_SH4_501)
+		set_bit(CPU_HAS_FPU, &(cpu_data->flags));
 
 	return 0;
 }
@@ -257,20 +280,16 @@ static inline void flush_cache_4096(unsigned long start,
 	unsigned long flags; 
 	extern void __flush_cache_4096(unsigned long addr, unsigned long phys, unsigned long exec_offset);
 
-		/*
+	/*
 	 * SH7751, SH7751R, and ST40 have no restriction to handle cache.
-		 * (While SH7750 must do that at P2 area.)
-		 */
-	if ((cpu_data->type == CPU_SH7751 ||
-	     cpu_data->type == CPU_SH7751R ||
-	     cpu_data->type == CPU_ST40RA ||
-	     cpu_data->type == CPU_ST40GX1) &&
-		(start >= CACHE_OC_ADDRESS_ARRAY)) {
-		__flush_cache_4096(start | SH_CACHE_ASSOC, phys | 0x80000000, 0);
-	} else {
+	 * (While SH7750 must do that at P2 area.)
+	 */
+	if (test_bit(CPU_HAS_P2_FLUSH_BUG, &(cpu_data->flags))) {
 		local_irq_save(flags);
 		__flush_cache_4096(start | SH_CACHE_ASSOC, phys | 0x80000000, 0x20000000);
 		local_irq_restore(flags);
+	} else if (start >= CACHE_OC_ADDRESS_ARRAY) {
+		__flush_cache_4096(start | SH_CACHE_ASSOC, phys | 0x80000000, 0);
 	}
 }
 

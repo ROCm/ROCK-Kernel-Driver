@@ -25,14 +25,6 @@ config RWSEM_GENERIC_SPINLOCK
 config RWSEM_XCHGADD_ALGORITHM
 	bool
 
-config GENERIC_ISA_DMA
-	bool
-	default y
-
-config VARIABLE_CLOCK_TICK_RATE
-	bool
-	default y
-
 source "init/Kconfig"
 
 
@@ -53,6 +45,12 @@ config SH_7751_SOLUTION_ENGINE
 	help
 	  Select 7751 SolutionEngine if configuring for a Hitachi SH7751
 	  evalutation board.
+
+config SH_7751_SYSTEMH
+	bool "SystemH7751R"
+	help
+	  Select SystemH if you are configuring for a Renesas SystemH
+	  7751R evaluation board.
 
 config SH_STB1_HARP
 	bool "STB1_Harp"
@@ -102,6 +100,8 @@ config SH_EC3104
 
 config SH_SATURN
 	bool "Saturn"
+	help
+	  Select Saturn if configuring for a SEGA Saturn.
 
 config SH_DREAMCAST
 	bool "Dreamcast"
@@ -132,6 +132,13 @@ config SH_ADX
 config SH_MPC1211
 	bool "MPC1211"
 
+config SH_SECUREEDGE5410
+	bool "SecureEdge5410"
+	help
+	  Select SecureEdge5410 if configuring for a SnapGear SH board.
+	  This includes both the OEM SecureEdge products as well as the
+	  SME product line.
+
 config SH_UNKNOWN
 	bool "BareCPU"
 	help
@@ -143,6 +150,85 @@ config SH_UNKNOWN
 	  not work.
 
 	  This option is for the early stages of porting to a new machine.
+
+endchoice
+
+choice
+	prompt "Processor family"
+	default CPU_SH4
+	help
+	  This option determines the CPU family to compile for. Supported
+	  targets are SH-2, SH-3, and SH-4. These options are independent of
+	  CPU functionality. As such, SH-DSP users will still want to select
+	  their respective processor family in addition to the DSP support
+	  option.
+
+config CPU_SH2
+	bool "SH-2"
+	select SH_WRITETHROUGH
+
+config CPU_SH3
+	bool "SH-3"
+
+config CPU_SH4
+	bool "SH-4"
+
+endchoice
+
+choice
+	prompt "Processor subtype"
+	
+config CPU_SUBTYPE_SH7604
+	bool "SH7604"
+	depends on CPU_SH2
+	help
+	  Select SH7604 if you have SH7604
+
+config CPU_SUBTYPE_SH7300
+	bool "SH7300"
+	depends on CPU_SH3
+	  
+config CPU_SUBTYPE_SH7707
+	bool "SH7707"
+	depends on CPU_SH3
+	help
+	  Select SH7707 if you have a  60 Mhz SH-3 HD6417707 CPU.
+
+config CPU_SUBTYPE_SH7708
+	bool "SH7708"
+	depends on CPU_SH3
+	help
+	  Select SH7708 if you have a  60 Mhz SH-3 HD6417708S or
+	  if you have a 100 Mhz SH-3 HD6417708R CPU.
+
+config CPU_SUBTYPE_SH7709
+	bool "SH7709"
+	depends on CPU_SH3
+	help
+	  Select SH7709 if you have a  80 Mhz SH-3 HD6417709 CPU.
+
+config CPU_SUBTYPE_SH7750
+	bool "SH7750"
+	depends on CPU_SH4
+	help
+	  Select SH7750 if you have a 200 Mhz SH-4 HD6417750 CPU.
+
+config CPU_SUBTYPE_SH7751
+	bool "SH7751/SH7751R"
+	depends on CPU_SH4
+	help
+	  Select SH7751 if you have a 166 Mhz SH-4 HD6417751 CPU,
+	  or if you have a HD6417751R CPU.
+
+config CPU_SUBTYPE_SH7760
+	bool "SH7760"
+	depends on CPU_SH4
+
+config CPU_SUBTYPE_ST40STB1
+	bool "ST40STB1"
+	depends on CPU_SH4
+	help
+	  Select ST40STB1 if you have a ST40STB1 CPU.
 
 endchoice
 
@@ -169,8 +255,8 @@ config CMDLINE
 # Platform-specific memory start and size definitions
 config MEMORY_START
 	hex "Physical memory start address" if !MEMORY_SET || MEMORY_OVERRIDE
-	default "08000000" if !MEMORY_SET || MEMORY_OVERRIDE || !MEMORY_OVERRIDE && SH_ADX || SH_MPC1211
-	default "0c000000" if !MEMORY_OVERRIDE && (SH_DREAMCAST || SH_HP600 || SH_BIGSUR || SH_SH2000 || SH_7751_SOLUTION_ENGINE || SH_SOLUTION_ENGINE)
+	default "0x08000000" if !MEMORY_SET || MEMORY_OVERRIDE || !MEMORY_OVERRIDE && SH_ADX || SH_MPC1211 || SH_SECUREEDGE5410
+	default "0x0c000000" if !MEMORY_OVERRIDE && (SH_DREAMCAST || SH_HP600 || SH_BIGSUR || SH_SH2000 || SH_7751_SOLUTION_ENGINE || SH_SOLUTION_ENGINE)
 	---help---
 	  Computers built with Hitachi SuperH processors always
 	  map the ROM starting at address zero.  But the processor
@@ -187,11 +273,11 @@ config MEMORY_START
 
 config MEMORY_SIZE
 	hex "Physical memory size" if !MEMORY_SET || MEMORY_OVERRIDE
-	default "00400000" if !MEMORY_SET || MEMORY_OVERRIDE || !MEMORY_OVERRIDE && SH_ADX || !MEMORY_OVERRIDE && (SH_HP600 || SH_BIGSUR || SH_SH2000)
-	default "01000000" if !MEMORY_OVERRIDE && SH_DREAMCAST
-	default "04000000" if !MEMORY_OVERRIDE && SH_7751_SOLUTION_ENGINE
-	default "02000000" if !MEMORY_OVERRIDE && SH_SOLUTION_ENGINE
-	default "08000000" if SH_MPC1211
+	default "0x00400000" if !MEMORY_SET || MEMORY_OVERRIDE || !MEMORY_OVERRIDE && SH_ADX || !MEMORY_OVERRIDE && (SH_HP600 || SH_BIGSUR || SH_SH2000)
+	default "0x01000000" if !MEMORY_OVERRIDE && SH_DREAMCAST || SH_SECUREEDGE5410
+	default "0x04000000" if !MEMORY_OVERRIDE && SH_7751_SOLUTION_ENGINE
+	default "0x02000000" if !MEMORY_OVERRIDE && SH_SOLUTION_ENGINE
+	default "0x08000000" if SH_MPC1211
 	help
 	  This sets the default memory size assumed by your SH kernel. It can
 	  be overridden as normal by the 'mem=' argument on the kernel command
@@ -201,7 +287,7 @@ config MEMORY_SIZE
 
 config MEMORY_SET
 	bool
-	depends on !MEMORY_OVERRIDE && (SH_MPC1211 || SH_ADX || SH_DREAMCAST || SH_HP600 || SH_BIGSUR || SH_SH2000 || SH_7751_SOLUTION_ENGINE || SH_SOLUTION_ENGINE)
+	depends on !MEMORY_OVERRIDE && (SH_MPC1211 || SH_ADX || SH_DREAMCAST || SH_HP600 || SH_BIGSUR || SH_SH2000 || SH_7751_SOLUTION_ENGINE || SH_SOLUTION_ENGINE || SH_SECUREEDGE5410)
 	default y
 	help
 	  This is an option about which you will never be asked a question.
@@ -254,15 +340,13 @@ endchoice
 config CF_BASE_ADDR
 	hex
 	depends on CF_ENABLER
-	default "b8000000" if CF_AREA6
-	default "b4000000" if CF_AREA5
-
-endmenu
+	default "0xb8000000" if CF_AREA6
+	default "0xb4000000" if CF_AREA5
 
 # The SH7750 RTC module is disabled in the Dreamcast
 config SH_RTC
 	bool
-	depends on !SH_DREAMCAST
+	depends on !SH_DREAMCAST && !SH_SATURN
 	default y
 	help
 	  Selecting this option will allow the Linux kernel to emulate
@@ -270,9 +354,16 @@ config SH_RTC
 
 	  If unsure, say N.
 
-# This is also board-specific
-config PCI_AUTO
-	bool
+config SH_DSP
+	bool "DSP support"
+	depends on !CPU_SH4
+	default y
+	help
+	  Selecting this option will enable support for SH processors that
+	  have DSP units (ie, SH2-DSP and SH3-DSP). It is safe to say Y here
+	  by default, as the existance of the DSP will be probed at runtime.
+
+	  This option must be set in order to enable the DSP.
 
 config SH_HP600
 	bool
@@ -289,91 +380,10 @@ config DISCONTIGMEM
 	  or have huge holes in the physical address space for other reasons.
 	  See <file:Documentation/vm/numa> for more.
 
-
-menu "Processor type and features"
-
-#
-# Ick, get rid of all this CPU_SUBTYPE nonsense. Just probe it, fill in
-# cpu_data, and leave it alone. (Feasible for SH-4 at least, and some
-# SH-3). ++paulm
-#
-choice
-	prompt "Processor type"
-	default CPU_SUBTYPE_SH7708
-
-config CPU_SUBTYPE_SH7604
-	bool "SH7604"
-	help
-	  Select SH7604 if you have SH7604
-
-config CPU_SUBTYPE_SH7707
-	bool "SH7707"
-	---help---
-	  Select the type of SuperH processor you have. This information is
-	  used for optimizing and configuration purposes.
-
-          Select SH7604 if you have a SH-2 CPU.
-
-	  Select SH7707 if you have a  60 Mhz SH-3 HD6417707 CPU.
-
-	  Select SH7708 if you have a  60 Mhz SH-3 HD6417708S or
-	  if you have a 100 Mhz SH-3 HD6417708R CPU.
-
-	  Select SH7709 if you have a  80 Mhz SH-3 HD6417709 CPU.
-
-	  Select SH7750 if you have a 200 Mhz SH-4 HD6417750 CPU.
-
-	  Select SH7751 if you have a SH7751
-
-	  Select ST40STB1 if you have a ST40STB1
-
-config CPU_SUBTYPE_SH7708
-	bool "SH7708"
-	help
-	  Select SH7708 if you have a  60 Mhz SH-3 HD6417708S or
-	  if you have a 100 Mhz SH-3 HD6417708R CPU.
-
-config CPU_SUBTYPE_SH7709
-	bool "SH7709"
-	help
-	  Select SH7709 if you have a  80 Mhz SH-3 HD6417709 CPU.
-
-config CPU_SUBTYPE_SH7750
-	bool "SH7750"
-	help
-	  Select SH7750 if you have a 200 Mhz SH-4 HD6417750 CPU.
-
-config CPU_SUBTYPE_SH7751
-	bool "SH7751"
-	help
-	  Select SH7750 if you have a 166 Mhz SH-4 HD6417751 CPU.
-
-config CPU_SUBTYPE_ST40STB1
-	bool "ST40STB1"
-	help
-	  Select ST40STB1 if you have a ST40STB1 CPU.
-
-endchoice
-
-config CPU_SH2
-	bool
-	depends on CPU_SUBTYPE_SH7604
-	default y
-
-config CPU_SH3
-	bool
-	depends on !CPU_SH2 && (CPU_SUBTYPE_SH7707 || CPU_SUBTYPE_SH7708 || CPU_SUBTYPE_SH7709)
-	default y
-
-config CPU_SH4
-	bool
-	depends on !CPU_SH3 && !CPU_SH2 && (CPU_SUBTYPE_SH7750 || CPU_SUBTYPE_SH7751 || CPU_SUBTYPE_ST40STB1)
-	default y
-
 config ZERO_PAGE_OFFSET
 	hex "Zero page offset"
-	default "00001000" if !SH_MPC1211
-	default "00004000" if SH_MPC1211
+	default "0x00001000" if !SH_MPC1211
+	default "0x00004000" if SH_MPC1211
 	help
 	  This sets the default offset of zero page.
 
@@ -385,17 +395,25 @@ config ST40_LMI_MEMORY
 config MEMORY_START
 	hex
 	depends on CPU_SUBTYPE_ST40STB1 && ST40_LMI_MEMORY
-	default "08000000"
+	default "0x08000000"
 
 config MEMORY_SIZE
 	hex
 	depends on CPU_SUBTYPE_ST40STB1 && ST40_LMI_MEMORY
-	default "00400000"
+	default "0x00400000"
 
 config MEMORY_SET
 	bool
 	depends on CPU_SUBTYPE_ST40STB1 && ST40_LMI_MEMORY
 	default y
+
+config BOOT_LINK_OFFSET
+	hex "Link address offset for booting"
+	default "0x00800000"
+	help
+	  This option allows you to set the link address offset of the zImage.
+	  This can be useful if you are on a board which has a small amount of
+	  memory.
 
 config CPU_LITTLE_ENDIAN
 	bool "Little Endian"
@@ -442,6 +460,13 @@ config SH_OCRAM
 
 	  If unsure, say N.
 
+config SH_STORE_QUEUES
+	bool "Support for Store Queues"
+	depends on CPU_SH4
+	help
+	  Selecting this option will enable an in-kernel API for manipulating
+	  the store queues integrated in the SH-4 processors.
+	
 config SMP
 	bool "Symmetric multi-processing support"
 	---help---
@@ -477,13 +502,18 @@ config NR_CPUS
 	  This is purely to save memory - each supported CPU adds
 	  approximately eight kilobytes to the kernel image.
 
-config SH_DMA
-	bool "DMA controller (DMAC) support"
+config SH_PCLK_FREQ
+	int "Peripheral clock frequency (in Hz)"
+	default "49876504" if CPU_SUBTYPE_SH7750
+	default "60013568" if CPU_SUBTYPE_SH7751
+	default "1193182"
 	help
-	  Selecting this option will provide same API as PC's Direct Memory
-	  Access Controller(8237A) for SuperH DMAC.
-
-	  If unsure, say N.
+	  This option is used to specify the peripheral clock frequency. This
+	  option must be set for each processor in order for the kernel to
+	  function reliably. If no sane default exists, we use a default from
+	  the legacy i8254. Any discrepancies will be reported on boot time
+	  with an auto-probed frequency which should be considered the proper
+	  value for your hardware.
 
 config CPU_FREQ
 	bool "CPU Frequency scaling"
@@ -518,80 +548,9 @@ config SH_CPU_FREQ
 
 source "drivers/cpufreq/Kconfig"
 
-# A board must have defined HD6446X_SERIES in order to see these
-choice
-	prompt "HD6446x options"
-	depends HD6446X_SERIES
-	default HD64461
+source "arch/sh/drivers/dma/Kconfig"
 
-config HD64461
-	bool "Hitachi HD64461 companion chip support"
-	depends on CPU_SUBTYPE_SH7709
-	---help---
-	  The Hitachi HD64461 provides an interface for
-	  the SH7709 CPU, supporting a LCD controller,
-	  CRT color controller, IrDA up to 4 Mbps, and a
-	  PCMCIA controller supporting 2 slots.
-
-	  More information is available at
-	  <http://semiconductor.hitachi.com/windowsce/superh/sld013.htm>.
-
-	  Say Y if you want support for the HD64461.
-	  Otherwise, say N.
-
-config HD64465
-	bool "Hitachi HD64465 companion chip support"
-	depends on CPU_SUBTYPE_SH7750
-	---help---
-	  The Hitachi HD64465 provides an interface for
-	  the SH7750 CPU, supporting a LCD controller,
-	  CRT color controller, IrDA, USB, PCMCIA,
-	  keyboard controller, and a printer interface.
-
-	  More information is available at
-	  <http://global.hitachi.com/New/cnews/E/1998/981019B.html>.
-
-	  Say Y if you want support for the HD64465.
-	  Otherwise, say N.
-
-endchoice
-
-# These will also be split into the Kconfig's below
-config HD64461_IRQ
-	int "HD64461 IRQ"
-	depends on HD64461
-	default "36"
-	help
-	  The default setting of the HD64461 IRQ is 36.
-
-	  Do not change this unless you know what you are doing.
-
-config HD64461_ENABLER
-	bool "HD64461 PCMCIA enabler"
-	depends on HD64461
-	help
-	  Say Y here if you want to enable PCMCIA support
-	  via the HD64461 companion chip.
-	  Otherwise, say N.
-
-
-config HD64465_IOBASE
-	hex "HD64465 start address"
-	depends on HD64465
-	default "b0000000"
-	help
-	  The default setting of the HD64465 IO base address is 0xb0000000.
-
-	  Do not change this unless you know what you are doing.
-
-config HD64465_IRQ
-	int "HD64465 IRQ"
-	depends on HD64465
-	default "5"
-	help
-	  The default setting of the HD64465 IRQ is 5.
-
-	  Do not change this unless you know what you are doing.
+source "arch/sh/cchips/Kconfig"
 
 endmenu
 
@@ -601,9 +560,13 @@ menu "Bus options (PCI, PCMCIA, EISA, MCA, ISA)"
 # Even on SuperH devices which don't have an ISA bus,
 # this variable helps the PCMCIA modules handle
 # IRQ requesting properly -- Greg Banks.
+#
+# Though we're generally not interested in it when
+# we're not using PCMCIA, so we make it dependent on
+# PCMCIA outright. -- PFM.
 config ISA
 	bool
-	default y
+	default y if PCMCIA
 	help
 	  Find out whether you have ISA slots on your motherboard.  ISA is the
 	  name of a bus system, i.e. the way the CPU talks to the other stuff
@@ -637,68 +600,11 @@ config MCA
 config SBUS
 	bool
 
-config PCI
-	bool "PCI support"
-	help
-	  Find out whether you have a PCI motherboard. PCI is the name of a
-	  bus system, i.e. the way the CPU talks to the other stuff inside
-	  your box. Other bus systems are ISA, EISA, MicroChannel (MCA) or
-	  VESA. If you have PCI, say Y, otherwise N.
-
-	  The PCI-HOWTO, available from
-	  <http://www.tldp.org/docs.html#howto>, contains valuable
-	  information about which PCI hardware does work under Linux and which
-	  doesn't.
-
-choice
-	prompt "PCI access mode"
-	depends on PCI
-	default PCI_GOANY
-
-config PCI_GOBIOS
-	bool "BIOS"
-	---help---
-	  On PCI systems, the BIOS can be used to detect the PCI devices and
-	  determine their configuration. However, some old PCI motherboards
-	  have BIOS bugs and may crash if this is done. Also, some embedded
-	  PCI-based systems don't have any BIOS at all. Linux can also try to
-	  detect the PCI hardware directly without using the BIOS.
-
-	  With this option, you can specify how Linux should detect the PCI
-	  devices. If you choose "BIOS", the BIOS will be used, if you choose
-	  "Direct", the BIOS won't be used, and if you choose "Any", the
-	  kernel will try the direct access method and falls back to the BIOS
-	  if that doesn't work. If unsure, go with the default, which is
-	  "Any".
-
-config PCI_GODIRECT
-	bool "Direct"
-
-config PCI_GOANY
-	bool "Any"
-
-endchoice
-
-config PCI_BIOS
+config MAPLE
 	bool
-	depends on PCI && (PCI_GOBIOS || PCI_GOANY)
-	default y
+	default y if SH_DREAMCAST
 
-config PCI_DIRECT
-	bool
-	depends on PCI && (PCI_GODIRECT || PCI_GOANY)
-	default y
-
-config SH_PCIDMA_NONCOHERENT
-	bool "Cache and PCI noncoherent"
-	depends on PCI
-	help
-	  Enable this option if your platform does not have a CPU cache which
-	  remains coherent with PCI DMA. It is safest to say 'Y', although you
-	  will see better performance if you can say 'N', because the PCI DMA
-	  code will not have to flush the CPU's caches. If you have a PCI host
-	  bridge integrated with your SH CPU, refer carefully to the chip specs
-	  to see if you can say 'N' here. Otherwise, leave it as 'Y'.
+source "arch/sh/drivers/pci/Kconfig"
 
 source "drivers/pci/Kconfig"
 
@@ -761,10 +667,6 @@ source "drivers/telephony/Kconfig"
 # input - input/joystick depends on it. As does USB.
 #
 source "drivers/input/Kconfig"
-
-#if [ "$CONFIG_SH_DREAMCAST" = "y" ]; then
-#   source drivers/maple/Config.in
-#fi
 
 menu "Character devices"
 
@@ -1136,6 +1038,7 @@ source "sound/Kconfig"
 
 source "drivers/usb/Kconfig"
 
+source "arch/sh/oprofile/Kconfig"
 
 menu "Kernel hacking"
 
@@ -1183,6 +1086,97 @@ config SH_EARLY_PRINTK
 	  This option is only useful porting the kernel to a new machine,
 	  when the kernel may crash or hang before the serial console is
 	  initialised. If unsure, say N.
+
+config KGDB
+	bool "Include KGDB kernel debugger"
+	help
+	  Include in-kernel hooks for kgdb, the Linux kernel source level
+	  debugger.  See <http://kgdb.sourceforge.net/> for more information.
+	  Unless you are intending to debug the kernel, say N here.
+
+menu "KGDB configuration options"
+	depends on KGDB
+
+config MORE_COMPILE_OPTIONS
+	bool "Add any additional compile options"
+	help
+	  If you want to add additional CFLAGS to the kernel build, enable this
+	  option and then enter what you would like to add in the next question.
+	  Note however that -g is already appended with the selection of KGDB.
+
+config COMPILE_OPTIONS
+	string "Additional compile arguments"
+	depends on MORE_COMPILE_OPTIONS
+
+config KGDB_NMI
+	bool "Enter KGDB on NMI"
+	default n
+
+config KGDB_THREAD
+	bool "Include KGDB thread support"
+	default y
+
+config SH_KGDB_CONSOLE
+	bool "Console messages through GDB"
+	default n
+
+config KGDB_SYSRQ
+	bool "Allow SysRq 'G' to enter KGDB"
+	default y
+
+config KGDB_KERNEL_ASSERTS
+	bool "Include KGDB kernel assertions"
+	default n
+
+comment "Serial port setup"
+
+config KGDB_DEFPORT
+	int "Port number (ttySCn)"
+	default "1"
+
+config KGDB_DEFBAUD
+	int "Baud rate"
+	default "115200"
+
+choice
+	prompt "Parity"
+	depends on KGDB
+	default KGDB_DEFPARITY_N
+
+config KGDB_DEFPARITY_N
+	bool "None"
+
+config KGDB_DEFPARITY_E
+	bool "Even"
+
+config KGDB_DEFPARITY_O
+	bool "Odd"
+
+endchoice
+
+choice
+	prompt "Data bits"
+	depends on KGDB
+	default KGDB_DEFBITS_8
+
+config KGDB_DEFBITS_8
+	bool "8"
+
+config KGDB_DEFBITS_7
+	bool "7"
+
+endchoice
+
+endmenu
+
+config FRAME_POINTER
+	bool "Compile the kernel with frame pointers"
+	default y if KGDB
+	help
+	  If you say Y here the resulting kernel image will be slightly larger
+	  and slower, but it will give very useful debugging information.
+	  If you don't debug the kernel, you can say N, but we may not be able
+	  to solve problems without frame pointers.
 
 endmenu
 

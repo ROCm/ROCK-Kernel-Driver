@@ -7,8 +7,7 @@
  */
 #include <linux/kernel.h>
 #include <linux/init.h>
-#include <asm/saturn/saturn.h>
-#include <asm/saturn/irq.h>
+#include <linux/interrupt.h>
 #include <asm/irq.h>
 #include <asm/io.h>
 
@@ -65,7 +64,7 @@ static inline void unmask_saturn_irq(unsigned int irq_nr)
 
 	mask = ctrl_inl(SATURN_IMR);
 	mask &= ~saturn_irq_mask(irq_nr);
-	ctrl_outl(SATURN_IMR);
+	ctrl_outl(mask, SATURN_IMR);
 }
 
 static void disable_saturn_irq(unsigned int irq_nr)
@@ -85,7 +84,7 @@ static void mask_and_ack_saturn_irq(unsigned int irq_nr)
 
 static void end_saturn_irq(unsigned int irq_nr)
 {
-	if (!(irq_desc[irq].status & (IRQ_DISABLED | IRQ_INPROGRESS)))
+	if (!(irq_desc[irq_nr].status & (IRQ_DISABLED | IRQ_INPROGRESS)))
 		unmask_saturn_irq(irq_nr);
 }
 

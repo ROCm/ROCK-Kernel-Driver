@@ -34,7 +34,7 @@ unsigned int __smp_probe_cpus(void)
  * addition to which, we treat them as write-only, since
  * reading from them will return undefined data.
  */
-static inline void smpc_slave_off(unsigned int cpu)
+static inline void smpc_slave_stop(unsigned int cpu)
 {
 	smpc_barrier();
 	ctrl_outb(1, SMPC_STATUS);
@@ -43,7 +43,7 @@ static inline void smpc_slave_off(unsigned int cpu)
 	smpc_barrier();
 }
 
-static inline void smpc_slave_on(unsigned int cpu)
+static inline void smpc_slave_start(unsigned int cpu)
 {
 	ctrl_outb(1, SMPC_STATUS);
 	ctrl_outb(SMPC_CMD_SSHON, SMPC_COMMAND);

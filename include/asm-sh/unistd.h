@@ -275,8 +275,14 @@
 #define __NR_clock_gettime	(__NR_timer_create+6)
 #define __NR_clock_getres	(__NR_timer_create+7)
 #define __NR_clock_nanosleep	(__NR_timer_create+8)
+#define __NR_statfs64		268
+#define __NR_fstatfs64		269
+#define __NR_tgkill		270
+#define __NR_utimes		271
+#define __NR_fadvise64_64	272
+#define __NR_vserver		273
 
-#define NR_syscalls 268
+#define NR_syscalls 274
 
 /* user-visible error numbers are in the range -1 - -124: see <asm-sh/errno.h> */
 
@@ -435,6 +441,8 @@ static __inline__ pid_t wait(int * wait_stat)
  * What we want is __attribute__((weak,alias("sys_ni_syscall"))),
  * but it doesn't work on all toolchains, so we just do it by hand
  */
+#ifndef cond_syscall
 #define cond_syscall(x) asm(".weak\t" #x "\n\t.set\t" #x ",sys_ni_syscall");
+#endif
 
 #endif /* __ASM_SH_UNISTD_H */

@@ -7,7 +7,7 @@
  * See arch/i386/kernel/sys_i386.c for ugly details..
  */
 struct ipc_kludge {
-	struct msgbuf *msgp;
+	struct msgbuf __user *msgp;
 	long msgtyp;
 };
 

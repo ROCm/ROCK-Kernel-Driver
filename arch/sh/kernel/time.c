@@ -1,4 +1,4 @@
-/* $Id: time.c,v 1.12 2003/06/28 15:35:28 lethal Exp $
+/* $Id: time.c,v 1.18 2003/10/09 16:28:14 lethal Exp $
  *
  *  linux/arch/sh/kernel/time.c
  *
@@ -68,7 +68,7 @@
 #endif /* CONFIG_CPU_SH3 or CONFIG_CPU_SH4 */
 
 extern unsigned long wall_jiffies;
-#define TICK_SIZE (TICK_NSEC / 1000)
+#define TICK_SIZE (tick_nsec / 1000)
 spinlock_t tmu0_lock = SPIN_LOCK_UNLOCKED;
 
 u64 jiffies_64 = INITIAL_JIFFIES;
@@ -100,6 +100,14 @@ static int pfc_values[]   = { 0, 0, 1, 2, 0, 3, 0, 4 };
 #else
 #error "Unknown ifc/bfc/pfc/stc values for this processor"
 #endif
+
+/*
+ * Scheduler clock - returns current time in nanosec units.
+ */
+unsigned long long sched_clock(void)
+{
+	return (unsigned long long)jiffies * (1000000000 / HZ);
+}
 
 static unsigned long do_gettimeoffset(void)
 {
@@ -198,7 +206,7 @@ int do_settimeofday(struct timespec *tv)
 	 * made, and then undo it!
 	 */
 	nsec -= 1000 * (do_gettimeoffset() +
-			(jiffies - wall_jiffies) * (1000000 / HZ));
+				(jiffies - wall_jiffies) * (1000000 / HZ));
 
 	wtm_sec  = wall_to_monotonic.tv_sec + (xtime.tv_sec - sec);
 	wtm_nsec = wall_to_monotonic.tv_nsec + (xtime.tv_nsec - nsec);
@@ -230,7 +238,8 @@ extern char _stext;
 
 static inline void sh_do_profile(unsigned long pc)
 {
-	if (!prof_buffer)
+	/* Don't profile cpu_idle.. */
+	if (!prof_buffer || !current->pid)
 		return;
 
 	if (pc >= 0xa0000000UL && pc < 0xc0000000UL)
@@ -365,6 +374,19 @@ static unsigned int __init get_timer_frequency(void)
 void (*board_time_init)(void) = 0;
 void (*board_timer_setup)(struct irqaction *irq) = 0;
 
+static unsigned int sh_pclk_freq __initdata = CONFIG_SH_PCLK_FREQ;
+
+static int __init sh_pclk_setup(char *str)
+{
+        unsigned int freq;
+
+	if (get_option(&str, &freq))
+		sh_pclk_freq = freq;
+
+	return 1;
+}
+__setup("sh_pclk=", sh_pclk_setup);
+
 static struct irqaction irq0  = { timer_interrupt, SA_INTERRUPT, 0, "timer", NULL, NULL};
 
 void get_current_frequency_divisors(unsigned int *ifc, unsigned int *bfc, unsigned int *pfc)
@@ -407,23 +429,46 @@ _FREQ_TABLE(pfc);
 
 void __init time_init(void)
 {
-	unsigned int timer_freq;
+	unsigned int timer_freq = 0;
 	unsigned int ifc, pfc, bfc;
 	unsigned long interval;
 
 	if (board_time_init)
 		board_time_init();
 
-	/* 
-	 * XXX: Hmm... when cpu/ is proposed, this looks like a good spot for
-	 * it, but we need a rtc to get the timer_freq so board_time_init()
-	 * must always come before a CPU time_(rtc?)_init().
-	 */
 	get_current_frequency_divisors(&ifc, &bfc, &pfc);
 
-	timer_freq = get_timer_frequency();
+	/*
+	 * If we don't have an RTC (such as with the SH7300), don't attempt to
+	 * probe the timer frequency. Rely on an either hardcoded peripheral
+	 * clock value, or on the sh_pclk command line option.
+	 */
+	current_cpu_data.module_clock = sh_pclk_freq;
 
-	current_cpu_data.module_clock = timer_freq * 4;
+	/* XXX: Switch this over to a more generic test. */
+	if (current_cpu_data.type != CPU_SH7300) {
+		unsigned int freq;
+
+		/* 
+		 * If we've specified a peripheral clock frequency, and we have
+		 * an RTC, compare it against the autodetected value. Complain
+		 * if there's a mismatch.
+		 *
+		 * Note: We should allow for some high and low watermarks for
+		 * the frequency here (compensating for potential drift), as
+		 * otherwise we'll likely end up triggering this essentially
+		 * on every boot.
+		 */
+		timer_freq = get_timer_frequency();
+		freq = timer_freq * 4;
+
+		if (sh_pclk_freq && sh_pclk_freq != freq) {
+			printk(KERN_NOTICE "Calculated peripheral clock value "
+			       "%d differs from sh_pclk value %d, fixing..\n",
+			       freq, sh_pclk_freq);
+			current_cpu_data.module_clock = freq;
+		}
+	}
 
 	rtc_get_time(&xtime);
 

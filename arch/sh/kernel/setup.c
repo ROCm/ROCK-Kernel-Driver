@@ -1,4 +1,4 @@
-/* $Id: setup.c,v 1.17 2003/05/20 01:51:37 lethal Exp $
+/* $Id: setup.c,v 1.30 2003/10/13 07:21:19 lethal Exp $
  *
  *  linux/arch/sh/kernel/setup.c
  *
@@ -10,38 +10,21 @@
  * This file handles the architecture-dependent parts of initialization
  */
 
-#include <linux/errno.h>
-#include <linux/sched.h>
-#include <linux/kernel.h>
-#include <linux/mm.h>
-#include <linux/stddef.h>
-#include <linux/unistd.h>
-#include <linux/ptrace.h>
-#include <linux/slab.h>
-#include <linux/user.h>
-#include <linux/a.out.h>
 #include <linux/tty.h>
 #include <linux/ioport.h>
-#include <linux/delay.h>
-#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/initrd.h>
 #include <linux/bootmem.h>
 #include <linux/console.h>
-#include <linux/ctype.h>
 #include <linux/seq_file.h>
-#include <linux/utsname.h>
 #include <linux/root_dev.h>
 #include <linux/utsname.h>
 #include <linux/cpu.h>
-#include <asm/processor.h>
-#include <asm/page.h>
-#include <asm/pgtable.h>
 #include <asm/uaccess.h>
-#include <asm/system.h>
 #include <asm/io.h>
 #include <asm/io_generic.h>
-#include <asm/machvec.h>
+#include <asm/sections.h>
+#include <asm/irq.h>
 #ifdef CONFIG_SH_EARLY_PRINTK
 #include <asm/sh_bios.h>
 #endif
@@ -63,7 +46,6 @@ static int kgdb_parse_options(char *options);
 struct sh_cpuinfo boot_cpu_data = { CPU_SH_NONE, 0, 10000000, };
 struct screen_info screen_info;
 unsigned char aux_device_present = 0xaa;
-static int fpu_disabled __initdata = 0;
 
 #if defined(CONFIG_SH_UNKNOWN)
 struct sh_machine_vector sh_mv;
@@ -82,11 +64,9 @@ struct screen_info screen_info = {
         16                      /* orig-video-points */
 };
 
-extern void fpu_init(void);
 extern void platform_setup(void);
 extern char *get_system_type(void);
 extern int root_mountflags;
-extern int _text, _etext, _edata, _end;
 
 #define MV_NAME_SIZE 32
 
@@ -174,7 +154,7 @@ static void scif_sercon_write(struct console *con, const char *s, unsigned count
 
 static int __init scif_sercon_setup(struct console *con, char *options)
 {
-	con->cflag = CREAD | HUPCL | CLOCAL | B115200 | CS8;
+	con->cflag = CREAD | HUPCL | CLOCAL | B57600 | CS8;
 
 	return 0;
 }
@@ -333,7 +313,7 @@ static inline void parse_cmdline (char ** cmdline_p, char mv_name[MV_NAME_SIZE],
 	*cmdline_p = command_line;
 }
 
-void __init setup_arch(char **cmdline_p)
+static int __init sh_mv_setup(char **cmdline_p)
 {
 #if defined(CONFIG_SH_UNKNOWN)
 	extern struct sh_machine_vector mv_unknown;
@@ -342,41 +322,11 @@ void __init setup_arch(char **cmdline_p)
 	char mv_name[MV_NAME_SIZE] = "";
 	unsigned long mv_io_base = 0;
 	int mv_mmio_enable = 0;
-	unsigned long bootmap_size;
-	unsigned long start_pfn, max_pfn, max_low_pfn;
-
-/* XXX: MRB-remove */
-#if 0
-	scif_sercon_init(115200);
-#endif
-#ifdef CONFIG_SH_EARLY_PRINTK
-	sh_console_init();
-#endif
-	
-	ROOT_DEV = old_decode_dev(ORIG_ROOT_DEV);
-
-#ifdef CONFIG_BLK_DEV_RAM
-	rd_image_start = RAMDISK_FLAGS & RAMDISK_IMAGE_START_MASK;
-	rd_prompt = ((RAMDISK_FLAGS & RAMDISK_PROMPT_FLAG) != 0);
-	rd_doload = ((RAMDISK_FLAGS & RAMDISK_LOAD_FLAG) != 0);
-#endif
-
-	if (!MOUNT_ROOT_RDONLY)
-		root_mountflags &= ~MS_RDONLY;
-	init_mm.start_code = (unsigned long)&_text;
-	init_mm.end_code = (unsigned long) &_etext;
-	init_mm.end_data = (unsigned long) &_edata;
-	init_mm.brk = (unsigned long) &_end;
-
-	code_resource.start = virt_to_bus(&_text);
-	code_resource.end = virt_to_bus(&_etext)-1;
-	data_resource.start = virt_to_bus(&_etext);
-	data_resource.end = virt_to_bus(&_edata)-1;
 
 	parse_cmdline(cmdline_p, mv_name, &mv, &mv_io_base, &mv_mmio_enable);
 
 #ifdef CONFIG_CMDLINE_BOOL
-	sprintf(*cmdline_p, CONFIG_CMDLINE);
+        sprintf(*cmdline_p, CONFIG_CMDLINE);
 #endif
 
 #ifdef CONFIG_SH_GENERIC
@@ -393,41 +343,74 @@ void __init setup_arch(char **cmdline_p)
 	sh_mv = mv_unknown;
 #endif
 
-#if defined(CONFIG_SH_UNKNOWN)
-	if (mv_io_base != 0) {
-		sh_mv.mv_inb = generic_inb;
-		sh_mv.mv_inw = generic_inw;
-		sh_mv.mv_inl = generic_inl;
-		sh_mv.mv_outb = generic_outb;
-		sh_mv.mv_outw = generic_outw;
-		sh_mv.mv_outl = generic_outl;
+	/*
+	 * Manually walk the vec, fill in anything that the board hasn't yet
+	 * by hand, wrapping to the generic implementation.
+	 */
+#define mv_set(elem) do { \
+	if (!sh_mv.mv_##elem) \
+		sh_mv.mv_##elem = generic_##elem; \
+} while (0)
 
-		sh_mv.mv_inb_p = generic_inb_p;
-		sh_mv.mv_inw_p = generic_inw_p;
-		sh_mv.mv_inl_p = generic_inl_p;
-		sh_mv.mv_outb_p = generic_outb_p;
-		sh_mv.mv_outw_p = generic_outw_p;
-		sh_mv.mv_outl_p = generic_outl_p;
+	mv_set(inb);	mv_set(inw);	mv_set(inl);
+	mv_set(outb);	mv_set(outw);	mv_set(outl);
 
-		sh_mv.mv_insb = generic_insb;
-		sh_mv.mv_insw = generic_insw;
-		sh_mv.mv_insl = generic_insl;
-		sh_mv.mv_outsb = generic_outsb;
-		sh_mv.mv_outsw = generic_outsw;
-		sh_mv.mv_outsl = generic_outsl;
+	mv_set(inb_p);	mv_set(inw_p);	mv_set(inl_p);
+	mv_set(outb_p);	mv_set(outw_p);	mv_set(outl_p);
 
-		sh_mv.mv_isa_port2addr = generic_isa_port2addr;
-		generic_io_base = mv_io_base;
-	}
-	if (mv_mmio_enable != 0) {
-		sh_mv.mv_readb = generic_readb;
-		sh_mv.mv_readw = generic_readw;
-		sh_mv.mv_readl = generic_readl;
-		sh_mv.mv_writeb = generic_writeb;
-		sh_mv.mv_writew = generic_writew;
-		sh_mv.mv_writel = generic_writel;
-	}
+	mv_set(insb);	mv_set(insw);	mv_set(insl);
+	mv_set(outsb);	mv_set(outsw);	mv_set(outsl);
+
+	mv_set(readb);	mv_set(readw);	mv_set(readl);
+	mv_set(writeb);	mv_set(writew);	mv_set(writel);
+
+	mv_set(ioremap);
+	mv_set(iounmap);
+
+	mv_set(isa_port2addr);
+	mv_set(irq_demux);
+
+#ifdef CONFIG_SH_UNKNOWN
+	__set_io_port_base(mv_io_base);
 #endif
+
+	return 0;
+}
+
+void __init setup_arch(char **cmdline_p)
+{
+	unsigned long bootmap_size;
+	unsigned long start_pfn, max_pfn, max_low_pfn;
+
+/* XXX: MRB-remove */
+#if 0
+	scif_sercon_init(57600);
+#endif
+#ifdef CONFIG_SH_EARLY_PRINTK
+	sh_console_init();
+#endif
+	
+	ROOT_DEV = old_decode_dev(ORIG_ROOT_DEV);
+
+#ifdef CONFIG_BLK_DEV_RAM
+	rd_image_start = RAMDISK_FLAGS & RAMDISK_IMAGE_START_MASK;
+	rd_prompt = ((RAMDISK_FLAGS & RAMDISK_PROMPT_FLAG) != 0);
+	rd_doload = ((RAMDISK_FLAGS & RAMDISK_LOAD_FLAG) != 0);
+#endif
+
+	if (!MOUNT_ROOT_RDONLY)
+		root_mountflags &= ~MS_RDONLY;
+	init_mm.start_code = (unsigned long) _text;
+	init_mm.end_code = (unsigned long) _etext;
+	init_mm.end_data = (unsigned long) _edata;
+	init_mm.brk = (unsigned long) _end;
+
+	code_resource.start = virt_to_bus(_text);
+	code_resource.end = virt_to_bus(_etext)-1;
+	data_resource.start = virt_to_bus(_etext);
+	data_resource.end = virt_to_bus(_edata)-1;
+
+	sh_mv_setup(cmdline_p);
 
 #define PFN_UP(x)	(((x) + PAGE_SIZE-1) >> PAGE_SHIFT)
 #define PFN_DOWN(x)	((x) >> PAGE_SHIFT)
@@ -459,7 +442,8 @@ void __init setup_arch(char **cmdline_p)
 	 * Partially used pages are not usable - thus
 	 * we are rounding upwards:
  	 */
-	start_pfn = PFN_UP(__pa(&_end));
+	start_pfn = PFN_UP(__pa(_end));
+
 	/*
 	 * Find a proper area for the bootmem bitmap. After this
 	 * bootstrap step all allocations (until the page allocator
@@ -524,39 +508,12 @@ void __init setup_arch(char **cmdline_p)
 	}
 #endif
 
-#ifdef CONFIG_VT
-#if defined(CONFIG_VGA_CONSOLE)
-	conswitchp = &vga_con;
-#elif defined(CONFIG_DUMMY_CONSOLE)
+#ifdef CONFIG_DUMMY_CONSOLE
 	conswitchp = &dummy_con;
-#endif
 #endif
 
 	/* Perform the machine specific initialisation */
 	platform_setup();
-
-#if defined(CONFIG_CPU_SH4)
-	/* FPU initialization */
-	clear_thread_flag(TIF_USEDFPU);
-	current->used_math = 0;
-#endif
-
-	/* Disable the FPU */
-	if (fpu_disabled) {
-		printk("FPU Disabled\n");
-		cpu_data->flags &= ~CPU_HAS_FPU;
-		release_fpu();
-	}
-
-#ifdef CONFIG_UBC_WAKEUP
-	/*
-	 * Some brain-damaged loaders decided it would be a good idea to put
-	 * the UBC to sleep. This causes some issues when it comes to things
-	 * like PTRACE_SINGLESTEP or doing hardware watchpoints in GDB.  So ..
-	 * we wake it up and hope that all is well.
-	 */
-	ubc_wakeup();
-#endif
 
 	paging_init();
 }
@@ -599,17 +556,20 @@ static int __init topology_init(void)
 subsys_initcall(topology_init);
 
 static const char *cpu_name[] = {
-	[CPU_SH7604]	"SH7604",
-	[CPU_SH7708]	"SH7708",
-	[CPU_SH7729]	"SH7729",
-	[CPU_SH7750]	"SH7750",
-	[CPU_SH7750S]	"SH7750S",
-	[CPU_SH7750R]	"SH7750R",
-	[CPU_SH7751]	"SH7751",
-	[CPU_SH7751R]	"SH7751R",
-	[CPU_ST40RA]	"ST40RA",
-	[CPU_ST40GX1]	"ST40GX1",
-	[CPU_SH_NONE]	"Unknown"
+	[CPU_SH7604]	= "SH7604",
+	[CPU_SH7708]	= "SH7708",
+	[CPU_SH7729]	= "SH7729",
+	[CPU_SH7750]	= "SH7750",
+	[CPU_SH7750S]	= "SH7750S",
+	[CPU_SH7750R]	= "SH7750R",
+	[CPU_SH7751]	= "SH7751",
+	[CPU_SH7751R]	= "SH7751R",
+	[CPU_SH7760]	= "SH7760",
+	[CPU_ST40RA]	= "ST40RA",
+	[CPU_ST40GX1]	= "ST40GX1",
+	[CPU_SH4_202]	= "SH4-202",
+	[CPU_SH4_501]	= "SH4-501",
+	[CPU_SH_NONE]	= "Unknown"
 };
 
 const char *get_cpu_subtype(void)
@@ -617,18 +577,44 @@ const char *get_cpu_subtype(void)
 	return cpu_name[boot_cpu_data.type];
 }
 
+#ifdef CONFIG_PROC_FS
+static const char *cpu_flags[] = {
+	"none", "fpu", "p2flush", "mmuassoc", "dsp",
+};
+
+static void show_cpuflags(struct seq_file *m)
+{
+	unsigned long i;
+
+	seq_printf(m, "cpu flags\t:");
+
+	if (!cpu_data->flags) {
+		seq_printf(m, " %s\n", cpu_flags[0]);
+		return;
+	}
+
+	for (i = 0; i < cpu_data->flags; i++)
+		if ((cpu_data->flags & (1 << i)))
+			seq_printf(m, " %s", cpu_flags[i]);
+	
+	seq_printf(m, "\n");
+}
+
+static void show_cacheinfo(struct seq_file *m, const char *type, struct cache_info info)
+{
+	unsigned int cache_size;
+
+	cache_size = info.ways * info.sets * info.linesz;
+
+	seq_printf(m, "%s size\t: %dKiB\n", type, cache_size >> 10);
+}
+
 /*
  *	Get CPU information for use by the procfs.
  */
-#ifdef CONFIG_PROC_FS
 static int show_cpuinfo(struct seq_file *m, void *v)
 {
-	unsigned int dcachesz, icachesz;
 	unsigned int cpu = smp_processor_id();
-
-	icachesz = boot_cpu_data.icache.ways *
-		   boot_cpu_data.icache.sets *
-		   boot_cpu_data.icache.linesz;
 
 	if (!cpu && cpu_online(cpu))
 		seq_printf(m, "machine\t\t: %s\n", get_system_type());
@@ -636,25 +622,28 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	seq_printf(m, "processor\t: %d\n", cpu);
 	seq_printf(m, "cpu family\t: %s\n", system_utsname.machine);
 	seq_printf(m, "cpu type\t: %s\n", get_cpu_subtype());
-	seq_printf(m, "cache size\t: %dK-bytes", icachesz >> 10);
+
+	show_cpuflags(m);
+
+	seq_printf(m, "cache type\t: ");
 
 	/*
-	 * SH-2 and SH-3 have a combined cache, thus there's no real
-	 * I/D distinction ..  so don't inadvertently double
-	 * up the output.
+	 * Check for what type of cache we have, we support both the
+	 * unified cache on the SH-2 and SH-3, as well as the harvard
+	 * style cache on the SH-4.
 	 */
-	if (strcmp(system_utsname.machine, "sh2") ||
-	    strcmp(system_utsname.machine, "sh3")) {
-		dcachesz = boot_cpu_data.dcache.ways *
-			   boot_cpu_data.dcache.sets *
-			   boot_cpu_data.dcache.linesz;
-
-		seq_printf(m, "/%dK-bytes", dcachesz >> 10);
+	if (test_bit(SH_CACHE_COMBINED, &(boot_cpu_data.icache.flags))) {
+		seq_printf(m, "unified\n");
+		show_cacheinfo(m, "cache", boot_cpu_data.icache);
+	} else {
+		seq_printf(m, "split (harvard)\n");
+		show_cacheinfo(m, "icache", boot_cpu_data.icache);
+		show_cacheinfo(m, "dcache", boot_cpu_data.dcache);
 	}
 
-	seq_printf(m, "\nbogomips\t: %lu.%02lu\n",
-		     loops_per_jiffy/(500000/HZ),
-		     (loops_per_jiffy/(5000/HZ)) % 100);
+	seq_printf(m, "bogomips\t: %lu.%02lu\n",
+		     boot_cpu_data.loops_per_jiffy/(500000/HZ),
+		     (boot_cpu_data.loops_per_jiffy/(5000/HZ)) % 100);
 
 #define PRINT_CLOCK(name, value) \
 	seq_printf(m, name " clock\t: %d.%02dMHz\n", \
@@ -779,11 +768,4 @@ static int __init kgdb_parse_options(char *options)
 }
 __setup("kgdb=", kgdb_parse_options);
 #endif /* CONFIG_SH_KGDB */
-
-static int __init fpu_setup(char *opts)
-{
-	fpu_disabled = 1;
-	return 0;
-}
-__setup("nofpu", fpu_setup);
 

@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.17 2003/05/20 03:12:54 lethal Exp $
+# $Id: Makefile,v 1.32 2003/10/26 23:33:49 lethal Exp $
 #
 # This file is subject to the terms and conditions of the GNU General Public
 # License.  See the file "COPYING" in the main directory of this archive
@@ -25,20 +25,20 @@ ifndef include_config
 -include .config
 endif
 
-cpu-y				:= -mb
-cpu-$(CONFIG_CPU_LITTLE_ENDIAN)	:= -ml
+cflags-y				:= -mb
+cflags-$(CONFIG_CPU_LITTLE_ENDIAN)	:= -ml
 
-cpu-$(CONFIG_CPU_SH2)		+= -m2
-cpu-$(CONFIG_CPU_SH3)		+= -m3
-cpu-$(CONFIG_CPU_SH4)		+= -m4 -mno-implicit-fp
+cflags-$(CONFIG_CPU_SH2)		+= -m2
+cflags-$(CONFIG_CPU_SH3)		+= -m3
+cflags-$(CONFIG_CPU_SH4)		+= -m4 \
+	$(call check_gcc,-mno-implicit-fp,-m4-nofpu)
 
-ifdef CONFIG_SH_KGDB
-CFLAGS :=$(CFLAGS:-fomit-frame-pointer=) -g
-AFLAGS += -g
-ifdef CONFIG_KGDB_MORE
-CFLAGS += $(shell echo $(CONFIG_KGDB_OPTIONS) | sed -e 's/"//g')
-endif
-endif
+cflags-$(CONFIG_SH_DSP)			+= -Wa,-dsp
+cflags-$(CONFIG_SH_KGDB)		+= -g
+cflags-$(CONFIG_EMBEDDED)		+= -Os
+
+cflags-$(CONFIG_MORE_COMPILE_OPTIONS)	+= \
+	$(shell echo $(CONFIG_COMPILE_OPTIONS) | sed -e 's/"//g')
 
 OBJCOPYFLAGS	:= -O binary -R .note -R .comment -R .stab -R .stabstr -S
 
@@ -49,13 +49,15 @@ OBJCOPYFLAGS	:= -O binary -R .note -R .comment -R .stab -R .stabstr -S
 LDFLAGS_vmlinux     += -e _stext
 
 ifdef CONFIG_CPU_LITTLE_ENDIAN
-LDFLAGS_vmlinux     +=  --defsym 'jiffies=jiffies_64' -EL
+LDFLAGS_vmlinux		+= --defsym 'jiffies=jiffies_64'
+LDFLAGS			+= -EL
 else
-LDFLAGS_vmlinux     +=  --defsym 'jiffies=jiffies_64+4' -EB
+LDFLAGS_vmlinux		+= --defsym 'jiffies=jiffies_64+4'
+LDFLAGS			+= -EB
 endif
 
-CFLAGS		+= -pipe $(cpu-y)
-AFLAGS		+= $(cpu-y)
+CFLAGS		+= -pipe $(cflags-y)
+AFLAGS		+= $(cflags-y)
 
 head-y := arch/sh/kernel/head.o arch/sh/kernel/init_task.o
 
@@ -66,6 +68,7 @@ core-y				+= arch/sh/kernel/ arch/sh/mm/
 # Boards
 machdir-$(CONFIG_SH_SOLUTION_ENGINE)		:= se/770x
 machdir-$(CONFIG_SH_7751_SOLUTION_ENGINE)	:= se/7751
+machdir-$(CONFIG_SH_7751_SYSTEMH)		:= systemh
 machdir-$(CONFIG_SH_STB1_HARP)			:= harp
 machdir-$(CONFIG_SH_STB1_OVERDRIVE)		:= overdrive
 machdir-$(CONFIG_SH_HP620)			:= hp6xx/hp620
@@ -81,6 +84,7 @@ machdir-$(CONFIG_SH_BIGSUR)			:= bigsur
 machdir-$(CONFIG_SH_SH2000)			:= sh2000
 machdir-$(CONFIG_SH_ADX)			:= adx
 machdir-$(CONFIG_SH_MPC1211)			:= mpc1211
+machdir-$(CONFIG_SH_SECUREEDGE5410)		:= snapgear
 machdir-$(CONFIG_SH_UNKNOWN)			:= unknown
 
 incdir-y			:= $(machdir-y)
@@ -99,7 +103,10 @@ cpuincdir-$(CONFIG_CPU_SH2)	:= cpu-sh2
 cpuincdir-$(CONFIG_CPU_SH3)	:= cpu-sh3
 cpuincdir-$(CONFIG_CPU_SH4)	:= cpu-sh4
 
-libs-y				+= arch/sh/lib/	$(LIBGCC)
+libs-y				:= arch/sh/lib/	$(libs-y) $(LIBGCC)
+
+drivers-y			+= arch/sh/drivers/
+drivers-$(CONFIG_OPROFILE)	+= arch/sh/oprofile/
 
 boot := arch/sh/boot
 
@@ -110,18 +117,36 @@ prepare: target_links
 .PHONY: target_links FORCE
 target_links:
 	@echo '  Making asm-sh/cpu -> asm-sh/$(cpuincdir-y) link'
+	@rm -f include/asm-sh/cpu
 	@ln -sf $(cpuincdir-y) include/asm-sh/cpu
 
 	@echo '  Making asm-sh/mach -> asm-sh/$(incdir-y) link'
+	@rm -f include/asm-sh/mach
 	@ln -sf $(incdir-y) include/asm-sh/mach
 
 	$(Q)$(MAKE) $(build)=arch/sh/tools include/asm-sh/machtypes.h
 
-BOOTIMAGE=arch/sh/boot/zImage
 zImage: vmlinux
-	$(Q)$(MAKE) $(build)=$(boot) $(BOOTIMAGE)
+	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
 
 compressed: zImage
 
 archclean:
 	$(Q)$(MAKE) $(clean)=$(boot)
+
+defconfig-%:
+	@echo '  Copying arch/sh/configs/$@ -> .config'
+	@if [ -e .config ]; then mv -f .config .config.old; fi
+	@cp -f arch/sh/configs/$@ .config
+	@chmod 644 .config
+
+define archhelp
+	@echo '  zImage		  - Compressed kernel image (arch/sh/boot/zImage)'
+	for board in arch/sh/configs/*; \
+	do \
+		 echo -n ' ' $$board | sed -e 's|arch/sh/configs/||g' ; \
+		 echo -n '  	  - Build for ' ; \
+		 echo -e $$board | sed -e 's|.*-||g'; \
+	done
+endef
+
