@@ -94,24 +94,20 @@ int run_helper(void (*pre_exec)(void *), void *pre_data, char **argv,
 	if(n < 0){
 		printk("run_helper : read on pipe failed, err = %d\n", -n);
 		err = n;
-		goto out_kill;
+		os_kill_process(pid, 1);
 	}
 	else if(n != 0){
 		CATCH_EINTR(n = waitpid(pid, NULL, 0));
 		pid = -errno;
 	}
+	err = pid;
 
-	if(stack_out == NULL) free_stack(stack, 0);
-        else *stack_out = stack;
-	return(pid);
-
- out_kill:
-	os_kill_process(pid, 1);
  out_close:
 	os_close_file(fds[0]);
-	os_close_file(fds[1]);
  out_free:
-	free_stack(stack, 0);
+	if(stack_out == NULL)
+		free_stack(stack, 0);
+        else *stack_out = stack;
 	return(err);
 }
 
