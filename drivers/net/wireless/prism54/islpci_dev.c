@@ -245,7 +245,7 @@ static int
 islpci_open(struct net_device *ndev)
 {
 	u32 rc;
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 
 	printk(KERN_DEBUG "%s: islpci_open()\n", ndev->name);
 
@@ -265,7 +265,7 @@ islpci_open(struct net_device *ndev)
 static int
 islpci_close(struct net_device *ndev)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 
 	printk(KERN_DEBUG "%s: islpci_close ()\n", ndev->name);
 
@@ -491,7 +491,7 @@ islpci_reset(islpci_private *priv, int reload_firmware)
 struct net_device_stats *
 islpci_statistics(struct net_device *ndev)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 
 #if VERBOSE > SHOW_ERROR_MESSAGES
 	DEBUG(SHOW_FUNCTION_CALLS, "islpci_statistics \n");
