@@ -1149,13 +1149,19 @@ ia64_mca_cmc_int_caller(int cpe_irq, void *arg, struct pt_regs *ptregs)
 
 			printk(KERN_WARNING "%s: Returning to interrupt driven CMC handler\n", __FUNCTION__);
 
-			cmc_polling_enabled = 0;
 			/*
 			 * The cmc interrupt handler enabled irqs, so
 			 * this can't deadlock.
 			 */
 			smp_call_function(ia64_mca_cmc_vector_enable, NULL, 1, 0);
+
+			/*
+			 * Turn off interrupts before re-enabling the
+			 * cmc vector locally.  Make sure we get out.
+			 */
+			local_irq_disable();
 			ia64_mca_cmc_vector_enable(NULL);
+			cmc_polling_enabled = 0;
 
 		} else {
 
