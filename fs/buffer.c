@@ -36,6 +36,8 @@
 #include <linux/buffer_head.h>
 #include <asm/bitops.h>
 
+static void invalidate_bh_lrus(void);
+
 #define BH_ENTRY(list) list_entry((list), struct buffer_head, b_assoc_buffers)
 
 /*
@@ -389,7 +391,7 @@ out:
  * private_lock is contended then so is mapping->page_lock).
  */
 struct buffer_head *
-__find_get_block(struct block_device *bdev, sector_t block, int unused)
+__find_get_block_slow(struct block_device *bdev, sector_t block, int unused)
 {
 	struct inode *bd_inode = bdev->bd_inode;
 	struct address_space *bd_mapping = bd_inode->i_mapping;
@@ -459,6 +461,7 @@ out:
    pass does the actual I/O. */
 void invalidate_bdev(struct block_device *bdev, int destroy_dirty_buffers)
 {
+	invalidate_bh_lrus();
 	/*
 	 * FIXME: what about destroy_dirty_buffers?
 	 * We really want to use invalidate_inode_pages2() for
@@ -1159,7 +1162,7 @@ grow_buffers(struct block_device *bdev, unsigned long block, int size)
  * attempt is failing.  FIXME, perhaps?
  */
 struct buffer_head *
-__getblk(struct block_device *bdev, sector_t block, int size)
+__getblk_slow(struct block_device *bdev, sector_t block, int size)
 {
 	for (;;) {
 		struct buffer_head * bh;
@@ -1259,7 +1262,8 @@ void __bforget(struct buffer_head *bh)
  *  Reads a specified block, and returns buffer head that contains it.
  *  It returns NULL if the block was unreadable.
  */
-struct buffer_head * __bread(struct block_device *bdev, int block, int size)
+struct buffer_head *
+__bread_slow(struct block_device *bdev, sector_t block, int size)
 {
 	struct buffer_head *bh = __getblk(bdev, block, size);
 
@@ -1281,6 +1285,165 @@ struct buffer_head * __bread(struct block_device *bdev, int block, int size)
 	}
 	brelse(bh);
 	return NULL;
+}
+
+/*
+ * Per-cpu buffer LRU implementation.  To reduce the cost of __find_get_block().
+ * The bhs[] array is sorted - newest buffer is at bhs[0].  Buffers have their
+ * refcount elevated by one when they're in an LRU.  A buffer can only appear
+ * once in a particular CPU's LRU.  A single buffer can be present in multiple
+ * CPU's LRUs at the same time.
+ *
+ * This is a transparent caching front-end to sb_bread(), sb_getblk() and
+ * sb_find_get_block().
+ */
+
+#define BH_LRU_SIZE	7
+
+static struct bh_lru {
+	spinlock_t lock;
+	struct buffer_head *bhs[BH_LRU_SIZE];
+} ____cacheline_aligned_in_smp bh_lrus[NR_CPUS];
+
+/*
+ * The LRU management algorithm is dopey-but-simple.  Sorry.
+ */
+static void bh_lru_install(struct buffer_head *bh)
+{
+	struct buffer_head *evictee = NULL;
+	struct bh_lru *lru;
+
+	if (bh == NULL)
+		return;
+
+	lru = &bh_lrus[get_cpu()];
+	spin_lock(&lru->lock);
+	if (lru->bhs[0] != bh) {
+		struct buffer_head *bhs[BH_LRU_SIZE];
+		int in;
+		int out = 0;
+
+		get_bh(bh);
+		bhs[out++] = bh;
+		for (in = 0; in < BH_LRU_SIZE; in++) {
+			struct buffer_head *bh2 = lru->bhs[in];
+
+			if (bh2 == bh) {
+				__brelse(bh2);
+			} else {
+				if (out >= BH_LRU_SIZE) {
+					BUG_ON(evictee != NULL);
+					evictee = bh2;
+				} else {
+					bhs[out++] = bh2;
+				}
+			}
+		}
+		while (out < BH_LRU_SIZE)
+			bhs[out++] = NULL;
+		memcpy(lru->bhs, bhs, sizeof(bhs));
+	}
+	spin_unlock(&lru->lock);
+	put_cpu();
+
+	if (evictee) {
+		touch_buffer(evictee);
+		__brelse(evictee);
+	}
+}
+
+static inline struct buffer_head *
+lookup_bh(struct block_device *bdev, sector_t block, int size)
+{
+	struct buffer_head *ret = NULL;
+	struct bh_lru *lru;
+	int i;
+
+	lru = &bh_lrus[get_cpu()];
+	spin_lock(&lru->lock);
+	for (i = 0; i < BH_LRU_SIZE; i++) {
+		struct buffer_head *bh = lru->bhs[i];
+
+		if (bh && bh->b_bdev == bdev &&
+				bh->b_blocknr == block && bh->b_size == size) {
+			if (i) {
+				while (i) {
+					lru->bhs[i] = lru->bhs[i - 1];
+					i--;
+				}
+				lru->bhs[0] = bh;
+			}
+			get_bh(bh);
+			ret = bh;
+			break;
+		}
+	}
+	spin_unlock(&lru->lock);
+	put_cpu();
+	return ret;
+}
+
+struct buffer_head *
+__find_get_block(struct block_device *bdev, sector_t block, int size)
+{
+	struct buffer_head *bh = lookup_bh(bdev, block, size);
+
+	if (bh == NULL) {
+		bh = __find_get_block_slow(bdev, block, size);
+		bh_lru_install(bh);
+	}
+	return bh;
+}
+EXPORT_SYMBOL(__find_get_block);
+
+struct buffer_head *
+__getblk(struct block_device *bdev, sector_t block, int size)
+{
+	struct buffer_head *bh = __find_get_block(bdev, block, size);
+
+	if (bh == NULL) {
+		bh = __getblk_slow(bdev, block, size);
+		bh_lru_install(bh);
+	}
+	return bh;
+}
+EXPORT_SYMBOL(__getblk);
+
+struct buffer_head *
+__bread(struct block_device *bdev, sector_t block, int size)
+{
+	struct buffer_head *bh = __getblk(bdev, block, size);
+
+	if (bh) {
+		if (buffer_uptodate(bh))
+			return bh;
+		__brelse(bh);
+	}
+	bh = __bread_slow(bdev, block, size);
+	bh_lru_install(bh);
+	return bh;
+}
+EXPORT_SYMBOL(__bread);
+
+/*
+ * This is called rarely - at unmount.
+ */
+static void invalidate_bh_lrus(void)
+{
+	int cpu_idx;
+
+	for (cpu_idx = 0; cpu_idx < NR_CPUS; cpu_idx++)
+		spin_lock(&bh_lrus[cpu_idx].lock);
+	for (cpu_idx = 0; cpu_idx < NR_CPUS; cpu_idx++) {
+		int i;
+
+		for (i = 0; i < BH_LRU_SIZE; i++) {
+			brelse(bh_lrus[cpu_idx].bhs[i]);
+			bh_lrus[cpu_idx].bhs[i] = NULL;
+		}
+	}
+	for (cpu_idx = 0; cpu_idx < NR_CPUS; cpu_idx++)
+		spin_unlock(&bh_lrus[cpu_idx].lock);
 }
 
 void set_bh_page(struct buffer_head *bh,
@@ -2434,6 +2597,9 @@ static void bh_mempool_free(void *element, void *pool_data)
 void __init buffer_init(void)
 {
 	int i;
+
+	for (i = 0; i < NR_CPUS; i++)
+		spin_lock_init(&bh_lrus[i].lock);
 
 	bh_cachep = kmem_cache_create("buffer_head",
 			sizeof(struct buffer_head), 0,
