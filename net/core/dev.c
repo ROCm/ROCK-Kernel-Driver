@@ -3033,8 +3033,6 @@ static int __init net_dev_init(void)
 
 	dev_boot_phase = 0;
 
-	probe_old_netdevs();
-
 	open_softirq(NET_TX_SOFTIRQ, net_tx_action, NULL);
 	open_softirq(NET_RX_SOFTIRQ, net_rx_action, NULL);
 
@@ -3049,7 +3047,7 @@ out:
 	return rc;
 }
 
-fs_initcall(net_dev_init);
+subsys_initcall(net_dev_init);
 
 EXPORT_SYMBOL(__dev_get);
 EXPORT_SYMBOL(__dev_get_by_flags);
