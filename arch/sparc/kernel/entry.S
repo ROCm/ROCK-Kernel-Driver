@@ -1393,7 +1393,7 @@ flush_patch_two:
 	std	%g4, [%curptr + AOFF_task_thread + AOFF_thread_fork_kpsr]
 	add	%sp, REGWIN_SZ, %o2		! arg2:	pt_regs ptr
 	mov	0, %o3
-	call	C_LABEL(do_fork)
+	call	C_LABEL(do_fork_FIXME_NOW_RETURNS_TASK_STRUCT)
 	 mov	%l5, %o7
 	
 	/* Whee, kernel threads! */
@@ -1416,7 +1416,8 @@ flush_patch_three:
 	std	%g4, [%curptr + AOFF_task_thread + AOFF_thread_fork_kpsr]
 	add	%sp, REGWIN_SZ, %o2		! arg2:	pt_regs ptr
 	mov	0, %o3
-	call	C_LABEL(do_fork)
+	/* FIXME:	remove CLONE_IDLETASK from flags first */
+	call	C_LABEL(do_fork_WITHOUT_CLONE_IDLETASK)
 	 mov	%l5, %o7
 
 	/* Whee, real vfork! */
@@ -1432,9 +1433,9 @@ flush_patch_four:
 	sethi	%hi(0x4000 | 0x0100 | SIGCHLD), %o0
 	mov	%fp, %o1
 	or	%o0, %lo(0x4000 | 0x0100 | SIGCHLD), %o0
-	sethi	%hi(C_LABEL(do_fork)), %l1
+	sethi	%hi(C_LABEL(do_fork_FIXME_NOW_RETURNS_TASK_STRUCT)), %l1
 	mov	0, %o3
-	jmpl	%l1 + %lo(C_LABEL(do_fork)), %g0
+	jmpl	%l1 + %lo(C_LABEL(do_fork_FIXME_NOW_RETURNS_TASK_STRUCT)), %g0
 	 add	%sp, REGWIN_SZ, %o2
 
         .align  4

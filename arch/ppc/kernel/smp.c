@@ -343,11 +343,9 @@ void __init smp_boot_cpus(void)
 		/* create a process for the processor */
 		/* only regs.msr is actually used, and 0 is OK for it */
 		memset(&regs, 0, sizeof(struct pt_regs));
-		if (do_fork(CLONE_VM|CLONE_PID, 0, &regs, 0) < 0)
+		p = do_fork(CLONE_VM|CLONE_IDLETASK, 0, &regs, 0);
+		if (IS_ERR(p))
 			panic("failed fork for CPU %d", i);
-		p = prev_task(&init_task);
-		if (!p)
-			panic("No idle task for CPU %d", i);
 		init_idle(p, i);
 		unhash_process(p);
 

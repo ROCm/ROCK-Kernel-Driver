@@ -77,26 +77,26 @@ out:
 
 asmlinkage int sys_fork(abi64_no_regargs, struct pt_regs regs)
 {
-	int res;
+	struct task_struct *p;
 
 	save_static(&regs);
-	res = do_fork(SIGCHLD, regs.regs[29], &regs, 0);
-	return res;
+	p = do_fork(SIGCHLD, regs.regs[29], &regs, 0);
+	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
 asmlinkage int sys_clone(abi64_no_regargs, struct pt_regs regs)
 {
 	unsigned long clone_flags;
 	unsigned long newsp;
-	int res;
+	struct task_struct *p;
 
 	save_static(&regs);
 	clone_flags = regs.regs[4];
 	newsp = regs.regs[5];
 	if (!newsp)
 		newsp = regs.regs[29];
-	res = do_fork(clone_flags, newsp, &regs, 0);
-	return res;
+	p = do_fork(clone_flags & ~CLONE_IDLETASK, newsp, &regs, 0);
+	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
 /*

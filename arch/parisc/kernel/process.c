@@ -159,14 +159,17 @@ int
 sys_clone(unsigned long clone_flags, unsigned long usp,
 	  struct pt_regs *regs)
 {
-	return do_fork(clone_flags, usp, regs, 0);
+	struct task_struct *p;
+	p = do_fork(clone_flags & ~CLONE_IDLETASK, usp, regs, 0);
+	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
 int
 sys_vfork(struct pt_regs *regs)
 {
-	return do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD,
-		       regs->gr[30], regs, 0);
+	struct task_struct *p;
+	p = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs->gr[30], regs, 0);
+	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
 int

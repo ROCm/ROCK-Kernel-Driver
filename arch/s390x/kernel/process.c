@@ -331,19 +331,23 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long new_stackp,
 
 asmlinkage int sys_fork(struct pt_regs regs)
 {
-        return do_fork(SIGCHLD, regs.gprs[15], &regs, 0);
+	struct task_struct *p;
+        p = do_fork(SIGCHLD, regs.gprs[15], &regs, 0);
+	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
 asmlinkage int sys_clone(struct pt_regs regs)
 {
         unsigned long clone_flags;
         unsigned long newsp;
+	struct task_struct *p;
 
         clone_flags = regs.gprs[3];
         newsp = regs.orig_gpr2;
         if (!newsp)
                 newsp = regs.gprs[15];
-        return do_fork(clone_flags, newsp, &regs, 0);
+        p = do_fork(clone_flags & ~CLONE_IDLETASK, newsp, &regs, 0);
+	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
 /*
@@ -358,8 +362,9 @@ asmlinkage int sys_clone(struct pt_regs regs)
  */
 asmlinkage int sys_vfork(struct pt_regs regs)
 {
-	return do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD,
-                       regs.gprs[15], &regs, 0);
+	struct task_struct *p;
+	p = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs.gprs[15], &regs, 0);
+	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
 /*
