@@ -109,6 +109,7 @@
 #define I2C_DRIVERID_OVCAMCHIP	61	/* OmniVision CMOS image sens.	*/
 #define I2C_DRIVERID_TDA7313	62	/* TDA7313 audio processor	*/
 #define I2C_DRIVERID_MAX6900	63	/* MAX6900 real-time clock	*/
+#define I2C_DRIVERID_SAA7114H	64	/* video decoder		*/
 
 
 #define I2C_DRIVERID_EXP0	0xF0	/* experimental use id's	*/
@@ -196,6 +197,9 @@
 #define I2C_ALGO_OCP_IOP3XX  0x140000	/* XSCALE IOP3XX On-chip I2C alg */
 #define I2C_ALGO_PCA	0x150000	/* PCA 9564 style adapters	*/
 
+#define I2C_ALGO_SIBYTE 0x150000	/* Broadcom SiByte SOCs		*/
+#define I2C_ALGO_SGI	0x160000        /* SGI algorithm                */
+
 #define I2C_ALGO_EXP	0x800000	/* experimental			*/
 
 #define I2C_ALGO_MASK	0xff0000	/* Mask for algorithms		*/
@@ -257,6 +261,13 @@
 
 /* --- PowerPC on-chip adapters						*/
 #define I2C_HW_OCP 0x00	/* IBM on-chip I2C adapter 	*/
+
+/* --- Broadcom SiByte adapters						*/
+#define I2C_HW_SIBYTE	0x00
+
+/* --- SGI adapters							*/
+#define I2C_HW_SGI_VINO	0x00
+#define I2C_HW_SGI_MACE	0x01
 
 /* --- XSCALE on-chip adapters                          */
 #define I2C_HW_IOP321 0x00

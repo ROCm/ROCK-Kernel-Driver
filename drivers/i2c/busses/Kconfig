@@ -323,6 +323,12 @@ config I2C_SAVAGE4
 	  This driver can also be built as a module.  If so, the module
 	  will be called i2c-savage4.
 
+config I2C_SIBYTE
+	tristate "SiByte SMBus interface"
+	depends on SIBYTE_SB1xxx_SOC && I2C
+	help
+	  Supports the SiByte SOC on-chip I2C interfaces (2 channels).
+
 config SCx200_I2C
 	tristate "NatSemi SCx200 I2C using GPIO pins"
 	depends on SCx200_GPIO && I2C
