@@ -482,14 +482,15 @@ struct sctp_transport *sctp_assoc_add_peer(struct sctp_association *asoc,
 
 	/* 7.2.1 Slow-Start
 	 *
-	 * o The initial cwnd before data transmission or after a
-	 *   sufficiently long idle period MUST be <= 2*MTU.
+	 * o The initial cwnd before DATA transmission or after a sufficiently
+	 *   long idle period MUST be set to
+	 *      min(4*MTU, max(2*MTU, 4380 bytes))
 	 *
 	 * o The initial value of ssthresh MAY be arbitrarily high
 	 *   (for example, implementations MAY use the size of the
 	 *   receiver advertised window).
 	 */
-	peer->cwnd = asoc->pmtu * 2;
+	peer->cwnd = min(4*asoc->pmtu, max_t(__u32, 2*asoc->pmtu, 4380));
 
 	/* At this point, we may not have the receiver's advertised window,
 	 * so initialize ssthresh to the default value and it will be set
