@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: fs.c,v 1.50 2004/11/23 15:37:31 gleixner Exp $
+ * $Id: fs.c,v 1.51 2004/11/28 12:19:37 dedekind Exp $
  *
  */
 
@@ -20,6 +20,7 @@
 #include <linux/mtd/mtd.h>
 #include <linux/pagemap.h>
 #include <linux/slab.h>
+#include <linux/vmalloc.h>
 #include <linux/vfs.h>
 #include <linux/crc32.h>
 #include "nodelist.h"
