@@ -130,6 +130,31 @@ struct pt_regs32 {
 #define PT_FPSCR32 (PT_FPR0 + 2*32 + 1)	  /* each FP reg occupies 2 32-bit userspace slots */
 #endif
 
+#define PT_VR0 82	/* each Vector reg occupies 2 slots in 64-bit */
+#define PT_VSCR (PT_VR0 + 32*2 + 1)
+#define PT_VRSAVE (PT_VR0 + 33*2)
+
+#ifdef __KERNEL__
+#define PT_VR0_32 164	/* each Vector reg occupies 4 slots in 32-bit */
+#define PT_VSCR_32 (PT_VR0 + 32*4 + 3)
+#define PT_VRSAVE_32 (PT_VR0 + 33*4)
+#endif
+
+/*
+ * Get/set all the altivec registers vr0..vr31, vscr, vrsave, in one go. 
+ * The transfer totals 34 quadword.  Quadwords 0-31 contain the 
+ * corresponding vector registers.  Quadword 32 contains the vscr as the 
+ * last word (offset 12) within that quadword.  Quadword 33 contains the 
+ * vrsave as the first word (offset 0) within the quadword.
+ *
+ * This definition of the VMX state is compatible with the current PPC32 
+ * ptrace interface.  This allows signal handling and ptrace to use the same 
+ * structures.  This also simplifies the implementation of a bi-arch 
+ * (combined (32- and 64-bit) gdb.
+ */
+#define PTRACE_GETVRREGS	18
+#define PTRACE_SETVRREGS	19
+
 /* Additional PTRACE requests implemented on PowerPC. */
 #define PPC_PTRACE_GETREGS	      0x99  /* Get GPRs 0 - 31 */
 #define PPC_PTRACE_SETREGS	      0x98  /* Set GPRs 0 - 31 */
