@@ -166,17 +166,21 @@ xlog_header_check_recover(xfs_mount_t *mp, xlog_rec_header_t *head)
      * a dirty log created in IRIX.
      */
 
-    if (INT_GET(head->h_fmt, ARCH_CONVERT) != XLOG_FMT) {
+    if (unlikely(INT_GET(head->h_fmt, ARCH_CONVERT) != XLOG_FMT)) {
 	xlog_warn("XFS: dirty log written in incompatible format - can't recover");
 #ifdef DEBUG
 	xlog_header_check_dump(mp, head);
 #endif
+	XFS_ERROR_REPORT("xlog_header_check_recover(1)",
+			 XFS_ERRLEVEL_HIGH, mp);
 	return XFS_ERROR(EFSCORRUPTED);
-    } else if (!uuid_equal(&mp->m_sb.sb_uuid, &head->h_fs_uuid)) {
+    } else if (unlikely(!uuid_equal(&mp->m_sb.sb_uuid, &head->h_fs_uuid))) {
 	xlog_warn("XFS: dirty log entry has mismatched uuid - can't recover");
 #ifdef DEBUG
 	xlog_header_check_dump(mp, head);
 #endif
+	XFS_ERROR_REPORT("xlog_header_check_recover(2)",
+			 XFS_ERRLEVEL_HIGH, mp);
 	return XFS_ERROR(EFSCORRUPTED);
     }
 
@@ -202,11 +206,13 @@ xlog_header_check_mount(xfs_mount_t *mp, xlog_rec_header_t *head)
 
 	xlog_warn("XFS: nil uuid in log - IRIX style log");
 
-    } else if (!uuid_equal(&mp->m_sb.sb_uuid, &head->h_fs_uuid)) {
+    } else if (unlikely(!uuid_equal(&mp->m_sb.sb_uuid, &head->h_fs_uuid))) {
 	xlog_warn("XFS: log has mismatched uuid - can't recover");
 #ifdef DEBUG
 	xlog_header_check_dump(mp, head);
 #endif
+	XFS_ERROR_REPORT("xlog_header_check_mount",
+			 XFS_ERRLEVEL_HIGH, mp);
 	return XFS_ERROR(EFSCORRUPTED);
     }
 
@@ -1113,8 +1119,11 @@ xlog_clear_stale_blocks(
 		 * the distance from the beginning of the log to the
 		 * tail.
 		 */
-		if (head_block < tail_block || head_block >= log->l_logBBsize)
+		if (unlikely(head_block < tail_block || head_block >= log->l_logBBsize)) {
+			XFS_ERROR_REPORT("xlog_clear_stale_blocks(1)",
+					 XFS_ERRLEVEL_LOW, log->l_mp);
 			return XFS_ERROR(EFSCORRUPTED);
+		}
 		tail_distance = tail_block + (log->l_logBBsize - head_block);
 	} else {
 		/*
@@ -1122,8 +1131,11 @@ xlog_clear_stale_blocks(
 		 * so the distance from the head to the tail is just
 		 * the tail block minus the head block.
 		 */
-		if (head_block >= tail_block || head_cycle != (tail_cycle + 1))
+		if (unlikely(head_block >= tail_block || head_cycle != (tail_cycle + 1))){
+			XFS_ERROR_REPORT("xlog_clear_stale_blocks(2)",
+					 XFS_ERRLEVEL_LOW, log->l_mp);
 			return XFS_ERROR(EFSCORRUPTED);
+		}
 		tail_distance = tail_block - head_block;
 	}
 
@@ -1732,10 +1744,12 @@ xlog_recover_do_inode_buffer(xfs_mount_t		*mp,
 		logged_nextp = (xfs_agino_t *)
 			       ((char *)(item->ri_buf[item_index].i_addr) +
 				(next_unlinked_offset - reg_buf_offset));
-		if (*logged_nextp == 0)	 {
+		if (unlikely(*logged_nextp == 0)) {
 			xfs_fs_cmn_err(CE_ALERT, mp,
 				"bad inode buffer log record (ptr = 0x%p, bp = 0x%p).  XFS trying to replay bad (0) inode di_next_unlinked field",
 				item, bp);
+			XFS_ERROR_REPORT("xlog_recover_do_inode_buf",
+					 XFS_ERRLEVEL_LOW, mp);
 			return XFS_ERROR(EFSCORRUPTED);
 		}
 
@@ -1933,6 +1947,8 @@ xlog_recover_do_buffer_trans(xlog_t		 *log,
 		xfs_fs_cmn_err(CE_ALERT, log->l_mp,
 			"xfs_log_recover: unknown buffer type 0x%x, dev 0x%x",
 			buf_f->blf_type, log->l_dev);
+		XFS_ERROR_REPORT("xlog_recover_do_buffer_trans",
+				 XFS_ERRLEVEL_LOW, log->l_mp);
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 
@@ -2038,7 +2054,6 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 		imap.im_blkno = 0;
 		xfs_imap(log->l_mp, 0, ino, &imap, 0);
 	}
-
 	bp = xfs_buf_read_flags(mp->m_ddev_targp, imap.im_blkno, imap.im_len,
 								XFS_BUF_LOCK);
 	if (XFS_BUF_ISERROR(bp)) {
@@ -2049,7 +2064,6 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 		return error;
 	}
 	error = 0;
-	xfs_inobp_check(mp, bp);
 	ASSERT(in_f->ilf_fields & XFS_ILOG_CORE);
 	dip = (xfs_dinode_t *)xfs_buf_offset(bp, imap.im_boffset);
 
@@ -2057,34 +2071,42 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 	 * Make sure the place we're flushing out to really looks
 	 * like an inode!
 	 */
-	if (INT_GET(dip->di_core.di_magic, ARCH_CONVERT) != XFS_DINODE_MAGIC) {
+	if (unlikely(INT_GET(dip->di_core.di_magic, ARCH_CONVERT) != XFS_DINODE_MAGIC)) {
 		xfs_buf_relse(bp);
 		xfs_fs_cmn_err(CE_ALERT, mp,
 			"xfs_inode_recover: Bad inode magic number, dino ptr = 0x%p, dino bp = 0x%p, ino = %Ld",
 			dip, bp, ino);
+		XFS_ERROR_REPORT("xlog_recover_do_inode_trans(1)",
+				 XFS_ERRLEVEL_LOW, mp);
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 	dicp = (xfs_dinode_core_t*)(item->ri_buf[1].i_addr);
-	if (dicp->di_magic != XFS_DINODE_MAGIC) {
+	if (unlikely(dicp->di_magic != XFS_DINODE_MAGIC)) {
 		xfs_buf_relse(bp);
 		xfs_fs_cmn_err(CE_ALERT, mp,
 			"xfs_inode_recover: Bad inode log record, rec ptr 0x%p, ino %Ld",
 			item, ino);
+		XFS_ERROR_REPORT("xlog_recover_do_inode_trans(2)",
+				 XFS_ERRLEVEL_LOW, mp);
 		return XFS_ERROR(EFSCORRUPTED);
 	}
-	if ((dicp->di_mode & IFMT) == IFREG) {
+	if (unlikely((dicp->di_mode & IFMT) == IFREG)) {
 		if ((dicp->di_format != XFS_DINODE_FMT_EXTENTS) &&
 		    (dicp->di_format != XFS_DINODE_FMT_BTREE)) {
+			XFS_CORRUPTION_ERROR("xlog_recover_do_inode_trans(3)",
+					 XFS_ERRLEVEL_LOW, mp, dicp);
 			xfs_buf_relse(bp);
 			xfs_fs_cmn_err(CE_ALERT, mp,
 				"xfs_inode_recover: Bad regular inode log record, rec ptr 0x%p, ino ptr = 0x%p, ino bp = 0x%p, ino %Ld",
 				item, dip, bp, ino);
 			return XFS_ERROR(EFSCORRUPTED);
 		}
-	} else if ((dicp->di_mode & IFMT) == IFDIR) {
+	} else if (unlikely((dicp->di_mode & IFMT) == IFDIR)) {
 		if ((dicp->di_format != XFS_DINODE_FMT_EXTENTS) &&
 		    (dicp->di_format != XFS_DINODE_FMT_BTREE) &&
 		    (dicp->di_format != XFS_DINODE_FMT_LOCAL)) {
+			XFS_CORRUPTION_ERROR("xlog_recover_do_inode_trans(4)",
+					     XFS_ERRLEVEL_LOW, mp, dicp);
 			xfs_buf_relse(bp);
 			xfs_fs_cmn_err(CE_ALERT, mp,
 				"xfs_inode_recover: Bad dir inode log record, rec ptr 0x%p, ino ptr = 0x%p, ino bp = 0x%p, ino %Ld",
@@ -2092,7 +2114,9 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 			return XFS_ERROR(EFSCORRUPTED);
 		}
 	}
-	if (dicp->di_nextents + dicp->di_anextents > dicp->di_nblocks) {
+	if (unlikely(dicp->di_nextents + dicp->di_anextents > dicp->di_nblocks)){
+		XFS_CORRUPTION_ERROR("xlog_recover_do_inode_trans(5)",
+				     XFS_ERRLEVEL_LOW, mp, dicp);
 		xfs_buf_relse(bp);
 		xfs_fs_cmn_err(CE_ALERT, mp,
 			"xfs_inode_recover: Bad inode log record, rec ptr 0x%p, dino ptr 0x%p, dino bp 0x%p, ino %Ld, total extents = %d, nblocks = %Ld",
@@ -2101,14 +2125,18 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 			dicp->di_nblocks);
 		return XFS_ERROR(EFSCORRUPTED);
 	}
-	if (dicp->di_forkoff > mp->m_sb.sb_inodesize) {
+	if (unlikely(dicp->di_forkoff > mp->m_sb.sb_inodesize)) {
+		XFS_CORRUPTION_ERROR("xlog_recover_do_inode_trans(6)",
+				     XFS_ERRLEVEL_LOW, mp, dicp);
 		xfs_buf_relse(bp);
 		xfs_fs_cmn_err(CE_ALERT, mp,
 			"xfs_inode_recover: Bad inode log rec ptr 0x%p, dino ptr 0x%p, dino bp 0x%p, ino %Ld, forkoff 0x%x",
 			item, dip, bp, ino, dicp->di_forkoff);
 		return XFS_ERROR(EFSCORRUPTED);
 	}
-	if (item->ri_buf[1].i_len > sizeof(xfs_dinode_core_t)) {
+	if (unlikely(item->ri_buf[1].i_len > sizeof(xfs_dinode_core_t))) {
+		XFS_CORRUPTION_ERROR("xlog_recover_do_inode_trans(7)",
+				     XFS_ERRLEVEL_LOW, mp, dicp);
 		xfs_buf_relse(bp);
 		xfs_fs_cmn_err(CE_ALERT, mp,
 			"xfs_inode_recover: Bad inode log record length %d, rec ptr 0x%p",
@@ -2207,14 +2235,6 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 
 
 write_inode_buffer:
-#if 0
-	/*
-	 * Can't do this if the transaction didn't log the current
-	 * contents, e.g. rmdir.
-	 */
-	XFS_DIR_SHORTFORM_VALIDATE_ONDISK(mp, dip);
-#endif
-	xfs_inobp_check(mp, bp);
 	if (ITEM_TYPE(item) == XFS_LI_INODE) {
 		ASSERT(XFS_BUF_FSPRIVATE(bp, void *) == NULL ||
 		       XFS_BUF_FSPRIVATE(bp, xfs_mount_t *) == mp);
@@ -3238,10 +3258,12 @@ xlog_do_recovery_pass(xlog_t	*log,
 	    ASSERT(BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT) <= INT_MAX));
 	    bblks = (int) BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT));	/* blocks in data section */
 
-	    if ((INT_GET(rhead->h_magicno, ARCH_CONVERT) != XLOG_HEADER_MAGIC_NUM) ||
+	    if (unlikely((INT_GET(rhead->h_magicno, ARCH_CONVERT) != XLOG_HEADER_MAGIC_NUM) ||
 		(BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT) > INT_MAX)) ||
 		(bblks <= 0) ||
-		(blk_no > log->l_logBBsize)) {
+		(blk_no > log->l_logBBsize))) {
+		    XFS_ERROR_REPORT("xlog_do_recovery_pass(1)",
+				     XFS_ERRLEVEL_LOW, log->l_mp);
 		    error = EFSCORRUPTED;
 		    goto bread_err2;
 	    }
@@ -3307,9 +3329,11 @@ xlog_do_recovery_pass(xlog_t	*log,
 	    ASSERT(bblks > 0);
 	    blk_no += hblks;			/* successfully read header */
 
-	    if ((INT_GET(rhead->h_magicno, ARCH_CONVERT) != XLOG_HEADER_MAGIC_NUM) ||
+	    if (unlikely((INT_GET(rhead->h_magicno, ARCH_CONVERT) != XLOG_HEADER_MAGIC_NUM) ||
 		(BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT) > INT_MAX)) ||
-		(bblks <= 0)) {
+		(bblks <= 0))) {
+		    XFS_ERROR_REPORT("xlog_do_recovery_pass(2)",
+				     XFS_ERRLEVEL_LOW, log->l_mp);
 		    error = EFSCORRUPTED;
 		    goto bread_err2;
 	    }
@@ -3472,7 +3496,7 @@ xlog_do_recover(xlog_t	*log,
 	 * or iunlinks they will have some entries in the AIL; so we look at
 	 * the AIL to determine how to set the tail_lsn.
 	 */
-	xlog_assign_tail_lsn(log->l_mp, NULL);
+	xlog_assign_tail_lsn(log->l_mp);
 
 	/*
 	 * Now that we've finished replaying all buffer and inode

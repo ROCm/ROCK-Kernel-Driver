@@ -530,6 +530,7 @@ xfs_iomap_write_allocate(
 	xfs_trans_t	*tp;
 	int		i, nimaps, committed;
 	int		error = 0;
+	int		nres;
 
 	*retmap = 0;
 
@@ -562,9 +563,19 @@ xfs_iomap_write_allocate(
 		nimaps = 0;
 		while (nimaps == 0) {
 			tp = xfs_trans_alloc(mp, XFS_TRANS_STRAT_WRITE);
-			error = xfs_trans_reserve(tp, 0, XFS_WRITE_LOG_RES(mp),
+			nres = XFS_EXTENTADD_SPACE_RES(mp, XFS_DATA_FORK);
+			error = xfs_trans_reserve(tp, nres,
+					XFS_WRITE_LOG_RES(mp),
 					0, XFS_TRANS_PERM_LOG_RES,
 					XFS_WRITE_LOG_COUNT);
+
+			if (error == ENOSPC) {
+				error = xfs_trans_reserve(tp, 0,
+						XFS_WRITE_LOG_RES(mp),
+						0,
+						XFS_TRANS_PERM_LOG_RES,
+						XFS_WRITE_LOG_COUNT);
+			}
 			if (error) {
 				xfs_trans_cancel(tp, 0);
 				return XFS_ERROR(error);

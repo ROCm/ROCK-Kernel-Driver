@@ -75,9 +75,6 @@ typedef struct vfsops {
 	int	(*vfs_mount)(struct vfs *, struct xfs_mount_args *,
 					struct cred *);
 					/* mount file system */
-	int	(*vfs_dounmount)(bhv_desc_t *, int, struct vnode *,
-				 struct cred *);
-					/* preparation and unmount */
 	int	(*vfs_unmount)(bhv_desc_t *, int, struct cred *);
 					/* unmount file system */
 	int	(*vfs_root)(bhv_desc_t *, struct vnode **);
@@ -98,48 +95,30 @@ typedef struct vfsops {
 					int, char *, int);
 } vfsops_t;
 
-#define VFS_DOUNMOUNT(vfsp,f,vp,cr, rv) \
-{	\
-	BHV_READ_LOCK(&(vfsp)->vfs_bh); \
-	rv = (*(VFS_FOPS(vfsp)->vfs_dounmount))((vfsp)->vfs_fbhv, f, vp, cr);	\
-	BHV_READ_UNLOCK(&(vfsp)->vfs_bh); \
-}
 #define VFS_UNMOUNT(vfsp,f,cr, rv)	\
 {	\
-	BHV_READ_LOCK(&(vfsp)->vfs_bh); \
-	rv = (*(VFS_FOPS(vfsp)->vfs_unmount))((vfsp)->vfs_fbhv, f, cr);		\
-	BHV_READ_UNLOCK(&(vfsp)->vfs_bh); \
+	rv = (*(VFS_FOPS(vfsp)->vfs_unmount))((vfsp)->vfs_fbhv, f, cr);	\
 }
 #define VFS_ROOT(vfsp, vpp, rv)		\
 {	\
-	BHV_READ_LOCK(&(vfsp)->vfs_bh); \
 	rv = (*(VFS_FOPS(vfsp)->vfs_root))((vfsp)->vfs_fbhv, vpp);	\
-	BHV_READ_UNLOCK(&(vfsp)->vfs_bh); \
 }
 #define VFS_STATVFS(vfsp, sp, vp, rv)	\
 {	\
-	BHV_READ_LOCK(&(vfsp)->vfs_bh); \
-	rv = (*(VFS_FOPS(vfsp)->vfs_statvfs))((vfsp)->vfs_fbhv, sp, vp);	\
-	BHV_READ_UNLOCK(&(vfsp)->vfs_bh); \
+	rv = (*(VFS_FOPS(vfsp)->vfs_statvfs))((vfsp)->vfs_fbhv, sp, vp);\
 }
 #define VFS_SYNC(vfsp, flag, cr, rv) \
 {	\
-	BHV_READ_LOCK(&(vfsp)->vfs_bh); \
 	rv = (*(VFS_FOPS(vfsp)->vfs_sync))((vfsp)->vfs_fbhv, flag, cr); \
-	BHV_READ_UNLOCK(&(vfsp)->vfs_bh); \
 }
 #define VFS_VGET(vfsp, vpp, fidp, rv) \
 {	\
-	BHV_READ_LOCK(&(vfsp)->vfs_bh); \
 	rv = (*(VFS_FOPS(vfsp)->vfs_vget))((vfsp)->vfs_fbhv, vpp, fidp);  \
-	BHV_READ_UNLOCK(&(vfsp)->vfs_bh); \
 }
 
 #define VFS_INIT_VNODE(vfsp, vp, bhv, unlock) \
 {	\
-	BHV_READ_LOCK(&(vfsp)->vfs_bh); \
 	(*(VFS_FOPS(vfsp)->vfs_init_vnode))((vfsp)->vfs_fbhv, vp, bhv, unlock);\
-	BHV_READ_UNLOCK(&(vfsp)->vfs_bh); \
 }
 
 /* No behavior lock here */
@@ -148,9 +127,7 @@ typedef struct vfsops {
 
 #define VFS_DMAPI_FSYS_VECTOR(vfsp, df, rv) \
 {	\
-	BHV_READ_LOCK(&(vfsp)->vfs_bh); \
 	rv = (*(VFS_FOPS(vfsp)->vfs_dmapi_fsys_vector))((vfsp)->vfs_fbhv, df);	      \
-	BHV_READ_UNLOCK(&(vfsp)->vfs_bh); \
 }
 
 

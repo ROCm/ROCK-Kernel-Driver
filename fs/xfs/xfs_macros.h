@@ -33,13 +33,12 @@
 #define __XFS_MACROS_H__
 
 /*
- * Set for debug kernels and simulation, and 32-bit kernels,
- * but not for standalone.  These replacements save space.
+ * Set for debug kernels and simulation
+ * These replacements save space.
  * Used in xfs_macros.c.
  */
 #define XFS_WANT_SPACE_C	\
-	(!defined(_STANDALONE) && \
-	 (defined(DEBUG) || (defined(_KERNEL))))
+	(!defined(_STANDALONE) && defined(DEBUG))
 
 /*
  * Set for debug simulation and kernel builds, but not for standalone.

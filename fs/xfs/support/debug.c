@@ -55,7 +55,7 @@ assfail(char *a, char *f, int l)
     BUG();
 }
 
-#ifdef DEBUG
+#if (defined(DEBUG) || defined(INDUCE_IO_ERRROR))
 
 unsigned long
 random(void)
@@ -85,8 +85,8 @@ void
 cmn_err(register int level, char *fmt, ...)
 {
 	char	*fp = fmt;
-	ulong	flags;
 	int	len;
+	ulong	flags;
 	va_list	ap;
 
 	level &= XFS_ERR_MASK;

@@ -1125,8 +1125,10 @@ xfs_attr_leaf_list(xfs_attr_list_context_t *context)
 		return(error);
 	ASSERT(bp != NULL);
 	leaf = bp->data;
-	if (INT_GET(leaf->hdr.info.magic, ARCH_CONVERT)
-						!= XFS_ATTR_LEAF_MAGIC) {
+	if (unlikely(INT_GET(leaf->hdr.info.magic, ARCH_CONVERT)
+						!= XFS_ATTR_LEAF_MAGIC)) {
+		XFS_CORRUPTION_ERROR("xfs_attr_leaf_list", XFS_ERRLEVEL_LOW,
+				     context->dp->i_mount, leaf);
 		xfs_da_brelse(NULL, bp);
 		return(XFS_ERROR(EFSCORRUPTED));
 	}
@@ -1806,14 +1808,22 @@ xfs_attr_node_list(xfs_attr_list_context_t *context)
 						      XFS_ATTR_FORK);
 			if (error)
 				return(error);
-			if (bp == NULL)
+			if (unlikely(bp == NULL)) {
+				XFS_ERROR_REPORT("xfs_attr_node_list(2)",
+						 XFS_ERRLEVEL_LOW,
+						 context->dp->i_mount);
 				return(XFS_ERROR(EFSCORRUPTED));
+			}
 			node = bp->data;
 			if (INT_GET(node->hdr.info.magic, ARCH_CONVERT)
 							== XFS_ATTR_LEAF_MAGIC)
 				break;
-			if (INT_GET(node->hdr.info.magic, ARCH_CONVERT)
-							!= XFS_DA_NODE_MAGIC) {
+			if (unlikely(INT_GET(node->hdr.info.magic, ARCH_CONVERT)
+							!= XFS_DA_NODE_MAGIC)) {
+				XFS_CORRUPTION_ERROR("xfs_attr_node_list(3)",
+						     XFS_ERRLEVEL_LOW,
+						     context->dp->i_mount,
+						     node);
 				xfs_da_brelse(NULL, bp);
 				return(XFS_ERROR(EFSCORRUPTED));
 			}
@@ -1846,8 +1856,11 @@ xfs_attr_node_list(xfs_attr_list_context_t *context)
 	 */
 	for (;;) {
 		leaf = bp->data;
-		if (INT_GET(leaf->hdr.info.magic, ARCH_CONVERT)
-						!= XFS_ATTR_LEAF_MAGIC) {
+		if (unlikely(INT_GET(leaf->hdr.info.magic, ARCH_CONVERT)
+						!= XFS_ATTR_LEAF_MAGIC)) {
+			XFS_CORRUPTION_ERROR("xfs_attr_node_list(4)",
+					     XFS_ERRLEVEL_LOW,
+					     context->dp->i_mount, leaf);
 			xfs_da_brelse(NULL, bp);
 			return(XFS_ERROR(EFSCORRUPTED));
 		}
@@ -1860,8 +1873,12 @@ xfs_attr_node_list(xfs_attr_list_context_t *context)
 					      &bp, XFS_ATTR_FORK);
 		if (error)
 			return(error);
-		if (bp == NULL)
+		if (unlikely((bp == NULL))) {
+			XFS_ERROR_REPORT("xfs_attr_node_list(5)",
+					 XFS_ERRLEVEL_LOW,
+					 context->dp->i_mount);
 			return(XFS_ERROR(EFSCORRUPTED));
+		}
 	}
 	xfs_da_brelse(NULL, bp);
 	return(0);
