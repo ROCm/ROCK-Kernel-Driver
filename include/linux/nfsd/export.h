@@ -55,10 +55,12 @@ struct svc_client {
 	struct in_addr		cl_addr[NFSCLNT_ADDRMAX];
 	struct svc_uidmap *	cl_umap;
 	struct list_head	cl_export[NFSCLNT_EXPMAX];
+	struct list_head	cl_list;
 };
 
 struct svc_export {
 	struct list_head	ex_hash;
+	struct list_head	ex_list;
 	char			ex_path[NFS_MAXPATHLEN+1];
 	struct svc_export *	ex_parent;
 	struct svc_client *	ex_client;

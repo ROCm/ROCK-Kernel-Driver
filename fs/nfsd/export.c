@@ -148,15 +148,13 @@ exp_child(svc_client *clp, struct super_block *sb, struct dentry *dentry)
 /* Update parent pointers of all exports */
 static void exp_change_parents(svc_client *clp, svc_export *old, svc_export *new)
 {
-	int i;
-	for (i = 0; i < NFSCLNT_EXPMAX; i++) {
-		struct list_head *head = &clp->cl_export[i];
-		struct list_head *p;
-		list_for_each(p, head) {
-			svc_export *exp = list_entry(p, svc_export, ex_hash);
-			if (exp->ex_parent == old)
-				exp->ex_parent = new;
-		}
+	struct list_head *head = &clp->cl_list;
+	struct list_head *p;
+
+	list_for_each(p, head) {
+		svc_export *exp = list_entry(p, svc_export, ex_list);
+		if (exp->ex_parent == old)
+			exp->ex_parent = new;
 	}
 }
 
@@ -270,6 +268,7 @@ exp_export(struct nfsctl_export *nxp)
 		exp_change_parents(clp, parent, exp);
 
 	list_add(&exp->ex_hash, clp->cl_export + EXPORT_HASH(dev));
+	list_add_tail(&exp->ex_list, &clp->cl_list);
 
 	err = 0;
 
@@ -317,18 +316,15 @@ exp_do_unexport(svc_export *unexp)
 static void
 exp_unexport_all(svc_client *clp)
 {
-	int		i;
+	struct list_head *p = &clp->cl_list;
 
 	dprintk("unexporting all fs's for clnt %p\n", clp);
-	for (i = 0; i < NFSCLNT_EXPMAX; i++) {
-		struct list_head *p = &clp->cl_export[i];
-		svc_export *exp;
 
-		while (!list_empty(p)) {
-			exp = list_entry(p->next, svc_export, ex_hash);
-			list_del(&exp->ex_hash);
-			exp_do_unexport(exp);
-		}
+	while (!list_empty(p)) {
+		svc_export *exp = list_entry(p->next, svc_export, ex_list);
+		list_del(&exp->ex_list);
+		list_del(&exp->ex_hash);
+		exp_do_unexport(exp);
 	}
 }
 
@@ -355,6 +351,7 @@ exp_unexport(struct nfsctl_export *nxp)
 		svc_export *exp = exp_get(clp, ex_dev, nxp->ex_ino);
 		if (exp) {
 			list_del(&exp->ex_hash);
+			list_del(&exp->ex_list);
 			exp_do_unexport(exp);
 			err = 0;
 		}
@@ -599,58 +596,56 @@ exp_procfs_exports(char *buffer, char **start, off_t offset,
 	off_t	pos = 0;
         off_t	begin = 0;
         int	len = 0;
-	int	i,j;
+	int	j;
 
         len += sprintf(buffer, "# Version 1.1\n");
         len += sprintf(buffer+len, "# Path Client(Flags) # IPs\n");
 
 	for (clp = clients; clp; clp = clp->cl_next) {
-		for (i = 0; i < NFSCLNT_EXPMAX; i++) {
-			struct list_head *list = &clp->cl_export[i];
-			struct list_head *p;
+		struct list_head *list = &clp->cl_list;
+		struct list_head *p;
 
-			list_for_each(p, list) {
-				int first = 0;
+		list_for_each(p, list) {
+			int first = 0;
 
-				exp = list_entry(p, svc_export, ex_hash);
-				MANGLE(exp->ex_path);
-				buffer[len++]='\t';
-				MANGLE(clp->cl_ident);
-				buffer[len++]='(';
+			exp = list_entry(p, svc_export, ex_list);
+			MANGLE(exp->ex_path);
+			buffer[len++]='\t';
+			MANGLE(clp->cl_ident);
+			buffer[len++]='(';
 
-				len += exp_flags(buffer+len, exp->ex_flags);
-				len += sprintf(buffer+len, ") # ");
-				for (j = 0; j < clp->cl_naddr; j++) {
-					struct in_addr	addr = clp->cl_addr[j]; 
+			len += exp_flags(buffer+len, exp->ex_flags);
+			len += sprintf(buffer+len, ") # ");
+			for (j = 0; j < clp->cl_naddr; j++) {
+				struct in_addr	addr = clp->cl_addr[j]; 
 
-					head = &clnt_hash[CLIENT_HASH(addr.s_addr)];
-					for (hp = head; (tmp = *hp) != NULL; hp = &(tmp->h_next)) {
-						if (tmp->h_addr.s_addr == addr.s_addr) {
-							if (first++) len += sprintf(buffer+len, "%s", " ");
-							if (tmp->h_client != clp)
-								len += sprintf(buffer+len, "(");
-							len += sprintf(buffer+len, "%d.%d.%d.%d",
-									htonl(addr.s_addr) >> 24 & 0xff,
-									htonl(addr.s_addr) >> 16 & 0xff,
-									htonl(addr.s_addr) >>  8 & 0xff,
-									htonl(addr.s_addr) >>  0 & 0xff);
-							if (tmp->h_client != clp)
-							  len += sprintf(buffer+len, ")");
-							break;
-						}
+				head = &clnt_hash[CLIENT_HASH(addr.s_addr)];
+				for (hp = head; (tmp = *hp) != NULL; hp = &(tmp->h_next)) {
+					if (tmp->h_addr.s_addr == addr.s_addr) {
+						if (first++) len += sprintf(buffer+len, "%s", " ");
+						if (tmp->h_client != clp)
+							len += sprintf(buffer+len, "(");
+						len += sprintf(buffer+len, "%d.%d.%d.%d",
+								htonl(addr.s_addr) >> 24 & 0xff,
+								htonl(addr.s_addr) >> 16 & 0xff,
+								htonl(addr.s_addr) >>  8 & 0xff,
+								htonl(addr.s_addr) >>  0 & 0xff);
+						if (tmp->h_client != clp)
+						  len += sprintf(buffer+len, ")");
+						break;
 					}
 				}
-
-				buffer[len++]='\n';
-
-				pos=begin+len;
-				if(pos<offset) {
-					len=0;
-					begin=pos;
-				}
-				if (pos > offset + length)
-					goto done;
 			}
+
+			buffer[len++]='\n';
+
+			pos=begin+len;
+			if(pos<offset) {
+				len=0;
+				begin=pos;
+			}
+			if (pos > offset + length)
+				goto done;
 		}
 	}
 
@@ -701,6 +696,7 @@ exp_addclient(struct nfsctl_client *ncp)
 		memset(clp, 0, sizeof(*clp));
 		for (i = 0; i < NFSCLNT_EXPMAX; i++)
 			INIT_LIST_HEAD(&clp->cl_export[i]);
+		INIT_LIST_HEAD(&clp->cl_list);
 
 		dprintk("created client %s (%p)\n", ncp->cl_ident, clp);
 
