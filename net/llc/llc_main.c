@@ -123,6 +123,12 @@ struct llc_sap *llc_sap_find(u8 sap_value)
 	return sap;
 }
 
+/*
+ * FIXME: this will not be needed in next changesets, when this
+ * will move to llc_conn
+ */
+extern int llc_conn_rcv(struct sock* sk, struct sk_buff *skb);
+
 /**
  *	llc_backlog_rcv - Processes rx frames and expired timers.
  *	@sk: LLC sock (p8022 connection)
@@ -536,9 +542,6 @@ static struct packet_type llc_tr_packet_type = {
 	.data = (void *)1,
 };
 
-static char llc_banner[] __initdata =
-		KERN_INFO "LLC 2.0 by Procom, 1997, Arnaldo C. Melo, 2001, 2002\n"
-		KERN_INFO "NET 4.0 IEEE 802.2 extended support\n";
 static char llc_error_msg[] __initdata =
 		KERN_ERR "LLC install NOT successful.\n";
 
@@ -548,7 +551,6 @@ static int __init llc_init(void)
 	struct sk_buff *skb;
 	struct llc_station_state_ev *ev;
 
-	printk(llc_banner);
 	INIT_LIST_HEAD(&llc_main_station.sap_list.list);
 	rwlock_init(&llc_main_station.sap_list.lock);
 	skb_queue_head_init(&llc_main_station.mac_pdu_q);
