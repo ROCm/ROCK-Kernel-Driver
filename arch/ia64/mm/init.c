@@ -109,6 +109,7 @@ free_initmem (void)
 void
 free_initrd_mem (unsigned long start, unsigned long end)
 {
+	struct page *page;
 	/*
 	 * EFI uses 4KB pages while the kernel can use 4KB  or bigger.
 	 * Thus EFI and the kernel may have different page sizes. It is
@@ -147,11 +148,12 @@ free_initrd_mem (unsigned long start, unsigned long end)
 		printk(KERN_INFO "Freeing initrd memory: %ldkB freed\n", (end - start) >> 10);
 
 	for (; start < end; start += PAGE_SIZE) {
-		if (!VALID_PAGE(virt_to_page(start)))
+		if (!virt_addr_valid(start))
 			continue;
-		clear_bit(PG_reserved, &virt_to_page(start)->flags);
-		set_page_count(virt_to_page(start), 1);
-		free_page(start);
+		page = virt_to_page(start);
+		clear_bit(PG_reserved, &page->flags);
+		set_page_count(page, 1);
+		__free_page(page);
 		++totalram_pages;
 	}
 }

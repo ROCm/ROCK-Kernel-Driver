@@ -240,9 +240,13 @@ make_coherent(struct vm_area_struct *vma, unsigned long addr, struct page *page)
  */
 void update_mmu_cache(struct vm_area_struct *vma, unsigned long addr, pte_t pte)
 {
-	struct page *page = pte_page(pte);
+	unsigned long pfn = pte_pfn(pte);
+	struct page *page;
 
-	if (VALID_PAGE(page) && page->mapping) {
+	if (!pfn_valid(pfn))
+		return;
+	page = pfn_to_page(pfn);
+	if (page->mapping) {
 		if (test_and_clear_bit(PG_dcache_dirty, &page->flags))
 			__flush_dcache_page(page);
 
