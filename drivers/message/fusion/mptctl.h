@@ -20,7 +20,7 @@
  *  (mailto:sjralston1@netscape.net)
  *  (mailto:Pam.Delaney@lsil.com)
  *
- *  $Id: mptctl.h,v 1.12 2002/10/17 20:15:58 pdelaney Exp $
+ *  $Id: mptctl.h,v 1.13 2002/12/03 21:26:33 pdelaney Exp $
  */
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*

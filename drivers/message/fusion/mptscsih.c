@@ -26,7 +26,7 @@
  *  (mailto:sjralston1@netscape.net)
  *  (mailto:Pam.Delaney@lsil.com)
  *
- *  $Id: mptscsih.c,v 1.103 2002/10/17 20:15:59 pdelaney Exp $
+ *  $Id: mptscsih.c,v 1.104 2002/12/03 21:26:34 pdelaney Exp $
  */
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
@@ -159,11 +159,9 @@ typedef struct _dv_parameters {
 static int	mptscsih_io_done(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *r);
 static void	mptscsih_report_queue_full(Scsi_Cmnd *sc, SCSIIOReply_t *pScsiReply, SCSIIORequest_t *pScsiReq);
 static int	mptscsih_taskmgmt_complete(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *r);
-static int	mptscsih_io_direction(Scsi_Cmnd *cmd);
 
 static int	mptscsih_AddSGE(MPT_SCSI_HOST *hd, Scsi_Cmnd *SCpnt,
 				 SCSIIORequest_t *pReq, int req_idx);
-static int	mptscsih_getFreeChainBuffer(MPT_SCSI_HOST *hd, int *retIndex);
 static void	mptscsih_freeChainBuffers(MPT_SCSI_HOST *hd, int req_idx);
 static int	mptscsih_initChainBuffers (MPT_SCSI_HOST *hd, int init);
 static void	copy_sense_data(Scsi_Cmnd *sc, MPT_SCSI_HOST *hd, MPT_FRAME_HDR *mf, SCSIIOReply_t *pScsiReply);
@@ -274,6 +272,436 @@ static struct mptscsih_driver_setup
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
+ *  Private inline routines...
+ */
+/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
+/* 19991030 -sralston
+ *  Return absolute SCSI data direction:
+ *     1 = _DATA_OUT
+ *     0 = _DIR_NONE
+ *    -1 = _DATA_IN
+ *
+ * Changed: 3-20-2002 pdelaney to use the default data
+ * direction and the defines set up in the
+ * 2.4 kernel series
+ *     1 = _DATA_OUT	changed to SCSI_DATA_WRITE (1)
+ *     0 = _DIR_NONE	changed to SCSI_DATA_NONE (3)
+ *    -1 = _DATA_IN	changed to SCSI_DATA_READ (2)
+ * If the direction is unknown, fall through to original code.
+ *
+ * Mid-layer bug fix(): sg interface generates the wrong data
+ * direction in some cases. Set the direction the hard way for
+ * the most common commands.
+ */
+static inline int
+mptscsih_io_direction(Scsi_Cmnd *cmd)
+{
+	switch (cmd->cmnd[0]) {
+	case WRITE_6:		
+	case WRITE_10:		
+		return SCSI_DATA_WRITE;
+		break;
+	case READ_6:		
+	case READ_10:		
+		return SCSI_DATA_READ;
+		break;
+	}
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
+	if (cmd->sc_data_direction != SCSI_DATA_UNKNOWN)
+		return cmd->sc_data_direction;
+#endif
+	switch (cmd->cmnd[0]) {
+	/*  _DATA_OUT commands	*/
+	case WRITE_6:		case WRITE_10:		case WRITE_12:
+	case WRITE_LONG:	case WRITE_SAME:	case WRITE_BUFFER:
+	case WRITE_VERIFY:	case WRITE_VERIFY_12:
+	case COMPARE:		case COPY:		case COPY_VERIFY:
+	case SEARCH_EQUAL:	case SEARCH_HIGH:	case SEARCH_LOW:
+	case SEARCH_EQUAL_12:	case SEARCH_HIGH_12:	case SEARCH_LOW_12:
+	case MODE_SELECT:	case MODE_SELECT_10:	case LOG_SELECT:
+	case SEND_DIAGNOSTIC:	case CHANGE_DEFINITION: case UPDATE_BLOCK:
+	case SET_WINDOW:	case MEDIUM_SCAN:	case SEND_VOLUME_TAG:
+	case REASSIGN_BLOCKS:
+	case PERSISTENT_RESERVE_OUT:
+	case 0xea:
+	case 0xa3:
+		return SCSI_DATA_WRITE;
+
+	/*  No data transfer commands  */
+	case SEEK_6:		case SEEK_10:
+	case RESERVE:		case RELEASE:
+	case TEST_UNIT_READY:
+	case START_STOP:
+	case ALLOW_MEDIUM_REMOVAL:
+		return SCSI_DATA_NONE;
+
+	/*  Conditional data transfer commands	*/
+	case FORMAT_UNIT:
+		if (cmd->cmnd[1] & 0x10)	/* FmtData (data out phase)? */
+			return SCSI_DATA_WRITE;
+		else
+			return SCSI_DATA_NONE;
+
+	case VERIFY:
+		if (cmd->cmnd[1] & 0x02)	/* VERIFY:BYTCHK (data out phase)? */
+			return SCSI_DATA_WRITE;
+		else
+			return SCSI_DATA_NONE;
+
+	case RESERVE_10:
+		if (cmd->cmnd[1] & 0x03)	/* RESERVE:{LongID|Extent} (data out phase)? */
+			return SCSI_DATA_WRITE;
+		else
+			return SCSI_DATA_NONE;
+
+	/*  Must be data _IN!  */
+	default:
+		return SCSI_DATA_READ;
+	}
+} /* mptscsih_io_direction() */
+
+/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
+/**
+ *	mptscsih_add_sge - Place a simple SGE at address pAddr.
+ *	@pAddr: virtual address for SGE
+ *	@flagslength: SGE flags and data transfer length
+ *	@dma_addr: Physical address
+ *
+ *	This routine places a MPT request frame back on the MPT adapter's
+ *	FreeQ.
+ */
+static inline void
+mptscsih_add_sge(char *pAddr, u32 flagslength, dma_addr_t dma_addr)
+{
+	if (sizeof(dma_addr_t) == sizeof(u64)) {
+		SGESimple64_t *pSge = (SGESimple64_t *) pAddr;
+		u32 tmp = dma_addr & 0xFFFFFFFF;
+
+		pSge->FlagsLength = cpu_to_le32(flagslength);
+		pSge->Address.Low = cpu_to_le32(tmp);
+		tmp = (u32) ((u64)dma_addr >> 32);
+		pSge->Address.High = cpu_to_le32(tmp);
+
+	} else {
+		SGESimple32_t *pSge = (SGESimple32_t *) pAddr;
+		pSge->FlagsLength = cpu_to_le32(flagslength);
+		pSge->Address = cpu_to_le32(dma_addr);
+	}
+} /* mptscsih_add_sge() */
+
+/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
+/**
+ *	mptscsih_add_chain - Place a chain SGE at address pAddr.
+ *	@pAddr: virtual address for SGE
+ *	@next: nextChainOffset value (u32's)
+ *	@length: length of next SGL segment
+ *	@dma_addr: Physical address
+ *
+ *	This routine places a MPT request frame back on the MPT adapter's
+ *	FreeQ.
+ */
+static inline void
+mptscsih_add_chain(char *pAddr, u8 next, u16 length, dma_addr_t dma_addr)
+{
+	if (sizeof(dma_addr_t) == sizeof(u64)) {
+		SGEChain64_t *pChain = (SGEChain64_t *) pAddr;
+		u32 tmp = dma_addr & 0xFFFFFFFF;
+
+		pChain->Length = cpu_to_le16(length);
+		pChain->Flags = MPI_SGE_FLAGS_CHAIN_ELEMENT | mpt_addr_size();
+
+		pChain->NextChainOffset = next;
+
+		pChain->Address.Low = cpu_to_le32(tmp);
+		tmp = (u32) ((u64)dma_addr >> 32);
+		pChain->Address.High = cpu_to_le32(tmp);
+	} else {
+		SGEChain32_t *pChain = (SGEChain32_t *) pAddr;
+		pChain->Length = cpu_to_le16(length);
+		pChain->Flags = MPI_SGE_FLAGS_CHAIN_ELEMENT | mpt_addr_size();
+		pChain->NextChainOffset = next;
+		pChain->Address = cpu_to_le32(dma_addr);
+	}
+} /* mptscsih_add_chain() */
+
+/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
+/*
+ *	mptscsih_getFreeChainBuffes - Function to get a free chain
+ *	from the MPT_SCSI_HOST FreeChainQ.
+ *	@hd: Pointer to the MPT_SCSI_HOST instance
+ *	@req_idx: Index of the SCSI IO request frame. (output)
+ *
+ *	return SUCCESS or FAILED
+ */
+static inline int
+mptscsih_getFreeChainBuffer(MPT_SCSI_HOST *hd, int *retIndex)
+{
+	MPT_FRAME_HDR *chainBuf = NULL;
+	unsigned long flags;
+	int rc = FAILED;
+	int chain_idx = MPT_HOST_NO_CHAIN;
+
+	spin_lock_irqsave(&hd->ioc->FreeQlock, flags);
+	if (!Q_IS_EMPTY(&hd->FreeChainQ)) {
+
+		int offset;
+
+		chainBuf = hd->FreeChainQ.head;
+		Q_DEL_ITEM(&chainBuf->u.frame.linkage);
+		offset = (u8 *)chainBuf - (u8 *)hd->ChainBuffer;
+		chain_idx = offset / hd->ioc->req_sz;
+		rc = SUCCESS;
+	}
+	spin_unlock_irqrestore(&hd->ioc->FreeQlock, flags);
+
+
+	*retIndex = chain_idx;
+
+	dsgprintk((MYIOC_s_INFO_FMT "getFreeChainBuffer (index %d), got buf=%p\n",
+			hd->ioc->name, *retIndex, chainBuf));
+
+	return rc;
+} /* mptscsih_getFreeChainBuffer() */
+
+/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
+/*
+ *	mptscsih_AddSGE - Add a SGE (plus chain buffers) to the
+ *	SCSIIORequest_t Message Frame.
+ *	@hd: Pointer to MPT_SCSI_HOST structure
+ *	@SCpnt: Pointer to Scsi_Cmnd structure
+ *	@pReq: Pointer to SCSIIORequest_t structure
+ *
+ *	Returns ...
+ */
+static int
+mptscsih_AddSGE(MPT_SCSI_HOST *hd, Scsi_Cmnd *SCpnt,
+		SCSIIORequest_t *pReq, int req_idx)
+{
+	char 	*psge;
+	char	*chainSge;
+	struct scatterlist *sg;
+	int	 frm_sz;
+	int	 sges_left, sg_done;
+	int	 chain_idx = MPT_HOST_NO_CHAIN;
+	int	 sgeOffset;
+	int	 numSgeSlots, numSgeThisFrame;
+	u32	 sgflags, sgdir, thisxfer = 0;
+	int	 chain_dma_off = 0;
+	int	 newIndex;
+	int	 ii;
+	dma_addr_t v2;
+
+	sgdir = le32_to_cpu(pReq->Control) & MPI_SCSIIO_CONTROL_DATADIRECTION_MASK;
+	if (sgdir == MPI_SCSIIO_CONTROL_WRITE)  {
+		sgdir = MPT_TRANSFER_HOST_TO_IOC;
+	} else {
+		sgdir = MPT_TRANSFER_IOC_TO_HOST;
+	}
+
+	psge = (char *) &pReq->SGL;
+	frm_sz = hd->ioc->req_sz;
+
+	/* Map the data portion, if any.
+	 * sges_left  = 0 if no data transfer.
+	 */
+	sges_left = SCpnt->use_sg;
+	if (SCpnt->use_sg) {
+		sges_left = pci_map_sg(hd->ioc->pcidev,
+			       (struct scatterlist *) SCpnt->request_buffer,
+			       SCpnt->use_sg,
+			       scsi_to_pci_dma_dir(SCpnt->sc_data_direction));
+	} else if (SCpnt->request_bufflen) {
+		dma_addr_t	 buf_dma_addr;
+		scPrivate	*my_priv;
+
+		buf_dma_addr = pci_map_single(hd->ioc->pcidev,
+				      SCpnt->request_buffer,
+				      SCpnt->request_bufflen,
+				      scsi_to_pci_dma_dir(SCpnt->sc_data_direction));
+
+		/* We hide it here for later unmap. */
+		my_priv = (scPrivate *) &SCpnt->SCp;
+		my_priv->p1 = (void *)(ulong) buf_dma_addr;
+
+		dsgprintk((MYIOC_s_INFO_FMT "SG: non-SG for %p, len=%d\n",
+				hd->ioc->name, SCpnt, SCpnt->request_bufflen));
+
+		mptscsih_add_sge((char *) &pReq->SGL,
+			0xD1000000|MPT_SGE_FLAGS_ADDRESSING|sgdir|SCpnt->request_bufflen,
+			buf_dma_addr);
+
+		return SUCCESS;
+	}
+
+	/* Handle the SG case.
+	 */
+	sg = (struct scatterlist *) SCpnt->request_buffer;
+	sg_done  = 0;
+	sgeOffset = sizeof(SCSIIORequest_t) - sizeof(SGE_IO_UNION);
+	chainSge = NULL;
+
+	/* Prior to entering this loop - the following must be set
+	 * current MF:  sgeOffset (bytes)
+	 *              chainSge (Null if original MF is not a chain buffer)
+	 *              sg_done (num SGE done for this MF)
+	 */
+
+nextSGEset:
+	numSgeSlots = ((frm_sz - sgeOffset) / (sizeof(u32) + sizeof(dma_addr_t)) );
+	numSgeThisFrame = (sges_left < numSgeSlots) ? sges_left : numSgeSlots;
+
+	sgflags = MPT_SGE_FLAGS_SIMPLE_ELEMENT | MPT_SGE_FLAGS_ADDRESSING | sgdir;
+
+	/* Get first (num - 1) SG elements
+	 * Skip any SG entries with a length of 0
+	 * NOTE: at finish, sg and psge pointed to NEXT data/location positions
+	 */
+	for (ii=0; ii < (numSgeThisFrame-1); ii++) {
+		thisxfer = sg_dma_len(sg);
+		if (thisxfer == 0) {
+			sg ++; /* Get next SG element from the OS */
+			sg_done++;
+			continue;
+		}
+
+		v2 = sg_dma_address(sg);
+		mptscsih_add_sge(psge, sgflags | thisxfer, v2);
+
+		sg++;		/* Get next SG element from the OS */
+		psge += (sizeof(u32) + sizeof(dma_addr_t));
+		sgeOffset += (sizeof(u32) + sizeof(dma_addr_t));
+		sg_done++;
+	}
+
+	if (numSgeThisFrame == sges_left) {
+		/* Add last element, end of buffer and end of list flags.
+		 */
+		sgflags |= MPT_SGE_FLAGS_LAST_ELEMENT |
+				MPT_SGE_FLAGS_END_OF_BUFFER |
+				MPT_SGE_FLAGS_END_OF_LIST;
+
+		/* Add last SGE and set termination flags.
+		 * Note: Last SGE may have a length of 0 - which should be ok.
+		 */
+		thisxfer = sg_dma_len(sg);
+
+		v2 = sg_dma_address(sg);
+		mptscsih_add_sge(psge, sgflags | thisxfer, v2);
+		/*
+		sg++;
+		psge += (sizeof(u32) + sizeof(dma_addr_t));
+		*/
+		sgeOffset += (sizeof(u32) + sizeof(dma_addr_t));
+		sg_done++;
+
+		if (chainSge) {
+			/* The current buffer is a chain buffer,
+			 * but there is not another one.
+			 * Update the chain element
+			 * Offset and Length fields.
+			 */
+			mptscsih_add_chain((char *)chainSge, 0, sgeOffset, hd->ChainBufferDMA + chain_dma_off);
+		} else {
+			/* The current buffer is the original MF
+			 * and there is no Chain buffer.
+			 */
+			pReq->ChainOffset = 0;
+		}
+	} else {
+		/* At least one chain buffer is needed.
+		 * Complete the first MF
+		 *  - last SGE element, set the LastElement bit
+		 *  - set ChainOffset (words) for orig MF
+		 *             (OR finish previous MF chain buffer)
+		 *  - update MFStructPtr ChainIndex
+		 *  - Populate chain element
+		 * Also
+		 * Loop until done.
+		 */
+
+		dsgprintk((MYIOC_s_INFO_FMT "SG: Chain Required! sg done %d\n",
+				hd->ioc->name, sg_done));
+
+		/* Set LAST_ELEMENT flag for last non-chain element
+		 * in the buffer. Since psge points at the NEXT
+		 * SGE element, go back one SGE element, update the flags
+		 * and reset the pointer. (Note: sgflags & thisxfer are already
+		 * set properly).
+		 */
+		if (sg_done) {
+			u32 *ptmp = (u32 *) (psge - (sizeof(u32) + sizeof(dma_addr_t)));
+			sgflags = le32_to_cpu(*ptmp);
+			sgflags |= MPT_SGE_FLAGS_LAST_ELEMENT;
+			*ptmp = cpu_to_le32(sgflags);
+		}
+
+		if (chainSge) {
+			/* The current buffer is a chain buffer.
+			 * chainSge points to the previous Chain Element.
+			 * Update its chain element Offset and Length (must
+			 * include chain element size) fields.
+			 * Old chain element is now complete.
+			 */
+			u8 nextChain = (u8) (sgeOffset >> 2);
+			sgeOffset += (sizeof(u32) + sizeof(dma_addr_t));
+			mptscsih_add_chain((char *)chainSge, nextChain, sgeOffset, hd->ChainBufferDMA + chain_dma_off);
+		} else {
+			/* The original MF buffer requires a chain buffer -
+			 * set the offset.
+			 * Last element in this MF is a chain element.
+			 */
+			pReq->ChainOffset = (u8) (sgeOffset >> 2);
+		}
+
+		sges_left -= sg_done;
+
+
+		/* NOTE: psge points to the beginning of the chain element
+		 * in current buffer. Get a chain buffer.
+		 */
+		if ((mptscsih_getFreeChainBuffer(hd, &newIndex)) == FAILED)
+			return FAILED;
+
+		/* Update the tracking arrays.
+		 * If chainSge == NULL, update ReqToChain, else ChainToChain
+		 */
+		if (chainSge) {
+			hd->ChainToChain[chain_idx] = newIndex;
+		} else {
+			hd->ReqToChain[req_idx] = newIndex;
+		}
+		chain_idx = newIndex;
+		chain_dma_off = hd->ioc->req_sz * chain_idx;
+
+		/* Populate the chainSGE for the current buffer.
+		 * - Set chain buffer pointer to psge and fill
+		 *   out the Address and Flags fields.
+		 */
+		chainSge = (char *) psge;
+		dsgprintk((KERN_INFO "  Current buff @ %p (index 0x%x)",
+				psge, req_idx));
+
+		/* Start the SGE for the next buffer
+		 */
+		psge = (char *) (hd->ChainBuffer + chain_dma_off);
+		sgeOffset = 0;
+		sg_done = 0;
+
+		dsgprintk((KERN_INFO "  Chain buff @ %p (index 0x%x)\n",
+				psge, chain_idx));
+
+		/* Start the SGE for the next buffer
+		 */
+
+		goto nextSGEset;
+	}
+
+	return SUCCESS;
+} /* mptscsih_AddSGE() */
+
+/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
+/*
  *	mptscsih_io_done - Main SCSI IO callback routine registered to
  *	Fusion MPT (base) driver
  *	@ioc: Pointer to MPT_ADAPTER structure
@@ -294,7 +722,7 @@ mptscsih_io_done(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *mr)
 	MPT_SCSI_HOST	*hd;
 	SCSIIORequest_t	*pScsiReq;
 	SCSIIOReply_t	*pScsiReply;
-#ifndef MPT_SCSI_USE_NEW_EH
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,5,0)
 	unsigned long	 flags;
 #endif
 	u16		 req_idx;
@@ -305,7 +733,6 @@ mptscsih_io_done(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *mr)
 	    (mf >= MPT_INDEX_2_MFPTR(ioc, ioc->req_depth))) {
 		printk(MYIOC_s_ERR_FMT "%s req frame ptr! (=%p)!\n",
 				ioc->name, mf?"BAD":"NULL", (void *) mf);
-		/* return 1; CHECKME SteveR. Don't free. */
 		return 0;
 	}
 
@@ -411,12 +838,12 @@ mptscsih_io_done(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *mr)
 #ifndef MPT_SCSI_USE_NEW_EH
 			search_taskQ_for_cmd(sc, hd);
 #endif
-			/* Linux handles an unsolicited DID_RESET better 
+			/* Linux handles an unsolicited DID_RESET better
 			 * than an unsolicited DID_ABORT.
 			 */
 			sc->result = DID_RESET << 16;
 
-			/* GEM Workaround. */ 
+			/* GEM Workaround. */
 			if (hd->is_spi)
 				mptscsih_no_negotiate(hd, sc->target);
 			break;
@@ -428,7 +855,7 @@ mptscsih_io_done(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *mr)
 #endif
 			sc->result = DID_RESET << 16;
 
-			/* GEM Workaround. */ 
+			/* GEM Workaround. */
 			if (hd->is_spi)
 				mptscsih_no_negotiate(hd, sc->target);
 			break;
@@ -506,7 +933,7 @@ mptscsih_io_done(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *mr)
 				;
 			} else if (scsi_state & MPI_SCSI_STATE_AUTOSENSE_VALID) {
 				/*
-				 * If running agains circa 200003dd 909 MPT f/w,
+				 * If running against circa 200003dd 909 MPT f/w,
 				 * may get this (AUTOSENSE_VALID) for actual TASK_SET_FULL
 				 * (QUEUE_FULL) returned from device! --> get 0x0000?128
 				 * and with SenseBytes set to 0.
@@ -625,7 +1052,9 @@ mptscsih_io_done(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *mr)
 
 	hd->ScsiLookup[req_idx] = NULL;
 
-	sc->host_scribble = NULL;	/* CHECKME! - Do we need to clear this??? */
+#ifndef MPT_SCSI_USE_NEW_EH
+	sc->host_scribble = NULL;
+#endif
 
         MPT_HOST_LOCK(flags);
 	sc->scsi_done(sc);		/* Issue the command callback */
@@ -894,7 +1323,7 @@ mptscsih_flush_running_cmds(MPT_SCSI_HOST *hd)
 	int		 ii;
 	int		 max = hd->ioc->req_depth;
 
-#ifndef MPT_SCSI_USE_NEW_EH
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,5,0)
 	unsigned long	 flags;
 #endif
 
@@ -911,7 +1340,7 @@ mptscsih_flush_running_cmds(MPT_SCSI_HOST *hd)
 			search_taskQ_for_cmd(SCpnt, hd);
 #endif
 
-			/* Search pendingQ, if found, 
+			/* Search pendingQ, if found,
 			 * delete from Q. If found, do not decrement
 			 * queue_depth, command never posted.
 			 */
@@ -1061,7 +1490,7 @@ mptscsih_initChainBuffers (MPT_SCSI_HOST *hd, int init)
 	 * of chain buffers to be allocated.
 	 * index = chain_idx
 	 *
-	 * Calculate the number of chain buffers needed(plus 1) per I/O 
+	 * Calculate the number of chain buffers needed(plus 1) per I/O
 	 * then multiply the the maximum number of simultaneous cmds
 	 *
 	 * num_sge = num sge in request frame + last chain buffer
@@ -1175,6 +1604,7 @@ mptscsih_report_queue_full(Scsi_Cmnd *sc, SCSIIOReply_t *pScsiReply, SCSIIOReque
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 static int BeenHereDoneThat = 0;
+static char *info_kbuf = NULL;
 
 /*  SCSI host fops start here...  */
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
@@ -1263,9 +1693,10 @@ mptscsih_detect(Scsi_Host_Template *tpnt)
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0)
 			tpnt->proc_dir = &proc_mpt_scsihost;
 #endif
+			tpnt->proc_info = mptscsih_proc_info;
 			sh = scsi_register(tpnt, sizeof(MPT_SCSI_HOST));
 			if (sh != NULL) {
-				mptscsih_lock(this, flags);
+				spin_lock_irqsave(&this->FreeQlock, flags);
 				sh->io_port = 0;
 				sh->n_io_port = 0;
 				sh->irq = 0;
@@ -1326,7 +1757,7 @@ mptscsih_detect(Scsi_Host_Template *tpnt)
 				} else {
 					numSGE = 1 + (scale - 1) * (this->facts.MaxChainDepth-1) + scale +
 						(this->req_sz - 64) / (sizeof(dma_addr_t) + sizeof(u32));
-				} 
+				}
 
 				if (numSGE < sh->sg_tablesize) {
 					/* Reset this value */
@@ -1340,7 +1771,7 @@ mptscsih_detect(Scsi_Host_Template *tpnt)
 				 */
 				scsi_set_pci_device(sh, this->pcidev);
 
-				mptscsih_unlock(this, flags);
+				spin_unlock_irqrestore(&this->FreeQlock, flags);
 
 				hd = (MPT_SCSI_HOST *) sh->hostdata;
 				hd->ioc = this;
@@ -1503,12 +1934,25 @@ mptscsih_detect(Scsi_Host_Template *tpnt)
 done:
 	if (mpt_scsi_hosts > 0)
 		register_reboot_notifier(&mptscsih_notifier);
+	else {
+		mpt_reset_deregister(ScsiDoneCtx);
+		dprintk((KERN_INFO MYNAM ": Deregistered for IOC reset notifications\n"));
+
+		mpt_event_deregister(ScsiDoneCtx);
+		dprintk((KERN_INFO MYNAM ": Deregistered for IOC event notifications\n"));
+
+		mpt_deregister(ScsiScanDvCtx);
+		mpt_deregister(ScsiTaskCtx);
+		mpt_deregister(ScsiDoneCtx);
+
+		if (info_kbuf != NULL)
+			kfree(info_kbuf);
+	}
 
 	return mpt_scsi_hosts;
 }
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
-    static char *info_kbuf = NULL;
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /**
  *	mptscsih_release - Unregister SCSI host from linux scsi mid-layer
@@ -1731,7 +2175,7 @@ mptscsih_halt(struct notifier_block *nb, ulong event, void *buf)
 const char *
 mptscsih_info(struct Scsi_Host *SChost)
 {
-	MPT_SCSI_HOST *h;
+	MPT_SCSI_HOST *h = NULL;
 	int size = 0;
 
 	if (info_kbuf == NULL)
@@ -1740,11 +2184,306 @@ mptscsih_info(struct Scsi_Host *SChost)
 
 	h = (MPT_SCSI_HOST *)SChost->hostdata;
 	info_kbuf[0] = '\0';
-	mpt_print_ioc_summary(h->ioc, info_kbuf, &size, 0, 0);
-	info_kbuf[size-1] = '\0';
+	if (h) {
+		mpt_print_ioc_summary(h->ioc, info_kbuf, &size, 0, 0);
+		info_kbuf[size-1] = '\0';
+	}
 
 	return info_kbuf;
 }
+
+struct info_str {
+	char *buffer;
+	int   length;
+	int   offset;
+	int   pos;
+};
+
+static void copy_mem_info(struct info_str *info, char *data, int len)
+{
+	if (info->pos + len > info->length)
+		len = info->length - info->pos;
+
+	if (info->pos + len < info->offset) {
+		info->pos += len;
+		return;
+	}
+
+	if (info->pos < info->offset) {
+	        data += (info->offset - info->pos);
+	        len  -= (info->offset - info->pos);
+	}
+
+	if (len > 0) {
+                memcpy(info->buffer + info->pos, data, len);
+                info->pos += len;
+	}
+}
+
+static int copy_info(struct info_str *info, char *fmt, ...)
+{
+	va_list args;
+	char buf[81];
+	int len;
+
+	va_start(args, fmt);
+	len = vsprintf(buf, fmt, args);
+	va_end(args);
+
+	copy_mem_info(info, buf, len);
+	return len;
+}
+
+static int mptscsih_host_info(MPT_ADAPTER *ioc, char *pbuf, off_t offset, int len)
+{
+	struct info_str info;
+
+	info.buffer	= pbuf;
+	info.length	= len;
+	info.offset	= offset;
+	info.pos	= 0;
+
+	copy_info(&info, "%s: %s, ", ioc->name, ioc->prod_name);
+	copy_info(&info, "%s%08xh, ", MPT_FW_REV_MAGIC_ID_STRING, ioc->facts.FWVersion.Word);
+	copy_info(&info, "Ports=%d, ", ioc->facts.NumberOfPorts);
+	copy_info(&info, "MaxQ=%d\n", ioc->req_depth);
+
+	return ((info.pos > info.offset) ? info.pos - info.offset : 0);
+}
+
+struct mptscsih_usrcmd {
+	ulong target;
+	ulong lun;
+	ulong data;
+	ulong cmd;
+};
+
+#define UC_GET_SPEED	0x10
+
+static void mptscsih_exec_user_cmd(MPT_ADAPTER *ioc, struct mptscsih_usrcmd *uc)
+{
+	CONFIGPARMS		 cfg;
+	dma_addr_t		 cfg_dma_addr = -1;
+	ConfigPageHeader_t	 header;
+
+	dprintk(("exec_user_command: ioc %p cmd %ld target=%ld\n", 
+			ioc, uc->cmd, uc->target));
+
+	switch (uc->cmd) {
+	case UC_GET_SPEED:
+		{
+			SCSIDevicePage0_t	*pData = NULL;
+
+			if (ioc->spi_data.sdp0length == 0)
+				return;
+
+			pData = (SCSIDevicePage0_t *)pci_alloc_consistent(ioc->pcidev,
+				 ioc->spi_data.sdp0length * 4, &cfg_dma_addr);
+
+			if (pData == NULL)
+				return;
+
+			header.PageVersion = ioc->spi_data.sdp0version;
+			header.PageLength = ioc->spi_data.sdp0length;
+			header.PageNumber = 0;
+			header.PageType = MPI_CONFIG_PAGETYPE_SCSI_DEVICE;
+
+			cfg.hdr = &header;
+			cfg.action = MPI_CONFIG_ACTION_PAGE_READ_CURRENT;
+			cfg.dir = 0;
+			cfg.pageAddr = (u32) uc->target; /* bus << 8 | target */
+			cfg.physAddr = cfg_dma_addr;
+
+			if (mpt_config(ioc, &cfg) == 0) {
+				u32 np = le32_to_cpu(pData->NegotiatedParameters);
+				u32 tmp = np & MPI_SCSIDEVPAGE0_NP_WIDE;
+
+				printk("Target %d: %s;",
+						(u32) uc->target,
+						tmp ? "Wide" : "Narrow");
+
+				tmp = np & MPI_SCSIDEVPAGE0_NP_NEG_SYNC_OFFSET_MASK;
+				if (tmp) {
+					u32 speed = 0;
+					printk(" Synchronous");
+					tmp = (tmp >> 16);
+					printk(" (Offset=0x%x", tmp);
+					tmp = np & MPI_SCSIDEVPAGE0_NP_NEG_SYNC_PERIOD_MASK;
+					tmp = (tmp >> 8);
+					printk(" Factor=0x%x)", tmp);
+					if (tmp <= MPT_ULTRA320)
+						speed=160;
+					else if (tmp <= MPT_ULTRA160)
+						speed=80;
+					else if (tmp <= MPT_ULTRA2)
+						speed=40;
+					else if (tmp <= MPT_ULTRA)
+						speed=20;
+					else if (tmp <= MPT_FAST)
+						speed=10;
+					else if (tmp <= MPT_SCSI)
+						speed=5;
+
+					if (np & MPI_SCSIDEVPAGE0_NP_WIDE)
+						speed*=2;
+
+					printk(" %dMB/sec\n", speed);
+
+				} else 
+					printk(" Asynchronous.\n");
+			} else {
+				printk("failed\n" );
+			}
+
+			pci_free_consistent(ioc->pcidev, ioc->spi_data.sdp0length * 4,
+					    pData, cfg_dma_addr);
+		}
+		break;
+	}
+}
+
+#define is_digit(c)	((c) >= '0' && (c) <= '9')
+#define digit_to_bin(c)	((c) - '0')
+#define is_space(c)	((c) == ' ' || (c) == '\t')
+
+static int skip_spaces(char *ptr, int len)
+{
+	int cnt, c;
+
+	for (cnt = len; cnt > 0 && (c = *ptr++) && is_space(c); cnt --);
+
+	return (len - cnt);
+}
+
+static int get_int_arg(char *ptr, int len, ulong *pv)
+{
+	int cnt, c;
+	ulong	v;
+	for (v =  0, cnt = len; cnt > 0 && (c=*ptr++) && is_digit(c); cnt --) {
+		v = (v * 10) + digit_to_bin(c);
+	}
+
+	if (pv)
+		*pv = v;
+
+	return (len - cnt);
+}
+
+
+static int is_keyword(char *ptr, int len, char *verb)
+{
+	int verb_len = strlen(verb);
+
+	if (len >= strlen(verb) && !memcmp(verb, ptr, verb_len))
+		return verb_len;
+	else
+		return 0;
+}
+
+#define SKIP_SPACES(min_spaces)						\
+	if ((arg_len = skip_spaces(ptr,len)) < (min_spaces))		\
+		return -EINVAL;						\
+	ptr += arg_len;							\
+	len -= arg_len;
+
+#define GET_INT_ARG(v)							\
+	if (!(arg_len = get_int_arg(ptr,len, &(v))))			\
+		return -EINVAL;						\
+	ptr += arg_len;							\
+	len -= arg_len;
+
+static int mptscsih_user_command(MPT_ADAPTER *ioc, char *buffer, int length)
+{
+	char *ptr	= buffer;
+	struct mptscsih_usrcmd cmd, *uc = &cmd;
+	ulong		target;
+	int		arg_len;
+	int len		= length;
+
+	uc->target = uc->cmd = uc->lun = uc->data = 0;
+	
+	if ((len > 0) && (ptr[len -1] == '\n'))
+		--len;
+
+	if ((arg_len = is_keyword(ptr, len, "getspeed")) != 0)
+		uc->cmd = UC_GET_SPEED;
+	else
+		arg_len = 0;
+
+	dprintk(("user_command:  arg_len=%d, cmd=%ld\n", arg_len, uc->cmd));
+
+	if (!arg_len)
+		return -EINVAL;
+
+	ptr += arg_len;
+	len -= arg_len;
+
+	switch(uc->cmd) {
+		case UC_GET_SPEED:
+			SKIP_SPACES(1);
+			GET_INT_ARG(target);
+			uc->target = target;
+			break;
+	}
+
+	dprintk(("user_command: target=%ld len=%d\n", uc->target, len));
+
+	if (len)
+		return -EINVAL;
+	else {
+		/* process this command ...
+		 */
+		mptscsih_exec_user_cmd(ioc, uc);
+	}
+	/* Not yet implemented */
+	return length;
+}
+
+/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
+/**
+ *	mptscsih_proc_info - Return information about MPT adapter
+ *
+ *	(linux Scsi_Host_Template.info routine)
+ *
+ * 	buffer: if write, user data; if read, buffer for user
+ * 	length: if write, return length;
+ * 	offset: if write, 0; if read, the current offset into the buffer from
+ * 		the previous read.
+ * 	hostno: scsi host number
+ *	func:   if write = 1; if read = 0
+ */
+int mptscsih_proc_info(char *buffer, char **start, off_t offset,
+			int length, int hostno, int func)
+{
+	MPT_ADAPTER	*ioc = NULL;
+	MPT_SCSI_HOST	*hd = NULL;
+	int size = 0;
+
+	dprintk(("Called mptscsih_proc_info: hostno=%d, func=%d\n", hostno, func));
+	dprintk(("buffer %p, start=%p (%p) offset=%ld length = %d\n",
+			buffer, start, *start, offset, length));
+
+	for (ioc = mpt_adapter_find_first(); ioc != NULL; ioc = mpt_adapter_find_next(ioc)) {
+		if ((ioc->sh) && (ioc->sh->host_no == hostno)) {
+			hd = (MPT_SCSI_HOST *)ioc->sh->hostdata;
+			break;
+		}
+	}
+	if ((ioc == NULL) || (ioc->sh == NULL) || (hd == NULL))
+		return 0;
+
+	if (func) {
+		size = mptscsih_user_command(ioc, buffer, length);
+	} else {
+		if (start)
+			*start = buffer;
+
+		size = mptscsih_host_info(ioc, buffer, offset, length);
+	}
+
+	return size;
+}
+
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 	static int max_qd = 1;
@@ -1777,16 +2516,16 @@ static int numTMrequested = 0;
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
  *	mptscsih_put_msgframe - Wrapper routine to post message frame to F/W.
- *	@context: Call back context (ScsiDoneCtx, ScsiScanDvCtx) 
- *	@id: IOC id number 
- *	@mf: Pointer to message frame 
+ *	@context: Call back context (ScsiDoneCtx, ScsiScanDvCtx)
+ *	@id: IOC id number
+ *	@mf: Pointer to message frame
  *
- *	Handles the call to mptbase for posting request and queue depth 
+ *	Handles the call to mptbase for posting request and queue depth
  *	tracking.
  *
  *	Returns none.
  */
-static void
+static inline void
 mptscsih_put_msgframe(int context, int id, MPT_FRAME_HDR *mf)
 {
 	/* Main banana... */
@@ -1973,12 +2712,11 @@ mptscsih_qcmd(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 
 	/*
 	 *  Write SCSI CDB into the message
+	 *  Should write from cmd_len up to 16, but skip for performance reasons.
 	 */
 	cmd_len = SCpnt->cmd_len;
 	for (ii=0; ii < cmd_len; ii++)
 		pScsiReq->CDB[ii] = SCpnt->cmnd[ii];
-	for (ii=cmd_len; ii < 16; ii++)
-		pScsiReq->CDB[ii] = 0;
 
 	/* DataLength */
 	pScsiReq->DataLength = cpu_to_le32(datalen);
@@ -1993,7 +2731,7 @@ mptscsih_qcmd(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 	rc = SUCCESS;
 	if (datalen == 0) {
 		/* Add a NULL SGE */
-		mpt_add_sge((char *)&pScsiReq->SGL, MPT_SGE_FLAGS_SSIMPLE_READ | 0,
+		mptscsih_add_sge((char *)&pScsiReq->SGL, MPT_SGE_FLAGS_SSIMPLE_READ | 0,
 			(dma_addr_t) -1);
 	} else {
 		/* Add a 32 or 64 bit SGE */
@@ -2057,24 +2795,25 @@ mptscsih_qcmd(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 				}
 
 #ifndef MPTSCSIH_DISABLE_DOMAIN_VALIDATION
-				if ((dvStatus & MPT_SCSICFG_NEED_DV) || hd->ioc->spi_data.forceDv) {
+				if ((dvStatus & MPT_SCSICFG_NEED_DV) ||
+					(hd->ioc->spi_data.forceDv & MPT_SCSICFG_NEED_DV)) {
 					unsigned long lflags;
 					/* Schedule DV if necessary */
 					spin_lock_irqsave(&dvtaskQ_lock, lflags);
 					if (!dvtaskQ_active) {
 						dvtaskQ_active = 1;
 						spin_unlock_irqrestore(&dvtaskQ_lock, lflags);
-						MPT_INIT_WORK(&mptscsih_dvTask, mptscsih_domainValidation, (void *) hd); 
+						MPT_INIT_WORK(&mptscsih_dvTask, mptscsih_domainValidation, (void *) hd);
 
 						SCHEDULE_TASK(&mptscsih_dvTask);
 					} else {
 						spin_unlock_irqrestore(&dvtaskQ_lock, lflags);
 					}
-					hd->ioc->spi_data.forceDv = 0;
+					hd->ioc->spi_data.forceDv &= ~MPT_SCSICFG_NEED_DV;
 				}
 
 				/* Trying to do DV to this target, extend timeout.
-				 * Wait to issue intil flag is clear 
+				 * Wait to issue intil flag is clear
 				 */
 				if (dvStatus & MPT_SCSICFG_DV_PENDING) {
 					mod_timer(&SCpnt->eh_timeout, jiffies + 40 * HZ);
@@ -2149,283 +2888,6 @@ did_error:
 	}
 
 	return 0;
-}
-
-/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
-/*
- *	mptscsih_AddSGE - Add a SGE (plus chain buffers) to the
- *	SCSIIORequest_t Message Frame.
- *	@hd: Pointer to MPT_SCSI_HOST structure
- *	@SCpnt: Pointer to Scsi_Cmnd structure
- *	@pReq: Pointer to SCSIIORequest_t structure
- *
- *	Returns ...
- */
-static int
-mptscsih_AddSGE(MPT_SCSI_HOST *hd, Scsi_Cmnd *SCpnt,
-				 SCSIIORequest_t *pReq, int req_idx)
-{
-	char 	*psge;
-	char	*chainSge;
-	struct scatterlist *sg;
-	int	 frm_sz;
-	int	 sges_left, sg_done;
-	int	 chain_idx = MPT_HOST_NO_CHAIN;
-	int	 sgeOffset;
-	int	 numSgeSlots, numSgeThisFrame;
-	u32	 sgflags, sgdir, thisxfer = 0;
-	int	 chain_dma_off = 0;
-	int	 newIndex;
-	int	 ii;
-	dma_addr_t v2;
-
-	sgdir = le32_to_cpu(pReq->Control) & MPI_SCSIIO_CONTROL_DATADIRECTION_MASK;
-	if (sgdir == MPI_SCSIIO_CONTROL_WRITE)  {
-		sgdir = MPT_TRANSFER_HOST_TO_IOC;
-	} else {
-		sgdir = MPT_TRANSFER_IOC_TO_HOST;
-	}
-
-	psge = (char *) &pReq->SGL;
-	frm_sz = hd->ioc->req_sz;
-
-	/* Map the data portion, if any.
-	 * sges_left  = 0 if no data transfer.
-	 */
-	sges_left = SCpnt->use_sg;
-	if (SCpnt->use_sg) {
-		sges_left = pci_map_sg(hd->ioc->pcidev,
-			       (struct scatterlist *) SCpnt->request_buffer,
-			       SCpnt->use_sg,
-			       scsi_to_pci_dma_dir(SCpnt->sc_data_direction));
-	} else if (SCpnt->request_bufflen) {
-		dma_addr_t	 buf_dma_addr;
-		scPrivate	*my_priv;
-
-		buf_dma_addr = pci_map_single(hd->ioc->pcidev,
-				      SCpnt->request_buffer,
-				      SCpnt->request_bufflen,
-				      scsi_to_pci_dma_dir(SCpnt->sc_data_direction));
-
-		/* We hide it here for later unmap. */
-		my_priv = (scPrivate *) &SCpnt->SCp;
-		my_priv->p1 = (void *)(ulong) buf_dma_addr;
-
-		dsgprintk((MYIOC_s_INFO_FMT "SG: non-SG for %p, len=%d\n",
-				hd->ioc->name, SCpnt, SCpnt->request_bufflen));
-
-		mpt_add_sge((char *) &pReq->SGL,
-			0xD1000000|MPT_SGE_FLAGS_ADDRESSING|sgdir|SCpnt->request_bufflen,
-			buf_dma_addr);
-
-		return SUCCESS;
-	}
-
-	/* Handle the SG case.
-	 */
-	sg = (struct scatterlist *) SCpnt->request_buffer;
-	sg_done  = 0;
-	sgeOffset = sizeof(SCSIIORequest_t) - sizeof(SGE_IO_UNION);
-	chainSge = NULL;
-
-	/* Prior to entering this loop - the following must be set
-	 * current MF:  sgeOffset (bytes)
-	 *              chainSge (Null if original MF is not a chain buffer)
-	 *              sg_done (num SGE done for this MF)
-	 */
-
-nextSGEset:
-	numSgeSlots = ((frm_sz - sgeOffset) / (sizeof(u32) + sizeof(dma_addr_t)) );
-	numSgeThisFrame = (sges_left < numSgeSlots) ? sges_left : numSgeSlots;
-
-	sgflags = MPT_SGE_FLAGS_SIMPLE_ELEMENT | MPT_SGE_FLAGS_ADDRESSING | sgdir;
-
-	/* Get first (num - 1) SG elements
-	 * Skip any SG entries with a length of 0
-	 * NOTE: at finish, sg and psge pointed to NEXT data/location positions
-	 */
-	for (ii=0; ii < (numSgeThisFrame-1); ii++) {
-		thisxfer = sg_dma_len(sg);
-		if (thisxfer == 0) {
-			sg ++; /* Get next SG element from the OS */
-			sg_done++;
-			continue;
-		}
-
-		v2 = sg_dma_address(sg);
-		mpt_add_sge(psge, sgflags | thisxfer, v2);
-
-		sg++;		/* Get next SG element from the OS */
-		psge += (sizeof(u32) + sizeof(dma_addr_t));
-		sgeOffset += (sizeof(u32) + sizeof(dma_addr_t));
-		sg_done++;
-	}
-
-	if (numSgeThisFrame == sges_left) {
-		/* Add last element, end of buffer and end of list flags.
-		 */
-		sgflags |= MPT_SGE_FLAGS_LAST_ELEMENT |
-				MPT_SGE_FLAGS_END_OF_BUFFER |
-				MPT_SGE_FLAGS_END_OF_LIST;
-
-		/* Add last SGE and set termination flags.
-		 * Note: Last SGE may have a length of 0 - which should be ok.
-		 */
-		thisxfer = sg_dma_len(sg);
-
-		v2 = sg_dma_address(sg);
-		mpt_add_sge(psge, sgflags | thisxfer, v2);
-		/*
-		sg++;
-		psge += (sizeof(u32) + sizeof(dma_addr_t));
-		*/
-		sgeOffset += (sizeof(u32) + sizeof(dma_addr_t));
-		sg_done++;
-
-		if (chainSge) {
-			/* The current buffer is a chain buffer,
-			 * but there is not another one.
-			 * Update the chain element
-			 * Offset and Length fields.
-			 */
-			mpt_add_chain((char *)chainSge, 0, sgeOffset, hd->ChainBufferDMA + chain_dma_off);
-		} else {
-			/* The current buffer is the original MF
-			 * and there is no Chain buffer.
-			 */
-			pReq->ChainOffset = 0;
-		}
-	} else {
-		/* At least one chain buffer is needed.
-		 * Complete the first MF
-		 *  - last SGE element, set the LastElement bit
-		 *  - set ChainOffset (words) for orig MF
-		 *             (OR finish previous MF chain buffer)
-		 *  - update MFStructPtr ChainIndex
-		 *  - Populate chain element
-		 * Also
-		 * Loop until done.
-		 */
-
-		dsgprintk((MYIOC_s_INFO_FMT "SG: Chain Required! sg done %d\n",
-				hd->ioc->name, sg_done));
-
-		/* Set LAST_ELEMENT flag for last non-chain element
-		 * in the buffer. Since psge points at the NEXT
-		 * SGE element, go back one SGE element, update the flags
-		 * and reset the pointer. (Note: sgflags & thisxfer are already
-		 * set properly).
-		 */
-		if (sg_done) {
-			u32 *ptmp = (u32 *) (psge - (sizeof(u32) + sizeof(dma_addr_t)));
-			sgflags = le32_to_cpu(*ptmp);
-			sgflags |= MPT_SGE_FLAGS_LAST_ELEMENT;
-			*ptmp = cpu_to_le32(sgflags);
-		}
-
-		if (chainSge) {
-			/* The current buffer is a chain buffer.
-			 * chainSge points to the previous Chain Element.
-			 * Update its chain element Offset and Length (must
-			 * include chain element size) fields.
-			 * Old chain element is now complete.
-			 */
-			u8 nextChain = (u8) (sgeOffset >> 2);
-			sgeOffset += (sizeof(u32) + sizeof(dma_addr_t));
-			mpt_add_chain((char *)chainSge, nextChain, sgeOffset, hd->ChainBufferDMA + chain_dma_off);
-		} else {
-			/* The original MF buffer requires a chain buffer -
-			 * set the offset.
-			 * Last element in this MF is a chain element.
-			 */
-			pReq->ChainOffset = (u8) (sgeOffset >> 2);
-		}
-
-		sges_left -= sg_done;
-
-
-		/* NOTE: psge points to the beginning of the chain element
-		 * in current buffer. Get a chain buffer.
-		 */
-		if ((mptscsih_getFreeChainBuffer(hd, &newIndex)) == FAILED)
-			return FAILED;
-
-		/* Update the tracking arrays.
-		 * If chainSge == NULL, update ReqToChain, else ChainToChain
-		 */
-		if (chainSge) {
-			hd->ChainToChain[chain_idx] = newIndex;
-		} else {
-			hd->ReqToChain[req_idx] = newIndex;
-		}
-		chain_idx = newIndex;
-		chain_dma_off = hd->ioc->req_sz * chain_idx;
-
-		/* Populate the chainSGE for the current buffer.
-		 * - Set chain buffer pointer to psge and fill
-		 *   out the Address and Flags fields.
-		 */
-		chainSge = (char *) psge;
-		dsgprintk((KERN_INFO "  Current buff @ %p (index 0x%x)",
-				psge, req_idx));
-
-		/* Start the SGE for the next buffer
-		 */
-		psge = (char *) (hd->ChainBuffer + chain_dma_off);
-		sgeOffset = 0;
-		sg_done = 0;
-
-		dsgprintk((KERN_INFO "  Chain buff @ %p (index 0x%x)\n",
-				psge, chain_idx));
-
-		/* Start the SGE for the next buffer
-		 */
-
-		goto nextSGEset;
-	}
-
-	return SUCCESS;
-}
-
-/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
-/*
- *	mptscsih_getFreeChainBuffes - Function to get a free chain
- *	from the MPT_SCSI_HOST FreeChainQ.
- *	@hd: Pointer to the MPT_SCSI_HOST instance
- *	@req_idx: Index of the SCSI IO request frame. (output)
- *
- *	return SUCCESS or FAILED
- */
-static int
-mptscsih_getFreeChainBuffer(MPT_SCSI_HOST *hd, int *retIndex)
-{
-	MPT_FRAME_HDR *chainBuf = NULL;
-	unsigned long flags;
-	int rc = FAILED;
-	int chain_idx = MPT_HOST_NO_CHAIN;
-
-	//spin_lock_irqsave(&hd->FreeChainQlock, flags);
-	spin_lock_irqsave(&hd->ioc->FreeQlock, flags);
-	if (!Q_IS_EMPTY(&hd->FreeChainQ)) {
-
-		int offset;
-
-		chainBuf = hd->FreeChainQ.head;
-		Q_DEL_ITEM(&chainBuf->u.frame.linkage);
-		offset = (u8 *)chainBuf - (u8 *)hd->ChainBuffer;
-		chain_idx = offset / hd->ioc->req_sz;
-		rc = SUCCESS;
-	}
-	//spin_unlock_irqrestore(&hd->FreeChainQlock, flags);
-	spin_unlock_irqrestore(&hd->ioc->FreeQlock, flags);
-
-
-	*retIndex = chain_idx;
-
-	dsgprintk((MYIOC_s_INFO_FMT "getFreeChainBuffer (index %d), got buf=%p\n",
-			hd->ioc->name, *retIndex, chainBuf));
-
-	return rc;
 }
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
@@ -2547,8 +3009,8 @@ mptscsih_TMHandler(MPT_SCSI_HOST *hd, u8 type, u8 target, u8 lun, int ctx2abort,
 
 #ifdef MPT_DEBUG_RESET
 	if ((ioc_raw_state & MPI_IOC_STATE_MASK) != MPI_IOC_STATE_OPERATIONAL) {
-		printk(MYIOC_s_WARN_FMT 
-			"TM Handler: IOC Not operational! state 0x%x Calling HardResetHandler\n", 
+		printk(MYIOC_s_WARN_FMT
+			"TM Handler: IOC Not operational! state 0x%x Calling HardResetHandler\n",
 			hd->ioc->name, ioc_raw_state);
 	}
 #endif
@@ -2765,7 +3227,7 @@ mptscsih_abort(Scsi_Cmnd * SCpnt)
 
 	hd->abortSCpnt = SCpnt;
 	if (mptscsih_TMHandler(hd, MPI_SCSITASKMGMT_TASKTYPE_ABORT_TASK,
-	                       SCpnt->target, SCpnt->lun, ctx2abort, NO_SLEEP) 
+	                       SCpnt->target, SCpnt->lun, ctx2abort, NO_SLEEP)
 		< 0) {
 
 		/* The TM request failed and the subsequent FW-reload failed!
@@ -2830,7 +3292,7 @@ mptscsih_dev_reset(Scsi_Cmnd * SCpnt)
 	}
 
 	if (mptscsih_TMHandler(hd, MPI_SCSITASKMGMT_TASKTYPE_TARGET_RESET,
-	                       SCpnt->target, 0, 0, NO_SLEEP) 
+	                       SCpnt->target, 0, 0, NO_SLEEP)
 		< 0){
 		/* The TM request failed and the subsequent FW-reload failed!
 		 * Fatal error case.
@@ -2889,13 +3351,13 @@ mptscsih_bus_reset(Scsi_Cmnd * SCpnt)
 
 	/* We are now ready to execute the task management request. */
 	if (mptscsih_TMHandler(hd, MPI_SCSITASKMGMT_TASKTYPE_RESET_BUS,
-	                       0, 0, 0, NO_SLEEP) 
+	                       0, 0, 0, NO_SLEEP)
 	    < 0){
 
 		/* The TM request failed and the subsequent FW-reload failed!
 		 * Fatal error case.
 		 */
-		printk(MYIOC_s_WARN_FMT 
+		printk(MYIOC_s_WARN_FMT
 		       "Error processing TaskMgmt request (sc=%p)\n",
 		       hd->ioc->name, SCpnt);
 		hd->tmPending = 0;
@@ -2941,8 +3403,8 @@ mptscsih_host_reset(Scsi_Cmnd *SCpnt)
 	if (mpt_HardResetHandler(hd->ioc, NO_SLEEP) < 0){
 		status = FAILED;
 	} else {
-		/*  Make sure TM pending is cleared and TM state is set to 
-		 *  NONE. 
+		/*  Make sure TM pending is cleared and TM state is set to
+		 *  NONE.
 		 */
 		hd->tmPending = 0;
 		hd->tmState = TM_STATE_NONE;
@@ -2958,7 +3420,7 @@ mptscsih_host_reset(Scsi_Cmnd *SCpnt)
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /**
- *	mptscsih_tm_pending_wait - wait for pending task management request to 
+ *	mptscsih_tm_pending_wait - wait for pending task management request to
  *		complete.
  *	@hd: Pointer to MPT host structure.
  *
@@ -3114,7 +3576,7 @@ mptscsih_old_abort(Scsi_Cmnd *SCpnt)
 		 *  (bottom/unused portion of) MPT request frame.
 		 */
 		ptaskfoo = (struct mpt_work_struct *) &mptscsih_ptaskfoo;
-		MPT_INIT_WORK(&mptscsih_ptaskfoo, mptscsih_taskmgmt_bh, (void *) SCpnt); 
+		MPT_INIT_WORK(&mptscsih_ptaskfoo, mptscsih_taskmgmt_bh, (void *) SCpnt);
 
 		SCHEDULE_TASK(ptaskfoo);
 	} else  {
@@ -3245,7 +3707,7 @@ mptscsih_old_reset(Scsi_Cmnd *SCpnt, unsigned int reset_flags)
 		 *  (bottom/unused portion of) MPT request frame.
 		 */
 		ptaskfoo = (struct mpt_work_struct *) &mptscsih_ptaskfoo;
-		MPT_INIT_WORK(&mptscsih_ptaskfoo, mptscsih_taskmgmt_bh, (void *) SCpnt); 
+		MPT_INIT_WORK(&mptscsih_ptaskfoo, mptscsih_taskmgmt_bh, (void *) SCpnt);
 
 		SCHEDULE_TASK(ptaskfoo);
 	} else  {
@@ -3599,7 +4061,7 @@ mptscsih_bios_param(Disk * disk, kdev_t dev, int *ip)
  *	Called once per device the bus scan. Use it to force the queue_depth
  *	member to 1 if a device does not support Q tags.
  */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,44)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,52)
 int
 mptscsih_slave_configure(Scsi_Device *device)
 {
@@ -3614,15 +4076,21 @@ mptscsih_slave_configure(Scsi_Device *device)
 			if (!device->tagged_supported ||
 			    !(pTarget->tflags & MPT_TARGET_FLAGS_Q_YES)) {
 				scsi_adjust_queue_depth(device, 0, 1);
+
+			} else if ((pTarget->tflags & MPT_TARGET_FLAGS_VALID_INQUIRY)
+				   && (pTarget->inq_data[0] & 0x1f) == 0x00
+				   && (pTarget->minSyncFactor <= MPT_ULTRA160 || !hd->is_spi)) {
+				scsi_adjust_queue_depth(device, MSG_SIMPLE_TAG,
+							MPT_SCSI_CMD_PER_DEV_HIGH);
 			} else {
-				scsi_adjust_queue_depth(device, MSG_SIMPLE_TAG, 
-							device->host->can_queue >> 1);
+				scsi_adjust_queue_depth(device, MSG_SIMPLE_TAG,
+							MPT_SCSI_CMD_PER_DEV_LOW);
 			}
 		}
 	}
 	return 0;
 }
-#else /* LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,44) */
+#else /* LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,52) */
 void
 mptscsih_select_queue_depths(struct Scsi_Host *sh, Scsi_Device *sdList)
 {
@@ -3648,113 +4116,32 @@ mptscsih_select_queue_depths(struct Scsi_Host *sh, Scsi_Device *sdList)
 
 			for (ii=0; ii < max; ii++) {
 				pTarget = hd->Targets[ii];
-				if (pTarget && !(pTarget->tflags & MPT_TARGET_FLAGS_Q_YES)) {
-					device->queue_depth = 1;
+				if (pTarget == NULL) {
+					continue;
 				}
+				if (!(pTarget->tflags & MPT_TARGET_FLAGS_Q_YES)) {
+					device->queue_depth = 1;
+				} else if ((pTarget->tflags & MPT_TARGET_FLAGS_VALID_INQUIRY)
+					   && (pTarget->inq_data[0] & 0x1f) == 0x00
+					   && (pTarget->minSyncFactor <= MPT_ULTRA160 || !hd->is_spi)) {
+					device->queue_depth = MPT_SCSI_CMD_PER_DEV_HIGH;
+				} else {
+					device->queue_depth = MPT_SCSI_CMD_PER_DEV_LOW;
+				}
+				dprintk((MYIOC_s_INFO_FMT
+					 "target = %d, sync factor = %#x, queue depth = %d\n",
+					 hd->ioc->name, pTarget->target_id,
+					 pTarget->minSyncFactor, device->queue_depth));
 			}
 		}
 	}
 }
-#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,44) */
+#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,52) */
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
  *  Private routines...
  */
-/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
-/* 19991030 -sralston
- *  Return absolute SCSI data direction:
- *     1 = _DATA_OUT
- *     0 = _DIR_NONE
- *    -1 = _DATA_IN
- *
- * Changed: 3-20-2002 pdelaney to use the default data
- * direction and the defines set up in the
- * 2.4 kernel series
- *     1 = _DATA_OUT	changed to SCSI_DATA_WRITE (1)
- *     0 = _DIR_NONE	changed to SCSI_DATA_NONE (3)
- *    -1 = _DATA_IN	changed to SCSI_DATA_READ (2)
- * If the direction is unknown, fall through to original code.
- *
- * Mid-layer bug fix(): sg interface generates the wrong data 
- * direction in some cases. Set the direction the hard way for 
- * the most common commands.
- */
-static int
-mptscsih_io_direction(Scsi_Cmnd *cmd)
-{
-	switch (cmd->cmnd[0]) {
-	case WRITE_6:		
-	case WRITE_10:		
-		return SCSI_DATA_WRITE;
-		break;
-	case READ_6:		
-	case READ_10:		
-		return SCSI_DATA_READ;
-		break;
-	}
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
-	if (cmd->sc_data_direction != SCSI_DATA_UNKNOWN)
-		return cmd->sc_data_direction;
-#endif
-	switch (cmd->cmnd[0]) {
-	/*  _DATA_OUT commands	*/
-	case WRITE_6:		case WRITE_10:		case WRITE_12:
-	case WRITE_LONG:	case WRITE_SAME:	case WRITE_BUFFER:
-	case WRITE_VERIFY:	case WRITE_VERIFY_12:
-	case COMPARE:		case COPY:		case COPY_VERIFY:
-	case SEARCH_EQUAL:	case SEARCH_HIGH:	case SEARCH_LOW:
-	case SEARCH_EQUAL_12:	case SEARCH_HIGH_12:	case SEARCH_LOW_12:
-	case MODE_SELECT:	case MODE_SELECT_10:	case LOG_SELECT:
-	case SEND_DIAGNOSTIC:	case CHANGE_DEFINITION: case UPDATE_BLOCK:
-	case SET_WINDOW:	case MEDIUM_SCAN:	case SEND_VOLUME_TAG:
-	case REASSIGN_BLOCKS:
-	case PERSISTENT_RESERVE_OUT:
-	case 0xea:
-	case 0xa3:
-		return SCSI_DATA_WRITE;
-
-	/*  No data transfer commands  */
-	case SEEK_6:		case SEEK_10:
-	case RESERVE:		case RELEASE:
-	case TEST_UNIT_READY:
-	case START_STOP:
-	case ALLOW_MEDIUM_REMOVAL:
-		return SCSI_DATA_NONE;
-
-	/*  Conditional data transfer commands	*/
-	case FORMAT_UNIT:
-		if (cmd->cmnd[1] & 0x10)	/* FmtData (data out phase)? */
-			return SCSI_DATA_WRITE;
-		else
-			return SCSI_DATA_NONE;
-
-	case VERIFY:
-		if (cmd->cmnd[1] & 0x02)	/* VERIFY:BYTCHK (data out phase)? */
-			return SCSI_DATA_WRITE;
-		else
-			return SCSI_DATA_NONE;
-
-	case RESERVE_10:
-		if (cmd->cmnd[1] & 0x03)	/* RESERVE:{LongID|Extent} (data out phase)? */
-			return SCSI_DATA_WRITE;
-		else
-			return SCSI_DATA_NONE;
-
-#if 0
-	case REZERO_UNIT:	/* (or REWIND) */
-	case SPACE:
-	case ERASE:		case ERASE_10:
-	case SYNCHRONIZE_CACHE:
-	case LOCK_UNLOCK_CACHE:
-#endif
-
-	/*  Must be data _IN!  */
-	default:
-		return SCSI_DATA_READ;
-	}
-}
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /* Utility function to copy sense data from the scsi_cmnd buffer
@@ -3803,7 +4190,7 @@ copy_sense_data(Scsi_Cmnd *sc, MPT_SCSI_HOST *hd, MPT_FRAME_HDR *mf, SCSIIOReply
 
 #ifdef ABORT_FIX
 			if (sz >= SCSI_STD_SENSE_BYTES) {
-				if ((sense_data[02] == ABORTED_COMMAND) && 
+				if ((sense_data[02] == ABORTED_COMMAND) &&
 					(sense_data[12] == 0x47) && (sense_data[13] == 0x00)){
 					target->numAborts++;
 					if ((target->raidVolume == 0) && (target->numAborts > 5)) {
@@ -3896,7 +4283,7 @@ SCPNT_TO_LOOKUP_IDX(Scsi_Cmnd *sc)
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /* Search the pendingQ for a command with specific index.
- * If found, delete and return mf pointer  
+ * If found, delete and return mf pointer
  * If not found, return NULL
  */
 static MPT_FRAME_HDR *
@@ -4126,6 +4513,13 @@ mptscsih_ioc_reset(MPT_ADAPTER *ioc, int reset_phase)
 
 		dtmprintk((MYIOC_s_WARN_FMT "Post-Reset handling complete.\n",
 			ioc->name));
+
+
+		/* 8. Set flag to force DV and re-read IOC Page 3
+		 */
+		ioc->spi_data.forceDv = MPT_SCSICFG_NEED_DV | MPT_SCSICFG_RELOAD_IOC_PG3;
+		ddvtprintk(("Set reload IOC Pg3 Flag\n"));
+
 	}
 
 	return 1;		/* currently means nothing really */
@@ -4172,7 +4566,7 @@ mptscsih_event_process(MPT_ADAPTER *ioc, EventNotificationReply_t *pEvReply)
 
 	case MPI_EVENT_INTEGRATED_RAID:			/* 0B */
 #ifndef MPTSCSIH_DISABLE_DOMAIN_VALIDATION
-		/* negoNvram set to 0 if DV enabled and to USE_NVRAM if 
+		/* negoNvram set to 0 if DV enabled and to USE_NVRAM if
 		 * if DV disabled. Need to check for target mode.
 		 */
 		hd = NULL;
@@ -4188,11 +4582,12 @@ mptscsih_event_process(MPT_ADAPTER *ioc, EventNotificationReply_t *pEvReply)
 			
 			reason = (le32_to_cpu(pEvReply->Data[0]) & 0x00FF0000) >> 16;
 			if (reason == MPI_EVENT_RAID_RC_DOMAIN_VAL_NEEDED) {
-				/* New or replaced disk. 
+				/* New or replaced disk.
 				 * Set DV flag and schedule DV.
 				 */
 				pSpi = &ioc->spi_data;
 				physDiskNum = (le32_to_cpu(pEvReply->Data[0]) & 0xFF000000) >> 24;
+				ddvtprintk(("DV requested for phys disk id %d\n", physDiskNum));
 				if (pSpi->pIocPg3) {
 					pPDisk =  pSpi->pIocPg3->PhysDisk;
 					numPDisk =pSpi->pIocPg3->NumPhysDisks;
@@ -4206,6 +4601,16 @@ mptscsih_event_process(MPT_ADAPTER *ioc, EventNotificationReply_t *pEvReply)
 						}
 						pPDisk++;
 						numPDisk--;
+					}
+
+					if (numPDisk == 0) {
+						/* The physical disk that needs DV was not found
+						 * in the stored IOC Page 3. The driver must reload
+						 * this page. DV routine will set the NEED_DV flag for
+						 * all phys disks that have DV_NOT_DONE set.
+						 */
+						pSpi->forceDv = MPT_SCSICFG_NEED_DV | MPT_SCSICFG_RELOAD_IOC_PG3;
+						ddvtprintk(("phys disk %d not found. Setting reload IOC Pg3 Flag\n", physDiskNum));
 					}
 				}
 			}
@@ -4670,7 +5075,7 @@ int mpt_ScsiHost_ErrorReport(IO_Info_t *ioop)
 		if (ioop->cdbPtr == NULL) {
 			return 0;
 		} else if ((ioop->cdbPtr[0] == CMD_TestUnitReady) ||
-			(ioop->cdbPtr[0] == CMD_ReadCapacity) || 
+			(ioop->cdbPtr[0] == CMD_ReadCapacity) ||
 			(ioop->cdbPtr[0] == 0x43)) {
 			return 0;
 		}
@@ -4794,7 +5199,7 @@ mptscsih_initTarget(MPT_SCSI_HOST *hd, int bus_id, int target_id, u8 lun, char *
 	}
 
 	if (vdev && data) {
-		if ((!(vdev->tflags & MPT_TARGET_FLAGS_VALID_INQUIRY)) || 
+		if ((!(vdev->tflags & MPT_TARGET_FLAGS_VALID_INQUIRY)) ||
 		((dlen > 56) && (!(vdev->tflags & MPT_TARGET_FLAGS_VALID_56)))) {
 
 			/* Copy the inquiry data  - if we haven't yet.
@@ -4877,7 +5282,7 @@ void mptscsih_setTargetNegoParms(MPT_SCSI_HOST *hd, VirtDevice *target, char byt
 					factor = MPT_ULTRA320;
 
 				/* If RAID, never disable QAS
-				 * else if non RAID, do not disable 
+				 * else if non RAID, do not disable
 				 *   QAS if bit 1 is set
 				 * bit 1 QAS support, non-raid only
 				 * bit 0 IU support
@@ -5000,8 +5405,8 @@ static void clear_sense_flag(MPT_SCSI_HOST *hd, SCSIIORequest_t *pReq)
 #endif
 
 /* If DV disabled (negoNvram set to USE_NVARM) or if not LUN 0, return.
- * Else set the NEED_DV flag after Read Capacity Issued (disks) 
- * or Mode Sense (cdroms). 
+ * Else set the NEED_DV flag after Read Capacity Issued (disks)
+ * or Mode Sense (cdroms).
  *
  * Tapes, initTarget will set this flag on completion of Inquiry command.
  * Called only if DV_NOT_DONE flag is set
@@ -5037,7 +5442,7 @@ static void mptscsih_set_dvflags(MPT_SCSI_HOST *hd, SCSIIORequest_t *pReq)
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
- * If no Target, bus reset on 1st I/O. Set the flag to 
+ * If no Target, bus reset on 1st I/O. Set the flag to
  * prevent any future negotiations to this device.
  */
 static void mptscsih_no_negotiate(MPT_SCSI_HOST *hd, int target_id)
@@ -5286,9 +5691,9 @@ mptscsih_writeSDP1(MPT_SCSI_HOST *hd, int portnum, int target_id, int flags)
 		pData->Reserved = 0;
 		pData->Configuration = cpu_to_le32(configuration);
 
-		dprintk((MYIOC_s_INFO_FMT 
+		dprintk((MYIOC_s_INFO_FMT
 			"write SDP1: id %d pgaddr 0x%x req 0x%x config 0x%x\n",
-				ioc->name, id, (id | (bus<<8)), 
+				ioc->name, id, (id | (bus<<8)),
 				requested, configuration));
 
 		mptscsih_put_msgframe(ScsiDoneCtx, ioc->id, mf);
@@ -5327,8 +5732,8 @@ static void mptscsih_taskmgmt_timeout(unsigned long data)
 		/* Because we have reset the IOC, no TM requests can be
 		 * pending.  So let's make sure the tmPending flag is reset.
 		 */
-		nehprintk((KERN_WARNING MYNAM 
-			   ": %s: mptscsih_taskmgmt_timeout\n", 
+		nehprintk((KERN_WARNING MYNAM
+			   ": %s: mptscsih_taskmgmt_timeout\n",
 			   hd->ioc->name));
 		hd->tmPending = 0;
 	}
@@ -5566,7 +5971,7 @@ static void mptscsih_timer_expired(unsigned long data)
 			if (hd->tmPending) {
 				spin_unlock_irqrestore(&hd->ioc->FreeQlock, flags);
 				return;
-			} else 
+			} else
 				hd->tmPending = 1;
 			spin_unlock_irqrestore(&hd->ioc->FreeQlock, flags);
 
@@ -5645,7 +6050,7 @@ mptscsih_do_raid(MPT_SCSI_HOST *hd, u8 action, INTERNAL_CMD *io)
 	pReq->ActionDataWord = 0; /* Reserved for this action */
 	//pReq->ActionDataSGE = 0;
 
-	mpt_add_sge((char *)&pReq->ActionDataSGE, 
+	mpt_add_sge((char *)&pReq->ActionDataSGE,
 		MPT_SGE_FLAGS_SSIMPLE_READ | 0, (dma_addr_t) -1);
 
 	ddvprintk((MYIOC_s_INFO_FMT "RAID Volume action %x id %d\n",
@@ -5974,7 +6379,7 @@ mptscsih_synchronize_cache(MPT_SCSI_HOST *hd, int portnum)
 	if (id == hostId)
 		id++;
 
-	/* Write SDP1 for all SCSI devices 
+	/* Write SDP1 for all SCSI devices
 	 * Alloc memory and set up config buffer
 	 */
 	if (hd->is_spi) {
@@ -6097,7 +6502,7 @@ mptscsih_domainValidation(void *arg)
 	spin_unlock_irqrestore(&dvtaskQ_lock, flags);
 
 	/* For this ioc, loop through all devices and do dv to each device.
-	 * When complete with this ioc, search through the ioc list, and 
+	 * When complete with this ioc, search through the ioc list, and
 	 * for each scsi ioc found, do dv for all devices. Exit when no
 	 * device needs dv.
 	 */
@@ -6127,6 +6532,23 @@ mptscsih_domainValidation(void *arg)
 			hd = (MPT_SCSI_HOST *) ioc->sh->hostdata;
 			if (hd == NULL)
 				continue;
+
+			if ((ioc->spi_data.forceDv & MPT_SCSICFG_RELOAD_IOC_PG3) != 0) {
+				mpt_read_ioc_pg_3(ioc);
+				if (ioc->spi_data.pIocPg3) {
+					Ioc3PhysDisk_t *pPDisk = ioc->spi_data.pIocPg3->PhysDisk;
+					int		numPDisk = ioc->spi_data.pIocPg3->NumPhysDisks;
+
+					while (numPDisk) {
+						if (ioc->spi_data.dvStatus[pPDisk->PhysDiskID] & MPT_SCSICFG_DV_NOT_DONE)
+							ioc->spi_data.dvStatus[pPDisk->PhysDiskID] |= MPT_SCSICFG_NEED_DV;
+
+						pPDisk++;
+						numPDisk--;
+					}
+				}
+				ioc->spi_data.forceDv &= ~MPT_SCSICFG_RELOAD_IOC_PG3;
+			}
 
 			maxid = MIN (ioc->sh->max_id, MPT_MAX_SCSI_DEVICES);
 
@@ -6318,7 +6740,7 @@ mptscsih_doDv(MPT_SCSI_HOST *hd, int portnum, int id)
 
 	lun = 0;
 	bus = 0;
-	ddvtprintk((MYIOC_s_NOTE_FMT 
+	ddvtprintk((MYIOC_s_NOTE_FMT
 			"DV started: numIOs %d bus=%d, id %d dv @ %p\n",
 			ioc->name, atomic_read(&queue_depth), bus, id, &dv));
 
@@ -6423,7 +6845,7 @@ mptscsih_doDv(MPT_SCSI_HOST *hd, int portnum, int id)
 	/* Skip this ID? Set cfg.hdr to force config page write
 	 */
 	if ((ioc->spi_data.nvram[id] != MPT_HOST_NVRAM_INVALID) &&
-			(!(ioc->spi_data.nvram[id] & MPT_NVRAM_ID_SCAN_ENABLE))) { 
+			(!(ioc->spi_data.nvram[id] & MPT_NVRAM_ID_SCAN_ENABLE))) {
 
 		ddvprintk((MYIOC_s_NOTE_FMT "DV Skipped: bus, id, lun (%d, %d, %d)\n",
 			ioc->name, bus, id, lun));
@@ -6495,11 +6917,11 @@ mptscsih_doDv(MPT_SCSI_HOST *hd, int portnum, int id)
 
 		/* Wide - narrow - wide workaround case
 		 */
-		if ((rc == MPT_SCANDV_ISSUE_SENSE) && dv.max.width) { 
+		if ((rc == MPT_SCANDV_ISSUE_SENSE) && dv.max.width) {
 			/* Send an untagged command to reset disk Qs corrupted
 			 * when a parity error occurs on a Request Sense.
 			 */
-			if ((hd->ioc->facts.FWVersion.Word >= 0x01000600) || 
+			if ((hd->ioc->facts.FWVersion.Word >= 0x01000600) ||
 				((hd->ioc->facts.FWVersion.Word >= 0x01010000) &&
 				(hd->ioc->facts.FWVersion.Word < 0x01010B00)) ) {
 
@@ -6535,7 +6957,11 @@ mptscsih_doDv(MPT_SCSI_HOST *hd, int portnum, int id)
 			rc = hd->pLocal->completion;
 			if (rc == MPT_SCANDV_GOOD) {
 				if (hd->pLocal->scsiStatus == STS_BUSY) {
-					retcode = 1;
+					if ((iocmd.flags & MPT_ICFLAG_TAGGED_CMD) == 0)
+						retcode = 1;
+					else
+						retcode = 0;
+
 					goto target_done;
 				}
 			} else if  (rc == MPT_SCANDV_SENSE) {
@@ -6607,7 +7033,7 @@ mptscsih_doDv(MPT_SCSI_HOST *hd, int portnum, int id)
 					 * Fujitsu: PPR U320 -> Msg Reject and Ultra2 and wide
 					 * Resetart with a request for U160.
 					 */
-					if ((dv.now.factor == MPT_ULTRA320) && (sdp0_nego == MPT_ULTRA2)) { 
+					if ((dv.now.factor == MPT_ULTRA320) && (sdp0_nego == MPT_ULTRA2)) {
 							doFallback = 1;
 					} else {
 						dv.cmd = MPT_UPDATE_MAX;
@@ -6631,7 +7057,7 @@ mptscsih_doDv(MPT_SCSI_HOST *hd, int portnum, int id)
 				}
 
 
-			} else if (rc == MPT_SCANDV_ISSUE_SENSE) 
+			} else if (rc == MPT_SCANDV_ISSUE_SENSE)
 				doFallback = 1;	/* set fallback flag */
 			else if ((rc == MPT_SCANDV_DID_RESET) || (rc == MPT_SCANDV_SENSE))
 				doFallback = 1;	/* set fallback flag */
@@ -6871,7 +7297,7 @@ mptscsih_doDv(MPT_SCSI_HOST *hd, int portnum, int id)
 						mdelay (2000);
 						notDone++;
 					} else {
-						ddvprintk((MYIOC_s_INFO_FMT 
+						ddvprintk((MYIOC_s_INFO_FMT
 							"DV: Reserved Failed.", ioc->name));
 						goto target_done;
 					}
@@ -6935,7 +7361,7 @@ mptscsih_doDv(MPT_SCSI_HOST *hd, int portnum, int id)
 							patt = -1;
 							continue;
 						}
-					} 
+					}
 					goto target_done;
 				}
 				else
@@ -7048,7 +7474,7 @@ target_done:
 			if (hd->pLocal->completion == MPT_SCANDV_GOOD)
 				iocmd.flags &= ~MPT_ICFLAG_RESERVED;
 		} else {
-			printk(MYIOC_s_INFO_FMT "DV: Release failed. id %d", 
+			printk(MYIOC_s_INFO_FMT "DV: Release failed. id %d",
 						ioc->name, id);
 		}
 	}
@@ -7066,7 +7492,7 @@ target_done:
 		mptscsih_dv_parms(hd, &dv, (void *)pcfg1Data);
 
 #if 0	
-	/* Double writes to SDP1 can cause problems, 
+	/* Double writes to SDP1 can cause problems,
 	 * skip here since unnecessary
 	 */
 		/* Save the final negotiated settings to
@@ -7222,7 +7648,7 @@ mptscsih_dv_parms(MPT_SCSI_HOST *hd, DVPARAMETERS *dv,void *pPage)
 	case MPT_SET_MIN:
 		ddvprintk((MYIOC_s_NOTE_FMT "Setting Min: ",
 								hd->ioc->name));
-		/* Set page to asynchronous and narrow 
+		/* Set page to asynchronous and narrow
 		 * Do not update now, breaks fallback routine. */
 		width = MPT_NARROW;
 		offset = 0;
@@ -7244,7 +7670,7 @@ mptscsih_dv_parms(MPT_SCSI_HOST *hd, DVPARAMETERS *dv,void *pPage)
 	case MPT_FALLBACK:
 		ddvprintk((MYIOC_s_NOTE_FMT
 			"Fallback: Start: offset %d, factor %x, width %d \n",
-				hd->ioc->name, dv->now.offset, 
+				hd->ioc->name, dv->now.offset,
 				dv->now.factor, dv->now.width));
 		width = dv->now.width;
 		offset = dv->now.offset;
