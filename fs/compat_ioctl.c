@@ -1441,24 +1441,11 @@ static int cdrom_do_read_audio(unsigned int fd, unsigned int cmd, unsigned long 
 	return sys_ioctl(fd, cmd, (unsigned long) cdread_audio);
 }
 
-static int __cgc_do_ptr(void **ptr64, __u32 *ptr32)
-{
-	u32 data;
-	void *datap;
-
-	if (get_user(data, ptr32))
-		return -EFAULT;
-	datap = compat_ptr(data);
-	if (put_user(datap, ptr64))
-		return -EFAULT;
-
-	return 0;
-}
-
 static int cdrom_do_generic_command(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
-	struct cdrom_generic_command *cgc;
-	struct cdrom_generic_command32 *cgc32;
+	struct cdrom_generic_command __user *cgc;
+	struct cdrom_generic_command32 __user *cgc32;
+	u32 data;
 	unsigned char dir;
 	int itmp;
 
@@ -1466,25 +1453,20 @@ static int cdrom_do_generic_command(unsigned int fd, unsigned int cmd, unsigned 
 	cgc32 = compat_ptr(arg);
 
 	if (copy_in_user(&cgc->cmd, &cgc32->cmd, sizeof(cgc->cmd)) ||
-	    __cgc_do_ptr((void **) &cgc->buffer, &cgc32->buffer) ||
+	    get_user(data, &cgc32->buffer) ||
+	    put_user(compat_ptr(data), &cgc->buffer) ||
 	    copy_in_user(&cgc->buflen, &cgc32->buflen,
 			 (sizeof(unsigned int) + sizeof(int))) ||
-	    __cgc_do_ptr((void **) &cgc->sense, &cgc32->sense))
-		return -EFAULT;
-
-	if (get_user(dir, &cgc32->data_direction) ||
-	    put_user(dir, &cgc->data_direction))
-		return -EFAULT;
-
-	if (get_user(itmp, &cgc32->quiet) ||
-	    put_user(itmp, &cgc->quiet))
-		return -EFAULT;
-
-	if (get_user(itmp, &cgc32->timeout) ||
-	    put_user(itmp, &cgc->timeout))
-		return -EFAULT;
-
-	if (__cgc_do_ptr(&cgc->reserved[0], &cgc32->reserved[0]))
+	    get_user(data, &cgc32->sense) ||
+	    put_user(compat_ptr(data), &cgc->sense) ||
+	    get_user(dir, &cgc32->data_direction) ||
+	    put_user(dir, &cgc->data_direction) ||
+	    get_user(itmp, &cgc32->quiet) ||
+	    put_user(itmp, &cgc->quiet) ||
+	    get_user(itmp, &cgc32->timeout) ||
+	    put_user(itmp, &cgc->timeout) ||
+	    get_user(data, &cgc32->reserved[0]) ||
+	    put_user(compat_ptr(data), &cgc->reserved[0]))
 		return -EFAULT;
 
 	return sys_ioctl(fd, cmd, (unsigned long) cgc);
