@@ -221,6 +221,7 @@ static void __init pSeries_setup_arch(void)
 		printk("No ramdisk, default root is /dev/sda2\n");
 		ROOT_DEV = Root_SDA2;
 	}
+	ROOT_DEV = Root_SDA3;
 
 	fwnmi_init();
 
