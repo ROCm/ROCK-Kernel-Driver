@@ -18,8 +18,9 @@
  *	!(len & 127) && len >= 256
  */
 	.text
-	.globl xor_vis_2
-	.type xor_vis_2,@function
+	.align	32
+	.globl	xor_vis_2
+	.type	xor_vis_2,#function
 xor_vis_2:
 	rd	%fprs, %o5
 	andcc	%o5, FPRS_FEF|FPRS_DU, %g0
@@ -87,11 +88,10 @@ xor_vis_2:
 	wr	%g1, %g0, %asi
 	retl
 	  wr	%g0, 0, %fprs
-	.size xor_vis_2, .-xor_vis_2
+	.size	xor_vis_2, .-xor_vis_2
 
-
-	.globl xor_vis_3
-	.type xor_vis_3,@function
+	.globl	xor_vis_3
+	.type	xor_vis_3,#function
 xor_vis_3:
 	rd	%fprs, %o5
 	andcc	%o5, FPRS_FEF|FPRS_DU, %g0
@@ -156,11 +156,10 @@ xor_vis_3:
 	wr	%g1, %g0, %asi
 	retl
 	 wr	%g0, 0, %fprs
-	.size xor_vis_3, .-xor_vis_3
+	.size	xor_vis_3, .-xor_vis_3
 
-
-	.globl xor_vis_4
-	.type xor_vis_4,@function
+	.globl	xor_vis_4
+	.type	xor_vis_4,#function
 xor_vis_4:
 	rd	%fprs, %o5
 	andcc	%o5, FPRS_FEF|FPRS_DU, %g0
@@ -244,11 +243,10 @@ xor_vis_4:
 	wr	%g1, %g0, %asi
 	retl
 	 wr	%g0, 0, %fprs
-	.size xor_vis_4, .-xor_vis_4
+	.size	xor_vis_4, .-xor_vis_4
 
-
-	.globl xor_vis_5
-	.type xor_vis_5,@function
+	.globl	xor_vis_5
+	.type	xor_vis_5,#function
 xor_vis_5:
 	mov	%o5, %g5
 	rd	%fprs, %o5
@@ -353,4 +351,4 @@ xor_vis_5:
 	wr	%g1, %g0, %asi
 	retl
 	 wr	%g0, 0, %fprs
-	.size xor_vis_5, .-xor_vis_5
+	.size	xor_vis_5, .-xor_vis_5
