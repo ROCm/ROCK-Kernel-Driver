@@ -1,5 +1,5 @@
 /*
- * drivers/net/wan/dscc4/dscc4_main.c: a DSCC4 HDLC driver for Linux
+ * drivers/net/wan/dscc4/dscc4.c: a DSCC4 HDLC driver for Linux
  *
  * This software may be used and distributed according to the terms of the 
  * GNU General Public License. 
@@ -21,6 +21,7 @@
  * - Data Sheet "DSCC4, DMA Supported Serial Communication Controller with
  * 4 Channels, PEB 20534 Version 2.1, PEF 20534 Version 2.1";
  * - Application Hint "Management of DSCC4 on-chip FIFO resources".
+ * - Errata sheet DS5 (courtesy of Michael Skerritt).
  * Jens David has built an adapter based on the same chipset. Take a look
  * at http://www.afthd.tu-darmstadt.de/~dg1kjd/pciscc4 for a specific
  * driver.
@@ -37,15 +38,13 @@
  *
  * III. Driver operation
  *
- * The rx/tx operations are based on a linked list of descriptor. I haven't
- * tried the start/stop descriptor method as this one looks like the cheapest
- * in terms of PCI manipulation.
+ * The rx/tx operations are based on a linked list of descriptors. The driver
+ * doesn't use HOLD mode any more. HOLD mode is definitely buggy and the more 
+ * I tried to fix it, the more it started to look like (convoluted) software 
+ * mutation of LxDA method. Errata sheet DS5 suggests to use LxDA: consider
+ * this a rfc2119 MUST.
  *
  * Tx direction
- * Once the data section of the current descriptor processed, the next linked
- * descriptor is loaded if the HOLD bit isn't set in the current descriptor.
- * If HOLD is met, the transmission is stopped until the host unsets it and
- * signals the change via TxPOLL.
  * When the tx ring is full, the xmit routine issues a call to netdev_stop.
  * The device is supposed to be enabled again during an ALLS irq (we could
  * use HI but as it's easy to loose events, it's fscked).
@@ -55,12 +54,6 @@
  * I may implement it some day but it isn't the highest ranked item.
  *
  * IV. Notes
- * The chipset is buggy. Typically, under some specific load patterns (I
- * wouldn't call them "high"), the irq queues and the descriptors look like
- * some event has been lost. Even assuming some fancy PCI feature, it won't 
- * explain the reproductible missing "C" bit in the descriptors. Faking an 
- * irq in the periodic timer isn't really elegant but at least it seems 
- * reliable.
  * The current error (XDU, RFO) recovery code is untested.
  * So far, RDO takes his RX channel down and the right sequence to enable it
  * again is still a mistery. If RDO happens, plan a reboot. More details
@@ -69,7 +62,7 @@
  * suggest it for DCE either but at least one can get some messages instead
  * of a complete instant freeze.
  * Tests are done on Rev. 20 of the silicium. The RDO handling changes with
- * the documentation/chipset releases. An on-line errata would be welcome.
+ * the documentation/chipset releases.
  *
  * TODO:
  * - test X25.
@@ -115,7 +108,7 @@
 #include <linux/hdlc.h>
 
 /* Version */
-static const char version[] = "$Id: dscc4.c,v 1.158 2002/01/30 00:40:37 romieu Exp $\n";
+static const char version[] = "$Id: dscc4.c,v 1.159 2002/04/10 22:05:17 romieu Exp $ for Linux\n";
 static int debug;
 static int quartz;
 
@@ -148,7 +141,7 @@ struct TxFD {
 	u32 next;
 	u32 data;
 	u32 complete;
-	u32 jiffies; /* more hack to come :o) */
+	u32 jiffies; /* Allows sizeof(TxFD) == sizeof(RxFD) + extra hack */
 };
 
 struct RxFD {
@@ -159,23 +152,29 @@ struct RxFD {
 	u32 end;
 };
 
-#define DEBUG
-#define DEBUG_PARANOIA
+#define CONFIG_DSCC4_DEBUG
+
+#define DUMMY_SKB_SIZE		64
+/*
+ * FIXME: TX_HIGH very different from TX_RING_SIZE doesn't make much sense
+ * for LxDA mode.
+ */
+#define TX_LOW			8
+#define TX_HIGH			16
 #define TX_RING_SIZE    32
 #define RX_RING_SIZE    32
-#define IRQ_RING_SIZE   64 /* Keep it A multiple of 32 */
+#define IRQ_RING_SIZE		64		/* Keep it a multiple of 32 */
 #define TX_TIMEOUT      (HZ/10)
 #define DSCC4_HZ_MAX	33000000
-#define BRR_DIVIDER_MAX 64*0x00008000
+#define BRR_DIVIDER_MAX		64*0x00004000	/* Cf errata DS5 p.10 */
 #define dev_per_card	4
+#define SCC_REGISTERS_MAX	23		/* Cf errata DS5 p.4 */
 
-#define SOURCE_ID(flags) (((flags) >> 28 ) & 0x03)
+#define SOURCE_ID(flags)	(((flags) >> 28) & 0x03)
 #define TO_SIZE(state) (((state) >> 16) & 0x1fff)
 #define TO_STATE(len) cpu_to_le32(((len) & TxSizeMax) << 16)
-#define RX_MAX(len) ((((len) >> 5) + 1)<< 5)
-#define SCC_REG_START(id) SCC_START+(id)*SCC_OFFSET
-
-#undef DEBUG
+#define RX_MAX(len)		((((len) >> 5) + 1) << 5)
+#define SCC_REG_START(dpriv)	(SCC_START+(dpriv->dev_id)*SCC_OFFSET)
 
 struct dscc4_pci_priv {
         u32 *iqcfg;
@@ -197,20 +196,23 @@ struct dscc4_dev_priv {
         u32 *iqrx;
         u32 *iqtx;
 
+	/* FIXME: check all the volatile are required */
+        volatile u32 tx_current;
         u32 rx_current;
-        u32 tx_current;
-        u32 iqrx_current;
         u32 iqtx_current;
+        u32 iqrx_current;
 
-        u32 tx_dirty;
-	int bad_tx_frame;
-	int bad_rx_frame;
-	int rx_needs_refill;
+        volatile u32 tx_dirty;
+        volatile u32 ltda;
+        u32 rx_dirty;
+        u32 lrda;
 
         dma_addr_t tx_fd_dma;
         dma_addr_t rx_fd_dma;
         dma_addr_t iqtx_dma;
         dma_addr_t iqrx_dma;
+
+	volatile u32 scc_regs[SCC_REGISTERS_MAX]; /* Cf errata DS5 p.4 */
 
 	struct timer_list timer;
 
@@ -220,13 +222,12 @@ struct dscc4_dev_priv {
         int dev_id;
 	volatile u32 flags;
 	u32 timer_help;
-	u32 hi_expected;
 
-	hdlc_device hdlc;
-	sync_serial_settings settings;
 	unsigned short encoding;
 	unsigned short parity;
-	u32 pad __attribute__ ((aligned (4)));
+	hdlc_device hdlc;
+	sync_serial_settings settings;
+	u32 __pad __attribute__ ((aligned (4)));
 };
 
 /* GLOBAL registers definitions */
@@ -245,6 +246,10 @@ struct dscc4_dev_priv {
 #define CH0CFG  0x50
 #define CH0BRDA 0x54
 #define CH0BTDA 0x58
+#define CH0FRDA 0x98
+#define CH0FTDA 0xb0
+#define CH0LRDA 0xc8
+#define CH0LTDA 0xe0
 
 /* SCC registers definitions */
 #define SCC_START	0x0100
@@ -279,11 +284,13 @@ struct dscc4_dev_priv {
 
 #define Ccr0ClockMask	0x0000003f
 #define Ccr1LoopMask	0x00000200
+#define IsrMask		0x000fffff
 #define BrrExpMask	0x00000f00
 #define BrrMultMask	0x0000003f
 #define EncodingMask	0x00700000
 #define Hold		0x40000000
 #define SccBusy		0x10000000
+#define PowerUp		0x80000000
 #define FrameOk		(FrameVfr | FrameCrc)
 #define FrameVfr	0x80
 #define FrameRdo	0x40
@@ -430,7 +437,6 @@ void inline try_get_rx_skb(struct dscc4_dev_priv *priv, int cur, struct net_devi
 	if (!skb) {
 		priv->rx_fd[cur--].data = (u32) NULL;
 		priv->rx_fd[cur%RX_RING_SIZE].state1 |= Hold;
-		priv->rx_needs_refill++;
 		return;
 	}
 	skb->dev = dev;
@@ -682,7 +688,7 @@ err_out:
  */
 static void dscc4_init_registers(u32 base_addr, int dev_id)
 {
-	u32 ioaddr = base_addr + SCC_REG_START(dev_id);
+	u32 ioaddr = base_addr + SCC_REG_START(dpriv);
 
 	writel(0x80001000, ioaddr + CCR0);
 
@@ -754,7 +760,7 @@ static int dscc4_found1(struct pci_dev *pdev, unsigned long ioaddr)
 	        }
 		hdlc->proto = IF_PROTO_HDLC;
 		SET_MODULE_OWNER(d);
-		dscc4_init_registers(ioaddr, i);
+		dscc4_init_registers(ioaddr, dpriv);
 		dpriv->parity = PARITY_CRC16_PR0_CCITT;
 		dpriv->encoding = ENCODING_NRZ;
 	}
@@ -866,7 +872,7 @@ static int dscc4_open(struct net_device *dev)
 	if (dscc4_init_ring(dev))
 		goto err_out;
 
-	ioaddr = dev->base_addr + SCC_REG_START(dpriv->dev_id);
+	ioaddr = dev->base_addr + SCC_REG_START(dpriv);
 
 	/* IDT+IDR during XPR */
 	dpriv->flags = NeedIDR | NeedIDT;
@@ -957,10 +963,8 @@ static int dscc4_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	 * (especially the net_dev re-enabling ones) thus there is no
 	 * reason to try and be smart.
 	 */
-	if ((dpriv->tx_dirty + 16) < dpriv->tx_current) {
+	if ((dpriv->tx_dirty + 16) < dpriv->tx_current)
 			netif_stop_queue(dev);
-			dpriv->hi_expected = 2;
-	}
 	tx_fd = dpriv->tx_fd + cur;
 	tx_fd->state &= ~Hold;
 	mb(); // FIXME: suppress ?
@@ -986,7 +990,7 @@ static int dscc4_close(struct net_device *dev)
 
 	dev_id = dpriv->dev_id;
 
-	writel(0x00050000, ioaddr + SCC_REG_START(dev_id) + CCR2);
+	writel(0x00050000, ioaddr + SCC_REG_START(dpriv) + CCR2);
 	writel(MTFi|Rdr|Rdt, ioaddr + CH0CFG + dev_id*0x0c); /* Reset Rx/Tx */
 	writel(0x00000001, ioaddr + GCMDR);
 	readl(ioaddr + GCMDR);
@@ -1059,7 +1063,7 @@ static int dscc4_set_clock(struct net_device *dev, u32 *bps, u32 *state)
 		 */
 		brr = 0;
 	}
-	writel(brr, dev->base_addr + BRR + SCC_REG_START(dpriv->dev_id));
+	writel(brr, dev->base_addr + BRR + SCC_REG_START(dpriv));
 
 	return 0;
 }
@@ -1135,7 +1139,7 @@ static int dscc4_clock_setting(struct net_device *dev)
 	u32 ioaddr;
 
 	bps = settings->clock_rate;
-	ioaddr = dev->base_addr + CCR0 + SCC_REG_START(dpriv->dev_id);
+	ioaddr = dev->base_addr + CCR0 + SCC_REG_START(dpriv);
 	state = readl(ioaddr);
 	if(dscc4_set_clock(dev, &bps, &state) < 0)
 		return -EOPNOTSUPP;
@@ -1171,7 +1175,7 @@ static int dscc4_encoding_setting(struct net_device *dev)
 	if (i >= 0) {
 		u32 ioaddr;
 
-		ioaddr = dev->base_addr + CCR0 + SCC_REG_START(dpriv->dev_id);
+		ioaddr = dev->base_addr + CCR0 + SCC_REG_START(dpriv);
 		dscc4_patch_register(ioaddr, EncodingMask, encoding[i].bits);
 	} else
 		ret = -EOPNOTSUPP;
@@ -1184,7 +1188,7 @@ static int dscc4_loopback_setting(struct net_device *dev)
 	sync_serial_settings *settings = &dpriv->settings;
 	u32 ioaddr, state;
 
-	ioaddr = dev->base_addr + CCR1 + SCC_REG_START(dpriv->dev_id);
+	ioaddr = dev->base_addr + CCR1 + SCC_REG_START(dpriv);
 	state = readl(ioaddr);
 	if (settings->loopback) {
 		printk(KERN_DEBUG "%s: loopback\n", dev->name);
@@ -1212,7 +1216,7 @@ static int dscc4_crc_setting(struct net_device *dev)
 	if (i >= 0) {
 		u32 ioaddr;
 
-		ioaddr = dev->base_addr + CCR1 + SCC_REG_START(dpriv->dev_id);
+		ioaddr = dev->base_addr + CCR1 + SCC_REG_START(dpriv);
 		dscc4_patch_register(ioaddr, CrcMask, crc[i].bits);
 	} else
 		ret = -EOPNOTSUPP;
@@ -1341,7 +1345,7 @@ try:
 				u32 ioaddr, isr;
 
 				ioaddr = dev->base_addr + 
-					 SCC_REG_START(dpriv->dev_id) + ISR;
+					 SCC_REG_START(dpriv) + ISR;
 				isr = readl(ioaddr);
 				printk(KERN_DEBUG 
 				       "%s: DataComplete=0 cur=%d isr=%08x state=%08x\n",
@@ -1392,7 +1396,7 @@ try:
 			unsigned long scc_offset;
 			u32 scc_addr;
 
-			scc_offset = ioaddr + SCC_REG_START(dpriv->dev_id);
+			scc_offset = ioaddr + SCC_REG_START(dpriv);
 			scc_addr = ioaddr + 0x0c*dpriv->dev_id;
 			if (readl(scc_offset + STAR) & SccBusy)
 				printk(KERN_DEBUG "%s busy. Fatal\n", 
@@ -1482,21 +1486,21 @@ try:
 			 * problem with latency. In this case, increasing
 			 * RX_RING_SIZE may help.
 			 */
-			while (dpriv->rx_needs_refill) {
+			//while (dpriv->rx_needs_refill) {
 				while(!(rx_fd->state1 & Hold)) {
 					rx_fd++;
 					cur++;
 					if (!(cur = cur%RX_RING_SIZE))
 						rx_fd = dpriv->rx_fd;
 				}
-				dpriv->rx_needs_refill--;
+				//dpriv->rx_needs_refill--;
 				try_get_rx_skb(dpriv, cur, dev);
 				if (!rx_fd->data)
 					goto try;
 				rx_fd->state1 &= ~Hold;
 				rx_fd->state2 = 0x00000000;
 				rx_fd->end = 0xbabeface;
-			}
+			//}
 			goto try;
 		}
 		if (state & Fi) {
@@ -1548,7 +1552,7 @@ try:
 			//	dscc4_rx_dump(dpriv);
 			ioaddr = dev->base_addr;
 			scc_addr = ioaddr + 0x0c*dpriv->dev_id;
-			scc_offset = ioaddr + SCC_REG_START(dpriv->dev_id);
+			scc_offset = ioaddr + SCC_REG_START(dpriv);
 
 			writel(readl(scc_offset + CCR2) & ~RxActivate, 
 			       scc_offset + CCR2);
