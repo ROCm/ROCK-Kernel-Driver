@@ -65,6 +65,9 @@ EXPORT_SYMBOL(ia64_pfn_valid);
 
 #include <asm/processor.h>
 EXPORT_SYMBOL(cpu_info__per_cpu);
+#ifdef CONFIG_SMP
+EXPORT_SYMBOL(__per_cpu_offset);
+#endif
 EXPORT_SYMBOL(kernel_thread);
 
 #include <asm/system.h>
@@ -160,6 +163,7 @@ EXPORT_SYMBOL(efi_dir);
 EXPORT_SYMBOL(ia64_mv);
 #endif
 EXPORT_SYMBOL(machvec_noop);
+EXPORT_SYMBOL(machvec_memory_fence);
 EXPORT_SYMBOL(zero_page_memmap_ptr);
 #ifdef CONFIG_PERFMON
 #include <asm/perfmon.h>
