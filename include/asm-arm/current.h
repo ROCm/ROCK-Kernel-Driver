@@ -1,7 +1,7 @@
 #ifndef _ASMARM_CURRENT_H
 #define _ASMARM_CURRENT_H
 
-#include <asm/thread_info.h>
+#include <linux/thread_info.h>
 
 static inline struct task_struct *get_current(void) __attribute__ (( __const__ ));
 
