@@ -28,7 +28,8 @@ irnet_post_event(irnet_socket *	ap,
 		 irnet_event	event,
 		 __u32		saddr,
 		 __u32		daddr,
-		 char *		name)
+		 char *		name,
+		 __u16		hints)
 {
   unsigned long		flags;		/* For spinlock */
   int			index;		/* In the log */
@@ -52,6 +53,8 @@ irnet_post_event(irnet_socket *	ap,
     strcpy(irnet_events.log[index].name, name);
   else
     irnet_events.log[index].name[0] = '\0';
+  /* Copy hints */
+  irnet_events.log[index].hints.word = hints;
   /* Try to get ppp unit number */
   if((ap != (irnet_socket *) NULL) && (ap->ppp_open))
     irnet_events.log[index].unit = ppp_unit_number(&ap->chan);
@@ -609,7 +612,7 @@ irda_irnet_destroy(irnet_socket *	self)
        * doesn't exist anymore when we post the event, so we need to pass
        * NULL as the first arg... */
       irnet_post_event(NULL, IRNET_DISCONNECT_TO,
-		       self->saddr, self->daddr, self->rname);
+		       self->saddr, self->daddr, self->rname, 0);
     }
 
   /* Prevent various IrDA callbacks from messing up things
@@ -862,7 +865,7 @@ irnet_connect_socket(irnet_socket *	server,
 
   /* Notify the control channel */
   irnet_post_event(new, IRNET_CONNECT_FROM,
-		   new->saddr, new->daddr, server->rname);
+		   new->saddr, new->daddr, server->rname, 0);
 
   DEXIT(IRDA_SERV_TRACE, "\n");
   return 0;
@@ -893,7 +896,7 @@ irnet_disconnect_server(irnet_socket *	self,
 
   /* Notify the control channel (see irnet_find_socket()) */
   irnet_post_event(NULL, IRNET_REQUEST_FROM,
-		   self->saddr, self->daddr, self->rname);
+		   self->saddr, self->daddr, self->rname, 0);
 
   /* Clean up the server to keep it in listen state */
   irttp_listen(self->tsap);
@@ -1108,12 +1111,12 @@ irnet_disconnect_indication(void *	instance,
   /* If we were active, notify the control channel */
   if(test_open)
     irnet_post_event(self, IRNET_DISCONNECT_FROM,
-		     self->saddr, self->daddr, self->rname);
+		     self->saddr, self->daddr, self->rname, 0);
   else
     /* If we were trying to connect, notify the control channel */
     if((self->tsap) && (self != &irnet_server.s))
       irnet_post_event(self, IRNET_NOANSWER_FROM,
-		       self->saddr, self->daddr, self->rname);
+		       self->saddr, self->daddr, self->rname, 0);
 
   /* Close our IrTTP connection, cleanup tsap */
   if((self->tsap) && (self != &irnet_server.s))
@@ -1213,7 +1216,7 @@ irnet_connect_confirm(void *	instance,
 
   /* Notify the control channel */
   irnet_post_event(self, IRNET_CONNECT_TO,
-		   self->saddr, self->daddr, self->rname);
+		   self->saddr, self->daddr, self->rname, 0);
 
   DEXIT(IRDA_TCB_TRACE, "\n");
 }
@@ -1282,7 +1285,7 @@ irnet_status_indication(void *	instance,
     {
     case STATUS_NO_ACTIVITY:
       irnet_post_event(self, IRNET_BLOCKED_LINK,
-		       self->saddr, self->daddr, self->rname);
+		       self->saddr, self->daddr, self->rname, 0);
       break;
     default:
       DEBUG(IRDA_CB_INFO, "Unknown status...\n");
@@ -1616,8 +1619,8 @@ irnet_discovervalue_confirm(int		result,
  *
  *    Got a discovery indication from IrLMP, post an event
  *
- * Note : IrLMP take care of matching the hint mask for us, we only
- * check if it is a "new" node...
+ * Note : IrLMP take care of matching the hint mask for us, and also
+ * check if it is a "new" node for us...
  *
  * As IrLMP filter on the IrLAN hint bit, we get both IrLAN and IrNET
  * nodes, so it's only at connection time that we will know if the
@@ -1633,7 +1636,7 @@ irnet_discovervalue_confirm(int		result,
  * is to messy, so we leave that to user space...
  */
 static void
-irnet_discovery_indication(discovery_t *	discovery,
+irnet_discovery_indication(discinfo_t *		discovery,
 			   DISCOVERY_MODE	mode,
 			   void *		priv)
 {
@@ -1643,21 +1646,13 @@ irnet_discovery_indication(discovery_t *	discovery,
   DASSERT(priv == &irnet_server, , IRDA_OCB_ERROR,
 	  "Invalid instance (0x%X) !!!\n", (unsigned int) priv);
 
-  /* Check if node is discovered is a new one or an old one.
-   * We check when how long ago this node was discovered, with a
-   * coarse timeout (we may miss some discovery events or be delayed).
-   */
-  if((jiffies - discovery->first_timestamp) >= (sysctl_discovery_timeout * HZ))
-    {
-      return;		/* Too old, not interesting -> goodbye */
-    }
-
   DEBUG(IRDA_OCB_INFO, "Discovered new IrNET/IrLAN node %s...\n",
-	discovery->nickname);
+	discovery->info);
 
   /* Notify the control channel */
   irnet_post_event(NULL, IRNET_DISCOVER,
-		   discovery->saddr, discovery->daddr, discovery->nickname);
+		   discovery->saddr, discovery->daddr, discovery->info,
+		   u16ho(discovery->hints));
 
   DEXIT(IRDA_OCB_TRACE, "\n");
 }
@@ -1672,7 +1667,7 @@ irnet_discovery_indication(discovery_t *	discovery,
  * check if it is a "new" node...
  */
 static void
-irnet_expiry_indication(discovery_t *	expiry,
+irnet_expiry_indication(discinfo_t *	expiry,
 			DISCOVERY_MODE	mode,
 			void *		priv)
 {
@@ -1683,11 +1678,12 @@ irnet_expiry_indication(discovery_t *	expiry,
 	  "Invalid instance (0x%X) !!!\n", (unsigned int) priv);
 
   DEBUG(IRDA_OCB_INFO, "IrNET/IrLAN node %s expired...\n",
-	expiry->nickname);
+	expiry->info);
 
   /* Notify the control channel */
   irnet_post_event(NULL, IRNET_EXPIRE,
-		   expiry->saddr, expiry->daddr, expiry->nickname);
+		   expiry->saddr, expiry->daddr, expiry->info,
+		   u16ho(expiry->hints));
 
   DEXIT(IRDA_OCB_TRACE, "\n");
 }

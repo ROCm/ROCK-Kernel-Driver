@@ -401,11 +401,10 @@ static void irda_getvalue_confirm(int result, __u16 obj_id,
  *
  *    Got a selective discovery indication from IrLMP.
  *
- * IrLMP is telling us that this node is matching our hint bit
- * filter. Check if it's a newly discovered node (or if node changed its
- * hint bits), and then wake up any process waiting for answer...
+ * IrLMP is telling us that this node is new and matching our hint bit
+ * filter. Wake up any process waiting for answer...
  */
-static void irda_selective_discovery_indication(discovery_t *discovery,
+static void irda_selective_discovery_indication(discinfo_t *discovery,
 						DISCOVERY_MODE mode,
 						void *priv)
 {
@@ -419,18 +418,8 @@ static void irda_selective_discovery_indication(discovery_t *discovery,
 		return;
 	}
 
-	/* Check if node is discovered is a new one or an old one.
-	 * We check when how long ago this node was discovered, with a
-	 * coarse timeout (we may miss some discovery events or be delayed).
-	 * Note : by doing this test here, we avoid waking up a process ;-)
-	 */
-	if((jiffies - discovery->first_timestamp) >
-	   (sysctl_discovery_timeout * HZ)) {
-		return;		/* Too old, not interesting -> goodbye */
-	}
-
 	/* Pass parameter to the caller */
-	self->cachediscovery = discovery;
+	self->cachedaddr = discovery->daddr;
 
 	/* Wake up process if its waiting for device to be discovered */
 	wake_up_interruptible(&self->query_wait);
@@ -455,7 +444,7 @@ static void irda_discovery_timeout(u_long priv)
 
 	/* Nothing for the caller */
 	self->cachelog = NULL;
-	self->cachediscovery = NULL;
+	self->cachedaddr = 0;
 	self->errno = -ETIME;
 
 	/* Wake up process if its still waiting... */
@@ -627,7 +616,7 @@ static int irda_find_lsap_sel(struct irda_sock *self, char *name)
  */
 static int irda_discover_daddr_and_lsap_sel(struct irda_sock *self, char *name)
 {
-	struct irda_device_info *discoveries;	/* Copy of the discovery log */
+	discinfo_t *discoveries;	/* Copy of the discovery log */
 	int	number;			/* Number of nodes in the log */
 	int	i;
 	int	err = -ENETUNREACH;
@@ -642,7 +631,8 @@ static int irda_discover_daddr_and_lsap_sel(struct irda_sock *self, char *name)
 	 * Note : we have to use irlmp_get_discoveries(), as opposed
 	 * to play with the cachelog directly, because while we are
 	 * making our ias query, le log might change... */
-	discoveries = irlmp_get_discoveries(&number, self->mask, self->nslots);
+	discoveries = irlmp_get_discoveries(&number, self->mask.word,
+					    self->nslots);
 	/* Check if the we got some results */
 	if (discoveries == NULL)
 		return -ENETUNREACH;	/* No nodes discovered */
@@ -1137,7 +1127,7 @@ static int irda_create(struct socket *sock, int protocol)
 
 	/* Register as a client with IrLMP */
 	self->ckey = irlmp_register_client(0, NULL, NULL, NULL);
-	self->mask = 0xffff;
+	self->mask.word = 0xffff;
 	self->rx_flow = self->tx_flow = FLOW_START;
 	self->nslots = DISCOVERY_DEFAULT_SLOTS;
 	self->daddr = DEV_ADDR_ANY;	/* Until we get connected */
@@ -1997,6 +1987,7 @@ static int irda_setsockopt(struct socket *sock, int level, int optname,
 		if (optlen < sizeof(int))
 			return -EINVAL;
 
+		/* The input is really a (__u8 hints[2]), easier as an int */
 		if (get_user(opt, (int *)optval))
 			return -EFAULT;
 
@@ -2015,16 +2006,17 @@ static int irda_setsockopt(struct socket *sock, int level, int optname,
 		if (optlen < sizeof(int))
 			return -EINVAL;
 
+		/* The input is really a (__u8 hints[2]), easier as an int */
 		if (get_user(opt, (int *)optval))
 			return -EFAULT;
 
 		/* Set the new hint mask */
-		self->mask = (__u16) opt;
+		self->mask.word = (__u16) opt;
 		/* Mask out extension bits */
-		self->mask &= 0x7f7f;
+		self->mask.word &= 0x7f7f;
 		/* Check if no bits */
-		if(!self->mask)
-			self->mask = 0xFFFF;
+		if(!self->mask.word)
+			self->mask.word = 0xFFFF;
 
 		break;
 	default:
@@ -2115,7 +2107,7 @@ static int irda_getsockopt(struct socket *sock, int level, int optname,
 	switch (optname) {
 	case IRLMP_ENUMDEVICES:
 		/* Ask lmp for the current discovery log */
-		discoveries = irlmp_get_discoveries(&list.len, self->mask,
+		discoveries = irlmp_get_discoveries(&list.len, self->mask.word,
 						    self->nslots);
 		/* Check if the we got some results */
 		if (discoveries == NULL)
@@ -2347,7 +2339,7 @@ bed:
 			return -EFAULT;
 
 		/* Tell IrLMP we want to be notified */
-		irlmp_update_client(self->ckey, self->mask,
+		irlmp_update_client(self->ckey, self->mask.word,
 				    irda_selective_discovery_indication,
 				    NULL, (void *) self);
 
@@ -2355,7 +2347,7 @@ bed:
 		irlmp_discovery_request(self->nslots);
 
 		/* Wait until a node is discovered */
-		if (!self->cachediscovery) {
+		if (!self->cachedaddr) {
 			int ret = 0;
 
 			IRDA_DEBUG(1, "%s(), nothing discovered yet, going to sleep...\n", __FUNCTION__);
@@ -2370,7 +2362,7 @@ bed:
 
 			/* Wait for IR-LMP to call us back */
 			__wait_event_interruptible(self->query_wait,
-			   (self->cachediscovery!=NULL || self->errno==-ETIME),
+			      (self->cachedaddr != 0 || self->errno == -ETIME),
 						   ret);
 
 			/* If watchdog is still activated, kill it! */
@@ -2387,19 +2379,25 @@ bed:
 				   __FUNCTION__);
 
 		/* Tell IrLMP that we have been notified */
-		irlmp_update_client(self->ckey, self->mask, NULL, NULL, NULL);
+		irlmp_update_client(self->ckey, self->mask.word,
+				    NULL, NULL, NULL);
 
 		/* Check if the we got some results */
-		if (!self->cachediscovery)
+		if (!self->cachedaddr)
 			return -EAGAIN;		/* Didn't find any devices */
+		daddr = self->cachedaddr;
 		/* Cleanup */
-		self->cachediscovery = NULL;
+		self->cachedaddr = 0;
 
-		/* Note : We don't return anything to the user.
-		 * We could return the device that triggered the wake up,
-		 * but it's probably better to force the user to query
-		 * the whole discovery log and let him pick one device...
+		/* We return the daddr of the device that trigger the
+		 * wakeup. As irlmp pass us only the new devices, we
+		 * are sure that it's not an old device.
+		 * If the user want more details, he should query
+		 * the whole discovery log and pick one device...
 		 */
+		if (put_user(daddr, (int *)optval))
+			return -EFAULT;
+
 		break;
 	default:
 		return -ENOPROTOOPT;
