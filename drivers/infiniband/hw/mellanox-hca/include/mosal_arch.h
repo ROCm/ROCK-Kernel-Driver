@@ -162,8 +162,10 @@ extern long __cmpxchg_called_with_bad_pointer(void);
 })
 #endif
 
+#ifndef cmpxchg_acq
 #define cmpxchg_acq(ptr,o,n)    ia64_cmpxchg("acq", (ptr), (o), (n), sizeof(*(ptr)))
 #define cmpxchg_rel(ptr,o,n)    ia64_cmpxchg("rel", (ptr), (o), (n), sizeof(*(ptr)))
+#endif
 
 #ifdef CONFIG_IA64_DEBUG_CMPXCHG
 # define CMPXCHG_BUGCHECK_DECL  int _cmpxchg_bugcheck_count = 128;
