@@ -34,7 +34,7 @@ if [ "$CONFIG_PARTITION_ADVANCED" = "y" ]; then
    bool '  Sun partition tables support' CONFIG_SUN_PARTITION
    bool '  EFI GUID Partition support' CONFIG_EFI_PARTITION
 else
-   if [ "$ARCH" = "alpha" ]; then
+   if [ "$CONFIG_ALPHA" = "y" ]; then
       define_bool CONFIG_OSF_PARTITION y
    fi
    if [ "$CONFIG_AMIGA" != "y" -a "$CONFIG_ATARI" != "y" -a \
