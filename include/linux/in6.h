@@ -183,5 +183,17 @@ struct in6_flowlabel_req
 #define IPV6_IPSEC_POLICY	34
 #define IPV6_XFRM_POLICY	35
 
+/*
+ * Multicast:
+ * Following socket options are shared between IPv4 and IPv6.
+ *
+ * MCAST_JOIN_GROUP		42
+ * MCAST_BLOCK_SOURCE		43
+ * MCAST_UNBLOCK_SOURCE		44
+ * MCAST_LEAVE_GROUP		45
+ * MCAST_JOIN_SOURCE_GROUP	46
+ * MCAST_LEAVE_SOURCE_GROUP	47
+ * MCAST_MSFILTER		48
+ */
 
 #endif

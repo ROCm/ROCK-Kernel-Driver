@@ -163,7 +163,7 @@ static struct hlist_head *dn_find_list(struct sock *sk)
 	struct dn_scp *scp = DN_SK(sk);
 
 	if (scp->addr.sdn_flags & SDF_WILD)
-		return hlist_empty(&dn_wild_sk) ? NULL : &dn_wild_sk;
+		return hlist_empty(&dn_wild_sk) ? &dn_wild_sk : NULL;
 
 	return &dn_sk_hash[scp->addrloc & DN_SK_HASH_MASK];
 }
@@ -456,7 +456,7 @@ struct sock *dn_alloc_sock(struct socket *sock, int gfp)
 	if  (!sk)
 		goto out;
 
-	DN_SK(sk) = scp = (struct dn_scp *)(sk + 1);
+	sk->sk_protinfo = scp = (struct dn_scp *)(sk + 1);
 
 	if (sock)
 		sock->ops = &dn_proto_ops;

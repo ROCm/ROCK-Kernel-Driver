@@ -1940,9 +1940,9 @@ void dev_seq_stop(struct seq_file *seq, void *v)
 
 static void dev_seq_printf_stats(struct seq_file *seq, struct net_device *dev)
 {
-	struct net_device_stats *stats = dev->get_stats ? dev->get_stats(dev) :
-							  NULL;
-	if (stats)
+	if (dev->get_stats) {
+		struct net_device_stats *stats = dev->get_stats(dev);
+
 		seq_printf(seq, "%6s:%8lu %7lu %4lu %4lu %4lu %5lu %10lu %9lu "
 				"%8lu %7lu %4lu %4lu %4lu %5lu %7lu %10lu\n",
 			   dev->name, stats->rx_bytes, stats->rx_packets,
@@ -1960,7 +1960,7 @@ static void dev_seq_printf_stats(struct seq_file *seq, struct net_device *dev)
 			     stats->tx_window_errors +
 			     stats->tx_heartbeat_errors,
 			   stats->tx_compressed);
-	else
+	} else
 		seq_printf(seq, "%6s: No statistics available.\n", dev->name);
 }
 

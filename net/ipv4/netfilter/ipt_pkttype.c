@@ -1,3 +1,10 @@
+/* (C) 1999-2001 Michal Ludvig <michal@logix.cz>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ */
+
 #include <linux/module.h>
 #include <linux/skbuff.h>
 #include <linux/if_ether.h>
@@ -7,6 +14,8 @@
 #include <linux/netfilter_ipv4/ip_tables.h>
 
 MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Michal Ludvig <michal@logix.cz>");
+MODULE_DESCRIPTION("IP tables match to match on linklayer packet type");
 
 static int match(const struct sk_buff *skb,
       const struct net_device *in,

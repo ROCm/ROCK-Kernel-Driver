@@ -21,6 +21,7 @@ struct ipv4_devconf
 	int	medium_id;
 	int	no_xfrm;
 	int	no_policy;
+	int	force_igmp_version;
 	void	*sysctl;
 };
 
