@@ -1,5 +1,5 @@
 /*
- * $Id: ctcmain.c,v 1.62 2004/07/15 16:03:08 ptiedem Exp $
+ * $Id: ctcmain.c,v 1.63 2004/07/28 12:27:54 ptiedem Exp $
  *
  * CTC / ESCON network driver
  *
@@ -36,7 +36,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: CTC/ESCON network driver $Revision: 1.62 $
+ * RELEASE-TAG: CTC/ESCON network driver $Revision: 1.63 $
  *
  */
 
@@ -320,7 +320,7 @@ static void
 print_banner(void)
 {
 	static int printed = 0;
-	char vbuf[] = "$Revision: 1.62 $";
+	char vbuf[] = "$Revision: 1.63 $";
 	char *version = vbuf;
 
 	if (printed)
@@ -3250,7 +3250,7 @@ ctc_exit(void)
 {
 	unregister_cu3088_discipline(&ctc_group_driver);
 	ctc_tty_cleanup();
-	unregister_dbf_views();
+	ctc_unregister_dbf_views();
 	ctc_pr_info("CTC driver unloaded\n");
 }
 
@@ -3267,16 +3267,16 @@ ctc_init(void)
 
 	print_banner();
 
-	ret = register_dbf_views();
+	ret = ctc_register_dbf_views();
 	if (ret){
-		ctc_pr_crit("ctc_init failed with register_dbf_views rc = %d\n", ret);
+		ctc_pr_crit("ctc_init failed with ctc_register_dbf_views rc = %d\n", ret);
 		return ret;
 	}
 	ctc_tty_init();
 	ret = register_cu3088_discipline(&ctc_group_driver);
 	if (ret) {
 		ctc_tty_cleanup();
-		unregister_dbf_views();
+		ctc_unregister_dbf_views();
 	}
 	return ret;
 }
