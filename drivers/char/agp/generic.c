@@ -599,7 +599,6 @@ int agp_generic_create_gatt_table(void)
 }
 EXPORT_SYMBOL(agp_generic_create_gatt_table);
 
-
 int agp_generic_suspend(void)
 {
 	return 0;
@@ -657,6 +656,12 @@ int agp_generic_free_gatt_table(void)
 		ClearPageReserved(page);
 
 	free_pages((unsigned long) agp_bridge->gatt_table_real, page_order);
+
+	agp_gatt_table = NULL;
+	agp_bridge->gatt_table = NULL;
+	agp_bridge->gatt_table_real = NULL;
+	agp_bridge->gatt_bus_addr = NULL;
+
 	return 0;
 }
 EXPORT_SYMBOL(agp_generic_free_gatt_table);

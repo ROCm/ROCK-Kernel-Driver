@@ -185,8 +185,10 @@ err_out:
 				phys_to_virt(bridge->scratch_page_real));
 	if (got_gatt)
 		bridge->driver->free_gatt_table();
-	if (got_keylist)
+	if (got_keylist) {
 		vfree(bridge->key_list);
+		bridge->key_list = NULL;
+	}
 	return rc;
 }
 
@@ -197,8 +199,10 @@ static void agp_backend_cleanup(struct agp_bridge_data *bridge)
 		bridge->driver->cleanup();
 	if (bridge->driver->free_gatt_table)
 		bridge->driver->free_gatt_table();
-	if (bridge->key_list)
+	if (bridge->key_list) {
 		vfree(bridge->key_list);
+		bridge->key_list = NULL;
+	}
 
 	if (bridge->driver->agp_destroy_page &&
 	    bridge->driver->needs_scratch_page)

@@ -75,6 +75,7 @@ static void amd_free_gatt_pages(void)
 		}
 	}
 	kfree(tables);
+	amd_irongate_private.gatt_pages = NULL;
 }
 
 static int amd_create_gatt_pages(int nr_tables)

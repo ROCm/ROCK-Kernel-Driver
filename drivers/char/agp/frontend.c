@@ -198,6 +198,7 @@ static int agp_create_segment(agp_client * client, agp_region * region)
 	seg = kmalloc((sizeof(agp_segment_priv) * region->seg_count), GFP_KERNEL);
 	if (seg == NULL) {
 		kfree(region->seg_list);
+		region->seg_list = NULL;
 		return -ENOMEM;
 	}
 	memset(seg, 0, (sizeof(agp_segment_priv) * region->seg_count));
@@ -208,14 +209,15 @@ static int agp_create_segment(agp_client * client, agp_region * region)
 		seg[i].pg_count = user_seg[i].pg_count;
 		seg[i].prot = agp_convert_mmap_flags(user_seg[i].prot);
 	}
+	kfree(region->seg_list);
+	region->seg_list = NULL;
+
 	ret_seg = kmalloc(sizeof(void *), GFP_KERNEL);
 	if (ret_seg == NULL) {
-		kfree(region->seg_list);
 		kfree(seg);
 		return -ENOMEM;
 	}
 	*ret_seg = seg;
-	kfree(region->seg_list);
 	agp_add_seg_to_client(client, ret_seg, region->seg_count);
 	return 0;
 }
@@ -690,6 +692,7 @@ static int agp_release(struct inode *inode, struct file *file)
 							       priv);
 			}
 			agp_remove_controller(controller);
+			controller = NULL;
 		}
 	}
 
@@ -698,6 +701,7 @@ static int agp_release(struct inode *inode, struct file *file)
 
 	agp_remove_file_private(priv);
 	kfree(priv);
+	(agp_file_private *) file->private_data = NULL;
 	up(&(agp_fe.agp_mutex));
 	return 0;
 }
@@ -860,10 +864,8 @@ static int agpioc_reserve_wrap(agp_file_private * priv, unsigned long arg)
 		client_priv = agp_find_private(reserve.pid);
 
 		if (client_priv != NULL) {
-			set_bit(AGP_FF_IS_CLIENT,
-				&client_priv->access_flags);
-			set_bit(AGP_FF_IS_VALID,
-				&client_priv->access_flags);
+			set_bit(AGP_FF_IS_CLIENT, &client_priv->access_flags);
+			set_bit(AGP_FF_IS_VALID, &client_priv->access_flags);
 		}
 		if (client == NULL) {
 			/* client is already removed */
@@ -875,7 +877,7 @@ static int agpioc_reserve_wrap(agp_file_private * priv, unsigned long arg)
 
 		if (reserve.seg_count >= 16384)
 			return -EINVAL;
-			
+
 		segment = kmalloc((sizeof(agp_segment) * reserve.seg_count),
 				  GFP_KERNEL);
 
@@ -900,15 +902,11 @@ static int agpioc_reserve_wrap(agp_file_private * priv, unsigned long arg)
 			client_priv = agp_find_private(reserve.pid);
 
 			if (client_priv != NULL) {
-				set_bit(AGP_FF_IS_CLIENT,
-					&client_priv->access_flags);
-				set_bit(AGP_FF_IS_VALID,
-					&client_priv->access_flags);
+				set_bit(AGP_FF_IS_CLIENT, &client_priv->access_flags);
+				set_bit(AGP_FF_IS_VALID, &client_priv->access_flags);
 			}
-			return agp_create_segment(client, &reserve);
-		} else {
-			return agp_create_segment(client, &reserve);
 		}
+		return agp_create_segment(client, &reserve);
 	}
 	/* Will never really happen */
 	return -EINVAL;
