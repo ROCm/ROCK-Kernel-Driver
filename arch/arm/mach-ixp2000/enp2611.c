@@ -124,19 +124,27 @@ static int __init enp2611_pci_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 {
 	int irq;
 
-	if (dev->bus->number == 0x00 && PCI_SLOT(dev->devfn) == 0x01) {
+	if (dev->bus->number == 0 && PCI_SLOT(dev->devfn) == 0) {
+		/* IXP2400. */
+		irq = IRQ_IXP2000_PCIA;
+	} else if (dev->bus->number == 0 && PCI_SLOT(dev->devfn) == 1) {
 		/* 21555 non-transparent bridge.  */
 		irq = IRQ_IXP2000_PCIB;
-	} else if (dev->bus->number == 0x01 && PCI_SLOT(dev->devfn) == 0x00) {
+	} else if (dev->bus->number == 0 && PCI_SLOT(dev->devfn) == 4) {
+		/* PCI2050B transparent bridge.  */
+		irq = -1;
+	} else if (dev->bus->number == 1 && PCI_SLOT(dev->devfn) == 0) {
 		/* 82559 ethernet.  */
 		irq = IRQ_IXP2000_PCIA;
+	} else if (dev->bus->number == 1 && PCI_SLOT(dev->devfn) == 1) {
+		/* SPI-3 option board.  */
+		irq = IRQ_IXP2000_PCIB;
 	} else {
-		printk(KERN_INFO "enp2611_pci_map_irq for unknown device\n");
-		irq = IRQ_IXP2000_PCI;
+		printk(KERN_ERR "enp2611_pci_map_irq() called for unknown "
+				"device PCI:%d:%d:%d\n", dev->bus->number,
+				PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn));
+		irq = -1;
 	}
-
-	printk(KERN_INFO "Assigned IRQ %d to PCI:%d:%d:%d\n", irq,
-		dev->bus->number, PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn));
 
 	return irq;
 }
@@ -151,7 +159,9 @@ struct hw_pci enp2611_pci __initdata = {
 
 int __init enp2611_pci_init(void)
 {
-	pci_common_init(&enp2611_pci);
+	if (machine_is_enp2611())
+		pci_common_init(&enp2611_pci);
+
 	return 0;
 }
 
