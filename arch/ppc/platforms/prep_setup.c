@@ -762,37 +762,6 @@ static struct smp_ops_t prep_smp_ops __prepdata = {
 #endif /* CONFIG_SMP */
 
 /*
- * This finds the amount of physical ram and does necessary
- * setup for prep.  This is pretty architecture specific so
- * this will likely stay separate from the pmac.
- * -- Cort
- */
-static unsigned long __init
-prep_find_end_of_memory(void)
-{
-	unsigned long total = 0;
-	extern unsigned int boot_mem_size;
-
-#ifdef CONFIG_PREP_RESIDUAL	
-	total = res->TotalMemory;
-#endif	
-
-	if (total == 0 && boot_mem_size != 0)
-		total = boot_mem_size;
-	else if (total == 0) {
-		/*
-		 * I need a way to probe the amount of memory if the residual
-		 * data doesn't contain it. -- Cort
-		 */
-		total = 0x02000000;
-		printk(KERN_INFO "Ramsize from residual data was 0"
-			 " -- defaulting to %ldM\n", total>>20);
-	}
-
-	return (total);
-}
-
-/*
  * Setup the bat mappings we're going to load that cover
  * the io areas.  RAM was mapped by mapin_ram().
  * -- Cort
@@ -881,7 +850,6 @@ prep_init(unsigned long r3, unsigned long r4, unsigned long r5,
 		ppc_md.time_init      = mk48t59_init;
 	}
 
-	ppc_md.find_end_of_memory = prep_find_end_of_memory;
 	ppc_md.setup_io_mappings = prep_map_io;
 
 #if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
