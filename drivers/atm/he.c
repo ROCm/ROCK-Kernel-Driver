@@ -2596,9 +2596,8 @@ he_close(struct atm_vcc *vcc)
 
 		while (((tx_inuse = atomic_read(&vcc->sk->sk_wmem_alloc)) > 0) &&
 		       (retry < MAX_RETRY)) {
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			(void) schedule_timeout(sleep);
-			if (sleep < HZ)
+			msleep(sleep);
+			if (sleep < 250)
 				sleep = sleep * 2;
 
 			++retry;

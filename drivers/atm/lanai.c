@@ -813,7 +813,7 @@ static void lanai_shutdown_tx_vci(struct lanai_dev *lanai,
 			DPRINTK("read, write = %d, %d\n", read, write);
 			break;
 		}
-		schedule_timeout(HZ / 25);
+		msleep(4);
 	}
 	/* 15.2.2 - clear out all tx registers */
 	cardvcc_write(lvcc, 0, vcc_txreadptr);

@@ -1704,8 +1704,7 @@ static int __devinit fs_init (struct fs_dev *dev)
 		}
 
 		/* Try again after 10ms. */
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout ((HZ+99)/100);
+		msleep(10);
 	}
 
 	if (!to) {

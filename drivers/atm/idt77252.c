@@ -2516,7 +2516,7 @@ idt77252_close(struct atm_vcc *vcc)
 	struct vc_map *vc = vcc->dev_data;
 	unsigned long flags;
 	unsigned long addr;
-	int timeout;
+	unsigned long timeout;
 
 	down(&card->mutex);
 
@@ -2566,9 +2566,9 @@ done:
 		}
 		spin_unlock_irqrestore(&vc->lock, flags);
 
-		timeout = 5 * HZ;
+		timeout = 5 * 1000;
 		while (atomic_read(&vc->scq->used) > 0) {
-			timeout = schedule_timeout(timeout);
+			timeout = msleep_interruptible(timeout);
 			if (!timeout)
 				break;
 		}
