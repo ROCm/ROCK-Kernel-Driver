@@ -27,13 +27,6 @@
 #include <sound/yss225.h>
 #include <sound/initval.h>
 
-#if 0
-MODULE_AUTHOR("Paul Davis <pbd@op.net>");
-MODULE_DESCRIPTION("ALSA driver for Turtle Beach Tropez+ YSS225 FX Processor");
-MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-#endif
-
 /* Control bits for the Load Control Register
  */
 
@@ -256,7 +249,7 @@ snd_wavefront_fx_ioctl (snd_hwdep_t *sdev, struct file *file,
 */
 
 
-int
+int __init
 snd_wavefront_fx_start (snd_wavefront_t *dev)
 
 {
@@ -1031,22 +1024,3 @@ static unsigned char coefficients3[] __initdata = {
 0x0f, 0xd7, 0x0f, 0xd7, 0x0f, 0xff, 0x0f, 0xff
 };
 
-#if 0
-EXPORT_SYMBOL(snd_wavefront_fx_start);
-EXPORT_SYMBOL(snd_wavefront_fx_detect);
-EXPORT_SYMBOL(snd_wavefront_fx_ioctl);
-EXPORT_SYMBOL(snd_wavefront_fx_open);
-EXPORT_SYMBOL(snd_wavefront_fx_release);
-
-static int __init alsa_wavefront_fx_init(void)
-{
-	return 0;
-}
-
-static void __exit alsa_wavefront_fx_exit(void)
-{
-}
-
-module_init(alsa_wavefront_fx_init)
-module_exit(alsa_wavefront_fx_exit)
-#endif

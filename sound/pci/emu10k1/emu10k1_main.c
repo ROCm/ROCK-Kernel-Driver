@@ -547,7 +547,7 @@ int __devinit snd_emu10k1_create(snd_card_t * card,
 		snd_printk("architecture does not support 31bit PCI busmaster DMA\n");
 		return -ENXIO;
 	}
-	if (pci->driver_data)
+	if (pci_get_drvdata(pci))
 		pci_set_dma_mask(pci, 0xffffffff); /* audigy */
 	else
 		pci_set_dma_mask(pci, 0x7fffffff);

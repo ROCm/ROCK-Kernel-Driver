@@ -778,7 +778,7 @@ int snd_sb16dsp_configure(sb_t * chip)
 			return -EINVAL;
 		}
 	}
-	if (chip->dma16 >= 0) {
+	if (chip->dma16 >= 0 && chip->dma16 != chip->dma8) {
 		switch (chip->dma16) {
 		case 5:
 			dmareg |= SB_DMASETUP_DMA5;
@@ -869,7 +869,10 @@ int snd_sb16dsp_pcm(sb_t * chip, int device, snd_pcm_t ** rpcm)
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &snd_sb16_playback_ops);
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, &snd_sb16_capture_ops);
 
-	snd_ctl_add(card, snd_ctl_new1(&snd_sb16_dma_control, chip));
+	if (chip->dma16 >= 0 && chip->dma8 != chip->dma16)
+		snd_ctl_add(card, snd_ctl_new1(&snd_sb16_dma_control, chip));
+	else
+		pcm->info_flags = SNDRV_PCM_INFO_HALF_DUPLEX;
 
 	snd_pcm_lib_preallocate_isa_pages_for_all(pcm, 64*1024, 128*1024);
 

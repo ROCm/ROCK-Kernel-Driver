@@ -2177,7 +2177,7 @@ static int __devinit snd_ali_create(snd_card_t * card,
 static int __devinit snd_ali_probe(struct pci_dev *pci,
 				   const struct pci_device_id *id)
 {
-	static int dev = 0;
+	static int dev;
 	snd_card_t *card;
 	ali_t *codec;
 	int err;

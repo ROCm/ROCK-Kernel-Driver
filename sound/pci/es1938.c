@@ -1583,7 +1583,7 @@ static int __init snd_es1938_mixer(snd_pcm_t *pcm)
 static int __devinit snd_es1938_probe(struct pci_dev *pci,
 				      const struct pci_device_id *id)
 {
-	static int dev = 0;
+	static int dev;
 	snd_card_t *card;
 	es1938_t *chip;
 	snd_pcm_t *pcm;

@@ -256,7 +256,7 @@ static int empeg_write (struct usb_serial_port *port, int from_user, const unsig
 		}
 
 		if (urb->transfer_buffer == NULL) {
-			urb->transfer_buffer = kmalloc (URB_TRANSFER_BUFFER_SIZE, GFP_KERNEL);
+			urb->transfer_buffer = kmalloc (URB_TRANSFER_BUFFER_SIZE, GFP_ATOMIC);
 			if (urb->transfer_buffer == NULL) {
 				err(__FUNCTION__" no more kernel memory...");
 				goto exit;
@@ -288,7 +288,7 @@ static int empeg_write (struct usb_serial_port *port, int from_user, const unsig
 		urb->transfer_flags |= USB_QUEUE_BULK;
 
 		/* send it down the pipe */
-		status = usb_submit_urb(urb, GFP_KERNEL);
+		status = usb_submit_urb(urb, GFP_ATOMIC);
 		if (status) {
 			err(__FUNCTION__ " - usb_submit_urb(write bulk) failed with status = %d", status);
 			bytes_sent = status;
@@ -441,7 +441,7 @@ static void empeg_read_bulk_callback (struct urb *urb)
 
 	port->read_urb->transfer_flags |= USB_QUEUE_BULK;
 
-	result = usb_submit_urb(port->read_urb, GFP_KERNEL);
+	result = usb_submit_urb(port->read_urb, GFP_ATOMIC);
 
 	if (result)
 		err(__FUNCTION__ " - failed resubmitting read urb, error %d", result);
@@ -466,7 +466,7 @@ static void empeg_unthrottle (struct usb_serial_port *port)
 
 	port->read_urb->dev = port->serial->dev;
 
-	result = usb_submit_urb(port->read_urb, GFP_KERNEL);
+	result = usb_submit_urb(port->read_urb, GFP_ATOMIC);
 
 	if (result)
 		err(__FUNCTION__ " - failed submitting read urb, error %d", result);

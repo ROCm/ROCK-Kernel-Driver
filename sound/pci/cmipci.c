@@ -1485,9 +1485,10 @@ static int snd_cmipci_playback_spdif_open(snd_pcm_substream_t *substream)
 	if ((err = open_device_check(cm, CM_OPEN_SPDIF_PLAYBACK, substream)) < 0) /* use channel A */
 		return err;
 	runtime->hw = snd_cmipci_playback_spdif;
-	if (cm->can_ac3_hw) {
+#ifdef DO_SOFT_AC3
+	if (cm->can_ac3_hw)
+#endif
 		runtime->hw.info |= SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_MMAP_VALID;
-	}
 	snd_pcm_hw_constraint_minmax(runtime, SNDRV_PCM_HW_PARAM_BUFFER_SIZE, 0, 0x40000);
 	cm->dig_pcm_status = cm->dig_status;
 	return 0;
@@ -2461,8 +2462,11 @@ static int snd_cmipci_free(cmipci_t *cm)
 	snd_cmipci_proc_done(cm);
 
 	if (cm->irq >= 0) {
+		snd_cmipci_clear_bit(cm, CM_REG_MISC_CTRL, CM_FM_EN);
+		snd_cmipci_clear_bit(cm, CM_REG_LEGACY_CTRL, CM_ENSPDOUT);
 		snd_cmipci_write(cm, CM_REG_INT_HLDCLR, 0);  /* disable ints */
 		snd_cmipci_write(cm, CM_REG_FUNCTRL0, 0); /* disable channels */
+		snd_cmipci_write(cm, CM_REG_FUNCTRL1, 0);
 
 		/* reset mixer */
 		snd_cmipci_mixer_write(cm, 0, 0);
@@ -2597,11 +2601,19 @@ static int __devinit snd_cmipci_create(snd_card_t *card,
 
 		if (snd_opl3_create(card, iosynth, iosynth + 2,
 				    OPL3_HW_OPL3, 0, &cm->opl3) < 0) {
-			printk(KERN_ERR "cmipci: no OPL device at 0x%lx\n", iosynth);
+			printk(KERN_ERR "cmipci: no OPL device at 0x%lx, skipping...\n", iosynth);
+			iosynth = 0;
 		} else {
-			if ((err = snd_opl3_hwdep_new(cm->opl3, 0, 1, &cm->opl3hwdep)) < 0)
+			if ((err = snd_opl3_hwdep_new(cm->opl3, 0, 1, &cm->opl3hwdep)) < 0) {
 				printk(KERN_ERR "cmipci: cannot create OPL3 hwdep\n");
+				return err;
+			}
 		}
+	}
+	if (! iosynth) {
+		/* disable FM */
+		snd_cmipci_write(cm, CM_REG_LEGACY_CTRL, val & ~CM_FMSEL_MASK);
+		snd_cmipci_clear_bit(cm, CM_REG_MISC_CTRL, CM_FM_EN);
 	}
 
 	/* reset mixer */
@@ -2658,7 +2670,7 @@ MODULE_DEVICE_TABLE(pci, snd_cmipci_ids);
 static int __devinit snd_cmipci_probe(struct pci_dev *pci,
 				      const struct pci_device_id *id)
 {
-	static int dev = 0;
+	static int dev;
 	snd_card_t *card;
 	cmipci_t *cm;
 	int err;

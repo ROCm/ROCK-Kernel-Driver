@@ -50,7 +50,7 @@
 #define FB_MAX	8
 #endif
 
-#define ALIGN(x) (((x) + sizeof(unsigned long)-1) & -sizeof(unsigned long))
+#define ALIGNUL(x) (((x) + sizeof(unsigned long)-1) & -sizeof(unsigned long))
 
 struct prom_args {
 	const char *service;
@@ -376,7 +376,7 @@ try_again:
 		}
 	}
 
-	return ALIGN(mem);
+	return ALIGNUL(mem);
 }
 
 /* This function will enable the early boot text when doing OF booting. This
@@ -457,7 +457,7 @@ copy_device_tree(unsigned long mem_start, unsigned long mem_end)
 		prom_exit();
 	}
 	allnextp = &allnodes;
-	mem_start = ALIGN(mem_start);
+	mem_start = ALIGNUL(mem_start);
 	new_start = inspect_node(root, 0, mem_start, mem_end, &allnextp);
 	*allnextp = 0;
 	return new_start;
@@ -501,7 +501,7 @@ inspect_node(phandle node, struct device_node *dad,
 		if ((int) call_prom("nextprop", 3, 1, node, prev_name,
 				    namep) <= 0)
 			break;
-		mem_start = ALIGN((unsigned long)namep + strlen(namep) + 1);
+		mem_start = ALIGNUL((unsigned long)namep + strlen(namep) + 1);
 		prev_name = namep;
 		valp = (unsigned char *) mem_start;
 		pp->value = PTRUNRELOC(valp);
@@ -514,7 +514,7 @@ inspect_node(phandle node, struct device_node *dad,
 		if (pp->length > MAX_PROPERTY_LENGTH)
 			continue; /* ignore this property */
 #endif
-		mem_start = ALIGN(mem_start + pp->length);
+		mem_start = ALIGNUL(mem_start + pp->length);
 		*prev_propp = PTRUNRELOC(pp);
 		prev_propp = &pp->next;
 	}
@@ -526,7 +526,7 @@ inspect_node(phandle node, struct device_node *dad,
 		namep = (char *) (pp + 1);
 		pp->name = PTRUNRELOC(namep);
 		strcpy(namep, "linux,phandle");
-		mem_start = ALIGN((unsigned long)namep + strlen(namep) + 1);
+		mem_start = ALIGNUL((unsigned long)namep + strlen(namep) + 1);
 		pp->value = (unsigned char *) PTRUNRELOC(&np->node);
 		pp->length = sizeof(np->node);
 	}
@@ -538,7 +538,7 @@ inspect_node(phandle node, struct device_node *dad,
 	if (l >= 0) {
 		np->full_name = PTRUNRELOC((char *) mem_start);
 		*(char *)(mem_start + l) = 0;
-		mem_start = ALIGN(mem_start + l + 1);
+		mem_start = ALIGNUL(mem_start + l + 1);
 	}
 
 	/* do all our children */
@@ -741,7 +741,7 @@ prom_init(int r3, int r4, prom_entry pp)
 		*d = 0;
 		call_prom("canon", 3, 1, p, d, 1<<20);
 		bootdevice = PTRUNRELOC(d);
-		mem = ALIGN(mem + strlen(d) + 1);
+		mem = ALIGNUL(mem + strlen(d) + 1);
 	}
 
 	prom_instantiate_rtas();

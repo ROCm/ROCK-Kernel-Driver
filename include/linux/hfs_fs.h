@@ -318,12 +318,17 @@ extern int hfs_mac2triv(char *, const struct hfs_name *);
 extern void hfs_tolower(unsigned char *, int);
 
 #include <linux/hfs_fs_i.h>
+#include <linux/hfs_fs_sb.h>
 
 static inline struct hfs_inode_info *HFS_I(struct inode *inode)
 {
 	return list_entry(inode, struct hfs_inode_info, vfs_inode);
 }
-#define	HFS_SB(X)	(&((X)->u.hfs_sb))
+
+static inline struct hfs_sb_info *HFS_SB(struct super_block *sb)
+{
+	return sb->u.generic_sbp;
+}
 
 static inline void hfs_nameout(struct inode *dir, struct hfs_name *out,
 				   const char *in, int len) {

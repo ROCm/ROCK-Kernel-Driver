@@ -318,7 +318,7 @@ static int __init snd_card_dt0197h_probe(int dev)
 static int __init snd_dt0197h_isapnp_detect(struct isapnp_card *card,
 					    const struct isapnp_card_id *id)
 {
-	static int dev = 0;
+	static int dev;
 	int res;
 
 	for ( ; dev < SNDRV_CARDS; dev++) {

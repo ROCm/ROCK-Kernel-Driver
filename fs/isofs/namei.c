@@ -65,6 +65,7 @@ isofs_find_entry(struct inode *dir, struct dentry *dentry,
 	unsigned char bufbits = ISOFS_BUFFER_BITS(dir);
 	unsigned int block, f_pos, offset;
 	struct buffer_head * bh = NULL;
+	struct isofs_sb_info *sbi = ISOFS_SB(dir->i_sb);
 
 	if (!ISOFS_I(dir)->i_first_extent)
 		return 0;
@@ -120,19 +121,19 @@ isofs_find_entry(struct inode *dir, struct dentry *dentry,
 		dlen = de->name_len[0];
 		dpnt = de->name;
 
-		if (dir->i_sb->u.isofs_sb.s_rock &&
+		if (sbi->s_rock &&
 		    ((i = get_rock_ridge_filename(de, tmpname, dir)))) {
 			dlen = i; 	/* possibly -1 */
 			dpnt = tmpname;
 #ifdef CONFIG_JOLIET
-		} else if (dir->i_sb->u.isofs_sb.s_joliet_level) {
+		} else if (sbi->s_joliet_level) {
 			dlen = get_joliet_filename(de, tmpname, dir);
 			dpnt = tmpname;
 #endif
-		} else if (dir->i_sb->u.isofs_sb.s_mapping == 'a') {
+		} else if (sbi->s_mapping == 'a') {
 			dlen = get_acorn_filename(de, tmpname, dir);
 			dpnt = tmpname;
-		} else if (dir->i_sb->u.isofs_sb.s_mapping == 'n') {
+		} else if (sbi->s_mapping == 'n') {
 			dlen = isofs_name_translate(de, tmpname, dir);
 			dpnt = tmpname;
 		}
@@ -142,8 +143,8 @@ isofs_find_entry(struct inode *dir, struct dentry *dentry,
 		 */
 		match = 0;
 		if (dlen > 0 &&
-		    (!(de->flags[-dir->i_sb->u.isofs_sb.s_high_sierra] & 5)
-		     || dir->i_sb->u.isofs_sb.s_unhide == 'y'))
+		    (!(de->flags[-sbi->s_high_sierra] & 5)
+		     || sbi->s_unhide == 'y'))
 		{
 			match = (isofs_cmp(dentry,dpnt,dlen) == 0);
 		}

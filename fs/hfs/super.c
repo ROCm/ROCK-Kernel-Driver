@@ -178,6 +178,9 @@ static void hfs_put_super(struct super_block *sb)
 
 	/* restore default blocksize for the device */
 	set_blocksize(sb->s_dev, BLOCK_SIZE);
+
+	kfree(sb->u.generic_sbp);
+	sb->u.generic_sbp = NULL;
 }
 
 /*
@@ -443,6 +446,7 @@ done:
  */
 int hfs_fill_super(struct super_block *s, void *data, int silent)
 {
+	struct hfs_sb_info *sbi;
 	struct hfs_mdb *mdb;
 	struct hfs_cat_key key;
 	kdev_t dev = s->s_dev;
@@ -450,7 +454,13 @@ int hfs_fill_super(struct super_block *s, void *data, int silent)
 	struct inode *root_inode;
 	int part;
 
-	if (!parse_options((char *)data, HFS_SB(s), &part)) {
+	sbi = kmalloc(sizeof(struct hfs_sb_info), GFP_KERNEL);
+	if (!sbi)
+		return -ENOMEM;
+	s->u.generic_sbp = sbi;
+	memset(sbi, 0, sizeof(struct hfs_sb_info));
+
+	if (!parse_options((char *)data, sbi, &part)) {
 		hfs_warn("hfs_fs: unable to parse mount options.\n");
 		goto bail3;
 	}
@@ -485,7 +495,7 @@ int hfs_fill_super(struct super_block *s, void *data, int silent)
 		goto bail2;
 	}
 
-	HFS_SB(s)->s_mdb = mdb;
+	sbi->s_mdb = mdb;
 	if (HFS_ITYPE(mdb->next_id) != 0) {
 		hfs_warn("hfs_fs: too many files.\n");
 		goto bail1;
@@ -522,6 +532,8 @@ bail1:
 bail2:
 	set_blocksize(dev, BLOCK_SIZE);
 bail3:
+	kfree(sbi);
+	sb->u.generic_sbp = NULL;
 	return -EINVAL;	
 }
 

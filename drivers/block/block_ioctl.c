@@ -27,6 +27,7 @@
 #include <linux/smp_lock.h>
 #include <linux/module.h>
 #include <linux/blk.h>
+#include <linux/completion.h>
 
 #include <linux/cdrom.h>
 

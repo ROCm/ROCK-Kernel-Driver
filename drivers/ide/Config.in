@@ -53,18 +53,14 @@ if [ "$CONFIG_BLK_DEV_IDE" != "n" ]; then
 	 dep_mbool '      AEC62XX Tuning support' CONFIG_AEC62XX_TUNING $CONFIG_BLK_DEV_AEC62XX
 	 dep_bool '    ALI M15x3 chipset support' CONFIG_BLK_DEV_ALI15X3 $CONFIG_BLK_DEV_IDEDMA_PCI
 	 dep_mbool '      ALI M15x3 WDC support (DANGEROUS)' CONFIG_WDC_ALI15X3 $CONFIG_BLK_DEV_ALI15X3
-	 dep_bool '    AMD Viper support' CONFIG_BLK_DEV_AMD74XX $CONFIG_BLK_DEV_IDEDMA_PCI
-	 dep_mbool '      AMD Viper ATA-66 Override (WIP)' CONFIG_AMD74XX_OVERRIDE $CONFIG_BLK_DEV_AMD74XX $CONFIG_IDEDMA_PCI_WIP
+	 dep_bool '    AMD and nVidia chipset support' CONFIG_BLK_DEV_AMD74XX $CONFIG_BLK_DEV_IDEDMA_PCI
 	 dep_bool '    CMD64X chipset support' CONFIG_BLK_DEV_CMD64X $CONFIG_BLK_DEV_IDEDMA_PCI
 	 dep_bool '    CY82C693 chipset support' CONFIG_BLK_DEV_CY82C693 $CONFIG_BLK_DEV_IDEDMA_PCI
 	 dep_bool '    Cyrix CS5530 MediaGX chipset support' CONFIG_BLK_DEV_CS5530 $CONFIG_BLK_DEV_IDEDMA_PCI
   	 dep_bool '    HPT34X chipset support' CONFIG_BLK_DEV_HPT34X $CONFIG_BLK_DEV_IDEDMA_PCI
 	 dep_mbool '      HPT34X AUTODMA support (WIP)' CONFIG_HPT34X_AUTODMA $CONFIG_BLK_DEV_HPT34X $CONFIG_IDEDMA_PCI_WIP
 	 dep_bool '    HPT366 chipset support' CONFIG_BLK_DEV_HPT366 $CONFIG_BLK_DEV_IDEDMA_PCI
-	 if [ "$CONFIG_X86" = "y" -o "$CONFIG_IA64" = "y" ]; then
-	    dep_mbool '    Intel PIIXn chipsets support' CONFIG_BLK_DEV_PIIX $CONFIG_BLK_DEV_IDEDMA_PCI
-	    dep_mbool '      PIIXn Tuning support' CONFIG_PIIX_TUNING $CONFIG_BLK_DEV_PIIX $CONFIG_IDEDMA_PCI_AUTO
-	 fi
+	 dep_bool '    Intel and Efar (SMsC) chipset support' CONFIG_BLK_DEV_PIIX $CONFIG_BLK_DEV_IDEDMA_PCI
 	 if [ "$CONFIG_MIPS_ITE8172" = "y" -o "$CONFIG_MIPS_IVR" = "y" ]; then
 	    dep_mbool '    IT8172 IDE support' CONFIG_BLK_DEV_IT8172 $CONFIG_BLK_DEV_IDEDMA_PCI
 	    dep_mbool '      IT8172 IDE Tuning support' CONFIG_IT8172_TUNING $CONFIG_BLK_DEV_IT8172 $CONFIG_IDEDMA_PCI_AUTO
@@ -77,9 +73,8 @@ if [ "$CONFIG_BLK_DEV_IDE" != "n" ]; then
 	 dep_bool '      Special FastTrak Feature' CONFIG_PDC202XX_FORCE $CONFIG_BLK_DEV_PDC202XX
 	 dep_bool '    ServerWorks OSB4/CSB5 chipsets support' CONFIG_BLK_DEV_SVWKS $CONFIG_BLK_DEV_IDEDMA_PCI $CONFIG_X86
 	 dep_bool '    SiS5513 chipset support' CONFIG_BLK_DEV_SIS5513 $CONFIG_BLK_DEV_IDEDMA_PCI $CONFIG_X86
-	 dep_bool '    SLC90E66 chipset support' CONFIG_BLK_DEV_SLC90E66 $CONFIG_BLK_DEV_IDEDMA_PCI $CONFIG_X86
 	 dep_bool '    Tekram TRM290 chipset support (EXPERIMENTAL)' CONFIG_BLK_DEV_TRM290 $CONFIG_BLK_DEV_IDEDMA_PCI
-	 dep_bool '    VIA82CXXX chipset support' CONFIG_BLK_DEV_VIA82CXXX $CONFIG_BLK_DEV_IDEDMA_PCI
+	 dep_bool '    VIA chipset support' CONFIG_BLK_DEV_VIA82CXXX $CONFIG_BLK_DEV_IDEDMA_PCI
       fi
 
       if [ "$CONFIG_PPC" = "y" -o "$CONFIG_ARM" = "y" ]; then
@@ -165,32 +160,6 @@ if [ "$CONFIG_BLK_DEV_TIVO" = "y" ]; then
   define_bool CONFIG_DMA_NONPCI y
 else
   define_bool CONFIG_DMA_NONPCI n
-fi
-
-if [ "$CONFIG_IDE_CHIPSETS" = "y" -o \
-     "$CONFIG_BLK_DEV_AEC62XX" = "y" -o \
-     "$CONFIG_BLK_DEV_ALI15X3" = "y" -o \
-     "$CONFIG_BLK_DEV_AMD74XX" = "y" -o \
-     "$CONFIG_BLK_DEV_CMD640" = "y" -o \
-     "$CONFIG_BLK_DEV_CMD64X" = "y" -o \
-     "$CONFIG_BLK_DEV_CS5530" = "y" -o \
-     "$CONFIG_BLK_DEV_CY82C693" = "y" -o \
-     "$CONFIG_BLK_DEV_HPT34X" = "y" -o \
-     "$CONFIG_BLK_DEV_HPT366" = "y" -o \
-     "$CONFIG_BLK_DEV_IDE_PMAC" = "y" -o \
-     "$CONFIG_BLK_DEV_OPTI621" = "y" -o \
-     "$CONFIG_BLK_DEV_SVWKS" = "y" -o \
-     "$CONFIG_BLK_DEV_PDC202XX" = "y" -o \
-     "$CONFIG_BLK_DEV_PIIX" = "y" -o \
-     "$CONFIG_BLK_DEV_IT8172" = "y" -o \
-     "$CONFIG_BLK_DEV_SIS5513" = "y" -o \
-     "$CONFIG_BLK_DEV_SLC90E66" = "y" -o \
-     "$CONFIG_BLK_DEV_SL82C105" = "y" -o \
-     "$CONFIG_BLK_DEV_VIA82CXXX" = "y" -o \
-     "$CONFIG_BLK_DEV_MPC8xx_IDE" = "y" ]; then
-   define_bool CONFIG_BLK_DEV_IDE_MODES y
-else
-   define_bool CONFIG_BLK_DEV_IDE_MODES n
 fi
 
 dep_tristate 'Support for IDE Raid controllers' CONFIG_BLK_DEV_ATARAID $CONFIG_BLK_DEV_IDE $CONFIG_EXPERIMENTAL

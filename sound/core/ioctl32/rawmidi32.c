@@ -70,11 +70,16 @@ DEFINE_ALSA_IOCTL(rawmidi_status);
 
 #define AP(x) snd_ioctl32_##x
 
+enum {
+	SNDRV_RAWMIDI_IOCTL_PARAMS32 = _IOWR('W', 0x10, struct sndrv_rawmidi_params32),
+	SNDRV_RAWMIDI_IOCTL_STATUS32 = _IOWR('W', 0x20, struct sndrv_rawmidi_status32),
+};
+
 struct ioctl32_mapper rawmidi_mappers[] = {
 	{ SNDRV_RAWMIDI_IOCTL_PVERSION, NULL },
 	{ SNDRV_RAWMIDI_IOCTL_INFO, NULL },
-	{ SNDRV_RAWMIDI_IOCTL_PARAMS, AP(rawmidi_params) },
-	{ SNDRV_RAWMIDI_IOCTL_STATUS, AP(rawmidi_status) },
+	{ SNDRV_RAWMIDI_IOCTL_PARAMS32, AP(rawmidi_params) },
+	{ SNDRV_RAWMIDI_IOCTL_STATUS32, AP(rawmidi_status) },
 	{ SNDRV_RAWMIDI_IOCTL_DROP, NULL },
 	{ SNDRV_RAWMIDI_IOCTL_DRAIN, NULL },
 

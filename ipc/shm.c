@@ -23,6 +23,7 @@
 #include <linux/file.h>
 #include <linux/mman.h>
 #include <linux/proc_fs.h>
+#include <linux/shmem_fs.h>
 #include <asm/uaccess.h>
 
 #include "util.h"

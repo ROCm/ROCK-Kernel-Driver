@@ -1073,7 +1073,7 @@ static void vfat_remove_entry(struct inode *dir,struct vfat_slot_info *sinfo,
 		if (fat_get_entry(dir, &offset, &bh, &de, &ino) < 0)
 			continue;
 		de->name[0] = DELETED_FLAG;
-		de->attr = 0;
+		de->attr = ATTR_NONE;
 		fat_mark_buffer_dirty(sb, bh);
 	}
 	if (bh) fat_brelse(sb, bh);

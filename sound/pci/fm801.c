@@ -1025,7 +1025,7 @@ static int __devinit snd_fm801_create(snd_card_t * card,
 static int __devinit snd_card_fm801_probe(struct pci_dev *pci,
 					  const struct pci_device_id *id)
 {
-	static int dev = 0;
+	static int dev;
 	snd_card_t *card;
 	fm801_t *chip;
 	opl3_t *opl3;

@@ -676,7 +676,7 @@ dbg( "digi_write_oob_command: TOP: port=%d, count=%d", oob_priv->dp_port_num, co
 		oob_port->write_urb->transfer_buffer_length = len;
 		oob_port->write_urb->dev = port->serial->dev;
 
-		if( (ret=usb_submit_urb(oob_port->write_urb, GFP_KERNEL)) == 0 ) {
+		if( (ret=usb_submit_urb(oob_port->write_urb, GFP_ATOMIC)) == 0 ) {
 			oob_priv->dp_write_urb_in_use = 1;
 			count -= len;
 			buf += len;
@@ -764,7 +764,7 @@ count );
 		}
 		port->write_urb->dev = port->serial->dev;
 
-		if( (ret=usb_submit_urb(port->write_urb, GFP_KERNEL)) == 0 ) {
+		if( (ret=usb_submit_urb(port->write_urb, GFP_ATOMIC)) == 0 ) {
 			priv->dp_write_urb_in_use = 1;
 			priv->dp_out_buf_len = 0;
 			count -= len;
@@ -841,7 +841,7 @@ port_priv->dp_port_num, modem_signals );
 	oob_port->write_urb->transfer_buffer_length = 8;
 	oob_port->write_urb->dev = port->serial->dev;
 
-	if( (ret=usb_submit_urb(oob_port->write_urb, GFP_KERNEL)) == 0 ) {
+	if( (ret=usb_submit_urb(oob_port->write_urb, GFP_ATOMIC)) == 0 ) {
 		oob_priv->dp_write_urb_in_use = 1;
 		port_priv->dp_modem_signals =
 			(port_priv->dp_modem_signals&~(TIOCM_DTR|TIOCM_RTS))
@@ -962,7 +962,7 @@ dbg( "digi_rx_unthrottle: TOP: port=%d", priv->dp_port_num );
 	/* restart read chain */
 	if( priv->dp_throttle_restart ) {
 		port->read_urb->dev = port->serial->dev;
-		ret = usb_submit_urb( port->read_urb, GFP_KERNEL );
+		ret = usb_submit_urb( port->read_urb, GFP_ATOMIC );
 	}
 
 	/* turn throttle off */
@@ -1323,7 +1323,7 @@ priv->dp_port_num, count, from_user, in_interrupt() );
 	/* copy in new data */
 	memcpy( data, from_user ? user_buf : buf, new_len );
 
-	if( (ret=usb_submit_urb(port->write_urb, GFP_KERNEL)) == 0 ) {
+	if( (ret=usb_submit_urb(port->write_urb, GFP_ATOMIC)) == 0 ) {
 		priv->dp_write_urb_in_use = 1;
 		ret = new_len;
 		priv->dp_out_buf_len = 0;
@@ -1399,7 +1399,7 @@ dbg( "digi_write_bulk_callback: TOP, urb->status=%d", urb->status );
 		memcpy( port->write_urb->transfer_buffer+2, priv->dp_out_buf,
 			priv->dp_out_buf_len );
 
-		if( (ret=usb_submit_urb(port->write_urb, GFP_KERNEL)) == 0 ) {
+		if( (ret=usb_submit_urb(port->write_urb, GFP_ATOMIC)) == 0 ) {
 			priv->dp_write_urb_in_use = 1;
 			priv->dp_out_buf_len = 0;
 		}
@@ -1837,7 +1837,7 @@ dbg( "digi_read_bulk_callback: TOP" );
 
 	/* continue read */
 	urb->dev = port->serial->dev;
-	if( (ret=usb_submit_urb(urb, GFP_KERNEL)) != 0 ) {
+	if( (ret=usb_submit_urb(urb, GFP_ATOMIC)) != 0 ) {
 		err( __FUNCTION__ ": failed resubmitting urb, ret=%d, port=%d",
 			ret, priv->dp_port_num );
 	}

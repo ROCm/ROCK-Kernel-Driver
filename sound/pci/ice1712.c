@@ -98,6 +98,7 @@ MODULE_PARM_SYNTAX(snd_omni, SNDRV_ENABLED "," SNDRV_ENABLE_DESC);
 #define ICE1712_SUBDEVICE_DELTA66	0x121432d6
 #define ICE1712_SUBDEVICE_DELTA44	0x121433d6
 #define ICE1712_SUBDEVICE_AUDIOPHILE	0x121434d6
+#define ICE1712_SUBDEVICE_DELTA1010LT	0x12143bd6
 #define ICE1712_SUBDEVICE_EWX2496	0x3b153011
 #define ICE1712_SUBDEVICE_EWS88MT	0x3b151511
 #define ICE1712_SUBDEVICE_EWS88D	0x3b152b11
@@ -4196,7 +4197,7 @@ static int __devinit snd_ice1712_create(snd_card_t * card,
 static int __devinit snd_ice1712_probe(struct pci_dev *pci,
 				       const struct pci_device_id *id)
 {
-	static int dev = 0;
+	static int dev;
 	snd_card_t *card;
 	ice1712_t *ice;
 	int pcm_dev = 0, err;
@@ -4265,6 +4266,9 @@ static int __devinit snd_ice1712_probe(struct pci_dev *pci,
 		goto __no_mpu401;
 	case ICE1712_SUBDEVICE_AUDIOPHILE:
 		strcpy(card->shortname, "M Audio Audiophile 24/96");
+		break;
+	case ICE1712_SUBDEVICE_DELTA1010LT:
+		strcpy(card->shortname, "M Audio Delta 1010LT");
 		break;
 	case ICE1712_SUBDEVICE_EWX2496:
 		strcpy(card->shortname, "TerraTec EWX 24/96");

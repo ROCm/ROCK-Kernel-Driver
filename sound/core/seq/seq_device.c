@@ -82,7 +82,7 @@ struct ops_list {
 
 
 static LIST_HEAD(opslist);
-static int num_ops = 0;
+static int num_ops;
 static DECLARE_MUTEX(ops_mutex);
 static snd_info_entry_t *info_entry = NULL;
 

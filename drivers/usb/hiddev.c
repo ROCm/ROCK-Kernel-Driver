@@ -50,9 +50,10 @@ struct hiddev {
 };
 
 struct hiddev_list {
-	struct hiddev_event buffer[HIDDEV_BUFFER_SIZE];
+	struct hiddev_usage_ref buffer[HIDDEV_BUFFER_SIZE];
 	int head;
 	int tail;
+	unsigned flags;
 	struct fasync_struct *fasync;
 	struct hiddev *hiddev;
 	struct hiddev_list *next;
@@ -146,17 +147,19 @@ hiddev_lookup_usage(struct hid_device *hid, struct hiddev_usage_ref *uref)
  * This is where hid.c calls into hiddev to pass an event that occurred over
  * the interrupt pipe
  */
-void hiddev_hid_event(struct hid_device *hid, unsigned int usage, int value)
+void hiddev_hid_event(struct hid_device *hid, struct hiddev_usage_ref *uref)
 {
 	struct hiddev *hiddev = hid->hiddev;
 	struct hiddev_list *list = hiddev->list;
 
 	while (list) {
-		list->buffer[list->head].hid = usage;
-		list->buffer[list->head].value = value;
-		list->head = (list->head + 1) & (HIDDEV_BUFFER_SIZE - 1);
-
-		kill_fasync(&list->fasync, SIGIO, POLL_IN);
+		if (uref->field_index != HID_FIELD_INDEX_NONE ||
+		    (list->flags & HIDDEV_FLAG_REPORT) != 0) {
+			list->buffer[list->head] = *uref;
+			list->head = (list->head + 1) & 
+				(HIDDEV_BUFFER_SIZE - 1);
+			kill_fasync(&list->fasync, SIGIO, POLL_IN);
+		}
 
 		list = list->next;
 	}
@@ -257,43 +260,67 @@ static ssize_t hiddev_read(struct file * file, char * buffer, size_t count,
 {
 	DECLARE_WAITQUEUE(wait, current);
 	struct hiddev_list *list = file->private_data;
+	int event_size;
 	int retval = 0;
 
-	if (list->head == list->tail) {
+	event_size = ((list->flags & HIDDEV_FLAG_UREF) != 0) ?
+		sizeof(struct hiddev_usage_ref) : sizeof(struct hiddev_event);
 
-		add_wait_queue(&list->hiddev->wait, &wait);
-		set_current_state(TASK_INTERRUPTIBLE);
+	if (count < event_size) return 0;
 
-		while (list->head == list->tail) {
-
-			if (file->f_flags & O_NONBLOCK) {
-				retval = -EAGAIN;
-				break;
+	while (retval == 0) {
+		if (list->head == list->tail) {
+			add_wait_queue(&list->hiddev->wait, &wait);
+			set_current_state(TASK_INTERRUPTIBLE);
+			
+			while (list->head == list->tail) {
+				if (file->f_flags & O_NONBLOCK) {
+					retval = -EAGAIN;
+					break;
+				}
+				if (signal_pending(current)) {
+					retval = -ERESTARTSYS;
+					break;
+				}
+				if (!list->hiddev->exist) {
+					retval = -EIO;
+					break;
+				}
+				
+				schedule();
 			}
-			if (signal_pending(current)) {
-				retval = -ERESTARTSYS;
-				break;
-			}
-			if (!list->hiddev->exist) {
-				retval = -EIO;
-				break;
-			}
 
-			schedule();
+			set_current_state(TASK_RUNNING);
+			remove_wait_queue(&list->hiddev->wait, &wait);
 		}
 
-		set_current_state(TASK_RUNNING);
-		remove_wait_queue(&list->hiddev->wait, &wait);
-	}
+		if (retval)
+			return retval;
 
-	if (retval)
-		return retval;
 
-	while (list->head != list->tail && retval + sizeof(struct hiddev_event) <= count) {
-		if (copy_to_user(buffer + retval, list->buffer + list->tail,
-				 sizeof(struct hiddev_event))) return -EFAULT;
-		list->tail = (list->tail + 1) & (HIDDEV_BUFFER_SIZE - 1);
-		retval += sizeof(struct hiddev_event);
+		while (list->head != list->tail && 
+		       retval + event_size <= count) {
+			if ((list->flags & HIDDEV_FLAG_UREF) == 0) {
+				if (list->buffer[list->tail].field_index !=
+				    HID_FIELD_INDEX_NONE) {
+					struct hiddev_event event;
+					event.hid = list->buffer[list->tail].usage_code;
+					event.value = list->buffer[list->tail].value;
+					if (copy_to_user(buffer + retval, &event, sizeof(struct hiddev_event)))
+						return -EFAULT;
+					retval += sizeof(struct hiddev_event);
+				}
+			} else {
+				if (list->buffer[list->tail].field_index != HID_FIELD_INDEX_NONE ||
+				    (list->flags & HIDDEV_FLAG_REPORT) != 0) {
+					if (copy_to_user(buffer + retval, list->buffer + list->tail, sizeof(struct hiddev_usage_ref)))
+						return -EFAULT;
+					retval += sizeof(struct hiddev_usage_ref);
+				}
+			}
+			list->tail = (list->tail + 1) & (HIDDEV_BUFFER_SIZE - 1);
+		}
+
 	}
 
 	return retval;
@@ -357,6 +384,25 @@ static int hiddev_ioctl(struct inode *inode, struct file *file,
 		dinfo.num_applications = hid->maxapplication;
 		return copy_to_user((void *) arg, &dinfo, sizeof(dinfo));
 	}
+
+	case HIDIOCGFLAG:
+		return put_user(list->flags, (int *) arg);
+
+	case HIDIOCSFLAG:
+		{
+			int newflags;
+			if (get_user(newflags, (int *) arg))
+				return -EFAULT;
+
+			if ((newflags & ~HIDDEV_FLAGS) != 0 ||
+			    ((newflags & HIDDEV_FLAG_REPORT) != 0 &&
+			     (newflags & HIDDEV_FLAG_UREF) == 0))
+				return -EINVAL;
+
+			list->flags = newflags;
+
+			return 0;
+		}
 
 	case HIDIOCGSTRING:
 		{

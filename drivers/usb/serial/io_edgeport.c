@@ -790,7 +790,7 @@ static void edge_interrupt_callback (struct urb *urb)
 
 					/* we have pending bytes on the bulk in pipe, send a request */
 					edge_serial->read_urb->dev = edge_serial->serial->dev;
-					result = usb_submit_urb(edge_serial->read_urb, GFP_KERNEL);
+					result = usb_submit_urb(edge_serial->read_urb, GFP_ATOMIC);
 					if (result) {
 						dbg(__FUNCTION__" - usb_submit_urb(read bulk) failed with result = %d", result);
 					}
@@ -867,7 +867,7 @@ static void edge_bulk_in_callback (struct urb *urb)
 
 			/* there is, so resubmit our urb */
 			edge_serial->read_urb->dev = edge_serial->serial->dev;
-			status = usb_submit_urb(edge_serial->read_urb, GFP_KERNEL);
+			status = usb_submit_urb(edge_serial->read_urb, GFP_ATOMIC);
 			if (status) {
 				err(__FUNCTION__" - usb_submit_urb(read bulk) failed, status = %d", status);
 			}
@@ -1435,7 +1435,7 @@ static void send_more_port_data(struct edgeport_serial *edge_serial, struct edge
 
 	/* build the data header for the buffer and port that we are about to send out */
 	count = fifo->count;
-	buffer = kmalloc (count+2, GFP_KERNEL);
+	buffer = kmalloc (count+2, GFP_ATOMIC);
 	if (buffer == NULL) {
 		err(__FUNCTION__" - no more kernel memory...");
 		edge_port->write_in_progress = FALSE;
@@ -1474,7 +1474,7 @@ static void send_more_port_data(struct edgeport_serial *edge_serial, struct edge
 	urb->transfer_flags |= USB_QUEUE_BULK;
 
 	urb->dev = edge_serial->serial->dev;
-	status = usb_submit_urb(urb, GFP_KERNEL);
+	status = usb_submit_urb(urb, GFP_ATOMIC);
 	if (status) {
 		/* something went wrong */
 		dbg(__FUNCTION__" - usb_submit_urb(write bulk) failed");
@@ -2431,7 +2431,7 @@ static int send_iosp_ext_cmd (struct edgeport_port *edge_port, __u8 command, __u
 
 	dbg(__FUNCTION__" - %d, %d", command, param);
 
-	buffer =  kmalloc (10, GFP_KERNEL);
+	buffer =  kmalloc (10, GFP_ATOMIC);
 	if (!buffer) {
 		err(__FUNCTION__" - kmalloc(%d) failed.\n", 10);
 		return -ENOMEM;
@@ -2467,7 +2467,7 @@ static int write_cmd_usb (struct edgeport_port *edge_port, unsigned char *buffer
 	usb_serial_debug_data (__FILE__, __FUNCTION__, length, buffer);
 
 	/* Allocate our next urb */
-	urb = usb_alloc_urb (0, GFP_KERNEL);
+	urb = usb_alloc_urb (0, GFP_ATOMIC);
 	if (!urb)
 		return -ENOMEM;
 
@@ -2482,7 +2482,7 @@ static int write_cmd_usb (struct edgeport_port *edge_port, unsigned char *buffer
 	urb->transfer_flags |= USB_QUEUE_BULK;
 
 	edge_port->commandPending = TRUE;
-	status = usb_submit_urb(urb, GFP_KERNEL);
+	status = usb_submit_urb(urb, GFP_ATOMIC);
 
 	if (status) {
 		/* something went wrong */
@@ -2532,7 +2532,7 @@ static int send_cmd_write_baud_rate (struct edgeport_port *edge_port, int baudRa
 	}
 
 	// Alloc memory for the string of commands.
-	cmdBuffer =  kmalloc (0x100, GFP_KERNEL);
+	cmdBuffer =  kmalloc (0x100, GFP_ATOMIC);
 	if (!cmdBuffer) {
 		err(__FUNCTION__" - kmalloc(%d) failed.\n", 0x100);
 		return -ENOMEM;
@@ -2618,7 +2618,7 @@ static int send_cmd_write_uart_register (struct edgeport_port *edge_port, __u8 r
 	dbg (__FUNCTION__" - write to %s register 0x%02x", (regNum == MCR) ? "MCR" : "LCR", regValue);
 
 	// Alloc memory for the string of commands.
-	cmdBuffer = kmalloc (0x10, GFP_KERNEL);
+	cmdBuffer = kmalloc (0x10, GFP_ATOMIC);
 	if (cmdBuffer == NULL ) {
 		return -ENOMEM;
 	}

@@ -24,9 +24,6 @@
 #include "seq_prioq.h"
 #include "seq_timer.h"
 #include "seq_lock.h"
-#ifdef SNDRV_SEQ_SYNC_SUPPORT
-#include "seq_sync.h"
-#endif
 #include <linux/interrupt.h>
 #include <linux/list.h>
 
@@ -61,16 +58,6 @@ struct _snd_seq_queue {
 	snd_use_lock_t use_lock;
 
 	struct tasklet_struct taskq;
-
-#ifdef SNDRV_SEQ_SYNC_SUPPORT
-	struct list_head master_head;	/* list of masters */
-	queue_sync_t slave;		/* slave (exclusive) */
-
-	rwlock_t master_lock;
-	rwlock_t slave_lock;
-
-	snd_seq_addr_t sync_port;	/* address of the attached sync port */
-#endif
 };
 
 

@@ -35,15 +35,8 @@
 #include <sound/initval.h>
 
 #ifndef LINUX_2_2
-#if defined(CONFIG_INPUT_GAMEPORT) || defined(CONFIG_INPUT_GAMEPORT_MODULE)
-#define HAVE_GAMEPORT_SUPPORT
-#endif
-#endif
-
-#ifdef HAVE_GAMEPORT_SUPPORT
 #include <linux/gameport.h>
 #endif
-
 
 EXPORT_NO_SYMBOLS;
 
@@ -469,13 +462,6 @@ struct snd_cs4281_dma {
 	int frag;			/* period number */
 };
 
-#ifdef HAVE_GAMEPORT_SUPPORT
-typedef struct snd_cs4281_gameport {
-	struct gameport info;
-	cs4281_t *chip;
-} cs4281_gameport_t;
-#endif
-
 struct snd_cs4281 {
 	int irq;
 
@@ -513,9 +499,7 @@ struct snd_cs4281 {
 	unsigned int uartm;
 	snd_info_entry_t *proc_entry;
 
-#ifdef HAVE_GAMEPORT_SUPPORT
-	cs4281_gameport_t *gameport;
-#endif
+	struct snd_cs4281_gameport *gameport;
 };
 
 static void snd_cs4281_interrupt(int irq, void *dev_id, struct pt_regs *regs);
@@ -1192,12 +1176,109 @@ static void snd_cs4281_proc_done(cs4281_t * chip)
 }
 
 /*
+ * joystick support
+ */
+
+#ifndef LINUX_2_2
+
+typedef struct snd_cs4281_gameport {
+	struct gameport info;
+	cs4281_t *chip;
+} cs4281_gameport_t;
+
+static void snd_cs4281_gameport_trigger(struct gameport *gameport)
+{
+	cs4281_gameport_t *gp = (cs4281_gameport_t *)gameport;
+	cs4281_t *chip;
+	snd_assert(gp, return);
+	chip = snd_magic_cast(cs4281_t, gp->chip, return);
+	snd_cs4281_pokeBA0(chip, BA0_JSPT, 0xff);
+}
+
+static unsigned char snd_cs4281_gameport_read(struct gameport *gameport)
+{
+	cs4281_gameport_t *gp = (cs4281_gameport_t *)gameport;
+	cs4281_t *chip;
+	snd_assert(gp, return 0);
+	chip = snd_magic_cast(cs4281_t, gp->chip, return 0);
+	return snd_cs4281_peekBA0(chip, BA0_JSPT);
+}
+
+#ifdef COOKED_MODE
+static int snd_cs4281_gameport_cooked_read(struct gameport *gameport, int *axes, int *buttons)
+{
+	cs4281_gameport_t *gp = (cs4281_gameport_t *)gameport;
+	cs4281_t *chip;
+	unsigned js1, js2, jst;
+	
+	snd_assert(gp, return 0);
+	chip = snd_magic_cast(cs4281_t, gp->chip, return 0);
+
+	js1 = snd_cs4281_peekBA0(chip, BA0_JSC1);
+	js2 = snd_cs4281_peekBA0(chip, BA0_JSC2);
+	jst = snd_cs4281_peekBA0(chip, BA0_JSPT);
+	
+	*buttons = (~jst >> 4) & 0x0F; 
+	
+	axes[0] = ((js1 & JSC1_Y1V_MASK) >> JSC1_Y1V_SHIFT) & 0xFFFF;
+	axes[1] = ((js1 & JSC1_X1V_MASK) >> JSC1_X1V_SHIFT) & 0xFFFF;
+	axes[2] = ((js2 & JSC2_Y2V_MASK) >> JSC2_Y2V_SHIFT) & 0xFFFF;
+	axes[3] = ((js2 & JSC2_X2V_MASK) >> JSC2_X2V_SHIFT) & 0xFFFF;
+
+	for(jst=0;jst<4;++jst)
+		if(axes[jst]==0xFFFF) axes[jst] = -1;
+	return 0;
+}
+#endif
+
+static int snd_cs4281_gameport_open(struct gameport *gameport, int mode)
+{
+	switch (mode) {
+#ifdef COOKED_MODE
+	case GAMEPORT_MODE_COOKED:
+		return 0;
+#endif
+	case GAMEPORT_MODE_RAW:
+		return 0;
+	default:
+		return -1;
+	}
+	return 0;
+}
+
+static void __devinit snd_cs4281_gameport(cs4281_t *chip)
+{
+	cs4281_gameport_t *gp;
+	gp = kmalloc(sizeof(*gp), GFP_KERNEL);
+	if (! gp) {
+		snd_printk("cannot allocate gameport area\n");
+		return;
+	}
+	memset(gp, 0, sizeof(*gp));
+	gp->info.open = snd_cs4281_gameport_open;
+	gp->info.read = snd_cs4281_gameport_read;
+	gp->info.trigger = snd_cs4281_gameport_trigger;
+#ifdef COOKED_MODE
+	gp->info.cooked_read = snd_cs4281_gameport_cooked_read;
+#endif
+	gp->chip = chip;
+	chip->gameport = gp;
+
+	snd_cs4281_pokeBA0(chip, BA0_JSIO, 0xFF); // ?
+	snd_cs4281_pokeBA0(chip, BA0_JSCTL, JSCTL_SP_MEDIUM_SLOW);
+	gameport_register_port(&gp->info);
+}
+
+#endif /* !LINUX_2_2 */
+
+
+/*
 
  */
 
 static int snd_cs4281_free(cs4281_t *chip)
 {
-#ifdef HAVE_GAMEPORT_SUPPORT
+#ifndef LINUX_2_2
 	if (chip->gameport) {
 		gameport_unregister_port(&chip->gameport->info);
 		kfree(chip->gameport);
@@ -1733,100 +1814,11 @@ static void snd_cs4281_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	snd_cs4281_pokeBA0(chip, BA0_HICR, BA0_HICR_EOI);
 }
 
-#ifdef HAVE_GAMEPORT_SUPPORT
-/*
- * joystick support
- */
-static void snd_cs4281_gameport_trigger(struct gameport *gameport)
-{
-	cs4281_gameport_t *gp = (cs4281_gameport_t *)gameport;
-	cs4281_t *chip;
-	snd_assert(gp, return);
-	chip = snd_magic_cast(cs4281_t, gp->chip, return);
-	snd_cs4281_pokeBA0(chip, BA0_JSPT, 0xff);
-}
-
-static unsigned char snd_cs4281_gameport_read(struct gameport *gameport)
-{
-	cs4281_gameport_t *gp = (cs4281_gameport_t *)gameport;
-	cs4281_t *chip;
-	snd_assert(gp, return 0);
-	chip = snd_magic_cast(cs4281_t, gp->chip, return 0);
-	return snd_cs4281_peekBA0(chip, BA0_JSPT);
-}
-
-#ifdef COOKED_MODE
-static int snd_cs4281_gameport_cooked_read(struct gameport *gameport, int *axes, int *buttons)
-{
-	cs4281_gameport_t *gp = (cs4281_gameport_t *)gameport;
-	cs4281_t *chip;
-	unsigned js1, js2, jst;
-	
-	snd_assert(gp, return);
-	chip = snd_magic_cast(cs4281_t, gp->chip, return);
-
-	js1 = snd_cs4281_peekBA0(chip, BA0_JSC1);
-	js2 = snd_cs4281_peekBA0(chip, BA0_JSC2);
-	jst = snd_cs4281_peekBA0(chip, BA0_JSPT);
-	
-	*buttons = (~jst >> 4) & 0x0F; 
-	
-	axes[0] = ((js1 & JSC1_Y1V_MASK) >> JSC1_Y1V_SHIFT) & 0xFFFF;
-	axes[1] = ((js1 & JSC1_X1V_MASK) >> JSC1_X1V_SHIFT) & 0xFFFF;
-	axes[2] = ((js2 & JSC2_Y2V_MASK) >> JSC2_Y2V_SHIFT) & 0xFFFF;
-	axes[3] = ((js2 & JSC2_X2V_MASK) >> JSC2_X2V_SHIFT) & 0xFFFF;
-
-	for(jst=0;jst<4;++jst)
-		if(axes[jst]==0xFFFF) axes[jst] = -1;
-	return 0;
-}
-#endif
-
-static int snd_cs4281_gameport_open(struct gameport *gameport, int mode)
-{
-	switch (mode) {
-#ifdef COOKED_MODE
-	case GAMEPORT_MODE_COOKED:
-		return 0;
-#endif
-	case GAMEPORT_MODE_RAW:
-		return 0;
-	default:
-		return -1;
-	}
-	return 0;
-}
-
-static void __devinit snd_cs4281_gameport(cs4281_t *chip)
-{
-	cs4281_gameport_t *gp;
-	gp = kmalloc(sizeof(*gp), GFP_KERNEL);
-	if (! gp) {
-		snd_printk("cannot allocate gameport area\n");
-		return;
-	}
-	memset(gp, 0, sizeof(*gp));
-	gp->info.open = snd_cs4281_gameport_open;
-	gp->info.read = snd_cs4281_gameport_read;
-	gp->info.trigger = snd_cs4281_gameport_trigger;
-#ifdef COOKED_MODE
-	gp->info.cooked_read = snd_cs4281_gameport_cooked_read;
-#endif
-	gp->chip = chip;
-	chip->gameport = gp;
-
-	snd_cs4281_pokeBA0(chip, BA0_JSIO, 0xFF); // ?
-	snd_cs4281_pokeBA0(chip, BA0_JSCTL, JSCTL_SP_MEDIUM_SLOW);
-	gameport_register_port(&gp->info);
-}
-
-#endif /* HAVE_GAMEPORT_SUPPORT */
-
 
 static int __devinit snd_cs4281_probe(struct pci_dev *pci,
 				      const struct pci_device_id *id)
 {
-	static int dev = 0;
+	static int dev;
 	snd_card_t *card;
 	cs4281_t *chip;
 	opl3_t *opl3;
@@ -1871,7 +1863,7 @@ static int __devinit snd_cs4281_probe(struct pci_dev *pci,
 		snd_card_free(card);
 		return err;
 	}
-#ifdef HAVE_GAMEPORT_SUPPORT
+#ifndef LINUX_2_2
 	snd_cs4281_gameport(chip);
 #endif
 	strcpy(card->driver, "CS4281");

@@ -1697,6 +1697,9 @@ struct _snd_cs46xx {
 	struct pci_dev *acpi_dev;
 	int acpi_port;
 	snd_kcontrol_t *eapd_switch; /* for amplifier hack */
+	int accept_valid;	/* accept mmap valid (for OSS) */
+
+	struct snd_cs46xx_gameport *gameport;
 
 #ifdef CONFIG_PM
 	struct pm_dev *pm_dev;
@@ -1711,6 +1714,7 @@ int snd_cs46xx_create(snd_card_t *card,
 int snd_cs46xx_pcm(cs46xx_t *chip, int device, snd_pcm_t **rpcm);
 int snd_cs46xx_mixer(cs46xx_t *chip);
 int snd_cs46xx_midi(cs46xx_t *chip, int device, snd_rawmidi_t **rmidi);
+void snd_cs46xx_gameport(cs46xx_t *chip);
 
 #ifdef CONFIG_PM
 void snd_cs46xx_suspend(cs46xx_t *chip);
