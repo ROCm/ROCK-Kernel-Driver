@@ -228,12 +228,12 @@ struct net_device * __init mac8390_probe(int unit)
 	volatile unsigned short *i;
 	int version_disp = 0;
 	struct nubus_dev * ndev = NULL;
-	static int probed;
-	int err = -ENDOEV;
+	int err = -ENODEV;
 	
 	struct nubus_dir dir;
 	struct nubus_dirent ent;
 	int offset;
+	static unsigned int slots;
 
 	enum mac8390_type cardtype;
 
@@ -379,7 +379,7 @@ out1:
 	dev->priv = NULL;
 out:
 	free_netdev(dev);
-	return ERR_PTE(err);
+	return ERR_PTR(err);
 }
 
 #ifdef MODULE

@@ -737,7 +737,7 @@ static int __init a2065_probe(void)
 			continue;
 		}
 
-		dev = alloc_etherdev(0, sizeof(struct lance_private));
+		dev = alloc_etherdev(sizeof(struct lance_private));
 
 		if (dev == NULL) {
 			release_resource(r1);
