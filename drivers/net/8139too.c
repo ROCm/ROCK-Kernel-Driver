@@ -462,7 +462,7 @@ enum RxConfigBits {
 
 
 /* Twister tuning parameters from RealTek.
-   Completely undocumented, but required to tune bad links. */
+   Completely undocumented, but required to tune bad links on some boards. */
 enum CSCRBits {
 	CSCR_LinkOKBit = 0x0400,
 	CSCR_LinkChangeBit = 0x0800,
@@ -477,16 +477,22 @@ enum Cfg9346Bits {
 	Cfg9346_Unlock = 0xC0,
 };
 
+#ifdef CONFIG_8139TOO_TUNE_TWISTER
 
-#define PARA78_default	0x78fa8388
-#define PARA7c_default	0xcb38de43	/* param[0][3] */
-#define PARA7c_xxx		0xcb38de43
+enum TwisterParamVals {
+	PARA78_default	= 0x78fa8388,
+	PARA7c_default	= 0xcb38de43,	/* param[0][3] */
+	PARA7c_xxx	= 0xcb38de43,
+};
+
 static const unsigned long param[4][4] = {
 	{0xcb39de43, 0xcb39ce43, 0xfb38de03, 0xcb38de43},
 	{0xcb39de43, 0xcb39ce43, 0xcb39ce83, 0xcb39ce83},
 	{0xcb39de43, 0xcb39ce43, 0xcb39ce83, 0xcb39ce83},
 	{0xbb39de43, 0xbb39ce43, 0xbb39ce83, 0xbb39ce83}
 };
+
+#endif /* CONFIG_8139TOO_TUNE_TWISTER */
 
 typedef enum {
 	CH_8139 = 0,
@@ -1302,7 +1308,7 @@ static int rtl8139_open (struct net_device *dev)
 
 	tp->mii.full_duplex = tp->mii.duplex_lock;
 	tp->tx_flag = (TX_FIFO_THRESH << 11) & 0x003f0000;
-	tp->twistie = 1;
+	tp->twistie = (tp->chipset == CH_8139_K) ? 1 : 0;
 	tp->time_to_die = 0;
 
 	rtl8139_init_ring (dev);
