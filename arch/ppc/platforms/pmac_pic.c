@@ -34,6 +34,7 @@
 #include <asm/time.h>
 #include <asm/open_pic.h>
 #include <asm/xmon.h>
+#include <asm/pmac_feature.h>
 
 #include "pmac_pic.h"
 
@@ -363,32 +364,76 @@ static int __init enable_second_ohare(void)
 	return irqctrler->intrs[0].line;
 }
 
-void __init
-pmac_pic_init(void)
+#ifdef CONFIG_POWER4
+static irqreturn_t k2u3_action(int cpl, void *dev_id, struct pt_regs *regs)
+{
+	int irq;
+
+	irq = openpic2_get_irq(regs);
+	if (irq != -1)
+		ppc_irq_dispatch_handler(regs, irq);
+	return IRQ_HANDLED;
+}
+#endif /* CONFIG_POWER4 */
+
+void __init pmac_pic_init(void)
 {
         int i;
-        struct device_node *irqctrler;
+        struct device_node *irqctrler  = NULL;
+        struct device_node *irqctrler2 = NULL;
+	struct device_node *np;
         unsigned long addr;
 	int irq_cascade = -1;
 
 	/* We first try to detect Apple's new Core99 chipset, since mac-io
 	 * is quite different on those machines and contains an IBM MPIC2.
 	 */
-	irqctrler = find_type_devices("open-pic");
+	np = find_type_devices("open-pic");
+	while(np) {
+		if (np->parent && !strcmp(np->parent->name, "u3"))
+			irqctrler2 = np;
+		else
+			irqctrler = np;
+		np = np->next;
+	}
 	if (irqctrler != NULL)
 	{
-		printk("PowerMac using OpenPIC irq controller\n");
 		if (irqctrler->n_addrs > 0)
 		{
-			unsigned char senses[NR_IRQS];
+			unsigned char senses[128];
 
-			prom_get_irq_senses(senses, 0, NR_IRQS);
+			printk(KERN_INFO "PowerMac using OpenPIC irq controller at 0x%08x\n",
+			       irqctrler->addrs[0].address);
+
+			prom_get_irq_senses(senses, 0, 128);
 			OpenPIC_InitSenses = senses;
-			OpenPIC_NumInitSenses = NR_IRQS;
+			OpenPIC_NumInitSenses = 128;
 			ppc_md.get_irq = openpic_get_irq;
+			pmac_call_feature(PMAC_FTR_ENABLE_MPIC, irqctrler, 0, 0);
 			OpenPIC_Addr = ioremap(irqctrler->addrs[0].address,
 					       irqctrler->addrs[0].size);
 			openpic_init(0);
+
+#ifdef CONFIG_POWER4
+			if (irqctrler2 != NULL && irqctrler2->n_intrs > 0 &&
+			    irqctrler2->n_addrs > 0) {
+				printk(KERN_INFO "Slave OpenPIC at 0x%08x hooked on IRQ %d\n",
+				       irqctrler2->addrs[0].address,
+				       irqctrler2->intrs[0].line);
+				pmac_call_feature(PMAC_FTR_ENABLE_MPIC, irqctrler2, 0, 0);
+				OpenPIC2_Addr = ioremap(irqctrler2->addrs[0].address,
+							irqctrler2->addrs[0].size);
+				prom_get_irq_senses(senses, PMAC_OPENPIC2_OFFSET,
+						    PMAC_OPENPIC2_OFFSET+128);
+				OpenPIC_InitSenses = senses;
+				OpenPIC_NumInitSenses = 128;
+				openpic2_init(PMAC_OPENPIC2_OFFSET);
+				if (request_irq(irqctrler2->intrs[0].line, k2u3_action, 0,
+						"U3->K2 Cascade", NULL))
+					printk("Unable to get OpenPIC IRQ for cascade\n");
+			}
+#endif /* CONFIG_POWER4 */
+
 #ifdef CONFIG_XMON
 			{
 				struct device_node* pswitch;
