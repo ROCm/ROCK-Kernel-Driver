@@ -1,7 +1,7 @@
 /*
  * Architecture-specific setup.
  *
- * Copyright (C) 1998-2001, 2003 Hewlett-Packard Co
+ * Copyright (C) 1998-2001, 2003-2004 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  *	Stephane Eranian <eranian@hpl.hp.com>
  * Copyright (C) 2000, Rohit Seth <rohit.seth@intel.com>
@@ -312,7 +312,28 @@ setup_arch (char **cmdline_p)
 	io_port_init();
 
 #ifdef CONFIG_IA64_GENERIC
-	machvec_init(acpi_get_sysname());
+	{
+		const char *mvec_name = strstr (*cmdline_p, "machvec=");
+		char str[64];
+
+		if (mvec_name) {
+			const char *end;
+			size_t len;
+
+			mvec_name += 8;
+			end = strchr (mvec_name, ' ');
+			if (end)
+				len = end - mvec_name;
+			else
+				len = strlen (mvec_name);
+			len = min(len, sizeof (str) - 1);
+			strncpy (str, mvec_name, len);
+			str[len] = '\0';
+			mvec_name = str;
+		} else
+			mvec_name = acpi_get_sysname();
+		machvec_init(mvec_name);
+	}
 #endif
 
 	if (early_console_setup(*cmdline_p) == 0)

@@ -61,11 +61,12 @@ config IA64_GENERIC
 	  will run on any supported IA-64 system.  However, if you configure
 	  a kernel for your specific system, it will be faster and smaller.
 
-	  generic	 For any supported IA-64 system
-	  DIG-compliant	 For DIG ("Developer's Interface Guide") compliant systems
-	  HP-zx1/sx1000	 For HP systems
-	  SGI-SN2	 For SGI Altix systems
-	  Ski-simulator  For the HP simulator <http://www.hpl.hp.com/research/linux/ski/>
+	  generic		For any supported IA-64 system
+	  DIG-compliant		For DIG ("Developer's Interface Guide") compliant systems
+	  HP-zx1/sx1000		For HP systems
+	  HP-zx1/sx1000+swiotlb	For HP systems with (broken) DMA-constrained devices.
+	  SGI-SN2		For SGI Altix systems
+	  Ski-simulator		For the HP simulator <http://www.hpl.hp.com/research/linux/ski/>
 
 	  If you don't know what to do, choose "generic".
 
@@ -77,6 +78,15 @@ config IA64_HP_ZX1
 	help
 	  Build a kernel that runs on HP zx1 and sx1000 systems.  This adds
 	  support for the HP I/O MMU.
+
+config IA64_HP_ZX1_SWIOTLB
+	bool "HP-zx1/sx1000 with software I/O TLB"
+	help
+	  Build a kernel that runs on HP zx1 and sx1000 systems even when they
+	  have broken PCI devices which cannot DMA to full 32 bits.  Apart
+	  from support for the HP I/O MMU, this includes support for the software
+	  I/O TLB, which allows supporting the broken devices at the expense of
+	  wasting some kernel memory (about 2MB by default).
 
 config IA64_SGI_SN2
 	bool "SGI-SN2"
@@ -188,7 +198,7 @@ config HOLES_IN_ZONE
 
 config DISCONTIGMEM
 	bool "Discontiguous memory support"
-	depends on (IA64_DIG || IA64_SGI_SN2 || IA64_GENERIC || IA64_HP_ZX1) && NUMA && VIRTUAL_MEM_MAP
+	depends on (IA64_DIG || IA64_SGI_SN2 || IA64_GENERIC || IA64_HP_ZX1 || IA64_HP_ZX1_SWIOTLB) && NUMA && VIRTUAL_MEM_MAP
 	default y if (IA64_SGI_SN2 || IA64_GENERIC) && NUMA
 	help
 	  Say Y to support efficient handling of discontiguous physical memory,
@@ -326,7 +336,7 @@ menu "Power management and ACPI"
 
 config PM
 	bool "Power Management support"
-	depends on IA64_GENERIC || IA64_DIG || IA64_HP_ZX1
+	depends on IA64_GENERIC || IA64_DIG || IA64_HP_ZX1 || IA64_HP_ZX1_SWIOTLB
 	default y
 	help
 	  "Power Management" means that parts of your computer are shut
