@@ -1,13 +1,13 @@
 /*
  * JFFS2 -- Journalling Flash File System, Version 2.
  *
- * Copyright (C) 2001, 2002 Red Hat, Inc.
+ * Copyright (C) 2001-2003 Red Hat, Inc.
  *
- * Created by David Woodhouse <dwmw2@cambridge.redhat.com>
+ * Created by David Woodhouse <dwmw2@redhat.com>
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: nodemgmt.c,v 1.94 2003/02/19 17:50:26 gleixner Exp $
+ * $Id: nodemgmt.c,v 1.102 2003/10/08 17:21:19 dwmw2 Exp $
  *
  */
 
@@ -43,12 +43,9 @@ static int jffs2_do_reserve_space(struct jffs2_sb_info *c,  uint32_t minsize, ui
 int jffs2_reserve_space(struct jffs2_sb_info *c, uint32_t minsize, uint32_t *ofs, uint32_t *len, int prio)
 {
 	int ret = -EAGAIN;
-	int blocksneeded = JFFS2_RESERVED_BLOCKS_WRITE;
+	int blocksneeded = c->resv_blocks_write;
 	/* align it */
 	minsize = PAD(minsize);
-
-	if (prio == ALLOC_DELETION)
-		blocksneeded = JFFS2_RESERVED_BLOCKS_DELETION;
 
 	D1(printk(KERN_DEBUG "jffs2_reserve_space(): Requested 0x%x bytes\n", minsize));
 	down(&c->alloc_sem);
@@ -63,8 +60,6 @@ int jffs2_reserve_space(struct jffs2_sb_info *c, uint32_t minsize, uint32_t *ofs
 			int ret;
 			uint32_t dirty, avail;
 
-			up(&c->alloc_sem);
-			
 			/* calculate real dirty size
 			 * dirty_size contains blocks on erase_pending_list
 			 * those blocks are counted in c->nr_erasing_blocks.
@@ -78,10 +73,16 @@ int jffs2_reserve_space(struct jffs2_sb_info *c, uint32_t minsize, uint32_t *ofs
 			 * of nodes.
 			 */
 			dirty = c->dirty_size + c->erasing_size - c->nr_erasing_blocks * c->sector_size + c->unchecked_size;
-			if (dirty < c->sector_size) {
-				D1(printk(KERN_DEBUG "dirty size 0x%08x + unchecked_size 0x%08x < sector size 0x%08x, returning -ENOSPC\n",
+			if (dirty < c->nospc_dirty_size) {
+				if (prio == ALLOC_DELETION && c->nr_free_blocks + c->nr_erasing_blocks >= c->resv_blocks_deletion) {
+					printk(KERN_NOTICE "jffs2_reserve_space(): Low on dirty space to GC, but it's a deletion. Allowing...\n");
+					break;
+				}
+				D1(printk(KERN_DEBUG "dirty size 0x%08x + unchecked_size 0x%08x < nospc_dirty_size 0x%08x, returning -ENOSPC\n",
 					  dirty, c->unchecked_size, c->sector_size));
+
 				spin_unlock(&c->erase_completion_lock);
+				up(&c->alloc_sem);
 				return -ENOSPC;
 			}
 			
@@ -96,12 +97,20 @@ int jffs2_reserve_space(struct jffs2_sb_info *c, uint32_t minsize, uint32_t *ofs
 			 */
 			avail = c->free_size + c->dirty_size + c->erasing_size + c->unchecked_size;
 			if ( (avail / c->sector_size) <= blocksneeded) {
+				if (prio == ALLOC_DELETION && c->nr_free_blocks + c->nr_erasing_blocks >= c->resv_blocks_deletion) {
+					printk(KERN_NOTICE "jffs2_reserve_space(): Low on possibly available space, but it's a deletion. Allowing...\n");
+					break;
+				}
+
 				D1(printk(KERN_DEBUG "max. available size 0x%08x  < blocksneeded * sector_size 0x%08x, returning -ENOSPC\n",
 					  avail, blocksneeded * c->sector_size));
 				spin_unlock(&c->erase_completion_lock);
+				up(&c->alloc_sem);
 				return -ENOSPC;
 			}
-			
+
+			up(&c->alloc_sem);
+
 			D1(printk(KERN_DEBUG "Triggering GC pass. nr_free_blocks %d, nr_erasing_blocks %d, free_size 0x%08x, dirty_size 0x%08x, wasted_size 0x%08x, used_size 0x%08x, erasing_size 0x%08x, bad_size 0x%08x (total 0x%08x of 0x%08x)\n",
 				  c->nr_free_blocks, c->nr_erasing_blocks, c->free_size, c->dirty_size, c->wasted_size, c->used_size, c->erasing_size, c->bad_size,
 				  c->free_size + c->dirty_size + c->wasted_size + c->used_size + c->erasing_size + c->bad_size, c->flash_size));
@@ -158,12 +167,13 @@ static int jffs2_do_reserve_space(struct jffs2_sb_info *c,  uint32_t minsize, ui
 	if (jeb && minsize > jeb->free_size) {
 		/* Skip the end of this block and file it as having some dirty space */
 		/* If there's a pending write to it, flush now */
-		if (c->wbuf_len) {
+		if (jffs2_wbuf_dirty(c)) {
 			spin_unlock(&c->erase_completion_lock);
 			D1(printk(KERN_DEBUG "jffs2_do_reserve_space: Flushing write buffer\n"));			    
-			jffs2_flush_wbuf(c, 1);
+			jffs2_flush_wbuf_pad(c);
 			spin_lock(&c->erase_completion_lock);
-			/* We know nobody's going to have changed nextblock. Just continue */
+			jeb = c->nextblock;
+			goto restart;
 		}
 		c->wasted_size += jeb->free_size;
 		c->free_size -= jeb->free_size;
@@ -219,7 +229,7 @@ static int jffs2_do_reserve_space(struct jffs2_sb_info *c,  uint32_t minsize, ui
 				D1(printk(KERN_DEBUG "jffs2_do_reserve_space: Flushing write buffer\n"));
 				/* c->nextblock is NULL, no update to c->nextblock allowed */			    
 				spin_unlock(&c->erase_completion_lock);
-				jffs2_flush_wbuf(c, 1);
+				jffs2_flush_wbuf_pad(c);
 				spin_lock(&c->erase_completion_lock);
 				/* Have another go. It'll be on the erasable_list now */
 				return -EAGAIN;
@@ -344,10 +354,10 @@ int jffs2_add_physical_node_ref(struct jffs2_sb_info *c, struct jffs2_raw_node_r
 		/* If it lives on the dirty_list, jffs2_reserve_space will put it there */
 		D1(printk(KERN_DEBUG "Adding full erase block at 0x%08x to clean_list (free 0x%08x, dirty 0x%08x, used 0x%08x\n",
 			  jeb->offset, jeb->free_size, jeb->dirty_size, jeb->used_size));
-		if (c->wbuf_len) {
+		if (jffs2_wbuf_dirty(c)) {
 			/* Flush the last write in the block if it's outstanding */
 			spin_unlock(&c->erase_completion_lock);
-			jffs2_flush_wbuf(c, 1);
+			jffs2_flush_wbuf_pad(c);
 			spin_lock(&c->erase_completion_lock);
 		}
 
@@ -368,6 +378,20 @@ void jffs2_complete_reservation(struct jffs2_sb_info *c)
 	D1(printk(KERN_DEBUG "jffs2_complete_reservation()\n"));
 	jffs2_garbage_collect_trigger(c);
 	up(&c->alloc_sem);
+}
+
+static inline int on_list(struct list_head *obj, struct list_head *head)
+{
+	struct list_head *this;
+
+	list_for_each(this, head) {
+		if (this == obj) {
+			D1(printk("%p is on list at %p\n", obj, head));
+			return 1;
+
+		}
+	}
+	return 0;
 }
 
 void jffs2_mark_node_obsolete(struct jffs2_sb_info *c, struct jffs2_raw_node_ref *ref)
@@ -418,11 +442,26 @@ void jffs2_mark_node_obsolete(struct jffs2_sb_info *c, struct jffs2_raw_node_ref
 	// Take care, that wasted size is taken into concern
 	if ((jeb->dirty_size || ISDIRTY(jeb->wasted_size + ref->totlen)) && jeb != c->nextblock) {
 		D1(printk("Dirtying\n"));
-		addedsize = ref->totlen + jeb->wasted_size;
-		jeb->dirty_size += addedsize;
-		c->dirty_size += addedsize;
-		c->wasted_size -= jeb->wasted_size;
-		jeb->wasted_size = 0;
+		addedsize = ref->totlen;
+		jeb->dirty_size += ref->totlen;
+		c->dirty_size += ref->totlen;
+
+		/* Convert wasted space to dirty, if not a bad block */
+		if (jeb->wasted_size) {
+			if (on_list(&jeb->list, &c->bad_used_list)) {
+				D1(printk(KERN_DEBUG "Leaving block at %08x on the bad_used_list\n",
+					  jeb->offset));
+				addedsize = 0; /* To fool the refiling code later */
+			} else {
+				D1(printk(KERN_DEBUG "Converting %d bytes of wasted space to dirty in block at %08x\n",
+					  jeb->wasted_size, jeb->offset));
+				addedsize += jeb->wasted_size;
+				jeb->dirty_size += jeb->wasted_size;
+				c->dirty_size += jeb->wasted_size;
+				c->wasted_size -= jeb->wasted_size;
+				jeb->wasted_size = 0;
+			}
+		}
 	} else {
 		D1(printk("Wasting\n"));
 		addedsize = 0;
@@ -455,7 +494,7 @@ void jffs2_mark_node_obsolete(struct jffs2_sb_info *c, struct jffs2_raw_node_ref
 			D1(printk(KERN_DEBUG "Eraseblock at 0x%08x completely dirtied. Removing from (dirty?) list...\n", jeb->offset));
 			list_del(&jeb->list);
 		}
-		if (c->wbuf_len) {
+		if (jffs2_wbuf_dirty(c)) {
 			D1(printk(KERN_DEBUG "...and adding to erasable_pending_wbuf_list\n"));
 			list_add_tail(&jeb->list, &c->erasable_pending_wbuf_list);
 #if 0 /* This check was added to allow us to find places where we added nodes to the lists
@@ -506,7 +545,7 @@ void jffs2_mark_node_obsolete(struct jffs2_sb_info *c, struct jffs2_raw_node_ref
 		D1(printk(KERN_DEBUG "...and adding to dirty_list\n"));
 		list_add_tail(&jeb->list, &c->dirty_list);
 	} else if (VERYDIRTY(c, jeb->dirty_size) &&
-		   !VERYDIRTY(c, jeb->dirty_size - ref->totlen)) {
+		   !VERYDIRTY(c, jeb->dirty_size - addedsize)) {
 		D1(printk(KERN_DEBUG "Eraseblock at 0x%08x is now very dirty. Removing from dirty list...\n", jeb->offset));
 		list_del(&jeb->list);
 		D1(printk(KERN_DEBUG "...and adding to very_dirty_list\n"));
@@ -569,7 +608,7 @@ void jffs2_dump_block_lists(struct jffs2_sb_info *c)
 	printk(KERN_DEBUG "erasing_size: %08x\n", c->erasing_size);
 	printk(KERN_DEBUG "bad_size: %08x\n", c->bad_size);
 	printk(KERN_DEBUG "sector_size: %08x\n", c->sector_size);
-	printk(KERN_DEBUG "jffs2_reserved_blocks size: %08x\n",c->sector_size * JFFS2_RESERVED_BLOCKS_WRITE);
+	printk(KERN_DEBUG "jffs2_reserved_blocks size: %08x\n",c->sector_size * c->resv_blocks_write);
 
 	if (c->nextblock) {
 		printk(KERN_DEBUG "nextblock: %08x (used %08x, dirty %08x, wasted %08x, unchecked %08x, free %08x)\n",
@@ -672,7 +711,7 @@ void jffs2_dump_block_lists(struct jffs2_sb_info *c)
 
 		list_for_each(this, &c->erasable_pending_wbuf_list) {
 			struct jffs2_eraseblock *jeb = list_entry(this, struct jffs2_eraseblock, list);
-			printk(KERN_DEBUG "erase_pending_wbuf_list: %08x (used %08x, dirty %08x, wasted %08x, unchecked %08x, free %08x)\n",
+			printk(KERN_DEBUG "erasable_pending_wbuf_list: %08x (used %08x, dirty %08x, wasted %08x, unchecked %08x, free %08x)\n",
 			       jeb->offset, jeb->used_size, jeb->dirty_size, jeb->wasted_size, jeb->unchecked_size, jeb->free_size);
 		}
 	}

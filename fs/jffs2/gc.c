@@ -1,13 +1,13 @@
 /*
  * JFFS2 -- Journalling Flash File System, Version 2.
  *
- * Copyright (C) 2001, 2002 Red Hat, Inc.
+ * Copyright (C) 2001-2003 Red Hat, Inc.
  *
- * Created by David Woodhouse <dwmw2@cambridge.redhat.com>
+ * Created by David Woodhouse <dwmw2@redhat.com>
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: gc.c,v 1.103 2003/05/22 18:01:02 dwmw2 Exp $
+ * $Id: gc.c,v 1.114 2003/10/09 13:53:35 dwmw2 Exp $
  *
  */
 
@@ -49,7 +49,7 @@ static struct jffs2_eraseblock *jffs2_find_gc_block(struct jffs2_sb_info *c)
 	   put the clever wear-levelling algorithms. Eventually.  */
 	/* We possibly want to favour the dirtier blocks more when the
 	   number of free blocks is low. */
-	if (!list_empty(&c->bad_used_list) && c->nr_free_blocks > JFFS2_RESERVED_BLOCKS_GCBAD) {
+	if (!list_empty(&c->bad_used_list) && c->nr_free_blocks > c->resv_blocks_gcbad) {
 		D1(printk(KERN_DEBUG "Picking block from bad_used_list to GC next\n"));
 		nextlist = &c->bad_used_list;
 	} else if (n < 50 && !list_empty(&c->erasable_list)) {
@@ -274,7 +274,7 @@ int jffs2_garbage_collect_pass(struct jffs2_sb_info *c)
 		if (ref_flags(raw) == REF_PRISTINE)
 			ic->state = INO_STATE_GC;
 		else {
-			D1(printk("Ino #%u is absent but node not REF_PRISTINE. Reading.\n", 
+			D1(printk(KERN_DEBUG "Ino #%u is absent but node not REF_PRISTINE. Reading.\n", 
 				  inum));
 		}
 		break;
@@ -493,6 +493,7 @@ static int jffs2_garbage_collect_pristine(struct jffs2_sb_info *c,
 	int ret;
 	uint32_t phys_ofs, alloclen;
 	uint32_t crc;
+	int retried = 0;
 
 	D1(printk(KERN_DEBUG "Going to GC REF_PRISTINE node at 0x%08x\n", ref_offset(raw)));
 
@@ -573,13 +574,15 @@ static int jffs2_garbage_collect_pristine(struct jffs2_sb_info *c,
 		ret = -ENOMEM;
 		goto out_node;
 	}
+
+	/* OK, all the CRCs are good; this node can just be copied as-is. */
+ retry:
 	nraw->flash_offset = phys_ofs;
 	nraw->totlen = raw->totlen;
 	nraw->next_phys = NULL;
 
-	/* OK, all the CRCs are good; this node can just be copied as-is. */
-
 	ret = jffs2_flash_write(c, phys_ofs, raw->totlen, &retlen, (char *)node);
+
 	if (ret || (retlen != raw->totlen)) {
 		printk(KERN_NOTICE "Write of %d bytes at 0x%08x failed. returned %d, retlen %zd\n",
                        raw->totlen, phys_ofs, ret, retlen);
@@ -592,8 +595,34 @@ static int jffs2_garbage_collect_pristine(struct jffs2_sb_info *c,
 			jffs2_mark_node_obsolete(c, nraw);
 		} else {
 			printk(KERN_NOTICE "Not marking the space at 0x%08x as dirty because the flash driver returned retlen zero\n", nraw->flash_offset);
-                        jffs2_free_raw_node_ref(raw);
+                        jffs2_free_raw_node_ref(nraw);
 		}
+		if (!retried && (nraw == jffs2_alloc_raw_node_ref())) {
+			/* Try to reallocate space and retry */
+			uint32_t dummy;
+			struct jffs2_eraseblock *jeb = &c->blocks[phys_ofs / c->sector_size];
+
+			retried = 1;
+
+			D1(printk(KERN_DEBUG "Retrying failed write of REF_PRISTINE node.\n"));
+			
+			ACCT_SANITY_CHECK(c,jeb);
+			D1(ACCT_PARANOIA_CHECK(jeb));
+
+			ret = jffs2_reserve_space_gc(c, raw->totlen, &phys_ofs, &dummy);
+
+			if (!ret) {
+				D1(printk(KERN_DEBUG "Allocated space at 0x%08x to retry failed write.\n", phys_ofs));
+
+				ACCT_SANITY_CHECK(c,jeb);
+				D1(ACCT_PARANOIA_CHECK(jeb));
+
+				goto retry;
+			}
+			D1(printk(KERN_DEBUG "Failed to allocate space to retry failed write: %d!\n", ret));
+			jffs2_free_raw_node_ref(nraw);
+		}
+
 		if (!ret)
 			ret = -EIO;
 		goto out_node;
@@ -684,7 +713,7 @@ static int jffs2_garbage_collect_metadata(struct jffs2_sb_info *c, struct jffs2_
 	ri.node_crc = cpu_to_je32(crc32(0, &ri, sizeof(ri)-8));
 	ri.data_crc = cpu_to_je32(crc32(0, mdata, mdatalen));
 
-	new_fn = jffs2_write_dnode(c, f, &ri, mdata, mdatalen, phys_ofs, NULL);
+	new_fn = jffs2_write_dnode(c, f, &ri, mdata, mdatalen, phys_ofs, ALLOC_GC);
 
 	if (IS_ERR(new_fn)) {
 		printk(KERN_WARNING "Error writing new dnode: %ld\n", PTR_ERR(new_fn));
@@ -728,7 +757,7 @@ static int jffs2_garbage_collect_dirent(struct jffs2_sb_info *c, struct jffs2_er
 		       sizeof(rd)+rd.nsize, ret);
 		return ret;
 	}
-	new_fd = jffs2_write_dirent(c, f, &rd, fd->name, rd.nsize, phys_ofs, NULL);
+	new_fd = jffs2_write_dirent(c, f, &rd, fd->name, rd.nsize, phys_ofs, ALLOC_GC);
 
 	if (IS_ERR(new_fd)) {
 		printk(KERN_WARNING "jffs2_write_dirent in garbage_collect_dirent failed: %ld\n", PTR_ERR(new_fd));
@@ -951,7 +980,7 @@ static int jffs2_garbage_collect_hole(struct jffs2_sb_info *c, struct jffs2_eras
 		       sizeof(ri), ret);
 		return ret;
 	}
-	new_fn = jffs2_write_dnode(c, f, &ri, NULL, 0, phys_ofs, NULL);
+	new_fn = jffs2_write_dnode(c, f, &ri, NULL, 0, phys_ofs, ALLOC_GC);
 
 	if (IS_ERR(new_fn)) {
 		printk(KERN_WARNING "Error writing new hole node: %ld\n", PTR_ERR(new_fn));
@@ -1010,7 +1039,7 @@ static int jffs2_garbage_collect_dnode(struct jffs2_sb_info *c, struct jffs2_era
 {
 	struct jffs2_full_dnode *new_fn;
 	struct jffs2_raw_inode ri;
-	uint32_t alloclen, phys_ofs, offset, orig_end;	
+	uint32_t alloclen, phys_ofs, offset, orig_end, orig_start;	
 	int ret = 0;
 	unsigned char *comprbuf = NULL, *writebuf;
 	struct page *pg;
@@ -1023,29 +1052,129 @@ static int jffs2_garbage_collect_dnode(struct jffs2_sb_info *c, struct jffs2_era
 		  f->inocache->ino, start, end));
 
 	orig_end = end;
+	orig_start = start;
 
-	/* If we're looking at the last node in the block we're
-	   garbage-collecting, we allow ourselves to merge as if the
-	   block was already erasing. We're likely to be GC'ing a
-	   partial page, and the next block we GC is likely to have
-	   the other half of this page right at the beginning, which
-	   means we'd expand it _then_, as nr_erasing_blocks would have
-	   increased since we checked, and in doing so would obsolete 
-	   the partial node which we'd have written here. Meaning that 
-	   the GC would churn and churn, and just leave dirty blocks in
-	   it's wake.
-	*/
-	if(c->nr_free_blocks + c->nr_erasing_blocks > JFFS2_RESERVED_BLOCKS_GCMERGE - (fn->raw->next_phys?0:1)) {
-		/* Shitloads of space */
-		/* FIXME: Integrate this properly with GC calculations */
-		start &= ~(PAGE_CACHE_SIZE-1);
-		end = min_t(uint32_t, start + PAGE_CACHE_SIZE, JFFS2_F_I_SIZE(f));
-		D1(printk(KERN_DEBUG "Plenty of free space, so expanding to write from offset 0x%x to 0x%x\n",
-			  start, end));
-		if (end < orig_end) {
-			printk(KERN_WARNING "Eep. jffs2_garbage_collect_dnode extended node to write, but it got smaller: start 0x%x, orig_end 0x%x, end 0x%x\n", start, orig_end, end);
-			end = orig_end;
+	if (c->nr_free_blocks + c->nr_erasing_blocks > c->resv_blocks_gcmerge) {
+		/* Attempt to do some merging. But only expand to cover logically
+		   adjacent frags if the block containing them is already considered
+		   to be dirty. Otherwise we end up with GC just going round in 
+		   circles dirtying the nodes it already wrote out, especially 
+		   on NAND where we have small eraseblocks and hence a much higher
+		   chance of nodes having to be split to cross boundaries. */
+
+		struct jffs2_node_frag *frag;
+		uint32_t min, max;
+
+		min = start & ~(PAGE_CACHE_SIZE-1);
+		max = min + PAGE_CACHE_SIZE;
+
+		frag = jffs2_lookup_node_frag(&f->fragtree, start);
+
+		/* BUG_ON(!frag) but that'll happen anyway... */
+
+		BUG_ON(frag->ofs != start);
+
+		/* First grow down... */
+		while((frag = frag_prev(frag)) && frag->ofs >= min) {
+
+			/* If the previous frag doesn't even reach the beginning, there's
+			   excessive fragmentation. Just merge. */
+			if (frag->ofs > min) {
+				D1(printk(KERN_DEBUG "Expanding down to cover partial frag (0x%x-0x%x)\n",
+					  frag->ofs, frag->ofs+frag->size));
+				start = frag->ofs;
+				continue;
+			}
+			/* OK. This frag holds the first byte of the page. */
+			if (!frag->node || !frag->node->raw) {
+				D1(printk(KERN_DEBUG "First frag in page is hole (0x%x-0x%x). Not expanding down.\n",
+					  frag->ofs, frag->ofs+frag->size));
+				break;
+			} else {
+
+				/* OK, it's a frag which extends to the beginning of the page. Does it live 
+				   in a block which is still considered clean? If so, don't obsolete it.
+				   If not, cover it anyway. */
+
+				struct jffs2_raw_node_ref *raw = frag->node->raw;
+				struct jffs2_eraseblock *jeb;
+
+				jeb = &c->blocks[raw->flash_offset / c->sector_size];
+
+				if (jeb == c->gcblock) {
+					D1(printk(KERN_DEBUG "Expanding down to cover frag (0x%x-0x%x) in gcblock at %08x\n",
+						  frag->ofs, frag->ofs+frag->size, ref_offset(raw)));
+					start = frag->ofs;
+					break;
+				}
+				if (!ISDIRTY(jeb->dirty_size + jeb->wasted_size)) {
+					D1(printk(KERN_DEBUG "Not expanding down to cover frag (0x%x-0x%x) in clean block %08x\n",
+						  frag->ofs, frag->ofs+frag->size, jeb->offset));
+					break;
+				}
+
+				D1(printk(KERN_DEBUG "Expanding down to cover frag (0x%x-0x%x) in dirty block %08x\n",
+						  frag->ofs, frag->ofs+frag->size, jeb->offset));
+				start = frag->ofs;
+				break;
+			}
 		}
+
+		/* ... then up */
+
+		/* Find last frag which is actually part of the node we're to GC. */
+		frag = jffs2_lookup_node_frag(&f->fragtree, end-1);
+
+		while((frag = frag_next(frag)) && frag->ofs+frag->size <= max) {
+
+			/* If the previous frag doesn't even reach the beginning, there's lots
+			   of fragmentation. Just merge. */
+			if (frag->ofs+frag->size < max) {
+				D1(printk(KERN_DEBUG "Expanding up to cover partial frag (0x%x-0x%x)\n",
+					  frag->ofs, frag->ofs+frag->size));
+				end = frag->ofs + frag->size;
+				continue;
+			}
+
+			if (!frag->node || !frag->node->raw) {
+				D1(printk(KERN_DEBUG "Last frag in page is hole (0x%x-0x%x). Not expanding up.\n",
+					  frag->ofs, frag->ofs+frag->size));
+				break;
+			} else {
+
+				/* OK, it's a frag which extends to the beginning of the page. Does it live 
+				   in a block which is still considered clean? If so, don't obsolete it.
+				   If not, cover it anyway. */
+
+				struct jffs2_raw_node_ref *raw = frag->node->raw;
+				struct jffs2_eraseblock *jeb;
+
+				jeb = &c->blocks[raw->flash_offset / c->sector_size];
+
+				if (jeb == c->gcblock) {
+					D1(printk(KERN_DEBUG "Expanding up to cover frag (0x%x-0x%x) in gcblock at %08x\n",
+						  frag->ofs, frag->ofs+frag->size, ref_offset(raw)));
+					end = frag->ofs + frag->size;
+					break;
+				}
+				if (!ISDIRTY(jeb->dirty_size + jeb->wasted_size)) {
+					D1(printk(KERN_DEBUG "Not expanding up to cover frag (0x%x-0x%x) in clean block %08x\n",
+						  frag->ofs, frag->ofs+frag->size, jeb->offset));
+					break;
+				}
+
+				D1(printk(KERN_DEBUG "Expanding up to cover frag (0x%x-0x%x) in dirty block %08x\n",
+						  frag->ofs, frag->ofs+frag->size, jeb->offset));
+				end = frag->ofs + frag->size;
+				break;
+			}
+		}
+		D1(printk(KERN_DEBUG "Expanded dnode to write from (0x%x-0x%x) to (0x%x-0x%x)\n", 
+			  orig_start, orig_end, start, end));
+
+		BUG_ON(end > JFFS2_F_I_SIZE(f));
+		BUG_ON(end < orig_end);
+		BUG_ON(start > orig_start);
 	}
 	
 	/* First, use readpage() to read the appropriate page into the page cache */
@@ -1114,7 +1243,7 @@ static int jffs2_garbage_collect_dnode(struct jffs2_sb_info *c, struct jffs2_era
 		ri.node_crc = cpu_to_je32(crc32(0, &ri, sizeof(ri)-8));
 		ri.data_crc = cpu_to_je32(crc32(0, writebuf, cdatalen));
 	
-		new_fn = jffs2_write_dnode(c, f, &ri, writebuf, cdatalen, phys_ofs, NULL);
+		new_fn = jffs2_write_dnode(c, f, &ri, writebuf, cdatalen, phys_ofs, ALLOC_GC);
 
 		if (IS_ERR(new_fn)) {
 			printk(KERN_WARNING "Error writing new dnode: %ld\n", PTR_ERR(new_fn));

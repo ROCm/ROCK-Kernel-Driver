@@ -1,13 +1,13 @@
 /*
  * JFFS2 -- Journalling Flash File System, Version 2.
  *
- * Copyright (C) 2001, 2002 Red Hat, Inc.
+ * Copyright (C) 2001-2003 Red Hat, Inc.
  *
- * Created by David Woodhouse <dwmw2@cambridge.redhat.com>
+ * Created by David Woodhouse <dwmw2@redhat.com>
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: dir.c,v 1.77 2003/06/05 14:42:24 dwmw2 Exp $
+ * $Id: dir.c,v 1.82 2003/10/11 11:47:23 dwmw2 Exp $
  *
  */
 
@@ -22,18 +22,22 @@
 #include <linux/time.h>
 #include "nodelist.h"
 
-/* Urgh. Please tell me there's a nicer way of doing this. */
+/* Urgh. Please tell me there's a nicer way of doing these. */
 #include <linux/version.h>
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,48)
 typedef int mknod_arg_t;
+#define NAMEI_COMPAT(x) ((void *)x)
 #else
 typedef dev_t mknod_arg_t;
+#define NAMEI_COMPAT(x) (x)
 #endif
 
 static int jffs2_readdir (struct file *, void *, filldir_t);
 
-static int jffs2_create (struct inode *,struct dentry *,int, struct nameidata *);
-static struct dentry *jffs2_lookup (struct inode *,struct dentry *, struct nameidata *);
+static int jffs2_create (struct inode *,struct dentry *,int,
+			 struct nameidata *);
+static struct dentry *jffs2_lookup (struct inode *,struct dentry *,
+				    struct nameidata *);
 static int jffs2_link (struct dentry *,struct inode *,struct dentry *);
 static int jffs2_unlink (struct inode *,struct dentry *);
 static int jffs2_symlink (struct inode *,struct dentry *,const char *);
@@ -54,8 +58,8 @@ struct file_operations jffs2_dir_operations =
 
 struct inode_operations jffs2_dir_inode_operations =
 {
-	.create =	jffs2_create,
-	.lookup =	jffs2_lookup,
+	.create =	NAMEI_COMPAT(jffs2_create),
+	.lookup =	NAMEI_COMPAT(jffs2_lookup),
 	.link =		jffs2_link,
 	.unlink =	jffs2_unlink,
 	.symlink =	jffs2_symlink,
@@ -73,7 +77,8 @@ struct inode_operations jffs2_dir_inode_operations =
    and we use the same hash function as the dentries. Makes this 
    nice and simple
 */
-static struct dentry *jffs2_lookup(struct inode *dir_i, struct dentry *target, struct nameidata *nd)
+static struct dentry *jffs2_lookup(struct inode *dir_i, struct dentry *target,
+				   struct nameidata *nd)
 {
 	struct jffs2_inode_info *dir_f;
 	struct jffs2_sb_info *c;
@@ -176,7 +181,7 @@ static int jffs2_readdir(struct file *filp, void *dirent, filldir_t filldir)
 
 
 static int jffs2_create(struct inode *dir_i, struct dentry *dentry, int mode,
-		struct nameidata *nd)
+			struct nameidata *nd)
 {
 	struct jffs2_raw_inode *ri;
 	struct jffs2_inode_info *f, *dir_f;
@@ -292,7 +297,6 @@ static int jffs2_symlink (struct inode *dir_i, struct dentry *dentry, const char
 	struct jffs2_full_dirent *fd;
 	int namelen;
 	uint32_t alloclen, phys_ofs;
-	uint32_t writtenlen;
 	int ret;
 
 	/* FIXME: If you care. We'd need to use frags for the target
@@ -339,7 +343,7 @@ static int jffs2_symlink (struct inode *dir_i, struct dentry *dentry, const char
 	ri->data_crc = cpu_to_je32(crc32(0, target, strlen(target)));
 	ri->node_crc = cpu_to_je32(crc32(0, ri, sizeof(*ri)-8));
 	
-	fn = jffs2_write_dnode(c, f, ri, target, strlen(target), phys_ofs, &writtenlen);
+	fn = jffs2_write_dnode(c, f, ri, target, strlen(target), phys_ofs, ALLOC_NORMAL);
 
 	jffs2_free_raw_inode(ri);
 
@@ -356,20 +360,12 @@ static int jffs2_symlink (struct inode *dir_i, struct dentry *dentry, const char
 	f->metadata = fn;
 	up(&f->sem);
 
-	/* Work out where to put the dirent node now. */
-	writtenlen = PAD(writtenlen);
-	phys_ofs += writtenlen;
-	alloclen -= writtenlen;
-
-	if (alloclen < sizeof(*rd)+namelen) {
-		/* Not enough space left in this chunk. Get some more */
-		jffs2_complete_reservation(c);
-		ret = jffs2_reserve_space(c, sizeof(*rd)+namelen, &phys_ofs, &alloclen, ALLOC_NORMAL);
-		if (ret) {
-			/* Eep. */
-			jffs2_clear_inode(inode);
-			return ret;
-		}
+	jffs2_complete_reservation(c);
+	ret = jffs2_reserve_space(c, sizeof(*rd)+namelen, &phys_ofs, &alloclen, ALLOC_NORMAL);
+	if (ret) {
+		/* Eep. */
+		jffs2_clear_inode(inode);
+		return ret;
 	}
 
 	rd = jffs2_alloc_raw_dirent();
@@ -397,7 +393,7 @@ static int jffs2_symlink (struct inode *dir_i, struct dentry *dentry, const char
 	rd->node_crc = cpu_to_je32(crc32(0, rd, sizeof(*rd)-8));
 	rd->name_crc = cpu_to_je32(crc32(0, dentry->d_name.name, namelen));
 
-	fd = jffs2_write_dirent(c, dir_f, rd, dentry->d_name.name, namelen, phys_ofs, &writtenlen);
+	fd = jffs2_write_dirent(c, dir_f, rd, dentry->d_name.name, namelen, phys_ofs, ALLOC_NORMAL);
 
 	if (IS_ERR(fd)) {
 		/* dirent failed to write. Delete the inode normally 
@@ -436,7 +432,6 @@ static int jffs2_mkdir (struct inode *dir_i, struct dentry *dentry, int mode)
 	struct jffs2_full_dirent *fd;
 	int namelen;
 	uint32_t alloclen, phys_ofs;
-	uint32_t writtenlen;
 	int ret;
 
 	mode |= S_IFDIR;
@@ -476,7 +471,7 @@ static int jffs2_mkdir (struct inode *dir_i, struct dentry *dentry, int mode)
 	ri->data_crc = cpu_to_je32(0);
 	ri->node_crc = cpu_to_je32(crc32(0, ri, sizeof(*ri)-8));
 	
-	fn = jffs2_write_dnode(c, f, ri, NULL, 0, phys_ofs, &writtenlen);
+	fn = jffs2_write_dnode(c, f, ri, NULL, 0, phys_ofs, ALLOC_NORMAL);
 
 	jffs2_free_raw_inode(ri);
 
@@ -493,20 +488,12 @@ static int jffs2_mkdir (struct inode *dir_i, struct dentry *dentry, int mode)
 	f->metadata = fn;
 	up(&f->sem);
 
-	/* Work out where to put the dirent node now. */
-	writtenlen = PAD(writtenlen);
-	phys_ofs += writtenlen;
-	alloclen -= writtenlen;
-
-	if (alloclen < sizeof(*rd)+namelen) {
-		/* Not enough space left in this chunk. Get some more */
-		jffs2_complete_reservation(c);
-		ret = jffs2_reserve_space(c, sizeof(*rd)+namelen, &phys_ofs, &alloclen, ALLOC_NORMAL);
-		if (ret) {
-			/* Eep. */
-			jffs2_clear_inode(inode);
-			return ret;
-		}
+	jffs2_complete_reservation(c);
+	ret = jffs2_reserve_space(c, sizeof(*rd)+namelen, &phys_ofs, &alloclen, ALLOC_NORMAL);
+	if (ret) {
+		/* Eep. */
+		jffs2_clear_inode(inode);
+		return ret;
 	}
 	
 	rd = jffs2_alloc_raw_dirent();
@@ -534,7 +521,7 @@ static int jffs2_mkdir (struct inode *dir_i, struct dentry *dentry, int mode)
 	rd->node_crc = cpu_to_je32(crc32(0, rd, sizeof(*rd)-8));
 	rd->name_crc = cpu_to_je32(crc32(0, dentry->d_name.name, namelen));
 
-	fd = jffs2_write_dirent(c, dir_f, rd, dentry->d_name.name, namelen, phys_ofs, &writtenlen);
+	fd = jffs2_write_dirent(c, dir_f, rd, dentry->d_name.name, namelen, phys_ofs, ALLOC_NORMAL);
 	
 	if (IS_ERR(fd)) {
 		/* dirent failed to write. Delete the inode normally 
@@ -591,7 +578,6 @@ static int jffs2_mknod (struct inode *dir_i, struct dentry *dentry, int mode, mk
 	jint16_t dev;
 	int devlen = 0;
 	uint32_t alloclen, phys_ofs;
-	uint32_t writtenlen;
 	int ret;
 
 	if (!old_valid_dev(rdev))
@@ -639,7 +625,7 @@ static int jffs2_mknod (struct inode *dir_i, struct dentry *dentry, int mode, mk
 	ri->data_crc = cpu_to_je32(crc32(0, &dev, devlen));
 	ri->node_crc = cpu_to_je32(crc32(0, ri, sizeof(*ri)-8));
 	
-	fn = jffs2_write_dnode(c, f, ri, (char *)&dev, devlen, phys_ofs, &writtenlen);
+	fn = jffs2_write_dnode(c, f, ri, (char *)&dev, devlen, phys_ofs, ALLOC_NORMAL);
 
 	jffs2_free_raw_inode(ri);
 
@@ -656,20 +642,12 @@ static int jffs2_mknod (struct inode *dir_i, struct dentry *dentry, int mode, mk
 	f->metadata = fn;
 	up(&f->sem);
 
-	/* Work out where to put the dirent node now. */
-	writtenlen = PAD(writtenlen);
-	phys_ofs += writtenlen;
-	alloclen -= writtenlen;
-
-	if (alloclen < sizeof(*rd)+namelen) {
-		/* Not enough space left in this chunk. Get some more */
-		jffs2_complete_reservation(c);
-		ret = jffs2_reserve_space(c, sizeof(*rd)+namelen, &phys_ofs, &alloclen, ALLOC_NORMAL);
-		if (ret) {
-			/* Eep. */
-			jffs2_clear_inode(inode);
-			return ret;
-		}
+	jffs2_complete_reservation(c);
+	ret = jffs2_reserve_space(c, sizeof(*rd)+namelen, &phys_ofs, &alloclen, ALLOC_NORMAL);
+	if (ret) {
+		/* Eep. */
+		jffs2_clear_inode(inode);
+		return ret;
 	}
 
 	rd = jffs2_alloc_raw_dirent();
@@ -700,7 +678,7 @@ static int jffs2_mknod (struct inode *dir_i, struct dentry *dentry, int mode, mk
 	rd->node_crc = cpu_to_je32(crc32(0, rd, sizeof(*rd)-8));
 	rd->name_crc = cpu_to_je32(crc32(0, dentry->d_name.name, namelen));
 
-	fd = jffs2_write_dirent(c, dir_f, rd, dentry->d_name.name, namelen, phys_ofs, &writtenlen);
+	fd = jffs2_write_dirent(c, dir_f, rd, dentry->d_name.name, namelen, phys_ofs, ALLOC_NORMAL);
 	
 	if (IS_ERR(fd)) {
 		/* dirent failed to write. Delete the inode normally 
