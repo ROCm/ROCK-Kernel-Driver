@@ -515,10 +515,6 @@ static struct tty_driver *serial_driver;
 /* number of characters left in xmit buffer before we ask for more */
 #define WAKEUP_CHARS 256
 
-#ifndef MIN
-#define MIN(a,b) ((a) < (b) ? (a) : (b))
-#endif
-
 
 /* tty callbacks */
 
@@ -1000,8 +996,8 @@ static int write(struct tty_struct *tty, int from_user,
 	}
 
 	for (;;) {
-		c = MIN(count,
-			MIN(info->max_frame_size - info->tx_count - 1,
+		c = min_t(int, count,
+			min(info->max_frame_size - info->tx_count - 1,
 			    info->max_frame_size - info->tx_put));
 		if (c <= 0)
 			break;
@@ -1144,7 +1140,7 @@ static void wait_until_sent(struct tty_struct *tty, int timeout)
 		char_time = 1;
 
 	if (timeout)
-		char_time = MIN(char_time, timeout);
+		char_time = min_t(unsigned long, char_time, timeout);
 
 	if ( info->params.mode == MGSL_MODE_HDLC ) {
 		while (info->tx_active) {
@@ -5026,7 +5022,7 @@ CheckAgain:
 
 	if ( debug_level >= DEBUG_LEVEL_DATA )
 		trace_block(info,info->rx_buf_list_ex[StartIndex].virt_addr,
-			MIN(framesize,SCABUFSIZE),0);
+			min_t(int, framesize,SCABUFSIZE),0);
 
 	if (framesize) {
 		if (framesize > info->max_frame_size)
@@ -5041,7 +5037,7 @@ CheckAgain:
 			info->icount.rxok++;
 
 			while(copy_count) {
-				int partial_count = MIN(copy_count,SCABUFSIZE);
+				int partial_count = min(copy_count,SCABUFSIZE);
 				memcpy( ptmp,
 					info->rx_buf_list_ex[index].virt_addr,
 					partial_count );
@@ -5098,14 +5094,14 @@ void tx_load_dma_buffer(SLMP_INFO *info, const char *buf, unsigned int count)
 	SCADESC_EX *desc_ex;
 
 	if ( debug_level >= DEBUG_LEVEL_DATA )
-		trace_block(info,buf, MIN(count,SCABUFSIZE), 1);
+		trace_block(info,buf, min_t(int, count,SCABUFSIZE), 1);
 
 	/* Copy source buffer to one or more DMA buffers, starting with
 	 * the first transmit dma buffer.
 	 */
 	for(i=0;;)
 	{
-		copy_count = MIN(count,SCABUFSIZE);
+		copy_count = min_t(unsigned short,count,SCABUFSIZE);
 
 		desc = &info->tx_buf_list[i];
 		desc_ex = &info->tx_buf_list_ex[i];
