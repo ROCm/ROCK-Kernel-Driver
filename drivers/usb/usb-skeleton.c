@@ -205,14 +205,11 @@ static inline void usb_skel_debug_data (const char *function, int size, const un
  */
 static inline void skel_delete (struct usb_skel *dev)
 {
-	if (dev->bulk_in_buffer != NULL)
-		kfree (dev->bulk_in_buffer);
-	if (dev->bulk_out_buffer != NULL)
-		usb_buffer_free (dev->udev, dev->bulk_out_size,
+	kfree (dev->bulk_in_buffer);
+	usb_buffer_free (dev->udev, dev->bulk_out_size,
 				dev->bulk_out_buffer,
 				dev->write_urb->transfer_dma);
-	if (dev->write_urb != NULL)
-		usb_free_urb (dev->write_urb);
+	usb_free_urb (dev->write_urb);
 	kfree (dev);
 }
 
