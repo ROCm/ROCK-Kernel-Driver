@@ -198,7 +198,7 @@ static int llc_ui_release(struct socket *sock)
 	if (!sk->zapped)
 		llc_sap_unassign_sock(llc->sap, sk);
 	release_sock(sk);
-	if (llc->sap && list_empty(&llc->sap->sk_list.list))
+	if (llc->sap && !llc->sap->sk_list.list)
 		llc_sap_close(llc->sap);
 	sock_put(sk);
 	llc_sk_free(sk);
@@ -1042,25 +1042,24 @@ static int llc_ui_get_info(char *buffer, char **start, off_t offset, int length)
 {
 	off_t pos = 0;
 	off_t begin = 0;
-	struct llc_opt *llc;
 	struct llc_sap *sap;
-	struct list_head *sap_entry, *llc_entry;
+	struct sock *sk;
+	struct list_head *sap_entry;
 	struct llc_station *station = llc_station_get();
 	int len = sprintf(buffer, "SKt Mc local_mac_sap        "
 				  "remote_mac_sap       tx_queue rx_queue st uid "
 				  "link\n");
 
 	/* Output the LLC socket data for the /proc filesystem */
-	spin_lock_bh(&station->sap_list.lock);
+	read_lock_bh(&station->sap_list.lock);
 	list_for_each(sap_entry, &station->sap_list.list) {
 		sap = list_entry(sap_entry, struct llc_sap, node);
 
-		spin_lock_bh(&sap->sk_list.lock);
-		list_for_each(llc_entry, &sap->sk_list.list) {
-			llc = list_entry(llc_entry, struct llc_opt, node);
+		read_lock_bh(&sap->sk_list.lock);
+		for (sk = sap->sk_list.list; sk; sk = sk->next) {
+			struct llc_opt *llc = llc_sk(sk);
 
-			len += sprintf(buffer + len, "%2X  %2X ",
-				       llc->sk->type,
+			len += sprintf(buffer + len, "%2X  %2X ", sk->type,
 				       !llc_mac_null(llc->addr.sllc_mmac));
 			if (llc->dev && llc_mac_null(llc->addr.sllc_mmac))
 				llc_ui_format_mac(buffer + len,
@@ -1080,12 +1079,11 @@ static int llc_ui_get_info(char *buffer, char **start, off_t offset, int length)
 			len += sprintf(buffer + len,
 					"@%02X %8d %8d %2d %3d ",
 					llc->addr.sllc_dsap,
-					atomic_read(&llc->sk->wmem_alloc),
-					atomic_read(&llc->sk->rmem_alloc),
-					llc->sk->state,
-					llc->sk->socket ?
-					  SOCK_INODE(llc->sk->socket)->i_uid :
-					  -1);
+					atomic_read(&sk->wmem_alloc),
+					atomic_read(&sk->rmem_alloc),
+					sk->state,
+					sk->socket ?
+					  SOCK_INODE(sk->socket)->i_uid : -1);
 			len += sprintf(buffer + len, "%4d\n", llc->link);
 			/* Are we still dumping unwanted data then discard the record */
 			pos = begin + len;
@@ -1097,9 +1095,9 @@ static int llc_ui_get_info(char *buffer, char **start, off_t offset, int length)
 			if (pos > offset + length) /* We have dumped enough */
 				break;
 		}
-		spin_unlock_bh(&sap->sk_list.lock);
+		read_unlock_bh(&sap->sk_list.lock);
 	}
-	spin_unlock_bh(&station->sap_list.lock);
+	read_unlock_bh(&station->sap_list.lock);
 
 	/* The data in question runs from begin to begin + len */
 	*start = buffer + offset - begin; /* Start of wanted data */

@@ -16,30 +16,30 @@
 /**
  * struct llc_sap - Defines the SAP component
  *
+ * @station - station this sap belongs to
+ * @state - sap state
  * @p_bit - only lowest-order bit used
  * @f_bit - only lowest-order bit used
- * @ind - provided by network layer
- * @conf - provided by network layer
  * @laddr - SAP value in this 'lsap'
  * @node - entry in station sap_list
  * @sk_list - LLC sockets this one manages
  * @mac_pdu_q - PDUs ready to send to MAC
  */
 struct llc_sap {
-	struct llc_station	 *parent_station;
-	u8			 state;
-	u8			 p_bit;
-	u8			 f_bit;
-	int			 (*rcv_func)(struct sk_buff *skb,
-					     struct net_device *dev,
-					     struct packet_type *pt);
-	struct llc_addr		 laddr;
-	struct list_head	 node;
+	struct llc_station *station;
+	u8		    state;
+	u8		    p_bit;
+	u8		    f_bit;
+	int		    (*rcv_func)(struct sk_buff *skb,
+					struct net_device *dev,
+					struct packet_type *pt);
+	struct llc_addr	    laddr;
+	struct list_head    node;
 	struct {
-		spinlock_t	 lock;
-		struct list_head list;
+		rwlock_t    lock;
+		struct sock *list;
 	} sk_list;
-	struct sk_buff_head	 mac_pdu_q;
+	struct sk_buff_head mac_pdu_q;
 };
 struct llc_sap_state_ev;
 

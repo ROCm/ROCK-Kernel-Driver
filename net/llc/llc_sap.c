@@ -40,11 +40,15 @@ static struct llc_sap_state_trans *llc_find_sap_trans(struct llc_sap *sap,
  */
 void llc_sap_assign_sock(struct llc_sap *sap, struct sock *sk)
 {
-	spin_lock_bh(&sap->sk_list.lock);
+	write_lock_bh(&sap->sk_list.lock);
 	llc_sk(sk)->sap = sap;
-	list_add_tail(&llc_sk(sk)->node, &sap->sk_list.list);
+	sk->next = sap->sk_list.list;
+	if (sk->next)
+		sap->sk_list.list->pprev = &sk->next;
+	sap->sk_list.list = sk;
+	sk->pprev = &sap->sk_list.list;
 	sock_hold(sk);
-	spin_unlock_bh(&sap->sk_list.lock);
+	write_unlock_bh(&sap->sk_list.lock);
 }
 
 /**
@@ -56,10 +60,19 @@ void llc_sap_assign_sock(struct llc_sap *sap, struct sock *sk)
  */
 void llc_sap_unassign_sock(struct llc_sap *sap, struct sock *sk)
 {
-	spin_lock_bh(&sap->sk_list.lock);
-	list_del(&llc_sk(sk)->node);
-	sock_put(sk);
-	spin_unlock_bh(&sap->sk_list.lock);
+	write_lock_bh(&sap->sk_list.lock);
+	if (sk->pprev) {
+		if (sk->next)
+			sk->next->pprev = sk->pprev;
+		*sk->pprev = sk->next;
+		sk->pprev  = NULL;
+		/*
+		 * This only makes sense if the socket was inserted on the
+		 * list, if sk->pprev is NULL it wasn't
+		 */
+		sock_put(sk);
+	}
+	write_unlock_bh(&sap->sk_list.lock);
 }
 
 /**

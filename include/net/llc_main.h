@@ -43,7 +43,7 @@ struct llc_station {
 	u8			    maximum_retry;
 	u8			    mac_sa[6];
 	struct {
-		spinlock_t	    lock;
+		rwlock_t	    lock;
 		struct list_head    list;
 	} sap_list;
 	struct {
