@@ -1691,9 +1691,10 @@ static struct console m68328_driver = {
 };
 
 
-static void __init m68328_console_init(void)
+static int __init m68328_console_init(void)
 {
 	register_console(&m68328_driver);
+	return 0;
 }
 
 console_initcall(m68328_console_init);
