@@ -11,44 +11,6 @@ CONFIG_VIDEO_SELECT
   Read the file <file:Documentation/svga.txt> for more information
   about the Video mode selection support. If unsure, say N.
 
-CONFIG_FBCON_VGA_PLANES
-  This low level frame buffer console driver enable the kernel to use
-  the 16-color planar modes of the old VGA cards where the bits of
-  each pixel are separated into 4 planes.
-
-  Only answer Y here if you have a (very old) VGA card that isn't VESA
-  2 compatible.
-
-CONFIG_FB_VGA16
-  This is the frame buffer device driver for VGA 16 color graphic
-  cards. Say Y if you have such a card.
-
-  This code is also available as a module. If you want to compile it
-  as a module ( = code which can be inserted in and removed from the
-  running kernel whenever you want), say M here and read
-  <file:Documentation/modules.txt>.  The module will be called
-  vga16fb.o.
-
-CONFIG_FB_STI
-  STI refers to the HP "Standard Text Interface" which is a set of
-  BIOS routines contained in a ROM chip in HP PA-RISC based machines.
-  Enabling this option will implement the linux framebuffer device and
-  an fbcon color text console using calls to the STI BIOS routines.
-  The HP framebuffer device is usually planar, uses a strange memory
-  layout, and changing the plane mask to create colored pixels
-  requires a call to the STI routines, so do not expect /dev/fb to
-  actually be useful.  However, it is the best we have as far as
-  graphics on the HP chipsets due to lack of hardware level
-  documentation for the various on-board HP chipsets used in these
-  systems.  It is sufficient for basic text console functions,
-  including fonts.
-
-  You should probably enable this option, unless you are having
-  trouble getting video when booting the kernel (make sure it isn't
-  just that you are running the console on the serial port, though).
-  Really old HP boxes may not have STI, and must use the PDC BIOS
-  console or the IODC BIOS.
-
 CONFIG_FBCON_FONTS
   Say Y here if you would like to use fonts other than the default
   your frame buffer console usually use.

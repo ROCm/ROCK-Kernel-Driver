@@ -85,9 +85,8 @@ this file *will* be replaced with it.  You have been warned.
 #include <asm/system.h>
 #include <asm/uaccess.h>
 
-#include <video/fbcon.h>
-#include <video/font.h>
-
+#include "fbcon.h"
+#include "font.h"
 #include "sti-bmode.h"
 
 /* The latency of the STI functions cannot really be reduced by setting

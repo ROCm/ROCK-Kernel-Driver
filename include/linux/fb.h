@@ -433,7 +433,7 @@ struct fb_info {
 #define fb_writel sbus_writel
 #define fb_memset sbus_memset_io
 
-#elif defined(__i386__) || defined(__alpha__) || defined(__x86_64__)
+#elif defined(__i386__) || defined(__alpha__) || defined(__x86_64__) || defined(__hppa__)
 
 #define fb_readb __raw_readb
 #define fb_readw __raw_readw

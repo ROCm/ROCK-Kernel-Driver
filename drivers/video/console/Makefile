@@ -7,7 +7,7 @@
 
 export-objs    	:= fbcon.o fbcon-accel.o fbcon-afb.o fbcon-ilbm.o \
 		   fbcon-iplan2p2.o fbcon-iplan2p4.o fbcon-iplan2p8.o \
-		   fbcon-vga-planes.o fbcon-vga8-planes.o fbcon-hga.o
+		   fbcon-hga.o
 
 # Each configuration option enables a list of files.
 

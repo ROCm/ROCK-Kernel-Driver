@@ -22,8 +22,8 @@
 #include <asm/setup.h>
 #endif
 
-#include <video/fbcon.h>
-#include <video/fbcon-iplan2p8.h>
+#include "fbcon.h"
+#include "fbcon-iplan2p8.h"
 
 
     /*

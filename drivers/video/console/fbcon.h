@@ -1,5 +1,5 @@
 /*
- *  linux/drivers/video/fbcon.h -- Low level frame buffer based console driver
+ *  linux/drivers/video/console/fbcon.h -- Low level frame buffer based console driver
  *
  *	Copyright (C) 1997 Geert Uytterhoeven
  *

@@ -22,6 +22,9 @@
 #include <linux/init.h>
 
 #include <asm/io.h>
+
+#include <video/fbcon.h>
+#include "fbcon-accel.h"
 #include "vga.h"
 
 #define GRAPHICS_ADDR_REG 0x3ce		/* Graphics address register. */
@@ -242,15 +245,9 @@ static void vga16fb_update_fix(struct fb_info *info)
 
 static void vga16fb_set_disp(int con, struct fb_info *info)
 {
-	struct vga16fb_par *par = (struct vga16fb_par *) info->par;
 	struct display *display;
 
 	display = (con < 0) ? info->disp : fb_display + con;
-
-	if (con != info->currcon) {
-		display->dispsw = &fbcon_dummy;
-		return;
-	}
 
 	if (info->fix.visual == FB_VISUAL_PSEUDOCOLOR ||
             info->fix.visual == FB_VISUAL_DIRECTCOLOR) {
@@ -268,34 +265,21 @@ static void vga16fb_set_disp(int con, struct fb_info *info)
 	display->inverse = 0;
 
 	switch (info->fix.type) {
-#ifdef FBCON_HAS_VGA_PLANES
 		case FB_TYPE_VGA_PLANES:
 			if (info->fix.type_aux == FB_AUX_VGA_PLANES_VGA4) {
-				display->dispsw = &fbcon_vga_planes;
+				display->dispsw = &fbcon_accel;
 			} else
+#ifdef FBCON_HAS_VGA_PLANES
 				display->dispsw = &fbcon_vga8_planes;
-			break;
 #endif
+			break;
 #ifdef FBCON_HAS_VGA
 		case FB_TYPE_TEXT:
 			display->dispsw = &fbcon_vga;
 			break;
 #endif
 		default: /* only FB_TYPE_PACKED_PIXELS */
-			switch (info->var.bits_per_pixel) {
-#ifdef FBCON_HAS_CFB4
-				case 4:
-					display->dispsw = &fbcon_cfb4;
-					break;
-#endif
-#ifdef FBCON_HAS_CFB8
-				case 8: 
-					display->dispsw = &fbcon_cfb8;
-					break;
-#endif
-				default:
-					display->dispsw = &fbcon_dummy;
-			}
+			display->dispsw = &fbcon_accel;
 			break;
 	}
 }
@@ -362,43 +346,27 @@ static int vga16fb_check_var(struct fb_var_screeninfo *var,
 
 	if (var->bits_per_pixel == 4) {
 		if (var->nonstd) {
-#ifdef FBCON_HAS_CFB4
 			if (!par->isVGA)
 				return -EINVAL;
 			shift = 3;
 			mode = MODE_SKIP4 | MODE_CFB;
 			maxmem = 16384;
 			par->pel_msk = 0x0F;
-#else
-			return -EINVAL;
-#endif
 		} else {
-#ifdef FBCON_HAS_VGA_PLANES
 			shift = 3;
 			mode = 0;
 			maxmem = 65536;
-#else
-			return -EINVAL;
-#endif
 		}
 	} else if (var->bits_per_pixel == 8) {
 		if (!par->isVGA)
 			return -EINVAL;	/* no support on EGA */
 		shift = 2;
 		if (var->nonstd) {
-#ifdef FBCON_HAS_VGA_PLANES
 			mode = MODE_8BPP | MODE_CFB;
 			maxmem = 65536;
-#else
-			return -EINVAL;
-#endif
 		} else {
-#ifdef FBCON_HAS_CFB8
 			mode = MODE_SKIP4 | MODE_8BPP | MODE_CFB;
 			maxmem = 16384;
-#else
-			return -EINVAL;
-#endif
 		}
 	}
 #ifdef FBCON_HAS_VGA	
@@ -984,7 +952,7 @@ static int vga16fb_blank(int blank, struct fb_info *info)
 			par->vesa_blanked = 0;
 		}
 		if (par->palette_blanked) {
-			do_install_cmap(info->currcon, info);
+			//do_install_cmap(info->currcon, info);
 			par->palette_blanked = 0;
 		}
 		break;
@@ -998,6 +966,146 @@ static int vga16fb_blank(int blank, struct fb_info *info)
 		break;
 	}
 	return 0;
+}
+
+void vga16fb_fillrect(struct fb_info *info, struct fb_fillrect *rect)
+{
+	int x, x2, y2, vxres, vyres, width, height, line_ofs;
+	char *dst;
+
+	vxres = info->var.xres_virtual;
+	vyres = info->var.yres_virtual;
+
+	if (!rect->width || !rect->height || rect->dx > vxres || rect->dy > vyres)
+		return;
+
+	/* We could use hardware clipping but on many cards you get around
+	 * hardware clipping by writing to framebuffer directly. */
+
+	x2 = rect->dx + rect->width;
+	y2 = rect->dy + rect->height;
+	x2 = x2 < vxres ? x2 : vxres;
+	y2 = y2 < vyres ? y2 : vyres;
+	rect->width = x2 - rect->dx;
+
+	height = y2 - rect->dy;
+	width = rect->width/8;
+
+	line_ofs = info->fix.line_length - width;
+	dst = info->screen_base + (rect->dx/8) + rect->dy * info->fix.line_length;
+
+	switch (rect->rop) {
+		case ROP_COPY:
+			setmode(0);
+			setop(0);
+			setsr(0xf);
+			setcolor(rect->color);
+			selectmask();
+
+			setmask(0xff);
+
+			while (height--) {
+				for (x = 0; x < width; x++) {
+					writeb(0, dst);
+					dst++;
+				}
+				dst += line_ofs;
+			}
+			break;
+		case ROP_XOR:
+			setmode(0);
+			setop(0x18);
+			setsr(0xf);
+			setcolor(0xf);
+			selectmask();
+
+			setmask(0xff);
+			while (height--) {
+				for (x = 0; x < width; x++) {
+					rmw(dst);
+					dst++;
+				}
+				dst += line_ofs;
+			}
+			break;
+	}
+}
+
+void vga16fb_copyarea(struct fb_info *info, struct fb_copyarea *area)
+{
+	int x, x2, y2, old_dx, old_dy, vxres, vyres;
+	int height, width, line_ofs;
+	char *dst = NULL, *src = NULL;
+
+	vxres = info->var.xres_virtual;
+	vyres = info->var.yres_virtual;
+
+	if (area->dx > vxres || area->sx > vxres || area->dy > vyres ||
+	    area->sy > vyres)
+		return;
+
+	/* clip the destination */
+	old_dx = area->dx;
+	old_dy = area->dy;
+
+	/*
+	 * We could use hardware clipping but on many cards you get around
+	 * hardware clipping by writing to framebuffer directly.
+	 */
+	x2 = area->dx + area->width;
+	y2 = area->dy + area->height;
+	area->dx = area->dx > 0 ? area->dx : 0;
+	area->dy = area->dy > 0 ? area->dy : 0;
+	x2 = x2 < vxres ? x2 : vxres;
+	y2 = y2 < vyres ? y2 : vyres;
+	area->width = x2 - area->dx;
+	area->height = y2 - area->dy;
+
+	/* update sx1,sy1 */
+	area->sx += (area->dx - old_dx);
+	area->sy += (area->dy - old_dy);
+
+	/* the source must be completely inside the virtual screen */
+	if (area->sx < 0 || area->sy < 0 ||
+	    (area->sx + area->width) > vxres ||
+	    (area->sy + area->height) > vyres)
+		return;
+
+	width = area->width/8;
+	height = area->height;
+	line_ofs = info->fix.line_length - width;
+
+	setmode(1);
+	setop(0);
+	setsr(0xf);
+
+	if (area->dy < area->sy || (area->dy == area->sy && area->dx < area->sx)) {
+		dst = info->screen_base + (area->dx/8) + area->dy * info->fix.line_length;
+		src = info->screen_base + (area->sx/8) + area->sy * info->fix.line_length;
+		while (height--) {
+			for (x = 0; x < width; x++) {
+				readb(src);
+				writeb(0, dst);
+				dst++;
+				src++;
+			}
+			src += line_ofs;
+			dst += line_ofs;
+		}
+	} else {
+		dst = info->screen_base + (area->dx/8) + width + (area->dy + height - 1) * info->fix.line_length;
+		src = info->screen_base + (area->sx/8) + width + (area->sy + height  - 1) * info->fix.line_length;
+		while (height--) {
+			for (x = 0; x < width; x++) {
+				dst--;
+				src--;
+				readb(src);
+				writeb(0, dst);
+			}
+			src -= line_ofs;
+			dst -= line_ofs;
+		}
+	}
 }
 
 void vga16fb_imageblit(struct fb_info *info, struct fb_image *image)
@@ -1050,22 +1158,30 @@ static struct fb_ops vga16fb_ops = {
 	.fb_set_var	= vga16fb_set_var,
 	.fb_check_var	= vga16fb_check_var,
 	.fb_set_par	= vga16fb_set_par,
+	.fb_get_cmap	= gen_get_cmap,
+	.fb_set_cmap 	= gen_set_cmap,
 	.fb_setcolreg 	= vga16fb_setcolreg,
 	.fb_pan_display = vga16fb_pan_display,
 	.fb_blank 	= vga16fb_blank,
+	.fb_fillrect	= vga16fb_fillrect,
+	.fb_copyarea	= vga16fb_copyarea,
 	.fb_imageblit	= vga16fb_imageblit,
-	.fb_cursor	= cfb_cursor,
 };
 
 int vga16fb_setup(char *options)
 {
 	char *this_opt;
 	
+	vga16fb.fontname[0] = '\0';
+	
 	if (!options || !*options)
 		return 0;
 	
 	while ((this_opt = strsep(&options, ",")) != NULL) {
 		if (!*this_opt) continue;
+		
+		if (!strncmp(this_opt, "font:", 5))
+			strcpy(vga16fb.fontname, this_opt+5);
 	}
 	return 0;
 }
@@ -1095,14 +1211,24 @@ int __init vga16fb_init(void)
 	vga16fb_defined.green.length = i;
 	vga16fb_defined.blue.length  = i;	
 
+	/* XXX share VGA I/O region with vgacon and others */
+
+	disp.var = vga16fb_defined;
+
 	/* name should not depend on EGA/VGA */
-	strcpy(vga16fb_fix.id, "VGA16 VGA");
+	strcpy(vga16fb.modename, "VGA16 VGA");
+	vga16fb.changevar = NULL;
 	vga16fb.node = NODEV;
 	vga16fb.fbops = &vga16fb_ops;
 	vga16fb.var = vga16fb_defined;
 	vga16fb.fix = vga16fb_fix;
 	vga16fb.par = &vga16_par;
+	vga16fb.disp = &disp;
+	vga16fb.currcon = -1;
+	vga16fb.switch_con = gen_switch;
+	vga16fb.updatevar=&vga16fb_update_var;
 	vga16fb.flags=FBINFO_FLAG_DEFAULT;
+	vga16fb_set_disp(-1, &vga16fb);
 
 	if (register_framebuffer(&vga16fb) < 0) {
 		iounmap(vga16fb.screen_base);
@@ -1110,7 +1236,8 @@ int __init vga16fb_init(void)
 	}
 
 	printk(KERN_INFO "fb%d: %s frame buffer device\n",
-	       GET_FB_IDX(vga16fb.node), vga16fb.fix.id);
+	       GET_FB_IDX(vga16fb.node), vga16fb.modename);
+
 	return 0;
 }
 

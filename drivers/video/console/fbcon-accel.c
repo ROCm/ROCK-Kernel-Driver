@@ -14,7 +14,7 @@
 #include <linux/string.h>
 #include <linux/fb.h>
 
-#include <video/fbcon.h>
+#include "fbcon.h"
 #include "fbcon-accel.h"
 
 void fbcon_accel_setup(struct display *p)

@@ -57,7 +57,6 @@ if [ "$CONFIG_VT" != "n" ]; then
             tristate '    Atari interleaved bitplanes (2 planes) support' CONFIG_FBCON_IPLAN2P2
             tristate '    Atari interleaved bitplanes (4 planes) support' CONFIG_FBCON_IPLAN2P4
             tristate '    Atari interleaved bitplanes (8 planes) support' CONFIG_FBCON_IPLAN2P8
-            tristate '    VGA 16-color planar support' CONFIG_FBCON_VGA_PLANES
             tristate '    HGA monochrome support ' CONFIG_FBCON_HGA
          else
 	    if [ "$CONFIG_FB_NEOMAGIC" = "y" -o "$CONFIG_FB_VESA" = "y" -o \
@@ -101,13 +100,6 @@ if [ "$CONFIG_VT" != "n" ]; then
 	         define_tristate CONFIG_FBCON_IPLAN2P8 m
 	      fi
  	    fi
-	    if [ "$CONFIG_FB_VGA16" = "y" ]; then
-	       define_tristate CONFIG_FBCON_VGA_PLANES y
-	    else
-	       if [ "$CONFIG_FB_VGA16" = "m" ]; then
-	          define_tristate CONFIG_FBCON_VGA_PLANES m
-	       fi
-	    fi
          fi
          bool '  Support only 8 pixels wide fonts' CONFIG_FBCON_FONTWIDTH8_ONLY
          if [ "$CONFIG_SPARC32" = "y" -o "$CONFIG_SPARC64" = "y" ]; then

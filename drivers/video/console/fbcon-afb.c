@@ -15,8 +15,8 @@
 #include <linux/string.h>
 #include <linux/fb.h>
 
-#include <video/fbcon.h>
-#include <video/fbcon-afb.h>
+#include "fbcon.h"
+#include "fbcon-afb.h"
 
 
     /*
