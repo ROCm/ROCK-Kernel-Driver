@@ -17,22 +17,30 @@
 #include <asm/sun3xprom.h>
 #include <asm/sun3ints.h>
 #include <asm/setup.h>
+#include <asm/oplib.h>
 
 #include "time.h"
 
 volatile char *clock_va;
 extern volatile unsigned char *sun3_intreg;
 
+extern void sun3_get_model(char *model);
 
 void sun3_leds(unsigned int i)
 {
 
 }
 
-/* should probably detect types of these eventually. */
-static void sun3x_get_model(char *model)
+static int sun3x_get_hardware_list(char *buffer)
 {
-	sprintf(model, "Sun3x");
+	
+	int len = 0;
+
+	len += sprintf(buffer + len, "PROM Revision:\t%s\n",
+		       romvec->pv_monid);
+	
+	return len;
+
 }
 
 /*

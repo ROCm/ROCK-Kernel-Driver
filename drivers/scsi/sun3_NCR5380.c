@@ -270,6 +270,9 @@ static Scsi_Host_Template *the_template = NULL;
 #define	HOSTNO		instance->host_no
 #define	H_NO(cmd)	(cmd)->host->host_no
 
+#define SGADDR(buffer) (void *)(((unsigned long)page_address((buffer)->page)) + \
+			(buffer)->offset)
+
 #ifdef SUPPORT_TAGS
 
 /*
@@ -476,10 +479,10 @@ static void merge_contiguous_buffers( Scsi_Cmnd *cmd )
 
     for (endaddr = virt_to_phys(cmd->SCp.ptr + cmd->SCp.this_residual - 1) + 1;
 	 cmd->SCp.buffers_residual &&
-	 virt_to_phys(cmd->SCp.buffer[1].address) == endaddr; ) {
+	 virt_to_phys(SGADDR(&(cmd->SCp.buffer[1]))) == endaddr; ) {
 	
 	MER_PRINTK("VTOP(%p) == %08lx -> merging\n",
-		   cmd->SCp.buffer[1].address, endaddr);
+		   SGADDR(&(cmd->SCp.buffer[1])), endaddr);
 #if (NDEBUG & NDEBUG_MERGING)
 	++cnt;
 #endif
@@ -514,12 +517,13 @@ static __inline__ void initialize_SCp(Scsi_Cmnd *cmd)
     if (cmd->use_sg) {
 	cmd->SCp.buffer = (struct scatterlist *) cmd->buffer;
 	cmd->SCp.buffers_residual = cmd->use_sg - 1;
-	cmd->SCp.ptr = (char *) cmd->SCp.buffer->address;
+	cmd->SCp.ptr = (char *) SGADDR(cmd->SCp.buffer);
 	cmd->SCp.this_residual = cmd->SCp.buffer->length;
+
 	/* ++roman: Try to merge some scatter-buffers if they are at
 	 * contiguous physical addresses.
 	 */
-	merge_contiguous_buffers( cmd );
+//	merge_contiguous_buffers( cmd );
     } else {
 	cmd->SCp.buffer = NULL;
 	cmd->SCp.buffers_residual = 0;
@@ -1211,7 +1215,7 @@ static void NCR5380_dma_complete( struct Scsi_Host *instance )
 	       HOSTNO, NCR5380_read(BUS_AND_STATUS_REG),
 	       NCR5380_read(STATUS_REG));
 
-    if((sun3scsi_dma_finish(hostdata->connected->request->cmd))) {
+    if((sun3scsi_dma_finish(rq_data_dir(hostdata->connected->request)))) {
 	    printk("scsi%d: overrun in UDC counter -- not prepared to deal with this!\n", HOSTNO);
 	    printk("please e-mail sammy@sammy.net with a description of how this\n");
 	    printk("error was produced.\n");
@@ -2000,7 +2004,7 @@ static void NCR5380_information_transfer (struct Scsi_Host *instance)
 
 		if (!cmd->SCp.this_residual && cmd->SCp.buffers_residual) {
 			count = cmd->SCp.buffer->length;
-			d = cmd->SCp.buffer->address;
+			d = SGADDR(cmd->SCp.buffer);
 		} else {
 			count = cmd->SCp.this_residual;
 			d = cmd->SCp.ptr;
@@ -2010,9 +2014,9 @@ static void NCR5380_information_transfer (struct Scsi_Host *instance)
 		if((count > SUN3_DMA_MINSIZE) && (sun3_dma_setup_done
 						  != cmd))
 		{
-			if((cmd->request->cmd == 0) || (cmd->request->cmd == 1)) {
+			if(cmd->request->flags & REQ_CMD) {
 				sun3scsi_dma_setup(d, count,
-						   cmd->request->cmd);
+						   rq_data_dir(cmd->request));
 				sun3_dma_setup_done = cmd;
 			}
 		}
@@ -2052,7 +2056,7 @@ static void NCR5380_information_transfer (struct Scsi_Host *instance)
 		    ++cmd->SCp.buffer;
 		    --cmd->SCp.buffers_residual;
 		    cmd->SCp.this_residual = cmd->SCp.buffer->length;
-		    cmd->SCp.ptr = cmd->SCp.buffer->address;
+		    cmd->SCp.ptr = SGADDR(cmd->SCp.buffer);
 
 		    /* ++roman: Try to merge some scatter-buffers if
 		     * they are at contiguous physical addresses.
@@ -2607,24 +2611,22 @@ static void NCR5380_reselect (struct Scsi_Host *instance)
     /* engage dma setup for the command we just saw */
     {
 	    void *d;
-		    unsigned long count;
+	    unsigned long count;
 
-		if (!tmp->SCp.this_residual && tmp->SCp.buffers_residual) {
-			count = tmp->SCp.buffer->length;
-			d = tmp->SCp.buffer->address;
-		} else {
-			count = tmp->SCp.this_residual;
-			d = tmp->SCp.ptr;
-		}
-#ifdef REAL_DMA		
-		/* setup this command for dma if not already */
-		if((count > SUN3_DMA_MINSIZE) && (sun3_dma_setup_done
-						  != tmp))
-		{
-			sun3scsi_dma_setup(d, count,
-					   tmp->request->cmd);
-			sun3_dma_setup_done = tmp;
-		}
+	    if (!tmp->SCp.this_residual && tmp->SCp.buffers_residual) {
+		    count = tmp->SCp.buffer->length;
+		    d = SGADDR(tmp->SCp.buffer);
+	    } else {
+		    count = tmp->SCp.this_residual;
+		    d = tmp->SCp.ptr;
+	    }
+#ifdef REAL_DMA
+	    /* setup this command for dma if not already */
+	    if((count > SUN3_DMA_MINSIZE) && (sun3_dma_setup_done != tmp))
+	    {
+		    sun3scsi_dma_setup(d, count, rq_data_dir(tmp->request));
+		    sun3_dma_setup_done = tmp;
+	    }
 #endif
     }
 #endif
