@@ -91,6 +91,9 @@ void tcp_get_info(struct sock *sk, struct tcp_info *info)
 	info->tcpi_snd_cwnd = tp->snd_cwnd;
 	info->tcpi_advmss = tp->advmss;
 	info->tcpi_reordering = tp->reordering;
+
+	info->tcpi_rcv_rtt = ((1000000*tp->rcv_rtt_est.rtt)/HZ)>>3;
+	info->tcpi_rcv_space = tp->rcvq_space.space;
 }
 
 static int tcpdiag_fill(struct sk_buff *skb, struct sock *sk,
