@@ -946,7 +946,7 @@ static int __init qlogicpti_detect(Scsi_Host_Template *tpnt)
 	return nqptis;
 }
 
-staticstatic  int qlogicpti_release(struct Scsi_Host *host)
+static int qlogicpti_release(struct Scsi_Host *host)
 {
 	struct qlogicpti *qpti = (struct qlogicpti *) host->hostdata;
 
@@ -1163,6 +1163,8 @@ static void ourdone(Scsi_Cmnd *Cmnd)
 	}
 	done(Cmnd);
 }
+
+static int qlogicpti_queuecommand(Scsi_Cmnd *Cmnd, void (*done)(Scsi_Cmnd *));
 
 static int qlogicpti_queuecommand_slow(Scsi_Cmnd *Cmnd,
 				       void (*done)(Scsi_Cmnd *))
