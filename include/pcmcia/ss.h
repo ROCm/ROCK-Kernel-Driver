@@ -129,6 +129,7 @@ struct pccard_resource_ops {
 					 struct pcmcia_socket *s);
 	int	(*adjust_resource)	(struct pcmcia_socket *s,
 					 adjust_t *adj);
+	int	(*init)			(struct pcmcia_socket *s);
 	void	(*exit)			(struct pcmcia_socket *s);
 };
 /* SS_CAP_STATIC_MAP */
@@ -167,11 +168,6 @@ struct config_t;
 struct region_t;
 struct pcmcia_callback;
 
-/* for io_db and mem_db */
-struct resource_map_t {
-	u_long			base, num;
-	struct resource_map_t	*next;
-};
 
 struct pcmcia_socket {
 	struct module			*owner;
@@ -197,10 +193,6 @@ struct pcmcia_socket {
 	struct list_head		socket_list;
 	struct completion		socket_released;
 
-	struct resource_map_t		mem_db;
-	struct resource_map_t		io_db;
-	unsigned int			rsrc_mem_probe;
-
  	/* deprecated */
 	unsigned int			sock;		/* socket number */
 
@@ -216,6 +208,7 @@ struct pcmcia_socket {
 	/* socket operations */
 	struct pccard_operations *	ops;
 	struct pccard_resource_ops *	resource_ops;
+	void *				resource_data;
 
 	/* Zoom video behaviour is so chip specific its not worth adding
 	   this to _ops */

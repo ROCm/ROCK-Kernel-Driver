@@ -47,7 +47,19 @@ INT_MODULE_PARM(probe_io,	1);		/* IO port probe? */
 INT_MODULE_PARM(mem_limit,	0x10000);
 #endif
 
+/* for io_db and mem_db */
+struct resource_map_t {
+	u_long			base, num;
+	struct resource_map_t	*next;
+};
+
 typedef struct resource_map_t resource_map_t;
+
+struct socket_data {
+	struct resource_map_t		mem_db;
+	struct resource_map_t		io_db;
+	unsigned int			rsrc_mem_probe;
+};
 
 static DECLARE_MUTEX(rsrc_sem);
 #define MEM_PROBE_LOW	(1 << 0)
@@ -179,6 +191,7 @@ static int sub_interval(resource_map_t *map, u_long base, u_long num)
 static void do_io_probe(struct pcmcia_socket *s, ioaddr_t base, ioaddr_t num)
 {
     struct resource *res;
+    struct socket_data *s_data = s->resource_data;
     ioaddr_t i, j, bad, any;
     u_char *b, hole, most;
 
@@ -221,7 +234,7 @@ static void do_io_probe(struct pcmcia_socket *s, ioaddr_t base, ioaddr_t num)
 		bad = any = i;
 	} else {
 	    if (bad) {
-		sub_interval(&s->io_db, bad, i-bad);
+		sub_interval(&s_data->io_db, bad, i-bad);
 		printk(" %#04x-%#04x", bad, i-1);
 		bad = 0;
 	    }
@@ -232,7 +245,7 @@ static void do_io_probe(struct pcmcia_socket *s, ioaddr_t base, ioaddr_t num)
 	    printk(" nothing: probe failed.\n");
 	    return;
 	} else {
-	    sub_interval(&s->io_db, bad, i-bad);
+	    sub_interval(&s_data->io_db, bad, i-bad);
 	    printk(" %#04x-%#04x", bad, i-1);
 	}
     }
@@ -351,6 +364,7 @@ checksum_match(struct pcmcia_socket *s, unsigned long base, unsigned long size)
 
 static int do_mem_probe(u_long base, u_long num, struct pcmcia_socket *s)
 {
+    struct socket_data *s_data = s->resource_data;
     u_long i, j, bad, fail, step;
 
     printk(KERN_INFO "cs: memory probe 0x%06lx-0x%06lx:",
@@ -377,7 +391,7 @@ static int do_mem_probe(u_long base, u_long num, struct pcmcia_socket *s)
 	if (i != j) {
 	    if (!bad) printk(" excluding");
 	    printk(" %#05lx-%#05lx", i, j-1);
-	    sub_interval(&s->mem_db, i, j-i);
+	    sub_interval(&s_data->mem_db, i, j-i);
 	    bad += j-i;
 	}
     }
@@ -389,13 +403,14 @@ static int do_mem_probe(u_long base, u_long num, struct pcmcia_socket *s)
 
 static u_long inv_probe(resource_map_t *m, struct pcmcia_socket *s)
 {
+    struct socket_data *s_data = s->resource_data;
     u_long ok;
-    if (m == &s->mem_db)
+    if (m == &s_data->mem_db)
 	return 0;
     ok = inv_probe(m->next, s);
     if (ok) {
 	if (m->base >= 0x100000)
-	    sub_interval(&s->mem_db, m->base, m->num);
+	    sub_interval(&s_data->mem_db, m->base, m->num);
 	return ok;
     }
     if (m->base < 0x100000)
@@ -408,17 +423,18 @@ static void validate_mem(struct pcmcia_socket *s, unsigned int probe_mask)
     resource_map_t *m, mm;
     static u_char order[] = { 0xd0, 0xe0, 0xc0, 0xf0 };
     u_long b, i, ok = 0;
+    struct socket_data *s_data = s->resource_data;
 
     /* We do up to four passes through the list */
     if (probe_mask & MEM_PROBE_HIGH) {
-	if (inv_probe(s->mem_db.next, s) > 0)
+	if (inv_probe(s_data->mem_db.next, s) > 0)
 	    return;
 	printk(KERN_NOTICE "cs: warning: no high memory space "
 	       "available!\n");
     }
     if ((probe_mask & MEM_PROBE_LOW) == 0)
 	return;
-    for (m = s->mem_db.next; m != &s->mem_db; m = mm.next) {
+    for (m = s_data->mem_db.next; m != &s_data->mem_db; m = mm.next) {
 	mm = *m;
 	/* Only probe < 1 MB */
 	if (mm.base >= 0x100000) continue;
@@ -431,7 +447,7 @@ static void validate_mem(struct pcmcia_socket *s, unsigned int probe_mask)
 	    b = order[i] << 12;
 	    if ((b >= mm.base) && (b+0x10000 <= mm.base+mm.num)) {
 		if (ok >= mem_limit)
-		    sub_interval(&s->mem_db, b, 0x10000);
+		    sub_interval(&s_data->mem_db, b, 0x10000);
 		else
 		    ok += do_mem_probe(b, 0x10000, s);
 	    }
@@ -444,8 +460,9 @@ static void validate_mem(struct pcmcia_socket *s, unsigned int probe_mask)
 static void validate_mem(struct pcmcia_socket *s, unsigned int probe_mask)
 {
 	resource_map_t *m, mm;
+	struct socket_data *s_data = s->resource_data;
 
-	for (m = s->mem_db.next; m != &s->mem_db; m = mm.next) {
+	for (m = s_data->mem_db.next; m != &s_data->mem_db; m = mm.next) {
 		mm = *m;
 		if (do_mem_probe(mm.base, mm.num, s))
 			break;
@@ -461,6 +478,7 @@ static void validate_mem(struct pcmcia_socket *s, unsigned int probe_mask)
  */
 static void pcmcia_nonstatic_validate_mem(struct pcmcia_socket *s)
 {
+	struct socket_data *s_data = s->resource_data;
 	if (probe_mem) {
 		unsigned int probe_mask;
 
@@ -470,8 +488,8 @@ static void pcmcia_nonstatic_validate_mem(struct pcmcia_socket *s)
 		if (s->features & SS_CAP_PAGE_REGS)
 			probe_mask = MEM_PROBE_HIGH;
 
-		if (probe_mask & ~s->rsrc_mem_probe) {
-			s->rsrc_mem_probe |= probe_mask;
+		if (probe_mask & ~s_data->rsrc_mem_probe) {
+			s_data->rsrc_mem_probe |= probe_mask;
 
 			down(&s->skt_sem);
 
@@ -555,10 +573,11 @@ static int nonstatic_adjust_io_region(struct resource *res, unsigned long r_star
 				      unsigned long r_end, struct pcmcia_socket *s)
 {
 	resource_map_t *m;
+	struct socket_data *s_data = s->resource_data;
 	int ret = -ENOMEM;
 
 	down(&rsrc_sem);
-	for (m = s->io_db.next; m != &s->io_db; m = m->next) {
+	for (m = s_data->io_db.next; m != &s_data->io_db; m = m->next) {
 		unsigned long start = m->base;
 		unsigned long end = m->base + m->num - 1;
 
@@ -590,6 +609,7 @@ struct resource *nonstatic_find_io_region(unsigned long base, int num,
 		   unsigned long align, struct pcmcia_socket *s)
 {
 	struct resource *res = make_resource(0, num, IORESOURCE_IO, s->dev.class_id);
+	struct socket_data *s_data = s->resource_data;
 	struct pcmcia_align_data data;
 	unsigned long min = base;
 	int ret;
@@ -599,7 +619,7 @@ struct resource *nonstatic_find_io_region(unsigned long base, int num,
 
 	data.mask = align - 1;
 	data.offset = base & data.mask;
-	data.map = &s->io_db;
+	data.map = &s_data->io_db;
 
 	down(&rsrc_sem);
 #ifdef CONFIG_PCI
@@ -623,6 +643,7 @@ struct resource * nonstatic_find_mem_region(u_long base, u_long num, u_long alig
 				 int low, struct pcmcia_socket *s)
 {
 	struct resource *res = make_resource(0, num, IORESOURCE_MEM, s->dev.class_id);
+	struct socket_data *s_data = s->resource_data;
 	struct pcmcia_align_data data;
 	unsigned long min, max;
 	int ret, i;
@@ -631,7 +652,7 @@ struct resource * nonstatic_find_mem_region(u_long base, u_long num, u_long alig
 
 	data.mask = align - 1;
 	data.offset = base & data.mask;
-	data.map = &s->mem_db;
+	data.map = &s_data->mem_db;
 
 	for (i = 0; i < 2; i++) {
 		if (low) {
@@ -669,6 +690,7 @@ struct resource * nonstatic_find_mem_region(u_long base, u_long num, u_long alig
 static int adjust_memory(struct pcmcia_socket *s, adjust_t *adj)
 {
 	u_long base, num;
+	struct socket_data *data = s->resource_data;
 	int ret;
 
 	base = adj->resource.memory.Base;
@@ -681,10 +703,10 @@ static int adjust_memory(struct pcmcia_socket *s, adjust_t *adj)
 	down(&rsrc_sem);
 	switch (adj->Action) {
 	case ADD_MANAGED_RESOURCE:
-		ret = add_interval(&s->mem_db, base, num);
+		ret = add_interval(&data->mem_db, base, num);
 		break;
 	case REMOVE_MANAGED_RESOURCE:
-		ret = sub_interval(&s->mem_db, base, num);
+		ret = sub_interval(&data->mem_db, base, num);
 		if (ret == CS_SUCCESS) {
 			struct pcmcia_socket *socket;
 			down_read(&pcmcia_socket_list_rwsem);
@@ -704,6 +726,7 @@ static int adjust_memory(struct pcmcia_socket *s, adjust_t *adj)
 
 static int adjust_io(struct pcmcia_socket *s, adjust_t *adj)
 {
+	struct socket_data *data = s->resource_data;
 	int base, num, ret = CS_SUCCESS;
 
 	base = adj->resource.io.BasePort;
@@ -716,7 +739,7 @@ static int adjust_io(struct pcmcia_socket *s, adjust_t *adj)
 	down(&rsrc_sem);
 	switch (adj->Action) {
 	case ADD_MANAGED_RESOURCE:
-		if (add_interval(&s->io_db, base, num) != 0) {
+		if (add_interval(&data->io_db, base, num) != 0) {
 			ret = CS_IN_USE;
 			break;
 		}
@@ -726,7 +749,7 @@ static int adjust_io(struct pcmcia_socket *s, adjust_t *adj)
 #endif
 		break;
 	case REMOVE_MANAGED_RESOURCE:
-		sub_interval(&s->io_db, base, num);
+		sub_interval(&data->io_db, base, num);
 		break;
 	default:
 		ret = CS_UNSUPPORTED_FUNCTION;
@@ -749,15 +772,32 @@ static int nonstatic_adjust_resource_info(struct pcmcia_socket *s, adjust_t *adj
 	return CS_UNSUPPORTED_FUNCTION;
 }
 
+static int nonstatic_init(struct pcmcia_socket *s)
+{
+	struct socket_data *data;
+
+	data = kmalloc(sizeof(struct socket_data), GFP_KERNEL);
+	if (!data)
+		return -ENOMEM;
+
+	data->mem_db.next = &data->mem_db;
+	data->io_db.next = &data->io_db;
+
+	s->resource_data = (void *) data;
+
+	return 0;
+}
+
 static void nonstatic_release_resource_db(struct pcmcia_socket *s)
 {
+	struct socket_data *data = s->resource_data;
 	resource_map_t *p, *q;
 
-	for (p = s->mem_db.next; p != &s->mem_db; p = q) {
+	for (p = data->mem_db.next; p != &data->mem_db; p = q) {
 		q = p->next;
 		kfree(p);
 	}
-	for (p = s->io_db.next; p != &s->io_db; p = q) {
+	for (p = data->io_db.next; p != &data->io_db; p = q) {
 		q = p->next;
 		kfree(p);
 	}
@@ -770,6 +810,7 @@ struct pccard_resource_ops pccard_nonstatic_ops = {
 	.find_io = nonstatic_find_io_region,
 	.find_mem = nonstatic_find_mem_region,
 	.adjust_resource = nonstatic_adjust_resource_info,
+	.init = nonstatic_init,
 	.exit = nonstatic_release_resource_db,
 };
 EXPORT_SYMBOL(pccard_nonstatic_ops);

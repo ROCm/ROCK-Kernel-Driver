@@ -217,6 +217,12 @@ int pcmcia_register_socket(struct pcmcia_socket *socket)
 
 	cs_dbg(socket, 0, "pcmcia_register_socket(0x%p)\n", socket->ops);
 
+	if (socket->resource_ops->init) {
+		ret = socket->resource_ops->init(socket);
+		if (ret)
+			return (ret);
+	}
+
 	/* try to obtain a socket number [yes, it gets ugly if we
 	 * register more than 2^sizeof(unsigned int) pcmcia 
 	 * sockets... but the socket number is deprecated 
@@ -249,10 +255,6 @@ int pcmcia_register_socket(struct pcmcia_socket *socket)
 	/* base address = 0, map = 0 */
 	socket->cis_mem.flags = 0;
 	socket->cis_mem.speed = cis_speed;
-
-
-	socket->mem_db.next = &socket->mem_db;
-	socket->io_db.next = &socket->io_db;
 
 	INIT_LIST_HEAD(&socket->cis_cache);
 	spin_lock_init(&socket->lock);
