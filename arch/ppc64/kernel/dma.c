@@ -77,7 +77,7 @@ dma_addr_t dma_map_single(struct device *dev, void *cpu_addr, size_t size,
 		return pci_map_single(to_pci_dev(dev), cpu_addr, size, (int)direction);
 #ifdef CONFIG_PPC_PSERIES
 	if (dev->bus == &vio_bus_type)
-		return vio_map_single(to_vio_dev(dev), cpu_addr, size, (int)direction);
+		return vio_map_single(to_vio_dev(dev), cpu_addr, size, direction);
 #endif
 	BUG();
 	return (dma_addr_t)0;
@@ -91,7 +91,7 @@ void dma_unmap_single(struct device *dev, dma_addr_t dma_addr, size_t size,
 		pci_unmap_single(to_pci_dev(dev), dma_addr, size, (int)direction);
 #ifdef CONFIG_PPC_PSERIES
 	else if (dev->bus == &vio_bus_type)
-		vio_unmap_single(to_vio_dev(dev), dma_addr, size, (int)direction);
+		vio_unmap_single(to_vio_dev(dev), dma_addr, size, direction);
 #endif
 	else
 		BUG();
@@ -106,7 +106,7 @@ dma_addr_t dma_map_page(struct device *dev, struct page *page,
 		return pci_map_page(to_pci_dev(dev), page, offset, size, (int)direction);
 #ifdef CONFIG_PPC_PSERIES
 	if (dev->bus == &vio_bus_type)
-		return vio_map_page(to_vio_dev(dev), page, offset, size, (int)direction);
+		return vio_map_page(to_vio_dev(dev), page, offset, size, direction);
 #endif
 	BUG();
 	return (dma_addr_t)0;
@@ -120,7 +120,7 @@ void dma_unmap_page(struct device *dev, dma_addr_t dma_address, size_t size,
 		pci_unmap_page(to_pci_dev(dev), dma_address, size, (int)direction);
 #ifdef CONFIG_PPC_PSERIES
 	else if (dev->bus == &vio_bus_type)
-		vio_unmap_page(to_vio_dev(dev), dma_address, size, (int)direction);
+		vio_unmap_page(to_vio_dev(dev), dma_address, size, direction);
 #endif
 	else
 		BUG();
@@ -134,7 +134,7 @@ int dma_map_sg(struct device *dev, struct scatterlist *sg, int nents,
 		return pci_map_sg(to_pci_dev(dev), sg, nents, (int)direction);
 #ifdef CONFIG_PPC_PSERIES
 	if (dev->bus == &vio_bus_type)
-		return vio_map_sg(to_vio_dev(dev), sg, nents, (int)direction);
+		return vio_map_sg(to_vio_dev(dev), sg, nents, direction);
 #endif
 	BUG();
 	return 0;
@@ -148,7 +148,7 @@ void dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nhwentries,
 		pci_unmap_sg(to_pci_dev(dev), sg, nhwentries, (int)direction);
 #ifdef CONFIG_PPC_PSERIES
 	else if (dev->bus == &vio_bus_type)
-		vio_unmap_sg(to_vio_dev(dev), sg, nhwentries, (int)direction);
+		vio_unmap_sg(to_vio_dev(dev), sg, nhwentries, direction);
 #endif
 	else
 		BUG();
@@ -162,7 +162,7 @@ void dma_sync_single(struct device *dev, dma_addr_t dma_handle, size_t size,
 		pci_dma_sync_single(to_pci_dev(dev), dma_handle, size, (int)direction);
 #ifdef CONFIG_PPC_PSERIES
 	else if (dev->bus == &vio_bus_type)
-		vio_dma_sync_single(to_vio_dev(dev), dma_handle, size, (int)direction);
+		vio_dma_sync_single(to_vio_dev(dev), dma_handle, size, direction);
 #endif
 	else
 		BUG();
@@ -176,7 +176,7 @@ void dma_sync_sg(struct device *dev, struct scatterlist *sg, int nelems,
 		pci_dma_sync_sg(to_pci_dev(dev), sg, nelems, (int)direction);
 #ifdef CONFIG_PPC_PSERIES
 	else if (dev->bus == &vio_bus_type)
-		vio_dma_sync_sg(to_vio_dev(dev), sg, nelems, (int)direction);
+		vio_dma_sync_sg(to_vio_dev(dev), sg, nelems, direction);
 #endif
 	else
 		BUG();

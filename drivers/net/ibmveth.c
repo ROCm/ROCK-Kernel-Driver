@@ -39,7 +39,6 @@
 #include <linux/types.h>
 #include <linux/errno.h>
 #include <linux/ioport.h>
-#include <linux/pci.h>
 #include <linux/dma-mapping.h>
 #include <linux/kernel.h>
 #include <linux/netdevice.h>
@@ -218,7 +217,7 @@ static void ibmveth_replenish_buffer_pool(struct ibmveth_adapter *adapter, struc
 		ibmveth_assert(index != 0xffff);
 		ibmveth_assert(pool->skbuff[index] == NULL);
 
-		dma_addr = vio_map_single(adapter->vdev, skb->data, pool->buff_size, PCI_DMA_FROMDEVICE);
+		dma_addr = vio_map_single(adapter->vdev, skb->data, pool->buff_size, DMA_FROM_DEVICE);
 
 		pool->dma_addr[index] = dma_addr;
 		pool->skbuff[index] = skb;
@@ -236,7 +235,7 @@ static void ibmveth_replenish_buffer_pool(struct ibmveth_adapter *adapter, struc
 		if(lpar_rc != H_Success) {
 			pool->skbuff[index] = NULL;
 			pool->consumer_index--;
-			vio_unmap_single(adapter->vdev, pool->dma_addr[index], pool->buff_size, PCI_DMA_FROMDEVICE);
+			vio_unmap_single(adapter->vdev, pool->dma_addr[index], pool->buff_size, DMA_FROM_DEVICE);
 			dev_kfree_skb_any(skb);
 			adapter->replenish_add_buff_failure++;
 			break;
@@ -300,7 +299,7 @@ static void ibmveth_free_buffer_pool(struct ibmveth_adapter *adapter, struct ibm
 				vio_unmap_single(adapter->vdev,
 						 pool->dma_addr[i],
 						 pool->buff_size,
-						 PCI_DMA_FROMDEVICE);
+						 DMA_FROM_DEVICE);
 				dev_kfree_skb_any(skb);
 				pool->skbuff[i] = NULL;
 			}
@@ -338,7 +337,7 @@ static void ibmveth_remove_buffer_from_pool(struct ibmveth_adapter *adapter, u64
 	vio_unmap_single(adapter->vdev,
 			 adapter->rx_buff_pool[pool].dma_addr[index],
 			 adapter->rx_buff_pool[pool].buff_size,
-			 PCI_DMA_FROMDEVICE);
+			 DMA_FROM_DEVICE);
 
 	free_index = adapter->rx_buff_pool[pool].producer_index++ % adapter->rx_buff_pool[pool].size;
 	adapter->rx_buff_pool[pool].free_map[free_index] = index;
@@ -406,7 +405,7 @@ static void ibmveth_cleanup(struct ibmveth_adapter *adapter)
 {
 	if(adapter->buffer_list_addr != NULL) {
 		if(!vio_dma_mapping_error(adapter->buffer_list_dma)) {
-			vio_unmap_single(adapter->vdev, adapter->buffer_list_dma, 4096, PCI_DMA_BIDIRECTIONAL);
+			vio_unmap_single(adapter->vdev, adapter->buffer_list_dma, 4096, DMA_BIDIRECTIONAL);
 			adapter->buffer_list_dma = DMA_ERROR_CODE;
 		}
 		free_page((unsigned long)adapter->buffer_list_addr);
@@ -415,7 +414,7 @@ static void ibmveth_cleanup(struct ibmveth_adapter *adapter)
 
 	if(adapter->filter_list_addr != NULL) {
 		if(!vio_dma_mapping_error(adapter->filter_list_dma)) {
-			vio_unmap_single(adapter->vdev, adapter->filter_list_dma, 4096, PCI_DMA_BIDIRECTIONAL);
+			vio_unmap_single(adapter->vdev, adapter->filter_list_dma, 4096, DMA_BIDIRECTIONAL);
 			adapter->filter_list_dma = DMA_ERROR_CODE;
 		}
 		free_page((unsigned long)adapter->filter_list_addr);
@@ -424,7 +423,7 @@ static void ibmveth_cleanup(struct ibmveth_adapter *adapter)
 
 	if(adapter->rx_queue.queue_addr != NULL) {
 		if(!vio_dma_mapping_error(adapter->rx_queue.queue_dma)) {
-			vio_unmap_single(adapter->vdev, adapter->rx_queue.queue_dma, adapter->rx_queue.queue_len, PCI_DMA_BIDIRECTIONAL);
+			vio_unmap_single(adapter->vdev, adapter->rx_queue.queue_dma, adapter->rx_queue.queue_len, DMA_BIDIRECTIONAL);
 			adapter->rx_queue.queue_dma = DMA_ERROR_CODE;
 		}
 		kfree(adapter->rx_queue.queue_addr);
@@ -470,9 +469,9 @@ static int ibmveth_open(struct net_device *netdev)
 		return -ENOMEM;
 	}
 
-	adapter->buffer_list_dma = vio_map_single(adapter->vdev, adapter->buffer_list_addr, 4096, PCI_DMA_BIDIRECTIONAL);
-	adapter->filter_list_dma = vio_map_single(adapter->vdev, adapter->filter_list_addr, 4096, PCI_DMA_BIDIRECTIONAL);
-	adapter->rx_queue.queue_dma = vio_map_single(adapter->vdev, adapter->rx_queue.queue_addr, adapter->rx_queue.queue_len, PCI_DMA_BIDIRECTIONAL);
+	adapter->buffer_list_dma = vio_map_single(adapter->vdev, adapter->buffer_list_addr, 4096, DMA_BIDIRECTIONAL);
+	adapter->filter_list_dma = vio_map_single(adapter->vdev, adapter->filter_list_addr, 4096, DMA_BIDIRECTIONAL);
+	adapter->rx_queue.queue_dma = vio_map_single(adapter->vdev, adapter->rx_queue.queue_addr, adapter->rx_queue.queue_len, DMA_BIDIRECTIONAL);
 
 	if((vio_dma_mapping_error(adapter->buffer_list_dma) ) ||
 	   (vio_dma_mapping_error(adapter->filter_list_dma)) ||
@@ -673,7 +672,7 @@ static int ibmveth_start_xmit(struct sk_buff *skb, struct net_device *netdev)
 				vio_unmap_single(adapter->vdev,
 						 desc[curfrag+1].fields.address,
 						 desc[curfrag+1].fields.length,
-						 PCI_DMA_TODEVICE);
+						 DMA_TO_DEVICE);
 				curfrag++;
 			}
 			dev_kfree_skb(skb);
@@ -710,7 +709,7 @@ static int ibmveth_start_xmit(struct sk_buff *skb, struct net_device *netdev)
 	}
 
 	do {
-		vio_unmap_single(adapter->vdev, desc[nfrags].fields.address, desc[nfrags].fields.length, PCI_DMA_TODEVICE);
+		vio_unmap_single(adapter->vdev, desc[nfrags].fields.address, desc[nfrags].fields.length, DMA_TO_DEVICE);
 	} while(--nfrags >= 0);
 
 	dev_kfree_skb(skb);

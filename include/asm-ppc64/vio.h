@@ -17,7 +17,6 @@
 #include <linux/init.h>
 #include <linux/errno.h>
 #include <linux/device.h>
-#include <linux/pci.h>
 #include <linux/dma-mapping.h>
 #include <asm/hvcall.h>
 #include <asm/prom.h>
@@ -58,13 +57,13 @@ int vio_enable_interrupts(struct vio_dev *dev);
 int vio_disable_interrupts(struct vio_dev *dev);
 
 dma_addr_t vio_map_single(struct vio_dev *dev, void *vaddr, 
-			  size_t size, int direction);
+			  size_t size, enum dma_data_direction direction);
 void vio_unmap_single(struct vio_dev *dev, dma_addr_t dma_handle, 
-		      size_t size, int direction);
+		      size_t size, enum dma_data_direction direction);
 int vio_map_sg(struct vio_dev *vdev, struct scatterlist *sglist, 
-	       int nelems, int direction);
+	       int nelems, enum dma_data_direction direction);
 void vio_unmap_sg(struct vio_dev *vdev, struct scatterlist *sglist, 
-		  int nelems, int direction);
+		  int nelems, enum dma_data_direction direction);
 void *vio_alloc_consistent(struct vio_dev *dev, size_t size, 
 			   dma_addr_t *dma_handle);
 void vio_free_consistent(struct vio_dev *dev, size_t size, void *vaddr, 
@@ -81,18 +80,18 @@ static inline int vio_dma_supported(struct vio_dev *hwdev, u64 mask)
 
 
 static inline void vio_dma_sync_single(struct vio_dev *hwdev,
-				       dma_addr_t dma_handle,
-				       size_t size, int direction)
+				       dma_addr_t dma_handle, size_t size,
+				       enum dma_data_direction direction)
 {
-	BUG_ON(direction == PCI_DMA_NONE);
+	BUG_ON(direction == DMA_NONE);
 	/* nothing to do */
 }
 
 static inline void vio_dma_sync_sg(struct vio_dev *hwdev,
-				   struct scatterlist *sg,
-				   int nelems, int direction)
+				   struct scatterlist *sg, int nelems,
+				   enum dma_data_direction direction)
 {
-	BUG_ON(direction == PCI_DMA_NONE);
+	BUG_ON(direction == DMA_NONE);
 	/* nothing to do */
 }
 static inline int vio_set_dma_mask(struct vio_dev *dev, u64 mask) { return -EIO; }

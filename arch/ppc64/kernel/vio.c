@@ -14,7 +14,6 @@
 
 #include <linux/init.h>
 #include <linux/console.h>
-#include <linux/pci.h>
 #include <linux/version.h>
 #include <linux/module.h>
 #include <linux/kobject.h>
@@ -416,14 +415,14 @@ EXPORT_SYMBOL(vio_disable_interrupts);
 
 
 dma_addr_t vio_map_single(struct vio_dev *dev, void *vaddr,
-			  size_t size, int direction )
+			  size_t size, enum dma_data_direction direction)
 {
 	struct iommu_table *tbl;
 	dma_addr_t dma_handle = DMA_ERROR_CODE;
 	unsigned long uaddr;
 	unsigned int npages;
 
-	BUG_ON(direction == PCI_DMA_NONE);
+	BUG_ON(direction == DMA_NONE);
 
 	uaddr = (unsigned long)vaddr;
 	npages = PAGE_ALIGN( uaddr + size ) - ( uaddr & PAGE_MASK );
@@ -432,7 +431,7 @@ dma_addr_t vio_map_single(struct vio_dev *dev, void *vaddr,
 	tbl = dev->iommu_table;
 
 	if (tbl) {
-		dma_handle = iommu_alloc(tbl, vaddr, npages, direction);
+		dma_handle = iommu_alloc(tbl, vaddr, npages, (int)direction);
 		dma_handle |= (uaddr & ~PAGE_MASK);
 	}
 
@@ -441,12 +440,12 @@ dma_addr_t vio_map_single(struct vio_dev *dev, void *vaddr,
 EXPORT_SYMBOL(vio_map_single);
 
 void vio_unmap_single(struct vio_dev *dev, dma_addr_t dma_handle,
-		      size_t size, int direction)
+		      size_t size, enum dma_data_direction direction)
 {
 	struct iommu_table * tbl;
 	unsigned int npages;
 
-	BUG_ON(direction == PCI_DMA_NONE);
+	BUG_ON(direction == DMA_NONE);
 
 	npages = PAGE_ALIGN( dma_handle + size ) - ( dma_handle & PAGE_MASK );
 	npages >>= PAGE_SHIFT;
@@ -458,11 +457,11 @@ void vio_unmap_single(struct vio_dev *dev, dma_addr_t dma_handle,
 EXPORT_SYMBOL(vio_unmap_single);
 
 int vio_map_sg(struct vio_dev *vdev, struct scatterlist *sglist, int nelems,
-	       int direction)
+	       enum dma_data_direction direction)
 {
 	struct iommu_table *tbl;
 
-	BUG_ON(direction == PCI_DMA_NONE);
+	BUG_ON(direction == DMA_NONE);
 
 	if (nelems == 0)
 		return 0;
@@ -471,16 +470,16 @@ int vio_map_sg(struct vio_dev *vdev, struct scatterlist *sglist, int nelems,
 	if (!tbl)
 		return 0;
 
-	return iommu_alloc_sg(tbl, &vdev->dev, sglist, nelems, direction);
+	return iommu_alloc_sg(tbl, &vdev->dev, sglist, nelems, (int)direction);
 }
 EXPORT_SYMBOL(vio_map_sg);
 
 void vio_unmap_sg(struct vio_dev *vdev, struct scatterlist *sglist, int nelems,
-		  int direction)
+		  enum dma_data_direction direction)
 {
 	struct iommu_table *tbl;
 
-	BUG_ON(direction == PCI_DMA_NONE);
+	BUG_ON(direction == DMA_NONE);
 
 	tbl = vdev->iommu_table;
 	if (tbl)
@@ -516,7 +515,7 @@ void *vio_alloc_consistent(struct vio_dev *dev, size_t size,
 			/* Page allocation succeeded */
 			memset(ret, 0, npages << PAGE_SHIFT);
 			/* Set up tces to cover the allocated range */
-			tce = iommu_alloc(tbl, ret, npages, PCI_DMA_BIDIRECTIONAL);
+			tce = iommu_alloc(tbl, ret, npages, (int)DMA_BIDIRECTIONAL);
 			if (tce == DMA_ERROR_CODE) {
 				PPCDBG(PPCDBG_TCE, "vio_alloc_consistent: iommu_alloc failed\n" );
 				free_pages((unsigned long)ret, order);
