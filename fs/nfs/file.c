@@ -104,11 +104,16 @@ nfs_file_flush(struct file *file)
 
 	dfprintk(VFS, "nfs: flush(%s/%ld)\n", inode->i_sb->s_id, inode->i_ino);
 
+	if ((file->f_mode & FMODE_WRITE) == 0)
+		return 0;
 	lock_kernel();
-	status = nfs_wb_file(inode, file);
+	/* Ensure that data+attribute caches are up to date after close() */
+	status = nfs_wb_all(inode);
 	if (!status) {
 		status = file->f_error;
 		file->f_error = 0;
+		if (!status)
+			__nfs_revalidate_inode(NFS_SERVER(inode), inode);
 	}
 	unlock_kernel();
 	return status;

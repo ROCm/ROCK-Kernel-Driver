@@ -68,20 +68,6 @@ nfs3_async_handle_jukebox(struct rpc_task *task)
 	return 1;
 }
 
-static void
-nfs3_write_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
-{
-	if (fattr->valid & NFS_ATTR_FATTR) {
-		if (!(fattr->valid & NFS_ATTR_WCC)) {
-			fattr->pre_size  = NFS_CACHE_ISIZE(inode);
-			fattr->pre_mtime = NFS_CACHE_MTIME(inode);
-			fattr->pre_ctime = NFS_CACHE_CTIME(inode);
-			fattr->valid |= NFS_ATTR_WCC;
-		}
-		nfs_refresh_inode(inode, fattr);
-	}
-}
-
 static struct rpc_cred *
 nfs_cred(struct inode *inode, struct file *filp)
 {
@@ -280,7 +266,7 @@ nfs3_proc_write(struct nfs_write_data *wdata, struct file *filp)
 	msg.rpc_cred = nfs_cred(inode, filp);
 	status = rpc_call_sync(NFS_CLIENT(inode), &msg, rpcflags);
 	if (status >= 0)
-		nfs3_write_refresh_inode(inode, fattr);
+		nfs_refresh_inode(inode, fattr);
 	dprintk("NFS reply write: %d\n", status);
 	return status < 0? status : wdata->res.count;
 }
@@ -303,7 +289,7 @@ nfs3_proc_commit(struct nfs_write_data *cdata, struct file *filp)
 	msg.rpc_cred = nfs_cred(inode, filp);
 	status = rpc_call_sync(NFS_CLIENT(inode), &msg, 0);
 	if (status >= 0)
-		nfs3_write_refresh_inode(inode, fattr);
+		nfs_refresh_inode(inode, fattr);
 	dprintk("NFS reply commit: %d\n", status);
 	return status;
 }
@@ -777,12 +763,13 @@ nfs3_proc_read_setup(struct nfs_read_data *data, unsigned int count)
 static void
 nfs3_write_done(struct rpc_task *task)
 {
-	struct nfs_write_data *data = (struct nfs_write_data *) task->tk_calldata;
+	struct nfs_write_data *data;
 
 	if (nfs3_async_handle_jukebox(task))
 		return;
+	data = (struct nfs_write_data *)task->tk_calldata;
 	if (task->tk_status >= 0)
-		nfs3_write_refresh_inode(data->inode, data->res.fattr);
+		nfs_refresh_inode(data->inode, data->res.fattr);
 	nfs_writeback_done(task);
 }
 
@@ -835,12 +822,13 @@ nfs3_proc_write_setup(struct nfs_write_data *data, unsigned int count, int how)
 static void
 nfs3_commit_done(struct rpc_task *task)
 {
-	struct nfs_write_data *data = (struct nfs_write_data *) task->tk_calldata;
+	struct nfs_write_data *data;
 
 	if (nfs3_async_handle_jukebox(task))
 		return;
+	data = (struct nfs_write_data *)task->tk_calldata;
 	if (task->tk_status >= 0)
-		nfs3_write_refresh_inode(data->inode, data->res.fattr);
+		nfs_refresh_inode(data->inode, data->res.fattr);
 	nfs_commit_done(task);
 }
 

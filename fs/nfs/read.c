@@ -124,6 +124,7 @@ nfs_readpage_sync(struct file *file, struct inode *inode, struct page *page)
 		if (result < rdata.args.count)	/* NFSv2ism */
 			break;
 	} while (count);
+	NFS_FLAGS(inode) |= NFS_INO_INVALID_ATIME;
 
 	if (count)
 		memclear_highpage_flush(page, rdata.args.pgbase, count);
@@ -266,6 +267,7 @@ nfs_readpage_result(struct rpc_task *task)
 	dprintk("NFS: %4d nfs_readpage_result, (status %d)\n",
 		task->tk_pid, task->tk_status);
 
+	NFS_FLAGS(data->inode) |= NFS_INO_INVALID_ATIME;
 	while (!list_empty(&data->pages)) {
 		struct nfs_page *req = nfs_list_entry(data->pages.next);
 		struct page *page = req->wb_page;

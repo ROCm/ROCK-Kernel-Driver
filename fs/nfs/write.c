@@ -157,6 +157,7 @@ nfs_writepage_sync(struct file *file, struct inode *inode, struct page *page,
 		(long long)NFS_FILEID(inode),
 		count, (long long)(page_offset(page) + offset));
 
+	nfs_begin_data_update(inode);
 	do {
 		if (count < wsize && !swapfile)
 			wdata.args.count = count;
@@ -190,15 +191,15 @@ nfs_writepage_sync(struct file *file, struct inode *inode, struct page *page,
 		ClearPageError(page);
 
 io_error:
+	nfs_end_data_update(inode);
 	if (wdata.cred)
 		put_rpccred(wdata.cred);
 
 	return written ? written : result;
 }
 
-static int
-nfs_writepage_async(struct file *file, struct inode *inode, struct page *page,
-		    unsigned int offset, unsigned int count)
+static int nfs_writepage_async(struct file *file, struct inode *inode,
+		struct page *page, unsigned int offset, unsigned int count)
 {
 	struct nfs_page	*req;
 	loff_t		end;
@@ -213,7 +214,6 @@ nfs_writepage_async(struct file *file, struct inode *inode, struct page *page,
 	end = ((loff_t)page->index<<PAGE_CACHE_SHIFT) + (loff_t)(offset + count);
 	if (i_size_read(inode) < end)
 		i_size_write(inode, end);
-
  out:
 	return status;
 }
@@ -312,8 +312,10 @@ nfs_inode_add_request(struct inode *inode, struct nfs_page *req)
 	BUG_ON(error == -EEXIST);
 	if (error)
 		return error;
-	if (!nfsi->npages)
+	if (!nfsi->npages) {
 		igrab(inode);
+		nfs_begin_data_update(inode);
+	}
 	nfsi->npages++;
 	req->wb_count++;
 	return 0;
@@ -336,6 +338,7 @@ nfs_inode_remove_request(struct nfs_page *req)
 	nfsi->npages--;
 	if (!nfsi->npages) {
 		spin_unlock(&nfs_wreq_lock);
+		nfs_end_data_update(inode);
 		iput(inode);
 	} else
 		spin_unlock(&nfs_wreq_lock);
@@ -891,10 +894,7 @@ nfs_writeback_done(struct rpc_task *task)
 #endif
 
 	/*
-	 * Update attributes as result of writeback.
-	 * FIXME: There is an inherent race with invalidate_inode_pages and
-	 *	  writebacks since the page->count is kept > 1 for as long
-	 *	  as the page has a write request pending.
+	 * Process the nfs_page list
 	 */
 	while (!list_empty(&data->pages)) {
 		req = nfs_list_entry(data->pages.next);
