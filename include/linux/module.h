@@ -99,7 +99,7 @@ extern const struct gtype##_id __mod_##gtype##_table		\
  */
 #define MODULE_LICENSE(license)					\
 	static const char __module_license[]			\
-		__attribute__((section(".init.license"))) = license
+		__attribute__((section(".init.license"), unused)) = license
 
 #else  /* !MODULE */
 
@@ -161,7 +161,7 @@ void *__symbol_get_gpl(const char *symbol);
 #define __CRC_SYMBOL(sym, sec)					\
 	extern void *__crc_##sym __attribute__((weak));		\
 	static const unsigned long __kcrctab_##sym		\
-	__attribute__((section("__kcrctab" sec)))		\
+	__attribute__((section("__kcrctab" sec), unused))	\
 	= (unsigned long) &__crc_##sym;
 #else
 #define __CRC_SYMBOL(sym, sec)
@@ -174,7 +174,7 @@ void *__symbol_get_gpl(const char *symbol);
 	__attribute__((section("__ksymtab_strings")))		\
 	= MODULE_SYMBOL_PREFIX #sym;                    	\
 	static const struct kernel_symbol __ksymtab_##sym	\
-	__attribute__((section("__ksymtab" sec)))		\
+	__attribute__((section("__ksymtab" sec), unused))	\
 	= { (unsigned long)&sym, __kstrtab_##sym }
 
 #define EXPORT_SYMBOL(sym)					\
