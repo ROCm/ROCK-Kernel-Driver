@@ -1008,27 +1008,17 @@ struct gendisk *ata_probe(dev_t dev, int *part, void *data)
 	return drive->disk;
 }
 
-/*
- * init_gendisk() (as opposed to ide_geninit) is called for each major device,
- * after probing for drives, to allocate partition tables and other data
- * structures needed for the routines in genhd.c.  ide_geninit() gets called
- * somewhat later, during the partition check.
- */
-static void init_gendisk (ide_hwif_t *hwif)
+static int alloc_disks(ide_hwif_t *hwif)
 {
-	unsigned int unit, units;
-	extern devfs_handle_t ide_devfs_handle;
+	unsigned int unit;
 	struct gendisk *disks[MAX_DRIVES];
-
-	units = MAX_DRIVES;
 
 	for (unit = 0; unit < MAX_DRIVES; unit++) {
 		disks[unit] = alloc_disk(1 << PARTN_BITS);
 		if (!disks[unit])
-			goto err_kmalloc_gd;
+			goto Enomem;
 	}
-
-	for (unit = 0; unit < units; ++unit) {
+	for (unit = 0; unit < MAX_DRIVES; ++unit) {
 		ide_drive_t *drive = &hwif->drives[unit];
 		struct gendisk *disk = disks[unit];
 		disk->major  = hwif->major;
@@ -1039,48 +1029,57 @@ static void init_gendisk (ide_hwif_t *hwif)
 		disk->queue = &drive->queue;
 		drive->disk = disk;
 	}
+	return 0;
+Enomem:
+	printk(KERN_WARNING "(ide::init_gendisk) Out of memory\n");
+	while (unit--)
+		put_disk(disks[unit]);
+	return -ENOMEM;
+}
 
-	for (unit = 0; unit < units; ++unit) {
-		char name[64];
-		ide_add_generic_settings(hwif->drives + unit);
-		sprintf (name, "host%d/bus%d/target%d/lun%d",
-			(hwif->channel && hwif->mate) ?
-			hwif->mate->index : hwif->index,
-			hwif->channel, unit, hwif->drives[unit].lun);
-		if (hwif->drives[unit].present)
-			hwif->drives[unit].de = devfs_mk_dir(ide_devfs_handle, name, NULL);
-	}
-	
-	for (unit = 0; unit < units; ++unit) {
+/*
+ * init_gendisk() (as opposed to ide_geninit) is called for each major device,
+ * after probing for drives, to allocate partition tables and other data
+ * structures needed for the routines in genhd.c.  ide_geninit() gets called
+ * somewhat later, during the partition check.
+ */
+static void init_gendisk (ide_hwif_t *hwif)
+{
+	unsigned int unit;
+	extern devfs_handle_t ide_devfs_handle;
+
+	for (unit = 0; unit < MAX_DRIVES; ++unit) {
 		ide_drive_t * drive = &hwif->drives[unit];
-
+		char name[64];
+		ide_add_generic_settings(drive);
 		snprintf(drive->gendev.bus_id,BUS_ID_SIZE,"%u.%u",
 			 hwif->index,unit);
 		snprintf(drive->gendev.name,DEVICE_NAME_SIZE,
 			 "%s","IDE Drive");
 		drive->gendev.parent = &hwif->gendev;
 		drive->gendev.bus = &ide_bus_type;
-		if (drive->present)
+		sprintf (name, "host%d/bus%d/target%d/lun%d",
+			(hwif->channel && hwif->mate) ?
+			hwif->mate->index : hwif->index,
+			hwif->channel, unit, drive->lun);
+		if (drive->present) {
 			device_register(&drive->gendev);
+			drive->de = devfs_mk_dir(ide_devfs_handle, name, NULL);
+		}
 	}
-
-	blk_register_region(MKDEV(hwif->major, 0), units << PARTN_BITS,
+	blk_register_region(MKDEV(hwif->major, 0), MAX_DRIVES << PARTN_BITS,
 			THIS_MODULE, ata_probe, ata_lock, hwif);
-
-	return;
-
-err_kmalloc_gd:
-	printk(KERN_WARNING "(ide::init_gendisk) Out of memory\n");
-	while (unit--)
-		put_disk(disks[unit]);
 }
 
 EXPORT_SYMBOL(init_gendisk);
 
 int hwif_init (ide_hwif_t *hwif)
 {
+	int old_irq, unit;
+
 	if (!hwif->present)
 		return 0;
+
 	if (!hwif->irq) {
 		if (!(hwif->irq = ide_default_irq(hwif->io_ports[IDE_DATA_OFFSET])))
 		{
@@ -1102,33 +1101,47 @@ int hwif_init (ide_hwif_t *hwif)
 	if (register_blkdev (hwif->major, hwif->name, ide_fops)) {
 		printk("%s: UNABLE TO GET MAJOR NUMBER %d\n",
 			hwif->name, hwif->major);
-		return (hwif->present = 0);
+		return 0;
 	}
+
+	if (alloc_disks(hwif) < 0)
+		goto out;
 	
-	if (init_irq(hwif)) {
-		int i = hwif->irq;
-		/*
-		 *	It failed to initialise. Find the default IRQ for 
-		 *	this port and try that.
-		 */
-		if (!(hwif->irq = ide_default_irq(hwif->io_ports[IDE_DATA_OFFSET]))) {
-			printk("%s: Disabled unable to get IRQ %d.\n",
-				hwif->name, i);
-			(void) unregister_blkdev(hwif->major, hwif->name);
-			return (hwif->present = 0);
-		}
-		if (init_irq(hwif)) {
-			printk("%s: probed IRQ %d and default IRQ %d failed.\n",
-				hwif->name, i, hwif->irq);
-			(void) unregister_blkdev(hwif->major, hwif->name);
-			return (hwif->present = 0);
-		}
-		printk("%s: probed IRQ %d failed, using default.\n",
-			hwif->name, hwif->irq);
+	if (init_irq(hwif) == 0)
+		goto done;
+
+	old_irq = hwif->irq;
+	/*
+	 *	It failed to initialise. Find the default IRQ for 
+	 *	this port and try that.
+	 */
+	if (!(hwif->irq = ide_default_irq(hwif->io_ports[IDE_DATA_OFFSET]))) {
+		printk("%s: Disabled unable to get IRQ %d.\n",
+			hwif->name, old_irq);
+		goto out_disks;
 	}
+	if (init_irq(hwif)) {
+		printk("%s: probed IRQ %d and default IRQ %d failed.\n",
+			hwif->name, old_irq, hwif->irq);
+		goto out_disks;
+	}
+	printk("%s: probed IRQ %d failed, using default.\n",
+		hwif->name, hwif->irq);
+
+done:
 	init_gendisk(hwif);
 	hwif->present = 1;	/* success */
 	return 1;
+
+out_disks:
+	for (unit = 0; unit < MAX_DRIVES; unit++) {
+		struct gendisk *disk = hwif->drives[unit].disk;
+		hwif->drives[unit].disk = NULL;
+		put_disk(disk);
+	}
+out:
+	unregister_blkdev(hwif->major, hwif->name);
+	return 0;
 }
 
 EXPORT_SYMBOL(hwif_init);

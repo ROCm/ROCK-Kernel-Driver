@@ -1315,7 +1315,6 @@ int ide_diag_taskfile (ide_drive_t *drive, ide_task_t *args, unsigned long data_
 	struct request *rq;
 	unsigned long flags;
 	ide_hwgroup_t *hwgroup = HWGROUP(drive);
-	unsigned int major = HWIF(drive)->major;
 	struct list_head *queue_head = &drive->queue.queue_head;
 	DECLARE_COMPLETION(wait);
 
@@ -1357,7 +1356,8 @@ int ide_diag_taskfile (ide_drive_t *drive, ide_task_t *args, unsigned long data_
 	rq->special = args;
 	rq->errors = 0;
 	rq->rq_status = RQ_ACTIVE;
-	rq->rq_dev = MKDEV(major,(drive->select.b.unit)<<PARTN_BITS);
+	rq->rq_dev = mk_kdev(disk->major, disk->first_minor);
+	rq->rq_disk = drive->disk;
 	rq->waiting = &wait;
 
 	spin_lock_irqsave(&ide_lock, flags);
