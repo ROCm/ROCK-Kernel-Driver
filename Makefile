@@ -36,13 +36,36 @@ KERNELRELEASE=$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)
 SUBARCH := $(shell uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ \
 				  -e s/arm.*/arm/ -e s/sa110/arm/ \
 				  -e s/s390x/s390/ )
-ARCH := $(SUBARCH)
 
 # Remove hyphens since they have special meaning in RPM filenames
 KERNELPATH=kernel-$(subst -,,$(KERNELRELEASE))
 
+# Cross compiling and selecting different set of gcc/bin-utils
+# ---------------------------------------------------------------------------
+#
+# When performing cross compilation for other architectures ARCH shall be set
+# to the target architecture. (See arch/* for the possibilities).
+# ARCH can be set during invocation of make:
+# make ARCH=ia64
+# Another way is to have ARCH set in the environment.
+# The default ARCH is the host where make is executed.
+
+# CROSS_COMPILE specify the prefix used for all executables used
+# during compilation. Only gcc and related bin-utils executables
+# are prefixed with $(CROSS_COMPILE).
+# CROSS_COMPILE can be set on the command line
+# make CROSS_COMPILE=ia64-linux-
+# Alternatively CROSS_COMPILE can be set in the environment.
+# Default value for CROSS_COMPILE is not to prefix executables
+# Note: Some architectures assign CROSS_COMPILE in their arch/*/Makefile
+
+ARCH		?= $(SUBARCH)
+CROSS_COMPILE	?=
+
+# Architecture as present in compile.h
 UTS_MACHINE := $(ARCH)
 
+# SHELL used by kbuild
 CONFIG_SHELL := $(shell if [ -x "$$BASH" ]; then echo $$BASH; \
 	  else if [ -x /bin/bash ]; then echo /bin/bash; \
 	  else echo sh; fi ; fi)
@@ -53,7 +76,6 @@ HOSTCXX  	= g++
 HOSTCFLAGS	= -Wall -Wstrict-prototypes -O2 -fomit-frame-pointer
 HOSTCXXFLAGS	= -O2
 
-CROSS_COMPILE 	=
 
 # 	That's our default target when none is given on the command line
 #	Note that 'modules' will be added as a prerequisite as well, 
