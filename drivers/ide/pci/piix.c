@@ -768,8 +768,8 @@ static void __init piix_check_450nx(void)
 		/* Only on the original revision: IDE DMA can hang */
 		if(rev == 0x00)
 			no_piix_dma = 1;
-		/* On all revisions PXB bus lock must be disabled for IDE */
-		else if(cfg & (1<<14))
+		/* On all revisions below 5 PXB bus lock must be disabled for IDE */
+		else if(cfg & (1<<14) && rev < 5)
 			no_piix_dma = 2;
 	}
 	if(no_piix_dma)
