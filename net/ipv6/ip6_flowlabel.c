@@ -627,7 +627,7 @@ static void ip6fl_fl_seq_show(struct seq_file *seq, struct ip6_flowlabel *fl)
 {
 	while(fl) {
 		seq_printf(seq,
-			   "%05X %-1d %-6d %-6d %-6d %-8ld "
+			   "%05X %-1d %-6d %-6d %-6ld %-8ld "
 			   "%02x%02x%02x%02x%02x%02x%02x%02x "
 			   "%-4d\n",
 			   (unsigned)ntohl(fl->label),
