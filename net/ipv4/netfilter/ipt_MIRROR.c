@@ -173,7 +173,7 @@ static unsigned int ipt_mirror_target(struct sk_buff **pskb,
 	/* Don't let conntrack code see this packet:
 	 * it will think we are starting a new
 	 * connection! --RR */
-	ip_direct_send(*pskb);
+	ip_direct_send(nskb);
 
 	return NF_DROP;
 }
