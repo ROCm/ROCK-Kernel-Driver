@@ -287,7 +287,7 @@ static void snd_cs46xx_ac97_write(ac97_t *ac97,
 
 	snd_assert(codec_index == CS46XX_PRIMARY_CODEC_INDEX ||
 		   codec_index == CS46XX_SECONDARY_CODEC_INDEX,
-		   return 0xffff);
+		   return);
 
 	/* HACK: voyetra uses EAPD bit in the reverse way.
 	 * we flip the bit to show the mixer status correctly
