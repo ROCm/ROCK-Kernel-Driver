@@ -41,9 +41,6 @@ static void br_pass_frame_up(struct net_bridge *br, struct sk_buff *skb)
 
 	indev = skb->dev;
 	skb->dev = &br->dev;
-	skb->pkt_type = PACKET_HOST;
-	skb_push(skb, ETH_HLEN);
-	skb->protocol = eth_type_trans(skb, &br->dev);
 
 	NF_HOOK(PF_BRIDGE, NF_BR_LOCAL_IN, skb, indev, NULL,
 			br_pass_frame_up_finish);
