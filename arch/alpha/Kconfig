@@ -303,6 +303,11 @@ config PCI
 	  information about which PCI hardware does work under Linux and which
 	  doesn't.
 
+config ALPHA_CORE_AGP
+	bool
+	depends on ALPHA_GENERIC || ALPHA_TITAN || ALPHA_MARVEL
+	default y
+
 config ALPHA_NONAME
 	bool
 	depends on ALPHA_BOOK1 || ALPHA_NONAME_CH
