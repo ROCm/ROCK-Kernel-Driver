@@ -801,14 +801,9 @@ struct zfcp_data {
 	struct notifier_block	reboot_notifier;     /* used to register cleanup
 							functions */
 	atomic_t		loglevel;            /* current loglevel */
-#ifndef MODULE                                       /* initial parameters
-							needed if ipl from a
-							scsi device is wanted */
 	char                    init_busid[BUS_ID_SIZE];
 	wwn_t                   init_wwpn;
 	fcp_lun_t               init_fcp_lun;
-	int                     init_is_valid;
-#endif
 #ifdef ZFCP_STAT_REQSIZES                            /* Statistical accounting
 							of processed data */
 	struct list_head	read_req_head;
