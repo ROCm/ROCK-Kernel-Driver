@@ -140,26 +140,12 @@ static struct ps2esdi_i_struct ps2esdi_info[MAX_HD] =
 
 static struct block_device_operations ps2esdi_fops =
 {
-	owner:		THIS_MODULE,
-	open:		ps2esdi_open,
-	ioctl:		ps2esdi_ioctl,
+	.owner		= THIS_MODULE,
+	.open		= ps2esdi_open,
+	.ioctl		= ps2esdi_ioctl,
 };
 
-static struct gendisk ps2esdi_gendisk[2] = {
-{
-	major:		MAJOR_NR,
-	disk_name:	"eda",
-	first_minor:	0,
-	minor_shift:	6,
-	fops:		&ps2esdi_fops,
-},{
-	major:		MAJOR_NR,
-	first_minor:	64,
-	disk_name:	"edb",
-	minor_shift:	6,
-	fops:		&ps2esdi_fops,
-}
-};
+static struct gendisk *ps2esdi_gendisk[2];
 
 /* initialization routine called by ll_rw_blk.c   */
 int __init ps2esdi_init(void)
@@ -233,8 +219,10 @@ cleanup_module(void) {
 	free_irq(PS2ESDI_IRQ, &ps2esdi_gendisk);
 	unregister_blkdev(MAJOR_NR, "ed");
 	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
-	for (i = 0; i < ps2esdi_drives; i++)
-		del_gendisk(ps2esdi_gendisk + i);
+	for (i = 0; i < ps2esdi_drives; i++) {
+		del_gendisk(ps2esdi_gendisk[i]);
+		put_disk(ps2esdi_gendisk[i]);
+	}
 }
 #endif /* MODULE */
 
@@ -431,14 +419,29 @@ static int __init ps2esdi_geninit(void)
 	}
 	blk_queue_max_sectors(BLK_DEFAULT_QUEUE(MAJOR_NR), 128);
 
+	error = -ENOMEM;
 	for (i = 0; i < ps2esdi_drives; i++) {
-		struct gendisk *disk = ps2esdi_gendisk + i;
+		struct gendisk *disk = alloc_disk();
+		if (!disk)
+			goto err_out4;
+		disk->major = MAJOR_NR;
+		disk->first_minor = i<<6;
+		sprintf(disk->disk_name, "ed%c", 'a'+i);
+		disk->minor_shift = 6;
+		disk->fops = &ps2esdi_fops;
+		ps2esdi_gendisk[i] = disk;
+	}
+
+	for (i = 0; i < ps2esdi_drives; i++) {
+		struct gendisk *disk = ps2esdi_gendisk[i];
 		set_capacity(disk, ps2esdi_info[i].head * ps2esdi_info[i].sect *
 				ps2esdi_info[i].cyl);
 		add_disk(disk);
 	}
 	return 0;
-
+err_out4:
+	while (i--)
+		put_disk(ps2esdi_gendisk[i]);
 err_out3:
 	release_region(io_base, 4);
 err_out2:
@@ -504,7 +507,7 @@ static void do_ps2esdi_request(request_queue_t * q)
 	}			/* check for above 16Mb dmas */
 	else if ((unit < ps2esdi_drives) &&
 	    (CURRENT->sector + CURRENT->current_nr_sectors <=
-	     get_capacity(&ps2esdi_gendisk[unit])) &&
+	     get_capacity(ps2esdi_gendisk[unit])) &&
 	    	CURRENT->flags & REQ_CMD) {
 #if 0
 		printk("%s:got request. device : %d minor : %d command : %d  sector : %ld count : %ld\n",
@@ -533,7 +536,7 @@ static void do_ps2esdi_request(request_queue_t * q)
 	/* is request is valid */ 
 	else {
 		printk("Grrr. error. ps2esdi_drives: %d, %lu %lu\n", ps2esdi_drives,
-		       CURRENT->sector, get_capacity(&ps2esdi_gendisk[unit]));
+		       CURRENT->sector, get_capacity(ps2esdi_gendisk[unit]));
 		end_request(CURRENT, FAIL);
 	}
 

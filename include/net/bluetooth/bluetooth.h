@@ -50,6 +50,7 @@
 #define BTPROTO_HCI     1
 #define BTPROTO_SCO   	2
 #define BTPROTO_RFCOMM	3
+#define BTPROTO_BNEP    4
 
 #define SOL_HCI     0
 #define SOL_L2CAP   6
@@ -198,15 +199,5 @@ int hci_sock_init(void);
 int hci_sock_cleanup(void);
 
 int bterr(__u16 code);
-
-#ifndef MODULE_LICENSE
-#define MODULE_LICENSE(x)
-#endif
-
-#ifndef list_for_each_safe
-#define list_for_each_safe(pos, n, head) \
-	for (pos = (head)->next, n = pos->next; pos != (head); \
-		pos = n, n = pos->next)
-#endif
 
 #endif /* __BLUETOOTH_H */

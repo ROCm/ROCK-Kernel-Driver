@@ -25,9 +25,9 @@
 /*
  * BlueZ HCI UART(H4) protocol.
  *
- * $Id: hci_h4.c,v 1.2 2002/04/17 17:37:20 maxk Exp $    
+ * $Id: hci_h4.c,v 1.3 2002/09/09 01:17:32 maxk Exp $    
  */
-#define VERSION "1.1"
+#define VERSION "1.2"
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -64,63 +64,61 @@
 #endif
 
 /* Initialize protocol */
-static int h4_open(struct n_hci *n_hci)
+static int h4_open(struct hci_uart *hu)
 {
 	struct h4_struct *h4;
 	
-	BT_DBG("n_hci %p", n_hci);
+	BT_DBG("hu %p", hu);
 	
 	h4 = kmalloc(sizeof(*h4), GFP_ATOMIC);
 	if (!h4)
 		return -ENOMEM;
 	memset(h4, 0, sizeof(*h4));
 
-	n_hci->priv = h4;
+	skb_queue_head_init(&h4->txq);
+
+	hu->priv = h4;
 	return 0;
 }
 
 /* Flush protocol data */
-static int h4_flush(struct n_hci *n_hci)
+static int h4_flush(struct hci_uart *hu)
 {
-	BT_DBG("n_hci %p", n_hci);
+	struct h4_struct *h4 = hu->priv;
+
+	BT_DBG("hu %p", hu);
+	skb_queue_purge(&h4->txq);
 	return 0;
 }
 
 /* Close protocol */
-static int h4_close(struct n_hci *n_hci)
+static int h4_close(struct hci_uart *hu)
 {
-	struct h4_struct *h4 = n_hci->priv;
-	n_hci->priv = NULL;
+	struct h4_struct *h4 = hu->priv;
+	hu->priv = NULL;
 
-	BT_DBG("n_hci %p", n_hci);
+	BT_DBG("hu %p", hu);
 
+	skb_queue_purge(&h4->txq);
 	if (h4->rx_skb)
 		kfree_skb(h4->rx_skb);
 
+	hu->priv = NULL;
 	kfree(h4);
 	return 0;
 }
 
-/* Send data */
-static int h4_send(struct n_hci *n_hci, void *data, int len)
+/* Enqueue frame for transmittion (padding, crc, etc) */
+static int h4_enqueue(struct hci_uart *hu, struct sk_buff *skb)
 {
-	struct tty_struct *tty = n_hci->tty;
-	
-	BT_DBG("n_hci %p len %d", n_hci, len);
+	struct h4_struct *h4 = hu->priv;
 
-	/* Send frame to TTY driver */
-	tty->flags |= (1 << TTY_DO_WRITE_WAKEUP);
-	return tty->driver.write(tty, 0, data, len);
-}
-
-/* Init frame before queueing (padding, crc, etc) */
-static struct sk_buff* h4_preq(struct n_hci *n_hci, struct sk_buff *skb)
-{
-	BT_DBG("n_hci %p skb %p", n_hci, skb);
+	BT_DBG("hu %p skb %p", hu, skb);
 
 	/* Prepend skb with frame type */
 	memcpy(skb_push(skb, 1), &skb->pkt_type, 1);
-	return skb;
+	skb_queue_tail(&h4->txq, skb);
+	return 0;
 }
 
 static inline int h4_check_data_len(struct h4_struct *h4, int len)
@@ -132,7 +130,7 @@ static inline int h4_check_data_len(struct h4_struct *h4, int len)
 		BT_DMP(h4->rx_skb->data, h4->rx_skb->len);
 		hci_recv_frame(h4->rx_skb);
 	} else if (len > room) {
-		BT_ERR("Data length is to large");
+		BT_ERR("Data length is too large");
 		kfree_skb(h4->rx_skb);
 	} else {
 		h4->rx_state = H4_W4_DATA;
@@ -147,16 +145,17 @@ static inline int h4_check_data_len(struct h4_struct *h4, int len)
 }
 
 /* Recv data */
-static int h4_recv(struct n_hci *n_hci, void *data, int count)
+static int h4_recv(struct hci_uart *hu, void *data, int count)
 {
-	struct h4_struct *h4 = n_hci->priv;
+	struct h4_struct *h4 = hu->priv;
 	register char *ptr;
 	hci_event_hdr *eh;
 	hci_acl_hdr   *ah;
 	hci_sco_hdr   *sh;
 	register int len, type, dlen;
 
-	BT_DBG("n_hci %p count %d rx_state %ld rx_count %ld", n_hci, count, h4->rx_state, h4->rx_count);
+	BT_DBG("hu %p count %d rx_state %ld rx_count %ld", 
+			hu, count, h4->rx_state, h4->rx_count);
 
 	ptr = data;
 	while (count) {
@@ -204,7 +203,7 @@ static int h4_recv(struct n_hci *n_hci, void *data, int count)
 
 				h4_check_data_len(h4, sh->dlen);
 				continue;
-			};
+			}
 		}
 
 		/* H4_W4_PACKET_TYPE */
@@ -232,7 +231,7 @@ static int h4_recv(struct n_hci *n_hci, void *data, int count)
 
 		default:
 			BT_ERR("Unknown HCI packet type %2.2x", (__u8)*ptr);
-			n_hci->hdev.stat.err_rx++;
+			hu->hdev.stat.err_rx++;
 			ptr++; count--;
 			continue;
 		};
@@ -246,20 +245,26 @@ static int h4_recv(struct n_hci *n_hci, void *data, int count)
 			h4->rx_count = 0;
 			return 0;
 		}
-		h4->rx_skb->dev = (void *) &n_hci->hdev;
+		h4->rx_skb->dev = (void *) &hu->hdev;
 		h4->rx_skb->pkt_type = type;
 	}
 	return count;
 }
 
+static struct sk_buff *h4_dequeue(struct hci_uart *hu)
+{
+	struct h4_struct *h4 = hu->priv;
+	return skb_dequeue(&h4->txq);
+}
+
 static struct hci_uart_proto h4p = {
-	.id    = HCI_UART_H4,
-	.open  = h4_open,
-	.close = h4_close,
-	.send  = h4_send,
-	.recv  = h4_recv,
-	.preq  = h4_preq,
-	.flush = h4_flush,
+	.id      = HCI_UART_H4,
+	.open    = h4_open,
+	.close   = h4_close,
+	.recv    = h4_recv,
+	.enqueue = h4_enqueue,
+	.dequeue = h4_dequeue,
+	.flush   = h4_flush,
 };
 	      
 int h4_init(void)

@@ -38,7 +38,7 @@
 #include <linux/blk.h>
 #include <linux/devfs_fs_kernel.h>
 
-static struct gendisk disks[2];
+static struct gendisk *disks[2];
 
 #define MAX_FLOPPIES	2
 
@@ -1014,6 +1014,7 @@ static devfs_handle_t floppy_devfs_handle;
 int swim3_init(void)
 {
 	struct device_node *swim;
+	int err = -ENOMEM;
 	int i;
 
 	floppy_devfs_handle = devfs_mk_dir(NULL, "floppy", NULL);
@@ -1032,26 +1033,37 @@ int swim3_init(void)
 		swim = swim->next;
 	}
 
-	if (floppy_count > 0)
-	{
-		if (register_blkdev(MAJOR_NR, "fd", &floppy_fops)) {
-			printk(KERN_ERR "Unable to get major %d for floppy\n",
-			       MAJOR_NR);
-			return -EBUSY;
-		}
-		blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_fd_request, &swim3_lock);
-		for (i = 0; i < floppy_count; i++) {
-			struct gendisk *disk = disks + i;
-			disk->major = MAJOR_NR;
-			disk->first_minor = i;
-			disk->fops = &floppy_fops;
-			sprintf(disk->disk_name, "fd%d", i);
-			set_capacity(disk, 2880);
-			add_disk(disk);
-		}
+	if (!floppy_count)
+		return -ENODEV;
+
+	for (i = 0; i < floppy_count; i++) {
+		disks[i] = alloc_disk();
+		if (!disks[i])
+			goto out;
 	}
 
+	if (register_blkdev(MAJOR_NR, "fd", &floppy_fops)) {
+		printk(KERN_ERR"Unable to get major %d for floppy\n", MAJOR_NR);
+		err = -EBUSY;
+		goto out;
+	}
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_fd_request, &swim3_lock);
+	for (i = 0; i < floppy_count; i++) {
+		struct gendisk *disk = disks[i];
+		disk->major = MAJOR_NR;
+		disk->first_minor = i;
+		disk->fops = &floppy_fops;
+		sprintf(disk->disk_name, "fd%d", i);
+		set_capacity(disk, 2880);
+		add_disk(disk);
+	}
 	return 0;
+
+out:
+	while (i--)
+		put_disk(disks[i]);
+	/* shouldn't we do something with results of swim_add_device()? */
+	return err;
 }
 
 static int swim3_add_device(struct device_node *swim)
@@ -1117,8 +1129,6 @@ static int swim3_add_device(struct device_node *swim)
 */
 
 	init_timer(&fs->timeout);
-
-	do_floppy = NULL;
 
 	printk(KERN_INFO "fd%d: SWIM3 floppy controller %s\n", floppy_count,
 		mediabay ? "in media bay" : "");

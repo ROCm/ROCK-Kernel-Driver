@@ -61,11 +61,6 @@ static inline long waitpid(pid_t pid, unsigned int *status, int options)
 	KERNEL_CALL(pid_t, sys_wait4, pid, status, options, NULL)
 }
 
-static inline pid_t wait(int *status)
-{
-	KERNEL_CALL(pid_t, sys_wait4, -1, status, 0, NULL)
-}
-
 static inline pid_t setsid(void)
 {
 	KERNEL_CALL(pid_t, sys_setsid)

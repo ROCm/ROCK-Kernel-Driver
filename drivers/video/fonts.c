@@ -56,6 +56,10 @@ static struct fbcon_font_desc *fbcon_fonts[] = {
 #undef NO_FONTS
     &font_pearl_8x8,
 #endif
+#ifdef CONFIG_FONT_MINI_4x6
+#undef NO_FONTS
+    &font_mini_4x6,
+#endif
 };
 
 #define num_fonts (sizeof(fbcon_fonts)/sizeof(*fbcon_fonts))

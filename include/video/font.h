@@ -28,6 +28,7 @@ struct fbcon_font_desc {
 #define SUN8x16_IDX	4
 #define SUN12x22_IDX	5
 #define ACORN8x8_IDX	6
+#define	MINI4x6_IDX	7
 
 extern struct fbcon_font_desc	font_vga_8x8,
 				font_vga_8x16,
@@ -35,7 +36,8 @@ extern struct fbcon_font_desc	font_vga_8x8,
 				font_vga_6x11,
 				font_sun_8x16,
 				font_sun_12x22,
-				font_acorn_8x8;
+				font_acorn_8x8,
+				font_mini_4x6;
 
 /* Find a font with a specific name */
 

@@ -55,7 +55,7 @@ endif
 # SK_DBGCAT_DRV_INT_SRC         0x04000000      interrupts sources
 # SK_DBGCAT_DRV_EVENT           0x08000000      driver events
 
-EXTRA_CFLAGS += -I. -DSK_USE_CSUM $(DBGDEF)
+EXTRA_CFLAGS += -Idrivers/net/sk98lin -DSK_USE_CSUM $(DBGDEF)
 
 include $(TOPDIR)/Rules.make
 

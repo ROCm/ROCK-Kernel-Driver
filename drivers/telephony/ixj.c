@@ -274,8 +274,8 @@ static char ixj_c_revision[] = "$Revision: 4.7 $";
 
 #include "ixj.h"
 
-#define TYPE(dev) (MINOR(dev) >> 4)
-#define NUM(dev) (MINOR(dev) & 0xf)
+#define TYPE(dev) (minor(dev) >> 4)
+#define NUM(dev) (minor(dev) & 0xf)
 
 static int ixjdebug;
 static int hertz = HZ;
@@ -386,7 +386,7 @@ static inline void ixj_fsk_alloc(IXJ *j)
 #ifdef PERFMON_STATS
 #define ixj_perfmon(x)	((x)++)
 #else
-#define ixj_perfmon(x)	do {} while(0);
+#define ixj_perfmon(x)	do { } while(0)
 #endif
 
 static int ixj_convert_loaded;
@@ -2806,7 +2806,10 @@ static void ulaw2alaw(unsigned char *buff, unsigned long len)
 	};
 
 	while (len--)
-		*buff++ = table_ulaw2alaw[*(unsigned char *)buff];
+	{
+		*buff = table_ulaw2alaw[*(unsigned char *)buff];
+		buff++;
+	}
 }
 
 static void alaw2ulaw(unsigned char *buff, unsigned long len)
@@ -2848,7 +2851,10 @@ static void alaw2ulaw(unsigned char *buff, unsigned long len)
 	};
 
         while (len--)
-                *buff++ = table_alaw2ulaw[*(unsigned char *)buff];
+        {
+                *buff = table_alaw2ulaw[*(unsigned char *)buff];
+                buff++;
+	}
 }
 
 static ssize_t ixj_read(struct file * file_p, char *buf, size_t length, loff_t * ppos)
@@ -5943,7 +5949,7 @@ static int ixj_build_cadence(IXJ *j, IXJ_CADENCE * cp)
 	lcp = kmalloc(sizeof(IXJ_CADENCE), GFP_KERNEL);
 	if (lcp == NULL)
 		return -ENOMEM;
-	if (copy_from_user(lcp, (char *) cp, sizeof(IXJ_CADENCE)) || (unsigned)lcp->elements_used >= ~0U/sizeof(IXJ_CADENCE) )
+	if (copy_from_user(lcp, (char *) cp, sizeof(IXJ_CADENCE)) || (unsigned)lcp->elements_used >= ~0U/sizeof(IXJ_CADENCE_ELEMENT) )
         {
                 kfree(lcp);
                 return -EFAULT;
@@ -6202,7 +6208,7 @@ static int ixj_ioctl(struct inode *inode, struct file *file_p, unsigned int cmd,
 	IXJ_FILTER_RAW jfr;
 
 	unsigned int raise, mant;
-	unsigned int minor = MINOR(inode->i_rdev);
+	unsigned int minor = minor(inode->i_rdev);
 	int board = NUM(inode->i_rdev);
 
 	IXJ *j = get_ixj(NUM(inode->i_rdev));

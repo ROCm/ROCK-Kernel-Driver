@@ -127,7 +127,7 @@ struct jsflash {
 
 /*
  */
-static struct gendisk jsfd_disk[JSF_MAX];
+static struct gendisk *jsfd_disk[JSF_MAX];
 
 /*
  * Let's pretend we may have several of these...
@@ -614,20 +614,30 @@ static int jsfd_init(void)
 	static spinlock_t lock = SPIN_LOCK_UNLOCKED;
 	struct jsflash *jsf;
 	struct jsfd_part *jdp;
+	int err;
 	int i;
 
 	if (jsf0.base == 0)
 		return -ENXIO;
 
+	err = -ENOMEM;
+	for (i = 0; i < JSF_MAX; i++) {
+		struct gendisk *disk = alloc_disk();
+		if (!disk)
+			goto out;
+		jsfd_disk[i] = disk;
+	}
+
 	if (register_blkdev(JSFD_MAJOR, "jsfd", &jsfd_fops)) {
 		printk("jsfd_init: unable to get major number %d\n",
 		    JSFD_MAJOR);
-		return -EIO;
+		err = -EIO;
+		goto out;
 	}
 
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), jsfd_do_request, &lock);
 	for (i = 0; i < JSF_MAX; i++) {
-		struct gendisk *disk = jsfd_disk + i;
+		struct gendisk *disk = jsfd_disk[i];
 		if ((i & JSF_PART_MASK) >= JSF_NPART) continue;
 		jsf = &jsf0;	/* actually, &jsfv[i >> JSF_PART_BITS] */
 		jdp = &jsf->dv[i&JSF_PART_MASK];
@@ -644,6 +654,10 @@ static int jsfd_init(void)
 		set_device_ro(MKDEV(JSFD_MAJOR, i), 1);
 	}
 	return 0;
+out:
+	while (i--)
+		put_disk(jsfd_disk[i]);
+	return err;
 }
 
 MODULE_LICENSE("GPL");
@@ -664,7 +678,8 @@ static void __exit jsflash_cleanup_module(void)
 
 	for (i = 0; i < JSF_MAX; i++) {
 		if ((i & JSF_PART_MASK) >= JSF_NPART) continue;
-		del_gendisk(jsfd_disk + i);
+		del_gendisk(jsfd_disk[i]);
+		put_disk(jsfd_disk[i]);
 	}
 	if (jsf0.busy)
 		printk("jsf0: cleaning busy unit\n");

@@ -58,6 +58,9 @@
 
 #include "xd.h"
 
+static void __init do_xd_setup (int *integers);
+static int xd[5] = { -1,-1,-1,-1, };
+
 #define XD_DONT_USE_DMA		0  /* Initial value. may be overriden using
 				      "nodma" module option */
 #define XD_INIT_DISK_DELAY	(30*HZ/1000)  /* 30 ms delay during disk initialization */
@@ -123,23 +126,7 @@ static unsigned int xd_bases[] __initdata =
 
 static spinlock_t xd_lock = SPIN_LOCK_UNLOCKED;
 
-extern struct block_device_operations xd_fops;
-
-static struct gendisk xd_gendisk[2] = {
-{
-	.major =	MAJOR_NR,
-	.first_minor =	0,
-	.disk_name =	"xda",
-	.minor_shift =	6,
-	.fops =		&xd_fops,
-},{
-	.major =	MAJOR_NR,
-	.first_minor =	64,
-	.disk_name =	"xdb",
-	.minor_shift =	6,
-	.fops =		&xd_fops,
-}
-};
+static struct gendisk *xd_gendisk[2];
 
 static struct block_device_operations xd_fops = {
 	owner:		THIS_MODULE,
@@ -161,10 +148,19 @@ static int nodma = XD_DONT_USE_DMA;
 static devfs_handle_t devfs_handle = NULL;
 
 /* xd_init: register the block device number and set up pointer tables */
-int __init xd_init (void)
+static int __init xd_init(void)
 {
 	u_char i,controller;
 	unsigned int address;
+	int err;
+
+#ifdef MODULE
+	for (i = 4; i > 0; i--)
+		if(((xd[i] = xd[i-1]) >= 0) && !count)
+			count = i;
+	if((xd[0] = count))
+		do_xd_setup(xd);
+#endif
 
 	init_timer (&xd_watchdog_int); xd_watchdog_int.function = xd_watchdog;
 
@@ -175,9 +171,10 @@ int __init xd_init (void)
 		return -ENOMEM;
 	}
 
+	err = -EBUSY;
 	if (register_blkdev(MAJOR_NR,"xd",&xd_fops)) {
 		printk("xd: Unable to get major number %d\n",MAJOR_NR);
-		return -1;
+		goto out1;
 	}
 	devfs_handle = devfs_mk_dir (NULL, "xd", NULL);
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_xd_request, &xd_lock);
@@ -188,7 +185,7 @@ int __init xd_init (void)
 		if (!request_region(xd_iobase,4,"xd")) {
 			printk("xd: Ports at 0x%x are not available\n",
 				xd_iobase);
-			return -EBUSY;
+			goto out2;
 		}
 		if (controller)
 			xd_sigs[controller].init_controller(address);
@@ -203,31 +200,65 @@ int __init xd_init (void)
 
 	}
 
+	err = -ENODEV;
 	if (!xd_drives)
-		return -ENODEV;
+		goto out3;
 
+	for (i = 0; i < xd_drives; i++) {
+		struct gendisk *disk = alloc_disk();
+		if (!disk)
+			goto Enomem;
+		disk->major = MAJOR_NR;
+		disk->first_minor = i<<6;
+		disk->minor_shift = 6;
+		sprintf(disk->disk_name, "xd%c", i+'a');
+		disk->fops = &xd_fops;
+		xd_gendisk[i] = disk;
+	}
+
+	err = -EBUSY;
 	if (request_irq(xd_irq,xd_interrupt_handler, 0, "XT hard disk", NULL)) {
 		printk("xd: unable to get IRQ%d\n",xd_irq);
-		return -EBUSY;
+		goto out4;
 	}
 
 	if (request_dma(xd_dma,"xd")) {
 		printk("xd: unable to get DMA%d\n",xd_dma);
-		free_irq(xd_irq, NULL);
-		return -EBUSY;
+		goto out5;
 	}
 
 	/* xd_maxsectors depends on controller - so set after detection */
 	blk_queue_max_sectors(BLK_DEFAULT_QUEUE(MAJOR_NR), xd_maxsectors);
 
 	for (i = 0; i < xd_drives; i++) {
-		struct gendisk *disk = xd_gendisk + i;
+		struct gendisk *disk = xd_gendisk[i];
 		set_capacity(disk, xd_info[i].heads * xd_info[i].cylinders *
 				xd_info[i].sectors);
 		add_disk(disk);
 	}
 
 	return 0;
+
+out5:
+	free_irq(xd_irq, NULL);
+out4:
+	for (i = 0; i < xd_drives; i++)
+		put_disk(xd_gendisk[i]);
+out3:
+	release_region(xd_iobase,4);
+out2:
+	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+	unregister_blkdev(MAJOR_NR, "xd");
+out1:
+	if (xd_dma_buffer)
+		xd_dma_mem_free((unsigned long)xd_dma_buffer,
+				xd_maxsectors * 0x200);
+	return err;
+Enomem:
+	err = -ENOMEM;
+	while (i--)
+		put_disk(xd_gendisk[i]);
+	goto out3;
 }
 
 /* xd_detect: scan the possible BIOS ROM locations for the signature strings */
@@ -282,7 +313,7 @@ static void do_xd_request (request_queue_t * q)
 		if (unit < xd_drives
 		    && (CURRENT->flags & REQ_CMD)
 		    && CURRENT->sector + CURRENT->nr_sectors
-		         <= get_capacity(xd_gendisk + unit)) {
+		         <= get_capacity(xd_gendisk[unit])) {
 			block = CURRENT->sector;
 			count = CURRENT->nr_sectors;
 
@@ -980,7 +1011,7 @@ static void __init xd_override_init_drive (u_char drive)
 }
 
 /* xd_setup: initialise controller from command line parameters */
-void __init do_xd_setup (int *integers)
+static void __init do_xd_setup (int *integers)
 {
 	switch (integers[0]) {
 		case 4: if (integers[4] < 0)
@@ -1023,7 +1054,6 @@ static void __init xd_setparam (u_char command,u_char drive,u_char heads,u_short
 
 
 #ifdef MODULE
-static int xd[5] = { -1,-1,-1,-1, };
 
 MODULE_PARM(xd, "1-4i");
 MODULE_PARM(xd_geo, "3-6i");
@@ -1031,44 +1061,16 @@ MODULE_PARM(nodma, "i");
 
 MODULE_LICENSE("GPL");
 
-static void xd_done (void)
-{
-	int i;
-	for (i = 0; i < xd_drives; i++)
-		del_gendisk(xd_gendisk + i);
-	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
-	release_region(xd_iobase,4);
-}
-
-int init_module(void)
-{
-	int i,count = 0;
-	int error;
-
-	for (i = 4; i > 0; i--)
-		if(((xd[i] = xd[i-1]) >= 0) && !count)
-			count = i;
-	if((xd[0] = count))
-		do_xd_setup(xd);
-
-	error = xd_init();
-	if (error) return error;
-
-	printk(KERN_INFO "XD: Loaded as a module.\n");
-	if (!xd_drives) {
-		/* no drives detected - unload module */
-		unregister_blkdev(MAJOR_NR, "xd");
-		xd_done();
-		return (-1);
-	}
-        
-	return 0;
-}
-
 void cleanup_module(void)
 {
+	int i;
 	unregister_blkdev(MAJOR_NR, "xd");
-	xd_done();
+	for (i = 0; i < xd_drives; i++) {
+		del_gendisk(xd_gendisk[i]);
+		put_disk(xd_gendisk[i]);
+	}
+	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+	release_region(xd_iobase,4);
 	devfs_unregister (devfs_handle);
 	if (xd_drives) {
 		free_irq(xd_irq, NULL);
@@ -1107,4 +1109,6 @@ __setup ("xd=", xd_setup);
 __setup ("xd_geo=", xd_manual_geo_init);
 
 #endif /* MODULE */
+
+module_init(xd_init)
 

@@ -222,7 +222,7 @@ struct pcd_unit {
 	int present;		/* does this unit exist ? */
 	char *name;		/* pcd0, pcd1, etc */
 	struct cdrom_device_info info;	/* uniform cdrom interface */
-	struct gendisk disk;
+	struct gendisk *disk;
 };
 
 struct pcd_unit pcd[PCD_UNITS];
@@ -281,7 +281,10 @@ static void pcd_init_units(void)
 
 	pcd_drive_count = 0;
 	for (unit = 0, cd = pcd; unit < PCD_UNITS; unit++, cd++) {
-		struct gendisk *disk = &cd->disk;
+		struct gendisk *disk = alloc_disk();
+		if (!disk)
+			continue;
+		cd->disk = disk;
 		cd->pi = &cd->pia;
 		cd->present = 0;
 		cd->last_sense = 0;
@@ -680,7 +683,7 @@ static int pcd_detect(void)
 		cd = pcd;
 		if (pi_init(cd->pi, 1, -1, -1, -1, -1, -1, pcd_buffer,
 			    PI_PCD, verbose, cd->name)) {
-			if (!pcd_probe(cd, -1, id)) {
+			if (!pcd_probe(cd, -1, id) && cd->disk) {
 				cd->present = 1;
 				k++;
 			} else
@@ -695,7 +698,7 @@ static int pcd_detect(void)
 				     conf[D_UNI], conf[D_PRO], conf[D_DLY],
 				     pcd_buffer, PI_PCD, verbose, cd->name)) 
 				continue;
-			if (!pcd_probe(cd, conf[D_SLV], id)) {
+			if (!pcd_probe(cd, conf[D_SLV], id) && cd->disk) {
 				cd->present = 1;
 				k++;
 			} else
@@ -706,6 +709,8 @@ static int pcd_detect(void)
 		return 0;
 
 	printk("%s: No CD-ROM drive found\n", name);
+	for (unit = 0, cd = pcd; unit < PCD_UNITS; unit++, cd++)
+		put_disk(cd->disk);
 	return -1;
 }
 
@@ -925,14 +930,15 @@ static int __init pcd_init(void)
 
 	if (register_blkdev(MAJOR_NR, name, &pcd_bdops)) {
 		printk("pcd: unable to get major number %d\n", MAJOR_NR);
+		for (unit = 0, cd = pcd; unit < PCD_UNITS; unit++, cd++)
+			put_disk(cd->disk);
 		return -1;
 	}
 
 	for (unit = 0, cd = pcd; unit < PCD_UNITS; unit++, cd++) {
 		if (cd->present) {
-			struct gendisk *disk = &cd->disk;
 			register_cdrom(&cd->info);
-			add_disk(disk);
+			add_disk(cd->disk);
 		}
 	}
 
@@ -948,10 +954,11 @@ static void __exit pcd_exit(void)
 
 	for (unit = 0, cd = pcd; unit < PCD_UNITS; unit++, cd++) {
 		if (cd->present) {
-			del_gendisk(&cd->disk);
+			del_gendisk(cd->disk);
 			pi_release(cd->pi);
 			unregister_cdrom(&cd->info);
 		}
+		put_disk(cd->disk);
 	}
 	unregister_blkdev(MAJOR_NR, name);
 }
