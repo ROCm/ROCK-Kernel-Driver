@@ -296,9 +296,20 @@ extern spinlock_t modlist_lock;
 #define symbol_request(x) try_then_request_module(symbol_get(x), "symbol:" #x)
 
 /* BELOW HERE ALL THESE ARE OBSOLETE AND WILL VANISH */
-#define __MOD_INC_USE_COUNT(mod) \
-	do { __unsafe(mod); (void)try_module_get(mod); } while(0)
-#define __MOD_DEC_USE_COUNT(mod) module_put(mod)
+static inline void __deprecated __MOD_INC_USE_COUNT(struct module *module)
+{
+	__unsafe(module);
+	/*
+	 * Yes, we ignore the retval here, that's why it's deprecated.
+	 */
+	try_module_get(module);
+}
+
+static inline void __deprecated __MOD_DEC_USE_COUNT(struct module *module)
+{
+	module_put(module);
+}
+
 #define SET_MODULE_OWNER(dev) ((dev)->owner = THIS_MODULE)
 
 struct obsolete_modparm {
@@ -319,14 +330,21 @@ struct obsolete_modparm __parm_##var __attribute__((section("__obsparm"))) = \
 /* People do this inside their init routines, when the module isn't
    "live" yet.  They should no longer be doing that, but
    meanwhile... */
+static inline void __deprecated _MOD_INC_USE_COUNT(struct module *module)
+{
+	__unsafe(module);
+
 #if defined(CONFIG_MODULE_UNLOAD) && defined(MODULE)
-#define MOD_INC_USE_COUNT	\
-	do { __unsafe(THIS_MODULE); local_inc(&THIS_MODULE->ref[get_cpu()].count); put_cpu(); } while (0)
+	local_inc(&module->ref[get_cpu()].count);
+	put_cpu();
 #else
-#define MOD_INC_USE_COUNT \
-	do { __unsafe(THIS_MODULE); (void)try_module_get(THIS_MODULE); } while (0)
+	try_module_get(module);
 #endif
-#define MOD_DEC_USE_COUNT module_put(THIS_MODULE)
+}
+#define MOD_INC_USE_COUNT \
+	_MOD_INC_USE_COUNT(THIS_MODULE)
+#define MOD_DEC_USE_COUNT \
+	__MOD_DEC_USE_COUNT(THIS_MODULE)
 #define try_inc_mod_count(mod) try_module_get(mod)
 #define EXPORT_NO_SYMBOLS
 extern int module_dummy_usage;
