@@ -102,7 +102,7 @@
 #include <asm/bitops.h>
 
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include "atari_scsi.h"
 #include "NCR5380.h"
 #include <asm/atari_stdma.h>

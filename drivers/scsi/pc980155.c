@@ -20,7 +20,7 @@
 #include <asm/dma.h>
 
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include "wd33c93.h"
 #include "pc980155.h"
 

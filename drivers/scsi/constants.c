@@ -12,7 +12,7 @@
 #include <linux/blkdev.h>
 #include <linux/kernel.h>
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 
 #define CONST_COMMAND   0x01
 #define CONST_STATUS    0x02

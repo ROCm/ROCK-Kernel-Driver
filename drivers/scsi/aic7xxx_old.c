@@ -239,7 +239,7 @@
 #include <linux/smp.h>
 #include <linux/interrupt.h>
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include "aic7xxx_old/aic7xxx.h"
 
 #include "aic7xxx_old/sequencer.h"

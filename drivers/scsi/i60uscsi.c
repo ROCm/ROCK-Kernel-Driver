@@ -81,7 +81,7 @@
 #include <asm/io.h>
 #include <linux/blkdev.h>
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include "inia100.h"
 
 #define JIFFIES_TO_MS(t) ((t) * 1000 / HZ)

@@ -54,7 +54,7 @@
 #include <linux/blkdev.h>
 #include <linux/spinlock.h>
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 
 /* ============================================================= */
 

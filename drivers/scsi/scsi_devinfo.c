@@ -9,7 +9,7 @@
 #include <scsi/scsi_devinfo.h>
 
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include "scsi_priv.h"
 
 /*

@@ -12,7 +12,7 @@
 #include <asm/pc9800.h>
 
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 
 
 static int pc98_first_bios_param(struct scsi_device *sdev, int *ip)

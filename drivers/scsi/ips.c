@@ -176,7 +176,7 @@
 #include <scsi/sg.h>
 
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include "ips.h"
 
 #include <linux/module.h>

@@ -808,7 +808,7 @@
 #include <asm/dma.h>
 
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include "advansys.h"
 #ifdef CONFIG_PCI
 #include <linux/pci.h>

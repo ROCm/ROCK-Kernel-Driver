@@ -61,7 +61,7 @@ const char * osst_version = "0.99.1";
 #define OSST_DEB_MSG  KERN_NOTICE
 
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include <scsi/scsi_driver.h>
 #include <scsi/scsi_ioctl.h>
 

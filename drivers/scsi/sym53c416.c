@@ -43,7 +43,7 @@
 #include <linux/blkdev.h>
 #include <linux/isapnp.h>
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include "sym53c416.h"
 
 #define VERSION_STRING        "Version 1.0.0-ac"

@@ -53,7 +53,7 @@
 #include <linux/blkdev.h>
 #include <asm/io.h>
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include "dc395x.h"
 #include <scsi/scsicam.h>	/* needed for scsicam_bios_param */
 #include <linux/interrupt.h>

@@ -27,7 +27,7 @@
 #include <asm/byteorder.h>
 
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include "qlogicpti.h"
 
 #include <asm/sbus.h>

@@ -19,7 +19,7 @@
 #include <linux/buffer_head.h>
 #include <asm/unaligned.h>
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include <scsi/scsicam.h>
 
 static int setsize(unsigned long capacity, unsigned int *cyls, unsigned int *hds,

@@ -24,7 +24,7 @@
 
 #include "../parisc/gsc.h"
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 
 #include "ncr53c8xx.h"
 

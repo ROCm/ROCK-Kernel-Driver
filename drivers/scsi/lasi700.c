@@ -50,7 +50,7 @@
 #include <asm/delay.h>
 
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 
 #include "lasi700.h"
 #include "53c700.h"

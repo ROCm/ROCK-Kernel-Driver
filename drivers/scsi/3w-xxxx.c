@@ -220,7 +220,7 @@ MODULE_LICENSE("GPL");
 #define __3W_C			/* let 3w-xxxx.h know it is use */
 
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 
 #include "3w-xxxx.h"
 

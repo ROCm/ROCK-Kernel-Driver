@@ -357,7 +357,7 @@
 #else
 #include <linux/blk.h>
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include "sd.h"
 #endif
 

@@ -126,7 +126,7 @@
 #include <asm/system.h>
 
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 
 #define IN2000_VERSION    "1.33-2.5"
 #define IN2000_DATE       "2002/11/03"

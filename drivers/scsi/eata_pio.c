@@ -63,7 +63,7 @@
 #include <asm/io.h>
 
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include <scsi/scsicam.h>
 
 #include "eata_generic.h"
