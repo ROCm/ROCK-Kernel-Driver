@@ -294,21 +294,31 @@ gt64260_pci_error_int_handler(int irq, void *dev_id, struct pt_regs *regs)
 static int __init
 gt64260_register_hdlrs(void)
 {
+	int rc;
+
 	/* Register CPU interface error interrupt handler */
-	request_irq(MV64x60_IRQ_CPU_ERR, gt64260_cpu_error_int_handler,
-		    SA_INTERRUPT, CPU_INTR_STR, 0);
+	if ((rc = request_irq(MV64x60_IRQ_CPU_ERR,
+		gt64260_cpu_error_int_handler, SA_INTERRUPT, CPU_INTR_STR, 0)))
+		printk(KERN_WARNING "Can't register cpu error handler: %d", rc);
+
 	mv64x60_write(&bh, MV64x60_CPU_ERR_MASK, 0);
 	mv64x60_write(&bh, MV64x60_CPU_ERR_MASK, 0x000000fe);
 
 	/* Register PCI 0 error interrupt handler */
-	request_irq(MV64360_IRQ_PCI0, gt64260_pci_error_int_handler,
-		    SA_INTERRUPT, PCI0_INTR_STR, (void *)0);
+	if ((rc = request_irq(MV64360_IRQ_PCI0, gt64260_pci_error_int_handler,
+		    SA_INTERRUPT, PCI0_INTR_STR, (void *)0)))
+		printk(KERN_WARNING "Can't register pci 0 error handler: %d",
+			rc);
+
 	mv64x60_write(&bh, MV64x60_PCI0_ERR_MASK, 0);
 	mv64x60_write(&bh, MV64x60_PCI0_ERR_MASK, 0x003c0c24);
 
 	/* Register PCI 1 error interrupt handler */
-	request_irq(MV64360_IRQ_PCI1, gt64260_pci_error_int_handler,
-		    SA_INTERRUPT, PCI1_INTR_STR, (void *)1);
+	if ((rc = request_irq(MV64360_IRQ_PCI1, gt64260_pci_error_int_handler,
+		    SA_INTERRUPT, PCI1_INTR_STR, (void *)1)))
+		printk(KERN_WARNING "Can't register pci 1 error handler: %d",
+			rc);
+
 	mv64x60_write(&bh, MV64x60_PCI1_ERR_MASK, 0);
 	mv64x60_write(&bh, MV64x60_PCI1_ERR_MASK, 0x003c0c24);
 

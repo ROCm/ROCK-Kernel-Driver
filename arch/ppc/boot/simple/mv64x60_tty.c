@@ -21,7 +21,7 @@
 #include <linux/serial_reg.h>
 #include <asm/serial.h>
 #include <asm/mv64x60_defs.h>
-#include "../../../../drivers/serial/mpsc_defs.h"
+#include <mpsc_defs.h>
 
 extern void udelay(long);
 static void stop_dma(int chan);
@@ -78,19 +78,19 @@ static struct sdma_regs	sdma_regs[2];
 static u32	mpsc_base[2] = { MV64x60_MPSC_0_OFFSET, MV64x60_MPSC_1_OFFSET };
 
 struct mv64x60_rx_desc {
-	volatile u16 bufsize;
-	volatile u16 bytecnt;
-	volatile u32 cmd_stat;
-	volatile u32 next_desc_ptr;
-	volatile u32 buffer;
+	u16	bufsize;
+	u16	bytecnt;
+	u32	cmd_stat;
+	u32	next_desc_ptr;
+	u32	buffer;
 };
 
 struct mv64x60_tx_desc {
-	volatile u16 bytecnt;
-	volatile u16 shadow;
-	volatile u32 cmd_stat;
-	volatile u32 next_desc_ptr;
-	volatile u32 buffer;
+	u16	bytecnt;
+	u16	shadow;
+	u32	cmd_stat;
+	u32	next_desc_ptr;
+	u32	buffer;
 };
 
 #define	MAX_RESET_WAIT	10000
@@ -120,6 +120,24 @@ static char chan_initialized[2] = { 0, 0 };
 	(rdp)->cmd_stat = SDMA_DESC_CMDSTAT_L | SDMA_DESC_CMDSTAT_F |	\
 		SDMA_DESC_CMDSTAT_O;	\
 }
+
+#ifdef CONFIG_MV64360
+static u32 cpu2mem_tab[MV64x60_CPU2MEM_WINDOWS][2] = {
+		{ MV64x60_CPU2MEM_0_BASE, MV64x60_CPU2MEM_0_SIZE },
+		{ MV64x60_CPU2MEM_1_BASE, MV64x60_CPU2MEM_1_SIZE },
+		{ MV64x60_CPU2MEM_2_BASE, MV64x60_CPU2MEM_2_SIZE },
+		{ MV64x60_CPU2MEM_3_BASE, MV64x60_CPU2MEM_3_SIZE }
+};
+
+static u32 com2mem_tab[MV64x60_CPU2MEM_WINDOWS][2] = {
+		{ MV64360_MPSC2MEM_0_BASE, MV64360_MPSC2MEM_0_SIZE },
+		{ MV64360_MPSC2MEM_1_BASE, MV64360_MPSC2MEM_1_SIZE },
+		{ MV64360_MPSC2MEM_2_BASE, MV64360_MPSC2MEM_2_SIZE },
+		{ MV64360_MPSC2MEM_3_BASE, MV64360_MPSC2MEM_3_SIZE }
+};
+
+static u32 dram_selects[MV64x60_CPU2MEM_WINDOWS] = { 0xe, 0xd, 0xb, 0x7 };
+#endif
 
 unsigned long
 serial_init(int chan, void *ignored)
@@ -180,19 +198,6 @@ serial_init(int chan, void *ignored)
 
 	/* Set up comm unit to memory mapping windows */
 	/* Note: Assumes MV64x60_CPU2MEM_WINDOWS == 4 */
-	u32	cpu2mem_tab[MV64x60_CPU2MEM_WINDOWS][2] = {
-			{ MV64x60_CPU2MEM_0_BASE, MV64x60_CPU2MEM_0_SIZE },
-			{ MV64x60_CPU2MEM_1_BASE, MV64x60_CPU2MEM_1_SIZE },
-			{ MV64x60_CPU2MEM_2_BASE, MV64x60_CPU2MEM_2_SIZE },
-			{ MV64x60_CPU2MEM_3_BASE, MV64x60_CPU2MEM_3_SIZE }
-	};
-	u32	com2mem_tab[MV64x60_CPU2MEM_WINDOWS][2] = {
-			{ MV64360_MPSC2MEM_0_BASE, MV64360_MPSC2MEM_0_SIZE },
-			{ MV64360_MPSC2MEM_1_BASE, MV64360_MPSC2MEM_1_SIZE },
-			{ MV64360_MPSC2MEM_2_BASE, MV64360_MPSC2MEM_2_SIZE },
-			{ MV64360_MPSC2MEM_3_BASE, MV64360_MPSC2MEM_3_SIZE }
-	};
-	u32	dram_selects[MV64x60_CPU2MEM_WINDOWS] = { 0xe, 0xd, 0xb, 0x7 };
 
 	enables = MV64x60_REG_READ(MV64360_CPU_BAR_ENABLE) & 0xf;
 	prot_bits = 0;
