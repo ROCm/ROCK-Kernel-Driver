@@ -364,6 +364,7 @@ struct _snd_pcm_runtime {
 typedef struct _snd_pcm_group {		/* keep linked substreams */
 	spinlock_t lock;
 	struct list_head substreams;
+	int count;
 } snd_pcm_group_t;
 
 struct _snd_pcm_substream {
@@ -488,6 +489,7 @@ int snd_pcm_status(snd_pcm_substream_t * substream, snd_pcm_status_t *status);
 int snd_pcm_prepare(snd_pcm_substream_t *substream);
 int snd_pcm_start(snd_pcm_substream_t *substream);
 int snd_pcm_stop(snd_pcm_substream_t *substream, int status);
+int snd_pcm_drain_done(snd_pcm_substream_t *substream);
 #ifdef CONFIG_PM
 int snd_pcm_suspend(snd_pcm_substream_t *substream);
 int snd_pcm_suspend_all(snd_pcm_t *pcm);

@@ -317,13 +317,13 @@ static unsigned short get_pslots(ac97_t *ac97, unsigned char *rate_table, unsign
 		if (ac97_is_rev22(ac97)) {
 			/* Note: it's simply emulation of AMAP behaviour */
 			u16 es;
-			es = ac97->regs[AC97_EXTENDED_STATUS] &= ~AC97_EI_DACS_SLOT_MASK;
+			es = ac97->regs[AC97_EXTENDED_ID] &= ~AC97_EI_DACS_SLOT_MASK;
 			switch (ac97->addr) {
 			case 1:
 			case 2: es |= (1<<AC97_EI_DACS_SLOT_SHIFT); break;
 			case 3: es |= (2<<AC97_EI_DACS_SLOT_SHIFT); break;
 			}
-			snd_ac97_write_cache(ac97, AC97_EXTENDED_STATUS, es);
+			snd_ac97_write_cache(ac97, AC97_EXTENDED_ID, es);
 		}
 		switch (ac97->addr) {
 		case 0:

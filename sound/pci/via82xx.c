@@ -623,11 +623,6 @@ static irqreturn_t snd_via82xx_interrupt(int irq, void *dev_id, struct pt_regs *
 	unsigned int status;
 	unsigned int i;
 
-#if 0
-	/* FIXME: does it work on via823x? */
-	if (chip->chip_type != TYPE_VIA686)
-		goto _skip_sgd;
-#endif
 	status = inl(VIAREG(chip, SGD_SHADOW));
 	if (! (status & chip->intr_mask)) {
 		if (chip->rmidi)
@@ -635,7 +630,6 @@ static irqreturn_t snd_via82xx_interrupt(int irq, void *dev_id, struct pt_regs *
 			return snd_mpu401_uart_interrupt(irq, chip->rmidi->private_data, regs);
 		return IRQ_NONE;
 	}
-// _skip_sgd:
 
 	/* check status for each stream */
 	spin_lock(&chip->reg_lock);
@@ -2103,10 +2097,11 @@ static int __devinit check_dxs_list(struct pci_dev *pci)
 		{ .vendor = 0x1071, .device = 0x8375, .action = VIA_DXS_NO_VRA }, /* Vobis/Yakumo/Mitac notebook */
 		{ .vendor = 0x10cf, .device = 0x118e, .action = VIA_DXS_ENABLE }, /* FSC laptop */
 		{ .vendor = 0x1106, .device = 0x4161, .action = VIA_DXS_NO_VRA }, /* ASRock K7VT2 */
+		{ .vendor = 0x1106, .device = 0x4552, .action = VIA_DXS_NO_VRA }, /* QDI Kudoz 7X/600-6AL */
 		{ .vendor = 0x1106, .device = 0xaa01, .action = VIA_DXS_NO_VRA }, /* EPIA MII */
 		{ .vendor = 0x1297, .device = 0xa232, .action = VIA_DXS_ENABLE }, /* Shuttle ?? */
 		{ .vendor = 0x1297, .device = 0xc160, .action = VIA_DXS_ENABLE }, /* Shuttle SK41G */
-		{ .vendor = 0x1458, .device = 0xa002, .action = VIA_DXS_NO_VRA }, /* Gigabyte GA-7VAXP (FIXME: or DXS_ENABLE?) */
+		{ .vendor = 0x1458, .device = 0xa002, .action = VIA_DXS_ENABLE }, /* Gigabyte GA-7VAXP */
 		{ .vendor = 0x147b, .device = 0x1401, .action = VIA_DXS_ENABLE }, /* ABIT KD7(-RAID) */
 		{ .vendor = 0x14ff, .device = 0x0403, .action = VIA_DXS_ENABLE }, /* Twinhead mobo */
 		{ .vendor = 0x1462, .device = 0x3800, .action = VIA_DXS_ENABLE }, /* MSI KT266 */

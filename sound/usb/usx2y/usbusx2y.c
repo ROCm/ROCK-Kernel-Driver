@@ -1,6 +1,10 @@
 /*
  * usbus428.c - ALSA USB US-428 Driver
  *
+2004-09-20 Karsten Wiese
+	Version 0.7.3:
+	Use usb_kill_urb() instead of deprecated (kernel 2.6.9) usb_unlink_urb().
+
 2004-07-13 Karsten Wiese
 	Version 0.7.1:
 	Don't sleep in START/STOP callbacks anymore.
@@ -115,7 +119,7 @@
 
 
 MODULE_AUTHOR("Karsten Wiese <annabellesgarden@yahoo.de>");
-MODULE_DESCRIPTION("TASCAM "NAME_ALLCAPS" Version 0.7.2");
+MODULE_DESCRIPTION("TASCAM "NAME_ALLCAPS" Version 0.7.3");
 MODULE_LICENSE("GPL");
 MODULE_SUPPORTED_DEVICE("{{TASCAM(0x1604), "NAME_ALLCAPS"(0x8001)(0x8005)(0x8007) }}");
 
@@ -277,7 +281,7 @@ static void usX2Y_unlinkSeq(snd_usX2Y_AsyncSeq_t* S)
 	int	i;
 	for (i = 0; i < URBS_AsyncSeq; ++i) {
 		if (S[i].urb) {
-			usb_unlink_urb(S->urb[i]);
+			usb_kill_urb(S->urb[i]);
 			usb_free_urb(S->urb[i]);
 			S->urb[i] = NULL;
 		}
@@ -408,7 +412,7 @@ static void usX2Y_usb_disconnect(struct usb_device* device, void* ptr)
 		usX2Y->chip.shutdown = 1;
 		usX2Y->chip_status = USX2Y_STAT_CHIP_HUP;
 		usX2Y_unlinkSeq(&usX2Y->AS04);
-		usb_unlink_urb(usX2Y->In04urb);
+		usb_kill_urb(usX2Y->In04urb);
 		snd_card_disconnect((snd_card_t*)ptr);
 		/* release the midi resources */
 		list_for_each(p, &usX2Y->chip.midi_list) {
