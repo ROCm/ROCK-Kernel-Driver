@@ -1220,6 +1220,7 @@ int get_signal_to_deliver(siginfo_t *info, struct pt_regs *regs)
 
 #endif
 
+EXPORT_SYMBOL(recalc_sigpending);
 EXPORT_SYMBOL(dequeue_signal);
 EXPORT_SYMBOL(flush_signals);
 EXPORT_SYMBOL(force_sig);
