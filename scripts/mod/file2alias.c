@@ -27,7 +27,7 @@ typedef unsigned char  __u8;
 /* Big exception to the "don't include kernel headers into userspace, which
  * even potentially has different endianness and word sizes, since 
  * we handle those differences explicitly below */
-#include "../include/linux/mod_devicetable.h"
+#include "../../include/linux/mod_devicetable.h"
 
 #define ADD(str, sep, cond, field)                              \
 do {                                                            \

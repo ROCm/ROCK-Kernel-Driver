@@ -9,7 +9,7 @@ host-progs	:= conmakehash kallsyms pnmtologo bin2c
 always		:= $(host-progs)
 
 subdir-$(CONFIG_MODVERSIONS)	+= genksyms
-subdir-y	+= modpost
+subdir-y	+= mod
 
 # Let clean descend into subdirs
 subdir-	+= basic lxdialog kconfig package
