@@ -7,6 +7,7 @@
  *            layer code.
  * 2003/06/24 Louis D. Langholtz <ldl@aros.net>
  *            Removed unneeded blksize_bits field from nbd_device struct.
+ *            Cleanup PARANOIA usage & code.
  */
 
 #ifndef LINUX_NBD_H
@@ -28,15 +29,11 @@ enum {
 	NBD_CMD_DISC = 2
 };
 
-
-#ifdef PARANOIA
-extern int requests_in;
-extern int requests_out;
-#endif
-
 #define nbd_cmd(req) ((req)->cmd[0])
-
 #define MAX_NBD 128
+
+/* Define PARANOIA to include extra sanity checking code in here & driver */
+#define PARANOIA
 
 struct nbd_device {
 	int refcnt;	
@@ -46,7 +43,9 @@ struct nbd_device {
 #define NBD_WRITE_NOCHK 0x0002
 	struct socket * sock;
 	struct file * file; 	/* If == NULL, device is not ready, yet	*/
+#ifdef PARANOIA
 	int magic;		/* FIXME: not if debugging is off	*/
+#endif
 	spinlock_t queue_lock;
 	struct list_head queue_head;/* Requests are added here...	*/
 	struct semaphore tx_lock;

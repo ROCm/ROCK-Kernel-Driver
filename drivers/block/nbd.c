@@ -35,13 +35,13 @@
  * 03-06-23 Enhance diagnostics support. <ldl@aros.net>
  * 03-06-24 Remove unneeded blksize_bits field from nbd_device struct.
  *   <ldl@aros.net>
+ * 03-06-24 Cleanup PARANOIA usage & code. <ldl@aros.net>
  *
  * possible FIXME: make set_sock / set_blksize / set_size / do_it one syscall
  * why not: would need verify_area and friends, would share yet another 
  *          structure with userland
  */
 
-#define PARANOIA
 #include <linux/major.h>
 
 #include <linux/blk.h>
@@ -64,9 +64,12 @@
 #include <asm/uaccess.h>
 #include <asm/types.h>
 
+/* Define PARANOIA in linux/nbd.h to turn on extra sanity checking */
 #include <linux/nbd.h>
 
+#ifdef PARANOIA
 #define LO_MAGIC 0x68797548
+#endif
 
 #ifdef NDEBUG
 #define dprintk(flags, fmt...)
@@ -99,8 +102,10 @@ static struct nbd_device nbd_dev[MAX_NBD];
  */
 static spinlock_t nbd_lock = SPIN_LOCK_UNLOCKED;
 
+#ifdef PARANOIA
 static int requests_in;
 static int requests_out;
+#endif
 
 #ifndef NDEBUG
 static const char *ioctl_cmd_to_ascii(int cmd)
@@ -397,7 +402,9 @@ void nbd_do_it(struct nbd_device *lo)
 {
 	struct request *req;
 
+#ifdef PARANOIA
 	BUG_ON(lo->magic != LO_MAGIC);
+#endif
 	while ((req = nbd_read_stat(lo)) != NULL)
 		nbd_end_request(req);
 	printk(KERN_NOTICE "%s: req should never be null\n",
@@ -409,7 +416,9 @@ void nbd_clear_que(struct nbd_device *lo)
 {
 	struct request *req;
 
+#ifdef PARANOIA
 	BUG_ON(lo->magic != LO_MAGIC);
+#endif
 
 	do {
 		req = NULL;
@@ -448,7 +457,9 @@ static void do_nbd_request(request_queue_t * q)
 			goto error_out;
 
 		lo = req->rq_disk->private_data;
+#ifdef PARANOIA
 		BUG_ON(lo->magic != LO_MAGIC);
+#endif
 		if (!lo->file) {
 			printk(KERN_ERR "%s: Request when not-ready\n",
 					lo->disk->disk_name);
@@ -463,7 +474,9 @@ static void do_nbd_request(request_queue_t * q)
 				goto error_out;
 			}
 		}
+#ifdef PARANOIA
 		requests_in++;
+#endif
 
 		req->errors = 0;
 		spin_unlock_irq(q->queue_lock);
@@ -522,11 +535,13 @@ static int nbd_release(struct inode *inode, struct file *file)
 {
 	struct nbd_device *lo = inode->i_bdev->bd_disk->private_data;
 
+#ifdef PARANOIA
 	if (lo->refcnt <= 0) {
 		printk(KERN_ALERT "%s: nbd_release: refcount(%d) <= 0\n",
 				lo->disk->disk_name, lo->refcnt);
 		BUG();
 	}
+#endif
 	lo->refcnt--;
 	dprintk(DBG_RELEASE, "%s: nbd_release: refcnt=%d\n",
 			lo->disk->disk_name, lo->refcnt);
@@ -540,6 +555,9 @@ static int nbd_ioctl(struct inode *inode, struct file *file,
 	int error;
 	struct request sreq ;
 
+#ifdef PARANOIA
+	BUG_ON(lo->magic != LO_MAGIC);
+#endif
 	/* Anyone capable of this syscall can do *real bad* things */
 	dprintk(DBG_IOCTL, "%s: nbd_ioctl cmd=%s(0x%x) arg=%lu\n",
 			lo->disk->disk_name, ioctl_cmd_to_ascii(cmd), cmd, arg);
@@ -642,13 +660,17 @@ static int nbd_ioctl(struct inode *inode, struct file *file,
 	case NBD_CLEAR_QUE:
 		nbd_clear_que(lo);
 		return 0;
-#ifdef PARANOIA
 	case NBD_PRINT_DEBUG:
+#ifdef PARANOIA
 		printk(KERN_INFO "%s: next = %p, prev = %p. Global: in %d, out %d\n",
-		       inode->i_bdev->bd_disk->disk_name, lo->queue_head.next,
-		       lo->queue_head.prev, requests_in, requests_out);
-		return 0;
+			inode->i_bdev->bd_disk->disk_name, lo->queue_head.next,
+			lo->queue_head.prev, requests_in, requests_out);
+#else
+		printk(KERN_INFO "%s: next = %p, prev = %p\n",
+			inode->i_bdev->bd_disk->disk_name,
+			lo->queue_head.next, lo->queue_head.prev);
 #endif
+		return 0;
 	}
 	return -EINVAL;
 }
@@ -671,10 +693,12 @@ static int __init nbd_init(void)
 	int err = -ENOMEM;
 	int i;
 
+#ifdef PARANOIA
 	if (sizeof(struct nbd_request) != 28) {
 		printk(KERN_CRIT "nbd: Sizeof nbd_request needs to be 28 in order to work!\n" );
 		return -EIO;
 	}
+#endif
 
 	for (i = 0; i < MAX_NBD; i++) {
 		struct gendisk *disk = alloc_disk(1);
@@ -708,7 +732,9 @@ static int __init nbd_init(void)
 		struct gendisk *disk = nbd_dev[i].disk;
 		nbd_dev[i].refcnt = 0;
 		nbd_dev[i].file = NULL;
+#ifdef PARANOIA
 		nbd_dev[i].magic = LO_MAGIC;
+#endif
 		nbd_dev[i].flags = 0;
 		spin_lock_init(&nbd_dev[i].queue_lock);
 		INIT_LIST_HEAD(&nbd_dev[i].queue_head);
