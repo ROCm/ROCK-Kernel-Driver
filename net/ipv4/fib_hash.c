@@ -538,6 +538,8 @@ fn_hash_insert(struct fib_table *tb, struct rtmsg *r, struct kern_rta *rta,
 		 */
 		fa_orig = fa;
 		list_for_each_entry(fa, fa_orig->fa_list.prev, fa_list) {
+			if (fa->fa_tos != tos)
+				break;
 			if (fa->fa_info->fib_priority != fi->fib_priority)
 				break;
 			if (fa->fa_type == type &&
@@ -638,6 +640,9 @@ fn_hash_delete(struct fib_table *tb, struct rtmsg *r, struct kern_rta *rta,
 	fa_head = fa->fa_list.prev;
 	list_for_each_entry(fa, fa_head, fa_list) {
 		struct fib_info *fi = fa->fa_info;
+
+		if (fa->fa_tos != tos)
+			break;
 
 		if ((!r->rtm_type ||
 		     fa->fa_type == r->rtm_type) &&
