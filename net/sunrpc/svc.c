@@ -324,8 +324,10 @@ svc_process(struct svc_serv *serv, struct svc_rqst *rqstp)
 		goto dropit;
 	}
 		
-	progp = serv->sv_program;
-	if (prog != progp->pg_prog)
+	for (progp = serv->sv_program; progp; progp = progp->pg_next)
+		if (prog == progp->pg_prog)
+			break;
+	if (progp == NULL)
 		goto err_bad_prog;
 
 	if (vers >= progp->pg_nvers ||
@@ -438,7 +440,7 @@ err_bad_auth:
 
 err_bad_prog:
 #ifdef RPC_PARANOIA
-	if (prog != 100227 || progp->pg_prog != 100003)
+	if (prog != 100227 || serv->sv_program->pg_prog != 100003)
 		printk("svc: unknown program %d (me %d)\n", prog, progp->pg_prog);
 	/* else it is just a Solaris client seeing if ACLs are supported */
 #endif
