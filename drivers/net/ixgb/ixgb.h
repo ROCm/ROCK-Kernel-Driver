@@ -120,9 +120,9 @@ struct ixgb_adapter;
 struct ixgb_buffer {
 	struct sk_buff *skb;
 	uint64_t dma;
-	unsigned long length;
 	unsigned long time_stamp;
-	unsigned int next_to_watch;
+	uint16_t length;
+	uint16_t next_to_watch;
 };
 
 struct ixgb_desc_ring {
