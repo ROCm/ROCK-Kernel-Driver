@@ -277,7 +277,7 @@ void sysfs_remove_dir(struct kobject * kobj)
 	pr_debug("sysfs %s: removing dir\n",dentry->d_name.name);
 	down(&dentry->d_inode->i_sem);
 	list_for_each_entry_safe(sd, tmp, &parent_sd->s_children, s_sibling) {
-		if (!sd->s_element)
+		if (!sd->s_element || !(sd->s_type & SYSFS_NOT_PINNED))
 			continue;
 		list_del_init(&sd->s_sibling);
 		sysfs_drop_dentry(sd, dentry);
