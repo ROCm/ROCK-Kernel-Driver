@@ -1,3 +1,8 @@
+# 
+# Copyright (C) 2002 Jeff Dike (jdike@karaya.com)
+# Licensed under the GPL
+#
+
 EXTRA_TARGETS	:= unmap_fin.o
 
 obj-y = config.o exec_kern.o exec_user.o exitcode.o frame_kern.o frame.o \
@@ -9,32 +14,33 @@ obj-y = config.o exec_kern.o exec_user.o exitcode.o frame_kern.o frame.o \
 	umid.o user_util.o
 
 obj-$(CONFIG_BLK_DEV_INITRD) += initrd_kern.o initrd_user.o
-
-# user_syms.o not included here because Rules.make has its own ideas about
-# building anything in export-objs
-
-USER_OBJS := $(filter %_user.o,$(obj-y)) config.o helper.o process.o \
-	tempfile.o time.o tty_log.o umid.o user_util.o user_syms.o
-USER_OBJS := $(foreach file,$(USER_OBJS),arch/um/kernel/$(file))
-
-export-objs := ksyms.o process_kern.o signal_kern.o gprof_syms.o gmon_syms.o
-
-UNMAP_CFLAGS := $(patsubst -pg -DPROFILING,,$(USER_CFLAGS))
-UNMAP_CFLAGS := $(patsubst -fprofile-arcs -ftest-coverage,,$(UNMAP_CFLAGS))
-
-ifeq ($(CONFIG_MODULES), y)
-  DMODULES = -D__CONFIG_MODULES__
-endif
-
-ifeq ($(CONFIG_MODVERSIONS), y)
-  DMODVERSIONS = -D__CONFIG_MODVERSIONS__
-endif
-
 obj-$(CONFIG_GPROF)	+= gprof_syms.o
 obj-$(CONFIG_GCOV)	+= gmon_syms.o
 obj-$(CONFIG_TTY_LOG)	+= tty_log.o
 
-CFLAGS_user_syms.o = -D__AUTOCONF_INCLUDED__ $(DMODULES) $(DMODVERSIONS) \
+subdir-$(CONFIG_PTPROXY) += tt
+
+user-objs-$(CONFIG_TTY_LOG) += tty_log.o
+
+# user_syms.o not included here because Rules.make has its own ideas about
+# building anything in export-objs
+
+USER_OBJS := $(filter %_user.o,$(obj-y))  $(user-objs-y) config.o helper.o 
+	process.o tempfile.o time.o tty_log.o umid.o user_util.o user_syms.o
+USER_OBJS := $(foreach file,$(USER_OBJS),arch/um/kernel/$(file))
+
+UNMAP_CFLAGS := $(patsubst -pg -DPROFILING,,$(USER_CFLAGS))
+UNMAP_CFLAGS := $(patsubst -fprofile-arcs -ftest-coverage,,$(UNMAP_CFLAGS))
+
+DMODULES-$(CONFIG_MODULES) = -D__CONFIG_MODULES__
+DMODVERSIONS-$(CONFIG_MODVERSIONS) = -D__CONFIG_MODVERSIONS__
+
+export-objs-$(CONFIG_GPROF) += gprof_syms.o
+export-objs-$(CONFIG_GCOV) += gmon_syms.o
+
+export-objs := ksyms.o process_kern.o signal_kern.o $(export-objs-y)
+
+CFLAGS_user_syms.o = -D__AUTOCONF_INCLUDED__ $(DMODULES-y) $(DMODVERSIONS-y) \
 	-I/usr/include -I../include
 
 CFLAGS_frame.o := $(patsubst -fomit-frame-pointer,,$(USER_CFLAGS))
@@ -65,6 +71,7 @@ arch/um/kernel/config.o : arch/um/kernel/config.c
 
 clean:
 	rm -f config.c
+	for dir in $(subdir-y) ; do $(MAKE) -C $$dir clean; done
 
 modules:
 
