@@ -1281,6 +1281,9 @@ static void ata_dev_set_mode(struct ata_port *ap, struct ata_device *dev)
 	if (!ata_dev_present(dev) || (ap->flags & ATA_FLAG_PORT_DISABLED))
 		return;
 
+	if (dev->xfer_shift == ATA_SHIFT_PIO)
+		dev->flags |= ATA_DFLAG_PIO;
+
 	ata_dev_set_xfermode(ap, dev);
 
 	base = base_from_shift(dev->xfer_shift);
@@ -2338,8 +2341,6 @@ struct ata_queued_cmd *ata_qc_new_init(struct ata_port *ap,
 
 		ata_tf_init(ap, &qc->tf, dev->devno);
 
-		if (likely((dev->flags & ATA_DFLAG_PIO) == 0))
-			qc->flags |= ATA_QCFLAG_DMA;
 		if (dev->flags & ATA_DFLAG_LBA48)
 			qc->tf.flags |= ATA_TFLAG_LBA48;
 	}
@@ -2483,6 +2484,7 @@ int ata_qc_issue_prot(struct ata_queued_cmd *qc)
 		break;
 
 	case ATA_PROT_ATAPI:
+		ata_qc_set_polling(qc);
 		ata_tf_to_host_nolock(ap, &qc->tf);
 		queue_work(ata_wq, &ap->packet_task);
 		break;
