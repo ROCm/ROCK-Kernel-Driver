@@ -50,6 +50,7 @@ static int udf_adinicb_readpage(struct file *file, struct page * page)
 	struct buffer_head *bh;
 	int block;
 	char *kaddr;
+	int err = 0;
 
 	if (!PageLocked(page))
 		PAGE_BUG(page);
@@ -58,13 +59,20 @@ static int udf_adinicb_readpage(struct file *file, struct page * page)
 	memset(kaddr, 0, PAGE_CACHE_SIZE);
 	block = udf_get_lb_pblock(inode->i_sb, UDF_I_LOCATION(inode), 0);
 	bh = sb_bread(inode->i_sb, block);
+	if (!bh)
+	{
+		SetPageError(page);
+		err = -EIO;
+		goto out;
+	}
 	memcpy(kaddr, bh->b_data + udf_ext0_offset(inode), inode->i_size);
 	brelse(bh);
 	flush_dcache_page(page);
 	SetPageUptodate(page);
+out:
 	kunmap(page);
 	UnlockPage(page);
-	return 0;
+	return err;
 }
 
 static int udf_adinicb_writepage(struct page *page)
@@ -74,6 +82,7 @@ static int udf_adinicb_writepage(struct page *page)
 	struct buffer_head *bh;
 	int block;
 	char *kaddr;
+	int err = 0;
 
 	if (!PageLocked(page))
 		PAGE_BUG(page);
@@ -81,13 +90,20 @@ static int udf_adinicb_writepage(struct page *page)
 	kaddr = kmap(page);
 	block = udf_get_lb_pblock(inode->i_sb, UDF_I_LOCATION(inode), 0);
 	bh = sb_bread(inode->i_sb, block);
+	if (!bh)
+	{
+		SetPageError(page);
+		err = -EIO;
+		goto out;
+	}
 	memcpy(bh->b_data + udf_ext0_offset(inode), kaddr, inode->i_size);
 	mark_buffer_dirty(bh);
 	brelse(bh);
 	SetPageUptodate(page);
+out:
 	kunmap(page);
 	UnlockPage(page);
-	return 0;
+	return err;
 }
 
 static int udf_adinicb_prepare_write(struct file *file, struct page *page, unsigned offset, unsigned to)
@@ -103,19 +119,27 @@ static int udf_adinicb_commit_write(struct file *file, struct page *page, unsign
 	struct buffer_head *bh;
 	int block;
 	char *kaddr = page_address(page);
+	int err = 0;
 
 	block = udf_get_lb_pblock(inode->i_sb, UDF_I_LOCATION(inode), 0);
 	bh = sb_bread(inode->i_sb, block);
+	if (!bh)
+	{
+		SetPageError(page);
+		err = -EIO;
+		goto out;
+	}
 	memcpy(bh->b_data + udf_file_entry_alloc_offset(inode) + offset,
-		kaddr + offset, to-offset);
+		kaddr + offset, to - offset);
 	mark_buffer_dirty(bh);
 	brelse(bh);
 	SetPageUptodate(page);
+out:
 	kunmap(page);
 	/* only one page here */
 	if (to > inode->i_size)
 		inode->i_size = to;
-	return 0;
+	return err;
 }
 
 struct address_space_operations udf_adinicb_aops = {

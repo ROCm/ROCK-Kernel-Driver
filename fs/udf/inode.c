@@ -83,9 +83,6 @@ void udf_put_inode(struct inode * inode)
 	{
 		lock_kernel();
 		udf_discard_prealloc(inode);
-		/* write the root inode on put, if dirty */
-		if (!inode->i_sb->s_root && inode->i_state & I_DIRTY)
-			udf_update_inode(inode, IS_SYNC(inode));
 		unlock_kernel();
 	}
 }
@@ -703,7 +700,6 @@ static void udf_prealloc_extents(struct inode *inode, int c, int lastblock,
 
 		if (numalloc)
 		{
-			UDF_I_LENEXTENTS(inode) += numalloc << inode->i_sb->s_blocksize_bits;
 			if (start == (c+1))
 				laarr[start].extLength +=
 					(numalloc << inode->i_sb->s_blocksize_bits);
@@ -727,7 +723,7 @@ static void udf_prealloc_extents(struct inode *inode, int c, int lastblock,
 
 				if (elen > numalloc)
 				{
-					laarr[c+1].extLength -=
+					laarr[c].extLength -=
 						(numalloc << inode->i_sb->s_blocksize_bits);
 					numalloc = 0;
 				}
@@ -741,6 +737,7 @@ static void udf_prealloc_extents(struct inode *inode, int c, int lastblock,
 					(*endnum) --;
 				}
 			}
+			UDF_I_LENEXTENTS(inode) += numalloc << inode->i_sb->s_blocksize_bits;
 		}
 	}
 }
@@ -1349,6 +1346,7 @@ udf_update_inode(struct inode *inode, int do_sync)
 		use->lengthAllocDescs = cpu_to_le32(UDF_I_LENALLOC(inode));
 		crclen = sizeof(struct UnallocatedSpaceEntry) + UDF_I_LENALLOC(inode) -
 			sizeof(tag);
+		use->descTag.tagLocation = cpu_to_le32(UDF_I_LOCATION(inode).logicalBlockNum);
 		use->descTag.descCRCLength = cpu_to_le16(crclen);
 		use->descTag.descCRC = cpu_to_le16(udf_crc((char *)use + sizeof(tag), crclen, 0));
 
