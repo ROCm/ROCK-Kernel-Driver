@@ -1274,14 +1274,31 @@ __bread_slow(struct block_device *bdev, sector_t block, int size)
  *
  * This is a transparent caching front-end to sb_bread(), sb_getblk() and
  * sb_find_get_block().
+ *
+ * The LRUs themselves only need locking against invalidate_bh_lrus.  We use
+ * a local interrupt disable for that.
  */
 
-#define BH_LRU_SIZE	7
+#define BH_LRU_SIZE	8
 
 static struct bh_lru {
-	spinlock_t lock;
 	struct buffer_head *bhs[BH_LRU_SIZE];
 } ____cacheline_aligned_in_smp bh_lrus[NR_CPUS];
+
+#ifdef CONFIG_SMP
+#define bh_lru_lock()	local_irq_disable()
+#define bh_lru_unlock()	local_irq_enable()
+#else
+#define bh_lru_lock()	preempt_disable()
+#define bh_lru_unlock()	preempt_enable()
+#endif
+
+static inline void check_irqs_on(void)
+{
+#ifdef irqs_disabled
+	BUG_ON(irqs_disabled());
+#endif
+}
 
 /*
  * The LRU management algorithm is dopey-but-simple.  Sorry.
@@ -1294,8 +1311,9 @@ static void bh_lru_install(struct buffer_head *bh)
 	if (bh == NULL)
 		return;
 
-	lru = &bh_lrus[get_cpu()];
-	spin_lock(&lru->lock);
+	check_irqs_on();
+	bh_lru_lock();
+	lru = &bh_lrus[smp_processor_id()];
 	if (lru->bhs[0] != bh) {
 		struct buffer_head *bhs[BH_LRU_SIZE];
 		int in;
@@ -1321,8 +1339,7 @@ static void bh_lru_install(struct buffer_head *bh)
 			bhs[out++] = NULL;
 		memcpy(lru->bhs, bhs, sizeof(bhs));
 	}
-	spin_unlock(&lru->lock);
-	put_cpu();
+	bh_lru_unlock();
 
 	if (evictee) {
 		touch_buffer(evictee);
@@ -1337,8 +1354,9 @@ lookup_bh(struct block_device *bdev, sector_t block, int size)
 	struct bh_lru *lru;
 	int i;
 
-	lru = &bh_lrus[get_cpu()];
-	spin_lock(&lru->lock);
+	check_irqs_on();
+	bh_lru_lock();
+	lru = &bh_lrus[smp_processor_id()];
 	for (i = 0; i < BH_LRU_SIZE; i++) {
 		struct buffer_head *bh = lru->bhs[i];
 
@@ -1356,8 +1374,7 @@ lookup_bh(struct block_device *bdev, sector_t block, int size)
 			break;
 		}
 	}
-	spin_unlock(&lru->lock);
-	put_cpu();
+	bh_lru_unlock();
 	return ret;
 }
 
@@ -1404,25 +1421,32 @@ __bread(struct block_device *bdev, sector_t block, int size)
 EXPORT_SYMBOL(__bread);
 
 /*
- * This is called rarely - at unmount.
+ * invalidate_bh_lrus() is called rarely - at unmount.  Because it is only for
+ * unmount it only needs to ensure that all buffers from the target device are
+ * invalidated on return and it doesn't need to worry about new buffers from
+ * that device being added - the unmount code has to prevent that.
  */
+static void invalidate_bh_lru(void *arg)
+{
+	const int cpu = get_cpu();
+	int i;
+
+	for (i = 0; i < BH_LRU_SIZE; i++) {
+		brelse(bh_lrus[cpu].bhs[i]);
+		bh_lrus[cpu].bhs[i] = NULL;
+	}
+	put_cpu();
+}
+	
 static void invalidate_bh_lrus(void)
 {
-	int cpu_idx;
-
-	for (cpu_idx = 0; cpu_idx < NR_CPUS; cpu_idx++)
-		spin_lock(&bh_lrus[cpu_idx].lock);
-	for (cpu_idx = 0; cpu_idx < NR_CPUS; cpu_idx++) {
-		int i;
-
-		for (i = 0; i < BH_LRU_SIZE; i++) {
-			brelse(bh_lrus[cpu_idx].bhs[i]);
-			bh_lrus[cpu_idx].bhs[i] = NULL;
-		}
-	}
-	for (cpu_idx = 0; cpu_idx < NR_CPUS; cpu_idx++)
-		spin_unlock(&bh_lrus[cpu_idx].lock);
+	preempt_disable();
+	invalidate_bh_lru(NULL);
+	smp_call_function(invalidate_bh_lru, NULL, 1, 1);
+	preempt_enable();
 }
+
+
 
 void set_bh_page(struct buffer_head *bh,
 		struct page *page, unsigned long offset)
@@ -2544,9 +2568,6 @@ static void bh_mempool_free(void *element, void *pool_data)
 void __init buffer_init(void)
 {
 	int i;
-
-	for (i = 0; i < NR_CPUS; i++)
-		spin_lock_init(&bh_lrus[i].lock);
 
 	bh_cachep = kmem_cache_create("buffer_head",
 			sizeof(struct buffer_head), 0,
