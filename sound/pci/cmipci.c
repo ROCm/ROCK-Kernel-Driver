@@ -2479,7 +2479,7 @@ static int snd_cmipci_free(cmipci_t *cm)
 		/* reset mixer */
 		snd_cmipci_mixer_write(cm, 0, 0);
 
-		synchronize_irq();
+		synchronize_irq(dev->irq);
 
 		free_irq(cm->irq, (void *)cm);
 	}
