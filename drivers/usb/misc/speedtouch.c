@@ -912,6 +912,9 @@ fail_instance:
 static void udsl_usb_disconnect (struct usb_interface *intf)
 {
 	struct udsl_instance_data *instance = usb_get_intfdata (intf);
+	struct list_head *pos;
+	unsigned long flags;
+	unsigned int count = 0;
 	int i;
 
 	PDEBUG ("disconnecting\n");
@@ -927,12 +930,39 @@ static void udsl_usb_disconnect (struct usb_interface *intf)
 
 	down (&instance->serialize);
 	/* no need to take the spinlock - recvqueue_tasklet is not running */
+	list_for_each (pos, &instance->spare_receivers)
+		if (++count > UDSL_NUMBER_RCV_URBS)
+			panic (__FILE__ ": memory corruption detected at line %d!\n", __LINE__);
 	INIT_LIST_HEAD (&instance->spare_receivers);
 	up (&instance->serialize);
+
+	PDEBUG ("udsl_usb_disconnect: flushed %u spare receivers\n", count);
+
+	count = UDSL_NUMBER_RCV_URBS - count;
 
 	for (i = 0; i < UDSL_NUMBER_RCV_URBS; i++)
 		usb_unlink_urb (instance->rcvbufs[i].urb);
 
+	/* wait for completion handlers to finish */
+	do {
+		unsigned int completed = 0;
+
+		spin_lock_irqsave (&instance->completed_receivers_lock, flags);
+		list_for_each (pos, &instance->completed_receivers)
+			if (++completed > count)
+				panic (__FILE__ ": memory corruption detected at line %d!\n", __LINE__);
+		spin_unlock_irqrestore (&instance->completed_receivers_lock, flags);
+
+		PDEBUG ("udsl_usb_disconnect: found %u completed receivers\n", completed);
+
+		if (completed == count)
+			break;
+
+		/* not all urbs accounted for */
+		yield ();
+	} while (1);
+
+	PDEBUG ("udsl_usb_disconnect: flushing %u completed receivers\n", count);
 	/* no need to take the spinlock - no completion handlers running */
 	INIT_LIST_HEAD (&instance->completed_receivers);
 
