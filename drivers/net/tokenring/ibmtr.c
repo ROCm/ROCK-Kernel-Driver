@@ -110,7 +110,6 @@ in the event that chatty debug messages are desired - jjs 12/30/98 */
 #include <linux/module.h>
 
 #ifdef PCMCIA
-#undef MODULE
 #undef ENABLE_PAGING
 #else
 #define ENABLE_PAGING 1		
@@ -352,21 +351,13 @@ static int __devinit ibmtr_probe1(struct net_device *dev, int PIOaddr)
 
 	unsigned char segment, intr=0, irq=0, i, j, cardpresent=NOTOK, temp=0;
 	void * t_mmio = 0;
-	struct tok_info *ti = 0;
+	struct tok_info *ti = dev->priv;
 	void *cd_chanid;
 	unsigned char *tchanid, ctemp;
 #ifndef PCMCIA
 	unsigned char t_irq=0;
         unsigned long timeout;
 	static int version_printed;
-#endif
-
-#ifndef MODULE
-#ifndef PCMCIA
-	dev = init_trdev(dev, 0);
-	if (!dev)
-		return -ENOMEM;
-#endif
 #endif
 
 	/*    Query the adapter PIO base port which will return
@@ -404,7 +395,6 @@ static int __devinit ibmtr_probe1(struct net_device *dev, int PIOaddr)
 	 */
 #ifdef PCMCIA
 	iounmap(t_mmio);
-	ti = dev->priv;		/*BMS moved up here */
 	t_mmio = (void *)ti->mmio;	/*BMS to get virtual address */
 	irq = ti->irq;		/*BMS to display the irq!   */
 #endif
@@ -454,30 +444,20 @@ static int __devinit ibmtr_probe1(struct net_device *dev, int PIOaddr)
 		DPRINTK("Expected for MCA: ");
 		PrtChanID(mcchannelid, 1);
 	}
-	/* Now, allocate some of the pl0 buffers for this driver.. */
+	/* Now, setup some of the pl0 buffers for this driver.. */
 	/* If called from PCMCIA, it is already set up, so no need to 
 	   waste the memory, just use the existing structure */
 #ifndef PCMCIA
-	ti = (struct tok_info *) kmalloc(sizeof(struct tok_info), GFP_KERNEL);
-	if (ti == NULL) {
-		iounmap(t_mmio);
-		return -ENOMEM;
-	}
-	memset(ti, 0, sizeof(struct tok_info));
 	ti->mmio = t_mmio;
-	dev->priv = ti;		/* this seems like the logical use of the
-				   field ... let's try some empirical tests
-				   using the token-info structure -- that
-				   should fit with out future hope of multiple
-				   adapter support as well /dwm   */
-        for(i=0; i<IBMTR_MAX_ADAPTERS; i++) {
-                if (turbo_io[i] != PIOaddr) continue;
+        for (i = 0; i < IBMTR_MAX_ADAPTERS; i++) {
+                if (turbo_io[i] != PIOaddr)
+			continue;
 #if IBMTR_DEBUG_MESSAGES 
-		printk("ibmtr::tr_probe1, setting PIOaddr %x to Turbo\n" ,
-							PIOaddr);
+		printk("ibmtr::tr_probe1, setting PIOaddr %x to Turbo\n",
+		       PIOaddr);
 #endif
-		ti->turbo=1;
-		t_irq=turbo_irq[i];
+		ti->turbo = 1;
+		t_irq = turbo_irq[i];
         }
 #endif /* !PCMCIA */
 	ti->readlog_pending = 0;
@@ -826,11 +806,6 @@ static int __devinit trdev_init(struct net_device *dev)
 	dev->set_multicast_list = tok_set_multicast_list;
 	dev->change_mtu = ibmtr_change_mtu;
 
-#ifndef MODULE
-#ifndef PCMCIA
-	tr_setup(dev);
-#endif
-#endif
 	return 0;
 }
 
@@ -1948,21 +1923,21 @@ int init_module(void)
 	int count=0;
 
 	find_turbo_adapters(io);
+
 	for (i = 0; io[i] && (i < IBMTR_MAX_ADAPTERS); i++) {
 		irq[i] = 0;
 		mem[i] = 0;
-		dev_ibmtr[i] = NULL;
-		dev_ibmtr[i] = init_trdev(dev_ibmtr[i], 0);
+		dev_ibmtr[i] = alloc_trdev(sizeof(struct tok_info));
 		if (dev_ibmtr[i] == NULL) { 
-			if (i==0)
+			if (i == 0)
 				return -ENOMEM;
-			break ; 
+			break;
 		}
 		dev_ibmtr[i]->base_addr = io[i];
 		dev_ibmtr[i]->irq = irq[i];
 		dev_ibmtr[i]->mem_start = mem[i];
 		dev_ibmtr[i]->init = &ibmtr_probe;
-		if (register_trdev(dev_ibmtr[i]) != 0) {
+		if (register_netdev(dev_ibmtr[i]) != 0) {
 			kfree(dev_ibmtr[i]);
 			dev_ibmtr[i] = NULL;
 			continue;
@@ -1970,7 +1945,7 @@ int init_module(void)
 		count++;
 	}
 	if (count) return 0;
-	printk("ibmtr: register_trdev() returned non-zero.\n");
+	printk("ibmtr: register_netdev() returned non-zero.\n");
 	return -EIO;
 }				/*init_module */
 
@@ -1979,24 +1954,25 @@ void cleanup_module(void)
 	int i,j;
 
 	for (i = 0; i < IBMTR_MAX_ADAPTERS; i++){
-		if(!dev_ibmtr[i]) continue;
+		if (!dev_ibmtr[i])
+			continue;
 		if (dev_ibmtr[i]->base_addr) {
 			outb(0,dev_ibmtr[i]->base_addr+ADAPTRESET);
 			for(j=jiffies+TR_RST_TIME;
 				time_before_eq(jiffies,j);) ;
                         outb(0,dev_ibmtr[i]->base_addr+ADAPTRESETREL);
                 }
-		unregister_trdev(dev_ibmtr[i]);
+		unregister_netdev(dev_ibmtr[i]);
 		free_irq(dev_ibmtr[i]->irq, dev_ibmtr[i]);
 		release_region(dev_ibmtr[i]->base_addr, IBMTR_IO_EXTENT);
 #ifndef PCMCIA
 		{ 
-		struct tok_info *ti = (struct tok_info *)dev_ibmtr[i]->priv ; 
-		iounmap((u32 *)ti->mmio) ; 
-		iounmap((u32 *)ti->sram_virt) ; 
+			struct tok_info *ti = (struct tok_info *)
+				dev_ibmtr[i]->priv;
+			iounmap((u32 *)ti->mmio);
+			iounmap((u32 *)ti->sram_virt);
 		}
 #endif		
-		kfree(dev_ibmtr[i]->priv);
 		kfree(dev_ibmtr[i]);
 		dev_ibmtr[i] = NULL;
 	}
