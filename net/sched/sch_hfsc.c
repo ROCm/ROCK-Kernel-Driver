@@ -122,7 +122,9 @@ struct hfsc_class
 	u32		classid;	/* class id */
 	unsigned int	refcnt;		/* usage count */
 
-	struct tc_stats	stats;		/* generic statistics */
+	struct gnet_stats_basic bstats;
+	struct gnet_stats_queue qstats;
+	struct gnet_stats_rate_est rate_est;
 	spinlock_t	*stats_lock;
 	unsigned int	level;		/* class level in hierarchy */
 	struct tcf_proto *filter_list;	/* filter list */
@@ -1686,7 +1688,7 @@ hfsc_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 
 	err = cl->qdisc->enqueue(skb, cl->qdisc);
 	if (unlikely(err != NET_XMIT_SUCCESS)) {
-		cl->stats.drops++;
+		cl->qstats.drops++;
 		sch->qstats.drops++;
 		return err;
 	}
@@ -1694,8 +1696,8 @@ hfsc_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 	if (cl->qdisc->q.qlen == 1)
 		set_active(cl, len);
 
-	cl->stats.packets++;
-	cl->stats.bytes += len;
+	cl->bstats.packets++;
+	cl->bstats.bytes += len;
 	sch->bstats.packets++;
 	sch->bstats.bytes += len;
 	sch->q.qlen++;
@@ -1799,7 +1801,7 @@ hfsc_drop(struct Qdisc *sch)
 			} else {
 				list_move_tail(&cl->dlist, &q->droplist);
 			}
-			cl->stats.drops++;
+			cl->qstats.drops++;
 			sch->qstats.drops++;
 			sch->q.qlen--;
 			return len;
