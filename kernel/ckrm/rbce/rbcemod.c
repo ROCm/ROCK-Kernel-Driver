@@ -377,9 +377,38 @@ reinsert_rule(struct rbce_rule *rule, int order)
  */
 
 static struct rbce_class *
+create_rbce_class(const char *classname, int classtype, void *classobj)
+{
+	struct rbce_class *cls;
+
+	if (classtype >= CKRM_MAX_CLASSTYPES) {
+		printk(KERN_ERR "ckrm_classobj returned %d as classtype which cannot "
+				" be handled by RBCE\n", classtype);
+		return NULL;
+	}
+
+	cls = kmalloc(sizeof(struct rbce_class), GFP_ATOMIC);
+	if (!cls) {
+		return NULL;
+	}
+	cls->obj.name = kmalloc(strlen(classname) + 1, GFP_ATOMIC);
+	if (cls->obj.name) {
+		GET_REF(cls) = 1;
+		cls->classobj = classobj;
+		strcpy(cls->obj.name, classname);
+		list_add_tail(&cls->obj.link, &class_list);
+		cls->classtype = classtype;
+	} else {
+		kfree(cls);
+		cls = NULL;
+	}
+	return cls;
+} 
+
+static struct rbce_class *
 get_class(char *classname, int *classtype)
 {
-	static struct rbce_class *cls;
+	struct rbce_class *cls;
 	void *classobj;
 
 	if (!classname) {
@@ -399,31 +428,7 @@ get_class(char *classname, int *classtype)
 		return NULL;
 	}
 
-	/* now walk through our list and see the mapping for that */
-
-	if (*classtype >= CKRM_MAX_CLASSTYPES) {
-		printk(KERN_ERR "ckrm_classobj returned %d as classtype which cannot "
-				" be handled by RBCE\n", *classtype);
-		return NULL;
-	}
-
-	cls = kmalloc(sizeof(struct rbce_class), GFP_ATOMIC);
-	if (!cls) {
-		return NULL;
-	}
-	cls->obj.name = kmalloc(strlen(classname) + 1, GFP_ATOMIC);
-	if (cls->obj.name) {
-		GET_REF(cls) = 1;
-		cls->classobj = classobj;
-		strcpy(cls->obj.name, classname);
-		list_add_tail(&cls->obj.link, &class_list);
-		notify_class_action(cls,1);
-		cls->classtype = *classtype;
-	} else {
-		kfree(cls);
-		cls = NULL;
-	}
-	return cls;
+	return create_rbce_class(classname,*classtype,classobj);
 }
 
 /*
@@ -436,7 +441,6 @@ put_class(struct rbce_class *cls)
 {
 	if (cls) {
 		if (DEC_REF(cls) <= 0) {
-			notify_class_action(cls,0);
 			list_del(&cls->obj.link);
 			kfree(cls->obj.name);
 			kfree(cls);
@@ -453,16 +457,19 @@ put_class(struct rbce_class *cls)
 
 #ifdef RBCE_EXTENSION 
 static void
-rbce_class_addcb(const char *classname, void *clsobj)
+rbce_class_addcb(const char *classname, void *clsobj, int classtype)
 {
-	static struct rbce_class *cls;
+	struct rbce_class *cls;
 
 	write_lock(&global_rwlock);
 	cls = find_class_name((char*)classname);
 	if (cls) {
-		cls->classobj = clsobj; 
-		notify_class_action(cls,1);
+		cls->classobj = clsobj;
+	} else {
+		cls = create_rbce_class(classname, classtype, clsobj);
 	}
+	if (cls)
+		notify_class_action(cls,1);
 	write_unlock(&global_rwlock);
 	return;
 }
@@ -472,7 +479,7 @@ rbce_class_addcb(const char *classname, void *clsobj)
  * Callback from core when a class is deleted.
  */
 static void
-rbce_class_deletecb(const char *classname, void *classobj)
+rbce_class_deletecb(const char *classname, void *classobj, int classtype)
 {
 	static struct rbce_class *cls;
 	struct named_obj_hdr *pos;
@@ -497,6 +504,7 @@ rbce_class_deletecb(const char *classname, void *classobj)
 				}
 			}
 		}
+		put_class(cls);
 		if ((cls = find_class_name(classname)) != NULL) {
 			printk(KERN_ERR "rbce ERROR: class %s exists in rbce after "
 					"removal in core\n", classname);

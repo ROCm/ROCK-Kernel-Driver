@@ -643,7 +643,7 @@ ckrm_alloc_task_class(struct ckrm_core_class *parent, const char *name)
 
 	ce_protect(&CT_taskclass);
 	if (CT_taskclass.ce_cb_active && CT_taskclass.ce_callbacks.class_add)
-		(*CT_taskclass.ce_callbacks.class_add)(name,taskcls);
+		(*CT_taskclass.ce_callbacks.class_add)(name,taskcls,CT_taskclass.typeID);
 	ce_release(&CT_taskclass);
 
 	return class_core(taskcls);
@@ -671,7 +671,7 @@ ckrm_free_task_class(struct ckrm_core_class *core)
 	ce_protect(&CT_taskclass);
 
 	if (CT_taskclass.ce_cb_active && CT_taskclass.ce_callbacks.class_delete)
-		(*CT_taskclass.ce_callbacks.class_delete)(core->name,taskcls);
+		(*CT_taskclass.ce_callbacks.class_delete)(core->name,taskcls,CT_taskclass.typeID);
 	ckrm_reclassify_class_tasks( taskcls );
 
 	ce_release(&CT_taskclass);

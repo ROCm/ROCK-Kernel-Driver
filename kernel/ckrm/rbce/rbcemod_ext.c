@@ -371,12 +371,13 @@ notify_class_action(struct rbce_class *cls, int action)
 	struct crbce_class_info cinfo;
 	int len;
 
-
 	rec_set_timehdr(&cinfo,CRBCE_REC_CLASS_INFO,0,cls->classobj);
 	cinfo.action = action;
-	len = strlen(cls->obj.name) + 1;
-	cinfo.namelen = len;
+	len = strnlen(cls->obj.name,CRBCE_MAX_CLASS_NAME_LEN-1);
 	memcpy(&cinfo.name,cls->obj.name,len);
+	cinfo.name[len] = '\0';
+	len++;
+	cinfo.namelen = len;
 
 	len += sizeof(cinfo)-CRBCE_MAX_CLASS_NAME_LEN;
 	rec_send_len(&cinfo,len);

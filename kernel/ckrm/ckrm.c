@@ -208,8 +208,17 @@ ckrm_register_engine(const char *typename, ckrm_eng_callback_t *ecbs)
 	ctype->ce_regd = 1;
 	ctype->ce_callbacks = *ecbs;
 	set_callbacks_active(ctype);
-	if (ctype->ce_callbacks.class_add) 
-		(*ctype->ce_callbacks.class_add)(ctype->default_class->name,ctype->default_class);
+
+	if (ctype->ce_callbacks.class_add) {
+                struct ckrm_core_class *core;
+
+	        read_lock(&ckrm_class_lock);
+
+                list_for_each_entry(core, &ctype->classes, clslist) {
+			(*ctype->ce_callbacks.class_add)(core->name,core,ctype->typeID);
+                }
+        	read_unlock(&ckrm_class_lock);
+        }
 	return ctype->typeID;
 }
 

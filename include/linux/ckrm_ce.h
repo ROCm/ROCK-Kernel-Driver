@@ -50,8 +50,8 @@ typedef struct ckrm_eng_callback {
 	unsigned long c_interest;         /* set of classification events CE is interested in */
 	ce_classify_fct_t   classify;     /* generic classify */
 
-	void   (*class_add)   (const char *name, void *core); /* class added */
-	void   (*class_delete)(const char *name, void *core); /* class deleted */
+	void   (*class_add)   (const char *name, void *core, int classtype); /* class added */
+	void   (*class_delete)(const char *name, void *core, int classtype); /* class deleted */
 
 	/* callback which are called while holding task_lock(tsk) */
 	unsigned long n_interest;         /* set of notification events CE is interested in */

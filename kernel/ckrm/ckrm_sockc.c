@@ -304,7 +304,7 @@ sock_alloc_class(struct ckrm_core_class *parent, const char *name)
 
 	ce_protect(&CT_sockclass);
 	if (CT_sockclass.ce_cb_active && CT_sockclass.ce_callbacks.class_add)
-		(*CT_sockclass.ce_callbacks.class_add)(name,sockcls);
+		(*CT_sockclass.ce_callbacks.class_add)(name,sockcls,CT_sockclass.typeID);
 	ce_release(&CT_sockclass);
 
 	return class_core(sockcls);
@@ -330,7 +330,7 @@ sock_free_class(struct ckrm_core_class *core)
 	ce_protect(&CT_sockclass);
 
 	if (CT_sockclass.ce_cb_active && CT_sockclass.ce_callbacks.class_delete)
-		(*CT_sockclass.ce_callbacks.class_delete)(core->name,sockcls);
+		(*CT_sockclass.ce_callbacks.class_delete)(core->name,sockcls,CT_sockclass.typeID);
 
 	sock_reclassify_class ( sockcls );
 
