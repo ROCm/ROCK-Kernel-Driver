@@ -18,11 +18,11 @@
 #endif
 
 struct file_operations bfs_file_operations = {
-	llseek: 	generic_file_llseek,
-	read:		generic_file_read,
-	write:		generic_file_write,
-	mmap:		generic_file_mmap,
-	sendfile:	generic_file_sendfile,
+	.llseek 	= generic_file_llseek,
+	.read		= generic_file_read,
+	.write		= generic_file_write,
+	.mmap		= generic_file_mmap,
+	.sendfile	= generic_file_sendfile,
 };
 
 static int bfs_move_block(unsigned long from, unsigned long to, struct super_block *sb)
@@ -151,12 +151,12 @@ static int bfs_bmap(struct address_space *mapping, long block)
 }
 
 struct address_space_operations bfs_aops = {
-	readpage:	bfs_readpage,
-	writepage:	bfs_writepage,
-	sync_page:	block_sync_page,
-	prepare_write:	bfs_prepare_write,
-	commit_write:	generic_commit_write,
-	bmap:		bfs_bmap,
+	.readpage	= bfs_readpage,
+	.writepage	= bfs_writepage,
+	.sync_page	= block_sync_page,
+	.prepare_write	= bfs_prepare_write,
+	.commit_write	= generic_commit_write,
+	.bmap		= bfs_bmap,
 };
 
 struct inode_operations bfs_file_inops;
