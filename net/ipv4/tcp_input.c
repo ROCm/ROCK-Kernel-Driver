@@ -3043,8 +3043,8 @@ static int tcp_prune_queue(struct sock *sk)
 
 	/* First, purge the out_of_order queue. */
 	if (skb_queue_len(&tp->out_of_order_queue)) {
-		net_statistics[smp_processor_id() * 2].OfoPruned +=
-					skb_queue_len(&tp->out_of_order_queue);
+		NET_ADD_STATS_BH(OfoPruned,
+				 skb_queue_len(&tp->out_of_order_queue));
 		__skb_queue_purge(&tp->out_of_order_queue);
 
 		/* Reset SACK state.  A conforming SACK implementation will

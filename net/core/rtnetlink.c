@@ -220,6 +220,40 @@ int rtnetlink_dump_ifinfo(struct sk_buff *skb, struct netlink_callback *cb)
 	return skb->len;
 }
 
+static int do_setlink(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
+{
+	struct ifinfomsg  *ifm = NLMSG_DATA(nlh);
+	struct rtattr    **ida = arg;
+	struct net_device *dev;
+	int err;
+
+	dev = dev_get_by_index(ifm->ifi_index);
+	if (!dev)
+		return -ENODEV;
+
+	err = -EINVAL;
+
+	if (ida[IFLA_ADDRESS - 1]) {
+		if (ida[IFLA_ADDRESS - 1]->rta_len != RTA_LENGTH(dev->addr_len))
+			goto out;
+		memcpy(dev->dev_addr, RTA_DATA(ida[IFLA_ADDRESS - 1]),
+		       dev->addr_len);
+	}
+
+	if (ida[IFLA_BROADCAST - 1]) {
+		if (ida[IFLA_BROADCAST - 1]->rta_len != RTA_LENGTH(dev->addr_len))
+			goto out;
+		memcpy(dev->broadcast, RTA_DATA(ida[IFLA_BROADCAST - 1]),
+		       dev->addr_len);
+	}
+
+	err = 0;
+
+out:
+	dev_put(dev);
+	return err;
+}
+
 int rtnetlink_dump_all(struct sk_buff *skb, struct netlink_callback *cb)
 {
 	int idx;
@@ -457,32 +491,14 @@ static void rtnetlink_rcv(struct sock *sk, int len)
 
 static struct rtnetlink_link link_rtnetlink_table[RTM_MAX-RTM_BASE+1] =
 {
-	{ NULL,			NULL,			},
-	{ NULL,			NULL,			},
-	{ NULL,			rtnetlink_dump_ifinfo,	},
-	{ NULL,			NULL,			},
-
-	{ NULL,			NULL,			},
-	{ NULL,			NULL,			},
-	{ NULL,			rtnetlink_dump_all,	},
-	{ NULL,			NULL,			},
-
-	{ NULL,			NULL,			},
-	{ NULL,			NULL,			},
-	{ NULL,			rtnetlink_dump_all,	},
-	{ NULL,			NULL,			},
-
-	{ neigh_add,		NULL,			},
-	{ neigh_delete,		NULL,			},
-	{ NULL,			neigh_dump_info,	},
-	{ NULL,			NULL,			},
-
-	{ NULL,			NULL,			},
-	{ NULL,			NULL,			},
-	{ NULL,			NULL,			},
-	{ NULL,			NULL,			},
+	[RTM_GETLINK  - RTM_BASE] = { .dumpit = rtnetlink_dump_ifinfo },
+	[RTM_SETLINK  - RTM_BASE] = { .doit   = do_setlink	      },
+	[RTM_GETADDR  - RTM_BASE] = { .dumpit = rtnetlink_dump_all    },
+	[RTM_GETROUTE - RTM_BASE] = { .dumpit = rtnetlink_dump_all    },
+	[RTM_NEWNEIGH - RTM_BASE] = { .doit   = neigh_add	      },
+	[RTM_DELNEIGH - RTM_BASE] = { .doit   = neigh_delete	      },
+	[RTM_GETNEIGH - RTM_BASE] = { .dumpit = neigh_dump_info	      }
 };
-
 
 static int rtnetlink_event(struct notifier_block *this, unsigned long event, void *ptr)
 {
