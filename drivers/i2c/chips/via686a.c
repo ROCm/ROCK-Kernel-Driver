@@ -653,7 +653,7 @@ static DEVICE_ATTR(alarms, S_IRUGO | S_IWUSR, show_alarms, NULL);
    smbus_driver and isa_driver, and clients could be of either kind */
 static struct i2c_driver via686a_driver = {
 	.owner		= THIS_MODULE,
-	.name		= "VIA686A",
+	.name		= "via686a",
 	.id		= I2C_DRIVERID_VIA686A,
 	.flags		= I2C_DF_NOTIFY,
 	.attach_adapter	= via686a_attach_adapter,
