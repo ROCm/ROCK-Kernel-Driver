@@ -762,8 +762,7 @@ int scsi_prep_fn(struct request_queue *q, struct request *req)
 		SRpnt = (Scsi_Request *) req->special;
 		
 		if( SRpnt->sr_magic == SCSI_REQ_MAGIC ) {
-			SCpnt = scsi_allocate_device(SRpnt->sr_device, 
-						     FALSE, FALSE);
+			SCpnt = scsi_allocate_device(SRpnt->sr_device, 0);
 			if (!SCpnt)
 				return BLKPREP_DEFER;
 			scsi_init_cmd_from_req(SCpnt, SRpnt);
@@ -774,9 +773,9 @@ int scsi_prep_fn(struct request_queue *q, struct request *req)
 		 * Now try and find a command block that we can use.
 		 */
 		if (req->special) {
-				SCpnt = (Scsi_Cmnd *) req->special;
+			SCpnt = (Scsi_Cmnd *) req->special;
 		} else {
-			SCpnt = scsi_allocate_device(SDpnt, FALSE, FALSE);
+			SCpnt = scsi_allocate_device(SDpnt, 0);
 		}
 		/*
 		 * if command allocation failure, wait a bit
