@@ -1418,16 +1418,6 @@ static struct pci_driver dc390_driver = {
 
 static int __init dc390_module_init(void)
 {
-	if (tmscsim[0] == -1 || tmscsim[0] > 15) {
-		tmscsim[0] = 7;
-		tmscsim[1] = 4;
-		tmscsim[2] = 0x09;
-		tmscsim[3] = 0x0f;
-		tmscsim[4] = 2;
-		tmscsim[5] = 10;
-		printk(KERN_INFO "DC390: Using safe settings.\n");
-	}
-
 	return pci_module_init(&dc390_driver);
 }
 
