@@ -1486,7 +1486,7 @@ ia64_handle_unaligned (unsigned long ifa, struct pt_regs *regs)
 	/* something went wrong... */
 	if (!user_mode(regs)) {
 		if (eh) {
-			handle_exception(regs, eh);
+			ia64_handle_exception(regs, eh);
 			goto done;
 		}
 		die_if_kernel("error during unaligned kernel access\n", regs, ret);

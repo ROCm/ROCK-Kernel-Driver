@@ -213,7 +213,7 @@ ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_regs *re
 		return;
 	}
 
-	if (done_with_exception(regs))
+	if (ia64_done_with_exception(regs))
 		return;
 
 	/*

@@ -488,7 +488,7 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 			siginfo.si_isr = isr;
 			force_sig_info(sig, &siginfo, current);
 			return;
-		} else if (done_with_exception(regs))
+		} else if (ia64_done_with_exception(regs))
 			return;
 		sprintf(buf, "NaT consumption");
 		break;
