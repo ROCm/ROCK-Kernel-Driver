@@ -88,13 +88,12 @@ static struct usb_device_id tower_table [] = {
 
 MODULE_DEVICE_TABLE (usb, tower_table);
 
-/* FIXME: Get a minor range for your devices from the usb maintainer */
-#define LEGO_USB_TOWER_MINOR_BASE	0xB3
+#define LEGO_USB_TOWER_MINOR_BASE	160
 
 /* we can have up to this number of device plugged in at once */
 #define MAX_DEVICES		16
 
-#define COMMAND_TIMEOUT    (2*HZ)  /* 60 second timeout for a command */
+#define COMMAND_TIMEOUT		(2*HZ)  /* 2 second timeout for a command */
 
 /* Structure to hold all of our device specific stuff */
 struct lego_usb_tower {
@@ -130,7 +129,6 @@ struct lego_usb_tower {
 /* local function prototypes */
 static ssize_t tower_read	(struct file *file, char *buffer, size_t count, loff_t *ppos);
 static ssize_t tower_write	(struct file *file, const char *buffer, size_t count, loff_t *ppos);
-static int tower_ioctl		(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg);
 static inline void tower_delete (struct lego_usb_tower *dev);
 static int tower_open		(struct inode *inode, struct file *file);
 static int tower_release	(struct inode *inode, struct file *file);
@@ -151,7 +149,6 @@ static struct file_operations tower_fops = {
 	.owner = 	THIS_MODULE,
 	.read  = 	tower_read,
 	.write =	tower_write,
-	.ioctl =	tower_ioctl,
 	.open =		tower_open,
 	.release = 	tower_release,
 };
@@ -212,15 +209,9 @@ static inline void tower_delete (struct lego_usb_tower *dev)
 	if (dev->interrupt_out_urb != NULL) {
 		usb_free_urb (dev->interrupt_out_urb);
 	}
-	if (dev->read_buffer != NULL) {
-		kfree (dev->read_buffer);
-	}
-	if (dev->interrupt_in_buffer != NULL) {
-		kfree (dev->interrupt_in_buffer);
-	}
-	if (dev->interrupt_out_buffer != NULL) {
-		kfree (dev->interrupt_out_buffer);
-	}
+	kfree (dev->read_buffer);
+	kfree (dev->interrupt_in_buffer);
+	kfree (dev->interrupt_out_buffer);
 	kfree (dev);
 
 	dbg(2, "%s : leave", __func__);
@@ -436,7 +427,6 @@ static ssize_t tower_read (struct file *file, char *buffer, size_t count, loff_t
 			}
 
 			if (signal_pending(current)) {
-
 				retval = -EINTR;
 				goto exit;
 			}
@@ -505,7 +495,7 @@ static ssize_t tower_write (struct file *file, const char *buffer, size_t count,
 
 	/* verify that we actually have some data to write */
 	if (count == 0) {
-        	dbg(1," %s : write request of 0 bytes", __func__);
+		dbg(1," %s : write request of 0 bytes", __func__);
 		goto exit;
 	}
 
@@ -584,20 +574,6 @@ exit:
 	up (&dev->sem);
 
 	dbg(2," %s : leave, return value %d", __func__, retval);
-
-	return retval;
-}
-
-
-/**
- *	Number of reasons why this isn't supported - GKH doesn't like them
- *      since they are non-portable and also most of this is derived from
- *      proprietary information
- */
-
-static int tower_ioctl (struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
-{
-	int retval =  -ENOTTY;  /* default: we don't understand ioctl */
 
 	return retval;
 }
@@ -778,8 +754,6 @@ static int tower_probe (struct usb_interface *interface, const struct usb_device
 		err("Couldn't allocate interrupt_out_urb");
 		goto error;
 	}                
-
-	/* initialize the devfs node for this device and register it */
 
 	/* we can register the device now, as it is ready */
 	usb_set_intfdata (interface, dev);
