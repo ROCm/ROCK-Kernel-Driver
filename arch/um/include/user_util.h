@@ -27,6 +27,7 @@ extern unsigned long uml_physmem;
 extern unsigned long uml_reserved;
 extern unsigned long end_vm;
 extern unsigned long start_vm;
+extern unsigned long highmem;
 
 extern int tracing_pid;
 extern int honeypot;

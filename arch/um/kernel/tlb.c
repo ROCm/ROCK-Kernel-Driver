@@ -178,6 +178,11 @@ void flush_tlb_kernel_vm(void)
 	flush_tlb_kernel_range(start_vm, end_vm);
 }
 
+void __flush_tlb_one(unsigned long addr)
+{
+	flush_tlb_kernel_range(addr, addr + PAGE_SIZE);
+}
+  
 void flush_tlb_range(struct vm_area_struct *vma, unsigned long start, 
 		     unsigned long end)
 {

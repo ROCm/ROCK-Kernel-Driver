@@ -31,6 +31,7 @@ CONFIG_MAGIC_SYSRQ=y
 # CONFIG_SMP is not set
 CONFIG_NEST_LEVEL=0
 CONFIG_KERNEL_HALF_GIGS=1
+# CONFIG_HIGHMEM is not set
 
 #
 # Loadable module support

@@ -32,6 +32,7 @@ bool 'Symmetric multi-processing support' CONFIG_UML_SMP
 define_bool CONFIG_SMP $CONFIG_UML_SMP
 int 'Nesting level' CONFIG_NEST_LEVEL 0
 int 'Kernel address space size (in .5G units)' CONFIG_KERNEL_HALF_GIGS 1
+bool 'Highmem support' CONFIG_HIGHMEM
 endmenu
 
 mainmenu_option next_comment

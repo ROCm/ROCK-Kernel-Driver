@@ -43,10 +43,11 @@ extern void *region_va(unsigned long phys);
 #define __pa(virt) region_pa((void *) (virt))
 #define __va(phys) region_va((unsigned long) (phys))
 
+extern unsigned long page_to_pfn(struct page *page);
+extern struct page *pfn_to_page(unsigned long pfn);
+
 extern struct page *phys_to_page(unsigned long phys);
 
-#define pfn_to_page(pfn) (phys_to_page(pfn << PAGE_SHIFT))
-#define page_to_pfn(page) (page_to_phys(page) >> PAGE_SHIFT)
 #define virt_to_page(v) (phys_to_page(__pa(v)))
 
 extern struct page *page_mem_map(struct page *page);

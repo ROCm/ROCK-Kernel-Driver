@@ -77,25 +77,6 @@ int create_mem_file(unsigned long len)
 	return(fd);
 }
 
-void setup_one_range(int n, int fd, char *driver, unsigned long start, 
-		     unsigned long len, struct mem_region *region)
-{
-	if(fd == -1)
-		fd = create_mem_file(len);
-	if(region == NULL){
-		region = malloc(sizeof(*region));
-		if(region == NULL){
-			perror("Allocating mem_region");
-			exit(1);
-		}
-	}
-	*region = ((struct mem_region) { driver :	driver, 
-					 start :	start, 
-					 len :		len, 
-					 fd :		fd } );
-	regions[n] = region;
-}
-
 int setup_region(struct mem_region *region, void *entry)
 {
 	void *loc, *start;
