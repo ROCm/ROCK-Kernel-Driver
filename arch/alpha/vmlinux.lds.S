@@ -21,41 +21,30 @@ SECTIONS
 	*(.gnu.warning)
   } :kernel
   _etext = .;					/* End of text section */
-  RODATA
 
   . = ALIGN(16);
   __start___ex_table = .;			/* Exception table */
   __ex_table : { *(__ex_table) }
   __stop___ex_table = .;
 
-  . = ALIGN(8);
-  __start___ksymtab = .;			/* Kernel symbol table */
-  __ksymtab : { *(__ksymtab) }
-  __stop___ksymtab = .;
-
-  . = ALIGN(8);
-  __start___gpl_ksymtab = .;	/* kernel symbol table - GPL-only symbols */
-  __gpl_ksymtab : { *(__gpl_ksymtab) }
-  __stop___gpl_ksymtab = .;
-
-  . = ALIGN(8);
-  __start___kallsyms = .;			/* All kernel symbols */
-  __kallsyms : { *(__kallsyms) }
-  __stop___kallsyms = .;
+  RODATA
 
   /* Will be freed after init */
   . = ALIGN(8192);				/* Init code and data */
   __init_begin = .;
   .init.text : { *(.init.text) }
   .init.data : { *(.init.data) }
+
   . = ALIGN(16);
   __setup_start = .;
   .init.setup : { *(.init.setup) }
   __setup_end = .;
+
   . = ALIGN(8);
   __start___param = .;
   __param : { *(__param) }
   __stop___param = .;
+
   . = ALIGN(8);
   __initcall_start = .;
   .initcall.init : {
@@ -68,24 +57,23 @@ SECTIONS
 	*(.initcall7.init)
   }
   __initcall_end = .;
+
   . = ALIGN(8192);
   __initramfs_start = .;
   .init.ramfs : { *(.init.ramfs) }
   __initramfs_end = .;
+
   . = ALIGN(64);
   __per_cpu_start = .;
   .data.percpu : { *(.data.percpu) }
   __per_cpu_end = .;
-  . = ALIGN(8192);
+
+  . = ALIGN(2*8192);
   __init_end = .;
   /* Freed after init ends here */
 
-  /* writeable */
-  _data = .;
-  .data : {					/* Data */
-	*(.data)
-	CONSTRUCTORS
-  }
+  /* Note 2 page alignment above.  */
+  .data.init_thread : { *(.data.init_thread) }
 
   . = ALIGN(8192);
   .data.page_aligned : { *(.data.page_aligned) }
@@ -93,13 +81,16 @@ SECTIONS
   . = ALIGN(64);
   .data.cacheline_aligned : { *(.data.cacheline_aligned) }
 
+  _data = .;
+  .data : {					/* Data */
+	*(.data)
+	CONSTRUCTORS
+  }
+
   .got : { *(.got) }
   .sdata : { *(.sdata) }
 
   _edata = .;					/* End of data section */
-
-  . = ALIGN(2*8192);				/* Inititial task and stack */
-  .data.init_thread : { *(.data.init_thread) }
 
   __bss_start = .;
   .sbss : { *(.sbss) *(.scommon) }
@@ -110,7 +101,6 @@ SECTIONS
 
   /* Sections to be discarded */
   /DISCARD/ : { *(.exit.text) *(.exit.data) *(.exitcall.exit) }
-
 
   .mdebug 0 : { *(.mdebug) }
   .note 0 : { *(.note) }
