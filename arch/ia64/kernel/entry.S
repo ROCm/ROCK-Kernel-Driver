@@ -3,7 +3,7 @@
  *
  * Kernel entry points.
  *
- * Copyright (C) 1998-2003 Hewlett-Packard Co
+ * Copyright (C) 1998-2003, 2005 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  * Copyright (C) 1999, 2002-2003
  *	Asit Mallick <Asit.K.Mallick@intel.com>
@@ -904,7 +904,7 @@ GLOBAL_ENTRY(ia64_leave_kernel)
 	cmp.eq p9,p0=r0,r0	// set p9 to indicate that we should restore cr.ifs
 	;;
 	ld8 r24=[r16],16	// load ar.rnat (may be garbage)
-	ld8 r23=[r17],16// load ar.bspstore (may be garbage)
+	ld8 r23=[r17],16	// load ar.bspstore (may be garbage)
 	;;
 	ld8 r31=[r16],16	// load predicates
 	ld8 r21=[r17],16	// load b0
