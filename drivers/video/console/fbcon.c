@@ -314,6 +314,28 @@ static int search_for_mapped_con(void)
 	return 0;
 }
 
+static int fbcon_takeover(void)
+{
+	int err, i;
+
+	if (!num_registered_fb)
+		return -ENODEV;
+
+	for (i = first_fb_vc; i <= last_fb_vc; i++)
+		con2fb_map[i] = info_idx;
+
+	err = take_over_console(&fb_con, first_fb_vc, last_fb_vc,
+				fbcon_is_default);
+	if (err) {
+		for (i = first_fb_vc; i <= last_fb_vc; i++) {
+			con2fb_map[i] = -1;
+		}
+		info_idx = -1;
+	}
+
+	return err;
+}
+
 /**
  *	set_con2fb_map - map console to frame buffer device
  *	@unit: virtual console number to map
@@ -322,7 +344,7 @@ static int search_for_mapped_con(void)
  *	Maps a virtual console @unit to a frame buffer device
  *	@newidx.
  */
-int set_con2fb_map(int unit, int newidx)
+static int set_con2fb_map(int unit, int newidx)
 {
 	struct vc_data *vc = vc_cons[unit].d;
 	int oldidx = con2fb_map[unit];
@@ -338,8 +360,7 @@ int set_con2fb_map(int unit, int newidx)
 
 	if (!search_for_mapped_con()) {
 		info_idx = newidx;
-		fb_console_init();
-		return 0;
+		return fbcon_takeover();
 	}
 
 	if (oldidx != -1)
@@ -2730,12 +2751,25 @@ static int fbcon_mode_deleted(struct fb_info *info,
 	return found;
 }
 
+static int fbcon_fb_registered(int idx)
+{
+	int ret = 0;
+
+	if (info_idx == -1) {
+		info_idx = idx;
+		ret = fbcon_takeover();
+	}
+
+	return ret;
+}
+
 static int fbcon_event_notify(struct notifier_block *self, 
 			      unsigned long action, void *data)
 {
 	struct fb_event *event = (struct fb_event *) data;
 	struct fb_info *info = event->info;
 	struct fb_videomode *mode;
+	struct fb_con2fbmap *con2fb;
 	int ret = 0;
 
 	switch(action) {
@@ -2751,6 +2785,17 @@ static int fbcon_event_notify(struct notifier_block *self,
 	case FB_EVENT_MODE_DELETE:
 		mode = (struct fb_videomode *) event->data;
 		ret = fbcon_mode_deleted(info, mode);
+		break;
+	case FB_EVENT_FB_REGISTERED:
+		ret = fbcon_fb_registered(info->node);
+		break;
+	case FB_EVENT_SET_CONSOLE_MAP:
+		con2fb = (struct fb_con2fbmap *) event->data;
+		ret = set_con2fb_map(con2fb->console - 1, con2fb->framebuffer);
+		break;
+	case FB_EVENT_GET_CONSOLE_MAP:
+		con2fb = (struct fb_con2fbmap *) event->data;
+		con2fb->framebuffer = con2fb_map[con2fb->console - 1];
 		break;
 	}
 
@@ -2790,43 +2835,28 @@ const struct consw fb_con = {
 static struct notifier_block fbcon_event_notifier = {
 	.notifier_call	= fbcon_event_notify,
 };
-static int fbcon_event_notifier_registered;
 
-/* can't be __init as it can be called by set_con2fb_map() later */
-int fb_console_init(void)
+int __init fb_console_init(void)
 {
-	int err, i;
+	int i;
+
+	acquire_console_sem();
+	fb_register_client(&fbcon_event_notifier);
+	release_console_sem();
 
 	for (i = 0; i < MAX_NR_CONSOLES; i++)
 		con2fb_map[i] = -1;
 
-	if (!num_registered_fb)
-		return -ENODEV;
-
-	if (info_idx == -1) {
+	if (num_registered_fb) {
 		for (i = 0; i < FB_MAX; i++) {
 			if (registered_fb[i] != NULL) {
 				info_idx = i;
 				break;
 			}
 		}
+		fbcon_takeover();
 	}
-	for (i = first_fb_vc; i <= last_fb_vc; i++)
-		con2fb_map[i] = info_idx;
-	err = take_over_console(&fb_con, first_fb_vc, last_fb_vc,
-				fbcon_is_default);
-	if (err) {
-		for (i = first_fb_vc; i <= last_fb_vc; i++) {
-			con2fb_map[i] = -1;
-		}
-		return err;
-	}
-	acquire_console_sem();
-	if (!fbcon_event_notifier_registered) {
-		fb_register_client(&fbcon_event_notifier);
-		fbcon_event_notifier_registered = 1;
-	} 
-	release_console_sem();
+
 	return 0;
 }
 
@@ -2835,10 +2865,7 @@ int fb_console_init(void)
 void __exit fb_console_exit(void)
 {
 	acquire_console_sem();
-	if (fbcon_event_notifier_registered) {
-		fb_unregister_client(&fbcon_event_notifier);
-		fbcon_event_notifier_registered = 0;
-	}
+	fb_unregister_client(&fbcon_event_notifier);
 	release_console_sem();
 	give_up_console(&fb_con);
 }	

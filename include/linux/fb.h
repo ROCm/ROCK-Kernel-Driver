@@ -452,6 +452,13 @@ struct fb_cursor_user {
 #define FB_EVENT_RESUME			0x03
 /*      An entry from the modelist was removed */
 #define FB_EVENT_MODE_DELETE            0x04
+/*      A driver registered itself */
+#define FB_EVENT_FB_REGISTERED          0x05
+/*      get console to framebuffer mapping */
+#define FB_EVENT_GET_CONSOLE_MAP        0x06
+/*      set console to framebuffer mapping */
+#define FB_EVENT_SET_CONSOLE_MAP        0x07
+
 
 struct fb_event {
 	struct fb_info *info;

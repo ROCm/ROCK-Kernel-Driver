@@ -47,9 +47,6 @@
 
 #include <linux/fb.h>
 
-#ifdef CONFIG_FRAMEBUFFER_CONSOLE
-#include "console/fbcon.h"
-#endif
     /*
      *  Frame buffer device initialization and setup routines
      */
@@ -1236,10 +1233,9 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	struct fb_ops *fb = info->fbops;
 	struct fb_var_screeninfo var;
 	struct fb_fix_screeninfo fix;
-#ifdef CONFIG_FRAMEBUFFER_CONSOLE
 	struct fb_con2fbmap con2fb;
-#endif
 	struct fb_cmap_user cmap;
+	struct fb_event event;
 	void __user *argp = (void __user *)arg;
 	int i;
 	
@@ -1288,13 +1284,16 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		i = fb_cursor(info, argp);
 		release_console_sem();
 		return i;
-#ifdef CONFIG_FRAMEBUFFER_CONSOLE
 	case FBIOGET_CON2FBMAP:
 		if (copy_from_user(&con2fb, argp, sizeof(con2fb)))
 			return -EFAULT;
 		if (con2fb.console < 1 || con2fb.console > MAX_NR_CONSOLES)
 		    return -EINVAL;
-		con2fb.framebuffer = con2fb_map[con2fb.console-1];
+		con2fb.framebuffer = -1;
+		event.info = info;
+		event.data = &con2fb;
+		notifier_call_chain(&fb_notifier_list,
+				    FB_EVENT_GET_CONSOLE_MAP, &event);
 		return copy_to_user(argp, &con2fb,
 				    sizeof(con2fb)) ? -EFAULT : 0;
 	case FBIOPUT_CON2FBMAP:
@@ -1310,11 +1309,14 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 #endif /* CONFIG_KMOD */
 		if (!registered_fb[con2fb.framebuffer])
 		    return -EINVAL;
-		if (con2fb.console > 0 && con2fb.console < MAX_NR_CONSOLES)
-			return set_con2fb_map(con2fb.console-1,
-					      con2fb.framebuffer);
+		if (con2fb.console > 0 && con2fb.console < MAX_NR_CONSOLES) {
+			event.info = info;
+			event.data = &con2fb;
+			return notifier_call_chain(&fb_notifier_list,
+						   FB_EVENT_SET_CONSOLE_MAP,
+						   &event);
+		}
 		return -EINVAL;
-#endif	/* CONFIG_FRAMEBUFFER_CONSOLE */
 	case FBIOBLANK:
 		acquire_console_sem();
 		i = fb_blank(info, arg);
@@ -1493,6 +1495,7 @@ register_framebuffer(struct fb_info *fb_info)
 {
 	int i;
 	struct class_device *c;
+	struct fb_event event;
 
 	if (num_registered_fb == FB_MAX)
 		return -ENXIO;
@@ -1546,6 +1549,9 @@ register_framebuffer(struct fb_info *fb_info)
 
 	devfs_mk_cdev(MKDEV(FB_MAJOR, i),
 			S_IFCHR | S_IRUGO | S_IWUGO, "fb/%d", i);
+	event.info = fb_info;
+	notifier_call_chain(&fb_notifier_list,
+			    FB_EVENT_FB_REGISTERED, &event);
 	return 0;
 }
 
