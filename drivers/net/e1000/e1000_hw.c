@@ -289,9 +289,7 @@ e1000_reset_hw(struct e1000_hw *hw)
         /* Configure activity LED after PHY reset */
         led_ctrl = E1000_READ_REG(hw, LEDCTL);
         led_ctrl &= IGP_ACTIVITY_LED_MASK;
-        led_ctrl |= IGP_ACTIVITY_LED_ENABLE;
-        if(hw->mac_type == e1000_82547)
-            led_ctrl |= IGP_LED3_MODE;
+        led_ctrl |= (IGP_ACTIVITY_LED_ENABLE | IGP_LED3_MODE);
         E1000_WRITE_REG(hw, LEDCTL, led_ctrl);
     }
 
@@ -738,9 +736,7 @@ e1000_setup_copper_link(struct e1000_hw *hw)
         /* Configure activity LED after PHY reset */
         led_ctrl = E1000_READ_REG(hw, LEDCTL);
         led_ctrl &= IGP_ACTIVITY_LED_MASK;
-        led_ctrl |= IGP_ACTIVITY_LED_ENABLE;
-        if(hw->mac_type == e1000_82547)
-            led_ctrl |= IGP_LED3_MODE;
+        led_ctrl |= (IGP_ACTIVITY_LED_ENABLE | IGP_LED3_MODE);
         E1000_WRITE_REG(hw, LEDCTL, led_ctrl);
 
         if(hw->autoneg_advertised == ADVERTISE_1000_FULL) {
@@ -2294,9 +2290,7 @@ e1000_phy_hw_reset(struct e1000_hw *hw)
         /* Configure activity LED after PHY reset */
         led_ctrl = E1000_READ_REG(hw, LEDCTL);
         led_ctrl &= IGP_ACTIVITY_LED_MASK;
-        led_ctrl |= IGP_ACTIVITY_LED_ENABLE;
-        if(hw->mac_type == e1000_82547)
-            led_ctrl |= IGP_LED3_MODE;
+        led_ctrl |= (IGP_ACTIVITY_LED_ENABLE | IGP_LED3_MODE);
         E1000_WRITE_REG(hw, LEDCTL, led_ctrl);
     }
 }
