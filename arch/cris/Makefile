@@ -39,7 +39,7 @@ CFLAGS := $(subst -fomit-frame-pointer,,$(CFLAGS)) -g
 CFLAGS += -fno-omit-frame-pointer
 endif
 
-HEAD := arch/$(ARCH)/$(SARCH)/kernel/head.o
+head-y := arch/$(ARCH)/$(SARCH)/kernel/head.o
 
 LIBGCC = $(shell $(CC) $(CFLAGS) -print-file-name=libgcc.a)
 
