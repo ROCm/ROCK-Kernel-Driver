@@ -1036,7 +1036,7 @@ struct task_struct *do_fork(unsigned long clone_flags,
 		}
 
 		if (p->ptrace & PT_PTRACED)
-			send_sig(SIGSTOP, p, 1);
+			force_sig_specific(SIGSTOP, p);
 
 		wake_up_forked_process(p);		/* do this last */
 		++total_forks;
