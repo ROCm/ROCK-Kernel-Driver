@@ -275,6 +275,9 @@ EXPORT_SYMBOL(lock_may_write);
 EXPORT_SYMBOL(dcache_readdir);
 EXPORT_SYMBOL(fd_install);
 EXPORT_SYMBOL(put_unused_fd);
+EXPORT_SYMBOL(get_sb_bdev);
+EXPORT_SYMBOL(get_sb_nodev);
+EXPORT_SYMBOL(get_sb_single);
 
 /* for stackable file systems (lofs, wrapfs, cryptfs, etc.) */
 EXPORT_SYMBOL(default_llseek);

@@ -946,6 +946,16 @@ struct file_system_type {
 	struct list_head fs_supers;
 };
 
+struct super_block *get_sb_bdev(struct file_system_type *fs_type,
+	int flags, char *dev_name, void * data,
+	int (*fill_super)(struct super_block *, void *, int));
+struct super_block *get_sb_single(struct file_system_type *fs_type,
+	int flags, void *data,
+	int (*fill_super)(struct super_block *, void *, int));
+struct super_block *get_sb_nodev(struct file_system_type *fs_type,
+	int flags, void *data,
+	int (*fill_super)(struct super_block *, void *, int));
+
 #define DECLARE_FSTYPE(var,type,read,flags) \
 struct file_system_type var = { \
 	name:		type, \
