@@ -19,7 +19,7 @@
 #include <asm/io_apic.h>
 #include <mach_apic.h>
 
-#include <linux/pci_msi.h>
+#include "msi.h"
 
 
 static spinlock_t msi_lock = SPIN_LOCK_UNLOCKED;

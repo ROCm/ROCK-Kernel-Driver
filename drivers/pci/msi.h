@@ -1,12 +1,10 @@
 /*
- *	../include/linux/pci_msi.h
+ *	msi.h
  *
  */
 
-#ifndef PCI_MSI_H
-#define PCI_MSI_H
-
-#include <linux/pci.h>
+#ifndef MSI_H
+#define MSI_H
 
 #define MSI_AUTO -1
 #define NR_REPEATS	23
@@ -167,4 +165,4 @@ struct msi_desc {
 	struct pci_dev *dev;
 };
 
-#endif /* PCI_MSI_H */
+#endif /* MSI_H */
