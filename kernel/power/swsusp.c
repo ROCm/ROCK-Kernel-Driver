@@ -893,80 +893,58 @@ static void suspend_finish(void)
 #endif
 }
 
-/*
- * Magic happens here
- */
 
-asmlinkage void do_magic_resume_1(void)
+extern asmlinkage int swsusp_arch_suspend(void);
+extern asmlinkage int swsusp_arch_resume(void);
+
+
+asmlinkage int swsusp_save(void)
 {
-	barrier();
-	mb();
-	spin_lock_irq(&suspend_pagedir_lock);	/* Done to disable interrupts */ 
+	int error = 0;
 
-	device_power_down(3);
-	PRINTK( "Waiting for DMAs to settle down...\n");
-	mdelay(1000);	/* We do not want some readahead with DMA to corrupt our memory, right?
-			   Do it with disabled interrupts for best effect. That way, if some
-			   driver scheduled DMA, we have good chance for DMA to finish ;-). */
+	if ((error = swsusp_swap_check()))
+		return error;
+	return suspend_prepare_image();
 }
 
-asmlinkage void do_magic_resume_2(void)
+int swsusp_suspend(void)
+{
+	int error;
+	if ((error = arch_prepare_suspend()))
+		return error;
+	local_irq_disable();
+	save_processor_state();
+	error = swsusp_arch_suspend();
+	restore_processor_state();
+	local_irq_enable();
+	return error;
+}
+
+
+asmlinkage int swsusp_restore(void)
 {
 	BUG_ON (nr_copy_pages_check != nr_copy_pages);
 	BUG_ON (pagedir_order_check != pagedir_order);
-
-	__flush_tlb_global();		/* Even mappings of "global" things (vmalloc) need to be fixed */
-	device_power_up();
-	spin_unlock_irq(&suspend_pagedir_lock);
+	
+	/* Even mappings of "global" things (vmalloc) need to be fixed */
+	__flush_tlb_global();
+	return 0;
 }
 
-/* do_magic() is implemented in arch/?/kernel/suspend_asm.S, and basically does:
-
-	if (!resume) {
-		do_magic_suspend_1();
-		save_processor_state();
-		SAVE_REGISTERS
-		do_magic_suspend_2();
-		return;
-	}
-	GO_TO_SWAPPER_PAGE_TABLES
-	do_magic_resume_1();
-	COPY_PAGES_BACK
-	RESTORE_REGISTERS
+int swsusp_resume(void)
+{
+	int error;
+	local_irq_disable();
+	save_processor_state();
+	error = swsusp_arch_resume();
 	restore_processor_state();
-	do_magic_resume_2();
-
- */
-
-asmlinkage void do_magic_suspend_1(void)
-{
-	mb();
-	barrier();
-	BUG_ON(in_atomic());
-	spin_lock_irq(&suspend_pagedir_lock);
+	local_irq_enable();
+	return error;
 }
 
-asmlinkage void do_magic_suspend_2(void)
-{
-	int is_problem;
-	swsusp_swap_check();
-	device_power_down(3);
-	is_problem = suspend_prepare_image();
-	device_power_up();
-	spin_unlock_irq(&suspend_pagedir_lock);
-	if (!is_problem) {
-		kernel_fpu_end();	/* save_processor_state() does kernel_fpu_begin, and we need to revert it in order to pass in_atomic() checks */
-		BUG_ON(in_atomic());
-		suspend_save_image();
-		suspend_power_down();	/* FIXME: if suspend_power_down is commented out, console is lost after few suspends ?! */
-	}
 
-	printk(KERN_EMERG "%sSuspend failed, trying to recover...\n", name_suspend);
-	MDELAY(1000); /* So user can wait and report us messages if armageddon comes :-) */
 
-	barrier();
-	mb();
-}
+static int in_suspend __nosavedata = 0;
 
 /*
  * This is main interface to the outside world. It needs to be
@@ -998,16 +976,15 @@ int software_suspend(void)
 		/* Save state of all device drivers, and stop them. */
 		printk("Suspending devices... ");
 		if ((res = device_suspend(3))==0) {
-			/* If stopping device drivers worked, we proceed basically into
-			 * suspend_save_image.
-			 *
-			 * do_magic(0) returns after system is resumed.
-			 *
-			 * do_magic() copies all "used" memory to "free" memory, then
-			 * unsuspends all device drivers, and writes memory to disk
-			 * using normal kernel mechanism.
-			 */
-			do_magic(0);
+			in_suspend = 1;
+
+			res = swsusp_save();
+
+			if (!res && in_suspend) {
+				suspend_save_image();
+				suspend_power_down();
+			}
+			in_suspend = 0;
 			suspend_finish();
 		}
 		thaw_processes();
@@ -1352,7 +1329,7 @@ static int __init software_resume(void)
 	/* FIXME: Should we stop processes here, just to be safer? */
 	disable_nonboot_cpus();
 	device_suspend(3);
-	do_magic(1);
+	swsusp_resume();
 	panic("This never returns");
 
 read_failure:

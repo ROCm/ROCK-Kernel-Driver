@@ -75,12 +75,6 @@ static inline void disable_nonboot_cpus(void) {}
 static inline void enable_nonboot_cpus(void) {}
 #endif
 
-asmlinkage void do_magic(int is_resume);
-asmlinkage void do_magic_resume_1(void);
-asmlinkage void do_magic_resume_2(void);
-asmlinkage void do_magic_suspend_1(void);
-asmlinkage void do_magic_suspend_2(void);
-
 void save_processor_state(void);
 void restore_processor_state(void);
 struct saved_context;

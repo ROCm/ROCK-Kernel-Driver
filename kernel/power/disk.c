@@ -23,10 +23,10 @@
 extern u32 pm_disk_mode;
 extern struct pm_ops * pm_ops;
 
-extern int pmdisk_save(void);
+extern int swsusp_suspend(void);
 extern int pmdisk_write(void);
 extern int pmdisk_read(void);
-extern int pmdisk_restore(void);
+extern int swsusp_resume(void);
 extern int pmdisk_free(void);
 
 
@@ -161,7 +161,7 @@ int pm_suspend_disk(void)
 
 	pr_debug("PM: snapshotting memory.\n");
 	in_suspend = 1;
-	if ((error = pmdisk_save()))
+	if ((error = swsusp_save()))
 		goto Done;
 
 	if (in_suspend) {
@@ -227,7 +227,7 @@ static int pm_resume(void)
 	mdelay(1000);
 
 	pr_debug("PM: Restoring saved image.\n");
-	pmdisk_restore();
+	swsusp_resume();
 	pr_debug("PM: Restore failed, recovering.n");
 	finish();
  Free:

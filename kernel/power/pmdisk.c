@@ -249,28 +249,7 @@ static int write_suspend_image(void)
 
 
 extern void free_suspend_pagedir(unsigned long);
-extern int suspend_prepare_image(void);
 
-/**
- *	pmdisk_suspend - Atomically snapshot the system.
- *
- *	This must be called with interrupts disabled, to prevent the 
- *	system changing at all from underneath us. 
- *
- *	To do this, we count the number of pages in the system that we 
- *	need to save; make sure	we have enough memory and swap to clone
- *	the pages and save them in swap, allocate the space to hold them,
- *	and then snapshot them all.
- */
-
-int pmdisk_suspend(void)
-{
-	int error = 0;
-
-	if ((error = swsusp_swap_check()))
-		return error;
-	return suspend_prepare_image();
-}
 
 
 /**
@@ -296,36 +275,6 @@ static int suspend_save_image(void)
 	swsusp_swap_lock();
 	return error;
 }
-
-/*
- * Magic happens here
- */
-
-int pmdisk_resume(void)
-{
-	BUG_ON (nr_copy_pages_check != nr_copy_pages);
-	BUG_ON (pagedir_order_check != pagedir_order);
-	
-	/* Even mappings of "global" things (vmalloc) need to be fixed */
-	__flush_tlb_global();
-	return 0;
-}
-
-/* pmdisk_arch_suspend() is implemented in arch/?/power/pmdisk.S,
-   and basically does:
-
-	if (!resume) {
-		save_processor_state();
-		SAVE_REGISTERS
-		return pmdisk_suspend();
-	}
-	GO_TO_SWAPPER_PAGE_TABLES
-	COPY_PAGES_BACK
-	RESTORE_REGISTERS
-	restore_processor_state();
-	return pmdisk_resume();
-
- */
 
 
 /* More restore stuff */
@@ -563,28 +512,6 @@ static int __init read_suspend_image(void)
 	goto Done;
 }
 
-/**
- *	pmdisk_save - Snapshot memory
- */
-
-int pmdisk_save(void) 
-{
-	int error;
-
-#if defined (CONFIG_HIGHMEM) || defined (CONFIG_DISCONTIGMEM)
-	pr_debug("pmdisk: not supported with high- or discontig-mem.\n");
-	return -EPERM;
-#endif
-	if ((error = arch_prepare_suspend()))
-		return error;
-	local_irq_disable();
-	save_processor_state();
-	error = pmdisk_arch_suspend(0);
-	restore_processor_state();
-	local_irq_enable();
-	return error;
-}
-
 
 /**
  *	pmdisk_write - Write saved memory image to swap.
@@ -628,22 +555,6 @@ int __init pmdisk_read(void)
 		pr_debug("Reading resume file was successful\n");
 	else
 		pr_debug("pmdisk: Error %d resuming\n", error);
-	return error;
-}
-
-
-/**
- *	pmdisk_restore - Replace running kernel with saved image.
- */
-
-int __init pmdisk_restore(void)
-{
-	int error;
-	local_irq_disable();
-	save_processor_state();
-	error = pmdisk_arch_suspend(1);
-	restore_processor_state();
-	local_irq_enable();
 	return error;
 }
 
