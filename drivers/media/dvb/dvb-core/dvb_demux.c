@@ -1110,8 +1110,8 @@ static int dvbdmx_get_pes_pids(struct dmx_demux *demux, u16 *pids)
 	return 0;
 }
 
-int 
-dvb_dmx_init(struct dvb_demux *dvbdemux)
+
+int dvb_dmx_init(struct dvb_demux *dvbdemux)
 {
 	int i, err;
 	struct dmx_demux *dmx = &dvbdemux->dmx;
@@ -1181,8 +1181,8 @@ dvb_dmx_init(struct dvb_demux *dvbdemux)
 	return 0;
 }
 
-int 
-dvb_dmx_release(struct dvb_demux *dvbdemux)
+
+int dvb_dmx_release(struct dvb_demux *dvbdemux)
 {
 	struct dmx_demux *dmx = &dvbdemux->dmx;
 
