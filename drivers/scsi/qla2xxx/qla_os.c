@@ -1663,7 +1663,7 @@ qla2xxx_eh_host_reset(struct scsi_cmnd *cmd)
 		goto out;
 
 	/* Waiting for our command in done_queue to be returned to OS.*/
-	if (qla2x00_eh_wait_for_pending_commands(ha))
+	if (!qla2x00_eh_wait_for_pending_commands(ha))
 		rval = FAILED;
 
  out:
