@@ -1,4 +1,4 @@
-/* $Id: capifunc.h,v 1.11 2004/03/20 17:19:58 armin Exp $
+/* $Id: capifunc.h,v 1.11.4.1 2004/08/28 20:03:53 armin Exp $
  *
  * ISDN interface module for Eicon active cards DIVA.
  * CAPI Interface common functions
@@ -12,8 +12,6 @@
 
 #ifndef __CAPIFUNC_H__
 #define __CAPIFUNC_H__
-
-#define MAX_DESCRIPTORS  32
 
 #define DRRELMAJOR  2
 #define DRRELMINOR  0

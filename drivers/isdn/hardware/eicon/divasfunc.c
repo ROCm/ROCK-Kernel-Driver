@@ -1,4 +1,4 @@
-/* $Id: divasfunc.c,v 1.23 2004/04/08 01:17:57 armin Exp $
+/* $Id: divasfunc.c,v 1.23.4.2 2004/08/28 20:03:53 armin Exp $
  *
  * Low level driver for Eicon DIVA Server ISDN cards.
  *
@@ -26,8 +26,6 @@ static int debugmask;
 extern void DIVA_DIDD_Read(void *, int);
 
 extern PISDN_ADAPTER IoAdapters[MAX_ADAPTER];
-
-#define MAX_DESCRIPTORS  32
 
 extern char *DRIVERRELEASE_DIVAS;
 
@@ -76,10 +74,10 @@ void diva_xdi_didd_register_adapter(int card)
 		d.features = IoAdapters[card - 1]->Properties.Features;
 		DBG_TRC(("DIDD register A(%d) channels=%d", card,
 			 d.channels))
-		/* workaround for different Name in structure */
-		strlcpy(IoAdapters[card - 1]->Name,
-			IoAdapters[card - 1]->Properties.Name,
-			sizeof(IoAdapters[card - 1]->Name));
+		    /* workaround for different Name in structure */
+		    strlcpy(IoAdapters[card - 1]->Name,
+			    IoAdapters[card - 1]->Properties.Name,
+			    sizeof(IoAdapters[card - 1]->Name));
 		req.didd_remove_adapter.e.Req = 0;
 		req.didd_add_adapter.e.Rc = IDI_SYNC_REQ_DIDD_ADD_ADAPTER;
 		req.didd_add_adapter.info.descriptor = (void *) &d;

@@ -115,7 +115,7 @@ diva_strace_library_interface_t* DivaSTraceLibraryCreateInstance (int Adapter,
 		return NULL;
 	}
 
-  pmem += sizeof(*pLib);
+	pmem += sizeof(*pLib);
 	memset(pLib, 0x00, sizeof(*pLib));
 
 	pLib->Adapter  = Adapter;
@@ -337,13 +337,60 @@ static int SuperTraceMessageInput (void* hLib) {
         pLib->e.RNum       = 1;
         pLib->e.R->P       = (byte*)&pLib->buffer[0];
         pLib->e.R->PLength = (word)(sizeof(pLib->buffer) - 1);
+
       } else {
         /*
           Indication reception complete, process it now
           */
         byte* p = (byte*)&pLib->buffer[0];
         pLib->buffer[pLib->e.R->PLength] = 0; /* terminate I.E. with zero */
+
         switch (Ind) {
+          case MAN_COMBI_IND: {
+            int total_length    = pLib->e.R->PLength;
+            word  this_ind_length;
+
+            while (total_length > 3 && *p) {
+              Ind = *p++;
+              this_ind_length = (word)p[0] | ((word)p[1] << 8);
+              p += 2;
+
+              switch (Ind) {
+                case MAN_INFO_IND:
+                  if (process_idi_info (pLib, (diva_man_var_header_t*)p)) {
+                    return (-1);
+                  }
+                  break;
+      					case MAN_EVENT_IND:
+                  if (process_idi_event (pLib, (diva_man_var_header_t*)p)) {
+                    return (-1);
+                  }
+                  break;
+                case MAN_TRACE_IND:
+                  if (pLib->trace_on == 1) {
+                    /*
+                      Ignore first trace event that is result of
+                      EVENT_ON operation
+                    */
+                    pLib->trace_on++;
+                  } else {
+                    /*
+                      Delivery XLOG buffer to application
+                      */
+                    if (pLib->user_proc_table.trace_proc) {
+                      (*(pLib->user_proc_table.trace_proc))(pLib->user_proc_table.user_context,
+                                                            &pLib->instance, pLib->Adapter,
+                                                            p, this_ind_length);
+                    }
+                  }
+                  break;
+                default:
+                  diva_mnt_internal_dprintf (0, DLI_ERR, "Unknon IDI Ind (DMA mode): %02x", Ind);
+              }
+              p += (this_ind_length+1);
+              total_length -= (4 + this_ind_length);
+            }
+          } break;
           case MAN_INFO_IND:
             if (process_idi_info (pLib, (diva_man_var_header_t*)p)) {
               return (-1);
@@ -806,7 +853,7 @@ static int ScheduleNextTraceRequest (diva_strace_context_t* pLib) {
 }
 
 static int process_idi_event (diva_strace_context_t* pLib,
-															diva_man_var_header_t* pVar) {
+				diva_man_var_header_t* pVar) {
 	const char* path = (char*)&pVar->path_length+1;
 	char name[64];
 	int i;

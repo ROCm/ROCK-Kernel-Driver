@@ -1,4 +1,4 @@
-/* $Id: diddfunc.c,v 1.14 2003/08/25 10:06:37 schindler Exp $
+/* $Id: diddfunc.c,v 1.14.6.2 2004/08/28 20:03:53 armin Exp $
  *
  * DIDD Interface module for Eicon active cards.
  * 
@@ -15,8 +15,6 @@
 #include "di_defs.h"
 #include "dadapter.h"
 #include "divasync.h"
-
-#define MAX_DESCRIPTORS  32
 
 #define DBG_MINIMUM  (DL_LOG + DL_FTL + DL_ERR)
 #define DBG_DEFAULT  (DBG_MINIMUM + DL_XLOG + DL_REG)

@@ -1,4 +1,4 @@
-/* $Id: platform.h,v 1.37.4.1 2004/07/28 14:47:21 armin Exp $
+/* $Id: platform.h,v 1.37.4.2 2004/08/28 20:03:53 armin Exp $
  *
  * platform.h
  * 
@@ -269,20 +269,6 @@ static __inline__ void diva_os_leave_spin_lock (diva_os_spin_lock_t* a, \
                               diva_os_spin_lock_magic_t* old_irql, \
                               void* dbg) { spin_unlock_bh(a); }
 
-static __inline__ void diva_os_enter_spin_lock_hard (diva_os_spin_lock_t* a, \
-                                   diva_os_spin_lock_magic_t* old_irql, \
-                                   void* dbg) { \
-  unsigned long flags; \
-  spin_lock_irqsave (a, flags); \
-  *old_irql = (diva_os_spin_lock_magic_t)flags; \
-}
-static __inline__ void diva_os_leave_spin_lock_hard (diva_os_spin_lock_t* a, \
-                                   diva_os_spin_lock_magic_t* old_irql, \
-                                   void* dbg) { \
-  unsigned long flags = (unsigned long)*old_irql; \
-	spin_unlock_irqrestore (a, flags); \
-}
-
 #define diva_os_destroy_spin_lock(a,b) do { } while(0)
 
 /*
@@ -347,12 +333,18 @@ diva_os_atomic_decrement(diva_os_atomic_t* pv)
 
 #define DIVA_IDI_RX_DMA 1
 
+/*
+** endian macros
+*/
 #define READ_WORD(addr)   readw(addr)
 #define READ_DWORD(addr)  readl(addr)
 
 #define WRITE_WORD(addr,v)  writew(v,addr)
 #define WRITE_DWORD(addr,v) writel(v,addr)
 
+/*
+** 32/64 bit macors
+*/
 #ifdef BITS_PER_LONG
  #if BITS_PER_LONG > 32 
   #define PLATFORM_GT_32BIT
@@ -360,8 +352,23 @@ diva_os_atomic_decrement(diva_os_atomic_t* pv)
  #endif
 #endif
 
+/*
+** undef os definitions of macros we use
+*/
 #undef ID_MASK
 #undef N_DATA
 #undef ADDR
+
+/*
+** dump file
+*/
+#define diva_os_dump_file_t char
+#define diva_os_board_trace_t char
+#define diva_os_dump_file(__x__) do { } while(0)
+
+/*
+** size of internal arrays
+*/
+#define MAX_DESCRIPTORS 64
 
 #endif	/* __PLATFORM_H__ */

@@ -232,7 +232,7 @@ typedef struct _DbgHandle_ *pDbgHandle ;
 typedef void ( * DbgEnd) (pDbgHandle) ;
 typedef void ( * DbgLog) (unsigned short, int, char *, va_list) ;
 typedef void ( * DbgOld) (unsigned short, char *, va_list) ;
-typedef void ( * DbgEv)  (unsigned short, unsigned int, va_list) ;
+typedef void ( * DbgEv)  (unsigned short, unsigned long, va_list) ;
 typedef void ( * DbgIrq) (unsigned short, int, char *, va_list) ;
 typedef struct _DbgHandle_
 { char    Registered ; /* driver successfull registered */
@@ -259,7 +259,7 @@ typedef struct _DbgHandle_
  void      *pReserved3 ;
 } _DbgHandle_ ;
 extern _DbgHandle_ myDriverDebugHandle ;
-typedef struct
+typedef struct _OldDbgHandle_
 { struct _OldDbgHandle_ *next ;
  void                *pIrp ;
  long    regTime[2] ;
@@ -310,7 +310,7 @@ typedef struct
             unsigned long   B_ChannelMask;
             unsigned long   LogBufferSize;
         } CardTrace;
-    } u1;     
+    }Data;     
 } _DbgExtendedInfo_;
 #ifndef DIVA_NO_DEBUGLIB
 /* -------------------------------------------------------------
