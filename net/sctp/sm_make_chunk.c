@@ -177,12 +177,9 @@ sctp_chunk_t *sctp_make_init(const struct sctp_association *asoc,
 	 * can be IPv4 and/or IPv6 in any combination.
 	 */
 	retval = NULL;
-	addrs.v = NULL;
 
-	/* Convert the provided bind address list to raw format */
+	/* Convert the provided bind address list to raw format. */
 	addrs = sctp_bind_addrs_to_raw(bp, &addrs_len, gfp);
-	if (!addrs.v)
-		goto nodata;
 
 	init.init_tag		   = htonl(asoc->c.my_vtag);
 	init.a_rwnd		   = htonl(asoc->rwnd);
@@ -252,9 +249,8 @@ sctp_chunk_t *sctp_make_init_ack(const struct sctp_association *asoc,
 
 	retval = NULL;
 
+	/* Note: there may be no addresses to embed. */
 	addrs = sctp_bind_addrs_to_raw(&asoc->base.bind_addr, &addrs_len, gfp);
-	if (!addrs.v)
-		goto nomem_rawaddr;
 
 	initack.init_tag	        = htonl(asoc->c.my_vtag);
 	initack.a_rwnd			= htonl(asoc->rwnd);
@@ -313,8 +309,8 @@ sctp_chunk_t *sctp_make_init_ack(const struct sctp_association *asoc,
 nomem_chunk:
 	kfree(cookie);
 nomem_cookie:
-	kfree(addrs.v);
-nomem_rawaddr:
+	if (addrs.v)
+		kfree(addrs.v);
 	return retval;
 }
 
@@ -840,7 +836,7 @@ sctp_chunk_t *sctp_make_abort_user(const struct sctp_association *asoc,
 		payoff = payload;
 
 		for (; iovlen > 0; --iovlen) {
-			if (copy_from_user(payoff, iov->iov_base, iov->iov_len))
+			if (copy_from_user(payoff, iov->iov_base,iov->iov_len))
 				goto err_copy;
 			payoff += iov->iov_len;
 			iov++;
@@ -1540,6 +1536,12 @@ no_hmac:
 						 GFP_ATOMIC) < 0) {
 		*error = -SCTP_IERROR_NOMEM;
 		goto fail;
+	}
+
+	/* Also, add the destination address. */
+	if (list_empty(&retval->base.bind_addr.address_list)) {
+		sctp_add_bind_addr(&retval->base.bind_addr, &chunk->dest, 
+				   GFP_ATOMIC);
 	}
 
 	retval->next_tsn = retval->c.initial_tsn;
