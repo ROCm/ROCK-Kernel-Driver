@@ -966,7 +966,7 @@ static int usblp_select_alts(struct usblp *usblp)
 	struct usb_endpoint_descriptor *epd, *epwrite, *epread;
 	int p, i, e;
 
-	if_alt = &usblp->dev->actconfig->interface[usblp->ifnum];
+	if_alt = usblp->dev->actconfig->interface[usblp->ifnum];
 
 	for (p = 0; p < USBLP_MAX_PROTOCOLS; p++)
 		usblp->protocol[p].alt_setting = -1;

@@ -796,7 +796,7 @@ static int pwc_isoc_init(struct pwc_device *pdev)
 	/* Get the current alternate interface, adjust packet size */
 	if (!udev->actconfig)
 		return -EFAULT;
-	idesc = &udev->actconfig->interface[0].altsetting[pdev->valternate];
+	idesc = &udev->actconfig->interface[0]->altsetting[pdev->valternate];
 	if (!idesc)
 		return -EFAULT;
 

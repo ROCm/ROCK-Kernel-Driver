@@ -547,7 +547,7 @@ static int cdc_bind (struct usbnet *dev, struct usb_interface *intf)
 			d = &intf->altsetting->desc;
 			if (info->u->bMasterInterface0 != d->bInterfaceNumber)
 				goto bad_desc;
-			info->data = dev->udev->actconfig->interface;
+			info->data = dev->udev->actconfig->interface[0];
 			if (intf != (info->data + info->u->bMasterInterface0))
 				goto bad_desc;
 

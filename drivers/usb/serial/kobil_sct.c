@@ -182,7 +182,7 @@ static int kobil_startup (struct usb_serial *serial)
 	// search for the necessary endpoints
 	pdev = serial->dev;
  	actconfig = pdev->actconfig;
- 	interface = actconfig->interface;
+ 	interface = actconfig->interface[0];
 	altsetting = interface->altsetting;
  	endpoint = altsetting->endpoint;
   
