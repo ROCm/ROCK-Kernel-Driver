@@ -141,7 +141,8 @@ __setup("max_scsi_report_luns=", scsi_report_luns_setup);
  *     @sreq to unlock a device, storing the (unused) results into result.
  *     Called for BLIST_KEY devices.
  **/
-static void scsi_unlock_floptical(Scsi_Request *sreq, unsigned char *result)
+static void scsi_unlock_floptical(struct scsi_request *sreq,
+				  unsigned char *result)
 {
 	unsigned char scsi_cmd[MAX_COMMAND_SIZE];
 
@@ -154,8 +155,7 @@ static void scsi_unlock_floptical(Scsi_Request *sreq, unsigned char *result)
 	scsi_cmd[5] = 0;
 	sreq->sr_cmd_len = 0;
 	sreq->sr_data_direction = SCSI_DATA_READ;
-	scsi_wait_req(sreq, (void *) scsi_cmd, (void *) result, 0x2a /* size */,
-		      SCSI_TIMEOUT, 3);
+	scsi_wait_req(sreq, scsi_cmd, result, 0x2a /* size */, SCSI_TIMEOUT, 3);
 }
 
 /**
@@ -354,10 +354,10 @@ void scsi_free_sdev(struct scsi_device *sdev)
  *     are copied to the Scsi_Device at @sreq->sr_device (sdev);
  *     any flags value is stored in *@bflags.
  **/
-static void scsi_probe_lun(Scsi_Request *sreq, char *inq_result,
+static void scsi_probe_lun(struct scsi_request *sreq, char *inq_result,
 			   int *bflags)
 {
-	Scsi_Device *sdev = sreq->sr_device;	/* a bit ugly */
+	struct scsi_device *sdev = sreq->sr_device;	/* a bit ugly */
 	unsigned char scsi_cmd[MAX_COMMAND_SIZE];
 	int possible_inq_resp_len;
 
@@ -522,7 +522,7 @@ static void scsi_set_name(struct scsi_device *sdev, char *inq_result)
  *     SCSI_SCAN_NO_RESPONSE: could not allocate or setup a Scsi_Device
  *     SCSI_SCAN_LUN_PRESENT: a new Scsi_Device was allocated and initialized
  **/
-static int scsi_add_lun(Scsi_Device *sdev, char *inq_result, int *bflags)
+static int scsi_add_lun(struct scsi_device *sdev, char *inq_result, int *bflags)
 {
 	struct scsi_device *sdev_sibling;
 	struct scsi_target *starget;
