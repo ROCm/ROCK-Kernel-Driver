@@ -66,10 +66,31 @@ fh_dup2(struct svc_fh *dst, struct svc_fh *src)
 }
 
 static int
+do_open_permission(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_open *open)
+{
+	int accmode, status;
+
+	if (open->op_truncate &&
+		!(open->op_share_access & NFS4_SHARE_ACCESS_WRITE))
+		return nfserr_inval;
+
+	accmode = MAY_NOP;
+	if (open->op_share_access & NFS4_SHARE_ACCESS_READ)
+		accmode = MAY_READ;
+	if (open->op_share_deny & NFS4_SHARE_ACCESS_WRITE)
+		accmode |= (MAY_WRITE | MAY_TRUNC);
+	accmode |= MAY_OWNER_OVERRIDE;
+
+	status = fh_verify(rqstp, current_fh, S_IFREG, accmode);
+
+	return status;
+}
+
+static int
 do_open_lookup(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_open *open)
 {
 	struct svc_fh resfh;
-	int accmode, status;
+	int status;
 
 	fh_init(&resfh, NFS4_FHSIZE);
 	open->op_truncate = 0;
@@ -92,6 +113,8 @@ do_open_lookup(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_o
 
 	if (!status) {
 		set_change_info(&open->op_cinfo, current_fh);
+
+		/* set reply cache */
 		fh_dup2(current_fh, &resfh);
 		/* XXXJBF: keep a saved svc_fh struct instead?? */
 		open->op_stateowner->so_replay.rp_openfh_len =
@@ -100,18 +123,40 @@ do_open_lookup(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_o
 				&resfh.fh_handle.fh_base,
 				resfh.fh_handle.fh_size);
 
-		accmode = MAY_NOP;
-		if (open->op_share_access & NFS4_SHARE_ACCESS_READ)
-			accmode = MAY_READ;
-		if (open->op_share_deny & NFS4_SHARE_ACCESS_WRITE)
-			accmode |= (MAY_WRITE | MAY_TRUNC);
-		accmode |= MAY_OWNER_OVERRIDE;
-		status = fh_verify(rqstp, current_fh, S_IFREG, accmode);
+		status = do_open_permission(rqstp, current_fh, open);
 	}
 
 	fh_put(&resfh);
 	return status;
 }
+
+static int
+do_open_fhandle(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_open *open)
+{
+	int status;
+
+	dprintk("NFSD: do_open_fhandle\n");
+
+	/* we don't know the target directory, and therefore can not
+	* set the change info
+	*/
+
+	memset(&open->op_cinfo, 0, sizeof(struct nfsd4_change_info));
+
+	/* set replay cache */
+	open->op_stateowner->so_replay.rp_openfh_len = current_fh->fh_handle.fh_size;
+	memcpy(open->op_stateowner->so_replay.rp_openfh,
+		&current_fh->fh_handle.fh_base,
+		current_fh->fh_handle.fh_size);
+
+	open->op_truncate = (open->op_iattr.ia_valid & ATTR_SIZE) &&
+	!open->op_iattr.ia_size;
+
+	status = do_open_permission(rqstp, current_fh, open);
+
+	return status;
+}
+
 
 /*
  * nfs4_unlock_state() called in encode
@@ -123,6 +168,13 @@ nfsd4_open(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_open 
 	dprintk("NFSD: nfsd4_open filename %.*s op_stateowner %p\n",
 		(int)open->op_fname.len, open->op_fname.data,
 		open->op_stateowner);
+
+	if (nfs4_in_grace() && open->op_claim_type != NFS4_OPEN_CLAIM_PREVIOUS)
+		return nfserr_grace;
+
+	if (nfs4_in_no_grace() &&
+		           open->op_claim_type == NFS4_OPEN_CLAIM_PREVIOUS)
+		return nfserr_no_grace;
 
 	/* This check required by spec. */
 	if (open->op_create && open->op_claim_type != NFS4_OPEN_CLAIM_NULL)
@@ -148,16 +200,30 @@ nfsd4_open(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_open 
 	}
 	if (status)
 		return status;
+	if (open->op_claim_type == NFS4_OPEN_CLAIM_NULL) {
 	/*
 	 * This block of code will (1) set CURRENT_FH to the file being opened,
 	 * creating it if necessary, (2) set open->op_cinfo, 
 	 * (3) set open->op_truncate if the file is to be truncated 
 	 * after opening, (4) do permission checking.
 	 */
-	status = do_open_lookup(rqstp, current_fh, open);
-	if (status)
-		return status;
-
+		status = do_open_lookup(rqstp, current_fh, open);
+		if (status)
+			return status;
+	} else if (open->op_claim_type == NFS4_OPEN_CLAIM_PREVIOUS) {
+	/*
+	* The CURRENT_FH is already set to the file being opened. This
+	* block of code will (1) set open->op_cinfo, (2) set
+	* open->op_truncate if the file is to be truncated after opening,
+	* (3) do permission checking.
+	*/
+		status = do_open_fhandle(rqstp, current_fh, open);
+		if (status)
+			return status;
+	} else {
+		printk("NFSD: unsupported OPEN claim type\n");
+		return nfserr_inval;
+	}
 	/*
 	 * nfsd4_process_open2() does the actual opening of the file.  If
 	 * successful, it (1) truncates the file if open->op_truncate was
@@ -414,6 +480,8 @@ nfsd4_read(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_read 
 	int status;
 
 	/* no need to check permission - this will be done in nfsd_read() */
+	if (nfs4_in_grace())
+		return nfserr_grace;
 
 	if (read->rd_offset >= OFFSET_MAX)
 		return nfserr_inval;
@@ -537,10 +605,13 @@ static inline int
 nfsd4_setattr(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_setattr *setattr)
 {
 	struct nfs4_stateid *stp;
-	int status = nfserr_nofilehandle;
+	int status = nfs_ok;
+
+	if (nfs4_in_grace())
+		return nfserr_grace;
 
 	if (!current_fh->fh_dentry)
-		goto out;
+		return nfserr_nofilehandle;
 
 	status = nfs_ok;
 	if (setattr->sa_iattr.ia_valid & ATTR_SIZE) {
@@ -578,6 +649,9 @@ nfsd4_write(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_writ
 	stateid_t *stateid = &write->wr_stateid;
 	u32 *p;
 	int status = nfs_ok;
+
+	if (nfs4_in_grace())
+		return nfserr_grace;
 
 	/* no need to check permission - this will be done in nfsd_write() */
 

@@ -52,6 +52,7 @@
 
 /* Globals */
 time_t boot_time;
+static time_t grace_end = 0;
 static u32 current_clientid = 1;
 static u32 current_ownerid;
 static u32 current_fileid;
@@ -1090,7 +1091,7 @@ nfsd4_process_open1(struct nfsd4_open *open)
 
 	status = nfserr_stale_clientid;
 	if (STALE_CLIENTID(&open->op_clientid))
-		goto out;
+		return status;
 
 	strhashval = ownerstr_hashval(clientid->cl_id, open->op_owner);
 	if (find_openstateowner_str(strhashval, open, &sop)) {
@@ -1111,7 +1112,7 @@ nfsd4_process_open1(struct nfsd4_open *open)
 			}
 			/* replay: indicate to calling function */
 			status = NFSERR_REPLAY_ME;
-			goto out;
+			return status;
 		}
 		if (sop->so_confirmed) {
 			if (open->op_seqid == sop->so_seqid + 1) { 
@@ -1149,6 +1150,8 @@ instantiate_new_owner:
 renew:
 	renew_client(sop->so_client);
 out:
+	if (status && open->op_claim_type == NFS4_OPEN_CLAIM_PREVIOUS)
+		status = nfserr_reclaim_bad;
 	return status;
 }
 /*
@@ -1159,7 +1162,7 @@ nfsd4_process_open2(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nf
 {
 	struct iattr iattr;
 	struct nfs4_stateowner *sop = open->op_stateowner;
-	struct nfs4_file *fp;
+	struct nfs4_file *fp = NULL;
 	struct inode *ino;
 	unsigned int fi_hashval;
 	struct nfs4_stateid *stq, *stp = NULL;
@@ -1167,7 +1170,7 @@ nfsd4_process_open2(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nf
 
 	status = nfserr_resource;
 	if (!sop)
-		goto out;
+		return status;
 
 	ino = current_fh->fh_dentry->d_inode;
 
@@ -1258,6 +1261,17 @@ out:
 	if (fp && list_empty(&fp->fi_perfile))
 		release_file(fp);
 
+	if (open->op_claim_type == NFS4_OPEN_CLAIM_PREVIOUS) {
+		if (status)
+			status = nfserr_reclaim_bad;
+		else {
+		/* successful reclaim. so_seqid is decremented because
+		* it will be bumped in encode_open
+		*/
+			open->op_stateowner->so_confirmed = 1;
+			open->op_stateowner->so_seqid--;
+		}
+	}
 	/*
 	* To finish the open response, we just need to set the rflags.
 	*/
@@ -1270,6 +1284,7 @@ out_free:
 	kfree(stp);
 	goto out;
 }
+
 static struct work_struct laundromat_work;
 static void laundromat_main(void *);
 static DECLARE_WORK(laundromat_work, laundromat_main, NULL);
@@ -1954,6 +1969,11 @@ nfsd4_lock(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_lock 
 		(long long) lock->lk_offset,
 		(long long) lock->lk_length);
 
+	if (nfs4_in_grace() && !lock->lk_reclaim)
+		return nfserr_grace;
+	if (nfs4_in_no_grace() && lock->lk_reclaim)
+		return nfserr_no_grace;
+
 	if (check_lock_length(lock->lk_offset, lock->lk_length))
 		 return nfserr_inval;
 
@@ -1983,8 +2003,11 @@ nfsd4_lock(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_lock 
 		                        CHECK_FH | OPEN_STATE,
 		                        &open_sop, &open_stp,
 					&lock->v.new.clientid);
-		if (status)
+		if (status) {
+			if (lock->lk_reclaim)
+				status = nfserr_reclaim_bad;
 			goto out;
+		}
 		/* create lockowner and lock stateid */
 		fp = open_stp->st_file;
 		strhashval = lock_ownerstr_hashval(fp->fi_inode, 
@@ -2118,6 +2141,9 @@ nfsd4_lockt(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_lock
 	struct file_lock *conflicting_lock;
 	unsigned int strhashval;
 	int status;
+
+	if (nfs4_in_grace())
+		return nfserr_grace;
 
 	if (check_lock_length(lockt->lt_offset, lockt->lt_length))
 		 return nfserr_inval;
@@ -2343,6 +2369,7 @@ void
 nfs4_state_init(void)
 {
 	int i;
+	time_t start = get_seconds();
 
 	if (nfs4_init)
 		return;
@@ -2373,12 +2400,26 @@ nfs4_state_init(void)
 	INIT_LIST_HEAD(&close_lru);
 	INIT_LIST_HEAD(&client_lru);
 	init_MUTEX(&client_sema);
-	boot_time = get_seconds();
+	boot_time = start;
+	grace_end = start + NFSD_LEASE_TIME;
 	INIT_WORK(&laundromat_work,laundromat_main, NULL);
 	schedule_delayed_work(&laundromat_work, NFSD_LEASE_TIME*HZ);
 	nfs4_init = 1;
 
 }
+
+int
+nfs4_in_grace(void)
+{
+	return time_before(get_seconds(), (unsigned long)grace_end);
+}
+
+int
+nfs4_in_no_grace(void)
+{
+	return (grace_end < get_seconds());
+}
+
 
 static void
 __nfs4_state_shutdown(void)

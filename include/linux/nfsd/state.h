@@ -215,4 +215,6 @@ extern int nfs4_share_conflict(struct svc_fh *current_fh,
 		unsigned int deny_type);
 extern void nfs4_lock_state(void);
 extern void nfs4_unlock_state(void);
+extern int nfs4_in_grace(void);
+extern int nfs4_in_no_grace(void);
 #endif   /* NFSD4_STATE_H */
