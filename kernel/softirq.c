@@ -92,10 +92,9 @@ restart:
 			mask &= ~pending;
 			goto restart;
 		}
-		__local_bh_enable();
-
 		if (pending)
 			wakeup_softirqd(cpu);
+		__local_bh_enable();
 	}
 
 	local_irq_restore(flags);

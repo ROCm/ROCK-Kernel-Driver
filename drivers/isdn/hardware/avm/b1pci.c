@@ -343,12 +343,16 @@ static int __devinit b1pci_pci_probe(struct pci_dev *pdev,
 
 static void __devexit b1pci_pci_remove(struct pci_dev *pdev)
 {
+#ifdef CONFIG_ISDN_DRV_AVMB1_B1PCIV4
 	avmcard *card = pci_get_drvdata(pdev);
 
 	if (card->dma)
 		b1pciv4_remove(pdev);
 	else
 		b1pci_remove(pdev);
+#else
+	b1pci_remove(pdev);
+#endif
 }
 
 static struct pci_driver b1pci_pci_driver = {

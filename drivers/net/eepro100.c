@@ -843,6 +843,7 @@ static int __devinit speedo_found1(struct pci_dev *pdev,
 	sp->lstats = (struct speedo_stats *)(sp->tx_ring + TX_RING_SIZE);
 	sp->lstats_dma = TX_RING_ELEM_DMA(sp, TX_RING_SIZE);
 	init_timer(&sp->timer); /* used in ioctl() */
+	spin_lock_init(&sp->lock);
 
 	sp->mii_if.full_duplex = option >= 0 && (option & 0x10) ? 1 : 0;
 	if (card_idx >= 0) {
@@ -994,7 +995,6 @@ speedo_open(struct net_device *dev)
 	sp->dirty_tx = 0;
 	sp->last_cmd = 0;
 	sp->tx_full = 0;
-	spin_lock_init(&sp->lock);
 	sp->in_interrupt = 0;
 
 	/* .. we can safely take handler calls during init. */

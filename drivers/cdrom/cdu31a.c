@@ -3368,11 +3368,8 @@ int __init cdu31a_init(void)
 	if (!request_region(cdu31a_port, 4, "cdu31a"))
 		goto errout3;
 
-	if (register_blkdev(MAJOR_NR, "cdu31a", &scd_bdops)) {
-		printk("Unable to get major %d for CDU-31a\n",
-		       MAJOR_NR);
+	if (register_blkdev(MAJOR_NR, "cdu31a"))
 		goto errout2;
-	}
 
 	disk = alloc_disk(1);
 	if (!disk)

@@ -1193,11 +1193,9 @@ int __init mcdx_init_drive(int drive)
 	}
 
 	xtrace(INIT, "init() register blkdev\n");
-	if (register_blkdev(MAJOR_NR, "mcdx", &mcdx_bdops) != 0) {
+	if (register_blkdev(MAJOR_NR, "mcdx")) {
 		release_region((unsigned long) stuffp->wreg_data,
 			       MCDX_IO_SIZE);
-		xwarn("%s=0x%3p,%d: Init failed. Can't get major %d.\n",
-		      MCDX, stuffp->wreg_data, stuffp->irq, MAJOR_NR);
 		kfree(stuffp);
 		put_disk(disk);
 		return 1;

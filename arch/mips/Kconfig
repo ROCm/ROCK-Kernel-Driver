@@ -10,10 +10,6 @@ config MMU
 	bool
 	default y
 
-config SWAP
-	bool
-	default y
-
 config SMP
 	bool
 	---help---

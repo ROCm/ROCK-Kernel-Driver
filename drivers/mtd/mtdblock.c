@@ -570,11 +570,10 @@ static spinlock_t mtddev_lock = SPIN_LOCK_UNLOCKED;
 int __init init_mtdblock(void)
 {
 	spin_lock_init(&mtdblks_lock);
-	if (register_blkdev(MAJOR_NR,DEVICE_NAME,&mtd_fops)) {
-		printk(KERN_NOTICE "Can't allocate major number %d for Memory Technology Devices.\n",
-		       MTD_BLOCK_MAJOR);
+
+	if (register_blkdev(MAJOR_NR, DEVICE_NAME))
 		return -EAGAIN;
-	}
+
 #ifdef CONFIG_DEVFS_FS
 	devfs_mk_dir(NULL, DEVICE_NAME, NULL);
 #endif

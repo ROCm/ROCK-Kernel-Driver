@@ -503,13 +503,7 @@ void del_gendisk(struct gendisk *disk)
 	disk->capacity = 0;
 	disk->flags &= ~GENHD_FL_UP;
 	unlink_gendisk(disk);
-	disk->reads = disk->writes = 0;
-	disk->read_sectors = disk->write_sectors = 0;
-	disk->read_merges = disk->write_merges = 0;
-	disk->read_ticks = disk->write_ticks = 0;
-	disk->in_flight = 0;
-	disk->io_ticks = 0;
-	disk->time_in_queue = 0;
+	disk_stat_set_all(disk, 0);
 	disk->stamp = disk->stamp_idle = 0;
 	devfs_remove_partitions(disk);
 	if (disk->driverfs_dev) {

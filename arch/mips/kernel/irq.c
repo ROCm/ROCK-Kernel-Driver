@@ -73,17 +73,19 @@ volatile unsigned long irq_err_count, spurious_count;
 int show_interrupts(struct seq_file *p, void *v)
 {
 	struct irqaction * action;
+	unsigned long flags;
 	int i;
-
+	
 	seq_puts(p, "           ");
 	for (i=0; i < 1 /*smp_num_cpus*/; i++)
 		seq_printf(p, "CPU%d       ", i);
 	seq_putc(p, '\n');
 
 	for (i = 0 ; i < NR_IRQS ; i++) {
+		spin_lock_irqsave(&irq_desc[i].lock, flags);
 		action = irq_desc[i].action;
 		if (!action) 
-			continue;
+			goto unlock;
 		seq_printf(p, "%3d: ",i);
 		seq_printf(p, "%10u ", kstat_irqs(i));
 		seq_printf(p, " %14s", irq_desc[i].handler->typename);
@@ -92,6 +94,8 @@ int show_interrupts(struct seq_file *p, void *v)
 		for (action=action->next; action; action = action->next)
 			seq_printf(p, ", %s", action->name);
 		seq_putc(p, '\n');
+unlock:
+		spin_unlock_irqrestore(&irq_desc[i].lock, flags);
 	}
 	seq_printf(p, "ERR: %10lu\n", irq_err_count);
 	return 0;

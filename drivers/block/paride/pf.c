@@ -957,8 +957,7 @@ static int __init pf_init(void)
 		return -1;
 	pf_busy = 0;
 
-	if (register_blkdev(major, name, &pf_fops)) {
-		printk("pf_init: unable to get major number %d\n", major);
+	if (register_blkdev(major, name)) {
 		for (pf = units, unit = 0; unit < PF_UNITS; pf++, unit++)
 			put_disk(pf->disk);
 		return -1;
@@ -969,6 +968,7 @@ static int __init pf_init(void)
 
 	for (pf = units, unit = 0; unit < PF_UNITS; pf++, unit++) {
 		struct gendisk *disk = pf->disk;
+
 		if (!pf->present)
 			continue;
 		disk->private_data = pf;

@@ -966,6 +966,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 		if (APIC_init_uniprocessor())
 			printk(KERN_NOTICE "Local APIC not detected."
 					   " Using dummy APIC emulation.\n");
+		map_cpu_to_logical_apicid();
 		return;
 	}
 

@@ -71,9 +71,6 @@ obj-$(CONFIG_FB_E1355)            += epson1355fb.o
 obj-$(CONFIG_FB_PVR2)             += pvr2fb.o
 obj-$(CONFIG_FB_VOODOO1)          += sstfb.o cfbfillrect.o cfbcopyarea.o cfbimgblt.o
 
-# One by one these are being converted over to the new APIs
-#obj-$(CONFIG_FB_LEO)              += leofb.o sbusfb.o
-
 obj-$(CONFIG_FB_FFB)               += ffb.o sbuslib.o cfbimgblt.o cfbcopyarea.o
 obj-$(CONFIG_FB_CG6)               += cg6.o sbuslib.o cfbimgblt.o cfbcopyarea.o
 obj-$(CONFIG_FB_CG3)               += cg3.o sbuslib.o cfbimgblt.o cfbcopyarea.o \
@@ -85,6 +82,8 @@ obj-$(CONFIG_FB_CG14)              += cg14.o sbuslib.o cfbimgblt.o cfbcopyarea.o
 obj-$(CONFIG_FB_P9100)             += p9100.o sbuslib.o cfbimgblt.o cfbcopyarea.o \
 				      cfbfillrect.o
 obj-$(CONFIG_FB_TCX)               += tcx.o sbuslib.o cfbimgblt.o cfbcopyarea.o \
+				      cfbfillrect.o
+obj-$(CONFIG_FB_LEO)               += leo.o sbuslib.o cfbimgblt.o cfbcopyarea.o \
 				      cfbfillrect.o
 
 # Files generated that shall be removed upon make clean

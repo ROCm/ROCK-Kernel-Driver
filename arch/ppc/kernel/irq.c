@@ -346,6 +346,7 @@ int show_interrupts(struct seq_file *p, void *v)
 {
 	int i, j;
 	struct irqaction * action;
+	unsigned long flags;
 
 	seq_puts(p, "           ");
 	for (j=0; j<NR_CPUS; j++)
@@ -354,9 +355,10 @@ int show_interrupts(struct seq_file *p, void *v)
 	seq_putc(p, '\n');
 
 	for (i = 0 ; i < NR_IRQS ; i++) {
+		spin_lock_irqsave(&irq_desc[i].lock, flags);
 		action = irq_desc[i].action;
 		if ( !action || !action->handler )
-			continue;
+			goto skip;
 		seq_printf(p, "%3d: ", i);		
 #ifdef CONFIG_SMP
 		for (j = 0; j < NR_CPUS; j++)
@@ -373,8 +375,10 @@ int show_interrupts(struct seq_file *p, void *v)
 		seq_printf(p, "%s", (irq_desc[i].status & IRQ_LEVEL) ? "Level " : "Edge  ");
 		seq_printf(p, "    %s", action->name);
 		for (action = action->next; action; action = action->next)
-			seq_printf(p, ", %s", action->name);
+				seq_printf(p, ", %s", action->name);
 		seq_putc(p, '\n');
+skip:
+		spin_unlock_irqrestore(&irq_desc[i].lock, flags);
 	}
 #ifdef CONFIG_TAU_INT
 	if (tau_initialized){

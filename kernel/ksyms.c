@@ -57,6 +57,7 @@
 #include <linux/mount.h>
 #include <linux/ptrace.h>
 #include <linux/time.h>
+#include <linux/backing-dev.h>
 #include <asm/checksum.h>
 
 #if defined(CONFIG_PROC_FS)
@@ -367,6 +368,7 @@ EXPORT_SYMBOL_GPL(generic_file_direct_IO);
 EXPORT_SYMBOL(generic_file_readv);
 EXPORT_SYMBOL(generic_file_writev);
 EXPORT_SYMBOL(iov_shorten);
+EXPORT_SYMBOL_GPL(default_backing_dev_info);
 
 /* tty routines */
 EXPORT_SYMBOL(tty_wait_until_sent);
@@ -483,8 +485,6 @@ EXPORT_SYMBOL(task_nice);
 EXPORT_SYMBOL_GPL(idle_cpu);
 #if CONFIG_SMP
 EXPORT_SYMBOL_GPL(set_cpus_allowed);
-#endif
-#if CONFIG_SMP || CONFIG_PREEMPT
 EXPORT_SYMBOL(kernel_flag);
 #endif
 EXPORT_SYMBOL(jiffies);

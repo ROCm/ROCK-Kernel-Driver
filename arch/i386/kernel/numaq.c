@@ -31,8 +31,7 @@
 #include <asm/numaq.h>
 
 /* These are needed before the pgdat's are created */
-unsigned long node_start_pfn[MAX_NUMNODES];
-unsigned long node_end_pfn[MAX_NUMNODES];
+extern long node_start_pfn[], node_end_pfn[];
 
 #define	MB_TO_PAGES(addr) ((addr) << (20 - PAGE_SHIFT))
 
@@ -64,26 +63,6 @@ static void __init smp_dump_qct(void)
 		}
 	}
 }
-
-/*
- * -----------------------------------------
- *
- * functions related to physnode_map
- *
- * -----------------------------------------
- */
-/*
- * physnode_map keeps track of the physical memory layout of the
- * numaq nodes on a 256Mb break (each element of the array will
- * represent 256Mb of memory and will be marked by the node id.  so,
- * if the first gig is on node 0, and the second gig is on node 1
- * physnode_map will contain:
- * physnode_map[0-3] = 0;
- * physnode_map[4-7] = 1;
- * physnode_map[8- ] = -1;
- */
-int physnode_map[MAX_ELEMENTS] = { [0 ... (MAX_ELEMENTS - 1)] = -1};
-EXPORT_SYMBOL(physnode_map);
 
 /*
  * for each node mark the regions

@@ -1126,22 +1126,6 @@ config BOOT_LOAD
 config PIN_TLB
 	bool "Pinned Kernel TLBs (860 ONLY)"
 	depends on ADVANCED_OPTIONS && 8xx
-
-config SWAP
-	bool "Enable support for swap"
-	depends on ADVANCED_OPTIONS
-	help
-	  This option allows you to turn off support for swapfiles in
-	  the kernel.  This can be useful if you know that your system
-	  will never have swap.
-
-	  Say Y here unless you know what you are doing.
-
-config SWAP
-	bool
-	depends on !ADVANCED_OPTIONS
-	default y
-
 endmenu
 
 source "drivers/mtd/Kconfig"

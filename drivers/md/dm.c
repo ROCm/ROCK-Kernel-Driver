@@ -79,9 +79,8 @@ static __init int local_init(void)
 		return -ENOMEM;
 
 	_major = major;
-	r = register_blkdev(_major, _name, &dm_blk_dops);
+	r = register_blkdev(_major, _name);
 	if (r < 0) {
-		DMERR("register_blkdev failed");
 		kmem_cache_destroy(_io_cache);
 		return r;
 	}

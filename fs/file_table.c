@@ -27,7 +27,7 @@ static LIST_HEAD(anon_list);
 /* And here the free ones sit */
 static LIST_HEAD(free_list);
 /* public *and* exported. Not pretty! */
-spinlock_t files_lock = SPIN_LOCK_UNLOCKED;
+spinlock_t files_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 
 /* Find an unused file structure and return a pointer to it.
  * Returns NULL, if there are no more free file structures or
