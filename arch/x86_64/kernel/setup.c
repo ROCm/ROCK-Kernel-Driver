@@ -37,6 +37,7 @@
 #include <asm/processor.h>
 #include <linux/console.h>
 #include <linux/seq_file.h>
+#include <linux/root_dev.h>
 #include <asm/mtrr.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
@@ -550,7 +551,7 @@ void __init setup_arch(char **cmdline_p)
 	unsigned long bootmap_size, low_mem_size;
 	int i;
 
- 	ROOT_DEV = to_kdev_t(ORIG_ROOT_DEV);
+ 	ROOT_DEV = ORIG_ROOT_DEV;
  	drive_info = DRIVE_INFO;
  	screen_info = SCREEN_INFO;
 	aux_device_present = AUX_DEVICE_INFO;

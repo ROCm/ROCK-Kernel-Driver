@@ -1257,8 +1257,6 @@ extern int vfs_fstat(unsigned int, struct kstat *);
 extern struct file_system_type *get_fs_type(const char *name);
 extern struct super_block *get_super(kdev_t);
 extern void drop_super(struct super_block *sb);
-extern kdev_t ROOT_DEV;
-extern char root_device_name[];
 
 extern int dcache_dir_open(struct inode *, struct file *);
 extern int dcache_dir_close(struct inode *, struct file *);

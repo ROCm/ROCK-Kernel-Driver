@@ -49,6 +49,7 @@
 #include <linux/binfmts.h>
 #include <linux/namei.h>
 #include <linux/buffer_head.h>
+#include <linux/root_dev.h>
 #include <asm/checksum.h>
 
 #if defined(CONFIG_PROC_FS)
