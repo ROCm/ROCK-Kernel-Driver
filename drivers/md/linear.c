@@ -116,7 +116,8 @@ static int linear_run (mddev_t *mddev)
 	linear_conf_t *conf;
 	struct linear_hash *table;
 	mdk_rdev_t *rdev;
-	int size, i, nb_zone, cnt;
+	int i, nb_zone, cnt;
+	sector_t size;
 	unsigned int curr_offset;
 	struct list_head *tmp;
 
@@ -265,10 +266,11 @@ static int linear_make_request (request_queue_t *q, struct bio *bio)
 		char b[BDEVNAME_SIZE];
 
 		printk("linear_make_request: Block %llu out of bounds on "
-			"dev %s size %ld offset %ld\n",
+			"dev %s size %llu offset %llu\n",
 			(unsigned long long)block,
 			bdevname(tmp_dev->rdev->bdev, b),
-			tmp_dev->size, tmp_dev->offset);
+			(unsigned long long)tmp_dev->size,
+		        (unsigned long long)tmp_dev->offset);
 		bio_io_error(bio, bio->bi_size);
 		return 0;
 	}
