@@ -2949,7 +2949,7 @@ static int radeonfb_pci_register (struct pci_dev *pdev,
 		switch (pdev->device) {
 			case PCI_DEVICE_ID_ATI_RADEON_LY:
 			case PCI_DEVICE_ID_ATI_RADEON_LZ:
-				rinfo->video_ram = 8192;
+				rinfo->video_ram = 8192 * 1024;
 				break;
 			default:
 				break;
