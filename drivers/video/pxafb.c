@@ -1350,7 +1350,7 @@ failed:
 }
 
 static struct device_driver pxafb_driver = {
-	.name		= "pxafb",
+	.name		= "pxa2xx-fb",
 	.bus		= &platform_bus_type,
 	.probe		= pxafb_probe,
 #ifdef CONFIG_PM
