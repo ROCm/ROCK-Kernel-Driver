@@ -19,7 +19,6 @@ unexport SUB_DIRS
 unexport ALL_SUB_DIRS
 unexport MOD_SUB_DIRS
 unexport O_TARGET
-unexport ALL_MOBJS
 
 unexport obj-y
 unexport obj-m
@@ -32,6 +31,12 @@ unexport subdir-n
 unexport subdir-
 
 comma	:= ,
+
+#
+# When an object is listed to be built compiled-in and modular,
+# only build the compiled-in version
+#
+obj-m := $(filter-out $(obj-y),$(obj-m))
 
 #
 # Get things started.
@@ -182,8 +187,7 @@ endif
 #
 # A rule to make modules
 #
-ALL_MOBJS = $(filter-out $(obj-y), $(obj-m))
-ifneq "$(strip $(ALL_MOBJS))" ""
+ifneq "$(strip $(obj-m))" ""
 MOD_DESTDIR := $(shell $(CONFIG_SHELL) $(TOPDIR)/scripts/pathdown.sh)
 endif
 
@@ -200,14 +204,14 @@ $(patsubst %,_modinst_%,$(MOD_DIRS)) : dummy
 endif
 
 .PHONY: modules
-modules: $(ALL_MOBJS) dummy \
+modules: $(obj-m) dummy \
 	 $(patsubst %,_modsubdir_%,$(MOD_DIRS))
 
 .PHONY: _modinst__
 _modinst__: dummy
-ifneq "$(strip $(ALL_MOBJS))" ""
+ifneq "$(strip $(obj-m))" ""
 	mkdir -p $(MODLIB)/kernel/$(MOD_DESTDIR)
-	cp $(ALL_MOBJS) $(MODLIB)/kernel/$(MOD_DESTDIR)
+	cp $(obj-m) $(MODLIB)/kernel/$(MOD_DESTDIR)
 endif
 
 .PHONY: modules_install
