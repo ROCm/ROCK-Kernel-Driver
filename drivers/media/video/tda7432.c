@@ -330,8 +330,6 @@ static int tda7432_attach(struct i2c_adapter *adap, int addr, int kind)
 	i2c_set_clientdata(client, t);
 	
 	do_tda7432_init(client);
-	MOD_INC_USE_COUNT;
-	strncpy(client->dev.name, "TDA7432", DEVICE_NAME_SIZE);
 	printk(KERN_INFO "tda7432: init\n");
 
 	i2c_attach_client(client);
@@ -347,13 +345,12 @@ static int tda7432_probe(struct i2c_adapter *adap)
 
 static int tda7432_detach(struct i2c_client *client)
 {
-	struct tda7432 *t = i2c_get_clientdata(client);
+	struct tda7432 *t  = i2c_get_clientdata(client);
 
 	do_tda7432_init(client);
 	i2c_detach_client(client);
 	
 	kfree(t);
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -525,11 +522,9 @@ static struct i2c_driver driver = {
 
 static struct i2c_client client_template =
 {
-        .id     = -1,
-	.driver = &driver, 
-        .dev	= {
-		.name	= "tda7432",
-	},
+	I2C_DEVNAME("tda7432"),
+        .id         = -1,
+	.driver     = &driver, 
 };
 
 static int tda7432_init(void)
