@@ -160,7 +160,7 @@ const char *ig_small_value[] = {
  * this was computed as peak_value[i] = pow((63-i)*1.42,1.013)
  *
  * UDA1341 datasheet on page 21: Peak value (dB) = (Peak level - 63.5)*5*log2
- * There is an tabel with these values [level]=value: [3]=-90.31, [7]=-84.29
+ * There is an table with these values [level]=value: [3]=-90.31, [7]=-84.29
  * [61]=-2.78, [62] = -1.48, [63] = 0.0
  * I tried to compute it, but using but even using logarithm with base either 10 or 2
  * i was'n able to get values in the table from the formula. So I constructed another

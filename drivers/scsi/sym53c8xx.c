@@ -9092,7 +9092,7 @@ void ncr_int_udc (ncb_p np)
 	ccb_p   cp  = ncr_ccb_from_dsa(np, dsa);
 
 	/*
-	 * Fix Up. Some disks respond to a PPR negotation with
+	 * Fix Up. Some disks respond to a PPR negotiation with
 	 * a bus free instead of a message reject. 
 	 * Disable ppr negotiation if this is first time
 	 * tried ppr negotiation.

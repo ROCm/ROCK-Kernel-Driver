@@ -132,7 +132,7 @@ static int backoff;
    Both 'options[]' and 'full_duplex[]' should exist for driver
    interoperability.
    The media type is usually passed in 'options[]'.
-   The default is autonegotation for speed and duplex.
+   The default is autonegotiation for speed and duplex.
      This should rarely be overridden.
    Use option values 0x10/0x20 for 10Mbps, 0x100,0x200 for 100Mbps.
    Use option values 0x10 and 0x100 for forcing half duplex fixed speed.

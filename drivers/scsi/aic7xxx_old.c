@@ -4945,9 +4945,9 @@ aic7xxx_parse_msg(struct aic7xxx_host *p, struct aic7xxx_scb *scb)
   target_mask = (0x01 << tindex);
 
   /*
-   * Parse as much of the message as is availible,
+   * Parse as much of the message as is available,
    * rejecting it if we don't support it.  When
-   * the entire message is availible and has been
+   * the entire message is available and has been
    * handled, return TRUE indicating that we have
    * parsed an entire message.
    */
