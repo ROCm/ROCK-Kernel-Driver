@@ -1,5 +1,5 @@
 /*
- * $Id: mtd_blkdevs.c,v 1.23 2004/08/19 01:54:36 tpoynor Exp $
+ * $Id: mtd_blkdevs.c,v 1.24 2004/11/16 18:28:59 dwmw2 Exp $
  *
  * (C) 2003 David Woodhouse <dwmw2@infradead.org>
  *
@@ -143,7 +143,7 @@ static void mtd_blktrans_request(struct request_queue *rq)
 }
 
 
-int blktrans_open(struct inode *i, struct file *f)
+static int blktrans_open(struct inode *i, struct file *f)
 {
 	struct mtd_blktrans_dev *dev;
 	struct mtd_blktrans_ops *tr;
@@ -174,7 +174,7 @@ int blktrans_open(struct inode *i, struct file *f)
 	return ret;
 }
 
-int blktrans_release(struct inode *i, struct file *f)
+static int blktrans_release(struct inode *i, struct file *f)
 {
 	struct mtd_blktrans_dev *dev;
 	struct mtd_blktrans_ops *tr;
@@ -326,7 +326,7 @@ int del_mtd_blktrans_dev(struct mtd_blktrans_dev *old)
 	return 0;
 }
 
-void blktrans_notify_remove(struct mtd_info *mtd)
+static void blktrans_notify_remove(struct mtd_info *mtd)
 {
 	struct list_head *this, *this2, *next;
 
@@ -342,7 +342,7 @@ void blktrans_notify_remove(struct mtd_info *mtd)
 	}
 }
 
-void blktrans_notify_add(struct mtd_info *mtd)
+static void blktrans_notify_add(struct mtd_info *mtd)
 {
 	struct list_head *this;
 

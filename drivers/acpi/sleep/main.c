@@ -1,6 +1,7 @@
 /*
  * sleep.c - ACPI sleep support.
  *
+ * Copyright (c) 2004 David Shaohua Li <shaohua.li@intel.com>
  * Copyright (c) 2000-2003 Patrick Mochel
  * Copyright (c) 2003 Open Source Development Lab
  *
@@ -13,6 +14,7 @@
 #include <linux/dmi.h>
 #include <linux/device.h>
 #include <linux/suspend.h>
+#include <asm/io.h>
 #include <acpi/acpi_bus.h>
 #include <acpi/acpi_drivers.h>
 #include "sleep.h"
@@ -56,7 +58,8 @@ static int acpi_pm_prepare(suspend_state_t pm_state)
 		if (!acpi_wakeup_address)
 			return -EFAULT;
 		acpi_set_firmware_waking_vector(
-			(acpi_physical_address) acpi_wakeup_address);
+			(acpi_physical_address) virt_to_phys(
+				(void *)acpi_wakeup_address));
 	}
 	ACPI_FLUSH_CPU_CACHE();
 	acpi_enable_wakeup_device_prep(acpi_state);

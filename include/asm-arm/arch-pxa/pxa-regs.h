@@ -1280,6 +1280,10 @@
 #define GPIO78_nCS_2		78	/* chip select 2 */
 #define GPIO79_nCS_3		79	/* chip select 3 */
 #define GPIO80_nCS_4		80	/* chip select 4 */
+#define GPIO81_NSCLK		81	/* NSSP clock */
+#define GPIO82_NSFRM		82	/* NSSP Frame */
+#define GPIO83_NSTXD		83	/* NSSP transmit */
+#define GPIO84_NSRXD		84	/* NSSP receive */
 #define GPIO85_nPCE_1		85	/* Card Enable for Card Space (PXA27x) */
 #define GPIO92_MMCDAT0		92	/* MMC DAT0 (PXA27x) */
 #define GPIO109_MMCDAT1		109	/* MMC DAT1 (PXA27x) */
@@ -1303,6 +1307,8 @@
 #define GPIO_MD_MASK_NR		0x07f
 #define GPIO_MD_MASK_DIR	0x080
 #define GPIO_MD_MASK_FN		0x300
+#define GPIO_DFLT_LOW		0x400
+#define GPIO_DFLT_HIGH		0x800
 
 #define GPIO1_RTS_MD		( 1 | GPIO_ALT_FN_1_IN)
 #define GPIO6_MMCCLK_MD		( 6 | GPIO_ALT_FN_1_OUT)
@@ -1400,6 +1406,14 @@
 #define GPIO79_nCS_3_MD		(79 | GPIO_ALT_FN_2_OUT)
 #define GPIO79_pSKTSEL_MD	(79 | GPIO_ALT_FN_1_OUT)
 #define GPIO80_nCS_4_MD		(80 | GPIO_ALT_FN_2_OUT)
+#define GPIO81_NSSP_CLK_OUT 	(81 | GPIO_ALT_FN_1_OUT)
+#define GPIO81_NSSP_CLK_IN  	(81 | GPIO_ALT_FN_1_IN)
+#define GPIO82_NSSP_FRM_OUT 	(82 | GPIO_ALT_FN_1_OUT)
+#define GPIO82_NSSP_FRM_IN  	(82 | GPIO_ALT_FN_1_IN)
+#define GPIO83_NSSP_TX      	(83 | GPIO_ALT_FN_1_OUT)
+#define GPIO83_NSSP_RX      	(83 | GPIO_ALT_FN_2_IN)
+#define GPIO84_NSSP_TX      	(84 | GPIO_ALT_FN_1_OUT)
+#define GPIO84_NSSP_RX      	(84 | GPIO_ALT_FN_2_IN)
 #define GPIO85_nPCE_1_MD	(85 | GPIO_ALT_FN_1_OUT)
 #define GPIO92_MMCDAT0_MD	(92 | GPIO_ALT_FN_1_OUT)
 #define GPIO109_MMCDAT1_MD	(109 | GPIO_ALT_FN_1_OUT)
@@ -1503,6 +1517,25 @@
 #define RCSR_SMR	(1 << 2)	/* Sleep Mode */
 #define RCSR_WDR	(1 << 1)	/* Watchdog Reset */
 #define RCSR_HWR	(1 << 0)	/* Hardware Reset */
+
+#define PWER_GPIO(Nb)	(1 << Nb)	/* GPIO [0..15] wake-up enable     */
+#define PWER_GPIO0	PWER_GPIO (0)	/* GPIO  [0] wake-up enable        */
+#define PWER_GPIO1	PWER_GPIO (1)	/* GPIO  [1] wake-up enable        */
+#define PWER_GPIO2	PWER_GPIO (2)	/* GPIO  [2] wake-up enable        */
+#define PWER_GPIO3	PWER_GPIO (3)	/* GPIO  [3] wake-up enable        */
+#define PWER_GPIO4	PWER_GPIO (4)	/* GPIO  [4] wake-up enable        */
+#define PWER_GPIO5	PWER_GPIO (5)	/* GPIO  [5] wake-up enable        */
+#define PWER_GPIO6	PWER_GPIO (6)	/* GPIO  [6] wake-up enable        */
+#define PWER_GPIO7	PWER_GPIO (7)	/* GPIO  [7] wake-up enable        */
+#define PWER_GPIO8	PWER_GPIO (8)	/* GPIO  [8] wake-up enable        */
+#define PWER_GPIO9	PWER_GPIO (9)	/* GPIO  [9] wake-up enable        */
+#define PWER_GPIO10	PWER_GPIO (10)	/* GPIO [10] wake-up enable        */
+#define PWER_GPIO11	PWER_GPIO (11)	/* GPIO [11] wake-up enable        */
+#define PWER_GPIO12	PWER_GPIO (12)	/* GPIO [12] wake-up enable        */
+#define PWER_GPIO13	PWER_GPIO (13)	/* GPIO [13] wake-up enable        */
+#define PWER_GPIO14	PWER_GPIO (14)	/* GPIO [14] wake-up enable        */
+#define PWER_GPIO15	PWER_GPIO (15)	/* GPIO [15] wake-up enable        */
+#define PWER_RTC	0x80000000	/* RTC alarm wake-up enable        */
 
 
 /*

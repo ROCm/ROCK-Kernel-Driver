@@ -1,5 +1,5 @@
 /*
- * $Id: lubbock-flash.c,v 1.18 2004/09/28 18:54:40 nico Exp $
+ * $Id: lubbock-flash.c,v 1.19 2004/11/04 13:24:15 gleixner Exp $
  *
  * Map driver for the Lubbock developer platform.
  *
@@ -84,7 +84,7 @@ static int __init init_lubbock(void)
 	lubbock_maps[flashboot].name = "Lubbock Boot ROM";
 
 	for (i = 0; i < 2; i++) {
-		lubbock_maps[i].virt = (void __iomem *)ioremap(lubbock_maps[i].phys, WINDOW_SIZE);
+		lubbock_maps[i].virt = ioremap(lubbock_maps[i].phys, WINDOW_SIZE);
 		if (!lubbock_maps[i].virt) {
 			printk(KERN_WARNING "Failed to ioremap %s\n", lubbock_maps[i].name);
 			if (!ret)

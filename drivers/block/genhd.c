@@ -438,8 +438,52 @@ static int block_hotplug_filter(struct kset *kset, struct kobject *kobj)
 	return ((ktype == &ktype_block) || (ktype == &ktype_part));
 }
 
+static int block_hotplug(struct kset *kset, struct kobject *kobj, char **envp,
+			 int num_envp, char *buffer, int buffer_size)
+{
+	struct device *dev = NULL;
+	struct kobj_type *ktype = get_ktype(kobj);
+	int length = 0;
+	int i = 0;
+
+	/* get physical device backing disk or partition */
+	if (ktype == &ktype_block) {
+		struct gendisk *disk = container_of(kobj, struct gendisk, kobj);
+		dev = disk->driverfs_dev;
+	} else if (ktype == &ktype_part) {
+		struct gendisk *disk = container_of(kobj->parent, struct gendisk, kobj);
+		dev = disk->driverfs_dev;
+	}
+
+	if (dev) {
+		/* add physical device, backing this device  */
+		char *path = kobject_get_path(&dev->kobj, GFP_KERNEL);
+
+		add_hotplug_env_var(envp, num_envp, &i, buffer, buffer_size,
+				    &length, "PHYSDEVPATH=%s", path);
+		kfree(path);
+
+		/* add bus name of physical device */
+		if (dev->bus)
+			add_hotplug_env_var(envp, num_envp, &i,
+					    buffer, buffer_size, &length,
+					    "PHYSDEVBUS=%s", dev->bus->name);
+
+		/* add driver name of physical device */
+		if (dev->driver)
+			add_hotplug_env_var(envp, num_envp, &i,
+					    buffer, buffer_size, &length,
+					    "PHYSDEVDRIVER=%s", dev->driver->name);
+
+		envp[i] = NULL;
+	}
+
+	return 0;
+}
+
 static struct kset_hotplug_ops block_hotplug_ops = {
-	.filter	= block_hotplug_filter,
+	.filter		= block_hotplug_filter,
+	.hotplug	= block_hotplug,
 };
 
 /* declare block_subsys. */

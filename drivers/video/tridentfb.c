@@ -1017,22 +1017,24 @@ static int tridentfb_blank(int blank_mode, struct fb_info *info)
 	DPMSCont = read3CE(PowerStatus) & 0xFC;
 	switch (blank_mode)
 	{
-	case VESA_NO_BLANKING:
+	case FB_BLANK_UNBLANK:
 		/* Screen: On, HSync: On, VSync: On */
+	case FB_BLANK_NORMAL:
+		/* Screen: Off, HSync: On, VSync: On */
 		PMCont |= 0x03;
 		DPMSCont |= 0x00;
 		break;
-	case VESA_HSYNC_SUSPEND:
+	case FB_BLANK_HSYNC_SUSPEND:
 		/* Screen: Off, HSync: Off, VSync: On */
 		PMCont |= 0x02;
 		DPMSCont |= 0x01;
 		break;
-	case VESA_VSYNC_SUSPEND:
+	case FB_BLANK_VSYNC_SUSPEND:
 		/* Screen: Off, HSync: On, VSync: Off */
 		PMCont |= 0x02;
 		DPMSCont |= 0x02;
 		break;
-	case VESA_POWERDOWN:
+	case FB_BLANK_POWERDOWN:
 		/* Screen: Off, HSync: Off, VSync: Off */
 		PMCont |= 0x00;
 		DPMSCont |= 0x03;
@@ -1044,7 +1046,9 @@ static int tridentfb_blank(int blank_mode, struct fb_info *info)
 	t_outb(PMCont,0x83C6);
 
 	debug("exit\n");
-	return 0;
+
+	/* let fbcon do a softblank for us */
+	return (blank_mode == FB_BLANK_NORMAL) ? 1 : 0;
 }
 
 static int __devinit trident_pci_probe(struct pci_dev * dev, const struct pci_device_id * id)

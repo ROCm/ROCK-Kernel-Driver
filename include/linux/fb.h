@@ -258,6 +258,24 @@ struct fb_con2fbmap {
 #define VESA_HSYNC_SUSPEND      2
 #define VESA_POWERDOWN          3
 
+
+enum {
+	/* screen: unblanked, hsync: on,  vsync: on */
+	FB_BLANK_UNBLANK       = VESA_NO_BLANKING,
+
+	/* screen: blanked,   hsync: on,  vsync: on */
+	FB_BLANK_NORMAL        = VESA_NO_BLANKING + 1,
+
+	/* screen: blanked,   hsync: on,  vsync: off */
+	FB_BLANK_VSYNC_SUSPEND = VESA_VSYNC_SUSPEND + 1,
+
+	/* screen: blanked,   hsync: off, vsync: on */
+	FB_BLANK_HSYNC_SUSPEND = VESA_HSYNC_SUSPEND + 1,
+
+	/* screen: blanked,   hsync: off, vsync: off */
+	FB_BLANK_POWERDOWN     = VESA_POWERDOWN + 1
+};
+
 #define FB_VBLANK_VBLANKING	0x001	/* currently in a vertical blank */
 #define FB_VBLANK_HBLANKING	0x002	/* currently in a horizontal blank */
 #define FB_VBLANK_HAVE_VBLANK	0x004	/* vertical blanks can be detected */
@@ -685,7 +703,6 @@ struct fb_info {
 	struct fb_fix_screeninfo fix;	/* Current fix */
 	struct fb_monspecs monspecs;	/* Current Monitor specs */
 	struct work_struct queue;	/* Framebuffer event queue */
-	struct timer_list cursor_timer; /* Cursor timer */
 	struct fb_pixmap pixmap;	/* Image hardware mapper */
 	struct fb_pixmap sprite;	/* Cursor hardware mapper */
 	struct fb_cmap cmap;		/* Current cmap */
@@ -697,7 +714,6 @@ struct fb_info {
 #endif
 	char __iomem *screen_base;	/* Virtual address */
 	unsigned long screen_size;	/* Amount of ioremapped VRAM or 0 */ 
-	int currcon;			/* Current VC. */
 	void *pseudo_palette;		/* Fake palette of 16 colors */ 
 #define FBINFO_STATE_RUNNING	0
 #define FBINFO_STATE_SUSPENDED	1

@@ -308,6 +308,8 @@ config BLK_DEV_UB
 	  This driver supports certain USB attached storage devices
 	  such as flash keys.
 
+	  Warning: Enabling this cripples the usb-storage driver.
+
 	  If unsure, say N.
 
 config BLK_DEV_RAM

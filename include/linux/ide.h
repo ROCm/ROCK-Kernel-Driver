@@ -39,7 +39,6 @@
  *
  * REALLY_SLOW_IO can be defined in ide.c and ide-cd.c, if necessary
  */
-#define REALLY_FAST_IO			/* define if ide ports are perfect */
 #define INITIAL_MULT_COUNT	0	/* off=0; on=2,4,8,16,32, etc.. */
 
 #ifndef SUPPORT_SLOW_DATA_PORTS		/* 1 to support slow data ports */
@@ -62,18 +61,6 @@
  */
  
 #define IDE_NO_IRQ		(-1)
-
-/*
- * IDE_DRIVE_CMD is used to implement many features of the hdparm utility
- */
-#define IDE_DRIVE_CMD			99	/* (magic) undef to reduce kernel size*/
-
-#define IDE_DRIVE_TASK			98
-
-/*
- * IDE_DRIVE_TASKFILE is used to implement many features needed for raw tasks
- */
-#define IDE_DRIVE_TASKFILE		97
 
 /*
  *  "No user-serviceable parts" beyond this point  :)
@@ -100,13 +87,6 @@ typedef unsigned char	byte;	/* used everywhere */
  */
 
 #define DMA_PIO_RETRY	1	/* retrying in PIO */
-
-/*
- * Ensure that various configuration flags have compatible settings
- */
-#ifdef REALLY_SLOW_IO
-#undef REALLY_FAST_IO
-#endif
 
 #define HWIF(drive)		((ide_hwif_t *)((drive)->hwif))
 #define HWGROUP(drive)		((ide_hwgroup_t *)(HWIF(drive)->hwgroup))
@@ -197,10 +177,7 @@ typedef unsigned char	byte;	/* used everywhere */
 /*
  * Some more useful definitions
  */
-#define IDE_MAJOR_NAME	"hd"	/* the same for all i/f; see also genhd.c */
-#define MAJOR_NAME	IDE_MAJOR_NAME
 #define PARTN_BITS	6	/* number of minor dev bits for partitions */
-#define PARTN_MASK	((1<<PARTN_BITS)-1)	/* a useful bit mask */
 #define MAX_DRIVES	2	/* per interface; 2 assumed by lots of code */
 #define SECTOR_SIZE	512
 #define SECTOR_WORDS	(SECTOR_SIZE / 4)	/* number of 32bit words per sector */
@@ -256,16 +233,14 @@ typedef struct hw_regs_s {
 	int		irq;			/* our irq number */
 	int		dma;			/* our dma entry */
 	ide_ack_intr_t	*ack_intr;		/* acknowledge interrupt */
-	void		*priv;			/* interface specific data */
 	hwif_chipset_t  chipset;
-	unsigned long	sata_scr[SATA_NR_PORTS];
-	unsigned long	sata_misc[SATA_NR_PORTS];
 } hw_regs_t;
 
 /*
  * Register new hardware with ide
  */
 int ide_register_hw(hw_regs_t *hw, struct hwif_s **hwifp);
+int ide_register_hw_with_fixup(hw_regs_t *, struct hwif_s **, void (*)(struct hwif_s *));
 
 /*
  * Set up hw_regs_t structure before calling ide_register_hw (optional)
@@ -1194,14 +1169,6 @@ ide_startstop_t ide_error (ide_drive_t *drive, const char *msg, byte stat);
  */
 extern ide_startstop_t ide_abort(ide_drive_t *, const char *);
 
-/*
- * Issue a simple drive command
- * The drive must be selected beforehand.
- *
- * (drive, command, nsector, handler)
- */
-extern void ide_cmd(ide_drive_t *, u8, u8, ide_handler_t *);
-
 extern void ide_fix_driveid(struct hd_driveid *);
 /*
  * ide_fixstring() cleans up and (optionally) byte-swaps a text string,
@@ -1366,7 +1333,6 @@ extern ide_startstop_t recal_intr(ide_drive_t *);
 extern ide_startstop_t task_no_data_intr(ide_drive_t *);
 extern ide_startstop_t task_in_intr(ide_drive_t *);
 extern ide_startstop_t pre_task_out_intr(ide_drive_t *, struct request *);
-extern ide_startstop_t task_out_intr(ide_drive_t *);
 
 extern int ide_raw_taskfile(ide_drive_t *, ide_task_t *, u8 *);
 
@@ -1376,7 +1342,6 @@ int ide_task_ioctl(ide_drive_t *, unsigned int, unsigned long);
 
 extern int system_bus_clock(void);
 
-extern u8 ide_auto_reduce_xfer(ide_drive_t *);
 extern int ide_driveid_update(ide_drive_t *);
 extern int ide_ata66_check(ide_drive_t *, ide_task_t *);
 extern int ide_config_drive_speed(ide_drive_t *, u8);
@@ -1463,6 +1428,7 @@ typedef struct ide_pci_device_s {
 	void			(*init_iops)(ide_hwif_t *);
 	void                    (*init_hwif)(ide_hwif_t *);
 	void			(*init_dma)(ide_hwif_t *, unsigned long);
+	void			(*fixup)(ide_hwif_t *);
 	u8			channels;
 	u8			autodma;
 	ide_pci_enablebit_t	enablebits[2];
@@ -1523,6 +1489,9 @@ extern int ide_hwif_request_regions(ide_hwif_t *hwif);
 extern void ide_hwif_release_regions(ide_hwif_t* hwif);
 extern void ide_unregister (unsigned int index);
 
+void ide_undecoded_slave(ide_hwif_t *);
+
+int probe_hwif_init_with_fixup(ide_hwif_t *, void (*)(ide_hwif_t *));
 extern int probe_hwif_init(ide_hwif_t *);
 
 static inline void *ide_get_hwifdata (ide_hwif_t * hwif)

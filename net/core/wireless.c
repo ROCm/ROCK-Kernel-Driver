@@ -52,7 +52,8 @@
  * v6 - 18.06.04 - Jean II
  *	o Change get_spydata() method for added safety
  *	o Remove spy #ifdef, they are always on -> cleaner code
- *	o Allow any size GET request is user specifies length > max
+ *	o Allow any size GET request if user specifies length > max
+ *		and if request has IW_DESCR_FLAG_NOMAX flag or is SIOCGIWPRIV
  *	o Start migrating get_wireless_stats to struct iw_handler_def
  *	o Add wmb() in iw_handler_set_spy() for non-coherent archs/cpus
  * Based on patch from Pavel Roskin <proski@gnu.org> :
@@ -690,6 +691,10 @@ static inline int ioctl_standard_call(struct net_device *	dev,
 				 * we can support any size GET requests.
 				 * There is still a limit : -ENOMEM. */
 				extra_size = user_length * descr->token_size;
+				/* Note : user_length is originally a __u16,
+				 * and token_size is controlled by us,
+				 * so extra_size won't get negative and
+				 * won't overflow... */
 			}
 		}
 
@@ -1227,7 +1232,7 @@ int iw_handler_set_spy(struct net_device *	dev,
 
 	/* We want to operate without locking, because wireless_spy_update()
 	 * most likely will happen in the interrupt handler, and therefore
-	 * have it own locking constraints and needs performance.
+	 * have its own locking constraints and needs performance.
 	 * The rtnl_lock() make sure we don't race with the other iw_handlers.
 	 * This make sure wireless_spy_update() "see" that the spy list
 	 * is temporarily disabled. */

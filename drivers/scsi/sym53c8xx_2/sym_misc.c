@@ -190,10 +190,12 @@ void sym_announce_transfer_rate(hcb_p np, int target)
 			mb10 = (f10 + period/2) / period;
 		}
 		printf_info (
-		    "%s:%d: %s %sSCSI %d.%d MB/s %s (%d.%d ns, offset %d)\n",
+		    "%s:%d: %s %sSCSI %d.%d MB/s %s%s%s (%d.%d ns, offset %d)\n",
 		    sym_name(np), target, scsi, __tcurr.width? "WIDE " : "",
 		    mb10/10, mb10%10,
 		    (__tcurr.options & PPR_OPT_DT) ? "DT" : "ST",
+		    (__tcurr.options & PPR_OPT_IU) ? " IU" : "",
+		    (__tcurr.options & PPR_OPT_QAS) ? " QAS" : "",
 		    period/10, period%10, __tcurr.offset);
 	}
 	else

@@ -1,5 +1,5 @@
 /*
-    $Id: bttvp.h,v 1.11 2004/10/13 10:39:00 kraxel Exp $
+    $Id: bttvp.h,v 1.12 2004/10/25 11:26:36 kraxel Exp $
 
     bttv - Bt848 frame grabber driver
 

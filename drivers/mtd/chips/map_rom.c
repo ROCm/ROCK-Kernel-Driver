@@ -1,7 +1,7 @@
 /*
  * Common code to handle map devices which are simple ROM
  * (C) 2000 Red Hat. GPL'd.
- * $Id: map_rom.c,v 1.21 2004/07/12 14:06:01 dwmw2 Exp $
+ * $Id: map_rom.c,v 1.22 2004/11/16 18:29:00 dwmw2 Exp $
  */
 
 #include <linux/module.h>
@@ -19,7 +19,7 @@
 static int maprom_read (struct mtd_info *, loff_t, size_t, size_t *, u_char *);
 static int maprom_write (struct mtd_info *, loff_t, size_t, size_t *, const u_char *);
 static void maprom_nop (struct mtd_info *);
-struct mtd_info *map_rom_probe(struct map_info *map);
+static struct mtd_info *map_rom_probe(struct map_info *map);
 
 static struct mtd_chip_driver maprom_chipdrv = {
 	.probe	= map_rom_probe,
@@ -27,7 +27,7 @@ static struct mtd_chip_driver maprom_chipdrv = {
 	.module	= THIS_MODULE
 };
 
-struct mtd_info *map_rom_probe(struct map_info *map)
+static struct mtd_info *map_rom_probe(struct map_info *map)
 {
 	struct mtd_info *mtd;
 
@@ -75,7 +75,7 @@ static int maprom_write (struct mtd_info *mtd, loff_t to, size_t len, size_t *re
 	return -EIO;
 }
 
-int __init map_rom_init(void)
+static int __init map_rom_init(void)
 {
 	register_mtd_chip_driver(&maprom_chipdrv);
 	return 0;

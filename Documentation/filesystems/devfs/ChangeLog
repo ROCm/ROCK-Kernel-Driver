@@ -1632,7 +1632,7 @@ Changes for patch v177
 - Fixed bugs in handling symlinks: could leak or cause Oops
 
 - Cleaned up directory handling by separating fops
-  Thanks to Alexander Viro <viro@math.psu.edu>
+  Thanks to Alexander Viro <viro@parcelfarce.linux.theplanet.co.uk>
 ===============================================================================
 Changes for patch v178
 

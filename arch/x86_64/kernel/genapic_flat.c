@@ -103,6 +103,13 @@ static unsigned int flat_cpu_mask_to_apicid(cpumask_t cpumask)
 	return cpus_addr(cpumask)[0] & APIC_ALL_CPUS;
 }
 
+static unsigned int phys_pkg_id(int index_msb)
+{
+	u32 ebx;
+
+	ebx = cpuid_ebx(1);
+	return ((ebx >> 24) & 0xFF) >> index_msb;
+}
 
 struct genapic apic_flat =  {
 	.name = "flat",
@@ -116,4 +123,5 @@ struct genapic apic_flat =  {
 	.send_IPI_allbutself = flat_send_IPI_allbutself,
 	.send_IPI_mask = flat_send_IPI_mask,
 	.cpu_mask_to_apicid = flat_cpu_mask_to_apicid,
+	.phys_pkg_id = phys_pkg_id,
 };

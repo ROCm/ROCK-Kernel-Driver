@@ -63,7 +63,8 @@ const char *usbcore_name = "usbcore";
 int nousb;		/* Disable USB when built into kernel image */
 			/* Not honored on modular build */
 
-static DECLARE_RWSEM(usb_all_devices_rwsem);
+DECLARE_RWSEM(usb_all_devices_rwsem);
+EXPORT_SYMBOL(usb_all_devices_rwsem);
 
 
 static int generic_probe (struct device *dev)
@@ -97,6 +98,7 @@ int usb_probe_interface(struct device *dev)
 
 	if (!driver->probe)
 		return error;
+	/* FIXME we'd much prefer to just resume it ... */
 	if (interface_to_usbdev(intf)->state == USB_STATE_SUSPENDED)
 		return -EHOSTUNREACH;
 
@@ -1402,6 +1404,10 @@ static int usb_generic_suspend(struct device *dev, u32 state)
 
 	intf = to_usb_interface(dev);
 	driver = to_usb_driver(dev->driver);
+
+	/* there's only one USB suspend state */
+	if (intf->dev.power.power_state)
+		return 0;
 
 	if (driver->suspend)
 		return driver->suspend(intf, state);

@@ -76,6 +76,7 @@ struct hpet_dev {
 struct hpets {
 	struct hpets *hp_next;
 	struct hpet __iomem *hp_hpet;
+	struct time_interpolator *hp_interpolator;
 	unsigned long hp_period;
 	unsigned long hp_delta;
 	unsigned int hp_ntimer;
@@ -660,15 +661,6 @@ int hpet_control(struct hpet_task *tp, unsigned int cmd, unsigned long arg)
 	return hpet_ioctl_common(devp, cmd, arg, 1);
 }
 
-#ifdef	CONFIG_TIME_INTERPOLATION
-
-static struct time_interpolator hpet_interpolator = {
-	.source = TIME_SOURCE_MMIO64,
-	.shift = 10
-};
-
-#endif
-
 static ctl_table hpet_table[] = {
 	{
 	 .ctl_name = 1,
@@ -705,6 +697,28 @@ static ctl_table dev_root[] = {
 
 static struct ctl_table_header *sysctl_header;
 
+static void hpet_register_interpolator(struct hpets *hpetp)
+{
+#ifdef	CONFIG_TIME_INTERPOLATION
+	struct time_interpolator *ti;
+
+	ti = kmalloc(sizeof(*ti), GFP_KERNEL);
+	if (!ti)
+		return;
+
+	memset(ti, 0, sizeof(*ti));
+	ti->source = TIME_SOURCE_MMIO64;
+	ti->shift = 10;
+	ti->addr = &hpetp->hp_hpet->hpet_mc;
+	ti->frequency = hpet_time_div(hpets->hp_period);
+	ti->drift = ti->frequency * HPET_DRIFT / 1000000;
+	ti->mask = -1;
+
+	hpetp->hp_interpolator = ti;
+	register_time_interpolator(ti);
+#endif
+}
+
 /*
  * Adjustment for when arming the timer with
  * initial conditions.  That is, main counter
@@ -712,7 +726,7 @@ static struct ctl_table_header *sysctl_header;
  */
 #define	TICK_CALIBRATE	(1000UL)
 
-static unsigned long __init hpet_calibrate(struct hpets *hpetp)
+static unsigned long hpet_calibrate(struct hpets *hpetp)
 {
 	struct hpet_timer __iomem *timer = NULL;
 	unsigned long t, m, count, i, flags, start;
@@ -749,7 +763,7 @@ static unsigned long __init hpet_calibrate(struct hpets *hpetp)
 	return (m - start) / i;
 }
 
-int __init hpet_alloc(struct hpet_data *hdp)
+int hpet_alloc(struct hpet_data *hdp)
 {
 	u64 cap, mcfg;
 	struct hpet_dev *devp;
@@ -757,7 +771,7 @@ int __init hpet_alloc(struct hpet_data *hdp)
 	struct hpets *hpetp;
 	size_t siz;
 	struct hpet __iomem *hpet;
-	static struct hpets *last __initdata = (struct hpets *)0;
+	static struct hpets *last = (struct hpets *)0;
 	unsigned long ns;
 
 	/*
@@ -810,8 +824,9 @@ int __init hpet_alloc(struct hpet_data *hdp)
 	hpetp->hp_period = (cap & HPET_COUNTER_CLK_PERIOD_MASK) >>
 	    HPET_COUNTER_CLK_PERIOD_SHIFT;
 
-	printk(KERN_INFO "hpet%d: at MMIO 0x%p, IRQ%s",
-		hpetp->hp_which, hpet, hpetp->hp_ntimer > 1 ? "s" : "");
+	printk(KERN_INFO "hpet%d: at MMIO 0x%lx, IRQ%s",
+		hpetp->hp_which, hdp->hd_phys_address,
+		hpetp->hp_ntimer > 1 ? "s" : "");
 	for (i = 0; i < hpetp->hp_ntimer; i++)
 		printk("%s %d", i > 0 ? "," : "", hdp->hd_irq[i]);
 	printk("\n");
@@ -854,11 +869,12 @@ int __init hpet_alloc(struct hpet_data *hdp)
 	}
 
 	hpetp->hp_delta = hpet_calibrate(hpetp);
+	hpet_register_interpolator(hpetp);
 
 	return 0;
 }
 
-static acpi_status __init hpet_resources(struct acpi_resource *res, void *data)
+static acpi_status hpet_resources(struct acpi_resource *res, void *data)
 {
 	struct hpet_data *hdp;
 	acpi_status status;
@@ -873,6 +889,7 @@ static acpi_status __init hpet_resources(struct acpi_resource *res, void *data)
 		unsigned long size;
 
 		size = addr.max_address_range - addr.min_address_range + 1;
+		hdp->hd_phys_address = addr.min_address_range;
 		hdp->hd_address = ioremap(addr.min_address_range, size);
 
 		for (hpetp = hpets; hpetp; hpetp = hpetp->hp_next)
@@ -898,7 +915,7 @@ static acpi_status __init hpet_resources(struct acpi_resource *res, void *data)
 	return AE_OK;
 }
 
-static int __init hpet_acpi_add(struct acpi_device *device)
+static int hpet_acpi_add(struct acpi_device *device)
 {
 	acpi_status result;
 	struct hpet_data data;
@@ -920,9 +937,10 @@ static int __init hpet_acpi_add(struct acpi_device *device)
 	return hpet_alloc(&data);
 }
 
-static int __init hpet_acpi_remove(struct acpi_device *device, int type)
+static int hpet_acpi_remove(struct acpi_device *device, int type)
 {
-	return 0;
+	/* XXX need to unregister interpolator, dealloc mem, etc */
+	return -EINVAL;
 }
 
 static struct acpi_driver hpet_acpi_driver = {
@@ -938,37 +956,32 @@ static struct miscdevice hpet_misc = { HPET_MINOR, "hpet", &hpet_fops };
 
 static int __init hpet_init(void)
 {
-	(void)acpi_bus_register_driver(&hpet_acpi_driver);
+	int result;
 
-	if (hpets) {
-		if (misc_register(&hpet_misc))
-			return -ENODEV;
-
-		sysctl_header = register_sysctl_table(dev_root, 0);
-
-#ifdef	CONFIG_TIME_INTERPOLATION
-		{
-			struct hpet *hpet;
-
-			hpet = hpets->hp_hpet;
-			hpet_interpolator.addr = &hpets->hp_hpet->hpet_mc;
-			hpet_interpolator.frequency = hpet_time_div(hpets->hp_period);
-			hpet_interpolator.drift = hpet_interpolator.frequency *
-			    HPET_DRIFT / 1000000;
-			register_time_interpolator(&hpet_interpolator);
-		}
-#endif
-		return 0;
-	} else
+	result = misc_register(&hpet_misc);
+	if (result < 0)
 		return -ENODEV;
+
+	sysctl_header = register_sysctl_table(dev_root, 0);
+
+	result = acpi_bus_register_driver(&hpet_acpi_driver);
+	if (result < 0) {
+		if (sysctl_header)
+			unregister_sysctl_table(sysctl_header);
+		misc_deregister(&hpet_misc);
+		return result;
+	}
+
+	return 0;
 }
 
 static void __exit hpet_exit(void)
 {
 	acpi_bus_unregister_driver(&hpet_acpi_driver);
 
-	if (hpets)
+	if (sysctl_header)
 		unregister_sysctl_table(sysctl_header);
+	misc_deregister(&hpet_misc);
 
 	return;
 }

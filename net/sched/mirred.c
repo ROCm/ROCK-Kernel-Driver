@@ -76,7 +76,7 @@ tcf_mirred_release(struct tcf_mirred *p, int bind)
 	return 0;
 }
 
-int
+static int
 tcf_mirred_init(struct rtattr *rta, struct rtattr *est, struct tc_action *a,int ovr, int bind)
 {
 	struct rtattr *tb[TCA_MIRRED_MAX];
@@ -138,8 +138,9 @@ tcf_mirred_init(struct rtattr *rta, struct rtattr *est, struct tc_action *a,int 
 		p->eaction = parm->eaction;
 		if (parm->ifindex) {
 			p->ifindex = parm->ifindex;
+			if (ovr)
+				dev_put(p->dev);
 			p->dev = dev;
-			dev_hold(p->dev); 
 		}
 		spin_unlock(&p->lock);
 	}
@@ -150,7 +151,7 @@ tcf_mirred_init(struct rtattr *rta, struct rtattr *est, struct tc_action *a,int 
 
 }
 
-int
+static int
 tcf_mirred_cleanup(struct tc_action *a, int bind)
 {
 	struct tcf_mirred *p;
@@ -160,7 +161,7 @@ tcf_mirred_cleanup(struct tc_action *a, int bind)
 	return 0;
 }
 
-int
+static int
 tcf_mirred(struct sk_buff **pskb, struct tc_action *a)
 {
 	struct tcf_mirred *p;
@@ -195,9 +196,9 @@ tcf_mirred(struct sk_buff **pskb, struct tc_action *a)
 bad_mirred:
 		if (NULL != skb2)
 			kfree_skb(skb2);
-		p->stats.overlimits++;
-		p->stats.bytes += skb->len;
-		p->stats.packets++;
+		p->qstats.overlimits++;
+		p->bstats.bytes += skb->len;
+		p->bstats.packets++;
 		spin_unlock(&p->lock);
 		/* should we be asking for packet to be dropped?
 		 * may make sense for redirect case only 
@@ -216,8 +217,8 @@ bad_mirred:
 		goto bad_mirred;
 	}
 
-	p->stats.bytes += skb2->len;
-	p->stats.packets++;
+	p->bstats.bytes += skb2->len;
+	p->bstats.packets++;
 	if ( !(at & AT_EGRESS)) {
 		if (p->ok_push) {
 			skb_push(skb2, skb2->dev->hard_header_len);
@@ -235,7 +236,7 @@ bad_mirred:
 	return p->action;
 }
 
-int
+static int
 tcf_mirred_dump(struct sk_buff *skb, struct tc_action *a,int bind, int ref)
 {
 	unsigned char *b = skb->tail;
@@ -257,27 +258,15 @@ tcf_mirred_dump(struct sk_buff *skb, struct tc_action *a,int bind, int ref)
 	opt.ifindex = p->ifindex;
 	DPRINTK(" tcf_mirred_dump index %d action %d eaction %d ifndex %d\n",p->index,p->action,p->eaction,p->ifindex);
 	RTA_PUT(skb, TCA_MIRRED_PARMS, sizeof (opt), &opt);
-	t.install = jiffies - p->tm.install;
-	t.lastuse = jiffies - p->tm.lastuse;
-	t.expires = p->tm.expires;
+	t.install = jiffies_to_clock_t(jiffies - p->tm.install);
+	t.lastuse = jiffies_to_clock_t(jiffies - p->tm.lastuse);
+	t.expires = jiffies_to_clock_t(p->tm.expires);
 	RTA_PUT(skb, TCA_MIRRED_TM, sizeof (t), &t);
 	return skb->len;
 
       rtattr_failure:
 	skb_trim(skb, b - skb->data);
 	return -1;
-}
-
-int
-tcf_mirred_stats(struct sk_buff *skb, struct tc_action *a)
-{
-	struct tcf_mirred *p;
-	p = PRIV(a,mirred);
-
-	if (NULL != p)
-		return qdisc_copy_stats(skb, &p->stats, p->stats_lock);
-
-	return 1;
 }
 
 static struct tc_action_ops act_mirred_ops = {
@@ -287,7 +276,6 @@ static struct tc_action_ops act_mirred_ops = {
 	.capab		=	TCA_CAP_NONE,
 	.owner		=	THIS_MODULE,
 	.act		=	tcf_mirred,
-	.get_stats	=	tcf_mirred_stats,
 	.dump		=	tcf_mirred_dump,
 	.cleanup	=	tcf_mirred_cleanup,
 	.lookup		=	tcf_hash_search,

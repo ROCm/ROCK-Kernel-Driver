@@ -1629,15 +1629,16 @@ static int radeonfb_blank (int blank, struct fb_info *info)
 	val2 &= ~(LVDS_DISPLAY_DIS);
 
         switch (blank) {
-                case VESA_NO_BLANKING:
+	        case FB_BLANK_UNBLANK:
+	        case FB_BLANK_NORMAL:
                         break;
-                case VESA_VSYNC_SUSPEND:
+                case FB_BLANK_VSYNC_SUSPEND:
                         val |= (CRTC_DISPLAY_DIS | CRTC_VSYNC_DIS);
                         break;
-                case VESA_HSYNC_SUSPEND:
+                case FB_BLANK_HSYNC_SUSPEND:
                         val |= (CRTC_DISPLAY_DIS | CRTC_HSYNC_DIS);
                         break;
-                case VESA_POWERDOWN:
+                case FB_BLANK_POWERDOWN:
                         val |= (CRTC_DISPLAY_DIS | CRTC_VSYNC_DIS | 
                                 CRTC_HSYNC_DIS);
 			val2 |= (LVDS_DISPLAY_DIS);
@@ -1654,7 +1655,8 @@ static int radeonfb_blank (int blank, struct fb_info *info)
 			break;
 	}
 
-	return 0;
+	/* let fbcon do a soft blank for us */
+	return (blank == FB_BLANK_NORMAL) ? 1 : 0;
 }
 
 
@@ -2247,7 +2249,6 @@ static int __devinit radeon_set_fbinfo (struct radeonfb_info *rinfo)
 
 	info = &rinfo->info;
 
-	info->currcon = -1;
 	info->par = rinfo;
 	info->pseudo_palette = rinfo->pseudo_palette;
         info->flags = FBINFO_DEFAULT | FBINFO_HWACCEL_YPAN;

@@ -689,7 +689,7 @@ static int __init detect_init_APIC (void)
 	u32 h, l, features;
 	extern void get_cpu_vendor(struct cpuinfo_x86*);
 
-	/* Disabled by DMI scan or kernel option? */
+	/* Disabled by kernel option? */
 	if (enable_local_apic < 0)
 		return -1;
 
@@ -703,8 +703,7 @@ static int __init detect_init_APIC (void)
 			break;
 		goto no_apic;
 	case X86_VENDOR_INTEL:
-		if (boot_cpu_data.x86 == 6 ||
-		    (boot_cpu_data.x86 == 15 && (cpu_has_apic || enable_local_apic > 0)) ||
+		if (boot_cpu_data.x86 == 6 || boot_cpu_data.x86 == 15 ||
 		    (boot_cpu_data.x86 == 5 && cpu_has_apic))
 			break;
 		goto no_apic;
@@ -714,20 +713,23 @@ static int __init detect_init_APIC (void)
 
 	if (!cpu_has_apic) {
 		/*
-		 * Over-ride BIOS and try to enable LAPIC
-		 * only if "lapic" specified
+		 * Over-ride BIOS and try to enable the local
+		 * APIC only if "lapic" specified.
 		 */
-		if (enable_local_apic != 1)
-			goto no_apic;
+		if (enable_local_apic <= 0) {
+			printk("Local APIC disabled by BIOS -- "
+			       "you can enable it with \"lapic\"\n");
+			return -1;
+		}
 		/*
 		 * Some BIOSes disable the local APIC in the
 		 * APIC_BASE MSR. This can only be done in
-		 * software for Intel P6 and AMD K7 (Model > 1).
+		 * software for Intel P6 or later and AMD K7
+		 * (Model > 1) or later.
 		 */
 		rdmsr(MSR_IA32_APICBASE, l, h);
 		if (!(l & MSR_IA32_APICBASE_ENABLE)) {
-			apic_printk(APIC_VERBOSE, "Local APIC disabled "
-					"by BIOS -- reenabling.\n");
+			printk("Local APIC disabled by BIOS -- reenabling.\n");
 			l &= ~MSR_IA32_APICBASE_BASE;
 			l |= MSR_IA32_APICBASE_ENABLE | APIC_DEFAULT_PHYS_BASE;
 			wrmsr(MSR_IA32_APICBASE, l, h);
@@ -754,7 +756,7 @@ static int __init detect_init_APIC (void)
 	if (nmi_watchdog != NMI_NONE)
 		nmi_watchdog = NMI_LOCAL_APIC;
 
-	apic_printk(APIC_VERBOSE, "Found and enabled local APIC!\n");
+	printk("Found and enabled local APIC!\n");
 
 	apic_pm_activate();
 
@@ -781,8 +783,8 @@ void __init init_apic_mappings(void)
 		apic_phys = mp_lapic_addr;
 
 	set_fixmap_nocache(FIX_APIC_BASE, apic_phys);
-	apic_printk(APIC_DEBUG, "mapped APIC to %08lx (%08lx)\n", APIC_BASE,
-			apic_phys);
+	printk(KERN_DEBUG "mapped APIC to %08lx (%08lx)\n", APIC_BASE,
+	       apic_phys);
 
 	/*
 	 * Fetch the APIC ID of the BSP in case we have a
@@ -800,21 +802,23 @@ void __init init_apic_mappings(void)
 			if (smp_found_config) {
 				ioapic_phys = mp_ioapics[i].mpc_apicaddr;
 				if (!ioapic_phys) {
-					printk(KERN_ERR "WARNING: bogus zero IO-APIC address found in MPTABLE, disabling IO/APIC support!\n");
-
+					printk(KERN_ERR
+					       "WARNING: bogus zero IO-APIC "
+					       "address found in MPTABLE, "
+					       "disabling IO/APIC support!\n");
 					smp_found_config = 0;
 					skip_ioapic_setup = 1;
 					goto fake_ioapic_page;
 				}
 			} else {
 fake_ioapic_page:
-				ioapic_phys = (unsigned long) alloc_bootmem_pages(PAGE_SIZE);
+				ioapic_phys = (unsigned long)
+					      alloc_bootmem_pages(PAGE_SIZE);
 				ioapic_phys = __pa(ioapic_phys);
 			}
 			set_fixmap_nocache(idx, ioapic_phys);
-			apic_printk(APIC_DEBUG, "mapped IOAPIC to "
-					"%08lx (%08lx)\n",
-					__fix_to_virt(idx), ioapic_phys);
+			printk(KERN_DEBUG "mapped IOAPIC to %08lx (%08lx)\n",
+			       __fix_to_virt(idx), ioapic_phys);
 			idx++;
 		}
 	}

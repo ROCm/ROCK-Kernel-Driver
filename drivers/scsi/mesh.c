@@ -60,22 +60,22 @@ MODULE_AUTHOR("Paul Mackerras (paulus@samba.org)");
 MODULE_DESCRIPTION("PowerMac MESH SCSI driver");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(sync_rate, "i");
-MODULE_PARM_DESC(sync_rate, "Synchronous rate (0..10, 0=async)");
-MODULE_PARM(sync_targets, "i");
-MODULE_PARM_DESC(sync_targets, "Bitmask of targets allowed to set synchronous");
-MODULE_PARM(resel_targets, "i");
-MODULE_PARM_DESC(resel_targets, "Bitmask of targets allowed to set disconnect");
-MODULE_PARM(debug_targets, "i");
-MODULE_PARM_DESC(debug_targets, "Bitmask of debugged targets");
-MODULE_PARM(init_reset_delay, "i");
-MODULE_PARM_DESC(init_reset_delay, "Initial bus reset delay (0=no reset)");
-
 static int sync_rate = CONFIG_SCSI_MESH_SYNC_RATE;
 static int sync_targets = 0xff;
 static int resel_targets = 0xff;
 static int debug_targets = 0;	/* print debug for these targets */
 static int init_reset_delay = CONFIG_SCSI_MESH_RESET_DELAY_MS;
+
+module_param(sync_rate, int, 0);
+MODULE_PARM_DESC(sync_rate, "Synchronous rate (0..10, 0=async)");
+module_param(sync_targets, int, 0);
+MODULE_PARM_DESC(sync_targets, "Bitmask of targets allowed to set synchronous");
+module_param(resel_targets, int, 0);
+MODULE_PARM_DESC(resel_targets, "Bitmask of targets allowed to set disconnect");
+module_param(debug_targets, int, 0644);
+MODULE_PARM_DESC(debug_targets, "Bitmask of debugged targets");
+module_param(init_reset_delay, int, 0);
+MODULE_PARM_DESC(init_reset_delay, "Initial bus reset delay (0=no reset)");
 
 static int mesh_sync_period = 100;
 static int mesh_sync_offset = 0;
@@ -1231,8 +1231,8 @@ static void handle_msgin(struct mesh_state *ms)
 			} else if (code != cmd->device->lun + IDENTIFY_BASE) {
 				printk(KERN_WARNING "mesh: lun mismatch "
 				       "(%d != %d) on reselection from "
-				       "target %d\n", i, cmd->device->lun,
-				       ms->conn_tgt);
+				       "target %d\n", code - IDENTIFY_BASE,
+				       cmd->device->lun, ms->conn_tgt);
 			}
 			break;
 		}
@@ -1762,7 +1762,7 @@ static int mesh_suspend(struct macio_dev *mdev, u32 state)
 	struct mesh_state *ms = (struct mesh_state *)macio_get_drvdata(mdev);
 	unsigned long flags;
 
-	if (state == mdev->ofdev.dev.power_state || state < 2)
+	if (state == mdev->ofdev.dev.power.power_state || state < 2)
 		return 0;
 
 	scsi_block_requests(ms->host);
@@ -1777,7 +1777,7 @@ static int mesh_suspend(struct macio_dev *mdev, u32 state)
 	disable_irq(ms->meshintr);
 	set_mesh_power(ms, 0);
 
-	mdev->ofdev.dev.power_state = state;
+	mdev->ofdev.dev.power.power_state = state;
 
 	return 0;
 }
@@ -1787,7 +1787,7 @@ static int mesh_resume(struct macio_dev *mdev)
 	struct mesh_state *ms = (struct mesh_state *)macio_get_drvdata(mdev);
 	unsigned long flags;
 
-	if (mdev->ofdev.dev.power_state == 0)
+	if (mdev->ofdev.dev.power.power_state == 0)
 		return 0;
 
 	set_mesh_power(ms, 1);
@@ -1798,7 +1798,7 @@ static int mesh_resume(struct macio_dev *mdev)
 	enable_irq(ms->meshintr);
 	scsi_unblock_requests(ms->host);
 
-	mdev->ofdev.dev.power_state = 0;
+	mdev->ofdev.dev.power.power_state = 0;
 
 	return 0;
 }

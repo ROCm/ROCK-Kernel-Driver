@@ -15,7 +15,7 @@
  *
  * Author: Tobias Anderberg <tobiasa@axis.com>.
  *
- * $Id: pcf8563.c,v 1.4 2004/05/28 09:26:59 starvik Exp $
+ * $Id: pcf8563.c,v 1.8 2004/08/24 06:42:51 starvik Exp $
  */
 
 #include <linux/config.h>
@@ -40,7 +40,7 @@
 #define PCF8563_MAJOR 121		/* Local major number. */
 #define DEVICE_NAME "rtc"		/* Name which is registered in /proc/devices. */
 #define PCF8563_NAME "PCF8563"
-#define DRIVER_VERSION "$Revision: 1.4 $"
+#define DRIVER_VERSION "$Revision: 1.8 $"
 
 /* I2C bus slave registers. */
 #define RTC_I2C_READ		0xa3

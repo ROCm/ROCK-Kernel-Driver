@@ -276,7 +276,7 @@ static void iommu_buses_init(void)
 		first_phb = 0;
 
 		for (dn = first_dn; dn != NULL; dn = dn->sibling)
-			iommu_devnode_init(dn);
+			iommu_devnode_init_pSeries(dn);
 	}
 }
 
@@ -290,7 +290,11 @@ static void iommu_buses_init_lpar(struct list_head *bus_list)
 
 	for (ln=bus_list->next; ln != bus_list; ln=ln->next) {
 		bus = pci_bus_b(ln);
-		busdn = PCI_GET_DN(bus);
+
+		if (bus->self)
+			busdn = pci_device_to_OF_node(bus->self);
+		else
+			busdn = bus->sysdata;   /* must be a phb */
 
 		dma_window = (unsigned int *)get_property(busdn, "ibm,dma-window", NULL);
 		if (dma_window) {
@@ -298,7 +302,7 @@ static void iommu_buses_init_lpar(struct list_head *bus_list)
 			 * Do it now because iommu_table_setparms_lpar needs it.
 			 */
 			busdn->bussubno = bus->number;
-			iommu_devnode_init(busdn);
+			iommu_devnode_init_pSeries(busdn);
 		}
 
 		/* look for a window on a bridge even if the PHB had one */
@@ -397,7 +401,7 @@ static void iommu_table_setparms_lpar(struct pci_controller *phb,
 }
 
 
-void iommu_devnode_init(struct device_node *dn)
+void iommu_devnode_init_pSeries(struct device_node *dn)
 {
 	struct iommu_table *tbl;
 
@@ -410,39 +414,6 @@ void iommu_devnode_init(struct device_node *dn)
 		iommu_table_setparms(dn->phb, dn, tbl);
 	
 	dn->iommu_table = iommu_init_table(tbl);
-}
-
-void iommu_free_table(struct device_node *dn)
-{
-	struct iommu_table *tbl = dn->iommu_table;
-	unsigned long bitmap_sz, i;
-	unsigned int order;
-
-	if (!tbl || !tbl->it_map) {
-		printk(KERN_ERR "%s: expected TCE map for %s\n", __FUNCTION__,
-				dn->full_name);
-		return;
-	}
-
-	/* verify that table contains no entries */
-	/* it_mapsize is in entries, and we're examining 64 at a time */
-	for (i = 0; i < (tbl->it_mapsize/64); i++) {
-		if (tbl->it_map[i] != 0) {
-			printk(KERN_WARNING "%s: Unexpected TCEs for %s\n",
-				__FUNCTION__, dn->full_name);
-			break;
-		}
-	}
-
-	/* calculate bitmap size in bytes */
-	bitmap_sz = (tbl->it_mapsize + 7) / 8;
-
-	/* free bitmap */
-	order = get_order(bitmap_sz);
-	free_pages((unsigned long) tbl->it_map, order);
-
-	/* free table */
-	kfree(tbl);
 }
 
 void iommu_setup_pSeries(void)
@@ -459,8 +430,8 @@ void iommu_setup_pSeries(void)
 	 * pci device_node.  This means get_iommu_table() won't need to search
 	 * up the device tree to find it.
 	 */
-	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
-		mydn = dn = PCI_GET_DN(dev);
+	for_each_pci_dev(dev) {
+		mydn = dn = pci_device_to_OF_node(dev);
 
 		while (dn && dn->iommu_table == NULL)
 			dn = dn->parent;
@@ -468,7 +439,6 @@ void iommu_setup_pSeries(void)
 			mydn->iommu_table = dn->iommu_table;
 	}
 }
-
 
 /* These are called very early. */
 void tce_init_pSeries(void)

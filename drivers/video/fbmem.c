@@ -743,29 +743,13 @@ fb_set_var(struct fb_info *info, struct fb_var_screeninfo *var)
 int
 fb_blank(struct fb_info *info, int blank)
 {	
-	/* ??? Variable sized stack allocation.  */
-	struct fb_cmap cmap;
-	u16 *black = NULL;
-	int err = 0;
+	int err = -EINVAL;
 	
-	if (info->fbops->fb_blank && !info->fbops->fb_blank(blank, info))
-		return 0;
+ 	if (blank > FB_BLANK_POWERDOWN)
+ 		blank = FB_BLANK_POWERDOWN;
 
-	cmap = info->cmap;
-
-	if (blank) { 
-		black = kmalloc(sizeof(u16) * info->cmap.len, GFP_KERNEL);
-		if (black) {
-			memset(black, 0, info->cmap.len * sizeof(u16));
-			cmap.red = cmap.green = cmap.blue = black;
-			cmap.transp = info->cmap.transp ? black : NULL;
-			cmap.start = info->cmap.start;
-			cmap.len = info->cmap.len;
-		}
-	}
-
-	err = fb_set_cmap(&cmap, info);
-	kfree(black);
+	if (info->fbops->fb_blank)
+ 		err = info->fbops->fb_blank(blank, info);
 
 	return err;
 }
@@ -922,9 +906,8 @@ fb_mmap(struct file *file, struct vm_area_struct * vma)
 	off += start;
 	vma->vm_pgoff = off >> PAGE_SHIFT;
 	/* This is an IO map - tell maydump to skip this VMA */
-	vma->vm_flags |= VM_IO;
+	vma->vm_flags |= VM_IO | VM_RESERVED;
 #if defined(__sparc_v9__)
-	vma->vm_flags |= (VM_SHM | VM_LOCKED);
 	if (io_remap_page_range(vma, vma->vm_start, off,
 				vma->vm_end - vma->vm_start, vma->vm_page_prot, 0))
 		return -EAGAIN;

@@ -349,7 +349,7 @@ static int fops_mmap(struct file *file, struct vm_area_struct * vma)
 		BUG();
 		return 0;
 	}
-	return videobuf_mmap_mapper(vma,q);
+	return videobuf_mmap_mapper(q,vma);
 }
 
 static unsigned int fops_poll(struct file *file, struct poll_table_struct *wait)
@@ -362,7 +362,7 @@ static unsigned int fops_poll(struct file *file, struct poll_table_struct *wait)
 
 	if (V4L2_BUF_TYPE_VBI_CAPTURE == fh->type) {
 		if( 0 == fh->vbi_q.streaming )
-			return videobuf_poll_stream(file, file->private_data, &fh->vbi_q, wait);
+			return videobuf_poll_stream(file, &fh->vbi_q, wait);
 		q = &fh->vbi_q;
 	} else {
 		DEB_D(("using video queue.\n"));

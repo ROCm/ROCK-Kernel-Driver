@@ -70,10 +70,10 @@ static void intel_thermal_interrupt(struct pt_regs *regs)
 /* Thermal interrupt handler for this CPU setup */
 static void (*vendor_thermal_interrupt)(struct pt_regs *regs) = unexpected_thermal_interrupt;
 
-asmlinkage void smp_thermal_interrupt(struct pt_regs regs)
+fastcall void smp_thermal_interrupt(struct pt_regs *regs)
 {
 	irq_enter();
-	vendor_thermal_interrupt(&regs);
+	vendor_thermal_interrupt(regs);
 	irq_exit();
 }
 
@@ -159,7 +159,7 @@ done:
 	return mce_num_extended_msrs;
 }
 
-static asmlinkage void intel_machine_check(struct pt_regs * regs, long error_code)
+static fastcall void intel_machine_check(struct pt_regs * regs, long error_code)
 {
 	int recover=1;
 	u32 alow, ahigh, high, low;

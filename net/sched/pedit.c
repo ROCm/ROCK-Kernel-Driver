@@ -53,7 +53,7 @@ static rwlock_t pedit_lock = RW_LOCK_UNLOCKED;
 #include <net/pkt_act.h>
 
 
-int
+static int
 tcf_pedit_init(struct rtattr *rta, struct rtattr *est, struct tc_action *a,int ovr, int bind)
 {
 	struct rtattr *tb[TCA_PEDIT_MAX];
@@ -100,7 +100,7 @@ override:
 	return ret;
 }
 
-int
+static int
 tcf_pedit_cleanup(struct tc_action *a, int bind)
 {
 	struct tcf_pedit *p;
@@ -113,7 +113,7 @@ tcf_pedit_cleanup(struct tc_action *a, int bind)
 /*
 **
 */
-int
+static int
 tcf_pedit(struct sk_buff **pskb, struct tc_action *a)
 {
 	struct tcf_pedit *p;
@@ -183,15 +183,15 @@ tcf_pedit(struct sk_buff **pskb, struct tc_action *a)
 	}
 
 bad:
-	p->stats.overlimits++;
+	p->qstats.overlimits++;
 done:
-	p->stats.bytes += skb->len;
-	p->stats.packets++;
+	p->bstats.bytes += skb->len;
+	p->bstats.packets++;
 	spin_unlock(&p->lock);
 	return p->action;
 }
 
-int
+static int
 tcf_pedit_dump(struct sk_buff *skb, struct tc_action *a,int bind, int ref)
 {
 	unsigned char *b = skb->tail;
@@ -244,26 +244,15 @@ tcf_pedit_dump(struct sk_buff *skb, struct tc_action *a,int bind, int ref)
 #endif
 
 	RTA_PUT(skb, TCA_PEDIT_PARMS, s, opt);
-	t.install = jiffies - p->tm.install;
-	t.lastuse = jiffies - p->tm.lastuse;
-	t.expires = p->tm.expires;
+	t.install = jiffies_to_clock_t(jiffies - p->tm.install);
+	t.lastuse = jiffies_to_clock_t(jiffies - p->tm.lastuse);
+	t.expires = jiffies_to_clock_t(p->tm.expires);
 	RTA_PUT(skb, TCA_PEDIT_TM, sizeof (t), &t);
 	return skb->len;
 
 rtattr_failure:
 	skb_trim(skb, b - skb->data);
 	return -1;
-}
-
-int
-tcf_pedit_stats(struct sk_buff *skb, struct tc_action *a)
-{
-	struct tcf_pedit *p;
-	p = PRIV(a,pedit);
-	if (NULL != p)
-		return qdisc_copy_stats(skb, &p->stats, p->stats_lock);
-
-	return 1;
 }
 
 static
@@ -273,7 +262,6 @@ struct tc_action_ops act_pedit_ops = {
 	.capab		=	TCA_CAP_NONE,
 	.owner		=	THIS_MODULE,
 	.act		=	tcf_pedit,
-	.get_stats	=	tcf_pedit_stats,
 	.dump		=	tcf_pedit_dump,
 	.cleanup	=	tcf_pedit_cleanup,
 	.lookup		=	tcf_hash_search,

@@ -39,6 +39,8 @@
 #include <linux/cpufreq.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
+#include <linux/dmi.h>
+#include <linux/moduleparam.h>
 
 #include <asm/io.h>
 #include <asm/system.h>
@@ -99,6 +101,8 @@ static struct acpi_driver acpi_processor_driver = {
 			},
 };
 
+static int c2 = -1;
+static int c3 = -1;
 
 struct acpi_processor_errata {
 	u8			smp;
@@ -140,6 +144,8 @@ static struct file_operations acpi_processor_limit_fops = {
 
 static struct acpi_processor	*processors[NR_CPUS];
 static struct acpi_processor_errata errata;
+module_param_named(c2, c2, bool, 0);
+module_param_named(c3, c3, bool, 0);
 static void (*pm_idle_save)(void);
 
 
@@ -410,8 +416,15 @@ acpi_processor_idle (void)
 	switch (pr->power.state) {
 
 	case ACPI_STATE_C1:
-		/* Invoke C1. */
-		safe_halt();
+		/*
+		 * Invoke C1.
+		 * Use the appropriate idle routine, the one that would
+		 * be used without acpi C-states.
+		 */
+		if (pm_idle_save)
+			pm_idle_save();
+		else
+			safe_halt();
 		/*
                  * TBD: Can't get time duration while in C1, as resumes
 		 *      go to an ISR rather than here.  Need to instrument
@@ -467,8 +480,9 @@ acpi_processor_idle (void)
 	 * Track the number of longs (time asleep is greater than threshold)
 	 * and promote when the count threshold is reached.  Note that bus
 	 * mastering activity may prevent promotions.
+	 * Do not promote above acpi_cstate_limit.
 	 */
-	if (cx->promotion.state) {
+	if (cx->promotion.state && (cx->promotion.state <= acpi_cstate_limit)) {
 		if (sleep_ticks > cx->promotion.threshold.ticks) {
 			cx->promotion.count++;
  			cx->demotion.count = 0;
@@ -505,6 +519,13 @@ acpi_processor_idle (void)
 	}
 
 end:
+	/*
+	 * Demote if current state exceeds acpi_cstate_limit
+	 */
+	if (pr->power.state > acpi_cstate_limit) {
+		next_state = acpi_cstate_limit;
+	}
+
 	/*
 	 * New Cx State?
 	 * -------------
@@ -656,6 +677,11 @@ acpi_processor_get_power_info (
 		else if (errata.smp)
 			ACPI_DEBUG_PRINT((ACPI_DB_INFO,
 				"C2 not supported in SMP mode\n"));
+
+
+		else if (!c2) 
+			printk(KERN_INFO "C2 disabled\n");
+
 		/*
 		 * Otherwise we've met all of our C2 requirements.
 		 * Normalize the C2 latency to expidite policy.
@@ -711,6 +737,9 @@ acpi_processor_get_power_info (
 			ACPI_DEBUG_PRINT((ACPI_DB_INFO,
 				"C3 not supported on PIIX4 with Type-F DMA\n"));
 		}
+		else if (!c3)
+			printk(KERN_INFO "C3 disabled\n");
+
 		/*
 		 * Otherwise we've met all of our C3 requirements.  
 		 * Normalize the C2 latency to expidite policy.  Enable
@@ -767,7 +796,10 @@ static DECLARE_MUTEX(performance_sem);
  * policy is adjusted accordingly.
  */
 
-static int acpi_processor_ppc_is_init = 0;
+#define PPC_REGISTERED   1
+#define PPC_IN_USE       2
+
+static int acpi_processor_ppc_status = 0;
 
 static int acpi_processor_ppc_notifier(struct notifier_block *nb, 
 	unsigned long event,
@@ -825,6 +857,10 @@ acpi_processor_get_platform_limit (
 	 * (e.g. 0 = states 0..n; 1 = states 1..n; etc.
 	 */
 	status = acpi_evaluate_integer(pr->handle, "_PPC", NULL, &ppc);
+
+	if (status != AE_NOT_FOUND)
+		acpi_processor_ppc_status |= PPC_IN_USE;
+
 	if(ACPI_FAILURE(status) && status != AE_NOT_FOUND) {
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Error evaluating _PPC\n"));
 		return_VALUE(-ENODEV);
@@ -849,17 +885,17 @@ static int acpi_processor_ppc_has_changed(
 
 static void acpi_processor_ppc_init(void) {
 	if (!cpufreq_register_notifier(&acpi_ppc_notifier_block, CPUFREQ_POLICY_NOTIFIER))
-		acpi_processor_ppc_is_init = 1;
+		acpi_processor_ppc_status |= PPC_REGISTERED;
 	else
 		printk(KERN_DEBUG "Warning: Processor Platform Limit not supported.\n");
 }
 
 
 static void acpi_processor_ppc_exit(void) {
-	if (acpi_processor_ppc_is_init)
+	if (acpi_processor_ppc_status & PPC_REGISTERED)
 		cpufreq_unregister_notifier(&acpi_ppc_notifier_block, CPUFREQ_POLICY_NOTIFIER);
 
-	acpi_processor_ppc_is_init = 0;
+	acpi_processor_ppc_status &= ~PPC_REGISTERED;
 }
 
 /*
@@ -1079,6 +1115,73 @@ acpi_processor_get_performance_info (
 }
 
 
+int acpi_processor_notify_smm(struct module *calling_module) {
+	acpi_status		status;
+	static int		is_done = 0;
+
+	ACPI_FUNCTION_TRACE("acpi_processor_notify_smm");
+
+	if (!(acpi_processor_ppc_status & PPC_REGISTERED))
+		return_VALUE(-EBUSY);
+
+	if (!try_module_get(calling_module))
+		return_VALUE(-EINVAL);
+
+	/* is_done is set to negative if an error occured,
+	 * and to postitive if _no_ error occured, but SMM
+	 * was already notified. This avoids double notification
+	 * which might lead to unexpected results...
+	 */
+	if (is_done > 0) {
+		module_put(calling_module);
+		return_VALUE(0);
+	}
+	else if (is_done < 0) {
+		module_put(calling_module);
+		return_VALUE(is_done);
+	}
+
+	is_done = -EIO;
+
+	/* Can't write pstate_cnt to smi_cmd if either value is zero */
+	if ((!acpi_fadt.smi_cmd) ||
+	    (!acpi_fadt.pstate_cnt)) {
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO,
+			"No SMI port or pstate_cnt\n"));
+		module_put(calling_module);
+		return_VALUE(0);
+	}
+
+	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Writing pstate_cnt [0x%x] to smi_cmd [0x%x]\n", acpi_fadt.pstate_cnt, acpi_fadt.smi_cmd));
+
+	/* FADT v1 doesn't support pstate_cnt, many BIOS vendors use
+	 * it anyway, so we need to support it... */
+	if (acpi_fadt_is_v1) {
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Using v1.0 FADT reserved value for pstate_cnt\n"));
+	}
+
+	status = acpi_os_write_port (acpi_fadt.smi_cmd,
+				     (u32) acpi_fadt.pstate_cnt, 8);
+	if (ACPI_FAILURE (status)) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
+				  "Failed to write pstate_cnt [0x%x] to "
+				  "smi_cmd [0x%x]\n", acpi_fadt.pstate_cnt, acpi_fadt.smi_cmd));
+		module_put(calling_module);
+		return_VALUE(status);
+	}
+
+	/* Success. If there's no _PPC, we need to fear nothing, so
+	 * we can allow the cpufreq driver to be rmmod'ed. */
+	is_done = 1;
+
+	if (!(acpi_processor_ppc_status & PPC_IN_USE))
+		module_put(calling_module);
+
+	return_VALUE(0);
+}
+EXPORT_SYMBOL(acpi_processor_notify_smm);
+
+
 #ifdef CONFIG_X86_ACPI_CPUFREQ_PROC_INTF
 /* /proc/acpi/processor/../performance interface (DEPRECATED) */
 
@@ -1119,7 +1222,7 @@ static int acpi_processor_perf_seq_show(struct seq_file *seq, void *offset)
 			(u32) pr->performance->states[i].transition_latency);
 
 end:
-	return 0;
+	return_VALUE(0);
 }
 
 static int acpi_processor_perf_open_fs(struct inode *inode, struct file *file)
@@ -1235,7 +1338,7 @@ acpi_processor_register_performance (
 
 	ACPI_FUNCTION_TRACE("acpi_processor_register_performance");
 
-	if (!acpi_processor_ppc_is_init)
+	if (!(acpi_processor_ppc_status & PPC_REGISTERED))
 		return_VALUE(-EINVAL);
 
 	down(&performance_sem);
@@ -1275,9 +1378,6 @@ acpi_processor_unregister_performance (
 	struct acpi_processor *pr;
 
 	ACPI_FUNCTION_TRACE("acpi_processor_unregister_performance");
-
-	if (!acpi_processor_ppc_is_init)
-		return_VOID;
 
 	down(&performance_sem);
 
@@ -1844,7 +1944,7 @@ static int acpi_processor_info_seq_show(struct seq_file *seq, void *offset)
 			pr->flags.limit ? "yes" : "no");
 
 end:
-	return 0;
+	return_VALUE(0);
 }
 
 static int acpi_processor_info_open_fs(struct inode *inode, struct file *file)
@@ -1899,7 +1999,7 @@ static int acpi_processor_power_seq_show(struct seq_file *seq, void *offset)
 	}
 
 end:
-	return 0;
+	return_VALUE(0);
 }
 
 static int acpi_processor_power_open_fs(struct inode *inode, struct file *file)
@@ -1943,7 +2043,7 @@ static int acpi_processor_throttling_seq_show(struct seq_file *seq, void *offset
 			(pr->throttling.states[i].performance?pr->throttling.states[i].performance/10:0));
 
 end:
-	return 0;
+	return_VALUE(0);
 }
 
 static int acpi_processor_throttling_open_fs(struct inode *inode, struct file *file)
@@ -2004,7 +2104,7 @@ static int acpi_processor_limit_seq_show(struct seq_file *seq, void *offset)
 			pr->limit.thermal.px, pr->limit.thermal.tx);
 
 end:
-	return 0;
+	return_VALUE(0);
 }
 
 static int acpi_processor_limit_open_fs(struct inode *inode, struct file *file)
@@ -2379,22 +2479,28 @@ acpi_processor_add (
 
 	/*
 	 * Install the idle handler if processor power management is supported.
-	 * Note that the default idle handler (default_idle) will be used on 
+	 * Note that we use previously set idle handler will be used on 
 	 * platforms that only support C1.
 	 */
-	if ((pr->id == 0) && (pr->flags.power)) {
-		pm_idle_save = pm_idle;
-		pm_idle = acpi_processor_idle;
+	if ((pr->flags.power) && (!boot_option_idle_override)) {
+		printk(KERN_INFO PREFIX "%s [%s] (supports",
+			acpi_device_name(device), acpi_device_bid(device));
+		for (i = 1; i < ACPI_C_STATE_COUNT; i++)
+			if (pr->power.states[i].valid)
+				printk(" C%d", i);
+		printk(")\n");
+		if (pr->id == 0) {
+			pm_idle_save = pm_idle;
+			pm_idle = acpi_processor_idle;
+		}
 	}
 	
-	printk(KERN_INFO PREFIX "%s [%s] (supports",
-		acpi_device_name(device), acpi_device_bid(device));
-	for (i=1; i<ACPI_C_STATE_COUNT; i++)
-		if (pr->power.states[i].valid)
-			printk(" C%d", i);
-	if (pr->flags.throttling)
-		printk(", %d throttling states", pr->throttling.state_count);
-	printk(")\n");
+	if (pr->flags.throttling) {
+		printk(KERN_INFO PREFIX "%s [%s] (supports",
+			acpi_device_name(device), acpi_device_bid(device));
+		printk(" %d throttling states", pr->throttling.state_count);
+		printk(")\n");
+	}
 
 end:
 	if (result) {
@@ -2448,6 +2554,33 @@ acpi_processor_remove (
 	return_VALUE(0);
 }
 
+/* IBM ThinkPad R40e crashes mysteriously when going into C2 or C3. 
+   For now disable this. Probably a bug somewhere else. */
+static int no_c2c3(struct dmi_system_id *id)
+{
+	printk(KERN_INFO 
+	       "%s detected - C2,C3 disabled. Overwrite with \"processor.c2=1 processor.c3=1\n\"",
+	       id->ident);
+	if (c2 == -1) 
+		c2 = 0;
+	if (c3 == -1) 
+		c3 = 0; 
+	return 0;
+}
+
+static struct dmi_system_id __initdata processor_dmi_table[] = { 
+	{ no_c2c3, "IBM ThinkPad R40e", {
+	  DMI_MATCH(DMI_BIOS_VENDOR,"IBM"),
+	  DMI_MATCH(DMI_BIOS_VERSION,"1SET60WW") }},
+	{ no_c2c3, "Medion 41700", {
+	  DMI_MATCH(DMI_BIOS_VENDOR,"Phoenix Technologies LTD"),
+	  DMI_MATCH(DMI_BIOS_VERSION,"R01-A1J") }},
+	{},
+};
+
+/* We keep the driver loaded even when ACPI is not running. 
+   This is needed for the powernow-k8 driver, that works even without
+   ACPI, but needs symbols from this driver */
 
 static int __init
 acpi_processor_init (void)
@@ -2461,18 +2594,20 @@ acpi_processor_init (void)
 
 	acpi_processor_dir = proc_mkdir(ACPI_PROCESSOR_CLASS, acpi_root_dir);
 	if (!acpi_processor_dir)
-		return_VALUE(-ENODEV);
+		return_VALUE(0);
 	acpi_processor_dir->owner = THIS_MODULE;
 
 	result = acpi_bus_register_driver(&acpi_processor_driver);
 	if (result < 0) {
 		remove_proc_entry(ACPI_PROCESSOR_CLASS, acpi_root_dir);
-		return_VALUE(-ENODEV);
+		return_VALUE(0);
 	}
 
 	acpi_thermal_cpufreq_init();
 
 	acpi_processor_ppc_init();
+
+	dmi_check_system(processor_dmi_table); 
 
 	return_VALUE(0);
 }
@@ -2497,5 +2632,6 @@ acpi_processor_exit (void)
 
 module_init(acpi_processor_init);
 module_exit(acpi_processor_exit);
+module_param_named(acpi_cstate_limit, acpi_cstate_limit, uint, 0);
 
 EXPORT_SYMBOL(acpi_processor_set_thermal_limit);

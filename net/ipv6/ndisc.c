@@ -1078,13 +1078,6 @@ static void ndisc_router_discovery(struct sk_buff *skb)
 			return;
 		}
 		neigh->flags |= NTF_ROUTER;
-
-		/*
-		 *	If we where using an "all destinations on link" route
-		 *	delete it
-		 */
-
-		rt6_purge_dflt_routers();
 	}
 
 	if (rt)
@@ -1226,7 +1219,7 @@ static void ndisc_redirect_rcv(struct sk_buff *skb)
 		return;
 	}
 
-	if (ipv6_addr_cmp(dest, target) == 0) {
+	if (ipv6_addr_equal(dest, target)) {
 		on_link = 1;
 	} else if (!(ipv6_addr_type(target) & IPV6_ADDR_LINKLOCAL)) {
 		ND_PRINTK2(KERN_WARNING 

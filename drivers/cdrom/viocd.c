@@ -154,7 +154,6 @@ static struct disk_info viocd_diskinfo[VIOCD_MAX_CD];
 
 #define DEVICE_NR(di)	((di) - &viocd_diskinfo[0])
 
-static request_queue_t *viocd_queue;
 static spinlock_t viocd_reqlock;
 
 #define MAX_CD_REQ	1
@@ -503,6 +502,18 @@ static int viocd_packet(struct cdrom_device_info *cdi,
 	return ret;
 }
 
+static void restart_all_queues(int first_index)
+{
+	int i;
+
+	for (i = first_index + 1; i < viocd_numdev; i++)
+		if (viocd_diskinfo[i].viocd_disk)
+			blk_run_queue(viocd_diskinfo[i].viocd_disk->queue);
+	for (i = 0; i <= first_index; i++)
+		if (viocd_diskinfo[i].viocd_disk)
+			blk_run_queue(viocd_diskinfo[i].viocd_disk->queue);
+}
+
 /* This routine handles incoming CD LP events */
 static void vio_handle_cd_event(struct HvLpEvent *event)
 {
@@ -532,7 +543,7 @@ static void vio_handle_cd_event(struct HvLpEvent *event)
 	case viocdopen:
 		if (event->xRc == 0) {
 			di = &viocd_diskinfo[bevent->disk];
-			blk_queue_hardsect_size(viocd_queue,
+			blk_queue_hardsect_size(di->viocd_disk->queue,
 					bevent->block_size);
 			set_capacity(di->viocd_disk,
 					bevent->media_size *
@@ -584,7 +595,7 @@ return_complete:
 
 		/* restart handling of incoming requests */
 		spin_unlock_irqrestore(&viocd_reqlock, flags);
-		blk_run_queue(viocd_queue);
+		restart_all_queues(bevent->disk);
 		break;
 
 	default:
@@ -624,6 +635,7 @@ static int viocd_probe(struct vio_dev *vdev, const struct vio_device_id *id)
 	struct disk_info *d;
 	struct cdrom_device_info *c;
 	struct cdrom_info *ci;
+	struct request_queue *q;
 
 	deviceno = vdev->unit_address;
 	if (deviceno >= viocd_numdev)
@@ -643,17 +655,22 @@ static int viocd_probe(struct vio_dev *vdev, const struct vio_device_id *id)
 	if (register_cdrom(c) != 0) {
 		printk(VIOCD_KERN_WARNING "Cannot register viocd CD-ROM %s!\n",
 				c->name);
-		return 0;
+		goto out;
 	}
 	printk(VIOCD_KERN_INFO "cd %s is iSeries resource %10.10s "
 			"type %4.4s, model %3.3s\n",
 			c->name, ci->rsrcname, ci->type, ci->model);
+	q = blk_init_queue(do_viocd_request, &viocd_reqlock);
+	if (q == NULL) {
+		printk(VIOCD_KERN_WARNING "Cannot allocate queue for %s!\n",
+				c->name);
+		goto out_unregister_cdrom;
+	}
 	gendisk = alloc_disk(1);
 	if (gendisk == NULL) {
 		printk(VIOCD_KERN_WARNING "Cannot create gendisk for %s!\n",
 				c->name);
-		unregister_cdrom(c);
-		return 0;
+		goto out_cleanup_queue;
 	}
 	gendisk->major = VIOCD_MAJOR;
 	gendisk->first_minor = deviceno;
@@ -661,7 +678,10 @@ static int viocd_probe(struct vio_dev *vdev, const struct vio_device_id *id)
 			sizeof(gendisk->disk_name));
 	snprintf(gendisk->devfs_name, sizeof(gendisk->devfs_name),
 			VIOCD_DEVICE_DEVFS "%d", deviceno);
-	gendisk->queue = viocd_queue;
+	blk_queue_max_hw_segments(q, 1);
+	blk_queue_max_phys_segments(q, 1);
+	blk_queue_max_sectors(q, 4096 / 512);
+	gendisk->queue = q;
 	gendisk->fops = &viocd_fops;
 	gendisk->flags = GENHD_FL_CD|GENHD_FL_REMOVABLE;
 	set_capacity(gendisk, 0);
@@ -670,8 +690,14 @@ static int viocd_probe(struct vio_dev *vdev, const struct vio_device_id *id)
 	d->dev = &vdev->dev;
 	gendisk->driverfs_dev = d->dev;
 	add_disk(gendisk);
-
 	return 0;
+
+out_cleanup_queue:
+	blk_cleanup_queue(q);
+out_unregister_cdrom:
+	unregister_cdrom(c);
+out:
+	return -ENODEV;
 }
 
 static int viocd_remove(struct vio_dev *vdev)
@@ -683,6 +709,7 @@ static int viocd_remove(struct vio_dev *vdev)
 				"Cannot unregister viocd CD-ROM %s!\n",
 				d->viocd_info.name);
 	del_gendisk(d->viocd_disk);
+	blk_cleanup_queue(d->viocd_disk->queue);
 	put_disk(d->viocd_disk);
 	return 0;
 }
@@ -742,18 +769,10 @@ static int __init viocd_init(void)
 		goto out_undo_vio;
 
 	spin_lock_init(&viocd_reqlock);
-	viocd_queue = blk_init_queue(do_viocd_request, &viocd_reqlock);
-	if (viocd_queue == NULL) {
-		ret = -ENOMEM;
-		goto out_free_info;
-	}
-	blk_queue_max_hw_segments(viocd_queue, 1);
-	blk_queue_max_phys_segments(viocd_queue, 1);
-	blk_queue_max_sectors(viocd_queue, 4096 / 512);
 
 	ret = vio_register_driver(&viocd_driver);
 	if (ret)
-		goto out_cleanup_queue;
+		goto out_free_info;
 
 	e = create_proc_entry("iSeries/viocd", S_IFREG|S_IRUGO, NULL);
 	if (e) {
@@ -763,8 +782,6 @@ static int __init viocd_init(void)
 
 	return 0;
 
-out_cleanup_queue:
-	blk_cleanup_queue(viocd_queue);
 out_free_info:
 	dma_free_coherent(iSeries_vio_dev,
 			sizeof(*viocd_unitinfo) * VIOCD_MAX_CD,
@@ -781,7 +798,6 @@ static void __exit viocd_exit(void)
 {
 	remove_proc_entry("iSeries/viocd", NULL);
 	vio_unregister_driver(&viocd_driver);
-	blk_cleanup_queue(viocd_queue);
 	if (viocd_unitinfo != NULL)
 		dma_free_coherent(iSeries_vio_dev,
 				sizeof(*viocd_unitinfo) * VIOCD_MAX_CD,

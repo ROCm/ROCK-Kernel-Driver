@@ -526,20 +526,13 @@ extern int			netdev_boot_setup_add(char *name, struct ifmap *map);
 extern int 			netdev_boot_setup_check(struct net_device *dev);
 extern unsigned long		netdev_boot_base(const char *prefix, int unit);
 extern struct net_device    *dev_getbyhwaddr(unsigned short type, char *hwaddr);
-extern struct net_device *__dev_getfirstbyhwtype(unsigned short type);
 extern struct net_device *dev_getfirstbyhwtype(unsigned short type);
 extern void		dev_add_pack(struct packet_type *pt);
 extern void		dev_remove_pack(struct packet_type *pt);
 extern void		__dev_remove_pack(struct packet_type *pt);
-extern int		__dev_get(const char *name);
-static inline int __deprecated dev_get(const char *name)
-{
-	return __dev_get(name);
-}
+
 extern struct net_device	*dev_get_by_flags(unsigned short flags,
 						  unsigned short mask);
-extern struct net_device	*__dev_get_by_flags(unsigned short flags,
-						    unsigned short mask);
 extern struct net_device	*dev_get_by_name(const char *name);
 extern struct net_device	*__dev_get_by_name(const char *name);
 extern int		dev_alloc_name(struct net_device *dev, const char *name);
@@ -553,7 +546,6 @@ extern void		synchronize_net(void);
 extern int 		register_netdevice_notifier(struct notifier_block *nb);
 extern int		unregister_netdevice_notifier(struct notifier_block *nb);
 extern int		call_netdevice_notifiers(unsigned long val, void *v);
-extern int		dev_new_index(void);
 extern struct net_device	*dev_get_by_index(int ifindex);
 extern struct net_device	*__dev_get_by_index(int ifindex);
 extern int		dev_restart(struct net_device *dev);
@@ -910,10 +902,7 @@ static inline void netif_tx_disable(struct net_device *dev)
 /* These functions live elsewhere (drivers/net/net_init.c, but related) */
 
 extern void		ether_setup(struct net_device *dev);
-extern void		fddi_setup(struct net_device *dev);
-extern void		tr_setup(struct net_device *dev);
-extern void		fc_setup(struct net_device *dev);
-extern void		fc_freedev(struct net_device *dev);
+
 /* Support for loadable net-drivers */
 extern struct net_device *alloc_netdev(int sizeof_priv, const char *name,
 				       void (*setup)(struct net_device *));
@@ -936,6 +925,9 @@ extern unsigned long	netdev_fc_xoff;
 extern atomic_t netdev_dropping;
 extern int		netdev_set_master(struct net_device *dev, struct net_device *master);
 extern int skb_checksum_help(struct sk_buff *skb, int inward);
+/* rx skb timestamps */
+extern void		net_enable_timestamp(void);
+extern void		net_disable_timestamp(void);
 
 #ifdef CONFIG_SYSCTL
 extern char *net_sysctl_strdup(const char *s);

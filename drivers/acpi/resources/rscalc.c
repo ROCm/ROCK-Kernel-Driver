@@ -74,7 +74,6 @@ acpi_rs_get_byte_stream_length (
 {
 	acpi_size                       byte_stream_size_needed = 0;
 	acpi_size                       segment_size;
-	struct acpi_resource_ext_irq    *ex_irq = NULL;
 	u8                              done = FALSE;
 
 
@@ -91,8 +90,8 @@ acpi_rs_get_byte_stream_length (
 		case ACPI_RSTYPE_IRQ:
 			/*
 			 * IRQ Resource
-			 * For an IRQ Resource, Byte 3, although optional, will
-			 * always be created - it holds IRQ information.
+			 * For an IRQ Resource, Byte 3, although optional, will always be
+			 * created - it holds IRQ information.
 			 */
 			segment_size = 4;
 			break;
@@ -108,8 +107,8 @@ acpi_rs_get_byte_stream_length (
 		case ACPI_RSTYPE_START_DPF:
 			/*
 			 * Start Dependent Functions Resource
-			 * For a start_dependent_functions Resource, Byte 1,
-			 * although optional, will always be created.
+			 * For a start_dependent_functions Resource, Byte 1, although
+			 * optional, will always be created.
 			 */
 			segment_size = 2;
 			break;
@@ -141,10 +140,9 @@ acpi_rs_get_byte_stream_length (
 		case ACPI_RSTYPE_VENDOR:
 			/*
 			 * Vendor Defined Resource
-			 * For a Vendor Specific resource, if the Length is
-			 * between 1 and 7 it will be created as a Small
-			 * Resource data type, otherwise it is a Large
-			 * Resource data type.
+			 * For a Vendor Specific resource, if the Length is between 1 and 7
+			 * it will be created as a Small Resource data type, otherwise it
+			 * is a Large Resource data type.
 			 */
 			if (linked_list->data.vendor_specific.length > 7) {
 				segment_size = 3;
@@ -191,10 +189,9 @@ acpi_rs_get_byte_stream_length (
 		case ACPI_RSTYPE_ADDRESS16:
 			/*
 			 * 16-Bit Address Resource
-			 * The base size of this byte stream is 16. If a
-			 * Resource Source string is not NULL, add 1 for
-			 * the Index + the length of the null terminated
-			 * string Resource Source + 1 for the null.
+			 * The base size of this byte stream is 16. If a Resource Source
+			 * string is not NULL, add 1 for the Index + the length of the null
+			 * terminated string Resource Source + 1 for the null.
 			 */
 			segment_size = 16;
 
@@ -223,10 +220,9 @@ acpi_rs_get_byte_stream_length (
 		case ACPI_RSTYPE_ADDRESS64:
 			/*
 			 * 64-Bit Address Resource
-			 * The base size of this byte stream is 46. If a Resource
-			 * Source string is not NULL, add 1 for the Index + the
-			 * length of the null terminated string Resource Source +
-			 * 1 for the null.
+			 * The base size of this byte stream is 46. If a resource_source
+			 * string is not NULL, add 1 for the Index + the length of the null
+			 * terminated string Resource Source + 1 for the null.
 			 */
 			segment_size = 46;
 
@@ -239,9 +235,8 @@ acpi_rs_get_byte_stream_length (
 		case ACPI_RSTYPE_EXT_IRQ:
 			/*
 			 * Extended IRQ Resource
-			 * The base size of this byte stream is 9. This is for an
-			 * Interrupt table length of 1.  For each additional
-			 * interrupt, add 4.
+			 * The base size of this byte stream is 9. This is for an Interrupt
+			 * table length of 1.  For each additional interrupt, add 4.
 			 * If a Resource Source string is not NULL, add 1 for the
 			 * Index + the length of the null terminated string
 			 * Resource Source + 1 for the null.
@@ -249,7 +244,7 @@ acpi_rs_get_byte_stream_length (
 			segment_size = 9 +
 				(((acpi_size) linked_list->data.extended_irq.number_of_interrupts - 1) * 4);
 
-			if (ex_irq && ex_irq->resource_source.string_ptr) {
+			if (linked_list->data.extended_irq.resource_source.string_ptr) {
 				segment_size += linked_list->data.extended_irq.resource_source.string_length;
 				segment_size++;
 			}
@@ -257,8 +252,7 @@ acpi_rs_get_byte_stream_length (
 
 		default:
 			/*
-			 * If we get here, everything is out of sync,
-			 * so exit with an error
+			 * If we get here, everything is out of sync, exit with error
 			 */
 			return_ACPI_STATUS (AE_AML_INVALID_RESOURCE_TYPE);
 
@@ -366,7 +360,6 @@ acpi_rs_get_list_length (
 			/*
 			 * 32-Bit Memory Range Resource
 			 */
-
 			bytes_consumed = 20;
 
 			structure_size = ACPI_SIZEOF_RESOURCE (struct acpi_resource_mem32);
@@ -395,14 +388,12 @@ acpi_rs_get_list_length (
 			bytes_consumed = temp16 + 3;
 
 			/*
-			 * Resource Source Index and Resource Source are
-			 * optional elements.  Check the length of the
-			 * Bytestream.  If it is greater than 43, that
-			 * means that an Index exists and is followed by
-			 * a null termininated string.  Therefore, set
-			 * the temp variable to the length minus the minimum
-			 * byte stream length plus the byte for the Index to
-			 * determine the size of the NULL terminiated string.
+			 * Resource Source Index and Resource Source are optional elements.
+			 * Check the length of the Bytestream.  If it is greater than 43,
+			 * that means that an Index exists and is followed by a null
+			 * terminated string.  Therefore, set the temp variable to the
+			 * length minus the minimum byte stream length plus the byte for
+			 * the Index to determine the size of the NULL terminated string.
 			 */
 			if (43 < temp16) {
 				temp8 = (u8) (temp16 - 44);
@@ -433,14 +424,12 @@ acpi_rs_get_list_length (
 			bytes_consumed = temp16 + 3;
 
 			/*
-			 * Resource Source Index and Resource Source are
-			 * optional elements.  Check the length of the
-			 * Bytestream.  If it is greater than 23, that
-			 * means that an Index exists and is followed by
-			 * a null termininated string.  Therefore, set
-			 * the temp variable to the length minus the minimum
-			 * byte stream length plus the byte for the Index to
-			 * determine the size of the NULL terminiated string.
+			 * Resource Source Index and Resource Source are optional elements.
+			 * Check the length of the Bytestream.  If it is greater than 23,
+			 * that means that an Index exists and is followed by a null
+			 * terminated string.  Therefore, set the temp variable to the
+			 * length minus the minimum byte stream length plus the byte for
+			 * the Index to determine the size of the NULL terminated string.
 			 */
 			if (23 < temp16) {
 				temp8 = (u8) (temp16 - 24);
@@ -471,14 +460,12 @@ acpi_rs_get_list_length (
 			bytes_consumed = temp16 + 3;
 
 			/*
-			 * Resource Source Index and Resource Source are
-			 * optional elements.  Check the length of the
-			 * Bytestream.  If it is greater than 13, that
-			 * means that an Index exists and is followed by
-			 * a null termininated string.  Therefore, set
-			 * the temp variable to the length minus the minimum
-			 * byte stream length plus the byte for the Index to
-			 * determine the size of the NULL terminiated string.
+			 * Resource Source Index and Resource Source are optional elements.
+			 * Check the length of the Bytestream.  If it is greater than 13,
+			 * that means that an Index exists and is followed by a null
+			 * terminated string.  Therefore, set the temp variable to the
+			 * length minus the minimum byte stream length plus the byte for
+			 * the Index to determine the size of the NULL terminated string.
 			 */
 			if (13 < temp16) {
 				temp8 = (u8) (temp16 - 14);
@@ -509,9 +496,8 @@ acpi_rs_get_list_length (
 			bytes_consumed = temp16 + 3;
 
 			/*
-			 * Point past the length field and the
-			 * Interrupt vector flags to save off the
-			 * Interrupt table length to the Temp8 variable.
+			 * Point past the length field and the Interrupt vector flags to
+			 * save off the Interrupt table length to the Temp8 variable.
 			 */
 			buffer += 3;
 			temp8 = *buffer;
@@ -523,14 +509,12 @@ acpi_rs_get_list_length (
 			additional_bytes = (u8) ((temp8 - 1) * 4);
 
 			/*
-			 * Resource Source Index and Resource Source are
-			 * optional elements.  Check the length of the
-			 * Bytestream.  If it is greater than 9, that
-			 * means that an Index exists and is followed by
-			 * a null termininated string.  Therefore, set
-			 * the temp variable to the length minus the minimum
-			 * byte stream length plus the byte for the Index to
-			 * determine the size of the NULL terminiated string.
+			 * Resource Source Index and Resource Source are optional elements.
+			 * Check the length of the Bytestream.  If it is greater than 9,
+			 * that means that an Index exists and is followed by a null
+			 * terminated string.  Therefore, set the temp variable to the
+			 * length minus the minimum byte stream length plus the byte for
+			 * the Index to determine the size of the NULL terminated string.
 			 */
 			if (9 + additional_bytes < temp16) {
 				temp8 = (u8) (temp16 - (9 + additional_bytes));
@@ -565,9 +549,8 @@ acpi_rs_get_list_length (
 				bytes_consumed = 3;
 			}
 
-			/*
-			 * Point past the descriptor
-			 */
+			/* Point past the descriptor */
+
 			++buffer;
 
 			/*
@@ -595,9 +578,8 @@ acpi_rs_get_list_length (
 			buffer = byte_stream_buffer;
 			bytes_consumed = 3;
 
-			/*
-			 * Point past the descriptor
-			 */
+			/* Point past the descriptor */
+
 			++buffer;
 
 			/*

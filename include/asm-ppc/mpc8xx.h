@@ -96,11 +96,7 @@
 extern unsigned char __res[];
 
 struct pt_regs;
-extern int request_8xxirq(unsigned int irq,
-		       void (*handler)(int, void *, struct pt_regs *),
-		       unsigned long flags,
-		       const char *device,
-		       void *dev_id);
+
 #endif /* !__ASSEMBLY__ */
 #endif /* CONFIG_8xx */
 #endif /* __CONFIG_8xx_DEFS */

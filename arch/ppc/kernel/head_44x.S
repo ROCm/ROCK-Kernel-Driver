@@ -599,64 +599,8 @@ interrupt_base:
 	mfspr	r10, SPRG0
 	b	InstructionStorage
 
-/* Check for a single step debug exception while in an exception
- * handler before state has been saved.  This is to catch the case
- * where an instruction that we are trying to single step causes
- * an exception (eg ITLB/DTLB miss) and thus the first instruction of
- * the exception handler generates a single step debug exception.
- *
- * If we get a debug trap on the first instruction of an exception handler,
- * we reset the MSR_DE in the _exception handler's_ MSR (the debug trap is
- * a critical exception, so we are using SPRN_CSRR1 to manipulate the MSR).
- * The exception handler was handling a non-critical interrupt, so it will
- * save (and later restore) the MSR via SPRN_SRR1, which will still have
- * the MSR_DE bit set.
- */
 	/* Debug Interrupt */
-	START_EXCEPTION(Debug)
-	CRITICAL_EXCEPTION_PROLOG
-
-	/*
-	 * If this is a single step or branch-taken exception in an
-	 * exception entry sequence, it was probably meant to apply to
-	 * the code where the exception occurred (since exception entry
-	 * doesn't turn off DE automatically).  We simulate the effect
-	 * of turning off DE on entry to an exception handler by turning
-	 * off DE in the CSRR1 value and clearing the debug status.
-	 */
-	mfspr	r10,SPRN_DBSR		/* check single-step/branch taken */
-	andis.	r10,r10,(DBSR_IC|DBSR_BT)@h
-	beq+	1f
-	andi.	r0,r9,MSR_PR		/* check supervisor */
-	beq	2f			/* branch if we need to fix it up... */
-
-	/* continue normal handling for a critical exception... */
-1:	mfspr	r4,SPRN_DBSR
-	addi	r3,r1,STACK_FRAME_OVERHEAD
-	EXC_XFER_TEMPLATE(DebugException, 0x2002, \
-		(MSR_KERNEL & ~(MSR_ME|MSR_DE|MSR_CE)), \
-		NOCOPY, crit_transfer_to_handler, ret_from_crit_exc)
-
-	/* here it looks like we got an inappropriate debug exception. */
-2:	rlwinm	r9,r9,0,~MSR_DE		/* clear DE in the CSRR1 value */
-	mtspr	SPRN_DBSR,r10		/* clear the IC/BT debug intr status */
-	/* restore state and get out */
-	lwz	r10,_CCR(r11)
-	lwz	r0,GPR0(r11)
-	lwz	r1,GPR1(r11)
-	mtcrf	0x80,r10
-	mtspr	CSRR0,r12
-	mtspr	CSRR1,r9
-	lwz	r9,GPR9(r11)
-
-	mtspr	SPRG2,r8;		/* SPRG2 only used in criticals */
-	lis	r8,crit_save@ha;
-	lwz	r10,crit_r10@l(r8)
-	lwz	r11,crit_r11@l(r8)
-	mfspr	r8,SPRG2
-
-	rfci
-	b	.
+	DEBUG_EXCEPTION
 
 /*
  * Local functions

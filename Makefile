@@ -1,7 +1,7 @@
 VERSION = 2
 PATCHLEVEL = 6
 SUBLEVEL = 10
-EXTRAVERSION =-rc1
+EXTRAVERSION =-rc2
 NAME=Woozy Numbat
 
 # *DOCUMENTATION*
@@ -156,7 +156,7 @@ localversion-files := $(wildcard $(objtree)/localversion* $(srctree)/localversio
 endif
 
 LOCALVERSION = $(subst $(space),, \
-	       $(shell cat /dev/null $(localversion-files)) \
+	       $(shell cat /dev/null $(localversion-files:%~=)) \
 	       $(patsubst "%",%,$(CONFIG_LOCALVERSION)))
 
 KERNELRELEASE=$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)$(LOCALVERSION)
@@ -439,6 +439,12 @@ ifeq ($(config-targets),1)
 # ===========================================================================
 # *config targets only - make sure prerequisites are updated, and descend
 # in scripts/kconfig to make the *config target
+
+# Read arch specific Makefile to set KBUILD_DEFCONFIG as needed.
+# KBUILD_DEFCONFIG may point out an alternative default configuration
+# used for 'make defconfig'
+include $(srctree)/arch/$(ARCH)/Makefile
+export KBUILD_DEFCONFIG
 
 config: scripts_basic outputmakefile FORCE
 	$(Q)$(MAKE) $(build)=scripts/kconfig $@

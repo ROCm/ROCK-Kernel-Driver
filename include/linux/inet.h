@@ -43,6 +43,8 @@
 #define _LINUX_INET_H
 
 #ifdef __KERNEL__
+#include <linux/types.h>
+
 extern __u32 in_aton(const char *str);
 #endif
 #endif	/* _LINUX_INET_H */

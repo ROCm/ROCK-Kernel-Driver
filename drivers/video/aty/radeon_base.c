@@ -947,15 +947,16 @@ static int radeon_screen_blank (struct radeonfb_info *rinfo, int blank, int mode
         val &= ~(CRTC_DISPLAY_DIS | CRTC_HSYNC_DIS |
                  CRTC_VSYNC_DIS);
         switch (blank) {
-	case VESA_NO_BLANKING:
+	case FB_BLANK_UNBLANK:
+	case FB_BLANK_NORMAL:
 		break;
-	case VESA_VSYNC_SUSPEND:
+	case FB_BLANK_VSYNC_SUSPEND:
 		val |= (CRTC_DISPLAY_DIS | CRTC_VSYNC_DIS);
 		break;
-	case VESA_HSYNC_SUSPEND:
+	case FB_BLANK_HSYNC_SUSPEND:
 		val |= (CRTC_DISPLAY_DIS | CRTC_HSYNC_DIS);
 		break;
-	case VESA_POWERDOWN:
+	case FB_BLANK_POWERDOWN:
 		val |= (CRTC_DISPLAY_DIS | CRTC_VSYNC_DIS |
 			CRTC_HSYNC_DIS);
 		break;
@@ -967,7 +968,8 @@ static int radeon_screen_blank (struct radeonfb_info *rinfo, int blank, int mode
 	case MT_DFP:
 		if (mode_switch)
 			break;
-		if (blank == VESA_NO_BLANKING)
+		if (blank == FB_BLANK_UNBLANK ||
+		    blank == FB_BLANK_NORMAL)
 			OUTREGP(FP_GEN_CNTL, (FP_FPON | FP_TMDS_EN),
 				~(FP_FPON | FP_TMDS_EN));
 		else
@@ -975,7 +977,8 @@ static int radeon_screen_blank (struct radeonfb_info *rinfo, int blank, int mode
 		break;
 	case MT_LCD:
 		val = INREG(LVDS_GEN_CNTL);
-		if (blank == VESA_NO_BLANKING) {
+		if (blank == FB_BLANK_UNBLANK ||
+		    blank == FB_BLANK_NORMAL) {
 			u32 target_val = (val & ~LVDS_DISPLAY_DIS) | LVDS_BLON | LVDS_ON
 				| LVDS_ON | (rinfo->init_state.lvds_gen_cntl & LVDS_DIGON);
 			if ((val ^ target_val) == LVDS_DISPLAY_DIS)
@@ -1023,7 +1026,8 @@ static int radeon_screen_blank (struct radeonfb_info *rinfo, int blank, int mode
 		break;
 	}
 
-	return 0;
+	/* let fbcon do a soft blank for us */
+	return (blank == FB_BLANK_NORMAL) ? -EINVAL : 0;
 }
 
 int radeonfb_blank (int blank, struct fb_info *info)
@@ -1265,7 +1269,7 @@ static void radeon_write_mode (struct radeonfb_info *rinfo,
 
 	del_timer_sync(&rinfo->lvds_timer);
 
-	radeon_screen_blank(rinfo, VESA_POWERDOWN, 1);
+	radeon_screen_blank(rinfo, FB_BLANK_POWERDOWN, 1);
 	msleep(100);
 
 	radeon_fifo_wait(31);
@@ -1308,7 +1312,7 @@ static void radeon_write_mode (struct radeonfb_info *rinfo,
 		OUTREG(TMDS_TRANSMITTER_CNTL, mode->tmds_transmitter_cntl);
 	}
 
-	radeon_screen_blank(rinfo, VESA_NO_BLANKING, 1);
+	radeon_screen_blank(rinfo, FB_BLANK_UNBLANK, 1);
 
 	radeon_fifo_wait(2);
 	OUTPLL(VCLK_ECP_CNTL, mode->vclk_ecp_cntl);
@@ -1749,7 +1753,6 @@ static int __devinit radeon_set_fbinfo (struct radeonfb_info *rinfo)
 {
 	struct fb_info *info = rinfo->info;
 
-	info->currcon = -1;
 	info->par = rinfo;
 	info->pseudo_palette = rinfo->pseudo_palette;
 	info->flags = FBINFO_DEFAULT

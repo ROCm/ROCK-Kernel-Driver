@@ -458,9 +458,12 @@ static void destroy_serial(struct kref *kref)
 			usb_free_urb(port->write_urb);
 			usb_kill_urb(port->interrupt_in_urb);
 			usb_free_urb(port->interrupt_in_urb);
+			usb_kill_urb(port->interrupt_out_urb);
+			usb_free_urb(port->interrupt_out_urb);
 			kfree(port->bulk_in_buffer);
 			kfree(port->bulk_out_buffer);
 			kfree(port->interrupt_in_buffer);
+			kfree(port->interrupt_out_buffer);
 		}
 	}
 
@@ -478,46 +481,51 @@ static int serial_open (struct tty_struct *tty, struct file * filp)
 	struct usb_serial *serial;
 	struct usb_serial_port *port;
 	unsigned int portNumber;
-	int retval = 0;
+	int retval;
 	
 	dbg("%s", __FUNCTION__);
-
-	/* initialize the pointer incase something fails */
-	tty->driver_data = NULL;
 
 	/* get the serial object associated with this tty pointer */
 	serial = usb_serial_get_by_index(tty->index);
 	if (!serial) {
-		retval = -ENODEV;
-		goto bailout;
+		tty->driver_data = NULL;
+		return -ENODEV;
 	}
 
-	/* set up our port structure making the tty driver remember our port object, and us it */
 	portNumber = tty->index - serial->minor;
 	port = serial->port[portNumber];
-	tty->driver_data = port;
-
-	port->tty = tty;
 	 
-	/* lock this module before we call it,
-	   this may, which means we must bail out, safe because we are called with BKL held */
-	if (!try_module_get(serial->type->owner)) {
-		retval = -ENODEV;
-		goto bailout;
-	}
-
 	++port->open_count;
+
 	if (port->open_count == 1) {
+
+		/* set up our port structure making the tty driver
+		 * remember our port object, and us it */
+		tty->driver_data = port;
+		port->tty = tty;
+
+		/* lock this module before we call it
+		 * this may fail, which means we must bail out,
+		 * safe because we are called with BKL held */
+		if (!try_module_get(serial->type->owner)) {
+			retval = -ENODEV;
+			goto bailout_kref_put;
+		}
+
 		/* only call the device specific open if this 
 		 * is the first time the port is opened */
 		retval = serial->type->open(port, filp);
-		if (retval) {
-			port->open_count = 0;
-			module_put(serial->type->owner);
-			kref_put(&serial->kref, destroy_serial);
-		}
+		if (retval)
+			goto bailout_module_put;
 	}
-bailout:
+
+	return 0;
+
+bailout_module_put:
+	module_put(serial->type->owner);
+bailout_kref_put:
+	kref_put(&serial->kref, destroy_serial);
+	port->open_count = 0;
 	return retval;
 }
 
@@ -530,21 +538,24 @@ static void serial_close(struct tty_struct *tty, struct file * filp)
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
+	if (port->open_count == 0)
+		return;
+
 	--port->open_count;
-	if (port->open_count <= 0) {
+	if (port->open_count == 0) {
 		/* only call the device specific close if this 
 		 * port is being closed by the last owner */
 		port->serial->type->close(port, filp);
-		port->open_count = 0;
 
 		if (port->tty) {
 			if (port->tty->driver_data)
 				port->tty->driver_data = NULL;
 			port->tty = NULL;
 		}
+
+		module_put(port->serial->type->owner);
 	}
 
-	module_put(port->serial->type->owner);
 	kref_put(&port->serial->kref, destroy_serial);
 }
 
@@ -799,9 +810,12 @@ static void port_release(struct device *dev)
 	usb_free_urb(port->write_urb);
 	usb_kill_urb(port->interrupt_in_urb);
 	usb_free_urb(port->interrupt_in_urb);
+	usb_kill_urb(port->interrupt_out_urb);
+	usb_free_urb(port->interrupt_out_urb);
 	kfree(port->bulk_in_buffer);
 	kfree(port->bulk_out_buffer);
 	kfree(port->interrupt_in_buffer);
+	kfree(port->interrupt_out_buffer);
 	kfree(port);
 }
 
@@ -855,6 +869,7 @@ int usb_serial_probe(struct usb_interface *interface,
 	struct usb_host_interface *iface_desc;
 	struct usb_endpoint_descriptor *endpoint;
 	struct usb_endpoint_descriptor *interrupt_in_endpoint[MAX_NUM_PORTS];
+	struct usb_endpoint_descriptor *interrupt_out_endpoint[MAX_NUM_PORTS];
 	struct usb_endpoint_descriptor *bulk_in_endpoint[MAX_NUM_PORTS];
 	struct usb_endpoint_descriptor *bulk_out_endpoint[MAX_NUM_PORTS];
 	struct usb_serial_device_type *type = NULL;
@@ -863,6 +878,7 @@ int usb_serial_probe(struct usb_interface *interface,
 	int buffer_size;
 	int i;
 	int num_interrupt_in = 0;
+	int num_interrupt_out = 0;
 	int num_bulk_in = 0;
 	int num_bulk_out = 0;
 	int num_ports = 0;
@@ -910,7 +926,7 @@ int usb_serial_probe(struct usb_interface *interface,
 		if ((endpoint->bEndpointAddress & 0x80) &&
 		    ((endpoint->bmAttributes & 3) == 0x02)) {
 			/* we found a bulk in endpoint */
-			dbg("found bulk in");
+			dbg("found bulk in on endpoint %d", i);
 			bulk_in_endpoint[num_bulk_in] = endpoint;
 			++num_bulk_in;
 		}
@@ -918,7 +934,7 @@ int usb_serial_probe(struct usb_interface *interface,
 		if (((endpoint->bEndpointAddress & 0x80) == 0x00) &&
 		    ((endpoint->bmAttributes & 3) == 0x02)) {
 			/* we found a bulk out endpoint */
-			dbg("found bulk out");
+			dbg("found bulk out on endpoint %d", i);
 			bulk_out_endpoint[num_bulk_out] = endpoint;
 			++num_bulk_out;
 		}
@@ -926,9 +942,17 @@ int usb_serial_probe(struct usb_interface *interface,
 		if ((endpoint->bEndpointAddress & 0x80) &&
 		    ((endpoint->bmAttributes & 3) == 0x03)) {
 			/* we found a interrupt in endpoint */
-			dbg("found interrupt in");
+			dbg("found interrupt in on endpoint %d", i);
 			interrupt_in_endpoint[num_interrupt_in] = endpoint;
 			++num_interrupt_in;
+		}
+
+		if (((endpoint->bEndpointAddress & 0x80) == 0x00) &&
+		    ((endpoint->bmAttributes & 3) == 0x03)) {
+			/* we found an interrupt out endpoint */
+			dbg("found interrupt out on endpoint %d", i);
+			interrupt_out_endpoint[num_interrupt_out] = endpoint;
+			++num_interrupt_out;
 		}
 	}
 
@@ -1006,11 +1030,13 @@ int usb_serial_probe(struct usb_interface *interface,
 	serial->num_bulk_in = num_bulk_in;
 	serial->num_bulk_out = num_bulk_out;
 	serial->num_interrupt_in = num_interrupt_in;
+	serial->num_interrupt_out = num_interrupt_out;
 
 	/* create our ports, we need as many as the max endpoints */
 	/* we don't use num_ports here cauz some devices have more endpoint pairs than ports */
 	max_endpoints = max(num_bulk_in, num_bulk_out);
 	max_endpoints = max(max_endpoints, num_interrupt_in);
+	max_endpoints = max(max_endpoints, num_interrupt_out);
 	max_endpoints = max(max_endpoints, (int)serial->num_ports);
 	serial->num_port_pointers = max_endpoints;
 	dbg("%s - setting up %d port structures for this device", __FUNCTION__, max_endpoints);
@@ -1074,29 +1100,61 @@ int usb_serial_probe(struct usb_interface *interface,
 				   port);
 	}
 
-	for (i = 0; i < num_interrupt_in; ++i) {
-		endpoint = interrupt_in_endpoint[i];
-		port = serial->port[i];
-		port->interrupt_in_urb = usb_alloc_urb(0, GFP_KERNEL);
-		if (!port->interrupt_in_urb) {
-			dev_err(&interface->dev, "No free urbs available\n");
-			goto probe_error;
+	if (serial->type->read_int_callback) {
+		for (i = 0; i < num_interrupt_in; ++i) {
+			endpoint = interrupt_in_endpoint[i];
+			port = serial->port[i];
+			port->interrupt_in_urb = usb_alloc_urb(0, GFP_KERNEL);
+			if (!port->interrupt_in_urb) {
+				dev_err(&interface->dev, "No free urbs available\n");
+				goto probe_error;
+			}
+			buffer_size = endpoint->wMaxPacketSize;
+			port->interrupt_in_endpointAddress = endpoint->bEndpointAddress;
+			port->interrupt_in_buffer = kmalloc (buffer_size, GFP_KERNEL);
+			if (!port->interrupt_in_buffer) {
+				dev_err(&interface->dev, "Couldn't allocate interrupt_in_buffer\n");
+				goto probe_error;
+			}
+			usb_fill_int_urb (port->interrupt_in_urb, dev, 
+					  usb_rcvintpipe (dev,
+							  endpoint->bEndpointAddress),
+					  port->interrupt_in_buffer, buffer_size, 
+					  serial->type->read_int_callback, port, 
+					  endpoint->bInterval);
 		}
-		buffer_size = endpoint->wMaxPacketSize;
-		port->interrupt_in_endpointAddress = endpoint->bEndpointAddress;
-		port->interrupt_in_buffer = kmalloc (buffer_size, GFP_KERNEL);
-		if (!port->interrupt_in_buffer) {
-			dev_err(&interface->dev, "Couldn't allocate interrupt_in_buffer\n");
-			goto probe_error;
-		}
-		usb_fill_int_urb (port->interrupt_in_urb, dev, 
-				  usb_rcvintpipe (dev,
-						  endpoint->bEndpointAddress),
-				  port->interrupt_in_buffer, buffer_size, 
-				  serial->type->read_int_callback, port, 
-				  endpoint->bInterval);
+	} else if (num_interrupt_in) {
+		dbg("the device claims to support interrupt in transfers, but read_int_callback is not defined");
 	}
-
+	
+	if (serial->type->write_int_callback) {
+		for (i = 0; i < num_interrupt_out; ++i) {
+			endpoint = interrupt_out_endpoint[i];
+			port = serial->port[i];
+			port->interrupt_out_urb = usb_alloc_urb(0, GFP_KERNEL);
+			if (!port->interrupt_out_urb) {
+				dev_err(&interface->dev, "No free urbs available\n");
+				goto probe_error;
+			}
+			buffer_size = endpoint->wMaxPacketSize;
+			port->interrupt_out_size = buffer_size;
+			port->interrupt_out_endpointAddress = endpoint->bEndpointAddress;
+			port->interrupt_out_buffer = kmalloc (buffer_size, GFP_KERNEL);
+			if (!port->interrupt_out_buffer) {
+				dev_err(&interface->dev, "Couldn't allocate interrupt_out_buffer\n");
+				goto probe_error;
+			}
+			usb_fill_int_urb (port->interrupt_out_urb, dev,
+					  usb_sndintpipe (dev,
+							  endpoint->bEndpointAddress),
+					  port->interrupt_out_buffer, buffer_size,
+					  serial->type->write_int_callback, port,
+					  endpoint->bInterval);
+		}
+	} else if (num_interrupt_out) {
+		dbg("the device claims to support interrupt out transfers, but write_int_callback is not defined");
+	}
+	
 	/* if this device type has an attach function, call it */
 	if (type->attach) {
 		if (!try_module_get(type->owner)) {
@@ -1158,6 +1216,14 @@ probe_error:
 		if (port->interrupt_in_urb)
 			usb_free_urb (port->interrupt_in_urb);
 		kfree(port->interrupt_in_buffer);
+	}
+	for (i = 0; i < num_interrupt_out; ++i) {
+		port = serial->port[i];
+		if (!port)
+			continue;
+		if (port->interrupt_out_urb)
+			usb_free_urb (port->interrupt_out_urb);
+		kfree(port->interrupt_out_buffer);
 	}
 
 	/* return the minor range that this device had */

@@ -92,7 +92,7 @@ static char *errbuf;
 
 static kmem_cache_t *uhci_up_cachep;	/* urb_priv */
 
-static int uhci_get_current_frame_number(struct uhci_hcd *uhci);
+static unsigned int uhci_get_current_frame_number(struct uhci_hcd *uhci);
 static int uhci_urb_dequeue(struct usb_hcd *hcd, struct urb *urb);
 static void uhci_unlink_generic(struct uhci_hcd *uhci, struct urb *urb);
 static void uhci_remove_pending_urbps(struct uhci_hcd *uhci);
@@ -174,7 +174,7 @@ static inline void uhci_fill_td(struct uhci_td *td, u32 status,
  */
 static void uhci_insert_td_frame_list(struct uhci_hcd *uhci, struct uhci_td *td, unsigned framenum)
 {
-	framenum %= UHCI_NUMFRAMES;
+	framenum &= (UHCI_NUMFRAMES - 1);
 
 	td->frame = framenum;
 
@@ -1145,15 +1145,14 @@ static int isochronous_find_start(struct uhci_hcd *uhci, struct urb *urb)
 	limits = isochronous_find_limits(uhci, urb, &start, &end);
 
 	if (urb->transfer_flags & URB_ISO_ASAP) {
-		if (limits) {
-			int curframe;
-
-			curframe = uhci_get_current_frame_number(uhci) % UHCI_NUMFRAMES;
-			urb->start_frame = (curframe + 10) % UHCI_NUMFRAMES;
-		} else
+		if (limits)
+			urb->start_frame =
+					(uhci_get_current_frame_number(uhci) +
+						10) & (UHCI_NUMFRAMES - 1);
+		else
 			urb->start_frame = end;
 	} else {
-		urb->start_frame %= UHCI_NUMFRAMES;
+		urb->start_frame &= (UHCI_NUMFRAMES - 1);
 		/* FIXME: Sanity check */
 	}
 
@@ -1514,7 +1513,7 @@ static int uhci_fsbr_timeout(struct uhci_hcd *uhci, struct urb *urb)
  *
  * returns the current frame number for a USB bus/controller.
  */
-static int uhci_get_current_frame_number(struct uhci_hcd *uhci)
+static unsigned int uhci_get_current_frame_number(struct uhci_hcd *uhci)
 {
 	return inw(uhci->io_addr + USBFRNUM);
 }
@@ -1852,10 +1851,10 @@ static void hc_state_transitions(struct uhci_hcd *uhci)
 	}
 }
 
-static void start_hc(struct uhci_hcd *uhci)
+static int start_hc(struct uhci_hcd *uhci)
 {
 	unsigned long io_addr = uhci->io_addr;
-	int timeout = 1000;
+	int timeout = 10;
 
 	/*
 	 * Reset the HC - this will force us to get a
@@ -1865,10 +1864,11 @@ static void start_hc(struct uhci_hcd *uhci)
 	 */
 	outw(USBCMD_HCRESET, io_addr + USBCMD);
 	while (inw(io_addr + USBCMD) & USBCMD_HCRESET) {
-		if (!--timeout) {
+		if (--timeout < 0) {
 			dev_err(uhci_dev(uhci), "USBCMD_HCRESET timed out!\n");
-			break;
+			return -ETIMEDOUT;
 		}
+		msleep(1);
 	}
 
 	/* Turn on PIRQ and all interrupts */
@@ -1887,6 +1887,7 @@ static void start_hc(struct uhci_hcd *uhci)
 	outw(USBCMD_RS | USBCMD_CF | USBCMD_MAXP, io_addr + USBCMD);
 
         uhci->hcd.state = USB_STATE_RUNNING;
+	return 0;
 }
 
 /*
@@ -2138,7 +2139,8 @@ static int uhci_start(struct usb_hcd *hcd)
 	 * the memory writes above before the I/O transfers in start_hc().
 	 */
 	mb();
-	start_hc(uhci);
+	if ((retval = start_hc(uhci)) != 0)
+		goto err_alloc_skelqh;
 
 	init_stall_timer(hcd);
 
@@ -2244,6 +2246,7 @@ static int uhci_suspend(struct usb_hcd *hcd, u32 state)
 static int uhci_resume(struct usb_hcd *hcd)
 {
 	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
+	int rc;
 
 	pci_set_master(to_pci_dev(uhci_dev(uhci)));
 
@@ -2266,7 +2269,8 @@ static int uhci_resume(struct usb_hcd *hcd)
 				USBLEGSUP_DEFAULT);
 	} else {
 		reset_hc(uhci);
-		start_hc(uhci);
+		if ((rc = start_hc(uhci)) != 0)
+			return rc;
 	}
 	uhci->hcd.state = USB_STATE_RUNNING;
 	return 0;
@@ -2284,11 +2288,6 @@ static struct usb_hcd *uhci_hcd_alloc(void)
 	memset(uhci, 0, sizeof(*uhci));
 	uhci->hcd.product_desc = "UHCI Host Controller";
 	return &uhci->hcd;
-}
-
-static void uhci_hcd_free(struct usb_hcd *hcd)
-{
-	kfree(hcd_to_uhci(hcd));
 }
 
 /* Are there any URBs for a particular device/endpoint on a given list? */
@@ -2355,7 +2354,6 @@ static const struct hc_driver uhci_driver = {
 	.stop =			uhci_stop,
 
 	.hcd_alloc =		uhci_hcd_alloc,
-	.hcd_free =		uhci_hcd_free,
 
 	.urb_enqueue =		uhci_urb_enqueue,
 	.urb_dequeue =		uhci_urb_dequeue,

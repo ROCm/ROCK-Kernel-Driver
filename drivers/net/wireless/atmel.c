@@ -1267,7 +1267,7 @@ static irqreturn_t service_interrupt(int irq, void *dev_id, struct pt_regs *regs
 				build_wpa_mib(priv);
 			break;
 		case ISR_GENERIC_IRQ:
-			printk(KERN_INFO "%s: Generic_irq recieved.\n", dev->name);
+			printk(KERN_INFO "%s: Generic_irq received.\n", dev->name);
 			break;
 		}
 	}	
@@ -2567,7 +2567,7 @@ static void join(struct atmel_private *priv, int type)
 	struct {
 		u8 BSSID[6];
 		u8 SSID[MAX_SSID_LENGTH];
-		u8 BSS_type; /* this is a short in a scan command - wierd */                                
+		u8 BSS_type; /* this is a short in a scan command - weird */
 		u8 channel;
 		u16 timeout;
 		u8 SSID_size;

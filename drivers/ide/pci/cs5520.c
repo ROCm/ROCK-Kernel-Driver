@@ -58,7 +58,7 @@ struct pio_clocks
 	int recovery;
 };
 
-struct pio_clocks cs5520_pio_clocks[]={
+static struct pio_clocks cs5520_pio_clocks[]={
 	{3, 6, 11},
 	{2, 5, 6},
 	{1, 4, 3},
@@ -241,8 +241,6 @@ static int __devinit cs5520_init_one(struct pci_dev *dev, const struct pci_devic
 
 	ide_pci_setup_ports(dev, d, 14, &index);
 
-	printk("Index.b %d %d\n", index.b.low, index.b.high);
-	mdelay(2000);
 	if((index.b.low & 0xf0) != 0xf0)
 		probe_hwif_init(&ide_hwifs[index.b.low]);
 	if((index.b.high & 0xf0) != 0xf0)

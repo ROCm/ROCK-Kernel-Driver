@@ -326,7 +326,7 @@ static struct inet6_dev * ipv6_add_dev(struct net_device *dev)
 	if (ndev) {
 		memset(ndev, 0, sizeof(struct inet6_dev));
 
-		ndev->lock = RW_LOCK_UNLOCKED;
+		rwlock_init(&ndev->lock);
 		ndev->dev = dev;
 		memcpy(&ndev->cnf, &ipv6_devconf_dflt, sizeof(ndev->cnf));
 		ndev->cnf.mtu6 = dev->mtu;
@@ -921,7 +921,7 @@ int ipv6_chk_addr(struct in6_addr *addr, struct net_device *dev, int strict)
 
 	read_lock_bh(&addrconf_hash_lock);
 	for(ifp = inet6_addr_lst[hash]; ifp; ifp=ifp->lst_next) {
-		if (ipv6_addr_cmp(&ifp->addr, addr) == 0 &&
+		if (ipv6_addr_equal(&ifp->addr, addr) &&
 		    !(ifp->flags&IFA_F_TENTATIVE)) {
 			if (dev == NULL || ifp->idev->dev == dev ||
 			    !(ifp->scope&(IFA_LINK|IFA_HOST) || strict))
@@ -940,7 +940,7 @@ int ipv6_chk_same_addr(const struct in6_addr *addr, struct net_device *dev)
 
 	read_lock_bh(&addrconf_hash_lock);
 	for(ifp = inet6_addr_lst[hash]; ifp; ifp=ifp->lst_next) {
-		if (ipv6_addr_cmp(&ifp->addr, addr) == 0) {
+		if (ipv6_addr_equal(&ifp->addr, addr)) {
 			if (dev == NULL || ifp->idev->dev == dev)
 				break;
 		}
@@ -956,7 +956,7 @@ struct inet6_ifaddr * ipv6_get_ifaddr(struct in6_addr *addr, struct net_device *
 
 	read_lock_bh(&addrconf_hash_lock);
 	for(ifp = inet6_addr_lst[hash]; ifp; ifp=ifp->lst_next) {
-		if (ipv6_addr_cmp(&ifp->addr, addr) == 0) {
+		if (ipv6_addr_equal(&ifp->addr, addr)) {
 			if (dev == NULL || ifp->idev->dev == dev ||
 			    !(ifp->scope&(IFA_LINK|IFA_HOST) || strict)) {
 				in6_ifa_hold(ifp);
@@ -992,7 +992,7 @@ int ipv6_rcv_saddr_equal(const struct sock *sk, const struct sock *sk2)
 		return 1;
 
 	if (sk2_rcv_saddr6 &&
-	    !ipv6_addr_cmp(sk_rcv_saddr6, sk2_rcv_saddr6))
+	    ipv6_addr_equal(sk_rcv_saddr6, sk2_rcv_saddr6))
 		return 1;
 
 	if (addr_type == IPV6_ADDR_MAPPED &&
@@ -1630,7 +1630,7 @@ static int inet6_addr_del(int ifindex, struct in6_addr *pfx, int plen)
 	read_lock_bh(&idev->lock);
 	for (ifp = idev->addr_list; ifp; ifp=ifp->if_next) {
 		if (ifp->prefix_len == plen &&
-		    (!memcmp(pfx, &ifp->addr, sizeof(struct in6_addr)))) {
+		    ipv6_addr_equal(pfx, &ifp->addr)) {
 			in6_ifa_hold(ifp);
 			read_unlock_bh(&idev->lock);
 			
@@ -3387,6 +3387,29 @@ int unregister_inet6addr_notifier(struct notifier_block *nb)
 
 void __init addrconf_init(void)
 {
+	/* The addrconf netdev notifier requires that loopback_dev
+	 * has it's ipv6 private information allocated and setup
+	 * before it can bring up and give link-local addresses
+	 * to other devices which are up.
+	 *
+	 * Unfortunately, loopback_dev is not necessarily the first
+	 * entry in the global dev_base list of net devices.  In fact,
+	 * it is likely to be the very last entry on that list.
+	 * So this causes the notifier registry below to try and
+	 * give link-local addresses to all devices besides loopback_dev
+	 * first, then loopback_dev, which cases all the non-loopback_dev
+	 * devices to fail to get a link-local address.
+	 *
+	 * So, as a temporary fix, register loopback_dev first by hand.
+	 * Longer term, all of the dependencies ipv6 has upon the loopback
+	 * device and it being up should be removed.
+	 */
+	rtnl_lock();
+	addrconf_notify(&ipv6_dev_notf, NETDEV_REGISTER, &loopback_dev);
+	if (loopback_dev.flags & IFF_UP)
+		addrconf_notify(&ipv6_dev_notf, NETDEV_UP, &loopback_dev);
+	rtnl_unlock();
+
 	register_netdevice_notifier(&ipv6_dev_notf);
 
 #ifdef CONFIG_IPV6_PRIVACY

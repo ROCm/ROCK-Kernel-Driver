@@ -16,6 +16,7 @@
 #ifdef __KERNEL__
 #include <linux/time.h> /* need struct timeval */
 #endif
+#include <linux/compiler.h> /* need __user */
 
 /*
  *	M I S C E L L A N E O U S
@@ -218,6 +219,7 @@ struct v4l2_pix_format
 
 /*  Vendor-specific formats   */
 #define V4L2_PIX_FMT_WNVA     v4l2_fourcc('W','N','V','A') /* Winnov hw compress */
+#define V4L2_PIX_FMT_SN9C10X  v4l2_fourcc('S','9','1','0') /* SN9C10x compression */
 
 /*
  *	F O R M A T   E N U M E R A T I O N

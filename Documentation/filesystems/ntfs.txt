@@ -258,10 +258,10 @@ Then you would use ldminfo in dump mode to obtain the necessary information:
 $ ./ldminfo --dump /dev/hda
 
 This would dump the LDM database found on /dev/hda which describes all of your
-dinamic disks and all the volumes on them.  At the bottom you will see the
+dynamic disks and all the volumes on them.  At the bottom you will see the
 VOLUME DEFINITIONS section which is all you really need.  You may need to look
 further above to determine which of the disks in the volume definitions is
-which device in Linux.  Hint: Run ldminfo on each of your dinamic disks and
+which device in Linux.  Hint: Run ldminfo on each of your dynamic disks and
 look at the Disk Id close to the top of the output for each (the PRIVATE HEADER
 section).  You can then find these Disk Ids in the VBLK DATABASE section in the
 <Disk> components where you will get the LDM Name for the disk that is found in
@@ -432,6 +432,9 @@ ChangeLog
 
 Note, a technical ChangeLog aimed at kernel hackers is in fs/ntfs/ChangeLog.
 
+2.1.22:
+	- Improve handling of ntfs volumes with errors.
+	- Fix various bugs and race conditions.
 2.1.21:
 	- Fix several race conditions and various other bugs.
 	- Many internal cleanups, code reorganization, optimizations, and mft

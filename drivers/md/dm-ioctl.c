@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2001, 2002 Sistina Software (UK) Limited.
+ * Copyright (C) 2004 Red Hat, Inc. All rights reserved.
  *
  * This file is released under the GPL.
  */
@@ -17,7 +18,7 @@
 
 #include <asm/uaccess.h>
 
-#define DM_DRIVER_EMAIL "dm@uk.sistina.com"
+#define DM_DRIVER_EMAIL "dm-devel@redhat.com"
 
 /*-----------------------------------------------------------------
  * The ioctl interface needs to be able to look up devices by
@@ -224,6 +225,7 @@ static int dm_hash_insert(const char *name, const char *uuid, struct mapped_devi
 	}
 	register_with_devfs(cell);
 	dm_get(md);
+	dm_set_mdptr(md, cell);
 	up_write(&_hash_lock);
 
 	return 0;
@@ -240,6 +242,7 @@ static void __hash_remove(struct hash_cell *hc)
 	list_del(&hc->uuid_list);
 	list_del(&hc->name_list);
 	unregister_with_devfs(hc);
+	dm_set_mdptr(hc->md, NULL);
 	dm_put(hc->md);
 	if (hc->new_map)
 		dm_table_put(hc->new_map);
@@ -579,12 +582,16 @@ static int dev_create(struct dm_ioctl *param, size_t param_size)
 }
 
 /*
- * Always use UUID for lookups if it's present, otherwise use name.
+ * Always use UUID for lookups if it's present, otherwise use name or dev.
  */
 static inline struct hash_cell *__find_device_hash_cell(struct dm_ioctl *param)
 {
-	return *param->uuid ?
-	    __get_uuid_cell(param->uuid) : __get_name_cell(param->name);
+	if (*param->uuid)
+		return __get_uuid_cell(param->uuid);
+	else if (*param->name)
+		return __get_name_cell(param->name);
+	else
+		return dm_get_mdptr(huge_decode_dev(param->dev));
 }
 
 static inline struct mapped_device *find_device(struct dm_ioctl *param)
@@ -596,6 +603,7 @@ static inline struct mapped_device *find_device(struct dm_ioctl *param)
 	hc = __find_device_hash_cell(param);
 	if (hc) {
 		md = hc->md;
+		dm_get(md);
 
 		/*
 		 * Sneakily write in both the name and the uuid
@@ -611,8 +619,6 @@ static inline struct mapped_device *find_device(struct dm_ioctl *param)
 			param->flags |= DM_INACTIVE_PRESENT_FLAG;
 		else
 			param->flags &= ~DM_INACTIVE_PRESENT_FLAG;
-
-		dm_get(md);
 	}
 	up_read(&_hash_lock);
 
@@ -1097,6 +1103,67 @@ static int table_status(struct dm_ioctl *param, size_t param_size)
 	return r;
 }
 
+/*
+ * Pass a message to the target that's at the supplied device offset.
+ */
+static int target_message(struct dm_ioctl *param, size_t param_size)
+{
+	int r, argc;
+	char **argv;
+	struct mapped_device *md;
+	struct dm_table *table;
+	struct dm_target *ti;
+	struct dm_target_msg *tmsg = (void *) param + param->data_start;
+
+	md = find_device(param);
+	if (!md)
+		return -ENXIO;
+
+	r = __dev_status(md, param);
+	if (r)
+		goto out;
+
+	if (tmsg < (struct dm_target_msg *) (param + 1) ||
+	    invalid_str(tmsg->message, (void *) param + param_size)) {
+		DMWARN("Invalid target message parameters.");
+		r = -EINVAL;
+		goto out;
+	}
+
+	r = dm_split_args(&argc, &argv, tmsg->message);
+	if (r) {
+		DMWARN("Failed to split target message parameters");
+		goto out;
+	}
+
+	table = dm_get_table(md);
+	if (!table)
+		goto out_argv;
+
+	if (tmsg->sector >= dm_table_get_size(table)) {
+		DMWARN("Target message sector outside device.");
+		r = -EINVAL;
+		goto out_table;
+	}
+
+	ti = dm_table_find_target(table, tmsg->sector);
+	if (ti->type->message)
+		r = ti->type->message(ti, argc, argv);
+	else {
+		DMWARN("Target type does not support messages");
+		r = -EINVAL;
+	}
+
+ out_table:
+	dm_table_put(table);
+ out_argv:
+	kfree(argv);
+ out:
+	param->data_size = 0;
+	dm_put(md);
+	return r;
+}
+
 /*-----------------------------------------------------------------
  * Implementation of open/close/ioctl on the special char
  * device.
@@ -1123,7 +1190,9 @@ static ioctl_fn lookup_ioctl(unsigned int cmd)
 		{DM_TABLE_DEPS_CMD, table_deps},
 		{DM_TABLE_STATUS_CMD, table_status},
 
-		{DM_LIST_VERSIONS_CMD, list_versions}
+		{DM_LIST_VERSIONS_CMD, list_versions},
+
+		{DM_TARGET_MSG_CMD, target_message}
 	};
 
 	return (cmd >= ARRAY_SIZE(_ioctls)) ? NULL : _ioctls[cmd].fn;
@@ -1202,14 +1271,14 @@ static int validate_params(uint cmd, struct dm_ioctl *param)
 	    cmd == DM_LIST_VERSIONS_CMD)
 		return 0;
 
-	/* Unless creating, either name or uuid but not both */
-	if (cmd != DM_DEV_CREATE_CMD) {
-		if ((!*param->uuid && !*param->name) ||
-		    (*param->uuid && *param->name)) {
-			DMWARN("one of name or uuid must be supplied, cmd(%u)",
-			       cmd);
+	if ((cmd == DM_DEV_CREATE_CMD)) {
+		if (!*param->name) {
+			DMWARN("name not supplied when creating device");
 			return -EINVAL;
 		}
+	} else if ((*param->uuid && *param->name)) {
+		DMWARN("only supply one of name or uuid, cmd(%u)", cmd);
+		return -EINVAL;
 	}
 
 	/* Ensure strings are terminated */

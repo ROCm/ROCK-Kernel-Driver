@@ -92,7 +92,10 @@ extern      u32                                 acpi_gbl_nesting_level;
 /*
  * Enable "slack" in the AML interpreter?  Default is FALSE, and the
  * interpreter strictly follows the ACPI specification.  Setting to TRUE
- * allows the interpreter to forgive certain bad AML constructs.
+ * allows the interpreter to forgive certain bad AML constructs.  Currently:
+ * 1) Allow "implicit return" of last value in a control method
+ * 2) Allow access beyond end of operation region
+ * 3) Allow access to uninitialized locals/args (auto-init to integer 0)
  */
 ACPI_EXTERN u8       ACPI_INIT_GLOBAL (acpi_gbl_enable_interpreter_slack, FALSE);
 
@@ -180,6 +183,7 @@ ACPI_EXTERN struct acpi_mutex_info              acpi_gbl_mutex_info[NUM_MUTEX];
 ACPI_EXTERN struct acpi_memory_list             acpi_gbl_memory_lists[ACPI_NUM_MEM_LISTS];
 ACPI_EXTERN struct acpi_object_notify_handler   acpi_gbl_device_notify;
 ACPI_EXTERN struct acpi_object_notify_handler   acpi_gbl_system_notify;
+ACPI_EXTERN acpi_exception_handler              acpi_gbl_exception_handler;
 ACPI_EXTERN acpi_init_handler                   acpi_gbl_init_handler;
 ACPI_EXTERN struct acpi_walk_state             *acpi_gbl_breakpoint_walk;
 ACPI_EXTERN acpi_handle                         acpi_gbl_global_lock_semaphore;

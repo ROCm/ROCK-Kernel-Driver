@@ -1,6 +1,6 @@
 /*    System Call Table
  *
- *    Copyright (C) 1999-2003 Matthew Wilcox <willy at parisc-linux.org>
+ *    Copyright (C) 1999-2004 Matthew Wilcox <willy at parisc-linux.org>
  *    Copyright (C) 2000-2001 John Marvin <jsm at parisc-linux.org>
  *    Copyright (C) 2000 Alan Modra <amodra at parisc-linux.org>
  *    Copyright (C) 2000-2003 Paul Bame <bame at parisc-linux.org>
@@ -308,19 +308,18 @@
 	ENTRY_OURS(ftruncate64)		/* 200 */
 	ENTRY_SAME(getdents64)
 	ENTRY_COMP(fcntl64)
-	ENTRY_SAME(ni_syscall)
-	ENTRY_SAME(ni_syscall)
-	ENTRY_SAME(ni_syscall)		/* 205 */
-	ENTRY_SAME(gettid)             
-	ENTRY_OURS(readahead)          
-	ENTRY_SAME(ni_syscall)		/* tkill */
-
+	ENTRY_SAME(ni_syscall)	/* attrctl -- dead */
+	ENTRY_SAME(ni_syscall)	/* acl_get -- dead */
+	ENTRY_SAME(ni_syscall)		/* 205 (acl_set -- dead) */
+	ENTRY_SAME(gettid)
+	ENTRY_OURS(readahead)
+	ENTRY_SAME(tkill)
 	ENTRY_SAME(sendfile64)
 	ENTRY_COMP(futex)		/* 210 */
 	ENTRY_COMP(sched_setaffinity)
 	ENTRY_COMP(sched_getaffinity)
-	ENTRY_SAME(ni_syscall)
-	ENTRY_SAME(ni_syscall)
+	ENTRY_SAME(ni_syscall)	/* set_thread_area */
+	ENTRY_SAME(ni_syscall)	/* get_thread_area */
 	ENTRY_SAME(io_setup)		/* 215 */
 	ENTRY_SAME(io_destroy)
 	ENTRY_SAME(io_getevents)
@@ -334,12 +333,40 @@
 	ENTRY_SAME(epoll_ctl)		/* 225 */
 	ENTRY_SAME(epoll_wait)
  	ENTRY_SAME(remap_file_pages)
-  ENTRY_SAME(semtimedop)
-  ENTRY_SAME(mq_open)
-  ENTRY_SAME(mq_unlink)   /* 230 */
-  ENTRY_SAME(mq_timedsend)
-  ENTRY_SAME(mq_timedreceive)
-  ENTRY_SAME(mq_notify)
-  ENTRY_SAME(mq_getsetattr)
-  /* Nothing yet */       /* 235 */
+	ENTRY_SAME(semtimedop)
+	ENTRY_SAME(mq_open)
+	ENTRY_SAME(mq_unlink)		/* 230 */
+	ENTRY_SAME(mq_timedsend)
+	ENTRY_SAME(mq_timedreceive)
+	ENTRY_SAME(mq_notify)
+	ENTRY_SAME(mq_getsetattr)
+	ENTRY_COMP(waitid)		/* 235 */
+	ENTRY_OURS(fadvise64_64)
+	ENTRY_SAME(set_tid_address)
+	ENTRY_SAME(setxattr)
+	ENTRY_SAME(lsetxattr)
+	ENTRY_SAME(fsetxattr)		/* 240 */
+	ENTRY_SAME(getxattr)
+	ENTRY_SAME(lgetxattr)
+	ENTRY_SAME(fgetxattr)
+	ENTRY_SAME(listxattr)
+	ENTRY_SAME(llistxattr)		/* 245 */
+	ENTRY_SAME(flistxattr)
+	ENTRY_SAME(removexattr)
+	ENTRY_SAME(lremovexattr)
+	ENTRY_SAME(fremovexattr)
+	ENTRY_COMP(timer_create)	/* 250 */
+	ENTRY_COMP(timer_settime)
+	ENTRY_COMP(timer_gettime)
+	ENTRY_SAME(timer_getoverrun)
+	ENTRY_SAME(timer_delete)
+	ENTRY_COMP(clock_settime)	/* 255 */
+	ENTRY_COMP(clock_gettime)
+	ENTRY_COMP(clock_getres)
+	ENTRY_COMP(clock_nanosleep)
+	ENTRY_SAME(tgkill)
+	ENTRY_COMP(mbind)		/* 260 */
+	ENTRY_COMP(get_mempolicy)
+	ENTRY_COMP(set_mempolicy)
+	/* Nothing yet */
 

@@ -867,6 +867,7 @@ acpi_ds_create_walk_state (
 
 	status = acpi_ds_result_stack_push (walk_state);
 	if (ACPI_FAILURE (status)) {
+		acpi_ut_release_to_cache (ACPI_MEM_LIST_WALK, walk_state);
 		return_PTR (NULL);
 	}
 

@@ -62,6 +62,7 @@
 
 #include <linux/parport.h>
 #include <linux/parport_pc.h>
+#include <linux/via.h>
 #include <asm/parport.h>
 
 #define PARPORT_PC_MAX_PORTS PARPORT_MAX
@@ -2378,7 +2379,7 @@ EXPORT_SYMBOL (parport_pc_unregister_port);
 
 /* ITE support maintained by Rich Liu <richliu@poorman.org> */
 static int __devinit sio_ite_8872_probe (struct pci_dev *pdev, int autoirq,
-					 int autodma)
+					 int autodma, struct parport_pc_via_data *via)
 {
 	short inta_addr[6] = { 0x2A0, 0x2C0, 0x220, 0x240, 0x1E0 };
 	struct resource *base_res;
@@ -2481,70 +2482,160 @@ static int __devinit sio_ite_8872_probe (struct pci_dev *pdev, int autoirq,
 	return 0;
 }
 
-/* Via support maintained by Jeff Garzik <jgarzik@pobox.com> */
-static int __devinit sio_via_686a_probe (struct pci_dev *pdev, int autoirq,
-					 int autodma)
+/* VIA 8231 support by Pavel Fedin <sonic_amiga@rambler.ru>
+   based on VIA 686a support code by Jeff Garzik <jgarzik@pobox.com> */
+static int __initdata parport_init_mode = 0;
+
+/* Data for two known VIA chips */
+static struct parport_pc_via_data via_686a_data __devinitdata = {
+	0x51,
+	0x50,
+	0x85,
+	0x02,
+	0xE2,
+	0xF0,
+	0xE6
+};
+static struct parport_pc_via_data via_8231_data __devinitdata = {
+	0x45,
+	0x44,
+	0x50,
+	0x04,
+	0xF2,
+	0xFA,
+	0xF6
+};
+
+static int __devinit sio_via_probe (struct pci_dev *pdev, int autoirq,
+					 int autodma, struct parport_pc_via_data *via)
 {
-	u8 tmp;
+	u8 tmp, tmp2, siofunc;
+	u8 ppcontrol = 0;
 	int dma, irq;
-	unsigned port1, port2, have_eppecp;
+	unsigned port1, port2;
+	unsigned have_epp = 0;
+
+	printk(KERN_DEBUG "parport_pc: VIA 686A/8231 detected\n");
+
+	switch(parport_init_mode)
+	{
+	case 1:
+	    printk(KERN_DEBUG "parport_pc: setting SPP mode\n");
+	    siofunc = VIA_FUNCTION_PARPORT_SPP;
+	    break;
+	case 2:
+	    printk(KERN_DEBUG "parport_pc: setting PS/2 mode\n");
+	    siofunc = VIA_FUNCTION_PARPORT_SPP;
+	    ppcontrol = VIA_PARPORT_BIDIR;
+	    break;
+	case 3:
+	    printk(KERN_DEBUG "parport_pc: setting EPP mode\n");
+	    siofunc = VIA_FUNCTION_PARPORT_EPP;
+	    ppcontrol = VIA_PARPORT_BIDIR;
+	    have_epp = 1;
+	    break;
+	case 4:
+	    printk(KERN_DEBUG "parport_pc: setting ECP mode\n");
+	    siofunc = VIA_FUNCTION_PARPORT_ECP;
+	    ppcontrol = VIA_PARPORT_BIDIR;
+	    break;
+	case 5:
+	    printk(KERN_DEBUG "parport_pc: setting EPP+ECP mode\n");
+	    siofunc = VIA_FUNCTION_PARPORT_ECP;
+	    ppcontrol = VIA_PARPORT_BIDIR|VIA_PARPORT_ECPEPP;
+	    have_epp = 1;
+	    break;
+	 default:
+	    printk(KERN_DEBUG "parport_pc: probing current configuration\n");
+	    siofunc = VIA_FUNCTION_PROBE;
+	    break;
+	}
+	/*
+	 * unlock super i/o configuration
+	 */
+	pci_read_config_byte(pdev, via->via_pci_superio_config_reg, &tmp);
+	tmp |= via->via_pci_superio_config_data;
+	pci_write_config_byte(pdev, via->via_pci_superio_config_reg, tmp);
+
+	/* Bits 1-0: Parallel Port Mode / Enable */
+	outb(via->viacfg_function, VIA_CONFIG_INDEX);
+	tmp = inb (VIA_CONFIG_DATA);
+	/* Bit 5: EPP+ECP enable; bit 7: PS/2 bidirectional port enable */
+	outb(via->viacfg_parport_control, VIA_CONFIG_INDEX);
+	tmp2 = inb (VIA_CONFIG_DATA);
+	if (siofunc == VIA_FUNCTION_PROBE)
+	{
+	    siofunc = tmp & VIA_FUNCTION_PARPORT_DISABLE;
+	    ppcontrol = tmp2;
+	}
+	else
+	{
+	    tmp &= ~VIA_FUNCTION_PARPORT_DISABLE;
+	    tmp |= siofunc;
+	    outb(via->viacfg_function, VIA_CONFIG_INDEX);
+	    outb(tmp, VIA_CONFIG_DATA);
+	    tmp2 &= ~(VIA_PARPORT_BIDIR|VIA_PARPORT_ECPEPP);
+	    tmp2 |= ppcontrol;
+	    outb(via->viacfg_parport_control, VIA_CONFIG_INDEX);
+	    outb(tmp2, VIA_CONFIG_DATA);
+	}
+	
+	/* Parallel Port I/O Base Address, bits 9-2 */
+	outb(via->viacfg_parport_base, VIA_CONFIG_INDEX);
+	port1 = inb(VIA_CONFIG_DATA) << 2;
+	
+	printk (KERN_DEBUG "parport_pc: Current parallel port base: 0x%X\n",port1);
+	if ((port1 == 0x3BC) && have_epp)
+	{
+	    outb(via->viacfg_parport_base, VIA_CONFIG_INDEX);
+	    outb((0x378 >> 2), VIA_CONFIG_DATA);
+	    printk(KERN_DEBUG "parport_pc: Parallel port base changed to 0x378\n");
+	    port1 = 0x378;
+	}
 
 	/*
-	 * unlock super i/o configuration, set 0x85_1
+	 * lock super i/o configuration
 	 */
-	pci_read_config_byte (pdev, 0x85, &tmp);
-	tmp |= (1 << 1);
-	pci_write_config_byte (pdev, 0x85, tmp);
-	
-	/* 
-	 * Super I/O configuration, index port == 3f0h, data port == 3f1h
-	 */
-	
-	/* 0xE2_1-0: Parallel Port Mode / Enable */
-	outb (0xE2, 0x3F0);
-	tmp = inb (0x3F1);
-	
-	if ((tmp & 0x03) == 0x03) {
-		printk (KERN_INFO "parport_pc: Via 686A parallel port disabled in BIOS\n");
+	pci_read_config_byte(pdev, via->via_pci_superio_config_reg, &tmp);
+	tmp &= ~via->via_pci_superio_config_data;
+	pci_write_config_byte(pdev, via->via_pci_superio_config_reg, tmp);
+
+	if (siofunc == VIA_FUNCTION_PARPORT_DISABLE) {
+		printk(KERN_INFO "parport_pc: VIA parallel port disabled in BIOS\n");
 		return 0;
 	}
 	
-	/* 0xE6: Parallel Port I/O Base Address, bits 9-2 */
-	outb (0xE6, 0x3F0);
-	port1 = inb (0x3F1) << 2;
-	
+	/* Bits 7-4: PnP Routing for Parallel Port IRQ */
+	pci_read_config_byte(pdev, via->via_pci_parport_irq_reg, &tmp);
+	irq = ((tmp & VIA_IRQCONTROL_PARALLEL) >> 4);
+
+	if (siofunc == VIA_FUNCTION_PARPORT_ECP)
+	{
+	    /* Bits 3-2: PnP Routing for Parallel Port DMA */
+	    pci_read_config_byte(pdev, via->via_pci_parport_dma_reg, &tmp);
+	    dma = ((tmp & VIA_DMACONTROL_PARALLEL) >> 2);
+	}
+	else
+	    /* if ECP not enabled, DMA is not enabled, assumed bogus 'dma' value */
+	    dma = PARPORT_DMA_NONE;
+
+	/* Let the user (or defaults) steer us away from interrupts and DMA */
+	if (autoirq == PARPORT_IRQ_NONE) {
+	    irq = PARPORT_IRQ_NONE;
+	    dma = PARPORT_DMA_NONE;
+	}
+	if (autodma == PARPORT_DMA_NONE)
+	    dma = PARPORT_DMA_NONE;
+
 	switch (port1) {
 	case 0x3bc: port2 = 0x7bc; break;
 	case 0x378: port2 = 0x778; break;
 	case 0x278: port2 = 0x678; break;
 	default:
-		printk (KERN_INFO "parport_pc: Weird Via 686A parport base 0x%X, ignoring\n",
+		printk(KERN_INFO "parport_pc: Weird VIA parport base 0x%X, ignoring\n",
 			port1);
 		return 0;
 	}
-
-	/* 0xF0_5: EPP+ECP enable */
-	outb (0xF0, 0x3F0);
-	have_eppecp = (inb (0x3F1) & (1 << 5));
-	
-	/*
-	 * lock super i/o configuration, clear 0x85_1
-	 */
-	pci_read_config_byte (pdev, 0x85, &tmp);
-	tmp &= ~(1 << 1);
-	pci_write_config_byte (pdev, 0x85, tmp);
-
-	/*
-	 * Get DMA and IRQ from PCI->ISA bridge PCI config registers
-	 */
-
-	/* 0x50_3-2: PnP Routing for Parallel Port DRQ */
-	pci_read_config_byte (pdev, 0x50, &tmp);
-	dma = ((tmp >> 2) & 0x03);
-	
-	/* 0x51_7-4: PnP Routing for Parallel Port IRQ */
-	pci_read_config_byte (pdev, 0x51, &tmp);
-	irq = ((tmp >> 4) & 0x0F);
 
 	/* filter bogus IRQs */
 	switch (irq) {
@@ -2559,22 +2650,10 @@ static int __devinit sio_via_686a_probe (struct pci_dev *pdev, int autoirq,
 		break;
 	}
 
-	/* if ECP not enabled, DMA is not enabled, assumed bogus 'dma' value */
-	if (!have_eppecp)
-		dma = PARPORT_DMA_NONE;
-
-	/* Let the user (or defaults) steer us away from interrupts and DMA */
-	if (autoirq != PARPORT_IRQ_AUTO) {
-		irq = PARPORT_IRQ_NONE;
-		dma = PARPORT_DMA_NONE;
-	}
-	if (autodma != PARPORT_DMA_AUTO)
-		dma = PARPORT_DMA_NONE;
-
 	/* finally, do the probe with values obtained */
 	if (parport_pc_probe_port (port1, port2, irq, dma, NULL)) {
 		printk (KERN_INFO
-			"parport_pc: Via 686A parallel port: io=0x%X", port1);
+			"parport_pc: VIA parallel port: io=0x%X", port1);
 		if (irq != PARPORT_IRQ_NONE)
 			printk (", irq=%d", irq);
 		if (dma != PARPORT_DMA_NONE)
@@ -2583,7 +2662,7 @@ static int __devinit sio_via_686a_probe (struct pci_dev *pdev, int autoirq,
 		return 1;
 	}
 	
-	printk (KERN_WARNING "parport_pc: Strange, can't probe Via 686A parallel port: io=0x%X, irq=%d, dma=%d\n",
+	printk(KERN_WARNING "parport_pc: Strange, can't probe VIA parallel port: io=0x%X, irq=%d, dma=%d\n",
 		port1, irq, dma);
 	return 0;
 }
@@ -2591,18 +2670,20 @@ static int __devinit sio_via_686a_probe (struct pci_dev *pdev, int autoirq,
 
 enum parport_pc_sio_types {
 	sio_via_686a = 0,	/* Via VT82C686A motherboard Super I/O */
+	sio_via_8231,		/* Via VT8231 south bridge integrated Super IO */
 	sio_ite_8872,
 	last_sio
 };
 
 /* each element directly indexed from enum list, above */
 static struct parport_pc_superio {
-	int (*probe) (struct pci_dev *pdev, int autoirq, int autodma);
+	int (*probe) (struct pci_dev *pdev, int autoirq, int autodma, struct parport_pc_via_data *via);
+	struct parport_pc_via_data *via;
 } parport_pc_superio_info[] __devinitdata = {
-	{ sio_via_686a_probe, },
-	{ sio_ite_8872_probe, },
+	{ sio_via_probe, &via_686a_data, },
+	{ sio_via_probe, &via_8231_data, },
+	{ sio_ite_8872_probe, NULL, },
 };
-
 
 enum parport_pc_pci_cards {
 	siig_1p_10x = last_sio,
@@ -2737,6 +2818,7 @@ static struct parport_pc_pci {
 static struct pci_device_id parport_pc_pci_tbl[] = {
 	/* Super-IO onboard chips */
 	{ 0x1106, 0x0686, PCI_ANY_ID, PCI_ANY_ID, 0, 0, sio_via_686a },
+	{ 0x1106, 0x8231, PCI_ANY_ID, PCI_ANY_ID, 0, 0, sio_via_8231 },
 	{ PCI_VENDOR_ID_ITE, PCI_DEVICE_ID_ITE_8872,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, sio_ite_8872 },
 
@@ -2886,7 +2968,7 @@ static int __init parport_pc_init_superio (int autoirq, int autodma)
 			continue;
 
 		if (parport_pc_superio_info[id->driver_data].probe
-			(pdev, autoirq, autodma)) {
+			(pdev, autoirq, autodma,parport_pc_superio_info[id->driver_data].via)) {
 			ret++;
 		}
 	}
@@ -2966,7 +3048,7 @@ static struct pnp_driver parport_pc_pnp_driver = {
 
 
 /* This is called by parport_pc_find_nonpci_ports (in asm/parport.h) */
-static int __init __attribute__((unused))
+static int __devinit __attribute__((unused))
 parport_pc_find_isa_ports (int autoirq, int autodma)
 {
 	int count = 0;
@@ -3072,28 +3154,51 @@ static int __init parport_parse_dma(const char *dmastr, int *val)
 				     PARPORT_DMA_NONE, PARPORT_DMA_NOFIFO);
 }
 
+static int __init parport_init_mode_setup(const char *str) {
+
+	printk(KERN_DEBUG "parport_pc.c: Specified parameter parport_init_mode=%s\n", str);
+
+	if (!strcmp (str, "spp"))
+		parport_init_mode=1;
+	if (!strcmp (str, "ps2"))
+		parport_init_mode=2;
+	if (!strcmp (str, "epp"))
+		parport_init_mode=3;
+	if (!strcmp (str, "ecp"))
+		parport_init_mode=4;
+	if (!strcmp (str, "ecpepp"))
+		parport_init_mode=5;
+	return 1;
+}
+
 #ifdef MODULE
 static const char *irq[PARPORT_PC_MAX_PORTS];
 static const char *dma[PARPORT_PC_MAX_PORTS];
+static const char *init_mode;
 
 MODULE_PARM_DESC(io, "Base I/O address (SPP regs)");
-MODULE_PARM(io, "1-" __MODULE_STRING(PARPORT_PC_MAX_PORTS) "i");
+module_param_array(io, int, NULL, 0);
 MODULE_PARM_DESC(io_hi, "Base I/O address (ECR)");
-MODULE_PARM(io_hi, "1-" __MODULE_STRING(PARPORT_PC_MAX_PORTS) "i");
+module_param_array(io_hi, int, NULL, 0);
 MODULE_PARM_DESC(irq, "IRQ line");
-MODULE_PARM(irq, "1-" __MODULE_STRING(PARPORT_PC_MAX_PORTS) "s");
+module_param_array(irq, charp, NULL, 0);
 MODULE_PARM_DESC(dma, "DMA channel");
-MODULE_PARM(dma, "1-" __MODULE_STRING(PARPORT_PC_MAX_PORTS) "s");
+module_param_array(dma, charp, NULL, 0);
 #if defined(CONFIG_PARPORT_PC_SUPERIO) || \
        (defined(CONFIG_PARPORT_1284) && defined(CONFIG_PARPORT_PC_FIFO))
 MODULE_PARM_DESC(verbose_probing, "Log chit-chat during initialisation");
-MODULE_PARM(verbose_probing, "i");
+module_param(verbose_probing, int, 0644);
 #endif
+MODULE_PARM_DESC(init_mode, "Initialise mode for VIA VT8231 port (spp, ps2, epp, ecp or ecpepp)");
+MODULE_PARM(init_mode, "s");
 
 static int __init parse_parport_params(void)
 {
 	unsigned int i;
 	int val;
+
+	if (init_mode)
+		parport_init_mode_setup(init_mode);
 
 	for (i = 0; i < PARPORT_PC_MAX_PORTS && io[i]; i++) {
 		if (parport_parse_irq(irq[i], &val))
@@ -3202,6 +3307,15 @@ static int __init parse_parport_params(void)
 }
 
 __setup ("parport=", parport_setup);
+
+/*
+ * Acceptable parameters:
+ *
+ * parport_init_mode=[spp|ps2|epp|ecp|ecpepp]
+ */
+
+__setup("parport_init_mode=",parport_init_mode_setup);
+
 #endif
 
 /* "Parser" ends here */

@@ -26,26 +26,26 @@
  *
  */
 #include <linux/config.h>
-#include <linux/module.h>
-#include <linux/tty.h>
-#include <linux/ioport.h>
-#include <linux/init.h>
-#include <linux/serial.h>
-#include <linux/console.h>
-#include <linux/sysrq.h>
-#include <linux/spinlock.h>
-#include <linux/device.h>
-
-#include <asm/hardware.h>
-#include <asm/io.h>
-#include <asm/irq.h>
 
 #if defined(CONFIG_SERIAL_CLPS711X_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
 #define SUPPORT_SYSRQ
 #endif
 
+#include <linux/module.h>
+#include <linux/ioport.h>
+#include <linux/init.h>
+#include <linux/console.h>
+#include <linux/sysrq.h>
+#include <linux/spinlock.h>
+#include <linux/device.h>
+#include <linux/tty.h>
+#include <linux/tty_flip.h>
 #include <linux/serial_core.h>
+#include <linux/serial.h>
 
+#include <asm/hardware.h>
+#include <asm/io.h>
+#include <asm/irq.h>
 #include <asm/hardware/clps7111.h>
 
 #define UART_NR		2
@@ -123,9 +123,7 @@ static irqreturn_t clps711xuart_int_rx(int irq, void *dev_id, struct pt_regs *re
 			goto ignore_char;
 
 	error_return:
-		*tty->flip.flag_buf_ptr++ = flg;
-		*tty->flip.char_buf_ptr++ = ch;
-		tty->flip.count++;
+		tty_insert_flip_char(tty, ch, flg);
 	ignore_char:
 		status = clps_readl(SYSFLG(port));
 	}
@@ -158,11 +156,7 @@ static irqreturn_t clps711xuart_int_rx(int irq, void *dev_id, struct pt_regs *re
 		 * CHECK: does overrun affect the current character?
 		 * ASSUMPTION: it does not.
 		 */
-		*tty->flip.flag_buf_ptr++ = flg;
-		*tty->flip.char_buf_ptr++ = ch;
-		tty->flip.count++;
-		if (tty->flip.count >= TTY_FLIPBUF_SIZE)
-			goto ignore_char;
+		tty_insert_flip_char(tty, ch, flg);
 		ch = 0;
 		flg = TTY_OVERRUN;
 	}

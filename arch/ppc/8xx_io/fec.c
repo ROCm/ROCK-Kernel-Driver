@@ -1684,7 +1684,7 @@ static int __init fec_enet_init(void)
 
 	/* Install our interrupt handler.
 	*/
-	if (request_8xxirq(FEC_INTERRUPT, fec_enet_interrupt, 0, "fec", dev) != 0)
+	if (request_irq(FEC_INTERRUPT, fec_enet_interrupt, 0, "fec", dev) != 0)
 		panic("Could not allocate FEC IRQ!");
 
 #ifdef CONFIG_RPXCLASSIC
@@ -1705,7 +1705,7 @@ static int __init fec_enet_init(void)
 	((immap_t *)IMAP_ADDR)->im_siu_conf.sc_siel |=
 		(0x80000000 >> PHY_INTERRUPT);
 
-	if (request_8xxirq(PHY_INTERRUPT, mii_link_interrupt, 0, "mii", dev) != 0)
+	if (request_irq(PHY_INTERRUPT, mii_link_interrupt, 0, "mii", dev) != 0)
 		panic("Could not allocate MII IRQ!");
 #endif
 

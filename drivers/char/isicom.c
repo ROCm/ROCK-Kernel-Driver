@@ -1773,9 +1773,9 @@ static int irq[4];
 MODULE_AUTHOR("MultiTech");
 MODULE_DESCRIPTION("Driver for the ISI series of cards by MultiTech");
 MODULE_LICENSE("GPL");
-MODULE_PARM(io, "1-4i");
+module_param_array(io, int, NULL, 0);
 MODULE_PARM_DESC(io, "I/O ports for the cards");
-MODULE_PARM(irq, "1-4i");
+module_param_array(irq, int, NULL, 0);
 MODULE_PARM_DESC(irq, "Interrupts for the cards");
 
 int init_module(void)

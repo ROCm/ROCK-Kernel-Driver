@@ -773,9 +773,11 @@ static void klsi_105_set_termios (struct usb_serial_port *port,
 		switch (cflag & CSIZE) {
 		case CS5:
 			dbg("%s - 5 bits/byte not supported", __FUNCTION__);
+			spin_unlock_irqrestore (&priv->lock, flags);
 			return ;
 		case CS6:
 			dbg("%s - 6 bits/byte not supported", __FUNCTION__);
+			spin_unlock_irqrestore (&priv->lock, flags);
 			return ;
 		case CS7:
 			priv->cfg.databits = kl5kusb105a_dtb_7;

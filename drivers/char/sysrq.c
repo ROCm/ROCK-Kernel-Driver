@@ -216,6 +216,16 @@ static struct sysrq_key_op sysrq_kill_op = {
 
 /* END SIGNAL SYSRQ HANDLERS BLOCK */
 
+static void sysrq_handle_unrt(int key, struct pt_regs *pt_regs,
+				struct tty_struct *tty)
+{
+	normalize_rt_tasks();
+}
+static struct sysrq_key_op sysrq_unrt_op = {
+	.handler	= sysrq_handle_unrt,
+	.help_msg	= "Nice",
+	.action_msg	= "Nice All RT Tasks"
+};
 
 /* Key Operations table and lock */
 static spinlock_t sysrq_key_table_lock = SPIN_LOCK_UNLOCKED;
@@ -250,7 +260,7 @@ static struct sysrq_key_op *sysrq_key_table[SYSRQ_KEY_TABLE_LENGTH] = {
 #endif
 /* l */	NULL,
 /* m */	&sysrq_showmem_op,
-/* n */	NULL,
+/* n */	&sysrq_unrt_op,
 /* o */	NULL, /* This will often be registered
 		 as 'Off' at init time */
 /* p */	&sysrq_showregs_op,
@@ -284,14 +294,6 @@ static int sysrq_key_table_key2index(int key) {
 }
 
 /*
- * table lock and unlocking functions, exposed to modules
- */
-
-void __sysrq_lock_table (void) { spin_lock(&sysrq_key_table_lock); }
-
-void __sysrq_unlock_table (void) { spin_unlock(&sysrq_key_table_lock); }
-
-/*
  * get and put functions for the table, exposed to modules.
  */
 
@@ -323,8 +325,9 @@ void __handle_sysrq(int key, struct pt_regs *pt_regs, struct tty_struct *tty)
 	struct sysrq_key_op *op_p;
 	int orig_log_level;
 	int i, j;
+	unsigned long flags;
 
-	__sysrq_lock_table();
+	spin_lock_irqsave(&sysrq_key_table_lock, flags);
 	orig_log_level = console_loglevel;
 	console_loglevel = 7;
 	printk(KERN_INFO "SysRq : ");
@@ -346,7 +349,7 @@ void __handle_sysrq(int key, struct pt_regs *pt_regs, struct tty_struct *tty)
 		printk ("\n");
 		console_loglevel = orig_log_level;
 	}
-	__sysrq_unlock_table();
+	spin_unlock_irqrestore(&sysrq_key_table_lock, flags);
 }
 
 /*
@@ -361,8 +364,34 @@ void handle_sysrq(int key, struct pt_regs *pt_regs, struct tty_struct *tty)
 	__handle_sysrq(key, pt_regs, tty);
 }
 
+int __sysrq_swap_key_ops(int key, struct sysrq_key_op *insert_op_p,
+                                struct sysrq_key_op *remove_op_p) {
+
+	int retval;
+	unsigned long flags;
+
+	spin_lock_irqsave(&sysrq_key_table_lock, flags);
+	if (__sysrq_get_key_op(key) == remove_op_p) {
+		__sysrq_put_key_op(key, insert_op_p);
+		retval = 0;
+	} else {
+		retval = -1;
+	}
+	spin_unlock_irqrestore(&sysrq_key_table_lock, flags);
+
+	return retval;
+}
+
+int register_sysrq_key(int key, struct sysrq_key_op *op_p)
+{
+	return __sysrq_swap_key_ops(key, op_p, NULL);
+}
+
+int unregister_sysrq_key(int key, struct sysrq_key_op *op_p)
+{
+	return __sysrq_swap_key_ops(key, NULL, op_p);
+}
+
 EXPORT_SYMBOL(handle_sysrq);
-EXPORT_SYMBOL(__sysrq_lock_table);
-EXPORT_SYMBOL(__sysrq_unlock_table);
-EXPORT_SYMBOL(__sysrq_get_key_op);
-EXPORT_SYMBOL(__sysrq_put_key_op);
+EXPORT_SYMBOL(register_sysrq_key);
+EXPORT_SYMBOL(unregister_sysrq_key);

@@ -115,29 +115,6 @@ int request_module(const char *fmt, ...)
 EXPORT_SYMBOL(request_module);
 #endif /* CONFIG_KMOD */
 
-#ifdef CONFIG_HOTPLUG
-/*
-	hotplug path is set via /proc/sys
-	invoked by hotplug-aware bus drivers,
-	with call_usermodehelper
-
-	argv [0] = hotplug_path;
-	argv [1] = "usb", "scsi", "pci", "network", etc;
-	... plus optional type-specific parameters
-	argv [n] = 0;
-
-	envp [*] = HOME, PATH; optional type-specific parameters
-
-	a hotplug bus should invoke this for device add/remove
-	events.  the command is expected to load drivers when
-	necessary, and may perform additional system setup.
-*/
-char hotplug_path[KMOD_PATH_LEN] = "/sbin/hotplug";
-
-EXPORT_SYMBOL(hotplug_path);
-
-#endif /* CONFIG_HOTPLUG */
-
 struct subprocess_info {
 	struct completion *complete;
 	char *path;

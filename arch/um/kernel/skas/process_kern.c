@@ -24,69 +24,6 @@
 #include "mode.h"
 #include "proc_mm.h"
 
-static atomic_t using_sysemu;
-int sysemu_supported;
-
-void set_using_sysemu(int value)
-{
-	atomic_set(&using_sysemu, sysemu_supported && value);
-}
-
-int get_using_sysemu(void)
-{
-	return atomic_read(&using_sysemu);
-}
-
-int proc_read_sysemu(char *buf, char **start, off_t offset, int size,int *eof, void *data)
-{
-	if (snprintf(buf, size, "%d\n", get_using_sysemu()) < size) /*No overflow*/
-		*eof = 1;
-
-	return strlen(buf);
-}
-
-int proc_write_sysemu(struct file *file,const char *buf, unsigned long count,void *data)
-{
-	char tmp[2];
-
-	if (copy_from_user(tmp, buf, 1))
-		return -EFAULT;
-
-	if (tmp[0] == '0' || tmp[0] == '1')
-		set_using_sysemu(tmp[0] - '0');
-	return count; /*We use the first char, but pretend to write everything*/
-}
-
-int __init make_proc_sysemu(void)
-{
-	struct proc_dir_entry *ent;
-	if (mode_tt || !sysemu_supported)
-		return 0;
-
-	ent = create_proc_entry("sysemu", 0600, &proc_root);
-
-	if (ent == NULL)
-	{
-		printk("Failed to register /proc/sysemu\n");
-		return(0);
-	}
-
-	ent->read_proc  = proc_read_sysemu;
-	ent->write_proc = proc_write_sysemu;
-
-	return 0;
-}
-
-late_initcall(make_proc_sysemu);
-
-int singlestepping_skas(void)
-{
-	int ret = current->ptrace & PT_DTRACE;
-
-	current->ptrace &= ~PT_DTRACE;
-	return(ret);
-}
-
 void *switch_to_skas(void *prev, void *next)
 {
 	struct task_struct *from, *to;

@@ -78,13 +78,6 @@ static inline void __atalk_insert_socket(struct sock *sk)
 	sk_add_node(sk, &atalk_sockets);
 }
 
-static inline void atalk_insert_socket(struct sock *sk)
-{
-	write_lock_bh(&atalk_sockets_lock);
-	__atalk_insert_socket(sk);
-	write_unlock_bh(&atalk_sockets_lock);
-}
-
 static inline void atalk_remove_socket(struct sock *sk)
 {
 	write_lock_bh(&atalk_sockets_lock);
@@ -570,7 +563,7 @@ static int atrtr_create(struct rtentry *r, struct net_device *devhint)
 
 		retval = -ENOBUFS;
 		if (!rt)
-			goto out;
+			goto out_unlock;
 		memset(rt, 0, sizeof(*rt));
 
 		rt->next = atalk_routes;

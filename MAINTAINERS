@@ -531,10 +531,9 @@ S:	Supported
 COMPUTONE INTELLIPORT MULTIPORT CARD
 P:	Michael H. Warfield
 M:	Michael H. Warfield <mhw@wittsend.com>
-W:	http://www.computone.com/
 W:	http://www.wittsend.com/computone.html
 L:	linux-computone@lazuli.wittsend.com
-S:	Supported
+S:	Orphaned
 
 COSA/SRP SYNC SERIAL DRIVER
 P:	Jan "Yenya" Kasprzak
@@ -559,8 +558,8 @@ W:     http://sourceforge.net/projects/cramfs/
 S:     Orphan
 
 CRIS PORT
-P:	Bjorn Wesen
-M:	bjornw@axis.com
+P:	Mikael Starvik
+M:	starvik@axis.com
 L:	dev-etrax@axis.com
 W:	http://developer.axis.com
 S:	Maintained
@@ -670,7 +669,7 @@ P:	Digi International, Inc
 M:	Eng.Linux@digi.com
 L:	Eng.Linux@digi.com
 W:	http://www.digi.com
-S:	Maintained
+S:	Orphaned
 
 DIGI RIGHTSWITCH NETWORK DRIVER
 P:	Rick Richardson
@@ -683,7 +682,7 @@ P:	Christoph Lameter
 M:	christoph@lameter.com
 W:	http://www.digi.com
 L:	digilnux@digi.com
-S:	Orphaned
+S:	Obsolete
 
 DIRECTORY NOTIFICATION
 P:	Stephen Rothwell
@@ -832,7 +831,7 @@ S:	Maintained
 
 FILESYSTEMS (VFS and infrastructure)
 P:	Alexander Viro
-M:	viro@math.psu.edu
+M:	viro@parcelfarce.linux.theplanet.co.uk
 S:	Maintained
 
 FIRMWARE LOADER (request_firmware)
@@ -1248,6 +1247,12 @@ W:	http://nfs.sourceforge.net/
 W:	http://www.cse.unsw.edu.au/~neilb/patches/linux-devel/
 S:	Maintained
 
+KERNEL EVENT LAYER (KOBJECT_UEVENT)
+P:	Robert Love
+M:	rml@novell.com
+L:	linux-kernel@vger.kernel.org
+S:	Maintained
+
 LANMEDIA WAN CARD DRIVER
 P:	Andrew Stanley-Jones
 M:	asj@lanmedia.com
@@ -1289,14 +1294,14 @@ LINUX FOR POWERPC
 P:	Paul Mackerras
 M:	paulus@samba.org
 W:	http://www.penguinppc.org/
-L:	linuxppc-dev@lists.linuxppc.org
+L:	linuxppc-dev@ozlabs.org
 S:	Supported
 
 LINUX FOR POWER MACINTOSH
 P:	Benjamin Herrenschmidt
 M:	benh@kernel.crashing.org
 W:	http://www.penguinppc.org/
-L:	linuxppc-dev@lists.linuxppc.org
+L:	linuxppc-dev@ozlabs.org
 S:	Maintained
 
 LINUX FOR POWERPC EMBEDDED MPC52XX
@@ -1312,21 +1317,21 @@ LINUX FOR POWERPC EMBEDDED PPC4XX
 P:	Matt Porter
 M:	mporter@kernel.crashing.org
 W:	http://www.penguinppc.org/
-L:	linuxppc-embedded@lists.linuxppc.org
+L:	linuxppc-embedded@ozlabs.org
 S:	Maintained
 
 LINUX FOR POWERPC EMBEDDED PPC8XX AND BOOT CODE
 P:	Tom Rini
 M:	trini@kernel.crashing.org
 W:	http://www.penguinppc.org/
-L:	linuxppc-embedded@lists.linuxppc.org
+L:	linuxppc-embedded@ozlabs.org
 S:	Maintained
 
 LINUX FOR POWERPC EMBEDDED PPC85XX
 P:     Kumar Gala
 M:     kumar.gala@freescale.com
 W:     http://www.penguinppc.org/
-L:     linuxppc-embedded@lists.linuxppc.org
+L:     linuxppc-embedded@ozlabs.org
 S:     Maintained
 
 LLC (802.2)
@@ -1342,7 +1347,7 @@ P:	Anton Blanchard
 M:	anton@samba.org
 M:	anton@au.ibm.com
 W:	http://linuxppc64.org
-L:	linuxppc64-dev@lists.linuxppc.org
+L:	linuxppc64-dev@ozlabs.org
 S:	Supported
 
 LINUX SECURITY MODULE (LSM) FRAMEWORK
@@ -2336,6 +2341,15 @@ M:	wgreathouse@smva.com
 L:	linux-usb-users@lists.sourceforge.net
 L:	linux-usb-devel@lists.sourceforge.net
 S:	Maintained
+
+USB SERIAL CYPRESS M8 DRIVER
+P:	Lonnie Mendez
+M:	dignome@gmail.com
+L:	linux-usb-users@lists.sourceforge.net
+L:	linux-usb-devel@lists.sourceforge.net
+S:	Maintained
+W:	http://geocities.com/i0xox0i
+W:	http://firstlight.net/cvs
 
 USB SERIAL CYBERJACK PINPAD/E-COM DRIVER
 L:	linux-usb-users@lists.sourceforge.net

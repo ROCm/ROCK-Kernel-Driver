@@ -1,8 +1,9 @@
 /*
 **  System Bus Adapter (SBA) I/O MMU manager
 **
-**	(c) Copyright 2000 Grant Grundler
-**	(c) Copyright 2000 Hewlett-Packard Company
+**	(c) Copyright 2000-2004 Grant Grundler <grundler @ parisc-linux x org>
+**	(c) Copyright 2004 Naresh Kumar Inna <knaresh at india x hp x com>
+**	(c) Copyright 2000-2004 Hewlett-Packard Company
 **
 **	Portions (c) 1999 Dave S. Miller (from sparc64 I/O MMU code)
 **
@@ -167,11 +168,21 @@ extern struct proc_dir_entry * proc_mckinley_root;
 
 #define MAX_IOC		2	/* per Ike. Pluto/Astro only have 1. */
 
+#define ROPES_PER_IOC	8	/* per Ike half or Pluto/Astro */
+
 
 /*
 ** Offsets into MBIB (Function 0 on Ike and hopefully Astro)
 ** Firmware programs this stuff. Don't touch it.
 */
+#define LMMIO_DIRECT0_BASE  0x300
+#define LMMIO_DIRECT0_MASK  0x308
+#define LMMIO_DIRECT0_ROUTE 0x310
+
+#define LMMIO_DIST_BASE  0x360
+#define LMMIO_DIST_MASK  0x368
+#define LMMIO_DIST_ROUTE 0x370
+
 #define IOS_DIST_BASE	0x390
 #define IOS_DIST_MASK	0x398
 #define IOS_DIST_ROUTE	0x3A0
@@ -288,6 +299,9 @@ struct sba_device {
 	spinlock_t		sba_lock;
 	unsigned int		flags;  /* state/functionality enabled */
 	unsigned int		hw_rev;  /* HW revision of chip */
+
+	struct resource		chip_resv; /* MMIO reserved for chip */
+	struct resource		iommu_resv; /* MMIO reserved for iommu */
 
 	unsigned int		num_ioc;  /* number of on-board IOC's */
 	struct ioc		ioc[MAX_IOC];
@@ -569,7 +583,7 @@ sba_search_bitmap(struct ioc *ioc, unsigned long bits_wanted)
 		while(res_ptr < res_end)
 		{ 
 			DBG_RES("    %p %lx %lx\n", res_ptr, mask, *res_ptr);
-			ASSERT(0 != mask);
+			BUG_ON(0 == mask);
 			if(0 == ((*res_ptr) & mask)) {
 				*res_ptr |= mask;     /* mark resources busy! */
 				pide = ((unsigned long)res_ptr - (unsigned long)ioc->res_map);
@@ -1696,19 +1710,46 @@ sba_hw_init(struct sba_device *sba_dev)
 	} /* if !PLUTO */
 
 	if (IS_ASTRO(sba_dev->iodc)) {
+		int err;
 		/* PAT_PDC (L-class) also reports the same goofy base */
 		sba_dev->ioc[0].ioc_hpa = ASTRO_IOC_OFFSET;
 		num_ioc = 1;
+
+		sba_dev->chip_resv.name = "Astro Intr Ack";
+		sba_dev->chip_resv.start = PCI_F_EXTEND | 0xfef00000UL;
+		sba_dev->chip_resv.end   = PCI_F_EXTEND | (0xff000000UL - 1) ;
+		err = request_resource(&iomem_resource, &(sba_dev->chip_resv));
+		if (err < 0) {
+			BUG();
+		}
+
 	} else if (IS_PLUTO(sba_dev->iodc)) {
+		int err;
+
 		/* We use a negative value for IOC HPA so it gets 
                  * corrected when we add it with IKE's IOC offset.
 		 * Doesnt look clean, but fewer code. 
                  */
 		sba_dev->ioc[0].ioc_hpa = -PLUTO_IOC_OFFSET;
 		num_ioc = 1;
+
+		sba_dev->chip_resv.name = "Pluto Intr/PIOP/VGA";
+		sba_dev->chip_resv.start = PCI_F_EXTEND | 0xfee00000UL;
+		sba_dev->chip_resv.end   = PCI_F_EXTEND | (0xff200000UL - 1);
+		err = request_resource(&iomem_resource, &(sba_dev->chip_resv));
+		BUG_ON(err < 0);
+
+		sba_dev->iommu_resv.name = "IOVA Space";
+		sba_dev->iommu_resv.start = 0x40000000UL;
+		sba_dev->iommu_resv.end   = 0x50000000UL - 1;
+		err = request_resource(&iomem_resource, &(sba_dev->iommu_resv));
+		BUG_ON(err < 0);
 	} else {
+		/* IS_IKE (ie N-class, L3000, L1500) */
 		sba_dev->ioc[0].ioc_hpa = sba_dev->ioc[1].ioc_hpa = 0;
 		num_ioc = 2;
+
+		/* TODO - LOOKUP Ike/Stretch chipset mem map */
 	}
 
 	sba_dev->num_ioc = num_ioc;
@@ -1843,8 +1884,9 @@ static int sba_proc_info(char *buf, char **start, off_t offset, int len)
 	struct sba_device *sba_dev = sba_list;
 	struct ioc *ioc = &sba_dev->ioc[0];	/* FIXME: Multi-IOC support! */
 	int total_pages = (int) (ioc->res_size << 3); /* 8 bits per byte */
+	unsigned long i;
 #ifdef SBA_COLLECT_STATS
-	unsigned long i = 0, avg = 0, min, max;
+	unsigned long avg = 0, min, max;
 #endif
 
 	sprintf(buf, "%s rev %d.%d\n",
@@ -1859,6 +1901,21 @@ static int sba_proc_info(char *buf, char **start, off_t offset, int len)
 
 	sprintf(buf, "%sResource bitmap : %d bytes (%d pages)\n", 
 		buf, ioc->res_size, ioc->res_size << 3);   /* 8 bits per byte */
+
+	sprintf(buf, "%sLMMIO_BASE/MASK/ROUTE %08x %08x %08x\n",
+		buf,
+		READ_REG32(sba_dev->sba_hpa + LMMIO_DIST_BASE),
+		READ_REG32(sba_dev->sba_hpa + LMMIO_DIST_MASK),
+		READ_REG32(sba_dev->sba_hpa + LMMIO_DIST_ROUTE)
+		);
+
+	for (i=0; i<4; i++)
+		sprintf(buf, "%sDIR%ld_BASE/MASK/ROUTE %08x %08x %08x\n",
+			buf, i,
+			READ_REG32(sba_dev->sba_hpa + LMMIO_DIRECT0_BASE  + i*0x18),
+			READ_REG32(sba_dev->sba_hpa + LMMIO_DIRECT0_MASK  + i*0x18),
+			READ_REG32(sba_dev->sba_hpa + LMMIO_DIRECT0_ROUTE + i*0x18)
+		);
 
 #ifdef SBA_COLLECT_STATS
 	sprintf(buf, "%sIO PDIR entries : %ld free  %ld used (%d%%)\n", buf,
@@ -1949,7 +2006,7 @@ static struct parisc_driver sba_driver = {
 };
 
 /*
-** Determine if lba should claim this chip (return 0) or not (return 1).
+** Determine if sba should claim this chip (return 0) or not (return 1).
 ** If so, initialize the chip and tell other partners in crime they
 ** have work to do.
 */
@@ -2062,17 +2119,95 @@ void __init sba_init(void)
  * sba_get_iommu - Assign the iommu pointer for the pci bus controller.
  * @dev: The parisc device.
  *
- * This function searches through the registerd IOMMU's and returns the
- * appropriate IOMMU data for the given parisc PCI controller.
+ * Returns the appropriate IOMMU data for the given parisc PCI controller.
+ * This is cached and used later for PCI DMA Mapping.
  */
 void * sba_get_iommu(struct parisc_device *pci_hba)
 {
-	struct sba_device *sba = (struct sba_device *) pci_hba->parent->sysdata;
-	char t = pci_hba->parent->id.hw_type;
+	struct parisc_device *sba_dev = parisc_parent(pci_hba);
+	struct sba_device *sba = sba_dev->dev.driver_data;
+	char t = sba_dev->id.hw_type;
 	int iocnum = (pci_hba->hw_path >> 3);	/* rope # */
+
+	BUG_ON((t != HPHW_IOA) && (t != HPHW_BCPORT));
+
+	return &(sba->ioc[iocnum]);
+}
+
+
+/**
+ * sba_directed_lmmio - return first directed LMMIO range routed to rope
+ * @pa_dev: The parisc device.
+ * @r: resource PCI host controller wants start/end fields assigned.
+ *
+ * For the given parisc PCI controller, determine if any direct ranges
+ * are routed down the corresponding rope.
+ */
+void sba_directed_lmmio(struct parisc_device *pci_hba, struct resource *r)
+{
+	struct parisc_device *sba_dev = parisc_parent(pci_hba);
+	struct sba_device *sba = sba_dev->dev.driver_data;
+	char t = sba_dev->id.hw_type;
+	int i;
+	int rope = (pci_hba->hw_path & (ROPES_PER_IOC-1));  /* rope # */
 
 	if ((t!=HPHW_IOA) && (t!=HPHW_BCPORT))
 		BUG();
 
-	return &(sba->ioc[iocnum]);
+	r->start = r->end = 0;
+
+	/* Astro has 4 directed ranges. Not sure about Ike/Pluto/et al */
+	for (i=0; i<4; i++) {
+		int base, size;
+		unsigned long reg = sba->sba_hpa + i*0x18;
+
+		base = READ_REG32(reg + LMMIO_DIRECT0_BASE);
+		if ((base & 1) == 0)
+			continue;	/* not enabled */
+
+		size = READ_REG32(reg + LMMIO_DIRECT0_ROUTE);
+
+		if ((size & (ROPES_PER_IOC-1)) != rope)
+			continue;	/* directed down different rope */
+		
+		r->start = (base & ~1UL) | PCI_F_EXTEND;
+		size = ~ READ_REG32(reg + LMMIO_DIRECT0_MASK);
+		r->end = r->start + size;
+	}
+}
+
+
+/**
+ * sba_distributed_lmmio - return portion of distributed LMMIO range
+ * @pa_dev: The parisc device.
+ * @r: resource PCI host controller wants start/end fields assigned.
+ *
+ * For the given parisc PCI controller, return portion of distributed LMMIO
+ * range. The distributed LMMIO is always present and it's just a question
+ * of the base address and size of the range.
+ */
+void sba_distributed_lmmio(struct parisc_device *pci_hba, struct resource *r )
+{
+	struct parisc_device *sba_dev = parisc_parent(pci_hba);
+	struct sba_device *sba = sba_dev->dev.driver_data;
+	char t = sba_dev->id.hw_type;
+	int base, size;
+	int rope = (pci_hba->hw_path & (ROPES_PER_IOC-1));  /* rope # */
+
+	if ((t!=HPHW_IOA) && (t!=HPHW_BCPORT))
+		BUG();
+
+	r->start = r->end = 0;
+
+	base = READ_REG32(sba->sba_hpa + LMMIO_DIST_BASE);
+	if ((base & 1) == 0) {
+		BUG();	/* Gah! Distr Range wasn't enabled! */
+		return;
+	}
+
+	r->start = (base & ~1UL) | PCI_F_EXTEND;
+
+	size = (~READ_REG32(sba->sba_hpa + LMMIO_DIST_MASK)) / ROPES_PER_IOC;
+	r->start += rope * (size + 1);	/* adjust base for this rope */
+	r->end = r->start + size;
 }

@@ -1275,13 +1275,8 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 	es = (struct ext3_super_block *) (((char *)bh->b_data) + offset);
 	sbi->s_es = es;
 	sb->s_magic = le16_to_cpu(es->s_magic);
-	if (sb->s_magic != EXT3_SUPER_MAGIC) {
-		if (!silent)
-			printk(KERN_ERR 
-			       "VFS: Can't find ext3 filesystem on dev %s.\n",
-			       sb->s_id);
-		goto failed_mount;
-	}
+	if (sb->s_magic != EXT3_SUPER_MAGIC)
+		goto cantfind_ext3;
 
 	/* Set defaults before we parse the mount options */
 	def_mount_opts = le32_to_cpu(es->s_default_mount_opts);
@@ -1415,8 +1410,13 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 	sbi->s_blocks_per_group = le32_to_cpu(es->s_blocks_per_group);
 	sbi->s_frags_per_group = le32_to_cpu(es->s_frags_per_group);
 	sbi->s_inodes_per_group = le32_to_cpu(es->s_inodes_per_group);
+	if (EXT3_INODE_SIZE(sb) == 0)
+		goto cantfind_ext3;
 	sbi->s_inodes_per_block = blocksize / EXT3_INODE_SIZE(sb);
-	sbi->s_itb_per_group = sbi->s_inodes_per_group /sbi->s_inodes_per_block;
+	if (sbi->s_inodes_per_block == 0)
+		goto cantfind_ext3;
+	sbi->s_itb_per_group = sbi->s_inodes_per_group /
+					sbi->s_inodes_per_block;
 	sbi->s_desc_per_block = blocksize / sizeof(struct ext3_group_desc);
 	sbi->s_sbh = bh;
 	sbi->s_mount_state = le16_to_cpu(es->s_state);
@@ -1445,6 +1445,8 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 		goto failed_mount;
 	}
 
+	if (EXT3_BLOCKS_PER_GROUP(sb) == 0)
+		goto cantfind_ext3;
 	sbi->s_groups_count = (le32_to_cpu(es->s_blocks_count) -
 			       le32_to_cpu(es->s_first_data_block) +
 			       EXT3_BLOCKS_PER_GROUP(sb) - 1) /
@@ -1491,7 +1493,7 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 	sbi->s_rsv_window_head.rsv_end = EXT3_RESERVE_WINDOW_NOT_ALLOCATED;
 	atomic_set(&sbi->s_rsv_window_head.rsv_alloc_hit, 0);
 	atomic_set(&sbi->s_rsv_window_head.rsv_goal_size, 0);
-	rsv_window_add(sb, &sbi->s_rsv_window_head);
+	ext3_rsv_window_add(sb, &sbi->s_rsv_window_head);
 
 	/*
 	 * set up enough so that it can read an inode
@@ -1604,6 +1606,12 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 
 	return 0;
 
+cantfind_ext3:
+	if (!silent)
+		printk(KERN_ERR "VFS: Can't find ext3 filesystem on dev %s.\n",
+		       sb->s_id);
+	goto failed_mount;
+
 failed_mount3:
 	journal_destroy(sbi->s_journal);
 failed_mount2:
@@ -1612,10 +1620,8 @@ failed_mount2:
 	kfree(sbi->s_group_desc);
 failed_mount:
 #ifdef CONFIG_QUOTA
-	for (i = 0; i < MAXQUOTAS; i++) {
-		if (sbi->s_qf_names[i])
-			kfree(sbi->s_qf_names[i]);
-	}
+	for (i = 0; i < MAXQUOTAS; i++)
+		kfree(sbi->s_qf_names[i]);
 #endif
 	ext3_blkdev_remove(sbi);
 	brelse(bh);

@@ -76,7 +76,7 @@ EXPORT_SYMBOL(__lock_buffer);
 void fastcall unlock_buffer(struct buffer_head *bh)
 {
 	clear_buffer_locked(bh);
-	smp_mb();
+	smp_mb__after_clear_bit();
 	wake_up_bit(&bh->b_state, BH_Lock);
 }
 
@@ -88,14 +88,6 @@ void fastcall unlock_buffer(struct buffer_head *bh)
 void __wait_on_buffer(struct buffer_head * bh)
 {
 	wait_on_bit(&bh->b_state, BH_Lock, sync_buffer, TASK_UNINTERRUPTIBLE);
-}
-
-static void
-__set_page_buffers(struct page *page, struct buffer_head *head)
-{
-	page_cache_get(page);
-	SetPagePrivate(page);
-	page->private = (unsigned long)head;
 }
 
 static void
@@ -1013,8 +1005,8 @@ int remove_inode_buffers(struct inode *inode)
  * The retry flag is used to differentiate async IO (paging, swapping)
  * which may not fail from ordinary buffer allocations.
  */
-static struct buffer_head *
-create_buffers(struct page * page, unsigned long size, int retry)
+struct buffer_head *alloc_page_buffers(struct page *page, unsigned long size,
+		int retry)
 {
 	struct buffer_head *bh, *head;
 	long offset;
@@ -1072,6 +1064,7 @@ no_grow:
 	free_more_memory();
 	goto try_again;
 }
+EXPORT_SYMBOL_GPL(alloc_page_buffers);
 
 static inline void
 link_dev_buffers(struct page *page, struct buffer_head *head)
@@ -1084,7 +1077,7 @@ link_dev_buffers(struct page *page, struct buffer_head *head)
 		bh = bh->b_this_page;
 	} while (bh);
 	tail->b_this_page = head;
-	__set_page_buffers(page, head);
+	attach_page_buffers(page, head);
 }
 
 /*
@@ -1145,7 +1138,7 @@ grow_dev_page(struct block_device *bdev, sector_t block,
 	/*
 	 * Allocate some buffers for this page
 	 */
-	bh = create_buffers(page, size, 0);
+	bh = alloc_page_buffers(page, size, 0);
 	if (!bh)
 		goto failed;
 
@@ -1651,7 +1644,7 @@ void create_empty_buffers(struct page *page,
 {
 	struct buffer_head *bh, *head, *tail;
 
-	head = create_buffers(page, blocksize, 1);
+	head = alloc_page_buffers(page, blocksize, 1);
 	bh = head;
 	do {
 		bh->b_state |= b_state;
@@ -1671,7 +1664,7 @@ void create_empty_buffers(struct page *page,
 			bh = bh->b_this_page;
 		} while (bh != head);
 	}
-	__set_page_buffers(page, head);
+	attach_page_buffers(page, head);
 	spin_unlock(&page->mapping->private_lock);
 }
 EXPORT_SYMBOL(create_empty_buffers);

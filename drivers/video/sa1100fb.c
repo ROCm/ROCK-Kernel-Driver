@@ -309,23 +309,6 @@ static struct sa1100fb_mach_info h3100_info __initdata = {
 };
 #endif
 
-#ifdef CONFIG_SA1100_BRUTUS
-static struct sa1100fb_mach_info brutus_info __initdata = {
-	.pixclock	= 0,		.bpp		= 8,
-	.xres		= 320,		.yres		= 240,
-
-	.hsync_len	= 3,		.vsync_len	= 1,
-	.left_margin	= 41,		.upper_margin	= 0,
-	.right_margin	= 101,		.lower_margin	= 0,
-
-	.sync		= FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
-
-	.lccr0		= LCCR0_Color | LCCR0_Sngl | LCCR0_Pas,
-	.lccr3		= LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2) |
-			  LCCR3_PixClkDiv(44),
-};
-#endif
-
 #ifdef CONFIG_SA1100_COLLIE
 static struct sa1100fb_mach_info collie_info __initdata = {
 	.pixclock	= 171521,	.bpp		= 16,
@@ -339,65 +322,6 @@ static struct sa1100fb_mach_info collie_info __initdata = {
 
 	.lccr0		= LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
 	.lccr3		= LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2),
-};
-#endif
-
-#ifdef CONFIG_SA1100_FREEBIRD
-#warning Please check this carefully
-static struct sa1100fb_mach_info freebird_info __initdata = {
-	.pixclock	= 171521,	.bpp		= 16,
-	.xres		= 240,		.yres		= 320,
-
-	.hsync_len	= 3,		.vsync_len	= 2,
-	.left_margin	= 2,		.upper_margin	= 0,
-	.right_margin	= 2,		.lower_margin	= 0,
-
-	.sync		= FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
-
-	.lccr0		= LCCR0_Color | LCCR0_Sngl | LCCR0_Pas,
-	.lccr3		= LCCR3_OutEnH | LCCR3_PixFlEdg | LCCR3_ACBsDiv(2),
-};
-
-static struct sa1100fb_rgb freebird_rgb_16 = {
-	.red	= { .offset = 8,  .length = 4, },
-	.green	= { .offset = 4,  .length = 4, },
-	.blue	= { .offset = 0,  .length = 4, },
-	.transp	= { .offset = 12, .length = 4, },
-};
-#endif
-
-#ifdef CONFIG_SA1100_GRAPHICSCLIENT
-static struct sa1100fb_mach_info graphicsclient_info __initdata = {
-	.pixclock	= 53500,	.bpp		= 8,
-	.xres		= 640,		.yres		= 480,
-
-	.hsync_len	= 9,		.vsync_len	= 9,
-	.left_margin	= 54,		.upper_margin	= 24,
-	.right_margin	= 54,		.lower_margin	= 32,
-
-	.lccr0		= LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
-	.lccr3		= LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2),
-};
-#endif
-
-#ifdef CONFIG_SA1100_HUW_WEBPANEL
-static struct sa1100fb_mach_info huw_webpanel_info __initdata = {
-	.pixclock	= 0,		.bpp		= 8,
-	.xres		= 640,		.yres		= 480,
-
-	.hsync_len	= 3,		.vsync_len	= 1,
-	.left_margin	= 41,		.upper_margin	= 0,
-	.right_margin	= 101,		.lower_margin	= 0,
-
-	.sync		= FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
-
-	.lccr0		= LCCR0_Color | LCCR0_Dual | LCCR0_Pas,
-	.lccr3		= LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2) | 8,
-#error FIXME
-	/*
-	 * FIXME: please get rid of the '| 8' in preference to an
-	 * LCCR3_PixClkDiv() version. --rmk
-	 */
 };
 #endif
 
@@ -476,138 +400,6 @@ static struct sa1100fb_mach_info shannon_info __initdata = {
 };
 #endif
 
-#ifdef CONFIG_SA1100_OMNIMETER
-static struct sa1100fb_mach_info omnimeter_info __initdata = {
-	.pixclock	= 0,		.bpp		= 4,
-	.xres		= 480,		.yres		= 320,
-
-	.hsync_len	= 1,		.vsync_len	= 1,
-	.left_margin	= 10,		.upper_margin	= 0,
-	.right_margin	= 10,		.lower_margin	= 0,
-
-	.cmap_greyscale	= 1,
-	.sync		= FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
-
-	.lccr0		= LCCR0_Mono | LCCR0_Sngl | LCCR0_Pas | LCCR0_8PixMono,
-	.lccr3		= LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(255) |
-			  LCCR3_PixClkDiv(44),
-#error FIXME: fix pixclock, ACBsDiv
-	/*
-	 * FIXME: I think ACBsDiv is wrong above - should it be 512 (disabled)?
-	 *   - rmk
-	 */
-};
-#endif
-
-#ifdef CONFIG_SA1100_PANGOLIN
-static struct sa1100fb_mach_info pangolin_info __initdata = {
-	.pixclock	= 341521,	.bpp		= 16,
-	.xres		= 800,		.yres		= 600,
-
-	.hsync_len	= 64,		.vsync_len	= 7,
-	.left_margin	= 160,		.upper_margin	= 7,
-	.right_margin	= 24,		.lower_margin	= 1,
-
-	.sync		= FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
-
-	.lccr0		= LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
-	.lccr3		= LCCR3_OutEnH | LCCR3_PixFlEdg | LCCR3_ACBsCntOff,
-};
-#endif
-
-#ifdef CONFIG_SA1100_STORK
-#if STORK_TFT			/* ie the NEC TFT */
-/*
- * pixclock is ps per clock. say 72Hz, 800x600 clocks => (1/72)/(800*600)
- * = 28935 and a bit
- * NB likely to be increased to ease bus timings wrt pcmcia interface
- */
-static struct sa1100fb_mach_info stork_tft_info __initdata = {
-	.pixclock	= 28935,	.bpp		= 16,
-	.xres		= 640,		.yres		= 480,
-
-	.hsync_len	= 64,		.vsync_len	= 2,
-	.left_margin	= 48,		.upper_margin	= 12,
-	.right_margin	= 48,		.lower_margin	= 31,
-
-	.lccr0		= LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
-	.lccr3		= LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsCntOff,
-};
-
-static struct sa1100fb_rgb stork_tft_rgb_16 = {
-	.red	= { .offset = 11, .length = 5, },
-	.green	= { .offset = 5,  .length = 6, },
-	.blue	= { .offset = 0,  .length = 5, },
-	.transp	= { .offset = 0,  .length = 0, },
-};
-
-#else	/* Kyocera DSTN */
-
-static struct sa1100fb_mach_info stork_dstn_info __initdata = {
-	.pixclock	= 0,		.bpp		= 16,
-	.xres		= 640,		.yres		= 480,
-
-	.hsync_len	= 2,		.vsync_len	= 2,
-	.left_margin	= 2,		.upper_margin	= 0,
-	.right_margin	= 2,		.lower_margin	= 0,
-
-	.sync		= FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT ,
-
-	.lccr0		= LCCR0_Color | LCCR0_Dual | LCCR0_Pas,
-#error Fixme
-	.lccr3		= 0xff00 |
-			0x18		/* ought to be 0x14 but DMA isn't up to that as yet */
-};
-
-static struct sa1100fb_rgb stork_dstn_rgb_16 = {
-	.red	= { .offset = 8,  .length = 4, },
-	.green	= { .offset = 4,  .length = 4, },
-	.blue	= { .offset = 0,  .length = 4, },
-	.transp	= { .offset = 0,  .length = 0, },
-};
-#endif
-#endif
-
-#ifdef CONFIG_SA1100_PT_SYSTEM3
-/*
- * 648 x 480 x 8bpp x 75Hz Dual Panel Color STN Display
- *
- * pixclock = 1/( 640*3/8*240 ), [pixclock]=1e-12s=ps
- *	3 due to r,g,b lines
- *	8 due to 8 bit data bus
- *	640 due to 640 pixels per line
- *	240 = 480/2 due to dual panel display
- *	=>4.32Mhz => 231481E-12s
- */
-static struct sa1100fb_mach_info system3_info __initdata = {
-	.pixclock	= 231481,	.bpp		= 8,
-	.xres		= 640,		.yres		= 480,
-
-	.hsync_len	= 2,		.vsync_len	= 2,
-	.left_margin	= 2,		.upper_margin	= 0,
-	.right_margin	= 2,		.lower_margin	= 0,
-
-	.sync		= FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
-
-	.lccr0		= LCCR0_Color | LCCR0_Dual | LCCR0_Pas,
-	.lccr3		= LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(512),
-};
-#endif
-
-#ifdef CONFIG_SA1100_XP860
-static struct sa1100fb_mach_info xp860_info __initdata = {
-	.pixclock	= 0,		.bpp		= 8,
-	.xres		= 1024,		.yres		= 768,
-
-	.hsync_len	= 3,		.vsync_len	= 3,
-	.left_margin	= 3,		.upper_margin	= 2,
-	.right_margin	= 2,		.lower_margin	= 1,
-
-	.lccr0		= LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
-	.lccr3		= LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_PixClkDiv(6),
-};
-#endif
-
 
 
 static struct sa1100fb_mach_info * __init
@@ -646,30 +438,9 @@ sa1100fb_get_machine_info(struct sa1100fb_info *fbi)
 		inf = &h3800_info;
 	}
 #endif
-#ifdef CONFIG_SA1100_BRUTUS
-	if (machine_is_brutus()) {
-		inf = &brutus_info;
-	}
-#endif
 #ifdef CONFIG_SA1100_COLLIE
 	if (machine_is_collie()) {
 		inf = &collie_info;
-	}
-#endif
-#ifdef CONFIG_SA1100_FREEBIRD
-	if (machine_is_freebird()) {
-		inf = &freebird_info;
-		fbi->rgb[RGB_16] = &freebird_rgb16;
-	}
-#endif
-#ifdef CONFIG_SA1100_GRAPHICSCLIENT
-	if (machine_is_graphicsclient()) {
-		inf = &graphicsclient_info;
-	}
-#endif
-#ifdef CONFIG_SA1100_HUW_WEBPANEL
-	if (machine_is_huw_webpanel()) {
-		inf = &huw_webpanel_info;
 	}
 #endif
 #ifdef CONFIG_SA1100_LART
@@ -688,40 +459,9 @@ sa1100fb_get_machine_info(struct sa1100fb_info *fbi)
 #endif
 	}
 #endif
-#ifdef CONFIG_SA1100_OMNIMETER
-	if (machine_is_omnimeter()) {
-		inf = &omnimeter_info;
-	}
-#endif
-#ifdef CONFIG_SA1100_PANGOLIN
-	if (machine_is_pangolin()) {
-		inf = &pangolin_info;
-	}
-#endif
-#ifdef CONFIG_SA1100_PT_SYSTEM3
-	if (machine_is_pt_system3()) {
-		inf = &system3_info;
-	}
-#endif
 #ifdef CONFIG_SA1100_SHANNON
 	if (machine_is_shannon()) {
 		inf = &shannon_info;
-	}
-#endif
-#ifdef CONFIG_SA1100_STORK
-	if (machine_is_stork()) {
-#if STORK_TFT
-		inf = &stork_tft_info;
-		fbi->rgb[RGB_16] = &stork_tft_rgb_16;
-#else
-		inf = &stork_dstn_info;
-		fbi->rgb[RGB_16] = &stork_dstn_rgb_16;
-#endif
-	}
-#endif
-#ifdef CONFIG_SA1100_XP860
-	if (machine_is_xp860()) {
-		inf = &xp860_info;
 	}
 #endif
 	return inf;
@@ -989,13 +729,6 @@ static int sa1100fb_set_par(struct fb_info *info)
 	 * Set (any) board control register to handle new color depth
 	 */
 	sa1100fb_set_truecolor(fbi->fb.fix.visual == FB_VISUAL_TRUECOLOR);
-
-#ifdef CONFIG_SA1100_OMNIMETER
-#error Do we have to do this here?   We already do it at init time.
-	if (machine_is_omnimeter())
-		SetLCDContrast(DefaultLCDContrast);
-#endif
-
 	sa1100fb_activate_var(var, fbi);
 
 	return 0;
@@ -1061,9 +794,10 @@ static int sa1100fb_blank(int blank, struct fb_info *info)
 	DPRINTK("sa1100fb_blank: blank=%d\n", blank);
 
 	switch (blank) {
-	case VESA_POWERDOWN:
-	case VESA_VSYNC_SUSPEND:
-	case VESA_HSYNC_SUSPEND:
+	case FB_BLANK_POWERDOWN:
+	case FB_BLANK_VSYNC_SUSPEND:
+	case FB_BLANK_HSYNC_SUSPEND:
+	case FB_BLANK_NORMAL:
 		if (fbi->fb.fix.visual == FB_VISUAL_PSEUDOCOLOR ||
 		    fbi->fb.fix.visual == FB_VISUAL_STATIC_PSEUDOCOLOR)
 			for (i = 0; i < fbi->palette_size; i++)
@@ -1071,7 +805,7 @@ static int sa1100fb_blank(int blank, struct fb_info *info)
 		sa1100fb_schedule_work(fbi, C_DISABLE);
 		break;
 
-	case VESA_NO_BLANKING:
+	case FB_BLANK_UNBLANK:
 		if (fbi->fb.fix.visual == FB_VISUAL_PSEUDOCOLOR ||
 		    fbi->fb.fix.visual == FB_VISUAL_STATIC_PSEUDOCOLOR)
 			fb_set_cmap(&fbi->fb.cmap, info);
@@ -1287,15 +1021,6 @@ static void sa1100fb_enable_controller(struct sa1100fb_info *fbi)
 	DBAR2 = fbi->dbar2;
 	LCCR0 |= LCCR0_LEN;
 
-#ifdef CONFIG_SA1100_GRAPHICSCLIENT
-#error Where is GPIO24 set as an output?  Can we fit this in somewhere else?
-	if (machine_is_graphicsclient()) {
-		// From ADS doc again...same as disable
-		msleep(20);
-		GPSR |= GPIO_GPIO24;
-	}
-#endif
-
 	if (machine_is_shannon()) {
 		GPDR |= SHANNON_GPIO_DISP_EN;
 		GPSR |= SHANNON_GPIO_DISP_EN;
@@ -1314,29 +1039,6 @@ static void sa1100fb_disable_controller(struct sa1100fb_info *fbi)
 	DECLARE_WAITQUEUE(wait, current);
 
 	DPRINTK("Disabling LCD controller\n");
-
-#ifdef CONFIG_SA1100_GRAPHICSCLIENT
-#error Where is GPIO24 set as an output?  Can we fit this in somewhere else?
-	if (machine_is_graphicsclient()) {
-		/*
-		 * From ADS internal document:
-		 *  GPIO24 should be LOW at least 10msec prior to disabling
-		 *  the LCD interface.
-		 *
-		 * We'll wait 20msec.
-		 */
-		GPCR |= GPIO_GPIO24;
-		msleep(20);
-	}
-#endif
-#ifdef CONFIG_SA1100_HUW_WEBPANEL
-#error Move me into __sa1100fb_lcd_power and/or __sa1100fb_backlight_power
-	if (machine_is_huw_webpanel()) {
-		// don't forget to set the control lines to zero (?)
-		DPRINTK("ShutDown HuW LCD controller\n");
-		BCR_clear(BCR_TFT_ENA + BCR_CCFL_POW + BCR_PWM_BACKLIGHT);
-	}
-#endif
 
 	if (machine_is_shannon()) {
 		GPCR |= SHANNON_GPIO_DISP_EN;
@@ -1673,7 +1375,6 @@ static struct sa1100fb_info * __init sa1100fb_init_fbinfo(struct device *dev)
 	fbi->fb.fbops		= &sa1100fb_ops;
 	fbi->fb.flags		= FBINFO_DEFAULT;
 	fbi->fb.monspecs	= monspecs;
-	fbi->fb.currcon		= -1;
 	fbi->fb.pseudo_palette	= (fbi + 1);
 
 	fbi->rgb[RGB_8]		= &rgb_8;
@@ -1752,16 +1453,6 @@ static int __init sa1100fb_probe(struct device *dev)
 #ifdef ASSABET_PAL_VIDEO
 	if (machine_is_assabet())
 		ASSABET_BCR_clear(ASSABET_BCR_LCD_ON);
-#endif
-
-#ifdef CONFIG_SA1100_FREEBIRD
-#error Please move this into __sa1100fb_lcd_power
-	if (machine_is_freebird()) {
-		BCR_set(BCR_FREEBIRD_LCD_DISP);
-		mdelay(20);
-		BCR_set(BCR_FREEBIRD_LCD_PWR);
-		mdelay(20);
-	}
 #endif
 
 	/*

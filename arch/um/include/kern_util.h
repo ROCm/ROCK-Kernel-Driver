@@ -29,7 +29,7 @@ extern int kernel_thread_proc(void *data);
 extern void syscall_segv(int sig);
 extern int current_pid(void);
 extern unsigned long alloc_stack(int order, int atomic);
-extern int do_signal(int error);
+extern int do_signal(void);
 extern int is_stack_fault(unsigned long sp);
 extern unsigned long segv(unsigned long address, unsigned long ip, 
 			  int is_write, int is_user, void *sc);
@@ -41,7 +41,7 @@ extern int is_tracing(void *task);
 extern int segv_syscall(void);
 extern void kern_finish_exec(void *task, int new_pid, unsigned long stack);
 extern int page_size(void);
-extern int page_mask(void);
+extern unsigned long page_mask(void);
 extern int need_finish_fork(void);
 extern void free_stack(unsigned long stack, int order);
 extern void add_input_request(int op, void (*proc)(int), void *arg);
@@ -110,7 +110,6 @@ extern void arch_switch(void);
 extern void free_irq(unsigned int, void *);
 extern int um_in_interrupt(void);
 extern int cpu(void);
-extern unsigned long long time_stamp(void);
 
 #endif
 

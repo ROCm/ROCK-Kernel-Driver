@@ -135,9 +135,31 @@ void dump_stack(void)
 
 EXPORT_SYMBOL(dump_stack);
 
-void show_stack(struct task_struct *task, unsigned long *s)
+static void do_show_stack(struct unwind_frame_info *info)
 {
 	int i = 1;
+
+	printk("Backtrace:\n");
+	while (i <= 16) {
+		if (unwind_once(info) < 0 || info->ip == 0)
+			break;
+
+		if (__kernel_text_address(info->ip)) {
+			printk(" [<" RFMT ">] ", info->ip);
+#ifdef CONFIG_KALLSYMS
+			print_symbol("%s\n", info->ip);
+#else
+			if ((i & 0x03) == 0)
+				printk("\n");
+#endif
+			i++;
+		}
+	}
+	printk("\n");
+}
+
+void show_stack(struct task_struct *task, unsigned long *s)
+{
 	struct unwind_frame_info info;
 
 	if (!task) {
@@ -152,23 +174,7 @@ HERE:
 		unwind_frame_init_from_blocked_task(&info, task);
 	}
 
-	printk("Backtrace:\n");
-	while (i <= 16) {
-		if (unwind_once(&info) < 0 || info.ip == 0)
-			break;
-
-		if (__kernel_text_address(info.ip)) {
-			printk(" [<" RFMT ">] ", info.ip);
-#ifdef CONFIG_KALLSYMS
-			print_symbol("%s\n", info.ip);
-#else
-			if ((i & 0x03) == 0)
-				printk("\n");
-#endif
-			i++;
-		}
-	}
-	printk("\n");
+	do_show_stack(&info);
 }
 
 void die_if_kernel(char *str, struct pt_regs *regs, long err)
@@ -373,9 +379,9 @@ void transfer_pim_to_trap_frame(struct pt_regs *regs)
 
 
 /*
- * This routine handles page faults.  It determines the address,
- * and the problem, and then passes it off to one of the appropriate
- * routines.
+ * This routine is called as a last resort when everything else
+ * has gone clearly wrong. We get called for faults in kernel space,
+ * and HPMC's.
  */
 void parisc_terminate(char *msg, struct pt_regs *regs, int code, unsigned long offset)
 {
@@ -407,7 +413,12 @@ void parisc_terminate(char *msg, struct pt_regs *regs, int code, unsigned long o
 
 	}
 	    
-	show_stack(NULL, (unsigned long *)regs->gr[30]);
+	{
+		/* show_stack(NULL, (unsigned long *)regs->gr[30]); */
+		struct unwind_frame_info info;
+		unwind_frame_init(&info, current, regs->gr[30], regs->iaoq[0], regs->gr[2]);
+		do_show_stack(&info);
+	}
 
 	printk("\n");
 	printk(KERN_CRIT "%s: Code=%d regs=%p (Addr=" RFMT ")\n",
@@ -421,9 +432,16 @@ void parisc_terminate(char *msg, struct pt_regs *regs, int code, unsigned long o
 	 * system will shut down immediately right here. */
 	pdc_soft_power_button(0);
 	
-	/* Gutter the processor! */
-	for(;;)
-	    ;
+	/* Call kernel panic() so reboot timeouts work properly 
+	 * FIXME: This function should be on the list of
+	 * panic notifiers, and we should call panic
+	 * directly from the location that we wish. 
+	 * e.g. We should not call panic from
+	 * parisc_terminate, but rather the oter way around.
+	 * This hack works, prints the panic message twice,
+	 * and it enables reboot timers!
+	 */
+	panic(msg);
 }
 
 void handle_interruption(int code, struct pt_regs *regs)
@@ -437,6 +455,36 @@ void handle_interruption(int code, struct pt_regs *regs)
 	else
 	    local_irq_enable();
 
+	/* Security check:
+	 * If the priority level is still user, and the
+	 * faulting space is not equal to the active space
+	 * then the user is attempting something in a space
+	 * that does not belong to them. Kill the process.
+	 *
+	 * This is normally the situation when the user
+	 * attempts to jump into the kernel space at the
+	 * wrong offset, be it at the gateway page or a
+	 * random location.
+	 *
+	 * We cannot normally signal the process because it
+	 * could *be* on the gateway page, and processes
+	 * executing on the gateway page can't have signals
+	 * delivered.
+	 * 
+	 * We merely readjust the address into the users
+	 * space, at a destination address of zero, and
+	 * allow processing to continue.
+	 */
+	if (((unsigned long)regs->iaoq[0] & 3) &&
+	    ((unsigned long)regs->iasq[0] != (unsigned long)regs->sr[7])) { 
+	  	/* Kill the user process later */
+	  	regs->iaoq[0] = 0 | 3;
+		regs->iaoq[1] = regs->iaoq[0] + 4;
+	 	regs->iasq[0] = regs->iasq[0] = regs->sr[7];
+		regs->gr[0] &= ~PSW_B;
+		return;
+	}
+	
 #if 0
 	printk(KERN_CRIT "Interruption # %d\n", code);
 #endif
@@ -461,7 +509,7 @@ void handle_interruption(int code, struct pt_regs *regs)
 	case  3:
 		/* Recovery counter trap */
 		regs->gr[0] &= ~PSW_R;
-		if (regs->iasq[0])
+		if (user_space(regs))
 			handle_gdb_break(regs, TRAP_TRACE);
 		/* else this must be the start of a syscall - just let it run */
 		return;
@@ -542,12 +590,12 @@ void handle_interruption(int code, struct pt_regs *regs)
 			/* Set to zero, and let the userspace app figure it out from
 		   	   the insn pointed to by si_addr */
 			si.si_code = 0;
-			si.si_addr = (void *) regs->iaoq[0];
+			si.si_addr = (void __user *) regs->iaoq[0];
 			force_sig_info(SIGFPE, &si, current);
 			return;
-		} else 
-			/* The kernel doesn't want to handle condition codes */
-			break;
+		} 
+		/* The kernel doesn't want to handle condition codes */
+		break;
 		
 	case 14:
 		/* Assist Exception Trap, i.e. floating point exception. */
@@ -565,9 +613,16 @@ void handle_interruption(int code, struct pt_regs *regs)
 		/* Fall through */
 	case 17:
 		/* Non-access data TLB miss fault/Non-access data page fault */
-		/* TODO: Still need to add slow path emulation code here */
-		/* TODO: Understand what is meant by the TODO listed
-		         above this one. (Carlos) */
+		/* FIXME: 
+		 	 Still need to add slow path emulation code here!
+		         If the insn used a non-shadow register, then the tlb
+			 handlers could not have their side-effect (e.g. probe
+			 writing to a target register) emulated since rfir would
+			 erase the changes to said register. Instead we have to
+			 setup everything, call this function we are in, and emulate
+			 by hand. Technically we need to emulate:
+			 fdc,fdce,pdc,"fic,4f",prober,probeir,probew, probeiw
+		*/			  
 		fault_address = regs->ior;
 		fault_space = regs->isr;
 		break;
@@ -598,7 +653,7 @@ void handle_interruption(int code, struct pt_regs *regs)
 	case 25:
 		/* Taken branch trap */
 		regs->gr[0] &= ~PSW_T;
-		if (regs->iasq[0])
+		if (user_space(regs))
 			handle_gdb_break(regs, TRAP_BRANCH);
 		/* else this must be the start of a syscall - just let it
 		 * run.

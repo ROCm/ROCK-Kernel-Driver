@@ -771,7 +771,7 @@ static void vga_vesa_blank(struct vga16fb_par *par, int mode)
 	 * <Start of vertical Retrace> to maximum (incl. overflow)
 	 * Result: turn off vertical sync (VSync) pulse.
 	 */
-	if (mode & VESA_VSYNC_SUSPEND) {
+	if (mode & FB_BLANK_VSYNC_SUSPEND) {
 		outb_p(0x10,vga_video_port_reg);	/* StartVertRetrace */
 		outb_p(0xff,vga_video_port_val); 	/* maximum value */
 		outb_p(0x11,vga_video_port_reg);	/* EndVertRetrace */
@@ -780,7 +780,7 @@ static void vga_vesa_blank(struct vga16fb_par *par, int mode)
 		outb_p(par->vga_state.Overflow | 0x84,vga_video_port_val); /* bits 9,10 of vert. retrace */
 	}
 
-	if (mode & VESA_HSYNC_SUSPEND) {
+	if (mode & FB_BLANK_HSYNC_SUSPEND) {
 		/*
 		 * Set <End of horizontal retrace> to minimum (0) and
 		 *  <Start of horizontal Retrace> to maximum
@@ -853,22 +853,21 @@ static int vga16fb_blank(int blank, struct fb_info *info)
 	struct vga16fb_par *par = (struct vga16fb_par *) info->par;
 
 	switch (blank) {
-	case 0:				/* Unblank */
+	case FB_BLANK_UNBLANK:				/* Unblank */
 		if (par->vesa_blanked) {
 			vga_vesa_unblank(par);
 			par->vesa_blanked = 0;
 		}
 		if (par->palette_blanked) {
-			//do_install_cmap(info->currcon, info);
 			par->palette_blanked = 0;
 		}
 		break;
-	case 1:				/* blank */
+	case FB_BLANK_NORMAL:				/* blank */
 		vga_pal_blank();
 		par->palette_blanked = 1;
 		break;
 	default:			/* VESA blanking */
-		vga_vesa_blank(par, blank-1);
+		vga_vesa_blank(par, blank);
 		par->vesa_blanked = 1;
 		break;
 	}

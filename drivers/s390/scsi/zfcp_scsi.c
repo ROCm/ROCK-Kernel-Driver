@@ -32,7 +32,7 @@
 #define ZFCP_LOG_AREA			ZFCP_LOG_AREA_SCSI
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_SCSI_REVISION "$Revision: 1.71 $"
+#define ZFCP_SCSI_REVISION "$Revision: 1.72 $"
 
 #include "zfcp_ext.h"
 
@@ -49,8 +49,8 @@ static int zfcp_task_management_function(struct zfcp_unit *, u8);
 
 static struct zfcp_unit *zfcp_unit_lookup(struct zfcp_adapter *, int, scsi_id_t,
 					  scsi_lun_t);
-static struct zfcp_port * zfcp_port_lookup(struct zfcp_adapter *, int,
-					 scsi_id_t);
+static struct zfcp_port *zfcp_port_lookup(struct zfcp_adapter *, int,
+					  scsi_id_t);
 
 static struct device_attribute *zfcp_sysfs_sdev_attrs[];
 
@@ -402,15 +402,7 @@ zfcp_unit_lookup(struct zfcp_adapter *adapter, int channel, scsi_id_t id,
  out:
 	return retval;
 }
-/*
- * function:    zfcp_unit_tgt_lookup
- *
- * purpose:
- *
- * returns:
- *
- * context:	
- */
+
 static struct zfcp_port *
 zfcp_port_lookup(struct zfcp_adapter *adapter, int channel, scsi_id_t id)
 {
@@ -420,7 +412,7 @@ zfcp_port_lookup(struct zfcp_adapter *adapter, int channel, scsi_id_t id)
 		if (id == port->scsi_id)
 			return port;
 	}
-	return (zfcp_port *)NULL;
+	return (struct zfcp_port *) NULL;
 }
 
 /*
@@ -653,7 +645,7 @@ zfcp_scsi_eh_device_reset_handler(struct scsi_cmnd *scpnt)
 	if (!atomic_test_mask(ZFCP_STATUS_UNIT_NOTSUPPUNITRESET,
 			      &unit->status)) {
 		retval =
-		    zfcp_task_management_function(unit, LOGICAL_UNIT_RESET);
+		    zfcp_task_management_function(unit, FCP_LOGICAL_UNIT_RESET);
 		if (retval) {
 			ZFCP_LOG_DEBUG("unit reset failed (unit=%p)\n", unit);
 			if (retval == -ENOTSUPP)
@@ -669,7 +661,7 @@ zfcp_scsi_eh_device_reset_handler(struct scsi_cmnd *scpnt)
 			goto out;
 		}
 	}
-	retval = zfcp_task_management_function(unit, TARGET_RESET);
+	retval = zfcp_task_management_function(unit, FCP_TARGET_RESET);
 	if (retval) {
 		ZFCP_LOG_DEBUG("target reset failed (unit=%p)\n", unit);
 		retval = FAILED;
@@ -956,3 +948,6 @@ static struct device_attribute *zfcp_sysfs_sdev_attrs[] = {
 };
 
 #undef ZFCP_LOG_AREA
+
+EXPORT_SYMBOL(zfcp_data);
+EXPORT_SYMBOL(zfcp_scsi_command_sync);

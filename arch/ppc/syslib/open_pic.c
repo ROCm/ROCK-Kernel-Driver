@@ -261,6 +261,9 @@ static void openpic_safe_writefield_IPI(volatile u_int *addr, u_int mask, u_int 
 #endif /* CONFIG_SMP */
 
 #ifdef CONFIG_EPIC_SERIAL_MODE
+/* On platforms that may use EPIC serial mode, the default is enabled. */
+int epic_serial_mode = 1;
+
 static void __init openpic_eicr_set_clk(u_int clkval)
 {
 	openpic_writefield(&OpenPIC->Global.Global_Configuration1,
@@ -415,8 +418,10 @@ void __init openpic_init(int offset)
 	openpic_set_spurious(OPENPIC_VEC_SPURIOUS);
 	openpic_disable_8259_pass_through();
 #ifdef CONFIG_EPIC_SERIAL_MODE
-	openpic_eicr_set_clk(7);	/* Slowest value until we know better */
-	openpic_enable_sie();
+	if (epic_serial_mode) {
+		openpic_eicr_set_clk(7);	/* Slowest value until we know better */
+		openpic_enable_sie();
+	}
 #endif
 	openpic_set_priority(0);
 
@@ -681,13 +686,21 @@ openpic_init_nmi_irq(u_int irq)
 /*
  * Hookup a cascade to the OpenPIC.
  */
+
+static struct irqaction openpic_cascade_irqaction = {
+	.handler = no_action,
+	.flags = SA_INTERRUPT,
+	.mask = CPU_MASK_NONE,
+};
+
 void __init
 openpic_hookup_cascade(u_int irq, char *name,
 	int (*cascade_fn)(struct pt_regs *))
 {
 	openpic_cascade_irq = irq;
 	openpic_cascade_fn = cascade_fn;
-	if (request_irq(irq, no_action, SA_INTERRUPT, name, NULL))
+
+	if (setup_irq(irq, &openpic_cascade_irqaction))
 		printk("Unable to get OpenPIC IRQ %d for cascade\n",
 				irq - open_pic_irq_offset);
 }

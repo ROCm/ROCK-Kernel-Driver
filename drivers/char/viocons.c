@@ -784,7 +784,7 @@ static void vioHandleOpenEvent(struct HvLpEvent *event)
 			atomic_set(aptr, 1);
 		} else
 			printk(VIOCONS_KERN_WARN
-			       "wierd...got open ack without atomic\n");
+			       "weird...got open ack without atomic\n");
 		return;
 	}
 

@@ -66,7 +66,6 @@ EXPORT_SYMBOL(kfifo_init);
  */
 struct kfifo *kfifo_alloc(unsigned int size, int gfp_mask, spinlock_t *lock)
 {
-	unsigned int newsize;
 	unsigned char *buffer;
 	struct kfifo *ret;
 
@@ -74,13 +73,12 @@ struct kfifo *kfifo_alloc(unsigned int size, int gfp_mask, spinlock_t *lock)
 	 * round up to the next power of 2, since our 'let the indices
 	 * wrap' tachnique works only in this case.
 	 */
-	newsize = size;
 	if (size & (size - 1)) {
 		BUG_ON(size > 0x80000000);
-		newsize = roundup_pow_of_two(size);
+		size = roundup_pow_of_two(size);
 	}
 
-	buffer = kmalloc(newsize, gfp_mask);
+	buffer = kmalloc(size, gfp_mask);
 	if (!buffer)
 		return ERR_PTR(-ENOMEM);
 

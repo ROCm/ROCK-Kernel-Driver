@@ -16,6 +16,7 @@
 #include <asm/sal.h>
 #include <asm/sn/sn_cpuid.h>
 #include <asm/sn/arch.h>
+#include <asm/sn/geo.h>
 #include <asm/sn/nodepda.h>
 
 // SGI Specific Calls
@@ -314,7 +315,7 @@ ia64_sn_plat_specific_err_print(int (*hook)(const char*, ...), char *rec)
 	ret_stuff.v0 = 0;
 	ret_stuff.v1 = 0;
 	ret_stuff.v2 = 0;
-	SAL_CALL_NOLOCK(ret_stuff, SN_SAL_PRINT_ERROR, (uint64_t)hook, (uint64_t)rec, 0, 0, 0, 0, 0);
+	SAL_CALL_REENTRANT(ret_stuff, SN_SAL_PRINT_ERROR, (uint64_t)hook, (uint64_t)rec, 0, 0, 0, 0, 0);
 
 	return ret_stuff.status;
 }

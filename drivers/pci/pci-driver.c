@@ -271,17 +271,14 @@ static int pci_device_remove(struct device * dev)
 		pci_dev->driver = NULL;
 	}
 
-#ifdef CONFIG_DEBUG_KERNEL
 	/*
-	 * If the driver decides to stop using the device, it should
-	 * call pci_disable_device().
+	 * We would love to complain here if pci_dev->is_enabled is set, that
+	 * the driver should have called pci_disable_device(), but the
+	 * unfortunate fact is there are too many odd BIOS and bridge setups
+	 * that don't like drivers doing that all of the time.  
+	 * Oh well, we can dream of sane hardware when we sleep, no matter how
+	 * horrible the crap we have to deal with is when we are awake...
 	 */
-	if (pci_dev->is_enabled) {
-		dev_warn(&pci_dev->dev, "Device was removed without properly "
-			 "calling pci_disable_device(). This may need fixing.\n");
-		/* WARN_ON(1); */
-	}
-#endif /* CONFIG_DEBUG_KERNEL */
 
 	pci_dev_put(pci_dev);
 	return 0;
@@ -308,8 +305,8 @@ static int pci_device_suspend(struct device * dev, u32 state)
 	dev_state = state_conversion[state];
 	if (drv && drv->suspend)
 		i = drv->suspend(pci_dev, dev_state);
-		
-	pci_save_state(pci_dev);
+	else
+		pci_save_state(pci_dev);
 	return i;
 }
 

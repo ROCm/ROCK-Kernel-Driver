@@ -316,14 +316,14 @@ Amd7930_empty_Dfifo(struct IsdnCardState *cs, int flag)
 								QuickHex(t, cs->rcvbuf, cs->rcvidx);
 								debugl1(cs, cs->dlog);
 							}
-                                                        /* moves recieved data in sk-buffer */
+                                                        /* moves received data in sk-buffer */
 							memcpy(skb_put(skb, cs->rcvidx), cs->rcvbuf, cs->rcvidx);
 							skb_queue_tail(&cs->rq, skb);
 						}
 					}
 
 				}
-                                /* throw damaged packets away, reset recieve-buffer, indicate RX */
+                                /* throw damaged packets away, reset receive-buffer, indicate RX */
 				ptr = cs->rcvbuf;
 				cs->rcvidx = 0;
 				schedule_event(cs, D_RCVBUFREADY);

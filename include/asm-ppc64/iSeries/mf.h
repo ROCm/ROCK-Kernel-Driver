@@ -1,6 +1,7 @@
 /*
  * mf.h
  * Copyright (C) 2001  Troy D. Armstrong IBM Corporation
+ * Copyright (C) 2004  Stephen Rothwell IBM Corporation
  *
  * This modules exists as an interface between a Linux secondary partition
  * running on an iSeries and the primary partition's Virtual Service
@@ -23,48 +24,34 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  */
-#ifndef MF_H_INCLUDED
-#define MF_H_INCLUDED
+#ifndef _ASM_PPC64_ISERIES_MF_H
+#define _ASM_PPC64_ISERIES_MF_H
 
-#include <linux/proc_fs.h>
+#include <linux/types.h>
 
 #include <asm/iSeries/HvTypes.h>
-#include <asm/iSeries/HvLpEvent.h>
+#include <asm/iSeries/HvCallEvent.h>
 
 struct rtc_time;
 
 typedef void (*MFCompleteHandler)(void *clientToken, int returnCode);
 
-extern void mf_allocateLpEvents(HvLpIndex targetLp, HvLpEvent_Type type,
+extern void mf_allocate_lp_events(HvLpIndex targetLp, HvLpEvent_Type type,
 		unsigned size, unsigned amount, MFCompleteHandler hdlr,
 		void *userToken);
-extern void mf_deallocateLpEvents(HvLpIndex targetLp, HvLpEvent_Type type,
+extern void mf_deallocate_lp_events(HvLpIndex targetLp, HvLpEvent_Type type,
 		unsigned count, MFCompleteHandler hdlr, void *userToken);
 
-extern void mf_powerOff(void);
+extern void mf_power_off(void);
 extern void mf_reboot(void);
 
-extern void mf_displaySrc(u32 word);
-extern void mf_displayProgress(u16 value);
-extern void mf_clearSrc(void);
+extern void mf_display_src(u32 word);
+extern void mf_display_progress(u16 value);
+extern void mf_clear_src(void);
 
 extern void mf_init(void);
 
-extern void mf_setSide(char side);
-extern char mf_getSide(void);
+extern int mf_get_rtc(struct rtc_time *tm);
+extern int mf_set_rtc(struct rtc_time *tm);
 
-extern void mf_setCmdLine(const char *cmdline, int size, u64 side);
-extern int  mf_getCmdLine(char *cmdline, int *size, u64 side);
-
-extern void mf_getSrcHistory(char *buffer, int size);
-
-extern int mf_setVmlinuxChunk(const char *buffer, int size, int offset,
-		u64 side);
-extern int mf_getVmlinuxChunk(char *buffer, int *size, int offset, u64 side);
-
-extern int mf_setRtcTime(unsigned long time);
-extern int mf_getRtcTime(unsigned long *time);
-extern int mf_getRtc( struct rtc_time * tm );
-extern int mf_setRtc( struct rtc_time * tm );
-
-#endif /* MF_H_INCLUDED */
+#endif /* _ASM_PPC64_ISERIES_MF_H */

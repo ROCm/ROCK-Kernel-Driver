@@ -1,5 +1,5 @@
 /*
- *  linux/arch/m32r/kernel/io_mappi.c
+ *  linux/arch/m32r/kernel/io_m32700ut.c
  *
  *  Typical I/O routines for M32700UT board.
  *
@@ -32,8 +32,8 @@ extern void pcc_iowrite_byte(int, unsigned long, void *, size_t, size_t, int);
 extern void pcc_iowrite_word(int, unsigned long, void *, size_t, size_t, int);
 #endif /* CONFIG_PCMCIA && CONFIG_M32R_CFC */
 
-#define PORT2ADDR(port)  _port2addr(port)
-#define PORT2ADDR_USB(port) _port2addr_usb(port)
+#define PORT2ADDR(port)	     _port2addr(port)
+#define PORT2ADDR_USB(port)  _port2addr_usb(port)
 
 static __inline__ void *_port2addr(unsigned long port)
 {

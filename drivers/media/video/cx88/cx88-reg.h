@@ -1,5 +1,5 @@
-/* 
-    $Id: cx88-reg.h,v 1.5 2004/09/15 16:15:24 kraxel Exp $
+/*
+    $Id: cx88-reg.h,v 1.6 2004/10/13 10:39:00 kraxel Exp $
 
     cx88x-hw.h - CX2388x register offsets
 
@@ -559,11 +559,11 @@
 /* ---------------------------------------------------------------------- */
 /* various constants                                                      */
 
-#define SEL_BTSC     0x01 
-#define SEL_EIAJ     0x02 
-#define SEL_A2       0x04 
+#define SEL_BTSC     0x01
+#define SEL_EIAJ     0x02
+#define SEL_A2       0x04
 #define SEL_SAP      0x08
-#define SEL_NICAM    0x10 
+#define SEL_NICAM    0x10
 #define SEL_FMRADIO  0x20
 
 // AUD_CTL
@@ -618,7 +618,7 @@
 #define EN_DMTRX_BYPASS         (1 << 11)
 #endif
 
-// Video 
+// Video
 #define VID_CAPTURE_CONTROL		0x310180
 
 #define CX23880_CAP_CTL_CAPTURE_VBI_ODD  (1<<3)
@@ -630,10 +630,10 @@
 #define VideoInputMux1		 0x1
 #define VideoInputMux2		 0x2
 #define VideoInputMux3		 0x3
-#define VideoInputTuner		 0x0 
-#define VideoInputComposite	 0x1 
+#define VideoInputTuner		 0x0
+#define VideoInputComposite	 0x1
 #define VideoInputSVideo	 0x2
-#define VideoInputOther		 0x3 
+#define VideoInputOther		 0x3
 
 #define Xtal0		 0x1
 #define Xtal1		 0x2
@@ -644,12 +644,12 @@
 #define VideoFormatNTSCJapan	 0x2
 #define VideoFormatNTSC443	 0x3
 #define VideoFormatPAL		 0x4
-#define VideoFormatPALB		 0x4 
-#define VideoFormatPALD		 0x4 
-#define VideoFormatPALG		 0x4 
-#define VideoFormatPALH		 0x4 
-#define VideoFormatPALI		 0x4 
-#define VideoFormatPALBDGHI	 0x4 
+#define VideoFormatPALB		 0x4
+#define VideoFormatPALD		 0x4
+#define VideoFormatPALG		 0x4
+#define VideoFormatPALH		 0x4
+#define VideoFormatPALI		 0x4
+#define VideoFormatPALBDGHI	 0x4
 #define VideoFormatPALM		 0x5
 #define VideoFormatPALN		 0x6
 #define VideoFormatPALNC	 0x7
@@ -661,12 +661,12 @@
 #define VideoFormatNTSCJapan27MHz	 0x12
 #define VideoFormatNTSC44327MHz		 0x13
 #define VideoFormatPAL27MHz		 0x14
-#define VideoFormatPALB27MHz		 0x14 
-#define VideoFormatPALD27MHz		 0x14 
-#define VideoFormatPALG27MHz		 0x14 
-#define VideoFormatPALH27MHz		 0x14 
-#define VideoFormatPALI27MHz		 0x14 
-#define VideoFormatPALBDGHI27MHz	 0x14 
+#define VideoFormatPALB27MHz		 0x14
+#define VideoFormatPALD27MHz		 0x14
+#define VideoFormatPALG27MHz		 0x14
+#define VideoFormatPALH27MHz		 0x14
+#define VideoFormatPALI27MHz		 0x14
+#define VideoFormatPALBDGHI27MHz	 0x14
 #define VideoFormatPALM27MHz		 0x15
 #define VideoFormatPALN27MHz		 0x16
 #define VideoFormatPALNC27MHz		 0x17
@@ -745,8 +745,8 @@
 #define CHANNEL_VIP_UP		 0xA
 #define CHANNEL_HOST_DN		 0xB
 #define CHANNEL_HOST_UP		 0xC
-#define CHANNEL_FIRST		 0x1 
-#define CHANNEL_LAST		 0xC 
+#define CHANNEL_FIRST		 0x1
+#define CHANNEL_LAST		 0xC
 
 #define GP_COUNT_CONTROL_NONE		 0x0
 #define GP_COUNT_CONTROL_INC		 0x1
@@ -773,15 +773,15 @@
 #define DEFAULT_SAT_U_NTSC			0x7F
 #define DEFAULT_SAT_V_NTSC			0x5A
 
-typedef enum                                                                          
-{                                                                                     
-	SOURCE_TUNER = 0,                                                             
-	SOURCE_COMPOSITE,                                                             
-	SOURCE_SVIDEO,                                                                
-	SOURCE_OTHER1,                                                                
-	SOURCE_OTHER2,                                                                
-	SOURCE_COMPVIASVIDEO,                                                         
-	SOURCE_CCIR656                                                                    
+typedef enum
+{
+	SOURCE_TUNER = 0,
+	SOURCE_COMPOSITE,
+	SOURCE_SVIDEO,
+	SOURCE_OTHER1,
+	SOURCE_OTHER2,
+	SOURCE_COMPVIASVIDEO,
+	SOURCE_CCIR656
 } VIDEOSOURCETYPE;
 
 #endif /* _CX88_REG_H_ */

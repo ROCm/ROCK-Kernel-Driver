@@ -283,6 +283,29 @@ int sync_page_range(struct inode *inode, struct address_space *mapping,
 }
 EXPORT_SYMBOL(sync_page_range);
 
+/*
+ * Note: Holding i_sem across sync_page_range_nolock is not a good idea
+ * as it forces O_SYNC writers to different parts of the same file
+ * to be serialised right until io completion.
+ */
+int sync_page_range_nolock(struct inode *inode, struct address_space *mapping,
+			loff_t pos, size_t count)
+{
+	pgoff_t start = pos >> PAGE_CACHE_SHIFT;
+	pgoff_t end = (pos + count - 1) >> PAGE_CACHE_SHIFT;
+	int ret;
+
+	if (mapping->backing_dev_info->memory_backed || !count)
+		return 0;
+	ret = filemap_fdatawrite_range(mapping, pos, pos + count - 1);
+	if (ret == 0)
+		ret = generic_osync_inode(inode, mapping, OSYNC_METADATA);
+	if (ret == 0)
+		ret = wait_on_page_writeback_range(mapping, start, end);
+	return ret;
+}
+EXPORT_SYMBOL(sync_page_range_nolock);
+
 /**
  * filemap_fdatawait - walk the list of under-writeback pages of the given
  *     address space and wait for all of them.
@@ -408,9 +431,7 @@ void fastcall unlock_page(struct page *page)
 	smp_mb__after_clear_bit(); 
 	wake_up_page(page, PG_locked);
 }
-
 EXPORT_SYMBOL(unlock_page);
-EXPORT_SYMBOL(lock_page);
 
 /*
  * End writeback against a page.
@@ -420,11 +441,10 @@ void end_page_writeback(struct page *page)
 	if (!TestClearPageReclaim(page) || rotate_reclaimable_page(page)) {
 		if (!test_clear_page_writeback(page))
 			BUG();
-		smp_mb__after_clear_bit();
 	}
+	smp_mb__after_clear_bit();
 	wake_up_page(page, PG_writeback);
 }
-
 EXPORT_SYMBOL(end_page_writeback);
 
 /*
@@ -1829,7 +1849,6 @@ inline int generic_write_checks(struct file *file, loff_t *pos, size_t *count, i
 	}
 	return 0;
 }
-
 EXPORT_SYMBOL(generic_write_checks);
 
 ssize_t
@@ -1867,7 +1886,6 @@ generic_file_direct_write(struct kiocb *iocb, const struct iovec *iov,
 		written = -EIOCBQUEUED;
 	return written;
 }
-
 EXPORT_SYMBOL(generic_file_direct_write);
 
 ssize_t
@@ -1989,11 +2007,10 @@ generic_file_buffered_write(struct kiocb *iocb, const struct iovec *iov,
 	pagevec_lru_add(&lru_pvec);
 	return written ? written : status;
 }
-
 EXPORT_SYMBOL(generic_file_buffered_write);
 
 ssize_t
-generic_file_aio_write_nolock(struct kiocb *iocb, const struct iovec *iov,
+__generic_file_aio_write_nolock(struct kiocb *iocb, const struct iovec *iov,
 				unsigned long nr_segs, loff_t *ppos)
 {
 	struct file *file = iocb->ki_filp;
@@ -2066,8 +2083,43 @@ out:
 	current->backing_dev_info = NULL;
 	return written ? written : err;
 }
-
 EXPORT_SYMBOL(generic_file_aio_write_nolock);
+
+ssize_t
+generic_file_aio_write_nolock(struct kiocb *iocb, const struct iovec *iov,
+				unsigned long nr_segs, loff_t *ppos)
+{
+	struct file *file = iocb->ki_filp;
+	struct address_space *mapping = file->f_mapping;
+	struct inode *inode = mapping->host;
+	ssize_t ret;
+	loff_t pos = *ppos;
+
+	ret = __generic_file_aio_write_nolock(iocb, iov, nr_segs, ppos);
+
+	if (ret > 0 && ((file->f_flags & O_SYNC) || IS_SYNC(inode))) {
+		int err;
+
+		err = sync_page_range_nolock(inode, mapping, pos, ret);
+		if (err < 0)
+			ret = err;
+	}
+	return ret;
+}
+
+ssize_t
+__generic_file_write_nolock(struct file *file, const struct iovec *iov,
+				unsigned long nr_segs, loff_t *ppos)
+{
+	struct kiocb kiocb;
+	ssize_t ret;
+
+	init_sync_kiocb(&kiocb, file);
+	ret = __generic_file_aio_write_nolock(&kiocb, iov, nr_segs, ppos);
+	if (ret == -EIOCBQUEUED)
+		ret = wait_on_sync_kiocb(&kiocb);
+	return ret;
+}
 
 ssize_t
 generic_file_write_nolock(struct file *file, const struct iovec *iov,
@@ -2082,7 +2134,6 @@ generic_file_write_nolock(struct file *file, const struct iovec *iov,
 		ret = wait_on_sync_kiocb(&kiocb);
 	return ret;
 }
-
 EXPORT_SYMBOL(generic_file_write_nolock);
 
 ssize_t generic_file_aio_write(struct kiocb *iocb, const char __user *buf,
@@ -2123,7 +2174,7 @@ ssize_t generic_file_write(struct file *file, const char __user *buf,
 					.iov_len = count };
 
 	down(&inode->i_sem);
-	ret = generic_file_write_nolock(file, &local_iov, 1, ppos);
+	ret = __generic_file_write_nolock(file, &local_iov, 1, ppos);
 	up(&inode->i_sem);
 
 	if (ret > 0 && ((file->f_flags & O_SYNC) || IS_SYNC(inode))) {
@@ -2149,7 +2200,6 @@ ssize_t generic_file_readv(struct file *filp, const struct iovec *iov,
 		ret = wait_on_sync_kiocb(&kiocb);
 	return ret;
 }
-
 EXPORT_SYMBOL(generic_file_readv);
 
 ssize_t generic_file_writev(struct file *file, const struct iovec *iov,
@@ -2160,7 +2210,7 @@ ssize_t generic_file_writev(struct file *file, const struct iovec *iov,
 	ssize_t ret;
 
 	down(&inode->i_sem);
-	ret = generic_file_write_nolock(file, iov, nr_segs, ppos);
+	ret = __generic_file_write_nolock(file, iov, nr_segs, ppos);
 	up(&inode->i_sem);
 
 	if (ret > 0 && ((file->f_flags & O_SYNC) || IS_SYNC(inode))) {
@@ -2172,7 +2222,6 @@ ssize_t generic_file_writev(struct file *file, const struct iovec *iov,
 	}
 	return ret;
 }
-
 EXPORT_SYMBOL(generic_file_writev);
 
 /*
@@ -2195,5 +2244,4 @@ generic_file_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
 	}
 	return retval;
 }
-
 EXPORT_SYMBOL_GPL(generic_file_direct_IO);

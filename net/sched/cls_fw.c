@@ -56,16 +56,16 @@ struct fw_filter
 	struct fw_filter	*next;
 	u32			id;
 	struct tcf_result	res;
-#ifdef CONFIG_NET_CLS_ACT
-       struct tc_action        *action;
 #ifdef CONFIG_NET_CLS_IND
-       char			indev[IFNAMSIZ];
-#endif
-#else
+	char			indev[IFNAMSIZ];
+#endif /* CONFIG_NET_CLS_IND */
+#ifdef CONFIG_NET_CLS_ACT
+	struct tc_action        *action;
+#else /* CONFIG_NET_CLS_ACT */
 #ifdef CONFIG_NET_CLS_POLICE
 	struct tcf_police	*police;
-#endif
-#endif
+#endif /* CONFIG_NET_CLS_POLICE */
+#endif /* CONFIG_NET_CLS_ACT */
 };
 
 static __inline__ int fw_hash(u32 handle)
@@ -84,47 +84,39 @@ static int fw_classify(struct sk_buff *skb, struct tcf_proto *tp,
 	u32 id = 0;
 #endif
 
-	if (head == NULL)
-		goto old_method;
-
-	for (f=head->ht[fw_hash(id)]; f; f=f->next) {
-		if (f->id == id) {
-			*res = f->res;
-#ifdef CONFIG_NET_CLS_ACT
+	if (head != NULL) {
+		for (f=head->ht[fw_hash(id)]; f; f=f->next) {
+			if (f->id == id) {
+				*res = f->res;
 #ifdef CONFIG_NET_CLS_IND
-			if (0 != f->indev[0]) {
-				if  (NULL == skb->input_dev) {
+				if (!tcf_match_indev(skb, f->indev))
 					continue;
-				} else {
-					if (0 != strcmp(f->indev, skb->input_dev->name)) {
-						continue;
-					}
+#endif /* CONFIG_NET_CLS_IND */
+#ifdef CONFIG_NET_CLS_ACT
+				if (f->action) {
+					int act_res = tcf_action_exec(skb, f->action, res);
+					if (act_res >= 0)
+						return act_res;
+					continue;
 				}
-			}
-#endif
-                               if (f->action) {
-                                       int pol_res = tcf_action_exec(skb, f->action, res);
-                                       if (pol_res >= 0)
-                                               return pol_res;
-                               } else
-#else
+#else /* CONFIG_NET_CLS_ACT */
 #ifdef CONFIG_NET_CLS_POLICE
-			if (f->police)
-				return tcf_police(skb, f->police);
-#endif
-#endif
+				if (f->police)
+					return tcf_police(skb, f->police);
+#endif /* CONFIG_NET_CLS_POLICE */
+#endif /* CONFIG_NET_CLS_ACT */
+				return 0;
+			}
+		}
+	} else {
+		/* old method */
+		if (id && (TC_H_MAJ(id) == 0 || !(TC_H_MAJ(id^tp->q->handle)))) {
+			res->classid = id;
+			res->class = 0;
 			return 0;
 		}
 	}
-	return -1;
 
-old_method:
-	if (id && (TC_H_MAJ(id) == 0 ||
-		     !(TC_H_MAJ(id^tp->q->handle)))) {
-		res->classid = id;
-		res->class = 0;
-		return 0;
-	}
 	return -1;
 }
 
@@ -163,20 +155,17 @@ static void fw_destroy(struct tcf_proto *tp)
 
 	for (h=0; h<256; h++) {
 		while ((f=head->ht[h]) != NULL) {
-			unsigned long cl;
 			head->ht[h] = f->next;
-
-			if ((cl = __cls_set_class(&f->res.class, 0)) != 0)
-				tp->q->ops->cl_ops->unbind_tcf(tp->q, cl);
+			tcf_unbind_filter(tp, &f->res);
 #ifdef CONFIG_NET_CLS_ACT
-       if (f->action) {
-               tcf_action_destroy(f->action,TCA_ACT_UNBIND);
-       }
-#else
+			if (f->action)
+				tcf_action_destroy(f->action, TCA_ACT_UNBIND);
+#else /* CONFIG_NET_CLS_ACT */
 #ifdef CONFIG_NET_CLS_POLICE
-			tcf_police_release(f->police,TCA_ACT_UNBIND);
-#endif
-#endif
+			if (f->police)
+				tcf_police_release(f->police, TCA_ACT_UNBIND);
+#endif /* CONFIG_NET_CLS_POLICE */
+#endif /* CONFIG_NET_CLS_ACT */
 
 			kfree(f);
 		}
@@ -195,23 +184,18 @@ static int fw_delete(struct tcf_proto *tp, unsigned long arg)
 
 	for (fp=&head->ht[fw_hash(f->id)]; *fp; fp = &(*fp)->next) {
 		if (*fp == f) {
-			unsigned long cl;
-
 			tcf_tree_lock(tp);
 			*fp = f->next;
 			tcf_tree_unlock(tp);
-
-			if ((cl = cls_set_class(tp, &f->res.class, 0)) != 0)
-				tp->q->ops->cl_ops->unbind_tcf(tp->q, cl);
+			tcf_unbind_filter(tp, &f->res);
 #ifdef CONFIG_NET_CLS_ACT
-       if (f->action) {
-               tcf_action_destroy(f->action,TCA_ACT_UNBIND);
-       }
-#else
+			if (f->action)
+				tcf_action_destroy(f->action,TCA_ACT_UNBIND);
+#else /* CONFIG_NET_CLS_ACT */
 #ifdef CONFIG_NET_CLS_POLICE
 			tcf_police_release(f->police,TCA_ACT_UNBIND);
-#endif
-#endif
+#endif /* CONFIG_NET_CLS_POLICE */
+#endif /* CONFIG_NET_CLS_ACT */
 			kfree(f);
 			return 0;
 		}
@@ -220,21 +204,67 @@ out:
 	return -EINVAL;
 }
 
+static int
+fw_change_attrs(struct tcf_proto *tp, struct fw_filter *f,
+	struct rtattr **tb, struct rtattr **tca, unsigned long base)
+{
+	int err = -EINVAL;
+
+	if (tb[TCA_FW_CLASSID-1]) {
+		if (RTA_PAYLOAD(tb[TCA_FW_CLASSID-1]) != sizeof(u32))
+			goto errout;
+		f->res.classid = *(u32*)RTA_DATA(tb[TCA_FW_CLASSID-1]);
+		tcf_bind_filter(tp, &f->res, base);
+	}
+
+#ifdef CONFIG_NET_CLS_IND
+	if (tb[TCA_FW_INDEV-1]) {
+		err = tcf_change_indev(tp, f->indev, tb[TCA_FW_INDEV-1]);
+		if (err < 0)
+			goto errout;
+	}
+#endif /* CONFIG_NET_CLS_IND */
+
+#ifdef CONFIG_NET_CLS_ACT
+	if (tb[TCA_FW_POLICE-1]) {
+		err = tcf_change_act_police(tp, &f->action, tb[TCA_FW_POLICE-1],
+			tca[TCA_RATE-1]);
+		if (err < 0)
+			goto errout;
+	}
+
+	if (tb[TCA_FW_ACT-1]) {
+		err = tcf_change_act(tp, &f->action, tb[TCA_FW_ACT-1],
+			tca[TCA_RATE-1]);
+		if (err < 0)
+			goto errout;
+	}
+#else /* CONFIG_NET_CLS_ACT */
+#ifdef CONFIG_NET_CLS_POLICE
+	if (tb[TCA_FW_POLICE-1]) {
+		err = tcf_change_police(tp, &f->police, tb[TCA_FW_POLICE-1],
+			tca[TCA_RATE-1]);
+		if (err < 0)
+			goto errout;
+	}
+#endif /* CONFIG_NET_CLS_POLICE */
+#endif /* CONFIG_NET_CLS_ACT */
+
+	err = 0;
+errout:
+	return err;
+}
+
 static int fw_change(struct tcf_proto *tp, unsigned long base,
 		     u32 handle,
 		     struct rtattr **tca,
 		     unsigned long *arg)
 {
 	struct fw_head *head = (struct fw_head*)tp->root;
-	struct fw_filter *f;
+	struct fw_filter *f = (struct fw_filter *) *arg;
 	struct rtattr *opt = tca[TCA_OPTIONS-1];
 	struct rtattr *tb[TCA_FW_MAX];
 	int err;
-#ifdef CONFIG_NET_CLS_ACT
-       struct tc_action *act = NULL;
-       int ret;
-#endif
-
 
 	if (!opt)
 		return handle ? -EINVAL : 0;
@@ -242,85 +272,10 @@ static int fw_change(struct tcf_proto *tp, unsigned long base,
 	if (rtattr_parse(tb, TCA_FW_MAX, RTA_DATA(opt), RTA_PAYLOAD(opt)) < 0)
 		return -EINVAL;
 
-	if ((f = (struct fw_filter*)*arg) != NULL) {
-		/* Node exists: adjust only classid */
-
+	if (f != NULL) {
 		if (f->id != handle && handle)
 			return -EINVAL;
-		if (tb[TCA_FW_CLASSID-1]) {
-			unsigned long cl;
-
-			f->res.classid = *(u32*)RTA_DATA(tb[TCA_FW_CLASSID-1]);
-			cl = tp->q->ops->cl_ops->bind_tcf(tp->q, base, f->res.classid);
-			cl = cls_set_class(tp, &f->res.class, cl);
-			if (cl)
-				tp->q->ops->cl_ops->unbind_tcf(tp->q, cl);
-		}
-#ifdef CONFIG_NET_CLS_ACT
-		if (tb[TCA_FW_POLICE-1]) {
-			act = kmalloc(sizeof(*act),GFP_KERNEL);
-			if (NULL == act)
-				return -ENOMEM;
-
-			memset(act,0,sizeof(*act));
-			ret = tcf_action_init_1(tb[TCA_FW_POLICE-1], tca[TCA_RATE-1] ,act,"police",TCA_ACT_NOREPLACE,TCA_ACT_BIND);
-			if (0 > ret){
-				tcf_action_destroy(act,TCA_ACT_UNBIND);
-				return ret;
-			}
-			act->type = TCA_OLD_COMPAT;
-
-			sch_tree_lock(tp->q);
-			act = xchg(&f->action, act);
-			sch_tree_unlock(tp->q);
-
-			tcf_action_destroy(act,TCA_ACT_UNBIND);
-
-		}
-
-		if(tb[TCA_FW_ACT-1]) {
-			act = kmalloc(sizeof(*act),GFP_KERNEL);
-			if (NULL == act)
-				return -ENOMEM;
-			memset(act,0,sizeof(*act));
-			ret = tcf_action_init(tb[TCA_FW_ACT-1], tca[TCA_RATE-1],act,NULL, TCA_ACT_NOREPLACE,TCA_ACT_BIND);
-			if (0 > ret) {
-				tcf_action_destroy(act,TCA_ACT_UNBIND);
-				return ret;
-			}
-
-			sch_tree_lock(tp->q);
-			act = xchg(&f->action, act);
-			sch_tree_unlock(tp->q);
-
-			tcf_action_destroy(act,TCA_ACT_UNBIND);
-		}
-#ifdef CONFIG_NET_CLS_IND
-		if(tb[TCA_FW_INDEV-1]) {
-			struct rtattr *idev = tb[TCA_FW_INDEV-1];
-			if (RTA_PAYLOAD(idev) >= IFNAMSIZ) {
-				printk("cls_fw: bad indev name %s\n",(char*)RTA_DATA(idev));
-				err = -EINVAL;
-				goto errout;
-			}
-			memset(f->indev,0,IFNAMSIZ);
-			sprintf(f->indev, "%s", (char*)RTA_DATA(idev));
-		}
-#endif
-#else /* only POLICE defined */
-#ifdef CONFIG_NET_CLS_POLICE
-		if (tb[TCA_FW_POLICE-1]) {
-			struct tcf_police *police = tcf_police_locate(tb[TCA_FW_POLICE-1], tca[TCA_RATE-1]);
-
-			tcf_tree_lock(tp);
-			police = xchg(&f->police, police);
-			tcf_tree_unlock(tp);
-
-			tcf_police_release(police,TCA_ACT_UNBIND);
-		}
-#endif
-#endif
-		return 0;
+		return fw_change_attrs(tp, f, tb, tca, base);
 	}
 
 	if (!handle)
@@ -344,45 +299,9 @@ static int fw_change(struct tcf_proto *tp, unsigned long base,
 
 	f->id = handle;
 
-	if (tb[TCA_FW_CLASSID-1]) {
-		err = -EINVAL;
-		if (RTA_PAYLOAD(tb[TCA_FW_CLASSID-1]) != 4)
-			goto errout;
-		f->res.classid = *(u32*)RTA_DATA(tb[TCA_FW_CLASSID-1]);
-		cls_set_class(tp, &f->res.class, tp->q->ops->cl_ops->bind_tcf(tp->q, base, f->res.classid));
-	}
-
-#ifdef CONFIG_NET_CLS_ACT
-	if(tb[TCA_FW_ACT-1]) {
-		act = kmalloc(sizeof(*act),GFP_KERNEL);
-		if (NULL == act)
-			return -ENOMEM;
-		memset(act,0,sizeof(*act));
-		ret = tcf_action_init(tb[TCA_FW_ACT-1], tca[TCA_RATE-1],act,NULL,TCA_ACT_NOREPLACE,TCA_ACT_BIND);
-		if (0 > ret) {
-			tcf_action_destroy(act,TCA_ACT_UNBIND);
-			return ret;
-		}
-		f->action= act;
-	}
-#ifdef CONFIG_NET_CLS_IND
-		if(tb[TCA_FW_INDEV-1]) {
-			struct rtattr *idev = tb[TCA_FW_INDEV-1];
-			if (RTA_PAYLOAD(idev) >= IFNAMSIZ) {
-				printk("cls_fw: bad indev name %s\n",(char*)RTA_DATA(idev));
-				err = -EINVAL;
-				goto errout;
-			}
-			memset(f->indev,0,IFNAMSIZ);
-			sprintf(f->indev, "%s", (char*)RTA_DATA(idev));
-		}
-#endif
-#else
-#ifdef CONFIG_NET_CLS_POLICE
-	if (tb[TCA_FW_POLICE-1])
-		f->police = tcf_police_locate(tb[TCA_FW_POLICE-1], tca[TCA_RATE-1]);
-#endif
-#endif
+	err = fw_change_attrs(tp, f, tb, tca, base);
+	if (err < 0)
+		goto errout;
 
 	f->next = head->ht[fw_hash(handle)];
 	tcf_tree_lock(tp);
@@ -419,7 +338,7 @@ static void fw_walk(struct tcf_proto *tp, struct tcf_walker *arg)
 			}
 			if (arg->fn(tp, (unsigned long)f, arg) < 0) {
 				arg->stop = 1;
-				break;
+				return;
 			}
 			arg->count++;
 		}
@@ -438,15 +357,15 @@ static int fw_dump(struct tcf_proto *tp, unsigned long fh,
 
 	t->tcm_handle = f->id;
 
-       if (!f->res.classid
+	if (!f->res.classid
 #ifdef CONFIG_NET_CLS_ACT
-           && !f->action
+		&& !f->action
 #else
 #ifdef CONFIG_NET_CLS_POLICE
-           && !f->police
+		&& !f->police
 #endif
 #endif
-           )
+		)
 		return skb->len;
 
 	rta = (struct rtattr*)b;
@@ -454,65 +373,33 @@ static int fw_dump(struct tcf_proto *tp, unsigned long fh,
 
 	if (f->res.classid)
 		RTA_PUT(skb, TCA_FW_CLASSID, 4, &f->res.classid);
-#ifdef CONFIG_NET_CLS_ACT
-               /* again for backward compatible mode - we want
-               *  to work with both old and new modes of entering
-               *  tc data even if iproute2  was newer - jhs
-               */
-	if (f->action) {
-		struct rtattr * p_rta = (struct rtattr*)skb->tail;
-
-		if (f->action->type != TCA_OLD_COMPAT) {
-			RTA_PUT(skb, TCA_FW_ACT, 0, NULL);
-			if (tcf_action_dump(skb,f->action,0,0) < 0) {
-				goto rtattr_failure;
-			}
-		} else {
-			RTA_PUT(skb, TCA_FW_POLICE, 0, NULL);
-			if (tcf_action_dump_old(skb,f->action,0,0) < 0) {
-				goto rtattr_failure;
-			}
-		}
-
-		p_rta->rta_len = skb->tail - (u8*)p_rta;
-	}
 #ifdef CONFIG_NET_CLS_IND
-	if(strlen(f->indev)) {
-		struct rtattr * p_rta = (struct rtattr*)skb->tail;
+	if (strlen(f->indev))
 		RTA_PUT(skb, TCA_FW_INDEV, IFNAMSIZ, f->indev);
-		p_rta->rta_len = skb->tail - (u8*)p_rta;
-	}
-#endif
-#else
+#endif /* CONFIG_NET_CLS_IND */
+#ifdef CONFIG_NET_CLS_ACT
+	if (tcf_dump_act(skb, f->action, TCA_FW_ACT, TCA_FW_POLICE) < 0)
+		goto rtattr_failure;
+#else /* CONFIG_NET_CLS_ACT */
 #ifdef CONFIG_NET_CLS_POLICE
-	if (f->police) {
-		struct rtattr * p_rta = (struct rtattr*)skb->tail;
-
-		RTA_PUT(skb, TCA_FW_POLICE, 0, NULL);
-
-		if (tcf_police_dump(skb, f->police) < 0)
-			goto rtattr_failure;
-
-		p_rta->rta_len = skb->tail - (u8*)p_rta;
-	}
-#endif
-#endif
+	if (tcf_dump_police(skb, f->police, TCA_FW_POLICE) < 0)
+		goto rtattr_failure;
+#endif /* CONFIG_NET_CLS_POLICE */
+#endif /* CONFIG_NET_CLS_ACT */
 
 	rta->rta_len = skb->tail - b;
 #ifdef CONFIG_NET_CLS_ACT
-       if (f->action && f->action->type == TCA_OLD_COMPAT) {
-               if (tcf_action_copy_stats(skb,f->action))
-                       goto rtattr_failure;
-       }
-#else
-#ifdef CONFIG_NET_CLS_POLICE
-	if (f->police) {
-		if (qdisc_copy_stats(skb, &f->police->stats,
-				     f->police->stats_lock))
+	if (f->action && f->action->type == TCA_OLD_COMPAT) {
+		if (tcf_action_copy_stats(skb,f->action))
 			goto rtattr_failure;
 	}
-#endif
-#endif
+#else /* CONFIG_NET_CLS_ACT */
+#ifdef CONFIG_NET_CLS_POLICE
+	if (f->police)
+		if (tcf_police_dump_stats(skb, f->police) < 0)
+			goto rtattr_failure;
+#endif /* CONFIG_NET_CLS_POLICE */
+#endif /* CONFIG_NET_CLS_ACT */
 	return skb->len;
 
 rtattr_failure:

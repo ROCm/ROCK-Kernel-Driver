@@ -60,8 +60,8 @@
 
 #define DRV_MODULE_NAME		"tg3"
 #define PFX DRV_MODULE_NAME	": "
-#define DRV_MODULE_VERSION	"3.11"
-#define DRV_MODULE_RELDATE	"October 20, 2004"
+#define DRV_MODULE_VERSION	"3.14"
+#define DRV_MODULE_RELDATE	"November 15, 2004"
 
 #define TG3_DEF_MAC_MODE	0
 #define TG3_DEF_RX_MODE		0
@@ -205,6 +205,14 @@ static struct pci_device_id tg3_pci_tbl[] = {
 	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5751M,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
 	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5751F,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5753,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5753M,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5753F,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5781,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
 	{ PCI_VENDOR_ID_SYSKONNECT, PCI_DEVICE_ID_SYSKONNECT_9DXX,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
@@ -414,6 +422,20 @@ static void tg3_enable_ints(struct tg3 *tp)
 	     (tp->misc_host_ctrl & ~MISC_HOST_CTRL_MASK_PCI_INT));
 	tw32_mailbox(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW, 0x00000000);
 	tr32(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW);
+
+	tg3_cond_int(tp);
+}
+
+/* tg3_restart_ints
+ *  similar to tg3_enable_ints, but it can return without flushing the
+ *  PIO write which reenables interrupts
+ */
+static void tg3_restart_ints(struct tg3 *tp)
+{
+	tw32(TG3PCI_MISC_HOST_CTRL,
+		(tp->misc_host_ctrl & ~MISC_HOST_CTRL_MASK_PCI_INT));
+	tw32_mailbox(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW, 0x00000000);
+	mmiowb();
 
 	tg3_cond_int(tp);
 }
@@ -867,34 +889,54 @@ static void tg3_frob_aux_power(struct tg3 *tp)
 			      GRC_LCLCTRL_GPIO_OUTPUT1));
 			udelay(100);
 		} else {
+			int no_gpio2;
+			u32 grc_local_ctrl;
+
 			if (tp_peer != tp &&
 			    (tp_peer->tg3_flags & TG3_FLAG_INIT_COMPLETE) != 0)
 				return;
 
+			/* On 5753 and variants, GPIO2 cannot be used. */
+			no_gpio2 = (tp->nic_sram_data_cfg &
+				    NIC_SRAM_DATA_CFG_NO_GPIO2) != 0;
+
+			grc_local_ctrl = GRC_LCLCTRL_GPIO_OE0 |
+					 GRC_LCLCTRL_GPIO_OE1 |
+					 GRC_LCLCTRL_GPIO_OE2 |
+					 GRC_LCLCTRL_GPIO_OUTPUT1 |
+					 GRC_LCLCTRL_GPIO_OUTPUT2;
+			if (no_gpio2) {
+				grc_local_ctrl &= ~(GRC_LCLCTRL_GPIO_OE2 |
+						    GRC_LCLCTRL_GPIO_OUTPUT2);
+			}
 			tw32_f(GRC_LOCAL_CTRL, tp->grc_local_ctrl |
-			     (GRC_LCLCTRL_GPIO_OE0 |
-			      GRC_LCLCTRL_GPIO_OE1 |
-			      GRC_LCLCTRL_GPIO_OE2 |
-			      GRC_LCLCTRL_GPIO_OUTPUT1 |
-			      GRC_LCLCTRL_GPIO_OUTPUT2));
+			       grc_local_ctrl);
 			udelay(100);
 
+			grc_local_ctrl = GRC_LCLCTRL_GPIO_OE0 |
+					 GRC_LCLCTRL_GPIO_OE1 |
+					 GRC_LCLCTRL_GPIO_OE2 |
+					 GRC_LCLCTRL_GPIO_OUTPUT0 |
+					 GRC_LCLCTRL_GPIO_OUTPUT1 |
+					 GRC_LCLCTRL_GPIO_OUTPUT2;
+			if (no_gpio2) {
+				grc_local_ctrl &= ~(GRC_LCLCTRL_GPIO_OE2 |
+						    GRC_LCLCTRL_GPIO_OUTPUT2);
+			}
 			tw32_f(GRC_LOCAL_CTRL, tp->grc_local_ctrl |
-			     (GRC_LCLCTRL_GPIO_OE0 |
-			      GRC_LCLCTRL_GPIO_OE1 |
-			      GRC_LCLCTRL_GPIO_OE2 |
-			      GRC_LCLCTRL_GPIO_OUTPUT0 |
-			      GRC_LCLCTRL_GPIO_OUTPUT1 |
-			      GRC_LCLCTRL_GPIO_OUTPUT2));
+			       grc_local_ctrl);
 			udelay(100);
 
-			tw32_f(GRC_LOCAL_CTRL, tp->grc_local_ctrl |
-			     (GRC_LCLCTRL_GPIO_OE0 |
-			      GRC_LCLCTRL_GPIO_OE1 |
-			      GRC_LCLCTRL_GPIO_OE2 |
-			      GRC_LCLCTRL_GPIO_OUTPUT0 |
-			      GRC_LCLCTRL_GPIO_OUTPUT1));
-			udelay(100);
+			grc_local_ctrl = GRC_LCLCTRL_GPIO_OE0 |
+					 GRC_LCLCTRL_GPIO_OE1 |
+					 GRC_LCLCTRL_GPIO_OE2 |
+					 GRC_LCLCTRL_GPIO_OUTPUT0 |
+					 GRC_LCLCTRL_GPIO_OUTPUT1;
+			if (!no_gpio2) {
+				tw32_f(GRC_LOCAL_CTRL, tp->grc_local_ctrl |
+				       grc_local_ctrl);
+				udelay(100);
+			}
 		}
 	} else {
 		if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5700 &&
@@ -2145,7 +2187,16 @@ static int tg3_setup_fiber_hw_autoneg(struct tg3 *tp, u32 mac_status)
 		tp->tg3_flags2 |= TG3_FLG2_PHY_JUST_INITTED;
 	} else if (mac_status & (MAC_STATUS_PCS_SYNCED |
 				 MAC_STATUS_SIGNAL_DET)) {
-		sg_dig_status = tr32(SG_DIG_STATUS);
+		int i;
+
+		/* Giver time to negotiate (~200ms) */
+		for (i = 0; i < 40000; i++) {
+			sg_dig_status = tr32(SG_DIG_STATUS);
+			if (sg_dig_status & (0x3))
+				break;
+			udelay(5);
+		}
+		mac_status = tr32(MAC_STATUS);
 
 		if ((sg_dig_status & (1 << 1)) &&
 		    (mac_status & MAC_STATUS_PCS_SYNCED)) {
@@ -2730,6 +2781,7 @@ next_pkt_nopost:
 		tw32_rx_mbox(MAILBOX_RCV_JUMBO_PROD_IDX + TG3_64BIT_REG_LOW,
 			     sw_idx);
 	}
+	mmiowb();
 
 	return received;
 }
@@ -2788,7 +2840,7 @@ static int tg3_poll(struct net_device *netdev, int *budget)
 	if (done) {
 		spin_lock_irqsave(&tp->lock, flags);
 		__netif_rx_complete(netdev);
-		tg3_enable_ints(tp);
+		tg3_restart_ints(tp);
 		spin_unlock_irqrestore(&tp->lock, flags);
 	}
 
@@ -3177,6 +3229,7 @@ static int tg3_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		netif_stop_queue(dev);
 
 out_unlock:
+    	mmiowb();
 	spin_unlock_irqrestore(&tp->tx_lock, flags);
 
 	dev->trans_start = jiffies;
@@ -7594,7 +7647,8 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 	      tp->pdev->device == PCI_DEVICE_ID_TIGON3_5901_2 ||
 	      tp->pdev->device == PCI_DEVICE_ID_TIGON3_5705F)) ||
 	    (tp->pdev->vendor == PCI_VENDOR_ID_BROADCOM &&
-	     tp->pdev->device == PCI_DEVICE_ID_TIGON3_5751F))
+	     (tp->pdev->device == PCI_DEVICE_ID_TIGON3_5751F ||
+	      tp->pdev->device == PCI_DEVICE_ID_TIGON3_5753F)))
 		tp->tg3_flags |= TG3_FLAG_10_100_ONLY;
 
 	err = tg3_phy_probe(tp);
@@ -7901,7 +7955,8 @@ static int __devinit tg3_test_dma(struct tg3 *tp)
 #endif
 
 	if (tp->tg3_flags2 & TG3_FLG2_PCI_EXPRESS) {
-		tp->dma_rwctrl |= 0x001f0000;
+		/* DMA read watermark not used on PCIE */
+		tp->dma_rwctrl |= 0x00180000;
 	} else if (!(tp->tg3_flags & TG3_FLAG_PCIX_MODE)) {
 		if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705 ||
 		    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5750)
@@ -8224,7 +8279,7 @@ static int __devinit tg3_init_one(struct pci_dev *pdev,
 	spin_lock_init(&tp->indirect_lock);
 	INIT_WORK(&tp->reset_task, tg3_reset_task, tp);
 
-	tp->regs = ioremap(tg3reg_base, tg3reg_len);
+	tp->regs = ioremap_nocache(tg3reg_base, tg3reg_len);
 	if (tp->regs == 0UL) {
 		printk(KERN_ERR PFX "Cannot map device registers, "
 		       "aborting.\n");

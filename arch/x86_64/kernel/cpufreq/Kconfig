@@ -4,18 +4,6 @@
 
 menu "CPU Frequency scaling"
 
-config CPU_FREQ
-	bool "CPU Frequency scaling"
-	help
-	  Clock scaling allows you to change the clock speed of CPUs on the
-	  fly. This is a nice method to save battery power on notebooks,
-	  because the lower the clock speed, the less power the CPU consumes.
-
-	  For more information, take a look at <file:Documentation/cpu-freq/>
-	  or at <http://www.codemonkey.org.uk/projects/cpufreq/>
-
-	  If in doubt, say N.
-
 source "drivers/cpufreq/Kconfig"
 
 config CPU_FREQ_TABLE
@@ -87,6 +75,30 @@ config X86_ACPI_CPUFREQ_PROC_INTF
 	  cross-architecture cpufreq interfaces should be used.
 
 	  If in doubt, say N.
+
+config X86_P4_CLOCKMOD
+	tristate "Intel Pentium 4 clock modulation"
+	depends on CPU_FREQ_TABLE && EMBEDDED
+	help
+	  This adds the clock modulation driver for Intel Pentium 4 / XEON
+	  processors.  When enabled it will lower CPU temperature by skipping
+	  clocks.
+
+	  This driver should be only used in exceptional
+	  circumstances when very low power is needed because it causes severe
+	  slowdowns and noticeable latencies.  Normally Speedstep should be used
+	  instead.
+
+	  For details, take a look at <file:Documentation/cpu-freq/>.
+
+	  Unless you are absolutely sure say N.
+
+
+config X86_SPEEDSTEP_LIB
+        tristate
+        depends on (X86_P4_CLOCKMOD)
+        default (X86_P4_CLOCKMOD)
+
 
 endmenu
 

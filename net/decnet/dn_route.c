@@ -1676,7 +1676,7 @@ static struct dn_route *dn_rt_cache_get_first(struct seq_file *seq)
 		rt = dn_rt_hash_table[s->bucket].chain;
 		if (rt)
 			break;
-		rcu_read_unlock();
+		rcu_read_unlock_bh();
 	}
 	return rt;
 }
@@ -1822,7 +1822,7 @@ void __init dn_route_init(void)
 
 	dn_rt_hash_mask--;
         for(i = 0; i <= dn_rt_hash_mask; i++) {
-                dn_rt_hash_table[i].lock = SPIN_LOCK_UNLOCKED;
+                spin_lock_init(&dn_rt_hash_table[i].lock);
                 dn_rt_hash_table[i].chain = NULL;
         }
 

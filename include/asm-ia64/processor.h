@@ -691,6 +691,8 @@ prefetchw (const void *x)
 
 #define spin_lock_prefetch(x)	prefetchw(x)
 
+extern unsigned long boot_option_idle_override;
+
 #endif /* !__ASSEMBLY__ */
 
 #endif /* _ASM_IA64_PROCESSOR_H */

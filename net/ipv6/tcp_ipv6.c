@@ -262,7 +262,7 @@ static struct sock *tcp_v6_lookup_listener(struct in6_addr *daddr, unsigned shor
 			
 			score = 1;
 			if (!ipv6_addr_any(&np->rcv_saddr)) {
-				if (ipv6_addr_cmp(&np->rcv_saddr, daddr))
+				if (!ipv6_addr_equal(&np->rcv_saddr, daddr))
 					continue;
 				score++;
 			}
@@ -321,8 +321,8 @@ static inline struct sock *__tcp_v6_lookup_established(struct in6_addr *saddr, u
 
 		if(*((__u32 *)&(tw->tw_dport))	== ports	&&
 		   sk->sk_family		== PF_INET6) {
-			if(!ipv6_addr_cmp(&tw->tw_v6_daddr, saddr)	&&
-			   !ipv6_addr_cmp(&tw->tw_v6_rcv_saddr, daddr)	&&
+			if(ipv6_addr_equal(&tw->tw_v6_daddr, saddr)	&&
+			   ipv6_addr_equal(&tw->tw_v6_rcv_saddr, daddr)	&&
 			   (!sk->sk_bound_dev_if || sk->sk_bound_dev_if == dif))
 				goto hit;
 		}
@@ -364,6 +364,8 @@ inline struct sock *tcp_v6_lookup(struct in6_addr *saddr, u16 sport,
 	return sk;
 }
 
+EXPORT_SYMBOL_GPL(tcp_v6_lookup);
+
 
 /*
  * Open request hash tables.
@@ -404,8 +406,8 @@ static struct open_request *tcp_v6_search_req(struct tcp_opt *tp,
 	     prev = &req->dl_next) {
 		if (req->rmt_port == rport &&
 		    req->class->family == AF_INET6 &&
-		    !ipv6_addr_cmp(&req->af.v6_req.rmt_addr, raddr) &&
-		    !ipv6_addr_cmp(&req->af.v6_req.loc_addr, laddr) &&
+		    ipv6_addr_equal(&req->af.v6_req.rmt_addr, raddr) &&
+		    ipv6_addr_equal(&req->af.v6_req.loc_addr, laddr) &&
 		    (!req->af.v6_req.iif || req->af.v6_req.iif == iif)) {
 			BUG_TRAP(req->sk == NULL);
 			*prevp = prev;
@@ -461,8 +463,8 @@ static int tcp_v6_check_established(struct sock *sk)
 
 		if(*((__u32 *)&(tw->tw_dport))	== ports	&&
 		   sk2->sk_family		== PF_INET6	&&
-		   !ipv6_addr_cmp(&tw->tw_v6_daddr, saddr)	&&
-		   !ipv6_addr_cmp(&tw->tw_v6_rcv_saddr, daddr)	&&
+		   ipv6_addr_equal(&tw->tw_v6_daddr, saddr)	&&
+		   ipv6_addr_equal(&tw->tw_v6_rcv_saddr, daddr)	&&
 		   sk2->sk_bound_dev_if == sk->sk_bound_dev_if) {
 			struct tcp_opt *tp = tcp_sk(sk);
 
@@ -608,7 +610,7 @@ static int tcp_v6_connect(struct sock *sk, struct sockaddr *uaddr,
 	}
 
 	if (tp->ts_recent_stamp &&
-	    ipv6_addr_cmp(&np->daddr, &usin->sin6_addr)) {
+	    !ipv6_addr_equal(&np->daddr, &usin->sin6_addr)) {
 		tp->ts_recent = 0;
 		tp->ts_recent_stamp = 0;
 		tp->write_seq = 0;
@@ -2130,6 +2132,7 @@ void tcp6_proc_exit(void)
 
 struct proto tcpv6_prot = {
 	.name			= "TCPv6",
+	.owner			= THIS_MODULE,
 	.close			= tcp_close,
 	.connect		= tcp_v6_connect,
 	.disconnect		= tcp_disconnect,

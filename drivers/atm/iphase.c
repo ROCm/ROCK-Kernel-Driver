@@ -81,14 +81,14 @@ static struct timer_list ia_timer = TIMER_INITIALIZER(ia_led_timer, 0, 0);
 struct atm_vcc *vcc_close_que[100];
 static int IA_TX_BUF = DFL_TX_BUFFERS, IA_TX_BUF_SZ = DFL_TX_BUF_SZ;
 static int IA_RX_BUF = DFL_RX_BUFFERS, IA_RX_BUF_SZ = DFL_RX_BUF_SZ;
-static u32 IADebugFlag = /* IF_IADBG_ERR | IF_IADBG_CBR| IF_IADBG_INIT_ADAPTER
+static uint IADebugFlag = /* IF_IADBG_ERR | IF_IADBG_CBR| IF_IADBG_INIT_ADAPTER
             |IF_IADBG_ABR | IF_IADBG_EVENT*/ 0; 
 
-MODULE_PARM(IA_TX_BUF, "i");
-MODULE_PARM(IA_TX_BUF_SZ, "i");
-MODULE_PARM(IA_RX_BUF, "i");
-MODULE_PARM(IA_RX_BUF_SZ, "i");
-MODULE_PARM(IADebugFlag, "i");
+module_param(IA_TX_BUF, int, 0);
+module_param(IA_TX_BUF_SZ, int, 0);
+module_param(IA_RX_BUF, int, 0);
+module_param(IA_RX_BUF_SZ, int, 0);
+module_param(IADebugFlag, uint, 0644);
 
 MODULE_LICENSE("GPL");
 

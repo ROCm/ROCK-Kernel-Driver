@@ -39,9 +39,6 @@
 #define DBG(x...)
 #endif
 
-extern int pci_probe_only;
-extern int pci_read_irq_line(struct pci_dev *pci_dev);
-
 /* XXX Could be per-controller, but I don't think we risk anything by
  * assuming we won't have both UniNorth and Bandit */
 static int has_uninorth;
@@ -507,7 +504,7 @@ static void __init pmac_process_bridge_OF_ranges(struct pci_controller *hose,
 	dt_ranges = (unsigned int *) get_property(dev, "ranges", &rlen);
 	if (!dt_ranges)
 		return;
-	/*	lc_ranges = (unsigned int *) alloc_bootmem(rlen);*/
+	/*	lc_ranges = alloc_bootmem(rlen);*/
 	lc_ranges = static_lc_ranges;
 	if (!lc_ranges)
 		return; /* what can we do here ? */
@@ -617,15 +614,17 @@ static int __init add_bridge(struct device_node *dev)
        			       dev->full_name);
        	}
 
-       	hose = pci_alloc_pci_controller(phb_type_apple);
-       	if (!hose)
-       		return -ENOMEM;
+	hose = alloc_bootmem(sizeof(struct pci_controller));
+	if (hose == NULL)
+		return -ENOMEM;
+       	pci_setup_pci_controller(hose);
+
        	hose->arch_data = dev;
        	hose->first_busno = bus_range ? bus_range[0] : 0;
        	hose->last_busno = bus_range ? bus_range[1] : 0xff;
 
-	of_prop = (struct property *)alloc_bootmem(sizeof(struct property) +
-			sizeof(hose->global_number));        
+	of_prop = alloc_bootmem(sizeof(struct property) +
+				sizeof(hose->global_number));
 	if (of_prop) {
 		memset(of_prop, 0, sizeof(struct property));
 		of_prop->name = "linux,pci-domain";
@@ -663,7 +662,7 @@ void __init pmac_pcibios_fixup(void)
 {
 	struct pci_dev *dev = NULL;
 
-	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL)
+	for_each_pci_dev(dev)
 		pci_read_irq_line(dev);
 
 	pci_fix_bus_sysdata();

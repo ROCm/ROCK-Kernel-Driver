@@ -55,7 +55,6 @@ EXPORT_SYMBOL(journal_sync_buffer);
 #endif
 EXPORT_SYMBOL(journal_flush);
 EXPORT_SYMBOL(journal_revoke);
-EXPORT_SYMBOL(journal_callback_set);
 
 EXPORT_SYMBOL(journal_init_dev);
 EXPORT_SYMBOL(journal_init_inode);
@@ -79,7 +78,6 @@ EXPORT_SYMBOL(journal_wipe);
 EXPORT_SYMBOL(journal_blocks_per_page);
 EXPORT_SYMBOL(journal_invalidatepage);
 EXPORT_SYMBOL(journal_try_to_free_buffers);
-EXPORT_SYMBOL(journal_bmap);
 EXPORT_SYMBOL(journal_force_commit);
 
 static int journal_convert_superblock_v1(journal_t *, journal_superblock_t *);
@@ -153,6 +151,9 @@ int kjournald(void *arg)
 	spin_lock(&journal->j_state_lock);
 
 loop:
+	if (journal->j_flags & JFS_UNMOUNT)
+		goto end_loop;
+
 	jbd_debug(1, "commit_sequence=%d, commit_request=%d\n",
 		journal->j_commit_sequence, journal->j_commit_request);
 
@@ -162,7 +163,7 @@ loop:
 		del_timer_sync(journal->j_commit_timer);
 		journal_commit_transaction(journal);
 		spin_lock(&journal->j_state_lock);
-		goto end_loop;
+		goto loop;
 	}
 
 	wake_up(&journal->j_wait_done_commit);
@@ -210,10 +211,9 @@ loop:
 		journal->j_commit_request = transaction->t_tid;
 		jbd_debug(1, "woke because of timeout\n");
 	}
-end_loop:
-	if (!(journal->j_flags & JFS_UNMOUNT))
-		goto loop;
+	goto loop;
 
+end_loop:
 	spin_unlock(&journal->j_state_lock);
 	del_timer_sync(journal->j_commit_timer);
 	journal->j_task = NULL;

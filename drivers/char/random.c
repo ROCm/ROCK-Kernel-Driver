@@ -698,7 +698,7 @@ static int __init batch_entropy_init(int size, struct entropy_store *r)
  * hashing calculations during an interrupt in add_timer_randomness().
  * Instead, the entropy is only added to the pool by keventd.
  */
-void batch_entropy_store(u32 a, u32 b, int num)
+static void batch_entropy_store(u32 a, u32 b, int num)
 {
 	int new;
 	unsigned long flags;
@@ -728,8 +728,6 @@ void batch_entropy_store(u32 a, u32 b, int num)
 
 	spin_unlock_irqrestore(&batch_lock, flags);
 }
-
-EXPORT_SYMBOL(batch_entropy_store);
 
 /*
  * Flush out the accumulated entropy operations, adding entropy to the passed
@@ -874,8 +872,6 @@ void add_keyboard_randomness(unsigned char scancode)
 	}
 }
 
-EXPORT_SYMBOL(add_keyboard_randomness);
-
 void add_mouse_randomness(__u32 mouse_data)
 {
 	add_timer_randomness(&mouse_timer_state, mouse_data);
@@ -890,8 +886,6 @@ void add_interrupt_randomness(int irq)
 
 	add_timer_randomness(irq_timer_state[irq], 0x100+irq);
 }
-
-EXPORT_SYMBOL(add_interrupt_randomness);
 
 void add_disk_randomness(struct gendisk *disk)
 {

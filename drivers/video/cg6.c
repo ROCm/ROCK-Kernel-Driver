@@ -456,17 +456,17 @@ cg6_blank(int blank, struct fb_info *info)
 	spin_lock_irqsave(&par->lock, flags);
 
 	switch (blank) {
-	case 0: /* Unblanking */
+	case FB_BLANK_UNBLANK: /* Unblanking */
 		val = sbus_readl(&thc->thc_misc);
 		val |= CG6_THC_MISC_VIDEO;
 		sbus_writel(val, &thc->thc_misc);
 		par->flags &= ~CG6_FLAG_BLANKED;
 		break;
 
-	case 1: /* Normal blanking */
-	case 2: /* VESA blank (vsync off) */
-	case 3: /* VESA blank (hsync off) */
-	case 4: /* Poweroff */
+	case FB_BLANK_NORMAL: /* Normal blanking */
+	case FB_BLANK_VSYNC_SUSPEND: /* VESA blank (vsync off) */
+	case FB_BLANK_HSYNC_SUSPEND: /* VESA blank (hsync off) */
+	case FB_BLANK_POWERDOWN: /* Poweroff */
 		val = sbus_readl(&thc->thc_misc);
 		val &= ~CG6_THC_MISC_VIDEO;
 		sbus_writel(val, &thc->thc_misc);
@@ -723,7 +723,6 @@ static void cg6_init_one(struct sbus_dev *sdev)
 		all->info.screen_base = (char *)
 			sbus_ioremap(&sdev->resource[0], CG6_RAM_OFFSET,
 				     all->par.fbsize, "cgsix ram");
-	all->info.currcon = -1;
 	all->info.par = &all->par;
 
 	all->info.var.accel_flags = FB_ACCELF_TEXT;

@@ -2,7 +2,7 @@
  * amd76xrom.c
  *
  * Normal mappings of chips in physical memory
- * $Id: amd76xrom.c,v 1.17 2004/09/18 01:59:56 eric Exp $
+ * $Id: amd76xrom.c,v 1.18 2004/11/16 18:29:02 dwmw2 Exp $
  */
 
 #include <linux/module.h>
@@ -298,7 +298,7 @@ static struct pci_driver amd76xrom_driver = {
 };
 #endif
 
-int __init init_amd76xrom(void)
+static int __init init_amd76xrom(void)
 {
 	struct pci_dev *pdev;
 	struct pci_device_id *id;

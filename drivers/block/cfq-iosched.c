@@ -1920,7 +1920,7 @@ int cfq_init(void)
 	return ret;
 }
 
-void cfq_exit(void)
+static void __exit cfq_exit(void)
 {
 	cfq_slab_kill();
 	elv_unregister(&iosched_cfq);

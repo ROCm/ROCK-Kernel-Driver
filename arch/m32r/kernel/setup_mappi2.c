@@ -151,7 +151,6 @@ void __init init_IRQ(void)
 	disable_mappi2_irq(M32R_IRQ_INT1);
 #endif /* CONFIG_USB */
 
-#if defined(CONFIG_M32R_CFC)
 	/* ICUCR40: CFC IREQ */
 	irq_desc[PLD_IRQ_CFIREQ].status = IRQ_DISABLED;
 	irq_desc[PLD_IRQ_CFIREQ].handler = &mappi2_irq_type;
@@ -161,6 +160,7 @@ void __init init_IRQ(void)
 	icu_data[PLD_IRQ_CFIREQ].icucr = M32R_ICUCR_IEN|M32R_ICUCR_ISMOD01;
 	disable_mappi2_irq(PLD_IRQ_CFIREQ);
 
+#if defined(CONFIG_M32R_CFC)
 	/* ICUCR41: CFC Insert */
 	irq_desc[PLD_IRQ_CFC_INSERT].status = IRQ_DISABLED;
 	irq_desc[PLD_IRQ_CFC_INSERT].handler = &mappi2_irq_type;

@@ -8,7 +8,7 @@
 
 
 /*** Version/name ***/
-#define INTELFB_VERSION			"0.9.0"
+#define INTELFB_VERSION			"0.9.2"
 #define INTELFB_MODULE_NAME		"intelfb"
 #define SUPPORTED_CHIPSETS		"830M/845G/852GM/855GM/865G"
 
@@ -33,14 +33,6 @@
 
 #ifndef ALLOCATE_FOR_PANNING
 #define ALLOCATE_FOR_PANNING		1
-#endif
-
-#ifndef BAILOUT_EARLY
-#define BAILOUT_EARLY			0
-#endif
-
-#ifndef TEST_MODE_TO_HW
-#define TEST_MODE_TO_HW			0
 #endif
 
 #ifndef PREFERRED_MODE
@@ -94,21 +86,10 @@
 /* get commonly used pointers */
 #define GET_DINFO(info)		(info)->par
 
-/* module parameters */
-#define INTELFB_INT_PARAM(name, default, desc)				\
-	static int name = default;					\
-	module_param(name, int, default);			        \
-	MODULE_PARM_DESC(name, desc);
-
-#define INTELFB_STR_PARAM(name, default, desc)				\
-	static char *name = (char *) default;				\
-	module_param(name, charp, default);		                \
-	MODULE_PARM_DESC(name, desc);
-
 /* misc macros */
-#define TEXT_ACCEL(d, v)						\
-	((d)->accel && (d)->ring_active &&				\
-	 ((v)->accel_flags & FB_ACCELF_TEXT))
+#define ACCEL(d, i)                                                     \
+	((d)->accel && !(d)->ring_lockup &&                             \
+	 ((i)->var.accel_flags & FB_ACCELF_TEXT))
 
 /*#define NOACCEL_CHIPSET(d)						\
 	((d)->chipset != INTEL_865G)*/
@@ -205,7 +186,7 @@ struct intelfb_hwstate {
 
 struct intelfb_heap_data {
 	u32 physical;
-	u32 __iomem *virtual;
+	u8 __iomem *virtual;
 	u32 offset;  // in GATT pages
 	u32 size;    // in bytes
 };
@@ -218,9 +199,12 @@ struct intelfb_info {
 	struct intelfb_hwstate save_state;
 
 	/* agpgart structs */
-	struct agp_memory *gtt_fb_mem;     // use all stolen memory
+	struct agp_memory *gtt_fb_mem;     // use all stolen memory or vram
 	struct agp_memory *gtt_ring_mem;   // ring buffer
 	struct agp_memory *gtt_cursor_mem; // hw cursor
+
+	/* use a gart reserved fb mem */
+	u8 fbmem_gart;
 
 	/* mtrr support */
 	u32 mtrr_reg;
@@ -234,13 +218,13 @@ struct intelfb_info {
 
 	/* mmio regs */
 	u32 mmio_base_phys;
-	u32 __iomem *mmio_base;
+	u8 __iomem *mmio_base;
 
 	/* fb start offset (in bytes) */
 	u32 fb_start;
 
 	/* ring buffer */
-	u32 __iomem *ring_head;
+	u8 __iomem *ring_head;
 	u32 ring_tail;
 	u32 ring_tail_mask;
 	u32 ring_space;

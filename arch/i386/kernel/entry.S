@@ -131,7 +131,7 @@ VM_MASK		= 0x00020000
 	movl $(__USER_DS), %edx; \
 	movl %edx, %ds; \
 	movl %edx, %es; \
-	pushl $11;	\
+	movl $11,%eax;	\
 	call do_exit;	\
 .previous;		\
 .section __ex_table,"a";\
@@ -291,8 +291,8 @@ work_notifysig:				# deal with pending signals and
 
 	ALIGN
 work_notifysig_v86:
-	pushl %ecx
-	call save_v86_state
+	pushl %ecx			# save ti_flags for do_notify_resume
+	call save_v86_state		# %eax contains pt_regs pointer
 	popl %ecx
 	movl %eax, %esp
 	xorl %edx, %edx
@@ -359,6 +359,7 @@ vector=vector+1
 	ALIGN
 common_interrupt:
 	SAVE_ALL
+	movl %esp,%eax
 	call do_IRQ
 	jmp ret_from_intr
 
@@ -366,7 +367,8 @@ common_interrupt:
 ENTRY(name)				\
 	pushl $nr-256;			\
 	SAVE_ALL			\
-	call smp_/**/name;	\
+	movl %esp,%eax;			\
+	call smp_/**/name;		\
 	jmp ret_from_intr;
 
 /* The include is where all of the SMP etc. interrupts come from */
@@ -389,18 +391,15 @@ error_code:
 	pushl %ebx
 	cld
 	movl %es, %ecx
-	movl ORIG_EAX(%esp), %esi	# get the error code
 	movl ES(%esp), %edi		# get the function address
+	movl ORIG_EAX(%esp), %edx	# get the error code
 	movl %eax, ORIG_EAX(%esp)
 	movl %ecx, ES(%esp)
-	movl %esp, %edx
-	pushl %esi			# push the error code
-	pushl %edx			# push the pt_regs pointer
-	movl $(__USER_DS), %edx
-	movl %edx, %ds
-	movl %edx, %es
+	movl $(__USER_DS), %ecx
+	movl %ecx, %ds
+	movl %ecx, %es
+	movl %esp,%eax			# pt_regs pointer
 	call *%edi
-	addl $8, %esp
 	jmp ret_from_exception
 
 ENTRY(coprocessor_error)
@@ -457,11 +456,9 @@ ENTRY(debug)
 debug_stack_correct:
 	pushl $-1			# mark this as an int
 	SAVE_ALL
-	movl %esp,%edx
-  	pushl $0
-	pushl %edx
+	xorl %edx,%edx			# error code 0
+	movl %esp,%eax			# pt_regs pointer
 	call do_debug
-	addl $8,%esp
 	testl %eax,%eax
 	jnz restore_all
 	jmp ret_from_exception
@@ -491,11 +488,9 @@ ENTRY(nmi)
 nmi_stack_correct:
 	pushl %eax
 	SAVE_ALL
-	movl %esp, %edx
-	pushl $0
-	pushl %edx
+	xorl %edx,%edx		# zero error code
+	movl %esp,%eax		# pt_regs pointer
 	call do_nmi
-	addl $8, %esp
 	RESTORE_ALL
 
 nmi_stack_fixup:
@@ -515,11 +510,9 @@ nmi_debug_stack_fixup:
 ENTRY(int3)
 	pushl $-1			# mark this as an int
 	SAVE_ALL
-	movl %esp,%edx
-	pushl $0
-	pushl %edx
+	xorl %edx,%edx		# zero error code
+	movl %esp,%eax		# pt_regs pointer
 	call do_int3
-	addl $8,%esp
 	testl %eax,%eax
 	jnz restore_all
 	jmp ret_from_exception

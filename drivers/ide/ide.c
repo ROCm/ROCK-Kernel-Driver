@@ -335,11 +335,16 @@ static void __init init_ide_data (void)
 
 int ide_system_bus_speed (void)
 {
+	static struct pci_device_id pci_default[] = {
+		{ PCI_DEVICE(PCI_ANY_ID, PCI_ANY_ID) },
+		{ }
+	};
+
 	if (!system_bus_speed) {
 		if (idebus_parameter) {
 			/* user supplied value */
 			system_bus_speed = idebus_parameter;
-		} else if (pci_find_device(PCI_ANY_ID, PCI_ANY_ID, NULL) != NULL) {
+		} else if (pci_dev_present(pci_default)) {
 			/* safe default value for PCI */
 			system_bus_speed = 33;
 		} else {
@@ -985,9 +990,10 @@ void ide_setup_ports (	hw_regs_t *hw,
 }
 
 /**
- *	ide_register_hw		-	register IDE interface
+ *	ide_register_hw_with_fixup	-	register IDE interface
  *	@hw: hardware registers
  *	@hwifp: pointer to returned hwif
+ *	@fixup: fixup function
  *
  *	Register an IDE interface, specifying exactly the registers etc.
  *	Set init=1 iff calling before probes have taken place.
@@ -995,7 +1001,7 @@ void ide_setup_ports (	hw_regs_t *hw,
  *	Returns -1 on error.
  */
 
-int ide_register_hw (hw_regs_t *hw, ide_hwif_t **hwifp)
+int ide_register_hw_with_fixup(hw_regs_t *hw, ide_hwif_t **hwifp, void(*fixup)(ide_hwif_t *hwif))
 {
 	int index, retry = 1;
 	ide_hwif_t *hwif;
@@ -1034,7 +1040,7 @@ found:
 	hwif->chipset = hw->chipset;
 
 	if (!initializing) {
-		probe_hwif_init(hwif);
+		probe_hwif_init_with_fixup(hwif, fixup);
 		create_proc_ide_interfaces();
 	}
 
@@ -1042,6 +1048,13 @@ found:
 		*hwifp = hwif;
 
 	return (initializing || hwif->present) ? index : -1;
+}
+
+EXPORT_SYMBOL(ide_register_hw_with_fixup);
+
+int ide_register_hw(hw_regs_t *hw, ide_hwif_t **hwifp)
+{
+	return ide_register_hw_with_fixup(hw, hwifp, NULL);
 }
 
 EXPORT_SYMBOL(ide_register_hw);
@@ -1833,7 +1846,7 @@ int __init ide_setup (char *s)
 #endif /* CONFIG_BLK_DEV_IDEDOUBLER */
 
 	if (!strcmp(s, "ide=nodma")) {
-		printk("IDE: Prevented DMA\n");
+		printk(" : Prevented DMA\n");
 		noautodma = 1;
 		return 1;
 	}
@@ -1882,10 +1895,10 @@ int __init ide_setup (char *s)
 				goto do_serialize;
 			case -6: /* "autotune" */
 				drive->autotune = IDE_TUNE_AUTO;
-				goto done;
+				goto obsolete_option;
 			case -7: /* "noautotune" */
 				drive->autotune = IDE_TUNE_NOAUTO;
-				goto done;
+				goto obsolete_option;
 			case -9: /* "swapdata" */
 			case -10: /* "bswap" */
 				drive->bswap = 1;
@@ -2017,30 +2030,30 @@ int __init ide_setup (char *s)
 			case -7: /* ata66 */
 #ifdef CONFIG_BLK_DEV_IDEPCI
 				hwif->udma_four = 1;
-				goto done;
+				goto obsolete_option;
 #else
 				goto bad_hwif;
 #endif
 			case -6: /* dma */
 				hwif->autodma = 1;
-				goto done;
+				goto obsolete_option;
 			case -5: /* "reset" */
 				hwif->reset = 1;
-				goto done;
+				goto obsolete_option;
 			case -4: /* "noautotune" */
 				hwif->drives[0].autotune = IDE_TUNE_NOAUTO;
 				hwif->drives[1].autotune = IDE_TUNE_NOAUTO;
-				goto done;
+				goto obsolete_option;
 			case -3: /* "autotune" */
 				hwif->drives[0].autotune = IDE_TUNE_AUTO;
 				hwif->drives[1].autotune = IDE_TUNE_AUTO;
-				goto done;
+				goto obsolete_option;
 			case -2: /* "serialize" */
 			do_serialize:
 				hwif->mate = &ide_hwifs[hw^1];
 				hwif->mate->mate = hwif;
 				hwif->serialized = hwif->mate->serialized = 1;
-				goto done;
+				goto obsolete_option;
 
 			case -1: /* "noprobe" */
 				hwif->noprobe = 1;
@@ -2057,7 +2070,7 @@ int __init ide_setup (char *s)
 				hwif->irq      = vals[2];
 				hwif->noprobe  = 0;
 				hwif->chipset  = ide_forced;
-				goto done;
+				goto obsolete_option;
 
 			case 0: goto bad_option;
 			default:
@@ -2067,6 +2080,9 @@ int __init ide_setup (char *s)
 	}
 bad_option:
 	printk(" -- BAD OPTION\n");
+	return 1;
+obsolete_option:
+	printk(" -- OBSOLETE OPTION, WILL BE REMOVED SOON!\n");
 	return 1;
 bad_hwif:
 	printk("-- NOT SUPPORTED ON ide%d", hw);
@@ -2458,7 +2474,7 @@ int __init ide_init (void)
 
 #ifdef MODULE
 char *options = NULL;
-MODULE_PARM(options,"s");
+module_param(options, charp, 0);
 MODULE_LICENSE("GPL");
 
 static void __init parse_options (char *line)

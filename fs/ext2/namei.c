@@ -2,7 +2,8 @@
  * linux/fs/ext2/namei.c
  *
  * Rewrite to pagecache. Almost all code had been changed, so blame me
- * if the things go wrong. Please, send bug reports to viro@math.psu.edu
+ * if the things go wrong. Please, send bug reports to
+ * viro@parcelfarce.linux.theplanet.co.uk
  *
  * Stuff here is basically a glue between the VFS and generic UNIXish
  * filesystem that keeps everything in pagecache. All knowledge of the

@@ -145,13 +145,13 @@ static void __init ocotea_set_emacdata(void)
 }
 
 #define PCIX_READW(offset) \
-	(readw((u32)pcix_reg_base+offset))
+	(readw(pcix_reg_base+offset))
 
 #define PCIX_WRITEW(value, offset) \
-	(writew(value, (u32)pcix_reg_base+offset))
+	(writew(value, pcix_reg_base+offset))
 
 #define PCIX_WRITEL(value, offset) \
-	(writel(value, (u32)pcix_reg_base+offset))
+	(writel(value, pcix_reg_base+offset))
 
 /*
  * FIXME: This is only here to "make it work".  This will move
@@ -291,14 +291,6 @@ ocotea_setup_arch(void)
 
 	ibm440gx_tah_enable();
 
-#if !defined(CONFIG_BDI_SWITCH)
-	/*
-	 * The Abatron BDI JTAG debugger does not tolerate others
-	 * mucking with the debug registers.
-	 */
-        mtspr(SPRN_DBCR0, (DBCR0_TDE | DBCR0_IDM));
-#endif
-
 	/* Setup TODC access */
 	TODC_INIT(TODC_TYPE_DS1743,
 			0,
@@ -329,6 +321,11 @@ ocotea_setup_arch(void)
 	printk("IBM Ocotea port (MontaVista Software, Inc. <source@mvista.com>)\n");
 }
 
+static void __init ocotea_init(void)
+{
+	ibm440gx_l2c_setup(&clocks);
+}
+
 void __init platform_init(unsigned long r3, unsigned long r4,
 		unsigned long r5, unsigned long r6, unsigned long r7)
 {
@@ -350,12 +347,11 @@ void __init platform_init(unsigned long r3, unsigned long r4,
 	ibm440gx_get_clocks(&clocks, 33333333, 6 * 1843200);
 	ocp_sys_info.opb_bus_freq = clocks.opb;
 
-	/*
-	 * Always disable L2 cache. All revs/speeds of silicon
-	 * have parity error problems despite errata claims to
-	 * the contrary.
+	/* XXX Fix L2C IRQ triggerring setting (edge-sensitive).
+	 * Firmware (at least PIBS v1.72 OCT/28/2003) sets it incorrectly
+	 * --ebs
 	 */
-	ibm440gx_l2c_disable();
+	mtdcr(DCRN_UIC_TR(UIC2), mfdcr(DCRN_UIC_TR(UIC2)) | 0x00000100);
 
 	ibm44x_platform_init();
 
@@ -373,4 +369,5 @@ void __init platform_init(unsigned long r3, unsigned long r4,
 #ifdef CONFIG_KGDB
 	ppc_md.early_serial_map = ocotea_early_serial_map;
 #endif
+	ppc_md.init = ocotea_init;
 }

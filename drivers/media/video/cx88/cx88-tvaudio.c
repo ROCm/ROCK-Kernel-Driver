@@ -1,5 +1,5 @@
 /*
-    $Id: cx88-tvaudio.c,v 1.22 2004/10/11 13:45:51 kraxel Exp $
+    $Id: cx88-tvaudio.c,v 1.24 2004/10/25 11:51:00 kraxel Exp $
 
     cx88x-audio.c - Conexant CX23880/23881 audio downstream driver driver
 
@@ -18,9 +18,9 @@
 
     Some comes from the dscaler sources, one of the dscaler driver guy works
     for Conexant ...
-    
+
     -----------------------------------------------------------------------
-    
+
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation; either version 2 of the License, or
@@ -338,7 +338,7 @@ static void set_audio_standard_NICAM(struct cx88_core *core)
 
 static void set_audio_standard_NICAM_L(struct cx88_core *core)
 {
-	/* This is officially wierd.. register dumps indicate windows
+	/* This is officially weird.. register dumps indicate windows
 	 * uses audio mode 4.. A2. Let's operate and find out. */
 
 	static const struct rlist nicam_l[] = {
@@ -553,6 +553,13 @@ static void set_audio_standard_A2(struct cx88_core *core)
 	set_audio_start(core, 0x0004, EN_DMTRX_SUMDIFF | EN_A2_AUTO_STEREO);
 	set_audio_registers(core, a2_common);
 	switch (core->tvaudio) {
+	case WW_NICAM_I:
+		/* gives at least mono according to the dscaler guys */
+		/* so use use that while nicam is broken ...         */
+		dprintk("%s PAL-I mono (status: unknown)\n",__FUNCTION__);
+		set_audio_registers(core, a2_table1);
+		cx_write(AUD_CTL, EN_A2_FORCE_MONO1);
+		break;
 	case WW_A2_BG:
 		dprintk("%s PAL-BG A2 (status: known-good)\n",__FUNCTION__);
 		set_audio_registers(core, a2_table1);
@@ -601,7 +608,7 @@ static void set_audio_standard_FM(struct cx88_core *core)
 			cx_write(AUD_DEEMPH1_B0, 0x1C29);
 			cx_write(AUD_DEEMPH1_A1, 0x3FC66);
 			cx_write(AUD_DEEMPH1_B1, 0x399A);
-			
+
 			break;
 
 		case WW_FM_DEEMPH_75:
@@ -639,10 +646,11 @@ void cx88_set_tvaudio(struct cx88_core *core)
 	case WW_BTSC:
 		set_audio_standard_BTSC(core,0);
 		break;
-	case WW_NICAM_I:
+	// case WW_NICAM_I:
 	case WW_NICAM_BGDKL:
 		set_audio_standard_NICAM(core);
 		break;
+	case WW_NICAM_I:
 	case WW_A2_BG:
 	case WW_A2_DK:
 	case WW_A2_M:
@@ -750,7 +758,7 @@ void cx88_set_stereo(struct cx88_core *core, u32 mode)
 	case WW_A2_DK:
 	case WW_A2_M:
 		switch (mode) {
-		case V4L2_TUNER_MODE_MONO:   
+		case V4L2_TUNER_MODE_MONO:
 		case V4L2_TUNER_MODE_LANG1:
 			ctl  = EN_A2_FORCE_MONO1;
 			mask = 0x3f;
@@ -767,7 +775,7 @@ void cx88_set_stereo(struct cx88_core *core, u32 mode)
 		break;
 	case WW_NICAM_BGDKL:
 		switch (mode) {
-		case V4L2_TUNER_MODE_MONO:   
+		case V4L2_TUNER_MODE_MONO:
 			ctl  = EN_NICAM_FORCE_MONO1;
 			mask = 0x3f;
 			break;
@@ -780,10 +788,10 @@ void cx88_set_stereo(struct cx88_core *core, u32 mode)
 			mask = 0x93f;
 			break;
 		}
-		break;	
+		break;
 	case WW_FM:
 		switch (mode) {
-		case V4L2_TUNER_MODE_MONO:   
+		case V4L2_TUNER_MODE_MONO:
 			ctl  = EN_FMRADIO_FORCE_MONO;
 			mask = 0x3f;
 			break;
@@ -792,7 +800,7 @@ void cx88_set_stereo(struct cx88_core *core, u32 mode)
 			mask = 0x3f;
 			break;
 		}
-		break;	
+		break;
 	}
 
 	if (UNSET != ctl) {

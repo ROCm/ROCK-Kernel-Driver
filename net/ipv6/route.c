@@ -979,9 +979,9 @@ int ip6_del_rt(struct rt6_info *rt, struct nlmsghdr *nlh, void *_rtattr)
 
 	rt6_reset_dflt_pointer(NULL);
 
+	err = fib6_del(rt, nlh, _rtattr);
 	dst_release(&rt->u.dst);
 
-	err = fib6_del(rt, nlh, _rtattr);
 	write_unlock_bh(&rt6_lock);
 
 	return err;
@@ -1006,7 +1006,7 @@ static int ip6_route_del(struct in6_rtmsg *rtmsg, struct nlmsghdr *nlh, void *_r
 			     rt->rt6i_dev->ifindex != rtmsg->rtmsg_ifindex))
 				continue;
 			if (rtmsg->rtmsg_flags&RTF_GATEWAY &&
-			    ipv6_addr_cmp(&rtmsg->rtmsg_gateway, &rt->rt6i_gateway))
+			    !ipv6_addr_equal(&rtmsg->rtmsg_gateway, &rt->rt6i_gateway))
 				continue;
 			if (rtmsg->rtmsg_metric &&
 			    rtmsg->rtmsg_metric != rt->rt6i_metric)
@@ -1057,13 +1057,13 @@ void rt6_redirect(struct in6_addr *dest, struct in6_addr *saddr,
 	 *	is a bit fuzzy and one might need to check all default
 	 *	routers.
 	 */
-	if (ipv6_addr_cmp(saddr, &rt->rt6i_gateway)) {
+	if (!ipv6_addr_equal(saddr, &rt->rt6i_gateway)) {
 		if (rt->rt6i_flags & RTF_DEFAULT) {
 			struct rt6_info *rt1;
 
 			read_lock(&rt6_lock);
 			for (rt1 = ip6_routing_table.leaf; rt1; rt1 = rt1->u.next) {
-				if (!ipv6_addr_cmp(saddr, &rt1->rt6i_gateway)) {
+				if (ipv6_addr_equal(saddr, &rt1->rt6i_gateway)) {
 					dst_hold(&rt1->u.dst);
 					dst_release(&rt->u.dst);
 					read_unlock(&rt6_lock);
@@ -1262,7 +1262,7 @@ struct rt6_info *rt6_get_dflt_router(struct in6_addr *addr, struct net_device *d
 	write_lock_bh(&rt6_lock);
 	for (rt = fn->leaf; rt; rt=rt->u.next) {
 		if (dev == rt->rt6i_dev &&
-		    ipv6_addr_cmp(&rt->rt6i_gateway, addr) == 0)
+		    ipv6_addr_equal(&rt->rt6i_gateway, addr))
 			break;
 	}
 	if (rt)

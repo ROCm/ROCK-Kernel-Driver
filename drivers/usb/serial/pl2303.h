@@ -9,7 +9,8 @@
  */
 #define PL2303_VENDOR_ID	0x067b
 #define PL2303_PRODUCT_ID	0x2303
-#define PL2303_PRODUCT_ID_RSAQ2	0x04bb
+#define PL2303_PRODUCT_ID_RSAQ2		0x04bb
+#define PL2303_PRODUCT_ID_PHAROS	0xaaa0
 
 #define ATEN_VENDOR_ID		0x0557
 #define ATEN_VENDOR_ID2		0x0547
@@ -47,9 +48,8 @@
 #define ALCATEL_PRODUCT_ID	0x02df
 
 /* Samsung I330 phone cradle */
-#define SAMSUNG_VENDOR_ID       0x04e8
-#define SAMSUNG_PRODUCT_ID      0x8001
+#define SAMSUNG_VENDOR_ID	0x04e8
+#define SAMSUNG_PRODUCT_ID	0x8001
 
-/* Pharos / Microsoft GPS puck */
-#define PHAROS_VENDOR_ID       0x067b
-#define PHAROS_PRODUCT_ID      0xaaa0
+#define SIEMENS_VENDOR_ID	0x11f5
+#define SIEMENS_PRODUCT_ID_X65	0x0003

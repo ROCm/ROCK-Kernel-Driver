@@ -1314,6 +1314,10 @@ shmem_get_inode(struct super_block *sb, int mode, dev_t dev)
 		case S_IFLNK:
 			break;
 		}
+	} else if (sbinfo) {
+		spin_lock(&sbinfo->stat_lock);
+		sbinfo->free_inodes++;
+		spin_unlock(&sbinfo->stat_lock);
 	}
 	return inode;
 }
@@ -1986,6 +1990,8 @@ static int shmem_fill_super(struct super_block *sb,
 		sbinfo->free_inodes = inodes;
 	}
 	sb->s_xattr = shmem_xattr_handlers;
+#else
+	sb->s_flags |= MS_NOUSER;
 #endif
 
 	sb->s_maxbytes = SHMEM_MAX_BYTES;

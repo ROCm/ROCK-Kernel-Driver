@@ -211,6 +211,62 @@ ZyXEL omni.net lcd plus ISDN TA
   azummo@towertech.it
 
 
+Cypress M8 CY4601 Family Serial Driver
+
+  This driver was in most part developed by Neil "koyama" Whelchel.  It
+  has been improved since that previous form to support dynamic serial
+  line settings and improved line handling.  The driver is for the most
+  part stable and has been tested on an smp machine. (dual p2)
+
+    Chipsets supported under CY4601 family:
+	
+		CY7C63723, CY7C63742, CY7C63743, CY7C64013
+
+    Devices supported:
+
+		-DeLorme's USB Earthmate (SiRF Star II lp arch)
+		-Cypress HID->COM RS232 adapter
+	
+		Note: Cypress Semiconductor claims no affiliation with the
+			the hid->com device.
+
+	Most devices using chipsets under the CY4601 family should
+     work with the driver.  As long as they stay true to the CY4601
+     usbserial specification.
+
+    Technical notes:
+
+        The Earthmate starts out at 4800 8N1 by default... the driver will
+	upon start init to this setting.  usbserial core provides the rest
+	of the termios settings, along with some custom termios so that the
+	output is in proper format and parsable.
+	
+	The device can be put into sirf mode by issuing NMEA command:
+		$PSRF100,<protocol>,<baud>,<databits>,<stopbits>,<parity>*CHECKSUM
+		$PSRF100,0,9600,8,1,0*0C
+
+		It should then be sufficient to change the port termios to match this
+		to begin communicating.
+
+	As far as I can tell it supports pretty much every sirf command as
+	documented online available with firmware 2.31, with some unknown
+	message ids.
+
+	The hid->com adapter can run at a maximum baud of 115200bps.  Please note
+	that the device has trouble or is incapable of raising line voltage properly.
+	It will be fine with null modem links, as long as you do not try to link two
+	together without hacking the adapter to set the line high.
+
+	The driver is smp safe.  Performance with the driver is rather low when using
+	it for transfering files.  This is being worked on, but I would be willing to
+	accept patches.  An urb queue or packet buffer would likely fit the bill here.
+
+	If you have any questions, problems, patches, feature requests, etc. you can
+	contact me here via email:
+					dignome@gmail.com
+		(your problems/patches can alternately be submitted to usb-devel)
+
+
 Digi AccelePort Driver
 
   This driver supports the Digi AccelePort USB 2 and 4 devices, 2 port

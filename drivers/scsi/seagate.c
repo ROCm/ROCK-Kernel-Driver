@@ -254,9 +254,9 @@ static unsigned char controller_type = 0;	/* set to SEAGATE for ST0x
 						   boards */
 static int irq = IRQ;
 
-MODULE_PARM (base_address, "i");
-MODULE_PARM (controller_type, "b");
-MODULE_PARM (irq, "i");
+module_param(base_address, uint, 0);
+module_param(controller_type, byte, 0);
+module_param(irq, int, 0);
 MODULE_LICENSE("GPL");
 
 

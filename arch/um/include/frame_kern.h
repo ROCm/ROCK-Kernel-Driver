@@ -10,13 +10,11 @@
 #include "sysdep/frame_kern.h"
 
 extern int setup_signal_stack_sc(unsigned long stack_top, int sig, 
-				 unsigned long handler,
-				 void (*restorer)(void), 
+				 struct k_sigaction *ka,
 				 struct pt_regs *regs, 
 				 sigset_t *mask);
 extern int setup_signal_stack_si(unsigned long stack_top, int sig, 
-				 unsigned long handler, 
-				 void (*restorer)(void), 
+				 struct k_sigaction *ka,
 				 struct pt_regs *regs, siginfo_t *info, 
 				 sigset_t *mask);
 

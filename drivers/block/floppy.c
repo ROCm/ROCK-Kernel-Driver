@@ -4124,7 +4124,7 @@ static struct param_table {
 	int *var;
 	int def_param;
 	int param2;
-} config_params[] = {
+} config_params[] __initdata = {
 	{"allowed_drive_mask", NULL, &allowed_drive_mask, 0xff, 0}, /* obsolete */
 	{"all_drives", NULL, &allowed_drive_mask, 0xff, 0},	/* obsolete */
 	{"asus_pci", NULL, &allowed_drive_mask, 0x33, 0},
@@ -4630,9 +4630,9 @@ void cleanup_module(void)
 	wait_for_completion(&device_release);
 }
 
-MODULE_PARM(floppy, "s");
-MODULE_PARM(FLOPPY_IRQ, "i");
-MODULE_PARM(FLOPPY_DMA, "i");
+module_param(floppy, charp, 0);
+module_param(FLOPPY_IRQ, int, 0);
+module_param(FLOPPY_DMA, int, 0);
 MODULE_AUTHOR("Alain L. Knaff");
 MODULE_SUPPORTED_DEVICE("fd");
 MODULE_LICENSE("GPL");

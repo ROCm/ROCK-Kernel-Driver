@@ -28,7 +28,7 @@
 #include <linux/a.out.h>
 #include <linux/interrupt.h>
 #include <linux/config.h>
-#include <linux/version.h>
+#include <linux/utsname.h>
 #include <linux/delay.h>
 #include <linux/reboot.h>
 #include <linux/init.h>
@@ -56,6 +56,9 @@
 asmlinkage void ret_from_fork(void) __asm__("ret_from_fork");
 
 int hlt_counter;
+
+unsigned long boot_option_idle_override = 0;
+EXPORT_SYMBOL(boot_option_idle_override);
 
 /*
  * Return saved PC of a blocked thread.
@@ -214,6 +217,7 @@ static int __init idle_setup (char *str)
 		pm_idle = default_idle;
 	}
 
+	boot_option_idle_override = 1;
 	return 1;
 }
 
@@ -230,7 +234,8 @@ void show_regs(struct pt_regs * regs)
 
 	if (regs->xcs & 3)
 		printk(" ESP: %04x:%08lx",0xffff & regs->xss,regs->esp);
-	printk(" EFLAGS: %08lx    %s  (%s)\n",regs->eflags, print_tainted(),UTS_RELEASE);
+	printk(" EFLAGS: %08lx    %s  (%s)\n",
+	       regs->eflags, print_tainted(), system_utsname.release);
 	printk("EAX: %08lx EBX: %08lx ECX: %08lx EDX: %08lx\n",
 		regs->eax,regs->ebx,regs->ecx,regs->edx);
 	printk("ESI: %08lx EDI: %08lx EBP: %08lx",

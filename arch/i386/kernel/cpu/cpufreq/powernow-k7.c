@@ -66,6 +66,7 @@ union powernow_acpi_control_t {
 };
 #endif
 
+#ifdef CONFIG_CPU_FREQ_DEBUG
 /* divide by 1000 to get VID. */
 static int mobile_vid_table[32] = {
     2000, 1950, 1900, 1850, 1800, 1750, 1700, 1650,
@@ -73,6 +74,7 @@ static int mobile_vid_table[32] = {
     1275, 1250, 1225, 1200, 1175, 1150, 1125, 1100,
     1075, 1050, 1024, 1000, 975, 950, 925, 0,
 };
+#endif
 
 /* divide by 10 to get FID. */
 static int fid_codes[32] = {
@@ -87,7 +89,6 @@ static int fid_codes[32] = {
  */
 
 static int acpi_force;
-static int debug;
 
 static struct cpufreq_frequency_table *powernow_table;
 
@@ -100,20 +101,7 @@ static unsigned int fsb;
 static unsigned int latency;
 static char have_a0;
 
-static void dprintk(const char *fmt, ...)
-{
-	char s[256];
-	va_list args;
-
-	if (debug==0)
-		return;
-
-	va_start(args,fmt);
-	vsprintf(s, fmt, args);
-	printk(s);
-	va_end(args);
-}
-
+#define dprintk(msg...) cpufreq_debug_printk(CPUFREQ_DEBUG_DRIVER, "powernow-k7", msg)
 
 static int check_fsb(unsigned int fsbspeed)
 {
@@ -202,9 +190,6 @@ static int get_ranges (unsigned char *pst)
 #endif
 		}
 
-		dprintk (KERN_INFO PFX "   FID: 0x%x (%d.%dx [%dMHz])  ", fid,
-			fid_codes[fid] / 10, fid_codes[fid] % 10, speed/1000);
-
 		if (speed < minimum_speed)
 			minimum_speed = speed;
 		if (speed > maximum_speed)
@@ -212,8 +197,12 @@ static int get_ranges (unsigned char *pst)
 
 		vid = *pst++;
 		powernow_table[j].index |= (vid << 8); /* upper 8 bits */
-		dprintk ("VID: 0x%x (%d.%03dV)\n", vid,	mobile_vid_table[vid]/1000,
-			mobile_vid_table[vid]%1000);
+
+		dprintk ("   FID: 0x%x (%d.%dx [%dMHz])  "
+			 "VID: 0x%x (%d.%03dV)\n", fid, fid_codes[fid] / 10, 
+			 fid_codes[fid] % 10, speed/1000, vid,	
+			 mobile_vid_table[vid]/1000,
+			 mobile_vid_table[vid]%1000);
 	}
 	powernow_table[number_scales].frequency = CPUFREQ_TABLE_END;
 	powernow_table[number_scales].index = 0;
@@ -302,7 +291,7 @@ static void change_speed (unsigned int index)
 
 #ifdef CONFIG_X86_POWERNOW_K7_ACPI
 
-struct acpi_processor_performance *acpi_processor_perf;
+static struct acpi_processor_performance *acpi_processor_perf;
 
 static int powernow_acpi_init(void)
 {
@@ -361,7 +350,7 @@ static int powernow_acpi_init(void)
 		unsigned int speed;
 
 		pc.val = (unsigned long) acpi_processor_perf->states[i].control;
-		dprintk (KERN_INFO PFX "acpi:  P%d: %d MHz %d mW %d uS control %08x SGTC %d\n",
+		dprintk ("acpi:  P%d: %d MHz %d mW %d uS control %08x SGTC %d\n",
 			 i,
 			 (u32) acpi_processor_perf->states[i].core_frequency,
 			 (u32) acpi_processor_perf->states[i].power,
@@ -383,10 +372,11 @@ static int powernow_acpi_init(void)
 				powernow_table[i].frequency = CPUFREQ_ENTRY_INVALID;
 		}
 
-		dprintk (KERN_INFO PFX "   FID: 0x%x (%d.%dx [%dMHz])  ", fid,
-			fid_codes[fid] / 10, fid_codes[fid] % 10, speed/1000);
-		dprintk ("VID: 0x%x (%d.%03dV)\n", vid,	mobile_vid_table[vid]/1000,
-			mobile_vid_table[vid]%1000);
+		dprintk ("   FID: 0x%x (%d.%dx [%dMHz])  "
+			 "VID: 0x%x (%d.%03dV)\n", fid, fid_codes[fid] / 10, 
+			 fid_codes[fid] % 10, speed/1000, vid,	
+			 mobile_vid_table[vid]/1000,
+			 mobile_vid_table[vid]%1000);
 
 		if (latency < pc.bits.sgtc)
 			latency = pc.bits.sgtc;
@@ -399,6 +389,9 @@ static int powernow_acpi_init(void)
 
 	powernow_table[i].frequency = CPUFREQ_TABLE_END;
 	powernow_table[i].index = 0;
+
+	/* notify BIOS that we exist */
+	acpi_processor_notify_smm(THIS_MODULE);
 
 	return 0;
 
@@ -436,21 +429,20 @@ static int powernow_decode_bios (int maxfid, int startvid)
 		p = phys_to_virt(i);
 
 		if (memcmp(p, "AMDK7PNOW!",  10) == 0){
-			dprintk (KERN_INFO PFX "Found PSB header at %p\n", p);
+			dprintk ("Found PSB header at %p\n", p);
 			psb = (struct psb_s *) p;
-			dprintk (KERN_INFO PFX "Table version: 0x%x\n", psb->tableversion);
+			dprintk ("Table version: 0x%x\n", psb->tableversion);
 			if (psb->tableversion != 0x12) {
 				printk (KERN_INFO PFX "Sorry, only v1.2 tables supported right now\n");
 				return -ENODEV;
 			}
 
-			dprintk (KERN_INFO PFX "Flags: 0x%x (", psb->flags);
+			dprintk ("Flags: 0x%x\n", psb->flags);
 			if ((psb->flags & 1)==0) {
-				dprintk ("Mobile");
+				dprintk ("Mobile voltage regulator\n");
 			} else {
-				dprintk ("Desktop");
+				dprintk ("Desktop voltage regulator\n");
 			}
-			dprintk (" voltage regulator)\n");
 
 			latency = psb->settlingtime;
 			if (latency < 100) {
@@ -458,8 +450,8 @@ static int powernow_decode_bios (int maxfid, int startvid)
 						"Should be at least 100. Correcting.\n", latency);
 				latency = 100;
 			}
-			dprintk (KERN_INFO PFX "Settling Time: %d microseconds.\n", psb->settlingtime);
-			dprintk (KERN_INFO PFX "Has %d PST tables. (Only dumping ones relevant to this CPU).\n", psb->numpst);
+			dprintk ("Settling Time: %d microseconds.\n", psb->settlingtime);
+			dprintk ("Has %d PST tables. (Only dumping ones relevant to this CPU).\n", psb->numpst);
 
 			p += sizeof (struct psb_s);
 
@@ -472,11 +464,9 @@ static int powernow_decode_bios (int maxfid, int startvid)
 				if ((etuple == pst->cpuid) && check_fsb(pst->fsbspeed) &&
 				    (maxfid==pst->maxfid) && (startvid==pst->startvid))
 				{
-					dprintk (KERN_INFO PFX "PST:%d (@%p)\n", i, pst);
-					dprintk (KERN_INFO PFX " cpuid: 0x%x  ", pst->cpuid);
-					dprintk ("fsb: %d  ", pst->fsbspeed);
-					dprintk ("maxFID: 0x%x  ", pst->maxfid);
-					dprintk ("startvid: 0x%x\n", pst->startvid);
+					dprintk ("PST:%d (@%p)\n", i, pst);
+					dprintk (" cpuid: 0x%x  fsb: %d  maxFID: 0x%x  startvid: 0x%x\n", 
+						 pst->cpuid, pst->fsbspeed, pst->maxfid, pst->startvid);
 
 					ret = get_ranges ((char *) pst + sizeof (struct pst_s));
 					return ret;
@@ -602,7 +592,7 @@ static int __init powernow_cpu_init (struct cpufreq_policy *policy)
 		printk(KERN_WARNING PFX "can not determine bus frequency\n");
 		return -EINVAL;
 	}
-	dprintk(KERN_INFO PFX "FSB: %3d.%03d MHz\n", fsb/1000, fsb%1000);
+	dprintk("FSB: %3d.%03d MHz\n", fsb/1000, fsb%1000);
 
 	if (dmi_check_system(powernow_dmi_table) || acpi_force) {
 		printk (KERN_INFO PFX "PSB/PST known to be broken.  Trying ACPI instead\n");
@@ -685,8 +675,6 @@ static void __exit powernow_exit (void)
 		kfree(powernow_table);
 }
 
-module_param(debug, int, 0444);
-MODULE_PARM_DESC(debug, "enable debug output.");
 module_param(acpi_force,  int, 0444);
 MODULE_PARM_DESC(acpi_force, "Force ACPI to be used.");
 

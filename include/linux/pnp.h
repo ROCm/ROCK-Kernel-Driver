@@ -82,8 +82,9 @@ struct pnp_port {
 	struct pnp_port *next;		/* next port */
 };
 
+#define PNP_IRQ_NR 256
 struct pnp_irq {
-	unsigned short map;		/* bitmaks for IRQ lines */
+	DECLARE_BITMAP(map, PNP_IRQ_NR); /* bitmaks for IRQ lines */
 	unsigned char flags;		/* IRQ flags */
 	unsigned char pad;		/* pad */
 	struct pnp_irq *next;		/* next IRQ */
@@ -200,6 +201,7 @@ struct pnp_dev {
 	unsigned short	regs;		/* ISAPnP: supported registers */
 	int 		flags;		/* used by protocols */
 	struct proc_dir_entry *procent;	/* device entry in /proc/bus/isapnp */
+	void *data;
 };
 
 #define global_to_pnp_dev(n) list_entry(n, struct pnp_dev, global_list)

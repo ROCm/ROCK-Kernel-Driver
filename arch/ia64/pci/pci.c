@@ -46,6 +46,8 @@
 #define DBG(x...)
 #endif
 
+static int pci_routeirq;
+
 /*
  * Low-level SAL-based PCI configuration access functions. Note that SAL
  * calls are already serialized (via sal_lock), so we don't need another
@@ -141,13 +143,28 @@ extern acpi_status acpi_map_iosapic (acpi_handle, u32, void*, void**);
 
 	acpi_get_devices(NULL, acpi_map_iosapic, NULL, NULL);
 #endif
-	/*
-	 * PCI IRQ routing is set up by pci_enable_device(), but we
-	 * also do it here in case there are still broken drivers that
-	 * don't use pci_enable_device().
-	 */
-	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL)
-		acpi_pci_irq_enable(dev);
+
+	if (pci_routeirq) {
+		/*
+		 * PCI IRQ routing is set up by pci_enable_device(), but we
+		 * also do it here in case there are still broken drivers that
+		 * don't use pci_enable_device().
+		 */
+		printk(KERN_INFO "** Routing PCI interrupts for all devices because \"pci=routeirq\"\n");
+		printk(KERN_INFO "** was specified.  If this was required to make a driver work,\n");
+		printk(KERN_INFO "** please email the output of \"lspci\" to bjorn.helgaas@hp.com\n");
+		printk(KERN_INFO "** so I can fix the driver.\n");
+		while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL)
+			acpi_pci_irq_enable(dev);
+	} else {
+		printk(KERN_INFO "** PCI interrupts are no longer routed automatically.  If this\n");
+		printk(KERN_INFO "** causes a device to stop working, it is probably because the\n");
+		printk(KERN_INFO "** driver failed to call pci_enable_device().  As a temporary\n");
+		printk(KERN_INFO "** workaround, the \"pci=routeirq\" argument restores the old\n");
+		printk(KERN_INFO "** behavior.  If this argument makes the device work again,\n");
+		printk(KERN_INFO "** please email the output of \"lspci\" to bjorn.helgaas@hp.com\n");
+		printk(KERN_INFO "** so I can fix the driver.\n");
+	}
 
 	return 0;
 }
@@ -328,33 +345,65 @@ out1:
 	return NULL;
 }
 
-void __init
-pcibios_fixup_device_resources (struct pci_dev *dev, struct pci_bus *bus)
+void pcibios_resource_to_bus(struct pci_dev *dev,
+		struct pci_bus_region *region, struct resource *res)
 {
 	struct pci_controller *controller = PCI_CONTROLLER(dev);
-	struct pci_window *window;
-	int i, j;
+	unsigned long offset = 0;
+	int i;
+
+	for (i = 0; i < controller->windows; i++) {
+		struct pci_window *window = &controller->window[i];
+		if (!(window->resource.flags & res->flags))
+			continue;
+		if (window->resource.start > res->start - window->offset)
+			continue;
+		if (window->resource.end < res->end - window->offset)
+			continue;
+		offset = window->offset;
+		break;
+	}
+
+	region->start = res->start - offset;
+	region->end = res->end - offset;
+}
+
+void pcibios_bus_to_resource(struct pci_dev *dev,
+		struct resource *res, struct pci_bus_region *region)
+{
+	struct pci_controller *controller = PCI_CONTROLLER(dev);
+	unsigned long offset = 0;
+	int i;
+
+	for (i = 0; i < controller->windows; i++) {
+		struct pci_window *window = &controller->window[i];
+		if (!(window->resource.flags & res->flags))
+			continue;
+		if (window->resource.start > region->start)
+			continue;
+		if (window->resource.end < region->end)
+			continue;
+		offset = window->offset;
+		break;
+	}
+
+	res->start = region->start + offset;
+	res->end = region->end + offset;
+}
+
+static void __devinit pcibios_fixup_device_resources(struct pci_dev *dev)
+{
+	struct pci_bus_region region;
+	int i;
 	int limit = (dev->hdr_type == PCI_HEADER_TYPE_NORMAL) ? \
 		PCI_BRIDGE_RESOURCES : PCI_NUM_RESOURCES;
 
 	for (i = 0; i < limit; i++) {
-		if (!dev->resource[i].start)
+		if (!dev->resource[i].flags)
 			continue;
-
-#define contains(win, res)	((res)->start >= (win)->start && \
-				 (res)->end   <= (win)->end)
-
-		for (j = 0; j < controller->windows; j++) {
-			window = &controller->window[j];
-			if (((dev->resource[i].flags & IORESOURCE_MEM &&
-			      window->resource.flags & IORESOURCE_MEM) ||
-			     (dev->resource[i].flags & IORESOURCE_IO &&
-			      window->resource.flags & IORESOURCE_IO)) &&
-			    contains(&window->resource, &dev->resource[i])) {
-				dev->resource[i].start += window->offset;
-				dev->resource[i].end   += window->offset;
-			}
-		}
+		region.start = dev->resource[i].start;
+		region.end = dev->resource[i].end;
+		pcibios_bus_to_resource(dev, &dev->resource[i], &region);
 		pci_claim_resource(dev, i);
 	}
 }
@@ -368,7 +417,7 @@ pcibios_fixup_bus (struct pci_bus *b)
 	struct pci_dev *dev;
 
 	list_for_each_entry(dev, &b->devices, bus_list)
-		pcibios_fixup_device_resources(dev, b);
+		pcibios_fixup_device_resources(dev);
 
 	return;
 }
@@ -443,6 +492,8 @@ pcibios_align_resource (void *data, struct resource *res,
 char * __init
 pcibios_setup (char *str)
 {
+	if (!strcmp(str, "routeirq"))
+		pci_routeirq = 1;
 	return NULL;
 }
 
@@ -451,21 +502,21 @@ pci_mmap_page_range (struct pci_dev *dev, struct vm_area_struct *vma,
 		     enum pci_mmap_state mmap_state, int write_combine)
 {
 	/*
-	 * I/O space cannot be accessed via normal processor loads and stores on this
-	 * platform.
+	 * I/O space cannot be accessed via normal processor loads and
+	 * stores on this platform.
 	 */
 	if (mmap_state == pci_mmap_io)
 		/*
-		 * XXX we could relax this for I/O spaces for which ACPI indicates that
-		 * the space is 1-to-1 mapped.  But at the moment, we don't support
-		 * multiple PCI address spaces and the legacy I/O space is not 1-to-1
-		 * mapped, so this is moot.
+		 * XXX we could relax this for I/O spaces for which ACPI
+		 * indicates that the space is 1-to-1 mapped.  But at the
+		 * moment, we don't support multiple PCI address spaces and
+		 * the legacy I/O space is not 1-to-1 mapped, so this is moot.
 		 */
 		return -EINVAL;
 
 	/*
-	 * Leave vm_pgoff as-is, the PCI space address is the physical address on this
-	 * platform.
+	 * Leave vm_pgoff as-is, the PCI space address is the physical
+	 * address on this platform.
 	 */
 	vma->vm_flags |= (VM_SHM | VM_LOCKED | VM_IO);
 

@@ -23,6 +23,7 @@
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <asm/uaccess.h>
 
 /* #define DEBUG_UNALIGNED 1 */
 
@@ -37,6 +38,11 @@
 #else
 #define RFMT "%08lx"
 #endif
+
+#define FIXUP_BRANCH(lbl) \
+	"\tldil L%%" #lbl ", %%r1\n"			\
+	"\tldo R%%" #lbl "(%%r1), %%r1\n"		\
+	"\tbv,n %%r0(%%r1)\n"
 
 /* 1111 1100 0000 0000 0001 0011 1100 0000 */
 #define OPCODE1(a,b,c)	((a)<<26|(b)<<12|(c)<<6) 
@@ -134,15 +140,19 @@ static int emulate_ldh(struct pt_regs *regs, int toreg)
 "1:	ldbs	0(%%sr1,%3), %%r20\n"
 "2:	ldbs	1(%%sr1,%3), %0\n"
 "	depw	%%r20, 23, 24, %0\n"
-"	cmpclr,= %%r0, %%r0, %1\n"
-"3:	ldo	-2(%%r0), %1\n"
-"	.section __ex_table,\"a\"\n"
+"	copy	%%r0, %1\n"
+"3:	\n"
+"	.section .fixup,\"ax\"\n"
+"4:	ldi	-2, %1\n"
+	FIXUP_BRANCH(3b)
+"	.previous\n"
+"	.section __ex_table,\"aw\"\n"
 #ifdef __LP64__
-"	.dword	1b,(3b-1b)\n"
-"	.dword  2b,(3b-2b)\n"
+"	.dword	1b,4b\n"
+"	.dword  2b,4b\n"
 #else
-"	.word	1b,(3b-1b)\n"
-"	.word	2b,(3b-2b)\n"
+"	.word	1b,4b\n"
+"	.word	2b,4b\n"
 #endif
 "	.previous\n"
 	: "=r" (val), "=r" (ret)
@@ -175,15 +185,19 @@ static int emulate_ldw(struct pt_regs *regs, int toreg, int flop)
 "	subi	32,%%r19,%%r19\n"
 "	mtctl	%%r19,11\n"
 "	vshd	%0,%%r20,%0\n"
-"	cmpclr,= %%r0, %%r0, %1\n"
-"3:	ldo	-2(%%r0), %1\n"
-"	.section __ex_table,\"a\"\n"
+"	copy	%%r0, %1\n"
+"3:	\n"
+"	.section .fixup,\"ax\"\n"
+"4:	ldi	-2, %1\n"
+	FIXUP_BRANCH(3b)
+"	.previous\n"
+"	.section __ex_table,\"aw\"\n"
 #ifdef __LP64__
-"	.dword	1b,(3b-1b)\n"
-"	.dword  2b,(3b-2b)\n"
+"	.dword	1b,4b\n"
+"	.dword  2b,4b\n"
 #else
-"	.word	1b,(3b-1b)\n"
-"	.word	2b,(3b-2b)\n"
+"	.word	1b,4b\n"
+"	.word	2b,4b\n"
 #endif
 "	.previous\n"
 	: "=r" (val), "=r" (ret)
@@ -222,15 +236,19 @@ static int emulate_ldd(struct pt_regs *regs, int toreg, int flop)
 "	subi	64,%%r19,%%r19\n"
 "	mtsar	%%r19\n"
 "	shrpd	%0,%%r20,%%sar,%0\n"
-"	cmpclr,= %%r0, %%r0, %1\n"
-"3:	ldo	-2(%%r0), %1\n"
-"	.section __ex_table,\"a\"\n"
+"	copy	%%r0, %1\n"
+"3:	\n"
+"	.section .fixup,\"ax\"\n"
+"4:	ldi	-2, %1\n"
+	FIXUP_BRANCH(3b)
+"	.previous\n"
+"	.section __ex_table,\"aw\"\n"
 #ifdef __LP64__
-"	.dword	1b,(3b-1b)\n"
-"	.dword  2b,(3b-2b)\n"
+"	.dword	1b,4b\n"
+"	.dword  2b,4b\n"
 #else
-"	.word	1b,(3b-1b)\n"
-"	.word	2b,(3b-2b)\n"
+"	.word	1b,4b\n"
+"	.word	2b,4b\n"
 #endif
 "	.previous\n"
 	: "=r" (val), "=r" (ret)
@@ -250,17 +268,21 @@ static int emulate_ldd(struct pt_regs *regs, int toreg, int flop)
 "	mtsar	%%r19\n"
 "	vshd	%0,%1,%0\n"
 "	vshd	%1,%%r20,%1\n"
-"	cmpclr,= %%r0, %%r0, %2\n"
-"4:	ldo	-2(%%r0), %2\n"
-"	.section __ex_table,\"a\"\n"
+"	copy	%%r0, %2\n"
+"4:	\n"
+"	.section .fixup,\"ax\"\n"
+"5:	ldi	-2, %2\n"
+	FIXUP_BRANCH(4b)
+"	.previous\n"
+"	.section __ex_table,\"aw\"\n"
 #ifdef __LP64__
-"	.dword	1b,(4b-1b)\n"
-"	.dword  2b,(4b-2b)\n"
-"	.dword	3b,(4b-3b)\n"
+"	.dword	1b,5b\n"
+"	.dword  2b,5b\n"
+"	.dword	3b,5b\n"
 #else
-"	.word	1b,(4b-1b)\n"
-"	.word	2b,(4b-2b)\n"
-"	.word	3b,(4b-3b)\n"
+"	.word	1b,5b\n"
+"	.word	2b,5b\n"
+"	.word	3b,5b\n"
 #endif
 "	.previous\n"
 	: "=r" (valh), "=r" (vall), "=r" (ret)
@@ -296,15 +318,19 @@ static int emulate_sth(struct pt_regs *regs, int frreg)
 "	extrw,u %1, 23, 8, %%r19\n"
 "1:	stb %1, 1(%%sr1, %2)\n"
 "2:	stb %%r19, 0(%%sr1, %2)\n"
-"	cmpclr,= %%r0, %%r0, %0\n"
-"3:	ldo	-2(%%r0), %0\n"
-"	.section __ex_table,\"a\"\n"
+"	copy	%%r0, %0\n"
+"3:	\n"
+"	.section .fixup,\"ax\"\n"
+"4:	ldi	-2, %0\n"
+	FIXUP_BRANCH(3b)
+"	.previous\n"
+"	.section __ex_table,\"aw\"\n"
 #ifdef __LP64__
-"	.dword	1b,(3b-1b)\n"
-"	.dword  2b,(3b-2b)\n"
+"	.dword	1b,4b\n"
+"	.dword  2b,4b\n"
 #else
-"	.word	1b,(3b-1b)\n"
-"	.word	2b,(3b-2b)\n"
+"	.word	1b,4b\n"
+"	.word	2b,4b\n"
 #endif
 "	.previous\n"
 	: "=r" (ret)
@@ -346,15 +372,19 @@ static int emulate_stw(struct pt_regs *regs, int frreg, int flop)
 "	or	%%r1, %%r21, %%r21\n"
 "	stw	%%r20,0(%%sr1,%2)\n"
 "	stw	%%r21,4(%%sr1,%2)\n"
-"	cmpclr,= %%r0, %%r0, %0\n"
-"3:	ldo	-2(%%r0), %0\n"
-"	.section __ex_table,\"a\"\n"
+"	copy	%%r0, %0\n"
+"3:	\n"
+"	.section .fixup,\"ax\"\n"
+"4:	ldi	-2, %0\n"
+	FIXUP_BRANCH(3b)
+"	.previous\n"
+"	.section __ex_table,\"aw\"\n"
 #ifdef __LP64__
-"	.dword	1b,(3b-1b)\n"
-"	.dword  2b,(3b-2b)\n"
+"	.dword	1b,4b\n"
+"	.dword  2b,4b\n"
 #else
-"	.word	1b,(3b-1b)\n"
-"	.word	2b,(3b-2b)\n"
+"	.word	1b,4b\n"
+"	.word	2b,4b\n"
 #endif
 "	.previous\n"
 	: "=r" (ret)
@@ -399,19 +429,23 @@ static int emulate_std(struct pt_regs *regs, int frreg, int flop)
 "	or	%%r1, %%r21, %%r21\n"
 "3:	std	%%r20,0(%%sr1,%2)\n"
 "4:	std	%%r21,8(%%sr1,%2)\n"
-"	cmpclr,= %%r0, %%r0, %0\n"
-"5:	ldo	-2(%%r0), %0\n"
-"	.section __ex_table,\"a\"\n"
+"	copy	%%r0, %0\n"
+"5:	\n"
+"	.section .fixup,\"ax\"\n"
+"6:	ldi	-2, %0\n"
+	FIXUP_BRANCH(5b)
+"	.previous\n"
+"	.section __ex_table,\"aw\"\n"
 #ifdef __LP64__
-"	.dword	1b,(5b-1b)\n"
-"	.dword  2b,(5b-2b)\n"
-"	.dword	3b,(5b-3b)\n"
-"	.dword  4b,(5b-4b)\n"
+"	.dword	1b,6b\n"
+"	.dword  2b,6b\n"
+"	.dword	3b,6b\n"
+"	.dword  4b,6b\n"
 #else
-"	.word	1b,(5b-1b)\n"
-"	.word	2b,(5b-2b)\n"
-"	.word	3b,(5b-3b)\n"
-"	.word	4b,(5b-4b)\n"
+"	.word	1b,6b\n"
+"	.word	2b,6b\n"
+"	.word	3b,6b\n"
+"	.word	4b,6b\n"
 #endif
 "	.previous\n"
 	: "=r" (ret)
@@ -438,21 +472,25 @@ static int emulate_std(struct pt_regs *regs, int frreg, int flop)
 "3:	stw	%1,0(%%sr1,%1)\n"
 "4:	stw	%%r1,4(%%sr1,%3)\n"
 "5:	stw	%2,8(%%sr1,%3)\n"
-"	cmpclr,= %%r0, %%r0, %0\n"
-"6:	ldo	-2(%%r0), %0\n"
-"	.section __ex_table,\"a\"\n"
+"	copy	%%r0, %0\n"
+"6:	\n"
+"	.section .fixup,\"ax\"\n"
+"7:	ldi	-2, %0\n"
+	FIXUP_BRANCH(6b)
+"	.previous\n"
+"	.section __ex_table,\"aw\"\n"
 #ifdef __LP64__
-"	.dword	1b,(6b-1b)\n"
-"	.dword  2b,(6b-2b)\n"
-"	.dword	3b,(6b-3b)\n"
-"	.dword  4b,(6b-4b)\n"
-"	.dword  5b,(6b-5b)\n"
+"	.dword	1b,7b\n"
+"	.dword  2b,7b\n"
+"	.dword	3b,7b\n"
+"	.dword  4b,7b\n"
+"	.dword  5b,7b\n"
 #else
-"	.word	1b,(6b-1b)\n"
-"	.word	2b,(6b-2b)\n"
-"	.word	3b,(6b-3b)\n"
-"	.word	4b,(6b-4b)\n"
-"	.word  	5b,(6b-5b)\n"
+"	.word	1b,7b\n"
+"	.word	2b,7b\n"
+"	.word	3b,7b\n"
+"	.word	4b,7b\n"
+"	.word  	5b,7b\n"
 #endif
 "	.previous\n"
 	: "=r" (ret)
@@ -492,7 +530,6 @@ void handle_unaligned(struct pt_regs *regs)
 			show_regs(regs);
 #endif		
 		}
-
 		if (!unaligned_enabled)
 			goto force_sigbus;
 	}
@@ -555,16 +592,6 @@ void handle_unaligned(struct pt_regs *regs)
 			newbase += IM14(regs->iir&~4);
 		}
 		break;
-	}
-
-	if (regs->isr != regs->sr[7])
-	{
-		printk(KERN_CRIT "isr verification failed (isr: " RFMT ", sr7: " RFMT "\n",
-			regs->isr, regs->sr[7]);
-
-		/* don't kill him though, since he has appropriate access to the page, or we
-		 * would never have gotten here.
-		 */
 	}
 
 	/* TODO: make this cleaner... */

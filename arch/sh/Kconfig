@@ -645,16 +645,6 @@ config SH_PCLK_FREQ
 
 menu "CPU Frequency scaling"
 
-config CPU_FREQ
-	bool "CPU Frequency scaling"
-	help
-	  CPU clock scaling allows you to change the clock speed of the
-	  running CPU on the fly.
-
-	  For details, take a look at <file:Documentation/cpu-freq>.
-
-	  If unsure, say N.
-
 source "drivers/cpufreq/Kconfig"
 
 config CPU_FREQ_TABLE

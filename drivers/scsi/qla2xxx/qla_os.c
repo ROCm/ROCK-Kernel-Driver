@@ -754,7 +754,7 @@ qla2x00_queuecommand(struct scsi_cmnd *cmd, void (*fn)(struct scsi_cmnd *))
 	cmd->host_scribble = (unsigned char *)handle;
 
 	/* Bookkeeping information */
-	sp->r_start = jiffies;       /* time the request was recieved */
+	sp->r_start = jiffies;       /* time the request was received */
 	sp->u_start = 0;
 
 	/* Setup device queue pointers. */

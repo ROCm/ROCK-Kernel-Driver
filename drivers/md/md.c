@@ -2351,16 +2351,27 @@ static int update_array_info(mddev_t *mddev, mdu_array_info_t *info)
 /*	    mddev->patch_version != info->patch_version || */
 	    mddev->ctime         != info->ctime         ||
 	    mddev->level         != info->level         ||
-	    mddev->layout        != info->layout        ||
+/*	    mddev->layout        != info->layout        || */
 	    !mddev->persistent	 != info->not_persistent||
 	    mddev->chunk_size    != info->chunk_size    )
 		return -EINVAL;
 	/* Check there is only one change */
 	if (mddev->size != info->size) cnt++;
 	if (mddev->raid_disks != info->raid_disks) cnt++;
+	if (mddev->layout != info->layout) cnt++;
 	if (cnt == 0) return 0;
 	if (cnt > 1) return -EINVAL;
 
+	if (mddev->layout != info->layout) {
+		/* Change layout
+		 * we don't need to do anything at the md level, the
+		 * personality will take care of it all.
+		 */
+		if (mddev->pers->reconfig == NULL)
+			return -EINVAL;
+		else
+			return mddev->pers->reconfig(mddev, info->layout, -1);
+	}
 	if (mddev->size != info->size) {
 		mdk_rdev_t * rdev;
 		struct list_head *tmp;

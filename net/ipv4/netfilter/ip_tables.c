@@ -477,6 +477,18 @@ ipt_find_target_lock(const char *name, int *error, struct semaphore *mutex)
 	return find_inlist_lock(&ipt_target, name, "ipt_", error, mutex);
 }
 
+struct ipt_target *
+__ipt_find_target_lock(const char *name, int *error)
+{
+	return ipt_find_target_lock(name,error,&ipt_mutex);
+}
+
+void
+__ipt_mutex_up(void)
+{
+	up(&ipt_mutex);
+}
+
 /* All zeroes == unconditional rule. */
 static inline int
 unconditional(const struct ipt_ip *ip)
@@ -1280,7 +1292,7 @@ do_ipt_get_ctl(struct sock *sk, int cmd, void __user *user, int *len)
 			       sizeof(info.underflow));
 			info.num_entries = t->private->number;
 			info.size = t->private->size;
-			strcpy(info.name, name);
+			memcpy(info.name, name, sizeof(info.name));
 
 			if (copy_to_user(user, &info, *len) != 0)
 				ret = -EFAULT;
@@ -1418,7 +1430,7 @@ int ipt_register_table(struct ipt_table *table)
 	/* save number of initial entries */
 	table->private->initial_entries = table->private->number;
 
-	table->lock = RW_LOCK_UNLOCKED;
+	rwlock_init(&table->lock);
 	list_prepend(&ipt_tables, table);
 
  unlock:
@@ -1877,6 +1889,8 @@ EXPORT_SYMBOL(ipt_unregister_match);
 EXPORT_SYMBOL(ipt_do_table);
 EXPORT_SYMBOL(ipt_register_target);
 EXPORT_SYMBOL(ipt_unregister_target);
+EXPORT_SYMBOL_GPL(__ipt_find_target_lock);
+EXPORT_SYMBOL_GPL(__ipt_mutex_up);
 
 module_init(init);
 module_exit(fini);

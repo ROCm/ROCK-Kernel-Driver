@@ -13,6 +13,10 @@ OBJCOPYFLAGS	:=-O binary -R .note -R .comment -S
 GZFLAGS		:=-9
 #CFLAGS		+=-pipe
 
+# Do not use arch/arm/defconfig - it's always outdated.
+# Select a platform tht is kept up-to-date
+KBUILD_DEFCONFIG := versatile_defconfig
+
 ifeq ($(CONFIG_FRAME_POINTER),y)
 CFLAGS		+=-fno-omit-frame-pointer -mapcs -mno-sched-prolog
 endif
@@ -54,14 +58,13 @@ tune-$(CONFIG_CPU_XSCALE)	:=$(call cc-option,-mtune=xscale,-mtune=strongarm110) 
 tune-$(CONFIG_CPU_V6)		:=-mtune=strongarm
 
 # Need -Uarm for gcc < 3.x
-CFLAGS		+=-mapcs-32 $(arch-y) $(tune-y) $(call cc-option,-malignment-traps,-mshort-load-bytes) -msoft-float -Uarm
-AFLAGS		+=-mapcs-32 $(arch-y) $(tune-y) -msoft-float
+CFLAGS_ABI	:=$(call cc-option,-mapcs-32,-mabi=apcs-gnu)
+CFLAGS		+=$(CFLAGS_ABI) $(arch-y) $(tune-y) $(call cc-option,-mshort-load-bytes,$(call cc-option,-malignment-traps,)) -msoft-float -Uarm
+AFLAGS		+=$(CFLAGS_ABI) $(arch-y) $(tune-y) -msoft-float
 
 CHECKFLAGS	+= -D__arm__
 
 #Default value
-DATAADDR	:= .
-
 head-y		:= arch/arm/kernel/head.o arch/arm/kernel/init_task.o
 textaddr-y	:= 0xC0008000
 
@@ -93,7 +96,7 @@ textaddr-$(CONFIG_ARCH_FORTUNET)   := 0xc0008000
  machine-$(CONFIG_ARCH_OMAP)	   := omap
  machine-$(CONFIG_ARCH_S3C2410)	   := s3c2410
  machine-$(CONFIG_ARCH_LH7A40X)	   := lh7a40x
- machine-$(CONFIG_ARCH_VERSATILE_PB) := versatile
+ machine-$(CONFIG_ARCH_VERSATILE)  := versatile
  machine-$(CONFIG_ARCH_IMX)	   := imx
  machine-$(CONFIG_ARCH_H720X)	   := h720x
 
@@ -105,6 +108,16 @@ export CFLAGS_3c589_cs.o
 endif
 
 TEXTADDR := $(textaddr-y)
+ifeq ($(CONFIG_XIP_KERNEL),y)
+  DATAADDR := $(TEXTADDR)
+  xipaddr-$(CONFIG_ARCH_CO285) := 0x5f000000
+  xipaddr-y ?= 0xbf000000
+  # Replace phys addr with virt addr while keeping offset from base.
+  TEXTADDR := $(shell echo $(CONFIG_XIP_PHYS_ADDR) $(xipaddr-y) | \
+                      awk --non-decimal-data '/[:xdigit:]/ \
+                          { printf("0x%x\n", and($$1, 0x000fffff) + $$2) }' )
+endif
+
 ifeq ($(incdir-y),)
 incdir-y := $(machine-y)
 endif
@@ -115,7 +128,7 @@ else
 MACHINE  :=
 endif
   
-export	TEXTADDR GZFLAGS
+export	TEXTADDR DATAADDR GZFLAGS
 
 # Do we have FASTFPE?
 FASTFPE		:=arch/arm/fastfpe
@@ -137,7 +150,11 @@ drivers-$(CONFIG_ARCH_L7200)	+= drivers/acorn/char/
 libs-y				+= arch/arm/lib/
 
 # Default target when executing plain make
+ifeq ($(CONFIG_XIP_KERNEL),y)
+all: xipImage
+else
 all: zImage
+endif
 
 boot := arch/arm/boot
 
@@ -164,7 +181,7 @@ maketools: include/asm-arm/constants.h include/linux/version.h FORCE
 # Convert bzImage to zImage
 bzImage: zImage
 
-zImage Image bootpImage uImage: vmlinux
+zImage Image xipImage bootpImage uImage: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
 
 zinstall install: vmlinux
@@ -190,6 +207,7 @@ include/asm-$(ARCH)/constants.h: arch/$(ARCH)/kernel/asm-offsets.s
 define archhelp
   echo  '* zImage        - Compressed kernel image (arch/$(ARCH)/boot/zImage)'
   echo  '  Image         - Uncompressed kernel image (arch/$(ARCH)/boot/Image)'
+  echo  '* xipImage      - XIP kernel image, if configured (arch/$(ARCH)/boot/xipImage)'
   echo  '  bootpImage    - Combined zImage and initial RAM disk' 
   echo  '                  (supply initrd image via make variable INITRD=<path>)'
   echo  '  install       - Install uncompressed kernel'

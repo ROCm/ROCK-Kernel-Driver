@@ -519,7 +519,6 @@ inline int try_get_rx_skb(struct dscc4_dev_priv *dpriv, struct net_device *dev)
 	dpriv->rx_skbuff[dirty] = skb;
 	if (skb) {
 		skb->protocol = hdlc_type_trans(skb, dev);
-		skb->mac.raw = skb->data;
 		rx_fd->data = pci_map_single(dpriv->pci_priv->pdev, skb->data,
 					     len, PCI_DMA_FROMDEVICE);
 	} else {

@@ -162,10 +162,10 @@ config ARCH_LH7A40X
 config ARCH_OMAP
 	bool "TI OMAP"
 
-config ARCH_VERSATILE_PB
-	bool "Versatile PB"
+config ARCH_VERSATILE
+	bool "Versatile"
 	help
-	  This enables support for ARM Ltd Versatile PB board.
+	  This enables support for ARM Ltd Versatile board.
 
 config ARCH_IMX
 	bool "IMX"
@@ -204,6 +204,8 @@ source "arch/arm/mach-lh7a40x/Kconfig"
 source "arch/arm/mach-imx/Kconfig"
 
 source "arch/arm/mach-h720x/Kconfig"
+
+source "arch/arm/mach-versatile/Kconfig"
 
 # Definitions to make life easier
 config ARCH_ACORN
@@ -287,9 +289,14 @@ config ICST525
 	depends on ARCH_INTEGRATOR
 	default y
 
+config ICST307
+	bool
+	depends on ARCH_VERSATILE
+	default y
+
 config ARM_AMBA
 	bool
-	depends on ARCH_INTEGRATOR || ARCH_VERSATILE_PB
+	depends on ARCH_INTEGRATOR || ARCH_VERSATILE
 	default y
 
 config ISA
@@ -336,18 +343,51 @@ config ZBOOT_ROM_BSS
 	  while the decompressor is running.  Unless you have special requirements,
 	  you should not change this value.
 
-if (ARCH_SA1100 || ARCH_INTEGRATOR)
-
-config CPU_FREQ
-	bool "Support CPU clock change"
+config XIP_KERNEL
+	bool "Kernel Execute-In-Place from ROM"
+	depends on !ZBOOT_ROM
 	help
-	  CPU clock scaling allows you to change the clock speed of the
-	  running CPU on the fly. This is a nice method to save battery power,
-	  because the lower the clock speed, the less power the CPU
-	  consumes. Note that this driver doesn't automatically change the CPU
-	  clock speed, you need some userland tools (which still have to be
-	  written) to implement the policy. If you don't understand what this
-	  is all about, it's safe to say 'N'.
+	  Execute-In-Place allows the kernel to run from non-volatile storage
+	  directly addressable by the CPU, such as NOR flash. This saves RAM
+	  space since the text section of the kernel is not loaded from flash
+	  to RAM.  Read-write sections, such as the data section and stack,
+	  are still copied to RAM.  The XIP kernel is not compressed since
+	  it has to run directly from flash, so it will take more space to
+	  store it.  The flash address used to link the kernel object files,
+	  and for storing it, is configuration dependent. Therefore, if you
+	  say Y here, you must know the proper physical address where to
+	  store the kernel image depending on your own flash memory usage.
+
+	  Also note that the make target becomes "make xipImage" rather than
+	  "make zImage" or "make Image".  The final kernel binary to put in
+	  ROM memory will be arch/arm/boot/xipImage.
+
+	  If unsure, say N.
+
+config XIP_PHYS_ADDR
+	hex "XIP Kernel Physical Location"
+	depends on XIP_KERNEL
+	default "0x00080000"
+	help
+	  This is the physical address in your flash memory the kernel will
+	  be linked for and stored to.  This address is dependent on your
+	  own flash usage.
+
+	  Please note that, if you're using MTD, you must use a flash chip
+	  that is NOT handled by MTD or the flash will be turned into non
+	  data mode for status and query purposes which will instantaneously
+	  crash the kernel.
+
+	  MTD can however be used with a XIP kernel on the same flash chip
+	  but only if the flash memory supports multiple partitions in
+	  hardware, like with the Intel K3 flash parts, and only if the
+	  kernel is not stored within the firrst hardware partition of the
+	  chip.
+
+	  In any case, make sure that MTD support is configured out for
+	  the first attempt.
+
+if (ARCH_SA1100 || ARCH_INTEGRATOR)
 
 source "drivers/cpufreq/Kconfig"
 
@@ -547,7 +587,7 @@ config CMDLINE
 
 config LEDS
 	bool "Timer and CPU usage LEDs"
-	depends on ARCH_NETWINDER || ARCH_EBSA110 || ARCH_EBSA285 || ARCH_SHARK || ARCH_CO285 || ARCH_SA1100 || ARCH_LUBBOCK || MACH_MAINSTONE || ARCH_PXA_IDP || ARCH_INTEGRATOR || ARCH_CDB89712 || ARCH_P720T || ARCH_OMAP || ARCH_VERSATILE_PB || ARCH_IMX
+	depends on ARCH_NETWINDER || ARCH_EBSA110 || ARCH_EBSA285 || ARCH_SHARK || ARCH_CO285 || ARCH_SA1100 || ARCH_LUBBOCK || MACH_MAINSTONE || ARCH_PXA_IDP || ARCH_INTEGRATOR || ARCH_CDB89712 || ARCH_P720T || ARCH_OMAP || ARCH_VERSATILE || ARCH_IMX
 	help
 	  If you say Y here, the LEDs on your machine will be used
 	  to provide useful information about your current system status.
@@ -560,8 +600,8 @@ config LEDS
 	  system, but the driver will do nothing.
 
 config LEDS_TIMER
-	bool "Timer LED" if LEDS && (ARCH_NETWINDER || ARCH_EBSA285 || ARCH_SHARK || MACH_MAINSTONE || ARCH_CO285 || ARCH_SA1100 || ARCH_LUBBOCK || ARCH_PXA_IDP || ARCH_INTEGRATOR || ARCH_P720T || ARCH_VERSATILE_PB || ARCH_IMX)
-	depends on ARCH_NETWINDER || ARCH_EBSA110 || ARCH_EBSA285 || ARCH_SHARK || ARCH_CO285 || ARCH_SA1100 || ARCH_LUBBOCK || MACH_MAINSTONE || ARCH_PXA_IDP || ARCH_INTEGRATOR || ARCH_CDB89712 || ARCH_P720T || ARCH_OMAP || ARCH_VERSATILE_PB || ARCH_IMX
+	bool "Timer LED" if LEDS && (ARCH_NETWINDER || ARCH_EBSA285 || ARCH_SHARK || MACH_MAINSTONE || ARCH_CO285 || ARCH_SA1100 || ARCH_LUBBOCK || ARCH_PXA_IDP || ARCH_INTEGRATOR || ARCH_P720T || ARCH_VERSATILE || ARCH_IMX)
+	depends on ARCH_NETWINDER || ARCH_EBSA110 || ARCH_EBSA285 || ARCH_SHARK || ARCH_CO285 || ARCH_SA1100 || ARCH_LUBBOCK || MACH_MAINSTONE || ARCH_PXA_IDP || ARCH_INTEGRATOR || ARCH_CDB89712 || ARCH_P720T || ARCH_OMAP || ARCH_VERSATILE || ARCH_IMX
 	default y if ARCH_EBSA110
 	help
 	  If you say Y here, one of the system LEDs (the green one on the
@@ -576,7 +616,7 @@ config LEDS_TIMER
 
 config LEDS_CPU
 	bool "CPU usage LED"
-	depends on LEDS && (ARCH_NETWINDER || ARCH_EBSA285 || ARCH_SHARK || ARCH_CO285 || ARCH_SA1100 || ARCH_LUBBOCK || MACH_MAINSTONE || ARCH_PXA_IDP || ARCH_INTEGRATOR || ARCH_P720T || ARCH_VERSATILE_PB || ARCH_IMX)
+	depends on LEDS && (ARCH_NETWINDER || ARCH_EBSA285 || ARCH_SHARK || ARCH_CO285 || ARCH_SA1100 || ARCH_LUBBOCK || MACH_MAINSTONE || ARCH_PXA_IDP || ARCH_INTEGRATOR || ARCH_P720T || ARCH_VERSATILE || ARCH_IMX)
 	help
 	  If you say Y here, the red LED will be used to give a good real
 	  time indication of CPU usage, by lighting whenever the idle task

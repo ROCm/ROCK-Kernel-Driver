@@ -908,6 +908,7 @@ itd_urb_transaction (
 
 		if (unlikely (0 == itd)) {
 			iso_sched_free (stream, sched);
+			spin_unlock_irqrestore (&ehci->lock, flags);
 			return -ENOMEM;
 		}
 		memset (itd, 0, sizeof *itd);
@@ -1836,7 +1837,9 @@ restart:
 		while (q.ptr != 0) {
 			unsigned		uf;
 			union ehci_shadow	temp;
+			int			live;
 
+			live = HCD_IS_RUNNING (ehci->hcd.state);
 			switch (type) {
 			case Q_TYPE_QH:
 				/* handle any completions */
@@ -1861,7 +1864,7 @@ restart:
 			case Q_TYPE_ITD:
 				/* skip itds for later in the frame */
 				rmb ();
-				for (uf = uframes; uf < 8; uf++) {
+				for (uf = live ? uframes : 8; uf < 8; uf++) {
 					if (0 == (q.itd->hw_transaction [uf]
 							& ITD_ACTIVE))
 						continue;
@@ -1885,7 +1888,8 @@ restart:
 				q = *q_p;
 				break;
 			case Q_TYPE_SITD:
-				if (q.sitd->hw_results & SITD_ACTIVE) {
+				if ((q.sitd->hw_results & SITD_ACTIVE)
+						&& live) {
 					q_p = &q.sitd->sitd_next;
 					hw_p = &q.sitd->hw_next;
 					type = Q_NEXT_TYPE (q.sitd->hw_next);

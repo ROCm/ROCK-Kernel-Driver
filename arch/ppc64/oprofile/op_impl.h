@@ -71,6 +71,7 @@ struct op_system_config {
 	unsigned long mmcra;
 	unsigned long enable_kernel;
 	unsigned long enable_user;
+	unsigned long backtrace_spinlocks;
 };
 
 /* Per-arch configuration */

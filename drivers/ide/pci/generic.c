@@ -41,12 +41,12 @@
 
 #include "generic.h"
 
-static unsigned int __init init_chipset_generic (struct pci_dev *dev, const char *name)
+static unsigned int __devinit init_chipset_generic (struct pci_dev *dev, const char *name)
 {
 	return 0;
 }
 
-static void __init init_hwif_generic (ide_hwif_t *hwif)
+static void __devinit init_hwif_generic (ide_hwif_t *hwif)
 {
 	switch(hwif->pci_dev->device) {
 		case PCI_DEVICE_ID_UMC_UM8673F:

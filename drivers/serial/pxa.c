@@ -25,8 +25,12 @@
  */
 
 #include <linux/config.h>
+
+#if defined(CONFIG_SERIAL_PXA_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
+#define SUPPORT_SYSRQ
+#endif
+
 #include <linux/module.h>
-#include <linux/tty.h>
 #include <linux/ioport.h>
 #include <linux/init.h>
 #include <linux/console.h>
@@ -36,17 +40,14 @@
 #include <linux/delay.h>
 #include <linux/interrupt.h>
 #include <linux/device.h>
+#include <linux/tty.h>
+#include <linux/tty_flip.h>
+#include <linux/serial_core.h>
 
 #include <asm/io.h>
 #include <asm/hardware.h>
 #include <asm/irq.h>
 #include <asm/arch/pxa-regs.h>
-
-#if defined(CONFIG_SERIAL_PXA_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
-#define SUPPORT_SYSRQ
-#endif
-
-#include <linux/serial_core.h>
 
 
 struct uart_pxa_port {
@@ -102,25 +103,20 @@ static inline void
 receive_chars(struct uart_pxa_port *up, int *status, struct pt_regs *regs)
 {
 	struct tty_struct *tty = up->port.info->tty;
-	unsigned char ch;
+	unsigned int ch, flag;
 	int max_count = 256;
 
 	do {
 		if (unlikely(tty->flip.count >= TTY_FLIPBUF_SIZE)) {
+			if (tty->low_latency)
+				tty_flip_buffer_push(tty);
 			/*
-			 * FIXME: Deadlock can happen here if we're a
-			 * low-latency port.  We're holding the per-port
-			 * spinlock, and we call flush_to_ldisc->
-			 * n_tty_receive_buf->n_tty_receive_char->
-			 * opost->uart_put_char.
+			 * If this failed then we will throw away the
+			 * bytes but must do so to clear interrupts
 			 */
-			tty->flip.work.func((void *)tty);
-			if (tty->flip.count >= TTY_FLIPBUF_SIZE)
-				return; // if TTY_DONT_FLIP is set
 		}
 		ch = serial_in(up, UART_RX);
-		*tty->flip.char_buf_ptr = ch;
-		*tty->flip.flag_buf_ptr = TTY_NORMAL;
+		flag = TTY_NORMAL;
 		up->port.icount.rx++;
 
 		if (unlikely(*status & (UART_LSR_BI | UART_LSR_PE |
@@ -159,18 +155,16 @@ receive_chars(struct uart_pxa_port *up, int *status, struct pt_regs *regs)
 			}
 #endif
 			if (*status & UART_LSR_BI) {
-				*tty->flip.flag_buf_ptr = TTY_BREAK;
+				flag = TTY_BREAK;
 			} else if (*status & UART_LSR_PE)
-				*tty->flip.flag_buf_ptr = TTY_PARITY;
+				flag = TTY_PARITY;
 			else if (*status & UART_LSR_FE)
-				*tty->flip.flag_buf_ptr = TTY_FRAME;
+				flag = TTY_FRAME;
 		}
 		if (uart_handle_sysrq_char(&up->port, ch, regs))
 			goto ignore_char;
 		if ((*status & up->port.ignore_status_mask) == 0) {
-			tty->flip.flag_buf_ptr++;
-			tty->flip.char_buf_ptr++;
-			tty->flip.count++;
+			tty_insert_flip_char(tty, ch, flag);
 		}
 		if ((*status & UART_LSR_OE) &&
 		    tty->flip.count < TTY_FLIPBUF_SIZE) {
@@ -179,10 +173,7 @@ receive_chars(struct uart_pxa_port *up, int *status, struct pt_regs *regs)
 			 * immediately, and doesn't affect the current
 			 * character.
 			 */
-			*tty->flip.flag_buf_ptr = TTY_OVERRUN;
-			tty->flip.flag_buf_ptr++;
-			tty->flip.char_buf_ptr++;
-			tty->flip.count++;
+			tty_insert_flip_char(tty, 0, TTY_OVERRUN);
 		}
 	ignore_char:
 		*status = serial_in(up, UART_LSR);

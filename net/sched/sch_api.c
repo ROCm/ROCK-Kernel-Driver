@@ -196,10 +196,14 @@ struct Qdisc *qdisc_lookup(struct net_device *dev, u32 handle)
 {
 	struct Qdisc *q;
 
+	read_lock_bh(&qdisc_tree_lock);
 	list_for_each_entry(q, &dev->qdisc_list, list) {
-		if (q->handle == handle)
+		if (q->handle == handle) {
+			read_unlock_bh(&qdisc_tree_lock);
 			return q;
+		}
 	}
+	read_unlock_bh(&qdisc_tree_lock);
 	return NULL;
 }
 
@@ -229,8 +233,11 @@ struct Qdisc_ops *qdisc_lookup_ops(struct rtattr *kind)
 	if (kind) {
 		read_lock(&qdisc_mod_lock);
 		for (q = qdisc_base; q; q = q->next) {
-			if (rtattr_strcmp(kind, q->id) == 0)
+			if (rtattr_strcmp(kind, q->id) == 0) {
+				if (!try_module_get(q->owner))
+					q = NULL;
 				break;
+			}
 		}
 		read_unlock(&qdisc_mod_lock);
 	}
@@ -409,9 +416,6 @@ qdisc_create(struct net_device *dev, u32 handle, struct rtattr **tca, int *errp)
 	err = -EINVAL;
 	if (ops == NULL)
 		goto err_out;
-	err = -EBUSY;
-	if (!try_module_get(ops->owner))
-		goto err_out;
 
 	/* ensure that the Qdisc and the private data are 32-byte aligned */
 	size = ((sizeof(*sch) + QDISC_ALIGN_CONST) & ~QDISC_ALIGN_CONST);
@@ -451,11 +455,9 @@ qdisc_create(struct net_device *dev, u32 handle, struct rtattr **tca, int *errp)
         else
                 sch->handle = handle;
 
-	/* enqueue is accessed locklessly - make sure it's visible
-	 * before we set a netdevice's qdisc pointer to sch */
 	if (!ops->init || (err = ops->init(sch, tca[TCA_OPTIONS-1])) == 0) {
 		qdisc_lock_tree(dev);
-		list_add_tail_rcu(&sch->list, &dev->qdisc_list);
+		list_add_tail(&sch->list, &dev->qdisc_list);
 		qdisc_unlock_tree(dev);
 
 #ifdef CONFIG_NET_ESTIMATOR
@@ -727,19 +729,6 @@ graft:
 	}
 	return 0;
 }
-
-int qdisc_copy_stats(struct sk_buff *skb, struct tc_stats *st, spinlock_t *lock)
-{
-	spin_lock_bh(lock);
-	RTA_PUT(skb, TCA_STATS, sizeof(struct tc_stats), st);
-	spin_unlock_bh(lock);
-	return 0;
-
-rtattr_failure:
-	spin_unlock_bh(lock);
-	return -1;
-}
-
 
 static int tc_fill_qdisc(struct sk_buff *skb, struct Qdisc *q, u32 clid,
 			 u32 pid, u32 seq, unsigned flags, int event)
@@ -1271,7 +1260,6 @@ static int __init pktsched_init(void)
 
 subsys_initcall(pktsched_init);
 
-EXPORT_SYMBOL(qdisc_copy_stats);
 EXPORT_SYMBOL(qdisc_get_rtab);
 EXPORT_SYMBOL(qdisc_put_rtab);
 EXPORT_SYMBOL(register_qdisc);

@@ -29,6 +29,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
+ * 2004-08-06 Harald Welte <laforge@gnumonks.org>
+ *	- Enable BREAK interrupt
+ *	- Add support for sysreq
+ *
  * TODO:   - Add DMA support
  *         - Defer port shutdown to a few seconds after close
  *         - maybe put something right into uap->clk_divisor
@@ -36,6 +40,7 @@
 
 #undef DEBUG
 #undef DEBUG_HARD
+#undef USE_CTRL_O_SYSRQ
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -54,6 +59,7 @@
 #include <linux/adb.h>
 #include <linux/pmu.h>
 #include <linux/bitops.h>
+#include <linux/sysrq.h>
 #include <asm/sections.h>
 #include <asm/io.h>
 #include <asm/irq.h>
@@ -63,6 +69,10 @@
 #include <asm/dbdma.h>
 #include <asm/macio.h>
 #include <asm/semaphore.h>
+
+#if defined (CONFIG_SERIAL_PMACZILOG_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
+#define SUPPORT_SYSRQ
+#endif
 
 #include <linux/serial.h>
 #include <linux/serial_core.h>
@@ -259,8 +269,27 @@ static struct tty_struct *pmz_receive_chars(struct uart_pmac_port *uap,
 		}
 
 		ch &= uap->parity_mask;
-		if (ch == 0 && uap->prev_status & BRK_ABRT)
-			r1 |= BRK_ABRT;
+		if (ch == 0 && uap->flags & PMACZILOG_FLAG_BREAK) {
+			uap->flags &= ~PMACZILOG_FLAG_BREAK;
+		}
+
+#if defined(CONFIG_MAGIC_SYSRQ) && defined(CONFIG_SERIAL_CORE_CONSOLE)
+#ifdef USE_CTRL_O_SYSRQ
+		/* Handle the SysRq ^O Hack */
+		if (ch == '\x0f') {
+			uap->port.sysrq = jiffies + HZ*5;
+			goto next_char;
+		}
+#endif /* USE_CTRL_O_SYSRQ */
+		if (uap->port.sysrq) {
+			int swallow;
+			spin_unlock(&uap->port.lock);
+			swallow = uart_handle_sysrq_char(&uap->port, ch, regs);
+			spin_lock(&uap->port.lock);
+			if (swallow)
+				goto next_char;
+ 		}
+#endif /* CONFIG_MAGIC_SYSRQ && CONFIG_SERIAL_CORE_CONSOLE */
 
 		/* A real serial line, record the character and status.  */
 		if (drop)
@@ -276,10 +305,8 @@ static struct tty_struct *pmz_receive_chars(struct uart_pmac_port *uap,
 				pmz_debug("pmz: got break !\n");
 				r1 &= ~(PAR_ERR | CRC_ERR);
 				uap->port.icount.brk++;
-				if (uart_handle_break(&uap->port)) {
-					pmz_debug("pmz: do handle break !\n");
+				if (uart_handle_break(&uap->port))
 					goto next_char;
-				}
 			}
 			else if (r1 & PAR_ERR)
 				uap->port.icount.parity++;
@@ -294,10 +321,6 @@ static struct tty_struct *pmz_receive_chars(struct uart_pmac_port *uap,
 				*tty->flip.flag_buf_ptr = TTY_PARITY;
 			else if (r1 & CRC_ERR)
 				*tty->flip.flag_buf_ptr = TTY_FRAME;
-		}
-		if (uart_handle_sysrq_char(&uap->port, ch, regs)) {
-			pmz_debug("pmz: sysrq swallowed the char\n");
-			goto next_char;
 		}
 
 		if (uap->port.ignore_status_mask == 0xff ||
@@ -363,6 +386,9 @@ static void pmz_status_handle(struct uart_pmac_port *uap, struct pt_regs *regs)
 
 		wake_up_interruptible(&uap->port.info->delta_msr_wait);
 	}
+
+	if (status & BRK_ABRT)
+		uap->flags |= PMACZILOG_FLAG_BREAK;
 
 	uap->prev_status = status;
 }
@@ -872,8 +898,8 @@ static int __pmz_startup(struct uart_pmac_port *uap)
 	uap->curregs[R13] = 0;
 	uap->curregs[R14] = BRENAB;
 
-	/* Clear handshaking */
-	uap->curregs[R15] = 0;
+	/* Clear handshaking, enable BREAK interrupts */
+	uap->curregs[R15] = BRKIE;
 
 	/* Master interrupt enable */
 	uap->curregs[R9] |= NV | MIE;
@@ -949,8 +975,7 @@ static int pmz_startup(struct uart_port *port)
 	 */
 	if (pwr_delay != 0) {
 		pmz_debug("pmz: delaying %d ms\n", pwr_delay);
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout((pwr_delay * HZ)/1000);
+		msleep(pwr_delay);
 	}
 
 	/* IrDA reset is done now */
@@ -1309,6 +1334,8 @@ static void __pmz_set_termios(struct uart_port *port, struct termios *termios,
 		/* Load registers to the chip */
 		pmz_maybe_update_regs(uap);
 	}
+	uart_update_timeout(port, termios->c_cflag, baud);
+
 	pmz_debug("pmz: set_termios() done.\n");
 }
 
@@ -1576,7 +1603,7 @@ static int pmz_suspend(struct macio_dev *mdev, u32 pm_state)
 		return 0;
 	}
 
-	if (pm_state == mdev->ofdev.dev.power_state || pm_state < 2)
+	if (pm_state == mdev->ofdev.dev.power.power_state || pm_state < 2)
 		return 0;
 
 	pmz_debug("suspend, switching to state %d\n", pm_state);
@@ -1620,7 +1647,7 @@ static int pmz_suspend(struct macio_dev *mdev, u32 pm_state)
 
 	pmz_debug("suspend, switching complete\n");
 
-	mdev->ofdev.dev.power_state = pm_state;
+	mdev->ofdev.dev.power.power_state = pm_state;
 
 	return 0;
 }
@@ -1636,7 +1663,7 @@ static int pmz_resume(struct macio_dev *mdev)
 	if (uap == NULL)
 		return 0;
 
-	if (mdev->ofdev.dev.power_state == 0)
+	if (mdev->ofdev.dev.power.power_state == 0)
 		return 0;
 	
 	pmz_debug("resume, switching to state 0\n");
@@ -1684,13 +1711,12 @@ static int pmz_resume(struct macio_dev *mdev)
 	 */
 	if (pwr_delay != 0) {
 		pmz_debug("pmz: delaying %d ms\n", pwr_delay);
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout((pwr_delay * HZ)/1000);
+		msleep(pwr_delay);
 	}
 
 	pmz_debug("resume, switching complete\n");
 
-	mdev->ofdev.dev.power_state = 0;
+	mdev->ofdev.dev.power.power_state = 0;
 
 	return 0;
 }

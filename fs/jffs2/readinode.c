@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: readinode.c,v 1.113 2003/11/03 13:20:33 dwmw2 Exp $
+ * $Id: readinode.c,v 1.114 2004/11/14 17:07:07 dedekind Exp $
  *
  */
 
@@ -510,7 +510,7 @@ static int jffs2_do_read_inode_internal(struct jffs2_sb_info *c,
 	D1(printk(KERN_DEBUG "jffs2_do_read_inode_internal(): ino #%u nlink is %d\n", f->inocache->ino, f->inocache->nlink));
 
 	/* Grab all nodes relevant to this ino */
-	ret = jffs2_get_inode_nodes(c, f->inocache->ino, f, &tn_list, &fd_list, &f->highest_version, &latest_mctime, &mctime_ver);
+	ret = jffs2_get_inode_nodes(c, f, &tn_list, &fd_list, &f->highest_version, &latest_mctime, &mctime_ver);
 
 	if (ret) {
 		printk(KERN_CRIT "jffs2_get_inode_nodes() for ino %u returned %d\n", f->inocache->ino, ret);

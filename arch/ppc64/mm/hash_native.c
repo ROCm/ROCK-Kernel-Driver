@@ -387,33 +387,37 @@ static void native_flush_hash_range(unsigned long context,
 	local_irq_restore(flags);
 }
 
+#ifdef CONFIG_PPC_PSERIES
+/* Disable TLB batching on nighthawk */
+static inline int tlb_batching_enabled(void)
+{
+	struct device_node *root = of_find_node_by_path("/");
+	int enabled = 1;
+
+	if (root) {
+		const char *model = get_property(root, "model", NULL);
+		if (model && !strcmp(model, "IBM,9076-N81"))
+			enabled = 0;
+		of_node_put(root);
+	}
+
+	return enabled;
+}
+#else
+static inline int tlb_batching_enabled(void)
+{
+	return 1;
+}
+#endif
+
 void hpte_init_native(void)
 {
-#ifdef CONFIG_PPC_PSERIES
-	struct device_node *root;
-	const char *model;
-#endif /* CONFIG_PPC_PSERIES */
-
 	ppc_md.hpte_invalidate	= native_hpte_invalidate;
 	ppc_md.hpte_updatepp	= native_hpte_updatepp;
 	ppc_md.hpte_updateboltedpp = native_hpte_updateboltedpp;
 	ppc_md.hpte_insert	= native_hpte_insert;
 	ppc_md.hpte_remove     	= native_hpte_remove;
-
-#ifdef CONFIG_PPC_PSERIES
-	/* Disable TLB batching on nighthawk */
-	root = of_find_node_by_path("/");
-	if (root) {
-		model = get_property(root, "model", NULL);
-		if (!strcmp(model, "CHRP IBM,9076-N81")) {
-			of_node_put(root);
-			goto bail;
-		}
-		of_node_put(root);
-	}
-#endif /* CONFIG_PPC_PSERIES */
-
-	ppc_md.flush_hash_range = native_flush_hash_range;
- bail:
+	if (tlb_batching_enabled())
+		ppc_md.flush_hash_range = native_flush_hash_range;
 	htab_finish_init();
 }

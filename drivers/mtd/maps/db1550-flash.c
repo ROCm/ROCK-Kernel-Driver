@@ -1,7 +1,7 @@
 /*
  * Flash memory access on Alchemy Db1550 board
  * 
- * $Id: db1550-flash.c,v 1.6 2004/10/20 05:50:19 ppopov Exp $
+ * $Id: db1550-flash.c,v 1.7 2004/11/04 13:24:14 gleixner Exp $
  *
  * (C) 2004 Embedded Edge, LLC, based on db1550-flash.c:
  * (C) 2003, 2004 Pete Popov <ppopov@embeddedalley.com>
@@ -161,8 +161,7 @@ int __init db1550_mtd_init(void)
 	 */
 	printk(KERN_NOTICE "Db1550 flash: probing %d-bit flash bus\n", 
 			db1550_map.bankwidth*8);
-	db1550_map.virt = 
-		(void __iomem *)ioremap(window_addr, window_size);
+	db1550_map.virt = ioremap(window_addr, window_size);
 	mymtd = do_map_probe("cfi_probe", &db1550_map);
 	if (!mymtd) return -ENXIO;
 	mymtd->owner = THIS_MODULE;

@@ -4598,7 +4598,7 @@ static void sctp_sock_migrate(struct sock *oldsk, struct sock *newsk,
 	 * delivery.   Three cases:
 	 * 1) No partial deliver;  no work.
 	 * 2) Peeling off partial delivery; keep pd_lobby in new pd_lobby.
-	 * 3) Peeling off non-partial delivery; move pd_lobby to recieve_queue.
+	 * 3) Peeling off non-partial delivery; move pd_lobby to receive_queue.
 	 */
 	skb_queue_head_init(&newsp->pd_lobby);
 	sctp_sk(newsk)->pd_mode = assoc->ulpq.pd_mode;
@@ -4652,6 +4652,7 @@ static void sctp_sock_migrate(struct sock *oldsk, struct sock *newsk,
 /* This proto struct describes the ULP interface for SCTP.  */
 struct proto sctp_prot = {
 	.name        =	"SCTP",
+	.owner       =	THIS_MODULE,
 	.close       =	sctp_close,
 	.connect     =	sctp_connect,
 	.disconnect  =	sctp_disconnect,
@@ -4675,6 +4676,7 @@ struct proto sctp_prot = {
 #if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
 struct proto sctpv6_prot = {
 	.name		= "SCTPv6",
+	.owner		= THIS_MODULE,
 	.close		= sctp_close,
 	.connect	= sctp_connect,
 	.disconnect	= sctp_disconnect,

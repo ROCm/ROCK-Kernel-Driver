@@ -33,6 +33,9 @@ struct mpu_rate rate_table[] = {
 	/* MPU MHz, xtal MHz, dpll1 MHz, CKCTL, DPLL_CTL
 	 * armdiv, dspdiv, dspmmu, tcdiv, perdiv, lcddiv
 	 */
+#if defined(CONFIG_OMAP_ARM_216MHZ) && defined(CONFIG_ARCH_OMAP16XX)
+	{ 216000000, 12000000, 216000000, 0x050d, 0x2910 }, /* 1/1/2/2/2/8 */
+#endif
 #if defined(CONFIG_OMAP_ARM_195MHZ) && defined(CONFIG_ARCH_OMAP730)
 	{ 195000000, 13000000, 195000000, 0x050e, 0x2790 }, /* 1/1/2/2/4/8 */
 #endif
@@ -95,19 +98,21 @@ static void watchdog_recalc(struct clk *  clk)
 static struct clk ck_ref = {
 	.name		= "ck_ref",
 	.rate		= 12000000,
-	.flags		= ALWAYS_ENABLED,
+	.flags		= CLOCK_IN_OMAP1510 | CLOCK_IN_OMAP16XX |
+			  ALWAYS_ENABLED,
 };
 
 static struct clk ck_dpll1 = {
 	.name		= "ck_dpll1",
 	.parent		= &ck_ref,
-	.flags		= RATE_PROPAGATES | ALWAYS_ENABLED,
+	.flags		= CLOCK_IN_OMAP1510 | CLOCK_IN_OMAP16XX |
+			  RATE_PROPAGATES | ALWAYS_ENABLED,
 };
 
 static struct clk ck_dpll1out = {
 	.name		= "ck_dpll1out",
 	.parent		= &ck_dpll1,
-	.flags		= DOES_NOT_EXIST_ON_1510,
+	.flags		= CLOCK_IN_OMAP16XX,
 	.enable_reg	= ARM_IDLECT2,
 	.enable_bit	= EN_CKOUT_ARM,
 	.recalc		= &followparent_recalc,
@@ -116,7 +121,8 @@ static struct clk ck_dpll1out = {
 static struct clk arm_ck = {
 	.name		= "arm_ck",
 	.parent		= &ck_dpll1,
-	.flags		= RATE_CKCTL | RATE_PROPAGATES | ALWAYS_ENABLED,
+	.flags		= CLOCK_IN_OMAP1510 | CLOCK_IN_OMAP16XX |
+			  RATE_CKCTL | RATE_PROPAGATES | ALWAYS_ENABLED,
 	.rate_offset	= CKCTL_ARMDIV_OFFSET,
 	.recalc		= &ckctl_recalc,
 };
@@ -124,7 +130,8 @@ static struct clk arm_ck = {
 static struct clk armper_ck = {
 	.name		= "armper_ck",
 	.parent		= &ck_dpll1,
-	.flags		= RATE_CKCTL,
+	.flags		= CLOCK_IN_OMAP1510 | CLOCK_IN_OMAP16XX |
+			  RATE_CKCTL,
 	.enable_reg	= ARM_IDLECT2,
 	.enable_bit	= EN_PERCK,
 	.rate_offset	= CKCTL_PERDIV_OFFSET,
@@ -134,7 +141,7 @@ static struct clk armper_ck = {
 static struct clk arm_gpio_ck = {
 	.name		= "arm_gpio_ck",
 	.parent		= &ck_dpll1,
-	.flags		= DOES_NOT_EXIST_ON_1610,
+	.flags		= CLOCK_IN_OMAP1510,
 	.enable_reg	= ARM_IDLECT2,
 	.enable_bit	= EN_GPIOCK,
 	.recalc		= &followparent_recalc,
@@ -143,6 +150,7 @@ static struct clk arm_gpio_ck = {
 static struct clk armxor_ck = {
 	.name		= "armxor_ck",
 	.parent		= &ck_ref,
+	.flags		= CLOCK_IN_OMAP1510 | CLOCK_IN_OMAP16XX,
 	.enable_reg	= ARM_IDLECT2,
 	.enable_bit	= EN_XORPCK,
 	.recalc		= &followparent_recalc,
@@ -151,6 +159,7 @@ static struct clk armxor_ck = {
 static struct clk armtim_ck = {
 	.name		= "armtim_ck",
 	.parent		= &ck_ref,
+	.flags		= CLOCK_IN_OMAP1510 | CLOCK_IN_OMAP16XX,
 	.enable_reg	= ARM_IDLECT2,
 	.enable_bit	= EN_TIMCK,
 	.recalc		= &followparent_recalc,
@@ -159,6 +168,7 @@ static struct clk armtim_ck = {
 static struct clk armwdt_ck = {
 	.name		= "armwdt_ck",
 	.parent		= &ck_ref,
+	.flags		= CLOCK_IN_OMAP1510 | CLOCK_IN_OMAP16XX,
 	.enable_reg	= ARM_IDLECT2,
 	.enable_bit	= EN_WDTCK,
 	.recalc		= &watchdog_recalc,
@@ -167,7 +177,7 @@ static struct clk armwdt_ck = {
 static struct clk arminth_ck1610 = {
 	.name		= "arminth_ck",
 	.parent		= &arm_ck,
-	.flags		= DOES_NOT_EXIST_ON_1510,
+	.flags		= CLOCK_IN_OMAP16XX,
 	.recalc		= &followparent_recalc,
 	/* Note: On 1610/1710 frequency can be divided by 2 by programming
 	 * ARM_CKCTL:ARM_INTHCK_SEL(14) to 1
@@ -179,7 +189,8 @@ static struct clk arminth_ck1610 = {
 static struct clk dsp_ck = {
 	.name		= "dsp_ck",
 	.parent		= &ck_dpll1,
-	.flags		= RATE_CKCTL,
+	.flags		= CLOCK_IN_OMAP1510 | CLOCK_IN_OMAP16XX |
+			  RATE_CKCTL,
 	.enable_reg	= ARM_CKCTL,
 	.enable_bit	= EN_DSPCK,
 	.rate_offset	= CKCTL_DSPDIV_OFFSET,
@@ -189,7 +200,8 @@ static struct clk dsp_ck = {
 static struct clk dspmmu_ck = {
 	.name		= "dspmmu_ck",
 	.parent		= &ck_dpll1,
-	.flags		= RATE_CKCTL | ALWAYS_ENABLED,
+	.flags		= CLOCK_IN_OMAP1510 | CLOCK_IN_OMAP16XX |
+			  RATE_CKCTL | ALWAYS_ENABLED,
 	.rate_offset	= CKCTL_DSPMMUDIV_OFFSET,
 	.recalc		= &ckctl_recalc,
 };
@@ -197,7 +209,8 @@ static struct clk dspmmu_ck = {
 static struct clk tc_ck = {
 	.name		= "tc_ck",
 	.parent		= &ck_dpll1,
-	.flags		= RATE_CKCTL | RATE_PROPAGATES | ALWAYS_ENABLED,
+	.flags		= CLOCK_IN_OMAP1510 | CLOCK_IN_OMAP16XX |
+			  RATE_CKCTL | RATE_PROPAGATES | ALWAYS_ENABLED,
 	.rate_offset	= CKCTL_TCDIV_OFFSET,
 	.recalc		= &ckctl_recalc,
 };
@@ -205,7 +218,7 @@ static struct clk tc_ck = {
 static struct clk arminth_ck1510 = {
 	.name		= "arminth_ck",
 	.parent		= &tc_ck,
-	.flags		= DOES_NOT_EXIST_ON_1610,
+	.flags		= CLOCK_IN_OMAP1510,
 	.recalc		= &followparent_recalc,
 	/* Note: On 1510 frequency follows TC_CK
 	 *
@@ -216,14 +229,14 @@ static struct clk arminth_ck1510 = {
 static struct clk tipb_ck = {
 	.name		= "tibp_ck",
 	.parent		= &tc_ck,
-	.flags		= DOES_NOT_EXIST_ON_1610,
+	.flags		= CLOCK_IN_OMAP1510,
 	.recalc		= &followparent_recalc,
 };
 
 static struct clk l3_ocpi_ck = {
 	.name		= "l3_ocpi_ck",
 	.parent		= &tc_ck,
-	.flags		= DOES_NOT_EXIST_ON_1510,
+	.flags		= CLOCK_IN_OMAP16XX,
 	.enable_reg	= ARM_IDLECT3,
 	.enable_bit	= EN_OCPI_CK,
 	.recalc		= &followparent_recalc,
@@ -232,7 +245,7 @@ static struct clk l3_ocpi_ck = {
 static struct clk tc1_ck = {
 	.name		= "tc1_ck",
 	.parent		= &tc_ck,
-	.flags		= DOES_NOT_EXIST_ON_1510,
+	.flags		= CLOCK_IN_OMAP16XX,
 	.enable_reg	= ARM_IDLECT3,
 	.enable_bit	= EN_TC1_CK,
 	.recalc		= &followparent_recalc,
@@ -241,7 +254,7 @@ static struct clk tc1_ck = {
 static struct clk tc2_ck = {
 	.name		= "tc2_ck",
 	.parent		= &tc_ck,
-	.flags		= DOES_NOT_EXIST_ON_1510,
+	.flags		= CLOCK_IN_OMAP16XX,
 	.enable_reg	= ARM_IDLECT3,
 	.enable_bit	= EN_TC2_CK,
 	.recalc		= &followparent_recalc,
@@ -250,19 +263,21 @@ static struct clk tc2_ck = {
 static struct clk dma_ck = {
 	.name		= "dma_ck",
 	.parent		= &tc_ck,
+	.flags		= CLOCK_IN_OMAP1510 | CLOCK_IN_OMAP16XX,
 	.recalc		= &followparent_recalc,
 };
 
 static struct clk dma_lcdfree_ck = {
 	.name		= "dma_lcdfree_ck",
 	.parent		= &tc_ck,
-	.flags		= DOES_NOT_EXIST_ON_1510,
+	.flags		= CLOCK_IN_OMAP16XX,
 	.recalc		= &followparent_recalc,
 };
 
 static struct clk api_ck = {
 	.name		= "api_ck",
 	.parent		= &tc_ck,
+	.flags		= CLOCK_IN_OMAP1510 | CLOCK_IN_OMAP16XX,
 	.enable_reg	= ARM_IDLECT2,
 	.enable_bit	= EN_APICK,
 	.recalc		= &followparent_recalc,
@@ -271,7 +286,7 @@ static struct clk api_ck = {
 static struct clk lb_ck = {
 	.name		= "lb_ck",
 	.parent		= &tc_ck,
-	.flags		= DOES_NOT_EXIST_ON_1610,
+	.flags		= CLOCK_IN_OMAP1510,
 	.enable_reg	= ARM_IDLECT2,
 	.enable_bit	= EN_LBCK,
 	.recalc		= &followparent_recalc,
@@ -280,21 +295,22 @@ static struct clk lb_ck = {
 static struct clk rhea1_ck = {
 	.name		= "rhea1_ck",
 	.parent		= &tc_ck,
-	.flags		= DOES_NOT_EXIST_ON_1510,
+	.flags		= CLOCK_IN_OMAP16XX,
 	.recalc		= &followparent_recalc,
 };
 
 static struct clk rhea2_ck = {
 	.name		= "rhea2_ck",
 	.parent		= &tc_ck,
-	.flags		= DOES_NOT_EXIST_ON_1510,
+	.flags		= CLOCK_IN_OMAP16XX,
 	.recalc		= &followparent_recalc,
 };
 
 static struct clk lcd_ck = {
 	.name		= "lcd_ck",
 	.parent		= &ck_dpll1,
-	.flags		= RATE_CKCTL,
+	.flags		= CLOCK_IN_OMAP1510 | CLOCK_IN_OMAP16XX |
+			  RATE_CKCTL,
 	.enable_reg	= ARM_IDLECT2,
 	.enable_bit	= EN_LCDCK,
 	.rate_offset	= CKCTL_LCDDIV_OFFSET,
@@ -305,7 +321,8 @@ static struct clk uart1_ck = {
 	.name		= "uart1_ck",
 	/* Direct from ULPD, no parent */
 	.rate		= 48000000,
-	.flags		= RATE_FIXED | ENABLE_REG_32BIT,
+	.flags		= CLOCK_IN_OMAP1510 | CLOCK_IN_OMAP16XX |
+			  RATE_FIXED | ENABLE_REG_32BIT,
 	.enable_reg	= MOD_CONF_CTRL_0,
 	.enable_bit	= 29,
 	/* (Only on 1510)
@@ -317,7 +334,8 @@ static struct clk uart2_ck = {
 	.name		= "uart2_ck",
 	/* Direct from ULPD, no parent */
 	.rate		= 48000000,
-	.flags		= RATE_FIXED | ENABLE_REG_32BIT,
+	.flags		= CLOCK_IN_OMAP1510 | CLOCK_IN_OMAP16XX |
+			  RATE_FIXED | ENABLE_REG_32BIT,
 	.enable_reg	= MOD_CONF_CTRL_0,
 	.enable_bit	= 30,
 	/* (1510/1610/1710)
@@ -329,7 +347,8 @@ static struct clk uart3_ck = {
 	.name		= "uart3_ck",
 	/* Direct from ULPD, no parent */
 	.rate		= 48000000,
-	.flags		= RATE_FIXED | ENABLE_REG_32BIT,
+	.flags		= CLOCK_IN_OMAP1510 | CLOCK_IN_OMAP16XX |
+			  RATE_FIXED | ENABLE_REG_32BIT,
 	.enable_reg	= MOD_CONF_CTRL_0,
 	.enable_bit	= 31,
 	/* (Only on 1510)
@@ -341,8 +360,8 @@ static struct clk usb_ck1610 = {
 	.name		= "usb_ck",
 	/* Direct from ULPD, no parent */
 	.rate		= 48000000,
-	.flags		= RATE_FIXED | ENABLE_REG_32BIT |
-			  DOES_NOT_EXIST_ON_1510,
+	.flags		= CLOCK_IN_OMAP16XX |
+			  RATE_FIXED | ENABLE_REG_32BIT,
 	.enable_reg	= ULPD_CLOCK_CTRL,
 	.enable_bit	= USB_MCLK_EN,
 };
@@ -351,14 +370,15 @@ static struct clk usb_ck1510 = {
 	.name		= "usb_ck",
 	/* Direct from ULPD, no parent */
 	.rate		= 48000000,
-	.flags		= RATE_FIXED | DOES_NOT_EXIST_ON_1610,
+	.flags		= CLOCK_IN_OMAP1510 | RATE_FIXED,
 };
 
 static struct clk usb_hhc_ck = {
 	.name		= "usb_hhc_ck",
 	/* Direct from ULPD, no parent */
 	.rate		= 48000000, /* Actually 2 clocks, 12MHz and 48MHz */
-	.flags		= RATE_FIXED | ENABLE_REG_32BIT,
+	.flags		= CLOCK_IN_OMAP1510 | CLOCK_IN_OMAP16XX |
+			  RATE_FIXED | ENABLE_REG_32BIT,
 	.enable_reg	= MOD_CONF_CTRL_0,
 	.enable_bit	= USB_HOST_HHC_UHOST_EN,
 };
@@ -373,39 +393,32 @@ static struct clk bclk = {
 };
 -- to be done */
 
-static struct clk mmc_ck = {
-	.name		= "mmc1_ck",
-	.parent		= &armxor_ck, /* (1510) */
-	.rate		= 48000000,
-	.flags		= RATE_FIXED | ENABLE_REG_32BIT |
-			  DOES_NOT_EXIST_ON_1610,
-	.enable_reg	= MOD_CONF_CTRL_0,
-	.enable_bit	= 23,
-};
-
 static struct clk mmc1_ck = {
 	.name		= "mmc1_ck",
-	/* Direct from ULPD, no parent (1610/1710) */
+	/* Functional clock is direct from ULPD, interface clock is ARMPER */
+	.parent		= &armper_ck,
 	.rate		= 48000000,
-	.flags		= RATE_FIXED | ENABLE_REG_32BIT |
-			  DOES_NOT_EXIST_ON_1510,
+	.flags		= CLOCK_IN_OMAP1510 | CLOCK_IN_OMAP16XX |
+			  RATE_FIXED | ENABLE_REG_32BIT,
 	.enable_reg	= MOD_CONF_CTRL_0,
 	.enable_bit	= 23,
 };
 
 static struct clk mmc2_ck = {
 	.name		= "mmc2_ck",
-	/* Direct from ULPD, no parent */
+	/* Functional clock is direct from ULPD, interface clock is ARMPER */
+	.parent		= &armper_ck,
 	.rate		= 48000000,
-	.flags		= RATE_FIXED | ENABLE_REG_32BIT |
-			  DOES_NOT_EXIST_ON_1510,
+	.flags		= CLOCK_IN_OMAP16XX |
+			  RATE_FIXED | ENABLE_REG_32BIT,
 	.enable_reg	= MOD_CONF_CTRL_0,
 	.enable_bit	= 20,
 };
 
 static struct clk virtual_ck_mpu = {
 	.name		= "mpu",
-	.flags		= VIRTUAL_CLOCK | ALWAYS_ENABLED,
+	.flags		= CLOCK_IN_OMAP1510 | CLOCK_IN_OMAP16XX |
+			  VIRTUAL_CLOCK | ALWAYS_ENABLED,
 	.parent		= &arm_ck, /* Is smarter alias for */
 	.recalc		= &followparent_recalc,
 	.set_rate	= &select_table_rate,
@@ -454,8 +467,7 @@ static struct clk *  onchip_clks[] = {
 	&mclk,
 	&bclk,
 	-- to be done */
-	&mmc_ck, /* 1510 */
-	&mmc1_ck, /* 1610/1710 */
+	&mmc1_ck,
 	&mmc2_ck,
 	/* Virtual clocks */
 	&virtual_ck_mpu,
@@ -496,7 +508,8 @@ int __clk_enable(struct clk *clk)
 		return 0;
 
 	if (unlikely(clk->enable_reg == 0)) {
-		printk("Enable for %s without enable enabled\n", clk->name);
+		printk(KERN_ERR "clock.c: Enable for %s without enable code\n",
+		       clk->name);
 		return 0;
 	}
 
@@ -618,10 +631,6 @@ EXPORT_SYMBOL(clk_unuse);
 
 unsigned long clk_get_rate(struct clk *clk)
 {
-	if (clk->rate == 0) {
-		printk("Get rate for %s without cached clock\n", clk->name);
-	}
-
 	return clk->rate;
 }
 EXPORT_SYMBOL(clk_get_rate);
@@ -869,14 +878,15 @@ int __init clk_init(void)
 	int crystal_type = 0; /* Default 12 MHz */
 
 	for (clkp = onchip_clks; clkp < onchip_clks+ARRAY_SIZE(onchip_clks); clkp++) {
-		if ((((*clkp)->flags & DOES_NOT_EXIST_ON_1510) &&
-		     cpu_is_omap1510()) ||
-		    (((*clkp)->flags & DOES_NOT_EXIST_ON_1610) &&
-		     (cpu_is_omap1610() || cpu_is_omap1710()))) {
-			(*clkp)->parent = 0;
+		if (((*clkp)->flags &CLOCK_IN_OMAP1510) && cpu_is_omap1510()) {
+			clk_register(*clkp);
 			continue;
 		}
-		clk_register(*clkp);
+
+		if (((*clkp)->flags &CLOCK_IN_OMAP16XX) && cpu_is_omap16xx()) {
+			clk_register(*clkp);
+			continue;
+		}
 	}
 
 	info = omap_get_config(OMAP_TAG_CLOCK, struct omap_clock_config);
@@ -897,14 +907,14 @@ int __init clk_init(void)
 
 	/* Find the highest supported frequency and enable it */
 	if (select_table_rate(~0)) {
-		printk("System frequencies not set. Check your config.\n");
+		printk(KERN_ERR "System frequencies not set. Check your config.\n");
 		/* Guess sane values (60MHz) */
 		omap_writew(0x2290, DPLL_CTL);
 		omap_writew(0x1005, ARM_CKCTL);
 		ck_dpll1.rate = 60000000;
 		propagate_rate(&ck_dpll1);
-		printk("Clocking rate (xtal/DPLL1/MPU): %ld/%ld/%ld\n",
-			ck_ref.rate, ck_dpll1.rate, arm_ck.rate);
+		printk(KERN_INFO "Clocking rate (xtal/DPLL1/MPU): %ld/%ld/%ld\n",
+		       ck_ref.rate, ck_dpll1.rate, arm_ck.rate);
 	}
 
 	/* Cache rates for clocks connected to ck_ref (not dpll1) */
@@ -940,8 +950,6 @@ int __init clk_init(void)
 
 	if (cpu_is_omap1510())
 		clk_enable(&arm_gpio_ck);
-
-	start_mputimer1(0xffffffff);
 
 	return 0;
 }

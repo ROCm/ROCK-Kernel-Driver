@@ -275,7 +275,8 @@ ext2_readdir (struct file * filp, void * dirent, filldir_t filldir)
 				   "bad page in #%lu",
 				   inode->i_ino);
 			filp->f_pos += PAGE_CACHE_SIZE - offset;
-			continue;
+			ret = -EIO;
+			goto done;
 		}
 		kaddr = page_address(page);
 		if (need_revalidate) {

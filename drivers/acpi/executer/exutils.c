@@ -280,25 +280,25 @@ acpi_ex_digits_needed (
 {
 	u32                             num_digits;
 	acpi_integer                    current_value;
-	acpi_integer                    quotient;
 
 
 	ACPI_FUNCTION_TRACE ("ex_digits_needed");
 
 
-	/*
-	 * acpi_integer is unsigned, so we don't worry about a '-'
-	 */
-	if ((current_value = value) == 0) {
+	/* acpi_integer is unsigned, so we don't worry about a '-' prefix */
+
+	if (value == 0) {
 		return_VALUE (1);
 	}
 
+	current_value = value;
 	num_digits = 0;
 
+	/* Count the digits in the requested base */
+
 	while (current_value) {
-		(void) acpi_ut_short_divide (&current_value, base, &quotient, NULL);
+		(void) acpi_ut_short_divide (current_value, base, &current_value, NULL);
 		num_digits++;
-		current_value = quotient;
 	}
 
 	return_VALUE (num_digits);
@@ -361,7 +361,6 @@ acpi_ex_unsigned_integer_to_string (
 	u32                             count;
 	u32                             digits_needed;
 	u32                             remainder;
-	acpi_integer                    quotient;
 
 
 	ACPI_FUNCTION_ENTRY ();
@@ -371,9 +370,8 @@ acpi_ex_unsigned_integer_to_string (
 	out_string[digits_needed] = 0;
 
 	for (count = digits_needed; count > 0; count--) {
-		(void) acpi_ut_short_divide (&value, 10, &quotient, &remainder);
+		(void) acpi_ut_short_divide (value, 10, &value, &remainder);
 		out_string[count-1] = (char) ('0' + remainder);\
-		value = quotient;
 	}
 }
 

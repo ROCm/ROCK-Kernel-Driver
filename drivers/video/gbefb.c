@@ -384,11 +384,11 @@ static int gbefb_blank(int blank, struct fb_info *info)
 {
 	/* 0 unblank, 1 blank, 2 no vsync, 3 no hsync, 4 off */
 	switch (blank) {
-	case 0:		/* unblank */
+	case FB_BLANK_UNBLANK:		/* unblank */
 		gbe_turn_on();
 		break;
 
-	case 1:		/* blank */
+	case FB_BLANK_NORMAL:		/* blank */
 		gbe_turn_off();
 		break;
 
@@ -1140,7 +1140,6 @@ int __init gbefb_init(void)
 	for (i = 0; i < (gbe_mem_size >> TILE_SHIFT); i++)
 		gbe_tiles.cpu[i] = (gbe_mem_phys >> TILE_SHIFT) + i;
 
-	fb_info.currcon = -1;
 	fb_info.fbops = &gbefb_ops;
 	fb_info.pseudo_palette = pseudo_palette;
 	fb_info.flags = FBINFO_DEFAULT;

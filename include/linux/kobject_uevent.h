@@ -11,6 +11,11 @@
 #ifndef _KOBJECT_EVENT_H_
 #define _KOBJECT_EVENT_H_
 
+#define HOTPLUG_PATH_LEN	256
+
+/* path to the hotplug userspace helper executed on an event */
+extern char hotplug_path[];
+
 /*
  * If you add an action here, you must also add the proper string to the
  * lib/kobject_uevent.c file.
@@ -23,6 +28,7 @@ enum kobject_action {
 	KOBJ_MOUNT	= (__force kobject_action_t) 0x04,	/* mount event for block devices */
 	KOBJ_UMOUNT	= (__force kobject_action_t) 0x05,	/* umount event for block devices */
 	KOBJ_OFFLINE	= (__force kobject_action_t) 0x06,	/* offline event for hotplug devices */
+	KOBJ_ONLINE	= (__force kobject_action_t) 0x07,	/* online event for hotplug devices */
 };
 
 

@@ -91,11 +91,6 @@ static inline int read_lpstatus(struct qcam_device *q)
 	return parport_read_status(q->pport);
 }
 
-static inline int read_lpcontrol(struct qcam_device *q)
-{
-	return parport_read_control(q->pport);
-}
-
 static inline int read_lpdata(struct qcam_device *q)
 {
 	return parport_read_data(q->pport);

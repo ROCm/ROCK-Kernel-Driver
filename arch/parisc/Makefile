@@ -37,8 +37,10 @@ cflags-y	:= -pipe
 # are not in gcc 3.2.
 cflags-y	+= -mno-space-regs -mfast-indirect-calls
 
-# No fixed-point multiply
-cflags-y	+= -mdisable-fpregs
+# Currently we save and restore fpregs on all kernel entry/interruption paths.
+# If that gets optimized, we might need to disable the use of fpregs in the
+# kernel.
+#cflags-y	+= -mdisable-fpregs
 
 # Without this, "ld -r" results in .text sections that are too big
 # (> 0x40000) for branches to reach stubs.
@@ -52,7 +54,6 @@ cflags-$(CONFIG_PA7300LC)	+= -march=1.1 -mschedule=7300
 cflags-$(CONFIG_PA8X00)		+= -march=2.0 -mschedule=8000
 
 head-y			:= arch/parisc/kernel/head.o 
-head-$(CONFIG_PARISC64)	:= arch/parisc/kernel/head64.o
 
 CFLAGS	+= $(cflags-y)
 
@@ -86,6 +87,12 @@ oldpalo: vmlinux
 # Shorthands for known targets not supported by parisc, use palo as default
 Image zImage bzImage: palo
 
+kernel_install: vmlinux
+	sh $(src)/arch/parisc/install.sh \
+			$(KERNELRELEASE) $< System.map "$(INSTALL_PATH)"
+
+install: kernel_install modules_install
+
 prepare: include/asm-parisc/offsets.h
 
 arch/parisc/kernel/asm-offsets.s: include/asm include/linux/version.h \
@@ -100,4 +107,8 @@ MRPROPER_FILES	+= palo.conf
 define archhelp
 	@echo  '* vmlinux	- Uncompressed kernel image (./vmlinux)'
 	@echo  '  palo		- Bootable image (./lifimage)'
+	@echo  '  install	- Install kernel using'
+	@echo  '		  (your) ~/bin/installkernel or'
+	@echo  '		  (distribution) /sbin/installkernel or'
+	@echo  '		  copy to $$(INSTALL_PATH)'
 endef

@@ -1,5 +1,5 @@
 /*
-    mxb.c - v4l2 driver for the Multimedia eXtension Board
+    mxb - v4l2 driver for the Multimedia eXtension Board
     
     Copyright (C) 1998-2003 Michael Hunold <michael@mihu.de>
 
@@ -43,12 +43,12 @@ static int mxb_num = 0;
    in verden (lower saxony, germany) 4148 is a
    channel called "phoenix" */
 static int freq = 4148;
-MODULE_PARM(freq,"i");
+module_param(freq, int, 0644);
 MODULE_PARM_DESC(freq, "initial frequency the tuner will be tuned to while setup");
 
 static int debug = 0;
-MODULE_PARM(debug,"i");
-MODULE_PARM_DESC(debug, "debug verbosity");
+module_param(debug, int, 0644);
+MODULE_PARM_DESC(debug, "Turn on/off device debugging (default:off).");
 
 #define MXB_INPUTS 4
 enum { TUNER, AUX1, AUX3, AUX3_YC };

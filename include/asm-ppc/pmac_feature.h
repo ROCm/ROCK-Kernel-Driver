@@ -9,7 +9,7 @@
  *                    Ben. Herrenschmidt.
  *
  *
- * Note: I removed media-bay details from the feature stuff, I beleive it's
+ * Note: I removed media-bay details from the feature stuff, I believe it's
  *       not worth it, the media-bay driver can directly use the mac-io
  *       ASIC registers.
  *

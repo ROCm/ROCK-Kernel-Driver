@@ -107,12 +107,13 @@ static int sg_emulated_host(request_queue_t *q, int __user *p)
 
 #define CMD_READ_SAFE	0x01
 #define CMD_WRITE_SAFE	0x02
+#define CMD_WARNED	0x04
 #define safe_for_read(cmd)	[cmd] = CMD_READ_SAFE
 #define safe_for_write(cmd)	[cmd] = CMD_WRITE_SAFE
 
 static int verify_command(struct file *file, unsigned char *cmd)
 {
-	static const unsigned char cmd_type[256] = {
+	static unsigned char cmd_type[256] = {
 
 		/* Basic read-only commands */
 		safe_for_read(TEST_UNIT_READY),
@@ -129,7 +130,6 @@ static int verify_command(struct file *file, unsigned char *cmd)
 		safe_for_read(START_STOP),
 		safe_for_read(GPCMD_VERIFY_10),
 		safe_for_read(VERIFY_16),
-		safe_for_read(READ_BUFFER),
 
 		/* Audio CD commands */
 		safe_for_read(GPCMD_PLAY_CD),
@@ -139,6 +139,7 @@ static int verify_command(struct file *file, unsigned char *cmd)
 		safe_for_read(GPCMD_PAUSE_RESUME),
 
 		/* CD/DVD data reading */
+		safe_for_read(GPCMD_READ_BUFFER_CAPACITY),
 		safe_for_read(GPCMD_READ_CD),
 		safe_for_read(GPCMD_READ_CD_MSF),
 		safe_for_read(GPCMD_READ_DISC_INFO),
@@ -194,6 +195,11 @@ static int verify_command(struct file *file, unsigned char *cmd)
 	if (type & CMD_WRITE_SAFE) {
 		if (file->f_mode & FMODE_WRITE)
 			return 0;
+	}
+
+	if (!(type & CMD_WARNED)) {
+		cmd_type[cmd[0]] = CMD_WARNED;
+		printk(KERN_WARNING "scsi: unknown opcode 0x%02x\n", cmd[0]);
 	}
 
 	/* And root can do any command.. */

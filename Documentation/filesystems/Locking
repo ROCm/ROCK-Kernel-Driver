@@ -317,8 +317,8 @@ prototypes:
 locking rules:
 	called from interrupts. In other words, extreme care is needed here.
 bh is locked, but that's all warranties we have here. Currently only RAID1,
-highmem and fs/buffer.c are providing these. Block devices call this method
-upon the IO completion.
+highmem, fs/buffer.c, and fs/ntfs/aops.c are providing these. Block devices
+call this method upon the IO completion.
 
 --------------------------- block_device_operations -----------------------
 prototypes:

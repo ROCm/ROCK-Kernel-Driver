@@ -256,9 +256,12 @@ unsigned long __init find_and_init_phbs(void)
 		int ret = HvCallXm_testBus(bus);
 		if (ret == 0) {
 			printk("bus %d appears to exist\n", bus);
-			phb = pci_alloc_pci_controller(phb_type_hypervisor);
+
+			phb = (struct pci_controller *)kmalloc(sizeof(struct pci_controller), GFP_KERNEL);
 			if (phb == NULL)
-				return -1;
+				return -ENOMEM;
+       			pci_setup_pci_controller(phb);
+
 			phb->pci_mem_offset = phb->local_number = bus;
 			phb->first_busno = bus;
 			phb->last_busno = bus;
@@ -292,7 +295,6 @@ void iSeries_pcibios_init(void)
 	iomm_table_initialize();
 	find_and_init_phbs();
 	io_page_mask = -1;
-	/* pci_assign_all_busses = 0;		SFRXXX*/
 	PPCDBG(PPCDBG_BUSWALK, "iSeries_pcibios_init Exit.\n"); 
 }
 
@@ -309,11 +311,10 @@ void __init iSeries_pci_final_fixup(void)
 	PPCDBG(PPCDBG_BUSWALK, "iSeries_pcibios_fixup Entry.\n"); 
 
 	/* Fix up at the device node and pci_dev relationship */
-	mf_displaySrc(0xC9000100);
+	mf_display_src(0xC9000100);
 
 	printk("pcibios_final_fixup\n");
-	while ((pdev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, pdev))
-			!= NULL) {
+	for_each_pci_dev(pdev) {
 		node = find_Device_Node(pdev->bus->number, pdev->devfn);
 		printk("pci dev %p (%x.%x), node %p\n", pdev,
 		       pdev->bus->number, pdev->devfn, node);
@@ -329,14 +330,14 @@ void __init iSeries_pci_final_fixup(void)
 			iSeries_Device_Information(pdev, Buffer,
 					sizeof(Buffer));
 			printk("%d. %s\n", DeviceCount, Buffer);
-			iommu_devnode_init(node);
+			iommu_devnode_init_iSeries(node);
 		} else
 			printk("PCI: Device Tree not found for 0x%016lX\n",
 					(unsigned long)pdev);
 		pdev->irq = node->Irq;
 	}
 	iSeries_activate_IRQs();
-	mf_displaySrc(0xC9000200);
+	mf_display_src(0xC9000200);
 }
 
 void pcibios_fixup_bus(struct pci_bus *PciBus)
@@ -678,7 +679,7 @@ static int CheckReturnCode(char *TextHdr, struct iSeries_Device_Node *DevNode,
 		 */
 		if ((DevNode->IoRetry > Pci_Retry_Max) &&
 				(Pci_Error_Flag > 0)) {
-			mf_displaySrc(0xB6000103);
+			mf_display_src(0xB6000103);
 			panic_timeout = 0; 
 			panic("PCI: Hardware I/O Error, SRC B6000103, "
 					"Automatic Reboot Disabled.\n");

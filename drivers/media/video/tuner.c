@@ -1,5 +1,5 @@
 /*
- * $Id: tuner.c,v 1.27 2004/10/20 09:43:34 kraxel Exp $
+ * $Id: tuner.c,v 1.29 2004/11/07 13:17:15 kraxel Exp $
  */
 
 #include <linux/module.h>
@@ -1102,8 +1102,8 @@ static void set_type(struct i2c_client *c, unsigned int type, char *source)
 	}
 }
 
-static char *pal = "-";
-MODULE_PARM(pal,"s");
+static char pal[] = "-";
+module_param_string(pal, pal, 0644, sizeof(pal));
 
 static int tuner_fixup_std(struct tuner *t)
 {

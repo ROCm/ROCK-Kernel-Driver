@@ -166,5 +166,17 @@ void __init ibm44x_platform_init(void)
 #ifdef CONFIG_KGDB
 	ppc_md.kgdb_map_scc = gen550_kgdb_map_scc;
 #endif
+
+	/*
+	 * The Abatron BDI JTAG debugger does not tolerate others
+	 * mucking with the debug registers.
+	 */
+#if !defined(CONFIG_BDI_SWITCH)
+	/* Enable internal debug mode */
+        mtspr(SPRN_DBCR0, (DBCR0_IDM));
+
+	/* Clear any residual debug events */
+	mtspr(SPRN_DBSR, 0xffffffff);
+#endif
 }
 

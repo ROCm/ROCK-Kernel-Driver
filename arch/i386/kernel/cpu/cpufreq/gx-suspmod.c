@@ -141,17 +141,7 @@ module_param (max_duration, int, 0444);
 #define POLICY_MIN_DIV 20
 
 
-/* DEBUG
- *   Define it if you want verbose debug output
- */
-
-#define SUSPMOD_DEBUG 1
-
-#ifdef SUSPMOD_DEBUG
-#define dprintk(msg...) printk(KERN_DEBUG "cpufreq:" msg)
-#else
-#define dprintk(msg...) do { } while(0)
-#endif
+#define dprintk(msg...) cpufreq_debug_printk(CPUFREQ_DEBUG_DRIVER, "gx-suspmod", msg)
 
 /**
  *      we can detect a core multipiler from dir0_lsb 
@@ -194,7 +184,7 @@ static __init struct pci_dev *gx_detect_chipset(void)
 	/* check if CPU is a MediaGX or a Geode. */
         if ((current_cpu_data.x86_vendor != X86_VENDOR_NSC) && 
 	    (current_cpu_data.x86_vendor != X86_VENDOR_CYRIX)) {
-		printk(KERN_INFO "gx-suspmod: error: no MediaGX/Geode processor found!\n");
+		dprintk("error: no MediaGX/Geode processor found!\n");
 		return NULL;		
 	}
 
@@ -205,7 +195,7 @@ static __init struct pci_dev *gx_detect_chipset(void)
 		}
 	}
 
-	dprintk(KERN_INFO "gx-suspmod: error: no supported chipset found!\n");
+	dprintk("error: no supported chipset found!\n");
 	return NULL;
 }
 

@@ -484,6 +484,8 @@ void __init mem_init(void)
 #endif
 }
 
+extern char __initdata_begin[], __initdata_end[];
+
 void free_initmem(void)
 {
 	unsigned long addr;
@@ -492,12 +494,11 @@ void free_initmem(void)
 	for (; addr < (unsigned long)(&__init_end); addr += PAGE_SIZE) {
 		ClearPageReserved(virt_to_page(addr));
 		set_page_count(virt_to_page(addr), 1);
-#ifdef CONFIG_INIT_DEBUG
 		memset((void *)(addr & ~(PAGE_SIZE-1)), 0xcc, PAGE_SIZE); 
-#endif
 		free_page(addr);
 		totalram_pages++;
 	}
+	memset(__initdata_begin, 0xba, __initdata_end - __initdata_begin);
 	printk ("Freeing unused kernel memory: %luk freed\n", (&__init_end - &__init_begin) >> 10);
 }
 

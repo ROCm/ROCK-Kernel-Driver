@@ -197,20 +197,20 @@ cg3_blank(int blank, struct fb_info *info)
 	spin_lock_irqsave(&par->lock, flags);
 
 	switch (blank) {
-	case 0: /* Unblanking */
-		val = sbus_readl(&regs->control);
+	case FB_BLANK_UNBLANK: /* Unblanking */
+		val = sbus_readb(&regs->control);
 		val |= CG3_CR_ENABLE_VIDEO;
-		sbus_writel(val, &regs->control);
+		sbus_writeb(val, &regs->control);
 		par->flags &= ~CG3_FLAG_BLANKED;
 		break;
 
-	case 1: /* Normal blanking */
-	case 2: /* VESA blank (vsync off) */
-	case 3: /* VESA blank (hsync off) */
-	case 4: /* Poweroff */
-		val = sbus_readl(&regs->control);
+	case FB_BLANK_NORMAL: /* Normal blanking */
+	case FB_BLANK_VSYNC_SUSPEND: /* VESA blank (vsync off) */
+	case FB_BLANK_HSYNC_SUSPEND: /* VESA blank (hsync off) */
+	case FB_BLANK_POWERDOWN: /* Poweroff */
+		val = sbus_readb(&regs->control);
 		val |= CG3_CR_ENABLE_VIDEO;
-		sbus_writel(val, &regs->control);
+		sbus_writeb(val, &regs->control);
 		par->flags |= CG3_FLAG_BLANKED;
 		break;
 	}
@@ -408,7 +408,6 @@ static void cg3_init_one(struct sbus_dev *sdev)
 		all->info.screen_base = (char *)
 			sbus_ioremap(&sdev->resource[0], CG3_RAM_OFFSET,
 				     all->par.fbsize, "cg3 ram");
-	all->info.currcon = -1;
 	all->info.par = &all->par;
 
 	cg3_blank(0, &all->info);

@@ -44,8 +44,8 @@ static struct
 	struct ipt_replace repl;
 	struct ipt_standard entries[3];
 	struct ipt_error term;
-} initial_table __initdata
-= { { "filter", FILTER_VALID_HOOKS, 4,
+} initial_table = {
+    { "filter", FILTER_VALID_HOOKS, 4,
       sizeof(struct ipt_standard) * 3 + sizeof(struct ipt_error),
       { [NF_IP_LOCAL_IN] = 0,
 	[NF_IP_FORWARD] = sizeof(struct ipt_standard),

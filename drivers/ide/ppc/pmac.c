@@ -52,8 +52,6 @@
 
 #include "ide-timing.h"
 
-extern void ide_do_request(ide_hwgroup_t *hwgroup, int masked_irq);
-
 #define IDE_PMAC_DEBUG
 
 #define DMA_WAIT_TIMEOUT	50
@@ -1362,10 +1360,10 @@ pmac_ide_macio_suspend(struct macio_dev *mdev, u32 state)
 	ide_hwif_t	*hwif = (ide_hwif_t *)dev_get_drvdata(&mdev->ofdev.dev);
 	int		rc = 0;
 
-	if (state != mdev->ofdev.dev.power_state && state >= 2) {
+	if (state != mdev->ofdev.dev.power.power_state && state >= 2) {
 		rc = pmac_ide_do_suspend(hwif);
 		if (rc == 0)
-			mdev->ofdev.dev.power_state = state;
+			mdev->ofdev.dev.power.power_state = state;
 	}
 
 	return rc;
@@ -1377,10 +1375,10 @@ pmac_ide_macio_resume(struct macio_dev *mdev)
 	ide_hwif_t	*hwif = (ide_hwif_t *)dev_get_drvdata(&mdev->ofdev.dev);
 	int		rc = 0;
 	
-	if (mdev->ofdev.dev.power_state != 0) {
+	if (mdev->ofdev.dev.power.power_state != 0) {
 		rc = pmac_ide_do_resume(hwif);
 		if (rc == 0)
-			mdev->ofdev.dev.power_state = 0;
+			mdev->ofdev.dev.power.power_state = 0;
 	}
 
 	return rc;
@@ -1470,10 +1468,10 @@ pmac_ide_pci_suspend(struct pci_dev *pdev, u32 state)
 	ide_hwif_t	*hwif = (ide_hwif_t *)pci_get_drvdata(pdev);
 	int		rc = 0;
 	
-	if (state != pdev->dev.power_state && state >= 2) {
+	if (state != pdev->dev.power.power_state && state >= 2) {
 		rc = pmac_ide_do_suspend(hwif);
 		if (rc == 0)
-			pdev->dev.power_state = state;
+			pdev->dev.power.power_state = state;
 	}
 
 	return rc;
@@ -1485,10 +1483,10 @@ pmac_ide_pci_resume(struct pci_dev *pdev)
 	ide_hwif_t	*hwif = (ide_hwif_t *)pci_get_drvdata(pdev);
 	int		rc = 0;
 	
-	if (pdev->dev.power_state != 0) {
+	if (pdev->dev.power.power_state != 0) {
 		rc = pmac_ide_do_resume(hwif);
 		if (rc == 0)
-			pdev->dev.power_state = 0;
+			pdev->dev.power.power_state = 0;
 	}
 
 	return rc;

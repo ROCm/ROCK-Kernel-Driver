@@ -68,8 +68,8 @@ __xfrm6_find_bundle(struct flowi *fl, struct xfrm_policy *policy)
 		ipv6_addr_prefix(&fl_src_prefix,
 				 &fl->fl6_src,
 				 xdst->u.rt6.rt6i_src.plen);
-		if (!ipv6_addr_cmp(&xdst->u.rt6.rt6i_dst.addr, &fl_dst_prefix) &&
-		    !ipv6_addr_cmp(&xdst->u.rt6.rt6i_src.addr, &fl_src_prefix) &&
+		if (ipv6_addr_equal(&xdst->u.rt6.rt6i_dst.addr, &fl_dst_prefix) &&
+		    ipv6_addr_equal(&xdst->u.rt6.rt6i_src.addr, &fl_src_prefix) &&
 		    __xfrm6_bundle_ok(xdst, fl)) {
 			dst_clone(dst);
 			break;
@@ -123,7 +123,7 @@ __xfrm6_bundle_create(struct xfrm_policy *policy, struct xfrm_state **xfrm, int 
 		trailer_len += xfrm[i]->props.trailer_len;
 	}
 
-	if (ipv6_addr_cmp(remote, &fl->fl6_dst)) {
+	if (!ipv6_addr_equal(remote, &fl->fl6_dst)) {
 		struct flowi fl_tunnel;
 
 		memset(&fl_tunnel, 0, sizeof(fl_tunnel));

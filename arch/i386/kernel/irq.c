@@ -45,10 +45,10 @@ static union irq_ctx *softirq_ctx[NR_CPUS];
  * SMP cross-CPU interrupts have their own specific
  * handlers).
  */
-asmlinkage unsigned int do_IRQ(struct pt_regs regs)
+fastcall unsigned int do_IRQ(struct pt_regs *regs)
 {	
 	/* high bits used in ret_from_ code */
-	int irq = regs.orig_eax & 0xff;
+	int irq = regs->orig_eax & 0xff;
 #ifdef CONFIG_4KSTACKS
 	union irq_ctx *curctx, *irqctx;
 	u32 *isp;
@@ -82,24 +82,24 @@ asmlinkage unsigned int do_IRQ(struct pt_regs regs)
 	 * current stack (which is the irq stack already after all)
 	 */
 	if (curctx != irqctx) {
+		int arg1, arg2, ebx;
+
 		/* build the stack frame on the IRQ stack */
 		isp = (u32*) ((char*)irqctx + sizeof(*irqctx));
 		irqctx->tinfo.task = curctx->tinfo.task;
-		irqctx->tinfo.previous_esp = current_stack_pointer();
-
-		*--isp = (u32) &regs;
-		*--isp = (u32) irq;
+		irqctx->tinfo.previous_esp = current_stack_pointer;
 
 		asm volatile(
 			"       xchgl   %%ebx,%%esp      \n"
 			"       call    __do_IRQ         \n"
-			"       xchgl   %%ebx,%%esp      \n"
-			: : "b"(isp)
-			: "memory", "cc", "eax", "edx", "ecx"
+			"       movl   %%ebx,%%esp      \n"
+			: "=a" (arg1), "=d" (arg2), "=b" (ebx)
+			:  "0" (irq),   "1" (regs),  "2" (isp)
+			: "memory", "cc", "ecx"
 		);
 	} else
 #endif
-		__do_IRQ(irq, &regs);
+		__do_IRQ(irq, regs);
 
 	irq_exit();
 
@@ -168,7 +168,7 @@ asmlinkage void do_softirq(void)
 		curctx = current_thread_info();
 		irqctx = softirq_ctx[smp_processor_id()];
 		irqctx->tinfo.task = curctx->task;
-		irqctx->tinfo.previous_esp = current_stack_pointer();
+		irqctx->tinfo.previous_esp = current_stack_pointer;
 
 		/* build the stack frame on the softirq stack */
 		isp = (u32*) ((char*)irqctx + sizeof(*irqctx));

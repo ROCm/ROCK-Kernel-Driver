@@ -165,14 +165,123 @@ static void remove_slot(struct dummy_slot *dslot)
 		err("Problem unregistering a slot %s\n", dslot->slot->name);
 }
 
+/**
+ * Rescan slot.
+ * Tries hard not to re-enable already existing devices
+ * also handles scanning of subfunctions
+ *
+ * @param temp   Device template. Should be set: bus and devfn.
+ */
+static void pci_rescan_slot(struct pci_dev *temp)
+{
+	struct pci_bus *bus = temp->bus;
+	struct pci_dev *dev;
+	int func;
+	u8 hdr_type;
+	if (!pci_read_config_byte(temp, PCI_HEADER_TYPE, &hdr_type)) {
+		temp->hdr_type = hdr_type & 0x7f;
+		if (!pci_find_slot(bus->number, temp->devfn)) {
+			dev = pci_scan_single_device(bus, temp->devfn);
+			if (dev) {
+				dbg("New device on %s function %x:%x\n",
+					bus->name, temp->devfn >> 3,
+					temp->devfn & 7);
+				pci_bus_add_device(dev);
+				add_slot(dev);
+			}
+		}
+		/* multifunction device? */
+		if (!(hdr_type & 0x80))
+			return;
+
+		/* continue scanning for other functions */
+		for (func = 1, temp->devfn++; func < 8; func++, temp->devfn++) {
+			if (pci_read_config_byte(temp, PCI_HEADER_TYPE, &hdr_type))
+				continue;
+			temp->hdr_type = hdr_type & 0x7f;
+
+			if (!pci_find_slot(bus->number, temp->devfn)) {
+				dev = pci_scan_single_device(bus, temp->devfn);
+				if (dev) {
+					dbg("New device on %s function %x:%x\n",
+						bus->name, temp->devfn >> 3,
+						temp->devfn & 7);
+					pci_bus_add_device(dev);
+					add_slot(dev);
+				}
+			}
+		}
+	}
+}
+
+
+/**
+ * Rescan PCI bus.
+ * call pci_rescan_slot for each possible function of the bus
+ *
+ * @param bus
+ */
+static void pci_rescan_bus(const struct pci_bus *bus)
+{
+	unsigned int devfn;
+	struct pci_dev *dev;
+	dev = kmalloc(sizeof(struct pci_dev), GFP_KERNEL);
+	if (!dev)
+		return;
+
+	memset(dev, 0, sizeof(dev));
+	dev->bus = (struct pci_bus*)bus;
+	dev->sysdata = bus->sysdata;
+	for (devfn = 0; devfn < 0x100; devfn += 8) {
+		dev->devfn = devfn;
+		pci_rescan_slot(dev);
+	}
+	kfree(dev);
+}
+
+/* recursively scan all buses */
+static void pci_rescan_buses(const struct list_head *list)
+{
+	const struct list_head *l;
+	list_for_each(l,list) {
+		const struct pci_bus *b = pci_bus_b(l);
+		pci_rescan_bus(b);
+		pci_rescan_buses(&b->children);
+	}
+}
+
+/* initiate rescan of all pci buses */
+static inline void pci_rescan(void) {
+	pci_rescan_buses(&pci_root_buses);
+}
+
+
 static int enable_slot(struct hotplug_slot *hotplug_slot)
 {
+	/* mis-use enable_slot for rescanning of the pci bus */
+	pci_rescan();
 	return -ENODEV;
 }
+
+/* find the hotplug_slot for the pci_dev */
+static struct hotplug_slot *get_slot_from_dev(struct pci_dev *dev)
+{
+	struct dummy_slot *dslot;
+
+	list_for_each_entry(dslot, &slot_list, node) {
+		if (dslot->dev == dev)
+			return dslot->slot;
+	}
+	return NULL;
+}
+
 
 static int disable_slot(struct hotplug_slot *slot)
 {
 	struct dummy_slot *dslot;
+	struct hotplug_slot *hslot;
+	struct pci_dev *dev;
+	int func;
 
 	if (!slot)
 		return -ENODEV;
@@ -184,6 +293,23 @@ static int disable_slot(struct hotplug_slot *slot)
 	if (dslot->dev->subordinate) {
 		err("Can't remove PCI devices with other PCI devices behind it yet.\n");
 		return -ENODEV;
+	}
+	/* search for subfunctions and disable them first */
+	if (!(dslot->dev->devfn & 7)) {
+		for (func = 1; func < 8; func++) {
+			dev = pci_find_slot(dslot->dev->bus->number,
+					dslot->dev->devfn + func);
+			if (dev) {
+				hslot = get_slot_from_dev(dev);
+				if (hslot)
+					disable_slot(hslot);
+				else {
+					err("Hotplug slot not found for subfunction of PCI device\n");
+					return -ENODEV;
+				}
+			} else
+				dbg("No device in slot found\n");
+		}
 	}
 
 	/* remove the device from the pci core */
@@ -227,6 +353,6 @@ module_exit(dummyphp_exit);
 MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
-MODULE_PARM(debug, "i");
+module_param(debug, bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(debug, "Debugging mode enabled or not");
 

@@ -116,7 +116,28 @@ static int dev_hotplug(struct kset *kset, struct kobject *kobj, char **envp,
 			int num_envp, char *buffer, int buffer_size)
 {
 	struct device *dev = to_dev(kobj);
+	int i = 0;
+	int length = 0;
 	int retval = 0;
+
+	/* add bus name of physical device */
+	if (dev->bus)
+		add_hotplug_env_var(envp, num_envp, &i,
+				    buffer, buffer_size, &length,
+				    "PHYSDEVBUS=%s", dev->bus->name);
+
+	/* add driver name of physical device */
+	if (dev->driver)
+		add_hotplug_env_var(envp, num_envp, &i,
+				    buffer, buffer_size, &length,
+				    "PHYSDEVDRIVER=%s", dev->driver->name);
+
+	/* terminate, set to next free slot, shrink available space */
+	envp[i] = NULL;
+	envp = &envp[i];
+	num_envp -= i;
+	buffer = &buffer[length];
+	buffer_size -= length;
 
 	if (dev->bus->hotplug) {
 		/* have the bus specific function add its stuff */
@@ -209,12 +230,12 @@ void device_initialize(struct device *dev)
  */
 int device_add(struct device *dev)
 {
-	struct device * parent;
-	int error;
+	struct device *parent = NULL;
+	int error = -EINVAL;
 
 	dev = get_device(dev);
 	if (!dev || !strlen(dev->bus_id))
-		return -EINVAL;
+		goto Error;
 
 	parent = get_device(dev->parent);
 

@@ -1,3 +1,32 @@
+config CPU_FREQ
+	bool "CPU Frequency scaling"
+	help
+	  CPU Frequency scaling allows you to change the clock speed of 
+	  CPUs on the fly. This is a nice method to save power, because 
+	  the lower the CPU clock speed, the less power the CPU consumes.
+
+	  Note that this driver doesn't automatically change the CPU
+	  clock speed, you need to either enable a dynamic cpufreq governor
+	  (see below) after boot, or use a userspace tool.
+
+	  For details, take a look at <file:Documentation/cpu-freq>.
+
+	  If in doubt, say N.
+
+config CPU_FREQ_DEBUG
+	bool "Enable CPUfreq debugging"
+	depends on CPU_FREQ
+	help
+	  Say Y here to enable CPUfreq subsystem (including drivers)
+	  debugging. You will need to activate it via the kernel
+	  command line by passing
+	     cpufreq.debug=<value>
+
+	  To get <value>, add 
+	       1 to activate CPUfreq core debugging,
+	       2 to activate CPUfreq drivers debugging, and
+	       4 to activate CPUfreq governor debugging
+
 config CPU_FREQ_PROC_INTF
 	tristate "/proc/cpufreq interface (deprecated)"
 	depends on CPU_FREQ && PROC_FS

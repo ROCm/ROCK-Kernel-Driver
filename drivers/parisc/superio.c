@@ -69,14 +69,11 @@
 #include <linux/tty.h>
 #include <linux/serial_core.h>
 #include <linux/delay.h>
-#include <linux/ide.h>
 
 #include <asm/io.h>
 #include <asm/hardware.h>
 #include <asm/irq.h>
 #include <asm/superio.h>
-
-#define SUPERIO_IDE_MAX_RETRIES 25
 
 static struct superio_device sio_dev;
 
@@ -101,16 +98,20 @@ superio_interrupt(int irq, void *devp, struct pt_regs *regs)
 
 	results = inb(IC_PIC1+0);
 
+	/*
+	 * Bit    7:	1 = active Interrupt; 0 = no Interrupt pending
+	 * Bits 6-3:	zero
+	 * Bits 2-0:	highest priority, active requesting interrupt ID (0-7)
+	 */
 	if ((results & 0x80) == 0) {
-#ifndef CONFIG_SMP
-		/* HACK: need to investigate why this happens if SMP enabled */
-		BUG(); /* This shouldn't happen */
-#endif
+		/* I suspect "spurious" interrupts are from unmasking an IRQ.
+		 * We don't know if an interrupt was/is pending and thus
+		 * just call the handler for that IRQ as if it were pending.
+		 */
 		return IRQ_HANDLED;
 	}
 
 	/* Check to see which device is interrupting */
-
 	local_irq = results & 0x0f;
 
 	if (local_irq == 2 || local_irq > 7) {
@@ -136,8 +137,9 @@ superio_interrupt(int irq, void *devp, struct pt_regs *regs)
 		sio->irq_region->data.irqbase + local_irq,
 		regs);
 
-	/* set EOI */
-
+	/* set EOI - forces a new interrupt if a lower priority device
+	 * still needs service.
+	 */
 	outb((OCW2_SEOI|local_irq),IC_PIC1 + 0);
 	return IRQ_HANDLED;
 }
@@ -469,11 +471,6 @@ superio_parport_init(void)
 }
 
 
-static u8 superio_ide_inb (unsigned long port);
-static unsigned long superio_ide_status[2];
-static unsigned long superio_ide_select[2];
-static unsigned long superio_ide_dma_status[2];
-
 void superio_fixup_pci(struct pci_dev *pdev)
 {
 	u8 prog;
@@ -484,58 +481,8 @@ void superio_fixup_pci(struct pci_dev *pdev)
 	pci_read_config_byte(pdev, PCI_CLASS_PROG, &prog);
 	printk("PCI: Enabled native mode for NS87415 (pif=0x%x)\n", prog);
 }
-DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_NS, PCI_DEVICE_ID_NS_87415, superio_fixup_pci);
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_NS, PCI_DEVICE_ID_NS_87415, superio_fixup_pci);
 
-/* Because of a defect in Super I/O, all reads of the PCI DMA status 
- * registers, IDE status register and the IDE select register need to be 
- * retried
- */
-static u8 superio_ide_inb (unsigned long port)
-{
-	if (port == superio_ide_status[0] ||
-	    port == superio_ide_status[1] ||
-	    port == superio_ide_select[0] ||
-	    port == superio_ide_select[1] ||
-	    port == superio_ide_dma_status[0] ||
-	    port == superio_ide_dma_status[1]) {
-		u8 tmp;
-		int retries = SUPERIO_IDE_MAX_RETRIES;
-
-		/* printk(" [ reading port 0x%x with retry ] ", port); */
-
-		do {
-			tmp = inb(port);
-			if (tmp == 0)
-				udelay(50);
-		} while (tmp == 0 && retries-- > 0);
-
-		return tmp;
-	}
-
-	return inb(port);
-}
-
-void __init superio_ide_init_iops (struct hwif_s *hwif)
-{
-	u32 base, dmabase;
-	u8 tmp;
-	struct pci_dev *pdev = hwif->pci_dev;
-	u8 port = hwif->channel;
-
-	base = pci_resource_start(pdev, port * 2) & ~3;
-	dmabase = pci_resource_start(pdev, 4) & ~3;
-
-	superio_ide_status[port] = base + IDE_STATUS_OFFSET;
-	superio_ide_select[port] = base + IDE_SELECT_OFFSET;
-	superio_ide_dma_status[port] = dmabase + (!port ? 2 : 0xa);
-	
-	/* Clear error/interrupt, enable dma */
-	tmp = superio_ide_inb(superio_ide_dma_status[port]);
-	outb(tmp | 0x66, superio_ide_dma_status[port]);
-
-	/* We need to override inb to workaround a SuperIO errata */
-	hwif->INB = superio_ide_inb;
-}
 
 static int __devinit superio_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {

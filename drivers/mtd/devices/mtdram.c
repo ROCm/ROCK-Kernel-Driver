@@ -1,6 +1,6 @@
 /*
  * mtdram - a test mtd device
- * $Id: mtdram.c,v 1.33 2004/08/09 13:19:44 dwmw2 Exp $
+ * $Id: mtdram.c,v 1.34 2004/11/16 18:29:01 dwmw2 Exp $
  * Author: Alexander Larsson <alex@cendio.se>
  *
  * Copyright (c) 1999 Alexander Larsson <alex@cendio.se>
@@ -153,7 +153,7 @@ int mtdram_init_device(struct mtd_info *mtd, void *mapped_address,
 
 #if CONFIG_MTDRAM_TOTAL_SIZE > 0
 #if CONFIG_MTDRAM_ABS_POS > 0
-int __init init_mtdram(void)
+static int __init init_mtdram(void)
 {
   void *addr;
   int err;
@@ -186,7 +186,7 @@ int __init init_mtdram(void)
 
 #else /* CONFIG_MTDRAM_ABS_POS > 0 */
 
-int __init init_mtdram(void)
+static int __init init_mtdram(void)
 {
   void *addr;
   int err;
@@ -220,7 +220,7 @@ int __init init_mtdram(void)
 
 #else /* CONFIG_MTDRAM_TOTAL_SIZE > 0 */
 
-int __init init_mtdram(void)
+static int __init init_mtdram(void)
 {
   return 0;
 }

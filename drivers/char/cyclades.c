@@ -729,8 +729,8 @@ static unsigned int cy_isa_addresses[] = {
 static long maddr[NR_CARDS] = { 0, };
 static int irq[NR_CARDS]  = { 0, };
 
-MODULE_PARM(maddr, "1-" __MODULE_STRING(NR_CARDS) "l");
-MODULE_PARM(irq, "1-" __MODULE_STRING(NR_CARDS) "i");
+module_param_array(maddr, long, NULL, 0);
+module_param_array(irq, int, NULL, 0);
 #endif
 
 #endif /* CONFIG_ISA */
@@ -4725,7 +4725,7 @@ cy_detect_pci(void)
         for (i = 0; i < NR_CARDS; i++) {
                 /* look for a Cyclades card by vendor and device id */
                 while((device_id = cy_pci_dev_id[dev_index]) != 0) {
-                        if((pdev = pci_find_device(PCI_VENDOR_ID_CYCLADES,
+                        if((pdev = pci_get_device(PCI_VENDOR_ID_CYCLADES,
                                         device_id, pdev)) == NULL) {
                                 dev_index++;    /* try next device id */
                         } else {

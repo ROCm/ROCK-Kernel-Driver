@@ -6,6 +6,9 @@
 #define __LINUX_FILTER_H__
 
 #include <linux/compiler.h>
+#include <linux/types.h>
+
+#include <asm/atomic.h>
 
 /*
  * Current version of the filter code architecture.
@@ -135,6 +138,9 @@ static inline unsigned int sk_filter_len(struct sk_filter *fp)
 #define SKF_LL_OFF    (-0x200000)
 
 #ifdef __KERNEL__
+struct sk_buff;
+struct sock;
+
 extern int sk_run_filter(struct sk_buff *skb, struct sock_filter *filter, int flen);
 extern int sk_attach_filter(struct sock_fprog *fprog, struct sock *sk);
 extern int sk_chk_filter(struct sock_filter *filter, int flen);

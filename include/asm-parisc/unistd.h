@@ -721,14 +721,42 @@
 #define __NR_epoll_wait         (__NR_Linux + 226)
 #define __NR_remap_file_pages   (__NR_Linux + 227)
 #define __NR_semtimedop         (__NR_Linux + 228)
-#define __NR_mq_open            (__NR_Linux + 229) /* Keep the mq_* syscalls together */
+#define __NR_mq_open            (__NR_Linux + 229)
 #define __NR_mq_unlink          (__NR_Linux + 230)
 #define __NR_mq_timedsend       (__NR_Linux + 231)
 #define __NR_mq_timedreceive    (__NR_Linux + 232)
 #define __NR_mq_notify          (__NR_Linux + 233)
 #define __NR_mq_getsetattr      (__NR_Linux + 234)
+#define __NR_waitid		(__NR_Linux + 235)
+#define __NR_fadvise64_64	(__NR_Linux + 236)
+#define __NR_set_tid_address	(__NR_Linux + 237)
+#define __NR_setxattr		(__NR_Linux + 238)
+#define __NR_lsetxattr		(__NR_Linux + 239)
+#define __NR_fsetxattr		(__NR_Linux + 240)
+#define __NR_getxattr		(__NR_Linux + 241)
+#define __NR_lgetxattr		(__NR_Linux + 242)
+#define __NR_fgetxattr		(__NR_Linux + 243)
+#define __NR_listxattr		(__NR_Linux + 244)
+#define __NR_llistxattr		(__NR_Linux + 245)
+#define __NR_flistxattr		(__NR_Linux + 246)
+#define __NR_removexattr	(__NR_Linux + 247)
+#define __NR_lremovexattr	(__NR_Linux + 248)
+#define __NR_fremovexattr	(__NR_Linux + 249)
+#define __NR_timer_create	(__NR_Linux + 250)
+#define __NR_timer_settime	(__NR_Linux + 251)
+#define __NR_timer_gettime	(__NR_Linux + 252)
+#define __NR_timer_getoverrun	(__NR_Linux + 253)
+#define __NR_timer_delete	(__NR_Linux + 254)
+#define __NR_clock_settime	(__NR_Linux + 255)
+#define __NR_clock_gettime	(__NR_Linux + 256)
+#define __NR_clock_getres	(__NR_Linux + 257)
+#define __NR_clock_nanosleep	(__NR_Linux + 258)
+#define __NR_tgkill		(__NR_Linux + 259)
+#define __NR_mbind		(__NR_Linux + 260)
+#define __NR_get_mempolicy	(__NR_Linux + 261)
+#define __NR_set_mempolicy	(__NR_Linux + 262)
 
-#define __NR_Linux_syscalls     235
+#define __NR_Linux_syscalls     263
 
 #define HPUX_GATEWAY_ADDR       0xC0000004
 #define LINUX_GATEWAY_ADDR      0x100
@@ -752,14 +780,10 @@
 
 #ifdef PIC
 /* WARNING: CANNOT BE USED IN A NOP! */
-# define K_STW_PIC stw %r19, -32(%sr0, %sp) ASM_LINE_SEP
-# define K_LDW_PIC ldw -32(%sr0, %sp), %r19 ASM_LINE_SEP
 # define K_STW_ASM_PIC	"       copy %%r19, %%r4\n"
 # define K_LDW_ASM_PIC	"       copy %%r4, %%r19\n"
 # define K_USING_GR4	"%r4",
 #else
-# define K_STW_PIC ASM_LINE_SEP
-# define K_LDW_PIC ASM_LINE_SEP
 # define K_STW_ASM_PIC	" \n"
 # define K_LDW_ASM_PIC	" \n"
 # define K_USING_GR4
@@ -793,7 +817,7 @@
 			K_LDW_ASM_PIC					\
 			: "=r" (__res)					\
 			: "i" (SYS_ify(name)) K_ASM_ARGS_##nr   	\
-			: K_CALL_CLOB_REGS K_CLOB_ARGS_##nr		\
+			: "memory", K_CALL_CLOB_REGS K_CLOB_ARGS_##nr	\
 		);							\
 		__sys_res = (long)__res;				\
 	}								\

@@ -676,7 +676,7 @@ ffb_blank(int blank, struct fb_info *info)
 	FFBWait(par);
 
 	switch (blank) {
-	case 0: /* Unblanking */
+	case FB_BLANK_UNBLANK: /* Unblanking */
 		upa_writel(0x6000, &dac->type);
 		tmp = (upa_readl(&dac->value) | 0x1);
 		upa_writel(0x6000, &dac->type);
@@ -684,10 +684,10 @@ ffb_blank(int blank, struct fb_info *info)
 		par->flags &= ~FFB_FLAG_BLANKED;
 		break;
 
-	case 1: /* Normal blanking */
-	case 2: /* VESA blank (vsync off) */
-	case 3: /* VESA blank (hsync off) */
-	case 4: /* Poweroff */
+	case FB_BLANK_NORMAL: /* Normal blanking */
+	case FB_BLANK_VSYNC_SUSPEND: /* VESA blank (vsync off) */
+	case FB_BLANK_HSYNC_SUSPEND: /* VESA blank (hsync off) */
+	case FB_BLANK_POWERDOWN: /* Poweroff */
 		upa_writel(0x6000, &dac->type);
 		tmp = (upa_readl(&dac->value) & ~0x1);
 		upa_writel(0x6000, &dac->type);
@@ -969,7 +969,6 @@ static void ffb_init_one(int node, int parent)
 			   FBINFO_HWACCEL_IMAGEBLIT);
 	all->info.fbops = &ffb_ops;
 	all->info.screen_base = (char *) all->par.physbase + FFB_DFB24_POFF;
-	all->info.currcon = -1;
 	all->info.par = &all->par;
 	all->info.pseudo_palette = all->pseudo_palette;
 

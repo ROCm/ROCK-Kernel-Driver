@@ -261,7 +261,7 @@ static void __init ixp4xx_timer_init(void)
 	setup_irq(IRQ_IXP4XX_TIMER1, &ixp4xx_timer_irq);
 }
 
-struct ixp4xx_timer = {
+struct sys_timer ixp4xx_timer = {
 	.init		= ixp4xx_timer_init,
 	.offset		= ixp4xx_gettimeoffset,
 };

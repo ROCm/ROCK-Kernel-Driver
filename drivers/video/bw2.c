@@ -138,17 +138,17 @@ bw2_blank(int blank, struct fb_info *info)
 	spin_lock_irqsave(&par->lock, flags);
 
 	switch (blank) {
-	case 0: /* Unblanking */
+	case FB_BLANK_UNBLANK: /* Unblanking */
 		val = sbus_readb(&regs->control);
 		val |= BWTWO_CTL_ENABLE_VIDEO;
 		sbus_writeb(val, &regs->control);
 		par->flags &= ~BW2_FLAG_BLANKED;
 		break;
 
-	case 1: /* Normal blanking */
-	case 2: /* VESA blank (vsync off) */
-	case 3: /* VESA blank (hsync off) */
-	case 4: /* Poweroff */
+	case FB_BLANK_NORMAL: /* Normal blanking */
+	case FB_BLANK_VSYNC_SUSPEND: /* VESA blank (vsync off) */
+	case FB_BLANK_HSYNC_SUSPEND: /* VESA blank (hsync off) */
+	case FB_BLANK_POWERDOWN: /* Poweroff */
 		val = sbus_readb(&regs->control);
 		val &= ~BWTWO_CTL_ENABLE_VIDEO;
 		sbus_writeb(val, &regs->control);
@@ -361,7 +361,6 @@ static void bw2_init_one(struct sbus_dev *sdev)
 	if (!all->info.screen_base)
 		all->info.screen_base = (char *)
 			sbus_ioremap(resp, 0, all->par.fbsize, "bw2 ram");
-	all->info.currcon = -1;
 	all->info.par = &all->par;
 
 	bw2_blank(0, &all->info);

@@ -589,7 +589,7 @@ typedef union icb {
 
 #ifdef MODULE
 static char *wd7000;
-MODULE_PARM(wd7000, "s");
+module_param(wd7000, charp, 0);
 #endif
 
 /*

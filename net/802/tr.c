@@ -583,6 +583,43 @@ static struct file_operations rif_seq_fops = {
 
 #endif
 
+static void tr_setup(struct net_device *dev)
+{
+	/*
+	 *	Configure and register
+	 */
+	
+	dev->hard_header	= tr_header;
+	dev->rebuild_header	= tr_rebuild_header;
+
+	dev->type		= ARPHRD_IEEE802_TR;
+	dev->hard_header_len	= TR_HLEN;
+	dev->mtu		= 2000;
+	dev->addr_len		= TR_ALEN;
+	dev->tx_queue_len	= 100;	/* Long queues on tr */
+	
+	memset(dev->broadcast,0xFF, TR_ALEN);
+
+	/* New-style flags. */
+	dev->flags		= IFF_BROADCAST | IFF_MULTICAST ;
+}
+
+/**
+ * alloc_trdev - Register token ring device
+ * @sizeof_priv: Size of additional driver-private structure to be allocated
+ *	for this token ring device
+ *
+ * Fill in the fields of the device structure with token ring-generic values.
+ *
+ * Constructs a new net device, complete with a private data area of
+ * size @sizeof_priv.  A 32-byte (not bit) alignment is enforced for
+ * this private data area.
+ */
+struct net_device *alloc_trdev(int sizeof_priv)
+{
+	return alloc_netdev(sizeof_priv, "tr%d", tr_setup);
+}
+
 /*
  *	Called during bootup.  We don't actually have to initialise
  *	too much for this.
@@ -604,3 +641,4 @@ module_init(rif_init);
 
 EXPORT_SYMBOL(tr_source_route);
 EXPORT_SYMBOL(tr_type_trans);
+EXPORT_SYMBOL(alloc_trdev);

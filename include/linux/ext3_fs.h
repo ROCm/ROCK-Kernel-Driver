@@ -722,7 +722,7 @@ extern struct ext3_group_desc * ext3_get_group_desc(struct super_block * sb,
 						    unsigned int block_group,
 						    struct buffer_head ** bh);
 extern int ext3_should_retry_alloc(struct super_block *sb, int *retries);
-extern void rsv_window_add(struct super_block *sb, struct reserve_window_node *rsv);
+extern void ext3_rsv_window_add(struct super_block *sb, struct ext3_reserve_window_node *rsv);
 
 /* dir.c */
 extern int ext3_check_dir_entry(const char *, struct inode *,

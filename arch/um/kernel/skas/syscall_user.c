@@ -10,10 +10,6 @@
 #include "sysdep/ptrace.h"
 #include "sysdep/sigcontext.h"
 
-/* XXX Bogus */
-#define ERESTARTSYS	512
-#define ERESTARTNOINTR	513
-#define ERESTARTNOHAND	514
 
 void handle_syscall(union uml_pt_regs *regs)
 {
@@ -22,15 +18,12 @@ void handle_syscall(union uml_pt_regs *regs)
 
 	index = record_syscall_start(UPT_SYSCALL_NR(regs));
 
-	syscall_trace(regs, 1);
+	syscall_trace(regs, 0);
 	result = execute_syscall(regs);
 
 	REGS_SET_SYSCALL_RETURN(regs->skas.regs, result);
-	if((result == -ERESTARTNOHAND) || (result == -ERESTARTSYS) || 
-	   (result == -ERESTARTNOINTR))
-		do_signal(result);
 
-	syscall_trace(regs, 0);
+	syscall_trace(regs, 1);
 	record_syscall_end(index, result);
 }
 

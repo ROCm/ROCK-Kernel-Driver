@@ -22,17 +22,6 @@
  */
 #define MAX_COMPACT_NODES       2048
 
-typedef u64	nic_t;
-
-#define NASID_TO_COMPACT_NODEID(nasid)  (nasid_to_cnodeid(nasid))
-#define COMPACT_TO_NASID_NODEID(cnode)  (cnodeid_to_nasid(cnode))
-
-
-#define INVALID_NASID		((nasid_t)-1)
-#define INVALID_SLAB            (slabid_t)-1
-#define INVALID_MODULE		((moduleid_t)-1)
-#define	INVALID_PARTID		((partid_t)-1)
-
 extern void sn_flush_all_caches(long addr, long bytes);
 
 #endif /* _ASM_IA64_SN_ARCH_H */

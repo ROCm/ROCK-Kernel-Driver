@@ -2261,7 +2261,7 @@ static int __devinit amb_probe(struct pci_dev *pci_dev, const struct pci_device_
 	int err;
 
 	// read resources from PCI configuration space
-	u8 irq = pci_dev->irq;
+	unsigned int irq = pci_dev->irq;
 
 	if (pci_dev->device == PCI_DEVICE_ID_MADGE_AMBASSADOR_BAD) {
 		PRINTK (KERN_ERR, "skipped broken (PLX rev 2) card");
@@ -2414,13 +2414,13 @@ static void __init amb_check_args (void) {
 MODULE_AUTHOR(maintainer_string);
 MODULE_DESCRIPTION(description_string);
 MODULE_LICENSE("GPL");
-MODULE_PARM(debug,   "h");
-MODULE_PARM(cmds,    "i");
-MODULE_PARM(txs,     "i");
-MODULE_PARM(rxs,     __MODULE_STRING(NUM_RX_POOLS) "i");
-MODULE_PARM(rxs_bs,  __MODULE_STRING(NUM_RX_POOLS) "i");
-MODULE_PARM(rx_lats, "i");
-MODULE_PARM(pci_lat, "b");
+module_param(debug,   ushort, 0644);
+module_param(cmds,    uint, 0);
+module_param(txs,     uint, 0);
+module_param_array(rxs,     uint, NULL, 0);
+module_param_array(rxs_bs,  uint, NULL, 0);
+module_param(rx_lats, uint, 0);
+module_param(pci_lat, byte, 0);
 MODULE_PARM_DESC(debug,   "debug bitmap, see .h file");
 MODULE_PARM_DESC(cmds,    "number of command queue entries");
 MODULE_PARM_DESC(txs,     "number of TX queue entries");
@@ -2438,6 +2438,8 @@ static struct pci_device_id amb_pci_tbl[] = {
 	  0, 0, 0 },
 	{ 0, }
 };
+
+MODULE_DEVICE_TABLE(pci, amb_pci_tbl);
 
 static struct pci_driver amb_driver = {
 	.name =		"amb",

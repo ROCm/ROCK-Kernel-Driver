@@ -207,26 +207,26 @@ tcx_blank(int blank, struct fb_info *info)
 	val = sbus_readl(&thc->thc_misc);
 
 	switch (blank) {
-	case 0: /* Unblanking */
+	case FB_BLANK_UNBLANK: /* Unblanking */
 		val &= ~(TCX_THC_MISC_VSYNC_DIS |
 			 TCX_THC_MISC_HSYNC_DIS);
 		val |= TCX_THC_MISC_VIDEO;
 		par->flags &= ~TCX_FLAG_BLANKED;
 		break;
 
-	case 1: /* Normal blanking */
+	case FB_BLANK_NORMAL: /* Normal blanking */
 		val &= ~TCX_THC_MISC_VIDEO;
 		par->flags |= TCX_FLAG_BLANKED;
 		break;
 
-	case 2: /* VESA blank (vsync off) */
+	case FB_BLANK_VSYNC_SUSPEND: /* VESA blank (vsync off) */
 		val |= TCX_THC_MISC_VSYNC_DIS;
 		break;
-	case 3: /* VESA blank (hsync off) */
+	case FB_BLANK_HSYNC_SUSPEND: /* VESA blank (hsync off) */
 		val |= TCX_THC_MISC_HSYNC_DIS;
 		break;
 
-	case 4: /* Poweroff */
+	case FB_BLANK_POWERDOWN: /* Poweroff */
 		break;
 	};
 
@@ -422,7 +422,6 @@ static void tcx_init_one(struct sbus_dev *sdev)
 		all->info.screen_base = (char *)
 			sbus_ioremap(&sdev->resource[0], 0,
 				     all->par.fbsize, "tcx ram");
-	all->info.currcon = -1;
 	all->info.par = &all->par;
 
 	/* Initialize brooktree DAC. */

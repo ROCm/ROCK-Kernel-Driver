@@ -404,7 +404,8 @@ running once the system is up.
 
 	elevator=	[IOSCHED]
 			Format: {"as"|"cfq"|"deadline"|"noop"}
-			See Documentation/as-iosched.txt for details
+			See Documentation/block/as-iosched.txt
+			and Documentation/block/deadline-iosched.txt for details.
 
 	es1370=		[HW,OSS]
 			Format: <lineout>[,<micbias>]
@@ -505,10 +506,12 @@ running once the system is up.
 	icn=		[HW,ISDN]
 			Format: <io>[,<membase>[,<icn_id>[,<icn_id2>]]]
 
+	ide=		[HW] (E)IDE subsystem
+			Format: ide=nodma or ide=doubler or ide=reverse
+			See Documentation/ide.txt.
+
 	ide?=		[HW] (E)IDE subsystem
-			Config (iomem/irq), tuning or debugging
-			(serialize,reset,no{dma,tune,probe}) or chipset
-			specific parameters.
+			Format: ide?=noprobe or chipset specific parameters.
 			See Documentation/ide.txt.
 	
 	idebus=		[HW] (E)IDE subsystem - VLB/PCI bus speed
@@ -703,7 +706,7 @@ running once the system is up.
 			[KNL,ACPI] Mark specific memory as reserved.
 			Region of memory to be used, from ss to ss+nn.
 
-	meye=		[HW] Set MotionEye Camera parameters
+	meye.*=		[HW] Set MotionEye Camera parameters
 			See Documentation/video4linux/meye.txt.
 
 	mga=		[HW,DRM]
@@ -875,6 +878,16 @@ running once the system is up.
 					order they are specified on the command
 					line, starting with parport0.
 
+	parport_init_mode=
+			[HW,PPT]	Configure VIA parallel port to
+					operate in specific mode. This is
+					necessary on Pegasos computer where
+					firmware has no options for setting up
+					parallel port mode and sets it to
+					spp. Currently this function knows
+					686a and 8231 chips.
+			Format: [spp|ps2|epp|ecp|ecpepp]
+
 	pas2=		[HW,OSS]
 			Format: <io>,<irq>,<dma>,<dma16>,<sb_io>,<sb_irq>,<sb_dma>,<sb_dma16>
  
@@ -930,6 +943,10 @@ running once the system is up.
 					enabled.
 		noacpi			[IA-32] Do not use ACPI for IRQ routing
 					or for PCI scanning.
+		routeirq		Do IRQ routing for all PCI devices.
+					This is normally done in pci_enable_device(),
+					so this option is a temporary workaround
+					for broken drivers that don't call it.
 
 		firmware		[ARM] Do not re-enumerate the bus but
 					instead just use the configuration
@@ -983,6 +1000,11 @@ running once the system is up.
 			(param: profile step/bucket size as a power of 2 for
 				statistical time based profiling)
 
+	processor.c2=	[HW, ACPI]
+	processor.c3=	[HW, ACPI]
+			0 - disable C2 or C3 idle power saving state.
+			1 - enable C2 or C3 (default unless DMI blacklist entry)
+
 	prompt_ramdisk=	[RAM] List of RAM disks to prompt for floppy disk
 			before loading.
 			See Documentation/ramdisk.txt.
@@ -1022,10 +1044,6 @@ running once the system is up.
  
 	ramdisk_size=	[RAM] Sizes of RAM disks in kilobytes
 			New name for the ramdisk parameter.
-			See Documentation/ramdisk.txt.
-
-	ramdisk_start=	[RAM] Starting block of RAM disk image (so you can
-			place it after the kernel image on a boot floppy).
 			See Documentation/ramdisk.txt.
 
 	reboot=		[BUGS=IA-32,BUGS=ARM,BUGS=IA-64] Rebooting mode

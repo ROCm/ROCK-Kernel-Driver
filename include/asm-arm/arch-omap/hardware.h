@@ -283,6 +283,26 @@
 
 /*
  * ---------------------------------------------------------------------------
+ * Serial ports
+ * ---------------------------------------------------------------------------
+ */
+#define OMAP_UART1_BASE		(unsigned char *)0xfffb0000
+#define OMAP_UART2_BASE		(unsigned char *)0xfffb0800
+#define OMAP_UART3_BASE		(unsigned char *)0xfffb9800
+#define OMAP_MAX_NR_PORTS	3
+#define OMAP1510_BASE_BAUD	(12000000/16)
+#define OMAP16XX_BASE_BAUD	(48000000/16)
+
+#define is_omap_port(p)	({int __ret = 0;				\
+			if (p == (char*)IO_ADDRESS(OMAP_UART1_BASE) ||	\
+			    p == (char*)IO_ADDRESS(OMAP_UART2_BASE) ||	\
+			    p == (char*)IO_ADDRESS(OMAP_UART3_BASE))	\
+				__ret = 1;				\
+			__ret;						\
+			})
+
+/*
+ * ---------------------------------------------------------------------------
  * Processor specific defines
  * ---------------------------------------------------------------------------
  */

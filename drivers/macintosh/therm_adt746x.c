@@ -61,8 +61,8 @@ MODULE_PARM_DESC(limit_adjust,"Adjust maximum temperatures (50 cpu, 70 gpu) "
 		 "by N degrees.");
 
 MODULE_PARM(fan_speed,"i");
-MODULE_PARM_DESC(fan_speed,"Specify fan speed (0-255) when lim < temp < lim+8 "
-		 "(default 128)");
+MODULE_PARM_DESC(fan_speed,"Specify starting fan speed (0-255) "
+		 "(default 64)");
 
 struct thermostat {
 	struct i2c_client	clt;
@@ -71,7 +71,7 @@ struct thermostat {
 	u8			initial_limits[3];
 	u8			limits[3];
 	int			last_speed[2];
-	int			overriding[2];
+	int			last_var[2];
 };
 
 static enum {ADT7460, ADT7467} therm_type;
@@ -211,10 +211,10 @@ static void write_fan_speed(struct thermostat *th, int speed, int fan)
 	
 	if (th->last_speed[fan] != speed) {
 		if (speed == -1)
-			printk(KERN_INFO "adt746x: Setting speed to automatic "
+			printk(KERN_DEBUG "adt746x: Setting speed to automatic "
 				"for %s fan.\n", fan?"GPU":"CPU");
 		else
-			printk(KERN_INFO "adt746x: Setting speed to %d "
+			printk(KERN_DEBUG "adt746x: Setting speed to %d "
 				"for %s fan.\n", speed, fan?"GPU":"CPU");
 	} else
 		return;
@@ -278,43 +278,46 @@ static void update_fans_speed (struct thermostat *th)
 		int started = 0;
 		int fan_number = (therm_type == ADT7460 && i == 2);
 		int var = th->temps[i] - th->limits[i];
-		if (var > 8) {
-			if (th->overriding[fan_number] == 0)
-				printk(KERN_INFO "adt746x: Limit exceeded by "
-					"%d, overriding specified fan speed "
-					"for %s.\n", var,
-					fan_number?"GPU":"CPU");
 
-			th->overriding[fan_number] = 1;
-			write_fan_speed(th, 255, fan_number);
-			started = 1;
-		} else if ((!th->overriding[fan_number] || var < 6) && var > 0) {
-			if (th->overriding[fan_number] == 1)
-				printk(KERN_INFO "adt746x: Limit exceeded by "
-					"%d, setting speed to specified "
-					"for %s.\n", var,
-					fan_number?"GPU":"CPU");
+		if (var > -1) {
+			int step = (255 - fan_speed) / 7;
+			int new_speed = 0;
 
-			th->overriding[fan_number] = 0;
-			write_fan_speed(th, fan_speed, fan_number);
+			/* hysteresis : change fan speed only if variation is
+			 * more than two degrees */
+			if (abs(var - th->last_var[fan_number]) < 2)
+				continue;
+
 			started = 1;
-		} else if (var < -1) {
-			/* don't stop iBook fan if GPU is cold and CPU is not
+			new_speed = fan_speed + ((var-1)*step);
+
+			if (new_speed < fan_speed)
+				new_speed = fan_speed;
+			if (new_speed > 255)
+				new_speed = 255;
+
+			printk(KERN_DEBUG "adt746x: setting fans speed to %d "
+					 "(limit exceeded by %d on %s) \n",
+					new_speed, var,
+					fan_number?"GPU/pwr":"CPU");
+			write_both_fan_speed(th, new_speed);
+			th->last_var[fan_number] = var;
+		} else if (var < -2) {
+			/* don't stop fan if GPU/power is cold and CPU is not
 			 * so cold (lastvar >= -1) */
-			if (therm_type == ADT7460 || lastvar < -1 || i == 1) {
+			if (i == 2 && lastvar < -1) {
 				if (th->last_speed[fan_number] != 0)
-					printk(KERN_INFO "adt746x: Stopping %s "
-						"fan.\n",
-						fan_number?"GPU":"CPU");
-				write_fan_speed(th, 0, fan_number);
+					printk(KERN_DEBUG "adt746x: Stopping "
+						"fans.\n");
+				write_both_fan_speed(th, 0);
 			}
 		}
 
 		lastvar = var;
 
-		if (started && therm_type == ADT7467)
+		if (started)
 			return; /* we don't want to re-stop the fan
-				* if CPU is heating and GPU is not */
+				* if CPU is heating and GPU/power is not */
 	}
 }
 
@@ -391,7 +394,7 @@ static int attach_one_thermostat(struct i2c_adapter *adapter, int addr,
 
 	/* force manual control to start the fan quieter */
 	if (fan_speed == -1)
-		fan_speed=128;
+		fan_speed = 64;
 	
 	if(therm_type == ADT7460) {
 		printk(KERN_INFO "adt746x: ADT7460 initializing\n");
@@ -424,7 +427,9 @@ static int attach_one_thermostat(struct i2c_adapter *adapter, int addr,
 	/* be sure to really write fan speed the first time */
 	th->last_speed[0] = -2;
 	th->last_speed[1] = -2;
-	
+	th->last_var[0] = -80;
+	th->last_var[1] = -80;
+
 	if (fan_speed != -1) {
 		/* manual mode, stop fans */
 		write_both_fan_speed(th, 0);

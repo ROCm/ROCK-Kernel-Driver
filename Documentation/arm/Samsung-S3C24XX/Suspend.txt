@@ -6,7 +6,7 @@ Introduction
 ------------
 
   The S3C2410 supports a low-power suspend mode, where the SDRAM is kept
-  in Self-Refresh mode, and all but the esential peripheral blocks are
+  in Self-Refresh mode, and all but the essential peripheral blocks are
   powered down. For more information on how this works, please look
   at the S3C2410 datasheets from Samsung.
 
@@ -33,17 +33,18 @@ Resuming
   code to resume Linux operation.
 
   GSTATUS4 is currently left alone by the sleep code, and is free to
-  use for any other purposes.
+  use for any other purposes (for example, the EB2410ITX uses this to
+  save memory configuration in).
 
 
 Machine Support
 ---------------
 
   The machine specific functions must call the s3c2410_pm_init() function
-  to say that it's bootloader is capable of resuming. This can be as
-  simple as adding the following to the file:
+  to say that its bootloader is capable of resuming. This can be as
+  simple as adding the following to the machine's definition:
 
-  late_initcall(s3c2410_pm_init);
+  INITMACHINE(s3c2410_pm_init)
 
   A board can do its own setup before calling s3c2410_pm_init, if it
   needs to setup anything else for power management support.
@@ -51,6 +52,23 @@ Machine Support
   There is currently no support for over-riding the default method of
   saving the resume address, if your board requires it, then contact
   the maintainer and discuss what is required.
+
+  Note, the original method of adding an late_initcall() is wrong,
+  and will end up initialising all compiled machines' pm init!
+
+
+Debugging
+---------
+
+  There are several important things to remember when using PM suspend:
+
+  1) The uart drivers will disable the clocks to the UART blocks when
+     suspending, which means that use of printascii() or similar direct
+     access to the UARTs will cause the debug to stop.
+
+  2) Whilst the pm code itself will attempt to re-enable the UART clocks,
+     care should be taken that any external clock sources that the UARTs
+     rely on are still enabled at that point.
 
 
 Configuration

@@ -1681,7 +1681,7 @@ config VIA_RHINE
 	  (e.g. VT8235).
 
 	  To compile this driver as a module, choose M here. The module
-	  will be called via-velocity.
+	  will be called via-rhine.
 
 config VIA_RHINE_MMIO
 	bool "Use MMIO instead of PIO"

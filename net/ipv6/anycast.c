@@ -205,7 +205,7 @@ int ipv6_sock_ac_drop(struct sock *sk, int ifindex, struct in6_addr *addr)
 	prev_pac = NULL;
 	for (pac = np->ipv6_ac_list; pac; pac = pac->acl_next) {
 		if ((ifindex == 0 || pac->acl_ifindex == ifindex) &&
-		     ipv6_addr_cmp(&pac->acl_addr, addr) == 0)
+		     ipv6_addr_equal(&pac->acl_addr, addr))
 			break;
 		prev_pac = pac;
 	}
@@ -278,7 +278,7 @@ int inet6_ac_check(struct sock *sk, struct in6_addr *addr, int ifindex)
 	for (pac=np->ipv6_ac_list; pac; pac=pac->acl_next) {
 		if (ifindex && pac->acl_ifindex != ifindex)
 			continue;
-		found = ipv6_addr_cmp(&pac->acl_addr, addr) == 0;
+		found = ipv6_addr_equal(&pac->acl_addr, addr);
 		if (found)
 			break;
 	}
@@ -320,7 +320,7 @@ int ipv6_dev_ac_inc(struct net_device *dev, struct in6_addr *addr)
 	}
 
 	for (aca = idev->ac_list; aca; aca = aca->aca_next) {
-		if (ipv6_addr_cmp(&aca->aca_addr, addr) == 0) {
+		if (ipv6_addr_equal(&aca->aca_addr, addr)) {
 			aca->aca_users++;
 			err = 0;
 			goto out;
@@ -354,7 +354,7 @@ int ipv6_dev_ac_inc(struct net_device *dev, struct in6_addr *addr)
 	/* aca_tstamp should be updated upon changes */
 	aca->aca_cstamp = aca->aca_tstamp = jiffies;
 	atomic_set(&aca->aca_refcnt, 2);
-	aca->aca_lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&aca->aca_lock);
 
 	aca->aca_next = idev->ac_list;
 	idev->ac_list = aca;
@@ -384,7 +384,7 @@ int __ipv6_dev_ac_dec(struct inet6_dev *idev, struct in6_addr *addr)
 	write_lock_bh(&idev->lock);
 	prev_aca = NULL;
 	for (aca = idev->ac_list; aca; aca = aca->aca_next) {
-		if (ipv6_addr_cmp(&aca->aca_addr, addr) == 0)
+		if (ipv6_addr_equal(&aca->aca_addr, addr))
 			break;
 		prev_aca = aca;
 	}
@@ -436,7 +436,7 @@ static int ipv6_chk_acast_dev(struct net_device *dev, struct in6_addr *addr)
 	if (idev) {
 		read_lock_bh(&idev->lock);
 		for (aca = idev->ac_list; aca; aca = aca->aca_next)
-			if (ipv6_addr_cmp(&aca->aca_addr, addr) == 0)
+			if (ipv6_addr_equal(&aca->aca_addr, addr))
 				break;
 		read_unlock_bh(&idev->lock);
 		in6_dev_put(idev);

@@ -290,12 +290,12 @@ intelfbhw_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
 
 	if ((xoffset + var->xres > var->xres_virtual) ||
 	    (yoffset + var->yres > var->yres_virtual))
-		return EINVAL;
+		return -EINVAL;
 
 	offset = (yoffset * dinfo->pitch) +
 		 (xoffset * var->bits_per_pixel) / 8;
 
-	offset += dinfo->fb.offset >> 12;
+	offset += dinfo->fb.offset << 12;
 
 	OUTREG(DSPABASE, offset);
 
@@ -341,17 +341,17 @@ intelfbhw_do_blank(int blank, struct fb_info *info)
 	/* Set DPMS level */
 	tmp = INREG(ADPA) & ~ADPA_DPMS_CONTROL_MASK;
 	switch (blank) {
-	case 0:
-	case 1:
+	case FB_BLANK_UNBLANK:
+	case FB_BLANK_NORMAL:
 		tmp |= ADPA_DPMS_D0;
 		break;
-	case 2:
+	case FB_BLANK_VSYNC_SUSPEND:
 		tmp |= ADPA_DPMS_D1;
 		break;
-	case 3:
+	case FB_BLANK_HSYNC_SUSPEND:
 		tmp |= ADPA_DPMS_D2;
 		break;
-	case 4:
+	case FB_BLANK_POWERDOWN:
 		tmp |= ADPA_DPMS_D3;
 		break;
 	}
@@ -1240,7 +1240,7 @@ wait_ring(struct intelfb_info *dinfo, int n)
 
 	end = jiffies + (HZ * 3);
 	while (dinfo->ring_space < n) {
-		dinfo->ring_head = (u32 __iomem *)(INREG(PRI_RING_HEAD) &
+		dinfo->ring_head = (u8 __iomem *)(INREG(PRI_RING_HEAD) &
 						   RING_HEAD_MASK);
 		if (dinfo->ring_tail + RING_MIN_FREE <
 		    (u32 __iomem) dinfo->ring_head)
@@ -1312,8 +1312,8 @@ refresh_ring(struct intelfb_info *dinfo)
 	DBG_MSG("refresh_ring\n");
 #endif
 
-	dinfo->ring_head = (u32 __iomem *) (INREG(PRI_RING_HEAD) &
-		RING_HEAD_MASK);
+	dinfo->ring_head = (u8 __iomem *) (INREG(PRI_RING_HEAD) &
+					   RING_HEAD_MASK);
 	dinfo->ring_tail = INREG(PRI_RING_TAIL) & RING_TAIL_MASK;
 	if (dinfo->ring_tail + RING_MIN_FREE < (u32 __iomem)dinfo->ring_head)
 		dinfo->ring_space = (u32 __iomem) dinfo->ring_head
@@ -1605,7 +1605,7 @@ intelfbhw_cursor_init(struct intelfb_info *dinfo)
 			 CURSOR_ENABLE | CURSOR_STRIDE_MASK);
 		tmp = CURSOR_FORMAT_3C;
 		OUTREG(CURSOR_CONTROL, tmp);
-		OUTREG(CURSOR_A_BASEADDR, dinfo->cursor.physical);
+		OUTREG(CURSOR_A_BASEADDR, dinfo->cursor.offset << 12);
 		tmp = (64 << CURSOR_SIZE_H_SHIFT) |
 		      (64 << CURSOR_SIZE_V_SHIFT);
 		OUTREG(CURSOR_SIZE, tmp);

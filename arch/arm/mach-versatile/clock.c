@@ -16,7 +16,7 @@
 
 #include <asm/semaphore.h>
 #include <asm/hardware/clock.h>
-#include <asm/hardware/icst525.h>
+#include <asm/hardware/icst307.h>
 
 #include "clock.h"
 
@@ -83,12 +83,12 @@ EXPORT_SYMBOL(clk_round_rate);
 int clk_set_rate(struct clk *clk, unsigned long rate)
 {
 	int ret = -EIO;
-#if 0 // Not yet
-	if (clk->setvco) {
-		struct icst525_vco vco;
 
-		vco = icst525_khz_to_vco(clk->params, rate / 1000);
-		clk->rate = icst525_khz(clk->params, vco) * 1000;
+	if (clk->setvco) {
+		struct icst307_vco vco;
+
+		vco = icst307_khz_to_vco(clk->params, rate / 1000);
+		clk->rate = icst307_khz(clk->params, vco) * 1000;
 
 		printk("Clock %s: setting VCO reg params: S=%d R=%d V=%d\n",
 			clk->name, vco.s, vco.r, vco.v);
@@ -96,7 +96,6 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
 		clk->setvco(clk, vco);
 		ret = 0;
 	}
-#endif
 	return ret;
 }
 EXPORT_SYMBOL(clk_set_rate);

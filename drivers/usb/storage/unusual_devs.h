@@ -281,6 +281,14 @@ UNUSUAL_DEV(  0x052b, 0x1801, 0x0100, 0x0100,
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_IGNORE_RESIDUE ),
 
+/* Yakumo Mega Image 47
+ * Reported by Bjoern Paetzel <kolrabi@kolrabi.de> */
+UNUSUAL_DEV(  0x052b, 0x1905, 0x0100, 0x0100,
+		"Tekom Technologies, Inc",
+		"400_CAMERA",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_IGNORE_RESIDUE ),
+
 /* This entry is needed because the device reports Sub=ff */
 UNUSUAL_DEV(  0x054c, 0x0010, 0x0106, 0x0450, 
 		"Sony",
@@ -446,6 +454,13 @@ UNUSUAL_DEV(  0x05ab, 0x5701, 0x0100, 0x0110,
 		US_SC_ISD200, US_PR_BULK, isd200_Initialization,
 		0 ),
 #endif
+
+/* Reported by Avi Kivity <avi@argo.co.il> */
+UNUSUAL_DEV( 0x05ac, 0x1203, 0x0001, 0x0001,
+		"Apple",
+		"iPod",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_FIX_CAPACITY ),
 
 #ifdef CONFIG_USB_STORAGE_JUMPSHOT
 UNUSUAL_DEV(  0x05dc, 0x0001, 0x0000, 0x0001,

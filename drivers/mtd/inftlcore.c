@@ -7,7 +7,7 @@
  * (c) 1999 Machine Vision Holdings, Inc.
  * Author: David Woodhouse <dwmw2@infradead.org>
  *
- * $Id: inftlcore.c,v 1.17 2004/08/09 13:56:48 dwmw2 Exp $
+ * $Id: inftlcore.c,v 1.18 2004/11/16 18:28:59 dwmw2 Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -352,7 +352,7 @@ static u16 INFTL_foldchain(struct INFTLrecord *inftl, unsigned thisVUC, unsigned
 	return targetEUN;
 }
 
-u16 INFTL_makefreeblock(struct INFTLrecord *inftl, unsigned pendingblock)
+static u16 INFTL_makefreeblock(struct INFTLrecord *inftl, unsigned pendingblock)
 {
 	/*
 	 * This is the part that needs some cleverness applied. 
@@ -877,7 +877,7 @@ static int inftl_getgeo(struct mtd_blktrans_dev *dev, struct hd_geometry *geo)
 	return 0;
 }
 
-struct mtd_blktrans_ops inftl_tr = {
+static struct mtd_blktrans_ops inftl_tr = {
 	.name		= "inftl",
 	.major		= INFTL_MAJOR,
 	.part_bits	= INFTL_PARTN_BITS,
@@ -891,9 +891,9 @@ struct mtd_blktrans_ops inftl_tr = {
 
 extern char inftlmountrev[];
 
-int __init init_inftl(void)
+static int __init init_inftl(void)
 {
-	printk(KERN_INFO "INFTL: inftlcore.c $Revision: 1.17 $, "
+	printk(KERN_INFO "INFTL: inftlcore.c $Revision: 1.18 $, "
 		"inftlmount.c %s\n", inftlmountrev);
 
 	return register_mtd_blktrans(&inftl_tr);

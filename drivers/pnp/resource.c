@@ -101,8 +101,8 @@ int pnp_register_irq_resource(struct pnp_option *option, struct pnp_irq *data)
 	{
 		int i;
 
-		for (i=0; i<16; i++)
-			if (data->map & (1<<i))
+		for (i = 0; i < 16; i++)
+			if (test_bit(i, data->map))
 				pcibios_penalize_isa_irq(i);
 	}
 #endif
@@ -421,6 +421,7 @@ int pnp_check_irq(struct pnp_dev * dev, int idx)
 
 int pnp_check_dma(struct pnp_dev * dev, int idx)
 {
+#ifndef CONFIG_IA64
 	int tmp;
 	struct pnp_dev *tdev;
 	unsigned long * dma = &dev->res.dma_resource[idx].start;
@@ -470,6 +471,10 @@ int pnp_check_dma(struct pnp_dev * dev, int idx)
 	}
 
 	return 1;
+#else
+	/* IA64 hasn't legacy DMA */
+	return 0;
+#endif
 }
 
 

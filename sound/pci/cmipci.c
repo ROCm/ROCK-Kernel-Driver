@@ -2572,6 +2572,10 @@ static int __devinit snd_cmipci_create(snd_card_t *card, struct pci_dev *pci,
 	long iomidi = mpu_port[dev];
 	long iosynth = fm_port[dev];
 	int pcm_index, pcm_spdif_index;
+	static struct pci_device_id intel_82437vx[] = {
+		{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82437VX) },
+		{ },
+	};
 
 	*rcmipci = NULL;
 
@@ -2647,8 +2651,7 @@ static int __devinit snd_cmipci_create(snd_card_t *card, struct pci_dev *pci,
 	switch (pci->device) {
 	case PCI_DEVICE_ID_CMEDIA_CM8738:
 	case PCI_DEVICE_ID_CMEDIA_CM8738B:
-		/* PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82437VX */
-		if (! pci_find_device(0x8086, 0x7030, NULL))
+		if (!pci_dev_present(intel_82437vx)) 
 			snd_cmipci_set_bit(cm, CM_REG_MISC_CTRL, CM_TXVX);
 		break;
 	default:

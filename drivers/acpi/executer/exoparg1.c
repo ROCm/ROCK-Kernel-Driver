@@ -67,7 +67,7 @@
  * Where:
  *
  * xA - ARGUMENTS:    The number of arguments (input operands) that are
- *                    required for this opcode type (1 through 6 args).
+ *                    required for this opcode type (0 through 6 args).
  * yT - TARGETS:      The number of targets (output operands) that are required
  *                    for this opcode type (0, 1, or 2 targets).
  * zR - RETURN VALUE: Indicates whether this opcode type returns a value
@@ -76,6 +76,69 @@
  * The AcpiExOpcode* functions are called via the Dispatcher component with
  * fully resolved operands.
 !*/
+
+/*******************************************************************************
+ *
+ * FUNCTION:    acpi_ex_opcode_0A_0T_1R
+ *
+ * PARAMETERS:  walk_state          - Current state (contains AML opcode)
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Execute operator with no operands, one return value
+ *
+ ******************************************************************************/
+
+acpi_status
+acpi_ex_opcode_0A_0T_1R (
+	struct acpi_walk_state          *walk_state)
+{
+	acpi_status                     status = AE_OK;
+	union acpi_operand_object       *return_desc = NULL;
+
+
+	ACPI_FUNCTION_TRACE_STR ("ex_opcode_0A_0T_1R", acpi_ps_get_opcode_name (walk_state->opcode));
+
+
+	/* Examine the AML opcode */
+
+	switch (walk_state->opcode) {
+	case AML_TIMER_OP:      /*  Timer () */
+
+		/* Create a return object of type Integer */
+
+		return_desc = acpi_ut_create_internal_object (ACPI_TYPE_INTEGER);
+		if (!return_desc) {
+			status = AE_NO_MEMORY;
+			goto cleanup;
+		}
+
+		return_desc->integer.value = acpi_os_get_timer ();
+		break;
+
+	default:                /*  Unknown opcode  */
+
+		ACPI_REPORT_ERROR (("acpi_ex_opcode_0A_0T_1R: Unknown opcode %X\n",
+			walk_state->opcode));
+		status = AE_AML_BAD_OPCODE;
+		break;
+	}
+
+cleanup:
+
+	if (!walk_state->result_obj) {
+		walk_state->result_obj = return_desc;
+	}
+
+	/* Delete return object on error */
+
+	if (ACPI_FAILURE (status)) {
+		acpi_ut_remove_reference (return_desc);
+	}
+
+	return_ACPI_STATUS (status);
+}
+
 
 /*******************************************************************************
  *
@@ -124,7 +187,7 @@ acpi_ex_opcode_1A_0T_0R (
 
 	case AML_SLEEP_OP:      /*  Sleep (msec_time) */
 
-		status = acpi_ex_system_do_suspend ((u32) operand[0]->integer.value);
+		status = acpi_ex_system_do_suspend (operand[0]->integer.value);
 		break;
 
 
@@ -222,7 +285,7 @@ acpi_ex_opcode_1A_1T_1R (
 	union acpi_operand_object       *return_desc2 = NULL;
 	u32                             temp32;
 	u32                             i;
-	u32                             power_of_ten;
+	acpi_integer                    power_of_ten;
 	acpi_integer                    digit;
 
 
@@ -262,7 +325,8 @@ acpi_ex_opcode_1A_1T_1R (
 			 * Acpi specification describes Integer type as a little
 			 * endian unsigned value, so this boundary condition is valid.
 			 */
-			for (temp32 = 0; return_desc->integer.value && temp32 < ACPI_INTEGER_BIT_SIZE; ++temp32) {
+			for (temp32 = 0; return_desc->integer.value &&
+					   temp32 < ACPI_INTEGER_BIT_SIZE; ++temp32) {
 				return_desc->integer.value >>= 1;
 			}
 
@@ -278,13 +342,15 @@ acpi_ex_opcode_1A_1T_1R (
 			 * The Acpi specification describes Integer type as a little
 			 * endian unsigned value, so this boundary condition is valid.
 			 */
-			for (temp32 = 0; return_desc->integer.value && temp32 < ACPI_INTEGER_BIT_SIZE; ++temp32) {
+			for (temp32 = 0; return_desc->integer.value &&
+					   temp32 < ACPI_INTEGER_BIT_SIZE; ++temp32) {
 				return_desc->integer.value <<= 1;
 			}
 
 			/* Since the bit position is one-based, subtract from 33 (65) */
 
-			return_desc->integer.value = temp32 == 0 ? 0 : (ACPI_INTEGER_BIT_SIZE + 1) - temp32;
+			return_desc->integer.value = temp32 == 0 ? 0 :
+					  (ACPI_INTEGER_BIT_SIZE + 1) - temp32;
 			break;
 
 
@@ -319,7 +385,8 @@ acpi_ex_opcode_1A_1T_1R (
 
 				/* Sum the digit into the result with the current power of 10 */
 
-				return_desc->integer.value += (((acpi_integer) temp32) * power_of_ten);
+				return_desc->integer.value += (((acpi_integer) temp32) *
+						 power_of_ten);
 
 				/* Shift to next BCD digit */
 
@@ -340,18 +407,20 @@ acpi_ex_opcode_1A_1T_1R (
 			/* Each BCD digit is one nybble wide */
 
 			for (i = 0; (i < acpi_gbl_integer_nybble_width) && (digit > 0); i++) {
-				(void) acpi_ut_short_divide (&digit, 10, &digit, &temp32);
+				(void) acpi_ut_short_divide (digit, 10, &digit, &temp32);
 
 				/* Insert the BCD digit that resides in the remainder from above */
 
-				return_desc->integer.value |= (((acpi_integer) temp32) << (i * 4));
+				return_desc->integer.value |= (((acpi_integer) temp32) <<
+						   ACPI_MUL_4 (i));
 			}
 
 			/* Overflow if there is any data left in Digit */
 
 			if (digit > 0) {
-				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Integer too large to convert to BCD: %8.8X%8.8X\n",
-						ACPI_FORMAT_UINT64 (operand[0]->integer.value)));
+				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+					"Integer too large to convert to BCD: %8.8X%8.8X\n",
+					ACPI_FORMAT_UINT64 (operand[0]->integer.value)));
 				status = AE_AML_NUMERIC_OVERFLOW;
 				goto cleanup;
 			}
@@ -429,42 +498,47 @@ acpi_ex_opcode_1A_1T_1R (
 	 */
 	case AML_COPY_OP:               /* Copy (Source, Target) */
 
-		status = acpi_ut_copy_iobject_to_iobject (operand[0], &return_desc, walk_state);
+		status = acpi_ut_copy_iobject_to_iobject (operand[0], &return_desc,
+				 walk_state);
 		break;
 
 
 	case AML_TO_DECSTRING_OP:       /* to_decimal_string (Data, Result) */
 
-		status = acpi_ex_convert_to_string (operand[0], &return_desc, 10, ACPI_UINT32_MAX, walk_state);
+		status = acpi_ex_convert_to_string (operand[0], &return_desc,
+				 ACPI_EXPLICIT_CONVERT_DECIMAL);
 		break;
 
 
 	case AML_TO_HEXSTRING_OP:       /* to_hex_string (Data, Result) */
 
-		status = acpi_ex_convert_to_string (operand[0], &return_desc, 16, ACPI_UINT32_MAX, walk_state);
+		status = acpi_ex_convert_to_string (operand[0], &return_desc,
+				 ACPI_EXPLICIT_CONVERT_HEX);
 		break;
 
 
 	case AML_TO_BUFFER_OP:          /* to_buffer (Data, Result) */
 
-		status = acpi_ex_convert_to_buffer (operand[0], &return_desc, walk_state);
+		status = acpi_ex_convert_to_buffer (operand[0], &return_desc);
 		break;
 
 
 	case AML_TO_INTEGER_OP:         /* to_integer (Data, Result) */
 
-		status = acpi_ex_convert_to_integer (operand[0], &return_desc, walk_state);
+		status = acpi_ex_convert_to_integer (operand[0], &return_desc,
+				 ACPI_ANY_BASE);
 		break;
 
 
-	case AML_SHIFT_LEFT_BIT_OP:     /*  shift_left_bit (Source, bit_num) */
-	case AML_SHIFT_RIGHT_BIT_OP:    /*  shift_right_bit (Source, bit_num) */
+	case AML_SHIFT_LEFT_BIT_OP:     /* shift_left_bit (Source, bit_num) */
+	case AML_SHIFT_RIGHT_BIT_OP:    /* shift_right_bit (Source, bit_num) */
 
 		/*
 		 * These are two obsolete opcodes
 		 */
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "%s is obsolete and not implemented\n",
-				  acpi_ps_get_opcode_name (walk_state->opcode)));
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+			"%s is obsolete and not implemented\n",
+			acpi_ps_get_opcode_name (walk_state->opcode)));
 		status = AE_SUPPORT;
 		goto cleanup;
 
@@ -537,7 +611,13 @@ acpi_ex_opcode_1A_0T_1R (
 			goto cleanup;
 		}
 
-		return_desc->integer.value = !operand[0]->integer.value;
+		/*
+		 * Set result to ONES (TRUE) if Value == 0.  Note:
+		 * return_desc->Integer.Value is initially == 0 (FALSE) from above.
+		 */
+		if (!operand[0]->integer.value) {
+			return_desc->integer.value = ACPI_INTEGER_MAX;
+		}
 		break;
 
 
@@ -545,46 +625,73 @@ acpi_ex_opcode_1A_0T_1R (
 	case AML_INCREMENT_OP:          /* Increment (Operand)  */
 
 		/*
-		 * Since we are expecting a Reference operand, it
-		 * can be either a NS Node or an internal object.
+		 * Create a new integer.  Can't just get the base integer and
+		 * increment it because it may be an Arg or Field.
 		 */
-		return_desc = operand[0];
-		if (ACPI_GET_DESCRIPTOR_TYPE (operand[0]) == ACPI_DESC_TYPE_OPERAND) {
-			/* Internal reference object - prevent deletion */
-
-			acpi_ut_add_reference (return_desc);
+		return_desc = acpi_ut_create_internal_object (ACPI_TYPE_INTEGER);
+		if (!return_desc) {
+			status = AE_NO_MEMORY;
+			goto cleanup;
 		}
 
 		/*
-		 * Convert the return_desc Reference to a Number
-		 * (This removes a reference on the return_desc object)
+		 * Since we are expecting a Reference operand, it can be either a
+		 * NS Node or an internal object.
 		 */
-		status = acpi_ex_resolve_operands (AML_LNOT_OP, &return_desc, walk_state);
+		temp_desc = operand[0];
+		if (ACPI_GET_DESCRIPTOR_TYPE (temp_desc) == ACPI_DESC_TYPE_OPERAND) {
+			/* Internal reference object - prevent deletion */
+
+			acpi_ut_add_reference (temp_desc);
+		}
+
+		/*
+		 * Convert the Reference operand to an Integer (This removes a
+		 * reference on the Operand[0] object)
+		 *
+		 * NOTE:  We use LNOT_OP here in order to force resolution of the
+		 * reference operand to an actual integer.
+		 */
+		status = acpi_ex_resolve_operands (AML_LNOT_OP, &temp_desc, walk_state);
 		if (ACPI_FAILURE (status)) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "%s: bad operand(s) %s\n",
-				acpi_ps_get_opcode_name (walk_state->opcode), acpi_format_exception(status)));
+				acpi_ps_get_opcode_name (walk_state->opcode),
+				acpi_format_exception(status)));
 
 			goto cleanup;
 		}
 
 		/*
-		 * return_desc is now guaranteed to be an Integer object
-		 * Do the actual increment or decrement
+		 * temp_desc is now guaranteed to be an Integer object --
+		 * Perform the actual increment or decrement
 		 */
-		if (AML_INCREMENT_OP == walk_state->opcode) {
-			return_desc->integer.value++;
+		if (walk_state->opcode == AML_INCREMENT_OP) {
+			return_desc->integer.value = temp_desc->integer.value +1;
 		}
 		else {
-			return_desc->integer.value--;
+			return_desc->integer.value = temp_desc->integer.value -1;
 		}
 
-		/* Store the result back in the original descriptor */
+		/* Finished with this Integer object */
 
+		acpi_ut_remove_reference (temp_desc);
+
+		/*
+		 * Store the result back (indirectly) through the original
+		 * Reference object
+		 */
 		status = acpi_ex_store (return_desc, operand[0], walk_state);
 		break;
 
 
 	case AML_TYPE_OP:               /* object_type (source_object) */
+
+		/*
+		 * Note: The operand is not resolved at this point because we want to
+		 * get the associated object, not its value.  For example, we don't want
+		 * to resolve a field_unit to its value, we want the actual field_unit
+		 * object.
+		 */
 
 		/* Get the type of the base object */
 
@@ -592,7 +699,6 @@ acpi_ex_opcode_1A_0T_1R (
 		if (ACPI_FAILURE (status)) {
 			goto cleanup;
 		}
-
 		/* Allocate a descriptor to hold the type. */
 
 		return_desc = acpi_ut_create_internal_object (ACPI_TYPE_INTEGER);
@@ -607,6 +713,11 @@ acpi_ex_opcode_1A_0T_1R (
 
 	case AML_SIZE_OF_OP:            /* size_of (source_object) */
 
+		/*
+		 * Note: The operand is not resolved at this point because we want to
+		 * get the associated object, not its value.
+		 */
+
 		/* Get the base object */
 
 		status = acpi_ex_resolve_multiple (walk_state, operand[0], &type, &temp_desc);
@@ -615,11 +726,19 @@ acpi_ex_opcode_1A_0T_1R (
 		}
 
 		/*
-		 * Type is guaranteed to be a buffer, string, or package at this
-		 * point (even if the original operand was an object reference, it
-		 * will be resolved and typechecked during operand resolution.)
+		 * The type of the base object must be integer, buffer, string, or
+		 * package.  All others are not supported.
+		 *
+		 * NOTE: Integer is not specifically supported by the ACPI spec,
+		 * but is supported implicitly via implicit operand conversion.
+		 * rather than bother with conversion, we just use the byte width
+		 * global (4 or 8 bytes).
 		 */
 		switch (type) {
+		case ACPI_TYPE_INTEGER:
+			value = acpi_gbl_integer_byte_width;
+			break;
+
 		case ACPI_TYPE_BUFFER:
 			value = temp_desc->buffer.length;
 			break;
@@ -633,7 +752,8 @@ acpi_ex_opcode_1A_0T_1R (
 			break;
 
 		default:
-			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "size_of, Not Buf/Str/Pkg - found type %s\n",
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+				"size_of - Operand is not Buf/Int/Str/Pkg - found type %s\n",
 				acpi_ut_get_type_name (type)));
 			status = AE_AML_OPERAND_TYPE;
 			goto cleanup;
@@ -803,7 +923,8 @@ acpi_ex_opcode_1A_0T_1R (
 						 * an uninitialized package element and is thus a
 						 * severe error.
 						 */
-						ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "NULL package element obj %p\n",
+						ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+							"NULL package element obj %p\n",
 							operand[0]));
 						status = AE_AML_UNINITIALIZED_ELEMENT;
 						goto cleanup;
@@ -815,7 +936,8 @@ acpi_ex_opcode_1A_0T_1R (
 
 				default:
 
-					ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unknown Index target_type %X in obj %p\n",
+					ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+						"Unknown Index target_type %X in obj %p\n",
 						operand[0]->reference.target_type, operand[0]));
 					status = AE_AML_OPERAND_TYPE;
 					goto cleanup;
@@ -839,7 +961,8 @@ acpi_ex_opcode_1A_0T_1R (
 
 
 			default:
-				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unknown opcode in ref(%p) - %X\n",
+				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+					"Unknown opcode in ref(%p) - %X\n",
 					operand[0], operand[0]->reference.opcode));
 
 				status = AE_TYPE;

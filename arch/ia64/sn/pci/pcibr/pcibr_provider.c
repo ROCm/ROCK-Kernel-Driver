@@ -98,7 +98,7 @@ pcibr_bus_fixup(struct pcibus_bussoft *prom_bussoft)
 	}
 
 	nasid = NASID_GET(soft->pbi_buscommon.bs_base);
-	cnode = NASID_TO_COMPACT_NODEID(nasid);
+	cnode = nasid_to_cnodeid(nasid);
 	hubdev_info = (struct hubdev_info *)(NODEPDA(cnode)->pdinfo);
 
 	if (hubdev_info->hdi_flush_nasid_list.widget_p) {

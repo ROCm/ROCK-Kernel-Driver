@@ -11,11 +11,10 @@
 
 extern __inline__ void __delay(unsigned long loops)
 {
-	__asm__ __volatile__ ("mov.l %0,er0\n\t"
-			      "1:\n\t"
-			      "dec.l #1,er0\n\t"
+	__asm__ __volatile__ ("1:\n\t"
+			      "dec.l #1,%0\n\t"
 			      "bne 1b"
-			      ::"r" (loops):"er0");
+			      :"=r" (loops):"0"(loops));
 }
 
 /*

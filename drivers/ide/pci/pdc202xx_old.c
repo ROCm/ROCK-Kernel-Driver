@@ -457,7 +457,7 @@ static void pdc202xx_reset_host (ide_hwif_t *hwif)
 		hwif->channel ? "Secondary" : "Primary");
 }
 
-void pdc202xx_reset (ide_drive_t *drive)
+static void pdc202xx_reset (ide_drive_t *drive)
 {
 	ide_hwif_t *hwif	= HWIF(drive);
 	ide_hwif_t *mate	= hwif->mate;

@@ -152,12 +152,16 @@ static unsigned long get_offset_pit(void)
 
 /* tsc timer_opts struct */
 struct timer_opts timer_pit = {
-	.name = 	"pit",
-	.init =		init_pit, 
-	.mark_offset =	mark_offset_pit, 
-	.get_offset =	get_offset_pit,
+	.name = "pit",
+	.mark_offset = mark_offset_pit, 
+	.get_offset = get_offset_pit,
 	.monotonic_clock = monotonic_clock_pit,
 	.delay = delay_pit,
+};
+
+struct init_timer_opts __initdata timer_pit_init = {
+	.init = init_pit, 
+	.opts = &timer_pit,
 };
 
 void setup_pit_timer(void)
@@ -181,7 +185,7 @@ static int timer_resume(struct sys_device *dev)
 }
 
 static struct sysdev_class timer_sysclass = {
-	set_kset_name("timer"),
+	set_kset_name("timer_pit"),
 	.resume	= timer_resume,
 };
 
