@@ -332,8 +332,8 @@ static int sr_init_command(Scsi_Cmnd * SCpnt)
 	this_count = (SCpnt->request_bufflen >> 9) / (s_size >> 9);
 
 
-	SCSI_LOG_HLQUEUE(2, printk("sr%d : %s %d/%ld 512 byte blocks.\n",
-                                   devm,
+	SCSI_LOG_HLQUEUE(2, printk("%s : %s %d/%ld 512 byte blocks.\n",
+                                   SCp->cdi.name,
 		   (rq_data_dir(SCpnt->request) == WRITE) ? "writing" : "reading",
 				 this_count, SCpnt->request->nr_sectors));
 
@@ -464,8 +464,8 @@ static int sr_attach(Scsi_Device * SDp)
 	if (sr_template.nr_dev > sr_template.dev_max)
 		panic("scsi_devices corrupt (sr)");
 
-	printk("Attached scsi CD-ROM sr%d at scsi%d, channel %d, id %d, lun %d\n",
-	       i, SDp->host->host_no, SDp->channel, SDp->id, SDp->lun);
+	printk("Attached scsi CD-ROM %s at scsi%d, channel %d, id %d, lun %d\n",
+	       scsi_CDs[i].cdi.name, SDp->host->host_no, SDp->channel, SDp->id, SDp->lun);
 	return 0;
 }
 
@@ -547,8 +547,8 @@ void get_sectorsize(int i)
 		case 512:
 			break;
 		default:
-			printk("sr%d: unsupported sector size %d.\n",
-			       i, sector_size);
+			printk("%s: unsupported sector size %d.\n",
+			       SCp->cdi.name, sector_size);
 			SCp->capacity = 0;
 			SCp->needs_sector_size = 1;
 		}
@@ -619,7 +619,7 @@ void get_capabilities(int i)
 					 CDC_DVD | CDC_DVD_RAM |
 					 CDC_SELECT_DISC | CDC_SELECT_SPEED);
 		kfree(buffer);
-		printk("sr%i: scsi-1 drive\n", i);
+		printk("%s: scsi-1 drive\n", SCp->cdi.name);
 		return;
 	}
 	n = buffer[3] + 4;
@@ -627,7 +627,7 @@ void get_capabilities(int i)
 	SCp->readcd_known = 1;
 	SCp->readcd_cdda = buffer[n + 5] & 0x01;
 	/* print some capability bits */
-	printk("sr%i: scsi3-mmc drive: %dx/%dx %s%s%s%s%s%s\n", i,
+	printk("%s: scsi3-mmc drive: %dx/%dx %s%s%s%s%s%s\n", SCp->cdi.name,
 	       ((buffer[n + 14] << 8) + buffer[n + 15]) / 176,
 	       SCp->cdi.speed,
 	       buffer[n + 3] & 0x01 ? "writer " : "",	/* CD Writer */
@@ -696,6 +696,7 @@ static int sr_registered;
 
 static int sr_init()
 {
+	int i;
 	if (sr_template.dev_noticed == 0)
 		return 0;
 
@@ -714,6 +715,8 @@ static int sr_init()
 	if (!scsi_CDs)
 		goto cleanup_dev;
 	memset(scsi_CDs, 0, sr_template.dev_max * sizeof(Scsi_CD));
+	for (i = 0; i < sr_template.dev_max; i++)
+		sprintf(scsi_CDs[i].cdi.name, "sr%d", i);
 
 	sr_sizes = kmalloc(sr_template.dev_max * sizeof(int), GFP_ATOMIC);
 	if (!sr_sizes)
@@ -750,7 +753,6 @@ static DEVICE_ATTR(type,S_IRUGO,sr_device_type_read,NULL);
 void sr_finish()
 {
 	int i;
-	char name[6];
 
 	blk_dev[MAJOR_NR].queue = sr_find_queue;
 	blk_size[MAJOR_NR] = sr_sizes;
@@ -790,8 +792,6 @@ void sr_finish()
 		get_capabilities(i);
 		sr_vendor_init(SCp);
 
-		sprintf(name, "sr%d", i);
-		strcpy(SCp->cdi.name, name);
 		sprintf(SCp->cdi.cdrom_driverfs_dev.bus_id, "%s:cd",
 			SCp->device->sdev_driverfs_dev.bus_id);
 		sprintf(SCp->cdi.cdrom_driverfs_dev.name, "%scdrom",

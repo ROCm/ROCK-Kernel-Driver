@@ -78,13 +78,14 @@ static int sr_fake_playtrkind(struct cdrom_device_info *cdi, struct cdrom_ti *ti
 
 int sr_do_ioctl(int target, unsigned char *sr_cmd, void *buffer, unsigned buflength, int quiet, int readwrite, struct request_sense *sense)
 {
+	Scsi_CD *cd = &scsi_CDs[target];
 	Scsi_Request *SRpnt;
 	Scsi_Device *SDev;
         struct request *req;
 	int result, err = 0, retries = 0;
 	char *bounce_buffer;
 
-	SDev = scsi_CDs[target].device;
+	SDev = cd->device;
 	SRpnt = scsi_allocate_request(SDev);
         if (!SRpnt) {
                 printk("Unable to allocate SCSI request in sr_do_ioctl");
@@ -127,7 +128,7 @@ int sr_do_ioctl(int target, unsigned char *sr_cmd, void *buffer, unsigned buflen
 		case UNIT_ATTENTION:
 			SDev->changed = 1;
 			if (!quiet)
-				printk(KERN_INFO "sr%d: disc change detected.\n", target);
+				printk(KERN_INFO "%s: disc change detected.\n", cd->cdi.name);
 			if (retries++ < 10)
 				goto retry;
 			err = -ENOMEDIUM;
@@ -137,7 +138,7 @@ int sr_do_ioctl(int target, unsigned char *sr_cmd, void *buffer, unsigned buflen
 			    SRpnt->sr_sense_buffer[13] == 0x01) {
 				/* sense: Logical unit is in process of becoming ready */
 				if (!quiet)
-					printk(KERN_INFO "sr%d: CDROM not ready yet.\n", target);
+					printk(KERN_INFO "%s: CDROM not ready yet.\n", cd->cdi.name);
 				if (retries++ < 10) {
 					/* sleep 2 sec and try again */
 					scsi_sleep(2 * HZ);
@@ -149,7 +150,7 @@ int sr_do_ioctl(int target, unsigned char *sr_cmd, void *buffer, unsigned buflen
 				}
 			}
 			if (!quiet)
-				printk(KERN_INFO "sr%d: CDROM not ready.  Make sure there is a disc in the drive.\n", target);
+				printk(KERN_INFO "%s: CDROM not ready.  Make sure there is a disc in the drive.\n", cd->cdi.name);
 #ifdef DEBUG
 			print_req_sense("sr", SRpnt);
 #endif
@@ -157,8 +158,8 @@ int sr_do_ioctl(int target, unsigned char *sr_cmd, void *buffer, unsigned buflen
 			break;
 		case ILLEGAL_REQUEST:
 			if (!quiet)
-				printk(KERN_ERR "sr%d: CDROM (ioctl) reports ILLEGAL "
-				       "REQUEST.\n", target);
+				printk(KERN_ERR "%s: CDROM (ioctl) reports ILLEGAL "
+				       "REQUEST.\n", cd->cdi.name);
 			if (SRpnt->sr_sense_buffer[12] == 0x20 &&
 			    SRpnt->sr_sense_buffer[13] == 0x00) {
 				/* sense: Invalid command operation code */
@@ -172,7 +173,7 @@ int sr_do_ioctl(int target, unsigned char *sr_cmd, void *buffer, unsigned buflen
 #endif
 			break;
 		default:
-			printk(KERN_ERR "sr%d: CDROM (ioctl) error, command: ", target);
+			printk(KERN_ERR "%s: CDROM (ioctl) error, command: ", cd->cdi.name);
 			print_command(sr_cmd);
 			print_req_sense("sr", SRpnt);
 			err = -EIO;
@@ -445,8 +446,8 @@ int sr_read_cd(int minor, unsigned char *dest, int lba, int format, int blksize)
 	Scsi_CD *SCp = &scsi_CDs[minor];
 
 #ifdef DEBUG
-	printk("sr%d: sr_read_cd lba=%d format=%d blksize=%d\n",
-	       minor, lba, format, blksize);
+	printk("%s: sr_read_cd lba=%d format=%d blksize=%d\n",
+	       SCp->cdi.name, lba, format, blksize);
 #endif
 
 	memset(cmd, 0, MAX_COMMAND_SIZE);
@@ -501,7 +502,7 @@ int sr_read_sector(int minor, int lba, int blksize, unsigned char *dest)
 			return rc;
 	}
 #ifdef DEBUG
-	printk("sr%d: sr_read_sector lba=%d blksize=%d\n", minor, lba, blksize);
+	printk("%s: sr_read_sector lba=%d blksize=%d\n", SCp->cdi.name, lba, blksize);
 #endif
 
 	memset(cmd, 0, MAX_COMMAND_SIZE);
@@ -544,7 +545,7 @@ int sr_is_xa(int minor)
 	}
 	kfree(raw_sector);
 #ifdef DEBUG
-	printk("sr%d: sr_is_xa: %d\n", minor, is_xa);
+	printk("%s: sr_is_xa: %d\n", SCp->cdi.name, is_xa);
 #endif
 	return is_xa;
 }
