@@ -20,6 +20,7 @@
 #include <linux/string.h>
 #include <net/neighbour.h>
 #include <net/dst.h>
+#include <net/flow.h>
 
 #include <asm/uaccess.h>
 

@@ -1377,7 +1377,6 @@ static int wait_for_devfsd_finished (struct fs_info *fs_info)
  *	@uid: The user ID.
  *	@gid: The group ID.
  *	@fs_info: The filesystem info.
- *	@atomic: If TRUE, an atomic allocation is required.
  *
  *	Returns %TRUE if an event was queued and devfsd woken up, else %FALSE.
  */
@@ -1423,7 +1422,7 @@ static int devfsd_notify_de (struct devfs_entry *de,
 static void devfsd_notify (struct devfs_entry *de,unsigned short type)
 {
 	devfsd_notify_de(de, type, de->mode, current->euid,
-			 current->egid, &fs_info, 0);
+			 current->egid, &fs_info);
 } 
 
 
@@ -1456,8 +1455,8 @@ devfs_handle_t devfs_register (devfs_handle_t dir, const char *name,
     dev_t devnum = 0, dev = MKDEV(major, minor);
     struct devfs_entry *de;
 
-    if (flags)
-	printk(KERN_ERR "%s called with flags != 0, please fix!\n");
+    /* we don't accept any flags anymore.  prototype will change soon. */
+    WARN_ON(flags);
 
     if (name == NULL)
     {
@@ -1748,7 +1747,7 @@ void devfs_remove(const char *fmt, ...)
  *	else a negative error code.
  */
 
-int devfs_generate_path (devfs_handle_t de, char *path, int buflen)
+static int devfs_generate_path (devfs_handle_t de, char *path, int buflen)
 {
     int pos;
 #define NAMEOF(de) ( (de)->mode ? (de)->name : (de)->u.name )
@@ -1868,7 +1867,6 @@ EXPORT_SYMBOL(devfs_unregister);
 EXPORT_SYMBOL(devfs_mk_symlink);
 EXPORT_SYMBOL(devfs_mk_dir);
 EXPORT_SYMBOL(devfs_remove);
-EXPORT_SYMBOL(devfs_generate_path);
 
 
 /**

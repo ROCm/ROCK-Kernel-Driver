@@ -228,7 +228,7 @@ EXPORT_SYMBOL(destroy_EII_client);
 #if defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)
 EXPORT_SYMBOL(dev_change_flags);
 #endif
-EXPORT_SYMBOL(vlan_ioctl_hook);
+EXPORT_SYMBOL(vlan_ioctl_set);
 
 EXPORT_SYMBOL(scm_detach_fds);
 

@@ -169,7 +169,7 @@ extern void end_page_writeback(struct page *page);
 /*
  * Fault a userspace page into pagetables.  Return non-zero on a fault.
  *
- * FIXME: this assumes that two userspace pages are always sufficient.  That's
+ * This assumes that two userspace pages are always sufficient.  That's
  * not true if PAGE_CACHE_SIZE > PAGE_SIZE.
  */
 static inline int fault_in_pages_writeable(char *uaddr, int size)

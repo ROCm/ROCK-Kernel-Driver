@@ -36,12 +36,13 @@ static inline void mach_prepare_counter(void)
 	outb_p(CALIBRATE_LATCH >> 8, 0x42);       /* MSB of count */
 }
 
-static inline void mach_countup(unsigned long *count)
+static inline void mach_countup(unsigned long *count_p)
 {
-	*count = 0L;
+	unsigned long count = 0;
 	do {
-		*count++;
+		count++;
 	} while ((inb_p(0x61) & 0x20) == 0);
+	*count_p = count;
 }
 
 #endif /* !_MACH_TIMER_H */

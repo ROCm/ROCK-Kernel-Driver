@@ -195,8 +195,8 @@ _decode_session6(struct sk_buff *skb, struct flowi *fl)
 			if (pskb_may_pull(skb, skb->nh.raw + offset + 4 - skb->data)) {
 				u16 *ports = (u16 *)exthdr;
 
-				fl->uli_u.ports.sport = ports[0];
-				fl->uli_u.ports.dport = ports[1];
+				fl->fl_ip_sport = ports[0];
+				fl->fl_ip_dport = ports[1];
 			}
 			return;
 
@@ -205,7 +205,7 @@ _decode_session6(struct sk_buff *skb, struct flowi *fl)
 		case IPPROTO_ESP:
 		case IPPROTO_COMP:
 		default:
-			fl->uli_u.spi = 0;
+			fl->fl_ipsec_spi = 0;
 			return;
 		};
 	}

@@ -270,5 +270,6 @@ void cb_free(socket_info_t * s)
 {
 	struct pci_dev *bridge = s->cap.cb_dev;
 
-	pci_remove_behind_bridge(bridge);
+	if (bridge)
+		pci_remove_behind_bridge(bridge);
 }

@@ -138,8 +138,8 @@ config ARCH_FOOTBRIDGE
 config ARCH_INTEGRATOR
 	bool "Integrator"
 
-config ARCH_IOP310
-	bool "IOP310-based"
+config ARCH_IOP3XX
+	bool "IOP3xx-based"
 
 config ARCH_L7200
 	bool "LinkUp-L7200"
@@ -342,7 +342,7 @@ config CPU_SA1100
 # XScale
 config CPU_XSCALE
 	bool
-	depends on ARCH_IOP310 || ARCH_ADIFCC || ARCH_PXA
+	depends on ARCH_IOP3XX || ARCH_ADIFCC || ARCH_PXA
 	default y
 
 # Figure out what processor architecture version we should be using.
@@ -359,7 +359,7 @@ config CPU_32v4
 
 config CPU_32v5
 	bool
-	depends on ARCH_IOP310 || ARCH_ADIFCC || ARCH_PXA
+	depends on ARCH_IOP3XX || ARCH_ADIFCC || ARCH_PXA
 	default y
 
 comment "Processor Features"
@@ -436,8 +436,8 @@ config DISCONTIGMEM
 # Now handle the bus types
 config PCI
 	bool
-	default PCI_INTEGRATOR if !ARCH_FTVPCI && !ARCH_SHARK && !FOOTBRIDGE_HOST && !ARCH_IOP310 && ARCH_INTEGRATOR
-	default y if ARCH_FTVPCI || ARCH_SHARK || FOOTBRIDGE_HOST || ARCH_IOP310
+	default PCI_INTEGRATOR if !ARCH_FTVPCI && !ARCH_SHARK && !FOOTBRIDGE_HOST && !ARCH_IOP3XX && ARCH_INTEGRATOR
+	default y if ARCH_FTVPCI || ARCH_SHARK || FOOTBRIDGE_HOST || ARCH_IOP3XX
 	help
 	  Find out whether you have a PCI motherboard. PCI is the name of a
 	  bus system, i.e. the way the CPU talks to the other stuff inside
@@ -451,7 +451,7 @@ config PCI
 
 config PCI_INTEGRATOR
 	bool "PCI support"
-	depends on !ARCH_FTVPCI && !ARCH_SHARK && !FOOTBRIDGE_HOST && !ARCH_IOP310 && ARCH_INTEGRATOR
+	depends on !ARCH_FTVPCI && !ARCH_SHARK && !FOOTBRIDGE_HOST && !ARCH_IOP3XX && ARCH_INTEGRATOR
 	help
 	  Find out whether you have a PCI motherboard. PCI is the name of a
 	  bus system, i.e. the way the CPU talks to the other stuff inside

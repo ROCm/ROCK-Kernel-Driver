@@ -214,49 +214,9 @@ return (to);
  */
 static inline void * __constant_memcpy(void * to, const void * from, size_t n)
 {
-	switch (n) {
-		case 0:
-			return to;
-		case 1:
-			*(unsigned char *)to = *(const unsigned char *)from;
-			return to;
-		case 2:
-			*(unsigned short *)to = *(const unsigned short *)from;
-			return to;
-		case 3:
-			*(unsigned short *)to = *(const unsigned short *)from;
-			*(2+(unsigned char *)to) = *(2+(const unsigned char *)from);
-			return to;
-		case 4:
-			*(unsigned long *)to = *(const unsigned long *)from;
-			return to;
-		case 6:	/* for Ethernet addresses */
-			*(unsigned long *)to = *(const unsigned long *)from;
-			*(2+(unsigned short *)to) = *(2+(const unsigned short *)from);
-			return to;
-		case 8:
-			*(unsigned long *)to = *(const unsigned long *)from;
-			*(1+(unsigned long *)to) = *(1+(const unsigned long *)from);
-			return to;
-		case 12:
-			*(unsigned long *)to = *(const unsigned long *)from;
-			*(1+(unsigned long *)to) = *(1+(const unsigned long *)from);
-			*(2+(unsigned long *)to) = *(2+(const unsigned long *)from);
-			return to;
-		case 16:
-			*(unsigned long *)to = *(const unsigned long *)from;
-			*(1+(unsigned long *)to) = *(1+(const unsigned long *)from);
-			*(2+(unsigned long *)to) = *(2+(const unsigned long *)from);
-			*(3+(unsigned long *)to) = *(3+(const unsigned long *)from);
-			return to;
-		case 20:
-			*(unsigned long *)to = *(const unsigned long *)from;
-			*(1+(unsigned long *)to) = *(1+(const unsigned long *)from);
-			*(2+(unsigned long *)to) = *(2+(const unsigned long *)from);
-			*(3+(unsigned long *)to) = *(3+(const unsigned long *)from);
-			*(4+(unsigned long *)to) = *(4+(const unsigned long *)from);
-			return to;
-	}
+	if (n <= 128)
+		return __builtin_memcpy(to, from, n);
+
 #define COMMON(x) \
 __asm__ __volatile__( \
 	"rep ; movsl" \

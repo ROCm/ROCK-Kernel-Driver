@@ -317,7 +317,6 @@ skip_copy_pte_range:
 				get_page(page);
 				dst->rss++;
 
-cont_copy_pte_range:
 				set_pte(dst_pte, pte);
 				pte_chain = page_add_rmap(page, dst_pte,
 							pte_chain);

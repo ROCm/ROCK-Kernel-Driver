@@ -173,13 +173,13 @@ static inline int ip_route_connect(struct rtable **rp, u32 dst,
 static inline int ip_route_newports(struct rtable **rp, u16 sport, u16 dport,
 				    struct sock *sk)
 {
-	if (sport != (*rp)->fl.uli_u.ports.sport ||
-	    dport != (*rp)->fl.uli_u.ports.dport) {
+	if (sport != (*rp)->fl.fl_ip_sport ||
+	    dport != (*rp)->fl.fl_ip_dport) {
 		struct flowi fl;
 
 		memcpy(&fl, &(*rp)->fl, sizeof(fl));
-		fl.uli_u.ports.sport = sport;
-		fl.uli_u.ports.dport = dport;
+		fl.fl_ip_sport = sport;
+		fl.fl_ip_dport = dport;
 		ip_rt_put(*rp);
 		*rp = NULL;
 		return ip_route_output_flow(rp, &fl, sk, 0);

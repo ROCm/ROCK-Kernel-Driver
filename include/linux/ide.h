@@ -13,7 +13,6 @@
 #include <linux/hdsmart.h>
 #include <linux/blkdev.h>
 #include <linux/proc_fs.h>
-#include <linux/devfs_fs_kernel.h>
 #include <linux/interrupt.h>
 #include <linux/bitops.h>
 #include <linux/bio.h>
@@ -699,7 +698,7 @@ typedef struct ide_drive_s {
 	struct hd_driveid	*id;	/* drive model identification info */
 	struct proc_dir_entry *proc;	/* /proc/ide/ directory entry */
 	struct ide_settings_s *settings;/* /proc/ide/ drive settings */
-	devfs_handle_t		de;	/* directory for device */
+	char		devfs_name[64];	/* devfs crap */
 
 	struct hwif_s		*hwif;	/* actually (ide_hwif_t *) */
 

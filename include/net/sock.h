@@ -859,6 +859,9 @@ sock_recv_timestamp(struct msghdr *msg, struct sock *sk, struct sk_buff *skb)
  * 	schedule();
  * SOCK_SLEEP_POST(sk)
  *
+ * N.B. These are now obsolete and were, afaik, only ever used in DECnet
+ * and when the last use of them in DECnet has gone, I'm intending to
+ * remove them.
  */
 
 #define SOCK_SLEEP_PRE(sk) 	{ struct task_struct *tsk = current; \

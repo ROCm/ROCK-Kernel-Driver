@@ -7,6 +7,7 @@
 
 #include <linux/config.h>
 #include <asm/arch/iop310.h>
+#include <asm/arch/iop321.h>
 
 /*
  * Task size: 3GB
@@ -47,11 +48,21 @@
  */
 #define __virt_to_bus__is_a_macro
 #define __bus_to_virt__is_a_macro
+
+#ifdef CONFIG_ARCH_IOP310
+
 #define __virt_to_bus(x)	(((__virt_to_phys(x)) & ~(*IOP310_SIATVR)) | ((*IOP310_SIABAR) & 0xfffffff0))
 #define __bus_to_virt(x)    (__phys_to_virt(((x) & ~(*IOP310_SIALR)) | ( *IOP310_SIATVR)))
 
+#elif defined(CONFIG_ARCH_IOP321)
+
+#define __virt_to_bus(x)	(((__virt_to_phys(x)) & ~(*IOP321_IATVR2)) | ((*IOP321_IABAR2) & 0xfffffff0))
+#define __bus_to_virt(x)    (__phys_to_virt(((x) & ~(*IOP321_IALR2)) | ( *IOP321_IATVR2)))
+
+#endif
+
 /* boot mem allocate global pointer for MU circular queues QBAR */
-#ifdef CONFIG_IOP310_MU
+#ifdef CONFIG_IOP3XX_MU
 extern void *mu_mem;
 #endif
 

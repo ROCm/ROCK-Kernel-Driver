@@ -434,7 +434,15 @@ static void dn_nsp_disc_init(struct sock *sk, struct sk_buff *skb)
 		sk->state_change(sk);
 	}
 
-	dn_nsp_send_disc(sk, NSP_DISCCONF, NSP_REASON_DC, GFP_ATOMIC);
+	/* 
+	 * It appears that its possible for remote machines to send disc
+	 * init messages with no port identifier if we are in the CI and
+	 * possibly also the CD state. Obviously we shouldn't reply with
+	 * a message if we don't know what the end point is.
+	 */
+	if (scp->addrrem) {
+		dn_nsp_send_disc(sk, NSP_DISCCONF, NSP_REASON_DC, GFP_ATOMIC);
+	}
 	scp->persist_fxn = dn_destroy_timer;
 	scp->persist = dn_nsp_persist(sk);
 

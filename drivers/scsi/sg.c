@@ -182,7 +182,6 @@ typedef struct sg_device { /* holds the state of each scsi generic device */
 	wait_queue_head_t o_excl_wait;	/* queue open() when O_EXCL in use */
 	int sg_tablesize;	/* adapter's max scatter-gather table size */
 	Sg_fd *headfp;		/* first open fd belonging to this device */
-	devfs_handle_t de;
 	volatile char detached;	/* 0->attached, 1->detached pending removal */
 	volatile char exclude;	/* opened for exclusive access */
 	char sgdebug;		/* 0->off, 1->sense, 9->dump dev, 10-> all devs */
@@ -1350,6 +1349,7 @@ sg_attach(Scsi_Device * scsidp)
 	struct gendisk *disk;
 	Sg_device *sdp = NULL;
 	unsigned long iflags;
+	char devfs_name[64];
 	int k, error;
 
 	disk = alloc_disk(1);
@@ -1447,10 +1447,13 @@ find_empty_slot:
 	device_register(&sdp->sg_driverfs_dev);
 	device_create_file(&sdp->sg_driverfs_dev, &dev_attr_type);
 	device_create_file(&sdp->sg_driverfs_dev, &dev_attr_kdev);
-	sdp->de = devfs_register(scsidp->de, "generic", DEVFS_FL_DEFAULT,
-				 SCSI_GENERIC_MAJOR, k,
-				 S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP,
-				 &sg_fops, sdp);
+
+	sprintf(devfs_name, "%s/generic", scsidp->devfs_name);
+	devfs_register(NULL, devfs_name, 0,
+			SCSI_GENERIC_MAJOR, k,
+			S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP,
+			&sg_fops, sdp);
+
 	switch (scsidp->type) {
 	case TYPE_DISK:
 	case TYPE_MOD:
@@ -1527,8 +1530,7 @@ sg_detach(Scsi_Device * scsidp)
 	write_unlock_irqrestore(&sg_dev_arr_lock, iflags);
 
 	if (sdp) {
-		devfs_unregister(sdp->de);
-		sdp->de = NULL;
+		devfs_remove("%s/generic", scsidp->devfs_name);
 		device_remove_file(&sdp->sg_driverfs_dev, &dev_attr_type);
 		device_remove_file(&sdp->sg_driverfs_dev, &dev_attr_kdev);
 		device_unregister(&sdp->sg_driverfs_dev);

@@ -94,6 +94,7 @@ void br_fdb_changeaddr(struct net_bridge_port *p, unsigned char *newaddr)
 {
 	struct net_bridge *br;
 	int i;
+	int newhash = br_mac_hash(newaddr);
 
 	br = p->br;
 	write_lock_bh(&br->hash_lock);
@@ -103,9 +104,11 @@ void br_fdb_changeaddr(struct net_bridge_port *p, unsigned char *newaddr)
 		f = br->hash[i];
 		while (f != NULL) {
 			if (f->dst == p && f->is_local) {
-				__hash_unlink(f);
 				memcpy(f->addr.addr, newaddr, ETH_ALEN);
-				__hash_link(br, f, br_mac_hash(newaddr));
+				if (newhash != i) {
+					__hash_unlink(f);
+					__hash_link(br, f, newhash);
+				}
 				write_unlock_bh(&br->hash_lock);
 				return;
 			}
@@ -212,21 +215,15 @@ int br_fdb_get_entries(struct net_bridge *br,
 	for (i=0;i<BR_HASH_SIZE;i++) {
 		struct net_bridge_fdb_entry *f;
 
-		f = br->hash[i];
-		while (f != NULL && num < maxnum) {
+		for (f = br->hash[i]; f != NULL && num < maxnum;
+		     f = f->next_hash) {
 			struct __fdb_entry ent;
-			int err;
-			struct net_bridge_fdb_entry *g;
-			struct net_bridge_fdb_entry **pp; 
 
-			if (has_expired(br, f)) {
-				f = f->next_hash;
+			if (has_expired(br, f)) 
 				continue;
-			}
 
 			if (offset) {
 				offset--;
-				f = f->next_hash;
 				continue;
 			}
 
@@ -234,37 +231,33 @@ int br_fdb_get_entries(struct net_bridge *br,
 
 			atomic_inc(&f->use_count);
 			read_unlock_bh(&br->hash_lock);
-			err = copy_to_user(walk, &ent, sizeof(struct __fdb_entry));
+			
+			if (copy_to_user(walk, &ent, sizeof(struct __fdb_entry)))
+				return -EFAULT;
+
 			read_lock_bh(&br->hash_lock);
+			
+			/* entry was deleted during copy_to_user */
+			if (atomic_dec_and_test(&f->use_count)) {
+				kfree(f);
+				num = -EAGAIN;
+				goto out;
+			}
 
-			g = f->next_hash;
-			pp = f->pprev_hash;
-			br_fdb_put(f);
-
-			if (err)
-				goto out_fault;
-
-			if (g == NULL && pp == NULL)
-				goto out_disappeared;
+			/* entry changed address hash while copying */
+			if (br_mac_hash(f->addr.addr) != i) {
+				num = -EAGAIN;
+				goto out;
+			}
 
 			num++;
 			walk++;
-
-			f = g;
 		}
 	}
 
  out:
 	read_unlock_bh(&br->hash_lock);
 	return num;
-
- out_disappeared:
-	num = -EAGAIN;
-	goto out;
-
- out_fault:
-	num = -EFAULT;
-	goto out;
 }
 
 static __inline__ void __fdb_possibly_replace(struct net_bridge_fdb_entry *fdb,

@@ -2,10 +2,13 @@
  *  linux/include/asm-arm/arch-iop80310/uncompress.h
  */
 #include <linux/config.h>
+#include <linux/serial_reg.h>
+#include <asm/hardware.h>
 
 #ifdef CONFIG_ARCH_IQ80310
-#define UART1_BASE    ((volatile unsigned char *)0xfe800000)
-#define UART2_BASE    ((volatile unsigned char *)0xfe810000)
+#define UART2_BASE    ((volatile unsigned char *)IQ80310_UART2)
+#elif defined(CONFIG_ARCH_IQ80321)
+#define UART2_BASE    ((volatile unsigned char *)IQ80321_UART1)
 #endif
 
 static __inline__ void putc(char c)

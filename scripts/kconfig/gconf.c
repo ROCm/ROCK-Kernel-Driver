@@ -64,7 +64,7 @@ static struct menu *current;
 enum {
 	COL_OPTION, COL_NAME, COL_NO, COL_MOD, COL_YES, COL_VALUE,
 	COL_MENU, COL_COLOR, COL_EDIT, COL_PIXBUF,
-	COL_PIXVIS, COL_BTNVIS, COL_BTNACT, COL_BTNINC,
+	COL_PIXVIS, COL_BTNVIS, COL_BTNACT, COL_BTNINC, COL_BTNRAD,
 	COL_NUMBER
 };
 
@@ -295,7 +295,8 @@ void init_tree_model(void)
 					  G_TYPE_POINTER, GDK_TYPE_COLOR,
 					  G_TYPE_BOOLEAN, GDK_TYPE_PIXBUF,
 					  G_TYPE_BOOLEAN, G_TYPE_BOOLEAN,
-					  G_TYPE_BOOLEAN, G_TYPE_BOOLEAN);
+					  G_TYPE_BOOLEAN, G_TYPE_BOOLEAN,
+					  G_TYPE_BOOLEAN);
 	model2 = GTK_TREE_MODEL(tree2);
 
 	for (parents[0] = NULL, i = 1; i < 256; i++)
@@ -308,7 +309,8 @@ void init_tree_model(void)
 				   G_TYPE_POINTER, GDK_TYPE_COLOR,
 				   G_TYPE_BOOLEAN, GDK_TYPE_PIXBUF,
 				   G_TYPE_BOOLEAN, G_TYPE_BOOLEAN,
-				   G_TYPE_BOOLEAN, G_TYPE_BOOLEAN);
+				   G_TYPE_BOOLEAN, G_TYPE_BOOLEAN,
+				   G_TYPE_BOOLEAN);
 	model1 = GTK_TREE_MODEL(tree1);
 }
 
@@ -370,7 +372,8 @@ void init_right_tree(void)
 					    renderer,
 					    "active", COL_BTNACT,
 					    "inconsistent", COL_BTNINC,
-					    "visible", COL_BTNVIS, NULL);
+					    "visible", COL_BTNVIS, 
+					    "radio", COL_BTNRAD, NULL);
 	/*g_signal_connect(G_OBJECT(renderer), "toggled",
 	   G_CALLBACK(renderer_toggled), NULL); */
 	renderer = gtk_cell_renderer_text_new();
@@ -1219,6 +1222,8 @@ static gchar **fill_row(struct menu *menu)
 		struct symbol *def_sym = sym_get_choice_value(sym);
 		struct menu *def_menu = NULL;
 
+		row[COL_BTNVIS] = GINT_TO_POINTER(FALSE);
+
 		for (child = menu->list; child; child = child->next) {
 			if (menu_is_visible(child)
 			    && child->sym == def_sym)
@@ -1229,6 +1234,8 @@ static gchar **fill_row(struct menu *menu)
 			row[COL_VALUE] =
 			    g_strdup(menu_get_prompt(def_menu));
 	}
+	if(sym->flags & SYMBOL_CHOICEVAL)
+		row[COL_BTNRAD] = GINT_TO_POINTER(TRUE);
 
 	stype = sym_get_type(sym);
 	switch (stype) {
@@ -1307,6 +1314,7 @@ static void set_node(GtkTreeIter * node, struct menu *menu, gchar ** row)
 			   COL_BTNVIS, GPOINTER_TO_INT(row[COL_BTNVIS]),
 			   COL_BTNACT, GPOINTER_TO_INT(row[COL_BTNACT]),
 			   COL_BTNINC, GPOINTER_TO_INT(row[COL_BTNINC]),
+			   COL_BTNRAD, GPOINTER_TO_INT(row[COL_BTNRAD]),
 			   -1);
 
 	g_object_unref(pix);

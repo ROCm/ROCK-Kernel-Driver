@@ -2059,9 +2059,8 @@ static int idefloppy_attach (ide_drive_t *drive)
 	g->minors = 1 << PARTN_BITS;
 	g->minor_shift = PARTN_BITS;
 	g->driverfs_dev = &drive->gendev;
-	g->de = drive->de;
+	strcpy(g->devfs_name, drive->devfs_name);
 	g->flags = drive->removable ? GENHD_FL_REMOVABLE : 0;
-	g->flags |= GENHD_FL_DEVFS;
 	g->fops = &idefloppy_ops;
 	add_disk(g);
 	return 0;

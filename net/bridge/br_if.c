@@ -17,13 +17,12 @@
 #include <linux/if_arp.h>
 #include <linux/if_bridge.h>
 #include <linux/inetdevice.h>
+#include <linux/module.h>
 #include <linux/rtnetlink.h>
 #include <linux/brlock.h>
+#include <net/sock.h>
 #include <asm/uaccess.h>
 #include "br_private.h"
-
-static struct net_bridge *bridge_list;
-static spinlock_t bridge_lock = SPIN_LOCK_UNLOCKED;
 
 static int br_initial_port_cost(struct net_device *dev)
 {
@@ -70,23 +69,6 @@ static int __br_del_if(struct net_bridge *br, struct net_device *dev)
 	return 0;
 }
 
-/* called with bridge_lock */
-static struct net_bridge **__find_br(char *name)
-{
-	struct net_bridge **b;
-	struct net_bridge *br;
-
-	b = &bridge_list;
-	while ((br = *b) != NULL) {
-		if (!strncmp(br->dev.name, name, IFNAMSIZ))
-			return b;
-
-		b = &(br->next);
-	}
-
-	return NULL;
-}
-
 static void del_ifs(struct net_bridge *br)
 {
 	br_write_lock_bh(BR_NETPROTO_LOCK);
@@ -97,7 +79,7 @@ static void del_ifs(struct net_bridge *br)
 	br_write_unlock_bh(BR_NETPROTO_LOCK);
 }
 
-static struct net_bridge *new_nb(char *name)
+static struct net_bridge *new_nb(const char *name)
 {
 	struct net_bridge *br;
 	struct net_device *dev;
@@ -112,6 +94,7 @@ static struct net_bridge *new_nb(char *name)
 
 	strncpy(dev->name, name, IFNAMSIZ);
 	dev->priv = br;
+	dev->priv_flags = IFF_EBRIDGE;
 	ether_setup(dev);
 	br_dev_setup(dev);
 
@@ -178,56 +161,47 @@ static struct net_bridge_port *new_nbp(struct net_bridge *br, struct net_device 
 	return p;
 }
 
-int br_add_bridge(char *name)
+int br_add_bridge(const char *name)
 {
 	struct net_bridge *br;
+	int ret;
 
-	if ((br = new_nb(name)) == NULL)
+	if ((br = new_nb(name)) == NULL) 
 		return -ENOMEM;
 
-	if (__dev_get_by_name(name) != NULL) {
+	ret = register_netdev(&br->dev);
+	if (ret)
 		kfree(br);
-		return -EEXIST;
-	}
-
-	spin_lock(&bridge_lock);
-	br->next = bridge_list;
-	bridge_list = br;
-	spin_unlock(&bridge_lock);
-
-	br_inc_use_count();
-	register_netdev(&br->dev);
-
-	return 0;
+	return ret;
 }
 
-int br_del_bridge(char *name)
+int br_del_bridge(const char *name)
 {
-	struct net_bridge **b;
-	struct net_bridge *br;
+	struct net_device *dev;
+	int ret = 0;
 
-	spin_lock(&bridge_lock);
-	if ((b = __find_br(name)) == NULL) {
-		spin_unlock(&bridge_lock);
-		return -ENXIO;
+	dev = dev_get_by_name(name);
+	if (dev == NULL) 
+		return -ENXIO; 	/* Could not find device */
+
+	if (!(dev->priv_flags & IFF_EBRIDGE)) {
+		/* Attempt to delete non bridge device! */
+		ret = -EPERM;
 	}
 
-	br = *b;
-	if (br->dev.flags & IFF_UP) {
-		spin_unlock(&bridge_lock);
-		return -EBUSY;
+	else if (dev->flags & IFF_UP) {
+		/* Not shutdown yet. */
+		ret = -EBUSY;
+	} 
+
+	else {
+		del_ifs((struct net_bridge *) dev->priv);
+	
+		unregister_netdev(dev);
 	}
 
-	*b = br->next;
-	spin_unlock(&bridge_lock);
-
-	del_ifs(br);
-
-	unregister_netdev(&br->dev);
-	kfree(br);
-	br_dec_use_count();
-
-	return 0;
+	dev_put(dev);
+	return ret;
 }
 
 int br_add_if(struct net_bridge *br, struct net_device *dev)
@@ -278,24 +252,19 @@ int br_del_if(struct net_bridge *br, struct net_device *dev)
 
 int br_get_bridge_ifindices(int *indices, int num)
 {
-	struct net_bridge *br;
-	int i;
+	struct net_device *dev;
+	int i = 0;
 
-	spin_lock(&bridge_lock);
-	br = bridge_list;
-	for (i=0;i<num;i++) {
-		if (br == NULL)
-			break;
-
-		indices[i] = br->dev.ifindex;
-		br = br->next;
+	rtnl_shlock();
+	for (dev = dev_base; dev && i < num; dev = dev->next) {
+		if (dev->priv_flags & IFF_EBRIDGE) 
+			indices[i++] = dev->ifindex;
 	}
-	spin_unlock(&bridge_lock);
+	rtnl_shunlock();
 
 	return i;
 }
 
-/* called under ioctl_lock */
 void br_get_port_ifindices(struct net_bridge *br, int *ifindices)
 {
 	struct net_bridge_port *p;
@@ -307,4 +276,25 @@ void br_get_port_ifindices(struct net_bridge *br, int *ifindices)
 		p = p->next;
 	}
 	read_unlock(&br->lock);
+}
+
+
+void __exit br_cleanup_bridges(void)
+{
+	struct net_device *dev, *nxt;
+
+	rtnl_lock();
+	for (dev = dev_base; dev; dev = nxt) {
+		nxt = dev->next;
+		if ((dev->priv_flags & IFF_EBRIDGE)
+		    && dev->owner == THIS_MODULE) {
+			pr_debug("cleanup %s\n", dev->name);
+
+			del_ifs((struct net_bridge *) dev->priv);
+			
+			unregister_netdevice(dev);
+		}
+	}
+	rtnl_unlock();
+
 }
