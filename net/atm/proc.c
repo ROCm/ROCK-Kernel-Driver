@@ -1,20 +1,12 @@
-/* net/atm/proc.c - ATM /proc interface */
-
-/* Written 1995-2000 by Werner Almesberger, EPFL LRC/ICA */
-
-/*
- * The mechanism used here isn't designed for speed but rather for convenience
- * of implementation. We only return one entry per read system call, so we can
- * be reasonably sure not to overrun the page and race conditions may lead to
- * the addition or omission of some lines but never to any corruption of a
- * line's internal structure.
+/* net/atm/proc.c - ATM /proc interface
  *
- * Making the whole thing slightly more efficient is left as an exercise to the
- * reader. (Suggestions: wrapper which loops to get several entries per system
- * call; or make --left slightly more clever to avoid O(n^2) characteristics.)
- * I find it fast enough on my unloaded 266 MHz Pentium 2 :-)
+ * Written 1995-2000 by Werner Almesberger, EPFL LRC/ICA
+ *
+ * seq_file api usage by romieu@fr.zoreil.com
+ *
+ * Evaluating the efficiency of the whole thing if left as an exercise to
+ * the reader.
  */
-
 
 #include <linux/config.h>
 #include <linux/module.h> /* for EXPORT_SYMBOL */
@@ -52,17 +44,10 @@
 
 static ssize_t proc_dev_atm_read(struct file *file,char *buf,size_t count,
     loff_t *pos);
-static ssize_t proc_spec_atm_read(struct file *file,char *buf,size_t count,
-    loff_t *pos);
 
-static struct file_operations proc_dev_atm_operations = {
+static struct file_operations proc_atm_dev_ops = {
 	.owner =	THIS_MODULE,
 	.read =		proc_dev_atm_read,
-};
-
-static struct file_operations proc_spec_atm_operations = {
-	.owner =	THIS_MODULE,
-	.read =		proc_spec_atm_read,
 };
 
 static void add_stats(struct seq_file *seq, const char *aal,
@@ -903,28 +888,6 @@ static ssize_t proc_dev_atm_read(struct file *file,char *buf,size_t count,
 }
 
 
-static ssize_t proc_spec_atm_read(struct file *file,char *buf,size_t count,
-    loff_t *pos)
-{
-	unsigned long page;
-	int length;
-	int (*info)(loff_t,char *);
-	info = PDE(file->f_dentry->d_inode)->data;
-
-	if (count == 0) return 0;
-	page = get_zeroed_page(GFP_KERNEL);
-	if (!page) return -ENOMEM;
-	length = (*info)(*pos,(char *) page);
-	if (length > count) length = -EINVAL;
-	if (length >= 0) {
-		if (copy_to_user(buf,(char *) page,length)) length = -EFAULT;
-		(*pos)++;
-	}
-	free_page(page);
-	return length;
-}
-
-
 struct proc_dir_entry *atm_proc_root;
 EXPORT_SYMBOL(atm_proc_root);
 
@@ -945,19 +908,19 @@ int atm_proc_dev_register(struct atm_dev *dev)
 
 	dev->proc_name = kmalloc(strlen(dev->type) + digits + 2, GFP_KERNEL);
 	if (!dev->proc_name)
-		goto fail1;
+		goto err_out;
 	sprintf(dev->proc_name,"%s:%d",dev->type, dev->number);
 
 	dev->proc_entry = create_proc_entry(dev->proc_name, 0, atm_proc_root);
 	if (!dev->proc_entry)
-		goto fail0;
+		goto err_free_name;
 	dev->proc_entry->data = dev;
-	dev->proc_entry->proc_fops = &proc_dev_atm_operations;
+	dev->proc_entry->proc_fops = &proc_atm_dev_ops;
 	dev->proc_entry->owner = THIS_MODULE;
 	return 0;
-fail0:
+err_free_name:
 	kfree(dev->proc_name);
-fail1:
+err_out:
 	return error;
 }
 
@@ -971,65 +934,65 @@ void atm_proc_dev_deregister(struct atm_dev *dev)
 	kfree(dev->proc_name);
 }
 
-#define CREATE_SEQ_ENTRY(name) \
-	do { \
-		name = create_proc_entry(#name, S_IRUGO, atm_proc_root); \
-		if (!name) \
-			goto cleanup; \
-		name->proc_fops = & name##_seq_fops; \
-		name->owner = THIS_MODULE; \
-	} while (0)
+static struct atm_proc_entry {
+	char *name;
+	struct file_operations *proc_fops;
+	struct proc_dir_entry *dirent;
+} atm_proc_ents[] = {
+	{ .name = "devices",	.proc_fops = &devices_seq_fops },
+	{ .name = "pvc",	.proc_fops = &pvc_seq_fops },
+	{ .name = "svc",	.proc_fops = &svc_seq_fops },
+	{ .name = "vc",		.proc_fops = &vcc_seq_fops },
+#if defined(CONFIG_ATM_CLIP) || defined(CONFIG_ATM_CLIP_MODULE)
+	{ .name = "arp",	.proc_fops = &arp_seq_fops },
+#endif
+#if defined(CONFIG_ATM_LANE) || defined(CONFIG_ATM_LANE_MODULE)
+	{ .name = "lec",	.proc_fops = &lec_seq_fops },
+#endif
+	{ .name = NULL,		.proc_fops = NULL }
+};
 
-#define CREATE_ENTRY(name) \
-    name = create_proc_entry(#name,0,atm_proc_root); \
-    if (!name) goto cleanup; \
-    name->data = atm_##name##_info; \
-    name->proc_fops = &proc_spec_atm_operations; \
-    name->owner = THIS_MODULE
-
-static struct proc_dir_entry *devices = NULL, *pvc = NULL,
-		*svc = NULL, *arp = NULL, *lec = NULL, *vcc = NULL;
-
-static void atm_proc_cleanup(void)
+static void atm_proc_dirs_remove(void)
 {
-	if (devices)
-		remove_proc_entry("devices",atm_proc_root);
-	if (pvc)
-		remove_proc_entry("pvc",atm_proc_root);
-	if (svc)
-		remove_proc_entry("svc",atm_proc_root);
-	if (arp)
-		remove_proc_entry("arp",atm_proc_root);
-	if (lec)
-		remove_proc_entry("lec",atm_proc_root);
-	if (vcc)
-		remove_proc_entry("vcc",atm_proc_root);
-	remove_proc_entry("net/atm",NULL);
+	static struct atm_proc_entry *e;
+
+	for (e = atm_proc_ents; e->name; e++) {
+		if (e->dirent) 
+			remove_proc_entry(e->name, atm_proc_root);
+	}
+	remove_proc_entry("net/atm", NULL);
 }
 
 int __init atm_proc_init(void)
 {
+	static struct atm_proc_entry *e;
+	int ret;
+
 	atm_proc_root = proc_mkdir("net/atm",NULL);
 	if (!atm_proc_root)
-		return -ENOMEM;
-	CREATE_SEQ_ENTRY(devices);
-	CREATE_SEQ_ENTRY(pvc);
-	CREATE_SEQ_ENTRY(svc);
-	CREATE_SEQ_ENTRY(vcc);
-#if defined(CONFIG_ATM_CLIP) || defined(CONFIG_ATM_CLIP_MODULE)
-	CREATE_SEQ_ENTRY(arp);
-#endif
-#if defined(CONFIG_ATM_LANE) || defined(CONFIG_ATM_LANE_MODULE)
-	CREATE_SEQ_ENTRY(lec);
-#endif
-	return 0;
+		goto err_out;
+	for (e = atm_proc_ents; e->name; e++) {
+		struct proc_dir_entry *dirent;
 
-cleanup:
-	atm_proc_cleanup();
-	return -ENOMEM;
+		dirent = create_proc_entry(e->name, S_IRUGO, atm_proc_root);
+		if (!dirent)
+			goto err_out_remove;
+		dirent->proc_fops = e->proc_fops;
+		dirent->owner = THIS_MODULE;
+		e->dirent = dirent;
+	}
+	ret = 0;
+out:
+	return ret;
+
+err_out_remove:
+	atm_proc_dirs_remove();
+err_out:
+	ret = -ENOMEM;
+	goto out;
 }
 
-void atm_proc_exit(void)
+void __exit atm_proc_exit(void)
 {
-	atm_proc_cleanup();
+	atm_proc_dirs_remove();
 }
