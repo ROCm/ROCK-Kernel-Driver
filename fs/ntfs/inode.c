@@ -352,7 +352,7 @@ static inline ntfs_inode *ntfs_alloc_extent_inode(void)
 	return NULL;
 }
 
-void ntfs_destroy_extent_inode(ntfs_inode *ni)
+static void ntfs_destroy_extent_inode(ntfs_inode *ni)
 {
 	ntfs_debug("Entering.");
 	BUG_ON(ni->page);
@@ -2133,7 +2133,7 @@ void ntfs_put_inode(struct inode *vi)
 	}
 }
 
-void __ntfs_clear_inode(ntfs_inode *ni)
+static void __ntfs_clear_inode(ntfs_inode *ni)
 {
 	/* Free all alocated memory. */
 	down_write(&ni->runlist.lock);

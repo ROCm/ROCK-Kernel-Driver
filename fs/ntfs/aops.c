@@ -348,10 +348,8 @@ handle_zblock:
  * for it to be read in before we can do the copy.
  *
  * Return 0 on success and -errno on error.
- *
- * WARNING: Do not make this function static! It is used by mft.c!
  */
-int ntfs_readpage(struct file *file, struct page *page)
+static int ntfs_readpage(struct file *file, struct page *page)
 {
 	s64 attr_pos;
 	ntfs_inode *ni, *base_ni;
