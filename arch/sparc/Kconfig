@@ -1424,6 +1424,12 @@ config MAGIC_SYSRQ
 config DEBUG_SPINLOCK
 	bool "Spinlock debugging"
 
+config DEBUG_SPINLOCK_SLEEP
+	bool "Sleep-inside-spinlock checking"
+	help
+	  If you say Y here, various routines which may sleep will become very
+	  noisy if they are called with a spinlock held.	
+
 endmenu
 
 source "security/Kconfig"
