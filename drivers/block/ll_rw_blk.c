@@ -1499,7 +1499,7 @@ void ll_rw_block(int rw, int nr, struct buffer_head * bhs[])
 	if (!nr)
 		return;
 
-	major = major(bhs[0]->b_dev);
+	major = major(to_kdev_t(bhs[0]->b_bdev->bd_dev));
 
 	/* Determine correct block size for this device. */
 	correct_size = bdev_hardsect_size(bhs[0]->b_bdev);
@@ -1510,15 +1510,15 @@ void ll_rw_block(int rw, int nr, struct buffer_head * bhs[])
 		if (bh->b_size & (correct_size - 1)) {
 			printk(KERN_NOTICE "ll_rw_block: device %s: "
 			       "only %d-char blocks implemented (%u)\n",
-			       kdevname(bhs[0]->b_dev),
+			       bdevname(bhs[0]->b_bdev),
 			       correct_size, bh->b_size);
 			goto sorry;
 		}
 	}
 
-	if ((rw & WRITE) && is_read_only(bhs[0]->b_dev)) {
+	if ((rw & WRITE) && is_read_only(to_kdev_t(bhs[0]->b_bdev->bd_dev))) {
 		printk(KERN_NOTICE "Can't write to read-only device %s\n",
-		       kdevname(bhs[0]->b_dev));
+		       bdevname(bhs[0]->b_bdev));
 		goto sorry;
 	}
 

@@ -58,7 +58,7 @@ static void make_rdonly(struct block_device *bdev, int *no_write)
 {
 	if (bdev) {
 		printk(KERN_WARNING "Turning device %s read-only\n", 
-		       bdevname(to_kdev_t(bdev->bd_dev)));
+		       bdevname(bdev));
 		*no_write = 0xdead0000 + bdev->bd_dev;
 	}
 }
@@ -351,7 +351,7 @@ static struct block_device *ext3_blkdev_get(kdev_t dev)
 
 fail:
 	printk(KERN_ERR "EXT3: failed to open journal device %s: %d\n",
-			bdevname(dev), err);
+			__bdevname(dev), err);
 	return NULL;
 }
 
@@ -764,7 +764,7 @@ static int ext3_setup_super(struct super_block *sb, struct ext3_super_block *es,
 				sb->s_id);
 	if (EXT3_SB(sb)->s_journal->j_inode == NULL) {
 		printk("external journal on %s\n",
-		    bdevname(to_kdev_t(EXT3_SB(sb)->s_journal->j_dev->bd_dev)));
+		    bdevname(EXT3_SB(sb)->s_journal->j_dev));
 	} else {
 		printk("internal journal\n");
 	}

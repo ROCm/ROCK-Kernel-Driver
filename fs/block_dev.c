@@ -117,7 +117,6 @@ static int blkdev_get_block(struct inode * inode, sector_t iblock, struct buffer
 	if (iblock >= max_block(inode->i_rdev))
 		return -EIO;
 
-	bh->b_dev = inode->i_rdev;
 	bh->b_bdev = inode->i_bdev;
 	bh->b_blocknr = iblock;
 	bh->b_state |= 1UL << BH_Mapped;
@@ -564,7 +563,7 @@ int check_disk_change(kdev_t dev)
 		return 0;
 
 	printk(KERN_DEBUG "VFS: Disk change detected on device %s\n",
-		bdevname(dev));
+		__bdevname(dev));
 
 	if (invalidate_device(dev, 0))
 		printk("VFS: busy inodes on changed media.\n");
@@ -768,7 +767,7 @@ struct file_operations def_blk_fops = {
 	ioctl:		blkdev_ioctl,
 };
 
-const char * bdevname(kdev_t dev)
+const char *__bdevname(kdev_t dev)
 {
 	static char buffer[32];
 	const char * name = blkdevs[major(dev)].name;

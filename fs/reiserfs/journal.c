@@ -893,7 +893,7 @@ static int flush_older_journal_lists(struct super_block *p_s_sb, struct reiserfs
 static void reiserfs_end_buffer_io_sync(struct buffer_head *bh, int uptodate) {
     if (buffer_journaled(bh)) {
         reiserfs_warning("clm-2084: pinned buffer %lu:%s sent to disk\n",
-	                 bh->b_blocknr, kdevname(bh->b_dev)) ;
+	                 bh->b_blocknr, bdevname(bh->b_bdev)) ;
     }
     mark_buffer_uptodate(bh, uptodate) ;
     unlock_buffer(bh) ;
@@ -1666,7 +1666,7 @@ static int journal_read(struct super_block *p_s_sb) {
 
   cur_dblock = SB_ONDISK_JOURNAL_1st_BLOCK(p_s_sb) ;
   printk("reiserfs: checking transaction log (%s) for (%s)\n",
-	 bdevname(SB_JOURNAL_DEV(p_s_sb)), p_s_sb->s_id) ;
+	 __bdevname(SB_JOURNAL_DEV(p_s_sb)), p_s_sb->s_id) ;
   start = CURRENT_TIME ;
 
   /* step 1, read in the journal header block.  Check the transaction it says 
