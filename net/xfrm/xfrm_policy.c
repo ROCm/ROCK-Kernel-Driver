@@ -19,6 +19,8 @@
 #include <linux/list.h>
 #include <linux/spinlock.h>
 #include <linux/workqueue.h>
+#include <linux/notifier.h>
+#include <linux/netdevice.h>
 #include <net/xfrm.h>
 #include <net/ip.h>
 
@@ -1022,7 +1024,8 @@ static struct dst_entry *xfrm_negative_advice(struct dst_entry *dst)
 	return dst;
 }
 
-static void __xfrm_garbage_collect(void)
+static void xfrm_prune_bundles(int (*func)(struct dst_entry *, void *),
+			      void *data)
 {
 	int i;
 	struct xfrm_policy *pol;
@@ -1034,7 +1037,7 @@ static void __xfrm_garbage_collect(void)
 			write_lock(&pol->lock);
 			dstp = &pol->bundles;
 			while ((dst=*dstp) != NULL) {
-				if (atomic_read(&dst->__refcnt) == 0) {
+				if (func(dst, data)) {
 					*dstp = dst->next;
 					dst->next = gc_list;
 					gc_list = dst;
@@ -1054,8 +1057,20 @@ static void __xfrm_garbage_collect(void)
 	}
 }
 
-static int bundle_depends_on(struct dst_entry *dst, struct xfrm_state *x)
+static int unused_dst(struct dst_entry *dst, void *data)
 {
+	return !atomic_read(&dst->__refcnt);
+}
+
+static void __xfrm_garbage_collect(void)
+{
+	xfrm_prune_bundles(unused_dst, NULL);
+}
+
+static int bundle_depends_on(struct dst_entry *dst, void *data)
+{
+	struct xfrm_state *x = data;
+
 	do {
 		if (dst->xfrm == x)
 			return 1;
@@ -1065,35 +1080,7 @@ static int bundle_depends_on(struct dst_entry *dst, struct xfrm_state *x)
 
 int xfrm_flush_bundles(struct xfrm_state *x)
 {
-	int i;
-	struct xfrm_policy *pol;
-	struct dst_entry *dst, **dstp, *gc_list = NULL;
-
-	read_lock_bh(&xfrm_policy_lock);
-	for (i=0; i<2*XFRM_POLICY_MAX; i++) {
-		for (pol = xfrm_policy_list[i]; pol; pol = pol->next) {
-			write_lock(&pol->lock);
-			dstp = &pol->bundles;
-			while ((dst=*dstp) != NULL) {
-				if (bundle_depends_on(dst, x)) {
-					*dstp = dst->next;
-					dst->next = gc_list;
-					gc_list = dst;
-				} else {
-					dstp = &dst->next;
-				}
-			}
-			write_unlock(&pol->lock);
-		}
-	}
-	read_unlock_bh(&xfrm_policy_lock);
-
-	while (gc_list) {
-		dst = gc_list;
-		gc_list = dst->next;
-		dst_free(dst);
-	}
-
+	xfrm_prune_bundles(bundle_depends_on, x);
 	return 0;
 }
 
@@ -1216,6 +1203,35 @@ void xfrm_policy_put_afinfo(struct xfrm_policy_afinfo *afinfo)
 	read_unlock(&afinfo->lock);
 }
 
+static int bundle_has_dev(struct dst_entry *dst, void *data)
+{
+	struct net_device *dev = data;
+
+	do {
+		if (dst->dev == dev)
+			return 1;
+	} while ((dst = dst->child) != NULL);
+	return 0;
+}
+
+static int xfrm_dev_event(struct notifier_block *this, unsigned long event, void *ptr)
+{
+	struct net_device *dev = ptr;
+
+	switch (event) {
+	case NETDEV_UNREGISTER:
+	case NETDEV_DOWN:
+		xfrm_prune_bundles(bundle_has_dev, dev);
+	}
+	return NOTIFY_DONE;
+}
+
+struct notifier_block xfrm_dev_notifier = {
+	xfrm_dev_event,
+	NULL,
+	0
+};
+
 void __init xfrm_policy_init(void)
 {
 	xfrm_dst_cache = kmem_cache_create("xfrm_dst_cache",
@@ -1226,6 +1242,7 @@ void __init xfrm_policy_init(void)
 		panic("XFRM: failed to allocate xfrm_dst_cache\n");
 
 	INIT_WORK(&xfrm_policy_gc_work, xfrm_policy_gc_task, NULL);
+	register_netdevice_notifier(&xfrm_dev_notifier);
 }
 
 void __init xfrm_init(void)
