@@ -376,8 +376,8 @@ ipq_mangle_ipv6(ipq_verdict_msg_t *v, struct ipq_queue_entry *e)
 	 */
 	if (e->info->hook == NF_IP_LOCAL_OUT) {
 		struct ipv6hdr *iph = e->skb->nh.ipv6h;
-		if (ipv6_addr_cmp(&iph->daddr, &e->rt_info.daddr) ||
-		    ipv6_addr_cmp(&iph->saddr, &e->rt_info.saddr))
+		if (!ipv6_addr_equal(&iph->daddr, &e->rt_info.daddr) ||
+		    !ipv6_addr_equal(&iph->saddr, &e->rt_info.saddr))
 			return ip6_route_me_harder(e->skb);
 	}
 	return 0;

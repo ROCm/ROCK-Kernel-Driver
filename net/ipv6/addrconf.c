@@ -921,7 +921,7 @@ int ipv6_chk_addr(struct in6_addr *addr, struct net_device *dev, int strict)
 
 	read_lock_bh(&addrconf_hash_lock);
 	for(ifp = inet6_addr_lst[hash]; ifp; ifp=ifp->lst_next) {
-		if (ipv6_addr_cmp(&ifp->addr, addr) == 0 &&
+		if (ipv6_addr_equal(&ifp->addr, addr) &&
 		    !(ifp->flags&IFA_F_TENTATIVE)) {
 			if (dev == NULL || ifp->idev->dev == dev ||
 			    !(ifp->scope&(IFA_LINK|IFA_HOST) || strict))
@@ -940,7 +940,7 @@ int ipv6_chk_same_addr(const struct in6_addr *addr, struct net_device *dev)
 
 	read_lock_bh(&addrconf_hash_lock);
 	for(ifp = inet6_addr_lst[hash]; ifp; ifp=ifp->lst_next) {
-		if (ipv6_addr_cmp(&ifp->addr, addr) == 0) {
+		if (ipv6_addr_equal(&ifp->addr, addr)) {
 			if (dev == NULL || ifp->idev->dev == dev)
 				break;
 		}
@@ -956,7 +956,7 @@ struct inet6_ifaddr * ipv6_get_ifaddr(struct in6_addr *addr, struct net_device *
 
 	read_lock_bh(&addrconf_hash_lock);
 	for(ifp = inet6_addr_lst[hash]; ifp; ifp=ifp->lst_next) {
-		if (ipv6_addr_cmp(&ifp->addr, addr) == 0) {
+		if (ipv6_addr_equal(&ifp->addr, addr)) {
 			if (dev == NULL || ifp->idev->dev == dev ||
 			    !(ifp->scope&(IFA_LINK|IFA_HOST) || strict)) {
 				in6_ifa_hold(ifp);
@@ -992,7 +992,7 @@ int ipv6_rcv_saddr_equal(const struct sock *sk, const struct sock *sk2)
 		return 1;
 
 	if (sk2_rcv_saddr6 &&
-	    !ipv6_addr_cmp(sk_rcv_saddr6, sk2_rcv_saddr6))
+	    ipv6_addr_equal(sk_rcv_saddr6, sk2_rcv_saddr6))
 		return 1;
 
 	if (addr_type == IPV6_ADDR_MAPPED &&
@@ -1630,7 +1630,7 @@ static int inet6_addr_del(int ifindex, struct in6_addr *pfx, int plen)
 	read_lock_bh(&idev->lock);
 	for (ifp = idev->addr_list; ifp; ifp=ifp->if_next) {
 		if (ifp->prefix_len == plen &&
-		    (!memcmp(pfx, &ifp->addr, sizeof(struct in6_addr)))) {
+		    ipv6_addr_equal(pfx, &ifp->addr)) {
 			in6_ifa_hold(ifp);
 			read_unlock_bh(&idev->lock);
 			
