@@ -1190,7 +1190,7 @@ static int philips_tdm1316l_request_firmware(struct dvb_frontend* fe, const stru
 	return request_firmware(fw, name, &ttusb->dev->dev);
 }
 
-struct tda1004x_config philips_tdm1316l_config = {
+static struct tda1004x_config philips_tdm1316l_config = {
 
 	.demod_address = 0x8,
 	.invert = 1,

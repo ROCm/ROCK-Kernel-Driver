@@ -53,10 +53,14 @@ int av7110_debiwrite(struct av7110 *av7110, u32 config,
 {
 	struct saa7146_dev *dev = av7110->dev;
 
-	if (count <= 0 || count > 32764)
+	if (count <= 0 || count > 32764) {
+		printk("%s: invalid count %d\n", __FUNCTION__, count);
 		return -1;
-	if (saa7146_wait_for_debi_done(av7110->dev) < 0)
+	}
+	if (saa7146_wait_for_debi_done(av7110->dev, 0) < 0) {
+		printk("%s: wait_for_debi_done failed\n", __FUNCTION__);
 		return -1;
+	}
 	saa7146_write(dev, DEBI_CONFIG, config);
 	if (count <= 4)		/* immediate transfer */
 		saa7146_write(dev, DEBI_AD, val);
@@ -72,10 +76,14 @@ u32 av7110_debiread(struct av7110 *av7110, u32 config, int addr, int count)
 	struct saa7146_dev *dev = av7110->dev;
 	u32 result = 0;
 
-	if (count > 32764 || count <= 0)
+	if (count > 32764 || count <= 0) {
+		printk("%s: invalid count %d\n", __FUNCTION__, count);
 		return 0;
-	if (saa7146_wait_for_debi_done(av7110->dev) < 0)
+	}
+	if (saa7146_wait_for_debi_done(av7110->dev, 0) < 0) {
+		printk("%s: wait_for_debi_done #1 failed\n", __FUNCTION__);
 		return 0;
+	}
 	saa7146_write(dev, DEBI_AD, av7110->debi_bus);
 	saa7146_write(dev, DEBI_COMMAND, (count << 17) | 0x10000 | (addr & 0xffff));
 
@@ -83,7 +91,11 @@ u32 av7110_debiread(struct av7110 *av7110, u32 config, int addr, int count)
 	saa7146_write(dev, MC2, (2 << 16) | 2);
 	if (count > 4)
 		return count;
-	saa7146_wait_for_debi_done(av7110->dev);
+	if (saa7146_wait_for_debi_done(av7110->dev, 0) < 0) {
+		printk("%s: wait_for_debi_done #2 failed\n", __FUNCTION__);
+		return 0;
+	}
+
 	result = saa7146_read(dev, DEBI_AD);
 	result &= (0xffffffffUL >> ((4 - count) * 8));
 	return result;
@@ -240,7 +252,7 @@ int av7110_bootarm(struct av7110 *av7110)
 	mwdebi(av7110, DEBISWAB, DPRAM_BASE, bootcode, sizeof(bootcode));
 	iwdebi(av7110, DEBINOSWAP, BOOT_STATE, BOOTSTATE_BUFFER_FULL, 2);
 
-	if (saa7146_wait_for_debi_done(av7110->dev)) {
+	if (saa7146_wait_for_debi_done(av7110->dev, 1)) {
 		printk(KERN_ERR "dvb-ttpci: av7110_bootarm(): "
 		       "saa7146_wait_for_debi_done() timed out\n");
 		return -1;
@@ -258,7 +270,7 @@ int av7110_bootarm(struct av7110 *av7110)
 	dprintk(1, "load dpram code\n");
 	mwdebi(av7110, DEBISWAB, DPRAM_BASE, av7110->bin_dpram, av7110->size_dpram);
 
-	if (saa7146_wait_for_debi_done(av7110->dev)) {
+	if (saa7146_wait_for_debi_done(av7110->dev, 1)) {
 		printk(KERN_ERR "dvb-ttpci: av7110_bootarm(): "
 		       "saa7146_wait_for_debi_done() timed out after loading DRAM\n");
 		return -1;
@@ -305,6 +317,8 @@ int __av7110_send_fw_cmd(struct av7110 *av7110, u16* buf, int length)
 		}
 	}
 
+	wdebi(av7110, DEBINOSWAP, COM_IF_LOCK, 0xffff, 2);
+
 #ifndef _NOHANDSHAKE
 	start = jiffies;
 	while (rdebi(av7110, DEBINOSWAP, HANDSHAKE_REG, 0, 2 )) {
@@ -333,6 +347,8 @@ int __av7110_send_fw_cmd(struct av7110 *av7110, u16* buf, int length)
 		wdebi(av7110, DEBINOSWAP, COMMAND + 2, 0, 2);
 
 	wdebi(av7110, DEBINOSWAP, COMMAND, (u32) buf[0], 2);
+
+	wdebi(av7110, DEBINOSWAP, COM_IF_LOCK, 0x0000, 2);
 
 #ifdef COM_DEBUG
 	start = jiffies;

@@ -674,7 +674,7 @@ void av7110_p2t_write(u8 const *buf, long int length, u16 pid, struct av7110_p2t
 }
 
 
-int write_ts_header2(u16 pid, u8 *counter, int pes_start, u8 *buf, u8 length)
+static int write_ts_header2(u16 pid, u8 *counter, int pes_start, u8 *buf, u8 length)
 {
 	int i;
 	int c = 0;
@@ -936,7 +936,7 @@ static ssize_t dvb_audio_write(struct file *file, const char __user *buf,
 	return dvb_aplay(av7110, buf, count, file->f_flags & O_NONBLOCK, 0);
 }
 
-u8 iframe_header[] = { 0x00, 0x00, 0x01, 0xe0, 0x00, 0x00, 0x80, 0x00, 0x00 };
+static u8 iframe_header[] = { 0x00, 0x00, 0x01, 0xe0, 0x00, 0x00, 0x80, 0x00, 0x00 };
 
 #define MIN_IFRAME 400000
 
