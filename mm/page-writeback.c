@@ -372,6 +372,45 @@ int generic_writeback_mapping(struct address_space *mapping, int *nr_to_write)
 }
 EXPORT_SYMBOL(generic_writeback_mapping);
 
+/**
+ * write_one_page - write out a single page and optionally wait on I/O
+ *
+ * @page - the page to write
+ * @wait - if true, wait on writeout
+ *
+ * The page must be locked by the caller and will come unlocked when I/O
+ * completes.
+ *
+ * write_one_page() returns a negative error code if I/O failed.
+ */
+int write_one_page(struct page *page, int wait)
+{
+	struct address_space *mapping = page->mapping;
+	int ret = 0;
+
+	BUG_ON(!PageLocked(page));
+
+	write_lock(&mapping->page_lock);
+	list_del(&page->list);
+	list_add(&page->list, &mapping->locked_pages);
+	write_unlock(&mapping->page_lock);
+
+	if (TestClearPageDirty(page)) {
+		page_cache_get(page);
+		ret = mapping->a_ops->writepage(page);
+		if (ret == 0 && wait) {
+			wait_on_page(page);
+			if (PageError(page))
+				ret = -EIO;
+		}
+		page_cache_release(page);
+	} else {
+		unlock_page(page);
+	}
+	return ret;
+}
+EXPORT_SYMBOL(write_one_page);
+
 /*
  * Add a page to the dirty page list.
  *

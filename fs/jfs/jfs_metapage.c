@@ -489,12 +489,10 @@ static inline void sync_metapage(metapage_t *mp)
 	lock_page(page);
 
 	/* we're done with this page - no need to check for errors */
-	if (page_has_buffers(page)) {
-		writeout_one_page(page);
-		waitfor_one_page(page);
-	}
-
-	unlock_page(page);
+	if (page_has_buffers(page))
+		write_one_page(page, 1);
+	else
+		unlock_page(page);
 	page_cache_release(page);
 }
 
