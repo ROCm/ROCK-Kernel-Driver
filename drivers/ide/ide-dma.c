@@ -90,11 +90,11 @@
 #include <asm/irq.h>
 
 struct drive_list_entry {
-	char * id_model;
-	char * id_firmware;
+	const char *id_model;
+	const char *id_firmware;
 };
 
-struct drive_list_entry drive_whitelist [] = {
+static const struct drive_list_entry drive_whitelist [] = {
 
 	{ "Micropolis 2112A"	,       "ALL"		},
 	{ "CONNER CTMA 4000"	,       "ALL"		},
@@ -103,7 +103,7 @@ struct drive_list_entry drive_whitelist [] = {
 	{ 0			,	0		}
 };
 
-struct drive_list_entry drive_blacklist [] = {
+static const struct drive_list_entry drive_blacklist [] = {
 
 	{ "WDC AC11000H"	,	"ALL"		},
 	{ "WDC AC22100H"	,	"ALL"		},
@@ -151,7 +151,7 @@ struct drive_list_entry drive_blacklist [] = {
  *	Returns 1 if the drive is found in the table.
  */
 
-static int in_drive_list(struct hd_driveid *id, struct drive_list_entry * drive_table)
+static int in_drive_list(struct hd_driveid *id, const struct drive_list_entry *drive_table)
 {
 	for ( ; drive_table->id_model ; drive_table++)
 		if ((!strcmp(drive_table->id_model, id->model)) &&
@@ -161,6 +161,7 @@ static int in_drive_list(struct hd_driveid *id, struct drive_list_entry * drive_
 	return 0;
 }
 
+#ifdef CONFIG_BLK_DEV_IDEDMA_PCI
 /**
  *	ide_dma_intr	-	IDE DMA interrupt handler
  *	@drive: the drive the interrupt is for
@@ -764,6 +765,7 @@ int __ide_dma_test_irq (ide_drive_t *drive)
 }
 
 EXPORT_SYMBOL(__ide_dma_test_irq);
+#endif /* CONFIG_BLK_DEV_IDEDMA_PCI */
 
 int __ide_dma_bad_drive (ide_drive_t *drive)
 {
@@ -771,8 +773,9 @@ int __ide_dma_bad_drive (ide_drive_t *drive)
 
 	int blacklist = in_drive_list(id, drive_blacklist);
 	if (blacklist) {
-		printk(KERN_WARNING "%s: Disabling (U)DMA for %s\n", drive->name, id->model);
-		return(blacklist);
+		printk(KERN_WARNING "%s: Disabling (U)DMA for %s (blacklisted)\n",
+				    drive->name, id->model);
+		return blacklist;
 	}
 	return 0;
 }
@@ -787,6 +790,7 @@ int __ide_dma_good_drive (ide_drive_t *drive)
 
 EXPORT_SYMBOL(__ide_dma_good_drive);
 
+#ifdef CONFIG_BLK_DEV_IDEDMA_PCI
 /*
  * Used for HOST FIFO counters for VDMA
  * PIO over DMA, effective ATA-Bridge operator.
@@ -1104,3 +1108,4 @@ void ide_setup_dma (ide_hwif_t *hwif, unsigned long dma_base, unsigned int num_p
 }
 
 EXPORT_SYMBOL_GPL(ide_setup_dma);
+#endif /* CONFIG_BLK_DEV_IDEDMA_PCI */

@@ -752,7 +752,6 @@ static int __devinit cmd64x_init_one(struct pci_dev *dev, const struct pci_devic
 	if (dev->device != d->device)
 		BUG();
 	ide_setup_pci_device(dev, d);
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -775,13 +774,7 @@ static int cmd64x_ide_init(void)
 	return ide_pci_register_driver(&driver);
 }
 
-static void cmd64x_ide_exit(void)
-{
-	ide_pci_unregister_driver(&driver);
-}
-
 module_init(cmd64x_ide_init);
-module_exit(cmd64x_ide_exit);
 
 MODULE_AUTHOR("Eddie Dost, David Miller, Andre Hedrick");
 MODULE_DESCRIPTION("PCI driver module for CMD64x IDE");

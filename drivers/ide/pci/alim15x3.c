@@ -868,7 +868,6 @@ static int __devinit alim15x3_init_one(struct pci_dev *dev, const struct pci_dev
 	d->init_hwif = init_hwif_common_ali15x3;
 #endif /* CONFIG_SPARC64 */
 	ide_setup_pci_device(dev, d);
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -889,13 +888,7 @@ static int ali15x3_ide_init(void)
 	return ide_pci_register_driver(&driver);
 }
 
-static void ali15x3_ide_exit(void)
-{
-	ide_pci_unregister_driver(&driver);
-}
-
 module_init(ali15x3_ide_init);
-module_exit(ali15x3_ide_exit);
 
 MODULE_AUTHOR("Michael Aubry, Andrzej Krzysztofowicz, CJ, Andre Hedrick, Alan Cox");
 MODULE_DESCRIPTION("PCI driver module for ALi 15x3 IDE");

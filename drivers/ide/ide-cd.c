@@ -2860,6 +2860,10 @@ int ide_cdrom_open_real (struct cdrom_device_info *cdi, int purpose)
 static
 void ide_cdrom_release_real (struct cdrom_device_info *cdi)
 {
+	ide_drive_t *drive = cdi->handle;
+
+	if (!cdi->use_count)
+		CDROM_STATE_FLAGS(drive)->toc_valid = 0;
 }
 
 

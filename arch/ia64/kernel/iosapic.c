@@ -114,7 +114,7 @@ static struct iosapic {
 	char		*addr;		/* base address of IOSAPIC */
 	unsigned int 	gsi_base;	/* first GSI assigned to this IOSAPIC */
 	unsigned short 	num_rte;	/* number of RTE in this IOSAPIC */
-} iosapic_lists[256];
+} iosapic_lists[NR_IOSAPICS];
 
 static int num_iosapic;
 
