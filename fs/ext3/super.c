@@ -105,32 +105,6 @@ static void clear_ro_after(struct super_block *sb)
 
 static char error_buf[1024];
 
-/* Determine the appropriate response to ext3_error on a given filesystem */
-
-static int ext3_error_behaviour(struct super_block *sb)
-{
-	/* First check for mount-time options */
-	if (test_opt (sb, ERRORS_PANIC))
-		return EXT3_ERRORS_PANIC;
-	if (test_opt (sb, ERRORS_RO))
-		return EXT3_ERRORS_RO;
-	if (test_opt (sb, ERRORS_CONT))
-		return EXT3_ERRORS_CONTINUE;
-	
-	/* If no overrides were specified on the mount, then fall back
-	 * to the default behaviour set in the filesystem's superblock
-	 * on disk. */
-	switch (le16_to_cpu(EXT3_SB(sb)->s_es->s_errors)) {
-	case EXT3_ERRORS_PANIC:
-		return EXT3_ERRORS_PANIC;
-	case EXT3_ERRORS_RO:
-		return EXT3_ERRORS_RO;
-	default:
-		break;
-	}
-	return EXT3_ERRORS_CONTINUE;
-}
-
 /* Deal with the reporting of failure conditions on a filesystem such as
  * inconsistencies detected or read IO failures.
  *
@@ -156,20 +130,16 @@ static void ext3_handle_error(struct super_block *sb)
 	if (sb->s_flags & MS_RDONLY)
 		return;
 
-	if (ext3_error_behaviour(sb) != EXT3_ERRORS_CONTINUE) {
+	if (test_opt (sb, ERRORS_PANIC))
+		panic ("EXT3-fs (device %s): panic forced after error\n",
+		       sb->s_id);
+	if (test_opt (sb, ERRORS_RO)) {
+		printk (KERN_CRIT "Remounting filesystem read-only\n");
+		sb->s_flags |= MS_RDONLY;
+	} else {
 		EXT3_SB(sb)->s_mount_opt |= EXT3_MOUNT_ABORT;
 		journal_abort(EXT3_SB(sb)->s_journal, -EIO);
 	}
-
-	if (ext3_error_behaviour(sb) == EXT3_ERRORS_PANIC) 
-		panic ("EXT3-fs (device %s): panic forced after error\n",
-		       sb->s_id);
-
-	if (ext3_error_behaviour(sb) == EXT3_ERRORS_RO) {
-		printk (KERN_CRIT "Remounting filesystem read-only\n");
-		sb->s_flags |= MS_RDONLY;
-	}
-
 	ext3_commit_super(sb, es, 1);
 }
 
@@ -257,7 +227,7 @@ void ext3_abort (struct super_block * sb, const char * function,
 	vsprintf (error_buf, fmt, args);
 	va_end (args);
 
-	if (ext3_error_behaviour(sb) == EXT3_ERRORS_PANIC)
+	if (test_opt (sb, ERRORS_PANIC))
 		panic ("EXT3-fs panic (device %s): %s: %s\n",
 		       sb->s_id, function, error_buf);
 
@@ -545,17 +515,32 @@ static int want_numeric(char *value, char *option, unsigned long *number)
 	return 0;
 }
 
+static unsigned long get_sb_block(void **data)
+{
+	unsigned long 	sb_block;
+	char 		*options = (char *) *data;
+
+	if (!options || strncmp(options, "sb=", 3) != 0)
+		return 1;	/* Default location */
+	options += 3;
+	sb_block = simple_strtoul(options, &options, 0);
+	if (*options && *options != ',') {
+		printk("EXT3-fs: Invalid sb specification: %s\n",
+		       (char *) *data);
+		return 1;
+	}
+	if (*options == ',')
+		options++;
+	*data = (void *) options;
+	return sb_block;
+}
+
 /*
  * This function has been shamelessly adapted from the msdos fs
  */
-static int parse_options (char * options, unsigned long * sb_block,
-			  struct ext3_sb_info *sbi,
-			  unsigned long * inum,
-			  int is_remount)
+static int parse_options (char * options, struct ext3_sb_info *sbi,
+			  unsigned long * inum, int is_remount)
 {
-	unsigned long *mount_options = &sbi->s_mount_opt;
-	uid_t *resuid = &sbi->s_resuid;
-	gid_t *resgid = &sbi->s_resgid;
 	char * this_char;
 	char * value;
 
@@ -567,42 +552,42 @@ static int parse_options (char * options, unsigned long * sb_block,
 		if ((value = strchr (this_char, '=')) != NULL)
 			*value++ = 0;
 		if (!strcmp (this_char, "bsddf"))
-			clear_opt (*mount_options, MINIX_DF);
+			clear_opt (sbi->s_mount_opt, MINIX_DF);
 		else if (!strcmp (this_char, "nouid32")) {
-			set_opt (*mount_options, NO_UID32);
+			set_opt (sbi->s_mount_opt, NO_UID32);
 		}
 		else if (!strcmp (this_char, "abort"))
-			set_opt (*mount_options, ABORT);
+			set_opt (sbi->s_mount_opt, ABORT);
 		else if (!strcmp (this_char, "check")) {
 			if (!value || !*value || !strcmp (value, "none"))
-				clear_opt (*mount_options, CHECK);
+				clear_opt (sbi->s_mount_opt, CHECK);
 			else
 #ifdef CONFIG_EXT3_CHECK
-				set_opt (*mount_options, CHECK);
+				set_opt (sbi->s_mount_opt, CHECK);
 #else
 				printk(KERN_ERR 
 				       "EXT3 Check option not supported\n");
 #endif
 		}
 		else if (!strcmp (this_char, "debug"))
-			set_opt (*mount_options, DEBUG);
+			set_opt (sbi->s_mount_opt, DEBUG);
 		else if (!strcmp (this_char, "errors")) {
 			if (want_value(value, "errors"))
 				return 0;
 			if (!strcmp (value, "continue")) {
-				clear_opt (*mount_options, ERRORS_RO);
-				clear_opt (*mount_options, ERRORS_PANIC);
-				set_opt (*mount_options, ERRORS_CONT);
+				clear_opt (sbi->s_mount_opt, ERRORS_RO);
+				clear_opt (sbi->s_mount_opt, ERRORS_PANIC);
+				set_opt (sbi->s_mount_opt, ERRORS_CONT);
 			}
 			else if (!strcmp (value, "remount-ro")) {
-				clear_opt (*mount_options, ERRORS_CONT);
-				clear_opt (*mount_options, ERRORS_PANIC);
-				set_opt (*mount_options, ERRORS_RO);
+				clear_opt (sbi->s_mount_opt, ERRORS_CONT);
+				clear_opt (sbi->s_mount_opt, ERRORS_PANIC);
+				set_opt (sbi->s_mount_opt, ERRORS_RO);
 			}
 			else if (!strcmp (value, "panic")) {
-				clear_opt (*mount_options, ERRORS_CONT);
-				clear_opt (*mount_options, ERRORS_RO);
-				set_opt (*mount_options, ERRORS_PANIC);
+				clear_opt (sbi->s_mount_opt, ERRORS_CONT);
+				clear_opt (sbi->s_mount_opt, ERRORS_RO);
+				set_opt (sbi->s_mount_opt, ERRORS_PANIC);
 			}
 			else {
 				printk (KERN_ERR
@@ -613,29 +598,25 @@ static int parse_options (char * options, unsigned long * sb_block,
 		}
 		else if (!strcmp (this_char, "grpid") ||
 			 !strcmp (this_char, "bsdgroups"))
-			set_opt (*mount_options, GRPID);
+			set_opt (sbi->s_mount_opt, GRPID);
 		else if (!strcmp (this_char, "minixdf"))
-			set_opt (*mount_options, MINIX_DF);
+			set_opt (sbi->s_mount_opt, MINIX_DF);
 		else if (!strcmp (this_char, "nocheck"))
-			clear_opt (*mount_options, CHECK);
+			clear_opt (sbi->s_mount_opt, CHECK);
 		else if (!strcmp (this_char, "nogrpid") ||
 			 !strcmp (this_char, "sysvgroups"))
-			clear_opt (*mount_options, GRPID);
+			clear_opt (sbi->s_mount_opt, GRPID);
 		else if (!strcmp (this_char, "resgid")) {
 			unsigned long v;
 			if (want_numeric(value, "resgid", &v))
 				return 0;
-			*resgid = v;
+			sbi->s_resgid = v;
 		}
 		else if (!strcmp (this_char, "resuid")) {
 			unsigned long v;
 			if (want_numeric(value, "resuid", &v))
 				return 0;
-			*resuid = v;
-		}
-		else if (!strcmp (this_char, "sb")) {
-			if (want_numeric(value, "sb", sb_block))
-				return 0;
+			sbi->s_resuid = v;
 		}
 #ifdef CONFIG_JBD_DEBUG
 		else if (!strcmp (this_char, "ro-after")) {
@@ -666,12 +647,12 @@ static int parse_options (char * options, unsigned long * sb_block,
 			if (want_value(value, "journal"))
 				return 0;
 			if (!strcmp (value, "update"))
-				set_opt (*mount_options, UPDATE_JOURNAL);
+				set_opt (sbi->s_mount_opt, UPDATE_JOURNAL);
 			else if (want_numeric(value, "journal", inum))
 				return 0;
 		}
 		else if (!strcmp (this_char, "noload"))
-			set_opt (*mount_options, NOLOAD);
+			set_opt (sbi->s_mount_opt, NOLOAD);
 		else if (!strcmp (this_char, "data")) {
 			int data_opt = 0;
 
@@ -690,7 +671,7 @@ static int parse_options (char * options, unsigned long * sb_block,
 				return 0;
 			}
 			if (is_remount) {
-				if ((*mount_options & EXT3_MOUNT_DATA_FLAGS) !=
+				if ((sbi->s_mount_opt & EXT3_MOUNT_DATA_FLAGS) !=
 							data_opt) {
 					printk(KERN_ERR
 					       "EXT3-fs: cannot change data "
@@ -698,8 +679,8 @@ static int parse_options (char * options, unsigned long * sb_block,
 					return 0;
 				}
 			} else {
-				*mount_options &= ~EXT3_MOUNT_DATA_FLAGS;
-				*mount_options |= data_opt;
+				sbi->s_mount_opt &= ~EXT3_MOUNT_DATA_FLAGS;
+				sbi->s_mount_opt |= data_opt;
 			}
 		} else if (!strcmp (this_char, "commit")) {
 			unsigned long v;
@@ -954,10 +935,11 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 	struct buffer_head * bh;
 	struct ext3_super_block *es = 0;
 	struct ext3_sb_info *sbi;
-	unsigned long sb_block = 1;
+	unsigned long sb_block = get_sb_block(&data);
 	unsigned long logic_sb_block = 1;
 	unsigned long offset = 0;
 	unsigned long journal_inum = 0;
+	unsigned long def_mount_opts;
 	int blocksize;
 	int hblock;
 	int db_count;
@@ -967,13 +949,6 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 #ifdef CONFIG_JBD_DEBUG
 	ext3_ro_after = 0;
 #endif
-	/*
-	 * See what the current blocksize for the device is, and
-	 * use that as the blocksize.  Otherwise (or if the blocksize
-	 * is smaller than the default) use the default.
-	 * This is important for devices that have a hardware
-	 * sectorsize that is larger than the default.
-	 */
 	sbi = kmalloc(sizeof(*sbi), GFP_KERNEL);
 	if (!sbi)
 		return -ENOMEM;
@@ -982,8 +957,6 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 	sbi->s_mount_opt = 0;
 	sbi->s_resuid = EXT3_DEF_RESUID;
 	sbi->s_resgid = EXT3_DEF_RESGID;
-	if (!parse_options ((char *) data, &sb_block, sbi, &journal_inum, 0))
-		goto out_fail;
 
 	blocksize = sb_min_blocksize(sb, EXT3_MIN_BLOCK_SIZE);
 	if (!blocksize) {
@@ -1018,6 +991,33 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 			       sb->s_id);
 		goto failed_mount;
 	}
+	
+	/* Set defaults before we parse the mount options */
+	def_mount_opts = le32_to_cpu(es->s_default_mount_opts);
+	if (def_mount_opts & EXT3_DEFM_DEBUG)
+		set_opt(sbi->s_mount_opt, DEBUG);
+	if (def_mount_opts & EXT3_DEFM_BSDGROUPS)
+		set_opt(sbi->s_mount_opt, GRPID);
+	if (def_mount_opts & EXT3_DEFM_UID16)
+		set_opt(sbi->s_mount_opt, NO_UID32);
+	if ((def_mount_opts & EXT3_DEFM_JMODE) == EXT3_DEFM_JMODE_DATA)
+		sbi->s_mount_opt |= EXT3_MOUNT_JOURNAL_DATA;
+	else if ((def_mount_opts & EXT3_DEFM_JMODE) == EXT3_DEFM_JMODE_ORDERED)
+		sbi->s_mount_opt |= EXT3_MOUNT_ORDERED_DATA;
+	else if ((def_mount_opts & EXT3_DEFM_JMODE) == EXT3_DEFM_JMODE_WBACK)
+		sbi->s_mount_opt |= EXT3_MOUNT_WRITEBACK_DATA;
+
+	if (le16_to_cpu(sbi->s_es->s_errors) == EXT3_ERRORS_PANIC)
+		set_opt(sbi->s_mount_opt, ERRORS_PANIC);
+	else if (le16_to_cpu(sbi->s_es->s_errors) == EXT3_ERRORS_RO)
+		set_opt(sbi->s_mount_opt, ERRORS_RO);
+	
+	sbi->s_resuid = le16_to_cpu(es->s_def_resuid);
+	sbi->s_resgid = le16_to_cpu(es->s_def_resgid);
+
+	if (!parse_options ((char *) data, sbi, &journal_inum, 0))
+		goto failed_mount;
+
 	if (le32_to_cpu(es->s_rev_level) == EXT3_GOOD_OLD_REV &&
 	    (EXT3_HAS_COMPAT_FEATURE(sb, ~0U) ||
 	     EXT3_HAS_RO_COMPAT_FEATURE(sb, ~0U) ||
@@ -1115,10 +1115,6 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 	sbi->s_itb_per_group = sbi->s_inodes_per_group /sbi->s_inodes_per_block;
 	sbi->s_desc_per_block = blocksize / sizeof(struct ext3_group_desc);
 	sbi->s_sbh = bh;
-	if (sbi->s_resuid == EXT3_DEF_RESUID)
-		sbi->s_resuid = le16_to_cpu(es->s_def_resuid);
-	if (sbi->s_resgid == EXT3_DEF_RESGID)
-		sbi->s_resgid = le16_to_cpu(es->s_def_resgid);
 	sbi->s_mount_state = le16_to_cpu(es->s_state);
 	sbi->s_addr_per_block_bits = log2(EXT3_ADDR_PER_BLOCK(sb));
 	sbi->s_desc_per_block_bits = log2(EXT3_DESC_PER_BLOCK(sb));
@@ -1702,7 +1698,7 @@ int ext3_remount (struct super_block * sb, int * flags, char * data)
 	/*
 	 * Allow the "check" option to be passed as a remount option.
 	 */
-	if (!parse_options(data, &tmp, sbi, &tmp, 1))
+	if (!parse_options(data, sbi, &tmp, 1))
 		return -EINVAL;
 
 	if (sbi->s_mount_opt & EXT3_MOUNT_ABORT)

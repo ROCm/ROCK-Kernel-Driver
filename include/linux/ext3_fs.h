@@ -449,7 +449,8 @@ struct ext3_super_block {
 	__u8	s_def_hash_version;	/* Default hash version to use */
 	__u8	s_reserved_char_pad;
 	__u16	s_reserved_word_pad;
-	__u32	s_reserved[192];	/* Padding to the end of the block */
+	__u32	s_default_mount_opts;
+	__u32	s_reserved[191];	/* Padding to the end of the block */
 };
 
 #ifdef __KERNEL__
@@ -541,6 +542,19 @@ static inline struct ext3_inode_info *EXT3_I(struct inode *inode)
  */
 #define	EXT3_DEF_RESUID		0
 #define	EXT3_DEF_RESGID		0
+
+/*
+ * Default mount options
+ */
+#define EXT3_DEFM_DEBUG		0x0001
+#define EXT3_DEFM_BSDGROUPS	0x0002
+#define EXT3_DEFM_XATTR_USER	0x0004
+#define EXT3_DEFM_ACL		0x0008
+#define EXT3_DEFM_UID16		0x0010
+#define EXT3_DEFM_JMODE		0x0060
+#define EXT3_DEFM_JMODE_DATA	0x0020
+#define EXT3_DEFM_JMODE_ORDERED	0x0040
+#define EXT3_DEFM_JMODE_WBACK	0x0060
 
 /*
  * Structure of a directory entry

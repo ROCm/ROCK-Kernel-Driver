@@ -52,16 +52,12 @@ void ext2_error (struct super_block * sb, const char * function,
 	va_start (args, fmt);
 	vsprintf (error_buf, fmt, args);
 	va_end (args);
-	if (test_opt (sb, ERRORS_PANIC) ||
-	    (le16_to_cpu(sbi->s_es->s_errors) == EXT2_ERRORS_PANIC &&
-	     !test_opt (sb, ERRORS_CONT) && !test_opt (sb, ERRORS_RO)))
+	if (test_opt (sb, ERRORS_PANIC))
 		panic ("EXT2-fs panic (device %s): %s: %s\n",
 		       sb->s_id, function, error_buf);
 	printk (KERN_CRIT "EXT2-fs error (device %s): %s: %s\n",
 		sb->s_id, function, error_buf);
-	if (test_opt (sb, ERRORS_RO) ||
-	    (le16_to_cpu(sbi->s_es->s_errors) == EXT2_ERRORS_RO &&
-	     !test_opt (sb, ERRORS_CONT) && !test_opt (sb, ERRORS_PANIC))) {
+	if (test_opt (sb, ERRORS_RO)) {
 		printk ("Remounting filesystem read-only\n");
 		sb->s_flags |= MS_RDONLY;
 	}
@@ -216,12 +212,61 @@ static struct export_operations ext2_export_ops = {
 	.get_parent = ext2_get_parent,
 };
 
+static unsigned long get_sb_block(void **data)
+{
+	unsigned long 	sb_block;
+	char 		*options = (char *) *data;
+
+	if (!options || strncmp(options, "sb=", 3) != 0)
+		return 1;	/* Default location */
+	options += 3;
+	sb_block = simple_strtoul(options, &options, 0);
+	if (*options && *options != ',') {
+		printk("EXT2-fs: Invalid sb specification: %s\n",
+		       (char *) *data);
+		return 1;
+	}
+	if (*options == ',')
+		options++;
+	*data = (void *) options;
+	return sb_block;
+}
+
+static int want_value(char *value, char *option)
+{
+	if (!value || !*value) {
+		printk(KERN_NOTICE "EXT2-fs: the %s option needs an argument\n",
+		       option);
+		return -1;
+	}
+	return 0;
+}
+
+static int want_null_value(char *value, char *option)
+{
+	if (*value) {
+		printk(KERN_NOTICE "EXT2-fs: Invalid %s argument: %s\n",
+		       option, value);
+		return -1;
+	}
+	return 0;
+}
+
+static int want_numeric(char *value, char *option, unsigned long *number)
+{
+	if (want_value(value, option))
+		return -1;
+	*number = simple_strtoul(value, &value, 0);
+	if (want_null_value(value, option))
+		return -1;
+	return 0;
+}
+
 /*
  * This function has been shamelessly adapted from the msdos fs
  */
-static int parse_options (char * options, unsigned long * sb_block,
-			  unsigned short *resuid, unsigned short * resgid,
-			  unsigned long * mount_options)
+static int parse_options (char * options,
+			  struct ext2_sb_info *sbi)
 {
 	char * this_char;
 	char * value;
@@ -234,22 +279,22 @@ static int parse_options (char * options, unsigned long * sb_block,
 		if ((value = strchr (this_char, '=')) != NULL)
 			*value++ = 0;
 		if (!strcmp (this_char, "bsddf"))
-			clear_opt (*mount_options, MINIX_DF);
+			clear_opt (sbi->s_mount_opt, MINIX_DF);
 		else if (!strcmp (this_char, "nouid32")) {
-			set_opt (*mount_options, NO_UID32);
+			set_opt (sbi->s_mount_opt, NO_UID32);
 		}
 		else if (!strcmp (this_char, "check")) {
 			if (!value || !*value || !strcmp (value, "none"))
-				clear_opt (*mount_options, CHECK);
+				clear_opt (sbi->s_mount_opt, CHECK);
 			else
 #ifdef CONFIG_EXT2_CHECK
-				set_opt (*mount_options, CHECK);
+				set_opt (sbi->s_mount_opt, CHECK);
 #else
 				printk("EXT2 Check option not supported\n");
 #endif
 		}
 		else if (!strcmp (this_char, "debug"))
-			set_opt (*mount_options, DEBUG);
+			set_opt (sbi->s_mount_opt, DEBUG);
 		else if (!strcmp (this_char, "errors")) {
 			if (!value || !*value) {
 				printk ("EXT2-fs: the errors option requires "
@@ -257,19 +302,19 @@ static int parse_options (char * options, unsigned long * sb_block,
 				return 0;
 			}
 			if (!strcmp (value, "continue")) {
-				clear_opt (*mount_options, ERRORS_RO);
-				clear_opt (*mount_options, ERRORS_PANIC);
-				set_opt (*mount_options, ERRORS_CONT);
+				clear_opt (sbi->s_mount_opt, ERRORS_RO);
+				clear_opt (sbi->s_mount_opt, ERRORS_PANIC);
+				set_opt (sbi->s_mount_opt, ERRORS_CONT);
 			}
 			else if (!strcmp (value, "remount-ro")) {
-				clear_opt (*mount_options, ERRORS_CONT);
-				clear_opt (*mount_options, ERRORS_PANIC);
-				set_opt (*mount_options, ERRORS_RO);
+				clear_opt (sbi->s_mount_opt, ERRORS_CONT);
+				clear_opt (sbi->s_mount_opt, ERRORS_PANIC);
+				set_opt (sbi->s_mount_opt, ERRORS_RO);
 			}
 			else if (!strcmp (value, "panic")) {
-				clear_opt (*mount_options, ERRORS_CONT);
-				clear_opt (*mount_options, ERRORS_RO);
-				set_opt (*mount_options, ERRORS_PANIC);
+				clear_opt (sbi->s_mount_opt, ERRORS_CONT);
+				clear_opt (sbi->s_mount_opt, ERRORS_RO);
+				set_opt (sbi->s_mount_opt, ERRORS_PANIC);
 			}
 			else {
 				printk ("EXT2-fs: Invalid errors option: %s\n",
@@ -279,52 +324,25 @@ static int parse_options (char * options, unsigned long * sb_block,
 		}
 		else if (!strcmp (this_char, "grpid") ||
 			 !strcmp (this_char, "bsdgroups"))
-			set_opt (*mount_options, GRPID);
+			set_opt (sbi->s_mount_opt, GRPID);
 		else if (!strcmp (this_char, "minixdf"))
-			set_opt (*mount_options, MINIX_DF);
+			set_opt (sbi->s_mount_opt, MINIX_DF);
 		else if (!strcmp (this_char, "nocheck"))
-			clear_opt (*mount_options, CHECK);
+			clear_opt (sbi->s_mount_opt, CHECK);
 		else if (!strcmp (this_char, "nogrpid") ||
 			 !strcmp (this_char, "sysvgroups"))
-			clear_opt (*mount_options, GRPID);
+			clear_opt (sbi->s_mount_opt, GRPID);
 		else if (!strcmp (this_char, "resgid")) {
-			if (!value || !*value) {
-				printk ("EXT2-fs: the resgid option requires "
-					"an argument\n");
+			unsigned long v;
+			if (want_numeric(value, "resgid", &v))
 				return 0;
-			}
-			*resgid = simple_strtoul (value, &value, 0);
-			if (*value) {
-				printk ("EXT2-fs: Invalid resgid option: %s\n",
-					value);
-				return 0;
-			}
+			sbi->s_resgid = v;
 		}
 		else if (!strcmp (this_char, "resuid")) {
-			if (!value || !*value) {
-				printk ("EXT2-fs: the resuid option requires "
-					"an argument");
+			unsigned long v;
+			if (want_numeric(value, "resuid", &v))
 				return 0;
-			}
-			*resuid = simple_strtoul (value, &value, 0);
-			if (*value) {
-				printk ("EXT2-fs: Invalid resuid option: %s\n",
-					value);
-				return 0;
-			}
-		}
-		else if (!strcmp (this_char, "sb")) {
-			if (!value || !*value) {
-				printk ("EXT2-fs: the sb option requires "
-					"an argument");
-				return 0;
-			}
-			*sb_block = simple_strtoul (value, &value, 0);
-			if (*value) {
-				printk ("EXT2-fs: Invalid sb option: %s\n",
-					value);
-				return 0;
-			}
+			sbi->s_resuid = v;
 		}
 		/* Silently ignore the quota options */
 		else if (!strcmp (this_char, "grpquota")
@@ -464,10 +482,9 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 	struct ext2_sb_info * sbi;
 	struct ext2_super_block * es;
 	unsigned long sb_block = 1;
-	unsigned short resuid = EXT2_DEF_RESUID;
-	unsigned short resgid = EXT2_DEF_RESGID;
-	unsigned long logic_sb_block = 1;
+	unsigned long logic_sb_block = get_sb_block(&data);
 	unsigned long offset = 0;
+	unsigned long def_mount_opts;
 	int blocksize = BLOCK_SIZE;
 	int db_count;
 	int i, j;
@@ -485,12 +502,6 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 	 * This is important for devices that have a hardware
 	 * sectorsize that is larger than the default.
 	 */
-
-	sbi->s_mount_opt = 0;
-	if (!parse_options ((char *) data, &sb_block, &resuid, &resgid,
-	    &sbi->s_mount_opt))
-		goto failed_sbi;
-
 	blocksize = sb_min_blocksize(sb, BLOCK_SIZE);
 	if (!blocksize) {
 		printk ("EXT2-fs: unable to set blocksize\n");
@@ -498,9 +509,8 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 	}
 
 	/*
-	 * If the superblock doesn't start on a sector boundary,
-	 * calculate the offset.  FIXME(eric) this doesn't make sense
-	 * that we would have to do this.
+	 * If the superblock doesn't start on a hardware sector boundary,
+	 * calculate the offset.  
 	 */
 	if (blocksize != BLOCK_SIZE) {
 		logic_sb_block = (sb_block*BLOCK_SIZE) / blocksize;
@@ -524,6 +534,27 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 				sb->s_id);
 		goto failed_mount;
 	}
+
+	/* Set defaults before we parse the mount options */
+	def_mount_opts = le32_to_cpu(es->s_default_mount_opts);
+	if (def_mount_opts & EXT2_DEFM_DEBUG)
+		set_opt(sbi->s_mount_opt, DEBUG);
+	if (def_mount_opts & EXT2_DEFM_BSDGROUPS)
+		set_opt(sbi->s_mount_opt, GRPID);
+	if (def_mount_opts & EXT2_DEFM_UID16)
+		set_opt(sbi->s_mount_opt, NO_UID32);
+	
+	if (le16_to_cpu(sbi->s_es->s_errors) == EXT2_ERRORS_PANIC)
+		set_opt(sbi->s_mount_opt, ERRORS_PANIC);
+	else if (le16_to_cpu(sbi->s_es->s_errors) == EXT2_ERRORS_RO)
+		set_opt(sbi->s_mount_opt, ERRORS_RO);
+
+	sbi->s_resuid = le16_to_cpu(es->s_def_resuid);
+	sbi->s_resgid = le16_to_cpu(es->s_def_resgid);
+	
+	if (!parse_options ((char *) data, sbi))
+		goto failed_mount;
+
 	if (le32_to_cpu(es->s_rev_level) == EXT2_GOOD_OLD_REV &&
 	    (EXT2_HAS_COMPAT_FEATURE(sb, ~0U) ||
 	     EXT2_HAS_RO_COMPAT_FEATURE(sb, ~0U) ||
@@ -605,14 +636,6 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 	sbi->s_desc_per_block = sb->s_blocksize /
 					 sizeof (struct ext2_group_desc);
 	sbi->s_sbh = bh;
-	if (resuid != EXT2_DEF_RESUID)
-		sbi->s_resuid = resuid;
-	else
-		sbi->s_resuid = le16_to_cpu(es->s_def_resuid);
-	if (resgid != EXT2_DEF_RESGID)
-		sbi->s_resgid = resgid;
-	else
-		sbi->s_resgid = le16_to_cpu(es->s_def_resgid);
 	sbi->s_mount_state = le16_to_cpu(es->s_state);
 	sbi->s_addr_per_block_bits =
 		log2 (EXT2_ADDR_PER_BLOCK(sb));
@@ -767,22 +790,13 @@ static int ext2_remount (struct super_block * sb, int * flags, char * data)
 {
 	struct ext2_sb_info * sbi = EXT2_SB(sb);
 	struct ext2_super_block * es;
-	unsigned short resuid = sbi->s_resuid;
-	unsigned short resgid = sbi->s_resgid;
-	unsigned long new_mount_opt;
-	unsigned long tmp;
 
 	/*
 	 * Allow the "check" option to be passed as a remount option.
 	 */
-	new_mount_opt = sbi->s_mount_opt;
-	if (!parse_options (data, &tmp, &resuid, &resgid,
-			    &new_mount_opt))
+	if (!parse_options (data, sbi))
 		return -EINVAL;
 
-	sbi->s_mount_opt = new_mount_opt;
-	sbi->s_resuid = resuid;
-	sbi->s_resgid = resgid;
 	es = sbi->s_es;
 	if ((*flags & MS_RDONLY) == (sb->s_flags & MS_RDONLY))
 		return 0;
