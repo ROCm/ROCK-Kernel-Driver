@@ -374,27 +374,22 @@ static void visor_close (struct usb_serial_port *port, struct file * filp)
 	if (!serial)
 		return;
 	
-	if (serial->dev) {
-		/* only send a shutdown message if the 
-		 * device is still here */
-		transfer_buffer =  kmalloc (0x12, GFP_KERNEL);
-		if (!transfer_buffer) {
-			dev_err(&port->dev, "%s - kmalloc(%d) failed.\n", __FUNCTION__, 0x12);
-		} else {
-			/* send a shutdown message to the device */
-			usb_control_msg (serial->dev,
-					 usb_rcvctrlpipe(serial->dev, 0),
-					 VISOR_CLOSE_NOTIFICATION, 0xc2,
-					 0x0000, 0x0000, 
-					 transfer_buffer, 0x12, 300);
-			kfree (transfer_buffer);
-		}
-		/* shutdown our bulk read */
-		usb_unlink_urb (port->read_urb);
+	/* shutdown our urbs */
+	usb_unlink_urb (port->read_urb);
+	if (port->interrupt_in_urb)
+		usb_unlink_urb (port->interrupt_in_urb);
 
-		if (port->interrupt_in_urb)
-			usb_unlink_urb (port->interrupt_in_urb);
+	/* Try to send shutdown message, if the device is gone, this will just fail. */
+	transfer_buffer =  kmalloc (0x12, GFP_KERNEL);
+	if (transfer_buffer) {
+		usb_control_msg (serial->dev,
+				 usb_rcvctrlpipe(serial->dev, 0),
+				 VISOR_CLOSE_NOTIFICATION, 0xc2,
+				 0x0000, 0x0000, 
+				 transfer_buffer, 0x12, 300);
+		kfree (transfer_buffer);
 	}
+
 	/* Uncomment the following line if you want to see some statistics in your syslog */
 	/* dev_info (&port->dev, "Bytes In = %d  Bytes Out = %d\n", bytes_in, bytes_out); */
 }
