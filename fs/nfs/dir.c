@@ -1001,7 +1001,7 @@ static int nfs_unlink(struct inode *dir, struct dentry *dentry)
 		return error;
 	}
 	if (!d_unhashed(dentry)) {
-		list_del_init(&dentry->d_hash);
+		__d_drop(dentry);
 		need_rehash = 1;
 	}
 	spin_unlock(&dcache_lock);
