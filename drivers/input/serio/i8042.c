@@ -379,6 +379,8 @@ static irqreturn_t i8042_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	unsigned int dfl;
 	int ret;
 
+	mod_timer(&i8042_timer, jiffies + I8042_POLL_PERIOD);
+
 	spin_lock_irqsave(&i8042_lock, flags);
 	str = i8042_read_status();
 	if (str & I8042_STR_OBF)
@@ -433,7 +435,6 @@ static irqreturn_t i8042_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 irq_ret:
 	ret = 1;
 out:
-	mod_timer(&i8042_timer, jiffies + I8042_POLL_PERIOD);
 	return IRQ_RETVAL(ret);
 }
 
