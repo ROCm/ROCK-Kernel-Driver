@@ -1751,6 +1751,7 @@ static int raid5_spare_active(mddev_t *mddev)
 		failed_rdev->desc_nr = spare_desc->number;
 		failed_rdev->raid_disk = spare_disk;
 	}
+	spare_rdev->in_sync = 1;
 	
 	xchg_values(*spare_desc, *failed_desc);
 	xchg_values(*fdisk, *sdisk);

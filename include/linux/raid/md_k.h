@@ -158,6 +158,8 @@ struct mdk_rdev_s
 
 	int alias_device;		/* device alias to the same disk */
 	int faulty;			/* if faulty do not issue IO requests */
+	int in_sync;			/* device is a full member of the array */
+
 	int desc_nr;			/* descriptor index in the superblock */
 	int raid_disk;			/* role of device in array */
 };

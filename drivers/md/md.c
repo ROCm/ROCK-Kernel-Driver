@@ -1179,9 +1179,19 @@ static int analyze_sbs(mddev_t * mddev)
 			rdev->alias_device = !!i;
 			rdev->desc_nr = i++;
 			rdev->raid_disk = rdev->desc_nr;
+			rdev->in_sync = 1;
 		} else {
+			mdp_disk_t *desc;
 			rdev->desc_nr = rdev->sb->this_disk.number;
-			rdev->raid_disk = sb->disks[rdev->desc_nr].raid_disk;
+			desc = sb->disks + rdev->desc_nr;
+			rdev->raid_disk = desc->raid_disk;
+			rdev->in_sync = rdev->faulty = 0;
+
+			if (desc->state & (1<<MD_DISK_FAULTY))
+				rdev->faulty = 1;
+			else if (desc->state & (1<<MD_DISK_SYNC) &&
+				 rdev->raid_disk < mddev->sb-raid_disks)
+				rdev->in_sync = 1;
 		}
 	}
 	/*
@@ -2110,6 +2120,11 @@ static int add_new_disk(mddev_t * mddev, mdu_disk_info_t *info)
 		rdev->old_dev = dev;
 		rdev->desc_nr = info->number;
 		rdev->raid_disk = info->raid_disk;
+		rdev->faulty = 0;
+		if (rdev->raid_disk < mddev->sb->raid_disks)
+			rdev->in_sync = (info->state & (1<<MD_DISK_SYNC));
+		else
+			rdev->in_sync = 0;
 
 		bind_rdev_to_array(rdev, mddev);
 
@@ -2271,6 +2286,7 @@ static int hot_add_disk(mddev_t * mddev, kdev_t dev)
 		err = -EINVAL;
 		goto abort_export;
 	}
+	rdev->in_sync = 0;
 	bind_rdev_to_array(rdev, mddev);
 
 	/*
@@ -2852,6 +2868,7 @@ int md_error(mddev_t *mddev, struct block_device *bdev)
 	if (!mddev->pers->error_handler
 			|| mddev->pers->error_handler(mddev,bdev) <= 0) {
 		rrdev->faulty = 1;
+		rrdev->in_sync = 0;
 	} else
 		return 1;
 	/*
