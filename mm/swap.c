@@ -115,7 +115,7 @@ void __pagevec_release(struct pagevec *pvec)
 		if (!put_page_testzero(page))
 			continue;
 
-		if (!lock_held && PageLRU(page)) {
+		if (!lock_held) {
 			spin_lock(&pagemap_lru_lock);
 			lock_held = 1;
 		}

@@ -118,10 +118,10 @@ void invalidate_inode_pages(struct inode * inode)
 	struct list_head *head, *curr;
 	struct page * page;
 	struct address_space *mapping = inode->i_mapping;
+	struct pagevec lru_pvec;
 
 	head = &mapping->clean_pages;
-
-	spin_lock(&pagemap_lru_lock);
+	pagevec_init(&lru_pvec);
 	write_lock(&mapping->page_lock);
 	curr = head->next;
 
@@ -143,10 +143,10 @@ void invalidate_inode_pages(struct inode * inode)
 		if (page_count(page) != 1)
 			goto unlock;
 
-		__lru_cache_del(page);
 		__remove_from_page_cache(page);
 		unlock_page(page);
-		page_cache_release(page);
+		if (!pagevec_add(&lru_pvec, page))
+			__pagevec_lru_del(&lru_pvec);
 		continue;
 unlock:
 		unlock_page(page);
@@ -154,7 +154,7 @@ unlock:
 	}
 
 	write_unlock(&mapping->page_lock);
-	spin_unlock(&pagemap_lru_lock);
+	pagevec_lru_del(&lru_pvec);
 }
 
 static int do_invalidatepage(struct page *page, unsigned long offset)
@@ -174,16 +174,14 @@ static inline void truncate_partial_page(struct page *page, unsigned partial)
 }
 
 /*
- * If truncate can remove the fs-private metadata from the page, it
- * removes the page from the LRU immediately.  This because some other thread
- * of control (eg, sendfile) may have a reference to the page.  But dropping
- * the final reference to an LRU page in interrupt context is illegal - it may
- * deadlock over pagemap_lru_lock.
+ * If truncate cannot remove the fs-private metadata from the page, the page
+ * becomes anonymous.  It will be left on the LRU and may even be mapped into
+ * user pagetables if we're racing with filemap_nopage().
  */
 static void truncate_complete_page(struct page *page)
 {
-	if (!PagePrivate(page) || do_invalidatepage(page, 0))
-		lru_cache_del(page);
+	if (PagePrivate(page))
+		do_invalidatepage(page, 0);
 
 	ClearPageDirty(page);
 	ClearPageUptodate(page);
@@ -204,8 +202,10 @@ static int truncate_list_pages(struct address_space *mapping,
 	struct list_head *curr;
 	struct page * page;
 	int unlocked = 0;
+	struct pagevec release_pvec;
 
- restart:
+	pagevec_init(&release_pvec);
+restart:
 	curr = head->next;
 	while (curr != head) {
 		unsigned long offset;
@@ -225,18 +225,17 @@ static int truncate_list_pages(struct address_space *mapping,
 				list_add_tail(head, curr);
 				write_unlock(&mapping->page_lock);
 				wait_on_page_writeback(page);
-				page_cache_release(page);
+				if (!pagevec_add(&release_pvec, page))
+					__pagevec_release(&release_pvec);
 				unlocked = 1;
 				write_lock(&mapping->page_lock);
 				goto restart;
 			}
 
 			list_del(head);
-			if (!failed)
-				/* Restart after this page */
+			if (!failed)		/* Restart after this page */
 				list_add(head, curr);
-			else
-				/* Restart on this page */
+			else			/* Restart on this page */
 				list_add_tail(head, curr);
 
 			write_unlock(&mapping->page_lock);
@@ -246,24 +245,26 @@ static int truncate_list_pages(struct address_space *mapping,
 				if (*partial && (offset + 1) == start) {
 					truncate_partial_page(page, *partial);
 					*partial = 0;
-				} else 
+				} else {
 					truncate_complete_page(page);
-
+				}
 				unlock_page(page);
-			} else
+			} else {
  				wait_on_page_locked(page);
-
-			page_cache_release(page);
-
-			if (need_resched()) {
-				__set_current_state(TASK_RUNNING);
-				schedule();
 			}
-
+			if (!pagevec_add(&release_pvec, page))
+				__pagevec_release(&release_pvec);
+			cond_resched();
 			write_lock(&mapping->page_lock);
 			goto restart;
 		}
 		curr = curr->next;
+	}
+	if (pagevec_count(&release_pvec)) {
+		write_unlock(&mapping->page_lock);
+		pagevec_release(&release_pvec);
+		write_lock(&mapping->page_lock);
+		unlocked = 1;
 	}
 	return unlocked;
 }
@@ -362,8 +363,10 @@ static int invalidate_list_pages2(struct address_space * mapping,
 	struct list_head *curr;
 	struct page * page;
 	int unlocked = 0;
+	struct pagevec release_pvec;
 
- restart:
+	pagevec_init(&release_pvec);
+restart:
 	curr = head->prev;
 	while (curr != head) {
 		page = list_entry(curr, struct page, list);
@@ -380,7 +383,8 @@ static int invalidate_list_pages2(struct address_space * mapping,
 				goto restart;
 			}
 
-			__unlocked = invalidate_this_page2(mapping, page, curr, head);
+			__unlocked = invalidate_this_page2(mapping,
+						page, curr, head);
 			unlock_page(page);
 			unlocked |= __unlocked;
 			if (!__unlocked) {
@@ -398,14 +402,17 @@ static int invalidate_list_pages2(struct address_space * mapping,
 			wait_on_page_locked(page);
 		}
 
-		page_cache_release(page);
-		if (need_resched()) {
-			__set_current_state(TASK_RUNNING);
-			schedule();
-		}
-
+		if (!pagevec_add(&release_pvec, page))
+			__pagevec_release(&release_pvec);
+		cond_resched();
 		write_lock(&mapping->page_lock);
 		goto restart;
+	}
+	if (pagevec_count(&release_pvec)) {
+		write_unlock(&mapping->page_lock);
+		pagevec_release(&release_pvec);
+		write_lock(&mapping->page_lock);
+		unlocked = 1;
 	}
 	return unlocked;
 }
