@@ -49,8 +49,6 @@
  *******************************************************************/
 struct pci_controller *alloc_phb(struct device_node *dev, char *model,
 				 unsigned int addr_size_words) ;
-static int rtas_fake_read(struct device_node *dn, int offset, int nbytes,
-			  unsigned long *returnval);
 
 /* RTAS tokens */
 static int read_pci_config;
@@ -73,8 +71,6 @@ static int rtas_read_config(struct device_node *dn, int where, int size, u32 *va
 	buid = dn->phb->buid;
 	if (buid) {
 		ret = rtas_call(ibm_read_pci_config, 4, 2, &returnval, addr, buid >> 32, buid & 0xffffffff, size);
-		if (ret < 0|| (returnval == 0xffffffff))
-			ret = rtas_fake_read(dn, where, size, &returnval);
 	} else {
 		ret = rtas_call(read_pci_config, 2, 2, &returnval, addr, size);
 	}
@@ -140,48 +136,6 @@ struct pci_ops rtas_pci_ops = {
 	rtas_pci_read_config,
 	rtas_pci_write_config
 };
-
-/*
- * Handle the case where rtas refuses to do a pci config read.
- * This currently only happens with some PHBs in which case we totally fake
- * out the values (and call it a speedwagaon -- something we could look up
- * in the device tree).
- */
-static int
-rtas_fake_read(struct device_node *dn, int offset, int nbytes, unsigned long *returnval)
-{
-	char *device_type = (char *)get_property(dn, "device_type", 0);
-	u32 *class_code = (u32 *)get_property(dn, "class-code", 0);
-
-	*returnval = ~0;	/* float by default */
-
-	/* udbg_printf("rtas_fake_read dn=%p, offset=0x%02x, nbytes=%d, device_type=%s\n", dn, offset, nbytes, device_type ? device_type : "<none>"); */
-	if (device_type && strcmp(device_type, "pci") != 0)
-		return -3;	/* Not a phb or bridge */
-
-	/* NOTE: class_code != NULL => EADS pci bridge.  Else a PHB */
-	if (nbytes == 1) {
-		if (offset == PCI_HEADER_TYPE)
-			*returnval = 0x80;	/* multifunction */
-		else if (offset == PCI_INTERRUPT_PIN || offset == PCI_INTERRUPT_LINE)
-			*returnval = 0;
-	} else if (nbytes == 2) {
-		if (offset == PCI_SUBSYSTEM_VENDOR_ID || offset == PCI_SUBSYSTEM_ID)
-			*returnval = 0;
-		else if (offset == PCI_COMMAND)
-			*returnval = PCI_COMMAND_PARITY|PCI_COMMAND_MASTER|PCI_COMMAND_MEMORY;
-	} else if (nbytes == 4) {
-		if (offset == PCI_VENDOR_ID)
-			*returnval = 0x1014 | ((class_code ? 0x8b : 0x102) << 16); /* a phb */
-		else if (offset == PCI_REVISION_ID)
-			*returnval = (class_code ? PCI_CLASS_BRIDGE_PCI : PCI_CLASS_BRIDGE_HOST) << 16; /* revs are zero */
-		else if ((offset >= PCI_BASE_ADDRESS_0 && offset <= PCI_BASE_ADDRESS_5) || offset == PCI_ROM_ADDRESS)
-			*returnval = 0;
-	}
-
-	/* printk("fake: %s nbytes=%d, offset=%lx ret=%lx\n", class_code ? "EADS" : "PHB", nbytes, offset, *returnval); */
-	return 0;
-}
 
 /******************************************************************
  * pci_read_irq_line
