@@ -326,17 +326,17 @@ static void __init ethif_probe2(int unit)
 	if (base_addr == 1)
 		return;
 
-	probe_list2(unit, m68k_probes, base_addr == 0) &&
-	probe_list2(unit, mips_probes, base_addr == 0) &&
-	probe_list2(unit, eisa_probes, base_addr == 0) &&
-	probe_list2(unit, mca_probes, base_addr == 0) &&
-	probe_list2(unit, isa_probes, base_addr == 0) &&
-	probe_list2(unit, parport_probes, base_addr == 0);
+	(void)(	probe_list2(unit, m68k_probes, base_addr == 0) &&
+		probe_list2(unit, mips_probes, base_addr == 0) &&
+		probe_list2(unit, eisa_probes, base_addr == 0) &&
+		probe_list2(unit, mca_probes, base_addr == 0) &&
+		probe_list2(unit, isa_probes, base_addr == 0) &&
+		probe_list2(unit, parport_probes, base_addr == 0));
 }
 
 #ifdef CONFIG_TR
 /* Token-ring device probe */
-extern int ibmtr_probe(struct net_device *);
+extern int ibmtr_probe_card(struct net_device *);
 extern struct net_device *sk_isa_probe(int unit);
 extern struct net_device *proteon_probe(int unit);
 extern struct net_device *smctr_probe(int unit);
@@ -356,26 +356,19 @@ static struct devprobe2 tr_probes2[] __initdata = {
 
 static __init int trif_probe(int unit)
 {
-	struct net_device *dev;
 	int err = -ENODEV;
-	
-	dev = alloc_trdev(0);
+#ifdef CONFIG_IBMTR
+	struct net_device *dev = alloc_trdev(0);
 	if (!dev)
 		return -ENOMEM;
 
 	sprintf(dev->name, "tr%d", unit);
 	netdev_boot_setup_check(dev);
-	if (
-#ifdef CONFIG_IBMTR
-	    ibmtr_probe(dev) == 0  ||
-#endif
-	    0 ) 
-		err = register_netdev(dev);
-		
+	err = ibmtr_probe_card(dev);
 	if (err)
 		free_netdev(dev);
+#endif
 	return err;
-
 }
 
 static void __init trif_probe2(int unit)

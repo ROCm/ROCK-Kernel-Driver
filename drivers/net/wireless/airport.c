@@ -216,7 +216,7 @@ airport_attach(struct macio_dev *mdev, const struct of_match *match)
 
 	if (! request_OF_resource(of_node, 0, " (airport)")) {
 		printk(KERN_ERR "airport: can't request IO resource !\n");
-		kfree(dev);
+		free_netdev(dev);
 		return -ENODEV;
 	}
 

@@ -1275,7 +1275,7 @@ static int baycom_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
  * If dev->base_addr == 2, allocate space for the device and return success
  * (detachable devices only).
  */
-static int baycom_probe(struct net_device *dev)
+static void baycom_probe(struct net_device *dev)
 {
 	static char ax25_bcast[AX25_ADDR_LEN] = {
 		'Q' << 1, 'S' << 1, 'T' << 1, ' ' << 1, ' ' << 1, ' ' << 1, '0' << 1
@@ -1288,9 +1288,6 @@ static int baycom_probe(struct net_device *dev)
 	};
 	struct baycom_state *bc;
 
-	if (!dev)
-		return -ENXIO;
-	baycom_paranoia_check(dev, "baycom_probe", -ENXIO);
 	/*
 	 * not a real probe! only initialize data structures
 	 */
@@ -1332,8 +1329,6 @@ static int baycom_probe(struct net_device *dev)
 
 	/* New style flags */
 	dev->flags = 0;
-
-	return 0;
 }
 
 /* --------------------------------------------------------------------- */
@@ -1368,7 +1363,7 @@ static void __init baycom_epp_dev_setup(struct net_device *dev)
 	/*
 	 * initialize part of the device struct
 	 */
-	dev->init = baycom_probe;
+	baycom_probe(dev);
 }
 
 static int __init init_baycomepp(void)

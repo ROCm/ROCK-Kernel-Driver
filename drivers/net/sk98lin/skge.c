@@ -1253,7 +1253,7 @@ SK_EVPARA EvPara;
 
 		if ((pAC->GIni.GIMacsFound == 2) && pAC->RlmtNets == 2){
 			unregister_netdev(pAC->dev[1]);
-			kfree(pAC->dev[1]);
+			free_netdev(pAC->dev[1]);
 		}
 
 		FreeResources(SkGeRootDev);

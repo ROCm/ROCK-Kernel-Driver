@@ -172,7 +172,7 @@ int br_add_bridge(const char *name)
 
 	ret = register_netdev(br->dev);
 	if (ret)
-		kfree(br->dev);
+		free_netdev(br->dev);
 	return ret;
 }
 

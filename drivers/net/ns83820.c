@@ -374,19 +374,6 @@ static int lnksts = 0;		/* CFG_LNKSTS bit polarity */
 #define LINK_DOWN		0x02
 #define LINK_UP			0x04
 
-#define __kick_rx(dev)	writel(CR_RXE, dev->base + CR)
-
-#define kick_rx(dev) do { \
-	dprintk("kick_rx: maybe kicking\n"); \
-	if (test_and_clear_bit(0, &dev->rx_info.idle)) { \
-		dprintk("actually kicking\n"); \
-		writel(dev->rx_info.phy_descs + (4 * DESC_SIZE * dev->rx_info.next_rx), dev->base + RXDP); \
-		if (dev->rx_info.next_rx == dev->rx_info.next_empty) \
-			printk(KERN_DEBUG "%s: uh-oh: next_rx == next_empty???\n", dev->net_dev.name);\
-		__kick_rx(dev); \
-	} \
-} while(0)
-
 #ifdef USE_64BIT_ADDR
 #define HW_ADDR_LEN	8
 #define desc_addr_set(desc, addr)				\
@@ -438,7 +425,6 @@ struct rx_info {
 
 
 struct ns83820 {
-	struct net_device	net_dev;	/* must be first */
 	struct net_device_stats	stats;
 	u8			*base;
 
@@ -477,6 +463,29 @@ struct ns83820 {
 
 	struct timer_list	tx_watchdog;
 };
+
+static inline struct ns83820 *PRIV(struct net_device *dev)
+{
+	return netdev_priv(dev);
+}
+
+#define __kick_rx(dev)	writel(CR_RXE, dev->base + CR)
+
+static inline void kick_rx(struct net_device *ndev)
+{
+	struct ns83820 *dev = PRIV(ndev);
+	dprintk("kick_rx: maybe kicking\n");
+	if (test_and_clear_bit(0, &dev->rx_info.idle)) {
+		dprintk("actually kicking\n");
+		writel(dev->rx_info.phy_descs +
+			(4 * DESC_SIZE * dev->rx_info.next_rx),
+		       dev->base + RXDP);
+		if (dev->rx_info.next_rx == dev->rx_info.next_empty)
+			printk(KERN_DEBUG "%s: uh-oh: next_rx == next_empty???\n",
+				ndev->name);
+		__kick_rx(dev);
+	}
+}
 
 //free = (tx_done_idx + NR_TX_DESC-2 - free_idx) % NR_TX_DESC
 #define start_tx_okay(dev)	\
@@ -546,15 +555,16 @@ static inline int ns83820_add_rx_skb(struct ns83820 *dev, struct sk_buff *skb)
 	return 0;
 }
 
-static inline int rx_refill(struct ns83820 *dev, int gfp)
+static inline int rx_refill(struct net_device *ndev, int gfp)
 {
+	struct ns83820 *dev = PRIV(ndev);
 	unsigned i;
 	unsigned long flags = 0;
 
 	if (unlikely(nr_rx_empty(dev) <= 2))
 		return 0;
 
-	dprintk("rx_refill(%p)\n", dev);
+	dprintk("rx_refill(%p)\n", ndev);
 	if (gfp == GFP_ATOMIC)
 		spin_lock_irqsave(&dev->rx_info.lock, flags);
 	for (i=0; i<NR_RX_DESC; i++) {
@@ -570,7 +580,7 @@ static inline int rx_refill(struct ns83820 *dev, int gfp)
 		res &= 0xf;
 		skb_reserve(skb, res);
 
-		skb->dev = &dev->net_dev;
+		skb->dev = ndev;
 		if (gfp != GFP_ATOMIC)
 			spin_lock_irqsave(&dev->rx_info.lock, flags);
 		res = ns83820_add_rx_skb(dev, skb);
@@ -587,20 +597,21 @@ static inline int rx_refill(struct ns83820 *dev, int gfp)
 	return i ? 0 : -ENOMEM;
 }
 
-static void FASTCALL(rx_refill_atomic(struct ns83820 *dev));
-static void rx_refill_atomic(struct ns83820 *dev)
+static void FASTCALL(rx_refill_atomic(struct net_device *ndev));
+static void rx_refill_atomic(struct net_device *ndev)
 {
-	rx_refill(dev, GFP_ATOMIC);
+	rx_refill(ndev, GFP_ATOMIC);
 }
 
 /* REFILL */
 static inline void queue_refill(void *_dev)
 {
-	struct ns83820 *dev = _dev;
+	struct net_device *ndev = _dev;
+	struct ns83820 *dev = PRIV(ndev);
 
-	rx_refill(dev, GFP_KERNEL);
+	rx_refill(ndev, GFP_KERNEL);
 	if (dev->rx_info.up)
-		kick_rx(dev);
+		kick_rx(ndev);
 }
 
 static inline void clear_rx_desc(struct ns83820 *dev, unsigned i)
@@ -608,9 +619,10 @@ static inline void clear_rx_desc(struct ns83820 *dev, unsigned i)
 	build_rx_desc(dev, dev->rx_info.descs + (DESC_SIZE * i), 0, 0, CMDSTS_OWN, 0);
 }
 
-static void FASTCALL(phy_intr(struct ns83820 *dev));
-static void phy_intr(struct ns83820 *dev)
+static void FASTCALL(phy_intr(struct net_device *ndev));
+static void phy_intr(struct net_device *ndev)
 {
+	struct ns83820 *dev = PRIV(ndev);
 	static char *speeds[] = { "10", "100", "1000", "1000(?)", "1000F" };
 	u32 cfg, new_cfg;
 	u32 tbisr, tanar, tanlpar;
@@ -688,27 +700,28 @@ static void phy_intr(struct ns83820 *dev)
 
 	if (newlinkstate & LINK_UP
 	    && dev->linkstate != newlinkstate) {
-		netif_start_queue(&dev->net_dev);
-		netif_wake_queue(&dev->net_dev);
+		netif_start_queue(ndev);
+		netif_wake_queue(ndev);
 		printk(KERN_INFO "%s: link now %s mbps, %s duplex and up.\n",
-			dev->net_dev.name,
+			ndev->name,
 			speeds[speed],
 			fullduplex ? "full" : "half");
 	} else if (newlinkstate & LINK_DOWN
 		   && dev->linkstate != newlinkstate) {
-		netif_stop_queue(&dev->net_dev);
-		printk(KERN_INFO "%s: link now down.\n", dev->net_dev.name);
+		netif_stop_queue(ndev);
+		printk(KERN_INFO "%s: link now down.\n", ndev->name);
 	}
 
 	dev->linkstate = newlinkstate;
 }
 
-static int ns83820_setup_rx(struct ns83820 *dev)
+static int ns83820_setup_rx(struct net_device *ndev)
 {
+	struct ns83820 *dev = PRIV(ndev);
 	unsigned i;
 	int ret;
 
-	dprintk("ns83820_setup_rx(%p)\n", dev);
+	dprintk("ns83820_setup_rx(%p)\n", ndev);
 
 	dev->rx_info.idle = 1;
 	dev->rx_info.next_rx = 0;
@@ -721,7 +734,7 @@ static int ns83820_setup_rx(struct ns83820 *dev)
 	writel(0, dev->base + RXDP_HI);
 	writel(dev->rx_info.phy_descs, dev->base + RXDP);
 
-	ret = rx_refill(dev, GFP_KERNEL);
+	ret = rx_refill(ndev, GFP_KERNEL);
 	if (!ret) {
 		dprintk("starting receiver\n");
 		/* prevent the interrupt handler from stomping on us */
@@ -734,7 +747,7 @@ static int ns83820_setup_rx(struct ns83820 *dev)
 
 		dev->rx_info.up = 1;
 
-		phy_intr(dev);
+		phy_intr(ndev);
 
 		/* Okay, let it rip */
 		spin_lock_irq(&dev->misc_lock);
@@ -753,7 +766,7 @@ static int ns83820_setup_rx(struct ns83820 *dev)
 		writel(1, dev->base + IER);
 		spin_unlock_irq(&dev->misc_lock);
 
-		kick_rx(dev);
+		kick_rx(ndev);
 
 		spin_unlock_irq(&dev->rx_info.lock);
 	}
@@ -793,37 +806,39 @@ static void ns83820_cleanup_rx(struct ns83820 *dev)
 	}
 }
 
-static void FASTCALL(ns83820_rx_kick(struct ns83820 *dev));
-static void ns83820_rx_kick(struct ns83820 *dev)
+static void FASTCALL(ns83820_rx_kick(struct net_device *ndev));
+static void ns83820_rx_kick(struct net_device *ndev)
 {
+	struct ns83820 *dev = PRIV(ndev);
 	/*if (nr_rx_empty(dev) >= NR_RX_DESC/4)*/ {
 		if (dev->rx_info.up) {
-			rx_refill_atomic(dev);
-			kick_rx(dev);
+			rx_refill_atomic(ndev);
+			kick_rx(ndev);
 		}
 	}
 
 	if (dev->rx_info.up && nr_rx_empty(dev) > NR_RX_DESC*3/4)
 		schedule_work(&dev->tq_refill);
 	else
-		kick_rx(dev);
+		kick_rx(ndev);
 	if (dev->rx_info.idle)
-		printk(KERN_DEBUG "%s: BAD\n", dev->net_dev.name);
+		printk(KERN_DEBUG "%s: BAD\n", ndev->name);
 }
 
 /* rx_irq
  *	
  */
-static void FASTCALL(rx_irq(struct ns83820 *dev));
-static void rx_irq(struct ns83820 *dev)
+static void FASTCALL(rx_irq(struct net_device *ndev));
+static void rx_irq(struct net_device *ndev)
 {
+	struct ns83820 *dev = PRIV(ndev);
 	struct rx_info *info = &dev->rx_info;
 	unsigned next_rx;
 	u32 cmdsts, *desc;
 	unsigned long flags;
 	int nr = 0;
 
-	dprintk("rx_irq(%p)\n", dev);
+	dprintk("rx_irq(%p)\n", ndev);
 	dprintk("rxdp: %08x, descs: %08lx next_rx[%d]: %p next_empty[%d]: %p\n",
 		readl(dev->base + RXDP),
 		(long)(dev->rx_info.phy_descs),
@@ -873,7 +888,7 @@ static void rx_irq(struct ns83820 *dev)
 			} else {
 				skb->ip_summed = CHECKSUM_NONE;
 			}
-			skb->protocol = eth_type_trans(skb, &dev->net_dev);
+			skb->protocol = eth_type_trans(skb, ndev);
 			if (NET_RX_DROP == netif_rx(skb)) {
 netdev_mangle_me_harder_failed:
 				dev->stats.rx_dropped ++;
@@ -899,8 +914,9 @@ out:
 
 static void rx_action(unsigned long _dev)
 {
-	struct ns83820 *dev = (void *)_dev;
-	rx_irq(dev);
+	struct net_device *ndev = (void *)_dev;
+	struct ns83820 *dev = PRIV(ndev);
+	rx_irq(ndev);
 	writel(ihr, dev->base + IHR);
 
 	spin_lock_irq(&dev->misc_lock);
@@ -908,8 +924,8 @@ static void rx_action(unsigned long _dev)
 	writel(dev->IMR_cache, dev->base + IMR);
 	spin_unlock_irq(&dev->misc_lock);
 
-	rx_irq(dev);
-	ns83820_rx_kick(dev);
+	rx_irq(ndev);
+	ns83820_rx_kick(ndev);
 }
 
 /* Packet Transmit code
@@ -924,13 +940,14 @@ static inline void kick_tx(struct ns83820 *dev)
 /* No spinlock needed on the transmit irq path as the interrupt handler is
  * serialized.
  */
-static void do_tx_done(struct ns83820 *dev)
+static void do_tx_done(struct net_device *ndev)
 {
+	struct ns83820 *dev = PRIV(ndev);
 	u32 cmdsts, tx_done_idx, *desc;
 
 	spin_lock_irq(&dev->tx_lock);
 
-	dprintk("do_tx_done(%p)\n", dev);
+	dprintk("do_tx_done(%p)\n", ndev);
 	tx_done_idx = dev->tx_done_idx;
 	desc = dev->tx_descs + (tx_done_idx * DESC_SIZE);
 
@@ -980,10 +997,10 @@ static void do_tx_done(struct ns83820 *dev)
 	/* Allow network stack to resume queueing packets after we've
 	 * finished transmitting at least 1/4 of the packets in the queue.
 	 */
-	if (netif_queue_stopped(&dev->net_dev) && start_tx_okay(dev)) {
-		dprintk("start_queue(%p)\n", dev);
-		netif_start_queue(&dev->net_dev);
-		netif_wake_queue(&dev->net_dev);
+	if (netif_queue_stopped(ndev) && start_tx_okay(dev)) {
+		dprintk("start_queue(%p)\n", ndev);
+		netif_start_queue(ndev);
+		netif_wake_queue(ndev);
 	}
 	spin_unlock_irq(&dev->tx_lock);
 }
@@ -1015,9 +1032,9 @@ static void ns83820_cleanup_tx(struct ns83820 *dev)
  * while trying to track down a bug in either the zero copy code or
  * the tx fifo (hence the MAX_FRAG_LEN).
  */
-static int ns83820_hard_start_xmit(struct sk_buff *skb, struct net_device *_dev)
+static int ns83820_hard_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 {
-	struct ns83820 *dev = (struct ns83820 *)_dev;
+	struct ns83820 *dev = PRIV(ndev);
 	u32 free_idx, cmdsts, extsts;
 	int nr_free, nr_frags;
 	unsigned tx_done_idx, last_idx;
@@ -1033,10 +1050,10 @@ static int ns83820_hard_start_xmit(struct sk_buff *skb, struct net_device *_dev)
 	nr_frags =  skb_shinfo(skb)->nr_frags;
 again:
 	if (unlikely(dev->CFG_cache & CFG_LNKSTS)) {
-		netif_stop_queue(&dev->net_dev);
+		netif_stop_queue(ndev);
 		if (unlikely(dev->CFG_cache & CFG_LNKSTS))
 			return 1;
-		netif_start_queue(&dev->net_dev);
+		netif_start_queue(ndev);
 	}
 
 	last_idx = free_idx = dev->tx_free_idx;
@@ -1044,13 +1061,13 @@ again:
 	nr_free = (tx_done_idx + NR_TX_DESC-2 - free_idx) % NR_TX_DESC;
 	nr_free -= 1;
 	if (nr_free <= nr_frags) {
-		dprintk("stop_queue - not enough(%p)\n", dev);
-		netif_stop_queue(&dev->net_dev);
+		dprintk("stop_queue - not enough(%p)\n", ndev);
+		netif_stop_queue(ndev);
 
 		/* Check again: we may have raced with a tx done irq */
 		if (dev->tx_done_idx != tx_done_idx) {
-			dprintk("restart queue(%p)\n", dev);
-			netif_start_queue(&dev->net_dev);
+			dprintk("restart queue(%p)\n", ndev);
+			netif_start_queue(ndev);
 			goto again;
 		}
 		return 1;
@@ -1063,8 +1080,8 @@ again:
 
 	nr_free -= nr_frags;
 	if (nr_free < MIN_TX_DESC_FREE) {
-		dprintk("stop_queue - last entry(%p)\n", dev);
-		netif_stop_queue(&dev->net_dev);
+		dprintk("stop_queue - last entry(%p)\n", ndev);
+		netif_stop_queue(ndev);
 		stopped = 1;
 	}
 
@@ -1136,10 +1153,10 @@ again:
 
 	/* Check again: we may have raced with a tx done irq */
 	if (stopped && (dev->tx_done_idx != tx_done_idx) && start_tx_okay(dev))
-		netif_start_queue(&dev->net_dev);
+		netif_start_queue(ndev);
 
 	/* set the transmit start time to catch transmit timeouts */
-	dev->net_dev.trans_start = jiffies;
+	ndev->trans_start = jiffies;
 	return 0;
 }
 
@@ -1161,9 +1178,9 @@ static void ns83820_update_stats(struct ns83820 *dev)
 	dev->stats.tx_carrier_errors	+= readl(base + 0x88) & 0xff;
 }
 
-static struct net_device_stats *ns83820_get_stats(struct net_device *_dev)
+static struct net_device_stats *ns83820_get_stats(struct net_device *ndev)
 {
-	struct ns83820 *dev = (void *)_dev;
+	struct ns83820 *dev = PRIV(ndev);
 
 	/* somewhat overkill */
 	spin_lock_irq(&dev->misc_lock);
@@ -1213,9 +1230,9 @@ static int ns83820_ethtool_ioctl (struct ns83820 *dev, void *useraddr)
 	return -EOPNOTSUPP;
 }
 
-static int ns83820_ioctl(struct net_device *_dev, struct ifreq *rq, int cmd)
+static int ns83820_ioctl(struct net_device *ndev, struct ifreq *rq, int cmd)
 {
-	struct ns83820 *dev = (struct ns83820 *)_dev;
+	struct ns83820 *dev = PRIV(ndev);
 
 	switch(cmd) {
 	case SIOCETHTOOL:
@@ -1233,23 +1250,25 @@ static void ns83820_mib_isr(struct ns83820 *dev)
 	spin_unlock(&dev->misc_lock);
 }
 
-static void ns83820_do_isr(struct ns83820 *dev, u32 isr);
+static void ns83820_do_isr(struct net_device *ndev, u32 isr);
 static irqreturn_t ns83820_irq(int foo, void *data, struct pt_regs *regs)
 {
-	struct ns83820 *dev = data;
+	struct net_device *ndev = data;
+	struct ns83820 *dev = PRIV(ndev);
 	u32 isr;
-	dprintk("ns83820_irq(%p)\n", dev);
+	dprintk("ns83820_irq(%p)\n", ndev);
 
 	dev->ihr = 0;
 
 	isr = readl(dev->base + ISR);
 	dprintk("irq: %08x\n", isr);
-	ns83820_do_isr(dev, isr);
+	ns83820_do_isr(ndev, isr);
 	return IRQ_HANDLED;
 }
 
-static void ns83820_do_isr(struct ns83820 *dev, u32 isr)
+static void ns83820_do_isr(struct net_device *ndev, u32 isr)
 {
+	struct ns83820 *dev = PRIV(ndev);
 #ifdef DEBUG
 	if (isr & ~(ISR_PHY | ISR_RXDESC | ISR_RXEARLY | ISR_RXOK | ISR_RXERR | ISR_TXIDLE | ISR_TXOK | ISR_TXDESC))
 		Dprintk("odd isr? 0x%08x\n", isr);
@@ -1258,7 +1277,7 @@ static void ns83820_do_isr(struct ns83820 *dev, u32 isr)
 	if (ISR_RXIDLE & isr) {
 		dev->rx_info.idle = 1;
 		Dprintk("oh dear, we are idle\n");
-		ns83820_rx_kick(dev);
+		ns83820_rx_kick(ndev);
 	}
 
 	if ((ISR_RXDESC | ISR_RXOK) & isr) {
@@ -1270,12 +1289,12 @@ static void ns83820_do_isr(struct ns83820 *dev, u32 isr)
 		spin_unlock_irq(&dev->misc_lock);
 
 		tasklet_schedule(&dev->rx_tasklet);
-		//rx_irq(dev);
+		//rx_irq(ndev);
 		//writel(4, dev->base + IHR);
 	}
 
 	if ((ISR_RXIDLE | ISR_RXORN | ISR_RXDESC | ISR_RXOK | ISR_RXERR) & isr)
-		ns83820_rx_kick(dev);
+		ns83820_rx_kick(ndev);
 
 	if (unlikely(ISR_RXSOVR & isr)) {
 		//printk("overrun: rxsovr\n");
@@ -1297,7 +1316,7 @@ static void ns83820_do_isr(struct ns83820 *dev, u32 isr)
 		txdp -= dev->tx_phy_descs;
 		dev->tx_idx = txdp / (DESC_SIZE * 4);
 		if (dev->tx_idx >= NR_TX_DESC) {
-			printk(KERN_ALERT "%s: BUG -- txdp out of range\n", dev->net_dev.name);
+			printk(KERN_ALERT "%s: BUG -- txdp out of range\n", ndev->name);
 			dev->tx_idx = 0;
 		}
 		/* The may have been a race between a pci originated read
@@ -1313,7 +1332,7 @@ static void ns83820_do_isr(struct ns83820 *dev, u32 isr)
 	 * work has accumulated
 	 */
 	if ((ISR_TXDESC | ISR_TXIDLE | ISR_TXOK | ISR_TXERR) & isr) {
-		do_tx_done(dev);
+		do_tx_done(ndev);
 
 		/* Disable TxOk if there are no outstanding tx packets.
 		 */
@@ -1345,7 +1364,7 @@ static void ns83820_do_isr(struct ns83820 *dev, u32 isr)
 
 	/* PHY: Link up/down/negotiation state change */
 	if (unlikely(ISR_PHY & isr))
-		phy_intr(dev);
+		phy_intr(ndev);
 
 #if 0	/* Still working on the interrupt mitigation strategy */
 	if (dev->ihr)
@@ -1363,9 +1382,9 @@ static void ns83820_do_reset(struct ns83820 *dev, u32 which)
 	Dprintk("okay!\n");
 }
 
-static int ns83820_stop(struct net_device *_dev)
+static int ns83820_stop(struct net_device *ndev)
 {
-	struct ns83820 *dev = (struct ns83820 *)_dev;
+	struct ns83820 *dev = PRIV(ndev);
 
 	/* FIXME: protect against interrupt handler? */
 	del_timer_sync(&dev->tx_watchdog);
@@ -1392,10 +1411,9 @@ static int ns83820_stop(struct net_device *_dev)
 	return 0;
 }
 
-static void ns83820_do_isr(struct ns83820 *dev, u32 isr);
-static void ns83820_tx_timeout(struct net_device *_dev)
+static void ns83820_tx_timeout(struct net_device *ndev)
 {
-	struct ns83820 *dev = (struct ns83820 *)_dev;
+	struct ns83820 *dev = PRIV(ndev);
         u32 tx_done_idx, *desc;
 	unsigned long flags;
 
@@ -1405,7 +1423,7 @@ static void ns83820_tx_timeout(struct net_device *_dev)
 	desc = dev->tx_descs + (tx_done_idx * DESC_SIZE);
 
 	printk(KERN_INFO "%s: tx_timeout: tx_done_idx=%d free_idx=%d cmdsts=%08x\n",
-		dev->net_dev.name,
+		ndev->name,
 		tx_done_idx, dev->tx_free_idx, le32_to_cpu(desc[DESC_CMDSTS]));
 
 #if defined(DEBUG)
@@ -1413,17 +1431,17 @@ static void ns83820_tx_timeout(struct net_device *_dev)
 		u32 isr;
 		isr = readl(dev->base + ISR);
 		printk("irq: %08x imr: %08x\n", isr, dev->IMR_cache);
-		ns83820_do_isr(dev, isr);
+		ns83820_do_isr(ndev, isr);
 	}
 #endif
 
-	do_tx_done(dev);
+	do_tx_done(ndev);
 
 	tx_done_idx = dev->tx_done_idx;
 	desc = dev->tx_descs + (tx_done_idx * DESC_SIZE);
 
 	printk(KERN_INFO "%s: after: tx_done_idx=%d free_idx=%d cmdsts=%08x\n",
-		dev->net_dev.name,
+		ndev->name,
 		tx_done_idx, dev->tx_free_idx, le32_to_cpu(desc[DESC_CMDSTS]));
 
 	local_irq_restore(flags);
@@ -1431,7 +1449,8 @@ static void ns83820_tx_timeout(struct net_device *_dev)
 
 static void ns83820_tx_watch(unsigned long data)
 {
-	struct ns83820 *dev = (void *)data;
+	struct net_device *ndev = (void *)data;
+	struct ns83820 *dev = PRIV(ndev);
 
 #if defined(DEBUG)
 	printk("ns83820_tx_watch: %u %u %d\n",
@@ -1439,21 +1458,21 @@ static void ns83820_tx_watch(unsigned long data)
 		);
 #endif
 
-	if (time_after(jiffies, dev->net_dev.trans_start + 1*HZ) &&
+	if (time_after(jiffies, ndev->trans_start + 1*HZ) &&
 	    dev->tx_done_idx != dev->tx_free_idx) {
 		printk(KERN_DEBUG "%s: ns83820_tx_watch: %u %u %d\n",
-			dev->net_dev.name,
+			ndev->name,
 			dev->tx_done_idx, dev->tx_free_idx,
 			atomic_read(&dev->nr_tx_skbs));
-		ns83820_tx_timeout(&dev->net_dev);
+		ns83820_tx_timeout(ndev);
 	}
 
 	mod_timer(&dev->tx_watchdog, jiffies + 2*HZ);
 }
 
-static int ns83820_open(struct net_device *_dev)
+static int ns83820_open(struct net_device *ndev)
 {
-	struct ns83820 *dev = (struct ns83820 *)_dev;
+	struct ns83820 *dev = PRIV(ndev);
 	unsigned i;
 	u32 desc;
 	int ret;
@@ -1462,7 +1481,7 @@ static int ns83820_open(struct net_device *_dev)
 
 	writel(0, dev->base + PQCR);
 
-	ret = ns83820_setup_rx(dev);
+	ret = ns83820_setup_rx(ndev);
 	if (ret)
 		goto failed;
 
@@ -1481,16 +1500,16 @@ static int ns83820_open(struct net_device *_dev)
 	writel(desc, dev->base + TXDP);
 
 	init_timer(&dev->tx_watchdog);
-	dev->tx_watchdog.data = (unsigned long)dev;
+	dev->tx_watchdog.data = (unsigned long)ndev;
 	dev->tx_watchdog.function = ns83820_tx_watch;
 	mod_timer(&dev->tx_watchdog, jiffies + 2*HZ);
 
-	netif_start_queue(&dev->net_dev);	/* FIXME: wait for phy to come up */
+	netif_start_queue(ndev);	/* FIXME: wait for phy to come up */
 
 	return 0;
 
 failed:
-	ns83820_stop(_dev);
+	ns83820_stop(ndev);
 	return ret;
 }
 
@@ -1513,28 +1532,28 @@ static void ns83820_getmac(struct ns83820 *dev, u8 *mac)
 	}
 }
 
-static int ns83820_change_mtu(struct net_device *_dev, int new_mtu)
+static int ns83820_change_mtu(struct net_device *ndev, int new_mtu)
 {
 	if (new_mtu > RX_BUF_SIZE)
 		return -EINVAL;
-	_dev->mtu = new_mtu;
+	ndev->mtu = new_mtu;
 	return 0;
 }
 
-static void ns83820_set_multicast(struct net_device *_dev)
+static void ns83820_set_multicast(struct net_device *ndev)
 {
-	struct ns83820 *dev = (void *)_dev;
+	struct ns83820 *dev = PRIV(ndev);
 	u8 *rfcr = dev->base + RFCR;
 	u32 and_mask = 0xffffffff;
 	u32 or_mask = 0;
 	u32 val;
 
-	if (dev->net_dev.flags & IFF_PROMISC)
+	if (ndev->flags & IFF_PROMISC)
 		or_mask |= RFCR_AAU | RFCR_AAM;
 	else
 		and_mask &= ~(RFCR_AAU | RFCR_AAM);
 
-	if (dev->net_dev.flags & IFF_ALLMULTI)
+	if (ndev->flags & IFF_ALLMULTI)
 		or_mask |= RFCR_AAM;
 	else
 		and_mask &= ~RFCR_AAM;
@@ -1547,14 +1566,15 @@ static void ns83820_set_multicast(struct net_device *_dev)
 	spin_unlock_irq(&dev->misc_lock);
 }
 
-static void ns83820_run_bist(struct ns83820 *dev, const char *name, u32 enable, u32 done, u32 fail)
+static void ns83820_run_bist(struct net_device *ndev, const char *name, u32 enable, u32 done, u32 fail)
 {
+	struct ns83820 *dev = PRIV(ndev);
 	int timed_out = 0;
 	long start;
 	u32 status;
 	int loops = 0;
 
-	dprintk("%s: start %s\n", dev->net_dev.name, name);
+	dprintk("%s: start %s\n", ndev->name, name);
 
 	start = jiffies;
 
@@ -1578,12 +1598,12 @@ static void ns83820_run_bist(struct ns83820 *dev, const char *name, u32 enable, 
 
 	if (status & fail)
 		printk(KERN_INFO "%s: %s failed! (0x%08x & 0x%08x)\n",
-			dev->net_dev.name, name, status, fail);
+			ndev->name, name, status, fail);
 	else if (timed_out)
 		printk(KERN_INFO "%s: run_bist %s timed out! (%08x)\n",
-			dev->net_dev.name, name, status);
+			ndev->name, name, status);
 
-	dprintk("%s: done %s in %d loops\n", dev->net_dev.name, name, loops);
+	dprintk("%s: done %s in %d loops\n", ndev->name, name, loops);
 }
 
 #ifdef PHY_CODE_IS_FINISHED
@@ -1706,8 +1726,9 @@ static unsigned ns83820_mii_write_reg(struct ns83820 *dev, unsigned phy, unsigne
 	return data;
 }
 
-static void ns83820_probe_phy(struct ns83820 *dev)
+static void ns83820_probe_phy(struct net_device *ndev)
 {
+	struct ns83820 *dev = PRIV(ndev);
 	static int first;
 	int i;
 #define MII_PHYIDR1	0x02
@@ -1734,11 +1755,11 @@ static void ns83820_probe_phy(struct ns83820 *dev)
 		b = ns83820_mii_read_reg(dev, i, MII_PHYIDR2);
 
 		//printk("%s: phy %d: 0x%04x 0x%04x\n",
-		//	dev->net_dev.name, i, a, b);
+		//	ndev->name, i, a, b);
 
 		for (j=0; j<0x16; j+=4) {
 			dprintk("%s: [0x%02x] %04x %04x %04x %04x\n",
-				dev->net_dev.name, j,
+				ndev->name, j,
 				ns83820_mii_read_reg(dev, i, 0 + j),
 				ns83820_mii_read_reg(dev, i, 1 + j),
 				ns83820_mii_read_reg(dev, i, 2 + j),
@@ -1763,6 +1784,7 @@ static void ns83820_probe_phy(struct ns83820 *dev)
 
 static int __devinit ns83820_init_one(struct pci_dev *pci_dev, const struct pci_device_id *id)
 {
+	struct net_device *ndev;
 	struct ns83820 *dev;
 	long addr;
 	int err;
@@ -1778,7 +1800,8 @@ static int __devinit ns83820_init_one(struct pci_dev *pci_dev, const struct pci_
 		return -ENODEV;
 	}
 
-	dev = (struct ns83820 *)alloc_etherdev((sizeof *dev) - (sizeof dev->net_dev));
+	ndev = alloc_etherdev(sizeof(struct ns83820));
+	dev = PRIV(ndev);
 	err = -ENOMEM;
 	if (!dev)
 		goto out;
@@ -1790,12 +1813,11 @@ static int __devinit ns83820_init_one(struct pci_dev *pci_dev, const struct pci_
 
 	dev->ee.cache = &dev->MEAR_cache;
 	dev->ee.lock = &dev->misc_lock;
-	SET_MODULE_OWNER(dev->net_dev);
-	SET_NETDEV_DEV(&dev->net_dev, &pci_dev->dev);
-	dev->net_dev.priv = dev;
+	SET_MODULE_OWNER(ndev);
+	SET_NETDEV_DEV(ndev, &pci_dev->dev);
 
-	INIT_WORK(&dev->tq_refill, queue_refill, dev);
-	tasklet_init(&dev->rx_tasklet, rx_action, (unsigned long)dev);
+	INIT_WORK(&dev->tq_refill, queue_refill, ndev);
+	tasklet_init(&dev->rx_tasklet, rx_action, (unsigned long)ndev);
 
 	err = pci_enable_device(pci_dev);
 	if (err) {
@@ -1829,55 +1851,63 @@ static int __devinit ns83820_init_one(struct pci_dev *pci_dev, const struct pci_
 		0);
 
 	err = request_irq(pci_dev->irq, ns83820_irq, SA_SHIRQ,
-			  dev->net_dev.name, dev);
+			  ndev->name, ndev);
 	if (err) {
 		printk(KERN_INFO "ns83820: unable to register irq %d\n",
 			pci_dev->irq);
 		goto out_disable;
 	}
 
-	err = register_netdev(&dev->net_dev);
-	if (err) {
-		printk(KERN_INFO "ns83820: unable to register netdev: %d\n", err);
+	/*
+	 * FIXME: we are holding rtnl_lock() over obscenely long area only
+	 * because some of the setup code uses dev->name.  It's Wrong(tm) -
+	 * we should be using driver-specific names for all that stuff.
+	 * For now that will do, but we really need to come back and kill
+	 * most of the dev_alloc_name() users later.
+	 */
+	rtnl_lock();
+	err = dev_alloc_name(ndev, ndev->name);
+	if (err < 0) {
+		printk(KERN_INFO "ns83820: unable to get netdev name: %d\n", err);
 		goto out_free_irq;
 	}
 
 	printk("%s: ns83820.c: 0x22c: %08x, subsystem: %04x:%04x\n",
-		dev->net_dev.name, le32_to_cpu(readl(dev->base + 0x22c)),
+		ndev->name, le32_to_cpu(readl(dev->base + 0x22c)),
 		pci_dev->subsystem_vendor, pci_dev->subsystem_device);
 
-	dev->net_dev.open = ns83820_open;
-	dev->net_dev.stop = ns83820_stop;
-	dev->net_dev.hard_start_xmit = ns83820_hard_start_xmit;
-	dev->net_dev.get_stats = ns83820_get_stats;
-	dev->net_dev.change_mtu = ns83820_change_mtu;
-	dev->net_dev.set_multicast_list = ns83820_set_multicast;
-	dev->net_dev.do_ioctl = ns83820_ioctl;
-	dev->net_dev.tx_timeout = ns83820_tx_timeout;
-	dev->net_dev.watchdog_timeo = 5 * HZ;
+	ndev->open = ns83820_open;
+	ndev->stop = ns83820_stop;
+	ndev->hard_start_xmit = ns83820_hard_start_xmit;
+	ndev->get_stats = ns83820_get_stats;
+	ndev->change_mtu = ns83820_change_mtu;
+	ndev->set_multicast_list = ns83820_set_multicast;
+	ndev->do_ioctl = ns83820_ioctl;
+	ndev->tx_timeout = ns83820_tx_timeout;
+	ndev->watchdog_timeo = 5 * HZ;
 
-	pci_set_drvdata(pci_dev, dev);
+	pci_set_drvdata(pci_dev, ndev);
 
 	ns83820_do_reset(dev, CR_RST);
 
 	/* Must reset the ram bist before running it */
 	writel(PTSCR_RBIST_RST, dev->base + PTSCR);
-	ns83820_run_bist(dev, "sram bist",   PTSCR_RBIST_EN,
+	ns83820_run_bist(ndev, "sram bist",   PTSCR_RBIST_EN,
 			 PTSCR_RBIST_DONE, PTSCR_RBIST_FAIL);
-	ns83820_run_bist(dev, "eeprom bist", PTSCR_EEBIST_EN, 0,
+	ns83820_run_bist(ndev, "eeprom bist", PTSCR_EEBIST_EN, 0,
 			 PTSCR_EEBIST_FAIL);
-	ns83820_run_bist(dev, "eeprom load", PTSCR_EELOAD_EN, 0, 0);
+	ns83820_run_bist(ndev, "eeprom load", PTSCR_EELOAD_EN, 0, 0);
 
 	/* I love config registers */
 	dev->CFG_cache = readl(dev->base + CFG);
 
 	if ((dev->CFG_cache & CFG_PCI64_DET)) {
 		printk(KERN_INFO "%s: detected 64 bit PCI data bus.\n",
-			dev->net_dev.name);
+			ndev->name);
 		/*dev->CFG_cache |= CFG_DATA64_EN;*/
 		if (!(dev->CFG_cache & CFG_DATA64_EN))
 			printk(KERN_INFO "%s: EEPROM did not enable 64 bit bus.  Disabled.\n",
-				dev->net_dev.name);
+				ndev->name);
 	} else
 		dev->CFG_cache &= ~(CFG_DATA64_EN);
 
@@ -1905,7 +1935,7 @@ static int __devinit ns83820_init_one(struct pci_dev *pci_dev, const struct pci_
 	/* setup optical transceiver if we have one */
 	if (dev->CFG_cache & CFG_TBI_EN) {
 		printk(KERN_INFO "%s: enabling optical transceiver\n",
-			dev->net_dev.name);
+			ndev->name);
 		writel(readl(dev->base + GPIOR) | 0x3e8, dev->base + GPIOR);
 
 		/* setup auto negotiation feature advertisement */
@@ -1926,7 +1956,7 @@ static int __devinit ns83820_init_one(struct pci_dev *pci_dev, const struct pci_
 	dprintk("CFG: %08x\n", dev->CFG_cache);
 
 	if (reset_phy) {
-		printk(KERN_INFO "%s: resetting phy\n", dev->net_dev.name);
+		printk(KERN_INFO "%s: resetting phy\n", ndev->name);
 		writel(dev->CFG_cache | CFG_PHY_RST, dev->base + CFG);
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule_timeout((HZ+99)/100);
@@ -1996,37 +2026,49 @@ static int __devinit ns83820_init_one(struct pci_dev *pci_dev, const struct pci_
 	/* Disable Wake On Lan */
 	writel(0, dev->base + WCSR);
 
-	ns83820_getmac(dev, dev->net_dev.dev_addr);
+	ns83820_getmac(dev, ndev->dev_addr);
 
 	/* Yes, we support dumb IP checksum on transmit */
-	dev->net_dev.features |= NETIF_F_SG;
-	dev->net_dev.features |= NETIF_F_IP_CSUM;
+	ndev->features |= NETIF_F_SG;
+	ndev->features |= NETIF_F_IP_CSUM;
 
 	if (using_dac) {
 		printk(KERN_INFO "%s: using 64 bit addressing.\n",
-			dev->net_dev.name);
-		dev->net_dev.features |= NETIF_F_HIGHDMA;
+			ndev->name);
+		ndev->features |= NETIF_F_HIGHDMA;
 	}
 
 	printk(KERN_INFO "%s: ns83820 v" VERSION ": DP83820 v%u.%u: %02x:%02x:%02x:%02x:%02x:%02x io=0x%08lx irq=%d f=%s\n",
-		dev->net_dev.name,
+		ndev->name,
 		(unsigned)readl(dev->base + SRR) >> 8,
 		(unsigned)readl(dev->base + SRR) & 0xff,
-		dev->net_dev.dev_addr[0], dev->net_dev.dev_addr[1],
-		dev->net_dev.dev_addr[2], dev->net_dev.dev_addr[3],
-		dev->net_dev.dev_addr[4], dev->net_dev.dev_addr[5],
+		ndev->dev_addr[0], ndev->dev_addr[1],
+		ndev->dev_addr[2], ndev->dev_addr[3],
+		ndev->dev_addr[4], ndev->dev_addr[5],
 		addr, pci_dev->irq,
-		(dev->net_dev.features & NETIF_F_HIGHDMA) ? "h,sg" : "sg"
+		(ndev->features & NETIF_F_HIGHDMA) ? "h,sg" : "sg"
 		);
 
 #ifdef PHY_CODE_IS_FINISHED
-	ns83820_probe_phy(dev);
+	ns83820_probe_phy(ndev);
 #endif
+
+	err = register_netdevice(ndev);
+	if (err) {
+		printk(KERN_INFO "ns83820: unable to register netdev: %d\n", err);
+		goto out_cleanup;
+	}
+	rtnl_unlock();
 
 	return 0;
 
+out_cleanup:
+	writel(0, dev->base + IMR);	/* paranoia */
+	writel(0, dev->base + IER);
+	readl(dev->base + IER);
 out_free_irq:
-	free_irq(pci_dev->irq, dev);
+	rtnl_unlock();
+	free_irq(pci_dev->irq, ndev);
 out_disable:
 	if (dev->base)
 		iounmap(dev->base);
@@ -2034,7 +2076,7 @@ out_disable:
 	pci_free_consistent(pci_dev, 4 * DESC_SIZE * NR_RX_DESC, dev->rx_info.descs, dev->rx_info.phy_descs);
 	pci_disable_device(pci_dev);
 out_free:
-	free_netdev(&dev->net_dev);
+	free_netdev(ndev);
 	pci_set_drvdata(pci_dev, NULL);
 out:
 	return err;
@@ -2042,24 +2084,25 @@ out:
 
 static void __devexit ns83820_remove_one(struct pci_dev *pci_dev)
 {
-	struct ns83820	*dev = pci_get_drvdata(pci_dev);
+	struct net_device *ndev = pci_get_drvdata(pci_dev);
+	struct ns83820 *dev = PRIV(ndev); /* ok even if NULL */
 
-	if (!dev)			/* paranoia */
+	if (!ndev)			/* paranoia */
 		return;
 
 	writel(0, dev->base + IMR);	/* paranoia */
 	writel(0, dev->base + IER);
 	readl(dev->base + IER);
 
-	unregister_netdev(&dev->net_dev);
-	free_irq(dev->pci_dev->irq, dev);
+	unregister_netdev(ndev);
+	free_irq(dev->pci_dev->irq, ndev);
 	iounmap(dev->base);
 	pci_free_consistent(dev->pci_dev, 4 * DESC_SIZE * NR_TX_DESC,
 			dev->tx_descs, dev->tx_phy_descs);
 	pci_free_consistent(dev->pci_dev, 4 * DESC_SIZE * NR_RX_DESC,
 			dev->rx_info.descs, dev->rx_info.phy_descs);
 	pci_disable_device(dev->pci_dev);
-	free_netdev(&dev->net_dev);
+	free_netdev(ndev);
 	pci_set_drvdata(pci_dev, NULL);
 }
 

@@ -242,10 +242,9 @@ struct net_device * __init mac8390_probe(int unit)
 	if (!MACH_IS_MAC)
 		return ERR_PTR(-ENODEV);
 
-	dev = alloc_etherdev(0);
+	dev = alloc_ei_netdev();
 	if (!dev)
 		return ERR_PTR(-ENOMEM);
-	dev->priv = NULL;
 
 	if (unit >= 0)
 		sprintf(dev->name, "eth%d", unit);
@@ -371,12 +370,9 @@ struct net_device * __init mac8390_probe(int unit)
 		goto out;
 	err = register_netdev(dev);
 	if (err)
-		goto out1;
+		goto out;
 	return dev;
 
-out1:
-	kfree(dev->priv);
-	dev->priv = NULL;
 out:
 	free_netdev(dev);
 	return ERR_PTR(err);
@@ -412,7 +408,6 @@ void cleanup_module(void)
 		struct net_device *dev = dev_mac890[i];
 		if (dev) {
 			unregister_netdev(dev);
-			kfree(dev->priv);
 			free_netdev(dev);
 		}
 	}
@@ -444,12 +439,6 @@ static int __init mac8390_initdev(struct net_device * dev, struct nubus_dev * nd
 
 	int access_bitmode;
 	
-	/* 8390 specific init for dev - allocates dev->priv */
-	if (ethdev_init(dev)) {
-		printk(KERN_ERR "%s: Unable to allocate memory for dev->priv!\n", dev->name);
-		return -ENOMEM;
-	}
-
 	/* Now fill in our stuff */
 	dev->open = &mac8390_open;
 	dev->stop = &mac8390_close;
@@ -520,8 +509,6 @@ static int __init mac8390_initdev(struct net_device * dev, struct nubus_dev * nd
 		break;
 	default:
 		printk(KERN_ERR "Card type %s is unsupported, sorry\n", cardname[type]);
-		kfree(dev->priv);
-		dev->priv = NULL;
 		return -ENODEV;
 	}
 		

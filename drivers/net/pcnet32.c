@@ -806,11 +806,12 @@ pcnet32_probe1(unsigned long ioaddr, unsigned int irq_line, int shared,
     dev->tx_timeout = pcnet32_tx_timeout;
     dev->watchdog_timeo = (5*HZ);
 
+    /* Fill in the generic fields of the device structure. */
+    if (register_netdev(dev))
+	goto err_free_consistent;
+
     lp->next = pcnet32_dev;
     pcnet32_dev = dev;
-
-    /* Fill in the generic fields of the device structure. */
-    register_netdev(dev);
     printk(KERN_INFO "%s: registered as %s\n",dev->name, lp->name);
     cards_found++;
     return 0;

@@ -242,7 +242,7 @@ struct scc_priv {
 struct scc_info {
   int irq_used;
   int twin_serial_cfg;
-  struct net_device dev[2];
+  struct net_device *dev[2];
   struct scc_priv priv[2];
   struct scc_info *next;
   spinlock_t register_lock;	/* Per device register lock */
@@ -310,17 +310,18 @@ static void __exit dmascc_exit(void) {
     info = first;
 
     /* Unregister devices */
-    for (i = 0; i < 2; i++) {
-      if (info->dev[i].name)
-	unregister_netdev(&info->dev[i]);
-    }
+    for (i = 0; i < 2; i++)
+	unregister_netdev(info->dev[i]);
 
     /* Reset board */
     if (info->priv[0].type == TYPE_TWIN)
-      outb(0, info->dev[0].base_addr + TWIN_SERIAL_CFG);
+      outb(0, info->dev[0]->base_addr + TWIN_SERIAL_CFG);
     write_scc(&info->priv[0], R9, FHWRES);
-    release_region(info->dev[0].base_addr,
+    release_region(info->dev[0]->base_addr,
 		   hw[info->priv[0].type].io_size);
+
+    for (i = 0; i < 2; i++)
+	free_netdev(info->dev[i]);
 
     /* Free memory */
     first = info->next;
@@ -443,156 +444,193 @@ static int __init dmascc_init(void) {
 module_init(dmascc_init);
 module_exit(dmascc_exit);
 
+static void dev_setup(struct net_device *dev)
+{
+	dev->type = ARPHRD_AX25;
+	dev->hard_header_len = 73;
+	dev->mtu = 1500;
+	dev->addr_len = 7;
+	dev->tx_queue_len = 64;
+	memcpy(dev->broadcast, ax25_broadcast, 7);
+	memcpy(dev->dev_addr, ax25_test, 7);
+}
 
-int __init setup_adapter(int card_base, int type, int n) {
-  int i, irq, chip;
-  struct scc_info *info;
-  struct net_device *dev;
-  struct scc_priv *priv;
-  unsigned long time;
-  unsigned int irqs;
-  int tmr_base = card_base + hw[type].tmr_offset;
-  int scc_base = card_base + hw[type].scc_offset;
-  char *chipnames[] = CHIPNAMES;
+static int __init setup_adapter(int card_base, int type, int n)
+{
+	int i, irq, chip;
+	struct scc_info *info;
+	struct net_device *dev;
+	struct scc_priv *priv;
+	unsigned long time;
+	unsigned int irqs;
+	int tmr_base = card_base + hw[type].tmr_offset;
+	int scc_base = card_base + hw[type].scc_offset;
+	char *chipnames[] = CHIPNAMES;
 
-  /* Allocate memory */
-  info = kmalloc(sizeof(struct scc_info), GFP_KERNEL | GFP_DMA);
-  if (!info) {
-    printk(KERN_ERR "dmascc: could not allocate memory for %s at %#3x\n",
-	   hw[type].name, card_base);
-    return -1;
-  }
+	/* Allocate memory */
+	info = kmalloc(sizeof(struct scc_info), GFP_KERNEL | GFP_DMA);
+	if (!info) {
+		printk(KERN_ERR "dmascc: "
+			"could not allocate memory for %s at %#3x\n",
+			hw[type].name, card_base);
+		goto out;
+	}
 
-  /* Initialize what is necessary for write_scc and write_scc_data */
-  memset(info, 0, sizeof(struct scc_info));
-  spin_lock_init(&info->register_lock);
-  
-  priv = &info->priv[0];
-  priv->type = type;
-  priv->card_base = card_base;
-  priv->scc_cmd = scc_base + SCCA_CMD;
-  priv->scc_data = scc_base + SCCA_DATA;
-  priv->register_lock = &info->register_lock;
+	/* Initialize what is necessary for write_scc and write_scc_data */
+	memset(info, 0, sizeof(struct scc_info));
 
-  /* Reset SCC */
-  write_scc(priv, R9, FHWRES | MIE | NV);
+	info->dev[0] = alloc_netdev(0, "", dev_setup);
+	if (!info->dev[0]) {
+		printk(KERN_ERR "dmascc: "
+			"could not allocate memory for %s at %#3x\n",
+			hw[type].name, card_base);
+		goto out1;
+	}
 
-  /* Determine type of chip by enabling SDLC/HDLC enhancements */
-  write_scc(priv, R15, SHDLCE);
-  if (!read_scc(priv, R15)) {
-    /* WR7' not present. This is an ordinary Z8530 SCC. */
-    chip = Z8530;
-  } else {
-    /* Put one character in TX FIFO */
-    write_scc_data(priv, 0, 0);
-    if (read_scc(priv, R0) & Tx_BUF_EMP) {
-      /* TX FIFO not full. This is a Z85230 ESCC with a 4-byte FIFO. */
-      chip = Z85230;
-    } else {
-      /* TX FIFO full. This is a Z85C30 SCC with a 1-byte FIFO. */
-      chip = Z85C30;
-    }
-  }
-  write_scc(priv, R15, 0);
+	info->dev[1] = alloc_netdev(0, "", dev_setup);
+	if (!info->dev[1]) {
+		printk(KERN_ERR "dmascc: "
+			"could not allocate memory for %s at %#3x\n",
+			hw[type].name, card_base);
+		goto out2;
+	}
+	spin_lock_init(&info->register_lock);
 
-  /* Start IRQ auto-detection */
-  irqs = probe_irq_on();
+	priv = &info->priv[0];
+	priv->type = type;
+	priv->card_base = card_base;
+	priv->scc_cmd = scc_base + SCCA_CMD;
+	priv->scc_data = scc_base + SCCA_DATA;
+	priv->register_lock = &info->register_lock;
 
-  /* Enable interrupts */
-  if (type == TYPE_TWIN) {
-    outb(0, card_base + TWIN_DMA_CFG);
-    inb(card_base + TWIN_CLR_TMR1);
-    inb(card_base + TWIN_CLR_TMR2);
-    outb((info->twin_serial_cfg = TWIN_EI), card_base + TWIN_SERIAL_CFG);
-  } else {
-    write_scc(priv, R15, CTSIE);
-    write_scc(priv, R0, RES_EXT_INT);
-    write_scc(priv, R1, EXT_INT_ENAB);
-  }
+	/* Reset SCC */
+	write_scc(priv, R9, FHWRES | MIE | NV);
 
-  /* Start timer */
-  outb(1, tmr_base + TMR_CNT1);
-  outb(0, tmr_base + TMR_CNT1);
+	/* Determine type of chip by enabling SDLC/HDLC enhancements */
+	write_scc(priv, R15, SHDLCE);
+	if (!read_scc(priv, R15)) {
+		/* WR7' not present. This is an ordinary Z8530 SCC. */
+		chip = Z8530;
+	} else {
+		/* Put one character in TX FIFO */
+		write_scc_data(priv, 0, 0);
+		if (read_scc(priv, R0) & Tx_BUF_EMP) {
+			/* TX FIFO not full. This is a Z85230 ESCC with a 4-byte FIFO. */
+			chip = Z85230;
+		} else {
+			/* TX FIFO full. This is a Z85C30 SCC with a 1-byte FIFO. */
+			chip = Z85C30;
+		}
+	}
+	write_scc(priv, R15, 0);
 
-  /* Wait and detect IRQ */
-  time = jiffies; while (jiffies - time < 2 + HZ / TMR_0_HZ);
-  irq = probe_irq_off(irqs);
+	/* Start IRQ auto-detection */
+	irqs = probe_irq_on();
 
-  /* Clear pending interrupt, disable interrupts */
-  if (type == TYPE_TWIN) {
-    inb(card_base + TWIN_CLR_TMR1);
-  } else {
-    write_scc(priv, R1, 0);
-    write_scc(priv, R15, 0);
-    write_scc(priv, R0, RES_EXT_INT);
-  }
+	/* Enable interrupts */
+	if (type == TYPE_TWIN) {
+		outb(0, card_base + TWIN_DMA_CFG);
+		inb(card_base + TWIN_CLR_TMR1);
+		inb(card_base + TWIN_CLR_TMR2);
+		info->twin_serial_cfg = TWIN_EI;
+		outb(info->twin_serial_cfg, card_base + TWIN_SERIAL_CFG);
+	} else {
+		write_scc(priv, R15, CTSIE);
+		write_scc(priv, R0, RES_EXT_INT);
+		write_scc(priv, R1, EXT_INT_ENAB);
+	}
 
-  if (irq <= 0) {
-    printk(KERN_ERR "dmascc: could not find irq of %s at %#3x (irq=%d)\n",
-	   hw[type].name, card_base, irq);
-    kfree(info);
-    return -1;
-  }
+	/* Start timer */
+	outb(1, tmr_base + TMR_CNT1);
+	outb(0, tmr_base + TMR_CNT1);
 
-  /* Set up data structures */
-  for (i = 0; i < 2; i++) {
-    dev = &info->dev[i];
-    priv = &info->priv[i];
-    priv->type = type;
-    priv->chip = chip;
-    priv->dev = dev;
-    priv->info = info;
-    priv->channel = i;
-    spin_lock_init(&priv->ring_lock);
-    priv->register_lock = &info->register_lock;
-    priv->card_base = card_base;
-    priv->scc_cmd = scc_base + (i ? SCCB_CMD : SCCA_CMD);
-    priv->scc_data = scc_base + (i ? SCCB_DATA : SCCA_DATA);
-    priv->tmr_cnt = tmr_base + (i ? TMR_CNT2 : TMR_CNT1);
-    priv->tmr_ctrl = tmr_base + TMR_CTRL;
-    priv->tmr_mode = i ? 0xb0 : 0x70;
-    priv->param.pclk_hz = hw[type].pclk_hz;
-    priv->param.brg_tc = -1;
-    priv->param.clocks = TCTRxCP | RCRTxCP;
-    priv->param.persist = 256;
-    priv->param.dma = -1;
-    INIT_WORK(&priv->rx_work, rx_bh, priv);
-    dev->priv = priv;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,0)
-    if (sizeof(dev->name) == sizeof(char *)) dev->name = priv->name;
-#endif
-    sprintf(dev->name, "dmascc%i", 2*n+i);
-    SET_MODULE_OWNER(dev);
-    dev->base_addr = card_base;
-    dev->irq = irq;
-    dev->open = scc_open;
-    dev->stop = scc_close;
-    dev->do_ioctl = scc_ioctl;
-    dev->hard_start_xmit = scc_send_packet;
-    dev->get_stats = scc_get_stats;
-    dev->hard_header = ax25_encapsulate;
-    dev->rebuild_header = ax25_rebuild_header;
-    dev->set_mac_address = scc_set_mac_address;
-    dev->type = ARPHRD_AX25;
-    dev->hard_header_len = 73;
-    dev->mtu = 1500;
-    dev->addr_len = 7;
-    dev->tx_queue_len = 64;
-    memcpy(dev->broadcast, ax25_broadcast, 7);
-    memcpy(dev->dev_addr, ax25_test, 7);
-    rtnl_lock();
-    if (register_netdevice(dev)) {
-      printk(KERN_ERR "dmascc: could not register %s\n", dev->name);
-    }
-    rtnl_unlock();
-  }
+	/* Wait and detect IRQ */
+	time = jiffies; while (jiffies - time < 2 + HZ / TMR_0_HZ);
+	irq = probe_irq_off(irqs);
+
+	/* Clear pending interrupt, disable interrupts */
+	if (type == TYPE_TWIN) {
+		inb(card_base + TWIN_CLR_TMR1);
+	} else {
+		write_scc(priv, R1, 0);
+		write_scc(priv, R15, 0);
+		write_scc(priv, R0, RES_EXT_INT);
+	}
+
+	if (irq <= 0) {
+		printk(KERN_ERR "dmascc: could not find irq of %s at %#3x (irq=%d)\n",
+			hw[type].name, card_base, irq);
+		goto out3;
+	}
+
+	/* Set up data structures */
+	for (i = 0; i < 2; i++) {
+		dev = info->dev[i];
+		priv = &info->priv[i];
+		priv->type = type;
+		priv->chip = chip;
+		priv->dev = dev;
+		priv->info = info;
+		priv->channel = i;
+		spin_lock_init(&priv->ring_lock);
+		priv->register_lock = &info->register_lock;
+		priv->card_base = card_base;
+		priv->scc_cmd = scc_base + (i ? SCCB_CMD : SCCA_CMD);
+		priv->scc_data = scc_base + (i ? SCCB_DATA : SCCA_DATA);
+		priv->tmr_cnt = tmr_base + (i ? TMR_CNT2 : TMR_CNT1);
+		priv->tmr_ctrl = tmr_base + TMR_CTRL;
+		priv->tmr_mode = i ? 0xb0 : 0x70;
+		priv->param.pclk_hz = hw[type].pclk_hz;
+		priv->param.brg_tc = -1;
+		priv->param.clocks = TCTRxCP | RCRTxCP;
+		priv->param.persist = 256;
+		priv->param.dma = -1;
+		INIT_WORK(&priv->rx_work, rx_bh, priv);
+		dev->priv = priv;
+		sprintf(dev->name, "dmascc%i", 2*n+i);
+		SET_MODULE_OWNER(dev);
+		dev->base_addr = card_base;
+		dev->irq = irq;
+		dev->open = scc_open;
+		dev->stop = scc_close;
+		dev->do_ioctl = scc_ioctl;
+		dev->hard_start_xmit = scc_send_packet;
+		dev->get_stats = scc_get_stats;
+		dev->hard_header = ax25_encapsulate;
+		dev->rebuild_header = ax25_rebuild_header;
+		dev->set_mac_address = scc_set_mac_address;
+	}
+	if (register_netdev(info->dev[0])) {
+		printk(KERN_ERR "dmascc: could not register %s\n",
+				info->dev[0]->name);
+		goto out3;
+	}
+	if (register_netdev(info->dev[1])) {
+		printk(KERN_ERR "dmascc: could not register %s\n",
+				info->dev[1]->name);
+		goto out4;
+	}
 
 
-  info->next = first;
-  first = info;
-  printk(KERN_INFO "dmascc: found %s (%s) at %#3x, irq %d\n", hw[type].name,
-	 chipnames[chip], card_base, irq);
-  return 0;
+	info->next = first;
+	first = info;
+	printk(KERN_INFO "dmascc: found %s (%s) at %#3x, irq %d\n", hw[type].name,
+	chipnames[chip], card_base, irq);
+	return 0;
+
+out4:
+	unregister_netdev(info->dev[0]);
+out3:
+	if (info->priv[0].type == TYPE_TWIN)
+		outb(0, info->dev[0]->base_addr + TWIN_SERIAL_CFG);
+	write_scc(&info->priv[0], R9, FHWRES);
+	free_netdev(info->dev[1]);
+out2:
+	free_netdev(info->dev[0]);
+out1:
+	kfree(info);
+out:
+	return -1;
 }
 
 

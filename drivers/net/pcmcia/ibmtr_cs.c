@@ -125,8 +125,7 @@ static void ibmtr_detach(dev_link_t *);
 
 static dev_link_t *dev_list;
 
-extern int ibmtr_probe(struct net_device *dev);
-extern int trdev_init(struct net_device *dev);
+extern int ibmtr_probe_card(struct net_device *dev);
 extern irqreturn_t tok_interrupt (int irq, void *dev_id, struct pt_regs *regs);
 
 /*====================================================================*/
@@ -199,7 +198,6 @@ static dev_link_t *ibmtr_attach(void)
 
     link->irq.Instance = info->dev = dev;
     
-    dev->init = &ibmtr_probe;
     SET_ETHTOOL_OPS(dev, &netdev_ethtool_ops);
 
     /* Register with Card Services */
@@ -253,6 +251,10 @@ static void ibmtr_detach(dev_link_t *link)
         return;
 
     dev = info->dev;
+
+    if (link->dev)
+	unregister_netdev(dev);
+
     {
 	struct tok_info *ti = (struct tok_info *)dev->priv;
 	del_timer_sync(&(ti->tr_timer));
@@ -265,7 +267,6 @@ static void ibmtr_detach(dev_link_t *link)
 
     /* Unlink device structure, free bits */
     *linkp = link->next;
-    unregister_netdev(dev);
     free_netdev(dev);
     kfree(info); 
 } /* ibmtr_detach */
@@ -366,7 +367,7 @@ static void ibmtr_config(dev_link_t *link)
         Adapters Technical Reference"  SC30-3585 for this info.  */
     ibmtr_hw_setup(dev, mmiobase);
 
-    i = register_netdev(dev);
+    i = ibmtr_probe_card(dev);
     
     if (i != 0) {
 	printk(KERN_NOTICE "ibmtr_cs: register_netdev() failed\n");
@@ -469,7 +470,7 @@ static int ibmtr_event(event_t event, int priority,
         if (link->state & DEV_CONFIG) {
             pcmcia_request_configuration(link->handle, &link->conf);
             if (link->open) {
-		(dev->init)(dev);
+		ibmtr_probe(dev);	/* really? */
 		netif_device_attach(dev);
             }
         }

@@ -289,7 +289,6 @@ typedef struct _synclinkmp_info {
 	char netname[10];
 	struct net_device *netdev;
 	struct net_device_stats netstats;
-	struct net_device netdevice;
 #endif
 } SLMP_INFO;
 
@@ -1627,35 +1626,44 @@ static void set_break(struct tty_struct *tty, int break_state)
 
 /* syncppp support and callbacks */
 
+static void cb_setup(struct net_device *dev)
+{
+	dev->open = sppp_cb_open;
+	dev->stop = sppp_cb_close;
+	dev->hard_start_xmit = sppp_cb_tx;
+	dev->do_ioctl = sppp_cb_ioctl;
+	dev->get_stats = sppp_cb_net_stats;
+	dev->tx_timeout = sppp_cb_tx_timeout;
+	dev->watchdog_timeo = 10*HZ;
+}
+
 static void sppp_init(SLMP_INFO *info)
 {
 	struct net_device *d;
 
 	sprintf(info->netname,"mgslm%dp%d",info->adapter_num,info->port_num);
 
+	d = alloc_netdev(0, info->netname, cb_setup);
+	if (!d) {
+		printk(KERN_WARNING "%s: alloc_netdev failed.\n",
+						info->netname);
+		return;
+	}
+
 	info->if_ptr = &info->pppdev;
-	info->netdev = info->pppdev.dev = &info->netdevice;
+	info->netdev = info->pppdev.dev = d;
 
 	sppp_attach(&info->pppdev);
 
-	d = info->netdev;
-	strcpy(d->name,info->netname);
-	d->base_addr = 0;
 	d->irq = info->irq_level;
-	d->dma = 0;
 	d->priv = info;
-	d->init = NULL;
-	d->open = sppp_cb_open;
-	d->stop = sppp_cb_close;
-	d->hard_start_xmit = sppp_cb_tx;
-	d->do_ioctl = sppp_cb_ioctl;
-	d->get_stats = sppp_cb_net_stats;
-	d->tx_timeout = sppp_cb_tx_timeout;
-	d->watchdog_timeo = 10*HZ;
 
 	if (register_netdev(d)) {
 		printk(KERN_WARNING "%s: register_netdev failed.\n", d->name);
 		sppp_detach(info->netdev);
+		info->netdev = NULL;
+		info->pppdev.dev = NULL;
+		free_netdev(d);
 		return;
 	}
 
@@ -1667,8 +1675,11 @@ static void sppp_delete(SLMP_INFO *info)
 {
 	if (debug_level >= DEBUG_LEVEL_INFO)
 		printk("sppp_delete(%s)\n",info->netname);
-	sppp_detach(info->netdev);
 	unregister_netdev(info->netdev);
+	sppp_detach(info->netdev);
+	free_netdev(info->netdev);
+	info->netdev = NULL;
+	info->pppdev.dev = NULL;
 }
 
 static int sppp_cb_open(struct net_device *d)

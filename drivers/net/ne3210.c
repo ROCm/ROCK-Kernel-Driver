@@ -111,12 +111,6 @@ static int __init ne3210_eisa_probe (struct device *device)
 	device->driver_data = dev;
 	ioaddr = edev->base_addr;
 
-	if (ethdev_init (dev)) {
-		printk ("ne3210.c: unable to allocate memory for dev->priv!\n");
-		retval = -ENOMEM;
-		goto out;
-	}
-
 	if (!request_region(ioaddr, NE3210_IO_EXTENT, dev->name)) {
 		retval = -EBUSY;
 		goto out;

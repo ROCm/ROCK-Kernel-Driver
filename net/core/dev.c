@@ -2960,7 +2960,7 @@ void free_netdev(struct net_device *dev)
 {
 	/*  Compatiablity with error handling in drivers */
 	if (dev->reg_state == NETREG_UNINITIALIZED) {
-		kfree(dev);
+		kfree((char *)dev - dev->padded);
 		return;
 	}
 

@@ -563,32 +563,20 @@ static int clip_setentry(struct atm_vcc *vcc,u32 ip)
 }
 
 
-static int clip_init(struct net_device *dev)
+static void clip_setup(struct net_device *dev)
 {
-	DPRINTK("clip_init %s\n",dev->name);
 	dev->hard_start_xmit = clip_start_xmit;
 	/* sg_xmit ... */
-	dev->hard_header = NULL;
-	dev->rebuild_header = NULL;
-	dev->set_mac_address = NULL;
-	dev->hard_header_parse = NULL;
-	dev->hard_header_cache = NULL;
-	dev->header_cache_update = NULL;
-	dev->change_mtu = NULL;
-	dev->do_ioctl = NULL;
 	dev->get_stats = clip_get_stats;
 	dev->type = ARPHRD_ATM;
 	dev->hard_header_len = RFC1483LLC_LEN;
 	dev->mtu = RFC1626_MTU;
-	dev->addr_len = 0;
 	dev->tx_queue_len = 100; /* "normal" queue (packets) */
 	    /* When using a "real" qdisc, the qdisc determines the queue */
 	    /* length. tx_queue_len is only used for the default case, */
 	    /* without any more elaborate queuing. 100 is a reasonable */
 	    /* compromise between decent burst-tolerance and protection */
 	    /* against memory hogs. */
-	dev->flags = 0;
-	return 0;
 }
 
 
@@ -608,18 +596,16 @@ static int clip_create(int number)
 			if (PRIV(dev)->number >= number)
 				number = PRIV(dev)->number+1;
 	}
-	dev = kmalloc(sizeof(struct net_device)+sizeof(struct clip_priv),
-	    GFP_KERNEL); 
-	if (!dev) return -ENOMEM;
-	memset(dev,0,sizeof(struct net_device)+sizeof(struct clip_priv));
+	dev = alloc_netdev(sizeof(struct clip_priv), "", clip_setup);
+	if (!dev)
+		return -ENOMEM;
 	clip_priv = PRIV(dev);
 	sprintf(dev->name,"atm%d",number);
-	dev->init = clip_init;
 	spin_lock_init(&clip_priv->xoff_lock);
 	clip_priv->number = number;
 	error = register_netdev(dev);
 	if (error) {
-		kfree(dev);
+		free_netdev(dev);
 		return error;
 	}
 	clip_priv->next = clip_devs;
@@ -634,7 +620,7 @@ static int clip_device_event(struct notifier_block *this,unsigned long event,
 {
 	/* ignore non-CLIP devices */
 	if (((struct net_device *) dev)->type != ARPHRD_ATM ||
-	    ((struct net_device *) dev)->init != clip_init)
+	    ((struct net_device *) dev)->hard_start_xmit != clip_start_xmit)
 		return NOTIFY_DONE;
 	switch (event) {
 		case NETDEV_UP:
