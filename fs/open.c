@@ -673,9 +673,11 @@ out:
 asmlinkage long sys_fchmod(unsigned int fd, mode_t mode)
 {
 	struct file * file;
-	int err = -EBADF;
+	int err;
 
 	FSHOOK_BEGIN(fchmod, err, .fd = fd, .mode = mode)
+
+	err = -EBADF;
 
 	file = fget(fd);
 	if (!file)
