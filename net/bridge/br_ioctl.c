@@ -20,13 +20,6 @@
 #include <asm/uaccess.h>
 #include "br_private.h"
 
-/* Report time remaining in user HZ  */
-static unsigned long timer_residue(const struct timer_list *timer)
-{
-	return timer_pending(timer) 
-		? jiffies_to_clock_t(timer->expires - jiffies) : 0;
-}
-
 /* called with RTNL */
 static int get_bridge_ifindices(int *indices, int num)
 {
@@ -139,10 +132,10 @@ int br_dev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		b.root_port = br->root_port;
 		b.stp_enabled = br->stp_enabled;
 		b.ageing_time = jiffies_to_clock_t(br->ageing_time);
-		b.hello_timer_value = timer_residue(&br->hello_timer);
-		b.tcn_timer_value = timer_residue(&br->tcn_timer);
-		b.topology_change_timer_value = timer_residue(&br->topology_change_timer);
-		b.gc_timer_value = timer_residue(&br->gc_timer);
+		b.hello_timer_value = br_timer_value(&br->hello_timer);
+		b.tcn_timer_value = br_timer_value(&br->tcn_timer);
+		b.topology_change_timer_value = br_timer_value(&br->topology_change_timer);
+		b.gc_timer_value = br_timer_value(&br->gc_timer);
 	        rcu_read_unlock();
 
 		if (copy_to_user((void *)args[1], &b, sizeof(b)))
@@ -237,9 +230,9 @@ int br_dev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		p.state = pt->state;
 		p.top_change_ack = pt->topology_change_ack;
 		p.config_pending = pt->config_pending;
-		p.message_age_timer_value = timer_residue(&pt->message_age_timer);
-		p.forward_delay_timer_value = timer_residue(&pt->forward_delay_timer);
-		p.hold_timer_value = timer_residue(&pt->hold_timer);
+		p.message_age_timer_value = br_timer_value(&pt->message_age_timer);
+		p.forward_delay_timer_value = br_timer_value(&pt->forward_delay_timer);
+		p.hold_timer_value = br_timer_value(&pt->hold_timer);
 
 		rcu_read_unlock();
 

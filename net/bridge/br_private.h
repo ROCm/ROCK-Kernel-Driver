@@ -205,5 +205,6 @@ extern int br_stp_handle_bpdu(struct sk_buff *skb);
 /* br_stp_timer.c */
 extern void br_stp_timer_init(struct net_bridge *br);
 extern void br_stp_port_timer_init(struct net_bridge_port *p);
+extern unsigned long br_timer_value(const struct timer_list *timer);
 
 #endif
