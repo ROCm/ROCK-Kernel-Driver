@@ -38,6 +38,9 @@
 #include <linux/unistd.h>
 #include <linux/stddef.h>
 #include <linux/highuid.h>
+#include <linux/personality.h>
+#include <linux/tty.h>
+#include <linux/binfmts.h>
 
 #include <asm/setup.h>
 #include <asm/uaccess.h>

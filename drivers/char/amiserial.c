@@ -89,7 +89,7 @@ static char *serial_version = "4.30";
 #include <asm/setup.h>
 
 #include <asm/system.h>
-#include <asm/io.h>
+
 #include <asm/irq.h>
 #include <asm/bitops.h>
 

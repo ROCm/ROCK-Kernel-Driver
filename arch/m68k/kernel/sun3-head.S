@@ -1,5 +1,6 @@
 #include <linux/linkage.h>
 
+#include <asm/entry.h>
 #include <asm/page.h>
 #include <asm/contregs.h>
 #include <asm/sun3-head.h>
