@@ -356,7 +356,7 @@ acpi_os_get_timer (void)
 	if (!t)
 		printk(KERN_ERR PREFIX "acpi_os_get_timer() TBD\n");
 
-	return(++t);
+	return ++t;
 }
 
 acpi_status
@@ -635,7 +635,7 @@ acpi_os_write_pci_configuration (
 	acpi_integer		value,
 	u32			width)
 {
-	return (AE_SUPPORT);
+	return AE_SUPPORT;
 }
 
 acpi_status
@@ -645,7 +645,7 @@ acpi_os_read_pci_configuration (
 	void			*value,
 	u32			width)
 {
-	return (AE_SUPPORT);
+	return AE_SUPPORT;
 }
 
 void
