@@ -591,7 +591,8 @@ struct nfs4_state_owner {
 struct nfs4_lock_state {
 	struct list_head	ls_locks;	/* Other lock stateids */
 	fl_owner_t		ls_owner;	/* POSIX lock owner */
-	struct nfs4_state *	ls_parent;	/* Parent nfs4_state */
+#define NFS_LOCK_INITIALIZED 1
+	int			ls_flags;
 	u32			ls_seqid;
 	u32			ls_id;
 	nfs4_stateid		ls_stateid;
@@ -644,6 +645,7 @@ extern int nfs4_wait_clnt_recover(struct rpc_clnt *, struct nfs4_client *);
 extern struct inode *nfs4_atomic_open(struct inode *, struct dentry *, struct nameidata *);
 extern int nfs4_open_revalidate(struct inode *, struct dentry *, int);
 extern int nfs4_handle_exception(struct nfs_server *, int, struct nfs4_exception *);
+extern int nfs4_lock_reclaim(struct nfs4_state *state, struct file_lock *request);
 
 /* nfs4renewd.c */
 extern void nfs4_schedule_state_renewal(struct nfs4_client *);
@@ -667,11 +669,11 @@ extern struct nfs4_state *nfs4_find_state(struct inode *, struct rpc_cred *, mod
 extern void nfs4_increment_seqid(int status, struct nfs4_state_owner *sp);
 extern void nfs4_schedule_state_recovery(struct nfs4_client *);
 extern struct nfs4_lock_state *nfs4_find_lock_state(struct nfs4_state *state, fl_owner_t);
-extern struct nfs4_lock_state *nfs4_alloc_lock_state(struct nfs4_state *state, fl_owner_t);
+extern struct nfs4_lock_state *nfs4_get_lock_state(struct nfs4_state *state, fl_owner_t);
 extern void nfs4_put_lock_state(struct nfs4_lock_state *state);
 extern void nfs4_increment_lock_seqid(int status, struct nfs4_lock_state *ls);
-extern void nfs4_notify_setlk(struct inode *, struct file_lock *, struct nfs4_lock_state *);
-extern void nfs4_notify_unlck(struct inode *, struct file_lock *, struct nfs4_lock_state *);
+extern void nfs4_notify_setlk(struct nfs4_state *, struct file_lock *, struct nfs4_lock_state *);
+extern void nfs4_notify_unlck(struct nfs4_state *, struct file_lock *, struct nfs4_lock_state *);
 extern void nfs4_copy_stateid(nfs4_stateid *, struct nfs4_state *, fl_owner_t);
 
 

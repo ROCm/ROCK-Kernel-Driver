@@ -40,6 +40,7 @@
 
 #include <linux/config.h>
 #include <linux/slab.h>
+#include <linux/smp_lock.h>
 #include <linux/nfs_fs.h>
 #include <linux/nfs_idmap.h>
 #include <linux/workqueue.h>
@@ -516,8 +517,7 @@ nfs4_find_lock_state(struct nfs4_state *state, fl_owner_t fl_owner)
  *
  * The caller must be holding state->lock_sema
  */
-struct nfs4_lock_state *
-nfs4_alloc_lock_state(struct nfs4_state *state, fl_owner_t fl_owner)
+static struct nfs4_lock_state *nfs4_alloc_lock_state(struct nfs4_state *state, fl_owner_t fl_owner)
 {
 	struct nfs4_lock_state *lsp;
 	struct nfs4_client *clp = state->owner->so_client;
@@ -525,16 +525,32 @@ nfs4_alloc_lock_state(struct nfs4_state *state, fl_owner_t fl_owner)
 	lsp = kmalloc(sizeof(*lsp), GFP_KERNEL);
 	if (lsp == NULL)
 		return NULL;
+	lsp->ls_flags = 0;
 	lsp->ls_seqid = 0;	/* arbitrary */
 	lsp->ls_id = -1; 
 	memset(lsp->ls_stateid.data, 0, sizeof(lsp->ls_stateid.data));
 	atomic_set(&lsp->ls_count, 1);
 	lsp->ls_owner = fl_owner;
-	lsp->ls_parent = state;
 	INIT_LIST_HEAD(&lsp->ls_locks);
 	spin_lock(&clp->cl_lock);
 	lsp->ls_id = nfs4_alloc_lockowner_id(clp);
 	spin_unlock(&clp->cl_lock);
+	return lsp;
+}
+
+/*
+ * Return a compatible lock_state. If no initialized lock_state structure
+ * exists, return an uninitialized one.
+ *
+ * The caller must be holding state->lock_sema and clp->cl_sem
+ */
+struct nfs4_lock_state *nfs4_get_lock_state(struct nfs4_state *state, fl_owner_t owner)
+{
+	struct nfs4_lock_state * lsp;
+	
+	lsp = nfs4_find_lock_state(state, owner);
+	if (lsp == NULL)
+		lsp = nfs4_alloc_lock_state(state, owner);
 	return lsp;
 }
 
@@ -588,13 +604,11 @@ nfs4_check_unlock(struct file_lock *fl, struct file_lock *request)
 /*
  * Post an initialized lock_state on the state->lock_states list.
  */
-void
-nfs4_notify_setlk(struct inode *inode, struct file_lock *request, struct nfs4_lock_state *lsp)
+void nfs4_notify_setlk(struct nfs4_state *state, struct file_lock *request, struct nfs4_lock_state *lsp)
 {
-	struct nfs4_state *state = lsp->ls_parent;
-
 	if (!list_empty(&lsp->ls_locks))
 		return;
+	atomic_inc(&lsp->ls_count);
 	write_lock(&state->state_lock);
 	list_add(&lsp->ls_locks, &state->lock_states);
 	set_bit(LK_STATE_IN_USE, &state->flags);
@@ -611,9 +625,9 @@ nfs4_notify_setlk(struct inode *inode, struct file_lock *request, struct nfs4_lo
  *
  */
 void
-nfs4_notify_unlck(struct inode *inode, struct file_lock *request, struct nfs4_lock_state *lsp)
+nfs4_notify_unlck(struct nfs4_state *state, struct file_lock *request, struct nfs4_lock_state *lsp)
 {
-	struct nfs4_state *state = lsp->ls_parent;
+	struct inode *inode = state->inode;
 	struct file_lock *fl;
 
 	for (fl = inode->i_flock; fl != NULL; fl = fl->fl_next) {
@@ -631,6 +645,7 @@ nfs4_notify_unlck(struct inode *inode, struct file_lock *request, struct nfs4_lo
 	if (list_empty(&state->lock_states))
 		clear_bit(LK_STATE_IN_USE, &state->flags);
 	write_unlock(&state->state_lock);
+	nfs4_put_lock_state(lsp);
 }
 
 /*
@@ -642,8 +657,7 @@ nfs4_put_lock_state(struct nfs4_lock_state *lsp)
 {
 	if (!atomic_dec_and_test(&lsp->ls_count))
 		return;
-	if (!list_empty(&lsp->ls_locks))
-		return;
+	BUG_ON (!list_empty(&lsp->ls_locks));
 	kfree(lsp);
 }
 
@@ -705,18 +719,62 @@ nfs4_schedule_state_recovery(struct nfs4_client *clp)
 		schedule_work(&clp->cl_recoverd);
 }
 
-static int
-nfs4_reclaim_open_state(struct nfs4_state_owner *sp)
+static int nfs4_reclaim_locks(struct nfs4_state *state)
+{
+	struct inode *inode = state->inode;
+	struct file_lock *fl;
+	int status = 0;
+
+	for (fl = inode->i_flock; fl != 0; fl = fl->fl_next) {
+		if (!(fl->fl_flags & FL_POSIX))
+			continue;
+		if ((struct nfs4_state *)fl->fl_file->private_data != state)
+			continue;
+		status = nfs4_lock_reclaim(state, fl);
+		if (status >= 0)
+			continue;
+		switch (status) {
+			default:
+				printk(KERN_ERR "%s: unhandled error %d. Zeroing state\n",
+						__FUNCTION__, status);
+			case -NFS4ERR_EXPIRED:
+			case -NFS4ERR_NO_GRACE:
+			case -NFS4ERR_RECLAIM_BAD:
+			case -NFS4ERR_RECLAIM_CONFLICT:
+				/* kill_proc(fl->fl_owner, SIGLOST, 1); */
+				break;
+			case -NFS4ERR_STALE_CLIENTID:
+				goto out_err;
+		}
+	}
+	return 0;
+out_err:
+	return status;
+}
+
+static int nfs4_reclaim_open_state(struct nfs4_state_owner *sp)
 {
 	struct nfs4_state *state;
+	struct nfs4_lock_state *lock;
 	int status = 0;
 
 	list_for_each_entry(state, &sp->so_states, open_states) {
 		if (state->state == 0)
 			continue;
 		status = nfs4_open_reclaim(sp, state);
-		if (status >= 0)
+		list_for_each_entry(lock, &state->lock_states, ls_locks)
+			lock->ls_flags &= ~NFS_LOCK_INITIALIZED;
+		if (status >= 0) {
+			status = nfs4_reclaim_locks(state);
+			if (status < 0)
+				goto out_err;
+			list_for_each_entry(lock, &state->lock_states, ls_locks) {
+				if (!(lock->ls_flags & NFS_LOCK_INITIALIZED))
+					printk("%s: Lock reclaim failed!\n",
+							__FUNCTION__);
+			}
 			continue;
+		}
 		switch (status) {
 			default:
 				printk(KERN_ERR "%s: unhandled error %d. Zeroing state\n",
@@ -757,6 +815,7 @@ static int reclaimer(void *ptr)
 	complete(&args->complete);
 
 	/* Ensure exclusive access to NFSv4 state */
+	lock_kernel();
 	down_write(&clp->cl_sem);
 	/* Are there any NFS mounts out there? */
 	if (list_empty(&clp->cl_superblocks))
@@ -780,6 +839,7 @@ restart_loop:
 out:
 	set_bit(NFS4CLNT_OK, &clp->cl_state);
 	up_write(&clp->cl_sem);
+	unlock_kernel();
 	wake_up_all(&clp->cl_waitq);
 	rpc_wake_up(&clp->cl_rpcwaitq);
 	nfs4_put_client(clp);

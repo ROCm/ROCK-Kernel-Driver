@@ -2192,16 +2192,19 @@ static int _nfs4_proc_unlck(struct nfs4_state *state, int cmd, struct file_lock 
 	lsp = nfs4_find_lock_state(state, request->fl_owner);
 	if (!lsp)
 		goto out;
-	luargs.seqid = lsp->ls_seqid;
-	memcpy(&luargs.stateid, &lsp->ls_stateid, sizeof(luargs.stateid));
-	arg.u.locku = &luargs;
-	status = rpc_call_sync(server->client, &msg, 0);
-	nfs4_increment_lock_seqid(status, lsp);
+	/* We might have lost the locks! */
+	if ((lsp->ls_flags & NFS_LOCK_INITIALIZED) != 0) {
+		luargs.seqid = lsp->ls_seqid;
+		memcpy(&luargs.stateid, &lsp->ls_stateid, sizeof(luargs.stateid));
+		arg.u.locku = &luargs;
+		status = rpc_call_sync(server->client, &msg, 0);
+		nfs4_increment_lock_seqid(status, lsp);
+	}
 
 	if (status == 0) {
 		memcpy(&lsp->ls_stateid,  &res.u.stateid, 
 				sizeof(lsp->ls_stateid));
-		nfs4_notify_unlck(inode, request, lsp);
+		nfs4_notify_unlck(state, request, lsp);
 	}
 	nfs4_put_lock_state(lsp);
 out:
@@ -2225,11 +2228,10 @@ static int nfs4_proc_unlck(struct nfs4_state *state, int cmd, struct file_lock *
 	return err;
 }
 
-static int _nfs4_proc_setlk(struct nfs4_state *state, int cmd, struct file_lock *request)
+static int _nfs4_do_setlk(struct nfs4_state *state, int cmd, struct file_lock *request, int reclaim)
 {
 	struct inode *inode = state->inode;
 	struct nfs_server *server = NFS_SERVER(inode);
-	struct nfs4_client *clp = server->nfs4_state;
 	struct nfs4_lock_state *lsp;
 	struct nfs_lockargs arg = {
 		.fh = NFS_FH(inode),
@@ -2247,24 +2249,22 @@ static int _nfs4_proc_setlk(struct nfs4_state *state, int cmd, struct file_lock 
 		.rpc_cred	= state->owner->so_cred,
 	};
 	struct nfs_lock_opargs largs = {
+		.reclaim = reclaim,
 		.new_lock_owner = 0,
 	};
 	int status;
 
-	down_read(&clp->cl_sem);
-	down(&state->lock_sema);
-	lsp = nfs4_find_lock_state(state, request->fl_owner);
-	if (lsp == NULL) {
+	lsp = nfs4_get_lock_state(state, request->fl_owner);
+	if (lsp == NULL)
+		return -ENOMEM;
+	if (!(lsp->ls_flags & NFS_LOCK_INITIALIZED)) {
 		struct nfs4_state_owner *owner = state->owner;
 		struct nfs_open_to_lock otl = {
 			.lock_owner = {
 				.clientid = server->nfs4_state->cl_clientid,
 			},
 		};
-		status = -ENOMEM;
-		lsp = nfs4_alloc_lock_state(state, request->fl_owner);
-		if (!lsp)
-			goto out;
+
 		otl.lock_seqid = lsp->ls_seqid;
 		otl.lock_owner.id = lsp->ls_id;
 		memcpy(&otl.open_stateid, &state->stateid, sizeof(otl.open_stateid));
@@ -2293,11 +2293,28 @@ static int _nfs4_proc_setlk(struct nfs4_state *state, int cmd, struct file_lock 
 	/* save the returned stateid. */
 	if (status == 0) {
 		memcpy(&lsp->ls_stateid, &res.u.stateid, sizeof(nfs4_stateid));
-		nfs4_notify_setlk(inode, request, lsp);
+		lsp->ls_flags |= NFS_LOCK_INITIALIZED;
+		if (!reclaim)
+			nfs4_notify_setlk(state, request, lsp);
 	} else if (status == -NFS4ERR_DENIED)
 		status = -EAGAIN;
 	nfs4_put_lock_state(lsp);
-out:
+	return status;
+}
+
+int nfs4_lock_reclaim(struct nfs4_state *state, struct file_lock *request)
+{
+	return _nfs4_do_setlk(state, F_SETLK64, request, 1);
+}
+
+static int _nfs4_proc_setlk(struct nfs4_state *state, int cmd, struct file_lock *request)
+{
+	struct nfs4_client *clp = state->owner->so_client;
+	int status;
+
+	down_read(&clp->cl_sem);
+	down(&state->lock_sema);
+	status = _nfs4_do_setlk(state, cmd, request, 0);
 	up(&state->lock_sema);
 	if (status == 0) {
 		/* Note: we always want to sleep here! */
