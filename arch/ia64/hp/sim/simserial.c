@@ -7,9 +7,9 @@
  * case means sys_sim.c console (goes via the simulator). The code hereafter
  * is completely leveraged from the serial.c driver.
  *
- * Copyright (C) 1999-2000 Hewlett-Packard Co
- * Copyright (C) 1999 Stephane Eranian <eranian@hpl.hp.com>
- * Copyright (C) 2000 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1999-2000, 2002 Hewlett-Packard Co
+ *	Stephane Eranian <eranian@hpl.hp.com>
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
  *
  * 02/04/00 D. Mosberger	Merged in serial.c bug fixes in rs_close().
  * 02/25/00 D. Mosberger	Synced up with 2.3.99pre-5 version of serial.c.
@@ -24,7 +24,7 @@
 #include <linux/major.h>
 #include <linux/fcntl.h>
 #include <linux/mm.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/console.h>
 #include <linux/module.h>
 #include <linux/serial.h>

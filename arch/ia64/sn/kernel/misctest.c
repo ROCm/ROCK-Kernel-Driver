@@ -75,7 +75,7 @@ sgi_mcatest(void)
 	if (mcatest == 5) {
 		int zzzspec(long);
 		int	i;
-		long	flags, dcr, res, val, addr=0xff00000000UL;
+		long	psr, dcr, res, val, addr=0xff00000000UL;
 
 		dcr = ia64_get_dcr();
 		for (i=0; i<5; i++) {
@@ -87,11 +87,11 @@ sgi_mcatest(void)
 			ia64_set_dcr(dcr);
 			res = ia64_sn_probe_io_slot(0xff00000000UL, 8, &val);
 			printk("zzzspec: probe %ld, 0x%lx\n", res, val);
-			ia64_clear_ic(flags);
+			psr = ia64_clear_ic();
 			ia64_itc(0x2, 0xe00000ff00000000UL,
 			          pte_val(mk_pte_phys(0xff00000000UL,
 				  __pgprot(__DIRTY_BITS|_PAGE_PL_0|_PAGE_AR_RW))), _PAGE_SIZE_256M);
-			local_irq_restore(flags);
+			ia64_set_psr(psr);
 			ia64_srlz_i ();
 		}
 
