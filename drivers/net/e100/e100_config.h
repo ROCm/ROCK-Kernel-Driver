@@ -163,5 +163,5 @@ extern void e100_config_force_dplx(struct e100_private *bdp);
 extern u8 e100_config_loopback_mode(struct e100_private *bdp, u8 mode);
 extern u8 e100_config_dynamic_tbd(struct e100_private *bdp, u8 enable);
 extern u8 e100_config_tcb_ext_enable(struct e100_private *bdp, u8 enable);
-
+extern void e100_config_vlan_drop(struct e100_private *bdp, unsigned char enable);
 #endif /* _E100_CONFIG_INC_ */

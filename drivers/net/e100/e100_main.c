@@ -146,6 +146,10 @@ char e100_driver_version[]="2.2.21-k1";
 const char *e100_full_driver_name = "Intel(R) PRO/100 Network Driver";
 char e100_short_driver_name[] = "e100";
 static int e100nics = 0;
+static void e100_vlan_rx_register(struct net_device *netdev, struct vlan_group
+		*grp);
+static void e100_vlan_rx_add_vid(struct net_device *netdev, u16 vid);
+static void e100_vlan_rx_kill_vid(struct net_device *netdev, u16 vid);
 
 #ifdef CONFIG_PM
 static int e100_notify_reboot(struct notifier_block *, unsigned long event, void *ptr);
@@ -651,6 +655,9 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
                 goto err_pci;
 	}
 	
+	dev->vlan_rx_register = e100_vlan_rx_register;
+	dev->vlan_rx_add_vid = e100_vlan_rx_add_vid;
+	dev->vlan_rx_kill_vid = e100_vlan_rx_kill_vid;
 	dev->irq = pcid->irq;
 	dev->open = &e100_open;
 	dev->hard_start_xmit = &e100_xmit_frame;
@@ -660,9 +667,11 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
 	dev->set_multicast_list = &e100_set_multi;
 	dev->set_mac_address = &e100_set_mac;
 	dev->do_ioctl = &e100_ioctl;
-	if (bdp->flags & USE_IPCB) {
-		dev->features |= NETIF_F_SG | NETIF_F_IP_CSUM;
-	}
+
+	if (bdp->flags & USE_IPCB)
+	dev->features = NETIF_F_SG | NETIF_F_HW_CSUM |
+			NETIF_F_HW_VLAN_TX | NETIF_F_HW_VLAN_RX;
+		
 	e100nics++;
 
 	e100_get_speed_duplex_caps(bdp);
@@ -1998,17 +2007,15 @@ e100_rx_srv(struct e100_private *bdp)
 		} else {
 			skb->ip_summed = CHECKSUM_NONE;
 		}
-		switch (netif_rx(skb)) {
-		case NET_RX_BAD:
-		case NET_RX_DROP:
-		case NET_RX_CN_MOD:
-		case NET_RX_CN_HIGH:
-			break;
-		default:
-			bdp->drv_stats.net_stats.rx_bytes += skb->len;
-			break;
-		}
 
+		if(bdp->vlgrp && (rfd_status & CB_STATUS_VLAN)) {
+			vlan_hwaccel_rx(skb, bdp->vlgrp, be16_to_cpu(rfd->vlanid));
+		} else {
+			netif_rx(skb);
+		}
+		dev->last_rx = jiffies;
+		bdp->drv_stats.net_stats.rx_bytes += skb->len;
+		
 		rfd_cnt++;
 	}			/* end of rfd loop */
 
@@ -2101,6 +2108,11 @@ e100_prepare_xmit_buff(struct e100_private *bdp, struct sk_buff *skb)
 		tcb->tcbu.ipcb.ip_schedule &= ~IPCB_TCPUDP_CHECKSUM_ENABLE;
 	}
 
+	if(bdp->vlgrp && vlan_tx_tag_present(skb)) {
+		(tcb->tcbu).ipcb.ip_activation_high |= IPCB_INSERTVLAN_ENABLE;
+		(tcb->tcbu).ipcb.vlan = cpu_to_be16(vlan_tx_tag_get(skb));
+	}
+	
 	tcb->tcb_hdr.cb_status = 0;
 	tcb->tcb_thrshld = bdp->tx_thld;
 	tcb->tcb_hdr.cb_cmd |= __constant_cpu_to_le16(CB_S_BIT);
@@ -4020,6 +4032,45 @@ exit:
 			netif_wake_queue(bdp->device);
 	}
 	spin_unlock_bh(&(bdp->bd_non_tx_lock));
+}
+
+static void
+e100_vlan_rx_register(struct net_device *netdev, struct vlan_group *grp)
+{
+	struct e100_private *bdp = netdev->priv;
+
+	e100_disable_clear_intr(bdp);
+	bdp->vlgrp = grp;
+
+	if(grp) {
+		/* enable VLAN tag insert/strip */
+		e100_config_vlan_drop(bdp, true);
+
+	} else {
+		/* disable VLAN tag insert/strip */
+		e100_config_vlan_drop(bdp, false);
+	}
+
+	e100_config(bdp);
+	e100_set_intr_mask(bdp);
+}
+
+static void
+e100_vlan_rx_add_vid(struct net_device *netdev, u16 vid)
+{
+	/* We don't do Vlan filtering */
+	return;
+}
+
+static void
+e100_vlan_rx_kill_vid(struct net_device *netdev, u16 vid)
+{
+	struct e100_private *bdp = netdev->priv;
+
+	if(bdp->vlgrp)
+		bdp->vlgrp->vlan_devices[vid] = NULL;
+	/* We don't do Vlan filtering */
+	return;
 }
 
 #ifdef CONFIG_PM

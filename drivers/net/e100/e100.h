@@ -57,6 +57,7 @@
 #include <linux/if.h>
 #include <asm/uaccess.h>
 #include <linux/ip.h>
+#include <linux/if_vlan.h>
 
 #define E100_REGS_LEN 1
 /*
@@ -358,7 +359,7 @@ struct driver_stats {
 #define CB_STATUS_MASK          BIT_12_15	/* CB Status Mask (4-bits) */
 #define CB_STATUS_COMPLETE      BIT_15	/* CB Complete Bit */
 #define CB_STATUS_OK            BIT_13	/* CB OK Bit */
-#define CB_STATUS_UNDERRUN      BIT_12	/* CB A Bit */
+#define CB_STATUS_VLAN          BIT_12 /* CB Valn detected Bit */
 #define CB_STATUS_FAIL          BIT_11	/* CB Fail (F) Bit */
 
 /*misc command bits */
@@ -851,6 +852,7 @@ struct ethtool_lpbk_data{
 };
 
 struct e100_private {
+	struct vlan_group *vlgrp;
 	u32 flags;		/* board management flags */
 	u32 tx_per_underrun;	/* number of good tx frames per underrun */
 	unsigned int tx_count;	/* count of tx frames, so we can request an interrupt */

@@ -521,6 +521,25 @@ e100_config_wol(struct e100_private *bdp)
 	spin_unlock_bh(&(bdp->config_lock));
 }
 
+void
+e100_config_vlan_drop(struct e100_private *bdp, unsigned char enable)
+{
+	spin_lock_bh(&(bdp->config_lock));
+	if (enable) {
+		if (!(bdp->config[22] & CB_CFIG_VLAN_DROP_ENABLE)) {
+			bdp->config[22] |= CB_CFIG_VLAN_DROP_ENABLE;
+			E100_CONFIG(bdp, 22);
+		}
+
+	} else {
+		if ((bdp->config[22] & CB_CFIG_VLAN_DROP_ENABLE)) {
+			bdp->config[22] &= ~CB_CFIG_VLAN_DROP_ENABLE;
+			E100_CONFIG(bdp, 22);
+		}
+	}
+	spin_unlock_bh(&(bdp->config_lock));
+}
+
 /**
  * e100_config_loopback_mode
  * @bdp: atapter's private data struct
