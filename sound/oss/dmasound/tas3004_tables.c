@@ -2,169 +2,169 @@
 #include "tas_eq_prefs.h"
 
 static struct tas_drce_t eqp_17_1_0_drce={
-    enable:    1,
-    above:     { val: 3.0 * (1<<8), expand: 0 },
-    below:     { val: 1.0 * (1<<8), expand: 0 },
-    threshold: -19.12  * (1<<8),
-    energy:    2.4     * (1<<12),
-    attack:    0.013   * (1<<12),
-    decay:     0.212   * (1<<12),
+    .enable     = 1,
+    .above      = { .val = 3.0 * (1<<8), .expand = 0 },
+    .below      = { .val = 1.0 * (1<<8), .expand = 0 },
+    .threshold  = -19.12  * (1<<8),
+    .energy     = 2.4     * (1<<12),
+    .attack     = 0.013   * (1<<12),
+    .decay      = 0.212   * (1<<12),
 };
 
 static struct tas_biquad_ctrl_t eqp_17_1_0_biquads[]={
-  { channel: 0, filter: 0, data: { coeff: { 0x0fd0d4, 0xe05e56, 0x0fd0d4, 0xe05ee1, 0x0fa234 } } },
-  { channel: 0, filter: 1, data: { coeff: { 0x0910d7, 0x088e1a, 0x030651, 0x01dcb1, 0x02c892 } } },
-  { channel: 0, filter: 2, data: { coeff: { 0x0ff895, 0xe0970b, 0x0f7f00, 0xe0970b, 0x0f7795 } } },
-  { channel: 0, filter: 3, data: { coeff: { 0x0fd1c4, 0xe1ac22, 0x0ec8cf, 0xe1ac22, 0x0e9a94 } } },
-  { channel: 0, filter: 4, data: { coeff: { 0x0f7c1c, 0xe3cc03, 0x0df786, 0xe3cc03, 0x0d73a2 } } },
-  { channel: 0, filter: 5, data: { coeff: { 0x11fb92, 0xf5a1a0, 0x073cd2, 0xf5a1a0, 0x093865 } } },
-  { channel: 0, filter: 6, data: { coeff: { 0x0e17a9, 0x068b6c, 0x08a0e5, 0x068b6c, 0x06b88e } } },
+  { .channel = 0, .filter = 0, .data = { .coeff = { 0x0fd0d4, 0xe05e56, 0x0fd0d4, 0xe05ee1, 0x0fa234 } } },
+  { .channel = 0, .filter = 1, .data = { .coeff = { 0x0910d7, 0x088e1a, 0x030651, 0x01dcb1, 0x02c892 } } },
+  { .channel = 0, .filter = 2, .data = { .coeff = { 0x0ff895, 0xe0970b, 0x0f7f00, 0xe0970b, 0x0f7795 } } },
+  { .channel = 0, .filter = 3, .data = { .coeff = { 0x0fd1c4, 0xe1ac22, 0x0ec8cf, 0xe1ac22, 0x0e9a94 } } },
+  { .channel = 0, .filter = 4, .data = { .coeff = { 0x0f7c1c, 0xe3cc03, 0x0df786, 0xe3cc03, 0x0d73a2 } } },
+  { .channel = 0, .filter = 5, .data = { .coeff = { 0x11fb92, 0xf5a1a0, 0x073cd2, 0xf5a1a0, 0x093865 } } },
+  { .channel = 0, .filter = 6, .data = { .coeff = { 0x0e17a9, 0x068b6c, 0x08a0e5, 0x068b6c, 0x06b88e } } },
 
-  { channel: 1, filter: 0, data: { coeff: { 0x0fd0d4, 0xe05e56, 0x0fd0d4, 0xe05ee1, 0x0fa234 } } },
-  { channel: 1, filter: 1, data: { coeff: { 0x0910d7, 0x088e1a, 0x030651, 0x01dcb1, 0x02c892 } } },
-  { channel: 1, filter: 2, data: { coeff: { 0x0ff895, 0xe0970b, 0x0f7f00, 0xe0970b, 0x0f7795 } } },
-  { channel: 1, filter: 3, data: { coeff: { 0x0fd1c4, 0xe1ac22, 0x0ec8cf, 0xe1ac22, 0x0e9a94 } } },
-  { channel: 1, filter: 4, data: { coeff: { 0x0f7c1c, 0xe3cc03, 0x0df786, 0xe3cc03, 0x0d73a2 } } },
-  { channel: 1, filter: 5, data: { coeff: { 0x11fb92, 0xf5a1a0, 0x073cd2, 0xf5a1a0, 0x093865 } } },
-  { channel: 1, filter: 6, data: { coeff: { 0x0e17a9, 0x068b6c, 0x08a0e5, 0x068b6c, 0x06b88e } } }
+  { .channel = 1, .filter = 0, .data = { .coeff = { 0x0fd0d4, 0xe05e56, 0x0fd0d4, 0xe05ee1, 0x0fa234 } } },
+  { .channel = 1, .filter = 1, .data = { .coeff = { 0x0910d7, 0x088e1a, 0x030651, 0x01dcb1, 0x02c892 } } },
+  { .channel = 1, .filter = 2, .data = { .coeff = { 0x0ff895, 0xe0970b, 0x0f7f00, 0xe0970b, 0x0f7795 } } },
+  { .channel = 1, .filter = 3, .data = { .coeff = { 0x0fd1c4, 0xe1ac22, 0x0ec8cf, 0xe1ac22, 0x0e9a94 } } },
+  { .channel = 1, .filter = 4, .data = { .coeff = { 0x0f7c1c, 0xe3cc03, 0x0df786, 0xe3cc03, 0x0d73a2 } } },
+  { .channel = 1, .filter = 5, .data = { .coeff = { 0x11fb92, 0xf5a1a0, 0x073cd2, 0xf5a1a0, 0x093865 } } },
+  { .channel = 1, .filter = 6, .data = { .coeff = { 0x0e17a9, 0x068b6c, 0x08a0e5, 0x068b6c, 0x06b88e } } }
 };
 
 static struct tas_eq_pref_t eqp_17_1_0 = {
-  sample_rate:  44100,
-  device_id:    0x17,
-  output_id:    TAS_OUTPUT_INTERNAL_SPKR,
-  speaker_id:   0x00,
+  .sample_rate   = 44100,
+  .device_id     = 0x17,
+  .output_id     = TAS_OUTPUT_INTERNAL_SPKR,
+  .speaker_id    = 0x00,
 
-  drce:         &eqp_17_1_0_drce,
+  .drce          = &eqp_17_1_0_drce,
 
-  filter_count: 14,
-  biquads:      eqp_17_1_0_biquads
+  .filter_count  = 14,
+  .biquads       = eqp_17_1_0_biquads
 };
 
 /* ======================================================================== */
 
 static struct tas_drce_t eqp_18_1_0_drce={
-  enable:    1,
-  above:     { val: 3.0 * (1<<8), expand: 0 },
-  below:     { val: 1.0 * (1<<8), expand: 0 },
-  threshold: -13.14  * (1<<8),
-  energy:    2.4     * (1<<12),
-  attack:    0.013   * (1<<12),
-  decay:     0.212   * (1<<12),
+  .enable     = 1,
+  .above      = { .val = 3.0 * (1<<8), .expand = 0 },
+  .below      = { .val = 1.0 * (1<<8), .expand = 0 },
+  .threshold  = -13.14  * (1<<8),
+  .energy     = 2.4     * (1<<12),
+  .attack     = 0.013   * (1<<12),
+  .decay      = 0.212   * (1<<12),
 };
 
 static struct tas_biquad_ctrl_t eqp_18_1_0_biquads[]={
-  { channel: 0, filter: 0, data: { coeff: { 0x0f5514, 0xe155d7, 0x0f5514, 0xe15cfa, 0x0eb14b } } },
-  { channel: 0, filter: 1, data: { coeff: { 0x06ec33, 0x02abe3, 0x015eef, 0xf764d9, 0x03922d } } },
-  { channel: 0, filter: 2, data: { coeff: { 0x0ef5f2, 0xe67d1f, 0x0bcf37, 0xe67d1f, 0x0ac529 } } },
-  { channel: 0, filter: 3, data: { coeff: { 0x0db050, 0xe5be4d, 0x0d0c78, 0xe5be4d, 0x0abcc8 } } },
-  { channel: 0, filter: 4, data: { coeff: { 0x0f1298, 0xe64ec6, 0x0cc03e, 0xe64ec6, 0x0bd2d7 } } },
-  { channel: 0, filter: 5, data: { coeff: { 0x0c641a, 0x06537a, 0x08d155, 0x06537a, 0x053570 } } },
-  { channel: 0, filter: 6, data: { coeff: { 0x100000, 0x000000, 0x000000, 0x000000, 0x000000 } } },
+  { .channel = 0, .filter = 0, .data = { .coeff = { 0x0f5514, 0xe155d7, 0x0f5514, 0xe15cfa, 0x0eb14b } } },
+  { .channel = 0, .filter = 1, .data = { .coeff = { 0x06ec33, 0x02abe3, 0x015eef, 0xf764d9, 0x03922d } } },
+  { .channel = 0, .filter = 2, .data = { .coeff = { 0x0ef5f2, 0xe67d1f, 0x0bcf37, 0xe67d1f, 0x0ac529 } } },
+  { .channel = 0, .filter = 3, .data = { .coeff = { 0x0db050, 0xe5be4d, 0x0d0c78, 0xe5be4d, 0x0abcc8 } } },
+  { .channel = 0, .filter = 4, .data = { .coeff = { 0x0f1298, 0xe64ec6, 0x0cc03e, 0xe64ec6, 0x0bd2d7 } } },
+  { .channel = 0, .filter = 5, .data = { .coeff = { 0x0c641a, 0x06537a, 0x08d155, 0x06537a, 0x053570 } } },
+  { .channel = 0, .filter = 6, .data = { .coeff = { 0x100000, 0x000000, 0x000000, 0x000000, 0x000000 } } },
 
-  { channel: 1, filter: 0, data: { coeff: { 0x0f5514, 0xe155d7, 0x0f5514, 0xe15cfa, 0x0eb14b } } },
-  { channel: 1, filter: 1, data: { coeff: { 0x06ec33, 0x02abe3, 0x015eef, 0xf764d9, 0x03922d } } },
-  { channel: 1, filter: 2, data: { coeff: { 0x0ef5f2, 0xe67d1f, 0x0bcf37, 0xe67d1f, 0x0ac529 } } },
-  { channel: 1, filter: 3, data: { coeff: { 0x0db050, 0xe5be4d, 0x0d0c78, 0xe5be4d, 0x0abcc8 } } },
-  { channel: 1, filter: 4, data: { coeff: { 0x0f1298, 0xe64ec6, 0x0cc03e, 0xe64ec6, 0x0bd2d7 } } },
-  { channel: 1, filter: 5, data: { coeff: { 0x0c641a, 0x06537a, 0x08d155, 0x06537a, 0x053570 } } },
-  { channel: 1, filter: 6, data: { coeff: { 0x100000, 0x000000, 0x000000, 0x000000, 0x000000 } } }
+  { .channel = 1, .filter = 0, .data = { .coeff = { 0x0f5514, 0xe155d7, 0x0f5514, 0xe15cfa, 0x0eb14b } } },
+  { .channel = 1, .filter = 1, .data = { .coeff = { 0x06ec33, 0x02abe3, 0x015eef, 0xf764d9, 0x03922d } } },
+  { .channel = 1, .filter = 2, .data = { .coeff = { 0x0ef5f2, 0xe67d1f, 0x0bcf37, 0xe67d1f, 0x0ac529 } } },
+  { .channel = 1, .filter = 3, .data = { .coeff = { 0x0db050, 0xe5be4d, 0x0d0c78, 0xe5be4d, 0x0abcc8 } } },
+  { .channel = 1, .filter = 4, .data = { .coeff = { 0x0f1298, 0xe64ec6, 0x0cc03e, 0xe64ec6, 0x0bd2d7 } } },
+  { .channel = 1, .filter = 5, .data = { .coeff = { 0x0c641a, 0x06537a, 0x08d155, 0x06537a, 0x053570 } } },
+  { .channel = 1, .filter = 6, .data = { .coeff = { 0x100000, 0x000000, 0x000000, 0x000000, 0x000000 } } }
 };
 
 static struct tas_eq_pref_t eqp_18_1_0 = {
-  sample_rate:  44100,
-  device_id:    0x18,
-  output_id:    TAS_OUTPUT_INTERNAL_SPKR,
-  speaker_id:   0x00,
+  .sample_rate   = 44100,
+  .device_id     = 0x18,
+  .output_id     = TAS_OUTPUT_INTERNAL_SPKR,
+  .speaker_id    = 0x00,
 
-  drce:         &eqp_18_1_0_drce,
+  .drce          = &eqp_18_1_0_drce,
 
-  filter_count: 14,
-  biquads:      eqp_18_1_0_biquads
+  .filter_count  = 14,
+  .biquads       = eqp_18_1_0_biquads
 };
 
 /* ======================================================================== */
 
 static struct tas_drce_t eqp_1a_1_0_drce={
-  enable:    1,
-  above:     { val: 3.0 * (1<<8), expand: 0 },
-  below:     { val: 1.0 * (1<<8), expand: 0 },
-  threshold: -10.75  * (1<<8),
-  energy:    2.4     * (1<<12),
-  attack:    0.013   * (1<<12),
-  decay:     0.212   * (1<<12),
+  .enable     = 1,
+  .above      = { .val = 3.0 * (1<<8), .expand = 0 },
+  .below      = { .val = 1.0 * (1<<8), .expand = 0 },
+  .threshold  = -10.75  * (1<<8),
+  .energy     = 2.4     * (1<<12),
+  .attack     = 0.013   * (1<<12),
+  .decay      = 0.212   * (1<<12),
 };
 
 static struct tas_biquad_ctrl_t eqp_1a_1_0_biquads[]={
-  { channel: 0, filter: 0, data: { coeff: { 0x0fb8fd, 0xe08e04, 0x0fb8fd, 0xe08f40, 0x0f7336 } } },
-  { channel: 0, filter: 1, data: { coeff: { 0x06371d, 0x0c6e3a, 0x06371d, 0x05bfd3, 0x031ca2 } } },
-  { channel: 0, filter: 2, data: { coeff: { 0x0fa1c0, 0xe18692, 0x0f030e, 0xe18692, 0x0ea4ce } } },
-  { channel: 0, filter: 3, data: { coeff: { 0x0fe495, 0xe17eff, 0x0f0452, 0xe17eff, 0x0ee8e7 } } },
-  { channel: 0, filter: 4, data: { coeff: { 0x100857, 0xe7e71c, 0x0e9599, 0xe7e71c, 0x0e9df1 } } },
-  { channel: 0, filter: 5, data: { coeff: { 0x0fb26e, 0x06a82c, 0x0db2b4, 0x06a82c, 0x0d6522 } } },
-  { channel: 0, filter: 6, data: { coeff: { 0x11419d, 0xf06cbf, 0x0a4f6e, 0xf06cbf, 0x0b910c } } },
+  { .channel = 0, .filter = 0, .data = { .coeff = { 0x0fb8fd, 0xe08e04, 0x0fb8fd, 0xe08f40, 0x0f7336 } } },
+  { .channel = 0, .filter = 1, .data = { .coeff = { 0x06371d, 0x0c6e3a, 0x06371d, 0x05bfd3, 0x031ca2 } } },
+  { .channel = 0, .filter = 2, .data = { .coeff = { 0x0fa1c0, 0xe18692, 0x0f030e, 0xe18692, 0x0ea4ce } } },
+  { .channel = 0, .filter = 3, .data = { .coeff = { 0x0fe495, 0xe17eff, 0x0f0452, 0xe17eff, 0x0ee8e7 } } },
+  { .channel = 0, .filter = 4, .data = { .coeff = { 0x100857, 0xe7e71c, 0x0e9599, 0xe7e71c, 0x0e9df1 } } },
+  { .channel = 0, .filter = 5, .data = { .coeff = { 0x0fb26e, 0x06a82c, 0x0db2b4, 0x06a82c, 0x0d6522 } } },
+  { .channel = 0, .filter = 6, .data = { .coeff = { 0x11419d, 0xf06cbf, 0x0a4f6e, 0xf06cbf, 0x0b910c } } },
 
-  { channel: 1, filter: 0, data: { coeff: { 0x0fb8fd, 0xe08e04, 0x0fb8fd, 0xe08f40, 0x0f7336 } } },
-  { channel: 1, filter: 1, data: { coeff: { 0x06371d, 0x0c6e3a, 0x06371d, 0x05bfd3, 0x031ca2 } } },
-  { channel: 1, filter: 2, data: { coeff: { 0x0fa1c0, 0xe18692, 0x0f030e, 0xe18692, 0x0ea4ce } } },
-  { channel: 1, filter: 3, data: { coeff: { 0x0fe495, 0xe17eff, 0x0f0452, 0xe17eff, 0x0ee8e7 } } },
-  { channel: 1, filter: 4, data: { coeff: { 0x100857, 0xe7e71c, 0x0e9599, 0xe7e71c, 0x0e9df1 } } },
-  { channel: 1, filter: 5, data: { coeff: { 0x0fb26e, 0x06a82c, 0x0db2b4, 0x06a82c, 0x0d6522 } } },
-  { channel: 1, filter: 6, data: { coeff: { 0x11419d, 0xf06cbf, 0x0a4f6e, 0xf06cbf, 0x0b910c } } }
+  { .channel = 1, .filter = 0, .data = { .coeff = { 0x0fb8fd, 0xe08e04, 0x0fb8fd, 0xe08f40, 0x0f7336 } } },
+  { .channel = 1, .filter = 1, .data = { .coeff = { 0x06371d, 0x0c6e3a, 0x06371d, 0x05bfd3, 0x031ca2 } } },
+  { .channel = 1, .filter = 2, .data = { .coeff = { 0x0fa1c0, 0xe18692, 0x0f030e, 0xe18692, 0x0ea4ce } } },
+  { .channel = 1, .filter = 3, .data = { .coeff = { 0x0fe495, 0xe17eff, 0x0f0452, 0xe17eff, 0x0ee8e7 } } },
+  { .channel = 1, .filter = 4, .data = { .coeff = { 0x100857, 0xe7e71c, 0x0e9599, 0xe7e71c, 0x0e9df1 } } },
+  { .channel = 1, .filter = 5, .data = { .coeff = { 0x0fb26e, 0x06a82c, 0x0db2b4, 0x06a82c, 0x0d6522 } } },
+  { .channel = 1, .filter = 6, .data = { .coeff = { 0x11419d, 0xf06cbf, 0x0a4f6e, 0xf06cbf, 0x0b910c } } }
 };
 
 static struct tas_eq_pref_t eqp_1a_1_0 = {
-  sample_rate:  44100,
-  device_id:    0x1a,
-  output_id:    TAS_OUTPUT_INTERNAL_SPKR,
-  speaker_id:   0x00,
+  .sample_rate   = 44100,
+  .device_id     = 0x1a,
+  .output_id     = TAS_OUTPUT_INTERNAL_SPKR,
+  .speaker_id    = 0x00,
 
-  drce:         &eqp_1a_1_0_drce,
+  .drce          = &eqp_1a_1_0_drce,
 
-  filter_count: 14,
-  biquads:      eqp_1a_1_0_biquads
+  .filter_count  = 14,
+  .biquads       = eqp_1a_1_0_biquads
 };
 
 /* ======================================================================== */
 
 static struct tas_drce_t eqp_1c_1_0_drce={
-  enable:    1,
-  above:     { val: 3.0 * (1<<8), expand: 0 },
-  below:     { val: 1.0 * (1<<8), expand: 0 },
-  threshold: -14.34  * (1<<8),
-  energy:    2.4     * (1<<12),
-  attack:    0.013   * (1<<12),
-  decay:     0.212   * (1<<12),
+  .enable     = 1,
+  .above      = { .val = 3.0 * (1<<8), .expand = 0 },
+  .below      = { .val = 1.0 * (1<<8), .expand = 0 },
+  .threshold  = -14.34  * (1<<8),
+  .energy     = 2.4     * (1<<12),
+  .attack     = 0.013   * (1<<12),
+  .decay      = 0.212   * (1<<12),
 };
 
 static struct tas_biquad_ctrl_t eqp_1c_1_0_biquads[]={
-  { channel: 0, filter: 0, data: { coeff: { 0x0f4f95, 0xe160d4, 0x0f4f95, 0xe1686e, 0x0ea6c5 } } },
-  { channel: 0, filter: 1, data: { coeff: { 0x066b92, 0x0290d4, 0x0148a0, 0xf6853f, 0x03bfc7 } } },
-  { channel: 0, filter: 2, data: { coeff: { 0x0f57dc, 0xe51c91, 0x0dd1cb, 0xe51c91, 0x0d29a8 } } },
-  { channel: 0, filter: 3, data: { coeff: { 0x0df1cb, 0xe4fa84, 0x0d7cdc, 0xe4fa84, 0x0b6ea7 } } },
-  { channel: 0, filter: 4, data: { coeff: { 0x0eba36, 0xe6aa48, 0x0b9f52, 0xe6aa48, 0x0a5989 } } },
-  { channel: 0, filter: 5, data: { coeff: { 0x0caf02, 0x05ef9d, 0x084beb, 0x05ef9d, 0x04faee } } },
-  { channel: 0, filter: 6, data: { coeff: { 0x0fc686, 0xe22947, 0x0e4b5d, 0xe22947, 0x0e11e4 } } },
+  { .channel = 0, .filter = 0, .data = { .coeff = { 0x0f4f95, 0xe160d4, 0x0f4f95, 0xe1686e, 0x0ea6c5 } } },
+  { .channel = 0, .filter = 1, .data = { .coeff = { 0x066b92, 0x0290d4, 0x0148a0, 0xf6853f, 0x03bfc7 } } },
+  { .channel = 0, .filter = 2, .data = { .coeff = { 0x0f57dc, 0xe51c91, 0x0dd1cb, 0xe51c91, 0x0d29a8 } } },
+  { .channel = 0, .filter = 3, .data = { .coeff = { 0x0df1cb, 0xe4fa84, 0x0d7cdc, 0xe4fa84, 0x0b6ea7 } } },
+  { .channel = 0, .filter = 4, .data = { .coeff = { 0x0eba36, 0xe6aa48, 0x0b9f52, 0xe6aa48, 0x0a5989 } } },
+  { .channel = 0, .filter = 5, .data = { .coeff = { 0x0caf02, 0x05ef9d, 0x084beb, 0x05ef9d, 0x04faee } } },
+  { .channel = 0, .filter = 6, .data = { .coeff = { 0x0fc686, 0xe22947, 0x0e4b5d, 0xe22947, 0x0e11e4 } } },
 
-  { channel: 1, filter: 0, data: { coeff: { 0x0f4f95, 0xe160d4, 0x0f4f95, 0xe1686e, 0x0ea6c5 } } },
-  { channel: 1, filter: 1, data: { coeff: { 0x066b92, 0x0290d4, 0x0148a0, 0xf6853f, 0x03bfc7 } } },
-  { channel: 1, filter: 2, data: { coeff: { 0x0f57dc, 0xe51c91, 0x0dd1cb, 0xe51c91, 0x0d29a8 } } },
-  { channel: 1, filter: 3, data: { coeff: { 0x0df1cb, 0xe4fa84, 0x0d7cdc, 0xe4fa84, 0x0b6ea7 } } },
-  { channel: 1, filter: 4, data: { coeff: { 0x0eba36, 0xe6aa48, 0x0b9f52, 0xe6aa48, 0x0a5989 } } },
-  { channel: 1, filter: 5, data: { coeff: { 0x0caf02, 0x05ef9d, 0x084beb, 0x05ef9d, 0x04faee } } },
-  { channel: 1, filter: 6, data: { coeff: { 0x0fc686, 0xe22947, 0x0e4b5d, 0xe22947, 0x0e11e4 } } }
+  { .channel = 1, .filter = 0, .data = { .coeff = { 0x0f4f95, 0xe160d4, 0x0f4f95, 0xe1686e, 0x0ea6c5 } } },
+  { .channel = 1, .filter = 1, .data = { .coeff = { 0x066b92, 0x0290d4, 0x0148a0, 0xf6853f, 0x03bfc7 } } },
+  { .channel = 1, .filter = 2, .data = { .coeff = { 0x0f57dc, 0xe51c91, 0x0dd1cb, 0xe51c91, 0x0d29a8 } } },
+  { .channel = 1, .filter = 3, .data = { .coeff = { 0x0df1cb, 0xe4fa84, 0x0d7cdc, 0xe4fa84, 0x0b6ea7 } } },
+  { .channel = 1, .filter = 4, .data = { .coeff = { 0x0eba36, 0xe6aa48, 0x0b9f52, 0xe6aa48, 0x0a5989 } } },
+  { .channel = 1, .filter = 5, .data = { .coeff = { 0x0caf02, 0x05ef9d, 0x084beb, 0x05ef9d, 0x04faee } } },
+  { .channel = 1, .filter = 6, .data = { .coeff = { 0x0fc686, 0xe22947, 0x0e4b5d, 0xe22947, 0x0e11e4 } } }
 };
 
 static struct tas_eq_pref_t eqp_1c_1_0 = {
-  sample_rate:  44100,
-  device_id:    0x1c,
-  output_id:    TAS_OUTPUT_INTERNAL_SPKR,
-  speaker_id:   0x00,
+  .sample_rate   = 44100,
+  .device_id     = 0x1c,
+  .output_id     = TAS_OUTPUT_INTERNAL_SPKR,
+  .speaker_id    = 0x00,
 
-  drce:         &eqp_1c_1_0_drce,
+  .drce          = &eqp_1c_1_0_drce,
 
-  filter_count: 14,
-  biquads:      eqp_1c_1_0_biquads
+  .filter_count  = 14,
+  .biquads       = eqp_1c_1_0_biquads
 };
 
 /* ======================================================================== */
@@ -286,10 +286,10 @@ static uint tas3004_bass_tab[]={
 };
 
 struct tas_gain_t tas3004_gain={
-  master: tas3004_master_tab,
-  treble: tas3004_treble_tab,
-  bass:   tas3004_bass_tab,
-  mixer:  tas3004_mixer_tab
+  .master  = tas3004_master_tab,
+  .treble  = tas3004_treble_tab,
+  .bass    = tas3004_bass_tab,
+  .mixer   = tas3004_mixer_tab
 };
 
 struct tas_eq_pref_t *tas3004_eq_prefs[]={

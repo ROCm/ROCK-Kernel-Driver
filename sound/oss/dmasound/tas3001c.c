@@ -55,7 +55,7 @@ struct tas3001c_data_t {
 
 static const union tas_biquad_t
 tas3001c_eq_unity={
-	buf: { 0x100000, 0x000000, 0x000000, 0x000000, 0x000000 }
+	.buf = { 0x100000, 0x000000, 0x000000, 0x000000, 0x000000 }
 };
 
 
