@@ -802,9 +802,9 @@ void __init time_init(void)
                 outl(0x800038a0, 0xcf8);
                 outl(0xff000001, 0xcfc);
                 outl(0x800038a0, 0xcf8);
-                hpet_address = inl(0xcfc) & 0xfffffffe;
+                vxtime.hpet_address = inl(0xcfc) & 0xfffffffe;
 		printk(KERN_WARNING "time.c: WARNING: Enabled HPET "
-		       "at %#lx.\n", hpet_address);
+		       "at %#lx.\n", vxtime.hpet_address);
         }
 #endif
 	if (nohpet)
