@@ -507,7 +507,7 @@ ret_from_except:
 	MTMSRD(r10)		/* disable interrupts */
 
 	lwz	r3,_MSR(r1)	/* Returning to user mode? */
-	andi.	r3,r3,MSR_PR
+	andi.	r0,r3,MSR_PR
 	beq	resume_kernel
 
 user_exc_return:		/* r10 contains MSR_KERNEL here */
@@ -528,6 +528,7 @@ restore_user:
 #ifdef CONFIG_PREEMPT
 	b	restore
 
+/* N.B. the only way to get here is from the beq following ret_from_except. */
 resume_kernel:
 	/* check current_thread_info->preempt_count */
 	rlwinm	r9,r1,0,0,18
@@ -549,8 +550,10 @@ resume_kernel:
 	SYNC
 	MTMSRD(r10)		/* disable interrupts */
 	rlwinm	r9,r1,0,0,18
-	lwz	r0,TI_FLAGS(r9)
-	andi.	r0,r0,_TIF_NEED_RESCHED
+	li	r0,0
+	stw	r0,TI_PREEMPT(r9)
+	lwz	r3,TI_FLAGS(r9)
+	andi.	r0,r3,_TIF_NEED_RESCHED
 	bne-	1b
 #else
 resume_kernel:
