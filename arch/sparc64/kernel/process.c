@@ -428,6 +428,9 @@ void flush_thread(void)
 {
 	struct thread_info *t = current_thread_info();
 
+	if (t->flags & _TIF_ABI_PENDING)
+		t->flags ^= (_TIF_ABI_PENDING | _TIF_32BIT);
+
 	if (t->task->mm) {
 		unsigned long pgd_cache = 0UL;
 		if (test_thread_flag(TIF_32BIT)) {

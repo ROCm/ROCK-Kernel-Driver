@@ -195,6 +195,7 @@ register struct thread_info *current_thread_info_reg asm("g6");
 #define TIF_BLKCOMMIT		9	/* use ASI_BLK_COMMIT_* in copy_user_page */
 
 #define TIF_POLLING_NRFLAG	10
+#define TIF_ABI_PENDING		11
 
 #define _TIF_SYSCALL_TRACE	(1<<TIF_SYSCALL_TRACE)
 #define _TIF_NOTIFY_RESUME	(1<<TIF_NOTIFY_RESUME)
@@ -207,6 +208,7 @@ register struct thread_info *current_thread_info_reg asm("g6");
 #define _TIF_NEWCHILD		(1<<TIF_NEWCHILD)
 #define _TIF_BLKCOMMIT		(1<<TIF_BLKCOMMIT)
 #define _TIF_POLLING_NRFLAG	(1<<TIF_POLLING_NRFLAG)
+#define _TIF_ABI_PENDING	(1<<TIF_ABI_PENDING)
 
 #define _TIF_USER_WORK_MASK	((0xff << TI_FLAG_WSAVED_SHIFT) | \
 				 (_TIF_NOTIFY_RESUME | _TIF_SIGPENDING | \
