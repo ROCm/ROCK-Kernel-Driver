@@ -1069,6 +1069,15 @@ int snd_emu10k1_audigy_midi(emu10k1_t * emu);
 /* proc interface */
 int snd_emu10k1_proc_init(emu10k1_t * emu);
 
+/* fx8010 irq handler */
+int snd_emu10k1_fx8010_register_irq_handler(emu10k1_t *emu,
+					    snd_fx8010_irq_handler_t *handler,
+					    unsigned char gpr_running,
+					    void *private_data,
+					    snd_emu10k1_fx8010_irq_t **r_irq);
+int snd_emu10k1_fx8010_unregister_irq_handler(emu10k1_t *emu,
+					      snd_emu10k1_fx8010_irq_t *irq);
+
 #endif /* __KERNEL__ */
 
 /*
