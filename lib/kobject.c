@@ -547,7 +547,7 @@ struct kobject * kset_find_obj(struct kset * kset, const char * name)
 	down_read(&kset->subsys->rwsem);
 	list_for_each(entry,&kset->list) {
 		struct kobject * k = to_kobj(entry);
-		if (!strcmp(kobject_name(k),name)) {
+		if (kobject_name(k) && (!strcmp(kobject_name(k),name))) {
 			ret = k;
 			break;
 		}
