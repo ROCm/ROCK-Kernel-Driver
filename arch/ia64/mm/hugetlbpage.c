@@ -49,8 +49,12 @@ huge_pte_offset (struct mm_struct *mm, unsigned long addr)
 	pte_t *pte = NULL;
 
 	pgd = pgd_offset(mm, taddr);
-	pmd = pmd_offset(pgd, taddr);
-	pte = pte_offset_map(pmd, taddr);
+	if (pgd_present(*pgd)) {
+		pmd = pmd_offset(pgd, taddr);
+		if (pmd_present(*pmd))
+			pte = pte_offset_map(pmd, taddr);
+	}
+
 	return pte;
 }
 
@@ -150,24 +154,19 @@ back1:
 	return i;
 }
 
-struct vm_area_struct *hugepage_vma(struct mm_struct *mm, unsigned long addr)
-{
-	if (mm->used_hugetlb) {
-		if (REGION_NUMBER(addr) == REGION_HPAGE) {
-			struct vm_area_struct *vma = find_vma(mm, addr);
-			if (vma && is_vm_hugetlb_page(vma))
-				return vma;
-		}
-	}
-	return NULL;
-}
-
-struct page *follow_huge_addr(struct mm_struct *mm, struct vm_area_struct *vma, unsigned long addr, int write)
+struct page *follow_huge_addr(struct mm_struct *mm, unsigned long addr, int write)
 {
 	struct page *page;
 	pte_t *ptep;
 
+	if (! mm->used_hugetlb)
+		return ERR_PTR(-EINVAL);
+	if (REGION_NUMBER(addr) != REGION_HPAGE)
+		return ERR_PTR(-EINVAL);
+
 	ptep = huge_pte_offset(mm, addr);
+	if (!ptep || pte_none(*ptep))
+		return NULL;
 	page = pte_page(*ptep);
 	page += ((addr & ~HPAGE_MASK) >> PAGE_SHIFT);
 	return page;

@@ -140,32 +140,31 @@ follow_hugetlb_page(struct mm_struct *mm, struct vm_area_struct *vma,
 
 #if 0	/* This is just for testing */
 struct page *
-follow_huge_addr(struct mm_struct *mm,
-	struct vm_area_struct *vma, unsigned long address, int write)
+follow_huge_addr(struct mm_struct *mm, unsigned long address, int write)
 {
 	unsigned long start = address;
 	int length = 1;
 	int nr;
 	struct page *page;
+	struct vm_area_struct *vma;
 
-	nr = follow_hugetlb_page(mm, vma, &page, NULL, &start, &length, 0);
-	if (nr == 1)
-		return page;
-	return NULL;
-}
+	if (! mm->used_hugetlb)
+		return ERR_PTR(-EINVAL);
 
-/*
- * If virtual address `addr' lies within a huge page, return its controlling
- * VMA, else NULL.
- */
-struct vm_area_struct *hugepage_vma(struct mm_struct *mm, unsigned long addr)
-{
-	if (mm->used_hugetlb) {
-		struct vm_area_struct *vma = find_vma(mm, addr);
-		if (vma && is_vm_hugetlb_page(vma))
-			return vma;
-	}
-	return NULL;
+	vma = find_vma(mm, addr);
+	if (!vma || !is_vm_hugetlb_page(vma))
+		return ERR_PTR(-EINVAL);
+
+	pte = huge_pte_offset(mm, address);
+
+	/* hugetlb should be locked, and hence, prefaulted */
+	WARN_ON(!pte || pte_none(*pte));
+
+	page = &pte_page(*pte)[vpfn % (HPAGE_SIZE/PAGE_SIZE)];
+
+	WARN_ON(!PageCompound(page));
+
+	return page;
 }
 
 int pmd_huge(pmd_t pmd)
@@ -183,15 +182,9 @@ follow_huge_pmd(struct mm_struct *mm, unsigned long address,
 #else
 
 struct page *
-follow_huge_addr(struct mm_struct *mm,
-	struct vm_area_struct *vma, unsigned long address, int write)
+follow_huge_addr(struct mm_struct *mm, unsigned long address, int write)
 {
-	return NULL;
-}
-
-struct vm_area_struct *hugepage_vma(struct mm_struct *mm, unsigned long addr)
-{
-	return NULL;
+	return ERR_PTR(-EINVAL);
 }
 
 int pmd_huge(pmd_t pmd)

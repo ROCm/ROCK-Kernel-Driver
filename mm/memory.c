@@ -657,11 +657,11 @@ follow_page(struct mm_struct *mm, unsigned long address, int write)
 	pmd_t *pmd;
 	pte_t *ptep, pte;
 	unsigned long pfn;
-	struct vm_area_struct *vma;
+	struct page *page;
 
-	vma = hugepage_vma(mm, address);
-	if (vma)
-		return follow_huge_addr(mm, vma, address, write);
+	page = follow_huge_addr(mm, address, write);
+	if (! IS_ERR(page))
+		return page;
 
 	pgd = pgd_offset(mm, address);
 	if (pgd_none(*pgd) || pgd_bad(*pgd))
