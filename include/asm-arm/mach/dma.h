@@ -40,7 +40,6 @@ struct dma_struct {
 
 	unsigned int	dma_base;	/* Controller base address	*/
 	int		dma_irq;	/* Controller IRQ		*/
-	int		state;		/* Controller state		*/
 	struct scatterlist cur_sg;	/* Current controller buffer	*/
 
 	struct dma_ops	*d_ops;

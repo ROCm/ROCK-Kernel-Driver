@@ -17,6 +17,7 @@
 #ifndef __ASSEMBLY__
 
 struct tag;
+struct meminfo;
 
 struct machine_desc {
 	/*
