@@ -348,7 +348,7 @@ do_translation_fault(unsigned long addr, unsigned int fsr,
 	if (pmd_none(*pmd_k))
 		goto bad_area;
 
-	set_pmd(pmd, *pmd_k);
+	copy_pmd(pmd, pmd_k);
 	return 0;
 
 bad_area:
