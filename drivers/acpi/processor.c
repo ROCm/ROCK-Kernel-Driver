@@ -794,7 +794,7 @@ acpi_processor_register_performance (
 }
 EXPORT_SYMBOL(acpi_processor_register_performance);
 
-/* for the rest of it, check processor_perf.c */
+/* for the rest of it, check cpufreq/acpi.c */
 
 
 /* --------------------------------------------------------------------------
@@ -1350,8 +1350,8 @@ static int
 acpi_processor_write_throttling (
         struct file		*file,
         const char		*buffer,
-        unsigned long		count,
-        void			*data)
+        size_t			count,
+        loff_t			*data)
 {
 	int			result = 0;
 	struct acpi_processor	*pr = (struct acpi_processor *) data;
@@ -1410,10 +1410,10 @@ static int acpi_processor_limit_open_fs(struct inode *inode, struct file *file)
 
 static int
 acpi_processor_write_limit (
-        struct file		*file,
-        const char		*buffer,
-        unsigned long		count,
-        void			*data)
+	struct file		*file,
+	const char		*buffer,
+	size_t			count,
+	loff_t			*data)
 {
 	int			result = 0;
 	struct acpi_processor	*pr = (struct acpi_processor *) data;
@@ -1511,7 +1511,7 @@ acpi_processor_add_fs (
 			ACPI_PROCESSOR_FILE_THROTTLING));
 	else {
 		entry->proc_fops = &acpi_processor_throttling_fops;
-		entry->write_proc = acpi_processor_write_throttling;
+		entry->proc_fops->write = acpi_processor_write_throttling;
 		entry->data = acpi_driver_data(device);
 	}
 
@@ -1524,7 +1524,7 @@ acpi_processor_add_fs (
 			ACPI_PROCESSOR_FILE_LIMIT));
 	else {
 		entry->proc_fops = &acpi_processor_limit_fops;
-		entry->write_proc = acpi_processor_write_limit;
+		entry->proc_fops->write = acpi_processor_write_limit;
 		entry->data = acpi_driver_data(device);
 	}
 

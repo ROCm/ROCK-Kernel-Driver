@@ -877,10 +877,12 @@ static int
 acpi_thermal_write_trip_points (
         struct file		*file,
         const char		*buffer,
-        unsigned long		count,
-        void			*data)
+        size_t			count,
+        loff_t			*ppos)
 {
-	struct acpi_thermal	*tz = (struct acpi_thermal *) data;
+	struct seq_file		*m = (struct seq_file *)file->private_data;
+	struct acpi_thermal	*tz = (struct acpi_thermal *)m->private;
+
 	char			limit_string[25] = {'\0'};
 	int			critical, hot, passive, active0, active1;
 
@@ -944,8 +946,8 @@ static int
 acpi_thermal_write_cooling_mode (
 	struct file		*file,
 	const char		*buffer,
-	unsigned long		count,
-	void			*data)
+	size_t			count,
+	loff_t			*data)
 {
 	int			result = 0;
 	struct acpi_thermal	*tz = (struct acpi_thermal *) data;
@@ -1004,8 +1006,8 @@ static int
 acpi_thermal_write_polling (
 	struct file		*file,
 	const char		*buffer,
-	unsigned long		count,
-	void			*data)
+	size_t			count,
+	loff_t			*data)
 {
 	int			result = 0;
 	struct acpi_thermal	*tz = (struct acpi_thermal *) data;
@@ -1079,10 +1081,10 @@ acpi_thermal_add_fs (
 	if (!entry)
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
 			"Unable to create '%s' fs entry\n",
-			ACPI_THERMAL_FILE_POLLING_FREQ));
+			ACPI_THERMAL_FILE_TRIP_POINTS));
 	else {
 		entry->proc_fops = &acpi_thermal_trip_fops;
-		entry->write_proc = acpi_thermal_write_trip_points;
+		entry->proc_fops->write = acpi_thermal_write_trip_points;
 		entry->data = acpi_driver_data(device);
 	}
 
@@ -1095,7 +1097,7 @@ acpi_thermal_add_fs (
 			ACPI_THERMAL_FILE_COOLING_MODE));
 	else {
 		entry->proc_fops = &acpi_thermal_cooling_fops;
-		entry->write_proc = acpi_thermal_write_cooling_mode;
+		entry->proc_fops->write = acpi_thermal_write_cooling_mode;
 		entry->data = acpi_driver_data(device);
 	}
 
@@ -1108,7 +1110,7 @@ acpi_thermal_add_fs (
 			ACPI_THERMAL_FILE_POLLING_FREQ));
 	else {
 		entry->proc_fops = &acpi_thermal_polling_fops;
-		entry->write_proc = acpi_thermal_write_polling;
+		entry->proc_fops->write = acpi_thermal_write_polling;
 		entry->data = acpi_driver_data(device);
 	}
 
