@@ -77,8 +77,8 @@ static int integrator_verify_speed(struct cpufreq_policy *policy)
 {
 	struct vco vco;
 
-	if (policy->max > policy->max_cpu_freq)
-		policy->max = policy->max_cpu_freq;
+	if (policy->max > policy->cpuinfo.max_freq)
+		policy->max = policy->cpuinfo.max_freq;
 
 	if (policy->max < 12000)
 		policy->max = 12000;
@@ -148,7 +148,9 @@ static int integrator_set_policy(struct cpufreq_policy *policy)
 static struct cpufreq_policy integrator_policy = {
 	.cpu		= 0,
 	.policy		= CPUFREQ_POLICY_POWERSAVE,
-	.max_cpu_freq	= 160000,
+	.cpuinfo.max_cpu_freq	= 160000,
+	.cpuinfo.min_cpu_freq   = 12000,
+	.cpuinfo.transition_latency  = CPUFREQ_ETERNAL,
 };
 
 static struct cpufreq_driver integrator_driver = {
@@ -197,7 +199,9 @@ static int __init integrator_cpu_init(void)
 
 		policies[cpu].cpu = cpu;
 		policies[cpu].policy = CPUFREQ_POLICY_POWERSAVE,
-		policies[cpu].max_cpu_freq = 160000;
+		policies[cpu].cpuinfo.max_freq = 160000;
+		policies[cpu].cpuinfo.min_freq = 12000;
+		policies[cpu].cpuinfo.transition_latency = CPUFREQ_ETERNAL;
 		policies[cpu].min =
 		policies[cpu].max = vco_to_freq(vco, 1);
 	}
@@ -205,8 +209,6 @@ static int __init integrator_cpu_init(void)
 	set_cpus_allowed(current, cpus_allowed);
 
 #ifdef CONFIG_CPU_FREQ
-	for (cpu=0; cpu<NR_CPUS; cpu++)
-		integrator_driver.cpu_min_freq[cpu] = 12000;
 	integrator_driver.policy = policies;
 	cpufreq_register(&integrator_driver);
 #else
