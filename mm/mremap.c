@@ -103,7 +103,6 @@ static int move_one_page(struct vm_area_struct *vma, unsigned long old_addr, uns
 static int move_page_tables(struct vm_area_struct *vma,
 	unsigned long new_addr, unsigned long old_addr, unsigned long len)
 {
-	struct mm_struct *mm = vma->vm_mm;
 	unsigned long offset = len;
 
 	flush_cache_range(vma, old_addr, old_addr + len);
