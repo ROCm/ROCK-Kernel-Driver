@@ -538,9 +538,8 @@ nfsd4_decode_create(struct nfsd4_compoundargs *argp, struct nfsd4_create *create
 	case NF4SOCK:
 	case NF4FIFO:
 	case NF4DIR:
-		break;
 	default:
-		goto xdr_error;
+		break;
 	}
 
 	READ_BUF(4);
