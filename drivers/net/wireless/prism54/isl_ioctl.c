@@ -1893,6 +1893,7 @@ prism54_process_trap(void *data)
 	struct net_device *ndev = frame->ndev;
 	enum oid_num_t n = mgt_oidtonum(frame->header->oid);
 
+	if (n != OID_NUM_LAST)
 	prism54_process_trap_helper(netdev_priv(ndev), n, frame->data);
 	islpci_mgt_release(frame);
 }
