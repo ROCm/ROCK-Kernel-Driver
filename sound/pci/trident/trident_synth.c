@@ -27,8 +27,6 @@
 #include <sound/trident.h>
 #include <sound/seq_device.h>
 
-EXPORT_NO_SYMBOLS;
-
 MODULE_AUTHOR("Scott McNab <jedi@tartarus.uwa.edu.au>");
 MODULE_DESCRIPTION("Routines for Trident 4DWave NX/DX soundcards - Synthesizer");
 MODULE_LICENSE("GPL");

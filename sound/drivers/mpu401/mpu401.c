@@ -30,8 +30,6 @@
 #include <sound/initval.h>
 #include <linux/delay.h>
 
-EXPORT_NO_SYMBOLS;
-
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("MPU-401 UART");
 MODULE_LICENSE("GPL");

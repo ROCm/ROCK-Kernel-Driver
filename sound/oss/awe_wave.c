@@ -219,7 +219,6 @@ MODULE_PARM(memsize, "i");
 MODULE_PARM_DESC(memsize, "onboard DRAM size in Kbytes");
 MODULE_PARM(isapnp, "i");
 MODULE_PARM_DESC(isapnp, "use ISAPnP detection");
-EXPORT_NO_SYMBOLS;
 
 /* DRAM start offset */
 static int awe_mem_start = AWE_DRAM_OFFSET;

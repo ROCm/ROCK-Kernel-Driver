@@ -38,8 +38,6 @@
 
 #define PFX "dt0197h: "
 
-EXPORT_NO_SYMBOLS;
-
 MODULE_AUTHOR("Massimo Piccioni <dafastidio@libero.it>");
 MODULE_DESCRIPTION("Diamond Technologies DT-0197H");
 MODULE_LICENSE("GPL");

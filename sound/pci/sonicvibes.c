@@ -40,8 +40,6 @@
 #include <linux/gameport.h>
 #endif
 
-EXPORT_NO_SYMBOLS;
-
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("S3 SonicVibes PCI");
 MODULE_LICENSE("GPL");

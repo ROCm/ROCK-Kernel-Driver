@@ -40,8 +40,6 @@
 
 /* {{{ Type definitions */
 
-EXPORT_NO_SYMBOLS;
-
 MODULE_AUTHOR("Tomas Kasparek <tomas.kasparek@seznam.cz>");
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("SA1100/SA1111 + UDA1341TS driver for ALSA");

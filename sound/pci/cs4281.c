@@ -39,8 +39,6 @@
 #include <linux/gameport.h>
 #endif
 
-EXPORT_NO_SYMBOLS;
-
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("Cirrus Logic CS4281");
 MODULE_LICENSE("GPL");

@@ -34,8 +34,6 @@
 #define SNDRV_GET_ID
 #include <sound/initval.h>
 
-EXPORT_NO_SYMBOLS;
-
 MODULE_AUTHOR("Christopher Butler <chrisb@sandy.force9.co.uk>");
 MODULE_DESCRIPTION("Aztech Sound Galaxy");
 MODULE_LICENSE("GPL");

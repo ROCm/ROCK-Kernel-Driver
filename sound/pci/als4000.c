@@ -58,8 +58,6 @@
 #define SNDRV_GET_ID
 #include <sound/initval.h>
 
-EXPORT_NO_SYMBOLS;
-
 MODULE_AUTHOR("Bart Hartgers <bart@etpmod.phys.tue.nl>");
 MODULE_DESCRIPTION("Avance Logic ALS4000");
 MODULE_LICENSE("GPL");

@@ -52,8 +52,6 @@
 #define SNDRV_GET_ID
 #include <sound/initval.h>
 
-EXPORT_NO_SYMBOLS;
-
 MODULE_AUTHOR("George Talusan <gstalusan@uwaterloo.ca>");
 MODULE_DESCRIPTION("C-Media CMI8330");
 MODULE_LICENSE("GPL");

@@ -40,8 +40,6 @@
 #define SNDRV_GET_ID
 #include <sound/initval.h>
 
-EXPORT_NO_SYMBOLS;
-
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("Intel 82801AA,82901AB,i810,i820,i830,i840,MX440; SiS 7012");
 MODULE_LICENSE("GPL");

@@ -26,8 +26,6 @@
 #include <linux/init.h>
 #include <sound/initval.h>
 
-EXPORT_NO_SYMBOLS;
-
 MODULE_AUTHOR("Uros Bizjak <uros@kss-loka.si>");
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("ALSA driver for OPL3 FM synth");
