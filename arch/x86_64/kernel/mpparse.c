@@ -572,6 +572,7 @@ void __init get_smp_config (void)
 
 static int __init smp_scan_config (unsigned long base, unsigned long length)
 {
+	static int printed;
 	extern void __bad_mpf_size(void); 
 	unsigned int *bp = phys_to_virt(base);
 	struct intel_mp_floating *mpf;
@@ -598,7 +599,10 @@ static int __init smp_scan_config (unsigned long base, unsigned long length)
 		bp += 4;
 		length -= 16;
 	}
-	printk(KERN_INFO "No mptable found.\n");
+	if (!printed) {
+		printk(KERN_INFO "No mptable found.\n");
+		printed = 1;
+	}
 	return 0;
 }
 

@@ -134,7 +134,6 @@ parse_unisys_oem (char *oemptr, int oem_entries)
 	}
 
 	if (success < 2) {
-		printk("\nNo ES7000 found.\n");
 		es7000_plat = 0;
 	} else {
 		printk("\nEnabling ES7000 specific features...\n");

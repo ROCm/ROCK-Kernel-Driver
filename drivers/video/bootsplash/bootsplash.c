@@ -399,7 +399,7 @@ static int splash_getraw(unsigned char *start, unsigned char *end)
     struct fb_info *info;
     struct splash_data *sd;
 
-    printk(KERN_INFO "bootsplash %s: looking for picture...", SPLASH_VERSION);
+    printk(KERN_INFO "bootsplash %s: looking for picture...\n", SPLASH_VERSION);
 
     for (ndata = start; ndata < end; ndata++) {
 	if (ndata[0] != 'B' || ndata[1] != 'O' || ndata[2] != 'O' || ndata[3] != 'T')
@@ -424,7 +424,7 @@ static int splash_getraw(unsigned char *start, unsigned char *end)
 	height = info->var.yres;
 	splash_size = splash_geti(ndata, SPLASH_OFF_SIZE);
 	if (splash_size == (int)0xffffffff && version > 1) {
-	    printk(" found, updating values.\n");
+	    printk(KERN_INFO "...found, updating values.\n");
 	    if ((sd = vc->vc_splash_data) != 0) {
 		i = splash_getb(ndata, SPLASH_OFF_STATE);
 		if (i != 255)
@@ -439,7 +439,7 @@ static int splash_getraw(unsigned char *start, unsigned char *end)
 	    return unit;
 	}
 	if (splash_size == 0) {
-	    printk(" found, freeing memory.\n");
+	    printk(KERN_INFO"...found, freeing memory.\n");
 	    if (vc->vc_splash_data)
 		splash_free(vc, info);
 	    return unit;
@@ -447,7 +447,7 @@ static int splash_getraw(unsigned char *start, unsigned char *end)
 	boxcnt = splash_gets(ndata, SPLASH_OFF_BOXCNT);
 	palcnt = 3 * splash_getb(ndata, SPLASH_OFF_PALCNT);
 	if (ndata + len + splash_size > end) {
-	    printk(" found, but truncated!\n");
+	    printk(KERN_INFO "...found, but truncated!\n");
 	    return -1;
 	}
 	if (!jpeg_check_size(ndata + len + boxcnt * 12 + palcnt, width, height)) {
@@ -458,16 +458,16 @@ static int splash_getraw(unsigned char *start, unsigned char *end)
 	    return -1;
 	silentsize = splash_geti(ndata, SPLASH_OFF_SSIZE);
 	if (silentsize)
-	    printk(" silentjpeg size %d bytes,", silentsize);
+	    printk(KERN_INFO" silentjpeg size %d bytes,", silentsize);
 	if (silentsize >= splash_size) {
-	    printk(" bigger than splashsize!\n");
+	    printk(KERN_INFO " bigger than splashsize!\n");
 	    return -1;
 	}
 	splash_size -= silentsize;
 	if (!splash_usesilent)
 	    silentsize = 0;
 	else if (height * 2 * info->fix.line_length > info->fix.smem_len) {
-	    printk(" does not fit into framebuffer.\n");
+	    printk(KERN_INFO " does not fit into framebuffer.\n");
 	    silentsize = 0;
 	}
 	sboxcnt = splash_gets(ndata, SPLASH_OFF_SBOXCNT);
@@ -475,7 +475,7 @@ static int splash_getraw(unsigned char *start, unsigned char *end)
 	    unsigned char *simage = ndata + len + splash_size + 12 * sboxcnt;
 	    if (!jpeg_check_size(simage, width, height) ||
 		splash_check_jpeg(simage, width, height, info->var.bits_per_pixel)) {
-		    printk(" error in silent jpeg.\n");
+		    printk(KERN_INFO " error in silent jpeg.\n");
 		    silentsize = 0;
 		}
 	}
@@ -516,15 +516,15 @@ static int splash_getraw(unsigned char *start, unsigned char *end)
 	}
 	if (sd->splash_text_xo + sd->splash_text_wi > width || sd->splash_text_yo + sd->splash_text_he > height) {
 	    splash_free(vc, info);
-	    printk(" found, but has oversized text area!\n");
+	    printk(KERN_INFO " found, but has oversized text area!\n");
 	    return -1;
 	}
 	if (!vc_cons[unit].d || info->fbops != &vesafb_ops) {
 	    splash_free(vc, info);
-	    printk(" found, but framebuffer can't handle it!\n");
+	    printk(KERN_INFO " found, but framebuffer can't handle it!\n");
 	    return -1;
 	}
-	printk(" found (%dx%d, %d bytes, v%d).\n", width, height, splash_size, version);
+	printk(KERN_INFO "...found (%dx%d, %d bytes, v%d).\n", width, height, splash_size, version);
 	if (version == 1) {
 	    printk(KERN_WARNING "bootsplash: Using deprecated v1 header. Updating your splash utility recommended.\n");
 	    printk(KERN_INFO    "bootsplash: Find the latest version at http://www.bootsplash.org/\n");
@@ -545,7 +545,7 @@ static int splash_getraw(unsigned char *start, unsigned char *end)
 	sd->splash_dosilent = sd->splash_silentjpeg != 0;
 	return unit;
     }
-    printk(" no good signature found.\n");
+    printk(KERN_INFO "...no good signature found.\n");
     return -1;
 }
 
