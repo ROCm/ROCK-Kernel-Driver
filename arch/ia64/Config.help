@@ -414,11 +414,17 @@ CONFIG_IA64_GENERIC
 
   HP-simulator   For the HP simulator
                  (<http://software.hp.com/ia64linux/>).
+  HP-zx1         For HP zx1 platforms.
   SN1-simulator  For the SGI SN1 simulator.
   DIG-compliant  For DIG ("Developer's Interface Guide") compliant
-                 system.
+                 systems.
 
   If you don't know what to do, choose "generic".
+
+CONFIG_IA64_HP_ZX1
+  Build a kernel that runs on HP zx1-based systems.  This adds support
+  for the zx1 IOMMU and makes root bus bridges appear in PCI config space
+  (required for zx1 agpgart support).
 
 CONFIG_IA64_PAGE_SIZE_4KB
   This lets you select the page size of the kernel.  For best IA-64

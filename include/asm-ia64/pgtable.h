@@ -121,6 +121,7 @@
 # ifndef __ASSEMBLY__
 
 #include <asm/bitops.h>
+#include <asm/cacheflush.h>
 #include <asm/mmu_context.h>
 #include <asm/processor.h>
 
@@ -290,30 +291,6 @@ ia64_phys_addr_valid (unsigned long addr)
 # define pgprot_writecombine(prot)	__pgprot((pgprot_val(prot) & ~_PAGE_MA_MASK) | _PAGE_MA_WC)
 #endif
 
-/*
- * Return the region index for virtual address ADDRESS.
- */
-static inline unsigned long
-rgn_index (unsigned long address)
-{
-	ia64_va a;
-
-	a.l = address;
-	return a.f.reg;
-}
-
-/*
- * Return the region offset for virtual address ADDRESS.
- */
-static inline unsigned long
-rgn_offset (unsigned long address)
-{
-	ia64_va a;
-
-	a.l = address;
-	return a.f.off;
-}
-
 static inline unsigned long
 pgd_index (unsigned long address)
 {
@@ -439,33 +416,6 @@ extern void paging_init (void);
 #define PageSkip(page)		(0)
 
 #define io_remap_page_range remap_page_range	/* XXX is this right? */
-
-
-/*
- * Now for some cache flushing routines.  This is the kind of stuff that can be very
- * expensive, so try to avoid them whenever possible.
- */
-
-/* Caches aren't brain-dead on the IA-64. */
-#define flush_cache_all()			do { } while (0)
-#define flush_cache_mm(mm)			do { } while (0)
-#define flush_cache_range(vma, start, end)	do { } while (0)
-#define flush_cache_page(vma, vmaddr)		do { } while (0)
-#define flush_page_to_ram(page)			do { } while (0)
-#define flush_icache_page(vma,page)		do { } while (0)
-
-#define flush_dcache_page(page)			\
-do {						\
-	clear_bit(PG_arch_1, &page->flags);	\
-} while (0)
-
-extern void flush_icache_range (unsigned long start, unsigned long end);
-
-#define flush_icache_user_range(vma, page, user_addr, len)			\
-do {										\
-	unsigned long _addr = page_address(page) + ((user_addr) & ~PAGE_MASK);	\
-	flush_icache_range(_addr, _addr + (len));				\
-} while (0)
 
 /*
  * ZERO_PAGE is a global shared page that is always zero: used

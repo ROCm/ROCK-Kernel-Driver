@@ -931,6 +931,9 @@
 	121a  NetServer SMIC Controller
 	121b  NetServer Legacy COM Port Decoder
 	121c  NetServer PCI COM Port Decoder
+	1229  zx1 System Bus Adapter
+	122a  zx1 I/O Controller
+	122e  zx1 Local Bus Adapter
 	2910  E2910A
 	2925  E2925A
 103e  Solliday Engineering

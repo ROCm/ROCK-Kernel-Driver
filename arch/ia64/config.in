@@ -22,6 +22,7 @@ choice 'IA-64 system type'					\
 	"generic		CONFIG_IA64_GENERIC		\
 	 DIG-compliant		CONFIG_IA64_DIG			\
 	 HP-simulator		CONFIG_IA64_HP_SIM		\
+	 HP-zx1			CONFIG_IA64_HP_ZX1		\
 	 SGI-SN1		CONFIG_IA64_SGI_SN1		\
 	 SGI-SN2		CONFIG_IA64_SGI_SN2" generic
 
@@ -56,7 +57,7 @@ if [ "$CONFIG_MCKINLEY" = "y" ]; then
 	fi
 fi
 
-if [ "$CONFIG_IA64_DIG" = "y" ]; then
+if [ "$CONFIG_IA64_GENERIC" = "y" ] || [ "$CONFIG_IA64_DIG" = "y" ] || [ "$CONFIG_IA64_HP_ZX1" = "y" ]; then
 	bool '  Enable IA-64 Machine Check Abort' CONFIG_IA64_MCA
 	define_bool CONFIG_PM y
 fi

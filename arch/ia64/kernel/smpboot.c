@@ -68,6 +68,7 @@ static volatile unsigned long go[SLAVE + 1];
 
 extern void __init calibrate_delay(void);
 extern void start_ap(void);
+extern unsigned long ia64_iobase;
 
 int cpucount;
 task_t *task_for_booting_cpu;
@@ -344,6 +345,11 @@ smp_callin (void)
 	 * Get our bogomips.
 	 */
 	ia64_init_itm();
+
+	/*
+	 * Set I/O port base per CPU
+	 */
+	ia64_set_kr(IA64_KR_IO_BASE, __pa(ia64_iobase));
 
 #ifdef CONFIG_IA64_MCA
 	ia64_mca_cmc_vector_setup();	/* Setup vector on AP & enable */

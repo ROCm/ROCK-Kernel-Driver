@@ -8,9 +8,11 @@
  *	in0: address of buffer to checksum (char *)
  *	in1: length of the buffer (int)
  *
- * Copyright (C) 1999, 2001 Hewlett-Packard Co
- * Copyright (C) 1999 Stephane Eranian <eranian@hpl.hp.com>
+ * Copyright (C) 1999, 2001-2002 Hewlett-Packard Co
+ *	Stephane Eranian <eranian@hpl.hp.com>
  *
+ * 02/04/08	David Mosberger <davidm@hpl.hp.com>
+ *		More cleanup and tuning.
  * 01/04/18	Jun Nakajima <jun.nakajima@intel.com>
  *		Clean up and optimize and the software pipeline, loading two
  *		back-to-back 8-byte words per loop. Clean up the initialization
@@ -71,8 +73,6 @@
 //	calculating the Internet checksum.
 //
 // NOT YET DONE:
-//	- use the lfetch instruction to augment the chances of the data being in
-//	  the cache when we need it.
 //	- Maybe another algorithm which would take care of the folding at the
 //	  end in a different manner
 //	- Work with people more knowledgeable than me on the network stack
@@ -102,10 +102,6 @@
 #define buf		in0
 #define len		in1
 
-#ifndef CONFIG_IA64_LOAD_LATENCY
-#define CONFIG_IA64_LOAD_LATENCY	2
-#endif
-
 #define LOAD_LATENCY	2	// XXX fix me
 
 #if (LOAD_LATENCY != 1) && (LOAD_LATENCY != 2)
@@ -122,45 +118,46 @@ GLOBAL_ENTRY(do_csum)
 	.prologue
 	.save ar.pfs, saved_pfs
 	alloc saved_pfs=ar.pfs,2,16,1,16
-	.rotr word1[4], word2[4],result1[4],result2[4]
-	.rotp p[PIPE_DEPTH]
+	.rotr word1[4], word2[4],result1[LOAD_LATENCY+2],result2[LOAD_LATENCY+2]
+	.rotp p[PIPE_DEPTH], pC1[2], pC2[2]
 	mov ret0=r0		// in case we have zero length
 	cmp.lt p0,p6=r0,len	// check for zero length or negative (32bit len)
-	;;			// avoid WAW on CFM
-	mov tmp3=0x7		// a temporary mask/value
+	;;
 	add tmp1=buf,len	// last byte's address
-(p6)	br.ret.spnt.many rp	// return if true (hope we can avoid that)
-
-	and firstoff=7,buf	// how many bytes off for first1 element
-	tbit.nz p15,p0=buf,0	// is buf an odd address ?
-	mov hmask=-1		// intialize head mask
-	;;
-	andcm first1=buf,tmp3	// 8byte aligned down address of first1 element
-	mov tmask=-1		// initialize tail mask
-	adds tmp2=-1,tmp1	// last-1
-	;;
-	and lastoff=7,tmp1	// how many bytes off for last element
-	andcm last=tmp2,tmp3	// address of word containing last byte
 	.save pr, saved_pr
 	mov saved_pr=pr		// preserve predicates (rotation)
+(p6)	br.ret.spnt.many rp	// return if zero or negative length
+
+	mov hmask=-1		// intialize head mask
+	tbit.nz p15,p0=buf,0	// is buf an odd address?
+	and first1=-8,buf	// 8-byte align down address of first1 element
+
+	and firstoff=7,buf	// how many bytes off for first1 element
+	mov tmask=-1		// initialize tail mask
+
+	;;
+	adds tmp2=-1,tmp1	// last-1
+	and lastoff=7,tmp1	// how many bytes off for last element
+	;;
+	sub tmp1=8,lastoff	// complement to lastoff
+	and last=-8,tmp2	// address of word containing last byte
 	;;
 	sub tmp3=last,first1	// tmp3=distance from first1 to last
+	.save ar.lc, saved_lc
+	mov saved_lc=ar.lc	// save lc
 	cmp.eq p8,p9=last,first1	// everything fits in one word ?
-	sub tmp1=8,lastoff	// complement to lastoff
-	ld8 firstval=[first1],8	// load,ahead of time, "first1" word
+
+	ld8 firstval=[first1],8	// load, ahead of time, "first1" word
+	and tmp1=7, tmp1	// make sure that if tmp1==8 -> tmp1=0
 	shl tmp2=firstoff,3	// number of bits
 	;;
-	and tmp1=7, tmp1	// make sure that if tmp1==8 -> tmp1=0
-(p9)	ld8 lastval=[last]	// load,ahead of time, "last" word, if needed
+(p9)	ld8 lastval=[last]	// load, ahead of time, "last" word, if needed
+	shl tmp1=tmp1,3		// number of bits
 (p9)	adds tmp3=-8,tmp3	// effectively loaded
 	;;
 (p8)	mov lastval=r0		// we don't need lastval if first1==last
-	shl tmp1=tmp1,3		// number of bits
 	shl hmask=hmask,tmp2	// build head mask, mask off [0,first1off[
-	;;
 	shr.u tmask=tmask,tmp1	// build tail mask, mask off ]8,lastoff]
-	.save ar.lc, saved_lc
-	mov saved_lc=ar.lc	// save lc
 	;;
 	.body
 #define count tmp3
@@ -171,8 +168,8 @@ GLOBAL_ENTRY(do_csum)
 	;;
 	// If count is odd, finish this 8-byte word so that we can
 	// load two back-to-back 8-byte words per loop thereafter.
-	tbit.nz p10,p11=count,0		// if (count is odd)
 	and word1[0]=firstval,hmask	// and mask it as appropriate
+	tbit.nz p10,p11=count,0		// if (count is odd)
 	;;
 (p8)	mov result1[0]=word1[0]
 (p9)	add result1[0]=word1[0],word2[0]
@@ -181,9 +178,8 @@ GLOBAL_ENTRY(do_csum)
 	;;
 (p6)	adds result1[0]=1,result1[0]
 (p8)	br.cond.dptk .do_csum_exit	// if (within an 8-byte word)
-	;;
 (p11)	br.cond.dptk .do_csum16		// if (count is even)
-	;;
+
 	// Here count is odd.
 	ld8 word1[1]=[first1],8		// load an 8-byte word
 	cmp.eq p9,p10=1,count		// if (count == 1)
@@ -194,11 +190,9 @@ GLOBAL_ENTRY(do_csum)
 	cmp.ltu p6,p0=result1[0],word1[1]
 	;;
 (p6)	adds result1[0]=1,result1[0]
-	;;
 (p9)	br.cond.sptk .do_csum_exit	// if (count == 1) exit
 	// Fall through to caluculate the checksum, feeding result1[0] as
 	// the initial value in result1[0].
-	;;
 	//
 	// Calculate the checksum loading two 8-byte words per loop.
 	//
@@ -207,45 +201,36 @@ GLOBAL_ENTRY(do_csum)
 	shr.u count=count,1	// we do 16 bytes per loop
 	;;
 	cmp.eq p9,p10=r0,count	// if (count == 0)
+	adds count=-1,count
 	brp.loop.imp 1f,2f
 	;;
-	adds count=-1,count
 	mov ar.ec=PIPE_DEPTH
-	;;
 	mov ar.lc=count	// set lc
-	;;
+
 	// result1[0] must be initialized in advance.
 	mov result2[0]=r0
-	;;
 	mov pr.rot=1<<16
-	;;
 	mov carry1=r0
 	mov carry2=r0
-	;;
 	add first2=8,first1
-	;;
 (p9)	br.cond.sptk .do_csum_exit
-	;;
-	nop.m	0
-	nop.i	0
 	;;
 	.align 32
 1:
-(ELD_1)	cmp.ltu p31,p0=result1[LOAD_LATENCY],word1[LOAD_LATENCY+1]
-(p32)	adds carry1=1,carry1
-(ELD_1)	cmp.ltu p47,p0=result2[LOAD_LATENCY],word2[LOAD_LATENCY+1]
-(p48)	adds carry2=1,carry2
+(ELD_1)	cmp.ltu pC1[0],p0=result1[LOAD_LATENCY],word1[LOAD_LATENCY+1]
+(pC1[1])adds carry1=1,carry1
+(ELD_1)	cmp.ltu pC2[0],p0=result2[LOAD_LATENCY],word2[LOAD_LATENCY+1]
+(pC2[1])adds carry2=1,carry2
 (ELD)	add result1[LOAD_LATENCY-1]=result1[LOAD_LATENCY],word1[LOAD_LATENCY]
 (ELD)	add result2[LOAD_LATENCY-1]=result2[LOAD_LATENCY],word2[LOAD_LATENCY]
-2:
-(p16)	ld8 word1[0]=[first1],16
-(p16)	ld8 word2[0]=[first2],16
+[2:]
+(p[0])	ld8 word1[0]=[first1],16
+(p[0])	ld8 word2[0]=[first2],16
 	br.ctop.sptk 1b
 	;;
-	// Since len is a 32-bit value, carry cannot be larger than
-	// a 64-bit value.
-(p32)	adds carry1=1,carry1	// since we miss the last one
-(p48)	adds carry2=1,carry2
+	// Since len is a 32-bit value, carry cannot be larger than a 64-bit value.
+(pC1[1])adds carry1=1,carry1	// since we miss the last one
+(pC2[1])adds carry2=1,carry2
 	;;
 	add result1[LOAD_LATENCY+1]=result1[LOAD_LATENCY+1],carry1
 	add result2[LOAD_LATENCY+1]=result2[LOAD_LATENCY+1],carry2
@@ -263,18 +248,15 @@ GLOBAL_ENTRY(do_csum)
 (p6)	adds result1[0]=1,result1[0]
 	;;
 .do_csum_exit:
-	movl tmp3=0xffffffff
-	;;
-	// XXX Fixme
 	//
 	// now fold 64 into 16 bits taking care of carry
 	// that's not very good because it has lots of sequentiality
 	//
-	and tmp1=result1[0],tmp3
+	mov tmp3=0xffff
+	zxt4 tmp1=result1[0]
 	shr.u tmp2=result1[0],32
 	;;
 	add result1[0]=tmp1,tmp2
-	shr.u tmp3=tmp3,16
 	;;
 	and tmp1=result1[0],tmp3
 	shr.u tmp2=result1[0],16

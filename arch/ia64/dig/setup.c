@@ -33,9 +33,6 @@
  * is sufficient (the IDE driver will autodetect the drive geometry).
  */
 char drive_info[4*16];
-extern int pcat_compat;
-
-unsigned char aux_device_present = 0xaa;	/* XXX remove this when legacy I/O is gone */
 
 void __init
 dig_setup (char **cmdline_p)
@@ -85,16 +82,4 @@ dig_setup (char **cmdline_p)
 void __init
 dig_irq_init (void)
 {
-	if (pcat_compat) {
-		/*
-		 * Disable the compatibility mode interrupts (8259 style), needs IN/OUT support
-		 * enabled.
-		 */
-		printk("%s: Disabling PC-AT compatible 8259 interrupts\n", __FUNCTION__);
-		outb(0xff, 0xA1);
-		outb(0xff, 0x21);
-	} else {
-		printk("%s: System doesn't have PC-AT compatible dual-8259 setup. "
-		       "Nothing to be done\n", __FUNCTION__);
-	}
 }

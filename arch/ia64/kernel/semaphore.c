@@ -1,8 +1,8 @@
 /*
  * IA-64 semaphore implementation (derived from x86 version).
  *
- * Copyright (C) 1999-2000 Hewlett-Packard Co
- * Copyright (C) 1999-2000 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1999-2000, 2002 Hewlett-Packard Co
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
 /*
@@ -25,6 +25,7 @@
  */
 #include <linux/sched.h>
 
+#include <asm/errno.h>
 #include <asm/semaphore.h>
 
 /*

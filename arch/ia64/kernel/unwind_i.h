@@ -103,7 +103,7 @@ struct unw_state_record {
 	unsigned int in_body : 1;	/* are we inside a body (as opposed to a prologue)? */
 	unsigned long flags;		/* see UNW_FLAG_* in unwind.h */
 
-	u8 *imask;			/* imask of of spill_mask record or NULL */
+	u8 *imask;			/* imask of spill_mask record or NULL */
 	unsigned long pr_val;		/* predicate values */
 	unsigned long pr_mask;		/* predicate mask */
 	long spill_offset;		/* psp-relative offset for spill base */
