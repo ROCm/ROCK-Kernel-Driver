@@ -897,7 +897,7 @@ err_chunk:
 
 /* Make a HEARTBEAT chunk.  */
 sctp_chunk_t *sctp_make_heartbeat(const sctp_association_t *asoc,
-				  const sctp_transport_t *transport,
+				  const struct sctp_transport *transport,
 				  const void *payload, const size_t paylen)
 {
 	sctp_chunk_t *retval = sctp_make_chunk(asoc, SCTP_CID_HEARTBEAT,
@@ -909,7 +909,7 @@ sctp_chunk_t *sctp_make_heartbeat(const sctp_association_t *asoc,
 	/* Cast away the 'const', as this is just telling the chunk
 	 * what transport it belongs to.
 	 */
-	retval->transport = (sctp_transport_t *) transport;
+	retval->transport = (struct sctp_transport *) transport;
 	retval->subh.hbs_hdr = sctp_addto_chunk(retval, paylen, payload);
 
 nodata:
@@ -1686,7 +1686,7 @@ int sctp_process_init(sctp_association_t *asoc, sctp_cid_t cid,
 		      int priority)
 {
 	union sctp_params param;
-	sctp_transport_t *transport;
+	struct sctp_transport *transport;
 	struct list_head *pos, *temp;
 	char *cookie;
 
@@ -1761,7 +1761,7 @@ int sctp_process_init(sctp_association_t *asoc, sctp_cid_t cid,
 	 * advertised window).
 	 */
 	list_for_each(pos, &asoc->peer.transport_addr_list) {
-		transport = list_entry(pos, sctp_transport_t, transports);
+		transport = list_entry(pos, struct sctp_transport, transports);
 		transport->ssthresh = asoc->peer.i.a_rwnd;
 	}
 
@@ -1801,7 +1801,7 @@ nomem_ssnmap:
 clean_up:
 	/* Release the transport structures. */
 	list_for_each_safe(pos, temp, &asoc->peer.transport_addr_list) {
-		transport = list_entry(pos, sctp_transport_t, transports);
+		transport = list_entry(pos, struct sctp_transport, transports);
 		list_del(pos);
 		sctp_transport_free(transport);
 	}

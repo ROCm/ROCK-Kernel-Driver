@@ -206,7 +206,7 @@ sctp_sm_table_entry_t *sctp_sm_lookup_event(sctp_event_t event_type,
 	/* SCTP_STATE_COOKIE_WAIT */ \
 	{.fn = sctp_sf_violation, .name = "sctp_sf_violation"}, \
 	/* SCTP_STATE_COOKIE_ECHOED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
+	{.fn = sctp_sf_discard_chunk, .name = "sctp_sf_discard_chunk"}, \
 	/* SCTP_STATE_ESTABLISHED */ \
 	{.fn = sctp_sf_backbeat_8_3, .name = "sctp_sf_backbeat_8_3"}, \
 	/* SCTP_STATE_SHUTDOWN_PENDING */ \
@@ -216,7 +216,7 @@ sctp_sm_table_entry_t *sctp_sm_lookup_event(sctp_event_t event_type,
 	/* SCTP_STATE_SHUTDOWN_RECEIVED */ \
 	{.fn = sctp_sf_backbeat_8_3, .name = "sctp_sf_backbeat_8_3"}, \
 	/* SCTP_STATE_SHUTDOWN_ACK_SENT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
+	{.fn = sctp_sf_discard_chunk, .name = "sctp_sf_discard_chunk"}, \
 } /* TYPE_SCTP_HEARTBEAT_ACK */
 
 #define TYPE_SCTP_ABORT { \
@@ -1089,11 +1089,11 @@ sctp_sm_table_entry_t other_event_table[SCTP_NUM_OTHER_TYPES][SCTP_STATE_NUM_STA
 	/* SCTP_STATE_SHUTDOWN_PENDING */ \
 	{.fn = sctp_sf_sendbeat_8_3, .name = "sctp_sf_sendbeat_8_3"}, \
 	/* SCTP_STATE_SHUTDOWN_SENT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
+	{.fn = sctp_sf_timer_ignore, .name = "sctp_sf_timer_ignore"}, \
 	/* SCTP_STATE_SHUTDOWN_RECEIVED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
+	{.fn = sctp_sf_sendbeat_8_3, .name = "sctp_sf_sendbeat_8_3"}, \
 	/* SCTP_STATE_SHUTDOWN_ACK_SENT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
+	{.fn = sctp_sf_timer_ignore, .name = "sctp_sf_timer_ignore"}, \
 }
 
 #define TYPE_SCTP_EVENT_TIMEOUT_SACK { \

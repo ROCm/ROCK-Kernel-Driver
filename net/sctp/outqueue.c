@@ -58,7 +58,7 @@
 static int sctp_acked(sctp_sackhdr_t *sack, __u32 tsn);
 static void sctp_check_transmitted(struct sctp_outq *q,
 				   struct list_head *transmitted_queue,
-				   sctp_transport_t *transport,
+				   struct sctp_transport *transport,
 				   sctp_sackhdr_t *sack,
 				   __u32 highest_new_tsn);
 
@@ -104,13 +104,13 @@ void sctp_outq_init(sctp_association_t *asoc, struct sctp_outq *q)
  */
 void sctp_outq_teardown(struct sctp_outq *q)
 {
-	sctp_transport_t *transport;
+	struct sctp_transport *transport;
 	struct list_head *lchunk, *pos, *temp;
 	sctp_chunk_t *chunk;
 
 	/* Throw away unacknowledged chunks. */
 	list_for_each(pos, &q->asoc->peer.transport_addr_list) {
-		transport = list_entry(pos, sctp_transport_t, transports);
+		transport = list_entry(pos, struct sctp_transport, transports);
 		while ((lchunk = sctp_list_dequeue(&transport->transmitted))) {
 			chunk = list_entry(lchunk, sctp_chunk_t,
 					   transmitted_list);
@@ -224,12 +224,12 @@ void sctp_retransmit_insert(struct list_head *tlchunk, struct sctp_outq *q)
 }
 
 /* Mark all the eligible packets on a transport for retransmission.  */
-void sctp_retransmit_mark(struct sctp_outq *q, sctp_transport_t *transport,
+void sctp_retransmit_mark(struct sctp_outq *q, 
+			  struct sctp_transport *transport,
 			  __u8 fast_retransmit)
 {
 	struct list_head *lchunk, *ltemp;
 	sctp_chunk_t *chunk;
-
 
 	/* Walk through the specified transmitted queue.  */
 	list_for_each_safe(lchunk, ltemp, &transport->transmitted) {
@@ -295,7 +295,7 @@ void sctp_retransmit_mark(struct sctp_outq *q, sctp_transport_t *transport,
 /* Mark all the eligible packets on a transport for retransmission and force
  * one packet out.
  */
-void sctp_retransmit(struct sctp_outq *q, sctp_transport_t *transport,
+void sctp_retransmit(struct sctp_outq *q, struct sctp_transport *transport,
 		     sctp_retransmit_reason_t reason)
 {
 	int error = 0;
@@ -334,7 +334,7 @@ static int sctp_outq_flush_rtx(struct sctp_outq *q, sctp_packet_t *pkt,
 {
 	struct list_head *lqueue;
 	struct list_head *lchunk;
-	sctp_transport_t *transport = pkt->transport;
+	struct sctp_transport *transport = pkt->transport;
 	sctp_xmit_t status;
 	sctp_chunk_t *chunk;
 	sctp_association_t *asoc;
@@ -442,7 +442,7 @@ static int sctp_outq_flush_rtx(struct sctp_outq *q, sctp_packet_t *pkt,
 void sctp_xmit_frag(struct sctp_outq *q, struct sk_buff *pos,
 		    sctp_packet_t *packet, sctp_chunk_t *frag, __u32 tsn)
 {
-	sctp_transport_t *transport = packet->transport;
+	struct sctp_transport *transport = packet->transport;
 	struct sk_buff_head *queue = &q->out;
 	sctp_xmit_t status;
 	int error;
@@ -655,8 +655,8 @@ int sctp_outq_flush(struct sctp_outq *q, int rtx_timeout)
 	sctp_packet_phandler_t *s_ecne_handler = NULL;
 	sctp_packet_phandler_t *ecne_handler = NULL;
 	struct sk_buff_head *queue;
-	sctp_transport_t *transport = NULL;
-	sctp_transport_t *new_transport;
+	struct sctp_transport *transport = NULL;
+	struct sctp_transport *new_transport;
 	sctp_chunk_t *chunk;
 	sctp_xmit_t status;
 	int error = 0;
@@ -967,8 +967,9 @@ sctp_flush_out:
 	 * --xguo
 	 */
 	while ((ltransport = sctp_list_dequeue(&transport_list)) != NULL ) {
-		sctp_transport_t *t = list_entry(ltransport,
-						 sctp_transport_t, send_ready);
+		struct sctp_transport *t = list_entry(ltransport,
+						      struct sctp_transport, 
+						      send_ready);
 		if (t != transport)
 			transport = t;
 
@@ -1020,7 +1021,7 @@ static __u32 sctp_highest_new_tsn(sctp_sackhdr_t *sack,
 				  sctp_association_t *asoc)
 {
 	struct list_head *ltransport, *lchunk;
-	sctp_transport_t *transport;
+	struct sctp_transport *transport;
 	sctp_chunk_t *chunk;
 	__u32 highest_new_tsn, tsn;
 	struct list_head *transport_list = &asoc->peer.transport_addr_list;
@@ -1028,7 +1029,7 @@ static __u32 sctp_highest_new_tsn(sctp_sackhdr_t *sack,
 	highest_new_tsn = ntohl(sack->cum_tsn_ack);
 
 	list_for_each(ltransport, transport_list) {
-		transport = list_entry(ltransport, sctp_transport_t,
+		transport = list_entry(ltransport, struct sctp_transport,
 				       transports);
 		list_for_each(lchunk, &transport->transmitted) {
 			chunk = list_entry(lchunk, sctp_chunk_t,
@@ -1053,7 +1054,7 @@ static __u32 sctp_highest_new_tsn(sctp_sackhdr_t *sack,
 int sctp_outq_sack(struct sctp_outq *q, sctp_sackhdr_t *sack)
 {
 	sctp_association_t *asoc = q->asoc;
-	sctp_transport_t *transport;
+	struct sctp_transport *transport;
 	sctp_chunk_t *tchunk;
 	struct list_head *lchunk, *transport_list, *pos;
 	sctp_sack_variable_t *frags = sack->variable;
@@ -1089,7 +1090,8 @@ int sctp_outq_sack(struct sctp_outq *q, sctp_sackhdr_t *sack)
 	 * This is a MASSIVE candidate for optimization.
 	 */
 	list_for_each(pos, transport_list) {
-		transport  = list_entry(pos, sctp_transport_t, transports);
+		transport  = list_entry(pos, struct sctp_transport, 
+					transports);
 		sctp_check_transmitted(q, &transport->transmitted,
 				       transport, sack, highest_new_tsn);
 	}
@@ -1142,7 +1144,8 @@ int sctp_outq_sack(struct sctp_outq *q, sctp_sackhdr_t *sack)
 		goto finish;
 
 	list_for_each(pos, transport_list) {
-		transport  = list_entry(pos, sctp_transport_t, transports);
+		transport  = list_entry(pos, struct sctp_transport, 
+					transports);
 		q->empty = q->empty && list_empty(&transport->transmitted);
 		if (!q->empty)
 			goto finish;
@@ -1178,7 +1181,7 @@ int sctp_outq_is_empty(const struct sctp_outq *q)
  */
 static void sctp_check_transmitted(struct sctp_outq *q,
 				   struct list_head *transmitted_queue,
-				   sctp_transport_t *transport,
+				   struct sctp_transport *transport,
 				   sctp_sackhdr_t *sack,
 				   __u32 highest_new_tsn_in_sack)
 {

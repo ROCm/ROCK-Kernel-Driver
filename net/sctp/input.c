@@ -66,7 +66,7 @@ static int sctp_rcv_ootb(struct sk_buff *);
 sctp_association_t *__sctp_rcv_lookup(struct sk_buff *skb,
 				      const union sctp_addr *laddr,
 				      const union sctp_addr *paddr,
-				      sctp_transport_t **transportp);
+				      struct sctp_transport **transportp);
 sctp_endpoint_t *__sctp_rcv_lookup_endpoint(const union sctp_addr *laddr);
 
 
@@ -104,7 +104,7 @@ int sctp_rcv(struct sk_buff *skb)
 	sctp_association_t *asoc;
 	sctp_endpoint_t *ep = NULL;
 	sctp_endpoint_common_t *rcvr;
-	sctp_transport_t *transport = NULL;
+	struct sctp_transport *transport = NULL;
 	sctp_chunk_t *chunk;
 	struct sctphdr *sh;
 	union sctp_addr src;
@@ -601,12 +601,12 @@ void __sctp_unhash_established(sctp_association_t *asoc)
 /* Look up an association. */
 sctp_association_t *__sctp_lookup_association(const union sctp_addr *laddr,
 					      const union sctp_addr *paddr,
-					      sctp_transport_t **transportp)
+					      struct sctp_transport **transportp)
 {
 	sctp_hashbucket_t *head;
 	sctp_endpoint_common_t *epb;
 	sctp_association_t *asoc;
-	sctp_transport_t *transport;
+	struct sctp_transport *transport;
 	int hash;
 
 	/* Optimize here for direct hit, only listening connections can
@@ -637,7 +637,7 @@ hit:
 /* Look up an association. BH-safe. */
 sctp_association_t *sctp_lookup_association(const union sctp_addr *laddr,
 					    const union sctp_addr *paddr,
-					    sctp_transport_t **transportp)
+					    struct sctp_transport **transportp)
 {
 	sctp_association_t *asoc;
 
@@ -653,7 +653,7 @@ int sctp_has_association(const union sctp_addr *laddr,
 			 const union sctp_addr *paddr)
 {
 	sctp_association_t *asoc;
-	sctp_transport_t *transport;
+	struct sctp_transport *transport;
 
 	if ((asoc = sctp_lookup_association(laddr, paddr, &transport))) {
 		sock_put(asoc->base.sk);
@@ -683,7 +683,7 @@ int sctp_has_association(const union sctp_addr *laddr,
  *
  */
 static sctp_association_t *__sctp_rcv_init_lookup(struct sk_buff *skb,
-	const union sctp_addr *laddr, sctp_transport_t **transportp)
+	const union sctp_addr *laddr, struct sctp_transport **transportp)
 {
 	sctp_association_t *asoc;
 	union sctp_addr addr;
@@ -743,7 +743,7 @@ static sctp_association_t *__sctp_rcv_init_lookup(struct sk_buff *skb,
 sctp_association_t *__sctp_rcv_lookup(struct sk_buff *skb,
 				      const union sctp_addr *paddr,
 				      const union sctp_addr *laddr,
-				      sctp_transport_t **transportp)
+				      struct sctp_transport **transportp)
 {
 	sctp_association_t *asoc;
 

@@ -291,7 +291,7 @@ fail_init:
  */
 void sctp_association_free(sctp_association_t *asoc)
 {
-	sctp_transport_t *transport;
+	struct sctp_transport *transport;
 	sctp_endpoint_t *ep;
 	struct list_head *pos, *temp;
 	int i;
@@ -337,7 +337,7 @@ void sctp_association_free(sctp_association_t *asoc)
 
 	/* Release the transport structures. */
 	list_for_each_safe(pos, temp, &asoc->peer.transport_addr_list) {
-		transport = list_entry(pos, sctp_transport_t, transports);
+		transport = list_entry(pos, struct sctp_transport, transports);
 		list_del(pos);
 		sctp_transport_free(transport);
 	}
@@ -363,11 +363,11 @@ static void sctp_association_destroy(sctp_association_t *asoc)
 
 
 /* Add a transport address to an association.  */
-sctp_transport_t *sctp_assoc_add_peer(sctp_association_t *asoc,
-				      const union sctp_addr *addr,
-				      int priority)
+struct sctp_transport *sctp_assoc_add_peer(sctp_association_t *asoc,
+					   const union sctp_addr *addr,
+					   int priority)
 {
-	sctp_transport_t *peer;
+	struct sctp_transport *peer;
 	sctp_opt_t *sp;
 	unsigned short port;
 
@@ -476,16 +476,16 @@ sctp_transport_t *sctp_assoc_add_peer(sctp_association_t *asoc,
 }
 
 /* Lookup a transport by address. */
-sctp_transport_t *sctp_assoc_lookup_paddr(const sctp_association_t *asoc,
+struct sctp_transport *sctp_assoc_lookup_paddr(const sctp_association_t *asoc,
 					  const union sctp_addr *address)
 {
-	sctp_transport_t *t;
+	struct sctp_transport *t;
 	struct list_head *pos;
 
 	/* Cycle through all transports searching for a peer address. */
 
 	list_for_each(pos, &asoc->peer.transport_addr_list) {
-		t = list_entry(pos, sctp_transport_t, transports);
+		t = list_entry(pos, struct sctp_transport, transports);
 		if (sctp_cmp_addr_exact(address, &t->ipaddr))
 			return t;
 	}
@@ -498,13 +498,13 @@ sctp_transport_t *sctp_assoc_lookup_paddr(const sctp_association_t *asoc,
  * Select and update the new active and retran paths.
  */
 void sctp_assoc_control_transport(sctp_association_t *asoc,
-				  sctp_transport_t *transport,
+				  struct sctp_transport *transport,
 				  sctp_transport_cmd_t command,
 				  sctp_sn_error_t error)
 {
-	sctp_transport_t *t = NULL;
-	sctp_transport_t *first;
-	sctp_transport_t *second;
+	struct sctp_transport *t = NULL;
+	struct sctp_transport *first;
+	struct sctp_transport *second;
 	sctp_ulpevent_t *event;
 	struct list_head *pos;
 	int spc_state = 0;
@@ -545,7 +545,7 @@ void sctp_assoc_control_transport(sctp_association_t *asoc,
 	first = NULL; second = NULL;
 
 	list_for_each(pos, &asoc->peer.transport_addr_list) {
-		t = list_entry(pos, sctp_transport_t, transports);
+		t = list_entry(pos, struct sctp_transport, transports);
 
 		if (!t->active)
 			continue;
@@ -693,12 +693,12 @@ sctp_chunk_t *sctp_get_no_prepend(sctp_association_t *asoc)
 /*
  * Find which transport this TSN was sent on.
  */
-sctp_transport_t *sctp_assoc_lookup_tsn(sctp_association_t *asoc, __u32 tsn)
+struct sctp_transport *sctp_assoc_lookup_tsn(sctp_association_t *asoc, __u32 tsn)
 {
-	sctp_transport_t *active;
-	sctp_transport_t *match;
+	struct sctp_transport *active;
+	struct sctp_transport *match;
 	struct list_head *entry, *pos;
-	sctp_transport_t *transport;
+	struct sctp_transport *transport;
 	sctp_chunk_t *chunk;
 	__u32 key = htonl(tsn);
 
@@ -732,7 +732,7 @@ sctp_transport_t *sctp_assoc_lookup_tsn(sctp_association_t *asoc, __u32 tsn)
 
 	/* If not found, go search all the other transports. */
 	list_for_each(pos, &asoc->peer.transport_addr_list) {
-		transport = list_entry(pos, sctp_transport_t, transports);
+		transport = list_entry(pos, struct sctp_transport, transports);
 
 		if (transport == active)
 			break;
@@ -750,11 +750,11 @@ out:
 }
 
 /* Is this the association we are looking for? */
-sctp_transport_t *sctp_assoc_is_match(sctp_association_t *asoc,
-				      const union sctp_addr *laddr,
-				      const union sctp_addr *paddr)
+struct sctp_transport *sctp_assoc_is_match(sctp_association_t *asoc,
+					   const union sctp_addr *laddr,
+					   const union sctp_addr *paddr)
 {
-	sctp_transport_t *transport;
+	struct sctp_transport *transport;
 
 	sctp_read_lock(&asoc->base.addr_lock);
 
@@ -897,9 +897,9 @@ void sctp_assoc_update(sctp_association_t *asoc, sctp_association_t *new)
  * through the inactive transports as this is the next best thing
  * we can try.
  */
-sctp_transport_t *sctp_assoc_choose_shutdown_transport(sctp_association_t *asoc)
+struct sctp_transport *sctp_assoc_choose_shutdown_transport(sctp_association_t *asoc)
 {
-	sctp_transport_t *t, *next;
+	struct sctp_transport *t, *next;
 	struct list_head *head = &asoc->peer.transport_addr_list;
 	struct list_head *pos;
 
@@ -922,7 +922,7 @@ sctp_transport_t *sctp_assoc_choose_shutdown_transport(sctp_association_t *asoc)
 		else
 			pos = pos->next;
 
-		t = list_entry(pos, sctp_transport_t, transports);
+		t = list_entry(pos, struct sctp_transport, transports);
 
 		/* Try to find an active transport. */
 
