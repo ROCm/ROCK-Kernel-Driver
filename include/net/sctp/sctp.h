@@ -178,12 +178,6 @@ extern void sctp_err_finish(struct sock *, struct sctp_endpoint *,
 			    struct sctp_association *);
 extern void sctp_icmp_frag_needed(struct sock *, struct sctp_association *,
 				  struct sctp_transport *t, __u32 pmtu);
-/*
- * sctp/hashdriver.c
- */
-extern void sctp_hash_digest(const char *secret, const int secret_len,
-			     const char *text, const int text_len,
-			     __u8 *digest);
 
 /*
  *  Section:  Macros, externs, and inlines
