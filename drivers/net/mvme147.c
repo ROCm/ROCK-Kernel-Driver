@@ -10,7 +10,6 @@
 #include <linux/sched.h>
 #include <linux/types.h>
 #include <linux/interrupt.h>
-#include <linux/ptrace.h>
 #include <linux/ioport.h>
 #include <linux/slab.h>
 #include <linux/string.h>

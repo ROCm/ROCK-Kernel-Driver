@@ -2,7 +2,6 @@
 #define _I386_USER_H
 
 #include <asm/page.h>
-#include <linux/ptrace.h>
 /* Core file format: The core file is written in such a way that gdb
    can understand it and provide useful information to the user (under
    linux we use the 'trad-core' bfd).  There are quite a number of

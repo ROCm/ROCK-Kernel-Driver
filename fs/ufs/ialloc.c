@@ -71,7 +71,7 @@ void ufs_free_inode (struct inode * inode)
 	UFSD(("ENTER, ino %lu\n", inode->i_ino))
 
 	sb = inode->i_sb;
-	uspi = sb->u.ufs_sb.s_uspi;
+	uspi = UFS_SB(sb)->s_uspi;
 	usb1 = ubh_get_usb_first(USPI_UBH);
 	
 	ino = inode->i_ino;
@@ -112,12 +112,12 @@ void ufs_free_inode (struct inode * inode)
 			ucpi->c_irotor = ino;
 		fs32_add(sb, &ucg->cg_cs.cs_nifree, 1);
 		fs32_add(sb, &usb1->fs_cstotal.cs_nifree, 1);
-		fs32_add(sb, &sb->fs_cs(cg).cs_nifree, 1);
+		fs32_add(sb, &UFS_SB(sb)->fs_cs(cg).cs_nifree, 1);
 
 		if (is_directory) {
 			fs32_sub(sb, &ucg->cg_cs.cs_ndir, 1);
 			fs32_sub(sb, &usb1->fs_cstotal.cs_ndir, 1);
-			fs32_sub(sb, &sb->fs_cs(cg).cs_ndir, 1);
+			fs32_sub(sb, &UFS_SB(sb)->fs_cs(cg).cs_ndir, 1);
 		}
 	}
 
@@ -146,6 +146,7 @@ void ufs_free_inode (struct inode * inode)
 struct inode * ufs_new_inode(struct inode * dir, int mode)
 {
 	struct super_block * sb;
+	struct ufs_sb_info * sbi;
 	struct ufs_sb_private_info * uspi;
 	struct ufs_super_block_first * usb1;
 	struct ufs_cg_private_info * ucpi;
@@ -164,7 +165,8 @@ struct inode * ufs_new_inode(struct inode * dir, int mode)
 	if (!inode)
 		return ERR_PTR(-ENOMEM);
 	ufsi = UFS_I(inode);
-	uspi = sb->u.ufs_sb.s_uspi;
+	sbi = UFS_SB(sb);
+	uspi = sbi->s_uspi;
 	usb1 = ubh_get_usb_first(USPI_UBH);
 
 	lock_super (sb);
@@ -173,7 +175,7 @@ struct inode * ufs_new_inode(struct inode * dir, int mode)
 	 * Try to place the inode in its parent directory
 	 */
 	i = ufs_inotocg(dir->i_ino);
-	if (sb->fs_cs(i).cs_nifree) {
+	if (sbi->fs_cs(i).cs_nifree) {
 		cg = i;
 		goto cg_found;
 	}
@@ -185,7 +187,7 @@ struct inode * ufs_new_inode(struct inode * dir, int mode)
 		i += j;
 		if (i >= uspi->s_ncg)
 			i -= uspi->s_ncg;
-		if (sb->fs_cs(i).cs_nifree) {
+		if (sbi->fs_cs(i).cs_nifree) {
 			cg = i;
 			goto cg_found;
 		}
@@ -199,7 +201,7 @@ struct inode * ufs_new_inode(struct inode * dir, int mode)
 		i++;
 		if (i >= uspi->s_ncg)
 			i = 0;
-		if (sb->fs_cs(i).cs_nifree) {
+		if (sbi->fs_cs(i).cs_nifree) {
 			cg = i;
 			goto cg_found;
 		}
@@ -235,12 +237,12 @@ cg_found:
 	
 	fs32_sub(sb, &ucg->cg_cs.cs_nifree, 1);
 	fs32_sub(sb, &usb1->fs_cstotal.cs_nifree, 1);
-	fs32_sub(sb, &sb->fs_cs(cg).cs_nifree, 1);
+	fs32_sub(sb, &sbi->fs_cs(cg).cs_nifree, 1);
 	
 	if (S_ISDIR(mode)) {
 		fs32_add(sb, &ucg->cg_cs.cs_ndir, 1);
 		fs32_add(sb, &usb1->fs_cstotal.cs_ndir, 1);
-		fs32_add(sb, &sb->fs_cs(cg).cs_ndir, 1);
+		fs32_add(sb, &sbi->fs_cs(cg).cs_ndir, 1);
 	}
 
 	ubh_mark_buffer_dirty (USPI_UBH);

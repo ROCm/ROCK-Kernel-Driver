@@ -2395,10 +2395,15 @@ static int con_open(struct tty_struct *tty, struct file * filp)
 
 static void con_close(struct tty_struct *tty, struct file * filp)
 {
+	struct vt_struct *vt;
+	
 	if (!tty)
 		return;
 	if (tty->count != 1) return;
 	vcs_make_devfs (minor(tty->device) - tty->driver.minor_start, 1);
+	vt = (struct vt_struct*)tty->driver_data;
+	if (vt)
+		vc_cons[vt->vc_num].d->vc_tty = NULL;
 	tty->driver_data = 0;
 }
 

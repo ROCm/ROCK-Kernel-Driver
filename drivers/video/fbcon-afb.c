@@ -160,8 +160,8 @@ static u8 expand_table[1024] = {
 
 void fbcon_afb_setup(struct display *p)
 {
-    if (p->line_length)
-	p->next_line = p->line_length;
+    if (p->fb_info->fix.line_length)
+	p->next_line = p->fb_info->fix.line_length;
     else
 	p->next_line = p->var.xres_virtual>>3;
     p->next_plane = p->var.yres_virtual*p->next_line;

@@ -55,7 +55,6 @@ static const char version[] =
 #include <linux/jiffies.h>
 #include <linux/fs.h>
 #include <linux/types.h>
-#include <linux/ptrace.h>
 #include <linux/string.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>

@@ -2,9 +2,9 @@
  *
  * Hardware accelerated Matrox Millennium I, II, Mystique, G100, G200 and G400
  *
- * (c) 1998-2001 Petr Vandrovec <vandrove@vc.cvut.cz>
+ * (c) 1998-2002 Petr Vandrovec <vandrove@vc.cvut.cz>
  *
- * Version: 1.51 2001/06/18
+ * Version: 1.65 2002/08/14
  *
  * MTRR stuff: 1998 Tom Rini <trini@kernel.crashing.org>
  *
@@ -85,21 +85,21 @@
 
 #define mga_ydstlen(y,l) mga_outl(M_YDSTLEN | M_EXEC, ((y) << 16) | (l))
 
-void matrox_cfbX_init(WPMINFO struct display* p) {
+void matrox_cfbX_init(WPMINFO2) {
 	u_int32_t maccess;
 	u_int32_t mpitch;
 	u_int32_t mopmode;
 
 	DBG("matrox_cfbX_init")
 
-	mpitch = p->var.xres_virtual;
+	mpitch = ACCESS_FBINFO(fbcon).var.xres_virtual;
 
-	if (p->type == FB_TYPE_TEXT) {
+	if (ACCESS_FBINFO(fbcon).fix.type == FB_TYPE_TEXT) {
 		maccess = 0x00000000;
 		mpitch = (mpitch >> 4) | 0x8000; /* set something */
 		mopmode = M_OPMODE_8BPP;
 	} else {
-		switch (p->var.bits_per_pixel) {
+		switch (ACCESS_FBINFO(fbcon).var.bits_per_pixel) {
 		case 4:		maccess = 0x00000000;	/* accelerate as 8bpp video */
 				mpitch = (mpitch >> 1) | 0x8000; /* disable linearization */
 				mopmode = M_OPMODE_4BPP;
@@ -107,7 +107,7 @@ void matrox_cfbX_init(WPMINFO struct display* p) {
 		case 8:		maccess = 0x00000000;
 				mopmode = M_OPMODE_8BPP;
 				break;
-		case 16:	if (p->var.green.length == 5)
+		case 16:	if (ACCESS_FBINFO(fbcon).var.green.length == 5)
 					maccess = 0xC0000001;
 				else
 					maccess = 0x40000001;
@@ -816,7 +816,7 @@ static void matrox_cfbX_clear_margins(struct vc_data* conp, struct display* p, i
 static void matrox_text_setup(struct display* p) {
 	MINFO_FROM_DISP(p);
 
-	p->next_line = p->line_length ? p->line_length : ((p->var.xres_virtual / (fontwidth(p)?fontwidth(p):8)) * ACCESS_FBINFO(devflags.textstep));
+	p->next_line = ACCESS_FBINFO(fbcon).fix.line_length ? ACCESS_FBINFO(fbcon).fix.line_length : ((p->var.xres_virtual / (fontwidth(p)?fontwidth(p):8)) * ACCESS_FBINFO(devflags.textstep));
 	p->next_plane = 0;
 }
 
@@ -1040,7 +1040,7 @@ static int matrox_text_setfont(struct display* p, int width, int height) {
 		MINFO_FROM_DISP(p);
 
 		matrox_text_round(PMINFO &p->var, p);
-		p->next_line = p->line_length = ((p->var.xres_virtual / (fontwidth(p)?fontwidth(p):8)) * ACCESS_FBINFO(devflags.textstep));
+		p->next_line = ACCESS_FBINFO(fbcon).fix.line_length = ((p->var.xres_virtual / (fontwidth(p)?fontwidth(p):8)) * ACCESS_FBINFO(devflags.textstep));
 
 		if (p->conp)
 			matrox_text_createcursor(PMINFO p);
@@ -1144,11 +1144,11 @@ void initMatrox(WPMINFO struct display* p) {
 	if (p->dispsw && p->conp)
 		fb_con.con_cursor(p->conp, CM_ERASE);
 	p->dispsw_data = NULL;
-	if ((p->var.accel_flags & FB_ACCELF_TEXT) != FB_ACCELF_TEXT) {
-		if (p->type == FB_TYPE_TEXT) {
+	if ((ACCESS_FBINFO(fbcon).var.accel_flags & FB_ACCELF_TEXT) != FB_ACCELF_TEXT) {
+		if (ACCESS_FBINFO(fbcon).fix.type == FB_TYPE_TEXT) {
 			swtmp = &matroxfb_text;
 		} else {
-			switch (p->var.bits_per_pixel) {
+			switch (ACCESS_FBINFO(fbcon).var.bits_per_pixel) {
 #ifdef FBCON_HAS_CFB4
 			case 4:
 				swtmp = &fbcon_cfb4;
@@ -1183,10 +1183,10 @@ void initMatrox(WPMINFO struct display* p) {
 			}
 		}
 		dprintk(KERN_INFO "matroxfb: acceleration disabled\n");
-	} else if (p->type == FB_TYPE_TEXT) {
+	} else if (ACCESS_FBINFO(fbcon).fix.type == FB_TYPE_TEXT) {
 		swtmp = &matroxfb_text;
 	} else {
-		switch (p->var.bits_per_pixel) {
+		switch (ACCESS_FBINFO(fbcon).var.bits_per_pixel) {
 #ifdef FBCON_HAS_CFB4
 		case 4:
 			swtmp = &matroxfb_cfb4;
@@ -1222,8 +1222,8 @@ void initMatrox(WPMINFO struct display* p) {
 	}
 	memcpy(&ACCESS_FBINFO(dispsw), swtmp, sizeof(ACCESS_FBINFO(dispsw)));
 	p->dispsw = &ACCESS_FBINFO(dispsw);
-	if ((p->type != FB_TYPE_TEXT) && ACCESS_FBINFO(devflags.hwcursor)) {
-		ACCESS_FBINFO(hw_switch)->selhwcursor(PMINFO p);
+	if ((ACCESS_FBINFO(fbcon).fix.type != FB_TYPE_TEXT) && ACCESS_FBINFO(devflags.hwcursor)) {
+		ACCESS_FBINFO(hw_switch)->selhwcursor(PMINFO2);
 	}
 }
 
@@ -1233,7 +1233,7 @@ void matrox_init_putc(WPMINFO struct display* p, void (*dac_createcursor)(WPMINF
 	int i;
 
 	if (p && p->conp) {
-		if (p->type == FB_TYPE_TEXT) {
+		if (ACCESS_FBINFO(fbcon).fix.type == FB_TYPE_TEXT) {
 			matrox_text_createcursor(PMINFO p);
 			matrox_text_loadfont(PMINFO p);
 			i = 0;
