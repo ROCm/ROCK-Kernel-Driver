@@ -396,7 +396,7 @@ static unsigned int fops_poll(struct file *file, struct poll_table_struct *wait)
 	return 0;
 }
 
-static ssize_t fops_read(struct file *file, char *data, size_t count, loff_t *ppos)
+static ssize_t fops_read(struct file *file, char __user *data, size_t count, loff_t *ppos)
 {
 	struct saa7146_fh *fh = file->private_data;
 
