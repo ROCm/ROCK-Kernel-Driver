@@ -97,7 +97,7 @@ struct udf_sb_info
 	uid_t			s_uid;
 
 	/* Root Info */
-	time_t			s_recordtime;
+	struct timespec		s_recordtime;
 
 	/* Fileset Info */
 	__u16			s_serialnum;
