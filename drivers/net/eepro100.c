@@ -119,6 +119,7 @@ static int debug = -1;			/* The debug level */
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 #include <linux/ethtool.h>
+#include <linux/mii.h>
 
 MODULE_AUTHOR("Maintainer: Andrey V. Savochkin <saw@saw.sw.com.sg>");
 MODULE_DESCRIPTION("Intel i82557/i82558/i82559 PCI EtherExpressPro driver");
@@ -488,7 +489,6 @@ struct speedo_private {
 	unsigned char acpi_pwr;
 	signed char rx_mode;			/* Current PROMISC/ALLMULTI setting. */
 	unsigned int tx_full:1;			/* The Tx queue is full. */
-	unsigned int full_duplex:1;		/* Full-duplex operation requested. */
 	unsigned int flow_ctrl:1;		/* Use 802.3x flow control. */
 	unsigned int rx_bug:1;			/* Work around receiver hang errata. */
 	unsigned char default_port:8;		/* Last dev->if_port value. */
@@ -1017,10 +1017,7 @@ speedo_open(struct net_device *dev)
 	if ((sp->phy[0] & 0x8000) == 0)
 		sp->mii_if.advertising = mdio_read(dev, sp->phy[0] & 0x1f, MII_ADVERTISE);
 
-	if (mdio_read(dev, sp->phy[0] & 0x1f, MII_BMSR) & BMSR_LSTATUS)
-		netif_carrier_on(dev);
-	else
-		netif_carrier_off(dev);
+	mii_check_link(&sp->mii_if);
 
 	if (speedo_debug > 2) {
 		printk(KERN_DEBUG "%s: Done speedo_open(), status %8.8x.\n",
@@ -1182,15 +1179,9 @@ static void speedo_timer(unsigned long data)
 				sp->flow_ctrl = flow_ctrl;
 				sp->rx_mode = -1;	/* Trigger a reload. */
 			}
-			/* Clear sticky bit. */
-			mdio_read(dev, phy_num, MII_BMSR);
-			/* If link beat has returned... */
-			if (mdio_read(dev, phy_num, MII_BMSR) & BMSR_LSTATUS)
-				netif_carrier_on(dev);
-			else
-				netif_carrier_off(dev);
 		}
 	}
+	mii_check_link(&sp->mii_if);
 	if (speedo_debug > 3) {
 		printk(KERN_DEBUG "%s: Media control tick, status %4.4x.\n",
 			   dev->name, inw(ioaddr + SCBStatus));
