@@ -403,6 +403,8 @@ void put_files_struct(struct files_struct *files)
 	}
 }
 
+EXPORT_SYMBOL(put_files_struct);
+
 static inline void __exit_files(struct task_struct *tsk)
 {
 	struct files_struct * files = tsk->files;

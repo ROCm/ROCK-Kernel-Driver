@@ -1,6 +1,9 @@
+#ifndef _PPC64_HVCALL_H
+#define _PPC64_HVCALL_H
 
 #define H_Success	0
 #define H_Busy		1	/* Hardware busy -- retry later */
+#define H_Constrained	4	/* Resource request constrained to max allowed */
 #define H_Hardware	-1	/* Hardware error */
 #define H_Function	-2	/* Function not supported */
 #define H_Privilege	-3	/* Caller not privileged */
@@ -138,3 +141,4 @@ long plpar_hcall_4out(unsigned long opcode,
 		      unsigned long *out3,
 		      unsigned long *out4);
 
+#endif /* _PPC64_HVCALL_H */

@@ -67,7 +67,7 @@ struct dvb_frontend_data {
 	pid_t thread_pid;
 	unsigned long release_jiffies;
 	unsigned long lost_sync_jiffies;
-	int aquire_signal;
+	int acquire_signal;
 	int bending;
 	int lnb_drift;
 	int timeout_count;
@@ -306,7 +306,7 @@ static int dvb_frontend_set_parameters (struct dvb_frontend_data *fe,
 		fe->lost_sync_count = 0;
 		fe->lost_sync_jiffies = jiffies;
 		fe->lnb_drift = 0;
-		fe->aquire_signal = 1;
+		fe->acquire_signal = 1;
 		if (fe->status & ~FE_TIMEDOUT)
 			dvb_frontend_add_event (fe, 0);
 		memcpy (&fe->parameters, param,
@@ -467,13 +467,13 @@ static int dvb_frontend_thread (void *data)
 		if (s & FE_HAS_LOCK) {
 			fe->timeout_count = 0;
 			fe->lost_sync_count = 0;
-			fe->aquire_signal = 0;
+			fe->acquire_signal = 0;
 		} else {
 			fe->lost_sync_count++;
 			if (!(fe->info->caps & FE_CAN_RECOVER)) {
 				if (!(fe->info->caps & FE_CAN_CLEAN_SETUP)) {
 					if (fe->lost_sync_count < 10) {
-						if (fe->aquire_signal)
+						if (fe->acquire_signal)
 							dvb_frontend_internal_ioctl(
 									&fe->frontend,
 									FE_RESET, NULL);

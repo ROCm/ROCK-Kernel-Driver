@@ -12,6 +12,7 @@
 
 #include <linux/stringify.h>
 #ifndef __ASSEMBLY__
+#include <linux/config.h>
 #include <asm/atomic.h>
 #include <asm/ppcdebug.h>
 #include <asm/a.out.h>

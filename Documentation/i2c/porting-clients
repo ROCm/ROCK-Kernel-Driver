@@ -92,10 +92,7 @@ Technical changes:
   i2c_get_clientdata(client) instead.
 
 * [Interface] Init function should not print anything. Make sure
-  there is a MODULE_LICENSE() line. MODULE_PARM() is replaced
-  by module_param(). Note that module_param has a third parameter,
-  that you should set to 0 by default. See include/linux/moduleparam.h
-  for details.
+  there is a MODULE_LICENSE() line.
 
 Coding policy:
 

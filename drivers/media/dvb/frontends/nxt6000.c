@@ -123,7 +123,19 @@ static u8 nxt6000_readreg(struct dvb_frontend *fe, u8 reg)
 	struct nxt6000_config *nxt = FE2NXT(fe);
 
 	return nxt6000_read(fe->i2c, nxt->demod_addr, reg);
+}
 
+static int pll_test(struct dvb_i2c_bus *i2c, u8 demod_addr, u8 tuner_addr)
+{
+	u8 buf [1];
+	struct i2c_msg msg = {.addr = tuner_addr >> 1,.flags = I2C_M_RD,.buf = buf,.len = 1 };
+	int ret;
+
+	nxt6000_write(i2c, demod_addr, ENABLE_TUNER_IIC, 0x01);	/* open i2c bus switch */
+	ret = i2c->xfer(i2c, &msg, 1);
+	nxt6000_write(i2c, demod_addr, ENABLE_TUNER_IIC, 0x00);	/* close i2c bus switch */
+
+	return (ret != 1) ? -EFAULT : 0;
 }
 
 static int pll_write(struct dvb_i2c_bus *i2c, u8 demod_addr, u8 tuner_addr, u8 *buf, u8 len)
@@ -833,21 +845,21 @@ static int nxt6000_attach(struct dvb_i2c_bus *i2c, void **data)
 		if (nxt6000_read(i2c, demod_addr_tbl[addr_nr], OFDM_MSC_REV) != NXT6000ASICDEVICE)
 			continue;
 
-		if (pll_write(i2c, demod_addr_tbl[addr_nr], 0xC0, NULL, 0) == 0) {
+		if (pll_test(i2c, demod_addr_tbl[addr_nr], 0xC0) == 0) {
 			nxt->tuner_addr = 0xC0;
 			nxt->tuner_type = TUNER_TYPE_ALP510;
 			nxt->clock_inversion = 1;
 	
 			dprintk("nxt6000: detected TI ALP510 tuner at 0x%02X\n", nxt->tuner_addr);
 		
-		} else if (pll_write(i2c, demod_addr_tbl[addr_nr], 0xC2, NULL, 0) == 0) {
+		} else if (pll_test(i2c, demod_addr_tbl[addr_nr], 0xC2) == 0) {
 			nxt->tuner_addr = 0xC2;
 			nxt->tuner_type = TUNER_TYPE_SP5659;
 			nxt->clock_inversion = 0;
 
 			dprintk("nxt6000: detected MITEL SP5659 tuner at 0x%02X\n", nxt->tuner_addr);
 		
-		} else if (pll_write(i2c, demod_addr_tbl[addr_nr], 0xC0, NULL, 0) == 0) {
+		} else if (pll_test(i2c, demod_addr_tbl[addr_nr], 0xC0) == 0) {
 			nxt->tuner_addr = 0xC0;
 			nxt->tuner_type = TUNER_TYPE_SP5730;
 			nxt->clock_inversion = 0;

@@ -4,4 +4,6 @@
 /* nothing to see, move along */
 #include <asm-generic/sections.h>
 
+extern char _end[], _start[];
+
 #endif

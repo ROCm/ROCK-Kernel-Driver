@@ -13,6 +13,7 @@
 #ifndef _PPC64_MMU_H_
 #define _PPC64_MMU_H_
 
+#include <linux/config.h>
 #include <asm/page.h>
 
 #ifndef __ASSEMBLY__
@@ -25,14 +26,6 @@ typedef unsigned long mm_context_t;
 #else
 #define CONTEXT_LOW_HPAGES	0
 #endif
-
-/*
- * Define the size of the cache used for segment table entries.  The first
- * entry is used as a cache pointer, therefore the actual number of entries
- * stored is one less than defined here.  Do not change this value without
- * considering the impact it will have on the layout of the paca in paca.h.
- */
-#define STAB_CACHE_SIZE 16
 
 /*
  * Hardware Segment Lookaside Buffer Entry

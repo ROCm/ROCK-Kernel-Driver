@@ -28,6 +28,7 @@
 #include <linux/device.h>
 #include <linux/swapops.h>
 #include <linux/bootmem.h>
+#include <linux/utsname.h>
 
 #include <asm/mmu_context.h>
 

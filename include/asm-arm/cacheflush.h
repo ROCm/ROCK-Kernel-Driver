@@ -209,8 +209,21 @@ extern void dmac_flush_range(unsigned long, unsigned long);
 
 #endif
 
+/*
+ * flush_cache_vmap() is used when creating mappings (eg, via vmap,
+ * vmalloc, ioremap etc) in kernel space for pages.  Since the
+ * direct-mappings of these pages may contain cached data, we need
+ * to do a full cache flush to ensure that writebacks don't corrupt
+ * data placed into these pages via the new mappings.
+ */
 #define flush_cache_vmap(start, end)		flush_cache_all()
 #define flush_cache_vunmap(start, end)		flush_cache_all()
+
+/*
+ * Copy user data from/to a page which is mapped into a different
+ * processes address space.  Really, we want to allow our "user
+ * space" model to handle this.
+ */
 #define copy_to_user_page(vma, page, vaddr, dst, src, len) \
 do { memcpy(dst, src, len); \
      flush_icache_user_range(vma, page, vaddr, len); \

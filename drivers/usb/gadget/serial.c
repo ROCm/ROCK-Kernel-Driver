@@ -135,9 +135,6 @@ do {									\
 
 #define GS_NUM_PORTS			16
 
-#define GS_VENDOR_ID			0x05F9
-#define GS_PRODUCT_ID			0xFFFF
-
 #define GS_NUM_CONFIGS			1
 #define GS_NO_CONFIG_ID			0
 #define GS_BULK_CONFIG_ID		2
@@ -187,7 +184,7 @@ static int debug = G_SERIAL_DEBUG;
  * DMA channels to manage their FIFOs.  It supports high speed.
  * Those endpoints can be arranged in any desired configuration.
  */
-#ifdef	CONFIG_USB_G_SERIAL_NET2280
+#ifdef	CONFIG_USB_GADGET_NET2280
 #define CHIP				"net2280"
 #define EP0_MAXPACKET			64
 static const char EP_OUT_NAME[] =	"ep-a";
@@ -220,13 +217,13 @@ static inline void hw_optimize(struct usb_gadget *gadget)
  * can't use altsettings or reset the interfaces independently.
  * So stick to a single interface.
  */
-#ifdef	CONFIG_USB_G_SERIAL_PXA2XX
+#ifdef	CONFIG_USB_GADGET_PXA2XX
 #define CHIP				"pxa2xx"
 #define EP0_MAXPACKET			16
-static const char EP_OUT_NAME[] =	"ep12out-bulk";
-#define EP_OUT_NUM			12
-static const char EP_IN_NAME[] =	"ep11in-bulk";
-#define EP_IN_NUM			11
+static const char EP_OUT_NAME[] =	"ep2out-bulk";
+#define EP_OUT_NUM			2
+static const char EP_IN_NAME[] =	"ep1in-bulk";
+#define EP_IN_NUM			1
 #define SELFPOWER 			USB_CONFIG_ATT_SELFPOWER
 
 /* no hw optimizations to apply */
@@ -245,7 +242,7 @@ static const char EP_IN_NAME[] =	"ep11in-bulk";
  * in special situations.  So this is a case of "choose it right
  * during enumeration" ...
  */
-#ifdef	CONFIG_USB_G_SERIAL_SA1100
+#ifdef	CONFIG_USB_GADGET_SA1100
 #define CHIP				"sa1100"
 #define EP0_MAXPACKET			8
 static const char EP_OUT_NAME[] =	"ep1out-bulk";
@@ -264,7 +261,7 @@ static const char EP_IN_NAME [] =	"ep2in-bulk";
  *
  * This has three semi-configurable full speed bulk/interrupt endpoints.
  */
-#ifdef	CONFIG_USB_G_SERIAL_GOKU
+#ifdef	CONFIG_USB_GADGET_GOKU
 #define CHIP				"goku"
 #define DRIVER_VERSION_NUM		0x0116
 #define EP0_MAXPACKET			8
@@ -301,6 +298,14 @@ static const char EP_IN_NAME [] =	"ep2-bulk";
 #define WAKEUP				0
 /* else value must be USB_CONFIG_ATT_WAKEUP */
 #endif
+
+/* Thanks to NetChip Technologies for donating this product ID.
+ *
+ * DO NOT REUSE THESE IDs with a protocol-incompatible driver!!  Ever!!
+ * Instead:  allocate your own, using normal USB-IF procedures.
+ */
+#define GS_VENDOR_ID	0x0525		/* NetChip */
+#define GS_PRODUCT_ID	0xa4a6		/* Linux-USB Serial Gadget */
 
 
 /* Structures */

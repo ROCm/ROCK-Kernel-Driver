@@ -19,7 +19,7 @@ extern unsigned long bus_to_virt_not_defined_use_pci_map(volatile void *addr);
 #define bus_to_virt bus_to_virt_not_defined_use_pci_map
 
 /* BIO layer definitions. */
-extern unsigned long phys_base;
+extern unsigned long phys_base, kern_base, kern_size;
 #define page_to_phys(page)	((((page) - mem_map) << PAGE_SHIFT)+phys_base)
 #define BIO_VMERGE_BOUNDARY	8192
 

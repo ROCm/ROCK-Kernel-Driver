@@ -11,6 +11,8 @@
  *  2 of the License, or (at your option) any later version.
  */
 
+#ifndef _PPC64_PPC_ASM_H
+#define _PPC64_PPC_ASM_H
 /*
  * Macros for storing registers into and loading registers from
  * exception frames.
@@ -238,3 +240,5 @@
 #define	vr29	29
 #define	vr30	30
 #define	vr31	31
+
+#endif /* _PPC64_PPC_ASM_H */

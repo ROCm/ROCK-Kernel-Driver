@@ -2,6 +2,8 @@
 # USB peripheral controller drivers
 #
 obj-$(CONFIG_USB_NET2280)	+= net2280.o
+obj-$(CONFIG_USB_PXA2XX)	+= pxa2xx_udc.o
+obj-$(CONFIG_USB_GOKU)		+= goku_udc.o
 
 #
 # USB gadget drivers
@@ -10,8 +12,11 @@ g_zero-objs			:= zero.o usbstring.o
 g_ether-objs			:= ether.o usbstring.o
 g_serial-objs			:= serial.o usbstring.o
 gadgetfs-objs			:= inode.o usbstring.o
+g_file_storage-objs		:= file_storage.o usbstring.o
  
 obj-$(CONFIG_USB_ZERO)		+= g_zero.o
 obj-$(CONFIG_USB_ETH)		+= g_ether.o
 obj-$(CONFIG_USB_GADGETFS)	+= gadgetfs.o
+obj-$(CONFIG_USB_FILE_STORAGE)	+= g_file_storage.o
 obj-$(CONFIG_USB_G_SERIAL)	+= g_serial.o
+

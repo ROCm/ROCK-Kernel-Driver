@@ -86,8 +86,7 @@ void __devinit pci_name_device(struct pci_dev *dev)
 
 		/* Full match */
 		match_device: {
-			char *n = name + sprintf(name, "%." PCI_NAME_HALF
-					"s %." PCI_NAME_HALF "s",
+			char *n = name + sprintf(name, "%s %s",
 					vendor_p->name, device_p->name);
 			int nr = device_p->seen + 1;
 			device_p->seen = nr;

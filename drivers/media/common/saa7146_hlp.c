@@ -1,9 +1,5 @@
+#include <linux/kernel.h>
 #include <media/saa7146_vv.h>
-
-#define my_min(type,x,y) \
-	({ type __x = (x), __y = (y); __x < __y ? __x: __y; })
-#define my_max(type,x,y) \
-	({ type __x = (x), __y = (y); __x > __y ? __x: __y; })
 
 static void calculate_output_format_register(struct saa7146_dev* saa, u32 palette, u32* clip_format)
 {
@@ -398,11 +394,11 @@ static void calculate_clipping_registers_rect(struct saa7146_dev *dev, struct sa
 		b = y[i]+h[i];
 		
 		/* insert left/right coordinates */
-		pixel_list[ 2*i   ] = my_min(int, l, width);
-		pixel_list[(2*i)+1] = my_min(int, r, width);
+		pixel_list[ 2*i   ] = min_t(int, l, width);
+		pixel_list[(2*i)+1] = min_t(int, r, width);
 		/* insert top/bottom coordinates */
-		line_list[ 2*i   ] = my_min(int, t, height);
-		line_list[(2*i)+1] = my_min(int, b, height);
+		line_list[ 2*i   ] = min_t(int, t, height);
+		line_list[(2*i)+1] = min_t(int, b, height);
 	}
 
 	/* sort and eliminate lists */
@@ -411,9 +407,9 @@ static void calculate_clipping_registers_rect(struct saa7146_dev *dev, struct sa
 	sort_and_eliminate( &line_list[0], &cnt_line );
 
 	/* calculate the number of used u32s */
-	numdwords = my_max(int, (cnt_line+1), (cnt_pixel+1))*2; 
-	numdwords = my_max(int, 4, numdwords);
-	numdwords = my_min(int, 64, numdwords);
+	numdwords = max_t(int, (cnt_line+1), (cnt_pixel+1))*2;
+	numdwords = max_t(int, 4, numdwords);
+	numdwords = min_t(int, 64, numdwords);
 
 	/* fill up cliptable */
 	for(i = 0; i < cnt_pixel; i++) {
@@ -1022,6 +1018,7 @@ void saa7146_set_capture(struct saa7146_dev *dev, struct saa7146_buf *buf, struc
 
 	saa7146_set_window(dev, buf->fmt->width, buf->fmt->height, buf->fmt->field);
 	saa7146_set_output_format(dev, sfmt->trans);
+	saa7146_disable_clipping(dev);
 
 	if ( vv->last_field == V4L2_FIELD_INTERLACED ) {
 	} else if ( vv->last_field == V4L2_FIELD_TOP ) {

@@ -159,6 +159,7 @@ GET_STATUS(power_status, u8)
 GET_STATUS(attention_status, u8)
 GET_STATUS(latch_status, u8)
 GET_STATUS(adapter_status, u8)
+GET_STATUS(address, u32)
 GET_STATUS(max_bus_speed, enum pci_bus_speed)
 GET_STATUS(cur_bus_speed, enum pci_bus_speed)
 
@@ -302,6 +303,28 @@ static struct hotplug_slot_attribute hotplug_slot_attr_presence = {
 	.show = presence_read_file,
 };
 
+static ssize_t address_read_file (struct hotplug_slot *slot, char *buf)
+{
+	int retval;
+	u32 address;
+
+	retval = get_address (slot, &address);
+	if (retval)
+		goto exit;
+	retval = sprintf (buf, "%04x:%02x:%02x\n",
+			  (address >> 16) & 0xffff,
+			  (address >> 8) & 0xff,
+			  address & 0xff);
+
+exit:
+	return retval;
+}
+
+static struct hotplug_slot_attribute hotplug_slot_attr_address = {
+	.attr = {.name = "address", .mode = S_IFREG | S_IRUGO},
+	.show = address_read_file,
+};
+
 static char *unknown_speed = "Unknown bus speed";
 
 static ssize_t max_bus_speed_read_file (struct hotplug_slot *slot, char *buf)
@@ -425,6 +448,15 @@ static int has_adapter_file (struct hotplug_slot *slot)
 	return -ENOENT;
 }
 
+static int has_address_file (struct hotplug_slot *slot)
+{
+	if ((!slot) || (!slot->ops))
+		return -ENODEV;
+	if (slot->ops->get_address)
+		return 0;
+	return -ENOENT;
+}
+
 static int has_max_bus_speed_file (struct hotplug_slot *slot)
 {
 	if ((!slot) || (!slot->ops))
@@ -466,6 +498,9 @@ static int fs_add_slot (struct hotplug_slot *slot)
 	if (has_adapter_file(slot) == 0)
 		sysfs_create_file(&slot->kobj, &hotplug_slot_attr_presence.attr);
 
+	if (has_address_file(slot) == 0)
+		sysfs_create_file(&slot->kobj, &hotplug_slot_attr_address.attr);
+
 	if (has_max_bus_speed_file(slot) == 0)
 		sysfs_create_file(&slot->kobj, &hotplug_slot_attr_max_bus_speed.attr);
 
@@ -491,6 +526,9 @@ static void fs_remove_slot (struct hotplug_slot *slot)
 
 	if (has_adapter_file(slot) == 0)
 		sysfs_remove_file(&slot->kobj, &hotplug_slot_attr_presence.attr);
+
+	if (has_address_file(slot) == 0)
+		sysfs_remove_file(&slot->kobj, &hotplug_slot_attr_address.attr);
 
 	if (has_max_bus_speed_file(slot) == 0)
 		sysfs_remove_file(&slot->kobj, &hotplug_slot_attr_max_bus_speed.attr);
@@ -533,7 +571,7 @@ int pci_hp_register (struct hotplug_slot *slot)
 	if ((slot->info == NULL) || (slot->ops == NULL))
 		return -EINVAL;
 
-	strlcpy(slot->kobj.name, slot->name, KOBJ_NAME_LEN);
+	kobject_set_name(&slot->kobj, slot->name);
 	kobj_set_kset_s(slot, pci_hotplug_slots_subsys);
 
 	/* this can fail if we have already registered a slot with the same name */
@@ -611,6 +649,10 @@ int pci_hp_change_slot_info (struct hotplug_slot *slot, struct hotplug_slot_info
 	if ((has_adapter_file(slot) == 0) &&
 	    (slot->info->adapter_status != info->adapter_status))
 		sysfs_update_file(&slot->kobj, &hotplug_slot_attr_presence.attr);
+
+	if ((has_address_file(slot) == 0) &&
+	    (slot->info->address != info->address))
+		sysfs_update_file(&slot->kobj, &hotplug_slot_attr_address.attr);
 
 	if ((has_max_bus_speed_file(slot) == 0) &&
 	    (slot->info->max_bus_speed != info->max_bus_speed))

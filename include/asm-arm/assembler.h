@@ -25,11 +25,25 @@
 #ifndef __ARMEB__
 #define pull            lsr
 #define push            lsl
-#define byte(x)         (x*8)
+#define get_byte_0      lsl #0
+#define get_byte_1	lsr #8
+#define get_byte_2	lsr #16
+#define get_byte_3	lsr #24
+#define put_byte_0      lsl #0
+#define put_byte_1	lsl #8
+#define put_byte_2	lsl #16
+#define put_byte_3	lsl #24
 #else
 #define pull            lsl
 #define push            lsr
-#define byte(x)         ((3-x)*8)
+#define get_byte_0	lsr #24
+#define get_byte_1	lsr #16
+#define get_byte_2	lsr #8
+#define get_byte_3      lsl #0
+#define put_byte_0	lsl #24
+#define put_byte_1	lsl #16
+#define put_byte_2	lsl #8
+#define put_byte_3      lsl #0
 #endif
 
 /*

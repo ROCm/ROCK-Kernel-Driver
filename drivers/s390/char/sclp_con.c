@@ -149,7 +149,8 @@ sclp_console_write(struct console *console, const char *message,
 		count -= written;
 	} while (count > 0);
 	/* Setup timer to output current console buffer after 1/10 second */
-	if (sclp_conbuf != NULL && !timer_pending(&sclp_con_timer)) {
+	if (sclp_conbuf != NULL && sclp_chars_in_buffer(sclp_conbuf) != 0 &&
+	    !timer_pending(&sclp_con_timer)) {
 		init_timer(&sclp_con_timer);
 		sclp_con_timer.function = sclp_console_timeout;
 		sclp_con_timer.data = 0UL;

@@ -6,9 +6,9 @@ static char rcsid[] =
  * pc300.c	Cyclades-PC300(tm) Driver.
  *
  * Author:	Ivan Passos <ivan@cyclades.com>
- * Maintainer:	Henrique Gobbi <henrique@cyclades.com>
+ * Maintainer:	PC300 Maintainer <pc300@cyclades.com>
  *
- * Copyright:	(c) 1999-2002 Cyclades Corp.
+ * Copyright:	(c) 1999-2003 Cyclades Corp.
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License
@@ -252,7 +252,7 @@ static char rcsid[] =
 #undef	PC300_DEBUG_RX
 #undef	PC300_DEBUG_OTHER
 
-static struct pci_device_id cpc_pci_dev_id[] = {
+static struct pci_device_id cpc_pci_dev_id[] __devinitdata = {
 	/* PC300/RSV or PC300/X21, 2 chan */
 	{0x120e, 0x300, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0x300},
 	/* PC300/RSV or PC300/X21, 1 chan */
@@ -1961,7 +1961,7 @@ void cpc_net_rx(hdlc_device * hdlc)
 		}
 		stats->rx_packets++;
 		skb->mac.raw = skb->data;
-		skb->protocol = htons(ETH_P_HDLC);
+		skb->protocol = hdlc_type_trans(skb, dev);
 		netif_rx(skb);
 	}
 }
@@ -2088,9 +2088,10 @@ static void sca_intr(pc300_t * card)
 					}
 				}
 				if (!(dsr_rx = cpc_readb(scabase + DSR_RX(ch)) & DSR_DE)) {
-
-printk("%s: RX intr chan[%d] (st=0x%08lx, dsr=0x%02x, dsr2=0x%02x)\n", 
-	dev->name, ch, status, drx_stat, dsr_rx);
+#ifdef PC300_DEBUG_INTR
+		printk("%s: RX intr chan[%d] (st=0x%08lx, dsr=0x%02x, dsr2=0x%02x)\n",
+			dev->name, ch, status, drx_stat, dsr_rx);
+#endif
 					cpc_writeb(scabase + DSR_RX(ch), (dsr_rx | DSR_DE) & 0xfe);
 				}
 			}
@@ -2770,6 +2771,10 @@ int cpc_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 					if (!capable(CAP_NET_ADMIN)) {
 						return -EPERM;
 					}
+					/* incorrect data len? */
+					if (ifr->ifr_settings.size != size) {
+						return -ENOBUFS;
+					}
 
 					if (copy_from_user(&conf->phys_settings, 
 							   settings->ifs_ifsu.sync, size)) {
@@ -2788,12 +2793,18 @@ int cpc_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 				case IF_IFACE_T1:
 				case IF_IFACE_E1:
 				{
+					const size_t te_size = sizeof(te1_settings);
 					const size_t size = sizeof(sync_serial_settings);
 
 					if (!capable(CAP_NET_ADMIN)) {
 						return -EPERM;
 					}
-					
+
+					/* incorrect data len? */
+					if (ifr->ifr_settings.size != te_size) {
+						return -ENOBUFS;
+					}
+
 					if (copy_from_user(&conf->phys_settings, 
 							   settings->ifs_ifsu.te1, size)) {
 						return -EFAULT;
@@ -3667,12 +3678,10 @@ static void __devexit cpc_remove_one(struct pci_dev *pdev)
 }
 
 static struct pci_driver cpc_driver = {
-	.name = "pc300",
-	.id_table = cpc_pci_dev_id,
-	.probe = cpc_init_one,
-	.remove = cpc_remove_one,
-	.suspend = NULL,
-	.resume = NULL,
+	.name           = "pc300",
+	.id_table       = cpc_pci_dev_id,
+	.probe          = cpc_init_one,
+	.remove         = __devexit_p(cpc_remove_one),
 };
 
 static int __init cpc_init(void)
@@ -3690,6 +3699,6 @@ module_exit(cpc_cleanup_module);
 
 MODULE_DESCRIPTION("Cyclades-PC300 cards driver");
 MODULE_AUTHOR(  "Author: Ivan Passos <ivan@cyclades.com>\r\n"
-                "Maintainer: Henrique Gobbi <henrique.gobbi@cyclades.com");
+                "Maintainer: PC300 Maintainer <pc300@cyclades.com");
 MODULE_LICENSE("GPL");
 

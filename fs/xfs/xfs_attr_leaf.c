@@ -159,6 +159,9 @@ xfs_attr_shortform_add(xfs_da_args_t *args)
 			continue;
 		if (memcmp(args->name, sfe->nameval, args->namelen) != 0)
 			continue;
+		if (((args->flags & ATTR_SECURE) != 0) !=
+		    ((sfe->flags & XFS_ATTR_SECURE) != 0))
+			continue;
 		if (((args->flags & ATTR_ROOT) != 0) !=
 		    ((sfe->flags & XFS_ATTR_ROOT) != 0))
 			continue;
@@ -173,7 +176,8 @@ xfs_attr_shortform_add(xfs_da_args_t *args)
 
 	sfe->namelen = args->namelen;
 	INT_SET(sfe->valuelen, ARCH_CONVERT, args->valuelen);
-	sfe->flags = (args->flags & ATTR_ROOT) ? XFS_ATTR_ROOT : 0;
+	sfe->flags = (args->flags & ATTR_SECURE) ? XFS_ATTR_SECURE :
+			((args->flags & ATTR_ROOT) ? XFS_ATTR_ROOT : 0);
 	memcpy(sfe->nameval, args->name, args->namelen);
 	memcpy(&sfe->nameval[args->namelen], args->value, args->valuelen);
 	INT_MOD(sf->hdr.count, ARCH_CONVERT, 1);
@@ -208,6 +212,9 @@ xfs_attr_shortform_remove(xfs_da_args_t *args)
 		if (sfe->namelen != args->namelen)
 			continue;
 		if (memcmp(sfe->nameval, args->name, args->namelen) != 0)
+			continue;
+		if (((args->flags & ATTR_SECURE) != 0) !=
+		    ((sfe->flags & XFS_ATTR_SECURE) != 0))
 			continue;
 		if (((args->flags & ATTR_ROOT) != 0) !=
 		    ((sfe->flags & XFS_ATTR_ROOT) != 0))
@@ -253,6 +260,9 @@ xfs_attr_shortform_lookup(xfs_da_args_t *args)
 			continue;
 		if (memcmp(args->name, sfe->nameval, args->namelen) != 0)
 			continue;
+		if (((args->flags & ATTR_SECURE) != 0) !=
+		    ((sfe->flags & XFS_ATTR_SECURE) != 0))
+			continue;
 		if (((args->flags & ATTR_ROOT) != 0) !=
 		    ((sfe->flags & XFS_ATTR_ROOT) != 0))
 			continue;
@@ -280,6 +290,9 @@ xfs_attr_shortform_getvalue(xfs_da_args_t *args)
 		if (sfe->namelen != args->namelen)
 			continue;
 		if (memcmp(args->name, sfe->nameval, args->namelen) != 0)
+			continue;
+		if (((args->flags & ATTR_SECURE) != 0) !=
+		    ((sfe->flags & XFS_ATTR_SECURE) != 0))
 			continue;
 		if (((args->flags & ATTR_ROOT) != 0) !=
 		    ((sfe->flags & XFS_ATTR_ROOT) != 0))
@@ -369,7 +382,8 @@ xfs_attr_shortform_to_leaf(xfs_da_args_t *args)
 		nargs.valuelen = INT_GET(sfe->valuelen, ARCH_CONVERT);
 		nargs.hashval = xfs_da_hashname((char *)sfe->nameval,
 						sfe->namelen);
-		nargs.flags = (sfe->flags & XFS_ATTR_ROOT) ? ATTR_ROOT : 0;
+		nargs.flags = (sfe->flags & XFS_ATTR_SECURE) ? ATTR_SECURE :
+				((sfe->flags & XFS_ATTR_ROOT) ? ATTR_ROOT : 0);
 		error = xfs_attr_leaf_lookup_int(bp, &nargs); /* set a->index */
 		ASSERT(error == ENOATTR);
 		error = xfs_attr_leaf_add(bp, &nargs);
@@ -446,14 +460,15 @@ xfs_attr_shortform_list(xfs_attr_list_context_t *context)
 				i < INT_GET(sf->hdr.count, ARCH_CONVERT); i++) {
 			attrnames_t	*namesp;
 
-			namesp = (sfe->flags & XFS_ATTR_ROOT) ? &attr_trusted :
-				  &attr_user;
 			if (((context->flags & ATTR_ROOT) != 0) !=
 			    ((sfe->flags & XFS_ATTR_ROOT) != 0) &&
 			    !(context->flags & ATTR_KERNFULLS)) {
 				sfe = XFS_ATTR_SF_NEXTENTRY(sfe);
 				continue;
 			}
+			namesp = (sfe->flags & XFS_ATTR_SECURE) ? &attr_secure:
+				((sfe->flags & XFS_ATTR_ROOT) ? &attr_trusted :
+				  &attr_user);
 			if (context->flags & ATTR_KERNOVAL) {
 				ASSERT(context->flags & ATTR_KERNAMELS);
 				context->count += namesp->attr_namelen +
@@ -548,8 +563,9 @@ xfs_attr_shortform_list(xfs_attr_list_context_t *context)
 	for ( ; i < nsbuf; i++, sbp++) {
 		attrnames_t	*namesp;
 
-		namesp = (sfe->flags & XFS_ATTR_ROOT) ? &attr_trusted :
-			  &attr_user;
+		namesp = (sfe->flags & XFS_ATTR_SECURE) ? &attr_secure :
+			((sfe->flags & XFS_ATTR_ROOT) ? &attr_trusted :
+			  &attr_user);
 
 		if (cursor->hashval != INT_GET(sbp->hash, ARCH_CONVERT)) {
 			cursor->hashval = INT_GET(sbp->hash, ARCH_CONVERT);
@@ -668,7 +684,8 @@ xfs_attr_leaf_to_shortform(xfs_dabuf_t *bp, xfs_da_args_t *args)
 		nargs.value = (char *)&name_loc->nameval[nargs.namelen];
 		nargs.valuelen = INT_GET(name_loc->valuelen, ARCH_CONVERT);
 		nargs.hashval = INT_GET(entry->hashval, ARCH_CONVERT);
-		nargs.flags = (entry->flags & XFS_ATTR_ROOT) ? ATTR_ROOT : 0;
+		nargs.flags = (entry->flags & XFS_ATTR_SECURE) ? ATTR_SECURE :
+			      ((entry->flags & XFS_ATTR_ROOT) ? ATTR_ROOT : 0);
 		xfs_attr_shortform_add(&nargs);
 	}
 	error = 0;
@@ -963,7 +980,8 @@ xfs_attr_leaf_add_work(xfs_dabuf_t *bp, xfs_da_args_t *args, int mapindex)
 				      + INT_GET(map->size, ARCH_CONVERT));
 	INT_SET(entry->hashval, ARCH_CONVERT, args->hashval);
 	entry->flags = tmp ? XFS_ATTR_LOCAL : 0;
-	entry->flags |= (args->flags & ATTR_ROOT) ? XFS_ATTR_ROOT : 0;
+	entry->flags |= (args->flags & ATTR_SECURE) ? XFS_ATTR_SECURE :
+			((args->flags & ATTR_ROOT) ? XFS_ATTR_ROOT : 0);
 	if (args->rename) {
 		entry->flags |= XFS_ATTR_INCOMPLETE;
 		if ((args->blkno2 == args->blkno) &&
@@ -1881,6 +1899,9 @@ xfs_attr_leaf_lookup_int(xfs_dabuf_t *bp, xfs_da_args_t *args)
 			if (memcmp(args->name, (char *)name_loc->nameval,
 					     args->namelen) != 0)
 				continue;
+			if (((args->flags & ATTR_SECURE) != 0) !=
+			    ((entry->flags & XFS_ATTR_SECURE) != 0))
+				continue;
 			if (((args->flags & ATTR_ROOT) != 0) !=
 			    ((entry->flags & XFS_ATTR_ROOT) != 0))
 				continue;
@@ -1892,6 +1913,9 @@ xfs_attr_leaf_lookup_int(xfs_dabuf_t *bp, xfs_da_args_t *args)
 				continue;
 			if (memcmp(args->name, (char *)name_rmt->name,
 					     args->namelen) != 0)
+				continue;
+			if (((args->flags & ATTR_SECURE) != 0) !=
+			    ((entry->flags & XFS_ATTR_SECURE) != 0))
 				continue;
 			if (((args->flags & ATTR_ROOT) != 0) !=
 			    ((entry->flags & XFS_ATTR_ROOT) != 0))
@@ -2290,8 +2314,9 @@ xfs_attr_leaf_list_int(xfs_dabuf_t *bp, xfs_attr_list_context_t *context)
 		    !(context->flags & ATTR_KERNFULLS))
 			continue;		/* skip non-matching entries */
 
-		namesp = (entry->flags & XFS_ATTR_ROOT) ? &attr_trusted :
-			  &attr_user;
+		namesp = (entry->flags & XFS_ATTR_SECURE) ? &attr_secure :
+			((entry->flags & XFS_ATTR_ROOT) ? &attr_trusted :
+			  &attr_user);
 
 		if (entry->flags & XFS_ATTR_LOCAL) {
 			name_loc = XFS_ATTR_LEAF_NAME_LOCAL(leaf, i);

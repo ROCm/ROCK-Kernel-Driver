@@ -42,7 +42,7 @@ csum_partial(const unsigned char * buff, int len, unsigned int sum)
 	__asm__ __volatile__ (
 		"0:  cksm %0,%1\n"	/* do checksum on longs */
 		"    jo   0b\n"
-		: "+&d" (sum), "+&a" (rp) : : "cc" );
+		: "+&d" (sum), "+&a" (rp) : : "cc", "memory" );
 #else /* __s390x__ */
         __asm__ __volatile__ (
                 "    lgr  2,%1\n"    /* address in gpr 2 */
@@ -51,7 +51,7 @@ csum_partial(const unsigned char * buff, int len, unsigned int sum)
                 "    jo   0b\n"
                 : "+&d" (sum)
                 : "d" (buff), "d" (len)
-                : "cc", "2", "3" );
+                : "cc", "memory", "2", "3" );
 #endif /* __s390x__ */
 	return sum;
 }

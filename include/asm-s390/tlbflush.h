@@ -85,7 +85,7 @@ static inline void global_flush_tlb(void)
 			"    slr  2,2\n"
 			"    slr  3,3\n"
 			"    csp  2,%0"
-			: : "a" (addr) : "cc", "2", "3" );
+			: : "a" (addr), "m" (dummy) : "cc", "2", "3" );
 	}
 }
 

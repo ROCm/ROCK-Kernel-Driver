@@ -66,6 +66,9 @@ config DVB_BUDGET_CI
 	  (so called Budget- or Nova-PCI cards) without onboard
 	  MPEG2 decoder, but with onboard Common Interface connector.
 
+	  Note: The Common Interface is not yet supported by this driver
+	  due to lack of information from the vendor.
+
 	  Say Y if you own such a card and want to use it.
 
 	  To compile this driver as a module, choose M here: the

@@ -55,5 +55,4 @@ void sort_extable(struct exception_table_entry *start,
 			}
 		}
 	} while (change != 0);
-	return 0;
 }
