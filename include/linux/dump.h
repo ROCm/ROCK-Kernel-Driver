@@ -48,8 +48,8 @@ struct __lkcdinfo {
  * dump devices are enabled.
  */
 #if defined(CONFIG_CRASH_BLOCKDEV) || defined(CONFIG_CRASH_BLOCKDEV_MODULE) \
-    defined(CONFIG_CRASH_NETDEV) || defined(CONFIG_CRASH_NETDEV_MODULE) \
-    defined(CONFIG_CRASH_MEMDEV) || defined(CONFIG_CRASH_MEMDEV_MODULE)
+    || defined(CONFIG_CRASH_NETDEV) || defined(CONFIG_CRASH_NETDEV_MODULE) \
+    || defined(CONFIG_CRASH_MEMDEV) || defined(CONFIG_CRASH_MEMDEV_MODULE)
 
 #include <linux/dumpdev.h>
 
