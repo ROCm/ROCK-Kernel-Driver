@@ -328,7 +328,7 @@ void scsi_setup_cmd_retry(struct scsi_cmnd *cmd)
 
 /*
  * Called for single_lun devices on IO completion. Clear starget_sdev_user,
- * and call __blk_run_queue for all the scsi_devices on the target -
+ * and call blk_run_queue for all the scsi_devices on the target -
  * including current_sdev first.
  *
  * Called with *no* scsi locks held.
@@ -336,7 +336,7 @@ void scsi_setup_cmd_retry(struct scsi_cmnd *cmd)
 static void scsi_single_lun_run(struct scsi_device *current_sdev)
 {
 	struct scsi_device *sdev;
-	unsigned long flags, flags2;
+	unsigned long flags;
 
 	spin_lock_irqsave(current_sdev->host->host_lock, flags);
 	WARN_ON(!current_sdev->sdev_target->starget_sdev_user);
@@ -344,14 +344,12 @@ static void scsi_single_lun_run(struct scsi_device *current_sdev)
 	spin_unlock_irqrestore(current_sdev->host->host_lock, flags);
 
 	/*
-	 * Call __blk_run_queue for all LUNs on the target, starting with
+	 * Call blk_run_queue for all LUNs on the target, starting with
 	 * current_sdev. We race with others (to set starget_sdev_user),
 	 * but in most cases, we will be first. Ideally, each LU on the
 	 * target would get some limited time or requests on the target.
 	 */
-	spin_lock_irqsave(current_sdev->request_queue->queue_lock, flags2);
-	__blk_run_queue(current_sdev->request_queue);
-	spin_unlock_irqrestore(current_sdev->request_queue->queue_lock, flags2);
+	blk_run_queue(current_sdev->request_queue);
 
 	spin_lock_irqsave(current_sdev->host->host_lock, flags);
 	if (current_sdev->sdev_target->starget_sdev_user) {
@@ -366,11 +364,8 @@ static void scsi_single_lun_run(struct scsi_device *current_sdev)
 	spin_unlock_irqrestore(current_sdev->host->host_lock, flags);
 
 	list_for_each_entry(sdev, &current_sdev->same_target_siblings,
-			    same_target_siblings) {
-		spin_lock_irqsave(sdev->request_queue->queue_lock, flags2);
-		__blk_run_queue(sdev->request_queue);
-		spin_unlock_irqrestore(sdev->request_queue->queue_lock, flags2);
-	}
+			    same_target_siblings)
+		blk_run_queue(sdev->request_queue);
 }
 
 /*
@@ -452,7 +447,7 @@ void scsi_queue_next_request(request_queue_t *q, struct scsi_cmnd *cmd)
 		  (shost->host_busy >= shost->can_queue))) {
 		/*
 		 * As long as shost is accepting commands and we have
-		 * starved queues, call __blk_run_queue. scsi_request_fn
+		 * starved queues, call blk_run_queue. scsi_request_fn
 		 * drops the queue_lock and can add us back to the
 		 * starved_list.
 		 *
@@ -465,9 +460,7 @@ void scsi_queue_next_request(request_queue_t *q, struct scsi_cmnd *cmd)
 		list_del_init(&sdev->starved_entry);
 		spin_unlock_irqrestore(shost->host_lock, flags);
 
-		spin_lock_irqsave(sdev->request_queue->queue_lock, flags);
-		__blk_run_queue(sdev->request_queue);
-		spin_unlock_irqrestore(sdev->request_queue->queue_lock, flags);
+		blk_run_queue(sdev->request_queue);
 
 		spin_lock_irqsave(shost->host_lock, flags);
 		if (unlikely(!list_empty(&sdev->starved_entry)))
@@ -480,9 +473,7 @@ void scsi_queue_next_request(request_queue_t *q, struct scsi_cmnd *cmd)
 	}
 	spin_unlock_irqrestore(shost->host_lock, flags);
 
-	spin_lock_irqsave(q->queue_lock, flags);
-	__blk_run_queue(q);
-	spin_unlock_irqrestore(q->queue_lock, flags);
+	blk_run_queue(q);
 }
 
 /*
