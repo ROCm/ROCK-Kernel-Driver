@@ -26,6 +26,7 @@
  */
 
 #include <linux/fs.h>
+#include <linux/locks.h>
 #include "jfs_incore.h"
 #include "jfs_inode.h"
 #include "jfs_dinode.h"
@@ -33,8 +34,6 @@
 #include "jfs_unicode.h"
 #include "jfs_metapage.h"
 #include "jfs_debug.h"
-#include <linux/locks.h>
-#include <linux/slab.h>
 
 extern struct inode_operations jfs_file_inode_operations;
 extern struct inode_operations jfs_symlink_inode_operations;

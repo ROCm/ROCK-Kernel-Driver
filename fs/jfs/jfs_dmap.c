@@ -30,7 +30,6 @@
  */
 
 #include <linux/fs.h>
-#include <linux/slab.h>
 #include "jfs_incore.h"
 #include "jfs_dmap.h"
 #include "jfs_imap.h"
