@@ -1,7 +1,6 @@
 #ifndef __ARCH_S390_ATOMIC__
 #define __ARCH_S390_ATOMIC__
 
-#ifdef __KERNEL__
 /*
  *  include/asm-s390/atomic.h
  *
@@ -27,6 +26,7 @@ typedef struct {
 } __attribute__ ((aligned (4))) atomic_t;
 #define ATOMIC_INIT(i)  { (i) }
 
+#ifdef __KERNEL__
 #define __CS_LOOP(ptr, op_val, op_string) ({				\
 	typeof(ptr->counter) old_val, new_val;				\
         __asm__ __volatile__("   l     %0,0(%3)\n"			\
