@@ -213,6 +213,7 @@ static int corgi_ssp_remove(struct device *dev)
 static int corgi_ssp_suspend(struct device *dev, u32 state, u32 level)
 {
 	if (level == SUSPEND_POWER_DOWN) {
+		ssp_flush(&corgi_ssp_dev);
 		ssp_save_state(&corgi_ssp_dev,&corgi_ssp_state);
 	}
 	return 0;
