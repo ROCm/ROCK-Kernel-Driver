@@ -1018,6 +1018,7 @@ static inline void cp_start_hw (struct cp_private *cp)
 static void cp_init_hw (struct cp_private *cp)
 {
 	struct net_device *dev = cp->dev;
+	dma_addr_t ring_dma;
 
 	cp_reset_hw(cp);
 
@@ -1043,10 +1044,13 @@ static void cp_init_hw (struct cp_private *cp)
 	cpw32_f(HiTxRingAddr, 0);
 	cpw32_f(HiTxRingAddr + 4, 0);
 
-	cpw32_f(RxRingAddr, cp->ring_dma);
-	cpw32_f(RxRingAddr + 4, 0);		/* FIXME: 64-bit PCI */
-	cpw32_f(TxRingAddr, cp->ring_dma + (sizeof(struct cp_desc) * CP_RX_RING_SIZE));
-	cpw32_f(TxRingAddr + 4, 0);		/* FIXME: 64-bit PCI */
+	ring_dma = cp->ring_dma;
+	cpw32_f(RxRingAddr, ring_dma & 0xffffffff);
+	cpw32_f(RxRingAddr + 4, (ring_dma >> 16) >> 16);
+
+	ring_dma += sizeof(struct cp_desc) * CP_RX_RING_SIZE;
+	cpw32_f(TxRingAddr, ring_dma & 0xffffffff);
+	cpw32_f(TxRingAddr + 4, (ring_dma >> 16) >> 16);
 
 	cpw16(MultiIntr, 0);
 
@@ -1484,8 +1488,8 @@ static void cp_get_ethtool_stats (struct net_device *dev,
 	int i;
 
 	/* begin NIC statistics dump */
-	cpw32(StatsAddr + 4, 0); /* FIXME: 64-bit PCI */
-	cpw32(StatsAddr, cp->nic_stats_dma | DumpStats);
+	cpw32(StatsAddr + 4, (cp->nic_stats_dma >> 16) >> 16);
+	cpw32(StatsAddr, (cp->nic_stats_dma & 0xffffffff) | DumpStats);
 	cpr32(StatsAddr);
 
 	while (work-- > 0) {
@@ -1696,16 +1700,24 @@ static int cp_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	/* Configure DMA attributes. */
 	if ((sizeof(dma_addr_t) > 32) &&
+	    !pci_set_consistent_dma_mask(pdev, 0xffffffffffffffffULL) &&
 	    !pci_set_dma_mask(pdev, 0xffffffffffffffffULL)) {
 		pci_using_dac = 1;
 	} else {
+		pci_using_dac = 0;
+
 		rc = pci_set_dma_mask(pdev, 0xffffffffULL);
 		if (rc) {
 			printk(KERN_ERR PFX "No usable DMA configuration, "
 			       "aborting.\n");
 			goto err_out_res;
 		}
-		pci_using_dac = 0;
+		rc = pci_set_consistent_dma_mask(pdev, 0xffffffffULL);
+		if (rc) {
+			printk(KERN_ERR PFX "No usable consistent DMA configuration, "
+			       "aborting.\n");
+			goto err_out_res;
+		}
 	}
 
 	cp->cpcmd = (pci_using_dac ? PCIDAC : 0) |
@@ -1751,6 +1763,9 @@ static int cp_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	dev->vlan_rx_register = cp_vlan_rx_register;
 	dev->vlan_rx_kill_vid = cp_vlan_rx_kill_vid;
 #endif
+
+	if (pci_using_dac)
+		dev->features |= NETIF_F_HIGHDMA;
 
 	dev->irq = pdev->irq;
 
