@@ -104,7 +104,8 @@ static struct board_type products[] = {
 };
 
 static struct hd_struct * ida;
-static struct gendisk ida_gendisk[MAX_CTLR];
+static char *ida_names;
+static struct gendisk ida_gendisk[MAX_CTLR * NWD];
 
 static struct proc_dir_entry *proc_array;
 
@@ -154,7 +155,6 @@ static inline void complete_command(cmdlist_t *cmd, int timeout);
 static void do_ida_intr(int irq, void *dev_id, struct pt_regs * regs);
 static void ida_timer(unsigned long tdata);
 static int ida_revalidate(kdev_t dev);
-static int revalidate_logvol(kdev_t dev, int maxusage);
 static int revalidate_allvol(kdev_t dev);
 
 #ifdef CONFIG_PROC_FS
@@ -165,23 +165,6 @@ static void ida_procinit(int i) {}
 static int ida_proc_get_info(char *buffer, char **start, off_t offset,
 			     int length, int *eof, void *data) { return 0;}
 #endif
-
-static void ida_geninit(int ctlr)
-{
-	int i;
-	drv_info_t *drv;
-
-	for(i=0; i<NWD; i++) {
-		drv = &hba[ctlr]->drv[i];
-		if (!drv->nr_blks)
-			continue;
-		ida[(ctlr<<CTLR_SHIFT) + (i<<NWD_SHIFT)].nr_sects = drv->nr_blks;
-
-		(BLK_DEFAULT_QUEUE(MAJOR_NR + ctlr))->hardsect_size = drv->blk_size;
-		ida_gendisk[ctlr].nr_real++;
-	}
-
-}
 
 static struct block_device_operations ida_fops  = {
 	owner:		THIS_MODULE,
@@ -307,7 +290,7 @@ int __init init_module(void)
 
 void cleanup_module(void)
 {
-	int i;
+	int i, j;
 	char buff[4]; 
 
 	for(i=0; i<nr_ctlr; i++) {
@@ -331,11 +314,15 @@ void cleanup_module(void)
 			hba[i]->cmd_pool_dhandle);
 		kfree(hba[i]->cmd_pool_bits);
 
-		del_gendisk(&ida_gendisk[i]);
+		for (j = 0; j < NWD; j++) {
+			if (ida_gendisk[i*NWD+j].major_name)
+				del_gendisk(&ida_gendisk[i*NWD+j]);
+		}
 	}
 	devfs_find_and_unregister(NULL, "ida", 0, 0, 0, 0);
 	remove_proc_entry("cpqarray", proc_root_driver);
 	kfree(ida);
+	kfree(ida_names);
 }
 #endif /* MODULE */
 
@@ -349,7 +336,6 @@ int __init cpqarray_init(void)
 	request_queue_t *q;
 	int i,j;
 	int num_cntlrs_reg = 0;
-
 	/* detect controllers */
 	cpqarray_pci_detect();
 	cpqarray_eisa_detect();
@@ -362,16 +348,15 @@ int __init cpqarray_init(void)
 
 	/* allocate space for disk structs */
 	ida = kmalloc(sizeof(struct hd_struct)*nr_ctlr*NWD*16, GFP_KERNEL);
-	if(ida==NULL)
-	{
+	ida_names = kmalloc(nr_ctlr*NWD*10, GFP_KERNEL);
+	if (!ida || !ida_names) {
 		printk( KERN_ERR "cpqarray: out of memory");
+		kfree(ida);
+		kfree(ida_names);
 		return(num_cntlrs_reg);
 	}
-	
 	memset(ida, 0, sizeof(struct hd_struct)*nr_ctlr*NWD*16);
-	memset(ida_gendisk, 0, sizeof(struct gendisk)*MAX_CTLR);
-
-		/* 
+	/* 
 	 * register block devices
 	 * Find disks and fill in structs
 	 * Get an interrupt, set the Q depth and get into /proc
@@ -424,6 +409,7 @@ int __init cpqarray_init(void)
 			if (num_cntlrs_reg == 0) 
 			{
 				kfree(ida);
+				kfree(ida_names);
 			}
                 	return(num_cntlrs_reg);
 	
@@ -450,30 +436,34 @@ int __init cpqarray_init(void)
 
 		/* This is a driver limit and could be eliminated. */
 		blk_queue_max_phys_segments(q, SG_MAX);
-
-		ida_gendisk[i].major = MAJOR_NR + i;
-		ida_gendisk[i].major_name = "ida";
-		ida_gendisk[i].minor_shift = NWD_SHIFT;
-		ida_gendisk[i].part = ida + (i*256);
-		ida_gendisk[i].nr_real = 0; 
-		ida_gendisk[i].de_arr = de_arr[i]; 
-		ida_gendisk[i].fops = &ida_fops; 
 	
-		/* Get on the disk list */
-		add_gendisk(&ida_gendisk[i]);
-
 		init_timer(&hba[i]->timer);
 		hba[i]->timer.expires = jiffies + IDA_TIMER;
 		hba[i]->timer.data = (unsigned long)hba[i];
 		hba[i]->timer.function = ida_timer;
 		add_timer(&hba[i]->timer);
 
-		ida_geninit(i);
-		for(j=0; j<NWD; j++)	
-			register_disk(&ida_gendisk[i], 
-				mk_kdev(MAJOR_NR+i,j<<4),
-				16, &ida_fops, hba[i]->drv[j].nr_blks);
-
+		for(j=0; j<NWD; j++) {
+			struct gendisk *disk = ida_gendisk + i*NWD + j;
+			drv_info_t *drv = &hba[i]->drv[j];
+			sprintf(ida_names + (i*NWD+j)*10, "ida/c%dd%d", i, j);
+			disk->major = MAJOR_NR + i;
+			disk->first_minor = j<<NWD_SHIFT;
+			disk->minor_shift = NWD_SHIFT;
+			disk->part = ida + i*256 + (j<<NWD_SHIFT);
+			disk->nr_real = 1; 
+			disk->de_arr = &de_arr[i][j]; 
+			disk->fops = &ida_fops; 
+			if (!drv->nr_blks)
+				continue;
+			disk->major_name = ida_names + (i*NWD+j)*10;
+			(BLK_DEFAULT_QUEUE(MAJOR_NR + i))->hardsect_size = drv->blk_size;
+			add_gendisk(disk);
+			register_disk(disk,
+				      mk_kdev(disk->major,disk->first_minor),
+				      1<<disk->minor_shift, disk->fops,
+				      drv->nr_blks);
+		}
 	}
 	/* done ! */
 	return(num_cntlrs_reg);
@@ -755,21 +745,19 @@ static int ida_open(struct inode *inode, struct file *filep)
 	if (ctlr > MAX_CTLR || hba[ctlr] == NULL)
 		return -ENXIO;
 
-	if (!capable(CAP_SYS_RAWIO) && inode->i_bdev->bd_inode->i_size == 0)
-		return -ENXIO;
-
 	/*
 	 * Root is allowed to open raw volume zero even if its not configured
 	 * so array config can still work.  I don't think I really like this,
 	 * but I'm already using way to many device nodes to claim another one
 	 * for "raw controller".
 	 */
-	if (capable(CAP_SYS_ADMIN)
-		&& inode->i_bdev->bd_inode->i_size == 0
-		&& minor(inode->i_rdev) != 0)
-		return -ENXIO;
-
-	hba[ctlr]->drv[dsk].usage_count++;
+	if (!hba[ctlr]->drv[dsk].nr_blks) {
+		if (!capable(CAP_SYS_RAWIO))
+			return -ENXIO;
+		/* Huh??? */
+		if (capable(CAP_SYS_ADMIN) && minor(inode->i_rdev) != 0)
+			return -ENXIO;
+	}
 	hba[ctlr]->usage_count++;
 	return 0;
 }
@@ -780,11 +768,6 @@ static int ida_open(struct inode *inode, struct file *filep)
 static int ida_release(struct inode *inode, struct file *filep)
 {
 	int ctlr = major(inode->i_rdev) - MAJOR_NR;
-	int dsk  = minor(inode->i_rdev) >> NWD_SHIFT;
-
-	DBGINFO(printk("ida_release %x (%x:%x)\n", inode->i_rdev, ctlr, dsk) );
-
-	hba[ctlr]->drv[dsk].usage_count--;
 	hba[ctlr]->usage_count--;
 	return 0;
 }
@@ -1474,9 +1457,16 @@ static int revalidate_allvol(kdev_t dev)
 	 * Set the partition and block size structures for all volumes
 	 * on this controller to zero.  We will reread all of this data
 	 */
+	for (i = 0; i < NWD; i++) {
+		struct gendisk *disk = ida_gendisk + ctlr*NWD + i;
+		if (!disk->major_name)
+			continue;
+		wipe_partitions(mk_kdev(disk->major, disk->first_minor));
+		del_gendisk(disk);
+		disk->major_name = NULL;
+	}
 	memset(ida+(ctlr*256),            0, sizeof(struct hd_struct)*NWD*16);
 	memset(hba[ctlr]->drv,            0, sizeof(drv_info_t)*NWD);
-	ida_gendisk[ctlr].nr_real = 0;
 
 	/*
 	 * Tell the array controller not to give us any interrupts while
@@ -1487,11 +1477,17 @@ static int revalidate_allvol(kdev_t dev)
 	getgeometry(ctlr);
 	hba[ctlr]->access.set_intr_mask(hba[ctlr], FIFO_NOT_EMPTY);
 
-	ida_geninit(ctlr);
 	for(i=0; i<NWD; i++) {
-		kdev_t kdev = mk_kdev(major(dev), i << NWD_SHIFT);
-		if (ida[(ctlr<<CTLR_SHIFT) + (i<<NWD_SHIFT)].nr_sects)
-			revalidate_logvol(kdev, 2);
+		struct gendisk *disk = ida_gendisk + ctlr*NWD + i;
+		drv_info_t *drv = &hba[ctlr]->drv[i];
+		if (!drv->nr_blks)
+			continue;
+		(BLK_DEFAULT_QUEUE(MAJOR_NR + ctlr))->hardsect_size = drv->blk_size;
+		add_gendisk(disk);
+		register_disk(disk,
+			      mk_kdev(disk->major,disk->first_minor),
+			      1<<disk->minor_shift, disk->fops,
+			      drv->nr_blks);
 	}
 
 	hba[ctlr]->usage_count--;
@@ -1502,46 +1498,10 @@ static int ida_revalidate(kdev_t dev)
 {
         int ctlr = major(dev) - MAJOR_NR;
 	int target = DEVICE_NR(dev);
-        struct gendisk *gdev = &ida_gendisk[ctlr];
-	gdev->part[minor(dev)].nr_sects = hba[ctlr]->drv[target].nr_blocks;
+        struct gendisk *gdev = &ida_gendisk[ctlr*NWD+target];
+	gdev->part[minor(dev)].nr_sects = hba[ctlr]->drv[target].nr_blks;
 	return 0;
 }
-
-/* Borrowed and adapted from sd.c */
-/*
- * FIXME: exclusion with ->open()
- */
-static int revalidate_logvol(kdev_t dev, int maxusage)
-{
-	int ctlr, target;
-	struct gendisk *gdev;
-	unsigned long flags;
-	int res;
-
-	target = DEVICE_NR(dev);
-	ctlr = major(dev) - MAJOR_NR;
-	gdev = &ida_gendisk[ctlr];
-	
-	spin_lock_irqsave(IDA_LOCK(ctlr), flags);
-	if (hba[ctlr]->drv[target].usage_count > maxusage) {
-		spin_unlock_irqrestore(IDA_LOCK(ctlr), flags);
-		printk(KERN_WARNING "cpqarray: Device busy for "
-			"revalidation (usage=%d)\n",
-			hba[ctlr]->drv[target].usage_count);
-		return -EBUSY;
-	}
-
-	hba[ctlr]->drv[target].usage_count++;
-	spin_unlock_irqrestore(IDA_LOCK(ctlr), flags);
-
-	res = wipe_partitions(dev);
-	if (!res)
-		grok_partitions(dev, hba[ctlr]->drv[target].nr_blks);
-
-	hba[ctlr]->drv[target].usage_count--;
-	return res;
-}
-
 
 /********************************************************************
     name: pollcomplete
