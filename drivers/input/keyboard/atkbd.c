@@ -27,8 +27,10 @@
 #include <linux/serio.h>
 #include <linux/workqueue.h>
 
+#define DRIVER_DESC	"AT and PS/2 keyboard driver"
+
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
-MODULE_DESCRIPTION("AT and PS/2 keyboard driver");
+MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
 
 static int atkbd_set = 2;
@@ -732,7 +734,7 @@ static void atkbd_disconnect(struct serio *serio)
  * to the input module.
  */
 
-static void atkbd_connect(struct serio *serio, struct serio_dev *dev)
+static void atkbd_connect(struct serio *serio, struct serio_driver *drv)
 {
 	struct atkbd *atkbd;
 	int i;
@@ -785,7 +787,7 @@ static void atkbd_connect(struct serio *serio, struct serio_dev *dev)
 
 	serio->private = atkbd;
 
-	if (serio_open(serio, dev)) {
+	if (serio_open(serio, drv)) {
 		kfree(atkbd);
 		return;
 	}
@@ -861,10 +863,10 @@ static void atkbd_connect(struct serio *serio, struct serio_dev *dev)
 static int atkbd_reconnect(struct serio *serio)
 {
 	struct atkbd *atkbd = serio->private;
-	struct serio_dev *dev = serio->dev;
+	struct serio_driver *drv = serio->drv;
 	unsigned char param[1];
 
-	if (!dev) {
+	if (!drv) {
 		printk(KERN_DEBUG "atkbd: reconnect request, but serio is disconnected, ignoring...\n");
 		return -1;
 	}
@@ -890,23 +892,27 @@ static int atkbd_reconnect(struct serio *serio)
 	return 0;
 }
 
-static struct serio_dev atkbd_dev = {
-	.interrupt =	atkbd_interrupt,
-	.connect =	atkbd_connect,
-	.reconnect = 	atkbd_reconnect,
-	.disconnect =	atkbd_disconnect,
-	.cleanup =	atkbd_cleanup,
+static struct serio_driver atkbd_drv = {
+	.driver		= {
+		.name	= "atkbd",
+	},
+	.description	= DRIVER_DESC,
+	.interrupt	= atkbd_interrupt,
+	.connect	= atkbd_connect,
+	.reconnect	= atkbd_reconnect,
+	.disconnect	= atkbd_disconnect,
+	.cleanup	= atkbd_cleanup,
 };
 
 int __init atkbd_init(void)
 {
-	serio_register_device(&atkbd_dev);
+	serio_register_driver(&atkbd_drv);
 	return 0;
 }
 
 void __exit atkbd_exit(void)
 {
-	serio_unregister_device(&atkbd_dev);
+	serio_unregister_driver(&atkbd_drv);
 }
 
 module_init(atkbd_init);

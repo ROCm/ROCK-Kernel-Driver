@@ -18,12 +18,14 @@
 
 #include <linux/list.h>
 #include <linux/spinlock.h>
+#include <linux/device.h>
 
 struct serio {
 	void *private;
-	void *driver;
-	char *name;
-	char *phys;
+	void *port_data;
+
+	char name[32];
+	char phys[32];
 
 	unsigned short idbus;
 	unsigned short idvendor;
@@ -39,27 +41,37 @@ struct serio {
 	int (*open)(struct serio *);
 	void (*close)(struct serio *);
 
-	struct serio_dev *dev; /* Accessed from interrupt, writes must be protected by serio_lock */
+	struct serio *parent, *child;
+
+	struct serio_driver *drv; /* Accessed from interrupt, writes must be protected by serio_lock */
+
+	struct device dev;
 
 	struct list_head node;
 };
+#define to_serio_port(d)	container_of(d, struct serio, dev)
 
-struct serio_dev {
+struct serio_driver {
 	void *private;
-	char *name;
+	char *description;
+
+	int manual_bind;
 
 	void (*write_wakeup)(struct serio *);
 	irqreturn_t (*interrupt)(struct serio *, unsigned char,
 			unsigned int, struct pt_regs *);
-	void (*connect)(struct serio *, struct serio_dev *dev);
+	void (*connect)(struct serio *, struct serio_driver *drv);
 	int  (*reconnect)(struct serio *);
 	void (*disconnect)(struct serio *);
 	void (*cleanup)(struct serio *);
 
+	struct device_driver driver;
+
 	struct list_head node;
 };
+#define to_serio_driver(d)	container_of(d, struct serio_driver, driver)
 
-int serio_open(struct serio *serio, struct serio_dev *dev);
+int serio_open(struct serio *serio, struct serio_driver *drv);
 void serio_close(struct serio *serio);
 void serio_rescan(struct serio *serio);
 void serio_reconnect(struct serio *serio);
@@ -67,12 +79,10 @@ irqreturn_t serio_interrupt(struct serio *serio, unsigned char data, unsigned in
 
 void serio_register_port(struct serio *serio);
 void serio_register_port_delayed(struct serio *serio);
-void __serio_register_port(struct serio *serio);
 void serio_unregister_port(struct serio *serio);
 void serio_unregister_port_delayed(struct serio *serio);
-void __serio_unregister_port(struct serio *serio);
-void serio_register_device(struct serio_dev *dev);
-void serio_unregister_device(struct serio_dev *dev);
+void serio_register_driver(struct serio_driver *drv);
+void serio_unregister_driver(struct serio_driver *drv);
 
 static __inline__ int serio_write(struct serio *serio, unsigned char data)
 {
@@ -82,16 +92,16 @@ static __inline__ int serio_write(struct serio *serio, unsigned char data)
 		return -1;
 }
 
-static __inline__ void serio_dev_write_wakeup(struct serio *serio)
+static __inline__ void serio_drv_write_wakeup(struct serio *serio)
 {
-	if (serio->dev && serio->dev->write_wakeup)
-		serio->dev->write_wakeup(serio);
+	if (serio->drv && serio->drv->write_wakeup)
+		serio->drv->write_wakeup(serio);
 }
 
 static __inline__ void serio_cleanup(struct serio *serio)
 {
-	if (serio->dev && serio->dev->cleanup)
-		serio->dev->cleanup(serio);
+	if (serio->drv && serio->drv->cleanup)
+		serio->drv->cleanup(serio);
 }
 
 #endif

@@ -34,20 +34,10 @@ typedef enum {
 	PSMOUSE_FULL_PACKET
 } psmouse_ret_t;
 
-struct psmouse;
-
-struct psmouse_ptport {
-	struct serio serio;
-
-	void (*activate)(struct psmouse *parent);
-	void (*deactivate)(struct psmouse *parent);
-};
-
 struct psmouse {
 	void *private;
 	struct input_dev dev;
 	struct serio *serio;
-	struct psmouse_ptport *ptport;
 	char *vendor;
 	char *name;
 	unsigned char cmdbuf[8];
@@ -65,9 +55,12 @@ struct psmouse {
 	char phys[32];
 	unsigned long flags;
 
-	psmouse_ret_t (*protocol_handler)(struct psmouse *psmouse, struct pt_regs *regs); 
+	psmouse_ret_t (*protocol_handler)(struct psmouse *psmouse, struct pt_regs *regs);
 	int (*reconnect)(struct psmouse *psmouse);
 	void (*disconnect)(struct psmouse *psmouse);
+
+	void (*pt_activate)(struct psmouse *psmouse);
+	void (*pt_deactivate)(struct psmouse *psmouse);
 };
 
 #define PSMOUSE_PS2		1
