@@ -32,8 +32,6 @@
  *	check resource allocation in sr_init and some cleanups
  */
 
-#define MAJOR_NR SCSI_CDROM_MAJOR
-
 #include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/kernel.h>
@@ -56,6 +54,9 @@
 
 
 MODULE_PARM(xa_test, "i");	/* see sr_ioctl.c */
+
+
+#define SR_DISKS	(1 << KDEV_MINOR_BITS)
 
 #define MAX_RETRIES	3
 #define SR_TIMEOUT	(30 * HZ)
@@ -82,9 +83,11 @@ static struct Scsi_Device_Template sr_template = {
 	},
 };
 
-static int sr_nr_dev;	/* XXX(hch) bad hack, we want a bitmap instead */
 static LIST_HEAD(sr_devlist);
 static spinlock_t sr_devlist_lock = SPIN_LOCK_UNLOCKED;
+
+static unsigned long sr_index_bits[SR_DISKS / BITS_PER_LONG];
+static spinlock_t sr_index_lock = SPIN_LOCK_UNLOCKED;
 
 static int sr_open(struct cdrom_device_info *, int);
 static void sr_release(struct cdrom_device_info *);
@@ -514,16 +517,17 @@ static int sr_attach(struct scsi_device *sdev)
 	if (!disk)
 		goto fail_free;
 
-	/*
-	 * XXX  This doesn't make us better than the previous code in the
-	 * XXX  end (not worse either, though..).
-	 * XXX  To properly support hotplugging we should have a bitmap and
-	 * XXX  use find_first_zero_bit on it.  This will happen at the
-	 * XXX  same time template->nr_* goes away.		--hch
-	 */
-	minor = sr_nr_dev++;
+	spin_lock(&sr_index_lock);
+	minor = find_first_zero_bit(sr_index_bits, SR_DISKS);
+	if (minor == SR_DISKS) {
+		spin_unlock(&sr_index_lock);
+		error = -EBUSY;
+		goto fail_put;
+	}
+	__set_bit(minor, sr_index_bits);
+	spin_unlock(&sr_index_lock);
 
-	disk->major = MAJOR_NR;
+	disk->major = SCSI_CDROM_MAJOR;
 	disk->first_minor = minor;
 	sprintf(disk->disk_name, "sr%d", minor);
 	disk->fops = &sr_bdops;
@@ -570,6 +574,8 @@ static int sr_attach(struct scsi_device *sdev)
 	    sdev->id, sdev->lun);
 	return 0;
 
+fail_put:
+	put_disk(disk);
 fail_free:
 	kfree(cd);
 fail:
@@ -802,13 +808,15 @@ static void sr_detach(struct scsi_device * SDp)
 		return;
 
 	sr_devlist_remove(cd);
+	scsi_slave_detach(SDp);
 	del_gendisk(cd->disk);
+
+	spin_lock(&sr_index_lock);
+	clear_bit(cd->disk->first_minor, sr_index_bits);
+	spin_unlock(&sr_index_lock);
+
 	put_disk(cd->disk);
 	unregister_cdrom(&cd->cdi);
-
-	scsi_slave_detach(SDp);
-	sr_nr_dev--;
-
 	kfree(cd);
 }
 
@@ -816,7 +824,7 @@ static int __init init_sr(void)
 {
 	int rc;
 
-	rc = register_blkdev(MAJOR_NR, "sr", &sr_bdops);
+	rc = register_blkdev(SCSI_CDROM_MAJOR, "sr", &sr_bdops);
 	if (rc)
 		return rc;
 	return scsi_register_device(&sr_template);
@@ -825,7 +833,7 @@ static int __init init_sr(void)
 static void __exit exit_sr(void)
 {
 	scsi_unregister_device(&sr_template);
-	unregister_blkdev(MAJOR_NR, "sr");
+	unregister_blkdev(SCSI_CDROM_MAJOR, "sr");
 }
 
 module_init(init_sr);
