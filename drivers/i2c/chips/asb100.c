@@ -193,6 +193,7 @@ static u8 DIV_TO_REG(long val)
    data is pointed to by client->data. The structure itself is
    dynamically allocated, at the same time the client itself is allocated. */
 struct asb100_data {
+	struct i2c_client client;
 	struct semaphore lock;
 	enum chips type;
 
@@ -722,17 +723,14 @@ static int asb100_detect(struct i2c_adapter *adapter, int address, int kind)
 	   client structure, even though we cannot fill it completely yet.
 	   But it allows us to access asb100_{read,write}_value. */
 
-	if (!(new_client = kmalloc(sizeof(struct i2c_client) +
-			sizeof(struct asb100_data), GFP_KERNEL))) {
+	if (!(data = kmalloc(sizeof(struct asb100_data), GFP_KERNEL))) {
 		pr_debug("asb100.o: detect failed, kmalloc failed!\n");
 		err = -ENOMEM;
 		goto ERROR0;
 	}
+	memset(data, 0, sizeof(struct asb100_data));
 
-	memset(new_client, 0,
-		sizeof(struct i2c_client) + sizeof(struct asb100_data));
-
-	data = (struct asb100_data *) (new_client + 1);
+	new_client = &data->client;
 	init_MUTEX(&data->lock);
 	i2c_set_clientdata(new_client, data);
 	new_client->addr = address;
@@ -842,7 +840,7 @@ static int asb100_detect(struct i2c_adapter *adapter, int address, int kind)
 ERROR2:
 	i2c_detach_client(new_client);
 ERROR1:
-	kfree(new_client);
+	kfree(data);
 ERROR0:
 	return err;
 }
@@ -857,7 +855,7 @@ static int asb100_detach_client(struct i2c_client *client)
 		return err;
 	}
 
-	kfree(client);
+	kfree(i2c_get_clientdata(client));
 
 	return 0;
 }

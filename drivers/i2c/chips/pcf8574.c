@@ -55,6 +55,7 @@ SENSORS_INSMOD_2(pcf8574, pcf8574a);
 
 /* Each client has this additional data */
 struct pcf8574_data {
+	struct i2c_client client;
 	struct semaphore update_lock;
 
 	u8 read, write;			/* Register values */
@@ -127,17 +128,13 @@ int pcf8574_detect(struct i2c_adapter *adapter, int address, int kind)
 
 	/* OK. For now, we presume we have a valid client. We now create the
 	   client structure, even though we cannot fill it completely yet. */
-	if (!(new_client = kmalloc(sizeof(struct i2c_client) +
-				   sizeof(struct pcf8574_data),
-				   GFP_KERNEL))) {
+	if (!(data = kmalloc(sizeof(struct pcf8574_data), GFP_KERNEL))) {
 		err = -ENOMEM;
 		goto exit;
 	}
+	memset(data, 0, sizeof(struct pcf8574_data));
 
-	memset(new_client, 0, sizeof(struct i2c_client) +
-	       sizeof(struct pcf8574_data));
-
-	data = (struct pcf8574_data *) (new_client + 1);
+	new_client = &data->client;
 	i2c_set_clientdata(new_client, data);
 	new_client->addr = address;
 	new_client->adapter = adapter;
@@ -182,7 +179,7 @@ int pcf8574_detect(struct i2c_adapter *adapter, int address, int kind)
    very code-efficient in this case. */
 
       exit_free:
-	kfree(new_client);
+	kfree(data);
       exit:
 	return err;
 }
@@ -197,7 +194,7 @@ static int pcf8574_detach_client(struct i2c_client *client)
 		return err;
 	}
 
-	kfree(client);
+	kfree(i2c_get_clientdata(client));
 	return 0;
 }
 

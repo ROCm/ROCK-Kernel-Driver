@@ -134,6 +134,7 @@ static int DIV_TO_REG(int val)
    dynamically allocated, at the same time when a new it87 client is
    allocated. */
 struct it87_data {
+	struct i2c_client client;
 	struct semaphore lock;
 	enum chips type;
 
@@ -508,7 +509,7 @@ static int it87_attach_adapter(struct i2c_adapter *adapter)
 int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 {
 	int i;
-	struct i2c_client *new_client = NULL;
+	struct i2c_client *new_client;
 	struct it87_data *data;
 	int err = 0;
 	const char *name = "";
@@ -554,16 +555,13 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 	   client structure, even though we cannot fill it completely yet.
 	   But it allows us to access it87_{read,write}_value. */
 
-	if (!(new_client = kmalloc((sizeof(struct i2c_client)) +
-					sizeof(struct it87_data),
-					GFP_KERNEL))) {
+	if (!(data = kmalloc(sizeof(struct it87_data), GFP_KERNEL))) {
 		err = -ENOMEM;
 		goto ERROR1;
 	}
-	memset(new_client, 0x00, sizeof(struct i2c_client) +
-				 sizeof(struct it87_data));
+	memset(data, 0, sizeof(struct it87_data));
 
-	data = (struct it87_data *) (new_client + 1);
+	new_client = &data->client;
 	if (is_isa)
 		init_MUTEX(&data->lock);
 	i2c_set_clientdata(new_client, data);
@@ -670,7 +668,7 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 	return 0;
 
 ERROR1:
-	kfree(new_client);
+	kfree(data);
 
 	if (is_isa)
 		release_region(address, IT87_EXTENT);
@@ -690,7 +688,7 @@ static int it87_detach_client(struct i2c_client *client)
 
 	if(i2c_is_isa_client(client))
 		release_region(client->addr, IT87_EXTENT);
-	kfree(client);
+	kfree(i2c_get_clientdata(client));
 
 	return 0;
 }

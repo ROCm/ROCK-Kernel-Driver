@@ -133,6 +133,7 @@ static struct i2c_driver fscher_driver = {
  */
 
 struct fscher_data {
+	struct i2c_client client;
 	struct semaphore update_lock;
 	char valid; /* zero until following fields are valid */
 	unsigned long last_updated; /* in jiffies */
@@ -309,17 +310,15 @@ static int fscher_detect(struct i2c_adapter *adapter, int address, int kind)
 	/* OK. For now, we presume we have a valid client. We now create the
 	 * client structure, even though we cannot fill it completely yet.
 	 * But it allows us to access i2c_smbus_read_byte_data. */
-	if (!(new_client = kmalloc(sizeof(struct i2c_client) +
-	    sizeof(struct fscher_data), GFP_KERNEL))) {
+	if (!(data = kmalloc(sizeof(struct fscher_data), GFP_KERNEL))) {
 		err = -ENOMEM;
 		goto exit;
   	}
-	memset(new_client, 0x00, sizeof(struct i2c_client) +
-	       sizeof(struct fscher_data));
+	memset(data, 0, sizeof(struct fscher_data));
 
-	/* The Hermes-specific data is placed right after the common I2C
-	 * client data. */
-	data = (struct fscher_data *) (new_client + 1);
+	/* The common I2C client data is placed right before the
+	 * Hermes-specific data. */
+	new_client = &data->client;
 	i2c_set_clientdata(new_client, data);
 	new_client->addr = address;
 	new_client->adapter = adapter;
@@ -371,7 +370,7 @@ static int fscher_detect(struct i2c_adapter *adapter, int address, int kind)
 	return 0;
 
 exit_free:
-	kfree(new_client);
+	kfree(data);
 exit:
 	return err;
 }
@@ -386,7 +385,7 @@ static int fscher_detach_client(struct i2c_client *client)
 		return err;
 	}
 
-	kfree(client);
+	kfree(i2c_get_clientdata(client));
 	return 0;
 }
 

@@ -76,6 +76,7 @@ MODULE_PARM_DESC(input_mode,
 #define REG_TO_SIGNED(reg)	(((reg) & 0x80)?((reg) - 256):(reg))
 
 struct pcf8591_data {
+	struct i2c_client client;
 	struct semaphore update_lock;
 
 	u8 control;
@@ -177,17 +178,13 @@ int pcf8591_detect(struct i2c_adapter *adapter, int address, int kind)
 
 	/* OK. For now, we presume we have a valid client. We now create the
 	   client structure, even though we cannot fill it completely yet. */
-	if (!(new_client = kmalloc(sizeof(struct i2c_client) +
-				   sizeof(struct pcf8591_data),
-				   GFP_KERNEL))) {
+	if (!(data = kmalloc(sizeof(struct pcf8591_data), GFP_KERNEL))) {
 		err = -ENOMEM;
 		goto exit;
 	}
-
-	memset(new_client, 0, sizeof(struct i2c_client) +
-			      sizeof(struct pcf8591_data));
+	memset(data, 0, sizeof(struct pcf8591_data));
 	
-	data = (struct pcf8591_data *) (new_client + 1);
+	new_client = &data->client;
 	i2c_set_clientdata(new_client, data);
 	new_client->addr = address;
 	new_client->adapter = adapter;
@@ -235,7 +232,7 @@ int pcf8591_detect(struct i2c_adapter *adapter, int address, int kind)
 	   very code-efficient in this case. */
 
 exit_kfree:
-	kfree(new_client);
+	kfree(data);
 exit:
 	return err;
 }
@@ -250,7 +247,7 @@ static int pcf8591_detach_client(struct i2c_client *client)
 		return err;
 	}
 
-	kfree(client);
+	kfree(i2c_get_clientdata(client));
 	return 0;
 }
 

@@ -118,6 +118,7 @@ static inline u8 FAN_TO_REG(long rpm, int div)
 
 /* Each client has this additional data */
 struct gl518_data {
+	struct i2c_client client;
 	enum chips type;
 
 	struct semaphore update_lock;
@@ -354,16 +355,13 @@ static int gl518_detect(struct i2c_adapter *adapter, int address, int kind)
 	   client structure, even though we cannot fill it completely yet.
 	   But it allows us to access gl518_{read,write}_value. */
 
-	if (!(new_client = kmalloc(sizeof(struct i2c_client) +
-				   sizeof(struct gl518_data),
-				   GFP_KERNEL))) {
+	if (!(data = kmalloc(sizeof(struct gl518_data), GFP_KERNEL))) {
 		err = -ENOMEM;
 		goto exit;
 	}
-	memset(new_client, 0x00, sizeof(struct i2c_client) +
-		sizeof(struct gl518_data));
+	memset(data, 0, sizeof(struct gl518_data));
 
-	data = (struct gl518_data *) (new_client + 1);
+	new_client = &data->client;
 	i2c_set_clientdata(new_client, data);
 
 	new_client->addr = address;
@@ -445,7 +443,7 @@ static int gl518_detect(struct i2c_adapter *adapter, int address, int kind)
    very code-efficient in this case. */
 
 exit_free:
-	kfree(new_client);
+	kfree(data);
 exit:
 	return err;
 }
@@ -479,7 +477,7 @@ static int gl518_detach_client(struct i2c_client *client)
 		return err;
 	}
 
-	kfree(client);
+	kfree(i2c_get_clientdata(client));
 
 	return 0;
 }
