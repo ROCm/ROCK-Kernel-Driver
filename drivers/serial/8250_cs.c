@@ -2,7 +2,7 @@
 
     A driver for PCMCIA serial devices
 
-    serial_cs.c 1.123 2000/08/24 18:46:38
+    serial_cs.c 1.134 2002/05/04 05:48:53
 
     The contents of this file are subject to the Mozilla Public
     License Version 1.1 (the "License"); you may not use this file
@@ -58,7 +58,7 @@
 static int pc_debug = PCMCIA_DEBUG;
 MODULE_PARM(pc_debug, "i");
 #define DEBUG(n, args...) if (pc_debug>(n)) printk(KERN_DEBUG args)
-static char *version = "serial_cs.c 1.123 2000/08/24 18:46:38 (David Hinds)";
+static char *version = "serial_cs.c 1.134 2002/05/04 05:48:53 (David Hinds)";
 #else
 #define DEBUG(n, args...)
 #endif
@@ -73,10 +73,13 @@ static int irq_list[4] = { -1 };
 
 /* Enable the speaker? */
 static int do_sound = 1;
+/* Skip strict UART tests? */
+static int buggy_uart;
 
 MODULE_PARM(irq_mask, "i");
 MODULE_PARM(irq_list, "1-4i");
 MODULE_PARM(do_sound, "i");
+MODULE_PARM(buggy_uart, "i");
 
 /*====================================================================*/
 
@@ -190,7 +193,6 @@ static dev_link_t *serial_attach(void)
 		for (i = 0; i < 4; i++)
 			link->irq.IRQInfo2 |= 1 << irq_list[i];
 	link->conf.Attributes = CONF_ENABLE_IRQ;
-	link->conf.Vcc = 50;
 	if (do_sound) {
 		link->conf.Attributes |= CONF_ENABLE_SPKR;
 		link->conf.Status = CCSR_AUDIO_ENA;
@@ -275,11 +277,13 @@ static int setup_serial(struct serial_info * info, ioaddr_t port, int irq)
 	serial.port = port;
 	serial.irq = irq;
 	serial.flags = UPF_SKIP_TEST | UPF_SHARE_IRQ;
+	if (buggy_uart)
+		serial.flags |= UPF_BUGGY_UART;
 	line = register_serial(&serial);
 	if (line < 0) {
 		printk(KERN_NOTICE "serial_cs: register_serial() at 0x%04lx,"
 		       " irq %d failed\n", (u_long) serial.port, serial.irq);
-		return -1;
+		return -EINVAL;
 	}
 
 	info->line[info->ndev] = line;
@@ -426,7 +430,15 @@ static int multi_config(dev_link_t * link)
 	u_char buf[256];
 	cisparse_t parse;
 	cistpl_cftable_entry_t *cf = &parse.cftable_entry;
+	config_info_t config;
 	int i, base2 = 0;
+
+	i = CardServices(GetConfigurationInfo, handle, &config);
+	if (i != CS_SUCCESS) {
+		cs_error(handle, GetConfiguration, i);
+		return -1;
+	}
+	link->conf.Vcc = config.Vcc;
 
 	tuple.TupleData = (cisdata_t *) buf;
 	tuple.TupleOffset = 0;
@@ -498,6 +510,19 @@ static int multi_config(dev_link_t * link)
 	if (i != CS_SUCCESS) {
 		cs_error(link->handle, RequestConfiguration, i);
 		return -1;
+	}
+
+	/* The Oxford Semiconductor OXCF950 cards are in fact single-port:
+	   8 registers are for the UART, the others are extra registers */
+	if (info->manfid == MANFID_OXSEMI) {
+		if (cf->index == 1 || cf->index == 3) {
+			setup_serial(info, base2, link->irq.AssignedIRQ);
+			outb(12, link->io.BasePort1 + 1);
+		} else {
+			setup_serial(info, link->io.BasePort1, link->irq.AssignedIRQ);
+			outb(12, base2 + 1);
+		}
+		return 0;
 	}
 
 	setup_serial(info, link->io.BasePort1, link->irq.AssignedIRQ);
@@ -608,6 +633,7 @@ void serial_config(dev_link_t * link)
 	cs_error(link->handle, last_fn, last_ret);
  failed:
 	serial_remove(link);
+	link->state &= ~DEV_CONFIG_PENDING;
 }
 
 /*======================================================================
