@@ -201,13 +201,13 @@ static struct file_operations exports_operations = {
  *	Description of fs contents.
  */
 static struct { char *name; struct file_operations *ops; int mode; } files[] = {
-	[NFSD_Svc] = {"svc", &transaction_ops, S_IWUSR},
-	[NFSD_Add] = {"add", &transaction_ops, S_IWUSR},
-	[NFSD_Del] = {"del", &transaction_ops, S_IWUSR},
-	[NFSD_Export] = {"export", &transaction_ops, S_IWUSR},
-	[NFSD_Unexport] = {"unexport", &transaction_ops, S_IWUSR},
-	[NFSD_Getfd] = {"getfd", &transaction_ops, S_IWUSR|S_IRUSR},
-	[NFSD_Getfs] = {"getfs", &transaction_ops, S_IWUSR|S_IRUSR},
+	[NFSD_Svc] = {".svc", &transaction_ops, S_IWUSR},
+	[NFSD_Add] = {".add", &transaction_ops, S_IWUSR},
+	[NFSD_Del] = {".del", &transaction_ops, S_IWUSR},
+	[NFSD_Export] = {".export", &transaction_ops, S_IWUSR},
+	[NFSD_Unexport] = {".unexport", &transaction_ops, S_IWUSR},
+	[NFSD_Getfd] = {".getfd", &transaction_ops, S_IWUSR|S_IRUSR},
+	[NFSD_Getfs] = {".getfs", &transaction_ops, S_IWUSR|S_IRUSR},
 	[NFSD_List] = {"exports", &exports_operations, S_IRUGO},
 };
 
