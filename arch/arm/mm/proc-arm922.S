@@ -512,7 +512,7 @@ __arm922_setup:
  */
 	.type	arm922_processor_functions, #object
 arm922_processor_functions:
-	.word	armv4t_early_abort
+	.word	v4t_early_abort
 	.word	cpu_arm922_check_bugs
 	.word	cpu_arm922_proc_init
 	.word	cpu_arm922_proc_fin

@@ -538,7 +538,7 @@ __setup_common:
 
 	.type	sa110_processor_functions, #object
 ENTRY(sa110_processor_functions)
-	.word	armv4_early_abort
+	.word	v4_early_abort
 	.word	cpu_sa110_check_bugs
 	.word	cpu_sa110_proc_init
 	.word	cpu_sa110_proc_fin

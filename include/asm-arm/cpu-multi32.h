@@ -118,7 +118,6 @@ extern const struct processor arm6_processor_functions;
 extern const struct processor arm7_processor_functions;
 extern const struct processor sa110_processor_functions;
 
-#define cpu_data_abort(pc)			processor._data_abort(pc)
 #define cpu_check_bugs()			processor._check_bugs()
 #define cpu_proc_init()				processor._proc_init()
 #define cpu_proc_fin()				processor._proc_fin()

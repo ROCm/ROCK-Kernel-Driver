@@ -549,7 +549,7 @@ __arm926_setup:
  */
 	.type	arm926_processor_functions, #object
 arm926_processor_functions:
-	.word	armv5ej_early_abort
+	.word	v5ej_early_abort
 	.word	cpu_arm926_check_bugs
 	.word	cpu_arm926_proc_init
 	.word	cpu_arm926_proc_fin

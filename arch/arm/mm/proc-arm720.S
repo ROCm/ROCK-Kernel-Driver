@@ -199,7 +199,7 @@ __arm720_setup:	mov	r0, #0
  */
 		.type	arm720_processor_functions, #object
 ENTRY(arm720_processor_functions)
-		.word	armv4t_late_abort
+		.word	v4t_late_abort
 		.word	cpu_arm720_check_bugs
 		.word	cpu_arm720_proc_init
 		.word	cpu_arm720_proc_fin

@@ -24,14 +24,21 @@
 #endif
 #define __glue(name,fn)		____glue(name,fn)
 
-/*
- * Select MMU TLB handling.
- */
+
 
 /*
- * ARMv3 MMU
+ *	MMU TLB Model
+ *	=============
+ *
+ *	We have the following to choose from:
+ *	  v3    - ARMv3
+ *	  v4    - ARMv4 without write buffer
+ *	  v4wb  - ARMv4 with write buffer without I TLB flush entry instruction
+ *	  v4wbi - ARMv4 with write buffer with I TLB flush entry instruction
  */
 #undef _TLB
+#undef MULTI_TLB
+
 #if defined(CONFIG_CPU_ARM610) || defined(CONFIG_CPU_ARM710)
 # ifdef _TLB
 #  define MULTI_TLB 1
@@ -40,9 +47,6 @@
 # endif
 #endif
 
-/*
- * ARMv4 MMU without write buffer
- */
 #if defined(CONFIG_CPU_ARM720T)
 # ifdef _TLB
 #  define MULTI_TLB 1
@@ -51,9 +55,6 @@
 # endif
 #endif
 
-/*
- * ARMv4 MMU with write buffer, with invalidate I TLB entry instruction
- */
 #if defined(CONFIG_CPU_ARM920T) || defined(CONFIG_CPU_ARM922T) || \
     defined(CONFIG_CPU_ARM926T) || defined(CONFIG_CPU_ARM1020) || \
     defined(CONFIG_CPU_XSCALE)
@@ -64,15 +65,86 @@
 # endif
 #endif
 
-/*
- * ARMv4 MMU with write buffer, without invalidate I TLB entry instruction
- */
 #if defined(CONFIG_CPU_SA110) || defined(CONFIG_CPU_SA1100)
 # ifdef _TLB
 #  define MULTI_TLB 1
 # else
 #  define _TLB v4wb
 # endif
+#endif
+
+#ifndef _TLB
+#error Unknown TLB model
+#endif
+
+
+
+/*
+ *	Data Abort Model
+ *	================
+ *
+ *	We have the following to choose from:
+ *	  arm6          - ARM6 style
+ *	  arm7		- ARM7 style
+ *	  v4_early	- ARMv4 without Thumb early abort handler
+ *	  v4t_late	- ARMv4 with Thumb late abort handler
+ *	  v4t_early	- ARMv4 with Thumb early abort handler
+ *	  v5ej_early	- ARMv5 with Thumb and Java early abort handler
+ */
+#undef CPU_ABORT_HANDLER
+#undef MULTI_ABORT
+
+#if defined(CONFIG_CPU_ARM610)
+# ifdef CPU_ABORT_HANDLER
+#  define MULTI_ABORT 1
+# else
+#  define CPU_ABORT_HANDLER cpu_arm6_data_abort
+# endif
+#endif
+
+#if defined(CONFIG_CPU_ARM710)
+# ifdef CPU_ABORT_HANDLER
+#  define MULTI_ABORT 1
+# else
+#  define CPU_ABORT_HANDLER cpu_arm7_data_abort
+# endif
+#endif
+
+#if defined(CONFIG_CPU_ARM720T)
+# ifdef CPU_ABORT_HANDLER
+#  define MULTI_ABORT 1
+# else
+#  define CPU_ABORT_HANDLER v4t_late_abort
+# endif
+#endif
+
+#if defined(CONFIG_CPU_SA110) || defined(CONFIG_CPU_SA1100)
+# ifdef CPU_ABORT_HANDLER
+#  define MULTI_ABORT 1
+# else
+#  define CPU_ABORT_HANDLER v4_early_abort
+# endif
+#endif
+
+#if defined(CONFIG_CPU_ARM920T) || defined(CONFIG_CPU_ARM922T) || \
+    defined(CONFIG_CPU_ARM1020) || defined(CONFIG_CPU_XSCALE)
+# ifdef CPU_ABORT_HANDLER
+#  define MULTI_ABORT 1
+# else
+#  define CPU_ABORT_HANDLER v4t_early_abort
+# endif
+#endif
+
+#if defined(CONFIG_CPU_ARM926T)
+# ifdef CPU_ABORT_HANDLER
+#  define MULTI_ABORT 1
+# else
+#  define CPU_ABORT_HANDLER v5ej_early_abort
+# endif
+#endif
+
+#ifndef CPU_ABORT_HANDLER
+#error Unknown data abort handler type
 #endif
 
 #endif

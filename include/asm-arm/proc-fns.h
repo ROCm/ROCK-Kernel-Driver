@@ -28,7 +28,6 @@
 
 /*
  * CPU_NAME - the prefix for CPU related functions
- * CPU_ABRT - the prefix for the CPU abort decoding function
  * MMU_ARCH - the prefix for copy_user_page/clear_user_page
  */
 
@@ -40,7 +39,6 @@
 #   define MULTI_CPU
 #  else
 #   define CPU_NAME cpu_arm6
-#   define CPU_ABRT cpu_arm6
 #   define MMU_ARCH armv3
 #  endif
 # endif
@@ -50,7 +48,6 @@
 #   define MULTI_CPU
 #  else
 #   define CPU_NAME cpu_arm7
-#   define CPU_ABRT cpu_arm7
 #   define MMU_ARCH armv3
 #  endif
 # endif
@@ -60,7 +57,6 @@
 #   define MULTI_CPU
 #  else
 #   define CPU_NAME cpu_arm720
-#   define CPU_ABRT armv4t_late
 #   define MMU_ARCH armv4
 #  endif
 # endif
@@ -70,7 +66,6 @@
 #   define MULTI_CPU
 #  else
 #   define CPU_NAME cpu_arm920
-#   define CPU_ABRT armv4t_early
 #   define MMU_ARCH armv4
 #  endif
 # endif
@@ -80,7 +75,6 @@
 #   define MULTI_CPU
 #  else
 #   define CPU_NAME cpu_arm922
-#   define CPU_ABRT armv4t_early
 #   define MMU_ARCH armv4
 #  endif
 # endif
@@ -90,7 +84,6 @@
 #   define MULTI_CPU
 #  else
 #   define CPU_NAME cpu_arm926
-#   define CPU_ABRT armv5ej_early
 #   define MMU_ARCH armv4
 #  endif
 # endif
@@ -100,7 +93,6 @@
 #   define MULTI_CPU
 #  else
 #   define CPU_NAME cpu_sa110
-#   define CPU_ABRT armv4_early
 #   define MMU_ARCH armv4
 #  endif
 # endif
@@ -110,7 +102,6 @@
 #   define MULTI_CPU
 #  else
 #   define CPU_NAME cpu_sa1100
-#   define CPU_ABRT armv4_early
 #   define MMU_ARCH armv4_mc
 #  endif
 # endif
@@ -120,7 +111,6 @@
 #   define MULTI_CPU
 #  else
 #   define CPU_NAME cpu_arm1020
-#   define CPU_ABRT armv4t_early
 #   define MMU_ARCH armv4
 #  endif
 # endif
@@ -130,7 +120,6 @@
 #   define MULTI_CPU
 #  else
 #   define CPU_NAME cpu_xscale
-#   define CPU_ABRT armv4t_early
 #   define MMU_ARCH armv5te
 #  endif
 # endif

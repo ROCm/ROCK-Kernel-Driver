@@ -22,7 +22,6 @@
  * function pointers for this lot.  Otherwise, we can optimise the
  * table away.
  */
-#define cpu_data_abort			__cpu_fn(CPU_ABRT,_abort)
 #define cpu_check_bugs			__cpu_fn(CPU_NAME,_check_bugs)
 #define cpu_proc_init			__cpu_fn(CPU_NAME,_proc_init)
 #define cpu_proc_fin			__cpu_fn(CPU_NAME,_proc_fin)

@@ -695,7 +695,7 @@ __xscale_setup:
 
 	.type	xscale_processor_functions, #object
 ENTRY(xscale_processor_functions)
-	.word	armv4t_early_abort
+	.word	v4t_early_abort
 	.word	cpu_xscale_check_bugs
 	.word	cpu_xscale_proc_init
 	.word	cpu_xscale_proc_fin
