@@ -16,7 +16,7 @@
 #define __ASM_ARM_ARCH_IO_H
 
 #define IO_SPACE_LIMIT		0xffffffff
-#define __mem_pci(a)		((unsigned long)(a))
+#define __mem_pci(a)		(a)
 
 /*
  * Pick up VMALLOC_END

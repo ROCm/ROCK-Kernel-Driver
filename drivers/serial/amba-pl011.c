@@ -745,7 +745,7 @@ static struct uart_driver amba_reg = {
 static int pl011_probe(struct amba_device *dev, void *id)
 {
 	struct uart_amba_port *uap;
-	void *base;
+	void __iomem *base;
 	int i, ret;
 
 	for (i = 0; i < ARRAY_SIZE(amba_ports); i++)

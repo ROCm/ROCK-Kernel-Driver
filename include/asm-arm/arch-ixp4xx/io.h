@@ -46,7 +46,7 @@ extern int ixp4xx_pci_write(u32 addr, u32 cmd, u32 data);
  */
 #ifndef	CONFIG_IXP4XX_INDIRECT_PCI
 
-#define __mem_pci(a)		((unsigned long)(a))
+#define __mem_pci(a)		(a)
 
 #else
 
@@ -58,10 +58,10 @@ extern int ixp4xx_pci_write(u32 addr, u32 cmd, u32 data);
  * access registers. If something outside of PCI is ioremap'd, we
  * fallback to the default.
  */
-static inline void *
+static inline void __iomem *
 __ixp4xx_ioremap(unsigned long addr, size_t size, unsigned long flags, unsigned long align)
 {
-	extern void * __ioremap(unsigned long, size_t, unsigned long, unsigned long);
+	extern void __iomem * __ioremap(unsigned long, size_t, unsigned long, unsigned long);
 	if((addr < 0x48000000) || (addr > 0x4fffffff))
 		return __ioremap(addr, size, flags, align);
 
@@ -69,9 +69,9 @@ __ixp4xx_ioremap(unsigned long addr, size_t size, unsigned long flags, unsigned 
 }
 
 static inline void
-__ixp4xx_iounmap(void *addr)
+__ixp4xx_iounmap(void __iomem *addr)
 {
-	extern void __iounmap(void *addr);
+	extern void __iounmap(void __iomem *addr);
 
 	if ((u32)addr >= VMALLOC_START)
 		__iounmap(addr);

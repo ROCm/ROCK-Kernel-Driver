@@ -194,7 +194,7 @@ amba_attr(resource, "\t%08lx\t%08lx\t%08lx\n",
 int amba_device_register(struct amba_device *dev, struct resource *parent)
 {
 	u32 pid, cid;
-	void *tmp;
+	void __iomem *tmp;
 	int i, ret;
 
 	dev->dev.release = amba_device_release;
