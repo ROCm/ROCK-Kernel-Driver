@@ -624,6 +624,21 @@ int do_IRQ(struct pt_regs *regs)
 
 	irq_enter();
 
+#ifdef CONFIG_DEBUG_STACKOVERFLOW
+	/* Debugging check for stack overflow: is there less than 4KB free? */
+	{
+		long sp;
+
+		sp = __get_SP() & (THREAD_SIZE-1);
+
+		if (unlikely(sp < (sizeof(struct thread_info) + 4096))) {
+			printk("do_IRQ: stack overflow: %ld\n",
+				sp - sizeof(struct thread_info));
+			dump_stack();
+		}
+	}
+#endif
+
 	/*
 	 * Every arch is required to implement ppc_md.get_irq.
 	 * This function will either return an irq number or -1 to
