@@ -760,7 +760,7 @@ int i2c_probe(struct i2c_adapter *adapter,
 			if (addr == address_data->normal_i2c[i]) {
 				found = 1;
 				dev_dbg(&adapter->dev, "found normal i2c entry for adapter %d, "
-					"addr %02x", adap_id,addr);
+					"addr %02x\n", adap_id, addr);
 			}
 		}
 

@@ -115,7 +115,7 @@ int i2c_detect(struct i2c_adapter *adapter,
 			for (i = 0; !found && (normal_i2c[i] != I2C_CLIENT_END); i += 1) {
 				if (addr == normal_i2c[i]) {
 					found = 1;
-					dev_dbg(&adapter->dev, "found normal i2c entry for adapter %d, addr %02x", adapter_id, addr);
+					dev_dbg(&adapter->dev, "found normal i2c entry for adapter %d, addr %02x\n", adapter_id, addr);
 				}
 			}
 		}
