@@ -190,10 +190,9 @@ static void atalk_destroy_timer(unsigned long data)
 	struct sock *sk = (struct sock *)data;
 
 	if (!atomic_read(&sk->wmem_alloc) &&
-	    !atomic_read(&sk->rmem_alloc) && test_bit(SOCK_DEAD, &sk->flags)) {
+	    !atomic_read(&sk->rmem_alloc) && test_bit(SOCK_DEAD, &sk->flags))
 		sock_put(sk);
-		MOD_DEC_USE_COUNT;
-	} else {
+	else {
 		sk->timer.expires = jiffies + SOCK_DESTROY_TIME;
 		add_timer(&sk->timer);
 	}
@@ -205,10 +204,9 @@ extern inline void atalk_destroy_socket(struct sock *sk)
 	skb_queue_purge(&sk->receive_queue);
 
 	if (!atomic_read(&sk->wmem_alloc) &&
-	    !atomic_read(&sk->rmem_alloc) && test_bit(SOCK_DEAD, &sk->flags)) {
+	    !atomic_read(&sk->rmem_alloc) && test_bit(SOCK_DEAD, &sk->flags))
 		sock_put(sk);
-		MOD_DEC_USE_COUNT;
-	} else {
+	else {
 		init_timer(&sk->timer);
 		sk->timer.expires = jiffies + SOCK_DESTROY_TIME;
 		sk->timer.function = atalk_destroy_timer;
@@ -249,7 +247,6 @@ static void atif_drop_device(struct net_device *dev)
 			*iface = tmp->next;
 			kfree(tmp);
 			dev->atalk_ptr = NULL;
-			MOD_DEC_USE_COUNT;
 		} else
 			iface = &tmp->next;
 	}
@@ -259,13 +256,10 @@ static void atif_drop_device(struct net_device *dev)
 static struct atalk_iface *atif_add_device(struct net_device *dev,
 					   struct atalk_addr *sa)
 {
-	struct atalk_iface *iface;
+	struct atalk_iface *iface = kmalloc(sizeof(*iface), GFP_KERNEL);
 
-	MOD_INC_USE_COUNT;
-
-	iface = kmalloc(sizeof(*iface), GFP_KERNEL);
 	if (!iface)
-		goto out_mem;
+		goto out;
 
 	iface->dev = dev;
 	dev->atalk_ptr = iface;
@@ -278,9 +272,6 @@ static struct atalk_iface *atif_add_device(struct net_device *dev,
 	write_unlock_bh(&atalk_interfaces_lock);
 out:
 	return iface;
-out_mem:
-	MOD_DEC_USE_COUNT;
-	goto out;
 }
 
 /* Perform phase 2 AARP probing on our tentative address */
@@ -982,17 +973,16 @@ static int atalk_create(struct socket *sock, int protocol)
 	struct atalk_sock *at;
 	int rc = -ESOCKTNOSUPPORT;
 
-	MOD_INC_USE_COUNT;
 	/*
 	 * We permit SOCK_DGRAM and RAW is an extension. It is trivial to do
 	 * and gives you the full ELAP frame. Should be handy for CAP 8) 
 	 */
 	if (sock->type != SOCK_RAW && sock->type != SOCK_DGRAM)
-		goto decmod;
+		goto out;
 	rc = -ENOMEM;
 	sk = sk_alloc(PF_APPLETALK, GFP_KERNEL, 1, NULL);
 	if (!sk)
-		goto decmod;
+		goto out;
 	at = at_sk(sk) = kmalloc(sizeof(*at), GFP_KERNEL);
 	if (!at)
 		goto outsk;
@@ -1005,8 +995,6 @@ out:
 	return rc;
 outsk:
 	sk_free(sk);
-decmod:
-	MOD_DEC_USE_COUNT;
 	goto out;
 }
 
@@ -1785,6 +1773,7 @@ static int atalk_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 static struct net_proto_family atalk_family_ops = {
 	.family		= PF_APPLETALK,
 	.create		= atalk_create,
+	.owner		= THIS_MODULE,
 };
 
 static struct proto_ops SOCKOPS_WRAPPED(atalk_dgram_ops) = {
