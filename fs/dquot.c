@@ -1307,7 +1307,8 @@ int vfs_quota_on(struct super_block *sb, int type, int format_id, char *path)
 	error = -EIO;
 	if (!f->f_op || !f->f_op->read || !f->f_op->write)
 		goto out_f;
-	if ((error = security_quota_on(f)))
+	error = security_quota_on(f);
+	if (error)
 		goto out_f;
 	inode = f->f_dentry->d_inode;
 	error = -EACCES;

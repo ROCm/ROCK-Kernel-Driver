@@ -140,7 +140,8 @@ asmlinkage void do_ptrace(struct pt_regs *regs)
 			pt_error_return(regs, EPERM);
 			goto out;
 		}
-		if ((ret = security_ptrace(current->parent, current))) {
+		ret = security_ptrace(current->parent, current);
+		if (ret) {
 			pt_error_return(regs, -ret);
 			goto out;
 		}

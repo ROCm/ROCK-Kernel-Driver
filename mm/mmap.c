@@ -504,7 +504,8 @@ unsigned long do_mmap_pgoff(struct file * file, unsigned long addr,
 		}
 	}
 
-	if ((error = security_file_mmap(file, prot, flags)))
+	error = security_file_mmap(file, prot, flags);
+	if (error)
 		return error;
 		
 	/* Clear old maps */

@@ -400,5 +400,10 @@ config USB_SERIAL_OMNINET
 	  The module will be called omninet.o. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
+config USB_EZUSB
+	bool
+	depends on USB_SERIAL_KEYSPAN_PDA || USB_SERIAL_XIRCOM || USB_SERIAL_KEYSPAN || USB_SERIAL_WHITEHEAT
+	default y
+
 endmenu
 

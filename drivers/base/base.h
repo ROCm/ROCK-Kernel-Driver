@@ -34,7 +34,7 @@ static inline int dev_hotplug(struct device *dev, const char *action)
 {
 	return 0;
 }
-static int class_hotplug(struct device *dev, const char *action)
+static inline int class_hotplug(struct device *dev, const char *action)
 {
 	return 0;
 }
