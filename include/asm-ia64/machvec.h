@@ -4,7 +4,7 @@
  * Copyright (C) 1999 Silicon Graphics, Inc.
  * Copyright (C) Srinivasa Thirumalachar <sprasad@engr.sgi.com>
  * Copyright (C) Vijay Chander <vijay@engr.sgi.com>
- * Copyright (C) 1999-2001 Hewlett-Packard Co.
+ * Copyright (C) 1999-2001, 2003 Hewlett-Packard Co.
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 #ifndef _ASM_IA64_MACHVEC_H
@@ -14,7 +14,7 @@
 #include <linux/types.h>
 
 /* forward declarations: */
-struct pci_dev;
+struct device;
 struct pt_regs;
 struct scatterlist;
 struct irq_desc;
@@ -33,17 +33,17 @@ typedef struct irq_desc *ia64_mv_irq_desc (unsigned int);
 typedef u8 ia64_mv_irq_to_vector (u8);
 typedef unsigned int ia64_mv_local_vector_to_irq (u8 vector);
 
-/* PCI-DMA interface: */
-typedef void ia64_mv_pci_dma_init (void);
-typedef void *ia64_mv_pci_alloc_consistent (struct pci_dev *, size_t, dma_addr_t *);
-typedef void ia64_mv_pci_free_consistent (struct pci_dev *, size_t, void *, dma_addr_t);
-typedef dma_addr_t ia64_mv_pci_map_single (struct pci_dev *, void *, size_t, int);
-typedef void ia64_mv_pci_unmap_single (struct pci_dev *, dma_addr_t, size_t, int);
-typedef int ia64_mv_pci_map_sg (struct pci_dev *, struct scatterlist *, int, int);
-typedef void ia64_mv_pci_unmap_sg (struct pci_dev *, struct scatterlist *, int, int);
-typedef void ia64_mv_pci_dma_sync_single (struct pci_dev *, dma_addr_t, size_t, int);
-typedef void ia64_mv_pci_dma_sync_sg (struct pci_dev *, struct scatterlist *, int, int);
-typedef int ia64_mv_pci_dma_supported (struct pci_dev *, u64);
+/* DMA-mapping interface: */
+typedef void ia64_mv_dma_init (void);
+typedef void *ia64_mv_dma_alloc_coherent (struct device *, size_t, dma_addr_t *, int);
+typedef void ia64_mv_dma_free_coherent (struct device *, size_t, void *, dma_addr_t);
+typedef dma_addr_t ia64_mv_dma_map_single (struct device *, void *, size_t, int);
+typedef void ia64_mv_dma_unmap_single (struct device *, dma_addr_t, size_t, int);
+typedef int ia64_mv_dma_map_sg (struct device *, struct scatterlist *, int, int);
+typedef void ia64_mv_dma_unmap_sg (struct device *, struct scatterlist *, int, int);
+typedef void ia64_mv_dma_sync_single (struct device *, dma_addr_t, size_t, int);
+typedef void ia64_mv_dma_sync_sg (struct device *, struct scatterlist *, int, int);
+typedef int ia64_mv_dma_supported (struct device *, u64);
 
 /*
  * WARNING: The legacy I/O space is _architected_.  Platforms are
@@ -66,6 +66,7 @@ typedef unsigned int ia64_mv_readl_t (void *);
 typedef unsigned long ia64_mv_readq_t (void *);
 
 extern void machvec_noop (void);
+extern void machvec_memory_fence (void);
 
 # if defined (CONFIG_IA64_HP_SIM)
 #  include <asm/machvec_hpsim.h>
@@ -92,16 +93,16 @@ extern void machvec_noop (void);
 #  define platform_log_print	ia64_mv.log_print
 #  define platform_send_ipi	ia64_mv.send_ipi
 #  define platform_global_tlb_purge	ia64_mv.global_tlb_purge
-#  define platform_pci_dma_init		ia64_mv.dma_init
-#  define platform_pci_alloc_consistent	ia64_mv.alloc_consistent
-#  define platform_pci_free_consistent	ia64_mv.free_consistent
-#  define platform_pci_map_single	ia64_mv.map_single
-#  define platform_pci_unmap_single	ia64_mv.unmap_single
-#  define platform_pci_map_sg		ia64_mv.map_sg
-#  define platform_pci_unmap_sg		ia64_mv.unmap_sg
-#  define platform_pci_dma_sync_single	ia64_mv.sync_single
-#  define platform_pci_dma_sync_sg	ia64_mv.sync_sg
-#  define platform_pci_dma_supported	ia64_mv.dma_supported
+#  define platform_dma_init		ia64_mv.dma_init
+#  define platform_dma_alloc_coherent	ia64_mv.dma_alloc_coherent
+#  define platform_dma_free_coherent	ia64_mv.dma_free_coherent
+#  define platform_dma_map_single	ia64_mv.dma_map_single
+#  define platform_dma_unmap_single	ia64_mv.dma_unmap_single
+#  define platform_dma_map_sg		ia64_mv.dma_map_sg
+#  define platform_dma_unmap_sg		ia64_mv.dma_unmap_sg
+#  define platform_dma_sync_single	ia64_mv.dma_sync_single
+#  define platform_dma_sync_sg		ia64_mv.dma_sync_sg
+#  define platform_dma_supported	ia64_mv.dma_supported
 #  define platform_irq_desc		ia64_mv.irq_desc
 #  define platform_irq_to_vector	ia64_mv.irq_to_vector
 #  define platform_local_vector_to_irq	ia64_mv.local_vector_to_irq
@@ -119,7 +120,7 @@ extern void machvec_noop (void);
 
 /* __attribute__((__aligned__(16))) is required to make size of the
  * structure multiple of 16 bytes.
- * This will fillup the holes created because of section 3.3.1 in 
+ * This will fillup the holes created because of section 3.3.1 in
  * Software Conventions guide.
  */
 struct ia64_machine_vector {
@@ -133,16 +134,16 @@ struct ia64_machine_vector {
 	ia64_mv_log_print_t *log_print;
 	ia64_mv_send_ipi_t *send_ipi;
 	ia64_mv_global_tlb_purge_t *global_tlb_purge;
-	ia64_mv_pci_dma_init *dma_init;
-	ia64_mv_pci_alloc_consistent *alloc_consistent;
-	ia64_mv_pci_free_consistent *free_consistent;
-	ia64_mv_pci_map_single *map_single;
-	ia64_mv_pci_unmap_single *unmap_single;
-	ia64_mv_pci_map_sg *map_sg;
-	ia64_mv_pci_unmap_sg *unmap_sg;
-	ia64_mv_pci_dma_sync_single *sync_single;
-	ia64_mv_pci_dma_sync_sg *sync_sg;
-	ia64_mv_pci_dma_supported *dma_supported;
+	ia64_mv_dma_init *dma_init;
+	ia64_mv_dma_alloc_coherent *dma_alloc_coherent;
+	ia64_mv_dma_free_coherent *dma_free_coherent;
+	ia64_mv_dma_map_single *dma_map_single;
+	ia64_mv_dma_unmap_single *dma_unmap_single;
+	ia64_mv_dma_map_sg *dma_map_sg;
+	ia64_mv_dma_unmap_sg *dma_unmap_sg;
+	ia64_mv_dma_sync_single *dma_sync_single;
+	ia64_mv_dma_sync_sg *dma_sync_sg;
+	ia64_mv_dma_supported *dma_supported;
 	ia64_mv_irq_desc *irq_desc;
 	ia64_mv_irq_to_vector *irq_to_vector;
 	ia64_mv_local_vector_to_irq *local_vector_to_irq;
@@ -170,16 +171,16 @@ struct ia64_machine_vector {
 	platform_log_print,			\
 	platform_send_ipi,			\
 	platform_global_tlb_purge,		\
-	platform_pci_dma_init,			\
-	platform_pci_alloc_consistent,		\
-	platform_pci_free_consistent,		\
-	platform_pci_map_single,		\
-	platform_pci_unmap_single,		\
-	platform_pci_map_sg,			\
-	platform_pci_unmap_sg,			\
-	platform_pci_dma_sync_single,		\
-	platform_pci_dma_sync_sg,		\
-	platform_pci_dma_supported,		\
+	platform_dma_init,			\
+	platform_dma_alloc_coherent,		\
+	platform_dma_free_coherent,		\
+	platform_dma_map_single,		\
+	platform_dma_unmap_single,		\
+	platform_dma_map_sg,			\
+	platform_dma_unmap_sg,			\
+	platform_dma_sync_single,		\
+	platform_dma_sync_sg,			\
+	platform_dma_supported,			\
 	platform_irq_desc,			\
 	platform_irq_to_vector,			\
 	platform_local_vector_to_irq,		\
@@ -205,16 +206,16 @@ extern void machvec_init (const char *name);
 /*
  * Declare default routines which aren't declared anywhere else:
  */
-extern ia64_mv_pci_dma_init swiotlb_init;
-extern ia64_mv_pci_alloc_consistent swiotlb_alloc_consistent;
-extern ia64_mv_pci_free_consistent swiotlb_free_consistent;
-extern ia64_mv_pci_map_single swiotlb_map_single;
-extern ia64_mv_pci_unmap_single swiotlb_unmap_single;
-extern ia64_mv_pci_map_sg swiotlb_map_sg;
-extern ia64_mv_pci_unmap_sg swiotlb_unmap_sg;
-extern ia64_mv_pci_dma_sync_single swiotlb_sync_single;
-extern ia64_mv_pci_dma_sync_sg swiotlb_sync_sg;
-extern ia64_mv_pci_dma_supported swiotlb_pci_dma_supported;
+extern ia64_mv_dma_init			swiotlb_init;
+extern ia64_mv_dma_alloc_coherent	swiotlb_alloc_coherent;
+extern ia64_mv_dma_free_coherent	swiotlb_free_coherent;
+extern ia64_mv_dma_map_single		swiotlb_map_single;
+extern ia64_mv_dma_unmap_single		swiotlb_unmap_single;
+extern ia64_mv_dma_map_sg		swiotlb_map_sg;
+extern ia64_mv_dma_unmap_sg		swiotlb_unmap_sg;
+extern ia64_mv_dma_sync_single		swiotlb_sync_single;
+extern ia64_mv_dma_sync_sg		swiotlb_sync_sg;
+extern ia64_mv_dma_supported		swiotlb_dma_supported;
 
 /*
  * Define default versions so we can extend machvec for new platforms without having
@@ -247,35 +248,35 @@ extern ia64_mv_pci_dma_supported swiotlb_pci_dma_supported;
 #ifndef platform_global_tlb_purge
 # define platform_global_tlb_purge	ia64_global_tlb_purge /* default to architected version */
 #endif
-#ifndef platform_pci_dma_init
-# define platform_pci_dma_init		swiotlb_init
+#ifndef platform_dma_init
+# define platform_dma_init		swiotlb_init
 #endif
-#ifndef platform_pci_alloc_consistent
-# define platform_pci_alloc_consistent	swiotlb_alloc_consistent
+#ifndef platform_dma_alloc_coherent
+# define platform_dma_alloc_coherent	swiotlb_alloc_coherent
 #endif
-#ifndef platform_pci_free_consistent
-# define platform_pci_free_consistent	swiotlb_free_consistent
+#ifndef platform_dma_free_coherent
+# define platform_dma_free_coherent	swiotlb_free_coherent
 #endif
-#ifndef platform_pci_map_single
-# define platform_pci_map_single	swiotlb_map_single
+#ifndef platform_dma_map_single
+# define platform_dma_map_single	swiotlb_map_single
 #endif
-#ifndef platform_pci_unmap_single
-# define platform_pci_unmap_single	swiotlb_unmap_single
+#ifndef platform_dma_unmap_single
+# define platform_dma_unmap_single	swiotlb_unmap_single
 #endif
-#ifndef platform_pci_map_sg
-# define platform_pci_map_sg		swiotlb_map_sg
+#ifndef platform_dma_map_sg
+# define platform_dma_map_sg		swiotlb_map_sg
 #endif
-#ifndef platform_pci_unmap_sg
-# define platform_pci_unmap_sg		swiotlb_unmap_sg
+#ifndef platform_dma_unmap_sg
+# define platform_dma_unmap_sg		swiotlb_unmap_sg
 #endif
-#ifndef platform_pci_dma_sync_single
-# define platform_pci_dma_sync_single	swiotlb_sync_single
+#ifndef platform_dma_sync_single
+# define platform_dma_sync_single	swiotlb_sync_single
 #endif
-#ifndef platform_pci_dma_sync_sg
-# define platform_pci_dma_sync_sg	swiotlb_sync_sg
+#ifndef platform_dma_sync_sg
+# define platform_dma_sync_sg		swiotlb_sync_sg
 #endif
-#ifndef platform_pci_dma_supported
-# define  platform_pci_dma_supported	swiotlb_pci_dma_supported
+#ifndef platform_dma_supported
+# define  platform_dma_supported	swiotlb_dma_supported
 #endif
 #ifndef platform_irq_desc
 # define platform_irq_desc		__ia64_irq_desc

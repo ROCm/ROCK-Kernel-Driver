@@ -123,8 +123,8 @@ show_regs (struct pt_regs *regs)
 
 	if (user_mode(regs)) {
 		/* print the stacked registers */
-		unsigned long val, sof, *bsp, ndirty;
-		int i, is_nat = 0;
+		unsigned long val, *bsp, ndirty;
+		int i, sof, is_nat = 0;
 
 		sof = regs->cr_ifs & 0x7f;	/* size of frame */
 		ndirty = (regs->loadrs >> 19);
@@ -379,6 +379,7 @@ copy_thread (int nr, unsigned long clone_flags,
 #	define THREAD_FLAGS_TO_SET	0
 	p->thread.flags = ((current->thread.flags & ~THREAD_FLAGS_TO_CLEAR)
 			   | THREAD_FLAGS_TO_SET);
+	p->thread.last_fph_cpu = -1;
 #ifdef CONFIG_IA32_SUPPORT
 	/*
 	 * If we're cloning an IA32 task then save the IA32 extra

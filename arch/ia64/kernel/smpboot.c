@@ -192,6 +192,7 @@ ia64_sync_itc (unsigned int master)
 {
 	long i, delta, adj, adjust_latency = 0, done = 0;
 	unsigned long flags, rt, master_time_stamp, bound;
+	extern void ia64_cpu_local_tick (void);
 #if DEBUG_ITC_SYNC
 	struct {
 		long rt;	/* roundtrip time */
@@ -246,6 +247,16 @@ ia64_sync_itc (unsigned int master)
 
 	printk(KERN_INFO "CPU %d: synchronized ITC with CPU %u (last diff %ld cycles, "
 	       "maxerr %lu cycles)\n", smp_processor_id(), master, delta, rt);
+
+	/*
+	 * Check whether we sync'd the itc ahead of the next timer interrupt.  If so, just
+	 * reset it.
+	 */
+	if (time_after(ia64_get_itc(), local_cpu_data->itm_next)) {
+		Dprintk("CPU %d: oops, jumped a timer tick; resetting timer.\n",
+			smp_processor_id());
+		ia64_cpu_local_tick();
+	}
 }
 
 /*
@@ -311,15 +322,6 @@ smp_callin (void)
 		 */
 		Dprintk("Going to syncup ITC with BP.\n");
 		ia64_sync_itc(0);
-
-		/*
-		 * Make sure we didn't sync the itc ahead of the next
-		 * timer interrupt, if so, just reset it.
-		 */
-		if (time_after(ia64_get_itc(),local_cpu_data->itm_next)) {
-			Dprintk("oops, jumped a timer.\n");
-			ia64_cpu_local_tick();
-		}
 	}
 
 	/*

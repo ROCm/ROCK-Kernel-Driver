@@ -234,7 +234,12 @@ static int reserve_sba_gart = 1;
 static u64 prefetch_spill_page;
 #endif
 
-#define GET_IOC(dev)	((struct ioc *) PCI_CONTROLLER(dev)->iommu)
+#ifdef CONFIG_PCI
+# define GET_IOC(dev)	(((dev)->bus == &pci_bus_type)						\
+			 ? ((struct ioc *) PCI_CONTROLLER(to_pci_dev(dev))->iommu) : NULL)
+#else
+# define GET_IOC(dev)	NULL
+#endif
 
 /*
 ** DMA_CHUNK_SIZE is used by the SCSI mid-layer to break up
@@ -752,12 +757,12 @@ sba_mark_invalid(struct ioc *ioc, dma_addr_t iova, size_t byte_cnt)
  * @dev: instance of PCI owned by the driver that's asking.
  * @addr:  driver buffer to map.
  * @size:  number of bytes to map in driver buffer.
- * @direction:  R/W or both.
+ * @dir:  R/W or both.
  *
  * See Documentation/DMA-mapping.txt
  */
 dma_addr_t
-sba_map_single(struct pci_dev *dev, void *addr, size_t size, int direction)
+sba_map_single(struct device *dev, void *addr, size_t size, int dir)
 {
 	struct ioc *ioc;
 	unsigned long flags;
@@ -776,7 +781,7 @@ sba_map_single(struct pci_dev *dev, void *addr, size_t size, int direction)
 	/*
  	** Check if the PCI device can DMA to ptr... if so, just return ptr
  	*/
-	if ((pci_addr & ~dev->dma_mask) == 0) {
+	if (dev && dev->dma_mask && (pci_addr & ~*dev->dma_mask) == 0) {
 		/*
  		** Device is bit capable of DMA'ing to the buffer...
 		** just return the PCI address of ptr
@@ -787,7 +792,7 @@ sba_map_single(struct pci_dev *dev, void *addr, size_t size, int direction)
 		spin_unlock_irqrestore(&ioc->res_lock, flags);
 #endif
 		DBG_BYPASS("sba_map_single() bypass mask/addr: 0x%lx/0x%lx\n",
-		           dev->dma_mask, pci_addr);
+		           *dev->dma_mask, pci_addr);
 		return pci_addr;
 	}
 #endif
@@ -845,12 +850,11 @@ sba_map_single(struct pci_dev *dev, void *addr, size_t size, int direction)
  * @dev: instance of PCI owned by the driver that's asking.
  * @iova:  IOVA of driver buffer previously mapped.
  * @size:  number of bytes mapped in driver buffer.
- * @direction:  R/W or both.
+ * @dir:  R/W or both.
  *
  * See Documentation/DMA-mapping.txt
  */
-void sba_unmap_single(struct pci_dev *dev, dma_addr_t iova, size_t size,
-		int direction)
+void sba_unmap_single(struct device *dev, dma_addr_t iova, size_t size, int dir)
 {
 	struct ioc *ioc;
 #if DELAYED_RESOURCE_CNT > 0
@@ -875,7 +879,7 @@ void sba_unmap_single(struct pci_dev *dev, dma_addr_t iova, size_t size,
 		DBG_BYPASS("sba_unmap_single() bypass addr: 0x%lx\n", iova);
 
 #ifdef ENABLE_MARK_CLEAN
-		if (direction == PCI_DMA_FROMDEVICE) {
+		if (dir == DMA_FROM_DEVICE) {
 			mark_clean(phys_to_virt(iova), size);
 		}
 #endif
@@ -917,7 +921,7 @@ void sba_unmap_single(struct pci_dev *dev, dma_addr_t iova, size_t size,
 	READ_REG(ioc->ioc_hpa+IOC_PCOM);	/* flush purges */
 #endif /* DELAYED_RESOURCE_CNT == 0 */
 #ifdef ENABLE_MARK_CLEAN
-	if (direction == PCI_DMA_FROMDEVICE) {
+	if (dir == DMA_FROM_DEVICE) {
 		u32 iovp = (u32) SBA_IOVP(ioc,iova);
 		int off = PDIR_INDEX(iovp);
 		void *addr;
@@ -962,31 +966,25 @@ void sba_unmap_single(struct pci_dev *dev, dma_addr_t iova, size_t size,
  * See Documentation/DMA-mapping.txt
  */
 void *
-sba_alloc_consistent(struct pci_dev *hwdev, size_t size, dma_addr_t *dma_handle)
+sba_alloc_coherent (struct device *hwdev, size_t size, dma_addr_t *dma_handle, int flags)
 {
 	struct ioc *ioc;
-	void *ret;
+	void *addr;
 
-	if (!hwdev) {
-		/* only support PCI */
-		*dma_handle = 0;
-		return 0;
-	}
+        addr = (void *) __get_free_pages(flags, get_order(size));
+	if (!addr)
+		return NULL;
 
-        ret = (void *) __get_free_pages(GFP_ATOMIC, get_order(size));
+	/*
+	 * REVISIT: if sba_map_single starts needing more than dma_mask from the
+	 * device, this needs to be updated.
+	 */
+	ioc = GET_IOC(hwdev);
+	ASSERT(ioc);
+	*dma_handle = sba_map_single(&ioc->sac_only_dev->dev, addr, size, 0);
 
-	if (ret) {
-		memset(ret, 0, size);
-		/*
-		 * REVISIT: if sba_map_single starts needing more
-		 * than dma_mask from the device, this needs to be
-		 * updated.
-		 */
-		ioc = GET_IOC(hwdev);
-		*dma_handle = sba_map_single(ioc->sac_only_dev, ret, size, 0);
-	}
-
-	return ret;
+	memset(addr, 0, size);
+	return addr;
 }
 
 
@@ -999,8 +997,7 @@ sba_alloc_consistent(struct pci_dev *hwdev, size_t size, dma_addr_t *dma_handle)
  *
  * See Documentation/DMA-mapping.txt
  */
-void sba_free_consistent(struct pci_dev *hwdev, size_t size, void *vaddr,
-		dma_addr_t dma_handle)
+void sba_free_coherent (struct device *hwdev, size_t size, void *vaddr, dma_addr_t dma_handle)
 {
 	sba_unmap_single(hwdev, dma_handle, size, 0);
 	free_pages((unsigned long) vaddr, get_order(size));
@@ -1249,11 +1246,11 @@ sba_coalesce_chunks( struct ioc *ioc,
  * @dev: instance of PCI owned by the driver that's asking.
  * @sglist:  array of buffer/length pairs
  * @nents:  number of entries in list
- * @direction:  R/W or both.
+ * @dir:  R/W or both.
  *
  * See Documentation/DMA-mapping.txt
  */
-int sba_map_sg(struct pci_dev *dev, struct scatterlist *sglist, int nents, int direction)
+int sba_map_sg(struct device *dev, struct scatterlist *sglist, int nents, int dir)
 {
 	struct ioc *ioc;
 	int coalesced, filled = 0;
@@ -1267,7 +1264,7 @@ int sba_map_sg(struct pci_dev *dev, struct scatterlist *sglist, int nents, int d
 	ASSERT(ioc);
 
 #ifdef ALLOW_IOV_BYPASS
-	if (dev->dma_mask >= ioc->dma_mask) {
+	if (dev && dev->dma_mask && (ioc->dma_mask & ~*dev->dma_mask) == 0) {
 		for (sg = sglist ; filled < nents ; filled++, sg++){
 			sg->dma_length = sg->length;
 			sg->dma_address = virt_to_phys(sba_sg_address(sg));
@@ -1283,9 +1280,8 @@ int sba_map_sg(struct pci_dev *dev, struct scatterlist *sglist, int nents, int d
 	/* Fast path single entry scatterlists. */
 	if (nents == 1) {
 		sglist->dma_length = sglist->length;
-		sglist->dma_address = sba_map_single(dev,
-		                                     sba_sg_address(sglist),
-		                                     sglist->length, direction);
+		sglist->dma_address = sba_map_single(dev, sba_sg_address(sglist), sglist->length,
+						     dir);
 #ifdef CONFIG_PROC_FS
 		/*
 		** Should probably do some stats counting, but trying to
@@ -1351,12 +1347,11 @@ int sba_map_sg(struct pci_dev *dev, struct scatterlist *sglist, int nents, int d
  * @dev: instance of PCI owned by the driver that's asking.
  * @sglist:  array of buffer/length pairs
  * @nents:  number of entries in list
- * @direction:  R/W or both.
+ * @dir:  R/W or both.
  *
  * See Documentation/DMA-mapping.txt
  */
-void sba_unmap_sg(struct pci_dev *dev, struct scatterlist *sglist, int nents,
-		int direction)
+void sba_unmap_sg (struct device *dev, struct scatterlist *sglist, int nents, int dir)
 {
 	struct ioc *ioc;
 #ifdef ASSERT_PDIR_SANITY
@@ -1381,8 +1376,7 @@ void sba_unmap_sg(struct pci_dev *dev, struct scatterlist *sglist, int nents,
 
 	while (nents && sglist->dma_length) {
 
-		sba_unmap_single(dev, sglist->dma_address,
-		                 sglist->dma_length, direction);
+		sba_unmap_single(dev, sglist->dma_address, sglist->dma_length, dir);
 #ifdef CONFIG_PROC_FS
 		/*
 		** This leaves inconsistent data in the stats, but we can't
@@ -1599,7 +1593,7 @@ ioc_sac_init(struct ioc *ioc)
 	struct pci_controller *controller = NULL;
 
 	/*
-	 * pci_alloc_consistent() must return a DMA address which is
+	 * pci_alloc_coherent() must return a DMA address which is
 	 * SAC (single address cycle) addressable, so allocate a
 	 * pseudo-device to enforce that.
 	 */
@@ -1616,6 +1610,9 @@ ioc_sac_init(struct ioc *ioc)
 	controller->iommu = ioc;
 	sac->sysdata = controller;
 	sac->dma_mask = 0xFFFFFFFFUL;
+#ifdef CONFIG_PCI
+	sac->dev.bus = &pci_bus_type;
+#endif
 	ioc->sac_only_dev = sac;
 }
 
@@ -1675,9 +1672,8 @@ ioc_init(u64 hpa, void *handle)
 	if (!ioc->name) {
 		ioc->name = kmalloc(24, GFP_KERNEL);
 		if (ioc->name)
-			sprintf(ioc->name, "Unknown (%04x:%04x)",
-				ioc->func_id & 0xFFFF,
-				(ioc->func_id >> 16) & 0xFFFF);
+			sprintf((char *) ioc->name, "Unknown (%04x:%04x)",
+				ioc->func_id & 0xFFFF, (ioc->func_id >> 16) & 0xFFFF);
 		else
 			ioc->name = "Unknown";
 	}
@@ -1813,10 +1809,9 @@ static int
 ioc_map_show(struct seq_file *s, void *v)
 {
 	struct ioc *ioc = v;
-	unsigned int *res_ptr = (unsigned int *)ioc->res_map;
-	int i;
+	unsigned int i, *res_ptr = (unsigned int *)ioc->res_map;
 
-	for (i = 0; i < (ioc->res_size / sizeof(unsigned int)); ++i, ++res_ptr)
+	for (i = 0; i < ioc->res_size / sizeof(unsigned int); ++i, ++res_ptr)
 		seq_printf(s, "%s%08x", (i & 7) ? " " : "\n   ", *res_ptr);
 	seq_printf(s, "\n");
 
@@ -1932,19 +1927,23 @@ static struct acpi_driver acpi_sba_ioc_driver = {
 	ids:		"HWP0001,HWP0004",
 	ops: {
 		add:	acpi_sba_ioc_add,
-     },
+	},
 };
 
 static int __init
 sba_init(void)
 {
-	struct pci_bus *b;
 	MAX_DMA_ADDRESS = ~0UL;
 
 	acpi_bus_register_driver(&acpi_sba_ioc_driver);
 
-	pci_for_each_bus(b)
-		sba_connect_bus(b);
+#ifdef CONFIG_PCI
+	{
+		struct pci_bus *b;
+		pci_for_each_bus(b)
+			sba_connect_bus(b);
+	}
+#endif
 
 #ifdef CONFIG_PROC_FS
 	ioc_proc_init();
@@ -1962,7 +1961,7 @@ nosbagart(char *str)
 }
 
 int
-sba_dma_supported (struct pci_dev *dev, u64 mask)
+sba_dma_supported (struct device *dev, u64 mask)
 {
 	/* make sure it's at least 32bit capable */
 	return ((mask & 0xFFFFFFFFUL) == 0xFFFFFFFFUL);
@@ -1975,5 +1974,5 @@ EXPORT_SYMBOL(sba_unmap_single);
 EXPORT_SYMBOL(sba_map_sg);
 EXPORT_SYMBOL(sba_unmap_sg);
 EXPORT_SYMBOL(sba_dma_supported);
-EXPORT_SYMBOL(sba_alloc_consistent);
-EXPORT_SYMBOL(sba_free_consistent);
+EXPORT_SYMBOL(sba_alloc_coherent);
+EXPORT_SYMBOL(sba_free_coherent);

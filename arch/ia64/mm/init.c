@@ -48,13 +48,13 @@ check_pgt_cache (void)
 	low = pgt_cache_water[0];
 	high = pgt_cache_water[1];
 
-	if (pgtable_cache_size > high) {
+	if (pgtable_cache_size > (u64) high) {
 		do {
 			if (pgd_quicklist)
 				free_page((unsigned long)pgd_alloc_one_fast(0));
 			if (pmd_quicklist)
 				free_page((unsigned long)pmd_alloc_one_fast(0, 0));
-		} while (pgtable_cache_size > low);
+		} while (pgtable_cache_size > (u64) low);
 	}
 }
 
@@ -406,7 +406,7 @@ mem_init (void)
 	 * any drivers that may need the PCI DMA interface are initialized or bootmem has
 	 * been freed.
 	 */
-	platform_pci_dma_init();
+	platform_dma_init();
 #endif
 
 #ifndef CONFIG_DISCONTIGMEM
@@ -445,7 +445,7 @@ mem_init (void)
 	num_pgt_pages = nr_free_pages() / PTRS_PER_PGD + NUM_TASKS;
 	if (num_pgt_pages > nr_free_pages() / 10)
 		num_pgt_pages = nr_free_pages() / 10;
-	if (num_pgt_pages > pgt_cache_water[1])
+	if (num_pgt_pages > (u64) pgt_cache_water[1])
 		pgt_cache_water[1] = num_pgt_pages;
 
 	/* install the gate page in the global page table: */

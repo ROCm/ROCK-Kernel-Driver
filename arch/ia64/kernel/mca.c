@@ -172,7 +172,7 @@ mca_handler_platform (void)
 
 }
 
-void
+irqreturn_t
 ia64_mca_cpe_int_handler (int cpe_irq, void *arg, struct pt_regs *ptregs)
 {
 	IA64_MCA_DEBUG("ia64_mca_cpe_int_handler: received interrupt. CPU:%d vector = %#x\n",
@@ -180,6 +180,7 @@ ia64_mca_cpe_int_handler (int cpe_irq, void *arg, struct pt_regs *ptregs)
 
 	/* Get the CMC error record and log it */
 	ia64_mca_log_sal_error_record(SAL_INFO_TYPE_CPE, 0);
+	return IRQ_HANDLED;
 }
 
 static void
@@ -338,9 +339,25 @@ init_handler_platform (sal_log_processor_info_t *proc_ptr,
 	udelay(5*1000000);
 	show_min_state(&SAL_LPI_PSI_INFO(proc_ptr)->min_state_area);
 
+	printk("Backtrace of current task (pid %d, %s)\n", current->pid, current->comm);
 	fetch_min_state(&SAL_LPI_PSI_INFO(proc_ptr)->min_state_area, pt, sw);
 	unw_init_from_interruption(&info, current, pt, sw);
 	ia64_do_show_stack(&info, NULL);
+
+	if (!tasklist_lock.write_lock)
+		read_lock(&tasklist_lock);
+	{
+		struct task_struct *g, *t;
+		do_each_thread (g, t) {
+			if (t == current)
+				continue;
+
+			printk("\nBacktrace of pid %d (%s)\n", t->pid, t->comm);
+			show_stack(t);
+		} while_each_thread (g, t);
+	}
+	if (!tasklist_lock.write_lock)
+		read_unlock(&tasklist_lock);
 
 	printk("\nINIT dump complete.  Please reboot now.\n");
 	while (1);			/* hang city if no debugger */
@@ -828,7 +845,7 @@ ia64_mca_wakeup_all(void)
  *  Inputs  :   None
  *  Outputs :   None
  */
-void
+irqreturn_t
 ia64_mca_rendez_int_handler(int rendez_irq, void *arg, struct pt_regs *ptregs)
 {
 	unsigned long flags;
@@ -851,6 +868,7 @@ ia64_mca_rendez_int_handler(int rendez_irq, void *arg, struct pt_regs *ptregs)
 
 	/* Enable all interrupts */
 	local_irq_restore(flags);
+	return IRQ_HANDLED;
 }
 
 
@@ -869,10 +887,10 @@ ia64_mca_rendez_int_handler(int rendez_irq, void *arg, struct pt_regs *ptregs)
  *  Outputs :   None
  *
  */
-void
+irqreturn_t
 ia64_mca_wakeup_int_handler(int wakeup_irq, void *arg, struct pt_regs *ptregs)
 {
-
+	return IRQ_HANDLED;
 }
 
 /*
@@ -967,7 +985,7 @@ ia64_mca_ucmc_handler(void)
  * Outputs
  *	None
  */
-void
+irqreturn_t
 ia64_mca_cmc_int_handler(int cmc_irq, void *arg, struct pt_regs *ptregs)
 {
 	static unsigned long	cmc_history[CMC_HISTORY_LENGTH];
@@ -984,7 +1002,7 @@ ia64_mca_cmc_int_handler(int cmc_irq, void *arg, struct pt_regs *ptregs)
 	if (!cmc_polling_enabled) {
 		int i, count = 1; /* we know 1 happened now */
 		unsigned long now = jiffies;
-		
+
 		for (i = 0; i < CMC_HISTORY_LENGTH; i++) {
 			if (now - cmc_history[i] <= HZ)
 				count++;
@@ -1019,12 +1037,12 @@ ia64_mca_cmc_int_handler(int cmc_irq, void *arg, struct pt_regs *ptregs)
 			 * something is generating more than we can handle.
 			 */
 			printk(KERN_WARNING "ia64_mca_cmc_int_handler: WARNING: Switching to polling CMC handler, error records may be lost\n");
-			
+
 
 			mod_timer(&cmc_poll_timer, jiffies + CMC_POLL_INTERVAL);
 
 			/* lock already released, get out now */
-			return;
+			return IRQ_HANDLED;
 		} else {
 			cmc_history[index++] = now;
 			if (index == CMC_HISTORY_LENGTH)
@@ -1032,6 +1050,7 @@ ia64_mca_cmc_int_handler(int cmc_irq, void *arg, struct pt_regs *ptregs)
 		}
 	}
 	spin_unlock(&cmc_history_lock);
+	return IRQ_HANDLED;
 }
 
 /*
@@ -1096,7 +1115,7 @@ ia64_mca_cmc_int_caller(void *dummy)
 static void
 ia64_mca_cmc_poll (unsigned long dummy)
 {
-	int start_count;
+	unsigned long start_count;
 
 	start_count = IA64_LOG_COUNT(SAL_INFO_TYPE_CMC);
 
@@ -1147,7 +1166,7 @@ ia64_mca_cpe_int_caller(void *dummy)
 static void
 ia64_mca_cpe_poll (unsigned long dummy)
 {
-	int start_count;
+	unsigned long start_count;
 	static int poll_time = MAX_CPE_POLL_INTERVAL;
 
 	start_count = IA64_LOG_COUNT(SAL_INFO_TYPE_CPE);
@@ -1264,7 +1283,8 @@ ia64_log_prt_guid (efi_guid_t *p_guid, prfunc_t prfunc)
 static void
 ia64_log_hexdump(unsigned char *p, unsigned long n_ch, prfunc_t prfunc)
 {
-	int i, j;
+	unsigned long i;
+	int j;
 
 	if (!p)
 		return;
@@ -2112,7 +2132,7 @@ ia64_log_processor_info_print(sal_log_record_header_t *lh, prfunc_t prfunc)
 {
 	sal_log_section_hdr_t       *slsh;
 	int                         n_sects;
-	int                         ercd_pos;
+	u32                         ercd_pos;
 
 	if (!lh)
 		return;
@@ -2174,7 +2194,7 @@ ia64_log_platform_info_print (sal_log_record_header_t *lh, prfunc_t prfunc)
 {
 	sal_log_section_hdr_t	*slsh;
 	int			n_sects;
-	int			ercd_pos;
+	u32			ercd_pos;
 	int			platform_err = 0;
 
 	if (!lh)

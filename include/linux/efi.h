@@ -7,7 +7,7 @@
  *
  * Copyright (C) 1999 VA Linux Systems
  * Copyright (C) 1999 Walt Drummond <drummond@valinux.com>
- * Copyright (C) 1999, 2002 Hewlett-Packard Co.
+ * Copyright (C) 1999, 2002-2003 Hewlett-Packard Co.
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  *	Stephane Eranian <eranian@hpl.hp.com>
  */
@@ -21,12 +21,12 @@
 #include <asm/system.h>
 
 #define EFI_SUCCESS		0
-#define EFI_LOAD_ERROR          (1L | (1L << 63))
-#define EFI_INVALID_PARAMETER	(2L | (1L << 63))
-#define EFI_UNSUPPORTED		(3L | (1L << 63))
-#define EFI_BAD_BUFFER_SIZE     (4L | (1L << 63))
-#define EFI_BUFFER_TOO_SMALL	(5L | (1L << 63))
-#define EFI_NOT_FOUND          (14L | (1L << 63))
+#define EFI_LOAD_ERROR          ( 1 | (1UL << 63))
+#define EFI_INVALID_PARAMETER	( 2 | (1UL << 63))
+#define EFI_UNSUPPORTED		( 3 | (1UL << 63))
+#define EFI_BAD_BUFFER_SIZE     ( 4 | (1UL << 63))
+#define EFI_BUFFER_TOO_SMALL	( 5 | (1UL << 63))
+#define EFI_NOT_FOUND		(14 | (1UL << 63))
 
 typedef unsigned long efi_status_t;
 typedef u8 efi_bool_t;
@@ -260,7 +260,7 @@ efi_guid_unparse(efi_guid_t *guid, char *out)
 extern void efi_init (void);
 extern void efi_map_pal_code (void);
 extern void efi_memmap_walk (efi_freemem_callback_t callback, void *arg);
-extern void efi_gettimeofday (struct timeval *tv);
+extern void efi_gettimeofday (struct timespec *ts);
 extern void efi_enter_virtual_mode (void);	/* switch EFI to virtual mode, if possible */
 extern u64 efi_get_iobase (void);
 extern u32 efi_mem_type (unsigned long phys_addr);

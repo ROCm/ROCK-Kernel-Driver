@@ -47,18 +47,7 @@ pcibios_penalize_isa_irq (int irq)
 #define HAVE_ARCH_PCI_MWI 1
 extern int pcibios_prep_mwi (struct pci_dev *);
 
-/*
- * Dynamic DMA mapping API.  See Documentation/DMA-mapping.txt for details.
- */
-#define pci_alloc_consistent		platform_pci_alloc_consistent
-#define pci_free_consistent		platform_pci_free_consistent
-#define pci_map_single			platform_pci_map_single
-#define pci_unmap_single		platform_pci_unmap_single
-#define pci_map_sg			platform_pci_map_sg
-#define pci_unmap_sg			platform_pci_unmap_sg
-#define pci_dma_sync_single		platform_pci_dma_sync_single
-#define pci_dma_sync_sg			platform_pci_dma_sync_sg
-#define pci_dma_supported		platform_pci_dma_supported
+#include <asm-generic/pci-dma-compat.h>
 
 /* pci_unmap_{single,page} is not a nop, thus... */
 #define DECLARE_PCI_UNMAP_ADDR(ADDR_NAME)	\
@@ -74,18 +63,12 @@ extern int pcibios_prep_mwi (struct pci_dev *);
 #define pci_unmap_len_set(PTR, LEN_NAME, VAL)		\
 	(((PTR)->LEN_NAME) = (VAL))
 
-#define pci_map_page(dev,pg,off,size,dir)				\
-	pci_map_single((dev), page_address(pg) + (off), (size), (dir))
-#define pci_unmap_page(dev,dma_addr,size,dir)				\
-	pci_unmap_single((dev), (dma_addr), (size), (dir))
-
 /* The ia64 platform always supports 64-bit addressing. */
-#define pci_dac_dma_supported(pci_dev, mask)	(1)
-
-#define pci_dac_page_to_dma(dev,pg,off,dir)	((dma_addr_t) page_to_bus(pg) + (off))
-#define pci_dac_dma_to_page(dev,dma_addr)	(virt_to_page(bus_to_virt(dma_addr)))
-#define pci_dac_dma_to_offset(dev,dma_addr)	((dma_addr) & ~PAGE_MASK)
-#define pci_dac_dma_sync_single(dev,dma_addr,len,dir)	do { /* nothing */ } while (0)
+#define pci_dac_dma_supported(pci_dev, mask)		(1)
+#define pci_dac_page_to_dma(dev,pg,off,dir)		((dma_addr_t) page_to_bus(pg) + (off))
+#define pci_dac_dma_to_page(dev,dma_addr)		(virt_to_page(bus_to_virt(dma_addr)))
+#define pci_dac_dma_to_offset(dev,dma_addr)		((dma_addr) & ~PAGE_MASK)
+#define pci_dac_dma_sync_single(dev,dma_addr,len,dir)	do { mb(); } while (0)
 
 /* Return the index of the PCI controller for device PDEV. */
 #define pci_controller_num(PDEV)	(0)

@@ -680,6 +680,8 @@ iosapic_enable_intr (unsigned int vector)
 	       vector, dest);
 }
 
+#ifdef CONFIG_ACPI_PCI
+
 void __init
 iosapic_parse_prt (void)
 {
@@ -712,7 +714,8 @@ iosapic_parse_prt (void)
 				/* new GSI; allocate a vector for it */
 				vector = ia64_alloc_vector();
 
-			register_intr(gsi, vector, IOSAPIC_LOWEST_PRIORITY, IOSAPIC_POL_LOW, IOSAPIC_LEVEL);
+			register_intr(gsi, vector, IOSAPIC_LOWEST_PRIORITY, IOSAPIC_POL_LOW,
+				      IOSAPIC_LEVEL);
 		}
 		snprintf(pci_id, sizeof(pci_id), "%02x:%02x:%02x[%c]",
 			 entry->id.segment, entry->id.bus, entry->id.device, 'A' + entry->pin);
@@ -723,7 +726,10 @@ iosapic_parse_prt (void)
 		 */
 		idesc = irq_desc(vector);
 		if (idesc->handler != irq_type)
-			register_intr(gsi, vector, IOSAPIC_LOWEST_PRIORITY, IOSAPIC_POL_LOW, IOSAPIC_LEVEL);
+			register_intr(gsi, vector, IOSAPIC_LOWEST_PRIORITY, IOSAPIC_POL_LOW,
+				      IOSAPIC_LEVEL);
 
 	}
 }
+
+#endif /* CONFIG_ACPI */

@@ -83,11 +83,26 @@ gettimeoffset (void)
 	return (elapsed_cycles*local_cpu_data->nsec_per_cyc) >> IA64_NSEC_PER_CYC_SHIFT;
 }
 
+static inline void
+set_normalized_timespec (struct timespec *ts, time_t sec, long nsec)
+{
+	while (nsec > NSEC_PER_SEC) {
+		nsec -= NSEC_PER_SEC;
+		++sec;
+	}
+	while (nsec < 0) {
+		nsec += NSEC_PER_SEC;
+		--sec;
+	}
+	ts->tv_sec = sec;
+	ts->tv_nsec = nsec;
+}
+
 void
 do_settimeofday (struct timeval *tv)
 {
-	time_t sec = tv->tv_sec;
-	long nsec = tv->tv_usec * 1000;
+	time_t wtm_sec, sec = tv->tv_sec;
+	long wtm_nsec, nsec = tv->tv_usec * 1000;
 
 	write_seqlock_irq(&xtime_lock);
 	{
@@ -99,13 +114,12 @@ do_settimeofday (struct timeval *tv)
 		 */
 		nsec -= gettimeoffset();
 
-		while (nsec < 0) {
-			nsec += 1000000000;
-			sec--;
-		}
+		wtm_sec  = wall_to_monotonic.tv_sec + (xtime.tv_sec - sec);
+		wtm_nsec = wall_to_monotonic.tv_nsec + (xtime.tv_nsec - nsec);
 
-		xtime.tv_sec = sec;
-		xtime.tv_nsec = nsec;
+		set_normalized_timespec(&xtime, sec, nsec);
+		set_normalized_timespec(&wall_to_monotonic, wtm_sec, wtm_nsec);
+
 		time_adjust = 0;		/* stop active adjtime() */
 		time_status |= STA_UNSYNC;
 		time_maxerror = NTP_PHASE_LIMIT;
@@ -166,8 +180,8 @@ do_gettimeofday (struct timeval *tv)
 
 	usec = (nsec + offset) / 1000;
 
-	while (unlikely(usec >= 1000000)) {
-		usec -= 1000000;
+	while (unlikely(usec >= USEC_PER_SEC)) {
+		usec -= USEC_PER_SEC;
 		++sec;
 	}
 
@@ -175,8 +189,8 @@ do_gettimeofday (struct timeval *tv)
 	tv->tv_usec = usec;
 }
 
-static void
-timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t
+timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned long new_itm;
 
@@ -231,12 +245,13 @@ timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	    ia64_set_itm(new_itm);
 	    /* double check, in case we got hit by a (slow) PMI: */
 	} while (time_after_eq(ia64_get_itc(), new_itm));
+	return IRQ_HANDLED;
 }
 
 /*
  * Encapsulate access to the itm structure for SMP.
  */
-void __init
+void
 ia64_cpu_local_tick (void)
 {
 	int cpu = smp_processor_id();
@@ -281,7 +296,7 @@ ia64_init_itm (void)
 	if (status != 0) {
 		/* invent "random" values */
 		printk(KERN_ERR
-		       "SAL/PAL failed to obtain frequency info---inventing reasonably values\n");
+		       "SAL/PAL failed to obtain frequency info---inventing reasonable values\n");
 		platform_base_freq = 100000000;
 		itc_ratio.num = 3;
 		itc_ratio.den = 1;
@@ -305,8 +320,8 @@ ia64_init_itm (void)
 
 	local_cpu_data->proc_freq = (platform_base_freq*proc_ratio.num)/proc_ratio.den;
 	local_cpu_data->itc_freq = itc_freq;
-	local_cpu_data->cyc_per_usec = (itc_freq + 500000) / 1000000;
-	local_cpu_data->nsec_per_cyc = ((1000000000UL<<IA64_NSEC_PER_CYC_SHIFT)
+	local_cpu_data->cyc_per_usec = (itc_freq + USEC_PER_SEC/2) / USEC_PER_SEC;
+	local_cpu_data->nsec_per_cyc = ((NSEC_PER_SEC<<IA64_NSEC_PER_CYC_SHIFT)
 					+ itc_freq/2)/itc_freq;
 
 	/* Setup the CPU local timer tick */
@@ -323,6 +338,12 @@ void __init
 time_init (void)
 {
 	register_percpu_irq(IA64_TIMER_VECTOR, &timer_irqaction);
-	efi_gettimeofday((struct timeval *) &xtime);
+	efi_gettimeofday(&xtime);
 	ia64_init_itm();
+
+	/*
+	 * Initialize wall_to_monotonic such that adding it to xtime will yield zero, the
+	 * tv_nsec field must be normalized (i.e., 0 <= nsec < NSEC_PER_SEC).
+	 */
+	set_normalized_timespec(&wall_to_monotonic, -xtime.tv_sec, -xtime.tv_nsec);
 }

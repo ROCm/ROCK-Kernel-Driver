@@ -364,8 +364,9 @@ typedef struct {
 
 #define PFM_CMD_IDX(cmd)	(cmd)
 
-#define PFM_CMD_IS_VALID(cmd)	((PFM_CMD_IDX(cmd) >= 0) && (PFM_CMD_IDX(cmd) < PFM_CMD_COUNT) \
-				  && pfm_cmd_tab[PFM_CMD_IDX(cmd)].cmd_func != NULL)
+#define PFM_CMD_IS_VALID(cmd)	((PFM_CMD_IDX(cmd) >= 0)				\
+				 && (PFM_CMD_IDX(cmd) < (int) PFM_CMD_COUNT)		\
+				 && pfm_cmd_tab[PFM_CMD_IDX(cmd)].cmd_func != NULL)
 
 #define PFM_CMD_USE_PID(cmd)	((pfm_cmd_tab[PFM_CMD_IDX(cmd)].cmd_flags & PFM_CMD_PID) != 0)
 #define PFM_CMD_READ_ARG(cmd)	((pfm_cmd_tab[PFM_CMD_IDX(cmd)].cmd_flags & PFM_CMD_ARG_READ) != 0)
@@ -726,8 +727,7 @@ pfm_remap_buffer(struct vm_area_struct *vma, unsigned long buf, unsigned long ad
 static unsigned long
 pfm_smpl_entry_size(unsigned long *which, unsigned long size)
 {
-	unsigned long res = 0;
-	int i;
+	unsigned long i, res = 0;
 
 	for (i=0; i < size; i++, which++) res += hweight64(*which);
 
@@ -2172,11 +2172,11 @@ pfm_write_ibr_dbr(int mode, struct task_struct *task, void *arg, int count, stru
 		 * never leaves the current CPU and the state
 		 * is shared by all processes running on it
 	 	 */
-		for (i=0; i < pmu_conf.num_ibrs; i++) {
+		for (i=0; i < (int) pmu_conf.num_ibrs; i++) {
 			ia64_set_ibr(i, 0UL);
 		}
 		ia64_srlz_i();
-		for (i=0; i < pmu_conf.num_dbrs; i++) {
+		for (i=0; i < (int) pmu_conf.num_dbrs; i++) {
 			ia64_set_dbr(i, 0UL);
 		}
 		ia64_srlz_d();
@@ -2518,7 +2518,7 @@ static pfm_cmd_desc_t pfm_cmd_tab[]={
 /* 33 */{ pfm_write_dbrs, PFM_CMD_PID|PFM_CMD_CTX|PFM_CMD_ARG_RW, PFM_CMD_ARG_MANY, sizeof(pfarg_dbreg_t)}
 #endif
 };
-#define PFM_CMD_COUNT	(sizeof(pfm_cmd_tab)/sizeof(pfm_cmd_desc_t))
+#define PFM_CMD_COUNT	ARRAY_SIZE(pfm_cmd_tab)
 
 static int
 check_task_state(struct task_struct *task)
@@ -3131,7 +3131,7 @@ pfm_overflow_handler(int mode, struct task_struct *task, pfm_context_t *ctx, u64
 	return 0x1UL;
 }
 
-static void
+static irqreturn_t
 pfm_interrupt_handler(int irq, void *arg, struct pt_regs *regs)
 {
 	u64 pmc0;
@@ -3146,7 +3146,7 @@ pfm_interrupt_handler(int irq, void *arg, struct pt_regs *regs)
 	if (pfm_alternate_intr_handler) {
 		(*pfm_alternate_intr_handler->handler)(irq, arg, regs);
 		put_cpu();
-		return;
+		return IRQ_HANDLED;
 	}
 
 	/* 
@@ -3171,7 +3171,7 @@ pfm_interrupt_handler(int irq, void *arg, struct pt_regs *regs)
 			printk(KERN_DEBUG "perfmon: Spurious overflow interrupt: process %d has "
 			       "no PFM context\n", task->pid);
 			put_cpu();
-			return;
+			return IRQ_HANDLED;
 		}
 
 		/* 
@@ -3199,6 +3199,7 @@ pfm_interrupt_handler(int irq, void *arg, struct pt_regs *regs)
 		pfm_stats[smp_processor_id()].pfm_spurious_ovfl_intr_count++;
 	}
 	put_cpu_no_resched();
+	return IRQ_HANDLED;
 }
 
 /* for debug only */
@@ -3452,11 +3453,11 @@ pfm_load_regs (struct task_struct *task)
 	 * in the next version of perfmon.
 	 */
 	if (ctx->ctx_fl_using_dbreg) {
-		for (i=0; i < pmu_conf.num_ibrs; i++) {
+		for (i=0; i < (int) pmu_conf.num_ibrs; i++) {
 			ia64_set_ibr(i, t->ibr[i]);
 		}
 		ia64_srlz_i();
-		for (i=0; i < pmu_conf.num_dbrs; i++) {
+		for (i=0; i < (int) pmu_conf.num_dbrs; i++) {
 			ia64_set_dbr(i, t->dbr[i]);
 		}
 		ia64_srlz_d();
@@ -3467,7 +3468,7 @@ pfm_load_regs (struct task_struct *task)
 	 * this path cannot be used in SMP
 	 */
 	if (owner == task) {
-		if (atomic_read(&ctx->ctx_last_cpu) != smp_processor_id())
+		if ((unsigned int) atomic_read(&ctx->ctx_last_cpu) != smp_processor_id())
 			DBprintk(("invalid last_cpu=%d for [%d]\n", 
 				atomic_read(&ctx->ctx_last_cpu), task->pid));
 
@@ -3741,7 +3742,7 @@ pfm_flush_regs (struct task_struct *task)
 	 *
 	 */
 
-	if (atomic_read(&ctx->ctx_last_cpu) != smp_processor_id())
+	if ((unsigned int) atomic_read(&ctx->ctx_last_cpu) != smp_processor_id())
 		printk(KERN_DEBUG "perfmon: [%d] last_cpu=%d\n",
 		       task->pid, atomic_read(&ctx->ctx_last_cpu));
 

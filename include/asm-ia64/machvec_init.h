@@ -1,7 +1,3 @@
-#define __MACHVEC_HDR(n)		<asm/machvec_##n##.h>
-#define __MACHVEC_EXPAND(n)		__MACHVEC_HDR(n)
-#define MACHVEC_PLATFORM_HEADER		__MACHVEC_EXPAND(MACHVEC_PLATFORM_NAME)
-
 #include <asm/machvec.h>
 
 extern ia64_mv_send_ipi_t ia64_send_ipi;

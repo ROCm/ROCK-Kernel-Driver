@@ -682,7 +682,7 @@ finish_prologue (struct unw_state_record *sr)
 	 * First, resolve implicit register save locations (see Section "11.4.2.3 Rules
 	 * for Using Unwind Descriptors", rule 3):
 	 */
-	for (i = 0; i < (int) (sizeof(unw.save_order)/sizeof(unw.save_order[0])); ++i) {
+	for (i = 0; i < (int) ARRAY_SIZE(unw.save_order); ++i) {
 		reg = sr->curr.reg + unw.save_order[i];
 		if (reg->where == UNW_WHERE_GR_SAVE) {
 			reg->where = UNW_WHERE_GR;
@@ -1214,13 +1214,13 @@ script_new (unsigned long ip)
 	spin_unlock(&unw.lock);
 
 	/*
-	 * XXX We'll deadlock here if we interrupt a thread that is
-	 * holding a read lock on script->lock.  A try_write_lock()
-	 * might be mighty handy here...  Alternatively, we could
-	 * disable interrupts whenever we hold a read-lock, but that
-	 * seems silly.
+	 * We'd deadlock here if we interrupted a thread that is holding a read lock on
+	 * script->lock.  Thus, if the write_trylock() fails, we simply bail out.  The
+	 * alternative would be to disable interrupts whenever we hold a read-lock, but
+	 * that seems silly.
 	 */
-	write_lock(&script->lock);
+	if (!write_trylock(&script->lock))
+		return NULL;
 
 	spin_lock(&unw.lock);
 	{

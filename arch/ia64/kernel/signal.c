@@ -528,7 +528,7 @@ ia64_do_signal (sigset_t *oldset, struct sigscratch *scr, long in_syscall)
 			else
 				errno = -errno;
 		}
-	} else if (scr->pt.r10 != -1)
+	} else if ((long) scr->pt.r10 != -1)
 		/*
 		 * A system calls has to be restarted only if one of the error codes
 		 * ERESTARTNOHAND, ERESTARTSYS, or ERESTARTNOINTR is returned.  If r10

@@ -196,7 +196,8 @@ acpi_parse_lsapic (acpi_table_entry_header *header)
 		printk(" enabled");
 #ifdef CONFIG_SMP
 		smp_boot_data.cpu_phys_id[total_cpus] = (lsapic->id << 8) | lsapic->eid;
-		if (hard_smp_processor_id() == smp_boot_data.cpu_phys_id[total_cpus])
+		if (hard_smp_processor_id()
+		    == (unsigned int) smp_boot_data.cpu_phys_id[total_cpus])
 			printk(" (BSP)");
 #endif
 	}

@@ -5,7 +5,7 @@
 #include <linux/compiler.h>
 
 /*
- * Copyright (C) 2002 Hewlett-Packard Co
+ * Copyright (C) 2002-2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
@@ -34,6 +34,8 @@ extern unsigned long __per_cpu_offset[NR_CPUS];
 
 #define EXPORT_PER_CPU_SYMBOL(var) EXPORT_SYMBOL(var##__per_cpu)
 #define EXPORT_PER_CPU_SYMBOL_GPL(var) EXPORT_SYMBOL_GPL(var##__per_cpu)
+
+extern void setup_per_cpu_areas (void);
 
 #endif /* !__ASSEMBLY__ */
 

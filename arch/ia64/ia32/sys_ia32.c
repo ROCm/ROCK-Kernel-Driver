@@ -53,10 +53,10 @@
 #include <asm/types.h>
 #include <asm/uaccess.h>
 #include <asm/semaphore.h>
+#include <asm/ia32.h>
 
 #include <net/scm.h>
 #include <net/sock.h>
-#include <asm/ia32.h>
 
 #define DEBUG	0
 
@@ -177,7 +177,7 @@ int cp_compat_stat(struct kstat *stat, struct compat_stat *ubuf)
 {
 	int err;
 
-	if (stat->size > MAX_NON_LFS)
+	if ((u64) stat->size > MAX_NON_LFS)
 		return -EOVERFLOW;
 
 	if (clear_user(ubuf, sizeof(*ubuf)))
@@ -927,8 +927,7 @@ asmlinkage ssize_t sys_writev (unsigned long,const struct iovec *,unsigned long)
 static struct iovec *
 get_compat_iovec (struct compat_iovec *iov32, struct iovec *iov_buf, u32 count, int type)
 {
-	int i;
-	u32 buf, len;
+	u32 i, buf, len;
 	struct iovec *ivp, *iov;
 
 	/* Get the "struct iovec" from user memory */
@@ -2070,7 +2069,7 @@ sys32_ptrace (int request, pid_t pid, unsigned int addr, unsigned int data,
 			ret = -EIO;
 			break;
 		}
-		for (i = 0; i < 17*sizeof(int); i += sizeof(int) ) {
+		for (i = 0; i < (int) (17*sizeof(int)); i += sizeof(int) ) {
 			put_user(getreg(child, i), (unsigned int *) A(data));
 			data += sizeof(int);
 		}
@@ -2082,7 +2081,7 @@ sys32_ptrace (int request, pid_t pid, unsigned int addr, unsigned int data,
 			ret = -EIO;
 			break;
 		}
-		for (i = 0; i < 17*sizeof(int); i += sizeof(int) ) {
+		for (i = 0; i < (int) (17*sizeof(int)); i += sizeof(int) ) {
 			get_user(tmp, (unsigned int *) A(data));
 			putreg(child, i, tmp);
 			data += sizeof(int);
@@ -2158,7 +2157,7 @@ sys32_iopl (int level)
 		return(-EINVAL);
 	/* Trying to gain more privileges? */
 	asm volatile ("mov %0=ar.eflag ;;" : "=r"(old));
-	if (level > ((old >> 12) & 3)) {
+	if ((unsigned int) level > ((old >> 12) & 3)) {
 		if (!capable(CAP_SYS_RAWIO))
 			return -EPERM;
 	}
