@@ -274,17 +274,15 @@ udbg_printSP(const char *s)
 	}
 }
 
-void
-udbg_printf(const char *fmt, ...)
+#define UDBG_BUFSIZE 256
+void udbg_printf(const char *fmt, ...)
 {
-	unsigned char buf[256];
-
+	unsigned char buf[UDBG_BUFSIZE];
 	va_list args;
+
 	va_start(args, fmt);
-
-	vsprintf(buf, fmt, args);
+	vsnprintf(buf, UDBG_BUFSIZE, fmt, args);
 	udbg_puts(buf);
-
 	va_end(args);
 }
 
@@ -296,7 +294,7 @@ udbg_ppcdbg(unsigned long debug_flags, const char *fmt, ...)
 
 	if ( active_debugs ) {
 		va_list ap;
-		unsigned char buf[256];
+		unsigned char buf[UDBG_BUFSIZE];
 		unsigned long i, len = 0;
 
 		for(i=0; i < PPCDBG_NUM_FLAGS ;i++) {
@@ -307,7 +305,7 @@ udbg_ppcdbg(unsigned long debug_flags, const char *fmt, ...)
 				break;
 			}
 		}
-		sprintf(buf, " [%s]: ", current->comm);
+		snprintf(buf, UDBG_BUFSIZE, " [%s]: ", current->comm);
 		len += strlen(buf); 
 		udbg_puts(buf);
 
@@ -317,7 +315,7 @@ udbg_ppcdbg(unsigned long debug_flags, const char *fmt, ...)
 		}
 
 		va_start(ap, fmt);
-		vsprintf(buf, fmt, ap);
+		vsnprintf(buf, UDBG_BUFSIZE, fmt, ap);
 		udbg_puts(buf);
 		
 		va_end(ap);
