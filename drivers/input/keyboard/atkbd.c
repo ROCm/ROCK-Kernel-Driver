@@ -48,33 +48,30 @@ static int atkbd_softrepeat;
  */
 
 static unsigned char atkbd_set2_keycode[512] = {
-	  0, 67, 65, 63, 61, 59, 60, 88,  0, 68, 66, 64, 62, 15, 41, 85,
-	  0, 56, 42,182, 29, 16,  2, 89,  0,  0, 44, 31, 30, 17,  3, 90,
-	  0, 46, 45, 32, 18,  5,  4, 91, 90, 57, 47, 33, 20, 19,  6,  0,
-	 91, 49, 48, 35, 34, 21,  7,  0,  0,  0, 50, 36, 22,  8,  9,  0,
+
+	  0, 67, 65, 63, 61, 59, 60, 88,  0, 68, 66, 64, 62, 15, 41,117,
+	  0, 56, 42,182, 29, 16,  2,  0,  0,  0, 44, 31, 30, 17,  3,  0,
+	  0, 46, 45, 32, 18,  5,  4,186,  0, 57, 47, 33, 20, 19,  6, 85,
+	  0, 49, 48, 35, 34, 21,  7, 89,  0,  0, 50, 36, 22,  8,  9, 90,
 	  0, 51, 37, 23, 24, 11, 10,  0,  0, 52, 53, 38, 39, 25, 12,  0,
-	122, 89, 40,120, 26, 13,  0,  0, 58, 54, 28, 27,  0, 43,  0,  0,
-	 85, 86, 90, 91, 92, 93, 14, 94, 95, 79,183, 75, 71,121,  0,123,
+	  0,181, 40,  0, 26, 13,  0,  0, 58, 54, 28, 27,  0, 43,  0,194,
+	  0, 86,193,192,184,  0, 14,185,  0, 79,182, 75, 71,124,  0,  0,
 	 82, 83, 80, 76, 77, 72,  1, 69, 87, 78, 81, 74, 55, 73, 70, 99,
-	  0,  0,  0, 65, 99,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+
 	  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-	  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-	  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-	  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-	  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-	  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-	  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,255,
-	  0,  0, 92, 90, 85,  0,137,  0,  0,  0,  0, 91, 89,144,115,  0,
-	217,100,255,  0, 97,165,164,  0,156,  0,  0,140,115,  0,  0,125,
-	173,114,  0,113,152,163,151,126,128,166,  0,140,  0,147,  0,127,
-	159,167,115,160,164,  0,  0,116,158,  0,150,166,  0,  0,  0,142,
-	157,  0,114,166,168,  0,  0,213,155,  0, 98,113,  0,163,  0,138,
-	226,  0,  0,  0,  0,  0,153,140,  0,255, 96,  0,  0,  0,143,  0,
-	133,  0,116,  0,143,  0,174,133,  0,107,  0,105,102,  0,  0,112,
-	110,111,108,112,106,103,  0,119,  0,118,109,  0, 99,104,119
+	217,100,255,  0, 97,165,  0,  0,156,  0,  0,  0,  0,  0,  0,125,
+	173,114,  0,113,  0,  0,  0,126,128,  0,  0,140,  0,  0,  0,127,
+	159,  0,115,  0,164,  0,  0,116,158,  0,150,166,  0,  0,  0,142,
+	157,  0,  0,  0,  0,  0,  0,  0,155,  0, 98,  0,  0,163,  0,  0,
+	226,  0,  0,  0,  0,  0,  0,  0,  0,255, 96,  0,  0,  0,143,  0,
+	  0,  0,  0,  0,  0,  0,  0,  0,  0,107,  0,105,102,  0,  0,112,
+	110,111,108,112,106,103,  0,119,  0,118,109,  0, 99,104,119,  0,
+
+	  0,  0,  0, 65, 99,
 };
 
 static unsigned char atkbd_set3_keycode[512] = {
+
 	  0,  0,  0,  0,  0,  0,  0, 59,  1,138,128,129,130, 15, 41, 60,
 	131, 29, 42, 86, 58, 16,  2, 61,133, 56, 44, 31, 30, 17,  3, 62,
 	134, 46, 45, 32, 18,  5,  4, 63,135, 57, 47, 33, 20, 19,  6, 64,
@@ -83,25 +80,21 @@ static unsigned char atkbd_set3_keycode[512] = {
 	113,114, 40, 84, 26, 13, 87, 99, 97, 54, 28, 27, 43, 84, 88, 70,
 	108,105,119,103,111,107, 14,110,  0, 79,106, 75, 71,109,102,104,
 	 82, 83, 80, 76, 77, 72, 69, 98,  0, 96, 81,  0, 78, 73, 55, 85,
+
 	 89, 90, 91, 92, 74,185,184,182,  0,  0,  0,125,126,127,112,  0,
 	  0,139,150,163,165,115,152,150,166,140,160,154,113,114,167,168,
-	148,149,147,140,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-	  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-	  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-	  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-	  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-	  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,255
+	148,149,147,140
 };
 
 static unsigned char atkbd_unxlate_table[128] = {
-	  0,118, 22, 30, 38, 37, 46, 54, 61, 62, 70, 69, 78, 85,102, 13,
-	 21, 29, 36, 45, 44, 53, 60, 67, 68, 77, 84, 91, 90, 20, 28, 27,
-	 35, 43, 52, 51, 59, 66, 75, 76, 82, 14, 18, 93, 26, 34, 33, 42,
-	 50, 49, 58, 65, 73, 74, 89,124, 17, 41, 88,  5,  6,  4, 12,  3,
-	 11,  2, 10,  1,  9,119,126,108,117,125,123,107,115,116,121,105,
-	114,122,112,113,127, 96, 97,120,  7, 15, 23, 31, 39, 47, 55, 63,
-	 71, 79, 86, 94,  8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 87,111,
-	 19, 25, 57, 81, 83, 92, 95, 98, 99,100,101,103,104,106,109,110
+          0,118, 22, 30, 38, 37, 46, 54, 61, 62, 70, 69, 78, 85,102, 13,
+         21, 29, 36, 45, 44, 53, 60, 67, 68, 77, 84, 91, 90, 20, 28, 27,
+         35, 43, 52, 51, 59, 66, 75, 76, 82, 14, 18, 93, 26, 34, 33, 42,
+         50, 49, 58, 65, 73, 74, 89,124, 17, 41, 88,  5,  6,  4, 12,  3,
+         11,  2, 10,  1,  9,119,126,108,117,125,123,107,115,116,121,105,
+        114,122,112,113,127, 96, 97,120,  7, 15, 23, 31, 39, 47, 55, 63,
+         71, 79, 86, 94,  8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 87,111,
+         19, 25, 57, 81, 83, 92, 95, 98, 99,100,101,103,104,106,109,110
 };
 
 #define ATKBD_CMD_SETLEDS	0x10ed
@@ -125,6 +118,9 @@ static unsigned char atkbd_unxlate_table[128] = {
 #define ATKBD_RET_EMULX		0x80
 #define ATKBD_RET_EMUL1		0xe1
 #define ATKBD_RET_RELEASE	0xf0
+#define ATKBD_RET_HANGUEL	0xf1
+#define ATKBD_RET_HANJA		0xf2
+#define ATKBD_RET_ERR		0xff
 
 #define ATKBD_KEY_UNKNOWN	  0
 #define ATKBD_KEY_NULL		255
@@ -156,6 +152,17 @@ struct atkbd {
 	unsigned long time;
 };
 
+static void atkbd_report_key(struct input_dev *dev, struct pt_regs *regs, int code, int value)
+{
+	input_regs(dev, regs);
+	if (value == 3) {
+		input_report_key(dev, code, 1);
+		input_report_key(dev, code, 0);
+	} else
+		input_event(dev, EV_KEY, code, value);
+	input_sync(dev);
+}
+
 /*
  * atkbd_interrupt(). Here takes place processing of data received from
  * the keyboard into events.
@@ -184,45 +191,35 @@ static irqreturn_t atkbd_interrupt(struct serio *serio, unsigned char data,
 		atkbd->resend = 0;
 #endif
 
-	switch (code) {
-		case ATKBD_RET_ACK:
-			atkbd->ack = 1;
-			goto out;
-		case ATKBD_RET_NAK:
-			atkbd->ack = -1;
-			goto out;
-	}
-
-	if (atkbd->translated) do {
-
-		if (atkbd->emul != 1) {
-			if (code == ATKBD_RET_EMUL0 || code == ATKBD_RET_EMUL1)
-				break;
-			if (code == ATKBD_RET_BAT) {
-				if (!atkbd->bat_xl)
-					break;
-				atkbd->bat_xl = 0;
-			}
-			if (code == (ATKBD_RET_BAT & 0x7f))
-				atkbd->bat_xl = 1;
+	if (!atkbd->ack)
+		switch (code) {
+			case ATKBD_RET_ACK:
+				atkbd->ack = 1;
+				goto out;
+			case ATKBD_RET_NAK:
+				atkbd->ack = -1;
+				goto out;
 		}
-
-		if (code < 0x80) {
-			code = atkbd_unxlate_table[code];
-			break;
-		}
-
-		if (atkbd->cmdcnt)
-			break;
-
-		code = atkbd_unxlate_table[code & 0x7f];
-		atkbd->release = 1;
-
-	} while (0);
 
 	if (atkbd->cmdcnt) {
 		atkbd->cmdbuf[--atkbd->cmdcnt] = code;
 		goto out;
+	}
+
+	if (atkbd->translated) {
+
+		if (atkbd->emul ||
+		    !(code == ATKBD_RET_EMUL0 || code == ATKBD_RET_EMUL1 ||
+		      code == ATKBD_RET_HANGUEL || code == ATKBD_RET_HANJA ||
+		      code == ATKBD_RET_ERR ||
+	             (code == ATKBD_RET_BAT && !atkbd->bat_xl))) {
+			atkbd->release = code >> 7;
+			code &= 0x7f;
+		}
+
+		if (!atkbd->emul &&
+		     (code & 0x7f) == (ATKBD_RET_BAT & 0x7f))
+			atkbd->bat_xl = !atkbd->release;
 	}
 
 	switch (code) {
@@ -238,22 +235,33 @@ static irqreturn_t atkbd_interrupt(struct serio *serio, unsigned char data,
 		case ATKBD_RET_RELEASE:
 			atkbd->release = 1;
 			goto out;
+		case ATKBD_RET_HANGUEL:
+			atkbd_report_key(&atkbd->dev, regs, KEY_LANG1, 3);
+			goto out;
+		case ATKBD_RET_HANJA:
+			atkbd_report_key(&atkbd->dev, regs, KEY_LANG2, 3);
+			goto out;
+		case ATKBD_RET_ERR:
+			printk(KERN_WARNING "atkbd.c: Keyboard on %s reports too many keys pressed.\n", serio->phys);
+			goto out;
 	}
 
+	if (atkbd->set != 3)
+		code = (code & 0x7f) | ((code & 0x80) << 1);
 	if (atkbd->emul) {
 		if (--atkbd->emul)
 			goto out;
-		code |= 0x100;
+		code |= (atkbd->set != 3) ? 0x80 : 0x100;
 	}
 
 	switch (atkbd->keycode[code]) {
 		case ATKBD_KEY_NULL:
 			break;
 		case ATKBD_KEY_UNKNOWN:
-			printk(KERN_WARNING "atkbd.c: Unknown key %s (%s set %d, code %#x, data %#x, on %s).\n",
+			printk(KERN_WARNING "atkbd.c: Unknown key %s (%s set %d, code %#x on %s).\n",
 				atkbd->release ? "released" : "pressed",
 				atkbd->translated ? "translated" : "raw", 
-				atkbd->set, code, data, serio->phys);
+				atkbd->set, code, serio->phys);
 			break;
 		default:
 			value = atkbd->release ? 0 :
@@ -273,9 +281,7 @@ static irqreturn_t atkbd_interrupt(struct serio *serio, unsigned char data,
 					break;
 			}
 
-			input_regs(&atkbd->dev, regs);
-			input_event(&atkbd->dev, EV_KEY, atkbd->keycode[code], value);
-			input_sync(&atkbd->dev);
+			atkbd_report_key(&atkbd->dev, regs, atkbd->keycode[code], value);
 	}
 
 	atkbd->release = 0;
@@ -369,10 +375,11 @@ static int atkbd_command(struct atkbd *atkbd, unsigned char *param, int command)
 static int atkbd_event(struct input_dev *dev, unsigned int type, unsigned int code, int value)
 {
 	struct atkbd *atkbd = dev->private;
-	struct { int p; u8 v; } period[] =	
-		{ {30, 0x00}, {25, 0x02}, {20, 0x04}, {15, 0x08}, {10, 0x0c}, {7, 0x10}, {5, 0x14}, {0, 0x14} };
-	struct { int d; u8 v; } delay[] =
-        	{ {1000, 0x60}, {750, 0x40}, {500, 0x20}, {250, 0x00}, {0, 0x00} };
+	const short period[32] =
+		{ 33,  37,  42,  46,  50,  54,  58,  63,  67,  75,  83,  92, 100, 109, 116, 125,
+		 133, 149, 167, 182, 200, 217, 232, 250, 270, 303, 333, 370, 400, 435, 470, 500 };
+	const short delay[4] =
+		{ 250, 500, 750, 1000 };
 	char param[2];
 	int i, j;
 
@@ -406,11 +413,11 @@ static int atkbd_event(struct input_dev *dev, unsigned int type, unsigned int co
 			if (atkbd_softrepeat) return 0;
 
 			i = j = 0;
-			while (period[i].p > dev->rep[REP_PERIOD]) i++;
-			while (delay[j].d > dev->rep[REP_DELAY]) j++;
-			dev->rep[REP_PERIOD] = period[i].p;
-			dev->rep[REP_DELAY] = delay[j].d;
-			param[0] = period[i].v | delay[j].v;
+			while (i < 32 && period[i] < dev->rep[REP_PERIOD]) i++;
+			while (j < 4 && delay[j] < dev->rep[REP_DELAY]) j++;
+			dev->rep[REP_PERIOD] = period[i];
+			dev->rep[REP_DELAY] = delay[j];
+			param[0] = i | (j << 5);
 			atkbd_command(atkbd, param, ATKBD_CMD_SETREP);
 
 			return 0;
@@ -623,6 +630,7 @@ static void atkbd_connect(struct serio *serio, struct serio_dev *dev)
 		atkbd->dev.rep[REP_PERIOD] = 33;
 	}
 
+	atkbd->ack = 1;
 	atkbd->serio = serio;
 
 	init_input_dev(&atkbd->dev);
@@ -665,16 +673,22 @@ static void atkbd_connect(struct serio *serio, struct serio_dev *dev)
 
 	sprintf(atkbd->phys, "%s/input0", serio->phys);
 
-	if (atkbd->set == 3)
-		memcpy(atkbd->keycode, atkbd_set3_keycode, sizeof(atkbd->keycode));
-	else
+	if (atkbd->translated) {
+		for (i = 0; i < 128; i++) {
+			atkbd->keycode[i] = atkbd_set2_keycode[atkbd_unxlate_table[i]];
+			atkbd->keycode[i | 0x80] = atkbd_set2_keycode[atkbd_unxlate_table[i] | 0x80];
+		}
+	} else if (atkbd->set == 2) {
 		memcpy(atkbd->keycode, atkbd_set2_keycode, sizeof(atkbd->keycode));
+	} else {
+		memcpy(atkbd->keycode, atkbd_set3_keycode, sizeof(atkbd->keycode));
+	}
 
 	atkbd->dev.name = atkbd->name;
 	atkbd->dev.phys = atkbd->phys;
 	atkbd->dev.id.bustype = BUS_I8042;
 	atkbd->dev.id.vendor = 0x0001;
-	atkbd->dev.id.product = atkbd->set;
+	atkbd->dev.id.product = atkbd->translated ? 1 : atkbd->set;
 	atkbd->dev.id.version = atkbd->id;
 
 	for (i = 0; i < 512; i++)
@@ -685,7 +699,6 @@ static void atkbd_connect(struct serio *serio, struct serio_dev *dev)
 
 	printk(KERN_INFO "input: %s on %s\n", atkbd->name, serio->phys);
 }
-
 
 static struct serio_dev atkbd_dev = {
 	.interrupt =	atkbd_interrupt,
