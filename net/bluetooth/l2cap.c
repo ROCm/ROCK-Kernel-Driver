@@ -2084,6 +2084,7 @@ static void __exit l2cap_proc_cleanup(void)
 
 static struct proto_ops l2cap_sock_ops = {
 	.family  =      PF_BLUETOOTH,
+	.owner   =	THIS_MODULE,
 	.release =      l2cap_sock_release,
 	.bind    =      l2cap_sock_bind,
 	.connect =      l2cap_sock_connect,
@@ -2104,6 +2105,7 @@ static struct proto_ops l2cap_sock_ops = {
 static struct net_proto_family l2cap_sock_family_ops = {
 	.family =       PF_BLUETOOTH,
 	.create	=       l2cap_sock_create,
+	.owner	=	THIS_MODULE,
 };
 
 static struct hci_proto l2cap_hci_proto = {
