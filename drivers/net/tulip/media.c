@@ -517,10 +517,11 @@ void __devinit tulip_find_mii (struct net_device *dev, int board_idx)
 		/* Enable autonegotiation: some boards default to off. */
 		if (tp->default_port == 0) {
 			new_bmcr = mii_reg0 | BMCR_ANENABLE;
-			if (new_bmcr != mii_reg0) {
-				new_bmcr |= BMCR_ANRESTART;
-				ane_switch = 1;
-			}
+			/* DM9161E PHY seems to need to restart
+			 * autonegotiation even if it defaults to enabled.
+			 */
+			new_bmcr |= BMCR_ANRESTART;
+			ane_switch = 1;
 		}
 		/* ...or disable nway, if forcing media */
 		else {

@@ -280,7 +280,7 @@ static void fb_flashcursor(void *private)
 	c = scr_readw((u16 *) vc->vc_pos);
 	mode = (!ops->cursor_flash || ops->cursor_state.enable) ?
 		CM_ERASE : CM_DRAW;
-	ops->cursor(vc, info, p, mode, get_color(vc, info, c, 1),
+	ops->cursor(vc, info, p, mode, softback_lines, get_color(vc, info, c, 1),
 		    get_color(vc, info, c, 0));
 	release_console_sem();
 }
@@ -1102,27 +1102,23 @@ static void fbcon_cursor(struct vc_data *vc, int mode)
 	struct fb_info *info = registered_fb[con2fb_map[vc->vc_num]];
 	struct fbcon_ops *ops = info->fbcon_par;
 	struct display *p = &fb_display[vc->vc_num];
-	int y = real_y(p, vc->vc_y);
+	int y;
  	int c = scr_readw((u16 *) vc->vc_pos);
 
 	if (fbcon_is_inactive(vc, info))
 		return;
 
-	ops->cursor_flash = 1;
+	ops->cursor_flash = (mode == CM_ERASE) ? 0 : 1;
 	if (mode & CM_SOFTBACK) {
 		mode &= ~CM_SOFTBACK;
-		if (softback_lines) {
-			if (y + softback_lines >= vc->vc_rows) {
-				mode = CM_ERASE;
-				ops->cursor_flash = 0;
-			}
-			else
-				y += softback_lines;
-		}
-	} else if (softback_lines)
-		fbcon_set_origin(vc);
+		y = softback_lines;
+	} else {
+		if (softback_lines)
+			fbcon_set_origin(vc);
+		y = 0;
+	}
 
-	ops->cursor(vc, info, p, mode, get_color(vc, info, c, 1),
+	ops->cursor(vc, info, p, mode, y, get_color(vc, info, c, 1),
 		    get_color(vc, info, c, 0));
 	vbl_cursor_cnt = CURSOR_DRAW_DELAY;
 }

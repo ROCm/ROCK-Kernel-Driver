@@ -87,7 +87,7 @@ struct fbcon_ops {
 	void (*clear_margins)(struct vc_data *vc, struct fb_info *info,
 			      int bottom_only);
 	void (*cursor)(struct vc_data *vc, struct fb_info *info,
-		       struct display *p, int mode, int fg, int bg);
+		       struct display *p, int mode, int softback_lines, int fg, int bg);
 
 	struct timer_list cursor_timer; /* Cursor timer */
 	struct fb_cursor cursor_state;

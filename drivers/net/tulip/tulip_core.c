@@ -383,6 +383,11 @@ static void tulip_up(struct net_device *dev)
 				goto media_picked;
 			}
 	}
+	if (tp->chip_id == ULI526X) {
+		for (i = tp->mtable->leafcount - 1; i >= 0; i--)
+			if (tulip_media_cap[tp->mtable->mleaf[i].media] & MediaIsMII)
+				goto media_picked;
+	}
 	/* Start sensing first non-full-duplex media. */
 	for (i = tp->mtable->leafcount - 1;
 		 (tulip_media_cap[tp->mtable->mleaf[i].media] & MediaAlwaysFD) && i > 0; i--)
