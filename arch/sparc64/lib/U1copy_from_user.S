@@ -1,4 +1,4 @@
-/* U3copy_from_user.S: UltraSparc-III optimized copy from userspace.
+/* U1copy_from_user.S: UltraSparc-I/II/IIi/IIe optimized copy from userspace.
  *
  * Copyright (C) 1999, 2000, 2004 David S. Miller (davem@redhat.com)
  */
@@ -15,8 +15,9 @@
 	.text;			\
 	.align 4;
 
-#define FUNC_NAME		U3copy_from_user
+#define FUNC_NAME		___copy_from_user
 #define LOAD(type,addr,dest)	type##a [addr] %asi, dest
+#define LOAD_BLK(addr,dest)	ldda [addr] ASI_BLK_AIUS, dest
 #define EX_RETVAL(x)		0
 
-#include "U3memcpy.S"
+#include "U1memcpy.S"

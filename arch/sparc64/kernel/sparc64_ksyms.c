@@ -334,7 +334,6 @@ EXPORT_SYMBOL(sys_close);
 #endif
 
 /* Special internal versions of library functions. */
-EXPORT_SYMBOL(__memset);
 EXPORT_SYMBOL(_clear_page);
 EXPORT_SYMBOL(clear_user_page);
 EXPORT_SYMBOL(copy_user_page);
@@ -343,7 +342,7 @@ EXPORT_SYMBOL(__memscan_zero);
 EXPORT_SYMBOL(__memscan_generic);
 EXPORT_SYMBOL(__memcmp);
 EXPORT_SYMBOL(__strncmp);
-EXPORT_SYMBOL(__memmove);
+EXPORT_SYMBOL(__memset);
 EXPORT_SYMBOL(memchr);
 
 EXPORT_SYMBOL(csum_partial);
@@ -351,9 +350,12 @@ EXPORT_SYMBOL(csum_partial_copy_sparc64);
 EXPORT_SYMBOL(ip_fast_csum);
 
 /* Moving data to/from/in userspace. */
-EXPORT_SYMBOL(__copy_to_user);
-EXPORT_SYMBOL(__copy_from_user);
-EXPORT_SYMBOL(__copy_in_user);
+EXPORT_SYMBOL(___copy_to_user);
+EXPORT_SYMBOL(___copy_from_user);
+EXPORT_SYMBOL(___copy_in_user);
+EXPORT_SYMBOL(copy_to_user_fixup);
+EXPORT_SYMBOL(copy_from_user_fixup);
+EXPORT_SYMBOL(copy_in_user_fixup);
 EXPORT_SYMBOL(__strncpy_from_user);
 EXPORT_SYMBOL(__bzero_noasi);
 
