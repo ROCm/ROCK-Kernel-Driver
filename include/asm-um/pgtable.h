@@ -9,6 +9,7 @@
 #define __UM_PGTABLE_H
 
 #include "linux/sched.h"
+#include "linux/linkage.h"
 #include "asm/processor.h"
 #include "asm/page.h"
 #include "asm/fixmap.h"
@@ -154,8 +155,8 @@ extern pte_t * __bad_pagetable(void);
 #define pud_newpage(x)  (pud_val(x) & _PAGE_NEWPAGE)
 #define pud_mkuptodate(x) (pud_val(x) &= ~_PAGE_NEWPAGE)
 
-static inline pud_t *__pud_alloc(struct mm_struct *mm, pgd_t *pgd,
-				 unsigned long addr)
+static inline pud_t fastcall *__pud_alloc(struct mm_struct *mm, pgd_t *pgd,
+					  unsigned long addr)
 {
 	BUG();
 }
