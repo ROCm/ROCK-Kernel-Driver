@@ -94,9 +94,13 @@ CONFIG_USB_OHCI
 CONFIG_USB_HID
   Say Y here if you want full HID support to connect keyboards,
   mice, joysticks, graphic tablets, or any other HID based devices
-  to your computer via USB. You can't use this driver and the
-  HIDBP (Boot Protocol) keyboard and mouse drivers at the same time.
-  More information is available: <file:Documentation/input/input.txt>.
+  to your computer via USB. You also need to select HID Input layer
+  support (below) if you want to use keyboards, mice, joysticks and
+  the like.
+
+  You can't use this driver and the HIDBP (Boot Protocol) keyboard
+  and mouse drivers at the same time. More information is available:
+  <file:Documentation/input/input.txt>.
 
   If unsure, say Y.
 
@@ -104,6 +108,13 @@ CONFIG_USB_HID
   inserted in and removed from the running kernel whenever you want).
   The module will be called hid.o. If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_HIDINPUT
+  Say Y here if you want to use a USB keyboard, mouse or joystick,
+  or any other HID input device. You also need Input layer support, 
+  (CONFIG_INPUT) which you select under "Input core support".
+
+  If unsure, say Y.
 
 CONFIG_USB_HIDDEV
   Say Y here if you want to support HID devices (from the USB
@@ -114,31 +125,35 @@ CONFIG_USB_HIDDEV
   event interface on /dev/usb/hiddevX (char 180:96 to 180:111).
   This driver requires CONFIG_USB_HID.
 
-  If unsure, say N.
+  If unsure, say Y.
 
 CONFIG_USB_KBD
-  Say Y here if you don't want to use the generic HID driver for your
-  USB keyboard and prefer to use the keyboard in its limited Boot
-  Protocol mode instead. This driver is much smaller than the HID one.
+  Say Y here only if you are absolutely sure that you don't want
+  to use the generic HID driver for your USB keyboard and prefer
+  to use the keyboard in its limited Boot Protocol mode instead.
+
+  This is almost certainly not what you want.
 
   This code is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
   The module will be called usbkbd.o. If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.
 
-  If unsure, say N.
+  If even remotely unsure, say N.
 
 CONFIG_USB_MOUSE
-  Say Y here if you don't want to use the generic HID driver for your
-  USB mouse and prefer to use the mouse in its limited Boot Protocol
-  mode instead. This driver is much smaller than the HID one.
+  Say Y here only if you are absolutely sure that you don't want
+  to use the generic HID driver for your USB keyboard and prefer
+  to use the keyboard in its limited Boot Protocol mode instead.
+
+  This is almost certainly not what you want.
 
   This code is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
   The module will be called usbmouse.o. If you want to compile it as
   a module, say M here and read <file:Documentation/modules.txt>.
 
-  If unsure, say N.
+  If even remotely unsure, say N.
 
 CONFIG_USB_WACOM
   Say Y here if you want to use the USB version of the Wacom Intuos
@@ -636,3 +651,21 @@ CONFIG_USB_BLUETOOTH
   The module will be called bluetooth.o. If you want to compile it as
   a module, say M here and read <file:Documentation/modules.txt>.
 
+CONFIG_USB_TIGL
+  If you own a Texas Instruments graphing calculator and use a 
+  TI-GRAPH LINK USB cable (aka SilverLink), then you might be 
+  interested in this driver.
+
+  If you enable this driver, you will be able to communicate with
+  your calculator through a set of device nodes under /dev.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called tiglusb.o. If you want to compile it as a
+  module, say M here and read Documentation/modules.txt.
+
+  If you don't know what the SilverLink cable is or what a Texas
+  Instruments graphing calculator is, then you probably don't need this
+  driver.
+
+  If unsure, say N.

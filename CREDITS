@@ -1916,6 +1916,7 @@ S: USA
 N: Petko Manolov
 E: petkan@users.sourceforge.net
 D: USB ethernet pegasus/pegasus-II driver
+D: USB ethernet rtl8150 driver
 D: optimizing i[45]86 string routines
 D: i386 task switching hacks
 S: 482 Shadowgraph Dr.
