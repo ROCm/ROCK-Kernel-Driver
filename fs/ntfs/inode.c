@@ -373,7 +373,7 @@ void ntfs_destroy_extent_inode(ntfs_inode *ni)
  *
  * Return zero on success and -ENOMEM on error.
  */
-static void __ntfs_init_inode(struct super_block *sb, ntfs_inode *ni)
+void __ntfs_init_inode(struct super_block *sb, ntfs_inode *ni)
 {
 	ntfs_debug("Entering.");
 	ni->initialized_size = ni->allocated_size = 0;
@@ -396,17 +396,6 @@ static void __ntfs_init_inode(struct super_block *sb, ntfs_inode *ni)
 	init_MUTEX(&ni->extent_lock);
 	ni->nr_extents = 0;
 	ni->ext.base_ntfs_ino = NULL;
-	return;
-}
-
-static inline void ntfs_init_big_inode(struct inode *vi)
-{
-	ntfs_inode *ni = NTFS_I(vi);
-
-	ntfs_debug("Entering.");
-	__ntfs_init_inode(vi->i_sb, ni);
-	ni->mft_no = vi->i_ino;
-	return;
 }
 
 inline ntfs_inode *ntfs_new_extent_inode(struct super_block *sb,

@@ -23,8 +23,9 @@
 #include <linux/dcache.h>
 #include <linux/security.h>
 
-#include "dir.h"
+#include "attrib.h"
 #include "debug.h"
+#include "dir.h"
 #include "mft.h"
 #include "ntfs.h"
 

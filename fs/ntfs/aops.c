@@ -29,9 +29,11 @@
 #include <linux/writeback.h>
 
 #include "aops.h"
+#include "attrib.h"
 #include "debug.h"
 #include "inode.h"
 #include "mft.h"
+#include "runlist.h"
 #include "types.h"
 #include "ntfs.h"
 

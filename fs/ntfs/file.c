@@ -22,6 +22,7 @@
 #include <linux/pagemap.h>
 #include <linux/buffer_head.h>
 
+#include "inode.h"
 #include "debug.h"
 #include "ntfs.h"
 

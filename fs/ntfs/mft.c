@@ -23,12 +23,14 @@
 #include <linux/buffer_head.h>
 #include <linux/swap.h>
 
-#include "bitmap.h"
-#include "lcnalloc.h"
+#include "attrib.h"
 #include "aops.h"
+#include "bitmap.h"
 #include "debug.h"
-#include "mft.h"
+#include "dir.h"
+#include "lcnalloc.h"
 #include "malloc.h"
+#include "mft.h"
 #include "ntfs.h"
 
 /**

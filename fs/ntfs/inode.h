@@ -35,6 +35,7 @@
 #include "volume.h"
 #include "types.h"
 #include "runlist.h"
+#include "debug.h"
 
 typedef struct _ntfs_inode ntfs_inode;
 
@@ -275,6 +276,17 @@ extern struct inode *ntfs_index_iget(struct inode *base_vi, ntfschar *name,
 extern struct inode *ntfs_alloc_big_inode(struct super_block *sb);
 extern void ntfs_destroy_big_inode(struct inode *inode);
 extern void ntfs_clear_big_inode(struct inode *vi);
+
+extern void __ntfs_init_inode(struct super_block *sb, ntfs_inode *ni);
+
+static inline void ntfs_init_big_inode(struct inode *vi)
+{
+	ntfs_inode *ni = NTFS_I(vi);
+
+	ntfs_debug("Entering.");
+	__ntfs_init_inode(vi->i_sb, ni);
+	ni->mft_no = vi->i_ino;
+}
 
 extern ntfs_inode *ntfs_new_extent_inode(struct super_block *sb,
 		unsigned long mft_no);

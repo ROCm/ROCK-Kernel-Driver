@@ -128,6 +128,10 @@ ToDo/Notes:
 	  dirty state.  We cannot look at the dirty state for subsequent
 	  buffers because we might be racing with
 	  fs/ntfs/aops.c::mark_ntfs_record_dirty().
+	- Move the static inline ntfs_init_big_inode() from fs/ntfs/inode.c to
+	  inode.h and make fs/ntfs/inode.c::__ntfs_init_inode() non-static and
+	  add a declaration for it to inode.h.  Fix some compilation issues
+	  that resulted due to #includes and header file interdependencies.
 
 2.1.20 - Fix two stupid bugs introduced in 2.1.18 release.
 

@@ -27,11 +27,12 @@
 #include <linux/buffer_head.h>
 #include <linux/bitops.h>
 
-#include "logfile.h"
-#include "volume.h"
+#include "attrib.h"
 #include "aops.h"
 #include "debug.h"
+#include "logfile.h"
 #include "malloc.h"
+#include "volume.h"
 #include "ntfs.h"
 
 /**
