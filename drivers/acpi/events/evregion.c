@@ -382,7 +382,7 @@ acpi_ev_detach_region(
 	union acpi_operand_object       *obj_desc;
 	union acpi_operand_object       **last_obj_ptr;
 	acpi_adr_space_setup            region_setup;
-	void                            *region_context;
+	void                            **region_context;
 	union acpi_operand_object       *region_obj2;
 	acpi_status                     status;
 
@@ -394,7 +394,7 @@ acpi_ev_detach_region(
 	if (!region_obj2) {
 		return_VOID;
 	}
-	region_context = region_obj2->extra.region_context;
+	region_context = &region_obj2->extra.region_context;
 
 	/* Get the address handler from the region object */
 
@@ -450,7 +450,7 @@ acpi_ev_detach_region(
 
 			region_setup = handler_obj->address_space.setup;
 			status = region_setup (region_obj, ACPI_REGION_DEACTIVATE,
-					  handler_obj->address_space.context, &region_context);
+					  handler_obj->address_space.context, region_context);
 
 			/* Init routine may fail, Just ignore errors */
 

@@ -231,7 +231,7 @@ acpi_processor_set_performance (
 	int			state)
 {
 	u16			port = 0;
-	u8			value = 0;
+	u16			value = 0;
 	int			i = 0;
 	struct cpufreq_freqs    cpufreq_freqs;
 
@@ -282,9 +282,9 @@ acpi_processor_set_performance (
 	value = (u16) perf->states[state].control;
 
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
-		"Writing 0x%02x to port 0x%04x\n", value, port));
+		"Writing 0x%04x to port 0x%04x\n", value, port));
 
-	outb(value, port); 
+	outw(value, port); 
 
 	/*
 	 * Then we read the 'status_register' and compare the value with the
@@ -296,12 +296,12 @@ acpi_processor_set_performance (
 	port = perf->status_register;
 
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
-		"Looking for 0x%02x from port 0x%04x\n",
-		(u8) perf->states[state].status, port));
+		"Looking for 0x%04x from port 0x%04x\n",
+		(u16) perf->states[state].status, port));
 
 	for (i=0; i<100; i++) {
-		value = inb(port);
-		if (value == (u8) perf->states[state].status)
+		value = inw(port);
+		if (value == (u16) perf->states[state].status)
 			break;
 		udelay(10);
 	}
@@ -309,7 +309,7 @@ acpi_processor_set_performance (
 	/* notify cpufreq */
 	cpufreq_notify_transition(&cpufreq_freqs, CPUFREQ_POSTCHANGE);
 
-	if (value != perf->states[state].status) {
+	if (value != (u16) perf->states[state].status) {
 		unsigned int tmp = cpufreq_freqs.new;
 		cpufreq_freqs.new = cpufreq_freqs.old;
 		cpufreq_freqs.old = tmp;

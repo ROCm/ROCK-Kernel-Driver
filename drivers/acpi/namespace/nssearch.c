@@ -96,7 +96,7 @@ acpi_ns_search_node (
 
 		scope_name = acpi_ns_get_external_pathname (node);
 		if (scope_name) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "Searching %s [%p] For %4.4s (%s)\n",
+			ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "Searching %s (%p) For [%4.4s] (%s)\n",
 				scope_name, node, (char *) &target_name, acpi_ut_get_type_name (type)));
 
 			ACPI_MEM_FREE (scope_name);
@@ -117,9 +117,9 @@ acpi_ns_search_node (
 			 * Found matching entry.
 			 */
 			ACPI_DEBUG_PRINT ((ACPI_DB_NAMES,
-				"Name %4.4s Type [%s] found in scope [%4.4s] %p\n",
+				"Name [%4.4s] (%s) %p found in scope [%4.4s] %p\n",
 				(char *) &target_name, acpi_ut_get_type_name (next_node->type),
-				next_node->name.ascii, next_node));
+				next_node, node->name.ascii, node));
 
 			*return_node = next_node;
 			return_ACPI_STATUS (AE_OK);
@@ -143,7 +143,7 @@ acpi_ns_search_node (
 	/* Searched entire namespace level, not found */
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_NAMES,
-		"Name %4.4s Type [%s] not found in search in scope [%4.4s] %p first child %p\n",
+		"Name [%4.4s] (%s) not found in search in scope [%4.4s] %p first child %p\n",
 		(char *) &target_name, acpi_ut_get_type_name (type),
 		node->name.ascii, node, node->child));
 

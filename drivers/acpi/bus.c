@@ -634,8 +634,7 @@ acpi_bus_init (void)
 	 * the EC parameters out of that.
 	 */
 	status = acpi_ec_ecdt_probe();
-	if (ACPI_FAILURE(status))
-		goto error1;
+	/* Ignore result. Not having an ECDT is not fatal. */
 #endif
 
 	status = acpi_initialize_objects(ACPI_FULL_INITIALIZATION);

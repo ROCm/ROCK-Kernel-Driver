@@ -65,7 +65,7 @@
  *
  * RETURN:      Status.
  *
- * DESCRIPTION: Late execution of region or field arguments
+ * DESCRIPTION: Late (deferred) execution of region or field arguments
  *
  ****************************************************************************/
 
@@ -111,7 +111,10 @@ acpi_ds_execute_arguments (
 		return_ACPI_STATUS (status);
 	}
 
+	/* Mark this parse as a deferred opcode */
+
 	walk_state->parse_flags = ACPI_PARSE_DEFERRED_OP;
+	walk_state->deferred_node = node;
 
 	/* Pass1: Parse the entire declaration */
 
@@ -128,7 +131,7 @@ acpi_ds_execute_arguments (
 	arg->common.node = node;
 	acpi_ps_delete_parse_tree (op);
 
-	/* Evaluate the address and length arguments for the Buffer Field */
+	/* Evaluate the deferred arguments */
 
 	op = acpi_ps_alloc_op (AML_INT_EVAL_SUBTREE_OP);
 	if (!op) {
@@ -144,6 +147,8 @@ acpi_ds_execute_arguments (
 		return_ACPI_STATUS (AE_NO_MEMORY);
 	}
 
+	/* Execute the opcode and arguments */
+
 	status = acpi_ds_init_aml_walk (walk_state, op, NULL, aml_start,
 			  aml_length, NULL, NULL, 3);
 	if (ACPI_FAILURE (status)) {
@@ -151,6 +156,9 @@ acpi_ds_execute_arguments (
 		return_ACPI_STATUS (status);
 	}
 
+	/* Mark this execution as a deferred opcode */
+
+	walk_state->deferred_node = node;
 	status = acpi_ps_parse_aml (walk_state);
 	acpi_ps_delete_parse_tree (op);
 	return_ACPI_STATUS (status);
@@ -192,7 +200,7 @@ acpi_ds_get_buffer_field_arguments (
 	node = obj_desc->buffer_field.node;
 
 	ACPI_DEBUG_EXEC(acpi_ut_display_init_pathname (ACPI_TYPE_BUFFER_FIELD, node, NULL));
-	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[%4.4s] buffer_field JIT Init\n",
+	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[%4.4s] buffer_field Arg Init\n",
 		node->name.ascii));
 
 	/* Execute the AML code for the term_arg arguments */
@@ -207,7 +215,7 @@ acpi_ds_get_buffer_field_arguments (
  *
  * FUNCTION:    acpi_ds_get_buffer_arguments
  *
- * PARAMETERS:  obj_desc        - A valid Bufferobject
+ * PARAMETERS:  obj_desc        - A valid Buffer object
  *
  * RETURN:      Status.
  *
@@ -240,7 +248,7 @@ acpi_ds_get_buffer_arguments (
 		return_ACPI_STATUS (AE_AML_INTERNAL);
 	}
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Buffer JIT Init\n"));
+	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Buffer Arg Init\n"));
 
 	/* Execute the AML code for the term_arg arguments */
 
@@ -254,7 +262,7 @@ acpi_ds_get_buffer_arguments (
  *
  * FUNCTION:    acpi_ds_get_package_arguments
  *
- * PARAMETERS:  obj_desc        - A valid Packageobject
+ * PARAMETERS:  obj_desc        - A valid Package object
  *
  * RETURN:      Status.
  *
@@ -287,7 +295,7 @@ acpi_ds_get_package_arguments (
 		return_ACPI_STATUS (AE_AML_INTERNAL);
 	}
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Package JIT Init\n"));
+	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Package Arg Init\n"));
 
 	/* Execute the AML code for the term_arg arguments */
 
@@ -335,11 +343,12 @@ acpi_ds_get_region_arguments (
 
 	node = obj_desc->region.node;
 
-	ACPI_DEBUG_EXEC(acpi_ut_display_init_pathname (ACPI_TYPE_REGION, node, NULL));
+	ACPI_DEBUG_EXEC (acpi_ut_display_init_pathname (ACPI_TYPE_REGION, node, NULL));
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[%4.4s] op_region Init at AML %p\n",
+	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[%4.4s] op_region Arg Init at AML %p\n",
 		node->name.ascii, extra_desc->extra.aml_start));
 
+	/* Execute the argument AML */
 
 	status = acpi_ds_execute_arguments (node, acpi_ns_get_parent_node (node),
 			 extra_desc->extra.aml_length, extra_desc->extra.aml_start);
@@ -505,14 +514,16 @@ acpi_ds_init_buffer_field (
 		goto cleanup;
 	}
 
-
 	/* Entire field must fit within the current length of the buffer */
 
 	if ((bit_offset + bit_count) >
 		(8 * (u32) buffer_desc->buffer.length)) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-			"Field size %d exceeds Buffer size %d (bits)\n",
-			 bit_offset + bit_count, 8 * (u32) buffer_desc->buffer.length));
+			"Field [%4.4s] size %d exceeds Buffer [%4.4s] size %d (bits)\n",
+			((struct acpi_namespace_node *) result_desc)->name.ascii,
+			 bit_offset + bit_count,
+			 buffer_desc->buffer.node->name.ascii,
+			 8 * (u32) buffer_desc->buffer.length));
 		status = AE_AML_BUFFER_LIMIT;
 		goto cleanup;
 	}
