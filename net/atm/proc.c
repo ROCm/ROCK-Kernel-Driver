@@ -161,6 +161,106 @@ static void atmarp_info(struct net_device *dev,struct atmarp_entry *entry,
 
 #endif
 
+struct vcc_state {
+	struct sock *sk;
+	int family;
+	int clip_info;
+};
+
+static inline int compare_family(struct sock *sk, int family)
+{
+	struct atm_vcc *vcc = atm_sk(sk);
+
+	return !family || (vcc->sk->sk_family == family);
+}
+
+static int __vcc_walk(struct sock **sock, int family, loff_t l)
+{
+	struct sock *sk = *sock;
+
+	if (sk == (void *)1) {
+		sk = hlist_empty(&vcc_sklist) ? NULL : __sk_head(&vcc_sklist);
+		l--;
+	} 
+	for (; sk; sk = sk_next(sk)) {
+		l -= compare_family(sk, family);
+		if (l < 0)
+			goto out;
+	}
+	sk = (void *)1;
+out:
+	*sock = sk;
+	return (l < 0);
+}
+
+static inline void *vcc_walk(struct vcc_state *state, loff_t l)
+{
+	return __vcc_walk(&state->sk, state->family, l) ?
+	       state : NULL;
+}
+
+static int __vcc_seq_open(struct inode *inode, struct file *file,
+	int family, struct seq_operations *ops)
+{
+	struct vcc_state *state;
+	struct seq_file *seq;
+	int rc = -ENOMEM;
+
+	state = kmalloc(sizeof(*state), GFP_KERNEL);
+	if (!state)
+		goto out;
+
+	rc = seq_open(file, ops);
+	if (rc)
+		goto out_kfree;
+
+	state->family = family;
+	state->clip_info = try_atm_clip_ops();
+
+	seq = file->private_data;
+	seq->private = state;
+out:
+	return rc;
+out_kfree:
+	kfree(state);
+	goto out;
+}
+
+static int vcc_seq_release(struct inode *inode, struct file *file)
+{
+#if defined(CONFIG_ATM_CLIP) || defined(CONFIG_ATM_CLIP_MODULE)
+	struct seq_file *seq = file->private_data;
+	struct vcc_state *state = seq->private;
+
+	if (state->clip_info)
+		module_put(atm_clip_ops->owner);
+#endif
+	return seq_release_private(inode, file);
+}
+
+static void *vcc_seq_start(struct seq_file *seq, loff_t *pos)
+{
+	struct vcc_state *state = seq->private;
+	loff_t left = *pos;
+
+	read_lock(&vcc_sklist_lock);
+	state->sk = (void *)1;
+	return left ? vcc_walk(state, left) : (void *)1;
+}
+
+static void vcc_seq_stop(struct seq_file *seq, void *v)
+{
+	read_unlock(&vcc_sklist_lock);
+}
+
+static void *vcc_seq_next(struct seq_file *seq, void *v, loff_t *pos)
+{
+	struct vcc_state *state = seq->private;
+
+	v = vcc_walk(state, 1);
+	*pos += !!PTR_ERR(v);
+	return v;
+}
 
 static void pvc_info(struct atm_vcc *vcc, char *buf, int clip_info)
 {
