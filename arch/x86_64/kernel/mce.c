@@ -73,7 +73,9 @@ static void print_mce(struct mce *m)
 	printk("CPU %d: Machine Check Exception: %16Lx Bank %d: %016Lx\n",
 	       m->cpu, m->mcgstatus, m->bank, m->status);
 	if (m->rip) {
-		printk("RIP %02x:<%016Lx> ", m->cs, m->rip);
+		printk("RIP%s %02x:<%016Lx> ",
+		       !(m->mcgstatus & MCG_STATUS_EIPV) ? " !INEXACT!" : "",
+		       m->cs, m->rip);
 		if (m->cs == __KERNEL_CS)
 			print_symbol("{%s}", m->rip);
 		printk("\n");
@@ -133,7 +135,7 @@ void do_machine_check(struct pt_regs * regs, long error_code)
 		return;
 	if (!(m.mcgstatus & MCG_STATUS_RIPV))
 		kill_it = 1;
-	if (regs && (m.mcgstatus & MCG_STATUS_EIPV)) {
+	if (regs) {
 		m.rip = regs->rip;
 		m.cs = regs->cs;
 	}

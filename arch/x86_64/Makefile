@@ -38,7 +38,7 @@ OBJCOPYFLAGS	:= -O binary -R .note -R .comment -S
 LDFLAGS_vmlinux := -e stext
 
 cflags-$(CONFIG_MK8) += $(call check_gcc,-march=k8,)
-cflags-$(CONFIG_MPSC) += $(call check_gcc,-march=pentium4,)
+cflags-$(CONFIG_MPSC) += $(call check_gcc,-march=prescott,)
 CFLAGS += $(cflags-y)
 
 CFLAGS += -mno-red-zone

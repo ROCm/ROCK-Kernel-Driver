@@ -21,6 +21,7 @@ CONFIG_SYSVIPC=y
 # CONFIG_BSD_PROCESS_ACCT is not set
 CONFIG_SYSCTL=y
 CONFIG_LOG_BUF_SHIFT=15
+CONFIG_HOTPLUG=y
 # CONFIG_IKCONFIG is not set
 # CONFIG_EMBEDDED is not set
 CONFIG_KALLSYMS=y
@@ -44,6 +45,7 @@ CONFIG_KMOD=y
 # Processor type and features
 #
 CONFIG_X86_PC=y
+# CONFIG_X86_ELAN is not set
 # CONFIG_X86_VOYAGER is not set
 # CONFIG_X86_NUMAQ is not set
 # CONFIG_X86_SUMMIT is not set
@@ -59,6 +61,7 @@ CONFIG_X86_PC=y
 # CONFIG_M686 is not set
 # CONFIG_MPENTIUMII is not set
 # CONFIG_MPENTIUMIII is not set
+# CONFIG_MPENTIUMM is not set
 CONFIG_MPENTIUM4=y
 # CONFIG_MK6 is not set
 # CONFIG_MK7 is not set
@@ -105,7 +108,9 @@ CONFIG_NOHIGHMEM=y
 # CONFIG_MATH_EMULATION is not set
 CONFIG_MTRR=y
 # CONFIG_EFI is not set
+CONFIG_IRQBALANCE=y
 CONFIG_HAVE_DEC_LOCK=y
+# CONFIG_REGPARM is not set
 
 #
 # Power management options (ACPI, APM)
@@ -137,6 +142,7 @@ CONFIG_ACPI_POWER=y
 CONFIG_ACPI_PCI=y
 CONFIG_ACPI_SYSTEM=y
 # CONFIG_ACPI_RELAXED_AML is not set
+# CONFIG_X86_PM_TIMER is not set
 
 #
 # APM (Advanced Power Management) BIOS Support
@@ -164,7 +170,6 @@ CONFIG_ISA=y
 # CONFIG_EISA is not set
 # CONFIG_MCA is not set
 # CONFIG_SCx200 is not set
-CONFIG_HOTPLUG=y
 
 #
 # PCMCIA/CardBus support
@@ -261,6 +266,7 @@ CONFIG_IDE_TASKFILE_IO=y
 #
 # IDE chipset support/bugfixes
 #
+CONFIG_IDE_GENERIC=y
 CONFIG_BLK_DEV_CMD640=y
 # CONFIG_BLK_DEV_CMD640_ENHANCED is not set
 # CONFIG_BLK_DEV_IDEPNP is not set
@@ -368,10 +374,13 @@ CONFIG_SCSI_ATA_PIIX=y
 # CONFIG_SCSI_QLOGIC_ISP is not set
 # CONFIG_SCSI_QLOGIC_FC is not set
 # CONFIG_SCSI_QLOGIC_1280 is not set
-CONFIG_SCSI_QLA2XXX_CONFIG=y
+CONFIG_SCSI_QLA2XXX=y
 # CONFIG_SCSI_QLA21XX is not set
 # CONFIG_SCSI_QLA22XX is not set
-# CONFIG_SCSI_QLA23XX is not set
+# CONFIG_SCSI_QLA2300 is not set
+# CONFIG_SCSI_QLA2322 is not set
+# CONFIG_SCSI_QLA6312 is not set
+# CONFIG_SCSI_QLA6322 is not set
 # CONFIG_SCSI_SYM53C416 is not set
 # CONFIG_SCSI_DC395x is not set
 # CONFIG_SCSI_DC390T is not set
@@ -397,7 +406,7 @@ CONFIG_SCSI_QLA2XXX_CONFIG=y
 # CONFIG_FUSION is not set
 
 #
-# IEEE 1394 (FireWire) support (EXPERIMENTAL)
+# IEEE 1394 (FireWire) support
 #
 CONFIG_IEEE1394=y
 
@@ -406,6 +415,7 @@ CONFIG_IEEE1394=y
 #
 # CONFIG_IEEE1394_VERBOSEDEBUG is not set
 # CONFIG_IEEE1394_OUI_DB is not set
+# CONFIG_IEEE1394_EXTRA_CONFIG_ROMS is not set
 
 #
 # Device Drivers
@@ -423,13 +433,17 @@ CONFIG_IEEE1394_OHCI1394=y
 # CONFIG_IEEE1394_SBP2 is not set
 # CONFIG_IEEE1394_ETH1394 is not set
 # CONFIG_IEEE1394_DV1394 is not set
-# CONFIG_IEEE1394_RAWIO is not set
+CONFIG_IEEE1394_RAWIO=y
 # CONFIG_IEEE1394_CMP is not set
 
 #
 # I2O device support
 #
 # CONFIG_I2O is not set
+
+#
+# Macintosh device drivers
+#
 
 #
 # Networking support
@@ -595,10 +609,11 @@ CONFIG_NET_PCI=y
 # CONFIG_NE2K_PCI is not set
 # CONFIG_8139CP is not set
 CONFIG_8139TOO=y
-# CONFIG_8139TOO_PIO is not set
+CONFIG_8139TOO_PIO=y
 # CONFIG_8139TOO_TUNE_TWISTER is not set
 # CONFIG_8139TOO_8129 is not set
 # CONFIG_8139_OLD_RX_RESET is not set
+CONFIG_8139_RXBUF_IDX=2
 # CONFIG_SIS900 is not set
 # CONFIG_EPIC100 is not set
 # CONFIG_SUNDANCE is not set
@@ -666,7 +681,7 @@ CONFIG_8139TOO=y
 #
 # ISDN subsystem
 #
-# CONFIG_ISDN_BOOL is not set
+# CONFIG_ISDN is not set
 
 #
 # Telephony Support
@@ -742,7 +757,8 @@ CONFIG_SERIAL_8250_NR_UARTS=4
 #
 CONFIG_SERIAL_CORE=y
 CONFIG_UNIX98_PTYS=y
-CONFIG_UNIX98_PTY_COUNT=256
+CONFIG_LEGACY_PTYS=y
+CONFIG_LEGACY_PTY_COUNT=256
 CONFIG_PRINTER=y
 # CONFIG_LP_CONSOLE is not set
 # CONFIG_PPDEV is not set
@@ -785,6 +801,7 @@ CONFIG_AGP_INTEL=y
 # CONFIG_AGP_SIS is not set
 # CONFIG_AGP_SWORKS is not set
 # CONFIG_AGP_VIA is not set
+# CONFIG_AGP_EFFICEON is not set
 CONFIG_DRM=y
 # CONFIG_DRM_TDFX is not set
 # CONFIG_DRM_GAMMA is not set
@@ -884,6 +901,7 @@ CONFIG_SND_SEQUENCER_OSS=y
 #
 # CONFIG_SND_ALI5451 is not set
 # CONFIG_SND_AZT3328 is not set
+# CONFIG_SND_BT87X is not set
 # CONFIG_SND_CS46XX is not set
 # CONFIG_SND_CS4281 is not set
 # CONFIG_SND_EMU10K1 is not set
@@ -976,7 +994,6 @@ CONFIG_USB_HIDINPUT=y
 # USB Imaging devices
 #
 # CONFIG_USB_MDC800 is not set
-# CONFIG_USB_SCANNER is not set
 # CONFIG_USB_MICROTEK is not set
 # CONFIG_USB_HPUSBSCSI is not set
 
@@ -1070,7 +1087,6 @@ CONFIG_VFAT_FS=y
 CONFIG_PROC_FS=y
 CONFIG_PROC_KCORE=y
 # CONFIG_DEVFS_FS is not set
-CONFIG_DEVPTS_FS=y
 # CONFIG_DEVPTS_FS_XATTR is not set
 CONFIG_TMPFS=y
 # CONFIG_HUGETLBFS is not set
@@ -1083,6 +1099,7 @@ CONFIG_RAMFS=y
 # CONFIG_ADFS_FS is not set
 # CONFIG_AFFS_FS is not set
 # CONFIG_HFS_FS is not set
+# CONFIG_HFSPLUS_FS is not set
 # CONFIG_BEFS_FS is not set
 # CONFIG_BFS_FS is not set
 # CONFIG_EFS_FS is not set
@@ -1111,7 +1128,6 @@ CONFIG_SUNRPC=y
 # CONFIG_CIFS is not set
 # CONFIG_NCP_FS is not set
 # CONFIG_CODA_FS is not set
-# CONFIG_INTERMEZZO_FS is not set
 # CONFIG_AFS_FS is not set
 
 #
@@ -1173,6 +1189,7 @@ CONFIG_OPROFILE=y
 # Kernel hacking
 #
 # CONFIG_DEBUG_KERNEL is not set
+CONFIG_EARLY_PRINTK=y
 CONFIG_DEBUG_SPINLOCK_SLEEP=y
 # CONFIG_FRAME_POINTER is not set
 CONFIG_X86_FIND_SMP_CONFIG=y

@@ -31,6 +31,7 @@
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
 #include <linux/init.h>
+#include <asm/eeh.h>       /* for eeh_add_device() */
 #include <asm/rtas.h>		/* rtas_call */
 #include <asm/pci-bridge.h>	/* for pci_controller */
 #include "../pci.h"		/* for pci_add_new_bus*/
@@ -474,6 +475,7 @@ static struct pci_dev *rpaphp_config_adapter(struct slot *slot)
 		}
 
 		dev = rpaphp_find_pci_dev(slot->dn->child);
+		eeh_add_device(dev);
 	} else {
 		/* slot is not enabled */
 		err("slot doesn't have pci_dev structure\n");
@@ -497,6 +499,7 @@ static int rpaphp_unconfig_adapter(struct slot *slot)
 	}
 
 	/* remove the device from the pci core */
+	eeh_remove_device(slot->dev);
 	pci_remove_bus_device(slot->dev);
 
 	pci_dev_put(slot->dev);

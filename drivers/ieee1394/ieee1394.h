@@ -36,8 +36,11 @@
 #define ACK_BUSY_X               0x4
 #define ACK_BUSY_A               0x5
 #define ACK_BUSY_B               0x6
+#define ACK_TARDY                0xb
+#define ACK_CONFLICT_ERROR       0xc
 #define ACK_DATA_ERROR           0xd
 #define ACK_TYPE_ERROR           0xe 
+#define ACK_ADDRESS_ERROR        0xf
 
 /* Non-standard "ACK codes" for internal use */
 #define ACKX_NONE                (-1)

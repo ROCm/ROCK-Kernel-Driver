@@ -152,6 +152,7 @@ struct fb_bitfield {
 #define FB_ACTIVATE_VBL	       16	/* activate values on next vbl  */
 #define FB_CHANGE_CMAP_VBL     32	/* change colormap on vbl	*/
 #define FB_ACTIVATE_ALL	       64	/* change all VCs on this fb	*/
+#define FB_ACTIVATE_FORCE     128	/* force apply even when no change*/
 
 #define FB_ACCELF_TEXT		1	/* text mode acceleration */
 

@@ -27,6 +27,7 @@ enum {
 	FW_STATUS_LOADING,
 	FW_STATUS_DONE,
 	FW_STATUS_ABORT,
+	FW_STATUS_READY,
 };
 
 static int loading_timeout = 10;	/* In seconds */
@@ -95,6 +96,9 @@ firmware_class_hotplug(struct class_device *class_dev, char **envp,
 	struct firmware_priv *fw_priv = class_get_devdata(class_dev);
 	int i = 0;
 	char *scratch = buffer;
+
+	if (!test_bit(FW_STATUS_READY, &fw_priv->status))
+		return -ENODEV;
 
 	if (buffer_size < (FIRMWARE_NAME_MAX + 10))
 		return -ENOMEM;
@@ -263,6 +267,8 @@ fw_class_dev_release(struct class_device *class_dev)
 
 	kfree(fw_priv);
 	kfree(class_dev);
+
+	module_put(THIS_MODULE);
 }
 
 static void
@@ -325,6 +331,7 @@ error_kfree:
 	kfree(class_dev);
 	return retval;
 }
+
 static int
 fw_setup_class_device(struct firmware *fw, struct class_device **class_dev_p,
 		      const char *fw_name, struct device *device)
@@ -337,6 +344,9 @@ fw_setup_class_device(struct firmware *fw, struct class_device **class_dev_p,
 	retval = fw_register_class_device(&class_dev, fw_name, device);
 	if (retval)
 		goto out;
+
+	/* Need to pin this module until class device is destroyed */
+	__module_get(THIS_MODULE);
 
 	fw_priv = class_get_devdata(class_dev);
 
@@ -356,6 +366,7 @@ fw_setup_class_device(struct firmware *fw, struct class_device **class_dev_p,
 		goto error_unreg;
 	}
 
+	set_bit(FW_STATUS_READY, &fw_priv->status);
 	*class_dev_p = class_dev;
 	goto out;
 
@@ -409,6 +420,7 @@ request_firmware(const struct firmware **firmware_p, const char *name,
 		add_timer(&fw_priv->timeout);
 	}
 
+	kobject_hotplug("add", &class_dev->kobj);
 	wait_for_completion(&fw_priv->completion);
 	set_bit(FW_STATUS_DONE, &fw_priv->status);
 

@@ -8,6 +8,8 @@
  *
  *  Based on the powernow-k7.c module written by Dave Jones.
  *  (C) 2003 Dave Jones <davej@codemonkey.ork.uk> on behalf of SuSE Labs
+ *  (C) 2004 Dominik Brodowski <linux@brodo.de>
+ *  (C) 2004 Pavel Machek <pavel@suse.cz>
  *  Licensed under the terms of the GNU GPL License version 2.
  *  Based upon datasheets & sample CPUs kindly provided by AMD.
  *
@@ -33,10 +35,6 @@
 #define BFX PFX "BIOS error: "
 #define VERSION "version 1.00.08a"
 #include "powernow-k8.h"
-
-#ifdef CONFIG_PREEMPT
-#warning this driver has not been tested on a preempt system
-#endif
 
 static u32 vstable;	/* voltage stabalization time, from PSB, units 20 us */
 static u32 plllock;	/* pll lock time, from PSB, units 1 us */
@@ -636,13 +634,22 @@ find_psb_table(void)
 			return -ENOMEM;
 		}
 
-		for (j = 0; j < numps; j++) {
-			printk(KERN_INFO PFX "   %d : fid 0x%x (%d MHz), vid 0x%x\n", j,
-			       pst[j].fid, find_freq_from_fid(pst[j].fid), pst[j].vid);
+		for (j = 0; j < psb->numpstates; j++) {
 			powernow_table[j].index = pst[j].fid; /* lower 8 bits */
 			powernow_table[j].index |= (pst[j].vid << 8); /* upper 8 bits */
-			powernow_table[j].frequency = find_freq_from_fid(pst[j].fid);
 		}
+
+		/* If you want to override your frequency tables, this
+		   is right place. */
+
+		for (j = 0; j < numps; j++) {
+			powernow_table[j].frequency = find_freq_from_fid(powernow_table[j].index & 0xff)*1000;
+			printk(KERN_INFO PFX "   %d : fid 0x%x (%d MHz), vid 0x%x\n", j,
+			       powernow_table[j].index & 0xff,
+			       powernow_table[j].frequency/1000,
+			       powernow_table[j].index >> 8);
+		}
+
 		powernow_table[numps].frequency = CPUFREQ_TABLE_END;
 		powernow_table[numps].index = 0;
 
