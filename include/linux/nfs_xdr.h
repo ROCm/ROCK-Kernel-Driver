@@ -105,6 +105,7 @@ struct nfs_openargs {
 	struct qstr *           name;
 	struct nfs4_getattr *   f_getattr;
 	struct nfs4_getattr *   d_getattr;
+	struct nfs_server *     server;	 /* Needed for ID mapping */
 };
 
 struct nfs_openres {
@@ -115,6 +116,7 @@ struct nfs_openres {
 	__u32                   rflags;
 	struct nfs4_getattr *   f_getattr;
 	struct nfs4_getattr *   d_getattr;
+	struct nfs_server *     server;
 };
 
 /*
@@ -248,10 +250,12 @@ struct nfs_setattrargs {
 	nfs4_stateid                    stateid;
 	struct iattr *                  iap;
 	struct nfs4_getattr *           attr;
+	struct nfs_server *             server; /* Needed for name mapping */
 };
 
 struct nfs_setattrres {
 	struct nfs4_getattr *           attr;
+	struct nfs_server *             server;
 };
 
 struct nfs_linkargs {

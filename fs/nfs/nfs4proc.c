@@ -596,11 +596,13 @@ nfs4_do_open(struct inode *dir, struct qstr *name, int flags,
 		.name           = name,
 		.f_getattr      = &f_getattr,
 		.d_getattr      = &d_getattr,
+		.server         = server,
 	};
 	struct nfs_openres o_res = {
 		.cinfo          = &d_cinfo,
 		.f_getattr      = &f_getattr,
 		.d_getattr      = &d_getattr,
+		.server         = server,
 	};
 	struct rpc_message msg = {
 		.rpc_proc       = &nfs4_procedures[NFSPROC4_CLNT_OPEN],
@@ -685,9 +687,11 @@ nfs4_do_setattr(struct nfs_server *server, struct nfs_fattr *fattr,
                 .fh             = fhandle,
                 .iap            = sattr,
                 .attr           = &getattr,
+		.server		= server,
         };
         struct nfs_setattrres  res = {
                 .attr           = &getattr,
+		.server		= server,
         };
         struct rpc_message msg = {
                 .rpc_proc       = &nfs4_procedures[NFSPROC4_CLNT_SETATTR],
