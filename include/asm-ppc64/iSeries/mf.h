@@ -1,6 +1,7 @@
 /*
  * mf.h
  * Copyright (C) 2001  Troy D. Armstrong IBM Corporation
+ * Copyright (C) 2004  Stephen Rothwell IBM Corporation
  *
  * This modules exists as an interface between a Linux secondary partition
  * running on an iSeries and the primary partition's Virtual Service
@@ -35,18 +36,18 @@ struct rtc_time;
 
 typedef void (*MFCompleteHandler)(void *clientToken, int returnCode);
 
-extern void mf_allocateLpEvents(HvLpIndex targetLp, HvLpEvent_Type type,
+extern void mf_allocate_lp_events(HvLpIndex targetLp, HvLpEvent_Type type,
 		unsigned size, unsigned amount, MFCompleteHandler hdlr,
 		void *userToken);
-extern void mf_deallocateLpEvents(HvLpIndex targetLp, HvLpEvent_Type type,
+extern void mf_deallocate_lp_events(HvLpIndex targetLp, HvLpEvent_Type type,
 		unsigned count, MFCompleteHandler hdlr, void *userToken);
 
-extern void mf_powerOff(void);
+extern void mf_power_off(void);
 extern void mf_reboot(void);
 
-extern void mf_displaySrc(u32 word);
-extern void mf_displayProgress(u16 value);
-extern void mf_clearSrc(void);
+extern void mf_display_src(u32 word);
+extern void mf_display_progress(u16 value);
+extern void mf_clear_src(void);
 
 extern void mf_init(void);
 
@@ -62,9 +63,7 @@ extern int mf_setVmlinuxChunk(const char *buffer, int size, int offset,
 		u64 side);
 extern int mf_getVmlinuxChunk(char *buffer, int *size, int offset, u64 side);
 
-extern int mf_setRtcTime(unsigned long time);
-extern int mf_getRtcTime(unsigned long *time);
-extern int mf_getRtc( struct rtc_time * tm );
-extern int mf_setRtc( struct rtc_time * tm );
+extern int mf_get_rtc(struct rtc_time *tm);
+extern int mf_set_rtc(struct rtc_time *tm);
 
 #endif /* MF_H_INCLUDED */

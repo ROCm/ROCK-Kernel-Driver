@@ -357,7 +357,7 @@ static int shutdown(void)
 	if (rc) {
 		printk(KERN_ALERT "mf.c: SIGINT to init failed (%d), "
 				"hard shutdown commencing\n", rc);
-		mf_powerOff();
+		mf_power_off();
 	} else
 		printk(KERN_INFO "mf.c: init has been successfully notified "
 				"to proceed with shutdown\n");
@@ -533,7 +533,7 @@ static void hvHandler(struct HvLpEvent *event, struct pt_regs *regs)
  * Global kernel interface to allocate and seed events into the
  * Hypervisor.
  */
-void mf_allocateLpEvents(HvLpIndex targetLp, HvLpEvent_Type type,
+void mf_allocate_lp_events(HvLpIndex targetLp, HvLpEvent_Type type,
 		unsigned size, unsigned count, MFCompleteHandler hdlr,
 		void *userToken)
 {
@@ -560,13 +560,13 @@ void mf_allocateLpEvents(HvLpIndex targetLp, HvLpEvent_Type type,
 	if ((rc != 0) && (hdlr != NULL))
 		(*hdlr)(userToken, rc);
 }
-EXPORT_SYMBOL(mf_allocateLpEvents);
+EXPORT_SYMBOL(mf_allocate_lp_events);
 
 /*
  * Global kernel interface to unseed and deallocate events already in
  * Hypervisor.
  */
-void mf_deallocateLpEvents(HvLpIndex targetLp, HvLpEvent_Type type,
+void mf_deallocate_lp_events(HvLpIndex targetLp, HvLpEvent_Type type,
 		unsigned count, MFCompleteHandler hdlr, void *userToken)
 {
 	struct pending_event *ev = new_pending_event();
@@ -591,13 +591,13 @@ void mf_deallocateLpEvents(HvLpIndex targetLp, HvLpEvent_Type type,
 	if ((rc != 0) && (hdlr != NULL))
 		(*hdlr)(userToken, rc);
 }
-EXPORT_SYMBOL(mf_deallocateLpEvents);
+EXPORT_SYMBOL(mf_deallocate_lp_events);
 
 /*
  * Global kernel interface to tell the VSP object in the primary
  * partition to power this partition off.
  */
-void mf_powerOff(void)
+void mf_power_off(void)
 {
 	printk(KERN_INFO "mf.c: Down it goes...\n");
 	signal_ce_msg("\x00\x00\x00\x4D\x00\x00\x00\x00\x00\x00\x00\x00", NULL);
@@ -618,7 +618,7 @@ void mf_reboot(void)
 /*
  * Display a single word SRC onto the VSP control panel.
  */
-void mf_displaySrc(u32 word)
+void mf_display_src(u32 word)
 {
 	u8 ce[12];
 
@@ -633,7 +633,7 @@ void mf_displaySrc(u32 word)
 /*
  * Display a single word SRC of the form "PROGXXXX" on the VSP control panel.
  */
-void mf_displayProgress(u16 value)
+void mf_display_progress(u16 value)
 {
 	u8 ce[12];
 	u8 src[72];
@@ -657,7 +657,7 @@ void mf_displayProgress(u16 value)
  * Clear the VSP control panel.  Used to "erase" an SRC that was
  * previously displayed.
  */
-void mf_clearSrc(void)
+void mf_clear_src(void)
 {
 	signal_ce_msg("\x00\x00\x00\x4B\x00\x00\x00\x00\x00\x00\x00\x00", NULL);
 }
@@ -909,15 +909,6 @@ int mf_getVmlinuxChunk(char *buffer, int *size, int offset, u64 side)
 	return rc;
 }
 
-int mf_setRtcTime(unsigned long time)
-{
-	struct rtc_time tm;
-
-	to_tm(time, &tm);
-
-	return mf_setRtc(&tm);
-}
-
 struct RtcTimeData {
 	struct completion com;
 	struct CeMsgData xCeMsg;
@@ -933,47 +924,7 @@ void getRtcTimeComplete(void * token, struct CeMsgData *ceMsg)
 	complete(&rtc->com);
 }
 
-static unsigned long lastsec = 1;
-
-int mf_getRtcTime(unsigned long *time)
-{
-	u32 dataWord1 = *((u32 *)(&xSpCommArea.xBcdTimeAtIplStart));
-	u32 dataWord2 = *(((u32 *)&(xSpCommArea.xBcdTimeAtIplStart)) + 1);
-	int year = 1970;
-	int year1 = (dataWord1 >> 24) & 0x000000FF;
-	int year2 = (dataWord1 >> 16) & 0x000000FF;
-	int sec = (dataWord1 >> 8) & 0x000000FF;
-	int min = dataWord1 & 0x000000FF;
-	int hour = (dataWord2 >> 24) & 0x000000FF;
-	int day = (dataWord2 >> 8) & 0x000000FF;
-	int mon = dataWord2 & 0x000000FF;
-
-	BCD_TO_BIN(sec);
-	BCD_TO_BIN(min);
-	BCD_TO_BIN(hour);
-	BCD_TO_BIN(day);
-	BCD_TO_BIN(mon);
-	BCD_TO_BIN(year1);
-	BCD_TO_BIN(year2);
-	year = year1 * 100 + year2;
-
-	*time = mktime(year, mon, day, hour, min, sec);
-	*time += (jiffies / HZ);
-
-	/*
-	 * Now THIS is a nasty hack!
-	 * It ensures that the first two calls to mf_getRtcTime get different
-	 * answers.  That way the loop in init_time (time.c) will not think
-	 * the clock is stuck.
-	 */
-	if (lastsec) {
-		*time -= lastsec;
-		--lastsec;
-	}
-	return 0;
-}
-
-int mf_getRtc(struct rtc_time *tm)
+int mf_get_rtc(struct rtc_time *tm)
 {
 	struct CeMsgCompleteData ceComplete;
 	struct RtcTimeData rtcData;
@@ -999,7 +950,7 @@ int mf_getRtc(struct rtc_time *tm)
 				tm->tm_mday = 10;
 				tm->tm_mon = 8;
 				tm->tm_year = 71;
-				mf_setRtc(tm);
+				mf_set_rtc(tm);
 			}
 			{
 				u32 dataWord1 = *((u32 *)(rtcData.xCeMsg.ce_msg+4));
@@ -1046,7 +997,7 @@ int mf_getRtc(struct rtc_time *tm)
 	return rc;
 }
 
-int mf_setRtc(struct rtc_time * tm)
+int mf_set_rtc(struct rtc_time * tm)
 {
 	char ceTime[12] = "\x00\x00\x00\x41\x00\x00\x00\x00\x00\x00\x00\x00";
 	u8 day, mon, hour, min, sec, y1, y2;
@@ -1210,9 +1161,9 @@ static int proc_mf_change_src(struct file *file, const char __user *buffer,
 		return -EFAULT;
 
 	if ((count == 1) && (*stkbuf == '\0'))
-		mf_clearSrc();
+		mf_clear_src();
 	else
-		mf_displaySrc(*(u32 *)stkbuf);
+		mf_display_src(*(u32 *)stkbuf);
 
 	return count;
 }

@@ -275,7 +275,7 @@ void iSeries_get_rtc_time(struct rtc_time *rtc_tm)
 	if (piranha_simulator)
 		return;
 
-	mf_getRtc(rtc_tm);
+	mf_get_rtc(rtc_tm);
 	rtc_tm->tm_mon--;
 }
 
@@ -285,7 +285,7 @@ void iSeries_get_rtc_time(struct rtc_time *rtc_tm)
  */
 int iSeries_set_rtc_time(struct rtc_time *tm)
 {
-	mf_setRtc(tm);
+	mf_set_rtc(tm);
 	return 0;
 }
 
