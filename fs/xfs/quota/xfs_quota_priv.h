@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -67,8 +67,8 @@
 #define XQMLCK(h)			(mutex_lock(&((h)->qh_lock), PINOD))
 #define XQMUNLCK(h)			(mutex_unlock(&((h)->qh_lock)))
 #ifdef DEBUG
-static inline int
-XQMISLCKD(xfs_dqhash_t *h)
+struct xfs_dqhash;
+static inline int XQMISLCKD(struct xfs_dqhash *h)
 {
 	if (mutex_trylock(&h->qh_lock)) {
 		mutex_unlock(&h->qh_lock);

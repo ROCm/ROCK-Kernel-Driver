@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -1189,25 +1189,6 @@ xfs_ialloc(
 	 */
 	ip->i_d.di_aformat = XFS_DINODE_FMT_EXTENTS;
 	ip->i_d.di_anextents = 0;
-
-#if DEBUG
-	{
-		uint	badflags = VNOSWAP |
-			       VISSWAP |
-			       VREPLICABLE |
-			   /*  VNONREPLICABLE | XXX uncomment this */
-			       VDOCMP |
-			       VFRLOCKS;
-
-		/*
-		 * For shared mounts, VNOSWAP is set in xfs_iget
-		 */
-		if (tp->t_mountp->m_cxfstype != XFS_CXFS_NOT)
-			badflags &= ~VNOSWAP;
-
-		ASSERT(!(vp->v_flag & badflags));
-	}
-#endif /* DEBUG */
 
 	/*
 	 * Log the new values stuffed into the inode.
@@ -3599,16 +3580,19 @@ xfs_ichgtime(xfs_inode_t *ip,
 
 	nanotime(&tv);
 	if (flags & XFS_ICHGTIME_MOD) {
-		inode->i_mtime.tv_nsec = ip->i_d.di_mtime.t_sec = (__int32_t)tv.tv_sec;
-		inode->i_mtime.tv_nsec = ip->i_d.di_mtime.t_nsec = (__int32_t)tv.tv_nsec;
+		inode->i_mtime = tv;
+		ip->i_d.di_mtime.t_sec = (__int32_t)tv.tv_sec;
+		ip->i_d.di_mtime.t_nsec = (__int32_t)tv.tv_nsec;
 	}
 	if (flags & XFS_ICHGTIME_ACC) {
-		inode->i_atime.tv_sec = ip->i_d.di_atime.t_sec = (__int32_t)tv.tv_sec;
-		inode->i_atime.tv_nsec = ip->i_d.di_atime.t_nsec = (__int32_t)tv.tv_nsec;
+		inode->i_atime  = tv;
+		ip->i_d.di_atime.t_sec = (__int32_t)tv.tv_sec;
+		ip->i_d.di_atime.t_nsec = (__int32_t)tv.tv_nsec;
 	}
 	if (flags & XFS_ICHGTIME_CHG) {
-		inode->i_ctime.tv_sec = ip->i_d.di_ctime.t_sec = (__int32_t)tv.tv_sec;
-		inode->i_ctime.tv_nsec = ip->i_d.di_ctime.t_nsec = (__int32_t)tv.tv_nsec;
+		inode->i_ctime  = tv;
+		ip->i_d.di_ctime.t_sec = (__int32_t)tv.tv_sec;
+		ip->i_d.di_ctime.t_nsec = (__int32_t)tv.tv_nsec;
 	}
 
 	/*

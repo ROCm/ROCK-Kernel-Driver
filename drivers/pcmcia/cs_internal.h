@@ -136,7 +136,6 @@ typedef struct socket_info_t {
 #ifdef CONFIG_CARDBUS
     struct resource *		cb_cis_res;
     u_char			*cb_cis_virt;
-    struct cb_config_t		*cb_config;
 #endif
     struct {
 	u_int			AssignedIRQ;
@@ -176,6 +175,7 @@ typedef struct socket_info_t {
 #define SOCKET_IO_REQ(i)	(0x1000<<(i))
 #define SOCKET_REGION_INFO	0x4000
 #define SOCKET_CARDBUS		0x8000
+#define SOCKET_CARDBUS_CONFIG	0x10000
 
 #define CHECK_HANDLE(h) \
     (((h) == NULL) || ((h)->client_magic != CLIENT_MAGIC))
@@ -198,8 +198,6 @@ typedef struct socket_info_t {
 /* In cardbus.c */
 int cb_alloc(socket_info_t *s);
 void cb_free(socket_info_t *s);
-void cb_enable(socket_info_t *s);
-void cb_disable(socket_info_t *s);
 int read_cb_mem(socket_info_t *s, int space, u_int addr, u_int len, void *ptr);
 void cb_release_cis_mem(socket_info_t *s);
 
@@ -234,8 +232,7 @@ int write_memory(memory_handle_t handle, mem_op_t *req, caddr_t buf);
 int copy_memory(memory_handle_t handle, copy_op_t *req);
 
 /* In rsrc_mgr */
-void validate_mem(int (*is_valid)(u_long), int (*do_cksum)(u_long),
-		  int force_low, socket_info_t *s);
+void validate_mem(socket_info_t *s);
 int find_io_region(ioaddr_t *base, ioaddr_t num, ioaddr_t align,
 		   char *name, socket_info_t *s);
 int find_mem_region(u_long *base, u_long num, u_long align,

@@ -173,11 +173,7 @@ xfs_trans_dup(
 	ntp->t_rtx_res = tp->t_rtx_res - tp->t_rtx_res_used;
 	tp->t_rtx_res = tp->t_rtx_res_used;
 
-	/*
-	 * dup the dquot stuff too.
-	 */
-	if (tp->t_dqinfo)
-		xfs_trans_dup_dqinfo(tp, ntp);
+	XFS_TRANS_DUP_DQINFO(tp->t_mountp, tp, ntp);
 
 	atomic_inc(&tp->t_mountp->m_active_trans);
 	return ntp;
@@ -703,9 +699,7 @@ shut_us_down:
 		 * means is that we have some (non-persistent) quota
 		 * reservations that need to be unreserved.
 		 */
-		if (tp->t_dqinfo && (tp->t_flags & XFS_TRANS_DQ_DIRTY)) {
-			xfs_trans_unreserve_and_mod_dquots(tp);
-		}
+		XFS_TRANS_UNRESERVE_AND_MOD_DQUOTS(mp, tp);
 		if (tp->t_ticket) {
 			commit_lsn = xfs_log_done(mp, tp->t_ticket,
 							NULL, log_flags);
@@ -733,9 +727,7 @@ shut_us_down:
 	if (tp->t_flags & XFS_TRANS_SB_DIRTY) {
 		xfs_trans_apply_sb_deltas(tp);
 	}
-	if (tp->t_flags & XFS_TRANS_DQ_DIRTY) {
-		xfs_trans_apply_dquot_deltas(tp);
-	}
+	XFS_TRANS_APPLY_DQUOT_DELTAS(mp, tp);
 
 	/*
 	 * Ask each log item how many log_vector entries it will
@@ -955,9 +947,7 @@ xfs_trans_uncommit(
 	}
 
 	xfs_trans_unreserve_and_mod_sb(tp);
-	if (tp->t_dqinfo && (tp->t_flags & XFS_TRANS_DQ_DIRTY)) {
-		xfs_trans_unreserve_and_mod_dquots(tp);
-	}
+	XFS_TRANS_UNRESERVE_AND_MOD_DQUOTS(tp->t_mountp, tp);
 
 	xfs_trans_free_items(tp, flags);
 	xfs_trans_free_busy(tp);
@@ -1079,9 +1069,7 @@ xfs_trans_cancel(
 	}
 #endif
 	xfs_trans_unreserve_and_mod_sb(tp);
-
-	if (tp->t_dqinfo && (tp->t_flags & XFS_TRANS_DQ_DIRTY))
-		xfs_trans_unreserve_and_mod_dquots(tp);
+	XFS_TRANS_UNRESERVE_AND_MOD_DQUOTS(tp->t_mountp, tp);
 
 	if (tp->t_ticket) {
 		if (flags & XFS_TRANS_RELEASE_LOG_RES) {
@@ -1110,8 +1098,7 @@ xfs_trans_free(
 	xfs_trans_t	*tp)
 {
 	atomic_dec(&tp->t_mountp->m_active_trans);
-	if (tp->t_dqinfo)
-		xfs_trans_free_dqinfo(tp);
+	XFS_TRANS_FREE_DQINFO(tp->t_mountp, tp);
 	kmem_zone_free(xfs_trans_zone, tp);
 }
 

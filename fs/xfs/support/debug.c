@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -55,7 +55,7 @@ assfail(char *a, char *f, int l)
     BUG();
 }
 
-#if (defined(DEBUG) || defined(INDUCE_IO_ERRROR))
+#if ((defined(DEBUG) || defined(INDUCE_IO_ERRROR)) && !defined(NO_WANT_RANDOM))
 
 unsigned long
 random(void)
@@ -79,7 +79,7 @@ get_thread_id(void)
 	return current->pid;
 }
 
-#endif /* DEBUG */
+#endif /* DEBUG || INDUCE_IO_ERRROR || !NO_WANT_RANDOM */
 
 void
 cmn_err(register int level, char *fmt, ...)

@@ -29,20 +29,14 @@
  *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef __XFS_GLOBALS_H__
-#define __XFS_GLOBALS_H__
+#include <xfs.h>
 
-/*
- * This file declares globals needed by XFS that were normally defined
- * somewhere else in IRIX.
- */
-
-extern uint64_t xfs_panic_mask;		/* set to cause more panics */
-
-extern unsigned long xfs_physmem;
-
-extern spinlock_t xfs_atomic_spin;
-
-extern struct cred *sys_cred;
-
-#endif	/* __XFS_GLOBALS_H__ */
+#ifndef CONFIG_XFS_DMAPI
+xfs_dmops_t	xfs_dmcore_xfs = {
+	.xfs_send_data		= (xfs_send_data_t)fs_nosys,
+	.xfs_send_mmap		= (xfs_send_mmap_t)fs_noerr,
+	.xfs_send_destroy	= (xfs_send_destroy_t)fs_nosys,
+	.xfs_send_namesp	= (xfs_send_namesp_t)fs_nosys,
+	.xfs_send_unmount	= (xfs_send_unmount_t)fs_noval,
+};
+#endif /* CONFIG_XFS_DMAPI */

@@ -31,8 +31,9 @@
  */
 
 #include <xfs.h>
-#include <xfs_quota_priv.h>
+#include "xfs_qm.h"
 
+STATIC void	xfs_trans_alloc_dqinfo(xfs_trans_t *);
 
 /*
  * Add the locked dquot to the transaction.
@@ -95,7 +96,7 @@ xfs_trans_log_dquot(
  * Carry forward whatever is left of the quota blk reservation to
  * the spanky new transaction
  */
-void
+STATIC void
 xfs_trans_dup_dqinfo(
 	xfs_trans_t	*otp,
 	xfs_trans_t	*ntp)
@@ -103,6 +104,9 @@ xfs_trans_dup_dqinfo(
 	xfs_dqtrx_t	*oq, *nq;
 	int		i,j;
 	xfs_dqtrx_t	*oqa, *nqa;
+
+	if (!otp->t_dqinfo)
+		return;
 
 	xfs_trans_alloc_dqinfo(ntp);
 	oqa = otp->t_dqinfo->dqa_usrdquots;
@@ -155,15 +159,23 @@ xfs_trans_mod_dquot_byino(
 	uint		field,
 	long		delta)
 {
+	xfs_mount_t	*mp;
+
 	ASSERT(tp);
+	mp = tp->t_mountp;
+
+	if (!XFS_IS_QUOTA_ON(mp) ||
+	    ip->i_ino == mp->m_sb.sb_uquotino ||
+	    ip->i_ino == mp->m_sb.sb_gquotino)
+		return;
 
 	if (tp->t_dqinfo == NULL)
 		xfs_trans_alloc_dqinfo(tp);
 
-	if (XFS_IS_UQUOTA_ON(tp->t_mountp) && ip->i_udquot) {
+	if (XFS_IS_UQUOTA_ON(mp) && ip->i_udquot) {
 		(void) xfs_trans_mod_dquot(tp, ip->i_udquot, field, delta);
 	}
-	if (XFS_IS_GQUOTA_ON(tp->t_mountp) && ip->i_gdquot) {
+	if (XFS_IS_GQUOTA_ON(mp) && ip->i_gdquot) {
 		(void) xfs_trans_mod_dquot(tp, ip->i_gdquot, field, delta);
 	}
 }
@@ -318,7 +330,7 @@ xfs_trans_dqlockedjoin(
  * xfs_trans_apply_sb_deltas().
  * Go thru all the dquots belonging to this transaction and modify the
  * INCORE dquot to reflect the actual usages.
- * Unreserve just the reservations done by this transaction
+ * Unreserve just the reservations done by this transaction.
  * dquot is still left locked at exit.
  */
 void
@@ -331,6 +343,9 @@ xfs_trans_apply_dquot_deltas(
 	xfs_disk_dquot_t	*d;
 	long			totalbdelta;
 	long			totalrtbdelta;
+
+	if (! (tp->t_flags & XFS_TRANS_DQ_DIRTY))
+		return;
 
 	ASSERT(tp->t_dqinfo);
 	qa = tp->t_dqinfo->dqa_usrdquots;
@@ -481,13 +496,15 @@ xfs_trans_apply_dquot_deltas(
 
 #ifdef QUOTADEBUG
 			if (qtrx->qt_rtblk_res != 0)
-				printk("RT res %d for 0x%p\n",
-				      (int) qtrx->qt_rtblk_res,
-				      dqp);
+				cmn_err(CE_DEBUG, "RT res %d for 0x%p\n",
+					(int) qtrx->qt_rtblk_res, dqp);
 #endif
-			ASSERT(dqp->q_res_bcount >= INT_GET(dqp->q_core.d_bcount, ARCH_CONVERT));
-			ASSERT(dqp->q_res_icount >= INT_GET(dqp->q_core.d_icount, ARCH_CONVERT));
-			ASSERT(dqp->q_res_rtbcount >= INT_GET(dqp->q_core.d_rtbcount, ARCH_CONVERT));
+			ASSERT(dqp->q_res_bcount >=
+				INT_GET(dqp->q_core.d_bcount, ARCH_CONVERT));
+			ASSERT(dqp->q_res_icount >=
+				INT_GET(dqp->q_core.d_icount, ARCH_CONVERT));
+			ASSERT(dqp->q_res_rtbcount >=
+				INT_GET(dqp->q_core.d_rtbcount, ARCH_CONVERT));
 		}
 		/*
 		 * Do the group quotas next
@@ -503,16 +520,18 @@ xfs_trans_apply_dquot_deltas(
  * we simply throw those away, since that's the expected behavior
  * when a transaction is curtailed without a commit.
  */
-void
+STATIC void
 xfs_trans_unreserve_and_mod_dquots(
-	xfs_trans_t	*tp)
+	xfs_trans_t		*tp)
 {
 	int			i, j;
 	xfs_dquot_t		*dqp;
 	xfs_dqtrx_t		*qtrx, *qa;
 	boolean_t		locked;
 
-	ASSERT(tp->t_dqinfo);
+	if (!tp->t_dqinfo || !(tp->t_flags & XFS_TRANS_DQ_DIRTY))
+		return;
+
 	qa = tp->t_dqinfo->dqa_usrdquots;
 
 	for (j = 0; j < 2; j++) {
@@ -604,8 +623,8 @@ xfs_trans_dqresv(
 	    !INT_ISZERO(dqp->q_core.d_id, ARCH_CONVERT) &&
 	    XFS_IS_QUOTA_ENFORCED(dqp->q_mount)) {
 #ifdef QUOTADEBUG
-		printk("BLK Res: nblks=%ld + resbcount=%Ld > hardlimit=%Ld?\n",
-			nblks, *resbcountp, hardlimit);
+		cmn_err(CE_DEBUG, "BLK Res: nblks=%ld + resbcount=%Ld"
+			  " > hardlimit=%Ld?", nblks, *resbcountp, hardlimit);
 #endif
 		if (nblks > 0) {
 			/*
@@ -713,6 +732,7 @@ error_return:
 int
 xfs_trans_reserve_quota_bydquots(
 	xfs_trans_t	*tp,
+	xfs_mount_t	*mp,
 	xfs_dquot_t	*udqp,
 	xfs_dquot_t	*gdqp,
 	long		nblks,
@@ -720,6 +740,9 @@ xfs_trans_reserve_quota_bydquots(
 	uint		flags)
 {
 	int		resvd;
+
+	if (! XFS_IS_QUOTA_ON(mp))
+		return (0);
 
 	if (tp && tp->t_dqinfo == NULL)
 		xfs_trans_alloc_dqinfo(tp);
@@ -760,15 +783,22 @@ xfs_trans_reserve_quota_bydquots(
  *
  * Returns 0 on success, EDQUOT or other errors otherwise
  */
-int
+STATIC int
 xfs_trans_reserve_quota_nblks(
 	xfs_trans_t	*tp,
+	xfs_mount_t	*mp,
 	xfs_inode_t	*ip,
 	long		nblks,
 	long		ninos,
 	uint		type)
 {
-	int error;
+	int		error;
+
+	if (!XFS_IS_QUOTA_ON(mp))
+		return (0);
+
+	ASSERT(ip->i_ino != mp->m_sb.sb_uquotino);
+	ASSERT(ip->i_ino != mp->m_sb.sb_gquotino);
 
 #ifdef QUOTADEBUG
 	if (ip->i_udquot)
@@ -785,7 +815,7 @@ xfs_trans_reserve_quota_nblks(
 	/*
 	 * Reserve nblks against these dquots, with trans as the mediator.
 	 */
-	error = xfs_trans_reserve_quota_bydquots(tp,
+	error = xfs_trans_reserve_quota_bydquots(tp, mp,
 						 ip->i_udquot, ip->i_gdquot,
 						 nblks, ninos,
 						 type);
@@ -836,17 +866,29 @@ xfs_trans_log_quotaoff_item(
 	lidp->lid_flags |= XFS_LID_DIRTY;
 }
 
-void
+STATIC void
 xfs_trans_alloc_dqinfo(
 	xfs_trans_t	*tp)
 {
 	(tp)->t_dqinfo = kmem_zone_zalloc(xfs_Gqm->qm_dqtrxzone, KM_SLEEP);
 }
 
-void
+STATIC void
 xfs_trans_free_dqinfo(
 	xfs_trans_t	*tp)
 {
+	if (!tp->t_dqinfo)
+		return;
 	kmem_zone_free(xfs_Gqm->qm_dqtrxzone, (tp)->t_dqinfo);
 	(tp)->t_dqinfo = NULL;
 }
+
+xfs_dqtrxops_t	xfs_trans_dquot_ops = {
+	.qo_dup_dqinfo			= xfs_trans_dup_dqinfo,
+	.qo_free_dqinfo			= xfs_trans_free_dqinfo,
+	.qo_mod_dquot_byino		= xfs_trans_mod_dquot_byino,
+	.qo_apply_dquot_deltas		= xfs_trans_apply_dquot_deltas,
+	.qo_reserve_quota_nblks		= xfs_trans_reserve_quota_nblks,
+	.qo_reserve_quota_bydquots	= xfs_trans_reserve_quota_bydquots,
+	.qo_unreserve_and_mod_dquots	= xfs_trans_unreserve_and_mod_dquots,
+};

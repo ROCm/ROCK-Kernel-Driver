@@ -406,8 +406,6 @@ static int kobil_write (struct usb_serial_port *port, int from_user,
 	int result = 0;
 	int todo = 0;
 	struct kobil_private * priv;
-	int i;
-	char *data;
 
 	if (count == 0) {
 		dbg("%s - port %d write request of 0 bytes", __FUNCTION__, port->number);
@@ -421,19 +419,6 @@ static int kobil_write (struct usb_serial_port *port, int from_user,
 		return -ENOMEM;
 	}
 
-	// BEGIN DEBUG
-	data = (unsigned char *) kmalloc((3 * count + 10) * sizeof(char), GFP_KERNEL);  
-	if (! data) {
-		return (-1);
-	}
-	memset(data, 0, (3 * count + 10));
-	for (i = 0; i < count; i++) { 
-		sprintf(data +3*i, "%02X ", buf[i]); 
-	} 
-	dbg(" %d --> %s", port->number, data );
-	kfree(data);
-	// END DEBUG
-
 	// Copy data to buffer
 	if (from_user) {
 		if (copy_from_user(priv->buf + priv->filled, buf, count)) {
@@ -442,6 +427,8 @@ static int kobil_write (struct usb_serial_port *port, int from_user,
 	} else {
 		memcpy (priv->buf + priv->filled, buf, count);
 	}
+
+	usb_serial_debug_data (__FILE__, __FUNCTION__, count, priv->buf + priv->filled);
 
 	priv->filled = priv->filled + count;
 

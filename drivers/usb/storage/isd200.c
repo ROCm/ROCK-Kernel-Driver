@@ -405,11 +405,14 @@ static int isd200_action( struct us_data *us, int action,
 {
 	union ata_cdb ata;
 	struct scsi_cmnd srb;
+	struct scsi_device srb_dev;
 	struct isd200_info *info = (struct isd200_info *)us->extra;
 	int status;
 
 	memset(&ata, 0, sizeof(ata));
 	memset(&srb, 0, sizeof(srb));
+	memset(&srb_dev, 0, sizeof(srb_dev));
+	srb.device = &srb_dev;
 
 	ata.generic.SignatureByte0 = info->ConfigData.ATAMajorCommand;
 	ata.generic.SignatureByte1 = info->ConfigData.ATAMinorCommand;
@@ -479,6 +482,7 @@ static int isd200_action( struct us_data *us, int action,
 	}
 
 	memcpy(srb.cmnd, &ata, sizeof(ata.generic));
+	srb.cmd_len = sizeof(ata.generic);
 	status = usb_stor_Bulk_transport(&srb, us);
 	if (status == USB_STOR_TRANSPORT_GOOD)
 		status = ISD200_GOOD;
@@ -538,6 +542,7 @@ void isd200_invoke_transport( struct us_data *us,
 	/* send the command to the transport layer */
 	srb->resid = 0;
 	memcpy(srb->cmnd, ataCdb, sizeof(ataCdb->generic));
+	srb->cmd_len = sizeof(ataCdb->generic);
 	transferStatus = usb_stor_Bulk_transport(srb, us);
 
 	/* if the command gets aborted by the higher layers, we need to

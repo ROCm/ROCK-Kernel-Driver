@@ -85,7 +85,6 @@
  * (20/10/1999)
  */
 
-#include <linux/version.h>
 #include <linux/sched.h>
 #include <linux/signal.h>
 #include <linux/spinlock.h>

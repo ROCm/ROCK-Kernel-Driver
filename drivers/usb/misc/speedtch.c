@@ -148,27 +148,15 @@ struct udsl_control {
 
 #define UDSL_SKB(x)		((struct udsl_control *)(x)->cb)
 
-struct atmsar_vcc_data {
-	struct atmsar_vcc_data *next;
-
-	/* general atmsar flags, per connection */
-	int flags;
-	int type;
-
-	/* connection specific non-atmsar data */
+struct udsl_vcc_data {
+	/* vpi/vci lookup */
+	struct list_head list;
+	short vpi;
+	int vci;
 	struct atm_vcc *vcc;
-	struct k_atm_aal_stats *stats;
-	unsigned short mtu;	/* max is actually  65k for AAL5... */
-
-	/* cell data */
-	unsigned int vp;
-	unsigned int vc;
-	unsigned char gfc;
-	unsigned char pti;
-	unsigned int headerFlags;
-	unsigned long atmHeader;
 
 	/* raw cell reassembly */
+	unsigned short mtu;
 	struct sk_buff *reasBuffer;
 };
 
@@ -186,7 +174,7 @@ struct udsl_instance_data {
 
 	/* atm device part */
 	struct atm_dev *atm_dev;
-	struct atmsar_vcc_data *atmsar_vcc_list;
+	struct list_head vcc_list;
 
 	/* receiving */
 	struct udsl_receiver all_receivers [UDSL_NUMBER_RCV_URBS];
@@ -258,73 +246,46 @@ static struct usb_driver udsl_usb_driver = {
 **  decode  **
 *************/
 
-#define ATM_HDR_VPVC_MASK		(ATM_HDR_VPI_MASK | ATM_HDR_VCI_MASK)
-#define ATMSAR_USE_53BYTE_CELL		0x1L
-
-struct sk_buff *atmsar_decode_rawcell (struct atmsar_vcc_data *list, struct sk_buff *skb,
-				       struct atmsar_vcc_data **ctx)
+static inline struct udsl_vcc_data *udsl_find_vcc (struct udsl_instance_data *instance, short vpi, int vci)
 {
+	struct udsl_vcc_data *vcc;
+
+	list_for_each_entry (vcc, &instance->vcc_list, list)
+		if ((vcc->vpi == vpi) && (vcc->vci == vci))
+			return vcc;
+	return NULL;
+}
+
+static struct sk_buff *udsl_decode_rawcell (struct udsl_instance_data *instance, struct sk_buff *skb, struct udsl_vcc_data **ctx)
+{
+	if (!instance || !skb || !ctx)
+		return NULL;
+	if (!skb->data || !skb->tail)
+		return NULL;
+
 	while (skb->len) {
 		unsigned char *cell = skb->data;
 		unsigned char *cell_payload;
-		struct atmsar_vcc_data *vcc = list;
-		unsigned long atmHeader =
-		    ((unsigned long) (cell[0]) << 24) | ((unsigned long) (cell[1]) << 16) |
-		    ((unsigned long) (cell[2]) << 8) | (cell[3] & 0xff);
+		struct udsl_vcc_data *vcc;
+		short vpi;
+		int vci;
 
-		dbg ("atmsar_decode_rawcell (0x%p, 0x%p, 0x%p) called", list, skb, ctx);
-		dbg ("atmsar_decode_rawcell skb->data %p, skb->tail %p", skb->data, skb->tail);
+		vpi = ((cell[0] & 0x0f) << 4) | (cell[1] >> 4);
+		vci = ((cell[1] & 0x0f) << 12) | (cell[2] << 4) | (cell[3] >> 4);
 
-		if (!list || !skb || !ctx)
-			return NULL;
-		if (!skb->data || !skb->tail)
-			return NULL;
+		dbg ("udsl_decode_rawcell (0x%p, 0x%p, 0x%p) called", instance, skb, ctx);
+		dbg ("udsl_decode_rawcell skb->data %p, skb->tail %p", skb->data, skb->tail);
 
 		/* here should the header CRC check be... */
 
-		/* look up correct vcc */
-		for (;
-		     vcc
-		     && ((vcc->atmHeader & ATM_HDR_VPVC_MASK) != (atmHeader & ATM_HDR_VPVC_MASK));
-		     vcc = vcc->next);
+		if (!(vcc = udsl_find_vcc (instance, vpi, vci)))
+			dbg ("udsl_decode_rawcell: no vcc found for packet on vpi %d, vci %d", vpi, vci);
+		else {
+			dbg ("udsl_decode_rawcell found vcc %p for packet on vpi %d, vci %d", vcc, vpi, vci);
 
-		dbg ("atmsar_decode_rawcell found vcc %p for packet on vp %d, vc %d", vcc,
-			(int) ((atmHeader & ATM_HDR_VPI_MASK) >> ATM_HDR_VPI_SHIFT),
-			(int) ((atmHeader & ATM_HDR_VCI_MASK) >> ATM_HDR_VCI_SHIFT));
+			if (skb->len >= 53) {
+				cell_payload = cell + 5;
 
-		if (vcc && (skb->len >= (vcc->flags & ATMSAR_USE_53BYTE_CELL ? 53 : 52))) {
-			cell_payload = cell + (vcc->flags & ATMSAR_USE_53BYTE_CELL ? 5 : 4);
-
-			switch (vcc->type) {
-			case ATM_AAL0:
-				/* case ATM_AAL1: when we have a decode AAL1 function... */
-				{
-					struct sk_buff *tmp = dev_alloc_skb (vcc->mtu);
-
-					if (tmp) {
-						memcpy (tmp->tail, cell_payload, 48);
-						skb_put (tmp, 48);
-
-						if (vcc->stats)
-							atomic_inc (&vcc->stats->rx);
-
-						skb_pull (skb,
-							  (vcc->
-							   flags & ATMSAR_USE_53BYTE_CELL ? 53 :
-							   52));
-						dbg
-						    ("atmsar_decode_rawcell returns ATM_AAL0 pdu 0x%p with length %d",
-						     tmp, tmp->len);
-						return tmp;
-					};
-				}
-				break;
-			case ATM_AAL1:
-			case ATM_AAL2:
-			case ATM_AAL34:
-				/* not supported */
-				break;
-			case ATM_AAL5:
 				if (!vcc->reasBuffer)
 					vcc->reasBuffer = dev_alloc_skb (vcc->mtu);
 
@@ -347,43 +308,36 @@ struct sk_buff *atmsar_decode_rawcell (struct atmsar_vcc_data *list, struct sk_b
 						/* the aal5 buffer ends here, cut the buffer. */
 						/* buffer will always have at least one whole cell, so */
 						/* don't need to check return from skb_pull */
-						skb_pull (skb,
-							  (vcc->
-							   flags & ATMSAR_USE_53BYTE_CELL ? 53 :
-							   52));
+						skb_pull (skb, 53);
 						*ctx = vcc;
 						tmp = vcc->reasBuffer;
 						vcc->reasBuffer = NULL;
 
-						dbg
-						    ("atmsar_decode_rawcell returns ATM_AAL5 pdu 0x%p with length %d",
-						     tmp, tmp->len);
+						dbg ("udsl_decode_rawcell returns ATM_AAL5 pdu 0x%p with length %d", tmp, tmp->len);
 						return tmp;
 					}
 				}
-				break;
-			};
-			/* flush the cell */
-			/* buffer will always contain at least one whole cell, so don't */
-			/* need to check return value from skb_pull */
-			skb_pull (skb, (vcc->flags & ATMSAR_USE_53BYTE_CELL ? 53 : 52));
-		} else {
-			/* If data is corrupt and skb doesn't hold a whole cell, flush the lot */
-			if (skb_pull (skb, (list->flags & ATMSAR_USE_53BYTE_CELL ? 53 : 52)) ==
-			    NULL)
-				return NULL;
+				/* flush the cell */
+				/* buffer will always contain at least one whole cell, so don't */
+				/* need to check return value from skb_pull */
+				skb_pull (skb, 53);
+			} else {
+				/* If data is corrupt and skb doesn't hold a whole cell, flush the lot */
+				if (skb_pull (skb, 53) == NULL)
+					return NULL;
+			}
 		}
 	}
 
 	return NULL;
-};
+}
 
-struct sk_buff *atmsar_decode_aal5 (struct atmsar_vcc_data *ctx, struct sk_buff *skb)
+static struct sk_buff *udsl_decode_aal5 (struct udsl_vcc_data *ctx, struct sk_buff *skb)
 {
 	uint crc = 0xffffffff;
 	uint length, pdu_crc, pdu_length;
 
-	dbg ("atmsar_decode_aal5 (0x%p, 0x%p) called", ctx, skb);
+	dbg ("udsl_decode_aal5 (0x%p, 0x%p) called", ctx, skb);
 
 	if (skb->len && (skb->len % 48))
 		return NULL;
@@ -393,20 +347,18 @@ struct sk_buff *atmsar_decode_aal5 (struct atmsar_vcc_data *ctx, struct sk_buff 
 	    (skb->tail[-4] << 24) + (skb->tail[-3] << 16) + (skb->tail[-2] << 8) + skb->tail[-1];
 	pdu_length = ((length + 47 + 8) / 48) * 48;
 
-	dbg ("atmsar_decode_aal5: skb->len = %d, length = %d, pdu_crc = 0x%x, pdu_length = %d",
-		skb->len, length, pdu_crc, pdu_length);
+	dbg ("udsl_decode_aal5: skb->len = %d, length = %d, pdu_crc = 0x%x, pdu_length = %d", skb->len, length, pdu_crc, pdu_length);
 
 	/* is skb long enough ? */
 	if (skb->len < pdu_length) {
-		if (ctx->stats)
-			atomic_inc (&ctx->stats->rx_err);
+		if (ctx->vcc->stats)
+			atomic_inc (&ctx->vcc->stats->rx_err);
 		return NULL;
 	}
 
 	/* is skb too long ? */
 	if (skb->len > pdu_length) {
-		dbg ("atmsar_decode_aal5: Warning: readjusting illeagl size %d -> %d",
-			skb->len, pdu_length);
+		dbg ("udsl_decode_aal5: Warning: readjusting illegal size %d -> %d", skb->len, pdu_length);
 		/* buffer is too long. we can try to recover
 		 * if we discard the first part of the skb.
 		 * the crc will decide whether this was ok
@@ -418,9 +370,9 @@ struct sk_buff *atmsar_decode_aal5 (struct atmsar_vcc_data *ctx, struct sk_buff 
 
 	/* check crc */
 	if (pdu_crc != crc) {
-		dbg ("atmsar_decode_aal5: crc check failed!");
-		if (ctx->stats)
-			atomic_inc (&ctx->stats->rx_err);
+		dbg ("udsl_decode_aal5: crc check failed!");
+		if (ctx->vcc->stats)
+			atomic_inc (&ctx->vcc->stats->rx_err);
 		return NULL;
 	}
 
@@ -428,19 +380,20 @@ struct sk_buff *atmsar_decode_aal5 (struct atmsar_vcc_data *ctx, struct sk_buff 
 	skb_trim (skb, length);
 
 	/* update stats */
-	if (ctx->stats)
-		atomic_inc (&ctx->stats->rx);
+	if (ctx->vcc->stats)
+		atomic_inc (&ctx->vcc->stats->rx);
 
-	dbg ("atmsar_decode_aal5 returns pdu 0x%p with length %d", skb, skb->len);
+	dbg ("udsl_decode_aal5 returns pdu 0x%p with length %d", skb, skb->len);
 	return skb;
-};
+}
 
 
 /*************
 **  encode  **
 *************/
 
-static void udsl_groom_skb (struct atm_vcc *vcc, struct sk_buff *skb) {
+static void udsl_groom_skb (struct atm_vcc *vcc, struct sk_buff *skb)
+{
 	struct udsl_control *ctrl = UDSL_SKB (skb);
 	unsigned int i, zero_padding;
 	unsigned char zero = 0;
@@ -480,7 +433,8 @@ static void udsl_groom_skb (struct atm_vcc *vcc, struct sk_buff *skb) {
 	ctrl->aal5_trailer [7] = crc;
 }
 
-unsigned int udsl_write_cells (unsigned int howmany, struct sk_buff *skb, unsigned char **target_p) {
+static unsigned int udsl_write_cells (unsigned int howmany, struct sk_buff *skb, unsigned char **target_p)
+{
 	struct udsl_control *ctrl = UDSL_SKB (skb);
 	unsigned char *target = *target_p;
 	unsigned int nc, ne, i;
@@ -569,7 +523,7 @@ static void udsl_process_receive (unsigned long data)
 	unsigned char *data_start;
 	struct sk_buff *skb;
 	struct urb *urb;
-	struct atmsar_vcc_data *atmsar_vcc = NULL;
+	struct udsl_vcc_data *atmsar_vcc = NULL;
 	struct sk_buff *new = NULL, *tmp = NULL;
 	int err;
 
@@ -597,40 +551,28 @@ static void udsl_process_receive (unsigned long data)
 			dbg ("skb->len = %d", skb->len);
 			PACKETDEBUG (skb->data, skb->len);
 
-			while ((new =
-				atmsar_decode_rawcell (instance->atmsar_vcc_list, skb,
-						       &atmsar_vcc)) != NULL) {
+			while ((new = udsl_decode_rawcell (instance, skb, &atmsar_vcc))) {
 				dbg ("(after cell processing)skb->len = %d", new->len);
 
-				switch (atmsar_vcc->type) {
-				case ATM_AAL5:
-					tmp = new;
-					new = atmsar_decode_aal5 (atmsar_vcc, new);
+				tmp = new;
+				new = udsl_decode_aal5 (atmsar_vcc, new);
 
-					/* we can't send NULL skbs upstream, the ATM layer would try to close the vcc... */
-					if (new) {
-						dbg ("(after aal5 decap) skb->len = %d", new->len);
-						if (new->len && atm_charge (atmsar_vcc->vcc, new->truesize)) {
-							PACKETDEBUG (new->data, new->len);
-							atmsar_vcc->vcc->push (atmsar_vcc->vcc, new);
-						} else {
-							dbg
-							    ("dropping incoming packet : rx_inuse = %d, vcc->sk->rcvbuf = %d, skb->true_size = %d",
-							     atomic_read (&atmsar_vcc->vcc->rx_inuse),
-							     atmsar_vcc->vcc->sk->rcvbuf, new->truesize);
-							dev_kfree_skb (new);
-						}
+				/* we can't send NULL skbs upstream, the ATM layer would try to close the vcc... */
+				if (new) {
+					dbg ("(after aal5 decap) skb->len = %d", new->len);
+					if (new->len && atm_charge (atmsar_vcc->vcc, new->truesize)) {
+						PACKETDEBUG (new->data, new->len);
+						atmsar_vcc->vcc->push (atmsar_vcc->vcc, new);
 					} else {
-						dbg ("atmsar_decode_aal5 returned NULL!");
-						dev_kfree_skb (tmp);
+						dbg
+						    ("dropping incoming packet : rx_inuse = %d, vcc->sk->rcvbuf = %d, skb->true_size = %d",
+						     atomic_read (&atmsar_vcc->vcc->rx_inuse),
+						     atmsar_vcc->vcc->sk->rcvbuf, new->truesize);
+						dev_kfree_skb (new);
 					}
-					break;
-				default:
-					/* not supported. we delete the skb. */
-					printk (KERN_INFO
-						"SpeedTouch USB: illegal vcc type. Dropping packet.\n");
-					dev_kfree_skb (new);
-					break;
+				} else {
+					dbg ("udsl_decode_aal5 returned NULL!");
+					dev_kfree_skb (tmp);
 				}
 			}
 
@@ -901,95 +843,6 @@ static int udsl_atm_send (struct atm_vcc *vcc, struct sk_buff *skb)
 **  ATM  **
 **********/
 
-#define ATMSAR_DEF_MTU_AAL0		48
-#define ATMSAR_DEF_MTU_AAL1		47
-#define ATMSAR_DEF_MTU_AAL2		0  /* not supported */
-#define ATMSAR_DEF_MTU_AAL34		0  /* not supported */
-#define ATMSAR_DEF_MTU_AAL5		65535  /* max mtu ..    */
-
-struct atmsar_vcc_data *atmsar_open (struct atmsar_vcc_data **list, struct atm_vcc *vcc, uint type,
-				     ushort vpi, ushort vci, unchar pti, unchar gfc, uint flags)
-{
-	struct atmsar_vcc_data *new;
-
-	if (!vcc)
-		return NULL;
-
-	new = kmalloc (sizeof (struct atmsar_vcc_data), GFP_KERNEL);
-
-	if (!new)
-		return NULL;
-
-	memset (new, 0, sizeof (struct atmsar_vcc_data));
-	new->vcc = vcc;
-	new->stats = vcc->stats;
-	new->type = type;
-	new->next = NULL;
-	new->gfc = gfc;
-	new->vp = vpi;
-	new->vc = vci;
-	new->pti = pti;
-
-	switch (type) {
-	case ATM_AAL0:
-		new->mtu = ATMSAR_DEF_MTU_AAL0;
-		break;
-	case ATM_AAL1:
-		new->mtu = ATMSAR_DEF_MTU_AAL1;
-		break;
-	case ATM_AAL2:
-		new->mtu = ATMSAR_DEF_MTU_AAL2;
-		break;
-	case ATM_AAL34:
-		/* not supported */
-		new->mtu = ATMSAR_DEF_MTU_AAL34;
-		break;
-	case ATM_AAL5:
-		new->mtu = ATMSAR_DEF_MTU_AAL5;
-		break;
-	}
-
-	new->atmHeader = ((unsigned long) gfc << ATM_HDR_GFC_SHIFT)
-	    | ((unsigned long) vpi << ATM_HDR_VPI_SHIFT)
-	    | ((unsigned long) vci << ATM_HDR_VCI_SHIFT)
-	    | ((unsigned long) pti << ATM_HDR_PTI_SHIFT);
-	new->flags = flags;
-	new->next = NULL;
-	new->reasBuffer = NULL;
-
-	new->next = *list;
-	*list = new;
-
-	dbg ("Allocated new SARLib vcc 0x%p with vp %d vc %d", new, vpi, vci);
-
-	return new;
-}
-
-void atmsar_close (struct atmsar_vcc_data **list, struct atmsar_vcc_data *vcc)
-{
-	struct atmsar_vcc_data *work;
-
-	if (*list == vcc) {
-		*list = (*list)->next;
-	} else {
-		for (work = *list; work && work->next && (work->next != vcc); work = work->next);
-
-		/* return if not found */
-		if (work->next != vcc)
-			return;
-
-		work->next = work->next->next;
-	}
-
-	if (vcc->reasBuffer) {
-		dev_kfree_skb (vcc->reasBuffer);
-	}
-
-	dbg ("Allocated SARLib vcc 0x%p with vp %d vc %d", vcc, vcc->vp, vcc->vc);
-
-	kfree (vcc);
-}
-
 static void udsl_atm_dev_close (struct atm_dev *dev)
 {
 	struct udsl_instance_data *instance = dev->dev_data;
@@ -1061,11 +914,10 @@ static int udsl_atm_proc_read (struct atm_dev *atm_dev, loff_t *pos, char *page)
 	return 0;
 }
 
-#define ATMSAR_SET_PTI		0x2L
-
 static int udsl_atm_open (struct atm_vcc *vcc, short vpi, int vci)
 {
 	struct udsl_instance_data *instance = vcc->dev->dev_data;
+	struct udsl_vcc_data *new;
 
 	dbg ("udsl_atm_open called");
 
@@ -1074,63 +926,97 @@ static int udsl_atm_open (struct atm_vcc *vcc, short vpi, int vci)
 		return -ENODEV;
 	}
 
-	/* at the moment only AAL5 support */
+	if ((vpi == ATM_VPI_ANY) || (vci == ATM_VCI_ANY))
+		return -EINVAL;
+
+	/* only support AAL5 */
 	if (vcc->qos.aal != ATM_AAL5)
 		return -EINVAL;
 
-	MOD_INC_USE_COUNT;
+	down (&instance->serialize); /* vs self, udsl_atm_close */
 
-	vcc->dev_data =
-	    atmsar_open (&(instance->atmsar_vcc_list), vcc, ATM_AAL5, vpi, vci, 0, 0,
-			 ATMSAR_USE_53BYTE_CELL | ATMSAR_SET_PTI);
-	if (!vcc->dev_data) {
-		MOD_DEC_USE_COUNT;
-		return -ENOMEM;	/* this is the only reason atmsar_open can fail... */
+	if (udsl_find_vcc (instance, vpi, vci)) {
+		up (&instance->serialize);
+		return -EADDRINUSE;
 	}
 
+	if (!(new = kmalloc (sizeof (struct udsl_vcc_data), GFP_KERNEL))) {
+		up (&instance->serialize);
+		return -ENOMEM;
+	}
+
+	memset (new, 0, sizeof (struct udsl_vcc_data));
+	new->vcc = vcc;
+	new->vpi = vpi;
+	new->vci = vci;
+	new->mtu = UDSL_MAX_AAL5_MRU;
+
+	vcc->dev_data = new;
 	vcc->vpi = vpi;
 	vcc->vci = vci;
+
+	tasklet_disable (&instance->receive_tasklet);
+	list_add (&new->list, &instance->vcc_list);
+	tasklet_enable (&instance->receive_tasklet);
+
 	set_bit (ATM_VF_ADDR, &vcc->flags);
 	set_bit (ATM_VF_PARTIAL, &vcc->flags);
 	set_bit (ATM_VF_READY, &vcc->flags);
 
-	((struct atmsar_vcc_data *)vcc->dev_data)->mtu = UDSL_MAX_AAL5_MRU;
+	up (&instance->serialize);
+
+	dbg ("Allocated new SARLib vcc 0x%p with vpi %d vci %d", new, vpi, vci);
+
+	MOD_INC_USE_COUNT;
 
 	if (instance->firmware_loaded)
 		udsl_fire_receivers (instance);
 
 	dbg ("udsl_atm_open successful");
+
 	return 0;
 }
 
 static void udsl_atm_close (struct atm_vcc *vcc)
 {
 	struct udsl_instance_data *instance = vcc->dev->dev_data;
+	struct udsl_vcc_data *vcc_data = vcc->dev_data;
 
 	dbg ("udsl_atm_close called");
 
-	if (!instance) {
-		dbg ("NULL instance!");
+	if (!instance || !vcc_data) {
+		dbg ("NULL data!");
 		return;
 	}
 
-	/* freeing resources */
-	/* cancel all sends on this vcc */
+	dbg ("Deallocating SARLib vcc 0x%p with vpi %d vci %d", vcc_data, vcc_data->vpi, vcc_data->vci);
+
 	udsl_cancel_send (instance, vcc);
 
-	atmsar_close (&(instance->atmsar_vcc_list), vcc->dev_data);
-	vcc->dev_data = NULL;
-	clear_bit (ATM_VF_PARTIAL, &vcc->flags);
+	down (&instance->serialize); /* vs self, udsl_atm_open */
 
-	/* freeing address */
+	tasklet_disable (&instance->receive_tasklet);
+	list_del (&vcc_data->list);
+	tasklet_enable (&instance->receive_tasklet);
+
+	if (vcc_data->reasBuffer)
+		kfree_skb (vcc_data->reasBuffer);
+	vcc_data->reasBuffer = NULL;
+
+	kfree (vcc_data);
+	vcc->dev_data = NULL;
+
 	vcc->vpi = ATM_VPI_UNSPEC;
 	vcc->vci = ATM_VCI_UNSPEC;
+	clear_bit (ATM_VF_READY, &vcc->flags);
+	clear_bit (ATM_VF_PARTIAL, &vcc->flags);
 	clear_bit (ATM_VF_ADDR, &vcc->flags);
+
+	up (&instance->serialize);
 
 	MOD_DEC_USE_COUNT;
 
 	dbg ("udsl_atm_close successful");
-	return;
 }
 
 static int udsl_atm_ioctl (struct atm_dev *dev, unsigned int cmd, void *arg)
@@ -1208,6 +1094,8 @@ static int udsl_usb_probe (struct usb_interface *intf, const struct usb_device_i
 	init_MUTEX (&instance->serialize);
 
 	instance->usb_dev = dev;
+
+	INIT_LIST_HEAD (&instance->vcc_list);
 
 	spin_lock_init (&instance->spare_receivers_lock);
 	INIT_LIST_HEAD (&instance->spare_receivers);

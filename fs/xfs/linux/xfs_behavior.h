@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000, 2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -91,8 +91,8 @@
  *     active object
  *
  */
-
-typedef void	bhv_head_lock_t;
+ 
+struct bhv_head_lock;
 
 /*
  * Behavior head.  Head of the chain of behaviors.
@@ -100,7 +100,7 @@ typedef void	bhv_head_lock_t;
  */
 typedef struct bhv_head {
 	struct bhv_desc *bh_first;	/* first behavior in chain */
-	bhv_head_lock_t *bh_lockp;	/* pointer to lock info struct */
+	struct bhv_head_lock *bh_lockp;	/* pointer to lock info struct */
 } bhv_head_t;
 
 /*
@@ -128,9 +128,7 @@ typedef struct bhv_identity {
 typedef bhv_identity_t bhv_position_t;
 
 #define BHV_IDENTITY_INIT(id,pos)	{id, pos}
-
 #define BHV_IDENTITY_INIT_POSITION(pos) BHV_IDENTITY_INIT(0, pos)
-
 
 /*
  * Define boundaries of position values.
@@ -154,7 +152,7 @@ typedef bhv_identity_t bhv_position_t;
 
 extern void bhv_head_init(bhv_head_t *, char *);
 extern void bhv_head_destroy(bhv_head_t *);
-extern void bhv_head_reinit(bhv_head_t *);
+extern int  bhv_insert(bhv_head_t *, bhv_desc_t *);
 extern void bhv_insert_initial(bhv_head_t *, bhv_desc_t *);
 
 /*
@@ -196,7 +194,11 @@ extern void bhv_insert_initial(bhv_head_t *, bhv_desc_t *);
  */
 extern void		bhv_remove_not_first(bhv_head_t *bhp, bhv_desc_t *bdp);
 extern bhv_desc_t *	bhv_lookup(bhv_head_t *bhp, void *ops);
-extern bhv_desc_t *	bhv_lookup_unlocked(bhv_head_t *bhp, void *ops);
-extern bhv_desc_t *	bhv_base_unlocked(bhv_head_t *bhp);
+extern bhv_desc_t *	bhv_lookup_range(bhv_head_t *bhp, int low, int high);
+extern bhv_desc_t *	bhv_base(bhv_head_t *bhp);
+
+/* No bhv locking on Linux */
+#define bhv_lookup_unlocked	bhv_lookup
+#define bhv_base_unlocked	bhv_base
 
 #endif /* __XFS_BEHAVIOR_H__ */

@@ -87,5 +87,9 @@ config PCMCIA_SA1111
 	tristate "SA1111 support"
 	depends on PCMCIA_SA1100 && SA1111
 
+config PCMCIA_PROBE
+	bool
+	default y if ISA && !ARCH_SA1100 && !ARCH_CLPS711X
+
 endmenu
 
