@@ -116,6 +116,8 @@ struct ps2esdi_i_struct {
 	unsigned int head, sect, cyl, wpcom, lzone, ctl;
 };
 static spinlock_t ps2esdi_lock = SPIN_LOCK_UNLOCKED;
+static struct request_queue ps2esdi_queue;
+static struct request *current_req;
 
 #if 0
 #if 0				/* try both - I don't know which one is better... UB */
@@ -156,8 +158,7 @@ int __init ps2esdi_init(void)
 		return -1;
 	}
 	/* set up some global information - indicating device specific info */
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_ps2esdi_request,
-			&ps2esdi_lock);
+	blk_init_queue(&ps2esdi_queue, do_ps2esdi_request, &ps2esdi_lock);
 
 	/* some minor housekeeping - setup the global gendisk structure */
 	error = ps2esdi_geninit();
@@ -165,7 +166,7 @@ int __init ps2esdi_init(void)
 		printk(KERN_WARNING "PS2ESDI: error initialising"
 			" device, releasing resources\n");
 		unregister_blkdev(MAJOR_NR, "ed");
-		blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+		blk_cleanup_queue(&ps2esdi_queue);
 		return error;
 	}
 	return 0;
@@ -214,7 +215,7 @@ cleanup_module(void) {
 	free_dma(dma_arb_level);
 	free_irq(PS2ESDI_IRQ, &ps2esdi_gendisk);
 	unregister_blkdev(MAJOR_NR, "ed");
-	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+	blk_cleanup_queue(&ps2esdi_queue);
 	for (i = 0; i < ps2esdi_drives; i++) {
 		del_gendisk(ps2esdi_gendisk[i]);
 		put_disk(ps2esdi_gendisk[i]);
@@ -413,7 +414,7 @@ static int __init ps2esdi_geninit(void)
 		error = -EBUSY;
 		goto err_out3;
 	}
-	blk_queue_max_sectors(BLK_DEFAULT_QUEUE(MAJOR_NR), 128);
+	blk_queue_max_sectors(&ps2esdi_queue, 128);
 
 	error = -ENOMEM;
 	for (i = 0; i < ps2esdi_drives; i++) {
@@ -431,6 +432,8 @@ static int __init ps2esdi_geninit(void)
 		struct gendisk *disk = ps2esdi_gendisk[i];
 		set_capacity(disk, ps2esdi_info[i].head * ps2esdi_info[i].sect *
 				ps2esdi_info[i].cyl);
+		disk->queue = &ps2esdi_queue;
+		disk->private_data = &ps2esdi_info[i];
 		add_disk(disk);
 	}
 	return 0;
@@ -477,65 +480,52 @@ static void __init ps2esdi_get_device_cfg(void)
 /* strategy routine that handles most of the IO requests */
 static void do_ps2esdi_request(request_queue_t * q)
 {
-	u_int block, count;
-	int unit;
+	struct request *req;
 	/* since, this routine is called with interrupts cleared - they 
 	   must be before it finishes  */
+
+	/* standard procedure to ensure that requests are really on the
+	   list + sanity checks.                     */
+	if (blk_queue_empty(q))
+		return;
+
+	req = elv_next_request(q);
 
 #if 0
 	printk("%s:got request. device : %d minor : %d command : %d  sector : %ld count : %ld, buffer: %p\n",
 	       DEVICE_NAME,
-	       DEVICE_NR(CURRENT->rq_dev), minor(CURRENT->rq_dev),
-	       CURRENT->cmd, CURRENT->sector,
-	       CURRENT->current_nr_sectors, CURRENT->buffer);
+	       DEVICE_NR(req->rq_dev), minor(req->rq_dev),
+	       req->cmd, req->sector,
+	       req->current_nr_sectors, req->buffer);
 #endif
 
-	/* standard procedure to ensure that requests are really on the
-	   list + sanity checks.                     */
-	if (blk_queue_empty(QUEUE))
-		return;
-
-	unit = DEVICE_NR(CURRENT->rq_dev);
-	if (isa_virt_to_bus(CURRENT->buffer + CURRENT->current_nr_sectors * 512) > 16 * MB) {
+	/* check for above 16Mb dmas */
+	if (isa_virt_to_bus(req->buffer + req->current_nr_sectors * 512) > 16 * MB) {
 		printk("%s: DMA above 16MB not supported\n", DEVICE_NAME);
-		end_request(CURRENT, FAIL);
-	}			/* check for above 16Mb dmas */
-	else if ((unit < ps2esdi_drives) &&
-	    (CURRENT->sector + CURRENT->current_nr_sectors <=
-	     get_capacity(ps2esdi_gendisk[unit])) &&
-	    	CURRENT->flags & REQ_CMD) {
-#if 0
-		printk("%s:got request. device : %d minor : %d command : %d  sector : %ld count : %ld\n",
-		       DEVICE_NAME,
-		       unit, minor(CURRENT->rq_dev),
-		       CURRENT->cmd, CURRENT->sector,
-		       CURRENT->current_nr_sectors);
-#endif
-
-		block = CURRENT->sector;
-		count = CURRENT->current_nr_sectors;
-
-		switch (rq_data_dir(CURRENT)) {
-		case READ:
-			ps2esdi_readwrite(READ, unit, block, count);
-			break;
-		case WRITE:
-			ps2esdi_readwrite(WRITE, unit, block, count);
-			break;
-		default:
-			printk("%s: Unknown command\n", DEVICE_NAME);
-			end_request(CURRENT, FAIL);
-			break;
-		}		/* handle different commands */
+		end_request(req, FAIL);
+		return;
 	}
-	/* is request is valid */ 
-	else {
+
+	if (req->sector+req->current_nr_sectors > get_capacity(req->rq_disk)) {
 		printk("Grrr. error. ps2esdi_drives: %d, %lu %llu\n",
-		    ps2esdi_drives, CURRENT->sector,
-		    (unsigned long long)get_capacity(ps2esdi_gendisk[unit]));
-		end_request(CURRENT, FAIL);
+		    ps2esdi_drives, req->sector,
+		    (unsigned long long)get_capacity(req->rq_disk));
+		end_request(req, FAIL);
+		return;
 	}
 
+	switch (rq_data_dir(req)) {
+	case READ:
+		ps2esdi_readwrite(READ, req);
+		break;
+	case WRITE:
+		ps2esdi_readwrite(WRITE, req);
+		break;
+	default:
+		printk("%s: Unknown command\n", req->rq_disk->disk_name);
+		end_request(req, FAIL);
+		break;
+	}		/* handle different commands */
 }				/* main strategy routine */
 
 /* resets the ESDI adapter */
@@ -572,17 +562,20 @@ static void reset_ctrl(void)
 }				/* reset the controller */
 
 /* called by the strategy routine to handle read and write requests */
-static void ps2esdi_readwrite(int cmd, u_char drive, u_int block, u_int count)
+static void ps2esdi_readwrite(int cmd, struct request *req)
 {
-
+	struct ps2esdi_i_struct *p = req->rq_disk->private_data;
+	unsigned block = req->sector;
+	unsigned count = req->current_nr_sectors;
+	int drive = DEVICE_NR(req->rq_dev);
 	u_short track, head, cylinder, sector;
 	u_short cmd_blk[TYPE_1_CMD_BLK_LENGTH];
 
 	/* do some relevant arithmatic */
-	track = block / ps2esdi_info[drive].sect;
-	head = track % ps2esdi_info[drive].head;
-	cylinder = track / ps2esdi_info[drive].head;
-	sector = block % ps2esdi_info[drive].sect;
+	track = block / p->sect;
+	head = track % p->head;
+	cylinder = track / p->head;
+	sector = block % p->sect;
 
 #if 0
 	printk("%s: cyl=%d head=%d sect=%d\n", DEVICE_NAME, cylinder, head, sector);
@@ -591,16 +584,16 @@ static void ps2esdi_readwrite(int cmd, u_char drive, u_int block, u_int count)
 	ps2esdi_fill_cmd_block
 	    (cmd_blk,
 	     (cmd == READ) ? CMD_READ : CMD_WRITE,
-	     cylinder, head, sector,
-	     CURRENT->current_nr_sectors, drive);
+	     cylinder, head, sector, count, drive);
 
 	/* send the command block to the controller */
+	current_req = req;
 	spin_unlock_irq(&ps2esdi_lock);
 	if (ps2esdi_out_cmd_blk(cmd_blk)) {
 		spin_lock_irq(&ps2esdi_lock);
 		printk("%s: Controller failed\n", DEVICE_NAME);
-		if ((++CURRENT->errors) >= MAX_RETRIES)
-			end_request(CURRENT, FAIL);
+		if ((++req->errors) >= MAX_RETRIES)
+			end_request(req, FAIL);
 	}
 	/* check for failure to put out the command block */ 
 	else {
@@ -680,11 +673,7 @@ static int ps2esdi_out_cmd_blk(u_short * cmd_blk)
 /* prepare for dma - do all the necessary setup */
 static void ps2esdi_prep_dma(char *buffer, u_short length, u_char dma_xmode)
 {
-	unsigned long flags;
-#if 0
-	printk("ps2esdi: b_wait: %p\n", &CURRENT->bh->b_wait);
-#endif
-	flags = claim_dma_lock();
+	unsigned long flags = claim_dma_lock();
 
 	mca_disable_dma(dma_arb_level);
 
@@ -873,8 +862,9 @@ static void ps2esdi_normal_interrupt_handler(u_int int_ret_code)
 
 	switch (int_ret_code & 0x0f) {
 	case INT_TRANSFER_REQ:
-		ps2esdi_prep_dma(CURRENT->buffer, CURRENT->current_nr_sectors,
-		    (rq_data_dir(CURRENT) == READ)
+		ps2esdi_prep_dma(current_req->buffer,
+				 current_req->current_nr_sectors,
+		    (rq_data_dir(current_req) == READ)
 		    ? MCA_DMA_MODE_16 | MCA_DMA_MODE_WRITE | MCA_DMA_MODE_XFER
 		    : MCA_DMA_MODE_16 | MCA_DMA_MODE_READ);
 		outb(CTRL_ENABLE_DMA | CTRL_ENABLE_INTR, ESDI_CONTROL);
@@ -894,7 +884,7 @@ static void ps2esdi_normal_interrupt_handler(u_int int_ret_code)
 			printk("%s: timeout reading status word\n", DEVICE_NAME);
 			outb((int_ret_code & 0xe0) | ATT_EOI, ESDI_ATTN);
 			outb(CTRL_ENABLE_INTR, ESDI_CONTROL);
-			if ((++CURRENT->errors) >= MAX_RETRIES)
+			if ((++current_req->errors) >= MAX_RETRIES)
 				ending = FAIL;
 			else
 				ending = -1;
@@ -907,9 +897,6 @@ static void ps2esdi_normal_interrupt_handler(u_int int_ret_code)
 			LITE_OFF;
 			outb((int_ret_code & 0xe0) | ATT_EOI, ESDI_ATTN);
 			outb(CTRL_ENABLE_INTR, ESDI_CONTROL);
-#if 0
-			printk("ps2esdi: cmd_complete b_wait: %p\n", &CURRENT->bh->b_wait);
-#endif
 			ending = SUCCES;
 			break;
 		default:
@@ -938,7 +925,7 @@ static void ps2esdi_normal_interrupt_handler(u_int int_ret_code)
 		dump_cmd_complete_status(int_ret_code);
 		outb((int_ret_code & 0xe0) | ATT_EOI, ESDI_ATTN);
 		outb(CTRL_ENABLE_INTR, ESDI_CONTROL);
-		if ((++CURRENT->errors) >= MAX_RETRIES)
+		if ((++current_req->errors) >= MAX_RETRIES)
 			ending = FAIL;
 		else
 			ending = -1;
@@ -976,8 +963,9 @@ static void ps2esdi_normal_interrupt_handler(u_int int_ret_code)
 	}
 	if(ending != -1) {
 		spin_lock_irqsave(&ps2esdi_lock, flags);
-		end_request(CURRENT, ending);
-		do_ps2esdi_request(BLK_DEFAULT_QUEUE(MAJOR_NR));
+		end_request(current_req, ending);
+		current_req = NULL;
+		do_ps2esdi_request(&ps2esdi_queue);
 		spin_unlock_irqrestore(&ps2esdi_lock, flags);
 	}
 }				/* handle interrupts */
@@ -1074,16 +1062,17 @@ static void dump_cmd_complete_status(u_int int_ret_code)
 static int ps2esdi_ioctl(struct inode *inode,
 			 struct file *file, u_int cmd, u_long arg)
 {
+	struct ps2esdi_i_struct *p = inode->i_bdev->bd_disk->private_data;
 	struct ps2esdi_geometry *geometry = (struct ps2esdi_geometry *) arg;
-	int dev = DEVICE_NR(inode->i_rdev), err;
+	int err;
 
 	if (cmd != HDIO_GETGEO)
 		return -EINVAL;
 	if ((err = verify_area(VERIFY_WRITE, geometry, sizeof(*geometry))))
 		return (err);
-	put_user(ps2esdi_info[dev].head, (char *) &geometry->heads);
-	put_user(ps2esdi_info[dev].sect, (char *) &geometry->sectors);
-	put_user(ps2esdi_info[dev].cyl, (short *) &geometry->cylinders);
+	put_user(p->head, (char *) &geometry->heads);
+	put_user(p->sect, (char *) &geometry->sectors);
+	put_user(p->cyl, (short *) &geometry->cylinders);
 	put_user(get_start_sect(inode->i_bdev), (long *) &geometry->start);
 	return 0;
 }
