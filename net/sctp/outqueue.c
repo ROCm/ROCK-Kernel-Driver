@@ -104,7 +104,7 @@ void sctp_outqueue_init(sctp_association_t *asoc, sctp_outqueue_t *q)
 void sctp_outqueue_teardown(sctp_outqueue_t *q)
 {
 	sctp_transport_t *transport;
-	struct list_head *lchunk, *pos;
+	struct list_head *lchunk, *pos, *temp;
 	sctp_chunk_t *chunk;
 
 	/* Throw away unacknowledged chunks. */
@@ -115,6 +115,13 @@ void sctp_outqueue_teardown(sctp_outqueue_t *q)
 					   transmitted_list);
 			sctp_free_chunk(chunk);
 		}
+	}
+
+	/* Throw away chunks that have been gap ACKed.  */
+	list_for_each_safe(lchunk, temp, &q->sacked) {
+		list_del(lchunk);
+		chunk = list_entry(lchunk, sctp_chunk_t, transmitted_list);
+		sctp_free_chunk(chunk);
 	}
 
 	/* Throw away any leftover chunks. */
