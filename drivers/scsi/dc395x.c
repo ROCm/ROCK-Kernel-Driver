@@ -47,6 +47,7 @@
  ************************************************************************
  */
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/delay.h>
 #include <linux/ctype.h>
 #include <linux/blk.h>
@@ -209,16 +210,6 @@ char DC395x_traceoverflow[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
 #define PCI_DEVICE_ID_TEKRAM_TRMS1040           0x0391	/* Device ID    */
 #endif
 
-static struct pci_device_id dc395x_pci_tbl[] __devinitdata = {
-	{
-		.vendor		= PCI_VENDOR_ID_TEKRAM,
-		.device		= PCI_DEVICE_ID_TEKRAM_TRMS1040,
-		.subvendor	= PCI_ANY_ID,
-		.subdevice	= PCI_ANY_ID,
-	 },
-	{}			/* Terminating entry */
-};
-MODULE_DEVICE_TABLE(pci, dc395x_pci_tbl);
 
 
 #define DC395x_LOCK_IO(dev)   spin_lock_irqsave(((struct Scsi_Host *)dev)->host_lock, flags)
@@ -546,7 +537,6 @@ static inline void DC395x_SetXferRate(struct AdapterCtlBlk *pACB,
 				      struct DeviceCtlBlk *pDCB);
 void DC395x_initDCB(struct AdapterCtlBlk *pACB,
 		    struct DeviceCtlBlk **ppDCB, u8 target, u8 lun);
-int DC395x_shutdown(struct Scsi_Host *host);
 static void DC395x_remove_dev(struct AdapterCtlBlk *pACB,
 			      struct DeviceCtlBlk *pDCB);
 
@@ -613,116 +603,203 @@ static u8 dc395x_clock_period[] = { 12, 18, 25, 31, 37, 43, 50, 62 };
 static u16 dc395x_clock_speed[] = { 200, 133, 100, 80, 67, 58, 50, 40 };
 /* real period:48ns,72ns,100ns,124ns,148ns,172ns,200ns,248ns */
 
+
+
+/*---------------------------------------------------------------------------
+                                Configuration
+  ---------------------------------------------------------------------------*/
+
 /*
- * Override defaults on cmdline:
- * dc395x_trm = AdaptID, MaxSpeed (Index), DevMode (Bitmapped), AdaptMode (Bitmapped), Tags (log2-1), DelayReset
+ * Command line parameters are stored in a structure below.
+ * These are the index's into the strcuture for the various
+ * command line options.
  */
-int dc395x_trm[] = { -2, -2, -2, -2, -2, -2 };
+#define CFG_ADAPTER_ID		0
+#define CFG_MAX_SPEED		1
+#define CFG_DEV_MODE		2
+#define CFG_ADAPTER_MODE	3
+#define CFG_TAGS		4
+#define CFG_RESET_DELAY		5
 
-#if defined(MODULE)
-MODULE_PARM(dc395x_trm, "1-6i");
-MODULE_PARM_DESC(dc395x_trm,
-		 "Host SCSI ID, Speed (0=20MHz), Device Flags, Adapter Flags, Max Tags (log2(tags)-1), DelayReset (s)");
+#define CFG_NUM			6	/* number of configuration items */
+
+
+/*
+ * Value used to indicate that a command line override
+ * hasn't been used to modify the value.
+ */
+#define CFG_PARAM_UNSET -1
+
+
+/*
+ * Hold command line parameters.
+ */
+struct dc395x_config_data {
+	int value;		/* value of this setting */
+	int min;		/* minimum value */
+	int max;		/* maximum value */
+	int def;		/* default value */
+	int safe;		/* safe value */
+};
+struct dc395x_config_data __initdata cfg_data[] = {
+	{ /* adapter id */
+		CFG_PARAM_UNSET,
+		0,
+		15,
+		7,
+		7
+	},
+	{ /* max speed */
+		CFG_PARAM_UNSET,
+		  0,
+		  7,
+		  1,	/* 13.3Mhz */
+		  4,	/*  6.7Hmz */
+	},
+	{ /* dev mode */
+		CFG_PARAM_UNSET,
+		0,
+		0x3f,
+		NTC_DO_PARITY_CHK | NTC_DO_DISCONNECT | NTC_DO_SYNC_NEGO |
+			NTC_DO_WIDE_NEGO | NTC_DO_TAG_QUEUEING |
+			NTC_DO_SEND_START,
+		NTC_DO_PARITY_CHK | NTC_DO_SEND_START
+	},
+	{ /* adapter mode */
+		CFG_PARAM_UNSET,
+		0,
+		0x2f,
+#ifdef CONFIG_SCSI_MULTI_LUN
+			NAC_SCANLUN |
 #endif
+		NAC_GT2DRIVES | NAC_GREATER_1G | NAC_POWERON_SCSI_RESET
+			/*| NAC_ACTIVE_NEG*/,
+		NAC_GT2DRIVES | NAC_GREATER_1G | NAC_POWERON_SCSI_RESET | 0x08
+	},
+	{ /* tags */
+		CFG_PARAM_UNSET,
+		0,
+		5,
+		3,	/* 16 tags (??) */
+		2,
+	},
+	{ /* reset delay */
+		CFG_PARAM_UNSET,
+		0,
+		180,
+		1,	/* 1 second */
+		10,	/* 10 seconds */
+	}
+};
 
-MODULE_AUTHOR("C.L. Huang / Erich Chen / Kurt Garloff");
-MODULE_DESCRIPTION
-    ("SCSI host adapter driver for Tekram TRM-S1040 based adapters: Tekram DC395 and DC315 series");
-MODULE_SUPPORTED_DEVICE("sd,sr,sg,st");
 
-MODULE_LICENSE("GPL");
+/*
+ * Safe settings. If set to zero the the BIOS/default values with command line
+ * overrides will be used. If set to 1 then safe and slow settings will be used.
+ */
+static int dc395x_safe = 0;
+module_param_named(safe, dc395x_safe, bool, 0);
+MODULE_PARM_DESC(safe, "Use safe and slow settings only. Default: false");
 
-/* Delaying after a reset */
-static char __initdata DC395x_interpd[] = { 1, 3, 5, 10, 16, 30, 60, 120 };
 
-/* Convert EEprom value to seconds */
-static void __init DC395x_interpret_delay(struct NvRamType *eeprom)
+module_param_named(adapter_id, cfg_data[CFG_ADAPTER_ID].value, int, 0);
+MODULE_PARM_DESC(adapter_id, "Adapter SCSI ID. Default 7 (0-15)");
+
+module_param_named(max_speed, cfg_data[CFG_MAX_SPEED].value, int, 0);
+MODULE_PARM_DESC(max_speed, "Maximum bus speed. Default 1 (0-7) Speeds: 0=20, 1=13.3, 2=10, 3=8, 4=6.7, 5=5.8, 6=5, 7=4 Mhz");
+
+module_param_named(dev_mode, cfg_data[CFG_DEV_MODE].value, int, 0);
+MODULE_PARM_DESC(dev_mode, "Device mode.");
+
+module_param_named(adapter_mode, cfg_data[CFG_ADAPTER_MODE].value, int, 0);
+MODULE_PARM_DESC(adapter_mode, "Adapter mode.");
+
+module_param_named(tags, cfg_data[CFG_TAGS].value, int, 0);
+MODULE_PARM_DESC(tags, "Number of tags (1<<x). Default 3 (0-5)");
+
+module_param_named(reset_delay, cfg_data[CFG_RESET_DELAY].value, int, 0);
+MODULE_PARM_DESC(reset_delay, "Reset delay in seconds. Default 1 (0-180)");
+
+
+/**
+ * set_safe_settings - if the safe parameter is set then
+ * set all values to the safe and slow values.
+ **/
+static
+void __init set_safe_settings(void)
 {
-	/*printk (DC395X_NAME, "Debug: Delay: %i\n", eeprom->NvramDelayTime); */
-	eeprom->NvramDelayTime = DC395x_interpd[eeprom->NvramDelayTime];
+	if (dc395x_safe)
+	{
+		int i;
+
+		dprintkl(KERN_INFO, "Using sage settings.\n");
+		for (i = 0; i < CFG_NUM; i++)
+		{
+			cfg_data[i].value = cfg_data[i].safe;
+		}
+	}
 }
 
-/* seconds to EEProm value */
-static int __init DC395x_uninterpret_delay(int delay)
+
+/**
+ * fix_settings - reset any boot parmeters which are out of range
+ * back to the default values.
+ **/
+static
+void __init fix_settings(void)
+{
+	int i;
+
+	dprintkdbg(DBG_PARSE, "setup %08x %08x %08x %08x %08x %08x\n",
+		    cfg_data[CFG_ADAPTER_ID].value,
+		    cfg_data[CFG_MAX_SPEED].value,
+		    cfg_data[CFG_DEV_MODE].value,
+		    cfg_data[CFG_ADAPTER_MODE].value,
+		    cfg_data[CFG_TAGS].value,
+		    cfg_data[CFG_RESET_DELAY].value);
+	for (i = 0; i < CFG_NUM; i++)
+	{
+		if (cfg_data[i].value < cfg_data[i].min ||
+			cfg_data[i].value > cfg_data[i].max)
+		{
+			cfg_data[i].value = cfg_data[i].def;
+		}
+	}
+}
+
+
+
+/*
+ * Mapping from the eeprom value (index into this array) to the
+ * the number of actual seconds that the delay should be for.
+ */
+static
+char __initdata eeprom_index_to_delay_map[] = { 1, 3, 5, 10, 16, 30, 60, 120 };
+
+
+/**
+ * eeprom_index_to_delay - Take the eeprom delay setting and convert it
+ * into a number of seconds.
+ */
+static void __init eeprom_index_to_delay(struct NvRamType *eeprom)
+{
+	eeprom->NvramDelayTime = eeprom_index_to_delay_map[eeprom->NvramDelayTime];
+}
+
+
+/**
+ * delay_to_eeprom_index - Take a delay in seconds and return the closest
+ * eeprom index which will delay for at least that amount of seconds.
+ */
+static int __init delay_to_eeprom_index(int delay)
 {
 	u8 idx = 0;
-	while (idx < 7 && DC395x_interpd[idx] < delay)
+	while (idx < 7 && eeprom_index_to_delay_map[idx] < delay) {
 		idx++;
+	}
 	return idx;
 }
 
-
-/* Handle "-1" case */
-static void __init DC395x_check_for_safe_settings(void)
-{
-	if (dc395x_trm[0] == -1 || dc395x_trm[0] > 15) {	/* modules-2.0.0 passes -1 as string */
-		dc395x_trm[0] = 7;
-		dc395x_trm[1] = 4;
-		dc395x_trm[2] = 0x09;
-		dc395x_trm[3] = 0x0f;
-		dc395x_trm[4] = 2;
-		dc395x_trm[5] = 10;
-		dprintkl(KERN_INFO, "Using safe settings.\n");
-	}
-}
-
-/* Defaults, to be overriden by (a) BIOS and (b) Cmnd line (kernel/module) args */
-int __initdata dc395x_def[] = { 7, 1 /* 13.3MHz */ ,
-	NTC_DO_PARITY_CHK | NTC_DO_DISCONNECT | NTC_DO_SYNC_NEGO |
-	    NTC_DO_WIDE_NEGO | NTC_DO_TAG_QUEUEING | NTC_DO_SEND_START,
-	NAC_GT2DRIVES | NAC_GREATER_1G | NAC_POWERON_SCSI_RESET
-	    /* | NAC_ACTIVE_NEG */
-#ifdef CONFIG_SCSI_MULTI_LUN
-	    | NAC_SCANLUN
-#endif
-	    , 3 /* 16 Tags per LUN */ , 1	/* s delay after Reset */
-};
-
-/* Copy defaults over set values where missing */
-static void __init DC395x_fill_with_defaults(void)
-{
-	int i;
-	dprintkdbg(DBG_PARSE, "setup %08x %08x %08x %08x %08x %08x\n",
-		    dc395x_trm[0], dc395x_trm[1], dc395x_trm[2],
-		    dc395x_trm[3], dc395x_trm[4], dc395x_trm[5]);
-	for (i = 0; i < 6; i++) {
-		if (dc395x_trm[i] < 0 || dc395x_trm[i] > 255)
-			dc395x_trm[i] = dc395x_def[i];
-	}
-	/* Sanity checks */
-	if (dc395x_trm[0] > 15)
-		dc395x_trm[0] = 7;
-	if (dc395x_trm[1] > 7)
-		dc395x_trm[1] = 4;
-	if (dc395x_trm[4] > 5)
-		dc395x_trm[4] = 4;
-	if (dc395x_trm[5] > 180)
-		dc395x_trm[5] = 180;
-}
-
-
-/* Read the parameters from the command line */
-#if !defined(MODULE)
-static int DC395x_trm_setup(char *str)
-{
-	int i;
-	int im;
-	int ints[8];
-	(void) get_options(str, ARRAY_SIZE(ints), ints);
-	im = ints[0];
-	if (im > 6) {
-		dprintkl(KERN_NOTICE, "ignore extra params!\n");
-		im = 6;
-	}
-	for (i = 0; i < im; i++)
-		dc395x_trm[i] = ints[i + 1];
-
-	return 1;
-}
-
-__setup(DC395X_NAME "=", DC395x_trm_setup);
-
-#endif				/* !MODULE */
 
 /* Overrride BIOS values with the set ones */
 static void __init DC395x_EEprom_Override(struct NvRamType *eeprom)
@@ -730,21 +807,32 @@ static void __init DC395x_EEprom_Override(struct NvRamType *eeprom)
 	u8 id;
 
 	/* Adapter Settings */
-	if (dc395x_trm[0] != -2)
-		eeprom->NvramScsiId = (u8) dc395x_trm[0];	/* Adapter ID */
-	if (dc395x_trm[3] != -2)
-		eeprom->NvramChannelCfg = (u8) dc395x_trm[3];
-	if (dc395x_trm[5] != -2)
-		eeprom->NvramDelayTime = DC395x_uninterpret_delay(dc395x_trm[5]);	/* Reset delay */
-	if (dc395x_trm[4] != -2)
-		eeprom->NvramMaxTag = (u8) dc395x_trm[4];	/* Tagged Cmds */
+	if (cfg_data[CFG_ADAPTER_ID].value != CFG_PARAM_UNSET) {
+		eeprom->NvramScsiId =
+		    (u8)cfg_data[CFG_ADAPTER_ID].value;
+	}
+	if (cfg_data[CFG_ADAPTER_MODE].value != CFG_PARAM_UNSET) {
+		eeprom->NvramChannelCfg =
+		    (u8)cfg_data[CFG_ADAPTER_MODE].value;
+	}
+	if (cfg_data[CFG_RESET_DELAY].value != CFG_PARAM_UNSET) {
+		eeprom->NvramDelayTime =
+		    delay_to_eeprom_index(cfg_data[CFG_RESET_DELAY].value);
+	}
+	if (cfg_data[CFG_TAGS].value != CFG_PARAM_UNSET) {
+		eeprom->NvramMaxTag = (u8)cfg_data[CFG_TAGS].value;
+	}
 
 	/* Device Settings */
 	for (id = 0; id < DC395x_MAX_SCSI_ID; id++) {
-		if (dc395x_trm[2] != -2)
-			eeprom->NvramTarget[id].NvmTarCfg0 = (u8) dc395x_trm[2];	/* Cfg0 */
-		if (dc395x_trm[1] != -2)
-			eeprom->NvramTarget[id].NvmTarPeriod = (u8) dc395x_trm[1];	/* Speed */
+		if (cfg_data[CFG_DEV_MODE].value != CFG_PARAM_UNSET) {
+			eeprom->NvramTarget[id].NvmTarCfg0 =
+			    (u8)cfg_data[CFG_DEV_MODE].value;
+		}
+		if (cfg_data[CFG_MAX_SPEED].value != CFG_PARAM_UNSET) {
+			eeprom->NvramTarget[id].NvmTarPeriod =
+			    (u8)cfg_data[CFG_MAX_SPEED].value;
+		}
 	}
 }
 
@@ -1346,7 +1434,7 @@ DC395x_queue_command(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *))
 #if debug_enabled(DBG_RECURSION)
 	if (dbg_in_driver++ > NORM_REC_LVL) {
 		dprintkl(KERN_DEBUG,
-			": %i queue_command () recursion? (pid=%li)\n",
+			"%i queue_command () recursion? (pid=%li)\n",
 			dbg_in_driver, cmd->pid);
 	}
 #endif
@@ -1928,7 +2016,7 @@ void DC395x_selection_timeout_missed(unsigned long ptr)
 	struct ScsiReqBlk *pSRB;
 	dprintkl(KERN_DEBUG, "Chip forgot to produce SelTO IRQ!\n");
 	if (!pACB->pActiveDCB || !pACB->pActiveDCB->pActiveSRB) {
-		dprintkl(KERN_DEBUG, " ... but no cmd pending? Oops!\n");
+		dprintkl(KERN_DEBUG, "... but no cmd pending? Oops!\n");
 		return;
 	}
 	DC395x_LOCK_IO(pACB->pScsiHost);
@@ -4160,6 +4248,7 @@ DC395x_remove_dev(struct AdapterCtlBlk *pACB, struct DeviceCtlBlk *pDCB)
 {
 	struct DeviceCtlBlk *pPrevDCB = pACB->pLinkDCB;
 
+	dprintkdbg(DBG_0, "remove_dev\n");
 	if (pDCB->GoingSRBCnt > 1) {
 		dprintkdbg(DBG_DCB, "Driver won't free DCB (ID %i, LUN %i): 0x%08x because of SRBCnt %i\n",
 			  pDCB->TargetID, pDCB->TargetLUN, (int) pDCB,
@@ -4982,6 +5071,7 @@ int DC395x_alloc_tracebufs(struct AdapterCtlBlk *pACB)
 
 
 /* Free SG tables */
+static
 void DC395x_free_SG_tables(struct AdapterCtlBlk *pACB, int SRBIdx)
 {
 	int srbidx;
@@ -5497,10 +5587,10 @@ DC395x_check_eeprom(struct NvRamType *eeprom, u16 io_port)
 		cksum += *w_eeprom;
 	if (cksum != 0x1234) {
 		/*
-		 * Checksum is wrong. 
+		 * Checksum is wrong.
 		 * Load a set of defaults into the eeprom buffer
 		 */
-		dprintkl(KERN_WARNING, 
+		dprintkl(KERN_WARNING,
 		       "EEProm checksum error: using default values and options.\n");
 		eeprom->NvramSubVendorID[0] = (u8) PCI_VENDOR_ID_TEKRAM;
 		eeprom->NvramSubVendorID[1] =
@@ -5529,8 +5619,8 @@ DC395x_check_eeprom(struct NvRamType *eeprom, u16 io_port)
 			*d_eeprom = 0x00;
 
 		/* Now load defaults (maybe set by boot/module params) */
-		DC395x_check_for_safe_settings();
-		DC395x_fill_with_defaults();
+		set_safe_settings();
+		fix_settings();
 		DC395x_EEprom_Override(eeprom);
 
 		eeprom->NvramCheckSum = 0x00;
@@ -5540,16 +5630,16 @@ DC395x_check_eeprom(struct NvRamType *eeprom, u16 io_port)
 
 		*w_eeprom = 0x1234 - cksum;
 		TRM_S1040_write_all(eeprom, io_port);
-		eeprom->NvramDelayTime = dc395x_trm[5];
+		eeprom->NvramDelayTime = cfg_data[CFG_RESET_DELAY].value;
 	} else {
-		DC395x_check_for_safe_settings();
-		DC395x_interpret_delay(eeprom);
+		set_safe_settings();
+		eeprom_index_to_delay(eeprom);
 		DC395x_EEprom_Override(eeprom);
 	}
 }
 
 
-/* 
+/*
  * adapter - print connection and terminiation config
  *
  * @param pACB - adapter control block
@@ -5586,6 +5676,29 @@ static void __init DC395x_print_config(struct AdapterCtlBlk *pACB)
 }
 
 
+/**
+ * DC395x_print_eeprom_settings - output the eeprom settings
+ * to the kernel log so people can see what they were.
+ *
+ * @index: Adapter number
+ **/
+static void __init
+DC395x_print_eeprom_settings(u16 index)
+{
+	dprintkl(KERN_INFO, "Used settings: AdapterID=%02i, Speed=%i(%02i.%01iMHz), DevMode=0x%02x\n",
+	       dc395x_trm_eepromBuf[index].NvramScsiId,
+	       dc395x_trm_eepromBuf[index].NvramTarget[0].NvmTarPeriod,
+	       dc395x_clock_speed[dc395x_trm_eepromBuf[index].NvramTarget[0].NvmTarPeriod] / 10,
+	       dc395x_clock_speed[dc395x_trm_eepromBuf[index].NvramTarget[0].NvmTarPeriod] % 10,
+	       dc395x_trm_eepromBuf[index].NvramTarget[0].NvmTarCfg0);
+	dprintkl(KERN_INFO, "               AdaptMode=0x%02x, Tags=%i(%02i), DelayReset=%is\n",
+	       dc395x_trm_eepromBuf[index].NvramChannelCfg,
+	       dc395x_trm_eepromBuf[index].NvramMaxTag,
+	       1 << dc395x_trm_eepromBuf[index].NvramMaxTag,
+	       dc395x_trm_eepromBuf[index].NvramDelayTime);
+}
+
+
 /*
  *********************************************************************
  *			DC395x_detect
@@ -5610,118 +5723,43 @@ DC395x_init(Scsi_Host_Template * host_template, u32 io_port, u8 irq,
 	 */
 	DC395x_check_eeprom(&dc395x_trm_eepromBuf[index], (u16) io_port);
 
-	/*$$$$$$$$$$$  MEMORY ALLOCATE FOR ADAPTER CONTROL BLOCK $$$$$$$$$$$$ */
+	/*
+	 *$$$$$$$$$$$  MEMORY ALLOCATE FOR ADAPTER CONTROL BLOCK $$$$$$$$$$$$
+	 */
 	host = scsi_register(host_template, sizeof(struct AdapterCtlBlk));
 	if (!host) {
 		dprintkl(KERN_INFO, "pSH scsi_register ERROR\n");
 		return 0;
 	}
-	dprintkl(KERN_INFO,
-	       "Used settings: AdapterID=%02i, Speed=%i(%02i.%01iMHz), DevMode=0x%02x\n",
-	       dc395x_trm_eepromBuf[index].NvramScsiId,
-	       dc395x_trm_eepromBuf[index].NvramTarget[0].NvmTarPeriod,
-	       dc395x_clock_speed[dc395x_trm_eepromBuf[index].
-				  NvramTarget[0].NvmTarPeriod] / 10,
-	       dc395x_clock_speed[dc395x_trm_eepromBuf[index].
-				  NvramTarget[0].NvmTarPeriod] % 10,
-	       dc395x_trm_eepromBuf[index].NvramTarget[0].NvmTarCfg0);
-	dprintkl(KERN_INFO,
-	       "               AdaptMode=0x%02x, Tags=%i(%02i), DelayReset=%is\n",
-	       dc395x_trm_eepromBuf[index].NvramChannelCfg,
-	       dc395x_trm_eepromBuf[index].NvramMaxTag,
-	       1 << dc395x_trm_eepromBuf[index].NvramMaxTag,
-	       dc395x_trm_eepromBuf[index].NvramDelayTime);
+	DC395x_print_eeprom_settings(index);
 
 	pACB = (struct AdapterCtlBlk *) host->hostdata;
-	/*DC395x_ACB_INITLOCK(pACB); */
-	/*DC395x_ACB_LOCK(pACB,acb_flags); */
-	/*$$$$$$$$ INITIAL ADAPTER CONTROL BLOCK $$$$$$$$$$$$ */
+
 	if (DC395x_initACB(host, io_port, irq, index)) {
 		scsi_unregister(host);
-		/*DC395x_ACB_UNLOCK(pACB,acb_flags); */
 		return 0;
 	}
 	DC395x_print_config(pACB);
-	/*$$$$$$$$$$$$$$$$$ INITIAL ADAPTER $$$$$$$$$$$$$$$$$ */
+
+       /*
+        *$$$$$$$$$$$$$$$$$ INITIAL ADAPTER $$$$$$$$$$$$$$$$$
+        */
 	if (!DC395x_initAdapter(host, io_port, irq, index)) {
 		if (!DC395x_pACB_start) {
 			DC395x_pACB_start = pACB;
-			DC395x_pACB_current = pACB;
-			pACB->pNextACB = NULL;
 		} else {
 			DC395x_pACB_current->pNextACB = pACB;
-			DC395x_pACB_current = pACB;
-			pACB->pNextACB = NULL;
 		}
-		/*DC395x_ACB_UNLOCK(pACB,acb_flags); */
-		return host;
+		DC395x_pACB_current = pACB;
+		pACB->pNextACB = NULL;
+
 	} else {
-		dprintkl(KERN_INFO,
-		       "DC395x_initAdapter initial ERROR\n");
+		dprintkl(KERN_INFO, "DC395x_initAdapter initial ERROR\n");
 		scsi_unregister(host);
-		/*DC395x_ACB_UNLOCK(pACB,acb_flags); */
-		return 0;
+		host = NULL;
 	}
+	return host;
 }
-
-
-/*
- * DC395x_detect
- *
- * Detect TRM-S1040 cards, acquire resources and initialise the card.
- * Argument is a pointer to the host driver's scsi_hosts entry.
- *
- * Returns the number of adapters found.
- *
- * This function is called during system initialization and must not
- * call SCSI mid-level functions including scsi_malloc() and
- * scsi_free().
- */
-static int __init DC395x_detect(Scsi_Host_Template * host_template)
-{
-	struct pci_dev *pdev = NULL;
-	unsigned int io_port;
-	u8 irq;
-	DC395x_pACB_start = NULL;
-
-	/* without PCI we cannot do anything */
-	if (pci_present() == 0) {
-		dprintkl(KERN_INFO, "PCI not present\n");
-		return 0;
-	}
-	dprintkl(KERN_INFO, "%s %s\n", DC395X_BANNER, DC395X_VERSION);
-
-	while ((pdev =
-		pci_find_device(PCI_VENDOR_ID_TEKRAM,
-				PCI_DEVICE_ID_TEKRAM_TRMS1040, pdev))) {
-		struct Scsi_Host *scsi_host;
-		if (pci_enable_device(pdev))
-			continue;
-
-		io_port =
-		    pci_resource_start(pdev, 0) & PCI_BASE_ADDRESS_IO_MASK;
-		irq = pdev->irq;
-		dprintkdbg(DBG_0, "IO_PORT=%04x,IRQ=%x\n", (unsigned int) io_port, irq);
-		if ((scsi_host =
-		     DC395x_init(host_template, io_port, irq,
-				 DC395x_adapterCnt))) {
-			pci_set_master(pdev);
-			((struct AdapterCtlBlk *) (scsi_host->hostdata))->
-			    pdev = pdev;
-			/*DC395x_set_pci_cfg(pdev); */
-			DC395x_adapterCnt++;
-		}
-	}
-
-	if (DC395x_adapterCnt) {
-		host_template->proc_name = DC395X_NAME;
-	}
-	dprintkl(KERN_INFO, "%s: %i adapters found\n",
-	       DC395X_BANNER, DC395x_adapterCnt);
-
-	return DC395x_adapterCnt;
-}
-
 
 /*
  * Functions: DC395x_inquiry(), DC395x_inquiry_done()
@@ -6014,130 +6052,224 @@ DC395x_proc_info(struct Scsi_Host *shpnt, char *buffer, char **start, off_t offs
 }
 
 
-/*
- * Function : int DC395x_shutdown (struct Scsi_Host *host)
- *  Purpose : does a clean (we hope) shutdown of the SCSI chip.
- *		Use prior to dumping core, unloading the driver, etc.
- *  Returns : 0 on success
- */
-int DC395x_shutdown(struct Scsi_Host *host)
+/**
+ * DC395x_chip_shutdown - cleanly shut down the scsi controller chip,
+ * stopping all operations and disablig interrupt generation on the
+ * card.
+ *
+ * @acb: The scsi adapter control block of the adapter to shut down.
+ **/
+static
+void DC395x_chip_shutdown(struct AdapterCtlBlk *pACB)
 {
-	struct AdapterCtlBlk *pACB;
-	pACB = (struct AdapterCtlBlk *) (host->hostdata);
-
-	/* pACB->soft_reset(host); */
-
 	/* disable interrupt */
 	DC395x_write8(TRM_S1040_DMA_INTEN, 0);
 	DC395x_write8(TRM_S1040_SCSI_INTEN, 0);
+
+	/* remove timers */
 	if (timer_pending(&pACB->Waiting_Timer))
 		del_timer(&pACB->Waiting_Timer);
 	if (timer_pending(&pACB->SelTO_Timer))
 		del_timer(&pACB->SelTO_Timer);
 
-	if (1 || pACB->Config & HCC_SCSI_RESET)
+	/* reset the scsi bus */
+	if (pACB->Config & HCC_SCSI_RESET)
 		DC395x_ResetSCSIBus(pACB);
 
+	/* clear any pending interupt state */
 	DC395x_read8(TRM_S1040_SCSI_INTSTATUS);
+
+	/* release chip resources */
 #if debug_enabled(DBG_TRACE|DBG_TRACEALL)
 	DC395x_free_tracebufs(pACB, DC395x_MAX_SRB_CNT);
 #endif
 	DC395x_free_SG_tables(pACB, DC395x_MAX_SRB_CNT);
-	return 0;
 }
 
 
-/*
- * Free all DCBs
- */
-void DC395x_freeDCBs(struct Scsi_Host *host)
+/**
+ * DC395x_free_DCBs - Free all of the DCBs.
+ *
+ * @pACB: Adapter to remove the DCBs for.
+ **/
+static
+void DC395x_free_DCBs(struct AdapterCtlBlk* pACB)
 {
-	struct DeviceCtlBlk *pDCB;
-	struct DeviceCtlBlk *nDCB;
-	struct AdapterCtlBlk *pACB =
-	    (struct AdapterCtlBlk *) (host->hostdata);
+	struct DeviceCtlBlk *dcb;
+	struct DeviceCtlBlk *dcb_next;
 
 	dprintkdbg(DBG_DCB, "Free %i DCBs\n", pACB->DCBCnt);
-	pDCB = pACB->pLinkDCB;
-	if (pDCB) {
-		do {
-			nDCB = pDCB->pNextDCB;
-			dprintkdbg(DBG_DCB, "Free DCB (ID %i, LUN %i): %p\n",
-				  pDCB->TargetID, pDCB->TargetLUN, pDCB);
-			DC395x_remove_dev(pACB, pDCB);	/* includes a dc395x_kfree(pDCB); */
-			printk(".");
-			pDCB = nDCB;
-		} while (pDCB && pACB->pLinkDCB);
+
+	for (dcb = pACB->pLinkDCB; dcb != NULL; dcb = dcb_next)
+	{
+		dcb_next = dcb->pNextDCB;
+		dprintkdbg(DBG_DCB, "Free DCB (ID %i, LUN %i): %p\n",
+				dcb->TargetID, dcb->TargetLUN, dcb);
+		/*
+		 * Free the DCB. This removes the entry from the
+		 * pLinkDCB list and decrements the count in DCBCnt
+		 */
+		DC395x_remove_dev(pACB, dcb);
+
 	}
 }
 
-
-/*
- * Release method
+/**
+ * DC395x_release - shutdown device and release resources that were
+ * allocate for it. Called once for each card as it is shutdown.
  *
- * Called when we are to shutdown the controller and release all of
- * it's resources.
- */
-static int DC395x_release(struct Scsi_Host *host)
+ * @host: The adapter instance to shutdown.
+ **/
+static
+void DC395x_release(struct Scsi_Host *host)
 {
-	struct AdapterCtlBlk *pACB =
-	    (struct AdapterCtlBlk *) (host->hostdata);
+	struct AdapterCtlBlk *pACB = (struct AdapterCtlBlk *) (host->hostdata);
 	unsigned long flags;
 
-	dprintkl(KERN_DEBUG, "release");
+	dprintkl(KERN_DEBUG, "DC395x release\n");
 
 	DC395x_LOCK_IO(pACB->pScsiHost);
-	DC395x_shutdown(host);
-	DC395x_freeDCBs(host);
+	DC395x_chip_shutdown(pACB);
+	DC395x_free_DCBs(pACB);
 
 	if (host->irq != NO_IRQ) {
-		/*
-		 * Find the IRQ to release. XXX Why didn't we just store the
-		 * appropriate IRQ details when we request_irq it?
-		 */
-		int irq_count;
-		for (irq_count = 0, pACB = DC395x_pACB_start;
-		     pACB;
-		     pACB = pACB->pNextACB) {
-			if (pACB->IRQLevel == host->irq)
-				++irq_count;
-		}
-		if (irq_count == 1)
-			free_irq(host->irq, DC395x_pACB_start);
+		free_irq(host->irq, DC395x_pACB_start);
 	}
 	release_region(host->io_port, host->n_io_port);
 
 	DC395x_UNLOCK_IO(pACB->pScsiHost);
-
-	return 1;
 }
 
 
 /*
  * SCSI host template
  */
-static Scsi_Host_Template driver_template = {
-	.proc_name = DC395X_NAME,
-	.proc_info = DC395x_proc_info,
-	.name = DC395X_BANNER " " DC395X_VERSION,
-	.detect = DC395x_detect,
-	.release = DC395x_release,
-	.queuecommand = DC395x_queue_command,
-	.bios_param = DC395x_bios_param,
-	.slave_alloc = DC395x_slave_alloc,
-	.slave_destroy = DC395x_slave_destroy,
-	.can_queue = DC395x_MAX_CAN_QUEUE,
-	.this_id = 7,
-	.sg_tablesize = DC395x_MAX_SG_TABLESIZE,
-	.cmd_per_lun = DC395x_MAX_CMD_PER_LUN,
-	.eh_abort_handler = DC395x_eh_abort,
-	.eh_bus_reset_handler = DC395x_eh_bus_reset,
-	.unchecked_isa_dma = 0,
-	.use_clustering = DISABLE_CLUSTERING,
+static Scsi_Host_Template dc395x_driver_template = {
+	.module                 = THIS_MODULE,
+	.proc_name              = DC395X_NAME,
+	.proc_info              = DC395x_proc_info,
+	.name                   = DC395X_BANNER " " DC395X_VERSION,
+	.queuecommand           = DC395x_queue_command,
+	.bios_param             = DC395x_bios_param,
+	.slave_alloc            = DC395x_slave_alloc,
+	.slave_destroy          = DC395x_slave_destroy,
+	.can_queue              = DC395x_MAX_CAN_QUEUE,
+	.this_id                = 7,
+	.sg_tablesize           = DC395x_MAX_SG_TABLESIZE,
+	.cmd_per_lun            = DC395x_MAX_CMD_PER_LUN,
+	.eh_abort_handler       = DC395x_eh_abort,
+	.eh_bus_reset_handler   = DC395x_eh_bus_reset,
+	.unchecked_isa_dma      = 0,
+	.use_clustering         = DISABLE_CLUSTERING,
 };
+
 /*
- * The following code deals with registering the above scsi host
- * template with the higher level scsi code and results in the detect
- * method from the template being called during initialisation.
+ * Called to initialise a single instance of the adaptor
  */
-#include "scsi_module.c"
+
+static
+int __devinit dc395x_init_one(struct pci_dev *pdev,
+			      const struct pci_device_id *id)
+{
+	unsigned int io_port;
+	u8 irq;
+	struct Scsi_Host *scsi_host;
+	static int banner_done = 0;
+
+	dprintkdbg(DBG_0, "Init one instance of the dc395x\n");
+	if (!banner_done)
+	{
+		dprintkl(KERN_INFO, "%s %s\n", DC395X_BANNER, DC395X_VERSION);
+		banner_done = 1;
+	}
+
+	if (pci_enable_device(pdev))
+	{
+		dprintkl(KERN_INFO, "PCI Enable device failed.\n");
+		return -ENODEV;
+	}
+
+	dprintkdbg(DBG_0, "Get resources...\n");
+	io_port = pci_resource_start(pdev, 0) & PCI_BASE_ADDRESS_IO_MASK;
+	irq = pdev->irq;
+	dprintkdbg(DBG_0, "IO_PORT=%04x,IRQ=%x\n", (unsigned int) io_port, irq);
+
+	scsi_host = DC395x_init(&dc395x_driver_template, io_port, irq, DC395x_adapterCnt);
+	if (!scsi_host)
+	{
+		dprintkdbg(DBG_0, "DC395x_init failed\n");
+		return -ENOMEM;
+	}
+
+	pci_set_master(pdev);
+
+	/* store pci devices in out host data object. */
+	((struct AdapterCtlBlk *)(scsi_host->hostdata))->pdev = pdev;
+
+	/* increment adaptor count */
+	DC395x_adapterCnt++;
+
+	/* store ptr to scsi host in the PCI device structure */
+	pci_set_drvdata(pdev, scsi_host);
+
+	/* get the scsi mid level to scan for new devices on the bus */
+	scsi_add_host(scsi_host, &pdev->dev);
+
+	return 0;
+}
+
+
+/*
+ * Called to remove a single instance of the adaptor
+ */
+static void __devexit dc395x_remove_one(struct pci_dev *pdev)
+{
+	struct Scsi_Host *host = pci_get_drvdata(pdev);
+	dprintkdbg(DBG_0, "Removing instance\n");
+	scsi_remove_host(host);
+	DC395x_release(host);
+	pci_set_drvdata(pdev, NULL);
+}
+
+/*
+ * Table which identifies the PCI devices which
+ * are handled by this device driver.
+ */
+static struct pci_device_id dc395x_pci_table[] __devinitdata = {
+	{
+		.vendor		= PCI_VENDOR_ID_TEKRAM,
+		.device		= PCI_DEVICE_ID_TEKRAM_TRMS1040,
+		.subvendor	= PCI_ANY_ID,
+		.subdevice	= PCI_ANY_ID,
+	 },
+	{}			/* Terminating entry */
+};
+MODULE_DEVICE_TABLE(pci, dc395x_pci_table);
+
+/*
+ * PCI driver operations.
+ * Tells the PCI sub system what can be done with the card.
+ */
+static struct pci_driver dc395x_driver = {
+	.name           = DC395X_NAME,
+	.id_table       = dc395x_pci_table,
+	.probe          = dc395x_init_one,
+	.remove         = __devexit_p(dc395x_remove_one),
+};
+
+static int __init dc395x_module_init(void)
+{
+	return pci_module_init(&dc395x_driver);
+}
+
+static void __exit dc395x_module_exit(void)
+{
+	pci_unregister_driver(&dc395x_driver);
+}
+
+module_init(dc395x_module_init);
+module_exit(dc395x_module_exit);
+
+MODULE_AUTHOR("C.L. Huang / Erich Chen / Kurt Garloff");
+MODULE_DESCRIPTION("SCSI host adapter driver for Tekram TRM-S1040 based adapters: Tekram DC395 and DC315 series");
+MODULE_LICENSE("GPL");
