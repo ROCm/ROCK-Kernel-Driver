@@ -12,8 +12,8 @@
  * data corruption on some CPUs.
  */
 
-#define map_page_into_agp(page) change_page_attr(page, 1, PAGE_KERNEL_NOCACHE)
-#define unmap_page_from_agp(page) change_page_attr(page, 1, PAGE_KERNEL)
+int map_page_into_agp(struct page *page);
+int unmap_page_from_agp(struct page *page);
 #define flush_agp_mappings() global_flush_tlb()
 
 /* Could use CLFLUSH here if the cpu supports it. But then it would

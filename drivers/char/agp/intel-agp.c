@@ -161,13 +161,15 @@ static void *i8xx_alloc_pages(void)
 	struct page * page;
 
 	page = alloc_pages(GFP_KERNEL, 2);
-	if (page == NULL) {
+	if (page == NULL)
 		return NULL;
-	}
+
 	if (change_page_attr(page, 4, PAGE_KERNEL_NOCACHE) < 0) {
+		global_flush_tlb();
 		__free_page(page);
 		return NULL;
 	}
+	global_flush_tlb();
 	get_page(page);
 	SetPageLocked(page);
 	atomic_inc(&agp_bridge->current_memory_agp);
@@ -183,6 +185,7 @@ static void i8xx_destroy_pages(void *addr)
 
 	page = virt_to_page(addr);
 	change_page_attr(page, 4, PAGE_KERNEL);
+	global_flush_tlb();
 	put_page(page);
 	unlock_page(page);
 	free_pages((unsigned long)addr, 2);
