@@ -23,10 +23,6 @@
 #include <media/saa7146_vv.h>
 #include <linux/video_decoder.h>	/* for saa7111a */
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,51)
-	#define KBUILD_MODNAME dpc7146
-#endif
-
 #define I2C_SAA7111A            0x24
 
 /* All unused bytes are reserverd. */
@@ -338,6 +334,8 @@ struct pci_device_id pci_tbl[] = {
 		.vendor = 0,
 	}
 };
+
+MODULE_DEVICE_TABLE(pci, pci_tbl);
 
 static
 struct saa7146_ext_vv vv_data = {
