@@ -35,11 +35,11 @@ void sn_dma_flush_init(unsigned long start, unsigned long end, int idx, int pin,
  * pci_bus_cvlink_init() - To be called once during initialization before 
  *	SGI IO Infrastructure init is called.
  */
-void
+int
 pci_bus_cvlink_init(void)
 {
 
-	extern void ioconfig_bus_init(void);
+	extern int ioconfig_bus_init(void);
 
 	memset(busnum_to_pcibr_vhdl, 0x0, sizeof(vertex_hdl_t) * MAX_PCI_XWIDGET);
 	memset(busnum_to_nid, 0x0, sizeof(nasid_t) * MAX_PCI_XWIDGET);
@@ -48,7 +48,7 @@ pci_bus_cvlink_init(void)
 
 	num_bridges = 0;
 
-	ioconfig_bus_init();
+	return ioconfig_bus_init();
 }
 
 /*
