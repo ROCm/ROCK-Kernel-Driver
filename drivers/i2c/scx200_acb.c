@@ -140,8 +140,7 @@ static void scx200_acb_machine(struct scx200_acb_iface *iface, u8 status)
 
 	switch (iface->state) {
 	case state_idle:
-		printk(KERN_WARNING NAME ": %s, interrupt in idle state\n", 
-		       iface->adapter.name);
+		dev_warn(&iface->adapter.dev, "interrupt in idle state\n",);
 		break;
 
 	case state_address:
@@ -226,8 +225,8 @@ static void scx200_acb_machine(struct scx200_acb_iface *iface, u8 status)
 	return;
 
  error:
-	printk(KERN_ERR NAME ": %s, %s in state %s\n", iface->adapter.name, 
-	       errmsg, scx200_acb_state_name[iface->state]);
+	dev_err(&iface->adapter.dev, "%s in state %s\n", errmsg,
+		scx200_acb_state_name[iface->state]);
 
 	iface->state = state_idle;
 	iface->result = -EIO;
@@ -236,8 +235,8 @@ static void scx200_acb_machine(struct scx200_acb_iface *iface, u8 status)
 
 static void scx200_acb_timeout(struct scx200_acb_iface *iface) 
 {
-	printk(KERN_ERR NAME ": %s, timeout in state %s\n", 
-	       iface->adapter.name, scx200_acb_state_name[iface->state]);
+	dev_err(&iface->adapter.dev, "timeout in state %s\n",
+		scx200_acb_state_name[iface->state]);
 
 	iface->state = state_idle;
 	iface->result = -EIO;
@@ -290,7 +289,7 @@ static s32 scx200_acb_smbus_xfer(struct i2c_adapter *adapter,
 				char rw, u8 command, int size, 
 				union i2c_smbus_data *data)
 {
-	struct scx200_acb_iface *iface = adapter->data;
+	struct scx200_acb_iface *iface = i2c_get_adapdata(adapter);
 	int len;
 	u8 *buffer;
 	u16 cur_word;
@@ -331,13 +330,12 @@ static s32 scx200_acb_smbus_xfer(struct i2c_adapter *adapter,
 	    size, address, command, len, rw == I2C_SMBUS_READ);
 
 	if (!len && rw == I2C_SMBUS_READ) {
-		printk(KERN_WARNING NAME ": %s, zero length read\n", 
-		       adapter->name);
+		dev_warn(&adapter->dev, "zero length read\n");
 		return -EINVAL;
 	}
 
 	if (len && !buffer) {
-		printk(KERN_WARNING NAME ": %s, nonzero length but no buffer\n", adapter->name);
+		dev_warn(&adapter->dev, "nonzero length but no buffer\n");
 		return -EFAULT;
 	}
 
@@ -457,18 +455,18 @@ static int  __init scx200_acb_create(int base, int index)
 
 	memset(iface, 0, sizeof(*iface));
 	adapter = &iface->adapter;
-	adapter->data = iface;
-	sprintf(adapter->name, "SCx200 ACB%d", index);
+	i2c_set_adapdata(adapter, iface);
+	snprintf(adapter->dev.name, DEVICE_NAME_SIZE, "SCx200 ACB%d", index);
 	adapter->owner = THIS_MODULE;
 	adapter->id = I2C_ALGO_SMBUS;
 	adapter->algo = &scx200_acb_algorithm;
 
 	init_MUTEX(&iface->sem);
 
-	sprintf(description, "NatSemi SCx200 ACCESS.bus [%s]", adapter->name);
+	snprintf(description, sizeof(description), "NatSemi SCx200 ACCESS.bus [%s]", adapter->dev.name);
 	if (request_region(base, 8, description) == 0) {
-		printk(KERN_ERR NAME ": %s, can't allocate io 0x%x-0x%x\n", 
-		       adapter->name, base, base + 8-1);
+		dev_err(&adapter->dev, "can't allocate io 0x%x-0x%x\n",
+			base, base + 8-1);
 		rc = -EBUSY;
 		goto errout;
 	}
@@ -476,14 +474,14 @@ static int  __init scx200_acb_create(int base, int index)
 
 	rc = scx200_acb_probe(iface);
 	if (rc) {
-		printk(KERN_WARNING NAME ": %s, probe failed\n", adapter->name);
+		dev_warn(&adapter->dev, "probe failed\n");
 		goto errout;
 	}
 
 	scx200_acb_reset(iface);
 
 	if (i2c_add_adapter(adapter) < 0) {
-		printk(KERN_ERR NAME ": %s, failed to register\n", adapter->name);
+		dev_err(&adapter->dev, "failed to register\n");
 		rc = -ENODEV;
 		goto errout;
 	}
