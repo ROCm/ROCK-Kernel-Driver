@@ -524,14 +524,6 @@ void agp_device_command(u32 command, int agp_v3)
 		printk(KERN_INFO PFX "Putting AGP V%d device at %s into %dx mode\n",
 				agp_v3 ? 3 : 2, pci_name(device), mode);
 		pci_write_config_dword(device, agp + PCI_AGP_COMMAND, command);
-
-		/*
-		 * Work around SIS648/746 instability by delaying a bit.
-		 * This isn't a particularly nice solution, but in absense of
-		 * info from SiS, it's the best we can do.
-		 */
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout((HZ+99)/100); /* >= 1/100th of a second */
 	}
 }
 EXPORT_SYMBOL(agp_device_command);

@@ -67,6 +67,42 @@ static void sis_cleanup(void)
 			      (previous_size->size_value & ~(0x03)));
 }
 
+static void sis_648_enable(u32 mode)
+{
+	struct pci_dev *device = NULL;
+	u32 command;
+	int rate;
+
+	printk(KERN_INFO PFX "Found an AGP %d.%d compliant device at %s.\n",
+		agp_bridge->major_version,
+		agp_bridge->minor_version,
+		agp_bridge->dev->slot_name);
+
+	pci_read_config_dword(agp_bridge->dev, agp_bridge->capndx + PCI_AGP_STATUS, &command);
+	command = agp_collect_device_status(mode, command);
+	command |= AGPSTAT_AGP_ENABLE;
+	rate = (command & 0x7) << 2;
+
+	while ((device = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, device)) != NULL) {
+		u8 agp = pci_find_capability(device, PCI_CAP_ID_AGP);
+		if (!agp)
+			continue;
+
+		printk(KERN_INFO PFX "Putting AGP V3 device at %s into %dx mode\n",
+			pci_name(device), rate);
+
+		pci_write_config_dword(device, agp + PCI_AGP_COMMAND, command);
+
+		if(device->device == PCI_DEVICE_ID_SI_648) {
+			// weird: on 648 and 648fx chipsets any rate change in the target command register
+			// triggers a 5ms screwup during which the master cannot be configured
+			printk(KERN_INFO PFX "sis 648 agp fix - giving bridge time to recover\n");
+			set_current_state(TASK_UNINTERRUPTIBLE);
+			schedule_timeout (1+(HZ*10)/1000);
+		}
+	}
+}
+
 static struct aper_size_info_8 sis_generic_sizes[7] =
 {
 	{256, 65536, 6, 99},
@@ -182,6 +218,26 @@ static struct agp_device_ids sis_agp_device_ids[] __devinitdata =
 	{ }, /* dummy final entry, always present */
 };
 
+
+static void __devinit sis_get_driver(struct agp_bridge_data *bridge)
+{
+	if (bridge->dev->device == PCI_DEVICE_ID_SI_648) {
+		if (agp_bridge->major_version == 3 && agp_bridge->minor_version < 5) {
+			sis_driver.agp_enable=sis_648_enable;
+		} else {
+			sis_driver.agp_enable			= sis_648_enable;
+			sis_driver.aperture_sizes		= agp3_generic_sizes;
+			sis_driver.size_type			= U16_APER_SIZE;
+			sis_driver.num_aperture_sizes	= AGP_GENERIC_SIZES_ENTRIES;
+			sis_driver.configure			= agp3_generic_configure;
+			sis_driver.fetch_size			= agp3_generic_fetch_size;
+			sis_driver.cleanup				= agp3_generic_cleanup;
+			sis_driver.tlb_flush			= agp3_generic_tlbflush;
+		}
+	}
+}
+
+
 static int __devinit agp_sis_probe(struct pci_dev *pdev,
 				   const struct pci_device_id *ent)
 {
@@ -216,10 +272,11 @@ found:
 	bridge->dev = pdev;
 	bridge->capndx = cap_ptr;
 
+	get_agp_version(bridge);
+
 	/* Fill in the mode register */
-	pci_read_config_dword(pdev,
-			bridge->capndx+PCI_AGP_STATUS,
-			&bridge->mode);
+	pci_read_config_dword(pdev, bridge->capndx+PCI_AGP_STATUS, &bridge->mode);
+	sis_get_driver(bridge);
 
 	pci_set_drvdata(pdev, bridge);
 	return agp_add_bridge(bridge);
