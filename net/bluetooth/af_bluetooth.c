@@ -326,9 +326,7 @@ extern int hci_sock_cleanup(void);
 
 static int __init bt_init(void)
 {
-	BT_INFO("Bluetooth Core ver %s Copyright (C) 2000,2001 Qualcomm Inc",
-		 VERSION);
-	BT_INFO("Written 2000,2001 by Maxim Krasnyansky <maxk@qualcomm.com>");
+	BT_INFO("Core ver %s", VERSION);
 
 	proc_mkdir("bluetooth", NULL);
 
@@ -338,11 +336,13 @@ static int __init bt_init(void)
 			SLAB_HWCACHE_ALIGN, 0, 0);
 
 	if (!bt_sock_cache) {
-		BT_ERR("Bluetooth socket cache creation failed");
+		BT_ERR("Socket cache creation failed");
 		return -ENOMEM;
 	}
 	
 	sock_register(&bt_sock_family_ops);
+
+	BT_INFO("HCI device and connection manager initialized");
 
 	hci_sock_init();
 	return 0;
