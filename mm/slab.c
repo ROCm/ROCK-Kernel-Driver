@@ -2194,10 +2194,19 @@ static void *s_start(struct seq_file *m, loff_t *pos)
 	struct list_head *p;
 
 	down(&cache_chain_sem);
-	if (!n)
-		return (void *)1;
+	if (!n) {
+		/*
+		 * Output format version, so at least we can change it
+		 * without _too_ many complaints.
+		 */
+		seq_puts(m, "slabinfo - version: 1.2"
+#if STATS
+				" (statistics)"
+#endif
+				"\n");
+	}
 	p = cache_chain.next;
-	while (--n) {
+	while (n--) {
 		p = p->next;
 		if (p == &cache_chain)
 			return NULL;
@@ -2209,8 +2218,6 @@ static void *s_next(struct seq_file *m, void *p, loff_t *pos)
 {
 	kmem_cache_t *cachep = p;
 	++*pos;
-	if (p == (void *)1)
-		return list_entry(cache_chain.next, kmem_cache_t, next);
 	return cachep->next.next == &cache_chain ? NULL
 		: list_entry(cachep->next.next, kmem_cache_t, next);
 }
@@ -2233,20 +2240,6 @@ static int s_show(struct seq_file *m, void *p)
 	char *error = NULL;
 	mm_segment_t old_fs;
 	char tmp; 
-
-
-	if (p == (void*)1) {
-		/*
-		 * Output format version, so at least we can change it
-		 * without _too_ many complaints.
-		 */
-		seq_puts(m, "slabinfo - version: 1.2"
-#if STATS
-				" (statistics)"
-#endif
-				"\n");
-		return 0;
-	}
 
 	check_irq_on();
 	spin_lock_irq(&cachep->spinlock);
