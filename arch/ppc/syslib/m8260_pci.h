@@ -66,6 +66,7 @@
 #endif
 
 #ifdef CONFIG_8260_PCI9
+struct pci_controller;
 extern void setup_m8260_indirect_pci(struct pci_controller* hose,
 				     u32 cfg_addr, u32 cfg_data);
 #else
