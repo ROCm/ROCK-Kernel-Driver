@@ -640,7 +640,7 @@ static void __exit powernow_exit (void)
 
 module_param(powernow_acpi_force,  int, 0444);
 
-MODULE_PARM_DESC(powernow_acpi_force, "Force ACPI to be used");
+MODULE_PARM_DESC(acpi_force, "Force ACPI to be used");
 
 MODULE_AUTHOR ("Dave Jones <davej@codemonkey.org.uk>");
 MODULE_DESCRIPTION ("Powernow driver for AMD K7 processors.");
