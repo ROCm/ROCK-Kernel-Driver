@@ -2912,6 +2912,54 @@ sys32_get_thread_area (struct ia32_user_desc *u_info)
 	return 0;
 }
 
+extern asmlinkage long
+sys_timer_create(clockid_t which_clock, struct sigevent *timer_event_spec,
+		 timer_t * created_timer_id);
+
+asmlinkage long
+sys32_timer_create(u32 clock, struct sigevent32 *se32, timer_t *timer_id)
+{
+	struct sigevent se;
+	mm_segment_t oldfs;
+	timer_t t;
+	long err;
+
+	if (se32 == NULL)
+		return sys_timer_create(clock, NULL, timer_id);
+
+	memset(&se, 0, sizeof(struct sigevent));
+	if (get_user(se.sigev_value.sival_int,	&se32->sigev_value.sival_int) ||
+	    __get_user(se.sigev_signo, &se32->sigev_signo) ||
+	    __get_user(se.sigev_notify, &se32->sigev_notify) ||
+	    __copy_from_user(&se._sigev_un._pad, &se32->_sigev_un._pad,
+	    sizeof(se._sigev_un._pad)))
+		return -EFAULT;
+
+	if (!access_ok(VERIFY_WRITE,timer_id,sizeof(timer_t)))
+		return -EFAULT;
+
+	oldfs = get_fs();
+	set_fs(KERNEL_DS);
+	err = sys_timer_create(clock, &se, &t);
+	set_fs(oldfs);
+
+	if (!err)
+		err = __put_user (t, timer_id);
+
+	return err;
+}
+
+extern long sys_fadvise64_64(int fd, loff_t offset, loff_t len, int advice);
+
+long sys32_fadvise64_64(int fd, __u32 offset_low, __u32 offset_high, 
+			__u32 len_low, __u32 len_high, int advice)
+{ 
+	return sys_fadvise64_64(fd,
+			       (((u64)offset_high)<<32) | offset_low,
+			       (((u64)len_high)<<32) | len_low,
+			       advice); 
+} 
+
 #ifdef	NOTYET  /* UNTESTED FOR IA64 FROM HERE DOWN */
 
 struct ncp_mount_data32 {

@@ -434,50 +434,55 @@ ia32_syscall_table:
 	data8 sys_ni_syscall		/* reserved for Security */
 	data8 sys_gettid
 	data8 sys_readahead	  /* 225 */
-	data8 sys_ni_syscall
-	data8 sys_ni_syscall
-	data8 sys_ni_syscall
-	data8 sys_ni_syscall
-	data8 sys_ni_syscall	/* 230 */
-	data8 sys_ni_syscall
-	data8 sys_ni_syscall
-	data8 sys_ni_syscall
-	data8 sys_ni_syscall
-	data8 sys_ni_syscall	/* 235 */
-	data8 sys_ni_syscall
-	data8 sys_ni_syscall
+ 	data8 sys_setxattr
+ 	data8 sys_lsetxattr
+ 	data8 sys_fsetxattr
+ 	data8 sys_getxattr
+ 	data8 sys_lgetxattr	/* 230 */
+ 	data8 sys_fgetxattr
+ 	data8 sys_listxattr
+ 	data8 sys_llistxattr
+ 	data8 sys_flistxattr
+ 	data8 sys_removexattr	/* 235 */
+ 	data8 sys_lremovexattr
+ 	data8 sys_fremovexattr
 	data8 sys_tkill
-	data8 sys_ni_syscall
+ 	data8 sys_sendfile64
 	data8 compat_sys_futex	/* 240 */
 	data8 compat_sys_sched_setaffinity
 	data8 compat_sys_sched_getaffinity
 	data8 sys32_set_thread_area
 	data8 sys32_get_thread_area
-	data8 sys_ni_syscall	/* 245 */
-	data8 sys_ni_syscall
-	data8 sys_ni_syscall
-	data8 sys_ni_syscall
-	data8 sys_ni_syscall
-	data8 sys_ni_syscall	/* 250 */
+ 	data8 compat_sys_io_setup	/* 245 */
+ 	data8 sys_io_destroy
+ 	data8 compat_sys_io_getevents
+ 	data8 compat_sys_io_submit
+ 	data8 sys_io_cancel
+ 	data8 sys_fadvise64	/* 250 */
 	data8 sys_ni_syscall
 	data8 sys_exit_group
-	data8 sys_ni_syscall
+ 	data8 sys_lookup_dcookie
 	data8 sys_epoll_create
 	data8 sys32_epoll_ctl	/* 255 */
 	data8 sys32_epoll_wait
 	data8 sys_remap_file_pages
 	data8 sys_set_tid_address
-	data8 sys_ni_syscall
-	data8 sys_ni_syscall	/* 260 */
-	data8 sys_ni_syscall
-	data8 sys_ni_syscall
-	data8 sys_ni_syscall
-	data8 sys_ni_syscall
-	data8 sys_ni_syscall	/* 265 */
-	data8 sys_ni_syscall
-	data8 sys_ni_syscall
+ 	data8 sys32_timer_create
+ 	data8 compat_timer_settime	/* 260 */
+ 	data8 compat_timer_gettime
+ 	data8 sys_timer_getoverrun
+ 	data8 sys_timer_delete
+ 	data8 compat_clock_settime
+ 	data8 compat_clock_gettime /* 265 */
+ 	data8 compat_clock_getres
+ 	data8 compat_clock_nanosleep
 	data8 sys_statfs64
 	data8 sys_fstatfs64
+ 	data8 sys_tgkill	/* 270 */
+ 	data8 compat_sys_utimes
+ 	data8 sys32_fadvise64_64
+ 	data8 sys_ni_syscall
+  	data8 sys_ni_syscall
 
 	// guard against failures to increase IA32_NR_syscalls
 	.org ia32_syscall_table + 8*IA32_NR_syscalls
