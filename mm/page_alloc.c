@@ -792,7 +792,7 @@ unsigned int nr_free_pagecache_pages(void)
 	return nr_free_zone_pages(GFP_HIGHUSER & GFP_ZONEMASK);
 }
 
-#if CONFIG_HIGHMEM
+#ifdef CONFIG_HIGHMEM
 unsigned int nr_free_highpages (void)
 {
 	pg_data_t *pgdat;

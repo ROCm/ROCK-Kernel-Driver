@@ -204,7 +204,7 @@ extern void do_settimeofday(struct timeval *tv);
 extern int do_sys_settimeofday(struct timeval *tv, struct timezone *tz);
 extern void clock_was_set(void); // call when ever the clock is set
 extern long do_nanosleep(struct timespec *t);
-extern long do_utimes(char * filename, struct timeval * times);
+extern long do_utimes(char __user * filename, struct timeval * times);
 #endif
 
 #define FD_SETSIZE		__FD_SETSIZE
