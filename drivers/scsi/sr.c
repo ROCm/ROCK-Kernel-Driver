@@ -284,6 +284,8 @@ static int sr_init_command(struct scsi_cmnd * SCpnt)
 		if (rq->timeout)
 			timeout = rq->timeout;
 
+		SCpnt->transfersize = rq->data_len;
+		SCpnt->underflow = rq->data_len;
 		goto queue;
 	}
 
@@ -359,10 +361,10 @@ static int sr_init_command(struct scsi_cmnd * SCpnt)
 	 * host adapter, it's safe to assume that we can at least transfer
 	 * this many bytes between each connect / disconnect.
 	 */
-queue:
 	SCpnt->transfersize = cd->device->sector_size;
 	SCpnt->underflow = this_count << 9;
 
+queue:
 	SCpnt->allowed = MAX_RETRIES;
 	SCpnt->timeout_per_command = timeout;
 
