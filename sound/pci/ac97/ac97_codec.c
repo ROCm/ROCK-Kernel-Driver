@@ -545,7 +545,7 @@ int snd_ac97_put_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontr
 #define AC97_DOUBLE(xname, reg, shift_left, shift_right, mask, invert) \
 { .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = (xname), .info = snd_ac97_info_double, \
   .get = snd_ac97_get_double, .put = snd_ac97_put_double, \
-  .private_value = reg | (shift_left << 8) | (shift_right << 12) | (mask << 16) | (invert << 24) }
+  .private_value = (reg) | ((shift_left) << 8) | ((shift_right) << 12) | ((mask) << 16) | ((invert) << 24) }
 
 static int snd_ac97_info_double(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
@@ -599,16 +599,6 @@ static int snd_ac97_put_double(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t *
 				    (val1 << shift_left) | (val2 << shift_right));
 }
 
-static const snd_kcontrol_new_t snd_ac97_controls_master[2] = {
-AC97_SINGLE("Master Playback Switch", AC97_MASTER, 15, 1, 1),
-AC97_DOUBLE("Master Playback Volume", AC97_MASTER, 8, 0, 31, 1)
-};
-
-static const snd_kcontrol_new_t snd_ac97_controls_headphone[2] = {
-AC97_SINGLE("Headphone Playback Switch", AC97_HEADPHONE, 15, 1, 1),
-AC97_DOUBLE("Headphone Playback Volume", AC97_HEADPHONE, 8, 0, 31, 1)
-};
-
 static const snd_kcontrol_new_t snd_ac97_controls_master_mono[2] = {
 AC97_SINGLE("Master Mono Playback Switch", AC97_MASTER_MONO, 15, 1, 1),
 AC97_SINGLE("Master Mono Playback Volume", AC97_MASTER_MONO, 0, 31, 1)
@@ -635,42 +625,16 @@ AC97_SINGLE("Mic Playback Volume", AC97_MIC, 0, 15, 1),
 AC97_SINGLE("Mic Boost (+20dB)", AC97_MIC, 6, 1, 0)
 };
 
-static const snd_kcontrol_new_t snd_ac97_controls_line[2] = {
-AC97_SINGLE("Line Playback Switch", AC97_LINE, 15, 1, 1),
-AC97_DOUBLE("Line Playback Volume", AC97_LINE, 8, 0, 31, 1)
-};
-
-static const snd_kcontrol_new_t snd_ac97_controls_cd[2] = {
-AC97_SINGLE("CD Playback Switch", AC97_CD, 15, 1, 1),
-AC97_DOUBLE("CD Playback Volume", AC97_CD, 8, 0, 31, 1)
-};
-
-static const snd_kcontrol_new_t snd_ac97_controls_video[2] = {
-AC97_SINGLE("Video Playback Switch", AC97_VIDEO, 15, 1, 1),
-AC97_DOUBLE("Video Playback Volume", AC97_VIDEO, 8, 0, 31, 1)
-};
-
-static const snd_kcontrol_new_t snd_ac97_controls_aux[2] = {
-AC97_SINGLE("Aux Playback Switch", AC97_AUX, 15, 1, 1),
-AC97_DOUBLE("Aux Playback Volume", AC97_AUX, 8, 0, 31, 1)
-};
-
-static const snd_kcontrol_new_t snd_ac97_controls_pcm[2] = {
-AC97_SINGLE("PCM Playback Switch", AC97_PCM, 15, 1, 1),
-AC97_DOUBLE("PCM Playback Volume", AC97_PCM, 8, 0, 31, 1)
-};
-
-static const snd_kcontrol_new_t snd_ac97_controls_capture[3] = {
-{
+static const snd_kcontrol_new_t snd_ac97_control_capture_src = {
 	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 	.name = "Capture Source",
 	.info = snd_ac97_info_mux,
 	.get = snd_ac97_get_mux,
 	.put = snd_ac97_put_mux,
-},
-AC97_SINGLE("Capture Switch", AC97_REC_GAIN, 15, 1, 1),
-AC97_DOUBLE("Capture Volume", AC97_REC_GAIN, 8, 0, 15, 0)
 };
+
+static const snd_kcontrol_new_t snd_ac97_control_capture_vol =
+AC97_DOUBLE("Capture Volume", AC97_REC_GAIN, 8, 0, 15, 0);
 
 static const snd_kcontrol_new_t snd_ac97_controls_mic_capture[2] = {
 AC97_SINGLE("Mic Capture Switch", AC97_REC_GAIN_MIC, 15, 1, 1),
@@ -715,11 +679,6 @@ AC97_SINGLE("LFE Playback Volume", AC97_CENTER_LFE_MASTER, 8, 31, 1)
 static const snd_kcontrol_new_t snd_ac97_controls_surround[2] = {
 AC97_DOUBLE("Surround Playback Switch", AC97_SURROUND_MASTER, 15, 7, 1, 1),
 AC97_DOUBLE("Surround Playback Volume", AC97_SURROUND_MASTER, 8, 0, 31, 1),
-};
-
-static const snd_kcontrol_new_t snd_ac97_sigmatel_surround[2] = {
-AC97_SINGLE("Sigmatel Surround Playback Switch", AC97_HEADPHONE, 15, 1, 1),
-AC97_DOUBLE("Sigmatel Surround Playback Volume", AC97_HEADPHONE, 8, 0, 31, 1)
 };
 
 static const snd_kcontrol_new_t snd_ac97_control_eapd =
@@ -899,17 +858,23 @@ const snd_kcontrol_new_t snd_ac97_controls_spdif[5] = {
 	},
 };
 
-#define AD18XX_PCM_BITS(xname, codec, shift, mask) \
+#define AD18XX_PCM_BITS(xname, codec, lshift, rshift, mask) \
 { .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .info = snd_ac97_ad18xx_pcm_info_bits, \
   .get = snd_ac97_ad18xx_pcm_get_bits, .put = snd_ac97_ad18xx_pcm_put_bits, \
-  .private_value = codec | (shift << 8) | (mask << 16) }
+  .private_value = (codec) | ((lshift) << 8) | ((rshift) << 12) | ((mask) << 24) }
 
 static int snd_ac97_ad18xx_pcm_info_bits(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
-	int mask = (kcontrol->private_value >> 16) & 0xff;
+	ac97_t *ac97 = snd_kcontrol_chip(kcontrol);
+	int mask = (kcontrol->private_value >> 16) & 0x0f;
+	int lshift = (kcontrol->private_value >> 8) & 0x0f;
+	int rshift = (kcontrol->private_value >> 12) & 0x0f;
 
 	uinfo->type = mask == 1 ? SNDRV_CTL_ELEM_TYPE_BOOLEAN : SNDRV_CTL_ELEM_TYPE_INTEGER;
-	uinfo->count = 1;
+	if (lshift != rshift && (ac97->flags & AC97_STEREO_MUTES))
+		uinfo->count = 2;
+	else
+		uinfo->count = 1;
 	uinfo->value.integer.min = 0;
 	uinfo->value.integer.max = mask;
 	return 0;
@@ -919,10 +884,13 @@ static int snd_ac97_ad18xx_pcm_get_bits(snd_kcontrol_t * kcontrol, snd_ctl_elem_
 {
 	ac97_t *ac97 = snd_kcontrol_chip(kcontrol);
 	int codec = kcontrol->private_value & 3;
-	int shift = (kcontrol->private_value >> 8) & 0xff;
+	int lshift = (kcontrol->private_value >> 8) & 0x0f;
+	int rshift = (kcontrol->private_value >> 12) & 0x0f;
 	int mask = (kcontrol->private_value >> 16) & 0xff;
 	
-	ucontrol->value.integer.value[0] = mask - ((ac97->spec.ad18xx.pcmreg[codec] >> shift) & mask);
+	ucontrol->value.integer.value[0] = mask - ((ac97->spec.ad18xx.pcmreg[codec] >> lshift) & mask);
+	if (lshift != rshift && (ac97->flags & AC97_STEREO_MUTES))
+		ucontrol->value.integer.value[1] = mask - ((ac97->spec.ad18xx.pcmreg[codec] >> rshift) & mask);
 	return 0;
 }
 
@@ -930,12 +898,18 @@ static int snd_ac97_ad18xx_pcm_put_bits(snd_kcontrol_t * kcontrol, snd_ctl_elem_
 {
 	ac97_t *ac97 = snd_kcontrol_chip(kcontrol);
 	int codec = kcontrol->private_value & 3;
-	int shift = (kcontrol->private_value >> 8) & 0xff;
+	int lshift = (kcontrol->private_value >> 8) & 0x0f;
+	int rshift = (kcontrol->private_value >> 12) & 0x0f;
 	int mask = (kcontrol->private_value >> 16) & 0xff;
-	unsigned short val;
+	unsigned short val, valmask;
 	
-	val = mask - (ucontrol->value.integer.value[0] & mask);
-	return snd_ac97_ad18xx_update_pcm_bits(ac97, codec, mask << shift, val << shift);
+	val = (mask - (ucontrol->value.integer.value[0] & mask)) << lshift;
+	valmask = mask << lshift;
+	if (lshift != rshift && (ac97->flags & AC97_STEREO_MUTES)) {
+		val |= (mask - (ucontrol->value.integer.value[1] & mask)) << rshift;
+		valmask |= mask << rshift;
+	}
+	return snd_ac97_ad18xx_update_pcm_bits(ac97, codec, valmask, val);
 }
 
 #define AD18XX_PCM_VOLUME(xname, codec) \
@@ -976,22 +950,23 @@ static int snd_ac97_ad18xx_pcm_put_volume(snd_kcontrol_t * kcontrol, snd_ctl_ele
 }
 
 static const snd_kcontrol_new_t snd_ac97_controls_ad18xx_pcm[2] = {
-AD18XX_PCM_BITS("PCM Playback Switch", 0, 15, 1),
+AD18XX_PCM_BITS("PCM Playback Switch", 0, 15, 7, 1),
 AD18XX_PCM_VOLUME("PCM Playback Volume", 0)
 };
 
 static const snd_kcontrol_new_t snd_ac97_controls_ad18xx_surround[2] = {
-AD18XX_PCM_BITS("Surround Playback Switch", 1, 15, 1),
+AD18XX_PCM_BITS("Surround Playback Switch", 1, 15, 7, 1),
 AD18XX_PCM_VOLUME("Surround Playback Volume", 1)
 };
 
 static const snd_kcontrol_new_t snd_ac97_controls_ad18xx_center[2] = {
-AD18XX_PCM_BITS("Center Playback Switch", 2, 15, 1),
-AD18XX_PCM_BITS("Center Playback Volume", 2, 8, 31)
+AD18XX_PCM_BITS("Center Playback Switch", 2, 15, 15, 1),
+AD18XX_PCM_BITS("Center Playback Volume", 2, 8, 8, 31)
 };
 
-static const snd_kcontrol_new_t snd_ac97_controls_ad18xx_lfe[1] = {
-AD18XX_PCM_BITS("LFE Playback Volume", 2, 0, 31)
+static const snd_kcontrol_new_t snd_ac97_controls_ad18xx_lfe[2] = {
+AD18XX_PCM_BITS("LFE Playback Switch", 2, 7, 7, 1),
+AD18XX_PCM_BITS("LFE Playback Volume", 2, 0, 0, 31)
 };
 
 /*
@@ -1144,11 +1119,67 @@ snd_kcontrol_t *snd_ac97_cnew(const snd_kcontrol_new_t *_template, ac97_t * ac97
 	return snd_ctl_new1(&template, ac97);
 }
 
+/*
+ * create mute switch(es) for normal stereo controls
+ */
+static int snd_ac97_cmute_new(snd_card_t *card, char *name, int reg, ac97_t *ac97)
+{
+	snd_kcontrol_t *kctl;
+	if (ac97->flags & AC97_STEREO_MUTES) {
+		snd_kcontrol_new_t tmp = AC97_DOUBLE(name, reg, 15, 7, 1, 1);
+		tmp.index = ac97->num;
+		kctl = snd_ctl_new1(&tmp, ac97);
+	} else {
+		snd_kcontrol_new_t tmp = AC97_SINGLE(name, reg, 15, 1, 1);
+		tmp.index = ac97->num;
+		kctl = snd_ctl_new1(&tmp, ac97);
+	}
+	return snd_ctl_add(card, kctl);
+}
+
+/*
+ * create volumes for normal stereo controls
+ */
+static int snd_ac97_cvol_new(snd_card_t *card, char *name, int reg, unsigned int max, ac97_t *ac97)
+{
+	int err;
+	snd_kcontrol_new_t tmp = AC97_DOUBLE(name, reg, 8, 0, (unsigned int)max, 1);
+	tmp.index = ac97->num;
+	if ((err = snd_ctl_add(card, snd_ctl_new1(&tmp, ac97))) < 0)
+		return err;
+	snd_ac97_write_cache(ac97, reg,
+			     ((ac97->flags & AC97_STEREO_MUTES) ? 0x8080 : 0x8000) |
+			     (unsigned short)max | ((unsigned short)max << 8));
+	return 0;
+}
+
+/*
+ * create mute-switch and volumes for normal stereo controls
+ */
+static int snd_ac97_cmix_new(snd_card_t *card, const char *pfx, int reg, int check_res, ac97_t *ac97)
+{
+	int err;
+	char name[44];
+	unsigned char max;
+
+	sprintf(name, "%s Switch", pfx);
+	if ((err = snd_ac97_cmute_new(card, name, reg, ac97)) < 0)
+		return err;
+	sprintf(name, "%s Volume", pfx);
+	if (check_res)
+		snd_ac97_change_volume_params1(ac97, reg, &max);
+	else
+		max = 31; /* 5bit */
+	if ((err = snd_ac97_cvol_new(card, name, reg, max, ac97)) < 0)
+		return err;
+	return 0;
+}
+
+
 static int snd_ac97_mixer_build(ac97_t * ac97)
 {
 	snd_card_t *card = ac97->card;
 	snd_kcontrol_t *kctl;
-	const snd_kcontrol_new_t *knew;
 	int err;
 	unsigned int idx;
 	unsigned char max;
@@ -1156,14 +1187,8 @@ static int snd_ac97_mixer_build(ac97_t * ac97)
 	/* build master controls */
 	/* AD claims to remove this control from AD1887, although spec v2.2 does not allow this */
 	if (snd_ac97_try_volume_mix(ac97, AC97_MASTER)) {
-		if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_controls_master[0], ac97))) < 0)
+		if ((err = snd_ac97_cmix_new(card, "Master Playback", AC97_MASTER, 1, ac97)) < 0)
 			return err;
-		if ((err = snd_ctl_add(card, kctl = snd_ac97_cnew(&snd_ac97_controls_master[1], ac97))) < 0)
-			return err;
-		snd_ac97_change_volume_params1(ac97, AC97_MASTER, &max);
-		kctl->private_value &= ~(0xff << 16);
-		kctl->private_value |= (int)max << 16;
-		snd_ac97_write_cache(ac97, AC97_MASTER, 0x8000 | max | (max << 8));
 	}
 
 	ac97->regs[AC97_CENTER_LFE_MASTER] = 0x8080;
@@ -1206,15 +1231,11 @@ static int snd_ac97_mixer_build(ac97_t * ac97)
 
 	/* build headphone controls */
 	if (snd_ac97_try_volume_mix(ac97, AC97_HEADPHONE) || ac97->id == AC97_ID_STAC9708) {
-		knew = ac97->id == AC97_ID_STAC9708 ? snd_ac97_sigmatel_surround : snd_ac97_controls_headphone;
-		if ((err = snd_ctl_add(card, snd_ac97_cnew(knew, ac97))) < 0)
+		const char *name = ac97->id == AC97_ID_STAC9708 ? 
+			"Sigmatel Surround Playback" :
+			"Headphone Playback";
+		if ((err = snd_ac97_cmix_new(card, name, AC97_HEADPHONE, 1, ac97)) < 0)
 			return err;
-		if ((err = snd_ctl_add(card, kctl = snd_ac97_cnew(knew + 1, ac97))) < 0)
-			return err;
-		snd_ac97_change_volume_params1(ac97, AC97_HEADPHONE, &max);
-		kctl->private_value &= ~(0xff << 16);
-		kctl->private_value |= (int)max << 16;
-		snd_ac97_write_cache(ac97, AC97_HEADPHONE, 0x8000 | max | (max << 8));
 	}
 	
 	/* build master mono controls */
@@ -1276,70 +1297,73 @@ static int snd_ac97_mixer_build(ac97_t * ac97)
 	snd_ac97_write_cache(ac97, AC97_MIC, 0x8000 | max);
 
 	/* build Line controls */
-	for (idx = 0; idx < 2; idx++)
-		if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_controls_line[idx], ac97))) < 0)
-			return err;
-	snd_ac97_write_cache(ac97, AC97_LINE, 0x9f1f);
+	if ((err = snd_ac97_cmix_new(card, "Line Playback", AC97_LINE, 0, ac97)) < 0)
+		return err;
 	
 	/* build CD controls */
-	for (idx = 0; idx < 2; idx++)
-		if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_controls_cd[idx], ac97))) < 0)
-			return err;
-	snd_ac97_write_cache(ac97, AC97_CD, 0x9f1f);
+	if ((err = snd_ac97_cmix_new(card, "CD Playback", AC97_CD, 0, ac97)) < 0)
+		return err;
 	
 	/* build Video controls */
 	if (snd_ac97_try_volume_mix(ac97, AC97_VIDEO)) {
-		for (idx = 0; idx < 2; idx++)
-			if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_controls_video[idx], ac97))) < 0)
-				return err;
-		snd_ac97_write_cache(ac97, AC97_VIDEO, 0x9f1f);
+		if ((err = snd_ac97_cmix_new(card, "Video Playback", AC97_VIDEO, 0, ac97)) < 0)
+			return err;
 	}
 
 	/* build Aux controls */
 	if (snd_ac97_try_volume_mix(ac97, AC97_AUX)) {
-		for (idx = 0; idx < 2; idx++)
-			if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_controls_aux[idx], ac97))) < 0)
-				return err;
-		snd_ac97_write_cache(ac97, AC97_AUX, 0x9f1f);
+		if ((err = snd_ac97_cmix_new(card, "Aux Playback", AC97_AUX, 0, ac97)) < 0)
+			return err;
 	}
 
 	/* build PCM controls */
 	if (ac97->flags & AC97_AD_MULTI) {
+		unsigned short init_val;
+		if (ac97->flags & AC97_STEREO_MUTES)
+			init_val = 0x9f9f;
+		else
+			init_val = 0x9f1f;
 		for (idx = 0; idx < 2; idx++)
 			if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_controls_ad18xx_pcm[idx], ac97))) < 0)
 				return err;
-		ac97->spec.ad18xx.pcmreg[0] = 0x9f1f;
+		ac97->spec.ad18xx.pcmreg[0] = init_val;
 		if (ac97->scaps & AC97_SCAP_SURROUND_DAC) {
 			for (idx = 0; idx < 2; idx++)
 				if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_controls_ad18xx_surround[idx], ac97))) < 0)
 					return err;
-			ac97->spec.ad18xx.pcmreg[1] = 0x9f1f;
+			ac97->spec.ad18xx.pcmreg[1] = init_val;
 		}
 		if (ac97->scaps & AC97_SCAP_CENTER_LFE_DAC) {
 			for (idx = 0; idx < 2; idx++)
 				if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_controls_ad18xx_center[idx], ac97))) < 0)
 					return err;
-			if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_controls_ad18xx_lfe[0], ac97))) < 0)
-				return err;
-			ac97->spec.ad18xx.pcmreg[2] = 0x9f1f;
+			for (idx = 0; idx < 2; idx++)
+				if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_controls_ad18xx_lfe[idx], ac97))) < 0)
+					return err;
+			ac97->spec.ad18xx.pcmreg[2] = init_val;
 		}
+		snd_ac97_write_cache(ac97, AC97_PCM, init_val);
 	} else {
-		unsigned int pcm_ctrls = 2;
+		if ((err = snd_ac97_cmute_new(card, "PCM Playback Switch", AC97_PCM, ac97)) < 0)
+			return err;
 		/* FIXME: C-Media chips have no PCM volume!! */
 		if (/*ac97->id == 0x434d4941 ||*/
 		    ac97->id == 0x434d4942 ||
 		    ac97->id == 0x434d4961)
-			pcm_ctrls = 1;
-		for (idx = 0; idx < pcm_ctrls; idx++)
-			if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_controls_pcm[idx], ac97))) < 0)
+			snd_ac97_write_cache(ac97, AC97_PCM, 0x9f1f);
+		else {
+			if ((err = snd_ac97_cvol_new(card, "PCM Playback Volume", AC97_PCM, 31, ac97)) < 0)
 				return err;
+		}
 	}
-	snd_ac97_write_cache(ac97, AC97_PCM, 0x9f1f);
 
 	/* build Capture controls */
-	for (idx = 0; idx < 3; idx++)
-		if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_controls_capture[idx], ac97))) < 0)
-			return err;
+	if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_control_capture_src, ac97))) < 0)
+		return err;
+	if ((err = snd_ac97_cmute_new(card, "Capture Switch", AC97_REC_GAIN, ac97)) < 0)
+		return err;
+	if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_control_capture_vol, ac97))) < 0)
+		return err;
 	snd_ac97_write_cache(ac97, AC97_REC_SEL, 0x0000);
 	snd_ac97_write_cache(ac97, AC97_REC_GAIN, 0x0000);
 

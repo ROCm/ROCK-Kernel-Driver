@@ -776,10 +776,13 @@ int patch_ad1980(ac97_t * ac97)
 	ac97->build_ops = &patch_ad1980_build_ops;
 	/* Switch FRONT/SURROUND LINE-OUT/HP-OUT default connection */
 	/* it seems that most vendors connect line-out connector to headphone out of AC'97 */
+	/* Stereo mutes enabled */
 	misc = snd_ac97_read(ac97, AC97_AD_MISC);
 	snd_ac97_write_cache(ac97, AC97_AD_MISC, misc |
 			     AC97_AD198X_LOSEL |
-			     AC97_AD198X_HPSEL);
+			     AC97_AD198X_HPSEL |
+			     AC97_AD198X_MSPLT);
+	ac97->flags |= AC97_STEREO_MUTES;
 	return 0;
 }
 
@@ -793,13 +796,16 @@ int patch_ad1985(ac97_t * ac97)
 	/* switch front/surround line-out/hp-out */
 	/* center/LFE, surround in High-Z mode */
 	/* AD-compatible mode */
+	/* Stereo mutes enabled */
 	snd_ac97_write_cache(ac97, AC97_AD_MISC, misc |
 			     AC97_AD198X_VREFD |
 			     AC97_AD198X_LOSEL |
 			     AC97_AD198X_HPSEL |
 			     AC97_AD198X_CLDIS |
 			     AC97_AD198X_LODIS |
+			     AC97_AD198X_MSPLT |
 			     AC97_AD198X_AC97NC);
+	ac97->flags |= AC97_STEREO_MUTES;
 	return 0;
 }
 

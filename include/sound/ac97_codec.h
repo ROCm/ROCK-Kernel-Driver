@@ -248,6 +248,7 @@
 #define AC97_AD_MULTI		(1<<1)	/* Analog Devices - multi codecs */
 #define AC97_CS_SPDIF		(1<<2)	/* Cirrus Logic uses funky SPDIF */
 #define AC97_CX_SPDIF		(1<<3)	/* Conexant's spdif interface */
+#define AC97_STEREO_MUTES	(1<<4)	/* has stereo mute bits */
 
 /* rates indexes */
 #define AC97_RATES_FRONT_DAC	0
