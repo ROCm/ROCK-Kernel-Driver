@@ -27,7 +27,7 @@
 
 #include "ieee754dp.h"
 
-ieee754dp ieee754dp_flong(long long x)
+ieee754dp ieee754dp_flong(s64 x)
 {
 	COMPXDP;
 
@@ -67,9 +67,9 @@ ieee754dp ieee754dp_flong(long long x)
 	DPNORMRET1(xs, xe, xm, "dp_flong", x);
 }
 
-ieee754dp ieee754dp_fulong(unsigned long long u)
+ieee754dp ieee754dp_fulong(u64 u)
 {
-	if ((long long) u < 0)
+	if ((s64) u < 0)
 		return ieee754dp_add(ieee754dp_1e63(),
 				     ieee754dp_flong(u & ~(1ULL << 63)));
 	return ieee754dp_flong(u);

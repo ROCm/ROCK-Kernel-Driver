@@ -3,18 +3,17 @@
  *
  *	(c) 1998 Martin Mares <mj@ucw.cz>
  */
-
-#ifndef _LINUX_ASM_VGA_H_
-#define _LINUX_ASM_VGA_H_
+#ifndef _ASM_VGA_H
+#define _ASM_VGA_H
 
 /*
  *	On the PC, we can just recalculate addresses and then
  *	access the videoram directly without any black magic.
  */
 
-#define VGA_MAP_MEM(x) ((unsigned long)0xb0000000 + (unsigned long)(x))
+#define VGA_MAP_MEM(x)	(0xb0000000L + (unsigned long)(x))
 
-#define vga_readb(x) (*(x))
-#define vga_writeb(x,y) (*(y) = (x))
+#define vga_readb(x)	(*(x))
+#define vga_writeb(x,y)	(*(y) = (x))
 
-#endif
+#endif /* _ASM_VGA_H */

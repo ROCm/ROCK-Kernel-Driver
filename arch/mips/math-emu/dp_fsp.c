@@ -31,16 +31,20 @@ ieee754dp ieee754dp_fsp(ieee754sp x)
 {
 	COMPXSP;
 
-	CLEARCX;
-
 	EXPLODEXSP;
 
+	CLEARCX;
+
+	FLUSHXSP;
+
 	switch (xc) {
-	case IEEE754_CLASS_QNAN:
 	case IEEE754_CLASS_SNAN:
+		SETCX(IEEE754_INVALID_OPERATION);
+		return ieee754dp_nanxcpt(ieee754dp_indef(), "fsp");
+	case IEEE754_CLASS_QNAN:
 		return ieee754dp_nanxcpt(builddp(xs,
 						 DP_EMAX + 1 + DP_EBIAS,
-						 ((unsigned long long) xm
+						 ((u64) xm
 						  << (DP_MBITS -
 						      SP_MBITS))), "fsp",
 					 x);
@@ -66,5 +70,5 @@ ieee754dp ieee754dp_fsp(ieee754sp x)
 	xm &= ~SP_HIDDEN_BIT;
 
 	return builddp(xs, xe + DP_EBIAS,
-		       (unsigned long long) xm << (DP_MBITS - SP_MBITS));
+		       (u64) xm << (DP_MBITS - SP_MBITS));
 }

@@ -10,6 +10,7 @@
 #include <linux/config.h>
 #include <linux/types.h>
 #include <linux/mm.h>
+#include <linux/module.h>
 #include <linux/string.h>
 #include <linux/pci.h>
 
@@ -20,18 +21,23 @@ void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
 {
 	void *ret;
 	int gfp = GFP_ATOMIC;
+	struct pci_bus *bus = NULL;
 
+#ifdef CONFIG_ISA
 	if (hwdev == NULL || hwdev->dma_mask != 0xffffffff)
 		gfp |= GFP_DMA;
+#endif
 	ret = (void *) __get_free_pages(gfp, get_order(size));
 
 	if (ret != NULL) {
 		memset(ret, 0, size);
-#ifndef CONFIG_COHERENT_IO
+		if (hwdev)
+			bus = hwdev->bus;
+		*dma_handle = bus_to_baddr(bus, __pa(ret));
+#ifdef CONFIG_NONCOHERENT_IO
 		dma_cache_wback_inv((unsigned long) ret, size);
-		ret = KSEG1ADDR(ret);
+		ret = UNCAC_ADDR(ret);
 #endif
-		*dma_handle = virt_to_bus(ret);
 	}
 
 	return ret;
@@ -42,8 +48,11 @@ void pci_free_consistent(struct pci_dev *hwdev, size_t size,
 {
 	unsigned long addr = (unsigned long) vaddr;
 
-#ifndef CONFIG_COHERENT_IO
-	addr = KSEG0ADDR(addr);
+#ifdef CONFIG_NONCOHERENT_IO
+	addr = CAC_ADDR(addr);
 #endif
 	free_pages(addr, get_order(size));
 }
+
+EXPORT_SYMBOL(pci_alloc_consistent);
+EXPORT_SYMBOL(pci_free_consistent);

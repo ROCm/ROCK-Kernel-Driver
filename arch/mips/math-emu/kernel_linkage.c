@@ -20,13 +20,10 @@
  *  with this program; if not, write to the Free Software Foundation, Inc.,
  *  59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  *
- *************************************************************************/
-/*
  * Routines corresponding to Linux kernel FP context
  * manipulation primitives for the Algorithmics MIPS
  * FPU Emulator
  */
-
 #include <linux/sched.h>
 #include <asm/processor.h>
 #include <asm/signal.h>
@@ -42,10 +39,10 @@ void fpu_emulator_init_fpu(void)
 {
 	static int first = 1;
 	int i;
- 
+
 	if (first) {
 		first = 0;
-		printk("Algorithmics/MIPS FPU Emulator v1.4\n");
+		printk("Algorithmics/MIPS FPU Emulator v1.5\n");
 	}
 
 	current->thread.fpu.soft.sr = 0;

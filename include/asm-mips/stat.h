@@ -3,23 +3,6 @@
 
 #include <linux/types.h>
 
-struct __old_kernel_stat {
-	unsigned int	st_dev;
-	unsigned int	st_ino;
-	unsigned int	st_mode;
-	unsigned int	st_nlink;
-	unsigned int	st_uid;
-	unsigned int	st_gid;
-	unsigned int	st_rdev;
-	long		st_size;
-	unsigned int	st_atime, st_res1;
-	unsigned int	st_mtime, st_res2;
-	unsigned int	st_ctime, st_res3;
-	unsigned int	st_blksize;
-	int		st_blocks;
-	unsigned int	st_unused0[2];
-};
-
 struct stat {
 	dev_t		st_dev;
 	long		st_pad1[3];		/* Reserved for network id */
@@ -75,13 +58,13 @@ struct stat64 {
 	 * but we don't have it under Linux.
 	 */
 	time_t		st_atime;
-	unsigned long	reserved0;	/* Reserved for st_atime expansion  */
+	unsigned long	st_atime_nsec;	/* Reserved for st_atime expansion  */
 
 	time_t		st_mtime;
-	unsigned long	reserved1;	/* Reserved for st_mtime expansion  */
+	unsigned long	st_mtime_nsec;	/* Reserved for st_mtime expansion  */
 
 	time_t		st_ctime;
-	unsigned long	reserved2;	/* Reserved for st_ctime expansion  */
+	unsigned long	st_ctime_nsec;	/* Reserved for st_ctime expansion  */
 
 	unsigned long	st_blksize;
 	unsigned long	st_pad2;

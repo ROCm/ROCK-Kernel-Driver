@@ -5,6 +5,7 @@
  *
  * Copyright (C) 1995 - 2000 by Ralf Baechle
  */
+#include <linux/config.h>
 #include <linux/signal.h>
 #include <linux/sched.h>
 #include <linux/interrupt.h>
@@ -18,21 +19,48 @@
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
 #include <linux/version.h>
+#include <linux/vt_kern.h>		/* For unblank_screen() */
+#include <linux/module.h>
 
+#include <asm/branch.h>
 #include <asm/hardirq.h>
 #include <asm/pgalloc.h>
 #include <asm/mmu_context.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
+#include <asm/ptrace.h>
 
 #define development_version (LINUX_VERSION_CODE & 0x100)
-
-unsigned long asid_cache = ASID_FIRST_VERSION;
 
 /*
  * Macro for exception fixup code to access integer registers.
  */
 #define dpf_reg(r) (regs->regs[r])
+
+/*
+ * Unlock any spinlocks which will prevent us from getting the out
+ */
+void bust_spinlocks(int yes)
+{
+	int loglevel_save = console_loglevel;
+
+	if (yes) {
+		oops_in_progress = 1;
+		return;
+	}
+#ifdef CONFIG_VT
+	unblank_screen();
+#endif
+	oops_in_progress = 0;
+	/*
+	 * OK, the message is on the console.  Now we call printk()
+	 * without oops_in_progress set so that printk will give klogd
+	 * a poke.  Hold onto your hats...
+	 */
+	console_loglevel = 15;		/* NMI oopser may have shut the console up */
+	printk(" ");
+	console_loglevel = loglevel_save;
+}
 
 /*
  * This routine handles page faults.  It determines the address,
@@ -45,8 +73,13 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long write,
 	struct vm_area_struct * vma;
 	struct task_struct *tsk = current;
 	struct mm_struct *mm = tsk->mm;
-	unsigned long fixup;
+	const struct exception_table_entry *fixup;
 	siginfo_t info;
+
+#if 0
+	printk("Cpu%d[%s:%d:%08lx:%ld:%08lx]\n", smp_processor_id(),
+	       current->comm, current->pid, address, write, regs->cp0_epc);
+#endif
 
 	/*
 	 * We fault-in kernel-space virtual memory on-demand. The
@@ -57,7 +90,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long write,
 	 * only copy the information from the master page table,
 	 * nothing more.
 	 */
-	if (address >= TASK_SIZE)
+	if (address >= VMALLOC_START)
 		goto vmalloc_fault;
 
 	info.si_code = SEGV_MAPERR;
@@ -65,12 +98,9 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long write,
 	 * If we're in an interrupt or have no user
 	 * context, we must not take the fault..
 	 */
-	if (in_interrupt() || !mm)
+	if (in_atomic() || !mm)
 		goto no_context;
-#if 0
-	printk("[%s:%d:%08lx:%ld:%08lx]\n", current->comm, current->pid,
-	       address, write, regs->cp0_epc);
-#endif
+
 	down_read(&mm->mmap_sem);
 	vma = find_vma(mm, address);
 	if (!vma)
@@ -96,22 +126,25 @@ good_area:
 			goto bad_area;
 	}
 
+survive:
 	/*
 	 * If for any reason at all we couldn't handle the fault,
 	 * make sure we exit gracefully rather than endlessly redo
 	 * the fault.
 	 */
 	switch (handle_mm_fault(mm, vma, address, write)) {
-	case 1:
+	case VM_FAULT_MINOR:
 		tsk->min_flt++;
 		break;
-	case 2:
+	case VM_FAULT_MAJOR:
 		tsk->maj_flt++;
 		break;
-	case 0:
+	case VM_FAULT_SIGBUS:
 		goto do_sigbus;
-	default:
+	case VM_FAULT_OOM:
 		goto out_of_memory;
+	default:
+		BUG();
 	}
 
 	up_read(&mm->mmap_sem);
@@ -124,7 +157,6 @@ good_area:
 bad_area:
 	up_read(&mm->mmap_sem);
 
-bad_area_nosemaphore:
 	/* User mode accesses just cause a SIGSEGV */
 	if (user_mode(regs)) {
 		tsk->thread.cp0_badvaddr = address;
@@ -148,12 +180,11 @@ bad_area_nosemaphore:
 
 no_context:
 	/* Are we prepared to handle this kernel fault?  */
-	fixup = search_exception_table(regs->cp0_epc);
+	fixup = search_exception_tables(exception_epc(regs));
 	if (fixup) {
-		long new_epc;
+		unsigned long new_epc = fixup->nextinsn;
 
 		tsk->thread.cp0_baduaddr = address;
-		new_epc = fixup_exception(dpf_reg, fixup, regs->cp0_epc);
 		if (development_version)
 			printk(KERN_DEBUG "%s: Exception at [<%lx>] (%lx)\n",
 			       tsk->comm, regs->cp0_epc, new_epc);
@@ -165,11 +196,13 @@ no_context:
 	 * Oops. The kernel tried to access some bad page. We'll have to
 	 * terminate things with extreme prejudice.
 	 */
+
+	bust_spinlocks(1);
+
 	printk(KERN_ALERT "Unable to handle kernel paging request at virtual "
 	       "address %08lx, epc == %08lx, ra == %08lx\n",
 	       address, regs->cp0_epc, regs->regs[31]);
 	die("Oops", regs);
-	do_exit(SIGKILL);
 
 /*
  * We ran out of memory, or some other thing happened to us that made
@@ -177,6 +210,11 @@ no_context:
  */
 out_of_memory:
 	up_read(&mm->mmap_sem);
+	if (tsk->pid == 1) {
+		yield();
+		down_read(&mm->mmap_sem);
+		goto survive;
+	}
 	printk("VM: killing process %s\n", tsk->comm);
 	if (user_mode(regs))
 		do_exit(SIGKILL);
@@ -207,26 +245,31 @@ vmalloc_fault:
 		/*
 		 * Synchronize this task's top level page-table
 		 * with the 'reference' page table.
+		 *
+		 * Do _not_ use "tsk" here. We might be inside
+		 * an interrupt in the middle of a task switch..
 		 */
-		int offset = pgd_index(address);
+		int offset = __pgd_offset(address);
 		pgd_t *pgd, *pgd_k;
 		pmd_t *pmd, *pmd_k;
+		pte_t *pte_k;
 
-		pgd = tsk->active_mm->pgd + offset;
+		pgd = (pgd_t *) pgd_current[smp_processor_id()] + offset;
 		pgd_k = init_mm.pgd + offset;
 
-		if (!pgd_present(*pgd)) {
-			if (!pgd_present(*pgd_k))
-				goto bad_area_nosemaphore;
-			set_pgd(pgd, *pgd_k);
-			return;
-		}
+		if (!pgd_present(*pgd_k))
+			goto no_context;
+		set_pgd(pgd, *pgd_k);
 
 		pmd = pmd_offset(pgd, address);
 		pmd_k = pmd_offset(pgd_k, address);
-
-		if (pmd_present(*pmd) || !pmd_present(*pmd_k))
-			goto bad_area_nosemaphore;
+		if (!pmd_present(*pmd_k))
+			goto no_context;
 		set_pmd(pmd, *pmd_k);
+
+		pte_k = pte_offset_kernel(pmd_k, address);
+		if (!pte_present(*pte_k))
+			goto no_context;
+		return;
 	}
 }

@@ -1,4 +1,4 @@
-/* 
+/*
  * IEEE754 floating point
  * double precision internal header file
  */
@@ -46,7 +46,7 @@
 #define DPDNORMX	DPDNORMx(xm,xe)
 #define DPDNORMY	DPDNORMx(ym,ye)
 
-static __inline ieee754dp builddp(int s, int bx, unsigned long long m)
+static __inline ieee754dp builddp(int s, int bx, u64 m)
 {
 	ieee754dp r;
 
@@ -64,11 +64,11 @@ static __inline ieee754dp builddp(int s, int bx, unsigned long long m)
 extern int ieee754dp_isnan(ieee754dp);
 extern int ieee754dp_issnan(ieee754dp);
 extern int ieee754si_xcpt(int, const char *, ...);
-extern long long ieee754di_xcpt(long long, const char *, ...);
+extern s64 ieee754di_xcpt(s64, const char *, ...);
 extern ieee754dp ieee754dp_xcpt(ieee754dp, const char *, ...);
 extern ieee754dp ieee754dp_nanxcpt(ieee754dp, const char *, ...);
 extern ieee754dp ieee754dp_bestnan(ieee754dp, ieee754dp);
-extern ieee754dp ieee754dp_format(int, int, unsigned long long);
+extern ieee754dp ieee754dp_format(int, int, u64);
 
 
 #define DPNORMRET2(s,e,m,name,a0,a1) \

@@ -1,5 +1,4 @@
-/* $Id: floppy-std.c,v 1.2 1999/01/04 16:03:51 ralf Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -20,7 +19,6 @@
 #include <asm/cachectl.h>
 #include <asm/dma.h>
 #include <asm/floppy.h>
-#include <asm/keyboard.h>
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/mc146818rtc.h>
@@ -112,8 +110,8 @@ static unsigned long std_fd_dma_mem_alloc(unsigned long size)
 }
 
 static void std_fd_dma_mem_free(unsigned long addr, unsigned long size)
-{       
-	free_pages(addr, get_order(size));	
+{
+	free_pages(addr, get_order(size));
 }
 
 static unsigned long std_fd_drive_type(unsigned long n)

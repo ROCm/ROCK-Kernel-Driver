@@ -1,4 +1,4 @@
-/* 
+/*
  * IEEE754 floating point
  * common internal header file
  */
@@ -38,11 +38,11 @@
 #define SP_EMAX		127
 #define SP_MBITS	23
 
-#define DP_MBIT(x)	((unsigned long long)1 << (x))
+#define DP_MBIT(x)	((u64)1 << (x))
 #define DP_HIDDEN_BIT	DP_MBIT(DP_MBITS)
 #define DP_SIGN_BIT	DP_MBIT(63)
 
-#define SP_MBIT(x)	((unsigned long)1 << (x))
+#define SP_MBIT(x)	((u32)1 << (x))
 #define SP_HIDDEN_BIT	SP_MBIT(SP_MBITS)
 #define SP_SIGN_BIT	SP_MBIT(31)
 
@@ -61,7 +61,10 @@
   (ieee754_csr.cx = 0)
 
 #define SETCX(x) \
-  (ieee754_csr.cx |= (x),ieee754_csr.sx |= (x),ieee754_csr.mx & (x))
+  (ieee754_csr.cx |= (x),ieee754_csr.sx |= (x))
+
+#define SETANDTESTCX(x) \
+  (SETCX(x),ieee754_csr.mx & (x))
 
 #define TSTX()	\
 	(ieee754_csr.cx & ieee754_csr.mx)
@@ -82,9 +85,9 @@
 	if(vm == 0)\
 	  vc = IEEE754_CLASS_INF;\
 	else if(vm & SP_MBIT(SP_MBITS-1)) \
-	  vc = IEEE754_CLASS_QNAN;\
-	else \
 	  vc = IEEE754_CLASS_SNAN;\
+	else \
+	  vc = IEEE754_CLASS_QNAN;\
     } else if(ve == SP_EMIN-1+SP_EBIAS) {\
 	if(vm) {\
 	    ve = SP_EMIN;\
@@ -102,10 +105,10 @@
 
 
 #define COMPXDP \
-unsigned long long xm; int xe; int xs; int xc
+u64 xm; int xe; int xs; int xc
 
 #define COMPYDP \
-unsigned long long ym; int ye; int ys; int yc
+u64 ym; int ye; int ys; int yc
 
 #define EXPLODEDP(v,vc,vs,ve,vm) \
 {\
@@ -116,9 +119,9 @@ unsigned long long ym; int ye; int ys; int yc
 	if(vm == 0)\
 	  vc = IEEE754_CLASS_INF;\
 	else if(vm & DP_MBIT(DP_MBITS-1)) \
-	  vc = IEEE754_CLASS_QNAN;\
-	else \
 	  vc = IEEE754_CLASS_SNAN;\
+	else \
+	  vc = IEEE754_CLASS_QNAN;\
     } else if(ve == DP_EMIN-1+DP_EBIAS) {\
 	if(vm) {\
 	    ve = DP_EMIN;\
@@ -133,3 +136,30 @@ unsigned long long ym; int ye; int ys; int yc
 }
 #define EXPLODEXDP EXPLODEDP(x,xc,xs,xe,xm)
 #define EXPLODEYDP EXPLODEDP(y,yc,ys,ye,ym)
+
+#define FLUSHDP(v,vc,vs,ve,vm) \
+	if(vc==IEEE754_CLASS_DNORM) {\
+	    if(ieee754_csr.nod) {\
+		SETCX(IEEE754_INEXACT);\
+		vc = IEEE754_CLASS_ZERO;\
+		ve = DP_EMIN-1+DP_EBIAS;\
+		vm = 0;\
+		v = ieee754dp_zero(vs);\
+	    }\
+	}
+
+#define FLUSHSP(v,vc,vs,ve,vm) \
+	if(vc==IEEE754_CLASS_DNORM) {\
+	    if(ieee754_csr.nod) {\
+		SETCX(IEEE754_INEXACT);\
+		vc = IEEE754_CLASS_ZERO;\
+		ve = SP_EMIN-1+SP_EBIAS;\
+		vm = 0;\
+		v = ieee754sp_zero(vs);\
+	    }\
+	}
+
+#define FLUSHXDP FLUSHDP(x,xc,xs,xe,xm)
+#define FLUSHYDP FLUSHDP(y,yc,ys,ye,ym)
+#define FLUSHXSP FLUSHSP(x,xc,xs,xe,xm)
+#define FLUSHYSP FLUSHSP(y,yc,ys,ye,ym)

@@ -12,9 +12,9 @@
 #include <linux/string.h>
 #include <linux/mm.h>
 #include <linux/interrupt.h>
-#include <asm/irq.h>
 #include <linux/in6.h>
 #include <linux/pci.h>
+#include <linux/tty.h>
 #include <linux/ide.h>
 
 #include <asm/bootinfo.h>
@@ -24,7 +24,7 @@
 #include <asm/page.h>
 #include <asm/pgalloc.h>
 #include <asm/semaphore.h>
-#include <asm/sgi/sgihpc.h>
+#include <asm/softirq.h>
 #include <asm/uaccess.h>
 #ifdef CONFIG_BLK_DEV_FD
 #include <asm/floppy.h>
@@ -41,7 +41,9 @@ extern long __strnlen_user_nocheck_asm(const char *s);
 extern long __strnlen_user_asm(const char *s);
 
 EXPORT_SYMBOL(mips_machtype);
+#ifdef CONFIG_EISA
 EXPORT_SYMBOL(EISA_bus);
+#endif
 
 /*
  * String functions
@@ -58,11 +60,8 @@ EXPORT_SYMBOL_NOVERS(strncat);
 EXPORT_SYMBOL_NOVERS(strnlen);
 EXPORT_SYMBOL_NOVERS(strrchr);
 EXPORT_SYMBOL_NOVERS(strstr);
-EXPORT_SYMBOL_NOVERS(strsep);
 
 EXPORT_SYMBOL(_clear_page);
-EXPORT_SYMBOL(enable_irq);
-EXPORT_SYMBOL(disable_irq);
 EXPORT_SYMBOL(kernel_thread);
 
 /*
@@ -77,15 +76,6 @@ EXPORT_SYMBOL_NOVERS(__strlen_user_asm);
 EXPORT_SYMBOL_NOVERS(__strnlen_user_nocheck_asm);
 EXPORT_SYMBOL_NOVERS(__strnlen_user_asm);
 
-
-/*
- * Functions to control caches.
- */
-EXPORT_SYMBOL(_flush_page_to_ram);
-EXPORT_SYMBOL(_flush_cache_all);
-EXPORT_SYMBOL(_dma_cache_wback_inv);
-EXPORT_SYMBOL(_dma_cache_inv);
-
 EXPORT_SYMBOL(invalid_pte_table);
 
 /*
@@ -97,31 +87,10 @@ EXPORT_SYMBOL(__down_trylock);
 EXPORT_SYMBOL(__up);
 
 /*
- * Base address of ports for Intel style I/O.
- */
-EXPORT_SYMBOL(mips_io_port_base);
-
-/*
- * Architecture specific stuff.
- */
-#ifdef CONFIG_MIPS_JAZZ
-EXPORT_SYMBOL(vdma_alloc);
-EXPORT_SYMBOL(vdma_free);
-EXPORT_SYMBOL(vdma_log2phys);
-#endif
-
-#ifdef CONFIG_SGI_IP22
-EXPORT_SYMBOL(hpc3c0);
-#endif
-
-/*
  * Kernel hacking ...
  */
 #include <asm/branch.h>
 #include <linux/sched.h>
-
-int register_fpe(void (*handler)(struct pt_regs *regs, unsigned int fcr31));
-int unregister_fpe(void (*handler)(struct pt_regs *regs, unsigned int fcr31));
 
 #ifdef CONFIG_VT
 EXPORT_SYMBOL(screen_info);
@@ -132,4 +101,3 @@ EXPORT_SYMBOL(ide_ops);
 #endif
 
 EXPORT_SYMBOL(get_wchan);
-EXPORT_SYMBOL(flush_tlb_page);

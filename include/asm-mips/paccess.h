@@ -1,5 +1,4 @@
-/* $Id: paccess.h,v 1.1 2000/04/07 12:55:57 raiko Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -15,6 +14,9 @@
 #define _ASM_PACCESS_H
 
 #include <linux/errno.h>
+
+extern asmlinkage void handle_ibe(void);
+extern asmlinkage void handle_dbe(void);
 
 #define put_dbe(x,ptr) __put_dbe((x),(ptr),sizeof(*(ptr)))
 #define get_dbe(x,ptr) __get_dbe((x),(ptr),sizeof(*(ptr)))
@@ -94,5 +96,7 @@ __asm__ __volatile__( \
 	:"r" (__pu_val), "o" (__mp(__pu_addr)), "i" (-EFAULT)); })
 
 extern void __put_dbe_unknown(void);
+
+extern unsigned long search_dbe_table(unsigned long addr);
 
 #endif /* _ASM_PACCESS_H */

@@ -3,7 +3,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1994, 1995, 1996, 1998, 1999 by Ralf Baechle
+ * Copyright (C) 1994, 1995, 1996, 1998, 1999, 2002 by Ralf Baechle
  * Copyright (C) 1996 David S. Miller (dm@engr.sgi.com)
  * Copyright (C) 1994, 1995, 1996, by Andreas Busse
  * Copyright (C) 1999 Silicon Graphics, Inc.
@@ -12,24 +12,35 @@
  */
 #include <linux/config.h>
 #include <asm/asm.h>
-#include <asm/bootinfo.h>
 #include <asm/cachectl.h>
-#include <asm/current.h>
 #include <asm/fpregdef.h>
 #include <asm/mipsregs.h>
 #include <asm/offset.h>
 #include <asm/page.h>
-#include <asm/pgtable.h>
+#include <asm/pgtable-bits.h>
 #include <asm/processor.h>
 #include <asm/regdef.h>
 #include <asm/stackframe.h>
+#include <asm/thread_info.h>
 
 #include <asm/asmmacro.h>
 
+#define ST_OFF (KERNEL_STACK_SIZE - 32 - PT_SIZE + PT_STATUS)
+
 /*
- * task_struct *r4xx0_resume(task_struct *prev, task_struct *next)
+ * FPU context is saved iff the process has used it's FPU in the current
+ * time slice as indicated by TIF_USEDFPU.  In any case, the CU1 bit for user
+ * space STATUS register should be 0, so that a process *always* starts its 
+ * userland with FPU disabled after each context switch.
+ *
+ * FPU will be enabled as soon as the process accesses FPU again, through 
+ * do_cpu() trap.
  */
-	.set	noreorder
+
+/*
+ * task_struct *r4xx0_resume(task_struct *prev, task_struct *next,
+ *                           struct thread_info *next_ti)
+ */
 	.align	5
 	LEAF(resume)
 #ifndef CONFIG_CPU_HAS_LLSC
@@ -40,79 +51,76 @@
 	CPU_SAVE_NONSCRATCH(a0)
 	sw	ra, THREAD_REG31(a0)
 
+	/* 
+	 * check if we need to save FPU registers
+	 */
+	lw	t3, TASK_THREAD_INFO(a0)
+	lw	t0, TI_FLAGS(t3)
+	li	t1, _TIF_USEDFPU
+	and	t2, t0, t1
+	beqz	t2, 1f
+	nor	t1, zero, t1
+
+	and	t0, t0, t1
+	sw	t0, TI_FLAGS(t3)
+
+	/*
+	 * clear saved user stack CU1 bit
+	 */
+	lw	t0, ST_OFF(t3)
+	li	t1, ~ST0_CU1
+	and	t0, t0, t1
+	sw	t0, ST_OFF(t3)
+
+	FPU_SAVE_DOUBLE(a0, t0)			# clobbers t0
+
+1:
 	/*
 	 * The order of restoring the registers takes care of the race
 	 * updating $28, $29 and kernelsp without disabling ints.
 	 */
-	move	$28, a1
-	CPU_RESTORE_NONSCRATCH($28)
+	move	$28, a2
+	CPU_RESTORE_NONSCRATCH(a1)
+
 	addiu	t0, $28, KERNEL_STACK_SIZE-32
-#ifdef CONFIG_SMP	 
+#ifdef CONFIG_SMP
 	mfc0	a3, CP0_CONTEXT
 	la	t1, kernelsp
 	srl	a3, 23
 	sll	a3, 2
 	addu	t1, a3, t1
-	sw	t0, (t1)	
+	sw	t0, (t1)
 #else
 	sw	t0, kernelsp
-#endif 
+#endif
+
 	mfc0	t1, CP0_STATUS		/* Do we really need this? */
 	li	a3, 0xff00
 	and	t1, a3
-	lw	a2, THREAD_STATUS($28)
+	lw	a2, THREAD_STATUS(a1)
 	nor	a3, $0, a3
 	and	a2, a3
 	or	a2, t1
 	mtc0	a2, CP0_STATUS
+	move	v0, a0
 	jr	ra
-	 move	v0, a0
 	END(resume)
-
-/*
- * Do lazy fpu context switch.  Saves FPU context to the process in a0
- * and loads the new context of the current process.
- */
-
-#define ST_OFF (KERNEL_STACK_SIZE - 32 - PT_SIZE + PT_STATUS)
-
-LEAF(lazy_fpu_switch)
-	mfc0	t0, CP0_STATUS			# enable cp1
-	li	t3, 0x20000000
-	or	t0, t3
-	mtc0	t0, CP0_STATUS
-
-	beqz	a0, 2f				# Save floating point state
-	 nor	t3, zero, t3
-
-	lw	t1, ST_OFF(a0)			# last thread loses fpu
-	and	t1, t3
-	sw	t1, ST_OFF(a0)
-
-
-	FPU_SAVE_DOUBLE(a0, t1)			# clobbers t1
-2:
-
-	.set	reorder
-	FPU_RESTORE_DOUBLE($28, t0)		# clobbers t0
-	jr	ra
-	END(lazy_fpu_switch)
 
 /*
  * Save a thread's fp context.
  */
-LEAF(save_fp)
+LEAF(_save_fp)
 	FPU_SAVE_DOUBLE(a0, t1)			# clobbers t1
 	jr	ra
-	END(save_fp)
+	END(_save_fp)
 
 /*
  * Restore a thread's fp context.
  */
-LEAF(restore_fp)
+LEAF(_restore_fp)
 	FPU_RESTORE_DOUBLE(a0, t1)		# clobbers t1
 	jr	ra
-	END(restore_fp)
+	END(_restore_fp)
 
 /*
  * Load the FPU with signalling NANS.  This bit pattern we're using has
@@ -124,12 +132,13 @@ LEAF(restore_fp)
 
 #define FPU_DEFAULT  0x00000000
 
-LEAF(init_fpu)
+LEAF(_init_fpu)
 	.set	mips3
 	mfc0	t0, CP0_STATUS
-	li	t1, 0x20000000
+	li	t1, ST0_CU1
 	or	t0, t1
 	mtc0	t0, CP0_STATUS
+	FPU_ENABLE_HAZARD
 
 	li	t1, FPU_DEFAULT
 	ctc1	t1, fcr31
@@ -151,9 +160,6 @@ LEAF(init_fpu)
 	dmtc1	t0, $f24
 	dmtc1	t0, $f26
 	dmtc1	t0, $f28
-	.set	noreorder
+	dmtc1	t0, $f30
 	jr	ra
-	 dmtc1	t0, $f30
-	.set	reorder
-	END(init_fpu)
-
+	END(_init_fpu)

@@ -2,18 +2,19 @@
 
 OUTPUT_ARCH(mips)
 ENTRY(kernel_entry)
+jiffies = JIFFIES32;
 SECTIONS
 {
-  /* Read-only sections, merged into text segment: */
   . = LOADADDR;
-  .init          : { *(.init)		} =0
-  .text      :
-  {
-    _ftext = . ;
+  /* read-only */
+  _text = .;			/* Text and read-only data */
+  .text : {
     *(.text)
-    /* .gnu.warning sections are handled specially by elf32.em.  */
+    *(.fixup)
     *(.gnu.warning)
   } =0
+
+  _etext = .;			/* End of text section */
 
   . = ALIGN(16);		/* Exception table */
   __start___ex_table = .;
@@ -25,38 +26,35 @@ SECTIONS
   __stop___dbe_table = .;
 
   RODATA
-	
-  _etext = .;
 
-  . = ALIGN(8192);
-  .data.init_task : { *(.data.init_task) }
+  . = ALIGN(64);
 
-  /* Startup code */
-  . = ALIGN(4096);
-  __init_begin = .;
-  .text.init : { *(.text.init) }
-  .data.init : { *(.data.init) }
-  . = ALIGN(16);
-  __setup_start = .;
-  .setup.init : { *(.setup.init) }
-  __setup_end = .;
-  __initcall_start = .;
-  .initcall.init : {
-	*(.initcall1.init) 
-	*(.initcall2.init) 
-	*(.initcall3.init) 
-	*(.initcall4.init) 
-	*(.initcall5.init) 
-	*(.initcall6.init) 
-	*(.initcall7.init)
+  /* writeable */
+  .data : {			/* Data */
+    *(.data)
+
+   /* Align the initial ramdisk image (INITRD) on page boundaries. */
+   . = ALIGN(4096);
+   __rd_start = .;
+   *(.initrd)
+   . = ALIGN(4096);
+   __rd_end = .;
+
+    CONSTRUCTORS
   }
-  __initcall_end = .;
-  __con_initcall_start = .;
-  .con_initcall.init : { *(.con_initcall.init) }
-  __con_initcall_end = .;
-  SECURITY_INIT
-  . = ALIGN(4096);	/* Align double page for init_task_union */
-  __init_end = .;
+  _gp = . + 0x8000;
+  .lit8 : { *(.lit8) }
+  .lit4 : { *(.lit4) }
+  /* We want the small data sections together, so single-instruction offsets
+     can access them all, and initialized data all before uninitialized, so
+     we can shorten the on-disk segment size.  */
+  .sdata     : { *(.sdata) }
+
+  . = ALIGN(4096);
+  __nosave_begin = .;
+  .data_nosave : { *(.data.nosave) }
+  . = ALIGN(4096);
+  __nosave_end = .;
 
   . = ALIGN(4096);
   .data.page_aligned : { *(.data.idt) }
@@ -64,71 +62,73 @@ SECTIONS
   . = ALIGN(32);
   .data.cacheline_aligned : { *(.data.cacheline_aligned) }
 
-  .fini      : { *(.fini)    } =0
+  _edata =  .;			/* End of data section */
+
+  . = ALIGN(8192);		/* init_task */
+  .data.init_task : { *(.data.init_task) }
+
+  /* will be freed after init */
+  . = ALIGN(4096);		/* Init code and data */
+  __init_begin = .;
+  /* /DISCARD/ doesn't work for .reginfo */
   .reginfo : { *(.reginfo) }
-  /* Adjust the address for the data segment.  We want to adjust up to
-     the same address within the page on the next page up.  It would
-     be more correct to do this:
-       . = .;
-     The current expression does not correctly handle the case of a
-     text segment ending precisely at the end of a page; it causes the
-     data segment to skip a page.  The above expression does not have
-     this problem, but it will currently (2/95) cause BFD to allocate
-     a single segment, combining both text and data, for this case.
-     This will prevent the text segment from being shared among
-     multiple executions of the program; I think that is more
-     important than losing a page of the virtual address space (note
-     that no actual memory is lost; the page which is skipped can not
-     be referenced).  */
-  . = .;
-  .data    :
-  {
-    _fdata = . ;
-    *(.data)
-
-   /* Align the initial ramdisk image (INITRD) on page boundaries. */
-   . = ALIGN(4096);
-   __rd_start = .;
-   *(.initrd)
-   __rd_end = .;
-   . = ALIGN(4096);
-
-    CONSTRUCTORS
+  .init.text : {
+	_sinittext = .;
+	*(.init.text)
+	_einittext = .;
   }
-  .data1   : { *(.data1) }
-  _gp = . + 0x8000;
-  .lit8 : { *(.lit8) }
-  .lit4 : { *(.lit4) }
-  .ctors         : { *(.ctors)   }
-  .dtors         : { *(.dtors)   }
-  .got           : { *(.got.plt) *(.got) }
-  .dynamic       : { *(.dynamic) }
-  /* We want the small data sections together, so single-instruction offsets
-     can access them all, and initialized data all before uninitialized, so
-     we can shorten the on-disk segment size.  */
-  .sdata     : { *(.sdata) }
-  . = ALIGN(4);
-  _edata  =  .;
-  PROVIDE (edata = .);
+  .init.data : { *(.init.data) }
+  . = ALIGN(16);
+  __setup_start = .;
+  .init.setup : { *(.init.setup) }
+  __setup_end = .;
+  __start___param = .;
+  __param : { *(__param) }
+  __stop___param = .;
+  __initcall_start = .;
+  .initcall.init : {
+	*(.initcall1.init)
+	*(.initcall2.init)
+	*(.initcall3.init)
+	*(.initcall4.init)
+	*(.initcall5.init)
+	*(.initcall6.init)
+	*(.initcall7.init)
+  }
+  __initcall_end = .;
+  __con_initcall_start = .;
+  .con_initcall.init : { *(.con_initcall.init) }
+  __con_initcall_end = .;
+  SECURITY_INIT
+  . = ALIGN(4096);
+  __initramfs_start = .;
+  .init.ramfs : { *(.init.ramfs) }
+  __initramfs_end = .;
+  . = ALIGN(32);
+  __per_cpu_start = .;
+  .data.percpu  : { *(.data.percpu) }
+  __per_cpu_end = .;
+  . = ALIGN(4096);
+  __init_end = .;
+  /* freed after init ends here */
 
-  __bss_start = .;
-  _fbss = .;
-  .sbss      : { *(.sbss) *(.scommon) }
-  .bss       :
-  {
-   *(.dynbss)
-   *(.bss)
-   *(COMMON)
-   .  = ALIGN(4);
+  __bss_start = .;		/* BSS */
+  .sbss      : {
+    *(.sbss)
+    *(.scommon)
+  }
+  .bss : {
+    *(.bss)
+    *(COMMON)
+  }
+  __bss_stop = .;
+
   _end = . ;
-  PROVIDE (end = .);
-  }
 
   /* Sections to be discarded */
-  /DISCARD/ :
-  {
-        *(.text.exit)
-        *(.data.exit)
+  /DISCARD/ : {
+        *(.exit.text)
+        *(.exit.data)
         *(.exitcall.exit)
   }
 

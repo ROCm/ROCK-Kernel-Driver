@@ -11,11 +11,12 @@
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/ioport.h>
-#include <linux/irq.h>
 #include <linux/interrupt.h>
 #include <linux/kernel.h>
 #include <linux/spinlock.h>
+#include <linux/sysdev.h>
 
+#include <asm/i8259.h>
 #include <asm/io.h>
 
 void enable_8259A_irq(unsigned int irq);
@@ -30,11 +31,12 @@ void disable_8259A_irq(unsigned int irq);
  * moves to arch independent land
  */
 
-spinlock_t i8259A_lock = SPIN_LOCK_UNLOCKED;
+static spinlock_t i8259A_lock = SPIN_LOCK_UNLOCKED;
 
 static void end_8259A_irq (unsigned int irq)
 {
-	if (!(irq_desc[irq].status & (IRQ_DISABLED|IRQ_INPROGRESS)))
+	if (!(irq_desc[irq].status & (IRQ_DISABLED|IRQ_INPROGRESS)) &&
+	    irq_desc[irq].action)
 		enable_8259A_irq(irq);
 }
 
@@ -43,7 +45,7 @@ static void end_8259A_irq (unsigned int irq)
 void mask_and_ack_8259A(unsigned int);
 
 static unsigned int startup_8259A_irq(unsigned int irq)
-{ 
+{
 	enable_8259A_irq(irq);
 
 	return 0; /* never anything pending */
@@ -69,9 +71,8 @@ static struct hw_interrupt_type i8259A_irq_type = {
  */
 static unsigned int cached_irq_mask = 0xffff;
 
-#define __byte(x,y) 	(((unsigned char *)&(y))[x])
-#define cached_21	(__byte(0,cached_irq_mask))
-#define cached_A1	(__byte(1,cached_irq_mask))
+#define cached_21	(cached_irq_mask)
+#define cached_A1	(cached_irq_mask >> 8)
 
 void disable_8259A_irq(unsigned int irq)
 {
@@ -211,7 +212,7 @@ spurious_8259A_irq:
 			printk("spurious 8259A interrupt: IRQ%d.\n", irq);
 			spurious_irq_mask |= irqmask;
 		}
-		irq_err_count++;
+		atomic_inc(&irq_err_count);
 		/*
 		 * Theoretically we do not have to handle this IRQ,
 		 * but in Linux this does not cause problems and is
@@ -220,6 +221,32 @@ spurious_8259A_irq:
 		goto handle_real_irq;
 	}
 }
+
+static int i8259A_resume(struct sys_device *dev)
+{
+	init_8259A(0);
+	return 0;
+}
+
+static struct sysdev_class i8259_sysdev_class = {
+	set_kset_name("i8259"),
+	.resume = i8259A_resume,
+};
+
+static struct sys_device device_i8259A = {
+	.id	= 0,
+	.cls	= &i8259_sysdev_class,
+};
+
+static int __init i8259A_init_sysfs(void)
+{
+	int error = sysdev_class_register(&i8259_sysdev_class);
+	if (!error)
+		error = sys_device_register(&device_i8259A);
+	return error;
+}
+
+device_initcall(i8259A_init_sysfs);
 
 void __init init_8259A(int auto_eoi)
 {
@@ -234,7 +261,7 @@ void __init init_8259A(int auto_eoi)
 	 * outb_p - this has to work on a wide range of PC hardware.
 	 */
 	outb_p(0x11, 0x20);	/* ICW1: select 8259A-1 init */
-	outb_p(0x20 + 0, 0x21);	/* ICW2: 8259A-1 IR0-7 mapped to 0x20-0x27 */
+	outb_p(0x00, 0x21);	/* ICW2: 8259A-1 IR0-7 mapped to 0x00-0x07 */
 	outb_p(0x04, 0x21);	/* 8259A-1 (the master) has a slave on IR2 */
 	if (auto_eoi)
 		outb_p(0x03, 0x21);	/* master does Auto EOI */
@@ -242,7 +269,7 @@ void __init init_8259A(int auto_eoi)
 		outb_p(0x01, 0x21);	/* master expects normal EOI */
 
 	outb_p(0x11, 0xA0);	/* ICW1: select 8259A-2 init */
-	outb_p(0x20 + 8, 0xA1);	/* ICW2: 8259A-2 IR0-7 mapped to 0x28-0x2f */
+	outb_p(0x08, 0xA1);	/* ICW2: 8259A-2 IR0-7 mapped to 0x08-0x0f */
 	outb_p(0x02, 0xA1);	/* 8259A-2 is a slave on master's IR2 */
 	outb_p(0x01, 0xA1);	/* (slave's support for AEOI in flat mode
 				    is to be investigated) */

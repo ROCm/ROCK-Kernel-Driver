@@ -13,8 +13,6 @@
  *		modify it under the terms of the GNU General Public License
  *		as published by the Free Software Foundation; either version
  *		2 of the License, or (at your option) any later version.
- *
- * $Id: csum_partial_copy.c,v 1.2 1998/09/19 19:16:17 ralf Exp $
  */
 #include <net/checksum.h>
 #include <linux/types.h>
@@ -25,8 +23,8 @@
 /*
  * copy while checksumming, otherwise like csum_partial
  */
-unsigned int csum_partial_copy_nocheck(const char *src, char *dst, 
-				       int len, unsigned int sum)
+unsigned int csum_partial_copy_nocheck(const char *src, char *dst,
+	int len, unsigned int sum)
 {
 	/*
 	 * It's 2:30 am and I don't feel like doing it real ...
@@ -43,8 +41,7 @@ unsigned int csum_partial_copy_nocheck(const char *src, char *dst,
  * then zero the rest of the buffer.
  */
 unsigned int csum_partial_copy_from_user (const char *src, char *dst,
-                                          int len, unsigned int sum,
-                                          int *err_ptr)
+	int len, unsigned int sum, int *err_ptr)
 {
 	int missing;
 
@@ -53,6 +50,6 @@ unsigned int csum_partial_copy_from_user (const char *src, char *dst,
 		memset(dst + len - missing, 0, missing);
 		*err_ptr = -EFAULT;
 	}
-		
+
 	return csum_partial(dst, len, sum);
 }

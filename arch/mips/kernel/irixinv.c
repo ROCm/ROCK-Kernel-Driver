@@ -1,11 +1,9 @@
 /*
  * Support the inventory interface for IRIX binaries
  * This is invoked before the mm layer is working, so we do not
- * use the linked lists for the inventory yet. 
+ * use the linked lists for the inventory yet.
  *
  * Miguel de Icaza, 1997.
- *
- * $Id: irixinv.c,v 1.3 1998/04/05 11:23:51 ralf Exp $
  */
 #include <linux/mm.h>
 #include <linux/init.h>
@@ -18,14 +16,13 @@ int inventory_items = 0;
 
 static inventory_t inventory [MAX_INVENTORY];
 
-void
-add_to_inventory (int class, int type, int controller, int unit, int state)
+void add_to_inventory (int class, int type, int controller, int unit, int state)
 {
 	inventory_t *ni = &inventory [inventory_items];
 
 	if (inventory_items == MAX_INVENTORY)
 		return;
-	
+
 	ni->inv_class      = class;
 	ni->inv_type       = type;
 	ni->inv_controller = controller;
@@ -35,8 +32,7 @@ add_to_inventory (int class, int type, int controller, int unit, int state)
 	inventory_items++;
 }
 
-int
-dump_inventory_to_user (void *userbuf, int size)
+int dump_inventory_to_user (void *userbuf, int size)
 {
 	inventory_t *inv  = &inventory [0];
 	inventory_t *user = userbuf;
@@ -53,13 +49,13 @@ dump_inventory_to_user (void *userbuf, int size)
 	return inventory_items * sizeof (inventory_t);
 }
 
-void __init init_inventory (void)
+static int __init init_inventory(void)
 {
-	/* gross hack while we put the right bits all over the kernel
+	/*
+	 * gross hack while we put the right bits all over the kernel
 	 * most likely this will not let just anyone run the X server
 	 * until we put the right values all over the place
 	 */
-	 
 	add_to_inventory (10, 3, 0, 0, 16400);
 	add_to_inventory (1, 1, 150, -1, 12);
 	add_to_inventory (1, 3, 0, 0, 8976);
@@ -78,4 +74,8 @@ void __init init_inventory (void)
 	add_to_inventory (2, 2, 0, 2, 0);
 	add_to_inventory (2, 2, 0, 1, 0);
 	add_to_inventory (7, 14, 0, 0, 6);
+
+	return 0;
 }
+
+module_init(init_inventory);

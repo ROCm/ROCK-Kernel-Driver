@@ -3,10 +3,8 @@
 # License.  See the file "COPYING" in the main directory of this archive
 # for more details.
 #
-# Copyright (C) 1995, 1998, 2001 by Ralf Baechle
+# Copyright (C) 1995, 1998, 2001, 2002 by Ralf Baechle
 #
-
-OBJS  = milo.o a.out.o
 
 #
 # Some DECstations need all possible sections of an ECOFF executable
@@ -21,25 +19,33 @@ endif
 # Drop some uninteresting sections in the kernel.
 # This is only relevant for ELF kernels but doesn't hurt a.out
 #
-drop-sections	= .reginfo .mdebug
+drop-sections	= .reginfo .mdebug .comment .note
 strip-flags	= $(addprefix --remove-section=,$(drop-sections))
 
 all: vmlinux.ecoff addinitrd
 
-vmlinux.ecoff:	elf2ecoff $(TOPDIR)/vmlinux
-	./elf2ecoff $(TOPDIR)/vmlinux vmlinux.ecoff $(E2EFLAGS)
+vmlinux.rm200: vmlinux
+	$(OBJCOPY) \
+		--change-addresses=0xfffffffc \
+		-O elf32-tradlittlemips \
+		$(strip-flags) \
+		$< $@
 
-elf2ecoff: elf2ecoff.c
+vmlinux.ecoff:	$(obj)/elf2ecoff vmlinux
+	./elf2ecoff vmlinux $(obj)/vmlinux.ecoff $(E2EFLAGS)
+
+$(obj)/elf2ecoff: $(obj)/elf2ecoff.c
 	$(HOSTCC) -o $@ $^
 
-addinitrd: addinitrd.c
+$(obj)/addinitrd: $(obj)/addinitrd.c
 	$(HOSTCC) -o $@ $^
 
-clean:
-	rm -f vmlinux.ecoff
-	rm -f zImage zImage.tmp
+archhelp:
+	@echo	'* vmlinux.rm200	- Bootable kernel image for RM200C'
 
-mrproper:
-	rm -f vmlinux.ecoff
-	rm -f addinitrd
-	rm -f elf2ecoff
+CLEAN_FILES += addinitrd \
+	       elf2ecoff \
+	       vmlinux.ecoff \
+	       vmlinux.rm200 \
+	       zImage.tmp \
+	       zImage
