@@ -3576,9 +3576,7 @@ static __exit void md_exit(void)
 	unregister_blkdev(MAJOR_NR,"md");
 	unregister_reboot_notifier(&md_notifier);
 	unregister_sysctl_table(raid_table_header);
-#ifdef CONFIG_PROC_FS
 	remove_proc_entry("mdstat", NULL);
-#endif
 	ITERATE_MDDEV(mddev,tmp) {
 		struct gendisk *disk = mddev->gendisk;
 		if (!disk)
