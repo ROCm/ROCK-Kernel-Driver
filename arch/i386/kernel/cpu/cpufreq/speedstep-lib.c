@@ -321,9 +321,7 @@ EXPORT_SYMBOL_GPL(speedstep_detect_processor);
 unsigned int speedstep_get_freqs(unsigned int processor,
 				  unsigned int *low_speed,
 				  unsigned int *high_speed,
-				  void (*set_state) (unsigned int state,
-						     unsigned int notify)
-				 )
+				  void (*set_state) (unsigned int state))
 {
 	unsigned int prev_speed;
 	unsigned int ret = 0;
@@ -340,7 +338,7 @@ unsigned int speedstep_get_freqs(unsigned int processor,
 	local_irq_save(flags);
 
 	/* switch to low state */
-	set_state(SPEEDSTEP_LOW, 0);
+	set_state(SPEEDSTEP_LOW);
 	*low_speed = speedstep_get_processor_frequency(processor);
 	if (!*low_speed) {
 		ret = -EIO;
@@ -348,7 +346,7 @@ unsigned int speedstep_get_freqs(unsigned int processor,
 	}
 
 	/* switch to high state */
-	set_state(SPEEDSTEP_HIGH, 0);
+	set_state(SPEEDSTEP_HIGH);
 	*high_speed = speedstep_get_processor_frequency(processor);
 	if (!*high_speed) {
 		ret = -EIO;
@@ -362,7 +360,7 @@ unsigned int speedstep_get_freqs(unsigned int processor,
 
 	/* switch to previous state, if necessary */
 	if (*high_speed != prev_speed)
-		set_state(SPEEDSTEP_LOW, 0);
+		set_state(SPEEDSTEP_LOW);
 
  out:
 	local_irq_restore(flags);
