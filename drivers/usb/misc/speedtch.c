@@ -20,7 +20,19 @@
  ******************************************************************************/
 
 /*
- *  Written by Johan Verrept (Johan.Verrept@advalvas.be)
+ *  Written by Johan Verrept, maintained by Duncan Sands (duncan.sands@wanadoo.fr)
+ *
+ *  1.6:	- No longer opens a connection if the firmware is not loaded
+ *  		- Added support for the speedtouch 330
+ *  		- Removed the limit on the number of devices
+ *  		- Module now autoloads on device plugin
+ *  		- Merged relevant parts of sarlib
+ *  		- Replaced the kernel thread with a tasklet
+ *  		- New packet transmission code
+ *  		- Changed proc file contents
+ *  		- Fixed all known SMP races
+ *  		- Many fixes and cleanups
+ *  		- Various fixes by Oliver Neukum (oliver@neukum.name)
  *
  *  1.5A:	- Version for inclusion in 2.5 series kernel
  *		- Modifications by Richard Purdie (rpurdie@rpsys.net)
@@ -28,6 +40,7 @@
  *		udsl_usb_send_data_context->urb to a pointer and adding code
  *		to alloc and free it
  *		- remove_wait_queue() added to udsl_atm_processqueue_thread()
+ *		- Duncan Sands (duncan.sands@wanadoo.fr) is the new maintainer
  *
  *  1.5:	- fixed memory leak when atmsar_decode_aal5 returned NULL.
  *		(reported by stephen.robinson@zen.co.uk)
@@ -77,9 +90,9 @@ static int udsl_print_packet (const unsigned char *data, int len);
 #define PACKETDEBUG(arg...)
 #endif
 
-#define DRIVER_AUTHOR	"Johan Verrept, Johan.Verrept@advalvas.be"
-#define DRIVER_DESC	"Driver for the Alcatel SpeedTouch USB ADSL modem"
-#define DRIVER_VERSION	"1.5A"
+#define DRIVER_AUTHOR	"Johan Verrept, Duncan Sands <duncan.sands@wanadoo.fr>"
+#define DRIVER_DESC	"Alcatel SpeedTouch USB driver"
+#define DRIVER_VERSION	"1.6"
 
 #define SPEEDTOUCH_VENDORID		0x06b9
 #define SPEEDTOUCH_PRODUCTID		0x4061
