@@ -707,11 +707,11 @@ cifs_commit_write(struct file *file, struct page *page, unsigned offset,
 	int rc = 0;
 	struct inode *inode = page->mapping->host;
 	loff_t position = ((loff_t)page->index << PAGE_CACHE_SHIFT) + to;
-	struct cifsFileInfo *open_file;
-	struct cifs_sb_info *cifs_sb;
+	/* struct cifsFileInfo *open_file;
+	struct cifs_sb_info *cifs_sb; */
 
 	xid = GetXid();
-	cFYI(1,("commit write for page %p up to position %ld or 0x%lx for %d or 0x%x bytes",page,position,position,to,to));
+	cFYI(1,("commit write for page %p up to position %lld for %d",page,position,to));
 	if (position > inode->i_size){
 		i_size_write(inode, position);
 		/*if (file->private_data == NULL) {
@@ -969,7 +969,7 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 	pagevec_init(&lru_pvec, 0);
 
 	for(i = 0;i<num_pages;) {
-		int contig_pages;
+		unsigned contig_pages;
 		struct page * tmp_page;
 		unsigned long expected_index;
 
@@ -991,7 +991,7 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 			}
 		}
 /*		cERROR(1,("ended with contig_pages %d since expected_index %d not matched",contig_pages,expected_index)); */
-		if(contig_pages >  num_pages - i) {
+		if(contig_pages + i >  num_pages) {
 /*			cERROR(1,("reducing contig_pages from %d with i: %d",contig_pages,i));*/
 			contig_pages = num_pages - i;
 		}
@@ -1038,7 +1038,7 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 
 			i +=  bytes_read >> PAGE_CACHE_SHIFT;
 
-			if((bytes_read & PAGE_CACHE_MASK) != bytes_read) {
+			if((int)(bytes_read & PAGE_CACHE_MASK) != bytes_read) {
 				cFYI(1,("Partial page %d of %d read to cache",i++,num_pages));
 
 				i++; /* account for partial page */
@@ -1055,7 +1055,7 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 				break; */
 			}
 		} else {
-			cFYI(1,("No bytes read (%d) at offset %d . Cleaning remaining pages from readahead list",bytes_read,offset)); 
+			cFYI(1,("No bytes read (%d) at offset %lld . Cleaning remaining pages from readahead list",bytes_read,offset)); 
 			/* BB turn off caching and do new lookup on file size at server? */
 			while (!list_empty(page_list) && (i < num_pages)) {
 				page = list_entry(page_list->prev, struct page, list);
