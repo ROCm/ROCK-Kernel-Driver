@@ -127,7 +127,7 @@ static inline int sync_page(struct page *page)
 		if (mapping->a_ops && mapping->a_ops->sync_page)
 			return mapping->a_ops->sync_page(page);
 	} else if (PageSwapCache(page)) {
-		swap_unplug_io_fn(NULL);
+		swap_unplug_io_fn(NULL, page);
 	}
 	return 0;
 }

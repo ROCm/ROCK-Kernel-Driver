@@ -181,7 +181,7 @@ extern int vm_swappiness;
 extern int shmem_unuse(swp_entry_t entry, struct page *page);
 #endif /* CONFIG_MMU */
 
-extern void swap_unplug_io_fn(struct backing_dev_info *);
+extern void swap_unplug_io_fn(struct backing_dev_info *, struct page *);
 
 #ifdef CONFIG_SWAP
 /* linux/mm/page_io.c */

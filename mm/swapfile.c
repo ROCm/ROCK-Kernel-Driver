@@ -88,7 +88,7 @@ static void remove_swap_bdev(struct block_device *bdev)
 	BUG();
 }
 
-void swap_unplug_io_fn(struct backing_dev_info *unused_bdi)
+void swap_unplug_io_fn(struct backing_dev_info *unused_bdi, struct page *page)
 {
 	int i;
 
