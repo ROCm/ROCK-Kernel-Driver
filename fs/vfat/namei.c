@@ -690,42 +690,39 @@ xlate_to_uni(const char *name, int len, char *outname, int *longlen, int *outlen
 	return 0;
 }
 
-static int
-vfat_fill_slots(struct inode *dir, struct msdos_dir_slot *ds, const char *name,
-		int len, int *slots, int is_dir, int uni_xlate)
+static int vfat_build_slots(struct inode *dir, const char *name, int len,
+			    struct msdos_dir_slot *ds, int *slots, int is_dir)
 {
-	struct nls_table *nls_io, *nls_disk;
-	wchar_t *uname;
+	struct msdos_sb_info *sbi = MSDOS_SB(dir->i_sb);
+	struct fat_mount_options *opts = &sbi->options;
 	struct msdos_dir_slot *ps;
 	struct msdos_dir_entry *de;
 	unsigned long page;
 	unsigned char cksum, lcase;
-	char *uniname, msdos_name[MSDOS_NAME];
-	int res, utf8, slot, ulen, unilen, i;
+	char msdos_name[MSDOS_NAME];
+	wchar_t *uname;
+	int res, slot, ulen, usize, i;
 	loff_t offset;
 
 	*slots = 0;
-	utf8 = MSDOS_SB(dir->i_sb)->options.utf8;
-	nls_io = MSDOS_SB(dir->i_sb)->nls_io;
-	nls_disk = MSDOS_SB(dir->i_sb)->nls_disk;
+	res = vfat_valid_longname(name, len, opts->unicode_xlate);
+	if (res < 0)
+		return res;
 
-	if (name[len-1] == '.')
-		len--;
 	if(!(page = __get_free_page(GFP_KERNEL)))
 		return -ENOMEM;
 
-	uniname = (char *) page;
-	res = xlate_to_uni(name, len, uniname, &ulen, &unilen, uni_xlate,
-			   utf8, nls_io);
+	uname = (wchar_t *)page;
+	res = xlate_to_uni(name, len, (char *)uname, &ulen, &usize,
+			   opts->unicode_xlate, opts->utf8, sbi->nls_io);
 	if (res < 0)
 		goto out_free;
 
-	uname = (wchar_t *) page;
 	res = vfat_is_used_badchars(uname, ulen);
 	if (res < 0)
 		goto out_free;
 
-	res = vfat_create_shortname(dir, nls_disk, uname, ulen,
+	res = vfat_create_shortname(dir, sbi->nls_disk, uname, ulen,
 				    msdos_name, &lcase);
 	if (res < 0)
 		goto out_free;
@@ -736,7 +733,7 @@ vfat_fill_slots(struct inode *dir, struct msdos_dir_slot *ds, const char *name,
 	}
 
 	/* build the entry of long file name */
-	*slots = unilen / 13;
+	*slots = usize / 13;
 	for (cksum = i = 0; i < 11; i++) {
 		cksum = (((cksum&1)<<7)|((cksum&0xfe)>>1)) + msdos_name[i];
 	}
@@ -772,21 +769,6 @@ shortname:
 out_free:
 	free_page(page);
 	return res;
-}
-
-/* We can't get "." or ".." here - VFS takes care of those cases */
-
-static int vfat_build_slots(struct inode *dir, const char *name, int len,
-			    struct msdos_dir_slot *ds, int *slots, int is_dir)
-{
-	int res, xlate;
-
-	xlate = MSDOS_SB(dir->i_sb)->options.unicode_xlate;
-	res = vfat_valid_longname(name, len, xlate);
-	if (res < 0)
-		return res;
-
-	return vfat_fill_slots(dir, ds, name, len, slots, is_dir, xlate);
 }
 
 static int vfat_add_entry(struct inode *dir,struct qstr* qname,

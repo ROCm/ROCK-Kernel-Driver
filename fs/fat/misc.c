@@ -208,7 +208,6 @@ struct buffer_head *fat_extend_dir(struct inode *inode)
 	}
 	inode->i_size += 1 << MSDOS_SB(sb)->cluster_bits;
 	MSDOS_I(inode)->mmu_private += 1 << MSDOS_SB(sb)->cluster_bits;
-	mark_inode_dirty(inode);
 
 	return res;
 }
