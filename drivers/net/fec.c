@@ -196,6 +196,7 @@ static struct net_device_stats *fec_enet_get_stats(struct net_device *dev);
 static void set_multicast_list(struct net_device *dev);
 static void fec_restart(struct net_device *dev, int duplex);
 static void fec_stop(struct net_device *dev);
+static void fec_set_mac_address(struct net_device *dev);
 
 
 /* MII processing.  We keep this as simple as possible.  Requests are
@@ -1479,6 +1480,8 @@ fec_enet_open(struct net_device *dev)
 	 * a simple way to do that.
 	 */
 
+	fec_set_mac_address(dev);
+
 	fep->sequence_done = 0;
 	fep->link = 0;
 
@@ -1487,6 +1490,10 @@ fec_enet_open(struct net_device *dev)
 		mii_do_cmd(dev, fep->phy->config);
 		mii_do_cmd(dev, phy_cmd_config);  /* display configuration */
 
+		/* FIXME: use netif_carrier_{on,off} ; this polls
+		 * until link is up which is wrong...  could be
+		 * 30 seconds or more we are trapped in here. -jgarzik
+		 */
 		while(!fep->sequence_done)
 			schedule();
 
@@ -1604,34 +1611,21 @@ static void set_multicast_list(struct net_device *dev)
 
 /* Set a MAC change in hardware.
  */
-static int 
-fec_set_mac_address(struct net_device *dev, void *p)
+static void
+fec_set_mac_address(struct net_device *dev)
 {
 	int i;
-	struct sockaddr *addr = p;
 	volatile fec_t *fecp;
 
 	fecp = fec_hwp;
 
-	if (netif_running(dev))
-		return -EBUSY;
-
-	/* Set the device copy of the Ethernet address
-	*/
-	memcpy(dev->dev_addr, addr->sa_data,dev->addr_len);
-
-	/* Set our copy of the Ethernet address 
-	*/
-	for (i = 0; i < (ETH_ALEN / 2); i++) {
+	/* Set our copy of the Ethernet address */
+	for (i = 0; i < (ETH_ALEN / 2); i++)
 		my_enet_addr[i] = (dev->dev_addr[i*2] << 8) | dev->dev_addr[i*2 + 1];
-	}
 
-	/* Set station address.
-	*/
+	/* Set station address. */
 	fecp->fec_addr_low = (my_enet_addr[0] << 16) | my_enet_addr[1];
 	fecp->fec_addr_high = my_enet_addr[2] << 16;
-  
-	return 0;
 }
 
 /* Initialize the FEC Ethernet on 860T (or ColdFire 5272).
@@ -1675,6 +1669,9 @@ int __init fec_enet_init(struct net_device *dev)
 
 	/* Set the Ethernet address.  If using multiple Enets on the 8xx,
 	 * this needs some work to get unique addresses.
+	 *
+	 * This is our default MAC address unless the user changes
+	 * it via eth_mac_addr (our dev->set_mac_addr handler).
 	 */
 	fec_get_mac(dev, fep);
 
@@ -1766,7 +1763,6 @@ int __init fec_enet_init(struct net_device *dev)
 	dev->stop = fec_enet_close;
 	dev->get_stats = fec_enet_get_stats;
 	dev->set_multicast_list = set_multicast_list;
-	dev->set_mac_address = fec_set_mac_address;
 
 	for (i=0; i<NMII-1; i++)
 		mii_cmds[i].mii_next = &mii_cmds[i+1];
