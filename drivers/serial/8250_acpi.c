@@ -28,8 +28,7 @@ static acpi_status acpi_serial_mmio(struct serial_struct *req,
 	req->iomem_base = ioremap(req->iomap_base, size);
 	if (!req->iomem_base) {
 		printk(KERN_ERR "%s: couldn't ioremap 0x%lx-0x%lx\n",
-			__FUNCTION__, addr->min_address_range,
-			addr->max_address_range);
+			__FUNCTION__, req->iomap_base, req->iomap_base + size);
 		return AE_ERROR;
 	}
 	req->io_type = SERIAL_IO_MEM;

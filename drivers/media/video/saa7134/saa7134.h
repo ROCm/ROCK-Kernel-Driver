@@ -19,19 +19,24 @@
  */
 
 #include <linux/version.h>
+#define SAA7134_VERSION_CODE KERNEL_VERSION(0,2,9)
+
 #include <linux/pci.h>
 #include <linux/i2c.h>
 #include <linux/videodev.h>
 #include <linux/kdev_t.h>
+#include <linux/input.h>
 
 #include <asm/io.h>
+
+#ifdef CONFIG_VIDEO_IR
+#include "ir-common.h"
+#endif
 
 #include <media/video-buf.h>
 #include <media/tuner.h>
 #include <media/audiochip.h>
 #include <media/id.h>
-
-#define SAA7134_VERSION_CODE KERNEL_VERSION(0,2,8)
 
 #ifndef TRUE
 # define TRUE (1==1)
@@ -133,6 +138,11 @@ struct saa7134_format {
 #define SAA7134_BOARD_TYPHOON_90031    13
 #define SAA7134_BOARD_ELSA             14
 #define SAA7134_BOARD_ELSA_500TV       15
+#define SAA7134_BOARD_ASUSTeK_TVFM7134 16
+#define SAA7134_BOARD_VA1000POWER      17
+#define SAA7134_BOARD_BMK_MPEX_NOTUNER 18
+#define SAA7134_BOARD_VIDEOMATE_TV     19
+#define SAA7134_BOARD_CRONOS_PLUS      20
 
 #define SAA7134_INPUT_MAX 8
 
@@ -200,6 +210,7 @@ struct saa7134_thread {
 	unsigned int               exit;
 	unsigned int               scan1;
 	unsigned int               scan2;
+	unsigned int               mode;
 };
 
 /* buffer for one video/vbi/ts frame */
@@ -255,6 +266,7 @@ struct saa7134_ts {
 	/* TS capture */
 	struct videobuf_queue      ts;
 	struct saa7134_pgtable     pt_ts;
+	int			   started;
 };
 
 /* oss dsp status */
@@ -286,6 +298,18 @@ struct saa7134_oss {
 	unsigned int               read_count;
 };
 
+#ifdef CONFIG_VIDEO_IR
+/* IR input */
+struct saa7134_ir {
+	struct input_dev           dev;
+	struct ir_input_state      ir;
+	char                       name[32];
+	char                       phys[32];
+	u32                        mask_keycode;
+	u32                        mask_keydown;
+};
+#endif
+
 /* global device status */
 struct saa7134_dev {
 	struct list_head           devlist;
@@ -294,12 +318,18 @@ struct saa7134_dev {
 
 	/* various device info */
 	unsigned int               resources;
-	struct video_device        video_dev;
-	struct video_device        ts_dev;
-	struct video_device        radio_dev;
-	struct video_device        vbi_dev;
+	struct video_device        *video_dev;
+	struct video_device        *ts_dev;
+	struct video_device        *radio_dev;
+	struct video_device        *vbi_dev;
 	struct saa7134_oss         oss;
 	struct saa7134_ts          ts;
+
+	/* infrared remote */
+	int                        has_remote;
+#ifdef CONFIG_VIDEO_IR
+	struct saa7134_ir          *remote;
+#endif
 
 	/* pci i/o */
 	char                       name[32];
@@ -311,6 +341,7 @@ struct saa7134_dev {
 	/* config info */
 	unsigned int               board;
 	unsigned int               tuner_type;
+	unsigned int               gpio_value;
 
 	/* i2c i/o */
 	struct i2c_adapter         i2c_adap;
@@ -372,7 +403,9 @@ struct saa7134_dev {
 #define saa_setb(reg,bit)          saa_andorb((reg),(bit),(bit))
 #define saa_clearb(reg,bit)        saa_andorb((reg),(bit),0)
 
-#define saa_wait(d) { if (need_resched()) schedule(); else udelay(d);}
+//#define saa_wait(d) { if (need_resched()) schedule(); else udelay(d);}
+#define saa_wait(d) { udelay(d); }
+//#define saa_wait(d) { schedule_timeout(HZ*d/1000 ?:1); }
 
 /* ----------------------------------------------------------- */
 /* saa7134-core.c                                              */
@@ -433,7 +466,8 @@ extern struct video_device saa7134_radio_template;
 int saa7134_common_ioctl(struct saa7134_dev *dev,
 			 unsigned int cmd, void *arg);
 
-int saa7134_video_init(struct saa7134_dev *dev);
+int saa7134_video_init1(struct saa7134_dev *dev);
+int saa7134_video_init2(struct saa7134_dev *dev);
 int saa7134_video_fini(struct saa7134_dev *dev);
 void saa7134_irq_video_intl(struct saa7134_dev *dev);
 void saa7134_irq_video_done(struct saa7134_dev *dev, unsigned long status);
@@ -443,7 +477,7 @@ void saa7134_irq_video_done(struct saa7134_dev *dev, unsigned long status);
 /* saa7134-ts.c                                                */
 
 extern struct video_device saa7134_ts_template;
-int saa7134_ts_init(struct saa7134_dev *dev);
+int saa7134_ts_init1(struct saa7134_dev *dev);
 int saa7134_ts_fini(struct saa7134_dev *dev);
 void saa7134_irq_ts_done(struct saa7134_dev *dev, unsigned long status);
 
@@ -454,7 +488,7 @@ void saa7134_irq_ts_done(struct saa7134_dev *dev, unsigned long status);
 extern struct videobuf_queue_ops saa7134_vbi_qops;
 extern struct video_device saa7134_vbi_template;
 
-int saa7134_vbi_init(struct saa7134_dev *dev);
+int saa7134_vbi_init1(struct saa7134_dev *dev);
 int saa7134_vbi_fini(struct saa7134_dev *dev);
 void saa7134_irq_vbi_done(struct saa7134_dev *dev, unsigned long status);
 
@@ -470,7 +504,7 @@ void saa7134_tvaudio_setinput(struct saa7134_dev *dev,
 void saa7134_tvaudio_setvolume(struct saa7134_dev *dev, int level);
 int saa7134_tvaudio_getstereo(struct saa7134_dev *dev);
 
-int saa7134_tvaudio_init(struct saa7134_dev *dev);
+int saa7134_tvaudio_init2(struct saa7134_dev *dev);
 int saa7134_tvaudio_fini(struct saa7134_dev *dev);
 int saa7134_tvaudio_do_scan(struct saa7134_dev *dev);
 
@@ -482,10 +516,16 @@ int saa_dsp_writel(struct saa7134_dev *dev, int reg, u32 value);
 extern struct file_operations saa7134_dsp_fops;
 extern struct file_operations saa7134_mixer_fops;
 
-int saa7134_oss_init(struct saa7134_dev *dev);
+int saa7134_oss_init1(struct saa7134_dev *dev);
 int saa7134_oss_fini(struct saa7134_dev *dev);
 void saa7134_irq_oss_done(struct saa7134_dev *dev, unsigned long status);
 
+/* ----------------------------------------------------------- */
+/* saa7134-input.c                                             */
+
+int  saa7134_input_init1(struct saa7134_dev *dev);
+void saa7134_input_fini(struct saa7134_dev *dev);
+void saa7134_input_irq(struct saa7134_dev *dev);
 
 /*
  * Local variables:

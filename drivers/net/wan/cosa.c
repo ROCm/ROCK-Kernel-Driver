@@ -519,7 +519,6 @@ static int cosa_probe(int base, int irq, int dma)
 		current->state = TASK_INTERRUPTIBLE;
 		cosa_putstatus(cosa, SR_TX_INT_ENA);
 		schedule_timeout(30);
-		current->state = TASK_RUNNING;
 		irq = probe_irq_off(irqs);
 		/* Disable all IRQs from the card */
 		cosa_putstatus(cosa, 0);
@@ -1532,7 +1531,6 @@ static int cosa_reset_and_read_id(struct cosa_data *cosa, char *idstring)
 #ifdef MODULE
 	current->state = TASK_INTERRUPTIBLE;
 	schedule_timeout(HZ/2);
-	current->state = TASK_RUNNING;
 #else
 	udelay(5*100000);
 #endif

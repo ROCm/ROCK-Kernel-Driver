@@ -69,7 +69,7 @@ esp_conn_in_get(const struct sk_buff *skb,
 	if (!cp) {
 		/*
 		 * We are not sure if the packet is from our
-		 * service, so the caller should check skip_nonexisting
+		 * service, so our conn_schedule hook should return NF_ACCEPT
 		 */
 		IP_VS_DBG(12, "Unknown ISAKMP entry for outin packet "
 			  "%s%s %u.%u.%u.%u->%u.%u.%u.%u\n",
@@ -104,14 +104,9 @@ esp_conn_out_get(const struct sk_buff *skb, struct ip_vs_protocol *pp,
 	}
 
 	if (!cp) {
-		/*
-		 * We are not sure if the packet is from our
-		 * service, so the caller should check skip_nonexisting
-		 * or our conn_schedule hook should return NF_ACCEPT
-		 */
 		IP_VS_DBG(12, "Unknown ISAKMP entry for inout packet "
 			  "%s%s %u.%u.%u.%u->%u.%u.%u.%u\n",
-			  inverse?"ICMP+":"",
+			  inverse ? "ICMP+" : "",
 			  pp->name,
 			  NIPQUAD(iph->saddr),
 			  NIPQUAD(iph->daddr));
@@ -166,11 +161,7 @@ static void esp_exit(struct ip_vs_protocol *pp)
 struct ip_vs_protocol ip_vs_protocol_esp = {
 	.name =			"ESP",
 	.protocol =		IPPROTO_ESP,
-	.minhlen =		0,
-	.minhlen_icmp =		0,
 	.dont_defrag =		1,
-	.skip_nonexisting =	1,
-	.slave =		1,
 	.init =			esp_init,
 	.exit =			esp_exit,
 	.conn_schedule =	esp_conn_schedule,

@@ -43,17 +43,17 @@ int videobuf_unlock(struct page **pages, int nr_pages);
  * A small set of helper functions to manage buffers (both userland
  * and kernel) for DMA.
  *
- * videobuf_init_*_dmabuf()
+ * videobuf_dma_init_*()
  *	creates a buffer.  The userland version takes a userspace
  *	pointer + length.  The kernel version just wants the size and
  *	does memory allocation too using vmalloc_32().
  *
- * videobuf_pci_*_dmabuf()
+ * videobuf_dma_pci_*()
  *	see Documentation/DMA-mapping.txt, these functions to
  *	basically the same.  The map function does also build a
  *	scatterlist for the buffer (and unmap frees it ...)
  *
- * videobuf_free_dmabuf()
+ * videobuf_dma_free()
  *	no comment ...
  *
  */
@@ -66,6 +66,9 @@ struct videobuf_dmabuf {
 	/* for kernel buffers */
 	void                *vmalloc;
 
+	/* for overlay buffers (pci-pci dma) */
+	dma_addr_t          bus_addr;
+
 	/* common */
 	struct scatterlist  *sglist;
 	int                 sglen;
@@ -77,6 +80,8 @@ int videobuf_dma_init_user(struct videobuf_dmabuf *dma, int direction,
 			   unsigned long data, unsigned long size);
 int videobuf_dma_init_kernel(struct videobuf_dmabuf *dma, int direction,
 			     int nr_pages);
+int videobuf_dma_init_overlay(struct videobuf_dmabuf *dma, int direction,
+			      dma_addr_t addr, int nr_pages);
 int videobuf_dma_pci_map(struct pci_dev *dev, struct videobuf_dmabuf *dma);
 int videobuf_dma_pci_sync(struct pci_dev *dev,
 			  struct videobuf_dmabuf *dma);
@@ -133,6 +138,7 @@ struct videobuf_buffer {
 	/* info about the buffer */
 	unsigned int            width;
 	unsigned int            height;
+	unsigned int            bytesperline; /* use only if != 0 */
 	unsigned long           size;
 	enum v4l2_field         field;
 	enum videobuf_state     state;
@@ -140,7 +146,8 @@ struct videobuf_buffer {
 	struct list_head        stream;  /* QBUF/DQBUF list */
 
 	/* for mmap'ed buffers */
-	size_t                  boff;    /* buffer offset (mmap) */
+	enum v4l2_memory        memory;
+	size_t                  boff;    /* buffer offset (mmap + overlay) */
 	size_t                  bsize;   /* buffer size */
 	unsigned long           baddr;   /* buffer addr (userland ptr!) */
 	struct videobuf_mapping *map;
@@ -185,7 +192,8 @@ struct videobuf_queue {
 
 void* videobuf_alloc(unsigned int size);
 int videobuf_waiton(struct videobuf_buffer *vb, int non_blocking, int intr);
-int videobuf_iolock(struct pci_dev *pci, struct videobuf_buffer *vb);
+int videobuf_iolock(struct pci_dev *pci, struct videobuf_buffer *vb,
+		    struct v4l2_framebuffer *fbuf);
 
 void videobuf_queue_init(struct videobuf_queue *q,
 			 struct videobuf_queue_ops *ops,
@@ -221,7 +229,8 @@ unsigned int videobuf_poll_stream(struct file *file,
 				  poll_table *wait);
 
 int videobuf_mmap_setup(struct file *file, struct videobuf_queue *q,
-			unsigned int bcount, unsigned int bsize);
+			unsigned int bcount, unsigned int bsize,
+			enum v4l2_memory memory);
 int videobuf_mmap_free(struct file *file, struct videobuf_queue *q);
 int videobuf_mmap_mapper(struct vm_area_struct *vma,
 			 struct videobuf_queue *q);

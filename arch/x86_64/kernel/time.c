@@ -28,6 +28,7 @@
 #include <asm/vsyscall.h>
 #include <asm/timex.h>
 #include <asm/proto.h>
+#include <linux/cpufreq.h>
 #ifdef CONFIG_X86_LOCAL_APIC
 #include <asm/apic.h>
 #endif
@@ -455,6 +456,51 @@ unsigned long get_cmos_time(void)
 	return mktime(year, mon, day, hour, min, sec);
 }
 
+#ifdef CONFIG_CPU_FREQ
+
+/* Frequency scaling support. Adjust the TSC based timer when the cpu frequency
+   changes.
+   
+   RED-PEN: On SMP we assume all CPUs run with the same frequency.  It's
+   not that important because current Opteron setups do not support
+   scaling on SMP anyroads.
+
+   Should fix up last_tsc too. Currently gettimeofday in the
+   first tick after the change will be slightly wrong. */
+
+static unsigned int  ref_freq = 0;
+static unsigned long loops_per_jiffy_ref = 0;
+
+//static unsigned long fast_gettimeoffset_ref = 0;
+static unsigned long cpu_khz_ref = 0;
+
+static int time_cpufreq_notifier(struct notifier_block *nb, unsigned long val,
+				 void *data)
+{
+        struct cpufreq_freqs *freq = data;
+
+	if (!ref_freq) {
+		ref_freq = freq->old;
+		loops_per_jiffy_ref = cpu_data[freq->cpu].loops_per_jiffy;
+		cpu_khz_ref = cpu_khz;
+	}
+        if ((val == CPUFREQ_PRECHANGE  && freq->old < freq->new) ||
+            (val == CPUFREQ_POSTCHANGE && freq->old > freq->new)) {
+                cpu_data[freq->cpu].loops_per_jiffy =
+		cpufreq_scale(loops_per_jiffy_ref, ref_freq, freq->new);
+
+		cpu_khz = cpufreq_scale(cpu_khz_ref, ref_freq, freq->new);
+		vxtime.tsc_quot = (1000L << 32) / cpu_khz;
+	}
+	
+	return 0;
+}
+ 
+static struct notifier_block time_cpufreq_notifier_block = {
+         .notifier_call  = time_cpufreq_notifier
+};
+#endif
+
 /*
  * calibrate_tsc() calibrates the processor TSC in a very simple way, comparing
  * it to the HPET timer of known frequency.
@@ -641,6 +687,11 @@ void __init time_init(void)
 	vxtime.hz = vxtime_hz;
 	rdtscll_sync(&vxtime.last_tsc);
 	setup_irq(0, &irq0);
+
+#ifdef CONFIG_CPU_FREQ
+	cpufreq_register_notifier(&time_cpufreq_notifier_block, 
+				  CPUFREQ_TRANSITION_NOTIFIER);
+#endif
 }
 
 void __init time_init_smp(void)

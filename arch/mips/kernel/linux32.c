@@ -79,8 +79,8 @@ int cp_compat_stat(struct kstat *stat, struct compat_stat *statbuf)
 	tmp.st_ino = stat->ino;
 	tmp.st_mode = stat->mode;
 	tmp.st_nlink = stat->nlink;
-	SET_STAT_UID(tmp, stat->uid);
-	SET_STAT_GID(tmp, stat->gid);
+	SET_UID(tmp.st_uid, stat->uid);
+	SET_GID(tmp.st_gid, stat->gid);
 	tmp.st_rdev = new_encode_dev(stat->rdev);
 	tmp.st_size = stat->size;
 	tmp.st_atime = stat->atime.tv_sec;

@@ -421,10 +421,10 @@ void kernel_to_ipc64_perm (struct kern_ipc_perm *in, struct ipc64_perm *out)
 void ipc64_perm_to_ipc_perm (struct ipc64_perm *in, struct ipc_perm *out)
 {
 	out->key	= in->key;
-	out->uid	= NEW_TO_OLD_UID(in->uid);
-	out->gid	= NEW_TO_OLD_GID(in->gid);
-	out->cuid	= NEW_TO_OLD_UID(in->cuid);
-	out->cgid	= NEW_TO_OLD_GID(in->cgid);
+	SET_UID(out->uid, in->uid);
+	SET_GID(out->gid, in->gid);
+	SET_UID(out->cuid, in->cuid);
+	SET_GID(out->cgid, in->cgid);
 	out->mode	= in->mode;
 	out->seq	= in->seq;
 }

@@ -408,27 +408,24 @@ static inline void ic_rarp_cleanup(void)
 static int __init
 ic_rarp_recv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt)
 {
-	struct arphdr *rarp = (struct arphdr *)skb->h.raw;
-	unsigned char *rarp_ptr = (unsigned char *) (rarp + 1);
+	struct arphdr *rarp;
+	unsigned char *rarp_ptr;
 	unsigned long sip, tip;
 	unsigned char *sha, *tha;		/* s for "source", t for "target" */
 	struct ic_device *d;
 
-	/* One reply at a time, please. */
-	spin_lock(&ic_recv_lock);
+	if ((skb = skb_share_check(skb, GFP_ATOMIC)) == NULL)
+		return NET_RX_DROP;
 
-	/* If we already have a reply, just drop the packet */
-	if (ic_got_reply)
+	if (!pskb_may_pull(skb, sizeof(arphdr)))
 		goto drop;
 
-	/* Find the ic_device that the packet arrived on */
-	d = ic_first_dev;
-	while (d && d->dev != dev)
-		d = d->next;
-	if (!d)
-		goto drop;	/* should never happen */
+	/* Basic sanity checks can be done without the lock.  */
+	rarp = (struct arphdr *)skb->h.raw;
 
-	/* If this test doesn't pass, it's not IP, or we should ignore it anyway */
+	/* If this test doesn't pass, it's not IP, or we should
+	 * ignore it anyway.
+	 */
 	if (rarp->ar_hln != dev->addr_len || dev->type != ntohs(rarp->ar_hrd))
 		goto drop;
 
@@ -439,6 +436,30 @@ ic_rarp_recv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt
 	/* If it's not Ethernet, delete it. */
 	if (rarp->ar_pro != htons(ETH_P_IP))
 		goto drop;
+
+	if (!pskb_may_pull(skb,
+			   sizeof(arphdr) +
+			   (2 * dev->addr_len) +
+			   (2 * 4)))
+		goto drop;
+
+	/* OK, it is all there and looks valid, process... */
+	rarp = (struct arphdr *)skb->h.raw;
+	rarp_ptr = (unsigned char *) (rarp + 1);
+
+	/* One reply at a time, please. */
+	spin_lock(&ic_recv_lock);
+
+	/* If we already have a reply, just drop the packet */
+	if (ic_got_reply)
+		goto drop_unlock;
+
+	/* Find the ic_device that the packet arrived on */
+	d = ic_first_dev;
+	while (d && d->dev != dev)
+		d = d->next;
+	if (!d)
+		goto drop_unlock;	/* should never happen */
 
 	/* Extract variable-width fields */
 	sha = rarp_ptr;
@@ -451,11 +472,11 @@ ic_rarp_recv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt
 
 	/* Discard packets which are not meant for us. */
 	if (memcmp(tha, dev->dev_addr, dev->addr_len))
-		goto drop;
+		goto drop_unlock;
 
 	/* Discard packets which are not from specified server. */
 	if (ic_servaddr != INADDR_NONE && ic_servaddr != sip)
-		goto drop;
+		goto drop_unlock;
 
 	/* We have a winner! */
 	ic_dev = dev;
@@ -464,10 +485,11 @@ ic_rarp_recv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt
 	ic_servaddr = sip;
 	ic_got_reply = IC_RARP;
 
-drop:
+drop_unlock:
 	/* Show's over.  Nothing to see here.  */
 	spin_unlock(&ic_recv_lock);
 
+drop:
 	/* Throw the packet out. */
 	kfree_skb(skb);
 	return 0;
@@ -793,51 +815,82 @@ static void __init ic_do_bootp_ext(u8 *ext)
  */
 static int __init ic_bootp_recv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt)
 {
-	struct bootp_pkt *b = (struct bootp_pkt *) skb->nh.iph;
-	struct iphdr *h = &b->iph;
+	struct bootp_pkt *b;
+	struct iphdr *h;
 	struct ic_device *d;
 	int len;
+
+	/* Perform verifications before taking the lock.  */
+	if (skb->pkt_type == PACKET_OTHERHOST)
+		goto drop;
+
+	if ((skb = skb_share_check(skb, GFP_ATOMIC)) == NULL)
+		return NET_RX_DROP;
+
+	if (!pskb_may_pull(skb,
+			   sizeof(struct iphdr) +
+			   sizeof(struct udphdr)))
+		goto drop;
+
+	b = (struct bootp_pkt *) skb->nh.iph;
+	h = &b->iph;
+
+	if (h->ihl != 5 || h->version != 4 || h->protocol != IPPROTO_UDP)
+		goto drop;
+
+	/* Fragments are not supported */
+	if (h->frag_off & htons(IP_OFFSET | IP_MF)) {
+		if (net_ratelimit())
+			printk(KERN_ERR "DHCP/BOOTP: Ignoring fragmented "
+			       "reply.\n");
+		goto drop;
+	}
+
+	if (skb->len < ntohs(h->tot_len))
+		goto drop;
+
+	if (ip_fast_csum((char *) h, h->ihl))
+		goto drop;
+
+	if (b->udph.source != htons(67) || b->udph.dest != htons(68))
+		goto drop;
+
+	if (ntohs(h->tot_len) < ntohs(b->udhp.len) + sizeof(struct iphdr))
+		goto drop;
+
+	len = ntohs(b->udph.len) - sizeof(struct udphdr);
+	if (len < 300)
+		goto drop;
+
+	/* Ok the front looks good, make sure we can get at the rest.  */
+	if (!pskb_may_pull(skb, skb->len))
+		goto drop;
+
+	b = (struct bootp_pkt *) skb->nh.iph;
+	h = &b->iph;
 
 	/* One reply at a time, please. */
 	spin_lock(&ic_recv_lock);
 
 	/* If we already have a reply, just drop the packet */
 	if (ic_got_reply)
-		goto drop;
+		goto drop_unlock;
 
 	/* Find the ic_device that the packet arrived on */
 	d = ic_first_dev;
 	while (d && d->dev != dev)
 		d = d->next;
 	if (!d)
-		goto drop;  /* should never happen */
-
-	/* Check whether it's a BOOTP packet */
-	if (skb->pkt_type == PACKET_OTHERHOST ||
-	    skb->len < sizeof(struct udphdr) + sizeof(struct iphdr) ||
-	    h->ihl != 5 ||
-	    h->version != 4 ||
-	    ip_fast_csum((char *) h, h->ihl) != 0 ||
-	    skb->len < ntohs(h->tot_len) ||
-	    h->protocol != IPPROTO_UDP ||
-	    b->udph.source != htons(67) ||
-	    b->udph.dest != htons(68) ||
-	    ntohs(h->tot_len) < ntohs(b->udph.len) + sizeof(struct iphdr))
-		goto drop;
-
-	/* Fragments are not supported */
-	if (h->frag_off & htons(IP_OFFSET | IP_MF)) {
-		printk(KERN_ERR "DHCP/BOOTP: Ignoring fragmented reply.\n");
-		goto drop;
-	}
+		goto drop_unlock;  /* should never happen */
 
 	/* Is it a reply to our BOOTP request? */
-	len = ntohs(b->udph.len) - sizeof(struct udphdr);
-	if (len < 300 ||				    /* See RFC 951:2.1 */
-	    b->op != BOOTP_REPLY ||
+	if (b->op != BOOTP_REPLY ||
 	    b->xid != d->xid) {
-		printk("?");
-		goto drop;
+		if (net_ratelimit())
+			printk(KERN_ERR "DHCP/BOOTP: Reply not for us, "
+			       "op[%x] xid[%x]\n",
+			       b->op, b->xid);
+		goto drop_unlock;
 	}
 
 	/* Parse extensions */
@@ -880,7 +933,7 @@ static int __init ic_bootp_recv(struct sk_buff *skb, struct net_device *dev, str
 				 * ignore all others.
 				 */
 				if (ic_myaddr != INADDR_NONE)
-					goto drop;
+					goto drop_unlock;
 
 				/* Let's accept that offer. */
 				ic_myaddr = b->your_ip;
@@ -908,7 +961,7 @@ static int __init ic_bootp_recv(struct sk_buff *skb, struct net_device *dev, str
 				/* Urque.  Forget it*/
 				ic_myaddr = INADDR_NONE;
 				ic_servaddr = INADDR_NONE;
-				goto drop;
+				goto drop_unlock;
 			};
 
 			ic_dhcp_msgtype = mt;
@@ -937,10 +990,11 @@ static int __init ic_bootp_recv(struct sk_buff *skb, struct net_device *dev, str
 		ic_nameservers[0] = ic_servaddr;
 	ic_got_reply = IC_BOOTP;
 
-drop:
+drop_unlock:
 	/* Show's over.  Nothing to see here.  */
 	spin_unlock(&ic_recv_lock);
 
+drop:
 	/* Throw the packet out. */
 	kfree_skb(skb);
 

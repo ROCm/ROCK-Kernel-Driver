@@ -345,10 +345,8 @@ void x25_destroy_socket(struct sock *sk)
 	if (atomic_read(&sk->sk_wmem_alloc) ||
 	    atomic_read(&sk->sk_rmem_alloc)) {
 		/* Defer: outstanding buffers */
-		init_timer(&sk->sk_timer);
 		sk->sk_timer.expires  = jiffies + 10 * HZ;
 		sk->sk_timer.function = x25_destroy_timer;
-		sk->sk_timer.data     = (unsigned long)sk;
 		add_timer(&sk->sk_timer);
 	} else {
 		/* drop last reference so sock_put will free */
@@ -463,6 +461,8 @@ frees:
 	goto out;
 }
 
+void x25_init_timers(struct sock *sk);
+
 static int x25_create(struct socket *sock, int protocol)
 {
 	struct sock *sk;
@@ -481,7 +481,7 @@ static int x25_create(struct socket *sock, int protocol)
 	sock_init_data(sock, sk);
 	sk_set_owner(sk, THIS_MODULE);
 
-	init_timer(&x25->timer);
+	x25_init_timers(sk);
 
 	sock->ops    = &x25_proto_ops;
 	sk->sk_protocol = protocol;
@@ -537,7 +537,7 @@ static struct sock *x25_make_new(struct sock *osk)
 	x25->facilities = ox25->facilities;
 	x25->qbitincl   = ox25->qbitincl;
 
-	init_timer(&x25->timer);
+	x25_init_timers(sk);
 out:
 	return sk;
 }
@@ -760,13 +760,14 @@ static int x25_accept(struct socket *sock, struct socket *newsock, int flags)
 	if (sk->sk_type != SOCK_SEQPACKET)
 		goto out;
 
+	lock_sock(sk);
 	rc = x25_wait_for_data(sk, sk->sk_rcvtimeo);
 	if (rc)
-		goto out;
+		goto out2;
 	skb = skb_dequeue(&sk->sk_receive_queue);
 	rc = -EINVAL;
 	if (!skb->sk)
-		goto out;
+		goto out2;
 	newsk		 = skb->sk;
 	newsk->sk_pair   = NULL;
 	newsk->sk_socket = newsock;
@@ -779,6 +780,8 @@ static int x25_accept(struct socket *sock, struct socket *newsock, int flags)
 	newsock->sk    = newsk;
 	newsock->state = SS_CONNECTED;
 	rc = 0;
+out2:
+	release_sock(sk);
 out:
 	return rc;
 }

@@ -1120,8 +1120,8 @@ static void fill_psinfo(struct elf_prpsinfo *psinfo, struct task_struct *p,
 	psinfo->pr_zomb = psinfo->pr_sname == 'Z';
 	psinfo->pr_nice = task_nice(p);
 	psinfo->pr_flag = p->flags;
-	psinfo->pr_uid = NEW_TO_OLD_UID(p->uid);
-	psinfo->pr_gid = NEW_TO_OLD_GID(p->gid);
+	SET_UID(psinfo->pr_uid, p->uid);
+	SET_GID(psinfo->pr_gid, p->gid);
 	strncpy(psinfo->pr_fname, p->comm, sizeof(psinfo->pr_fname));
 	
 	return;

@@ -53,6 +53,11 @@ void __init fpu_init(void)
  */
 void init_fpu(struct task_struct *child)
 {
+	if (child->used_math) { 
+		if (child == current)
+			unlazy_fpu(child);
+		return;
+	}	
 	memset(&child->thread.i387.fxsave, 0, sizeof(struct i387_fxsave_struct));
 	child->thread.i387.fxsave.cwd = 0x37f;
 	child->thread.i387.fxsave.mxcsr = 0x1f80;

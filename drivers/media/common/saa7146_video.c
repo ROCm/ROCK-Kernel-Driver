@@ -1090,7 +1090,8 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 
 		q = &fh->video_q;
 		down(&q->lock);
-		err = videobuf_mmap_setup(file,q,gbuffers,gbufsize); // ,V4L2_MEMORY_MMAP);
+		err = videobuf_mmap_setup(file,q,gbuffers,gbufsize,
+					  V4L2_MEMORY_MMAP);
 		if (err < 0) {
 			up(&q->lock);
 			return err;
@@ -1185,7 +1186,7 @@ static int buffer_prepare(struct file *file, struct videobuf_buffer *vb, enum v4
 			saa7146_pgtable_alloc(dev->pci, &buf->pt[0]);
 		}
 		
-		err = videobuf_iolock(dev->pci,&buf->vb);
+		err = videobuf_iolock(dev->pci,&buf->vb,NULL);
 		if (err)
 			goto oops;
 		err = saa7146_pgtable_build(dev,buf);

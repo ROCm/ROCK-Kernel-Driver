@@ -115,6 +115,8 @@
 #define BTTV_XGUARD         0x67
 #define BTTV_NEBULA_DIGITV  0x68
 #define BTTV_PV143          0x69
+#define BTTV_IVC100         0x6e
+#define BTTV_IVC120         0x6f
 
 /* i2c address list */
 #define I2C_TSA5522        0xc2
@@ -169,6 +171,9 @@ struct tvcard
 	unsigned int no_tda7432:1;
 	unsigned int needs_tvaudio:1;
 	unsigned int msp34xx_alt:1;
+
+	/* flag: video pci function is unused */
+	unsigned int no_video;
 
 	/* other settings */
 	unsigned int pll;
