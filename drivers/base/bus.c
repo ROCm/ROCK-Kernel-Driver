@@ -312,12 +312,14 @@ static int device_attach(struct device * dev)
  *	If bus_match() returns 0 and the @dev->driver is set, we've found
  *	a compatible pair, so we call devclass_add_device() to add the 
  *	device to the class. 
+ *
+ *	Note that we ignore the error from bus_match(), since it's perfectly
+ *	valid for a driver not to bind to any devices.
  */
 static int driver_attach(struct device_driver * drv)
 {
 	struct bus_type * bus = drv->bus;
 	struct list_head * entry;
-	int error = 0;
 
 	if (!bus->match)
 		return 0;
@@ -325,12 +327,11 @@ static int driver_attach(struct device_driver * drv)
 	list_for_each(entry,&bus->devices.list) {
 		struct device * dev = container_of(entry,struct device,bus_list);
 		if (!dev->driver) {
-			error = bus_match(dev,drv);
-			if (!error && dev->driver)
-				error = devclass_add_device(dev);
+			if (!bus_match(dev,drv) && dev->driver)
+				devclass_add_device(dev);
 		}
 	}
-	return error;
+	return 0;
 }
 
 
@@ -437,8 +438,10 @@ int bus_add_driver(struct device_driver * drv)
 		strncpy(drv->kobj.name,drv->name,KOBJ_NAME_LEN);
 		drv->kobj.kset = &bus->drivers;
 
-		if ((error = kobject_register(&drv->kobj)))
-			goto Done;
+		if ((error = kobject_register(&drv->kobj))) {
+			put_bus(bus);
+			return error;
+		}
 
 		down_write(&bus->subsys.rwsem);
 		if (!(error = devclass_add_driver(drv))) {
@@ -448,7 +451,6 @@ int bus_add_driver(struct device_driver * drv)
 		}
 		up_write(&bus->subsys.rwsem);
 
-	Done:
 		if (error) {
 			kobject_unregister(&drv->kobj);
 			put_bus(bus);
