@@ -286,6 +286,12 @@ typedef struct	SHT
 
     unsigned highmem_io:1;
 
+    /* 
+     * True if the driver wishes to use the generic block layer
+     * tag queueing functions
+     */
+    unsigned use_blk_tcq:1;
+
     /*
      * Name of proc directory
      */
@@ -386,6 +392,7 @@ struct Scsi_Host
     unsigned unchecked_isa_dma:1;
     unsigned use_clustering:1;
     unsigned highmem_io:1;
+    unsigned use_blk_tcq:1;
 
     /*
      * Host has rejected a command because it was busy.

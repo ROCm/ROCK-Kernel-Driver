@@ -850,6 +850,64 @@ struct scsi_cmnd {
 
 extern int scsi_reset_provider(Scsi_Device *, int);
 
+/**
+ * scsi_activate_tcq - turn on tag command queueing
+ * @SDpnt:	device to turn on TCQ for
+ * @depth:	queue depth
+ *
+ * Notes:
+ *	Eventually, I hope depth would be the maximum depth
+ *	the device could cope with and the real queue depth
+ *	would be adjustable from 0 to depth.
+ **/
+static inline void scsi_activate_tcq(Scsi_Device *SDpnt, int depth) {
+    request_queue_t *q = &SDpnt->request_queue;
+
+    if(SDpnt->tagged_supported && !blk_queue_tagged(q)) {
+            blk_queue_init_tags(q, depth);
+            SDpnt->tagged_queue = 1;
+    }
+}
+
+/**
+ * scsi_deactivate_tcq - turn off tag command queueing
+ * @SDpnt:	device to turn off TCQ for
+ **/
+static inline void scsi_deactivate_tcq(Scsi_Device *SDpnt) {
+    blk_queue_free_tags(&SDpnt->request_queue);
+    SDpnt->tagged_queue = 0;
+}
+#define MSG_SIMPLE_TAG	0x20
+#define MSG_HEAD_TAG	0x21
+#define MSG_ORDERED_TAG	0x22
+
+/**
+ * scsi_populate_tag_msg - place a tag message in a buffer
+ * @SCpnt:	pointer to the Scsi_Cmnd for the tag
+ * @msg:	pointer to the area to place the tag
+ *
+ * Notes:
+ *	designed to create the correct type of tag message for the 
+ *	particular request.  Returns the size of the tag message.
+ *	May return 0 if TCQ is disabled for this device.
+ **/
+static inline int scsi_populate_tag_msg(Scsi_Cmnd *SCpnt, char *msg) {
+    struct request *req = SCpnt->request;
+
+    if(!blk_rq_tagged(req))
+        return 0;
+    
+    if(req->flags & REQ_BARRIER)
+        *msg++ = MSG_ORDERED_TAG;
+    else
+        *msg++ = MSG_SIMPLE_TAG;
+
+    *msg++ = SCpnt->request->tag;
+
+    return 2;
+}
+    
+
 #endif
 
 /*

@@ -378,6 +378,9 @@ static Scsi_Cmnd *__scsi_end_request(Scsi_Cmnd * SCpnt,
 
 	add_blkdev_randomness(major(req->rq_dev));
 
+	if(blk_rq_tagged(req))
+		blk_queue_end_tag(q, req);
+
 	end_that_request_last(req);
 
 	spin_unlock_irqrestore(q->queue_lock, flags);
@@ -924,7 +927,10 @@ void scsi_request_fn(request_queue_t * q)
 		 * reason to search the list, because all of the commands
 		 * in this queue are for the same device.
 		 */
-		blkdev_dequeue_request(req);
+		if(blk_queue_tagged(q))
+			blk_queue_start_tag(q, req);
+		else
+			blkdev_dequeue_request(req);
 
 		SCpnt->request = req;
 
