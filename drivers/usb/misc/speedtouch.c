@@ -70,14 +70,15 @@
 */
 
 #ifdef DEBUG
-#define PDEBUG(arg...)  printk(KERN_DEBUG "SpeedTouch USB: " arg)
+#define PDEBUG(arg...)  printk(KERN_DEBUG __FILE__ ": " arg)
 #else
 #define PDEBUG(arg...)
 #endif
 
 
 #ifdef DEBUG_PACKET
-#define PACKETDEBUG(arg...) udsl_print_packet ( arg )
+static int udsl_print_packet (const unsigned char *data, int len);
+#define PACKETDEBUG(arg...) udsl_print_packet (arg)
 #else
 #define PACKETDEBUG(arg...)
 #endif
@@ -93,7 +94,7 @@
 #define UDSL_NUMBER_SND_URBS		1
 #define UDSL_NUMBER_SND_BUFS		(2*UDSL_NUMBER_SND_URBS)
 #define UDSL_RCV_BUFFER_SIZE		(1*64) /* ATM cells */
-#define UDSL_SND_BUFFER_SIZE		(2*64) /* ATM cells */
+#define UDSL_SND_BUFFER_SIZE		(1*64) /* ATM cells */
 /* max should be (1500 IP mtu + 2 ppp bytes + 32 * 5 cellheader overhead) for
  * PPPoA and (1500 + 14 + 32*5 cellheader overhead) for PPPoE */
 #define UDSL_MAX_AAL5_MRU		2048
@@ -193,11 +194,7 @@ struct udsl_instance_data {
 	struct list_head filled_buffers;
 };
 
-static const char udsl_driver_name [] = "Alcatel SpeedTouch USB";
-
-#ifdef DEBUG_PACKET
-static int udsl_print_packet (const unsigned char *data, int len);
-#endif
+static const char udsl_driver_name [] = "speedtch";
 
 /*
  * atm driver prototypes and stuctures
@@ -217,10 +214,6 @@ static struct atmdev_ops udsl_atm_devops = {
 	.ioctl =	udsl_atm_ioctl,
 	.send =		udsl_atm_send,
 	.proc_read =	udsl_atm_proc_read,
-};
-
-struct udsl_atm_dev_data {
-	struct atmsar_vcc_data *atmsar_vcc;
 };
 
 /*
@@ -246,10 +239,9 @@ static struct usb_driver udsl_usb_driver = {
 
 static void udsl_groom_skb (struct atm_vcc *vcc, struct sk_buff *skb) {
 	struct udsl_control *ctrl = UDSL_SKB (skb);
-	unsigned int zero_padding;
+	unsigned int i, zero_padding;
 	unsigned char zero = 0;
 	u32 crc;
-	int i;
 
 	ctrl->atm_data.vcc = vcc;
 	ctrl->cell_header [0] = vcc->vpi >> 4;
@@ -511,14 +503,15 @@ static void udsl_complete_send (struct urb *urb, struct pt_regs *regs)
 
 static void udsl_process_send (unsigned long data)
 {
-	struct udsl_instance_data *instance = (struct udsl_instance_data *) data;
-	struct udsl_sender *snd;
 	struct udsl_send_buffer *buf;
-	unsigned int cells_to_write, i;
-	struct sk_buff *skb;
-	unsigned char *target;
-	unsigned long flags;
+	unsigned int cells_to_write;
 	int err;
+	unsigned long flags;
+	unsigned int i;
+	struct udsl_instance_data *instance = (struct udsl_instance_data *) data;
+	struct sk_buff *skb;
+	struct udsl_sender *snd;
+	unsigned char *target;
 
 	PDEBUG ("udsl_process_send entered\n");
 
@@ -757,7 +750,6 @@ static int udsl_atm_proc_read (struct atm_dev *atm_dev, loff_t *pos, char *page)
 
 static int udsl_atm_open (struct atm_vcc *vcc, short vpi, int vci)
 {
-	struct udsl_atm_dev_data *dev_data;
 	struct udsl_instance_data *instance = vcc->dev->dev_data;
 
 	PDEBUG ("udsl_atm_open called\n");
@@ -772,15 +764,12 @@ static int udsl_atm_open (struct atm_vcc *vcc, short vpi, int vci)
 		return -EINVAL;
 
 	MOD_INC_USE_COUNT;
-	dev_data = kmalloc (sizeof (struct udsl_atm_dev_data), GFP_KERNEL);
-	if (!dev_data)
-		return -ENOMEM;
 
-	dev_data->atmsar_vcc =
+	vcc->dev_data =
 	    atmsar_open (&(instance->atmsar_vcc_list), vcc, ATMSAR_TYPE_AAL5, vpi, vci, 0, 0,
 			 ATMSAR_USE_53BYTE_CELL | ATMSAR_SET_PTI);
-	if (!dev_data->atmsar_vcc) {
-		kfree (dev_data);
+	if (!vcc->dev_data) {
+		MOD_DEC_USE_COUNT;
 		return -ENOMEM;	/* this is the only reason atmsar_open can fail... */
 	}
 
@@ -789,9 +778,8 @@ static int udsl_atm_open (struct atm_vcc *vcc, short vpi, int vci)
 	set_bit (ATM_VF_ADDR, &vcc->flags);
 	set_bit (ATM_VF_PARTIAL, &vcc->flags);
 	set_bit (ATM_VF_READY, &vcc->flags);
-	vcc->dev_data = dev_data;
 
-	dev_data->atmsar_vcc->mtu = UDSL_MAX_AAL5_MRU;
+	((struct atmsar_vcc_data *)vcc->dev_data)->mtu = UDSL_MAX_AAL5_MRU;
 
 	if (instance->firmware_loaded)
 		udsl_fire_receivers (instance);
@@ -802,13 +790,12 @@ static int udsl_atm_open (struct atm_vcc *vcc, short vpi, int vci)
 
 static void udsl_atm_close (struct atm_vcc *vcc)
 {
-	struct udsl_atm_dev_data *dev_data = vcc->dev_data;
 	struct udsl_instance_data *instance = vcc->dev->dev_data;
 
 	PDEBUG ("udsl_atm_close called\n");
 
-	if (!dev_data || !instance) {
-		PDEBUG ("NULL data!\n");
+	if (!instance) {
+		PDEBUG ("NULL instance!\n");
 		return;
 	}
 
@@ -816,8 +803,7 @@ static void udsl_atm_close (struct atm_vcc *vcc)
 	/* cancel all sends on this vcc */
 	udsl_cancel_send (instance, vcc);
 
-	atmsar_close (&(instance->atmsar_vcc_list), dev_data->atmsar_vcc);
-	kfree (dev_data);
+	atmsar_close (&(instance->atmsar_vcc_list), vcc->dev_data);
 	vcc->dev_data = NULL;
 	clear_bit (ATM_VF_PARTIAL, &vcc->flags);
 
