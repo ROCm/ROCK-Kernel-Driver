@@ -544,6 +544,14 @@ static void end_buffer_async_read(struct buffer_head *bh, int uptodate)
 	 */
 	if (page_uptodate && !PageError(page))
 		SetPageUptodate(page);
+
+	/*
+	 * swap page handling is a bit hacky.  A standalone completion handler
+	 * for swapout pages would fix that up.  swapin can use this function.
+	 */
+	if (PageSwapCache(page) && PageWriteback(page))
+		end_page_writeback(page);
+
 	unlock_page(page);
 	return;
 
@@ -2271,6 +2279,9 @@ int brw_kiovec(int rw, int nr, struct kiobuf *iovec[],
  * calls block_flushpage() under spinlock and hits a locked buffer, and
  * schedules under spinlock.   Another approach would be to teach
  * find_trylock_page() to also trylock the page's writeback flags.
+ *
+ * Swap pages are also marked PageWriteback when they are being written
+ * so that memory allocators will throttle on them.
  */
 int brw_page(int rw, struct page *page,
 		struct block_device *bdev, sector_t b[], int size)
@@ -2300,6 +2311,11 @@ int brw_page(int rw, struct page *page,
 		mark_buffer_async_read(bh);
 		bh = bh->b_this_page;
 	} while (bh != head);
+
+	if (rw == WRITE) {
+		BUG_ON(PageWriteback(page));
+		SetPageWriteback(page);
+	}
 
 	/* Stage 2: start the IO */
 	do {
