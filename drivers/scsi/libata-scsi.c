@@ -29,7 +29,6 @@
 #include "scsi.h"
 #include "hosts.h"
 #include <linux/libata.h>
-#include <linux/workqueue.h>
 
 #include "libata.h"
 

@@ -59,7 +59,7 @@ static void ata_set_mode(struct ata_port *ap);
 static int ata_qc_issue_prot(struct ata_queued_cmd *qc);
 
 static unsigned int ata_unique_id = 1;
-struct workqueue_struct *ata_wq = NULL;
+static struct workqueue_struct *ata_wq;
 
 MODULE_AUTHOR("Jeff Garzik");
 MODULE_DESCRIPTION("Library module for ATA devices");
