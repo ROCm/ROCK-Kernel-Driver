@@ -291,7 +291,6 @@ local_flush_tlb_page(struct vm_area_struct *vma, unsigned long vmaddr)
 	pmd_t *pmd;
 	pte_t *ptep;
 	pte_t pte;
-	unsigned long flags;
 	int local = 0;
 
 	switch( REGION_ID(vmaddr) ) {
@@ -339,7 +338,6 @@ local_flush_tlb_range(struct mm_struct *mm, unsigned long start, unsigned long e
 	pte_t pte;
 	unsigned long pgd_end, pmd_end;
 	unsigned long context;
-	unsigned long flags;
 	int i = 0;
 	struct tlb_batch_data *ptes = &tlb_batch_array[smp_processor_id()][0];
 	int local = 0;
@@ -565,6 +563,8 @@ extern unsigned long dprof_shift;
 extern unsigned long dprof_len;
 extern unsigned int * dprof_buffer;
 
+void initialize_paca_hardware_interrupt_stack(void);
+
 void __init mem_init(void)
 {
 	extern char *sysmap; 
@@ -617,8 +617,8 @@ void __init mem_init(void)
 	       PAGE_OFFSET, (unsigned long)__va(lmb_end_of_DRAM()));
 	mem_init_done = 1;
 
-    /* set the last page of each hardware interrupt stack to be protected       */
-    initialize_paca_hardware_interrupt_stack();
+	/* set the last page of each hardware interrupt stack to be protected */
+	initialize_paca_hardware_interrupt_stack();
 
 #ifdef CONFIG_PPC_ISERIES
 	create_virtual_bus_tce_table();
@@ -667,6 +667,10 @@ void flush_icache_user_range(struct vm_area_struct *vma, struct page *page,
 	maddr = (unsigned long)page_address(page) + (addr & ~PAGE_MASK);
 	flush_icache_range(maddr, maddr + len);
 }
+
+extern pte_t *find_linux_pte(pgd_t *pgdir, unsigned long ea);
+int __hash_page(unsigned long ea, unsigned long access, unsigned long vsid,
+		pte_t *ptep);
 
 /*
  * This is called at the end of handling a user page fault, when the
