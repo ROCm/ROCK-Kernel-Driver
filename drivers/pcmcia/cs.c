@@ -723,6 +723,9 @@ static int socket_insert(struct pcmcia_socket *skt)
 {
 	int ret;
 
+	if (!try_module_get(skt->owner))
+		return CS_NO_CARD;
+
 	ret = socket_setup(skt, setup_delay);
 	if (ret == CS_SUCCESS) {
 #ifdef CONFIG_CARDBUS
@@ -733,8 +736,10 @@ static int socket_insert(struct pcmcia_socket *skt)
 #endif
 		send_event(skt, CS_EVENT_CARD_INSERTION, CS_EVENT_PRI_LOW);
 		skt->socket.flags &= ~SS_DEBOUNCED;
-	} else
+	} else {
 		socket_shutdown(skt);
+		module_put(skt->owner);
+	}
 
 	return ret;
 }
@@ -778,12 +783,22 @@ static int socket_resume(struct pcmcia_socket *skt)
 			send_event(skt, CS_EVENT_PM_RESUME, CS_EVENT_PRI_LOW);
 		}
 		skt->socket.flags &= ~SS_DEBOUNCED;
-	} else
+	} else {
+		unsigned int old_state = skt->state;
 		socket_shutdown(skt);
+		if (old_state & SOCKET_PRESENT)
+			module_put(skt->owner);
+	}
 
 	skt->state &= ~SOCKET_SUSPEND;
 
 	return CS_SUCCESS;
+}
+
+static void socket_remove(struct pcmcia_socket *skt)
+{
+	socket_shutdown(skt);
+	module_put(skt->owner);
 }
 
 static int pccardd(void *__skt)
@@ -815,7 +830,7 @@ static int pccardd(void *__skt)
 				get_socket_status(skt, &status);
 				if ((skt->state & SOCKET_PRESENT) &&
 				     !(status & SS_DETECT))
-					socket_shutdown(skt);
+					socket_remove(skt);
 				if (!(skt->state & SOCKET_PRESENT) &&
 				    (status & SS_DETECT))
 					socket_insert(skt);
@@ -838,8 +853,6 @@ static int pccardd(void *__skt)
 			break;
 	}
 	remove_wait_queue(&skt->thread_wait, &wait);
-
-	socket_shutdown(skt);
 
 	complete_and_exit(&skt->thread_done, 0);
 }
@@ -2213,7 +2226,7 @@ int pcmcia_eject_card(client_handle_t handle, client_req_t *req)
 		if (ret != 0)
 			break;
 
-		socket_shutdown(skt);
+		socket_remove(skt);
 		ret = CS_SUCCESS;
 	} while (0);
 	up(&skt->skt_sem);
