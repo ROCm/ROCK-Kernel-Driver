@@ -92,12 +92,6 @@ enum devctl_cmd {
          * Return void. */
         CANCEL_REQUESTS,
 
-        /* Decrease host usage count if arg == 0, increase otherwise.  Return
-         * 1 for success, 0 for failure.  Increase usage may fail if the driver
-         * is in the process of shutting itself down.  Decrease usage can not
-         * fail. */
-        MODIFY_USAGE,
-
         /* Start or stop receiving isochronous channel in arg.  Return void.
          * This acts as an optimization hint, hosts are not required not to
          * listen on unrequested channels. */
@@ -147,6 +141,7 @@ enum reset_types {
 };
 
 struct hpsb_host_driver {
+	struct module *owner;
 	const char *name;
 
         /* This function must store a pointer to the configuration ROM into the
