@@ -528,8 +528,6 @@ extern void scsi_proc_host_rm(struct Scsi_Host *);
 extern int next_scsi_host;
 
 unsigned int scsi_init(void);
-extern struct Scsi_Host * scsi_register(Scsi_Host_Template *, int);
-extern void scsi_unregister(struct Scsi_Host *);
 extern void scsi_register_blocked_host(struct Scsi_Host *);
 extern void scsi_deregister_blocked_host(struct Scsi_Host *);
 
@@ -580,10 +578,26 @@ void  scsi_initialize_queue(Scsi_Device *, struct Scsi_Host *);
 
 
 /*
- * Driver registration/unregistration.
+ * Highlevel driver registration/unregistration.
  */
 extern int scsi_register_device(struct Scsi_Device_Template *);
 extern int scsi_unregister_device(struct Scsi_Device_Template *);
+
+/*
+ * HBA allocation/freeing.
+ */
+extern struct Scsi_Host * scsi_register(Scsi_Host_Template *, int);
+extern void scsi_unregister(struct Scsi_Host *);
+
+/*
+ * HBA registration/unregistration.
+ */
+extern int scsi_add_host(struct Scsi_Host *);
+extern int scsi_remove_host(struct Scsi_Host *);
+
+/*
+ * Legacy HBA template registration/unregistration.
+ */
 extern int scsi_register_host(Scsi_Host_Template *);
 extern int scsi_unregister_host(Scsi_Host_Template *);
 

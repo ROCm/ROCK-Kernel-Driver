@@ -32,6 +32,8 @@ EXPORT_SYMBOL(scsi_register_device);
 EXPORT_SYMBOL(scsi_unregister_device);
 EXPORT_SYMBOL(scsi_register_host);
 EXPORT_SYMBOL(scsi_unregister_host);
+EXPORT_SYMBOL(scsi_add_host);
+EXPORT_SYMBOL(scsi_remove_host);
 EXPORT_SYMBOL(scsi_register);
 EXPORT_SYMBOL(scsi_unregister);
 EXPORT_SYMBOL(scsicam_bios_param);
