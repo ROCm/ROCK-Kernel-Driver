@@ -61,6 +61,7 @@ u8 pci_std_swizzle(struct pci_dev *dev, u8 *pinp);
  */
 extern int iop310_setup(int nr, struct pci_sys_data *);
 extern struct pci_bus *iop310_scan_bus(int nr, struct pci_sys_data *);
+extern void iop310_init(void);
 
 extern int dc21285_setup(int nr, struct pci_sys_data *);
 extern struct pci_bus *dc21285_scan_bus(int nr, struct pci_sys_data *);
@@ -75,4 +76,3 @@ extern int pci_v3_setup(int nr, struct pci_sys_data *);
 extern struct pci_bus *pci_v3_scan_bus(int nr, struct pci_sys_data *);
 extern void pci_v3_preinit(void);
 extern void pci_v3_postinit(void);
-

@@ -399,24 +399,6 @@ static u_int h3600_uart_get_mctrl(struct uart_port *port)
 	return ret;
 }
 
-static void h3600_dcd_intr(int irq, void *dev_id, struct pt_regs *regs)
-{
-	struct uart_info *info = dev_id;
-	/* Note: should only call this if something has changed */
-	spin_lock_irq(&info->lock);
-	uart_handle_dcd_change(info, !(GPLR & GPIO_H3600_COM_DCD));
-	spin_unlock_irq(&info->lock);
-}
-
-static void h3600_cts_intr(int irq, void *dev_id, struct pt_regs *regs)
-{
-	struct uart_info *info = dev_id;
-	/* Note: should only call this if something has changed */
-	spin_lock_irq(&info->lock);
-	uart_handle_cts_change(info, !(GPLR & GPIO_H3600_COM_CTS));
-	spin_unlock_irq(&info->lock);
-}
-
 static void h3600_uart_pm(struct uart_port *port, u_int state, u_int oldstate)
 {
 	if (port->mapbase == _Ser2UTCR0) {
@@ -444,47 +426,11 @@ static int h3600_uart_set_wake(struct uart_port *port, u_int enable)
 	return err;
 }
 
-static int h3600_uart_open(struct uart_port *port, struct uart_info *info)
-{
-	int ret = 0;
-
-	if (port->mapbase == _Ser2UTCR0) {
-		Ser2UTCR4 = UTCR4_HSE;
-		Ser2HSCR0 = 0;
-		Ser2HSSR0 = HSSR0_EIF | HSSR0_TUR |
-			    HSSR0_RAB | HSSR0_FRE;
-	} else if (port->mapbase == _Ser3UTCR0) {
-		set_GPIO_IRQ_edge(GPIO_H3600_COM_DCD|GPIO_H3600_COM_CTS,
-				  GPIO_BOTH_EDGES);
-
-		ret = request_irq(IRQ_GPIO_H3600_COM_DCD, h3600_dcd_intr,
-				  0, "RS232 DCD", info);
-		if (ret)
-			return ret;
-
-		ret = request_irq(IRQ_GPIO_H3600_COM_CTS, h3600_cts_intr,
-				  0, "RS232 CTS", info);
-		if (ret)
-			free_irq(IRQ_GPIO_H3600_COM_DCD, info);
-	}
-	return ret;
-}
-
-static void h3600_uart_close(struct uart_port *port, struct uart_info *info)
-{
-	if (port->mapbase == _Ser3UTCR0) {
-		free_irq(IRQ_GPIO_H3600_COM_DCD, info);
-		free_irq(IRQ_GPIO_H3600_COM_CTS, info);
-	}
-}
-
 static struct sa1100_port_fns h3600_port_fns __initdata = {
 	set_mctrl:	h3600_uart_set_mctrl,
 	get_mctrl:	h3600_uart_get_mctrl,
 	pm:		h3600_uart_pm,
 	set_wake:	h3600_uart_set_wake,
-	open:		h3600_uart_open,
-	close:		h3600_uart_close,
 };
 
 static struct map_desc h3600_io_desc[] __initdata = {
