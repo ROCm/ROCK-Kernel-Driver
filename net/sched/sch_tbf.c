@@ -268,7 +268,7 @@ static void tbf_reset(struct Qdisc* sch)
 	struct tbf_sched_data *q = (struct tbf_sched_data *)sch->data;
 
 	qdisc_reset(q->qdisc);
-	skb_queue_purge(&sch->q);
+	sch->q.qlen = 0;
 	sch->stats.backlog = 0;
 	PSCHED_GET_TIME(q->t_c);
 	q->tokens = q->buffer;
