@@ -175,6 +175,8 @@ struct mddev_s
 	int				sb_dirty;
 	int				ro;
 
+	int				persistent;
+
 	struct mdk_thread_s		*sync_thread;	/* doing resync or reconstruct */
 	unsigned long			curr_resync;	/* blocks scheduled */
 	unsigned long			resync_mark;	/* a recent timestamp */
