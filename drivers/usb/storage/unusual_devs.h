@@ -90,6 +90,12 @@ UNUSUAL_DEV(  0x0436, 0x0005, 0x0100, 0x0100,
  		US_SC_SCSI, US_PR_DPCM_USB, NULL, 0 ),
 #endif
 
+/* Patch submitted by Alessandro Fracchetti <al.fracchetti@tin.it> */
+UNUSUAL_DEV(  0x0482, 0x0105, 0x0100, 0x0100,
+		"Kyocera",
+		"Finecam L3",
+		US_SC_SCSI, US_PR_BULK, NULL, US_FL_FIX_INQUIRY),
+
 /* Patch submitted by Philipp Friedrich <philipp@void.at> */
 UNUSUAL_DEV(  0x0482, 0x0100, 0x0100, 0x0100,
 		"Kyocera",
@@ -297,6 +303,13 @@ UNUSUAL_DEV(  0x054c, 0x002e, 0x0106, 0x0310,
 		US_SC_SCSI, US_PR_DEVICE, NULL,
 		US_FL_SINGLE_LUN | US_FL_MODE_XLATE),
 
+/* Submitted by Rajesh Kumble Nayak <nayak@obs-nice.fr> */
+UNUSUAL_DEV(  0x054c, 0x002e, 0x0500, 0x0500, 
+		"Sony",
+		"Handycam HC-85",
+		US_SC_UFI, US_PR_DEVICE, NULL,
+		US_FL_SINGLE_LUN | US_FL_MODE_XLATE),
+
 UNUSUAL_DEV(  0x054c, 0x0032, 0x0000, 0x9999,
 		"Sony",
 		"Memorystick MSC-U01N",
@@ -318,6 +331,13 @@ UNUSUAL_DEV(  0x054c, 0x0069, 0x0000, 0x9999,
 
 /* Submitted by Nathan Babb <nathan@lexi.com> */
 UNUSUAL_DEV(  0x054c, 0x006d, 0x0000, 0x9999,
+		"Sony",
+		"PEG Mass Storage",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_FIX_INQUIRY ),
+
+/* Submitted by Mike Alborn <malborn@deandra.homeip.net> */
+UNUSUAL_DEV(  0x054c, 0x016a, 0x0000, 0x9999,
 		"Sony",
 		"PEG Mass Storage",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
@@ -688,7 +708,7 @@ UNUSUAL_DEV(  0x097a, 0x0001, 0x0000, 0x0001,
 UNUSUAL_DEV(  0x0a16, 0x8888, 0x0100, 0x0100,
 		"IBM",
 		"IBM USB Memory Key",
-		US_SC_SCSI, US_PR_BULK, NULL,
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_INQUIRY ),
 
 /* This Pentax still camera is not conformant

@@ -326,6 +326,22 @@ static const struct keyspan_device_details usa19qi_device_details = {
 	.baudclk		= KEYSPAN_USA19_BAUDCLK,
 };
 
+static const struct keyspan_device_details mpr_device_details = {
+	.product_id		= keyspan_mpr_product_id,
+	.msg_format		= msg_usa28,
+	.num_ports		= 1,
+	.indat_endp_flip	= 1,
+	.outdat_endp_flip	= 1,
+	.indat_endpoints	= {0x81},
+	.outdat_endpoints	= {0x01},
+	.inack_endpoints	= {0x83},
+	.outcont_endpoints	= {0x03},
+	.instat_endpoint	= 0x84,
+	.glocont_endpoint	= -1,
+	.calculate_baud_rate	= keyspan_usa28_calc_baud,
+	.baudclk		= KEYSPAN_USA19_BAUDCLK,
+};
+
 static const struct keyspan_device_details usa19qw_device_details = {
 	.product_id		= keyspan_usa19qw_product_id,
 	.msg_format		= msg_usa26,
@@ -460,6 +476,7 @@ static const struct keyspan_device_details *keyspan_devices[] = {
 	&usa18x_device_details,
 	&usa19_device_details,
 	&usa19qi_device_details,
+	&mpr_device_details,
 	&usa19qw_device_details,
 	&usa19w_device_details,
 	&usa19hs_device_details,
@@ -535,7 +552,7 @@ static struct usb_device_id keyspan_1port_ids[] = {
 	{ USB_DEVICE(KEYSPAN_VENDOR_ID, keyspan_usa19qw_product_id) },
 	{ USB_DEVICE(KEYSPAN_VENDOR_ID, keyspan_usa19w_product_id) },
 	{ USB_DEVICE(KEYSPAN_VENDOR_ID, keyspan_usa19hs_product_id) },
-	{ USB_DEVICE(KEYSPAN_VENDOR_ID, keyspan_mpr_pre_product_id) },
+	{ USB_DEVICE(KEYSPAN_VENDOR_ID, keyspan_mpr_product_id) },
 	{ } /* Terminating entry */
 };
 
