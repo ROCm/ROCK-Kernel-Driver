@@ -1414,8 +1414,6 @@ void __wake_up_locked(wait_queue_head_t *q, unsigned int mode)
 	__wake_up_common(q, mode, 1, 0);
 }
 
-#ifdef CONFIG_SMP
-
 /**
  * __wake_up - sync- wake up threads blocked on a waitqueue.
  * @q: the waitqueue
@@ -1426,6 +1424,8 @@ void __wake_up_locked(wait_queue_head_t *q, unsigned int mode)
  * away soon, so while the target thread will be woken up, it will not
  * be migrated to another CPU - ie. the two threads are 'synchronized'
  * with each other. This can prevent needless bouncing between CPUs.
+ *
+ * On UP it can prevent extra preemption.
  */
 void __wake_up_sync(wait_queue_head_t *q, unsigned int mode, int nr_exclusive)
 {
@@ -1441,8 +1441,6 @@ void __wake_up_sync(wait_queue_head_t *q, unsigned int mode, int nr_exclusive)
 		__wake_up_common(q, mode, nr_exclusive, 0);
 	spin_unlock_irqrestore(&q->lock, flags);
 }
-
-#endif
 
 void complete(struct completion *x)
 {
