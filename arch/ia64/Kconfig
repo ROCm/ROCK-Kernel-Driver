@@ -414,18 +414,6 @@ config EFI_VARS
 	  To use this option, you have to check that the "/proc file system
 	  support" (CONFIG_PROC_FS) is enabled, too.
 
-config NR_CPUS
-	int "Maximum number of CPUs (2-512)"
-	range 2 512
-	depends on SMP
-	default "64"
-	help
-	  You should set this to the number of CPUs in your system, but
-	  keep in mind that a kernel compiled for, e.g., 2 CPUs will boot but
-	  only use 2 CPUs on a >2 CPU system.  Setting this to a value larger
-	  than 64 will cause the use of a CPU mask array, causing a small
-	  performance hit.
-
 source "fs/Kconfig.binfmt"
 
 if !IA64_HP_SIM
