@@ -590,13 +590,14 @@ static inline int forced_push(struct tcp_opt *tp)
 }
 
 static inline void skb_entail(struct sock *sk, struct tcp_opt *tp,
-			      struct sk_buff *skb)
+			      struct sk_buff *skb, int tso_factor)
 {
 	skb->csum = 0;
 	TCP_SKB_CB(skb)->seq = tp->write_seq;
 	TCP_SKB_CB(skb)->end_seq = tp->write_seq;
 	TCP_SKB_CB(skb)->flags = TCPCB_FLAG_ACK;
 	TCP_SKB_CB(skb)->sacked = 0;
+	TCP_SKB_CB(skb)->tso_factor = tso_factor;
 	__skb_queue_tail(&sk->sk_write_queue, skb);
 	sk_charge_skb(sk, skb);
 	if (!sk->sk_send_head)
@@ -632,7 +633,7 @@ static ssize_t do_tcp_sendpages(struct sock *sk, struct page **pages, int poffse
 			 size_t psize, int flags)
 {
 	struct tcp_opt *tp = tcp_sk(sk);
-	int mss_now;
+	int mss_now, mss_factor_now;
 	int err;
 	ssize_t copied;
 	long timeo = sock_sndtimeo(sk, flags & MSG_DONTWAIT);
@@ -644,7 +645,7 @@ static ssize_t do_tcp_sendpages(struct sock *sk, struct page **pages, int poffse
 
 	clear_bit(SOCK_ASYNC_NOSPACE, &sk->sk_socket->flags);
 
-	mss_now = tcp_current_mss(sk, !(flags&MSG_OOB));
+	mss_now = tcp_current_mss(sk, !(flags&MSG_OOB), &mss_factor_now);
 	copied = 0;
 
 	err = -EPIPE;
@@ -668,7 +669,7 @@ new_segment:
 			if (!skb)
 				goto wait_for_memory;
 
-			skb_entail(sk, tp, skb);
+			skb_entail(sk, tp, skb, mss_factor_now);
 			copy = mss_now;
 		}
 
@@ -719,7 +720,8 @@ wait_for_memory:
 		if ((err = sk_stream_wait_memory(sk, &timeo)) != 0)
 			goto do_error;
 
-		mss_now = tcp_current_mss(sk, !(flags&MSG_OOB));
+		mss_now = tcp_current_mss(sk, !(flags&MSG_OOB),
+					  &mss_factor_now);
 	}
 
 out:
@@ -780,7 +782,7 @@ int tcp_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 	struct tcp_opt *tp = tcp_sk(sk);
 	struct sk_buff *skb;
 	int iovlen, flags;
-	int mss_now;
+	int mss_now, mss_factor_now;
 	int err, copied;
 	long timeo;
 
@@ -798,7 +800,7 @@ int tcp_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 	/* This should be in poll */
 	clear_bit(SOCK_ASYNC_NOSPACE, &sk->sk_socket->flags);
 
-	mss_now = tcp_current_mss(sk, !(flags&MSG_OOB));
+	mss_now = tcp_current_mss(sk, !(flags&MSG_OOB), &mss_factor_now);
 
 	/* Ok commence sending. */
 	iovlen = msg->msg_iovlen;
@@ -843,7 +845,7 @@ new_segment:
 				     NETIF_F_HW_CSUM))
 					skb->ip_summed = CHECKSUM_HW;
 
-				skb_entail(sk, tp, skb);
+				skb_entail(sk, tp, skb, mss_factor_now);
 				copy = mss_now;
 			}
 
@@ -962,7 +964,8 @@ wait_for_memory:
 			if ((err = sk_stream_wait_memory(sk, &timeo)) != 0)
 				goto do_error;
 
-			mss_now = tcp_current_mss(sk, !(flags&MSG_OOB));
+			mss_now = tcp_current_mss(sk, !(flags&MSG_OOB),
+						  &mss_factor_now);
 		}
 	}
 
@@ -1818,7 +1821,7 @@ int tcp_disconnect(struct sock *sk, int flags)
 	tp->backoff = 0;
 	tp->snd_cwnd = 2;
 	tp->probes_out = 0;
-	tp->packets_out = 0;
+	tcp_set_pcount(&tp->packets_out, 0);
 	tp->snd_ssthresh = 0x7fffffff;
 	tp->snd_cwnd_cnt = 0;
 	tcp_set_ca_state(tp, TCP_CA_Open);
