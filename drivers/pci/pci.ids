@@ -2332,7 +2332,7 @@
 	c831  PCI-GPIB bridge
 1094  First International Computers [FIC]
 1095  Silicon Image, Inc. (formerly CMD Technology Inc)
-	0240  Adaptec AAR-1210SA SATA HostRAID Controller
+	0240  Adaptec AAR-1210SA SATA HostRAID
 	0640  PCI0640
 	0643  PCI0643
 	0646  PCI0646
@@ -2350,7 +2350,7 @@
 		1095 3680  Winic W-680 (Silicon Image 680 based)
 	3112  Silicon Image Serial ATARaid Controller [ CMD/Sil 3112/3112A ]
 		1095 6112  Asus A7N8X
-	3114  Silicon Image SiI 3114 SATARaid Controller
+	3114  Silicon Image SiI 3114 SATARaid
 	3512  Silicon Image Serial ATARaid Controller [ CMD/Sil 3512 ]
 1096  Alacron
 1097  Appian Technology
@@ -5155,7 +5155,7 @@
 	9132  Ethernet 100/10 MBit
 1283  Integrated Technology Express, Inc.
 	673a  IT8330G
-	8212  IT/ITE8212 Dual channel ATA RAID controller (PCI version seems to be IT8212, embedded seems to be ITE8212)
+	8212  IT/ITE8212 Dual channel ATA RAID
 	8330  IT8330G
 	8872  IT8874F PCI Dual Serial Port Controller
 	8888  IT8888F PCI to ISA Bridge with SMB
@@ -6098,7 +6098,7 @@
 	0340  PC4800
 	0350  PC4800
 	4500  PC4500
-	4800  Cisco Aironet 340 802.11b Wireless LAN Adapter/Aironet PC4800
+	4800  Cisco Aironet 340 802.11b WLAN Adapter/Aironet PC4800
 	a504  Cisco Aironet Wireless 802.11b
 	a505  Cisco Aironet CB20a 802.11a Wireless LAN Adapter
 14ba  INTERNIX Inc.
@@ -6825,7 +6825,7 @@
 	1003  Format synchronizer v3.0
 	2002  Fast Universal Data Output
 1638  Standard Microsystems Corp [SMC]
-	1100  SMC2602W EZConnect / Addtron AWA-100 / Eumitcom PCI WL11000
+	1100  SMC2602W EZConnect/Addtron AWA-100/Eumitcom WL11000
 163c  Smart Link Ltd.
 	3052  SmartLink SmartPCI562 56K Modem
 	5449  SmartPCI561 Modem
