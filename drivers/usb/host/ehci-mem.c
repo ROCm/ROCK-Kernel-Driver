@@ -114,7 +114,7 @@ static struct ehci_qh *ehci_qh_alloc (struct ehci_hcd *ehci, int flags)
 		return qh;
 
 	memset (qh, 0, sizeof *qh);
-	kref_init(&qh->kref, qh_destroy);
+	kref_init(&qh->kref);
 	qh->ehci = ehci;
 	qh->qh_dma = dma;
 	// INIT_LIST_HEAD (&qh->qh_list);
@@ -139,7 +139,7 @@ static inline struct ehci_qh *qh_get (struct ehci_qh *qh)
 
 static inline void qh_put (struct ehci_qh *qh)
 {
-	kref_put(&qh->kref);
+	kref_put(&qh->kref, qh_destroy);
 }
 
 /*-------------------------------------------------------------------------*/

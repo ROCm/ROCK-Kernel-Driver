@@ -39,7 +39,7 @@ void usb_init_urb(struct urb *urb)
 {
 	if (urb) {
 		memset(urb, 0, sizeof(*urb));
-		kref_init(&urb->kref, urb_destroy);
+		kref_init(&urb->kref);
 		spin_lock_init(&urb->lock);
 	}
 }
@@ -88,7 +88,7 @@ struct urb *usb_alloc_urb(int iso_packets, int mem_flags)
 void usb_free_urb(struct urb *urb)
 {
 	if (urb)
-		kref_put(&urb->kref);
+		kref_put(&urb->kref, urb_destroy);
 }
 
 /**
