@@ -1380,7 +1380,7 @@ void addrconf_prefix_rcv(struct net_device *dev, u8 *opt, int len)
 	if (pinfo->autoconf && in6_dev->cnf.autoconf) {
 		struct inet6_ifaddr * ifp;
 		struct in6_addr addr;
-		int create = 0;
+		int create = 0, update_lft = 0;
 
 		if (pinfo->prefix_len == 64) {
 			memcpy(&addr, &pinfo->prefix, 8);
@@ -1414,32 +1414,54 @@ ok:
 				return;
 			}
 
-			create = 1;
+			update_lft = create = 1;
 			addrconf_dad_start(ifp);
-		}
-
-		if (ifp && valid_lft == 0) {
-			ipv6_del_addr(ifp);
-			ifp = NULL;
 		}
 
 		if (ifp) {
 			int flags;
+			unsigned long now;
 #ifdef CONFIG_IPV6_PRIVACY
 			struct inet6_ifaddr *ift;
 #endif
+			u32 stored_lft;
 
+			/* update lifetime (RFC2462 5.5.3 e) */
 			spin_lock(&ifp->lock);
-			ifp->valid_lft = valid_lft;
-			ifp->prefered_lft = prefered_lft;
-			ifp->tstamp = jiffies;
-			flags = ifp->flags;
-			ifp->flags &= ~IFA_F_DEPRECATED;
-			spin_unlock(&ifp->lock);
+			now = jiffies;
+			if (ifp->valid_lft > (now - ifp->tstamp) / HZ)
+				stored_lft = ifp->valid_lft - (now - ifp->tstamp) / HZ;
+			else
+				stored_lft = 0;
+			if (!update_lft && stored_lft) {
+				if (valid_lft > MIN_VALID_LIFETIME ||
+				    valid_lft > stored_lft)
+					update_lft = 1;
+				else if (stored_lft <= MIN_VALID_LIFETIME) {
+					/* valid_lft <= stored_lft is always true */
+					/* XXX: IPsec */
+					update_lft = 0;
+				} else {
+					valid_lft = MIN_VALID_LIFETIME;
+					if (valid_lft < prefered_lft)
+						prefered_lft = valid_lft;
+					update_lft = 1;
+				}
+			}
 
-			if (!(flags&IFA_F_TENTATIVE))
-				ipv6_ifa_notify((flags&IFA_F_DEPRECATED) ?
-						0 : RTM_NEWADDR, ifp);
+			if (update_lft) {
+				ifp->valid_lft = valid_lft;
+				ifp->prefered_lft = prefered_lft;
+				ifp->tstamp = now;
+				flags = ifp->flags;
+				ifp->flags &= ~IFA_F_DEPRECATED;
+				spin_unlock(&ifp->lock);
+
+				if (!(flags&IFA_F_TENTATIVE))
+					ipv6_ifa_notify((flags&IFA_F_DEPRECATED) ?
+							0 : RTM_NEWADDR, ifp);
+			} else
+				spin_unlock(&ifp->lock);
 
 #ifdef CONFIG_IPV6_PRIVACY
 			read_lock_bh(&in6_dev->lock);
