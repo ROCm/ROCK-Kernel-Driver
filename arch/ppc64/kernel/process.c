@@ -129,7 +129,7 @@ struct task_struct *__switch_to(struct task_struct *prev,
 }
 
 static void show_tsk_stack(struct task_struct *p, unsigned long sp);
-static char *ppc_find_proc_name(unsigned *p, char *buf, unsigned buflen);
+char *ppc_find_proc_name(unsigned *p, char *buf, unsigned buflen);
 
 void show_regs(struct pt_regs * regs)
 {
@@ -426,7 +426,7 @@ void initialize_paca_hardware_interrupt_stack(void)
 
 extern char _stext[], _etext[], __init_begin[], __init_end[];
 
-static char *ppc_find_proc_name(unsigned *p, char *buf, unsigned buflen)
+char *ppc_find_proc_name(unsigned *p, char *buf, unsigned buflen)
 {
 	unsigned long tb_flags;
 	unsigned short name_len;
