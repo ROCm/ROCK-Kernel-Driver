@@ -47,8 +47,6 @@
 #define SA1111_BASE             (0x40000000)
 
 #ifndef __ASSEMBLY__
-#define machine_has_neponset() (0)
-
 #define PFS168_COM5_VBASE		(*((volatile unsigned char *)(0xf0000000UL)))
 #define PFS168_COM6_VBASE		(*((volatile unsigned char *)(0xf0001000UL)))
 #define PFS168_SYSC1RTS			(*((volatile unsigned char *)(0xf0002000UL)))

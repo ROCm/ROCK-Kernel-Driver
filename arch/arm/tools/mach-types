@@ -6,7 +6,7 @@
 # To add an entry into this database, please see Documentation/arm/README,
 # or contact rmk@arm.linux.org.uk
 #
-# Last update: Tue May 21 14:19:05 2002
+# Last update: Fri Jul 5 21:32:20 2002
 #
 # machine_is_xxx	CONFIG_xxxx		MACH_TYPE_xxx		number
 #
@@ -192,3 +192,18 @@ ks8695			ARCH_KS8695		KS8695			180
 brh			ARCH_BRH		BRH			181
 s3c2410			ARCH_S3C2410		S3C2410			182
 possio_px30		ARCH_POSSIO_PX30	POSSIO_PX30		183
+s3c2800			ARCH_S3C2800		S3C2800			184
+fleetwood		SA1100_FLEETWOOD	FLEETWOOD		185
+omaha			ARCH_OMAHA		OMAHA			186
+ta7			ARCH_TA7		TA7			187
+nova			SA1100_NOVA		NOVA			188
+hmk			ARCH_HMK		HMK			189
+inphinity		ARCH_INPHINITY		INPHINITY		190
+fester			SA1100_FESTER		FESTER			191
+gpi			ARCH_GPI		GPI			192
+smdk2410		ARCH_SMDK2410		SMDK2410		193
+premium			ARCH_PREMIUM		PREMIUM			194
+nexio			SA1100_NEXIO		NEXIO			195
+bitbox			SA1100_BITBOX		BITBOX			196
+g200			SA1100_G200		G200			197
+gill			SA1100_GILL		GILL			198

@@ -413,7 +413,7 @@ static int v2_write_dquot(struct dquot *dquot)
 
 	if (!dquot->dq_off)
 		if ((ret = dq_insert_tree(dquot)) < 0) {
-			printk(KERN_ERR "VFS: Error %d occured while creating quota.\n", ret);
+			printk(KERN_ERR "VFS: Error %Zd occured while creating quota.\n", ret);
 			return ret;
 		}
 	filp = sb_dqopt(dquot->dq_sb)->files[type];

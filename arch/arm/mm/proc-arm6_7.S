@@ -272,8 +272,6 @@ ENTRY(cpu_arm7_set_pmd)
 		.align	5
 ENTRY(cpu_arm6_set_pte)
 ENTRY(cpu_arm7_set_pte)
-		tst	r0, #2048
-		streq	r0, [r0, -r0]			@ BUG_ON
 		str	r1, [r0], #-2048		@ linux version
 
 		eor	r1, r1, #LPTE_PRESENT | LPTE_YOUNG | LPTE_WRITE | LPTE_DIRTY
