@@ -166,6 +166,7 @@ acpi_parse_lapic_addr_ovr (
 	return 0;
 }
 
+#ifndef CONFIG_ACPI_HT_ONLY
 
 static int __init
 acpi_parse_lapic_nmi (
@@ -185,11 +186,15 @@ acpi_parse_lapic_nmi (
 	return 0;
 }
 
+#endif /*CONFIG_ACPI_HT_ONLY*/
+
 #endif /*CONFIG_X86_LOCAL_APIC*/
 
 #ifdef CONFIG_X86_IO_APIC
 
 int acpi_ioapic;
+
+#ifndef CONFIG_ACPI_HT_ONLY
 
 static int __init
 acpi_parse_ioapic (
@@ -251,6 +256,7 @@ acpi_parse_nmi_src (
 	return 0;
 }
 
+#endif /*!CONFIG_ACPI_HT_ONLY*/ 
 #endif /*CONFIG_X86_IO_APIC*/
 
 
