@@ -390,8 +390,7 @@ struct via686a_data {
 static struct pci_dev *s_bridge;	/* pointer to the (only) via686a */
 
 static int via686a_attach_adapter(struct i2c_adapter *adapter);
-static int via686a_detect(struct i2c_adapter *adapter, int address,
-			  unsigned short flags, int kind);
+static int via686a_detect(struct i2c_adapter *adapter, int address, int kind);
 static int via686a_detach_client(struct i2c_client *client);
 
 static inline int via686a_read_value(struct i2c_client *client, u8 reg)
@@ -665,8 +664,7 @@ static int via686a_attach_adapter(struct i2c_adapter *adapter)
 	return i2c_detect(adapter, &addr_data, via686a_detect);
 }
 
-static int via686a_detect(struct i2c_adapter *adapter, int address,
-		   unsigned short flags, int kind)
+static int via686a_detect(struct i2c_adapter *adapter, int address, int kind)
 {
 	struct i2c_client *new_client;
 	struct via686a_data *data;
