@@ -1716,15 +1716,16 @@ static int wl3501_set_essid(struct net_device *dev,
 			    union iwreq_data *wrqu, char *extra)
 {
 	struct wl3501_card *this = dev->priv;
-	int rc = 0;
 
 	if (wrqu->data.flags) {
 		iw_set_mgmt_info_element(IW_MGMT_INFO_ELEMENT_SSID,
 					 &this->essid,
 					 extra, wrqu->data.length);
-		rc = wl3501_reset(dev);
+	} else { /* We accept any ESSID */
+		iw_set_mgmt_info_element(IW_MGMT_INFO_ELEMENT_SSID,
+					 &this->essid, "ANY", 3);
 	}
-	return rc;
+	return wl3501_reset(dev);
 }
 
 static int wl3501_get_essid(struct net_device *dev,
@@ -1737,7 +1738,7 @@ static int wl3501_get_essid(struct net_device *dev,
 	spin_lock_irqsave(&this->lock, flags);
 	wrqu->essid.flags  = 1;
 	wrqu->essid.length = this->essid.len;
-	strlcpy(extra, this->essid.data, this->essid.len);
+	memcpy(extra, this->essid.data, this->essid.len);
 	spin_unlock_irqrestore(&this->lock, flags);
 	return 0;
 }
