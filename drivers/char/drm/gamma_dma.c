@@ -139,15 +139,9 @@ static int gamma_do_dma(drm_device_t *dev, int locked)
 	drm_buf_t	 *buf;
 	int		 retcode = 0;
 	drm_device_dma_t *dma = dev->dma;
-#if DRM_DMA_HISTOGRAM
-	cycles_t	 dma_start, dma_stop;
-#endif
 
 	if (test_and_set_bit(0, &dev->dma_flag)) return -EBUSY;
 
-#if DRM_DMA_HISTOGRAM
-	dma_start = get_cycles();
-#endif
 
 	if (!dma->next_buffer) {
 		DRM_ERROR("No next_buffer\n");
@@ -221,9 +215,6 @@ static int gamma_do_dma(drm_device_t *dev, int locked)
 	buf->pending	 = 1;
 	buf->waiting	 = 0;
 	buf->list	 = DRM_LIST_PEND;
-#if DRM_DMA_HISTOGRAM
-	buf->time_dispatched = get_cycles();
-#endif
 
 	/* WE NOW ARE ON LOGICAL PAGES!!! - overriding address */
 	address = buf->idx << 12;
@@ -245,10 +236,6 @@ cleanup:
 
 	clear_bit(0, &dev->dma_flag);
 
-#if DRM_DMA_HISTOGRAM
-	dma_stop = get_cycles();
-	atomic_inc(&dev->histo.dma[gamma_histogram_slot(dma_stop - dma_start)]);
-#endif
 
 	return retcode;
 }
@@ -273,9 +260,6 @@ int gamma_dma_schedule(drm_device_t *dev, int locked)
 	int		 missed;
 	int		 expire	   = 20;
 	drm_device_dma_t *dma	   = dev->dma;
-#if DRM_DMA_HISTOGRAM
-	cycles_t	 schedule_start;
-#endif
 
 	if (test_and_set_bit(0, &dev->interrupt_flag)) {
 				/* Not reentrant */
@@ -284,9 +268,6 @@ int gamma_dma_schedule(drm_device_t *dev, int locked)
 	}
 	missed = atomic_read(&dev->counts[10]);
 
-#if DRM_DMA_HISTOGRAM
-	schedule_start = get_cycles();
-#endif
 
 again:
 	if (dev->context_flag) {
@@ -333,10 +314,6 @@ again:
 
 	clear_bit(0, &dev->interrupt_flag);
 
-#if DRM_DMA_HISTOGRAM
-	atomic_inc(&dev->histo.schedule[gamma_histogram_slot(get_cycles()
-							   - schedule_start)]);
-#endif
 	return retcode;
 }
 
@@ -448,10 +425,6 @@ static int gamma_dma_priority(struct file *filp,
 			}
 		}
 
-#if DRM_DMA_HISTOGRAM
-		buf->time_queued     = get_cycles();
-		buf->time_dispatched = buf->time_queued;
-#endif
 		gamma_dma_dispatch(dev, address, length);
 		atomic_inc(&dev->counts[9]); /* _DRM_STAT_SPECIAL */
 		atomic_add(length, &dev->counts[8]); /* _DRM_STAT_PRIMARY */
@@ -604,6 +577,8 @@ static int gamma_do_init_dma( drm_device_t *dev, drm_gamma_init_t *init )
 
 	memset( dev_priv, 0, sizeof(drm_gamma_private_t) );
 
+	dev_priv->num_rast = init->num_rast;
+
 	list_for_each(list, &dev->maplist->head) {
 		drm_map_list_t *r_list = list_entry(list, drm_map_list_t, head);
 		if( r_list->map &&
@@ -667,7 +642,8 @@ int gamma_do_cleanup_dma( drm_device_t *dev )
 	if ( dev->dev_private ) {
 		drm_gamma_private_t *dev_priv = dev->dev_private;
 
-		DRM_IOREMAPFREE( dev_priv->buffers );
+		if ( dev_priv->buffers != NULL )
+			DRM_IOREMAPFREE( dev_priv->buffers );
 
 		DRM(free)( dev->dev_private, sizeof(drm_gamma_private_t),
 			   DRM_MEM_DRIVER );
@@ -830,4 +806,36 @@ int gamma_setsareactx(struct inode *inode, struct file *filp,
 	dev->context_sareas[request.ctx_id] = map;
 	up(&dev->struct_sem);
 	return 0;
+}
+
+void DRM(driver_irq_preinstall)( drm_device_t *dev ) {
+	drm_gamma_private_t *dev_priv =
+				(drm_gamma_private_t *)dev->dev_private;
+
+	while(GAMMA_READ(GAMMA_INFIFOSPACE) < 2);
+
+	GAMMA_WRITE( GAMMA_GCOMMANDMODE,	0x00000004 );
+	GAMMA_WRITE( GAMMA_GDMACONTROL,		0x00000000 );
+}
+
+void DRM(driver_irq_postinstall)( drm_device_t *dev ) {
+	drm_gamma_private_t *dev_priv =
+				(drm_gamma_private_t *)dev->dev_private;
+
+	while(GAMMA_READ(GAMMA_INFIFOSPACE) < 3);
+
+	GAMMA_WRITE( GAMMA_GINTENABLE,		0x00002001 );
+	GAMMA_WRITE( GAMMA_COMMANDINTENABLE,	0x00000008 );
+	GAMMA_WRITE( GAMMA_GDELAYTIMER,		0x00039090 );
+}
+
+void DRM(driver_irq_uninstall)( drm_device_t *dev ) {
+	drm_gamma_private_t *dev_priv =
+				(drm_gamma_private_t *)dev->dev_private;
+
+	while(GAMMA_READ(GAMMA_INFIFOSPACE) < 3);
+
+	GAMMA_WRITE( GAMMA_GDELAYTIMER,		0x00000000 );
+	GAMMA_WRITE( GAMMA_COMMANDINTENABLE,	0x00000000 );
+	GAMMA_WRITE( GAMMA_GINTENABLE,		0x00000000 );
 }

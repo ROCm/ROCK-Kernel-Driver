@@ -94,7 +94,7 @@
  */
 #define __HAVE_DMA		1
 #define __HAVE_DMA_QUEUE	1
-#define __HAVE_DMA_WAITLIST	1
+#define __HAVE_DMA_WAITLIST	0
 #define __HAVE_DMA_RECLAIM	1
 
 #define __HAVE_DMA_QUIESCENT	1

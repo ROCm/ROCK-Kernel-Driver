@@ -39,7 +39,7 @@ config DRM_R128
 
 config DRM_RADEON
 	tristate "ATI Radeon"
-	depends on DRM && AGP
+	depends on DRM
 	help
 	  Choose this option if you have an ATI Radeon graphics card.  There
 	  are both PCI and AGP versions.  You don't need to choose this to
@@ -56,8 +56,14 @@ config DRM_I810
 	  for this driver to work.
 
 config DRM_I830
-	tristate "Intel 830M"
+	tristate "Intel 830M, 845G, 852GM, 855GM, 865G"
 	depends on DRM && AGP
+	help
+	  Choose this option if you have a system that has Intel 830M, 845G,
+	  852GM, 855GM or 865G integrated graphics.  If M is selected, the
+	  module will be called i830.  AGP support is required for this driver
+	  to work.
+
 
 config DRM_MGA
 	tristate "Matrox g200/g400"
