@@ -675,20 +675,25 @@ static int ppp_ioctl(struct inode *inode, struct file *file,
 
 		if (copy_from_user(&uprog, (void __user *) arg, sizeof(uprog)))
 			break;
+		err = -EINVAL;
+		if (uprog.len > BPF_MAXINSNS)
+			break;
 		err = -ENOMEM;
-		len = uprog.len * sizeof(struct sock_filter);
-		code = kmalloc(len, GFP_KERNEL);
-		if (code == 0)
-			break;
-		err = -EFAULT;
-		if (copy_from_user(code, (void __user *) uprog.filter, len)) {
-			kfree(code);
-			break;
-		}
-		err = sk_chk_filter(code, uprog.len);
-		if (err) {
-			kfree(code);
-			break;
+		if (uprog.len > 0) {
+			len = uprog.len * sizeof(struct sock_filter);
+			code = kmalloc(len, GFP_KERNEL);
+			if (code == NULL)
+				break;
+			err = -EFAULT;
+			if (copy_from_user(code, (void __user *) uprog.filter, len)) {
+				kfree(code);
+				break;
+			}
+			err = sk_chk_filter(code, uprog.len);
+			if (err) {
+				kfree(code);
+				break;
+			}
 		}
 		filtp = (cmd == PPPIOCSPASS)? &ppp->pass_filter: &ppp->active_filter;
 		ppp_lock(ppp);

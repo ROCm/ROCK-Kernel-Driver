@@ -332,7 +332,7 @@ int sk_chk_filter(struct sock_filter *filter, int flen)
 	struct sock_filter *ftest;
 	int pc;
 
-	if ((unsigned int)flen >= (~0U / sizeof(struct sock_filter)))
+	if (((unsigned int)flen >= (~0U / sizeof(struct sock_filter))) || flen == 0)
 		return -EINVAL;
 
 	/* check the filter code now */
