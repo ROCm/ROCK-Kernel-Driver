@@ -1039,6 +1039,7 @@ asmlinkage void preempt_schedule(void)
 		printk("bad: schedule() with irqs disabled!\n");
 		show_stack(NULL);
 		preempt_enable_no_resched();
+		return;
 	}
 
 need_resched:

@@ -3,7 +3,7 @@ Devfs (Device File System) FAQ
 
 Linux Devfs (Device File System) FAQ
 Richard Gooch
-21-JUL-2002
+20-AUG-2002
 
 
 Document languages:
@@ -1509,6 +1509,16 @@ Here are some common questions and answers.
 
 
 
+Devfsd doesn't start
+
+Make sure you have compiled and installed devfsd
+Make sure devfsd is being started from your boot
+scripts
+Make sure you have configured your kernel to enable devfs (see
+below)
+Make sure devfs is mounted (see below)
+
+
 Devfsd is not managing all my permissions
 
 Make sure you are capturing the appropriate events. For example,
@@ -1777,7 +1787,7 @@ I hate the naming scheme
 First, remember that no naming scheme will please everybody. You hate
 the scheme, others love it. Who's to say who's right and who's wrong?
 Ultimately, the person who writes the code gets to choose, and what
-exists now is a combination of the the choices made by the
+exists now is a combination of the choices made by the
 devfs author and the
 kernel maintainer (Linus).
 

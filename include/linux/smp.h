@@ -87,9 +87,6 @@ int cpu_up(unsigned int cpu);
 #define smp_processor_id()			0
 #define hard_smp_processor_id()			0
 #define smp_threads_ready			1
-#ifndef CONFIG_PREEMPT
-#define kernel_lock()
-#endif
 #define smp_call_function(func,info,retry,wait)	({ 0; })
 static inline void smp_send_reschedule(int cpu) { }
 static inline void smp_send_reschedule_all(void) { }

@@ -203,6 +203,7 @@ lockd(struct svc_rqst *rqstp)
 	rpciod_down();
 
 	/* Release module */
+	unlock_kernel();
 	MOD_DEC_USE_COUNT;
 }
 

@@ -55,12 +55,16 @@ static void set_bitmap(unsigned long *bitmap, short base, short extent, int new_
 asmlinkage int sys_ioperm(unsigned long from, unsigned long num, int turn_on)
 {
 	struct thread_struct * t = &current->thread;
-	struct tss_struct * tss = init_tss + smp_processor_id();
+	struct tss_struct * tss;
+	int ret = 0;
 
 	if ((from + num <= from) || (from + num > IO_BITMAP_SIZE*32))
 		return -EINVAL;
 	if (turn_on && !capable(CAP_SYS_RAWIO))
 		return -EPERM;
+
+	tss = init_tss + get_cpu();
+
 	/*
 	 * If it's the first ioperm() call in this thread's lifetime, set the
 	 * IO bitmap up. ioperm() is much less timing critical than clone(),
@@ -69,8 +73,11 @@ asmlinkage int sys_ioperm(unsigned long from, unsigned long num, int turn_on)
 	if (!t->ts_io_bitmap) {
 		unsigned long *bitmap;
 		bitmap = kmalloc(IO_BITMAP_BYTES, GFP_KERNEL);
-		if (!bitmap)
-			return -ENOMEM;
+		if (!bitmap) {
+			ret = -ENOMEM;
+			goto out;
+		}
+
 		/*
 		 * just in case ...
 		 */
@@ -88,7 +95,9 @@ asmlinkage int sys_ioperm(unsigned long from, unsigned long num, int turn_on)
 	set_bitmap(t->ts_io_bitmap, from, num, !turn_on);
 	set_bitmap(tss->io_bitmap, from, num, !turn_on);
 
-	return 0;
+out:
+	put_cpu();
+	return ret;
 }
 
 /*
