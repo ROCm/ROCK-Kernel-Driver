@@ -611,8 +611,8 @@ static int __tcp_v4_check_established(struct sock *sk, __u16 lport,
 unique:
 	/* Must record num and sport now. Otherwise we will see
 	 * in hash table socket with a funny identity. */
-	sk->num = lport;
-	sk->sport = htons(lport);
+	inet->num = lport;
+	inet->sport = htons(lport);
 	BUG_TRAP(sk->pprev==NULL);
 	if ((sk->next = *skp) != NULL)
 		(*skp)->pprev = &sk->next;
@@ -723,7 +723,7 @@ static int tcp_v4_hash_connect(struct sock *sk)
  
  		tcp_bind_hash(sk, tb, rover);
  		if (!sk->pprev) {
- 			sk->sport = htons(rover);
+ 			inet_sk(sk)->sport = htons(rover);
  			__tcp_v4_hash(sk, 0);
  		}
  		spin_unlock(&head->lock);
