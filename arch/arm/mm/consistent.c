@@ -194,7 +194,7 @@ __dma_alloc(struct device *dev, size_t size, dma_addr_t *handle, int gfp,
 		/*
 		 * Set the "dma handle"
 		 */
-		*handle = page_to_bus(page);
+		*handle = page_to_dma(dev, page);
 
 		do {
 			BUG_ON(!pte_none(*pte));
