@@ -1493,7 +1493,7 @@ static int find_i810(u16 device)
 {
 	struct pci_dev *i810_dev;
 
-	i810_dev = pci_find_device(PCI_VENDOR_ID_INTEL, device, NULL);
+	i810_dev = pci_get_device(PCI_VENDOR_ID_INTEL, device, NULL);
 	if (!i810_dev)
 		return 0;
 	intel_i810_private.i810_dev = i810_dev;
@@ -1504,9 +1504,9 @@ static int find_i830(u16 device)
 {
 	struct pci_dev *i830_dev;
 
-	i830_dev = pci_find_device(PCI_VENDOR_ID_INTEL, device, NULL);
+	i830_dev = pci_get_device(PCI_VENDOR_ID_INTEL, device, NULL);
 	if (i830_dev && PCI_FUNC(i830_dev->devfn) != 0) {
-		i830_dev = pci_find_device(PCI_VENDOR_ID_INTEL,
+		i830_dev = pci_get_device(PCI_VENDOR_ID_INTEL,
 				device, i830_dev);
 	}
 
@@ -1715,6 +1715,7 @@ static void __devexit agp_intel_remove(struct pci_dev *pdev)
 {
 	struct agp_bridge_data *bridge = pci_get_drvdata(pdev);
 
+	pci_dev_put(pdev);
 	agp_remove_bridge(bridge);
 	agp_put_bridge(bridge);
 }
