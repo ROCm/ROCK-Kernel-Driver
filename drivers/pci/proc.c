@@ -378,11 +378,7 @@ static ssize_t pci_show_irq(struct device * dev, char * buf, size_t count, loff_
 	return off ? 0 : sprintf(buf,"%u\n",pci_dev->irq);
 }
 
-static struct device_attribute pci_irq_entry = {
-	name:	"irq",
-	mode:	S_IRUGO,
-	show:	pci_show_irq,
-};
+static DEVICE_ATTR(irq,"irq",S_IRUGO,pci_show_irq,NULL);
 
 static ssize_t pci_show_resources(struct device * dev, char * buf, size_t count, loff_t off)
 {
@@ -406,11 +402,7 @@ static ssize_t pci_show_resources(struct device * dev, char * buf, size_t count,
 	return (str - buf);
 }
 
-static struct device_attribute pci_resource_entry = {
-	name:	"resources",
-	mode:	S_IRUGO,
-	show:	pci_show_resources,
-};
+static DEVICE_ATTR(resource,"resource",S_IRUGO,pci_show_resources,NULL);
 
 int pci_proc_attach_device(struct pci_dev *dev)
 {
@@ -432,8 +424,8 @@ int pci_proc_attach_device(struct pci_dev *dev)
 	e->data = dev;
 	e->size = PCI_CFG_SPACE_SIZE;
 
-	device_create_file(&dev->dev,&pci_irq_entry);
-	device_create_file(&dev->dev,&pci_resource_entry);
+	device_create_file(&dev->dev,&dev_attr_irq);
+	device_create_file(&dev->dev,&dev_attr_resource);
 	return 0;
 }
 

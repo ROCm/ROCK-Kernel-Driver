@@ -210,22 +210,14 @@ static ssize_t partition_device_kdev_read(struct device *driverfs_dev,
 	kdev.value=(int)(long)driverfs_dev->driver_data;
 	return off ? 0 : sprintf (page, "%x\n",kdev.value);
 }
-static struct device_attribute partition_device_kdev_file = {
-	name: "kdev",
-	mode: S_IRUGO,
-	show: partition_device_kdev_read,
-};
+static DEVICE_ATTR(kdev,"kdev",S_IRUGO,partition_device_kdev_read,NULL);
 
 static ssize_t partition_device_type_read(struct device *driverfs_dev, 
 			char *page, size_t count, loff_t off) 
 {
 	return off ? 0 : sprintf (page, "BLK\n");
 }
-static struct device_attribute partition_device_type_file = {
-	name: "type",
-	mode: S_IRUGO,
-	show: partition_device_type_read,
-};
+static DEVICE_ATTR(type,"type",S_IRUGO,partition_device_type_read,NULL);
 
 void driverfs_create_partitions(struct gendisk *hd, int minor)
 {
@@ -296,9 +288,9 @@ void driverfs_create_partitions(struct gendisk *hd, int minor)
 			if (parent) current_driverfs_dev->bus = parent->bus;
 			device_register(current_driverfs_dev);
 			device_create_file(current_driverfs_dev,
-					&partition_device_type_file);
+					   &dev_attr_type);
 			device_create_file(current_driverfs_dev,
-					&partition_device_kdev_file);
+					   &dev_attr_kdev);
 		}
 	}
 }
@@ -317,17 +309,17 @@ void driverfs_remove_partitions(struct gendisk *hd, int minor)
 		if ((p[part].nr_sects >= 1)) {
 			current_driverfs_dev = &p[part].hd_driverfs_dev;
 			device_remove_file(current_driverfs_dev,
-					&partition_device_type_file);
+					   &dev_attr_type);
 			device_remove_file(current_driverfs_dev,
-					&partition_device_kdev_file);
+					   &dev_attr_kdev);
 			put_device(current_driverfs_dev);	
 		}
 	}
 	current_driverfs_dev = &p->hd_driverfs_dev;
-	device_remove_file(current_driverfs_dev, 
-			   &partition_device_type_file);
-	device_remove_file(current_driverfs_dev, 
-			   &partition_device_kdev_file);
+	device_remove_file(current_driverfs_dev,
+			   &dev_attr_type);
+	device_remove_file(current_driverfs_dev,
+			   &dev_attr_kdev);
 	put_device(current_driverfs_dev);	
 	return;
 }

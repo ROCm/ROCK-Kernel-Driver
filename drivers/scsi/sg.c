@@ -1402,22 +1402,14 @@ static ssize_t sg_device_kdev_read(struct device *driverfs_dev, char *page,
 	Sg_device * sdp=list_entry(driverfs_dev, Sg_device, sg_driverfs_dev);
 	return off ? 0 : sprintf(page, "%x\n",sdp->i_rdev.value);
 }
-static struct device_attribute sg_device_kdev_file = {
-	name: "kdev",
-	mode: S_IRUGO,
-	show: sg_device_kdev_read,
-};
+static DEVICE_ATTR(kdev,"kdev",S_IRUGO,sg_device_kdev_read,NULL);
 
 static ssize_t sg_device_type_read(struct device *driverfs_dev, char *page, 
 		size_t count, loff_t off) 
 {
 	return off ? 0 : sprintf (page, "CHR\n");
 }
-static struct device_attribute sg_device_type_file = {
-	name: "type",
-	mode: S_IRUGO,
-	show: sg_device_type_read,
-};
+static DEVICE_ATTR(type,"type",S_IRUGO,sg_device_type_read,NULL);
 
 static int sg_attach(Scsi_Device * scsidp)
 {
@@ -1485,8 +1477,8 @@ static int sg_attach(Scsi_Device * scsidp)
     sdp->sg_driverfs_dev.parent = &scsidp->sdev_driverfs_dev;
     sdp->sg_driverfs_dev.bus = &scsi_driverfs_bus_type;
     device_register(&sdp->sg_driverfs_dev);
-    device_create_file(&sdp->sg_driverfs_dev, &sg_device_type_file);
-    device_create_file(&sdp->sg_driverfs_dev, &sg_device_kdev_file);
+    device_create_file(&sdp->sg_driverfs_dev, &dev_attr_type);
+    device_create_file(&sdp->sg_driverfs_dev, &dev_attr_kdev);
 
     sdp->de = devfs_register (scsidp->de, "generic", DEVFS_FL_DEFAULT,
                              SCSI_GENERIC_MAJOR, k,
@@ -1556,8 +1548,8 @@ static void sg_detach(Scsi_Device * scsidp)
             }
 	    SCSI_LOG_TIMEOUT(3, printk("sg_detach: dev=%d, dirty\n", k));
 	    devfs_unregister (sdp->de);
-	    device_remove_file(&sdp->sg_driverfs_dev,&sg_device_type_file);
-	    device_remove_file(&sdp->sg_driverfs_dev,&sg_device_kdev_file);
+	    device_remove_file(&sdp->sg_driverfs_dev,&dev_attr_type);
+	    device_remove_file(&sdp->sg_driverfs_dev,&dev_attr_kdev);
 	    put_device(&sdp->sg_driverfs_dev);
 	    sdp->de = NULL;
 	    if (NULL == sdp->headfp) {

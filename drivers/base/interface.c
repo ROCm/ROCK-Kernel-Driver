@@ -14,11 +14,7 @@ static ssize_t device_read_name(struct device * dev, char * buf, size_t count, l
 	return off ? 0 : sprintf(buf,"%s\n",dev->name);
 }
 
-static struct device_attribute device_name_entry = {
-	name:	"name",
-	mode:	S_IRUGO,
-	show:	device_read_name,
-};
+static DEVICE_ATTR(name,"name",S_IRUGO,device_read_name,NULL);
 
 static ssize_t
 device_read_power(struct device * dev, char * page, size_t count, loff_t off)
@@ -89,15 +85,11 @@ device_write_power(struct device * dev, const char * buf, size_t count, loff_t o
 	return error < 0 ? error : count;
 }
 
-static struct device_attribute device_power_entry = {
-	name:		"power",
-	mode:		S_IWUSR | S_IRUGO,
-	show:		device_read_power,
-	store:		device_write_power,
-};
+static DEVICE_ATTR(power,"power",S_IWUSR | S_IRUGO,
+		   device_read_power,device_write_power);
 
 struct device_attribute * device_default_files[] = {
-	&device_name_entry,
-	&device_power_entry,
+	&dev_attr_name,
+	&dev_attr_power,
 	NULL,
 };
