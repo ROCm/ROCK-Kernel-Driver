@@ -217,19 +217,91 @@ xdr_error:					\
 	x = (char *)p;				\
 	p += XDR_QUADLEN(nbytes);		\
 } while (0)
+#define SAVEMEM(x,nbytes) do {			\
+	if (!(x = (p==argp->tmp || p == argp->tmpp) ? \
+ 		savemem(argp, p, nbytes) :	\
+ 		(char *)p)) {			\
+		printk(KERN_NOTICE "xdr error! (%s:%d)\n", __FILE__, __LINE__); \
+		goto xdr_error;			\
+		}				\
+	p += XDR_QUADLEN(nbytes);		\
+} while (0)
 #define COPYMEM(x,nbytes) do {			\
 	memcpy((x), p, nbytes);			\
 	p += XDR_QUADLEN(nbytes);		\
 } while (0)
 
 #define READ_BUF(nbytes)  do {			\
-	if (nbytes > (u32)((char *)argp->end - (char *)argp->p)) {	\
+	if (nbytes <= (u32)((char *)argp->end - (char *)argp->p)) {	\
+		p = argp->p;			\
+		argp->p += XDR_QUADLEN(nbytes);	\
+	} else if (!(p = read_buf(argp, nbytes))) { \
 		printk(KERN_NOTICE "xdr error! (%s:%d)\n", __FILE__, __LINE__); \
 		goto xdr_error;			\
 	}					\
-	p = argp->p;				\
-	argp->p += XDR_QUADLEN(nbytes);		\
 } while (0)
+
+u32 *read_buf(struct nfsd4_compoundargs *argp, int nbytes)
+{
+	/* We want more bytes than seem to be available.
+	 * Maybe we need a new page, may wehave just run out
+	 */
+	int avail = (char*)argp->end - (char*)argp->p;
+	u32 *p;
+	if (avail + argp->pagelen < nbytes)
+		return NULL;
+	if (avail + PAGE_SIZE > nbytes) /* need more than a page !! */
+		return NULL;
+	/* ok, we can do it with the tail plus the next page */
+	if (nbytes <= sizeof(argp->tmp))
+		p = argp->tmp;
+	else {
+		if (argp->tmpp)
+			kfree(argp->tmpp);
+		p = argp->tmpp = kmalloc(nbytes, GFP_KERNEL);
+		if (!p)
+			return NULL;
+		
+	}
+	memcpy(p, argp->p, avail);
+	/* step to next page */
+	argp->p = page_address(argp->pagelist[0]);
+	argp->pagelist++;
+	if (argp->pagelen < PAGE_SIZE) {
+		argp->end = p + (argp->pagelen>>2);
+		argp->pagelen = 0;
+	} else {
+		argp->end = p + (PAGE_SIZE>>2);
+		argp->pagelen -= PAGE_SIZE;
+	}
+	memcpy(((char*)p)+avail, argp->p, (nbytes - avail));
+	argp->p += XDR_QUADLEN(nbytes - avail);
+	return p;
+}
+
+char *savemem(struct nfsd4_compoundargs *argp, u32 *p, int nbytes)
+{
+	struct tmpbuf *tb;
+	if (p == argp->tmp) {
+		p = kmalloc(nbytes, GFP_KERNEL);
+		if (!p) return NULL;
+		memcpy(p, argp->tmp, nbytes);
+	} else {
+		if (p != argp->tmpp)
+			BUG();
+		argp->tmpp = NULL;
+	}
+	tb = kmalloc(sizeof(*tb), GFP_KERNEL);
+	if (!tb) {
+		kfree(p);
+		return NULL;
+	}
+	tb->buf = p;
+	tb->next = argp->to_free;
+	argp->to_free = tb;
+	return (char*)p;
+}
+
 
 static int
 nfsd4_decode_bitmap(struct nfsd4_compoundargs *argp, u32 *bmval)
@@ -442,7 +514,7 @@ nfsd4_decode_create(struct nfsd4_compoundargs *argp, struct nfsd4_create *create
 		READ_BUF(4);
 		READ32(create->cr_linklen);
 		READ_BUF(create->cr_linklen);
-		READMEM(create->cr_linkname, create->cr_linklen);
+		SAVEMEM(create->cr_linkname, create->cr_linklen);
 		if (check_utf8(create->cr_linkname, create->cr_linklen))
 			return nfserr_inval;
 		break;
@@ -463,7 +535,7 @@ nfsd4_decode_create(struct nfsd4_compoundargs *argp, struct nfsd4_create *create
 	READ_BUF(4);
 	READ32(create->cr_namelen);
 	READ_BUF(create->cr_namelen);
-	READMEM(create->cr_name, create->cr_namelen);
+	SAVEMEM(create->cr_name, create->cr_namelen);
 	if ((status = check_filename(create->cr_name, create->cr_namelen, nfserr_inval)))
 		return status;
 
@@ -487,7 +559,7 @@ nfsd4_decode_link(struct nfsd4_compoundargs *argp, struct nfsd4_link *link)
 	READ_BUF(4);
 	READ32(link->li_namelen);
 	READ_BUF(link->li_namelen);
-	READMEM(link->li_name, link->li_namelen);
+	SAVEMEM(link->li_name, link->li_namelen);
 	if ((status = check_filename(link->li_name, link->li_namelen, nfserr_inval)))
 		return status;
 
@@ -502,7 +574,7 @@ nfsd4_decode_lookup(struct nfsd4_compoundargs *argp, struct nfsd4_lookup *lookup
 	READ_BUF(4);
 	READ32(lookup->lo_len);
 	READ_BUF(lookup->lo_len);
-	READMEM(lookup->lo_name, lookup->lo_len);
+	SAVEMEM(lookup->lo_name, lookup->lo_len);
 	if ((status = check_filename(lookup->lo_name, lookup->lo_len, nfserr_noent)))
 		return status;
 
@@ -527,7 +599,7 @@ nfsd4_decode_open(struct nfsd4_compoundargs *argp, struct nfsd4_open *open)
 
 	/* owner, open_flag */
 	READ_BUF(open->op_ownerlen + 4);
-	READMEM(open->op_owner, open->op_ownerlen);
+	SAVEMEM(open->op_owner, open->op_ownerlen);
 	READ32(open->op_create);
 	switch (open->op_create) {
 	case NFS4_OPEN_NOCREATE:
@@ -562,7 +634,7 @@ nfsd4_decode_open(struct nfsd4_compoundargs *argp, struct nfsd4_open *open)
 		READ_BUF(4);
 		READ32(open->op_namelen);
 		READ_BUF(open->op_namelen);
-		READMEM(open->op_name, open->op_namelen);
+		SAVEMEM(open->op_name, open->op_namelen);
 		if ((status = check_filename(open->op_name, open->op_namelen, nfserr_inval)))
 			return status;
 		break;
@@ -575,7 +647,7 @@ nfsd4_decode_open(struct nfsd4_compoundargs *argp, struct nfsd4_open *open)
 		COPYMEM(&open->op_delegate_stateid, sizeof(delegation_stateid_t));
 		READ32(open->op_namelen);
 		READ_BUF(open->op_namelen);
-		READMEM(open->op_name, open->op_namelen);
+		SAVEMEM(open->op_name, open->op_namelen);
 		if ((status = check_filename(open->op_name, open->op_namelen, nfserr_inval)))
 			return status;
 		break;
@@ -596,7 +668,7 @@ nfsd4_decode_putfh(struct nfsd4_compoundargs *argp, struct nfsd4_putfh *putfh)
 	if (putfh->pf_fhlen > NFS4_FHSIZE)
 		goto xdr_error;
 	READ_BUF(putfh->pf_fhlen);
-	READMEM(putfh->pf_fhval, putfh->pf_fhlen);
+	SAVEMEM(putfh->pf_fhval, putfh->pf_fhlen);
 
 	DECODE_TAIL;
 }
@@ -639,7 +711,7 @@ nfsd4_decode_remove(struct nfsd4_compoundargs *argp, struct nfsd4_remove *remove
 	READ_BUF(4);
 	READ32(remove->rm_namelen);
 	READ_BUF(remove->rm_namelen);
-	READMEM(remove->rm_name, remove->rm_namelen);
+	SAVEMEM(remove->rm_name, remove->rm_namelen);
 	if ((status = check_filename(remove->rm_name, remove->rm_namelen, nfserr_noent)))
 		return status;
 
@@ -654,10 +726,10 @@ nfsd4_decode_rename(struct nfsd4_compoundargs *argp, struct nfsd4_rename *rename
 	READ_BUF(4);
 	READ32(rename->rn_snamelen);
 	READ_BUF(rename->rn_snamelen + 4);
-	READMEM(rename->rn_sname, rename->rn_snamelen);
+	SAVEMEM(rename->rn_sname, rename->rn_snamelen);
 	READ32(rename->rn_tnamelen);
 	READ_BUF(rename->rn_tnamelen);
-	READMEM(rename->rn_tname, rename->rn_tnamelen);
+	SAVEMEM(rename->rn_tname, rename->rn_tnamelen);
 	if ((status = check_filename(rename->rn_sname, rename->rn_snamelen, nfserr_noent)))
 		return status;
 	if ((status = check_filename(rename->rn_tname, rename->rn_tnamelen, nfserr_inval)))
@@ -701,16 +773,16 @@ nfsd4_decode_setclientid(struct nfsd4_compoundargs *argp, struct nfsd4_setclient
 	READ32(setclientid->se_namelen);
 
 	READ_BUF(setclientid->se_namelen + 8);
-	READMEM(setclientid->se_name, setclientid->se_namelen);
+	SAVEMEM(setclientid->se_name, setclientid->se_namelen);
 	READ32(setclientid->se_callback_prog);
 	READ32(setclientid->se_callback_netid_len);
 
 	READ_BUF(setclientid->se_callback_netid_len + 4);
-	READMEM(setclientid->se_callback_netid_val, setclientid->se_callback_netid_len);
+	SAVEMEM(setclientid->se_callback_netid_val, setclientid->se_callback_netid_len);
 	READ32(setclientid->se_callback_addr_len);
 
 	READ_BUF(setclientid->se_callback_addr_len + 4);
-	READMEM(setclientid->se_callback_addr_val, setclientid->se_callback_addr_len);
+	SAVEMEM(setclientid->se_callback_addr_val, setclientid->se_callback_addr_len);
 	READ32(setclientid->se_callback_ident);
 
 	DECODE_TAIL;
@@ -739,7 +811,7 @@ nfsd4_decode_verify(struct nfsd4_compoundargs *argp, struct nfsd4_verify *verify
 	READ_BUF(4);
 	READ32(verify->ve_attrlen);
 	READ_BUF(verify->ve_attrlen);
-	READMEM(verify->ve_attrval, verify->ve_attrlen);
+	SAVEMEM(verify->ve_attrval, verify->ve_attrlen);
 
 	DECODE_TAIL;
 }
@@ -747,6 +819,9 @@ nfsd4_decode_verify(struct nfsd4_compoundargs *argp, struct nfsd4_verify *verify
 static int
 nfsd4_decode_write(struct nfsd4_compoundargs *argp, struct nfsd4_write *write)
 {
+	int avail;
+	int v;
+	int len;
 	DECODE_HEAD;
 
 	READ_BUF(sizeof(stateid_t) + 16);
@@ -758,8 +833,36 @@ nfsd4_decode_write(struct nfsd4_compoundargs *argp, struct nfsd4_write *write)
 		goto xdr_error;
 	READ32(write->wr_buflen);
 
-	READ_BUF(write->wr_buflen);
-	READMEM(write->wr_buf, write->wr_buflen);
+	/* Sorry .. no magic macros for this.. *
+	 * READ_BUF(write->wr_buflen);
+	 * SAVEMEM(write->wr_buf, write->wr_buflen);
+	 */
+	avail = (char*)argp->end - (char*)argp->p;
+	if (avail + argp->pagelen < write->wr_buflen) {
+		printk(KERN_NOTICE "xdr error! (%s:%d)\n", __FILE__, __LINE__); 
+		goto xdr_error;
+	}
+	write->wr_vec[0].iov_base = p;
+	write->wr_vec[0].iov_len = avail;
+	v = 0;
+	len = write->wr_buflen;
+	while (len > write->wr_vec[v].iov_len) {
+		len -= write->wr_vec[v].iov_len;
+		v++;
+		write->wr_vec[v].iov_base = page_address(argp->pagelist[0]);
+		argp->pagelist++;
+		if (argp->pagelen >= PAGE_SIZE) {
+			write->wr_vec[v].iov_len = PAGE_SIZE;
+			argp->pagelen -= PAGE_SIZE;
+		} else {
+			write->wr_vec[v].iov_len = argp->pagelen;
+			argp->pagelen = 0;
+		}
+	}
+	argp->end = (u32*) (write->wr_vec[v].iov_base + write->wr_vec[v].iov_len);
+	argp->p = (u32*)  (write->wr_vec[v].iov_base + len);
+	write->wr_vec[v].iov_len = len;
+	write->wr_vlen = v+1;
 
 	DECODE_TAIL;
 }
@@ -780,7 +883,7 @@ nfsd4_decode_compound(struct nfsd4_compoundargs *argp)
 	READ_BUF(4);
 	READ32(argp->taglen);
 	READ_BUF(argp->taglen + 8);
-	READMEM(argp->tag, argp->taglen);
+	SAVEMEM(argp->tag, argp->taglen);
 	READ32(argp->minorversion);
 	READ32(argp->opcnt);
 
@@ -1891,13 +1994,29 @@ nfs4svc_decode_compoundargs(struct svc_rqst *rqstp, u32 *p, struct nfsd4_compoun
 	int status;
 
 	args->p = p;
-	args->end = rqstp->rq_argbuf.base + rqstp->rq_argbuf.buflen;
+	args->end = rqstp->rq_arg.head[0].iov_base + rqstp->rq_arg.head[0].iov_len;
+	args->pagelist = rqstp->rq_arg.pages;
+	args->pagelen = rqstp->rq_args.page_len;
+	args->tmpp = NULL;
+	args->to_free = NULL;
 	args->ops = args->iops;
 
 	status = nfsd4_decode_compound(args);
-	if (status && args->ops != args->iops) {
-		kfree(args->ops);
-		args->ops = args->iops;
+	if (status) {
+		if (args->ops != args->iops) {
+			kfree(args->ops);
+			args->ops = args->iops;
+		}
+		if (args->tmpp) {
+			kfree(args->tmpp);
+			args->tmpp = NULL;
+		}
+		while (args->to_free) {
+			struct tmpbuf *tb = args->to_free;
+			args->to_free = tb->next;
+			kfree(tb->buf);
+			kfree(tb);
+		}
 	}
 	return !status;
 }

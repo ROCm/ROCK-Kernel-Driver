@@ -249,7 +249,9 @@ struct nfsd4_write {
 	u64		wr_offset;          /* request */
 	u32		wr_stable_how;      /* request */
 	u32		wr_buflen;          /* request */
-	char *		wr_buf;             /* request */
+	struct iovec	wr_vec[RPCSVC_MAXPAGES]; /* request */
+	int		wr_vlen;
+
 	u32		wr_bytes_written;   /* response */
 	u32		wr_how_written;     /* response */
 	nfs4_verifier	wr_verifier;        /* response */
@@ -288,6 +290,14 @@ struct nfsd4_compoundargs {
 	/* scratch variables for XDR decode */
 	u32 *				p;
 	u32 *				end;
+	struct page **			pagelist;
+	int				pagelen;
+	u32				tmp[8];
+	u32 *				tmpp;
+	struct tmpbuf {
+		struct tmpbuf *next;
+		void *buf;
+	}				*to_free;
 	
 	u32				taglen;
 	char *				tag;

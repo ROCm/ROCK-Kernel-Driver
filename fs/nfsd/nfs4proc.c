@@ -481,7 +481,8 @@ nfsd4_write(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_writ
 	*p++ = nfssvc_boot.tv_usec;
 
 	return nfsd_write(rqstp, current_fh, write->wr_offset,
-			  write->wr_buf, write->wr_buflen, &write->wr_how_written);
+			  write->wr_vec, write->wr_vlen, write->wr_buflen,
+			  &write->wr_how_written);
 }
 
 /* This routine never returns NFS_OK!  If there are no other errors, it
@@ -699,6 +700,16 @@ out:
 	if (args->ops != args->iops) {
 		kfree(args->ops);
 		args->ops = args->iops;
+	}
+	if (args->tmpp) {
+		kfree(args->tmpp);
+		args->tmpp = NULL;
+	}
+	while (args->to_free) {
+		struct tmpbuf *tb = args->to_free;
+		args->to_free = tb->next;
+		kfree(tb->buf);
+		kfree(tb);
 	}
 	fh_put(&current_fh);
 	fh_put(&save_fh);
