@@ -148,14 +148,16 @@ static void mousedev_event(struct input_handle *handle, unsigned int type, unsig
 					break;
 
 				case EV_KEY:
+					if (code == BTN_TOUCH && test_bit(BTN_TOOL_FINGER, handle->dev->keybit)) {
+						/* Handle touchpad data */
+						list->touch = value;
+						if (!list->touch)
+							list->pkt_count = 0;
+						break;
+					}
+
 					switch (code) {
-						case BTN_TOUCH: /* Handle touchpad data */
-							if (test_bit(BTN_TOOL_FINGER, handle->dev->keybit)) {
-								list->touch = value;
-								if (!list->touch)
-									list->pkt_count = 0;
-								return;
-							}
+						case BTN_TOUCH:
 						case BTN_0:
 						case BTN_FORWARD:
 						case BTN_LEFT:   index = 0; break;
