@@ -51,7 +51,7 @@ int dpm_runtime_suspend(struct device * dev, u32 state)
 		goto Done;
 
 	if (dev->power.power_state)
-		dpm_runtime_resume(dev);
+		runtime_resume(dev);
 
 	if (!(error = suspend_device(dev,state)))
 		dev->power.power_state = state;
