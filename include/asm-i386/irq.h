@@ -23,7 +23,11 @@
  * Since vectors 0x00-0x1f are used/reserved for the CPU,
  * the usable vector space is 0x20-0xff (224 vectors)
  */
+#ifdef CONFIG_X86_IO_APIC
 #define NR_IRQS 224
+#else
+#define NR_IRQS 16
+#endif
 
 static __inline__ int irq_cannonicalize(int irq)
 {
