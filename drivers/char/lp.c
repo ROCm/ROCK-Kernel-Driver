@@ -476,7 +476,6 @@ static int lp_open(struct inode * inode, struct file * file)
 		printk (KERN_INFO "lp%d: ECP mode\n", minor);
 		lp_table[minor].best_mode = IEEE1284_MODE_ECP;
 	} else {
-		printk (KERN_INFO "lp%d: compatibility mode\n", minor);
 		lp_table[minor].best_mode = IEEE1284_MODE_COMPAT;
 	}
 	/* Leave peripheral in compatibility mode */
