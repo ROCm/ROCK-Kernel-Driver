@@ -461,6 +461,12 @@ void get_agp_version(struct agp_bridge_data *bridge)
 EXPORT_SYMBOL(get_agp_version);
 
 
+static int agp_3_0_enable(struct agp_bridge_data *bridge, u32 mode)
+{
+	return 0;
+}
+
+
 void agp_generic_enable(u32 mode)
 {
 	u32 command;
@@ -476,8 +482,8 @@ void agp_generic_enable(u32 mode)
 		pci_read_config_dword(agp_bridge->dev, agp_bridge->capndx + 0x4, &agp_3_0);
 		/* Check to see if we are operating in 3.0 mode */
 		if((agp_3_0 >> 3) & 0x1) {
-			if (agp_bridge->minor_version >= 5)
-				agp_3_5_enable(agp_bridge, mode);
+			if (agp_bridge->minor_version < 5)
+				agp_3_0_enable(agp_bridge, mode);
 			else
 				agp_3_5_enable(agp_bridge, mode);
 			return;
@@ -848,6 +854,7 @@ void agp_enable(u32 mode)
 	agp_bridge->driver->agp_enable(mode);
 }
 EXPORT_SYMBOL(agp_enable);
+
 
 #ifdef CONFIG_SMP
 static void ipi_handler(void *null)
