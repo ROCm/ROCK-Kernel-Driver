@@ -32,6 +32,13 @@ extern cpumask_t cpu_present_mask;
  */
 #define PROC_CHANGE_PENALTY		15
 
+struct seq_file;
+
+/*
+ * generate IPI list text
+ */
+extern void show_ipi_list(struct seq_file *p);
+
 /*
  * Move global data into per-processor storage.
  */
