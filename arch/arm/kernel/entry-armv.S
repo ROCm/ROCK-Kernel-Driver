@@ -799,8 +799,7 @@ __und_svc:	sub	sp, sp, #S_FRAME_SIZE
 		adrsvc	al, r9, 1f			@ r9  = normal FP return
 		bl	call_fpe			@ lr  = undefined instr return
 
-		mov	r0, r5				@ unsigned long pc
-		mov	r1, sp				@ struct pt_regs *regs
+		mov	r0, sp				@ struct pt_regs *regs
 		bl	do_undefinstr
 
 1:		set_cpsr_c r0, #PSR_I_BIT | MODE_SVC
@@ -926,8 +925,7 @@ call_fpe:	get_thread_info r10			@ get current thread
 		ldr	pc, [r4]			@ Call FP module USR entry point
 
 fpundefinstr:	set_cpsr_c r0, #MODE_SVC		@ Enable interrupts
-		mov	r0, lr
-		mov	r1, sp
+		mov	r0, sp
 		adrsvc	al, lr, ret_from_exception
 		b	do_undefinstr
 

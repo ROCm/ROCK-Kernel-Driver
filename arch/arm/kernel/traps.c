@@ -201,7 +201,7 @@ void die_if_kernel(const char *str, struct pt_regs *regs, int err)
     	die(str, regs, err);
 }
 
-asmlinkage void do_undefinstr(int address, struct pt_regs *regs, int mode)
+asmlinkage void do_undefinstr(struct pt_regs *regs)
 {
 	unsigned long *pc;
 	siginfo_t info;
@@ -229,7 +229,7 @@ asmlinkage void do_undefinstr(int address, struct pt_regs *regs, int mode)
 
 	force_sig_info(SIGILL, &info, current);
 
-	die_if_kernel("Oops - undefined instruction", regs, mode);
+	die_if_kernel("Oops - undefined instruction", regs, 0);
 }
 
 #ifdef CONFIG_CPU_26
