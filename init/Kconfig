@@ -176,7 +176,7 @@ config AUDITSYSCALL
 
 config LOG_BUF_SHIFT
 	int "Kernel log buffer size (16 => 64KB, 17 => 128KB)" if DEBUG_KERNEL
-	range 12 20
+	range 12 21
 	default 17 if ARCH_S390
 	default 16 if X86_NUMAQ || IA64
 	default 15 if SMP
