@@ -2159,14 +2159,6 @@ static void check_ttfb_buffer(struct page *page, struct buffer_head *bh)
  * total exclusion from __set_page_dirty_buffers().  That is obtained with
  * i_bufferlist_lock.
  *
- * Nobody should be calling try_to_free_buffers against a page which is
- * eligible for set_page_dirty() treatment anyway - the page is clearly
- * not freeable.  So we could just test page_count(page) here and complain
- * then scram if it's wrong.
- *
- * If any buffer is not uptodate then the entire page is set not uptodate,
- * as the partial uptodateness information is about to be lost.
- *
  * try_to_free_buffers() is non-blocking.
  */
 static inline int buffer_busy(struct buffer_head *bh)
@@ -2222,8 +2214,17 @@ int try_to_free_buffers(struct page *page)
 	inode = page->mapping->host;
 	spin_lock(&inode->i_bufferlist_lock);
 	ret = drop_buffers(page);
-	if (ret)
+	if (ret && !PageSwapCache(page)) {
+		/*
+		 * If the filesystem writes its buffers by hand (eg ext3)
+		 * then we can have clean buffers against a dirty page.  We
+		 * clean the page here; otherwise later reattachment of buffers
+		 * could encounter a non-uptodate page, which is unresolvable.
+		 * This only applies in the rare case where try_to_free_buffers
+		 * succeeds but the page is not freed.
+		 */
 		ClearPageDirty(page);
+	}
 	spin_unlock(&inode->i_bufferlist_lock);
 	return ret;
 }
