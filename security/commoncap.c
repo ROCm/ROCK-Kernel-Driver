@@ -27,20 +27,25 @@
 int cap_capable (struct task_struct *tsk, int cap)
 {
 	/* Derived from include/linux/sched.h:capable. */
-	if (cap_raised (tsk->cap_effective, cap))
+	if (cap_raised(tsk->cap_effective, cap))
 		return 0;
-	else
+	return -EPERM;
+}
+
+int cap_settime(struct timespec *ts, struct timezone *tz)
+{
+	if (!capable(CAP_SYS_TIME))
 		return -EPERM;
+	return 0;
 }
 
 int cap_ptrace (struct task_struct *parent, struct task_struct *child)
 {
 	/* Derived from arch/i386/kernel/ptrace.c:sys_ptrace. */
 	if (!cap_issubset (child->cap_permitted, current->cap_permitted) &&
-	    !capable (CAP_SYS_PTRACE))
+	    !capable(CAP_SYS_PTRACE))
 		return -EPERM;
-	else
-		return 0;
+	return 0;
 }
 
 int cap_capget (struct task_struct *target, kernel_cap_t *effective,
@@ -373,6 +378,7 @@ int cap_vm_enough_memory(long pages)
 }
 
 EXPORT_SYMBOL(cap_capable);
+EXPORT_SYMBOL(cap_settime);
 EXPORT_SYMBOL(cap_ptrace);
 EXPORT_SYMBOL(cap_capget);
 EXPORT_SYMBOL(cap_capset_check);

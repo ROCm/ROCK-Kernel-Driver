@@ -49,6 +49,7 @@
 #include <linux/init.h>
 #include <linux/profile.h>
 #include <linux/cpu.h>
+#include <linux/security.h>
 
 #include <asm/segment.h>
 #include <asm/io.h>
@@ -434,15 +435,17 @@ long ppc64_sys32_stime(int __user * tptr)
 {
 	int value;
 	struct timespec myTimeval;
-
-	if (!capable(CAP_SYS_TIME))
-		return -EPERM;
+	int err;
 
 	if (get_user(value, tptr))
 		return -EFAULT;
 
 	myTimeval.tv_sec = value;
 	myTimeval.tv_nsec = 0;
+
+	err = security_settime(&myTimeval, NULL);
+	if (err)
+		return err;
 
 	do_settimeofday(&myTimeval);
 
@@ -459,15 +462,17 @@ long ppc64_sys_stime(long __user * tptr)
 {
 	long value;
 	struct timespec myTimeval;
-
-	if (!capable(CAP_SYS_TIME))
-		return -EPERM;
+	int err;
 
 	if (get_user(value, tptr))
 		return -EFAULT;
 
 	myTimeval.tv_sec = value;
 	myTimeval.tv_nsec = 0;
+
+	err = security_settime(&myTimeval, NULL);
+	if (err)
+		return err;
 
 	do_settimeofday(&myTimeval);
 
