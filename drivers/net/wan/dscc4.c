@@ -356,14 +356,50 @@ static inline struct dscc4_dev_priv *dscc4_priv(struct net_device *dev)
 	return list_entry(dev, struct dscc4_dev_priv, hdlc.netdev);
 }
 
-static inline void dscc4_patch_register(u32 ioaddr, u32 mask, u32 value)
+static void scc_patchl(u32 mask, u32 value, struct dscc4_dev_priv *dpriv,
+			struct net_device *dev, int offset)
 {
 	u32 state;
 
-	state = readl(ioaddr);
+	/* Cf scc_writel for concern regarding thread-safety */
+	state = dpriv->scc_regs[offset];
 	state &= ~mask;
 	state |= value;
-	writel(state, ioaddr); 
+	dpriv->scc_regs[offset] = state;
+	writel(state, dev->base_addr + SCC_REG_START(dpriv) + offset);
+}
+
+static void scc_writel(u32 bits, struct dscc4_dev_priv *dpriv, 
+		       struct net_device *dev, int offset)
+{
+	/*
+	 * Thread-UNsafe. 
+	 * As of 2002/02/16, there are no thread racing for access.
+	 */
+	dpriv->scc_regs[offset] = bits;
+	writel(bits, dev->base_addr + SCC_REG_START(dpriv) + offset);
+}
+
+static inline u32 scc_readl(struct dscc4_dev_priv *dpriv, int offset)
+{
+	return dpriv->scc_regs[offset];
+}
+
+static u32 scc_readl_star(struct dscc4_dev_priv *dpriv, struct net_device *dev)
+{
+	/* Cf errata DS5 p.4 */
+	readl(dev->base_addr + SCC_REG_START(dpriv) + STAR);
+	return readl(dev->base_addr + SCC_REG_START(dpriv) + STAR);
+}
+
+static inline void dscc4_do_tx(struct dscc4_dev_priv *dpriv, 
+			       struct net_device *dev)
+{
+	dpriv->ltda = dpriv->tx_fd_dma +
+                      (dpriv->tx_current%TX_RING_SIZE)*sizeof(struct TxFD);
+	writel(dpriv->ltda, dev->base_addr + CH0LTDA + dpriv->dev_id*4);
+	/* Flush posted writes *NOW* */
+	readl(dev->base_addr + CH0LTDA + dpriv->dev_id*4);
 }
 
 int state_check(u32 state, struct dscc4_dev_priv *dpriv, 
@@ -686,28 +722,28 @@ err_out:
  * Let's hope the default values are decent enough to protect my
  * feet from the user's gun - Ueimor
  */
-static void dscc4_init_registers(u32 base_addr, int dev_id)
+static void dscc4_init_registers(struct dscc4_dev_priv *dpriv,
+				 struct net_device *dev)
 {
-	u32 ioaddr = base_addr + SCC_REG_START(dpriv);
+	scc_writel(0x80001000, dpriv, dev, CCR0);
 
-	writel(0x80001000, ioaddr + CCR0);
+	scc_writel(LengthCheck | (HDLC_MAX_MRU >> 5), dpriv, dev, RLCR);
 
-	writel(LengthCheck | (HDLC_MAX_MRU >> 5), ioaddr + RLCR);
+	/* Shared flags transmission disabled - cf errata DS5 p.11 */
+	/* Carrier detect disabled - cf errata p.14 */
+	scc_writel(0x021c8000, dpriv, dev, CCR1);
 
-	/* no address recognition/crc-CCITT/cts enabled */
-	writel(0x021c8000, ioaddr + CCR1);
-
-	/* crc not forwarded */
-	writel(0x00050008 & ~RxActivate, ioaddr + CCR2);
+	/* crc not forwarded - Cf errata DS5 p.11 */
+	scc_writel(0x00050008 & ~RxActivate, dpriv, dev, CCR2);
 	// crc forwarded
-	//writel(0x00250008 & ~RxActivate, ioaddr + CCR2);
+	//scc_writel(0x00250008 & ~RxActivate, dpriv, dev, CCR2);
 
 	/* Don't mask RDO. Ever. */
 #ifdef DSCC4_POLLING
-	writel(0xfffeef7f, ioaddr + IMR); /* Interrupt mask */
+	scc_writel(0xfffeef7f, dpriv, dev, IMR); /* Interrupt mask */
 #else
-	//writel(0xfffaef7f, ioaddr + IMR); /* Interrupt mask */
-	writel(0xfffaef7e, ioaddr + IMR); /* Interrupt mask */
+	//scc_writel(0xfffaef7f, dpriv, dev, IMR); /* Interrupt mask */
+	scc_writel(0xfffaef7e, dpriv, dev, IMR); /* Interrupt mask */
 #endif
 }
 
@@ -760,7 +796,7 @@ static int dscc4_found1(struct pci_dev *pdev, unsigned long ioaddr)
 	        }
 		hdlc->proto = IF_PROTO_HDLC;
 		SET_MODULE_OWNER(d);
-		dscc4_init_registers(ioaddr, dpriv);
+		dscc4_init_registers(dpriv, d);
 		dpriv->parity = PARITY_CRC16_PR0_CCITT;
 		dpriv->encoding = ENCODING_NRZ;
 	}
@@ -890,7 +926,7 @@ static int dscc4_open(struct net_device *dev)
 	}
 
 	/* Posted write is flushed in the busy-waiting loop */
-	writel(TxSccRes | RxSccRes, ioaddr + CMDR);
+	scc_writel(TxSccRes | RxSccRes, dpriv, dev, CMDR);
 
 	if (dscc4_wait_ack_cec(ioaddr, dev, "Cec"))
 		goto err_free_ring;
@@ -1063,7 +1099,7 @@ static int dscc4_set_clock(struct net_device *dev, u32 *bps, u32 *state)
 		 */
 		brr = 0;
 	}
-	writel(brr, dev->base_addr + BRR + SCC_REG_START(dpriv));
+	scc_writel(brr, dpriv, dev, BRR);
 
 	return 0;
 }
@@ -1136,11 +1172,9 @@ static int dscc4_clock_setting(struct net_device *dev)
 	struct dscc4_dev_priv *dpriv = dscc4_priv(dev);
 	sync_serial_settings *settings = &dpriv->settings;
 	u32 bps, state;
-	u32 ioaddr;
 
 	bps = settings->clock_rate;
-	ioaddr = dev->base_addr + CCR0 + SCC_REG_START(dpriv);
-	state = readl(ioaddr);
+	state = scc_readl(dpriv, CCR0);
 	if(dscc4_set_clock(dev, &bps, &state) < 0)
 		return -EOPNOTSUPP;
 	if (bps) { /* DCE */
@@ -1154,7 +1188,7 @@ static int dscc4_clock_setting(struct net_device *dev)
 		state = 0x80001000;
 		printk(KERN_DEBUG "%s: external RxClk (DTE)\n", dev->name);
 	}
-	writel(state, ioaddr); 
+	scc_writel(state, dpriv, dev, CCR0);
 	return 0;
 }
 
@@ -1172,12 +1206,9 @@ static int dscc4_encoding_setting(struct net_device *dev)
 	int i, ret = 0;
 
 	i = dscc4_match(encoding, dpriv->encoding);
-	if (i >= 0) {
-		u32 ioaddr;
-
-		ioaddr = dev->base_addr + CCR0 + SCC_REG_START(dpriv);
-		dscc4_patch_register(ioaddr, EncodingMask, encoding[i].bits);
-	} else
+	if (i >= 0)
+		scc_patchl(EncodingMask, encoding[i].bits, dpriv, dev, CCR0);
+	else
 		ret = -EOPNOTSUPP;
 	return ret;
 }
@@ -1186,10 +1217,9 @@ static int dscc4_loopback_setting(struct net_device *dev)
 {
 	struct dscc4_dev_priv *dpriv = dscc4_priv(dev);
 	sync_serial_settings *settings = &dpriv->settings;
-	u32 ioaddr, state;
+	u32 state;
 
-	ioaddr = dev->base_addr + CCR1 + SCC_REG_START(dpriv);
-	state = readl(ioaddr);
+	state = scc_readl(dpriv, CCR1);
 	if (settings->loopback) {
 		printk(KERN_DEBUG "%s: loopback\n", dev->name);
 		state |= 0x00000100;
@@ -1197,7 +1227,7 @@ static int dscc4_loopback_setting(struct net_device *dev)
 		printk(KERN_DEBUG "%s: normal\n", dev->name);
 		state &= ~0x00000100;
 	}
-	writel(state, ioaddr);
+	scc_writel(state, dpriv, dev, CCR1);
 	return 0;
 }
 
@@ -1213,12 +1243,9 @@ static int dscc4_crc_setting(struct net_device *dev)
 	int i, ret = 0;
 
 	i = dscc4_match(crc, dpriv->parity);
-	if (i >= 0) {
-		u32 ioaddr;
-
-		ioaddr = dev->base_addr + CCR1 + SCC_REG_START(dpriv);
-		dscc4_patch_register(ioaddr, CrcMask, crc[i].bits);
-	} else
+	if (i >= 0)
+		scc_patchl(CrcMask, crc[i].bits, dpriv, dev, CCR1);
+	else
 		ret = -EOPNOTSUPP;
 	return ret;
 }
@@ -1424,7 +1451,7 @@ try:
 				dpriv->flags &= ~NeedIDR;
 				mb();
 				/* Activate receiver and misc */
-				writel(0x08050008, scc_offset + CCR2);
+				scc_writel(0x08050008, dpriv, dev, CCR2);
 			}
 		err_xpr:
 			if (!(state &= ~Xpr))
@@ -1561,7 +1588,7 @@ try:
 			 * ORed with TxSccRes, one sees the CFG ack (for
 			 * the TX part only).
 			 */	
-			writel(RxSccRes, scc_offset + CMDR);
+			scc_writel(RxSccRes, dpriv, dev, CMDR);
 			dpriv->flags |= RdoSet;
 
 			/* 
