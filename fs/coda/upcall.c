@@ -55,7 +55,8 @@ static void *alloc_upcall(int opcode, int size)
         inp->ih.opcode = opcode;
 	inp->ih.pid = current->pid;
 	inp->ih.pgid = current->pgrp;
-	coda_load_creds(&(inp->ih.cred));
+	memset(&inp->ih.cred, 0, sizeof(struct coda_cred));
+	inp->ih.cred.cr_fsuid = current->fsuid;
 
 	return (void*)inp;
 }
@@ -163,16 +164,18 @@ int venus_lookup(struct super_block *sb, struct ViceFid *fid,
 }
 
 int venus_store(struct super_block *sb, struct ViceFid *fid, int flags,
-                struct coda_cred *cred)
+                vuid_t uid)
 {
         union inputArgs *inp;
         union outputArgs *outp;
         int insize, outsize, error;
+	struct coda_cred cred = { 0, };
+	cred.cr_fsuid = uid;
 	
 	insize = SIZE(store);
 	UPARG(CODA_STORE);
 	
-	memcpy(&(inp->ih.cred), cred, sizeof(*cred));
+	memcpy(&(inp->ih.cred), &cred, sizeof(cred));
 	
         inp->coda_store.VFid = *fid;
         inp->coda_store.flags = flags;
@@ -202,16 +205,18 @@ int venus_release(struct super_block *sb, struct ViceFid *fid, int flags)
 }
 
 int venus_close(struct super_block *sb, struct ViceFid *fid, int flags,
-                struct coda_cred *cred)
+                vuid_t uid)
 {
 	union inputArgs *inp;
 	union outputArgs *outp;
 	int insize, outsize, error;
+	struct coda_cred cred = { 0, };
+	cred.cr_fsuid = uid;
 	
 	insize = SIZE(release);
 	UPARG(CODA_CLOSE);
 	
-	memcpy(&(inp->ih.cred), cred, sizeof(*cred));
+	memcpy(&(inp->ih.cred), &cred, sizeof(cred));
 	
         inp->coda_close.VFid = *fid;
         inp->coda_close.flags = flags;

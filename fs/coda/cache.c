@@ -31,8 +31,8 @@ void coda_cache_enter(struct inode *inode, int mask)
 	struct coda_inode_info *cii = ITOC(inode);
 
 	cii->c_cached_epoch = atomic_read(&permission_epoch);
-        if ( !coda_cred_ok(&cii->c_cached_cred) ) {
-                coda_load_creds(&cii->c_cached_cred);
+	if (cii->c_uid != current->fsuid) {
+                cii->c_uid = current->fsuid;
                 cii->c_cached_perm = mask;
         } else
                 cii->c_cached_perm |= mask;
@@ -64,8 +64,8 @@ int coda_cache_check(struct inode *inode, int mask)
         int hit;
 	
         hit = (mask & cii->c_cached_perm) == mask &&
-	    coda_cred_ok(&cii->c_cached_cred) &&
-	    cii->c_cached_epoch == atomic_read(&permission_epoch);
+		cii->c_uid == current->fsuid &&
+		cii->c_cached_epoch == atomic_read(&permission_epoch);
 
         return hit;
 }

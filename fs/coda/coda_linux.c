@@ -45,30 +45,6 @@ int coda_isroot(struct inode *i)
     return ( i->i_sb->s_root->d_inode == i );
 }
 
-/* put the current process credentials in the cred */
-void coda_load_creds(struct coda_cred *cred)
-{
-        cred->cr_uid = (vuid_t) current->uid;
-        cred->cr_euid = (vuid_t) current->euid;
-        cred->cr_suid = (vuid_t) current->suid;
-        cred->cr_fsuid = (vuid_t) current->fsuid;
-
-        cred->cr_groupid = (vgid_t) current->gid;
-        cred->cr_egid = (vgid_t) current->egid;
-        cred->cr_sgid = (vgid_t) current->sgid;
-        cred->cr_fsgid = (vgid_t) current->fsgid;
-}
-
-int coda_cred_ok(struct coda_cred *cred)
-{
-	return(current->fsuid == cred->cr_fsuid);
-}
-
-int coda_cred_eq(struct coda_cred *cred1, struct coda_cred *cred2)
-{
-	return (cred1->cr_fsuid == cred2->cr_fsuid);
-}
-
 unsigned short coda_flags_to_cflags(unsigned short flags)
 {
 	unsigned short coda_flags = 0;

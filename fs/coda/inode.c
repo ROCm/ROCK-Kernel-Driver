@@ -46,7 +46,7 @@ static struct inode *coda_alloc_inode(struct super_block *sb)
 		return NULL;
 	memset(&ei->c_fid, 0, sizeof(struct ViceFid));
 	ei->c_flags = 0;
-	memset(&ei->c_cached_cred, 0, sizeof(struct coda_cred));
+	ei->c_uid = 0;
 	ei->c_cached_perm = 0;
 	return &ei->vfs_inode;
 }

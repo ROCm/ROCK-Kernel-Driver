@@ -54,12 +54,9 @@ char *coda_f2s(ViceFid *f);
 int coda_isroot(struct inode *i);
 int coda_iscontrol(const char *name, size_t length);
 
-void coda_load_creds(struct coda_cred *cred);
 void coda_vattr_to_iattr(struct inode *, struct coda_vattr *);
 void coda_iattr_to_vattr(struct iattr *, struct coda_vattr *);
 unsigned short coda_flags_to_cflags(unsigned short);
-int coda_cred_ok(struct coda_cred *cred);
-int coda_cred_eq(struct coda_cred *cred1, struct coda_cred *cred2);
 
 /* sysctl.h */
 void coda_sysctl_init(void);
