@@ -223,14 +223,19 @@ static void x25_insert_socket(struct sock *sk)
 
 /*
  *	Find a socket that wants to accept the Call Request we just
- *	received.
+ *	received. Check the full list for an address/cud match.
+ *	If no cuds match return the next_best thing, an address match.
+ *	Note: if a listening socket has cud set it must only get calls
+ *	with matching cud.
  */
-static struct sock *x25_find_listener(struct x25_address *addr)
+static struct sock *x25_find_listener(struct x25_address *addr, struct x25_calluserdata *calluserdata)
 {
 	struct sock *s;
+	struct sock *next_best;
 	struct hlist_node *node;
 
 	read_lock_bh(&x25_list_lock);
+	next_best = NULL;
 
 	sk_for_each(s, node, &x25_list)
 		if ((!strcmp(addr->x25_addr,
@@ -238,9 +243,24 @@ static struct sock *x25_find_listener(struct x25_address *addr)
 		     !strcmp(addr->x25_addr,
 			     null_x25_address.x25_addr)) &&
 		     s->sk_state == TCP_LISTEN) {
-			sock_hold(s);
-			goto found;
+
+			/*
+			 * Found a listening socket, now check the incoming
+			 * call user data vs this sockets call user data
+			 */
+			if (x25_check_calluserdata(&x25_sk(s)->calluserdata, calluserdata)) {
+				sock_hold(s);
+				goto found;
+			}
+			if (x25_sk(s)->calluserdata.cudlength == 0) {
+				next_best = s;
+			}
 		}
+	if (next_best) {
+		s = next_best;
+		sock_hold(s);
+		goto found;
+	}
 	s = NULL;
 found:
 	read_unlock_bh(&x25_list_lock);
@@ -814,6 +834,7 @@ int x25_rx_call_request(struct sk_buff *skb, struct x25_neigh *nb,
 	struct x25_opt *makex25;
 	struct x25_address source_addr, dest_addr;
 	struct x25_facilities facilities;
+	struct x25_calluserdata calluserdata;
 	int len, rc;
 
 	/*
@@ -828,9 +849,27 @@ int x25_rx_call_request(struct sk_buff *skb, struct x25_neigh *nb,
 	skb_pull(skb, x25_addr_ntoa(skb->data, &source_addr, &dest_addr));
 
 	/*
-	 *	Find a listener for the particular address.
+	 *	Get the length of the facilities, skip past them for the moment
+	 *	get the call user data because this is needed to determine
+	 *	the correct listener
 	 */
-	sk = x25_find_listener(&source_addr);
+	len = skb->data[0] + 1;
+	skb_pull(skb,len);
+
+	/*
+	 *	Incoming Call User Data.
+	 */
+	if (skb->len >= 0) {
+		memcpy(calluserdata.cuddata, skb->data, skb->len);
+		calluserdata.cudlength = skb->len;
+	}
+
+	skb_push(skb,len);
+
+	/*
+	 *	Find a listener for the particular address/cud pair.
+	 */
+	sk = x25_find_listener(&source_addr,&calluserdata);
 
 	/*
 	 *	We can't accept the Call Request.
@@ -859,7 +898,7 @@ int x25_rx_call_request(struct sk_buff *skb, struct x25_neigh *nb,
 		goto out_sock_put;
 
 	/*
-	 *	Remove the facilities, leaving any Call User Data.
+	 *	Remove the facilities
 	 */
 	skb_pull(skb, len);
 
@@ -873,16 +912,9 @@ int x25_rx_call_request(struct sk_buff *skb, struct x25_neigh *nb,
 	makex25->neighbour     = nb;
 	makex25->facilities    = facilities;
 	makex25->vc_facil_mask = x25_sk(sk)->vc_facil_mask;
+	makex25->calluserdata  = calluserdata;
 
 	x25_write_internal(make, X25_CALL_ACCEPTED);
-
-	/*
-	 *	Incoming Call User Data.
-	 */
-	if (skb->len >= 0) {
-		memcpy(makex25->calluserdata.cuddata, skb->data, skb->len);
-		makex25->calluserdata.cudlength = skb->len;
-	}
 
 	makex25->state = X25_STATE_3;
 
