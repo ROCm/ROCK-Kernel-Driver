@@ -177,7 +177,7 @@ int cpqhp_proc_remove_ctrl (struct controller *ctrl)
 	
 int cpqhp_proc_init_ctrl (void)
 {
-	ctrl_proc_root = proc_mkdir("driver/hpc", NULL);
+	ctrl_proc_root = proc_mkdir("hpc", proc_root_driver);
 	if (!ctrl_proc_root)
 		return -ENOMEM;
 	ctrl_proc_root->owner = THIS_MODULE;
