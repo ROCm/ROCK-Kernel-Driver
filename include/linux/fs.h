@@ -914,9 +914,15 @@ static inline void mark_inode_dirty_sync(struct inode *inode)
 	__mark_inode_dirty(inode, I_DIRTY_SYNC);
 }
 
+static inline void touch_atime(struct vfsmount *mnt, struct dentry *dentry)
+{
+	/* per-mountpoint checks will go here */
+	update_atime(dentry->d_inode);
+}
+
 static inline void file_accessed(struct file *file)
 {
-	update_atime(file->f_dentry->d_inode);
+	touch_atime(file->f_vfsmnt, file->f_dentry);
 }
 
 
