@@ -459,13 +459,11 @@ static void slip_write_wakeup(struct tty_struct *tty)
 
 static void sl_tx_timeout(struct net_device *dev)
 {
-	struct slip *sl = (struct slip*)(dev->priv);
+	struct slip *sl = netdev_priv(dev);
 
 	spin_lock(&sl->lock);
 
 	if (netif_queue_stopped(dev)) {
-		struct slip *sl = (struct slip*)(dev->priv);
-
 		if (!netif_running(dev))
 			goto out;
 
@@ -495,7 +493,7 @@ out:
 static int
 sl_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	struct slip *sl = (struct slip*)(dev->priv);
+	struct slip *sl = netdev_priv(dev);
 
 	spin_lock(&sl->lock);
 	if (!netif_running(dev))  {
@@ -529,7 +527,7 @@ sl_xmit(struct sk_buff *skb, struct net_device *dev)
 static int
 sl_close(struct net_device *dev)
 {
-	struct slip *sl = (struct slip*)(dev->priv);
+	struct slip *sl = netdev_priv(dev);
 
 	spin_lock_bh(&sl->lock);
 	if (sl->tty) {
@@ -548,7 +546,7 @@ sl_close(struct net_device *dev)
 
 static int sl_open(struct net_device *dev)
 {
-	struct slip *sl = (struct slip*)(dev->priv);
+	struct slip *sl = netdev_priv(dev);
 
 	if (sl->tty==NULL)
 		return -ENODEV;
@@ -562,7 +560,7 @@ static int sl_open(struct net_device *dev)
 
 static int sl_change_mtu(struct net_device *dev, int new_mtu)
 {
-	struct slip *sl = (struct slip*)(dev->priv);
+	struct slip *sl = netdev_priv(dev);
 
 	if (new_mtu < 68 || new_mtu > 65534)
 		return -EINVAL;
@@ -578,7 +576,7 @@ static struct net_device_stats *
 sl_get_stats(struct net_device *dev)
 {
 	static struct net_device_stats stats;
-	struct slip *sl = (struct slip*)(dev->priv);
+	struct slip *sl = netdev_priv(dev);
 #ifdef SL_INCLUDE_CSLIP
 	struct slcompress *comp;
 #endif
@@ -613,7 +611,7 @@ sl_get_stats(struct net_device *dev)
 
 static int sl_init(struct net_device *dev)
 {
-	struct slip *sl = (struct slip*)(dev->priv);
+	struct slip *sl = netdev_priv(dev);
 
 	/*
 	 *	Finish setting up the DEVICE info. 
@@ -631,7 +629,7 @@ static int sl_init(struct net_device *dev)
 
 static void sl_uninit(struct net_device *dev)
 {
-	struct slip *sl = (struct slip*)(dev->priv);
+	struct slip *sl = netdev_priv(dev);
 
 	sl_free_bufs(sl);
 }
@@ -720,7 +718,7 @@ static void sl_sync(void)
 		if ((dev = slip_devs[i]) == NULL)
 			break;
 
-		sl = dev->priv;
+		sl = netdev_priv(dev);
 		if (sl->tty || sl->leased)
 			continue;
 		if (dev->flags&IFF_UP)
@@ -747,7 +745,7 @@ sl_alloc(dev_t line)
 		if (dev == NULL)
 			break;
 
-		sl = dev->priv;
+		sl = netdev_priv(dev);
 		if (sl->leased) {
 			if (sl->line != line)
 				continue;
@@ -789,7 +787,7 @@ sl_alloc(dev_t line)
 		i = sel;
 		dev = slip_devs[i];
 		if (score > 1) {
-			sl = dev->priv;
+			sl = netdev_priv(dev);
 			sl->flags &= (1 << SLF_INUSE);
 			return sl;
 		}
@@ -800,7 +798,7 @@ sl_alloc(dev_t line)
 		return NULL;
 
 	if (dev) {
-		sl = dev->priv;
+		sl = netdev_priv(dev);
 		if (test_bit(SLF_INUSE, &sl->flags)) {
 			unregister_netdevice(dev);
 			dev = NULL;
@@ -818,7 +816,7 @@ sl_alloc(dev_t line)
 		dev->base_addr  = i;
 	}
 
-	sl = dev->priv;
+	sl = netdev_priv(dev);
 
 	/* Initialize channel control data */
 	sl->magic       = SLIP_MAGIC;
@@ -1261,7 +1259,7 @@ static int slip_ioctl(struct tty_struct *tty, struct file *file, unsigned int cm
 
 static int sl_ioctl(struct net_device *dev,struct ifreq *rq,int cmd)
 {
-	struct slip *sl = (struct slip*)(dev->priv);
+	struct slip *sl = netdev_priv(dev);
 	unsigned long *p = (unsigned long *)&rq->ifr_ifru;
 
 	if (sl == NULL)		/* Allocation failed ?? */
@@ -1407,7 +1405,7 @@ static void __exit slip_exit(void)
 			dev = slip_devs[i];
 			if (!dev)
 				continue;
-			sl = dev->priv;
+			sl = netdev_priv(dev);
 			spin_lock_bh(&sl->lock);
 			if (sl->tty) {
 				busy++;
@@ -1424,7 +1422,7 @@ static void __exit slip_exit(void)
 			continue;
 		slip_devs[i] = NULL;
 
-		sl = dev->priv;
+		sl = netdev_priv(dev);
 		if (sl->tty) {
 			printk(KERN_ERR "%s: tty discipline still running\n",
 			       dev->name);
