@@ -83,9 +83,7 @@ __xfrm4_find_acq(u8 mode, u32 reqid, u8 proto,
 			    break;
 		    }
 	}
-	if (x0) {
-		xfrm_state_hold(x0);
-	} else if (create && (x0 = xfrm_state_alloc()) != NULL) {
+	if (!x0 && create && (x0 = xfrm_state_alloc()) != NULL) {
 		x0->sel.daddr.a4 = daddr->a4;
 		x0->sel.saddr.a4 = saddr->a4;
 		x0->sel.prefixlen_d = 32;
@@ -105,6 +103,8 @@ __xfrm4_find_acq(u8 mode, u32 reqid, u8 proto,
 		list_add_tail(&x0->bydst, xfrm4_state_afinfo.state_bydst+h);
 		wake_up(&km_waitq);
 	}
+	if (x0)
+		xfrm_state_hold(x0);
 	return x0;
 }
 

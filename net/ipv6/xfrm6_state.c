@@ -90,9 +90,7 @@ __xfrm6_find_acq(u8 mode, u32 reqid, u8 proto,
 			    break;
 		    }
 	}
-	if (x0) {
-		xfrm_state_hold(x0);
-	} else if (create && (x0 = xfrm_state_alloc()) != NULL) {
+	if (!x0 && create && (x0 = xfrm_state_alloc()) != NULL) {
 		ipv6_addr_copy((struct in6_addr *)x0->sel.daddr.a6,
 			       (struct in6_addr *)daddr);
 		ipv6_addr_copy((struct in6_addr *)x0->sel.saddr.a6,
@@ -115,6 +113,8 @@ __xfrm6_find_acq(u8 mode, u32 reqid, u8 proto,
 		list_add_tail(&x0->bydst, xfrm6_state_afinfo.state_bydst+h);
 		wake_up(&km_waitq);
 	}
+	if (x0)
+		xfrm_state_hold(x0);
 	return x0;
 }
 
