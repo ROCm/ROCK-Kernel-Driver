@@ -147,7 +147,7 @@ match(const struct sk_buff *skb,
        		return 0;
        }
 
-       frag=skb->data+ptr;
+       frag = (struct fraghdr *) (skb->data + ptr);
 
        DEBUGP("IPv6 FRAG LEN %u %u ", hdrlen, frag->hdrlen);
        DEBUGP("INFO %04X ", frag->info);
