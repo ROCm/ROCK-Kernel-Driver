@@ -437,7 +437,7 @@ int ips_release(struct Scsi_Host *);
 int ips_eh_abort(Scsi_Cmnd *);
 int ips_eh_reset(Scsi_Cmnd *);
 int ips_queue(Scsi_Cmnd *, void (*) (Scsi_Cmnd *));
-int ips_biosparam(Disk *, kdev_t, int *);
+int ips_biosparam(Disk *, struct block_device *, int *);
 const char * ips_info(struct Scsi_Host *);
 void do_ipsintr(int, void *, struct pt_regs *);
 static int ips_hainit(ips_ha_t *);
@@ -1853,7 +1853,7 @@ ips_queue(Scsi_Cmnd *SC, void (*done) (Scsi_Cmnd *)) {
 /*                                                                          */
 /****************************************************************************/
 int
-ips_biosparam(Disk *disk, kdev_t dev, int geom[]) {
+ips_biosparam(Disk *disk, struct block_device *dev, int geom[]) {
    ips_ha_t         *ha;
    int               heads;
    int               sectors;

@@ -22,7 +22,7 @@
 /* The proc_dir_entry for jffs (defined in jffs_proc.c).  */
 extern struct proc_dir_entry *jffs_proc_root;
 
-int jffs_register_jffs_proc_dir(kdev_t dev, struct jffs_control *c);
+int jffs_register_jffs_proc_dir(int mtd, struct jffs_control *c);
 int jffs_unregister_jffs_proc_dir(struct jffs_control *c);
 
 #endif /* __LINUX_JFFS_PROC_H__ */

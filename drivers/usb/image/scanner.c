@@ -811,11 +811,11 @@ ioctl_scanner(struct inode *inode, struct file *file,
 
 static struct
 file_operations usb_scanner_fops = {
-	read:		read_scanner,
-	write:		write_scanner,
-	ioctl:		ioctl_scanner,
-	open:		open_scanner,
-	release:	close_scanner,
+	.read =		read_scanner,
+	.write =	write_scanner,
+	.ioctl =	ioctl_scanner,
+	.open =		open_scanner,
+	.release =	close_scanner,
 };
 
 static void *
@@ -1116,10 +1116,10 @@ disconnect_scanner(struct usb_device *dev, void *ptr)
 
 static struct
 usb_driver scanner_driver = {
-	name:		"usbscanner",
-	probe:		probe_scanner,
-	disconnect:	disconnect_scanner,
-	id_table:	NULL, /* This would be scanner_device_ids, but we
+	.name =		"usbscanner",
+	.probe =	probe_scanner,
+	.disconnect =	disconnect_scanner,
+	.id_table =	NULL, /* This would be scanner_device_ids, but we
 				 need to check every USB device, in case
 				 we match a user defined vendor/product ID. */
 };

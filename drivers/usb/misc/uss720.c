@@ -646,10 +646,10 @@ MODULE_DEVICE_TABLE (usb, uss720_table);
 
 
 static struct usb_driver uss720_driver = {
-	name:		"uss720",
-	probe:		uss720_probe,
-	disconnect:	uss720_disconnect,
-	id_table:	uss720_table,
+	.name =		"uss720",
+	.probe =	uss720_probe,
+	.disconnect =	uss720_disconnect,
+	.id_table =	uss720_table,
 };
 
 /* --------------------------------------------------------------------- */

@@ -36,6 +36,7 @@
  *		(Gerhard.Wichert@pdb.siemens.de)
  */
 
+#include <linux/kernel_stat.h>
 #include <linux/mm.h>
 #include <linux/mman.h>
 #include <linux/swap.h>
@@ -46,6 +47,7 @@
 #include <linux/pagemap.h>
 
 #include <asm/pgalloc.h>
+#include <asm/rmap.h>
 #include <asm/uaccess.h>
 #include <asm/tlb.h>
 #include <asm/tlbflush.h>
@@ -79,7 +81,7 @@ struct page *mem_map;
  */
 static inline void free_one_pmd(mmu_gather_t *tlb, pmd_t * dir)
 {
-	struct page *pte;
+	struct page *page;
 
 	if (pmd_none(*dir))
 		return;
@@ -88,9 +90,10 @@ static inline void free_one_pmd(mmu_gather_t *tlb, pmd_t * dir)
 		pmd_clear(dir);
 		return;
 	}
-	pte = pmd_page(*dir);
+	page = pmd_page(*dir);
 	pmd_clear(dir);
-	pte_free_tlb(tlb, pte);
+	pgtable_remove_rmap(page);
+	pte_free_tlb(tlb, page);
 }
 
 static inline void free_one_pgd(mmu_gather_t *tlb, pgd_t * dir)
@@ -150,6 +153,7 @@ pte_t * pte_alloc_map(struct mm_struct *mm, pmd_t *pmd, unsigned long address)
 			pte_free(new);
 			goto out;
 		}
+		pgtable_add_rmap(new, mm, address);
 		pmd_populate(mm, pmd, new);
 	}
 out:
@@ -177,6 +181,7 @@ pte_t * pte_alloc_kernel(struct mm_struct *mm, pmd_t *pmd, unsigned long address
 			pte_free_kernel(new);
 			goto out;
 		}
+		pgtable_add_rmap(virt_to_page(new), mm, address);
 		pmd_populate_kernel(mm, pmd, new);
 	}
 out:
@@ -260,10 +265,13 @@ skip_copy_pte_range:		address = (address + PMD_SIZE) & PMD_MASK;
 
 				if (pte_none(pte))
 					goto cont_copy_pte_range_noset;
+				/* pte contains position in swap, so copy. */
 				if (!pte_present(pte)) {
 					swap_duplicate(pte_to_swp_entry(pte));
-					goto cont_copy_pte_range;
+					set_pte(dst_pte, pte);
+					goto cont_copy_pte_range_noset;
 				}
+				ptepage = pte_page(pte);
 				pfn = pte_pfn(pte);
 				if (!pfn_valid(pfn))
 					goto cont_copy_pte_range;
@@ -272,7 +280,7 @@ skip_copy_pte_range:		address = (address + PMD_SIZE) & PMD_MASK;
 					goto cont_copy_pte_range;
 
 				/* If it's a COW mapping, write protect it both in the parent and the child */
-				if (cow && pte_write(pte)) {
+				if (cow) {
 					ptep_set_wrprotect(src_pte);
 					pte = *src_pte;
 				}
@@ -285,6 +293,7 @@ skip_copy_pte_range:		address = (address + PMD_SIZE) & PMD_MASK;
 				dst->rss++;
 
 cont_copy_pte_range:		set_pte(dst_pte, pte);
+				page_add_rmap(ptepage, dst_pte);
 cont_copy_pte_range_noset:	address += PAGE_SIZE;
 				if (address >= end) {
 					pte_unmap_nested(src_pte);
@@ -342,6 +351,7 @@ static void zap_pte_range(mmu_gather_t *tlb, pmd_t * pmd, unsigned long address,
 					if (pte_dirty(pte))
 						set_page_dirty(page);
 					tlb->freed++;
+					page_remove_rmap(page, ptep);
 					tlb_remove_page(tlb, page);
 				}
 			}
@@ -992,7 +1002,9 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 	if (pte_same(*page_table, pte)) {
 		if (PageReserved(old_page))
 			++mm->rss;
+		page_remove_rmap(old_page, page_table);
 		break_cow(vma, new_page, address, page_table);
+		page_add_rmap(new_page, page_table);
 		lru_cache_add(new_page);
 
 		/* Free the old page.. */
@@ -1166,6 +1178,7 @@ static int do_swap_page(struct mm_struct * mm,
 
 		/* Had to read the page from swap area: Major fault */
 		ret = VM_FAULT_MAJOR;
+		KERNEL_STAT_INC(pgmajfault);
 	}
 
 	lock_page(page);
@@ -1199,6 +1212,7 @@ static int do_swap_page(struct mm_struct * mm,
 	flush_page_to_ram(page);
 	flush_icache_page(vma, page);
 	set_pte(page_table, pte);
+	page_add_rmap(page, page_table);
 
 	/* No need to invalidate - it was non-present before */
 	update_mmu_cache(vma, address, pte);
@@ -1215,14 +1229,13 @@ static int do_swap_page(struct mm_struct * mm,
 static int do_anonymous_page(struct mm_struct * mm, struct vm_area_struct * vma, pte_t *page_table, pmd_t *pmd, int write_access, unsigned long addr)
 {
 	pte_t entry;
+	struct page * page = ZERO_PAGE(addr);
 
 	/* Read-only mapping of ZERO_PAGE. */
 	entry = pte_wrprotect(mk_pte(ZERO_PAGE(addr), vma->vm_page_prot));
 
 	/* ..except if it's a write access */
 	if (write_access) {
-		struct page *page;
-
 		/* Allocate our own private page. */
 		pte_unmap(page_table);
 		spin_unlock(&mm->page_table_lock);
@@ -1248,6 +1261,7 @@ static int do_anonymous_page(struct mm_struct * mm, struct vm_area_struct * vma,
 	}
 
 	set_pte(page_table, entry);
+	page_add_rmap(page, page_table); /* ignores ZERO_PAGE */
 	pte_unmap(page_table);
 
 	/* No need to invalidate - it was non-present before */
@@ -1327,6 +1341,7 @@ static int do_no_page(struct mm_struct * mm, struct vm_area_struct * vma,
 		if (write_access)
 			entry = pte_mkwrite(pte_mkdirty(entry));
 		set_pte(page_table, entry);
+		page_add_rmap(new_page, page_table);
 		pte_unmap(page_table);
 	} else {
 		/* One of our sibling threads was faster, back out. */
@@ -1406,6 +1421,7 @@ int handle_mm_fault(struct mm_struct *mm, struct vm_area_struct * vma,
 	current->state = TASK_RUNNING;
 	pgd = pgd_offset(mm, address);
 
+	KERNEL_STAT_INC(pgfault);
 	/*
 	 * We need the page table lock to synchronize with kswapd
 	 * and the SMP-safe atomic PTE updates.

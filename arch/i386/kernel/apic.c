@@ -1084,9 +1084,9 @@ void smp_apic_timer_interrupt(struct pt_regs regs)
 	 * Besides, if we don't timer interrupts ignore the global
 	 * interrupt lock, which is the WrongThing (tm) to do.
 	 */
-	irq_enter(cpu, 0);
+	irq_enter();
 	smp_local_timer_interrupt(&regs);
-	irq_exit(cpu, 0);
+	irq_exit();
 
 	if (softirq_pending(cpu))
 		do_softirq();

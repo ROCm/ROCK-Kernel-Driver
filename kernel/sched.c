@@ -26,6 +26,7 @@
 #include <linux/interrupt.h>
 #include <linux/completion.h>
 #include <linux/kernel_stat.h>
+#include <linux/security.h>
 
 /*
  * Convert user-nice values [ -20 ... 0 ... 19 ]
@@ -726,7 +727,8 @@ void scheduler_tick(int user_tick, int system)
 	task_t *p = current;
 
 	if (p == rq->idle) {
-		if (local_bh_count(cpu) || local_irq_count(cpu) > 1)
+		/* note: this timer irq context must be accounted for as well */
+		if (preempt_count() >= 2*IRQ_OFFSET)
 			kstat.per_cpu_system[cpu] += system;
 #if CONFIG_SMP
 		idle_tick();
@@ -815,7 +817,7 @@ need_resched:
 	prev = current;
 	rq = this_rq();
 
-	release_kernel_lock(prev, smp_processor_id());
+	release_kernel_lock(prev);
 	prepare_arch_schedule(prev);
 	prev->sleep_timestamp = jiffies;
 	spin_lock_irq(&rq->lock);
@@ -824,7 +826,7 @@ need_resched:
 	 * if entering off of a kernel preemption go straight
 	 * to picking the next task.
 	 */
-	if (unlikely(preempt_get_count() & PREEMPT_ACTIVE))
+	if (unlikely(preempt_count() & PREEMPT_ACTIVE))
 		goto pick_next_task;
 
 	switch (prev->state) {
@@ -1123,6 +1125,7 @@ out_unlock:
 
 asmlinkage long sys_nice(int increment)
 {
+	int retval;
 	long nice;
 
 	/*
@@ -1144,6 +1147,11 @@ asmlinkage long sys_nice(int increment)
 		nice = -20;
 	if (nice > 19)
 		nice = 19;
+
+	retval = security_ops->task_setnice(current, nice);
+	if (retval)
+		return retval;
+
 	set_user_nice(current, nice);
 	return 0;
 }
@@ -1236,6 +1244,10 @@ static int setscheduler(pid_t pid, int policy, struct sched_param *param)
 	    !capable(CAP_SYS_NICE))
 		goto out_unlock;
 
+	retval = security_ops->task_setscheduler(p, policy, &lp);
+	if (retval)
+		goto out_unlock;
+
 	array = p->array;
 	if (array)
 		deactivate_task(p, task_rq(p));
@@ -1280,8 +1292,11 @@ asmlinkage long sys_sched_getscheduler(pid_t pid)
 	retval = -ESRCH;
 	read_lock(&tasklist_lock);
 	p = find_process_by_pid(pid);
-	if (p)
-		retval = p->policy;
+	if (p) {
+		retval = security_ops->task_getscheduler(p);
+		if (!retval)
+			retval = p->policy;
+	}
 	read_unlock(&tasklist_lock);
 
 out_nounlock:
@@ -1302,6 +1317,11 @@ asmlinkage long sys_sched_getparam(pid_t pid, struct sched_param *param)
 	retval = -ESRCH;
 	if (!p)
 		goto out_unlock;
+
+	retval = security_ops->task_getscheduler(p);
+	if (retval)
+		goto out_unlock;
+
 	lp.sched_priority = p->rt_priority;
 	read_unlock(&tasklist_lock);
 
@@ -1509,13 +1529,21 @@ asmlinkage long sys_sched_rr_get_interval(pid_t pid, struct timespec *interval)
 	retval = -ESRCH;
 	read_lock(&tasklist_lock);
 	p = find_process_by_pid(pid);
-	if (p)
-		jiffies_to_timespec(p->policy & SCHED_FIFO ?
-					 0 : TASK_TIMESLICE(p), &t);
+	if (!p)
+		goto out_unlock;
+
+	retval = security_ops->task_getscheduler(p);
+	if (retval)
+		goto out_unlock;
+
+	jiffies_to_timespec(p->policy & SCHED_FIFO ?
+				0 : TASK_TIMESLICE(p), &t);
 	read_unlock(&tasklist_lock);
-	if (p)
-		retval = copy_to_user(interval, &t, sizeof(t)) ? -EFAULT : 0;
+	retval = copy_to_user(interval, &t, sizeof(t)) ? -EFAULT : 0;
 out_nounlock:
+	return retval;
+out_unlock:
+	read_unlock(&tasklist_lock);
 	return retval;
 }
 
@@ -1667,7 +1695,9 @@ void __init init_idle(task_t *idle, int cpu)
 	__restore_flags(flags);
 
 	/* Set the preempt count _outside_ the spinlocks! */
+#if CONFIG_PREEMPT
 	idle->thread_info->preempt_count = (idle->lock_depth >= 0);
+#endif
 }
 
 extern void init_timervecs(void);

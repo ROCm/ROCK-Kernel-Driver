@@ -6114,7 +6114,7 @@ advansys_reset(Scsi_Cmnd *scp)
  * ip[2]: cylinders
  */
 int
-advansys_biosparam(Disk *dp, kdev_t dep, int ip[])
+advansys_biosparam(Disk *dp, struct block_device *dep, int ip[])
 {
     asc_board_t     *boardp;
 

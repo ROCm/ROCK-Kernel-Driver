@@ -274,7 +274,6 @@ struct iattr {
  */
 struct page;
 struct address_space;
-struct kiobuf;
 
 struct address_space_operations {
 	int (*writepage)(struct page *);
@@ -343,7 +342,7 @@ struct block_device {
 	struct inode *		bd_inode;
 	dev_t			bd_dev;  /* not a kdev_t - it's a search key */
 	int			bd_openers;
-	const struct block_device_operations *bd_op;
+	struct block_device_operations *bd_op;
 	struct request_queue	*bd_queue;
 	struct semaphore	bd_sem;	/* open/close mutex */
 	struct list_head	bd_inodes;
@@ -351,6 +350,9 @@ struct block_device {
 	int			bd_holders;
 	struct block_device *	bd_contains;
 	unsigned		bd_block_size;
+	unsigned long		bd_offset;
+	struct semaphore	bd_part_sem;
+	unsigned		bd_part_count;
 };
 
 struct inode {
@@ -493,10 +495,6 @@ struct file {
 
 	/* needed for tty driver, and maybe others */
 	void			*private_data;
-
-	/* preallocated helper kiobuf to speedup O_DIRECT */
-	struct kiobuf		*f_iobuf;
-	long			f_iobuf_lock;
 };
 extern spinlock_t files_lock;
 #define file_list_lock() spin_lock(&files_lock);
@@ -1087,7 +1085,7 @@ extern void bd_release(struct block_device *);
 extern void blk_run_queues(void);
 
 /* fs/devices.c */
-extern const struct block_device_operations *get_blkfops(unsigned int);
+extern struct block_device_operations *get_blkfops(unsigned int);
 extern int register_chrdev(unsigned int, const char *, struct file_operations *);
 extern int unregister_chrdev(unsigned int, const char *);
 extern int chrdev_open(struct inode *, struct file *);
@@ -1295,6 +1293,32 @@ static inline ino_t parent_ino(struct dentry *dentry)
 	res = dentry->d_parent->d_inode->i_ino;
 	read_unlock(&dparent_lock);
 	return res;
+}
+
+/* NOTE NOTE NOTE: this interface _will_ change in a couple of patches */
+
+static inline int dev_lock_part(kdev_t dev)
+{
+	struct block_device *bdev = bdget(kdev_t_to_nr(dev));
+	if (!bdev)
+		return -ENOMEM;
+	if (!down_trylock(&bdev->bd_part_sem)) {
+		if (!bdev->bd_part_count)
+			return 0;
+		up(&bdev->bd_part_sem);
+	}
+	bdput(bdev);
+	return -EBUSY;
+}
+
+static inline void dev_unlock_part(kdev_t dev)
+{
+	struct block_device *bdev = bdget(kdev_t_to_nr(dev));
+	if (!bdev)
+		BUG();
+	up(&bdev->bd_part_sem);
+	bdput(bdev);
+	bdput(bdev);
 }
 
 #endif /* __KERNEL__ */

@@ -68,8 +68,14 @@ static inline int copy_one_pte(struct mm_struct *mm, pte_t * src, pte_t * dst)
 {
 	int error = 0;
 	pte_t pte;
+	struct page * page = NULL;
+
+	if (pte_present(*src))
+		page = pte_page(*src);
 
 	if (!pte_none(*src)) {
+		if (page)
+			page_remove_rmap(page, src);
 		pte = ptep_get_and_clear(src);
 		if (!dst) {
 			/* No dest?  We must put it back. */
@@ -77,6 +83,8 @@ static inline int copy_one_pte(struct mm_struct *mm, pte_t * src, pte_t * dst)
 			error++;
 		}
 		set_pte(dst, pte);
+		if (page)
+			page_add_rmap(page, dst);
 	}
 	return error;
 }

@@ -683,10 +683,10 @@ static struct usb_device_id acm_ids[] = {
 MODULE_DEVICE_TABLE (usb, acm_ids);
 
 static struct usb_driver acm_driver = {
-	name:		"acm",
-	probe:		acm_probe,
-	disconnect:	acm_disconnect,
-	id_table:	acm_ids,
+	.name =		"acm",
+	.probe =	acm_probe,
+	.disconnect =	acm_disconnect,
+	.id_table =	acm_ids,
 };
 
 /*
@@ -700,32 +700,32 @@ static struct termios *acm_tty_termios[ACM_TTY_MINORS];
 static struct termios *acm_tty_termios_locked[ACM_TTY_MINORS];
 
 static struct tty_driver acm_tty_driver = {
-	magic:			TTY_DRIVER_MAGIC,
-	driver_name:		"acm",
-	name:			"usb/acm/%d",
-	major:			ACM_TTY_MAJOR,
-	minor_start:		0,
-	num:			ACM_TTY_MINORS,
-	type:			TTY_DRIVER_TYPE_SERIAL,
-	subtype:		SERIAL_TYPE_NORMAL,
-	flags:			TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS,
+	.magic =		TTY_DRIVER_MAGIC,
+	.driver_name =		"acm",
+	.name =			"usb/acm/%d",
+	.major =		ACM_TTY_MAJOR,
+	.minor_start =		0,
+	.num =			ACM_TTY_MINORS,
+	.type =			TTY_DRIVER_TYPE_SERIAL,
+	.subtype =		SERIAL_TYPE_NORMAL,
+	.flags =		TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS,
 
-	refcount:		&acm_tty_refcount,
+	.refcount =		&acm_tty_refcount,
 
-	table:			acm_tty_table,
-	termios:		acm_tty_termios,
-	termios_locked:		acm_tty_termios_locked,
+	.table =		acm_tty_table,
+	.termios =		acm_tty_termios,
+	.termios_locked =	acm_tty_termios_locked,
 
-	open:			acm_tty_open,
-	close:			acm_tty_close,
-	write:			acm_tty_write,
-	write_room:		acm_tty_write_room,
-	ioctl:			acm_tty_ioctl,
-	throttle:		acm_tty_throttle,
-	unthrottle:		acm_tty_unthrottle,
-	chars_in_buffer:	acm_tty_chars_in_buffer,
-	break_ctl:		acm_tty_break_ctl,
-	set_termios:		acm_tty_set_termios
+	.open =			acm_tty_open,
+	.close =		acm_tty_close,
+	.write =		acm_tty_write,
+	.write_room =		acm_tty_write_room,
+	.ioctl =		acm_tty_ioctl,
+	.throttle =		acm_tty_throttle,
+	.unthrottle =		acm_tty_unthrottle,
+	.chars_in_buffer =	acm_tty_chars_in_buffer,
+	.break_ctl =		acm_tty_break_ctl,
+	.set_termios =		acm_tty_set_termios
 };
 
 /*

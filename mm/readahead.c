@@ -43,7 +43,7 @@ read_pages(struct file *file, struct address_space *mapping,
 	for (page_idx = 0; page_idx < nr_pages; page_idx++) {
 		struct page *page = list_entry(pages->prev, struct page, list);
 		list_del(&page->list);
-		if (!add_to_page_cache_unique(page, mapping, page->index))
+		if (!add_to_page_cache(page, mapping, page->index))
 			mapping->a_ops->readpage(file, page);
 		page_cache_release(page);
 	}
@@ -61,6 +61,7 @@ read_pages(struct file *file, struct address_space *mapping,
  *              Together, these form the "current window".
  *              Together, start and size represent the `readahead window'.
  * next_size:   The number of pages to read on the next readahead miss.
+ *              Has the magical value -1UL if readahead has been disabled.
  * prev_page:   The page which the readahead algorithm most-recently inspected.
  *              prev_page is mainly an optimisation: if page_cache_readahead
  *		sees that it is again being called for a page which it just
@@ -68,6 +69,7 @@ read_pages(struct file *file, struct address_space *mapping,
  *		changes.
  * ahead_start,
  * ahead_size:  Together, these form the "ahead window".
+ * ra_pages:	The externally controlled max readahead for this fd.
  *
  * The readahead code manages two windows - the "current" and the "ahead"
  * windows.  The intent is that while the application is walking the pages
@@ -120,8 +122,10 @@ read_pages(struct file *file, struct address_space *mapping,
  * the pages first, then submits them all for I/O. This avoids the very bad
  * behaviour which would occur if page allocations are causing VM writeback.
  * We really don't want to intermingle reads and writes like that.
+ *
+ * Returns the number of pages which actually had IO started against them.
  */
-void do_page_cache_readahead(struct file *file,
+int do_page_cache_readahead(struct file *file,
 			unsigned long offset, unsigned long nr_to_read)
 {
 	struct address_space *mapping = file->f_dentry->d_inode->i_mapping;
@@ -130,10 +134,10 @@ void do_page_cache_readahead(struct file *file,
 	unsigned long end_index;	/* The last page we want to read */
 	LIST_HEAD(page_pool);
 	int page_idx;
-	int nr_to_really_read = 0;
+	int ret = 0;
 
 	if (inode->i_size == 0)
-		return;
+		goto out;
 
  	end_index = ((inode->i_size - 1) >> PAGE_CACHE_SHIFT);
 
@@ -158,7 +162,7 @@ void do_page_cache_readahead(struct file *file,
 			break;
 		page->index = page_offset;
 		list_add(&page->list, &page_pool);
-		nr_to_really_read++;
+		ret++;
 	}
 	read_unlock(&mapping->page_lock);
 
@@ -167,10 +171,36 @@ void do_page_cache_readahead(struct file *file,
 	 * uptodate then the caller will launch readpage again, and
 	 * will then handle the error.
 	 */
-	read_pages(file, mapping, &page_pool, nr_to_really_read);
-	blk_run_queues();
+	if (ret) {
+		read_pages(file, mapping, &page_pool, ret);
+		blk_run_queues();
+	}
 	BUG_ON(!list_empty(&page_pool));
-	return;
+out:
+	return ret;
+}
+
+/*
+ * Check how effective readahead is being.  If the amount of started IO is
+ * less than expected then the file is partly or fully in pagecache and
+ * readahead isn't helping.  Shrink the window.
+ *
+ * But don't shrink it too much - the application may read the same page
+ * occasionally.
+ */
+static inline void
+check_ra_success(struct file_ra_state *ra, pgoff_t attempt,
+			pgoff_t actual, pgoff_t orig_next_size)
+{
+	if (actual == 0) {
+		if (orig_next_size > 1) {
+			ra->next_size = orig_next_size - 1;
+			if (ra->ahead_size)
+				ra->ahead_size = ra->next_size;
+		} else {
+			ra->next_size = -1UL;
+		}
+	}
 }
 
 /*
@@ -180,25 +210,32 @@ void do_page_cache_readahead(struct file *file,
 void page_cache_readahead(struct file *file, unsigned long offset)
 {
 	struct file_ra_state *ra = &file->f_ra;
-	unsigned long max;
-	unsigned long min;
+	unsigned max;
+	unsigned min;
+	unsigned orig_next_size;
+	unsigned actual;
 
 	/*
 	 * Here we detect the case where the application is performing
 	 * sub-page sized reads.  We avoid doing extra work and bogusly
 	 * perturbing the readahead window expansion logic.
 	 * If next_size is zero, this is the very first read for this
-	 * file handle.
+	 * file handle, or the window is maximally shrunk.
 	 */
 	if (offset == ra->prev_page) {
 		if (ra->next_size != 0)
 			goto out;
 	}
 
+	if (ra->next_size == -1UL)
+		goto out;	/* Maximally shrunk */
+
 	max = get_max_readahead(file);
 	if (max == 0)
 		goto out;	/* No readahead */
+
 	min = get_min_readahead(file);
+	orig_next_size = ra->next_size;
 
 	if (ra->next_size == 0 && offset == 0) {
 		/*
@@ -224,8 +261,6 @@ void page_cache_readahead(struct file *file, unsigned long offset)
 		 * window by 25%.
 		 */
 		ra->next_size -= ra->next_size / 4;
-		if (ra->next_size < min)
-			ra->next_size = min;
 	}
 
 	if (ra->next_size > max)
@@ -272,19 +307,21 @@ do_io:
 		ra->ahead_start = 0;		/* Invalidate these */
 		ra->ahead_size = 0;
 
-		do_page_cache_readahead(file, offset, ra->size);
+		actual = do_page_cache_readahead(file, offset, ra->size);
+		check_ra_success(ra, ra->size, actual, orig_next_size);
 	} else {
 		/*
-		 * This read request is within the current window.  It
-		 * is time to submit I/O for the ahead window while
-		 * the application is crunching through the current
-		 * window.
+		 * This read request is within the current window.  It is time
+		 * to submit I/O for the ahead window while the application is
+		 * crunching through the current window.
 		 */
 		if (ra->ahead_start == 0) {
 			ra->ahead_start = ra->start + ra->size;
 			ra->ahead_size = ra->next_size;
-			do_page_cache_readahead(file,
+			actual = do_page_cache_readahead(file,
 					ra->ahead_start, ra->ahead_size);
+			check_ra_success(ra, ra->ahead_size,
+					actual, orig_next_size);
 		}
 	}
 out:
@@ -298,38 +335,55 @@ out:
  */
 void page_cache_readaround(struct file *file, unsigned long offset)
 {
-	const unsigned long min = get_min_readahead(file) * 2;
-	unsigned long target;
-	unsigned long backward;
+	struct file_ra_state *ra = &file->f_ra;
 
-	if (file->f_ra.next_size < min)
-		file->f_ra.next_size = min;
+	if (ra->next_size != -1UL) {
+		const unsigned long min = get_min_readahead(file) * 2;
+		unsigned long target;
+		unsigned long backward;
 
-	target = offset;
-	backward = file->f_ra.next_size / 4;
+		/*
+		 * If next_size is zero then leave it alone, because that's a
+		 * readahead startup state.
+		 */
+		if (ra->next_size && ra->next_size < min)
+			ra->next_size = min;
 
-	if (backward > target)
-		target = 0;
-	else
-		target -= backward;
-	page_cache_readahead(file, target);
+		target = offset;
+		backward = ra->next_size / 4;
+
+		if (backward > target)
+			target = 0;
+		else
+			target -= backward;
+		page_cache_readahead(file, target);
+	}
 }
 
 /*
- * handle_ra_thrashing() is called when it is known that a page which should
- * have been present (it's inside the readahead window) was in fact evicted by
- * the VM.
+ * handle_ra_miss() is called when it is known that a page which should have
+ * been present in the pagecache (we just did some readahead there) was in fact
+ * not found.  This will happen if it was evicted by the VM (readahead
+ * thrashing) or if the readahead window is maximally shrunk.
  *
- * We shrink the readahead window by three pages.  This is because we grow it
- * by two pages on a readahead hit.  Theory being that the readahead window
- * size will stabilise around the maximum level at which there isn't any
- * thrashing.
+ * If the window has been maximally shrunk (next_size == 0) then bump it up
+ * again to resume readahead.
+ *
+ * Otherwise we're thrashing, so shrink the readahead window by three pages.
+ * This is because it is grown by two pages on a readahead hit.  Theory being
+ * that the readahead window size will stabilise around the maximum level at
+ * which there is no thrashing.
  */
-void handle_ra_thrashing(struct file *file)
+void handle_ra_miss(struct file *file)
 {
+	struct file_ra_state *ra = &file->f_ra;
 	const unsigned long min = get_min_readahead(file);
 
-	file->f_ra.next_size -= 3;
-	if (file->f_ra.next_size < min)
-		file->f_ra.next_size = min;
+	if (ra->next_size == -1UL) {
+		ra->next_size = min;
+	} else {
+		ra->next_size -= 3;
+		if (ra->next_size < min)
+			ra->next_size = min;
+	}
 }

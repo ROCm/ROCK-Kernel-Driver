@@ -1050,13 +1050,7 @@ static int do_i2ob_revalidate(kdev_t dev, int maxu)
 		return -EBUSY;
 	}
 	
-	for( i = 15; i>=0 ; i--)
-	{
-		int m = minor+i;
-		invalidate_device(mk_kdev(MAJOR_NR, m), 1);
-		i2ob_gendisk.part[m].start_sect = 0;
-		i2ob_gendisk.part[m].nr_sects = 0;
-	}
+	wipe_partitions(mk_kdev(MAJOR_NR, minor), 1);
 
 	/*
 	 *	Do a physical check and then reconfigure
@@ -1089,7 +1083,7 @@ static int i2ob_ioctl(struct inode *inode, struct file *file,
 			int u = minor(inode->i_rdev) & 0xF0;
 			i2o_block_biosparam(i2ob_sizes[u]<<1, 
 				&g.cylinders, &g.heads, &g.sectors);
-			g.start = get_start_sect(inode->i_rdev);
+			g.start = get_start_sect(inode->i_bdev);
 			return copy_to_user((void *)arg, &g, sizeof(g))
 				? -EFAULT : 0;
 		}
@@ -1098,14 +1092,6 @@ static int i2ob_ioctl(struct inode *inode, struct file *file,
 			if(!capable(CAP_SYS_ADMIN))
 				return -EACCES;
 			return do_i2ob_revalidate(inode->i_rdev,1);
-			
-		case BLKGETSIZE:
-		case BLKGETSIZE64:
-		case BLKFLSBUF:
-		case BLKROSET:
-		case BLKROGET:
-		case BLKPG:
-			return blk_ioctl(inode->i_bdev, cmd, arg);
 			
 		default:
 			return -EINVAL;
@@ -1815,7 +1801,6 @@ int i2o_block_init(void)
 	 *	Now fill in the boiler plate
 	 */
 	 
-	blk_size[MAJOR_NR] = i2ob_sizes;
 	blk_dev[MAJOR_NR].queue = i2ob_get_queue;
 	
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), i2ob_request);

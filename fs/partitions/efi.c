@@ -87,25 +87,9 @@
  *
  ************************************************************/
 #include <linux/config.h>
-#include <linux/fs.h>
-#include <linux/genhd.h>
-#include <linux/kernel.h>
-#include <linux/major.h>
-#include <linux/string.h>
-#include <linux/blk.h>
-#include <linux/blkpg.h>
-#include <linux/slab.h>
-#include <linux/smp_lock.h>
-#include <linux/init.h>
 #include <linux/crc32.h>
-#include <asm/system.h>
-#include <asm/byteorder.h>
 #include "check.h"
 #include "efi.h"
-
-#if CONFIG_BLK_DEV_MD
-extern void md_autodetect_dev(kdev_t dev);
-#endif
 
 /* Handle printing of 64-bit values */
 /* Borrowed from /usr/include/inttypes.h */
@@ -184,7 +168,6 @@ is_pmbr_valid(legacy_mbr *mbr)
 
 /**
  * last_lba(): return number of last logical block of device
- * @hd: gendisk with partition list
  * @bdev: block device
  * 
  * Description: Returns last LBA value on success, 0 on error.
@@ -193,16 +176,13 @@ is_pmbr_valid(legacy_mbr *mbr)
  *  physical sectors available on the disk.
  */
 static u64
-last_lba(struct gendisk *hd, struct block_device *bdev)
+last_lba(struct block_device *bdev)
 {
-	if (!hd || !hd->part || !bdev)
-		return 0;
-	return hd->part[minor(to_kdev_t(bdev->bd_dev))].nr_sects - 1;
+	return (bdev->bd_inode->i_size >> 9) - 1;
 }
 
 /**
  * read_lba(): Read bytes from disk, starting at given LBA
- * @hd
  * @bdev
  * @lba
  * @buffer
@@ -212,39 +192,26 @@ last_lba(struct gendisk *hd, struct block_device *bdev)
  * Returns number of bytes read on success, 0 on error.
  */
 static size_t
-read_lba(struct gendisk *hd, struct block_device *bdev, u64 lba,
-	 u8 * buffer, size_t count)
+read_lba(struct block_device *bdev, u64 lba, u8 * buffer, size_t count)
 {
+	size_t totalreadcount = 0;
 
-	size_t totalreadcount = 0, bytesread = 0;
-	unsigned long blocksize;
-	int i;
-	Sector sect;
-	unsigned char *data = NULL;
-
-	if (!hd || !bdev || !buffer || !count)
+	if (!bdev || !buffer)
 		return 0;
 
-	blocksize = bdev_hardsect_size(bdev);
-	if (!blocksize)
-		blocksize = 512;
-
-	for (i = 0; count > 0; i++) {
-		data = read_dev_sector(bdev, lba, &sect);
+	while (count) {
+		int copied = 512;
+		Sector sect;
+		unsigned char *data = read_dev_sector(bdev, lba++, &sect);
 		if (!data)
-			return totalreadcount;
-
-		bytesread =
-		    PAGE_CACHE_SIZE - (data -
-				       (unsigned char *) page_address(sect.v));
-		bytesread = min(bytesread, count);
-		memcpy(buffer, data, bytesread);
+			break;
+		if (copied > count)
+			copied = count;
+		memcpy(buffer, data, copied);
 		put_dev_sector(sect);
-
-		buffer += bytesread;
-		totalreadcount += bytesread;
-		count -= bytesread;
-		lba += (bytesread / blocksize);
+		buffer += copied;
+		totalreadcount +=copied;
+		count -= copied;
 	}
 	return totalreadcount;
 }
@@ -252,7 +219,6 @@ read_lba(struct gendisk *hd, struct block_device *bdev, u64 lba,
 
 /**
  * alloc_read_gpt_entries(): reads partition entries from disk
- * @hd
  * @bdev
  * @gpt - GPT header
  * 
@@ -261,12 +227,11 @@ read_lba(struct gendisk *hd, struct block_device *bdev, u64 lba,
  * Notes: remember to free pte when you're done!
  */
 static gpt_entry *
-alloc_read_gpt_entries(struct gendisk *hd,
-		       struct block_device *bdev, gpt_header *gpt)
+alloc_read_gpt_entries(struct block_device *bdev, gpt_header *gpt)
 {
 	size_t count;
 	gpt_entry *pte;
-	if (!hd || !bdev || !gpt)
+	if (!bdev || !gpt)
 		return NULL;
 
 	count = le32_to_cpu(gpt->num_partition_entries) *
@@ -278,7 +243,7 @@ alloc_read_gpt_entries(struct gendisk *hd,
 		return NULL;
 	memset(pte, 0, count);
 
-	if (read_lba(hd, bdev, le64_to_cpu(gpt->partition_entry_lba),
+	if (read_lba(bdev, le64_to_cpu(gpt->partition_entry_lba),
                      (u8 *) pte,
 		     count) < count) {
 		kfree(pte);
@@ -290,7 +255,6 @@ alloc_read_gpt_entries(struct gendisk *hd,
 
 /**
  * alloc_read_gpt_header(): Allocates GPT header, reads into it from disk
- * @hd
  * @bdev
  * @lba is the Logical Block Address of the partition table
  * 
@@ -299,10 +263,10 @@ alloc_read_gpt_entries(struct gendisk *hd,
  * Note: remember to free gpt when finished with it.
  */
 static gpt_header *
-alloc_read_gpt_header(struct gendisk *hd, struct block_device *bdev, u64 lba)
+alloc_read_gpt_header(struct block_device *bdev, u64 lba)
 {
 	gpt_header *gpt;
-	if (!hd || !bdev)
+	if (!bdev)
 		return NULL;
 
 	gpt = kmalloc(sizeof (gpt_header), GFP_KERNEL);
@@ -310,7 +274,7 @@ alloc_read_gpt_header(struct gendisk *hd, struct block_device *bdev, u64 lba)
 		return NULL;
 	memset(gpt, 0, sizeof (gpt_header));
 
-	if (read_lba(hd, bdev, lba, (u8 *) gpt,
+	if (read_lba(bdev, lba, (u8 *) gpt,
 		     sizeof (gpt_header)) < sizeof (gpt_header)) {
 		kfree(gpt);
                 gpt=NULL;
@@ -322,7 +286,6 @@ alloc_read_gpt_header(struct gendisk *hd, struct block_device *bdev, u64 lba)
 
 /**
  * is_gpt_valid() - tests one GPT header and PTEs for validity
- * @hd
  * @bdev
  * @lba is the logical block address of the GPT header to test
  * @gpt is a GPT header ptr, filled on return.
@@ -332,14 +295,14 @@ alloc_read_gpt_header(struct gendisk *hd, struct block_device *bdev, u64 lba)
  * If valid, returns pointers to newly allocated GPT header and PTEs.
  */
 static int
-is_gpt_valid(struct gendisk *hd, struct block_device *bdev, u64 lba,
+is_gpt_valid(struct block_device *bdev, u64 lba,
 	     gpt_header **gpt, gpt_entry **ptes)
 {
 	u32 crc, origcrc;
 
-	if (!hd || !bdev || !gpt || !ptes)
+	if (!bdev || !gpt || !ptes)
 		return 0;
-	if (!(*gpt = alloc_read_gpt_header(hd, bdev, lba)))
+	if (!(*gpt = alloc_read_gpt_header(bdev, lba)))
 		return 0;
 
 	/* Check the GUID Partition Table signature */
@@ -377,7 +340,7 @@ is_gpt_valid(struct gendisk *hd, struct block_device *bdev, u64 lba,
 		return 0;
 	}
 
-	if (!(*ptes = alloc_read_gpt_entries(hd, bdev, *gpt))) {
+	if (!(*ptes = alloc_read_gpt_entries(bdev, *gpt))) {
 		kfree(*gpt);
 		*gpt = NULL;
 		return 0;
@@ -502,7 +465,6 @@ compare_gpts(gpt_header *pgpt, gpt_header *agpt, u64 lastlba)
 
 /**
  * find_valid_gpt() - Search disk for valid GPT headers and PTEs
- * @hd
  * @bdev
  * @gpt is a GPT header ptr, filled on return.
  * @ptes is a PTEs ptr, filled on return.
@@ -512,31 +474,30 @@ compare_gpts(gpt_header *pgpt, gpt_header *agpt, u64 lastlba)
  * or the Alternate GPT header and PTEs valid, and the PMBR valid.
  */
 static int
-find_valid_gpt(struct gendisk *hd, struct block_device *bdev,
-	       gpt_header **gpt, gpt_entry **ptes)
+find_valid_gpt(struct block_device *bdev, gpt_header **gpt, gpt_entry **ptes)
 {
 	int good_pgpt = 0, good_agpt = 0, good_pmbr = 0;
 	gpt_header *pgpt = NULL, *agpt = NULL;
 	gpt_entry *pptes = NULL, *aptes = NULL;
 	legacy_mbr *legacymbr = NULL;
 	u64 lastlba;
-	if (!hd || !bdev || !gpt || !ptes)
+	if (!bdev || !gpt || !ptes)
 		return 0;
 
-	lastlba = last_lba(hd, bdev);
-	good_pgpt = is_gpt_valid(hd, bdev, GPT_PRIMARY_PARTITION_TABLE_LBA,
+	lastlba = last_lba(bdev);
+	good_pgpt = is_gpt_valid(bdev, GPT_PRIMARY_PARTITION_TABLE_LBA,
 				 &pgpt, &pptes);
         if (good_pgpt) {
-		good_agpt = is_gpt_valid(hd, bdev,
+		good_agpt = is_gpt_valid(bdev,
                                          le64_to_cpu(pgpt->alternate_lba),
 					 &agpt, &aptes);
                 if (!good_agpt) {
-                        good_agpt = is_gpt_valid(hd, bdev, lastlba,
+                        good_agpt = is_gpt_valid(bdev, lastlba,
                                                  &agpt, &aptes);
                 }
         }
         else {
-                good_agpt = is_gpt_valid(hd, bdev, lastlba,
+                good_agpt = is_gpt_valid(bdev, lastlba,
                                          &agpt, &aptes);
         }
 
@@ -549,7 +510,7 @@ find_valid_gpt(struct gendisk *hd, struct block_device *bdev,
         legacymbr = kmalloc(sizeof (*legacymbr), GFP_KERNEL);
         if (legacymbr) {
                 memset(legacymbr, 0, sizeof (*legacymbr));
-                read_lba(hd, bdev, 0, (u8 *) legacymbr,
+                read_lba(bdev, 0, (u8 *) legacymbr,
                          sizeof (*legacymbr));
                 good_pmbr = is_pmbr_valid(legacymbr);
                 kfree(legacymbr);
@@ -616,12 +577,16 @@ find_valid_gpt(struct gendisk *hd, struct block_device *bdev,
 }
 
 /**
- * add_gpt_partitions(struct gendisk *hd, struct block_device *bdev,
- * @hd
+ * efi_partition(struct parsed_partitions *state, struct block_device *bdev)
+ * @state
  * @bdev
  *
- * Description: Create devices for each entry in the GUID Partition Table
- * Entries.
+ * Description: called from check.c, if the disk contains GPT
+ * partitions, sets up partition entries in the kernel.
+ *
+ * If the first block on the disk is a legacy MBR,
+ * it will get handled by msdos_partition().
+ * If it's a Protective MBR, we'll handle it here.
  *
  * We do not create a Linux partition for GPT, but
  * only for the actual data partitions.
@@ -631,104 +596,39 @@ find_valid_gpt(struct gendisk *hd, struct block_device *bdev,
  *  1 if successful
  *
  */
-static int
-add_gpt_partitions(struct gendisk *hd, struct block_device *bdev, int nextminor)
+int
+efi_partition(struct parsed_partitions *state, struct block_device *bdev)
 {
 	gpt_header *gpt = NULL;
 	gpt_entry *ptes = NULL;
 	u32 i;
-	int max_p; 
 
-	if (!hd || !bdev)
-		return -1;
-
-	if (!find_valid_gpt(hd, bdev, &gpt, &ptes) || !gpt || !ptes) {
-		if (gpt) {
-			kfree(gpt);
-                        gpt = NULL;
-                }
-		if (ptes) {
-			kfree(ptes);
-                        ptes = NULL;
-                }
+	if (!find_valid_gpt(bdev, &gpt, &ptes) || !gpt || !ptes) {
+		kfree(gpt);
+		kfree(ptes);
 		return 0;
 	}
 
 	Dprintk("GUID Partition Table is valid!  Yea!\n");
 
-	max_p = (1 << hd->minor_shift) - 1;
-	for (i = 0; i < le32_to_cpu(gpt->num_partition_entries) && i < max_p; i++) {
+	for (i = 0; i < le32_to_cpu(gpt->num_partition_entries) && i < state->limit-1; i++) {
 		if (!efi_guidcmp(ptes[i].partition_type_guid, NULL_GUID))
 			continue;
 
-		add_gd_partition(hd, nextminor+i,
-                                 le64_to_cpu(ptes[i].starting_lba),
+		put_partition(state, i+1, le64_to_cpu(ptes[i].starting_lba),
 				 (le64_to_cpu(ptes[i].ending_lba) -
                                   le64_to_cpu(ptes[i].starting_lba) +
 				  1));
 
 		/* If there's this is a RAID volume, tell md */
-#if CONFIG_BLK_DEV_MD
 		if (!efi_guidcmp(ptes[i].partition_type_guid,
-                                 PARTITION_LINUX_RAID_GUID)) {
-			md_autodetect_dev(mk_kdev(hd->major,
-                                                  nextminor));
-		}
-#endif
+				 PARTITION_LINUX_RAID_GUID))
+			state->parts[i+1].flags = 1;
 	}
 	kfree(ptes);
-        ptes=NULL;
 	kfree(gpt);
-        gpt=NULL;
 	printk("\n");
 	return 1;
-}
-
-/**
- * efi_partition(): EFI GPT partition handling entry function
- * @hd
- * @bdev
- * @first_sector: unused
- * @first_part_minor: minor number assigned to first GPT partition found
- *
- * Description: called from check.c, if the disk contains GPT
- * partitions, sets up partition entries in the kernel.
- *
- * If the first block on the disk is a legacy MBR,
- * it will get handled by msdos_partition().
- * If it's a Protective MBR, we'll handle it here.
- *
- * set_blocksize() calls are necessary to be able to read
- * a disk with an odd number of 512-byte sectors, as the
- * default BLOCK_SIZE of 1024 bytes won't let that last
- * sector be read otherwise.
- *
- * Returns:
- * -1 if unable to read the partition table
- *  0 if this isn't our partitoin table
- *  1 if successful
- */
-int
-efi_partition(struct gendisk *hd, struct block_device *bdev,
-	      unsigned long first_sector, int first_part_minor)
-{
-
-	int hardblocksize = bdev_hardsect_size(bdev);
-	int orig_blksize_size = block_size(bdev);
-	int rc = 0;
-
-	/* Need to change the block size that the block layer uses */
-
-	if (orig_blksize_size != hardblocksize)
-		set_blocksize(bdev, hardblocksize);
-
-	rc = add_gpt_partitions(hd, bdev, first_part_minor);
-
-	/* change back */
-	if (orig_blksize_size != hardblocksize)
-		set_blocksize(bdev, orig_blksize_size);
-
-	return rc;
 }
 
 /*

@@ -828,7 +828,7 @@ static int sym53c416_reset(Scsi_Cmnd *SCpnt, unsigned int reset_flags)
 	return SCSI_RESET_PENDING;
 }
 
-static int sym53c416_bios_param(Disk *disk, kdev_t dev, int *ip)
+static int sym53c416_bios_param(Disk *disk, struct block_device *dev, int *ip)
 {
 	int size;
 

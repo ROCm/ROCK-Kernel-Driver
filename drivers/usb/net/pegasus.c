@@ -1148,10 +1148,10 @@ static void pegasus_disconnect(struct usb_device *dev, void *ptr)
 }
 
 static struct usb_driver pegasus_driver = {
-	name:		driver_name,
-	probe:		pegasus_probe,
-	disconnect:	pegasus_disconnect,
-	id_table:	pegasus_ids,
+	.name =		driver_name,
+	.probe =	pegasus_probe,
+	.disconnect =	pegasus_disconnect,
+	.id_table =	pegasus_ids,
 };
 
 int __init pegasus_init(void)

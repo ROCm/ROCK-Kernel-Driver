@@ -3891,7 +3891,7 @@ struct pci_dev *pdev = NULL;
 }
 
 
-int iph5526_biosparam(Disk * disk, kdev_t n, int ip[])
+int iph5526_biosparam(Disk * disk, struct block_device *n, int ip[])
 {
 int size = disk->capacity;
 	ip[0] = 64;

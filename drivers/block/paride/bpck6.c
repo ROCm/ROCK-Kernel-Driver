@@ -26,6 +26,7 @@ int verbose=0; /* set this to 1 to see debugging messages and whatnot */
 #define BACKPACK_VERSION "2.0.2"
 
 #include <linux/module.h>
+#include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/types.h>
@@ -252,65 +253,41 @@ static void bpck6_release_proto(PIA *pi)
 	kfree((void *)(pi->private)); 
 }
 
-struct pi_protocol bpck6 = { "bpck6", /* name for proto*/
-				0, /* index into proto table */
-				5, /* max mode =5 */
-				2, /* 2-5 use epp (need 8 ports) */
-				0, /* no delay (not used anyway) */
-				255, /* we can have units  up to 255 */
-				bpck6_write_regr,
-				bpck6_read_regr,
-				bpck6_write_block,
-				bpck6_read_block,
-				bpck6_connect,
-				bpck6_disconnect,
-				bpck6_test_port,
- 				bpck6_probe_unit,
-				0,
-				bpck6_log_adapter,
-				bpck6_init_proto,
-				bpck6_release_proto
-                        };
+static struct pi_protocol bpck6 = {
+	.name		= "bpck6",
+	.max_mode	= 5,
+	.epp_first	= 2, /* 2-5 use epp (need 8 ports) */
+	.max_units	= 255,
+	.write_regr	= bpck6_write_regr,
+	.read_regr	= bpck6_read_regr,
+	.write_block	= bpck6_write_block,
+	.read_block	= bpck6_read_block,
+	.connect	= bpck6_connect,
+	.disconnect	= bpck6_disconnect,
+	.test_port	= bpck6_test_port,
+	.probe_unit	= bpck6_probe_unit,
+	.log_adapter	= bpck6_log_adapter,
+	.init_proto	= bpck6_init_proto,
+	.release_proto	= bpck6_release_proto,
+};
 
-
-EXPORT_SYMBOL(bpck6_write_regr);
-EXPORT_SYMBOL(bpck6_read_regr);
-EXPORT_SYMBOL(bpck6_write_block);
-EXPORT_SYMBOL(bpck6_read_block);
-EXPORT_SYMBOL(bpck6_connect);
-EXPORT_SYMBOL(bpck6_disconnect);
-EXPORT_SYMBOL(bpck6_test_port);
-EXPORT_SYMBOL(bpck6_probe_unit);
-EXPORT_SYMBOL(bpck6_log_adapter);
-EXPORT_SYMBOL(bpck6_init_proto);
-EXPORT_SYMBOL(bpck6_release_proto);
-
-/*---------------------------MODULE STUFF-----------------------*/
-
-#ifdef MODULE
-/*module information*/
-
-static int init_module(void)
+static int __init bpck6_init(void)
 {
 	printk(KERN_INFO "bpck6: BACKPACK Protocol Driver V"BACKPACK_VERSION"\n");
 	printk(KERN_INFO "bpck6: Copyright 2001 by Micro Solutions, Inc., DeKalb IL. USA\n");
-
 	if(verbose)
-	{
 		printk(KERN_DEBUG "bpck6: verbose debug enabled.\n");
-	}
-
 	return pi_register(&bpck6) - 1;  
 }
 
-void    cleanup_module(void)
+static void __exit bpck6_exit(void)
 {
 	pi_unregister(&bpck6);
 }
 
+MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Micro Solutions Inc.");
 MODULE_DESCRIPTION("BACKPACK Protocol module, compatible with PARIDE");
 MODULE_PARM(verbose,"i");
-
-#endif
-
+module_init(bpck6_init)
+module_exit(bpck6_exit)

@@ -2078,7 +2078,7 @@ out:
  */
 
 int cont_prepare_write(struct page *page, unsigned offset,
-		unsigned to, get_block_t *get_block, unsigned long *bytes)
+		unsigned to, get_block_t *get_block, loff_t *bytes)
 {
 	struct address_space *mapping = page->mapping;
 	struct inode *inode = mapping->host;
@@ -2308,55 +2308,6 @@ sector_t generic_block_bmap(struct address_space *mapping, sector_t block,
 	get_block(inode, block, &tmp, 0);
 	return tmp.b_blocknr;
 }
-
-#if 0
-int generic_direct_IO(int rw, struct inode *inode,
-			struct kiobuf *iobuf, unsigned long blocknr,
-			int blocksize, get_block_t *get_block)
-{
-	int i, nr_blocks, retval = 0;
-	sector_t *blocks = iobuf->blocks;
-	struct block_device *bdev = NULL;
-
-	nr_blocks = iobuf->length / blocksize;
-	/* build the blocklist */
-	for (i = 0; i < nr_blocks; i++, blocknr++) {
-		struct buffer_head bh;
-
-		bh.b_state = 0;
-		bh.b_size = blocksize;
-
-		retval = get_block(inode, blocknr, &bh, rw & 1);
-		if (retval)
-			goto out;
-
-		if (rw == READ) {
-			if (buffer_new(&bh))
-				BUG();
-			if (!buffer_mapped(&bh)) {
-				/* there was an hole in the filesystem */
-				blocks[i] = -1UL;
-				continue;
-			}
-		} else {
-			if (buffer_new(&bh))
-				unmap_underlying_metadata(bh.b_bdev,
-							bh.b_blocknr);
-			if (!buffer_mapped(&bh))
-				BUG();
-		}
-		blocks[i] = bh.b_blocknr;
-		bdev = bh.b_bdev;
-	}
-
-	/* This does not understand multi-device filesystems currently */
-	if (bdev)
-		retval = brw_kiovec(rw, 1, &iobuf, bdev, blocks, blocksize);
-
- out:
-	return retval;
-}
-#endif
 
 /*
  * Start I/O on a physical range of kernel memory, defined by a vector

@@ -26,12 +26,7 @@
  * See the LINUXDEV support.
  *
  * 
- * TODO:
- *
- * This needs to be retested for bulk queuing problems ... earlier versions
- * seemed to find different types of problems in each HCD.  Once they're fixed,
- * re-enable queues to get higher bandwidth utilization (without needing
- * to tweak MTU for larger packets).
+ * Status:
  *
  * - AN2720 ... not widely available, but reportedly works well
  *
@@ -45,8 +40,8 @@
  *   but the Sharp Zaurus uses an incompatible protocol (extra checksums).
  *   No reason not to merge the Zaurus protocol here too (got patch? :)
  *
- * - For Netchip, use keventd to poll via control requests to detect hardware
- *   level "carrier detect". 
+ * - For Netchip, should use keventd to poll via control requests to detect
+ *   hardware level "carrier detect". 
  *
  * - PL-230x ... the initialization protocol doesn't seem to match chip data
  *   sheets, sometimes it's not needed and sometimes it hangs.  Prolific has
@@ -60,9 +55,9 @@
  *
  * There are reports that bridging gives lower-than-usual throughput.
  *
- * Craft smarter hotplug policy scripts ... ones that know how to arrange
+ * Need smarter hotplug policy scripts ... ones that know how to arrange
  * bridging with "brctl", and can handle static and dynamic ("pump") setups.
- * Use those "peer connected" events.
+ * Use those eventual "peer connected" events.
  *
  *
  * CHANGELOG:
@@ -122,7 +117,7 @@
 
 // #define	DEBUG			// error path messages, extra info
 // #define	VERBOSE			// more; success messages
-// #define	REALLY_QUEUE
+#define	REALLY_QUEUE
 
 #if !defined (DEBUG) && defined (CONFIG_USB_DEBUG)
 #   define DEBUG
@@ -139,7 +134,7 @@
 #define	CONFIG_USB_PL2301
 
 
-#define DRIVER_VERSION		"07-May-2002"
+#define DRIVER_VERSION		"17-Jul-2002"
 
 /*-------------------------------------------------------------------------*/
 
@@ -301,12 +296,12 @@ MODULE_PARM_DESC (msg_level, "Initial message level (default = 1)");
  *-------------------------------------------------------------------------*/
 
 static const struct driver_info	an2720_info = {
-	description:	"AnchorChips/Cypress 2720",
+	.description =	"AnchorChips/Cypress 2720",
 	// no reset available!
 	// no check_connect available!
 
-	in: 2, out: 2,		// direction distinguishes these
-	epsize:	64,
+	.in = 2, out: 2,		// direction distinguishes these
+	.epsize =64,
 };
 
 #endif	/* CONFIG_USB_AN2720 */
@@ -324,10 +319,10 @@ static const struct driver_info	an2720_info = {
  *-------------------------------------------------------------------------*/
 
 static const struct driver_info	belkin_info = {
-	description:	"Belkin, eTEK, or compatible",
+	.description =	"Belkin, eTEK, or compatible",
 
-	in: 1, out: 1,		// direction distinguishes these
-	epsize:	64,
+	.in = 1, out: 1,		// direction distinguishes these
+	.epsize =64,
 };
 
 #endif	/* CONFIG_USB_BELKIN */
@@ -635,17 +630,17 @@ genelink_tx_fixup (struct usbnet *dev, struct sk_buff *skb, int flags)
 }
 
 static const struct driver_info	genelink_info = {
-	description:	"Genesys GeneLink",
-	flags:		FLAG_FRAMING_GL | FLAG_NO_SETINT,
-	reset:		genelink_reset,
-	rx_fixup:	genelink_rx_fixup,
-	tx_fixup:	genelink_tx_fixup,
+	.description =	"Genesys GeneLink",
+	.flags =	FLAG_FRAMING_GL | FLAG_NO_SETINT,
+	.reset =	genelink_reset,
+	.rx_fixup =	genelink_rx_fixup,
+	.tx_fixup =	genelink_tx_fixup,
 
-	in: 1, out: 2,
-	epsize:	64,
+	.in = 1, out: 2,
+	.epsize =64,
 
 #ifdef	GENELINK_ACK
-	check_connect:	genelink_check_connect,
+	.check_connect =genelink_check_connect,
 #endif
 };
 
@@ -676,11 +671,11 @@ static int linuxdev_check_connect (struct usbnet *dev)
 }
 
 static const struct driver_info	linuxdev_info = {
-	description:	"Linux Device",
+	.description =	"Linux Device",
 	// no reset defined (yet?)
-	check_connect:	linuxdev_check_connect,
-	in: 2, out: 1,
-	epsize:	64,
+	.check_connect =linuxdev_check_connect,
+	.in = 2, out: 1,
+	.epsize =64,
 };
 
 #endif	/* CONFIG_USB_LINUXDEV */
@@ -1123,15 +1118,15 @@ net1080_tx_fixup (struct usbnet *dev, struct sk_buff *skb, int flags)
 }
 
 static const struct driver_info	net1080_info = {
-	description:	"NetChip TurboCONNECT",
-	flags:		FLAG_FRAMING_NC,
-	reset:		net1080_reset,
-	check_connect:	net1080_check_connect,
-	rx_fixup:	net1080_rx_fixup,
-	tx_fixup:	net1080_tx_fixup,
+	.description =	"NetChip TurboCONNECT",
+	.flags =	FLAG_FRAMING_NC,
+	.reset =	net1080_reset,
+	.check_connect =net1080_check_connect,
+	.rx_fixup =	net1080_rx_fixup,
+	.tx_fixup =	net1080_tx_fixup,
 
-	in: 1, out: 1,		// direction distinguishes these
-	epsize:	64,
+	.in = 1, out: 1,		// direction distinguishes these
+	.epsize =64,
 };
 
 #endif /* CONFIG_USB_NET1080 */
@@ -1192,13 +1187,13 @@ static int pl_reset (struct usbnet *dev)
 }
 
 static const struct driver_info	prolific_info = {
-	description:	"Prolific PL-2301/PL-2302",
-	flags:		FLAG_NO_SETINT,
+	.description =	"Prolific PL-2301/PL-2302",
+	.flags =	FLAG_NO_SETINT,
 		/* some PL-2302 versions seem to fail usb_set_interface() */
-	reset:		pl_reset,
+	.reset =	pl_reset,
 
-	in: 3, out: 2,
-	epsize:	64,
+	.in = 3, out: 2,
+	.epsize =64,
 };
 
 #endif /* CONFIG_USB_PL2301 */
@@ -1815,20 +1810,19 @@ static int usbnet_start_xmit (struct sk_buff *skb, struct net_device *net)
 	}
 #endif	/* CONFIG_USB_NET1080 */
 
-	netif_stop_queue (net);
 	switch ((retval = usb_submit_urb (urb, GFP_ATOMIC))) {
 	case -EPIPE:
+		netif_stop_queue (net);
 		defer_kevent (dev, EVENT_TX_HALT);
 		break;
 	default:
-		netif_start_queue (net);
 		dbg ("%s tx: submit urb err %d", net->name, retval);
 		break;
 	case 0:
 		net->trans_start = jiffies;
 		__skb_queue_tail (&dev->txq, skb);
-		if (dev->txq.qlen < TX_QLEN)
-			netif_start_queue (net);
+		if (dev->txq.qlen >= TX_QLEN)
+			netif_stop_queue (net);
 	}
 	spin_unlock_irqrestore (&dev->txq.lock, flags);
 
@@ -2054,32 +2048,32 @@ static const struct usb_device_id	products [] = {
 #ifdef	CONFIG_USB_AN2720
 {
 	USB_DEVICE (0x0547, 0x2720),	// AnchorChips defaults
-	driver_info:	(unsigned long) &an2720_info,
+	.driver_info =	(unsigned long) &an2720_info,
 },
 
 {
 	USB_DEVICE (0x0547, 0x2727),	// Xircom PGUNET
-	driver_info:	(unsigned long) &an2720_info,
+	.driver_info =	(unsigned long) &an2720_info,
 },
 #endif
 
 #ifdef	CONFIG_USB_BELKIN
 {
 	USB_DEVICE (0x050d, 0x0004),	// Belkin
-	driver_info:	(unsigned long) &belkin_info,
+	.driver_info =	(unsigned long) &belkin_info,
 }, {
 	USB_DEVICE (0x056c, 0x8100),	// eTEK
-	driver_info:	(unsigned long) &belkin_info,
+	.driver_info =	(unsigned long) &belkin_info,
 }, {
 	USB_DEVICE (0x0525, 0x9901),	// Advance USBNET (eTEK)
-	driver_info:	(unsigned long) &belkin_info,
+	.driver_info =	(unsigned long) &belkin_info,
 },
 #endif
 
 #ifdef	CONFIG_USB_GENESYS
 {
 	USB_DEVICE (0x05e3, 0x0502),	// GL620USB-A
-	driver_info:	(unsigned long) &genelink_info,
+	.driver_info =	(unsigned long) &genelink_info,
 },
 #endif
 
@@ -2091,28 +2085,28 @@ static const struct usb_device_id	products [] = {
 {
 	// 1183 = 0x049F, both used as hex values?
 	USB_DEVICE (0x049F, 0x505A),	// Compaq "Itsy"
-	driver_info:	(unsigned long) &linuxdev_info,
+	.driver_info =	(unsigned long) &linuxdev_info,
 },
 #endif
 
 #ifdef	CONFIG_USB_NET1080
 {
 	USB_DEVICE (0x0525, 0x1080),	// NetChip ref design
-	driver_info:	(unsigned long) &net1080_info,
+	.driver_info =	(unsigned long) &net1080_info,
 },
 {
 	USB_DEVICE (0x06D0, 0x0622),	// Laplink Gold
-	driver_info:	(unsigned long) &net1080_info,
+	.driver_info =	(unsigned long) &net1080_info,
 },
 #endif
 
 #ifdef CONFIG_USB_PL2301
 {
 	USB_DEVICE (0x067b, 0x0000),	// PL-2301
-	driver_info:	(unsigned long) &prolific_info,
+	.driver_info =	(unsigned long) &prolific_info,
 }, {
 	USB_DEVICE (0x067b, 0x0001),	// PL-2302
-	driver_info:	(unsigned long) &prolific_info,
+	.driver_info =	(unsigned long) &prolific_info,
 },
 #endif
 
@@ -2123,10 +2117,10 @@ static const struct usb_device_id	products [] = {
 MODULE_DEVICE_TABLE (usb, products);
 
 static struct usb_driver usbnet_driver = {
-	name:		driver_name,
-	id_table:	products,
-	probe:		usbnet_probe,
-	disconnect:	usbnet_disconnect,
+	.name =		driver_name,
+	.id_table =	products,
+	.probe =	usbnet_probe,
+	.disconnect =	usbnet_disconnect,
 };
 
 /*-------------------------------------------------------------------------*/

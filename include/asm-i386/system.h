@@ -324,24 +324,14 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
 #define local_irq_disable()	__cli()
 #define local_irq_enable()	__sti()
 
-#ifdef CONFIG_SMP
-
-extern void __global_cli(void);
-extern void __global_sti(void);
-extern unsigned long __global_save_flags(void);
-extern void __global_restore_flags(unsigned long);
-#define cli() __global_cli()
-#define sti() __global_sti()
-#define save_flags(x) ((x)=__global_save_flags())
-#define restore_flags(x) __global_restore_flags(x)
-
-#else
-
-#define cli() __cli()
-#define sti() __sti()
-#define save_flags(x) __save_flags(x)
-#define restore_flags(x) __restore_flags(x)
-
+/*
+ * Compatibility macros - they will be removed after some time.
+ */
+#if !CONFIG_SMP
+# define sti() __sti()
+# define cli() __cli()
+# define save_flags(flags) __save_flags(flags)
+# define restore_flags(flags) __restore_flags(flags)
 #endif
 
 /*

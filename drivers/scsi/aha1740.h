@@ -11,7 +11,6 @@
  */
 
 #include <linux/types.h>
-#include <linux/kdev_t.h>
 
 /* Eisa Enhanced mode operation - slot locating and addressing */
 #define MINEISA 1   /* I don't have an EISA Spec to know these ranges, so I */
@@ -158,7 +157,7 @@ int aha1740_command(Scsi_Cmnd *);
 int aha1740_queuecommand(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
 int aha1740_abort(Scsi_Cmnd *);
 int aha1740_reset(Scsi_Cmnd *, unsigned int);
-int aha1740_biosparam(Disk *, kdev_t, int*);
+int aha1740_biosparam(Disk *, struct block_device *, int*);
 int aha1740_proc_info(char *buffer, char **start, off_t offset,
                                int length, int hostno, int inout);
 

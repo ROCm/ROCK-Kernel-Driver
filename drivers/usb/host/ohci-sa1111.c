@@ -288,47 +288,47 @@ ohci_sa1111_start (struct usb_hcd *hcd)
 /*-------------------------------------------------------------------------*/
 
 static const struct hc_driver ohci_sa1111_hc_driver = {
-	description:		hcd_name,
+	.description =		hcd_name,
 
 	/*
 	 * generic hardware linkage
 	 */
-	irq:			ohci_irq,
-	flags:			HCD_USB11,
+	.irq =			ohci_irq,
+	.flags =		HCD_USB11,
 
 	/*
 	 * basic lifecycle operations
 	 */
-	start:			ohci_sa1111_start,
+	.start =		ohci_sa1111_start,
 #ifdef	CONFIG_PM
 	/* suspend:		ohci_sa1111_suspend,  -- tbd */
 	/* resume:		ohci_sa1111_resume,   -- tbd */
 #endif
-	stop:			ohci_stop,
+	.stop =			ohci_stop,
 
 	/*
 	 * memory lifecycle (except per-request)
 	 */
-	hcd_alloc:		ohci_hcd_alloc,
-	hcd_free:		ohci_hcd_free,
+	.hcd_alloc =		ohci_hcd_alloc,
+	.hcd_free =		ohci_hcd_free,
 
 	/*
 	 * managing i/o requests and associated device resources
 	 */
-	urb_enqueue:		ohci_urb_enqueue,
-	urb_dequeue:		ohci_urb_dequeue,
-	free_config:		ohci_free_config,
+	.urb_enqueue =		ohci_urb_enqueue,
+	.urb_dequeue =		ohci_urb_dequeue,
+	.free_config =		ohci_free_config,
 
 	/*
 	 * scheduling support
 	 */
-	get_frame_number:	ohci_get_frame,
+	.get_frame_number =	ohci_get_frame,
 
 	/*
 	 * root hub support
 	 */
-	hub_status_data:	ohci_hub_status_data,
-	hub_control:		ohci_hub_control,
+	.hub_status_data =	ohci_hub_status_data,
+	.hub_control =		ohci_hub_control,
 };
 
 /*-------------------------------------------------------------------------*/

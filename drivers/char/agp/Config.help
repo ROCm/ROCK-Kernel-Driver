@@ -1,0 +1,88 @@
+CONFIG_AGP
+  AGP (Accelerated Graphics Port) is a bus system mainly used to
+  connect graphics cards to the rest of the system.
+
+  If you have an AGP system and you say Y here, it will be possible to
+  use the AGP features of your 3D rendering video card. This code acts
+  as a sort of "AGP driver" for the motherboard's chipset.
+
+  If you need more texture memory than you can get with the AGP GART
+  (theoretically up to 256 MB, but in practice usually 64 or 128 MB
+  due to kernel allocation issues), you could use PCI accesses
+  and have up to a couple gigs of texture space.
+
+  Note that this is the only means to have XFree4/GLX use
+  write-combining with MTRR support on the AGP bus. Without it, OpenGL
+  direct rendering will be a lot slower but still faster than PIO.
+
+  You should say Y here if you use XFree86 3.3.6 or 4.x and want to
+  use GLX or DRI.  If unsure, say N.
+
+  This driver is available as a module.  If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.  The
+  module will be called agpgart.o.
+
+CONFIG_AGP_INTEL
+  This option gives you AGP support for the GLX component of the
+  XFree86 4.x on Intel 440LX/BX/GX, 815, 820, 830, 840, 845, 850 and 860 chipsets.
+
+  You should say Y here if you use XFree86 3.3.6 or 4.x and want to
+  use GLX or DRI.  If unsure, say N.
+
+CONFIG_AGP_I810
+  This option gives you AGP support for the Xserver on the Intel 810
+  815 and 830m chipset boards for their on-board integrated graphics. This
+  is required to do any useful video modes with these boards.
+
+CONFIG_AGP_I460
+  This option gives you AGP GART support for the Intel 460GX chipset
+  for IA64 processors.
+
+CONFIG_AGP_VIA
+  This option gives you AGP support for the GLX component of the
+  XFree86 4.x on VIA MPV3/Apollo Pro chipsets.
+
+  You should say Y here if you use XFree86 3.3.6 or 4.x and want to
+  use GLX or DRI.  If unsure, say N.
+
+CONFIG_AGP_AMD
+  This option gives you AGP support for the GLX component of the
+  XFree86 4.x on AMD Irongate, 761, and 762 chipsets.
+
+  You should say Y here if you use XFree86 3.3.6 or 4.x and want to
+  use GLX or DRI.  If unsure, say N.
+
+CONFIG_AGP_SIS
+  This option gives you AGP support for the GLX component of the "soon
+  to be released" XFree86 4.x on Silicon Integrated Systems [SiS]
+  chipsets.
+
+  Note that 5591/5592 AGP chipsets are NOT supported.
+
+  You should say Y here if you use XFree86 3.3.6 or 4.x and want to
+  use GLX or DRI.  If unsure, say N.
+
+CONFIG_AGP_SWORKS
+  Say Y here to support the Serverworks AGP card.  See 
+  <http://www.serverworks.com/> for product descriptions and images.
+
+CONFIG_AGP_ALI
+  This option gives you AGP support for the GLX component of the
+  XFree86 4.x on the following ALi chipsets.  The supported chipsets
+  include M1541, M1621, M1631, M1632, M1641,M1647,and M1651.
+  For the ALi-chipset question, ALi suggests you refer to
+  <http://www.ali.com.tw/eng/support/index.shtml>.
+
+  The M1541 chipset can do AGP 1x and 2x, but note that there is an
+  acknowledged incompatibility with Matrox G200 cards. Due to
+  timing issues, this chipset cannot do AGP 2x with the G200.
+  This is a hardware limitation. AGP 1x seems to be fine, though.
+
+  You should say Y here if you use XFree86 3.3.6 or 4.x and want to
+  use GLX or DRI.  If unsure, say N.
+
+CONFIG_AGP_HP_ZX1
+  This option gives you AGP GART support for the HP ZX1 chipset
+  for IA64 processors.
+
+

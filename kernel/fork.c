@@ -24,7 +24,7 @@
 #include <linux/file.h>
 #include <linux/binfmts.h>
 #include <linux/fs.h>
-#include <linux/mm.h>
+#include <linux/security.h>
 
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
@@ -189,7 +189,6 @@ static inline int dup_mmap(struct mm_struct * mm)
 	mm->map_count = 0;
 	mm->rss = 0;
 	mm->cpu_vm_mask = 0;
-	mm->swap_address = 0;
 	pprev = &mm->mmap;
 
 	/*
@@ -308,9 +307,6 @@ inline void __mmdrop(struct mm_struct *mm)
 void mmput(struct mm_struct *mm)
 {
 	if (atomic_dec_and_lock(&mm->mm_users, &mmlist_lock)) {
-		extern struct mm_struct *swap_mm;
-		if (swap_mm == mm)
-			swap_mm = list_entry(mm->mmlist.next, struct mm_struct, mmlist);
 		list_del(&mm->mmlist);
 		mmlist_nr--;
 		spin_unlock(&mmlist_lock);
@@ -622,6 +618,10 @@ struct task_struct *do_fork(unsigned long clone_flags,
 	if ((clone_flags & (CLONE_NEWNS|CLONE_FS)) == (CLONE_NEWNS|CLONE_FS))
 		return ERR_PTR(-EINVAL);
 
+	retval = security_ops->task_create(clone_flags);
+	if (retval)
+		goto fork_out;
+
 	retval = -ENOMEM;
 	p = dup_task_struct(current);
 	if (!p)
@@ -701,13 +701,16 @@ struct task_struct *do_fork(unsigned long clone_flags,
 	p->array = NULL;
 	p->lock_depth = -1;		/* -1 = no lock */
 	p->start_time = jiffies;
+	p->security = NULL;
 
 	INIT_LIST_HEAD(&p->local_pages);
 
 	retval = -ENOMEM;
+	if (security_ops->task_alloc_security(p))
+		goto bad_fork_cleanup;
 	/* copy all the process information */
 	if (copy_semundo(clone_flags, p))
-		goto bad_fork_cleanup;
+		goto bad_fork_cleanup_security;
 	if (copy_files(clone_flags, p))
 		goto bad_fork_cleanup_semundo;
 	if (copy_fs(clone_flags, p))
@@ -816,6 +819,8 @@ bad_fork_cleanup_files:
 	exit_files(p); /* blocking */
 bad_fork_cleanup_semundo:
 	exit_semundo(p);
+bad_fork_cleanup_security:
+	security_ops->task_free_security(p);
 bad_fork_cleanup:
 	put_exec_domain(p->thread_info->exec_domain);
 	if (p->binfmt && p->binfmt->module)

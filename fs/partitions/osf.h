@@ -4,6 +4,4 @@
 
 #define DISKLABELMAGIC (0x82564557UL)
 
-int osf_partition(struct gendisk *hd, struct block_device *bdev,
-		unsigned long first_sector, int current_minor);
-
+int osf_partition(struct parsed_partitions *state, struct block_device *bdev);

@@ -11719,14 +11719,14 @@ aic7xxx_reset(Scsi_Cmnd *cmd, unsigned int flags)
  *   Return the disk geometry for the given SCSI device.
  *-F*************************************************************************/
 int
-aic7xxx_biosparam(Disk *disk, kdev_t dev, int geom[])
+aic7xxx_biosparam(Disk *disk, struct block_device *bdev, int geom[])
 {
   int heads, sectors, cylinders, ret;
   struct aic7xxx_host *p;
   unsigned char *buf;
 
   p = (struct aic7xxx_host *) disk->device->host->hostdata;
-  buf = scsi_bios_ptable(dev);
+  buf = scsi_bios_ptable(bdev);
 
   if ( buf )
   {

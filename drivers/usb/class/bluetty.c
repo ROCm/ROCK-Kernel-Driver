@@ -234,10 +234,10 @@ static struct usb_device_id usb_bluetooth_ids [] = {
 MODULE_DEVICE_TABLE (usb, usb_bluetooth_ids);
 
 static struct usb_driver usb_bluetooth_driver = {
-	name:		"bluetty",
-	probe:		usb_bluetooth_probe,
-	disconnect:	usb_bluetooth_disconnect,
-	id_table:	usb_bluetooth_ids,
+	.name =		"bluetty",
+	.probe =	usb_bluetooth_probe,
+	.disconnect =	usb_bluetooth_disconnect,
+	.id_table =	usb_bluetooth_ids,
 };
 
 static int			bluetooth_refcount;
@@ -1284,30 +1284,30 @@ static void usb_bluetooth_disconnect(struct usb_device *dev, void *ptr)
 
 
 static struct tty_driver bluetooth_tty_driver = {
-	magic:			TTY_DRIVER_MAGIC,
-	driver_name:		"usb-bluetooth",
-	name:			"usb/ttub/%d",
-	major:			BLUETOOTH_TTY_MAJOR,
-	minor_start:		0,
-	num:			BLUETOOTH_TTY_MINORS,
-	type:			TTY_DRIVER_TYPE_SERIAL,
-	subtype:		SERIAL_TYPE_NORMAL,
-	flags:			TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS,
+	.magic =		TTY_DRIVER_MAGIC,
+	.driver_name =		"usb-bluetooth",
+	.name =			"usb/ttub/%d",
+	.major =		BLUETOOTH_TTY_MAJOR,
+	.minor_start =		0,
+	.num =			BLUETOOTH_TTY_MINORS,
+	.type =			TTY_DRIVER_TYPE_SERIAL,
+	.subtype =		SERIAL_TYPE_NORMAL,
+	.flags =		TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS,
 
-	refcount:		&bluetooth_refcount,
-	table:			bluetooth_tty,
-	termios:		bluetooth_termios,
-	termios_locked:		bluetooth_termios_locked,
+	.refcount =		&bluetooth_refcount,
+	.table =		bluetooth_tty,
+	.termios =		bluetooth_termios,
+	.termios_locked =	bluetooth_termios_locked,
 
-	open:			bluetooth_open,
-	close:			bluetooth_close,
-	write:			bluetooth_write,
-	write_room:		bluetooth_write_room,
-	ioctl:			bluetooth_ioctl,
-	set_termios:		bluetooth_set_termios,
-	throttle:		bluetooth_throttle,
-	unthrottle:		bluetooth_unthrottle,
-	chars_in_buffer:	bluetooth_chars_in_buffer,
+	.open =			bluetooth_open,
+	.close =		bluetooth_close,
+	.write =		bluetooth_write,
+	.write_room =		bluetooth_write_room,
+	.ioctl =		bluetooth_ioctl,
+	.set_termios =		bluetooth_set_termios,
+	.throttle =		bluetooth_throttle,
+	.unthrottle =		bluetooth_unthrottle,
+	.chars_in_buffer =	bluetooth_chars_in_buffer,
 };
 
 

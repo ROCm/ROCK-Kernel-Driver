@@ -1439,7 +1439,7 @@ static int partsize(unsigned char *buf, unsigned long capacity,
  * Note:
  *   In contrary to other externally callable funcs (DC390_), we don't lock
  ***********************************************************************/
-int DC390_bios_param (Disk *disk, kdev_t devno, int geom[])
+int DC390_bios_param (Disk *disk, struct block_device *bdev, int geom[])
 {
     int heads, sectors, cylinders;
     PACB pACB = (PACB) disk->device->host->hostdata;
@@ -1447,7 +1447,7 @@ int DC390_bios_param (Disk *disk, kdev_t devno, int geom[])
     int size = disk->capacity;
     unsigned char *buf;
 
-    if ((buf = scsi_bios_ptable(devno)))
+    if ((buf = scsi_bios_ptable(bdev)))
     {
 	/* try to infer mapping from partition table */
 	ret_code = partsize (buf, (unsigned long) size, (unsigned int *) geom + 2,
@@ -1475,9 +1475,9 @@ int DC390_bios_param (Disk *disk, kdev_t devno, int geom[])
     return (0);
 }
 #else
-int DC390_bios_param (Disk *disk, kdev_t devno, int geom[])
+int DC390_bios_param (Disk *disk, struct block_device *bdev, int geom[])
 {
-    return scsicam_bios_param (disk, devno, geom);
+    return scsicam_bios_param (disk, bdev, geom);
 };
 #endif
 
@@ -2525,8 +2525,8 @@ else if (!p1) goto ok2
 if (dc390_search (&buffer, &pos, &p0, &var, txt, max, scale, "")) goto einv2; 		\
 else if (!p1) goto ok2
 
-#define SEARCH3(buffer, pos, &p0, var, txt, max, scale, ign)				\
-if (dc390_search (&buffer, &pos, p0, &var, txt, max, scale, ign)) goto einv2;		\
+#define SEARCH3(buffer, pos, p0, var, txt, max, scale, ign)				\
+if (dc390_search (&buffer, &pos, &p0, &var, txt, max, scale, ign)) goto einv2;		\
 else if (!p1) goto ok2
 
 

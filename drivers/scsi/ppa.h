@@ -170,7 +170,7 @@ int ppa_queuecommand(Scsi_Cmnd *, void (*done) (Scsi_Cmnd *));
 int ppa_abort(Scsi_Cmnd *);
 int ppa_reset(Scsi_Cmnd *);
 int ppa_proc_info(char *, char **, off_t, int, int, int);
-int ppa_biosparam(Disk *, kdev_t, int *);
+int ppa_biosparam(Disk *, struct block_device *, int *);
 
 #define PPA {	proc_name:			"ppa",		\
 		proc_info:			ppa_proc_info,		\

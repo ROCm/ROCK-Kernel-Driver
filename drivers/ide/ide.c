@@ -1105,9 +1105,6 @@ static int ide_open(struct inode * inode, struct file * filp)
 	if (drive->driver == NULL)
 		ide_driver_module();
 
-	while (drive->busy)
-		sleep_on(&drive->wqueue);
-
 	++drive->usage;
 	if (ata_ops(drive) && ata_ops(drive)->open)
 		return ata_ops(drive)->open(inode, filp, drive);

@@ -704,12 +704,12 @@ static int dabusb_ioctl (struct inode *inode, struct file *file, unsigned int cm
 
 static struct file_operations dabusb_fops =
 {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	read:		dabusb_read,
-	ioctl:		dabusb_ioctl,
-	open:		dabusb_open,
-	release:	dabusb_release,
+	.owner =	THIS_MODULE,
+	.llseek =	no_llseek,
+	.read =		dabusb_read,
+	.ioctl =	dabusb_ioctl,
+	.open =		dabusb_open,
+	.release =	dabusb_release,
 };
 
 static int dabusb_find_struct (void)
@@ -806,10 +806,10 @@ MODULE_DEVICE_TABLE (usb, dabusb_ids);
 
 static struct usb_driver dabusb_driver =
 {
-	name:		"dabusb",
-	probe:		dabusb_probe,
-	disconnect:	dabusb_disconnect,
-	id_table:	dabusb_ids,
+	.name =		"dabusb",
+	.probe =	dabusb_probe,
+	.disconnect =	dabusb_disconnect,
+	.id_table =	dabusb_ids,
 };
 
 /* --------------------------------------------------------------------- */

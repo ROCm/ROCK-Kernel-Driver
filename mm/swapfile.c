@@ -383,6 +383,7 @@ static inline void unuse_pte(struct vm_area_struct * vma, unsigned long address,
 		return;
 	get_page(page);
 	set_pte(dir, pte_mkold(mk_pte(page, vma->vm_page_prot)));
+	page_add_rmap(page, dir);
 	swap_free(entry);
 	++vma->vm_mm->rss;
 }

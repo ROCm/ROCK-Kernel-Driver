@@ -65,52 +65,39 @@ static int jffs_proc_layout_read (char *page, char **start, off_t off,
 /*
  * Register a JFFS partition directory (called upon mount)
  */
-int jffs_register_jffs_proc_dir(kdev_t dev, struct jffs_control *c)
+int jffs_register_jffs_proc_dir(int mtd, struct jffs_control *c)
 {
 	struct jffs_partition_dir *part_dir;
 	struct proc_dir_entry *part_info = 0;
 	struct proc_dir_entry *part_layout = 0;
 	struct proc_dir_entry *part_root = 0;
+	char name[10];
 
+	sprintf(name, "%d", mtd);
 	/* Allocate structure for local JFFS partition table */
-	if (!(part_dir = (struct jffs_partition_dir *)
-		kmalloc (sizeof (struct jffs_partition_dir), GFP_KERNEL))) {
-		return -ENOMEM;
-	}
+	part_dir = (struct jffs_partition_dir *)
+		kmalloc(sizeof (struct jffs_partition_dir), GFP_KERNEL);
+	if (!part_dir)
+		goto out;
 
 	/* Create entry for this partition */
-	if ((part_root = create_proc_entry (kdevname(dev),
-		S_IFDIR | S_IRUGO | S_IXUGO, jffs_proc_root))) {
-		part_root->read_proc = jffs_proc_info_read;
-		part_root->data = (void *) c;
-	}
-	else {
-		kfree (part_dir);
-		return -ENOMEM;
-	}
+	part_root = proc_mkdir(name, jffs_proc_root);
+	if (!part_root)
+		goto out1;
 
 	/* Create entry for 'info' file */
-	if ((part_info = create_proc_entry ("info", 0, part_root))) {
-		part_info->read_proc = jffs_proc_info_read;
-		part_info->data = (void *) c;
-	}
-	else {
-		remove_proc_entry (part_root->name, jffs_proc_root);
-		kfree (part_dir);
-		return -ENOMEM;
-	}
+	part_info = create_proc_entry ("info", 0, part_root);
+	if (!part_info)
+		goto out2;
+	part_info->read_proc = jffs_proc_info_read;
+	part_info->data = (void *) c;
 
 	/* Create entry for 'layout' file */
-	if ((part_layout = create_proc_entry ("layout", 0, part_root))) {
-		part_layout->read_proc = jffs_proc_layout_read;
-		part_layout->data = (void *) c;
-	}
-	else {
-		remove_proc_entry (part_info->name, part_root);
-		remove_proc_entry (part_root->name, jffs_proc_root);
-		kfree (part_dir);
-		return -ENOMEM;
-	}
+	part_layout = create_proc_entry ("layout", 0, part_root);
+	if (!part_layout)
+		goto out3;
+	part_layout->read_proc = jffs_proc_layout_read;
+	part_layout->data = (void *) c;
 
 	/* Fill in structure for table and insert in the list */
 	part_dir->c = c;
@@ -122,6 +109,15 @@ int jffs_register_jffs_proc_dir(kdev_t dev, struct jffs_control *c)
 
 	/* Return happy */
 	return 0;
+
+out3:
+	remove_proc_entry("info", part_root);
+out2:
+	remove_proc_entry(name, jffs_proc_root);
+out1:
+	kfree(part_dir);
+out:
+	return -ENOMEM;
 }
 
 
@@ -155,11 +151,7 @@ int jffs_unregister_jffs_proc_dir(struct jffs_control *c)
 			 * if it is.
 			 */
 			if (jffs_part_dirs == part_dir->next)
-#if LINUX_VERSION_CODE < 0x020300
-				remove_proc_entry ("jffs", &proc_root_fs);
-#else
 				remove_proc_entry ("jffs", proc_root_fs);
-#endif
 
 			/* Free memory for entry */
 			kfree(part_dir);

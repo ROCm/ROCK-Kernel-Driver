@@ -32,7 +32,6 @@
  */
 
 #include <linux/types.h>
-#include <linux/kdev_t.h>
 
 /* I/O Port interface 4.2 */
 /* READ */
@@ -141,7 +140,7 @@ static int aha1542_host_reset(Scsi_Cmnd * SCpnt);
 static int aha1542_old_abort(Scsi_Cmnd * SCpnt);
 static int aha1542_old_reset(Scsi_Cmnd *, unsigned int);
 #endif
-static int aha1542_biosparam(Disk *, kdev_t, int*);
+static int aha1542_biosparam(Disk *, struct block_device *, int*);
 
 #define AHA1542_MAILBOXES 8
 #define AHA1542_SCATTER 16

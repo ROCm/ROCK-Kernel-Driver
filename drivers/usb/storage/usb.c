@@ -170,12 +170,12 @@ MODULE_DEVICE_TABLE (usb, storage_usb_ids);
 		    vendor_name, product_name, use_protocol, use_transport, \
 		    init_function, Flags) \
 { \
-	vendorName: vendor_name,	\
-	productName: product_name,	\
-	useProtocol: use_protocol,	\
-	useTransport: use_transport,	\
+	.vendorName = vendor_name,	\
+	.productName = product_name,	\
+	.useProtocol = use_protocol,	\
+	.useTransport = use_transport,	\
 	initFunction : init_function,	\
-	flags: Flags, \
+	.flags = Flags, \
 }
 
 static struct us_unusual_dev us_unusual_dev_list[] = {
@@ -228,10 +228,10 @@ static struct us_unusual_dev us_unusual_dev_list[] = {
 };
 
 struct usb_driver usb_storage_driver = {
-	name:		"usb-storage",
-	probe:		storage_probe,
-	disconnect:	storage_disconnect,
-	id_table:	storage_usb_ids,
+	.name =		"usb-storage",
+	.probe =	storage_probe,
+	.disconnect =	storage_disconnect,
+	.id_table =	storage_usb_ids,
 };
 
 /*

@@ -647,15 +647,6 @@ struct file *dentry_open(struct dentry *dentry, struct vfsmount *mnt, int flags)
 	f->f_op = fops_get(inode->i_fop);
 	file_move(f, &inode->i_sb->s_files);
 
-	/* preallocate kiobuf for O_DIRECT */
-	f->f_iobuf = NULL;
-	f->f_iobuf_lock = 0;
-	if (f->f_flags & O_DIRECT) {
-		error = alloc_kiovec(1, &f->f_iobuf);
-		if (error)
-			goto cleanup_all;
-	}
-
 	if (f->f_op && f->f_op->open) {
 		error = f->f_op->open(inode,f);
 		if (error)
@@ -665,17 +656,16 @@ struct file *dentry_open(struct dentry *dentry, struct vfsmount *mnt, int flags)
 
 	/* NB: we're sure to have correct a_ops only after f_op->open */
 	if (f->f_flags & O_DIRECT) {
-		error = -EINVAL;
-		if (inode->i_mapping && inode->i_mapping->a_ops)
-			if (!inode->i_mapping->a_ops->direct_IO)
+		if (!inode->i_mapping || !inode->i_mapping->a_ops ||
+			!inode->i_mapping->a_ops->direct_IO) {
+				error = -EINVAL;
 				goto cleanup_all;
+		}
 	}
 
 	return f;
 
 cleanup_all:
-	if (f->f_iobuf)
-		free_kiovec(1, &f->f_iobuf);
 	fops_put(f->f_op);
 	if (f->f_mode & FMODE_WRITE)
 		put_write_access(inode);

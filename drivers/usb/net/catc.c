@@ -941,10 +941,10 @@ static struct usb_device_id catc_id_table [] = {
 MODULE_DEVICE_TABLE(usb, catc_id_table);
 
 static struct usb_driver catc_driver = {
-	name:		"catc",
-	probe:		catc_probe,
-	disconnect:	catc_disconnect,
-	id_table:	catc_id_table,
+	.name =		"catc",
+	.probe =	catc_probe,
+	.disconnect =	catc_disconnect,
+	.id_table =	catc_id_table,
 };
 
 static int __init catc_init(void)

@@ -38,7 +38,7 @@ static ctl_table ctl_isa_vars[4] = {
 
 static struct ctl_table_header *isa_sysctl_header;
 
-static ctl_table ctl_isa[2] = {{BUS_ISA, "isa", NULL, 0, 0555, ctl_isa_vars},
+static ctl_table ctl_isa[2] = {{CTL_BUS_ISA, "isa", NULL, 0, 0555, ctl_isa_vars},
 			       {0}};
 static ctl_table ctl_bus[2] = {{CTL_BUS, "bus", NULL, 0, 0555, ctl_isa},
 			       {0}};

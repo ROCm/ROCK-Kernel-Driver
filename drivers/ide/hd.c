@@ -83,9 +83,6 @@ static void bad_rw_intr(void);
 
 static char recalibrate[MAX_HD];
 static char special_op[MAX_HD];
-static int access_count[MAX_HD];
-static char busy[MAX_HD];
-static DECLARE_WAIT_QUEUE_HEAD(busy_wait);
 
 static int reset;
 static int hd_error;
@@ -644,7 +641,7 @@ static int hd_ioctl(struct inode * inode, struct file * file,
 			g.heads = hd_info[dev].head;
 			g.sectors = hd_info[dev].sect;
 			g.cylinders = hd_info[dev].cyl;
-			g.start = get_start_sect(inode->i_rdev);
+			g.start = get_start_sect(inode->i_bdev);
 			return copy_to_user(loc, &g, sizeof g) ? -EFAULT : 0; 
 		}
 
@@ -653,14 +650,6 @@ static int hd_ioctl(struct inode * inode, struct file * file,
 				return -EACCES;
 			return revalidate_hddisk(inode->i_rdev, 1);
 
-         	case BLKGETSIZE:
-		case BLKGETSIZE64:
-		case BLKROSET:
-		case BLKROGET:
-		case BLKFLSBUF:
-		case BLKPG:
-			return blk_ioctl(inode->i_bdev, cmd, arg);
-
 		default:
 			return -EINVAL;
 	}
@@ -668,14 +657,9 @@ static int hd_ioctl(struct inode * inode, struct file * file,
 
 static int hd_open(struct inode * inode, struct file * filp)
 {
-	int target;
-	target =  DEVICE_NR(inode->i_rdev);
-
+	int target =  DEVICE_NR(inode->i_rdev);
 	if (target >= NR_HD)
 		return -ENODEV;
-	while (busy[target])
-		sleep_on(&busy_wait);
-	access_count[target]++;
 	return 0;
 }
 
@@ -683,12 +667,6 @@ static int hd_open(struct inode * inode, struct file * filp)
  * Releasing a block device means we sync() it, so that it can safely
  * be forgotten about...
  */
-static int hd_release(struct inode * inode, struct file * file)
-{
-        int target =  DEVICE_NR(inode->i_rdev);
-	access_count[target]--;
-	return 0;
-}
 
 extern struct block_device_operations hd_fops;
 
@@ -715,7 +693,6 @@ static void hd_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 static struct block_device_operations hd_fops = {
 	.open =		hd_open,
-	.release =	hd_release,
 	.ioctl =	hd_ioctl,
 };
 
@@ -854,13 +831,9 @@ int __init hd_init(void)
 	return 0;
 }
 
-#define DEVICE_BUSY busy[target]
-#define USAGE access_count[target]
 #define CAPACITY (hd_info[target].head*hd_info[target].sect*hd_info[target].cyl)
 /* We assume that the BIOS parameters do not change, so the disk capacity
    will not change */
-#undef MAYBE_REINIT
-#define GENDISK_STRUCT hd_gendisk
 
 /*
  * This routine is called to flush all partitions and partition tables
@@ -872,36 +845,15 @@ int __init hd_init(void)
  */
 static int revalidate_hddisk(kdev_t dev, int maxusage)
 {
-	int target;
-	struct gendisk * gdev;
-	int res;
-	long flags;
-
-	target = DEVICE_NR(dev);
-	gdev = &GENDISK_STRUCT;
-
-	save_flags(flags);
-	cli();
-	if (DEVICE_BUSY || USAGE > maxusage) {
-		restore_flags(flags);
-		return -EBUSY;
-	}
-	DEVICE_BUSY = 1;
-	restore_flags(flags);
-
-	res = wipe_partitions(dev);
-	if (res)
-		goto leave;
-
-#ifdef MAYBE_REINIT
-	MAYBE_REINIT;
-#endif
-
-	grok_partitions(dev, CAPACITY);
-
-leave:
-	DEVICE_BUSY = 0;
-	wake_up(&busy_wait);
+	int target = DEVICE_NR(dev);
+	kdev_t device = mk_kdev(MAJOR_NR, target << 6);
+	int res = dev_lock_part(device);
+	if (res < 0)
+		return res;
+	res = wipe_partitions(device);
+	if (!res)
+		grok_partitions(device, CAPACITY);
+	dev_unlock_part(device);
 	return res;
 }
 

@@ -24,29 +24,16 @@
  *
  */
 
-#define __NO_VERSION__
-#include <linux/version.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
-#include <linux/sched.h>
-#include <linux/mm.h>
-#include <linux/string.h>
-#include <linux/errno.h>
-#include <linux/slab.h>
-#include <linux/vmalloc.h>
+#include <linux/mman.h>
 #include <linux/pci.h>
 #include <linux/init.h>
-#include <linux/pagemap.h>
 #include <linux/miscdevice.h>
 #include <linux/agp_backend.h>
 #include <linux/agpgart.h>
-#include <linux/smp_lock.h>
-#include <asm/system.h>
 #include <asm/uaccess.h>
-#include <asm/io.h>
-#include <asm/page.h>
-#include <asm/mman.h>
 
 #include "agp.h"
 

@@ -58,7 +58,7 @@
 }
 
 extern int aic7xxx_queue(Scsi_Cmnd *, void (*)(Scsi_Cmnd *));
-extern int aic7xxx_biosparam(Disk *, kdev_t, int[]);
+extern int aic7xxx_biosparam(Disk *, struct block_device *, int[]);
 extern int aic7xxx_detect(Scsi_Host_Template *);
 extern int aic7xxx_command(Scsi_Cmnd *);
 extern int aic7xxx_reset(Scsi_Cmnd *, unsigned int);
