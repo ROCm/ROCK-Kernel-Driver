@@ -52,6 +52,7 @@ config AIC7XXX_RESET_DELAY_MS
 
 config AIC7XXX_PROBE_EISA_VL
 	bool "Probe for EISA and VL AIC7XXX Adapters"
+	depends on SCSI_AIC7XXX
 	help
 	Probe for EISA and VLB Aic7xxx controllers.  In many newer systems,
 	the invasive probes necessary to detect these controllers can cause
