@@ -397,7 +397,8 @@ static void do_trap(int trapnr, int signr, char *str,
 
 	/* kernel trap */ 
 	{	     
-		unsigned long fixup = search_exception_table(regs->rip);
+		const struct exception_table_entry *fixup;
+		fixup = search_exception_tables(regs->rip);
 		if (fixup) {
 			extern int exception_trace; 
 			if (exception_trace)
@@ -405,7 +406,7 @@ static void do_trap(int trapnr, int signr, char *str,
 	             "%s: fixed kernel exception at %lx err:%ld\n",
 	             current->comm, regs->rip, error_code);
 		
-			regs->rip = fixup;
+			regs->rip = fixup->fixup;
 		} else	
 			die(str, regs, error_code);
 		return;
@@ -449,8 +450,6 @@ asmlinkage void do_int3(struct pt_regs * regs, long error_code)
 	do_trap(3, SIGTRAP, "int3", regs, error_code, NULL);
 }
 
-extern void dump_pagetable(unsigned long);
-
 asmlinkage void do_general_protection(struct pt_regs * regs, long error_code)
 {
 #ifdef CONFIG_CHECKING
@@ -479,13 +478,12 @@ asmlinkage void do_general_protection(struct pt_regs * regs, long error_code)
 
 	/* kernel gp */
 	{
-		unsigned long fixup;
-		fixup = search_exception_table(regs->rip);
+		const struct exception_table_entry *fixup;
+		fixup = search_exception_tables(regs->rip);
 		if (fixup) {
-			regs->rip = fixup;
+			regs->rip = fixup->fixup;
 			return;
 		}
-//		dump_pagetable(regs->rip); 
 		die("general protection fault", regs, error_code);
 	}
 }

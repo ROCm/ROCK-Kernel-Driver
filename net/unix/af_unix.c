@@ -1109,7 +1109,7 @@ out:
 static int unix_getname(struct socket *sock, struct sockaddr *uaddr, int *uaddr_len, int peer)
 {
 	struct sock *sk = sock->sk;
-	struct unix_sock *u = unix_sk(sk);
+	struct unix_sock *u;
 	struct sockaddr_un *sunaddr=(struct sockaddr_un *)uaddr;
 	int err = 0;
 
@@ -1124,6 +1124,7 @@ static int unix_getname(struct socket *sock, struct sockaddr *uaddr, int *uaddr_
 		sock_hold(sk);
 	}
 
+	u = unix_sk(sk);
 	unix_state_rlock(sk);
 	if (!u->addr) {
 		sunaddr->sun_family = AF_UNIX;

@@ -22,6 +22,7 @@
 #include <linux/tty.h>
 #include <linux/vt_kern.h>		/* For unblank_screen() */
 #include <linux/compiler.h>
+#include <linux/module.h>
 
 #include <asm/system.h>
 #include <asm/uaccess.h>
@@ -101,7 +102,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	struct mm_struct *mm;
 	struct vm_area_struct * vma;
 	unsigned long address;
-	unsigned long fixup;
+	const struct exception_table_entry *fixup;
 	int write;
 	siginfo_t info;
 
@@ -239,8 +240,9 @@ bad_area_nosemaphore:
 no_context:
 	
 	/* Are we prepared to handle this kernel fault?  */
-	if ((fixup = search_exception_table(regs->rip)) != 0) {
-		regs->rip = fixup;
+	fixup = search_exception_tables(regs->rip);
+	if (fixup) {
+		regs->rip = fixup->fixup;
 		if (0 && exception_trace) 
 		printk(KERN_ERR 
 		       "%s: fixed kernel exception at %lx address %lx err:%ld\n", 

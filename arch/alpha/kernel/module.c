@@ -87,13 +87,12 @@ process_reloc_for_got(Elf64_Rela *rela,
 }
 
 int
-module_frob_arch_sections(const Elf64_Ehdr *hdr, const Elf64_Shdr *sechdrs,
-			  const char *secstrings, struct module *me)
+module_frob_arch_sections(Elf64_Ehdr *hdr, Elf64_Shdr *sechdrs,
+			  char *secstrings, struct module *me)
 {
 	struct got_entry *chains;
 	Elf64_Rela *rela;
-	const Elf64_Shdr *esechdrs, *symtab, *s;
-	Elf64_Shdr *got;
+	Elf64_Shdr *esechdrs, *symtab, *s, *got;
 	unsigned long nsyms, nrela, i;
 
 	esechdrs = sechdrs + hdr->e_shnum;
@@ -106,7 +105,7 @@ module_frob_arch_sections(const Elf64_Ehdr *hdr, const Elf64_Shdr *sechdrs,
 		if (s->sh_type == SHT_SYMTAB)
 			symtab = s;
 		else if (!strcmp(".got", secstrings + s->sh_name)) {
-			got = (Elf64_Shdr *) s;
+			got = s;
 			me->arch.gotsecindex = s - sechdrs;
 		}
 
