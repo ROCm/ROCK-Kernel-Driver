@@ -720,6 +720,11 @@ extern void __set_special_pids(pid_t session, pid_t pgrp);
 
 /* per-UID process charging. */
 extern struct user_struct * alloc_uid(uid_t);
+static inline struct user_struct *get_uid(struct user_struct *u)
+{
+	atomic_inc(&u->__count);
+	return u;
+}
 extern void free_uid(struct user_struct *);
 extern void switch_uid(struct user_struct *);
 
