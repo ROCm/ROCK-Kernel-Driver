@@ -371,10 +371,10 @@ extern inline unsigned int blksize_bits(unsigned int size)
 extern inline unsigned int block_size(kdev_t dev)
 {
 	int retval = BLOCK_SIZE;
-	int major = MAJOR(dev);
+	int major = major(dev);
 
 	if (blksize_size[major]) {
-		int minor = MINOR(dev);
+		int minor = minor(dev);
 		if (blksize_size[major][minor])
 			retval = blksize_size[major][minor];
 	}

@@ -796,9 +796,7 @@ static void init_gendisk (ide_hwif_t *hwif)
 	gd->major	= hwif->major;		/* our major device number */
 	gd->major_name	= IDE_MAJOR_NAME;	/* treated special in genhd.c */
 	gd->minor_shift	= PARTN_BITS;		/* num bits for partitions */
-	gd->max_p	= 1<<PARTN_BITS;	/* 1 + max partitions / drive */
 	gd->nr_real	= units;		/* current num real drives */
-	gd->real_devices= hwif;			/* ptr to internal data */
 	gd->next	= NULL;			/* linked list of major devs */
 	gd->fops        = ide_fops;             /* file operations */
 	gd->de_arr	= kmalloc (sizeof *gd->de_arr * units, GFP_KERNEL);

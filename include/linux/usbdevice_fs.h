@@ -150,17 +150,6 @@ struct usbdevfs_hub_portinfo {
 #include <linux/list.h>
 #include <asm/semaphore.h>
 
-/*
- * inode number macros
- */
-#define ITYPE(x)   ((x)&(0xf<<28))
-#define ISPECIAL   (0<<28)
-#define IBUS       (1<<28)
-#define IDEVICE    (2<<28)
-#define IBUSNR(x)  (((x)>>8)&0xff)
-#define IDEVNR(x)  ((x)&0xff)
-
-#define IROOT      1
 
 struct dev_state {
 	struct list_head list;      /* state list */

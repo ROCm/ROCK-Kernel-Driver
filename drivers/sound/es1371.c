@@ -1213,7 +1213,7 @@ static int mixdev_ioctl(struct ac97_codec *codec, unsigned int cmd, unsigned lon
 
 static int es1371_open_mixdev(struct inode *inode, struct file *file)
 {
-	int minor = MINOR(inode->i_rdev);
+	int minor = minor(inode->i_rdev);
 	struct list_head *list;
 	struct es1371_state *s;
 
@@ -1913,7 +1913,7 @@ static int es1371_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 
 static int es1371_open(struct inode *inode, struct file *file)
 {
-	int minor = MINOR(inode->i_rdev);
+	int minor = minor(inode->i_rdev);
 	DECLARE_WAITQUEUE(wait, current);
 	unsigned long flags;
 	struct list_head *list;
@@ -2342,7 +2342,7 @@ static int es1371_ioctl_dac(struct inode *inode, struct file *file, unsigned int
 
 static int es1371_open_dac(struct inode *inode, struct file *file)
 {
-	int minor = MINOR(inode->i_rdev);
+	int minor = minor(inode->i_rdev);
 	DECLARE_WAITQUEUE(wait, current);
 	unsigned long flags;
 	struct list_head *list;
@@ -2584,7 +2584,7 @@ static unsigned int es1371_midi_poll(struct file *file, struct poll_table_struct
 
 static int es1371_midi_open(struct inode *inode, struct file *file)
 {
-	int minor = MINOR(inode->i_rdev);
+	int minor = minor(inode->i_rdev);
 	DECLARE_WAITQUEUE(wait, current);
 	unsigned long flags;
 	struct list_head *list;

@@ -29,7 +29,7 @@ static int setsize(unsigned long capacity, unsigned int *cyls, unsigned int *hds
 unsigned char *scsi_bios_ptable(kdev_t dev)
 {
 	unsigned char *res = kmalloc(66, GFP_KERNEL);
-	kdev_t rdev = MKDEV(MAJOR(dev), MINOR(dev) & ~0xf);
+	kdev_t rdev = mk_kdev(major(dev), minor(dev) & ~0x0f);
 
 	if (res) {
 		struct buffer_head *bh = bread(rdev, 0, block_size(rdev));

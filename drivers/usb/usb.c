@@ -97,6 +97,8 @@ int usb_register(struct usb_driver *new_driver)
 
 	usb_scan_devices();
 
+	usbfs_update_special();
+
 	return 0;
 }
 
@@ -192,6 +194,8 @@ void usb_deregister(struct usb_driver *driver)
 		usb_drivers_purge(driver, bus->root_hub);
 	}
 	up (&usb_bus_list_lock);
+
+	usbfs_update_special();
 }
 
 /**
@@ -421,7 +425,6 @@ struct usb_bus *usb_alloc_bus(struct usb_operations *op)
 	bus->bandwidth_isoc_reqs = 0;
 
 	INIT_LIST_HEAD(&bus->bus_list);
-	INIT_LIST_HEAD(&bus->inodes);
 
 	atomic_set(&bus->refcnt, 1);
 
@@ -468,7 +471,7 @@ void usb_register_bus(struct usb_bus *bus)
 	list_add(&bus->bus_list, &usb_bus_list);
 	up (&usb_bus_list_lock);
 
-	usbdevfs_add_bus(bus);
+	usbfs_add_bus(bus);
 
 	info("new USB bus registered, assigned bus number %d", bus->busnum);
 }
@@ -494,7 +497,7 @@ void usb_deregister_bus(struct usb_bus *bus)
 	list_del(&bus->bus_list);
 	up (&usb_bus_list_lock);
 
-	usbdevfs_remove_bus(bus);
+	usbfs_remove_bus(bus);
 
 	clear_bit(bus->busnum, busmap.busmap);
 
@@ -923,7 +926,7 @@ static void call_policy (char *verb, struct usb_device *dev)
 
 		/* a simple/common case: one config, one interface, one driver
 		 * with current altsetting being a reasonable setting.
-		 * everything needs a smart agent and usbdevfs; or can rely on
+		 * everything needs a smart agent and usbfs; or can rely on
 		 * device-specific binding policies.
 		 */
 		envp [i++] = scratch;
@@ -1013,10 +1016,11 @@ struct usb_device *usb_alloc_dev(struct usb_device *parent, struct usb_bus *bus)
 
 	usb_bus_get(bus);
 
+	if (!parent)
+		dev->devpath [0] = '/';
 	dev->bus = bus;
 	dev->parent = parent;
 	atomic_set(&dev->refcnt, 1);
-	INIT_LIST_HEAD(&dev->inodes);
 	INIT_LIST_HEAD(&dev->filelist);
 
 	init_MUTEX(&dev->serialize);
@@ -1906,7 +1910,7 @@ void usb_disconnect(struct usb_device **pdev)
 	/* Free the device number and remove the /proc/bus/usb entry */
 	if (dev->devnum > 0) {
 		clear_bit(dev->devnum, &dev->bus->devmap.devicemap);
-		usbdevfs_remove_device(dev);
+		usbfs_remove_device(dev);
 	}
 
 	/* Free up the device itself */
@@ -2579,7 +2583,7 @@ int usb_new_device(struct usb_device *dev)
 #endif
 
 	/* now that the basic setup is over, add a /proc/bus/usb entry */
-	usbdevfs_add_device(dev);
+	usbfs_add_device(dev);
 
 	/* find drivers willing to handle this device */
 	usb_find_drivers(dev);
@@ -2592,7 +2596,7 @@ int usb_new_device(struct usb_device *dev)
 
 static int usb_open(struct inode * inode, struct file * file)
 {
-	int minor = MINOR(inode->i_rdev);
+	int minor = minor(inode->i_rdev);
 	struct usb_driver *c = usb_minors[minor/16];
 	int err = -ENODEV;
 	struct file_operations *old_fops, *new_fops = NULL;
@@ -2660,7 +2664,7 @@ static int __init usb_init(void)
 {
 	init_MUTEX(&usb_bus_list_lock);
 	usb_major_init();
-	usbdevfs_init();
+	usbfs_init();
 	usb_hub_init();
 
 	return 0;
@@ -2672,7 +2676,7 @@ static int __init usb_init(void)
 static void __exit usb_exit(void)
 {
 	usb_major_cleanup();
-	usbdevfs_cleanup();
+	usbfs_cleanup();
 	usb_hub_cleanup();
 }
 

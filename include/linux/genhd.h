@@ -71,13 +71,11 @@ struct gendisk {
 	const char *major_name;		/* name of major driver */
 	int minor_shift;		/* number of times minor is shifted to
 					   get real minor */
-	int max_p;			/* maximum partitions per device */
 
 	struct hd_struct *part;		/* [indexed by minor] */
 	int *sizes;			/* [idem], device size in blocks */
 	int nr_real;			/* number of real devices */
 
-	void *real_devices;		/* internal use */
 	struct gendisk *next;
 	struct block_device_operations *fops;
 
@@ -247,7 +245,7 @@ extern void devfs_register_partitions (struct gendisk *dev, int minor,
 static inline unsigned int disk_index (kdev_t dev)
 {
 	struct gendisk *g = get_gendisk(dev);
-	return g ? (MINOR(dev) >> g->minor_shift) : 0;
+	return g ? (minor(dev) >> g->minor_shift) : 0;
 }
 
 #endif

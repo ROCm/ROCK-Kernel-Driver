@@ -159,8 +159,9 @@ nfs_writepage_sync(struct file *file, struct inode *inode, struct page *page,
 	if (!cred)
 		cred = get_rpccred(NFS_I(inode)->mm_cred);
 
-	dprintk("NFS:      nfs_writepage_sync(%x/%Ld %d@%Ld)\n",
-		inode->i_dev, (long long)NFS_FILEID(inode),
+	dprintk("NFS:      nfs_writepage_sync(%x:%x/%Ld %d@%Ld)\n",
+		major(inode->i_dev), minor(inode->i_dev),
+		(long long)NFS_FILEID(inode),
 		count, (long long)(page_offset(page) + offset));
 
 	buffer = kmap(page) + offset;
@@ -934,9 +935,9 @@ nfs_flush_one(struct list_head *head, struct inode *inode, int how)
 	msg.rpc_resp = &data->res;
 	msg.rpc_cred = data->cred;
 
-	dprintk("NFS: %4d initiated write call (req %x/%Ld count %d nriov %d)\n",
+	dprintk("NFS: %4d initiated write call (req %x:%x/%Ld count %d nriov %d)\n",
 		task->tk_pid, 
-		inode->i_dev,
+		major(inode->i_dev), minor(inode->i_dev),
 		(long long)NFS_FILEID(inode),
 		data->args.count, data->args.nriov);
 
@@ -1049,8 +1050,9 @@ nfs_writeback_done(struct rpc_task *task)
 
 		kunmap(page);
 
-		dprintk("NFS: write (%x/%Ld %d@%Ld)",
-			req->wb_inode->i_dev,
+		dprintk("NFS: write (%x:%x/%Ld %d@%Ld)",
+			major(req->wb_inode->i_dev),
+			minor(req->wb_inode->i_dev),
 			(long long)NFS_FILEID(req->wb_inode),
 			req->wb_bytes,
 			(long long)(page_offset(page) + req->wb_offset));

@@ -196,7 +196,7 @@ static urb_t *URB_List[NBR_OF_EP_DESC];
 static kmem_cache_t *usb_desc_cache;
 static struct usb_bus *etrax_usb_bus;
 
-static void dump_urb (purb_t purb);
+static void dump_urb (struct urb *urb);
 static void init_rx_buffers(void);
 static int etrax_rh_unlink_urb (urb_t *urb);
 static void etrax_rh_send_irq(urb_t *urb);
@@ -240,24 +240,24 @@ static struct usb_operations etrax_usb_device_operations =
 };
 
 #ifdef USB_DEBUG_DESC
-static void dump_urb(purb_t purb)
+static void dump_urb(struct urb *urb)
 {
-	printk("\nurb                   :0x%08X\n", purb);
-	printk("next                  :0x%08X\n", purb->next);
-	printk("dev                   :0x%08X\n", purb->dev);
-	printk("pipe                  :0x%08X\n", purb->pipe);
-	printk("status                :%d\n", purb->status);
-	printk("transfer_flags        :0x%08X\n", purb->transfer_flags);
-	printk("transfer_buffer       :0x%08X\n", purb->transfer_buffer);
-	printk("transfer_buffer_length:%d\n", purb->transfer_buffer_length);
-	printk("actual_length         :%d\n", purb->actual_length);
-	printk("setup_packet          :0x%08X\n", purb->setup_packet);
-	printk("start_frame           :%d\n", purb->start_frame);
-	printk("number_of_packets     :%d\n", purb->number_of_packets);
-	printk("interval              :%d\n", purb->interval);
-	printk("error_count           :%d\n", purb->error_count);
-	printk("context               :0x%08X\n", purb->context);
-	printk("complete              :0x%08X\n\n", purb->complete);
+	printk("\nurb                   :0x%08X\n", urb);
+	printk("next                  :0x%08X\n", urb->next);
+	printk("dev                   :0x%08X\n", urb->dev);
+	printk("pipe                  :0x%08X\n", urb->pipe);
+	printk("status                :%d\n", urb->status);
+	printk("transfer_flags        :0x%08X\n", urb->transfer_flags);
+	printk("transfer_buffer       :0x%08X\n", urb->transfer_buffer);
+	printk("transfer_buffer_length:%d\n", urb->transfer_buffer_length);
+	printk("actual_length         :%d\n", urb->actual_length);
+	printk("setup_packet          :0x%08X\n", urb->setup_packet);
+	printk("start_frame           :%d\n", urb->start_frame);
+	printk("number_of_packets     :%d\n", urb->number_of_packets);
+	printk("interval              :%d\n", urb->interval);
+	printk("error_count           :%d\n", urb->error_count);
+	printk("context               :0x%08X\n", urb->context);
+	printk("complete              :0x%08X\n\n", urb->complete);
 }
 
 static void dump_in_desc(USB_IN_Desc_t *in)

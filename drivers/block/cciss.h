@@ -8,7 +8,7 @@
 
 #define NWD		16
 #define NWD_SHIFT	4
-#define MAX_PART	16
+#define MAX_PART	(1 << NWD_SHIFT)
 
 #define IO_OK		0
 #define IO_ERROR	1

@@ -118,11 +118,9 @@ static struct gendisk md_gendisk=
 	major: MD_MAJOR,
 	major_name: "md",
 	minor_shift: 0,
-	max_p: 1,
 	part: md_hd_struct,
 	sizes: md_size,
 	nr_real: MAX_MD_DEVS,
-	real_devices: NULL,
 	next: NULL,
 	fops: &md_fops,
 };

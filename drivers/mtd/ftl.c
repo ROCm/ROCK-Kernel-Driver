@@ -72,33 +72,12 @@
 #include <linux/hdreg.h>
 #include <stdarg.h>
 
-#if (LINUX_VERSION_CODE >= 0x20100)
 #include <linux/vmalloc.h>
-#endif
-#if (LINUX_VERSION_CODE >= 0x20303)
 #include <linux/blkpg.h>
-#endif
 
 #include <linux/mtd/ftl.h>
-/*====================================================================*/
-/* Stuff which really ought to be in compatmac.h */
 
-#if (LINUX_VERSION_CODE < 0x20328)
-#define register_disk(dev, drive, minors, ops, size) \
-    do { (dev)->part[(drive)*(minors)].nr_sects = size; \
-        if (size == 0) (dev)->part[(drive)*(minors)].start_sect = -1; \
-        resetup_one_dev(dev, drive); } while (0);
-#endif
-
-#if (LINUX_VERSION_CODE < 0x20320)
-#define BLK_DEFAULT_QUEUE(n)    blk_dev[n].request_fn
-#define blk_init_queue(q, req)  q = (req)
-#define blk_cleanup_queue(q)    q = NULL
-#define request_arg_t           void
-#else
 #define request_arg_t           request_queue_t *q
-#endif
-
 
 /*====================================================================*/
 
@@ -206,10 +185,6 @@ static struct gendisk ftl_gendisk = {
     major:		FTL_MAJOR,
     major_name:		"ftl",
     minor_shift:	PART_BITS,
-    max_p:		MAX_PART,
-#if (LINUX_VERSION_CODE < 0x20328)
-    max_nr:		MAX_DEV*MAX_PART,
-#endif
     part:		ftl_hd,
     sizes:		ftl_sizes,
 };
@@ -224,23 +199,12 @@ static int ftl_reread_partitions(int minor);
 
 static void ftl_erase_callback(struct erase_info *done);
 
-#if LINUX_VERSION_CODE < 0x20326
-static struct file_operations ftl_blk_fops = {
-    open:	ftl_open,
-    release:	ftl_close,
-    ioctl:	ftl_ioctl,
-    read:	block_read,
-    write:	block_write,
-    fsync:	block_fsync
-};
-#else
 static struct block_device_operations ftl_blk_fops = {
     owner:	THIS_MODULE,
     open:	ftl_open,
     release:	ftl_close,
     ioctl:	ftl_ioctl,
 };
-#endif
 
 /*======================================================================
 
@@ -1177,22 +1141,11 @@ static int ftl_ioctl(struct inode *inode, struct file *file,
     case BLKRRPART:
 	ret = ftl_reread_partitions(minor);
 	break;
-#if (LINUX_VERSION_CODE < 0x20303)
-    case BLKFLSBUF:
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,2,0)
-	if (!capable(CAP_SYS_ADMIN)) return -EACCES;
-#endif
-	fsync_dev(inode->i_rdev);
-	invalidate_buffers(inode->i_rdev);
-	break;
-    RO_IOCTLS(inode->i_rdev, arg);
-#else
     case BLKROSET:
     case BLKROGET:
     case BLKFLSBUF:
 	ret = blk_ioctl(inode->i_rdev, cmd, arg);
 	break;
-#endif
     default:
 	ret = -EINVAL;
     }

@@ -88,7 +88,6 @@ do { \
 	major:D_MAJOR, \
 	major_name:D_NAME, \
 	minor_shift:D_PARTN_BITS, \
-	max_p:1 << D_PARTN_BITS, \
 	max_nr:D_PER_MAJOR, \
 	nr_real:D_PER_MAJOR,
 static inline struct request * 
@@ -111,7 +110,6 @@ do { \
 	major:D_MAJOR, \
 	major_name:D_NAME, \
 	minor_shift:D_PARTN_BITS, \
-	max_p:1 << D_PARTN_BITS, \
 	nr_real:D_PER_MAJOR, \
         fops:&dasd_device_operations, 
 static inline struct request * 

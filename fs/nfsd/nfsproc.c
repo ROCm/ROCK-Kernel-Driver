@@ -197,7 +197,7 @@ nfsd_proc_create(struct svc_rqst *rqstp, struct nfsd_createargs *argp,
 	struct inode	*inode;
 	struct dentry	*dchild;
 	int		nfserr, type, mode;
-	dev_t		rdev = NODEV;
+	dev_t		rdev = 0;
 
 	dprintk("nfsd: CREATE   %s %.*s\n",
 		SVCFH_fmt(dirfhp), argp->len, argp->name);
@@ -255,7 +255,7 @@ nfsd_proc_create(struct svc_rqst *rqstp, struct nfsd_createargs *argp,
 				case S_IFCHR:
 				case S_IFBLK:
 					/* reserve rdev for later checking */
-					attr->ia_size = inode->i_rdev;
+					attr->ia_size = kdev_t_to_nr(inode->i_rdev);
 					attr->ia_valid |= ATTR_SIZE;
 
 					/* FALLTHROUGH */
@@ -313,7 +313,7 @@ nfsd_proc_create(struct svc_rqst *rqstp, struct nfsd_createargs *argp,
 		/* Make sure the type and device matches */
 		nfserr = nfserr_exist;
 		if (inode && (type != (inode->i_mode & S_IFMT) || 
-		    (is_borc && inode->i_rdev != rdev)))
+		    (is_borc && kdev_t_to_nr(inode->i_rdev) != rdev)))
 			goto out_unlock;
 	}
 	

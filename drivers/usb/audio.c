@@ -833,7 +833,7 @@ static void usbin_convert(struct usbin *u, unsigned char *buffer, unsigned int s
 	}
 }		
 
-static int usbin_prepare_desc(struct usbin *u, purb_t urb)
+static int usbin_prepare_desc(struct usbin *u, struct urb *urb)
 {
 	unsigned int i, maxsize, offs;
 
@@ -850,7 +850,7 @@ static int usbin_prepare_desc(struct usbin *u, purb_t urb)
  * return value: 0 if descriptor should be restarted, -1 otherwise
  * convert sample format on the fly if necessary
  */
-static int usbin_retire_desc(struct usbin *u, purb_t urb)
+static int usbin_retire_desc(struct usbin *u, struct urb *urb)
 {
 	unsigned int i, ufmtsh, dfmtsh, err = 0, cnt, scnt, dmafree;
 	unsigned char *cp;
@@ -930,7 +930,7 @@ static void usbin_completed(struct urb *urb)
 /*
  * we output sync data
  */
-static int usbin_sync_prepare_desc(struct usbin *u, purb_t urb)
+static int usbin_sync_prepare_desc(struct usbin *u, struct urb *urb)
 {
 	unsigned char *cp = urb->transfer_buffer;
 	unsigned int i, offs;
@@ -948,7 +948,7 @@ static int usbin_sync_prepare_desc(struct usbin *u, purb_t urb)
 /*
  * return value: 0 if descriptor should be restarted, -1 otherwise
  */
-static int usbin_sync_retire_desc(struct usbin *u, purb_t urb)
+static int usbin_sync_retire_desc(struct usbin *u, struct urb *urb)
 {
 	unsigned int i;
 	
@@ -996,7 +996,7 @@ static int usbin_start(struct usb_audiodev *as)
 {
 	struct usb_device *dev = as->state->usbdev;
 	struct usbin *u = &as->usbin;
-	purb_t urb;
+	struct urb *urb;
 	unsigned long flags;
 	unsigned int maxsze, bufsz;
 
@@ -1186,7 +1186,7 @@ static void usbout_convert(struct usbout *u, unsigned char *buffer, unsigned int
 	}
 }		
 
-static int usbout_prepare_desc(struct usbout *u, purb_t urb)
+static int usbout_prepare_desc(struct usbout *u, struct urb *urb)
 {
 	unsigned int i, ufmtsh, dfmtsh, err = 0, cnt, scnt, offs;
 	unsigned char *cp = urb->transfer_buffer;
@@ -1238,7 +1238,7 @@ static int usbout_prepare_desc(struct usbout *u, purb_t urb)
 /*
  * return value: 0 if descriptor should be restarted, -1 otherwise
  */
-static int usbout_retire_desc(struct usbout *u, purb_t urb)
+static int usbout_retire_desc(struct usbout *u, struct urb *urb)
 {
 	unsigned int i;
 
@@ -1285,7 +1285,7 @@ static void usbout_completed(struct urb *urb)
 	spin_unlock_irqrestore(&as->lock, flags);
 }
 
-static int usbout_sync_prepare_desc(struct usbout *u, purb_t urb)
+static int usbout_sync_prepare_desc(struct usbout *u, struct urb *urb)
 {
 	unsigned int i, offs;
 
@@ -1299,7 +1299,7 @@ static int usbout_sync_prepare_desc(struct usbout *u, purb_t urb)
 /*
  * return value: 0 if descriptor should be restarted, -1 otherwise
  */
-static int usbout_sync_retire_desc(struct usbout *u, purb_t urb)
+static int usbout_sync_retire_desc(struct usbout *u, struct urb *urb)
 {
 	unsigned char *cp = urb->transfer_buffer;
 	unsigned int f, i;
@@ -1361,7 +1361,7 @@ static int usbout_start(struct usb_audiodev *as)
 {
 	struct usb_device *dev = as->state->usbdev;
 	struct usbout *u = &as->usbout;
-	purb_t urb;
+	struct urb *urb;
 	unsigned long flags;
 	unsigned int maxsze, bufsz;
 

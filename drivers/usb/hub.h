@@ -1,6 +1,13 @@
 #ifndef __LINUX_HUB_H
 #define __LINUX_HUB_H
 
+/*
+ * Hub protocol and driver data structures.
+ *
+ * Some of these are known to the "virtual root hub" code
+ * in host controller drivers.
+ */
+
 #include <linux/list.h>
 
 /*
@@ -9,6 +16,15 @@
 
 #define USB_RT_HUB	(USB_TYPE_CLASS | USB_RECIP_DEVICE)
 #define USB_RT_PORT	(USB_TYPE_CLASS | USB_RECIP_OTHER)
+
+/*
+ * Hub class requests
+ * See USB 2.0 spec Table 11-16
+ */
+#define HUB_CLEAR_TT_BUFFER	8
+#define HUB_RESET_TT		9
+#define HUB_GET_TT_STATE	10
+#define HUB_STOP_TT		11
 
 /*
  * Hub Class feature numbers
@@ -55,7 +71,7 @@ struct usb_port_status {
 #define USB_PORT_STAT_SUSPEND		0x0004
 #define USB_PORT_STAT_OVERCURRENT	0x0008
 #define USB_PORT_STAT_RESET		0x0010
-/* bits 5 for 7 are reserved */
+/* bits 5 to 7 are reserved */
 #define USB_PORT_STAT_POWER		0x0100
 #define USB_PORT_STAT_LOW_SPEED		0x0200
 #define USB_PORT_STAT_HIGH_SPEED        0x0400
@@ -120,22 +136,21 @@ struct usb_hub_descriptor {
 struct usb_device;
 
 struct usb_hub {
-	struct usb_device *dev;
+	struct usb_device	*dev;		/* the "real" device */
+	struct urb		*urb;		/* for interrupt polling pipe */
 
-	struct urb *urb;		/* Interrupt polling pipe */
+	/* buffer for urb ... 1 bit each for hub and children, rounded up */
+	char			buffer[(USB_MAXCHILDREN + 1 + 7) / 8];
 
-	char buffer[(USB_MAXCHILDREN + 1 + 7) / 8]; /* add 1 bit for hub status change */
-					/* and add 7 bits to round up to byte boundary */
-	int error;
-	int nerrors;
+	int			error;		/* last reported error */
+	int			nerrors;	/* track consecutive errors */
 
-	struct list_head hub_list;
+	struct list_head	hub_list;	/* all hubs */
+	struct list_head	event_list;	/* hubs w/data or errs ready */
 
-	struct list_head event_list;
-
-	struct usb_hub_descriptor *descriptor;
-
-	struct semaphore khubd_sem;
+	struct usb_hub_descriptor *descriptor;	/* class descriptor */
+	struct semaphore	khubd_sem;
+	struct usb_tt		tt;		/* Transaction Translator */
 };
 
 #endif /* __LINUX_HUB_H */

@@ -269,7 +269,6 @@ static __init int ataraid_init(void)
 	ataraid_gendisk.major       = ATAMAJOR;
 	ataraid_gendisk.major_name  = "ataraid";
 	ataraid_gendisk.minor_shift = 4;
-	ataraid_gendisk.max_p	    = 15;
 	ataraid_gendisk.sizes	    = &ataraid_gendisk_sizes[0];
 	ataraid_gendisk.nr_real	    = 16;
 	ataraid_gendisk.fops        = &ataraid_fops;

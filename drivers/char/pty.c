@@ -88,14 +88,14 @@ static void pty_close(struct tty_struct * tty, struct file * filp)
 		set_bit(TTY_OTHER_CLOSED, &tty->flags);
 #ifdef CONFIG_UNIX98_PTYS
 		{
-			unsigned int major = MAJOR(tty->device) - UNIX98_PTY_MASTER_MAJOR;
+			unsigned int major = major(tty->device) - UNIX98_PTY_MASTER_MAJOR;
 			if ( major < UNIX98_NR_MAJORS ) {
-				devpts_pty_kill( MINOR(tty->device)
+				devpts_pty_kill( minor(tty->device)
 			  - tty->driver.minor_start + tty->driver.name_base );
 			}
 		}
 #endif
-		tty_unregister_devfs (&tty->link->driver, MINOR (tty->device));
+		tty_unregister_devfs (&tty->link->driver, minor(tty->device));
 		tty_vhangup(tty->link);
 	}
 }
@@ -239,7 +239,7 @@ static int pty_chars_in_buffer(struct tty_struct *tty)
 #ifdef CONFIG_UNIX98_PTYS
 static int pty_get_device_number(struct tty_struct *tty, unsigned int *value)
 {
-	unsigned int result = MINOR(tty->device)
+	unsigned int result = minor(tty->device)
 		- tty->driver.minor_start + tty->driver.name_base;
 	return put_user(result, value);
 }
@@ -314,7 +314,7 @@ static int pty_open(struct tty_struct *tty, struct file * filp)
 	retval = -ENODEV;
 	if (!tty || !tty->link)
 		goto out;
-	line = MINOR(tty->device) - tty->driver.minor_start;
+	line = minor(tty->device) - tty->driver.minor_start;
 	if ((line < 0) || (line >= NR_PTYS))
 		goto out;
 	pty = (struct pty_struct *)(tty->driver.driver_state) + line;
@@ -336,7 +336,7 @@ static int pty_open(struct tty_struct *tty, struct file * filp)
 		tty_register_devfs(&tty->link->driver,
 				   DEVFS_FL_CURRENT_OWNER | DEVFS_FL_WAIT,
 				   tty->link->driver.minor_start +
-				   MINOR(tty->device)-tty->driver.minor_start);
+				   minor(tty->device)-tty->driver.minor_start);
 	retval = 0;
 out:
 	return retval;

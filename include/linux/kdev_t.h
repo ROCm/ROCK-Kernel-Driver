@@ -57,48 +57,84 @@ when some module is inserted).
 aeb - 950811
 */
 
-/* Since MINOR(dev) is used as index in static arrays,
-   the kernel is not quite ready yet for larger minors.
-   However, everything runs fine with an arbitrary kdev_t type. */
 
-#define MINORBITS	8
-#define MINORMASK	((1U << MINORBITS) - 1)
+/*
+ * NOTE NOTE NOTE!
+ *
+ * The kernel-internal "kdev_t" will eventually have
+ * 20 bits for minor numbers, and 12 bits for majors.
+ *
+ * HOWEVER, the external representation is still 8+8
+ * bits, and there is no way to generate the extended
+ * "kdev_t" format yet. Which is just as well, since
+ * we still use "minor" as an index into various
+ * static arrays, and they are sized for a 8-bit index.
+ */
+typedef struct {
+	unsigned short value;
+} kdev_t;
 
-typedef unsigned short kdev_t;
+#define KDEV_MINOR_BITS		8
+#define KDEV_MAJOR_BITS		8
 
-#define MAJOR(dev)	((unsigned int) ((dev) >> MINORBITS))
-#define MINOR(dev)	((unsigned int) ((dev) & MINORMASK))
-#define HASHDEV(dev)	((unsigned int) (dev))
-#define NODEV		0
-#define MKDEV(ma,mi)	(((ma) << MINORBITS) | (mi))
-#define B_FREE		0xffff		/* yuk */
+#define __mkdev(major,minor)	(((major) << KDEV_MINOR_BITS) + (minor))
+
+#define mk_kdev(major, minor)	((kdev_t) { __mkdev(major,minor) } )
+
+/*
+ * The "values" are just _cookies_, usable for 
+ * internal equality comparisons and for things
+ * like NFS filehandle conversion.
+ */
+static inline unsigned int kdev_val(kdev_t dev)
+{
+	return dev.value;
+}
+
+static inline kdev_t val_to_kdev(unsigned int val)
+{
+	kdev_t dev;
+	dev.value = val;
+	return dev;
+}
+
+#define HASHDEV(dev)	(kdev_val(dev))
+#define NODEV		(mk_kdev(0,0))
+#define B_FREE		(mk_kdev(0xff,0xff))
 
 extern const char * kdevname(kdev_t);	/* note: returns pointer to static data! */
 
-/*
-As long as device numbers in the outside world have 16 bits only,
-we use these conversions.
-*/
+static inline int kdev_same(kdev_t dev1, kdev_t dev2)
+{
+	return dev1.value == dev2.value;
+}
 
-static inline unsigned int kdev_t_to_nr(kdev_t dev) {
-	return (MAJOR(dev)<<8) | MINOR(dev);
+#define kdev_none(d1)	(!kdev_val(d1))
+
+/* Mask off the high bits for now.. */
+#define minor(dev)	((dev).value & 0xff)
+#define major(dev)	(((dev).value >> KDEV_MINOR_BITS) & 0xff)
+
+/* These are for user-level "dev_t" */
+#define MINORBITS	8
+#define MINORMASK	((1U << MINORBITS) - 1)
+
+#define MAJOR(dev)	((unsigned int) ((dev) >> MINORBITS))
+#define MINOR(dev)	((unsigned int) ((dev) & MINORMASK))
+#define MKDEV(ma,mi)	(((ma) << MINORBITS) | (mi))
+
+/*
+ * Conversion functions
+ */
+
+static inline int kdev_t_to_nr(kdev_t dev)
+{
+	return MKDEV(major(dev), minor(dev));
 }
 
 static inline kdev_t to_kdev_t(int dev)
 {
-	int major, minor;
-#if 0
-	major = (dev >> 16);
-	if (!major) {
-		major = (dev >> 8);
-		minor = (dev & 0xff);
-	} else
-		minor = (dev & 0xffff);
-#else
-	major = (dev >> 8);
-	minor = (dev & 0xff);
-#endif
-	return MKDEV(major, minor);
+	return mk_kdev(MAJOR(dev),MINOR(dev));
 }
 
 #else /* __KERNEL__ || _LVM_H_INCLUDE */

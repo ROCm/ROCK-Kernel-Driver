@@ -1132,9 +1132,9 @@ static void profile_readahead(int async, struct file *filp)
 
 static inline int get_max_readahead(struct inode * inode)
 {
-	if (!inode->i_dev || !max_readahead[MAJOR(inode->i_dev)])
+	if (kdev_none(inode->i_dev) || !max_readahead[major(inode->i_dev)])
 		return MAX_READAHEAD;
-	return max_readahead[MAJOR(inode->i_dev)][MINOR(inode->i_dev)];
+	return max_readahead[major(inode->i_dev)][minor(inode->i_dev)];
 }
 
 static void generic_file_readahead(int reada_ok,

@@ -38,7 +38,7 @@ static int rw_swap_page_base(int rw, swp_entry_t entry, struct page *page)
 	unsigned long offset;
 	sector_t zones[PAGE_SIZE/512];
 	int zones_used;
-	kdev_t dev = 0;
+	kdev_t dev = NODEV;
 	int block_size;
 	struct inode *swapf = 0;
 
@@ -49,7 +49,7 @@ static int rw_swap_page_base(int rw, swp_entry_t entry, struct page *page)
 		kstat.pswpout++;
 
 	get_swaphandle_info(entry, &offset, &dev, &swapf);
-	if (dev) {
+	if (!kdev_none(dev)) {
 		zones[0] = offset;
 		zones_used = 1;
 		block_size = PAGE_SIZE;

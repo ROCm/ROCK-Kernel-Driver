@@ -181,23 +181,23 @@ void usb_show_string(struct usb_device *dev, char *id, int index)
 	kfree(buf);
 }
 
-void usb_dump_urb (purb_t purb)
+void usb_dump_urb (struct urb *urb)
 {
-	printk ("urb                   :%p\n", purb);
-	printk ("next                  :%p\n", purb->next);
-	printk ("dev                   :%p\n", purb->dev);
-	printk ("pipe                  :%08X\n", purb->pipe);
-	printk ("status                :%d\n", purb->status);
-	printk ("transfer_flags        :%08X\n", purb->transfer_flags);
-	printk ("transfer_buffer       :%p\n", purb->transfer_buffer);
-	printk ("transfer_buffer_length:%d\n", purb->transfer_buffer_length);
-	printk ("actual_length         :%d\n", purb->actual_length);
-	printk ("setup_packet          :%p\n", purb->setup_packet);
-	printk ("start_frame           :%d\n", purb->start_frame);
-	printk ("number_of_packets     :%d\n", purb->number_of_packets);
-	printk ("interval              :%d\n", purb->interval);
-	printk ("error_count           :%d\n", purb->error_count);
-	printk ("context               :%p\n", purb->context);
-	printk ("complete              :%p\n", purb->complete);
+	printk ("urb                   :%p\n", urb);
+	printk ("next                  :%p\n", urb->next);
+	printk ("dev                   :%p\n", urb->dev);
+	printk ("pipe                  :%08X\n", urb->pipe);
+	printk ("status                :%d\n", urb->status);
+	printk ("transfer_flags        :%08X\n", urb->transfer_flags);
+	printk ("transfer_buffer       :%p\n", urb->transfer_buffer);
+	printk ("transfer_buffer_length:%d\n", urb->transfer_buffer_length);
+	printk ("actual_length         :%d\n", urb->actual_length);
+	printk ("setup_packet          :%p\n", urb->setup_packet);
+	printk ("start_frame           :%d\n", urb->start_frame);
+	printk ("number_of_packets     :%d\n", urb->number_of_packets);
+	printk ("interval              :%d\n", urb->interval);
+	printk ("error_count           :%d\n", urb->error_count);
+	printk ("context               :%p\n", urb->context);
+	printk ("complete              :%p\n", urb->complete);
 }
 

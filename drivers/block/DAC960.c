@@ -1973,9 +1973,7 @@ static boolean DAC960_RegisterBlockDevice(DAC960_Controller_T *Controller)
   Controller->GenericDiskInfo.major = MajorNumber;
   Controller->GenericDiskInfo.major_name = "rd";
   Controller->GenericDiskInfo.minor_shift = DAC960_MaxPartitionsBits;
-  Controller->GenericDiskInfo.max_p = DAC960_MaxPartitions;
   Controller->GenericDiskInfo.nr_real = DAC960_MaxLogicalDrives;
-  Controller->GenericDiskInfo.real_devices = Controller;
   Controller->GenericDiskInfo.next = NULL;
   Controller->GenericDiskInfo.fops = &DAC960_BlockDeviceOperations;
   /*
@@ -2024,10 +2022,9 @@ static void DAC960_UnregisterBlockDevice(DAC960_Controller_T *Controller)
   Information Partition Sector Counts and Block Sizes.
 */
 
-static void DAC960_ComputeGenericDiskInfo(GenericDiskInfo_T *GenericDiskInfo)
+static void DAC960_ComputeGenericDiskInfo(DAC960_Controller_T *Controller)
 {
-  DAC960_Controller_T *Controller =
-    (DAC960_Controller_T *) GenericDiskInfo->real_devices;
+  GenericDiskInfo_T *GenericDiskInfo = &Controller->GenericDiskInfo;
   int LogicalDriveNumber, i;
   for (LogicalDriveNumber = 0;
        LogicalDriveNumber < DAC960_MaxLogicalDrives;
@@ -2658,7 +2655,7 @@ static int DAC960_Initialize(void)
       int LogicalDriveNumber;
       if (Controller == NULL) continue;
       DAC960_InitializeController(Controller);
-      DAC960_ComputeGenericDiskInfo(&Controller->GenericDiskInfo);
+      DAC960_ComputeGenericDiskInfo(Controller);
       for (LogicalDriveNumber = 0;
 	   LogicalDriveNumber < DAC960_MaxLogicalDrives;
 	   LogicalDriveNumber++)
@@ -3161,7 +3158,7 @@ static void DAC960_V1_ProcessCompletedCommand(DAC960_Command_T *Command)
 				Controller->ControllerNumber,
 				LogicalDriveNumber);
 	      Controller->LogicalDriveCount = NewEnquiry->NumberOfLogicalDrives;
-	      DAC960_ComputeGenericDiskInfo(&Controller->GenericDiskInfo);
+	      DAC960_ComputeGenericDiskInfo(Controller);
 	    }
 	  if (NewEnquiry->NumberOfLogicalDrives < Controller->LogicalDriveCount)
 	    {
@@ -3173,7 +3170,7 @@ static void DAC960_V1_ProcessCompletedCommand(DAC960_Command_T *Command)
 				Controller->ControllerNumber,
 				LogicalDriveNumber);
 	      Controller->LogicalDriveCount = NewEnquiry->NumberOfLogicalDrives;
-	      DAC960_ComputeGenericDiskInfo(&Controller->GenericDiskInfo);
+	      DAC960_ComputeGenericDiskInfo(Controller);
 	    }
 	  if (NewEnquiry->StatusFlags.DeferredWriteError !=
 	      OldEnquiry->StatusFlags.DeferredWriteError)
@@ -4513,7 +4510,7 @@ static void DAC960_V2_ProcessCompletedCommand(DAC960_Command_T *Command)
 		{
 		  memset(LogicalDeviceInfo, 0,
 			 sizeof(DAC960_V2_LogicalDeviceInfo_T));
-		  DAC960_ComputeGenericDiskInfo(&Controller->GenericDiskInfo);
+		  DAC960_ComputeGenericDiskInfo(Controller);
 		}
 	    }
 	  if (LogicalDeviceInfo != NULL)
@@ -4630,7 +4627,7 @@ static void DAC960_V2_ProcessCompletedCommand(DAC960_Command_T *Command)
 	      kfree(LogicalDeviceInfo);
 	      Controller->LogicalDriveInitiallyAccessible
 			  [LogicalDriveNumber] = false;
-	      DAC960_ComputeGenericDiskInfo(&Controller->GenericDiskInfo);
+	      DAC960_ComputeGenericDiskInfo(Controller);
 	    }
 	  Controller->V2.NeedLogicalDeviceInformation = false;
 	}
@@ -5299,7 +5296,7 @@ static int DAC960_Open(Inode_T *Inode, File_T *File)
   if (!Controller->LogicalDriveInitiallyAccessible[LogicalDriveNumber])
     {
       Controller->LogicalDriveInitiallyAccessible[LogicalDriveNumber] = true;
-      DAC960_ComputeGenericDiskInfo(&Controller->GenericDiskInfo);
+      DAC960_ComputeGenericDiskInfo(Controller);
       DAC960_RegisterDisk(Controller, LogicalDriveNumber);
     }
   if (Controller->GenericDiskInfo.sizes[MINOR(Inode->i_rdev)] == 0)

@@ -160,10 +160,8 @@ static struct gendisk ps2esdi_gendisk =
 	major:		MAJOR_NR,
 	major_name:	"ed",
 	minor_shift:	6,
-	max_p:		1 << 6,
 	part:		ps2esdi,
 	sizes:		ps2esdi_sizes,
-	real_devices:	(void *)ps2esdi_info,
 	fops:		&ps2esdi_fops,
 };
 

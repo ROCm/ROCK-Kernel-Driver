@@ -50,7 +50,7 @@ static int		exp_verify_string(char *cp, int max);
 #define CLIENT_HASH(a) \
 		((((a)>>24) ^ ((a)>>16) ^ ((a)>>8) ^(a)) & CLIENT_HASHMASK)
 /* XXX: is this adequate for 32bit kdev_t ? */
-#define EXPORT_HASH(dev)	((dev) & (NFSCLNT_EXPMAX - 1))
+#define EXPORT_HASH(dev)	(minor(dev) & (NFSCLNT_EXPMAX - 1))
 
 struct svc_clnthash {
 	struct svc_clnthash *	h_next;
@@ -76,7 +76,7 @@ exp_find(svc_client *clp, kdev_t dev)
 	svc_export *	exp;
 
 	exp = clp->cl_export[EXPORT_HASH(dev)];
-	while (exp && exp->ex_dev != dev)
+	while (exp && !kdev_same(exp->ex_dev, dev))
 		exp = exp->ex_next;
 	return exp;
 }
@@ -95,7 +95,7 @@ exp_get(svc_client *clp, kdev_t dev, ino_t ino)
 	exp = clp->cl_export[EXPORT_HASH(dev)];
 	if (exp)
 		do {
-			if (exp->ex_ino == ino && exp->ex_dev == dev)
+			if (exp->ex_ino == ino && kdev_same(exp->ex_dev, dev))
 				goto out;
 		} while (NULL != (exp = exp->ex_next));
 	exp = NULL;
@@ -198,9 +198,10 @@ exp_export(struct nfsctl_export *nxp)
 
 	inode = nd.dentry->d_inode;
 	err = -EINVAL;
-	if (inode->i_dev != dev || inode->i_ino != nxp->ex_ino) {
-		printk(KERN_DEBUG "exp_export: i_dev = %x, dev = %x\n",
-			inode->i_dev, dev); 
+	if (!kdev_same(inode->i_dev, dev) || inode->i_ino != nxp->ex_ino) {
+		printk(KERN_DEBUG "exp_export: i_dev = %02x:%02x, dev = %02x:%02x\n",
+			major(inode->i_dev), minor(inode->i_dev),
+			major(dev), minor(dev)); 
 		/* I'm just being paranoid... */
 		goto finish;
 	}
@@ -302,7 +303,7 @@ exp_do_unexport(svc_export *unexp)
 	dentry = unexp->ex_dentry;
 	mnt = unexp->ex_mnt;
 	inode = dentry->d_inode;
-	if (unexp->ex_dev != inode->i_dev || unexp->ex_ino != inode->i_ino)
+	if (!kdev_same(unexp->ex_dev, inode->i_dev) || unexp->ex_ino != inode->i_ino)
 		printk(KERN_WARNING "nfsd: bad dentry in unexport!\n");
 	dput(dentry);
 	mntput(mnt);
@@ -353,9 +354,10 @@ exp_unexport(struct nfsctl_export *nxp)
 	err = -EINVAL;
 	clp = exp_getclientbyname(nxp->ex_client);
 	if (clp) {
-		expp = clp->cl_export + EXPORT_HASH(nxp->ex_dev);
+		kdev_t ex_dev = to_kdev_t(nxp->ex_dev);
+		expp = clp->cl_export + EXPORT_HASH(ex_dev);
 		while ((exp = *expp) != NULL) {
-			if (exp->ex_dev == nxp->ex_dev) {
+			if (kdev_same(exp->ex_dev, ex_dev)) {
 				if (exp->ex_ino == nxp->ex_ino) {
 					*expp = exp->ex_next;
 					exp_do_unexport(exp);
@@ -397,12 +399,13 @@ exp_rootfh(struct svc_client *clp, kdev_t dev, ino_t ino,
 		dev = nd.dentry->d_inode->i_dev;
 		ino = nd.dentry->d_inode->i_ino;
 	
-		dprintk("nfsd: exp_rootfh(%s [%p] %s:%x/%ld)\n",
-		         path, nd.dentry, clp->cl_ident, dev, (long) ino);
+		dprintk("nfsd: exp_rootfh(%s [%p] %s:%02x:%02x/%ld)\n",
+		         path, nd.dentry, clp->cl_ident,
+		         major(dev), minor(dev), (long) ino);
 		exp = exp_parent(clp, dev, nd.dentry);
 	} else {
-		dprintk("nfsd: exp_rootfh(%s:%x/%ld)\n",
-		         clp->cl_ident, dev, (long) ino);
+		dprintk("nfsd: exp_rootfh(%s:%02x:%02x/%ld)\n",
+		         clp->cl_ident, major(dev), minor(dev), (long) ino);
 		if ((exp = exp_get(clp, dev, ino))) {
 			nd.mnt = mntget(exp->ex_mnt);
 			nd.dentry = dget(exp->ex_dentry);
@@ -418,11 +421,12 @@ exp_rootfh(struct svc_client *clp, kdev_t dev, ino_t ino,
 		printk("exp_rootfh: Aieee, NULL d_inode\n");
 		goto out;
 	}
-	if (inode->i_dev != dev || inode->i_ino != ino) {
+	if (!kdev_same(inode->i_dev, dev) || inode->i_ino != ino) {
 		printk("exp_rootfh: Aieee, ino/dev mismatch\n");
-		printk("exp_rootfh: arg[dev(%x):ino(%ld)]"
-		       " inode[dev(%x):ino(%ld)]\n",
-		       dev, (long) ino, inode->i_dev, (long) inode->i_ino);
+		printk("exp_rootfh: arg[dev(%02x:%02x):ino(%ld)]"
+		       " inode[dev(%02x:%02x):ino(%ld)]\n",
+		       major(dev), minor(dev), (long) ino,
+		       major(inode->i_dev), minor(inode->i_dev), (long) inode->i_ino);
 	}
 
 	/*

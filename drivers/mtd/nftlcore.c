@@ -62,14 +62,9 @@ struct hd_struct part_table[256];
 static struct gendisk nftl_gendisk = {
 	major:		MAJOR_NR,
 	major_name:	"nftl",
-	minor_shift:	NFTL_PARTN_BITS,	/* Bits to shift to get real from partition */
-	max_p:		(1<<NFTL_PARTN_BITS)-1,	/* Number of partitions per real */
-#if LINUX_VERSION_CODE < 0x20328
-	max_nr:		MAX_NFTLS,      /* maximum number of real */
-	init:		dummy_init,     /* init function */
-#endif
-	part:		part_table,     /* hd struct */
-	sizes:		nftl_sizes,     /* block sizes */
+	minor_shift:	NFTL_PARTN_BITS,	/* # of partition bits */
+	part:		part_table,		/* hd struct */
+	sizes:		nftl_sizes,		/* block sizes */
 };
 
 struct NFTLrecord *NFTLs[MAX_NFTLS];

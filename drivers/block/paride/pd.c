@@ -347,7 +347,6 @@ static struct gendisk pd_gendisk = {
 	major:		PD_MAJOR,
 	major_name:	PD_NAME,
 	minor_shift:	PD_BITS,
-	max_p:		PD_PARTNS,
 	part:		pd_hd,
 	sizes:		pd_sizes,
 	fops:		&pd_fops,

@@ -270,10 +270,10 @@ static unsigned long fake_change;
 static int initialising=1;
 
 static inline int TYPE(kdev_t x) {
-	return  (MINOR(x)>>2) & 0x1f;
+	return  (minor(x)>>2) & 0x1f;
 }
 static inline int DRIVE(kdev_t x) {
-	return (MINOR(x)&0x03) | ((MINOR(x)&0x80) >> 5);
+	return (minor(x)&0x03) | ((minor(x)&0x80) >> 5);
 }
 #define ITYPE(x) (((x)>>2) & 0x1f)
 #define TOMINOR(x) ((x & 3) | ((x & 4) << 5))
@@ -2906,7 +2906,7 @@ static void redo_fd_request(void)
 			unlock_fdc();
 			return;
 		}
-		if (MAJOR(CURRENT->rq_dev) != MAJOR_NR)
+		if (major(CURRENT->rq_dev) != MAJOR_NR)
 			panic(DEVICE_NAME ": request list destroyed");
 
 		device = CURRENT->rq_dev;
@@ -3332,7 +3332,7 @@ static inline int set_geometry(unsigned int cmd, struct floppy_struct *g,
 			if (ITYPE(drive_state[cnt].fd_device) == type &&
 			    drive_state[cnt].fd_ref)
 				check_disk_change(
-					MKDEV(FLOPPY_MAJOR,
+					mk_kdev(FLOPPY_MAJOR,
 					      drive_state[cnt].fd_device));
 		}
 	} else {
@@ -3717,7 +3717,7 @@ static int floppy_open(struct inode * inode, struct file * filp)
 	if (TYPE(inode->i_rdev) >= NUMBER(floppy_type))
 		return -ENXIO;
 	old_dev = UDRS->fd_device;
-	if (UDRS->fd_ref && old_dev != MINOR(inode->i_rdev))
+	if (UDRS->fd_ref && old_dev != minor(inode->i_rdev))
 		return -EBUSY;
 
 	if (!UDRS->fd_ref && (UDP->flags & FD_BROKEN_DCL)){
@@ -3768,11 +3768,11 @@ static int floppy_open(struct inode * inode, struct file * filp)
 		}
 	}
 
-	UDRS->fd_device = MINOR(inode->i_rdev);
-	if (old_dev != -1 && old_dev != MINOR(inode->i_rdev)) {
+	UDRS->fd_device = minor(inode->i_rdev);
+	if (old_dev != -1 && old_dev != minor(inode->i_rdev)) {
 		if (buffer_drive == drive)
 			buffer_track = -1;
-		invalidate_buffers(MKDEV(FLOPPY_MAJOR,old_dev));
+		invalidate_buffers(mk_kdev(FLOPPY_MAJOR,old_dev));
 	}
 
 	/* Allow ioctls if we have write-permissions even if read-only open.
@@ -3806,7 +3806,7 @@ static int check_floppy_change(kdev_t dev)
 {
 	int drive = DRIVE(dev);
 
-	if (MAJOR(dev) != MAJOR_NR) {
+	if (major(dev) != MAJOR_NR) {
 		DPRINT("check_floppy_change: not a floppy\n");
 		return 0;
 	}
@@ -3868,7 +3868,7 @@ static int floppy_revalidate(kdev_t dev)
 			UDRS->generation++;
 		if (NO_GEOM){
 			/* auto-sensing */
-			int size = floppy_blocksizes[MINOR(dev)];
+			int size = floppy_blocksizes[minor(dev)];
 			if (!size)
 				size = 1024;
 			if (!(bh = getblk(dev,0,size))){
@@ -4275,7 +4275,7 @@ int __init floppy_init(void)
 		if (fdc_state[FDC(drive)].version == FDC_NONE)
 			continue;
 		for (i = 0; i<NUMBER(floppy_type); i++)
-			register_disk(NULL, MKDEV(MAJOR_NR,TOMINOR(drive)+i*4),
+			register_disk(NULL, mk_kdev(MAJOR_NR,TOMINOR(drive)+i*4),
 					1, &floppy_fops, 0);
 	}
 	return have_no_fdc;

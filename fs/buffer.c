@@ -203,7 +203,7 @@ static int write_some_buffers(kdev_t dev)
 		struct buffer_head * bh = next;
 		next = bh->b_next_free;
 
-		if (dev && bh->b_dev != dev)
+		if (!kdev_none(dev) && !kdev_same(bh->b_dev, dev))
 			continue;
 		if (test_and_set_bit(BH_Lock, &bh->b_state))
 			continue;
@@ -261,7 +261,7 @@ static int wait_for_buffers(kdev_t dev, int index, int refile)
 				__refile_buffer(bh);
 			continue;
 		}
-		if (dev && bh->b_dev != dev)
+		if (!kdev_none(dev) && !kdev_same(bh->b_dev, dev))
 			continue;
 
 		get_bh(bh);
@@ -346,7 +346,7 @@ int fsync_dev(kdev_t dev)
 
 	lock_kernel();
 	sync_inodes(dev);
-	if (dev) {
+	if (!kdev_none(dev)) {
 		struct super_block *sb = get_super(dev);
 		if (sb) {
 			DQUOT_SYNC(sb);
@@ -371,7 +371,7 @@ void sync_dev(kdev_t dev)
 
 asmlinkage long sys_sync(void)
 {
-	fsync_dev(0);
+	fsync_dev(NODEV);
 	return 0;
 }
 
@@ -571,7 +571,7 @@ struct buffer_head * get_hash_table(kdev_t dev, sector_t block, int size)
 			continue;
 		if (bh->b_size != size)
 			continue;
-		if (bh->b_dev != dev)
+		if (!kdev_same(bh->b_dev, dev))
 			continue;
 		get_bh(bh);
 		break;
@@ -675,7 +675,7 @@ void invalidate_bdev(struct block_device *bdev, int destroy_dirty_buffers)
 			bh_next = bh->b_next_free;
 
 			/* Another device? */
-			if (bh->b_dev != dev)
+			if (!kdev_same(bh->b_dev, dev))
 				continue;
 			/* Not hashed? */
 			if (!bh->b_pprev)
@@ -718,7 +718,7 @@ out:
 
 void __invalidate_buffers(kdev_t dev, int destroy_dirty_buffers)
 {
-	struct block_device *bdev = bdget(dev);
+	struct block_device *bdev = bdget(kdev_t_to_nr(dev));
 	if (bdev) {
 		invalidate_bdev(bdev, destroy_dirty_buffers);
 		bdput(bdev);
@@ -2396,7 +2396,7 @@ cleaned_buffers_try_again:
 		struct buffer_head * p = tmp;
 		tmp = tmp->b_this_page;
 
-		if (p->b_dev == B_FREE) BUG();
+		if (kdev_same(p->b_dev, B_FREE)) BUG();
 
 		remove_inode_queue(p);
 		__remove_from_queues(p);
@@ -2562,7 +2562,7 @@ static int sync_old_buffers(void)
 {
 	lock_kernel();
 	sync_unlocked_inodes();
-	sync_supers(0);
+	sync_supers(NODEV);
 	unlock_kernel();
 
 	for (;;) {

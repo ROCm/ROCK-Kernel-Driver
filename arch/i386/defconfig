@@ -409,6 +409,7 @@ CONFIG_NET_PCI=y
 # CONFIG_AC3200 is not set
 # CONFIG_APRICOT is not set
 # CONFIG_CS89x0 is not set
+# CONFIG_DE2104X is not set
 # CONFIG_TULIP is not set
 # CONFIG_DE4X5 is not set
 # CONFIG_DGRS is not set
@@ -624,7 +625,7 @@ CONFIG_AUTOFS4_FS=y
 # CONFIG_JFFS2_FS is not set
 # CONFIG_CRAMFS is not set
 CONFIG_TMPFS=y
-# CONFIG_RAMFS is not set
+CONFIG_RAMFS=y
 CONFIG_ISO9660_FS=y
 # CONFIG_JOLIET is not set
 # CONFIG_ZISOFS is not set

@@ -96,7 +96,7 @@ struct pwc_iso_buf
 	void *data;
 	int  length;
 	int  read;
-	purb_t urb;
+	struct urb *urb;
 };
 
 /* intermediate buffers with raw data from the USB cam */

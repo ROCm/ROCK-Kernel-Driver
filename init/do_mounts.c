@@ -1,5 +1,7 @@
 #define __KERNEL_SYSCALLS__
 #include <linux/config.h>
+#include <linux/kernel.h>
+#include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/unistd.h>
@@ -7,6 +9,7 @@
 #include <linux/blk.h>
 #include <linux/fd.h>
 #include <linux/tty.h>
+#include <linux/init.h>
 
 #include <linux/nfs_fs.h>
 #include <linux/nfs_fs_sb.h>
@@ -351,8 +354,8 @@ static int __init create_dev(char *name, kdev_t dev, char *devfs_name)
 	if (!do_devfs)
 		return sys_mknod(name, S_IFBLK|0600, kdev_t_to_nr(dev));
 
-	handle = devfs_find_handle(NULL, dev ? NULL : devfs_name,
-				MAJOR(dev), MINOR(dev), DEVFS_SPECIAL_BLK, 1);
+	handle = devfs_find_handle(NULL, kdev_none(dev) ? devfs_name : NULL,
+				major(dev), minor(dev), DEVFS_SPECIAL_BLK, 1);
 	if (!handle)
 		return -1;
 	n = devfs_generate_path(handle, path + 5, sizeof (path) - 5);
@@ -707,11 +710,11 @@ static void __init mount_root(void)
 	devfs_make_root(root_device_name);
 	create_dev("/dev/root", ROOT_DEV, root_device_name);
 #ifdef CONFIG_BLK_DEV_FD
-	if (MAJOR(ROOT_DEV) == FLOPPY_MAJOR) {
+	if (major(ROOT_DEV) == FLOPPY_MAJOR) {
 		/* rd_doload is 2 for a dual initrd/ramload setup */
 		if (rd_doload==2) {
 			if (rd_load_disk(1)) {
-				ROOT_DEV = MKDEV(RAMDISK_MAJOR, 1);
+				ROOT_DEV = mk_kdev(RAMDISK_MAJOR, 1);
 				create_dev("/dev/root", ROOT_DEV, NULL);
 			}
 		} else
@@ -809,7 +812,7 @@ static int __init initrd_load(void)
  */
 void prepare_namespace(void)
 {
-	int is_floppy = MAJOR(ROOT_DEV) == FLOPPY_MAJOR;
+	int is_floppy = major(ROOT_DEV) == FLOPPY_MAJOR;
 #ifdef CONFIG_BLK_DEV_INITRD
 	if (!initrd_start)
 		mount_initrd = 0;
@@ -825,12 +828,12 @@ void prepare_namespace(void)
 
 	create_dev("/dev/root", ROOT_DEV, NULL);
 	if (mount_initrd) {
-		if (initrd_load() && ROOT_DEV != MKDEV(RAMDISK_MAJOR, 0)) {
+		if (initrd_load() && kdev_same(ROOT_DEV, mk_kdev(RAMDISK_MAJOR, 0))) {
 			handle_initrd();
 			goto out;
 		}
 	} else if (is_floppy && rd_doload && rd_load_disk(0))
-		ROOT_DEV = MKDEV(RAMDISK_MAJOR, 0);
+		ROOT_DEV = mk_kdev(RAMDISK_MAJOR, 0);
 	mount_root();
 out:
 	sys_umount("/dev", 0);

@@ -538,7 +538,7 @@ static struct file_operations full_fops = {
 
 static int memory_open(struct inode * inode, struct file * filp)
 {
-	switch (MINOR(inode->i_rdev)) {
+	switch (minor(inode->i_rdev)) {
 		case 1:
 			filp->f_op = &mem_fops;
 			break;

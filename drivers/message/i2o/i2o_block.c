@@ -1778,7 +1778,6 @@ static struct gendisk i2ob_gendisk =
 	major:		MAJOR_NR,
 	major_name:	"i2o/hd",
 	minor_shift:	4,
-	max_p:		1<<4,
 	part:		i2ob,
 	sizes:		i2ob_sizes,
 	nr_real:	MAX_I2OB,

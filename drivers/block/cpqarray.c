@@ -483,7 +483,6 @@ int __init cpqarray_init(void)
 		ida_gendisk[i].major = MAJOR_NR + i;
 		ida_gendisk[i].major_name = "ida";
 		ida_gendisk[i].minor_shift = NWD_SHIFT;
-		ida_gendisk[i].max_p = 16;
 		ida_gendisk[i].part = ida + (i*256);
 		ida_gendisk[i].sizes = ida_sizes + (i*256);
 		ida_gendisk[i].nr_real = 0; 

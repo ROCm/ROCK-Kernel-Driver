@@ -337,7 +337,7 @@ static struct unique_numspace cdrom_numspace = UNIQUE_NUMBERSPACE_INITIALISER;
 int register_cdrom(struct cdrom_device_info *cdi)
 {
 	static char banner_printed;
-	int major = MAJOR(cdi->dev);
+	int major = major(cdi->dev);
         struct cdrom_device_ops *cdo = cdi->ops;
         int *change_capability = (int *)&cdo->capability; /* hack */
 
@@ -408,7 +408,7 @@ int register_cdrom(struct cdrom_device_info *cdi)
 int unregister_cdrom(struct cdrom_device_info *unreg)
 {
 	struct cdrom_device_info *cdi, *prev;
-	int major = MAJOR(unreg->dev);
+	int major = major(unreg->dev);
 
 	cdinfo(CD_OPEN, "entering unregister_cdrom\n"); 
 
@@ -417,7 +417,7 @@ int unregister_cdrom(struct cdrom_device_info *unreg)
 
 	prev = NULL;
 	cdi = topCdromPtr;
-	while (cdi != NULL && cdi->dev != unreg->dev) {
+	while (cdi != NULL && !kdev_same(cdi->dev, unreg->dev)) {
 		prev = cdi;
 		cdi = cdi->next;
 	}
@@ -440,7 +440,7 @@ struct cdrom_device_info *cdrom_find_device(kdev_t dev)
 	struct cdrom_device_info *cdi;
 
 	cdi = topCdromPtr;
-	while (cdi != NULL && cdi->dev != dev)
+	while (cdi != NULL && !kdev_same(cdi->dev, dev))
 		cdi = cdi->next;
 
 	return cdi;

@@ -38,7 +38,7 @@ typedef struct
 typedef struct 
 {
 	pdabusb_t s;
-	purb_t purb;
+	struct urb *purb;
 	struct list_head buff_list;
 } buff_t,*pbuff_t;
 

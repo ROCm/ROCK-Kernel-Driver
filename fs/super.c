@@ -418,7 +418,7 @@ static inline struct super_block * find_super(kdev_t dev)
 
 	list_for_each(p, &super_blocks) {
 		struct super_block * s = sb_entry(p);
-		if (s->s_dev == dev) {
+		if (kdev_same(s->s_dev, dev)) {
 			s->s_count++;
 			return s;
 		}
@@ -450,7 +450,7 @@ void sync_supers(kdev_t dev)
 {
 	struct super_block * sb;
 
-	if (dev) {
+	if (!kdev_none(dev)) {
 		sb = get_super(dev);
 		if (sb) {
 			if (sb->s_dirt)
@@ -487,7 +487,7 @@ struct super_block * get_super(kdev_t dev)
 {
 	struct super_block * s;
 
-	if (!dev)
+	if (kdev_none(dev))
 		return NULL;
 
 	while (1) {
@@ -540,7 +540,7 @@ int do_remount_sb(struct super_block *sb, int flags, void *data)
 {
 	int retval;
 	
-	if (!(flags & MS_RDONLY) && sb->s_dev && is_read_only(sb->s_dev))
+	if (!(flags & MS_RDONLY) && !kdev_none(sb->s_dev) && is_read_only(sb->s_dev))
 		return -EACCES;
 		/*flags |= MS_RDONLY;*/
 	if (flags & MS_RDONLY)
@@ -578,7 +578,7 @@ static spinlock_t unnamed_dev_lock = SPIN_LOCK_UNLOCKED;/* protects the above */
 static void put_anon_dev(kdev_t dev)
 {
 	spin_lock(&unnamed_dev_lock);
-	clear_bit(MINOR(dev), unnamed_dev_in_use);
+	clear_bit(minor(dev), unnamed_dev_in_use);
 	spin_unlock(&unnamed_dev_lock);
 }
 
@@ -608,7 +608,7 @@ struct super_block *get_anon_super(struct file_system_type *type,
 	int (*compare)(struct super_block *,void *), void *data)
 {
 	struct super_block *s = alloc_super();
-	kdev_t dev;
+	int dev;
 	struct list_head *p;
 
 	if (!s)
@@ -637,7 +637,7 @@ retry:
 		return old;
 	}
 
-	s->s_dev = dev;
+	s->s_dev = mk_kdev(0, dev);
 	insert_super(s, type);
 	return s;
 }
@@ -699,7 +699,7 @@ restart:
 
 	list_for_each(p, &super_blocks) {
 		struct super_block *old = sb_entry(p);
-		if (old->s_dev != dev)
+		if (!kdev_same(old->s_dev, dev))
 			continue;
 		if (old->s_type != fs_type ||
 		    ((flags ^ old->s_flags) & MS_RDONLY)) {

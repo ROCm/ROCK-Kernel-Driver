@@ -378,7 +378,6 @@ static struct gendisk lvm_gendisk =
 	major:		MAJOR_NR,
 	major_name:	LVM_NAME,
 	minor_shift:	0,
-	max_p:		1,
 	part:		lvm_hd_struct,
 	sizes:		lvm_size,
 	nr_real:	MAX_LV,

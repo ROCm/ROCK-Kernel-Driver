@@ -1886,7 +1886,6 @@ static int __init cciss_init_one(struct pci_dev *pdev,
 	hba[i]->gendisk.major = MAJOR_NR + i;
 	hba[i]->gendisk.major_name = "cciss";
 	hba[i]->gendisk.minor_shift = NWD_SHIFT;
-	hba[i]->gendisk.max_p = MAX_PART;
 	hba[i]->gendisk.part = hba[i]->hd;
 	hba[i]->gendisk.sizes = hba[i]->sizes;
 	hba[i]->gendisk.nr_real = hba[i]->num_luns;

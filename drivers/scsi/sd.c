@@ -66,7 +66,7 @@
 #define SCSI_DISKS_PER_MAJOR	16
 #define SD_MAJOR_NUMBER(i)	SD_MAJOR((i) >> 8)
 #define SD_MINOR_NUMBER(i)	((i) & 255)
-#define MKDEV_SD_PARTITION(i)	MKDEV(SD_MAJOR_NUMBER(i), (i) & 255)
+#define MKDEV_SD_PARTITION(i)	mk_kdev(SD_MAJOR_NUMBER(i), (i) & 255)
 #define MKDEV_SD(index)		MKDEV_SD_PARTITION((index) << 4)
 #define N_USED_SD_MAJORS	(1 + ((sd_template.dev_max - 1) >> 4))
 
@@ -569,7 +569,6 @@ static struct gendisk sd_gendisk =
 	major:		SCSI_DISK0_MAJOR,
 	major_name:	"sd",
 	minor_shift:	4,
-	max_p:		1 << 4,
 	fops:		&sd_fops,
 };
 
@@ -1116,7 +1115,7 @@ static int sd_init()
 	}
 
 	for (i = 0; i < N_USED_SD_MAJORS; i++) {
-		request_queue_t *q = blk_get_queue(SD_MAJOR(i));
+		request_queue_t *q = blk_get_queue(mk_kdev(SD_MAJOR(i), 0));
 		int parts_per_major = (SCSI_DISKS_PER_MAJOR << 4);
 
 		blksize_size[SD_MAJOR(i)] =
@@ -1141,12 +1140,9 @@ static int sd_init()
 		sd_gendisks[i].major = SD_MAJOR(i);
 		sd_gendisks[i].major_name = "sd";
 		sd_gendisks[i].minor_shift = 4;
-		sd_gendisks[i].max_p = 1 << 4;
 		sd_gendisks[i].part = sd + i * (N << 4);
 		sd_gendisks[i].sizes = sd_sizes + i * (N << 4);
 		sd_gendisks[i].nr_real = 0;
-		sd_gendisks[i].real_devices =
-		    (void *) (rscsi_disks + i * SCSI_DISKS_PER_MAJOR);
 	}
 
 	return 0;
@@ -1309,7 +1305,7 @@ static void sd_detach(Scsi_Device * SDp)
 	for (dpnt = rscsi_disks, i = 0; i < sd_template.dev_max; i++, dpnt++)
 		if (dpnt->device == SDp) {
 
-			max_p = sd_gendisk.max_p;
+			max_p = 1 << sd_gendisk.minor_shift;
 			start = i << sd_gendisk.minor_shift;
 			dev = MKDEV_SD_PARTITION(start);
 			wipe_partitions(dev);

@@ -103,7 +103,7 @@ struct gendisk *
 get_gendisk(kdev_t dev)
 {
 	struct gendisk *gp = NULL;
-	int maj = MAJOR(dev);
+	int maj = major(dev);
 
 	read_lock(&gendisk_lock);
 	for (gp = gendisk_head; gp; gp = gp->next)
@@ -124,7 +124,7 @@ get_start_sect(kdev_t dev)
 
 	gp = get_gendisk(dev);
 	if (gp)
-		return gp->part[MINOR(dev)].start_sect;
+		return gp->part[minor(dev)].start_sect;
 	return 0;
 }
 
@@ -137,7 +137,7 @@ get_nr_sects(kdev_t dev)
 
 	gp = get_gendisk(dev);
 	if (gp)
-		return gp->part[MINOR(dev)].nr_sects;
+		return gp->part[minor(dev)].nr_sects;
 	return 0;
 }
 

@@ -774,7 +774,7 @@ asmlinkage long sys_swapoff(const char * specialfile)
 		swap_list_unlock();
 		goto out_dput;
 	}
-	if (p->swap_device)
+	if (!kdev_none(p->swap_device))
 		blkdev_put(p->swap_file->d_inode->i_bdev, BDEV_SWAP);
 	path_release(&nd);
 
@@ -784,7 +784,7 @@ asmlinkage long sys_swapoff(const char * specialfile)
 	nd.dentry = p->swap_file;
 	p->swap_vfsmnt = NULL;
 	p->swap_file = NULL;
-	p->swap_device = 0;
+	p->swap_device = NODEV;
 	p->max = 0;
 	swap_map = p->swap_map;
 	p->swap_map = NULL;
@@ -826,7 +826,7 @@ int get_swaparea_info(char *buf)
 				}
 			len += sprintf(buf + len, "%-39s %s\t%d\t%d\t%d\n",
 				       path,
-				       ptr->swap_device ? "partition" : "file\t",
+				       kdev_none(ptr->swap_device) ? "file\t" : "partition",
 				       ptr->pages << (PAGE_SHIFT - 10),
 				       usedswap << (PAGE_SHIFT - 10),
 				       ptr->prio);
@@ -842,7 +842,7 @@ int is_swap_partition(kdev_t dev) {
 
 	for (i = 0 ; i < nr_swapfiles ; i++, ptr++) {
 		if (ptr->flags & SWP_USED)
-			if (ptr->swap_device == dev)
+			if (kdev_same(ptr->swap_device, dev))
 				return 1;
 	}
 	return 0;
@@ -888,7 +888,7 @@ asmlinkage long sys_swapon(const char * specialfile, int swap_flags)
 	p->flags = SWP_USED;
 	p->swap_file = NULL;
 	p->swap_vfsmnt = NULL;
-	p->swap_device = 0;
+	p->swap_device = NODEV;
 	p->swap_map = NULL;
 	p->lowest_bit = 0;
 	p->highest_bit = 0;
@@ -931,12 +931,12 @@ asmlinkage long sys_swapon(const char * specialfile, int swap_flags)
 			goto bad_swap_2;
 		set_blocksize(dev, PAGE_SIZE);
 		error = -ENODEV;
-		if (!dev || (blk_size[MAJOR(dev)] &&
-		     !blk_size[MAJOR(dev)][MINOR(dev)]))
+		if (kdev_none(dev) || (blk_size[major(dev)] &&
+		     !blk_size[major(dev)][minor(dev)]))
 			goto bad_swap;
 		swapfilesize = 0;
-		if (blk_size[MAJOR(dev)])
-			swapfilesize = blk_size[MAJOR(dev)][MINOR(dev)]
+		if (blk_size[major(dev)])
+			swapfilesize = blk_size[major(dev)][minor(dev)]
 				>> (PAGE_SHIFT - 10);
 	} else if (S_ISREG(swap_inode->i_mode))
 		swapfilesize = swap_inode->i_size >> PAGE_SHIFT;
@@ -1092,7 +1092,7 @@ bad_swap_2:
 	swap_map = p->swap_map;
 	nd.mnt = p->swap_vfsmnt;
 	nd.dentry = p->swap_file;
-	p->swap_device = 0;
+	p->swap_device = NODEV;
 	p->swap_file = NULL;
 	p->swap_vfsmnt = NULL;
 	p->swap_map = NULL;
@@ -1245,7 +1245,7 @@ void get_swaphandle_info(swp_entry_t entry, unsigned long *offset,
 		return;
 	}
 
-	if (p->swap_device) {
+	if (!kdev_none(p->swap_device)) {
 		*dev = p->swap_device;
 	} else if (p->swap_file) {
 		*swapf = p->swap_file->d_inode;

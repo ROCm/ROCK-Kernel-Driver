@@ -45,8 +45,8 @@
 #include <asm/system.h>
 #include <asm/bitops.h>
 
-#define CONSOLE_DEV MKDEV(TTY_MAJOR,0)
-#define SYSCONS_DEV  MKDEV(TTYAUX_MAJOR,1)
+#define IS_CONSOLE_DEV(dev)	(kdev_val(dev) == __mkdev(TTY_MAJOR,0))
+#define IS_SYSCONS_DEV(dev)	(kdev_val(dev) == __mkdev(TTYAUX_MAJOR,1))
 
 #ifndef MIN
 #define MIN(a,b)	((a) < (b) ? (a) : (b))
@@ -955,8 +955,8 @@ do_it_again:
 	/* NOTE: not yet done after every sleep pending a thorough
 	   check of the logic of this change. -- jlc */
 	/* don't stop on /dev/console */
-	if (file->f_dentry->d_inode->i_rdev != CONSOLE_DEV &&
-	    file->f_dentry->d_inode->i_rdev != SYSCONS_DEV &&
+	if (!IS_CONSOLE_DEV(file->f_dentry->d_inode->i_rdev) &&
+	    !IS_SYSCONS_DEV(file->f_dentry->d_inode->i_rdev) &&
 	    current->tty == tty) {
 		if (tty->pgrp <= 0)
 			printk("read_chan: tty->pgrp <= 0!\n");
@@ -1135,8 +1135,8 @@ static ssize_t write_chan(struct tty_struct * tty, struct file * file,
 
 	/* Job control check -- must be done at start (POSIX.1 7.1.1.4). */
 	if (L_TOSTOP(tty) && 
-	    file->f_dentry->d_inode->i_rdev != CONSOLE_DEV &&
-	    file->f_dentry->d_inode->i_rdev != SYSCONS_DEV) {
+	    !IS_CONSOLE_DEV(file->f_dentry->d_inode->i_rdev) &&
+	    !IS_SYSCONS_DEV(file->f_dentry->d_inode->i_rdev)) {
 		retval = tty_check_change(tty);
 		if (retval)
 			return retval;

@@ -149,11 +149,11 @@ encode_fattr(struct svc_rqst *rqstp, u32 *p, struct inode *inode)
 	}
 	*p++ = htonl((u32) inode->i_blksize);
 	if (S_ISCHR(type) || S_ISBLK(type))
-		*p++ = htonl((u32) inode->i_rdev);
+		*p++ = htonl((u32) kdev_t_to_nr(inode->i_rdev));
 	else
 		*p++ = htonl(0xffffffff);
 	*p++ = htonl((u32) inode->i_blocks);
-	*p++ = htonl((u32) inode->i_dev);
+	*p++ = htonl((u32) kdev_t_to_nr(inode->i_dev));
 	*p++ = htonl((u32) inode->i_ino);
 	*p++ = htonl((u32) inode->i_atime);
 	*p++ = 0;

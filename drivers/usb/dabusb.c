@@ -83,24 +83,24 @@ static int dabusb_add_buf_tail (pdabusb_t s, struct list_head *dst, struct list_
 }
 /*-------------------------------------------------------------------*/
 #ifdef DEBUG 
-static void dump_urb (purb_t purb)
+static void dump_urb (struct urb *urb)
 {
-	dbg("urb                   :%p", purb);
-	dbg("next                  :%p", purb->next);
-	dbg("dev                   :%p", purb->dev);
-	dbg("pipe                  :%08X", purb->pipe);
-	dbg("status                :%d", purb->status);
-	dbg("transfer_flags        :%08X", purb->transfer_flags);
-	dbg("transfer_buffer       :%p", purb->transfer_buffer);
-	dbg("transfer_buffer_length:%d", purb->transfer_buffer_length);
-	dbg("actual_length         :%d", purb->actual_length);
-	dbg("setup_packet          :%p", purb->setup_packet);
-	dbg("start_frame           :%d", purb->start_frame);
-	dbg("number_of_packets     :%d", purb->number_of_packets);
-	dbg("interval              :%d", purb->interval);
-	dbg("error_count           :%d", purb->error_count);
-	dbg("context               :%p", purb->context);
-	dbg("complete              :%p", purb->complete);
+	dbg("urb                   :%p", urb);
+	dbg("next                  :%p", urb->next);
+	dbg("dev                   :%p", urb->dev);
+	dbg("pipe                  :%08X", urb->pipe);
+	dbg("status                :%d", urb->status);
+	dbg("transfer_flags        :%08X", urb->transfer_flags);
+	dbg("transfer_buffer       :%p", urb->transfer_buffer);
+	dbg("transfer_buffer_length:%d", urb->transfer_buffer_length);
+	dbg("actual_length         :%d", urb->actual_length);
+	dbg("setup_packet          :%p", urb->setup_packet);
+	dbg("start_frame           :%d", urb->start_frame);
+	dbg("number_of_packets     :%d", urb->number_of_packets);
+	dbg("interval              :%d", urb->interval);
+	dbg("error_count           :%d", urb->error_count);
+	dbg("context               :%p", urb->context);
+	dbg("complete              :%p", urb->complete);
 }
 #endif
 /*-------------------------------------------------------------------*/
@@ -167,7 +167,7 @@ static int dabusb_free_buffers (pdabusb_t s)
 	return 0;
 }
 /*-------------------------------------------------------------------*/
-static void dabusb_iso_complete (purb_t purb)
+static void dabusb_iso_complete (struct urb *purb)
 {
 	pbuff_t b = purb->context;
 	pdabusb_t s = b->s;
@@ -482,7 +482,7 @@ static ssize_t dabusb_read (struct file *file, char *buf, size_t count, loff_t *
 	int rem;
 	int cnt;
 	pbuff_t b;
-	purb_t purb = NULL;
+	struct urb *purb = NULL;
 
 	dbg("dabusb_read");
 

@@ -38,7 +38,8 @@
 
 int warn_no_part = 1; /*This is ugly: should make genhd removable media aware*/
 
-static int (*check_part[])(struct gendisk *hd, struct block_device *bdev, unsigned long first_sect, int first_minor) = {
+static int (*check_part[])(struct gendisk *hd, struct block_device *bdev,
+			   unsigned long first_sect, int first_minor) = {
 #ifdef CONFIG_ACORN_PARTITION
 	acorn_partition,
 #endif
@@ -227,26 +228,26 @@ static void check_partition(struct gendisk *hd, kdev_t dev, int first_part_minor
 	if (first_time)
 		printk(KERN_INFO "Partition check:\n");
 	first_time = 0;
-	first_sector = hd->part[MINOR(dev)].start_sect;
+	first_sector = hd->part[minor(dev)].start_sect;
 
 	/*
 	 * This is a kludge to allow the partition check to be
 	 * skipped for specific drives (e.g. IDE CD-ROM drives)
 	 */
 	if ((int)first_sector == -1) {
-		hd->part[MINOR(dev)].start_sect = 0;
+		hd->part[minor(dev)].start_sect = 0;
 		return;
 	}
 
 	if (hd->de_arr)
-		de = hd->de_arr[MINOR(dev) >> hd->minor_shift];
+		de = hd->de_arr[minor(dev) >> hd->minor_shift];
 	i = devfs_generate_path (de, buf, sizeof buf);
 	if (i >= 0)
 		printk(KERN_INFO " /dev/%s:", buf + i);
 	else
-		printk(KERN_INFO " %s:", disk_name(hd, MINOR(dev), buf));
+		printk(KERN_INFO " %s:", disk_name(hd, minor(dev), buf));
 	bdev = bdget(kdev_t_to_nr(dev));
-	bdev->bd_inode->i_size = (loff_t)hd->part[MINOR(dev)].nr_sects << 9;
+	bdev->bd_inode->i_size = (loff_t)hd->part[minor(dev)].nr_sects << 9;
 	bdev->bd_inode->i_blkbits = blksize_bits(block_size(dev));
 	for (i = 0; check_part[i]; i++) {
 		int res;
@@ -333,11 +334,12 @@ static void devfs_register_disc (struct gendisk *dev, int minor)
 void devfs_register_partitions (struct gendisk *dev, int minor, int unregister)
 {
 #ifdef CONFIG_DEVFS_FS
-	int part;
+	int part, max_p;
 
 	if (!unregister)
 		devfs_register_disc (dev, minor);
-	for (part = 1; part < dev->max_p; part++) {
+	max_p = (1 << dev->minor_shift);
+	for (part = 1; part < max_p; part++) {
 		if ( unregister || (dev->part[part + minor].nr_sects < 1) ) {
 			devfs_unregister (dev->part[part + minor].de);
 			dev->part[part + minor].de = NULL;
@@ -381,10 +383,10 @@ void grok_partitions(kdev_t dev, long size)
 		return;
 
 	minors = 1 << g->minor_shift;
-	first_minor = MINOR(dev);
+	first_minor = minor(dev);
 	if (first_minor & (minors-1)) {
 		printk("grok_partitions: bad device 0x%02x:%02x\n",
-		       MAJOR(dev), first_minor);
+		       major(dev), first_minor);
 		first_minor &= ~(minors-1);
 	}
 	end_minor = first_minor + minors;
@@ -404,7 +406,7 @@ void grok_partitions(kdev_t dev, long size)
 			g->sizes[i] = 0;
 	}
 	blk_size[g->major] = g->sizes;
-	check_partition(g, MKDEV(g->major, first_minor), 1 + first_minor);
+	check_partition(g, mk_kdev(g->major, first_minor), 1 + first_minor);
 
  	/*
  	 * We need to set the sizes array before we will be able to access
@@ -450,8 +452,8 @@ int wipe_partitions(kdev_t dev)
 		return -EINVAL;
 
 	max_p = 1 << g->minor_shift;
-	major = MAJOR(dev);
-	minor = MINOR(dev);
+	major = major(dev);
+	minor = minor(dev);
 	minor0 = minor & ~(max_p - 1);
 	if (minor0 != minor)		/* for now only whole-disk reread */
 		return -EINVAL;		/* %%% later.. */
@@ -459,7 +461,7 @@ int wipe_partitions(kdev_t dev)
 	/* invalidate stuff */
 	for (p = max_p - 1; p >= 0; p--) {
 		minor = minor0 + p;
-		devp = MKDEV(major,minor);
+		devp = mk_kdev(major,minor);
 #if 0					/* %%% superfluous? */
 		if (g->part[minor].nr_sects == 0)
 			continue;

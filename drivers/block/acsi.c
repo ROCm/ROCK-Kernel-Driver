@@ -1386,10 +1386,8 @@ static struct gendisk acsi_gendisk = {
 	major:		MAJOR_NR,
 	major_name:	"ad",
 	minor_shift:	4,
-	max_p:		1 << 4,
 	part:		acsi_part,
 	sizes:		acsi_sizes,
-	real_devices:	(void *)acsi_info,
 	fops:		&acsi_fops,
 };
 	

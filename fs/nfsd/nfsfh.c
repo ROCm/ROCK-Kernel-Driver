@@ -424,7 +424,8 @@ find_fh_dentry(struct super_block *sb, __u32 *datap, int len, int fhtype, int ne
 	/* It's a directory, or we are required to confirm the file's
 	 * location in the tree.
 	 */
-	dprintk("nfs_fh: need to look harder for %d/%d\n",sb->s_dev,datap[0]);
+	dprintk("nfs_fh: need to look harder for %02x:%02x/%d\n",
+		major(sb->s_dev), minor(sb->s_dev), datap[0]);
 
 	if (!S_ISDIR(result->d_inode->i_mode)) {
 		nfsdstats.fh_nocache_nondir++;
@@ -556,7 +557,7 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 			case 0:
 				if ((data_left-=2)<0) goto out;
 				nfsdev = ntohl(*datap++);
-				xdev = MKDEV(nfsdev>>16, nfsdev&0xFFFF);
+				xdev = mk_kdev(nfsdev>>16, nfsdev&0xFFFF);
 				xino = *datap++;
 				break;
 			default:
@@ -788,8 +789,8 @@ fh_compose(struct svc_fh *fhp, struct svc_export *exp, struct dentry *dentry, st
 	struct dentry *parent = dentry->d_parent;
 	__u32 *datap;
 
-	dprintk("nfsd: fh_compose(exp %x/%ld %s/%s, ino=%ld)\n",
-		exp->ex_dev, (long) exp->ex_ino,
+	dprintk("nfsd: fh_compose(exp %02x:%02x/%ld %s/%s, ino=%ld)\n",
+		major(exp->ex_dev), minor(exp->ex_dev), (long) exp->ex_ino,
 		parent->d_name.name, dentry->d_name.name,
 		(inode ? inode->i_ino : 0));
 
@@ -811,7 +812,7 @@ fh_compose(struct svc_fh *fhp, struct svc_export *exp, struct dentry *dentry, st
 		memset(&fhp->fh_handle.fh_base, 0, NFS_FHSIZE);
 		fhp->fh_handle.fh_size = NFS_FHSIZE;
 		fhp->fh_handle.ofh_dcookie = 0xfeebbaca;
-		fhp->fh_handle.ofh_dev =  htonl((MAJOR(exp->ex_dev)<<16)| MINOR(exp->ex_dev));
+		fhp->fh_handle.ofh_dev =  htonl((major(exp->ex_dev)<<16)| minor(exp->ex_dev));
 		fhp->fh_handle.ofh_xdev = fhp->fh_handle.ofh_dev;
 		fhp->fh_handle.ofh_xino = ino_t_to_u32(exp->ex_ino);
 		fhp->fh_handle.ofh_dirino = ino_t_to_u32(dentry->d_parent->d_inode->i_ino);
@@ -823,7 +824,7 @@ fh_compose(struct svc_fh *fhp, struct svc_export *exp, struct dentry *dentry, st
 		fhp->fh_handle.fh_fsid_type = 0;
 		datap = fhp->fh_handle.fh_auth+0;
 		/* fsid_type 0 == 2byte major, 2byte minor, 4byte inode */
-		*datap++ = htonl((MAJOR(exp->ex_dev)<<16)| MINOR(exp->ex_dev));
+		*datap++ = htonl((major(exp->ex_dev)<<16)| minor(exp->ex_dev));
 		*datap++ = ino_t_to_u32(exp->ex_ino);
 		fhp->fh_handle.fh_size = 3*4;
 		if (inode) {

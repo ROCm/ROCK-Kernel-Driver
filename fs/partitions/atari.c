@@ -43,7 +43,7 @@ static inline int OK_id(char *s)
 int atari_partition (struct gendisk *hd, struct block_device *bdev,
 		     unsigned long first_sector, int minor)
 {
-	int m_lim = minor + hd->max_p;
+	int m_lim = minor + (1 << hd->minor_shift);
 	Sector sect;
 	struct rootsector *rs;
 	struct partition_info *pi;

@@ -555,7 +555,7 @@ static int proc_pid_maps_get_line (char *buf, struct vm_area_struct *map)
 	str[3] = flags & VM_MAYSHARE ? 's' : 'p';
 	str[4] = 0;
 
-	dev = 0;
+	dev = NODEV;
 	ino = 0;
 	if (map->vm_file != NULL) {
 		dev = map->vm_file->f_dentry->d_inode->i_dev;

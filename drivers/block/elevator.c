@@ -70,7 +70,7 @@ inline int bio_rq_in_between(struct bio *bio, struct request *rq,
 	 * if the device is different (not a normal case) just check if
 	 * bio is after rq
 	 */
-	if (next_rq->rq_dev != rq->rq_dev)
+	if (!kdev_same(next_rq->rq_dev, rq->rq_dev))
 		return bio->bi_sector > rq->sector;
 
 	/*
@@ -113,7 +113,7 @@ inline int elv_rq_merge_ok(struct request *rq, struct bio *bio)
 	/*
 	 * same device and no special stuff set, merge is ok
 	 */
-	if (rq->rq_dev == bio->bi_dev && !rq->waiting && !rq->special)
+	if (kdev_same(rq->rq_dev, bio->bi_dev) && !rq->waiting && !rq->special)
 		return 1;
 
 	return 0;

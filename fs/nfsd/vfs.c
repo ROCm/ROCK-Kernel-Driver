@@ -66,7 +66,7 @@ struct raparms {
 	struct raparms		*p_next;
 	unsigned int		p_count;
 	ino_t			p_ino;
-	dev_t			p_dev;
+	kdev_t			p_dev;
 	unsigned long		p_reada,
 				p_ramax,
 				p_raend,
@@ -543,13 +543,13 @@ nfsd_sync_dir(struct dentry *dp)
  * specified by (dev, ino).
  */
 static inline struct raparms *
-nfsd_get_raparms(dev_t dev, ino_t ino)
+nfsd_get_raparms(kdev_t dev, ino_t ino)
 {
 	struct raparms	*ra, **rap, **frap = NULL;
 	int depth = 0;
 	
 	for (rap = &raparm_cache; (ra = *rap); rap = &ra->p_next) {
-		if (ra->p_ino == ino && ra->p_dev == dev)
+		if (ra->p_ino == ino && kdev_same(ra->p_dev, dev))
 			goto found;
 		depth++;
 		if (ra->p_count == 0)
@@ -730,7 +730,7 @@ nfsd_write(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset,
 		 */
 		if (EX_WGATHER(exp)) {
 			if (atomic_read(&inode->i_writecount) > 1
-			    || (last_ino == inode->i_ino && last_dev == inode->i_dev)) {
+			    || (last_ino == inode->i_ino && kdev_same(last_dev, inode->i_dev))) {
 				dprintk("nfsd: write defer %d\n", current->pid);
 				set_current_state(TASK_UNINTERRUPTIBLE);
 				schedule_timeout((HZ+99)/100);
@@ -1245,7 +1245,7 @@ nfsd_rename(struct svc_rqst *rqstp, struct svc_fh *ffhp, char *fname, int flen,
 	tdir = tdentry->d_inode;
 
 	err = (rqstp->rq_vers == 2) ? nfserr_acces : nfserr_xdev;
-	if (fdir->i_dev != tdir->i_dev)
+	if (!kdev_same(fdir->i_dev, tdir->i_dev))
 		goto out;
 
 	err = nfserr_perm;

@@ -109,12 +109,12 @@ int blk_nohighio = 0;
  **/
 inline request_queue_t *blk_get_queue(kdev_t dev)
 {
-	struct blk_dev_struct *bdev = blk_dev + MAJOR(dev);
+	struct blk_dev_struct *bdev = blk_dev + major(dev);
 
 	if (bdev->queue)
 		return bdev->queue(dev);
 	else
-		return &blk_dev[MAJOR(dev)].request_queue;
+		return &blk_dev[major(dev)].request_queue;
 }
 
 void blk_queue_prep_rq(request_queue_t *q, prep_rq_fn *pfn)
@@ -309,7 +309,7 @@ void blk_dump_rq_flags(struct request *rq, char *msg)
 {
 	int bit;
 
-	printk("%s: dev %x: ", msg, rq->rq_dev);
+	printk("%s: dev %02x:%02x: ", msg, major(rq->rq_dev), minor(rq->rq_dev));
 	bit = 0;
 	do {
 		if (rq->flags & (1 << bit))
@@ -910,8 +910,8 @@ int is_read_only(kdev_t dev)
 {
 	int minor,major;
 
-	major = MAJOR(dev);
-	minor = MINOR(dev);
+	major = major(dev);
+	minor = minor(dev);
 	if (major < 0 || major >= MAX_BLKDEV) return 0;
 	return ro_bits[major][minor >> 5] & (1 << (minor & 31));
 }
@@ -920,8 +920,8 @@ void set_device_ro(kdev_t dev,int flag)
 {
 	int minor,major;
 
-	major = MAJOR(dev);
-	minor = MINOR(dev);
+	major = major(dev);
+	minor = minor(dev);
 	if (major < 0 || major >= MAX_BLKDEV) return;
 	if (flag) ro_bits[major][minor >> 5] |= 1 << (minor & 31);
 	else ro_bits[major][minor >> 5] &= ~(1 << (minor & 31));
@@ -929,7 +929,7 @@ void set_device_ro(kdev_t dev,int flag)
 
 void drive_stat_acct(struct request *rq, int nr_sectors, int new_io)
 {
-	unsigned int major = MAJOR(rq->rq_dev);
+	unsigned int major = major(rq->rq_dev);
 	int rw = rq_data_dir(rq);
 	unsigned int index;
 
@@ -1016,7 +1016,7 @@ static void attempt_merge(request_queue_t *q, struct request *req,
 		return;
 
 	if (rq_data_dir(req) != rq_data_dir(next)
-	    || req->rq_dev != next->rq_dev
+	    || !kdev_same(req->rq_dev, next->rq_dev)
 	    || req->nr_sectors + next->nr_sectors > q->max_sectors
 	    || next->waiting || next->special)
 		return;
@@ -1245,14 +1245,14 @@ static inline void blk_partition_remap(struct bio *bio)
 	struct gendisk *g;
 	kdev_t dev0;
 
-	major = MAJOR(bio->bi_dev);
+	major = major(bio->bi_dev);
 	if ((g = get_gendisk(bio->bi_dev))) {
-		minor = MINOR(bio->bi_dev);
+		minor = minor(bio->bi_dev);
 		drive = (minor >> g->minor_shift);
 		minor0 = (drive << g->minor_shift); /* whole disk device */
 		/* that is, minor0 = (minor & ~((1<<g->minor_shift)-1)); */
-		dev0 = MKDEV(major, minor0);
-		if (dev0 != bio->bi_dev) {
+		dev0 = mk_kdev(major, minor0);
+		if (!kdev_same(dev0, bio->bi_dev)) {
 			bio->bi_dev = dev0;
 			bio->bi_sector += g->part[minor].start_sect;
 		}
@@ -1287,8 +1287,8 @@ static inline void blk_partition_remap(struct bio *bio)
  * */
 void generic_make_request(struct bio *bio)
 {
-	int major = MAJOR(bio->bi_dev);
-	int minor = MINOR(bio->bi_dev);
+	int major = major(bio->bi_dev);
+	int minor = minor(bio->bi_dev);
 	request_queue_t *q;
 	sector_t minorsize = 0;
 	int ret, nr_sectors = bio_sectors(bio);
@@ -1477,7 +1477,7 @@ void ll_rw_block(int rw, int nr, struct buffer_head * bhs[])
 	if (!nr)
 		return;
 
-	major = MAJOR(bhs[0]->b_dev);
+	major = major(bhs[0]->b_dev);
 
 	/* Determine correct block size for this device. */
 	correct_size = get_hardsect_size(bhs[0]->b_dev);

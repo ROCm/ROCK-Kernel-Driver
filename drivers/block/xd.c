@@ -130,10 +130,8 @@ static struct gendisk xd_gendisk = {
 	major:		MAJOR_NR,
 	major_name:	"xd",
 	minor_shift:	6,
-	max_p:		1 << 6,
 	part:		xd_struct,
 	sizes:		xd_sizes,
-	real_devices:	(void *)xd_info,
 	fops:		&xd_fops,
 };
 

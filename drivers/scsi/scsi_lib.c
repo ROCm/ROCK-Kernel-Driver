@@ -385,7 +385,7 @@ static Scsi_Cmnd *__scsi_end_request(Scsi_Cmnd * SCpnt,
 	if (req->waiting)
 		complete(req->waiting);
 
-	add_blkdev_randomness(MAJOR(req->rq_dev));
+	add_blkdev_randomness(major(req->rq_dev));
 
 	/*
 	 * This will goose the queue request function at the end, so we don't
@@ -744,7 +744,7 @@ struct Scsi_Device_Template *scsi_get_request_dev(struct request *req)
 {
 	struct Scsi_Device_Template *spnt;
 	kdev_t dev = req->rq_dev;
-	int major = MAJOR(dev);
+	int major = major(dev);
 
 	for (spnt = scsi_devicelist; spnt; spnt = spnt->next) {
 		/*

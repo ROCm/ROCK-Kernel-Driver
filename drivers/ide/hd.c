@@ -693,7 +693,6 @@ static struct gendisk hd_gendisk = {
 	major:		MAJOR_NR,
 	major_name:	"hd",
 	minor_shift:	6,
-	max_p:		1 << 6,
 	part:		hd,
 	sizes:		hd_sizes,
 	fops:		&hd_fops,

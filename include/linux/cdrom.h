@@ -792,7 +792,7 @@ static inline void devfs_plain_cdrom(struct cdrom_device_info *cdi,
 
 	sprintf (vname, "cdroms/cdrom%d", cdi->number);
 	cdi->de = devfs_register (NULL, vname, DEVFS_FL_DEFAULT,
-				    MAJOR (cdi->dev), MINOR (cdi->dev),
+				    major(cdi->dev), minor(cdi->dev),
 				    S_IFBLK | S_IRUGO | S_IWUGO,
 				    ops, NULL);
 }

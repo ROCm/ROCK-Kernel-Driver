@@ -51,25 +51,16 @@ extern void mem_use(void);
  * NOTE! The unix "nice" value influences how long a process
  * gets. The nice value ranges from -20 to +19, where a -20
  * is a "high-priority" task, and a "+10" is a low-priority
- * task.
- *
- * We want the time-slice to be around 50ms or so, so this
- * calculation depends on the value of HZ.
+ * task. The default time slice for zero-nice tasks will be 43ms.
  */
-#if HZ < 200
-#define TICK_SCALE(x)	((x) >> 2)
-#elif HZ < 400
-#define TICK_SCALE(x)	((x) >> 1)
-#elif HZ < 800
-#define TICK_SCALE(x)	(x)
-#elif HZ < 1600
-#define TICK_SCALE(x)	((x) << 1)
-#else
-#define TICK_SCALE(x)	((x) << 2)
-#endif
+#define NICE_RANGE	40
+#define MIN_NICE_TSLICE	10000
+#define MAX_NICE_TSLICE	80000
+#define TASK_TIMESLICE(p)	((int) ts_table[19 - (p)->nice])
 
-#define TASK_TIMESLICE(p)	(TICK_SCALE(20-(p)->nice)+1)
+static unsigned char ts_table[NICE_RANGE];
 
+#define MM_AFFINITY_BONUS	1
 
 /*
  *	Init task must be ok at boot for the ix86 as we will check its signals
@@ -181,7 +172,7 @@ static inline int goodness(struct task_struct * p, int this_cpu, struct mm_struc
 
 		/* .. and a slight advantage to the current MM */
 		if (p->mm == this_mm || !p->mm)
-			weight += 1;
+			weight += MM_AFFINITY_BONUS;
 		weight += 20 - p->nice;
 		goto out;
 	}
@@ -1328,6 +1319,15 @@ void __init init_idle(void)
 
 extern void init_timervecs (void);
 
+static void fill_tslice_map(void)
+{
+	int i;
+
+	for (i = 0; i < NICE_RANGE; i++)
+		ts_table[i] = ((MIN_NICE_TSLICE +
+						((MAX_NICE_TSLICE - MIN_NICE_TSLICE) / NICE_RANGE) * i) * HZ) / 1000000;
+}
+
 void __init sched_init(void)
 {
 	/*
@@ -1341,6 +1341,8 @@ void __init sched_init(void)
 
 	for(nr = 0; nr < PIDHASH_SZ; nr++)
 		pidhash[nr] = NULL;
+
+	fill_tslice_map();
 
 	init_timervecs();
 

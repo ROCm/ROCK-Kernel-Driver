@@ -1311,10 +1311,8 @@ static struct gendisk mfm_gendisk = {
 	major:		MAJOR_NR,
 	major_name:	"mfm",
 	minor_shift:	6,
-	max_p:		1 << 6,
 	part:		mfm,
 	sizes:		mfm_sizes,
-	real_devices:	(void *)mfm_info,
 };
 
 static struct block_device_operations mfm_fops =
@@ -1473,7 +1471,7 @@ static int mfm_reread_partitions(kdev_t dev)
 	mfm_info[target].busy = 1;
 	restore_flags (flags);
 
-	maxp = mfm_gendisk.max_p;
+	maxp = 1 << mfm_gendisk.minor_shift;
 	start = target << mfm_gendisk.minor_shift;
 
 	for (i = maxp - 1; i >= 0; i--) {

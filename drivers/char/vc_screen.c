@@ -49,7 +49,8 @@ static int
 vcs_size(struct inode *inode)
 {
 	int size;
-	int currcons = MINOR(inode->i_rdev) & 127;
+	int minor = minor(inode->i_rdev);
+	int currcons = minor & 127;
 	if (currcons == 0)
 		currcons = fg_console;
 	else
@@ -59,7 +60,7 @@ vcs_size(struct inode *inode)
 
 	size = video_num_lines * video_num_columns;
 
-	if (MINOR(inode->i_rdev) & 128)
+	if (minor & 128)
 		size = 2*size + HEADER_SIZE;
 	return size;
 }
@@ -97,7 +98,7 @@ static ssize_t
 vcs_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 {
 	struct inode *inode = file->f_dentry->d_inode;
-	unsigned int currcons = MINOR(inode->i_rdev);
+	unsigned int currcons = minor(inode->i_rdev);
 	long pos = *ppos;
 	long viewed, attr, read;
 	int col, maxcol;
@@ -266,7 +267,7 @@ static ssize_t
 vcs_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 {
 	struct inode *inode = file->f_dentry->d_inode;
-	unsigned int currcons = MINOR(inode->i_rdev);
+	unsigned int currcons = minor(inode->i_rdev);
 	long pos = *ppos;
 	long viewed, attr, size, written;
 	char *con_buf0;
@@ -449,7 +450,7 @@ unlock_out:
 static int
 vcs_open(struct inode *inode, struct file *filp)
 {
-	unsigned int currcons = (MINOR(inode->i_rdev) & 127);
+	unsigned int currcons = minor(inode->i_rdev) & 127;
 	if(currcons && !vc_cons_allocated(currcons-1))
 		return -ENXIO;
 	return 0;

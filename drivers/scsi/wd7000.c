@@ -140,6 +140,11 @@
  *  03/01/1998
  *
  *  WD7000 driver now work on kernels >= 2.1.x
+ *
+ *
+ * 12/31/2001 - Arnaldo Carvalho de Melo <acme@conectiva.com.br>
+ *
+ * use host->host_lock, not io_request_lock, cleanups
  */
 
 #include <linux/module.h>
@@ -166,6 +171,11 @@
 
 #define ANY2SCSI_INLINE		/* undef this to use old macros */
 #undef  WD7000_DEBUG		/* general debug                */
+#ifdef WD7000_DEBUG
+#define dprintk printk
+#else
+#define dprintk(format,args...)
+#endif
 
 #include "wd7000.h"
 #include <linux/stat.h>
@@ -557,7 +567,7 @@ typedef union icb {
 } Icb;
 
 #ifdef MODULE
-static char * wd7000 = NULL;
+static char *wd7000;
 MODULE_PARM(wd7000, "s");
 #endif
 
@@ -568,23 +578,23 @@ MODULE_PARM(wd7000, "s");
  *  structure is not part of the Adapter structure.
  */
 static Scb scbs[MAX_SCBS];
-static Scb *scbfree = NULL;	/* free list         */
+static Scb *scbfree;		/* free list         */
 static int freescbs = MAX_SCBS;	/* free list counter */
 
 /*
  *  END of data/declarations - code follows.
  */
-static void setup_error (char *mesg, int *ints)
+static void __init setup_error(char *mesg, int *ints)
 {
     if (ints[0] == 3)
-        printk ("wd7000_setup: \"wd7000=%d,%d,0x%x\" -> %s\n",
-                ints[1], ints[2], ints[3], mesg);
+        printk(KERN_ERR "wd7000_setup: \"wd7000=%d,%d,0x%x\" -> %s\n",
+               ints[1], ints[2], ints[3], mesg);
     else if (ints[0] == 4)
-        printk ("wd7000_setup: \"wd7000=%d,%d,0x%x,%d\" -> %s\n",
-                ints[1], ints[2], ints[3], ints[4], mesg);
+        printk(KERN_ERR "wd7000_setup: \"wd7000=%d,%d,0x%x,%d\" -> %s\n",
+               ints[1], ints[2], ints[3], ints[4], mesg);
     else
-        printk ("wd7000_setup: \"wd7000=%d,%d,0x%x,%d,%d\" -> %s\n",
-                ints[1], ints[2], ints[3], ints[4], ints[5], mesg);
+        printk(KERN_ERR "wd7000_setup: \"wd7000=%d,%d,0x%x,%d,%d\" -> %s\n",
+               ints[1], ints[2], ints[3], ints[4], ints[5], mesg);
 }
 
 
@@ -604,21 +614,23 @@ static void setup_error (char *mesg, int *ints)
  */
 static int __init wd7000_setup(char *str)
 {
-	static short wd7000_card_num = 0;
-	short i, j;
+	static short wd7000_card_num; /* .bss will zero this */
+	short i;
 	int ints[6];
 
 	(void)get_options(str, ARRAY_SIZE(ints), ints);
 
 	if (wd7000_card_num >= NUM_CONFIGS) {
-		printk("wd7000_setup: Too many \"wd7000=\" configurations in "
-		"command line!\n");
+		printk(KERN_ERR __FUNCTION__
+			": Too many \"wd7000=\" configurations in "
+			"command line!\n");
 		return 0;
 	}
 
 	if ((ints[0] < 3) || (ints[0] > 5)) {
-		printk("wd7000_setup: Error in command line!  "
-		"Usage: wd7000=<IRQ>,<DMA>,IO>[,<BUS_ON>[,<BUS_OFF>]]\n");
+		printk(KERN_ERR __FUNCTION__ ": Error in command line!  "
+			"Usage: wd7000=<IRQ>,<DMA>,IO>[,<BUS_ON>"
+			"[,<BUS_OFF>]]\n");
 	} else {
 		for (i = 0; i < NUM_IRQS; i++)
 			if (ints[1] == wd7000_irq[i])
@@ -652,7 +664,8 @@ static int __init wd7000_setup(char *str)
 
 		if (ints[0] > 3) {
 			if ((ints[4] < 500) || (ints[4] > 31875)) {
-				setup_error("BUS_ON value is out of range (500 to 31875 nanoseconds)!", ints);
+				setup_error("BUS_ON value is out of range (500"
+					    " to 31875 nanoseconds)!", ints);
 				configs[wd7000_card_num].bus_on = BUS_ON;
 			} else
 				configs[wd7000_card_num].bus_on = ints[4] / 125;
@@ -661,36 +674,47 @@ static int __init wd7000_setup(char *str)
 
 		if (ints[0] > 4) {
 			if ((ints[5] < 500) || (ints[5] > 31875)) {
-				setup_error("BUS_OFF value is out of range (500 to 31875 nanoseconds)!", ints);
+				setup_error("BUS_OFF value is out of range (500"
+					    " to 31875 nanoseconds)!", ints);
 				configs[wd7000_card_num].bus_off = BUS_OFF;
 			} else
-				configs[wd7000_card_num].bus_off = ints[5] / 125;
+				configs[wd7000_card_num].bus_off = ints[5] /
+								   125;
 		} else
 			configs[wd7000_card_num].bus_off = BUS_OFF;
 
 		if (wd7000_card_num) {
-			for (i = 0; i < (wd7000_card_num - 1); i++)
-				for (j = i + 1; j < wd7000_card_num; j++)
+			for (i = 0; i < (wd7000_card_num - 1); i++) {
+				int j = i + 1;
+
+				for (; j < wd7000_card_num; j++)
 					if (configs[i].irq == configs[j].irq) {
-						setup_error("duplicated IRQ!", ints);
-						return 0;
-					} else if (configs[i].dma == configs[j].dma) {
-						setup_error("duplicated DMA channel!", ints);
-						return 0;
-					} else if (configs[i].iobase == configs[j].iobase) {
-						setup_error ("duplicated I/O base address!", ints);
+						setup_error("duplicated IRQ!",
+							    ints);
 						return 0;
 					}
+					if (configs[i].dma == configs[j].dma) {
+						setup_error("duplicated DMA "
+							    "channel!", ints);
+						return 0;
+					}
+					if (configs[i].iobase ==
+					    configs[j].iobase) {
+						setup_error("duplicated I/O "
+							    "base address!",
+							    ints);
+						return 0;
+					}
+			}
 		}
 
-#ifdef WD7000_DEBUG
-		printk ("wd7000_setup: IRQ=%d, DMA=%d, I/O=0x%x, BUS_ON=%dns, BUS_OFF=%dns\n",
+		dprintk(KERN_DEBUG "wd7000_setup: IRQ=%d, DMA=%d, I/O=0x%x, "
+				  "BUS_ON=%dns, BUS_OFF=%dns\n",
 			configs[wd7000_card_num].irq,
 			configs[wd7000_card_num].dma,
 			configs[wd7000_card_num].iobase,
 			configs[wd7000_card_num].bus_on * 125,
 			configs[wd7000_card_num].bus_off * 125);
-#endif
 
 		wd7000_card_num++;
 	}
@@ -811,7 +835,7 @@ static inline int command_out (Adapter * host, unchar * cmd, int len)
 	return (1);
     }
 
-    printk ("wd7000 command_out: WAIT failed(%d)\n", len + 1);
+    printk(KERN_WARNING "wd7000 command_out: WAIT failed(%d)\n", len + 1);
 
     return (0);
 }
@@ -827,7 +851,7 @@ static inline int command_out (Adapter * host, unchar * cmd, int len)
  *  the satisfiability of a request is not dependent on the size of the
  *  request.
  */
-static inline Scb *alloc_scbs (int needed)
+static inline Scb *alloc_scbs(struct Scsi_Host *host, int needed)
 {
     register Scb *scb, *p;
     register unsigned long flags;
@@ -842,18 +866,18 @@ static inline Scb *alloc_scbs (int needed)
     save_flags (flags);
     cli ();
     while (busy) {		/* someone else is allocating */
-	spin_unlock_irq(&io_request_lock);
+	spin_unlock_irq(&host->host_lock);
 	for (now = jiffies; now == jiffies; );	/* wait a jiffy */
-	spin_lock_irq(&io_request_lock);
+	spin_lock_irq(&host->host_lock);
     }
     busy = 1;			/* not busy now; it's our turn */
 
     while (freescbs < needed) {
 	timeout = jiffies + WAITnexttimeout;
 	do {
-	    spin_unlock_irq(&io_request_lock);
+	    spin_unlock_irq(&host->host_lock);
 	    for (now = jiffies; now == jiffies; );	/* wait a jiffy */
-	    spin_lock_irq(&io_request_lock);
+	    spin_lock_irq(&host->host_lock);
 	} while (freescbs < needed && time_before_eq(jiffies, timeout));
 	/*
 	 *  If we get here with enough free Scbs, we can take them.
@@ -929,9 +953,7 @@ static int mail_out (Adapter *host, Scb *scbptr)
     Mailbox *ogmbs = host->mb.ogmb;
     int *next_ogmb = &(host->next_ogmb);
 
-#ifdef WD7000_DEBUG
-    printk ("wd7000_mail_out: 0x%06lx", (long) scbptr);
-#endif
+    dprintk("wd7000_mail_out: 0x%06lx", (long) scbptr);
 
     /* We first look for a free outgoing mailbox */
     save_flags (flags);
@@ -939,9 +961,7 @@ static int mail_out (Adapter *host, Scb *scbptr)
     ogmb = *next_ogmb;
     for (i = 0; i < OGMB_CNT; i++) {
 	if (ogmbs[ogmb].status == 0) {
-#ifdef WD7000_DEBUG
-	    printk (" using OGMB 0x%x", ogmb);
-#endif
+	    dprintk(" using OGMB 0x%x", ogmb);
 	    ogmbs[ogmb].status = 1;
 	    any2scsi ((unchar *) ogmbs[ogmb].scbptr, (int) scbptr);
 
@@ -953,9 +973,7 @@ static int mail_out (Adapter *host, Scb *scbptr)
     }
     restore_flags (flags);
 
-#ifdef WD7000_DEBUG
-    printk (", scb is 0x%06lx", (long) scbptr);
-#endif
+    dprintk(", scb is 0x%06lx", (long) scbptr);
 
     if (i >= OGMB_CNT) {
 	/*
@@ -966,9 +984,7 @@ static int mail_out (Adapter *host, Scb *scbptr)
 	 *  that marks OGMB's free, waiting even with interrupts off
 	 *  should work, since they are freed very quickly in most cases.
 	 */
-#ifdef WD7000_DEBUG
-	printk (", no free OGMBs.\n");
-#endif
+	dprintk(", no free OGMBs.\n");
 	return (0);
     }
 
@@ -977,9 +993,7 @@ static int mail_out (Adapter *host, Scb *scbptr)
     start_ogmb = START_OGMB | ogmb;
     command_out (host, &start_ogmb, 1);
 
-#ifdef WD7000_DEBUG
-    printk (", awaiting interrupt.\n");
-#endif
+    dprintk(", awaiting interrupt.\n");
 
     return (1);
 }
@@ -1026,7 +1040,7 @@ int make_code (unsigned hosterr, unsigned scsierr)
     }
 #ifdef WD7000_DEBUG
     if (scsierr || hosterr)
-	printk ("\nSCSI command error: SCSI 0x%02x host 0x%04x return %d\n",
+	dprintk("\nSCSI command error: SCSI 0x%02x host 0x%04x return %d\n",
 		scsierr, in_error, hosterr);
 #endif
     return (scsierr | (hosterr << 16));
@@ -1035,10 +1049,7 @@ int make_code (unsigned hosterr, unsigned scsierr)
 
 static void wd7000_scsi_done (Scsi_Cmnd *SCpnt)
 {
-#ifdef WD7000_DEBUG
-    printk ("wd7000_scsi_done: 0x%06lx\n", (long) SCpnt);
-#endif
-
+    dprintk("wd7000_scsi_done: 0x%06lx\n", (long)SCpnt);
     SCpnt->SCp.phase = 0;
 }
 
@@ -1057,15 +1068,11 @@ void wd7000_intr_handle (int irq, void *dev_id, struct pt_regs *regs)
 
     host->int_counter++;
 
-#ifdef WD7000_DEBUG
-    printk ("wd7000_intr_handle: irq = %d, host = 0x%06lx\n", irq, (long) host);
-#endif
+    dprintk("wd7000_intr_handle: irq = %d, host = 0x%06lx\n", irq, (long) host);
 
     flag = inb (host->iobase + ASC_INTR_STAT);
 
-#ifdef WD7000_DEBUG
-    printk ("wd7000_intr_handle: intr stat = 0x%02x\n", flag);
-#endif
+    dprintk("wd7000_intr_handle: intr stat = 0x%02x\n", flag);
 
     if (!(inb (host->iobase + ASC_STAT) & INT_IM)) {
 	/* NB: these are _very_ possible if IRQ 15 is being used, since
@@ -1076,9 +1083,7 @@ void wd7000_intr_handle (int irq, void *dev_id, struct pt_regs *regs)
 	 * can sort these out.  Otherwise, electrical noise and other such
 	 * problems would be indistinguishable from valid interrupts...
 	 */
-#ifdef WD7000_DEBUG
-	printk ("wd7000_intr_handle: phantom interrupt...\n");
-#endif
+	dprintk("wd7000_intr_handle: phantom interrupt...\n");
 	wd7000_intr_ack (host);
 	return;
     }
@@ -1086,9 +1091,7 @@ void wd7000_intr_handle (int irq, void *dev_id, struct pt_regs *regs)
     if (flag & MB_INTR) {
 	/* The interrupt is for a mailbox */
 	if (!(flag & IMB_INTR)) {
-#ifdef WD7000_DEBUG
-	    printk ("wd7000_intr_handle: free outgoing mailbox\n");
-#endif
+	    dprintk("wd7000_intr_handle: free outgoing mailbox\n");
 	    /*
 	     * If sleep_on() and the "interrupt on free OGMB" command are
 	     * used in mail_out(), wake_up() should correspondingly be called
@@ -1102,10 +1105,8 @@ void wd7000_intr_handle (int irq, void *dev_id, struct pt_regs *regs)
 	    icmb = flag & MB_MASK;
 	    icmb_status = icmbs[icmb].status;
 	    if (icmb_status & 0x80) {	/* unsolicited - result in ICMB */
-#ifdef WD7000_DEBUG
-		printk ("wd7000_intr_handle: unsolicited interrupt 0x%02x\n",
+		dprintk("wd7000_intr_handle: unsolicited interrupt 0x%02x\n",
 			icmb_status);
-#endif
 		wd7000_intr_ack (host);
 		return;
 	    }
@@ -1135,18 +1136,17 @@ void wd7000_intr_handle (int irq, void *dev_id, struct pt_regs *regs)
 
     wd7000_intr_ack (host);
 
-#ifdef WD7000_DEBUG
-    printk ("wd7000_intr_handle: return from interrupt handler\n");
-#endif
+    dprintk("wd7000_intr_handle: return from interrupt handler\n");
 }
 
 void do_wd7000_intr_handle (int irq, void *dev_id, struct pt_regs *regs)
 {
     unsigned long flags;
+    struct Scsi_Host *host = dev_id;
 
-    spin_lock_irqsave(&io_request_lock, flags);
+    spin_lock_irqsave(&host->host_lock, flags);
     wd7000_intr_handle(irq, dev_id, regs);
-    spin_unlock_irqrestore(&io_request_lock, flags);
+    spin_unlock_irqrestore(&host->host_lock, flags);
 }
 
 
@@ -1163,7 +1163,7 @@ int wd7000_queuecommand (Scsi_Cmnd *SCpnt, void (*done) (Scsi_Cmnd *))
     idlun = ((SCpnt->target << 5) & 0xe0) | (SCpnt->lun & 7);
     SCpnt->scsi_done = done;
     SCpnt->SCp.phase = 1;
-    scb = alloc_scbs (1);
+    scb = alloc_scbs(SCpnt->host, 1);
     scb->idlun = idlun;
     memcpy (scb->cdb, cdb, cdblen);
     scb->direc = 0x40;		/* Disable direction check */
@@ -1179,9 +1179,7 @@ int wd7000_queuecommand (Scsi_Cmnd *SCpnt, void (*done) (Scsi_Cmnd *))
 	if (SCpnt->host->sg_tablesize == SG_NONE) {
 	    panic ("wd7000_queuecommand: scatter/gather not supported.\n");
 	}
-#ifdef WD7000_DEBUG
-	printk ("Using scatter/gather with %d elements.\n", SCpnt->use_sg);
-#endif
+	dprintk ("Using scatter/gather with %d elements.\n", SCpnt->use_sg);
 
 	sgb = scb->sgb;
 	scb->op = 1;
@@ -1367,14 +1365,12 @@ int wd7000_set_info (char *buffer, int length, struct Scsi_Host *host)
     save_flags (flags);
     cli ();
 
-#ifdef WD7000_DEBUG
-    printk ("Buffer = <%.*s>, length = %d\n", length, buffer, length);
-#endif
+    dprintk("Buffer = <%.*s>, length = %d\n", length, buffer, length);
 
     /*
      * Currently this is a no-op
      */
-    printk ("Sorry, this function is currently out of order...\n");
+    dprintk("Sorry, this function is currently out of order...\n");
 
     restore_flags (flags);
 
@@ -1521,9 +1517,7 @@ int wd7000_detect (Scsi_Host_Template *tpnt)
     Adapter *host = NULL;
     struct Scsi_Host *sh;
 
-#ifdef WD7000_DEBUG
-    printk ("wd7000_detect: started\n");
-#endif
+    dprintk("wd7000_detect: started\n");
 
 #ifdef MODULE
 	if (wd7000)
@@ -1573,12 +1567,12 @@ int wd7000_detect (Scsi_Host_Template *tpnt)
 	 * BIOS SIGNATURE has been found.
 	 */
 #ifdef WD7000_DEBUG
-	printk ("wd7000_detect: pass %d\n", pass + 1);
+	dprintk("wd7000_detect: pass %d\n", pass + 1);
 
 	if (biosaddr_ptr == NUM_ADDRS)
-	    printk ("WD-7000 SST BIOS not detected...\n");
+	    dprintk("WD-7000 SST BIOS not detected...\n");
 	else
-	    printk ("WD-7000 SST BIOS detected at 0x%lx: checking...\n",
+	    dprintk("WD-7000 SST BIOS detected at 0x%lx: checking...\n",
 		    wd7000_biosaddr[biosaddr_ptr]);
 #endif
 
@@ -1587,15 +1581,11 @@ int wd7000_detect (Scsi_Host_Template *tpnt)
 
 	iobase = configs[pass].iobase;
 
-#ifdef WD7000_DEBUG
-	printk ("wd7000_detect: check IO 0x%x region...\n", iobase);
-#endif
+	dprintk("wd7000_detect: check IO 0x%x region...\n", iobase);
 
 	if (request_region (iobase, 4, "wd7000")) {
 
-#ifdef WD7000_DEBUG
-	    printk ("wd7000_detect: ASC reset (IO 0x%x) ...", iobase);
-#endif
+	    dprintk("wd7000_detect: ASC reset (IO 0x%x) ...", iobase);
 	    /*
 	     * ASC reset...
 	     */
@@ -1603,17 +1593,11 @@ int wd7000_detect (Scsi_Host_Template *tpnt)
 	    delay (1);
 	    outb (0, iobase + ASC_CONTROL);
 
-	    if (WAIT (iobase + ASC_STAT, ASC_STATMASK, CMD_RDY, 0))
-#ifdef WD7000_DEBUG
-	    {
-		printk ("failed!\n");
+	    if (WAIT (iobase + ASC_STAT, ASC_STATMASK, CMD_RDY, 0)) {
+		dprintk("failed!\n");
 		goto err_release;
-	    }
-	    else 
-		printk ("ok!\n");
-#else
-	    goto err_release;
-#endif
+	    } else 
+		dprintk("ok!\n");
 
 	    if (inb (iobase + ASC_INTR_STAT) == 1) {
 		/*
@@ -1629,10 +1613,8 @@ int wd7000_detect (Scsi_Host_Template *tpnt)
 
 		host = (Adapter *) sh->hostdata;
 
-#ifdef WD7000_DEBUG
-		printk ("wd7000_detect: adapter allocated at 0x%x\n", (int) host);
-#endif
-
+		dprintk("wd7000_detect: adapter allocated at 0x%x\n",
+			(int)host);
 		memset (host, 0, sizeof (Adapter));
 
 		host->irq = configs[pass].irq;
@@ -1643,11 +1625,9 @@ int wd7000_detect (Scsi_Host_Template *tpnt)
 		host->bus_off = configs[pass].bus_off;
 		host->sh = wd7000_host[host->irq - IRQ_MIN] = sh;
 
-#ifdef WD7000_DEBUG
-		printk ("wd7000_detect: Trying init WD-7000 card at IO "
+		dprintk("wd7000_detect: Trying init WD-7000 card at IO "
 			"0x%x, IRQ %d, DMA %d...\n",
 			host->iobase, host->irq, host->dma);
-#endif
 
 		if (!wd7000_init (host)) 	/* Initialization failed */
 		    goto err_unregister;
@@ -1675,12 +1655,9 @@ int wd7000_detect (Scsi_Host_Template *tpnt)
                 printk ("  BUS_ON time: %dns, BUS_OFF time: %dns\n",
                         host->bus_on * 125, host->bus_off * 125);
 	    }
-	}
-
-#ifdef WD7000_DEBUG
-	else
-	    printk ("wd7000_detect: IO 0x%x region already allocated!\n", iobase);
-#endif
+	} else
+		dprintk("wd7000_detect: IO 0x%x region already allocated!\n",
+			iobase);
 
 	continue;
 
@@ -1730,9 +1707,8 @@ int wd7000_reset (Scsi_Cmnd *SCpnt, unsigned int unused)
  */
 int wd7000_biosparam (Disk *disk, kdev_t dev, int *ip)
 {
-#ifdef WD7000_DEBUG
-    printk ("wd7000_biosparam: dev=%s, size=%d, ", kdevname (dev), disk->capacity);
-#endif
+    dprintk("wd7000_biosparam: dev=%s, size=%d, ", kdevname(dev),
+	    disk->capacity);
 
     /*
      * try default translation
@@ -1766,14 +1742,13 @@ int wd7000_biosparam (Disk *disk, kdev_t dev, int *ip)
 	    ip[2] = info[2];
 
 	    if (info[0] == 255)
-		printk ("wd7000_biosparam: current partition table is using extended translation.\n");
+		printk(KERN_INFO __FUNCTION__ ": current partition table is "
+			"using extended translation.\n");
 	}
     }
 
-#ifdef WD7000_DEBUG
-    printk ("bios geometry: head=%d, sec=%d, cyl=%d\n", ip[0], ip[1], ip[2]);
-    printk ("WARNING: check, if the bios geometry is correct.\n");
-#endif
+    dprintk("bios geometry: head=%d, sec=%d, cyl=%d\n", ip[0], ip[1], ip[2]);
+    dprintk("WARNING: check, if the bios geometry is correct.\n");
 
     return (0);
 }

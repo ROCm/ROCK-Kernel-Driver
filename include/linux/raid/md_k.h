@@ -77,9 +77,9 @@ extern dev_mapping_t mddev_map [MAX_MD_DEVS];
 
 static inline mddev_t * kdev_to_mddev (kdev_t dev)
 {
-	if (MAJOR(dev) != MD_MAJOR)
+	if (major(dev) != MD_MAJOR)
 		BUG();
-        return mddev_map[MINOR(dev)].mddev;
+        return mddev_map[minor(dev)].mddev;
 }
 
 /*
@@ -256,7 +256,7 @@ static inline int mdidx (mddev_t * mddev)
 
 static inline kdev_t mddev_to_kdev(mddev_t * mddev)
 {
-	return MKDEV(MD_MAJOR, mdidx(mddev));
+	return mk_kdev(MD_MAJOR, mdidx(mddev));
 }
 
 extern mdk_rdev_t * find_rdev(mddev_t * mddev, kdev_t dev);

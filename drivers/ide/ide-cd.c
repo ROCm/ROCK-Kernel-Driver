@@ -2015,7 +2015,7 @@ static int cdrom_read_toc(ide_drive_t *drive, struct request_sense *sense)
 
 	/* Now try to get the total cdrom capacity. */
 	minor = (drive->select.b.unit) << PARTN_BITS;
-	dev = MKDEV(HWIF(drive)->major, minor);
+	dev = mk_kdev(HWIF(drive)->major, minor);
 	stat = cdrom_get_last_written(dev, &toc->capacity);
 	if (stat)
 		stat = cdrom_read_capacity(drive, &toc->capacity, sense);
@@ -2481,7 +2481,7 @@ static int ide_cdrom_register (ide_drive_t *drive, int nslots)
 	struct cdrom_device_info *devinfo = &info->devinfo;
 	int minor = (drive->select.b.unit) << PARTN_BITS;
 
-	devinfo->dev = MKDEV (HWIF(drive)->major, minor);
+	devinfo->dev = mk_kdev(HWIF(drive)->major, minor);
 	devinfo->ops = &ide_cdrom_dops;
 	devinfo->mask = 0;
 	*(int *)&devinfo->speed = CDROM_STATE_FLAGS (drive)->current_speed;
@@ -2678,8 +2678,8 @@ int ide_cdrom_setup (ide_drive_t *drive)
 	/*
 	 * default to read-only always and fix latter at the bottom
 	 */
-	set_device_ro(MKDEV(HWIF(drive)->major, minor), 1);
-	set_blocksize(MKDEV(HWIF(drive)->major, minor), CD_FRAMESIZE);
+	set_device_ro(mk_kdev(HWIF(drive)->major, minor), 1);
+	set_blocksize(mk_kdev(HWIF(drive)->major, minor), CD_FRAMESIZE);
 	blk_queue_hardsect_size(&drive->queue, CD_FRAMESIZE);
 
 	blk_queue_prep_rq(&drive->queue, ll_10byte_cmd_build);
@@ -2801,7 +2801,7 @@ int ide_cdrom_setup (ide_drive_t *drive)
 	nslots = ide_cdrom_probe_capabilities (drive);
 
 	if (CDROM_CONFIG_FLAGS(drive)->dvd_ram)
-		set_device_ro(MKDEV(HWIF(drive)->major, minor), 0);
+		set_device_ro(mk_kdev(HWIF(drive)->major, minor), 0);
 
 	if (ide_cdrom_register (drive, nslots)) {
 		printk ("%s: ide_cdrom_setup failed to register device with the cdrom driver.\n", drive->name);
@@ -2848,7 +2848,7 @@ void ide_cdrom_release (struct inode *inode, struct file *file,
 static
 int ide_cdrom_check_media_change (ide_drive_t *drive)
 {
-	return cdrom_media_changed(MKDEV (HWIF (drive)->major,
+	return cdrom_media_changed(mk_kdev (HWIF (drive)->major,
 			(drive->select.b.unit) << PARTN_BITS));
 }
 
@@ -2876,7 +2876,7 @@ void ide_cdrom_revalidate (ide_drive_t *drive)
 	 * 1024 even for CDROM's
 	 */
 	blk_size[HWIF(drive)->major] = HWIF(drive)->gd->sizes;
-	set_blocksize(MKDEV(HWIF(drive)->major, minor), CD_FRAMESIZE);
+	set_blocksize(mk_kdev(HWIF(drive)->major, minor), CD_FRAMESIZE);
 }
 
 static

@@ -558,7 +558,7 @@ static int unbind_request(int i, bind_info_t *bind_info)
 
 static int ds_open(struct inode *inode, struct file *file)
 {
-    socket_t i = MINOR(inode->i_rdev);
+    socket_t i = minor(inode->i_rdev);
     socket_info_t *s;
     user_info_t *user;
 
@@ -590,7 +590,7 @@ static int ds_open(struct inode *inode, struct file *file)
 
 static int ds_release(struct inode *inode, struct file *file)
 {
-    socket_t i = MINOR(inode->i_rdev);
+    socket_t i = minor(inode->i_rdev);
     socket_info_t *s;
     user_info_t *user, **link;
 
@@ -622,7 +622,7 @@ out:
 static ssize_t ds_read(struct file *file, char *buf,
 		       size_t count, loff_t *ppos)
 {
-    socket_t i = MINOR(file->f_dentry->d_inode->i_rdev);
+    socket_t i = minor(file->f_dentry->d_inode->i_rdev);
     socket_info_t *s;
     user_info_t *user;
 
@@ -651,7 +651,7 @@ static ssize_t ds_read(struct file *file, char *buf,
 static ssize_t ds_write(struct file *file, const char *buf,
 			size_t count, loff_t *ppos)
 {
-    socket_t i = MINOR(file->f_dentry->d_inode->i_rdev);
+    socket_t i = minor(file->f_dentry->d_inode->i_rdev);
     socket_info_t *s;
     user_info_t *user;
 
@@ -684,7 +684,7 @@ static ssize_t ds_write(struct file *file, const char *buf,
 /* No kernel lock - fine */
 static u_int ds_poll(struct file *file, poll_table *wait)
 {
-    socket_t i = MINOR(file->f_dentry->d_inode->i_rdev);
+    socket_t i = minor(file->f_dentry->d_inode->i_rdev);
     socket_info_t *s;
     user_info_t *user;
 
@@ -707,7 +707,7 @@ static u_int ds_poll(struct file *file, poll_table *wait)
 static int ds_ioctl(struct inode * inode, struct file * file,
 		    u_int cmd, u_long arg)
 {
-    socket_t i = MINOR(inode->i_rdev);
+    socket_t i = minor(inode->i_rdev);
     socket_info_t *s;
     u_int size;
     int ret, err;

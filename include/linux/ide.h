@@ -18,13 +18,13 @@
 
 /*
  * This is the multiple IDE interface driver, as evolved from hd.c.
- * It supports up to four IDE interfaces, on one or more IRQs (usually 14 & 15).
+ * It supports up to four IDE interfaces, on one or more IRQs (usually 14, 15).
  * There can be up to two drives per interface, as per the ATA-2 spec.
  *
- * Primary i/f:    ide0: major=3;  (hda)         minor=0; (hdb)         minor=64
- * Secondary i/f:  ide1: major=22; (hdc or hd1a) minor=0; (hdd or hd1b) minor=64
- * Tertiary i/f:   ide2: major=33; (hde)         minor=0; (hdf)         minor=64
- * Quaternary i/f: ide3: major=34; (hdg)         minor=0; (hdh)         minor=64
+ * Primary i/f:    ide0: major=3;  (hda) minor=0; (hdb) minor=64
+ * Secondary i/f:  ide1: major=22; (hdc) minor=0; (hdd) minor=64
+ * Tertiary i/f:   ide2: major=33; (hde) minor=0; (hdf) minor=64
+ * Quaternary i/f: ide3: major=34; (hdg) minor=0; (hdh) minor=64
  */
 
 /******************************************************************************

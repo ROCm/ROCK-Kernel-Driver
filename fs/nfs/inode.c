@@ -104,7 +104,7 @@ nfs_read_inode(struct inode * inode)
 {
 	inode->i_blksize = inode->i_sb->s_blocksize;
 	inode->i_mode = 0;
-	inode->i_rdev = 0;
+	inode->i_rdev = NODEV;
 	/* We can't support UPDATE_ATIME(), since the server will reset it */
 	inode->i_flags |= S_NOATIME;
 	INIT_LIST_HEAD(&inode->u.nfs_i.read);
@@ -127,7 +127,7 @@ nfs_write_inode(struct inode *inode, int sync)
 static void
 nfs_delete_inode(struct inode * inode)
 {
-	dprintk("NFS: delete_inode(%x/%ld)\n", inode->i_dev, inode->i_ino);
+	dprintk("NFS: delete_inode(%x:%x/%ld)\n", major(inode->i_dev), minor(inode->i_dev), inode->i_ino);
 
 	/*
 	 * The following can never actually happen...
@@ -747,8 +747,9 @@ __nfs_fhget(struct super_block *sb, struct nfs_fh *fh, struct nfs_fattr *fattr)
 		goto out_no_inode;
 
 	nfs_fill_inode(inode, fh, fattr);
-	dprintk("NFS: __nfs_fhget(%x/%Ld ct=%d)\n",
-		inode->i_dev, (long long)NFS_FILEID(inode),
+	dprintk("NFS: __nfs_fhget(%x:%x/%Ld ct=%d)\n",
+		major(inode->i_dev), minor(inode->i_dev),
+		(long long)NFS_FILEID(inode),
 		atomic_read(&inode->i_count));
 
 out:
@@ -902,8 +903,9 @@ __nfs_revalidate_inode(struct nfs_server *server, struct inode *inode)
 	int		 status = -ESTALE;
 	struct nfs_fattr fattr;
 
-	dfprintk(PAGECACHE, "NFS: revalidating (%x/%Ld)\n",
-		inode->i_dev, (long long)NFS_FILEID(inode));
+	dfprintk(PAGECACHE, "NFS: revalidating (%x:%x/%Ld)\n",
+		major(inode->i_dev), minor(inode->i_dev),
+		(long long)NFS_FILEID(inode));
 
 	lock_kernel();
 	if (!inode || is_bad_inode(inode))
@@ -924,8 +926,9 @@ __nfs_revalidate_inode(struct nfs_server *server, struct inode *inode)
 
 	status = NFS_PROTO(inode)->getattr(inode, &fattr);
 	if (status) {
-		dfprintk(PAGECACHE, "nfs_revalidate_inode: (%x/%Ld) getattr failed, error=%d\n",
-			 inode->i_dev, (long long)NFS_FILEID(inode), status);
+		dfprintk(PAGECACHE, "nfs_revalidate_inode: (%x:%x/%Ld) getattr failed, error=%d\n",
+			 major(inode->i_dev), minor(inode->i_dev),
+			 (long long)NFS_FILEID(inode), status);
 		if (status == -ESTALE) {
 			NFS_FLAGS(inode) |= NFS_INO_STALE;
 			if (inode != inode->i_sb->s_root->d_inode)
@@ -936,12 +939,14 @@ __nfs_revalidate_inode(struct nfs_server *server, struct inode *inode)
 
 	status = nfs_refresh_inode(inode, &fattr);
 	if (status) {
-		dfprintk(PAGECACHE, "nfs_revalidate_inode: (%x/%Ld) refresh failed, error=%d\n",
-			 inode->i_dev, (long long)NFS_FILEID(inode), status);
+		dfprintk(PAGECACHE, "nfs_revalidate_inode: (%x:%x/%Ld) refresh failed, error=%d\n",
+			 major(inode->i_dev), minor(inode->i_dev),
+			 (long long)NFS_FILEID(inode), status);
 		goto out;
 	}
-	dfprintk(PAGECACHE, "NFS: (%x/%Ld) revalidation complete\n",
-		inode->i_dev, (long long)NFS_FILEID(inode));
+	dfprintk(PAGECACHE, "NFS: (%x:%x/%Ld) revalidation complete\n",
+		major(inode->i_dev), minor(inode->i_dev),
+		(long long)NFS_FILEID(inode));
 
 	NFS_FLAGS(inode) &= ~NFS_INO_STALE;
 out:
@@ -1000,8 +1005,8 @@ __nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
 	time_t		new_atime;
 	int		invalid = 0;
 
-	dfprintk(VFS, "NFS: refresh_inode(%x/%ld ct=%d info=0x%x)\n",
-			inode->i_dev, inode->i_ino,
+	dfprintk(VFS, "NFS: refresh_inode(%x:%x/%ld ct=%d info=0x%x)\n",
+			major(inode->i_dev), minor(inode->i_dev), inode->i_ino,
 			atomic_read(&inode->i_count), fattr->valid);
 
 	if (NFS_FSID(inode) != fattr->fsid ||
@@ -1100,7 +1105,7 @@ __nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
  		inode->i_blocks = fattr->du.nfs2.blocks;
  		inode->i_blksize = fattr->du.nfs2.blocksize;
  	}
- 	inode->i_rdev = 0;
+ 	inode->i_rdev = NODEV;
  	if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode))
  		inode->i_rdev = to_kdev_t(fattr->rdev);
  

@@ -27,7 +27,7 @@
 /* serial module kmod load support */
 struct tty_driver *get_tty_driver(kdev_t device);
 #define isa_tty_dev(ma)	(ma == TTY_MAJOR || ma == TTYAUX_MAJOR)
-#define need_serial(ma,mi) (get_tty_driver(MKDEV(ma,mi)) == NULL)
+#define need_serial(ma,mi) (get_tty_driver(mk_kdev(ma,mi)) == NULL)
 #endif
 
 struct device_struct {
@@ -145,7 +145,7 @@ int chrdev_open(struct inode * inode, struct file * filp)
 {
 	int ret = -ENODEV;
 
-	filp->f_op = get_chrfops(MAJOR(inode->i_rdev), MINOR(inode->i_rdev));
+	filp->f_op = get_chrfops(major(inode->i_rdev), minor(inode->i_rdev));
 	if (filp->f_op) {
 		ret = 0;
 		if (filp->f_op->open != NULL) {
@@ -173,18 +173,18 @@ static struct file_operations def_chr_fops = {
 const char * kdevname(kdev_t dev)
 {
 	static char buffer[32];
-	sprintf(buffer, "%02x:%02x", MAJOR(dev), MINOR(dev));
+	sprintf(buffer, "%02x:%02x", major(dev), minor(dev));
 	return buffer;
 }
 
 const char * cdevname(kdev_t dev)
 {
 	static char buffer[32];
-	const char * name = chrdevs[MAJOR(dev)].name;
+	const char * name = chrdevs[major(dev)].name;
 
 	if (!name)
 		name = "unknown-char";
-	sprintf(buffer, "%s(%d,%d)", name, MAJOR(dev), MINOR(dev));
+	sprintf(buffer, "%s(%d,%d)", name, major(dev), minor(dev));
 	return buffer;
 }
   

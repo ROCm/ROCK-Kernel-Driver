@@ -643,8 +643,8 @@ static int nfs_create(struct inode *dir, struct dentry *dentry, int mode)
 	struct nfs_fh fhandle;
 	int error;
 
-	dfprintk(VFS, "NFS: create(%x/%ld, %s\n",
-		dir->i_dev, dir->i_ino, dentry->d_name.name);
+	dfprintk(VFS, "NFS: create(%x:%x/%ld, %s\n",
+		major(dir->i_dev), minor(dir->i_dev), dir->i_ino, dentry->d_name.name);
 
 	attr.ia_mode = mode;
 	attr.ia_valid = ATTR_MODE;
@@ -675,8 +675,8 @@ static int nfs_mknod(struct inode *dir, struct dentry *dentry, int mode, int rde
 	struct nfs_fh fhandle;
 	int error;
 
-	dfprintk(VFS, "NFS: mknod(%x/%ld, %s\n",
-		dir->i_dev, dir->i_ino, dentry->d_name.name);
+	dfprintk(VFS, "NFS: mknod(%x:%x/%ld, %s\n",
+		major(dir->i_dev), minor(dir->i_dev), dir->i_ino, dentry->d_name.name);
 
 	attr.ia_mode = mode;
 	attr.ia_valid = ATTR_MODE;
@@ -701,8 +701,8 @@ static int nfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 	struct nfs_fh fhandle;
 	int error;
 
-	dfprintk(VFS, "NFS: mkdir(%x/%ld, %s\n",
-		dir->i_dev, dir->i_ino, dentry->d_name.name);
+	dfprintk(VFS, "NFS: mkdir(%x:%x/%ld, %s\n",
+		major(dir->i_dev), minor(dir->i_dev), dir->i_ino, dentry->d_name.name);
 
 	attr.ia_valid = ATTR_MODE;
 	attr.ia_mode = mode | S_IFDIR;
@@ -730,8 +730,8 @@ static int nfs_rmdir(struct inode *dir, struct dentry *dentry)
 {
 	int error;
 
-	dfprintk(VFS, "NFS: rmdir(%x/%ld, %s\n",
-		dir->i_dev, dir->i_ino, dentry->d_name.name);
+	dfprintk(VFS, "NFS: rmdir(%x:%x/%ld, %s\n",
+		major(dir->i_dev), minor(dir->i_dev), dir->i_ino, dentry->d_name.name);
 
 	nfs_zap_caches(dir);
 	error = NFS_PROTO(dir)->rmdir(dir, &dentry->d_name);
@@ -877,8 +877,8 @@ static int nfs_unlink(struct inode *dir, struct dentry *dentry)
 {
 	int error;
 
-	dfprintk(VFS, "NFS: unlink(%x/%ld, %s)\n",
-		dir->i_dev, dir->i_ino, dentry->d_name.name);
+	dfprintk(VFS, "NFS: unlink(%x:%x/%ld, %s)\n",
+		major(dir->i_dev), minor(dir->i_dev), dir->i_ino, dentry->d_name.name);
 
 	error = nfs_sillyrename(dir, dentry);
 	if (error && error != -EBUSY) {
@@ -900,8 +900,8 @@ nfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 	unsigned int maxlen;
 	int error;
 
-	dfprintk(VFS, "NFS: symlink(%x/%ld, %s, %s)\n",
-		dir->i_dev, dir->i_ino, dentry->d_name.name, symname);
+	dfprintk(VFS, "NFS: symlink(%x:%x/%ld, %s, %s)\n",
+		major(dir->i_dev), minor(dir->i_dev), dir->i_ino, dentry->d_name.name, symname);
 
 	error = -ENAMETOOLONG;
 	maxlen = (NFS_PROTO(dir)->version==2) ? NFS2_MAXPATHLEN : NFS3_MAXPATHLEN;

@@ -521,7 +521,7 @@ struct usb_driver {
 
 	struct semaphore serialize;
 
-	/* ioctl -- userspace apps can talk to drivers through usbdevfs */
+	/* ioctl -- userspace apps can talk to drivers through usbfs */
 	int (*ioctl)(struct usb_device *dev, unsigned int code, void *buf);
 
 	/* support for "new-style" USB hotplugging */
@@ -567,7 +567,7 @@ typedef struct
 	unsigned int length;		/* expected length */
 	unsigned int actual_length;
 	unsigned int status;
-} iso_packet_descriptor_t, *piso_packet_descriptor_t;
+} iso_packet_descriptor_t;
 
 struct urb;
 
@@ -629,7 +629,7 @@ typedef void (*usb_complete_t)(struct urb *);
  *
  * This structure identifies USB transfer requests.  URBs may be allocated
  * in any way, although usb_alloc_urb() is often convenient.  Initialization
- * may be done using various FILL_*_URB() macros.  URBs are submitted
+ * may be done using various usb_fill_*_urb() functions.  URBs are submitted
  * using usb_submit_urb(), and pending requests may be canceled using
  * usb_unlink_urb().
  *
@@ -729,87 +729,7 @@ struct urb
 	iso_packet_descriptor_t iso_frame_desc[0];	/* (in) ISO ONLY */
 };
 
-typedef struct urb urb_t, *purb_t;
-
-/**
- * FILL_CONTROL_URB - macro to help initialize a control urb
- * @URB: pointer to the urb to initialize.
- * @DEV: pointer to the struct usb_device for this urb.
- * @PIPE: the endpoint pipe
- * @SETUP_PACKET: pointer to the setup_packet buffer
- * @TRANSFER_BUFFER: pointer to the transfer buffer
- * @BUFFER_LENGTH: length of the transfer buffer
- * @COMPLETE: pointer to the usb_complete_t function
- * @CONTEXT: what to set the urb context to.
- *
- * Initializes a control urb with the proper information needed to submit
- * it to a device.  This macro is depreciated, the usb_fill_control_urb()
- * function should be used instead.
- */
-#define FILL_CONTROL_URB(URB,DEV,PIPE,SETUP_PACKET,TRANSFER_BUFFER,BUFFER_LENGTH,COMPLETE,CONTEXT) \
-    do {\
-	spin_lock_init(&(URB)->lock);\
-	(URB)->dev=DEV;\
-	(URB)->pipe=PIPE;\
-	(URB)->setup_packet=SETUP_PACKET;\
-	(URB)->transfer_buffer=TRANSFER_BUFFER;\
-	(URB)->transfer_buffer_length=BUFFER_LENGTH;\
-	(URB)->complete=COMPLETE;\
-	(URB)->context=CONTEXT;\
-    } while (0)
-
-/**
- * FILL_BULK_URB - macro to help initialize a bulk urb
- * @URB: pointer to the urb to initialize.
- * @DEV: pointer to the struct usb_device for this urb.
- * @PIPE: the endpoint pipe
- * @TRANSFER_BUFFER: pointer to the transfer buffer
- * @BUFFER_LENGTH: length of the transfer buffer
- * @COMPLETE: pointer to the usb_complete_t function
- * @CONTEXT: what to set the urb context to.
- *
- * Initializes a bulk urb with the proper information needed to submit it
- * to a device.  This macro is depreciated, the usb_fill_bulk_urb()
- * function should be used instead.
- */
-#define FILL_BULK_URB(URB,DEV,PIPE,TRANSFER_BUFFER,BUFFER_LENGTH,COMPLETE,CONTEXT) \
-    do {\
-	spin_lock_init(&(URB)->lock);\
-	(URB)->dev=DEV;\
-	(URB)->pipe=PIPE;\
-	(URB)->transfer_buffer=TRANSFER_BUFFER;\
-	(URB)->transfer_buffer_length=BUFFER_LENGTH;\
-	(URB)->complete=COMPLETE;\
-	(URB)->context=CONTEXT;\
-    } while (0)
-    
-/**
- * FILL_INT_URB - macro to help initialize a interrupt urb
- * @URB: pointer to the urb to initialize.
- * @DEV: pointer to the struct usb_device for this urb.
- * @PIPE: the endpoint pipe
- * @TRANSFER_BUFFER: pointer to the transfer buffer
- * @BUFFER_LENGTH: length of the transfer buffer
- * @COMPLETE: pointer to the usb_complete_t function
- * @CONTEXT: what to set the urb context to.
- * @INTERVAL: what to set the urb interval to.
- *
- * Initializes a interrupt urb with the proper information needed to submit
- * it to a device.  This macro is depreciated, the usb_fill_int_urb()
- * function should be used instead.
- */
-#define FILL_INT_URB(URB,DEV,PIPE,TRANSFER_BUFFER,BUFFER_LENGTH,COMPLETE,CONTEXT,INTERVAL) \
-    do {\
-	spin_lock_init(&(URB)->lock);\
-	(URB)->dev=DEV;\
-	(URB)->pipe=PIPE;\
-	(URB)->transfer_buffer=TRANSFER_BUFFER;\
-	(URB)->transfer_buffer_length=BUFFER_LENGTH;\
-	(URB)->complete=COMPLETE;\
-	(URB)->context=CONTEXT;\
-	(URB)->interval=INTERVAL;\
-	(URB)->start_frame=-1;\
-    } while (0)
+typedef struct urb urb_t;
 
 /**
  * usb_fill_control_urb - initializes a control urb
@@ -908,11 +828,22 @@ static inline void usb_fill_int_urb (struct urb *urb,
 	urb->interval = interval;
 	urb->start_frame = -1;
 }
-    
+
+/*
+ * old style macros to enable 2.4 and 2.2 drivers to build
+ * properly.  Please do not use these for new USB drivers.
+ */
+#define FILL_CONTROL_URB(URB,DEV,PIPE,SETUP_PACKET,TRANSFER_BUFFER,BUFFER_LENGTH,COMPLETE,CONTEXT) \
+    usb_fill_control_urb(URB,DEV,PIPE,SETUP_PACKET,TRANSFER_BUFFER,BUFFER_LENGTH,COMPLETE,CONTEXT)
+#define FILL_BULK_URB(URB,DEV,PIPE,TRANSFER_BUFFER,BUFFER_LENGTH,COMPLETE,CONTEXT) \
+    usb_fill_bulk_urb(URB,DEV,PIPE,TRANSFER_BUFFER,BUFFER_LENGTH,COMPLETE,CONTEXT)
+#define FILL_INT_URB(URB,DEV,PIPE,TRANSFER_BUFFER,BUFFER_LENGTH,COMPLETE,CONTEXT,INTERVAL) \
+    usb_fill_int_urb(URB,DEV,PIPE,TRANSFER_BUFFER,BUFFER_LENGTH,COMPLETE,CONTEXT,INTERVAL)
+
 extern struct urb *usb_alloc_urb(int iso_packets);
-extern void usb_free_urb(struct urb *purb);
-extern int usb_submit_urb(struct urb *purb);
-extern int usb_unlink_urb(struct urb *purb);
+extern void usb_free_urb(struct urb *urb);
+extern int usb_submit_urb(struct urb *urb);
+extern int usb_unlink_urb(struct urb *urb);
 
 /*-------------------------------------------------------------------*
  *                         SYNCHRONOUS CALL SUPPORT                  *
@@ -959,8 +890,8 @@ struct usb_operations {
 	int (*allocate)(struct usb_device *);
 	int (*deallocate)(struct usb_device *);
 	int (*get_frame_number) (struct usb_device *usb_dev);
-	int (*submit_urb) (struct urb* purb);
-	int (*unlink_urb) (struct urb* purb);
+	int (*submit_urb) (struct urb *urb);
+	int (*unlink_urb) (struct urb *urb);
 };
 
 #define DEVNUM_ROUND_ROBIN	/***** OPTION *****/
@@ -989,8 +920,7 @@ struct usb_bus {
 	int bandwidth_int_reqs;		/* number of Interrupt requesters */
 	int bandwidth_isoc_reqs;	/* number of Isoc. requesters */
 
-	/* usbdevfs inode list */
-	struct list_head inodes;
+	struct dentry *dentry;		/* usbfs dentry entry for the bus */
 
 	atomic_t refcnt;
 };
@@ -1028,6 +958,21 @@ extern int usb_root_hub_string(int id, int serial,
 #define NS_TO_US(ns)	((ns + 500L) / 1000L)
 			/* convert & round nanoseconds to microseconds */
 
+/*
+ * As of USB 2.0, full/low speed devices are segregated into trees.
+ * One type grows from USB 1.1 host controllers (OHCI, UHCI etc).
+ * The other type grows from high speed hubs when they connect to
+ * full/low speed devices using "Transaction Translators" (TTs).
+ *
+ * TTs should only be known to the hub driver, and high speed bus
+ * drivers (only EHCI for now).  They affect periodic scheduling and
+ * sometimes control/bulk error recovery.
+ */
+struct usb_tt {
+	struct usb_device	*hub;	/* upstream highspeed hub */
+	int			multi;	/* true means one TT per port */
+};
+
 
 /* -------------------------------------------------------------------------- */
 
@@ -1056,7 +1001,8 @@ extern int usb_set_address(struct usb_device *dev);
 #define USB_MAXCHILDREN		(16)
 
 struct usb_device {
-	int devnum;			/* Device number on USB bus */
+	int		devnum;		/* Address on USB bus */
+	char		devpath [16];	/* Use in messages: /port/port/... */
 
 	enum {
 		USB_SPEED_UNKNOWN = 0,			/* enumerating */
@@ -1064,8 +1010,8 @@ struct usb_device {
 		USB_SPEED_HIGH				/* usb 2.0 */
 	} speed;
 
-	struct usb_device *tt;		/* usb1.1 device on usb2.0 bus */
-	int ttport;			/* device/hub port on that tt */
+	struct usb_tt	*tt; 		/* low/full speed dev, highspeed hub */
+	int		ttport;		/* device port on that tt hub */
 
 	atomic_t refcnt;		/* Reference count */
 	struct semaphore serialize;
@@ -1090,9 +1036,8 @@ struct usb_device {
   
 	void *hcpriv;			/* Host Controller private data */
 	
-        /* usbdevfs inode list */
-	struct list_head inodes;
 	struct list_head filelist;
+	struct dentry *dentry;		/* usbfs dentry entry for the device */
 
 	/*
 	 * Child devices - these can be either new devices
@@ -1254,7 +1199,7 @@ void usb_show_string(struct usb_device *dev, char *id, int index);
 
 /*
  * bus and driver list
- * exported only for usbdevfs (not visible outside usbcore)
+ * exported only for usbfs (not visible outside usbcore)
  */
 
 extern struct list_head usb_driver_list;
@@ -1271,23 +1216,25 @@ extern struct semaphore usb_bus_list_lock;
  * these are expected to be called from the USB core/hub thread
  * with the kernel lock held
  */
-extern void usbdevfs_add_bus(struct usb_bus *bus);
-extern void usbdevfs_remove_bus(struct usb_bus *bus);
-extern void usbdevfs_add_device(struct usb_device *dev);
-extern void usbdevfs_remove_device(struct usb_device *dev);
+extern void usbfs_add_bus(struct usb_bus *bus);
+extern void usbfs_remove_bus(struct usb_bus *bus);
+extern void usbfs_add_device(struct usb_device *dev);
+extern void usbfs_remove_device(struct usb_device *dev);
+extern void usbfs_update_special (void);
 
-extern int usbdevfs_init(void);
-extern void usbdevfs_cleanup(void);
+extern int usbfs_init(void);
+extern void usbfs_cleanup(void);
 
 #else /* CONFIG_USB_DEVICEFS */
 
-static inline void usbdevfs_add_bus(struct usb_bus *bus) {}
-static inline void usbdevfs_remove_bus(struct usb_bus *bus) {}
-static inline void usbdevfs_add_device(struct usb_device *dev) {}
-static inline void usbdevfs_remove_device(struct usb_device *dev) {}
+static inline void usbfs_add_bus(struct usb_bus *bus) {}
+static inline void usbfs_remove_bus(struct usb_bus *bus) {}
+static inline void usbfs_add_device(struct usb_device *dev) {}
+static inline void usbfs_remove_device(struct usb_device *dev) {}
+static inline void usbfs_update_special (void) {}
 
-static inline int usbdevfs_init(void) { return 0; }
-static inline void usbdevfs_cleanup(void) { }
+static inline int usbfs_init(void) { return 0; }
+static inline void usbfs_cleanup(void) { }
 
 #endif /* CONFIG_USB_DEVICEFS */
 

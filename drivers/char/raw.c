@@ -74,7 +74,7 @@ int raw_open(struct inode *inode, struct file *filp)
 	int sector_size;
 	int sector_bits;
 
-	minor = MINOR(inode->i_rdev);
+	minor = minor(inode->i_rdev);
 	
 	/* 
 	 * Is it the control device? 
@@ -134,7 +134,7 @@ int raw_release(struct inode *inode, struct file *filp)
 	int minor;
 	struct block_device *bdev;
 	
-	minor = MINOR(inode->i_rdev);
+	minor = minor(inode->i_rdev);
 	down(&raw_devices[minor].mutex);
 	bdev = raw_devices[minor].binding;
 	raw_devices[minor].inuse--;
@@ -192,8 +192,8 @@ int raw_ctl_ioctl(struct inode *inode,
 			 * major/minor numbers make sense. 
 			 */
 
-			if ((rq.block_major == NODEV && 
-			     rq.block_minor != NODEV) ||
+			if ((rq.block_major == 0 && 
+			     rq.block_minor != 0) ||
 			    rq.block_major > MAX_BLKDEV ||
 			    rq.block_minor > MINORMASK) {
 				err = -EINVAL;
@@ -209,7 +209,7 @@ int raw_ctl_ioctl(struct inode *inode,
 			if (raw_devices[minor].binding)
 				bdput(raw_devices[minor].binding);
 			raw_devices[minor].binding = 
-				bdget(kdev_t_to_nr(MKDEV(rq.block_major, rq.block_minor)));
+				bdget(kdev_t_to_nr(mk_kdev(rq.block_major, rq.block_minor)));
 			up(&raw_devices[minor].mutex);
 		} else {
 			struct block_device *bdev;
@@ -218,8 +218,8 @@ int raw_ctl_ioctl(struct inode *inode,
 			bdev = raw_devices[minor].binding;
 			if (bdev) {
 				dev = to_kdev_t(bdev->bd_dev);
-				rq.block_major = MAJOR(dev);
-				rq.block_minor = MINOR(dev);
+				rq.block_major = major(dev);
+				rq.block_minor = minor(dev);
 			} else {
 				rq.block_major = rq.block_minor = 0;
 			}
@@ -271,7 +271,7 @@ ssize_t	rw_raw_dev(int rw, struct file *filp, char *buf,
 	 * First, a few checks on device size limits 
 	 */
 
-	minor = MINOR(filp->f_dentry->d_inode->i_rdev);
+	minor = minor(filp->f_dentry->d_inode->i_rdev);
 
 	new_iobuf = 0;
 	iobuf = filp->f_iobuf;
@@ -291,12 +291,12 @@ ssize_t	rw_raw_dev(int rw, struct file *filp, char *buf,
 	sector_bits = raw_devices[minor].sector_bits;
 	sector_mask = sector_size- 1;
 	
-	if (blk_size[MAJOR(dev)])
-		limit = (((loff_t) blk_size[MAJOR(dev)][MINOR(dev)]) << BLOCK_SIZE_BITS) >> sector_bits;
+	if (blk_size[major(dev)])
+		limit = (((loff_t) blk_size[major(dev)][minor(dev)]) << BLOCK_SIZE_BITS) >> sector_bits;
 	else
 		limit = INT_MAX;
 	dprintk ("rw_raw_dev: dev %d:%d (+%d)\n",
-		 MAJOR(dev), MINOR(dev), limit);
+		 major(dev), minor(dev), limit);
 	
 	err = -EINVAL;
 	if ((*offp & sector_mask) || (size & sector_mask))

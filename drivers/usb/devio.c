@@ -245,7 +245,7 @@ extern __inline__ struct async *async_getpending(struct dev_state *ps, void *use
         return NULL;
 }
 
-static void async_completed(purb_t urb)
+static void async_completed(struct urb *urb)
 {
         struct async *as = (struct async *)urb->context;
         struct dev_state *ps = as->ps;
@@ -471,9 +471,7 @@ static int usbdev_open(struct inode *inode, struct file *file)
 	 */
 	lock_kernel();
 	ret = -ENOENT;
-	if (ITYPE(inode->i_ino) != IDEVICE)
-		goto out;
-	dev = inode->u.usbdev_i.p.dev;
+	dev = inode->u.generic_ip;
 	if (!dev)
 		goto out;
 	ret = -ENOMEM;

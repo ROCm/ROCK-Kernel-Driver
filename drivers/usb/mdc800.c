@@ -140,7 +140,7 @@ struct mdc800_data
 
 	unsigned int		endpoint [4];
 
-	purb_t			irq_urb;
+	struct urb *		irq_urb;
 	wait_queue_head_t	irq_wait;
 	int			irq_woken;
 	char*			irq_urb_buffer;
@@ -149,13 +149,13 @@ struct mdc800_data
 	int 			camera_request_ready; // Status to synchronize with irq
 	char 			camera_response [8];  // last Bytes send after busy
 
-	purb_t   		write_urb;
+	struct urb *   		write_urb;
 	char*			write_urb_buffer;
 	wait_queue_head_t	write_wait;
 	int			written;
 
 
-	purb_t	   		download_urb;
+	struct urb *   		download_urb;
 	char*			download_urb_buffer;
 	wait_queue_head_t	download_wait;
 	int			downloaded;
