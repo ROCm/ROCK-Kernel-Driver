@@ -8,13 +8,13 @@
  * by the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
- * This program/include file is distributed in the hope that it will be 
- * useful, but WITHOUT ANY WARRANTY; without even the implied warranty 
+ * This program/include file is distributed in the hope that it will be
+ * useful, but WITHOUT ANY WARRANTY; without even the implied warranty
  * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program (in the main directory of the Linux-NTFS 
+ * along with this program (in the main directory of the Linux-NTFS
  * distribution in the file COPYING); if not, write to the Free Software
  * Foundation,Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
@@ -29,26 +29,7 @@
 #include "dir.h"
 #include "inode.h"
 #include "attrib.h"
-
-/**
- * ntfs_attr - ntfs in memory attribute structure
- * @mft_no:	mft record number of the base mft record of this attribute
- * @name:	Unicode name of the attribute (NULL if unnamed)
- * @name_len:	length of @name in Unicode characters (0 if unnamed)
- * @type:	attribute type (see layout.h)
- *
- * This structure exists only to provide a small structure for the
- * ntfs_{attr_}iget()/ntfs_test_inode()/ntfs_init_locked_inode() mechanism.
- *
- * NOTE: Elements are ordered by size to make the structure as compact as
- * possible on all architectures.
- */
-typedef struct {
-	unsigned long mft_no;
-	uchar_t *name;
-	u32 name_len;
-	ATTR_TYPES type;
-} ntfs_attr;
+#include "time.h"
 
 /**
  * ntfs_test_inode - compare two (possibly fake) inodes for equality
@@ -66,7 +47,7 @@ typedef struct {
  * NOTE: This function runs with the inode_lock spin lock held so it is not
  * allowed to sleep.
  */
-static int ntfs_test_inode(struct inode *vi, ntfs_attr *na)
+int ntfs_test_inode(struct inode *vi, ntfs_attr *na)
 {
 	ntfs_inode *ni;
 
@@ -150,7 +131,6 @@ static int ntfs_init_locked_inode(struct inode *vi, ntfs_attr *na)
 	return 0;
 }
 
-typedef int (*test_t)(struct inode *, void *);
 typedef int (*set_t)(struct inode *, void *);
 static int ntfs_read_locked_inode(struct inode *vi);
 static int ntfs_read_locked_attr_inode(struct inode *base_vi, struct inode *vi);
@@ -380,7 +360,7 @@ inline ntfs_inode *ntfs_new_extent_inode(struct super_block *sb,
  * Search all file name attributes in the inode described by the attribute
  * search context @ctx and check if any of the names are in the $Extend system
  * directory.
- * 
+ *
  * Return values:
  *	   1: file is in $Extend directory
  *	   0: file is not in $Extend directory
@@ -590,21 +570,18 @@ static int ntfs_read_locked_inode(struct inode *vi)
 	 * mtime is the last change of the data within the file. Not changed
 	 * when only metadata is changed, e.g. a rename doesn't affect mtime.
 	 */
-	vi->i_mtime.tv_sec = ntfs2utc(si->last_data_change_time);
-	vi->i_mtime.tv_nsec = 0;
+	vi->i_mtime = ntfs2utc(si->last_data_change_time);
 	/*
 	 * ctime is the last change of the metadata of the file. This obviously
 	 * always changes, when mtime is changed. ctime can be changed on its
 	 * own, mtime is then not changed, e.g. when a file is renamed.
 	 */
-	vi->i_ctime.tv_sec = ntfs2utc(si->last_mft_change_time);
-	vi->i_ctime.tv_nsec = 0;
+	vi->i_ctime = ntfs2utc(si->last_mft_change_time);
 	/*
 	 * Last access to the data within the file. Not changed during a rename
 	 * for example but changed whenever the file is written to.
 	 */
-	vi->i_atime.tv_sec = ntfs2utc(si->last_access_time);
-	vi->i_atime.tv_nsec = 0;
+	vi->i_atime = ntfs2utc(si->last_access_time);
 
 	/* Find the attribute list attribute if present. */
 	reinit_attr_search_ctx(ctx);
@@ -1739,39 +1716,6 @@ err_out:
 }
 
 /**
- * ntfs_dirty_inode - mark the inode's metadata dirty
- * @vi:		inode to mark dirty
- *
- * This is called from fs/inode.c::__mark_inode_dirty(), when the inode itself
- * is being marked dirty. An example is when update_atime() is invoked.
- *
- * We mark the inode dirty by setting both the page in which the mft record
- * resides and the buffer heads in that page which correspond to the mft record
- * dirty. This ensures that the changes will eventually be propagated to disk
- * when the inode is set dirty.
- *
- * FIXME: Can we do that with the buffer heads? I am not too sure. Because if we
- * do that we need to make sure that the kernel will not write out those buffer
- * heads or we are screwed as it will write corrupt data to disk. The only way
- * a mft record can be written correctly is by mst protecting it, writting it
- * synchronously and fast mst deprotecting it. During this period, obviously,
- * the mft record must be marked as not uptodate, be locked for writing or
- * whatever, so that nobody attempts anything stupid.
- *
- * FIXME: Do we need to check that the fs is not mounted read only? And what
- * about the inode? Anything else?
- *
- * FIXME: As we are only a read only driver it is safe to just return here for
- * the moment.
- */
-void ntfs_dirty_inode(struct inode *vi)
-{
-	ntfs_debug("Entering for inode 0x%lx.", vi->i_ino);
-	NInoSetDirty(NTFS_I(vi));
-	return;
-}
-
-/**
  * ntfs_commit_inode - write out a dirty inode
  * @ni:		inode to write out
  *
@@ -2029,4 +1973,3 @@ trunc_err:
 }
 
 #endif
-
