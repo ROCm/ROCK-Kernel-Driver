@@ -244,8 +244,7 @@ static s32 nforce2_access(struct i2c_adapter * adap, u16 addr,
 		temp = inb_p(NVIDIA_SMB_STS);
 	}
 	if (~temp & NVIDIA_SMB_STS_DONE) {
-		current->state = TASK_INTERRUPTIBLE;
-		schedule_timeout(HZ/100);
+		msleep(10);
 		temp = inb_p(NVIDIA_SMB_STS);
 	}
 

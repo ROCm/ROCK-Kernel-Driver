@@ -662,8 +662,7 @@ dispose_iface(struct device *dev)
 	spin_lock_irq(&iface->lock);
 	while (iface->state != state_idle) {
 		spin_unlock_irq(&iface->lock);
-		set_task_state(current,TASK_UNINTERRUPTIBLE);
-		schedule_timeout(HZ/10);
+		msleep(100);
 		spin_lock_irq(&iface->lock);
 	}
 #endif /* POLLED_MODE */

@@ -101,12 +101,6 @@ static int wait_for_bb(struct i2c_algo_pcf_data *adap) {
 }
 
 
-static inline void pcf_sleep(unsigned long timeout)
-{
-	schedule_timeout( timeout * HZ);
-}
-
-
 static int wait_for_pin(struct i2c_algo_pcf_data *adap, int *status) {
 
 	int timeout = DEF_TIMEOUT;

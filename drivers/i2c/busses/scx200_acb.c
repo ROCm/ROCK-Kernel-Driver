@@ -32,6 +32,7 @@
 #include <linux/i2c.h>
 #include <linux/smp_lock.h>
 #include <linux/pci.h>
+#include <linux/delay.h>
 #include <asm/io.h>
 
 #include <linux/scx200.h>
@@ -254,7 +255,7 @@ static void scx200_acb_poll(struct scx200_acb_iface *iface)
 			scx200_acb_machine(iface, status);
 			return;
 		}
-		schedule_timeout(HZ/100+1);
+		msleep(10);
 	}
 
 	scx200_acb_timeout(iface);

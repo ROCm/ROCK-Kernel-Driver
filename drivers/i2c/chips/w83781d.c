@@ -815,8 +815,7 @@ store_sensor_reg(struct device *dev, const char *buf, size_t count, int nr)
 		data->sens[nr - 1] = val;
 		break;
 	default:
-		dev_err(&client->dev,
-		       "Invalid sensor type %ld; must be 1, 2, or %d\n",
+		dev_err(dev, "Invalid sensor type %ld; must be 1, 2, or %d\n",
 		       (long) val, W83781D_DEFAULT_BETA);
 		break;
 	}
@@ -1593,7 +1592,7 @@ static struct w83781d_data *w83781d_update_device(struct device *dev)
 	if (time_after
 	    (jiffies - data->last_updated, (unsigned long) (HZ + HZ / 2))
 	    || time_before(jiffies, data->last_updated) || !data->valid) {
-		pr_debug("Starting device update\n");
+		dev_dbg(dev, "Starting device update\n");
 
 		for (i = 0; i <= 8; i++) {
 			if ((data->type == w83783s || data->type == w83697hf)
