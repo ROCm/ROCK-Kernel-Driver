@@ -253,7 +253,7 @@ static struct device_list char_list;
  *	This routine is thread safe and may block.
  */
 
-kdev_t devfs_alloc_devnum (char type)
+dev_t devfs_alloc_devnum (char type)
 {
     int minor;
     struct semaphore *semaphore;
@@ -270,12 +270,12 @@ kdev_t devfs_alloc_devnum (char type)
 	semaphore = &block_semaphore;
 	list = &block_list;
     }
-    if (list->none_free) return NODEV;  /*  Fast test  */
+    if (list->none_free) return 0;  /*  Fast test  */
     down (semaphore);
     if (list->none_free)
     {
 	up (semaphore);
-	return NODEV;
+	return 0;
     }
     for (entry = list->first; entry != NULL; entry = entry->next)
     {
@@ -283,14 +283,14 @@ kdev_t devfs_alloc_devnum (char type)
 	if (minor >= 256) continue;
 	__set_bit (minor, entry->bits);
 	up (semaphore);
-	return mk_kdev (entry->major, minor);
+	return MKDEV(entry->major, minor);
     }
     /*  Need to allocate a new major  */
     if ( ( entry = kmalloc (sizeof *entry, GFP_KERNEL) ) == NULL )
     {
 	list->none_free = 1;
 	up (semaphore);
-	return NODEV;
+	return 0;
     }
     memset (entry, 0, sizeof *entry);
     if ( ( entry->major = devfs_alloc_major (type) ) < 0 )
@@ -298,14 +298,14 @@ kdev_t devfs_alloc_devnum (char type)
 	list->none_free = 1;
 	up (semaphore);
 	kfree (entry);
-	return NODEV;
+	return 0;
     }
     __set_bit (0, entry->bits);
     if (list->first == NULL) list->first = entry;
     else list->last->next = entry;
     list->last = entry;
     up (semaphore);
-    return mk_kdev (entry->major, 0);
+    return MKDEV(entry->major, 0);
 }   /*  End Function devfs_alloc_devnum  */
 EXPORT_SYMBOL(devfs_alloc_devnum);
 
@@ -318,14 +318,14 @@ EXPORT_SYMBOL(devfs_alloc_devnum);
  *	This routine is thread safe and may block.
  */
 
-void devfs_dealloc_devnum (char type, kdev_t devnum)
+void devfs_dealloc_devnum (char type, dev_t devnum)
 {
     int major, minor;
     struct semaphore *semaphore;
     struct device_list *list;
     struct minor_list *entry;
 
-    if ( kdev_none (devnum) ) return;
+    if (!devnum) return;
     if (type == DEVFS_SPECIAL_CHR)
     {
 	semaphore = &char_semaphore;
@@ -336,8 +336,8 @@ void devfs_dealloc_devnum (char type, kdev_t devnum)
 	semaphore = &block_semaphore;
 	list = &block_list;
     }
-    major = major (devnum);
-    minor = minor (devnum);
+    major = MAJOR (devnum);
+    minor = MINOR (devnum);
     down (semaphore);
     for (entry = list->first; entry != NULL; entry = entry->next)
     {
@@ -348,12 +348,12 @@ void devfs_dealloc_devnum (char type, kdev_t devnum)
 	if (was_set) list->none_free = 0;
 	up (semaphore);
 	if (!was_set)
-	    PRINTK ( "(): device %s was already free\n", kdevname (devnum) );
+	    PRINTK ( "(): device %s was already free\n", kdevname (to_kdev_t(devnum)) );
 	return;
     }
     up (semaphore);
     PRINTK ( "(): major for %s not previously allocated\n",
-	     kdevname (devnum) );
+	     kdevname (to_kdev_t(devnum)) );
 }   /*  End Function devfs_dealloc_devnum  */
 EXPORT_SYMBOL(devfs_dealloc_devnum);
 

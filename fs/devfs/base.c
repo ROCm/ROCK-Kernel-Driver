@@ -770,8 +770,7 @@ struct file_type
 struct bdev_type
 {
     struct block_device_operations *ops;
-    unsigned short major;
-    unsigned short minor;
+    dev_t dev;
     unsigned char autogen:1;
     unsigned char removable:1;
 };
@@ -779,8 +778,7 @@ struct bdev_type
 struct cdev_type
 {
     struct file_operations *ops;
-    unsigned short major;
-    unsigned short minor;
+    dev_t dev;
     unsigned char autogen:1;
 };
 
@@ -937,17 +935,9 @@ void devfs_put (devfs_handle_t de)
 	     de->parent ? de->parent->name : "no parent");
     if ( S_ISLNK (de->mode) ) kfree (de->u.symlink.linkname);
     if ( S_ISCHR (de->mode) && de->u.cdev.autogen )
-    {
-	devfs_dealloc_devnum ( DEVFS_SPECIAL_CHR,
-			       mk_kdev (de->u.cdev.major,
-					de->u.cdev.minor) );
-    }
+	devfs_dealloc_devnum (DEVFS_SPECIAL_CHR, de->u.cdev.dev);
     if ( S_ISBLK (de->mode) && de->u.bdev.autogen )
-    {
-	devfs_dealloc_devnum ( DEVFS_SPECIAL_BLK,
-			       mk_kdev (de->u.bdev.major,
-					de->u.bdev.minor) );
-    }
+	devfs_dealloc_devnum(DEVFS_SPECIAL_BLK, de->u.bdev.dev);
     WRITE_ENTRY_MAGIC (de, 0);
 #ifdef CONFIG_DEVFS_DEBUG
     spin_lock (&stat_lock);
@@ -1094,7 +1084,6 @@ static int _devfs_append_entry (devfs_handle_t dir, devfs_handle_t de,
 
 static struct devfs_entry *_devfs_get_root_entry (void)
 {
-    kdev_t devnum;
     struct devfs_entry *new;
     static spinlock_t root_lock = SPIN_LOCK_UNLOCKED;
 
@@ -1113,17 +1102,13 @@ static struct devfs_entry *_devfs_get_root_entry (void)
     /*  And create the entry for ".devfsd"  */
     if ( ( new = _devfs_alloc_entry (".devfsd", 0, S_IFCHR |S_IRUSR |S_IWUSR) )
 	 == NULL ) return NULL;
-    devnum = devfs_alloc_devnum (DEVFS_SPECIAL_CHR);
-    new->u.cdev.major = major (devnum);
-    new->u.cdev.minor = minor (devnum);
+    new->u.cdev.dev = devfs_alloc_devnum (DEVFS_SPECIAL_CHR);
     new->u.cdev.ops = &devfsd_fops;
     _devfs_append_entry (root_entry, new, FALSE, NULL);
 #ifdef CONFIG_DEVFS_DEBUG
     if ( ( new = _devfs_alloc_entry (".stat", 0, S_IFCHR | S_IRUGO | S_IWUGO) )
 	 == NULL ) return NULL;
-    devnum = devfs_alloc_devnum (DEVFS_SPECIAL_CHR);
-    new->u.cdev.major = major (devnum);
-    new->u.cdev.minor = minor (devnum);
+    new->u.cdev.dev = devfs_alloc_devnum (DEVFS_SPECIAL_CHR);
     new->u.cdev.ops = &stat_fops;
     _devfs_append_entry (root_entry, new, FALSE, NULL);
 #endif
@@ -1486,7 +1471,7 @@ devfs_handle_t devfs_register (devfs_handle_t dir, const char *name,
 {
     char devtype = S_ISCHR (mode) ? DEVFS_SPECIAL_CHR : DEVFS_SPECIAL_BLK;
     int err;
-    kdev_t devnum = NODEV;
+    dev_t devnum = 0, dev = MKDEV(major, minor);
     struct devfs_entry *de;
 
     if (name == NULL)
@@ -1512,30 +1497,27 @@ devfs_handle_t devfs_register (devfs_handle_t dir, const char *name,
     if ( ( S_ISCHR (mode) || S_ISBLK (mode) ) &&
 	 (flags & DEVFS_FL_AUTO_DEVNUM) )
     {
-	if ( kdev_none ( devnum = devfs_alloc_devnum (devtype) ) )
-	{
+	devnum = devfs_alloc_devnum (devtype);
+	if (!devnum) {
 	    PRINTK ("(%s): exhausted %s device numbers\n",
 		    name, S_ISCHR (mode) ? "char" : "block");
 	    return NULL;
 	}
-	major = major (devnum);
-	minor = minor (devnum);
+	dev = devnum;
     }
     if ( ( de = _devfs_prepare_leaf (&dir, name, mode) ) == NULL )
     {
 	PRINTK ("(%s): could not prepare leaf\n", name);
-	if ( !kdev_none (devnum) ) devfs_dealloc_devnum (devtype, devnum);
+	if (devnum) devfs_dealloc_devnum (devtype, devnum);
 	return NULL;
     }
     if (S_ISCHR (mode)) {
-	de->u.cdev.major = major;
-	de->u.cdev.minor = minor;
-	de->u.cdev.autogen = kdev_none (devnum) ? FALSE : TRUE;
+	de->u.cdev.dev = dev;
+	de->u.cdev.autogen = devnum != 0;
 	de->u.cdev.ops = ops;
     } else if (S_ISBLK (mode)) {
-	de->u.bdev.major = major;
-	de->u.bdev.minor = minor;
-	de->u.bdev.autogen = kdev_none (devnum) ? FALSE : TRUE;
+	de->u.bdev.dev = dev;
+	de->u.cdev.autogen = devnum != 0;
 	de->u.bdev.ops = ops;
 	if (flags & DEVFS_FL_REMOVABLE) de->u.bdev.removable = TRUE;
     } else if ( S_ISREG (mode) ) {
@@ -1562,7 +1544,7 @@ devfs_handle_t devfs_register (devfs_handle_t dir, const char *name,
     {
 	PRINTK ("(%s): could not append to parent, err: %d\n", name, err);
 	devfs_put (dir);
-	if ( !kdev_none (devnum) ) devfs_dealloc_devnum (devtype, devnum);
+	if (devnum) devfs_dealloc_devnum (devtype, devnum);
 	return NULL;
     }
     DPRINTK (DEBUG_REGISTER, "(%s): de: %p dir: %p \"%s\"  pp: %p\n",
@@ -1787,10 +1769,6 @@ devfs_handle_t devfs_mk_dir (devfs_handle_t dir, const char *name, void *info)
  *	@dir: The handle to the parent devfs directory entry. If this is %NULL the
  *		name is relative to the root of the devfs.
  *	@name: The name of the entry.
- *	@major: The major number. This is used if @name is %NULL.
- *	@minor: The minor number. This is used if @name is %NULL.
- *	@type: The type of special file to search for. This may be either
- *		%DEVFS_SPECIAL_CHR or %DEVFS_SPECIAL_BLK.
  *	@traverse_symlinks: If %TRUE then symlink entries in the devfs namespace are
  *		traversed. Symlinks pointing out of the devfs namespace will cause a
  *		failure. Symlink traversal consumes stack space.
@@ -2162,7 +2140,7 @@ static int check_disc_changed (struct devfs_entry *de)
 {
 	int tmp;
 	int retval = 0;
-	dev_t dev = MKDEV(de->u.bdev.major, de->u.bdev.minor);
+	dev_t dev = de->u.bdev.dev;
 	extern int warn_no_part;
 
 	if (!S_ISBLK(de->mode))
@@ -2342,14 +2320,12 @@ static struct inode *_devfs_get_vfs_inode (struct super_block *sb,
     inode->i_rdev = NODEV;
     if ( S_ISCHR (de->mode) )
     {
-	inode->i_rdev = mk_kdev (de->u.cdev.major,
-				 de->u.cdev.minor);
-	inode->i_cdev = cdget ( kdev_t_to_nr (inode->i_rdev) );
+	inode->i_rdev = to_kdev_t(de->u.cdev.dev);
+	inode->i_cdev = cdget(de->u.cdev.dev);
     }
     else if ( S_ISBLK (de->mode) )
     {
-	inode->i_rdev = mk_kdev (de->u.bdev.major,
-				 de->u.bdev.minor);
+	inode->i_rdev = to_kdev_t(de->u.bdev.dev);
 	if (bd_acquire (inode) != 0)
 		PRINTK ("(%d): no block device from bdget()\n",(int)inode->i_ino);
     }
@@ -2847,13 +2823,10 @@ static int devfs_mknod (struct inode *dir, struct dentry *dentry, int mode,
     de = _devfs_alloc_entry (dentry->d_name.name, dentry->d_name.len, mode);
     if (!de) return -ENOMEM;
     de->vfs_deletable = TRUE;
-    if (S_ISCHR (mode)) {
-	de->u.cdev.major = MAJOR (rdev);
-	de->u.cdev.minor = MINOR (rdev);
-    } else if (S_ISBLK (mode)) {
-	de->u.bdev.major = MAJOR (rdev);
-	de->u.bdev.minor = MINOR (rdev);
-    }
+    if (S_ISCHR (mode))
+	de->u.cdev.dev = rdev;
+    else if (S_ISBLK (mode))
+	de->u.bdev.dev = rdev;
     if ( ( err = _devfs_append_entry (parent, de, FALSE, NULL) ) != 0 )
 	return err;
     de->inode.uid = current->euid;
@@ -3006,11 +2979,11 @@ static ssize_t devfsd_read (struct file *file, char *buf, size_t len,
     info->gid = entry->gid;
     de = entry->de;
     if (S_ISCHR(de->mode)) {
-	info->major = de->u.cdev.major;
-	info->minor = de->u.cdev.minor;
+	info->major = MAJOR(de->u.cdev.dev);
+	info->minor = MINOR(de->u.cdev.dev);
     } else if (S_ISBLK (de->mode)) {
-	info->major = de->u.bdev.major;
-	info->minor = de->u.bdev.minor;
+	info->major = MAJOR(de->u.bdev.dev);
+	info->minor = MINOR(de->u.bdev.dev);
     }
     pos = devfs_generate_path (de, info->devname, DEVFS_PATHLEN);
     if (pos < 0) return pos;

@@ -74,8 +74,8 @@ extern void devfs_register_series (devfs_handle_t dir, const char *format,
 				   umode_t mode, void *ops, void *info);
 extern int devfs_alloc_major (char type);
 extern void devfs_dealloc_major (char type, int major);
-extern kdev_t devfs_alloc_devnum (char type);
-extern void devfs_dealloc_devnum (char type, kdev_t devnum);
+extern dev_t devfs_alloc_devnum (char type);
+extern void devfs_dealloc_devnum (char type, dev_t devnum);
 extern int devfs_alloc_unique_number (struct unique_numspace *space);
 extern void devfs_dealloc_unique_number (struct unique_numspace *space,
 					 int number);
@@ -199,12 +199,12 @@ static inline void devfs_dealloc_major (char type, int major)
     return;
 }
 
-static inline kdev_t devfs_alloc_devnum (char type)
+static inline dev_t devfs_alloc_devnum (char type)
 {
-    return NODEV;
+    return 0;
 }
 
-static inline void devfs_dealloc_devnum (char type, kdev_t devnum)
+static inline void devfs_dealloc_devnum (char type, dev_t devnum)
 {
     return;
 }
