@@ -261,6 +261,14 @@ UNUSUAL_DEV(  0x054c, 0x0010, 0x0106, 0x0450,
 		US_SC_SCSI, US_PR_DEVICE, NULL,
 		US_FL_SINGLE_LUN | US_FL_MODE_XLATE ),
 
+/* This entry is needed because the device reports Sub=ff */
+UNUSUAL_DEV(  0x054c, 0x0010, 0x0500, 0x0500, 
+               "Sony",
+               "DSC-T1", 
+               US_SC_8070, US_PR_DEVICE, NULL,
+               US_FL_SINGLE_LUN | US_FL_MODE_XLATE ),
+
+
 /* Reported by wim@geeks.nl */
 UNUSUAL_DEV(  0x054c, 0x0025, 0x0100, 0x0100, 
 		"Sony",
