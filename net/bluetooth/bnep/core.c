@@ -61,7 +61,7 @@
 #define BT_DBG(D...)
 #endif
 
-#define VERSION "1.0"
+#define VERSION "1.2"
 
 static LIST_HEAD(bnep_session_list);
 static DECLARE_RWSEM(bnep_session_sem);
@@ -115,6 +115,21 @@ static int bnep_send_rsp(struct bnep_session *s, u8 ctrl, u16 resp)
 	return bnep_send(s, &rsp, sizeof(rsp));
 }
 
+#ifdef CONFIG_BT_BNEP_PROTO_FILTER
+static inline void bnep_set_default_proto_filter(struct bnep_session *s)
+{
+	/* (IPv4, ARP)  */
+	s->proto_filter[0].start = htons(0x0800);
+	s->proto_filter[0].end   = htons(0x0806);
+	/* (RARP, AppleTalk) */
+	s->proto_filter[1].start = htons(0x8035);
+	s->proto_filter[1].end   = htons(0x80F3);
+	/* (IPX, IPv6) */
+	s->proto_filter[2].start = htons(0x8137);
+	s->proto_filter[2].end   = htons(0x86DD);
+}
+#endif
+
 static int bnep_ctrl_set_netfilter(struct bnep_session *s, u16 *data, int len)
 {
 	int n;
@@ -143,8 +158,12 @@ static int bnep_ctrl_set_netfilter(struct bnep_session *s, u16 *data, int len)
 			BT_DBG("proto filter start %d end %d",
 				f[i].start, f[i].end);
 		}
+
 		if (i < BNEP_MAX_PROTO_FILTERS)
 			memset(f + i, 0, sizeof(*f));
+
+		if (n == 0)
+			bnep_set_default_proto_filter(s);
 
 		bnep_send_rsp(s, BNEP_FILTER_NET_TYPE_RSP, BNEP_SUCCESS);
 	} else {
@@ -550,21 +569,12 @@ int bnep_add_connection(struct bnep_connadd_req *req, struct socket *sock)
 	/* Set default mc filter */
 	set_bit(bnep_mc_hash(dev->broadcast), (ulong *) &s->mc_filter);
 #endif
-	
+
 #ifdef CONFIG_BT_BNEP_PROTO_FILTER
 	/* Set default protocol filter */
-
-	/* (IPv4, ARP)  */
-	s->proto_filter[0].start = htons(0x0800);
-	s->proto_filter[0].end   = htons(0x0806);
-	/* (RARP, AppleTalk) */
-	s->proto_filter[1].start = htons(0x8035);
-	s->proto_filter[1].end   = htons(0x80F3);
-	/* (IPX, IPv6) */
-	s->proto_filter[2].start = htons(0x8137);
-	s->proto_filter[2].end   = htons(0x86DD);
+	bnep_set_default_proto_filter(s);
 #endif
-	
+
 	err = register_netdev(dev);
 	if (err) {
 		goto failed;
