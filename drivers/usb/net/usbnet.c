@@ -3009,7 +3009,7 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 		return -ENODEV;
 	}
 	xdev = interface_to_usbdev (udev);
-	interface = &udev->altsetting [udev->act_altsetting];
+	interface = udev->cur_altsetting;
 
 	usb_get_dev (xdev);
 

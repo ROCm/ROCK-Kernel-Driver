@@ -217,7 +217,7 @@ static int mtouchusb_probe(struct usb_interface *intf, const struct usb_device_i
         }
 
         dbg("%s - setting interface", __FUNCTION__);
-        interface = &intf->altsetting[intf->act_altsetting];
+        interface = intf->cur_altsetting;
 
         dbg("%s - setting endpoint", __FUNCTION__);
         endpoint = &interface->endpoint[0].desc;

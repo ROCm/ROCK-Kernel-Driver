@@ -700,7 +700,7 @@ static int ati_remote_probe(struct usb_interface *interface, const struct usb_de
 		return -ENOMEM;
 	memset(ati_remote, 0x00, sizeof (struct ati_remote));
 
-	iface_host = &interface->altsetting[interface->act_altsetting];
+	iface_host = interface->cur_altsetting;
 	if (iface_host->desc.bNumEndpoints != 2) {
 		err("%s: Unexpected desc.bNumEndpoints\n", __FUNCTION__);
 		retval = -ENODEV;
