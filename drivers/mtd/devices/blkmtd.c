@@ -989,8 +989,8 @@ static int __init init_blkmtd(void)
   rawdevice->as.nrpages = 0;
   rawdevice->as.a_ops = &blkmtd_aops;
   rawdevice->as.host = inode;
-  rawdevice->as.i_mmap = NULL;
-  rawdevice->as.i_mmap_shared = NULL;
+  INIT_LIST_HEAD(&rawdevice->as.i_mmap);
+  INIT_LIST_HEAD(&rawdevice->as.i_mmap_shared);
   spin_lock_init(&rawdevice->as.i_shared_lock);
   rawdevice->as.gfp_mask = GFP_KERNEL;
   rawdevice->file = file;

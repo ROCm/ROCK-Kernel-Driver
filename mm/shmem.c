@@ -904,7 +904,7 @@ static void do_shmem_file_read(struct file * filp, loff_t *ppos, read_descriptor
 		if ((desc->error = shmem_getpage(inode, index, &page)))
 			break;
 
-		if (mapping->i_mmap_shared != NULL)
+		if (!list_empty(&mapping->i_mmap_shared))
 			flush_dcache_page(page);
 
 		/*

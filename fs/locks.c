@@ -1459,7 +1459,7 @@ int fcntl_setlk(unsigned int fd, unsigned int cmd, struct flock *l)
 	    (inode->i_mode & (S_ISGID | S_IXGRP)) == S_ISGID) {
 		struct address_space *mapping = inode->i_mapping;
 
-		if (mapping->i_mmap_shared != NULL) {
+		if (!list_empty(&mapping->i_mmap_shared)) {
 			error = -EAGAIN;
 			goto out_putf;
 		}
@@ -1615,7 +1615,7 @@ int fcntl_setlk64(unsigned int fd, unsigned int cmd, struct flock64 *l)
 	    (inode->i_mode & (S_ISGID | S_IXGRP)) == S_ISGID) {
 		struct address_space *mapping = inode->i_mapping;
 
-		if (mapping->i_mmap_shared != NULL) {
+		if (!list_empty(&mapping->i_mmap_shared)) {
 			error = -EAGAIN;
 			goto out_putf;
 		}
