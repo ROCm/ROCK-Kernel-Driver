@@ -209,7 +209,7 @@ static unsigned int gx_get_cpuspeed(unsigned int cpu)
 	if ((gx_params->pci_suscfg & SUSMOD) == 0) 
 		return stock_freq;
 
-	return (stock_freq * gx_params->on_duration) 
+	return (stock_freq * gx_params->off_duration) 
 		/ (gx_params->on_duration + gx_params->off_duration);
 }
 
