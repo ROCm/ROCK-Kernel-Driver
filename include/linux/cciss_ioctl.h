@@ -35,17 +35,6 @@ typedef __u32 DriverVer_type;
 
 #define MAX_KMALLOC_SIZE 128000
 
-typedef struct _BIG_IOCTL_Command_struct {
-  LUNAddr_struct	   LUN_info;
-  RequestBlock_struct      Request;
-  ErrorInfo_struct  	   error_info; 
-  DWORD			   malloc_size; /* < MAX_KMALLOC_SIZE in cciss.c */
-  DWORD			   buf_size;    /* size in bytes of the buf */
-  				        /* < malloc_size * MAXSGENTRIES */
-  BYTE			   *buf;
-} BIG_IOCTL_Command_struct;
-
-
 #ifndef CCISS_CMD_H
 // This defines are duplicated in cciss_cmd.h in the driver directory 
 
@@ -180,6 +169,16 @@ typedef struct _IOCTL_Command_struct {
   WORD			   buf_size;  /* size in bytes of the buf */
   BYTE			   *buf;
 } IOCTL_Command_struct;
+
+typedef struct _BIG_IOCTL_Command_struct {
+  LUNAddr_struct	   LUN_info;
+  RequestBlock_struct      Request;
+  ErrorInfo_struct  	   error_info;
+  DWORD			   malloc_size; /* < MAX_KMALLOC_SIZE in cciss.c */
+  DWORD			   buf_size;    /* size in bytes of the buf */
+  				        /* < malloc_size * MAXSGENTRIES */
+  BYTE			   *buf;
+} BIG_IOCTL_Command_struct;
 
 typedef struct _LogvolInfo_struct{
 	__u32	LunID;
