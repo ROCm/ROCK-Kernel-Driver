@@ -187,7 +187,7 @@ config I2C_PROSAVAGE
 	  will be called i2c-prosavage.
 
 config I2C_RPXLITE
-	tristate "Embedded Planet RPX Lite/Classic suppoort"
+	tristate "Embedded Planet RPX Lite/Classic support"
 	depends on (RPXLITE || RPXCLASSIC) && I2C_ALGO8XX
 
 config I2C_SAVAGE4
