@@ -362,43 +362,56 @@ he_find_vcc(struct he_dev *he_dev, unsigned cid)
 static int __devinit
 he_init_one(struct pci_dev *pci_dev, const struct pci_device_id *pci_ent)
 {
-	struct atm_dev *atm_dev;
-	struct he_dev *he_dev;
+	struct atm_dev *atm_dev = NULL;
+	struct he_dev *he_dev = NULL;
+	int err = 0;
 
 	printk(KERN_INFO "he: %s\n", version);
 
 	if (pci_enable_device(pci_dev)) return -EIO;
-	if (pci_set_dma_mask(pci_dev, HE_DMA_MASK) != 0)
-	{
+	if (pci_set_dma_mask(pci_dev, HE_DMA_MASK) != 0) {
 		printk(KERN_WARNING "he: no suitable dma available\n");
-		return -EIO;
+		err = -EIO;
+		goto init_one_failure;
 	}
 
 	atm_dev = atm_dev_register(DEV_LABEL, &he_ops, -1, 0);
-	if (!atm_dev) return -ENODEV;
+	if (!atm_dev) {
+		err = -ENODEV;
+		goto init_one_failure;
+	}
 	pci_set_drvdata(pci_dev, atm_dev);
 
 	he_dev = (struct he_dev *) kmalloc(sizeof(struct he_dev),
 							GFP_KERNEL);
-	if (!he_dev) return -ENOMEM;
+	if (!he_dev) {
+		err = -ENOMEM;
+		goto init_one_failure;
+	}
 	memset(he_dev, 0, sizeof(struct he_dev));
 
 	he_dev->pci_dev = pci_dev;
 	he_dev->atm_dev = atm_dev;
 	he_dev->atm_dev->dev_data = he_dev;
 	HE_DEV(atm_dev) = he_dev;
-	he_dev->number = atm_dev->number;	/* was devs */
+	he_dev->number = atm_dev->number;
 	if (he_start(atm_dev)) {
-		atm_dev_deregister(atm_dev);
 		he_stop(he_dev);
-		kfree(he_dev);
-		return -ENODEV;
+		err = -ENODEV;
+		goto init_one_failure;
 	}
 	he_dev->next = NULL;
 	if (he_devs) he_dev->next = he_devs;
 	he_devs = he_dev;
-
 	return 0;
+
+init_one_failure:
+	if (atm_dev)
+		atm_dev_deregister(atm_dev);
+	if (he_dev)
+		kfree(he_dev);
+	pci_disable_device(pci_dev);
+	return err;
 }
 
 static void __devexit
@@ -417,6 +430,7 @@ he_remove_one (struct pci_dev *pci_dev)
 	kfree(he_dev);
 
 	pci_set_drvdata(pci_dev, NULL);
+	pci_disable_device(pci_dev);
 }
 
 
