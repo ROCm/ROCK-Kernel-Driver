@@ -29,6 +29,10 @@ config RWSEM_XCHGADD_ALGORITHM
 	bool
 	default n
 
+config GENERIC_CALIBRATE_DELAY
+	bool
+	default y
+
 source "init/Kconfig"
 
 menu "Processor type and features"

@@ -186,6 +186,10 @@ config RWSEM_XCHGADD_ALGORITHM
 	bool
 	default y
 
+config GENERIC_CALIBRATE_DELAY
+	bool
+	default y
+
 choice
 	prompt "SPARC64 Huge TLB Page Size"
 	depends on HUGETLB_PAGE
