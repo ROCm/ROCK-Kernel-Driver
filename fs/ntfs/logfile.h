@@ -111,10 +111,9 @@ typedef struct {
  * These are the so far known RESTART_AREA_* flags (16-bit) which contain
  * information about the log file in which they are present.
  */
-typedef enum {
-	RESTART_VOLUME_IS_CLEAN	= const_cpu_to_le16(0x0002),
-	REST_AREA_SPACE_FILLER	= 0xffff	/* Just to make flags 16-bit. */
-} __attribute__ ((__packed__)) RESTART_AREA_FLAGS;
+#define RESTART_VOLUME_IS_CLEAN	const_cpu_to_le16(0x0002)
+
+typedef le16 RESTART_AREA_FLAGS;
 
 /*
  * Log file restart area record.  The offset of this record is found by adding

@@ -143,13 +143,13 @@ typedef le32 NTFS_RECORD_TYPE;
 
 static inline BOOL __ntfs_is_magic(le32 x, NTFS_RECORD_TYPE r)
 {
-	return (x == (__force le32)r);
+	return (x == r);
 }
 #define ntfs_is_magic(x, m)	__ntfs_is_magic(x, magic_##m)
 
 static inline BOOL __ntfs_is_magicp(le32 *p, NTFS_RECORD_TYPE r)
 {
-	return (*p == (__force le32)r);
+	return (*p == r);
 }
 #define ntfs_is_magicp(p, m)	__ntfs_is_magicp(p, magic_##m)
 

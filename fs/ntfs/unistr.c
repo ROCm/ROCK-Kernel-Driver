@@ -276,7 +276,7 @@ int ntfs_nlstoucs(const ntfs_volume *vol, const char *ins,
 				} /* else (wc_len < 0) */
 				goto conversion_err;
 			}
-			ucs[o] = cpu_to_le16(0);
+			ucs[o] = 0;
 			*outs = ucs;
 			return o;
 		} /* else (!ucs) */
