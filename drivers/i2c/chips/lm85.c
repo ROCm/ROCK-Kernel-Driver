@@ -48,9 +48,6 @@ static unsigned int normal_isa_range[] = { I2C_CLIENT_ISA_END };
 /* Insmod parameters */
 SENSORS_INSMOD_4(lm85b, lm85c, adm1027, adt7463);
 
-/* Enable debug if true */
-static int	lm85debug = 0;
-
 /* The LM85 registers */
 
 #define	LM85_REG_IN(nr)			(0x20 + (nr))
@@ -802,19 +799,15 @@ int lm85_detect(struct i2c_adapter *adapter, int address,
 	company = lm85_read_value(new_client, LM85_REG_COMPANY);
 	verstep = lm85_read_value(new_client, LM85_REG_VERSTEP);
 
-	if (lm85debug) {
-		printk("lm85: Detecting device at %d,0x%02x with"
+	dev_dbg(&adapter->dev, "Detecting device at %d,0x%02x with"
 		" COMPANY: 0x%02x and VERSTEP: 0x%02x\n",
 		i2c_adapter_id(new_client->adapter), new_client->addr,
 		company, verstep);
-	}
 
 	/* If auto-detecting, Determine the chip type. */
 	if (kind <= 0) {
-		if (lm85debug) {
-			printk("lm85: Autodetecting device at %d,0x%02x ...\n",
+		dev_dbg(&adapter->dev, "Autodetecting device at %d,0x%02x ...\n",
 			i2c_adapter_id(adapter), address );
-		}
 		if( company == LM85_COMPANY_NATIONAL
 		    && verstep == LM85_VERSTEP_LM85C ) {
 			kind = lm85c ;
@@ -823,8 +816,8 @@ int lm85_detect(struct i2c_adapter *adapter, int address,
 			kind = lm85b ;
 		} else if( company == LM85_COMPANY_NATIONAL
 		    && (verstep & 0xf0) == LM85_VERSTEP_GENERIC ) {
-			printk("lm85: Unrecgonized version/stepping 0x%02x"
-			    " Defaulting to LM85.\n", verstep );
+			dev_err(&adapter->dev, "Unrecgonized version/stepping 0x%02x"
+				" Defaulting to LM85.\n", verstep);
 			kind = any_chip ;
 		} else if( company == LM85_COMPANY_ANALOG_DEV
 		    && verstep == LM85_VERSTEP_ADM1027 ) {
@@ -834,21 +827,19 @@ int lm85_detect(struct i2c_adapter *adapter, int address,
 			kind = adt7463 ;
 		} else if( company == LM85_COMPANY_ANALOG_DEV
 		    && (verstep & 0xf0) == LM85_VERSTEP_GENERIC ) {
-			printk("lm85: Unrecgonized version/stepping 0x%02x"
-			    " Defaulting to ADM1027.\n", verstep );
+			dev_err(&adapter->dev, "Unrecgonized version/stepping 0x%02x"
+				" Defaulting to ADM1027.\n", verstep);
 			kind = adm1027 ;
 		} else if( kind == 0 && (verstep & 0xf0) == 0x60) {
-			printk("lm85: Generic LM85 Version 6 detected\n");
+			dev_err(&adapter->dev, "Generic LM85 Version 6 detected\n");
 			/* Leave kind as "any_chip" */
 		} else {
-			if (lm85debug) {
-				printk("lm85: Autodetection failed\n");
-			}
+			dev_dbg(&adapter->dev, "Autodetection failed\n");
 			/* Not an LM85 ... */
 			if( kind == 0 ) {  /* User used force=x,y */
-			    printk("lm85: Generic LM85 Version 6 not"
-				" found at %d,0x%02x. Try force_lm85c.\n",
-				i2c_adapter_id(adapter), address );
+				dev_err(&adapter->dev, "Generic LM85 Version 6 not"
+					" found at %d,0x%02x. Try force_lm85c.\n",
+					i2c_adapter_id(adapter), address );
 			}
 			err = 0 ;
 			goto ERROR1;
@@ -879,12 +870,10 @@ int lm85_detect(struct i2c_adapter *adapter, int address,
 	data->valid = 0;
 	init_MUTEX(&data->update_lock);
 
-	if (lm85debug) {
-		printk("lm85: Assigning ID %d to %s at %d,0x%02x\n",
+	dev_dbg(&adapter->dev, "Assigning ID %d to %s at %d,0x%02x\n",
 		new_client->id, new_client->name,
 		i2c_adapter_id(new_client->adapter),
 		new_client->addr);
-	}
 
 	/* Tell the I2C layer a new client has arrived */
 	if ((err = i2c_attach_client(new_client)))
@@ -1021,31 +1010,24 @@ void lm85_init_client(struct i2c_client *client)
 	int value;
 	struct lm85_data *data = i2c_get_clientdata(client);
 
-	if (lm85debug) {
-		printk("lm85(%d): Initializing device\n", client->id);
-	}
+	dev_dbg(&client->dev, "Initializing device\n");
 
 	/* Warn if part was not "READY" */
 	value = lm85_read_value(client, LM85_REG_CONFIG);
-	if (lm85debug) {
-		printk("lm85(%d): LM85_REG_CONFIG is: 0x%02x\n", client->id, value );
-	}
+	dev_dbg(&client->dev, "LM85_REG_CONFIG is: 0x%02x\n", value);
 	if( value & 0x02 ) {
-		printk("lm85(%d): Client (%d,0x%02x) config is locked.\n",
-			    client->id,
+		dev_err(&client->dev, "Client (%d,0x%02x) config is locked.\n",
 			    i2c_adapter_id(client->adapter), client->addr );
 	};
 	if( ! (value & 0x04) ) {
-		printk("lm85(%d): Client (%d,0x%02x) is not ready.\n",
-			    client->id,
+		dev_err(&client->dev, "Client (%d,0x%02x) is not ready.\n",
 			    i2c_adapter_id(client->adapter), client->addr );
 	};
 	if( value & 0x10
 	    && ( data->type == adm1027
 		|| data->type == adt7463 ) ) {
-		printk("lm85(%d): Client (%d,0x%02x) VxI mode is set.  "
+		dev_err(&client->dev, "Client (%d,0x%02x) VxI mode is set.  "
 			"Please report this to the lm85 maintainer.\n",
-			    client->id,
 			    i2c_adapter_id(client->adapter), client->addr );
 	};
 
@@ -1061,11 +1043,8 @@ void lm85_init_client(struct i2c_client *client)
 	value = lm85_read_value(client, LM85_REG_CONFIG);
 	/* Try to clear LOCK, Set START, save everything else */
 	value = (value & ~ 0x02) | 0x01 ;
-	if (lm85debug) {
-		printk("lm85(%d): Setting CONFIG to: 0x%02x\n", client->id, value );
-	}
+	dev_dbg(&client->dev, "Setting CONFIG to: 0x%02x\n", value);
 	lm85_write_value(client, LM85_REG_CONFIG, value);
-
 }
 
 void lm85_update_client(struct i2c_client *client)
@@ -1078,10 +1057,8 @@ void lm85_update_client(struct i2c_client *client)
 	if ( !data->valid ||
 	     (jiffies - data->last_reading > LM85_DATA_INTERVAL ) ) {
 		/* Things that change quickly */
-
-		if (lm85debug) {
-			printk("lm85(%d): Reading sensor values\n", client->id);
-		}
+		dev_dbg(&client->dev, "Reading sensor values\n");
+		
 		/* Have to read extended bits first to "freeze" the
 		 * more significant bits that are read later.
 		 */
@@ -1125,10 +1102,8 @@ void lm85_update_client(struct i2c_client *client)
 	if ( !data->valid ||
 	     (jiffies - data->last_config > LM85_CONFIG_INTERVAL) ) {
 		/* Things that don't change often */
+		dev_dbg(&client->dev, "Reading config values\n");
 
-		if (lm85debug) {
-			printk("lm85(%d): Reading config values\n", client->id);
-		}
 		for (i = 0; i <= 4; ++i) {
 			data->in_min[i] =
 			    lm85_read_value(client, LM85_REG_IN_MIN(i));
@@ -1234,8 +1209,6 @@ static void  __exit sm_lm85_exit(void)
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Philip Pokorny <ppokorny@penguincomputing.com>, Margit Schubert-While <margitsw@t-online.de>");
 MODULE_DESCRIPTION("LM85-B, LM85-C driver");
-MODULE_PARM(lm85debug, "i");
-MODULE_PARM_DESC(lm85debug, "Enable debugging statements");
 
 module_init(sm_lm85_init);
 module_exit(sm_lm85_exit);

@@ -353,8 +353,8 @@ static int whiteheat_attach (struct usb_serial *serial)
 	int pipe;
 	int ret;
 	int alen;
-	__u8 command[2] = { WHITEHEAT_GET_HW_INFO, 0 };
-	__u8 result[sizeof(*hw_info) + 1];
+	__u8 *command;
+	__u8 *result;
 	int i;
 	int j;
 	struct urb *urb;
@@ -365,13 +365,22 @@ static int whiteheat_attach (struct usb_serial *serial)
 	command_port = serial->port[COMMAND_PORT];
 
 	pipe = usb_sndbulkpipe (serial->dev, command_port->bulk_out_endpointAddress);
+	command = kmalloc(2, GFP_KERNEL);
+	if (!command)
+		goto no_command_buffer;
+	command[0] = WHITEHEAT_GET_HW_INFO;
+	command[1] = 0;
+	
+	result = kmalloc(sizeof(*hw_info) + 1, GFP_KERNEL);
+	if (!result)
+		goto no_result_buffer;
 	/*
 	 * When the module is reloaded the firmware is still there and
 	 * the endpoints are still in the usb core unchanged. This is the
          * unlinking bug in disguise. Same for the call below.
          */
 	usb_clear_halt(serial->dev, pipe);
-	ret = usb_bulk_msg (serial->dev, pipe, command, sizeof(command), &alen, COMMAND_TIMEOUT);
+	ret = usb_bulk_msg (serial->dev, pipe, command, 2, &alen, COMMAND_TIMEOUT);
 	if (ret) {
 		err("%s: Couldn't send command [%d]", serial->type->name, ret);
 		goto no_firmware;
@@ -383,7 +392,7 @@ static int whiteheat_attach (struct usb_serial *serial)
 	pipe = usb_rcvbulkpipe (serial->dev, command_port->bulk_in_endpointAddress);
 	/* See the comment on the usb_clear_halt() above */
 	usb_clear_halt(serial->dev, pipe);
-	ret = usb_bulk_msg (serial->dev, pipe, result, sizeof(result), &alen, COMMAND_TIMEOUT);
+	ret = usb_bulk_msg (serial->dev, pipe, result, sizeof(*hw_info) + 1, &alen, COMMAND_TIMEOUT);
 	if (ret) {
 		err("%s: Couldn't get results [%d]", serial->type->name, ret);
 		goto no_firmware;
@@ -485,6 +494,8 @@ static int whiteheat_attach (struct usb_serial *serial)
 	usb_set_serial_port_data(command_port, command_info);
 	command_port->write_urb->complete = command_port_write_callback;
 	command_port->read_urb->complete = command_port_read_callback;
+	kfree(result);
+	kfree(command);
 
 	return 0;
 
@@ -526,6 +537,10 @@ no_rx_urb:
 no_private:
 		;
 	}
+	kfree(result);
+no_result_buffer:
+	kfree(command);
+no_command_buffer:
 	return -ENOMEM;
 }
 

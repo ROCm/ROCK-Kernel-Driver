@@ -856,7 +856,6 @@ extern int usb_bulk_msg(struct usb_device *usb_dev, unsigned int pipe,
 /* wrappers around usb_control_msg() for the most common standard requests */
 extern int usb_get_descriptor(struct usb_device *dev, unsigned char desctype,
 	unsigned char descindex, void *buf, int size);
-extern int usb_get_device_descriptor(struct usb_device *dev);
 extern int usb_get_status(struct usb_device *dev,
 	int type, int target, void *data);
 extern int usb_get_string(struct usb_device *dev,
