@@ -50,7 +50,6 @@ static unsigned int ata_busy_sleep (struct ata_port *ap,
 				    unsigned long tmout_pat,
 			    	    unsigned long tmout);
 static void __ata_dev_select (struct ata_port *ap, unsigned int device);
-static void ata_dma_complete(struct ata_queued_cmd *qc, u8 host_stat);
 static void ata_host_set_pio(struct ata_port *ap);
 static void ata_host_set_udma(struct ata_port *ap);
 static void ata_dev_set_pio(struct ata_port *ap, unsigned int device);
@@ -2136,7 +2135,7 @@ static void ata_pio_task(void *_data)
 
 void ata_eng_timeout(struct ata_port *ap)
 {
-	u8 host_stat, drv_stat;
+	u8 host_stat = 0, drv_stat;
 	struct ata_queued_cmd *qc;
 
 	DPRINTK("ENTER\n");
@@ -2157,30 +2156,28 @@ void ata_eng_timeout(struct ata_port *ap)
 	qc->scsidone = scsi_finish_command;
 
 	switch (qc->tf.protocol) {
+
 	case ATA_PROT_DMA:
+	case ATA_PROT_ATAPI_DMA:
 		host_stat = ata_bmdma_status(ap);
 
-		printk(KERN_ERR "ata%u: DMA timeout, stat 0x%x\n",
-		       ap->id, host_stat);
+		/* before we do anything else, clear DMA-Start bit */
+		ata_bmdma_stop(ap);
 
-		ata_dma_complete(qc, host_stat);
-		break;
+		/* fall through */
 
 	case ATA_PROT_NODATA:
-		drv_stat = ata_busy_wait(ap, ATA_BUSY | ATA_DRQ, 1000);
-
-		printk(KERN_ERR "ata%u: command 0x%x timeout, stat 0x%x\n",
-		       ap->id, qc->tf.command, drv_stat);
-
-		ata_qc_complete(qc, drv_stat);
-		break;
-
 	default:
-		drv_stat = ata_busy_wait(ap, ATA_BUSY | ATA_DRQ, 1000);
+		ata_altstatus(ap);
+		drv_stat = ata_chk_status(ap);
 
-		printk(KERN_ERR "ata%u: unknown timeout, cmd 0x%x stat 0x%x\n",
-		       ap->id, qc->tf.command, drv_stat);
+		/* ack bmdma irq events */
+		ata_bmdma_ack_irq(ap);
 
+		printk(KERN_ERR "ata%u: command 0x%x timeout, stat 0x%x host_stat 0x%x\n",
+		       ap->id, qc->tf.command, drv_stat, host_stat);
+
+		/* complete taskfile transaction */
 		ata_qc_complete(qc, drv_stat);
 		break;
 	}
@@ -2412,7 +2409,7 @@ void ata_bmdma_setup_mmio (struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
 	unsigned int rw = (qc->tf.flags & ATA_TFLAG_WRITE);
-	u8 host_stat, dmactl;
+	u8 dmactl;
 	void *mmio = (void *) ap->ioaddr.bmdma_addr;
 
 	/* load PRD table addr. */
@@ -2425,10 +2422,6 @@ void ata_bmdma_setup_mmio (struct ata_queued_cmd *qc)
 	if (!rw)
 		dmactl |= ATA_DMA_WR;
 	writeb(dmactl, mmio + ATA_DMA_CMD);
-
-	/* clear interrupt, error bits */
-	host_stat = readb(mmio + ATA_DMA_STATUS);
-	writeb(host_stat | ATA_DMA_INTR | ATA_DMA_ERR, mmio + ATA_DMA_STATUS);
 
 	/* issue r/w command */
 	ap->ops->exec_command(ap, &qc->tf);
@@ -2477,7 +2470,7 @@ void ata_bmdma_setup_pio (struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
 	unsigned int rw = (qc->tf.flags & ATA_TFLAG_WRITE);
-	u8 host_stat, dmactl;
+	u8 dmactl;
 
 	/* load PRD table addr. */
 	outl(ap->prd_dma, ap->ioaddr.bmdma_addr + ATA_DMA_TABLE_OFS);
@@ -2488,11 +2481,6 @@ void ata_bmdma_setup_pio (struct ata_queued_cmd *qc)
 	if (!rw)
 		dmactl |= ATA_DMA_WR;
 	outb(dmactl, ap->ioaddr.bmdma_addr + ATA_DMA_CMD);
-
-	/* clear interrupt, error bits */
-	host_stat = inb(ap->ioaddr.bmdma_addr + ATA_DMA_STATUS);
-	outb(host_stat | ATA_DMA_INTR | ATA_DMA_ERR,
-	     ap->ioaddr.bmdma_addr + ATA_DMA_STATUS);
 
 	/* issue r/w command */
 	ap->ops->exec_command(ap, &qc->tf);
@@ -2518,29 +2506,6 @@ void ata_bmdma_start_pio (struct ata_queued_cmd *qc)
 }
 
 /**
- *	ata_dma_complete - Complete an active ATA BMDMA command
- *	@qc: Command to complete
- *	@host_stat: BMDMA status register contents
- *
- *	LOCKING:
- */
-
-static void ata_dma_complete(struct ata_queued_cmd *qc, u8 host_stat)
-{
-	struct ata_port *ap = qc->ap;
-	VPRINTK("ENTER\n");
-
-	ata_bmdma_stop(ap);
-	ata_bmdma_ack_irq(ap);
-
-	DPRINTK("host %u, host_stat==0x%X, drv_stat==0x%X\n",
-		ap->id, (u32) host_stat, (u32) ata_chk_status(ap));
-
-	/* get drive status; clear intr; complete txn */
-	ata_qc_complete(qc, ata_wait_idle(ap));
-}
-
-/**
  *	ata_host_intr - Handle host interrupt for given (port, task)
  *	@ap: Port on which interrupt arrived (possibly...)
  *	@qc: Taskfile currently active in engine
@@ -2560,55 +2525,60 @@ inline unsigned int ata_host_intr (struct ata_port *ap,
 				   struct ata_queued_cmd *qc)
 {
 	u8 status, host_stat;
-	unsigned int handled = 0;
 
 	switch (qc->tf.protocol) {
 
-	/* BMDMA completion */
 	case ATA_PROT_DMA:
 	case ATA_PROT_ATAPI_DMA:
+		/* check status of DMA engine */
 		host_stat = ata_bmdma_status(ap);
 		VPRINTK("BUS_DMA (host_stat 0x%X)\n", host_stat);
 
-		if (!(host_stat & ATA_DMA_INTR)) {
-			ap->stats.idle_irq++;
-			break;
-		}
+		/* if it's not our irq... */
+		if (!(host_stat & ATA_DMA_INTR))
+			goto idle_irq;
 
-		ata_dma_complete(qc, host_stat);
-		handled = 1;
-		break;
+		/* before we do anything else, clear DMA-Start bit */
+		ata_bmdma_stop(ap);
 
-	/* command completion, but no data xfer */
-	/* FIXME: a shared interrupt _will_ cause a non-data command
-	 * to be completed prematurely, with an error.
-	 *
-	 * This doesn't matter right now, since we aren't sending
-	 * non-data commands down this pipe except in development
-	 * situations.
-	 */
-	case ATA_PROT_ATAPI:
+		/* fall through */
+
 	case ATA_PROT_NODATA:
-		status = ata_busy_wait(ap, ATA_BUSY | ATA_DRQ, 1000);
-		DPRINTK("BUS_NODATA (drv_stat 0x%X)\n", status);
+		/* check altstatus */
+		status = ata_altstatus(ap);
+		if (status & ATA_BUSY)
+			goto idle_irq;
+
+		/* check main status, clearing INTRQ */
+		status = ata_chk_status(ap);
+		if (unlikely(status & ATA_BUSY))
+			goto idle_irq;
+		DPRINTK("BUS_NODATA (dev_stat 0x%X)\n", status);
+
+		/* ack bmdma irq events */
+		ata_bmdma_ack_irq(ap);
+
+		/* complete taskfile transaction */
 		ata_qc_complete(qc, status);
-		handled = 1;
 		break;
 
 	default:
-		ap->stats.idle_irq++;
-
-#ifdef ATA_IRQ_TRAP
-		if ((ap->stats.idle_irq % 1000) == 0) {
-			handled = 1;
-			ata_irq_ack(ap, 0); /* debug trap */
-			printk(KERN_WARNING "ata%d: irq trap\n", ap->id);
-		}
-#endif
-		break;
+		goto idle_irq;
 	}
 
-	return handled;
+	return 1;	/* irq handled */
+
+idle_irq:
+	ap->stats.idle_irq++;
+
+#ifdef ATA_IRQ_TRAP
+	if ((ap->stats.idle_irq % 1000) == 0) {
+		handled = 1;
+		ata_irq_ack(ap, 0); /* debug trap */
+		printk(KERN_WARNING "ata%d: irq trap\n", ap->id);
+	}
+#endif
+	return 0;	/* irq not handled */
 }
 
 /**
@@ -2642,7 +2612,7 @@ irqreturn_t ata_interrupt (int irq, void *dev_instance, struct pt_regs *regs)
 
 			qc = ata_qc_from_tag(ap, ap->active_tag);
 			if (qc && (!(qc->tf.ctl & ATA_NIEN)))
-				handled += ata_host_intr(ap, qc);
+				handled |= ata_host_intr(ap, qc);
 		}
 	}
 
@@ -2906,6 +2876,10 @@ int ata_device_add(struct ata_probe_ent *ent)
 		kfree(host_set);
 		return 0;
 	}
+
+	/* TODO: ack irq here, to ensure it won't scream
+	 * when we enable it?
+	 */
 
 	/* obtain irq, that is shared between channels */
 	if (request_irq(ent->irq, ent->port_ops->irq_handler, ent->irq_flags,
