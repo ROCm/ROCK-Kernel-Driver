@@ -1014,6 +1014,8 @@ static int snd_cs46xx_playback_hw_params(snd_pcm_substream_t * substream,
 			substream->ops = &snd_cs46xx_playback_ops;
 		} else if (cpcm->pcm_channel_id == DSP_PCM_REAR_CHANNEL) {
 			substream->ops = &snd_cs46xx_playback_rear_ops;
+		} else if (cpcm->pcm_channel_id == DSP_PCM_CENTER_LFE_CHANNEL) {
+			substream->ops = &snd_cs46xx_playback_clfe_ops;
 		} else if (cpcm->pcm_channel_id == DSP_IEC958_CHANNEL) {
 			substream->ops = &snd_cs46xx_playback_iec958_ops;
 		} else {
@@ -1041,6 +1043,8 @@ static int snd_cs46xx_playback_hw_params(snd_pcm_substream_t * substream,
 			substream->ops = &snd_cs46xx_playback_indirect_ops;
 		} else if (cpcm->pcm_channel_id == DSP_PCM_REAR_CHANNEL) {
 			substream->ops = &snd_cs46xx_playback_indirect_rear_ops;
+		} else if (cpcm->pcm_channel_id == DSP_PCM_CENTER_LFE_CHANNEL) {
+			substream->ops = &snd_cs46xx_playback_indirect_clfe_ops;
 		} else if (cpcm->pcm_channel_id == DSP_IEC958_CHANNEL) {
 			substream->ops = &snd_cs46xx_playback_indirect_iec958_ops;
 		} else {
@@ -1423,6 +1427,13 @@ static int snd_cs46xx_playback_open_rear(snd_pcm_substream_t * substream)
 	return _cs46xx_playback_open_channel(substream,DSP_PCM_REAR_CHANNEL);
 }
 
+static int snd_cs46xx_playback_open_clfe(snd_pcm_substream_t * substream)
+{
+	snd_printdd("open center - LFE channel\n");
+
+	return _cs46xx_playback_open_channel(substream,DSP_PCM_CENTER_LFE_CHANNEL);
+}
+
 static int snd_cs46xx_playback_open_iec958(snd_pcm_substream_t * substream)
 {
 	cs46xx_t *chip = snd_pcm_substream_chip(substream);
@@ -1541,6 +1552,29 @@ snd_pcm_ops_t snd_cs46xx_playback_indirect_rear_ops = {
 	.ack =			snd_cs46xx_playback_transfer,
 };
 
+snd_pcm_ops_t snd_cs46xx_playback_clfe_ops = {
+	.open =			snd_cs46xx_playback_open_clfe,
+	.close =		snd_cs46xx_playback_close,
+	.ioctl =		snd_pcm_lib_ioctl,
+	.hw_params =		snd_cs46xx_playback_hw_params,
+	.hw_free =		snd_cs46xx_playback_hw_free,
+	.prepare =		snd_cs46xx_playback_prepare,
+	.trigger =		snd_cs46xx_playback_trigger,
+	.pointer =		snd_cs46xx_playback_direct_pointer,
+};
+
+snd_pcm_ops_t snd_cs46xx_playback_indirect_clfe_ops = {
+	.open =			snd_cs46xx_playback_open_clfe,
+	.close =		snd_cs46xx_playback_close,
+	.ioctl =		snd_pcm_lib_ioctl,
+	.hw_params =		snd_cs46xx_playback_hw_params,
+	.hw_free =		snd_cs46xx_playback_hw_free,
+	.prepare =		snd_cs46xx_playback_prepare,
+	.trigger =		snd_cs46xx_playback_trigger,
+	.pointer =		snd_cs46xx_playback_indirect_pointer,
+	.ack =			snd_cs46xx_playback_transfer,
+};
+
 snd_pcm_ops_t snd_cs46xx_playback_iec958_ops = {
 	.open =			snd_cs46xx_playback_open_iec958,
 	.close =		snd_cs46xx_playback_close_iec958,
@@ -1627,6 +1661,13 @@ static void snd_cs46xx_pcm_rear_free(snd_pcm_t *pcm)
 	snd_pcm_lib_preallocate_free_for_all(pcm);
 }
 
+static void snd_cs46xx_pcm_center_lfe_free(snd_pcm_t *pcm)
+{
+	cs46xx_t *chip = snd_magic_cast(cs46xx_t, pcm->private_data, return);
+	chip->pcm_center_lfe = NULL;
+	snd_pcm_lib_preallocate_free_for_all(pcm);
+}
+
 static void snd_cs46xx_pcm_iec958_free(snd_pcm_t *pcm)
 {
 	cs46xx_t *chip = snd_magic_cast(cs46xx_t, pcm->private_data, return);
@@ -1690,6 +1731,35 @@ int __devinit snd_cs46xx_pcm_rear(cs46xx_t *chip, int device, snd_pcm_t ** rpcm)
 	pcm->info_flags = 0;
 	strcpy(pcm->name, "CS46xx - Rear");
 	chip->pcm_rear = pcm;
+
+	snd_pcm_lib_preallocate_pci_pages_for_all(chip->pci, pcm, 64*1024, 256*1024);
+
+	if (rpcm)
+		*rpcm = pcm;
+
+	return 0;
+}
+
+int __devinit snd_cs46xx_pcm_center_lfe(cs46xx_t *chip, int device, snd_pcm_t ** rpcm)
+{
+	snd_pcm_t *pcm;
+	int err;
+
+	if (rpcm)
+		*rpcm = NULL;
+
+	if ((err = snd_pcm_new(chip->card, "CS46xx - Center LFE", device, MAX_PLAYBACK_CHANNELS, 0, &pcm)) < 0)
+		return err;
+
+	pcm->private_data = chip;
+	pcm->private_free = snd_cs46xx_pcm_center_lfe_free;
+
+	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &snd_cs46xx_playback_clfe_ops);
+
+	/* global setup */
+	pcm->info_flags = 0;
+	strcpy(pcm->name, "CS46xx - Center LFE");
+	chip->pcm_center_lfe = pcm;
 
 	snd_pcm_lib_preallocate_pci_pages_for_all(chip->pci, pcm, 64*1024, 256*1024);
 
@@ -1812,6 +1882,7 @@ static int snd_cs46xx_vol_dac_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_
 	return change;
 }
 
+#if 0
 static int snd_cs46xx_vol_iec958_get(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	cs46xx_t *chip = snd_kcontrol_chip(kcontrol);
@@ -1836,6 +1907,7 @@ static int snd_cs46xx_vol_iec958_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_val
 
 	return change;
 }
+#endif
 
 static int snd_mixer_boolean_info(snd_kcontrol_t *kcontrol, 
 				  snd_ctl_elem_info_t *uinfo)
@@ -2234,6 +2306,8 @@ static snd_kcontrol_new_t snd_cs46xx_controls[] __devinitdata = {
 	.put = snd_cs46xx_iec958_put,
 	.private_value = CS46XX_MIXER_SPDIF_INPUT_ELEMENT,
 },
+#if 0
+/* Input IEC958 volume does not work for the moment. (Benny) */
 {
 	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 	.name = "IEC958 Input Volume",
@@ -2242,6 +2316,7 @@ static snd_kcontrol_new_t snd_cs46xx_controls[] __devinitdata = {
 	.put = snd_cs46xx_vol_iec958_put,
 	.private_value = (ASYNCRX_SCB_ADDR + 0xE) << 2,
 },
+#endif
 {
 	.iface = SNDRV_CTL_ELEM_IFACE_PCM,
 	.name =  SNDRV_CTL_NAME_IEC958("",PLAYBACK,DEFAULT),
@@ -2314,16 +2389,25 @@ static snd_kcontrol_new_t snd_hercules_controls[] __devinitdata = {
 };
 
 
-static void snd_cs46xx_sec_codec_reset (ac97_t * ac97)
+static void snd_cs46xx_codec_reset (ac97_t * ac97)
 {
 	unsigned long end_time;
 	int err;
+	cs46xx_t * chip = snd_magic_cast(cs46xx_t,ac97->private_data,return /* -ENXIO */);
 
 	/* reset to defaults */
 	snd_ac97_write(ac97, AC97_RESET, 0);	
 
-	/* set codec in extended mode */
-	snd_cs46xx_ac97_write(ac97,AC97_CSR_ACMODE,0x3);
+	/* set the desired CODEC mode */
+	if (chip->nr_ac97_codecs == 0) {
+		snd_printdd("cs46xx: CODOEC1 mode %04x\n",0x0);
+		snd_cs46xx_ac97_write(ac97,AC97_CSR_ACMODE,0x0);
+	} else if (chip->nr_ac97_codecs == 1) {
+		snd_printdd("cs46xx: CODOEC2 mode %04x\n",0x3);
+		snd_cs46xx_ac97_write(ac97,AC97_CSR_ACMODE,0x3);
+	} else {
+		snd_assert(0); /* should never happen ... */
+	}
 
 	udelay(50);
 
@@ -2372,7 +2456,9 @@ int __devinit snd_cs46xx_mixer(cs46xx_t *chip)
 	ac97.read = snd_cs46xx_ac97_read;
 	ac97.private_data = chip;
 	ac97.private_free = snd_cs46xx_mixer_free_ac97;
-
+#ifdef CONFIG_SND_CS46XX_NEW_DSP
+	ac97.reset = snd_cs46xx_codec_reset;
+#endif
 	chip->ac97[CS46XX_PRIMARY_CODEC_INDEX] = &ac97;
 
 	snd_cs46xx_ac97_write(&ac97, AC97_MASTER, 0x8000);
@@ -2432,7 +2518,7 @@ int __devinit snd_cs46xx_mixer(cs46xx_t *chip)
 
 	/* use custom reset to set secondary codec in
 	   extended mode */
-	ac97.reset = snd_cs46xx_sec_codec_reset;
+	ac97.reset = snd_cs46xx_codec_reset;
 
 	if ((err = snd_ac97_mixer(card, &ac97, &chip->ac97[CS46XX_SECONDARY_CODEC_INDEX])) < 0)
 		return err;
@@ -2870,6 +2956,7 @@ static int snd_cs46xx_free(cs46xx_t *chip)
 		kfree(chip->gameport);
 	}
 #endif
+
 	if (chip->amplifier_ctrl)
 		chip->amplifier_ctrl(chip, -chip->amplifier); /* force to off */
 	
@@ -2892,10 +2979,14 @@ static int snd_cs46xx_free(cs46xx_t *chip)
 
 	if (chip->active_ctrl)
 		chip->active_ctrl(chip, -chip->amplifier);
-
+	
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
-	cs46xx_dsp_spos_destroy(chip);
+	if (chip->dsp_spos_instance) {
+		cs46xx_dsp_spos_destroy(chip);
+		chip->dsp_spos_instance = NULL;
+	}
 #endif
+	
 	snd_magic_kfree(chip);
 	return 0;
 }
@@ -3104,8 +3195,21 @@ static int snd_cs46xx_chip_init(cs46xx_t *chip, int busywait)
 		}
 	}
 
+#ifndef CONFIG_SND_CS46XX_NEW_DSP
 	snd_printk("create - never read ISV3 & ISV4 from AC'97\n");
 	return -EIO;
+#else
+	/* This may happen on a cold boot with a Terratec SiXPack 5.1.
+	   Reloading the driver may help, if there's other soundcards 
+	   with the same problem I would like to know. (Benny) */
+
+	snd_printk("ERROR: snd-cs46xx: never read ISV3 & ISV4 from AC'97\n");
+	snd_printk("       Try reloading the ALSA driver, if you find something\n");
+        snd_printk("       broken or not working on your soundcard upon\n");
+	snd_printk("       this message please report to alsa-devel@lists.sourceforge.net\n");
+
+	return -EIO;
+#endif
  ok2:
 
 	/*
@@ -3113,8 +3217,7 @@ static int snd_cs46xx_chip_init(cs46xx_t *chip, int busywait)
 	 *  commense the transfer of digital audio data to the AC97 codec.
 	 */
 
-	snd_cs46xx_pokeBA0(chip, BA0_ACOSV, ACOSV_SLV3 | ACOSV_SLV4 | 
-			   ACOSV_SLV7 | ACOSV_SLV8);
+	snd_cs46xx_pokeBA0(chip, BA0_ACOSV, ACOSV_SLV3 | ACOSV_SLV4);
 
 
 	/*
@@ -3224,21 +3327,7 @@ int __devinit snd_cs46xx_start_dsp(cs46xx_t *chip)
 	tmp |=  0x00000001;
 	snd_cs46xx_poke(chip, BA1_CIE, tmp);	/* capture interrupt enable */
 	
-#ifdef CONFIG_SND_CS46XX_NEW_DSP
-	/* set the attenuation to 0dB */ 
-	/* snd_cs46xx_poke(chip, (MASTERMIX_SCB_ADDR + 0xE) << 2, 0x80008000); 
-	   snd_cs46xx_poke(chip, (VARIDECIMATE_SCB_ADDR + 0xE) << 2, 0x80008000); */
-
-	/*
-	 * Initialize cs46xx SPDIF controller
-	 */
-
-	/* time countdown enable */
-	cs46xx_poke_via_dsp (chip,SP_ASER_COUNTDOWN, 0x80000000);
-
-	/* SPDIF input MASTER ENABLE */
-	cs46xx_poke_via_dsp (chip,SP_SPDIN_CONTROL, 0x800003ff);
-#else
+#ifndef CONFIG_SND_CS46XX_NEW_DSP
 	/* set the attenuation to 0dB */ 
 	snd_cs46xx_poke(chip, BA1_PVOL, 0x80008000);
 	snd_cs46xx_poke(chip, BA1_CVOL, 0x80008000);
@@ -3312,7 +3401,8 @@ static int voyetra_setup_eapd_slot(cs46xx_t *chip)
 
 	logic_type = snd_cs46xx_codec_read(chip, AC97_GPIO_POLARITY,
 					   CS46XX_SECONDARY_CODEC_INDEX);
-	logic_type &=0x27F;
+	logic_type &=0x27F; 
+
 	snd_cs46xx_codec_write (chip, AC97_GPIO_POLARITY, logic_type,
 				CS46XX_SECONDARY_CODEC_INDEX);
 
@@ -3592,55 +3682,62 @@ static struct cs_card_type __devinitdata cards[] = {
 		.id = 0x3357,
 		.name = "Voyetra",
 		.amp = amp_voyetra,
-		.mixer_init = voyetra_mixer_init
+		.mixer_init = voyetra_mixer_init,
 	},
 	{
 		.vendor = 0x1071,
 		.id = 0x6003,
 		.name = "Mitac MI6020/21",
-		.amp = amp_voyetra
+		.amp = amp_voyetra,
 	},
 	{
 		.vendor = 0x14AF,
 		.id = 0x0050,
 		.name = "Hercules Game Theatre XP",
 		.amp = amp_hercules,
-		.mixer_init = hercules_mixer_init
+		.mixer_init = hercules_mixer_init,
 	},
 	{
 		.vendor = 0x1681,
 		.id = 0x0050,
 		.name = "Hercules Game Theatre XP",
 		.amp = amp_hercules,
-		.mixer_init = hercules_mixer_init
+		.mixer_init = hercules_mixer_init,
 	},
 	{
 		.vendor = 0x1681,
 		.id = 0x0051,
 		.name = "Hercules Game Theatre XP",
 		.amp = amp_hercules,
-		.mixer_init = hercules_mixer_init
+		.mixer_init = hercules_mixer_init,
+
 	},
 	{
 		.vendor = 0x1681,
 		.id = 0x0052,
 		.name = "Hercules Game Theatre XP",
 		.amp = amp_hercules,
-		.mixer_init = hercules_mixer_init
+		.mixer_init = hercules_mixer_init,
 	},
 	{
 		.vendor = 0x1681,
 		.id = 0x0053,
 		.name = "Hercules Game Theatre XP",
 		.amp = amp_hercules,
-		.mixer_init = hercules_mixer_init
+		.mixer_init = hercules_mixer_init,
 	},
 	{
 		.vendor = 0x1681,
 		.id = 0x0054,
 		.name = "Hercules Game Theatre XP",
 		.amp = amp_hercules,
-		.mixer_init = hercules_mixer_init
+		.mixer_init = hercules_mixer_init,
+	},
+	/* Teratec */
+	{
+		.vendor = 0x153b,
+		.id = 0x1136,
+		.name = "Terratec SiXPack 5.1",
 	},
 	/* Not sure if the 570 needs the clkrun hack */
 	{
@@ -3648,19 +3745,19 @@ static struct cs_card_type __devinitdata cards[] = {
 		.id = 0x0132,
 		.name = "Thinkpad 570",
 		.init = clkrun_init,
-		.active = clkrun_hack
+		.active = clkrun_hack,
 	},
 	{
 		.vendor = PCI_VENDOR_ID_IBM,
 		.id = 0x0153,
 		.name = "Thinkpad 600X/A20/T20",
 		.init = clkrun_init,
-		.active = clkrun_hack
+		.active = clkrun_hack,
 	},
 	{
 		.vendor = PCI_VENDOR_ID_IBM,
 		.id = 0x1010,
-		.name = "Thinkpad 600E (unsupported)"
+		.name = "Thinkpad 600E (unsupported)",
 	},
 	{} /* terminator */
 };
@@ -3823,10 +3920,12 @@ int __devinit snd_cs46xx_create(snd_card_t * card,
 
 	for (cp = &cards[0]; cp->name; cp++) {
 		if (cp->vendor == ss_vendor && cp->id == ss_card) {
-			snd_printd ("hack for %s enabled\n", cp->name);
+			snd_printdd ("hack for %s enabled\n", cp->name);
+
 			chip->amplifier_ctrl = cp->amp;
 			chip->active_ctrl = cp->active;
 			chip->mixer_init = cp->mixer_init;
+
 			if (cp->init)
 				cp->init(chip);
 			break;
@@ -3867,6 +3966,7 @@ int __devinit snd_cs46xx_create(snd_card_t * card,
 			return -ENOMEM;
 		}
 	}
+
 	if (request_irq(pci->irq, snd_cs46xx_interrupt, SA_INTERRUPT|SA_SHIRQ, "CS46XX", (void *) chip)) {
 		snd_printk("unable to grab IRQ %d\n", pci->irq);
 		snd_cs46xx_free(chip);

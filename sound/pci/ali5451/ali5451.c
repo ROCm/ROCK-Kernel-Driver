@@ -375,24 +375,27 @@ static int snd_ali_codec_ready(	ali_t *codec,
 				unsigned int port,
 				int sched )
 {
-	signed long end_time;
+	unsigned long end_time;
+	unsigned int res;
 	
 	end_time = jiffies + 10 * (HZ >> 2);
 	do {
-		if (!(snd_ali_5451_peek(codec,port) & 0x8000))
+		res = snd_ali_5451_peek(codec,port);
+		if (! (res & 0x8000))
 			return 0;
 		if (sched) {
 			set_current_state(TASK_UNINTERRUPTIBLE);
 			schedule_timeout(1);
 		}
-	} while (end_time - (signed long)jiffies >= 0);
-	snd_printk("ali_codec_ready: codec is not ready.\n ");
+	} while (time_after_eq(end_time, jiffies));
+	snd_ali_5451_poke(codec, port, res & ~0x8000);
+	snd_printdd("ali_codec_ready: codec is not ready.\n ");
 	return -EIO;
 }
 
 static int snd_ali_stimer_ready(ali_t *codec, int sched)
 {
-	signed long end_time;
+	unsigned long end_time;
 	unsigned long dwChk1,dwChk2;
 	
 	dwChk1 = snd_ali_5451_peek(codec, ALI_STIMER);
@@ -407,7 +410,7 @@ static int snd_ali_stimer_ready(ali_t *codec, int sched)
 			set_current_state(TASK_UNINTERRUPTIBLE);
 			schedule_timeout(1);
 		}
-	} while (end_time - (signed long)jiffies >= 0);
+	} while (time_after_eq(end_time, jiffies));
 	snd_printk("ali_stimer_read: stimer is not ready.\n");
 	return -EIO;
 }

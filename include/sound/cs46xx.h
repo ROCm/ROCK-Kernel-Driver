@@ -1730,6 +1730,7 @@ struct _snd_cs46xx {
 	void (*amplifier_ctrl)(cs46xx_t *, int);
 	void (*active_ctrl)(cs46xx_t *, int);
   	void (*mixer_init)(cs46xx_t *);
+
 	struct pci_dev *acpi_dev;
 	int acpi_port;
 	snd_kcontrol_t *eapd_switch; /* for amplifier hack */
@@ -1749,6 +1750,7 @@ struct _snd_cs46xx {
 	dsp_spos_instance_t * dsp_spos_instance;
 
 	snd_pcm_t *pcm_rear;
+	snd_pcm_t *pcm_center_lfe;
 	snd_pcm_t *pcm_iec958;
 #else /* for compatibility */
 	cs46xx_pcm_t *playback_pcm;
@@ -1764,6 +1766,7 @@ int snd_cs46xx_create(snd_card_t *card,
 int snd_cs46xx_pcm(cs46xx_t *chip, int device, snd_pcm_t **rpcm);
 int snd_cs46xx_pcm_rear(cs46xx_t *chip, int device, snd_pcm_t **rpcm);
 int snd_cs46xx_pcm_iec958(cs46xx_t *chip, int device, snd_pcm_t **rpcm);
+int snd_cs46xx_pcm_center_lfe(cs46xx_t *chip, int device, snd_pcm_t **rpcm);
 int snd_cs46xx_mixer(cs46xx_t *chip);
 int snd_cs46xx_midi(cs46xx_t *chip, int device, snd_rawmidi_t **rmidi);
 int snd_cs46xx_start_dsp(cs46xx_t *chip);

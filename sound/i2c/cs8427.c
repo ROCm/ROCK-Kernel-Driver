@@ -425,7 +425,7 @@ int snd_cs8427_iec958_active(snd_i2c_device_t *cs8427, int active)
 	chip = snd_magic_cast(cs8427_t, cs8427->private_data, return -ENXIO);
 	if (active)
 		memcpy(chip->playback.pcm_status, chip->playback.def_status, 24);
-	chip->playback.pcm_ctl->access &= ~SNDRV_CTL_ELEM_ACCESS_INACTIVE;
+	chip->playback.pcm_ctl->vd[0].access &= ~SNDRV_CTL_ELEM_ACCESS_INACTIVE;
 	snd_ctl_notify(cs8427->bus->card, SNDRV_CTL_EVENT_MASK_VALUE |
 					  SNDRV_CTL_EVENT_MASK_INFO, &chip->playback.pcm_ctl->id);
 	return 0;

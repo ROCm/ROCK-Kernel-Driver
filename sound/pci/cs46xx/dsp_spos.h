@@ -73,9 +73,9 @@ typedef enum  {
 #define SPDIFI_IP_OUTPUT_BUFFER1 0x0E00
 #define SPDIFO_IP_OUTPUT_BUFFER1 0x1000
 #define MIX_SAMPLE_BUF1          0x1400
-#define MIX_SAMPLE_BUF2          0x2D00
-#define MIX_SAMPLE_BUF3          0x2E00
-#define MIX_SAMPLE_BUF4          0x2F00
+#define MIX_SAMPLE_BUF2          0x2E80
+#define MIX_SAMPLE_BUF3          0x2F00
+#define MIX_SAMPLE_BUF4          0x2F80
 #define MIX_SAMPLE_BUF5          0x3000
 
 /* Task stack address */
@@ -103,12 +103,13 @@ typedef enum  {
 #define OUTPUTSNOOP_SCB_ADDR     0x110
 #define PCMSERIALINII_SCB_ADDR   0x120
 #define SPIOWRITE_SCB_ADDR       0x130
-#define SEC_CODECOUT_SCB_ADDR    0x140
+#define REAR_CODECOUT_SCB_ADDR   0x140
 #define OUTPUTSNOOPII_SCB_ADDR   0x150
 #define PCMSERIALIN_PCM_SCB_ADDR 0x160
 #define RECORD_MIXER_SCB_ADDR    0x170
 #define REAR_MIXER_SCB_ADDR      0x180
-#define SPDIF_MIXER_SCB_ADDR     0x190
+#define CLFE_MIXER_SCB_ADDR      0x190
+#define CLFE_CODEC_SCB_ADDR      0x1A0
 
 /* hyperforground SCB's*/
 #define HFG_TREE_SCB             0xBA0

@@ -240,8 +240,13 @@ static int __devinit snd_emu10k1_init(emu10k1_t * emu, int enable_ir)
 	}
 	
 	if (!emu->APS) {	/* enable analog output */
-		unsigned int reg = inl(emu->port + HCFG);
-		outl(reg | HCFG_GPOUT0, emu->port + HCFG);
+		if (!emu->audigy) {
+			unsigned int reg = inl(emu->port + HCFG);
+			outl(reg | HCFG_GPOUT0, emu->port + HCFG);
+		} else {
+			unsigned int reg = inl(emu->port + A_IOCFG);
+			outl(reg | A_IOCFG_GPOUT0, emu->port + A_IOCFG);
+		}
 	}
 
 	/*

@@ -921,7 +921,7 @@ static int __devinit snd_fm801_create(snd_card_t * card,
 	fm801_t *chip;
 	unsigned char rev, id;
 	unsigned short cmdw;
-	signed long timeout;
+	unsigned long timeout;
 	int err;
 	static snd_device_ops_t ops = {
 		.dev_free =	snd_fm801_dev_free,
@@ -969,7 +969,7 @@ static int __devinit snd_fm801_create(snd_card_t * card,
 			goto __ac97_secondary;
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule_timeout(1);
-	} while ((timeout - (signed long)jiffies) > 0);
+	} while (time_after(timeout, jiffies));
 	snd_printk("Primary AC'97 codec not found\n");
 	snd_fm801_free(chip);
 	return -EIO;
@@ -980,8 +980,7 @@ static int __devinit snd_fm801_create(snd_card_t * card,
 	for (id = 3; id > 0; id--) {	/* my card has the secondary codec */
 					/* at address #3, so the loop is inverted */
 
-		if ((timeout - (signed long)jiffies) < HZ / 20)
-			timeout = jiffies + HZ / 20;
+		timeout = jiffies + HZ / 20;
 
 		outw((1<<7) | (id << FM801_AC97_ADDR_SHIFT) | AC97_VENDOR_ID1, FM801_REG(chip, AC97_CMD));
 		udelay(5);
@@ -996,7 +995,7 @@ static int __devinit snd_fm801_create(snd_card_t * card,
 			}
 			set_current_state(TASK_UNINTERRUPTIBLE);
 			schedule_timeout(1);
-		} while ((timeout - (signed long)jiffies) > 0);
+		} while (time_after(timeout, jiffies));
 	}
 
 	/* the recovery phase, it seems that probing for non-existing codec might */
@@ -1010,7 +1009,7 @@ static int __devinit snd_fm801_create(snd_card_t * card,
 			goto __ac97_ok;
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule_timeout(1);
-	} while ((timeout - (signed long)jiffies) > 0);
+	} while (time_after(timeout, jiffies));
 	snd_printk("Primary AC'97 codec not responding\n");
 	snd_fm801_free(chip);
 	return -EIO;

@@ -291,11 +291,14 @@ void  cs46xx_dsp_spos_destroy (cs46xx_t * chip)
 
 	if (ins->code.data)
 		kfree(ins->code.data);
+
 	if (ins->symbol_table.symbols)
 		vfree(ins->symbol_table.symbols);
+
 	if (ins->modules)
 		kfree(ins->modules);
-	kfree(ins);  
+	
+	kfree(ins);
 	up(&chip->spos_mutex);
 }
 
@@ -630,7 +633,7 @@ static void cs46xx_dsp_proc_sample_dump_read (snd_info_entry_t *entry, snd_info_
 
 	snd_iprintf(buffer,"\nSRC_TASK_SCB1:\n");
 	col = 0;
-	for (i = 0x2580 ; i < 0x2580 + 0x40 ; i += sizeof(u32),col ++) {
+	for (i = 0x2480 ; i < 0x2480 + 0x40 ; i += sizeof(u32),col ++) {
 		if (col == 4) {
 			snd_iprintf(buffer,"\n");
 			col = 0;
@@ -1030,7 +1033,6 @@ dsp_task_descriptor_t *  cs46xx_dsp_create_task_tree (cs46xx_t *chip,char * name
 	return desc;
 }
 
-
 int cs46xx_dsp_scb_and_task_init (cs46xx_t *chip)
 {
 	dsp_spos_instance_t * ins = chip->dsp_spos_instance;
@@ -1049,8 +1051,11 @@ int cs46xx_dsp_scb_and_task_init (cs46xx_t *chip)
 	dsp_scb_descriptor_t * record_mix_scb;
 	dsp_scb_descriptor_t * write_back_scb;
 	dsp_scb_descriptor_t * vari_decimate_scb;
-	dsp_scb_descriptor_t * sec_codec_out_scb;
+	dsp_scb_descriptor_t * rear_codec_out_scb;
+	dsp_scb_descriptor_t * clfe_codec_out_scb;
 	dsp_scb_descriptor_t * magic_snoop_scb;
+	
+	int fifo_addr,fifo_span,valid_slots;
 
 	spos_control_block_t sposcb = {
 		/* 0 */ HFG_TREE_SCB,HFG_STACK,
@@ -1335,28 +1340,78 @@ int cs46xx_dsp_scb_and_task_init (cs46xx_t *chip)
 
 	if (!record_mix_scb) goto _fail_end;
 
-	/* create secondary CODEC output */
-	sec_codec_out_scb = cs46xx_dsp_create_codec_out_scb(chip,"CodecOutSCB_II",0x0010,0x0040,
-							    REAR_MIXER_SCB_ADDR,
-							    SEC_CODECOUT_SCB_ADDR,codec_in_scb,
-							    SCB_ON_PARENT_NEXT_SCB);
-	if (!sec_codec_out_scb) goto _fail_end;
+	valid_slots = snd_cs46xx_peekBA0(chip, BA0_ACOSV);
 
+	snd_assert (chip->nr_ac97_codecs == 1 || chip->nr_ac97_codecs == 2);
 
+	if (chip->nr_ac97_codecs == 1) {
+		/* output on slot 5 and 11 
+		   on primary CODEC */
+		fifo_addr = 0x20;
+		fifo_span = 0x60;
+
+		/* enable slot 5 and 11 */
+		valid_slots |= ACOSV_SLV5 | ACOSV_SLV11;
+	} else {
+		/* output on slot 7 and 8 
+		   on secondary CODEC */
+		fifo_addr = 0x40;
+		fifo_span = 0x10;
+
+		/* enable slot 7 and 8 */
+		valid_slots |= ACOSV_SLV7 | ACOSV_SLV8;
+	}
+	/* create CODEC tasklet for rear speakers output*/
+	rear_codec_out_scb = cs46xx_dsp_create_codec_out_scb(chip,"CodecOutSCB_Rear",fifo_span,fifo_addr,
+							     REAR_MIXER_SCB_ADDR,
+							     REAR_CODECOUT_SCB_ADDR,codec_in_scb,
+							     SCB_ON_PARENT_NEXT_SCB);
+	if (!rear_codec_out_scb) goto _fail_end;
+	
+	
 	/* create the rear PCM channel  mixer SCB */
 	rear_mix_scb = cs46xx_dsp_create_mix_only_scb(chip,"RearMixerSCB",
 						      MIX_SAMPLE_BUF3,
 						      REAR_MIXER_SCB_ADDR,
-						      sec_codec_out_scb,
+						      rear_codec_out_scb,
 						      SCB_ON_PARENT_SUBLIST_SCB);
 	ins->rear_mix_scb = rear_mix_scb;
 	if (!rear_mix_scb) goto _fail_end;
+	
+	if (chip->nr_ac97_codecs == 2) {
+		/* create CODEC tasklet for rear Center/LFE output 
+		   slot 6 and 9 on seconadry CODEC */
+		clfe_codec_out_scb = cs46xx_dsp_create_codec_out_scb(chip,"CodecOutSCB_CLFE",0x0030,0x0030,
+								     CLFE_MIXER_SCB_ADDR,
+								     CLFE_CODEC_SCB_ADDR,
+								     rear_codec_out_scb,
+								     SCB_ON_PARENT_NEXT_SCB);
+		if (!clfe_codec_out_scb) goto _fail_end;
+		
+		
+		/* create the rear PCM channel  mixer SCB */
+		ins->center_lfe_mix_scb = cs46xx_dsp_create_mix_only_scb(chip,"CLFEMixerSCB",
+									 MIX_SAMPLE_BUF4,
+									 CLFE_MIXER_SCB_ADDR,
+									 clfe_codec_out_scb,
+									 SCB_ON_PARENT_SUBLIST_SCB);
+		if (!ins->center_lfe_mix_scb) goto _fail_end;
+
+		/* enable slot 6 and 9 */
+		valid_slots |= ACOSV_SLV6 | ACOSV_SLV9;
+	} else {
+		clfe_codec_out_scb = rear_codec_out_scb;
+		ins->center_lfe_mix_scb = rear_mix_scb;
+	}
+
+	/* enable slots depending on CODEC configuration */
+	snd_cs46xx_pokeBA0(chip, BA0_ACOSV, valid_slots);
 
 	/* the magic snooper */
 	magic_snoop_scb = cs46xx_dsp_create_magic_snoop_scb (chip,"MagicSnoopSCB_I",OUTPUTSNOOP_SCB_ADDR,
 							     OUTPUT_SNOOP_BUFFER,
 							     codec_out_scb,
-							     sec_codec_out_scb,
+							     clfe_codec_out_scb,
 							     SCB_ON_PARENT_NEXT_SCB);
 
     
@@ -1375,10 +1430,9 @@ int cs46xx_dsp_scb_and_task_init (cs46xx_t *chip)
 						      SRC_OUTPUT_BUF1,
 						      SRC_DELAY_BUF1,SRCTASK_SCB_ADDR,
 						      master_mix_scb,
-						      SCB_ON_PARENT_SUBLIST_SCB,0);
+						      SCB_ON_PARENT_SUBLIST_SCB,1);
 
 	if (!src_task_scb) goto _fail_end;
-
 	cs46xx_src_unlink(chip,src_task_scb);
 
 	/* NOTE: when we now how to detect the SPDIF input
@@ -1453,12 +1507,12 @@ int cs46xx_dsp_async_init (cs46xx_t *chip, dsp_scb_descriptor_t * fg_entry)
 			/* 0 */ DSP_SPOS_UULO,DSP_SPOS_UUHI,
 			/* 1 */ 0,
 			/* 2 */ 0,
-			/* 3 */ 1,4000,         
-			/* 4 */ DSP_SPOS_UUUU, 
-			/* 5 */ DSP_SPOS_UULO,DSP_SPOS_UUHI,
-			/* 6 */ DSP_SPOS_UUUU, 
-			/* 7 */ DSP_SPOS_UU,DSP_SPOS_DC, 
-			/* 8 */ DSP_SPOS_UUUU,			
+			/* 3 */ 1,4000,        /* SPDIFICountLimit SPDIFICount */ 
+			/* 4 */ DSP_SPOS_UUUU, /* SPDIFIStatusData */
+			/* 5 */ 0,DSP_SPOS_UUHI, /* StatusData, Free4 */
+			/* 6 */ DSP_SPOS_UUUU,  /* Free3 */
+			/* 7 */ DSP_SPOS_UU,DSP_SPOS_DC,  /* Free2 BitCount*/
+			/* 8 */ DSP_SPOS_UUUU,	/* TempStatus */
 			/* 9 */ SPDIFO_SCB_INST, NULL_SCB_ADDR,
 			/* A */ spdifi_task->address,
 			SPDIFI_SCB_INST + SPDIFIFIFOPointer,
@@ -1470,7 +1524,7 @@ int cs46xx_dsp_async_init (cs46xx_t *chip, dsp_scb_descriptor_t * fg_entry)
 			/* C */ (SPDIFI_IP_OUTPUT_BUFFER1 << 0x10) | 0xFFFC,
 			/* D */ 0x8048,0,
 			/* E */ 0x01f0,0x0001,
-			/* F */ DSP_SPOS_UUUU
+			/* F */ DSP_SPOS_UUUU /* SPDIN_STATUS monitor */
 		};
 
 		/* 0xBA0 */
@@ -1579,6 +1633,9 @@ static void cs46xx_dsp_disable_spdif_hw (cs46xx_t *chip)
 	/*cs46xx_poke_via_dsp (chip,SP_SPDOUT_CSUV, ins->spdif_csuv_default);*/
 	cs46xx_poke_via_dsp (chip,SP_SPDOUT_CSUV, 0x0);
 
+	/* clear fifo pointer */
+	cs46xx_poke_via_dsp (chip,SP_SPDIN_FIFOPTR, 0x0);
+
 	/* monitor state */
 	ins->spdif_status_out &= ~DSP_SPDIF_STATUS_HW_ENABLED;
 }
@@ -1618,6 +1675,20 @@ int cs46xx_dsp_enable_spdif_in (cs46xx_t *chip)
 	snd_assert (ins->spdif_in_src != NULL,return -EINVAL);
 
 	down(&chip->spos_mutex);
+
+	if ( ! (ins->spdif_status_out & DSP_SPDIF_STATUS_INPUT_CTRL_ENABLED) ) {
+		/* time countdown enable */
+		cs46xx_poke_via_dsp (chip,SP_ASER_COUNTDOWN, 0x80000005);
+		/* NOTE: 80000005 value is just magic. With all values
+		   that I've tested this one seem to give the best result.
+		   Got no explication why. (Benny) */
+
+		/* SPDIF input MASTER ENABLE */
+		cs46xx_poke_via_dsp (chip,SP_SPDIN_CONTROL, 0x800003ff);
+
+		ins->spdif_status_out |= DSP_SPDIF_STATUS_INPUT_CTRL_ENABLED;
+	}
+
 	/* create and start the asynchronous receiver SCB */
 	ins->asynch_rx_scb = cs46xx_dsp_create_asynch_fg_rx_scb(chip,"AsynchFGRxSCB",
 								ASYNCRX_SCB_ADDR,
@@ -1629,11 +1700,11 @@ int cs46xx_dsp_enable_spdif_in (cs46xx_t *chip)
 	spin_lock_irq(&chip->reg_lock);
 
 	/* reset SPDIF input sample buffer pointer */
-	snd_cs46xx_poke (chip, (SPDIFI_SCB_INST + 0x0c) << 2,
-			 (SPDIFI_IP_OUTPUT_BUFFER1 << 0x10) | 0xFFFC);
+	/*snd_cs46xx_poke (chip, (SPDIFI_SCB_INST + 0x0c) << 2,
+	  (SPDIFI_IP_OUTPUT_BUFFER1 << 0x10) | 0xFFFC);*/
 
 	/* reset FIFO ptr */
-	cs46xx_poke_via_dsp (chip,SP_SPDIN_FIFOPTR, 0x0);
+	/*cs46xx_poke_via_dsp (chip,SP_SPDIN_FIFOPTR, 0x0);*/
 	cs46xx_src_link(chip,ins->spdif_in_src);
 
 	/* unmute SRC volume */
@@ -1657,9 +1728,10 @@ int cs46xx_dsp_disable_spdif_in (cs46xx_t *chip)
 	dsp_spos_instance_t * ins = chip->dsp_spos_instance;
 
 	snd_assert (ins->asynch_rx_scb != NULL, return -EINVAL);
-	snd_assert (ins->spdif_in_src != NULL,return -EINVAL);
+	snd_assert (ins->spdif_in_src != NULL,return -EINVAL);	
 
 	down(&chip->spos_mutex);
+
 	/* Remove the asynchronous receiver SCB */
 	cs46xx_dsp_remove_scb (chip,ins->asynch_rx_scb);
 	ins->asynch_rx_scb = NULL;
@@ -1727,10 +1799,10 @@ int cs46xx_dsp_disable_adc_capture (cs46xx_t *chip)
 
 	snd_assert (ins->adc_input != NULL,return -EINVAL);
 
-    down(&chip->spos_mutex);
+	down(&chip->spos_mutex);
 	cs46xx_dsp_remove_scb (chip,ins->adc_input);
 	ins->adc_input = NULL;
-    up(&chip->spos_mutex);
+	up(&chip->spos_mutex);
 
 	return 0;
 }

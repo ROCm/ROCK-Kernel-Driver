@@ -829,11 +829,14 @@ static int snd_es1938_capture_copy(snd_pcm_substream_t *substream,
 	pos <<= chip->dma1_shift;
 	count <<= chip->dma1_shift;
 	snd_assert(pos + count <= chip->dma1_size, return -EINVAL);
-	if (pos + count < chip->dma1_size)
-		memcpy(dst, runtime->dma_area + pos + 1, count);
-	else {
-		memcpy(dst, runtime->dma_area + pos + 1, count - 1);
-		((unsigned char *)dst)[count - 1] = runtime->dma_area[0];
+	if (pos + count < chip->dma1_size) {
+		if (copy_to_user(dst, runtime->dma_area + pos + 1, count))
+			return -EFAULT;
+	} else {
+		if (copy_to_user(dst, runtime->dma_area + pos + 1, count - 1))
+			return -EFAULT;
+		if (put_user(runtime->dma_area[0], ((unsigned char *)dst) + count - 1))
+			return -EFAULT;
 	}
 	return 0;
 }

@@ -31,11 +31,7 @@
 
 #if defined(CONFIG_RTC) || defined(CONFIG_RTC_MODULE)
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 2, 12)	/* FIXME: which 2.2.x kernel? */
-#include <linux/rtc.h>
-#else
 #include <linux/mc146818rtc.h>
-#endif
 
 #define RTC_FREQ	1024		/* default frequency */
 #define NANO_SEC	1000000000L	/* 10^9 in sec */

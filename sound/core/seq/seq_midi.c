@@ -200,6 +200,7 @@ static int midisynth_subscribe(void *private_data, snd_seq_port_subscribe_t *inf
 		snd_rawmidi_kernel_release(&msynth->input_rfile);
 		return err;
 	}
+	snd_midi_event_reset_encode(msynth->parser);
 	runtime->event = snd_midi_input_event;
 	runtime->private_data = msynth;
 	snd_rawmidi_kernel_read(msynth->input_rfile.input, NULL, 0);
@@ -236,6 +237,7 @@ static int midisynth_use(void *private_data, snd_seq_port_subscribe_t *info)
 		snd_rawmidi_kernel_release(&msynth->output_rfile);
 		return err;
 	}
+	snd_midi_event_reset_decode(msynth->parser);
 	return 0;
 }
 

@@ -681,7 +681,7 @@ struct sndrv_timer_tread {
  *                                                                          *
  ****************************************************************************/
 
-#define SNDRV_CTL_VERSION		SNDRV_PROTOCOL_VERSION(2, 0, 1)
+#define SNDRV_CTL_VERSION		SNDRV_PROTOCOL_VERSION(2, 0, 2)
 
 struct sndrv_ctl_card_info {
 	int card;			/* card number */
@@ -726,7 +726,8 @@ enum sndrv_ctl_elem_iface {
 #define SNDRV_CTL_ELEM_ACCESS_INACTIVE		(1<<8)	/* control does actually nothing, but may be updated */
 #define SNDRV_CTL_ELEM_ACCESS_LOCK		(1<<9)	/* write lock */
 #define SNDRV_CTL_ELEM_ACCESS_OWNER		(1<<10)	/* write lock owner */
-#define SNDRV_CTL_ELEM_ACCESS_INDIRECT		(1<<31)	/* indirect access */
+#define SNDRV_CTL_ELEM_ACCESS_DINDIRECT		(1<<30)	/* indirect access for matrix dimensions in the info structure */
+#define SNDRV_CTL_ELEM_ACCESS_INDIRECT		(1<<31)	/* indirect access for element value in the value structure */
 
 /* for further details see the ACPI and PCI power management specification */
 #define SNDRV_CTL_POWER_D0		0x0000	/* full On */
@@ -778,7 +779,11 @@ struct sndrv_ctl_elem_info {
 		} enumerated;
 		unsigned char reserved[128];
 	} value;
-	unsigned char reserved[64];
+	union {
+		unsigned short d[4];		/* dimensions */
+		unsigned short *d_ptr;		/* indirect */
+	} dimen;
+	unsigned char reserved[64-4*sizeof(unsigned short)];
 };
 
 struct sndrv_ctl_elem_value {

@@ -949,6 +949,13 @@ static struct m3_quirk m3_quirk_list[] = {
 	},
 	/* FIXME: Inspiron 8100 id should probably be here, too
 	 * (8200 irrelevant: has intel8x0 with CS4205) */
+	/* NEC LM800J/7 */
+	{
+		.name = "NEC LM800J/7",
+		.vendor = 0x1033,
+		.device = 0x80f1,
+		.amp_gpio = 0x03,
+	},
 	/* END */
 	{ 0 }
 };

@@ -25,7 +25,7 @@
 #ifdef MODULE
 #define MODULE_GENERIC_STRING(name, string) \
 static const char __module_generic_string_##name [] \
-  __attribute__ ((section(".modstring"))) = #name "=" string;
+  __attribute__ ((unused, __section__(".modstring"))) = #name "=" string;
 #else
 #define MODULE_GENERIC_STRING(name, string)
 #endif

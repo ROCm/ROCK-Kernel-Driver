@@ -143,13 +143,13 @@ static int __init snd_sb8_probe(int dev)
 		if ((err = snd_opl3_create(card, chip->port + 8, 0,
 					   OPL3_HW_AUTO, 1,
 					   &opl3)) < 0) {
-			printk(KERN_ERR "sb8: no OPL device at 0x%lx\n", chip->port + 8);
+			snd_printk(KERN_ERR "sb8: no OPL device at 0x%lx\n", chip->port + 8);
 		}
 	} else {
 		if ((err = snd_opl3_create(card, chip->port, chip->port + 2,
 					   OPL3_HW_AUTO, 1,
 					   &opl3)) < 0) {
-			printk(KERN_ERR "sb8: no OPL device at 0x%lx-0x%lx\n",
+			snd_printk(KERN_ERR "sb8: no OPL device at 0x%lx-0x%lx\n",
 				   chip->port, chip->port + 2);
 		}
 	}
@@ -210,7 +210,7 @@ static int __init alsa_card_sb8_init(void)
 	cards += snd_legacy_auto_probe(possible_ports, snd_card_sb8_legacy_auto_probe);
 	if (!cards) {
 #ifdef MODULE
-		printk(KERN_ERR "Sound Blaster soundcard not found or device busy\n");
+		snd_printk(KERN_ERR "Sound Blaster soundcard not found or device busy\n");
 #endif
 		return -ENODEV;
 	}
