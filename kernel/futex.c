@@ -258,6 +258,18 @@ static void drop_key_refs(union futex_key *key)
 	}
 }
 
+static inline int get_futex_value_locked(int *dest, int __user *from)
+{
+	int ret;
+
+	inc_preempt_count();
+	ret = __copy_from_user_inatomic(dest, from, sizeof(int));
+	dec_preempt_count();
+	preempt_check_resched();
+
+	return ret ? -EFAULT : 0;
+}
+
 /*
  * The hash bucket lock must be held when this is called.
  * Afterwards, the futex_q must not be accessed.
@@ -329,6 +341,7 @@ static int futex_requeue(unsigned long uaddr1, unsigned long uaddr2,
 	int ret, drop_count = 0;
 	unsigned int nqueued;
 
+ retry:
 	down_read(&current->mm->mmap_sem);
 
 	ret = get_futex_key(uaddr1, &key1);
@@ -355,9 +368,20 @@ static int futex_requeue(unsigned long uaddr1, unsigned long uaddr2,
 		   before *uaddr1.  */
 		smp_mb();
 
-		if (get_user(curval, (int __user *)uaddr1) != 0) {
-			ret = -EFAULT;
-			goto out;
+		ret = get_futex_value_locked(&curval, (int __user *)uaddr1);
+
+		if (unlikely(ret)) {
+			/* If we would have faulted, release mmap_sem, fault
+			 * it in and start all over again.
+			 */
+			up_read(&current->mm->mmap_sem);
+
+			ret = get_user(curval, (int __user *)uaddr1);
+
+			if (!ret)
+				goto retry;
+
+			return ret;
 		}
 		if (curval != *valp) {
 			ret = -EAGAIN;
@@ -480,6 +504,7 @@ static int futex_wait(unsigned long uaddr, int val, unsigned long time)
 	int ret, curval;
 	struct futex_q q;
 
+ retry:
 	down_read(&current->mm->mmap_sem);
 
 	ret = get_futex_key(uaddr, &q.key);
@@ -508,9 +533,23 @@ static int futex_wait(unsigned long uaddr, int val, unsigned long time)
 	 * We hold the mmap semaphore, so the mapping cannot have changed
 	 * since we looked it up in get_futex_key.
 	 */
-	if (get_user(curval, (int __user *)uaddr) != 0) {
-		ret = -EFAULT;
-		goto out_unqueue;
+
+	ret = get_futex_value_locked(&curval, (int __user *)uaddr);
+
+	if (unlikely(ret)) {
+		/* If we would have faulted, release mmap_sem, fault it in and
+		 * start all over again.
+		 */
+		up_read(&current->mm->mmap_sem);
+
+		if (!unqueue_me(&q)) /* There's a chance we got woken already */
+			return 0;
+
+		ret = get_user(curval, (int __user *)uaddr);
+
+		if (!ret)
+			goto retry;
+		return ret;
 	}
 	if (curval != val) {
 		ret = -EWOULDBLOCK;
