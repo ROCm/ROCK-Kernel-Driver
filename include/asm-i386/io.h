@@ -286,122 +286,90 @@ static inline void flush_write_buffers(void)
 #endif /* __KERNEL__ */
 
 #ifdef SLOW_IO_BY_JUMPING
-#define __SLOW_DOWN_IO "\njmp 1f\n1:\tjmp 1f\n1:"
+#define __SLOW_DOWN_IO "jmp 1f; 1: jmp 1f; 1:"
 #else
-#define __SLOW_DOWN_IO "\noutb %%al,$0x80"
+#define __SLOW_DOWN_IO "outb %%al,$0x80;"
 #endif
 
+static inline void slow_down_io(void) {
+	__asm__ __volatile__(
+		__SLOW_DOWN_IO
 #ifdef REALLY_SLOW_IO
-#define __FULL_SLOW_DOWN_IO __SLOW_DOWN_IO __SLOW_DOWN_IO __SLOW_DOWN_IO __SLOW_DOWN_IO
-#else
-#define __FULL_SLOW_DOWN_IO __SLOW_DOWN_IO
+		__SLOW_DOWN_IO __SLOW_DOWN_IO __SLOW_DOWN_IO
 #endif
+		: : );
+}
 
 #ifdef CONFIG_MULTIQUAD
 extern void *xquad_portio;    /* Where the IO area was mapped */
-#endif /* CONFIG_MULTIQUAD */
-
-/*
- * Talk about misusing macros..
- */
-#define __OUT1(s,x) \
-static inline void out##s(unsigned x value, unsigned short port) {
-
-#define __OUT2(s,s1,s2) \
-__asm__ __volatile__ ("out" #s " %" s1 "0,%" s2 "1"
-
-#ifdef CONFIG_MULTIQUAD
-#define __OUTQ(s,ss,x)    /* Do the equivalent of the portio op on quads */ \
-static inline void out##ss(unsigned x value, unsigned short port) { \
+#define XQUAD_PORT_ADDR(port, quad) (xquad_portio + (XQUAD_PORTIO_QUAD*quad) + port)
+#define __BUILDIO(bwl,bw,type) \
+static inline void out##bwl##_quad(unsigned type value, int port, int quad) { \
 	if (xquad_portio) \
-		write##s(value, (unsigned long) xquad_portio + port); \
-	else               /* We're still in early boot, running on quad 0 */ \
-		out##ss##_local(value, port); \
+		write##bwl(value, XQUAD_PORT_ADDR(port, quad)); \
+	else \
+		out##bwl##_local(value, port); \
 } \
-static inline void out##ss##_quad(unsigned x value, unsigned short port, int quad) { \
+static inline void out##bwl(unsigned type value, int port) { \
+	out##bwl##_quad(value, port, 0); \
+} \
+static inline unsigned type in##bwl##_quad(int port, int quad) { \
 	if (xquad_portio) \
-		write##s(value, (unsigned long) xquad_portio + (XQUAD_PORTIO_QUAD*quad)\
-			+ port); \
+		return read##bwl(XQUAD_PORT_ADDR(port, quad)); \
+	else \
+		return in##bwl##_local(port); \
+} \
+static inline unsigned type in##bwl(int port) { \
+	return in##bwl##_quad(port, 0); \
+}
+#else
+#define __BUILDIO(bwl,bw,type) \
+static inline void out##bwl(unsigned type value, int port) { \
+	out##bwl##_local(value, port); \
+} \
+static inline unsigned type in##bwl(int port) { \
+	return in##bwl##_local(port); \
+}
+#endif
+
+
+#define BUILDIO(bwl,bw,type) \
+static inline void out##bwl##_local(unsigned type value, int port) { \
+	__asm__ __volatile__("out" #bwl " %" #bw "0, %w1" : : "a"(value), "Nd"(port)); \
+} \
+static inline unsigned type in##bwl##_local(int port) { \
+	unsigned type value; \
+	__asm__ __volatile__("in" #bwl " %w1, %" #bw "0" : "=a"(value) : "Nd"(port)); \
+	return value; \
+} \
+static inline void out##bwl##_local_p(unsigned type value, int port) { \
+	out##bwl##_local(value, port); \
+	slow_down_io(); \
+} \
+static inline unsigned type in##bwl##_local_p(int port) { \
+	unsigned type value = in##bwl##_local(port); \
+	slow_down_io(); \
+	return value; \
+} \
+__BUILDIO(bwl,bw,type) \
+static inline void out##bwl##_p(unsigned type value, int port) { \
+	out##bwl(value, port); \
+	slow_down_io(); \
+} \
+static inline unsigned type in##bwl##_p(int port) { \
+	unsigned type value = in##bwl(port); \
+	slow_down_io(); \
+	return value; \
+} \
+static inline void outs##bwl(int port, const void *addr, unsigned long count) { \
+	__asm__ __volatile__("rep; outs" #bwl : "+S"(addr), "+c"(count) : "d"(port)); \
+} \
+static inline void ins##bwl(int port, void *addr, unsigned long count) { \
+	__asm__ __volatile__("rep; ins" #bwl : "+D"(addr), "+c"(count) : "d"(port)); \
 }
 
-#define __INQ(s,ss)       /* Do the equivalent of the portio op on quads */ \
-static inline RETURN_TYPE in##ss(unsigned short port) { \
-	if (xquad_portio) \
-		return read##s((unsigned long) xquad_portio + port); \
-	else               /* We're still in early boot, running on quad 0 */ \
-		return in##ss##_local(port); \
-} \
-static inline RETURN_TYPE in##ss##_quad(unsigned short port, int quad) { \
-	if (xquad_portio) \
-		return read##s((unsigned long) xquad_portio + (XQUAD_PORTIO_QUAD*quad)\
-			+ port); \
-	else\
-		return 0;\
-}
-#endif /* CONFIG_MULTIQUAD */
-
-#ifndef CONFIG_MULTIQUAD
-#define __OUT(s,s1,x) \
-__OUT1(s,x) __OUT2(s,s1,"w") : : "a" (value), "Nd" (port)); } \
-__OUT1(s##_p,x) __OUT2(s,s1,"w") __FULL_SLOW_DOWN_IO : : "a" (value), "Nd" (port));} 
-#else
-/* Make the default portio routines operate on quad 0 */
-#define __OUT(s,s1,x) \
-__OUT1(s##_local,x) __OUT2(s,s1,"w") : : "a" (value), "Nd" (port)); } \
-__OUT1(s##_p_local,x) __OUT2(s,s1,"w") __FULL_SLOW_DOWN_IO : : "a" (value), "Nd" (port));} \
-__OUTQ(s,s,x) \
-__OUTQ(s,s##_p,x) 
-#endif /* CONFIG_MULTIQUAD */
-
-#define __IN1(s) \
-static inline RETURN_TYPE in##s(unsigned short port) { RETURN_TYPE _v;
-
-#define __IN2(s,s1,s2) \
-__asm__ __volatile__ ("in" #s " %" s2 "1,%" s1 "0"
-
-#ifndef CONFIG_MULTIQUAD
-#define __IN(s,s1,i...) \
-__IN1(s) __IN2(s,s1,"w") : "=a" (_v) : "Nd" (port) ,##i ); return _v; } \
-__IN1(s##_p) __IN2(s,s1,"w") __FULL_SLOW_DOWN_IO : "=a" (_v) : "Nd" (port) ,##i ); return _v; } 
-#else
-/* Make the default portio routines operate on quad 0 */
-#define __IN(s,s1,i...) \
-__IN1(s##_local) __IN2(s,s1,"w") : "=a" (_v) : "Nd" (port) ,##i ); return _v; } \
-__IN1(s##_p_local) __IN2(s,s1,"w") __FULL_SLOW_DOWN_IO : "=a" (_v) : "Nd" (port) ,##i ); return _v; } \
-__INQ(s,s) \
-__INQ(s,s##_p) 
-#endif /* CONFIG_MULTIQUAD */
-
-#define __INS(s) \
-static inline void ins##s(unsigned short port, void * addr, unsigned long count) \
-{ __asm__ __volatile__ ("rep ; ins" #s \
-: "=D" (addr), "=c" (count) : "d" (port),"0" (addr),"1" (count)); }
-
-#define __OUTS(s) \
-static inline void outs##s(unsigned short port, const void * addr, unsigned long count) \
-{ __asm__ __volatile__ ("rep ; outs" #s \
-: "=S" (addr), "=c" (count) : "d" (port),"0" (addr),"1" (count)); }
-
-#define RETURN_TYPE unsigned char
-__IN(b,"")
-#undef RETURN_TYPE
-#define RETURN_TYPE unsigned short
-__IN(w,"")
-#undef RETURN_TYPE
-#define RETURN_TYPE unsigned int
-__IN(l,"")
-#undef RETURN_TYPE
-
-__OUT(b,"b",char)
-__OUT(w,"w",short)
-__OUT(l,,int)
-
-__INS(b)
-__INS(w)
-__INS(l)
-
-__OUTS(b)
-__OUTS(w)
-__OUTS(l)
+BUILDIO(b,b,char)
+BUILDIO(w,w,short)
+BUILDIO(l,,long)
 
 #endif
