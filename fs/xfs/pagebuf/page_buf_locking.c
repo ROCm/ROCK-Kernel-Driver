@@ -54,6 +54,8 @@
 #include <linux/init.h>
 #include <linux/major.h>
 
+#include <support/debug.h>
+
 #include "page_buf_internal.h"
 
 #ifndef EVMS_MAJOR
@@ -76,7 +78,7 @@ pagebuf_cond_lock(			/* lock buffer, if not locked	*/
 {
 	int			locked;
 
-	assert(pb->pb_flags & _PBF_LOCKABLE);
+	ASSERT(pb->pb_flags & _PBF_LOCKABLE);
 
 	locked = down_trylock(&PBP(pb)->pb_sema) == 0;
 	if (locked) {
@@ -97,7 +99,7 @@ int
 pagebuf_lock_value(
 	page_buf_t		*pb)
 {
-	assert(pb->pb_flags & _PBF_LOCKABLE);
+	ASSERT(pb->pb_flags & _PBF_LOCKABLE);
 	return(atomic_read(&PBP(pb)->pb_sema.count));
 }
 
@@ -113,7 +115,7 @@ int
 pagebuf_lock(
 	page_buf_t		*pb)
 {
-	assert(pb->pb_flags & _PBF_LOCKABLE);
+	ASSERT(pb->pb_flags & _PBF_LOCKABLE);
 
 	PB_TRACE(pb, PB_TRACE_REC(lock), 0);
 	if (atomic_read(&PBP(pb)->pb_io_remaining))
@@ -219,7 +221,7 @@ void
 pagebuf_unlock(				/* unlock buffer		*/
 	page_buf_t		*pb)	/* buffer to unlock		*/
 {
-	assert(pb->pb_flags & _PBF_LOCKABLE);
+	ASSERT(pb->pb_flags & _PBF_LOCKABLE);
 	PB_CLEAR_OWNER(pb);
 	up(&PBP(pb)->pb_sema);
 	PB_TRACE(pb, PB_TRACE_REC(unlock), 0);

@@ -82,7 +82,7 @@ out:
  *	data now), it queues this frame in the connection's backlog.
  */
 int llc_rcv(struct sk_buff *skb, struct net_device *dev,
-		 struct packet_type *pt)
+	    struct packet_type *pt)
 {
 	struct llc_sap *sap;
 	struct llc_pdu_sn *pdu;
@@ -113,8 +113,22 @@ int llc_rcv(struct sk_buff *skb, struct net_device *dev,
 	}
 	llc_decode_pdu_type(skb, &dest);
 	if (dest == LLC_DEST_SAP) { /* type 1 services */
-		dprintk("%s: calling llc_sap_rcv!\n", __FUNCTION__);
-		llc_sap_rcv(sap, skb);
+		if (sap->rcv_func)
+			sap->rcv_func(skb, dev, pt);
+		else {
+			struct llc_addr laddr;
+			struct sock *sk;
+
+			llc_pdu_decode_da(skb, laddr.mac);
+			llc_pdu_decode_dsap(skb, &laddr.lsap);
+
+			sk = llc_lookup_dgram(sap, &laddr);
+			if (!sk)
+				goto drop;
+			skb->sk = sk;
+			llc_sap_rcv(sap, skb);
+			sock_put(sk);
+		}
 	} else if (dest == LLC_DEST_CONN) {
 		struct llc_addr saddr, daddr;
 		struct sock *sk;

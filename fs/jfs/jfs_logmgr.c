@@ -1552,7 +1552,12 @@ static int lmLogFileSystem(struct jfs_log * log, char *uuid, int activate)
 				memcpy(logsuper->active[i].uuid, NULL_UUID, 16);
 				break;
 			}
-		assert(i < MAX_ACTIVE);
+		if (i == MAX_ACTIVE) {
+			jERROR(1,("Somebody stomped on the journal!\n"));
+			lbmFree(bpsuper);
+			return EIO;
+		}
+		
 	}
 
 	/*

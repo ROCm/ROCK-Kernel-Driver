@@ -3,6 +3,7 @@
 #include <linux/module.h>
 #include <asm/module.h>
 #include <asm/uaccess.h>
+#include <linux/kallsyms.h>
 #include <linux/vmalloc.h>
 #include <linux/smp_lock.h>
 #include <asm/pgalloc.h>
@@ -39,8 +40,14 @@ extern struct module_symbol __stop___ksymtab[];
 extern const struct exception_table_entry __start___ex_table[];
 extern const struct exception_table_entry __stop___ex_table[];
 
-extern const char __start___kallsyms[] __attribute__ ((weak));
-extern const char __stop___kallsyms[] __attribute__ ((weak));
+extern const char __start___kallsyms[] __attribute__((weak));
+extern const char __stop___kallsyms[] __attribute__((weak));
+
+/* modutils uses these exported symbols to figure out if
+   kallsyms support is present */
+
+EXPORT_SYMBOL(__start___kallsyms);
+EXPORT_SYMBOL(__stop___kallsyms);
 
 struct module kernel_module =
 {
@@ -1220,6 +1227,30 @@ struct seq_operations ksyms_op = {
 	.show	= s_show
 };
 
+#define MODLIST_SIZE 4096
+
+/*
+ * this function isn't smp safe but that's not really a problem; it's
+ * called from oops context only and any locking could actually prevent
+ * the oops from going out; the line that is generated is informational
+ * only and should NEVER prevent the real oops from going out. 
+ */
+void print_modules(void)
+{
+	static char modlist[MODLIST_SIZE];
+	struct module *this_mod;
+	int pos = 0;
+
+	this_mod = module_list;
+	while (this_mod) {
+		if (this_mod->name)
+			pos += snprintf(modlist+pos, MODLIST_SIZE-pos-1, 
+					"%s ", this_mod->name);
+		this_mod = this_mod->next;
+	}
+	printk("%s\n",modlist);
+}
+
 #else		/* CONFIG_MODULES */
 
 /* Dummy syscalls for people who don't want modules */
@@ -1265,4 +1296,81 @@ int try_inc_mod_count(struct module *mod)
 	return 1;
 }
 
+void print_modules(void)
+{
+}
+
 #endif	/* CONFIG_MODULES */
+
+
+#if defined(CONFIG_MODULES) || defined(CONFIG_KALLSYMS)
+
+#define MAX_SYMBOL_SIZE 512
+
+static void
+address_to_exported_symbol(unsigned long address, const char **mod_name, 
+			   const char **sym_name, unsigned long *sym_start,
+			   unsigned long *sym_end)
+{
+	struct module *this_mod;
+	int i;
+
+	for (this_mod = module_list; this_mod; this_mod = this_mod->next) {
+		/* walk the symbol list of this module. Only symbols
+		   who's address is smaller than the searched for address
+		   are relevant; and only if it's better than the best so far */
+		for (i = 0; i < this_mod->nsyms; i++)
+			if ((this_mod->syms[i].value <= address) &&
+			    (*sym_start < this_mod->syms[i].value)) {
+				*sym_start = this_mod->syms[i].value;
+				*sym_name  = this_mod->syms[i].name;
+				*mod_name  = this_mod->name;
+				if (i + 1 < this_mod->nsyms)
+					*sym_end = this_mod->syms[i+1].value;
+				else
+					*sym_end = (unsigned long) this_mod + this_mod->size;
+			}
+	}
+}
+
+void
+print_symbol(const char *fmt, unsigned long address)
+{
+	/* static to not take up stackspace; if we race here too bad */
+	static char buffer[MAX_SYMBOL_SIZE];
+
+	const char *mod_name = NULL, *sec_name = NULL, *sym_name = NULL;
+	unsigned long mod_start, mod_end, sec_start, sec_end,
+		sym_start, sym_end;
+	char *tag = "";
+	
+	memset(buffer, 0, MAX_SYMBOL_SIZE);
+
+	sym_start = 0;
+	if (!kallsyms_address_to_symbol(address, &mod_name, &mod_start, &mod_end, &sec_name, &sec_start, &sec_end, &sym_name, &sym_start, &sym_end)) {
+		tag = "E ";
+		address_to_exported_symbol(address, &mod_name, &sym_name, &sym_start, &sym_end);
+	}
+
+	if (sym_start) {
+		if (*mod_name)
+		    snprintf(buffer, MAX_SYMBOL_SIZE - 1, "%s%s+%#x/%#x [%s]",
+			 tag, sym_name,
+			 (unsigned int)(address - sym_start),
+			 (unsigned int)(sym_end - sym_start),
+			 mod_name);
+		else
+		    snprintf(buffer, MAX_SYMBOL_SIZE - 1, "%s%s+%#x/%#x",
+			 tag, sym_name,
+			 (unsigned int)(address - sym_start),
+			 (unsigned int)(sym_end - sym_start));
+		printk(fmt, buffer);
+	}
+#if 0
+ else {
+		printk(fmt, "[unresolved]");
+	}
+#endif
+}
+
+#endif

@@ -66,7 +66,7 @@ static void sctp_assoc_bh_rcv(sctp_association_t *asoc);
 
 /* Allocate and initialize a new association */
 sctp_association_t *sctp_association_new(const sctp_endpoint_t *ep,
-					 const struct sock *sk, 
+					 const struct sock *sk,
 					 sctp_scope_t scope, int priority)
 {
 	sctp_association_t *asoc;
@@ -91,7 +91,7 @@ fail:
 
 /* Intialize a new association from provided memory. */
 sctp_association_t *sctp_association_init(sctp_association_t *asoc,
-					  const sctp_endpoint_t *ep, 
+					  const sctp_endpoint_t *ep,
 					  const struct sock *sk,
 					  sctp_scope_t scope, 
 					  int priority)
@@ -109,19 +109,19 @@ sctp_association_t *sctp_association_init(sctp_association_t *asoc,
 	asoc->ep = (sctp_endpoint_t *)ep;
 	sctp_endpoint_hold(asoc->ep);
 
-	/* Hold the sock. */
+	/* Hold the sock.  */
 	asoc->base.sk = (struct sock *)sk;
 	sock_hold(asoc->base.sk);
 
-	/* Initialize the common base substructure. */
+	/* Initialize the common base substructure.  */
 	asoc->base.type = SCTP_EP_TYPE_ASSOCIATION;
 
-	/* Initialize the object handling fields. */
+	/* Initialize the object handling fields.  */
 	atomic_set(&asoc->base.refcnt, 1);
 	asoc->base.dead = 0;
 	asoc->base.malloced = 0;
 
-	/* Initialize the bind addr area. */
+	/* Initialize the bind addr area.  */
 	sctp_bind_addr_init(&asoc->base.bind_addr, ep->base.bind_addr.port);
 	asoc->base.addr_lock = RW_LOCK_UNLOCKED;
 
@@ -135,7 +135,7 @@ sctp_association_t *sctp_association_init(sctp_association_t *asoc,
 	asoc->pmtu = 0;
 	asoc->frag_point = 0;
 
-	/* Initialize the default association max_retrans and RTO values. */
+	/* Initialize the default association max_retrans and RTO values.  */
 	asoc->max_retrans = ep->proto->max_retrans_association;
 	asoc->rto_initial = ep->proto->rto_initial;
 	asoc->rto_max = ep->proto->rto_max;
@@ -288,7 +288,6 @@ fail_init:
 	return NULL;
 }
 
-
 /* Free this association if possible.  There may still be users, so
  * the actual deallocation may be delayed.
  */
@@ -330,6 +329,11 @@ void sctp_association_free(sctp_association_t *asoc)
 			sctp_association_put(asoc);
 	}
 
+	/* Free peer's cached cookie. */
+	if (asoc->peer.cookie) {
+		kfree(asoc->peer.cookie);
+	}
+
 	/* Release the transport structures. */
 	list_for_each_safe(pos, temp, &asoc->peer.transport_addr_list) {
 		transport = list_entry(pos, sctp_transport_t, transports);
@@ -341,7 +345,6 @@ void sctp_association_free(sctp_association_t *asoc)
 
 	sctp_association_put(asoc);
 }
-
 
 /* Cleanup and free up an association. */
 static void sctp_association_destroy(sctp_association_t *asoc)
@@ -383,12 +386,11 @@ sctp_transport_t *sctp_assoc_add_peer(sctp_association_t *asoc,
 	};
 
 	/* Set the port if it has not been set yet.  */
-        if (0 == asoc->peer.port) {
-                asoc->peer.port = *port;
-        }
+	if (0 == asoc->peer.port) {
+		asoc->peer.port = *port;
+	}
 
-	SCTP_ASSERT(*port == asoc->peer.port, ":Invalid port\n",
-		    return NULL);
+	SCTP_ASSERT(*port == asoc->peer.port, ":Invalid port\n", return NULL);
 
 	/* Check to see if this is a duplicate. */
 	peer = sctp_assoc_lookup_paddr(asoc, addr);
@@ -461,11 +463,21 @@ sctp_transport_t *sctp_assoc_add_peer(sctp_association_t *asoc,
 	sp = sctp_sk(asoc->base.sk);
 	peer->hb_interval = sp->paddrparam.spp_hbinterval * HZ;
 
-        /* Attach the remote transport to our asoc.  */
+	/* Attach the remote transport to our asoc.  */
 	list_add_tail(&peer->transports, &asoc->peer.transport_addr_list);
 
 	/* If we do not yet have a primary path, set one.  */
-        if (NULL == asoc->peer.primary_path) {
+	if (NULL == asoc->peer.primary_path) {
+		asoc->peer.primary_path = peer;
+		/* Set a default msg_name for events. */
+		memcpy(&asoc->peer.primary_addr, &peer->ipaddr,
+		       sizeof(sockaddr_storage_t));
+		asoc->peer.active_path = peer;
+		asoc->peer.retran_path = peer;
+	}
+
+	/* If we do not yet have a primary path, set one.  */
+	if (NULL == asoc->peer.primary_path) {
 		asoc->peer.primary_path = peer;
 		asoc->peer.active_path = peer;
 		asoc->peer.retran_path = peer;
@@ -617,7 +629,7 @@ __u32 __sctp_association_get_next_tsn(sctp_association_t *asoc)
 	asoc->next_tsn++;
 	asoc->unack_data++;
 
-        return retval;
+	return retval;
 }
 
 /* Allocate 'num' TSNs by incrementing the association's TSN by num. */
@@ -739,7 +751,7 @@ int sctp_cmp_addr_exact(const sockaddr_storage_t *ss1,
  * Note:  We are sly and return a shared, prealloced chunk.
  */
 sctp_chunk_t *sctp_get_ecne_prepend(sctp_association_t *asoc)
-{ 
+{
 	sctp_chunk_t *chunk;
 	int need_ecne;
 	__u32 lowest_tsn;
@@ -892,7 +904,7 @@ static void sctp_assoc_bh_rcv(sctp_association_t *asoc)
 
 		/* Check to see if the association is freed in response to 
 		 * the incoming chunk.  If so, get out of the while loop.
-		 */ 
+		 */
 		if (!sctp_id2assoc(sk, associd))
 			goto out;
 
@@ -967,7 +979,7 @@ void sctp_assoc_update(sctp_association_t *asoc, sctp_association_t *new)
 		 * and peer's streams.
 		 */
 		for (i = 0; i < SCTP_MAX_STREAM; i++) {
-			asoc->ssn[i]      = 0;
+			asoc->ssn[i] = 0;
 			asoc->ulpq.ssn[i] = 0;
 		}
 	} else {

@@ -55,7 +55,8 @@ static char *acpi_table_signatures[ACPI_TABLE_COUNT] = {
 	[ACPI_SPCR]		= "SPCR",
 	[ACPI_SRAT]		= "SRAT",
 	[ACPI_SSDT]		= "SSDT",
-	[ACPI_SPMI]		= "SPMI"
+	[ACPI_SPMI]		= "SPMI",
+	[ACPI_HPET]		= "HPET"
 };
 
 /* System Description Table (RSDT/XSDT) */
@@ -320,7 +321,7 @@ acpi_table_parse_madt_family (
 			handler(entry);
 		}
 		entry = (acpi_table_entry_header *)
-			((unsigned long) entry += entry->length);
+			((unsigned long) entry + entry->length);
 	}
 
 	return count;

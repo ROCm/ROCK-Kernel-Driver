@@ -96,7 +96,7 @@ unsigned long update_adler32(unsigned long adler,
 		 * one subtract at the MOST, since buf[n]
 		 * is a max of 255.
 		 */
-		if(s1 >= BASE)
+		if (s1 >= BASE)
 			s1 -= BASE;
 
 		/* s2 = (s2 + s1) % BASE */

@@ -33,7 +33,9 @@ static int p8022_request(struct datalink_proto *dl, struct sk_buff *skb,
 }
 
 struct datalink_proto *register_8022_client(unsigned char type,
-			  int (*indicate)(struct llc_prim_if_block *prim))
+					    int (*func)(struct sk_buff *skb,
+							struct net_device *dev,
+							struct packet_type *pt))
 {
 	struct datalink_proto *proto;
 
@@ -42,7 +44,7 @@ struct datalink_proto *register_8022_client(unsigned char type,
 		proto->type[0]		= type;
 		proto->header_length	= 3;
 		proto->request		= p8022_request;
-		proto->sap = llc_sap_open(indicate, NULL, type);
+		proto->sap = llc_sap_open(type, func);
 		if (!proto->sap) {
 			kfree(proto);
 			proto = NULL;
