@@ -218,7 +218,7 @@ static int __init init_lapic_nmi_sysfs(void)
 
 	error = sysdev_class_register(&nmi_sysclass);
 	if (!error)
-		error = sys_device_register(&device_lapic_nmi);
+		error = sysdev_register(&device_lapic_nmi);
 	return error;
 }
 /* must come after the local APIC's device_initcall() */

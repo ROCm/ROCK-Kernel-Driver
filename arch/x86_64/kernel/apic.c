@@ -552,7 +552,7 @@ static int __init init_lapic_sysfs(void)
 	/* XXX: remove suspend/resume procs if !apic_pm_state.active? */
 	error = sysdev_class_register(&lapic_sysclass);
 	if (!error)
-		error = sys_device_register(&device_lapic);
+		error = sysdev_register(&device_lapic);
 	return error;
 }
 device_initcall(init_lapic_sysfs);
