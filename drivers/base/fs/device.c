@@ -10,10 +10,16 @@
 #include <linux/device.h>
 #include <linux/module.h>
 #include <linux/string.h>
+#include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/err.h>
 #include <linux/stat.h>
 #include <linux/limits.h>
+
+static struct driver_dir_entry device_root_dir = {
+	.name	= "root",
+	.mode	= (S_IRWXU | S_IRUGO | S_IXUGO),
+};
 
 extern struct device_attribute * device_default_files[];
 
@@ -164,7 +170,7 @@ int device_bus_link(struct device * dev)
 	 * one to get to the 'bus' directory, and one to get to the root 
 	 * of the fs.)
 	 */
-	length += strlen("../../..");
+	length += strlen("../../../root");
 
 	if (length > PATH_MAX)
 		return -ENAMETOOLONG;
@@ -174,7 +180,7 @@ int device_bus_link(struct device * dev)
 	memset(path,0,length);
 
 	/* our relative position */
-	strcpy(path,"../../..");
+	strcpy(path,"../../../root");
 
 	fill_devpath(dev,path,length);
 	error = driverfs_create_symlink(&dev->bus->device_dir,dev->bus_id,path);
@@ -207,13 +213,12 @@ int device_create_dir(struct driver_dir_entry * dir, struct driver_dir_entry * p
  */
 int device_make_dir(struct device * dev)
 {
-	struct driver_dir_entry * parent = NULL;
+	struct driver_dir_entry * parent;
 	struct device_attribute * entry;
 	int error;
 	int i;
 
-	if (dev->parent)
-		parent = &dev->parent->dir;
+	parent = dev->parent ? &dev->parent->dir : &device_root_dir;
 	dev->dir.name = dev->bus_id;
 	dev->dir.ops = &dev_attr_ops;
 
@@ -228,6 +233,13 @@ int device_make_dir(struct device * dev)
 	}
 	return error;
 }
+
+static int device_driverfs_init(void)
+{
+	return driverfs_create_dir(&device_root_dir,NULL);
+}
+
+core_initcall(device_driverfs_init);
 
 EXPORT_SYMBOL(device_create_file);
 EXPORT_SYMBOL(device_remove_file);

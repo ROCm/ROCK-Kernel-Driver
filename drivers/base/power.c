@@ -34,7 +34,7 @@ int device_suspend(u32 state, u32 level)
 	printk(KERN_EMERG "Suspending Devices\n");
 
 	spin_lock(&device_lock);
-	list_for_each(node,&device_root.g_list) {
+	list_for_each(node,&global_device_list) {
 		struct device * dev = get_device_locked(to_dev(node));
 		if (dev) {
 			spin_unlock(&device_lock);
@@ -65,7 +65,7 @@ void device_resume(u32 level)
 	struct device * prev = NULL;
 
 	spin_lock(&device_lock);
-	list_for_each_prev(node,&device_root.g_list) {
+	list_for_each_prev(node,&global_device_list) {
 		struct device * dev = get_device_locked(to_dev(node));
 		if (dev) {
 			spin_unlock(&device_lock);
@@ -98,7 +98,7 @@ void device_shutdown(void)
 	printk(KERN_EMERG "Shutting down devices\n");
 
 	spin_lock(&device_lock);
-	list_for_each(node,&device_root.g_list) {
+	list_for_each(node,&global_device_list) {
 		struct device * dev = get_device_locked(to_dev(node));
 		if (dev) {
 			spin_unlock(&device_lock);
