@@ -450,7 +450,7 @@ static inline unsigned jiffies_to_msec(unsigned jif)
 	return (jif / HZ) * 1000 + (jif % HZ) * 1000 / HZ;
 #endif
 }
-static ssize_t disk_stat_read(struct gendisk * disk, char *page)
+static ssize_t disk_stats_read(struct gendisk * disk, char *page)
 {
 	disk_round_stats(disk);
 	return sprintf(page,
@@ -458,14 +458,16 @@ static ssize_t disk_stat_read(struct gendisk * disk, char *page)
 		"%8u %8u %8llu %8u "
 		"%8u %8u %8u"
 		"\n",
-		disk->reads, disk->read_merges,
-		(unsigned long long)disk->read_sectors,
-		jiffies_to_msec(disk->read_ticks),
-		disk->writes, disk->write_merges,
-		(unsigned long long)disk->write_sectors,
-		jiffies_to_msec(disk->write_ticks),
-		disk->in_flight, jiffies_to_msec(disk->io_ticks),
-		jiffies_to_msec(disk->time_in_queue));
+		disk_stat_read(disk, reads), disk_stat_read(disk, read_merges),
+		(unsigned long long)disk_stat_read(disk, read_sectors),
+		jiffies_to_msec(disk_stat_read(disk, read_ticks)),
+		disk_stat_read(disk, writes), 
+		disk_stat_read(disk, write_merges),
+		(unsigned long long)disk_stat_read(disk, write_sectors),
+		jiffies_to_msec(disk_stat_read(disk, write_ticks)),
+		disk_stat_read(disk, in_flight), 
+		jiffies_to_msec(disk_stat_read(disk, io_ticks)),
+		jiffies_to_msec(disk_stat_read(disk, time_in_queue)));
 }
 static struct disk_attribute disk_attr_dev = {
 	.attr = {.name = "dev", .mode = S_IRUGO },
@@ -481,7 +483,7 @@ static struct disk_attribute disk_attr_size = {
 };
 static struct disk_attribute disk_attr_stat = {
 	.attr = {.name = "stat", .mode = S_IRUGO },
-	.show	= disk_stat_read
+	.show	= disk_stats_read
 };
 
 static struct attribute * default_attrs[] = {
@@ -497,6 +499,7 @@ static void disk_release(struct kobject * kobj)
 	struct gendisk *disk = to_disk(kobj);
 	kfree(disk->random);
 	kfree(disk->part);
+	free_disk_stats(disk);
 	kfree(disk);
 }
 
@@ -516,6 +519,10 @@ struct gendisk *alloc_disk(int minors)
 	struct gendisk *disk = kmalloc(sizeof(struct gendisk), GFP_KERNEL);
 	if (disk) {
 		memset(disk, 0, sizeof(struct gendisk));
+		if (!init_disk_stats(disk)) {
+			kfree(disk);
+			return NULL;
+		}
 		if (minors > 1) {
 			int size = (minors - 1) * sizeof(struct hd_struct);
 			disk->part = kmalloc(size, GFP_KERNEL);

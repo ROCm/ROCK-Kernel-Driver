@@ -13,6 +13,8 @@
 #include <linux/types.h>
 #include <linux/major.h>
 #include <linux/device.h>
+#include <linux/smp.h>
+#include <linux/string.h>
 
 enum {
 /* These three have identical behaviour; use the second one if DOS FDISK gets
@@ -70,6 +72,16 @@ struct hd_struct {
 #define GENHD_FL_CD	8
 #define GENHD_FL_UP	16
 
+struct disk_stats {
+	unsigned read_sectors, write_sectors;
+	unsigned reads, writes;
+	unsigned read_merges, write_merges;
+	unsigned read_ticks, write_ticks;
+	unsigned io_ticks;
+	int in_flight;
+	unsigned time_in_queue;
+};
+	
 struct gendisk {
 	int major;			/* major number of driver */
 	int first_minor;
@@ -94,15 +106,85 @@ struct gendisk {
 	int policy;
 
 	unsigned sync_io;		/* RAID */
-	unsigned read_sectors, write_sectors;
-	unsigned reads, writes;
-	unsigned read_merges, write_merges;
-	unsigned read_ticks, write_ticks;
-	unsigned io_ticks;
-	int in_flight;
 	unsigned long stamp, stamp_idle;
-	unsigned time_in_queue;
+#ifdef	CONFIG_SMP
+	struct disk_stats *dkstats;
+#else
+	struct disk_stats dkstats;
+#endif
 };
+
+/* 
+ * Macros to operate on percpu disk statistics:
+ * Since writes to disk_stats are serialised through the queue_lock,
+ * smp_processor_id() should be enough to get to the per_cpu versions
+ * of statistics counters
+ */
+#ifdef	CONFIG_SMP
+#define disk_stat_add(gendiskp, field, addnd) 	\
+	(per_cpu_ptr(gendiskp->dkstats, smp_processor_id())->field += addnd)
+#define disk_stat_read(gendiskp, field)					\
+({									\
+	typeof(gendiskp->dkstats->field) res = 0;			\
+	int i;								\
+	for (i=0; i < NR_CPUS; i++) {					\
+		if (!cpu_possible(i))					\
+			continue;					\
+		res += per_cpu_ptr(gendiskp->dkstats, i)->field;	\
+	}								\
+	res;								\
+})
+
+static inline void disk_stat_set_all(struct gendisk *gendiskp, int value)	{
+	int i;
+	for (i=0; i < NR_CPUS; i++) {
+		if (cpu_possible(i)) {
+			memset(per_cpu_ptr(gendiskp->dkstats, i), value,	
+					sizeof (struct disk_stats));
+		}
+	}
+}		
+				
+#else
+#define disk_stat_add(gendiskp, field, addnd) (gendiskp->dkstats.field += addnd)
+#define disk_stat_read(gendiskp, field)	(gendiskp->dkstats.field)
+
+static inline void disk_stat_set_all(struct gendisk *gendiskp, int value)	{
+	memset(&gendiskp->dkstats, value, sizeof (struct disk_stats));
+}
+#endif
+
+#define disk_stat_inc(gendiskp, field) disk_stat_add(gendiskp, field, 1)
+#define disk_stat_dec(gendiskp, field) disk_stat_add(gendiskp, field, -1)
+#define disk_stat_sub(gendiskp, field, subnd) \
+		disk_stat_add(gendiskp, field, -subnd)
+
+
+/* Inlines to alloc and free disk stats in struct gendisk */
+#ifdef  CONFIG_SMP
+static inline int init_disk_stats(struct gendisk *disk)
+{
+	disk->dkstats = kmalloc_percpu(sizeof (struct disk_stats), GFP_KERNEL);
+	if (!disk->dkstats)
+		return 0;
+	disk_stat_set_all(disk, 0);
+	return 1;
+}
+
+static inline void free_disk_stats(struct gendisk *disk)
+{
+	kfree_percpu(disk->dkstats);
+}
+#else	/* CONFIG_SMP */
+static inline int init_disk_stats(struct gendisk *disk)
+{
+	return 1;
+}
+
+static inline void free_disk_stats(struct gendisk *disk)
+{
+}
+#endif	/* CONFIG_SMP */
 
 /* drivers/block/ll_rw_blk.c */
 extern void disk_round_stats(struct gendisk *disk);
