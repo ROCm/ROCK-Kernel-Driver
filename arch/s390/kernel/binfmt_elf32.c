@@ -33,6 +33,8 @@
 #define NUM_ACRS      16    
 
 #define TASK31_SIZE		(0x80000000UL)
+#undef TASK_SIZE
+#define TASK_SIZE TASK31_SIZE
 
 /* For SVR4/S390 the function pointer to be registered with `atexit` is
    passed in R14. */

@@ -1004,7 +1004,9 @@ __init int sctp_init(void)
 		goto err_init_mibs;
 
 	/* Initialize proc fs directory.  */
-	sctp_proc_init();
+	status = sctp_proc_init();
+	if (status)
+		goto err_init_proc;
 
 	/* Initialize object count debugging.  */
 	sctp_dbg_objcnt_init();
@@ -1127,6 +1129,9 @@ __init int sctp_init(void)
 	/* Disable ADDIP by default. */
 	sctp_addip_enable = 0;
 
+	/* Enable PR-SCTP by default. */
+	sctp_prsctp_enable = 1;
+
 	sctp_sysctl_register();
 
 	INIT_LIST_HEAD(&sctp_address_families);
@@ -1171,6 +1176,7 @@ err_ehash_alloc:
 			     sizeof(struct sctp_hashbucket)));
 err_ahash_alloc:
 	sctp_dbg_objcnt_exit();
+err_init_proc:
 	sctp_proc_exit();
 	cleanup_sctp_mibs();
 err_init_mibs:

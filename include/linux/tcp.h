@@ -255,6 +255,10 @@ struct tcp_opt {
 	__u8	retransmits;	/* Number of unrecovered RTO timeouts.	*/
 
 	__u8	reordering;	/* Packet reordering metric.		*/
+	__u8	frto_counter;	/* Number of new acks after RTO */
+	__u32	frto_highmark;	/* snd_nxt when RTO occurred */
+
+	__u8	unused_pad;
 	__u8	queue_shrunk;	/* Write queue has been shrunk recently.*/
 	__u8	defer_accept;	/* User waits for some data after accept() */
 
@@ -370,9 +374,6 @@ struct tcp_opt {
 	unsigned int		keepalive_intvl;  /* time interval between keep alive probes */
 	int			linger2;
 
-	int                     frto_counter; /* Number of new acks after RTO */
-	__u32                   frto_highmark; /* snd_nxt when RTO occurred */
-
 	unsigned long last_synq_overflow; 
 
 /* TCP Westwood structure */
@@ -387,6 +388,18 @@ struct tcp_opt {
                 __u32    rtt;
                 __u32    rtt_min;          /* minimum observed RTT */
         } westwood;
+
+/* Vegas variables */
+	struct {
+		__u32	beg_snd_nxt;	/* right edge during last RTT */
+		__u32	beg_snd_una;	/* left edge  during last RTT */
+		__u32	beg_snd_cwnd;	/* saves the size of the cwnd */
+		__u8	do_vegas;	/* do vegas for this connection */
+		__u8	doing_vegas_now;/* if true, do vegas for this RTT */
+		__u16	cntRTT;		/* # of RTTs measured within last RTT */
+		__u32	minRTT;		/* min of RTTs measured within last RTT (in usec) */
+		__u32	baseRTT;	/* the min of all Vegas RTT measurements seen (in usec) */
+	} vegas;
 };
 
 /* WARNING: don't change the layout of the members in tcp_sock! */

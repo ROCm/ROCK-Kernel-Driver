@@ -6,10 +6,6 @@
  *
  * This file is part of the SCTP kernel reference Implementation
  *
- * This file includes part of the implementation of the add-IP extension,
- * based on <draft-ietf-tsvwg-addip-sctp-02.txt> June 29, 2001,
- * for the SCTP kernel reference Implementation.
- *
  * These functions work with the state functions in sctp_sm_statefuns.c
  * to implement the state operations.  These functions implement the
  * steps which require modifying existing data structures.
@@ -89,11 +85,13 @@ int sctp_chunk_iif(const struct sctp_chunk *chunk)
  * Note 2: The ECN capable field is reserved for future use of
  * Explicit Congestion Notification.
  */
-static const sctp_ecn_capable_param_t ecap_param = {
-	{
-		SCTP_PARAM_ECN_CAPABLE,
-		__constant_htons(sizeof(sctp_ecn_capable_param_t)),
-	}
+static const struct sctp_paramhdr ecap_param = {
+	SCTP_PARAM_ECN_CAPABLE,
+	__constant_htons(sizeof(struct sctp_paramhdr)),
+};
+static const struct sctp_paramhdr prsctp_param = {
+	SCTP_PARAM_FWD_TSN_SUPPORT,
+	__constant_htons(sizeof(struct sctp_paramhdr)),
 };
 
 /* A helper to initialize to initialize an op error inside a
@@ -196,6 +194,8 @@ struct sctp_chunk *sctp_make_init(const struct sctp_association *asoc,
 
 	chunksize = sizeof(init) + addrs_len + SCTP_SAT_LEN(num_types);
 	chunksize += sizeof(ecap_param);
+	if (sctp_prsctp_enable)
+		chunksize += sizeof(prsctp_param);
 	chunksize += vparam_len;
 
 	/* RFC 2960 3.3.2 Initiation (INIT) (1)
@@ -232,6 +232,8 @@ struct sctp_chunk *sctp_make_init(const struct sctp_association *asoc,
 	sctp_addto_chunk(retval, num_types * sizeof(__u16), &types);
 
 	sctp_addto_chunk(retval, sizeof(ecap_param), &ecap_param);
+	if (sctp_prsctp_enable)
+		sctp_addto_chunk(retval, sizeof(prsctp_param), &prsctp_param);
 nodata:
 	if (addrs.v)
 		kfree(addrs.v);
@@ -278,6 +280,10 @@ struct sctp_chunk *sctp_make_init_ack(const struct sctp_association *asoc,
 	if (asoc->peer.ecn_capable)
 		chunksize += sizeof(ecap_param);
 
+        /* Tell peer that we'll do PR-SCTP only if peer advertised.  */
+	if (asoc->peer.prsctp_capable)
+		chunksize += sizeof(prsctp_param);
+
 	/* Now allocate and fill out the chunk.  */
 	retval = sctp_make_chunk(asoc, SCTP_CID_INIT_ACK, 0, chunksize);
 	if (!retval)
@@ -293,6 +299,8 @@ struct sctp_chunk *sctp_make_init_ack(const struct sctp_association *asoc,
 	sctp_addto_chunk(retval, cookie_len, cookie);
 	if (asoc->peer.ecn_capable)
 		sctp_addto_chunk(retval, sizeof(ecap_param), &ecap_param);
+	if (asoc->peer.prsctp_capable)
+		sctp_addto_chunk(retval, sizeof(prsctp_param), &prsctp_param);
 
 	/* We need to remove the const qualifier at this point.  */
 	retval->asoc = (struct sctp_association *) asoc;
@@ -1286,6 +1294,9 @@ sctp_cookie_param_t *sctp_pack_cookie(const struct sctp_endpoint *ep,
 	/* Save the raw address list length in the cookie. */
 	cookie->c.raw_addr_list_len = addrs_len;
 
+	/* Remember PR-SCTP capability. */
+	cookie->c.prsctp_capable = asoc->peer.prsctp_capable;
+
 	/* Set an expiration time for the cookie.  */
 	do_gettimeofday(&cookie->c.expiration);
 	TIMEVAL_ADD(asoc->cookie_life, cookie->c.expiration);
@@ -1442,6 +1453,8 @@ no_hmac:
 	retval->next_tsn = retval->c.initial_tsn;
 	retval->ctsn_ack_point = retval->next_tsn - 1;
 	retval->addip_serial = retval->c.initial_tsn;
+	retval->adv_peer_ack_point = retval->ctsn_ack_point;
+	retval->peer.prsctp_capable = retval->c.prsctp_capable;
 
 	/* The INIT stuff will be done by the side effects.  */
 	return retval;
@@ -1653,6 +1666,10 @@ static int sctp_verify_param(const struct sctp_association *asoc,
 	case SCTP_PARAM_HOST_NAME_ADDRESS:
 		/* Tell the peer, we won't support this param.  */
 		return sctp_process_hn_param(asoc, param, chunk, err_chunk);
+	case SCTP_PARAM_FWD_TSN_SUPPORT:
+		if (sctp_prsctp_enable)
+			break;
+		/* Fall Through */ 
 	default:
 		SCTP_DEBUG_PRINTK("Unrecognized param: %d for chunk %d.\n",
 				ntohs(param.p->type), cid);
@@ -1968,6 +1985,12 @@ int sctp_process_param(struct sctp_association *asoc, union sctp_params param,
 		asoc->peer.ecn_capable = 1;
 		break;
 
+	case SCTP_PARAM_FWD_TSN_SUPPORT:
+		if (sctp_prsctp_enable) {
+			asoc->peer.prsctp_capable = 1;
+			break;
+		}
+		/* Fall Through */ 
 	default:
 		/* Any unrecognized parameters should have been caught
 		 * and handled by sctp_verify_param() which should be
@@ -2618,6 +2641,41 @@ int sctp_process_asconf_ack(struct sctp_association *asoc,
 			sctp_chunk_free(asconf);
 		else
 			asoc->addip_last_asconf = asconf;
+	}
+
+	return retval;
+}
+
+/* Make a FWD TSN chunk. */ 
+struct sctp_chunk *sctp_make_fwdtsn(const struct sctp_association *asoc,
+				    __u32 new_cum_tsn, size_t nstreams,
+				    struct sctp_fwdtsn_skip *skiplist)
+{
+	struct sctp_chunk *retval = NULL;
+	struct sctp_fwdtsn_chunk *ftsn_chunk;
+	struct sctp_fwdtsn_hdr ftsn_hdr; 
+	struct sctp_fwdtsn_skip skip;
+	size_t hint;
+	int i;
+
+	hint = (nstreams + 1) * sizeof(__u32);
+
+	/* Maybe set the T-bit if we have no association.  */
+	retval = sctp_make_chunk(asoc, SCTP_CID_FWD_TSN, 0, hint);
+
+	if (!retval)
+		return NULL;
+
+	ftsn_chunk = (struct sctp_fwdtsn_chunk *)retval->subh.fwdtsn_hdr;
+
+	ftsn_hdr.new_cum_tsn = htonl(new_cum_tsn);
+	retval->subh.fwdtsn_hdr =
+		sctp_addto_chunk(retval, sizeof(ftsn_hdr), &ftsn_hdr);
+
+	for (i = 0; i < nstreams; i++) {
+		skip.stream = skiplist[i].stream;
+		skip.ssn = skiplist[i].ssn;
+		sctp_addto_chunk(retval, sizeof(skip), &skip);
 	}
 
 	return retval;

@@ -39,6 +39,8 @@
 #include <linux/dma-mapping.h>
 #include <linux/module.h>
 #include <linux/completion.h>
+#include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 
 #include <asm/bug.h>
 
@@ -132,7 +134,12 @@ struct cdrom_info {
 	char	type[4];
 	char	model[3];
 };
-static struct cdrom_info viocd_unitinfo[VIOCD_MAX_CD];
+/*
+ * This needs to be allocated since it is passed to the
+ * Hypervisor and we may be a module.
+ */
+static struct cdrom_info *viocd_unitinfo;
+static dma_addr_t unitinfo_dmaaddr;
 
 struct disk_info {
 	struct gendisk			*viocd_disk;
@@ -141,12 +148,38 @@ struct disk_info {
 static struct disk_info viocd_diskinfo[VIOCD_MAX_CD];
 
 #define DEVICE_NR(di)	((di) - &viocd_diskinfo[0])
-#define VIOCDI		viocd_diskinfo[deviceno].viocd_info
 
 static request_queue_t *viocd_queue;
 static spinlock_t viocd_reqlock;
 
 #define MAX_CD_REQ	1
+
+/* procfs support */
+static int proc_viocd_show(struct seq_file *m, void *v)
+{
+	int i;
+
+	for (i = 0; i < viocd_numdev; i++) {
+		seq_printf(m, "viocd device %d is iSeries resource %10.10s"
+				"type %4.4s, model %3.3s\n",
+				i, viocd_unitinfo[i].rsrcname,
+				viocd_unitinfo[i].type,
+				viocd_unitinfo[i].model);
+	}
+	return 0;
+}
+
+static int proc_viocd_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, proc_viocd_show, NULL);
+}
+
+static struct file_operations proc_viocd_operations = {
+	.open		= proc_viocd_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
 
 static int viocd_blk_open(struct inode *inode, struct file *file)
 {
@@ -184,17 +217,19 @@ struct block_device_operations viocd_fops = {
 /* Get info on CD devices from OS/400 */
 static void __init get_viocd_info(void)
 {
-	dma_addr_t dmaaddr;
 	HvLpEvent_Rc hvrc;
 	int i;
 	struct viocd_waitevent we;
 
-	dmaaddr = dma_map_single(iSeries_vio_dev, viocd_unitinfo,
-			sizeof(viocd_unitinfo), DMA_FROM_DEVICE);
-	if (dmaaddr == (dma_addr_t)-1) {
-		printk(VIOCD_KERN_WARNING "error allocating tce\n");
+	viocd_unitinfo = dma_alloc_coherent(iSeries_vio_dev,
+			sizeof(*viocd_unitinfo) * VIOCD_MAX_CD,
+			&unitinfo_dmaaddr, GFP_ATOMIC);
+	if (viocd_unitinfo == NULL) {
+		printk(VIOCD_KERN_WARNING "error allocating unitinfo\n");
 		return;
 	}
+
+	memset(viocd_unitinfo, 0, sizeof(*viocd_unitinfo) * VIOCD_MAX_CD);
 
 	init_completion(&we.com);
 
@@ -204,29 +239,34 @@ static void __init get_viocd_info(void)
 			HvLpEvent_AckInd_DoAck, HvLpEvent_AckType_ImmediateAck,
 			viopath_sourceinst(viopath_hostLp),
 			viopath_targetinst(viopath_hostLp),
-			(u64)&we, VIOVERSION << 16, dmaaddr, 0,
-			sizeof(viocd_unitinfo), 0);
+			(u64)&we, VIOVERSION << 16, unitinfo_dmaaddr, 0,
+			sizeof(*viocd_unitinfo) * VIOCD_MAX_CD, 0);
 	if (hvrc != HvLpEvent_Rc_Good) {
 		printk(VIOCD_KERN_WARNING "cdrom error sending event. rc %d\n",
 				(int)hvrc);
-		return;
+		goto error_ret;
 	}
 
 	wait_for_completion(&we.com);
-
-	dma_unmap_single(iSeries_vio_dev, dmaaddr, sizeof(viocd_unitinfo),
-			DMA_FROM_DEVICE);
 
 	if (we.rc) {
 		const struct vio_error_entry *err =
 			vio_lookup_rc(viocd_err_table, we.sub_result);
 		printk(VIOCD_KERN_WARNING "bad rc %d:0x%04X on getinfo: %s\n",
 				we.rc, we.sub_result, err->msg);
-		return;
+		goto error_ret;
 	}
 
 	for (i = 0; (i < VIOCD_MAX_CD) && viocd_unitinfo[i].rsrcname[0]; i++)
 		viocd_numdev++;
+
+	return;
+
+error_ret:
+	dma_free_coherent(iSeries_vio_dev,
+			sizeof(*viocd_unitinfo) * VIOCD_MAX_CD,
+			viocd_unitinfo, unitinfo_dmaaddr);
+	viocd_unitinfo = NULL;
 }
 
 static int viocd_open(struct cdrom_device_info *cdi, int purpose)
@@ -307,10 +347,6 @@ static int send_request(struct request *req)
 	}
 	dmaaddr = sg_dma_address(&sg);
 	len = sg_dma_len(&sg);
-	if (dmaaddr == (dma_addr_t)-1) {
-		printk(VIOCD_KERN_WARNING "error allocating tce\n");
-		return -1;
-	}
 
 	hvrc = HvCallEvent_signalLpEventFast(viopath_hostLp,
 			HvLpEvent_Type_VirtualIo,
@@ -534,6 +570,7 @@ static int __init viocd_init(void)
 	struct gendisk *gendisk;
 	int deviceno;
 	int ret = 0;
+	struct proc_dir_entry *e;
 
 	if (viopath_hostLp == HvLpIndexInvalid) {
 		vio_set_hostlp();
@@ -604,7 +641,7 @@ static int __init viocd_init(void)
 			printk(VIOCD_KERN_WARNING
 					"Cannot create gendisk for %s!\n",
 					c->name);
-			unregister_cdrom(&VIOCDI);
+			unregister_cdrom(c);
 			continue;
 		}
 		gendisk->major = VIOCD_MAJOR;
@@ -622,6 +659,12 @@ static int __init viocd_init(void)
 		add_disk(gendisk);
 	}
 
+	e = create_proc_entry("iSeries/viocd", S_IFREG|S_IRUGO, NULL);
+	if (e) {
+		e->owner = THIS_MODULE;
+		e->proc_fops = &proc_viocd_operations;
+	}
+
 	return 0;
 
 out_undo_vio:
@@ -636,6 +679,7 @@ static void __exit viocd_exit(void)
 {
 	int deviceno;
 
+	remove_proc_entry("iSeries/viocd", NULL);
 	for (deviceno = 0; deviceno < viocd_numdev; deviceno++) {
 		struct disk_info *d = &viocd_diskinfo[deviceno];
 		if (unregister_cdrom(&d->viocd_info) != 0)
@@ -646,7 +690,10 @@ static void __exit viocd_exit(void)
 		put_disk(d->viocd_disk);
 	}
 	blk_cleanup_queue(viocd_queue);
-
+	if (viocd_unitinfo != NULL)
+		dma_free_coherent(iSeries_vio_dev,
+				sizeof(*viocd_unitinfo) * VIOCD_MAX_CD,
+				viocd_unitinfo, unitinfo_dmaaddr);
 	viopath_close(viopath_hostLp, viomajorsubtype_cdio, MAX_CD_REQ + 2);
 	vio_clearHandler(viomajorsubtype_cdio);
 	unregister_blkdev(VIOCD_MAJOR, VIOCD_DEVICE);

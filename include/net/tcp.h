@@ -583,6 +583,11 @@ extern int sysctl_tcp_tw_reuse;
 extern int sysctl_tcp_frto;
 extern int sysctl_tcp_low_latency;
 extern int sysctl_tcp_westwood;
+extern int sysctl_tcp_vegas_cong_avoid;
+extern int sysctl_tcp_vegas_alpha;
+extern int sysctl_tcp_vegas_beta;
+extern int sysctl_tcp_vegas_gamma;
+extern int sysctl_tcp_nometrics_save;
 
 extern atomic_t tcp_memory_allocated;
 extern atomic_t tcp_sockets_allocated;
@@ -1211,6 +1216,59 @@ static inline __u32 tcp_recalc_ssthresh(struct tcp_opt *tp)
 	return max(tp->snd_cwnd >> 1U, 2U);
 }
 
+/* Stop taking Vegas samples for now. */
+#define tcp_vegas_disable(__tp)	((__tp)->vegas.doing_vegas_now = 0)
+
+/* Is this TCP connection using Vegas (regardless of whether it is taking
+ * Vegas measurements at the current time)?
+ */
+#define tcp_is_vegas(__tp)	((__tp)->vegas.do_vegas)
+    
+static inline void tcp_vegas_enable(struct tcp_opt *tp)
+{
+	/* There are several situations when we must "re-start" Vegas:
+	 *
+	 *  o when a connection is established
+	 *  o after an RTO
+	 *  o after fast recovery
+	 *  o when we send a packet and there is no outstanding
+	 *    unacknowledged data (restarting an idle connection)
+	 *
+	 * In these circumstances we cannot do a Vegas calculation at the
+	 * end of the first RTT, because any calculation we do is using
+	 * stale info -- both the saved cwnd and congestion feedback are
+	 * stale.
+	 *
+	 * Instead we must wait until the completion of an RTT during
+	 * which we actually receive ACKs.
+	 */
+    
+	/* Begin taking Vegas samples next time we send something. */
+	tp->vegas.doing_vegas_now = 1;
+     
+	/* Set the beginning of the next send window. */
+	tp->vegas.beg_snd_nxt = tp->snd_nxt;
+
+	tp->vegas.cntRTT = 0;
+	tp->vegas.minRTT = 0x7fffffff;
+}
+
+/* Should we be taking Vegas samples right now? */
+#define tcp_vegas_enabled(__tp)	((__tp)->vegas.doing_vegas_now)
+
+extern void tcp_vegas_init(struct tcp_opt *tp);
+
+static inline void tcp_set_ca_state(struct tcp_opt *tp, u8 ca_state)
+{
+	if (tcp_is_vegas(tp)) {
+		if (ca_state == TCP_CA_Open) 
+			tcp_vegas_enable(tp);
+		else
+			tcp_vegas_disable(tp);
+	}
+	tp->ca_state = ca_state;
+}
+
 /* If cwnd > ssthresh, we may raise ssthresh to be half-way to cwnd.
  * The exception is rate halving phase, when cwnd is decreasing towards
  * ssthresh.
@@ -1270,7 +1328,7 @@ static inline void tcp_enter_cwr(struct tcp_opt *tp)
 	tp->prior_ssthresh = 0;
 	if (tp->ca_state < TCP_CA_CWR) {
 		__tcp_enter_cwr(tp);
-		tp->ca_state = TCP_CA_CWR;
+		tcp_set_ca_state(tp, TCP_CA_CWR);
 	}
 }
 

@@ -123,16 +123,6 @@ void show_trace(struct task_struct *task, unsigned long * stack)
 	printk("\n");
 }
 
-void show_trace_task(struct task_struct *tsk)
-{
-	unsigned long esp = tsk->thread.esp;
-
-	/* User space on another CPU? */
-	if ((esp ^ (unsigned long)tsk->thread_info) & ~(THREAD_SIZE - 1))
-		return;
-	show_trace(tsk, (unsigned long *)esp);
-}
-
 void show_stack(struct task_struct *task, unsigned long *esp)
 {
 	unsigned long *stack;

@@ -137,18 +137,6 @@ dik_show_trace(unsigned long *sp)
 	printk("\n");
 }
 
-void show_trace_task(struct task_struct * tsk)
-{
-	struct thread_info *ti = tsk->thread_info;
-	unsigned long fp, sp = ti->pcb.ksp, base = (unsigned long) ti;
- 
-	if (sp > base && sp+6*8 < base + 16*1024) {
-		fp = ((unsigned long*)sp)[6];
-		if (fp > sp && fp < base + 16*1024)
-			dik_show_trace((unsigned long *)fp);
-	}
-}
-
 static int kstack_depth_to_print = 24;
 
 void show_stack(struct task_struct *task, unsigned long *sp)

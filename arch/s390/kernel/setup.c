@@ -254,13 +254,13 @@ void (*_machine_power_off)(void) = machine_power_off_smp;
 /*
  * Reboot, halt and power_off routines for non SMP.
  */
-extern void do_reipl(unsigned long devno);
+extern void reipl(unsigned long devno);
 static void do_machine_restart_nonsmp(char * __unused)
 {
 	if (MACHINE_IS_VM)
 		cpcmd ("IPL", NULL, 0);
 	else
-		do_reipl (0x10000 | S390_lowcore.ipl_device);
+		reipl (0x10000 | S390_lowcore.ipl_device);
 }
 
 static void do_machine_halt_nonsmp(void)

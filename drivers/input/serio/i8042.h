@@ -1,6 +1,8 @@
 #ifndef _I8042_H
 #define _I8042_H
 
+#include <linux/config.h>
+
 /*
  *  Copyright (c) 1999-2002 Vojtech Pavlik
  *
@@ -13,7 +15,11 @@
  * Arch-dependent inline functions and defines.
  */
 
-#if defined(CONFIG_PPC)
+#if defined(CONFIG_MIPS_JAZZ)
+#include "i8042-jazzio.h"
+#elif defined(CONFIG_SGI_IP22)
+#include "i8042-ip22io.h"
+#elif defined(CONFIG_PPC)
 #include "i8042-ppcio.h"
 #elif defined(CONFIG_SPARC32) || defined(CONFIG_SPARC64)
 #include "i8042-sparcio.h"

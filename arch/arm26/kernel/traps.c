@@ -165,18 +165,6 @@ void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
 		c_backtrace(fp, processor_mode(regs));
 }
 
-/*
- * This is called from SysRq-T (show_task) to display the current
- * call trace for each process.  Very useful.
- */
-void show_trace_task(struct task_struct *tsk)
-{
-	if (tsk != current) {
-		unsigned int fp = thread_saved_fp(tsk);
-		c_backtrace(fp, 0x10);
-	}
-}
-
 /* FIXME - this is probably wrong.. */
 void show_stack(struct task_struct *task, unsigned long *sp) {
 	dump_mem("Stack: ", (unsigned long)sp, 8192+(unsigned long)task->thread_info);

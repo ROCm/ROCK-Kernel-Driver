@@ -1,5 +1,5 @@
 /* SCTP kernel reference Implementation
- * (C) Copyright IBM Corp. 2001, 2003
+ * (C) Copyright IBM Corp. 2001, 2004
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
  * Copyright (c) 2001 Intel Corp.
@@ -57,15 +57,6 @@ enum { SCTP_MAX_STREAM = 0xffff };
 enum { SCTP_DEFAULT_OUTSTREAMS = 10 };
 enum { SCTP_DEFAULT_INSTREAMS = SCTP_MAX_STREAM };
 
-/* Define the amount of space to reserve for SCTP, IP, LL.
- * There is a little bit of waste that we are always allocating
- * for ipv6 headers, but this seems worth the simplicity.
- */
-
-#define SCTP_IP_OVERHEAD ((sizeof(struct sctphdr)\
-                          + sizeof(struct ipv6hdr)\
-                          + MAX_HEADER))
-
 /* Since CIDs are sparse, we need all four of the following
  * symbols.  CIDs are dense through SCTP_CID_BASE_MAX.
  */
@@ -76,6 +67,8 @@ enum { SCTP_DEFAULT_INSTREAMS = SCTP_MAX_STREAM };
 #define SCTP_NUM_CHUNK_TYPES		(SCTP_NUM_BASE_CHUNKTYPES + 2)
 
 #define SCTP_NUM_ADDIP_CHUNK_TYPES	2
+
+#define SCTP_NUM_PRSCTP_CHUNK_TYPES	1
 
 /* These are the different flavours of event.  */
 typedef enum {
@@ -355,7 +348,6 @@ typedef enum {
 	SCTP_XMIT_OK,
 	SCTP_XMIT_PMTU_FULL,
 	SCTP_XMIT_RWND_FULL,
-	SCTP_XMIT_MUST_FRAG,
 	SCTP_XMIT_NAGLE_DELAY,
 } sctp_xmit_t;
 

@@ -16,3 +16,4 @@ obj-$(CONFIG_SERIO_Q40KBD)	+= q40kbd.o
 obj-$(CONFIG_SERIO_98KBD)	+= 98kbd-io.o
 obj-$(CONFIG_SERIO_GSCPS2)	+= gscps2.o
 obj-$(CONFIG_SERIO_PCIPS2)	+= pcips2.o
+obj-$(CONFIG_SERIO_MACEPS2)	+= maceps2.o

@@ -210,6 +210,7 @@ struct sctp_association *sctp_association_init(struct sctp_association *asoc,
 	asoc->next_tsn = asoc->c.initial_tsn;
 
 	asoc->ctsn_ack_point = asoc->next_tsn - 1;
+	asoc->adv_peer_ack_point = asoc->ctsn_ack_point;
 	asoc->highest_sacked = asoc->ctsn_ack_point;
 	asoc->last_cwr_tsn = asoc->ctsn_ack_point;
 	asoc->unack_data = 0;
@@ -261,12 +262,6 @@ struct sctp_association *sctp_association_init(struct sctp_association *asoc,
 
 	/* Create an output queue.  */
 	sctp_outq_init(asoc, &asoc->outqueue);
-	sctp_outq_set_output_handlers(&asoc->outqueue,
-				      sctp_packet_init,
-				      sctp_packet_config,
-				      sctp_packet_append_chunk,
-				      sctp_packet_transmit_chunk,
-				      sctp_packet_transmit);
 
 	if (!sctp_ulpq_init(&asoc->ulpq, asoc))
 		goto fail_init;
@@ -482,10 +477,8 @@ struct sctp_transport *sctp_assoc_add_peer(struct sctp_association *asoc,
 	/* The asoc->peer.port might not be meaningful yet, but
 	 * initialize the packet structure anyway.
 	 */
-	(asoc->outqueue.init_output)(&peer->packet,
-				     peer,
-				     asoc->base.bind_addr.port,
-				     asoc->peer.port);
+	sctp_packet_init(&peer->packet, peer, asoc->base.bind_addr.port,
+			 asoc->peer.port);
 
 	/* 7.2.1 Slow-Start
 	 *
@@ -967,6 +960,7 @@ void sctp_assoc_update(struct sctp_association *asoc,
 
 		asoc->next_tsn = new->next_tsn;
 		asoc->ctsn_ack_point = new->ctsn_ack_point;
+		asoc->adv_peer_ack_point = new->adv_peer_ack_point;
 
 		/* Reinitialize SSN for both local streams
 		 * and peer's streams.
@@ -975,6 +969,7 @@ void sctp_assoc_update(struct sctp_association *asoc,
 
 	} else {
 		asoc->ctsn_ack_point = asoc->next_tsn - 1;
+		asoc->adv_peer_ack_point = asoc->ctsn_ack_point;
 		if (!asoc->ssnmap) {
 			/* Move the ssnmap. */
 			asoc->ssnmap = new->ssnmap;

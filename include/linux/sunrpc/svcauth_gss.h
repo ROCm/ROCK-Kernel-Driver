@@ -20,6 +20,7 @@
 #include <linux/sunrpc/auth_gss.h>
 
 int gss_svc_init(void);
+void gss_svc_shutdown(void);
 int svcauth_gss_register_pseudoflavor(u32 pseudoflavor, char * name);
 
 #endif /* __KERNEL__ */

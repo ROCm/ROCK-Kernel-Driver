@@ -1361,7 +1361,7 @@ compat_sys_mq_open_wrapper:
 	llgtr	%r5,%r5			# struct compat_mq_attr *
 	jg	compat_sys_mq_open
 
-	.globl	sys_mq_unlink_wrapper
+	.globl	sys32_mq_unlink_wrapper
 sys32_mq_unlink_wrapper:
 	llgtr	%r2,%r2			# const char *
 	jg	sys_mq_unlink

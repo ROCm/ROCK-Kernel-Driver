@@ -1063,3 +1063,10 @@ gss_svc_init(void)
 	svc_auth_register(RPC_AUTH_GSS, &svcauthops_gss);
 	return 0;
 }
+
+void
+gss_svc_shutdown(void)
+{
+	cache_unregister(&rsc_cache);
+	cache_unregister(&rsi_cache);
+}

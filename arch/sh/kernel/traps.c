@@ -705,14 +705,8 @@ void show_task(unsigned long *sp)
 	show_stack(NULL, sp);
 }
 
-void show_trace_task(struct task_struct *tsk)
-{
-	show_task((unsigned long *)tsk->thread.sp);
-}
-
 void dump_stack(void)
 {
 	show_stack(NULL, NULL);
 }
-
 EXPORT_SYMBOL(dump_stack);

@@ -382,6 +382,7 @@ static void uhci_insert_qh(struct uhci_hcd *uhci, struct uhci_qh *skelqh, struct
 static void uhci_remove_qh(struct uhci_hcd *uhci, struct uhci_qh *qh)
 {
 	struct uhci_qh *pqh;
+	__u32 newlink;
 
 	if (!qh)
 		return;
@@ -390,8 +391,24 @@ static void uhci_remove_qh(struct uhci_hcd *uhci, struct uhci_qh *qh)
 	 * Only go through the hoops if it's actually linked in
 	 */
 	if (!list_empty(&qh->list)) {
-		pqh = list_entry(qh->list.prev, struct uhci_qh, list);
 
+		/* If our queue is nonempty, make the next URB the head */
+		if (!list_empty(&qh->urbp->queue_list)) {
+			struct urb_priv *nurbp;
+
+			nurbp = list_entry(qh->urbp->queue_list.next,
+					struct urb_priv, queue_list);
+			nurbp->queued = 0;
+			list_add(&nurbp->qh->list, &qh->list);
+			newlink = cpu_to_le32(nurbp->qh->dma_handle) | UHCI_PTR_QH;
+		} else
+			newlink = qh->link;
+
+		/* Fix up the previous QH's queue to link to either
+		 * the new head of this queue or the start of the
+		 * next endpoint's queue. */
+		pqh = list_entry(qh->list.prev, struct uhci_qh, list);
+		pqh->link = newlink;
 		if (pqh->urbp) {
 			struct list_head *head, *tmp;
 
@@ -403,28 +420,19 @@ static void uhci_remove_qh(struct uhci_hcd *uhci, struct uhci_qh *qh)
 
 				tmp = tmp->next;
 
-				turbp->qh->link = qh->link;
+				turbp->qh->link = newlink;
 			}
 		}
-
-		pqh->link = qh->link;
 		mb();
+
 		/* Leave qh->link in case the HC is on the QH now, it will */
 		/* continue the rest of the schedule */
 		qh->element = UHCI_PTR_TERM;
 
-		/* If our queue is nonempty, make the next URB the head */
-		if (!list_empty(&qh->urbp->queue_list)) {
-			struct urb_priv *nurbp;
-
-			nurbp = list_entry(qh->urbp->queue_list.next,
-					struct urb_priv, queue_list);
-			nurbp->queued = 0;
-			list_add_tail(&nurbp->qh->list, &qh->list);
-		}
 		list_del_init(&qh->list);
 	}
 
+	list_del_init(&qh->urbp->queue_list);
 	qh->urbp = NULL;
 
 	/* Check to see if the remove list is empty. Set the IOC bit */
@@ -579,7 +587,7 @@ static void uhci_delete_queued_urb(struct uhci_hcd *uhci, struct urb *urb)
 			pltd->link = UHCI_PTR_TERM;
 	}
 
-	list_del_init(&urbp->queue_list);
+	/* urbp->queue_list is handled in uhci_remove_qh() */
 }
 
 static struct urb_priv *uhci_alloc_urb_priv(struct uhci_hcd *uhci, struct urb *urb)

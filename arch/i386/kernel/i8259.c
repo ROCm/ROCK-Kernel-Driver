@@ -445,5 +445,5 @@ void __init init_IRQ(void)
 	if (boot_cpu_data.hard_math && !cpu_has_fpu)
 		setup_irq(FPU_IRQ, &fpu_irq);
 
-	irq_ctx_init(current_thread_info()->cpu);
+	irq_ctx_init(smp_processor_id());
 }

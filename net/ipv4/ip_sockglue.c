@@ -800,7 +800,7 @@ int ip_setsockopt(struct sock *sk, int level, int optname, char *optval, int opt
 				goto mc_msf_out;
 			}
 			if (GROUP_FILTER_SIZE(gsf->gf_numsrc) > optlen) {
-				err = EINVAL;
+				err = -EINVAL;
 				goto mc_msf_out;
 			}
 			msize = IP_MSFILTER_SIZE(gsf->gf_numsrc);

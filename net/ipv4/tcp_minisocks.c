@@ -769,7 +769,7 @@ struct sock *tcp_create_openreq_child(struct sock *sk, struct open_request *req,
 		newtp->frto_counter = 0;
 		newtp->frto_highmark = 0;
 
-		newtp->ca_state = TCP_CA_Open;
+		tcp_set_ca_state(newtp, TCP_CA_Open);
 		tcp_init_xmit_timers(newsk);
 		skb_queue_head_init(&newtp->out_of_order_queue);
 		newtp->send_head = NULL;
@@ -841,6 +841,7 @@ struct sock *tcp_create_openreq_child(struct sock *sk, struct open_request *req,
 		if (newtp->ecn_flags&TCP_ECN_OK)
 			newsk->sk_no_largesend = 1;
 
+		tcp_vegas_init(newtp);
 		TCP_INC_STATS_BH(TcpPassiveOpens);
 	}
 	return newsk;

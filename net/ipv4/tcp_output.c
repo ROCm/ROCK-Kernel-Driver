@@ -106,6 +106,9 @@ static void tcp_cwnd_restart(struct tcp_opt *tp, struct dst_entry *dst)
 	u32 restart_cwnd = tcp_init_cwnd(tp, dst);
 	u32 cwnd = tp->snd_cwnd;
 
+	if (tcp_is_vegas(tp)) 
+		tcp_vegas_enable(tp);
+
 	tp->snd_ssthresh = tcp_current_ssthresh(tp);
 	restart_cwnd = min(restart_cwnd, cwnd);
 
@@ -225,6 +228,19 @@ int tcp_transmit_skb(struct sock *sk, struct sk_buff *skb)
 			tcp_header_size += (TCPOLEN_SACK_BASE_ALIGNED +
 					    (tp->eff_sacks * TCPOLEN_SACK_PERBLOCK));
 		}
+		
+		/*
+		 * If the connection is idle and we are restarting,
+		 * then we don't want to do any Vegas calculations
+		 * until we get fresh RTT samples.  So when we
+		 * restart, we reset our Vegas state to a clean
+		 * slate. After we get acks for this flight of
+		 * packets, _then_ we can make Vegas calculations
+		 * again.
+		 */
+		if (tcp_is_vegas(tp) && tcp_packets_in_flight(tp) == 0)
+			tcp_vegas_enable(tp);
+
 		th = (struct tcphdr *) skb_push(skb, tcp_header_size);
 		skb->h.th = th;
 		skb_set_owner_w(skb, sk);
@@ -869,7 +885,7 @@ void tcp_simple_retransmit(struct sock *sk)
 		tp->snd_ssthresh = tcp_current_ssthresh(tp);
 		tp->prior_ssthresh = 0;
 		tp->undo_marker = 0;
-		tp->ca_state = TCP_CA_Loss;
+		tcp_set_ca_state(tp, TCP_CA_Loss);
 	}
 	tcp_xmit_retransmit_queue(sk);
 }
@@ -1268,6 +1284,7 @@ static inline void tcp_connect_init(struct sock *sk)
 		tp->window_clamp = dst_metric(dst, RTAX_WINDOW);
 	tp->advmss = dst_metric(dst, RTAX_ADVMSS);
 	tcp_initialize_rcv_mss(sk);
+	tcp_vegas_init(tp);
 
 	tcp_select_initial_window(tcp_full_space(sk),
 				  tp->advmss - (tp->ts_recent_stamp ? tp->tcp_header_len - sizeof(struct tcphdr) : 0),
@@ -1318,6 +1335,7 @@ int tcp_connect(struct sock *sk)
 	TCP_SKB_CB(buff)->end_seq = tp->write_seq;
 	tp->snd_nxt = tp->write_seq;
 	tp->pushed_seq = tp->write_seq;
+	tcp_vegas_init(tp);
 
 	/* Send it off. */
 	TCP_SKB_CB(buff)->when = tcp_time_stamp;
