@@ -109,7 +109,7 @@ static char serial_version[] __initdata = "2.2";
 
 static DECLARE_TASK_QUEUE(tq_esp);
 
-static struct tty_driver esp_driver;
+static struct tty_driver *esp_driver;
 
 /* serial subtype definitions */
 #define SERIAL_TYPE_NORMAL	1
@@ -2442,6 +2442,26 @@ static _INLINE_ int autoconfig(struct esp_struct * info, int *region_start)
 	return (port_detected);
 }
 
+static struct tty_operations esp_ops = {
+	.open = esp_open,
+	.close = rs_close,
+	.write = rs_write,
+	.put_char = rs_put_char,
+	.flush_chars = rs_flush_chars,
+	.write_room = rs_write_room,
+	.chars_in_buffer = rs_chars_in_buffer,
+	.flush_buffer = rs_flush_buffer,
+	.ioctl = rs_ioctl,
+	.throttle = rs_throttle,
+	.unthrottle = rs_unthrottle,
+	.set_termios = rs_set_termios,
+	.stop = rs_stop,
+	.start = rs_start,
+	.hangup = esp_hangup,
+	.break_ctl = esp_break,
+	.wait_until_sent = rs_wait_until_sent,
+};
+
 /*
  * The serial driver boot-time initialization code!
  */
@@ -2452,6 +2472,10 @@ int __init espserial_init(void)
 	struct esp_struct * info;
 	struct esp_struct *last_primary = 0;
 	int esp[] = {0x100,0x140,0x180,0x200,0x240,0x280,0x300,0x380};
+
+	esp_driver = alloc_tty_driver(NR_PORTS);
+	if (!esp_driver)
+		return -ENOMEM;
 	
 	init_bh(ESP_BH, do_serial_bh);
 
@@ -2490,41 +2514,21 @@ int __init espserial_init(void)
 
 	/* Initialize the tty_driver structure */
 	
-	memset(&esp_driver, 0, sizeof(struct tty_driver));
-	esp_driver.magic = TTY_DRIVER_MAGIC;
-	esp_driver.owner = THIS_MODULE;
-	esp_driver.name = "ttyP";
-	esp_driver.major = ESP_IN_MAJOR;
-	esp_driver.minor_start = 0;
-	esp_driver.num = NR_PORTS;
-	esp_driver.type = TTY_DRIVER_TYPE_SERIAL;
-	esp_driver.subtype = SERIAL_TYPE_NORMAL;
-	esp_driver.init_termios = tty_std_termios;
-	esp_driver.init_termios.c_cflag =
+	esp_driver->owner = THIS_MODULE;
+	esp_driver->name = "ttyP";
+	esp_driver->major = ESP_IN_MAJOR;
+	esp_driver->minor_start = 0;
+	esp_driver->type = TTY_DRIVER_TYPE_SERIAL;
+	esp_driver->subtype = SERIAL_TYPE_NORMAL;
+	esp_driver->init_termios = tty_std_termios;
+	esp_driver->init_termios.c_cflag =
 		B9600 | CS8 | CREAD | HUPCL | CLOCAL;
-	esp_driver.flags = TTY_DRIVER_REAL_RAW;
-
-	esp_driver.open = esp_open;
-	esp_driver.close = rs_close;
-	esp_driver.write = rs_write;
-	esp_driver.put_char = rs_put_char;
-	esp_driver.flush_chars = rs_flush_chars;
-	esp_driver.write_room = rs_write_room;
-	esp_driver.chars_in_buffer = rs_chars_in_buffer;
-	esp_driver.flush_buffer = rs_flush_buffer;
-	esp_driver.ioctl = rs_ioctl;
-	esp_driver.throttle = rs_throttle;
-	esp_driver.unthrottle = rs_unthrottle;
-	esp_driver.set_termios = rs_set_termios;
-	esp_driver.stop = rs_stop;
-	esp_driver.start = rs_start;
-	esp_driver.hangup = esp_hangup;
-	esp_driver.break_ctl = esp_break;
-	esp_driver.wait_until_sent = rs_wait_until_sent;
-
-	if (tty_register_driver(&esp_driver))
+	esp_driver->flags = TTY_DRIVER_REAL_RAW;
+	tty_set_operations(esp_driver, &esp_ops);
+	if (tty_register_driver(esp_driver))
 	{
 		printk(KERN_ERR "Couldn't register esp serial driver");
+		put_tty_driver(esp_driver);
 		return 1;
 	}
 
@@ -2533,7 +2537,8 @@ int __init espserial_init(void)
 	if (!info)
 	{
 		printk(KERN_ERR "Couldn't allocate memory for esp serial device information\n");
-		tty_unregister_driver(&esp_driver);
+		tty_unregister_driver(esp_driver);
+		put_tty_driver(esp_driver);
 		return 1;
 	}
 
@@ -2636,10 +2641,11 @@ static void __exit espserial_exit(void)
 	save_flags(flags);
 	cli();
 	remove_bh(ESP_BH);
-	if ((e1 = tty_unregister_driver(&esp_driver)))
+	if ((e1 = tty_unregister_driver(esp_driver)))
 		printk("SERIAL: failed to unregister serial driver (%d)\n",
 		       e1);
 	restore_flags(flags);
+	put_tty_driver(esp_driver);
 
 	while (ports) {
 		if (ports->port) {
