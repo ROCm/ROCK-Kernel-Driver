@@ -10,14 +10,11 @@
  */
 
 #include <linux/module.h>
-
 #include "minix.h"
 #include <linux/slab.h>
 #include <linux/locks.h>
 #include <linux/init.h>
-#include <linux/smp_lock.h>
 #include <linux/highuid.h>
-#include <linux/blkdev.h>
 
 static void minix_read_inode(struct inode * inode);
 static void minix_write_inode(struct inode * inode, int wait);
@@ -28,9 +25,7 @@ static void minix_delete_inode(struct inode *inode)
 {
 	inode->i_size = 0;
 	minix_truncate(inode);
-	lock_kernel();
 	minix_free_inode(inode);
-	unlock_kernel();
 }
 
 static void minix_put_super(struct super_block *sb)
@@ -304,10 +299,10 @@ static int minix_statfs(struct super_block *sb, struct statfs *buf)
 	buf->f_type = sb->s_magic;
 	buf->f_bsize = sb->s_blocksize;
 	buf->f_blocks = (sbi->s_nzones - sbi->s_firstdatazone) << sbi->s_log_zone_size;
-	buf->f_bfree = minix_count_free_blocks(sb);
+	buf->f_bfree = minix_count_free_blocks(sbi);
 	buf->f_bavail = buf->f_bfree;
 	buf->f_files = sbi->s_ninodes;
-	buf->f_ffree = minix_count_free_inodes(sb);
+	buf->f_ffree = minix_count_free_inodes(sbi);
 	buf->f_namelen = sbi->s_namelen;
 	return 0;
 }
@@ -498,12 +493,7 @@ static struct buffer_head *minix_update_inode(struct inode *inode)
 
 static void minix_write_inode(struct inode * inode, int wait)
 {
-	struct buffer_head *bh;
-
-	lock_kernel();
-	bh = minix_update_inode(inode);
-	unlock_kernel();
-	brelse(bh);
+	brelse(minix_update_inode(inode));
 }
 
 int minix_sync_inode(struct inode * inode)

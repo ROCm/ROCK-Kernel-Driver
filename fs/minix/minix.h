@@ -50,10 +50,10 @@ extern struct minix_inode * minix_V1_raw_inode(struct super_block *, ino_t, stru
 extern struct minix2_inode * minix_V2_raw_inode(struct super_block *, ino_t, struct buffer_head **);
 extern struct inode * minix_new_inode(const struct inode * dir, int * error);
 extern void minix_free_inode(struct inode * inode);
-extern unsigned long minix_count_free_inodes(struct super_block *sb);
+extern unsigned long minix_count_free_inodes(struct minix_sb_info *sbi);
 extern int minix_new_block(struct inode * inode);
 extern void minix_free_block(struct inode * inode, int block);
-extern unsigned long minix_count_free_blocks(struct super_block *sb);
+extern unsigned long minix_count_free_blocks(struct minix_sb_info *sbi);
 
 extern void V1_minix_truncate(struct inode *);
 extern void V2_minix_truncate(struct inode *);
