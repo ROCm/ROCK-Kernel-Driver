@@ -105,6 +105,7 @@
 
 #define FILE__EXECUTE_NO_TRANS                    0x00020000UL
 #define FILE__ENTRYPOINT                          0x00040000UL
+#define FILE__EXECMOD                             0x00080000UL
 
 #define LNK_FILE__IOCTL                           0x00000001UL
 #define LNK_FILE__READ                            0x00000002UL
@@ -458,6 +459,7 @@
 #define PROCESS__RLIMITINH                        0x00400000UL
 #define PROCESS__DYNTRANSITION                    0x00800000UL
 #define PROCESS__SETCURRENT                       0x01000000UL
+#define PROCESS__EXECMEM                          0x02000000UL
 
 #define IPC__CREATE                               0x00000001UL
 #define IPC__DESTROY                              0x00000002UL
