@@ -1419,6 +1419,8 @@ static int cache_grow (kmem_cache_t * cachep, int flags)
 opps1:
 	kmem_freepages(cachep, objp);
 failed:
+	if (local_flags & __GFP_WAIT)
+		local_irq_disable();
 	return 0;
 }
 
