@@ -2364,7 +2364,7 @@ typedef struct DAC960_Controller
   DAC960_Command_T *FreeCommands;
   unsigned char *CombinedStatusBuffer;
   unsigned char *CurrentStatusBuffer;
-  RequestQueue_T *RequestQueue;
+  RequestQueue_T RequestQueue;
   spinlock_t queue_lock;
   WaitQueue_T CommandWaitQueue;
   WaitQueue_T HealthStatusWaitQueue;
@@ -2504,7 +2504,7 @@ static inline
 void DAC960_AcquireControllerLock(DAC960_Controller_T *Controller,
 				  ProcessorFlags_T *ProcessorFlags)
 {
-  spin_lock_irqsave(Controller->RequestQueue->queue_lock, *ProcessorFlags);
+  spin_lock_irqsave(Controller->RequestQueue.queue_lock, *ProcessorFlags);
 }
 
 
@@ -2516,7 +2516,7 @@ static inline
 void DAC960_ReleaseControllerLock(DAC960_Controller_T *Controller,
 				  ProcessorFlags_T *ProcessorFlags)
 {
-  spin_unlock_irqrestore(Controller->RequestQueue->queue_lock, *ProcessorFlags);
+  spin_unlock_irqrestore(Controller->RequestQueue.queue_lock, *ProcessorFlags);
 }
 
 
@@ -2553,7 +2553,7 @@ static inline
 void DAC960_AcquireControllerLockIH(DAC960_Controller_T *Controller,
 				    ProcessorFlags_T *ProcessorFlags)
 {
-  spin_lock_irqsave(Controller->RequestQueue->queue_lock, *ProcessorFlags);
+  spin_lock_irqsave(Controller->RequestQueue.queue_lock, *ProcessorFlags);
 }
 
 
@@ -2566,7 +2566,7 @@ static inline
 void DAC960_ReleaseControllerLockIH(DAC960_Controller_T *Controller,
 				    ProcessorFlags_T *ProcessorFlags)
 {
-  spin_unlock_irqrestore(Controller->RequestQueue->queue_lock, *ProcessorFlags);
+  spin_unlock_irqrestore(Controller->RequestQueue.queue_lock, *ProcessorFlags);
 }
 
 #error I am a non-portable driver, please convert me to use the Documentation/DMA-mapping.txt interfaces
