@@ -1078,7 +1078,7 @@ void __init proc_caches_init(void)
  
 	vm_area_cachep = kmem_cache_create("vm_area_struct",
 			sizeof(struct vm_area_struct), 0,
-			SLAB_HWCACHE_ALIGN, NULL, NULL);
+			0, NULL, NULL);
 	if(!vm_area_cachep)
 		panic("vma_init: Cannot alloc vm_area_struct SLAB cache");
 
