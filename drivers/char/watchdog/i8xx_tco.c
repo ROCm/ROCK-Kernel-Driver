@@ -465,7 +465,7 @@ static int __init watchdog_init (void)
 		goto unreg_notifier;
 	}
 
-	tco_timer_keepalive ();
+	tco_timer_stop ();
 
 	printk (KERN_INFO PFX "initialized (0x%04x). heartbeat=%d sec (nowayout=%d)\n",
 		TCOBASE, heartbeat, nowayout);
