@@ -209,7 +209,7 @@ void exit_thread(void)
 	if (me->thread.io_bitmap_ptr) { 
 		kfree(me->thread.io_bitmap_ptr); 
 		me->thread.io_bitmap_ptr = NULL;
-		(init_tss + smp_processor_id())->io_map_base = 
+		(init_tss + smp_processor_id())->io_bitmap_base = 
 			INVALID_IO_BITMAP_OFFSET;
 	}
 }
@@ -312,11 +312,10 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long rsp,
 	asm("movl %%ds,%0" : "=m" (p->thread.ds));
 
 	if (unlikely(me->thread.io_bitmap_ptr != NULL)) { 
-		p->thread.io_bitmap_ptr = kmalloc((IO_BITMAP_SIZE+1)*4, GFP_KERNEL);
+		p->thread.io_bitmap_ptr = kmalloc(IO_BITMAP_BYTES, GFP_KERNEL);
 		if (!p->thread.io_bitmap_ptr) 
 			return -ENOMEM;
-		memcpy(p->thread.io_bitmap_ptr, me->thread.io_bitmap_ptr, 
-		       (IO_BITMAP_SIZE+1)*4);
+		memcpy(p->thread.io_bitmap_ptr, me->thread.io_bitmap_ptr, IO_BITMAP_BYTES);
 	} 
 
 	/*
@@ -449,9 +448,8 @@ struct task_struct *__switch_to(struct task_struct *prev_p, struct task_struct *
 			 * bad either. Anyone got something better?
 			 * This only affects processes which use ioperm().
 			 */
-			memcpy(tss->io_bitmap, next->io_bitmap_ptr,
-				 IO_BITMAP_SIZE*sizeof(u32));
-			tss->io_map_base = IO_BITMAP_OFFSET;
+			memcpy(tss->io_bitmap, next->io_bitmap_ptr, IO_BITMAP_BYTES);
+			tss->io_bitmap_base = IO_BITMAP_OFFSET;
 		} else {
 			/*
 			 * a bitmap offset pointing outside of the TSS limit
@@ -459,7 +457,7 @@ struct task_struct *__switch_to(struct task_struct *prev_p, struct task_struct *
 			 * tries to use a port IO instruction. The first
 			 * sys_ioperm() call sets up the bitmap properly.
 			 */
-			tss->io_map_base = INVALID_IO_BITMAP_OFFSET;
+			tss->io_bitmap_base = INVALID_IO_BITMAP_OFFSET;
 		}
 	}
 

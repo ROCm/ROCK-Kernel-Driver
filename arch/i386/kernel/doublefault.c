@@ -50,8 +50,7 @@ struct tss_struct doublefault_tss __cacheline_aligned = {
 	.esp0		= STACK_START,
 	.ss0		= __KERNEL_DS,
 	.ldt		= 0,
-	.bitmap		= INVALID_IO_BITMAP_OFFSET,
-	.io_bitmap	= { [0 ... IO_BITMAP_SIZE ] = ~0 },
+	.io_bitmap_base	= INVALID_IO_BITMAP_OFFSET,
 
 	.eip		= (unsigned long) doublefault_fn,
 	.eflags		= 0x00000082,
