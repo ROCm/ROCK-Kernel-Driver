@@ -192,16 +192,13 @@ sgiioc4_clearirq(ide_drive_t * drive)
 	return intr_reg & 3;
 }
 
-static int
-sgiioc4_ide_dma_begin(ide_drive_t * drive)
+static void sgiioc4_ide_dma_start(ide_drive_t * drive)
 {
 	ide_hwif_t *hwif = HWIF(drive);
 	unsigned int reg = hwif->INL(hwif->dma_base + IOC4_DMA_CTRL * 4);
 	unsigned int temp_reg = reg | IOC4_S_DMA_START;
 
 	hwif->OUTL(temp_reg, hwif->dma_base + IOC4_DMA_CTRL * 4);
-
-	return 0;
 }
 
 static u32
@@ -407,11 +404,7 @@ ide_dma_sgiioc4(ide_hwif_t * hwif, unsigned long dma_base)
 	if (!hwif->dmatable_cpu)
 		goto dma_alloc_failure;
 
-	hwif->sg_table =
-	    kmalloc(sizeof (struct scatterlist) * IOC4_PRD_ENTRIES, GFP_KERNEL);
-
-	if (!hwif->sg_table)
-		goto dma_sgalloc_failure;
+	hwif->sg_max_nents = IOC4_PRD_ENTRIES;
 
 	hwif->dma_base2 = (unsigned long)
 		pci_alloc_consistent(hwif->pci_dev,
@@ -424,9 +417,6 @@ ide_dma_sgiioc4(ide_hwif_t * hwif, unsigned long dma_base)
 	return;
 
 dma_base2alloc_failure:
-	kfree(hwif->sg_table);
-
-dma_sgalloc_failure:
 	pci_free_consistent(hwif->pci_dev,
 			    IOC4_PRD_ENTRIES * IOC4_PRD_BYTES,
 			    hwif->dmatable_cpu, hwif->dmatable_dma);
@@ -574,35 +564,31 @@ use_pio_instead:
 	return 0;		/* revert to PIO for this request */
 }
 
-static int
-sgiioc4_ide_dma_read(ide_drive_t * drive)
+static int sgiioc4_ide_dma_setup(ide_drive_t *drive)
 {
 	struct request *rq = HWGROUP(drive)->rq;
 	unsigned int count = 0;
+	int ddir;
 
-	if (!(count = sgiioc4_build_dma_table(drive, rq, PCI_DMA_FROMDEVICE))) {
+	if (rq_data_dir(rq))
+		ddir = PCI_DMA_TODEVICE;
+	else
+		ddir = PCI_DMA_FROMDEVICE;
+
+	if (!(count = sgiioc4_build_dma_table(drive, rq, ddir))) {
 		/* try PIO instead of DMA */
-		return 1;
-	}
-	/* Writes FROM the IOC4 TO Main Memory */
-	sgiioc4_configure_for_dma(IOC4_DMA_WRITE, drive);
-
-	return 0;
-}
-
-static int
-sgiioc4_ide_dma_write(ide_drive_t * drive)
-{
-	struct request *rq = HWGROUP(drive)->rq;
-	unsigned int count = 0;
-
-	if (!(count = sgiioc4_build_dma_table(drive, rq, PCI_DMA_TODEVICE))) {
-		/* try PIO instead of DMA */
+		ide_map_sg(drive, rq);
 		return 1;
 	}
 
-	sgiioc4_configure_for_dma(IOC4_DMA_READ, drive);
-	/* Writes TO the IOC4 FROM Main Memory */
+	if (rq_data_dir(rq))
+		/* Writes TO the IOC4 FROM Main Memory */
+		ddir = IOC4_DMA_READ;
+	else
+		/* Writes FROM the IOC4 TO Main Memory */
+		ddir = IOC4_DMA_WRITE;
+
+	sgiioc4_configure_for_dma(ddir, drive);
 
 	return 0;
 }
@@ -629,9 +615,8 @@ ide_init_sgiioc4(ide_hwif_t * hwif)
 	hwif->quirkproc = NULL;
 	hwif->busproc = NULL;
 
-	hwif->ide_dma_read = &sgiioc4_ide_dma_read;
-	hwif->ide_dma_write = &sgiioc4_ide_dma_write;
-	hwif->ide_dma_begin = &sgiioc4_ide_dma_begin;
+	hwif->dma_setup = &sgiioc4_ide_dma_setup;
+	hwif->dma_start = &sgiioc4_ide_dma_start;
 	hwif->ide_dma_end = &sgiioc4_ide_dma_end;
 	hwif->ide_dma_check = &sgiioc4_ide_dma_check;
 	hwif->ide_dma_on = &sgiioc4_ide_dma_on;
@@ -708,22 +693,10 @@ sgiioc4_ide_setup_pci_device(struct pci_dev *dev, ide_pci_device_t * d)
 	return 0;
 }
 
-/* This ensures that we can build this for generic kernels without
- * having all the SN2 code sync'd and merged.
- */
-typedef enum pciio_endian_e {
-	PCIDMA_ENDIAN_BIG,
-	PCIDMA_ENDIAN_LITTLE
-} pciio_endian_t;
-pciio_endian_t snia_pciio_endian_set(struct pci_dev
-				     *pci_dev, pciio_endian_t device_end,
-				     pciio_endian_t desired_end);
-
 static unsigned int __init
 pci_init_sgiioc4(struct pci_dev *dev, ide_pci_device_t * d)
 {
 	unsigned int class_rev;
-	pciio_endian_t endian_status;
 
 	if (pci_enable_device(dev)) {
 		printk(KERN_ERR
@@ -743,17 +716,6 @@ pci_init_sgiioc4(struct pci_dev *dev, ide_pci_device_t * d)
 			"46 or higher\n", d->name, dev->slot_name);
 		return -ENODEV;
 	}
-
-	/* Enable Byte Swapping in the PIC... */
-	endian_status = snia_pciio_endian_set(dev, PCIDMA_ENDIAN_LITTLE,
-					      PCIDMA_ENDIAN_BIG);
-	if (endian_status != PCIDMA_ENDIAN_BIG) {
-		printk(KERN_ERR
-		       "Failed to set endianness for device %s at slot %s\n",
-		       d->name, dev->slot_name);
-		return -ENODEV;
-	}
-
 	return sgiioc4_ide_setup_pci_device(dev, d);
 }
 

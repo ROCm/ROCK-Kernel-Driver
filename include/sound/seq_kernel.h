@@ -129,8 +129,8 @@ typedef struct _snd_seq_queue queue_t;
 
 typedef struct {
 	void *private_data;
-	int allow_input: 1,
-	    allow_output: 1;
+	unsigned allow_input: 1,
+		 allow_output: 1;
 	/*...*/
 } snd_seq_client_callback_t;
 

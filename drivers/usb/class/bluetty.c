@@ -426,8 +426,8 @@ static void bluetooth_close (struct tty_struct *tty, struct file * filp)
 		bluetooth->open_count = 0;
 
 		/* shutdown any in-flight urbs that we know about */
-		usb_unlink_urb (bluetooth->read_urb);
-		usb_unlink_urb (bluetooth->interrupt_in_urb);
+		usb_kill_urb (bluetooth->read_urb);
+		usb_kill_urb (bluetooth->interrupt_in_urb);
 	}
 	up(&bluetooth->lock);
 }
@@ -705,7 +705,7 @@ void btusb_disable_bulk_read(struct tty_struct *tty){
 	}
 
 	if ((bluetooth->read_urb) && (bluetooth->read_urb->actual_length))
-		usb_unlink_urb(bluetooth->read_urb);
+		usb_kill_urb(bluetooth->read_urb);
 }
 #endif
 
@@ -988,21 +988,13 @@ static void bluetooth_write_bulk_callback (struct urb *urb, struct pt_regs *regs
 static void bluetooth_softint(void *private)
 {
 	struct usb_bluetooth *bluetooth = get_usb_bluetooth ((struct usb_bluetooth *)private, __FUNCTION__);
-	struct tty_struct *tty;
 
 	dbg("%s", __FUNCTION__);
 
-	if (!bluetooth) {
+	if (!bluetooth)
 		return;
-	}
 
-	tty = bluetooth->tty;
-	if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) && tty->ldisc.write_wakeup) {
-		dbg("%s - write wakeup call.", __FUNCTION__);
-		(tty->ldisc.write_wakeup)(tty);
-	}
-
-	wake_up_interruptible(&tty->write_wait);
+	tty_wakeup(bluetooth->tty);
 }
 
 
@@ -1187,14 +1179,14 @@ static void usb_bluetooth_disconnect(struct usb_interface *intf)
 		bluetooth->open_count = 0;
 
 		if (bluetooth->read_urb) {
-			usb_unlink_urb (bluetooth->read_urb);
+			usb_kill_urb (bluetooth->read_urb);
 			usb_free_urb (bluetooth->read_urb);
 		}
 		if (bluetooth->bulk_in_buffer)
 			kfree (bluetooth->bulk_in_buffer);
 
 		if (bluetooth->interrupt_in_urb) {
-			usb_unlink_urb (bluetooth->interrupt_in_urb);
+			usb_kill_urb (bluetooth->interrupt_in_urb);
 			usb_free_urb (bluetooth->interrupt_in_urb);
 		}
 		if (bluetooth->interrupt_in_buffer)
@@ -1204,7 +1196,7 @@ static void usb_bluetooth_disconnect(struct usb_interface *intf)
 
 		for (i = 0; i < NUM_CONTROL_URBS; ++i) {
 			if (bluetooth->control_urb_pool[i]) {
-				usb_unlink_urb (bluetooth->control_urb_pool[i]);
+				usb_kill_urb (bluetooth->control_urb_pool[i]);
 				if (bluetooth->control_urb_pool[i]->transfer_buffer)
 					kfree (bluetooth->control_urb_pool[i]->transfer_buffer);
 				usb_free_urb (bluetooth->control_urb_pool[i]);

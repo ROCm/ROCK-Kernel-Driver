@@ -691,6 +691,7 @@ new_segment:
 		skb->ip_summed = CHECKSUM_HW;
 		tp->write_seq += copy;
 		TCP_SKB_CB(skb)->end_seq += copy;
+		skb_shinfo(skb)->tso_segs = 0;
 
 		if (!copied)
 			TCP_SKB_CB(skb)->flags &= ~TCPCB_FLAG_PSH;
@@ -937,6 +938,7 @@ new_segment:
 
 			tp->write_seq += copy;
 			TCP_SKB_CB(skb)->end_seq += copy;
+			skb_shinfo(skb)->tso_segs = 0;
 
 			from += copy;
 			copied += copy;
@@ -1590,14 +1592,6 @@ void tcp_destroy_sock(struct sock *sk)
 
 	/* If it has not 0 inet_sk(sk)->num, it must be bound */
 	BUG_TRAP(!inet_sk(sk)->num || tcp_sk(sk)->bind_hash);
-
-#ifdef TCP_DEBUG
-	if (sk->sk_zapped) {
-		printk(KERN_DEBUG "TCP: double destroy sk=%p\n", sk);
-		sock_hold(sk);
-	}
-	sk->sk_zapped = 1;
-#endif
 
 	sk->sk_prot->destroy(sk);
 

@@ -135,13 +135,6 @@ struct pccard_operations {
  */
 struct pcmcia_socket;
 
-typedef struct erase_busy_t {
-	eraseq_entry_t		*erase;
-	client_handle_t		client;
-	struct timer_list	timeout;
-	struct erase_busy_t	*prev, *next;
-} erase_busy_t;
-
 typedef struct io_window_t {
 	u_int			Attributes;
 	ioaddr_t		BasePort, NumPorts;
@@ -176,7 +169,7 @@ struct pcmcia_socket {
 	u_short				lock_count;
 	client_handle_t			clients;
 	pccard_mem_map			cis_mem;
-	u_char				*cis_virt;
+	void __iomem 			*cis_virt;
 	struct config_t			*config;
 	struct {
 		u_int			AssignedIRQ;
@@ -185,7 +178,6 @@ struct pcmcia_socket {
 	io_window_t			io[MAX_IO_WIN];
 	window_t			win[MAX_WIN];
 	struct region_t			*c_region, *a_region;
-	erase_busy_t			erase_busy;
 	struct list_head		cis_cache;
 	u_int				fake_cis_len;
 	char				*fake_cis;
@@ -227,7 +219,7 @@ struct pcmcia_socket {
 	/* cardbus (32-bit) */
 #ifdef CONFIG_CARDBUS
 	struct resource *		cb_cis_res;
-	u_char				*cb_cis_virt;
+	void __iomem			*cb_cis_virt;
 #endif
 
 	/* socket device */

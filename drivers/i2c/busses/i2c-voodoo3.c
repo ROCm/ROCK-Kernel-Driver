@@ -61,7 +61,7 @@
 #define TIMEOUT		(HZ / 2)
 
 
-static void *ioaddr;
+static void __iomem *ioaddr;
 
 /* The voo GPIO registers don't have individual masks for each bit
    so we always have to read before writing. */
@@ -195,6 +195,8 @@ static struct pci_device_id voodoo3_ids[] __devinitdata = {
 	{ 0, }
 };
 
+MODULE_DEVICE_TABLE (pci, voodoo3_ids);
+
 static int __devinit voodoo3_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {
 	int retval;
@@ -232,7 +234,7 @@ static struct pci_driver voodoo3_driver = {
 
 static int __init i2c_voodoo3_init(void)
 {
-	return pci_module_init(&voodoo3_driver);
+	return pci_register_driver(&voodoo3_driver);
 }
 
 static void __exit i2c_voodoo3_exit(void)

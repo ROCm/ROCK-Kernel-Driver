@@ -91,9 +91,9 @@ user_list (struct inode *inode, const char *name, int namelen, char *out)
 }
 
 struct reiserfs_xattr_handler user_handler = {
-    prefix: XATTR_USER_PREFIX,
-    get: user_get,
-    set: user_set,
-    del: user_del,
-    list: user_list,
+	.prefix = XATTR_USER_PREFIX,
+	.get = user_get,
+	.set = user_set,
+	.del = user_del,
+	.list = user_list,
 };

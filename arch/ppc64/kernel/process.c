@@ -147,7 +147,6 @@ EXPORT_SYMBOL(enable_kernel_altivec);
  */
 void flush_altivec_to_thread(struct task_struct *tsk)
 {
-#ifdef CONFIG_ALTIVEC
 	if (tsk->thread.regs) {
 		preempt_disable();
 		if (tsk->thread.regs->msr & MSR_VEC) {
@@ -158,7 +157,6 @@ void flush_altivec_to_thread(struct task_struct *tsk)
 		}
 		preempt_enable();
 	}
-#endif
 }
 
 int dump_task_altivec(struct pt_regs *regs, elf_vrregset_t *vrregs)
@@ -317,8 +315,6 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	extern void ret_from_fork(void);
 	unsigned long sp = (unsigned long)p->thread_info + THREAD_SIZE;
 
-	p->set_child_tid = p->clear_child_tid = NULL;
-
 	/* Copy registers */
 	sp -= sizeof(struct pt_regs);
 	childregs = (struct pt_regs *) sp;
@@ -410,7 +406,7 @@ void start_thread(struct pt_regs *regs, unsigned long fdptr, unsigned long sp)
 		unsigned long childregs = (unsigned long)current->thread_info +
 						THREAD_SIZE;
 		childregs -= sizeof(struct pt_regs);
-		current->thread.regs = childregs;
+		current->thread.regs = (struct pt_regs *)childregs;
 	}
 
 	regs->nip = entry;
@@ -514,8 +510,11 @@ int sys_execve(unsigned long a0, unsigned long a1, unsigned long a2,
 	error = do_execve(filename, (char __user * __user *) a1,
 				    (char __user * __user *) a2, regs);
   
-	if (error == 0)
+	if (error == 0) {
+		task_lock(current);
 		current->ptrace &= ~PT_DTRACE;
+		task_unlock(current);
+	}
 	putname(filename);
 
 out:

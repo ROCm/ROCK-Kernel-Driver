@@ -56,9 +56,7 @@ int mb_cache_entry_insert(struct mb_cache_entry *, struct block_device *,
 			  sector_t, unsigned int[]);
 void mb_cache_entry_rehash(struct mb_cache_entry *, unsigned int[]);
 void mb_cache_entry_release(struct mb_cache_entry *);
-void mb_cache_entry_takeout(struct mb_cache_entry *);
 void mb_cache_entry_free(struct mb_cache_entry *);
-struct mb_cache_entry *mb_cache_entry_dup(struct mb_cache_entry *);
 struct mb_cache_entry *mb_cache_entry_get(struct mb_cache *,
 					  struct block_device *,
 					  sector_t);

@@ -44,6 +44,7 @@
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 #include <linux/spinlock.h>
+#include <linux/bitops.h>
 #ifdef CONFIG_FEC_PACKETHOOK
 #include <linux/pkthook.h>
 #endif
@@ -52,7 +53,6 @@
 #include <asm/pgtable.h>
 #include <asm/mpc8xx.h>
 #include <asm/irq.h>
-#include <asm/bitops.h>
 #include <asm/uaccess.h>
 #include <asm/commproc.h>
 

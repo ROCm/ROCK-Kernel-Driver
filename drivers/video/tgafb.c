@@ -1454,6 +1454,7 @@ tgafb_pci_register(struct pci_dev *pdev, const struct pci_device_id *ent)
 	tgafb_set_par(&all->info);
 	tgafb_init_fix(&all->info);
 
+	all->info.device = &pdev->dev;
 	if (register_framebuffer(&all->info) < 0) {
 		printk(KERN_ERR "tgafb: Could not register framebuffer\n");
 		ret = -EINVAL;

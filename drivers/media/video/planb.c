@@ -178,8 +178,7 @@ static unsigned char saa_status(int byte, struct planb *pb)
 	saa_write_reg (SAA7196_STDC, saa_regs[pb->win.norm][SAA7196_STDC]);
 
 	/* Let's wait 30msec for this one */
-	current->state = TASK_INTERRUPTIBLE;
-	schedule_timeout(30 * HZ / 1000);
+	msleep_interruptible(30);
 
 	return (unsigned char)in_8 (&planb_regs->saa_status);
 }
@@ -1996,8 +1995,10 @@ static int planb_mmap(struct vm_area_struct *vma, struct video_device *dev, cons
 			return err;
 	}
 	for (i = 0; i < pb->rawbuf_size; i++) {
-		if (remap_page_range(vma, start, virt_to_phys((void *)pb->rawbuf[i]),
-						PAGE_SIZE, PAGE_SHARED))
+		unsigned long pfn;
+
+		pfn = virt_to_phys((void *)pb->rawbuf[i]) >> PAGE_SHIFT;
+		if (remap_pfn_range(vma, start, pfn, PAGE_SIZE, PAGE_SHARED))
 			return -EAGAIN;
 		start += PAGE_SIZE;
 		if (size <= PAGE_SIZE)

@@ -94,12 +94,12 @@ typedef elf_greg_t elf_gregset_t[ELF_NGREG];
 #define ELF_CORE_COPY_REGS(__elf_regs, __pt_regs)	\
 do {	unsigned long *dest = &(__elf_regs[0]);		\
 	struct pt_regs *src = (__pt_regs);		\
-	unsigned long *sp;				\
+	unsigned long __user *sp;			\
 	int i;						\
 	for(i = 0; i < 16; i++)				\
 		dest[i] = src->u_regs[i];		\
 	/* Don't try this at home kids... */		\
-	sp = (unsigned long *)				\
+	sp = (unsigned long __user *)			\
 	 ((src->u_regs[14] + STACK_BIAS)		\
 	  & 0xfffffffffffffff8UL);			\
 	for(i = 0; i < 16; i++)				\

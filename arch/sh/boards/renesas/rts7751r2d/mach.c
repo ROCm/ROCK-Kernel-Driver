@@ -24,7 +24,7 @@ extern void *rts7751r2d_ioremap(unsigned long, unsigned long);
 extern int rts7751r2d_irq_demux(int irq);
 
 extern void *voyagergx_consistent_alloc(struct device *, size_t, dma_addr_t *, int);
-extern void voyagergx_consistent_free(struct device *, size_t, void *, dma_addr_t);
+extern int voyagergx_consistent_free(struct device *, size_t, void *, dma_addr_t);
 
 /*
  * The Machine Vector
@@ -62,7 +62,9 @@ struct sh_machine_vector mv_rts7751r2d __initmv = {
 #endif
 	.mv_irq_demux		= rts7751r2d_irq_demux,
 
+#ifdef CONFIG_USB_OHCI_HCD
 	.mv_consistent_alloc	= voyagergx_consistent_alloc,
 	.mv_consistent_free	= voyagergx_consistent_free,
+#endif
 };
 ALIAS_MV(rts7751r2d)

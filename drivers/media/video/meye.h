@@ -315,7 +315,6 @@ struct meye {
 	struct video_picture picture;	/* video picture parameters */
 	struct meye_params params;	/* additional parameters */
 #ifdef CONFIG_PM
-	u32 pm_state[16];		/* PCI configuration space */
 	u8 pm_mchip_mode;		/* old mchip mode */
 #endif
 };

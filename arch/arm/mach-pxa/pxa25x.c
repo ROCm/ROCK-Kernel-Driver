@@ -22,6 +22,7 @@
 #include <linux/pm.h>
 
 #include <asm/hardware.h>
+#include <asm/arch/pxa-regs.h>
 
 #include "generic.h"
 

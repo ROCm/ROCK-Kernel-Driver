@@ -98,6 +98,7 @@ static char *version =
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
+#include <linux/delay.h>
 
 #include <asm/system.h>
 #include <asm/bitops.h>
@@ -308,8 +309,7 @@ void __init reset_chip(struct net_device *dev)
 	writereg(dev, PP_SelfCTL, readreg(dev, PP_SelfCTL) | POWER_ON_RESET);
 
 	/* wait 30 ms */
-	current->state = TASK_INTERRUPTIBLE;
-	schedule_timeout(30*HZ/1000);
+	msleep_interruptible(30);
 
 	/* Wait until the chip is reset */
 	reset_start_time = jiffies;

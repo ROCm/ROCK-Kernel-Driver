@@ -158,7 +158,7 @@ struct remote_queue {
 struct service_processor {
 	struct list_head	node;
 	spinlock_t		lock;
-	void 			*base_address;
+	void __iomem		*base_address;
 	unsigned int		irq;
 	struct command		*current_command;
 	struct command		*heartbeat;

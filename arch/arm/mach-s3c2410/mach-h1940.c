@@ -41,6 +41,7 @@
 #include <asm/arch/regs-serial.h>
 
 #include "s3c2410.h"
+#include "clock.h"
 #include "devs.h"
 #include "cpu.h"
 
@@ -56,7 +57,7 @@ static struct s3c2410_uartcfg h1940_uartcfgs[] = {
 	[0] = {
 		.hwport	     = 0,
 		.flags	     = 0,
-		.clock	     = &s3c2410_pclk,
+		.clock	     = &s3c24xx_pclk,
 		.ucon	     = 0x3c5,
 		.ulcon	     = 0x03,
 		.ufcon	     = 0x51,
@@ -64,7 +65,7 @@ static struct s3c2410_uartcfg h1940_uartcfgs[] = {
 	[1] = {
 		.hwport	     = 1,
 		.flags	     = 0,
-		.clock	     = &s3c2410_pclk,
+		.clock	     = &s3c24xx_pclk,
 		.ucon	     = 0x245,
 		.ulcon	     = 0x03,
 		.ufcon	     = 0x00,
@@ -73,7 +74,7 @@ static struct s3c2410_uartcfg h1940_uartcfgs[] = {
 	[2] = {
 		.hwport	     = 2,
 		.flags	     = 0,
-		.clock	     = &s3c2410_pclk,
+		.clock	     = &s3c24xx_pclk,
 		.ucon	     = 0x3c5,
 		.ulcon	     = 0x43,
 		.ufcon	     = 0x51,
@@ -109,16 +110,11 @@ void __init h1940_init_irq(void)
 
 }
 
-void __init h1940_init_time(void)
-{
-	s3c2410_init_time();
-}
-
 MACHINE_START(H1940, "IPAQ-H1940")
      MAINTAINER("Ben Dooks <ben@fluff.org>")
      BOOT_MEM(S3C2410_SDRAM_PA, S3C2410_PA_UART, S3C2410_VA_UART)
      BOOT_PARAMS(S3C2410_SDRAM_PA + 0x100)
      MAPIO(h1940_map_io)
      INITIRQ(h1940_init_irq)
-     INITTIME(h1940_init_time)
+     .timer		= &s3c2410_timer,
 MACHINE_END

@@ -382,28 +382,14 @@ static struct call_data_struct * call_data;
  * this function sends a 'generic call function' IPI to all other CPUs
  * in the system.
  */
-
-int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
-			int wait)
-/*
- * [SUMMARY] Run a function on all other CPUs.
- * <func> The function to run. This must be fast and non-blocking.
- * <info> An arbitrary pointer to pass to the function.
- * <nonatomic> currently unused.
- * <wait> If true, wait (atomically) until function has completed on other CPUs.
- * [RETURNS] 0 on success, else a negative status code. Does not return until
- * remote CPUs are nearly ready to execute <<func>> or are or have executed.
- *
- * You must not call this function with disabled interrupts or from a
- * hardware interrupt handler or from a bottom half handler.
- * Actually there are a few legal cases, like panic.
- */
+static void __smp_call_function (void (*func) (void *info), void *info,
+				int nonatomic, int wait)
 {
 	struct call_data_struct data;
 	int cpus = num_online_cpus()-1;
 
 	if (!cpus)
-		return 0;
+		return;
 
 	data.func = func;
 	data.info = info;
@@ -412,7 +398,6 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 	if (wait)
 		atomic_set(&data.finished, 0);
 
-	spin_lock(&call_lock);
 	call_data = &data;
 	wmb();
 	/* Send a message to all other CPUs and wait for them to respond */
@@ -425,8 +410,29 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 	if (wait)
 		while (atomic_read(&data.finished) != cpus)
 			barrier();
-	spin_unlock(&call_lock);
+}
 
+/*
+ * smp_call_function - run a function on all other CPUs.
+ * @func: The function to run. This must be fast and non-blocking.
+ * @info: An arbitrary pointer to pass to the function.
+ * @nonatomic: currently unused.
+ * @wait: If true, wait (atomically) until function has completed on other
+ *        CPUs.
+ *
+ * Returns 0 on success, else a negative status code. Does not return until
+ * remote CPUs are nearly ready to execute func or are or have executed.
+ *
+ * You must not call this function with disabled interrupts or from a
+ * hardware interrupt handler or from a bottom half handler.
+ * Actually there are a few legal cases, like panic.
+ */
+int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
+			int wait)
+{
+	spin_lock(&call_lock);
+	__smp_call_function(func,info,nonatomic,wait);
+	spin_unlock(&call_lock);
 	return 0;
 }
 
@@ -450,7 +456,16 @@ static void smp_really_stop_cpu(void *dummy)
 
 void smp_send_stop(void)
 {
-	smp_call_function(smp_really_stop_cpu, NULL, 1, 0);
+	int nolock = 0;
+	/* Don't deadlock on the call lock in panic */
+	if (!spin_trylock(&call_lock)) {
+		udelay(100);
+		/* ignore locking because we have paniced anyways */
+		nolock = 1;
+	}
+	__smp_call_function(smp_really_stop_cpu, NULL, 1, 0);
+	if (!nolock)
+		spin_unlock(&call_lock);
 	smp_stop_cpu();
 }
 

@@ -45,7 +45,7 @@
  * measured as the number of 100-nano-second intervals since 1st January 1601,
  * 00:00:00 UTC.
  */
-static inline s64 utc2ntfs(const struct timespec ts)
+static inline sle64 utc2ntfs(const struct timespec ts)
 {
 	/*
 	 * Convert the seconds to 100ns intervals, add the nano-seconds
@@ -61,7 +61,7 @@ static inline s64 utc2ntfs(const struct timespec ts)
  * Get the current time from the Linux kernel, convert it to its corresponding
  * NTFS time and return that in little endian format.
  */
-static inline s64 get_current_ntfs_time(void)
+static inline sle64 get_current_ntfs_time(void)
 {
 	return utc2ntfs(current_kernel_time());
 }
@@ -82,7 +82,7 @@ static inline s64 get_current_ntfs_time(void)
  * measured as the number of 100 nano-second intervals since 1st January 1601,
  * 00:00:00 UTC.
  */
-static inline struct timespec ntfs2utc(const s64 time)
+static inline struct timespec ntfs2utc(const sle64 time)
 {
 	struct timespec ts;
 

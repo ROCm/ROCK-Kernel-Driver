@@ -79,7 +79,7 @@
 #include <linux/pc_keyb.h>
 
 #include <asm/keyboard.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <asm/uaccess.h>
 #include <asm/irq.h>
 #include <asm/system.h>

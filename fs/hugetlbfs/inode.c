@@ -651,6 +651,7 @@ hugetlbfs_fill_super(struct super_block *sb, void *data, int silent)
 	sbinfo->free_blocks = config.nr_blocks;
 	sbinfo->max_inodes = config.nr_inodes;
 	sbinfo->free_inodes = config.nr_inodes;
+	sb->s_maxbytes = MAX_LFS_FILESIZE;
 	sb->s_blocksize = HPAGE_SIZE;
 	sb->s_blocksize_bits = HPAGE_SHIFT;
 	sb->s_magic = HUGETLBFS_MAGIC;

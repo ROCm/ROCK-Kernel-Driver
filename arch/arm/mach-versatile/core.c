@@ -760,8 +760,6 @@ typedef struct TimerStruct {
 	unsigned long TimerClear;
 } TimerStruct_t;
 
-extern unsigned long (*gettimeoffset)(void);
-
 /*
  * Returns number of ms since last clock interrupt.  Note that interrupts
  * will have been disabled by do_gettimeoffset()
@@ -810,10 +808,14 @@ static irqreturn_t versatile_timer_interrupt(int irq, void *dev_id, struct pt_re
 {
 	volatile TimerStruct_t *timer0 = (volatile TimerStruct_t *)TIMER0_VA_BASE;
 
+	write_seqlock(&xtime_lock);
+
 	// ...clear the interrupt
 	timer0->TimerClear = 1;
 
 	timer_tick(regs);
+
+	write_sequnlock(&xtime_lock);
 
 	return IRQ_HANDLED;
 }
@@ -827,7 +829,7 @@ static struct irqaction versatile_timer_irq = {
 /*
  * Set up timer interrupt, and return the current time in seconds.
  */
-void __init versatile_init_time(void)
+static void __init versatile_timer_init(void)
 {
 	volatile TimerStruct_t *timer0 = (volatile TimerStruct_t *)TIMER0_VA_BASE;
 	volatile TimerStruct_t *timer1 = (volatile TimerStruct_t *)TIMER1_VA_BASE;
@@ -859,8 +861,12 @@ void __init versatile_init_time(void)
 	 * Make irqs happen for the system timer
 	 */
 	setup_irq(IRQ_TIMERINT0_1, &versatile_timer_irq);
-	gettimeoffset = versatile_gettimeoffset;
 }
+
+static struct sys_timer versatile_timer = {
+	.init		= versatile_timer_init,
+	.offset		= versatile_gettimeoffset,
+};
 
 MACHINE_START(VERSATILE_PB, "ARM-Versatile PB")
 	MAINTAINER("ARM Ltd/Deep Blue Solutions Ltd")
@@ -868,6 +874,6 @@ MACHINE_START(VERSATILE_PB, "ARM-Versatile PB")
 	BOOT_PARAMS(0x00000100)
 	MAPIO(versatile_map_io)
 	INITIRQ(versatile_init_irq)
-	INITTIME(versatile_init_time)
+	.timer		= &versatile_timer,
 	INIT_MACHINE(versatile_init)
 MACHINE_END

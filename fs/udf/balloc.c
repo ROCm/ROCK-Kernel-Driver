@@ -28,7 +28,7 @@
 
 #include <linux/quotaops.h>
 #include <linux/buffer_head.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 
 #include "udf_i.h"
 #include "udf_sb.h"
@@ -49,8 +49,8 @@
 extern inline int find_next_one_bit (void * addr, int size, int offset)
 {
 	uintBPL_t * p = ((uintBPL_t *) addr) + (offset / BITS_PER_LONG);
-	uintBPL_t result = offset & ~(BITS_PER_LONG-1);
-	uintBPL_t tmp;
+	int result = offset & ~(BITS_PER_LONG-1);
+	unsigned long tmp;
 
 	if (offset >= size)
 		return size;

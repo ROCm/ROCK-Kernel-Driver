@@ -23,8 +23,17 @@
 #ifndef _LINUX_NTFS_TYPES_H
 #define _LINUX_NTFS_TYPES_H
 
+#include <linux/types.h>
+
+typedef __le16 le16;
+typedef __le32 le32;
+typedef __le64 le64;
+typedef __u16 __bitwise sle16;
+typedef __u32 __bitwise sle32;
+typedef __u64 __bitwise sle64;
+
 /* 2-byte Unicode character type. */
-typedef u16 ntfschar;
+typedef le16 ntfschar;
 #define UCHAR_T_SIZE_BITS 1
 
 /*
@@ -32,7 +41,9 @@ typedef u16 ntfschar;
  * and VCN, to allow for type checking and better code readability.
  */
 typedef s64 VCN;
+typedef sle64 leVCN;
 typedef s64 LCN;
+typedef sle64 leLCN;
 
 /*
  * The NTFS journal $LogFile uses log sequence numbers which are signed 64-bit
@@ -40,34 +51,7 @@ typedef s64 LCN;
  * code readability.
  */
 typedef s64 LSN;
-
-/**
- * runlist_element - in memory vcn to lcn mapping array element
- * @vcn:	starting vcn of the current array element
- * @lcn:	starting lcn of the current array element
- * @length:	length in clusters of the current array element
- *
- * The last vcn (in fact the last vcn + 1) is reached when length == 0.
- *
- * When lcn == -1 this means that the count vcns starting at vcn are not
- * physically allocated (i.e. this is a hole / data is sparse).
- */
-typedef struct {	/* In memory vcn to lcn mapping structure element. */
-	VCN vcn;	/* vcn = Starting virtual cluster number. */
-	LCN lcn;	/* lcn = Starting logical cluster number. */
-	s64 length;	/* Run length in clusters. */
-} runlist_element;
-
-/**
- * runlist - in memory vcn to lcn mapping array including a read/write lock
- * @rl:		pointer to an array of runlist elements
- * @lock:	read/write spinlock for serializing access to @rl
- *
- */
-typedef struct {
-	runlist_element *rl;
-	struct rw_semaphore lock;
-} runlist;
+typedef sle64 leLSN;
 
 typedef enum {
 	FALSE = 0,

@@ -1,4 +1,6 @@
 /*
+    $Id: bttv-cards.c,v 1.28 2004/10/06 13:45:14 kraxel Exp $
+
     bttv-cards.c
 
     this file has configuration informations - card-specific stuff
@@ -308,6 +310,7 @@ static struct CARD {
 	{ 0x00011822, BTTV_TWINHAN_DST,   "Twinhan VisionPlus DVB-T" },
 	{ 0xfc00270f, BTTV_TWINHAN_DST,   "ChainTech digitop DST-1000 DVB-S" },
 	{ 0x07711461, BTTV_AVDVBT_771,    "AVermedia DVB-T 771" },
+	{ 0xdb1018ac, BTTV_DVICO_DVBT_LITE,    "DVICO FusionHDTV DVB-T Lite" },
 	
 	{ 0, -1, NULL }
 };
@@ -2089,10 +2092,10 @@ struct tvcard bttv_tvcards[] = {
 	/* Matt Jesson <dvb@jesson.eclipse.co.uk> */
 	/* Based on the Nebula card data - added remote and new card number - BTTV_AVDVBT_761, see also ir-kbd-gpio.c */
 	.name           = "AverMedia AverTV DVB-T 761",
-	.video_inputs   = 1,
+	.video_inputs   = 2,
 	.tuner          = -1,
-	.svhs           = -1,
-	.muxsel         = { 2, 3, 1, 0},
+	.svhs           = 1,
+	.muxsel         = { 3, 1, 2, 0}, /* Comp0, S-Video, ?, ? */
 	.no_msp34xx     = 1,
 	.no_tda9875     = 1,
 	.no_tda7432     = 1,
@@ -2147,6 +2150,34 @@ struct tvcard bttv_tvcards[] = {
 	.tuner_type     = TUNER_PHILIPS_PAL,
 	.has_remote     = 1,   /* miniremote works, see ir-kbd-gpio.c */
 	.has_radio      = 1,   /* not every card has radio */
+},{
+
+	/* ---- card 0x80 ---------------------------------- */
+	/* Chris Pascoe <c.pascoe@itee.uq.edu.au> */
+	.name           = "DVICO FusionHDTV DVB-T Lite",
+	.tuner          = -1,
+	.no_msp34xx     = 1,
+	.no_tda9875     = 1,
+	.no_tda7432     = 1,
+	.pll            = PLL_28,
+	.no_video       = 1,
+	.has_dvb        = 1,
+	.tuner_type     = -1,
+},{
+	/* Steven <photon38@pchome.com.tw> */
+	.name           = "V-Gear MyVCD",
+	.video_inputs   = 3,
+	.audio_inputs   = 1,
+	.tuner          = 0,
+	.svhs           = 2,
+	.gpiomask       = 0x3f,
+	.muxsel         = {2, 3, 1, 0},
+	.audiomux       = {0x31, 0x31, 0x31, 0x31, 0x31, 0x31},
+	.no_msp34xx     = 1,
+	.pll            = PLL_28,
+	.tuner_type     = TUNER_PHILIPS_NTSC_M,
+	.has_radio      = 0,
+	// .has_remote     = 1,
 }};
 
 const unsigned int bttv_num_tvcards = ARRAY_SIZE(bttv_tvcards);
@@ -2538,6 +2569,7 @@ void __devinit bttv_init_card1(struct bttv *btv)
 /* initialization part two -- after registering i2c bus */
 void __devinit bttv_init_card2(struct bttv *btv)
 {
+	int tda9887;
         btv->tuner_type = -1;
 
 	if (BTTV_UNKNOWN == btv->c.type) {
@@ -2705,45 +2737,40 @@ void __devinit bttv_init_card2(struct bttv *btv)
 			boot_bt832(btv);
 	}
 
+	if (!autoload)
+		return;
+
 	/* try to detect audio/fader chips */
 	if (!bttv_tvcards[btv->c.type].no_msp34xx &&
-	    bttv_I2CRead(btv, I2C_MSP3400, "MSP34xx") >=0) {
-		if (autoload)
-			request_module("msp3400");
-	}
+	    bttv_I2CRead(btv, I2C_MSP3400, "MSP34xx") >=0)
+		request_module("msp3400");
 
 	if (bttv_tvcards[btv->c.type].msp34xx_alt &&
-	    bttv_I2CRead(btv, I2C_MSP3400_ALT, "MSP34xx (alternate address)") >=0) {
-		if (autoload)
-			request_module("msp3400");
-	}
+	    bttv_I2CRead(btv, I2C_MSP3400_ALT, "MSP34xx (alternate address)") >=0)
+		request_module("msp3400");
 
 	if (!bttv_tvcards[btv->c.type].no_tda9875 &&
-	    bttv_I2CRead(btv, I2C_TDA9875, "TDA9875") >=0) {
-		if (autoload)
-			request_module("tda9875");
-	}
+	    bttv_I2CRead(btv, I2C_TDA9875, "TDA9875") >=0)
+		request_module("tda9875");
 
 	if (!bttv_tvcards[btv->c.type].no_tda7432 && 
-	    bttv_I2CRead(btv, I2C_TDA7432, "TDA7432") >=0) {
-		if (autoload)
-			request_module("tda7432");
-	}
+	    bttv_I2CRead(btv, I2C_TDA7432, "TDA7432") >=0)
+		request_module("tda7432");
 
-	if (bttv_tvcards[btv->c.type].needs_tvaudio) {
-		if (autoload)
-			request_module("tvaudio");
-	}
+	if (bttv_tvcards[btv->c.type].needs_tvaudio)
+		request_module("tvaudio");
 
 	/* tuner modules */
-	if (btv->pinnacle_id != UNSET) {
-		if (autoload)
-			request_module("tda9887");
-	}
-	if (btv->tuner_type != UNSET) {
-		if (autoload)
-			request_module("tuner");
-	}
+	tda9887 = 0;
+	if (btv->pinnacle_id != UNSET)
+		tda9887 = 1;
+	if (0 == tda9887 && 0 == bttv_tvcards[btv->c.type].has_dvb &&
+	    bttv_I2CRead(btv, I2C_TDA9887, "TDA9887") >=0)
+		tda9887 = 1;
+	if (tda9887)
+		request_module("tda9887");
+	if (btv->tuner_type != UNSET)
+		request_module("tuner");
 }
 
 
@@ -2854,7 +2881,8 @@ static void __devinit hauppauge_eeprom(struct bttv *btv)
 	if (bttv_verbose)
 		printk(KERN_INFO "bttv%d: Hauppauge eeprom: model=%d, "
 		       "tuner=%s (%d), radio=%s\n",
-		       btv->c.nr, model, hauppauge_tuner[tuner].name,
+		       btv->c.nr, model, (tuner < ARRAY_SIZE(hauppauge_tuner)
+					  ? hauppauge_tuner[tuner].name : "?"),
 		       btv->tuner_type, radio ? "yes" : "no");
 }
 
@@ -4024,92 +4052,6 @@ static void ivc120_muxsel(struct bttv *btv, unsigned int input)
 }
 
 
-/* ----------------------------------------------------------------------- */
-/* motherboard chipset specific stuff                                      */
-
-void __devinit bttv_check_chipset(void)
-{
-	int pcipci_fail = 0;
-	struct pci_dev *dev = NULL;
-
-	if (pci_pci_problems & PCIPCI_FAIL)
-		pcipci_fail = 1;
-	if (pci_pci_problems & (PCIPCI_TRITON|PCIPCI_NATOMA|PCIPCI_VIAETBF))
-		triton1 = 1;
-	if (pci_pci_problems & PCIPCI_VSFX)
-		vsfx = 1;
-#ifdef PCIPCI_ALIMAGIK
-	if (pci_pci_problems & PCIPCI_ALIMAGIK)
-		latency = 0x0A;
-#endif
-
-#if 0
-	/* print which chipset we have */
-	while ((dev = pci_find_class(PCI_CLASS_BRIDGE_HOST << 8,dev)))
-		printk(KERN_INFO "bttv: Host bridge is %s\n",pci_name(dev));
-#endif
-
-	/* print warnings about any quirks found */
-	if (triton1)
-		printk(KERN_INFO "bttv: Host bridge needs ETBF enabled.\n");
-	if (vsfx)
-		printk(KERN_INFO "bttv: Host bridge needs VSFX enabled.\n");
-	if (pcipci_fail) {
-		printk(KERN_WARNING "bttv: BT848 and your chipset may not work together.\n");
-		if (UNSET == no_overlay) {
-			printk(KERN_WARNING "bttv: going to disable overlay.\n");
-			no_overlay = 1;
-		}
-	}
-	if (UNSET != latency)
-		printk(KERN_INFO "bttv: pci latency fixup [%d]\n",latency);
-
-	while ((dev = pci_find_device(PCI_VENDOR_ID_INTEL,
-				      PCI_DEVICE_ID_INTEL_82441, dev))) {
-                unsigned char b;
-		pci_read_config_byte(dev, 0x53, &b);
-		if (bttv_debug)
-			printk(KERN_INFO "bttv: Host bridge: 82441FX Natoma, "
-			       "bufcon=0x%02x\n",b);
-	}
-}
-
-int __devinit bttv_handle_chipset(struct bttv *btv)
-{
- 	unsigned char command;
-
-	if (!triton1 && !vsfx && UNSET == latency)
-		return 0;
-
-	if (bttv_verbose) {
-		if (triton1)
-			printk(KERN_INFO "bttv%d: enabling ETBF (430FX/VP3 compatibilty)\n",btv->c.nr);
-		if (vsfx && btv->id >= 878)
-			printk(KERN_INFO "bttv%d: enabling VSFX\n",btv->c.nr);
-		if (UNSET != latency)
-			printk(KERN_INFO "bttv%d: setting pci timer to %d\n",
-			       btv->c.nr,latency);
-	}
-
-	if (btv->id < 878) {
-		/* bt848 (mis)uses a bit in the irq mask for etbf */
-		if (triton1)
-			btv->triton1 = BT848_INT_ETBF;
-	} else {
-		/* bt878 has a bit in the pci config space for it */
-                pci_read_config_byte(btv->c.pci, BT878_DEVCTRL, &command);
-		if (triton1)
-			command |= BT878_EN_TBFX;
-		if (vsfx)
-			command |= BT878_EN_VSFX;
-                pci_write_config_byte(btv->c.pci, BT878_DEVCTRL, command);
-        }
-	if (UNSET != latency)
-		pci_write_config_byte(btv->c.pci, PCI_LATENCY_TIMER, latency);
-	return 0;
-}
-
-
 /* PXC200 muxsel helper
  * luke@syseng.anu.edu.au
  * another transplant
@@ -4145,7 +4087,7 @@ static void PXC200_muxsel(struct bttv *btv, unsigned int input)
 	  return;
 	}
 
-	rc=bttv_I2CRead(btv,(PX_I2C_PIC<<1),0);
+	rc=bttv_I2CRead(btv,(PX_I2C_PIC<<1),NULL);
 	if (!(rc & PX_CFG_PXC200F)) {
 	  printk(KERN_DEBUG "bttv%d: PXC200_muxsel: not PXC200F rc:%d \n", btv->c.nr,rc);
 	  return;
@@ -4189,6 +4131,92 @@ static void PXC200_muxsel(struct bttv *btv, unsigned int input)
 
 	printk(KERN_DEBUG "bttv%d: setting input channel to:%d\n", btv->c.nr,(int)mux);
 }
+
+/* ----------------------------------------------------------------------- */
+/* motherboard chipset specific stuff                                      */
+
+void __devinit bttv_check_chipset(void)
+{
+	int pcipci_fail = 0;
+	struct pci_dev *dev = NULL;
+
+	if (pci_pci_problems & PCIPCI_FAIL)
+		pcipci_fail = 1;
+	if (pci_pci_problems & (PCIPCI_TRITON|PCIPCI_NATOMA|PCIPCI_VIAETBF))
+		triton1 = 1;
+	if (pci_pci_problems & PCIPCI_VSFX)
+		vsfx = 1;
+#ifdef PCIPCI_ALIMAGIK
+	if (pci_pci_problems & PCIPCI_ALIMAGIK)
+		latency = 0x0A;
+#endif
+
+#if 0
+	/* print which chipset we have */
+	while ((dev = pci_get_class(PCI_CLASS_BRIDGE_HOST << 8,dev)))
+		printk(KERN_INFO "bttv: Host bridge is %s\n",pci_name(dev));
+#endif
+
+	/* print warnings about any quirks found */
+	if (triton1)
+		printk(KERN_INFO "bttv: Host bridge needs ETBF enabled.\n");
+	if (vsfx)
+		printk(KERN_INFO "bttv: Host bridge needs VSFX enabled.\n");
+	if (pcipci_fail) {
+		printk(KERN_WARNING "bttv: BT848 and your chipset may not work together.\n");
+		if (UNSET == no_overlay) {
+			printk(KERN_WARNING "bttv: going to disable overlay.\n");
+			no_overlay = 1;
+		}
+	}
+	if (UNSET != latency)
+		printk(KERN_INFO "bttv: pci latency fixup [%d]\n",latency);
+
+	while ((dev = pci_get_device(PCI_VENDOR_ID_INTEL,
+				     PCI_DEVICE_ID_INTEL_82441, dev))) {
+                unsigned char b;
+		pci_read_config_byte(dev, 0x53, &b);
+		if (bttv_debug)
+			printk(KERN_INFO "bttv: Host bridge: 82441FX Natoma, "
+			       "bufcon=0x%02x\n",b);
+	}
+}
+
+int __devinit bttv_handle_chipset(struct bttv *btv)
+{
+ 	unsigned char command;
+
+	if (!triton1 && !vsfx && UNSET == latency)
+		return 0;
+
+	if (bttv_verbose) {
+		if (triton1)
+			printk(KERN_INFO "bttv%d: enabling ETBF (430FX/VP3 compatibilty)\n",btv->c.nr);
+		if (vsfx && btv->id >= 878)
+			printk(KERN_INFO "bttv%d: enabling VSFX\n",btv->c.nr);
+		if (UNSET != latency)
+			printk(KERN_INFO "bttv%d: setting pci timer to %d\n",
+			       btv->c.nr,latency);
+	}
+
+	if (btv->id < 878) {
+		/* bt848 (mis)uses a bit in the irq mask for etbf */
+		if (triton1)
+			btv->triton1 = BT848_INT_ETBF;
+	} else {
+		/* bt878 has a bit in the pci config space for it */
+                pci_read_config_byte(btv->c.pci, BT878_DEVCTRL, &command);
+		if (triton1)
+			command |= BT878_EN_TBFX;
+		if (vsfx)
+			command |= BT878_EN_VSFX;
+                pci_write_config_byte(btv->c.pci, BT878_DEVCTRL, command);
+        }
+	if (UNSET != latency)
+		pci_write_config_byte(btv->c.pci, PCI_LATENCY_TIMER, latency);
+	return 0;
+}
+
 
 /*
  * Local variables:

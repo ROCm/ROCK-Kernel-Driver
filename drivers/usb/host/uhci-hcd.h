@@ -80,7 +80,7 @@
 #define CAN_SCHEDULE_FRAMES	1000	/* how far future frames can be scheduled */
 
 struct uhci_frame_list {
-	u32 frame[UHCI_NUMFRAMES];
+	__le32 frame[UHCI_NUMFRAMES];
 
 	void *frame_cpu[UHCI_NUMFRAMES];
 
@@ -105,8 +105,8 @@ struct urb_priv;
  */
 struct uhci_qh {
 	/* Hardware fields */
-	u32 link;			/* Next queue */
-	u32 element;			/* Queue element pointer */
+	__le32 link;			/* Next queue */
+	__le32 element;			/* Queue element pointer */
 
 	/* Software fields */
 	dma_addr_t dma_handle;
@@ -185,10 +185,10 @@ struct uhci_qh {
  */
 struct uhci_td {
 	/* Hardware fields */
-	u32 link;
-	u32 status;
-	u32 token;
-	u32 buffer;
+	__le32 link;
+	__le32 status;
+	__le32 token;
+	__le32 buffer;
 
 	/* Software fields */
 	dma_addr_t dma_handle;
@@ -352,6 +352,12 @@ struct uhci_hcd {
 	int resume_detect;			/* Need a Global Resume */
 	unsigned int saved_framenumber;		/* Save during PM suspend */
 
+	/* Support for port suspend/resume */
+	unsigned long port_c_suspend;		/* Bit-arrays of ports */
+	unsigned long suspended_ports;
+	unsigned long resuming_ports;
+	unsigned long resume_timeout;		/* Time to stop signalling */
+
 	/* Main list of URB's currently controlled by this HC */
 	struct list_head urb_list;		/* P: uhci->schedule_lock */
 
@@ -385,12 +391,12 @@ struct urb_priv {
 	struct uhci_qh *qh;		/* QH for this URB */
 	struct list_head td_list;	/* P: urb->lock */
 
-	int fsbr : 1;			/* URB turned on FSBR */
-	int fsbr_timeout : 1;		/* URB timed out on FSBR */
-	int queued : 1;			/* QH was queued (not linked in) */
-	int short_control_packet : 1;	/* If we get a short packet during */
-					/*  a control transfer, retrigger */
-					/*  the status phase */
+	unsigned fsbr : 1;		/* URB turned on FSBR */
+	unsigned fsbr_timeout : 1;	/* URB timed out on FSBR */
+	unsigned queued : 1;		/* QH was queued (not linked in) */
+	unsigned short_control_packet : 1;	/* If we get a short packet during */
+						/*  a control transfer, retrigger */
+						/*  the status phase */
 
 	unsigned long inserttime;	/* In jiffies */
 	unsigned long fsbrtime;		/* In jiffies */

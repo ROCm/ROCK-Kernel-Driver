@@ -529,6 +529,7 @@ int bus_add_driver(struct device_driver * drv)
 		down_write(&bus->subsys.rwsem);
 		driver_attach(drv);
 		up_write(&bus->subsys.rwsem);
+		module_add_driver(drv->owner, drv);
 
 		driver_add_attrs(bus, drv);
 	}
@@ -553,6 +554,7 @@ void bus_remove_driver(struct device_driver * drv)
 		pr_debug("bus %s: remove driver %s\n", drv->bus->name, drv->name);
 		driver_detach(drv);
 		up_write(&drv->bus->subsys.rwsem);
+		module_remove_driver(drv);
 		kobject_unregister(&drv->kobj);
 		put_bus(drv->bus);
 	}
@@ -721,20 +723,20 @@ int __init buses_init(void)
 }
 
 
-EXPORT_SYMBOL(bus_for_each_dev);
-EXPORT_SYMBOL(bus_for_each_drv);
+EXPORT_SYMBOL_GPL(bus_for_each_dev);
+EXPORT_SYMBOL_GPL(bus_for_each_drv);
 
-EXPORT_SYMBOL(device_bind_driver);
-EXPORT_SYMBOL(device_release_driver);
+EXPORT_SYMBOL_GPL(device_bind_driver);
+EXPORT_SYMBOL_GPL(device_release_driver);
 
-EXPORT_SYMBOL(bus_add_device);
-EXPORT_SYMBOL(bus_remove_device);
-EXPORT_SYMBOL(bus_register);
-EXPORT_SYMBOL(bus_unregister);
-EXPORT_SYMBOL(bus_rescan_devices);
-EXPORT_SYMBOL(get_bus);
-EXPORT_SYMBOL(put_bus);
-EXPORT_SYMBOL(find_bus);
+EXPORT_SYMBOL_GPL(bus_add_device);
+EXPORT_SYMBOL_GPL(bus_remove_device);
+EXPORT_SYMBOL_GPL(bus_register);
+EXPORT_SYMBOL_GPL(bus_unregister);
+EXPORT_SYMBOL_GPL(bus_rescan_devices);
+EXPORT_SYMBOL_GPL(get_bus);
+EXPORT_SYMBOL_GPL(put_bus);
+EXPORT_SYMBOL_GPL(find_bus);
 
-EXPORT_SYMBOL(bus_create_file);
-EXPORT_SYMBOL(bus_remove_file);
+EXPORT_SYMBOL_GPL(bus_create_file);
+EXPORT_SYMBOL_GPL(bus_remove_file);

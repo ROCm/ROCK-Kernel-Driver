@@ -683,7 +683,7 @@ struct ixgb_bus {
 };
 
 struct ixgb_hw {
-	uint8_t *hw_addr;	/* Base Address of the hardware     */
+	uint8_t __iomem *hw_addr;/* Base Address of the hardware     */
 	void *back;		/* Pointer to OS-dependent struct   */
 	struct ixgb_fc fc;	/* Flow control parameters          */
 	struct ixgb_bus bus;	/* Bus parameters                   */

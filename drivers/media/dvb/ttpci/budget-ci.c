@@ -38,12 +38,7 @@
 #include <linux/input.h>
 #include <linux/spinlock.h>
 
-#include "dvb_functions.h"
 #include "dvb_ca_en50221.h"
-
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0))
-#include "input_fake.h"
-#endif
 
 #define DEBIADDR_IR		0x1234
 #define DEBIADDR_CICONTROL	0x0000
@@ -79,14 +74,15 @@ static u32 budget_debiread (struct budget_ci* budget_ci, u32 config, int addr, i
 {
 	struct saa7146_dev *saa = budget_ci->budget.dev;
 	u32 result = 0;
+        unsigned long flags;
 
 	if (count > 4 || count <= 0)
 		return 0;
 
-	spin_lock(&budget_ci->debilock);
+	spin_lock_irqsave(&budget_ci->debilock, flags);
 
 	if (saa7146_wait_for_debi_done(saa) < 0) {
-		spin_unlock(&budget_ci->debilock);
+		spin_unlock_irqrestore(&budget_ci->debilock, flags);
 		return 0;
 	}
 
@@ -101,21 +97,22 @@ static u32 budget_debiread (struct budget_ci* budget_ci, u32 config, int addr, i
 	result = saa7146_read(saa, 0x88);
 	result &= (0xffffffffUL >> ((4 - count) * 8));
 
-	spin_unlock(&budget_ci->debilock);
+	spin_unlock_irqrestore(&budget_ci->debilock, flags);
 	return result;
 }
 
 static u8 budget_debiwrite (struct budget_ci* budget_ci, u32 config, int addr, int count, u32 value)
 {
 	struct saa7146_dev *saa = budget_ci->budget.dev;
+        unsigned long flags;
 
 	if (count > 4 || count <= 0)
 		return 0;
 
-	spin_lock(&budget_ci->debilock);
+	spin_lock_irqsave(&budget_ci->debilock, flags);
 
 	if (saa7146_wait_for_debi_done(saa) < 0) {
-		spin_unlock(&budget_ci->debilock);
+		spin_unlock_irqrestore(&budget_ci->debilock, flags);
 		return 0;
 	}
 
@@ -128,7 +125,7 @@ static u8 budget_debiwrite (struct budget_ci* budget_ci, u32 config, int addr, i
 
 	saa7146_wait_for_debi_done(saa);
 
-	spin_unlock(&budget_ci->debilock);
+	spin_unlock_irqrestore(&budget_ci->debilock, flags);
 	return 0;
 }
 
@@ -326,7 +323,7 @@ static int ciintf_slot_reset(struct dvb_ca_en50221* ca, int slot) {
 	saa7146_setgpio(saa, 0, SAA7146_GPIO_IRQHI);
 	budget_ci->slot_status = SLOTSTATUS_RESET;
 	budget_debiwrite(budget_ci, DEBICICTL, DEBIADDR_CICONTROL, 1, 0);
-	dvb_delay(1);
+	msleep(1);
 	budget_debiwrite(budget_ci, DEBICICTL, DEBIADDR_CICONTROL, 1, CICONTROL_RESET);
 
 	saa7146_setgpio(saa, 1, SAA7146_GPIO_OUTHI);
@@ -372,13 +369,12 @@ static void ciintf_interrupt (unsigned long data)
 	// ensure we don't get spurious IRQs during initialisation
 	if (!budget_ci->budget.ci_present) return;
 
+	// read the CAM status
 	flags = budget_debiread(budget_ci, DEBICICTL, DEBIADDR_CICONTROL, 1);
-
-	// always set the GPIO mode back to "normal", in case the card is
-	// yanked at an inopportune moment
-	saa7146_setgpio(saa, 0, SAA7146_GPIO_IRQLO);
-
 	if (flags & CICONTROL_CAMDETECT) {
+
+		// GPIO should be set to trigger on falling edge if a CAM is present
+	saa7146_setgpio(saa, 0, SAA7146_GPIO_IRQLO);
 
 		if (budget_ci->slot_status & SLOTSTATUS_NONE) {
 			// CAM insertion IRQ
@@ -395,7 +391,15 @@ static void ciintf_interrupt (unsigned long data)
 			dvb_ca_en50221_frda_irq(&budget_ci->ca, 0);
 		}
 	} else {
+
+		// trigger on rising edge if a CAM is not present - when a CAM is inserted, we
+		// only want to get the IRQ when it sets READY. If we trigger on the falling edge,
+		// the CAM might not actually be ready yet.
+		saa7146_setgpio(saa, 0, SAA7146_GPIO_IRQHI);
+
+	   	// generate a CAM removal IRQ if we haven't already
 		if (budget_ci->slot_status & SLOTSTATUS_OCCUPIED) {
+			// CAM removal IRQ
 			budget_ci->slot_status = SLOTSTATUS_NONE;
 			dvb_ca_en50221_camchange_irq(&budget_ci->ca, 0, DVB_CA_EN50221_CAMCHANGE_REMOVED);
 		}
@@ -446,7 +450,11 @@ static int ciintf_init(struct budget_ci* budget_ci)
 
 	// Setup CI slot IRQ
 	tasklet_init (&budget_ci->ciintf_irq_tasklet, ciintf_interrupt, (unsigned long) budget_ci);
+	if (budget_ci->slot_status != SLOTSTATUS_NONE) {
 	saa7146_setgpio(saa, 0, SAA7146_GPIO_IRQLO);
+	} else {
+		saa7146_setgpio(saa, 0, SAA7146_GPIO_IRQHI);
+	}
 	saa7146_write(saa, IER, saa7146_read(saa, IER) | MASK_03);
 	budget_debiwrite(budget_ci, DEBICICTL, DEBIADDR_CICONTROL, 1, CICONTROL_RESET);
 
@@ -475,7 +483,7 @@ static void ciintf_deinit(struct budget_ci* budget_ci)
 	saa7146_setgpio(saa, 0, SAA7146_GPIO_INPUT);
 	tasklet_kill(&budget_ci->ciintf_irq_tasklet);
 	budget_debiwrite(budget_ci, DEBICICTL, DEBIADDR_CICONTROL, 1, 0);
-	dvb_delay(1);
+	msleep(1);
 	budget_debiwrite(budget_ci, DEBICICTL, DEBIADDR_CICONTROL, 1, CICONTROL_RESET);
 
 	// disable TS data stream to CI interface
@@ -520,20 +528,19 @@ static int budget_ci_attach (struct saa7146_dev* dev,
 	spin_lock_init(&budget_ci->debilock);
 	budget_ci->budget.ci_present = 0;
 
+	dev->ext_priv = budget_ci;
+
 	if ((err = ttpci_budget_init (&budget_ci->budget, dev, info))) {
 		kfree (budget_ci);
 		return err;
 	}
-
-	dev->ext_priv = budget_ci;
 
 	tasklet_init (&budget_ci->msp430_irq_tasklet, msp430_ir_interrupt,
 		      (unsigned long) budget_ci);
 
 	msp430_ir_init (budget_ci);
 
-	// UNCOMMENT TO TEST CI INTERFACE
-//	ciintf_init(budget_ci);
+	ciintf_init(budget_ci);
 
 	return 0;
 }

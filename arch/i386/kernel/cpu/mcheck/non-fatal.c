@@ -48,6 +48,7 @@ static void mce_checkregs (void *info)
 
 			/* Serialize */
 			wmb();
+			add_taint(TAINT_MACHINE_CHECK);
 		}
 	}
 }

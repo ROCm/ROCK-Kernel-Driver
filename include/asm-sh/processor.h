@@ -7,6 +7,7 @@
 
 #ifndef __ASM_SH_PROCESSOR_H
 #define __ASM_SH_PROCESSOR_H
+#ifdef __KERNEL__
 
 #include <asm/page.h>
 #include <asm/types.h>
@@ -43,6 +44,7 @@ enum cpu_type {
 	/* SH-4 types */
 	CPU_SH7750, CPU_SH7750S, CPU_SH7750R, CPU_SH7751, CPU_SH7751R,
 	CPU_SH7760, CPU_ST40RA, CPU_ST40GX1, CPU_SH4_202, CPU_SH4_501,
+	CPU_SH73180,
 
 	/* Unknown subtype */
 	CPU_SH_NONE
@@ -137,6 +139,7 @@ union sh_fpu_union {
 #define CPU_HAS_P2_FLUSH_BUG	0x0002	/* Need to flush the cache in P2 area */
 #define CPU_HAS_MMU_PAGE_ASSOC	0x0004	/* SH3: TLB way selection bit support */
 #define CPU_HAS_DSP		0x0008	/* SH-DSP: DSP support */
+#define CPU_HAS_PERF_COUNTER	0x0010	/* Hardware performance counters */
 
 struct thread_struct {
 	unsigned long sp;
@@ -274,4 +277,5 @@ extern unsigned long get_wchan(struct task_struct *p);
 #define cpu_sleep()	__asm__ __volatile__ ("sleep" : : : "memory")
 #define cpu_relax()	do { } while (0)
 
+#endif /* __KERNEL__ */
 #endif /* __ASM_SH_PROCESSOR_H */

@@ -445,7 +445,7 @@ static int prog_dmabuf(struct solo1_state *s, struct dmabuf *db)
 		if (!db->rawbuf)
 			return -ENOMEM;
 		db->buforder = order;
-		/* now mark the pages as reserved; otherwise remap_page_range doesn't do what we want */
+		/* now mark the pages as reserved; otherwise remap_pfn_range doesn't do what we want */
 		pend = virt_to_page(db->rawbuf + (PAGE_SIZE << db->buforder) - 1);
 		for (page = virt_to_page(db->rawbuf); page <= pend; page++)
 			SetPageReserved(page);
@@ -1242,7 +1242,9 @@ static int solo1_mmap(struct file *file, struct vm_area_struct *vma)
 	if (size > (PAGE_SIZE << db->buforder))
 		goto out;
 	ret = -EAGAIN;
-	if (remap_page_range(vma, vma->vm_start, virt_to_phys(db->rawbuf), size, vma->vm_page_prot))
+	if (remap_pfn_range(vma, vma->vm_start,
+				virt_to_phys(db->rawbuf) >> PAGE_SHIFT,
+				size, vma->vm_page_prot))
 		goto out;
 	db->mapped = 1;
 	ret = 0;
@@ -2451,11 +2453,7 @@ static struct pci_driver solo1_driver = {
 static int __init init_solo1(void)
 {
 	printk(KERN_INFO "solo1: version v0.20 time " __TIME__ " " __DATE__ "\n");
-	if (!pci_register_driver(&solo1_driver)) {
-		pci_unregister_driver(&solo1_driver);
-                return -ENODEV;
-	}
-	return 0;
+	return pci_register_driver(&solo1_driver);
 }
 
 /* --------------------------------------------------------------------- */

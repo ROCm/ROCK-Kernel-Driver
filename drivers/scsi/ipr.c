@@ -4935,7 +4935,7 @@ static int ipr_reset_restore_cfg_space(struct ipr_cmnd *ipr_cmd)
 	int rc;
 
 	ENTER;
-	rc = pci_restore_state(ioa_cfg->pdev, ioa_cfg->pci_cfg_buf);
+	rc = pci_restore_state(ioa_cfg->pdev);
 
 	if (rc != PCIBIOS_SUCCESSFUL) {
 		ipr_cmd->ioasa.ioasc = cpu_to_be32(IPR_IOASC_PCI_ACCESS_ERROR);
@@ -5433,7 +5433,7 @@ static void ipr_free_all_resources(struct ipr_ioa_cfg *ioa_cfg)
 
 	ENTER;
 	free_irq(pdev->irq, ioa_cfg);
-	iounmap((void *) ioa_cfg->hdw_dma_regs);
+	iounmap(ioa_cfg->hdw_dma_regs);
 	pci_release_regions(pdev);
 	ipr_free_mem(ioa_cfg);
 	scsi_host_put(ioa_cfg->host);
@@ -5624,6 +5624,10 @@ static void __devinit ipr_initialize_bus_attr(struct ipr_ioa_cfg *ioa_cfg)
 static void __devinit ipr_init_ioa_cfg(struct ipr_ioa_cfg *ioa_cfg,
 				       struct Scsi_Host *host, struct pci_dev *pdev)
 {
+	const struct ipr_interrupt_offsets *p;
+	struct ipr_interrupts *t;
+	void __iomem *base;
+
 	ioa_cfg->host = host;
 	ioa_cfg->pdev = pdev;
 	ioa_cfg->log_level = ipr_log_level;
@@ -5655,17 +5659,19 @@ static void __devinit ipr_init_ioa_cfg(struct ipr_ioa_cfg *ioa_cfg,
 	host->max_cmd_len = IPR_MAX_CDB_LEN;
 	pci_set_drvdata(pdev, ioa_cfg);
 
-	memcpy(&ioa_cfg->regs, &ioa_cfg->chip_cfg->regs, sizeof(ioa_cfg->regs));
+	p = &ioa_cfg->chip_cfg->regs;
+	t = &ioa_cfg->regs;
+	base = ioa_cfg->hdw_dma_regs;
 
-	ioa_cfg->regs.set_interrupt_mask_reg += ioa_cfg->hdw_dma_regs;
-	ioa_cfg->regs.clr_interrupt_mask_reg += ioa_cfg->hdw_dma_regs;
-	ioa_cfg->regs.sense_interrupt_mask_reg += ioa_cfg->hdw_dma_regs;
-	ioa_cfg->regs.clr_interrupt_reg += ioa_cfg->hdw_dma_regs;
-	ioa_cfg->regs.sense_interrupt_reg += ioa_cfg->hdw_dma_regs;
-	ioa_cfg->regs.ioarrin_reg += ioa_cfg->hdw_dma_regs;
-	ioa_cfg->regs.sense_uproc_interrupt_reg += ioa_cfg->hdw_dma_regs;
-	ioa_cfg->regs.set_uproc_interrupt_reg += ioa_cfg->hdw_dma_regs;
-	ioa_cfg->regs.clr_uproc_interrupt_reg += ioa_cfg->hdw_dma_regs;
+	t->set_interrupt_mask_reg = base + p->set_interrupt_mask_reg;
+	t->clr_interrupt_mask_reg = base + p->clr_interrupt_mask_reg;
+	t->sense_interrupt_mask_reg = base + p->sense_interrupt_mask_reg;
+	t->clr_interrupt_reg = base + p->clr_interrupt_reg;
+	t->sense_interrupt_reg = base + p->sense_interrupt_reg;
+	t->ioarrin_reg = base + p->ioarrin_reg;
+	t->sense_uproc_interrupt_reg = base + p->sense_uproc_interrupt_reg;
+	t->set_uproc_interrupt_reg = base + p->set_uproc_interrupt_reg;
+	t->clr_uproc_interrupt_reg = base + p->clr_uproc_interrupt_reg;
 }
 
 /**
@@ -5681,7 +5687,8 @@ static int __devinit ipr_probe_ioa(struct pci_dev *pdev,
 {
 	struct ipr_ioa_cfg *ioa_cfg;
 	struct Scsi_Host *host;
-	unsigned long ipr_regs, ipr_regs_pci;
+	unsigned long ipr_regs_pci;
+	void __iomem *ipr_regs;
 	u32 rc = PCIBIOS_SUCCESSFUL;
 
 	ENTER;
@@ -5715,8 +5722,7 @@ static int __devinit ipr_probe_ioa(struct pci_dev *pdev,
 		goto out_scsi_host_put;
 	}
 
-	ipr_regs = (unsigned long)ioremap(ipr_regs_pci,
-					  pci_resource_len(pdev, 0));
+	ipr_regs = ioremap(ipr_regs_pci, pci_resource_len(pdev, 0));
 
 	if (!ipr_regs) {
 		dev_err(&pdev->dev,
@@ -5749,7 +5755,7 @@ static int __devinit ipr_probe_ioa(struct pci_dev *pdev,
 	}
 
 	/* Save away PCI config space for use following IOA reset */
-	rc = pci_save_state(pdev, ioa_cfg->pci_cfg_buf);
+	rc = pci_save_state(pdev);
 
 	if (rc != PCIBIOS_SUCCESSFUL) {
 		dev_err(&pdev->dev, "Failed to save PCI config space\n");
@@ -5790,7 +5796,7 @@ out:
 cleanup_nolog:
 	ipr_free_mem(ioa_cfg);
 cleanup_nomem:
-	iounmap((void *) ipr_regs);
+	iounmap(ipr_regs);
 out_release_regions:
 	pci_release_regions(pdev);
 out_scsi_host_put:

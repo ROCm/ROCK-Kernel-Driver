@@ -109,11 +109,11 @@ static const char version[] = "NET3 PLIP version 2.4-parport gniibe@mri.co.jp\n"
 #include <linux/ioport.h>
 #include <linux/spinlock.h>
 #include <linux/parport.h>
+#include <linux/bitops.h>
 
 #include <net/neighbour.h>
 
 #include <asm/system.h>
-#include <asm/bitops.h>
 #include <asm/irq.h>
 #include <asm/byteorder.h>
 #include <asm/semaphore.h>
@@ -547,7 +547,7 @@ static unsigned short plip_type_trans(struct sk_buff *skb, struct net_device *de
 	
 	skb->mac.raw=skb->data;
 	skb_pull(skb,dev->hard_header_len);
-	eth= skb->mac.ethernet;
+	eth = eth_hdr(skb);
 	
 	if(*eth->h_dest&1)
 	{

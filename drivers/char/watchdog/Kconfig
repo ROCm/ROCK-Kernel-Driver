@@ -106,6 +106,22 @@ config IXP2000_WATCHDOG
 
 	  Say N if you are unsure.
 
+config S3C2410_WATCHDOG
+	tristate "S3C2410 Watchdog"
+	depends on WATCHDOG && ARCH_S3C2410
+	help
+	  Watchdog timer block in the Samsung S3C2410 chips. This will
+	  reboot the system when the timer expires with the watchdog
+	  enabled.
+
+	  The driver is limited by the speed of the system's PCLK
+	  signal, so with reasonbaly fast systems (PCLK around 50-66MHz)
+	  then watchdog intervals of over approximately 20seconds are
+	  unavailable.
+
+	  The driver can be built as a module by choosing M, and will
+	  be called s3c2410_wdt
+
 config SA1100_WATCHDOG
 	tristate "SA1100/PXA2xx watchdog"
 	depends on WATCHDOG && ( ARCH_SA1100 || ARCH_PXA )
@@ -335,6 +351,20 @@ config INDYDOG
 	  watchdog timer that will reboot the machine after a 60 second
 	  timer expired and no process has written to /dev/watchdog during
 	  that time.
+
+# S390 Architecture
+
+config ZVM_WATCHDOG
+	tristate "z/VM Watchdog Timer"
+	depends on WATCHDOG && ARCH_S390
+	help
+	  IBM s/390 and zSeries machines running under z/VM 5.1 or later
+	  provide a virtual watchdog timer to their guest that cause a
+	  user define Control Program command to be executed after a
+	  timeout.
+
+	  To compile this driver as a module, choose M here. The module
+	  will be called vmwatchdog.
 
 # SUPERH Architecture
 

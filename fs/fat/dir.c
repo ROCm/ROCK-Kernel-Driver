@@ -22,6 +22,10 @@
 
 #include <asm/uaccess.h>
 
+static int fat_dir_ioctl(struct inode * inode, struct file * filp,
+		  unsigned int cmd, unsigned long arg);
+static int fat_readdir(struct file *filp, void *dirent, filldir_t filldir);
+
 struct file_operations fat_dir_operations = {
 	.read		= generic_read_dir,
 	.readdir	= fat_readdir,
@@ -567,7 +571,7 @@ out:
 	return ret;
 }
 
-int fat_readdir(struct file *filp, void *dirent, filldir_t filldir)
+static int fat_readdir(struct file *filp, void *dirent, filldir_t filldir)
 {
 	struct inode *inode = filp->f_dentry->d_inode;
 	return fat_readdirx(inode, filp, dirent, filldir, 0, 0);
@@ -624,7 +628,7 @@ efault:
 	return -EFAULT;
 }
 
-int fat_dir_ioctl(struct inode * inode, struct file * filp,
+static int fat_dir_ioctl(struct inode * inode, struct file * filp,
 		  unsigned int cmd, unsigned long arg)
 {
 	struct fat_ioctl_filldir_callback buf;
@@ -733,10 +737,10 @@ int fat_new_dir(struct inode *dir, struct inode *parent, int is_vfat)
 		de[0].adate = de[0].cdate =
 			de[1].adate = de[1].cdate = date;
 	}
-	de[0].start = CT_LE_W(MSDOS_I(dir)->i_logstart);
-	de[0].starthi = CT_LE_W(MSDOS_I(dir)->i_logstart>>16);
-	de[1].start = CT_LE_W(MSDOS_I(parent)->i_logstart);
-	de[1].starthi = CT_LE_W(MSDOS_I(parent)->i_logstart>>16);
+	de[0].start = cpu_to_le16(MSDOS_I(dir)->i_logstart);
+	de[0].starthi = cpu_to_le16(MSDOS_I(dir)->i_logstart>>16);
+	de[1].start = cpu_to_le16(MSDOS_I(parent)->i_logstart);
+	de[1].starthi = cpu_to_le16(MSDOS_I(parent)->i_logstart>>16);
 	mark_buffer_dirty(bh);
 	brelse(bh);
 	dir->i_atime = dir->i_ctime = dir->i_mtime = CURRENT_TIME;

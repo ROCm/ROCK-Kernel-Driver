@@ -35,6 +35,7 @@
 #include <linux/seq_file.h>
 #include <linux/kmod.h>
 #include <linux/list.h>
+#include <linux/bitops.h>
 
 #include <net/sock.h>
 #include <net/pkt_sched.h>
@@ -42,7 +43,6 @@
 #include <asm/processor.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
-#include <asm/bitops.h>
 
 static int qdisc_notify(struct sk_buff *oskb, struct nlmsghdr *n, u32 clid,
 			struct Qdisc *old, struct Qdisc *new);
@@ -371,6 +371,8 @@ int qdisc_graft(struct net_device *dev, struct Qdisc *parent, u32 classid,
 			unsigned long cl = cops->get(parent, classid);
 			if (cl) {
 				err = cops->graft(parent, cl, new, old);
+				if (new)
+					new->parent = classid;
 				cops->put(parent, cl);
 			}
 		}
@@ -459,8 +461,8 @@ qdisc_create(struct net_device *dev, u32 handle, struct rtattr **tca, int *errp)
 
 #ifdef CONFIG_NET_ESTIMATOR
 		if (tca[TCA_RATE-1])
-			qdisc_new_estimator(&sch->stats, sch->stats_lock,
-					    tca[TCA_RATE-1]);
+			gen_new_estimator(&sch->bstats, &sch->rate_est,
+				sch->stats_lock, tca[TCA_RATE-1]);
 #endif
 		return sch;
 	}
@@ -487,11 +489,9 @@ static int qdisc_change(struct Qdisc *sch, struct rtattr **tca)
 			return err;
 	}
 #ifdef CONFIG_NET_ESTIMATOR
-	if (tca[TCA_RATE-1]) {
-		qdisc_kill_estimator(&sch->stats);
-		qdisc_new_estimator(&sch->stats, sch->stats_lock,
-				    tca[TCA_RATE-1]);
-	}
+	if (tca[TCA_RATE-1])
+		gen_replace_estimator(&sch->bstats, &sch->rate_est,
+			sch->stats_lock, tca[TCA_RATE-1]);
 #endif
 	return 0;
 }
@@ -748,6 +748,7 @@ static int tc_fill_qdisc(struct sk_buff *skb, struct Qdisc *q, u32 clid,
 	struct tcmsg *tcm;
 	struct nlmsghdr  *nlh;
 	unsigned char	 *b = skb->tail;
+	struct gnet_dump d;
 
 	nlh = NLMSG_PUT(skb, pid, seq, event, sizeof(*tcm));
 	nlh->nlmsg_flags = flags;
@@ -760,9 +761,22 @@ static int tc_fill_qdisc(struct sk_buff *skb, struct Qdisc *q, u32 clid,
 	RTA_PUT(skb, TCA_KIND, IFNAMSIZ, q->ops->id);
 	if (q->ops->dump && q->ops->dump(q, skb) < 0)
 		goto rtattr_failure;
-	q->stats.qlen = q->q.qlen;
-	if (qdisc_copy_stats(skb, &q->stats, q->stats_lock))
+	q->qstats.qlen = q->q.qlen;
+
+	if (gnet_stats_start_copy_compat(skb, TCA_STATS2, TCA_STATS,
+			TCA_XSTATS, q->stats_lock, &d) < 0)
 		goto rtattr_failure;
+
+	if (gnet_stats_copy_basic(&d, &q->bstats) < 0 ||
+#ifdef CONFIG_NET_ESTIMATOR
+	    gnet_stats_copy_rate_est(&d, &q->rate_est) < 0 ||
+#endif
+	    gnet_stats_copy_queue(&d, &q->qstats) < 0)
+		goto rtattr_failure;
+	
+	if (gnet_stats_finish_copy(&d) < 0)
+		goto rtattr_failure;
+	
 	nlh->nlmsg_len = skb->tail - b;
 	return skb->len;
 
@@ -821,7 +835,7 @@ static int tc_dump_qdisc(struct sk_buff *skb, struct netlink_callback *cb)
 				q_idx++;
 				continue;
 			}
-			if (tc_fill_qdisc(skb, q, 0, NETLINK_CB(cb->skb).pid,
+			if (tc_fill_qdisc(skb, q, q->parent, NETLINK_CB(cb->skb).pid,
 					  cb->nlh->nlmsg_seq, NLM_F_MULTI, RTM_NEWQDISC) <= 0) {
 				read_unlock_bh(&qdisc_tree_lock);
 				goto done;

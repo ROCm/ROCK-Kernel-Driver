@@ -122,6 +122,9 @@ static struct ppp_channel_ops async_ops = {
  * frees the memory that ppp_asynctty_receive is using.  The best
  * way to fix this is to use a rwlock in the tty struct, but for now
  * we use a single global rwlock for all ttys in ppp line discipline.
+ *
+ * FIXME: this is no longer true. The _close path for the ldisc is 
+ * now guaranteed to be sane. 
  */
 static rwlock_t disc_data_lock = RW_LOCK_UNLOCKED;
 
@@ -144,7 +147,8 @@ static void ap_put(struct asyncppp *ap)
 }
 
 /*
- * Called when a tty is put into PPP line discipline.
+ * Called when a tty is put into PPP line discipline. Called in process
+ * context.
  */
 static int
 ppp_asynctty_open(struct tty_struct *tty)
@@ -255,6 +259,11 @@ ppp_asynctty_write(struct tty_struct *tty, struct file *file,
 	return -EAGAIN;
 }
 
+/*
+ * Called in process context only. May be re-entered by multiple
+ * ioctl calling threads.
+ */
+ 
 static int
 ppp_asynctty_ioctl(struct tty_struct *tty, struct file *file,
 		   unsigned int cmd, unsigned long arg)
@@ -716,7 +725,8 @@ flush:
 
 /*
  * Flush output from our internal buffers.
- * Called for the TCFLSH ioctl.
+ * Called for the TCFLSH ioctl. Can be entered in parallel
+ * but this is covered by the xmit_lock.
  */
 static void
 ppp_async_flush_output(struct asyncppp *ap)
@@ -816,7 +826,9 @@ process_input_packet(struct asyncppp *ap)
 		skb_trim(skb, 0);
 }
 
-/* called when the tty driver has data for us. */
+/* Called when the tty driver has data for us. Runs parallel with the
+   other ldisc functions but will not be re-entered */
+
 static void
 ppp_async_input(struct asyncppp *ap, const unsigned char *buf,
 		char *flags, int count)

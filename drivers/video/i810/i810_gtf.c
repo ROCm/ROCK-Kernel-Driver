@@ -124,7 +124,8 @@ void i810fb_encode_registers(const struct fb_var_screeninfo *var,
 			     struct i810fb_par *par, u32 xres, u32 yres)
 {
 	int n, blank_s, blank_e;
-	u8 *mmio = par->mmio_start_virtual, msr = 0;
+	u8 __iomem *mmio = par->mmio_start_virtual;
+	u8 msr = 0;
 
 	/* Horizontal */
 	/* htotal */

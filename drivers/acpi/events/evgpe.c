@@ -102,6 +102,8 @@ acpi_ev_set_gpe_type (
  * FUNCTION:    acpi_ev_update_gpe_enable_masks
  *
  * PARAMETERS:  gpe_event_info          - GPE to update
+ *              Type                    - What to do: ACPI_GPE_DISABLE or
+ *                                        ACPI_GPE_ENABLE
  *
  * RETURN:      Status
  *
@@ -166,6 +168,8 @@ acpi_ev_update_gpe_enable_masks (
  * FUNCTION:    acpi_ev_enable_gpe
  *
  * PARAMETERS:  gpe_event_info          - GPE to enable
+ *              write_to_hardware       - Enable now, or just mark data structs
+ *                                        (WAKE GPEs should be deferred)
  *
  * RETURN:      Status
  *
@@ -707,7 +711,7 @@ acpi_ev_gpe_dispatch (
 #ifdef ACPI_GPE_NOTIFY_CHECK
 
 /*******************************************************************************
- * NOT USED, PROTOTYPE ONLY AND WILL PROBABLY BE REMOVED
+ * TBD: NOT USED, PROTOTYPE ONLY AND WILL PROBABLY BE REMOVED
  *
  * FUNCTION:    acpi_ev_check_for_wake_only_gpe
  *

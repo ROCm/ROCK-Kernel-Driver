@@ -195,10 +195,10 @@ apply_imm22 (struct module *mod, struct insn *insn, uint64_t val)
 		printk(KERN_ERR "%s: value %li out of IMM22 range\n", mod->name, (int64_t)val);
 		return 0;
 	}
-	ia64_patch((u64) insn, 0x01fffcfe000, (  ((val & 0x200000) << 15) /* bit 21 -> 36 */
-					       | ((val & 0x1f0000) <<  6) /* bit 16 -> 22 */
-					       | ((val & 0x00ff80) << 20) /* bit  7 -> 27 */
-					       | ((val & 0x00007f) << 13) /* bit  0 -> 13 */));
+	ia64_patch((u64) insn, 0x01fffcfe000UL, (  ((val & 0x200000UL) << 15) /* bit 21 -> 36 */
+					         | ((val & 0x1f0000UL) <<  6) /* bit 16 -> 22 */
+					         | ((val & 0x00ff80UL) << 20) /* bit  7 -> 27 */
+					         | ((val & 0x00007fUL) << 13) /* bit  0 -> 13 */));
 	return 1;
 }
 
@@ -209,8 +209,8 @@ apply_imm21b (struct module *mod, struct insn *insn, uint64_t val)
 		printk(KERN_ERR "%s: value %li out of IMM21b range\n", mod->name, (int64_t)val);
 		return 0;
 	}
-	ia64_patch((u64) insn, 0x11ffffe000, (  ((val & 0x100000) << 16) /* bit 20 -> 36 */
-					      | ((val & 0x0fffff) << 13) /* bit  0 -> 13 */));
+	ia64_patch((u64) insn, 0x11ffffe000UL, (  ((val & 0x100000UL) << 16) /* bit 20 -> 36 */
+					        | ((val & 0x0fffffUL) << 13) /* bit  0 -> 13 */));
 	return 1;
 }
 
@@ -253,9 +253,9 @@ plt_target (struct plt_entry *plt)
 	long off;
 
 	b0 = b[0]; b1 = b[1];
-	off = (  ((b1 & 0x00fffff000000000) >> 36)		/* imm20b -> bit 0 */
-	       | ((b0 >> 48) << 20) | ((b1 & 0x7fffff) << 36)	/* imm39 -> bit 20 */
-	       | ((b1 & 0x0800000000000000) << 0));		/* i -> bit 59 */
+	off = (  ((b1 & 0x00fffff000000000UL) >> 36)		/* imm20b -> bit 0 */
+	       | ((b0 >> 48) << 20) | ((b1 & 0x7fffffUL) << 36)	/* imm39 -> bit 20 */
+	       | ((b1 & 0x0800000000000000UL) << 0));		/* i -> bit 59 */
 	return (long) plt->bundle[1] + 16*off;
 }
 
@@ -739,7 +739,7 @@ do_reloc (struct module *mod, uint8_t r_type, Elf64_Sym *sym, uint64_t addend,
 			if (gp_addressable(mod, val)) {
 				/* turn "ld8" into "mov": */
 				DEBUGP("%s: patching ld8 at %p to mov\n", __FUNCTION__, location);
-				ia64_patch((u64) location, 0x1fff80fe000, 0x10000000000);
+				ia64_patch((u64) location, 0x1fff80fe000UL, 0x10000000000UL);
 			}
 			return 0;
 

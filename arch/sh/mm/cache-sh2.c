@@ -24,7 +24,7 @@
 unsigned long __get_oc_addr(unsigned long set, unsigned long way)
 {
 	unsigned long ccr;
-	
+
 	/*
 	 * On SH-2 the way bit isn't tracked in the address field
 	 * if we're doing address array access .. instead, we need
@@ -46,27 +46,5 @@ unsigned long __get_oc_addr(unsigned long set, unsigned long way)
 	ctrl_outl(ccr, CCR);
 
 	return CACHE_OC_ADDRESS_ARRAY | (set << cpu_data->dcache.entry_shift);
-}
-
-int __init detect_cpu_and_cache_system(void)
-{
-	/*
-	 * For now, assume SH7604 .. fix this later.
-	 */
-	cpu_data->type			= CPU_SH7604;
-	cpu_data->dcache.ways		= 4;
-	cpu_data->dcache.way_shift	= 6;
-	cpu_data->dcache.sets		= 64;
-	cpu_data->dcache.entry_shift	= 4;
-	cpu_data->dcache.linesz		= L1_CACHE_BYTES;
-	cpu_data->dcache.flags		= 0;
-
-	/*
-	 * SH-2 doesn't have separate caches
-	 */
-	cpu_data->dcache.flags |= SH_CACHE_COMBINED;
-	cpu_data->icache = cpu_data->dcache;
-
-	return 0;
 }
 

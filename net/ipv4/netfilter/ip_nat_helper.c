@@ -347,7 +347,7 @@ ip_nat_sack_adjust(struct sk_buff **pskb,
 	return 1;
 }
 
-/* TCP sequence number adjustment.  Returns true or false.  */
+/* TCP sequence number adjustment.  Returns 1 on success, 0 on failure */
 int
 ip_nat_seq_adjust(struct sk_buff **pskb, 
 		  struct ip_conntrack *ct, 
@@ -396,7 +396,12 @@ ip_nat_seq_adjust(struct sk_buff **pskb,
 	tcph->seq = newseq;
 	tcph->ack_seq = newack;
 
-	return ip_nat_sack_adjust(pskb, tcph, ct, ctinfo);
+	if (!ip_nat_sack_adjust(pskb, tcph, ct, ctinfo))
+		return 0;
+
+	ip_conntrack_tcp_update(*pskb, ct, dir);
+
+	return 1;
 }
 
 static inline int

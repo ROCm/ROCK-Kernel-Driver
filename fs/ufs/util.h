@@ -72,20 +72,20 @@ ufs_get_fs_npsect(struct super_block *sb, struct ufs_super_block_first *usb1,
 static inline u64
 ufs_get_fs_qbmask(struct super_block *sb, struct ufs_super_block_third *usb3)
 {
-	u64 tmp;
+	__fs64 tmp;
 
 	switch (UFS_SB(sb)->s_flags & UFS_ST_MASK) {
 	case UFS_ST_SUN:
-		((u32 *)&tmp)[0] = usb3->fs_u2.fs_sun.fs_qbmask[0];
-		((u32 *)&tmp)[1] = usb3->fs_u2.fs_sun.fs_qbmask[1];
+		((__fs32 *)&tmp)[0] = usb3->fs_u2.fs_sun.fs_qbmask[0];
+		((__fs32 *)&tmp)[1] = usb3->fs_u2.fs_sun.fs_qbmask[1];
 		break;
 	case UFS_ST_SUNx86:
-		((u32 *)&tmp)[0] = usb3->fs_u2.fs_sunx86.fs_qbmask[0];
-		((u32 *)&tmp)[1] = usb3->fs_u2.fs_sunx86.fs_qbmask[1];
+		((__fs32 *)&tmp)[0] = usb3->fs_u2.fs_sunx86.fs_qbmask[0];
+		((__fs32 *)&tmp)[1] = usb3->fs_u2.fs_sunx86.fs_qbmask[1];
 		break;
 	case UFS_ST_44BSD:
-		((u32 *)&tmp)[0] = usb3->fs_u2.fs_44.fs_qbmask[0];
-		((u32 *)&tmp)[1] = usb3->fs_u2.fs_44.fs_qbmask[1];
+		((__fs32 *)&tmp)[0] = usb3->fs_u2.fs_44.fs_qbmask[0];
+		((__fs32 *)&tmp)[1] = usb3->fs_u2.fs_44.fs_qbmask[1];
 		break;
 	}
 
@@ -95,20 +95,20 @@ ufs_get_fs_qbmask(struct super_block *sb, struct ufs_super_block_third *usb3)
 static inline u64
 ufs_get_fs_qfmask(struct super_block *sb, struct ufs_super_block_third *usb3)
 {
-	u64 tmp;
+	__fs64 tmp;
 
 	switch (UFS_SB(sb)->s_flags & UFS_ST_MASK) {
 	case UFS_ST_SUN:
-		((u32 *)&tmp)[0] = usb3->fs_u2.fs_sun.fs_qfmask[0];
-		((u32 *)&tmp)[1] = usb3->fs_u2.fs_sun.fs_qfmask[1];
+		((__fs32 *)&tmp)[0] = usb3->fs_u2.fs_sun.fs_qfmask[0];
+		((__fs32 *)&tmp)[1] = usb3->fs_u2.fs_sun.fs_qfmask[1];
 		break;
 	case UFS_ST_SUNx86:
-		((u32 *)&tmp)[0] = usb3->fs_u2.fs_sunx86.fs_qfmask[0];
-		((u32 *)&tmp)[1] = usb3->fs_u2.fs_sunx86.fs_qfmask[1];
+		((__fs32 *)&tmp)[0] = usb3->fs_u2.fs_sunx86.fs_qfmask[0];
+		((__fs32 *)&tmp)[1] = usb3->fs_u2.fs_sunx86.fs_qfmask[1];
 		break;
 	case UFS_ST_44BSD:
-		((u32 *)&tmp)[0] = usb3->fs_u2.fs_44.fs_qfmask[0];
-		((u32 *)&tmp)[1] = usb3->fs_u2.fs_44.fs_qfmask[1];
+		((__fs32 *)&tmp)[0] = usb3->fs_u2.fs_44.fs_qfmask[0];
+		((__fs32 *)&tmp)[1] = usb3->fs_u2.fs_44.fs_qfmask[1];
 		break;
 	}
 
@@ -273,11 +273,11 @@ extern void _ubh_memcpyubh_(struct ufs_sb_private_info *, struct ufs_buffer_head
 	((begin) & ~uspi->s_fmask))
 
 #define ubh_get_addr16(ubh,begin) \
-	(((u16*)((ubh)->bh[(begin) >> (uspi->s_fshift-1)]->b_data)) + \
+	(((__fs16*)((ubh)->bh[(begin) >> (uspi->s_fshift-1)]->b_data)) + \
 	((begin) & (uspi->fsize>>1) - 1)))
 
 #define ubh_get_addr32(ubh,begin) \
-	(((u32*)((ubh)->bh[(begin) >> (uspi->s_fshift-2)]->b_data)) + \
+	(((__fs32*)((ubh)->bh[(begin) >> (uspi->s_fshift-2)]->b_data)) + \
 	((begin) & ((uspi->s_fsize>>2) - 1)))
 
 #define ubh_get_addr ubh_get_addr8
@@ -315,10 +315,10 @@ extern void _ubh_memcpyubh_(struct ufs_sb_private_info *, struct ufs_buffer_head
  * Macros to access cylinder group array structures
  */
 #define ubh_cg_blktot(ucpi,cylno) \
-	(*((__u32*)ubh_get_addr(UCPI_UBH, (ucpi)->c_btotoff + ((cylno) << 2))))
+	(*((__fs32*)ubh_get_addr(UCPI_UBH, (ucpi)->c_btotoff + ((cylno) << 2))))
 
 #define ubh_cg_blks(ucpi,cylno,rpos) \
-	(*((__u16*)ubh_get_addr(UCPI_UBH, \
+	(*((__fs16*)ubh_get_addr(UCPI_UBH, \
 	(ucpi)->c_boff + (((cylno) * uspi->s_nrpos + (rpos)) << 1 ))))
 
 /*
@@ -476,7 +476,7 @@ static inline void _ubh_setblock_(struct ufs_sb_private_info * uspi,
 }
 
 static inline void ufs_fragacct (struct super_block * sb, unsigned blockmap,
-	unsigned * fraglist, int cnt)
+	__fs32 * fraglist, int cnt)
 {
 	struct ufs_sb_private_info * uspi;
 	unsigned fragsize, pos;

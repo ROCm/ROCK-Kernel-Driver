@@ -1,34 +1,22 @@
 /*
- * Copyright (c) 1995-2001 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 1995-2001,2004 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2.1 of the GNU Lesser General Public License
  * as published by the Free Software Foundation.
  *
- * This program is distributed in the hope that it would be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  *
- * Further, this software is distributed without any warranty that it is
- * free of the rightful claim of any third person regarding infringement
- * or the like.  Any license provided herein, whether implied or
- * otherwise, applies only to this software file.  Patent licenses, if
- * any, provided herein do not apply to combinations of this program with
- * other software, or any other product whatsoever.
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307
+ * USA
  *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this program; if not, write the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307,
- * USA.
- *
- * Contact information: Silicon Graphics, Inc., 1600 Amphitheatre Pkwy,
- * Mountain View, CA  94043, or:
- *
- * http://www.sgi.com
- *
- * For further information regarding this notice, see:
- *
- * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
+ * Contact information: Silicon Graphics, Inc., 1500 Crittenden Lane,
+ * Mountain View, CA 94043, USA, or: http://www.sgi.com
  */
 #ifndef _LINUX_DQBLK_XFS_H
 #define _LINUX_DQBLK_XFS_H
@@ -40,12 +28,12 @@
  */
 
 #define XQM_CMD(x)	(('X'<<8)+(x))	/* note: forms first QCMD argument */
-#define Q_XQUOTAON	XQM_CMD(0x1)	/* enable accounting/enforcement */
-#define Q_XQUOTAOFF	XQM_CMD(0x2)	/* disable accounting/enforcement */
-#define Q_XGETQUOTA	XQM_CMD(0x3)	/* get disk limits and usage */
-#define Q_XSETQLIM	XQM_CMD(0x4)	/* set disk limits */
-#define Q_XGETQSTAT	XQM_CMD(0x5)	/* get quota subsystem status */
-#define Q_XQUOTARM	XQM_CMD(0x6)	/* free disk space used by dquots */
+#define Q_XQUOTAON	XQM_CMD(1)	/* enable accounting/enforcement */
+#define Q_XQUOTAOFF	XQM_CMD(2)	/* disable accounting/enforcement */
+#define Q_XGETQUOTA	XQM_CMD(3)	/* get disk limits and usage */
+#define Q_XSETQLIM	XQM_CMD(4)	/* set disk limits */
+#define Q_XGETQSTAT	XQM_CMD(5)	/* get quota subsystem status */
+#define Q_XQUOTARM	XQM_CMD(6)	/* free disk space used by dquots */
 
 /*
  * fs_disk_quota structure:
@@ -105,15 +93,30 @@ typedef struct fs_disk_quota {
 #define FS_DQ_TIMER_MASK	(FS_DQ_BTIMER | FS_DQ_ITIMER | FS_DQ_RTBTIMER)
 
 /*
+ * Warning counts are set in both super user's dquot and others. For others,
+ * warnings are set/cleared by the administrators (or automatically by going
+ * below the soft limit).  Superusers warning values set the warning limits
+ * for the rest.  In case these values are zero, the DQ_{F,B}WARNLIMIT values
+ * defined below are used. 
+ * These values also apply only to the d_fieldmask field for Q_XSETQLIM.
+ */
+#define FS_DQ_BWARNS	(1<<9)
+#define FS_DQ_IWARNS	(1<<10)
+#define FS_DQ_RTBWARNS	(1<<11)
+#define FS_DQ_WARNS_MASK	(FS_DQ_BWARNS | FS_DQ_IWARNS | FS_DQ_RTBWARNS)
+
+/*
  * Various flags related to quotactl(2).  Only relevant to XFS filesystems.
  */
 #define XFS_QUOTA_UDQ_ACCT	(1<<0)  /* user quota accounting */
 #define XFS_QUOTA_UDQ_ENFD	(1<<1)  /* user quota limits enforcement */
 #define XFS_QUOTA_GDQ_ACCT	(1<<2)  /* group quota accounting */
 #define XFS_QUOTA_GDQ_ENFD	(1<<3)  /* group quota limits enforcement */
+#define XFS_QUOTA_PDQ_ACCT	(1<<4)  /* project quota accounting */
+#define XFS_QUOTA_PDQ_ENFD	(1<<5)  /* project quota limits enforcement */
 
 #define XFS_USER_QUOTA		(1<<0)	/* user quota type */
-#define XFS_PROJ_QUOTA		(1<<1)	/* (IRIX) project quota type */
+#define XFS_PROJ_QUOTA		(1<<1)	/* project quota type */
 #define XFS_GROUP_QUOTA		(1<<2)	/* group quota type */
 
 /*

@@ -40,6 +40,7 @@
 #include <asm/io.h>
 #include <asm/hardware.h>
 #include <asm/irq.h>
+#include <asm/arch/pxa-regs.h>
 
 #if defined(CONFIG_SERIAL_PXA_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
 #define SUPPORT_SYSRQ

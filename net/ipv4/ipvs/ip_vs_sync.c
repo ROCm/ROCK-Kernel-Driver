@@ -16,6 +16,7 @@
  *	Alexandre Cassen	:	Added master & backup support at a time.
  *	Alexandre Cassen	:	Added SyncID support for incoming sync
  *					messages filtering.
+ *	Justin Ossevoort	:	Fix endian problem on sync message size.
  */
 
 #include <linux/module.h>
@@ -278,6 +279,9 @@ static void ip_vs_process_message(const char *buffer, const size_t buflen)
 	struct ip_vs_conn *cp;
 	char *p;
 	int i;
+
+	/* Convert size back to host byte order */
+	m->size = ntohs(m->size);
 
 	if (buflen != m->size) {
 		IP_VS_ERR("bogus message\n");
@@ -569,6 +573,19 @@ ip_vs_send_async(struct socket *sock, const char *buffer, const size_t length)
 	return len;
 }
 
+static void
+ip_vs_send_sync_msg(struct socket *sock, struct ip_vs_sync_mesg *msg)
+{
+	int msize;
+
+	msize = msg->size;
+
+	/* Put size in network byte order */
+	msg->size = htons(msg->size);
+
+	if (ip_vs_send_async(sock, (char *)msg, msize) != msize)
+		IP_VS_ERR("ip_vs_send_async error\n");
+}
 
 static int
 ip_vs_receive(struct socket *sock, char *buffer, const size_t buflen)
@@ -605,7 +622,6 @@ static void sync_master_loop(void)
 {
 	struct socket *sock;
 	struct ip_vs_sync_buff *sb;
-	struct ip_vs_sync_mesg *m;
 
 	/* create the sending multicast socket */
 	sock = make_send_sock();
@@ -618,19 +634,13 @@ static void sync_master_loop(void)
 
 	for (;;) {
 		while ((sb=sb_dequeue())) {
-			m = sb->mesg;
-			if (ip_vs_send_async(sock, (char *)m,
-					     m->size) != m->size)
-				IP_VS_ERR("ip_vs_send_async error\n");
+			ip_vs_send_sync_msg(sock, sb->mesg);
 			ip_vs_sync_buff_release(sb);
 		}
 
 		/* check if entries stay in curr_sb for 2 seconds */
 		if ((sb = get_curr_sync_buff(2*HZ))) {
-			m = sb->mesg;
-			if (ip_vs_send_async(sock, (char *)m,
-					     m->size) != m->size)
-				IP_VS_ERR("ip_vs_send_async error\n");
+			ip_vs_send_sync_msg(sock, sb->mesg);
 			ip_vs_sync_buff_release(sb);
 		}
 

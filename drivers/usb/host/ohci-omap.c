@@ -428,40 +428,18 @@ ohci_omap_start (struct usb_hcd *hcd)
 	struct ohci_hcd	*ohci = hcd_to_ohci (hcd);
 	int		ret;
 
-	config = hcd->self.controller->platform_data;
-	ohci->hcca = dma_alloc_coherent (hcd->self.controller,
-			sizeof *ohci->hcca, &ohci->hcca_dma, 0);
-	if (!ohci->hcca)
-		return -ENOMEM;
-
-        memset (ohci->hcca, 0, sizeof (struct ohci_hcca));
-	if ((ret = ohci_mem_init (ohci)) < 0) {
-		ohci_stop (hcd);
+	if ((ret = ohci_init(ohci)) < 0)
 		return ret;
-	}
-	ohci->regs = hcd->regs;
 
+	config = hcd->self.controller->platform_data;
 	if (config->otg || config->rwc)
 		writel(OHCI_CTRL_RWC, &ohci->regs->control);
 
-	if (hc_reset (ohci) < 0) {
-		ohci_stop (hcd);
-		return -ENODEV;
-	}
-
-	if (hc_start (ohci) < 0) {
+	if ((ret = ohci_run (ohci)) < 0) {
 		err ("can't start %s", ohci->hcd.self.bus_name);
 		ohci_stop (hcd);
-		return -EBUSY;
+		return ret;
 	}
-	if (ohci->power_budget)
-		hub_set_power_budget(ohci->hcd.self.root_hub,
-					ohci->power_budget);
-	create_debug_files (ohci);
-
-#ifdef	DEBUG
-	ohci_dump (ohci, 1);
-#endif
 	return 0;
 }
 

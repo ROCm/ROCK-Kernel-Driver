@@ -800,6 +800,7 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 	 */
 	sb->s_op = &ext2_sops;
 	sb->s_export_op = &ext2_export_ops;
+	sb->s_xattr = ext2_xattr_handlers;
 	root = iget(sb, EXT2_ROOT_INO);
 	sb->s_root = d_alloc_root(root);
 	if (!sb->s_root) {

@@ -1338,7 +1338,6 @@ static int ax25_accept(struct socket *sock, struct socket *newsock, int flags)
 	remove_wait_queue(sk->sk_sleep, &wait);
 
 	newsk		 = skb->sk;
-	newsk->sk_pair	 = NULL;
 	newsk->sk_socket = newsock;
 	newsk->sk_sleep	 = &newsock->wait;
 

@@ -1274,7 +1274,9 @@ asmlinkage long sparc32_execve(struct pt_regs *regs)
 		current_thread_info()->xfsr[0] = 0;
 		current_thread_info()->fpsaved[0] = 0;
 		regs->tstate &= ~TSTATE_PEF;
+		task_lock(current);
 		current->ptrace &= ~PT_DTRACE;
+		task_unlock(current);
 	}
 out:
 	return error;
@@ -1749,7 +1751,8 @@ asmlinkage long compat_sys_waitid(u32 which, u32 pid,
 
 	set_fs (KERNEL_DS);
 	ret = sys_waitid(which, pid, (siginfo_t __user *) &info,
-			 options, uru ? &ru : NULL);
+			 options,
+			 uru ? (struct rusage __user *) &ru : NULL);
 	set_fs (old_fs);
 
 	if (ret < 0 || info.si_signo == 0)

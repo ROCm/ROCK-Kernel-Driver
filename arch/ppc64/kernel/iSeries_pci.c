@@ -55,6 +55,7 @@ extern int panic_timeout;
 extern unsigned long iSeries_Base_Io_Memory;    
 
 extern struct iommu_table *tceTables[256];
+extern unsigned long io_page_mask;
 
 extern void iSeries_MmIoTest(void);
 
@@ -196,6 +197,7 @@ void iSeries_pcibios_init(void)
 	PPCDBG(PPCDBG_BUSWALK, "iSeries_pcibios_init Entry.\n"); 
 	iSeries_IoMmTable_Initialize();
 	find_and_init_phbs();
+	io_page_mask = -1;
 	/* pci_assign_all_busses = 0;		SFRXXX*/
 	PPCDBG(PPCDBG_BUSWALK, "iSeries_pcibios_init Exit.\n"); 
 }

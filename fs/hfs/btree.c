@@ -154,7 +154,7 @@ static struct hfs_bnode *hfs_bmap_new_bmap(struct hfs_bnode *prev, u32 idx)
 	struct hfs_btree *tree = prev->tree;
 	struct hfs_bnode *node;
 	struct hfs_bnode_desc desc;
-	u32 cnid;
+	__be32 cnid;
 
 	node = hfs_bnode_create(tree, idx);
 	if (IS_ERR(node))

@@ -180,7 +180,7 @@ acpi_ev_initialize_op_regions (
  * FUNCTION:    acpi_ev_execute_reg_method
  *
  * PARAMETERS:  region_obj          - Object structure
- *              Function            - On (1) or Off (0)
+ *              Function            - Passed to _REG:  On (1) or Off (0)
  *
  * RETURN:      Status
  *
@@ -232,7 +232,7 @@ acpi_ev_execute_reg_method (
 		goto cleanup;
 	}
 
-	/* Set up the parameter objects */
+	/* Setup the parameter objects */
 
 	params[0]->integer.value = region_obj->region.space_id;
 	params[1]->integer.value = function;
@@ -262,7 +262,6 @@ cleanup:
  * FUNCTION:    acpi_ev_address_space_dispatch
  *
  * PARAMETERS:  region_obj          - Internal region object
- *              space_id            - ID of the address space (0-255)
  *              Function            - Read or Write operation
  *              Address             - Where in the space to read or write
  *              bit_width           - Field width in bits (8, 16, 32, or 64)
@@ -425,8 +424,8 @@ acpi_ev_address_space_dispatch (
  *
  * FUNCTION:    acpi_ev_detach_region
  *
- * PARAMETERS:  region_obj      - Region Object
- *              acpi_ns_is_locked - Namespace Region Already Locked?
+ * PARAMETERS:  region_obj          - Region Object
+ *              acpi_ns_is_locked   - Namespace Region Already Locked?
  *
  * RETURN:      None
  *
@@ -560,9 +559,9 @@ acpi_ev_detach_region(
  *
  * FUNCTION:    acpi_ev_attach_region
  *
- * PARAMETERS:  handler_obj     - Handler Object
- *              region_obj      - Region Object
- *              acpi_ns_is_locked - Namespace Region Already Locked?
+ * PARAMETERS:  handler_obj         - Handler Object
+ *              region_obj          - Region Object
+ *              acpi_ns_is_locked   - Namespace Region Already Locked?
  *
  * RETURN:      None
  *
@@ -971,7 +970,7 @@ unlock_and_exit:
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Run _REG methods for the Space ID;
+ * DESCRIPTION: Run all _REG methods for the input Space ID;
  *              Note: assumes namespace is locked, or system init time.
  *
  ******************************************************************************/

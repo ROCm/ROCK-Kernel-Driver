@@ -160,6 +160,7 @@ static struct serio * __init parkbd_allocate_serio(void)
 
 	serio = kmalloc(sizeof(struct serio), GFP_KERNEL);
 	if (serio) {
+		memset(serio, 0, sizeof(struct serio));
 		serio->type = parkbd_mode;
 		serio->write = parkbd_write,
 		strlcpy(serio->name, "PARKBD AT/XT keyboard adapter", sizeof(serio->name));

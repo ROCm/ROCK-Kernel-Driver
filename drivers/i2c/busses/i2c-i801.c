@@ -599,6 +599,8 @@ static struct pci_device_id i801_ids[] = {
 	{ 0, }
 };
 
+MODULE_DEVICE_TABLE (pci, i801_ids);
+
 static int __devinit i801_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {
 
@@ -631,7 +633,7 @@ static struct pci_driver i801_driver = {
 
 static int __init i2c_i801_init(void)
 {
-	return pci_module_init(&i801_driver);
+	return pci_register_driver(&i801_driver);
 }
 
 static void __exit i2c_i801_exit(void)

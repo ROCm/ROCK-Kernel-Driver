@@ -34,12 +34,12 @@
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 #include <linux/spinlock.h>
+#include <linux/bitops.h>
 
 #include <asm/immap_cpm2.h>
 #include <asm/pgtable.h>
 #include <asm/mpc8260.h>
 #include <asm/irq.h>
-#include <asm/bitops.h>
 #include <asm/uaccess.h>
 #include <asm/cpm2.h>
 

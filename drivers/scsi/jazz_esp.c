@@ -286,7 +286,7 @@ static void dma_led_on(struct NCR_ESP *esp)
 }
 
 static Scsi_Host_Template driver_template = {
-	.proc_name		= "esp",
+	.proc_name		= "jazz_esp",
 	.proc_info		= &esp_proc_info,
 	.name			= "ESP 100/100a/200",
 	.detect			= jazz_esp_detect,

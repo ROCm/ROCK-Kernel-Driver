@@ -152,7 +152,7 @@ struct msi_desc {
 		__u16	tail;
 	}link;
 
-	unsigned long mask_base;
+	void __iomem *mask_base;
 	struct pci_dev *dev;
 };
 

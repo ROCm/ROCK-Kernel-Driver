@@ -399,3 +399,10 @@ config GACT_PROB
         depends on NET_ACT_GACT
         ---help---
         Allows generic actions to be randomly  or deterministically used
+
+config NET_ACT_MIRRED
+        tristate "Packet In/Egress redirecton/mirror Actions"
+        depends on NET_CLS_ACT
+        ---help---
+        requires new iproute2
+        This allows packets to be mirrored or redirected to netdevices

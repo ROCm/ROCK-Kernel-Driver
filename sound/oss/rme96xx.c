@@ -1685,14 +1685,14 @@ static int rm96xx_mmap(struct file *file, struct vm_area_struct *vma) {
 	if (vma->vm_flags & VM_WRITE) {
 		if (!s->started) rme96xx_startcard(s,1);
 
-		if (remap_page_range(vma, vma->vm_start, virt_to_phys(s->playbuf + dma->outoffset*RME96xx_DMA_MAX_SIZE), size, vma->vm_page_prot)) {
+		if (remap_pfn_range(vma, vma->vm_start, virt_to_phys(s->playbuf + dma->outoffset*RME96xx_DMA_MAX_SIZE) >> PAGE_SHIFT, size, vma->vm_page_prot)) {
 			unlock_kernel();
 			return -EAGAIN;
 		}
 	} 
 	else if (vma->vm_flags & VM_READ) {
 		if (!s->started) rme96xx_startcard(s,1);
-		if (remap_page_range(vma, vma->vm_start, virt_to_phys(s->playbuf + dma->inoffset*RME96xx_DMA_MAX_SIZE), size, vma->vm_page_prot)) {
+		if (remap_pfn_range(vma, vma->vm_start, virt_to_phys(s->playbuf + dma->inoffset*RME96xx_DMA_MAX_SIZE) >> PAGE_SHIFT, size, vma->vm_page_prot)) {
 			unlock_kernel();
 			return -EAGAIN;
 		}

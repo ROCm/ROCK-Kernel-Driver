@@ -27,6 +27,7 @@ menu "General machine setup"
 
 config VT
 	bool
+	select INPUT
 	default y
 	---help---
 	  If you say Y here, you will get support for terminal devices with

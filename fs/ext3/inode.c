@@ -1579,20 +1579,31 @@ static ssize_t ext3_direct_IO(int rw, struct kiocb *iocb,
 				 offset, nr_segs,
 				 ext3_direct_io_get_blocks, NULL);
 
+	/*
+	 * Reacquire the handle: ext3_direct_io_get_block() can restart the
+	 * transaction
+	 */
+	handle = journal_current_handle();
+
 out_stop:
 	if (handle) {
 		int err;
 
-		if (orphan) 
+		if (orphan && inode->i_nlink)
 			ext3_orphan_del(handle, inode);
 		if (orphan && ret > 0) {
 			loff_t end = offset + ret;
 			if (end > inode->i_size) {
 				ei->i_disksize = end;
 				i_size_write(inode, end);
-				err = ext3_mark_inode_dirty(handle, inode);
-				if (!ret) 
-					ret = err;
+				/*
+				 * We're going to return a positive `ret'
+				 * here due to non-zero-length I/O, so there's
+				 * no way of reporting error returns from
+				 * ext3_mark_inode_dirty() to userspace.  So
+				 * ignore it.
+				 */
+				ext3_mark_inode_dirty(handle, inode);
 			}
 		}
 		err = ext3_journal_stop(handle);

@@ -207,7 +207,7 @@ struct atkbd {
 static ssize_t atkbd_attr_show_helper(struct device *dev, char *buf,
 				ssize_t (*handler)(struct atkbd *, char *));
 static ssize_t atkbd_attr_set_helper(struct device *dev, const char *buf, size_t count,
-				int (*handler)(struct atkbd *, const char *, size_t));
+				ssize_t (*handler)(struct atkbd *, const char *, size_t));
 #define ATKBD_DEFINE_ATTR(_name)						\
 static ssize_t atkbd_show_##_name(struct atkbd *, char *);			\
 static ssize_t atkbd_set_##_name(struct atkbd *, const char *, size_t);		\
@@ -526,8 +526,11 @@ static int atkbd_probe(struct atkbd *atkbd)
 		return 0;
 	}
 
-	if (param[0] != 0xab && param[0] != 0xac)
+	if (param[0] != 0xab && param[0] != 0xac &&	/* Regular and NCD Sun keyboards */
+	    param[0] != 0x2b && param[0] != 0x5d &&	/* Trust keyboard, raw and translated */
+	    param[0] != 0x60 && param[0] != 0x47)	/* NMB SGI keyboard, raw and translated */
 		return -1;
+
 	atkbd->id = (param[0] << 8) | param[1];
 
 	if (atkbd->id == 0xaca1 && atkbd->translated) {
@@ -926,7 +929,7 @@ out:
 }
 
 static ssize_t atkbd_attr_set_helper(struct device *dev, const char *buf, size_t count,
-				int (*handler)(struct atkbd *, const char *, size_t))
+				ssize_t (*handler)(struct atkbd *, const char *, size_t))
 {
 	struct serio *serio = to_serio_port(dev);
 	struct atkbd *atkbd;

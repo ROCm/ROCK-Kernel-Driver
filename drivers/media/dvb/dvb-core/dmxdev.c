@@ -25,6 +25,7 @@
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/sched.h>
 #include <linux/poll.h>
 #include <linux/ioctl.h>
@@ -33,10 +34,11 @@
 #include <asm/system.h>
 
 #include "dmxdev.h"
-#include "dvb_functions.h"
 
-MODULE_PARM(debug,"i");
-static int debug = 0;
+static int debug;
+
+module_param(debug, int, 0644);
+MODULE_PARM_DESC(debug, "Turn on/off debugging (default:off).");
 
 #define dprintk	if (debug) printk
 

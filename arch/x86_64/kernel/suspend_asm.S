@@ -1,22 +1,18 @@
-/* originally gcc generated, but now changed. don't overwrite. */
+/* Originally gcc generated, modified by hand
+ *
+ * This may not use any stack, nor any variable that is not "NoSave":
+ *
+ * Its rewriting one kernel image with another. What is stack in "old"
+ * image could very well be data page in "new" image, and overwriting
+ * your own stack under you is bad idea.
+ */
 	
 	.text
 #include <linux/linkage.h>
 #include <asm/segment.h>
 #include <asm/page.h>
 
-/* Input:
- * rdi	resume flag 
- */	
-			
-ENTRY(do_magic)
-.LFB5:
-	subq	$8, %rsp
-.LCFI2:
-	testl	%edi, %edi
-	jne	.L90
-	call	do_magic_suspend_1
-	call	save_processor_state
+ENTRY(swsusp_arch_suspend)
 
 	movq %rsp, saved_context_esp(%rip)
 	movq %rax, saved_context_eax(%rip)
@@ -36,36 +32,35 @@ ENTRY(do_magic)
 	movq %r15, saved_context_r15(%rip)
 	pushfq ; popq saved_context_eflags(%rip)
 
-	addq	$8, %rsp
-	jmp	do_magic_suspend_2
-.L90:
+	call swsusp_save
+	ret
+
+ENTRY(swsusp_arch_resume)
 	/* set up cr3 */	
 	leaq	init_level4_pgt(%rip),%rax
 	subq	$__START_KERNEL_map,%rax
-	movq %rax,%cr3
+	movq	%rax,%cr3
 
 	movq	mmu_cr4_features(%rip), %rax
 	movq	%rax, %rdx
-	
 	andq	$~(1<<7), %rdx	# PGE
-	movq %rdx, %cr4;  # turn off PGE     
-	movq %cr3, %rcx;  # flush TLB        
-	movq %rcx, %cr3;                     
-	movq %rax, %cr4;  # turn PGE back on 
+	movq	%rdx, %cr4;  # turn off PGE
+	movq	%cr3, %rcx;  # flush TLB
+	movq	%rcx, %cr3;
+	movq	%rax, %cr4;  # turn PGE back on
 
-	call	do_magic_resume_1
 	movl	nr_copy_pages(%rip), %eax
 	xorl	%ecx, %ecx
-	movq	$0, loop(%rip)
+	movq	$0, %r10
 	testl	%eax, %eax
-	je	.L108
+	jz	done
 .L105:
 	xorl	%esi, %esi
-	movq	$0, loop2(%rip)
+	movq	$0, %r11
 	jmp	.L104
 	.p2align 4,,7
-.L111:
-	movq	loop(%rip), %rcx
+copy_one_page:
+	movq	%r10, %rcx
 .L104:
 	movq	pagedir_nosave(%rip), %rdx
 	movq	%rcx, %rax
@@ -75,27 +70,26 @@ ENTRY(do_magic)
 	movzbl	(%rsi,%rax), %eax
 	movb	%al, (%rsi,%rcx)
 
-	movq %cr3, %rax;  # flush TLB 
-	movq %rax, %cr3;              
+	movq	%cr3, %rax;  # flush TLB
+	movq	%rax, %cr3;
 
-	movq	loop2(%rip), %rax
+	movq	%r11, %rax
 	incq	%rax
 	cmpq	$4095, %rax
 	movq	%rax, %rsi
-	movq	%rax, loop2(%rip)
-	jbe	.L111
-	movq	loop(%rip), %rax
+	movq	%rax, %r11
+	jbe	copy_one_page
+	movq	%r10, %rax
 	incq	%rax
 	movq	%rax, %rcx
-	movq	%rax, loop(%rip)
+	movq	%rax, %r10
 	mov	nr_copy_pages(%rip), %eax
 	cmpq	%rax, %rcx
 	jb	.L105
-.L108:
-	.align 4
+done:
 	movl	$24, %eax
+	movl	%eax, %ds
 
-	movl %eax, %ds
 	movq saved_context_esp(%rip), %rsp
 	movq saved_context_ebp(%rip), %rbp
 	movq saved_context_eax(%rip), %rax
@@ -113,13 +107,5 @@ ENTRY(do_magic)
 	movq saved_context_r14(%rip), %r14
 	movq saved_context_r15(%rip), %r15
 	pushq saved_context_eflags(%rip) ; popfq
-	call	restore_processor_state
-	addq	$8, %rsp
-	jmp	do_magic_resume_2
-
-	.section .data.nosave
-loop:
-	.quad 0
-loop2:	
-	.quad 0		
-	.previous
+	call	swsusp_restore
+	ret

@@ -23,16 +23,6 @@ typedef struct pbe {
 
 #define SWAP_FILENAME_MAXLENGTH	32
 
-struct suspend_header {
-	u32 version_code;
-	unsigned long num_physpages;
-	char machine[8];
-	char version[20];
-	int num_cpus;
-	int page_size;
-	suspend_pagedir_t *suspend_pagedir;
-	unsigned int num_pbes;
-};
 
 #define SUSPEND_PD_PAGES(x)     (((x)*sizeof(struct pbe))/PAGE_SIZE+1)
    
@@ -45,16 +35,12 @@ extern void drain_local_pages(void);
 /* kernel/power/swsusp.c */
 extern int software_suspend(void);
 
-extern unsigned int nr_copy_pages __nosavedata;
-extern suspend_pagedir_t *pagedir_nosave __nosavedata;
-
 #else	/* CONFIG_SOFTWARE_SUSPEND */
 static inline int software_suspend(void)
 {
 	printk("Warning: fake suspend called\n");
 	return -EPERM;
 }
-#define software_resume()		do { } while(0)
 #endif	/* CONFIG_SOFTWARE_SUSPEND */
 
 
@@ -77,12 +63,6 @@ extern void enable_nonboot_cpus(void);
 static inline void disable_nonboot_cpus(void) {}
 static inline void enable_nonboot_cpus(void) {}
 #endif
-
-asmlinkage void do_magic(int is_resume);
-asmlinkage void do_magic_resume_1(void);
-asmlinkage void do_magic_resume_2(void);
-asmlinkage void do_magic_suspend_1(void);
-asmlinkage void do_magic_suspend_2(void);
 
 void save_processor_state(void);
 void restore_processor_state(void);

@@ -83,7 +83,7 @@ static struct i2c_driver lm77_driver = {
 	.detach_client	= lm77_detach_client,
 };
 
-static int lm77_id = 0;
+static int lm77_id;
 
 /* straight from the datasheet */
 #define LM77_TEMP_MIN (-55000)

@@ -2423,7 +2423,6 @@ static int wanpipe_accept(struct socket *sock, struct socket *newsock, int flags
 	write_unlock(&wanpipe_sklist_lock);
 	clear_bit(1,&wanpipe_tx_critical);
 
-	newsk->sk_pair = NULL;
 	newsk->sk_socket = newsock;
 	newsk->sk_sleep = &newsock->wait;
 

@@ -38,4 +38,3 @@ extern void s3c2440_map_io(struct map_desc *mach_desc, int size);
 #endif
 
 extern void s3c24xx_init_io(struct map_desc *mach_desc, int size);
-

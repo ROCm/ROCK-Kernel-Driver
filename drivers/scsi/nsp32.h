@@ -499,7 +499,7 @@ typedef struct _nsp32_autoparam {
 #define MSGIN03			BIT(1)		/* Auto Msg In 03 Flag  */
 
 typedef struct _nsp32_lunt {
-	Scsi_Cmnd	*SCpnt;	    /* Current Handling Scsi_Cmnd */
+	struct scsi_cmnd	*SCpnt;	    /* Current Handling struct scsi_cmnd */
 	unsigned long	 save_datp;  /* Save Data Pointer - saved position from initial address */
 	int		 msgin03;	/* auto msg in 03 flag     */
 	unsigned int	 sg_num;	/* Total number of SG entries */
@@ -563,11 +563,11 @@ typedef struct _nsp32_hw_data {
 	int           IrqNumber;
 	int           BaseAddress;
 	int           NumAddress;
-	unsigned long MmioAddress;
+	void __iomem *MmioAddress;
 #define NSP32_MMIO_OFFSET 0x0800
 	unsigned long MmioLength;
 
-	Scsi_Cmnd *CurrentSC;
+	struct scsi_cmnd *CurrentSC;
 
 	struct pci_dev             *Pci;
 	const struct pci_device_id *pci_devid;
@@ -605,9 +605,6 @@ typedef struct _nsp32_hw_data {
 	unsigned char msginbuf [MSGINBUF_MAX];	/* megin buffer     */
 	char	      msgin_len;		/* msginbuf length  */
 
-#ifdef CONFIG_PM
-	u32           PciState[16];     /* save PCI state to this area */
-#endif
 } nsp32_hw_data;
 
 /*

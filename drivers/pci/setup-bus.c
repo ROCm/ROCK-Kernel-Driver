@@ -533,16 +533,16 @@ EXPORT_SYMBOL(pci_bus_assign_resources);
 void __init
 pci_assign_unassigned_resources(void)
 {
-	struct list_head *ln;
+	struct pci_bus *bus;
 
 	/* Depth first, calculate sizes and alignments of all
 	   subordinate buses. */
-	list_for_each(ln, &pci_root_buses) {
-		pci_bus_size_bridges(pci_bus_b(ln));
+	list_for_each_entry(bus, &pci_root_buses, node) {
+		pci_bus_size_bridges(bus);
 	}
 	/* Depth last, allocate resources and update the hardware. */
-	list_for_each(ln, &pci_root_buses) {
-		pci_bus_assign_resources(pci_bus_b(ln));
-		pci_enable_bridges(pci_bus_b(ln));
+	list_for_each_entry(bus, &pci_root_buses, node) {
+		pci_bus_assign_resources(bus);
+		pci_enable_bridges(bus);
 	}
 }

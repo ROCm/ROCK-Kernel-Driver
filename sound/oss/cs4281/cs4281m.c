@@ -1755,7 +1755,7 @@ static int prog_dmabuf(struct cs4281_state *s, struct dmabuf *db)
 		}
 		db->buforder = order;
 		// Now mark the pages as reserved; otherwise the 
-		// remap_page_range() in cs4281_mmap doesn't work.
+		// remap_pfn_range() in cs4281_mmap doesn't work.
 		// 1. get index to last page in mem_map array for rawbuf.
 		mapend = virt_to_page(db->rawbuf + 
 			(PAGE_SIZE << db->buforder) - 1);
@@ -1778,7 +1778,7 @@ static int prog_dmabuf(struct cs4281_state *s, struct dmabuf *db)
 		}
 		s->buforder_tmpbuff = order;
 		// Now mark the pages as reserved; otherwise the 
-		// remap_page_range() in cs4281_mmap doesn't work.
+		// remap_pfn_range() in cs4281_mmap doesn't work.
 		// 1. get index to last page in mem_map array for rawbuf.
 		mapend = virt_to_page(s->tmpbuff + 
 				(PAGE_SIZE << s->buforder_tmpbuff) - 1);
@@ -3135,9 +3135,10 @@ static int cs4281_mmap(struct file *file, struct vm_area_struct *vma)
 	size = vma->vm_end - vma->vm_start;
 	if (size > (PAGE_SIZE << db->buforder))
 		return -EINVAL;
-	if (remap_page_range
-	    (vma, vma->vm_start, virt_to_phys(db->rawbuf), size,
-	     vma->vm_page_prot)) return -EAGAIN;
+	if (remap_pfn_range(vma, vma->vm_start,
+				virt_to_phys(db->rawbuf) >> PAGE_SHIFT,
+				size, vma->vm_page_prot))
+		return -EAGAIN;
 	db->mapped = 1;
 
 	CS_DBGOUT(CS_FUNCTION | CS_PARMS | CS_OPEN, 4,

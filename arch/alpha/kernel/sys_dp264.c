@@ -19,12 +19,12 @@
 #include <linux/sched.h>
 #include <linux/pci.h>
 #include <linux/init.h>
+#include <linux/bitops.h>
 
 #include <asm/ptrace.h>
 #include <asm/system.h>
 #include <asm/dma.h>
 #include <asm/irq.h>
-#include <asm/bitops.h>
 #include <asm/mmu_context.h>
 #include <asm/io.h>
 #include <asm/pgtable.h>
@@ -71,10 +71,10 @@ tsunami_update_irq_hw(unsigned long mask)
 	dim1 = &cchip->dim1.csr;
 	dim2 = &cchip->dim2.csr;
 	dim3 = &cchip->dim3.csr;
-	if (cpu_possible(0)) dim0 = &dummy;
-	if (cpu_possible(1)) dim1 = &dummy;
-	if (cpu_possible(2)) dim2 = &dummy;
-	if (cpu_possible(3)) dim3 = &dummy;
+	if (!cpu_possible(0)) dim0 = &dummy;
+	if (!cpu_possible(1)) dim1 = &dummy;
+	if (!cpu_possible(2)) dim2 = &dummy;
+	if (!cpu_possible(3)) dim3 = &dummy;
 
 	*dim0 = mask0;
 	*dim1 = mask1;

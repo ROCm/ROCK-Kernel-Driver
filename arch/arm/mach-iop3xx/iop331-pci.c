@@ -208,12 +208,10 @@ void iop331_init(void)
 	DBG("\tATU: IOP331_IABAR2=0x%08x IOP331_IALR2=0x%08x IOP331_IATVR2=%08x\n", *IOP331_IABAR2, *IOP331_IALR2, *IOP331_IATVR2);
 	DBG("\tATU: IOP331_IABAR3=0x%08x IOP331_IALR3=0x%08x IOP331_IATVR3=%08x\n", *IOP331_IABAR3, *IOP331_IALR3, *IOP331_IATVR3);
 
-#if 0
-	hook_fault_code(4, iop331_pci_abort, SIGBUS, "external abort on linefetch");
-	hook_fault_code(6, iop331_pci_abort, SIGBUS, "external abort on linefetch");
-	hook_fault_code(8, iop331_pci_abort, SIGBUS, "external abort on non-linefetch");
-	hook_fault_code(10, iop331_pci_abort, SIGBUS, "external abort on non-linefetch");
-#endif
+	/* redboot changed, reset IABAR0 to something sane */
+	/* fixes master aborts in plugged in cards */
+	/* will clean up later and work nicely with redboot */
+	*IOP331_IABAR0 = 0x00000004;
 	hook_fault_code(16+6, iop331_pci_abort, SIGBUS, "imprecise external abort");
 }
 

@@ -48,7 +48,7 @@
 /*************************************************************************
  * IXDP2400 timer tick
  *************************************************************************/
-static void __init ixdp2400_init_time(void)
+static void __init ixdp2400_timer_init(void)
 {
 	int numerator, denominator;
 	int denom_array[] = {2, 4, 8, 16, 1, 2, 4, 8};
@@ -58,6 +58,11 @@ static void __init ixdp2400_init_time(void)
 
 	ixp2000_init_time(((3125000 * numerator) / (denominator)) / 2);
 }
+
+static struct timer ixdp2400_timer = {
+	.init		= ixdp2400_timer_init,
+	.offset		= ixp2000_gettimeoffset,
+};
 
 /*************************************************************************
  * IXDP2400 PCI
@@ -171,7 +176,7 @@ MACHINE_START(IXDP2400, "Intel IXDP2400 Development Platform")
 	BOOT_PARAMS(0x00000100)
 	MAPIO(ixdp2x00_map_io)
 	INITIRQ(ixdp2400_init_irq)
-	INITTIME(ixdp2400_init_time)
+	.timer		= &ixdp2400_timer,
 	INIT_MACHINE(ixdp2x00_init_machine)
 MACHINE_END
 

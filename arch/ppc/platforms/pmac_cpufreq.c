@@ -140,11 +140,8 @@ static int __pmac dfs_set_cpu_speed(int low_speed)
 	if (low_speed == 0) {
 		/* ramping up, set voltage first */
 		pmac_call_feature(PMAC_FTR_WRITE_GPIO, NULL, voltage_gpio, 0x05);
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(HZ/1000);
-	} else {
-		/* ramping down, enable aack delay first */
-		pmac_call_feature(PMAC_FTR_AACK_DELAY_ENABLE, NULL, 1, 0);
+		/* Make sure we sleep for at least 1ms */
+		msleep(1 + jiffies_to_msecs(1));
 	}
 
 	/* set frequency */
@@ -153,11 +150,7 @@ static int __pmac dfs_set_cpu_speed(int low_speed)
 	if (low_speed == 1) {
 		/* ramping down, set voltage last */
 		pmac_call_feature(PMAC_FTR_WRITE_GPIO, NULL, voltage_gpio, 0x04);
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(HZ/1000);
-	} else {
-		/* ramping up, disable aack delay last */
-		pmac_call_feature(PMAC_FTR_AACK_DELAY_ENABLE, NULL, 0, 0);
+		msleep(1 + jiffies_to_msecs(1));
 	}
 
 	return 0;

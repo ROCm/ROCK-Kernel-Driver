@@ -107,7 +107,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 
 	/* read the word at location addr in the USER area. */
 		case PTRACE_PEEKUSR: {
-			unsigned long tmp;
+			unsigned long tmp = 0;
 			
 			if ((addr & 3) || addr < 0 || addr >= sizeof(struct user)) {
 				ret = -EIO;
@@ -192,7 +192,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		case PTRACE_KILL: {
 
 			ret = 0;
-			if (child->state == TASK_ZOMBIE) /* already dead */
+			if (child->exit_state == EXIT_ZOMBIE) /* already dead */
 				break;
 			child->exit_code = SIGKILL;
 			h8300_disable_trace(child);

@@ -84,17 +84,16 @@ extern int ia64_pfn_valid (unsigned long pfn);
 #endif
 
 #ifndef CONFIG_DISCONTIGMEM
-# ifdef CONFIG_VIRTUAL_MEM_MAP
+# define pfn_valid(pfn)		(((pfn) < max_mapnr) && ia64_pfn_valid(pfn))
+# define page_to_pfn(page)	((unsigned long) (page - mem_map))
+# define pfn_to_page(pfn)	(mem_map + (pfn))
+#else
 extern struct page *vmem_map;
-#  define pfn_valid(pfn)	(((pfn) < max_mapnr) && ia64_pfn_valid(pfn))
-#  define page_to_pfn(page)	((unsigned long) (page - vmem_map))
-#  define pfn_to_page(pfn)	(vmem_map + (pfn))
-# else
-#  define pfn_valid(pfn)	(((pfn) < max_mapnr) && ia64_pfn_valid(pfn))
-#  define page_to_pfn(page)	((unsigned long) (page - mem_map))
-#  define pfn_to_page(pfn)	(mem_map + (pfn))
-# endif
-#endif /* CONFIG_DISCONTIGMEM */
+extern unsigned long max_low_pfn;
+# define pfn_valid(pfn)		(((pfn) < max_low_pfn) && ia64_pfn_valid(pfn))
+# define page_to_pfn(page)	((unsigned long) (page - vmem_map))
+# define pfn_to_page(pfn)	(vmem_map + (pfn))
+#endif
 
 #define page_to_phys(page)	(page_to_pfn(page) << PAGE_SHIFT)
 #define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
@@ -124,7 +123,7 @@ typedef union ia64_va {
 #define REGION_KERNEL		7
 
 #ifdef CONFIG_HUGETLB_PAGE
-# define htlbpage_to_page(x)	((REGION_NUMBER(x) << 61)				\
+# define htlbpage_to_page(x)	(((unsigned long) REGION_NUMBER(x) << 61)			\
 				 | (REGION_OFFSET(x) >> (HPAGE_SHIFT-PAGE_SHIFT)))
 # define HUGETLB_PAGE_ORDER	(HPAGE_SHIFT - PAGE_SHIFT)
 # define is_hugepage_only_range(addr, len)		\
@@ -187,7 +186,7 @@ get_order (unsigned long size)
 # define __pgprot(x)	(x)
 #endif /* !STRICT_MM_TYPECHECKS */
 
-#define PAGE_OFFSET			0xe000000000000000
+#define PAGE_OFFSET			__IA64_UL_CONST(0xe000000000000000)
 
 #define VM_DATA_DEFAULT_FLAGS		(VM_READ | VM_WRITE |					\
 					 VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC |		\

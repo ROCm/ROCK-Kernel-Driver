@@ -319,7 +319,7 @@ unsigned long get_cmos_time(void)
 	return retval;
 }
 
-static long clock_cmos_diff;
+static long clock_cmos_diff, sleep_start;
 
 static int time_suspend(struct sys_device *dev, u32 state)
 {
@@ -328,16 +328,21 @@ static int time_suspend(struct sys_device *dev, u32 state)
 	 */
 	clock_cmos_diff = -get_cmos_time();
 	clock_cmos_diff += get_seconds();
+	sleep_start = get_cmos_time();
 	return 0;
 }
 
 static int time_resume(struct sys_device *dev)
 {
+	unsigned long flags;
 	unsigned long sec = get_cmos_time() + clock_cmos_diff;
-	write_seqlock_irq(&xtime_lock);
+	unsigned long sleep_length = get_cmos_time() - sleep_start;
+
+	write_seqlock_irqsave(&xtime_lock, flags);
 	xtime.tv_sec = sec;
 	xtime.tv_nsec = 0;
-	write_sequnlock_irq(&xtime_lock);
+	write_sequnlock_irqrestore(&xtime_lock, flags);
+	jiffies += sleep_length * HZ;
 	return 0;
 }
 

@@ -1,16 +1,17 @@
 /*
  * 	PCI searching functions.
  *
- *	Copyright 1993 -- 1997 Drew Eckhardt, Frederic Potter,
- *				David Mosberger-Tang
- *	Copyright 1997 -- 2000 Martin Mares <mj@ucw.cz>
- *	Copyright 2003 -- Greg Kroah-Hartman <greg@kroah.com>
+ *	Copyright (C) 1993 -- 1997 Drew Eckhardt, Frederic Potter,
+ *					David Mosberger-Tang
+ *	Copyright (C) 1997 -- 2000 Martin Mares <mj@ucw.cz>
+ *	Copyright (C) 2003 -- 2004 Greg Kroah-Hartman <greg@kroah.com>
  */
 
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/module.h>
 #include <linux/interrupt.h>
+#include "pci.h"
 
 spinlock_t pci_bus_lock = SPIN_LOCK_UNLOCKED;
 
@@ -156,10 +157,11 @@ struct pci_dev * pci_get_slot(struct pci_bus *bus, unsigned int devfn)
  * the pci device returned by this function can disappear at any moment in
  * time.
  */
-struct pci_dev *
-pci_find_subsys(unsigned int vendor, unsigned int device,
-		unsigned int ss_vendor, unsigned int ss_device,
-		const struct pci_dev *from)
+static struct pci_dev * pci_find_subsys(unsigned int vendor,
+				        unsigned int device,
+					unsigned int ss_vendor,
+					unsigned int ss_device,
+					const struct pci_dev *from)
 {
 	struct list_head *n;
 	struct pci_dev *dev;
@@ -257,12 +259,6 @@ exit:
  * @from: Previous PCI device found in search, or %NULL for new search.
  *
  * Iterates through the list of known PCI devices.  If a PCI device is
- * found with a matching @vendor and @device, a pointer to its device structure is
- * returned.  Otherwise, %NULL is returned.
- * A new search is initiated by passing %NULL to the @from argument.
- * Otherwise if @from is not %NULL, searches continue from next device on the global list.
- *
- * Iterates through the list of known PCI devices.  If a PCI device is
  * found with a matching @vendor and @device, the reference count to the
  * device is incremented and a pointer to its device structure is returned.
  * Otherwise, %NULL is returned.  A new search is initiated by passing %NULL
@@ -312,25 +308,26 @@ exit:
 	return dev;
 }
 
-
 /**
- * pci_find_class - begin or continue searching for a PCI device by class
+ * pci_get_class - begin or continue searching for a PCI device by class
  * @class: search for a PCI device with this class designation
  * @from: Previous PCI device found in search, or %NULL for new search.
  *
  * Iterates through the list of known PCI devices.  If a PCI device is
- * found with a matching @class, a pointer to its device structure is
- * returned.  Otherwise, %NULL is returned.
+ * found with a matching @class, the reference count to the device is
+ * incremented and a pointer to its device structure is returned.
+ * Otherwise, %NULL is returned.
  * A new search is initiated by passing %NULL to the @from argument.
  * Otherwise if @from is not %NULL, searches continue from next device
- * on the global list.
+ * on the global list.  The reference count for @from is always decremented
+ * if it is not %NULL.
  */
-struct pci_dev *
-pci_find_class(unsigned int class, const struct pci_dev *from)
+struct pci_dev *pci_get_class(unsigned int class, struct pci_dev *from)
 {
 	struct list_head *n;
 	struct pci_dev *dev;
 
+	WARN_ON(in_interrupt());
 	spin_lock(&pci_bus_lock);
 	n = from ? from->global_list.next : pci_devices.next;
 
@@ -342,16 +339,50 @@ pci_find_class(unsigned int class, const struct pci_dev *from)
 	}
 	dev = NULL;
 exit:
+	pci_dev_put(from);
+	dev = pci_dev_get(dev);
 	spin_unlock(&pci_bus_lock);
 	return dev;
 }
 
+/**
+ * pci_dev_present - Returns 1 if device matching the device list is present, 0 if not.
+ * @ids: A pointer to a null terminated list of struct pci_device_id structures
+ * that describe the type of PCI device the caller is trying to find.
+ *
+ * Obvious fact: You do not have a reference to any device that might be found
+ * by this function, so if that device is removed from the system right after
+ * this function is finished, the value will be stale.  Use this function to
+ * find devices that are usually built into a system, or for a general hint as
+ * to if another device happens to be present at this specific moment in time.
+ */
+int pci_dev_present(const struct pci_device_id *ids)
+{
+	struct pci_dev *dev;
+	int found = 0;
+
+	WARN_ON(in_interrupt());
+	spin_lock(&pci_bus_lock);
+	while (ids->vendor || ids->subvendor || ids->class_mask) {
+		list_for_each_entry(dev, &pci_devices, global_list) {
+			if (pci_match_one_device(ids, dev)) {
+				found = 1;
+				goto exit;
+			}
+		}
+		ids++;
+	}
+exit:				
+	spin_unlock(&pci_bus_lock);
+	return found;
+}
+EXPORT_SYMBOL(pci_dev_present);
+
 EXPORT_SYMBOL(pci_find_bus);
-EXPORT_SYMBOL(pci_find_class);
 EXPORT_SYMBOL(pci_find_device);
 EXPORT_SYMBOL(pci_find_device_reverse);
 EXPORT_SYMBOL(pci_find_slot);
-EXPORT_SYMBOL(pci_find_subsys);
 EXPORT_SYMBOL(pci_get_device);
 EXPORT_SYMBOL(pci_get_subsys);
 EXPORT_SYMBOL(pci_get_slot);
+EXPORT_SYMBOL(pci_get_class);

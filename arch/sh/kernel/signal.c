@@ -1,4 +1,4 @@
-/* $Id: signal.c,v 1.20 2004/01/13 05:52:11 kkojima Exp $
+/* $Id: signal.c,v 1.21 2004/06/28 13:18:44 doyu Exp $
  *
  *  linux/arch/sh/kernel/signal.c
  *
@@ -155,7 +155,7 @@ struct rt_sigframe
 	u16 retcode[8];
 };
 
-#ifdef CONFIG_CPU_SH4
+#ifdef CONFIG_SH_FPU
 static inline int restore_sigcontext_fpu(struct sigcontext __user *sc)
 {
 	struct task_struct *tsk = current;
@@ -192,7 +192,7 @@ static inline int save_sigcontext_fpu(struct sigcontext __user *sc,
 	return __copy_to_user(&sc->sc_fpregs[0], &tsk->thread.fpu.hard,
 			      sizeof(long)*(16*2+2));
 }
-#endif /* CONFIG_CPU_SH4 */
+#endif /* CONFIG_SH_FPU */
 
 static int
 restore_sigcontext(struct pt_regs *regs, struct sigcontext __user *sc, int *r0_p)
@@ -213,7 +213,7 @@ restore_sigcontext(struct pt_regs *regs, struct sigcontext __user *sc, int *r0_p
 	COPY(sr);	COPY(pc);
 #undef COPY
 
-#ifdef CONFIG_CPU_SH4
+#ifdef CONFIG_SH_FPU
 	if (cpu_data->flags & CPU_HAS_FPU) {
 		int owned_fp;
 		struct task_struct *tsk = current;
@@ -326,7 +326,7 @@ setup_sigcontext(struct sigcontext __user *sc, struct pt_regs *regs,
 	COPY(sr);	COPY(pc);
 #undef COPY
 
-#ifdef CONFIG_CPU_SH4
+#ifdef CONFIG_SH_FPU
 	err |= save_sigcontext_fpu(sc, regs);
 #endif
 

@@ -148,7 +148,7 @@ udp_print_range(char *buffer, const struct ip_nat_range *range)
 }
 
 struct ip_nat_protocol ip_nat_protocol_udp
-= { { NULL, NULL }, "UDP", IPPROTO_UDP,
+= { "UDP", IPPROTO_UDP,
     udp_manip_pkt,
     udp_in_range,
     udp_unique_tuple,

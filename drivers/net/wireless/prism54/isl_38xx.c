@@ -44,7 +44,7 @@
  *  register located at offset %ISL38XX_INT_IDENT_REG.
  */
 void
-isl38xx_disable_interrupts(void *device)
+isl38xx_disable_interrupts(void __iomem *device)
 {
 	isl38xx_w32_flush(device, 0x00000000, ISL38XX_INT_EN_REG);
 	udelay(ISL38XX_WRITEIO_DELAY);
@@ -52,7 +52,7 @@ isl38xx_disable_interrupts(void *device)
 
 void
 isl38xx_handle_sleep_request(isl38xx_control_block *control_block,
-			     int *powerstate, void *device_base)
+			     int *powerstate, void __iomem *device_base)
 {
 	/* device requests to go into sleep mode
 	 * check whether the transmit queues for data and management are empty */
@@ -88,7 +88,7 @@ isl38xx_handle_sleep_request(isl38xx_control_block *control_block,
 
 void
 isl38xx_handle_wakeup(isl38xx_control_block *control_block,
-		      int *powerstate, void *device_base)
+		      int *powerstate, void __iomem *device_base)
 {
 	/* device is in active state, update the powerstate flag */
 	*powerstate = ISL38XX_PSM_ACTIVE_STATE;
@@ -110,7 +110,7 @@ isl38xx_handle_wakeup(isl38xx_control_block *control_block,
 }
 
 void
-isl38xx_trigger_device(int asleep, void *device_base)
+isl38xx_trigger_device(int asleep, void __iomem *device_base)
 {
 	struct timeval current_time;
 	u32 reg, counter = 0;
@@ -190,7 +190,7 @@ isl38xx_trigger_device(int asleep, void *device_base)
 }
 
 void
-isl38xx_interface_reset(void *device_base, dma_addr_t host_address)
+isl38xx_interface_reset(void __iomem *device_base, dma_addr_t host_address)
 {
 	u32 reg;
 
@@ -219,7 +219,7 @@ isl38xx_interface_reset(void *device_base, dma_addr_t host_address)
 }
 
 void
-isl38xx_enable_common_interrupts(void *device_base) {
+isl38xx_enable_common_interrupts(void __iomem *device_base) {
 	u32 reg;
 	reg = ( ISL38XX_INT_IDENT_UPDATE | 
 			ISL38XX_INT_IDENT_SLEEP | ISL38XX_INT_IDENT_WAKEUP);

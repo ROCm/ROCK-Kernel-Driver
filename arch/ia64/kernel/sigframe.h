@@ -17,7 +17,7 @@ struct sigframe {
 	 * End of architected state.
 	 */
 
-	void *handler;			/* pointer to the plabel of the signal handler */
+	void __user *handler;		/* pointer to the plabel of the signal handler */
 	struct siginfo info;
 	struct sigcontext sc;
 };

@@ -398,6 +398,79 @@ static inline int isa_check_signature(unsigned long io_addr,
 	return 0;
 }
 
+/*
+ * Here comes the ppc implementation of the IOMAP 
+ * interfaces.
+ */
+static inline unsigned int ioread8(void __iomem *addr)
+{
+	return readb(addr);
+}
+
+static inline unsigned int ioread16(void __iomem *addr)
+{
+	return readw(addr);
+}
+
+static inline unsigned int ioread32(void __iomem *addr)
+{
+	return readl(addr);
+}
+
+static inline void iowrite8(u8 val, void __iomem *addr)
+{
+	writeb(val, addr);
+}
+
+static inline void iowrite16(u16 val, void __iomem *addr)
+{
+	writew(val, addr);
+}
+
+static inline void iowrite32(u32 val, void __iomem *addr)
+{
+	writel(val, addr);
+}
+
+static inline void ioread8_rep(void __iomem *addr, void *dst, unsigned long count)
+{
+	_insb((u8 __force *) addr, dst, count);
+}
+
+static inline void ioread16_rep(void __iomem *addr, void *dst, unsigned long count)
+{
+	_insw_ns((u16 __force *) addr, dst, count);
+}
+
+static inline void ioread32_rep(void __iomem *addr, void *dst, unsigned long count)
+{
+	_insl_ns((u32 __force *) addr, dst, count);
+}
+
+static inline void iowrite8_rep(void __iomem *addr, const void *src, unsigned long count)
+{
+	_outsb((u8 __force *) addr, src, count);
+}
+
+static inline void iowrite16_rep(void __iomem *addr, const void *src, unsigned long count)
+{
+	_outsw_ns((u16 __force *) addr, src, count);
+}
+
+static inline void iowrite32_rep(void __iomem *addr, const void *src, unsigned long count)
+{
+	_outsl_ns((u32 __force *) addr, src, count);
+}
+
+/* Create a virtual mapping cookie for an IO port range */
+extern void __iomem *ioport_map(unsigned long port, unsigned int nr);
+extern void ioport_unmap(void __iomem *);
+
+/* Create a virtual mapping cookie for a PCI BAR (memory or IO) */
+struct pci_dev;
+extern void __iomem *pci_iomap(struct pci_dev *dev, int bar, unsigned long max);
+extern void pci_iounmap(struct pci_dev *dev, void __iomem *);
+
 #endif /* _PPC_IO_H */
 
 #ifdef CONFIG_8260_PCI9

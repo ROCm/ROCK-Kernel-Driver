@@ -57,7 +57,7 @@ tune-$(CONFIG_CPU_V6)		:=-mtune=strongarm
 CFLAGS		+=-mapcs-32 $(arch-y) $(tune-y) $(call cc-option,-malignment-traps,-mshort-load-bytes) -msoft-float -Uarm
 AFLAGS		+=-mapcs-32 $(arch-y) $(tune-y) -msoft-float
 
-CHECKFLAGS	+= -D__arm__=1
+CHECKFLAGS	+= -D__arm__
 
 #Default value
 DATAADDR	:= .
@@ -95,6 +95,7 @@ textaddr-$(CONFIG_ARCH_FORTUNET)   := 0xc0008000
  machine-$(CONFIG_ARCH_LH7A40X)	   := lh7a40x
  machine-$(CONFIG_ARCH_VERSATILE_PB) := versatile
  machine-$(CONFIG_ARCH_IMX)	   := imx
+ machine-$(CONFIG_ARCH_H720X)	   := h720x
 
 ifeq ($(CONFIG_ARCH_EBSA110),y)
 # This is what happens if you forget the IOCS16 line.
@@ -108,6 +109,11 @@ ifeq ($(incdir-y),)
 incdir-y := $(machine-y)
 endif
 INCDIR   := arch-$(incdir-y)
+ifneq ($(machine-y),)
+MACHINE  := arch/arm/mach-$(machine-y)/
+else
+MACHINE  :=
+endif
   
 export	TEXTADDR GZFLAGS
 
@@ -119,9 +125,7 @@ endif
 
 # If we have a machine-specific directory, then include it in the build.
 core-y				+= arch/arm/kernel/ arch/arm/mm/ arch/arm/common/
-ifneq ($(machine-y),)
-core-y				+= arch/arm/mach-$(machine-y)/
-endif
+core-y				+= $(MACHINE)
 core-$(CONFIG_FPE_NWFPE)	+= arch/arm/nwfpe/
 core-$(CONFIG_FPE_FASTFPE)	+= $(FASTFPE_OBJ)
 core-$(CONFIG_VFP)		+= arch/arm/vfp/
@@ -161,10 +165,10 @@ maketools: include/asm-arm/constants.h include/linux/version.h FORCE
 bzImage: zImage
 
 zImage Image bootpImage uImage: vmlinux
-	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
+	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
 
 zinstall install: vmlinux
-	$(Q)$(MAKE) $(build)=$(boot) $@
+	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $@
 
 CLEAN_FILES += include/asm-arm/constants.h* include/asm-arm/mach-types.h \
 	       include/asm-arm/arch include/asm-arm/.arch
@@ -174,8 +178,8 @@ archclean:
 	$(Q)$(MAKE) $(clean)=$(boot)
 
 # My testing targets (bypasses dependencies)
-bp:;	$(Q)$(MAKE) $(build)=$(boot) $(boot)/bootpImage
-i zi:;	$(Q)$(MAKE) $(build)=$(boot) $@
+bp:;	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/bootpImage
+i zi:;	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $@
 
 arch/$(ARCH)/kernel/asm-offsets.s: include/asm include/linux/version.h \
 				   include/asm-arm/.arch

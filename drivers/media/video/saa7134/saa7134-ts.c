@@ -1,4 +1,6 @@
 /*
+ * $Id: saa7134-ts.c,v 1.9 2004/10/11 14:53:13 kraxel Exp $
+ *
  * device driver for philips saa7134 based TV cards
  * video4linux video interface
  *
@@ -88,10 +90,10 @@ static int buffer_activate(struct saa7134_dev *dev,
 	return 0;
 }
 
-static int buffer_prepare(struct file *file, struct videobuf_buffer *vb,
+static int buffer_prepare(void *priv, struct videobuf_buffer *vb,
 			  enum v4l2_field field)
 {
-	struct saa7134_dev *dev = file->private_data;
+	struct saa7134_dev *dev = priv;
 	struct saa7134_buf *buf = (struct saa7134_buf *)vb;
 	unsigned int lines, llength, size;
 	int err;
@@ -136,7 +138,7 @@ static int buffer_prepare(struct file *file, struct videobuf_buffer *vb,
 }
 
 static int
-buffer_setup(struct file *file, unsigned int *count, unsigned int *size)
+buffer_setup(void *priv, unsigned int *count, unsigned int *size)
 {
 	*size = TS_PACKET_SIZE * ts_nr_packets;
 	if (0 == *count)
@@ -145,17 +147,17 @@ buffer_setup(struct file *file, unsigned int *count, unsigned int *size)
 	return 0;
 }
 
-static void buffer_queue(struct file *file, struct videobuf_buffer *vb)
+static void buffer_queue(void *priv, struct videobuf_buffer *vb)
 {
-	struct saa7134_dev *dev = file->private_data;
+	struct saa7134_dev *dev = priv;
 	struct saa7134_buf *buf = (struct saa7134_buf *)vb;
 	
 	saa7134_buffer_queue(dev,&dev->ts_q,buf);
 }
 
-static void buffer_release(struct file *file, struct videobuf_buffer *vb)
+static void buffer_release(void *priv, struct videobuf_buffer *vb)
 {
-	struct saa7134_dev *dev = file->private_data;
+	struct saa7134_dev *dev = priv;
 	struct saa7134_buf *buf = (struct saa7134_buf *)vb;
 	
 	saa7134_dma_free(dev,buf);
@@ -174,10 +176,9 @@ static struct videobuf_queue_ops ts_qops = {
 static void ts_reset_encoder(struct saa7134_dev* dev) 
 {
 	saa_writeb(SAA7134_SPECIAL_MODE, 0x00);
-	mdelay(10);
+	msleep(10);
    	saa_writeb(SAA7134_SPECIAL_MODE, 0x01);
-   	set_current_state(TASK_INTERRUPTIBLE);
-	schedule_timeout(HZ/10);
+	msleep(100);
 }
 
 static int ts_init_encoder(struct saa7134_dev* dev, void* arg) 
@@ -226,10 +227,10 @@ static int ts_release(struct inode *inode, struct file *file)
 	struct saa7134_dev *dev = file->private_data;
 
 	if (dev->ts.ts.streaming)
-		videobuf_streamoff(file,&dev->ts.ts);
+		videobuf_streamoff(file->private_data,&dev->ts.ts);
 	down(&dev->ts.ts.lock);
 	if (dev->ts.ts.reading)
-		videobuf_read_stop(file,&dev->ts.ts);
+		videobuf_read_stop(file->private_data,&dev->ts.ts);
 	dev->ts.users--;
 
 	/* stop the encoder */
@@ -250,7 +251,9 @@ ts_read(struct file *file, char __user *data, size_t count, loff_t *ppos)
 		dev->ts.started = 1;
 	}
   
-	return videobuf_read_stream(file, &dev->ts.ts, data, count, ppos, 0);
+	return videobuf_read_stream(file->private_data,
+				    &dev->ts.ts, data, count, ppos, 0,
+				    file->f_flags & O_NONBLOCK);
 }
 
 static unsigned int
@@ -258,7 +261,8 @@ ts_poll(struct file *file, struct poll_table_struct *wait)
 {
 	struct saa7134_dev *dev = file->private_data;
 
-	return videobuf_poll_stream(file, &dev->ts.ts, wait);
+	return videobuf_poll_stream(file, file->private_data,
+				    &dev->ts.ts, wait);
 }
 
 
@@ -387,22 +391,23 @@ static int ts_do_ioctl(struct inode *inode, struct file *file,
 	}
 
 	case VIDIOC_REQBUFS:
-		return videobuf_reqbufs(file,&dev->ts.ts,arg);
+		return videobuf_reqbufs(file->private_data,&dev->ts.ts,arg);
 
 	case VIDIOC_QUERYBUF:
 		return videobuf_querybuf(&dev->ts.ts,arg);
 
 	case VIDIOC_QBUF:
-		return videobuf_qbuf(file,&dev->ts.ts,arg);
+		return videobuf_qbuf(file->private_data,&dev->ts.ts,arg);
 
 	case VIDIOC_DQBUF:
-		return videobuf_dqbuf(file,&dev->ts.ts,arg);
+		return videobuf_dqbuf(file->private_data,&dev->ts.ts,arg,
+				      file->f_flags & O_NONBLOCK);
 
 	case VIDIOC_STREAMON:
-		return videobuf_streamon(file,&dev->ts.ts);
+		return videobuf_streamon(file->private_data,&dev->ts.ts);
 
 	case VIDIOC_STREAMOFF:
-		return videobuf_streamoff(file,&dev->ts.ts);
+		return videobuf_streamoff(file->private_data,&dev->ts.ts);
 
 	case VIDIOC_QUERYCTRL:
 	case VIDIOC_G_CTRL:

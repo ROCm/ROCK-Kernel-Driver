@@ -32,7 +32,7 @@ static char *version =
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/init.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
 #include <linux/errno.h>

@@ -3,7 +3,7 @@
  *
  * SuperH on-chip serial module support.  (SCI with no FIFO / with FIFO)
  *
- *  Copyright (C) 2002, 2003  Paul Mundt
+ *  Copyright (C) 2002, 2003, 2004  Paul Mundt
  *
  * based off of the old drivers/char/sh-sci.c by:
  *
@@ -18,7 +18,8 @@
  * for more details.
  */
 
-#define DEBUG
+#undef DEBUG
+
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/errno.h>
@@ -40,6 +41,7 @@
 #include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/console.h>
+#include <linux/bitops.h>
 
 #ifdef CONFIG_CPU_FREQ
 #include <linux/notifier.h>
@@ -50,7 +52,6 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/uaccess.h>
-#include <asm/bitops.h>
 
 #include <linux/generic_serial.h>
 
@@ -332,7 +333,7 @@ static void sci_init_pins_sci(struct uart_port *port, unsigned int cflag)
 
 #if defined(SCIF_ONLY) || defined(SCI_AND_SCIF)
 #if defined(CONFIG_CPU_SH3)
-/* For SH7707, SH7709, SH7709A, SH7729, SH7300*/
+/* For SH7705, SH7707, SH7709, SH7709A, SH7729, SH7300*/
 static void sci_init_pins_scif(struct uart_port *port, unsigned int cflag)
 {
 	unsigned int fcr_val = 0;
@@ -798,7 +799,7 @@ static int sci_notifier(struct notifier_block *self, unsigned long phase, void *
 	if ((phase == CPUFREQ_POSTCHANGE) ||
 	    (phase == CPUFREQ_RESUMECHANGE)){
 		for (i = 0; i < SCI_NPORTS; i++) {
-			struct uart_port *port = &sci_ports[i];
+			struct uart_port *port = &sci_ports[i].port;
 
 			/*
 			 * Update the uartclk per-port if frequency has
@@ -1139,6 +1140,35 @@ static struct sci_port sci_ports[SCI_NPORTS] = {
 		.irqs		= SCI_IRQS,
 		.init_pins	= sci_init_pins_sci,
 	},
+#elif defined(CONFIG_CPU_SUBTYPE_SH7705)
+	{
+		.port	= {
+			.membase	= (void *)SCIF0,
+			.mapbase	= SCIF0,
+			.iotype		= SERIAL_IO_MEM,
+			.irq		= 55,
+			.ops		= &sci_uart_ops,
+			.flags		= ASYNC_BOOT_AUTOCONF,
+			.line		= 0,
+		},
+		.type		= PORT_SCIF,
+		.irqs		= SH3_IRDA_IRQS,
+		.init_pins	= sci_init_pins_scif,
+	},
+	{
+		.port	= {
+			.membase	= (void *)SCIF2,
+			.mapbase	= SCIF2,
+			.iotype		= SERIAL_IO_MEM,
+			.irq		= 59,
+			.ops		= &sci_uart_ops,
+			.flags		= ASYNC_BOOT_AUTOCONF,
+			.line		= 1,
+		},
+		.type		= PORT_SCIF,
+		.irqs		= SH3_SCIF_IRQS,
+		.init_pins	= sci_init_pins_scif,
+	}
 #elif defined(CONFIG_CPU_SUBTYPE_SH7707) || defined(CONFIG_CPU_SUBTYPE_SH7709)
 	{
 		.port	= {
@@ -1195,6 +1225,21 @@ static struct sci_port sci_ports[SCI_NPORTS] = {
 		},
 		.type		= PORT_SCIF,
 		.irqs		= SH7300_SCIF0_IRQS,
+		.init_pins	= sci_init_pins_scif,
+	},
+#elif defined(CONFIG_CPU_SUBTYPE_SH73180)
+	{
+		.port	= {
+			.membase	= (void *)0xffe00000,
+			.mapbase	= 0xffe00000,
+			.iotype		= SERIAL_IO_MEM,
+			.irq		= 25,
+			.ops		= &sci_uart_ops,
+			.flags		= ASYNC_BOOT_AUTOCONF,
+			.line		= 0,
+		},
+		.type		= PORT_SCIF,
+		.irqs		= SH73180_SCIF_IRQS,
 		.init_pins	= sci_init_pins_scif,
 	},
 #elif defined(CONFIG_SH_RTS7751R2D)
@@ -1282,6 +1327,21 @@ static struct sci_port sci_ports[SCI_NPORTS] = {
 		},
 		.type		= PORT_SCIF,
 		.irqs		= SH7760_SCIF2_IRQS,
+		.init_pins	= sci_init_pins_scif,
+	},
+#elif defined(CONFIG_CPU_SUBTYPE_SH4_202)
+	{
+		.port	= {
+			.membase	= (void *)0xffe80000,
+			.mapbase	= 0xffe80000,
+			.iotype		= SERIAL_IO_MEM,
+			.irq		= 43,
+			.ops		= &sci_uart_ops,
+			.flags		= ASYNC_BOOT_AUTOCONF,
+			.line		= 0,
+		},
+		.type		= PORT_SCIF,
+		.irqs		= SH4_SCIF_IRQS,
 		.init_pins	= sci_init_pins_scif,
 	},
 #elif defined(CONFIG_CPU_SUBTYPE_ST40STB1)
@@ -1551,7 +1611,7 @@ static struct console kgdb_console = {
 /* Register the KGDB console so we get messages (d'oh!) */
 static int __init kgdb_console_init(void)
 {
-        register_console(&kgdb_console);
+	register_console(&kgdb_console);
 	return 0;
 }
 

@@ -35,21 +35,15 @@ __XScale_start:
 		mcr	p15, 0, r0, c1, c0, 0
 
 #ifdef	CONFIG_ARCH_IQ80321
-		orr	pc, pc, #PHYS_OFFSET	@ jump to physical memory if we are not there.
-		nop
 		mov	r7, #MACH_TYPE_IQ80321
 #endif
 
 #ifdef  CONFIG_ARCH_IQ31244
-		orr	pc, pc, #PHYS_OFFSET	@ jump to physical memory if we are not there.
-		nop
 		mov	r7, #(MACH_TYPE_IQ31244 & 0xff)
 		orr	r7, r7, #(MACH_TYPE_IQ31244 & 0xff00)
 #endif
 
 #ifdef  CONFIG_ARCH_IQ80331
-		orr	pc, pc, #PHYS_OFFSET	@ jump to physical memory if we are not there.
-		nop
 		mov	r7, #(MACH_TYPE_IQ80331 & 0xff)
 		orr	r7, r7, #(MACH_TYPE_IQ80331 & 0xff00)
 #endif

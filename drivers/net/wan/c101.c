@@ -56,7 +56,7 @@ static char *hw;		/* pointer to hw=xxx command line string */
 typedef struct card_s {
 	struct net_device *dev;
 	spinlock_t lock;	/* TX lock */
-	u8 *win0base;		/* ISA window base address */
+	u8 __iomem *win0base;	/* ISA window base address */
 	u32 phy_winbase;	/* ISA physical base address */
 	sync_serial_settings settings;
 	int rxpart;		/* partial frame received, next frame invalid*/

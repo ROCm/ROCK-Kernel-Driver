@@ -28,7 +28,7 @@ static char * reiserfs_cpu_offset (struct cpu_key * key)
 }
 
 
-static char * le_offset (struct key * key)
+static char * le_offset (struct reiserfs_key * key)
 {
   int version;
 
@@ -57,7 +57,7 @@ static char * cpu_type (struct cpu_key * key)
 }
 
 
-static char * le_type (struct key * key)
+static char * le_type (struct reiserfs_key * key)
 {
     int version;
     
@@ -76,7 +76,7 @@ static char * le_type (struct key * key)
 
 
 /* %k */
-static void sprintf_le_key (char * buf, struct key * key)
+static void sprintf_le_key (char * buf, struct reiserfs_key * key)
 {
   if (key)
     sprintf (buf, "[%d %d %s %s]", le32_to_cpu (key->k_dir_id),
@@ -213,7 +213,7 @@ prepare_error_buf( const char *fmt, va_list args )
 
         switch (what) {
         case 'k':
-            sprintf_le_key (p, va_arg(args, struct key *));
+            sprintf_le_key (p, va_arg(args, struct reiserfs_key *));
             break;
         case 'K':
             sprintf_cpu_key (p, va_arg(args, struct cpu_key *));
@@ -366,6 +366,49 @@ void reiserfs_panic (struct super_block * sb, const char * fmt, ...)
 	 reiserfs_bdevname (sb), error_buf);
 }
 
+static void
+do_handle_error (struct super_block *sb, int errno)
+{
+    if (reiserfs_error_panic (sb)) {
+        panic ("REISERFS: panic (device %s): Panic forced after error\n",
+               reiserfs_bdevname (sb));
+    }
+
+    if (reiserfs_error_ro (sb)) {
+        printk (KERN_CRIT "REISERFS: error (device %s): Re-mounting fs "
+                "readonly\n", reiserfs_bdevname (sb));
+        reiserfs_journal_abort (sb, errno);
+    }
+}
+
+void
+reiserfs_error (struct super_block * sb, int errno, const char *fmt, ...)
+{
+    do_reiserfs_warning (fmt);
+    printk (KERN_CRIT "REISERFS: error (device %s): %s\n",
+            reiserfs_bdevname (sb), error_buf);
+    do_handle_error (sb, errno);
+}
+
+void
+reiserfs_abort (struct super_block *sb, int errno, const char *fmt, ...)
+{
+    do_reiserfs_warning (fmt);
+
+    if (reiserfs_error_panic (sb)) {
+        panic (KERN_CRIT "REISERFS: panic (device %s): %s\n",
+               reiserfs_bdevname (sb), error_buf);
+    }
+
+    if (sb->s_flags & MS_RDONLY)
+        return;
+
+    printk (KERN_CRIT "REISERFS: abort (device %s): %s\n",
+            reiserfs_bdevname (sb), error_buf);
+
+    sb->s_flags |= MS_RDONLY;
+    reiserfs_journal_abort (sb, errno);
+}
 
 void print_virtual_node (struct virtual_node * vn)
 {
@@ -419,7 +462,7 @@ void print_path (struct tree_balance * tb, struct path * path)
    dc_size)...*/
 static int print_internal (struct buffer_head * bh, int first, int last)
 {
-    struct key * key;
+    struct reiserfs_key * key;
     struct disk_child * dc;
     int i;
     int from, to;

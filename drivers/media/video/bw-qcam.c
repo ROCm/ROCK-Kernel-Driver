@@ -249,8 +249,7 @@ static int qc_waithand(struct qcam_device *q, int val)
 			   
 			if(runs++>maxpoll)
 			{
-				current->state=TASK_INTERRUPTIBLE;
-				schedule_timeout(HZ/200);
+				msleep_interruptible(5);
 			}
 			if(runs>(maxpoll+1000)) /* 5 seconds */
 				return -1;
@@ -269,8 +268,7 @@ static int qc_waithand(struct qcam_device *q, int val)
 			   
 			if(runs++>maxpoll)
 			{
-				current->state=TASK_INTERRUPTIBLE;
-				schedule_timeout(HZ/200);
+				msleep_interruptible(5);
 			}
 			if(runs++>(maxpoll+1000)) /* 5 seconds */
 				return -1;
@@ -302,8 +300,7 @@ static unsigned int qc_waithand2(struct qcam_device *q, int val)
 		   
 		if(runs++>maxpoll)
 		{
-			current->state=TASK_INTERRUPTIBLE;
-			schedule_timeout(HZ/200);
+			msleep_interruptible(5);
 		}
 		if(runs++>(maxpoll+1000)) /* 5 seconds */
 			return 0;
@@ -669,8 +666,7 @@ long qc_capture(struct qcam_device * q, char __user *buf, unsigned long len)
 		   time will be 240 / 200 = 1.2 seconds. The compile-time
 		   default is to yield every 4 lines. */
 		if (i >= yield) {
-			current->state=TASK_INTERRUPTIBLE;
-			schedule_timeout(HZ/200);
+			msleep_interruptible(5);
 			yield = i + yieldlines;
 		}
 	}

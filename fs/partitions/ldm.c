@@ -2,7 +2,7 @@
  * ldm - Support for Windows Logical Disk Manager (Dynamic Disks)
  *
  * Copyright (C) 2001,2002 Richard Russon <ldm@flatcap.org>
- * Copyright (C) 2001      Anton Altaparmakov <aia21@cantab.net>
+ * Copyright (c) 2001-2004 Anton Altaparmakov
  * Copyright (C) 2001,2002 Jakob Kemi <jakob.kemi@telia.com>
  *
  * Documentation is available at http://linux-ntfs.sf.net/ldm
@@ -517,9 +517,15 @@ static BOOL ldm_validate_vmdb (struct block_device *bdev, unsigned long base,
 	if (vm->vblk_offset != 512)
 		ldm_info ("VBLKs start at offset 0x%04x.", vm->vblk_offset);
 
-	/* FIXME: How should we handle this situation? */
-	if ((vm->vblk_size * vm->last_vblk_seq) != (toc->bitmap1_size << 9))
-		ldm_info ("VMDB and TOCBLOCK don't agree on the database size.");
+	/*
+	 * The last_vblkd_seq can be before the end of the vmdb, just make sure
+	 * it is not out of bounds.
+	 */
+	if ((vm->vblk_size * vm->last_vblk_seq) > (toc->bitmap1_size << 9)) {
+		ldm_crit ("VMDB exceeds allowed size specified by TOCBLOCK.  "
+				"Database is corrupt.  Aborting.");
+		goto out;
+	}
 
 	result = TRUE;
 out:
@@ -560,7 +566,7 @@ static BOOL ldm_validate_partition_table (struct block_device *bdev)
 		return FALSE;
 	}
 
-	if (*(u16*) (data + 0x01FE) != cpu_to_le16 (MSDOS_LABEL_MAGIC))
+	if (*(__le16*) (data + 0x01FE) != cpu_to_le16 (MSDOS_LABEL_MAGIC))
 		goto out;
 
 	p = (struct partition*)(data + 0x01BE);

@@ -357,7 +357,7 @@ static int do_insert_tree(struct dquot *dquot, uint *treeblk, int depth)
 	struct file *filp = sb_dqopt(dquot->dq_sb)->files[dquot->dq_type];
 	dqbuf_t buf;
 	int ret = 0, newson = 0, newact = 0;
-	u32 *ref;
+	__le32 *ref;
 	uint newblk;
 
 	if (!(buf = getdqbuf()))
@@ -376,7 +376,7 @@ static int do_insert_tree(struct dquot *dquot, uint *treeblk, int depth)
 			goto out_buf;
 		}
 	}
-	ref = (u32 *)buf;
+	ref = (__le32 *)buf;
 	newblk = le32_to_cpu(ref[GETIDINDEX(dquot->dq_id, depth)]);
 	if (!newblk)
 		newson = 1;
@@ -510,7 +510,7 @@ static int remove_tree(struct dquot *dquot, uint *blk, int depth)
 	dqbuf_t buf = getdqbuf();
 	int ret = 0;
 	uint newblk;
-	u32 *ref = (u32 *)buf;
+	__le32 *ref = (__le32 *)buf;
 	
 	if (!buf)
 		return -ENOMEM;
@@ -595,7 +595,7 @@ static loff_t find_tree_dqentry(struct dquot *dquot, uint blk, int depth)
 	struct file *filp = sb_dqopt(dquot->dq_sb)->files[dquot->dq_type];
 	dqbuf_t buf = getdqbuf();
 	loff_t ret = 0;
-	u32 *ref = (u32 *)buf;
+	__le32 *ref = (__le32 *)buf;
 
 	if (!buf)
 		return -ENOMEM;

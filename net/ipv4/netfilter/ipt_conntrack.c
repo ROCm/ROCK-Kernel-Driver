@@ -35,7 +35,7 @@ match(const struct sk_buff *skb,
 
 #define FWINV(bool,invflg) ((bool) ^ !!(sinfo->invflags & invflg))
 
-	if (skb->nfct == &ip_conntrack_untracked.infos[IP_CT_NEW])
+	if (ct == &ip_conntrack_untracked)
 		statebit = IPT_CONNTRACK_STATE_UNTRACKED;
 	else if (ct)
  		statebit = IPT_CONNTRACK_STATE_BIT(ctinfo);

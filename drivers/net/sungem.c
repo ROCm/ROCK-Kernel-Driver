@@ -37,9 +37,9 @@
 #include <linux/random.h>
 #include <linux/workqueue.h>
 #include <linux/if_vlan.h>
+#include <linux/bitops.h>
 
 #include <asm/system.h>
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/byteorder.h>
 #include <asm/uaccess.h>
@@ -973,7 +973,7 @@ static int gem_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (!spin_trylock(&gp->tx_lock)) {
 		/* Tell upper layer to requeue */
 		local_irq_restore(flags);
-		return -1;
+		return NETDEV_TX_LOCKED;
 	}
 
 	/* This is a hard error, log it. */
@@ -982,7 +982,7 @@ static int gem_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		spin_unlock_irqrestore(&gp->tx_lock, flags);
 		printk(KERN_ERR PFX "%s: BUG! Tx Ring full when queue awake!\n",
 		       dev->name);
-		return 1;
+		return NETDEV_TX_BUSY;
 	}
 
 	entry = gp->tx_new;
@@ -1070,7 +1070,7 @@ static int gem_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	dev->trans_start = jiffies;
 
-	return 0;
+	return NETDEV_TX_OK;
 }
 
 /* Jumbo-grams don't seem to work :-( */
@@ -2683,12 +2683,12 @@ static int gem_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 
 #if (!defined(__sparc__) && !defined(CONFIG_PPC))
 /* Fetch MAC address from vital product data of PCI ROM. */
-static void find_eth_addr_in_vpd(void *rom_base, int len, unsigned char *dev_addr)
+static void find_eth_addr_in_vpd(void __iomem *rom_base, int len, unsigned char *dev_addr)
 {
 	int this_offset;
 
 	for (this_offset = 0x20; this_offset < len; this_offset++) {
-		void *p = rom_base + this_offset;
+		void __iomem *p = rom_base + this_offset;
 		int i;
 
 		if (readb(p + 0) != 0x90 ||
@@ -2948,7 +2948,7 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 	dev->irq = pdev->irq;
 	dev->dma = 0;
 #ifdef CONFIG_NET_POLL_CONTROLLER
-        dev->poll_controller = gem_poll_controller;
+	dev->poll_controller = gem_poll_controller;
 #endif
 
 	if (register_netdev(dev)) {

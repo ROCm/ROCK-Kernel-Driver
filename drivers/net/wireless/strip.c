@@ -85,9 +85,9 @@ static const char StripVersion[] = "1.3A-STUART.CHESHIRE";
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/init.h>
+#include <linux/bitops.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
-#include <asm/bitops.h>
 
 # include <linux/ctype.h>
 #include <linux/string.h>
@@ -2666,8 +2666,6 @@ static int strip_open(struct tty_struct *tty)
 	tty->disc_data = strip_info;
 	if (tty->driver->flush_buffer)
 		tty->driver->flush_buffer(tty);
-	if (tty->ldisc.flush_buffer)
-		tty->ldisc.flush_buffer(tty);
 
 	/*
 	 * Restore default settings

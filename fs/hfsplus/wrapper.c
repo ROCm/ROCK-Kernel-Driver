@@ -30,22 +30,22 @@ static int hfsplus_read_mdb(void *bufptr, struct hfsplus_wd *wd)
 	u32 extent;
 	u16 attrib;
 
-	if (be16_to_cpu(*(u16 *)(bufptr + HFSP_WRAPOFF_EMBEDSIG)) != HFSPLUS_VOLHEAD_SIG)
+	if (be16_to_cpu(*(__be16 *)(bufptr + HFSP_WRAPOFF_EMBEDSIG)) != HFSPLUS_VOLHEAD_SIG)
 		return 0;
 
-	attrib = be16_to_cpu(*(u16 *)(bufptr + HFSP_WRAPOFF_ATTRIB));
+	attrib = be16_to_cpu(*(__be16 *)(bufptr + HFSP_WRAPOFF_ATTRIB));
 	if (!(attrib & HFSP_WRAP_ATTRIB_SLOCK) ||
 	   !(attrib & HFSP_WRAP_ATTRIB_SPARED))
 		return 0;
 
-	wd->ablk_size = be32_to_cpu(*(u32 *)(bufptr + HFSP_WRAPOFF_ABLKSIZE));
+	wd->ablk_size = be32_to_cpu(*(__be32 *)(bufptr + HFSP_WRAPOFF_ABLKSIZE));
 	if (wd->ablk_size < HFSPLUS_SECTOR_SIZE)
 		return 0;
 	if (wd->ablk_size % HFSPLUS_SECTOR_SIZE)
 		return 0;
-	wd->ablk_start = be16_to_cpu(*(u16 *)(bufptr + HFSP_WRAPOFF_ABLKSTART));
+	wd->ablk_start = be16_to_cpu(*(__be16 *)(bufptr + HFSP_WRAPOFF_ABLKSTART));
 
-	extent = be32_to_cpu(get_unaligned((u32 *)(bufptr + HFSP_WRAPOFF_EMBEDEXT)));
+	extent = be32_to_cpu(get_unaligned((__be32 *)(bufptr + HFSP_WRAPOFF_EMBEDEXT)));
 	wd->embed_start = (extent >> 16) & 0xFFFF;
 	wd->embed_count = extent & 0xFFFF;
 

@@ -304,7 +304,7 @@ int param_array_set(const char *val, struct kernel_param *kp)
 	struct kparam_array *arr = kp->arg;
 
 	return param_array(kp->name, val, 1, arr->max, arr->elem,
-			   arr->elemsize, arr->set, arr->num);
+			   arr->elemsize, arr->set, arr->num ?: &arr->max);
 }
 
 int param_array_get(char *buffer, struct kernel_param *kp)
@@ -314,7 +314,7 @@ int param_array_get(char *buffer, struct kernel_param *kp)
 	struct kernel_param p;
 
 	p = *kp;
-	for (i = off = 0; i < *arr->num; i++) {
+	for (i = off = 0; i < (arr->num ? *arr->num : arr->max); i++) {
 		if (i)
 			buffer[off++] = ',';
 		p.arg = arr->elem + arr->elemsize * i;

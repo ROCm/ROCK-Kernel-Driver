@@ -50,8 +50,11 @@
 #include <asm/bitops.h>
 #include <asm/uaccess.h>
 
-#include "scsi.h"
+#include <scsi/scsi.h>
+#include <scsi/scsi_cmnd.h>
+#include <scsi/scsi_device.h>
 #include <scsi/scsi_host.h>
+#include <scsi/scsi_tcq.h>
 #include <scsi/sg.h>
 
 #define IDESCSI_DEBUG_LOG		0
@@ -66,8 +69,8 @@ typedef struct idescsi_pc_s {
 	u8 *current_position;			/* Pointer into the above buffer */
 	struct scatterlist *sg;			/* Scatter gather table */
 	int b_count;				/* Bytes transferred from current entry */
-	Scsi_Cmnd *scsi_cmd;			/* SCSI command */
-	void (*done)(Scsi_Cmnd *);		/* Scsi completion routine */
+	struct scsi_cmnd *scsi_cmd;		/* SCSI command */
+	void (*done)(struct scsi_cmnd *);	/* Scsi completion routine */
 	unsigned long flags;			/* Status/Action flags */
 	unsigned long timeout;			/* Command timeout */
 } idescsi_pc_t;
@@ -552,6 +555,7 @@ static ide_startstop_t idescsi_pc_intr (ide_drive_t *drive)
 
 static ide_startstop_t idescsi_transfer_pc(ide_drive_t *drive)
 {
+	ide_hwif_t *hwif = drive->hwif;
 	idescsi_scsi_t *scsi = drive_to_idescsi(drive);
 	idescsi_pc_t *pc = scsi->pc;
 	atapi_ireason_t ireason;
@@ -576,7 +580,7 @@ static ide_startstop_t idescsi_transfer_pc(ide_drive_t *drive)
 	atapi_output_bytes(drive, scsi->pc->c, 12);
 	if (test_bit (PC_DMA_OK, &pc->flags)) {
 		set_bit (PC_DMA_IN_PROGRESS, &pc->flags);
-		(void) (HWIF(drive)->ide_dma_begin(drive));
+		hwif->dma_start(drive);
 	}
 	return ide_started;
 }
@@ -587,6 +591,7 @@ static ide_startstop_t idescsi_transfer_pc(ide_drive_t *drive)
 static ide_startstop_t idescsi_issue_pc (ide_drive_t *drive, idescsi_pc_t *pc)
 {
 	idescsi_scsi_t *scsi = drive_to_idescsi(drive);
+	ide_hwif_t *hwif = drive->hwif;
 	atapi_feature_t feature;
 	atapi_bcount_t bcount;
 	struct request *rq = pc->rq;
@@ -597,12 +602,8 @@ static ide_startstop_t idescsi_issue_pc (ide_drive_t *drive, idescsi_pc_t *pc)
 	bcount.all = min(pc->request_transfer, 63 * 1024);		/* Request to transfer the entire buffer at once */
 
 	feature.all = 0;
-	if (drive->using_dma && rq->bio) {
-		if (test_bit(PC_WRITING, &pc->flags))
-			feature.b.dma = !HWIF(drive)->ide_dma_write(drive);
-		else
-			feature.b.dma = !HWIF(drive)->ide_dma_read(drive);
-	}
+	if (drive->using_dma && rq->bio)
+		feature.b.dma = !hwif->dma_setup(drive);
 
 	SELECT_DRIVE(drive);
 	if (IDE_CONTROL_REG)
@@ -747,7 +748,7 @@ static struct block_device_operations idescsi_ops = {
 
 static int idescsi_attach(ide_drive_t *drive);
 
-static int idescsi_slave_configure(Scsi_Device * sdp)
+static int idescsi_slave_configure(struct scsi_device * sdp)
 {
 	/* Configure detected device */
 	scsi_adjust_queue_depth(sdp, MSG_SIMPLE_TAG, sdp->host->cmd_per_lun);
@@ -759,7 +760,7 @@ static const char *idescsi_info (struct Scsi_Host *host)
 	return "SCSI host adapter emulation for IDE ATAPI devices";
 }
 
-static int idescsi_ioctl (Scsi_Device *dev, int cmd, void __user *arg)
+static int idescsi_ioctl (struct scsi_device *dev, int cmd, void __user *arg)
 {
 	idescsi_scsi_t *scsi = scsihost_to_idescsi(dev->host);
 
@@ -849,7 +850,7 @@ static inline struct bio *idescsi_dma_bio(ide_drive_t *drive, idescsi_pc_t *pc)
 	return first_bh;
 }
 
-static inline int should_transform(ide_drive_t *drive, Scsi_Cmnd *cmd)
+static inline int should_transform(ide_drive_t *drive, struct scsi_cmnd *cmd)
 {
 	idescsi_scsi_t *scsi = drive_to_idescsi(drive);
 
@@ -867,7 +868,8 @@ static inline int should_transform(ide_drive_t *drive, Scsi_Cmnd *cmd)
 	return test_bit(IDESCSI_TRANSFORM, &scsi->transform);
 }
 
-static int idescsi_queue (Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd *))
+static int idescsi_queue (struct scsi_cmnd *cmd,
+		void (*done)(struct scsi_cmnd *))
 {
 	struct Scsi_Host *host = cmd->device->host;
 	idescsi_scsi_t *scsi = scsihost_to_idescsi(host);
@@ -933,7 +935,7 @@ abort:
 	return 1;
 }
 
-static int idescsi_eh_abort (Scsi_Cmnd *cmd)
+static int idescsi_eh_abort (struct scsi_cmnd *cmd)
 {
 	idescsi_scsi_t *scsi  = scsihost_to_idescsi(cmd->device->host);
 	ide_drive_t    *drive = scsi->drive;
@@ -992,7 +994,7 @@ no_drive:
 	return ret;
 }
 
-static int idescsi_eh_reset (Scsi_Cmnd *cmd)
+static int idescsi_eh_reset (struct scsi_cmnd *cmd)
 {
 	struct request *req;
 	idescsi_scsi_t *scsi  = scsihost_to_idescsi(cmd->device->host);
@@ -1075,7 +1077,7 @@ static int idescsi_bios(struct scsi_device *sdev, struct block_device *bdev,
 	return 0;
 }
 
-static Scsi_Host_Template idescsi_template = {
+static struct scsi_host_template idescsi_template = {
 	.module			= THIS_MODULE,
 	.name			= "idescsi",
 	.info			= idescsi_info,

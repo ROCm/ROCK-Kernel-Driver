@@ -23,8 +23,8 @@ static inline int freezeable(struct task_struct * p)
 {
 	if ((p == current) || 
 	    (p->flags & PF_NOFREEZE) ||
-	    (p->state == TASK_ZOMBIE) ||
-	    (p->state == TASK_DEAD) ||
+	    (p->exit_state == EXIT_ZOMBIE) ||
+	    (p->exit_state == EXIT_DEAD) ||
 	    (p->state == TASK_STOPPED) ||
 	    (p->state == TASK_TRACED))
 		return 0;

@@ -26,6 +26,7 @@
 #include "w1_log.h"
 #include "w1_netlink.h"
 
+#ifndef NETLINK_DISABLED
 void w1_netlink_send(struct w1_master *dev, struct w1_netlink_msg *msg)
 {
 	unsigned int size;
@@ -53,3 +54,10 @@ void w1_netlink_send(struct w1_master *dev, struct w1_netlink_msg *msg)
 nlmsg_failure:
 	return;
 }
+#else
+#warning Netlink support is disabled. Please compile with NET support enabled.
+
+void w1_netlink_send(struct w1_master *dev, struct w1_netlink_msg *msg)
+{
+}
+#endif

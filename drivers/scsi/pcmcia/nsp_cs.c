@@ -1528,7 +1528,7 @@ nsp_proc_info(
 	thislength = pos - (buffer + offset);
 
 	if(thislength < 0) {
-		*start = 0;
+		*start = NULL;
                 return 0;
         }
 

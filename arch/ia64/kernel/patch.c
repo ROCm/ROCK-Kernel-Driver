@@ -65,21 +65,21 @@ void
 ia64_patch_imm64 (u64 insn_addr, u64 val)
 {
 	ia64_patch(insn_addr,
-		   0x01fffefe000, (  ((val & 0x8000000000000000) >> 27) /* bit 63 -> 36 */
-				   | ((val & 0x0000000000200000) <<  0) /* bit 21 -> 21 */
-				   | ((val & 0x00000000001f0000) <<  6) /* bit 16 -> 22 */
-				   | ((val & 0x000000000000ff80) << 20) /* bit  7 -> 27 */
-				   | ((val & 0x000000000000007f) << 13) /* bit  0 -> 13 */));
-	ia64_patch(insn_addr - 1, 0x1ffffffffff, val >> 22);
+		   0x01fffefe000UL, (  ((val & 0x8000000000000000UL) >> 27) /* bit 63 -> 36 */
+				     | ((val & 0x0000000000200000UL) <<  0) /* bit 21 -> 21 */
+				     | ((val & 0x00000000001f0000UL) <<  6) /* bit 16 -> 22 */
+				     | ((val & 0x000000000000ff80UL) << 20) /* bit  7 -> 27 */
+				     | ((val & 0x000000000000007fUL) << 13) /* bit  0 -> 13 */));
+	ia64_patch(insn_addr - 1, 0x1ffffffffffUL, val >> 22);
 }
 
 void
 ia64_patch_imm60 (u64 insn_addr, u64 val)
 {
 	ia64_patch(insn_addr,
-		   0x011ffffe000, (  ((val & 0x0800000000000000) >> 23) /* bit 59 -> 36 */
-				   | ((val & 0x00000000000fffff) << 13) /* bit  0 -> 13 */));
-	ia64_patch(insn_addr - 1, 0x1fffffffffc, val >> 18);
+		   0x011ffffe000UL, (  ((val & 0x0800000000000000UL) >> 23) /* bit 59 -> 36 */
+				     | ((val & 0x00000000000fffffUL) << 13) /* bit  0 -> 13 */));
+	ia64_patch(insn_addr - 1, 0x1fffffffffcUL, val >> 18);
 }
 
 /*
@@ -130,10 +130,10 @@ ia64_patch_mckinley_e9 (unsigned long start, unsigned long end)
 
 	while (offp < (s32 *) end) {
 		wp = (u64 *) ia64_imva((char *) offp + *offp);
-		wp[0] = 0x0000000100000000; /* nop.m 0; nop.i 0; nop.i 0 */
-		wp[1] = 0x0004000000000200;
-		wp[2] = 0x0000000100000011; /* nop.m 0; nop.i 0; br.ret.sptk.many b6 */
-		wp[3] = 0x0084006880000200;
+		wp[0] = 0x0000000100000000UL; /* nop.m 0; nop.i 0; nop.i 0 */
+		wp[1] = 0x0004000000000200UL;
+		wp[2] = 0x0000000100000011UL; /* nop.m 0; nop.i 0; br.ret.sptk.many b6 */
+		wp[3] = 0x0084006880000200UL;
 		ia64_fc(wp); ia64_fc(wp + 2);
 		++offp;
 	}

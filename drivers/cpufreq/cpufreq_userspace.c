@@ -515,7 +515,7 @@ static int cpufreq_governor_userspace(struct cpufreq_policy *policy,
 	unsigned int cpu = policy->cpu;
 	switch (event) {
 	case CPUFREQ_GOV_START:
-		if ((!cpu_online(cpu)) || (!try_module_get(THIS_MODULE)))
+		if (!cpu_online(cpu))
 			return -EINVAL;
 		BUG_ON(!policy->cur);
 		down(&userspace_sem);
@@ -534,7 +534,6 @@ static int cpufreq_governor_userspace(struct cpufreq_policy *policy,
 		cpu_max_freq[cpu] = 0;
 		sysfs_remove_file (&policy->kobj, &freq_attr_scaling_setspeed.attr);
 		up(&userspace_sem);
-		module_put(THIS_MODULE);
 		break;
 	case CPUFREQ_GOV_LIMITS:
 		down(&userspace_sem);

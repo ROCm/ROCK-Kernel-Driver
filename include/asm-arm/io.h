@@ -16,6 +16,7 @@
  *  04-Apr-1999	PJB	Added check_signature.
  *  12-Dec-1999	RMK	More cleanups
  *  18-Jun-2000 RMK	Removed virt_to_* and friends definitions
+ *  05-Oct-2004 BJD     Moved memory string functions to use void __iomem
  */
 #ifndef __ASM_ARM_IO_H
 #define __ASM_ARM_IO_H
@@ -131,9 +132,9 @@ extern void __readwrite_bug(const char *fn);
 /*
  * String version of IO memory access ops:
  */
-extern void _memcpy_fromio(void *, unsigned long, size_t);
-extern void _memcpy_toio(unsigned long, const void *, size_t);
-extern void _memset_io(unsigned long, int, size_t);
+extern void _memcpy_fromio(void *, void __iomem *, size_t);
+extern void _memcpy_toio(void __iomem *, const void *, size_t);
+extern void _memset_io(void __iomem *, int, size_t);
 
 /*
  *  Memory access primitives

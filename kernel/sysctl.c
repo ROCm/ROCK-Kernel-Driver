@@ -40,6 +40,7 @@
 #include <linux/times.h>
 #include <linux/limits.h>
 #include <linux/dcache.h>
+#include <linux/syscalls.h>
 
 #include <asm/uaccess.h>
 #include <asm/processor.h>
@@ -65,6 +66,7 @@ extern int sysctl_lower_zone_protection;
 extern int min_free_kbytes;
 extern int printk_ratelimit_jiffies;
 extern int printk_ratelimit_burst;
+extern int pid_max_min, pid_max_max;
 
 #if defined(CONFIG_X86_LOCAL_APIC) && defined(__i386__)
 int unknown_nmi_panic;
@@ -574,7 +576,10 @@ static ctl_table kern_table[] = {
 		.data		= &pid_max,
 		.maxlen		= sizeof (int),
 		.mode		= 0644,
-		.proc_handler	= &proc_dointvec,
+		.proc_handler	= &proc_dointvec_minmax,
+		.strategy	= sysctl_intvec,
+		.extra1		= &pid_max_min,
+		.extra2		= &pid_max_max,
 	},
 	{
 		.ctl_name	= KERN_PANIC_ON_OOPS,
@@ -778,6 +783,7 @@ static ctl_table vm_table[] = {
 		.strategy	= &sysctl_intvec,
 		.extra1		= &zero,
 	},
+#ifdef CONFIG_SWAP
 	{
 		.ctl_name	= VM_VFS_CACHE_PRESSURE,
 		.procname	= "vfs_cache_pressure",
@@ -800,6 +806,15 @@ static ctl_table vm_table[] = {
 		.extra1		= &zero,
 	},
 #endif
+	{
+		.ctl_name	= VM_SWAP_TOKEN_TIMEOUT,
+		.procname	= "swap_token_timeout",
+		.data		= &swap_token_default_timeout,
+		.maxlen		= sizeof(swap_token_default_timeout),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec_jiffies,
+		.strategy	= &sysctl_jiffies,
+	},
 	{ .ctl_name = 0 }
 };
 
@@ -910,6 +925,7 @@ static ctl_table fs_table[] = {
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec,
 	},
+#endif
 	{ .ctl_name = 0 }
 };
 

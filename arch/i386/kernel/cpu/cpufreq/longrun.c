@@ -308,7 +308,7 @@ static void __exit longrun_exit(void)
 
 
 MODULE_AUTHOR ("Dominik Brodowski <linux@brodo.de>");
-MODULE_DESCRIPTION ("LongRun driver for Transmeta Crusoe processors.");
+MODULE_DESCRIPTION ("LongRun driver for Transmeta Crusoe and Efficeon processors.");
 MODULE_LICENSE ("GPL");
 
 module_init(longrun_init);

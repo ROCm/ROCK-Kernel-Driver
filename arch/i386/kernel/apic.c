@@ -47,6 +47,24 @@ int apic_verbosity;
 
 static void apic_pm_activate(void);
 
+/*
+ * 'what should we do if we get a hw irq event on an illegal vector'.
+ * each architecture has to answer this themselves.
+ */
+void ack_bad_irq(unsigned int irq)
+{
+	printk("unexpected IRQ trap at vector %02x\n", irq);
+	/*
+	 * Currently unexpected vectors happen only on SMP and APIC.
+	 * We _must_ ack these because every local APIC has only N
+	 * irq slots per priority level, and a 'hanging, unacked' IRQ
+	 * holds up an irq slot - in excessive cases (when multiple
+	 * unexpected vectors occur) that might lock up the APIC
+	 * completely.
+	 */
+	ack_APIC_irq();
+}
+
 void __init apic_intr_init(void)
 {
 #ifdef CONFIG_SMP
@@ -91,7 +109,7 @@ int get_physical_broadcast(void)
 	unsigned int lvr, version;
 	lvr = apic_read(APIC_LVR);
 	version = GET_APIC_VERSION(lvr);
-	if (version >= 0x14)
+	if (!APIC_INTEGRATED(version) || version >= 0x14)
 		return 0xff;
 	else
 		return 0xf;
@@ -691,6 +709,12 @@ static int __init detect_init_APIC (void)
 	}
 
 	if (!cpu_has_apic) {
+		/*
+		 * Over-ride BIOS and try to enable LAPIC
+		 * only if "lapic" specified
+		 */
+		if (enable_local_apic != 1)
+			goto no_apic;
 		/*
 		 * Some BIOSes disable the local APIC in the
 		 * APIC_BASE MSR. This can only be done in

@@ -45,7 +45,7 @@ int tpam_command(isdn_ctrl *c) {
 	tpam_card *card;
 	unsigned long argp;
 
-	dprintk("TurboPAM(tpam_command) card=%d, command=%d\n", 
+	pr_debug("TurboPAM(tpam_command) card=%d, command=%d\n",
 		c->driver, c->command);	
 
 	/* search for the board */
@@ -75,7 +75,7 @@ int tpam_command(isdn_ctrl *c) {
 					return tpam_command_ioctl_loopmode(card,
 									   0);
 				default:
-					dprintk("TurboPAM(tpam_command): "
+					pr_debug("TurboPAM(tpam_command): "
 						"invalid tpam ioctl %ld\n", 
 						c->arg);	
 					return -EINVAL;
@@ -95,7 +95,7 @@ int tpam_command(isdn_ctrl *c) {
 		case ISDN_CMD_PROCEED:
 			return tpam_command_proceed(card, c->arg);
 		default:
-			dprintk("TurboPAM(tpam_command): "
+			pr_debug("TurboPAM(tpam_command): "
 				"unknown or unused isdn ioctl %d\n", 
 				c->command);	
 			return -EINVAL;
@@ -117,7 +117,7 @@ int tpam_command(isdn_ctrl *c) {
 static int tpam_command_ioctl_dspload(tpam_card *card, u32 arg) {
 	tpam_dsp_ioctl tdl;
 
-	dprintk("TurboPAM(tpam_command_ioctl_dspload): card=%d\n", card->id);
+	pr_debug("TurboPAM(tpam_command_ioctl_dspload): card=%d\n", card->id);
 
 	/* get the IOCTL parameter from userspace */
 	if (copy_from_user(&tdl, (void __user *)arg, sizeof(tpam_dsp_ioctl)))
@@ -147,7 +147,7 @@ static int tpam_command_ioctl_dspload(tpam_card *card, u32 arg) {
 static int tpam_command_ioctl_dspsave(tpam_card *card, u32 arg) {
 	tpam_dsp_ioctl tdl;
 
-	dprintk("TurboPAM(tpam_command_ioctl_dspsave): card=%d\n", card->id);
+	pr_debug("TurboPAM(tpam_command_ioctl_dspsave): card=%d\n", card->id);
 
 	/* get the IOCTL parameter from userspace */
 	if (copy_from_user(&tdl, (void __user *)arg, sizeof(tpam_dsp_ioctl)))
@@ -178,7 +178,7 @@ static int tpam_command_ioctl_dsprun(tpam_card *card) {
 	isdn_ctrl ctrl;
 	struct sk_buff *skb;
 
-	dprintk("TurboPAM(tpam_command_ioctl_dsprun): card=%d\n", card->id);
+	pr_debug("TurboPAM(tpam_command_ioctl_dsprun): card=%d\n", card->id);
 
 	/* board must _not_ be running */
 	if (card->running)
@@ -297,7 +297,7 @@ static int tpam_command_dial(tpam_card *card, u32 channel, u8 *phone) {
 	struct sk_buff *skb;
 	isdn_ctrl ctrl;
 
-	dprintk("TurboPAM(tpam_command_dial): card=%d, channel=%lu, phone=%s\n",
+	pr_debug("TurboPAM(tpam_command_dial): card=%d, channel=%lu, phone=%s\n",
 		card->id, (unsigned long)channel, phone);
 
 	/* board must be running */
@@ -341,7 +341,7 @@ static int tpam_command_dial(tpam_card *card, u32 channel, u8 *phone) {
  */
 static int tpam_command_setl2(tpam_card *card, u32 channel, u8 proto) {
 
-	dprintk("TurboPAM(tpam_command_setl2): card=%d, channel=%lu, proto=%d\n",
+	pr_debug("TurboPAM(tpam_command_setl2): card=%d, channel=%lu, proto=%d\n",
 		card->id, (unsigned long)channel, proto);
 
 	/* board must be running */
@@ -376,7 +376,7 @@ static int tpam_command_acceptd(tpam_card *card, u32 channel) {
 	isdn_ctrl ctrl;
 	struct sk_buff *skb;
 
-	dprintk("TurboPAM(tpam_command_acceptd): card=%d, channel=%lu\n",
+	pr_debug("TurboPAM(tpam_command_acceptd): card=%d, channel=%lu\n",
 		card->id, (unsigned long)channel);
 
 	/* board must be running */
@@ -410,7 +410,7 @@ static int tpam_command_acceptd(tpam_card *card, u32 channel) {
 static int tpam_command_acceptb(tpam_card *card, u32 channel) {
 	isdn_ctrl ctrl;
 
-	dprintk("TurboPAM(tpam_command_acceptb): card=%d, channel=%lu\n",
+	pr_debug("TurboPAM(tpam_command_acceptb): card=%d, channel=%lu\n",
 		card->id, (unsigned long)channel);
 
 	/* board must be running */
@@ -437,7 +437,7 @@ static int tpam_command_acceptb(tpam_card *card, u32 channel) {
 static int tpam_command_hangup(tpam_card *card, u32 channel) {
 	struct sk_buff *skb;
 
-	dprintk("TurboPAM(tpam_command_hangup): card=%d, channel=%lu\n",
+	pr_debug("TurboPAM(tpam_command_hangup): card=%d, channel=%lu\n",
 		card->id, (unsigned long)channel);
 
 	/* board must be running */
@@ -464,7 +464,7 @@ static int tpam_command_hangup(tpam_card *card, u32 channel) {
 static int tpam_command_proceed(tpam_card *card, u32 channel) {
 	struct sk_buff *skb;
 
-	dprintk("TurboPAM(tpam_command_proceed): card=%d, channel=%lu\n",
+	pr_debug("TurboPAM(tpam_command_proceed): card=%d, channel=%lu\n",
 		card->id, (unsigned long)channel);
 
 	/* board must be running */
@@ -496,7 +496,7 @@ int tpam_writebuf_skb(int driverId, int channel, int ack, struct sk_buff *skb) {
 	void *finaldata;
 	u32 finallen;
 
-	dprintk("TurboPAM(tpam_writebuf_skb): "
+	pr_debug("TurboPAM(tpam_writebuf_skb): "
 		"card=%d, channel=%ld, ack=%d, data size=%d\n", 
 		driverId, (unsigned long)channel, ack, skb->len);
 
@@ -569,7 +569,7 @@ void tpam_recv_ACreateNCOCnf(tpam_card *card, struct sk_buff *skb) {
 	u8 status;
 	u32 channel;
 
-	dprintk("TurboPAM(tpam_recv_ACreateNCOCnf): card=%d\n", card->id);
+	pr_debug("TurboPAM(tpam_recv_ACreateNCOCnf): card=%d\n", card->id);
 
 	/* parse the message contents */
 	if (parse_ACreateNCOCnf(skb, &status, &ncoid))
@@ -614,7 +614,7 @@ void tpam_recv_ADestroyNCOCnf(tpam_card *card, struct sk_buff *skb) {
 	u8 status;
 	u32 channel;
 
-	dprintk("TurboPAM(tpam_recv_ADestroyNCOCnf): card=%d\n", card->id);
+	pr_debug("TurboPAM(tpam_recv_ADestroyNCOCnf): card=%d\n", card->id);
 
 	/* parse the message contents */
 	if (parse_ADestroyNCOCnf(skb, &status, &ncoid))
@@ -647,7 +647,7 @@ void tpam_recv_CConnectCnf(tpam_card *card, struct sk_buff *skb) {
 	u32 channel;
 	isdn_ctrl ctrl;
 
-	dprintk("TurboPAM(tpam_recv_CConnectCnf): card=%d\n", card->id);
+	pr_debug("TurboPAM(tpam_recv_CConnectCnf): card=%d\n", card->id);
 
 	/* parse the message contents */
 	if (parse_CConnectCnf(skb, &ncoid))
@@ -685,7 +685,7 @@ void tpam_recv_CConnectInd(tpam_card *card, struct sk_buff *skb) {
 	isdn_ctrl ctrl;
 	int status;
 
-	dprintk("TurboPAM(tpam_recv_CConnectInd): card=%d\n", card->id);
+	pr_debug("TurboPAM(tpam_recv_CConnectInd): card=%d\n", card->id);
 
 	/* parse the message contents */
 	if (parse_CConnectInd(skb, &ncoid, &hdlc, calling, called, &plan, &screen))
@@ -720,13 +720,13 @@ void tpam_recv_CConnectInd(tpam_card *card, struct sk_buff *skb) {
 		case 4:
 			/* call accepted, link layer will send us a ACCEPTD 
 			 * command later */
-			dprintk("TurboPAM(tpam_recv_CConnectInd): "
+			pr_debug("TurboPAM(tpam_recv_CConnectInd): "
 				"card=%d, channel=%d, icall waiting, status=%d\n", 
 				card->id, channel, status);
 			break;
 		default:
 			/* call denied, we build and send a CDisconnectReq */
-			dprintk("TurboPAM(tpam_recv_CConnectInd): "
+			pr_debug("TurboPAM(tpam_recv_CConnectInd): "
 				"card=%d, channel=%d, icall denied, status=%d\n", 
 				card->id, channel, status);
 			skb = build_CDisconnectReq(ncoid);
@@ -749,7 +749,7 @@ void tpam_recv_CDisconnectInd(tpam_card *card, struct sk_buff *skb) {
 	u32 cause;
 	isdn_ctrl ctrl;
 
-	dprintk("TurboPAM(tpam_recv_CDisconnectInd): card=%d\n", card->id);
+	pr_debug("TurboPAM(tpam_recv_CDisconnectInd): card=%d\n", card->id);
 
 	/* parse the message contents */
 	if (parse_CDisconnectInd(skb, &ncoid, &cause))
@@ -794,7 +794,7 @@ void tpam_recv_CDisconnectCnf(tpam_card *card, struct sk_buff *skb) {
 	u32 cause;
 	isdn_ctrl ctrl;
 
-	dprintk("TurboPAM(tpam_recv_CDisconnectCnf): card=%d\n", card->id);
+	pr_debug("TurboPAM(tpam_recv_CDisconnectCnf): card=%d\n", card->id);
 
 	/* parse the message contents */
 	if (parse_CDisconnectCnf(skb, &ncoid, &cause))
@@ -835,7 +835,7 @@ void tpam_recv_U3DataInd(tpam_card *card, struct sk_buff *skb) {
 	u16 len;
 	struct sk_buff *result;
 
-	dprintk("TurboPAM(tpam_recv_U3DataInd): card=%d, datalen=%d\n", 
+	pr_debug("TurboPAM(tpam_recv_U3DataInd): card=%d, datalen=%d\n",
 		card->id, skb->len);
 
 	/* parse the message contents */
@@ -914,7 +914,7 @@ void tpam_recv_U3ReadyToReceiveInd(tpam_card *card, struct sk_buff *skb) {
 	u32 channel;
 	u8 ready;
 
-	dprintk("TurboPAM(tpam_recv_U3ReadyToReceiveInd): card=%d\n", card->id);
+	pr_debug("TurboPAM(tpam_recv_U3ReadyToReceiveInd): card=%d\n", card->id);
 
 	/* parse the message contents */
 	if (parse_U3ReadyToReceiveInd(skb, &ncoid, &ready))
@@ -943,7 +943,7 @@ void tpam_recv_U3ReadyToReceiveInd(tpam_card *card, struct sk_buff *skb) {
 static void tpam_statcallb_run(unsigned long parm) {
 	tpam_statcallb_data *ds = (tpam_statcallb_data *)parm;
 
-	dprintk("TurboPAM(tpam_statcallb_run)\n");
+	pr_debug("TurboPAM(tpam_statcallb_run)\n");
 
 	(* ds->card->interface.statcallb)(&ds->ctrl);
 
@@ -961,7 +961,7 @@ static void tpam_statcallb(tpam_card *card, isdn_ctrl ctrl) {
 	struct timer_list *timer;
 	tpam_statcallb_data *ds;
 
-	dprintk("TurboPAM(tpam_statcallb): card=%d\n", card->id);
+	pr_debug("TurboPAM(tpam_statcallb): card=%d\n", card->id);
 
 	if (!(timer = (struct timer_list *) kmalloc(sizeof(struct timer_list), 
 						    GFP_ATOMIC))) {

@@ -28,8 +28,8 @@
 #include <linux/devfs_fs_kernel.h>
 #include <linux/smp_lock.h>
 #include <linux/device.h>
+#include <linux/bitops.h>
 
-#include <asm/bitops.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
 

@@ -1,4 +1,6 @@
 /*
+    $Id: btcx-risc.c,v 1.2 2004/09/15 16:15:24 kraxel Exp $
+
     btcx-risc.c
 
     bt848/bt878/cx2388x risc code generator.

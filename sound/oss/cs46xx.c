@@ -1190,7 +1190,7 @@ static int alloc_dmabuf(struct cs_state *state)
 	dmabuf->buforder = order;
 	dmabuf->rawbuf = rawbuf;
 	// Now mark the pages as reserved; otherwise the 
-	// remap_page_range() in cs46xx_mmap doesn't work.
+	// remap_pfn_range() in cs46xx_mmap doesn't work.
 	// 1. get index to last page in mem_map array for rawbuf.
 	mapend = virt_to_page(dmabuf->rawbuf + 
 		(PAGE_SIZE << dmabuf->buforder) - 1);
@@ -1227,7 +1227,7 @@ static int alloc_dmabuf(struct cs_state *state)
 	dmabuf->buforder_tmpbuff = order;
 	
 	// Now mark the pages as reserved; otherwise the 
-	// remap_page_range() in cs46xx_mmap doesn't work.
+	// remap_pfn_range() in cs46xx_mmap doesn't work.
 	// 1. get index to last page in mem_map array for rawbuf.
 	mapend = virt_to_page(dmabuf->tmpbuff + 
 		(PAGE_SIZE << dmabuf->buforder_tmpbuff) - 1);
@@ -2452,7 +2452,8 @@ static int cs_mmap(struct file *file, struct vm_area_struct *vma)
 		ret = -EINVAL;
 		goto out;
 	}
-	if (remap_page_range(vma, vma->vm_start, virt_to_phys(dmabuf->rawbuf),
+	if (remap_pfn_range(vma, vma->vm_start,
+			     virt_to_phys(dmabuf->rawbuf) >> PAGE_SHIFT,
 			     size, vma->vm_page_prot))
 	{
 		ret = -EAGAIN;

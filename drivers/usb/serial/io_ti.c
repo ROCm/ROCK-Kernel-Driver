@@ -270,7 +270,7 @@ static int TIReadDownloadMemory(struct usb_device *dev, int start_address,
 {
 	int status = 0;
 	__u8 read_length;
-	__u16 be_start_address;
+	__be16 be_start_address;
 	
 	dbg ("%s - @ %x for %d", __FUNCTION__, start_address, length);
 
@@ -387,7 +387,7 @@ static int TIWriteDownloadI2C (struct edgeport_serial *serial, int start_address
 {
 	int status = 0;
 	int write_length;
-	__u16 be_start_address;
+	__be16 be_start_address;
 
 	/* We can only send a maximum of 1 aligned byte page at a time */
 	
@@ -1796,12 +1796,7 @@ static void edge_bulk_out_callback (struct urb *urb, struct pt_regs *regs)
 	tty = port->tty;
 	if (tty) {
 		/* let the tty driver wakeup if it has a special write_wakeup function */
-		if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) && tty->ldisc.write_wakeup) {
-			(tty->ldisc.write_wakeup)(tty);
-		}
-
-		/* tell the tty driver that something has changed */
-		wake_up_interruptible(&tty->write_wait);
+		tty_wakeup(tty);
 	}
 }
 
@@ -1977,7 +1972,7 @@ static void edge_close (struct usb_serial_port *port, struct file * filp)
 	/* chase the port close */
 	TIChasePort (edge_port);
 
-	usb_unlink_urb (port->read_urb);
+	usb_kill_urb(port->read_urb);
 
 	/* assuming we can still talk to the device,
 	 * send a close port command to it */
@@ -1992,7 +1987,7 @@ static void edge_close (struct usb_serial_port *port, struct file * filp)
 	--edge_port->edge_serial->num_ports_open;
 	if (edge_port->edge_serial->num_ports_open <= 0) {
 		/* last port is now closed, let's shut down our interrupt urb */
-		usb_unlink_urb (port->serial->port[0]->interrupt_in_urb);
+		usb_kill_urb(port->serial->port[0]->interrupt_in_urb);
 		edge_port->edge_serial->num_ports_open = 0;
 	}
 	edge_port->close_pending = 0;
@@ -2126,7 +2121,7 @@ static void edge_throttle (struct usb_serial_port *port)
 		status = TIClearRts (edge_port);
 	}
 
-	usb_unlink_urb (port->read_urb);
+	usb_kill_urb(port->read_urb);
 }
 
 static void edge_unthrottle (struct usb_serial_port *port)

@@ -30,16 +30,20 @@ extern int sysctl_vsyscall32;
 char *syscall32_page; 
 static int use_sysenter __initdata = -1;
 
-/* RED-PEN: This knows too much about high level VM */ 
-/* Alternative would be to generate a vma with appropriate backing options
-   and let it be handled by generic VM */ 
-int map_syscall32(struct mm_struct *mm, unsigned long address) 
+/*
+ * Map the 32bit vsyscall page on demand.
+ *
+ * RED-PEN: This knows too much about high level VM.
+ *
+ * Alternative would be to generate a vma with appropriate backing options
+ * and let it be handled by generic VM.
+ */
+int __map_syscall32(struct mm_struct *mm, unsigned long address)
 { 
 	pte_t *pte;
 	pmd_t *pmd;
 	int err = 0;
 
-	down_read(&mm->mmap_sem);
 	spin_lock(&mm->page_table_lock); 
 	pmd = pmd_alloc(mm, pgd_offset(mm, address), address); 
 	if (pmd && (pte = pte_alloc_map(mm, pmd, address)) != NULL) { 
@@ -54,6 +58,14 @@ int map_syscall32(struct mm_struct *mm, unsigned long address)
 	} else
 		err = -ENOMEM; 
 	spin_unlock(&mm->page_table_lock);
+	return err;
+}
+
+int map_syscall32(struct mm_struct *mm, unsigned long address)
+{
+	int err;
+	down_read(&mm->mmap_sem);
+	err = __map_syscall32(mm, address);
 	up_read(&mm->mmap_sem);
 	return err;
 }
@@ -76,7 +88,8 @@ static int __init init_syscall32(void)
 	
 __initcall(init_syscall32); 
 
-void __init syscall32_cpu_init(void)
+/* May not be __init: called during resume */
+void syscall32_cpu_init(void)
 {
 	if (use_sysenter < 0)
  		use_sysenter = (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL);

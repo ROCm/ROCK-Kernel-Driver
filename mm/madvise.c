@@ -7,6 +7,7 @@
 
 #include <linux/mman.h>
 #include <linux/pagemap.h>
+#include <linux/syscalls.h>
 
 
 /*

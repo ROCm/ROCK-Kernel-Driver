@@ -191,12 +191,9 @@ static inline void transmit_char_pio(struct rs_port *port)
 	}
 	
         if (port->gs.xmit_cnt <= port->gs.wakeup_chars) {
-                if ((port->gs.tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-                    port->gs.tty->ldisc.write_wakeup)
-                        (port->gs.tty->ldisc.write_wakeup)(port->gs.tty);
+        	tty_wakeup(port->gs.tty);
                 rs_dprintk (TX3912_UART_DEBUG_TRANSMIT, "Waking up.... ldisc (%d)....\n",
                             port->gs.wakeup_chars); 
-                wake_up_interruptible(&port->gs.tty->write_wait);
        	}	
 }
 

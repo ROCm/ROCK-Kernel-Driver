@@ -5,6 +5,7 @@
 #include <linux/init.h>
 #include <linux/timex.h>
 #include <linux/errno.h>
+#include <linux/jiffies.h>
 
 #include <asm/io.h>
 #include <asm/timer.h>

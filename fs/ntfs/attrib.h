@@ -24,23 +24,11 @@
 #ifndef _LINUX_NTFS_ATTRIB_H
 #define _LINUX_NTFS_ATTRIB_H
 
-#include <linux/fs.h>
-
 #include "endian.h"
 #include "types.h"
 #include "layout.h"
-
-static inline void init_runlist(runlist *rl)
-{
-	rl->rl = NULL;
-	init_rwsem(&rl->lock);
-}
-
-typedef enum {
-	LCN_HOLE		= -1,	/* Keep this as highest value or die! */
-	LCN_RL_NOT_MAPPED	= -2,
-	LCN_ENOENT		= -3,
-} LCN_SPECIAL_VALUES;
+#include "inode.h"
+#include "runlist.h"
 
 /**
  * ntfs_attr_search_ctx - used in attribute search functions
@@ -71,17 +59,12 @@ typedef struct {
 	ATTR_RECORD *base_attr;
 } ntfs_attr_search_ctx;
 
-extern runlist_element *decompress_mapping_pairs(const ntfs_volume *vol,
-		const ATTR_RECORD *attr, runlist_element *old_rl);
-
 extern int ntfs_map_runlist(ntfs_inode *ni, VCN vcn);
-
-extern LCN ntfs_vcn_to_lcn(const runlist_element *rl, const VCN vcn);
 
 extern runlist_element *ntfs_find_vcn(ntfs_inode *ni, const VCN vcn,
 		const BOOL need_write);
 
-int ntfs_attr_lookup(const ATTR_TYPES type, const ntfschar *name,
+int ntfs_attr_lookup(const ATTR_TYPE type, const ntfschar *name,
 		const u32 name_len, const IGNORE_CASE_BOOL ic,
 		const VCN lowest_vcn, const u8 *val, const u32 val_len,
 		ntfs_attr_search_ctx *ctx);
@@ -89,7 +72,7 @@ int ntfs_attr_lookup(const ATTR_TYPES type, const ntfschar *name,
 extern int load_attribute_list(ntfs_volume *vol, runlist *rl, u8 *al_start,
 		const s64 size, const s64 initialized_size);
 
-static inline s64 attribute_value_length(const ATTR_RECORD *a)
+static inline s64 ntfs_attr_size(const ATTR_RECORD *a)
 {
 	if (!a->non_resident)
 		return (s64)le32_to_cpu(a->data.resident.value_length);
@@ -100,5 +83,10 @@ extern void ntfs_attr_reinit_search_ctx(ntfs_attr_search_ctx *ctx);
 extern ntfs_attr_search_ctx *ntfs_attr_get_search_ctx(ntfs_inode *ni,
 		MFT_RECORD *mrec);
 extern void ntfs_attr_put_search_ctx(ntfs_attr_search_ctx *ctx);
+
+extern int ntfs_attr_record_resize(MFT_RECORD *m, ATTR_RECORD *a, u32 new_size);
+
+extern int ntfs_attr_set(ntfs_inode *ni, const s64 ofs, const s64 cnt,
+		const u8 val);
 
 #endif /* _LINUX_NTFS_ATTRIB_H */

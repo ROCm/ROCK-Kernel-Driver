@@ -148,10 +148,10 @@ static int __set_utsfield(char __user *to, int to_size,
 	if (copy_to_user(to, from, len))
 		return -EFAULT;
 
+	off = len < to_size? len: len - 1;
 	if (dotchop) {
-		off = (strnchr(from, len, '.') - from);
-	} else{
-		off = len - 1;
+		const char *p = strnchr(from, len, '.');
+		if (p) off = p - from;
 	}
 
 	if (__put_user('\0', to + off))

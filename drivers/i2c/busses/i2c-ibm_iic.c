@@ -416,10 +416,8 @@ static int iic_wait_for_tc(struct ibm_iic_private* dev){
     		init_waitqueue_entry(&wait, current);
 		
 		add_wait_queue(&dev->wq, &wait);
-		set_current_state(TASK_INTERRUPTIBLE);
 		if (in_8(&iic->sts) & STS_PT)
-			schedule_timeout(dev->adap.timeout * HZ);
-		set_current_state(TASK_RUNNING);
+			msleep_interruptible(dev->adap.timeout * 1000);
 		remove_wait_queue(&dev->wq, &wait);
 		
 		if (unlikely(signal_pending(current))){

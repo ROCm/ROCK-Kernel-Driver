@@ -459,6 +459,8 @@ static struct pci_device_id piix4_ids[] = {
 	{ 0, }
 };
 
+MODULE_DEVICE_TABLE (pci, piix4_ids);
+
 static int __devinit piix4_probe(struct pci_dev *dev,
 				const struct pci_device_id *id)
 {
@@ -501,7 +503,7 @@ static struct pci_driver piix4_driver = {
 
 static int __init i2c_piix4_init(void)
 {
-	return pci_module_init(&piix4_driver);
+	return pci_register_driver(&piix4_driver);
 }
 
 static void __exit i2c_piix4_exit(void)

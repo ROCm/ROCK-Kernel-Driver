@@ -2,10 +2,8 @@
 #ifndef _ST_H
 #define _ST_H
 
-#ifndef _SCSI_H
-#include "scsi.h"
-#endif
 #include <linux/completion.h>
+
 
 /* The tape buffer descriptor. */
 typedef struct {
@@ -19,7 +17,7 @@ typedef struct {
 	int writing;
 	int midlevel_result;
 	int syscall_result;
-	Scsi_Request *last_SRpnt;
+	struct scsi_request *last_SRpnt;
 	unsigned char *b_data;
 	unsigned short use_sg;	/* zero or max number of s/g segments for this adapter */
 	unsigned short sg_segs;		/* number of segments in s/g list */
@@ -76,7 +74,7 @@ typedef struct {
 /* The tape drive descriptor */
 typedef struct {
 	struct scsi_driver *driver;
-	Scsi_Device *device;
+	struct scsi_device *device;
 	struct semaphore lock;	/* For serialization */
 	struct completion wait;	/* For SCSI commands */
 	ST_buffer *buffer;

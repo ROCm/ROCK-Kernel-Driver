@@ -509,13 +509,6 @@ static int irtty_open(struct tty_struct *tty)
 	if (tty->driver->flush_buffer)
 		tty->driver->flush_buffer(tty);
 	
-/* from old irtty - but what is it good for?
- * we _are_ the ldisc and we _don't_ implement flush_buffer!
- *
- *	if (tty->ldisc.flush_buffer)
- *		tty->ldisc.flush_buffer(tty);
- */
-
 	/* apply mtt override */
 	sir_tty_drv.qos_mtt_bits = qos_mtt_bits;
 

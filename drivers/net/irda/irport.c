@@ -51,9 +51,9 @@
 #include <linux/spinlock.h>
 #include <linux/delay.h>
 #include <linux/rtnetlink.h>
+#include <linux/bitops.h>
 
 #include <asm/system.h>
-#include <asm/bitops.h>
 #include <asm/io.h>
 
 #include <net/irda/irda.h>

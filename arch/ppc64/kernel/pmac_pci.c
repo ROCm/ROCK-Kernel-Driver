@@ -271,7 +271,7 @@ static int __pmac u3_ht_read_config(struct pci_bus *bus, unsigned int devfn,
 				    int offset, int len, u32 *val)
 {
 	struct pci_controller *hose;
-	struct device_node *busdn;
+	struct device_node *busdn, *dn;
 	unsigned long addr;
 
 	if (bus->self)
@@ -282,6 +282,16 @@ static int __pmac u3_ht_read_config(struct pci_bus *bus, unsigned int devfn,
 		return PCIBIOS_DEVICE_NOT_FOUND;
 	hose = busdn->phb;
 	if (hose == NULL)
+		return PCIBIOS_DEVICE_NOT_FOUND;
+
+	/* We only allow config cycles to devices that are in OF device-tree
+	 * as we are apparently having some weird things going on with some
+	 * revs of K2 on recent G5s
+	 */
+	for (dn = busdn->child; dn; dn = dn->sibling)
+		if (dn->devfn == devfn)
+			break;
+	if (dn == NULL)
 		return PCIBIOS_DEVICE_NOT_FOUND;
 
 	addr = u3_ht_cfg_access(hose, bus->number, devfn, offset);
@@ -419,7 +429,7 @@ static void __init setup_u3_ht(struct pci_controller* hose)
 	 * properties or figuring out the U3 address space decoding logic and
 	 * then read it's configuration register (if any).
 	 */
-	hose->io_base_phys = 0xf4000000 + 0x00400000;
+	hose->io_base_phys = 0xf4000000;
 	hose->io_base_virt = ioremap(hose->io_base_phys, 0x00400000);
 	isa_io_base = pci_io_base = (unsigned long) hose->io_base_virt;
 	hose->io_resource.name = np->full_name;
@@ -664,9 +674,7 @@ void __init pmac_pcibios_fixup(void)
 
 	pci_fix_bus_sysdata();
 
-#ifdef CONFIG_PMAC_DART
-	iommu_setup_pmac();
-#endif /* CONFIG_PMAC_DART */
+	iommu_setup_u3();
 
 }
 

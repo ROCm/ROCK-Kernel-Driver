@@ -1843,3 +1843,79 @@ scsi_reset_provider(struct scsi_device *dev, int flag)
 	scsi_next_command(scmd);
 	return rtn;
 }
+
+/**
+ * scsi_normalize_sense - normalize main elements from either fixed or
+ *			descriptor sense data format into a common format.
+ *
+ * @sense_buffer:	byte array containing sense data returned by device
+ * @sb_len:		number of valid bytes in sense_buffer
+ * @sshdr:		pointer to instance of structure that common
+ *			elements are written to.
+ *
+ * Notes:
+ *	The "main elements" from sense data are: response_code, sense_key,
+ *	asc, ascq and additional_length (only for descriptor format).
+ *
+ *	Typically this function can be called after a device has
+ *	responded to a SCSI command with the CHECK_CONDITION status.
+ *
+ * Return value:
+ *	1 if valid sense data information found, else 0;
+ **/
+int scsi_normalize_sense(const u8 *sense_buffer, int sb_len,
+                         struct scsi_sense_hdr *sshdr)
+{
+	if (!sense_buffer || !sb_len || (sense_buffer[0] & 0x70) != 0x70)
+		return 0;
+
+	memset(sshdr, 0, sizeof(struct scsi_sense_hdr));
+
+	sshdr->response_code = (sense_buffer[0] & 0x7f);
+	if (sshdr->response_code >= 0x72) {
+		/*
+		 * descriptor format
+		 */
+		if (sb_len > 1)
+			sshdr->sense_key = (sense_buffer[1] & 0xf);
+		if (sb_len > 2)
+			sshdr->asc = sense_buffer[2];
+		if (sb_len > 3)
+			sshdr->ascq = sense_buffer[3];
+		if (sb_len > 7)
+			sshdr->additional_length = sense_buffer[7];
+	} else {
+		/* 
+		 * fixed format
+		 */
+		if (sb_len > 2)
+			sshdr->sense_key = (sense_buffer[2] & 0xf);
+		if (sb_len > 7) {
+			sb_len = (sb_len < (sense_buffer[7] + 8)) ?
+					 sb_len : (sense_buffer[7] + 8);
+			if (sb_len > 12)
+				sshdr->asc = sense_buffer[12];
+			if (sb_len > 13)
+				sshdr->ascq = sense_buffer[13];
+		}
+	}
+
+	return 1;
+}
+EXPORT_SYMBOL(scsi_normalize_sense);
+
+int scsi_request_normalize_sense(struct scsi_request *sreq,
+				 struct scsi_sense_hdr *sshdr)
+{
+	return scsi_normalize_sense(sreq->sr_sense_buffer,
+			sizeof(sreq->sr_sense_buffer), sshdr);
+}
+EXPORT_SYMBOL(scsi_request_normalize_sense);
+
+int scsi_command_normalize_sense(struct scsi_cmnd *cmd,
+				 struct scsi_sense_hdr *sshdr)
+{
+	return scsi_normalize_sense(cmd->sense_buffer,
+			sizeof(cmd->sense_buffer), sshdr);
+}
+EXPORT_SYMBOL(scsi_command_normalize_sense);

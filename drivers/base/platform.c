@@ -298,13 +298,13 @@ u64 dma_get_required_mask(struct device *dev)
 	}
 	return mask & *dev->dma_mask;
 }
-EXPORT_SYMBOL(dma_get_required_mask);
+EXPORT_SYMBOL_GPL(dma_get_required_mask);
 #endif
 
-EXPORT_SYMBOL(platform_bus);
-EXPORT_SYMBOL(platform_bus_type);
-EXPORT_SYMBOL(platform_device_register);
-EXPORT_SYMBOL(platform_device_register_simple);
-EXPORT_SYMBOL(platform_device_unregister);
-EXPORT_SYMBOL(platform_get_irq);
-EXPORT_SYMBOL(platform_get_resource);
+EXPORT_SYMBOL_GPL(platform_bus);
+EXPORT_SYMBOL_GPL(platform_bus_type);
+EXPORT_SYMBOL_GPL(platform_device_register);
+EXPORT_SYMBOL_GPL(platform_device_register_simple);
+EXPORT_SYMBOL_GPL(platform_device_unregister);
+EXPORT_SYMBOL_GPL(platform_get_irq);
+EXPORT_SYMBOL_GPL(platform_get_resource);

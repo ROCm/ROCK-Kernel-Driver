@@ -72,7 +72,8 @@ config HPET_TIMER
 	  If unsure, say Y.
 
 config HPET_EMULATE_RTC
-	def_bool HPET_TIMER && RTC=y
+	bool "Provide RTC interrupt"
+	depends on HPET_TIMER && RTC=y
 
 config GENERIC_ISA_DMA
 	bool
@@ -255,6 +256,7 @@ config SCHED_SMT
 
 config K8_NUMA
        bool "K8 NUMA support"
+       select NUMA
        depends on SMP
        help
 	  Enable NUMA (Non Unified Memory Architecture) support for
@@ -264,15 +266,23 @@ config K8_NUMA
 	  This code is recommended on all multiprocessor Opteron systems
 	  and normally doesn't hurt on others.
 
+config NUMA_EMU
+	bool "NUMA emulation support"
+	select NUMA
+	depends on SMP
+	help
+	  Enable NUMA emulation. A flat machine will be split
+	  into virtual nodes when booted with "numa=fake=N", where N is the
+	  number of nodes. This is only useful for debugging.
+
 config DISCONTIGMEM
        bool
-       depends on K8_NUMA
+       depends on NUMA
        default y
 
 config NUMA
        bool
-       depends on K8_NUMA
-       default y
+       default n
 
 config HAVE_DEC_LOCK
 	bool
@@ -329,6 +339,12 @@ config X86_MCE
 
 endmenu
 
+#
+# Use the generic interrupt handling code in kernel/irq/:
+#
+config GENERIC_HARDIRQS
+	bool
+	default y
 
 menu "Power management options"
 
@@ -359,7 +375,6 @@ config PCI_MMCONFIG
 config UNORDERED_IO
        bool "Unordered IO mapping access"
        depends on EXPERIMENTAL
-       select UNORDERED_IO
        help
          Use unordered stores to access IO memory mappings in device drivers.
 	 Still very experimental. When a driver works on IA64/ppc64/pa-risc it should

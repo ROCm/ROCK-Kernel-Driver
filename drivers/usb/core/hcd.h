@@ -67,7 +67,6 @@ struct usb_hcd {	/* usb_bus.hcpriv points to this */
 
 	struct timer_list	rh_timer;	/* drives root hub */
 	struct list_head	dev_list;	/* devices on this bus */
-	struct work_struct	work;
 
 	/*
 	 * hardware info/state
@@ -81,7 +80,6 @@ struct usb_hcd {	/* usb_bus.hcpriv points to this */
 
 #ifdef	CONFIG_PCI
 	int			region;		/* pci region for regs */
-	u32			pci_state [16];	/* for PM state save */
 #endif
 
 #define HCD_BUFFER_POOLS	4
@@ -362,6 +360,9 @@ static inline int hcd_register_root (struct usb_device *usb_dev,
 
 	return usb_register_root_hub (usb_dev, hcd->self.controller);
 }
+
+extern void usb_set_device_state(struct usb_device *udev,
+		enum usb_device_state new_state);
 
 /*-------------------------------------------------------------------------*/
 

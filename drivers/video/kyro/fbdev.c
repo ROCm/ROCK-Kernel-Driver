@@ -76,7 +76,7 @@ static struct fb_var_screeninfo kyro_var __initdata = {
 static struct kyrofb_info *currentpar;
 
 typedef struct {
-	STG4000REG *pSTGReg;	/* Virtual address of PCI register region */
+	STG4000REG __iomem *pSTGReg;	/* Virtual address of PCI register region */
 	u32 ulNextFreeVidMem;	/* Offset from start of vid mem to next free region */
 	u32 ulOverlayOffset;	/* Offset from start of vid mem to overlay */
 	u32 ulOverlayStride;	/* Interleaved YUV and 422 mode Y stride */
@@ -735,6 +735,7 @@ static int __devinit kyrofb_probe(struct pci_dev *pdev,
 
 	fb_memset(info->screen_base, 0, size);
 
+	info->device = &pdev->dev;
 	if (register_framebuffer(info) < 0)
 		goto out_unmap;
 

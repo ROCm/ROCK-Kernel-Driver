@@ -133,8 +133,6 @@ static struct scatterlist* vmalloc_to_sg(unsigned char *virt, int nr_pages)
 /********************************************************************************/
 /* common page table functions */
 
-#define SAA7146_PGTABLE_SIZE 4096
-
 char *saa7146_vmalloc_build_pgtable(struct pci_dev *pci, long length, struct saa7146_pgtable *pt)
 {
 	int pages = (length+PAGE_SIZE-1)/PAGE_SIZE;
@@ -182,11 +180,11 @@ int saa7146_pgtable_alloc(struct pci_dev *pci, struct saa7146_pgtable *pt)
         u32          *cpu;
         dma_addr_t   dma_addr;
 
-	cpu = pci_alloc_consistent(pci, SAA7146_PGTABLE_SIZE, &dma_addr);
+	cpu = pci_alloc_consistent(pci, PAGE_SIZE, &dma_addr);
 	if (NULL == cpu) {
 		return -ENOMEM;
 	}
-	pt->size = SAA7146_PGTABLE_SIZE;
+	pt->size = PAGE_SIZE;
 	pt->cpu  = cpu;
 	pt->dma  = dma_addr;
 
@@ -201,11 +199,7 @@ int saa7146_pgtable_build_single(struct pci_dev *pci, struct saa7146_pgtable *pt
 	int   i,p;
 
 	BUG_ON( 0 == sglen);
-
-	if (list->offset > PAGE_SIZE) {
-		DEB_D(("offset > PAGE_SIZE. this should not happen."));
-		return -EINVAL;
-	}
+	BUG_ON(list->offset > PAGE_SIZE);
 	
 	/* if we have a user buffer, the first page may not be
 	   aligned to a page boundary. */
@@ -217,7 +211,7 @@ int saa7146_pgtable_build_single(struct pci_dev *pci, struct saa7146_pgtable *pt
 		printk("i:%d, adr:0x%08x, len:%d, offset:%d\n", i,sg_dma_address(list), sg_dma_len(list), list->offset);
 */
 		for (p = 0; p * 4096 < list->length; p++, ptr++) {
-			*ptr = sg_dma_address(list) + p * 4096;
+			*ptr = cpu_to_le32(sg_dma_address(list) + p * 4096);
 			nr_pages++;
 		}
 	}

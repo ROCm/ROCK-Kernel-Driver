@@ -192,13 +192,14 @@ static void cpc_tty_signal_on(pc300dev_t *pc300dev, unsigned char signal)
  */
 void cpc_tty_init(pc300dev_t *pc300dev)
 {
-	int port, aux;
+	unsigned long port;
+	int aux;
 	st_cpc_tty_area * cpc_tty;
 
 	/* hdlcX - X=interface number */
 	port = pc300dev->dev->name[4] - '0';
 	if (port >= CPC_TTY_NPORTS) {
-		printk("%s-tty: invalid interface selected (0-%i): %i", 
+		printk("%s-tty: invalid interface selected (0-%i): %li",
 			pc300dev->dev->name,
 			CPC_TTY_NPORTS-1,port);
 		return;
@@ -634,14 +635,8 @@ static void cpc_tty_flush_buffer(struct tty_struct *tty)
 	}
 
 	CPC_TTY_DBG("%s: call wake_up_interruptible\n",cpc_tty->name);
-	
-	wake_up_interruptible(&tty->write_wait); 
 
-	if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) && tty->ldisc.write_wakeup){
-		CPC_TTY_DBG("%s: call line disc. wake up\n",cpc_tty->name);
-		tty->ldisc.write_wakeup(tty); 
-	} 
-
+	tty_wakeup(tty);	
 	return; 
 } 
 
@@ -688,25 +683,32 @@ static void cpc_tty_hangup(struct tty_struct *tty)
  */
 static void cpc_tty_rx_work(void * data)
 {
-	int port, i, j;
+	unsigned long port;
+	int i, j;
 	st_cpc_tty_area *cpc_tty; 
 	volatile st_cpc_rx_buf * buf;
 	char flags=0,flg_rx=1; 
+	struct tty_ldisc *ld;
 
 	if (cpc_tty_cnt == 0) return;
 
+	
 	for (i=0; (i < 4) && flg_rx ; i++) {
 		flg_rx = 0;
-		port = (int) data;
+		port = (unsigned long)data;
 		for (j=0; j < CPC_TTY_NPORTS; j++) {
 			cpc_tty = &cpc_tty_area[port];
 		
 			if ((buf=cpc_tty->buf_rx.first) != 0) {
-															
-				if (cpc_tty->tty && (cpc_tty->tty->ldisc.receive_buf)) { 
-					CPC_TTY_DBG("%s: call line disc. receive_buf\n",cpc_tty->name);
-					cpc_tty->tty->ldisc.receive_buf(cpc_tty->tty, (char *)(buf->data), 
-					&flags, buf->size);
+				if(cpc_tty->tty) {
+					ld = tty_ldisc_ref(cpc_tty->tty);
+					if(ld) {
+						if (ld->receive_buf) {
+							CPC_TTY_DBG("%s: call line disc. receive_buf\n",cpc_tty->name);
+							ld->receive_buf(cpc_tty->tty, (char *)(buf->data), &flags, buf->size);
+						}
+						tty_ldisc_deref(ld);
+					}
 				}	
 				cpc_tty->buf_rx.first = cpc_tty->buf_rx.first->next;
 				kfree((unsigned char *)buf);
@@ -728,13 +730,13 @@ static void cpc_tty_rx_work(void * data)
  */
 static void cpc_tty_rx_disc_frame(pc300ch_t *pc300chan)
 {
-	volatile pcsca_bd_t * ptdescr; 
+	volatile pcsca_bd_t __iomem * ptdescr; 
 	volatile unsigned char status; 
 	pc300_t *card = (pc300_t *)pc300chan->card; 
 	int ch = pc300chan->channel; 
 
 	/* dma buf read */ 
-	ptdescr = (pcsca_bd_t *)(card->hw.rambase + 
+	ptdescr = (pcsca_bd_t __iomem *)(card->hw.rambase + 
 				RX_BD_ADDR(ch, pc300chan->rx_first_bd)); 
 	while (pc300chan->rx_first_bd != pc300chan->rx_last_bd) { 
 		status = cpc_readb(&ptdescr->status); 
@@ -745,7 +747,7 @@ static void cpc_tty_rx_disc_frame(pc300ch_t *pc300chan)
 		if (status & DST_EOM) { 
 			break; /* end of message */
 		}
-		ptdescr = (pcsca_bd_t *)(card->hw.rambase + cpc_readl(&ptdescr->next)); 
+		ptdescr = (pcsca_bd_t __iomem *)(card->hw.rambase + cpc_readl(&ptdescr->next)); 
 	}
 }
 
@@ -755,7 +757,7 @@ void cpc_tty_receive(pc300dev_t *pc300dev)
 	pc300ch_t *pc300chan = (pc300ch_t *)pc300dev->chan; 
 	pc300_t *card = (pc300_t *)pc300chan->card; 
 	int ch = pc300chan->channel; 
-	volatile pcsca_bd_t * ptdescr; 
+	volatile pcsca_bd_t  __iomem * ptdescr; 
 	struct net_device_stats *stats = hdlc_stats(pc300dev->dev);
 	int rx_len, rx_aux; 
 	volatile unsigned char status; 
@@ -773,14 +775,14 @@ void cpc_tty_receive(pc300dev_t *pc300dev)
 
 	while (1) { 
 		rx_len = 0;
-		ptdescr = (pcsca_bd_t *)(card->hw.rambase + RX_BD_ADDR(ch, first_bd));
+		ptdescr = (pcsca_bd_t  __iomem *)(card->hw.rambase + RX_BD_ADDR(ch, first_bd));
 		while ((status = cpc_readb(&ptdescr->status)) & DST_OSB) {
 			rx_len += cpc_readw(&ptdescr->len);
 			first_bd = (first_bd + 1) & (N_DMA_RX_BUF - 1);
 			if (status & DST_EOM) {
 				break;
 			}
-			ptdescr=(pcsca_bd_t*)(card->hw.rambase+cpc_readl(&ptdescr->next));
+			ptdescr=(pcsca_bd_t __iomem *)(card->hw.rambase+cpc_readl(&ptdescr->next));
 		}
 			
 		if (!rx_len) { 
@@ -812,7 +814,7 @@ void cpc_tty_receive(pc300dev_t *pc300dev)
 		}
 		
 		/* dma buf read */ 
-		ptdescr = (pcsca_bd_t *)(card->hw.rambase + 
+		ptdescr = (pcsca_bd_t __iomem *)(card->hw.rambase + 
 				RX_BD_ADDR(ch, pc300chan->rx_first_bd)); 
 
 		rx_len = 0;	/* counter frame size */
@@ -856,7 +858,7 @@ void cpc_tty_receive(pc300dev_t *pc300dev)
 			/* read the segment of the frame */
 			if (rx_aux != 0) {
 				memcpy_fromio((new->data + rx_len), 
-					(void *)(card->hw.rambase + 
+					(void __iomem *)(card->hw.rambase + 
 					 cpc_readl(&ptdescr->ptbuf)), rx_aux);
 				rx_len += rx_aux; 
 			}
@@ -866,7 +868,7 @@ void cpc_tty_receive(pc300dev_t *pc300dev)
 					(N_DMA_RX_BUF -1); 
 			if (status & DST_EOM)break;
 			
-			ptdescr = (pcsca_bd_t *) (card->hw.rambase + 
+			ptdescr = (pcsca_bd_t __iomem *) (card->hw.rambase + 
 					cpc_readl(&ptdescr->next)); 
 		}
 		/* update pointer */ 
@@ -916,13 +918,7 @@ static void cpc_tty_tx_work(void *data)
 		CPC_TTY_DBG("%s: the interface is not opened\n",cpc_tty->name);
 		return; 
 	}
-
-	if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) && tty->ldisc.write_wakeup){
-		CPC_TTY_DBG("%s:call line disc. wakeup\n",cpc_tty->name);
-		tty->ldisc.write_wakeup (tty); 
-	}
-
-	wake_up_interruptible(&tty->write_wait); 
+	tty_wakeup(tty);
 }
 
 /*
@@ -940,7 +936,7 @@ static int cpc_tty_send_to_card(pc300dev_t *dev,void* buf, int len)
 	int ch = chan->channel; 
 	struct net_device_stats *stats = hdlc_stats(dev->dev);
 	unsigned long flags; 
-	volatile pcsca_bd_t * ptdescr; 
+	volatile pcsca_bd_t __iomem *ptdescr; 
 	int i, nchar;
 	int tosend = len;
 	int nbuf = ((len - 1)/BD_DEF_LEN) + 1;
@@ -957,11 +953,11 @@ static int cpc_tty_send_to_card(pc300dev_t *dev,void* buf, int len)
 	CPC_TTY_DBG("%s: call dma_buf_write\n",
 			(st_cpc_tty_area *)dev->cpc_tty->name);	
 	for (i = 0 ; i < nbuf ; i++) {
-		ptdescr = (pcsca_bd_t *)(card->hw.rambase + 
+		ptdescr = (pcsca_bd_t __iomem *)(card->hw.rambase + 
 			TX_BD_ADDR(ch, card->chan[ch].tx_next_bd));
 		nchar = (BD_DEF_LEN > tosend) ? tosend : BD_DEF_LEN;
 		if (cpc_readb(&ptdescr->status) & DST_OSB) {
-			memcpy_toio((void *)(card->hw.rambase + 
+			memcpy_toio((void __iomem *)(card->hw.rambase + 
 				cpc_readl(&ptdescr->ptbuf)), 
 				&pdata[len - tosend], 
 				nchar);

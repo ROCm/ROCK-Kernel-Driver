@@ -2,6 +2,8 @@
 #define __ARCH_I386_ATOMIC__
 
 #include <linux/config.h>
+#include <linux/compiler.h>
+#include <asm/processor.h>
 
 /*
  * Atomic operations that C can't guarantee us.  Useful for
@@ -175,6 +177,46 @@ static __inline__ int atomic_add_negative(int i, atomic_t *v)
 		:"ir" (i), "m" (v->counter) : "memory");
 	return c;
 }
+
+/**
+ * atomic_add_return - add and return
+ * @v: pointer of type atomic_t
+ * @i: integer value to add
+ *
+ * Atomically adds @i to @v and returns @i + @v
+ */
+static __inline__ int atomic_add_return(int i, atomic_t *v)
+{
+	int __i;
+#ifdef CONFIG_M386
+	if(unlikely(boot_cpu_data.x86==3))
+		goto no_xadd;
+#endif
+	/* Modern 486+ processor */
+	__i = i;
+	__asm__ __volatile__(
+		LOCK "xaddl %0, %1;"
+		:"=r"(i)
+		:"m"(v->counter), "0"(i));
+	return i + __i;
+
+#ifdef CONFIG_M386
+no_xadd: /* Legacy 386 processor */
+	local_irq_disable();
+	__i = atomic_read(v);
+	atomic_set(v, i + __i);
+	local_irq_enable();
+	return i + __i;
+#endif
+}
+
+static __inline__ int atomic_sub_return(int i, atomic_t *v)
+{
+	return atomic_add_return(-i,v);
+}
+
+#define atomic_inc_return(v)  (atomic_add_return(1,v))
+#define atomic_dec_return(v)  (atomic_sub_return(1,v))
 
 /* These are x86-specific, used by some header files */
 #define atomic_clear_mask(mask, addr) \

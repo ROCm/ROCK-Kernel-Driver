@@ -36,9 +36,9 @@ static char version[] =
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
+#include <linux/bitops.h>
 
 #include <asm/system.h>
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
 #include <asm/byteorder.h>
@@ -2948,12 +2948,12 @@ static int is_quattro_p(struct pci_dev *pdev)
 }
 
 /* Fetch MAC address from vital product data of PCI ROM. */
-static void find_eth_addr_in_vpd(void *rom_base, int len, int index, unsigned char *dev_addr)
+static void find_eth_addr_in_vpd(void __iomem *rom_base, int len, int index, unsigned char *dev_addr)
 {
 	int this_offset;
 
 	for (this_offset = 0x20; this_offset < len; this_offset++) {
-		void *p = rom_base + this_offset;
+		void __iomem *p = rom_base + this_offset;
 
 		if (readb(p + 0) != 0x90 ||
 		    readb(p + 1) != 0x00 ||
@@ -2980,7 +2980,7 @@ static void find_eth_addr_in_vpd(void *rom_base, int len, int index, unsigned ch
 static void get_hme_mac_nonsparc(struct pci_dev *pdev, unsigned char *dev_addr)
 {
 	u32 rom_reg_orig;
-	void *p;
+	void __iomem *p;
 	int index;
 
 	index = 0;
@@ -3257,7 +3257,7 @@ static int __init happy_meal_pci_init(struct pci_dev *pdev)
 	return 0;
 
 err_out_iounmap:
-	iounmap((void *)hp->gregs);
+	iounmap(hp->gregs);
 
 err_out_free_res:
 	pci_release_regions(pdev);
@@ -3390,7 +3390,7 @@ static void __exit happy_meal_cleanup_module(void)
 					    PAGE_SIZE,
 					    hp->happy_block,
 					    hp->hblock_dvma);
-			iounmap((void *)hp->gregs);
+			iounmap(hp->gregs);
 			pci_release_regions(hp->happy_dev);
 		}
 #endif

@@ -731,7 +731,6 @@ static unsigned int ata_scsi_rbuf_get(struct scsi_cmnd *cmd, u8 **buf_out)
 		buflen = cmd->request_bufflen;
 	}
 
-	memset(buf, 0, buflen);
 	*buf_out = buf;
 	return buflen;
 }
@@ -780,6 +779,7 @@ void ata_scsi_rbuf_fill(struct ata_scsi_args *args,
 	struct scsi_cmnd *cmd = args->cmd;
 
 	buflen = ata_scsi_rbuf_get(cmd, &rbuf);
+	memset(rbuf, 0, buflen);
 	rc = actor(args, rbuf, buflen);
 	ata_scsi_rbuf_put(cmd);
 
@@ -1248,9 +1248,15 @@ static int atapi_qc_complete(struct ata_queued_cmd *qc, u8 drv_stat)
 {
 	struct scsi_cmnd *cmd = qc->scsicmd;
 
-	if (unlikely(drv_stat & (ATA_ERR | ATA_BUSY | ATA_DRQ)))
+	if (unlikely(drv_stat & (ATA_ERR | ATA_BUSY | ATA_DRQ))) {
+		DPRINTK("request check condition\n");
+
 		cmd->result = SAM_STAT_CHECK_CONDITION;
-	else {
+
+		qc->scsidone(cmd);
+
+		return 1;
+	} else {
 		u8 *scsicmd = cmd->cmnd;
 
 		if (scsicmd[0] == INQUIRY) {
@@ -1321,6 +1327,8 @@ static unsigned int atapi_xlat(struct ata_queued_cmd *qc, u8 *scsicmd)
 			qc->tf.feature |= ATAPI_DMADIR;
 #endif
 	}
+
+	qc->nbytes = cmd->bufflen;
 
 	return 0;
 }

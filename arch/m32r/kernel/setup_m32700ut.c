@@ -1,7 +1,7 @@
 /*
  *  linux/arch/m32r/kernel/setup_m32700ut.c
  *
- *  Setup routines for MITSUBISHI M32700UT Board
+ *  Setup routines for Renesas M32700UT Board
  *
  *  Copyright (c) 2002 	Hiroyuki Kondo, Hirokazu Takata,
  *                      Hitoshi Yamamoto, Takeo Takahashi
@@ -9,8 +9,6 @@
  *  This file is subject to the terms and conditions of the GNU General
  *  Public License.  See the file "COPYING" in the main directory of this
  *  archive for more details.
- *
- *  $Id: setup_m32700ut.c,v 1.6 2003/11/27 10:18:49 takeo Exp $
  */
 
 #include <linux/config.h>
@@ -437,7 +435,7 @@ void __init init_IRQ(void)
 	icu_data[M32R_IRQ_INT2].icucr = M32R_ICUCR_IEN|M32R_ICUCR_ISMOD01;
 	enable_m32700ut_irq(M32R_IRQ_INT2);
 
-//#if defined(CONFIG_M32R_AR_VGA)
+//#if defined(CONFIG_VIDEO_M32R_AR)
 	/*
 	 * INT3# is used for AR
 	 */
@@ -447,7 +445,7 @@ void __init init_IRQ(void)
 	irq_desc[M32R_IRQ_INT3].depth = 1;
 	icu_data[M32R_IRQ_INT3].icucr = M32R_ICUCR_IEN|M32R_ICUCR_ISMOD10;
 	disable_m32700ut_irq(M32R_IRQ_INT3);
-//#endif	/* CONFIG_M32R_ARV */
+//#endif	/* CONFIG_VIDEO_M32R_AR */
 }
 
 #define LAN_IOSTART     0x300

@@ -56,7 +56,7 @@ END_FTR_SECTION_IFCLR(CPU_FTR_CAN_NAP)
 	/* Now check if user or arch enabled NAP mode */
 	lis	r4,powersave_nap@ha
 	lwz	r4,powersave_nap@l(r4)
-	cmpi	0,r4,0
+	cmpwi	0,r4,0
 	beqlr
 
 	/* Clear MSR:EE */

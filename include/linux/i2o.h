@@ -28,7 +28,7 @@
 #include <asm/io.h>
 #include <asm/semaphore.h>	/* Needed for MUTEX init macros */
 #include <linux/pci.h>
-#include <asm/dma-mapping.h>
+#include <linux/dma-mapping.h>
 
 /* message queue empty */
 #define I2O_QUEUE_EMPTY		0xffffffff
@@ -147,10 +147,10 @@ struct i2o_controller {
 
 	struct pci_dev *pdev;	/* PCI device */
 
-	int short_req:1;	/* use small block sizes */
-	int no_quiesce:1;	/* dont quiesce before reset */
-	int raptor:1;		/* split bar */
-	int promise:1;		/* Promise controller */
+	unsigned int short_req:1;	/* use small block sizes */
+	unsigned int no_quiesce:1;	/* dont quiesce before reset */
+	unsigned int raptor:1;		/* split bar */
+	unsigned int promise:1;		/* Promise controller */
 
 #ifdef CONFIG_MTRR
 	int mtrr_reg0;
@@ -180,9 +180,9 @@ struct i2o_controller {
 	struct i2o_dma in_queue;	/* inbound message queue Host->IOP */
 	struct i2o_dma out_queue;	/* outbound message queue IOP->Host */
 
-	int battery:1;		/* Has a battery backup */
-	int io_alloc:1;		/* An I/O resource was allocated */
-	int mem_alloc:1;	/* A memory resource was allocated */
+	unsigned int battery:1;		/* Has a battery backup */
+	unsigned int io_alloc:1;	/* An I/O resource was allocated */
+	unsigned int mem_alloc:1;	/* A memory resource was allocated */
 
 	struct resource io_resource;	/* I/O resource allocated to the IOP */
 	struct resource mem_resource;	/* Mem resource allocated to the IOP */
@@ -499,6 +499,45 @@ static inline int i2o_msg_post_wait(struct i2o_controller *c, u32 m,
 static inline void i2o_flush_reply(struct i2o_controller *c, u32 m)
 {
 	I2O_REPLY_WRITE32(c, m);
+};
+
+/**
+ *	i2o_out_to_virt - Turn an I2O message to a virtual address
+ *	@c: controller
+ *	@m: message engine value
+ *
+ *	Turn a receive message from an I2O controller bus address into
+ *	a Linux virtual address. The shared page frame is a linear block
+ *	so we simply have to shift the offset. This function does not
+ *	work for sender side messages as they are ioremap objects
+ *	provided by the I2O controller.
+ */
+static inline struct i2o_message *i2o_msg_out_to_virt(struct i2o_controller *c,
+						      u32 m)
+{
+	if (unlikely
+	    (m < c->out_queue.phys
+	     || m >= c->out_queue.phys + c->out_queue.len))
+		BUG();
+
+	return c->out_queue.virt + (m - c->out_queue.phys);
+};
+
+/**
+ *	i2o_msg_in_to_virt - Turn an I2O message to a virtual address
+ *	@c: controller
+ *	@m: message engine value
+ *
+ *	Turn a send message from an I2O controller bus address into
+ *	a Linux virtual address. The shared page frame is a linear block
+ *	so we simply have to shift the offset. This function does not
+ *	work for receive side messages as they are kmalloc objects
+ *	in a different pool.
+ */
+static inline struct i2o_message *i2o_msg_in_to_virt(struct i2o_controller *c,
+						     u32 m)
+{
+	return c->in_queue.virt + m;
 };
 
 /**

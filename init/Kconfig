@@ -205,6 +205,25 @@ config HOTPLUG
 	  agent" (/sbin/hotplug) to load modules and set up software needed
 	  to use devices as you hotplug them.
 
+config KOBJECT_UEVENT
+	bool "Kernel Userspace Events"
+	depends on NET
+	default y
+	help
+	  This option enables the kernel userspace event layer, which is a
+	  simple mechanism for kernel-to-user communication over a netlink
+	  socket.
+	  The goal of the kernel userspace events layer is to provide a simple
+	  and efficient events system, that notifies userspace about kobject
+	  state changes. This will enable applications to just listen for
+	  events instead of polling system devices and files.
+	  Hotplug events (kobject addition and removal) are also available on
+	  the netlink socket in addition to the execution of /sbin/hotplug if
+	  CONFIG_HOTPLUG is enabled.
+
+	  Say Y, unless you are building a system requiring minimal memory
+	  consumption.
+
 config IKCONFIG
 	bool "Kernel .config support"
 	---help---
@@ -369,6 +388,18 @@ config MODVERSIONS
 	  to the modules to (hopefully) spot any changes which would
 	  make them incompatible with the kernel you are running.  If
 	  unsure, say N.
+
+config MODULE_SRCVERSION_ALL
+	bool "Source checksum for all modules"
+	depends on MODULES
+	help
+	  Modules which contain a MODULE_VERSION get an extra "srcversion"
+	  field inserting into their modinfo section, which contains a
+    	  sum of the source files which made it.  This helps maintainers
+	  see exactly which source was used to build a module (since
+	  others sometimes change the module source without updating
+	  the version).  With this option, such a "srcversion" field
+	  will be created for all modules.  If unsure, say N.
 
 config KMOD
 	bool "Automatic kernel module loading"

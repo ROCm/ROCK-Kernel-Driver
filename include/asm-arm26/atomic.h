@@ -105,6 +105,27 @@ static inline void atomic_clear_mask(unsigned long mask, unsigned long *addr)
 	local_irq_restore(flags);
 }
 
+static inline int atomic_add_return(int i, volatile atomic_t *v)
+{
+	unsigned long flags;
+	int val;
+
+	local_irq_save(flags);
+	val = v->counter + i;
+	v->counter = val;
+	local_irq_restore(flags);
+
+	return val;
+}
+
+static inline int atomic_sub_return(int i, volatile atomic_t *v)
+{
+	return atomic_add_return(-i, v);
+}
+
+#define atomic_inc_return(v)  (atomic_add_return(1,v))
+#define atomic_dec_return(v)  (atomic_sub_return(1,v))
+
 /* Atomic operations are already serializing on ARM */
 #define smp_mb__before_atomic_dec()	barrier()
 #define smp_mb__after_atomic_dec()	barrier()

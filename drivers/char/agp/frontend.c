@@ -627,8 +627,8 @@ static int agp_mmap(struct file *file, struct vm_area_struct *vma)
 		DBG("client vm_ops=%p", kerninfo.vm_ops);
 		if (kerninfo.vm_ops) {
 			vma->vm_ops = kerninfo.vm_ops;
-		} else if (remap_page_range(vma, vma->vm_start, 
-					    (kerninfo.aper_base + offset),
+		} else if (remap_pfn_range(vma, vma->vm_start,
+				(kerninfo.aper_base + offset) >> PAGE_SHIFT,
 					    size, vma->vm_page_prot)) {
 			goto out_again;
 		}
@@ -643,8 +643,8 @@ static int agp_mmap(struct file *file, struct vm_area_struct *vma)
 		DBG("controller vm_ops=%p", kerninfo.vm_ops);
 		if (kerninfo.vm_ops) {
 			vma->vm_ops = kerninfo.vm_ops;
-		} else if (remap_page_range(vma, vma->vm_start, 
-					    kerninfo.aper_base,
+		} else if (remap_pfn_range(vma, vma->vm_start,
+					    kerninfo.aper_base >> PAGE_SHIFT,
 					    size, vma->vm_page_prot)) {
 			goto out_again;
 		}

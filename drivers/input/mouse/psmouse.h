@@ -42,6 +42,7 @@ struct psmouse {
 	char *name;
 	unsigned char packet[8];
 	unsigned char pktcnt;
+	unsigned char pktsize;
 	unsigned char type;
 	unsigned char model;
 	unsigned long last;
@@ -50,7 +51,15 @@ struct psmouse {
 	char devname[64];
 	char phys[32];
 
+	unsigned int rate;
+	unsigned int resolution;
+	unsigned int resetafter;
+	unsigned int smartscroll;	/* Logitech only */
+
 	psmouse_ret_t (*protocol_handler)(struct psmouse *psmouse, struct pt_regs *regs);
+	void (*set_rate)(struct psmouse *psmouse, unsigned int rate);
+	void (*set_resolution)(struct psmouse *psmouse, unsigned int resolution);
+
 	int (*reconnect)(struct psmouse *psmouse);
 	void (*disconnect)(struct psmouse *psmouse);
 
@@ -62,7 +71,6 @@ enum psmouse_type {
 	PSMOUSE_NONE,
 	PSMOUSE_PS2,
 	PSMOUSE_PS2PP,
-	PSMOUSE_PS2TPP,
 	PSMOUSE_THINKPS,
 	PSMOUSE_GENPS,
 	PSMOUSE_IMPS,
@@ -73,8 +81,26 @@ enum psmouse_type {
 
 int psmouse_sliced_command(struct psmouse *psmouse, unsigned char command);
 int psmouse_reset(struct psmouse *psmouse);
+void psmouse_set_resolution(struct psmouse *psmouse, unsigned int resolution);
 
-extern int psmouse_smartscroll;
-extern unsigned int psmouse_rate;
+ssize_t psmouse_attr_show_helper(struct device *dev, char *buf,
+			ssize_t (*handler)(struct psmouse *, char *));
+ssize_t psmouse_attr_set_helper(struct device *dev, const char *buf, size_t count,
+			ssize_t (*handler)(struct psmouse *, const char *, size_t));
+
+#define PSMOUSE_DEFINE_ATTR(_name)						\
+static ssize_t psmouse_attr_show_##_name(struct psmouse *, char *);		\
+static ssize_t psmouse_attr_set_##_name(struct psmouse *, const char *, size_t);\
+static ssize_t psmouse_do_show_##_name(struct device *d, char *b)		\
+{										\
+	return psmouse_attr_show_helper(d, b, psmouse_attr_show_##_name);	\
+}										\
+static ssize_t psmouse_do_set_##_name(struct device *d, const char *b, size_t s)\
+{										\
+	return psmouse_attr_set_helper(d, b, s, psmouse_attr_set_##_name);	\
+}										\
+static struct device_attribute psmouse_attr_##_name = 				\
+	__ATTR(_name, S_IWUSR | S_IRUGO,					\
+		psmouse_do_show_##_name, psmouse_do_set_##_name);
 
 #endif /* _PSMOUSE_H */

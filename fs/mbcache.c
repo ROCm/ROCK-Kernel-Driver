@@ -65,9 +65,7 @@ EXPORT_SYMBOL(mb_cache_destroy);
 EXPORT_SYMBOL(mb_cache_entry_alloc);
 EXPORT_SYMBOL(mb_cache_entry_insert);
 EXPORT_SYMBOL(mb_cache_entry_release);
-EXPORT_SYMBOL(mb_cache_entry_takeout);
 EXPORT_SYMBOL(mb_cache_entry_free);
-EXPORT_SYMBOL(mb_cache_entry_dup);
 EXPORT_SYMBOL(mb_cache_entry_get);
 #if !defined(MB_CACHE_INDEXES_COUNT) || (MB_CACHE_INDEXES_COUNT > 0)
 EXPORT_SYMBOL(mb_cache_entry_find_first);
@@ -456,23 +454,6 @@ mb_cache_entry_release(struct mb_cache_entry *ce)
 
 
 /*
- * mb_cache_entry_takeout()
- *
- * Take a cache entry out of the cache, making it invalid. The entry can later
- * be re-inserted using mb_cache_entry_insert(), or released using
- * mb_cache_entry_release().
- */
-void
-mb_cache_entry_takeout(struct mb_cache_entry *ce)
-{
-	spin_lock(&mb_cache_spinlock);
-	mb_assert(list_empty(&ce->e_lru_list));
-	__mb_cache_entry_unhash(ce);
-	spin_unlock(&mb_cache_spinlock);
-}
-
-
-/*
  * mb_cache_entry_free()
  *
  * This is equivalent to the sequence mb_cache_entry_takeout() --
@@ -485,20 +466,6 @@ mb_cache_entry_free(struct mb_cache_entry *ce)
 	mb_assert(list_empty(&ce->e_lru_list));
 	__mb_cache_entry_unhash(ce);
 	__mb_cache_entry_release_unlock(ce);
-}
-
-
-/*
- * mb_cache_entry_dup()
- *
- * Duplicate a handle to a cache entry (does not duplicate the cache entry
- * itself). After the call, both the old and the new handle must be released.
- */
-struct mb_cache_entry *
-mb_cache_entry_dup(struct mb_cache_entry *ce)
-{
-	atomic_inc(&ce->e_used);
-	return ce;
 }
 
 

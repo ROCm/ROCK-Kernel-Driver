@@ -30,6 +30,7 @@
 #include <asm/hardware.h>
 #include <asm/memory.h>
 #include <asm/system.h>
+#include <asm/mach/time.h>
 
 extern void sa1100_cpu_suspend(void);
 extern void sa1100_cpu_resume(void);
@@ -44,9 +45,6 @@ extern void sa1100_cpu_resume(void);
  */
 enum {	SLEEP_SAVE_SP = 0,
 
-	SLEEP_SAVE_OIER,
-	SLEEP_SAVE_OSMR0, SLEEP_SAVE_OSMR1, SLEEP_SAVE_OSMR2, SLEEP_SAVE_OSMR3,
-
 	SLEEP_SAVE_GPDR, SLEEP_SAVE_GAFR,
 	SLEEP_SAVE_PPDR, SLEEP_SAVE_PPSR, SLEEP_SAVE_PPAR, SLEEP_SAVE_PSDR,
 
@@ -58,23 +56,19 @@ enum {	SLEEP_SAVE_SP = 0,
 
 static int sa11x0_pm_enter(u32 state)
 {
-	unsigned long sleep_save[SLEEP_SAVE_SIZE];
-	unsigned long delta, gpio;
+	unsigned long gpio, sleep_save[SLEEP_SAVE_SIZE];
+	struct timespec delta, rtc;
 
 	if (state != PM_SUSPEND_MEM)
 		return -EINVAL;
 
 	/* preserve current time */
-	delta = xtime.tv_sec - RCNR;
+	rtc.tv_sec = RCNR;
+	rtc.tv_nsec = 0;
+	save_time_delta(&delta, &rtc);
 	gpio = GPLR;
 
 	/* save vital registers */
-	SAVE(OSMR0);
-	SAVE(OSMR1);
-	SAVE(OSMR2);
-	SAVE(OSMR3);
-	SAVE(OIER);
-
 	SAVE(GPDR);
 	SAVE(GAFR);
 
@@ -126,17 +120,9 @@ static int sa11x0_pm_enter(u32 state)
 	 */
 	PSSR = PSSR_PH;
 
-	RESTORE(OSMR0);
-	RESTORE(OSMR1);
-	RESTORE(OSMR2);
-	RESTORE(OSMR3);
-	RESTORE(OIER);
-
-	/* OSMR0 is the system timer: make sure OSCR is sufficiently behind */
-	OSCR = OSMR0 - LATCH;
-
 	/* restore current time */
-	xtime.tv_sec = RCNR + delta;
+	rtc.tv_sec = RCNR;
+	restore_time_delta(&delta, &rtc);
 
 	return 0;
 }

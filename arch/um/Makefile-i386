@@ -1,41 +1,45 @@
 ifeq ($(CONFIG_HOST_2G_2G), y)
-TOP_ADDR = 0x80000000
+TOP_ADDR := 0x80000000
 else
-TOP_ADDR = 0xc0000000
+TOP_ADDR := 0xc0000000
+endif
+
+ifeq ($(CONFIG_MODE_SKAS),y)
+  ifneq ($(CONFIG_MODE_TT),y)
+     START := 0x8048000
+  endif
 endif
 
 CFLAGS += -U__$(SUBARCH)__ -U$(SUBARCH)
-ELF_ARCH = $(SUBARCH)
-ELF_FORMAT = elf32-$(SUBARCH)
+
+ifneq ($(CONFIG_GPROF),y)
+ARCH_CFLAGS += -DUM_FASTCALL
+endif
+
+ELF_ARCH := $(SUBARCH)
+ELF_FORMAT := elf32-$(SUBARCH)
 
 OBJCOPYFLAGS  := -O binary -R .note -R .comment -S
 
-SYS_DIR		:= $(ARCH_DIR)/include/sysdep-i386
 SYS_UTIL_DIR	:= $(ARCH_DIR)/sys-i386/util
 
-SYS_HEADERS = $(SYS_DIR)/sc.h $(SYS_DIR)/thread.h
-
-sys_prepare: $(SYS_DIR)/sc.h
+SYS_HEADERS := $(SYS_DIR)/sc.h $(SYS_DIR)/thread.h
 
 prepare: $(SYS_HEADERS)
 
-filechk_$(SYS_DIR)/sc.h := $(SYS_UTIL_DIR)/mk_sc
-
 $(SYS_DIR)/sc.h: $(SYS_UTIL_DIR)/mk_sc
-	$(call filechk,$@)
-
-filechk_$(SYS_DIR)/thread.h := $(SYS_UTIL_DIR)/mk_thread
+	$(call filechk,gen_header)
 
 $(SYS_DIR)/thread.h: $(SYS_UTIL_DIR)/mk_thread 
-	$(call filechk,$@)
+	$(call filechk,gen_header)
 
-$(SYS_UTIL_DIR)/mk_sc: scripts/basic/fixdep include/config/MARKER FORCE ;
+$(SYS_UTIL_DIR)/mk_sc: scripts_basic FORCE
 	$(Q)$(MAKE) $(build)=$(SYS_UTIL_DIR) $@
 
-$(SYS_UTIL_DIR)/mk_thread: $(ARCH_SYMLINKS) $(GEN_HEADERS) sys_prepare FORCE ;
+$(SYS_UTIL_DIR)/mk_thread: scripts_basic $(ARCH_SYMLINKS) $(GEN_HEADERS) FORCE
 	$(Q)$(MAKE) $(build)=$(SYS_UTIL_DIR) $@
 
-$(SYS_UTIL_DIR): include/asm FORCE
+$(SYS_UTIL_DIR): scripts_basic include/asm FORCE
 	$(Q)$(MAKE) $(build)=$(SYS_UTIL_DIR)
 
 CLEAN_FILES += $(SYS_HEADERS)

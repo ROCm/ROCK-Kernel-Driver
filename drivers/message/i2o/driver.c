@@ -18,7 +18,6 @@
 #include <linux/rwsem.h>
 #include <linux/i2o.h>
 
-
 /* max_drivers - Maximum I2O drivers (OSMs) which could be registered */
 unsigned int i2o_max_drivers = I2O_MAX_DRIVERS;
 module_param_named(max_drivers, i2o_max_drivers, uint, 0);
@@ -146,7 +145,7 @@ void i2o_driver_unregister(struct i2o_driver *drv)
 		struct i2o_device *i2o_dev;
 
 		list_for_each_entry(i2o_dev, &c->devices, list)
-			i2o_driver_notify_device_remove(drv, i2o_dev);
+		    i2o_driver_notify_device_remove(drv, i2o_dev);
 
 		i2o_driver_notify_controller_remove(drv, c);
 	}
@@ -246,14 +245,15 @@ int i2o_driver_dispatch(struct i2o_controller *c, u32 m,
  *	Send notifications to all registered drivers that a new controller was
  *	added.
  */
-void i2o_driver_notify_controller_add_all(struct i2o_controller *c) {
+void i2o_driver_notify_controller_add_all(struct i2o_controller *c)
+{
 	int i;
 	struct i2o_driver *drv;
 
-	for(i = 0; i < I2O_MAX_DRIVERS; i ++) {
+	for (i = 0; i < I2O_MAX_DRIVERS; i++) {
 		drv = i2o_drivers[i];
 
-		if(drv)
+		if (drv)
 			i2o_driver_notify_controller_add(drv, c);
 	}
 }
@@ -265,14 +265,15 @@ void i2o_driver_notify_controller_add_all(struct i2o_controller *c) {
  *	Send notifications to all registered drivers that a controller was
  *	removed.
  */
-void i2o_driver_notify_controller_remove_all(struct i2o_controller *c) {
+void i2o_driver_notify_controller_remove_all(struct i2o_controller *c)
+{
 	int i;
 	struct i2o_driver *drv;
 
-	for(i = 0; i < I2O_MAX_DRIVERS; i ++) {
+	for (i = 0; i < I2O_MAX_DRIVERS; i++) {
 		drv = i2o_drivers[i];
 
-		if(drv)
+		if (drv)
 			i2o_driver_notify_controller_remove(drv, c);
 	}
 }
@@ -283,14 +284,15 @@ void i2o_driver_notify_controller_remove_all(struct i2o_controller *c) {
  *
  *	Send notifications to all registered drivers that a device was added.
  */
-void i2o_driver_notify_device_add_all(struct i2o_device *i2o_dev) {
+void i2o_driver_notify_device_add_all(struct i2o_device *i2o_dev)
+{
 	int i;
 	struct i2o_driver *drv;
 
-	for(i = 0; i < I2O_MAX_DRIVERS; i ++) {
+	for (i = 0; i < I2O_MAX_DRIVERS; i++) {
 		drv = i2o_drivers[i];
 
-		if(drv)
+		if (drv)
 			i2o_driver_notify_device_add(drv, i2o_dev);
 	}
 }
@@ -301,14 +303,15 @@ void i2o_driver_notify_device_add_all(struct i2o_device *i2o_dev) {
  *
  *	Send notifications to all registered drivers that a device was removed.
  */
-void i2o_driver_notify_device_remove_all(struct i2o_device *i2o_dev) {
+void i2o_driver_notify_device_remove_all(struct i2o_device *i2o_dev)
+{
 	int i;
 	struct i2o_driver *drv;
 
-	for(i = 0; i < I2O_MAX_DRIVERS; i ++) {
+	for (i = 0; i < I2O_MAX_DRIVERS; i++) {
 		drv = i2o_drivers[i];
 
-		if(drv)
+		if (drv)
 			i2o_driver_notify_device_remove(drv, i2o_dev);
 	}
 }

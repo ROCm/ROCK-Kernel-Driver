@@ -3,7 +3,7 @@
  *	      Part of the Linux-NTFS project.
  *
  * Copyright (c) 2001 Richard Russon <ntfs@flatcap.org>
- * Copyright (c) 2001-2003 Anton Altaparmakov
+ * Copyright (c) 2001-2004 Anton Altaparmakov
  *
  * Modified for mkntfs inclusion 9 June 2001 by Anton Altaparmakov.
  * Modified for kernel inclusion 10 September 2001 by Anton Altparmakov.
@@ -24,6 +24,7 @@
  * Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include "malloc.h"
 #include "ntfs.h"
 
 ntfschar *generate_default_upcase(void)
@@ -87,4 +88,3 @@ ntfschar *generate_default_upcase(void)
 		uc[uc_word_table[r][0]] = cpu_to_le16(uc_word_table[r][1]);
 	return uc;
 }
-

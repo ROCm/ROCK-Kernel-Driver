@@ -34,9 +34,10 @@
 #include <asm/arch/regs-irq.h>
 #include <asm/mach/time.h>
 
+#include "clock.h"
+
 static unsigned long timer_startval;
 static unsigned long timer_ticks_usec;
-
 
 /* with an 12MHz clock, we get 12 ticks per-usec
  */
@@ -87,8 +88,9 @@ static unsigned long s3c2410_gettimeoffset (void)
 static irqreturn_t
 s3c2410_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
+	write_seqlock(&xtime_lock);
 	timer_tick(regs);
-
+	write_sequnlock(&xtime_lock);
 	return IRQ_HANDLED;
 }
 
@@ -104,14 +106,12 @@ static struct irqaction s3c2410_timer_irq = {
  * Currently we only use timer4, as it is the only timer which has no
  * other function that can be exploited externally
  */
-void __init s3c2410_init_time (void)
+static void __init s3c2410_timer_init (void)
 {
 	unsigned long tcon;
 	unsigned long tcnt;
 	unsigned long tcfg1;
 	unsigned long tcfg0;
-
-	gettimeoffset = s3c2410_gettimeoffset;
 
 	tcnt = 0xffff;  /* default value for tcnt */
 
@@ -139,7 +139,7 @@ void __init s3c2410_init_time (void)
 	 */
 
 	if (machine_is_h1940() || machine_is_smdk2410() ) {
-		timer_ticks_usec = s3c2410_pclk / (1000*1000);
+		timer_ticks_usec = s3c24xx_pclk / (1000*1000);
 		timer_ticks_usec /= 6;
 
 		tcfg1 &= ~S3C2410_TCFG1_MUX4_MASK;
@@ -148,7 +148,7 @@ void __init s3c2410_init_time (void)
 		tcfg0 &= ~S3C2410_TCFG_PRESCALER1_MASK;
 		tcfg0 |= ((6 - 1) / 2) << S3C2410_TCFG_PRESCALER1_SHIFT;
 
-		tcnt = (s3c2410_pclk / 6) / HZ;
+		tcnt = (s3c24xx_pclk / 6) / HZ;
 	}
 
 
@@ -185,5 +185,7 @@ void __init s3c2410_init_time (void)
 	__raw_writel(tcon, S3C2410_TCON);
 }
 
-
-
+struct sys_timer s3c2410_timer = {
+	.init		= s3c2410_timer_init,
+	.offset		= s3c2410_gettimeoffset,
+};

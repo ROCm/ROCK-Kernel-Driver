@@ -16,7 +16,7 @@
  */
 struct ed {
 	/* first fields are hardware-specified, le32 */
-	__u32			hwINFO;       	/* endpoint config bitmap */
+	__le32			hwINFO;       	/* endpoint config bitmap */
 	/* info bits defined by hcd */
 #define ED_DEQUEUE	__constant_cpu_to_le32(1 << 27)
 	/* info bits defined by the hardware */
@@ -25,11 +25,11 @@ struct ed {
 #define ED_LOWSPEED	__constant_cpu_to_le32(1 << 13)
 #define ED_OUT		__constant_cpu_to_le32(0x01 << 11)
 #define ED_IN		__constant_cpu_to_le32(0x02 << 11)
-	__u32			hwTailP;	/* tail of TD list */
-	__u32			hwHeadP;	/* head of TD list (hc r/w) */
+	__le32			hwTailP;	/* tail of TD list */
+	__le32			hwHeadP;	/* head of TD list (hc r/w) */
 #define ED_C		__constant_cpu_to_le32(0x02)	/* toggle carry */
 #define ED_H		__constant_cpu_to_le32(0x01)	/* halted */
-	__u32			hwNextED;	/* next ED in list */
+	__le32			hwNextED;	/* next ED in list */
 
 	/* rest are purely for the driver's use */
 	dma_addr_t		dma;		/* addr of ED */
@@ -42,7 +42,6 @@ struct ed {
 
 	/* create --> IDLE --> OPER --> ... --> IDLE --> destroy
 	 * usually:  OPER --> UNLINK --> (IDLE | OPER) --> ...
-	 * some special cases :  OPER --> IDLE ...
 	 */
 	u8			state;		/* ED_{IDLE,UNLINK,OPER} */
 #define ED_IDLE 	0x00		/* NOT linked to HC */
@@ -71,7 +70,7 @@ struct ed {
  */
 struct td {
 	/* first fields are hardware-specified, le32 */
-	__u32		hwINFO;		/* transfer info bitmask */
+	__le32		hwINFO;		/* transfer info bitmask */
 
 	/* hwINFO bits for both general and iso tds: */
 #define TD_CC       0xf0000000			/* condition code */
@@ -100,13 +99,13 @@ struct td {
 
 	/* (no hwINFO #defines yet for iso tds) */
 
-  	__u32		hwCBP;		/* Current Buffer Pointer (or 0) */
-  	__u32		hwNextTD;	/* Next TD Pointer */
-  	__u32		hwBE;		/* Memory Buffer End Pointer */
+  	__le32		hwCBP;		/* Current Buffer Pointer (or 0) */
+  	__le32		hwNextTD;	/* Next TD Pointer */
+  	__le32		hwBE;		/* Memory Buffer End Pointer */
 
 	/* PSW is only for ISO */
 #define MAXPSW 1		/* hardware allows 8 */
-  	__u16		hwPSW [MAXPSW];
+  	__le16		hwPSW [MAXPSW];
 
 	/* rest are purely for the driver's use */
   	__u8		index;
@@ -171,16 +170,16 @@ static const int cc_to_error [16] = {
  */
 struct ohci_hcca {
 #define NUM_INTS 32
-	__u32	int_table [NUM_INTS];	/* periodic schedule */
+	__le32	int_table [NUM_INTS];	/* periodic schedule */
 
 	/* 
 	 * OHCI defines u16 frame_no, followed by u16 zero pad.
 	 * Since some processors can't do 16 bit bus accesses,
 	 * portable access must be a 32 bit byteswapped access.
 	 */
-	u32	frame_no;		/* current frame number */
+	__le32	frame_no;		/* current frame number */
 #define OHCI_FRAME_NO(hccap) ((u16)le32_to_cpup(&(hccap)->frame_no))
-	__u32	done_head;		/* info returned for an interrupt */
+	__le32	done_head;		/* info returned for an interrupt */
 	u8	reserved_for_hc [116];
 	u8	what [4];		/* spec only identifies 252 bytes :) */
 } __attribute__ ((aligned(256)));
@@ -387,6 +386,7 @@ struct ohci_hcd {
 	unsigned long		flags;		/* for HC bugs */
 #define	OHCI_QUIRK_AMD756	0x01			/* erratum #4 */
 #define	OHCI_QUIRK_SUPERIO	0x02			/* natsemi */
+#define	OHCI_QUIRK_INITRESET	0x04			/* SiS, OPTi, ... */
 	// there are also chip quirks/bugs in init logic
 
 	/*
@@ -405,14 +405,14 @@ static inline void disable (struct ohci_hcd *ohci)
 }
 
 #define	FI			0x2edf		/* 12000 bits per frame (-1) */
-#define	DEFAULT_FMINTERVAL 	((((6 * (FI - 210)) / 7) << 16) | FI)
+#define	FSMP(fi) 		(0x7fff & ((6 * ((fi) - 210)) / 7))
 #define LSTHRESH		0x628		/* lowspeed bit threshold */
 
 static inline void periodic_reinit (struct ohci_hcd *ohci)
 {
-	writel (ohci->fminterval, &ohci->regs->fminterval);
-	writel (((9 * FI) / 10) & 0x3fff, &ohci->regs->periodicstart);
-	writel (LSTHRESH, &ohci->regs->lsthresh);
+	u32	fi = ohci->fminterval & 0x0ffff;
+
+	writel (((9 * fi) / 10) & 0x3fff, &ohci->regs->periodicstart);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -436,6 +436,8 @@ static inline void periodic_reinit (struct ohci_hcd *ohci)
 #	define ohci_vdbg(ohci, fmt, args...) do { } while (0)
 #endif
 
+/*-------------------------------------------------------------------------*/
+
 #ifdef CONFIG_ARCH_LH7A404
 	/* Marc Singer: at the time this code was written, the LH7A404
 	 * had a problem reading the USB host registers.  This
@@ -455,3 +457,25 @@ static inline unsigned int ohci_readl (void __iomem * regs)
 	return readl (regs);
 }
 #endif
+
+/* AMD-756 (D2 rev) reports corrupt register contents in some cases.
+ * The erratum (#4) description is incorrect.  AMD's workaround waits
+ * till some bits (mostly reserved) are clear; ok for all revs.
+ */
+#define read_roothub(hc, register, mask) ({ \
+	u32 temp = ohci_readl (&hc->regs->roothub.register); \
+	if (temp == -1) \
+		disable (hc); \
+	else if (hc->flags & OHCI_QUIRK_AMD756) \
+		while (temp & mask) \
+			temp = ohci_readl (&hc->regs->roothub.register); \
+	temp; })
+
+static u32 roothub_a (struct ohci_hcd *hc)
+	{ return read_roothub (hc, a, 0xfc0fe000); }
+static inline u32 roothub_b (struct ohci_hcd *hc)
+	{ return ohci_readl (&hc->regs->roothub.b); }
+static inline u32 roothub_status (struct ohci_hcd *hc)
+	{ return ohci_readl (&hc->regs->roothub.status); }
+static u32 roothub_portstatus (struct ohci_hcd *hc, int i)
+	{ return read_roothub (hc, portstatus [i], 0xffe0fce0); }

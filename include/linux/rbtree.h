@@ -113,8 +113,7 @@ struct rb_root
 };
 
 #define RB_ROOT	(struct rb_root) { NULL, }
-#define	rb_entry(ptr, type, member)					\
-	((type *)((char *)(ptr)-(unsigned long)(&((type *)0)->member)))
+#define	rb_entry(ptr, type, member) container_of(ptr, type, member)
 
 extern void rb_insert_color(struct rb_node *, struct rb_root *);
 extern void rb_erase(struct rb_node *, struct rb_root *);

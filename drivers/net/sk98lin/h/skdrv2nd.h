@@ -285,7 +285,7 @@ struct s_TxPort {
 	TXD		*pTxdRingPrev;	/* descriptor sent previously */
 	int		TxdRingFree;	/* # of free entrys */
 	spinlock_t	TxDesRingLock;	/* serialize descriptor accesses */
-	caddr_t		HwAddr;		/* bmu registers address */
+	SK_IOC		HwAddr;		/* bmu registers address */
 	int		PortIndex;	/* index number of port (0 or 1) */
 };
 
@@ -301,7 +301,7 @@ struct s_RxPort {
 	int		RxdRingFree;	/* # of free entrys */
 	spinlock_t	RxDesRingLock;	/* serialize descriptor accesses */
 	int		RxFillLimit;	/* limit for buffers in ring */
-	caddr_t		HwAddr;		/* bmu registers address */
+	SK_IOC		HwAddr;		/* bmu registers address */
 	int		PortIndex;	/* index number of port (0 or 1) */
 };
 

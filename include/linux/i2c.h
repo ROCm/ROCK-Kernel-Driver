@@ -568,7 +568,7 @@ union i2c_smbus_data {
   static unsigned short var[I2C_CLIENT_MAX_OPTS] = I2C_CLIENT_DEFAULTS; \
   static unsigned int var##_num; \
   /*MODULE_PARM(var,I2C_CLIENT_MODPARM);*/ \
-  module_param_array(var, short, var##_num, 0); \
+  module_param_array(var, short, &var##_num, 0); \
   MODULE_PARM_DESC(var,desc)
 
 /* This is the one you want to use in your own modules */

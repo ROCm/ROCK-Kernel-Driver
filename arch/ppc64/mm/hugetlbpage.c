@@ -213,6 +213,7 @@ static int prepare_low_seg_for_htlb(struct mm_struct *mm, unsigned long seg)
 		}
 		page = pmd_page(*pmd);
 		pmd_clear(pmd);
+		mm->nr_ptes--;
 		dec_page_state(nr_page_table_pages);
 		pte_free_tlb(tlb, page);
 	}

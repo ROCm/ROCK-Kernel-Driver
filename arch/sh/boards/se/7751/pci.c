@@ -19,7 +19,7 @@
 #include <linux/pci.h>
 
 #include <asm/io.h>
-#include <asm/pci-sh7751.h>
+#include "../../../drivers/pci/pci-sh7751.h"
 
 #define PCIMCR_MRSET_OFF	0xBFFFFFFF
 #define PCIMCR_RFSH_OFF		0xFFFFFFFB

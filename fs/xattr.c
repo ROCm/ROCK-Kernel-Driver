@@ -5,6 +5,7 @@
 
   Copyright (C) 2001 by Andreas Gruenbacher <a.gruenbacher@computer.org>
   Copyright (C) 2001 SGI - Silicon Graphics, Inc <linux-xfs@oss.sgi.com>
+  Copyright (c) 2004 Red Hat, Inc., James Morris <jmorris@redhat.com>
  */
 #include <linux/fs.h>
 #include <linux/slab.h>
@@ -13,6 +14,8 @@
 #include <linux/xattr.h>
 #include <linux/namei.h>
 #include <linux/security.h>
+#include <linux/syscalls.h>
+#include <linux/module.h>
 #include <asm/uaccess.h>
 
 /*
@@ -347,3 +350,131 @@ sys_fremovexattr(int fd, char __user *name)
 	fput(f);
 	return error;
 }
+
+
+static const char *
+strcmp_prefix(const char *a, const char *a_prefix)
+{
+	while (*a_prefix && *a == *a_prefix) {
+		a++;
+		a_prefix++;
+	}
+	return *a_prefix ? NULL : a;
+}
+
+/*
+ * In order to implement different sets of xattr operations for each xattr
+ * prefix with the generic xattr API, a filesystem should create a
+ * null-terminated array of struct xattr_handler (one for each prefix) and
+ * hang a pointer to it off of the s_xattr field of the superblock.
+ *
+ * The generic_fooxattr() functions will use this list to dispatch xattr
+ * operations to the correct xattr_handler.
+ */
+#define for_each_xattr_handler(handlers, handler)		\
+		for ((handler) = *(handlers)++;			\
+			(handler) != NULL;			\
+			(handler) = *(handlers)++)
+
+/*
+ * Find the xattr_handler with the matching prefix.
+ */
+static struct xattr_handler *
+xattr_resolve_name(struct xattr_handler **handlers, const char **name)
+{
+	struct xattr_handler *handler;
+
+	if (!*name)
+		return NULL;
+
+	for_each_xattr_handler(handlers, handler) {
+		const char *n = strcmp_prefix(*name, handler->prefix);
+		if (n) {
+			*name = n;
+			break;
+		}
+	}
+	return handler;
+}
+
+/*
+ * Find the handler for the prefix and dispatch its get() operation.
+ */
+ssize_t
+generic_getxattr(struct dentry *dentry, const char *name, void *buffer, size_t size)
+{
+	struct xattr_handler *handler;
+	struct inode *inode = dentry->d_inode;
+
+	handler = xattr_resolve_name(inode->i_sb->s_xattr, &name);
+	if (!handler)
+		return -EOPNOTSUPP;
+	return handler->get(inode, name, buffer, size);
+}
+
+/*
+ * Combine the results of the list() operation from every xattr_handler in the
+ * list.
+ */
+ssize_t
+generic_listxattr(struct dentry *dentry, char *buffer, size_t buffer_size)
+{
+	struct inode *inode = dentry->d_inode;
+	struct xattr_handler *handler, **handlers = inode->i_sb->s_xattr;
+	unsigned int size = 0;
+
+	if (!buffer) {
+		for_each_xattr_handler(handlers, handler)
+			size += handler->list(inode, NULL, 0, NULL, 0);
+	} else {
+		char *buf = buffer;
+
+		for_each_xattr_handler(handlers, handler) {
+			size = handler->list(inode, buf, buffer_size, NULL, 0);
+			if (size > buffer_size)
+				return -ERANGE;
+			buf += size;
+			buffer_size -= size;
+		}
+		size = buf - buffer;
+	}
+	return size;
+}
+
+/*
+ * Find the handler for the prefix and dispatch its set() operation.
+ */
+int
+generic_setxattr(struct dentry *dentry, const char *name, const void *value, size_t size, int flags)
+{
+	struct xattr_handler *handler;
+	struct inode *inode = dentry->d_inode;
+
+	if (size == 0)
+		value = "";  /* empty EA, do not remove */
+	handler = xattr_resolve_name(inode->i_sb->s_xattr, &name);
+	if (!handler)
+		return -EOPNOTSUPP;
+	return handler->set(inode, name, value, size, flags);
+}
+
+/*
+ * Find the handler for the prefix and dispatch its set() operation to remove
+ * any associated extended attribute.
+ */
+int
+generic_removexattr(struct dentry *dentry, const char *name)
+{
+	struct xattr_handler *handler;
+	struct inode *inode = dentry->d_inode;
+
+	handler = xattr_resolve_name(inode->i_sb->s_xattr, &name);
+	if (!handler)
+		return -EOPNOTSUPP;
+	return handler->set(inode, name, NULL, 0, XATTR_REPLACE);
+}
+
+EXPORT_SYMBOL(generic_getxattr);
+EXPORT_SYMBOL(generic_listxattr);
+EXPORT_SYMBOL(generic_setxattr);
+EXPORT_SYMBOL(generic_removexattr);

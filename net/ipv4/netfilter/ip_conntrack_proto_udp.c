@@ -91,10 +91,11 @@ static int udp_error(struct sk_buff *skb, enum ip_conntrack_info *ctinfo,
 {
 	struct iphdr *iph = skb->nh.iph;
 	unsigned int udplen = skb->len - iph->ihl * 4;
-	struct udphdr hdr;
+	struct udphdr _hdr, *hdr;
 
 	/* Header is too small? */
-	if (skb_copy_bits(skb, iph->ihl*4, &hdr, sizeof(hdr)) != 0) {
+	hdr = skb_header_pointer(skb, iph->ihl*4, sizeof(_hdr), &_hdr);
+	if (hdr == NULL) {
 		if (LOG_INVALID(IPPROTO_UDP))
 			nf_log_packet(PF_INET, 0, skb, NULL, NULL, 
 				  "ip_ct_udp: short packet ");
@@ -102,7 +103,7 @@ static int udp_error(struct sk_buff *skb, enum ip_conntrack_info *ctinfo,
 	}
 	
 	/* Truncated/malformed packets */
-	if (ntohs(hdr.len) > udplen || ntohs(hdr.len) < sizeof(hdr)) {
+	if (ntohs(hdr->len) > udplen || ntohs(hdr->len) < sizeof(*hdr)) {
 		if (LOG_INVALID(IPPROTO_UDP))
 			nf_log_packet(PF_INET, 0, skb, NULL, NULL, 
 				  "ip_ct_udp: truncated/malformed packet ");
@@ -110,7 +111,7 @@ static int udp_error(struct sk_buff *skb, enum ip_conntrack_info *ctinfo,
 	}
 	
 	/* Packet with no checksum */
-	if (!hdr.check)
+	if (!hdr->check)
 		return NF_ACCEPT;
 
 	/* Checksum invalid? Ignore.

@@ -29,7 +29,7 @@ static __inline__ void putc (char ch)
 	UART_DATA = ch;
 }
 
-static void puts (const char* sz)
+static void putstr (const char* sz)
 {
 	for (; *sz; ++sz) {
 		putc (*sz);

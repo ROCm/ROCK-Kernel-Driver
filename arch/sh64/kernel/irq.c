@@ -30,9 +30,9 @@
 #include <linux/smp_lock.h>
 #include <linux/init.h>
 #include <linux/seq_file.h>
+#include <linux/bitops.h>
 #include <asm/system.h>
 #include <asm/io.h>
-#include <asm/bitops.h>
 #include <asm/smp.h>
 #include <asm/pgalloc.h>
 #include <asm/delay.h>

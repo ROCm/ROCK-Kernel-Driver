@@ -22,6 +22,7 @@ static char version[] =
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
+#include <linux/bitops.h>
 
 #include <net/dst.h>
 #include <net/arp.h>
@@ -29,7 +30,6 @@ static char version[] =
 #include <net/ipv6.h>
 
 #include <asm/system.h>
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
 #include <asm/byteorder.h>
@@ -376,7 +376,7 @@ static unsigned short myri_type_trans(struct sk_buff *skb, struct net_device *de
 	
 	skb->mac.raw = (((unsigned char *)skb->data) + MYRI_PAD_LEN);
 	skb_pull(skb, dev->hard_header_len);
-	eth = skb->mac.ethernet;
+	eth = eth_hdr(skb);
 	
 #ifdef DEBUG_HEADER
 	DHDR(("myri_type_trans: "));

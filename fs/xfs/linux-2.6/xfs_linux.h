@@ -85,6 +85,7 @@
 #include <linux/vfs.h>
 #include <linux/seq_file.h>
 #include <linux/init.h>
+#include <linux/list.h>
 #include <linux/proc_fs.h>
 #include <linux/version.h>
 
@@ -140,6 +141,7 @@ static inline void set_buffer_unwritten_io(struct buffer_head *bh)
 #define xfs_inherit_noatime	xfs_params.inherit_noatim.val
 #define xfs_buf_timer_centisecs	xfs_params.xfs_buf_timer.val
 #define xfs_buf_age_centisecs	xfs_params.xfs_buf_age.val
+#define xfs_inherit_nosymlinks	xfs_params.inherit_nosym.val
 
 #define current_cpu()		smp_processor_id()
 #define current_pid()		(current->pid)

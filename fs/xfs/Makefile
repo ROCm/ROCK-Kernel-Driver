@@ -67,8 +67,6 @@ endif
 
 xfs-$(CONFIG_XFS_RT)		+= xfs_rtalloc.o
 xfs-$(CONFIG_XFS_POSIX_ACL)	+= xfs_acl.o
-xfs-$(CONFIG_XFS_POSIX_CAP)	+= xfs_cap.o
-xfs-$(CONFIG_XFS_POSIX_MAC)	+= xfs_mac.o
 xfs-$(CONFIG_PROC_FS)		+= linux-2.6/xfs_stats.o
 xfs-$(CONFIG_SYSCTL)		+= linux-2.6/xfs_sysctl.o
 xfs-$(CONFIG_COMPAT)		+= linux-2.6/xfs_ioctl32.o

@@ -78,6 +78,7 @@ config PPC_PMAC
 	bool "  Apple G5 based machines"
 	default y
 	select ADB_PMU
+	select U3_DART
 
 config PPC
 	bool
@@ -109,16 +110,10 @@ config PPC_SPLPAR
 	  processors, that is, which share physical processors between
 	  two or more partitions.
 
-config PMAC_DART
-	bool "Enable DART/IOMMU on PowerMac (allow >2G of RAM)"
-	depends on PPC_PMAC
-	depends on EXPERIMENTAL
+config U3_DART
+	bool 
+	depends on PPC_MULTIPLATFORM
 	default n
-	help
-	  Enabling DART makes it possible to boot a PowerMac G5 with more
-	  than 2GB of memory. Note that the code is very new and untested
-	  at this time, so it has to be considered experimental. Enabling
-	  this might result in data loss.
 
 config PPC_PMAC64
 	bool
@@ -212,6 +207,13 @@ config PREEMPT
 	  Say Y here if you are building a kernel for a desktop, embedded
 	  or real-time system.  Say N if you are unsure.
 
+#
+# Use the generic interrupt handling code in kernel/irq/:
+#
+config GENERIC_HARDIRQS
+	bool
+	default y
+
 config MSCHUNKS
 	bool
 	depends on PPC_ISERIES
@@ -220,7 +222,7 @@ config MSCHUNKS
 
 config PPC_RTAS
 	bool "Proc interface to RTAS"
-	depends on !PPC_ISERIES
+	depends on PPC_PSERIES
 
 config RTAS_FLASH
 	tristate "Firmware flash interface"
@@ -232,6 +234,7 @@ config SCANLOG
 
 config LPARCFG
 	tristate "LPAR Configuration Data"
+	depends on PPC_PSERIES || PPC_ISERIES
 	help
 	Provide system capacity information via human readable
 	<key word>=<value> pairs through a /proc/ppc64/lparcfg interface.
@@ -278,7 +281,7 @@ source "drivers/pci/Kconfig"
 
 config HOTPLUG_CPU
 	bool "Support for hot-pluggable CPUs"
-	depends on SMP && HOTPLUG && EXPERIMENTAL
+	depends on SMP && HOTPLUG && EXPERIMENTAL && PPC_PSERIES
 	---help---
 	  Say Y here to be able to turn CPUs off and on.
 

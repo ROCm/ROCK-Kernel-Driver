@@ -108,11 +108,11 @@ struct cardinfo {
 	int		irq;
 
 	unsigned long	csr_base;
-	unsigned char	*csr_remap;
+	unsigned char	__iomem *csr_remap;
 	unsigned long	csr_len;
 #ifdef CONFIG_MM_MAP_MEMORY
 	unsigned long	mem_base;
-	unsigned char	*mem_remap;
+	unsigned char	__iomem *mem_remap;
 	unsigned long	mem_len;
 #endif
 
@@ -926,7 +926,7 @@ static int __devinit mm_pci_probe(struct pci_dev *dev, const struct pci_device_i
 		goto failed_req_mem;
 	}
 
-	if (!(card->mem_remap = (unsigned char *)ioremap(card->mem_base, cards->mem_len))) {
+	if (!(card->mem_remap = ioremap(card->mem_base, cards->mem_len))) {
 		printk(KERN_ERR "MM%d: Unable to remap memory region\n", card->card_number);
 		ret = -ENOMEM;
 
@@ -1107,12 +1107,12 @@ static int __devinit mm_pci_probe(struct pci_dev *dev, const struct pci_device_i
 				    card->mm_pages[1].page_dma);
  failed_magic:
 #ifdef CONFIG_MM_MAP_MEMORY
-	iounmap((void *) card->mem_remap);
+	iounmap(card->mem_remap);
  failed_remap_mem:
 	release_mem_region(card->mem_base, card->mem_len);
  failed_req_mem:
 #endif
-	iounmap((void *) card->csr_remap);
+	iounmap(card->csr_remap);
  failed_remap_csr:
 	release_mem_region(card->csr_base, card->csr_len);
  failed_req_csr:

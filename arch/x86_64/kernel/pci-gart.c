@@ -22,10 +22,10 @@
 #include <linux/module.h>
 #include <linux/topology.h>
 #include <linux/interrupt.h>
+#include <linux/bitops.h>
 #include <asm/atomic.h>
 #include <asm/io.h>
 #include <asm/mtrr.h>
-#include <asm/bitops.h>
 #include <asm/pgtable.h>
 #include <asm/proto.h>
 #include <asm/cacheflush.h>

@@ -698,6 +698,7 @@ enum
 	TCA_XSTATS,
 	TCA_RATE,
 	TCA_FCNT,
+	TCA_STATS2,
 	__TCA_MAX
 };
 

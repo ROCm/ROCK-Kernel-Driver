@@ -243,6 +243,7 @@ void blk_queue_make_request(request_queue_t * q, make_request_fn * mfn)
 	blk_queue_hardsect_size(q, 512);
 	blk_queue_dma_alignment(q, 511);
 	blk_queue_congestion_threshold(q);
+	q->nr_batching = BLK_BATCH_REQ;
 
 	q->unplug_thresh = 4;		/* hmm */
 	q->unplug_delay = (3 * HZ) / 1000;	/* 3 milliseconds */
@@ -1395,7 +1396,8 @@ void blk_cleanup_queue(request_queue_t * q)
 	if (!atomic_dec_and_test(&q->refcnt))
 		return;
 
-	elevator_exit(q);
+	if (q->elevator)
+		elevator_exit(q->elevator);
 
 	del_timer_sync(&q->unplug_timer);
 	kblockd_flush();
@@ -1418,6 +1420,7 @@ static int blk_init_free_list(request_queue_t *q)
 	rl->count[READ] = rl->count[WRITE] = 0;
 	init_waitqueue_head(&rl->wait[READ]);
 	init_waitqueue_head(&rl->wait[WRITE]);
+	init_waitqueue_head(&rl->drain);
 
 	rl->rq_pool = mempool_create(BLKDEV_MIN_RQ, mempool_alloc_slab, mempool_free_slab, request_cachep);
 
@@ -1428,45 +1431,6 @@ static int blk_init_free_list(request_queue_t *q)
 }
 
 static int __make_request(request_queue_t *, struct bio *);
-
-static elevator_t *chosen_elevator =
-#if defined(CONFIG_IOSCHED_AS)
-	&iosched_as;
-#elif defined(CONFIG_IOSCHED_DEADLINE)
-	&iosched_deadline;
-#elif defined(CONFIG_IOSCHED_CFQ)
-	&iosched_cfq;
-#elif defined(CONFIG_IOSCHED_NOOP)
-	&elevator_noop;
-#else
-	NULL;
-#error "You must have at least 1 I/O scheduler selected"
-#endif
-
-#if defined(CONFIG_IOSCHED_AS) || defined(CONFIG_IOSCHED_DEADLINE) || defined (CONFIG_IOSCHED_NOOP)
-static int __init elevator_setup(char *str)
-{
-#ifdef CONFIG_IOSCHED_DEADLINE
-	if (!strcmp(str, "deadline"))
-		chosen_elevator = &iosched_deadline;
-#endif
-#ifdef CONFIG_IOSCHED_AS
-	if (!strcmp(str, "as"))
-		chosen_elevator = &iosched_as;
-#endif
-#ifdef CONFIG_IOSCHED_CFQ
-	if (!strcmp(str, "cfq"))
-		chosen_elevator = &iosched_cfq;
-#endif
-#ifdef CONFIG_IOSCHED_NOOP
-	if (!strcmp(str, "noop"))
-		chosen_elevator = &elevator_noop;
-#endif
-	return 1;
-}
-
-__setup("elevator=", elevator_setup);
-#endif /* CONFIG_IOSCHED_AS || CONFIG_IOSCHED_DEADLINE || CONFIG_IOSCHED_NOOP */
 
 request_queue_t *blk_alloc_queue(int gfp_mask)
 {
@@ -1520,20 +1484,13 @@ EXPORT_SYMBOL(blk_alloc_queue);
  **/
 request_queue_t *blk_init_queue(request_fn_proc *rfn, spinlock_t *lock)
 {
-	request_queue_t *q;
-	static int printed;
+	request_queue_t *q = blk_alloc_queue(GFP_KERNEL);
 
-	q = blk_alloc_queue(GFP_KERNEL);
 	if (!q)
 		return NULL;
 
 	if (blk_init_free_list(q))
 		goto out_init;
-
-	if (!printed) {
-		printed = 1;
-		printk("Using %s io scheduler\n", chosen_elevator->elevator_name);
-	}
 
 	q->request_fn		= rfn;
 	q->back_merge_fn       	= ll_back_merge_fn;
@@ -1555,8 +1512,10 @@ request_queue_t *blk_init_queue(request_fn_proc *rfn, spinlock_t *lock)
 	/*
 	 * all done
 	 */
-	if (!elevator_init(q, chosen_elevator))
+	if (!elevator_init(q, NULL)) {
+		blk_queue_congestion_threshold(q);
 		return q;
+	}
 
 	blk_cleanup_queue(q);
 out_init:
@@ -1584,12 +1543,19 @@ static inline void blk_free_request(request_queue_t *q, struct request *rq)
 	mempool_free(rq, q->rq.rq_pool);
 }
 
-static inline struct request *blk_alloc_request(request_queue_t *q,int gfp_mask)
+static inline struct request *blk_alloc_request(request_queue_t *q, int rw,
+						int gfp_mask)
 {
 	struct request *rq = mempool_alloc(q->rq.rq_pool, gfp_mask);
 
 	if (!rq)
 		return NULL;
+
+	/*
+	 * first three bits are identical in rq->flags and bio->bi_rw,
+	 * see bio.h and blkdev.h
+	 */
+	rq->flags = rw;
 
 	if (!elv_set_request(q, rq, gfp_mask))
 		return rq;
@@ -1602,7 +1568,7 @@ static inline struct request *blk_alloc_request(request_queue_t *q,int gfp_mask)
  * ioc_batching returns true if the ioc is a valid batching request and
  * should be given priority access to a request.
  */
-static inline int ioc_batching(struct io_context *ioc)
+static inline int ioc_batching(request_queue_t *q, struct io_context *ioc)
 {
 	if (!ioc)
 		return 0;
@@ -1612,7 +1578,7 @@ static inline int ioc_batching(struct io_context *ioc)
 	 * even if the batch times out, otherwise we could theoretically
 	 * lose wakeups.
 	 */
-	return ioc->nr_batch_requests == BLK_BATCH_REQ ||
+	return ioc->nr_batch_requests == q->nr_batching ||
 		(ioc->nr_batch_requests > 0
 		&& time_before(jiffies, ioc->last_waited + BLK_BATCH_TIME));
 }
@@ -1623,12 +1589,12 @@ static inline int ioc_batching(struct io_context *ioc)
  * is the behaviour we want though - once it gets a wakeup it should be given
  * a nice run.
  */
-void ioc_set_batching(struct io_context *ioc)
+void ioc_set_batching(request_queue_t *q, struct io_context *ioc)
 {
-	if (!ioc || ioc_batching(ioc))
+	if (!ioc || ioc_batching(q, ioc))
 		return;
 
-	ioc->nr_batch_requests = BLK_BATCH_REQ;
+	ioc->nr_batch_requests = q->nr_batching;
 	ioc->last_waited = jiffies;
 }
 
@@ -1644,11 +1610,14 @@ static void freed_request(request_queue_t *q, int rw)
 	if (rl->count[rw] < queue_congestion_off_threshold(q))
 		clear_queue_congested(q, rw);
 	if (rl->count[rw]+1 <= q->nr_requests) {
+		smp_mb();
 		if (waitqueue_active(&rl->wait[rw]))
 			wake_up(&rl->wait[rw]);
-		if (!waitqueue_active(&rl->wait[rw]))
-			blk_clear_queue_full(q, rw);
+		blk_clear_queue_full(q, rw);
 	}
+	if (unlikely(waitqueue_active(&rl->drain)) &&
+	    !rl->count[READ] && !rl->count[WRITE])
+		wake_up(&rl->drain);
 }
 
 #define blkdev_free_rq(list) list_entry((list)->next, struct request, queuelist)
@@ -1661,6 +1630,9 @@ static struct request *get_request(request_queue_t *q, int rw, int gfp_mask)
 	struct request_list *rl = &q->rq;
 	struct io_context *ioc = get_io_context(gfp_mask);
 
+	if (unlikely(test_bit(QUEUE_FLAG_DRAIN, &q->queue_flags)))
+		return NULL;
+
 	spin_lock_irq(q->queue_lock);
 	if (rl->count[rw]+1 >= q->nr_requests) {
 		/*
@@ -1670,13 +1642,22 @@ static struct request *get_request(request_queue_t *q, int rw, int gfp_mask)
 		 * will be blocked.
 		 */
 		if (!blk_queue_full(q, rw)) {
-			ioc_set_batching(ioc);
+			ioc_set_batching(q, ioc);
 			blk_set_queue_full(q, rw);
 		}
 	}
 
-	if (blk_queue_full(q, rw)
-			&& !ioc_batching(ioc) && !elv_may_queue(q, rw)) {
+	switch (elv_may_queue(q, rw)) {
+		case ELV_MQUEUE_NO:
+			spin_unlock_irq(q->queue_lock);
+			goto out;
+		case ELV_MQUEUE_MAY:
+			break;
+		case ELV_MQUEUE_MUST:
+			goto get_rq;
+	}
+
+	if (blk_queue_full(q, rw) && !ioc_batching(q, ioc)) {
 		/*
 		 * The queue is full and the allocating process is not a
 		 * "batcher", and not exempted by the IO scheduler
@@ -1685,12 +1666,13 @@ static struct request *get_request(request_queue_t *q, int rw, int gfp_mask)
 		goto out;
 	}
 
+get_rq:
 	rl->count[rw]++;
 	if (rl->count[rw] >= queue_congestion_on_threshold(q))
 		set_queue_congested(q, rw);
 	spin_unlock_irq(q->queue_lock);
 
-	rq = blk_alloc_request(q, gfp_mask);
+	rq = blk_alloc_request(q, rw, gfp_mask);
 	if (!rq) {
 		/*
 		 * Allocation failed presumably due to memory. Undo anything
@@ -1705,16 +1687,10 @@ static struct request *get_request(request_queue_t *q, int rw, int gfp_mask)
 		goto out;
 	}
 
-	if (ioc_batching(ioc))
+	if (ioc_batching(q, ioc))
 		ioc->nr_batch_requests--;
 	
 	INIT_LIST_HEAD(&rq->queuelist);
-
-	/*
-	 * first three bits are identical in rq->flags and bio->bi_rw,
-	 * see bio.h and blkdev.h
-	 */
-	rq->flags = rw;
 
 	rq->errors = 0;
 	rq->rq_status = RQ_ACTIVE;
@@ -1764,7 +1740,7 @@ static struct request *get_request_wait(request_queue_t *q, int rw)
 			 * See ioc_batching, ioc_set_batching
 			 */
 			ioc = get_io_context(GFP_NOIO);
-			ioc_set_batching(ioc);
+			ioc_set_batching(q, ioc);
 			put_io_context(ioc);
 		}
 		finish_wait(&rl->wait[rw], &wait);
@@ -2082,13 +2058,13 @@ void drive_stat_acct(struct request *rq, int nr_sectors, int new_io)
 		return;
 
 	if (rw == READ) {
-		disk_stat_add(rq->rq_disk, read_sectors, nr_sectors);
+		__disk_stat_add(rq->rq_disk, read_sectors, nr_sectors);
 		if (!new_io)
-			disk_stat_inc(rq->rq_disk, read_merges);
+			__disk_stat_inc(rq->rq_disk, read_merges);
 	} else if (rw == WRITE) {
-		disk_stat_add(rq->rq_disk, write_sectors, nr_sectors);
+		__disk_stat_add(rq->rq_disk, write_sectors, nr_sectors);
 		if (!new_io)
-			disk_stat_inc(rq->rq_disk, write_merges);
+			__disk_stat_inc(rq->rq_disk, write_merges);
 	}
 	if (new_io) {
 		disk_round_stats(rq->rq_disk);
@@ -2134,12 +2110,12 @@ void disk_round_stats(struct gendisk *disk)
 {
 	unsigned long now = jiffies;
 
-	disk_stat_add(disk, time_in_queue, 
+	__disk_stat_add(disk, time_in_queue,
 			disk->in_flight * (now - disk->stamp));
 	disk->stamp = now;
 
 	if (disk->in_flight)
-		disk_stat_add(disk, io_ticks, (now - disk->stamp_idle));
+		__disk_stat_add(disk, io_ticks, (now - disk->stamp_idle));
 	disk->stamp_idle = now;
 }
 
@@ -2506,6 +2482,70 @@ static inline void blk_partition_remap(struct bio *bio)
 	}
 }
 
+void blk_finish_queue_drain(request_queue_t *q)
+{
+	struct request_list *rl = &q->rq;
+
+	clear_bit(QUEUE_FLAG_DRAIN, &q->queue_flags);
+	wake_up(&rl->wait[0]);
+	wake_up(&rl->wait[1]);
+	wake_up(&rl->drain);
+}
+
+/*
+ * We rely on the fact that only requests allocated through blk_alloc_request()
+ * have io scheduler private data structures associated with them. Any other
+ * type of request (allocated on stack or through kmalloc()) should not go
+ * to the io scheduler core, but be attached to the queue head instead.
+ */
+void blk_wait_queue_drained(request_queue_t *q)
+{
+	struct request_list *rl = &q->rq;
+	DEFINE_WAIT(wait);
+
+	spin_lock_irq(q->queue_lock);
+	set_bit(QUEUE_FLAG_DRAIN, &q->queue_flags);
+
+	while (rl->count[READ] || rl->count[WRITE]) {
+		prepare_to_wait(&rl->drain, &wait, TASK_UNINTERRUPTIBLE);
+
+		if (rl->count[READ] || rl->count[WRITE]) {
+			__generic_unplug_device(q);
+			spin_unlock_irq(q->queue_lock);
+			io_schedule();
+			spin_lock_irq(q->queue_lock);
+		}
+
+		finish_wait(&rl->drain, &wait);
+	}
+
+	spin_unlock_irq(q->queue_lock);
+}
+
+/*
+ * block waiting for the io scheduler being started again.
+ */
+static inline void block_wait_queue_running(request_queue_t *q)
+{
+	DEFINE_WAIT(wait);
+
+	while (test_bit(QUEUE_FLAG_DRAIN, &q->queue_flags)) {
+		struct request_list *rl = &q->rq;
+
+		prepare_to_wait_exclusive(&rl->drain, &wait,
+				TASK_UNINTERRUPTIBLE);
+
+		/*
+		 * re-check the condition. avoids using prepare_to_wait()
+		 * in the fast path (queue is running)
+		 */
+		if (test_bit(QUEUE_FLAG_DRAIN, &q->queue_flags))
+			io_schedule();
+
+		finish_wait(&rl->drain, &wait);
+	}
+}
+
 /**
  * generic_make_request: hand a buffer to its device driver for I/O
  * @bio:  The bio describing the location in memory and on the device.
@@ -2594,6 +2634,8 @@ end_io:
 
 		if (test_bit(QUEUE_FLAG_DEAD, &q->queue_flags))
 			goto end_io;
+
+		block_wait_queue_running(q);
 
 		/*
 		 * If this device has partitions, remap block n
@@ -2940,12 +2982,12 @@ void end_that_request_last(struct request *req)
 		unsigned long duration = jiffies - req->start_time;
 		switch (rq_data_dir(req)) {
 		    case WRITE:
-			disk_stat_inc(disk, writes);
-			disk_stat_add(disk, write_ticks, duration);
+			__disk_stat_inc(disk, writes);
+			__disk_stat_add(disk, write_ticks, duration);
 			break;
 		    case READ:
-			disk_stat_inc(disk, reads);
-			disk_stat_add(disk, read_ticks, duration);
+			__disk_stat_inc(disk, reads);
+			__disk_stat_add(disk, read_ticks, duration);
 			break;
 		}
 		disk_round_stats(disk);
@@ -3018,6 +3060,7 @@ void kblockd_flush(void)
 {
 	flush_workqueue(kblockd_workqueue);
 }
+EXPORT_SYMBOL(kblockd_flush);
 
 int __init blk_dev_init(void)
 {
@@ -3036,6 +3079,7 @@ int __init blk_dev_init(void)
 
 	blk_max_low_pfn = max_low_pfn;
 	blk_max_pfn = max_pfn;
+
 	return 0;
 }
 
@@ -3052,9 +3096,13 @@ void put_io_context(struct io_context *ioc)
 	if (atomic_dec_and_test(&ioc->refcount)) {
 		if (ioc->aic && ioc->aic->dtor)
 			ioc->aic->dtor(ioc->aic);
+		if (ioc->cic && ioc->cic->dtor)
+			ioc->cic->dtor(ioc->cic);
+
 		kmem_cache_free(iocontext_cachep, ioc);
 	}
 }
+EXPORT_SYMBOL(put_io_context);
 
 /* Called by the exitting task */
 void exit_io_context(void)
@@ -3064,14 +3112,15 @@ void exit_io_context(void)
 
 	local_irq_save(flags);
 	ioc = current->io_context;
-	if (ioc) {
-		if (ioc->aic && ioc->aic->exit)
-			ioc->aic->exit(ioc->aic);
-		put_io_context(ioc);
-		current->io_context = NULL;
-	} else
-		WARN_ON(1);
+	current->io_context = NULL;
 	local_irq_restore(flags);
+
+	if (ioc->aic && ioc->aic->exit)
+		ioc->aic->exit(ioc->aic);
+	if (ioc->cic && ioc->cic->exit)
+		ioc->cic->exit(ioc->cic);
+
+	put_io_context(ioc);
 }
 
 /*
@@ -3090,22 +3139,42 @@ struct io_context *get_io_context(int gfp_flags)
 
 	local_irq_save(flags);
 	ret = tsk->io_context;
-	if (ret == NULL) {
-		ret = kmem_cache_alloc(iocontext_cachep, GFP_ATOMIC);
-		if (ret) {
-			atomic_set(&ret->refcount, 1);
-			ret->pid = tsk->pid;
-			ret->last_waited = jiffies; /* doesn't matter... */
-			ret->nr_batch_requests = 0; /* because this is 0 */
-			ret->aic = NULL;
-			tsk->io_context = ret;
-		}
-	}
 	if (ret)
-		atomic_inc(&ret->refcount);
+		goto out;
+
 	local_irq_restore(flags);
+
+	ret = kmem_cache_alloc(iocontext_cachep, gfp_flags);
+	if (ret) {
+		atomic_set(&ret->refcount, 1);
+		ret->pid = tsk->pid;
+		ret->last_waited = jiffies; /* doesn't matter... */
+		ret->nr_batch_requests = 0; /* because this is 0 */
+		ret->aic = NULL;
+		ret->cic = NULL;
+		spin_lock_init(&ret->lock);
+
+		local_irq_save(flags);
+
+		/*
+		 * very unlikely, someone raced with us in setting up the task
+		 * io context. free new context and just grab a reference.
+		 */
+		if (!tsk->io_context)
+			tsk->io_context = ret;
+		else {
+			kmem_cache_free(iocontext_cachep, ret);
+			ret = tsk->io_context;
+		}
+
+out:
+		atomic_inc(&ret->refcount);
+		local_irq_restore(flags);
+	}
+
 	return ret;
 }
+EXPORT_SYMBOL(get_io_context);
 
 void copy_io_context(struct io_context **pdst, struct io_context **psrc)
 {
@@ -3119,6 +3188,7 @@ void copy_io_context(struct io_context **pdst, struct io_context **psrc)
 		*pdst = src;
 	}
 }
+EXPORT_SYMBOL(copy_io_context);
 
 void swap_io_context(struct io_context **ioc1, struct io_context **ioc2)
 {
@@ -3127,7 +3197,7 @@ void swap_io_context(struct io_context **ioc1, struct io_context **ioc2)
 	*ioc1 = *ioc2;
 	*ioc2 = temp;
 }
-
+EXPORT_SYMBOL(swap_io_context);
 
 /*
  * sysfs parts below
@@ -3285,11 +3355,18 @@ static struct queue_sysfs_entry queue_max_hw_sectors_entry = {
 	.show = queue_max_hw_sectors_show,
 };
 
+static struct queue_sysfs_entry queue_iosched_entry = {
+	.attr = {.name = "scheduler", .mode = S_IRUGO | S_IWUSR },
+	.show = elv_iosched_show,
+	.store = elv_iosched_store,
+};
+
 static struct attribute *default_attrs[] = {
 	&queue_requests_entry.attr,
 	&queue_ra_entry.attr,
 	&queue_max_hw_sectors_entry.attr,
 	&queue_max_sectors_entry.attr,
+	&queue_iosched_entry.attr,
 	NULL,
 };
 

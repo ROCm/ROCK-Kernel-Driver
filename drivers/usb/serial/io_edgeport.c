@@ -479,7 +479,7 @@ static void get_boot_desc		(struct edgeport_serial *edge_serial);
 static void load_application_firmware	(struct edgeport_serial *edge_serial);
 
 
-static void unicode_to_ascii		(char *string, short *unicode, int unicode_size);
+static void unicode_to_ascii		(char *string, __le16 *unicode, int unicode_size);
 
 
 
@@ -504,7 +504,7 @@ static void update_edgeport_E2PROM (struct edgeport_serial *edge_serial)
 	__u32 BootNewVer;
 	__u8 BootMajorVersion;                  
 	__u8 BootMinorVersion;                  
-	__u16 BootBuildNumber;
+	__le16 BootBuildNumber;
 	__u8 *BootImage;      
 	__u32 BootSize;
 	struct edge_firmware_image_record *record;
@@ -900,12 +900,7 @@ static void edge_bulk_out_data_callback (struct urb *urb, struct pt_regs *regs)
 
 	if (tty && edge_port->open) {
 		/* let the tty driver wakeup if it has a special write_wakeup function */
-		if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) && tty->ldisc.write_wakeup) {
-			(tty->ldisc.write_wakeup)(tty);
-		}
-
-		/* tell the tty driver that something has changed */
-		wake_up_interruptible(&tty->write_wait);
+		tty_wakeup(tty);
 	}
 
 	// Release the Write URB
@@ -1243,7 +1238,7 @@ static void edge_close (struct usb_serial_port *port, struct file * filp)
 	edge_port->openPending = FALSE;
 
 	if (edge_port->write_urb) {
-		usb_unlink_urb (edge_port->write_urb);
+		usb_kill_urb(edge_port->write_urb);
 	}
 
 	if (edge_port->write_urb) {
@@ -2448,8 +2443,8 @@ static int write_cmd_usb (struct edgeport_port *edge_port, unsigned char *buffer
 	if (status) {
 		/* something went wrong */
 		dbg("%s - usb_submit_urb(write bulk) failed", __FUNCTION__);
-		usb_unlink_urb (urb);
-		usb_free_urb   (urb);
+		usb_kill_urb(urb);
+		usb_free_urb(urb);
 		return status;
 	}
 
@@ -2747,7 +2742,7 @@ static void change_port_settings (struct edgeport_port *edge_port, struct termio
  *	ASCII range, but it's only for debugging...
  *	NOTE: expects the unicode in LE format
  ****************************************************************************/
-static void unicode_to_ascii (char *string, short *unicode, int unicode_size)
+static void unicode_to_ascii (char *string, __le16 *unicode, int unicode_size)
 {
 	int i;
 	for (i = 0; i < unicode_size; ++i) {

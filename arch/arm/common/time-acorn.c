@@ -15,6 +15,7 @@
  */
 #include <linux/timex.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 
 #include <asm/hardware.h>
 #include <asm/io.h>
@@ -22,7 +23,7 @@
 
 #include <asm/mach/time.h>
 
-static unsigned long ioctime_gettimeoffset(void)
+unsigned long ioc_timer_gettimeoffset(void)
 {
 	unsigned int count1, count2, status;
 	long offset;
@@ -62,6 +63,34 @@ void __init ioctime_init(void)
 	ioc_writeb(LATCH & 255, IOC_T0LTCHL);
 	ioc_writeb(LATCH >> 8, IOC_T0LTCHH);
 	ioc_writeb(0, IOC_T0GO);
-
-	gettimeoffset = ioctime_gettimeoffset;
 }
+
+static irqreturn_t
+ioc_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+{
+	write_seqlock(&xtime_lock);
+	timer_tick(regs);
+	write_sequnlock(&xtime_lock);
+	return IRQ_HANDLED;
+}
+
+static struct irqaction ioc_timer_irq = {
+	.name		= "timer",
+	.flags		= SA_INTERRUPT,
+	.handler	= ioc_timer_interrupt
+};
+
+/*
+ * Set up timer interrupt.
+ */
+static void __init ioc_timer_init(void)
+{
+	ioctime_init();
+	setup_irq(IRQ_TIMER, &ioc_timer_irq);
+}
+
+struct sys_timer ioc_timer = {
+	.init		= ioc_timer_init,
+	.offset		= ioc_timer_gettimeoffset,
+};
+

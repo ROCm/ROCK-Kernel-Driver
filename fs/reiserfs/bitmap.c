@@ -137,6 +137,8 @@ static int scan_bitmap_block (struct reiserfs_transaction_handle *th,
     int end, next;
     int org = *beg;
 
+    BUG_ON (!th->t_trans_id);
+
     RFALSE(bmap_n >= SB_BMAP_NR (s), "Bitmap %d is out of range (0..%d)",bmap_n, SB_BMAP_NR (s) - 1);
     PROC_INFO_INC( s, scan_bitmap.bmap );
 /* this is unclear and lacks comments, explain how journal bitmaps
@@ -236,6 +238,9 @@ static int bmap_hash_id(struct super_block *s, u32 id) {
 	if (!bm)
 	    bm = 1;
     }
+    /* this can only be true when SB_BMAP_NR = 1 */
+    if (bm >= SB_BMAP_NR(s))
+    	bm = 0;
     return bm;
 }
 
@@ -287,12 +292,18 @@ static int scan_bitmap (struct reiserfs_transaction_handle *th,
     int end_bm, end_off;
     int off_max = s->s_blocksize << 3;
 
+    BUG_ON (!th->t_trans_id);
+
     PROC_INFO_INC( s, scan_bitmap.call ); 
     if ( SB_FREE_BLOCKS(s) <= 0)
 	return 0; // No point in looking for more free blocks
 
     get_bit_address (s, *start, &bm, &off);
     get_bit_address (s, finish, &end_bm, &end_off);
+    if (bm > SB_BMAP_NR(s))
+        return 0;
+    if (end_bm > SB_BMAP_NR(s))
+        end_bm = SB_BMAP_NR(s);
 
     /* When the bitmap is more than 10% free, anyone can allocate.
      * When it's less than 10% free, only files that already use the
@@ -313,6 +324,7 @@ static int scan_bitmap (struct reiserfs_transaction_handle *th,
 	    if (nr_allocated)
 		goto ret;
         }
+	/* we know from above that start is a reasonable number */
 	get_bit_address (s, *start, &bm, &off);
     }
 
@@ -339,6 +351,8 @@ static void _reiserfs_free_block (struct reiserfs_transaction_handle *th,
     struct buffer_head * sbh;
     struct reiserfs_bitmap_info *apbi;
     int nr, offset;
+
+    BUG_ON (!th->t_trans_id);
 
     PROC_INFO_INC( s, free_block );
 
@@ -381,6 +395,8 @@ void reiserfs_free_block (struct reiserfs_transaction_handle *th,
 {
     struct super_block * s = th->t_super;
 
+    BUG_ON (!th->t_trans_id);
+
     RFALSE(!s, "vs-4061: trying to free block on nonexistent device");
     RFALSE(is_reusable (s, block, 1) == 0, "vs-4071: can not free such block");
     /* mark it before we clear it, just in case */
@@ -393,6 +409,7 @@ void reiserfs_free_prealloc_block (struct reiserfs_transaction_handle *th,
 			  struct inode *inode, b_blocknr_t block) {
     RFALSE(!th->t_super, "vs-4060: trying to free block on nonexistent device");
     RFALSE(is_reusable (th->t_super, block, 1) == 0, "vs-4070: can not free such block");
+    BUG_ON (!th->t_trans_id);
     _reiserfs_free_block(th, inode, block, 1) ;
 }
 
@@ -402,6 +419,7 @@ static void __discard_prealloc (struct reiserfs_transaction_handle * th,
     unsigned long save = ei->i_prealloc_block ;
     int dirty = 0;
     struct inode *inode = &ei->vfs_inode;
+    BUG_ON (!th->t_trans_id);
 #ifdef CONFIG_REISERFS_CHECK
     if (ei->i_prealloc_count < 0)
 	reiserfs_warning (th->t_super, "zam-4001:%s: inode has negative prealloc blocks count.", __FUNCTION__ );
@@ -423,6 +441,7 @@ void reiserfs_discard_prealloc (struct reiserfs_transaction_handle *th,
 				struct inode *inode)
 {
     struct reiserfs_inode_info *ei = REISERFS_I(inode);
+    BUG_ON (!th->t_trans_id);
     if (ei->i_prealloc_count)
 	__discard_prealloc(th, ei);
 }
@@ -430,6 +449,8 @@ void reiserfs_discard_prealloc (struct reiserfs_transaction_handle *th,
 void reiserfs_discard_all_prealloc (struct reiserfs_transaction_handle *th)
 {
     struct list_head * plist = &SB_JOURNAL(th->t_super)->j_prealloc_list;
+
+    BUG_ON (!th->t_trans_id);
 
     while (!list_empty(plist)) {
 	struct reiserfs_inode_info *ei;
@@ -715,7 +736,7 @@ static inline int this_blocknr_allocation_would_make_it_a_large_file(reiserfs_bl
 #ifdef DISPLACE_NEW_PACKING_LOCALITIES
 static inline void displace_new_packing_locality (reiserfs_blocknr_hint_t *hint)
 {
-    struct key * key = &hint->key;
+    struct reiserfs_key * key = &hint->key;
 
     hint->th->displace_new_blocks = 0;
     hint->search_start = hint->beg + keyed_hash((char*)(&key->k_objectid),4) % (hint->end - hint->beg);
@@ -756,7 +777,7 @@ static inline int old_way (reiserfs_blocknr_hint_t * hint)
 
 static inline void hundredth_slices (reiserfs_blocknr_hint_t * hint)
 {
-    struct key * key = &hint->key;
+    struct reiserfs_key * key = &hint->key;
     b_blocknr_t slice_start;
 
     slice_start = (keyed_hash((char*)(&key->k_dir_id),4) % 100) * (hint->end / 100);
@@ -1050,9 +1071,10 @@ int reiserfs_allocate_blocknrs(reiserfs_blocknr_hint_t *hint,
 {
     int initial_amount_needed = amount_needed;
     int ret;
+    struct super_block *s = hint->th->t_super;
 
     /* Check if there is enough space, taking into account reserved space */
-    if ( SB_FREE_BLOCKS(hint->th->t_super) - REISERFS_SB(hint->th->t_super)->reserved_blocks <
+    if ( SB_FREE_BLOCKS(s) - REISERFS_SB(s)->reserved_blocks <
 	 amount_needed - reserved_by_us)
         return NO_DISK_SPACE;
     /* should this be if !hint->inode &&  hint->preallocate? */
@@ -1072,6 +1094,8 @@ int reiserfs_allocate_blocknrs(reiserfs_blocknr_hint_t *hint,
 
     /* find search start and save it in hint structure */
     determine_search_start(hint, amount_needed);
+    if (hint->search_start >= SB_BLOCK_COUNT(s))
+        hint->search_start = SB_BLOCK_COUNT(s) - 1;
 
     /* allocation itself; fill new_blocknrs and preallocation arrays */
     ret = blocknrs_and_prealloc_arrays_from_search_start

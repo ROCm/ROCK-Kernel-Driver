@@ -59,54 +59,7 @@ struct systemcfg {
 
 #ifdef __KERNEL__
 extern struct systemcfg *systemcfg;
-#else
-
-/* Processor Version Register (PVR) field extraction */
-#define PVR_VER(pvr)  (((pvr) >>  16) & 0xFFFF) /* Version field */
-#define PVR_REV(pvr)  (((pvr) >>   0) & 0xFFFF) /* Revison field */
-
-/* Processor Version Numbers */
-#define PV_NORTHSTAR    0x0033
-#define PV_PULSAR       0x0034
-#define PV_POWER4       0x0035
-#define PV_ICESTAR      0x0036
-#define PV_SSTAR        0x0037
-#define PV_POWER4p      0x0038
-#define PV_GPUL		0x0039
-#define PV_POWER5	0x003a
-#define PV_970FX	0x003c
-#define PV_630          0x0040
-#define PV_630p         0x0041
-
-/* Platforms supported by PPC64 */
-#define PLATFORM_PSERIES      0x0100
-#define PLATFORM_PSERIES_LPAR 0x0101
-#define PLATFORM_ISERIES_LPAR 0x0201
-#define PLATFORM_POWERMAC     0x0400
-
-/* Compatibility with drivers coming from PPC32 world */
-#define _machine	(systemcfg->platform)
-#define _MACH_Pmac	PLATFORM_POWERMAC
-
-
-static inline volatile struct systemcfg *systemcfg_init(void)
-{
-	int fd = open("/proc/ppc64/systemcfg", O_RDONLY);
-	volatile struct systemcfg *ret;
-
-	if (fd == -1)
-		return 0;
-	ret = mmap(0, sizeof(struct systemcfg), PROT_READ, MAP_SHARED, fd, 0);
-	close(fd);
-	if (!ret)
-		return 0;
-	if (ret->version.major != SYSTEMCFG_MAJOR || ret->version.minor < SYSTEMCFG_MINOR) {
-		munmap((void *)ret, sizeof(struct systemcfg));
-		return 0;
-	}
-	return ret;
-}
-#endif /* __KERNEL__ */
+#endif
 
 #endif /* __ASSEMBLY__ */
 

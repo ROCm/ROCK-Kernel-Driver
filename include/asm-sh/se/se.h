@@ -36,7 +36,11 @@
 #define PA_DIPSW0	0xb0800000	/* Dip switch 5,6 */
 #define PA_DIPSW1	0xb0800002	/* Dip switch 7,8 */
 #define PA_LED		0xb0c00000	/* LED */
+#if defined(CONFIG_CPU_SUBTYPE_SH7705)
+#define PA_BCR		0xb0e00000
+#else
 #define PA_BCR		0xb1400000	/* FPGA */
+#endif
 
 #define PA_MRSHPC	0xb83fffe0	/* MR-SHPC-01 PCMCIA controller */
 #define PA_MRSHPC_MW1	0xb8400000	/* MR-SHPC-01 memory window base */
@@ -64,6 +68,10 @@
 #define BCR_ILCRF	(PA_BCR + 10)
 #define BCR_ILCRG	(PA_BCR + 12)
 
+#if defined(CONFIG_CPU_SUBTYPE_SH7705)
+#define IRQ_STNIC   12
+#else
 #define IRQ_STNIC	10
+#endif
 
 #endif  /* __ASM_SH_HITACHI_SE_H */

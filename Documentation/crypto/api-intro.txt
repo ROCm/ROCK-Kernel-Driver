@@ -229,6 +229,7 @@ Khazad algorithm contributors:
 
 Whirlpool algorithm contributors:
   Aaron Grothe
+  Jean-Luc Cooke
 
 Generic scatterwalk code by Adam J. Richter <adam@yggdrasil.com>
 

@@ -15,17 +15,6 @@
 
 #include <linux/config.h>
 
-// FIXME hack so that SA-1111.h will work [cb]
-
-#ifndef __ASSEMBLY__
-typedef unsigned short  Word16 ;
-typedef unsigned int    Word32 ;
-typedef Word32          Word ;
-typedef Word            Quad [4] ;
-typedef void            *Address ;
-typedef void            (*ExcpHndlr) (void) ;
-#endif
-
 /*
  * PXA Chip selects
  */
@@ -962,7 +951,7 @@ typedef void            (*ExcpHndlr) (void) ;
 #define ICCR0_LBM	(1 << 1)	/* Loopback mode */
 #define ICCR0_ITR	(1 << 0)	/* IrDA transmission */
 
-#ifdef CONFIG_CPU_BULVERDE
+#ifdef CONFIG_PXA27x
 #define ICCR2_RXP       (1 << 3)	/* Receive Pin Polarity select */
 #define ICCR2_TXP       (1 << 2)	/* Transmit Pin Polarity select */
 #define ICCR2_TRIG	(3 << 0)	/* Receive FIFO Trigger threshold */
@@ -971,7 +960,7 @@ typedef void            (*ExcpHndlr) (void) ;
 #define ICCR2_TRIG_32   (2 << 0)	/*	>= 32 bytes */
 #endif
 
-#ifdef CONFIG_CPU_BULVERDE
+#ifdef CONFIG_PXA27x
 #define ICSR0_EOC	(1 << 6)	/* DMA End of Descriptor Chain */
 #endif
 #define ICSR0_FRE	(1 << 5)	/* Framing error */
@@ -1185,6 +1174,7 @@ typedef void            (*ExcpHndlr) (void) ;
 #define GPIO30_SDATA_OUT	30	/* AC97/I2S Sdata_out */
 #define GPIO31_SYNC		31	/* AC97/I2S sync */
 #define GPIO32_SDATA_IN1	32	/* AC97 Sdata_in1 */
+#define GPIO32_MMCCLK		32	/* MMC Clock (PXA270) */
 #define GPIO33_nCS_5		33	/* chip select 5 */
 #define GPIO34_FFRXD		34	/* FFUART receive */
 #define GPIO34_MMCCS0		34	/* MMC Chip Select 0 */
@@ -1213,6 +1203,7 @@ typedef void            (*ExcpHndlr) (void) ;
 #define GPIO53_MMCCLK		53	/* MMC Clock */
 #define GPIO54_MMCCLK		54	/* MMC Clock */
 #define GPIO54_pSKTSEL		54	/* Socket Select for Card Space */
+#define GPIO54_nPCE_2		54	/* Card Enable for Card Space (PXA27x) */
 #define GPIO55_nPREG		55	/* Card Address bit 26 */
 #define GPIO56_nPWAIT		56	/* Wait signal for Card Space */
 #define GPIO57_nIOIS16		57	/* Bus Width select for I/O Card Space */
@@ -1247,6 +1238,15 @@ typedef void            (*ExcpHndlr) (void) ;
 #define GPIO78_nCS_2		78	/* chip select 2 */
 #define GPIO79_nCS_3		79	/* chip select 3 */
 #define GPIO80_nCS_4		80	/* chip select 4 */
+#define GPIO85_nPCE_1		85	/* Card Enable for Card Space (PXA27x) */
+#define GPIO92_MMCDAT0		92	/* MMC DAT0 (PXA27x) */
+#define GPIO109_MMCDAT1		109	/* MMC DAT1 (PXA27x) */
+#define GPIO110_MMCDAT2		110	/* MMC DAT2 (PXA27x) */
+#define GPIO110_MMCCS0		110	/* MMC Chip Select 0 (PXA27x) */
+#define GPIO111_MMCDAT3		111	/* MMC DAT3 (PXA27x) */
+#define GPIO111_MMCCS1		111	/* MMC Chip Select 1 (PXA27x) */
+#define GPIO112_MMCCMD		112	/* MMC CMD (PXA27x) */
+#define GPIO113_AC97_RESET_N	113	/* AC97 NRESET on (PXA27x) */
 
 /* GPIO alternate function mode & direction */
 
@@ -1292,6 +1292,7 @@ typedef void            (*ExcpHndlr) (void) ;
 #define GPIO31_SYNC_AC97_MD	(31 | GPIO_ALT_FN_2_OUT)
 #define GPIO31_SYNC_I2S_MD	(31 | GPIO_ALT_FN_1_OUT)
 #define GPIO32_SDATA_IN1_AC97_MD	(32 | GPIO_ALT_FN_1_IN)
+#define GPIO32_MMCCLK_MD		( 32 | GPIO_ALT_FN_2_OUT)
 #define GPIO33_nCS_5_MD		(33 | GPIO_ALT_FN_2_OUT)
 #define GPIO34_FFRXD_MD		(34 | GPIO_ALT_FN_1_IN)
 #define GPIO34_MMCCS0_MD	(34 | GPIO_ALT_FN_2_OUT)
@@ -1319,6 +1320,7 @@ typedef void            (*ExcpHndlr) (void) ;
 #define GPIO53_nPCE_2_MD	(53 | GPIO_ALT_FN_2_OUT)
 #define GPIO53_MMCCLK_MD	(53 | GPIO_ALT_FN_1_OUT)
 #define GPIO54_MMCCLK_MD	(54 | GPIO_ALT_FN_1_OUT)
+#define GPIO54_nPCE_2_MD	(54 | GPIO_ALT_FN_2_OUT)
 #define GPIO54_pSKTSEL_MD	(54 | GPIO_ALT_FN_2_OUT)
 #define GPIO55_nPREG_MD		(55 | GPIO_ALT_FN_2_OUT)
 #define GPIO56_nPWAIT_MD	(56 | GPIO_ALT_FN_1_IN)
@@ -1353,7 +1355,17 @@ typedef void            (*ExcpHndlr) (void) ;
 #define GPIO77_LCD_ACBIAS_MD	(77 | GPIO_ALT_FN_2_OUT)
 #define GPIO78_nCS_2_MD		(78 | GPIO_ALT_FN_2_OUT)
 #define GPIO79_nCS_3_MD		(79 | GPIO_ALT_FN_2_OUT)
+#define GPIO79_pSKTSEL_MD	(79 | GPIO_ALT_FN_1_OUT)
 #define GPIO80_nCS_4_MD		(80 | GPIO_ALT_FN_2_OUT)
+#define GPIO85_nPCE_1_MD	(85 | GPIO_ALT_FN_1_OUT)
+#define GPIO92_MMCDAT0_MD	(92 | GPIO_ALT_FN_1_OUT)
+#define GPIO109_MMCDAT1_MD	(109 | GPIO_ALT_FN_1_OUT)
+#define GPIO110_MMCDAT2_MD	(110 | GPIO_ALT_FN_1_OUT)
+#define GPIO110_MMCCS0_MD	(110 | GPIO_ALT_FN_1_OUT)
+#define GPIO111_MMCDAT3_MD	(111 | GPIO_ALT_FN_1_OUT)
+#define GPIO110_MMCCS1_MD	(111 | GPIO_ALT_FN_1_OUT)
+#define GPIO112_MMCCMD_MD	(112 | GPIO_ALT_FN_1_OUT)
+#define GPIO113_AC97_RESET_N_MD	(113 | GPIO_ALT_FN_2_OUT)
 
 
 /*

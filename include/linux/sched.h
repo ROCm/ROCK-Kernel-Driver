@@ -29,6 +29,7 @@
 #include <linux/completion.h>
 #include <linux/pid.h>
 #include <linux/percpu.h>
+#include <linux/topology.h>
 
 struct exec_domain;
 
@@ -107,8 +108,8 @@ extern unsigned long nr_iowait(void);
 #define TASK_UNINTERRUPTIBLE	2
 #define TASK_STOPPED		4
 #define TASK_TRACED		8
-#define TASK_ZOMBIE		16
-#define TASK_DEAD		32
+#define EXIT_ZOMBIE		16
+#define EXIT_DEAD		32
 
 #define __set_task_state(tsk, state_value)		\
 	do { (tsk)->state = (state_value); } while (0)
@@ -217,7 +218,7 @@ struct mm_struct {
 	struct rw_semaphore mmap_sem;
 	spinlock_t page_table_lock;		/* Protects task page tables and mm->rss */
 
-	struct list_head mmlist;		/* List of all active mm's.  These are globally strung
+	struct list_head mmlist;		/* List of maybe swapped mm's.  These are globally strung
 						 * together off init_mm.mmlist, and are protected
 						 * by mmlist_lock
 						 */
@@ -226,7 +227,7 @@ struct mm_struct {
 	unsigned long start_brk, brk, start_stack;
 	unsigned long arg_start, arg_end, env_start, env_end;
 	unsigned long rss, total_vm, locked_vm, shared_vm;
-	unsigned long exec_vm, stack_vm, reserved_vm, def_flags;
+	unsigned long exec_vm, stack_vm, reserved_vm, def_flags, nr_ptes;
 
 	unsigned long saved_auxv[42]; /* for /proc/PID/auxv */
 
@@ -250,8 +251,6 @@ struct mm_struct {
 
 	struct kioctx		default_kioctx;
 };
-
-extern int mmlist_nr;
 
 struct sighand_struct {
 	atomic_t		count;
@@ -312,6 +311,17 @@ struct signal_struct {
 	unsigned long utime, stime, cutime, cstime;
 	unsigned long nvcsw, nivcsw, cnvcsw, cnivcsw;
 	unsigned long min_flt, maj_flt, cmin_flt, cmaj_flt;
+
+	/*
+	 * We don't bother to synchronize most readers of this at all,
+	 * because there is no reader checking a limit that actually needs
+	 * to get both rlim_cur and rlim_max atomically, and either one
+	 * alone is a single word that can safely be read normally.
+	 * getrlimit/setrlimit use task_lock(current->group_leader) to
+	 * protect this instead of the siglock, because they really
+	 * have no need to disable irqs.
+	 */
+	struct rlimit rlim[RLIM_NLIMITS];
 };
 
 /*
@@ -346,6 +356,11 @@ struct user_struct {
 	unsigned long mq_bytes;	/* How many bytes can be allocated to mqueue? */
 	unsigned long locked_shm; /* How many pages of mlocked shm ? */
 
+#ifdef CONFIG_KEYS
+	struct key *uid_keyring;	/* UID specific keyring */
+	struct key *session_keyring;	/* UID's default session keyring */
+#endif
+
 	/* Hash table maintenance information */
 	struct list_head uidhash_list;
 	uid_t uid;
@@ -359,26 +374,6 @@ extern struct user_struct root_user;
 typedef struct prio_array prio_array_t;
 struct backing_dev_info;
 struct reclaim_state;
-
-/* POSIX.1b interval timer structure. */
-struct k_itimer {
-	struct list_head list;		 /* free/ allocate list */
-	spinlock_t it_lock;
-	clockid_t it_clock;		/* which timer type */
-	timer_t it_id;			/* timer id */
-	int it_overrun;			/* overrun on pending signal  */
-	int it_overrun_last;		 /* overrun on last delivered signal */
-	int it_requeue_pending;          /* waiting to requeue this timer */
-	int it_sigev_notify;		 /* notify word of sigevent struct */
-	int it_sigev_signo;		 /* signo word of sigevent struct */
-	sigval_t it_sigev_value;	 /* value word of sigevent struct */
-	unsigned long it_incr;		/* interval specified in jiffies */
-	struct task_struct *it_process;	/* process to send signal to */
-	struct timer_list it_timer;
-	struct sigqueue *sigq;		/* signal queue entry. */
-	struct list_head abs_timer_entry; /* clock abs_timer_list */
-	struct timespec wall_to_prev;   /* wall_to_monotonic used when set */
-};
 
 #ifdef CONFIG_SCHEDSTATS
 struct sched_info {
@@ -394,6 +389,86 @@ struct sched_info {
 
 extern struct file_operations proc_schedstat_operations;
 #endif
+
+enum idle_type
+{
+	SCHED_IDLE,
+	NOT_IDLE,
+	NEWLY_IDLE,
+	MAX_IDLE_TYPES
+};
+
+/*
+ * sched-domains (multiprocessor balancing) declarations:
+ */
+#ifdef CONFIG_SMP
+#define SCHED_LOAD_SCALE	128UL	/* increase resolution of load */
+
+#define SD_LOAD_BALANCE		1	/* Do load balancing on this domain. */
+#define SD_BALANCE_NEWIDLE	2	/* Balance when about to become idle */
+#define SD_BALANCE_EXEC		4	/* Balance on exec */
+#define SD_WAKE_IDLE		8	/* Wake to idle CPU on task wakeup */
+#define SD_WAKE_AFFINE		16	/* Wake task to waking CPU */
+#define SD_WAKE_BALANCE		32	/* Perform balancing at task wakeup */
+#define SD_SHARE_CPUPOWER	64	/* Domain members share cpu power */
+
+struct sched_group {
+	struct sched_group *next;	/* Must be a circular list */
+	cpumask_t cpumask;
+
+	/*
+	 * CPU power of this group, SCHED_LOAD_SCALE being max power for a
+	 * single CPU. This is read only (except for setup, hotplug CPU).
+	 */
+	unsigned long cpu_power;
+};
+
+struct sched_domain {
+	/* These fields must be setup */
+	struct sched_domain *parent;	/* top domain must be null terminated */
+	struct sched_group *groups;	/* the balancing groups of the domain */
+	cpumask_t span;			/* span of all CPUs in this domain */
+	unsigned long min_interval;	/* Minimum balance interval ms */
+	unsigned long max_interval;	/* Maximum balance interval ms */
+	unsigned int busy_factor;	/* less balancing by factor if busy */
+	unsigned int imbalance_pct;	/* No balance until over watermark */
+	unsigned long long cache_hot_time; /* Task considered cache hot (ns) */
+	unsigned int cache_nice_tries;	/* Leave cache hot tasks for # tries */
+	unsigned int per_cpu_gain;	/* CPU % gained by adding domain cpus */
+	int flags;			/* See SD_* */
+
+	/* Runtime fields. */
+	unsigned long last_balance;	/* init to jiffies. units in jiffies */
+	unsigned int balance_interval;	/* initialise to 1. units in ms. */
+	unsigned int nr_balance_failed; /* initialise to 0 */
+
+#ifdef CONFIG_SCHEDSTATS
+	/* load_balance() stats */
+	unsigned long lb_cnt[MAX_IDLE_TYPES];
+	unsigned long lb_failed[MAX_IDLE_TYPES];
+	unsigned long lb_imbalance[MAX_IDLE_TYPES];
+	unsigned long lb_nobusyg[MAX_IDLE_TYPES];
+	unsigned long lb_nobusyq[MAX_IDLE_TYPES];
+
+	/* sched_balance_exec() stats */
+	unsigned long sbe_attempts;
+	unsigned long sbe_pushed;
+
+	/* try_to_wake_up() stats */
+	unsigned long ttwu_wake_affine;
+	unsigned long ttwu_wake_balance;
+#endif
+};
+
+#ifdef ARCH_HAS_SCHED_DOMAIN
+/* Useful helpers that arch setup code may use. Defined in kernel/sched.c */
+extern cpumask_t cpu_isolated_map;
+extern void init_sched_build_groups(struct sched_group groups[],
+	                        cpumask_t span, int (*group_fn)(int cpu));
+extern void cpu_attach_domain(struct sched_domain *sd, int cpu);
+#endif /* ARCH_HAS_SCHED_DOMAIN */
+#endif /* CONFIG_SMP */
+
 
 struct io_context;			/* See blkdev.h */
 void exit_io_context(void);
@@ -449,7 +524,7 @@ struct task_struct {
 
 	unsigned long sleep_avg;
 	long interactive_credit;
-	unsigned long long timestamp;
+	unsigned long long timestamp, last_ran;
 	int activated;
 
 	unsigned long policy;
@@ -472,6 +547,7 @@ struct task_struct {
 
 /* task state */
 	struct linux_binfmt *binfmt;
+	long exit_state;
 	int exit_code, exit_signal;
 	int pdeath_signal;  /*  The signal sent when the parent dies  */
 	/* ??? */
@@ -508,7 +584,7 @@ struct task_struct {
 	struct timer_list real_timer;
 	unsigned long utime, stime;
 	unsigned long nvcsw, nivcsw; /* context switch counts */
-	u64 start_time;
+	struct timespec start_time;
 /* mm fault and swap info: this can arguably be seen as either mm-specific or thread-specific */
 	unsigned long min_flt, maj_flt;
 /* process credentials */
@@ -518,8 +594,11 @@ struct task_struct {
 	kernel_cap_t   cap_effective, cap_inheritable, cap_permitted;
 	unsigned keep_capabilities:1;
 	struct user_struct *user;
-/* limits */
-	struct rlimit rlim[RLIM_NLIMITS];
+#ifdef CONFIG_KEYS
+	struct key *session_keyring;	/* keyring inherited over fork */
+	struct key *process_keyring;	/* keyring private to this process (CLONE_THREAD) */
+	struct key *thread_keyring;	/* keyring private to this thread */
+#endif
 	unsigned short used_math;
 	char comm[16];
 /* file system info */
@@ -553,7 +632,7 @@ struct task_struct {
 /* Thread group tracking */
    	u32 parent_exec_id;
    	u32 self_exec_id;
-/* Protection of (de-)allocation: mm, files, fs, tty */
+/* Protection of (de-)allocation: mm, files, fs, tty, keyrings */
 	spinlock_t alloc_lock;
 /* Protection of proc_dentry: nesting proc_lock, dcache_lock, write_lock_irq(&tasklist_lock); */
 	spinlock_t proc_lock;
@@ -621,6 +700,7 @@ do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
 #define PF_SWAPOFF	0x00080000	/* I am in swapoff */
 #define PF_LESS_THROTTLE 0x00100000	/* Throttle me less: I clean memory */
 #define PF_SYNCWRITE	0x00200000	/* I am doing a sync write */
+#define PF_BORROWED_MM	0x00400000	/* I am a kthread doing use_mm */
 
 #ifdef CONFIG_SMP
 extern int set_cpus_allowed(task_t *p, cpumask_t new_mask);
@@ -737,7 +817,6 @@ extern int force_sigsegv(int, struct task_struct *);
 extern int force_sig_info(int, struct siginfo *, struct task_struct *);
 extern int __kill_pg_info(int sig, struct siginfo *info, pid_t pgrp);
 extern int kill_pg_info(int, struct siginfo *, pid_t);
-extern int kill_sl_info(int, struct siginfo *, pid_t);
 extern int kill_proc_info(int, struct siginfo *, pid_t);
 extern void do_notify_parent(struct task_struct *, int);
 extern void force_sig(int, struct task_struct *);
@@ -886,8 +965,8 @@ static inline int thread_group_empty(task_t *p)
 extern void unhash_process(struct task_struct *p);
 
 /*
- * Protects ->fs, ->files, ->mm, ->ptrace, ->group_info, ->comm and
- * synchronises with wait4().
+ * Protects ->fs, ->files, ->mm, ->ptrace, ->group_info, ->comm, keyring
+ * subscriptions and synchronises with wait4().  Also used in procfs.
  *
  * Nests both inside and outside of read_lock(&tasklist_lock).
  * It must not be nested with write_lock_irq(&tasklist_lock),

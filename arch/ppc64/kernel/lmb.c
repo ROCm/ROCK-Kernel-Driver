@@ -13,12 +13,12 @@
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
+#include <linux/bitops.h>
 #include <asm/types.h>
 #include <asm/page.h>
 #include <asm/prom.h>
 #include <asm/lmb.h>
 #include <asm/abs_addr.h>
-#include <asm/bitops.h>
 
 struct lmb lmb;
 

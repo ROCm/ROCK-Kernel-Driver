@@ -23,8 +23,11 @@
 #include <linux/dcache.h>
 #include <linux/security.h>
 
-#include "ntfs.h"
+#include "attrib.h"
+#include "debug.h"
 #include "dir.h"
+#include "mft.h"
+#include "ntfs.h"
 
 /**
  * ntfs_lookup - find the inode represented by a dentry in a directory inode

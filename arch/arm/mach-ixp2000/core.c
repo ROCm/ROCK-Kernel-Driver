@@ -170,7 +170,7 @@ void __init ixp2000_map_io(void)
 static unsigned ticks_per_jiffy;
 static unsigned ticks_per_usec;
 
-static unsigned long ixp2000_gettimeoffset (void)
+unsigned long ixp2000_gettimeoffset (void)
 {
 	unsigned long elapsed;
 
@@ -182,10 +182,14 @@ static unsigned long ixp2000_gettimeoffset (void)
 
 static int ixp2000_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
+	write_seqlock(&xtime_lock);
+
 	/* clear timer 1 */
 	ixp2000_reg_write(IXP2000_T1_CLR, 1);
 	
 	timer_tick(regs);
+
+	write_sequnlock(&xtime_lock);
 
 	return IRQ_HANDLED;
 }
@@ -198,8 +202,6 @@ static struct irqaction ixp2000_timer_irq = {
 
 void __init ixp2000_init_time(unsigned long tick_rate)
 {
-	gettimeoffset = ixp2000_gettimeoffset;
-
 	ixp2000_reg_write(IXP2000_T1_CLR, 0);
 	ixp2000_reg_write(IXP2000_T2_CLR, 0);
 

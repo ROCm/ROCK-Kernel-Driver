@@ -666,7 +666,7 @@ int blkdev_get(struct block_device *bdev, mode_t mode, unsigned flags)
 
 EXPORT_SYMBOL(blkdev_get);
 
-int blkdev_open(struct inode * inode, struct file * filp)
+static int blkdev_open(struct inode * inode, struct file * filp)
 {
 	struct block_device *bdev;
 	int res;
@@ -694,8 +694,6 @@ int blkdev_open(struct inode * inode, struct file * filp)
 	blkdev_put(bdev);
 	return res;
 }
-
-EXPORT_SYMBOL(blkdev_open);
 
 int blkdev_put(struct block_device *bdev)
 {
@@ -797,8 +795,6 @@ struct file_operations def_blk_fops = {
 	.writev		= generic_file_write_nolock,
 	.sendfile	= generic_file_sendfile,
 };
-
-EXPORT_SYMBOL(def_blk_fops);
 
 int ioctl_by_bdev(struct block_device *bdev, unsigned cmd, unsigned long arg)
 {

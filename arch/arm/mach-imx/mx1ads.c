@@ -83,6 +83,6 @@ MACHINE_START(MX1ADS, "Motorola MX1ADS")
 	BOOT_PARAMS(0x08000100)
 	MAPIO(mx1ads_map_io)
 	INITIRQ(imx_init_irq)
-	INITTIME(imx_init_time)
+	.timer		= &imx_timer,
 	INIT_MACHINE(mx1ads_init)
 MACHINE_END

@@ -309,7 +309,9 @@ struct net_device
 
 	/* List of functions to handle Wireless Extensions (instead of ioctl).
 	 * See <net/iw_handler.h> for details. Jean II */
-	struct iw_handler_def *	wireless_handlers;
+	const struct iw_handler_def *	wireless_handlers;
+	/* Instance data managed by the core of Wireless Extensions. */
+	struct iw_public_data *	wireless_data;
 
 	struct ethtool_ops *ethtool_ops;
 
@@ -695,8 +697,12 @@ extern int		netdev_nit;
 static inline int netif_rx_ni(struct sk_buff *skb)
 {
        int err = netif_rx(skb);
+
+       preempt_disable();
        if (softirq_pending(smp_processor_id()))
                do_softirq();
+       preempt_enable();
+
        return err;
 }
 

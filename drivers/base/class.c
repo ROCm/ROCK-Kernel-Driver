@@ -528,22 +528,22 @@ int __init classes_init(void)
 	return 0;
 }
 
-EXPORT_SYMBOL(class_create_file);
-EXPORT_SYMBOL(class_remove_file);
-EXPORT_SYMBOL(class_register);
-EXPORT_SYMBOL(class_unregister);
-EXPORT_SYMBOL(class_get);
-EXPORT_SYMBOL(class_put);
+EXPORT_SYMBOL_GPL(class_create_file);
+EXPORT_SYMBOL_GPL(class_remove_file);
+EXPORT_SYMBOL_GPL(class_register);
+EXPORT_SYMBOL_GPL(class_unregister);
+EXPORT_SYMBOL_GPL(class_get);
+EXPORT_SYMBOL_GPL(class_put);
 
-EXPORT_SYMBOL(class_device_register);
-EXPORT_SYMBOL(class_device_unregister);
-EXPORT_SYMBOL(class_device_initialize);
-EXPORT_SYMBOL(class_device_add);
-EXPORT_SYMBOL(class_device_del);
-EXPORT_SYMBOL(class_device_get);
-EXPORT_SYMBOL(class_device_put);
-EXPORT_SYMBOL(class_device_create_file);
-EXPORT_SYMBOL(class_device_remove_file);
+EXPORT_SYMBOL_GPL(class_device_register);
+EXPORT_SYMBOL_GPL(class_device_unregister);
+EXPORT_SYMBOL_GPL(class_device_initialize);
+EXPORT_SYMBOL_GPL(class_device_add);
+EXPORT_SYMBOL_GPL(class_device_del);
+EXPORT_SYMBOL_GPL(class_device_get);
+EXPORT_SYMBOL_GPL(class_device_put);
+EXPORT_SYMBOL_GPL(class_device_create_file);
+EXPORT_SYMBOL_GPL(class_device_remove_file);
 
-EXPORT_SYMBOL(class_interface_register);
-EXPORT_SYMBOL(class_interface_unregister);
+EXPORT_SYMBOL_GPL(class_interface_register);
+EXPORT_SYMBOL_GPL(class_interface_unregister);

@@ -59,10 +59,10 @@
 #include <linux/mm.h>
 #include <linux/console.h>
 #include <linux/module.h>
+#include <linux/bitops.h>
 
 #include <asm/system.h>
 #include <asm/io.h>
-#include <asm/bitops.h>
 #include <asm/mvme16xhw.h>
 #include <asm/bootinfo.h>
 #include <asm/setup.h>
@@ -756,11 +756,7 @@ do_softint(void *private_)
 	wake_up_interruptible(&info->open_wait);
     }
     if (test_and_clear_bit(Cy_EVENT_WRITE_WAKEUP, &info->event)) {
-	if((tty->flags & (1<< TTY_DO_WRITE_WAKEUP))
-	&& tty->ldisc.write_wakeup){
-	    (tty->ldisc.write_wakeup)(tty);
-	}
-	wake_up_interruptible(&tty->write_wait);
+    	tty_wakeup(tty);
     }
 } /* do_softint */
 
@@ -1339,10 +1335,7 @@ cy_flush_buffer(struct tty_struct *tty)
     local_irq_save(flags);
 	info->xmit_cnt = info->xmit_head = info->xmit_tail = 0;
     local_irq_restore(flags);
-    wake_up_interruptible(&tty->write_wait);
-    if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP))
-    && tty->ldisc.write_wakeup)
-	(tty->ldisc.write_wakeup)(tty);
+    tty_wakeup(tty);
 } /* cy_flush_buffer */
 
 
@@ -1842,22 +1835,12 @@ cy_close(struct tty_struct * tty, struct file * filp)
     shutdown(info);
     if (tty->driver->flush_buffer)
 	tty->driver->flush_buffer(tty);
-    if (tty->ldisc.flush_buffer)
-	tty->ldisc.flush_buffer(tty);
+    tty_ldisc_flush(tty);
     info->event = 0;
     info->tty = 0;
-    if (tty->ldisc.num != ldiscs[N_TTY].num) {
-	if (tty->ldisc.close)
-	    (tty->ldisc.close)(tty);
-	tty->ldisc = ldiscs[N_TTY];
-	tty->termios->c_line = N_TTY;
-	if (tty->ldisc.open)
-	    (tty->ldisc.open)(tty);
-    }
     if (info->blocked_open) {
 	if (info->close_delay) {
-	    current->state = TASK_INTERRUPTIBLE;
-	    schedule_timeout(info->close_delay);
+	    msleep_interruptible(jiffies_to_msecs(info->close_delay));
 	}
 	wake_up_interruptible(&info->open_wait);
     }

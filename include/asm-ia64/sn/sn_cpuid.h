@@ -7,7 +7,6 @@
  * Copyright (C) 2000-2004 Silicon Graphics, Inc. All rights reserved.
  */
 
-
 #ifndef _ASM_IA64_SN_SN_CPUID_H
 #define _ASM_IA64_SN_SN_CPUID_H
 
@@ -84,6 +83,7 @@
  */
 
 #ifndef CONFIG_SMP
+#define cpu_logical_id(cpu)				0
 #define cpu_physical_id(cpuid)			((ia64_getreg(_IA64_REG_CR_LID) >> 16) & 0xffff)
 #endif
 
@@ -93,7 +93,7 @@
  */
 #define cpu_physical_id_to_nasid(cpi)		((cpi) &0xfff)
 #define cpu_physical_id_to_slice(cpi)		((cpi>>12) & 3)
-#define cpu_physical_id_to_coherence_id(cpi)	(cpu_physical_id_to_nasid(cpi) >> 9)
+#define cpu_physical_id_to_coherence_id(cpi)	(((cpi) & 0x600) >> 9)
 #define get_nasid()				((ia64_getreg(_IA64_REG_CR_LID) >> 16) & 0xfff)
 #define get_slice()				((ia64_getreg(_IA64_REG_CR_LID) >> 28) & 0xf)
 #define get_node_number(addr)			(((unsigned long)(addr)>>38) & 0x7ff)
@@ -177,7 +177,8 @@ extern short physical_node_map[];			/* indexed by nasid to get cnode */
  * cpuid_to_coherence_id - convert a cpuid to the coherence domain id it
  * resides on
  */
-#define cpuid_to_coherence_id(cpuid)	cpu_physical_id_to_coherence_id(cpu_physical_id(cpuid))
+#define cpuid_to_coherence_id(cpuid)    cpu_physical_id_to_coherence_id(cpu_physical_id(cpuid))
+
 
 #endif /* _ASM_IA64_SN_SN_CPUID_H */
 

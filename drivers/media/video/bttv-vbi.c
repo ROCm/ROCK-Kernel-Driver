@@ -1,4 +1,6 @@
 /*
+    $Id: bttv-vbi.c,v 1.5 2004/10/06 17:30:51 kraxel Exp $
+
     bttv - Bt848 frame grabber driver
     vbi interface
     
@@ -61,10 +63,10 @@ vbi_buffer_risc(struct bttv *btv, struct bttv_buffer *buf, int lines)
 	return 0;
 }
 
-static int vbi_buffer_setup(struct file *file,
+static int vbi_buffer_setup(void *priv,
 			    unsigned int *count, unsigned int *size)
 {
-	struct bttv_fh *fh = file->private_data;
+	struct bttv_fh *fh = priv;
 	struct bttv *btv = fh->btv;
 
 	if (0 == *count)
@@ -74,10 +76,10 @@ static int vbi_buffer_setup(struct file *file,
 	return 0;
 }
 
-static int vbi_buffer_prepare(struct file *file, struct videobuf_buffer *vb,
+static int vbi_buffer_prepare(void *priv, struct videobuf_buffer *vb,
 			      enum v4l2_field field)
 {
-	struct bttv_fh *fh = file->private_data;
+	struct bttv_fh *fh = priv;
 	struct bttv *btv = fh->btv;
 	struct bttv_buffer *buf = (struct bttv_buffer*)vb;
 	int rc;
@@ -105,9 +107,9 @@ static int vbi_buffer_prepare(struct file *file, struct videobuf_buffer *vb,
 }
 
 static void
-vbi_buffer_queue(struct file *file, struct videobuf_buffer *vb)
+vbi_buffer_queue(void *priv, struct videobuf_buffer *vb)
 {
-	struct bttv_fh *fh = file->private_data;
+	struct bttv_fh *fh = priv;
 	struct bttv *btv = fh->btv;
 	struct bttv_buffer *buf = (struct bttv_buffer*)vb;
 	
@@ -115,14 +117,14 @@ vbi_buffer_queue(struct file *file, struct videobuf_buffer *vb)
 	buf->vb.state = STATE_QUEUED;
 	list_add_tail(&buf->vb.queue,&btv->vcapture);
 	if (NULL == btv->cvbi) {
-		fh->btv->curr.irqflags |= 4;
-		bttv_set_dma(btv,0x0c,fh->btv->curr.irqflags);
+		fh->btv->loop_irq |= 4;
+		bttv_set_dma(btv,0x0c);
 	}
 }
 
-static void vbi_buffer_release(struct file *file, struct videobuf_buffer *vb)
+static void vbi_buffer_release(void *priv, struct videobuf_buffer *vb)
 {
-	struct bttv_fh *fh = file->private_data;
+	struct bttv_fh *fh = priv;
 	struct bttv *btv = fh->btv;
 	struct bttv_buffer *buf = (struct bttv_buffer*)vb;
 	

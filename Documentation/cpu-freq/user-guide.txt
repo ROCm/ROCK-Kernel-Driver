@@ -65,6 +65,7 @@ Intel Pentium 4, Intel Xeon
 Intel Pentium M (Centrino)
 National Semiconductors Geode GX
 Transmeta Crusoe
+Transmeta Efficeon
 VIA Cyrix 3 / C3
 various processors on some ACPI 2.0-compatible systems [*]
 

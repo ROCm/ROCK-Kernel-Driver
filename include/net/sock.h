@@ -142,7 +142,6 @@ struct sock_common {
   *	@sk_route_caps - route capabilities (e.g. %NETIF_F_TSO)
   *	@sk_lingertime - %SO_LINGER l_linger setting
   *	@sk_hashent - hash entry in several tables (e.g. tcp_ehash)
-  *	@sk_pair - socket pair (e.g. AF_UNIX/unix_peer)
   *	@sk_backlog - always used with the per-socket spinlock held
   *	@sk_callback_lock - used with the callbacks in the end of this struct
   *	@sk_error_queue - rarely used
@@ -219,7 +218,6 @@ struct sock {
 	int			sk_route_caps;
 	unsigned long	        sk_lingertime;
 	int			sk_hashent;
-	struct sock		*sk_pair;
 	/*
 	 * The backlog queue is special, it is always used with
 	 * the per-socket spinlock held and requires low latency
@@ -557,7 +555,6 @@ struct proto {
 
 	kmem_cache_t		*slab;
 	int			slab_obj_size;
-	void			*af_specific;
 
 	char			name[32];
 
@@ -1339,6 +1336,13 @@ static inline void sock_valbool_flag(struct sock *sk, int bit, int valbool)
 extern __u32 sysctl_wmem_max;
 extern __u32 sysctl_rmem_max;
 
+#ifdef CONFIG_NET
 int siocdevprivate_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg);
+#else
+static inline int siocdevprivate_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
+{
+	return -ENODEV;
+}
+#endif
 
 #endif	/* _SOCK_H */

@@ -1621,6 +1621,7 @@ static int ipx_getname(struct socket *sock, struct sockaddr *uaddr,
 
 	sipx.sipx_family = AF_IPX;
 	sipx.sipx_type	 = ipxs->type;
+	sipx.sipx_zero	 = 0;
 	memcpy(uaddr, &sipx, sizeof(sipx));
 
 	rc = 0;
@@ -1808,6 +1809,7 @@ static int ipx_recvmsg(struct kiocb *iocb, struct socket *sock,
 		memcpy(sipx->sipx_node, ipx->ipx_source.node, IPX_NODE_LEN);
 		sipx->sipx_network	= IPX_SKB_CB(skb)->ipx_source_net;
 		sipx->sipx_type 	= ipx->ipx_type;
+		sipx->sipx_zero		= 0;
 	}
 	rc = copied;
 

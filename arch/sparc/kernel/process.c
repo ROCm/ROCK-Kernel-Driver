@@ -480,8 +480,6 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long sp,
 #endif
 	}
 
-	p->set_child_tid = p->clear_child_tid = NULL;
-
 	/*
 	 *  p->thread_info         new_stack   childregs
 	 *  !                      !           !             {if(PSR_PS) }
@@ -670,8 +668,11 @@ asmlinkage int sparc_execve(struct pt_regs *regs)
 			  (char __user * __user *)regs->u_regs[base + UREG_I2],
 			  regs);
 	putname(filename);
-	if (error == 0)
+	if (error == 0) {
+		task_lock(current);
 		current->ptrace &= ~PT_DTRACE;
+		task_unlock(current);
+	}
 out:
 	return error;
 }

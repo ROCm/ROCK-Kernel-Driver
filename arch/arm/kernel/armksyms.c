@@ -60,7 +60,8 @@ EXPORT_SYMBOL_ALIAS(fp_send_sig,send_sig);
 EXPORT_SYMBOL(__backtrace);
 
 	/* platform dependent support */
-EXPORT_SYMBOL(udelay);
+EXPORT_SYMBOL(__udelay);
+EXPORT_SYMBOL(__const_udelay);
 
 	/* networking */
 EXPORT_SYMBOL(csum_partial);
@@ -149,6 +150,8 @@ EXPORT_SYMBOL(_change_bit_le);
 EXPORT_SYMBOL(_test_and_change_bit_le);
 EXPORT_SYMBOL(_find_first_zero_bit_le);
 EXPORT_SYMBOL(_find_next_zero_bit_le);
+EXPORT_SYMBOL(_find_first_bit_le);
+EXPORT_SYMBOL(_find_next_bit_le);
 
 #ifdef __ARMEB__
 EXPORT_SYMBOL(_set_bit_be);
@@ -159,6 +162,8 @@ EXPORT_SYMBOL(_change_bit_be);
 EXPORT_SYMBOL(_test_and_change_bit_be);
 EXPORT_SYMBOL(_find_first_zero_bit_be);
 EXPORT_SYMBOL(_find_next_zero_bit_be);
+EXPORT_SYMBOL(_find_first_bit_be);
+EXPORT_SYMBOL(_find_next_bit_be);
 #endif
 
 	/* syscalls */

@@ -87,22 +87,8 @@ Non Executable Mappings
 
   noexec=on|off
 
-  on      Enable
+  on      Enable(default)
   off     Disable
-  noforce (default) Don't enable by default for heap/stack/data,
-          but allow PROT_EXEC to be effective
-
-  noexec32=opt{,opt}
-
-  Control the no exec default for 32bit processes.
-  Requires noexec=on or noexec=noforce to be effective.
-
-  Valid options:
-     all,on    Heap,stack,data is non executable.
-     off       (default) Heap,stack,data is executable
-     stack     Stack is non executable, heap/data is.
-     force     Don't imply PROT_EXEC for PROT_READ
-     compat    (default) Imply PROT_EXEC for PROT_READ
 
 SMP
 

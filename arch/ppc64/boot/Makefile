@@ -31,7 +31,6 @@ BOOTAFLAGS	:= -D__ASSEMBLY__ $(BOOTCFLAGS) -traditional
 BOOTLD		:= $(CROSS32_COMPILE)ld
 BOOTLFLAGS	:= -Ttext 0x00400000 -e _start -T $(srctree)/$(src)/zImage.lds
 BOOTOBJCOPY	:= $(CROSS32_COMPILE)objcopy
-BOOTSTRIP	:= $(CROSS32_COMPILE)strip
 OBJCOPYFLAGS    := contents,alloc,load,readonly,data
 
 src-boot := crt0.S string.S prom.c main.c zlib.c imagesize.c div64.S
@@ -71,7 +70,7 @@ quiet_cmd_ramdisk = RAMDISK $@
       cmd_ramdisk = $(obj)/addRamDisk $(obj)/ramdisk.image.gz $< $@
 
 quiet_cmd_stripvm = STRIP $@
-      cmd_stripvm = $(BOOTSTRIP) -s $< -o $@
+      cmd_stripvm = $(STRIP) -s $< -o $@
 
 vmlinux.strip: vmlinux FORCE
 	$(call if_changed,stripvm)
@@ -121,4 +120,4 @@ $(obj)/imagesize.c: vmlinux.strip
 install: $(CONFIGURE) $(obj)/$(BOOTIMAGE)
 	sh -x $(src)/install.sh "$(KERNELRELEASE)" "$(obj)/$(BOOTIMAGE)" "$(INSTALL_PATH)"
 
-clean-files := $(patsubst $(obj)/%,%, $(obj-boot))
+clean-files := $(addprefix $(objtree)/, $(obj-boot) vmlinux.strip)

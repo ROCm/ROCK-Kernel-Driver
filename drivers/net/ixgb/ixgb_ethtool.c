@@ -38,12 +38,6 @@ extern char ixgb_driver_version[];
 extern int ixgb_up(struct ixgb_adapter *adapter);
 extern void ixgb_down(struct ixgb_adapter *adapter, boolean_t kill_watchdog);
 
-static inline int ixgb_eeprom_size(struct ixgb_hw *hw)
-{
-	/* return size in bytes */
-	return (IXGB_EEPROM_SIZE << 1);
-}
-
 struct ixgb_stats {
 	char stat_string[ETH_GSTRING_LEN];
 	int sizeof_stat;
@@ -94,9 +88,10 @@ static struct ixgb_stats ixgb_gstrings_stats[] = {
 #define IXGB_STATS_LEN	\
 	sizeof(ixgb_gstrings_stats) / sizeof(struct ixgb_stats)
 
-static void
-ixgb_ethtool_gset(struct ixgb_adapter *adapter, struct ethtool_cmd *ecmd)
+static int
+ixgb_ethtool_gset(struct net_device *netdev, struct ethtool_cmd *ecmd)
 {
+	struct ixgb_adapter *adapter = netdev->priv;
 	ecmd->supported = (SUPPORTED_10000baseT_Full | SUPPORTED_FIBRE);
 	ecmd->advertising = (SUPPORTED_10000baseT_Full | SUPPORTED_FIBRE);
 	ecmd->port = PORT_FIBRE;
@@ -111,11 +106,13 @@ ixgb_ethtool_gset(struct ixgb_adapter *adapter, struct ethtool_cmd *ecmd)
 	}
 
 	ecmd->autoneg = AUTONEG_DISABLE;
+	return 0;
 }
 
 static int
-ixgb_ethtool_sset(struct ixgb_adapter *adapter, struct ethtool_cmd *ecmd)
+ixgb_ethtool_sset(struct net_device *netdev, struct ethtool_cmd *ecmd)
 {
+	struct ixgb_adapter *adapter = netdev->priv;
 	if (ecmd->autoneg == AUTONEG_ENABLE ||
 	    ecmd->speed + ecmd->duplex != SPEED_10000 + DUPLEX_FULL)
 		return -EINVAL;
@@ -123,14 +120,14 @@ ixgb_ethtool_sset(struct ixgb_adapter *adapter, struct ethtool_cmd *ecmd)
 		ixgb_down(adapter, TRUE);
 		ixgb_up(adapter);
 	}
-
 	return 0;
 }
 
-static int
-ixgb_ethtool_gpause(struct ixgb_adapter *adapter,
+static void
+ixgb_ethtool_gpause(struct net_device *dev,
 		    struct ethtool_pauseparam *epause)
 {
+	struct ixgb_adapter *adapter = dev->priv;
 	struct ixgb_hw *hw = &adapter->hw;
 
 	epause->autoneg = AUTONEG_DISABLE;
@@ -143,14 +140,13 @@ ixgb_ethtool_gpause(struct ixgb_adapter *adapter,
 		epause->rx_pause = 1;
 		epause->tx_pause = 1;
 	}
-
-	return 0;
 }
 
 static int
-ixgb_ethtool_spause(struct ixgb_adapter *adapter,
+ixgb_ethtool_spause(struct net_device *dev,
 		    struct ethtool_pauseparam *epause)
 {
+	struct ixgb_adapter *adapter = dev->priv;
 	struct ixgb_hw *hw = &adapter->hw;
 
 	if (epause->autoneg == AUTONEG_ENABLE)
@@ -172,26 +168,23 @@ ixgb_ethtool_spause(struct ixgb_adapter *adapter,
 }
 
 static void
-ixgb_ethtool_gdrvinfo(struct ixgb_adapter *adapter,
+ixgb_ethtool_gdrvinfo(struct net_device *netdev,
 		      struct ethtool_drvinfo *drvinfo)
 {
+	struct ixgb_adapter *adapter = netdev->priv;
 	strncpy(drvinfo->driver, ixgb_driver_name, 32);
 	strncpy(drvinfo->version, ixgb_driver_version, 32);
 	strncpy(drvinfo->fw_version, "N/A", 32);
 	strncpy(drvinfo->bus_info, pci_name(adapter->pdev), 32);
-	drvinfo->n_stats = IXGB_STATS_LEN;
-#define IXGB_REG_DUMP_LEN  136*sizeof(uint32_t)
-	drvinfo->regdump_len = IXGB_REG_DUMP_LEN;
-	drvinfo->eedump_len = ixgb_eeprom_size(&adapter->hw);
 }
 
 #define IXGB_GET_STAT(_A_, _R_) _A_->stats._R_
 static void
-ixgb_ethtool_gregs(struct ixgb_adapter *adapter,
-		   struct ethtool_regs *regs, uint32_t * regs_buff)
+ixgb_ethtool_gregs(struct net_device *dev, struct ethtool_regs *regs, void *buf)
 {
+	struct ixgb_adapter *adapter = dev->priv;
 	struct ixgb_hw *hw = &adapter->hw;
-	uint32_t *reg = regs_buff;
+	uint32_t *reg = buf;
 	uint32_t *reg_start = reg;
 	uint8_t i;
 
@@ -323,69 +316,37 @@ ixgb_ethtool_gregs(struct ixgb_adapter *adapter,
 }
 
 static int
-ixgb_ethtool_geeprom(struct ixgb_adapter *adapter,
-		     struct ethtool_eeprom *eeprom, uint16_t * eeprom_buff)
+ixgb_ethtool_geeprom(struct net_device *dev,
+		     struct ethtool_eeprom *eeprom, u8 *data)
 {
+	struct ixgb_adapter *adapter = dev->priv;
 	struct ixgb_hw *hw = &adapter->hw;
-	int i, max_len, first_word, last_word;
-	int ret_val = 0;
-
-	if (eeprom->len == 0) {
-		ret_val = -EINVAL;
-		goto geeprom_error;
-	}
 
 	eeprom->magic = hw->vendor_id | (hw->device_id << 16);
 
-	max_len = ixgb_eeprom_size(hw);
-
 	/* use our function to read the eeprom and update our cache */
 	ixgb_get_eeprom_data(hw);
-
-	if (eeprom->offset > eeprom->offset + eeprom->len) {
-		ret_val = -EINVAL;
-		goto geeprom_error;
-	}
-
-	if ((eeprom->offset + eeprom->len) > max_len)
-		eeprom->len = (max_len - eeprom->offset);
-
-	first_word = eeprom->offset >> 1;
-	last_word = (eeprom->offset + eeprom->len - 1) >> 1;
-
-	for (i = 0; i <= (last_word - first_word); i++) {
-		eeprom_buff[i] = hw->eeprom[first_word + i];
-	}
-      geeprom_error:
-	return ret_val;
+	memcpy(data, (char *)hw->eeprom + eeprom->offset, eeprom->len);
+	return 0;
 }
 
 static int
-ixgb_ethtool_seeprom(struct ixgb_adapter *adapter,
-		     struct ethtool_eeprom *eeprom, void __user *user_data)
+ixgb_ethtool_seeprom(struct net_device *dev,
+		     struct ethtool_eeprom *eeprom, u8 *data)
 {
+	struct ixgb_adapter *adapter = dev->priv;
 	struct ixgb_hw *hw = &adapter->hw;
-	uint16_t eeprom_buff[256];
-	int i, max_len, first_word, last_word;
-	void *ptr;
+	/* We are under rtnl, so static is OK */
+	static uint16_t eeprom_buff[IXGB_EEPROM_SIZE];
+	int i, first_word, last_word;
+	char *ptr;
 
 	if (eeprom->magic != (hw->vendor_id | (hw->device_id << 16)))
 		return -EFAULT;
 
-	if (eeprom->len == 0)
-		return -EINVAL;
-
-	max_len = ixgb_eeprom_size(hw);
-
-	if (eeprom->offset > eeprom->offset + eeprom->len)
-		return -EINVAL;
-
-	if ((eeprom->offset + eeprom->len) > max_len)
-		eeprom->len = (max_len - eeprom->offset);
-
 	first_word = eeprom->offset >> 1;
 	last_word = (eeprom->offset + eeprom->len - 1) >> 1;
-	ptr = (void *)eeprom_buff;
+	ptr = (char *)eeprom_buff;
 
 	if (eeprom->offset & 1) {
 		/* need read/modify/write of first changed EEPROM word */
@@ -399,8 +360,7 @@ ixgb_ethtool_seeprom(struct ixgb_adapter *adapter,
 		eeprom_buff[last_word - first_word]
 		    = ixgb_read_eeprom(hw, last_word);
 	}
-	if (copy_from_user(ptr, user_data, eeprom->len))
-		return -EFAULT;
+	memcpy(ptr, data, eeprom->len);
 
 	for (i = 0; i <= (last_word - first_word); i++)
 		ixgb_write_eeprom(hw, first_word + i, eeprom_buff[i]);
@@ -431,8 +391,9 @@ static void ixgb_led_blink_callback(unsigned long data)
 }
 
 static int
-ixgb_ethtool_led_blink(struct ixgb_adapter *adapter, struct ethtool_value *id)
+ixgb_ethtool_led_blink(struct net_device *netdev, u32 data)
 {
+	struct ixgb_adapter *adapter = netdev->priv;
 	if (!adapter->blink_timer.function) {
 		init_timer(&adapter->blink_timer);
 		adapter->blink_timer.function = ixgb_led_blink_callback;
@@ -442,8 +403,8 @@ ixgb_ethtool_led_blink(struct ixgb_adapter *adapter, struct ethtool_value *id)
 	mod_timer(&adapter->blink_timer, jiffies);
 
 	set_current_state(TASK_INTERRUPTIBLE);
-	if (id->data)
-		schedule_timeout(id->data * HZ);
+	if (data)
+		schedule_timeout(data * HZ);
 	else
 		schedule_timeout(MAX_SCHEDULE_TIMEOUT);
 
@@ -454,268 +415,141 @@ ixgb_ethtool_led_blink(struct ixgb_adapter *adapter, struct ethtool_value *id)
 	return 0;
 }
 
-int ixgb_ethtool_ioctl(struct net_device *netdev, struct ifreq *ifr)
+static int ixgb_nway_reset(struct net_device *netdev)
 {
-	struct ixgb_adapter *adapter = netdev->priv;
-	void __user *addr = ifr->ifr_data;
-	uint32_t cmd;
+	if (netif_running(netdev)) {
+		struct ixgb_adapter *adapter = netdev->priv;
+		ixgb_down(adapter, TRUE);
+		ixgb_up(adapter);
+	}
+	return 0;
+}
 
-	if (get_user(cmd, (uint32_t __user *) addr))
-		return -EFAULT;
+static int ixgb_get_stats_count(struct net_device *dev)
+{
+	return IXGB_STATS_LEN;
+}
 
-	switch (cmd) {
-	case ETHTOOL_GSET:{
-			struct ethtool_cmd ecmd = { ETHTOOL_GSET };
-			ixgb_ethtool_gset(adapter, &ecmd);
-			if (copy_to_user(addr, &ecmd, sizeof(ecmd)))
-				return -EFAULT;
-			return 0;
-		}
-	case ETHTOOL_SSET:{
-			struct ethtool_cmd ecmd;
-			if (copy_from_user(&ecmd, addr, sizeof(ecmd)))
-				return -EFAULT;
-			return ixgb_ethtool_sset(adapter, &ecmd);
-		}
-	case ETHTOOL_GDRVINFO:{
-			struct ethtool_drvinfo drvinfo = { ETHTOOL_GDRVINFO };
-			ixgb_ethtool_gdrvinfo(adapter, &drvinfo);
-			if (copy_to_user(addr, &drvinfo, sizeof(drvinfo)))
-				return -EFAULT;
-			return 0;
-		}
-	case ETHTOOL_GSTRINGS:{
-			struct ethtool_gstrings gstrings = { ETHTOOL_GSTRINGS };
-			char *strings = NULL;
-			int err = 0;
-
-			if (copy_from_user(&gstrings, addr, sizeof(gstrings)))
-				return -EFAULT;
-			switch (gstrings.string_set) {
-			case ETH_SS_STATS:{
-					int i;
-					gstrings.len = IXGB_STATS_LEN;
-					strings =
-					    kmalloc(IXGB_STATS_LEN *
-						    ETH_GSTRING_LEN,
-						    GFP_KERNEL);
-					if (!strings)
-						return -ENOMEM;
-					for (i = 0; i < IXGB_STATS_LEN; i++) {
-						memcpy(&strings
-						       [i * ETH_GSTRING_LEN],
-						       ixgb_gstrings_stats[i].
-						       stat_string,
-						       ETH_GSTRING_LEN);
-					}
-					break;
-				}
-			default:
-				return -EOPNOTSUPP;
-			}
-			if (copy_to_user(addr, &gstrings, sizeof(gstrings)))
-				err = -EFAULT;
-			addr += offsetof(struct ethtool_gstrings, data);
-			if (!err && copy_to_user(addr, strings,
-						 gstrings.len *
-						 ETH_GSTRING_LEN))
-				err = -EFAULT;
-
-			kfree(strings);
-			return err;
-		}
-	case ETHTOOL_GREGS:{
-			struct ethtool_regs regs = { ETHTOOL_GREGS };
-			uint32_t regs_buff[IXGB_REG_DUMP_LEN];
-
-			if (copy_from_user(&regs, addr, sizeof(regs)))
-				return -EFAULT;
-			ixgb_ethtool_gregs(adapter, &regs, regs_buff);
-			if (copy_to_user(addr, &regs, sizeof(regs)))
-				return -EFAULT;
-
-			addr += offsetof(struct ethtool_regs, data);
-			if (copy_to_user(addr, regs_buff, regs.len))
-				return -EFAULT;
-
-			return 0;
-		}
-	case ETHTOOL_NWAY_RST:{
-			if (netif_running(netdev)) {
-				ixgb_down(adapter, TRUE);
-				ixgb_up(adapter);
-			}
-			return 0;
-		}
-	case ETHTOOL_PHYS_ID:{
-			struct ethtool_value id;
-			if (copy_from_user(&id, addr, sizeof(id)))
-				return -EFAULT;
-			return ixgb_ethtool_led_blink(adapter, &id);
-		}
-	case ETHTOOL_GLINK:{
-			struct ethtool_value link = { ETHTOOL_GLINK };
-			link.data = netif_carrier_ok(netdev);
-			if (copy_to_user(addr, &link, sizeof(link)))
-				return -EFAULT;
-			return 0;
-		}
-
-	case ETHTOOL_GEEPROM:{
-			struct ethtool_eeprom eeprom = { ETHTOOL_GEEPROM };
-			uint16_t eeprom_buff[IXGB_EEPROM_SIZE];
-			void *ptr;
-			int err = 0;
-
-			if (copy_from_user(&eeprom, addr, sizeof(eeprom)))
-				return -EFAULT;
-
-			if ((err =
-			     ixgb_ethtool_geeprom(adapter, &eeprom,
-						  eeprom_buff)) < 0)
-				return err;
-
-			if (copy_to_user(addr, &eeprom, sizeof(eeprom)))
-				return -EFAULT;
-
-			addr += offsetof(struct ethtool_eeprom, data);
-			ptr = ((void *)eeprom_buff) + (eeprom.offset & 1);
-
-			if (copy_to_user(addr, ptr, eeprom.len))
-				return -EFAULT;
-			return 0;
-		}
-	case ETHTOOL_SEEPROM:{
-			struct ethtool_eeprom eeprom;
-
-			if (copy_from_user(&eeprom, addr, sizeof(eeprom)))
-				return -EFAULT;
-
-			addr += offsetof(struct ethtool_eeprom, data);
-			return ixgb_ethtool_seeprom(adapter, &eeprom, addr);
-		}
-	case ETHTOOL_GPAUSEPARAM:{
-			struct ethtool_pauseparam epause =
-			    { ETHTOOL_GPAUSEPARAM };
-			ixgb_ethtool_gpause(adapter, &epause);
-			if (copy_to_user(addr, &epause, sizeof(epause)))
-				return -EFAULT;
-			return 0;
-		}
-	case ETHTOOL_SPAUSEPARAM:{
-			struct ethtool_pauseparam epause;
-			if (copy_from_user(&epause, addr, sizeof(epause)))
-				return -EFAULT;
-			return ixgb_ethtool_spause(adapter, &epause);
-		}
-	case ETHTOOL_GSTATS:{
-			struct {
-				struct ethtool_stats eth_stats;
-				uint64_t data[IXGB_STATS_LEN];
-			} stats = { {
-			ETHTOOL_GSTATS, IXGB_STATS_LEN}};
-			int i;
-
-			for (i = 0; i < IXGB_STATS_LEN; i++)
-				stats.data[i] =
-				    (ixgb_gstrings_stats[i].sizeof_stat ==
-				     sizeof(uint64_t)) ? *(uint64_t *) ((char *)
-									adapter
-									+
-									ixgb_gstrings_stats
-									[i].
-									stat_offset)
-				    : *(uint32_t *) ((char *)adapter +
-						     ixgb_gstrings_stats[i].
-						     stat_offset);
-			if (copy_to_user(addr, &stats, sizeof(stats)))
-				return -EFAULT;
-			return 0;
-		}
-	case ETHTOOL_GRXCSUM:{
-			struct ethtool_value edata = { ETHTOOL_GRXCSUM };
-
-			edata.data = adapter->rx_csum;
-			if (copy_to_user(addr, &edata, sizeof(edata)))
-				return -EFAULT;
-			return 0;
-		}
-	case ETHTOOL_SRXCSUM:{
-			struct ethtool_value edata;
-
-			if (copy_from_user(&edata, addr, sizeof(edata)))
-				return -EFAULT;
-			adapter->rx_csum = edata.data;
-			ixgb_down(adapter, TRUE);
-			ixgb_up(adapter);
-			return 0;
-		}
-	case ETHTOOL_GTXCSUM:{
-			struct ethtool_value edata = { ETHTOOL_GTXCSUM };
-
-			edata.data = (netdev->features & NETIF_F_HW_CSUM) != 0;
-			if (copy_to_user(addr, &edata, sizeof(edata)))
-				return -EFAULT;
-			return 0;
-		}
-	case ETHTOOL_STXCSUM:{
-			struct ethtool_value edata;
-
-			if (copy_from_user(&edata, addr, sizeof(edata)))
-				return -EFAULT;
-
-			if (edata.data)
-				netdev->features |= NETIF_F_HW_CSUM;
-			else
-				netdev->features &= ~NETIF_F_HW_CSUM;
-
-			return 0;
-		}
-	case ETHTOOL_GSG:{
-			struct ethtool_value edata = { ETHTOOL_GSG };
-
-			edata.data = (netdev->features & NETIF_F_SG) != 0;
-			if (copy_to_user(addr, &edata, sizeof(edata)))
-				return -EFAULT;
-			return 0;
-		}
-	case ETHTOOL_SSG:{
-			struct ethtool_value edata;
-
-			if (copy_from_user(&edata, addr, sizeof(edata)))
-				return -EFAULT;
-
-			if (edata.data)
-				netdev->features |= NETIF_F_SG;
-			else
-				netdev->features &= ~NETIF_F_SG;
-
-			return 0;
-		}
-#ifdef NETIF_F_TSO
-	case ETHTOOL_GTSO:{
-			struct ethtool_value edata = { ETHTOOL_GTSO };
-
-			edata.data = (netdev->features & NETIF_F_TSO) != 0;
-			if (copy_to_user(addr, &edata, sizeof(edata)))
-				return -EFAULT;
-			return 0;
-		}
-	case ETHTOOL_STSO:{
-			struct ethtool_value edata;
-
-			if (copy_from_user(&edata, addr, sizeof(edata)))
-				return -EFAULT;
-
-			if (edata.data)
-				netdev->features |= NETIF_F_TSO;
-			else
-				netdev->features &= ~NETIF_F_TSO;
-
-			return 0;
-		}
-#endif
-	default:
-		return -EOPNOTSUPP;
+static void ixgb_get_strings(struct net_device *dev, u32 stringset, u8 *data)
+{
+	int i;
+	for (i = 0; i < IXGB_STATS_LEN; i++) {
+		memcpy(data + i * ETH_GSTRING_LEN,
+		       ixgb_gstrings_stats[i].stat_string,
+		       ETH_GSTRING_LEN);
 	}
 }
+
+static int ixgb_get_regs_len(struct net_device *dev)
+{
+	return 136*sizeof(uint32_t);
+}
+
+static int ixgb_get_eeprom_len(struct net_device *dev)
+{
+	/* return size in bytes */
+	return (IXGB_EEPROM_SIZE << 1);
+}
+
+static void get_ethtool_stats(struct net_device *dev,
+		struct ethtool_stats *stats, u64 *data)
+{
+	struct ixgb_adapter *adapter = dev->priv;
+	int i;
+
+	for (i = 0; i < IXGB_STATS_LEN; i++) {
+		void *p = (char *)adapter + ixgb_gstrings_stats[i].stat_offset;
+		stats->data[i] =
+		    (ixgb_gstrings_stats[i].sizeof_stat == sizeof(uint64_t))
+		    ? *(uint64_t *) p
+		    : *(uint32_t *) p;
+	}
+}
+
+static u32 ixgb_get_rx_csum(struct net_device *dev)
+{
+	struct ixgb_adapter *adapter = dev->priv;
+	return adapter->rx_csum;
+}
+
+static int ixgb_set_rx_csum(struct net_device *dev, u32 sum)
+{
+	struct ixgb_adapter *adapter = dev->priv;
+	adapter->rx_csum = sum;
+	ixgb_down(adapter, TRUE);
+	ixgb_up(adapter);
+	return 0;
+}
+
+static u32 ixgb_get_tx_csum(struct net_device *dev)
+{
+	return (dev->features & NETIF_F_HW_CSUM) != 0;
+}
+
+static int ixgb_set_tx_csum(struct net_device *dev, u32 sum)
+{
+	if (sum)
+		dev->features |= NETIF_F_HW_CSUM;
+	else
+		dev->features &= ~NETIF_F_HW_CSUM;
+	return 0;
+}
+
+static u32 ixgb_get_sg(struct net_device *dev)
+{
+	return (dev->features & NETIF_F_SG) != 0;
+}
+
+static int ixgb_set_sg(struct net_device *dev, u32 sum)
+{
+	if (sum)
+		dev->features |= NETIF_F_SG;
+	else
+		dev->features &= ~NETIF_F_SG;
+	return 0;
+}
+
+#ifdef NETIF_F_TSO
+static u32 ixgb_get_tso(struct net_device *dev)
+{
+	return (dev->features & NETIF_F_TSO) != 0;
+}
+
+static int ixgb_set_tso(struct net_device *dev, u32 sum)
+{
+	if (sum)
+		dev->features |= NETIF_F_TSO;
+	else
+		dev->features &= ~NETIF_F_TSO;
+	return 0;
+}
+#endif
+
+struct ethtool_ops ixgb_ethtool_ops = {
+	.get_settings = ixgb_ethtool_gset,
+	.set_settings = ixgb_ethtool_sset,
+	.get_drvinfo = ixgb_ethtool_gdrvinfo,
+	.nway_reset = ixgb_nway_reset,
+	.get_link = ethtool_op_get_link,
+	.phys_id = ixgb_ethtool_led_blink,
+	.get_strings = ixgb_get_strings,
+	.get_stats_count = ixgb_get_stats_count,
+	.get_regs = ixgb_ethtool_gregs,
+	.get_regs_len = ixgb_get_regs_len,
+	.get_eeprom_len = ixgb_get_eeprom_len,
+	.get_eeprom = ixgb_ethtool_geeprom,
+	.set_eeprom = ixgb_ethtool_seeprom,
+	.get_pauseparam = ixgb_ethtool_gpause,
+	.set_pauseparam = ixgb_ethtool_spause,
+	.get_ethtool_stats = get_ethtool_stats,
+	.get_rx_csum = ixgb_get_rx_csum,
+	.set_rx_csum = ixgb_set_rx_csum,
+	.get_tx_csum = ixgb_get_tx_csum,
+	.set_tx_csum = ixgb_set_tx_csum,
+	.get_sg = ixgb_get_sg,
+	.set_sg = ixgb_set_sg,
+#ifdef NETIF_F_TSO
+	.get_tso = ixgb_get_tso,
+	.set_tso = ixgb_set_tso,
+#endif
+};

@@ -65,7 +65,7 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/dma.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <asm/types.h>
 #include <linux/termios.h>
 #include <linux/workqueue.h>
@@ -514,6 +514,40 @@ static dev_link_t *dev_list = NULL;
 static void* mgslpc_get_text_ptr(void)
 {
 	return mgslpc_get_text_ptr;
+}
+
+/**
+ * line discipline callback wrappers
+ *
+ * The wrappers maintain line discipline references
+ * while calling into the line discipline.
+ *
+ * ldisc_flush_buffer - flush line discipline receive buffers
+ * ldisc_receive_buf  - pass receive data to line discipline
+ */
+
+static void ldisc_flush_buffer(struct tty_struct *tty)
+{
+	struct tty_ldisc *ld = tty_ldisc_ref(tty);
+	if (ld) {
+		if (ld->flush_buffer)
+			ld->flush_buffer(tty);
+		tty_ldisc_deref(ld);
+	}
+}
+
+static void ldisc_receive_buf(struct tty_struct *tty,
+			      const __u8 *data, char *flags, int count)
+{
+	struct tty_ldisc *ld;
+	if (!tty)
+		return;
+	ld = tty_ldisc_ref(tty);
+	if (ld) {
+		if (ld->receive_buf)
+			ld->receive_buf(tty, data, flags, count);
+		tty_ldisc_deref(ld);
+	}
 }
 
 static dev_link_t *mgslpc_attach(void)
@@ -969,13 +1003,7 @@ void bh_transmit(MGSLPC_INFO *info)
 		printk("bh_transmit() entry on %s\n", info->device_name);
 
 	if (tty) {
-		if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-		    tty->ldisc.write_wakeup) {
-			if ( debug_level >= DEBUG_LEVEL_BH )
-				printk( "%s(%d):calling ldisc.write_wakeup on %s\n",
-					__FILE__,__LINE__,info->device_name);
-			(tty->ldisc.write_wakeup)(tty);
-		}
+		tty_wakeup(tty);
 		wake_up_interruptible(&tty->write_wait);
 	}
 }
@@ -1860,11 +1888,9 @@ static void mgslpc_flush_buffer(struct tty_struct *tty)
 	info->tx_count = info->tx_put = info->tx_get = 0;
 	del_timer(&info->tx_timer);	
 	spin_unlock_irqrestore(&info->lock,flags);
-	
+
 	wake_up_interruptible(&tty->write_wait);
-	if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-	    tty->ldisc.write_wakeup)
-		(tty->ldisc.write_wakeup)(tty);
+	tty_wakeup(tty);
 }
 
 /* Send a high-priority XON/XOFF character
@@ -2573,9 +2599,8 @@ static void mgslpc_close(struct tty_struct *tty, struct file * filp)
 
 	if (tty->driver->flush_buffer)
 		tty->driver->flush_buffer(tty);
-		
-	if (tty->ldisc.flush_buffer)
-		tty->ldisc.flush_buffer(tty);
+
+	ldisc_flush_buffer(tty);
 		
 	shutdown(info);
 	
@@ -2584,8 +2609,7 @@ static void mgslpc_close(struct tty_struct *tty, struct file * filp)
 	
 	if (info->blocked_open) {
 		if (info->close_delay) {
-			set_current_state(TASK_INTERRUPTIBLE);
-			schedule_timeout(info->close_delay);
+			msleep_interruptible(jiffies_to_msecs(info->close_delay));
 		}
 		wake_up_interruptible(&info->open_wait);
 	}
@@ -2640,8 +2664,7 @@ static void mgslpc_wait_until_sent(struct tty_struct *tty, int timeout)
 		
 	if (info->params.mode == MGSL_MODE_HDLC) {
 		while (info->tx_active) {
-			set_current_state(TASK_INTERRUPTIBLE);
-			schedule_timeout(char_time);
+			msleep_interruptible(jiffies_to_msecs(char_time));
 			if (signal_pending(current))
 				break;
 			if (timeout && time_after(jiffies, orig_jiffies + timeout))
@@ -2650,8 +2673,7 @@ static void mgslpc_wait_until_sent(struct tty_struct *tty, int timeout)
 	} else {
 		while ((info->tx_count || info->tx_active) &&
 			info->tx_enabled) {
-			set_current_state(TASK_INTERRUPTIBLE);
-			schedule_timeout(char_time);
+			msleep_interruptible(jiffies_to_msecs(char_time));
 			if (signal_pending(current))
 				break;
 			if (timeout && time_after(jiffies, orig_jiffies + timeout))
@@ -4040,11 +4062,7 @@ int rx_get_frame(MGSLPC_INFO *info)
 				hdlcdev_rx(info, buf->data, framesize);
 			else
 #endif
-			{
-				/* Call the line discipline receive callback directly. */
-				if (tty && tty->ldisc.receive_buf)
-					tty->ldisc.receive_buf(tty, buf->data, info->flag_buf, framesize);
-			}
+				ldisc_receive_buf(tty, buf->data, info->flag_buf, framesize);
 		}
 	}
 
@@ -4108,8 +4126,7 @@ BOOLEAN irq_test(MGSLPC_INFO *info)
 
 	end_time=100;
 	while(end_time-- && !info->irq_occurred) {
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(msecs_to_jiffies(10));
+		msleep_interruptible(10);
 	}
 	
 	info->testing_irq = FALSE;

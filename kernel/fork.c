@@ -24,6 +24,7 @@
 #include <linux/mempolicy.h>
 #include <linux/sem.h>
 #include <linux/file.h>
+#include <linux/key.h>
 #include <linux/binfmts.h>
 #include <linux/mman.h>
 #include <linux/fs.h>
@@ -86,7 +87,7 @@ EXPORT_SYMBOL(free_task);
 
 void __put_task_struct(struct task_struct *tsk)
 {
-	WARN_ON(!(tsk->state & (TASK_DEAD | TASK_ZOMBIE)));
+	WARN_ON(!(tsk->exit_state & (EXIT_DEAD | EXIT_ZOMBIE)));
 	WARN_ON(atomic_read(&tsk->usage));
 	WARN_ON(tsk == current);
 
@@ -99,131 +100,6 @@ void __put_task_struct(struct task_struct *tsk)
 	if (!profile_handoff_task(tsk))
 		free_task(tsk);
 }
-
-void fastcall add_wait_queue(wait_queue_head_t *q, wait_queue_t * wait)
-{
-	unsigned long flags;
-
-	wait->flags &= ~WQ_FLAG_EXCLUSIVE;
-	spin_lock_irqsave(&q->lock, flags);
-	__add_wait_queue(q, wait);
-	spin_unlock_irqrestore(&q->lock, flags);
-}
-
-EXPORT_SYMBOL(add_wait_queue);
-
-void fastcall add_wait_queue_exclusive(wait_queue_head_t *q, wait_queue_t * wait)
-{
-	unsigned long flags;
-
-	wait->flags |= WQ_FLAG_EXCLUSIVE;
-	spin_lock_irqsave(&q->lock, flags);
-	__add_wait_queue_tail(q, wait);
-	spin_unlock_irqrestore(&q->lock, flags);
-}
-
-EXPORT_SYMBOL(add_wait_queue_exclusive);
-
-void fastcall remove_wait_queue(wait_queue_head_t *q, wait_queue_t * wait)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&q->lock, flags);
-	__remove_wait_queue(q, wait);
-	spin_unlock_irqrestore(&q->lock, flags);
-}
-
-EXPORT_SYMBOL(remove_wait_queue);
-
-
-/*
- * Note: we use "set_current_state()" _after_ the wait-queue add,
- * because we need a memory barrier there on SMP, so that any
- * wake-function that tests for the wait-queue being active
- * will be guaranteed to see waitqueue addition _or_ subsequent
- * tests in this thread will see the wakeup having taken place.
- *
- * The spin_unlock() itself is semi-permeable and only protects
- * one way (it only protects stuff inside the critical region and
- * stops them from bleeding out - it would still allow subsequent
- * loads to move into the the critical region).
- */
-void fastcall prepare_to_wait(wait_queue_head_t *q, wait_queue_t *wait, int state)
-{
-	unsigned long flags;
-
-	wait->flags &= ~WQ_FLAG_EXCLUSIVE;
-	spin_lock_irqsave(&q->lock, flags);
-	if (list_empty(&wait->task_list))
-		__add_wait_queue(q, wait);
-	/*
-	 * don't alter the task state if this is just going to
-	 * queue an async wait queue callback
-	 */
-	if (is_sync_wait(wait))
-		set_current_state(state);
-	spin_unlock_irqrestore(&q->lock, flags);
-}
-
-EXPORT_SYMBOL(prepare_to_wait);
-
-void fastcall
-prepare_to_wait_exclusive(wait_queue_head_t *q, wait_queue_t *wait, int state)
-{
-	unsigned long flags;
-
-	wait->flags |= WQ_FLAG_EXCLUSIVE;
-	spin_lock_irqsave(&q->lock, flags);
-	if (list_empty(&wait->task_list))
-		__add_wait_queue_tail(q, wait);
-	/*
-	 * don't alter the task state if this is just going to
- 	 * queue an async wait queue callback
-	 */
-	if (is_sync_wait(wait))
-		set_current_state(state);
-	spin_unlock_irqrestore(&q->lock, flags);
-}
-
-EXPORT_SYMBOL(prepare_to_wait_exclusive);
-
-void fastcall finish_wait(wait_queue_head_t *q, wait_queue_t *wait)
-{
-	unsigned long flags;
-
-	__set_current_state(TASK_RUNNING);
-	/*
-	 * We can check for list emptiness outside the lock
-	 * IFF:
-	 *  - we use the "careful" check that verifies both
-	 *    the next and prev pointers, so that there cannot
-	 *    be any half-pending updates in progress on other
-	 *    CPU's that we haven't seen yet (and that might
-	 *    still change the stack area.
-	 * and
-	 *  - all other users take the lock (ie we can only
-	 *    have _one_ other CPU that looks at or modifies
-	 *    the list).
-	 */
-	if (!list_empty_careful(&wait->task_list)) {
-		spin_lock_irqsave(&q->lock, flags);
-		list_del_init(&wait->task_list);
-		spin_unlock_irqrestore(&q->lock, flags);
-	}
-}
-
-EXPORT_SYMBOL(finish_wait);
-
-int autoremove_wake_function(wait_queue_t *wait, unsigned mode, int sync, void *key)
-{
-	int ret = default_wake_function(wait, mode, sync, key);
-
-	if (ret)
-		list_del_init(&wait->task_list);
-	return ret;
-}
-
-EXPORT_SYMBOL(autoremove_wake_function);
 
 void __init fork_init(unsigned long mempages)
 {
@@ -249,8 +125,8 @@ void __init fork_init(unsigned long mempages)
 	if(max_threads < 20)
 		max_threads = 20;
 
-	init_task.rlim[RLIMIT_NPROC].rlim_cur = max_threads/2;
-	init_task.rlim[RLIMIT_NPROC].rlim_max = max_threads/2;
+	init_task.signal->rlim[RLIMIT_NPROC].rlim_cur = max_threads/2;
+	init_task.signal->rlim[RLIMIT_NPROC].rlim_max = max_threads/2;
 }
 
 static struct task_struct *dup_task_struct(struct task_struct *orig)
@@ -302,17 +178,6 @@ static inline int dup_mmap(struct mm_struct * mm, struct mm_struct * oldmm)
 	rb_link = &mm->mm_rb.rb_node;
 	rb_parent = NULL;
 	pprev = &mm->mmap;
-
-	/*
-	 * Add it to the mmlist after the parent.
-	 * Doing it this way means that we can order the list,
-	 * and fork() won't mess up the ordering significantly.
-	 * Add it first so that swapoff can see any swap entries.
-	 */
-	spin_lock(&mmlist_lock);
-	list_add(&mm->mmlist, &current->mm->mmlist);
-	mmlist_nr++;
-	spin_unlock(&mmlist_lock);
 
 	for (mpnt = current->mm->mmap ; mpnt ; mpnt = mpnt->vm_next) {
 		struct file *file;
@@ -413,7 +278,6 @@ static inline void mm_free_pgd(struct mm_struct * mm)
 #endif /* CONFIG_MMU */
 
 spinlock_t mmlist_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
-int mmlist_nr;
 
 #define allocate_mm()	(kmem_cache_alloc(mm_cachep, SLAB_KERNEL))
 #define free_mm(mm)	(kmem_cache_free(mm_cachep, (mm)))
@@ -425,7 +289,9 @@ static struct mm_struct * mm_init(struct mm_struct * mm)
 	atomic_set(&mm->mm_users, 1);
 	atomic_set(&mm->mm_count, 1);
 	init_rwsem(&mm->mmap_sem);
+	INIT_LIST_HEAD(&mm->mmlist);
 	mm->core_waiters = 0;
+	mm->nr_ptes = 0;
 	mm->page_table_lock = SPIN_LOCK_UNLOCKED;
 	mm->ioctx_list_lock = RW_LOCK_UNLOCKED;
 	mm->ioctx_list = NULL;
@@ -473,12 +339,14 @@ void fastcall __mmdrop(struct mm_struct *mm)
  */
 void mmput(struct mm_struct *mm)
 {
-	if (atomic_dec_and_lock(&mm->mm_users, &mmlist_lock)) {
-		list_del(&mm->mmlist);
-		mmlist_nr--;
-		spin_unlock(&mmlist_lock);
+	if (atomic_dec_and_test(&mm->mm_users)) {
 		exit_aio(mm);
 		exit_mmap(mm);
+		if (!list_empty(&mm->mmlist)) {
+			spin_lock(&mmlist_lock);
+			list_del(&mm->mmlist);
+			spin_unlock(&mmlist_lock);
+		}
 		put_swap_token(mm);
 		mmdrop(mm);
 	}
@@ -488,15 +356,11 @@ EXPORT_SYMBOL_GPL(mmput);
 /**
  * get_task_mm - acquire a reference to the task's mm
  *
- * Returns %NULL if the task has no mm.  Checks if the use count
- * of the mm is non-zero and if so returns a reference to it, after
+ * Returns %NULL if the task has no mm.  Checks PF_BORROWED_MM (meaning
+ * this kernel workthread has transiently adopted a user mm with use_mm,
+ * to do its AIO) is not set and if so returns a reference to it, after
  * bumping up the use count.  User must release the mm via mmput()
  * after use.  Typically used by /proc and ptrace.
- *
- * If the use count is zero, it means that this mm is going away,
- * so return %NULL.  This only happens in the case of an AIO daemon
- * which has temporarily adopted an mm (see use_mm), in the course
- * of its final mmput, before exit_aio has completed.
  */
 struct mm_struct *get_task_mm(struct task_struct *task)
 {
@@ -505,12 +369,10 @@ struct mm_struct *get_task_mm(struct task_struct *task)
 	task_lock(task);
 	mm = task->mm;
 	if (mm) {
-		spin_lock(&mmlist_lock);
-		if (!atomic_read(&mm->mm_users))
+		if (task->flags & PF_BORROWED_MM)
 			mm = NULL;
 		else
 			atomic_inc(&mm->mm_users);
-		spin_unlock(&mmlist_lock);
 	}
 	task_unlock(task);
 	return mm;
@@ -762,8 +624,17 @@ static int copy_files(unsigned long clone_flags, struct task_struct * tsk)
 
 	for (i = open_files; i != 0; i--) {
 		struct file *f = *old_fds++;
-		if (f)
+		if (f) {
 			get_file(f);
+		} else {
+			/*
+			 * The fd may be claimed in the fd bitmap but not yet
+			 * instantiated in the files array if a sibling thread
+			 * is partway through open().  So make sure that this
+			 * fd is available to the new process.
+			 */
+			FD_CLR(open_files - i, newf->open_fds);
+		}
 		*new_fds++ = f;
 	}
 	spin_unlock(&oldf->file_lock);
@@ -872,6 +743,10 @@ static inline int copy_signal(unsigned long clone_flags, struct task_struct * ts
 	sig->nvcsw = sig->nivcsw = sig->cnvcsw = sig->cnivcsw = 0;
 	sig->min_flt = sig->maj_flt = sig->cmin_flt = sig->cmaj_flt = 0;
 
+	task_lock(current->group_leader);
+	memcpy(sig->rlim, current->signal->rlim, sizeof sig->rlim);
+	task_unlock(current->group_leader);
+
 	return 0;
 }
 
@@ -941,7 +816,7 @@ static task_t *copy_process(unsigned long clone_flags,
 
 	retval = -EAGAIN;
 	if (atomic_read(&p->user->processes) >=
-			p->rlim[RLIMIT_NPROC].rlim_cur) {
+			p->signal->rlim[RLIMIT_NPROC].rlim_cur) {
 		if (!capable(CAP_SYS_ADMIN) && !capable(CAP_SYS_RESOURCE) &&
 				p->user != &root_user)
 			goto bad_fork_free;
@@ -992,7 +867,7 @@ static task_t *copy_process(unsigned long clone_flags,
 
 	p->utime = p->stime = 0;
 	p->lock_depth = -1;		/* -1 = no lock */
-	p->start_time = get_jiffies_64();
+	do_posix_clock_monotonic_gettime(&p->start_time);
 	p->security = NULL;
 	p->io_context = NULL;
 	p->io_wait = NULL;
@@ -1005,6 +880,10 @@ static task_t *copy_process(unsigned long clone_flags,
  		goto bad_fork_cleanup;
  	}
 #endif
+
+	p->tgid = p->pid;
+	if (clone_flags & CLONE_THREAD)
+		p->tgid = current->tgid;
 
 	if ((retval = security_task_alloc(p)))
 		goto bad_fork_cleanup_policy;
@@ -1023,8 +902,10 @@ static task_t *copy_process(unsigned long clone_flags,
 		goto bad_fork_cleanup_sighand;
 	if ((retval = copy_mm(clone_flags, p)))
 		goto bad_fork_cleanup_signal;
-	if ((retval = copy_namespace(clone_flags, p)))
+	if ((retval = copy_keys(clone_flags, p)))
 		goto bad_fork_cleanup_mm;
+	if ((retval = copy_namespace(clone_flags, p)))
+		goto bad_fork_cleanup_keys;
 	retval = copy_thread(0, clone_flags, stack_start, stack_size, p, regs);
 	if (retval)
 		goto bad_fork_cleanup_namespace;
@@ -1049,6 +930,7 @@ static task_t *copy_process(unsigned long clone_flags,
 	/* ok, now we should be set up.. */
 	p->exit_signal = (clone_flags & CLONE_THREAD) ? -1 : (clone_flags & CSIGNAL);
 	p->pdeath_signal = 0;
+	p->exit_state = 0;
 
 	/* Perform scheduler related setup */
 	sched_fork(p);
@@ -1057,7 +939,6 @@ static task_t *copy_process(unsigned long clone_flags,
 	 * Ok, make it visible to the rest of the system.
 	 * We dont wake it up yet.
 	 */
-	p->tgid = p->pid;
 	p->group_leader = p;
 	INIT_LIST_HEAD(&p->ptrace_children);
 	INIT_LIST_HEAD(&p->ptrace_list);
@@ -1105,7 +986,6 @@ static task_t *copy_process(unsigned long clone_flags,
 			retval = -EAGAIN;
 			goto bad_fork_cleanup_namespace;
 		}
-		p->tgid = current->tgid;
 		p->group_leader = current->group_leader;
 
 		if (current->signal->group_stop_count > 0) {
@@ -1145,8 +1025,11 @@ fork_out:
 
 bad_fork_cleanup_namespace:
 	exit_namespace(p);
+bad_fork_cleanup_keys:
+	exit_keys(p);
 bad_fork_cleanup_mm:
-	mmput(p->mm);
+	if (p->mm)
+		mmput(p->mm);
 bad_fork_cleanup_signal:
 	exit_signal(p);
 bad_fork_cleanup_sighand:

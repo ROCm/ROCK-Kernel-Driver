@@ -8,8 +8,6 @@
  *
  */
 
-#define DEBUG
-
 #include <linux/suspend.h>
 #include <linux/kobject.h>
 #include <linux/string.h>
@@ -35,8 +33,6 @@ void pm_set_ops(struct pm_ops * ops)
 {
 	down(&pm_sem);
 	pm_ops = ops;
-	if (ops->pm_disk_mode && ops->pm_disk_mode < PM_DISK_MAX)
-		pm_disk_mode = ops->pm_disk_mode;
 	up(&pm_sem);
 }
 
@@ -169,6 +165,15 @@ static int enter_state(u32 state)
 	return error;
 }
 
+/*
+ * This is main interface to the outside world. It needs to be
+ * called from process context.
+ */
+int software_suspend(void)
+{
+	return enter_state(PM_SUSPEND_DISK);
+}
+
 
 /**
  *	pm_suspend - Externally visible function for suspending system.
@@ -225,8 +230,8 @@ static ssize_t state_store(struct subsystem * subsys, const char * buf, size_t n
 	p = memchr(buf, '\n', n);
 	len = p ? p - buf : n;
 
-	for (s = &pm_states[state]; *s; s++, state++) {
-		if (!strncmp(buf, *s, len))
+	for (s = &pm_states[state]; state < PM_SUSPEND_MAX; s++, state++) {
+		if (*s && !strncmp(buf, *s, len))
 			break;
 	}
 	if (*s)

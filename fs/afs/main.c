@@ -100,7 +100,7 @@ static int afs_init(void)
 		goto error;
 #endif
 
-#ifdef CONFIG_KEYS
+#ifdef CONFIG_KEYS_TURNED_OFF
 	ret = afs_key_register();
 	if (ret < 0)
 		goto error_cache;
@@ -142,7 +142,7 @@ static int afs_init(void)
  error_kafstimod:
 	afs_kafstimod_stop();
  error_keys:
-#ifdef CONFIG_KEYS
+#ifdef CONFIG_KEYS_TURNED_OFF
 	afs_key_unregister();
  error_cache:
 #endif
@@ -169,7 +169,7 @@ static void __exit afs_exit(void)
 	afs_kafstimod_stop();
 	afs_kafsasyncd_stop();
 	afs_cell_purge();
-#ifdef CONFIG_KEYS
+#ifdef CONFIG_KEYS_TURNED_OFF
 	afs_key_unregister();
 #endif
 #ifdef AFS_CACHING_SUPPORT

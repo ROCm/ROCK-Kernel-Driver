@@ -550,9 +550,7 @@ static void pc_close(struct tty_struct * tty, struct file * filp)
 		if (tty->driver->flush_buffer)
 			tty->driver->flush_buffer(tty);
 
-		if (tty->ldisc.flush_buffer)
-			tty->ldisc.flush_buffer(tty);
-
+		tty_ldisc_flush(tty);
 		shutdown(ch);
 		tty->closing = 0;
 		ch->event = 0;
@@ -563,8 +561,7 @@ static void pc_close(struct tty_struct * tty, struct file * filp)
 
 			if (ch->close_delay) 
 			{
-				current->state = TASK_INTERRUPTIBLE;
-				schedule_timeout(ch->close_delay);
+				msleep_interruptible(jiffies_to_msecs(ch->close_delay));
 			}
 
 			wake_up_interruptible(&ch->open_wait);
@@ -656,10 +653,7 @@ static void pc_hangup(struct tty_struct *tty)
 		cli();
 		if (tty->driver->flush_buffer)
 			tty->driver->flush_buffer(tty);
-
-		if (tty->ldisc.flush_buffer)
-			tty->ldisc.flush_buffer(tty);
-
+		tty_ldisc_flush(tty);
 		shutdown(ch);
 
 		ch->tty   = NULL;
@@ -1119,8 +1113,7 @@ static void pc_flush_buffer(struct tty_struct *tty)
 	restore_flags(flags);
 
 	wake_up_interruptible(&tty->write_wait);
-	if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) && tty->ldisc.write_wakeup)
-		(tty->ldisc.write_wakeup)(tty);
+	tty_wakeup(tty);
 
 } /* End pc_flush_buffer */
 
@@ -2261,9 +2254,7 @@ static void doevent(int crd)
 				{ /* Begin if LOWWAIT */
 
 					ch->statusflags &= ~LOWWAIT;
-					if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-						  tty->ldisc.write_wakeup)
-						(tty->ldisc.write_wakeup)(tty);
+					tty_wakeup(tty);
 					wake_up_interruptible(&tty->write_wait);
 
 				} /* End if LOWWAIT */
@@ -2280,9 +2271,7 @@ static void doevent(int crd)
 				{ /* Begin if EMPTYWAIT */
 
 					ch->statusflags &= ~EMPTYWAIT;
-					if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-						  tty->ldisc.write_wakeup)
-						(tty->ldisc.write_wakeup)(tty);
+					tty_wakeup(tty);
 
 					wake_up_interruptible(&tty->write_wait);
 
@@ -3135,6 +3124,7 @@ static int pc_ioctl(struct tty_struct *tty, struct file * file,
 			}
 			else 
 			{
+				/* ldisc lock already held in ioctl */
 				if (tty->ldisc.flush_buffer)
 					tty->ldisc.flush_buffer(tty);
 			}
@@ -3942,23 +3932,12 @@ MODULE_DEVICE_TABLE(pci, epca_pci_tbl);
 
 int __init init_PCI (void)
 { /* Begin init_PCI */
-	
-	int pci_count;
-	
 	memset (&epca_driver, 0, sizeof (epca_driver));
 	epca_driver.name = "epca";
 	epca_driver.id_table = epca_pci_tbl;
 	epca_driver.probe = epca_init_one;
 
-	pci_count = pci_register_driver (&epca_driver);
-	
-	if (pci_count <= 0) {
-		pci_unregister_driver (&epca_driver);
-		pci_count = 0;
-	}
-
-	return(pci_count);
-
+	return pci_register_driver(&epca_driver);
 } /* End init_PCI */
 
 #endif /* ENABLE_PCI */

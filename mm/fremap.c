@@ -14,6 +14,7 @@
 #include <linux/swapops.h>
 #include <linux/rmap.h>
 #include <linux/module.h>
+#include <linux/syscalls.h>
 
 #include <asm/mmu_context.h>
 #include <asm/cacheflush.h>

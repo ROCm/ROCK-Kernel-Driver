@@ -133,7 +133,7 @@ static int rx_copybreak;
 #include <linux/ethtool.h>
 #include <linux/mii.h>
 #include <linux/crc32.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
 

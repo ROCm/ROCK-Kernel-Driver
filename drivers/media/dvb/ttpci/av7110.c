@@ -41,6 +41,7 @@
 #include <linux/smp_lock.h>
 
 #include <linux/kernel.h>
+#include <linux/moduleparam.h>
 #include <linux/sched.h>
 #include <linux/types.h>
 #include <linux/fcntl.h>
@@ -50,18 +51,14 @@
 #include <linux/vmalloc.h>
 #include <linux/firmware.h>
 #include <linux/crc32.h>
+#include <linux/i2c.h>
 
 #include <asm/system.h>
 #include <asm/semaphore.h>
 
 #include <linux/dvb/frontend.h>
 
-#include "dvb_i2c.h"
 #include "dvb_frontend.h"
-#include "dvb_functions.h"
-
-
-	#define DEBUG_VARIABLE av7110_debug
 
 #include "ttpci-eeprom.h"
 #include "av7110.h"
@@ -70,26 +67,93 @@
 #include "av7110_ca.h"
 #include "av7110_ipack.h"
 
-
-static void restart_feeds(struct av7110 *av7110);
-
-int av7110_debug = 0;
-
+static int av7110_debug;
 static int vidmode=CVBS_RGB_OUT;
 static int pids_off;
 static int adac=DVB_ADAC_TI;
-static int hw_sections = 0;
-static int rgb_on = 0;
+static int hw_sections;
+static int rgb_on;
+static int volume = 255;
+
+module_param_named(debug, av7110_debug, int, 0644);
+MODULE_PARM_DESC(av7110_debug, "Turn on/off debugging (default:off).");
+module_param(vidmode, int, 0444);
+MODULE_PARM_DESC(vidmode,"analog video out: 0 off, 1 CVBS+RGB (default), 2 CVBS+YC, 3 YC");
+module_param(pids_off, int, 0444);
+MODULE_PARM_DESC(pids_off,"clear video/audio/PCR PID filters when demux is closed");
+module_param(adac, int, 0444);
+MODULE_PARM_DESC(adac,"audio DAC type: 0 TI, 1 CRYSTAL, 2 MSP (use if autodetection fails)");
+module_param(hw_sections, int, 0444);
+MODULE_PARM_DESC(hw_sections, "0 use software section filter, 1 use hardware");
+module_param(rgb_on, int, 0444);
+MODULE_PARM_DESC(rgb_on, "For Siemens DVB-C cards only: Enable RGB control"
+		" signal on SCART pin 16 to switch SCART video mode from CVBS to RGB");
+module_param(volume, int, 0444);
+MODULE_PARM_DESC(volume, "initial volume: default 255 (range 0-255)");
+
+static void restart_feeds(struct av7110 *av7110);
 
 int av7110_num = 0;
 
+static void init_av7110_av(struct av7110 *av7110)
+{
+	struct saa7146_dev *dev=av7110->dev;
+
+	/* set internal volume control to maximum */
+	av7110->adac_type = DVB_ADAC_TI;
+	av7110_set_volume(av7110, av7110->mixer.volume_left, av7110->mixer.volume_right);
+
+	av7710_set_video_mode(av7110, vidmode);
+
+	/* handle different card types */
+	/* remaining inits according to card and frontend type */
+	av7110->has_analog_tuner = 0;
+	av7110->current_input = 0;
+	if (i2c_writereg(av7110, 0x20, 0x00, 0x00) == 1) {
+		printk ("av7110(%d): Crystal audio DAC detected\n",
+			av7110->dvb_adapter->num);
+		av7110->adac_type = DVB_ADAC_CRYSTAL;
+		i2c_writereg(av7110, 0x20, 0x01, 0xd2);
+		i2c_writereg(av7110, 0x20, 0x02, 0x49);
+		i2c_writereg(av7110, 0x20, 0x03, 0x00);
+		i2c_writereg(av7110, 0x20, 0x04, 0x00);
+
+	/**
+	 * some special handling for the Siemens DVB-C cards...
+	 */
+	} else if (0 == av7110_init_analog_module(av7110)) {
+		/* done. */
+	}
+	else if (dev->pci->subsystem_vendor == 0x110a) {
+		printk("av7110(%d): DVB-C w/o analog module detected\n",
+			av7110->dvb_adapter->num);
+		av7110->adac_type = DVB_ADAC_NONE;
+	}
+	else {
+		av7110->adac_type = adac;
+		printk("av7110(%d): adac type set to %d\n",
+			av7110->dvb_adapter->num, av7110->adac_type);
+	}
+
+	if (av7110->adac_type == DVB_ADAC_NONE || av7110->adac_type == DVB_ADAC_MSP) {
+		// switch DVB SCART on
+		av7110_fw_cmd(av7110, COMTYPE_AUDIODAC, MainSwitch, 1, 0);
+		av7110_fw_cmd(av7110, COMTYPE_AUDIODAC, ADSwitch, 1, 1);
+		if (rgb_on)
+			saa7146_setgpio(dev, 1, SAA7146_GPIO_OUTHI); // RGB on, SCART pin 16
+		//saa7146_setgpio(dev, 3, SAA7146_GPIO_OUTLO); // SCARTpin 8
+	}
+
+	av7110_set_volume(av7110, av7110->mixer.volume_left, av7110->mixer.volume_right);
+	av7110_setup_irc_config(av7110, 0);
+}
 
 static void recover_arm(struct av7110 *av7110)
 {
 	DEB_EE(("av7110: %p\n",av7110));
 
 	av7110_bootarm(av7110);
-        dvb_delay(100); 
+	msleep(100);
         restart_feeds(av7110);
 	av7110_fw_cmd(av7110, COMTYPE_PIDFILTER, SetIR, 1, av7110->ir_config);
 }
@@ -106,12 +170,16 @@ static void arm_error(struct av7110 *av7110)
 static int arm_thread(void *data)
 {
 	struct av7110 *av7110 = data;
-	unsigned long timeout;
         u16 newloops = 0;
+	int timeout;
 
 	DEB_EE(("av7110: %p\n",av7110));
 	
-	dvb_kernel_thread_setup ("arm_mon");
+        lock_kernel ();
+        daemonize ("arm_mon");
+        sigfillset (&current->blocked);
+        unlock_kernel ();
+
 	av7110->arm_thread = current;
 
 	while (1) {
@@ -135,6 +203,9 @@ static int arm_thread(void *data)
 				av7110->dvb_adapter->num);
 
 			arm_error(av7110);
+			av7710_set_video_mode(av7110, vidmode);
+
+			init_av7110_av(av7110);
 
                         if (down_interruptible(&av7110->dcomlock))
                                 break;
@@ -638,6 +709,8 @@ static int dvb_osd_ioctl(struct inode *inode, struct file *file,
 
 	if (cmd == OSD_SEND_CMD)
 		return av7110_osd_cmd(av7110, (osd_cmd_t *) parg);
+	if (cmd == OSD_GET_CAPABILITY)
+		return av7110_osd_capability(av7110, (osd_cap_t *) parg);
 
 	return -EINVAL;
         }
@@ -1203,19 +1276,17 @@ static void dvb_unregister(struct av7110 *av7110)
 int i2c_writereg(struct av7110 *av7110, u8 id, u8 reg, u8 val)
 {
 	u8 msg[2] = { reg, val };
-	struct dvb_i2c_bus *i2c = av7110->i2c_bus;
 	struct i2c_msg msgs;
 	
 	msgs.flags = 0;
 	msgs.addr = id / 2;
 	msgs.len = 2;
 	msgs.buf = msg;
-	return i2c->xfer(i2c, &msgs, 1);
+	return i2c_transfer(&av7110->i2c_adap, &msgs, 1);
 }
 
 u8 i2c_readreg(struct av7110 *av7110, u8 id, u8 reg)
 {
-	struct dvb_i2c_bus *i2c = av7110->i2c_bus;
 	u8 mm1[] = {0x00};
 	u8 mm2[] = {0x00};
 	struct i2c_msg msgs[2];
@@ -1226,15 +1297,9 @@ u8 i2c_readreg(struct av7110 *av7110, u8 id, u8 reg)
 	mm1[0] = reg;
 	msgs[0].len = 1; msgs[1].len = 1;
 	msgs[0].buf = mm1; msgs[1].buf = mm2;
-	i2c->xfer(i2c, msgs, 2);
+	i2c_transfer(&av7110->i2c_adap, msgs, 2);
 
 	return mm2[0];
-}
-
-static int master_xfer(struct dvb_i2c_bus *i2c, const struct i2c_msg msgs[], int num)
-{
-	struct saa7146_dev *dev = i2c->data;
-	return saa7146_i2c_transfer(dev, msgs, num, 6);
 }
 
 /****************************************************************************
@@ -1310,26 +1375,65 @@ static int get_firmware(struct av7110* av7110)
 	/* request the av7110 firmware, this will block until someone uploads it */
 	ret = request_firmware(&fw, "dvb-ttpci-01.fw", &av7110->dev->pci->dev);
 	if (ret) {
-		printk("dvb-ttpci: cannot request firmware!\n");
+		if (ret == -ENOENT) {
+			printk(KERN_ERR "dvb-ttpci: could not load firmware,"
+			       " file not found: dvb-ttpci-01.fw\n");
+			printk(KERN_ERR "dvb-ttpci: usually this should be in"
+			       " /usr/lib/hotplug/firmware\n");
+			printk(KERN_ERR "dvb-ttpci: and can be downloaded here"
+			       " http://www.linuxtv.org/download/dvb/firmware/\n");
+		} else
+			printk(KERN_ERR "dvb-ttpci: cannot request firmware"
+			       " (error %i)\n", ret);
 		return -EINVAL;
 	}
+
 	if (fw->size <= 200000) {
 		printk("dvb-ttpci: this firmware is way too small.\n");
+		release_firmware(fw);
 		return -EINVAL;
 	}
+
 	/* check if the firmware is available */
 	av7110->bin_fw = (unsigned char*) vmalloc(fw->size);
 	if (NULL == av7110->bin_fw) {
 		DEB_D(("out of memory\n"));
+		release_firmware(fw);
 		return -ENOMEM;
 	}
+
 	memcpy(av7110->bin_fw, fw->data, fw->size);
 	av7110->size_fw = fw->size;
 	if ((ret = check_firmware(av7110)))
 		vfree(av7110->bin_fw);
+
+	release_firmware(fw);
 	return ret;
 }
 #endif
+
+
+static int client_register(struct i2c_client *client)
+{
+	struct saa7146_dev *dev = (struct saa7146_dev*)i2c_get_adapdata(client->adapter);
+	struct av7110 *av7110 = (struct av7110*)dev->ext_priv;
+
+	/* fixme: check for "type" (ie. frontend type) */
+	if (client->driver->command)
+		return client->driver->command(client, FE_REGISTER, av7110->dvb_adapter);
+	return 0;
+}
+
+static int client_unregister(struct i2c_client *client)
+{
+	struct saa7146_dev *dev = (struct saa7146_dev*)i2c_get_adapdata(client->adapter);
+	struct av7110 *av7110 = (struct av7110*)dev->ext_priv;
+
+	/* fixme: check for "type" (ie. frontend type) */
+	if (client->driver->command)
+		return client->driver->command(client, FE_UNREGISTER, av7110->dvb_adapter);
+	return 0;
+}
 
 static int av7110_attach(struct saa7146_dev* dev, struct saa7146_pci_extension_data *pci_ext)
 {
@@ -1361,18 +1465,26 @@ static int av7110_attach(struct saa7146_dev* dev, struct saa7146_pci_extension_d
 	   get recognized before the main driver is fully loaded */
 	saa7146_write(dev, GPIO_CTRL, 0x500000);
 
-	saa7146_i2c_adapter_prepare(dev, NULL, 0, SAA7146_I2C_BUS_BIT_RATE_120); /* 275 kHz */
+	av7110->i2c_adap = (struct i2c_adapter) {
+		.client_register = client_register,
+		.client_unregister = client_unregister,
+#ifdef I2C_ADAP_CLASS_TV_DIGITAL
+		.class = I2C_ADAP_CLASS_TV_DIGITAL,
+#else
+		.class = I2C_CLASS_TV_DIGITAL,
+#endif
+	};
+	strlcpy(av7110->i2c_adap.name, pci_ext->ext_priv, sizeof(av7110->i2c_adap.name));
 
-	av7110->i2c_bus = dvb_register_i2c_bus (master_xfer, dev,
-						av7110->dvb_adapter, 0);
+	saa7146_i2c_adapter_prepare(dev, &av7110->i2c_adap, SAA7146_I2C_BUS_BIT_RATE_120); /* 275 kHz */
 
-	if (!av7110->i2c_bus) {
+	if (i2c_add_adapter(&av7110->i2c_adap) < 0) {
 		dvb_unregister_adapter (av7110->dvb_adapter);
 		kfree(av7110);
 		return -ENOMEM;
 	}
 
-	ttpci_eeprom_parse_mac(av7110->i2c_bus);
+	ttpci_eeprom_parse_mac(&av7110->i2c_adap, av7110->dvb_adapter->proposed_mac);
 
 	saa7146_write(dev, PCI_BT_V1, 0x1c00101f);
 	saa7146_write(dev, BCS_CTRL, 0x80400040);
@@ -1399,6 +1511,7 @@ static int av7110_attach(struct saa7146_dev* dev, struct saa7146_pci_extension_d
 
         /* default OSD window */
         av7110->osdwin=1;
+	sema_init(&av7110->osd_sema, 1);
 
         /* ARM "watchdog" */
 	init_waitqueue_head(&av7110->arm_wait);
@@ -1443,54 +1556,12 @@ static int av7110_attach(struct saa7146_dev* dev, struct saa7146_pci_extension_d
 		goto err2;
 	}
 
-	/* set internal volume control to maximum */
-	av7110->adac_type = DVB_ADAC_TI;
-	av7110_set_volume(av7110, 0xff, 0xff);
-
-	av7710_set_video_mode(av7110, vidmode);
-
-	/* handle different card types */
-	/* remaining inits according to card and frontend type */
-	av7110->has_analog_tuner = 0;
-	av7110->current_input = 0;
-	if (i2c_writereg(av7110, 0x20, 0x00, 0x00)==1) {
-		printk ("av7110(%d): Crystal audio DAC detected\n",
-			av7110->dvb_adapter->num);
-		av7110->adac_type = DVB_ADAC_CRYSTAL;
-		i2c_writereg(av7110, 0x20, 0x01, 0xd2);
-		i2c_writereg(av7110, 0x20, 0x02, 0x49);
-		i2c_writereg(av7110, 0x20, 0x03, 0x00);
-		i2c_writereg(av7110, 0x20, 0x04, 0x00);
+	/* set initial volume in mixer struct */
+	av7110->mixer.volume_left  = volume;
+	av7110->mixer.volume_right = volume;
 	
-	/**
-	 * some special handling for the Siemens DVB-C cards...
-	 */
-	} else if (0 == av7110_init_analog_module(av7110)) {
-		/* done. */
-	}
-	else if (dev->pci->subsystem_vendor == 0x110a) {
-		printk("av7110(%d): DVB-C w/o analog module detected\n",
-			av7110->dvb_adapter->num);
-		av7110->adac_type = DVB_ADAC_NONE;
-	}
-	else {
-		av7110->adac_type = adac;
-		printk("av7110(%d): adac type set to %d\n",
-			av7110->dvb_adapter->num, av7110->adac_type);
-		}
+	init_av7110_av(av7110);
 
-	if (av7110->adac_type == DVB_ADAC_NONE || av7110->adac_type == DVB_ADAC_MSP) {
-		// switch DVB SCART on
-		av7110_fw_cmd(av7110, COMTYPE_AUDIODAC, MainSwitch, 1, 0);
-		av7110_fw_cmd(av7110, COMTYPE_AUDIODAC, ADSwitch, 1, 1);
-		if (rgb_on)
-			saa7146_setgpio(dev, 1, SAA7146_GPIO_OUTHI); // RGB on, SCART pin 16
-		//saa7146_setgpio(dev, 3, SAA7146_GPIO_OUTLO); // SCARTpin 8
-	}
-	
-	av7110_set_volume(av7110, 0xff, 0xff);
-
-	av7110_setup_irc_config (av7110, 0);
 	av7110_register(av7110);
 	
 	/* special case DVB-C: these cards have an analog tuner
@@ -1510,13 +1581,12 @@ err3:
 	av7110->arm_rmmod = 1;
 	wake_up_interruptible(&av7110->arm_wait);
 	while (av7110->arm_thread)
-		dvb_delay(1);
+		msleep(1);
 err2:
 	av7110_ca_exit(av7110);
 	av7110_av_exit(av7110);
 err:
-	dvb_unregister_i2c_bus (master_xfer,av7110->i2c_bus->adapter,
-				av7110->i2c_bus->id);
+	i2c_del_adapter(&av7110->i2c_adap);
 
 	dvb_unregister_adapter (av7110->dvb_adapter);
 
@@ -1546,7 +1616,7 @@ static int av7110_detach (struct saa7146_dev* saa)
 	wake_up_interruptible(&av7110->arm_wait);
 
 	while (av7110->arm_thread)
-		dvb_delay(1);
+		msleep(1);
 
 	dvb_unregister(av7110);
 	
@@ -1563,7 +1633,8 @@ static int av7110_detach (struct saa7146_dev* saa)
 	pci_free_consistent(saa->pci, 8192, av7110->debi_virt,
 			    av7110->debi_bus);
 
-	dvb_unregister_i2c_bus (master_xfer,av7110->i2c_bus->adapter, av7110->i2c_bus->id);
+	i2c_del_adapter(&av7110->i2c_adap);
+
 	dvb_unregister_adapter (av7110->dvb_adapter);
 
 	av7110_num--;
@@ -1602,7 +1673,7 @@ static struct saa7146_pci_extension_data x_var = { \
 MAKE_AV7110_INFO(fs_1_5, "Siemens cable card PCI rev1.5");
 MAKE_AV7110_INFO(fs_1_3, "Siemens/Technotrend/Hauppauge PCI rev1.3");
 MAKE_AV7110_INFO(tt_1_6, "Technotrend/Hauppauge PCI rev1.3 or 1.6");
-MAKE_AV7110_INFO(tt_2_1, "Technotrend/Hauppauge PCI rev2.1");
+MAKE_AV7110_INFO(tt_2_1, "Technotrend/Hauppauge PCI rev2.1 or 2.2");
 MAKE_AV7110_INFO(tt_t,	 "Technotrend/Hauppauge PCI DVB-T");
 MAKE_AV7110_INFO(unkwn0, "Technotrend/Hauppauge PCI rev?(unknown0)?");
 MAKE_AV7110_INFO(unkwn1, "Technotrend/Hauppauge PCI rev?(unknown1)?");
@@ -1684,15 +1755,3 @@ MODULE_DESCRIPTION("driver for the SAA7146 based AV110 PCI DVB cards by "
 MODULE_AUTHOR("Ralph Metzler, Marcus Metzler, others");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(av7110_debug,"i");
-MODULE_PARM(vidmode,"i");
-MODULE_PARM_DESC(vidmode,"analog video out: 0 off, 1 CVBS+RGB (default), 2 CVBS+YC, 3 YC");
-MODULE_PARM(pids_off,"i");
-MODULE_PARM_DESC(pids_off,"clear video/audio/PCR PID filters when demux is closed");
-MODULE_PARM(adac,"i");
-MODULE_PARM_DESC(adac,"audio DAC type: 0 TI, 1 CRYSTAL, 2 MSP (use if autodetection fails)");
-MODULE_PARM(hw_sections, "i");
-MODULE_PARM_DESC(hw_sections, "0 use software section filter, 1 use hardware");
-MODULE_PARM(rgb_on, "i");
-MODULE_PARM_DESC(rgb_on, "For Siemens DVB-C cards only: Enable RGB control"
-		" signal on SCART pin 16 to switch SCART video mode from CVBS to RGB");

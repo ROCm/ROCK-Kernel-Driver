@@ -99,6 +99,9 @@
 #include <linux/mca.h>
 #include <asm/io.h>
 #include <scsi/scsi_host.h>
+#include <scsi/scsi_device.h>
+#include <scsi/scsi_transport.h>
+#include <scsi/scsi_transport_spi.h>
 
 #include "53c700.h"
 #include "NCR_D700.h"
@@ -198,34 +201,20 @@ NCR_D700_probe_one(struct NCR_D700_private *p, int siop,
 	NCR_700_set_io_mapped(hostdata);
 
 	/* and register the siop */
-	host = NCR_700_detect(&NCR_D700_driver_template, hostdata);
+	host = NCR_700_detect(&NCR_D700_driver_template, hostdata,
+			      p->dev, irq,
+			      /* FIXME: read this from SUS */
+			      id_array[slot * 2 + siop]);
 	if (!host) {
 		ret = -ENOMEM;
 		goto detect_failed;
 	}
 
-	host->irq = irq;
-	/* FIXME: Read this from SUS */
-	host->this_id = id_array[slot * 2 + siop];
-	printk(KERN_NOTICE "NCR D700: SIOP%d, SCSI id is %d\n",
-			siop, host->this_id);
-	if (request_irq(irq, NCR_700_intr, SA_SHIRQ, "NCR_D700", host)) {
-		printk(KERN_ERR "NCR D700: SIOP%d: irq problem, "
-				"detatching\n", siop);
-		ret = -ENODEV;
-		goto irq_failed;
-	}
-
-	scsi_add_host(host, p->dev); /* XXX handle failure */
 	scsi_scan_host(host);
 
 	p->hosts[siop] = host;
-	hostdata->dev = p->dev;
 	return 0;
 
- irq_failed:
-	scsi_host_put(host);
-	NCR_700_release(host);
  detect_failed:
 	release_region(host->base, 64);
  region_failed:

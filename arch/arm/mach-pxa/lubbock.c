@@ -29,6 +29,7 @@
 #include <asm/mach/map.h>
 #include <asm/mach/irq.h>
 
+#include <asm/arch/pxa-regs.h>
 #include <asm/arch/lubbock.h>
 #include <asm/arch/udc.h>
 #include <asm/arch/pxafb.h>
@@ -36,6 +37,8 @@
 
 #include "generic.h"
 
+
+#define LUB_MISC_WR		__LUB_REG(LUBBOCK_FPGA_PHYS + 0x080)
 
 void lubbock_set_misc_wr(unsigned int mask, unsigned int set)
 {
@@ -220,6 +223,6 @@ MACHINE_START(LUBBOCK, "Intel DBPXA250 Development Platform (aka Lubbock)")
 	BOOT_MEM(0xa0000000, 0x40000000, io_p2v(0x40000000))
 	MAPIO(lubbock_map_io)
 	INITIRQ(lubbock_init_irq)
-	INITTIME(pxa_init_time)
+	.timer		= &pxa_timer,
 	INIT_MACHINE(lubbock_init)
 MACHINE_END

@@ -200,7 +200,7 @@ int __init applicom_init(void)
 
 	/* No mem and irq given - check for a PCI card */
 
-	while ( (dev = pci_find_class(PCI_CLASS_OTHERS << 16, dev))) {
+	while ( (dev = pci_get_class(PCI_CLASS_OTHERS << 16, dev))) {
 
 		if (dev->vendor != PCI_VENDOR_ID_APPLICOM)
 			continue;

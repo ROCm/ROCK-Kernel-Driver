@@ -11,7 +11,7 @@
 /*
  * This does not append a newline
  */
-static void puts(const char *s)
+static void putstr(const char *s)
 {
 	unsigned long tmp1, tmp2;
 	__asm__ __volatile__(

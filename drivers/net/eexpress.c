@@ -115,9 +115,9 @@
 #include <linux/slab.h>
 #include <linux/mca-legacy.h>
 #include <linux/spinlock.h>
+#include <linux/bitops.h>
 
 #include <asm/system.h>
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/irq.h>
 

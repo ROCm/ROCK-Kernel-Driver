@@ -84,7 +84,6 @@ extern long register_vpa(unsigned long flags, unsigned long proc,
 			 unsigned long vpa);
 
 int smt_enabled_at_boot = 1;
-int boot_cpuid = 0;
 
 /* Low level assembly function used to backup CPU 0 state */
 extern void __save_cpu_setup(void);
@@ -391,7 +390,8 @@ out:
 static inline int __devinit smp_startup_cpu(unsigned int lcpu)
 {
 	int status;
-	unsigned long start_here = __pa(pseries_secondary_smp_init);
+	unsigned long start_here = __pa((u32)*((unsigned long *)
+					       pseries_secondary_smp_init));
 	unsigned int pcpu;
 
 	/* At boot time the cpus are already spinning in hold

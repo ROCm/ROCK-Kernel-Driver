@@ -14,50 +14,14 @@
 #include <linux/proc_fs.h>
 #include <asm/system.h>
 #include <asm/io.h>
-#include <asm/sn/sn2/addrs.h>
-#include <asm/sn/simulator.h>
-
-/* to lookup nasids */
+#include <asm/sn/sn_sal.h>
 #include <asm/sn/sn_cpuid.h>
+#include <asm/sn/addrs.h>
 
 MODULE_DESCRIPTION("PROM version reporting for /proc");
 MODULE_AUTHOR("Chad Talbott");
 MODULE_LICENSE("GPL");
 
-#undef DEBUG_PROMINFO
-
-#define TRACE_PROMINFO
-
-#if defined(DEBUG_PROMINFO)
-#  define DPRINTK(x...) printk(KERN_DEBUG x)
-#else
-#  define DPRINTK(x...)
-#endif
-
-#if defined(TRACE_PROMINFO) && defined(DEBUG_PROMINFO)
-#  if defined(__GNUC__)
-#    define TRACE()	printk(KERN_DEBUG "%s:%d:%s\n", \
-			       __FILE__, __LINE__, __FUNCTION__)
-#  else
-#    define TRACE()	printk(KERN_DEBUG "%s:%d\n", __LINE__, __FILE__)
-#  endif
-#else
-#  define TRACE()
-#endif
-
-/* Architected IA64 firmware space */
-#define FW_BASE			0x00000000FF000000
-#define FW_TOP			0x0000000100000000
-
-/* Sub-regions determined by bits in Node Offset */
-#define	LB_PROM_SPACE		0x0000000700000000ul /* Local LB PROM */
-
-/* Offset of PROM banner pointers in SAL A and SAL B */
-#define SAL_A_BANNER_OFFSET	(1 * 16)
-#define SAL_B_BANNER_OFFSET	(3 * 16)
-
-
-#define FIT_SIGNATURE		0x2020205f5449465ful
 /* Standard Intel FIT entry types */
 #define FIT_ENTRY_FIT_HEADER	0x00	/* FIT header entry */
 #define FIT_ENTRY_PAL_B		0x01	/* PAL_B entry */
@@ -90,37 +54,30 @@ MODULE_LICENSE("GPL");
 #define FIT_TYPE(q)	\
 	((unsigned) ((q) >> FIT_TYPE_SHIFT) & FIT_TYPE_MASK)
 
-#define FIT_ENTRY(type, maj, min, size)					\
-	((((unsigned long)(maj) & FIT_MAJOR_MASK) << FIT_MAJOR_SHIFT) |	\
-	 (((unsigned long)(min) & FIT_MINOR_MASK) << FIT_MINOR_SHIFT) |	\
-	 (((unsigned long)(type) & FIT_TYPE_MASK) << FIT_TYPE_SHIFT) |	\
-	 (size))
-
 struct fit_type_map_t {
-	unsigned char	type;
-	const char	*name;
+	unsigned char type;
+	const char *name;
 };
 
 static const struct fit_type_map_t fit_entry_types[] = {
-	{ FIT_ENTRY_FIT_HEADER, "FIT Header" },
-	{ FIT_ENTRY_PAL_A_GEN,  "Generic PAL_A" },
-	{ FIT_ENTRY_PAL_A_PROC, "Processor-specific PAL_A" },
-	{ FIT_ENTRY_PAL_A,      "PAL_A" },
-	{ FIT_ENTRY_PAL_B,      "PAL_B" },
-	{ FIT_ENTRY_SAL_A,      "SAL_A" },
-	{ FIT_ENTRY_SAL_B,      "SAL_B" },
-	{ FIT_ENTRY_SALRUNTIME, "SAL runtime" },
-	{ FIT_ENTRY_EFI,	"EFI" },
-	{ FIT_ENTRY_VMLINUX,    "Embedded Linux" },
-	{ FIT_ENTRY_FPSWA,      "Embedded FPSWA" },
-	{ FIT_ENTRY_UNUSED,     "Unused" },
-	{ 0xff,                 "Error" },
+	{FIT_ENTRY_FIT_HEADER, "FIT Header"},
+	{FIT_ENTRY_PAL_A_GEN, "Generic PAL_A"},
+	{FIT_ENTRY_PAL_A_PROC, "Processor-specific PAL_A"},
+	{FIT_ENTRY_PAL_A, "PAL_A"},
+	{FIT_ENTRY_PAL_B, "PAL_B"},
+	{FIT_ENTRY_SAL_A, "SAL_A"},
+	{FIT_ENTRY_SAL_B, "SAL_B"},
+	{FIT_ENTRY_SALRUNTIME, "SAL runtime"},
+	{FIT_ENTRY_EFI, "EFI"},
+	{FIT_ENTRY_VMLINUX, "Embedded Linux"},
+	{FIT_ENTRY_FPSWA, "Embedded FPSWA"},
+	{FIT_ENTRY_UNUSED, "Unused"},
+	{0xff, "Error"},
 };
 
-static const char *
-fit_type_name(unsigned char type)
+static const char *fit_type_name(unsigned char type)
 {
-	struct fit_type_map_t const*mapp;
+	struct fit_type_map_t const *mapp;
 
 	for (mapp = fit_entry_types; mapp->type != 0xff; mapp++)
 		if (type == mapp->type)
@@ -134,52 +91,34 @@ fit_type_name(unsigned char type)
 	return "Unknown type";
 }
 
-static unsigned long
-convert_fw_addr(nasid_t nasid, unsigned long addr)
-{
-	/* snag just the node-relative offset */
-	addr &= ~0ul >> (63-35);
-	/* the pointer to SAL A is relative to IA-64 compatibility
-	 * space.  However, the PROM is mapped at a different offset
-	 * in MMR space (both local and global)
-	 */
-	addr += 0x700000000;
-	return GLOBAL_MMR_ADDR(nasid, addr);
-}
-
 static int
-valid_fw_addr(unsigned long addr)
+get_fit_entry(unsigned long nasid, int index, unsigned long *fentry,
+	      char *banner, int banlen)
 {
-	addr &= ~(1ul << 63); /* Clear cached/uncached bit */
-	return (addr >= FW_BASE && addr < FW_TOP);
+	return ia64_sn_get_fit_compt(nasid, index, fentry, banner, banlen);
 }
 
-/* These two routines read the FIT table directly from the FLASH PROM
- * on a specific node.  The PROM can only be accessed using aligned 64
- * bit reads, so we do that and then shift and mask the result to get
- * at each field.
+
+/*
+ * These two routines display the FIT table for each node.
  */
-static int
-dump_fit_entry(char *page, unsigned long *fentry)
+static int dump_fit_entry(char *page, unsigned long *fentry)
 {
-	unsigned long q1, q2;
 	unsigned type;
 
-	TRACE();
-
-	q1 = readq(fentry);
-	q2 = readq(fentry + 1);
-	type = FIT_TYPE(q2);
+	type = FIT_TYPE(fentry[1]);
 	return sprintf(page, "%02x %-25s %x.%02x %016lx %u\n",
 		       type,
 		       fit_type_name(type),
-		       FIT_MAJOR(q2), FIT_MINOR(q2),
-		       q1,
+		       FIT_MAJOR(fentry[1]), FIT_MINOR(fentry[1]),
+		       fentry[0],
 		       /* mult by sixteen to get size in bytes */
-		       (unsigned)q2 * 16);
+		       (unsigned)(fentry[1] & 0xffffff) * 16);
 }
 
-/* We assume that the fit table will be small enough that we can print
+
+/*
+ * We assume that the fit table will be small enough that we can print
  * the whole thing into one page.  (This is true for our default 16kB
  * pages -- each entry is about 60 chars wide when printed.)  I read
  * somewhere that the maximum size of the FIT is 128 entries, so we're
@@ -187,77 +126,46 @@ dump_fit_entry(char *page, unsigned long *fentry)
  * anyway).
  */
 static int
-dump_fit(char *page, unsigned long *fit)
+dump_fit(char *page, unsigned long nasid)
 {
-	unsigned long qw;
-	int nentries;
-	int fentry;
+	unsigned long fentry[2];
+	int index;
 	char *p;
 
-	TRACE();
-
-	DPRINTK("dumping fit from %p\n", (void *)fit);
-
-	qw = readq(fit);
-	DPRINTK("FIT signature: %016lx (%.8s)\n", qw, (char *)&qw);
-	if (qw != FIT_SIGNATURE)
-		printk(KERN_WARNING "Unrecognized FIT signature");
-
-	qw = readq(fit + 1);
-	nentries = (unsigned)qw;
-	DPRINTK("number of fit entries: %u\n", nentries);
-	/* check that we won't overflow the page -- see comment above */
-	BUG_ON(nentries * 60 > PAGE_SIZE);
-
 	p = page;
-	for (fentry = 0; fentry < nentries; fentry++)
-		/* each FIT entry is two 64 bit words */
-		p += dump_fit_entry(p, fit + 2 * fentry);
+	for (index=0;;index++) {
+		BUG_ON(index * 60 > PAGE_SIZE);
+		if (get_fit_entry(nasid, index, fentry, NULL, 0))
+			break;
+		p += dump_fit_entry(p, fentry);
+	}
 
 	return p - page;
 }
 
 static int
-dump_version(char *page, unsigned long *fit)
+dump_version(char *page, unsigned long nasid)
 {
-	int nentries;
-	int fentry;
-	unsigned long qw = 0;
+	unsigned long fentry[2];
+	char banner[128];
+	int index;
 	int len;
-	nasid_t nasid = NASID_GET(fit);
 
-	TRACE();
-
-	nentries = (unsigned)readq(fit + 1);
-	BUG_ON(nentries * 60 > PAGE_SIZE);
-
-	for (fentry = 0; fentry < nentries; fentry++) {
-		qw = readq(fit + 2 * fentry + 1);
-		if (FIT_TYPE(qw) == FIT_ENTRY_SAL_A)
+	for (index = 0; ; index++) {
+		if (get_fit_entry(nasid, index, fentry, banner,
+				  sizeof(banner)))
+			return 0;
+		if (FIT_TYPE(fentry[1]) == FIT_ENTRY_SAL_A)
 			break;
 	}
-	if (fentry >= nentries)
-		return 0;
 
-	len = sprintf(page, "%x.%02x\n", FIT_MAJOR(qw), FIT_MINOR(qw));
+	len = sprintf(page, "%x.%02x\n", FIT_MAJOR(fentry[1]),
+		      FIT_MINOR(fentry[1]));
 	page += len;
 
-	qw = readq(fit + 2 * fentry);	/* Address of SAL A */
-	DPRINTK("SAL A at %p\n", (void *)qw);
-	if (!valid_fw_addr(qw))
-		return len;
+	if (banner[0])
+		len += snprintf(page, PAGE_SIZE-len, "%s\n", banner);
 
-	qw += SAL_A_BANNER_OFFSET;
-	qw = convert_fw_addr(nasid, qw);
-	DPRINTK("Banner ptr at %p\n", (void *)qw);
-
-	qw = readq(qw);			/* Address of banner */
-	if (!valid_fw_addr(qw))
-		return len;
-	qw = convert_fw_addr(nasid, qw);
-	DPRINTK("Banner at %p\n", (void *)qw);
-
-	len += snprintf(page, PAGE_SIZE-len, "%s\n", (char *)qw);
 	return len;
 }
 
@@ -266,11 +174,14 @@ static int
 proc_calc_metrics(char *page, char **start, off_t off, int count, int *eof,
 		  int len)
 {
-	if (len <= off+count) *eof = 1;
+	if (len <= off + count)
+		*eof = 1;
 	*start = page + off;
 	len -= off;
-	if (len>count) len = count;
-	if (len<0) len = 0;
+	if (len > count)
+		len = count;
+	if (len < 0)
+		len = 0;
 	return len;
 }
 
@@ -280,8 +191,8 @@ read_version_entry(char *page, char **start, off_t off, int count, int *eof,
 {
 	int len = 0;
 
-	/* data holds the pointer to this node's FIT */
-	len = dump_version(page, (unsigned long *)data);
+	/* data holds the NASID of the node */
+	len = dump_version(page, (unsigned long)data);
 	len = proc_calc_metrics(page, start, off, count, eof, len);
 	return len;
 }
@@ -292,50 +203,11 @@ read_fit_entry(char *page, char **start, off_t off, int count, int *eof,
 {
 	int len = 0;
 
-	/* data holds the pointer to this node's FIT */
-	len = dump_fit(page, (unsigned long *)data);
+	/* data holds the NASID of the node */
+	len = dump_fit(page, (unsigned long)data);
 	len = proc_calc_metrics(page, start, off, count, eof, len);
 
 	return len;
-}
-
-/* this is a fake FIT that's used on the medusa simulator which
- * doesn't usually run a complete PROM. 
- */
-#ifdef CONFIG_IA64_SGI_SN_SIM
-static unsigned long fakefit[] = {
-	/* this is all we need to satisfy the code below */
-	FIT_SIGNATURE,
-	FIT_ENTRY(FIT_ENTRY_FIT_HEADER, 0x02, 0x60, 2),
-	/* dump something arbitrary for
-	 * /proc/sgi_prominfo/nodeX/version */
-	0xbadbeef00fa3ef17ul,
-	FIT_ENTRY(FIT_ENTRY_SAL_A, 0, 0x99, 0x100)
-};	
-#endif
-
-static unsigned long *
-lookup_fit(int nasid)
-{
-	unsigned long *fitp;
-	unsigned long fit_paddr;
-	unsigned long *fit_vaddr;
-
-#ifdef CONFIG_IA64_SGI_SN_SIM
-	if (IS_RUNNING_ON_SIMULATOR())
-		return fakefit;
-#endif
-
-	fitp = (void *)GLOBAL_MMR_ADDR(nasid, LB_PROM_SPACE - 32);
-	DPRINTK("pointer to fit at %p\n", (void *)fitp);
-	fit_paddr = readq(fitp);
-	DPRINTK("fit pointer contains %lx\n", fit_paddr);
-
-	BUG_ON(!valid_fw_addr(fit_paddr));
-	fit_vaddr = (void *)convert_fw_addr(nasid, fit_paddr);
-
-	DPRINTK("fit at %p\n", (void *)fit_vaddr);
-	return fit_vaddr;
 }
 
 /* module entry points */
@@ -350,22 +222,16 @@ static struct proc_dir_entry *sgi_prominfo_entry;
 
 #define NODE_NAME_LEN 11
 
-int __init
-prominfo_init(void)
+int __init prominfo_init(void)
 {
 	struct proc_dir_entry **entp;
 	struct proc_dir_entry *p;
 	cnodeid_t cnodeid;
-	nasid_t nasid;
+	unsigned long nasid;
 	char name[NODE_NAME_LEN];
 
 	if (!ia64_platform_is("sn2"))
 		return 0;
-
-	TRACE();
-
-	DPRINTK("running on cpu %d\n", smp_processor_id());
-	DPRINTK("numnodes %d\n", numnodes);
 
 	proc_entries = kmalloc(numnodes * sizeof(struct proc_dir_entry *),
 			       GFP_KERNEL);
@@ -380,12 +246,12 @@ prominfo_init(void)
 		nasid = cnodeid_to_nasid(cnodeid);
 		p = create_proc_read_entry(
 			"fit", 0, *entp, read_fit_entry,
-			lookup_fit(nasid));
+			(void *)nasid);
 		if (p)
 			p->owner = THIS_MODULE;
 		p = create_proc_read_entry(
 			"version", 0, *entp, read_version_entry,
-			lookup_fit(nasid));
+			(void *)nasid);
 		if (p)
 			p->owner = THIS_MODULE;
 	}
@@ -393,18 +259,14 @@ prominfo_init(void)
 	return 0;
 }
 
-void __exit
-prominfo_exit(void)
+void __exit prominfo_exit(void)
 {
 	struct proc_dir_entry **entp;
 	unsigned cnodeid;
 	char name[NODE_NAME_LEN];
 
-	TRACE();
-
 	for (cnodeid = 0, entp = proc_entries;
-	     cnodeid < numnodes;
-	     cnodeid++, entp++) {
+	     cnodeid < numnodes; cnodeid++, entp++) {
 		remove_proc_entry("fit", *entp);
 		remove_proc_entry("version", *entp);
 		sprintf(name, "node%d", cnodeid);

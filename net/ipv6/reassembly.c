@@ -665,7 +665,7 @@ static int ip6_frag_reasm(struct frag_queue *fq, struct sk_buff **skb_in,
 	head->next = NULL;
 	head->dev = dev;
 	head->stamp = fq->stamp;
-	head->nh.ipv6h->payload_len = ntohs(payload_len);
+	head->nh.ipv6h->payload_len = htons(payload_len);
 
 	*skb_in = head;
 

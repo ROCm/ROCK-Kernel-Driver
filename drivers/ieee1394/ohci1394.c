@@ -94,7 +94,6 @@
 #include <linux/pci.h>
 #include <linux/fs.h>
 #include <linux/poll.h>
-#include <linux/irq.h>
 #include <asm/byteorder.h>
 #include <asm/atomic.h>
 #include <asm/uaccess.h>
@@ -103,6 +102,7 @@
 
 #include <asm/pgtable.h>
 #include <asm/page.h>
+#include <asm/irq.h>
 #include <linux/sched.h>
 #include <linux/types.h>
 #include <linux/vmalloc.h>

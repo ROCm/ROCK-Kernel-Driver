@@ -50,6 +50,7 @@
 #include <asm/setup.h>
 #include <asm/system.h>
 #include <asm/rtas.h>
+#include <asm/iommu.h>
 
 #ifdef DEBUG
 #define DBG(fmt...) udbg_printf(fmt)
@@ -98,7 +99,7 @@ unsigned long decr_overclock_set = 0;
 unsigned long decr_overclock_proc0_set = 0;
 
 int have_of = 1;
-
+int boot_cpuid = 0;
 dev_t boot_dev;
 
 /*
@@ -120,8 +121,8 @@ unsigned long SYSRQ_KEY;
 
 static int ppc64_panic_event(struct notifier_block *, unsigned long, void *);
 static struct notifier_block ppc64_panic_block = {
-	notifier_call: ppc64_panic_event,
-	priority: INT_MIN /* may not return; must be done last */
+	.notifier_call = ppc64_panic_event,
+	.priority = INT_MIN /* may not return; must be done last */
 };
 
 /*
@@ -712,7 +713,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 #ifdef CONFIG_SMP
 	pvr = per_cpu(pvr, cpu_id);
 #else
-	pvr = mfpvr(PSRN_PVR);
+	pvr = mfspr(SPRN_PVR);
 #endif
 	maj = (pvr >> 8) & 0xFF;
 	min = pvr & 0xFF;

@@ -316,6 +316,10 @@ u3_ht_read_config(struct pci_bus *bus, unsigned int devfn, int offset,
 	unsigned int addr;
 	int i;
 
+	struct device_node *np = pci_busdev_to_OF_node(bus, devfn);
+	if (np == NULL)
+		return PCIBIOS_DEVICE_NOT_FOUND;
+
 	/*
 	 * When a device in K2 is powered down, we die on config
 	 * cycle accesses. Fix that here.
@@ -363,6 +367,9 @@ u3_ht_write_config(struct pci_bus *bus, unsigned int devfn, int offset,
 	unsigned int addr;
 	int i;
 
+	struct device_node *np = pci_busdev_to_OF_node(bus, devfn);
+	if (np == NULL)
+		return PCIBIOS_DEVICE_NOT_FOUND;
 	/*
 	 * When a device in K2 is powered down, we die on config
 	 * cycle accesses. Fix that here.
@@ -716,7 +723,7 @@ setup_u3_ht(struct pci_controller* hose, struct reg_property *addr)
 	 * properties or figuring out the U3 address space decoding logic and
 	 * then read its configuration register (if any).
 	 */
-	hose->io_base_phys = 0xf4000000 + 0x00400000;
+	hose->io_base_phys = 0xf4000000;
 	hose->io_base_virt = ioremap(hose->io_base_phys, 0x00400000);
 	isa_io_base = (unsigned long) hose->io_base_virt;
 	hose->io_resource.name = np->full_name;

@@ -54,13 +54,13 @@
 #include <linux/spinlock.h>
 #include <linux/kobject.h>
 #include <linux/firmware.h>
+#include <linux/bitops.h>
 
 #include <asm/system.h>
 #include <asm/segment.h>
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/uaccess.h>
-#include <asm/bitops.h>
 
 #include "icom.h"
 

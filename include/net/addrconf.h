@@ -74,7 +74,7 @@ extern int			ipv6_rcv_saddr_equal(const struct sock *sk,
 						      const struct sock *sk2);
 extern void			addrconf_join_solict(struct net_device *dev,
 					struct in6_addr *addr);
-extern void			addrconf_leave_solict(struct net_device *dev,
+extern void			addrconf_leave_solict(struct inet6_dev *idev,
 					struct in6_addr *addr);
 
 /*
@@ -89,6 +89,7 @@ extern int inet6_mc_check(struct sock *sk, struct in6_addr *mc_addr,
 		struct in6_addr *src_addr);
 
 extern int ipv6_dev_mc_inc(struct net_device *dev, struct in6_addr *addr);
+extern int __ipv6_dev_mc_dec(struct inet6_dev *idev, struct in6_addr *addr);
 extern int ipv6_dev_mc_dec(struct net_device *dev, struct in6_addr *addr);
 extern void ipv6_mc_up(struct inet6_dev *idev);
 extern void ipv6_mc_down(struct inet6_dev *idev);
@@ -111,6 +112,7 @@ extern void ipv6_sock_ac_close(struct sock *sk);
 extern int inet6_ac_check(struct sock *sk, struct in6_addr *addr, int ifindex);
 
 extern int ipv6_dev_ac_inc(struct net_device *dev, struct in6_addr *addr);
+extern int __ipv6_dev_ac_dec(struct inet6_dev *idev, struct in6_addr *addr);
 extern int ipv6_dev_ac_dec(struct net_device *dev, struct in6_addr *addr);
 extern int ipv6_chk_acast_addr(struct net_device *dev, struct in6_addr *addr);
 

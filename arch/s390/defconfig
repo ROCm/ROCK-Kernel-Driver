@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
-# Linux kernel version: 2.6.9-rc2
-# Mon Sep 20 17:16:38 2004
+# Linux kernel version: 2.6.9-rc3
+# Fri Oct  8 19:17:35 2004
 #
 CONFIG_MMU=y
 CONFIG_RWSEM_XCHGADD_ALGORITHM=y
@@ -192,6 +192,11 @@ CONFIG_UNIX98_PTYS=y
 CONFIG_UNIX98_PTY_COUNT=2048
 
 #
+# Watchdog Cards
+#
+# CONFIG_WATCHDOG is not set
+
+#
 # S/390 character device drivers
 #
 CONFIG_TN3270=y
@@ -217,6 +222,8 @@ CONFIG_S390_TAPE_BLOCK=y
 # S/390 tape hardware support
 #
 CONFIG_S390_TAPE_34XX=m
+# CONFIG_VMLOGRDR is not set
+# CONFIG_MONREADER is not set
 
 #
 # Cryptographic devices
@@ -520,7 +527,7 @@ CONFIG_CRYPTO=y
 # CONFIG_CRYPTO_SHA1_Z990 is not set
 # CONFIG_CRYPTO_SHA256 is not set
 # CONFIG_CRYPTO_SHA512 is not set
-# CONFIG_CRYPTO_WHIRLPOOL is not set
+# CONFIG_CRYPTO_WP512 is not set
 # CONFIG_CRYPTO_DES is not set
 # CONFIG_CRYPTO_DES_Z990 is not set
 # CONFIG_CRYPTO_BLOWFISH is not set

@@ -721,7 +721,7 @@ done:
 
 static void qh_link_async (struct ehci_hcd *ehci, struct ehci_qh *qh)
 {
-	u32		dma = QH_NEXT (qh->qh_dma);
+	__le32		dma = QH_NEXT (qh->qh_dma);
 	struct ehci_qh	*head;
 
 	/* (re)start the async schedule? */
@@ -756,7 +756,7 @@ static void qh_link_async (struct ehci_hcd *ehci, struct ehci_qh *qh)
 
 /*-------------------------------------------------------------------------*/
 
-#define	QH_ADDR_MASK	__constant_le32_to_cpu(0x7f)
+#define	QH_ADDR_MASK	__constant_cpu_to_le32(0x7f)
 
 /*
  * For control/bulk/interrupt, return QH with these TDs appended.
@@ -840,7 +840,7 @@ static struct ehci_qh *qh_append_tds (
 		if (likely (qtd != 0)) {
 			struct ehci_qtd		*dummy;
 			dma_addr_t		dma;
-			u32			token;
+			__le32			token;
 
 			/* to avoid racing the HC, use the dummy td instead of
 			 * the first td of our list (becomes new dummy).  both

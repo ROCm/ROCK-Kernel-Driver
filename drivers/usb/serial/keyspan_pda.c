@@ -186,13 +186,7 @@ static void keyspan_pda_wakeup_write( struct usb_serial_port *port )
 	wake_up_interruptible( &port->write_wait );
 
 	/* wake up line discipline */
-	if( (tty->flags & (1 << TTY_DO_WRITE_WAKEUP))
-	&& tty->ldisc.write_wakeup )
-		(tty->ldisc.write_wakeup)(tty);
-
-	/* wake up other tty processes */
-	wake_up_interruptible( &tty->write_wait );
-	/* For 2.2.16 backport -- wake_up_interruptible( &tty->poll_wait ); */
+	tty_wakeup(tty);
 }
 
 static void keyspan_pda_request_unthrottle( struct usb_serial *serial )
@@ -291,7 +285,7 @@ static void keyspan_pda_rx_throttle (struct usb_serial_port *port)
 	   upon the device too. */
 
 	dbg("keyspan_pda_rx_throttle port %d", port->number);
-	usb_unlink_urb(port->interrupt_in_urb);
+	usb_kill_urb(port->interrupt_in_urb);
 }
 
 
@@ -712,8 +706,8 @@ static void keyspan_pda_close(struct usb_serial_port *port, struct file *filp)
 			keyspan_pda_set_modem_info(serial, 0);
 
 		/* shutdown our bulk reads and writes */
-		usb_unlink_urb (port->write_urb);
-		usb_unlink_urb (port->interrupt_in_urb);
+		usb_kill_urb(port->write_urb);
+		usb_kill_urb(port->interrupt_in_urb);
 	}
 }
 

@@ -8,30 +8,32 @@
 #include "sgi.h"
 
 struct sgi_disklabel {
-	s32 magic_mushroom;		/* Big fat spliff... */
-	s16 root_part_num;		/* Root partition number */
-	s16 swap_part_num;		/* Swap partition number */
+	__be32 magic_mushroom;		/* Big fat spliff... */
+	__be16 root_part_num;		/* Root partition number */
+	__be16 swap_part_num;		/* Swap partition number */
 	s8 boot_file[16];		/* Name of boot file for ARCS */
 	u8 _unused0[48];		/* Device parameter useless crapola.. */
 	struct sgi_volume {
 		s8 name[8];		/* Name of volume */
-		s32 block_num;		/* Logical block number */
-		s32 num_bytes;		/* How big, in bytes */
+		__be32 block_num;		/* Logical block number */
+		__be32 num_bytes;		/* How big, in bytes */
 	} volume[15];
 	struct sgi_partition {
-		u32 num_blocks;		/* Size in logical blocks */
-		u32 first_block;	/* First logical block */
-		s32 type;		/* Type of this partition */
+		__be32 num_blocks;		/* Size in logical blocks */
+		__be32 first_block;	/* First logical block */
+		__be32 type;		/* Type of this partition */
 	} partitions[16];
-	s32 csum;			/* Disk label checksum */
-	s32 _unused1;			/* Padding */
+	__be32 csum;			/* Disk label checksum */
+	__be32 _unused1;			/* Padding */
 };
 
 int sgi_partition(struct parsed_partitions *state, struct block_device *bdev)
 {
-	int i, csum, magic;
+	int i, csum;
+	__be32 magic;
 	int slot = 1;
-	unsigned int *ui, start, blocks, cs;
+	unsigned int start, blocks;
+	__be32 *ui, cs;
 	Sector sect;
 	struct sgi_disklabel *label;
 	struct sgi_partition *p;
@@ -44,12 +46,12 @@ int sgi_partition(struct parsed_partitions *state, struct block_device *bdev)
 	magic = label->magic_mushroom;
 	if(be32_to_cpu(magic) != SGI_LABEL_MAGIC) {
 		/*printk("Dev %s SGI disklabel: bad magic %08x\n",
-		       bdevname(bdev, b), magic);*/
+		       bdevname(bdev, b), be32_to_cpu(magic));*/
 		put_dev_sector(sect);
 		return 0;
 	}
-	ui = ((unsigned int *) (label + 1)) - 1;
-	for(csum = 0; ui >= ((unsigned int *) label);) {
+	ui = ((__be32 *) (label + 1)) - 1;
+	for(csum = 0; ui >= ((__be32 *) label);) {
 		cs = *ui--;
 		csum += be32_to_cpu(cs);
 	}

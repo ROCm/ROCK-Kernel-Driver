@@ -206,7 +206,7 @@ _GLOBAL(DoSyscall)
 	andi.	r11,r11,_TIF_SYSCALL_TRACE
 	bne-	syscall_dotrace
 syscall_dotrace_cont:
-	cmpli	0,r0,NR_syscalls
+	cmplwi	0,r0,NR_syscalls
 	lis	r10,sys_call_table@h
 	ori	r10,r10,sys_call_table@l
 	slwi	r0,r0,2
@@ -222,7 +222,7 @@ ret_from_syscall:
 #endif
 	mr	r6,r3
 	li	r11,-_LAST_ERRNO
-	cmpl	0,r3,r11
+	cmplw	0,r3,r11
 	rlwinm	r12,r1,0,0,18	/* current_thread_info() */
 	blt+	30f
 	lwz	r11,TI_LOCAL_FLAGS(r12)

@@ -1,5 +1,5 @@
 /*
- * $Id: lubbock-flash.c,v 1.15 2004/07/12 21:59:44 dwmw2 Exp $
+ * $Id: lubbock-flash.c,v 1.18 2004/09/28 18:54:40 nico Exp $
  *
  * Map driver for the Lubbock developer platform.
  *
@@ -15,11 +15,13 @@
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
+#include <linux/dma-mapping.h>
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/map.h>
 #include <linux/mtd/partitions.h>
 #include <asm/io.h>
 #include <asm/hardware.h>
+#include <asm/arch/pxa-regs.h>
 #include <asm/arch/lubbock.h>
 
 
@@ -82,16 +84,14 @@ static int __init init_lubbock(void)
 	lubbock_maps[flashboot].name = "Lubbock Boot ROM";
 
 	for (i = 0; i < 2; i++) {
-		lubbock_maps[i].virt = (unsigned long)ioremap(lubbock_maps[i].phys, WINDOW_SIZE);
+		lubbock_maps[i].virt = (void __iomem *)ioremap(lubbock_maps[i].phys, WINDOW_SIZE);
 		if (!lubbock_maps[i].virt) {
 			printk(KERN_WARNING "Failed to ioremap %s\n", lubbock_maps[i].name);
 			if (!ret)
 				ret = -ENOMEM;
 			continue;
 		}
-		lubbock_maps[i].cached = __ioremap(lubbock_maps[i].phys,
-						   WINDOW_SIZE,
-						   L_PTE_CACHEABLE, 1);
+		lubbock_maps[i].cached = ioremap_cached(lubbock_maps[i].phys, WINDOW_SIZE);
 		if (!lubbock_maps[i].cached)
 			printk(KERN_WARNING "Failed to ioremap cached %s\n", lubbock_maps[i].name);
 		simple_map_init(&lubbock_maps[i]);

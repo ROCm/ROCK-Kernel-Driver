@@ -15,6 +15,7 @@
 #include <linux/backing-dev.h>
 #include <linux/pagevec.h>
 #include <linux/fadvise.h>
+#include <linux/syscalls.h>
 
 #include <asm/unistd.h>
 

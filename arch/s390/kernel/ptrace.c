@@ -626,7 +626,7 @@ do_ptrace(struct task_struct *child, long request, long addr, long data)
 		 * perhaps it should be put in the status that it wants to 
 		 * exit.
 		 */
-		if (child->state == TASK_ZOMBIE) /* already dead */
+		if (child->exit_state == EXIT_ZOMBIE) /* already dead */
 			return 0;
 		child->exit_code = SIGKILL;
 		/* make sure the single step bit is not set. */

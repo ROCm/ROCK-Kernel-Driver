@@ -10,7 +10,7 @@
 #include <linux/mtd/flashchip.h>
 #include <linux/mtd/map.h> 
 #include <linux/mtd/cfi.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 
 struct chip_probe {
 	char *name;

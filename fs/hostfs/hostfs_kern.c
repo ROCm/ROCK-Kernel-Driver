@@ -18,6 +18,7 @@
 #include <linux/buffer_head.h>
 #include <linux/root_dev.h>
 #include <linux/statfs.h>
+#include <linux/kdev_t.h>
 #include <asm/uaccess.h>
 #include "hostfs.h"
 #include "kern_util.h"
@@ -230,7 +231,7 @@ static int read_inode(struct inode *ino)
 	if(name == NULL)
 		goto out;
 
-	if(file_type(name, NULL) == OS_TYPE_SYMLINK){
+	if(file_type(name, NULL, NULL) == OS_TYPE_SYMLINK){
 		name = follow_link(name);
 		if(IS_ERR(name)){
 			err = PTR_ERR(name);
@@ -290,7 +291,6 @@ static void hostfs_delete_inode(struct inode *inode)
 {
 	if(HOSTFS_I(inode)->fd != -1) {
 		close_file(&HOSTFS_I(inode)->fd);
-		printk("Closing host fd in .delete_inode\n");
 		HOSTFS_I(inode)->fd = -1;
 	}
 	clear_inode(inode);
@@ -301,9 +301,11 @@ static void hostfs_destroy_inode(struct inode *inode)
 	if(HOSTFS_I(inode)->host_filename)
 		kfree(HOSTFS_I(inode)->host_filename);
 
+	/*XXX: This should not happen, probably. The check is here for
+	 * additional safety.*/
 	if(HOSTFS_I(inode)->fd != -1) {
 		close_file(&HOSTFS_I(inode)->fd);
-		printk("Closing host fd in .destroy_inode\n");
+		printk(KERN_DEBUG "Closing host fd in .destroy_inode\n");
 	}
 
 	kfree(HOSTFS_I(inode));
@@ -522,13 +524,17 @@ static struct address_space_operations hostfs_aops = {
 static int init_inode(struct inode *inode, struct dentry *dentry)
 {
 	char *name;
-	int type, err = -ENOMEM, rdev;
+	int type, err = -ENOMEM;
+	int maj, min;
+	dev_t rdev = 0;
 
 	if(dentry){
 		name = dentry_name(dentry, 0);
 		if(name == NULL)
 			goto out;
-		type = file_type(name, &rdev);
+		type = file_type(name, &maj, &min);
+		/*Reencode maj and min with the kernel encoding.*/
+		rdev = MKDEV(maj, min);
 		kfree(name);
 	}
 	else type = OS_TYPE_DIR;
@@ -802,7 +808,7 @@ int hostfs_permission(struct inode *ino, int desired, struct nameidata *nd)
 	if(name == NULL) return(-ENOMEM);
 	err = access_file(name, r, w, x);
 	kfree(name);
-	if(!err) err = vfs_permission(ino, desired);
+	if(!err) err = generic_permission(ino, desired, NULL);
 	return(err);
 }
 

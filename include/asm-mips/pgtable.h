@@ -245,7 +245,8 @@ static inline void update_mmu_cache(struct vm_area_struct *vma,
  */
 #define HAVE_ARCH_UNMAPPED_AREA
 
-#define io_remap_page_range remap_page_range
+#define io_remap_page_range(vma, vaddr, paddr, size, prot)		\
+		remap_pfn_range(vma, vaddr, (paddr) >> PAGE_SHIFT, size, prot)
 
 /*
  * No page table caches to initialise

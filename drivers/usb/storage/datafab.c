@@ -486,7 +486,7 @@ static int datafab_handle_mode_sense(struct us_data *us,
 	if (sense_6)
 		ptr[0] = i - 1;
 	else
-		((u16 *) ptr)[0] = cpu_to_be16(i - 2);
+		((__be16 *) ptr)[0] = cpu_to_be16(i - 2);
 	usb_stor_set_xfer_buf(ptr, i, srb);
 
 	return USB_STOR_TRANSPORT_GOOD;
@@ -543,8 +543,8 @@ int datafab_transport(struct scsi_cmnd * srb, struct us_data *us)
 
 		// build the reply
 		// we need the last sector, not the number of sectors
-		((u32 *) ptr)[0] = cpu_to_be32(info->sectors - 1);
-		((u32 *) ptr)[1] = cpu_to_be32(info->ssize);
+		((__be32 *) ptr)[0] = cpu_to_be32(info->sectors - 1);
+		((__be32 *) ptr)[1] = cpu_to_be32(info->ssize);
 		usb_stor_set_xfer_buf(ptr, 8, srb);
 
 		return USB_STOR_TRANSPORT_GOOD;

@@ -580,7 +580,7 @@ struct teles3_hw {
 
 struct teles0_hw {
 	unsigned int cfg_reg;
-	unsigned long membase;
+	void __iomem *membase;
 	unsigned long phymem;
 };
 
@@ -751,8 +751,8 @@ struct hfcD_hw {
 struct isurf_hw {
 	unsigned int reset;
 	unsigned long phymem;
-	unsigned long isac;
-	unsigned long isar;
+	void __iomem *isac;
+	void __iomem *isar;
 	struct isar_reg isar_r;
 };
 

@@ -536,11 +536,30 @@ void netlink_detachskb(struct sock *sk, struct sk_buff *skb)
 	sock_put(sk);
 }
 
+static inline void netlink_trim(struct sk_buff *skb, int allocation)
+{
+	int delta = skb->end - skb->tail;
+
+	/* If the packet is charged to a socket, the modification
+	 * of truesize below is illegal and will corrupt socket
+	 * buffer accounting state.
+	 */
+	BUG_ON(skb->list != NULL);
+
+	if (delta * 2 < skb->truesize)
+		return;
+	if (pskb_expand_head(skb, 0, -delta, allocation))
+		return;
+	skb->truesize -= delta;
+}
+
 int netlink_unicast(struct sock *ssk, struct sk_buff *skb, u32 pid, int nonblock)
 {
 	struct sock *sk;
 	int err;
 	long timeo;
+
+	netlink_trim(skb, gfp_any());
 
 	timeo = sock_sndtimeo(ssk, nonblock);
 retry:
@@ -574,7 +593,7 @@ static __inline__ int netlink_broadcast_deliver(struct sock *sk, struct sk_buff 
 		skb_set_owner_r(skb, sk);
 		skb_queue_tail(&sk->sk_receive_queue, skb);
 		sk->sk_data_ready(sk, skb->len);
-		return 0;
+		return atomic_read(&sk->sk_rmem_alloc) > sk->sk_rcvbuf;
 	}
 	return -1;
 }
@@ -587,6 +606,10 @@ int netlink_broadcast(struct sock *ssk, struct sk_buff *skb, u32 pid,
 	struct sk_buff *skb2 = NULL;
 	int protocol = ssk->sk_protocol;
 	int failure = 0, delivered = 0;
+	int congested = 0;
+	int val;
+
+	netlink_trim(skb, allocation);
 
 	/* While we sleep in clone, do not allow to change socket list */
 
@@ -619,9 +642,10 @@ int netlink_broadcast(struct sock *ssk, struct sk_buff *skb, u32 pid,
 			netlink_overrun(sk);
 			/* Clone failed. Notify ALL listeners. */
 			failure = 1;
-		} else if (netlink_broadcast_deliver(sk, skb2)) {
+		} else if ((val = netlink_broadcast_deliver(sk, skb2)) < 0) {
 			netlink_overrun(sk);
 		} else {
+			congested |= val;
 			delivered = 1;
 			skb2 = NULL;
 		}
@@ -634,8 +658,11 @@ int netlink_broadcast(struct sock *ssk, struct sk_buff *skb, u32 pid,
 		kfree_skb(skb2);
 	kfree_skb(skb);
 
-	if (delivered)
+	if (delivered) {
+		if (congested && (allocation & __GFP_WAIT))
+			yield();
 		return 0;
+	}
 	if (failure)
 		return -ENOBUFS;
 	return -ESRCH;
@@ -1220,7 +1247,6 @@ MODULE_ALIAS_NETPROTO(PF_NETLINK);
 
 EXPORT_SYMBOL(netlink_ack);
 EXPORT_SYMBOL(netlink_broadcast);
-EXPORT_SYMBOL(netlink_broadcast_deliver);
 EXPORT_SYMBOL(netlink_dump_start);
 EXPORT_SYMBOL(netlink_kernel_create);
 EXPORT_SYMBOL(netlink_register_notifier);

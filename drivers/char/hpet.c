@@ -28,13 +28,13 @@
 #include <linux/wait.h>
 #include <linux/bcd.h>
 #include <linux/seq_file.h>
+#include <linux/bitops.h>
 
 #include <asm/current.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/irq.h>
-#include <asm/bitops.h>
 #include <asm/div64.h>
 
 #include <linux/acpi.h>
@@ -273,9 +273,9 @@ static int hpet_mmap(struct file *file, struct vm_area_struct *vma)
 	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 	addr = __pa(addr);
 
-	if (remap_page_range
-	    (vma, vma->vm_start, addr, PAGE_SIZE, vma->vm_page_prot)) {
-		printk(KERN_ERR "remap_page_range failed in hpet.c\n");
+	if (remap_pfn_range(vma, vma->vm_start, addr >> PAGE_SHIFT,
+					PAGE_SIZE, vma->vm_page_prot)) {
+		printk(KERN_ERR "remap_pfn_range failed in hpet.c\n");
 		return -EAGAIN;
 	}
 
@@ -925,7 +925,7 @@ static int __init hpet_acpi_remove(struct acpi_device *device, int type)
 	return 0;
 }
 
-static struct acpi_driver hpet_acpi_driver __initdata = {
+static struct acpi_driver hpet_acpi_driver = {
 	.name = "hpet",
 	.ids = "PNP0103",
 	.ops = {

@@ -161,8 +161,8 @@
 #include <linux/types.h>
 #include <linux/unistd.h>
 #include <linux/ctype.h>
+#include <linux/bitops.h>
 
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
 #include <asm/uaccess.h>
@@ -305,6 +305,8 @@ static int ewrk3_close(struct net_device *dev);
 static struct net_device_stats *ewrk3_get_stats(struct net_device *dev);
 static void set_multicast_list(struct net_device *dev);
 static int ewrk3_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
+static struct ethtool_ops ethtool_ops_203;
+static struct ethtool_ops ethtool_ops;
 
 /*
    ** Private functions
@@ -532,7 +534,7 @@ ewrk3_hw_init(struct net_device *dev, u_long iobase)
 		printk("      is in I/O only mode");
 	}
 
-	lp = (struct ewrk3_private *) dev->priv;
+	lp = netdev_priv(dev);
 	lp->shmem_base = mem_start;
 	lp->shmem_length = shmem_length;
 	lp->lemac = lemac;
@@ -610,6 +612,10 @@ ewrk3_hw_init(struct net_device *dev, u_long iobase)
 	dev->get_stats = ewrk3_get_stats;
 	dev->set_multicast_list = set_multicast_list;
 	dev->do_ioctl = ewrk3_ioctl;
+	if (lp->adapter_name[4] == '3')
+		SET_ETHTOOL_OPS(dev, &ethtool_ops_203);
+	else
+		SET_ETHTOOL_OPS(dev, &ethtool_ops);
 	dev->tx_timeout = ewrk3_timeout;
 	dev->watchdog_timeo = QUEUE_PKT_TIMEOUT;
 	
@@ -621,7 +627,7 @@ ewrk3_hw_init(struct net_device *dev, u_long iobase)
 
 static int ewrk3_open(struct net_device *dev)
 {
-	struct ewrk3_private *lp = (struct ewrk3_private *) dev->priv;
+	struct ewrk3_private *lp = netdev_priv(dev);
 	u_long iobase = dev->base_addr;
 	int i, status = 0;
 	u_char icr, csr;
@@ -684,7 +690,7 @@ static int ewrk3_open(struct net_device *dev)
  */
 static void ewrk3_init(struct net_device *dev)
 {
-	struct ewrk3_private *lp = (struct ewrk3_private *) dev->priv;
+	struct ewrk3_private *lp = netdev_priv(dev);
 	u_char csr, page;
 	u_long iobase = dev->base_addr;
 	int i;
@@ -725,7 +731,7 @@ static void ewrk3_init(struct net_device *dev)
  
 static void ewrk3_timeout(struct net_device *dev)
 {
-	struct ewrk3_private *lp = (struct ewrk3_private *) dev->priv;
+	struct ewrk3_private *lp = netdev_priv(dev);
 	u_char icr, csr;
 	u_long iobase = dev->base_addr;
 	
@@ -761,7 +767,7 @@ static void ewrk3_timeout(struct net_device *dev)
  */
 static int ewrk3_queue_pkt (struct sk_buff *skb, struct net_device *dev)
 {
-	struct ewrk3_private *lp = (struct ewrk3_private *) dev->priv;
+	struct ewrk3_private *lp = netdev_priv(dev);
 	u_long iobase = dev->base_addr;
 	u_long buf = 0;
 	u_char icr;
@@ -883,7 +889,7 @@ static irqreturn_t ewrk3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	u_long iobase;
 	u_char icr, cr, csr;
 
-	lp = (struct ewrk3_private *) dev->priv;
+	lp = netdev_priv(dev);
 	iobase = dev->base_addr;
 
 	/* get the interrupt information */
@@ -931,7 +937,7 @@ static irqreturn_t ewrk3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 /* Called with lp->hw_lock held */
 static int ewrk3_rx(struct net_device *dev)
 {
-	struct ewrk3_private *lp = (struct ewrk3_private *) dev->priv;
+	struct ewrk3_private *lp = netdev_priv(dev);
 	u_long iobase = dev->base_addr;
 	int i, status = 0;
 	u_char page;
@@ -1059,7 +1065,7 @@ static int ewrk3_rx(struct net_device *dev)
 */
 static int ewrk3_tx(struct net_device *dev)
 {
-	struct ewrk3_private *lp = (struct ewrk3_private *) dev->priv;
+	struct ewrk3_private *lp = netdev_priv(dev);
 	u_long iobase = dev->base_addr;
 	u_char tx_status;
 
@@ -1095,7 +1101,7 @@ static int ewrk3_tx(struct net_device *dev)
 
 static int ewrk3_close(struct net_device *dev)
 {
-	struct ewrk3_private *lp = (struct ewrk3_private *) dev->priv;
+	struct ewrk3_private *lp = netdev_priv(dev);
 	u_long iobase = dev->base_addr;
 	u_char icr, csr;
 
@@ -1130,7 +1136,7 @@ static int ewrk3_close(struct net_device *dev)
 
 static struct net_device_stats *ewrk3_get_stats(struct net_device *dev)
 {
-	struct ewrk3_private *lp = (struct ewrk3_private *) dev->priv;
+	struct ewrk3_private *lp = netdev_priv(dev);
 
 	/* Null body since there is no framing error counter */
 	return &lp->stats;
@@ -1141,7 +1147,7 @@ static struct net_device_stats *ewrk3_get_stats(struct net_device *dev)
  */
 static void set_multicast_list(struct net_device *dev)
 {
-	struct ewrk3_private *lp = (struct ewrk3_private *) dev->priv;
+	struct ewrk3_private *lp = netdev_priv(dev);
 	u_long iobase = dev->base_addr;
 	u_char csr;
 
@@ -1174,7 +1180,7 @@ static void set_multicast_list(struct net_device *dev)
  */
 static void SetMulticastFilter(struct net_device *dev)
 {
-	struct ewrk3_private *lp = (struct ewrk3_private *) dev->priv;
+	struct ewrk3_private *lp = netdev_priv(dev);
 	struct dev_mc_list *dmi = dev->mc_list;
 	u_long iobase = dev->base_addr;
 	int i;
@@ -1520,187 +1526,165 @@ static int __init EISA_signature(char *name, s32 eisa_id)
 	return status;		/* return the device name string */
 }
 
-static int ewrk3_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
+static void ewrk3_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
 {
-	struct ewrk3_private *lp = (struct ewrk3_private *) dev->priv;
-	u_long iobase = dev->base_addr;
-	u32 ethcmd;
+	int fwrev = Read_EEPROM(dev->base_addr, EEPROM_REVLVL);
 
-	if (get_user(ethcmd, (u32 __user *)useraddr))
-		return -EFAULT;
-
-	switch (ethcmd) {
-
-	/* Get driver info */
-	case ETHTOOL_GDRVINFO: {
-		struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
-		int fwrev = Read_EEPROM(dev->base_addr, EEPROM_REVLVL);
-
-		strcpy(info.driver, DRV_NAME);
-		strcpy(info.version, DRV_VERSION);
-		sprintf(info.fw_version, "%d", fwrev);
-		strcpy(info.bus_info, "N/A");
-		info.eedump_len = EEPROM_MAX;
-		if (copy_to_user(useraddr, &info, sizeof(info)))
-			return -EFAULT;
-		return 0;
-	}
-
-	/* Get settings */
-	case ETHTOOL_GSET: {
-		struct ethtool_cmd ecmd = { ETHTOOL_GSET };
-		u_char cr = inb(EWRK3_CR);
-
-		switch (lp->adapter_name[4]) {
-		case '3': /* DE203 */
-			ecmd.supported = SUPPORTED_BNC;
-			ecmd.port = PORT_BNC;
-			break;
-
-		case '4': /* DE204 */
-			ecmd.supported = SUPPORTED_TP;
-			ecmd.port = PORT_TP;
-			break;
-
-		case '5': /* DE205 */
-			ecmd.supported = SUPPORTED_TP | SUPPORTED_BNC | SUPPORTED_AUI;
-			ecmd.autoneg = !(cr & CR_APD);
-			/*
-			** Port is only valid if autoneg is disabled
-			** and even then we don't know if AUI is jumpered.
-			*/
-			if (!ecmd.autoneg)
-				ecmd.port = (cr & CR_PSEL) ? PORT_BNC : PORT_TP;
-			break;
-		}
-
-		ecmd.supported |= SUPPORTED_10baseT_Half;
-		ecmd.speed = SPEED_10;
-		ecmd.duplex = DUPLEX_HALF;
-
-		if (copy_to_user(useraddr, &ecmd, sizeof(ecmd)))
-			return -EFAULT;
-		return 0;
-	}
-
-	/* Set settings */
-	case ETHTOOL_SSET: {
-		struct ethtool_cmd ecmd;
-		u_char cr;
-		u_long flags;
-
-		/* DE205 is the only card with anything to set */
-		if (lp->adapter_name[4] != '5')
-			return -EOPNOTSUPP;
-
-		if (copy_from_user(&ecmd, useraddr, sizeof(ecmd)))
-			return -EFAULT;
-
-		/* Sanity-check parameters */
-		if (ecmd.speed != SPEED_10)
-			return -EINVAL;
-		if (ecmd.port != PORT_TP && ecmd.port != PORT_BNC)
-			return -EINVAL; /* AUI is not software-selectable */
-		if (ecmd.transceiver != XCVR_INTERNAL)
-			return -EINVAL;
-		if (ecmd.duplex != DUPLEX_HALF)
-			return -EINVAL;
-		if (ecmd.phy_address != 0)
-			return -EINVAL;
-
-		spin_lock_irqsave(&lp->hw_lock, flags);
-		cr = inb(EWRK3_CR);
-
-		/* If Autoneg is set, change to Auto Port mode */
-		/* Otherwise, disable Auto Port and set port explicitly */
-		if (ecmd.autoneg) {
-			cr &= ~CR_APD;
-		} else {
-			cr |= CR_APD;
-			if (ecmd.port == PORT_TP)
-				cr &= ~CR_PSEL;		/* Force TP */
-			else
-				cr |= CR_PSEL;		/* Force BNC */
-		}
-
-		/* Commit the changes */
-		outb(cr, EWRK3_CR);
-
-		spin_unlock_irqrestore(&lp->hw_lock, flags);
-		if (copy_to_user(useraddr, &ecmd, sizeof(ecmd)))
-			return -EFAULT;
-		return 0;
-	}
-
-	/* Get link status */
-	case ETHTOOL_GLINK: {
-		struct ethtool_value edata = { ETHTOOL_GLINK };
-		u_char cmr = inb(EWRK3_CMR);
-
-		/* DE203 has BNC only and link status does not apply */
-		if (lp->adapter_name[4] == '3')
-			return -EOPNOTSUPP;
-
-		/* On DE204 this is always valid since TP is the only port. */
-		/* On DE205 this reflects TP status even if BNC or AUI is selected. */
-		edata.data = !(cmr & CMR_LINK);
-
-		if (copy_to_user(useraddr, &edata, sizeof(edata)))
-			return -EFAULT;
-		return 0;
-	}
-
-	/* Blink LED for identification */
-	case ETHTOOL_PHYS_ID: {
-		struct ethtool_value edata;
-		u_long flags;
-		u_char cr;
-		int count;
-
-		if (copy_from_user(&edata, useraddr, sizeof(edata)))
-			return -EFAULT;
-
-		/* Toggle LED 4x per second */
-		count = edata.data << 2;
-
-		spin_lock_irqsave(&lp->hw_lock, flags);
-
-		/* Bail if a PHYS_ID is already in progress */
-		if (lp->led_mask == 0) {
-			spin_unlock_irqrestore(&lp->hw_lock, flags);
-			return -EBUSY;
-		}
-
-		/* Prevent ISR from twiddling the LED */
-		lp->led_mask = 0;
-
-		while (count--) {
-			/* Toggle the LED */
-			cr = inb(EWRK3_CR);
-			outb(cr ^ CR_LED, EWRK3_CR);
-
-			/* Wait a little while */
-			spin_unlock_irqrestore(&lp->hw_lock, flags);
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout(HZ>>2);
-			spin_lock_irqsave(&lp->hw_lock, flags);
-
-			/* Exit if we got a signal */
-			if (signal_pending(current))
-				break;
-		}
-
-		lp->led_mask = CR_LED;
-		cr = inb(EWRK3_CR);
-		outb(cr & ~CR_LED, EWRK3_CR);
-		spin_unlock_irqrestore(&lp->hw_lock, flags);
-		return signal_pending(current) ? -ERESTARTSYS : 0;
-	}
-
-	}
-
-	return -EOPNOTSUPP;
+	strcpy(info->driver, DRV_NAME);
+	strcpy(info->version, DRV_VERSION);
+	sprintf(info->fw_version, "%d", fwrev);
+	strcpy(info->bus_info, "N/A");
+	info->eedump_len = EEPROM_MAX;
 }
+
+static int ewrk3_get_settings(struct net_device *dev, struct ethtool_cmd *ecmd)
+{
+	struct ewrk3_private *lp = netdev_priv(dev);
+	unsigned long iobase = dev->base_addr;
+	u8 cr = inb(EWRK3_CR);
+
+	switch (lp->adapter_name[4]) {
+	case '3': /* DE203 */
+		ecmd->supported = SUPPORTED_BNC;
+		ecmd->port = PORT_BNC;
+		break;
+
+	case '4': /* DE204 */
+		ecmd->supported = SUPPORTED_TP;
+		ecmd->port = PORT_TP;
+		break;
+
+	case '5': /* DE205 */
+		ecmd->supported = SUPPORTED_TP | SUPPORTED_BNC | SUPPORTED_AUI;
+		ecmd->autoneg = !(cr & CR_APD);
+		/*
+		** Port is only valid if autoneg is disabled
+		** and even then we don't know if AUI is jumpered.
+		*/
+		if (!ecmd->autoneg)
+			ecmd->port = (cr & CR_PSEL) ? PORT_BNC : PORT_TP;
+		break;
+	}
+
+	ecmd->supported |= SUPPORTED_10baseT_Half;
+	ecmd->speed = SPEED_10;
+	ecmd->duplex = DUPLEX_HALF;
+	return 0;
+}
+
+static int ewrk3_set_settings(struct net_device *dev, struct ethtool_cmd *ecmd)
+{
+	struct ewrk3_private *lp = netdev_priv(dev);
+	unsigned long iobase = dev->base_addr;
+	unsigned long flags;
+	u8 cr;
+
+	/* DE205 is the only card with anything to set */
+	if (lp->adapter_name[4] != '5')
+		return -EOPNOTSUPP;
+
+	/* Sanity-check parameters */
+	if (ecmd->speed != SPEED_10)
+		return -EINVAL;
+	if (ecmd->port != PORT_TP && ecmd->port != PORT_BNC)
+		return -EINVAL; /* AUI is not software-selectable */
+	if (ecmd->transceiver != XCVR_INTERNAL)
+		return -EINVAL;
+	if (ecmd->duplex != DUPLEX_HALF)
+		return -EINVAL;
+	if (ecmd->phy_address != 0)
+		return -EINVAL;
+
+	spin_lock_irqsave(&lp->hw_lock, flags);
+	cr = inb(EWRK3_CR);
+
+	/* If Autoneg is set, change to Auto Port mode */
+	/* Otherwise, disable Auto Port and set port explicitly */
+	if (ecmd->autoneg) {
+		cr &= ~CR_APD;
+	} else {
+		cr |= CR_APD;
+		if (ecmd->port == PORT_TP)
+			cr &= ~CR_PSEL;		/* Force TP */
+		else
+			cr |= CR_PSEL;		/* Force BNC */
+	}
+
+	/* Commit the changes */
+	outb(cr, EWRK3_CR);
+	spin_unlock_irqrestore(&lp->hw_lock, flags);
+	return 0;
+}
+
+static u32 ewrk3_get_link(struct net_device *dev)
+{
+	unsigned long iobase = dev->base_addr;
+	u8 cmr = inb(EWRK3_CMR);
+	/* DE203 has BNC only and link status does not apply */
+	/* On DE204 this is always valid since TP is the only port. */
+	/* On DE205 this reflects TP status even if BNC or AUI is selected. */
+	return !(cmr & CMR_LINK);
+}
+
+static int ewrk3_phys_id(struct net_device *dev, u32 data)
+{
+	struct ewrk3_private *lp = netdev_priv(dev);
+	unsigned long iobase = dev->base_addr;
+	unsigned long flags;
+	u8 cr;
+	int count;
+
+	/* Toggle LED 4x per second */
+	count = data << 2;
+
+	spin_lock_irqsave(&lp->hw_lock, flags);
+
+	/* Bail if a PHYS_ID is already in progress */
+	if (lp->led_mask == 0) {
+		spin_unlock_irqrestore(&lp->hw_lock, flags);
+		return -EBUSY;
+	}
+
+	/* Prevent ISR from twiddling the LED */
+	lp->led_mask = 0;
+
+	while (count--) {
+		/* Toggle the LED */
+		cr = inb(EWRK3_CR);
+		outb(cr ^ CR_LED, EWRK3_CR);
+
+		/* Wait a little while */
+		spin_unlock_irqrestore(&lp->hw_lock, flags);
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_timeout(HZ>>2);
+		spin_lock_irqsave(&lp->hw_lock, flags);
+
+		/* Exit if we got a signal */
+		if (signal_pending(current))
+			break;
+	}
+
+	lp->led_mask = CR_LED;
+	cr = inb(EWRK3_CR);
+	outb(cr & ~CR_LED, EWRK3_CR);
+	spin_unlock_irqrestore(&lp->hw_lock, flags);
+	return signal_pending(current) ? -ERESTARTSYS : 0;
+}
+
+static struct ethtool_ops ethtool_ops_203 = {
+	.get_drvinfo = ewrk3_get_drvinfo,
+	.get_settings = ewrk3_get_settings,
+	.set_settings = ewrk3_set_settings,
+	.phys_id = ewrk3_phys_id,
+};
+
+static struct ethtool_ops ethtool_ops = {
+	.get_drvinfo = ewrk3_get_drvinfo,
+	.get_settings = ewrk3_get_settings,
+	.set_settings = ewrk3_set_settings,
+	.get_link = ewrk3_get_link,
+	.phys_id = ewrk3_phys_id,
+};
 
 /*
    ** Perform IOCTL call functions here. Some are privileged operations and the
@@ -1708,7 +1692,7 @@ static int ewrk3_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
  */
 static int ewrk3_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
-	struct ewrk3_private *lp = (struct ewrk3_private *) dev->priv;
+	struct ewrk3_private *lp = netdev_priv(dev);
 	struct ewrk3_ioctl *ioc = (struct ewrk3_ioctl *) &rq->ifr_ifru;
 	u_long iobase = dev->base_addr;
 	int i, j, status = 0;
@@ -1721,11 +1705,7 @@ static int ewrk3_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	
 	union ewrk3_addr *tmp;
 
-	/* ethtool IOCTLs are handled elsewhere */
-	if (cmd == SIOCETHTOOL)
-		return ewrk3_ethtool_ioctl(dev, rq->ifr_data);
-
-	/* Other than ethtool, all we handle are private IOCTLs */
+	/* All we handle are private IOCTLs */
 	if (cmd != EWRK3IOCTL)
 		return -EOPNOTSUPP;
 

@@ -668,8 +668,7 @@ static void whiteheat_close(struct usb_serial_port *port, struct file * filp)
 
 	if (port->tty->driver->flush_buffer)
 		port->tty->driver->flush_buffer(port->tty);
-	if (port->tty->ldisc.flush_buffer)
-		port->tty->ldisc.flush_buffer(port->tty);
+	tty_ldisc_flush(port->tty);
 
 	firm_report_tx_done(port);
 
@@ -680,7 +679,7 @@ static void whiteheat_close(struct usb_serial_port *port, struct file * filp)
 	list_for_each_safe(tmp, tmp2, &info->rx_urbs_submitted) {
 		wrap = list_entry(tmp, struct whiteheat_urb_wrap, list);
 		urb = wrap->urb;
-		usb_unlink_urb(urb);
+		usb_kill_urb(urb);
 		list_del(tmp);
 		list_add(tmp, &info->rx_urbs_free);
 	}
@@ -691,7 +690,7 @@ static void whiteheat_close(struct usb_serial_port *port, struct file * filp)
 	list_for_each_safe(tmp, tmp2, &info->tx_urbs_submitted) {
 		wrap = list_entry(tmp, struct whiteheat_urb_wrap, list);
 		urb = wrap->urb;
-		usb_unlink_urb(urb);
+		usb_kill_urb(urb);
 		list_del(tmp);
 		list_add(tmp, &info->tx_urbs_free);
 	}
@@ -1344,7 +1343,7 @@ static void stop_command_port(struct usb_serial *serial)
 	spin_lock_irqsave(&command_info->lock, flags);
 	command_info->port_running--;
 	if (!command_info->port_running)
-		usb_unlink_urb(command_port->read_urb);
+		usb_kill_urb(command_port->read_urb);
 	spin_unlock_irqrestore(&command_info->lock, flags);
 }
 
@@ -1372,7 +1371,7 @@ static int start_port_read(struct usb_serial_port *port)
 			list_for_each_safe(tmp, tmp2, &info->rx_urbs_submitted) {
 				wrap = list_entry(tmp, struct whiteheat_urb_wrap, list);
 				urb = wrap->urb;
-				usb_unlink_urb(urb);
+				usb_kill_urb(urb);
 				list_del(tmp);
 				list_add(tmp, &info->rx_urbs_free);
 			}

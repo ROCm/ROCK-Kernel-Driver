@@ -19,7 +19,9 @@
 #include <asm/hardware.h>
 #include <asm/memory.h>
 #include <asm/system.h>
+#include <asm/arch/pxa-regs.h>
 #include <asm/arch/lubbock.h>
+#include <asm/mach/time.h>
 
 
 /*
@@ -45,9 +47,6 @@ extern void pxa_cpu_resume(void);
  */
 enum {	SLEEP_SAVE_START = 0,
 
-	SLEEP_SAVE_OIER,
-	SLEEP_SAVE_OSMR0, SLEEP_SAVE_OSMR1, SLEEP_SAVE_OSMR2, SLEEP_SAVE_OSMR3,
-
 	SLEEP_SAVE_GPLR0, SLEEP_SAVE_GPLR1, SLEEP_SAVE_GPLR2,
 	SLEEP_SAVE_GPDR0, SLEEP_SAVE_GPDR1, SLEEP_SAVE_GPDR2,
 	SLEEP_SAVE_GRER0, SLEEP_SAVE_GRER1, SLEEP_SAVE_GRER2,
@@ -68,21 +67,16 @@ static int pxa_pm_enter(u32 state)
 {
 	unsigned long sleep_save[SLEEP_SAVE_SIZE];
 	unsigned long checksum = 0;
-	unsigned long delta;
+	struct timespec delta, rtc;
 	int i;
 
 	if (state != PM_SUSPEND_MEM)
 		return -EINVAL;
 
 	/* preserve current time */
-	delta = xtime.tv_sec - RCNR;
-
-	/* save vital registers */
-	SAVE(OSMR0);
-	SAVE(OSMR1);
-	SAVE(OSMR2);
-	SAVE(OSMR3);
-	SAVE(OIER);
+	rtc.tv_sec = RCNR;
+	rtc.tv_nsec = 0;
+	save_time_delta(&delta, &rtc);
 
 	SAVE(GPLR0); SAVE(GPLR1); SAVE(GPLR2);
 	SAVE(GPDR0); SAVE(GPDR1); SAVE(GPDR2);
@@ -144,15 +138,6 @@ static int pxa_pm_enter(u32 state)
 
 	PSSR = PSSR_RDH | PSSR_PH;
 
-	RESTORE(OSMR0);
-	RESTORE(OSMR1);
-	RESTORE(OSMR2);
-	RESTORE(OSMR3);
-	RESTORE(OIER);
-
-	/* OSMR0 is the system timer: make sure OSCR is sufficiently behind */
-	OSCR = OSMR0 - LATCH;
-
 	RESTORE(CKEN);
 
 	ICLR = 0;
@@ -160,7 +145,8 @@ static int pxa_pm_enter(u32 state)
 	RESTORE(ICMR);
 
 	/* restore current time */
-	xtime.tv_sec = RCNR + delta;
+	rtc.tv_sec = RCNR;
+	restore_time_delta(&delta, &rtc);
 
 #ifdef DEBUG
 	printk(KERN_DEBUG "*** made it back from resume\n");

@@ -100,7 +100,7 @@ int device_suspend(u32 state)
 	goto Done;
 }
 
-EXPORT_SYMBOL(device_suspend);
+EXPORT_SYMBOL_GPL(device_suspend);
 
 
 /**
@@ -132,5 +132,5 @@ int device_power_down(u32 state)
 	goto Done;
 }
 
-EXPORT_SYMBOL(device_power_down);
+EXPORT_SYMBOL_GPL(device_power_down);
 

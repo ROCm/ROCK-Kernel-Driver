@@ -399,7 +399,7 @@ static int show_journal(struct seq_file *m, struct super_block *sb)
                         DJP( jp_journal_trans_max ),
                         DJP( jp_journal_magic ),
                         DJP( jp_journal_max_batch ),
-                        SB_JOURNAL_MAX_COMMIT_AGE(sb),
+			SB_JOURNAL(sb)->j_max_commit_age,
                         DJP( jp_journal_max_trans_age ),
 
 			JF( j_1st_reserved_block ),			

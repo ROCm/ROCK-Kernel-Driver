@@ -26,7 +26,7 @@
 #include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/time.h>
-#include <linux/irq.h>
+#include <linux/interrupt.h>
 #include <linux/moduleparam.h>
 #include <sound/core.h>
 #include <sound/sb.h>
@@ -48,19 +48,18 @@ static long sbport[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;	/* 0x220,0x240 */
 static long wssport[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;	/* 0x530,0xe80,0xf40,0x604 */
 static int irq[SNDRV_CARDS] = SNDRV_DEFAULT_IRQ;	/* 7,9,10,11 */
 static int dma1[SNDRV_CARDS] = SNDRV_DEFAULT_DMA;	/* 0,1,3 */
-static int boot_devs;
 
-module_param_array(index, int, boot_devs, 0444);
+module_param_array(index, int, NULL, 0444);
 MODULE_PARM_DESC(index, "Index value for Sound Galaxy soundcard.");
-module_param_array(id, charp, boot_devs, 0444);
+module_param_array(id, charp, NULL, 0444);
 MODULE_PARM_DESC(id, "ID string for Sound Galaxy soundcard.");
-module_param_array(sbport, long, boot_devs, 0444);
+module_param_array(sbport, long, NULL, 0444);
 MODULE_PARM_DESC(sbport, "Port # for Sound Galaxy SB driver.");
-module_param_array(wssport, long, boot_devs, 0444);
+module_param_array(wssport, long, NULL, 0444);
 MODULE_PARM_DESC(wssport, "Port # for Sound Galaxy WSS driver.");
-module_param_array(irq, int, boot_devs, 0444);
+module_param_array(irq, int, NULL, 0444);
 MODULE_PARM_DESC(irq, "IRQ # for Sound Galaxy driver.");
-module_param_array(dma1, int, boot_devs, 0444);
+module_param_array(dma1, int, NULL, 0444);
 MODULE_PARM_DESC(dma1, "DMA1 # for Sound Galaxy driver.");
 
 #define SGALAXY_AUXC_LEFT 18

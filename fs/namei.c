@@ -25,6 +25,7 @@
 #include <linux/smp_lock.h>
 #include <linux/personality.h>
 #include <linux/security.h>
+#include <linux/syscalls.h>
 #include <linux/mount.h>
 #include <linux/audit.h>
 #include <asm/namei.h>
@@ -151,15 +152,19 @@ char * getname(const char __user * filename)
 	return result;
 }
 
-/*
- *	vfs_permission()
+/**
+ * generic_permission  -  check for access rights on a Posix-like filesystem
+ * @inode:	inode to check access rights for
+ * @mask:	right to check for (%MAY_READ, %MAY_WRITE, %MAY_EXEC)
+ * @check_acl:	optional callback to check for Posix ACLs
  *
- * is used to check for read/write/execute permissions on a file.
+ * Used to check for read/write/execute permissions on a file.
  * We use "fsuid" for this, letting us set arbitrary permissions
  * for filesystem access without changing the "normal" uids which
  * are used for other things..
  */
-int vfs_permission(struct inode * inode, int mask)
+int generic_permission(struct inode *inode, int mask,
+		int (*check_acl)(struct inode *inode, int mask))
 {
 	umode_t			mode = inode->i_mode;
 
@@ -180,8 +185,18 @@ int vfs_permission(struct inode * inode, int mask)
 
 	if (current->fsuid == inode->i_uid)
 		mode >>= 6;
-	else if (in_group_p(inode->i_gid))
-		mode >>= 3;
+	else {
+		if (IS_POSIXACL(inode) && (mode & S_IRWXG) && check_acl) {
+			int error = check_acl(inode, mask);
+			if (error == -EACCES)
+				goto check_capabilities;
+			else if (error != -EAGAIN)
+				return error;
+		}
+
+		if (in_group_p(inode->i_gid))
+			mode >>= 3;
+	}
 
 	/*
 	 * If the DACs are ok we don't need any capability check.
@@ -189,6 +204,7 @@ int vfs_permission(struct inode * inode, int mask)
 	if (((mode & mask & (MAY_READ|MAY_WRITE|MAY_EXEC)) == mask))
 		return 0;
 
+ check_capabilities:
 	/*
 	 * Read/write DACs are always overridable.
 	 * Executable DACs are overridable if at least one exec bit is set.
@@ -219,7 +235,7 @@ int permission(struct inode * inode,int mask, struct nameidata *nd)
 	if (inode->i_op && inode->i_op->permission)
 		retval = inode->i_op->permission(inode, submask, nd);
 	else
-		retval = vfs_permission(inode, submask);
+		retval = generic_permission(inode, submask, NULL);
 	if (retval)
 		return retval;
 
@@ -314,7 +330,7 @@ static struct dentry * cached_lookup(struct dentry * parent, struct qstr * name,
 /*
  * Short-cut version of permission(), for calling by
  * path_walk(), when dcache lock is held.  Combines parts
- * of permission() and vfs_permission(), and tests ONLY for
+ * of permission() and generic_permission(), and tests ONLY for
  * MAY_EXEC permission.
  *
  * If appropriate, check DAC only.  If not appropriate, or
@@ -897,20 +913,20 @@ static int __emul_lookup_dentry(const char *name, struct nameidata *nd)
 	return 1;
 }
 
-void set_fs_altroot(void)
+int __set_fs_altroot(const char *altroot)
 {
-	char *emul = __emul_prefix();
 	struct nameidata nd;
 	struct vfsmount *mnt = NULL, *oldmnt;
 	struct dentry *dentry = NULL, *olddentry;
 	int err;
-
-	if (!emul)
+	if (!altroot)
 		goto set_it;
-	err = path_lookup(emul, LOOKUP_FOLLOW|LOOKUP_DIRECTORY|LOOKUP_NOALT, &nd);
+	err = path_lookup(altroot, LOOKUP_FOLLOW|LOOKUP_DIRECTORY|LOOKUP_NOALT, &nd);
 	if (!err) {
 		mnt = nd.mnt;
 		dentry = nd.dentry;
+	} else {
+		return err;
 	}
 set_it:
 	write_lock(&current->fs->lock);
@@ -923,6 +939,58 @@ set_it:
 		dput(olddentry);
 		mntput(oldmnt);
 	}
+	return 0;
+}
+
+void set_fs_altroot(void)
+{
+	char *emul = __emul_prefix();
+
+	__set_fs_altroot(emul);
+}
+
+asmlinkage long sys_setaltroot(const char __user * altroot)
+{
+	char *emul = NULL;
+	int ret;
+
+	if (altroot) {
+		emul = getname(altroot);
+		if (IS_ERR(emul)) {
+			ret = PTR_ERR(emul);
+			goto out;
+		}
+	}
+
+	if (atomic_read(&current->fs->count) != 1) {
+		struct fs_struct *fsp, *ofsp;
+
+		fsp = copy_fs_struct(current->fs);
+		if (fsp == NULL) {
+			ret = -ENOMEM;
+			goto out_putname;
+		}
+
+		task_lock(current);
+		ofsp = current->fs;
+		current->fs = fsp;
+		task_unlock(current);
+
+		put_fs_struct(ofsp);
+	}
+
+	/*
+	 * At that point we are guaranteed to be the sole owner of
+	 * current->fs.
+	 */
+
+	ret = __set_fs_altroot(emul);
+
+out_putname:
+	if (emul)
+		putname(emul);
+out:
+	return ret;
 }
 
 int fastcall path_lookup(const char *name, unsigned int flags, struct nameidata *nd)
@@ -1825,13 +1893,12 @@ asmlinkage long sys_unlink(const char __user * pathname)
 		dput(dentry);
 	}
 	up(&nd.dentry->d_inode->i_sem);
+	if (inode)
+		iput(inode);	/* truncate the inode here */
 exit1:
 	path_release(&nd);
 exit:
 	putname(name);
-
-	if (inode)
-		iput(inode);	/* truncate the inode here */
 	return error;
 
 slashes:
@@ -2386,7 +2453,6 @@ EXPORT_SYMBOL(follow_up);
 EXPORT_SYMBOL(get_write_access); /* binfmt_aout */
 EXPORT_SYMBOL(getname);
 EXPORT_SYMBOL(lock_rename);
-EXPORT_SYMBOL(lookup_create);
 EXPORT_SYMBOL(lookup_hash);
 EXPORT_SYMBOL(lookup_one_len);
 EXPORT_SYMBOL(page_follow_link);
@@ -2405,7 +2471,7 @@ EXPORT_SYMBOL(vfs_follow_link);
 EXPORT_SYMBOL(vfs_link);
 EXPORT_SYMBOL(vfs_mkdir);
 EXPORT_SYMBOL(vfs_mknod);
-EXPORT_SYMBOL(vfs_permission);
+EXPORT_SYMBOL(generic_permission);
 EXPORT_SYMBOL(vfs_readlink);
 EXPORT_SYMBOL(vfs_rename);
 EXPORT_SYMBOL(vfs_rmdir);

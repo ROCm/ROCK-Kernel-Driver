@@ -377,14 +377,9 @@ out:
 /*
  *	device anycast group decrement
  */
-int ipv6_dev_ac_dec(struct net_device *dev, struct in6_addr *addr)
+int __ipv6_dev_ac_dec(struct inet6_dev *idev, struct in6_addr *addr)
 {
-	struct inet6_dev *idev;
 	struct ifacaddr6 *aca, *prev_aca;
-
-	idev = in6_dev_get(dev);
-	if (idev == NULL)
-		return -ENODEV;
 
 	write_lock_bh(&idev->lock);
 	prev_aca = NULL;
@@ -395,12 +390,10 @@ int ipv6_dev_ac_dec(struct net_device *dev, struct in6_addr *addr)
 	}
 	if (!aca) {
 		write_unlock_bh(&idev->lock);
-		in6_dev_put(idev);
 		return -ENOENT;
 	}
 	if (--aca->aca_users > 0) {
 		write_unlock_bh(&idev->lock);
-		in6_dev_put(idev);
 		return 0;
 	}
 	if (prev_aca)
@@ -408,7 +401,7 @@ int ipv6_dev_ac_dec(struct net_device *dev, struct in6_addr *addr)
 	else
 		idev->ac_list = aca->aca_next;
 	write_unlock_bh(&idev->lock);
-	addrconf_leave_solict(dev, &aca->aca_addr);
+	addrconf_leave_solict(idev, &aca->aca_addr);
 
 	dst_hold(&aca->aca_rt->u.dst);
 	if (ip6_del_rt(aca->aca_rt, NULL, NULL))
@@ -417,10 +410,20 @@ int ipv6_dev_ac_dec(struct net_device *dev, struct in6_addr *addr)
 		dst_release(&aca->aca_rt->u.dst);
 
 	aca_put(aca);
-	in6_dev_put(idev);
 	return 0;
 }
 
+int ipv6_dev_ac_dec(struct net_device *dev, struct in6_addr *addr)
+{
+	int ret;
+	struct inet6_dev *idev = in6_dev_get(dev);
+	if (idev == NULL)
+		return -ENODEV;
+	ret = __ipv6_dev_ac_dec(idev, addr);
+	in6_dev_put(idev);
+	return ret;
+}
+	
 /*
  *	check if the interface has this anycast address
  */

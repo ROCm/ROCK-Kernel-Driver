@@ -422,10 +422,7 @@ static void send_buffers(struct port_info *pi)
 			pi->overflowMessage = 0;
 
 		if (pi->tty) {
-			if ((pi->tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-			    (pi->tty->ldisc.write_wakeup))
-				(pi->tty->ldisc.write_wakeup)(pi->tty);
-			wake_up_interruptible(&pi->tty->write_wait);
+			tty_wakeup(pi->tty);
 		}
 	}
 

@@ -235,6 +235,8 @@ firmware_data_write(struct kobject *kobj,
 	struct firmware *fw;
 	ssize_t retval;
 
+	if (!capable(CAP_SYS_RAWIO))
+		return -EPERM;
 	down(&fw_lock);
 	fw = fw_priv->fw;
 	if (test_bit(FW_STATUS_DONE, &fw_priv->status)) {
@@ -420,7 +422,7 @@ request_firmware(const struct firmware **firmware_p, const char *name,
 		add_timer(&fw_priv->timeout);
 	}
 
-	kobject_hotplug("add", &class_dev->kobj);
+	kobject_hotplug(&class_dev->kobj, KOBJ_ADD);
 	wait_for_completion(&fw_priv->completion);
 	set_bit(FW_STATUS_DONE, &fw_priv->status);
 
@@ -439,6 +441,7 @@ request_firmware(const struct firmware **firmware_p, const char *name,
 
 error_kfree_fw:
 	kfree(firmware);
+	*firmware_p = NULL;
 out:
 	return retval;
 }

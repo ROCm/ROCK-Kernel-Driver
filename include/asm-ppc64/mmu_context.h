@@ -108,11 +108,10 @@ static inline void activate_mm(struct mm_struct *prev, struct mm_struct *next)
  *
  * This scramble is only well defined for proto-VSIDs below
  * 0xFFFFFFFFF, so both proto-VSID and actual VSID 0xFFFFFFFFF are
- * reserved.  VSID_MULTIPLIER is prime (the largest 28-bit prime, in
- * fact), so in particular it is co-prime to VSID_MODULUS, making this
- * a 1:1 scrambling function.  Because the modulus is 2^n-1 we can
- * compute it efficiently without a divide or extra multiply (see
- * below).
+ * reserved.  VSID_MULTIPLIER is prime, so in particular it is
+ * co-prime to VSID_MODULUS, making this a 1:1 scrambling function.
+ * Because the modulus is 2^n-1 we can compute it efficiently without
+ * a divide or extra multiply (see below).
  *
  * This scheme has several advantages over older methods:
  *

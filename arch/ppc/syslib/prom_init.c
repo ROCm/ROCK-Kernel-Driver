@@ -15,6 +15,7 @@
 #include <linux/ioport.h>
 #include <linux/pci.h>
 #include <linux/slab.h>
+#include <linux/bitops.h>
 
 #include <asm/sections.h>
 #include <asm/prom.h>
@@ -26,7 +27,6 @@
 #include <asm/system.h>
 #include <asm/mmu.h>
 #include <asm/pgtable.h>
-#include <asm/bitops.h>
 #include <asm/bootinfo.h>
 #include <asm/btext.h>
 #include <asm/pci-bridge.h>

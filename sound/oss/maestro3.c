@@ -1557,7 +1557,9 @@ static int m3_mmap(struct file *file, struct vm_area_struct *vma)
      * ask Jeff what the hell I'm doing wrong.
      */
     ret = -EAGAIN;
-    if (remap_page_range(vma, vma->vm_start, virt_to_phys(db->rawbuf), size, vma->vm_page_prot))
+    if (remap_pfn_range(vma, vma->vm_start,
+			virt_to_phys(db->rawbuf) >> PAGE_SHIFT,
+			size, vma->vm_page_prot))
         goto out;
 
     db->mapped = 1;
@@ -2940,8 +2942,7 @@ static int __init m3_init_module(void)
         return -ENODEV; /* ? */
     }
 
-    if (!pci_register_driver(&m3_pci_driver)) {
-        pci_unregister_driver(&m3_pci_driver);
+    if (pci_register_driver(&m3_pci_driver)) {
         unregister_reboot_notifier(&m3_reboot_nb);
         return -ENODEV;
     }

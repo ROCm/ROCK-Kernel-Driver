@@ -640,7 +640,7 @@ struct sndrv_seq_queue_info {
 	 *  etc. if the queue is locked for other clients
 	 */
 	int owner;		/* client id for owner of the queue */
-	int locked:1;		/* timing queue locked for other queues */
+	unsigned locked:1;	/* timing queue locked for other queues */
 	char name[64];		/* name of this queue */
 	unsigned int flags;	/* flags */
 	char reserved[60];	/* for future use */

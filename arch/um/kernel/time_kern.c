@@ -44,7 +44,9 @@ int timer_irq_inited = 0;
 
 static int first_tick;
 static unsigned long long prev_usecs;
+#ifdef CONFIG_UML_REAL_TIME_CLOCK
 static long long delta;   		/* Deviation per interval */
+#endif
 
 #define MILLION 1000000
 
@@ -60,7 +62,7 @@ void timer_irq(union uml_pt_regs *regs)
 	}
 
 	if(first_tick){
-#if defined(CONFIG_UML_REAL_TIME_CLOCK)
+#ifdef CONFIG_UML_REAL_TIME_CLOCK
 		/* We've had 1 tick */
 		unsigned long long usecs = os_usecs();
 
@@ -167,11 +169,9 @@ void __const_udelay(um_udelay_t usecs)
 
 void timer_handler(int sig, union uml_pt_regs *regs)
 {
-#ifdef CONFIG_SMP
 	local_irq_disable();
 	update_process_times(user_context(UPT_SP(regs)));
 	local_irq_enable();
-#endif
 	if(current_thread->cpu == 0)
 		timer_irq(regs);
 }

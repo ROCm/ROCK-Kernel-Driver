@@ -193,7 +193,7 @@ static int bpq_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_ty
 
 	bpq = (struct bpqdev *)dev->priv;
 
-	eth = (struct ethhdr *)skb->mac.raw;
+	eth = eth_hdr(skb);
 
 	if (!(bpq->acpt_addr[0] & 0x01) &&
 	    memcmp(eth->h_source, bpq->acpt_addr, ETH_ALEN))

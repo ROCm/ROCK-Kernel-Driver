@@ -49,9 +49,9 @@ static const char *version =
 #include <linux/pci.h>
 #include <linux/proc_fs.h>
 #include <linux/spinlock.h>
+#include <linux/bitops.h>
 
 #include <asm/system.h>
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
 #include <asm/byteorder.h>

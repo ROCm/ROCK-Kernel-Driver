@@ -296,11 +296,6 @@ xfs_read(
 		return -EIO;
 	}
 
-	/* OK so we are holding the I/O lock for the duration
-	 * of the submission, then what happens if the I/O
-	 * does not really happen here, but is scheduled 
-	 * later?
-	 */
 	xfs_ilock(ip, XFS_IOLOCK_SHARED);
 
 	if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_READ) &&
@@ -321,6 +316,7 @@ xfs_read(
 	ret = __generic_file_aio_read(iocb, iovp, segs, offset);
 	if (ret == -EIOCBQUEUED)
 		ret = wait_on_sync_kiocb(iocb);
+
 	xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 
 	if (ret > 0)
@@ -380,12 +376,17 @@ xfs_sendfile(
 		}
 	}
 	xfs_rw_enter_trace(XFS_SENDFILE_ENTER, &ip->i_iocore,
-			   (void*)(unsigned long)target, count, *offset, ioflags);
+		   (void *)(unsigned long)target, count, *offset, ioflags);
 	ret = generic_file_sendfile(filp, offset, count, actor, target);
+
 	xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 
-	XFS_STATS_ADD(xs_read_bytes, ret);
-	xfs_ichgtime(ip, XFS_ICHGTIME_ACC);
+	if (ret > 0)
+		XFS_STATS_ADD(xs_read_bytes, ret);
+
+	if (likely(!(ioflags & IO_INVIS)))
+		xfs_ichgtime(ip, XFS_ICHGTIME_ACC);
+
 	return ret;
 }
 

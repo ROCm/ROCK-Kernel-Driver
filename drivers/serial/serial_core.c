@@ -107,15 +107,7 @@ static void uart_start(struct tty_struct *tty)
 static void uart_tasklet_action(unsigned long data)
 {
 	struct uart_state *state = (struct uart_state *)data;
-	struct tty_struct *tty;
-
-	tty = state->info->tty;
-	if (tty) {
-		if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-		    tty->ldisc.write_wakeup)
-			tty->ldisc.write_wakeup(tty);
-		wake_up_interruptible(&tty->write_wait);
-	}
+	tty_wakeup(state->info->tty);
 }
 
 static inline void
@@ -403,7 +395,7 @@ uart_get_divisor(struct uart_port *port, unsigned int baud)
 	if (baud == 38400 && (port->flags & UPF_SPD_MASK) == UPF_SPD_CUST)
 		quot = port->custom_divisor;
 	else
-		quot = port->uartclk / (16 * baud);
+		quot = (port->uartclk + (8 * baud)) / (16 * baud);
 
 	return quot;
 }
@@ -581,10 +573,7 @@ static void uart_flush_buffer(struct tty_struct *tty)
 	spin_lock_irqsave(&port->lock, flags);
 	uart_circ_clear(&state->info->xmit);
 	spin_unlock_irqrestore(&port->lock, flags);
-	wake_up_interruptible(&tty->write_wait);
-	if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-	    tty->ldisc.write_wakeup)
-		(tty->ldisc.write_wakeup)(tty);
+	tty_wakeup(tty);
 }
 
 /*
@@ -1216,7 +1205,7 @@ static void uart_close(struct tty_struct *tty, struct file *filp)
 {
 	struct uart_state *state = tty->driver_data;
 	struct uart_port *port;
-
+	
 	BUG_ON(!kernel_locked());
 
 	if (!state || !state->port)
@@ -1239,12 +1228,12 @@ static void uart_close(struct tty_struct *tty, struct file *filp)
 		 * one, we've got real problems, since it means the
 		 * serial port won't be shutdown.
 		 */
-		printk("uart_close: bad serial port count; tty->count is 1, "
+		printk(KERN_ERR "uart_close: bad serial port count; tty->count is 1, "
 		       "state->count is %d\n", state->count);
 		state->count = 1;
 	}
 	if (--state->count < 0) {
-		printk("rs_close: bad serial port count for %s: %d\n",
+		printk(KERN_ERR "uart_close: bad serial port count for %s: %d\n",
 		       tty->name, state->count);
 		state->count = 0;
 	}
@@ -1280,8 +1269,9 @@ static void uart_close(struct tty_struct *tty, struct file *filp)
 
 	uart_shutdown(state);
 	uart_flush_buffer(tty);
-	if (tty->ldisc.flush_buffer)
-		tty->ldisc.flush_buffer(tty);
+
+	tty_ldisc_flush(tty);	
+	
 	tty->closing = 0;
 	state->info->tty = NULL;
 
@@ -2234,6 +2224,15 @@ int uart_add_one_port(struct uart_driver *drv, struct uart_port *port)
 	 * setserial to be used to alter this ports parameters.
 	 */
 	tty_register_device(drv->tty_driver, port->line, port->dev);
+
+	/*
+	 * If this driver supports console, and it hasn't been
+	 * successfully registered yet, try to re-register it.
+	 * It may be that the port was not available.
+	 */
+	if (port->type != PORT_UNKNOWN &&
+	    port->cons && !(port->cons->flags & CON_ENABLED))
+		register_console(port->cons);
 
  out:
 	up(&port_sem);

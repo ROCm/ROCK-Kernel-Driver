@@ -143,11 +143,6 @@ int pm_send(struct pm_dev *dev, pm_request_t rqst, void *data);
  */
 int pm_send_all(pm_request_t rqst, void *data);
 
-/*
- * Find a device
- */
-struct pm_dev *pm_find(pm_dev_t type, struct pm_dev *from);
-
 static inline void pm_access(struct pm_dev *dev) {}
 static inline void pm_dev_idle(struct pm_dev *dev) {}
 
@@ -194,11 +189,12 @@ extern void (*pm_idle)(void);
 extern void (*pm_power_off)(void);
 
 enum {
-	PM_SUSPEND_ON,
-	PM_SUSPEND_STANDBY,
-	PM_SUSPEND_MEM,
-	PM_SUSPEND_DISK,
-	PM_SUSPEND_MAX,
+	PM_SUSPEND_ON = 0,
+	PM_SUSPEND_STANDBY = 1,
+	/* NOTE: PM_SUSPEND_MEM == PCI_D3hot */
+	PM_SUSPEND_MEM = 3,
+	PM_SUSPEND_DISK = 4,
+	PM_SUSPEND_MAX = 5,
 };
 
 enum {

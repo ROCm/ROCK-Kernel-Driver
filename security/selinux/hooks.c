@@ -64,6 +64,7 @@
 #include <net/ipv6.h>
 #include <linux/hugetlb.h>
 #include <linux/personality.h>
+#include <linux/sysctl.h>
 
 #include "avc.h"
 #include "objsec.h"
@@ -386,13 +387,6 @@ static int try_context_mount(struct super_block *sb, void *data)
 				break;
 
 			case Opt_fscontext:
-				if (sbsec->behavior != SECURITY_FS_USE_XATTR) {
-					rc = -EINVAL;
-					printk(KERN_WARNING "SELinux:  "
-					       "fscontext option is invalid for"
-					       " this filesystem type\n");
-					goto out_free;
-				}
 				if (seen & (Opt_context|Opt_fscontext)) {
 					rc = -EINVAL;
 					printk(KERN_WARNING SEL_MOUNT_FAIL_MSG);
@@ -1554,10 +1548,10 @@ static int selinux_vm_enough_memory(long pages)
         /*
 	 * Sometimes we want to use more memory than we have
 	 */
-	if (sysctl_overcommit_memory == 1)
+	if (sysctl_overcommit_memory == OVERCOMMIT_ALWAYS)
 		return 0;
 
-	if (sysctl_overcommit_memory == 0) {
+	if (sysctl_overcommit_memory == OVERCOMMIT_GUESS) {
 		free = get_page_cache_size();
 		free += nr_free_pages();
 		free += nr_swap_pages;
@@ -1909,8 +1903,8 @@ static void selinux_bprm_apply_creds(struct linux_binprm *bprm, int unsafe)
 				  PROCESS__RLIMITINH, NULL, NULL);
 		if (rc) {
 			for (i = 0; i < RLIM_NLIMITS; i++) {
-				rlim = current->rlim + i;
-				initrlim = init_task.rlim+i;
+				rlim = current->signal->rlim + i;
+				initrlim = init_task.signal->rlim+i;
 				rlim->rlim_cur = min(rlim->rlim_max,initrlim->rlim_cur);
 			}
 		}
@@ -2331,9 +2325,8 @@ static int selinux_inode_removexattr (struct dentry *dentry, char *name)
 	return -EACCES;
 }
 
-static int selinux_inode_getsecurity(struct dentry *dentry, const char *name, void *buffer, size_t size)
+static int selinux_inode_getsecurity(struct inode *inode, const char *name, void *buffer, size_t size)
 {
-	struct inode *inode = dentry->d_inode;
 	struct inode_security_struct *isec = inode->i_security;
 	char *context;
 	unsigned len;
@@ -2361,10 +2354,9 @@ static int selinux_inode_getsecurity(struct dentry *dentry, const char *name, vo
 	return len;
 }
 
-static int selinux_inode_setsecurity(struct dentry *dentry, const char *name,
+static int selinux_inode_setsecurity(struct inode *inode, const char *name,
                                      const void *value, size_t size, int flags)
 {
-	struct inode *inode = dentry->d_inode;
 	struct inode_security_struct *isec = inode->i_security;
 	u32 newsid;
 	int rc;
@@ -2383,10 +2375,10 @@ static int selinux_inode_setsecurity(struct dentry *dentry, const char *name,
 	return 0;
 }
 
-static int selinux_inode_listsecurity(struct dentry *dentry, char *buffer)
+static int selinux_inode_listsecurity(struct inode *inode, char *buffer, size_t buffer_size)
 {
 	const int len = sizeof(XATTR_NAME_SELINUX);
-	if (buffer)
+	if (buffer && len <= buffer_size)
 		memcpy(buffer, XATTR_NAME_SELINUX, len);
 	return len;
 }
@@ -2466,21 +2458,14 @@ static int selinux_file_ioctl(struct file *file, unsigned int cmd,
 	return error;
 }
 
-static int selinux_file_mmap(struct file *file, unsigned long prot, unsigned long flags)
+static int file_map_prot_check(struct file *file, unsigned long prot, int shared)
 {
-	u32 av;
-	int rc;
-
-	rc = secondary_ops->file_mmap(file, prot, flags);
-	if (rc)
-		return rc;
-
 	if (file) {
 		/* read access is always possible with a mapping */
-		av = FILE__READ;
+		u32 av = FILE__READ;
 
 		/* write access only matters if the mapping is shared */
-		if ((flags & MAP_TYPE) == MAP_SHARED && (prot & PROT_WRITE))
+		if (shared && (prot & PROT_WRITE))
 			av |= FILE__WRITE;
 
 		if (prot & PROT_EXEC)
@@ -2489,6 +2474,18 @@ static int selinux_file_mmap(struct file *file, unsigned long prot, unsigned lon
 		return file_has_perm(current, file, av);
 	}
 	return 0;
+}
+
+static int selinux_file_mmap(struct file *file, unsigned long prot, unsigned long flags)
+{
+	int rc;
+
+	rc = secondary_ops->file_mmap(file, prot, flags);
+	if (rc)
+		return rc;
+
+	return file_map_prot_check(file, prot,
+				   (flags & MAP_TYPE) == MAP_SHARED);
 }
 
 static int selinux_file_mprotect(struct vm_area_struct *vma,
@@ -2500,7 +2497,7 @@ static int selinux_file_mprotect(struct vm_area_struct *vma,
 	if (rc)
 		return rc;
 
-	return selinux_file_mmap(vma->vm_file, prot, vma->vm_flags);
+	return file_map_prot_check(vma->vm_file, prot, vma->vm_flags&VM_SHARED);
 }
 
 static int selinux_file_lock(struct file *file, unsigned int cmd)
@@ -2625,6 +2622,11 @@ static int selinux_task_alloc_security(struct task_struct *tsk)
 	tsec2->exec_sid = tsec1->exec_sid;
 	tsec2->create_sid = tsec1->create_sid;
 
+	/* Retain ptracer SID across fork, if any.
+	   This will be reset by the ptrace hook upon any
+	   subsequent ptrace_attach operations. */
+	tsec2->ptrace_sid = tsec1->ptrace_sid;
+
 	return 0;
 }
 
@@ -2689,7 +2691,7 @@ static int selinux_task_setnice(struct task_struct *p, int nice)
 
 static int selinux_task_setrlimit(unsigned int resource, struct rlimit *new_rlim)
 {
-	struct rlimit *old_rlim = current->rlim + resource;
+	struct rlimit *old_rlim = current->signal->rlim + resource;
 	int rc;
 
 	rc = secondary_ops->task_setrlimit(resource, new_rlim);

@@ -801,7 +801,7 @@ int snd_card_pci_resume(struct pci_dev *dev)
 	if (card->power_state == SNDRV_CTL_POWER_D0)
 		return 0;
 	/* restore the PCI config space */
-	pci_restore_state(dev, dev->saved_config_space);
+	pci_restore_state(dev);
 	/* FIXME: correct state value? */
 	return card->pm_resume(card, 0);
 }

@@ -28,9 +28,9 @@
 #include <linux/rtnetlink.h>
 #include <linux/interrupt.h>
 #include <linux/pm.h>
+#include <linux/bitops.h>
 
 #include <asm/irq.h>
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/au1000.h>
 #if defined(CONFIG_MIPS_PB1000) || defined(CONFIG_MIPS_PB1100)

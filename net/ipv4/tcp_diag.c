@@ -18,6 +18,7 @@
 #include <linux/random.h>
 #include <linux/cache.h>
 #include <linux/init.h>
+#include <linux/time.h>
 
 #include <net/icmp.h>
 #include <net/tcp.h>
@@ -28,6 +29,16 @@
 #include <linux/stddef.h>
 
 #include <linux/tcp_diag.h>
+
+struct tcpdiag_entry
+{
+	u32 *saddr;
+	u32 *daddr;
+	u16 sport;
+	u16 dport;
+	u16 family;
+	u16 userlocks;
+};
 
 static struct sock *tcpnl;
 
@@ -68,8 +79,8 @@ void tcp_get_info(struct sock *sk, struct tcp_info *info)
 	if (tp->ecn_flags&TCP_ECN_OK)
 		info->tcpi_options |= TCPI_OPT_ECN;
 
-	info->tcpi_rto = (1000000*tp->rto)/HZ;
-	info->tcpi_ato = (1000000*tp->ack.ato)/HZ;
+	info->tcpi_rto = jiffies_to_usecs(tp->rto);
+	info->tcpi_ato = jiffies_to_usecs(tp->ack.ato);
 	info->tcpi_snd_mss = tp->mss_cache_std;
 	info->tcpi_rcv_mss = tp->ack.rcv_mss;
 
@@ -79,20 +90,20 @@ void tcp_get_info(struct sock *sk, struct tcp_info *info)
 	info->tcpi_retrans = tcp_get_pcount(&tp->retrans_out);
 	info->tcpi_fackets = tcp_get_pcount(&tp->fackets_out);
 
-	info->tcpi_last_data_sent = ((now - tp->lsndtime)*1000)/HZ;
-	info->tcpi_last_data_recv = ((now - tp->ack.lrcvtime)*1000)/HZ;
-	info->tcpi_last_ack_recv = ((now - tp->rcv_tstamp)*1000)/HZ;
+	info->tcpi_last_data_sent = jiffies_to_msecs(now - tp->lsndtime);
+	info->tcpi_last_data_recv = jiffies_to_msecs(now - tp->ack.lrcvtime);
+	info->tcpi_last_ack_recv = jiffies_to_msecs(now - tp->rcv_tstamp);
 
 	info->tcpi_pmtu = tp->pmtu_cookie;
 	info->tcpi_rcv_ssthresh = tp->rcv_ssthresh;
-	info->tcpi_rtt = ((1000000*tp->srtt)/HZ)>>3;
-	info->tcpi_rttvar = ((1000000*tp->mdev)/HZ)>>2;
+	info->tcpi_rtt = jiffies_to_usecs(tp->srtt)>>3;
+	info->tcpi_rttvar = jiffies_to_usecs(tp->mdev)>>2;
 	info->tcpi_snd_ssthresh = tp->snd_ssthresh;
 	info->tcpi_snd_cwnd = tp->snd_cwnd;
 	info->tcpi_advmss = tp->advmss;
 	info->tcpi_reordering = tp->reordering;
 
-	info->tcpi_rcv_rtt = ((1000000*tp->rcv_rtt_est.rtt)/HZ)>>3;
+	info->tcpi_rcv_rtt = jiffies_to_usecs(tp->rcv_rtt_est.rtt)>>3;
 	info->tcpi_rcv_space = tp->rcvq_space.space;
 }
 
@@ -116,7 +127,8 @@ static int tcpdiag_fill(struct sk_buff *skb, struct sock *sk,
 		if (ext & (1<<(TCPDIAG_INFO-1)))
 			info = TCPDIAG_PUT(skb, TCPDIAG_INFO, sizeof(*info));
 		
-		if (tcp_is_vegas(tp) && (ext & (1<<(TCPDIAG_VEGASINFO-1))))
+		if ((tcp_is_westwood(tp) || tcp_is_vegas(tp))
+		    && (ext & (1<<(TCPDIAG_VEGASINFO-1))))
 			vinfo = TCPDIAG_PUT(skb, TCPDIAG_VEGASINFO, sizeof(*vinfo));
 	}
 	r->tcpdiag_family = sk->sk_family;
@@ -209,10 +221,17 @@ static int tcpdiag_fill(struct sk_buff *skb, struct sock *sk,
 		tcp_get_info(sk, info);
 
 	if (vinfo) {
-		vinfo->tcpv_enabled = tp->vegas.doing_vegas_now;
-		vinfo->tcpv_rttcnt = tp->vegas.cntRTT;
-		vinfo->tcpv_rtt = tp->vegas.baseRTT;
-		vinfo->tcpv_minrtt = tp->vegas.minRTT;
+		if (tcp_is_vegas(tp)) {
+			vinfo->tcpv_enabled = tp->vegas.doing_vegas_now;
+			vinfo->tcpv_rttcnt = tp->vegas.cntRTT;
+			vinfo->tcpv_rtt = jiffies_to_usecs(tp->vegas.baseRTT);
+			vinfo->tcpv_minrtt = jiffies_to_usecs(tp->vegas.minRTT);
+		} else {
+			vinfo->tcpv_enabled = 0;
+			vinfo->tcpv_rttcnt = 0;
+			vinfo->tcpv_rtt = jiffies_to_usecs(tp->westwood.rtt);
+			vinfo->tcpv_minrtt = jiffies_to_usecs(tp->westwood.rtt_min);
+		}
 	}
 
 	nlh->nlmsg_len = skb->tail - b;
@@ -316,11 +335,11 @@ static int bitstring_match(const u32 *a1, const u32 *a2, int bits)
 }
 
 
-static int tcpdiag_bc_run(const void *bc, int len, struct sock *sk)
+static int tcpdiag_bc_run(const void *bc, int len,
+			  const struct tcpdiag_entry *entry)
 {
 	while (len > 0) {
 		int yes = 1;
-		struct inet_opt *inet = inet_sk(sk);
 		const struct tcpdiag_bc_op *op = bc;
 
 		switch (op->code) {
@@ -330,19 +349,19 @@ static int tcpdiag_bc_run(const void *bc, int len, struct sock *sk)
 			yes = 0;
 			break;
 		case TCPDIAG_BC_S_GE:
-			yes = inet->num >= op[1].no;
+			yes = entry->sport >= op[1].no;
 			break;
 		case TCPDIAG_BC_S_LE:
-			yes = inet->num <= op[1].no;
+			yes = entry->dport <= op[1].no;
 			break;
 		case TCPDIAG_BC_D_GE:
-			yes = ntohs(inet->dport) >= op[1].no;
+			yes = entry->dport >= op[1].no;
 			break;
 		case TCPDIAG_BC_D_LE:
-			yes = ntohs(inet->dport) <= op[1].no;
+			yes = entry->dport <= op[1].no;
 			break;
 		case TCPDIAG_BC_AUTO:
-			yes = !(sk->sk_userlocks & SOCK_BINDPORT_LOCK);
+			yes = !(entry->userlocks & SOCK_BINDPORT_LOCK);
 			break;
 		case TCPDIAG_BC_S_COND:
 		case TCPDIAG_BC_D_COND:
@@ -352,7 +371,7 @@ static int tcpdiag_bc_run(const void *bc, int len, struct sock *sk)
 
 			if (cond->port != -1 &&
 			    cond->port != (op->code == TCPDIAG_BC_S_COND ?
-					     inet->num : ntohs(inet->dport))) {
+					     entry->sport : entry->dport)) {
 				yes = 0;
 				break;
 			}
@@ -360,26 +379,14 @@ static int tcpdiag_bc_run(const void *bc, int len, struct sock *sk)
 			if (cond->prefix_len == 0)
 				break;
 
-#ifdef CONFIG_IPV6
-			if (sk->sk_family == AF_INET6) {
-				struct ipv6_pinfo *np = inet6_sk(sk);
-
-				if (op->code == TCPDIAG_BC_S_COND)
-					addr = (u32*)&np->rcv_saddr;
-				else
-					addr = (u32*)&np->daddr;
-			} else
-#endif
-			{
-				if (op->code == TCPDIAG_BC_S_COND)
-					addr = &inet->rcv_saddr;
-				else
-					addr = &inet->daddr;
-			}
+			if (op->code == TCPDIAG_BC_S_COND)
+				addr = entry->saddr;
+			else
+				addr = entry->daddr;
 
 			if (bitstring_match(addr, cond->addr, cond->prefix_len))
 				break;
-			if (sk->sk_family == AF_INET6 &&
+			if (entry->family == AF_INET6 &&
 			    cond->family == AF_INET) {
 				if (addr[0] == 0 && addr[1] == 0 &&
 				    addr[2] == htonl(0xffff) &&
@@ -458,16 +465,181 @@ static int tcpdiag_bc_audit(const void *bytecode, int bytecode_len)
 	return len == 0 ? 0 : -EINVAL;
 }
 
+static int tcpdiag_dump_sock(struct sk_buff *skb, struct sock *sk,
+			     struct netlink_callback *cb)
+{
+	struct tcpdiagreq *r = NLMSG_DATA(cb->nlh);
+
+	if (cb->nlh->nlmsg_len > 4 + NLMSG_SPACE(sizeof(*r))) {
+		struct tcpdiag_entry entry;
+		struct rtattr *bc = (struct rtattr *)(r + 1);
+		struct inet_opt *inet = inet_sk(sk);
+
+		entry.family = sk->sk_family;
+#ifdef CONFIG_IPV6
+		if (entry.family == AF_INET6) {
+			struct ipv6_pinfo *np = inet6_sk(sk);
+
+			entry.saddr = np->rcv_saddr.s6_addr32;
+			entry.daddr = np->daddr.s6_addr32;
+		} else
+#endif
+		{
+			entry.saddr = &inet->rcv_saddr;
+			entry.daddr = &inet->daddr;
+		}
+		entry.sport = inet->num;
+		entry.dport = ntohs(inet->dport);
+		entry.userlocks = sk->sk_userlocks;
+
+		if (!tcpdiag_bc_run(RTA_DATA(bc), RTA_PAYLOAD(bc), &entry))
+			return 0;
+	}
+
+	return tcpdiag_fill(skb, sk, r->tcpdiag_ext, NETLINK_CB(cb->skb).pid,
+			    cb->nlh->nlmsg_seq);
+}
+
+static int tcpdiag_fill_req(struct sk_buff *skb, struct sock *sk,
+			    struct open_request *req,
+			    u32 pid, u32 seq)
+{
+	struct inet_opt *inet = inet_sk(sk);
+	unsigned char *b = skb->tail;
+	struct tcpdiagmsg *r;
+	struct nlmsghdr *nlh;
+	long tmo;
+
+	nlh = NLMSG_PUT(skb, pid, seq, TCPDIAG_GETSOCK, sizeof(*r));
+	r = NLMSG_DATA(nlh);
+
+	r->tcpdiag_family = sk->sk_family;
+	r->tcpdiag_state = TCP_SYN_RECV;
+	r->tcpdiag_timer = 1;
+	r->tcpdiag_retrans = req->retrans;
+
+	r->id.tcpdiag_if = sk->sk_bound_dev_if;
+	r->id.tcpdiag_cookie[0] = (u32)(unsigned long)req;
+	r->id.tcpdiag_cookie[1] = (u32)(((unsigned long)req >> 31) >> 1);
+
+	tmo = req->expires - jiffies;
+	if (tmo < 0)
+		tmo = 0;
+
+	r->id.tcpdiag_sport = inet->sport;
+	r->id.tcpdiag_dport = req->rmt_port;
+	r->id.tcpdiag_src[0] = req->af.v4_req.loc_addr;
+	r->id.tcpdiag_dst[0] = req->af.v4_req.rmt_addr;
+	r->tcpdiag_expires = jiffies_to_msecs(tmo),
+	r->tcpdiag_rqueue = 0;
+	r->tcpdiag_wqueue = 0;
+	r->tcpdiag_uid = sock_i_uid(sk);
+	r->tcpdiag_inode = 0;
+#ifdef CONFIG_IPV6
+	if (r->tcpdiag_family == AF_INET6) {
+		ipv6_addr_copy((struct in6_addr *)r->id.tcpdiag_src,
+			       &req->af.v6_req.loc_addr);
+		ipv6_addr_copy((struct in6_addr *)r->id.tcpdiag_dst,
+			       &req->af.v6_req.rmt_addr);
+	}
+#endif
+	nlh->nlmsg_len = skb->tail - b;
+
+	return skb->len;
+
+nlmsg_failure:
+	skb_trim(skb, b - skb->data);
+	return -1;
+}
+
+static int tcpdiag_dump_reqs(struct sk_buff *skb, struct sock *sk,
+			     struct netlink_callback *cb)
+{
+	struct tcpdiag_entry entry;
+	struct tcpdiagreq *r = NLMSG_DATA(cb->nlh);
+	struct tcp_opt *tp = tcp_sk(sk);
+	struct tcp_listen_opt *lopt;
+	struct rtattr *bc = NULL;
+	struct inet_opt *inet = inet_sk(sk);
+	int j, s_j;
+	int reqnum, s_reqnum;
+	int err = 0;
+
+	s_j = cb->args[3];
+	s_reqnum = cb->args[4];
+
+	if (s_j > 0)
+		s_j--;
+
+	entry.family = sk->sk_family;
+
+	read_lock_bh(&tp->syn_wait_lock);
+
+	lopt = tp->listen_opt;
+	if (!lopt || !lopt->qlen)
+		goto out;
+
+	if (cb->nlh->nlmsg_len > 4 + NLMSG_SPACE(sizeof(*r))) {
+		bc = (struct rtattr *)(r + 1);
+		entry.sport = inet->num;
+		entry.userlocks = sk->sk_userlocks;
+	}
+
+	for (j = s_j; j < TCP_SYNQ_HSIZE; j++) {
+		struct open_request *req, *head = lopt->syn_table[j];
+
+		reqnum = 0;
+		for (req = head; req; reqnum++, req = req->dl_next) {
+			if (reqnum < s_reqnum)
+				continue;
+			if (r->id.tcpdiag_dport != req->rmt_port &&
+			    r->id.tcpdiag_dport)
+				continue;
+
+			if (bc) {
+				entry.saddr =
+#ifdef CONFIG_IPV6
+					(entry.family == AF_INET6) ?
+					req->af.v6_req.loc_addr.s6_addr32 :
+#endif
+					&req->af.v4_req.loc_addr;
+				entry.daddr = 
+#ifdef CONFIG_IPV6
+					(entry.family == AF_INET6) ?
+					req->af.v6_req.rmt_addr.s6_addr32 :
+#endif
+					&req->af.v4_req.rmt_addr;
+				entry.dport = ntohs(req->rmt_port);
+
+				if (!tcpdiag_bc_run(RTA_DATA(bc),
+						    RTA_PAYLOAD(bc), &entry))
+					continue;
+			}
+
+			err = tcpdiag_fill_req(skb, sk, req,
+					       NETLINK_CB(cb->skb).pid,
+					       cb->nlh->nlmsg_seq);
+			if (err < 0) {
+				cb->args[3] = j + 1;
+				cb->args[4] = reqnum;
+				goto out;
+			}
+		}
+
+		s_reqnum = 0;
+	}
+
+out:
+	read_unlock_bh(&tp->syn_wait_lock);
+
+	return err;
+}
 
 static int tcpdiag_dump(struct sk_buff *skb, struct netlink_callback *cb)
 {
 	int i, num;
 	int s_i, s_num;
 	struct tcpdiagreq *r = NLMSG_DATA(cb->nlh);
-	struct rtattr *bc = NULL;
-
-	if (cb->nlh->nlmsg_len > 4+NLMSG_SPACE(sizeof(struct tcpdiagreq)))
-		bc = (struct rtattr*)(r+1);
 
 	s_i = cb->args[1];
 	s_num = num = cb->args[2];
@@ -480,30 +652,47 @@ static int tcpdiag_dump(struct sk_buff *skb, struct netlink_callback *cb)
 			struct sock *sk;
 			struct hlist_node *node;
 
-			if (i > s_i)
-				s_num = 0;
-
 			num = 0;
 			sk_for_each(sk, node, &tcp_listening_hash[i]) {
 				struct inet_opt *inet = inet_sk(sk);
-				if (num < s_num)
+
+				if (num < s_num) {
+					num++;
 					continue;
-				if (!(r->tcpdiag_states&TCPF_LISTEN) ||
-				    r->id.tcpdiag_dport)
-					continue;
+				}
+
 				if (r->id.tcpdiag_sport != inet->sport &&
 				    r->id.tcpdiag_sport)
-					continue;
-				if (bc && !tcpdiag_bc_run(RTA_DATA(bc), RTA_PAYLOAD(bc), sk))
-					continue;
-				if (tcpdiag_fill(skb, sk, r->tcpdiag_ext,
-						 NETLINK_CB(cb->skb).pid,
-						 cb->nlh->nlmsg_seq) <= 0) {
+					goto next_listen;
+
+				if (!(r->tcpdiag_states&TCPF_LISTEN) ||
+				    r->id.tcpdiag_dport ||
+				    cb->args[3] > 0)
+					goto syn_recv;
+
+				if (tcpdiag_dump_sock(skb, sk, cb) < 0) {
 					tcp_listen_unlock();
 					goto done;
 				}
+
+syn_recv:
+				if (!(r->tcpdiag_states&TCPF_SYN_RECV))
+					goto next_listen;
+
+				if (tcpdiag_dump_reqs(skb, sk, cb) < 0) {
+					tcp_listen_unlock();
+					goto done;
+				}
+
+next_listen:
+				cb->args[3] = 0;
+				cb->args[4] = 0;
 				++num;
 			}
+
+			s_num = 0;
+			cb->args[3] = 0;
+			cb->args[4] = 0;
 		}
 		tcp_listen_unlock();
 skip_listen_ht:
@@ -529,22 +718,19 @@ skip_listen_ht:
 			struct inet_opt *inet = inet_sk(sk);
 
 			if (num < s_num)
-				continue;
+				goto next_normal;
 			if (!(r->tcpdiag_states & (1 << sk->sk_state)))
-				continue;
+				goto next_normal;
 			if (r->id.tcpdiag_sport != inet->sport &&
 			    r->id.tcpdiag_sport)
-				continue;
+				goto next_normal;
 			if (r->id.tcpdiag_dport != inet->dport && r->id.tcpdiag_dport)
-				continue;
-			if (bc && !tcpdiag_bc_run(RTA_DATA(bc), RTA_PAYLOAD(bc), sk))
-				continue;
-			if (tcpdiag_fill(skb, sk, r->tcpdiag_ext,
-					 NETLINK_CB(cb->skb).pid,
-					 cb->nlh->nlmsg_seq) <= 0) {
+				goto next_normal;
+			if (tcpdiag_dump_sock(skb, sk, cb) < 0) {
 				read_unlock_bh(&head->lock);
 				goto done;
 			}
+next_normal:
 			++num;
 		}
 
@@ -554,23 +740,18 @@ skip_listen_ht:
 				struct inet_opt *inet = inet_sk(sk);
 
 				if (num < s_num)
-					continue;
-				if (!(r->tcpdiag_states & (1 << sk->sk_zapped)))
-					continue;
+					goto next_dying;
 				if (r->id.tcpdiag_sport != inet->sport &&
 				    r->id.tcpdiag_sport)
-					continue;
+					goto next_dying;
 				if (r->id.tcpdiag_dport != inet->dport &&
 				    r->id.tcpdiag_dport)
-					continue;
-				if (bc && !tcpdiag_bc_run(RTA_DATA(bc), RTA_PAYLOAD(bc), sk))
-					continue;
-				if (tcpdiag_fill(skb, sk, r->tcpdiag_ext,
-						 NETLINK_CB(cb->skb).pid,
-						 cb->nlh->nlmsg_seq) <= 0) {
+					goto next_dying;
+				if (tcpdiag_dump_sock(skb, sk, cb) < 0) {
 					read_unlock_bh(&head->lock);
 					goto done;
 				}
+next_dying:
 				++num;
 			}
 		}

@@ -3788,7 +3788,7 @@ static int tg3_chip_reset(struct tg3 *tp)
 		val |= PCISTATE_RETRY_SAME_DMA;
 	pci_write_config_dword(tp->pdev, TG3PCI_PCISTATE, val);
 
-	pci_restore_state(tp->pdev, tp->pci_cfg_state);
+	pci_restore_state(tp->pdev);
 
 	/* Make sure PCI-X relaxed ordering bit is clear. */
 	pci_read_config_dword(tp->pdev, TG3PCI_X_CAPS, &val);
@@ -8316,7 +8316,7 @@ static int __devinit tg3_init_one(struct pci_dev *pdev,
 	 */
 	if ((tr32(HOSTCC_MODE) & HOSTCC_MODE_ENABLE) ||
 	    (tr32(WDMAC_MODE) & WDMAC_MODE_ENABLE)) {
-		pci_save_state(tp->pdev, tp->pci_cfg_state);
+		pci_save_state(tp->pdev);
 		tw32(MEMARB_MODE, MEMARB_MODE_ENABLE);
 		tg3_halt(tp);
 	}
@@ -8355,7 +8355,7 @@ static int __devinit tg3_init_one(struct pci_dev *pdev,
 	 * of the PCI config space.  We need to restore this after
 	 * GRC_MISC_CFG core clock resets and some resume events.
 	 */
-	pci_save_state(tp->pdev, tp->pci_cfg_state);
+	pci_save_state(tp->pdev);
 
 	printk(KERN_INFO "%s: Tigon3 [partno(%s) rev %04x PHY(%s)] (PCI%s:%s:%s) %sBaseT Ethernet ",
 	       dev->name,
@@ -8474,7 +8474,7 @@ static int tg3_resume(struct pci_dev *pdev)
 	if (!netif_running(dev))
 		return 0;
 
-	pci_restore_state(tp->pdev, tp->pci_cfg_state);
+	pci_restore_state(tp->pdev);
 
 	err = tg3_set_power_state(tp, 0);
 	if (err)

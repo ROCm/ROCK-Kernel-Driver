@@ -40,6 +40,7 @@
 #include <linux/kernel.h>
 #include <linux/timer.h>
 #include <linux/seqlock.h>
+#include <linux/jiffies.h>
 
 #include <asm/vsyscall.h>
 #include <asm/pgtable.h>

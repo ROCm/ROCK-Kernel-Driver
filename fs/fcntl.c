@@ -4,6 +4,7 @@
  *  Copyright (C) 1991, 1992  Linus Torvalds
  */
 
+#include <linux/syscalls.h>
 #include <linux/init.h>
 #include <linux/mm.h>
 #include <linux/fs.h>
@@ -86,7 +87,7 @@ static int locate_fd(struct files_struct *files,
 	int error;
 
 	error = -EINVAL;
-	if (orig_start >= current->rlim[RLIMIT_NOFILE].rlim_cur)
+	if (orig_start >= current->signal->rlim[RLIMIT_NOFILE].rlim_cur)
 		goto out;
 
 repeat:
@@ -105,7 +106,7 @@ repeat:
 	}
 	
 	error = -EMFILE;
-	if (newfd >= current->rlim[RLIMIT_NOFILE].rlim_cur)
+	if (newfd >= current->signal->rlim[RLIMIT_NOFILE].rlim_cur)
 		goto out;
 
 	error = expand_files(files, newfd);
@@ -161,7 +162,7 @@ asmlinkage long sys_dup2(unsigned int oldfd, unsigned int newfd)
 	if (newfd == oldfd)
 		goto out_unlock;
 	err = -EBADF;
-	if (newfd >= current->rlim[RLIMIT_NOFILE].rlim_cur)
+	if (newfd >= current->signal->rlim[RLIMIT_NOFILE].rlim_cur)
 		goto out_unlock;
 	get_file(file);			/* We are now finished with oldfd */
 
@@ -290,8 +291,6 @@ void f_delown(struct file *filp)
 	f_modown(filp, 0, 0, 0, 1);
 }
 
-EXPORT_SYMBOL(f_delown);
-
 static long do_fcntl(int fd, unsigned int cmd, unsigned long arg,
 		struct file *filp)
 {
@@ -362,7 +361,7 @@ static long do_fcntl(int fd, unsigned int cmd, unsigned long arg,
 	return err;
 }
 
-asmlinkage long sys_fcntl(int fd, unsigned int cmd, unsigned long arg)
+asmlinkage long sys_fcntl(unsigned int fd, unsigned int cmd, unsigned long arg)
 {	
 	struct file *filp;
 	long err = -EBADF;

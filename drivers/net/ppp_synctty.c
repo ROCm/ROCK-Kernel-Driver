@@ -175,6 +175,8 @@ ppp_print_buffer (const char *name, const __u8 *buf, int count)
  * frees the memory that ppp_synctty_receive is using.  The best
  * way to fix this is to use a rwlock in the tty struct, but for now
  * we use a single global rwlock for all ttys in ppp line discipline.
+ *
+ * FIXME: Fixed in tty_io nowdays.
  */
 static rwlock_t disc_data_lock = RW_LOCK_UNLOCKED;
 

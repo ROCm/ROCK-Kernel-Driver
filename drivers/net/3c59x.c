@@ -257,8 +257,8 @@ static int vortex_debug = 1;
 #include <linux/ethtool.h>
 #include <linux/highmem.h>
 #include <linux/eisa.h>
+#include <linux/bitops.h>
 #include <asm/irq.h>			/* For NR_IRQS only. */
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
 
@@ -798,7 +798,7 @@ struct vortex_private {
 
 	/* PCI configuration space information. */
 	struct device *gendev;
-	char *cb_fn_base;					/* CardBus function status addr space. */
+	char __iomem *cb_fn_base;		/* CardBus function status addr space. */
 
 	/* Some values here only for performance evaluation and path-coverage */
 	int rx_nocopy, rx_copy, queued_packet, rx_csumhits;
@@ -817,7 +817,7 @@ struct vortex_private {
 		partner_flow_ctrl:1,			/* Partner supports flow control */
 		has_nway:1,
 		enable_wol:1,					/* Wake-on-LAN is enabled */
-		pm_state_valid:1,				/* power_state[] has sane contents */
+		pm_state_valid:1,				/* pci_dev->saved_config_space has sane contents */
 		open:1,
 		medialock:1,
 		must_free_region:1,				/* Flag: if zero, Cardbus owns the I/O region */
@@ -834,7 +834,6 @@ struct vortex_private {
 	u16 io_size;						/* Size of PCI region (for release_region) */
 	spinlock_t lock;					/* Serialise access to device & its vortex_private */
 	spinlock_t mdio_lock;				/* Serialise access to mdio hardware */
-	u32 power_state[16];
 };
 
 #ifdef CONFIG_PCI
@@ -902,7 +901,9 @@ static void dump_tx_ring(struct net_device *dev);
 static void update_stats(long ioaddr, struct net_device *dev);
 static struct net_device_stats *vortex_get_stats(struct net_device *dev);
 static void set_rx_mode(struct net_device *dev);
+#ifdef CONFIG_PCI
 static int vortex_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
+#endif
 static void vortex_tx_timeout(struct net_device *dev);
 static void acpi_set_WOL(struct net_device *dev);
 static struct ethtool_ops vortex_ethtool_ops;
@@ -1295,6 +1296,13 @@ static int __devinit vortex_probe1(struct device *gendev,
 		for (i = 0; i < 6; i++)
 			printk("%c%2.2x", i ? ':' : ' ', dev->dev_addr[i]);
 	}
+	/* Unfortunately an all zero eeprom passes the checksum and this
+	   gets found in the wild in failure cases. Crypto is hard 8) */
+	if (!is_valid_ether_addr(dev->dev_addr)) {
+		retval = -EINVAL;
+		printk(KERN_ERR "*** EEPROM MAC address is invalid.\n");
+		goto free_ring;	/* With every pack */
+	}
 	EL3WINDOW(2);
 	for (i = 0; i < 6; i++)
 		outb(dev->dev_addr[i], ioaddr + i);
@@ -1473,7 +1481,9 @@ static int __devinit vortex_probe1(struct device *gendev,
 
 	dev->stop = vortex_close;
 	dev->get_stats = vortex_get_stats;
+#ifdef CONFIG_PCI
 	dev->do_ioctl = vortex_ioctl;
+#endif
 	dev->ethtool_ops = &vortex_ethtool_ops;
 	dev->set_multicast_list = set_rx_mode;
 	dev->tx_timeout = vortex_tx_timeout;
@@ -1483,7 +1493,7 @@ static int __devinit vortex_probe1(struct device *gendev,
 #endif
 	if (pdev && vp->enable_wol) {
 		vp->pm_state_valid = 1;
- 		pci_save_state(VORTEX_PCI(vp), vp->power_state);
+ 		pci_save_state(VORTEX_PCI(vp));
  		acpi_set_WOL(dev);
 	}
 	retval = register_netdev(dev);
@@ -1540,7 +1550,7 @@ vortex_up(struct net_device *dev)
 
 	if (VORTEX_PCI(vp) && vp->enable_wol) {
 		pci_set_power_state(VORTEX_PCI(vp), 0);	/* Go active */
-		pci_restore_state(VORTEX_PCI(vp), vp->power_state);
+		pci_restore_state(VORTEX_PCI(vp));
 	}
 
 	/* Before initializing select the active media port. */
@@ -2697,7 +2707,7 @@ vortex_down(struct net_device *dev, int final_down)
 		outl(0, ioaddr + DownListPtr);
 
 	if (final_down && VORTEX_PCI(vp) && vp->enable_wol) {
-		pci_save_state(VORTEX_PCI(vp), vp->power_state);
+		pci_save_state(VORTEX_PCI(vp));
 		acpi_set_WOL(dev);
 	}
 }
@@ -2880,6 +2890,7 @@ static struct ethtool_ops vortex_ethtool_ops = {
 	.get_drvinfo =		vortex_get_drvinfo,
 };
 
+#ifdef CONFIG_PCI
 static int vortex_do_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct vortex_private *vp = netdev_priv(dev);
@@ -2937,6 +2948,7 @@ static int vortex_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 
 	return err;
 }
+#endif
 
 
 /* Pre-Cyclone chips have no documented multicast filter, so the only
@@ -3153,7 +3165,7 @@ static void __devexit vortex_remove_one (struct pci_dev *pdev)
 	if (VORTEX_PCI(vp) && vp->enable_wol) {
 		pci_set_power_state(VORTEX_PCI(vp), 0);	/* Go active */
 		if (vp->pm_state_valid)
-			pci_restore_state(VORTEX_PCI(vp), vp->power_state);
+			pci_restore_state(VORTEX_PCI(vp));
 	}
 	/* Should really use issue_and_wait() here */
 	outw(TotalReset|0x14, dev->base_addr + EL3_CMD);

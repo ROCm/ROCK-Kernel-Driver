@@ -1,7 +1,7 @@
 /*
  *  linux/arch/m32r/kernel/setup.c
  *
- *  Setup routines for MITSUBISHI M32R
+ *  Setup routines for Renesas M32R
  *
  *  Copyright (c) 2001, 2002  Hiroyuki Kondo, Hirokazu Takata,
  *                            Hitoshi Yamamoto

@@ -9,6 +9,7 @@
 #include <net/pkt_cls.h>
 #include <linux/module.h>
 #include <linux/rtnetlink.h>
+#include <net/gen_stats.h>
 
 struct rtattr;
 struct Qdisc;
@@ -80,12 +81,15 @@ struct Qdisc
 	int			padded;
 	struct Qdisc_ops	*ops;
 	u32			handle;
+	u32			parent;
 	atomic_t		refcnt;
 	struct sk_buff_head	q;
 	struct net_device	*dev;
 	struct list_head	list;
 
-	struct tc_stats		stats;
+	struct gnet_stats_basic	bstats;
+	struct gnet_stats_queue	qstats;
+	struct gnet_stats_rate_est	rate_est;
 	spinlock_t		*stats_lock;
 	struct rcu_head 	q_rcu;
 	int			(*reshape_fail)(struct sk_buff *skb, struct Qdisc *q);
@@ -375,7 +379,7 @@ struct tc_action_ops
 extern int tcf_register_action(struct tc_action_ops *a);
 extern int tcf_unregister_action(struct tc_action_ops *a);
 extern void tcf_action_destroy(struct tc_action *a, int bind);
-extern int tcf_action_exec(struct sk_buff *skb, struct tc_action *a);
+extern int tcf_action_exec(struct sk_buff *skb, struct tc_action *a, struct tcf_result *res);
 extern int tcf_action_init(struct rtattr *rta, struct rtattr *est, struct tc_action *a,char *n, int ovr, int bind);
 extern int tcf_action_init_1(struct rtattr *rta, struct rtattr *est, struct tc_action *a,char *n, int ovr, int bind);
 extern int tcf_action_dump(struct sk_buff *skb, struct tc_action *a, int, int);

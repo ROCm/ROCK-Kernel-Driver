@@ -286,8 +286,10 @@ __setup("quiet", quiet_kernel);
 static int __init unknown_bootoption(char *param, char *val)
 {
 	/* Change NUL term back to "=", to make "param" the whole string. */
-	if (val)
-		val[-1] = '=';
+	if (val) {
+		if (val[-1] == '"') val[-2] = '=';
+		else val[-1] = '=';
+	}
 
 	/* Handle obsolete-style parameters */
 	if (obsolete_checksetup(param))

@@ -11,6 +11,7 @@
  * published by the Free Software Foundation.
  *
  * Modifications:
+ *     14-Sep-2004 BJD  USB Power control
  *     04-Sep-2004 BJD  Added new uart init, and io init
  *     21-Aug-2004 BJD  Added struct s3c2410_board
  *     06-Aug-2004 BJD  Fixed call to time initialisation
@@ -42,6 +43,7 @@
 #include "s3c2410.h"
 #include "devs.h"
 #include "cpu.h"
+#include "usb-simtec.h"
 
 /* macros for virtual address mods for the io space entries */
 #define VA_C5(item) ((item) + BAST_VAM_CS5)
@@ -160,16 +162,12 @@ void __init vr1000_map_io(void)
 	s3c24xx_init_io(vr1000_iodesc, ARRAY_SIZE(vr1000_iodesc));
 	s3c2410_init_uarts(vr1000_uartcfgs, ARRAY_SIZE(vr1000_uartcfgs));
 	s3c2410_set_board(&vr1000_board);
+	usb_simtec_init();
 }
 
 void __init vr1000_init_irq(void)
 {
 	s3c2410_init_irq();
-}
-
-void __init vr1000_init_time(void)
-{
-	s3c2410_init_time();
 }
 
 MACHINE_START(VR1000, "Thorcom-VR1000")
@@ -178,5 +176,5 @@ MACHINE_START(VR1000, "Thorcom-VR1000")
      BOOT_PARAMS(S3C2410_SDRAM_PA + 0x100)
      MAPIO(vr1000_map_io)
      INITIRQ(vr1000_init_irq)
-     INITTIME(vr1000_init_time)
+     .timer		= &s3c2410_timer,
 MACHINE_END

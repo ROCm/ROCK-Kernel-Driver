@@ -203,7 +203,7 @@ struct kaweth_ethernet_configuration
 	__u8 reserved2;
 	eth_addr_t hw_addr;
 	__u32 statistics_mask;
-	__u16 segment_size;
+	__le16 segment_size;
 	__u16 max_multicast_filters;
 	__u8 reserved3;
 } __attribute__ ((packed));
@@ -588,7 +588,7 @@ static void kaweth_usb_receive(struct urb *urb, struct pt_regs *regs)
 	int count = urb->actual_length;
 	int count2 = urb->transfer_buffer_length;
 
-	__u16 pkt_len = le16_to_cpup((u16 *)kaweth->rx_buf);
+	__u16 pkt_len = le16_to_cpup((__le16 *)kaweth->rx_buf);
 
 	struct sk_buff *skb;
 
@@ -668,13 +668,13 @@ static int kaweth_open(struct net_device *net)
 		INTBUFFERSIZE,
 		int_callback,
 		kaweth,
-		8);
+		250); /* overriding the descriptor */
 	kaweth->irq_urb->transfer_dma = kaweth->intbufferhandle;
 	kaweth->irq_urb->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
 
 	res = usb_submit_urb(kaweth->irq_urb, GFP_KERNEL);
 	if (res) {
-		usb_unlink_urb(kaweth->rx_urb);
+		usb_kill_urb(kaweth->rx_urb);
 		return -EIO;
 	}
 
@@ -695,52 +695,30 @@ static int kaweth_close(struct net_device *net)
 
 	kaweth->status |= KAWETH_STATUS_CLOSING;
 
-	usb_unlink_urb(kaweth->irq_urb);
-	usb_unlink_urb(kaweth->rx_urb);
+	usb_kill_urb(kaweth->irq_urb);
+	usb_kill_urb(kaweth->rx_urb);
 
 	flush_scheduled_work();
 
 	/* a scheduled work may have resubmitted,
 	   we hit them again */
-	usb_unlink_urb(kaweth->irq_urb);
-	usb_unlink_urb(kaweth->rx_urb);
+	usb_kill_urb(kaweth->irq_urb);
+	usb_kill_urb(kaweth->rx_urb);
 
 	kaweth->status &= ~KAWETH_STATUS_CLOSING;
 
 	return 0;
 }
 
-static int netdev_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
+static void kaweth_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
 {
-	u32 ethcmd;
 
-	if (copy_from_user(&ethcmd, useraddr, sizeof(ethcmd)))
-		return -EFAULT;
-
-	switch (ethcmd) {
-	case ETHTOOL_GDRVINFO: {
-		struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
-		strlcpy(info.driver, driver_name, sizeof(info.driver));
-		if (copy_to_user(useraddr, &info, sizeof(info)))
-			return -EFAULT;
-		return 0;
-	}
-	}
-
-	return -EOPNOTSUPP;
+	strlcpy(info->driver, driver_name, sizeof(info->driver));
 }
 
-/****************************************************************
- *     kaweth_ioctl
- ****************************************************************/
-static int kaweth_ioctl(struct net_device *net, struct ifreq *rq, int cmd)
-{
-	switch (cmd) {
-	case SIOCETHTOOL:
-		return netdev_ethtool_ioctl(net, rq->ifr_data);
-	}
-	return -EOPNOTSUPP;
-}
+static struct ethtool_ops ops = {
+	.get_drvinfo = kaweth_get_drvinfo
+};
 
 /****************************************************************
  *     kaweth_usb_transmit_complete
@@ -763,7 +741,7 @@ static void kaweth_usb_transmit_complete(struct urb *urb, struct pt_regs *regs)
 static int kaweth_start_xmit(struct sk_buff *skb, struct net_device *net)
 {
 	struct kaweth_device *kaweth = net->priv;
-	u16 *private_header;
+	__le16 *private_header;
 
 	int res;
 
@@ -794,7 +772,7 @@ static int kaweth_start_xmit(struct sk_buff *skb, struct net_device *net)
 		}
 	}
 
-	private_header = (u16 *)__skb_push(skb, 2);
+	private_header = (__le16 *)__skb_push(skb, 2);
 	*private_header = cpu_to_le16(skb->len-2);
 	kaweth->tx_skb = skb;
 
@@ -1107,11 +1085,11 @@ static int kaweth_probe(
 	kaweth->net->watchdog_timeo = KAWETH_TX_TIMEOUT;
 	kaweth->net->tx_timeout = kaweth_tx_timeout;
 
-	kaweth->net->do_ioctl = kaweth_ioctl;
 	kaweth->net->hard_start_xmit = kaweth_start_xmit;
 	kaweth->net->set_multicast_list = kaweth_set_rx_mode;
 	kaweth->net->get_stats = kaweth_netdev_stats;
 	kaweth->net->mtu = le16_to_cpu(kaweth->configuration.segment_size);
+	SET_ETHTOOL_OPS(kaweth->net, &ops);
 
 	memset(&kaweth->stats, 0, sizeof(kaweth->stats));
 
@@ -1173,8 +1151,8 @@ static void kaweth_disconnect(struct usb_interface *intf)
 	}
 
 	kaweth->removed = 1;
-	usb_unlink_urb(kaweth->irq_urb);
-	usb_unlink_urb(kaweth->rx_urb);
+	usb_kill_urb(kaweth->irq_urb);
+	usb_kill_urb(kaweth->rx_urb);
 
 	/* we need to wait for the urb to be cancelled, if it is active */
 	spin_lock(&kaweth->device_lock);
@@ -1250,19 +1228,17 @@ static int usb_start_wait_urb(struct urb *urb, int timeout, int* actual_length)
                 return status;
         }
 
-	set_current_state(TASK_UNINTERRUPTIBLE);
 	while (timeout && !awd.done) {
-		timeout = schedule_timeout(timeout);
 		set_current_state(TASK_UNINTERRUPTIBLE);
+		timeout = schedule_timeout(timeout);
 	}
 
-        set_current_state(TASK_RUNNING);
         remove_wait_queue(&awd.wqh, &wait);
 
         if (!timeout) {
                 // timeout
                 kaweth_warn("usb_control/bulk_msg: timeout");
-                usb_unlink_urb(urb);  // remove urb safely
+                usb_kill_urb(urb);  // remove urb safely
                 status = -ETIMEDOUT;
         }
 	else {

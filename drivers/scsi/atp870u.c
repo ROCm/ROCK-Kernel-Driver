@@ -363,7 +363,7 @@ go_42:
 			/*
 			 *      Clear it off the queue
 			 */
-			dev->id[target_id].curr_req = 0;
+			dev->id[target_id].curr_req = NULL;
 			dev->working--;
 			spin_unlock_irqrestore(dev->host->host_lock, flags);
 			/*
@@ -2263,10 +2263,10 @@ static int atp870u_init_tables(struct Scsi_Host *host)
 	dev->in_snd = 0;
 	dev->in_int = 0;
 	for (k = 0; k < qcnt; k++) {
-		dev->querequ[k] = 0;
+		dev->querequ[k] = NULL;
 	}
 	for (k = 0; k < 16; k++) {
-		dev->id[k].curr_req = 0;
+		dev->id[k].curr_req = NULL;
 		dev->sp[k] = 0x04;
 	}
 	return 0;

@@ -29,7 +29,7 @@ static __inline__ void putc(char c)
 /*
  * This does not append a newline
  */
-static void puts(const char *s)
+static void putstr(const char *s)
 {
 	while (*s) {
 		putc(*s);

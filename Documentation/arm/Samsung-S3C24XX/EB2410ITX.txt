@@ -26,4 +26,19 @@ Support
   and http://www.simtec.co.uk/products/EB2410ITX/resources.html
 
 
+MTD
+---
+
+  The NAND and NOR onboard are currently supported in the linux-mtd cvs,
+  and are awaiting merge in the mainline. see the linux-mtd project at
+  http://www.linux-mtd.infradead.org/ for more information.
+
+
+IDE
+---
+
+  Both onboard IDE ports are supported, however there is no support for
+  changing speed of devices, PIO Mode 4 capable drives should be used.
+
+
 (c) 2004 Ben Dooks, Simtec Electronics

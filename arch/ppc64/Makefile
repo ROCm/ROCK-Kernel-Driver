@@ -28,7 +28,7 @@ ifeq ($(new_nm),y)
 NM		:= $(NM) --synthetic
 endif
 
-CHECKFLAGS	+= -m64 -D__powerpc__=1
+CHECKFLAGS	+= -m64 -D__powerpc__
 
 LDFLAGS		:= -m elf64ppc
 LDFLAGS_vmlinux	:= -Bstatic -e $(KERNELLOAD) -Ttext $(KERNELLOAD)

@@ -9,7 +9,7 @@ comment "Video Adapters"
 
 config VIDEO_BT848
 	tristate "BT848 Video For Linux"
-	depends on VIDEO_DEV && PCI && I2C && SOUND
+	depends on VIDEO_DEV && PCI && I2C && FW_LOADER
 	select I2C_ALGOBIT
 	---help---
 	  Support for BT848 based frame grabber/overlay boards. This includes
@@ -295,6 +295,13 @@ config VIDEO_CX88
 	  To compile this driver as a module, choose M here: the
 	  module will be called cx8800
 
+#config VIDEO_CX88_DVB
+#	tristate "DVB Support for cx2388x based TV cards"
+#	depends on VIDEO_CX88 && DVB_CORE
+#	---help---
+#	  This adds support for DVB cards based on the
+#	  Connexant 2388x chip.
+
 config VIDEO_OVCAMCHIP
 	tristate "OmniVision Camera Chip support"
 	depends on VIDEO_DEV && I2C
@@ -306,5 +313,18 @@ config VIDEO_OVCAMCHIP
 	  To compile this driver as a module, choose M here: the
 	  module will be called ovcamchip
 
-endmenu
+config VIDEO_M32R_AR
+	tristate "AR devices"
+	depends on M32R
+	---help---
+	  This is a video4linux driver for the Renesas AR (Artificial Retina)
+	  camera module.
 
+config VIDEO_M32R_AR_M64278
+	tristate "Use Colour AR module M64278(VGA)"
+	depends on VIDEO_M32R_AR
+	---help---
+	  Say Y here to use the Renesas M64278E-800 camera module,
+	  which supports VGA(640x480 pixcels) size of images.
+
+endmenu

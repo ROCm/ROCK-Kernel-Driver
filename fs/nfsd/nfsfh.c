@@ -71,6 +71,35 @@ int nfsd_acceptable(void *expv, struct dentry *dentry)
 	return rv;
 }
 
+/* Type check. The correct error return for type mismatches does not seem to be
+ * generally agreed upon. SunOS seems to use EISDIR if file isn't S_IFREG; a
+ * comment in the NFSv3 spec says this is incorrect (implementation notes for
+ * the write call).
+ */
+static inline int
+nfsd_mode_check(struct svc_rqst *rqstp, umode_t mode, int type)
+{
+	/* Type can be negative when creating hardlinks - not to a dir */
+	if (type > 0 && (mode & S_IFMT) != type) {
+		if (rqstp->rq_vers == 4 && (mode & S_IFMT) == S_IFLNK)
+			return nfserr_symlink;
+		else if (type == S_IFDIR)
+			return nfserr_notdir;
+		else if ((mode & S_IFMT) == S_IFDIR)
+			return nfserr_isdir;
+		else
+			return nfserr_inval;
+	}
+	if (type < 0 && (mode & S_IFMT) == -type) {
+		if (rqstp->rq_vers == 4 && (mode & S_IFMT) == S_IFLNK)
+			return nfserr_symlink;
+		else if (type == -S_IFDIR)
+			return nfserr_isdir;
+		else
+			return nfserr_notdir;
+	}
+	return 0;
+}
 
 /*
  * Perform sanity checks on the dentry in a client's file handle.
@@ -87,7 +116,6 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 	struct knfsd_fh	*fh = &fhp->fh_handle;
 	struct svc_export *exp = NULL;
 	struct dentry	*dentry;
-	struct inode	*inode;
 	u32		error = 0;
 
 	dprintk("nfsd: fh_verify(%s)\n", SVCFH_fmt(fhp));
@@ -153,8 +181,8 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 		error = nfserr_perm;
 		if (!rqstp->rq_secure && EX_SECURE(exp)) {
 			printk(KERN_WARNING
-			       "nfsd: request from insecure port (%08x:%d)!\n",
-			       ntohl(rqstp->rq_addr.sin_addr.s_addr),
+			       "nfsd: request from insecure port (%u.%u.%u.%u:%d)!\n",
+			       NIPQUAD(rqstp->rq_addr.sin_addr.s_addr),
 			       ntohs(rqstp->rq_addr.sin_port));
 			goto out;
 		}
@@ -223,37 +251,9 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 	}
 	cache_get(&exp->h);
 
-	inode = dentry->d_inode;
-
-
-	/* Type check. The correct error return for type mismatches
-	 * does not seem to be generally agreed upon. SunOS seems to
-	 * use EISDIR if file isn't S_IFREG; a comment in the NFSv3
-	 * spec says this is incorrect (implementation notes for the
-	 * write call).
-	 */
-
-	/* Type can be negative when creating hardlinks - not to a dir */
-	if (type > 0 && (inode->i_mode & S_IFMT) != type) {
-		if (rqstp->rq_vers == 4 && (inode->i_mode & S_IFMT) == S_IFLNK)
-			error = nfserr_symlink;
-		else if (type == S_IFDIR)
-			error = nfserr_notdir;
-		else if ((inode->i_mode & S_IFMT) == S_IFDIR)
-			error = nfserr_isdir;
-		else
-			error = nfserr_inval;
+	error = nfsd_mode_check(rqstp, dentry->d_inode->i_mode, type);
+	if (error)
 		goto out;
-	}
-	if (type < 0 && (inode->i_mode & S_IFMT) == -type) {
-		if (rqstp->rq_vers == 4 && (inode->i_mode & S_IFMT) == S_IFLNK)
-			error = nfserr_symlink;
-		else if (type == -S_IFDIR)
-			error = nfserr_isdir;
-		else
-			error = nfserr_notdir;
-		goto out;
-	}
 
 	/* Finally, check access permissions. */
 	error = nfsd_permission(exp, dentry, access);

@@ -213,11 +213,13 @@ acpi_processor_errata_piix4 (
 		 * each IDE controller's DMA status to make sure we catch all
 		 * DMA activity.
 		 */
-		dev = pci_find_subsys(PCI_VENDOR_ID_INTEL,
+		dev = pci_get_subsys(PCI_VENDOR_ID_INTEL,
 		           PCI_DEVICE_ID_INTEL_82371AB, 
                            PCI_ANY_ID, PCI_ANY_ID, NULL);
-		if (dev)
+		if (dev) {
 			errata.piix4.bmisx = pci_resource_start(dev, 4);
+			pci_dev_put(dev);
+		}
 
 		/* 
 		 * Type-F DMA
@@ -228,7 +230,7 @@ acpi_processor_errata_piix4 (
 		 * disable C3 support if this is enabled, as some legacy 
 		 * devices won't operate well if fast DMA is disabled.
 		 */
-		dev = pci_find_subsys(PCI_VENDOR_ID_INTEL, 
+		dev = pci_get_subsys(PCI_VENDOR_ID_INTEL, 
 			PCI_DEVICE_ID_INTEL_82371AB_0, 
 			PCI_ANY_ID, PCI_ANY_ID, NULL);
 		if (dev) {
@@ -236,6 +238,7 @@ acpi_processor_errata_piix4 (
 			pci_read_config_byte(dev, 0x77, &value2);
 			if ((value1 & 0x80) || (value2 & 0x80))
 				errata.piix4.fdma = 1;
+			pci_dev_put(dev);
 		}
 
 		break;
@@ -267,10 +270,12 @@ acpi_processor_errata (
 	/*
 	 * PIIX4
 	 */
-	dev = pci_find_subsys(PCI_VENDOR_ID_INTEL, 
+	dev = pci_get_subsys(PCI_VENDOR_ID_INTEL, 
 		PCI_DEVICE_ID_INTEL_82371AB_3, PCI_ANY_ID, PCI_ANY_ID, NULL);
-	if (dev)
+	if (dev) {
 		result = acpi_processor_errata_piix4(dev);
+		pci_dev_put(dev);
+	}
 
 	return_VALUE(result);
 }

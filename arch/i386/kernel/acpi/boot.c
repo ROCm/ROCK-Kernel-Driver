@@ -71,6 +71,7 @@ int acpi_ht __initdata = 1;	/* enable HT */
 int acpi_lapic;
 int acpi_ioapic;
 int acpi_strict;
+EXPORT_SYMBOL(acpi_strict);
 
 acpi_interrupt_flags acpi_sci_flags __initdata;
 int acpi_sci_override_gsi __initdata;
@@ -449,6 +450,7 @@ int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
 unsigned int acpi_register_gsi(u32 gsi, int edge_level, int active_high_low)
 {
 	unsigned int irq;
+	unsigned int plat_gsi = gsi;
 
 #ifdef CONFIG_PCI
 	/*
@@ -470,10 +472,10 @@ unsigned int acpi_register_gsi(u32 gsi, int edge_level, int active_high_low)
 
 #ifdef CONFIG_X86_IO_APIC
 	if (acpi_irq_model == ACPI_IRQ_MODEL_IOAPIC) {
-		mp_register_gsi(gsi, edge_level, active_high_low);
+		plat_gsi = mp_register_gsi(gsi, edge_level, active_high_low);
 	}
 #endif
-	acpi_gsi_to_irq(gsi, &irq);
+	acpi_gsi_to_irq(plat_gsi, &irq);
 	return irq;
 }
 EXPORT_SYMBOL(acpi_register_gsi);
@@ -829,9 +831,15 @@ acpi_boot_init (void)
 	 */
 	error = acpi_blacklisted();
 	if (error) {
-		printk(KERN_WARNING PREFIX "BIOS listed in blacklist, disabling ACPI support\n");
-		disable_acpi();
-		return error;
+		extern int acpi_force;
+
+		if (acpi_force) {
+			printk(KERN_WARNING PREFIX "acpi=force override\n");
+		} else {
+			printk(KERN_WARNING PREFIX "Disabling ACPI support\n");
+			disable_acpi();
+			return error;
+		}
 	}
 
 	/*

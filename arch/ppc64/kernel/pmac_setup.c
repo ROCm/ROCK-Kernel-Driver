@@ -53,13 +53,12 @@
 #include <linux/irq.h>
 #include <linux/seq_file.h>
 #include <linux/root_dev.h>
+#include <linux/bitops.h>
 
 #include <asm/processor.h>
 #include <asm/sections.h>
 #include <asm/prom.h>
 #include <asm/system.h>
-#include <asm/pgtable.h>
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/pci-bridge.h>
 #include <asm/iommu.h>
@@ -447,15 +446,13 @@ static int __init pmac_probe(int platform)
 	if (platform != PLATFORM_POWERMAC)
 		return 0;
 
-#ifdef CONFIG_PMAC_DART
 	/*
 	 * On U3, the DART (iommu) must be allocated now since it
 	 * has an impact on htab_initialize (due to the large page it
 	 * occupies having to be broken up so the DART itself is not
 	 * part of the cacheable linar mapping
 	 */
-	pmac_iommu_alloc();
-#endif /* CONFIG_PMAC_DART */
+	alloc_u3_dart_table();
 
 	return 1;
 }

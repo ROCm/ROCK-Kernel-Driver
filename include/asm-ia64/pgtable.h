@@ -206,18 +206,18 @@ ia64_phys_addr_valid (unsigned long addr)
 #define RGN_SIZE	(1UL << 61)
 #define RGN_KERNEL	7
 
-#define VMALLOC_START		0xa000000200000000
+#define VMALLOC_START		0xa000000200000000UL
 #ifdef CONFIG_VIRTUAL_MEM_MAP
-# define VMALLOC_END_INIT	(0xa000000000000000 + (1UL << (4*PAGE_SHIFT - 9)))
+# define VMALLOC_END_INIT	(0xa000000000000000UL + (1UL << (4*PAGE_SHIFT - 9)))
 # define VMALLOC_END		vmalloc_end
   extern unsigned long vmalloc_end;
 #else
-# define VMALLOC_END		(0xa000000000000000 + (1UL << (4*PAGE_SHIFT - 9)))
+# define VMALLOC_END		(0xa000000000000000UL + (1UL << (4*PAGE_SHIFT - 9)))
 #endif
 
 /* fs/proc/kcore.c */
-#define	kc_vaddr_to_offset(v) ((v) - 0xa000000000000000)
-#define	kc_offset_to_vaddr(o) ((o) + 0xa000000000000000)
+#define	kc_vaddr_to_offset(v) ((v) - 0xa000000000000000UL)
+#define	kc_offset_to_vaddr(o) ((o) + 0xa000000000000000UL)
 
 /*
  * Conversion functions: convert page frame number (pfn) and a protection value to a page
@@ -452,7 +452,9 @@ extern void paging_init (void);
 #define pte_to_pgoff(pte)		((pte_val(pte) << 1) >> 3)
 #define pgoff_to_pte(off)		((pte_t) { ((off) << 2) | _PAGE_FILE })
 
-#define io_remap_page_range remap_page_range	/* XXX is this right? */
+/* XXX is this right? */
+#define io_remap_page_range(vma, vaddr, paddr, size, prot)		\
+		remap_pfn_range(vma, vaddr, (paddr) >> PAGE_SHIFT, size, prot)
 
 /*
  * ZERO_PAGE is a global shared page that is always zero: used

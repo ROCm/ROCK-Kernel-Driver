@@ -12,6 +12,7 @@
  *            Wolfgang Taphorn
  *            Stefan Bader <stefan.bader@de.ibm.com> 
  *            Heiko Carstens <heiko.carstens@de.ibm.com> 
+ *            Andreas Herrmann <aherrman@de.ibm.com>
  * 
  * This program is free software; you can redistribute it and/or modify 
  * it under the terms of the GNU General Public License as published by 
@@ -105,6 +106,8 @@
 #define FSF_PAYLOAD_SIZE_MISMATCH		0x00000060
 #define FSF_REQUEST_SIZE_TOO_LARGE		0x00000061
 #define FSF_RESPONSE_SIZE_TOO_LARGE		0x00000062
+#define FSF_SBAL_MISMATCH			0x00000063
+#define FSF_OPEN_PORT_WITHOUT_PRLI		0x00000064
 #define FSF_ADAPTER_STATUS_AVAILABLE		0x000000AD
 #define FSF_FCP_RSP_AVAILABLE			0x000000AF
 #define FSF_UNKNOWN_COMMAND			0x000000E2

@@ -26,10 +26,11 @@
  *  Accesses memory in 32-bit aligned chunks of 32-bits and thus
  *  may read beyond the 'size'th bit.
  */
-static u32 hfs_find_set_zero_bits(u32 *bitmap, u32 size, u32 offset, u32 *max)
+static u32 hfs_find_set_zero_bits(__be32 *bitmap, u32 size, u32 offset, u32 *max)
 {
-	u32 *curr, *end;
-	u32 val, mask, start, len;
+	__be32 *curr, *end;
+	u32 mask, start, len, n;
+	__be32 val;
 	int i;
 
 	len = *max;
@@ -42,11 +43,11 @@ static u32 hfs_find_set_zero_bits(u32 *bitmap, u32 size, u32 offset, u32 *max)
 	/* scan the first partial u32 for zero bits */
 	val = *curr;
 	if (~val) {
-		val = be32_to_cpu(val);
+		n = be32_to_cpu(val);
 		i = offset % 32;
 		mask = (1U << 31) >> i;
 		for (; i < 32; mask >>= 1, i++) {
-			if (!(val & mask))
+			if (!(n & mask))
 				goto found;
 		}
 	}
@@ -55,10 +56,10 @@ static u32 hfs_find_set_zero_bits(u32 *bitmap, u32 size, u32 offset, u32 *max)
 	while (++curr < end) {
 		val = *curr;
 		if (~val) {
-			val = be32_to_cpu(val);
+			n = be32_to_cpu(val);
 			mask = 1 << 31;
 			for (i = 0; i < 32; mask >>= 1, i++) {
-				if (!(val & mask))
+				if (!(n & mask))
 					goto found;
 			}
 		}
@@ -72,38 +73,38 @@ found:
 	/* do any partial u32 at the start */
 	len = min(size - start, len);
 	while (1) {
-		val |= mask;
+		n |= mask;
 		if (++i >= 32)
 			break;
 		mask >>= 1;
-		if (!--len || val & mask)
+		if (!--len || n & mask)
 			goto done;
 	}
 	if (!--len)
 		goto done;
-	*curr++ = cpu_to_be32(val);
+	*curr++ = cpu_to_be32(n);
 	/* do full u32s */
 	while (1) {
-		val = be32_to_cpu(*curr);
+		n = be32_to_cpu(*curr);
 		if (len < 32)
 			break;
-		if (val) {
+		if (n) {
 			len = 32;
 			break;
 		}
-		*curr++ = 0xffffffffU;
+		*curr++ = cpu_to_be32(0xffffffff);
 		len -= 32;
 	}
 	/* do any partial u32 at end */
 	mask = 1U << 31;
 	for (i = 0; i < len; i++) {
-		if (val & mask)
+		if (n & mask)
 			break;
-		val |= mask;
+		n |= mask;
 		mask >>= 1;
 	}
 done:
-	*curr = cpu_to_be32(val);
+	*curr = cpu_to_be32(n);
 	*max = (curr - bitmap) * 32 + i - start;
 	return start;
 }
@@ -191,7 +192,7 @@ out:
  */
 int hfs_clear_vbm_bits(struct super_block *sb, u16 start, u16 count)
 {
-	u32 *curr;
+	__be32 *curr;
 	u32 mask;
 	int i, len;
 

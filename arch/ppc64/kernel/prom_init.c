@@ -31,6 +31,7 @@
 #include <linux/stringify.h>
 #include <linux/delay.h>
 #include <linux/initrd.h>
+#include <linux/bitops.h>
 #include <asm/prom.h>
 #include <asm/rtas.h>
 #include <asm/abs_addr.h>
@@ -42,7 +43,6 @@
 #include <asm/system.h>
 #include <asm/mmu.h>
 #include <asm/pgtable.h>
-#include <asm/bitops.h>
 #include <asm/naca.h>
 #include <asm/pci.h>
 #include <asm/iommu.h>
@@ -423,13 +423,6 @@ static void __init early_cmdline_parse(void)
 		else if (!strncmp(opt, RELOC("force"), 5))
 			RELOC(iommu_force_on) = 1;
 	}
-
-#ifndef CONFIG_PMAC_DART
-	if (RELOC(of_platform) == PLATFORM_POWERMAC) {
-		RELOC(ppc64_iommu_off) = 1;
-		prom_printf("DART disabled on PowerMac !\n");
-	}
-#endif
 }
 
 /*
@@ -597,12 +590,15 @@ static void reserve_mem(unsigned long base, unsigned long size)
 	unsigned long top = base + size;
 	unsigned long cnt = RELOC(mem_reserve_cnt);
 
+	if (size == 0)
+		return;
+
 	/* We need to always keep one empty entry so that we
 	 * have our terminator with "size" set to 0 since we are
 	 * dumb and just copy this entire array to the boot params
 	 */
 	base = _ALIGN_DOWN(base, PAGE_SIZE);
-	top = _ALIGN_DOWN(top, PAGE_SIZE);
+	top = _ALIGN_UP(top, PAGE_SIZE);
 	size = top - base;
 
 	if (cnt >= (MEM_RESERVE_MAP_SIZE - 1))

@@ -74,7 +74,7 @@
 
 #include <asm/uaccess.h>
 #include <asm/system.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <linux/config.h>
 #include <linux/cpu.h>
 #include <linux/types.h>
@@ -2745,7 +2745,7 @@ int dev_ioctl(unsigned int cmd, void __user *arg)
 				/* Follow me in net/core/wireless.c */
 				ret = wireless_process_ioctl(&ifr, cmd);
 				rtnl_unlock();
-				if (!ret && IW_IS_GET(cmd) &&
+				if (IW_IS_GET(cmd) &&
 				    copy_to_user(arg, &ifr,
 					    	 sizeof(struct ifreq)))
 					ret = -EFAULT;

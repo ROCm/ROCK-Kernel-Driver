@@ -22,7 +22,7 @@
 #include <linux/module.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -102,7 +102,7 @@ static int fw_classify(struct sk_buff *skb, struct tcf_proto *tp,
 			}
 #endif
                                if (f->action) {
-                                       int pol_res = tcf_action_exec(skb, f->action);
+                                       int pol_res = tcf_action_exec(skb, f->action, res);
                                        if (pol_res >= 0)
                                                return pol_res;
                                } else

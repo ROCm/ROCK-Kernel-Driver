@@ -4,12 +4,11 @@
 #include <linux/interrupt.h>
 #include <linux/socket.h>
 #include <linux/netdevice.h>
+#include <linux/i2c.h>
 
 #ifdef CONFIG_DEVFS_FS
 #include <linux/devfs_fs_kernel.h>
 #endif
-
-#include <media/saa7146_vv.h>
 
 #include <linux/dvb/video.h>
 #include <linux/dvb/audio.h>
@@ -26,6 +25,7 @@
 #include "dvb_net.h"
 #include "dvb_ringbuffer.h"
 
+#include <media/saa7146_vv.h>
 
 #define MAXFILT 32
 
@@ -60,12 +60,13 @@ struct av7110 {
         struct dvb_device       dvb_dev;
         struct dvb_net               dvb_net;
 
-	struct video_device	v4l_dev;
-	struct video_device	vbi_dev;
+	struct video_device	*v4l_dev;
+	struct video_device	*vbi_dev;
 
         struct saa7146_dev	*dev;
 
-	struct dvb_i2c_bus	*i2c_bus;	
+	struct i2c_adapter	i2c_adap;
+
 	char			*card_name;
 
 	/* support for analog module of dvb-c */
@@ -127,7 +128,7 @@ struct av7110 {
 
         int                     osdwin;      /* currently active window */
         u16                     osdbpp[8];
-
+	struct semaphore	osd_sema;
 
         /* CA */
 
@@ -187,6 +188,7 @@ struct av7110 {
         struct dvb_ringbuffer    ci_rbuffer;
         struct dvb_ringbuffer    ci_wbuffer;
 
+	struct audio_mixer	mixer;
 
         struct dvb_adapter       *dvb_adapter;
         struct dvb_device        *video_dev;

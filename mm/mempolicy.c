@@ -66,6 +66,7 @@
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/mm.h>
+#include <linux/nodemask.h>
 #include <linux/gfp.h>
 #include <linux/slab.h>
 #include <linux/string.h>
@@ -95,7 +96,7 @@ static int nodes_online(unsigned long *nodes)
 {
 	DECLARE_BITMAP(online2, MAX_NUMNODES);
 
-	bitmap_copy(online2, node_online_map, MAX_NUMNODES);
+	bitmap_copy(online2, nodes_addr(node_online_map), MAX_NUMNODES);
 	if (bitmap_empty(online2, MAX_NUMNODES))
 		set_bit(0, online2);
 	if (!bitmap_subset(nodes, online2, MAX_NUMNODES))
@@ -424,7 +425,7 @@ static void get_zonemask(struct mempolicy *p, unsigned long *nodes)
 	case MPOL_PREFERRED:
 		/* or use current node instead of online map? */
 		if (p->v.preferred_node < 0)
-			bitmap_copy(nodes, node_online_map, MAX_NUMNODES);
+			bitmap_copy(nodes, nodes_addr(node_online_map), MAX_NUMNODES);
 		else
 			__set_bit(p->v.preferred_node, nodes);
 		break;
@@ -692,7 +693,7 @@ static struct page *alloc_page_interleave(unsigned gfp, unsigned order, unsigned
 	struct zonelist *zl;
 	struct page *page;
 
-	BUG_ON(!test_bit(nid, node_online_map));
+	BUG_ON(!node_online(nid));
 	zl = NODE_DATA(nid)->node_zonelists + (gfp & GFP_ZONEMASK);
 	page = __alloc_pages(gfp, order, zl);
 	if (page && page_zone(page) == zl->zones[0]) {
@@ -1081,7 +1082,8 @@ void __init numa_policy_init(void)
 	/* Set interleaving policy for system init. This way not all
 	   the data structures allocated at system boot end up in node zero. */
 
-	if (sys_set_mempolicy(MPOL_INTERLEAVE, node_online_map, MAX_NUMNODES) < 0)
+	if (sys_set_mempolicy(MPOL_INTERLEAVE, nodes_addr(node_online_map),
+							MAX_NUMNODES) < 0)
 		printk("numa_policy_init: interleaving failed\n");
 }
 

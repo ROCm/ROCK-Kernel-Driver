@@ -44,7 +44,7 @@ static int ehci_get_frame (struct usb_hcd *hcd);
  * @tag: hardware tag for type of this record
  */
 static union ehci_shadow *
-periodic_next_shadow (union ehci_shadow *periodic, int tag)
+periodic_next_shadow (union ehci_shadow *periodic, __le32 tag)
 {
 	switch (tag) {
 	case Q_TYPE_QH:
@@ -64,7 +64,7 @@ periodic_next_shadow (union ehci_shadow *periodic, int tag)
 static int periodic_unlink (struct ehci_hcd *ehci, unsigned frame, void *ptr)
 {
 	union ehci_shadow	*prev_p = &ehci->pshadow [frame];
-	u32			*hw_p = &ehci->periodic [frame];
+	__le32			*hw_p = &ehci->periodic [frame];
 	union ehci_shadow	here = *prev_p;
 	union ehci_shadow	*next_p;
 
@@ -98,7 +98,7 @@ static int periodic_unlink (struct ehci_hcd *ehci, unsigned frame, void *ptr)
 static unsigned short
 periodic_usecs (struct ehci_hcd *ehci, unsigned frame, unsigned uframe)
 {
-	u32			*hw_p = &ehci->periodic [frame];
+	__le32			*hw_p = &ehci->periodic [frame];
 	union ehci_shadow	*q = &ehci->pshadow [frame];
 	unsigned		usecs = 0;
 
@@ -196,7 +196,7 @@ static int tt_no_collision (
 	 */
 	for (; frame < ehci->periodic_size; frame += period) {
 		union ehci_shadow	here;
-		u32			type;
+		__le32			type;
 
 		here = ehci->pshadow [frame];
 		type = Q_NEXT_TYPE (ehci->periodic [frame]);
@@ -403,7 +403,7 @@ static int check_intr_schedule (
 	unsigned		frame,
 	unsigned		uframe,
 	const struct ehci_qh	*qh,
-	u32			*c_maskp
+	__le32			*c_maskp
 )
 {
     	int		retval = -ENOSPC;
@@ -412,7 +412,7 @@ static int check_intr_schedule (
 		goto done;
 	if (!qh->c_usecs) {
 		retval = 0;
-		*c_maskp = cpu_to_le32 (0);
+		*c_maskp = 0;
 		goto done;
 	}
 
@@ -447,7 +447,7 @@ static int qh_schedule (struct ehci_hcd *ehci, struct ehci_qh *qh)
 {
 	int 		status;
 	unsigned	uframe;
-	u32		c_mask;
+	__le32		c_mask;
 	unsigned	frame;		/* 0..(qh->period - 1), or NO_FRAME */
 
 	qh->hw_next = EHCI_LIST_END;
@@ -1008,8 +1008,7 @@ sitd_slot_ok (
 		uframe += period_uframes;
 	} while (uframe < mod);
 
-	stream->splits = stream->raw_mask << (uframe & 7);
-	cpu_to_le32s (&stream->splits);
+	stream->splits = cpu_to_le32(stream->raw_mask << (uframe & 7));
 	return 1;
 }
 
@@ -1812,7 +1811,7 @@ scan_periodic (struct ehci_hcd *ehci, struct pt_regs *regs)
 
 	for (;;) {
 		union ehci_shadow	q, *q_p;
-		u32			type, *hw_p;
+		__le32			type, *hw_p;
 		unsigned		uframes;
 
 		/* don't scan past the live uframe */

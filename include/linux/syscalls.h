@@ -61,6 +61,7 @@ struct mq_attr;
 #include <asm/siginfo.h>
 #include <asm/signal.h>
 #include <linux/quota.h>
+#include <linux/key.h>
 
 asmlinkage long sys_time(int __user *tloc);
 asmlinkage long sys_stime(time_t __user *tptr);
@@ -114,6 +115,9 @@ asmlinkage long sys_getitimer(int which, struct itimerval __user *value);
 asmlinkage long sys_setitimer(int which,
 				struct itimerval __user *value,
 				struct itimerval __user *ovalue);
+asmlinkage long sys_timer_create(clockid_t which_clock,
+				 struct sigevent __user *timer_event_spec,
+				 timer_t __user * created_timer_id);
 asmlinkage long sys_timer_gettime(timer_t timer_id,
 				struct itimerspec __user *setting);
 asmlinkage long sys_timer_getoverrun(timer_t timer_id);
@@ -486,6 +490,21 @@ asmlinkage long sys_nfsservctl(int cmd,
 				void __user *res);
 asmlinkage long sys_syslog(int type, char __user *buf, int len);
 asmlinkage long sys_uselib(const char __user *library);
+asmlinkage long sys_setaltroot(const char __user *altroot);
 asmlinkage long sys_ni_syscall(void);
+
+asmlinkage long sys_add_key(const char __user *_type,
+			    const char __user *_description,
+			    const void __user *_payload,
+			    size_t plen,
+			    key_serial_t destringid);
+
+asmlinkage long sys_request_key(const char __user *_type,
+				const char __user *_description,
+				const char __user *_callout_info,
+				key_serial_t destringid);
+
+asmlinkage long sys_keyctl(int cmd, unsigned long arg2, unsigned long arg3,
+			   unsigned long arg4, unsigned long arg5);
 
 #endif

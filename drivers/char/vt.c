@@ -101,11 +101,11 @@
 #include <linux/bootmem.h>
 #include <linux/pm.h>
 #include <linux/font.h>
+#include <linux/bitops.h>
 
 #include <asm/io.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
-#include <asm/bitops.h>
 
 #include "console_macros.h"
 
@@ -3076,6 +3076,10 @@ int con_font_get(int currcons, struct console_font_op *op)
 	}
 	if (rc)
 		goto out;
+
+	op->height = font.height;
+	op->width = font.width;
+	op->charcount = font.charcount;
 
 	if (op->data && copy_to_user(op->data, font.data, c))
 		rc = -EFAULT;

@@ -66,10 +66,10 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/bitops.h>
 
 #include <stdarg.h>
 
-#include <asm/bitops.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
 
@@ -743,22 +743,22 @@ again:
 	/*
 	 * Check ufs magic number
 	 */
-	switch ((uspi->fs_magic = __constant_le32_to_cpu(usb3->fs_magic))) {
+	sbi->s_bytesex = BYTESEX_LE;
+	switch ((uspi->fs_magic = fs32_to_cpu(sb, usb3->fs_magic))) {
 		case UFS_MAGIC:
 		case UFS2_MAGIC:
 		case UFS_MAGIC_LFN:
 	        case UFS_MAGIC_FEA:
 	        case UFS_MAGIC_4GB:
-			sbi->s_bytesex = BYTESEX_LE;
 			goto magic_found;
 	}
-	switch ((uspi->fs_magic = __constant_be32_to_cpu(usb3->fs_magic))) {
+	sbi->s_bytesex = BYTESEX_BE;
+	switch ((uspi->fs_magic = fs32_to_cpu(sb, usb3->fs_magic))) {
 		case UFS_MAGIC:
 		case UFS2_MAGIC:
 		case UFS_MAGIC_LFN:
 	        case UFS_MAGIC_FEA:
 	        case UFS_MAGIC_4GB:
-			sbi->s_bytesex = BYTESEX_BE;
 			goto magic_found;
 	}
 
@@ -1129,7 +1129,7 @@ static int ufs_statfs (struct super_block *sb, struct kstatfs *buf)
 	flags = UFS_SB(sb)->s_flags;
 	if ((flags & UFS_TYPE_MASK) == UFS_TYPE_UFS2) {
 		buf->f_type = UFS2_MAGIC;
-		buf->f_blocks = usb->fs_u11.fs_u2.fs_dsize;
+		buf->f_blocks = fs64_to_cpu(sb, usb->fs_u11.fs_u2.fs_dsize);
 		buf->f_bfree = ufs_blkstofrags(fs64_to_cpu(sb, usb->fs_u11.fs_u2.fs_cstotal.cs_nbfree)) +
 			fs64_to_cpu(sb, usb->fs_u11.fs_u2.fs_cstotal.cs_nffree);
 		buf->f_ffree = fs64_to_cpu(sb,

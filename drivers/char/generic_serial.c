@@ -26,6 +26,7 @@
 #include <linux/mm.h>
 #include <linux/generic_serial.h>
 #include <linux/interrupt.h>
+#include <linux/delay.h>
 #include <asm/semaphore.h>
 #include <asm/uaccess.h>
 
@@ -399,8 +400,7 @@ static int gs_wait_tx_flushed (void * ptr, int timeout)
 		gs_dprintk (GS_DEBUG_FLUSH, "Expect to finish in %d jiffies "
 			    "(%d chars).\n", jiffies_to_transmit, charsleft); 
 
-		set_current_state (TASK_INTERRUPTIBLE);
-		schedule_timeout(jiffies_to_transmit);
+		msleep_interruptible(jiffies_to_msecs(jiffies_to_transmit));
 		if (signal_pending (current)) {
 			gs_dprintk (GS_DEBUG_FLUSH, "Signal pending. Bombing out: "); 
 			rv = -EINTR;
@@ -436,9 +436,7 @@ void gs_flush_buffer(struct tty_struct *tty)
 	restore_flags(flags);
 
 	wake_up_interruptible(&tty->write_wait);
-	if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-	    tty->ldisc.write_wakeup)
-		(tty->ldisc.write_wakeup)(tty);
+	tty_wakeup(tty);
 	func_exit ();
 }
 
@@ -578,9 +576,7 @@ void gs_do_softint(void *private_)
 	if (!tty) return;
 
 	if (test_and_clear_bit(RS_EVENT_WRITE_WAKEUP, &port->event)) {
-		if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-		    tty->ldisc.write_wakeup)
-			(tty->ldisc.write_wakeup)(tty);
+		tty_wakeup(tty);
 		wake_up_interruptible(&tty->write_wait);
 	}
 	func_exit ();
@@ -694,7 +690,7 @@ void gs_close(struct tty_struct * tty, struct file * filp)
 {
 	unsigned long flags;
 	struct gs_port *port;
-
+	
 	func_enter ();
 
 	if (!tty) return;
@@ -760,8 +756,8 @@ void gs_close(struct tty_struct * tty, struct file * filp)
 
 	if (tty->driver->flush_buffer)
 		tty->driver->flush_buffer(tty);
-	if (tty->ldisc.flush_buffer)
-		tty->ldisc.flush_buffer(tty);
+		
+	tty_ldisc_flush(tty);
 	tty->closing = 0;
 
 	port->event = 0;
@@ -771,8 +767,7 @@ void gs_close(struct tty_struct * tty, struct file * filp)
 
 	if (port->blocked_open) {
 		if (port->close_delay) {
-			set_current_state (TASK_INTERRUPTIBLE);
-			schedule_timeout(port->close_delay);
+			msleep_interruptible(jiffies_to_msecs(port->close_delay));
 		}
 		wake_up_interruptible(&port->open_wait);
 	}

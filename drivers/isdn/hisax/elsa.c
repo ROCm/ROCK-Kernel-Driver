@@ -691,8 +691,7 @@ Elsa_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 				byteout(cs->hw.elsa.ctrl, cs->hw.elsa.ctrl_reg);
 				byteout(cs->hw.elsa.timer, 0);
 				spin_unlock_irqrestore(&cs->lock, flags);
-				set_current_state(TASK_UNINTERRUPTIBLE);
-				schedule_timeout((110*HZ)/1000);
+				msleep(110);
 				spin_lock_irqsave(&cs->lock, flags);
 				cs->hw.elsa.ctrl_reg &= ~ELSA_ENA_TIMER_INT;
 				byteout(cs->hw.elsa.ctrl, cs->hw.elsa.ctrl_reg);

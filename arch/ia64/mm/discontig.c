@@ -16,6 +16,7 @@
 #include <linux/bootmem.h>
 #include <linux/acpi.h>
 #include <linux/efi.h>
+#include <linux/nodemask.h>
 #include <asm/pgalloc.h>
 #include <asm/tlb.h>
 #include <asm/meminit.h>
@@ -631,12 +632,10 @@ void paging_init(void)
 	unsigned long max_dma;
 	unsigned long zones_size[MAX_NR_ZONES];
 	unsigned long zholes_size[MAX_NR_ZONES];
-	unsigned long max_gap, pfn_offset = 0;
+	unsigned long pfn_offset = 0;
 	int node;
 
 	max_dma = virt_to_phys((void *) MAX_DMA_ADDRESS) >> PAGE_SHIFT;
-	max_gap = 0;
-	efi_memmap_walk(find_largest_hole, &max_gap);
 
 	/* so min() will work in count_node_pages */
 	for (node = 0; node < numnodes; node++)
@@ -682,7 +681,7 @@ void paging_init(void)
 				PAGE_ALIGN(max_low_pfn * sizeof(struct page));
 			vmem_map = (struct page *) vmalloc_end;
 
-			efi_memmap_walk(create_mem_map_page_table, 0);
+			efi_memmap_walk(create_mem_map_page_table, NULL);
 			printk("Virtual mem_map starts at 0x%p\n", vmem_map);
 		}
 

@@ -31,12 +31,15 @@
 #include <linux/moduleparam.h>
 #include <linux/smp_lock.h>
 
-#include "ntfs.h"
 #include "sysctl.h"
 #include "logfile.h"
 #include "quota.h"
 #include "dir.h"
+#include "debug.h"
 #include "index.h"
+#include "aops.h"
+#include "malloc.h"
+#include "ntfs.h"
 
 /* Number of mounted file systems which have compression enabled. */
 static unsigned long ntfs_nr_compression_users;
@@ -145,7 +148,7 @@ static BOOL parse_options(ntfs_volume *vol, char *opt)
 	ntfs_debug("Entering with mount options string: %s", opt);
 	while ((p = strsep(&opt, ","))) {
 		if ((v = strchr(p, '=')))
-			*v++ = '\0';
+			*v++ = 0;
 		NTFS_GETOPT("uid", uid)
 		else NTFS_GETOPT("gid", gid)
 		else NTFS_GETOPT("umask", fmask = dmask)
@@ -322,7 +325,7 @@ static int ntfs_write_volume_flags(ntfs_volume *vol, const VOLUME_FLAGS flags)
 	int err;
 
 	ntfs_debug("Entering, old flags = 0x%x, new flags = 0x%x.",
-			vol->vol_flags, flags);
+			le16_to_cpu(vol->vol_flags), le16_to_cpu(flags));
 	if (vol->vol_flags == flags)
 		goto done;
 	BUG_ON(!ni);
@@ -386,7 +389,8 @@ static inline int ntfs_set_volume_flags(ntfs_volume *vol, VOLUME_FLAGS flags)
 static inline int ntfs_clear_volume_flags(ntfs_volume *vol, VOLUME_FLAGS flags)
 {
 	flags &= VOLUME_FLAGS_MASK;
-	return ntfs_write_volume_flags(vol, vol->vol_flags & ~flags);
+	flags = vol->vol_flags & cpu_to_le16(~le16_to_cpu(flags));
+	return ntfs_write_volume_flags(vol, flags);
 }
 
 #endif /* NTFS_RW */
@@ -511,8 +515,10 @@ static BOOL is_boot_sector_ntfs(const struct super_block *sb,
 	 * field. If checksum is zero, no checking is done.
 	 */
 	if ((void*)b < (void*)&b->checksum && b->checksum) {
-		u32 i, *u;
-		for (i = 0, u = (u32*)b; u < (u32*)(&b->checksum); ++u)
+		le32 *u;
+		u32 i;
+
+		for (i = 0, u = (le32*)b; u < (le32*)(&b->checksum); ++u)
 			i += le32_to_cpup(u);
 		if (le32_to_cpu(b->checksum) != i)
 			goto not_ntfs;
@@ -521,7 +527,7 @@ static BOOL is_boot_sector_ntfs(const struct super_block *sb,
 	if (b->oem_id != magicNTFS)
 		goto not_ntfs;
 	/* Check bytes per sector value is between 256 and 4096. */
-	if (le16_to_cpu(b->bpb.bytes_per_sector) <  0x100 ||
+	if (le16_to_cpu(b->bpb.bytes_per_sector) < 0x100 ||
 			le16_to_cpu(b->bpb.bytes_per_sector) > 0x1000)
 		goto not_ntfs;
 	/* Check sectors per cluster value is valid. */
@@ -824,12 +830,12 @@ static BOOL parse_ntfs_boot_sector(ntfs_volume *vol, const NTFS_BOOT_SECTOR *b)
 }
 
 /**
- * setup_lcn_allocator - initialize the cluster allocator
- * @vol:	volume structure for which to setup the lcn allocator
+ * ntfs_setup_allocators - initialize the cluster and mft allocators
+ * @vol:	volume structure for which to setup the allocators
  *
- * Setup the cluster (lcn) allocator to the starting values.
+ * Setup the cluster (lcn) and mft allocators to the starting values.
  */
-static void setup_lcn_allocator(ntfs_volume *vol)
+static void ntfs_setup_allocators(ntfs_volume *vol)
 {
 #ifdef NTFS_RW
 	LCN mft_zone_size, mft_lcn;
@@ -899,6 +905,11 @@ static void setup_lcn_allocator(ntfs_volume *vol)
 	vol->data2_zone_pos = 0;
 	ntfs_debug("vol->data2_zone_pos = 0x%llx",
 			(unsigned long long)vol->data2_zone_pos);
+
+	/* Set the mft data allocation position to mft record 24. */
+	vol->mft_data_pos = 24;
+	ntfs_debug("vol->mft_data_pos = 0x%llx",
+			(unsigned long long)vol->mft_data_pos);
 #endif /* NTFS_RW */
 }
 
@@ -935,8 +946,8 @@ static BOOL load_and_init_mft_mirror(ntfs_volume *vol)
 	/* No VFS initiated operations allowed for $MFTMirr. */
 	tmp_ino->i_op = &ntfs_empty_inode_ops;
 	tmp_ino->i_fop = &ntfs_empty_file_ops;
-	/* Put back our special address space operations. */
-	tmp_ino->i_mapping->a_ops = &ntfs_mft_aops;
+	/* Put in our special address space operations. */
+	tmp_ino->i_mapping->a_ops = &ntfs_mst_aops;
 	tmp_ni = NTFS_I(tmp_ino);
 	/* The $MFTMirr, like the $MFT is multi sector transfer protected. */
 	NInoSetMstProtected(tmp_ni);
@@ -1003,7 +1014,7 @@ static BOOL check_mft_mirror(ntfs_volume *vol)
 			++index;
 		}
 		/* Make sure the record is ok. */
-		if (ntfs_is_baad_recordp(kmft)) {
+		if (ntfs_is_baad_recordp((le32*)kmft)) {
 			ntfs_error(sb, "Incomplete multi sector transfer "
 					"detected in mft record %i.", i);
 mm_unmap_out:
@@ -1012,7 +1023,7 @@ mft_unmap_out:
 			ntfs_unmap_page(mft_page);
 			return FALSE;
 		}
-		if (ntfs_is_baad_recordp(kmirr)) {
+		if (ntfs_is_baad_recordp((le32*)kmirr)) {
 			ntfs_error(sb, "Incomplete multi sector transfer "
 					"detected in mft mirror record %i.", i);
 			goto mm_unmap_out;
@@ -1111,9 +1122,9 @@ static BOOL load_and_init_quota(ntfs_volume *vol)
 	static const ntfschar Quota[7] = { const_cpu_to_le16('$'),
 			const_cpu_to_le16('Q'), const_cpu_to_le16('u'),
 			const_cpu_to_le16('o'), const_cpu_to_le16('t'),
-			const_cpu_to_le16('a'), const_cpu_to_le16(0) };
+			const_cpu_to_le16('a'), 0 };
 	static ntfschar Q[3] = { const_cpu_to_le16('$'),
-			const_cpu_to_le16('Q'), const_cpu_to_le16(0) };
+			const_cpu_to_le16('Q'), 0 };
 
 	ntfs_debug("Entering.");
 	/*
@@ -2331,8 +2342,8 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	 */
 	result = parse_ntfs_boot_sector(vol, (NTFS_BOOT_SECTOR*)bh->b_data);
 
-	/* Initialize the cluster allocator. */
-	setup_lcn_allocator(vol);
+	/* Initialize the cluster and mft allocators. */
+	ntfs_setup_allocators(vol);
 
 	brelse(bh);
 
@@ -2571,7 +2582,7 @@ kmem_cache_t *ntfs_attr_ctx_cache;
 kmem_cache_t *ntfs_index_ctx_cache;
 
 /* A global default upcase table and a corresponding reference count. */
-wchar_t *default_upcase = NULL;
+ntfschar *default_upcase = NULL;
 unsigned long ntfs_nr_upcase_users = 0;
 
 /* Driver wide semaphore. */

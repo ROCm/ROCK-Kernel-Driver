@@ -620,8 +620,8 @@ int DRM(mmap)(struct file *filp, struct vm_area_struct *vma)
 					vma->vm_end - vma->vm_start,
 					vma->vm_page_prot, 0))
 #else
-		if (remap_page_range(DRM_RPR_ARG(vma) vma->vm_start,
-				     VM_OFFSET(vma) + offset,
+		if (remap_pfn_range(DRM_RPR_ARG(vma) vma->vm_start,
+				     (VM_OFFSET(vma) + offset) >> PAGE_SHIFT,
 				     vma->vm_end - vma->vm_start,
 				     vma->vm_page_prot))
 #endif
