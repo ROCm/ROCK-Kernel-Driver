@@ -101,6 +101,9 @@ struct node_entry {
 
 	struct device device;
 
+	/* Means this node is not attached anymore */
+	int in_limbo;
+
 	struct csr1212_csr *csr;
 };
 
@@ -187,5 +190,8 @@ void cleanup_ieee1394_nodemgr(void);
 
 /* The template for a host device */
 extern struct device nodemgr_dev_template_host;
+
+/* Bus attribute to destroy limbo'd nodes */
+extern struct bus_attribute bus_attr_destroy;
 
 #endif /* _IEEE1394_NODEMGR_H */

@@ -1008,6 +1008,7 @@ static int __init ieee1394_init(void)
 					      0, 0, NULL, NULL);
 
 	bus_register(&ieee1394_bus_type);
+	bus_create_file(&ieee1394_bus_type, &bus_attr_destroy);
 
 	if (init_csr())
 		return -ENOMEM;
@@ -1027,6 +1028,7 @@ static void __exit ieee1394_cleanup(void)
 
 	cleanup_csr();
 
+	bus_remove_file(&ieee1394_bus_type, &bus_attr_destroy);
 	bus_unregister(&ieee1394_bus_type);
 
 	kmem_cache_destroy(hpsb_packet_cache);

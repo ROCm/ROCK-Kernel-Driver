@@ -105,7 +105,6 @@ static struct csr1212_bus_ops nodemgr_csr_ops = {
 
 static DECLARE_MUTEX(nodemgr_serialize);
 
-
 struct host_info {
 	struct hpsb_host *host;
 	struct list_head list;
@@ -115,19 +114,92 @@ struct host_info {
 	char daemon_name[15];
 };
 
+static int nodemgr_bus_match(struct device * dev, struct device_driver * drv);
+static int nodemgr_hotplug(struct device *dev, char **envp, int num_envp,
+			   char *buffer, int buffer_size);
+static void nodemgr_resume_ne(struct node_entry *ne);
+static void nodemgr_remove_ne(struct node_entry *ne);
+static struct node_entry *find_entry_by_guid(u64 guid);
+
+struct bus_type ieee1394_bus_type = {
+	.name		= "ieee1394",
+	.match		= nodemgr_bus_match,
+	.hotplug	= nodemgr_hotplug,
+};
+
 static struct hpsb_highlevel nodemgr_highlevel;
 
-static int nodemgr_driverdata_ne;
-static int nodemgr_driverdata_host;
+static int nodemgr_platform_data_ne;
+static int nodemgr_platform_data_ud;
+static int nodemgr_platform_data_host;
+
+static int nodemgr_generic_probe(struct device *dev)
+{
+	return -ENODEV;
+}
 
 static struct device_driver nodemgr_driver_ne = {
 	.name	= "ieee1394_node",
 	.bus	= &ieee1394_bus_type,
+	.probe	= nodemgr_generic_probe,
 };
 
 static struct device_driver nodemgr_driver_host = {
 	.name	= "ieee1394_host",
 	.bus	= &ieee1394_bus_type,
+	.probe	= nodemgr_generic_probe,
+};
+
+static void nodemgr_release_ud(struct device *dev)
+{
+	struct unit_directory *ud = container_of(dev, struct unit_directory, device);
+
+	if (ud->vendor_name_kv)
+		csr1212_release_keyval(ud->vendor_name_kv);
+	if (ud->model_name_kv)
+		csr1212_release_keyval(ud->model_name_kv);
+
+	kfree(ud);
+}
+
+static void nodemgr_release_ne(struct device *dev)
+{
+	struct node_entry *ne = container_of(dev, struct node_entry, device);
+
+	if (ne->vendor_name_kv)
+		csr1212_release_keyval(ne->vendor_name_kv);
+
+	kfree(ne);
+}
+
+
+static void nodemgr_release_host(struct device *dev)
+{
+	struct hpsb_host *host = container_of(dev, struct hpsb_host, device);
+
+	csr1212_destroy_csr(host->csr.rom);
+
+	kfree(host);
+}
+
+static struct device nodemgr_dev_template_ud = {
+	.bus		= &ieee1394_bus_type,
+	.release	= nodemgr_release_ud,
+	.platform_data	= &nodemgr_platform_data_ud,
+};
+
+static struct device nodemgr_dev_template_ne = {
+	.bus		= &ieee1394_bus_type,
+	.release	= nodemgr_release_ne,
+	.driver		= &nodemgr_driver_ne,
+	.platform_data	= &nodemgr_platform_data_ne,
+};
+
+struct device nodemgr_dev_template_host = {
+	.bus		= &ieee1394_bus_type,
+	.release	= nodemgr_release_host,
+	.driver		= &nodemgr_driver_host,
+	.platform_data	= &nodemgr_platform_data_host,
 };
 
 
@@ -221,6 +293,27 @@ static ssize_t fw_show_ne_tlabels_mask(struct device *dev, char *buf)
 static DEVICE_ATTR(tlabels_mask,S_IRUGO,fw_show_ne_tlabels_mask,NULL);
 
 
+static ssize_t fw_set_destroy(struct bus_type *bus, const char *buf, size_t count)
+{
+	struct node_entry *ne;
+	u64 guid = (u64)simple_strtoull(buf, NULL, 16);
+
+	ne = find_entry_by_guid(guid);
+
+	if (ne == NULL || !ne->in_limbo)
+		return -EINVAL;
+
+	nodemgr_remove_ne(ne);
+
+	return count;
+}
+static ssize_t fw_get_destroy(struct bus_type *bus, char *buf)
+{
+	return sprintf(buf, "You can destroy in_limbo nodes by writing their GUID to this file\n");
+}
+BUS_ATTR(destroy, S_IWUGO | S_IRUGO, fw_get_destroy, fw_set_destroy);
+
+
 fw_attr(ne, struct node_entry, capabilities, unsigned int, "0x%06x\n")
 fw_attr(ne, struct node_entry, nodeid, unsigned int, "0x%04x\n")
 
@@ -231,6 +324,7 @@ fw_attr(ne, struct node_entry, vendor_oui, const char *, "%s\n")
 fw_attr(ne, struct node_entry, guid, unsigned long long, "0x%016Lx\n")
 fw_attr(ne, struct node_entry, guid_vendor_id, unsigned int, "0x%06x\n")
 fw_attr(ne, struct node_entry, guid_vendor_oui, const char *, "%s\n")
+fw_attr(ne, struct node_entry, in_limbo, int, "%d\n");
 
 static struct device_attribute *const fw_ne_attrs[] = {
 	&dev_attr_ne_guid,
@@ -435,13 +529,16 @@ static int nodemgr_bus_match(struct device * dev, struct device_driver * drv)
         struct unit_directory *ud;
 	struct ieee1394_device_id *id;
 
-	if (dev->driver_data == &nodemgr_driverdata_ne ||
-	    dev->driver_data == &nodemgr_driverdata_host ||
-	    drv == &nodemgr_driver_ne || drv == &nodemgr_driver_host)
+	/* We only match unit directories, and ignore our internal drivers */
+	if (dev->platform_data != &nodemgr_platform_data_ud ||
+	    drv->probe == nodemgr_generic_probe)
 		return 0;
 
 	ud = container_of(dev, struct unit_directory, device);
 	driver = container_of(drv, struct hpsb_protocol_driver, driver);
+
+	if (ud->ne->in_limbo)
+		return 0;
 
         for (id = driver->id_table; id->match_flags != 0; id++) {
                 if ((id->match_flags & IEEE1394_MATCH_VENDOR_ID) &&
@@ -464,34 +561,6 @@ static int nodemgr_bus_match(struct device * dev, struct device_driver * drv)
         }
 
 	return 0;
-}
-
-
-static void nodemgr_release_ud(struct device *dev)
-{
-	struct unit_directory *ud = container_of(dev, struct unit_directory, device);
-	if (ud->vendor_name_kv)
-		csr1212_release_keyval(ud->vendor_name_kv);
-	if (ud->model_name_kv)
-		csr1212_release_keyval(ud->model_name_kv);
-	kfree(container_of(dev, struct unit_directory, device));
-}
-
-
-static void nodemgr_release_ne(struct device *dev)
-{
-	struct node_entry *ne = container_of(dev, struct node_entry, device);
-	if (ne->vendor_name_kv)
-		csr1212_release_keyval(ne->vendor_name_kv);
-	kfree(container_of(dev, struct node_entry, device));
-}
-
-
-static void nodemgr_release_host(struct device *dev)
-{
-	struct hpsb_host *host = container_of(dev, struct hpsb_host, device);
-	csr1212_destroy_csr(host->csr.rom);
-	kfree(container_of(dev, struct hpsb_host, device));
 }
 
 
@@ -539,6 +608,9 @@ static void nodemgr_remove_ne(struct node_entry *ne)
 	struct device *dev = &ne->device;
 	int i;
 
+	HPSB_DEBUG("Node removed: ID:BUS[" NODE_BUS_FMT "]  GUID[%016Lx]",
+		   NODE_BUS_ARGS(ne->host, ne->nodeid), (unsigned long long)ne->guid);
+
 	nodemgr_remove_node_uds(ne);
 
 	for (i = 0; i < ARRAY_SIZE(fw_ne_attrs); i++)
@@ -547,6 +619,7 @@ static void nodemgr_remove_ne(struct node_entry *ne)
 	device_remove_file(dev, &dev_attr_ne_guid_vendor_oui);
 	device_remove_file(dev, &dev_attr_ne_vendor_name_kv);
 	device_remove_file(dev, &dev_attr_ne_vendor_oui);
+	device_remove_file(dev, &dev_attr_ne_in_limbo);
 
 	device_unregister(dev);
 }
@@ -570,38 +643,6 @@ static void nodemgr_remove_host_dev(struct device *dev)
 	sysfs_remove_link(&dev->kobj, "busmgr_id");
 	sysfs_remove_link(&dev->kobj, "host_id");
 }
-
-
-static struct device nodemgr_dev_template_ud = {
-	.bus		= &ieee1394_bus_type,
-	.release	= nodemgr_release_ud,
-};
-
-
-static struct device nodemgr_dev_template_ne = {
-	.bus		= &ieee1394_bus_type,
-	.release	= nodemgr_release_ne,
-	.driver		= &nodemgr_driver_ne,
-	.driver_data	= &nodemgr_driverdata_ne,
-};
-
-struct device nodemgr_dev_template_host = {
-	.bus		= &ieee1394_bus_type,
-	.release	= nodemgr_release_host,
-	.driver		= &nodemgr_driver_host,
-	.driver_data	= &nodemgr_driverdata_host,
-};
-
-
-static int nodemgr_hotplug(struct device *dev, char **envp, int num_envp,
-                           char *buffer, int buffer_size);
-
-
-struct bus_type ieee1394_bus_type = {
-	.name		= "ieee1394",
-	.match		= nodemgr_bus_match,
-	.hotplug	= nodemgr_hotplug,
-};
 
 
 static void nodemgr_update_bus_options(struct node_entry *ne)
@@ -688,7 +729,7 @@ static int nodemgr_guid_search_cb(struct device *dev, void *__data)
         struct guid_search_baton *search = __data;
         struct node_entry *ne;
 
-        if (dev->driver_data != &nodemgr_driverdata_ne)
+        if (dev->platform_data != &nodemgr_platform_data_ne)
                 return 0;
 
         ne = container_of(dev, struct node_entry, device);
@@ -725,7 +766,7 @@ static int nodemgr_nodeid_search_cb(struct device *dev, void *__data)
 	struct nodeid_search_baton *search = __data;
 	struct node_entry *ne;
 
-	if (dev->driver_data != &nodemgr_driverdata_ne)
+	if (dev->platform_data != &nodemgr_platform_data_ne)
 		return 0;
 
 	ne = container_of(dev, struct node_entry, device);
@@ -962,12 +1003,13 @@ static int nodemgr_hotplug(struct device *dev, char **envp, int num_envp,
 	if (!dev)
 		return -ENODEV;
 
-	/* Have to check driver_data, since on remove, driver == NULL */
-	if (dev->driver_data == &nodemgr_driverdata_ne ||
-	    dev->driver_data == &nodemgr_driverdata_host)
+	if (dev->platform_data != &nodemgr_platform_data_ud)
 		return -ENODEV;
 
 	ud = container_of(dev, struct unit_directory, device);
+
+	if (ud->ne->in_limbo)
+		return -ENODEV;
 
 	scratch = buffer;
 
@@ -1073,6 +1115,9 @@ static void nodemgr_update_node(struct node_entry *ne, struct csr1212_csr *csr,
 		ne->needs_probe = 1;
 	}
 
+	if (ne->in_limbo)
+		nodemgr_resume_ne(ne);
+
 	/* Mark the node current */
 	ne->generation = generation;
 }
@@ -1125,6 +1170,12 @@ static void nodemgr_node_scan_one(struct host_info *hi,
 	guid = ((u64)be32_to_cpu(csr->bus_info_data[3]) << 32) | be32_to_cpu(csr->bus_info_data[4]);
 	ne = find_entry_by_guid(guid);
 
+	if (ne->host != host && ne->in_limbo) {
+		/* Must have moved this device from one host to another */
+		nodemgr_remove_ne(ne);
+		ne = NULL;
+	}
+
 	if (!ne)
 		nodemgr_create_node(guid, csr, hi, nodeid, generation);
 	else
@@ -1140,17 +1191,17 @@ struct cleanup_baton {
 	struct node_entry *ne;
 };
 
-static int nodemgr_remove_node(struct device *dev, void *__data)
+static int nodemgr_check_node_cb(struct device *dev, void *__data)
 {
 	struct cleanup_baton *cleanup = __data;
 	struct node_entry *ne;
 
-	if (dev->driver_data != &nodemgr_driverdata_ne)
+	if (dev->platform_data != &nodemgr_platform_data_ne)
 		return 0;
 
 	ne = container_of(dev, struct node_entry, device);
 
-	if (ne->host != cleanup->host)
+	if (ne->in_limbo || ne->host != cleanup->host)
 		return 0;
 
 	if (ne->generation != cleanup->generation) {
@@ -1172,12 +1223,12 @@ static int nodemgr_probe_ne_cb(struct device *dev, void *__data)
 	struct host_info *hi = ne_cb_data->hi;
 	struct node_entry *ne;
 
-	if (dev->driver_data != &nodemgr_driverdata_ne)
+	if (dev->platform_data != &nodemgr_platform_data_ne)
 		return 0;
 
 	ne = ne_cb_data->ne = container_of(dev, struct node_entry, device);
 
-	if (ne->host != hi->host)
+	if (ne->host != hi->host || ne->in_limbo)
 		return 0;
 
 	/* We can't call nodemgr_process_root_directory() here because
@@ -1232,6 +1283,72 @@ static void nodemgr_node_scan(struct host_info *hi, int generation)
         }
 }
 
+
+static void nodemgr_suspend_ud(struct unit_directory *ud)
+{
+	struct device *dev;
+
+	list_for_each_entry(dev, &ud->device.children, node)
+		nodemgr_suspend_ud(container_of(dev, struct unit_directory, device));
+
+	if (ud->device.driver) {
+		int ret = -1;
+
+		if (ud->device.driver->suspend)
+			ret = ud->device.driver->suspend(&ud->device, 0, 0);
+
+		if (ret) {
+			dev = &ud->device;
+			down_write(&dev->bus->subsys.rwsem);
+			device_release_driver(dev);
+			up_write(&dev->bus->subsys.rwsem);
+		}
+	}								
+}
+
+
+static void nodemgr_suspend_ne(struct node_entry *ne)
+{
+	struct device *dev;
+
+	HPSB_DEBUG("Node suspended: ID:BUS[" NODE_BUS_FMT "]  GUID[%016Lx]",
+		   NODE_BUS_ARGS(ne->host, ne->nodeid), (unsigned long long)ne->guid);
+
+	ne->in_limbo = 1;
+	device_create_file(&ne->device, &dev_attr_ne_in_limbo);
+
+	list_for_each_entry(dev, &ne->device.children, node)
+		nodemgr_suspend_ud(container_of(dev, struct unit_directory, device));
+}
+
+
+static void nodemgr_resume_ud(struct unit_directory *ud)
+{
+	struct device *dev;
+
+	list_for_each_entry(dev, &ud->device.children, node)
+		nodemgr_resume_ud(container_of(dev, struct unit_directory, device));
+
+	if (ud->device.driver && ud->device.driver->resume)
+		ud->device.driver->resume(&ud->device, 0);
+}
+
+
+static void nodemgr_resume_ne(struct node_entry *ne)
+{
+	struct device *dev;
+
+	ne->in_limbo = 0;
+	device_remove_file(&ne->device, &dev_attr_ne_in_limbo);
+
+	list_for_each_entry(dev, &ne->device.children, node)
+		nodemgr_resume_ud(container_of(dev, struct unit_directory, device));
+
+	HPSB_DEBUG("Node resumed: ID:BUS[" NODE_BUS_FMT "]  GUID[%016Lx]",
+		   NODE_BUS_ARGS(ne->host, ne->nodeid), (unsigned long long)ne->guid);
+}
+
+
 static void nodemgr_node_probe(struct host_info *hi, int generation)
 {
 	struct hpsb_host *host = hi->host;
@@ -1269,16 +1386,10 @@ static void nodemgr_node_probe(struct host_info *hi, int generation)
 		cleanup.host = host;
 
 		/* This will iterate until all devices that do not match
-		 * the generation are removed. */
+		 * the generation are suspended. */
 		while (bus_for_each_dev(&ieee1394_bus_type, NULL, &cleanup,
-					nodemgr_remove_node)) {
-			struct node_entry *ne = cleanup.ne;
-
-			HPSB_DEBUG("Node removed: ID:BUS[" NODE_BUS_FMT "]  GUID[%016Lx]",
-				   NODE_BUS_ARGS(host, ne->nodeid), (unsigned long long)ne->guid);
-
-			nodemgr_remove_ne(ne);
-		}
+					nodemgr_check_node_cb))
+			nodemgr_suspend_ne(cleanup.ne);
 
 		/* Now let's tell the bus to rescan our devices. This may
 		 * seem like overhead, but the driver-model core will only
@@ -1486,7 +1597,7 @@ static int nodemgr_for_each_host_cb(struct device *dev, void *__data)
 	struct for_each_host_struct *host_data = __data;
 	struct hpsb_host *host;
 
-	if (dev->driver_data != &nodemgr_driverdata_host)
+	if (dev->platform_data != &nodemgr_platform_data_host)
 		return 0;
 
 	host = container_of(dev, struct hpsb_host, device);
