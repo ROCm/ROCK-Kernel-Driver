@@ -31,6 +31,9 @@
 #include <linux/ide.h>
 #include <linux/seq_file.h>
 #include <linux/root_dev.h>
+#include <linux/serial.h>
+#include <linux/tty.h>	/* for linux/serial_core.h */
+#include <linux/serial_core.h>
 
 #include <asm/system.h>
 #include <asm/pgtable.h>
@@ -49,35 +52,93 @@
 #include <asm/pplus.h>
 
 #include "mcpn765.h"
+#include "mcpn765_serial.h"
+
 
 static u_char mcpn765_openpic_initsenses[] __initdata = {
-	0,	/* 16: i8259 cascade (active high) */
-	1,	/* 17: COM1,2,3,4 */
-	1,	/* 18: Enet 1 (front panel) */
-	1,	/* 19: HAWK WDT XXXX */
-	1,	/* 20: 21554 PCI-PCI bridge */
-	1,	/* 21: cPCI INTA# */
-	1,	/* 22: cPCI INTB# */
-	1,	/* 23: cPCI INTC# */
-	1,	/* 24: cPCI INTD# */
-	1,	/* 25: PMC1 INTA#, PMC2 INTB# */
-	1,	/* 26: PMC1 INTB#, PMC2 INTC# */
-	1,	/* 27: PMC1 INTC#, PMC2 INTD# */
-	1,	/* 28: PMC1 INTD#, PMC2 INTA# */
-	1,	/* 29: Enet 2 (connected to J3) */
-	1,	/* 30: Abort Switch */
-	1,	/* 31: RTC Alarm */
+	(IRQ_SENSE_EDGE  | IRQ_POLARITY_POSITIVE),/* 16: i8259 cascade */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),/* 17: COM1,2,3,4 */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),/* 18: Enet 1 (front) */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),/* 19: HAWK WDT XXXX */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),/* 20: 21554 bridge */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),/* 21: cPCI INTA# */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),/* 22: cPCI INTB# */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),/* 23: cPCI INTC# */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),/* 24: cPCI INTD# */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),/* 25: PMC1 INTA#,PMC2 INTB#*/
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),/* 26: PMC1 INTB#,PMC2 INTC#*/
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),/* 27: PMC1 INTC#,PMC2 INTD#*/
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),/* 28: PMC1 INTD#,PMC2 INTA#*/
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),/* 29: Enet 2 (J3) */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),/* 30: Abort Switch */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),/* 31: RTC Alarm */
 };
 
 
 extern u_int openpic_irq(void);
 extern char cmd_line[];
 
+extern void gen550_progress(char *, unsigned short);
+extern void gen550_init(int, struct uart_port *);
+
 int use_of_interrupt_tree = 0;
 
 static void mcpn765_halt(void);
 
 TODC_ALLOC();
+
+#if defined(CONFIG_SERIAL_8250) && \
+	(defined(CONFIG_KGDB) || defined(CONFIG_SERIAL_TEXT_DEBUG))
+static void __init
+mcpn765_early_serial_map(void)
+{
+	struct uart_port serial_req;
+
+	/* Setup serial port access */
+	memset(&serial_req, 0, sizeof(serial_req));
+	serial_req.uartclk = UART_CLK;
+	serial_req.irq = 17;
+	serial_req.flags = STD_COM_FLAGS;
+	serial_req.iotype = SERIAL_IO_MEM;
+	serial_req.membase = (u_char *)MCPN765_SERIAL_1;
+	serial_req.regshift = 4;
+
+	gen550_init(0, &serial_req);
+
+	if (early_serial_setup(&serial_req) != 0)
+		printk(KERN_ERR "Early serial init of port 0 failed\n");
+
+	/* Assume early_serial_setup() doesn't modify serial_req */
+	serial_req.line = 1;
+	serial_req.irq = 17;
+	serial_req.membase = (u_char *)MCPN765_SERIAL_2;
+
+	gen550_init(1, &serial_req);
+
+	if (early_serial_setup(&serial_req) != 0)
+		printk(KERN_ERR "Early serial init of port 1 failed\n");
+
+	/* Assume early_serial_setup() doesn't modify serial_req */
+	serial_req.line = 2;
+	serial_req.irq = 17;
+	serial_req.membase = (u_char *)MCPN765_SERIAL_3;
+
+	gen550_init(2, &serial_req);
+
+	if (early_serial_setup(&serial_req) != 0)
+		printk(KERN_ERR "Early serial init of port 2 failed\n");
+
+	/* Assume early_serial_setup() doesn't modify serial_req */
+	serial_req.line = 3;
+	serial_req.irq = 17;
+	serial_req.membase = (u_char *)MCPN765_SERIAL_4;
+
+	gen550_init(3, &serial_req);
+
+	if (early_serial_setup(&serial_req) != 0)
+		printk(KERN_ERR "Early serial init of port 3 failed\n");
+}
+#endif
 
 static void __init
 mcpn765_setup_arch(void)
@@ -187,12 +248,12 @@ mcpn765_init_IRQ(void)
 	if ( ppc_md.progress )
 		ppc_md.progress("init_irq: enter", 0);
 
-	openpic_init(1, NUM_8259_INTERRUPTS, NULL, -1);
+	openpic_init(NUM_8259_INTERRUPTS);
 
 	for(i=0; i < NUM_8259_INTERRUPTS; i++)
 		irq_desc[i].handler = &i8259_pic;
 
-	i8259_init(NULL);
+	i8259_init(0);
 
 	if ( ppc_md.progress )
 		ppc_md.progress("init_irq: exit", 0);
@@ -361,65 +422,15 @@ mcpn765_ide_init_hwif_ports(hw_regs_t *hw, unsigned long data_port,
 static __inline__ void
 mcpn765_set_bat(void)
 {
-	unsigned long   bat3u, bat3l;
-	static int	mapping_set = 0;
-
-	if (!mapping_set) {
-
-		__asm__ __volatile__(
-		" lis %0,0xf000\n \
-		  ori %1,%0,0x002a\n \
-		  ori %0,%0,0x1ffe\n \
-		  mtspr 0x21e,%0\n \
-		  mtspr 0x21f,%1\n \
-		  isync\n \
-		  sync "
-		: "=r" (bat3u), "=r" (bat3l));
-
-		mapping_set = 1;
-	}
-
-	return;
+	mb();
+	mtspr(DBAT1U, 0xfe8000fe);
+	mtspr(DBAT1L, 0xfe80002a);
+	mb();
 }
-
-#ifdef CONFIG_SERIAL_TEXT_DEBUG
-#include <linux/serialP.h>
-#include <linux/serial_reg.h>
-#include <asm/serial.h>
-
-static struct serial_state rs_table[RS_TABLE_SIZE] = {
-	SERIAL_PORT_DFNS	/* Defined in <asm/serial.h> */
-};
-
-static void
-mcpn765_progress(char *s, unsigned short hex)
-{
-	volatile char c;
-	volatile unsigned long com_port;
-	u16 shift;
-
-	com_port = rs_table[0].port;
-	shift = rs_table[0].iomem_reg_shift;
-
-	while ((c = *s++) != 0) {
-		while ((*((volatile unsigned char *)com_port +
-				(UART_LSR << shift)) & UART_LSR_THRE) == 0)
-		                ;
-	        *(volatile unsigned char *)com_port = c;
-
-		if (c == '\n') {
-			while ((*((volatile unsigned char *)com_port +
-				(UART_LSR << shift)) & UART_LSR_THRE) == 0)
-					;
-	        	*(volatile unsigned char *)com_port = '\r';
-		}
-	}
-}
-#endif	/* CONFIG_SERIAL_TEXT_DEBUG */
 
 void __init
 platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
-	      unsigned long r6, unsigned long r7)
+		unsigned long r6, unsigned long r7)
 {
 	parse_bootinfo(find_bootinfo());
 
@@ -458,11 +469,13 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.heartbeat_reset = 0;
 	ppc_md.heartbeat_count = 0;
 
-#ifdef	CONFIG_SERIAL_TEXT_DEBUG
-	ppc_md.progress = mcpn765_progress;
-#else	/* !CONFIG_SERIAL_TEXT_DEBUG */
-	ppc_md.progress = NULL;
-#endif	/* CONFIG_SERIAL_TEXT_DEBUG */
+#if defined(CONFIG_SERIAL_8250) && \
+	(defined(CONFIG_KGDB) || defined(CONFIG_SERIAL_TEXT_DEBUG))
+	mcpn765_early_serial_map();
+#ifdef CONFIG_SERIAL_TEXT_DEBUG
+	ppc_md.progress = gen550_progress;
+#endif
+#endif
 
 #if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
         ppc_ide_md.default_irq = mcpn765_ide_default_irq;
