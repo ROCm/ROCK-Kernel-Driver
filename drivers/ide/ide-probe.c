@@ -635,7 +635,6 @@ static void hwif_register (ide_hwif_t *hwif)
 	device_register(&hwif->gendev);
 }
 
-#ifdef CONFIG_PPC
 static int wait_hwif_ready(ide_hwif_t *hwif)
 {
 	int rc;
@@ -671,7 +670,6 @@ static int wait_hwif_ready(ide_hwif_t *hwif)
 	
 	return rc;
 }
-#endif
 
 /*
  * This routine only knows how to look for drive units 0 and 1
@@ -717,7 +715,6 @@ static void probe_hwif(ide_hwif_t *hwif)
 
 	local_irq_set(flags);
 
-#ifdef CONFIG_PPC
 	/* This is needed on some PPCs and a bunch of BIOS-less embedded
 	 * platforms. Typical cases are:
 	 * 
@@ -739,7 +736,6 @@ static void probe_hwif(ide_hwif_t *hwif)
 	 */
 	if (wait_hwif_ready(hwif))
 		printk(KERN_WARNING "%s: Wait for ready failed before probe !\n", hwif->name);
-#endif /* CONFIG_PPC */
 
 	/*
 	 * Second drive should only exist if first drive was found,
