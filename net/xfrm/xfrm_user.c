@@ -260,7 +260,11 @@ static int xfrm_add_sa(struct sk_buff *skb, struct nlmsghdr *nlh, void **xfrma)
 	if (!x)
 		return err;
 
-	err = xfrm_state_replace(x, nlh->nlmsg_type == XFRM_MSG_NEWSA);
+	if (nlh->nlmsg_type == XFRM_MSG_NEWSA)
+		err = xfrm_state_add(x);
+	else
+		err = xfrm_state_update(x);
+
 	if (err < 0) {
 		x->km.state = XFRM_STATE_DEAD;
 		xfrm_state_put(x);
