@@ -267,12 +267,12 @@ extern long lstrnlen_user(const char __user *,long);
 #define clear_user lclear_user
 #define __clear_user lclear_user
 
-#define copy_from_user lcopy_from_user
-#define __copy_from_user lcopy_from_user
-#define copy_to_user lcopy_to_user
-#define __copy_to_user lcopy_to_user
-#define copy_in_user lcopy_in_user
-#define __copy_in_user lcopy_in_user
+unsigned long copy_to_user(void __user *dst, const void *src, unsigned long len);
+#define __copy_to_user copy_to_user
+unsigned long copy_from_user(void *dst, const void __user *src, unsigned long len);
+#define __copy_from_user copy_from_user
+unsigned long copy_in_user(void __user *dst, const void __user *src, unsigned long len);
+#define __copy_in_user copy_in_user
 #define __copy_to_user_inatomic __copy_to_user
 #define __copy_from_user_inatomic __copy_from_user
 
