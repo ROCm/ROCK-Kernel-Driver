@@ -600,9 +600,11 @@ static int cifs_oplock_thread(void * dummyarg)
 				netfid = oplock_item->netfid;
 				spin_unlock(&GlobalMid_Lock);
 				DeleteOplockQEntry(oplock_item);
-				if (S_ISREG(inode->i_mode)) 
+				if (S_ISREG(inode->i_mode)) {
 					rc = filemap_fdatawrite(inode->i_mapping);
-				else
+					if(CIFS_I(inode)->clientCanCacheRead == 0)
+						invalidate_remote_inode(inode);
+				} else
 					rc = 0;
 				if (rc)
 					CIFS_I(inode)->write_behind_rc = rc;

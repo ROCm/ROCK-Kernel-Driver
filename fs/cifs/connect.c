@@ -222,6 +222,15 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 				tcpStatus CifsNeedReconnect if server hung */
 			continue;
 		} else if (length <= 0) {
+			if(server->tcpStatus == CifsNew) {
+				cFYI(1,("tcp session abended prematurely (after SMBnegprot)"));
+				/* some servers kill tcp session rather than returning
+					smb negprot error in which case reconnecting here is
+					not going to help - return error to mount */
+				server->tcpStatus = CifsExiting;
+				break;
+			}
+
 			cFYI(1,("Reconnecting after unexpected rcvmsg error "));
 			cifs_reconnect(server);
 			csocket = server->ssocket;
@@ -712,6 +721,8 @@ int setup_session(unsigned int xid, struct cifsSesInfo *pSesInfo, struct nls_tab
 			if(rc == -EAGAIN) 
 				rc = -EHOSTDOWN;
 		}
+		if(rc == 0)
+			pSesInfo->server->tcpStatus = CifsGood;
 	}
 	pSesInfo->capabilities = pSesInfo->server->capabilities;
 	pSesInfo->sequence_number = 0;
@@ -989,7 +1000,7 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 			srvTcp->ssocket = csocket;
 			init_waitqueue_head(&srvTcp->response_q);
 			INIT_LIST_HEAD(&srvTcp->pending_mid_q);
-			srvTcp->tcpStatus = CifsGood;
+			srvTcp->tcpStatus = CifsNew;
 			init_MUTEX(&srvTcp->tcpSem);
 			kernel_thread((void *)(void *)cifs_demultiplex_thread, srvTcp,
 				      CLONE_FS | CLONE_FILES | CLONE_VM);

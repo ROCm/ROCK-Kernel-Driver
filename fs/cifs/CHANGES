@@ -1,3 +1,9 @@
+Version 0.99
+------------
+Invalidate local inode cached pages on oplock break so client does not
+continue using data modified in server copy of file.  Do not reconnect
+when server drops the tcp session prematurely before negotiate
+protocol response. 
 
 Version 0.98
 ------------
