@@ -51,7 +51,7 @@
 #endif
 
 static LIST_HEAD(registered_mechs);
-static spinlock_t registered_mechs_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(registered_mechs_lock);
 
 static void
 gss_mech_free(struct gss_api_mech *gm)

@@ -83,7 +83,7 @@ static unsigned char days_in_mo[] =
 static int irq_active;
 
 #ifdef CONFIG_GEN_RTC_X
-struct work_struct genrtc_task;
+static struct work_struct genrtc_task;
 static struct timer_list timer_task;
 
 static unsigned int oldsecs;

@@ -68,7 +68,7 @@ static struct dn_fib_rule default_rule = {
 };
 
 static struct dn_fib_rule *dn_fib_rules = &default_rule;
-static rwlock_t dn_fib_rules_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(dn_fib_rules_lock);
 
 
 int dn_fib_rtm_delrule(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)

@@ -314,9 +314,6 @@ enum uhci_state {
 	UHCI_RESUMING_2
 };
 
-#define hcd_to_uhci(hcd_ptr) container_of(hcd_ptr, struct uhci_hcd, hcd)
-#define uhci_dev(u)	((u)->hcd.self.controller)
-
 /*
  * This describes the full uhci information.
  *
@@ -324,12 +321,9 @@ enum uhci_state {
  * a subset of what the full implementation needs.
  */
 struct uhci_hcd {
-	struct usb_hcd hcd;		/* must come first! */
 
-#ifdef CONFIG_PROC_FS
-	/* procfs */
-	struct proc_dir_entry *proc_entry;
-#endif
+	/* debugfs */
+	struct dentry *dentry;
 
 	/* Grabbed from PCI */
 	unsigned long io_addr;
@@ -382,6 +376,18 @@ struct uhci_hcd {
 
 	wait_queue_head_t waitqh;		/* endpoint_disable waiters */
 };
+
+/* Convert between a usb_hcd pointer and the corresponding uhci_hcd */
+static inline struct uhci_hcd *hcd_to_uhci(struct usb_hcd *hcd)
+{
+	return (struct uhci_hcd *) (hcd->hcd_priv);
+}
+static inline struct usb_hcd *uhci_to_hcd(struct uhci_hcd *uhci)
+{
+	return container_of((void *) uhci, struct usb_hcd, hcd_priv);
+}
+
+#define uhci_dev(u)	(uhci_to_hcd(u)->self.controller)
 
 struct urb_priv {
 	struct list_head urb_list;

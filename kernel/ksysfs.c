@@ -30,7 +30,8 @@ static ssize_t hotplug_seqnum_show(struct subsystem *subsys, char *page)
 KERNEL_ATTR_RO(hotplug_seqnum);
 #endif
 
-static decl_subsys(kernel, NULL, NULL);
+decl_subsys(kernel, NULL, NULL);
+EXPORT_SYMBOL_GPL(kernel_subsys);
 
 static struct attribute * kernel_attrs[] = {
 #ifdef CONFIG_HOTPLUG

@@ -156,8 +156,6 @@ static int __init do_ultra_probe(struct net_device *dev)
 	/* Look for any installed ISAPnP cards */
 	if (isapnp_present() && (ultra_probe_isapnp(dev) == 0))
 		return 0;
-
-	printk(KERN_NOTICE "smc-ultra.c: No ISAPnP cards found, trying standard ones...\n");
 #endif
 
 	for (i = 0; ultra_portlist[i]; i++) {

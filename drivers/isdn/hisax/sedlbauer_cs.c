@@ -240,7 +240,6 @@ static dev_link_t *sedlbauer_attach(void)
     link->next = dev_list;
     dev_list = link;
     client_reg.dev_info = &dev_info;
-    client_reg.Attributes = INFO_IO_CLIENT | INFO_CARD_SHARE;
     client_reg.EventMask =
 	CS_EVENT_CARD_INSERTION | CS_EVENT_CARD_REMOVAL |
 	CS_EVENT_RESET_PHYSICAL | CS_EVENT_CARD_RESET |
@@ -648,13 +647,7 @@ static int __init init_sedlbauer_cs(void)
 static void __exit exit_sedlbauer_cs(void)
 {
 	pcmcia_unregister_driver(&sedlbauer_driver);
-
-	/* XXX: this really needs to move into generic code.. */
-	while (dev_list != NULL) {
-		if (dev_list->state & DEV_CONFIG)
-			sedlbauer_release(dev_list);
-		sedlbauer_detach(dev_list);
-	}
+	BUG_ON(dev_list != NULL);
 }
 
 module_init(init_sedlbauer_cs);

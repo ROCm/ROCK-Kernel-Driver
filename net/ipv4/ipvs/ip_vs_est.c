@@ -62,7 +62,7 @@ struct ip_vs_estimator
 
 
 static struct ip_vs_estimator *est_list = NULL;
-static rwlock_t est_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(est_lock);
 static struct timer_list est_timer;
 
 static void estimation_timer(unsigned long arg)

@@ -234,6 +234,11 @@ config SHARP_LOCOMO
 	depends on SA1100_COLLIE
 	default y
 
+config SHARP_SCOOP
+	bool
+	depends on PXA_SHARPSL
+	default y
+
 config FORCE_MAX_ZONEORDER
 	int
 	depends on SA1111
@@ -412,20 +417,6 @@ config XIP_PHYS_ADDR
 	  This is the physical address in your flash memory the kernel will
 	  be linked for and stored to.  This address is dependent on your
 	  own flash usage.
-
-	  Please note that, if you're using MTD, you must use a flash chip
-	  that is NOT handled by MTD or the flash will be turned into non
-	  data mode for status and query purposes which will instantaneously
-	  crash the kernel.
-
-	  MTD can however be used with a XIP kernel on the same flash chip
-	  but only if the flash memory supports multiple partitions in
-	  hardware, like with the Intel K3 flash parts, and only if the
-	  kernel is not stored within the firrst hardware partition of the
-	  chip.
-
-	  In any case, make sure that MTD support is configured out for
-	  the first attempt.
 
 if (ARCH_SA1100 || ARCH_INTEGRATOR)
 

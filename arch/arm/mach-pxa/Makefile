@@ -11,6 +11,7 @@ obj-$(CONFIG_PXA27x) += pxa27x.o
 obj-$(CONFIG_ARCH_LUBBOCK) += lubbock.o
 obj-$(CONFIG_MACH_MAINSTONE) += mainstone.o
 obj-$(CONFIG_ARCH_PXA_IDP) += idp.o
+obj-$(CONFIG_PXA_SHARPSL)	+= corgi.o corgi_ssp.o ssp.o
 
 # Support for blinky lights
 led-y := leds.o

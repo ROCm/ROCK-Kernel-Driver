@@ -613,7 +613,7 @@ static int via686a_detect(struct i2c_adapter *adapter, int address, int kind)
 	}
 
 	/* Reserve the ISA region */
-	if (!request_region(address, VIA686A_EXTENT, "via686a-sensor")) {
+	if (!request_region(address, VIA686A_EXTENT, via686a_driver.name)) {
 		dev_err(&adapter->dev,"region 0x%x already in use!\n",
 		       address);
 		return -ENODEV;

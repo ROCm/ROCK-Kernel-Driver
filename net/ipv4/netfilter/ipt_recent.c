@@ -90,7 +90,7 @@ static struct recent_ip_tables *r_tables = NULL;
 /* We protect r_list with this spinlock so two processors are not modifying
  * the list at the same time. 
  */
-static spinlock_t recent_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(recent_lock);
 
 #ifdef CONFIG_PROC_FS
 /* Our /proc/net/ipt_recent entry */

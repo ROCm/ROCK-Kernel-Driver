@@ -4,6 +4,7 @@
 #include <linux/config.h>
 #include <linux/smp_lock.h>
 #include <asm/hardirq.h>
+#include <asm/system.h>
 
 /*
  * We put the hardirq and softirq counter into the preemption
@@ -84,7 +85,22 @@ extern void synchronize_irq(unsigned int irq);
 #define nmi_enter()		irq_enter()
 #define nmi_exit()		sub_preempt_count(HARDIRQ_OFFSET)
 
-#define irq_enter()		add_preempt_count(HARDIRQ_OFFSET)
+#ifndef CONFIG_VIRT_CPU_ACCOUNTING
+static inline void account_user_vtime(struct task_struct *tsk)
+{
+}
+
+static inline void account_system_vtime(struct task_struct *tsk)
+{
+}
+#endif
+
+#define irq_enter()					\
+	do {						\
+		account_system_vtime(current);		\
+		add_preempt_count(HARDIRQ_OFFSET);	\
+	} while (0)
+
 extern void irq_exit(void);
 
 #endif /* LINUX_HARDIRQ_H */

@@ -541,6 +541,8 @@ void acct_update_integrals(void)
 	if (likely(tsk->mm)) {
 		long delta = tsk->stime - tsk->acct_stimexpd;
 
+		if (delta == 0)
+			return;
 		tsk->acct_stimexpd = tsk->stime;
 		tsk->acct_rss_mem1 += delta * tsk->mm->rss;
 		tsk->acct_vm_mem1 += delta * tsk->mm->total_vm;

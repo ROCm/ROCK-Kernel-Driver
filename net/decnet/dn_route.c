@@ -336,7 +336,7 @@ nothing_to_declare:
 	}
 }
 
-static spinlock_t dn_rt_flush_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(dn_rt_flush_lock);
 
 void dn_rt_cache_flush(int delay)
 {

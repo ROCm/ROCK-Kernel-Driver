@@ -27,7 +27,7 @@ static int read_proc_exitcode(char *page, char **start, off_t off,
 	return(len);
 }
 
-static int write_proc_exitcode(struct file *file, const char *buffer,
+static int write_proc_exitcode(struct file *file, const char __user *buffer,
 			       unsigned long count, void *data)
 {
 	char *end, buf[sizeof("nnnnn\0")];

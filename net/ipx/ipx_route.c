@@ -16,7 +16,7 @@
 #include <net/sock.h>
 
 LIST_HEAD(ipx_routes);
-rwlock_t ipx_routes_lock = RW_LOCK_UNLOCKED;
+DEFINE_RWLOCK(ipx_routes_lock);
 
 extern struct ipx_interface *ipx_internal_net;
 

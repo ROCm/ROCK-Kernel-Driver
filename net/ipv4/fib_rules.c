@@ -99,7 +99,7 @@ static struct fib_rule local_rule = {
 };
 
 static struct fib_rule *fib_rules = &local_rule;
-static rwlock_t fib_rules_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(fib_rules_lock);
 
 int inet_rtm_delrule(struct sk_buff *skb, struct nlmsghdr* nlh, void *arg)
 {

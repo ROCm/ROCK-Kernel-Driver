@@ -557,7 +557,7 @@ static inline void reparent_thread(task_t *p, task_t *father, int traced)
 			 * a normal stop since it's no longer being
 			 * traced.
 			 */
-			p->state = TASK_STOPPED;
+			ptrace_untrace(p);
 		}
 	}
 
@@ -755,8 +755,8 @@ static void exit_notify(struct task_struct *tsk)
 	 * Clear these here so that update_process_times() won't try to deliver
 	 * itimer, profile or rlimit signals to this task while it is in late exit.
 	 */
-	tsk->it_virt_value = 0;
-	tsk->it_prof_value = 0;
+	tsk->it_virt_value = cputime_zero;
+	tsk->it_prof_value = cputime_zero;
 
 	write_unlock_irq(&tasklist_lock);
 
@@ -790,6 +790,12 @@ fastcall NORET_TYPE void do_exit(long code)
 		panic("Attempted to kill init!");
 	if (tsk->io_context)
 		exit_io_context();
+
+	if (unlikely(current->ptrace & PT_TRACE_EXIT)) {
+		current->ptrace_message = code;
+		ptrace_notify((PTRACE_EVENT_EXIT << 8) | SIGTRAP);
+	}
+
 	tsk->flags |= PF_EXITING;
 	del_timer_sync(&tsk->real_timer);
 
@@ -797,11 +803,6 @@ fastcall NORET_TYPE void do_exit(long code)
 		printk(KERN_INFO "note: %s[%d] exited with preempt_count %d\n",
 				current->comm, current->pid,
 				preempt_count());
-
-	if (unlikely(current->ptrace & PT_TRACE_EXIT)) {
-		current->ptrace_message = code;
-		ptrace_notify((PTRACE_EVENT_EXIT << 8) | SIGTRAP);
-	}
 
 	acct_update_integrals();
 	update_mem_hiwater();
@@ -1045,10 +1046,16 @@ static int wait_task_zombie(task_t *p, int noreap,
 		 * here reaping other children at the same time.
 		 */
 		spin_lock_irq(&p->parent->sighand->siglock);
-		p->parent->signal->cutime +=
-			p->utime + p->signal->utime + p->signal->cutime;
-		p->parent->signal->cstime +=
-			p->stime + p->signal->stime + p->signal->cstime;
+		p->parent->signal->cutime =
+			cputime_add(p->parent->signal->cutime,
+			cputime_add(p->utime,
+			cputime_add(p->signal->utime,
+				    p->signal->cutime)));
+		p->parent->signal->cstime =
+			cputime_add(p->parent->signal->cstime,
+			cputime_add(p->stime,
+			cputime_add(p->signal->stime,
+				    p->signal->cstime)));
 		p->parent->signal->cmin_flt +=
 			p->min_flt + p->signal->min_flt + p->signal->cmin_flt;
 		p->parent->signal->cmaj_flt +=

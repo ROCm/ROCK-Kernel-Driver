@@ -12,12 +12,6 @@
 
 #ifdef __KERNEL__
 
-/*
- * Size of kernel stack for each process. This must be a power of 2...
- */
-#define THREAD_SIZE		8192	/* 2 pages */
-
-
 #ifndef __ASSEMBLY__
 
 /*
@@ -59,7 +53,7 @@ static inline struct thread_info *current_thread_info(void)
 		"move.l	%%sp, %0 \n\t"
 		"and.l	%1, %0"
 		: "=&d"(ti)
-		: "d" (~(THREAD_SIZE-1))
+		: "di" (~(THREAD_SIZE-1))
 		);
 	return ti;
 }

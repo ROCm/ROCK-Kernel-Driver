@@ -219,7 +219,6 @@ struct tvcard
 };
 
 extern struct tvcard bttv_tvcards[];
-extern const unsigned int bttv_num_tvcards;
 
 /* identification / initialization of the card */
 extern void bttv_idcard(struct bttv *btv);

@@ -125,6 +125,12 @@ restore_sigcontext(struct pt_regs *regs, struct sigcontext __user *sc, unsigned 
 			if (verify_area(VERIFY_READ, buf, sizeof(*buf)))
 				goto badframe;
 			err |= restore_i387(buf);
+		} else {
+			struct task_struct *me = current;
+			if (me->used_math) {
+				clear_fpu(me);
+				me->used_math = 0;
+			}
 		}
 	}
 
@@ -139,7 +145,7 @@ asmlinkage long sys_rt_sigreturn(struct pt_regs *regs)
 {
 	struct rt_sigframe __user *frame;
 	sigset_t set;
-	long eax;
+	unsigned long eax;
 
 	frame = (struct rt_sigframe __user *)(regs->rsp - 8);
 	if (verify_area(VERIFY_READ, frame, sizeof(*frame))) { 

@@ -190,10 +190,10 @@ static inline void clear_pgd_range(struct mmu_gather *tlb, pgd_t *pgd, unsigned 
 void clear_page_range(struct mmu_gather *tlb, unsigned long start, unsigned long end)
 {
 	unsigned long addr = start, next;
-	unsigned long i, nr = pgd_index(end + PGDIR_SIZE-1) - pgd_index(start);
 	pgd_t * pgd = pgd_offset(tlb->mm, start);
+	unsigned long i;
 
-	for (i = 0; i < nr; i++) {
+	for (i = pgd_index(start); i <= pgd_index(end-1); i++) {
 		next = (addr + PGDIR_SIZE) & PGDIR_MASK;
 		if (next > end || next <= addr)
 			next = end;
@@ -1795,9 +1795,10 @@ do_anonymous_page(struct mm_struct *mm, struct vm_area_struct *vma,
 
 		if (unlikely(anon_vma_prepare(vma)))
 			goto no_mem;
-		page = alloc_page_vma(GFP_HIGHZERO, vma, addr);
+		page = alloc_page_vma(GFP_HIGHUSER, vma, addr);
 		if (!page)
 			goto no_mem;
+		clear_user_highpage(page, addr);
 
 		spin_lock(&mm->page_table_lock);
 		page_table = pte_offset_map(pmd, addr);

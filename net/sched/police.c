@@ -43,7 +43,7 @@
 static u32 idx_gen;
 static struct tcf_police *tcf_police_ht[MY_TAB_SIZE];
 /* Policer hash table lock */
-static rwlock_t police_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(police_lock);
 
 /* Each policer is serialized by its individual spinlock */
 
@@ -171,8 +171,7 @@ static int tcf_act_police_locate(struct rtattr *rta, struct rtattr *est,
 	struct tcf_police *p;
 	struct qdisc_rate_table *R_tab = NULL, *P_tab = NULL;
 
-	if (rta == NULL || rtattr_parse(tb, TCA_POLICE_MAX, RTA_DATA(rta),
-	                                RTA_PAYLOAD(rta)) < 0)
+	if (rta == NULL || rtattr_parse_nested(tb, TCA_POLICE_MAX, rta) < 0)
 		return -EINVAL;
 
 	if (tb[TCA_POLICE_TBF-1] == NULL ||
@@ -225,7 +224,7 @@ override:
 		}
 	}
 	/* No failure allowed after this point */
-	spin_lock(&p->lock);
+	spin_lock_bh(&p->lock);
 	if (R_tab != NULL) {
 		qdisc_put_rtab(p->R_tab);
 		p->R_tab = R_tab;
@@ -255,7 +254,7 @@ override:
 		gen_replace_estimator(&p->bstats, &p->rate_est, p->stats_lock, est);
 #endif
 
-	spin_unlock(&p->lock);
+	spin_unlock_bh(&p->lock);
 	if (ret != ACT_P_CREATED)
 		return ret;
 
@@ -417,8 +416,7 @@ struct tcf_police * tcf_police_locate(struct rtattr *rta, struct rtattr *est)
 	struct rtattr *tb[TCA_POLICE_MAX];
 	struct tc_police *parm;
 
-	if (rtattr_parse(tb, TCA_POLICE_MAX, RTA_DATA(rta),
-	                 RTA_PAYLOAD(rta)) < 0)
+	if (rtattr_parse_nested(tb, TCA_POLICE_MAX, rta) < 0)
 		return NULL;
 
 	if (tb[TCA_POLICE_TBF-1] == NULL ||

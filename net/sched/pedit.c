@@ -42,7 +42,7 @@
 #define MY_TAB_MASK     15
 static u32 idx_gen;
 static struct tcf_pedit *tcf_pedit_ht[MY_TAB_SIZE];
-static rwlock_t pedit_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(pedit_lock);
 
 #define tcf_st		tcf_pedit
 #define tc_st		tc_pedit
@@ -63,8 +63,7 @@ tcf_pedit_init(struct rtattr *rta, struct rtattr *est, struct tc_action *a,
 	struct tc_pedit_key *keys = NULL;
 	int ksize;
 
-	if (rta == NULL || rtattr_parse(tb, TCA_PEDIT_MAX, RTA_DATA(rta),
-	                                RTA_PAYLOAD(rta)) < 0)
+	if (rta == NULL || rtattr_parse_nested(tb, TCA_PEDIT_MAX, rta) < 0)
 		return -EINVAL;
 
 	if (tb[TCA_PEDIT_PARMS - 1] == NULL ||

@@ -54,7 +54,7 @@
 
    qdisc_tree_lock must be grabbed BEFORE dev->queue_lock!
  */
-rwlock_t qdisc_tree_lock = RW_LOCK_UNLOCKED;
+DEFINE_RWLOCK(qdisc_tree_lock);
 
 void qdisc_lock_tree(struct net_device *dev)
 {

@@ -83,23 +83,6 @@
 
 #include "usb_atm.h"
 
-/*
-#define DEBUG
-#define VERBOSE_DEBUG
-*/
-
-#if !defined (DEBUG) && defined (CONFIG_USB_DEBUG)
-#	define DEBUG
-#endif
-
-#include <linux/usb.h>
-
-#ifdef DEBUG
-#define UDSL_ASSERT(x)	BUG_ON(!(x))
-#else
-#define UDSL_ASSERT(x)	do { if (!(x)) warn("failed assertion '" #x "' at line %d", __LINE__); } while(0)
-#endif
-
 #ifdef VERBOSE_DEBUG
 static int udsl_print_packet(const unsigned char *data, int len);
 #define PACKETDEBUG(arg...)	udsl_print_packet (arg)

@@ -163,6 +163,7 @@ EXPORT_SYMBOL(local_bh_enable);
  */
 void irq_exit(void)
 {
+	account_system_vtime(current);
 	sub_preempt_count(IRQ_EXIT_OFFSET);
 	if (!in_interrupt() && local_softirq_pending())
 		invoke_softirq();

@@ -151,7 +151,7 @@ static void dn_keepalive(struct sock *sk);
 
 static kmem_cache_t *dn_sk_cachep;
 static struct proto_ops dn_proto_ops;
-static rwlock_t dn_hash_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(dn_hash_lock);
 static struct hlist_head dn_sk_hash[DN_SK_HASH_SIZE];
 static struct hlist_head dn_wild_sk;
 

@@ -31,15 +31,15 @@
 #define MAX_SKBS 32
 #define MAX_UDP_CHUNK 1460
 
-static spinlock_t skb_list_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(skb_list_lock);
 static int nr_skbs;
 static struct sk_buff *skbs;
 
-static spinlock_t rx_list_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(rx_list_lock);
 static LIST_HEAD(rx_list);
 
 static atomic_t trapped;
-static spinlock_t netpoll_poll_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(netpoll_poll_lock);
 
 #define NETPOLL_RX_ENABLED  1
 #define NETPOLL_RX_DROP     2

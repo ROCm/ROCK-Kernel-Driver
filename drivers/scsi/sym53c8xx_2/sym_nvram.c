@@ -68,6 +68,21 @@ void sym_nvram_setup_host(struct sym_hcb *np, struct sym_nvram *nvram)
 	case SYM_TEKRAM_NVRAM:
 		np->myaddr = nvram->data.Tekram.host_id & 0x0f;
 		break;
+#ifdef CONFIG_PARISC
+	case SYM_PARISC_PDC:
+		if (nvram->data.parisc.host_id != -1)
+			np->myaddr = nvram->data.parisc.host_id;
+		if (nvram->data.parisc.factor != -1)
+			np->minsync = nvram->data.parisc.factor;
+		if (nvram->data.parisc.width != -1)
+			np->maxwide = nvram->data.parisc.width;
+		switch (nvram->data.parisc.mode) {
+			case 0: np->scsi_mode = SMODE_SE; break;
+			case 1: np->scsi_mode = SMODE_HVD; break;
+			case 2: np->scsi_mode = SMODE_LVD; break;
+			default: break;
+		}
+#endif
 	default:
 		break;
 	}
@@ -702,6 +717,28 @@ static int sym_read_Tekram_nvram (struct sym_device *np, Tekram_nvram *nvram)
 	return 0;
 }
 
+#ifdef CONFIG_PARISC
+/*
+ * Host firmware (PDC) keeps a table for altering SCSI capabilities.
+ * Many newer machines export one channel of 53c896 chip as SE, 50-pin HD.
+ * Also used for Multi-initiator SCSI clusters to set the SCSI Initiator ID.
+ */
+static int sym_read_parisc_pdc(struct sym_device *np, struct pdc_initiator *pdc)
+{
+	struct hardware_path hwpath;
+	get_pci_node_path(np->pdev, &hwpath);
+	if (!pdc_get_initiator(&hwpath, pdc))
+		return 0;
+
+	return SYM_PARISC_PDC;
+}
+#else
+static int sym_read_parisc_pdc(struct sym_device *np, struct pdc_initiator *x)
+{
+	return 0;
+}
+#endif
+
 /*
  *  Try reading Symbios or Tekram NVRAM
  */
@@ -714,7 +751,7 @@ int sym_read_nvram(struct sym_device *np, struct sym_nvram *nvp)
 		nvp->type = SYM_TEKRAM_NVRAM;
 		sym_display_Tekram_nvram(np, &nvp->data.Tekram);
 	} else {
-		nvp->type = 0;
+		nvp->type = sym_read_parisc_pdc(np, &nvp->data.parisc);
 	}
 	return nvp->type;
 }

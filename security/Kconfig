@@ -76,6 +76,7 @@ config SECURITY_ROOTPLUG
 config SECURITY_SECLVL
 	tristate "BSD Secure Levels"
 	depends on SECURITY
+	select CRYPTO
 	select CRYPTO_SHA1
 	help
 	  Implements BSD Secure Levels as an LSM.  See

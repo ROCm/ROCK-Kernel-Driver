@@ -326,7 +326,7 @@ int device_attach(struct device * dev)
 			if (!error)
 				/* success, driver matched */
 				return 1;
-			if (error != -ENODEV)
+			if (error != -ENODEV && error != -ENXIO)
 				/* driver matched but the probe failed */
 				printk(KERN_WARNING
 				    "%s: probe of %s failed with error %d\n",

@@ -683,7 +683,7 @@ static int bfusb_probe(struct usb_interface *intf, const struct usb_device_id *i
 	bfusb->udev = udev;
 	bfusb->bulk_in_ep    = bulk_in_ep->desc.bEndpointAddress;
 	bfusb->bulk_out_ep   = bulk_out_ep->desc.bEndpointAddress;
-	bfusb->bulk_pkt_size = bulk_out_ep->desc.wMaxPacketSize;
+	bfusb->bulk_pkt_size = le16_to_cpu(bulk_out_ep->desc.wMaxPacketSize);
 
 	rwlock_init(&bfusb->lock);
 

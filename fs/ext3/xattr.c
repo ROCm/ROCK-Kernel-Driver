@@ -139,22 +139,11 @@ ext3_xattr_handler(int name_index)
 }
 
 /*
- * Inode operation listxattr()
- *
- * dentry->d_inode->i_sem: don't care
- */
-ssize_t
-ext3_listxattr(struct dentry *dentry, char *buffer, size_t size)
-{
-	return ext3_xattr_list(dentry->d_inode, buffer, size);
-}
-
-/*
  * ext3_xattr_block_get()
  *
  * routine looks for attribute in EA block and returns it's value and size
  */
-int
+static int
 ext3_xattr_block_get(struct inode *inode, int name_index, const char *name,
 	       void *buffer, size_t buffer_size)
 {
@@ -250,7 +239,7 @@ cleanup:
  *
  * routine looks for attribute in inode body and returns it's value and size
  */
-int
+static int
 ext3_xattr_ibody_get(struct inode *inode, int name_index, const char *name,
 	       void *buffer, size_t buffer_size)
 {
@@ -352,7 +341,7 @@ ext3_xattr_get(struct inode *inode, int name_index, const char *name,
  *
  * generate list of attributes stored in EA block
  */
-int
+static int
 ext3_xattr_block_list(struct inode *inode, char *buffer, size_t buffer_size)
 {
 	struct buffer_head *bh = NULL;
@@ -428,7 +417,7 @@ cleanup:
  *
  * generate list of attributes stored in inode body
  */
-int
+static int
 ext3_xattr_ibody_list(struct inode *inode, char *buffer, size_t buffer_size)
 {
 	struct ext3_xattr_entry *last;
@@ -507,7 +496,7 @@ cleanup:
  * Returns a negative error number on failure, or the number of bytes
  * used / required on success.
  */
-int
+static int
 ext3_xattr_list(struct inode *inode, char *buffer, size_t buffer_size)
 {
 	int size = buffer_size;
@@ -546,6 +535,17 @@ cleanup:
 }
 
 /*
+ * Inode operation listxattr()
+ *
+ * dentry->d_inode->i_sem: don't care
+ */
+ssize_t
+ext3_listxattr(struct dentry *dentry, char *buffer, size_t size)
+{
+	return ext3_xattr_list(dentry->d_inode, buffer, size);
+}
+
+/*
  * If the EXT3_FEATURE_COMPAT_EXT_ATTR feature of this file system is
  * not set, set it.
  */
@@ -571,7 +571,7 @@ static void ext3_xattr_update_super_block(handle_t *handle,
  * search attribute and calculate free space in inode body
  * NOTE: free space includes space our attribute hold
  */
-int
+static int
 ext3_xattr_ibody_find(struct inode *inode, int name_index,
 			const char *name, int *free)
 {
@@ -638,7 +638,7 @@ ext3_xattr_ibody_find(struct inode *inode, int name_index,
  * search attribute and calculate free space in EA block (if it allocated)
  * NOTE: free space includes space our attribute hold
  */
-int
+static int
 ext3_xattr_block_find(struct inode *inode, int name_index,
 			const char *name, int *free)
 {
@@ -698,7 +698,7 @@ bad_block:	ext3_error(inode->i_sb, "ext3_xattr_get",
  *
  * this routine add/remove/replace attribute in inode body
  */
-int
+static int
 ext3_xattr_ibody_set(handle_t *handle, struct inode *inode, int name_index,
 		      const char *name, const void *value, size_t value_len,
 		      int flags)
@@ -846,112 +846,11 @@ done:
 }
 
 /*
- * ext3_xattr_set_handle()
- *
- * Create, replace or remove an extended attribute for this inode. Buffer
- * is NULL to remove an existing extended attribute, and non-NULL to
- * either replace an existing extended attribute, or create a new extended
- * attribute. The flags XATTR_REPLACE and XATTR_CREATE
- * specify that an extended attribute must exist and must not exist
- * previous to the call, respectively.
- *
- * Returns 0, or a negative error number on failure.
- */
-int
-ext3_xattr_set_handle(handle_t *handle, struct inode *inode, int name_index,
-		const char *name, const void *value, size_t value_len,
-		int flags)
-{
-	int free1 = -1, free2 = -1;
-	int err, where = 0, total;
-	int name_len;
-
-	ea_idebug(inode, "name=%d.%s, value=%p, value_len=%ld",
-		  name_index, name, value, (long)value_len);
-
-	if (IS_RDONLY(inode))
-		return -EROFS;
-	if (IS_IMMUTABLE(inode) || IS_APPEND(inode))
-		return -EPERM;
-	if (value == NULL)
-		value_len = 0;
-	if (name == NULL)
-		return -EINVAL;
-	name_len = strlen(name);
-	if (name_len > 255 || value_len > inode->i_sb->s_blocksize)
-		return -ERANGE;
-	down_write(&EXT3_I(inode)->xattr_sem);
-
-#define EX_FOUND_IN_IBODY	1
-#define EX_FOUND_IN_BLOCK	2
-
-	/* try to find attribute in inode body */
-	err = ext3_xattr_ibody_find(inode, name_index, name, &free1);
-	if (err == 0) {
-		/* found EA in inode */
-		where = EX_FOUND_IN_IBODY;
-	} else if (err == -ENOENT) {
-		/* there is no such attribute in inode body */
-		/* try to find attribute in dedicated block */
-		err = ext3_xattr_block_find(inode, name_index, name, &free2);
-		if (err != 0 && err != -ENOENT) {
-			/* not found EA in block */
-			goto finish;
-		} else if (err == 0) {
-			/* found EA in block */
-			where = EX_FOUND_IN_BLOCK;
-		}
-	} else
-		goto finish;
-
-	/* check flags: may replace? may create ? */
-	if (where && (flags & XATTR_CREATE)) {
-		err = -EEXIST;
-		goto finish;
-	} else if (!where && (flags & XATTR_REPLACE)) {
-		err = -ENODATA;
-		goto finish;
-	}
-
-	/* check if we have enough space to store attribute */
-	total = EXT3_XATTR_LEN(strlen(name)) + value_len;
-	if (total > free1 && free2 > 0 && total > free2) {
-		/* have no enough space */
-		err = -ENOSPC;
-		goto finish;
-	}
-
-	/* there are two cases when we want to remove EA from original storage:
-	 * a) EA is stored in the inode, but new value doesn't fit
-	 * b) EA is stored in the block, but new value fit in inode
-	 */
-	if (where == EX_FOUND_IN_IBODY && total > free1)
-		ext3_xattr_ibody_set(handle, inode, name_index, name,
-					NULL, 0, flags);
-	else if (where == EX_FOUND_IN_BLOCK && total <= free1)
-		ext3_xattr_block_set(handle, inode, name_index,
-					name, NULL, 0, flags);
-
-	/* try to store EA in inode body */
-	err = ext3_xattr_ibody_set(handle, inode, name_index, name,
-					value, value_len, flags);
-	if (err) {
-		/* can't store EA in inode body: try to store in block */
-		err = ext3_xattr_block_set(handle, inode, name_index, name,
-						value, value_len, flags);
-	}
-
-finish:
-	up_write(&EXT3_I(inode)->xattr_sem);
-	return err;
-}
-
-/*
  * ext3_xattr_block_set()
  *
  * this routine add/remove/replace attribute in EA block
  */
-int
+static int
 ext3_xattr_block_set(handle_t *handle, struct inode *inode, int name_index,
 		      const char *name, const void *value, size_t value_len,
 		      int flags)
@@ -1203,6 +1102,107 @@ cleanup:
 		kfree(header);
 
 	return error;
+}
+
+/*
+ * ext3_xattr_set_handle()
+ *
+ * Create, replace or remove an extended attribute for this inode. Buffer
+ * is NULL to remove an existing extended attribute, and non-NULL to
+ * either replace an existing extended attribute, or create a new extended
+ * attribute. The flags XATTR_REPLACE and XATTR_CREATE
+ * specify that an extended attribute must exist and must not exist
+ * previous to the call, respectively.
+ *
+ * Returns 0, or a negative error number on failure.
+ */
+int
+ext3_xattr_set_handle(handle_t *handle, struct inode *inode, int name_index,
+		const char *name, const void *value, size_t value_len,
+		int flags)
+{
+	int free1 = -1, free2 = -1;
+	int err, where = 0, total;
+	int name_len;
+
+	ea_idebug(inode, "name=%d.%s, value=%p, value_len=%ld",
+		  name_index, name, value, (long)value_len);
+
+	if (IS_RDONLY(inode))
+		return -EROFS;
+	if (IS_IMMUTABLE(inode) || IS_APPEND(inode))
+		return -EPERM;
+	if (value == NULL)
+		value_len = 0;
+	if (name == NULL)
+		return -EINVAL;
+	name_len = strlen(name);
+	if (name_len > 255 || value_len > inode->i_sb->s_blocksize)
+		return -ERANGE;
+	down_write(&EXT3_I(inode)->xattr_sem);
+
+#define EX_FOUND_IN_IBODY	1
+#define EX_FOUND_IN_BLOCK	2
+
+	/* try to find attribute in inode body */
+	err = ext3_xattr_ibody_find(inode, name_index, name, &free1);
+	if (err == 0) {
+		/* found EA in inode */
+		where = EX_FOUND_IN_IBODY;
+	} else if (err == -ENOENT) {
+		/* there is no such attribute in inode body */
+		/* try to find attribute in dedicated block */
+		err = ext3_xattr_block_find(inode, name_index, name, &free2);
+		if (err != 0 && err != -ENOENT) {
+			/* not found EA in block */
+			goto finish;
+		} else if (err == 0) {
+			/* found EA in block */
+			where = EX_FOUND_IN_BLOCK;
+		}
+	} else
+		goto finish;
+
+	/* check flags: may replace? may create ? */
+	if (where && (flags & XATTR_CREATE)) {
+		err = -EEXIST;
+		goto finish;
+	} else if (!where && (flags & XATTR_REPLACE)) {
+		err = -ENODATA;
+		goto finish;
+	}
+
+	/* check if we have enough space to store attribute */
+	total = EXT3_XATTR_LEN(strlen(name)) + value_len;
+	if (total > free1 && free2 > 0 && total > free2) {
+		/* have no enough space */
+		err = -ENOSPC;
+		goto finish;
+	}
+
+	/* there are two cases when we want to remove EA from original storage:
+	 * a) EA is stored in the inode, but new value doesn't fit
+	 * b) EA is stored in the block, but new value fit in inode
+	 */
+	if (where == EX_FOUND_IN_IBODY && total > free1)
+		ext3_xattr_ibody_set(handle, inode, name_index, name,
+					NULL, 0, flags);
+	else if (where == EX_FOUND_IN_BLOCK && total <= free1)
+		ext3_xattr_block_set(handle, inode, name_index,
+					name, NULL, 0, flags);
+
+	/* try to store EA in inode body */
+	err = ext3_xattr_ibody_set(handle, inode, name_index, name,
+					value, value_len, flags);
+	if (err) {
+		/* can't store EA in inode body: try to store in block */
+		err = ext3_xattr_block_set(handle, inode, name_index, name,
+						value, value_len, flags);
+	}
+
+finish:
+	up_write(&EXT3_I(inode)->xattr_sem);
+	return err;
 }
 
 /*

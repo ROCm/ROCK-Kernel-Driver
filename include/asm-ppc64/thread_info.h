@@ -12,6 +12,7 @@
 
 #ifndef __ASSEMBLY__
 #include <linux/config.h>
+#include <linux/cache.h>
 #include <asm/processor.h>
 #include <asm/page.h>
 #include <linux/stringify.h>
@@ -22,12 +23,13 @@
 struct thread_info {
 	struct task_struct *task;		/* main task structure */
 	struct exec_domain *exec_domain;	/* execution domain */
-	unsigned long	flags;			/* low level flags */
 	int		cpu;			/* cpu we're on */
 	int		preempt_count;
 	struct restart_block restart_block;
 	/* set by force_successful_syscall_return */
 	unsigned char	syscall_noerror;
+	/* low level flags - has atomic operations done on it */
+	unsigned long	flags ____cacheline_aligned_in_smp;
 };
 
 /*
@@ -39,12 +41,12 @@ struct thread_info {
 {						\
 	.task =		&tsk,			\
 	.exec_domain =	&default_exec_domain,	\
-	.flags =	0,			\
 	.cpu =		0,			\
 	.preempt_count = 1,			\
 	.restart_block = {			\
 		.fn = do_no_restart_syscall,	\
 	},					\
+	.flags =	0,			\
 }
 
 #define init_thread_info	(init_thread_union.thread_info)

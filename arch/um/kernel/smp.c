@@ -247,10 +247,8 @@ int smp_call_function(void (*_func)(void *info), void *_info, int nonatomic,
 	func = _func;
 	info = _info;
 
-	for (i=0;i<NR_CPUS;i++)
-		if((i != current_thread->cpu) &&
-		   cpu_isset(i, cpu_online_map))
-			os_write_file(cpu_data[i].ipi_pipe[1], "C", 1);
+	for_each_cpu(i)
+		os_write_file(cpu_data[i].ipi_pipe[1], "C", 1);
 
 	while (atomic_read(&scf_started) != cpus)
 		barrier();

@@ -97,7 +97,7 @@ struct br2684_dev {
  * do read-locking under interrupt context, so write locking must block
  * the current CPU's interrupts
  */
-static rwlock_t devs_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(devs_lock);
 
 static LIST_HEAD(br2684_devs);
 

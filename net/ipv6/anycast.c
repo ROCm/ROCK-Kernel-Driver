@@ -44,7 +44,7 @@
 #include <net/checksum.h>
 
 /* Big ac list lock for all the sockets */
-static rwlock_t ipv6_sk_ac_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(ipv6_sk_ac_lock);
 
 /* XXX ip6_addr_match() and ip6_onlink() really belong in net/core.c */
 

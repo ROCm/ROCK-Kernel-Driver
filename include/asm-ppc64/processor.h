@@ -331,8 +331,8 @@
 #define   MMCR0_FCECE	0x02000000UL /* freeze counters on enabled condition or event */
 /* time base exception enable */
 #define   MMCR0_TBEE	0x00400000UL /* time base exception enable */
-#define   MMCR0_PMC1INTCONTROL	0x00008000UL /* PMC1 count enable*/
-#define   MMCR0_PMCNINTCONTROL	0x00004000UL /* PMCn count enable*/
+#define   MMCR0_PMC1CE	0x00008000UL /* PMC1 count enable*/
+#define   MMCR0_PMCjCE	0x00004000UL /* PMCj count enable*/
 #define   MMCR0_TRIGGER	0x00002000UL /* TRIGGER enable */
 #define   MMCR0_PMAO	0x00000080UL /* performance monitor alert has occurred, set to 0 after handling exception */
 #define   MMCR0_SHRFC	0x00000040UL /* SHRre freeze conditions between threads */

@@ -36,7 +36,7 @@ static struct sysfs_dirent * sysfs_new_dirent(struct sysfs_dirent * parent_sd,
 {
 	struct sysfs_dirent * sd;
 
-	sd = kmalloc(sizeof(*sd), GFP_KERNEL);
+	sd = kmem_cache_alloc(sysfs_dir_cachep, GFP_KERNEL);
 	if (!sd)
 		return NULL;
 

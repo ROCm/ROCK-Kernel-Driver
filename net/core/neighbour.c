@@ -93,7 +93,7 @@ static struct file_operations neigh_stat_seq_fops;
    list of neighbour tables. This list is used only in process context,
  */
 
-static rwlock_t neigh_tbl_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(neigh_tbl_lock);
 
 static int neigh_blackhole(struct sk_buff *skb)
 {

@@ -493,7 +493,7 @@ smb_put_super(struct super_block *sb)
 	smb_kfree(server);
 }
 
-int smb_fill_super(struct super_block *sb, void *raw_data, int silent)
+static int smb_fill_super(struct super_block *sb, void *raw_data, int silent)
 {
 	struct smb_sb_info *server;
 	struct smb_mount_data_kernel *mnt;

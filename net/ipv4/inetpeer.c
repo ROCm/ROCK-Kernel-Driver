@@ -70,7 +70,7 @@
  */
 
 /* Exported for inet_getid inline function.  */
-spinlock_t inet_peer_idlock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(inet_peer_idlock);
 
 static kmem_cache_t *peer_cachep;
 
@@ -82,7 +82,7 @@ static struct inet_peer peer_fake_node = {
 };
 #define peer_avl_empty (&peer_fake_node)
 static struct inet_peer *peer_root = peer_avl_empty;
-static rwlock_t peer_pool_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(peer_pool_lock);
 #define PEER_MAXDEPTH 40 /* sufficient for about 2^27 nodes */
 
 static volatile int peer_total;
@@ -95,7 +95,7 @@ int inet_peer_maxttl = 10 * 60 * HZ;	/* usual time to live: 10 min */
 /* Exported for inet_putpeer inline function.  */
 struct inet_peer *inet_peer_unused_head,
 		**inet_peer_unused_tailp = &inet_peer_unused_head;
-spinlock_t inet_peer_unused_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(inet_peer_unused_lock);
 #define PEER_MAX_CLEANUP_WORK 30
 
 static void peer_check_expire(unsigned long dummy);

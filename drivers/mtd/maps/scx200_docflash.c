@@ -26,9 +26,6 @@ MODULE_AUTHOR("Christer Weinigel <wingel@hack.org>");
 MODULE_DESCRIPTION("NatSemi SCx200 DOCCS Flash Driver");
 MODULE_LICENSE("GPL");
 
-/* Set this to one if you want to partition the flash */
-#define PARTITION 1
-
 static int probe = 0;		/* Don't autoprobe */
 static unsigned size = 0x1000000; /* 16 MiB the whole ISA address space */
 static unsigned width = 8;	/* Default to 8 bits wide */
@@ -50,7 +47,7 @@ static struct resource docmem = {
 
 static struct mtd_info *mymtd;
 
-#if PARTITION
+#ifdef CONFIG_MTD_PARTITIONS
 static struct mtd_partition partition_info[] = {
 	{ 
 		.name   = "DOCCS Boot kernel", 
@@ -200,7 +197,7 @@ static int __init init_scx200_docflash(void)
 
 	mymtd->owner = THIS_MODULE;
 
-#if PARTITION
+#ifdef CONFIG_MTD_PARTITIONS
 	partition_info[3].offset = mymtd->size-partition_info[3].size;
 	partition_info[2].size = partition_info[3].offset-partition_info[2].offset;
 	add_mtd_partitions(mymtd, partition_info, NUM_PARTITIONS);
@@ -213,7 +210,7 @@ static int __init init_scx200_docflash(void)
 static void __exit cleanup_scx200_docflash(void)
 {
 	if (mymtd) {
-#if PARTITION
+#ifdef CONFIG_MTD_PARTITIONS
 		del_mtd_partitions(mymtd);
 #else
 		del_mtd_device(mymtd);

@@ -360,7 +360,7 @@ static int proc_pid_wchan(struct task_struct *task, char *buffer)
 	char *modname;
 	const char *sym_name;
 	unsigned long wchan, size, offset;
-	char namebuf[128];
+	char namebuf[KSYM_NAME_LEN+1];
 
 	wchan = get_wchan(task);
 

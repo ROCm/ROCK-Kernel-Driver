@@ -32,10 +32,11 @@ extern void __flush_tlb_pending(struct ppc64_tlb_batch *batch);
 
 static inline void flush_tlb_pending(void)
 {
-	struct ppc64_tlb_batch *batch = &__get_cpu_var(ppc64_tlb_batch);
+	struct ppc64_tlb_batch *batch = &get_cpu_var(ppc64_tlb_batch);
 
 	if (batch->index)
 		__flush_tlb_pending(batch);
+	put_cpu_var(ppc64_tlb_batch);
 }
 
 #define flush_tlb_mm(mm)			flush_tlb_pending()

@@ -33,7 +33,7 @@
 static LIST_HEAD(ip_vs_schedulers);
 
 /* lock for service table */
-static rwlock_t __ip_vs_sched_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(__ip_vs_sched_lock);
 
 
 /*

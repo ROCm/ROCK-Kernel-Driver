@@ -31,6 +31,7 @@
 #include <asm/cputable.h>
 #include <asm/rtas.h>
 #include <asm/sstep.h>
+#include <asm/bug.h>
 
 #include "nonstdio.h"
 #include "privinst.h"
@@ -1319,6 +1320,26 @@ static void backtrace(struct pt_regs *excp)
 	scannl();
 }
 
+static void print_bug_trap(struct pt_regs *regs)
+{
+	struct bug_entry *bug;
+	unsigned long addr;
+
+	if (regs->msr & MSR_PR)
+		return;		/* not in kernel */
+	addr = regs->nip;	/* address of trap instruction */
+	if (addr < PAGE_OFFSET)
+		return;
+	bug = find_bug(regs->nip);
+	if (bug == NULL)
+		return;
+	if (bug->line & BUG_WARNING_TRAP)
+		return;
+
+	printf("kernel BUG in %s at %s:%d!\n",
+	       bug->function, bug->file, (unsigned int)bug->line);
+}
+
 void excprint(struct pt_regs *fp)
 {
 	unsigned long trap;
@@ -1350,6 +1371,9 @@ void excprint(struct pt_regs *fp)
 		printf("    pid   = %ld, comm = %s\n",
 		       current->pid, current->comm);
 	}
+
+	if (trap == 0x700)
+		print_bug_trap(fp);
 }
 
 void prregs(struct pt_regs *fp)

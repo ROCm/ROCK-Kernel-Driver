@@ -419,7 +419,7 @@ static void tcp_twkill(unsigned long);
 #define TCP_TWKILL_QUOTA	100
 
 static struct hlist_head tcp_tw_death_row[TCP_TWKILL_SLOTS];
-static spinlock_t tw_death_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(tw_death_lock);
 static struct timer_list tcp_tw_timer = TIMER_INITIALIZER(tcp_twkill, 0, 0);
 static void twkill_work(void *);
 static DECLARE_WORK(tcp_twkill_work, twkill_work, NULL);

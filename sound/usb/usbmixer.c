@@ -1514,12 +1514,12 @@ int snd_usb_create_mixer(snd_usb_audio_t *chip, int ctrlif)
 	state.buffer = hostif->extra;
 	state.buflen = hostif->extralen;
 	state.ctrlif = ctrlif;
-	state.vendor = dev->idVendor;
-	state.product = dev->idProduct;
+	state.vendor = le16_to_cpu(dev->idVendor);
+	state.product = le16_to_cpu(dev->idProduct);
 
 	/* check the mapping table */
 	for (map = usbmix_ctl_maps; map->vendor; map++) {
-		if (map->vendor == dev->idVendor && map->product == dev->idProduct) {
+		if (map->vendor == le16_to_cpu(dev->idVendor) && map->product == le16_to_cpu(dev->idProduct)) {
 			state.map = map->map;
 			chip->ignore_ctl_error = map->ignore_ctl_error;
 			break;

@@ -398,7 +398,6 @@ static dev_link_t *ray_attach(void)
     link->next = dev_list;
     dev_list = link;
     client_reg.dev_info = &dev_info;
-    client_reg.Attributes = INFO_IO_CLIENT | INFO_CARD_SHARE;
     client_reg.EventMask =
         CS_EVENT_CARD_INSERTION | CS_EVENT_CARD_REMOVAL |
         CS_EVENT_RESET_PHYSICAL | CS_EVENT_CARD_RESET |
@@ -564,6 +563,7 @@ static void ray_config(dev_link_t *link)
         return;
     }
 
+    SET_NETDEV_DEV(dev, &handle_to_dev(handle));
     i = register_netdev(dev);
     if (i != 0) {
         printk("ray_config register_netdev() failed\n");
@@ -2952,8 +2952,7 @@ static void __exit exit_ray_cs(void)
 #endif
 
     pcmcia_unregister_driver(&ray_driver);
-    while (dev_list != NULL)
-        ray_detach(dev_list);
+    BUG_ON(dev_list != NULL);
 } /* exit_ray_cs */
 
 module_init(init_ray_cs);

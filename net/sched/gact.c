@@ -41,7 +41,7 @@
 
 static u32 idx_gen;
 static struct tcf_gact *tcf_gact_ht[MY_TAB_SIZE];
-static rwlock_t gact_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(gact_lock);
 
 /* ovewrride the defaults */
 #define tcf_st		tcf_gact
@@ -79,8 +79,7 @@ static int tcf_gact_init(struct rtattr *rta, struct rtattr *est,
 	struct tcf_gact *p;
 	int ret = 0;
 
-	if (rta == NULL ||
-	    rtattr_parse(tb, TCA_GACT_MAX, RTA_DATA(rta), RTA_PAYLOAD(rta)) < 0)
+	if (rta == NULL || rtattr_parse_nested(tb, TCA_GACT_MAX, rta) < 0)
 		return -EINVAL;
 
 	if (tb[TCA_GACT_PARMS - 1] == NULL ||

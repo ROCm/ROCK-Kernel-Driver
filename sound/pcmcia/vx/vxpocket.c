@@ -165,7 +165,7 @@ static int __init init_vxpocket(void)
 static void __exit exit_vxpocket(void)
 {
 	pcmcia_unregister_driver(&vxp_cs_driver);
-	snd_vxpocket_detach_all(&hw_entry);
+	BUG_ON(hw_entry.dev_list != NULL);
 }
 
 module_init(init_vxpocket);

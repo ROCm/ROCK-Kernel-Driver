@@ -17,16 +17,16 @@
 #include <linux/profile.h>
 #include <linux/errno.h>
 #include <linux/mm.h>
+#include <linux/cpu.h>
+#include <linux/smp.h>
 #include <linux/seq_file.h>
 
 #include <asm/atomic.h>
+#include <asm/cacheflush.h>
 #include <asm/cpu.h>
 #include <asm/processor.h>
-#include <asm/smp.h>
-#include <asm/ptrace.h>
-
-#include <asm/cacheflush.h>
 #include <asm/tlbflush.h>
+#include <asm/ptrace.h>
 
 /*
  * bitmask of present and online CPUs.
@@ -42,6 +42,7 @@ cpumask_t cpu_online_map;
  */
 struct ipi_data {
 	spinlock_t lock;
+	unsigned long ipi_count;
 	unsigned long bits;
 };
 
@@ -242,12 +243,12 @@ int smp_call_function(void (*func)(void *info), void *info, int retry,
 
 void show_ipi_list(struct seq_file *p)
 {
-	int cpu;
+	unsigned int cpu;
 
-	seq_printf(p, "IPI: ");
+	seq_puts(p, "IPI:");
 
 	for_each_online_cpu(cpu)
-		seq_printf(p, "%10lu ", per_cpu(cpu_data, cpu).ipi_count);
+		seq_printf(p, " %10lu", per_cpu(ipi_data, cpu).ipi_count);
 
 	seq_putc(p, '\n');
 }
@@ -316,12 +317,11 @@ static void ipi_cpu_stop(unsigned int cpu)
 void do_IPI(unsigned int ipimask, struct pt_regs *regs)
 {
 	unsigned int cpu = smp_processor_id();
+	struct ipi_data *ipi = &per_cpu(ipi_data, cpu);
 
-	per_cpu(cpu_data, cpu).ipi_count++;
+	ipi->ipi_count++;
 
 	if (ipimask & (1 << 0)) {
-		struct ipi_data *ipi = &per_cpu(ipi_data, cpu);
-
 		for (;;) {
 			unsigned long msgs;
 

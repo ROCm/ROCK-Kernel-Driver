@@ -28,6 +28,7 @@
 #include <linux/errno.h>
 #include <linux/i2c.h>
 
+static u8  stub_pointer;
 static u8  stub_bytes[256];
 static u16 stub_words[256];
 
@@ -44,6 +45,22 @@ static s32 stub_xfer(struct i2c_adapter * adap, u16 addr, unsigned short flags,
 		ret = 0;
 		break;
 
+	case I2C_SMBUS_BYTE:
+		if (read_write == I2C_SMBUS_WRITE) {
+			stub_pointer = command;
+			dev_dbg(&adap->dev, "smbus byte - addr 0x%02x, "
+					"wrote 0x%02x.\n",
+					addr, command);
+		} else {
+			data->byte = stub_bytes[stub_pointer++];
+			dev_dbg(&adap->dev, "smbus byte - addr 0x%02x, "
+					"read  0x%02x.\n",
+					addr, data->byte);
+		}
+
+		ret = 0;
+		break;
+
 	case I2C_SMBUS_BYTE_DATA:
 		if (read_write == I2C_SMBUS_WRITE) {
 			stub_bytes[command] = data->byte;
@@ -56,6 +73,7 @@ static s32 stub_xfer(struct i2c_adapter * adap, u16 addr, unsigned short flags,
 					"read  0x%02x at 0x%02x.\n",
 					addr, data->byte, command);
 		}
+		stub_pointer = command + 1;
 
 		ret = 0;
 		break;
@@ -87,8 +105,8 @@ static s32 stub_xfer(struct i2c_adapter * adap, u16 addr, unsigned short flags,
 
 static u32 stub_func(struct i2c_adapter *adapter)
 {
-	return I2C_FUNC_SMBUS_QUICK | I2C_FUNC_SMBUS_BYTE_DATA |
-		I2C_FUNC_SMBUS_WORD_DATA;
+	return I2C_FUNC_SMBUS_QUICK | I2C_FUNC_SMBUS_BYTE |
+		I2C_FUNC_SMBUS_BYTE_DATA | I2C_FUNC_SMBUS_WORD_DATA;
 }
 
 static struct i2c_algorithm smbus_algorithm = {

@@ -18,7 +18,8 @@
  *     05-Apr-2004 BJD  Copied to make mach-vr1000.c
  *     18-Oct-2004 BJD  Updated board struct
  *     04-Nov-2004 BJD  Clock and serial configuration update
- *     04-Jan-2004 BJD  Updated uart init call
+ *     04-Jan-2005 BJD  Updated uart init call
+ *     10-Jan-2005 BJD  Removed include of s3c2410.h
 */
 
 #include <linux/kernel.h>
@@ -43,7 +44,6 @@
 //#include <asm/debug-ll.h>
 #include <asm/arch/regs-serial.h>
 
-#include "s3c2410.h"
 #include "clock.h"
 #include "devs.h"
 #include "cpu.h"
@@ -212,7 +212,7 @@ void __init vr1000_map_io(void)
 
 void __init vr1000_init_irq(void)
 {
-	s3c2410_init_irq();
+	s3c24xx_init_irq();
 }
 
 MACHINE_START(VR1000, "Thorcom-VR1000")
@@ -221,5 +221,5 @@ MACHINE_START(VR1000, "Thorcom-VR1000")
      BOOT_PARAMS(S3C2410_SDRAM_PA + 0x100)
      MAPIO(vr1000_map_io)
      INITIRQ(vr1000_init_irq)
-     .timer		= &s3c2410_timer,
+	.timer		= &s3c24xx_timer,
 MACHINE_END

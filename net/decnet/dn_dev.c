@@ -65,7 +65,7 @@ extern struct neigh_table dn_neigh_table;
  */
 dn_address decnet_address = 0;
 
-static rwlock_t dndev_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(dndev_lock);
 static struct net_device *decnet_default_device;
 static struct notifier_block *dnaddr_chain;
 

@@ -32,7 +32,7 @@
 #include <linux/init.h>
 
 ax25_dev *ax25_dev_list;
-spinlock_t ax25_dev_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(ax25_dev_lock);
 
 ax25_dev *ax25_addr_ax25dev(ax25_address *addr)
 {

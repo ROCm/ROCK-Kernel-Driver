@@ -171,6 +171,10 @@ struct Tekram_nvram {
 typedef struct Tekram_nvram	Tekram_nvram;
 typedef struct Tekram_target	Tekram_target;
 
+#ifndef CONFIG_PARISC
+struct pdc_initiator { int dummy; };
+#endif
+
 /*
  *  Union of supported NVRAM formats.
  */
@@ -178,10 +182,12 @@ struct sym_nvram {
 	int type;
 #define	SYM_SYMBIOS_NVRAM	(1)
 #define	SYM_TEKRAM_NVRAM	(2)
+#define SYM_PARISC_PDC		(3)
 #if SYM_CONF_NVRAM_SUPPORT
 	union {
 		Symbios_nvram Symbios;
 		Tekram_nvram Tekram;
+		struct pdc_initiator parisc;
 	} data;
 #endif
 };

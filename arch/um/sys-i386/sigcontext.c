@@ -22,8 +22,7 @@ void sc_to_sc(void *to_ptr, void *from_ptr)
 unsigned long *sc_sigmask(void *sc_ptr)
 {
 	struct sigcontext *sc = sc_ptr;
-
-	return(&sc->oldmask);
+	return &sc->oldmask;
 }
 
 int sc_get_fpregs(unsigned long buf, void *sc_ptr)

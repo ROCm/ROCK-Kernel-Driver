@@ -23,15 +23,6 @@ config SSL
 
         Unless you have a specific reason for disabling this, say Y.
 
-config FD_CHAN
-	bool "file descriptor channel support"
-	help
-        This option enables support for attaching UML consoles and serial
-        lines to already set up file descriptors.  Generally, the main
-        console is attached to file descriptors 0 and 1 (stdin and stdout),
-        so it would be wise to leave this enabled unless you intend to
-        attach it to some other host device.
-
 config NULL_CHAN
 	bool "null channel support"
 	help
@@ -80,7 +71,7 @@ config XTERM_CHAN
 
 config NOCONFIG_CHAN
 	bool
-	default !(XTERM_CHAN && TTY_CHAN && PTY_CHAN && PORT_CHAN && FD_CHAN && NULL_CHAN)
+	default !(XTERM_CHAN && TTY_CHAN && PTY_CHAN && PORT_CHAN && NULL_CHAN)
 
 config CON_ZERO_CHAN
 	string "Default main console channel initialization"

@@ -99,7 +99,7 @@ struct ipq {
 
 /* Per-bucket lock is easy to add now. */
 static struct ipq *ipq_hash[IPQ_HASHSZ];
-static rwlock_t ipfrag_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(ipfrag_lock);
 static u32 ipfrag_hash_rnd;
 static LIST_HEAD(ipq_lru_list);
 int ip_frag_nqueues = 0;

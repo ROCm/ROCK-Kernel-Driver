@@ -34,9 +34,12 @@ int old_mmap(unsigned long addr, unsigned long len,
 	[ __NR_multiplexer ] = sys_ni_syscall, \
 	[ __NR_mmap ] = old_mmap, \
 	[ __NR_madvise ] = sys_madvise, \
-	[ __NR_mincore ] = sys_mincore, 
+	[ __NR_mincore ] = sys_mincore, \
+	[ __NR_iopl ] = (syscall_handler_t *) sys_ni_syscall, \
+	[ __NR_utimes ] = (syscall_handler_t *) sys_utimes, \
+	[ __NR_fadvise64 ] = (syscall_handler_t *) sys_fadvise64,
 
-#define LAST_ARCH_SYSCALL __NR_mincore
+#define LAST_ARCH_SYSCALL __NR_fadvise64
 
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.

@@ -66,7 +66,6 @@ extern struct xattr_handler ext2_xattr_security_handler;
 extern ssize_t ext2_listxattr(struct dentry *, char *, size_t);
 
 extern int ext2_xattr_get(struct inode *, int, const char *, void *, size_t);
-extern int ext2_xattr_list(struct inode *, char *, size_t);
 extern int ext2_xattr_set(struct inode *, int, const char *, const void *, size_t, int);
 
 extern void ext2_xattr_delete_inode(struct inode *);
@@ -82,12 +81,6 @@ extern struct xattr_handler *ext2_xattr_handlers[];
 static inline int
 ext2_xattr_get(struct inode *inode, int name_index,
 	       const char *name, void *buffer, size_t size)
-{
-	return -EOPNOTSUPP;
-}
-
-static inline int
-ext2_xattr_list(struct inode *inode, char *buffer, size_t size)
 {
 	return -EOPNOTSUPP;
 }

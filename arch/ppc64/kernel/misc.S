@@ -167,27 +167,7 @@ _GLOBAL(call_with_mmu_off)
 	xori	r0,r0,MSR_IR|MSR_DR
 	mtspr	SPRN_SRR1,r0
 	rfid
-	
-/*
- * Flush instruction cache.
- */
-_GLOBAL(flush_instruction_cache)
 
-/*
- * This is called by kgdb code
- * and should probably go away
- * to be replaced by invalidating
- * the cache lines that are actually
- * modified
- */
-	/* use invalidate-all bit in HID0
-	 *  - is this consistent across all 64-bit cpus?  -- paulus */
-	mfspr	r3,HID0
-	ori	r3,r3,HID0_ICFI
-	mtspr	HID0,r3
-	sync
-	isync
-	blr
 
 	.section	".toc","aw"
 PPC64_CACHES:

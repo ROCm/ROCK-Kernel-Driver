@@ -322,7 +322,6 @@ static dev_link_t *tc574_attach(void)
 	link->next = dev_list;
 	dev_list = link;
 	client_reg.dev_info = &dev_info;
-	client_reg.Attributes = INFO_IO_CLIENT | INFO_CARD_SHARE;
 	client_reg.EventMask =
 		CS_EVENT_CARD_INSERTION | CS_EVENT_CARD_REMOVAL |
 			CS_EVENT_RESET_PHYSICAL | CS_EVENT_CARD_RESET |
@@ -519,6 +518,7 @@ static void tc574_config(dev_link_t *link)
 
 	link->state &= ~DEV_CONFIG_PENDING;
 	link->dev = &lp->node;
+	SET_NETDEV_DEV(dev, &handle_to_dev(handle));
 
 	if (register_netdev(dev) != 0) {
 		printk(KERN_NOTICE "3c574_cs: register_netdev() failed\n");
@@ -1308,8 +1308,7 @@ static int __init init_tc574(void)
 static void __exit exit_tc574(void)
 {
 	pcmcia_unregister_driver(&tc574_driver);
-	while (dev_list != NULL)
-		tc574_detach(dev_list);
+	BUG_ON(dev_list != NULL);
 }
 
 module_init(init_tc574);

@@ -41,7 +41,7 @@ struct in_device;
 #endif
 
 /* Use lock to serialize, so printks don't overlap */
-static spinlock_t log_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(log_lock);
 
 /* One level of recursion won't kill us */
 static void dump_packet(const struct ip6t_log_info *info,

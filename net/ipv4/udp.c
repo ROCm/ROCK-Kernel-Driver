@@ -115,7 +115,7 @@
 DEFINE_SNMP_STAT(struct udp_mib, udp_statistics);
 
 struct hlist_head udp_hash[UDP_HTABLE_SIZE];
-rwlock_t udp_hash_lock = RW_LOCK_UNLOCKED;
+DEFINE_RWLOCK(udp_hash_lock);
 
 /* Shared by v4/v6 udp. */
 int udp_port_rover;

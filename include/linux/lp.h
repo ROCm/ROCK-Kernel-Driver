@@ -186,12 +186,6 @@ struct lp_struct {
  */
 #define LP_DELAY 	50
 
-/*
- * function prototypes
- */
-
-extern int lp_init(void);
-
 #endif
 
 #endif
