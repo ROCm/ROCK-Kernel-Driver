@@ -128,12 +128,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define E100_DEFAULT_TCB   MAX_TCB
 #define E100_MIN_TCB       2*TX_FRAME_CNT + 3	/* make room for at least 2 interrupts */
 
-#ifdef __ia64__
- /* We can't use too many DMAble buffers on IA64 machines with >4 GB mem */
-#define E100_MAX_TCB       64
-#else
 #define E100_MAX_TCB       1024
-#endif /*  __ia64__ */
 
 #define E100_DEFAULT_RFD   MAX_RFD
 #define E100_MIN_RFD       8
@@ -766,6 +761,8 @@ typedef enum _non_tx_cmd_state_t {
 #define IPCB_INSERTVLAN_ENABLE 		BIT_1
 #define IPCB_IP_ACTIVATION_DEFAULT      IPCB_HARDWAREPARSING_ENABLE
 
+#define FOLD_CSUM(_XSUM)  ((((_XSUM << 16) | (_XSUM >> 16)) + _XSUM) >> 16)
+
 /* Transmit Buffer Descriptor (TBD)*/
 typedef struct _tbd_t {
 	u32 tbd_buf_addr;	/* Physical Transmit Buffer Address */
@@ -1008,6 +1005,11 @@ struct e100_private {
 	u32 wolopts;
 	u16 ip_lbytes;
 #endif
+
+#ifdef CONFIG_PM
+	u32 pci_state[16];
+#endif
+
 };
 
 #define E100_AUTONEG        0
@@ -1029,5 +1031,10 @@ extern unsigned char e100_selftest(struct e100_private *bdp, u32 *st_timeout,
 				   u32 *st_result);
 extern unsigned char e100_get_link_state(struct e100_private *bdp);
 extern unsigned char e100_wait_scb(struct e100_private *bdp);
+
+extern void e100_deisolate_driver(struct e100_private *bdp,
+				  u8 recover, u8 full_reset);
+extern unsigned char e100_hw_reset_recover(struct e100_private *bdp,
+					   u32 reset_cmd);
 
 #endif

@@ -65,9 +65,15 @@
 #include <asm/io.h>
 #include <asm/uaccess.h>
 
+#if defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)
+#define CP_VLAN_TAG_USED 1
+#define CP_VLAN_TX_TAG(tx_desc,vlan_tag_value) \
+	do { (tx_desc)->opts2 = (vlan_tag_value); } while (0)
+#else
 #define CP_VLAN_TAG_USED 0
 #define CP_VLAN_TX_TAG(tx_desc,vlan_tag_value) \
 	do { (tx_desc)->opts2 = 0; } while (0)
+#endif
 
 /* These identify the driver base version and may not be removed. */
 static char version[] __devinitdata =
@@ -643,7 +649,7 @@ static void cp_tx (struct cp_private *cp)
 
 	cp->tx_tail = tx_tail;
 
-	if (netif_queue_stopped(cp->dev) && (TX_BUFFS_AVAIL(cp) > 1))
+	if (netif_queue_stopped(cp->dev) && (TX_BUFFS_AVAIL(cp) > (MAX_SKB_FRAGS + 1)))
 		netif_wake_queue(cp->dev);
 }
 
@@ -658,9 +664,12 @@ static int cp_start_xmit (struct sk_buff *skb, struct net_device *dev)
 
 	spin_lock_irq(&cp->lock);
 
+	/* This is a hard error, log it. */
 	if (TX_BUFFS_AVAIL(cp) <= (skb_shinfo(skb)->nr_frags + 1)) {
 		netif_stop_queue(dev);
 		spin_unlock_irq(&cp->lock);
+		printk(KERN_ERR PFX "%s: BUG! Tx Ring full when queue awake!\n",
+		       dev->name);
 		return 1;
 	}
 
@@ -760,9 +769,7 @@ static int cp_start_xmit (struct sk_buff *skb, struct net_device *dev)
 	if (netif_msg_tx_queued(cp))
 		printk(KERN_DEBUG "%s: tx queued, slot %d, skblen %d\n",
 		       dev->name, entry, skb->len);
-	if (TX_BUFFS_AVAIL(cp) < 0)
-		BUG();
-	if (TX_BUFFS_AVAIL(cp) == 0)
+	if (TX_BUFFS_AVAIL(cp) <= (MAX_SKB_FRAGS + 1))
 		netif_stop_queue(dev);
 
 	spin_unlock_irq(&cp->lock);
@@ -772,6 +779,9 @@ static int cp_start_xmit (struct sk_buff *skb, struct net_device *dev)
 
 	return 0;
 }
+
+/* Set or clear the multicast filter for this adaptor.
+   This routine is not state sensitive and need not be SMP locked. */
 
 static void __cp_set_rx_mode (struct net_device *dev)
 {
@@ -1072,6 +1082,7 @@ static int cp_change_mtu(struct net_device *dev, int new_mtu)
 
 	/* if network interface not up, no need for complexity */
 	if (!netif_running(dev)) {
+		dev->mtu = new_mtu;
 		cp_set_rxbufsize(cp);	/* set new rx buf size */
 		return 0;
 	}
@@ -1081,6 +1092,7 @@ static int cp_change_mtu(struct net_device *dev, int new_mtu)
 	cp_stop_hw(cp);			/* stop h/w and free rings */
 	cp_clean_rings(cp);
 
+	dev->mtu = new_mtu;
 	cp_set_rxbufsize(cp);		/* set new rx buf size */
 
 	rc = cp_init_rings(cp);		/* realloc and restart h/w */
@@ -1226,7 +1238,7 @@ static int cp_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 }
 
 #if CP_VLAN_TAG_USED
-static int cp_vlan_rx_register(struct net_device *dev, struct vlan_group *grp)
+static void cp_vlan_rx_register(struct net_device *dev, struct vlan_group *grp)
 {
 	struct cp_private *cp = dev->priv;
 
@@ -1234,8 +1246,6 @@ static int cp_vlan_rx_register(struct net_device *dev, struct vlan_group *grp)
 	cp->vlgrp = grp;
 	cpw16(CpCmd, cpr16(CpCmd) | RxVlanOn);
 	spin_unlock_irq(&cp->lock);
-
-	return 0;
 }
 
 static void cp_vlan_rx_kill_vid(struct net_device *dev, unsigned short vid)
