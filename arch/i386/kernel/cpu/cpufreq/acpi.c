@@ -591,10 +591,6 @@ acpi_processor_get_performance_info (
 	if (result)
 		return_VALUE(result);
 
-	result = acpi_processor_get_platform_limit(perf->pr);
-	if (result)
-		return_VALUE(result);
-
 	return_VALUE(0);
 }
 
@@ -694,7 +690,6 @@ acpi_cpufreq_init (void)
 	int                     result = 0;
 	int                     i = 0;
 	struct acpi_processor   *pr = NULL;
-	struct acpi_processor_performance *perf = NULL;
 
 	ACPI_FUNCTION_TRACE("acpi_cpufreq_init");
 
