@@ -343,6 +343,20 @@ continue_fault:
 		goto good_area;
 	if (!(vma->vm_flags & VM_GROWSDOWN))
 		goto bad_area;
+	if (!(fault_code & FAULT_CODE_WRITE)) {
+		/* Non-faulting loads shouldn't expand stack. */
+		insn = get_fault_insn(regs, insn);
+		if ((insn & 0xc0800000) == 0xc0800000) {
+			unsigned char asi;
+
+			if (insn & 0x2000)
+				asi = (regs->tstate >> 24);
+			else
+				asi = (insn >> 5);
+			if ((asi & 0xf2) == 0x82)
+				goto bad_area;
+		}
+	}
 	if (expand_stack(vma, address))
 		goto bad_area;
 	/*
