@@ -287,7 +287,7 @@ cpci_hp_register_bus(struct pci_bus *bus, u8 first, u8 last)
 	struct hotplug_slot *hotplug_slot;
 	struct hotplug_slot_info *info;
 	char *name;
-	int status = 0;
+	int status = -ENOMEM;
 	int i;
 
 	if(!(controller && bus)) {
@@ -300,35 +300,26 @@ cpci_hp_register_bus(struct pci_bus *bus, u8 first, u8 last)
 	 */
 	for (i = first; i <= last; ++i) {
 		slot = kmalloc(sizeof (struct slot), GFP_KERNEL);
-		if(!slot)
-			return -ENOMEM;
+		if (!slot)
+			goto error;
 		memset(slot, 0, sizeof (struct slot));
 
 		hotplug_slot =
 		    kmalloc(sizeof (struct hotplug_slot), GFP_KERNEL);
-		if(!hotplug_slot) {
-			kfree(slot);
-			return -ENOMEM;
-		}
+		if (!hotplug_slot)
+			goto error_slot;
 		memset(hotplug_slot, 0, sizeof (struct hotplug_slot));
 		slot->hotplug_slot = hotplug_slot;
 
 		info = kmalloc(sizeof (struct hotplug_slot_info), GFP_KERNEL);
-		if(!info) {
-			kfree(hotplug_slot);
-			kfree(slot);
-			return -ENOMEM;
-		}
+		if (!info)
+			goto error_hpslot;
 		memset(info, 0, sizeof (struct hotplug_slot_info));
 		hotplug_slot->info = info;
 
 		name = kmalloc(SLOT_NAME_SIZE, GFP_KERNEL);
-		if(!name) {
-			kfree(info);
-			kfree(hotplug_slot);
-			kfree(slot);
-			return -ENOMEM;
-		}
+		if (!name)
+			goto error_info;
 		hotplug_slot->name = name;
 
 		slot->bus = bus;
@@ -350,13 +341,9 @@ cpci_hp_register_bus(struct pci_bus *bus, u8 first, u8 last)
 
 		dbg("registering slot %s", slot->hotplug_slot->name);
 		status = pci_hp_register(slot->hotplug_slot);
-		if(status) {
+		if (status) {
 			err("pci_hp_register failed with error %d", status);
-			kfree(info);
-			kfree(name);
-			kfree(hotplug_slot);
-			kfree(slot);
-			return status;
+			goto error_name;
 		}
 
 		/* Add slot to our internal list */
@@ -365,6 +352,16 @@ cpci_hp_register_bus(struct pci_bus *bus, u8 first, u8 last)
 		slots++;
 		spin_unlock(&list_lock);
 	}
+	return 0;
+error_name:
+	kfree(name);
+error_info:
+	kfree(info);
+error_hpslot:
+	kfree(hotplug_slot);
+error_slot:
+	kfree(slot);
+error:
 	return status;
 }
 
@@ -863,7 +860,6 @@ cpci_hotplug_exit(void)
 	 */
 	cleanup_slots();
 }
-
 
 EXPORT_SYMBOL_GPL(cpci_hp_register_controller);
 EXPORT_SYMBOL_GPL(cpci_hp_unregister_controller);
