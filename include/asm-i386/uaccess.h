@@ -8,6 +8,7 @@
 #include <linux/errno.h>
 #include <linux/thread_info.h>
 #include <linux/prefetch.h>
+#include <linux/string.h>
 #include <asm/page.h>
 
 #define VERIFY_READ 0
@@ -494,6 +495,8 @@ copy_from_user(void *to, const void __user *from, unsigned long n)
 {
 	if (access_ok(VERIFY_READ, from, n))
 		n = __copy_from_user(to, from, n);
+	else
+		memset(to, 0, n);
 	return n;
 }
 
