@@ -5612,7 +5612,7 @@ static const struct iw_handler_def	airo_handler_def =
 	.standard	= (iw_handler *) airo_handler,
 	.private	= (iw_handler *) airo_private_handler,
 	.private_args	= (struct iw_priv_args *) airo_private_args,
-#if 0 && WIRELESS_EXT > 15
+#if WIRELESS_EXT > 15
 	.spy_offset	= ((void *) (&((struct airo_info *) NULL)->spy_data) -
 			   (void *) NULL),
 #endif /* WIRELESS_EXT > 15 */
