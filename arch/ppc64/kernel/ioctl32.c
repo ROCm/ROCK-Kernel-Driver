@@ -4495,10 +4495,9 @@ int register_ioctl32_conversion(unsigned int cmd, int (*handler)(unsigned int, u
 {
 	int i;
 	if (!additional_ioctls) {
-		additional_ioctls = module_map(PAGE_SIZE);
+		additional_ioctls = get_zeroed_page(GFP_KERNEL);
 		if (!additional_ioctls)
 			return -ENOMEM;
-		memset(additional_ioctls, 0, PAGE_SIZE);
 	}
 	for (i = 0; i < PAGE_SIZE/sizeof(struct ioctl_trans); i++) {
 		if (!additional_ioctls[i].cmd)

@@ -103,22 +103,6 @@ typedef unsigned long pgprot_t;
 
 #endif
 
-#ifdef CONFIG_XMON
-#include <asm/ptrace.h>
-extern void xmon(struct pt_regs *excp);
-#define BUG() do { \
-	printk("kernel BUG at %s:%d!\n", __FILE__, __LINE__); \
-	xmon(0); \
-} while (0)
-#else
-#define BUG() do { \
-	printk("kernel BUG at %s:%d!\n", __FILE__, __LINE__); \
-	__asm__ __volatile__(".long " BUG_ILLEGAL_INSTR); \
-} while (0)
-#endif
-
-#define PAGE_BUG(page) do { BUG(); } while (0)
-
 /* Pure 2^n version of get_order */
 static inline int get_order(unsigned long size)
 {

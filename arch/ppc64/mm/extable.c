@@ -21,10 +21,11 @@ extern struct exception_table_entry __stop___ex_table[];
  * The exception table needs to be sorted because we use the macros
  * which put things into the exception table in a variety of segments
  * as well as the init segment and the main kernel text segment.
+ *
+ * Also used for modules.
  */
-static inline void
-sort_ex_table(struct exception_table_entry *start,
-	      struct exception_table_entry *finish)
+void __init_or_module sort_ex_table(struct exception_table_entry *start,
+				    struct exception_table_entry *finish)
 {
 	struct exception_table_entry el, *p, *q;
 
