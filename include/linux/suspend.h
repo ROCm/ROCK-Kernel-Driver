@@ -90,7 +90,7 @@ extern int pm_prepare_console(void);
 extern void pm_restore_console(void);
 
 #else
-static inline void refrigerator(unsigned long)
+static inline void refrigerator(unsigned long flag)
 {
 
 }
