@@ -6,6 +6,7 @@
 #define _LINUX_WORKQUEUE_H
 
 #include <linux/timer.h>
+#include <linux/linkage.h>
 
 struct workqueue_struct;
 

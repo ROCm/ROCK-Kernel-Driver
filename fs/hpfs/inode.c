@@ -66,10 +66,10 @@ void hpfs_read_inode(struct inode *i)
 	unsigned char *ea;
 	int ea_size;
 
-	i->i_uid = sb->s_hpfs_uid;
-	i->i_gid = sb->s_hpfs_gid;
-	i->i_mode = sb->s_hpfs_mode;
-	hpfs_inode->i_conv = sb->s_hpfs_conv;
+	i->i_uid = hpfs_sb(sb)->sb_uid;
+	i->i_gid = hpfs_sb(sb)->sb_gid;
+	i->i_mode = hpfs_sb(sb)->sb_mode;
+	hpfs_inode->i_conv = hpfs_sb(sb)->sb_conv;
 	i->i_blksize = 512;
 	i->i_size = -1;
 	i->i_blocks = -1;
@@ -93,9 +93,9 @@ void hpfs_read_inode(struct inode *i)
 	i->i_mtime = 0;
 	i->i_ctime = 0;
 
-	if (!i->i_sb->s_hpfs_rd_inode)
-		hpfs_error(i->i_sb, "read_inode: s_hpfs_rd_inode == 0");
-	if (i->i_sb->s_hpfs_rd_inode == 2) {
+	if (!hpfs_sb(i->i_sb)->sb_rd_inode)
+		hpfs_error(i->i_sb, "read_inode: sb_rd_inode == 0");
+	if (hpfs_sb(i->i_sb)->sb_rd_inode == 2) {
 		i->i_mode |= S_IFREG;
 		i->i_mode &= ~0111;
 		i->i_op = &hpfs_file_iops;
@@ -112,7 +112,7 @@ void hpfs_read_inode(struct inode *i)
 		make_bad_inode(i);
 		return;
 	}
-	if (i->i_sb->s_hpfs_eas) {
+	if (hpfs_sb(i->i_sb)->sb_eas) {
 		if ((ea = hpfs_get_ea(i->i_sb, fnode, "UID", &ea_size))) {
 			if (ea_size == 2) {
 				i->i_uid = ea[0] + (ea[1] << 8);
@@ -140,7 +140,7 @@ void hpfs_read_inode(struct inode *i)
 		}
 		if ((ea = hpfs_get_ea(i->i_sb, fnode, "MODE", &ea_size))) {
 			int rdev = 0;
-			umode_t mode = sb->s_hpfs_mode;
+			umode_t mode = hpfs_sb(sb)->sb_mode;
 			if (ea_size == 2) {
 				mode = ea[0] + (ea[1] << 8);
 				hpfs_inode->i_ea_mode = 1;
@@ -171,7 +171,7 @@ void hpfs_read_inode(struct inode *i)
 		i->i_fop = &hpfs_dir_ops;
 		hpfs_inode->i_parent_dir = fnode->up;
 		hpfs_inode->i_dno = fnode->u.external[0].disk_secno;
-		if (sb->s_hpfs_chk >= 2) {
+		if (hpfs_sb(sb)->sb_chk >= 2) {
 			struct buffer_head *bh0;
 			if (hpfs_map_fnode(sb, hpfs_inode->i_parent_dir, &bh0)) brelse(bh0);
 		}
@@ -201,24 +201,24 @@ void hpfs_write_inode_ea(struct inode *i, struct fnode *fnode)
 		/* Some unknown structures like ACL may be in fnode,
 		   we'd better not overwrite them */
 		hpfs_error(i->i_sb, "fnode %08x has some unknown HPFS386 stuctures", i->i_ino);
-	} else if (i->i_sb->s_hpfs_eas >= 2) {
+	} else if (hpfs_sb(i->i_sb)->sb_eas >= 2) {
 		unsigned char ea[4];
-		if ((i->i_uid != i->i_sb->s_hpfs_uid) || hpfs_inode->i_ea_uid) {
+		if ((i->i_uid != hpfs_sb(i->i_sb)->sb_uid) || hpfs_inode->i_ea_uid) {
 			ea[0] = i->i_uid & 0xff;
 			ea[1] = i->i_uid >> 8;
 			hpfs_set_ea(i, fnode, "UID", ea, 2);
 			hpfs_inode->i_ea_uid = 1;
 		}
-		if ((i->i_gid != i->i_sb->s_hpfs_gid) || hpfs_inode->i_ea_gid) {
+		if ((i->i_gid != hpfs_sb(i->i_sb)->sb_gid) || hpfs_inode->i_ea_gid) {
 			ea[0] = i->i_gid & 0xff;
 			ea[1] = i->i_gid >> 8;
 			hpfs_set_ea(i, fnode, "GID", ea, 2);
 			hpfs_inode->i_ea_gid = 1;
 		}
 		if (!S_ISLNK(i->i_mode))
-			if ((i->i_mode != ((i->i_sb->s_hpfs_mode & ~(S_ISDIR(i->i_mode) ? 0 : 0111))
+			if ((i->i_mode != ((hpfs_sb(i->i_sb)->sb_mode & ~(S_ISDIR(i->i_mode) ? 0 : 0111))
 			  | (S_ISDIR(i->i_mode) ? S_IFDIR : S_IFREG))
-			  && i->i_mode != ((i->i_sb->s_hpfs_mode & ~(S_ISDIR(i->i_mode) ? 0222 : 0333))
+			  && i->i_mode != ((hpfs_sb(i->i_sb)->sb_mode & ~(S_ISDIR(i->i_mode) ? 0222 : 0333))
 			  | (S_ISDIR(i->i_mode) ? S_IFDIR : S_IFREG))) || hpfs_inode->i_ea_mode) {
 				ea[0] = i->i_mode & 0xff;
 				ea[1] = i->i_mode >> 8;
@@ -241,7 +241,7 @@ void hpfs_write_inode(struct inode *i)
 	struct hpfs_inode_info *hpfs_inode = hpfs_i(i);
 	struct inode *parent;
 	if (!i->i_nlink) return;
-	if (i->i_ino == i->i_sb->s_hpfs_root) return;
+	if (i->i_ino == hpfs_sb(i->i_sb)->sb_root) return;
 	if (hpfs_inode->i_rddir_off && !atomic_read(&i->i_count)) {
 		if (*hpfs_inode->i_rddir_off) printk("HPFS: write_inode: some position still there\n");
 		kfree(hpfs_inode->i_rddir_off);
@@ -264,9 +264,9 @@ void hpfs_write_inode_nolock(struct inode *i)
 	struct fnode *fnode;
 	struct quad_buffer_head qbh;
 	struct hpfs_dirent *de;
-	if (i->i_ino == i->i_sb->s_hpfs_root) return;
+	if (i->i_ino == hpfs_sb(i->i_sb)->sb_root) return;
 	if (!(fnode = hpfs_map_fnode(i->i_sb, i->i_ino, &bh))) return;
-	if (i->i_ino != i->i_sb->s_hpfs_root) {
+	if (i->i_ino != hpfs_sb(i->i_sb)->sb_root) {
 		if (!(de = map_fnode_dirent(i->i_sb, i->i_ino, fnode, &qbh))) {
 			brelse(bh);
 			return;
@@ -309,7 +309,7 @@ int hpfs_notify_change(struct dentry *dentry, struct iattr *attr)
 	int error=0;
 	lock_kernel();
 	if ( ((attr->ia_valid & ATTR_SIZE) && attr->ia_size > inode->i_size) ||
-	     (inode->i_sb->s_hpfs_root == inode->i_ino) ) {
+	     (hpfs_sb(inode->i_sb)->sb_root == inode->i_ino) ) {
 		error = -EINVAL;
 	} else if ((error = inode_change_ok(inode, attr))) {
 	} else if ((error = inode_setattr(inode, attr))) {

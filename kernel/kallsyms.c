@@ -225,3 +225,9 @@ int kallsyms_sections(void *token,
 	}
 	return(1);
 }
+
+/* Allocate the __kallsyms section, so it's already present in
+ * the temporary vmlinux that kallsyms is run on, so the first
+ * run will pick up the section info already. */
+
+__asm__(".section __kallsyms,\"a\"\n.previous");

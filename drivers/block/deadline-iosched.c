@@ -159,7 +159,6 @@ deadline_merge(request_queue_t *q, struct list_head **insert, struct bio *bio)
 	struct deadline_data *dd = q->elevator.elevator_data;
 	const int data_dir = bio_data_dir(bio);
 	struct list_head *entry, *sort_list;
-	struct deadline_rq *drq;
 	struct request *__rq;
 	int ret = ELEVATOR_NO_MERGE;
 
@@ -191,15 +190,21 @@ deadline_merge(request_queue_t *q, struct list_head **insert, struct bio *bio)
 	entry = sort_list = &dd->sort_list[data_dir];
 	while ((entry = entry->prev) != sort_list) {
 		__rq = list_entry_rq(entry);
-		drq = RQ_DATA(__rq);
 
 		BUG_ON(__rq->flags & REQ_STARTED);
 
 		if (!(__rq->flags & REQ_CMD))
 			continue;
 
-		if (!*insert && bio_rq_in_between(bio, __rq, sort_list))
+		/*
+		 * it's not necessary to break here, and in fact it could make
+		 * us loose a front merge. emperical evidence shows this to
+		 * be a big waste of cycles though, so quit scanning
+		 */
+		if (!*insert && bio_rq_in_between(bio, __rq, sort_list)) {
 			*insert = &__rq->queuelist;
+			break;
+		}
 
 		if (__rq->flags & REQ_BARRIER)
 			break;
@@ -583,7 +588,7 @@ static int __init deadline_slab_setup(void)
 	return 0;
 }
 
-module_init(deadline_slab_setup);
+subsys_initcall(deadline_slab_setup);
 
 elevator_t iosched_deadline = {
 	.elevator_merge_fn = 		deadline_merge,

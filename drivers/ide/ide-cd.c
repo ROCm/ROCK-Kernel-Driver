@@ -830,9 +830,6 @@ static ide_startstop_t cdrom_start_packet_command(ide_drive_t *drive,
 	if (IDE_CONTROL_REG)
 		HWIF(drive)->OUTB(drive->ctl, IDE_CONTROL_REG);
  
-	if (info->dma)
-		(void) (HWIF(drive)->ide_dma_begin(drive));
-
 	if (CDROM_CONFIG_FLAGS (drive)->drq_interrupt) {
 		if (HWGROUP(drive)->handler != NULL)
 			BUG();
@@ -863,6 +860,7 @@ static ide_startstop_t cdrom_transfer_packet_command (ide_drive_t *drive,
 	unsigned char *cmd_buf	= pc->c;
 	int cmd_len		= sizeof(pc->c);
 	unsigned int timeout	= pc->timeout;
+	struct cdrom_info *info = drive->driver_data;
 	ide_startstop_t startstop;
 
 	if (CDROM_CONFIG_FLAGS(drive)->drq_interrupt) {
@@ -888,6 +886,11 @@ static ide_startstop_t cdrom_transfer_packet_command (ide_drive_t *drive,
 
 	/* Send the command to the device. */
 	HWIF(drive)->atapi_output_bytes(drive, cmd_buf, cmd_len);
+
+	/* Start the DMA if need be */
+	if (info->dma)
+		(void) HWIF(drive)->ide_dma_begin(drive);
+
 	return ide_started;
 }
 
@@ -2245,6 +2248,8 @@ static int ide_cdrom_packet(struct cdrom_device_info *cdi,
 	   touch it at all. */
 	memset(&pc, 0, sizeof(pc));
 	memcpy(pc.c, cgc->cmd, CDROM_PACKET_SIZE);
+	if (cgc->sense)
+		memset(cgc->sense, 0, sizeof(struct request_sense));
 	pc.buffer = cgc->buffer;
 	pc.buflen = cgc->buflen;
 	pc.quiet = cgc->quiet;

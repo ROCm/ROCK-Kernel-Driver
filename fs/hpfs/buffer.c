@@ -15,7 +15,7 @@ void hpfs_lock_creation(struct super_block *s)
 #ifdef DEBUG_LOCKS
 	printk("lock creation\n");
 #endif
-	down(&s->u.hpfs_sb.hpfs_creation_de);
+	down(&hpfs_sb(s)->hpfs_creation_de);
 }
 
 void hpfs_unlock_creation(struct super_block *s)
@@ -23,7 +23,7 @@ void hpfs_unlock_creation(struct super_block *s)
 #ifdef DEBUG_LOCKS
 	printk("unlock creation\n");
 #endif
-	up(&s->u.hpfs_sb.hpfs_creation_de);
+	up(&hpfs_sb(s)->hpfs_creation_de);
 }
 
 void hpfs_lock_iget(struct super_block *s, int mode)
@@ -31,8 +31,8 @@ void hpfs_lock_iget(struct super_block *s, int mode)
 #ifdef DEBUG_LOCKS
 	printk("lock iget\n");
 #endif
-	while (s->s_hpfs_rd_inode) sleep_on(&s->s_hpfs_iget_q);
-	s->s_hpfs_rd_inode = mode;
+	while (hpfs_sb(s)->sb_rd_inode) sleep_on(&hpfs_sb(s)->sb_iget_q);
+	hpfs_sb(s)->sb_rd_inode = mode;
 }
 
 void hpfs_unlock_iget(struct super_block *s)
@@ -40,8 +40,8 @@ void hpfs_unlock_iget(struct super_block *s)
 #ifdef DEBUG_LOCKS
 	printk("unlock iget\n");
 #endif
-	s->s_hpfs_rd_inode = 0;
-	wake_up(&s->s_hpfs_iget_q);
+	hpfs_sb(s)->sb_rd_inode = 0;
+	wake_up(&hpfs_sb(s)->sb_iget_q);
 }
 
 void hpfs_lock_inode(struct inode *i)

@@ -112,10 +112,13 @@ static int jffs2_garbage_collect_thread(void *_c)
                  */
                 while (signal_pending(current)) {
                         siginfo_t info;
-                        unsigned long signr;
+                        unsigned long signr = 0 ;
 
                         spin_lock_irq(&current->sig->siglock);
-                        signr = dequeue_signal(&current->blocked, &info);
+			if (current->sig->shared_pending.head)
+				signr = dequeue_signal(&current->sig->shared_pending, &current->blocked, &info);
+			if (!signr)
+				signr = dequeue_signal(&current->pending, &current->blocked, &info);
                         spin_unlock_irq(&current->sig->siglock);
 
                         switch(signr) {

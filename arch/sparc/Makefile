@@ -41,8 +41,7 @@ core-y += arch/sparc/kernel/ arch/sparc/mm/ arch/sparc/math-emu/
 libs-y += arch/sparc/prom/ arch/sparc/lib/
 
 # Export what is needed by arch/sparc/boot/Makefile
-export CORE_FILES
-export INIT
+export init-y core-y drivers-y net-y libs-y HEAD
 
 image: vmlinux
 	$(MAKE) -C arch/sparc/boot image

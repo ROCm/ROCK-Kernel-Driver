@@ -91,6 +91,28 @@ CONFIG_I2C_CHARDEV
   <file:Documentation/modules.txt>.
   The module will be called i2c-dev.o.
 
+CONFIG_SCx200_I2C
+  Enable the use of two GPIO pins of a SCx200 processor as an I2C bus.
+
+  If you don't know what to do here, say N.
+
+  If compiled as a module, it will be called scx200_i2c.o.
+
+CONFIG_SCx200_I2C_SCL
+  Enter the GPIO pin number used for the SCL signal.  This value can
+  also be specified with a module parameter.
+
+CONFIG_SCx200_I2C_SDA
+  Enter the GPIO pin number used for the SSA signal.  This value can
+  also be specified with a module parameter.
+
+CONFIG_SCx200_ACB
+  Enable the use of the ACCESS.bus controllers of a SCx200 processor.
+
+  If you don't know what to do here, say N.
+
+  If compiled as a module, it will be called scx200_acb.o.
+
 CONFIG_I2C_PROC
   This provides support for i2c device entries in the /proc filesystem.
   The entries will be found in /proc/sys/dev/sensors.

@@ -22,6 +22,7 @@
 #include <linux/mempool.h>
 #include <linux/blkdev.h>
 #include <linux/init.h>
+#include <linux/hash.h>
 #include <asm/pgalloc.h>
 
 static mempool_t *page_pool, *isa_page_pool;
@@ -88,7 +89,7 @@ static void flush_all_zero_pkmaps(void)
 		page = pte_page(pkmap_page_table[i]);
 		pte_clear(&pkmap_page_table[i]);
 
-		page->virtual = NULL;
+		set_page_address(page, NULL);
 	}
 	flush_tlb_kernel_range(PKMAP_ADDR(0), PKMAP_ADDR(LAST_PKMAP));
 }
@@ -126,8 +127,8 @@ start:
 			spin_lock(&kmap_lock);
 
 			/* Somebody else might have mapped it while we slept */
-			if (page->virtual)
-				return (unsigned long) page->virtual;
+			if (page_address(page))
+				return (unsigned long)page_address(page);
 
 			/* Re-start */
 			goto start;
@@ -137,7 +138,7 @@ start:
 	set_pte(&(pkmap_page_table[last_pkmap_nr]), mk_pte(page, kmap_prot));
 
 	pkmap_count[last_pkmap_nr] = 1;
-	page->virtual = (void *) vaddr;
+	set_page_address(page, (void *)vaddr);
 
 	return vaddr;
 }
@@ -153,7 +154,7 @@ void *kmap_high(struct page *page)
 	 * We cannot call this from interrupts, as it may block
 	 */
 	spin_lock(&kmap_lock);
-	vaddr = (unsigned long) page->virtual;
+	vaddr = (unsigned long)page_address(page);
 	if (!vaddr)
 		vaddr = map_new_virtual(page);
 	pkmap_count[PKMAP_NR(vaddr)]++;
@@ -170,7 +171,7 @@ void kunmap_high(struct page *page)
 	int need_wakeup;
 
 	spin_lock(&kmap_lock);
-	vaddr = (unsigned long) page->virtual;
+	vaddr = (unsigned long)page_address(page);
 	if (!vaddr)
 		BUG();
 	nr = PKMAP_NR(vaddr);
@@ -467,7 +468,7 @@ void blk_queue_bounce(request_queue_t *q, struct bio **bio_orig)
 	*bio_orig = bio;
 }
 
-#if CONFIG_DEBUG_HIGHMEM
+#if defined(CONFIG_DEBUG_HIGHMEM) && defined(CONFIG_HIGHMEM)
 void check_highmem_ptes(void)
 {
 	int idx, type;
@@ -484,3 +485,121 @@ void check_highmem_ptes(void)
 }
 #endif
 
+#if defined(HASHED_PAGE_VIRTUAL)
+
+#define PA_HASH_ORDER	7
+
+/*
+ * Describes one page->virtual association
+ */
+struct page_address_map {
+	struct page *page;
+	void *virtual;
+	struct list_head list;
+};
+
+/*
+ * page_address_map freelist, allocated from page_address_maps.
+ */
+static struct list_head page_address_pool;	/* freelist */
+static spinlock_t pool_lock;			/* protects page_address_pool */
+
+/*
+ * Hash table bucket
+ */
+static struct page_address_slot {
+	struct list_head lh;			/* List of page_address_maps */
+	spinlock_t lock;			/* Protect this bucket's list */
+} ____cacheline_aligned_in_smp page_address_htable[1<<PA_HASH_ORDER];
+
+static struct page_address_slot *page_slot(struct page *page)
+{
+	return &page_address_htable[hash_ptr(page, PA_HASH_ORDER)];
+}
+
+void *page_address(struct page *page)
+{
+	unsigned long flags;
+	void *ret;
+	struct page_address_slot *pas;
+
+	if (!PageHighMem(page))
+		return lowmem_page_address(page);
+
+	pas = page_slot(page);
+	ret = NULL;
+	spin_lock_irqsave(&pas->lock, flags);
+	if (!list_empty(&pas->lh)) {
+		struct page_address_map *pam;
+
+		list_for_each_entry(pam, &pas->lh, list) {
+			if (pam->page == page) {
+				ret = pam->virtual;
+				goto done;
+			}
+		}
+	}
+done:
+	spin_unlock_irqrestore(&pas->lock, flags);
+	return ret;
+}
+
+void set_page_address(struct page *page, void *virtual)
+{
+	unsigned long flags;
+	struct page_address_slot *pas;
+	struct page_address_map *pam;
+
+	BUG_ON(!PageHighMem(page));
+
+	pas = page_slot(page);
+	if (virtual) {		/* Add */
+		BUG_ON(list_empty(&page_address_pool));
+
+		spin_lock_irqsave(&pool_lock, flags);
+		pam = list_entry(page_address_pool.next,
+				struct page_address_map, list);
+		list_del(&pam->list);
+		spin_unlock_irqrestore(&pool_lock, flags);
+
+		pam->page = page;
+		pam->virtual = virtual;
+
+		spin_lock_irqsave(&pas->lock, flags);
+		list_add_tail(&pam->list, &pas->lh);
+		spin_unlock_irqrestore(&pas->lock, flags);
+	} else {		/* Remove */
+		spin_lock_irqsave(&pas->lock, flags);
+		list_for_each_entry(pam, &pas->lh, list) {
+			if (pam->page == page) {
+				list_del(&pam->list);
+				spin_unlock_irqrestore(&pas->lock, flags);
+				spin_lock_irqsave(&pool_lock, flags);
+				list_add_tail(&pam->list, &page_address_pool);
+				spin_unlock_irqrestore(&pool_lock, flags);
+				goto done;
+			}
+		}
+		spin_unlock_irqrestore(&pas->lock, flags);
+	}
+done:
+	return;
+}
+
+static struct page_address_map page_address_maps[LAST_PKMAP];
+
+void __init page_address_init(void)
+{
+	int i;
+
+	INIT_LIST_HEAD(&page_address_pool);
+	for (i = 0; i < ARRAY_SIZE(page_address_maps); i++)
+		list_add(&page_address_maps[i].list, &page_address_pool);
+	for (i = 0; i < ARRAY_SIZE(page_address_htable); i++) {
+		INIT_LIST_HEAD(&page_address_htable[i].lh);
+		spin_lock_init(&page_address_htable[i].lock);
+	}
+	spin_lock_init(&pool_lock);
+}
+
+#endif	/* defined(CONFIG_HIGHMEM) && !defined(WANT_PAGE_VIRTUAL) */

@@ -104,10 +104,33 @@ typedef struct
         __u64   addr;
 } __attribute__ ((aligned(8))) psw_t;
 
-#ifdef __KERNEL__
-#define FIX_PSW(addr) ((unsigned long)(addr))
-#define ADDR_BITS_REMOVE(addr) ((addr))
-#endif
+#define PSW_MASK_PER		0x4000000000000000UL
+#define PSW_MASK_DAT		0x0400000000000000UL
+#define PSW_MASK_IO		0x0200000000000000UL
+#define PSW_MASK_EXT		0x0100000000000000UL
+#define PSW_MASK_KEY		0x00F0000000000000UL
+#define PSW_MASK_MCHECK		0x0004000000000000UL
+#define PSW_MASK_WAIT		0x0002000000000000UL
+#define PSW_MASK_PSTATE		0x0001000000000000UL
+#define PSW_MASK_ASC		0x0000C00000000000UL
+#define PSW_MASK_CC		0x0000300000000000UL
+#define PSW_MASK_PM		0x00000F0000000000UL
+
+#define PSW_BASE_BITS		0x0000000180000000UL
+#define PSW_BASE32_BITS		0x0000000080000000UL
+
+#define PSW_ASC_PRIMARY		0x0000000000000000UL
+#define PSW_ASC_ACCREG		0x0000400000000000UL
+#define PSW_ASC_SECONDARY	0x0000800000000000UL
+#define PSW_ASC_HOME		0x0000C00000000000UL
+
+#define PSW_KERNEL_BITS	(PSW_BASE_BITS | PSW_MASK_DAT | PSW_ASC_PRIMARY)
+#define PSW_USER_BITS	(PSW_BASE_BITS | PSW_MASK_DAT | PSW_ASC_HOME | \
+			 PSW_MASK_IO | PSW_MASK_EXT | PSW_MASK_MCHECK | \
+			 PSW_MASK_PSTATE)
+#define PSW_USER32_BITS (PSW_BASE32_BITS | PSW_MASK_DAT | PSW_ASC_HOME | \
+			 PSW_MASK_IO | PSW_MASK_EXT | PSW_MASK_MCHECK | \
+			 PSW_MASK_PSTATE)
 
 typedef union
 {
@@ -309,7 +332,7 @@ struct user_regs_struct
 };
 
 #ifdef __KERNEL__
-#define user_mode(regs) (((regs)->psw.mask & PSW_PROBLEM_STATE) != 0)
+#define user_mode(regs) (((regs)->psw.mask & PSW_MASK_PSTATE) != 0)
 #define instruction_pointer(regs) ((regs)->psw.addr)
 extern void show_regs(struct pt_regs * regs);
 #endif

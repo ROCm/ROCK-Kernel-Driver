@@ -123,9 +123,6 @@ Command line parameters
 
 * /proc/chpids
 
-  This entry will only show up if you specified CONFIG_CHSC=y during kernel
-  config.
-
   This entry serves a dual purpose:
  
   - show which chpids are currently known to Linux and their status (online,

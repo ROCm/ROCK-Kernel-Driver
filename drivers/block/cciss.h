@@ -81,7 +81,7 @@ struct ctlr_info
 	int			nr_frees; 
 
 	// Disk structures we need to pass back
-	struct gendisk   gendisk[NWD];
+	struct gendisk   *gendisk[NWD];
 #ifdef CONFIG_CISS_SCSI_TAPE
 	void *scsi_ctlr; /* ptr to structure containing scsi related stuff */
 #endif

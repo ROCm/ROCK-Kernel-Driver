@@ -207,7 +207,7 @@ void use_config(char *m, int slen)
 		else
 			*p = tolower((unsigned char)*p);
 	}
-	printf("    $(wildcard %s/include/config/%s.h) \\\n", topdir, s);
+	printf("    $(wildcard include/config/%s.h) \\\n", s);
 }
 
 void parse_config_file(char *map, size_t len)

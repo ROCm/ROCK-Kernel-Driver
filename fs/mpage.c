@@ -331,6 +331,8 @@ mpage_writepage(struct bio *bio, struct page *page, get_block_t get_block,
 	unsigned first_unmapped = blocks_per_page;
 	struct block_device *bdev = NULL;
 	int boundary = 0;
+	sector_t boundary_block = 0;
+	struct block_device *boundary_bdev = NULL;
 
 	if (page_has_buffers(page)) {
 		struct buffer_head *head = page_buffers(page);
@@ -363,6 +365,10 @@ mpage_writepage(struct bio *bio, struct page *page, get_block_t get_block,
 			}
 			blocks[page_block++] = bh->b_blocknr;
 			boundary = buffer_boundary(bh);
+			if (boundary) {
+				boundary_block = bh->b_blocknr;
+				boundary_bdev = bh->b_bdev;
+			}
 			bdev = bh->b_bdev;
 		} while ((bh = bh->b_this_page) != head);
 
@@ -393,6 +399,10 @@ mpage_writepage(struct bio *bio, struct page *page, get_block_t get_block,
 		if (buffer_new(&map_bh))
 			unmap_underlying_metadata(map_bh.b_bdev,
 						map_bh.b_blocknr);
+		if (buffer_boundary(&map_bh)) {
+			boundary_block = map_bh.b_blocknr;
+			boundary_bdev = map_bh.b_bdev;
+		}
 		if (page_block) {
 			if (map_bh.b_blocknr != blocks[page_block-1] + 1)
 				goto confused;
@@ -430,10 +440,8 @@ page_is_mapped:
 
 alloc_new:
 	if (bio == NULL) {
-		const unsigned __nr_pages = 64;	/* FIXME */
-
 		bio = mpage_alloc(bdev, blocks[0] << (blkbits - 9),
-					__nr_pages, GFP_NOFS|__GFP_HIGH);
+				bio_get_nr_vecs(bdev), GFP_NOFS|__GFP_HIGH);
 		if (bio == NULL)
 			goto confused;
 	}
@@ -466,10 +474,15 @@ alloc_new:
 	BUG_ON(PageWriteback(page));
 	SetPageWriteback(page);
 	unlock_page(page);
-	if (boundary || (first_unmapped != blocks_per_page))
+	if (boundary || (first_unmapped != blocks_per_page)) {
 		bio = mpage_bio_submit(WRITE, bio);
-	else
+		if (boundary_block) {
+			write_boundary_block(boundary_bdev,
+					boundary_block, 1 << blkbits);
+		}
+	} else {
 		*last_block_in_bio = blocks[blocks_per_page - 1];
+	}
 	goto out;
 
 confused:

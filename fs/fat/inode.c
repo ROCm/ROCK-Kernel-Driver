@@ -228,8 +228,6 @@ static int parse_options(char *options, int *debug,
 	save = 0;
 	savep = NULL;
 	while ((this_char = strsep(&options,",")) != NULL) {
-		if (!*this_char)
-			continue;
 		if ((value = strchr(this_char,'=')) != NULL) {
 			save = *value;
 			savep = value;
@@ -351,7 +349,7 @@ static int parse_options(char *options, int *debug,
 			strncpy(cvf_options,value,100);
 		}
 
-		if (this_char != options) *(this_char-1) = ',';
+		if (options) *(options-1) = ',';
 		if (value) *savep = save;
 		if (ret == 0)
 			break;

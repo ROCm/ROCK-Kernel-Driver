@@ -114,7 +114,6 @@
 #include <linux/config.h>
 #include <linux/stddef.h>
 #include <linux/types.h>
-
 #include <asm/setup.h>
 
 /* this typedef defines how a Program Status Word looks like */
@@ -124,10 +123,32 @@ typedef struct
         __u32   addr;
 } __attribute__ ((aligned(8))) psw_t;
 
-#ifdef __KERNEL__
-#define FIX_PSW(addr) ((unsigned long)(addr)|0x80000000UL)
-#define ADDR_BITS_REMOVE(addr) ((addr)&0x7fffffff)
-#endif
+#define PSW_MASK_PER		0x40000000UL
+#define PSW_MASK_DAT		0x04000000UL
+#define PSW_MASK_IO		0x02000000UL
+#define PSW_MASK_EXT		0x01000000UL
+#define PSW_MASK_KEY		0x00F00000UL
+#define PSW_MASK_MCHECK		0x00040000UL
+#define PSW_MASK_WAIT		0x00020000UL
+#define PSW_MASK_PSTATE		0x00010000UL
+#define PSW_MASK_ASC		0x0000C000UL
+#define PSW_MASK_CC		0x00003000UL
+#define PSW_MASK_PM		0x00000F00UL
+
+#define PSW_ADDR_AMODE31	0x80000000UL
+#define PSW_ADDR_INSN		0x7FFFFFFFUL
+
+#define PSW_BASE_BITS		0x00080000UL
+
+#define PSW_ASC_PRIMARY		0x00000000UL
+#define PSW_ASC_ACCREG		0x00004000UL
+#define PSW_ASC_SECONDARY	0x00008000UL
+#define PSW_ASC_HOME		0x0000C000UL
+
+#define PSW_KERNEL_BITS	(PSW_BASE_BITS | PSW_MASK_DAT | PSW_ASC_PRIMARY)
+#define PSW_USER_BITS	(PSW_BASE_BITS | PSW_MASK_DAT | PSW_ASC_HOME | \
+			 PSW_MASK_IO | PSW_MASK_EXT | PSW_MASK_MCHECK | \
+			 PSW_MASK_PSTATE)
 
 typedef union
 {
@@ -328,8 +349,8 @@ struct user_regs_struct
 };
 
 #ifdef __KERNEL__
-#define user_mode(regs) (((regs)->psw.mask & PSW_PROBLEM_STATE) != 0)
-#define instruction_pointer(regs) ((regs)->psw.addr)
+#define user_mode(regs) (((regs)->psw.mask & PSW_MASK_PSTATE) != 0)
+#define instruction_pointer(regs) ((regs)->psw.addr & PSW_MASK_INSN)
 extern void show_regs(struct pt_regs * regs);
 #endif
 

@@ -9,21 +9,24 @@
 #ifndef __s390io_h
 #define __s390io_h
 
+#include <linux/device.h>
+
 /*
  * IRQ data structure used by I/O subroutines
  *
  * Note : If bit flags are added, the "unused" value must be
  *        decremented accordingly !
  */
-typedef struct _ioinfo {
+typedef struct subchannel {
      unsigned int  irq;           /* aka. subchannel number */
      spinlock_t    irq_lock;      /* irq lock */
+
+     __u8          st;            /* subchannel type */
+
      void          *private_data; /* pointer to private data */
 
-     struct _ioinfo *prev;
-     struct _ioinfo *next;
-
-     __u8          st;            /* subchannel type */	
+     struct subchannel *prev;
+     struct subchannel *next;
 
      union {
         unsigned int info;
@@ -78,8 +81,26 @@ typedef struct _ioinfo {
      unsigned long qflag;         /* queued flags */
      __u8          qlpm;          /* queued logical path mask */
      ssd_info_t    ssd_info;      /* subchannel description */
+     struct device dev;		  /* entry in device tree */
+} __attribute__ ((aligned(8))) ioinfo_t;
 
-   } __attribute__ ((aligned(8))) ioinfo_t;
+
+/*
+ * There are four different subchannel types, but we are currently
+ * only interested in I/O subchannels. This means there is only
+ * one subchannel_driver, other subchannels belonging to css_bus_type
+ * are simply ignored.
+ */
+struct subchannel_driver {
+	enum {
+		SUBCHANNEL_TYPE_IO      = 0,
+		SUBCHANNEL_TYPE_CHSC    = 1,
+		SUBCHANNEL_TYPE_MESSAGE = 2,
+		SUBCHANNEL_TYPE_ADM     = 3,
+	} st;			  /* subchannel type */
+	struct device_driver drv; /* entry in driver tree */
+};
+extern struct bus_type css_bus_type;
 
 #define IOINFO_FLAGS_BUSY    0x80000000
 #define IOINFO_FLAGS_OPER    0x40000000

@@ -49,6 +49,7 @@
 #include <linux/interrupt.h>
 #include <linux/timer.h>
 #include <linux/sched.h>
+#include <linux/tqueue.h>
 
 #include <linux/signal.h>
 #include <linux/string.h>
@@ -195,7 +196,7 @@ typedef struct {
 	unsigned long doios_multi;
 	unsigned long txlen;
 	unsigned long tx_time;
-	struct timeval send_stamp;
+	struct timespec send_stamp;
 } ctc_profile;
 
 /**
@@ -976,10 +977,10 @@ static void ch_action_txdone(fsm_instance *fi, int event, void *arg)
 	int            first = 1;
 	int            i;
 
-	struct timeval done_stamp = xtime;
+	struct timespec done_stamp = xtime;
 	unsigned long duration = 
 		(done_stamp.tv_sec - ch->prof.send_stamp.tv_sec) * 1000000 +
-		done_stamp.tv_usec - ch->prof.send_stamp.tv_usec;
+		(done_stamp.tv_nsec - ch->prof.send_stamp.tv_nsec) / 1000;
 	if (duration > ch->prof.tx_time)
 		ch->prof.tx_time = duration;
 

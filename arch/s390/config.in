@@ -17,22 +17,20 @@ define_bool CONFIG_ARCH_S390 y
 source init/Config.in
 
 mainmenu_option next_comment
+comment 'Base setup'
 comment 'Processor type and features'
 bool 'Symmetric multi-processing support' CONFIG_SMP
 bool 'IEEE FPU emulation' CONFIG_MATHEMU
-endmenu
 
-mainmenu_option next_comment
-comment 'Base setup'
-bool 'Fast IRQ handling' CONFIG_FAST_IRQ
+comment 'I/O subsystem configuration'
 bool 'Process warning machine checks' CONFIG_MACHCHK_WARNING
-bool 'Use chscs for Common I/O' CONFIG_CHSC
-
 tristate 'QDIO support' CONFIG_QDIO
-  if [ "$CONFIG_QDIO" != "n" ]; then
-    bool '   Performance statistics in /proc' CONFIG_QDIO_PERF_STATS
-  fi
+if [ "$CONFIG_QDIO" != "n" ]; then
+  bool '   Performance statistics in /proc' CONFIG_QDIO_PERF_STATS
+fi
 
+comment 'Misc'
+bool 'Preemptible Kernel' CONFIG_PREEMPT
 bool 'Builtin IPL record support' CONFIG_IPL
 if [ "$CONFIG_IPL" = "y" ]; then
   choice 'IPL method generated into head.S' \
@@ -68,7 +66,6 @@ source fs/Config.in
 mainmenu_option next_comment
 comment 'Kernel hacking'
 
-#bool 'Debug kmalloc/kfree' CONFIG_DEBUG_MALLOC
 #if [ "$CONFIG_CTC" = "y" ]; then
 #  bool 'Remote GDB kernel debugging' CONFIG_REMOTE_DEBUG
 #fi

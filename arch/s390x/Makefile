@@ -26,7 +26,7 @@ HEAD := arch/s390x/kernel/head.o arch/s390x/kernel/init_task.o
 
 core-y		+= arch/s390x/mm/ arch/s390x/kernel/
 drivers-y	+= drivers/s390/
-libs-y		+= arch/s390/lib/
+libs-y		+= arch/s390x/lib/
 
 all: image listing
 

@@ -33,7 +33,6 @@ static struct list_head dasd_major_info = LIST_HEAD_INIT(dasd_major_info);
 struct major_info {
 	struct list_head list;
 	int major;
-	struct gendisk disks[DASD_PER_MAJOR];
 };
 
 /*
@@ -65,12 +64,8 @@ static int
 dasd_register_major(int major)
 {
 	struct major_info *mi;
-	int new_major, rc;
-	struct list_head *l;
-	int index;
-	int i;
+	int new_major;
 
-	rc = 0;
 	/* Allocate major info structure. */
 	mi = kmalloc(sizeof(struct major_info), GFP_KERNEL);
 
@@ -79,66 +74,39 @@ dasd_register_major(int major)
 		MESSAGE(KERN_WARNING, "%s",
 			"Cannot get memory to allocate another "
 			"major number");
-		rc = -ENOMEM;
-		goto out_error;
+		return -ENOMEM;
 	}
 
 	/* Register block device. */
 	new_major = register_blkdev(major, "dasd", &dasd_device_operations);
 	if (new_major < 0) {
 		MESSAGE(KERN_WARNING,
-			"Cannot register to major no %d, rc = %d", major, rc);
-		rc = new_major;
-		goto out_error;
+			"Cannot register to major no %d, rc = %d",
+			major, new_major);
+		kfree(mi);
+		return new_major;
 	}
 	if (major != 0)
 		new_major = major;
-	
+
 	/* Initialize major info structure. */
-	memset(mi, 0, sizeof(struct major_info));
 	mi->major = new_major;
-	for (i = 0; i < DASD_PER_MAJOR; i++) {
-		struct gendisk *disk = mi->disks + i;
-		disk->major = new_major;
-		disk->first_minor = i << DASD_PARTN_BITS;
-		disk->minor_shift = DASD_PARTN_BITS;
-		disk->fops = &dasd_device_operations;
-		disk->flags = GENHD_FL_DEVFS;
-	}
 
 	/* Setup block device pointers for the new major. */
 	blk_dev[new_major].queue = dasd_get_queue;
 
+	/* Insert the new major info structure into dasd_major_info list. */
 	spin_lock(&dasd_major_lock);
-	index = 0;
-	list_for_each(l, &dasd_major_info)
-		index += DASD_PER_MAJOR;
-	for (i = 0; i < DASD_PER_MAJOR; i++, index++) {
-		name = mi->disks[i].disk_name;
-		sprintf(name, "dasd");
-		name += 4;
-		if (index > 701)
-			*name++ = 'a' + (((index - 702) / 676) % 26);
-		if (index > 25)
-			*name++ = 'a' + (((index - 26) / 26) % 26);
-		sprintf(name, "%c", 'a' + (index % 26));
-	}
 	list_add_tail(&mi->list, &dasd_major_info);
 	spin_unlock(&dasd_major_lock);
 
 	return 0;
-
-	/* Something failed. Do the cleanup and return rc. */
-out_error:
-	/* We rely on kfree to do the != NULL check. */
-	kfree(mi);
-	return rc;
 }
 
 static void
 dasd_unregister_major(struct major_info * mi)
 {
-	int major, rc;
+	int rc;
 
 	if (mi == NULL)
 		return;
@@ -149,82 +117,110 @@ dasd_unregister_major(struct major_info * mi)
 	spin_unlock(&dasd_major_lock);
 
 	/* Clear block device pointers. */
-	major = mi->major;
-	blk_dev[major].queue = NULL;
+	blk_dev[mi->major].queue = NULL;
 
-	rc = unregister_blkdev(major, "dasd");
+	rc = unregister_blkdev(mi->major, "dasd");
 	if (rc < 0)
 		MESSAGE(KERN_WARNING,
 			"Cannot unregister from major no %d, rc = %d",
-			major, rc);
+			mi->major, rc);
 
 	/* Free memory. */
 	kfree(mi);
 }
 
 /*
- * Dynamically allocate a new major for dasd devices.
+ * This one is needed for naming 18000+ possible dasd devices.
+ *   dasda - dasdz : 26 devices
+ *   dasdaa - dasdzz : 676 devices, added up = 702
+ *   dasdaaa - dasdzzz : 17576 devices, added up = 18278
  */
 int
-dasd_gendisk_new_major(void)
+dasd_device_name(char *str, int index, int partition)
 {
-	int rc;
-	
-	rc = dasd_register_major(0);
-	if (rc)
-		DBF_EXC(DBF_ALERT, "%s", "out of major numbers!");
-	return rc;
-}
+	int len;
 
-/*
- * Return pointer to gendisk structure by kdev.
- */
-static struct gendisk *dasd_gendisk_by_dev(kdev_t dev)
-{
-	struct list_head *l;
-	struct major_info *mi;
-	struct gendisk *gdp;
-	int major = major(dev);
+	if (partition > DASD_PARTN_MASK)
+		return -EINVAL;
 
-	spin_lock(&dasd_major_lock);
-	gdp = NULL;
-	list_for_each(l, &dasd_major_info) {
-		mi = list_entry(l, struct major_info, list);
-		if (mi->major == major) {
-			gdp = &mi->disks[minor(dev) >> DASD_PARTN_BITS];
-			break;
-		}
+	len = sprintf(str, "dasd");
+	if (index > 25) {
+		if (index > 701)
+			len += sprintf(str + len, "%c",
+				       'a' + (((index - 702) / 676) % 26));
+		len += sprintf(str + len, "%c",
+			       'a' + (((index - 26) / 26) % 26));
 	}
-	spin_unlock(&dasd_major_lock);
-	return gdp;
+	len += sprintf(str + len, "%c", 'a' + (index % 26));
+
+	if (partition)
+		len += sprintf(str + len, "%d", partition);
+	return 0;
 }
 
 /*
- * Return pointer to gendisk structure by devindex.
+ * Allocate gendisk structure for devindex.
  */
 struct gendisk *
-dasd_gendisk_from_devindex(int devindex)
+dasd_gendisk_alloc(char *device_name, int devindex)
 {
 	struct list_head *l;
 	struct major_info *mi;
 	struct gendisk *gdp;
+	int index, len, rc;
 
-	spin_lock(&dasd_major_lock);
-	gdp = NULL;
-	list_for_each(l, &dasd_major_info) {
-		mi = list_entry(l, struct major_info, list);
-		if (devindex < DASD_PER_MAJOR) {
-			gdp = &mi->disks[devindex];
-			break;
+	/* Make sure the major for this device exists. */
+	mi = NULL;
+	while (1) {
+		spin_lock(&dasd_major_lock);
+		index = devindex;
+		list_for_each(l, &dasd_major_info) {
+			mi = list_entry(l, struct major_info, list);
+			if (index < DASD_PER_MAJOR)
+				break;
+			index -= DASD_PER_MAJOR;
 		}
-		devindex -= DASD_PER_MAJOR;
+		spin_unlock(&dasd_major_lock);
+		if (index < DASD_PER_MAJOR)
+			break;
+		rc = dasd_register_major(0);
+		if (rc) {
+			DBF_EXC(DBF_ALERT, "%s", "out of major numbers!");
+			return ERR_PTR(rc);
+		}
 	}
-	spin_unlock(&dasd_major_lock);
+
+	gdp = alloc_disk();
+	if (!gdp)
+		return ERR_PTR(-ENOMEM);
+
+	/* Initialize gendisk structure. */
+	memcpy(gdp->disk_name, device_name, 16);	/* huh? -- AV */
+	gdp->major = mi->major;
+	gdp->first_minor = index << DASD_PARTN_BITS;
+	gdp->minor_shift = DASD_PARTN_BITS;
+	gdp->fops = &dasd_device_operations;
+
+	/*
+	 * Set device name.
+	 *   dasda - dasdz : 26 devices
+	 *   dasdaa - dasdzz : 676 devices, added up = 702
+	 *   dasdaaa - dasdzzz : 17576 devices, added up = 18278
+	 */
+	len = sprintf(device_name, "dasd");
+	if (devindex > 25) {
+		if (devindex > 701)
+			len += sprintf(device_name + len, "%c",
+				       'a' + (((devindex - 702) / 676) % 26));
+		len += sprintf(device_name + len, "%c",
+			       'a' + (((devindex - 26) / 26) % 26));
+	}
+	len += sprintf(device_name + len, "%c", 'a' + (devindex % 26));
 	return gdp;
 }
 
 /*
- * Return devindex of first device using a specifiy major number.
+ * Return devindex of first device using a specific major number.
  */
 int dasd_gendisk_major_index(int major)
 {
@@ -248,16 +244,37 @@ int dasd_gendisk_major_index(int major)
 }
 
 /*
+ * Return major number for device with device index devindex.
+ */
+int dasd_gendisk_index_major(int devindex)
+{
+	struct list_head *l;
+	struct major_info *mi;
+	int rc;
+
+	spin_lock(&dasd_major_lock);
+	rc = -ENODEV;
+	list_for_each(l, &dasd_major_info) {
+		mi = list_entry(l, struct major_info, list);
+		if (devindex < DASD_PER_MAJOR) {
+			rc = mi->major;
+			break;
+		}
+		devindex -= DASD_PER_MAJOR;
+	}
+	spin_unlock(&dasd_major_lock);
+	return rc;
+}
+
+/*
  * Register disk to genhd. This will trigger a partition detection.
  */
 void
 dasd_setup_partitions(dasd_device_t * device)
 {
-	struct gendisk *disk = dasd_gendisk_by_dev(device->kdev);
-	if (disk == NULL)
-		return;
-	set_capacity(disk, device->blocks << device->s2b_shift);
-	add_disk(disk);
+	/* Make the disk known. */
+	set_capacity(device->gdp, device->blocks << device->s2b_shift);
+	add_disk(device->gdp);
 }
 
 /*
@@ -267,13 +284,7 @@ dasd_setup_partitions(dasd_device_t * device)
 void
 dasd_destroy_partitions(dasd_device_t * device)
 {
-	struct gendisk *disk = dasd_gendisk_by_dev(device->kdev);
-	int minor, i;
-
-	if (disk == NULL)
-		return;
-
-	del_gendisk(disk);
+	del_gendisk(device->gdp);
 }
 
 int
@@ -294,6 +305,7 @@ void
 dasd_gendisk_exit(void)
 {
 	struct list_head *l, *n;
+
 	spin_lock(&dasd_major_lock);
 	list_for_each_safe(l, n, &dasd_major_info)
 		dasd_unregister_major(list_entry(l, struct major_info, list));

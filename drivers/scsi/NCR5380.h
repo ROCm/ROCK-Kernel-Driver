@@ -304,10 +304,18 @@ static void NCR5380_print(struct Scsi_Host *instance);
 static
 #endif
 int NCR5380_abort(Scsi_Cmnd * cmd);
-#ifndef NCR5380_reset
+#ifndef NCR5380_bus_reset
 static
 #endif
-int NCR5380_reset(Scsi_Cmnd * cmd, unsigned int reset_flags);
+int NCR5380_bus_reset(Scsi_Cmnd * cmd);
+#ifndef NCR5380_host_reset
+static
+#endif
+int NCR5380_host_reset(Scsi_Cmnd * cmd);
+#ifndef NCR5380_device_reset
+static
+#endif
+int NCR5380_device_reset(Scsi_Cmnd * cmd);
 #ifndef NCR5380_queue_command
 static
 #endif

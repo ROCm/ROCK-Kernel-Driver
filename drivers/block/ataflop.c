@@ -235,7 +235,7 @@ static struct atari_floppy_struct {
 	unsigned int wpstat;	/* current state of WP signal (for
 				   disk change detection) */
 	int flags;		/* flags */
-	struct gendisk disk;
+	struct gendisk *disk;
 } unit[FD_MAX_UNITS];
 
 #define	UD	unit[drive]
@@ -1093,7 +1093,7 @@ static void fd_rwsec_done1(int status)
 			    if (SUDT[-1].blocks > ReqBlock) {
 				/* try another disk type */
 				SUDT--;
-				set_capacity(&unit[SelectedDrive].disk,
+				set_capacity(unit[SelectedDrive].disk,
 							SUDT->blocks);
 			    } else
 				Probing = 0;
@@ -1108,7 +1108,7 @@ static void fd_rwsec_done1(int status)
 /* record not found, but not probing. Maybe stretch wrong ? Restart probing */
 			if (SUD.autoprobe) {
 				SUDT = disk_type + StartDiskType[DriveType];
-				set_capacity(&unit[SelectedDrive].disk,
+				set_capacity(unit[SelectedDrive].disk,
 							SUDT->blocks);
 				Probing = 1;
 			}
@@ -1470,7 +1470,7 @@ repeat:
 		if (!UDT) {
 			Probing = 1;
 			UDT = disk_type + StartDiskType[DriveType];
-			set_capacity(&unit[drive].disk, UDT->blocks);
+			set_capacity(unit[drive].disk, UDT->blocks);
 			UD.autoprobe = 1;
 		}
 	} 
@@ -1488,7 +1488,7 @@ repeat:
 		}
 		type = minor2disktype[type].index;
 		UDT = &disk_type[type];
-		set_capacity(&unit[drive].disk, UDT->blocks);
+		set_capacity(unit[drive].disk, UDT->blocks);
 		UD.autoprobe = 0;
 	}
 	
@@ -1635,7 +1635,7 @@ static int fd_ioctl(struct inode *inode, struct file *filp,
 				    printk (KERN_INFO "floppy%d: setting %s %p!\n",
 				        drive, dtp->name, dtp);
 				UDT = dtp;
-				set_capacity(&unit[drive].disk, UDT->blocks);
+				set_capacity(unit[drive].disk, UDT->blocks);
 
 				if (cmd == FDDEFPRM) {
 				  /* save settings as permanent default type */
@@ -1681,7 +1681,7 @@ static int fd_ioctl(struct inode *inode, struct file *filp,
 		}
 
 		UDT = dtp;
-		set_capacity(&unit[drive].disk, UDT->blocks);
+		set_capacity(unit[drive].disk, UDT->blocks);
 
 		return 0;
 	case FDMSGON:
@@ -1704,7 +1704,7 @@ static int fd_ioctl(struct inode *inode, struct file *filp,
 		UDT = NULL;
 		/* MSch: invalidate default_params */
 		default_params[drive].blocks  = 0;
-		set_capacity(&unit[drive].disk, MAX_DISK_SIZE * 2);
+		set_capacity(unit[drive].disk, MAX_DISK_SIZE * 2);
 	case FDFMTEND:
 	case FDFLUSH:
 		/* invalidate the buffer track to force a reread */
@@ -1928,7 +1928,7 @@ static struct gendisk *floppy_find(int minor)
 	int type  = minor >> 2;
 	if (drive >= FD_MAX_UNITS || type > NUM_DISK_MINORS)
 		return NULL;
-	return &unit[drive].disk;
+	return unit[drive].disk;
 }
 
 int __init atari_floppy_init (void)
@@ -1948,6 +1948,12 @@ int __init atari_floppy_init (void)
 		return -EBUSY;
 	}
 
+	for (i = 0; i < FD_MAX_UNITS; i++) {
+		unit[i].disk = alloc_disk();
+		if (!unit[i].disk)
+			goto Enomem;
+	}
+
 	if (UseTrackbuffer < 0)
 		/* not set by user -> use default: for now, we turn
 		   track buffering off for all Medusas, though it
@@ -1962,8 +1968,7 @@ int __init atari_floppy_init (void)
 	DMABuffer = atari_stram_alloc(BUFFER_SIZE+512, "ataflop");
 	if (!DMABuffer) {
 		printk(KERN_ERR "atari_floppy_init: cannot get dma buffer\n");
-		unregister_blkdev(MAJOR_NR, "fd");
-		return -ENOMEM;
+		goto Enomem;
 	}
 	TrackBuffer = DMABuffer + 512;
 	PhysDMABuffer = virt_to_phys(DMABuffer);
@@ -1973,12 +1978,12 @@ int __init atari_floppy_init (void)
 	for (i = 0; i < FD_MAX_UNITS; i++) {
 		unit[i].track = -1;
 		unit[i].flags = 0;
-		unit[i].disk.major = MAJOR_NR;
-		unit[i].disk.first_minor = i;
-		sprintf(unit[i].disk.disk_name, "fd%d", i);
-		unit[i].disk.fops = &floppy_fops;
-		set_capacity(&unit[i].disk, MAX_DISK_SIZE * 2);
-		add_disk(&unit[i].disk);
+		unit[i].disk->major = MAJOR_NR;
+		unit[i].disk->first_minor = i;
+		sprintf(unit[i].disk->disk_name, "fd%d", i);
+		unit[i].disk->fops = &floppy_fops;
+		set_capacity(unit[i].disk, MAX_DISK_SIZE * 2);
+		add_disk(unit[i].disk);
 	}
 
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_fd_request, &ataflop_lock);
@@ -1990,6 +1995,11 @@ int __init atari_floppy_init (void)
 	config_types();
 
 	return 0;
+Enomem:
+	while (i--)
+		put_disk(unit[i].disk);
+	unregister_blkdev(MAJOR_NR, "fd");
+	return -ENOMEM;
 }
 
 
@@ -2035,8 +2045,10 @@ int init_module (void)
 void cleanup_module (void)
 {
 	int i;
-	for (i = 0; i < FD_MAX_UNITS; i++)
-		del_gendisk(&unit[i].disk);
+	for (i = 0; i < FD_MAX_UNITS; i++) {
+		del_gendisk(unit[i].disk);
+		put_disk(unit[i].disk);
+	}
 	unregister_blkdev(MAJOR_NR, "fd");
 	blk_set_probe(MAJOR_NR, NULL);
 

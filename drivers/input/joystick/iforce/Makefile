@@ -5,7 +5,6 @@
 #
 
 # Goal definition
-list-multi	:= iforce.o
 iforce-objs	:= iforce-ff.o iforce-main.o iforce-packets.o
 
 obj-$(CONFIG_JOYSTICK_IFORCE)	+= iforce.o 
@@ -23,8 +22,3 @@ EXTRA_CFLAGS = -Werror-implicit-function-declaration
 # The global Rules.make.
 
 include $(TOPDIR)/Rules.make
-
-# Additional rules
-iforce.o: $(iforce-objs)
-	$(LD) -r -o $@ $(iforce-objs)
-

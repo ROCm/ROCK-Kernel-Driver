@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/cio.c
  *   S/390 common I/O routines -- low level i/o calls
- *   $Revision: 1.15 $
+ *   $Revision: 1.26 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *                            IBM Corporation
@@ -52,7 +52,7 @@ s390_displayhex (void *ptr, s32 cnt, int level)
 	}
 	DBG ("%s\n", buffer);
 	if (cio_debug_initialized) 
-		debug_text_event (cio_debug_trace_id, level, buffer);
+		debug_text_event (cio_debug_msg_id, level, buffer);
 }
 
 
@@ -98,7 +98,6 @@ static inline int
 s390_do_sync_wait(int irq, int do_tpi)
 {
 	unsigned long psw_mask;
-	int ccode;
 	uint64_t time_start;
 	uint64_t time_curr;
 	
@@ -116,31 +115,7 @@ s390_do_sync_wait(int irq, int do_tpi)
 	 *  sync. interrupt arrived we reset the I/O old PSW to
 	 *  its original value.
 	 */
-	
-	ccode = iac ();
-	
-	switch (ccode) {
-	case 0:	/* primary-space */
-		psw_mask = _IO_PSW_MASK
-			| _PSW_PRIM_SPACE_MODE | _PSW_IO_WAIT;
-		break;
-	case 1:	/* secondary-space */
-		psw_mask = _IO_PSW_MASK
-			| _PSW_SEC_SPACE_MODE | _PSW_IO_WAIT;
-		break;
-	case 2:	/* access-register */
-		psw_mask = _IO_PSW_MASK
-			| _PSW_ACC_REG_MODE | _PSW_IO_WAIT;
-		break;
-	case 3:	/* home-space */
-		psw_mask = _IO_PSW_MASK
-			| _PSW_HOME_SPACE_MODE | _PSW_IO_WAIT;
-		break;
-	default:
-		panic ("start_IO() : unexpected "
-		       "address-space-control %d\n", ccode);
-		break;
-	}
+	psw_mask = PSW_KERNEL_BITS | PSW_MASK_IO | PSW_MASK_WAIT;
 	
 	/*
 	 * Martin didn't like modifying the new PSW, now we take
@@ -201,7 +176,6 @@ s390_do_sync_wait_haltclear(int irq, int halt)
 	int io_sub;
 	__u32 io_parm;
 	unsigned long psw_mask;
-	int ccode;
 	
 	int ready = 0;
 	
@@ -212,32 +186,7 @@ s390_do_sync_wait_haltclear(int irq, int halt)
 	 * FIXME: Are there case where we can't rely on an interrupt
 	 *        to occurr? Need to check...
 	 */
-
-	ccode = iac ();
-	
-	switch (ccode) {
-	case 0:	/* primary-space */
-		psw_mask = _IO_PSW_MASK
-			| _PSW_PRIM_SPACE_MODE | _PSW_IO_WAIT;
-		break;
-	case 1:	/* secondary-space */
-		psw_mask = _IO_PSW_MASK
-			| _PSW_SEC_SPACE_MODE | _PSW_IO_WAIT;
-		break;
-	case 2:	/* access-register */
-		psw_mask = _IO_PSW_MASK
-			| _PSW_ACC_REG_MODE | _PSW_IO_WAIT;
-		break;
-	case 3:	/* home-space */
-		psw_mask = _IO_PSW_MASK
-			| _PSW_HOME_SPACE_MODE | _PSW_IO_WAIT;
-		break;
-	default: /* FIXME: isn't ccode only 2 bits anyway? */
-		panic (halt?"halt":"clear"
-		       "_IO() : unexpected address-space-control %d\n", 
-		       ccode);
-		break;
-	}
+	psw_mask = PSW_KERNEL_BITS | PSW_MASK_IO | PSW_MASK_WAIT;
 	
 	/*
 	 * Martin didn't like modifying the new PSW, now we take
@@ -393,6 +342,7 @@ s390_start_IO_handle_notoper(int irq,
 
 	if (valid_lpm) {
 		ioinfo[irq]->opm &= ~lpm;
+		switch_off_chpids(irq, lpm);
 	} else {
 		ioinfo[irq]->opm = 0;
 		
@@ -433,8 +383,6 @@ s390_start_IO (int irq,		/* IRQ */
 	int ret = 0;
 	char dbf_txt[15];
 
-	SANITY_CHECK (irq);
-
 	/*
 	 * The flag usage is mutal exclusive ...
 	 */
@@ -456,7 +404,7 @@ s390_start_IO (int irq,		/* IRQ */
 		ret = enable_cpu_sync_isc (irq);
 
 		if (ret) 
-			return (ret);
+			return ret;
 
 	}
 
@@ -556,7 +504,7 @@ s390_start_IO (int irq,		/* IRQ */
 	if (flag & DOIO_DONT_CALL_INTHDLR) 
 		ioinfo[irq]->ui.flags.repnone = 0;
 
-	return (ret);
+	return ret;
 }
 
 int
@@ -618,7 +566,7 @@ do_IO (int irq,			/* IRQ */
 
 	}
 
-	return (ret);
+	return ret;
 
 }
 
@@ -677,7 +625,7 @@ resume_IO (int irq)
 
 	}
 
-	return (ret);
+	return ret;
 }
 
 /*
@@ -720,7 +668,7 @@ halt_IO (int irq, unsigned long user_intparm, unsigned long flag)
 		ret = enable_cpu_sync_isc (irq);
 
 		if (ret)
-			return (ret);
+			return ret;
 	}
 
 	/*
@@ -784,7 +732,7 @@ halt_IO (int irq, unsigned long user_intparm, unsigned long flag)
 	if (flag & DOIO_WAIT_FOR_INTERRUPT) 
 		disable_cpu_sync_isc (irq);
 
-	return (ret);
+	return ret;
 }
 
 /*
@@ -803,7 +751,7 @@ clear_IO (int irq, unsigned long user_intparm, unsigned long flag)
 	SANITY_CHECK (irq);
 
 	if (ioinfo[irq] == INVALID_STORAGE_AREA)
-		return (-ENODEV);
+		return -ENODEV;
 
 	/*
 	 * we only allow for clear_IO if the device has an I/O handler associated
@@ -829,7 +777,7 @@ clear_IO (int irq, unsigned long user_intparm, unsigned long flag)
 		ret = enable_cpu_sync_isc (irq);
 
 		if (ret)
-			return (ret);
+			return ret;
 	}
 
 	/*
@@ -891,7 +839,7 @@ clear_IO (int irq, unsigned long user_intparm, unsigned long flag)
 	if (flag & DOIO_WAIT_FOR_INTERRUPT) 
 		disable_cpu_sync_isc (irq);
 
-	return (ret);
+	return ret;
 }
 
 /*
@@ -907,8 +855,6 @@ cancel_IO (int irq)
 	int ccode;
 	char dbf_txt[15];
 	int ret = 0;
-
-	SANITY_CHECK (irq);
 
 	sprintf (dbf_txt, "cancelIO%x", irq);
 	CIO_TRACE_EVENT (2, dbf_txt);
@@ -955,7 +901,6 @@ do_IRQ (struct pt_regs regs)
 	 * Get interrupt info from lowcore
 	 */
 	volatile tpi_info_t *tpi_info = (tpi_info_t *) (__LC_SUBCHANNEL_ID);
-	int cpu = smp_processor_id ();
 
 	/*
 	 * take fast exit if CPU is in sync. I/O state
@@ -965,22 +910,19 @@ do_IRQ (struct pt_regs regs)
 	 *       entry condition to synchronous I/O.
 	 */
 	if (*(__u32 *) __LC_SYNC_IO_WORD) {
-		regs.psw.mask &= ~(_PSW_WAIT_MASK_BIT | _PSW_IO_MASK_BIT);
+		regs.psw.mask &= ~(PSW_MASK_WAIT | PSW_MASK_IO);
 		return;
 	}
 	/* endif */
-#ifdef CONFIG_FAST_IRQ
 	do {
-#endif				/* CONFIG_FAST_IRQ */
-
 		/*
 		 * Non I/O-subchannel thin interrupts are processed differently
 		 */
 		if (tpi_info->adapter_IO == 1 &&
 		    tpi_info->int_type == IO_INTERRUPT_TYPE) {
-			irq_enter (cpu, -1);
+			irq_enter ();
 			do_adapter_IO (tpi_info->intparm);
-			irq_exit (cpu, -1);
+			irq_exit ();
 		} else {
 			unsigned int irq = tpi_info->irq;
 
@@ -1001,23 +943,21 @@ do_IRQ (struct pt_regs regs)
 				return;
 			}
 
-			irq_enter (cpu, irq);
+			irq_enter ();
 			s390irq_spin_lock (irq);
 			s390_process_IRQ (irq);
 			s390irq_spin_unlock (irq);
-			irq_exit (cpu, irq);
+			irq_exit ();
 		}
-
-#ifdef CONFIG_FAST_IRQ
 
 		/*
 		 * Are more interrupts pending?
 		 * If so, the tpi instruction will update the lowcore 
 		 * to hold the info for the next interrupt.
+		 * We don't do this for VM because a tpi drops the cpu
+		 * out of the sie which costs more cycles than it saves.
 		 */
-	} while (tpi (NULL) != 0);
-
-#endif				/* CONFIG_FAST_IRQ */
+	} while (!MACHINE_IS_VM && tpi (NULL) != 0);
 
 	return;
 }
@@ -1126,9 +1066,9 @@ s390_reset_flags_after_ending_status(int irq)
  * for cc=0 and cc=1 after tsch
  */
 static inline int
-s390_process_IRQ_normal(unsigned int irq,
-			int ending_status)
+s390_process_IRQ_normal(unsigned int irq)
 {
+	int ending_status;
 	unsigned int fctl;	/* function control */
 	unsigned int stctl;	/* status   control */
 	unsigned int actl;	/* activity control */
@@ -1188,7 +1128,7 @@ s390_process_IRQ_normal(unsigned int irq,
 	 * take fast exit if no handler is available
 	 */
 	if (!ioinfo[irq]->ui.flags.ready)
-		return (ending_status);
+		return ending_status;
 	
 	/*
 	 * Check whether we must issue a SENSE CCW ourselves if there is no
@@ -1376,8 +1316,7 @@ s390_process_IRQ_normal(unsigned int irq,
  * for cc=3 after tsch
  */
 static inline int
-s390_process_IRQ_notoper(unsigned int irq,
-			 int ending_status)
+s390_process_IRQ_notoper(unsigned int irq)
 {
 	devstat_t *dp;
 	devstat_t *udp;
@@ -1440,7 +1379,7 @@ s390_process_IRQ_notoper(unsigned int irq,
 	 * take fast exit if no handler is available
 	 */
 	if (!ioinfo[irq]->ui.flags.ready)
-		return (ending_status);
+		return 0;
 	
 	memcpy (udp, &(ioinfo[irq]->devstat), 
 		sizeof(devstat_t) - 
@@ -1448,7 +1387,7 @@ s390_process_IRQ_notoper(unsigned int irq,
 	
 	ioinfo[irq]->devstat.intparm = 0;
 	
-	if (!ioinfo[irq]->ui.flags.s_pend) 
+	if (!(ioinfo[irq]->ui.flags.s_pend || ioinfo[irq]->ui.flags.repnone))
 		ioinfo[irq]->irq_desc.handler (irq, udp, NULL);
 	
 	return 1;
@@ -1478,7 +1417,6 @@ s390_process_IRQ (unsigned int irq)
 	int irb_cc;		/* cond code from irb */
 
 	int issense = 0;
-	int ending_status = 0;
 	devstat_t *dp;
 	devstat_t *udp;
 	scsw_t *scsw;
@@ -1490,7 +1428,8 @@ s390_process_IRQ (unsigned int irq)
 		s390_irq_count[cpu]++;
 	}
 
-	sprintf (dbf_txt, "procIRQ%x", irq);
+	CIO_TRACE_EVENT (3, "procIRQ");
+	sprintf (dbf_txt, "%x", irq);
 	CIO_TRACE_EVENT (3, dbf_txt);
 
 	if (ioinfo[irq] == INVALID_STORAGE_AREA) {
@@ -1502,14 +1441,8 @@ s390_process_IRQ (unsigned int irq)
 			  "for non-initialized subchannel!\n", irq);
 
 		tsch (irq, &p_init_irb);
-		return (1);
-
-	}
-
-	if (ioinfo[irq]->st) {
-		/* can't be */
-		BUG();
 		return 1;
+
 	}
 
 	dp = &ioinfo[irq]->devstat;
@@ -1676,25 +1609,14 @@ s390_process_IRQ (unsigned int irq)
 
 	switch (irb_cc) {
 	case 1:		/* status pending */
-
 		dp->flag |= DEVSTAT_STATUS_PENDING;
 
 	case 0:		/* normal i/o interruption */
+		return s390_process_IRQ_normal(irq);
 
-		ending_status = s390_process_IRQ_normal(irq, ending_status);
-
-
-		break;
-
-	case 3:		/* device/path not operational */
-
-		ending_status = s390_process_IRQ_notoper(irq, ending_status); 
-
-		break;
-
+	default:	/* device/path not operational */
+		return s390_process_IRQ_notoper(irq);
 	}
-
-	return (ending_status);
 }
 
 /*
@@ -1719,8 +1641,6 @@ set_cons_dev (int irq)
 	int ccode;
 	int rc = 0;
 	char dbf_txt[15];
-
-	SANITY_CHECK (irq);
 
 	if (cons_dev != -1)
 		return -EBUSY;
@@ -1755,7 +1675,7 @@ set_cons_dev (int irq)
 		}
 	}
 
-	return (rc);
+	return rc;
 }
 
 int
@@ -1783,7 +1703,7 @@ wait_cons_dev (int irq)
 		 */
 		__ctl_store (cr6, 6, 6);
 		save_cr6 = cr6;
-		cr6 &= 0x01FFFFFF;
+		cr6 = 0x01000000;
 		__ctl_load (cr6, 6, 6);
 
 		do {
@@ -1806,7 +1726,7 @@ wait_cons_dev (int irq)
 
 	}
 
-	return (rc);
+	return rc;
 }
 
 /*
@@ -1923,47 +1843,39 @@ enable_cpu_sync_isc (int irq)
 
 	/* This one spins until it can get the sync_isc lock for irq# irq */
 
-	if ((irq <= highest_subchannel) && 
-	    (ioinfo[irq] != INVALID_STORAGE_AREA) &&
-	    (!ioinfo[irq]->st)) {
-		if (atomic_read (&sync_isc) != irq)
-			atomic_compare_and_swap_spin (-1, irq, &sync_isc);
-
-		sync_isc_cnt++;
-
-		if (sync_isc_cnt > 255) {	/* fixme : magic number */
-			panic ("Too many recursive calls to enable_sync_isc");
-
+	if (atomic_read (&sync_isc) != irq)
+		atomic_compare_and_swap_spin (-1, irq, &sync_isc);
+	
+	sync_isc_cnt++;
+	
+	if (sync_isc_cnt > 255) {	/* fixme : magic number */
+		panic ("Too many recursive calls to enable_sync_isc");
+		
+	}
+	/*
+	 * we only run the STSCH/MSCH path for the first enablement
+	 */
+	else if (sync_isc_cnt == 1) {
+		ioinfo[irq]->ui.flags.syncio = 1;
+		
+		ccode = stsch (irq, &(ioinfo[irq]->schib));
+		
+		if (!ccode) {
+			ioinfo[irq]->schib.pmcw.isc = 5;
+			rc = s390_set_isc5(irq, 0);
+			
+		} else {
+			rc = -ENODEV;	/* device is not-operational */
+			
 		}
-		/*
-		 * we only run the STSCH/MSCH path for the first enablement
-		 */
-		else if (sync_isc_cnt == 1) {
-			ioinfo[irq]->ui.flags.syncio = 1;
-
-			ccode = stsch (irq, &(ioinfo[irq]->schib));
-
-			if (!ccode) {
-				ioinfo[irq]->schib.pmcw.isc = 5;
-				rc = s390_set_isc5(irq, 0);
-
-			} else {
-				rc = -ENODEV;	/* device is not-operational */
-
-			}
-		}
-
-		if (rc) {	/* can only happen if stsch/msch fails */
-			sync_isc_cnt = 0;
-			atomic_set (&sync_isc, -1);
-		}
-	} else {
-
-		rc = -EINVAL;
-
+	}
+	
+	if (rc) {	/* can only happen if stsch/msch fails */
+		sync_isc_cnt = 0;
+		atomic_set (&sync_isc, -1);
 	}
 
-	return (rc);
+	return rc;
 }
 
 
@@ -1978,44 +1890,36 @@ disable_cpu_sync_isc (int irq)
 	sprintf (dbf_txt, "disisc%x", irq);
 	CIO_TRACE_EVENT (4, dbf_txt);
 
-	if ((irq <= highest_subchannel) && 
-	    (ioinfo[irq] != INVALID_STORAGE_AREA) && 
-	    (!ioinfo[irq]->st)) {
-		/*
-		 * We disable if we're the top user only, as we may
-		 *  run recursively ... 
-		 * We must not decrease the count immediately; during
-		 *  msch() processing we may face another pending
-		 *  status we have to process recursively (sync).
-		 */
-
-		if (sync_isc_cnt == 1) {
-			ccode = stsch (irq, &(ioinfo[irq]->schib));
-
-			if (!ccode) {
-
-				ioinfo[irq]->schib.pmcw.isc = 3;
-				rc = s390_set_isc5(irq, 1);
-			} else {
-				rc = -ENODEV;
-			}
-				
-			ioinfo[irq]->ui.flags.syncio = 0;
-
-			sync_isc_cnt = 0;
-			atomic_set (&sync_isc, -1);
-
+	/*
+	 * We disable if we're the top user only, as we may
+	 *  run recursively ... 
+	 * We must not decrease the count immediately; during
+	 *  msch() processing we may face another pending
+	 *  status we have to process recursively (sync).
+	 */
+	
+	if (sync_isc_cnt == 1) {
+		ccode = stsch (irq, &(ioinfo[irq]->schib));
+		
+		if (!ccode) {
+			
+			ioinfo[irq]->schib.pmcw.isc = 3;
+			rc = s390_set_isc5(irq, 1);
 		} else {
-			sync_isc_cnt--;
-
+			rc = -ENODEV;
 		}
+		
+		ioinfo[irq]->ui.flags.syncio = 0;
+		
+		sync_isc_cnt = 0;
+		atomic_set (&sync_isc, -1);
+		
 	} else {
-
-		rc = -EINVAL;
-
+		sync_isc_cnt--;
+		
 	}
 
-	return (rc);
+	return rc;
 }
 
 EXPORT_SYMBOL (halt_IO);

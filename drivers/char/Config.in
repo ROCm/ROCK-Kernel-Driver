@@ -131,6 +131,7 @@ if [ "$CONFIG_WATCHDOG" != "n" ]; then
    tristate '  IB700 SBC Watchdog Timer' CONFIG_IB700_WDT
    tristate '  Intel i810 TCO timer / Watchdog' CONFIG_I810_TCO
    tristate '  Mixcom Watchdog' CONFIG_MIXCOMWD 
+   tristate '  NatSemi SCx200 Watchdog' CONFIG_SCx200_WDT
    tristate '  SBC-60XX Watchdog Timer' CONFIG_60XX_WDT
    tristate '  W83877F (EMACS) Watchdog Timer' CONFIG_W83877F_WDT
    tristate '  ZF MachZ Watchdog' CONFIG_MACHZ_WDT
@@ -192,6 +193,8 @@ fi
 if [ "$CONFIG_X86" = "y" ]; then
    tristate 'ACP Modem (Mwave) support' CONFIG_MWAVE
 fi
+
+dep_tristate 'NatSemi SCx200 GPIO Support' CONFIG_SCx200_GPIO $CONFIG_SCx200
 
 tristate '  RAW driver (/dev/raw/rawN)' CONFIG_RAW_DRIVER
 

@@ -73,8 +73,8 @@ typedef struct blkelv_ioctl_arg_s {
 #define BLKELVGET   _IOR(0x12,106,sizeof(blkelv_ioctl_arg_t))
 #define BLKELVSET   _IOW(0x12,107,sizeof(blkelv_ioctl_arg_t))
 
-extern int elevator_init(request_queue_t *, elevator_t *, elevator_t);
-extern void elevator_exit(request_queue_t *, elevator_t *);
+extern int elevator_init(request_queue_t *, elevator_t *);
+extern void elevator_exit(request_queue_t *);
 extern inline int bio_rq_in_between(struct bio *, struct request *, struct list_head *);
 extern inline int elv_rq_merge_ok(struct request *, struct bio *);
 extern inline int elv_try_merge(struct request *, struct bio *);

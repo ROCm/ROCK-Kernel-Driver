@@ -806,24 +806,6 @@ type name(type1 arg1, type2 arg2, type3 arg3, type4 arg4, type5 arg5, type6 arg6
 
 #ifdef __KERNEL_SYSCALLS__
 
-static inline int idle(void)
-{
-	extern int sys_idle(void);
-	return sys_idle();
-}
-
-static inline int pause(void)
-{
-	extern int sys_pause(void);
-	return sys_pause();
-}
-
-static inline int sync(void)
-{
-	extern int sys_sync(void);
-	return sys_sync();
-}
-
 static inline pid_t setsid(void)
 {
 	extern int sys_setsid(void);
@@ -875,18 +857,6 @@ static inline pid_t waitpid(pid_t pid, int *wait_stat, int options)
 {
 	extern int sys_wait4(int, int *, int, struct rusage *);
 	return sys_wait4((int)pid, wait_stat, options, NULL);
-}
-
-static inline int delete_module(const char *name)
-{
-	extern int sys_delete_module(const char *name);
-	return sys_delete_module(name);
-}
-
-static inline pid_t wait(int * wait_stat)
-{
-	extern int sys_wait4(int, int *, int, struct rusage *);
-	return sys_wait4(-1, wait_stat, 0, NULL);
 }
 
 static inline int execve(char *filename, char * argv [],

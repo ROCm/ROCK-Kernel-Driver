@@ -111,13 +111,13 @@ typedef struct thread_struct thread_struct;
 
 /* need to define ... */
 #define start_thread(regs, new_psw, new_stackp) do {            \
-        regs->psw.mask  = _USER_PSW_MASK;                       \
+        regs->psw.mask  = PSW_USER_BITS;                        \
         regs->psw.addr  = new_psw;                              \
         regs->gprs[15]  = new_stackp;                           \
 } while (0)
 
 #define start_thread31(regs, new_psw, new_stackp) do {          \
-	regs->psw.mask  = _USER_PSW_MASK & ~(1L << 32);		\
+	regs->psw.mask  = PSW_USER32_BITS;			\
         regs->psw.addr  = new_psw;                              \
         regs->gprs[15]  = new_stackp;                           \
 } while (0)
@@ -154,19 +154,6 @@ unsigned long get_wchan(struct task_struct *p);
 #define cpu_relax()	barrier()
 
 /*
- * Set of msr bits that gdb can change on behalf of a process.
- */
-/* Only let our hackers near the condition codes */
-#define PSW_MASK_DEBUGCHANGE    0x0000300000000000UL
-/* Don't let em near the addressing mode either */    
-#define PSW_ADDR_DEBUGCHANGE    0xFFFFFFFFFFFFFFFFUL
-#define PSW_ADDR_MASK           0xFFFFFFFFFFFFFFFFUL
-/* Program event recording mask */    
-#define PSW_PER_MASK            0x4000000000000000UL
-#define USER_STD_MASK           0x0000000000000080UL
-#define PSW_PROBLEM_STATE       0x0001000000000000UL
-
-/*
  * Set PSW mask to specified value, while leaving the
  * PSW addr pointing to the next instruction.
  */
@@ -194,7 +181,8 @@ static inline void enabled_wait(void)
 	unsigned long reg;
 	psw_t wait_psw;
 
-	wait_psw.mask = 0x0706000180000000;
+	wait_psw.mask = PSW_BASE_BITS | PSW_MASK_IO | PSW_MASK_EXT |
+		PSW_MASK_MCHECK | PSW_MASK_WAIT;
 	asm volatile (
 		"    larl  %0,0f\n"
 		"    stg   %0,8(%1)\n"
@@ -214,7 +202,7 @@ static inline void disabled_wait(addr_t code)
         psw_t *dw_psw = (psw_t *)(((unsigned long) &psw_buffer+sizeof(psw_t)-1)
                                   & -sizeof(psw_t));
 
-        dw_psw->mask = 0x0002000180000000;
+        dw_psw->mask = PSW_BASE_BITS | PSW_MASK_WAIT;
         dw_psw->addr = code;
         /* 
          * Store status and then load disabled wait psw,

@@ -16,6 +16,7 @@
 
 #include <linux/slab.h>
 #include <linux/hdreg.h>	/* HDIO_GETGEO			    */
+#include <linux/bio.h>
 
 #include <asm/idals.h>
 #include <asm/ebcdic.h>
@@ -43,7 +44,6 @@ typedef struct dasd_fba_private_t {
 	dasd_fba_characteristics_t rdc_data;
 } dasd_fba_private_t;
 
-#ifdef CONFIG_DASD_DYNAMIC
 static
 devreg_t dasd_fba_known_devices[] = {
 	{
@@ -59,7 +59,6 @@ devreg_t dasd_fba_known_devices[] = {
 		oper_func:dasd_oper_handler
 	}
 };
-#endif
 
 static inline void
 define_extent(ccw1_t * ccw, DE_fba_data_t *data, int rw,
@@ -417,10 +416,8 @@ dasd_fba_init(void)
 
 	ASCEBC(dasd_fba_discipline.ebcname, 4);
 	dasd_discipline_add(&dasd_fba_discipline);
-#ifdef CONFIG_DASD_DYNAMIC
 	for (i = 0; i < sizeof(dasd_fba_known_devices) / sizeof(devreg_t); i++)
 		s390_device_register(&dasd_fba_known_devices[i]);
-#endif
 	return 0;
 }
 
@@ -429,10 +426,8 @@ dasd_fba_cleanup(void)
 {
 	int i;
 
-#ifdef CONFIG_DASD_DYNAMIC
 	for (i = 0; i < sizeof(dasd_fba_known_devices) / sizeof(devreg_t); i++)
 		s390_device_unregister(&dasd_fba_known_devices[i]);
-#endif
 	dasd_discipline_del(&dasd_fba_discipline);
 }
 

@@ -312,7 +312,7 @@ static int __init sbus_init(void)
 		nd = prom_searchsiblings(topnd, "sbus");
 		if(nd == 0) {
 #ifdef CONFIG_PCI
-			if (!pcibios_present()) {	
+			if (!pci_present()) {
 				prom_printf("Neither SBUS nor PCI found.\n");
 				prom_halt();
 			} else {

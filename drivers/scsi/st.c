@@ -3832,14 +3832,14 @@ static int st_attach(Scsi_Device * SDp)
 	    tpnt->driverfs_dev_r[mode].parent = &SDp->sdev_driverfs_dev;
 	    tpnt->driverfs_dev_r[mode].bus = &scsi_driverfs_bus_type;
 	    tpnt->driverfs_dev_r[mode].driver_data =
-			(void *)(long)__mkdev(MAJOR_NR, i + (mode << 5));
+			(void *)(long)__mkdev(MAJOR_NR, dev_num + (mode << 5));
 	    device_register(&tpnt->driverfs_dev_r[mode]);
 	    device_create_file(&tpnt->driverfs_dev_r[mode], 
 			       &dev_attr_type);
 	    device_create_file(&tpnt->driverfs_dev_r[mode], &dev_attr_kdev);
 	    tpnt->de_r[mode] =
 		devfs_register (SDp->de, name, DEVFS_FL_DEFAULT,
-				MAJOR_NR, i + (mode << 5),
+				MAJOR_NR, dev_num + (mode << 5),
 				S_IFCHR | S_IRUGO | S_IWUGO,
 				&st_fops, NULL);
 	    /*  No-rewind entry  */
@@ -3851,7 +3851,7 @@ static int st_attach(Scsi_Device * SDp)
 	    tpnt->driverfs_dev_n[mode].parent= &SDp->sdev_driverfs_dev;
 	    tpnt->driverfs_dev_n[mode].bus = &scsi_driverfs_bus_type;
 	    tpnt->driverfs_dev_n[mode].driver_data =
-			(void *)(long)__mkdev(MAJOR_NR, i + (mode << 5) + 128);
+			(void *)(long)__mkdev(MAJOR_NR, dev_num + (mode << 5) + 128);
 	    device_register(&tpnt->driverfs_dev_n[mode]);
 	    device_create_file(&tpnt->driverfs_dev_n[mode], 
 			       &dev_attr_type);
@@ -3859,7 +3859,7 @@ static int st_attach(Scsi_Device * SDp)
 			       &dev_attr_kdev);
 	    tpnt->de_n[mode] =
 		devfs_register (SDp->de, name, DEVFS_FL_DEFAULT,
-				MAJOR_NR, i + (mode << 5) + 128,
+				MAJOR_NR, dev_num + (mode << 5) + 128,
 				S_IFCHR | S_IRUGO | S_IWUGO,
 				&st_fops, NULL);
 	}

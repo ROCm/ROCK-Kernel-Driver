@@ -12,6 +12,7 @@
 #include <linux/slab.h>
 #include <linux/module.h>
 #include <linux/mempool.h>
+#include <linux/blkdev.h>
 #include <linux/writeback.h>
 
 static void add_element(mempool_t *pool, void *element)
@@ -184,8 +185,7 @@ void * mempool_alloc(mempool_t *pool, int gfp_mask)
 {
 	void *element;
 	unsigned long flags;
-	int curr_nr;
-	DECLARE_WAITQUEUE(wait, current);
+	DEFINE_WAIT(wait);
 	int gfp_nowait = gfp_mask & ~(__GFP_WAIT | __GFP_IO);
 	int pf_flags = current->flags;
 
@@ -226,18 +226,10 @@ repeat_alloc:
 
 	blk_run_queues();
 
-	add_wait_queue_exclusive(&pool->wait, &wait);
-	set_task_state(current, TASK_UNINTERRUPTIBLE);
-
-	spin_lock_irqsave(&pool->lock, flags);
-	curr_nr = pool->curr_nr;
-	spin_unlock_irqrestore(&pool->lock, flags);
-
-	if (!curr_nr)
-		schedule();
-
-	current->state = TASK_RUNNING;
-	remove_wait_queue(&pool->wait, &wait);
+	prepare_to_wait(&pool->wait, &wait, TASK_UNINTERRUPTIBLE);
+	if (!pool->curr_nr)
+		io_schedule();
+	finish_wait(&pool->wait, &wait);
 
 	goto repeat_alloc;
 }

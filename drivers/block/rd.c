@@ -213,7 +213,7 @@ static int rd_blkdev_pagecache_IO(int rw, struct bio_vec *vec,
 		kunmap(vec->bv_page);
 
 		if (rw == READ) {
-			flush_dcache_page(page);
+			flush_dcache_page(sbh->b_page);
 		} else {
 			SetPageDirty(page);
 		}
@@ -476,6 +476,7 @@ static int __init rd_init (void)
 
 #ifdef CONFIG_BLK_DEV_INITRD
 	/* We ought to separate initrd operations here */
+	set_capacity(initrd_disk, (initrd_end-initrd_start+511)>>9);
 	add_disk(initrd_disk);
 	devfs_register(devfs_handle, "initrd", DEVFS_FL_DEFAULT, MAJOR_NR,
 			INITRD_MINOR, S_IFBLK | S_IRUSR, &rd_bd_op, NULL);

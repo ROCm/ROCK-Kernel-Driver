@@ -303,8 +303,9 @@ static int __devinit it8172_init_one(struct pci_dev *dev, const struct pci_devic
 	ide_pci_device_t *d = &it8172_chipsets[id->driver_data];
         if ((!(PCI_FUNC(dev->devfn) & 1) ||
             (!((dev->class >> 8) == PCI_CLASS_STORAGE_IDE))))
-                return 0; /* IT8172 is more than only a IDE controller */
+                return 1; /* IT8172 is more than only a IDE controller */
 	ide_setup_pci_device(dev, d);
+	MOD_INC_USE_COUNT;
 	return 0;
 }
 

@@ -7,6 +7,5 @@ obj-y    := sbus.o dvma.o
 endif
 
 obj-$(CONFIG_SBUSCHAR) += char/
-obj-$(CONFIG_SPARCAUDIO) += audio/
 
 include $(TOPDIR)/Rules.make

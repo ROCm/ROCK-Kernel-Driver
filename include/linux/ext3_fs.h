@@ -17,6 +17,7 @@
 #define _LINUX_EXT3_FS_H
 
 #include <linux/types.h>
+#include <linux/ext3_fs_sb.h>
 
 /*
  * The second extended filesystem constants/structures

@@ -11,6 +11,8 @@ CONFIG_BLUEZ
                HCI Device drivers (interface to the hardware)
                L2CAP Module (L2CAP protocol)
                SCO Module (SCO links)
+               RFCOMM Module (RFCOMM protocol)  
+               BNEP Module (BNEP protocol)
 
   Say Y here to enable Linux Bluetooth support and to build BlueZ Core
   layer.

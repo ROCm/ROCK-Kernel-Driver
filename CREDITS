@@ -1081,6 +1081,11 @@ D: Made support for modules, ramdisk, generic-serial, etc. optional.
 D: Transformed old user space bdflush into 1st kernel thread - kflushd.
 D: Many other patches, documentation files, mini kernels, utilities, ...
 
+N: Masanori GOTO
+E: gotom@debian.or.jp
+D: Workbit NinjaSCSI-32Bi/UDE driver
+S: Japan
+
 N: John E. Gotts
 E: jgotts@linuxsavvy.com
 D: kernel hacker
@@ -3337,6 +3342,12 @@ D: RTLinux (RealTime Linux)
 S: POB 1822 
 S: Socorro NM, 87801
 S: USA
+
+N: Hiroshi YOKOTA
+E: yokota@netlab.is.tsukuba.ac.jp
+D: Workbit NinjaSCSI-3/32Bi PCMCIA driver
+D: Workbit NinjaSCSI-32Bi/UDE driver
+S: Japan
 
 N: Eric Youngdale
 E: eric@andante.org

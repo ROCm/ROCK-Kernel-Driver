@@ -65,8 +65,8 @@ static struct block_device_operations ubd_blops = {
 static request_queue_t *ubd_queue;
 
 static int fake_major = 0;
-static struct gendisk ubd_gendisk[MAX_DEV];
-static struct gendisk fake_gendisk[MAX_DEV];
+static struct gendisk *ubd_gendisk[MAX_DEV];
+static struct gendisk *fake_gendisk[MAX_DEV];
  
 #ifdef CONFIG_BLK_DEV_UBD_SYNC
 #define OPEN_FLAGS ((struct openflags) { r : 1, w : 1, s : 1, c : 0 })
@@ -398,31 +398,43 @@ static int ubd_add(int n)
  	devfs_handle_t real, fake;
 	char name[sizeof("nnnnnn\0")];
 	struct ubd *dev = &ubd_dev[n];
+	struct gendisk *disk, *fake_disk;
 	u64 size;
 
 	if (!dev->file)
 		return -1;
 
-	ubd_gendisk[n].major = MAJOR_NR;
-	ubd_gendisk[n].first_minor = n << UBD_SHIFT;
-	ubd_gendisk[n].minor_shift = UBD_SHIFT;
-	ubd_gendisk[n].fops = &ubd_fops;
+	disk = alloc_disk();
+	if (!disk)
+		return -1;
+	disk->major = MAJOR_NR;
+	disk->first_minor = n << UBD_SHIFT;
+	disk->minor_shift = UBD_SHIFT;
+	disk->fops = &ubd_fops;
 	if (fakehd_set)
-		sprintf(ubd_gendisk[n].disk_name, "hd%c", n + 'a');
+		sprintf(disk->disk_name, "hd%c", n + 'a');
 	else
-		sprintf(ubd_gendisk[n].disk_name, "ubd%d", n);
+		sprintf(disk->disk_name, "ubd%d", n);
 
 	if (fake_major) {
-		fake_gendisk[n].major = fake_major;
-		fake_gendisk[n].first_minor = n << UBD_SHIFT;
-		fake_gendisk[n].minor_shift = UBD_SHIFT;
-		fake_gendisk[n].fops = &ubd_fops;
-		sprintf(fake_gendisk[n].disk_name, "ubd%d", n);
+		fake_disk = alloc_disk();
+		if (!fake_disk) {
+			put_disk(disk);
+			return -1;
+		}
+		fake_disk->major = fake_major;
+		fake_disk->first_minor = n << UBD_SHIFT;
+		fake_disk->minor_shift = UBD_SHIFT;
+		fake_disk->fops = &ubd_fops;
+		sprintf(fake_disk->disk_name, "ubd%d", n);
+		fake_gendisk[n] = fake_disk;
 	}
 
+	ubd_gendisk[n] = disk;
+
 	if (!dev->is_dir && ubd_file_size(dev, &size) == 0) {
-		set_capacity(&ubd_gendisk[n], size/512);
-		set_capacity(&fake_gendisk[n], size/512);
+		set_capacity(disk, size/512);
+		set_capacity(fake_disk, size/512);
 	}
  
 	sprintf(name, "%d", n);
@@ -430,14 +442,14 @@ static int ubd_add(int n)
 			      MAJOR_NR, n << UBD_SHIFT,
 			      S_IFBLK | S_IRUSR | S_IWUSR | S_IRGRP |S_IWGRP,
 			      &ubd_blops, NULL);
-	add_disk(&ubd_gendisk[n]);
+	add_disk(disk);
 	if (fake_major) {
 		fake = devfs_register(ubd_fake_dir_handle, name, 
 				      DEVFS_FL_REMOVABLE, fake_major,
 				      n << UBD_SHIFT, 
 				      S_IFBLK | S_IRUSR | S_IWUSR | S_IRGRP |
 				      S_IWGRP, &ubd_blops, NULL);
-		add_disk(&fake_gendisk[n]);
+		add_disk(fake_disk);
  		if(fake == NULL) return(-1);
  		ubd_dev[n].fake = fake;
 	}
@@ -445,7 +457,7 @@ static int ubd_add(int n)
  	if(real == NULL) return(-1);
  	ubd_dev[n].real = real;
  
-	make_ide_entries(ubd_gendisk[n].name);
+	make_ide_entries(disk->disk_name);
 	return(0);
 }
 
@@ -483,9 +495,14 @@ static int ubd_remove(char *str)
 	n = *str - '0';
 	if(n > MAX_DEV) return(-1);
 	dev = &ubd_dev[n];
-	del_gendisk(&ubd_gendisk[n]);
-	if (fake_major)
-		del_gendisk(&fake_gendisk[n]);
+	del_gendisk(ubd_gendisk[n]);
+	put_disk(ubd_gendisk[n]);
+	ubd_gendisk[n] = NULL;
+	if (fake_major) {
+		del_gendisk(fake_gendisk[n]);
+		put_disk(fake_gendisk[n]);
+		fake_gendisk[n] = NULL;
+	}
 	if(dev->file == NULL) return(0);
 	if(dev->count > 0) return(-1);
 	if(dev->real != NULL) devfs_unregister(dev->real);
@@ -878,9 +895,9 @@ static int ubd_revalidate(kdev_t rdev)
 	
 	err = ubd_file_size(dev, &size);
 	if (!err) {
-		set_capacity(&ubd_gendisk[n], size / 512);
+		set_capacity(ubd_gendisk[n], size / 512);
 		if(fake_major != 0)
-			set_capacity(&fake_gendisk[n], size / 512);
+			set_capacity(fake_gendisk[n], size / 512);
 		dev->size = size;
 	}
 

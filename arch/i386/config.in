@@ -293,6 +293,8 @@ else
    fi
 fi
 
+tristate 'NatSemi SCx200 support' CONFIG_SCx200
+
 source drivers/pci/Config.in
 
 bool 'EISA support' CONFIG_EISA

@@ -65,7 +65,7 @@ int hpfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	int c1, c2 = 0;
 	int ret = 0;
 
-	if (inode->i_sb->s_hpfs_chk) {
+	if (hpfs_sb(inode->i_sb)->sb_chk) {
 		if (hpfs_chk_sectors(inode->i_sb, inode->i_ino, 1, "dir_fnode")) {
 			ret = -EFSERROR;
 			goto out;
@@ -75,7 +75,7 @@ int hpfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 			goto out;
 		}
 	}
-	if (inode->i_sb->s_hpfs_chk >= 2) {
+	if (hpfs_sb(inode->i_sb)->sb_chk >= 2) {
 		struct buffer_head *bh;
 		struct fnode *fno;
 		int e = 0;
@@ -97,7 +97,7 @@ int hpfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 			goto out;
 		}
 	}
-	lc = inode->i_sb->s_hpfs_lowercase;
+	lc = hpfs_sb(inode->i_sb)->sb_lowercase;
 	if (filp->f_pos == 12) { /* diff -r requires this (note, that diff -r */
 		filp->f_pos = 13; /* also fails on msdos filesystem in 2.0) */
 		goto out;
@@ -114,7 +114,7 @@ int hpfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		/* This won't work when cycle is longer than number of dirents
 		   accepted by filldir, but what can I do?
 		   maybe killall -9 ls helps */
-		if (inode->i_sb->s_hpfs_chk)
+		if (hpfs_sb(inode->i_sb)->sb_chk)
 			if (hpfs_stop_cycles(inode->i_sb, filp->f_pos, &c1, &c2, "hpfs_readdir")) {
 				hpfs_unlock_inode(inode);
 				ret = -EFSERROR;
@@ -160,7 +160,7 @@ int hpfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 				goto out;
 			}
 			if (de->first || de->last) {
-				if (inode->i_sb->s_hpfs_chk) {
+				if (hpfs_sb(inode->i_sb)->sb_chk) {
 					if (de->first && !de->last && (de->namelen != 2 || de ->name[0] != 1 || de->name[1] != 1)) hpfs_error(inode->i_sb, "hpfs_readdir: bad ^A^A entry; pos = %08x", old_pos);
 					if (de->last && (de->namelen != 1 || de ->name[0] != 255)) hpfs_error(inode->i_sb, "hpfs_readdir: bad \\377 entry; pos = %08x", old_pos);
 				}
@@ -241,7 +241,7 @@ struct dentry *hpfs_lookup(struct inode *dir, struct dentry *dentry)
 	 * Go find or make an inode.
 	 */
 
-	hpfs_lock_iget(dir->i_sb, de->directory || (de->ea_size && dir->i_sb->s_hpfs_eas) ? 1 : 2);
+	hpfs_lock_iget(dir->i_sb, de->directory || (de->ea_size && hpfs_sb(dir->i_sb)->sb_eas) ? 1 : 2);
 	if (!(result = iget(dir->i_sb, ino))) {
 		hpfs_unlock_iget(dir->i_sb);
 		hpfs_error(dir->i_sb, "hpfs_lookup: can't get inode");

@@ -15,7 +15,6 @@
  *   Device specific file operations
  *        xpram_iotcl
  *        xpram_open
- *        xpram_release
  *
  * "ad-hoc" partitioning:
  *    the expanded memory can be partitioned among several devices 
@@ -36,6 +35,7 @@
 #include <linux/blkpg.h>
 #include <linux/hdreg.h>  /* HDIO_GETGEO */
 #include <linux/device.h>
+#include <linux/bio.h>
 #include <asm/uaccess.h>
 
 #define XPRAM_NAME	"xpram"
@@ -47,10 +47,13 @@
 #define PRINT_WARN(x...)	printk(KERN_WARNING XPRAM_NAME " warning:" x)
 #define PRINT_ERR(x...)		printk(KERN_ERR XPRAM_NAME " error:" x)
 
-static struct device xpram_sys_device = {
-	name: "S/390 expanded memory RAM disk",
-	bus_id: "xpram",
-};
+static struct sys_device xpram_sys_device = {
+	.name = "S/390 expanded memory RAM disk",
+	.dev  = {
+		.name   = "S/390 expanded memory RAM disk",
+		.bus_id = "xpram",
+	},
+}; 
 
 typedef struct {
 	unsigned long	size;		/* size of xpram segment in pages */
@@ -59,7 +62,7 @@ typedef struct {
 
 static xpram_device_t xpram_devices[XPRAM_MAX_DEVS];
 static int xpram_sizes[XPRAM_MAX_DEVS];
-static struct gendisk xpram_disks[XPRAM_MAX_DEVS];
+static struct gendisk *xpram_disks[XPRAM_MAX_DEVS];
 static unsigned long xpram_pages;
 static int xpram_devs;
 static devfs_handle_t xpram_devfs_handle;
@@ -312,10 +315,12 @@ static int xpram_make_request(request_queue_t *q, struct bio *bio)
 		}
 	}
 	set_bit(BIO_UPTODATE, &bio->bi_flags);
-	bio->bi_end_io(bio);
+	bytes = bio->bi_size;
+	bio->bi_size = 0;
+	bio->bi_end_io(bio, bytes, 0);
 	return 0;
 fail:
-	bio_io_error(bio);
+	bio_io_error(bio, bio->bi_size);
 	return 0;
 }
 
@@ -329,7 +334,6 @@ static int xpram_open (struct inode *inode, struct file *filp)
 	return 0;
 }
 
-
 static int xpram_ioctl (struct inode *inode, struct file *filp,
 		 unsigned int cmd, unsigned long arg)
 {
@@ -338,7 +342,7 @@ static int xpram_ioctl (struct inode *inode, struct file *filp,
 	int idx = minor(inode->i_rdev);
 	if (idx >= xpram_devs)
 		return -ENODEV;
-	if (cmd != HDIO_GETGEO)
+ 	if (cmd != HDIO_GETGEO)
 		return -EINVAL;
 	/*
 	 * get geometry: we have to fake one...  trim the size to a
@@ -355,14 +359,12 @@ static int xpram_ioctl (struct inode *inode, struct file *filp,
 	put_user(4, &geo->start);
 	return 0;
 }
-}
 
 static struct block_device_operations xpram_devops =
 {
 	owner:   THIS_MODULE,
 	ioctl:   xpram_ioctl,
 	open:    xpram_open,
-	release: xpram_release,
 };
 
 /*
@@ -436,7 +438,14 @@ static int __init xpram_setup_blkdev(void)
 {
 	request_queue_t *q;
 	unsigned long offset;
-	int i, rc;
+	int i, rc = -ENOMEM;
+
+	for (i = 0; i < xpram_devs; i++) {
+		struct gendisk *disk = alloc_disk();
+		if (!disk)
+			goto out;
+		xpram_disks[i] = disk;
+	}
 
 	/*
 	 * Register xpram major.
@@ -444,7 +453,7 @@ static int __init xpram_setup_blkdev(void)
 	rc = register_blkdev(XPRAM_MAJOR, XPRAM_NAME, &xpram_devops);
 	if (rc < 0) {
 		PRINT_ERR("Can't get xpram major %d\n", XPRAM_MAJOR);
-		return rc;
+		goto out;
 	}
 
 	xpram_devfs_handle = devfs_mk_dir (NULL, "slram", NULL);
@@ -466,7 +475,7 @@ static int __init xpram_setup_blkdev(void)
 	 */
 	offset = 0;
 	for (i = 0; i < xpram_devs; i++) {
-		struct gendisk *disk = xpram_disks + i;
+		struct gendisk *disk = xpram_disks[i];
 		xpram_devices[i].size = xpram_sizes[i] / 4;
 		xpram_devices[i].offset = offset;
 		offset += xpram_devices[i].size;
@@ -480,6 +489,9 @@ static int __init xpram_setup_blkdev(void)
 	}
 
 	return 0;
+out:
+	while (i--)
+		put_disk(xpram_disks[i]);
 }
 
 /*
@@ -488,11 +500,13 @@ static int __init xpram_setup_blkdev(void)
 static void __exit xpram_exit(void)
 {
 	int i;
-	for (i = 0; i < xpram_devs; i++)
-		del_gendisk(xpram_disks + i);
+	for (i = 0; i < xpram_devs; i++) {
+		del_gendisk(xpram_disks[i]);
+		put_disk(xpram_disks[i]);
+	}
 	unregister_blkdev(XPRAM_MAJOR, XPRAM_NAME);
 	devfs_unregister(xpram_devfs_handle);
-	unregister_sys_device(&xpram_sys_device);
+	sys_device_unregister(&xpram_sys_device);
 }
 
 static int __init xpram_init(void)
@@ -510,12 +524,12 @@ static int __init xpram_init(void)
 	rc = xpram_setup_sizes(xpram_pages);
 	if (rc)
 		return rc;
-	rc = register_sys_device(&xpram_sys_device);
+	rc = sys_device_register(&xpram_sys_device);
 	if (rc)
 		return rc;
 	rc = xpram_setup_blkdev();
 	if (rc)
-		unregister_sys_device(&xpram_sys_device);
+		sys_device_unregister(&xpram_sys_device);
 	return rc;
 }
 

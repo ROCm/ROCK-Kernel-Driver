@@ -11,7 +11,7 @@
 
 #include <linux/config.h>
 #include <linux/threads.h>
-#include <linux/ptrace.h>
+#include <linux/bitops.h>
 
 #if defined(__KERNEL__) && defined(CONFIG_SMP) && !defined(__ASSEMBLY__)
 
@@ -29,6 +29,7 @@ typedef struct
 } sigp_info;
 
 extern volatile unsigned long cpu_online_map;
+extern unsigned long cpu_possible_map;
 
 #define NO_PROC_ID		0xFF		/* No processor magic marker */
 
@@ -46,14 +47,20 @@ extern volatile unsigned long cpu_online_map;
 
 #define smp_processor_id() (current_thread_info()->cpu)
 
-extern __inline__ int cpu_logical_map(int cpu)
+#define cpu_online(cpu) (cpu_online_map & (1<<(cpu)))
+#define cpu_possible(cpu) (cpu_possible_map & (1<<(cpu)))
+
+extern inline unsigned int num_online_cpus(void)
 {
-        return cpu;
+	return hweight32(cpu_online_map);
 }
 
-extern __inline__ int cpu_number_map(int cpu)
+extern inline int any_online_cpu(unsigned int mask)
 {
-        return cpu;
+	if (mask & cpu_online_map)
+		return __ffs(mask & cpu_online_map);
+
+	return -1;
 }
 
 extern __inline__ __u16 hard_smp_processor_id(void)
