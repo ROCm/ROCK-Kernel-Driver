@@ -803,8 +803,6 @@ running once the system is up.
 
 	nofxsr		[BUGS=IA-32]
 
-	nohighio	[BUGS=IA-32] Disable highmem block I/O.
-
 	nohlt		[BUGS=ARM]
  
 	no-hlt		[BUGS=IA-32] Tells the kernel that the hlt
