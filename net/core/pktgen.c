@@ -88,9 +88,9 @@
 #define cycles()	((u32)get_cycles())
 
 
-#define VERSION "pktgen version 1.2.1"
+#define VERSION "pktgen version 1.3"
 static char version[] __initdata = 
-  "pktgen.c: v1.2.1: Packet Generator for packet performance testing.\n";
+  "pktgen.c: v1.3: Packet Generator for packet performance testing.\n";
 
 /* Used to help with determining the pkts on receive */
 
@@ -744,8 +744,6 @@ out_reldev:
 		odev = NULL;
 	}
 
-	/* TODO:  Is this worth printing out (other than for debug?) */
-	printk("fp = %llu\n", (unsigned long long) fp);
 	return;
 
 }
