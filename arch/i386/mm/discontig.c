@@ -34,20 +34,14 @@
 #include <asm/e820.h>
 #include <asm/setup.h>
 
-struct pfns {
-	unsigned long start_pfn;
-	unsigned long max_pfn;
-};
-
 struct pglist_data *node_data[MAX_NUMNODES];
-bootmem_data_t plat_node_bdata;
-struct pfns plat_node_bootpfns[MAX_NUMNODES];
+bootmem_data_t node0_bdata;
 
 extern unsigned long find_max_low_pfn(void);
 extern void find_max_pfn(void);
 extern void one_highpage_init(struct page *, int, int);
 
-extern u64 nodes_mem_start[], nodes_mem_size[];
+extern unsigned long node_start_pfn[], node_end_pfn[];
 extern struct e820map e820;
 extern char _end;
 extern unsigned long highend_pfn, highstart_pfn;
@@ -60,22 +54,22 @@ extern unsigned long totalhigh_pages;
  */
 static void __init find_max_pfn_node(int nid)
 {
-	unsigned long node_datasz;
-	unsigned long start, end;
-
-	start = plat_node_bootpfns[nid].start_pfn = PFN_UP(nodes_mem_start[nid]);
-	end = PFN_DOWN(nodes_mem_start[nid]) + PFN_DOWN(nodes_mem_size[nid]);
-
-	if (start >= end) {
+	if (node_start_pfn[nid] >= node_end_pfn[nid])
 		BUG();
-	}
-	if (end > max_pfn) {
-		end = max_pfn;
-	}
-	plat_node_bootpfns[nid].max_pfn = end;
+	if (node_end_pfn[nid] > max_pfn)
+		node_end_pfn[nid] = max_pfn;
+}
+
+/* 
+ * Allocate memory for the pg_data_t via a crude pre-bootmem method
+ * We ought to relocate these onto their own node later on during boot.
+ */
+static void __init allocate_pgdat(int nid)
+{
+	unsigned long node_datasz;
 
 	node_datasz = PFN_UP(sizeof(struct pglist_data));
-	NODE_DATA(nid) = (struct pglist_data *)(__va(min_low_pfn << PAGE_SHIFT));
+	NODE_DATA(nid) = (pg_data_t *)(__va(min_low_pfn << PAGE_SHIFT));
 	min_low_pfn += node_datasz;
 }
 
@@ -147,12 +141,11 @@ unsigned long __init setup_memory(void)
 			pages_to_mb(system_max_low_pfn));
 	
 	for (nid = 0; nid < numnodes; nid++)
-	{	
+		allocate_pgdat(nid);
+	for (nid = 0; nid < numnodes; nid++)
 		find_max_pfn_node(nid);
 
-	}
-
-	NODE_DATA(0)->bdata = &plat_node_bdata;
+	NODE_DATA(0)->bdata = &node0_bdata;
 
 	/*
 	 * Initialize the boot-time allocator (with low memory only):
@@ -231,8 +224,8 @@ void __init zone_sizes_init(void)
 		unsigned int max_dma;
 
 		unsigned long low = max_low_pfn;
-		unsigned long high = plat_node_bootpfns[nid].max_pfn;
-		unsigned long start = plat_node_bootpfns[nid].start_pfn;
+		unsigned long start = node_start_pfn[nid];
+		unsigned long high = node_end_pfn[nid];
 		
 		max_dma = virt_to_phys((char *)MAX_DMA_ADDRESS) >> PAGE_SHIFT;
 
