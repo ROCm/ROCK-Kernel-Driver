@@ -34,9 +34,28 @@ extern void smp_send_xmon_break(int cpu);
 struct pt_regs;
 extern void smp_message_recv(int, struct pt_regs *);
 
-#define cpu_possible(cpu)	paca[cpu].active
 
 #define smp_processor_id() (get_paca()->xPacaIndex)
+#define hard_smp_processor_id() (get_paca()->xHwProcNum)
+
+/*
+ * Retrieve the state of a CPU:
+ * online:          CPU is in a normal run state
+ * possible:        CPU is a candidate to be made online
+ * available:       CPU is candidate for the 'possible' pool
+ *                  Used to get SMT threads started at boot time.
+ * present_at_boot: CPU was available at boot time.  Used in DLPAR
+ *                  code to handle special cases for processor start up.
+ */
+extern cpumask_t cpu_present_at_boot;
+extern cpumask_t cpu_online_map;
+extern cpumask_t cpu_possible_map;
+extern cpumask_t cpu_available_map;
+
+#define cpu_present_at_boot(cpu) cpu_isset(cpu, cpu_present_at_boot)
+#define cpu_online(cpu)          cpu_isset(cpu, cpu_online_map) 
+#define cpu_possible(cpu)        cpu_isset(cpu, cpu_possible_map) 
+#define cpu_available(cpu)       cpu_isset(cpu, cpu_available_map) 
 
 /* Since OpenPIC has only 4 IPIs, we use slightly different message numbers.
  *
@@ -52,5 +71,7 @@ void smp_init_pSeries(void);
 
 #endif /* __ASSEMBLY__ */
 #endif /* !(CONFIG_SMP) */
+#define get_hard_smp_processor_id(CPU) (paca[(CPU)].xHwProcNum)
+#define set_hard_smp_processor_id(CPU, VAL) do { (paca[(CPU)].xHwProcNum = VAL); } while (0)
 #endif /* !(_PPC64_SMP_H) */
 #endif /* __KERNEL__ */

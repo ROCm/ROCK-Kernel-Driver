@@ -53,8 +53,11 @@
 int smp_threads_ready;
 unsigned long cache_decay_ticks;
 
-/* initialised so it doesn't end up in bss */
+/* Initialised so it doesn't end up in bss */
+cpumask_t cpu_possible_map    = CPU_MASK_NONE;
 cpumask_t cpu_online_map = CPU_MASK_NONE;
+cpumask_t cpu_available_map   = CPU_MASK_NONE;
+cpumask_t cpu_present_at_boot = CPU_MASK_NONE;
 
 EXPORT_SYMBOL(cpu_online_map);
 
@@ -67,6 +70,8 @@ extern unsigned char stab_array[];
 extern int cpu_idle(void *unused);
 void smp_call_function_interrupt(void);
 void smp_message_pass(int target, int msg, unsigned long data, int wait);
+extern long register_vpa(unsigned long flags, unsigned long proc,
+			 unsigned long vpa);
 
 #define smp_message_pass(t,m,d,w) smp_ops->message_pass((t),(m),(d),(w))
 
