@@ -3379,10 +3379,7 @@ jffs_garbage_collect_thread(void *ptr)
 			unsigned long signr = 0;
 
 			spin_lock_irq(&current->sig->siglock);
-			if (current->sig->shared_pending.head)
-				signr = dequeue_signal(&current->sig->shared_pending, &info);
-			if (!signr)
-				signr = dequeue_signal(&current->pending, &info);
+			signr = dequeue_signal(&current->blocked, &info);
 			spin_unlock_irq(&current->sig->siglock);
 
 			switch(signr) {
