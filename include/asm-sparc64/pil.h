@@ -12,10 +12,11 @@
  * XXX happily sit at the same PIL.  We would then need only two
  * XXX PILs, one for devices and one for the CPU local timer tick.
  */
-#define PIL_MIGRATE	1
+/* None currently allocated, '1' is available for use. */
+#define PIL_SMP_1	1
 
 #ifndef __ASSEMBLY__
-#define PIL_RESERVED(PIL)	((PIL) == PIL_MIGRATE)
+#define PIL_RESERVED(PIL)	((PIL) == PIL_SMP_1)
 #endif
 
 #endif /* !(_SPARC64_PIL_H) */

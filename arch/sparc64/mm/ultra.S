@@ -684,11 +684,4 @@ xcall_call_function:
 	b,pt		%xcc, rtrap_irq
 	 nop
 
-	.globl		xcall_migrate_task
-xcall_migrate_task:
-	mov		1, %g2
-	sllx		%g2, (PIL_MIGRATE), %g2
-	wr		%g2, 0x0, %set_softint
-	retry
-
 #endif /* CONFIG_SMP */

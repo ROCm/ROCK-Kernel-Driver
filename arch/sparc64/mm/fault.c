@@ -160,10 +160,12 @@ static unsigned int get_user_insn(unsigned long tpc)
 	pmdp = pmd_offset(pgdp, tpc);
 	if (pmd_none(*pmdp))
 		goto outret;
-	ptep = pte_offset(pmdp, tpc);
+
+	/* This disables preemption for us as well. */
 	__asm__ __volatile__("rdpr %%pstate, %0" : "=r" (pstate));
 	__asm__ __volatile__("wrpr %0, %1, %%pstate"
 				: : "r" (pstate), "i" (PSTATE_IE));
+	ptep = pte_offset_map(pmdp, tpc);
 	pte = *ptep;
 	if (!pte_present(pte))
 		goto out;
@@ -177,6 +179,7 @@ static unsigned int get_user_insn(unsigned long tpc)
 			     : "r" (pa), "i" (ASI_PHYS_USE_EC));
 
 out:
+	pte_unmap(ptep);
 	__asm__ __volatile__("wrpr %0, 0x0, %%pstate" : : "r" (pstate));
 outret:
 	return insn;

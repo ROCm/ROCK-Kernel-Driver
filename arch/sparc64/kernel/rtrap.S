@@ -276,9 +276,9 @@ to_kernel:
 		 add			%l5, 1, %l6
 		stw			%l6, [%g6 + TI_PRE_COUNT]
 		call			kpreempt_maybe
-		 wrpr			%g0, RTRAP_PSTATE, %pstate
-		wrpr			%g0, RTRAP_PSTATE_IRQOFF, %pstate		
-		stw			%l5, [%g6 + TI_PRE_COUNT]
+		 nop
+		ba,pt			%xcc, rtrap
+		 stw			%l5, [%g6 + TI_PRE_COUNT]
 #endif
 kern_fpucheck:	ldub			[%g6 + TI_FPDEPTH], %l5
 		brz,pt			%l5, rt_continue
