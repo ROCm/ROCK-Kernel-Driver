@@ -193,7 +193,7 @@ isdn_net_ciscohdlck_slarp_send_request(isdn_net_local *lp)
 	isdn_net_write_super(lp, skb);
 }
 
-void 
+static void 
 isdn_ciscohdlck_connected(isdn_net_local *lp)
 {
 	lp->cisco_myseq = 0;
@@ -204,20 +204,25 @@ isdn_ciscohdlck_connected(isdn_net_local *lp)
 	lp->cisco_line_state = 0;
 	lp->cisco_debserint = 0;
 
-	/* send slarp request because interface/seq.no.s reset */
-	isdn_net_ciscohdlck_slarp_send_request(lp);
+	if (lp->p_encap == ISDN_NET_ENCAP_CISCOHDLCK) {
+		/* send slarp request because interface/seq.no.s reset */
+		isdn_net_ciscohdlck_slarp_send_request(lp);
 
-	init_timer(&lp->cisco_timer);
-	lp->cisco_timer.data = (unsigned long) lp;
-	lp->cisco_timer.function = isdn_net_ciscohdlck_slarp_send_keepalive;
-	lp->cisco_timer.expires = jiffies + lp->cisco_keepalive_period * HZ;
-	add_timer(&lp->cisco_timer);
+		init_timer(&lp->cisco_timer);
+		lp->cisco_timer.data = (unsigned long) lp;
+		lp->cisco_timer.function = isdn_net_ciscohdlck_slarp_send_keepalive;
+		lp->cisco_timer.expires = jiffies + lp->cisco_keepalive_period * HZ;
+		add_timer(&lp->cisco_timer);
+	}
+	isdn_net_device_wake_queue(lp);
 }
 
 void 
 isdn_ciscohdlck_disconnected(isdn_net_local *lp)
 {
-	del_timer(&lp->cisco_timer);
+	if (lp->p_encap == ISDN_NET_ENCAP_CISCOHDLCK) {
+		del_timer(&lp->cisco_timer);
+	}
 }
 
 static void
@@ -394,6 +399,7 @@ isdn_ciscohdlck_setup(isdn_net_dev *p)
 	p->dev.flags = IFF_NOARP|IFF_POINTOPOINT;
 	p->dev.do_ioctl = isdn_ciscohdlck_dev_ioctl;
 	p->local.receive = isdn_ciscohdlck_receive;
+	p->local.connected = isdn_ciscohdlck_connected;
 
 	return 0;
 }

@@ -18,7 +18,6 @@ int  isdn_x25_setup(isdn_net_dev *p, int encap);
 void isdn_x25_cleanup(isdn_net_dev *p);
 void isdn_x25_open(struct net_device *dev);
 void isdn_x25_close(struct net_device *dev);
-void isdn_x25_connected(isdn_net_local *lp);
 void isdn_x25_bhup(isdn_net_local *lp);
 void isdn_x25_hangup(isdn_net_local *lp);
 int  isdn_x25_start_xmit(struct sk_buff *skb, struct net_device *dev);
@@ -45,11 +44,6 @@ isdn_x25_open(struct net_device *dev)
 
 static inline void
 isdn_x25_close(struct net_device *dev)
-{
-}
-
-static inline void
-isdn_x25_connected(isdn_net_local *lp)
 {
 }
 

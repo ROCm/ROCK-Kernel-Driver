@@ -105,18 +105,6 @@ static __inline__ int isdn_net_device_started(isdn_net_dev *n)
 }
 
 /*
- * wake up the network -> net_device queue.
- * For slaves, wake the corresponding master interface.
- */
-static __inline__ void isdn_net_device_wake_queue(isdn_net_local *lp)
-{
-	if (lp->master) 
-		netif_wake_queue(lp->master);
-	else
-		netif_wake_queue(&lp->netdev->dev);
-}
-
-/*
  * stop the network -> net_device queue.
  * For slaves, stop the corresponding master interface.
  */
@@ -385,8 +373,6 @@ static void isdn_net_connected(isdn_net_local *lp)
 	lp->hup_timer.expires = jiffies + HZ;
 	add_timer(&lp->hup_timer);
 
-	if (lp->p_encap == ISDN_NET_ENCAP_CISCOHDLCK)
-		isdn_ciscohdlck_connected(lp);
 	if (lp->p_encap != ISDN_NET_ENCAP_SYNCPPP) {
 		if (lp->master) { /* is lp a slave? */
 			isdn_net_dev *nd = ((isdn_net_local *)lp->master->priv)->netdev;
@@ -407,13 +393,7 @@ static void isdn_net_connected(isdn_net_local *lp)
 	lp->cps = 0;
 	lp->last_jiffies = jiffies;
 
-	if (lp->p_encap == ISDN_NET_ENCAP_SYNCPPP)
-		isdn_ppp_wakeup_daemon(lp);
-
-	isdn_x25_connected(lp);
-	/* ppp needs to do negotiations first */
-	if (lp->p_encap != ISDN_NET_ENCAP_SYNCPPP)
-		isdn_net_device_wake_queue(lp);
+	lp->connected(lp);
 }
 
 /*
@@ -2484,6 +2464,7 @@ isdn_iptyp_setup(isdn_net_dev *p)
 	p->dev.header_cache_update = NULL;
 	p->dev.flags = IFF_NOARP|IFF_POINTOPOINT;
 	p->local.receive = isdn_iptyp_receive;
+	p->local.connected = isdn_net_device_wake_queue;
 
 	return 0;
 }
@@ -2521,6 +2502,7 @@ isdn_uihdlc_setup(isdn_net_dev *p)
 	p->dev.header_cache_update = NULL;
 	p->dev.flags = IFF_NOARP|IFF_POINTOPOINT;
 	p->local.receive = isdn_uihdlc_receive;
+	p->local.connected = isdn_net_device_wake_queue;
 
 	return 0;
 }
@@ -2548,6 +2530,7 @@ isdn_rawip_setup(isdn_net_dev *p)
 	p->dev.header_cache_update = NULL;
 	p->dev.flags = IFF_NOARP|IFF_POINTOPOINT;
 	p->local.receive = isdn_rawip_receive;
+	p->local.connected = isdn_net_device_wake_queue;
 
 	return 0;
 }
@@ -2629,6 +2612,7 @@ isdn_ether_setup(isdn_net_dev *p)
 	p->dev.header_cache_update = eth_header_cache_update;
 	p->dev.flags = IFF_BROADCAST | IFF_MULTICAST;
 	p->local.receive = isdn_ether_receive;
+	p->local.connected = isdn_net_device_wake_queue;
 
 	return 0;
 }

@@ -374,6 +374,7 @@ typedef struct isdn_net_local_s {
   void                   (*receive)(struct isdn_net_dev_s *p,
 				    struct isdn_net_local_s *olp,
 				    struct sk_buff *skb);
+  void                   (*connected)(struct isdn_net_local_s *lp);
 } isdn_net_local;
 
 /* the interface itself */

@@ -147,7 +147,7 @@ void isdn_x25_close(struct net_device *dev)
 	if( cprot && cprot -> pops ) cprot -> pops -> close( cprot );
 }
 
-void isdn_x25_connected(isdn_net_local *lp)
+static void isdn_x25_connected(isdn_net_local *lp)
 {
 	struct concap_proto *cprot = lp -> netdev -> cprot;
 	struct concap_proto_ops *pops = cprot ? cprot -> pops : 0;
@@ -156,6 +156,8 @@ void isdn_x25_connected(isdn_net_local *lp)
 	if( pops )
 		if( pops->connect_ind)
 			pops->connect_ind(cprot);
+
+	isdn_net_device_wake_queue(lp);
 }
 
 void isdn_x25_dhup(isdn_net_local *lp)
@@ -264,6 +266,7 @@ int isdn_x25_setup(isdn_net_dev *p, int encap)
 	p->dev.hard_header_cache = NULL;
 	p->dev.header_cache_update = NULL;
 	p->local.receive = isdn_x25_receive;
+	p->local.connected = isdn_x25_connected;
 
 	/* the protocol is not configured yet; this will
 	   happen later when isdn_x25_open() is called */

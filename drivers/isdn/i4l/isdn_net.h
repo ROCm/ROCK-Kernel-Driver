@@ -145,6 +145,18 @@ static __inline__ void isdn_net_rm_from_bundle(isdn_net_local *lp)
 	spin_unlock_irqrestore(&master_lp->netdev->queue_lock, flags);
 }
 
+/*
+ * wake up the network -> net_device queue.
+ * For slaves, wake the corresponding master interface.
+ */
+static inline void isdn_net_device_wake_queue(isdn_net_local *lp)
+{
+	if (lp->master) 
+		netif_wake_queue(lp->master);
+	else
+		netif_wake_queue(&lp->netdev->dev);
+}
+
 static inline int
 put_u8(unsigned char *p, u8 x)
 {

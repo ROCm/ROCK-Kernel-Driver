@@ -224,7 +224,7 @@ isdn_ppp_bind(isdn_net_local * lp)
  * (wakes up daemon after B-channel connect)
  */
 
-void
+static void
 isdn_ppp_wakeup_daemon(isdn_net_local * lp)
 {
 	if (lp->ppp_slot < 0 || lp->ppp_slot >= ISDN_MAX_CHANNELS) {
@@ -2926,6 +2926,7 @@ isdn_ppp_setup(isdn_net_dev *p)
 	p->dev.addr_len = 0;
 	p->dev.do_ioctl = isdn_ppp_dev_ioctl;
 	p->local.receive = isdn_ppp_receive;
+	p->local.connected = isdn_ppp_wakeup_daemon;
 
 	return 0;
 }
