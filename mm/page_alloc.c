@@ -961,18 +961,36 @@ unsigned long __read_page_state(unsigned offset)
 	return ret;
 }
 
-void get_zone_counts(unsigned long *active,
-		unsigned long *inactive, unsigned long *free)
+void __get_zone_counts(unsigned long *active, unsigned long *inactive,
+			unsigned long *free, struct pglist_data *pgdat)
 {
-	struct zone *zone;
+	struct zone *zones = pgdat->node_zones;
+	int i;
 
 	*active = 0;
 	*inactive = 0;
 	*free = 0;
-	for_each_zone(zone) {
-		*active += zone->nr_active;
-		*inactive += zone->nr_inactive;
-		*free += zone->free_pages;
+	for (i = 0; i < MAX_NR_ZONES; i++) {
+		*active += zones[i].nr_active;
+		*inactive += zones[i].nr_inactive;
+		*free += zones[i].free_pages;
+	}
+}
+
+void get_zone_counts(unsigned long *active,
+		unsigned long *inactive, unsigned long *free)
+{
+	struct pglist_data *pgdat;
+
+	*active = 0;
+	*inactive = 0;
+	*free = 0;
+	for_each_pgdat(pgdat) {
+		unsigned long l, m, n;
+		__get_zone_counts(&l, &m, &n, pgdat);
+		*active += l;
+		*inactive += m;
+		*free += n;
 	}
 }
 

@@ -272,6 +272,8 @@ typedef struct pglist_data {
 extern int numnodes;
 extern struct pglist_data *pgdat_list;
 
+void __get_zone_counts(unsigned long *active, unsigned long *inactive,
+			unsigned long *free, struct pglist_data *pgdat);
 void get_zone_counts(unsigned long *active, unsigned long *inactive,
 			unsigned long *free);
 void build_all_zonelists(void);

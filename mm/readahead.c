@@ -571,6 +571,6 @@ unsigned long max_sane_readahead(unsigned long nr)
 	unsigned long inactive;
 	unsigned long free;
 
-	get_zone_counts(&active, &inactive, &free);
+	__get_zone_counts(&active, &inactive, &free, NODE_DATA(numa_node_id()));
 	return min(nr, (inactive + free) / 2);
 }
