@@ -2,7 +2,7 @@
  * kobject.c - library routines for handling generic kernel objects
  */
 
-#define DEBUG 1
+#define DEBUG 0
 
 #include <linux/kobject.h>
 #include <linux/module.h>
