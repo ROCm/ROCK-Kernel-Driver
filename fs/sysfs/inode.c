@@ -303,11 +303,11 @@ static int check_perm(struct inode * inode, struct file * file)
 	if (!kobj || !attr)
 		goto Einval;
 
-	/* if the kobject has no subsystem, then it is a subsystem itself,
-	 * so give it the subsys_sysfs_ops.
+	/* if the kobject has no ktype, then we assume that it is a subsystem
+	 * itself, and use ops for it.
 	 */
-	if (kobj->subsys)
-		ops = kobj->subsys->sysfs_ops;
+	if (kobj->ktype)
+		ops = kobj->ktype->sysfs_ops;
 	else
 		ops = &subsys_sysfs_ops;
 

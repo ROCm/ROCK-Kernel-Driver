@@ -384,11 +384,14 @@ static void disk_release(struct kobject * kobj)
 	kfree(disk);
 }
 
-struct subsystem block_subsys = {
-	.kobj	= { .name = "block" },
+static struct kobj_type ktype_block = {
 	.release	= disk_release,
 	.sysfs_ops	= &disk_sysfs_ops,
 	.default_attrs	= default_attrs,
+};
+
+struct subsystem block_subsys = {
+	.kobj	= { .name = "block" },
 };
 
 struct gendisk *alloc_disk(int minors)
@@ -409,6 +412,7 @@ struct gendisk *alloc_disk(int minors)
 		while (minors >>= 1)
 			disk->minor_shift++;
 		disk->kobj.subsys = &block_subsys;
+		disk->kobj.ktype = &ktype_block;
 		kobject_init(&disk->kobj);
 		INIT_LIST_HEAD(&disk->full_list);
 		rand_initialize_disk(disk);

@@ -31,10 +31,15 @@ static void acpi_device_release(struct kobject * kobj)
 	kfree(dev);
 }
 
-static struct subsystem acpi_namespace_subsys = {
-	.kobj		= { .name = "namespace" },
-	.parent		= &acpi_subsys,
+static struct kobj_type ktype_acpi_ns = {
 	.release	= acpi_device_release,
+};
+
+static struct subsystem acpi_namespace_subsys = {
+	.kobj		= { 
+		.name = "namespace",
+		.parent = &acpi_subsys.kobj,
+	},
 };
 
 
@@ -61,6 +66,7 @@ static void acpi_device_register(struct acpi_device * device, struct acpi_device
 	strncpy(device->kobj.name,device->pnp.bus_id,KOBJ_NAME_LEN);
 	if (parent)
 		device->kobj.parent = &parent->kobj;
+	device->kobj.ktype = &ktype_acpi_ns;
 	device->kobj.subsys = &acpi_namespace_subsys;
 	kobject_register(&device->kobj);
 }

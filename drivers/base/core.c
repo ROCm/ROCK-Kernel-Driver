@@ -81,6 +81,11 @@ static void device_release(struct kobject * kobj)
 		dev->release(dev);
 }
 
+static struct kobj_type ktype_device = {
+	.release	= device_release,
+	.sysfs_ops	= &dev_sysfs_ops,
+	.default_attrs	= dev_default_attrs,
+};
 
 /**
  *	device_subsys - structure to be registered with kobject core.
@@ -89,9 +94,6 @@ struct subsystem device_subsys = {
 	.kobj		= {
 		.name	= "devices",
 	},
-	.release	= device_release,
-	.sysfs_ops	= &dev_sysfs_ops,
-	.default_attrs	= dev_default_attrs,
 };
 
 
@@ -175,6 +177,7 @@ int device_add(struct device *dev)
 
 	/* first, register with generic layer. */
 	strncpy(dev->kobj.name,dev->bus_id,KOBJ_NAME_LEN);
+	dev->kobj.ktype = &ktype_device;
 	dev->kobj.subsys = &device_subsys;
 	if (parent)
 		dev->kobj.parent = &parent->kobj;

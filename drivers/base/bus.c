@@ -70,6 +70,11 @@ static void driver_release(struct kobject * kobj)
 	up(&drv->unload_sem);
 }
 
+static struct kobj_type ktype_driver = {
+	.sysfs_ops	= &driver_sysfs_ops,
+	.release	= driver_release,
+};
+
 
 /*
  * sysfs bindings for buses
@@ -126,9 +131,13 @@ void bus_remove_file(struct bus_type * bus, struct bus_attribute * attr)
 	}
 }
 
+static struct kobj_type ktype_bus = {
+	.sysfs_ops	= &bus_sysfs_ops,
+
+};
+
 struct subsystem bus_subsys = {
 	.kobj	= { .name = "bus" },
-	.sysfs_ops	= &bus_sysfs_ops,
 };
 
 
@@ -432,6 +441,7 @@ int bus_add_driver(struct device_driver * drv)
 		pr_debug("bus %s: add driver %s\n",bus->name,drv->name);
 
 		strncpy(drv->kobj.name,drv->name,KOBJ_NAME_LEN);
+		drv->kobj.ktype = &ktype_driver;
 		drv->kobj.subsys = &bus->drvsubsys;
 		kobject_register(&drv->kobj);
 
@@ -491,7 +501,8 @@ int bus_register(struct bus_type * bus)
 
 	down(&bus_sem);
 	strncpy(bus->subsys.kobj.name,bus->name,KOBJ_NAME_LEN);
-	bus->subsys.parent = &bus_subsys;
+	bus->subsys.kobj.ktype = &ktype_bus;
+	bus->subsys.kobj.subsys = &bus_subsys;
 	subsystem_register(&bus->subsys);
 
 	snprintf(bus->devsubsys.kobj.name,KOBJ_NAME_LEN,"devices");
@@ -500,8 +511,6 @@ int bus_register(struct bus_type * bus)
 
 	snprintf(bus->drvsubsys.kobj.name,KOBJ_NAME_LEN,"drivers");
 	bus->drvsubsys.parent = &bus->subsys;
-	bus->drvsubsys.sysfs_ops = &driver_sysfs_ops;
-	bus->drvsubsys.release = driver_release;
 	subsystem_register(&bus->drvsubsys);
 
 	pr_debug("bus type '%s' registered\n",bus->name);

@@ -46,9 +46,12 @@ static struct sysfs_ops class_sysfs_ops = {
 	.store	= devclass_attr_store,
 };
 
+static struct kobj_type ktype_devclass = {
+	.sysfs_ops	= &class_sysfs_ops,
+};
+
 static struct subsystem class_subsys = {
 	.kobj	= { .name = "class", },
-	.sysfs_ops	= &class_sysfs_ops,
 };
 
 
@@ -231,7 +234,8 @@ int devclass_register(struct device_class * cls)
 
 	pr_debug("device class '%s': registering\n",cls->name);
 	strncpy(cls->subsys.kobj.name,cls->name,KOBJ_NAME_LEN);
-	cls->subsys.parent = &class_subsys;
+	cls->subsys.kobj.subsys = &class_subsys;
+	cls->subsys.kobj.ktype = &ktype_devclass;
 	subsystem_register(&cls->subsys);
 
 	snprintf(cls->devsubsys.kobj.name,KOBJ_NAME_LEN,"devices");

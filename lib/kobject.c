@@ -25,13 +25,13 @@ static spinlock_t kobj_lock = SPIN_LOCK_UNLOCKED;
 
 static int populate_dir(struct kobject * kobj)
 {
-	struct subsystem * s = kobj->subsys;
+	struct kobj_type * t = kobj->ktype;
 	struct attribute * attr;
 	int error = 0;
 	int i;
 	
-	if (s && s->default_attrs) {
-		for (i = 0; (attr = s->default_attrs[i]); i++) {
+	if (t && t->default_attrs) {
+		for (i = 0; (attr = t->default_attrs[i]); i++) {
 			if ((error = sysfs_create_file(kobj,attr)))
 				break;
 		}
@@ -173,17 +173,18 @@ struct kobject * kobject_get(struct kobject * kobj)
 
 void kobject_cleanup(struct kobject * kobj)
 {
+	struct kobj_type * t = kobj->ktype;
 	struct subsystem * s = kobj->subsys;
 
 	pr_debug("kobject %s: cleaning up\n",kobj->name);
 	if (s) {
 		down_write(&s->rwsem);
 		list_del_init(&kobj->entry);
-		if (s->release)
-			s->release(kobj);
 		up_write(&s->rwsem);
 		subsys_put(s);
 	}
+	if (t && t->release)
+		t->release(kobj);
 }
 
 /**

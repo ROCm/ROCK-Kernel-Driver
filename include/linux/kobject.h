@@ -20,6 +20,7 @@ struct kobject {
 	struct list_head	entry;
 	struct kobject		* parent;
 	struct subsystem	* subsys;
+	struct kobj_type	* ktype;
 	struct dentry		* dentry;
 };
 
@@ -36,14 +37,17 @@ extern struct kobject * kobject_get(struct kobject *);
 extern void kobject_put(struct kobject *);
 
 
+struct kobj_type {
+	void (*release)(struct kobject *);
+	struct sysfs_ops	* sysfs_ops;
+	struct attribute	** default_attrs;
+};
+
 struct subsystem {
 	struct kobject		kobj;
 	struct list_head	list;
 	struct rw_semaphore	rwsem;
 	struct subsystem	* parent;
-	void (*release)(struct kobject *);
-	struct sysfs_ops	* sysfs_ops;
-	struct attribute	** default_attrs;
 };
 
 extern void subsystem_init(struct subsystem *);
