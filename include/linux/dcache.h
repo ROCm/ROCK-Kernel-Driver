@@ -27,11 +27,14 @@ struct vfsmount;
 /*
  * "quick string" -- eases parameter passing, but more importantly
  * saves "metadata" about the string (ie length and the hash).
+ *
+ * hash comes first so it snuggles against d_parent and d_bucket in the
+ * dentry.
  */
 struct qstr {
+	unsigned int hash;
 	const unsigned char *name;
 	unsigned int len;
-	unsigned int hash;
 };
 
 struct dentry_stat_t {
@@ -75,12 +78,23 @@ full_name_hash(const unsigned char *name, unsigned int len)
 
 struct dcookie_struct;
 
+/*
+ * On x86, dentries are a multiple of 16 bytes, with 16-byte alignment.
+ */
 struct dentry {
 	atomic_t d_count;
 	unsigned int d_flags;		/* protected by d_lock */
 	spinlock_t d_lock;		/* per dentry lock */
 	struct inode *d_inode;		/* Where the name belongs to - NULL is
 					 * negative */
+	/*
+	 * The next three fields are touched by __d_lookup.  Place them here
+	 * so they all fit in a 16-byte range, with 16-byte alignment.
+	 */
+	struct dentry *d_parent;	/* parent directory */
+	struct hlist_head *d_bucket;	/* lookup hash bucket */
+	struct qstr d_name;
+
 	struct list_head d_lru;		/* LRU list */
 	struct list_head d_child;	/* child of parent list */
 	struct list_head d_subdirs;	/* our children */
@@ -92,10 +106,7 @@ struct dentry {
 	void *d_fsdata;			/* fs-specific data */
  	struct rcu_head d_rcu;
 	struct dcookie_struct *d_cookie; /* cookie, if any */
-	struct dentry *d_parent;	/* parent directory */
-	struct qstr d_name;
 	struct hlist_node d_hash;	/* lookup hash list */	
-	struct hlist_head *d_bucket;	/* lookup hash bucket */
 	unsigned char d_iname[0];	/* small names */
 };
 
