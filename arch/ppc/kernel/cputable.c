@@ -30,7 +30,6 @@ extern void __setup_cpu_745x(unsigned long offset, int cpu_nr, struct cpu_spec* 
 extern void __setup_cpu_power3(unsigned long offset, int cpu_nr, struct cpu_spec* spec);
 extern void __setup_cpu_power4(unsigned long offset, int cpu_nr, struct cpu_spec* spec);
 extern void __setup_cpu_ppc970(unsigned long offset, int cpu_nr, struct cpu_spec* spec);
-extern void __setup_cpu_8xx(unsigned long offset, int cpu_nr, struct cpu_spec* spec);
 extern void __setup_cpu_generic(unsigned long offset, int cpu_nr, struct cpu_spec* spec);
 
 #define CLASSIC_PPC (!defined(CONFIG_8xx) && !defined(CONFIG_4xx) && \
@@ -693,7 +692,6 @@ struct cpu_spec	cpu_specs[] = {
 		.icache_bsize		= 16,
 		.dcache_bsize		= 16,
 		.num_pmcs		= 0,
-		.cpu_setup		= __setup_cpu_8xx	/* Empty */
 	},
 #endif /* CONFIG_8xx */
 #ifdef CONFIG_40x

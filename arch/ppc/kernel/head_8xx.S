@@ -583,11 +583,6 @@ DataTLBError:
 giveup_fpu:
 	blr
 
-/* Maybe someday.......
-*/
-_GLOBAL(__setup_cpu_8xx)
-	blr
-
 /*
  * This is where the main kernel code starts.
  */
