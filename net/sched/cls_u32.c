@@ -549,7 +549,6 @@ static int u32_change(struct tcf_proto *tp, unsigned long base, u32 handle,
 	struct tc_u_hnode *ht;
 	struct tc_u_knode *n;
 	struct tc_u32_sel *s;
-	struct tc_u32_mark *mark;
 	struct rtattr *opt = tca[TCA_OPTIONS-1];
 	struct rtattr *tb[TCA_U32_MAX];
 	u32 htid;
@@ -654,15 +653,22 @@ static int u32_change(struct tcf_proto *tp, unsigned long base, u32 handle,
 	n->fshift = i;
 }
 
-#ifdef CONFIG_CLS_U32_MARK                                                                                                                                             
+#ifdef CONFIG_CLS_U32_MARK
 	if (tb[TCA_U32_MARK-1]) {
-		if (RTA_PAYLOAD(tb[TCA_U32_MARK-1]) < sizeof(struct tc_u32_mark))
+		struct tc_u32_mark *mark;
+
+		if (RTA_PAYLOAD(tb[TCA_U32_MARK-1]) < sizeof(struct tc_u32_mark)) {
+#ifdef CONFIG_CLS_U32_PERF
+			kfree(n->pf);
+#endif
+			kfree(n);
 			return -EINVAL;
+		}
 		mark = RTA_DATA(tb[TCA_U32_MARK-1]);
 		memcpy(&n->mark, mark, sizeof(struct tc_u32_mark));
 		n->mark.success = 0;
-	}                                                                                                                                                                
-#endif                                                                                                                                                                 
+	}
+#endif
 
 	err = u32_set_parms(tp, base, ht, n, tb, tca[TCA_RATE-1]);
 	if (err == 0) {
