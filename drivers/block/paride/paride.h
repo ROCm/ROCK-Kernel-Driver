@@ -155,8 +155,9 @@ struct pi_protocol {
 	int  (*test_proto)(PIA *,char *,int);
 	void (*log_adapter)(PIA *,char *,int);
 	
-	void (*init_proto)(PIA *);
+	int (*init_proto)(PIA *);
 	void (*release_proto)(PIA *);
+	struct module *owner;
 };
 
 typedef struct pi_protocol PIP;

@@ -249,17 +249,8 @@ static void k971_log_adapter( PIA *pi, char * scratch, int verbose )
 {       kbic_log_adapter(pi,scratch,verbose,"KBIC-971A");
 }
 
-static void kbic_init_proto( PIA *pi)
-
-{       MOD_INC_USE_COUNT;
-}
-
-static void kbic_release_proto( PIA *pi)
-
-{       MOD_DEC_USE_COUNT;
-}
-
 static struct pi_protocol k951 = {
+	.owner		= THIS_MODULE,
 	.name		= "k951",
 	.max_mode	= 6,
 	.epp_first	= 3,
@@ -272,11 +263,10 @@ static struct pi_protocol k951 = {
 	.connect	= k951_connect,
 	.disconnect	= k951_disconnect,
 	.log_adapter	= k951_log_adapter,
-	.init_proto	= kbic_init_proto,
-	.release_proto	= kbic_release_proto
 };
 
 static struct pi_protocol k971 = {
+	.owner		= THIS_MODULE,
 	.name		= "k971",
 	.max_mode	= 6,
 	.epp_first	= 3,
@@ -289,8 +279,6 @@ static struct pi_protocol k971 = {
 	.connect	= k971_connect,
 	.disconnect	= k971_disconnect,
 	.log_adapter	= k971_log_adapter,
-	.init_proto	= kbic_init_proto,
-	.release_proto	= kbic_release_proto
 };
 
 static int __init kbic_init(void)

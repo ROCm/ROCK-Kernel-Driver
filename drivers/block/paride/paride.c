@@ -106,7 +106,6 @@ void pi_do_claimed(PIA * pi, void (*cont) (void))
 	unsigned long flags;
 
 	spin_lock_irqsave(&pi_spinlock, flags);
-
 	if (pi->pardev && parport_claim(pi->pardev)) {
 		pi->claim_cont = cont;
 		spin_unlock_irqrestore(&pi_spinlock, flags);
@@ -117,7 +116,6 @@ void pi_do_claimed(PIA * pi, void (*cont) (void))
 #endif
 	cont();
 }
-
 
 EXPORT_SYMBOL(pi_do_claimed);
 
@@ -175,39 +173,31 @@ void pi_release(PIA * pi)
 	if (pi->reserved)
 		release_region(pi->port, pi->reserved);
 #endif				/* !CONFIG_PARPORT */
-	pi->proto->release_proto(pi);
+	if (pi->proto->release_proto)
+		pi->proto->release_proto(pi);
+	if (pi->proto->owner)
+		__MOD_DEC_USE_COUNT(pi->proto->owner);
 }
 
 EXPORT_SYMBOL(pi_release);
 
-#define WR(r,v)         pi_write_regr(pi,0,r,v)
-#define RR(r)           (pi_read_regr(pi,0,r))
-
-static int pi_test_proto(PIA * pi, char *scratch, int verbose)
+static int default_test_proto(PIA * pi, char *scratch, int verbose)
 {
 	int j, k;
 	int e[2] = { 0, 0 };
 
-	if (pi->proto->test_proto) {
-		pi_claim(pi);
-		j = pi->proto->test_proto(pi, scratch, verbose);
-		pi_unclaim(pi);
-		return j;
-	}
-
-	pi_connect(pi);
+	pi->proto->connect(pi);
 
 	for (j = 0; j < 2; j++) {
-		WR(6, 0xa0 + j * 0x10);
+		pi_write_regr(pi, 0, 6, 0xa0 + j * 0x10);
 		for (k = 0; k < 256; k++) {
-			WR(2, k ^ 0xaa);
-			WR(3, k ^ 0x55);
-			if (RR(2) != (k ^ 0xaa))
+			pi_write_regr(pi, 0, 2, k ^ 0xaa);
+			pi_write_regr(pi, 0, 3, k ^ 0x55);
+			if (pi_read_regr(pi, 0, 2) != (k ^ 0xaa))
 				e[j]++;
 		}
 	}
-
-	pi_disconnect(pi);
+	pi->proto->disconnect(pi);
 
 	if (verbose)
 		printk("%s: %s: port 0x%x, mode  %d, test=(%d,%d)\n",
@@ -215,6 +205,20 @@ static int pi_test_proto(PIA * pi, char *scratch, int verbose)
 		       pi->mode, e[0], e[1]);
 
 	return (e[0] && e[1]);	/* not here if both > 0 */
+}
+
+static int pi_test_proto(PIA * pi, char *scratch, int verbose)
+{
+	int res;
+
+	pi_claim(pi);
+	if (pi->proto->test_proto)
+		res = pi->proto->test_proto(pi, scratch, verbose);
+	else
+		res = default_test_proto(pi, scratch, verbose);
+	pi_unclaim(pi);
+
+	return res;
 }
 
 int pi_register(PIP * pr)
@@ -384,40 +388,52 @@ int pi_init(PIA * pi, int autoprobe, int port, int mode,
 	}
 
 	for (p = s; p < e; p++) {
-		if (protocols[p]) {
-			pi->proto = protocols[p];
-			pi->private = 0;
-			pi->proto->init_proto(pi);
-			if (delay == -1)
-				pi->delay = pi->proto->default_delay;
-			else
-				pi->delay = delay;
-			pi->devtype = devtype;
-			pi->device = device;
-
-			pi->parname = NULL;
-			pi->pardev = NULL;
-			init_waitqueue_head(&pi->parq);
-			pi->claimed = 0;
-			pi->claim_cont = NULL;
-
-			pi->mode = mode;
-			if (port != -1) {
-				pi->port = port;
-				if (pi_probe_unit(pi, unit, scratch, verbose))
-					break;
-				pi->port = 0;
-			} else {
-				k = 0;
-				while ((pi->port = lpts[k++]))
-					if (pi_probe_unit
-					    (pi, unit, scratch, verbose))
-						break;
-				if (pi->port)
-					break;
-			}
-			pi->proto->release_proto(pi);
+		struct pi_protocol *proto = protocols[p];
+		if (!proto)
+			continue;
+		/* still racy */
+		if (proto->owner)
+			__MOD_INC_USE_COUNT(proto->owner);
+		pi->proto = proto;
+		pi->private = 0;
+		if (proto->init_proto && proto->init_proto(pi) < 0) {
+			pi->proto = NULL;
+			if (proto->owner)
+				__MOD_DEC_USE_COUNT(proto->owner);
+			continue;
 		}
+		if (delay == -1)
+			pi->delay = pi->proto->default_delay;
+		else
+			pi->delay = delay;
+		pi->devtype = devtype;
+		pi->device = device;
+
+		pi->parname = NULL;
+		pi->pardev = NULL;
+		init_waitqueue_head(&pi->parq);
+		pi->claimed = 0;
+		pi->claim_cont = NULL;
+
+		pi->mode = mode;
+		if (port != -1) {
+			pi->port = port;
+			if (pi_probe_unit(pi, unit, scratch, verbose))
+				break;
+			pi->port = 0;
+		} else {
+			k = 0;
+			while ((pi->port = lpts[k++]))
+				if (pi_probe_unit
+				    (pi, unit, scratch, verbose))
+					break;
+			if (pi->port)
+				break;
+		}
+		if (pi->proto->release_proto)
+			pi->proto->release_proto(pi);
+		if (proto->owner)
+			__MOD_DEC_USE_COUNT(proto->owner);
 	}
 
 	if (!pi->port) {

@@ -301,17 +301,8 @@ static void epat_log_adapter( PIA *pi, char * scratch, int verbose )
 
 }
 
-static void epat_init_proto( PIA *pi)
-
-{  	MOD_INC_USE_COUNT;
-}
-
-static void epat_release_proto( PIA *pi)
-
-{	MOD_DEC_USE_COUNT;
-}
-
 static struct pi_protocol epat = {
+	.owner		= THIS_MODULE,
 	.name		= "epat",
 	.max_mode	= 6,
 	.epp_first	= 3,
@@ -325,8 +316,6 @@ static struct pi_protocol epat = {
 	.disconnect	= epat_disconnect,
 	.test_proto	= epat_test_proto,
 	.log_adapter	= epat_log_adapter,
-	.init_proto	= epat_init_proto,
-	.release_proto	= epat_release_proto,
 };
 
 static int __init epat_init(void)

@@ -233,25 +233,18 @@ static void friq_log_adapter( PIA *pi, char * scratch, int verbose )
 
 }
 
-static void friq_init_proto( PIA *pi)
-
-{       MOD_INC_USE_COUNT;
-	pi->private = 0;
-}
-
 static void friq_release_proto( PIA *pi)
-
-{       if (pi->private) {		/* turn off the power */
+{
+	if (pi->private) {		/* turn off the power */
 		friq_connect(pi);
 		CMD(0x1d); CMD(0x1e);
 		friq_disconnect(pi);
 		pi->private = 0;
 	}
-
-	MOD_DEC_USE_COUNT;
 }
 
 static struct pi_protocol friq = {
+	.owner		= THIS_MODULE,
 	.name		= "friq",
 	.max_mode	= 5,
 	.epp_first	= 2,
@@ -265,7 +258,6 @@ static struct pi_protocol friq = {
 	.disconnect	= friq_disconnect,
 	.test_proto	= friq_test_proto,
 	.log_adapter	= friq_log_adapter,
-	.init_proto	= friq_init_proto,
 	.release_proto	= friq_release_proto,
 };
 
