@@ -342,6 +342,9 @@ void esp6_destroy(struct xfrm_state *x)
 {
 	struct esp_data *esp = x->data;
 
+	if (!esp)
+		return;
+
 	if (esp->conf.tfm) {
 		crypto_free_tfm(esp->conf.tfm);
 		esp->conf.tfm = NULL;
