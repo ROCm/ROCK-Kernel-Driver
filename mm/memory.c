@@ -449,7 +449,7 @@ static void zap_pmd_range(struct mmu_gather *tlb,
 		zap_pte_range(tlb, pmd, address, end - address, details);
 		address = (address + PMD_SIZE) & PMD_MASK; 
 		pmd++;
-	} while (address < end);
+	} while (address && (address < end));
 }
 
 static void unmap_page_range(struct mmu_gather *tlb,
