@@ -126,10 +126,8 @@ struct hw_interrupt_type no_irq_type = {
 };
 
 atomic_t irq_err_count;
-#ifdef CONFIG_X86_IO_APIC
-#ifdef APIC_MISMATCH_DEBUG
+#if defined(CONFIG_X86_IO_APIC) && defined(APIC_MISMATCH_DEBUG)
 atomic_t irq_mis_count;
-#endif
 #endif
 
 /*
@@ -186,10 +184,8 @@ skip:
 		seq_putc(p, '\n');
 #endif
 		seq_printf(p, "ERR: %10u\n", atomic_read(&irq_err_count));
-#ifdef CONFIG_X86_IO_APIC
-#ifdef APIC_MISMATCH_DEBUG
+#if defined(CONFIG_X86_IO_APIC) && defined(APIC_MISMATCH_DEBUG)
 		seq_printf(p, "MIS: %10u\n", atomic_read(&irq_mis_count));
-#endif
 #endif
 	}
 	return 0;
