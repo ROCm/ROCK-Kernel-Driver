@@ -11,8 +11,16 @@ DOCBOOKS := wanbook.sgml z8530book.sgml mcabook.sgml videobook.sgml \
 	    kernel-locking.sgml via-audio.sgml mousedrivers.sgml \
 	    deviceiobook.sgml procfs-guide.sgml tulip-user.sgml \
 	    writing_usb_driver.sgml scsidrivers.sgml sis900.sgml \
-	    kernel-api.sgml
+	    kernel-api.sgml journal-api.sgml
 
+JBDSOURCES :=  $(TOPDIR)/include/linux/jbd.h \
+	$(TOPDIR)/fs/jbd/journal.c \
+	$(TOPDIR)/fs/jbd/recovery.c \
+	$(TOPDIR)/fs/jbd/transaction.c
+
+journal-api.sgml: journal-api.tmpl $(JBDSOURCES)
+	$(TOPDIR)/scripts/docgen   $(JBDSOURCES) \
+	<journal-api.tmpl >journal-api.sgml
 ###
 # The build process is as follows (targets):
 #              (sgmldocs)
