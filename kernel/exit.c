@@ -41,7 +41,7 @@ static void __unhash_process(struct task_struct *p)
 		detach_pid(p, PIDTYPE_PGID);
 		detach_pid(p, PIDTYPE_SID);
 		if (p->pid)
-			per_cpu(process_counts, smp_processor_id())--;
+			__get_cpu_var(process_counts)--;
 	}
 
 	REMOVE_LINKS(p);
