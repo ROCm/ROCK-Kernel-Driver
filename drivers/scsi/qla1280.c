@@ -3371,6 +3371,7 @@ qla1280_64bit_start_scsi(struct scsi_qla_host *ha, struct srb * sp)
 	sp->flags |= SRB_SENT;
 	ha->actthreads++;
 	WRT_REG_WORD(&reg->mailbox4, ha->req_ring_index);
+	(void) RD_REG_WORD(&reg->mailbox4);
 
  out:
 	if (status)
