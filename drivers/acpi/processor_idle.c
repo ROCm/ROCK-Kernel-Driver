@@ -425,10 +425,7 @@ acpi_processor_set_power_policy (
 				cx->demotion.threshold.bm = 0x0F;
 		}
 
-		/* from C3 we always demote to C2, even if there are multiple
-		 * states of type C3 available. */
-		if (cx->type < ACPI_STATE_C3)
-			lower = cx;
+		lower = cx;
 	}
 
 	/* promotion */
