@@ -1,9 +1,9 @@
 /*
- * Rocketport device driver for Linux
+ * RocketPort device driver for Linux
  *
- * Written by Theodore Ts'o, 1995, 1996, 1997.
+ * Written by Theodore Ts'o, 1995, 1996, 1997, 1998, 1999, 2000.
  * 
- * Copyright (C) 1995, 1996, 1997 by Comtrol, Inc.
+ * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2003 by Comtrol, Inc.
  * 
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -21,60 +21,46 @@
  */
 
 /*
- * Minor number schema:
+ * Kernel Synchronization:
  *
- * +-------------------------------+
- * | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0 |
- * +---+-------+-------+-----------+
- * | C | Board |  AIOP | Port #    |
- * +---+-------+-------+-----------+
+ * This driver has 2 kernel control paths - exception handlers (calls into the driver
+ * from user mode) and the timer bottom half (tasklet).  This is a polled driver, interrupts
+ * are not used.
  *
- * C=0 implements normal POSIX tty.
- * C=1 is reserved for the callout device.
+ * Critical data: 
+ * -  rp_table[], accessed through passed "info" pointers, is a global (static) array of 
+ *    serial port state information and the xmit_buf circular buffer.  Protected by 
+ *    a per port spinlock.
+ * -  xmit_flags[], an array of ints indexed by line (port) number, indicating that there
+ *    is data to be transmitted.  Protected by atomic bit operations.
+ * -  rp_num_ports, int indicating number of open ports, protected by atomic operations.
  * 
- * Normally, the user won't have to worry about the AIOP; as far as
- * the user is concerned, the lower 5 bits of the minor number address
- * the ports on a particular board (from 0 up to 32).
+ * rp_write() and rp_write_char() functions use a per port semaphore to protect against
+ * simultaneous access to the same port by more than one process.
  */
 
-/* Kernel includes */
-
+/****** Defines ******/
 #include <linux/config.h>
 #include <linux/version.h>
 
-#include <linux/module.h>
-#include <linux/errno.h>
-#include <linux/major.h>
-#include <linux/kernel.h>
-#include <linux/signal.h>
-#include <linux/slab.h>
-#include <linux/mm.h>
-
-#include <linux/sched.h>
-#include <linux/timer.h>
-#include <linux/interrupt.h>
-#include <linux/tty.h>
-#include <linux/tty_flip.h>
-#include <linux/string.h>
-#include <linux/fcntl.h>
-#include <linux/ptrace.h>
-#include <linux/ioport.h>
-#include <linux/pci.h>
-#include <linux/init.h>
-	
-#include "rocket_int.h"
-#ifdef LOCAL_ROCKET_H
-#include "rocket.h"
-#include "version.h"
+#ifdef PCI_NUM_RESOURCES
+#define PCI_BASE_ADDRESS(dev, r) ((dev)->resource[r].start)
 #else
-#include <linux/rocket.h>
-#define ROCKET_VERSION "1.14c"
-#define ROCKET_DATE "24-Aug-98"
-#endif /* LOCAL_ROCKET_H */
+#define PCI_BASE_ADDRESS(dev, r) ((dev)->base_address[r])
+#endif
+
+#ifndef VERSION_CODE
+#  define VERSION_CODE(vers,rel,seq) ( ((vers)<<16) | ((rel)<<8) | (seq) )
+#endif
+
+#if LINUX_VERSION_CODE < VERSION_CODE(2,2,9)	/*  No version < 2.2 */
+#  error "This kernel is too old: not supported by this file"
+#endif
 
 #define ROCKET_PARANOIA_CHECK
-#define ROCKET_SOFT_FLOW
+#define ROCKET_DISABLE_SIMUSAGE
 
+#undef ROCKET_SOFT_FLOW
 #undef ROCKET_DEBUG_OPEN
 #undef ROCKET_DEBUG_INTR
 #undef ROCKET_DEBUG_WRITE
@@ -83,7 +69,11 @@
 #undef ROCKET_DEBUG_WAIT_UNTIL_SENT
 #undef ROCKET_DEBUG_RECEIVE
 #undef ROCKET_DEBUG_HANGUP
-	
+#undef REV_PCI_ORDER
+#undef ROCKET_DEBUG_IO
+
+#undef CONFIG_DEVFS_FS
+
 
 /*   CAUTION!!!!!  The TIME_STAT Function relies on the Pentium 64 bit
  *    register.  For various reasons related to 1.2.13, the test for this
@@ -96,46 +86,132 @@
  *    CPU, there is probably something funny about your CPU.
  */
 
-#undef TIME_STAT	/* For performing timing statistics on driver. */
+#undef TIME_STAT		/* For performing timing statistics on driver. */
 			/* Produces printks, one every TIME_COUNTER loops, eats */
 			/* some of your CPU time.  Good for testing or */
 			/* other checking, otherwise, leave it undefed */
 			/* Doug Ledford */
-#define TIME_STAT_CPU 100      /* This needs to be set to your processor speed */
-                               /* For example, 100Mhz CPU, set this to 100 */
-#define TIME_COUNTER 180000    /* This is how many iterations to run before */
+#define TIME_STAT_CPU 100	/* This needs to be set to your processor speed */
+			       /* For example, 100Mhz CPU, set this to 100 */
+#define TIME_COUNTER 180000	/* This is how many iterations to run before */
 			      /* performing the printk statements.   */
 			      /* 6000 = 1 minute, 360000 = 1 hour, etc. */
 			      /* Since time_stat is long long, this */
 			      /* Can be really high if you want :)  */
-#undef TIME_STAT_VERBOSE   /* Undef this if you want a terse log message. */
+#undef TIME_STAT_VERBOSE	/* Undef this if you want a terse log message. */
 
-#define _INLINE_ inline
+#if LINUX_VERSION_CODE < VERSION_CODE(2,4,0)
+#define TTY_DRIVER_NO_DEVFS 0
+#endif
 
-static struct r_port *rp_table[MAX_RP_PORTS];
-static struct tty_struct *rocket_table[MAX_RP_PORTS];
-static unsigned int xmit_flags[NUM_BOARDS];
+#define POLL_PERIOD HZ/100	/*  Polling period .01 seconds (10ms) */
+
+/****** Kernel includes ******/
+
+#ifdef MODVERSIONS
+#if LINUX_VERSION_CODE < VERSION_CODE(2,5,00)
+#include <linux/modversions.h>
+#else
+#include <config/modversions.h>
+#endif
+#endif				
+
+#include <linux/module.h>
+#include <linux/errno.h>
+#include <linux/major.h>
+#include <linux/kernel.h>
+#include <linux/signal.h>
+
+#if LINUX_VERSION_CODE < VERSION_CODE(2,4,0)
+#include <linux/malloc.h>
+#else
+#include <linux/slab.h>
+#endif
+
+#include <linux/mm.h>
+#include <linux/sched.h>
+#include <linux/timer.h>
+#include <linux/interrupt.h>
+#include <linux/tty.h>
+#include <linux/tty_driver.h>
+#include <linux/tty_flip.h>
+#include <linux/string.h>
+#include <linux/fcntl.h>
+#include <linux/ptrace.h>
+#include <linux/major.h>
+#include <linux/ioport.h>
+#include <linux/delay.h>
+#include <linux/wait.h>
+#include <linux/delay.h>
+#include <linux/pci.h>
+#include <asm/uaccess.h>
+#include <asm/atomic.h>
+#include <asm/bitops.h>
+#include <linux/spinlock.h>
+#include <asm/semaphore.h>
+#include <linux/init.h>
+
+/****** RocketPort includes ******/
+
+#include "rocket_int.h"
+#include "rocket.h"
+
+#ifdef LOCAL_ROCKET_H
+#include "version.h"
+#else
+#define ROCKET_VERSION "2.08"
+#define ROCKET_DATE "02-June-2003"
+#endif				/* LOCAL_ROCKET_H */
+
+/*
+ * All of the compatibilty code so we can compile serial.c against
+ * older kernels is hidden in rocket_compat.h
+ */
+#if defined(LOCAL_ROCKET_H) || (LINUX_VERSION_CODE < VERSION_CODE(2,3,23))
+#include "rocket_compat.h"
+#endif
+
+/****** RocketPort Local Variables ******/
+
+static struct tty_struct *rocket_table[MAX_RP_PORTS];	/*  TTY required variables */
 static struct termios *rocket_termios[MAX_RP_PORTS];
 static struct termios *rocket_termios_locked[MAX_RP_PORTS];
-static void rp_wait_until_sent(struct tty_struct *tty, int timeout);
-static void rp_flush_buffer(struct tty_struct *tty);
-
 static struct tty_driver rocket_driver;
 static int rocket_refcount;
 
-static int rp_num_ports_open;
+static struct rocket_version driver_version = {	
+	ROCKET_VERSION, ROCKET_DATE
+};
 
+static struct r_port *rp_table[MAX_RP_PORTS];	       /*  The main repository of serial port state information. */
+static unsigned int xmit_flags[NUM_BOARDS];	       /*  Bit significant, indicates port had data to transmit. */
+						       /*  eg.  Bit 0 indicates port 0 has xmit data, ...        */
+static atomic_t rp_num_ports_open;	               /*  Number of serial ports open                           */
 static struct timer_list rocket_timer;
 
-unsigned long board1;
-unsigned long board2;
-unsigned long board3;
-unsigned long board4;
-unsigned long controller;
-unsigned long support_low_speed;
-int rp_baud_base = 460800;
+static unsigned long board1;	                       /* ISA addresses, retrieved from rocketport.conf          */
+static unsigned long board2;
+static unsigned long board3;
+static unsigned long board4;
+static unsigned long controller;
+static unsigned long support_low_speed;
+static unsigned long modem1;
+static unsigned long modem2;
+static unsigned long modem3;
+static unsigned long modem4;
+static unsigned long pc104_1[8];
+static unsigned long pc104_2[8];
+static unsigned long pc104_3[8];
+static unsigned long pc104_4[8];
+static unsigned long *pc104[4] = { pc104_1, pc104_2, pc104_3, pc104_4 };
+
+static int rp_baud_base[NUM_BOARDS];	               /*  Board config info (Someday make a per-board structure)  */
 static unsigned long rcktpt_io_addr[NUM_BOARDS];
+static int rcktpt_type[NUM_BOARDS];
+static int is_PCI[NUM_BOARDS];
+static rocketModel_t rocketModel[NUM_BOARDS];
 static int max_board;
+
 #ifdef TIME_STAT
 static unsigned long long time_stat;
 static unsigned long time_stat_short;
@@ -143,83 +219,140 @@ static unsigned long time_stat_long;
 static unsigned long time_counter;
 #endif
 
+/*
+ * The following arrays define the interrupt bits corresponding to each AIOP.
+ * These bits are different between the ISA and regular PCI boards and the
+ * Universal PCI boards.
+ */
+
+static Word_t aiop_intr_bits[AIOP_CTL_SIZE] = {
+	AIOP_INTR_BIT_0,
+	AIOP_INTR_BIT_1,
+	AIOP_INTR_BIT_2,
+	AIOP_INTR_BIT_3
+};
+
+static Word_t upci_aiop_intr_bits[AIOP_CTL_SIZE] = {
+	UPCI_AIOP_INTR_BIT_0,
+	UPCI_AIOP_INTR_BIT_1,
+	UPCI_AIOP_INTR_BIT_2,
+	UPCI_AIOP_INTR_BIT_3
+};
+
+/*
+ *  Line number is the ttySIx number (x), the Minor number.  We 
+ *  assign them sequentially, starting at zero.  The following 
+ *  array keeps track of the line number assigned to a given board/aiop/channel.
+ */
+static unsigned char lineNumbers[MAX_RP_PORTS];
+static unsigned long nextLineNumber;
+
+/*****  RocketPort Static Prototypes   *********/
+static int __init init_ISA(int i, int *reserved_controller);
+static void rp_wait_until_sent(struct tty_struct *tty, int timeout);
+static void rp_flush_buffer(struct tty_struct *tty);
+static void rmSpeakerReset(CONTROLLER_T * CtlP, unsigned long model);
+static unsigned char GetLineNumber(int ctrl, int aiop, int ch);
+static unsigned char SetLineNumber(int ctrl, int aiop, int ch);
+static void rp_start(struct tty_struct *tty);
+
+#ifdef MODULE
 MODULE_AUTHOR("Theodore Ts'o");
-MODULE_DESCRIPTION("Comtrol Rocketport driver");
-MODULE_LICENSE("GPL");
-MODULE_PARM(board1,     "i");
+MODULE_DESCRIPTION("Comtrol RocketPort driver");
+MODULE_PARM(board1, "i");
 MODULE_PARM_DESC(board1, "I/O port for (ISA) board #1");
-MODULE_PARM(board2,     "i");
+MODULE_PARM(board2, "i");
 MODULE_PARM_DESC(board2, "I/O port for (ISA) board #2");
-MODULE_PARM(board3,     "i");
+MODULE_PARM(board3, "i");
 MODULE_PARM_DESC(board3, "I/O port for (ISA) board #3");
-MODULE_PARM(board4,     "i");
+MODULE_PARM(board4, "i");
 MODULE_PARM_DESC(board4, "I/O port for (ISA) board #4");
 MODULE_PARM(controller, "i");
 MODULE_PARM_DESC(controller, "I/O port for (ISA) rocketport controller");
 MODULE_PARM(support_low_speed, "i");
-MODULE_PARM_DESC(support_low_speed, "0 means support 50 baud, 1 means support 460400 baud");	
+MODULE_PARM_DESC(support_low_speed, "1 means support 50 baud, 0 means support 460400 baud");
+MODULE_PARM(modem1, "i");
+MODULE_PARM_DESC(modem1, "1 means (ISA) board #1 is a RocketModem");
+MODULE_PARM(modem2, "i");
+MODULE_PARM_DESC(modem2, "1 means (ISA) board #2 is a RocketModem");
+MODULE_PARM(modem3, "i");
+MODULE_PARM_DESC(modem3, "1 means (ISA) board #3 is a RocketModem");
+MODULE_PARM(modem4, "i");
+MODULE_PARM_DESC(modem4, "1 means (ISA) board #4 is a RocketModem");
+MODULE_PARM(pc104_1, "1-8i");
+MODULE_PARM_DESC(pc104_1, "set interface types for ISA(PC104) board #1 (e.g. pc104_1=232,232,485,485,...");
+MODULE_PARM(pc104_2, "1-8i");
+MODULE_PARM_DESC(pc104_2, "set interface types for ISA(PC104) board #2 (e.g. pc104_2=232,232,485,485,...");
+MODULE_PARM(pc104_3, "1-8i");
+MODULE_PARM_DESC(pc104_3, "set interface types for ISA(PC104) board #3 (e.g. pc104_3=232,232,485,485,...");
+MODULE_PARM(pc104_4, "1-8i");
+MODULE_PARM_DESC(pc104_4, "set interface types for ISA(PC104) board #4 (e.g. pc104_4=232,232,485,485,...");
 
-#include <asm/uaccess.h>
+int rp_init(void);
+static void rp_cleanup_module(void);
 
-/*
- * tmp_buf is used as a temporary buffer by rp_write.  We need to
- * lock it in case the memcpy_fromfs blocks while swapping in a page,
- * and some other program tries to do a serial write at the same time.
- * Since the lock will only come under contention when the system is
- * swapping and available memory is low, it makes sense to share one
- * buffer across all the serial ports, since it significantly saves
- * memory if large numbers of serial ports are open.
- */
-static unsigned char *tmp_buf = 0;
-static DECLARE_MUTEX(tmp_buf_sem);
+module_init(rp_init);
+module_exit(rp_cleanup_module);
 
-static void rp_start(struct tty_struct *tty);
+#endif
+
+#ifdef MODULE_LICENSE
+MODULE_LICENSE("Dual BSD/GPL");
+#endif
+
+/*************************************************************************/
+/*                     Module code starts here                           */
 
 static inline int rocket_paranoia_check(struct r_port *info,
-					char *name, const char *routine)
+					const char *routine)
 {
 #ifdef ROCKET_PARANOIA_CHECK
-	static const char *badmagic =
-		"Warning: bad magic number for rocketport struct %s in %s\n";
 	if (!info)
 		return 1;
 	if (info->magic != RPORT_MAGIC) {
-		printk(badmagic, name, routine);
+		printk(KERN_INFO "Warning: bad magic number for rocketport struct in %s\n",
+		     routine);
 		return 1;
 	}
 #endif
 	return 0;
 }
 
-/*
- * Here begins the interrupt/polling routine for the Rocketport!
+
+/*  Serial port receive data function.  Called (from timer poll) when an AIOPIC signals 
+ *  that receive data is present on a serial port.  Pulls data from FIFO, moves it into the 
+ *  tty layer.  
  */
-static _INLINE_ void rp_do_receive(struct r_port *info, struct tty_struct *tty,
-				   CHANNEL_t *cp, unsigned int ChanStatus)
+static void rp_do_receive(struct r_port *info,
+			  struct tty_struct *tty,
+			  CHANNEL_t * cp, unsigned int ChanStatus)
 {
 	unsigned int CharNStat;
 	int ToRecv, wRecv, space, count;
-	unsigned char	*cbuf;
-	char		*fbuf;
-	
-	ToRecv= sGetRxCnt(cp);
-	space = 2*TTY_FLIPBUF_SIZE;
+	unsigned char *cbuf;
+	char *fbuf;
+
+	ToRecv = sGetRxCnt(cp);
+	space = tty->ldisc.receive_room(tty);
+	if (space > 2 * TTY_FLIPBUF_SIZE)
+		space = 2 * TTY_FLIPBUF_SIZE;
 	cbuf = tty->flip.char_buf;
 	fbuf = tty->flip.flag_buf;
 	count = 0;
 #ifdef ROCKET_DEBUG_INTR
-	printk("rp_do_receive(%d, %d)...", ToRecv, space);
+	printk(KERN_INFO "rp_do_receive(%d, %d)...", ToRecv, space);
 #endif
-	if (ToRecv == 0 || (space <= 0))
-		return;
-	
+
 	/*
 	 * determine how many we can actually read in.  If we can't
 	 * read any in then we have a software overrun condition.
 	 */
 	if (ToRecv > space)
 		ToRecv = space;
-	
+
+	if (ToRecv <= 0)
+		return;
+
 	/*
 	 * if status indicates there are errored characters in the
 	 * FIFO, then enter status mode (a word in FIFO holds
@@ -228,7 +361,7 @@ static _INLINE_ void rp_do_receive(struct r_port *info, struct tty_struct *tty,
 	if (ChanStatus & (RXFOVERFL | RXBREAK | RXFRAME | RXPARITY)) {
 		if (!(ChanStatus & STATMODE)) {
 #ifdef ROCKET_DEBUG_RECEIVE
-			printk("Entering STATMODE...");
+			printk(KERN_INFO "Entering STATMODE...");
 #endif
 			ChanStatus |= STATMODE;
 			sEnRxStatusMode(cp);
@@ -242,16 +375,14 @@ static _INLINE_ void rp_do_receive(struct r_port *info, struct tty_struct *tty,
 	 */
 	if (ChanStatus & STATMODE) {
 #ifdef ROCKET_DEBUG_RECEIVE
-		printk("Ignore %x, read %x...", info->ignore_status_mask,
+		printk(KERN_INFO "Ignore %x, read %x...", info->ignore_status_mask,
 		       info->read_status_mask);
 #endif
 		while (ToRecv) {
-			CharNStat= sInW(sGetTxRxDataIO(cp));
-
+			CharNStat = sInW(sGetTxRxDataIO(cp));
 #ifdef ROCKET_DEBUG_RECEIVE
-			printk("%x...", CharNStat);
+			printk(KERN_INFO "%x...", CharNStat);
 #endif
-
 			if (CharNStat & STMBREAKH)
 				CharNStat &= ~(STMFRAMEH | STMPARITYH);
 			if (CharNStat & info->ignore_status_mask) {
@@ -259,18 +390,14 @@ static _INLINE_ void rp_do_receive(struct r_port *info, struct tty_struct *tty,
 				continue;
 			}
 			CharNStat &= info->read_status_mask;
-			if (CharNStat & STMBREAKH) {
+			if (CharNStat & STMBREAKH)
 				*fbuf++ = TTY_BREAK;
-#if 0
-				if (info->flags & ROCKET_SAK)
-					do_SAK(tty);
-#endif
-			} else if (CharNStat & STMPARITYH)
+			else if (CharNStat & STMPARITYH)
 				*fbuf++ = TTY_PARITY;
 			else if (CharNStat & STMFRAMEH)
 				*fbuf++ = TTY_FRAME;
 			else if (CharNStat & STMRCVROVRH)
-				*fbuf++ =TTY_OVERRUN;
+				*fbuf++ = TTY_OVERRUN;
 			else
 				*fbuf++ = 0;
 			*cbuf++ = CharNStat & 0xff;
@@ -284,7 +411,7 @@ static _INLINE_ void rp_do_receive(struct r_port *info, struct tty_struct *tty,
 		 */
 		if (sGetRxCnt(cp) == 0) {
 #ifdef ROCKET_DEBUG_RECEIVE
-			printk("Status mode off.\n");
+			printk(KERN_INFO "Status mode off.\n");
 #endif
 			sDisRxStatusMode(cp);
 		}
@@ -294,86 +421,93 @@ static _INLINE_ void rp_do_receive(struct r_port *info, struct tty_struct *tty,
 		 * characters at time by doing repeated word IO
 		 * transfer.
 		 */
-		wRecv= ToRecv >> 1;
+		wRecv = ToRecv >> 1;
 		if (wRecv)
-			sInStrW(sGetTxRxDataIO(cp), cbuf,
-				wRecv);
+			sInStrW(sGetTxRxDataIO(cp), (unsigned short *) cbuf, wRecv);
 		if (ToRecv & 1)
-			cbuf[ToRecv-1] = sInB(sGetTxRxDataIO(cp));
+			cbuf[ToRecv - 1] = sInB(sGetTxRxDataIO(cp));
 		memset(fbuf, 0, ToRecv);
 		cbuf += ToRecv;
 		fbuf += ToRecv;
 		count += ToRecv;
 	}
-	tty->ldisc.receive_buf(tty, tty->flip.char_buf,
-			       tty->flip.flag_buf, count);
+	/*  Push the data up to the tty layer */
+	tty->ldisc.receive_buf(tty, tty->flip.char_buf, tty->flip.flag_buf, count);
 }
 
 /*
- * This routine is called when a transmit interrupt is found.  It's
- * responsible for pushing data found in the transmit buffer out to
- * the serial card.
+ *  Serial port transmit data function.  Called from the timer polling loop as a 
+ *  result of a bit set in xmit_flags[], indicating data (from the tty layer) is ready
+ *  to be sent out the serial port.  Data is buffered in rp_table[line].xmit_buf, it is 
+ *  moved to the port's xmit FIFO.  *info is critical data, protected by spinlocks.
  */
-static _INLINE_ void rp_do_transmit(struct r_port *info)
+static void rp_do_transmit(struct r_port *info)
 {
-	int	c;
+	int c;
 	CHANNEL_t *cp = &info->channel;
 	struct tty_struct *tty;
-	
+	unsigned long flags;
+
 #ifdef ROCKET_DEBUG_INTR
-	printk("rp_do_transmit ");
+	printk(KERN_INFO "rp_do_transmit ");
 #endif
 	if (!info)
 		return;
 	if (!info->tty) {
-		printk("rp: WARNING rp_do_transmit called with info->tty==NULL\n");
-		xmit_flags[info->line >> 5] &= ~(1 << (info->line & 0x1f));
+		printk(KERN_INFO  "rp: WARNING rp_do_transmit called with info->tty==NULL\n");
+		clear_bit((info->aiop * 8) + info->chan, (void *) &xmit_flags[info->board]);
 		return;
 	}
+
+	spin_lock_irqsave(&info->slock, flags);
 	tty = info->tty;
 	info->xmit_fifo_room = TXFIFO_SIZE - sGetTxCnt(cp);
+
+	/*  Loop sending data to FIFO until done or FIFO full */
 	while (1) {
 		if (tty->stopped || tty->hw_stopped)
 			break;
-		c = MIN(info->xmit_fifo_room,
-			MIN(info->xmit_cnt,
-			    XMIT_BUF_SIZE - info->xmit_tail));
+		c = MIN(info->xmit_fifo_room, MIN(info->xmit_cnt, XMIT_BUF_SIZE - info->xmit_tail));
 		if (c <= 0 || info->xmit_fifo_room <= 0)
 			break;
-		sOutStrW(sGetTxRxDataIO(cp),
-			 info->xmit_buf + info->xmit_tail, c/2);
+		sOutStrW(sGetTxRxDataIO(cp), (unsigned short *) (info->xmit_buf + info->xmit_tail), c / 2);
 		if (c & 1)
-			sOutB(sGetTxRxDataIO(cp),
-			      info->xmit_buf[info->xmit_tail + c -
-					     1]);
+			sOutB(sGetTxRxDataIO(cp), info->xmit_buf[info->xmit_tail + c - 1]);
 		info->xmit_tail += c;
-		info->xmit_tail &= XMIT_BUF_SIZE-1;
+		info->xmit_tail &= XMIT_BUF_SIZE - 1;
 		info->xmit_cnt -= c;
 		info->xmit_fifo_room -= c;
 #ifdef ROCKET_DEBUG_INTR
-		printk("tx %d chars...", c);
+		printk(KERN_INFO "tx %d chars...", c);
 #endif
 	}
+
 	if (info->xmit_cnt == 0)
-		xmit_flags[info->line >> 5] &= ~(1 << (info->line & 0x1f));
+		clear_bit((info->aiop * 8) + info->chan, (void *) &xmit_flags[info->board]);
+
 	if (info->xmit_cnt < WAKEUP_CHARS) {
-		if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-		    tty->ldisc.write_wakeup)
-			(tty->ldisc.write_wakeup)(tty);
+		if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) && tty->ldisc.write_wakeup)
+			(tty->ldisc.write_wakeup) (tty);
 		wake_up_interruptible(&tty->write_wait);
+#ifdef ROCKETPORT_HAVE_POLL_WAIT
+		wake_up_interruptible(&tty->poll_wait);
+#endif
 	}
+
+	spin_unlock_irqrestore(&info->slock, flags);
+
 #ifdef ROCKET_DEBUG_INTR
-	printk("(%d,%d,%d,%d)...", info->xmit_cnt, info->xmit_head,
+	printk(KERN_INFO "(%d,%d,%d,%d)...", info->xmit_cnt, info->xmit_head,
 	       info->xmit_tail, info->xmit_fifo_room);
 #endif
 }
 
 /*
- * This function is called for each port which has signalled an
- * interrupt.  It checks what interrupts are pending and services
- * them. 
+ *  Called when a serial port signals it has read data in it's RX FIFO.
+ *  It checks what interrupts are pending and services them, including
+ *  receiving serial data.  
  */
-static _INLINE_ void rp_handle_port(struct r_port *info)
+static void rp_handle_port(struct r_port *info)
 {
 	CHANNEL_t *cp;
 	struct tty_struct *tty;
@@ -381,12 +515,13 @@ static _INLINE_ void rp_handle_port(struct r_port *info)
 
 	if (!info)
 		return;
-	if ( (info->flags & ROCKET_INITIALIZED) == 0 ) {
-		printk("rp: WARNING: rp_handle_port called with info->flags & NOT_INIT\n");
+
+	if ((info->flags & ROCKET_INITIALIZED) == 0) {
+		printk(KERN_INFO "rp: WARNING: rp_handle_port called with info->flags & NOT_INIT\n");
 		return;
 	}
 	if (!info->tty) {
-		printk("rp: WARNING: rp_handle_port called with info->tty==NULL\n");
+		printk(KERN_INFO "rp: WARNING: rp_handle_port called with info->tty==NULL\n");
 		return;
 	}
 	cp = &info->channel;
@@ -394,25 +529,20 @@ static _INLINE_ void rp_handle_port(struct r_port *info)
 
 	IntMask = sGetChanIntID(cp) & info->intmask;
 #ifdef ROCKET_DEBUG_INTR
-	printk("rp_interrupt %02x...", IntMask);
+	printk(KERN_INFO "rp_interrupt %02x...", IntMask);
 #endif
-	ChanStatus= sGetChanStatus(cp);
+	ChanStatus = sGetChanStatus(cp);
 	if (IntMask & RXF_TRIG) {	/* Rx FIFO trigger level */
 		rp_do_receive(info, tty, cp, ChanStatus);
 	}
-#if 0
-	if (IntMask & SRC_INT) {	/* Special receive condition */
-	}
-#endif
 	if (IntMask & DELTA_CD) {	/* CD change  */
-#if (defined(ROCKET_DEBUG_OPEN) || defined(ROCKET_DEBUG_INTR) || \
-     defined(ROCKET_DEBUG_HANGUP))
-		printk("ttyR%d CD now %s...", info->line,
+#if (defined(ROCKET_DEBUG_OPEN) || defined(ROCKET_DEBUG_INTR) || defined(ROCKET_DEBUG_HANGUP))
+		printk(KERN_INFO "ttyR%d CD now %s...", info->line,
 		       (ChanStatus & CD_ACT) ? "on" : "off");
 #endif
 		if (!(ChanStatus & CD_ACT) && info->cd_status) {
 #ifdef ROCKET_DEBUG_HANGUP
-			printk("CD drop, calling hangup.\n");
+			printk(KERN_INFO "CD drop, calling hangup.\n");
 #endif
 			tty_hangup(tty);
 		}
@@ -421,125 +551,166 @@ static _INLINE_ void rp_handle_port(struct r_port *info)
 	}
 #ifdef ROCKET_DEBUG_INTR
 	if (IntMask & DELTA_CTS) {	/* CTS change */
-		printk("CTS change...\n");
+		printk(KERN_INFO "CTS change...\n");
 	}
 	if (IntMask & DELTA_DSR) {	/* DSR change */
-		printk("DSR change...\n");
+		printk(KERN_INFO "DSR change...\n");
 	}
 #endif
 }
 
 /*
- * The top level polling routine.
+ *  The top level polling routine.  Repeats every 1/100 HZ (10ms).
  */
 static void rp_do_poll(unsigned long dummy)
 {
 	CONTROLLER_t *ctlp;
-	int ctrl, aiop, ch, line;
+	int ctrl, aiop, ch, line, i;
 	unsigned int xmitmask;
-	unsigned char CtlMask, AiopMask;
+	unsigned int CtlMask;
+	unsigned char AiopMask;
+	Word_t bit;
 
 #ifdef TIME_STAT
-	unsigned long loop_time;
-	unsigned long long time_stat_tmp=0, time_stat_tmp2=0;
+	unsigned long low = 0, high = 0, loop_time;
+	unsigned long long time_stat_tmp = 0, time_stat_tmp2 = 0;
 
-	rdtscll(time_stat_tmp);
-#endif /* TIME_STAT */
+      __asm__(".byte 0x0f,0x31":"=a"(low), "=d"(high));
+	time_stat_tmp = high;
+	time_stat_tmp <<= 32;
+	time_stat_tmp += low;
+#endif				/* TIME_STAT */
 
-	for (ctrl=0; ctrl < max_board; ctrl++) {
+	/*  Walk through all the boards (ctrl's) */
+	for (ctrl = 0; ctrl < max_board; ctrl++) {
 		if (rcktpt_io_addr[ctrl] <= 0)
 			continue;
-		ctlp= sCtlNumToCtlPtr(ctrl);
 
+		/*  Get a ptr to the board's control struct */
+		ctlp = sCtlNumToCtlPtr(ctrl);
+
+		/*  Get the interupt status from the board */
 #ifdef CONFIG_PCI
-		if(ctlp->BusType == isPCI)
-			CtlMask= sPCIGetControllerIntStatus(ctlp);
+		if (ctlp->BusType == isPCI)
+			CtlMask = sPCIGetControllerIntStatus(ctlp);
 		else
 #endif
-			CtlMask= sGetControllerIntStatus(ctlp);
-		for (aiop=0; CtlMask; CtlMask >>= 1, aiop++) {
-			if (CtlMask & 1) {
-				AiopMask= sGetAiopIntStatus(ctlp, aiop);
-				for (ch=0; AiopMask; AiopMask >>= 1, ch++) {
+			CtlMask = sGetControllerIntStatus(ctlp);
+
+		/*  Check if any AIOP read bits are set */
+		for (aiop = 0; CtlMask; aiop++) {
+			bit = ctlp->AiopIntrBits[aiop];
+			if (CtlMask & bit) {
+				CtlMask &= ~bit;
+				AiopMask = sGetAiopIntStatus(ctlp, aiop);
+
+				/*  Check if any port read bits are set */
+				for (ch = 0; AiopMask;  AiopMask >>= 1, ch++) {
 					if (AiopMask & 1) {
-						line = (ctrl << 5) | 
-							(aiop << 3) | ch;
+
+						/*  Get the line number (/dev/ttyRx number). */
+						/*  Read the data from the port. */
+						line = GetLineNumber(ctrl, aiop, ch);
 						rp_handle_port(rp_table[line]);
 					}
 				}
 			}
 		}
+
 		xmitmask = xmit_flags[ctrl];
-		for (line = ctrl << 5; xmitmask; xmitmask >>= 1, line++) {
-			if (xmitmask & 1)
-				rp_do_transmit(rp_table[line]);
+
+		/*
+		 *  xmit_flags contains bit-significant flags, indicating there is data
+		 *  to xmit on the port. Bit 0 is port 0 on this board, bit 1 is port 
+		 *  1, ... (32 total possible).  The variable i has the aiop and ch 
+		 *  numbers encoded in it (port 0-7 are aiop0, 8-15 are aiop1, etc).
+		 */
+		if (xmitmask) {
+			for (i = 0; i < rocketModel[ctrl].numPorts; i++) {
+				if (xmitmask & (1 << i)) {
+					aiop = (i & 0x18) >> 3;
+					ch = i & 0x07;
+					line = GetLineNumber(ctrl, aiop, ch);
+					rp_do_transmit(rp_table[line]);
+				}
+			}
 		}
 	}
 
 	/*
-	 * Reset the timer so we get called at the next clock tick.
+	 * Reset the timer so we get called at the next clock tick (10ms).
 	 */
-	if (rp_num_ports_open) {
-		mod_timer(&rocket_timer, jiffies + 1);
-	}
+	if (atomic_read(&rp_num_ports_open))
+		mod_timer(&rocket_timer, jiffies + POLL_PERIOD);
+
 #ifdef TIME_STAT
-	rdtscll(time_stat_tmp2);
+      __asm__(".byte 0x0f,0x31":"=a"(low), "=d"(high));
+	time_stat_tmp2 = high;
+	time_stat_tmp2 <<= 32;
+	time_stat_tmp2 += low;
 	time_stat_tmp2 -= time_stat_tmp;
 	time_stat += time_stat_tmp2;
-	if (time_counter == 0) 
+	if (time_counter == 0)
 		time_stat_short = time_stat_long = time_stat_tmp2;
 	else {
-		if ( time_stat_tmp2 < time_stat_short )
+		if (time_stat_tmp2 < time_stat_short)
 			time_stat_short = time_stat_tmp2;
-		else if ( time_stat_tmp2 > time_stat_long )
+		else if (time_stat_tmp2 > time_stat_long)
 			time_stat_long = time_stat_tmp2;
 	}
-	if ( ++time_counter == TIME_COUNTER ) {
-		loop_time = (unsigned long) ( ((unsigned long)(time_stat >> 32) * ( (unsigned long)(0xffffffff)/(TIME_STAT_CPU * TIME_COUNTER) ) ) + ((unsigned long)time_stat/(TIME_STAT_CPU*TIME_COUNTER)));
+	if (++time_counter == TIME_COUNTER) {
+		loop_time =
+		    (unsigned
+		     long) (((unsigned long) (time_stat >> 32) *
+			     ((unsigned long) (0xffffffff) /
+			      (TIME_STAT_CPU * TIME_COUNTER))) +
+			    ((unsigned long) time_stat /
+			     (TIME_STAT_CPU * TIME_COUNTER)));
 #ifdef TIME_STAT_VERBOSE
-		printk("rp_do_poll: Interrupt Timings\n");
-		printk("     %5ld iterations; %ld us min,\n",
-		       (long)TIME_COUNTER, (time_stat_short/TIME_STAT_CPU));
-		printk("     %5ld us max, %ld us average per iteration.\n",
-		       (time_stat_long/TIME_STAT_CPU), loop_time);
-		printk("We want to use < 5,000 us for an iteration.\n");
-#else /* TIME_STAT_VERBOSE */
-		printk("rp: %ld loops: %ld min, %ld max, %ld us/loop.\n",
-		       (long)TIME_COUNTER, (time_stat_short/TIME_STAT_CPU),
-		       (time_stat_long/TIME_STAT_CPU), loop_time);
-#endif /* TIME_STAT_VERBOSE */
+		printk(KERN_INFO "rp_do_poll: Interrupt Timings\n");
+		printk(KERN_INFO "     %5ld iterations; %ld us min,\n",
+		       (long) TIME_COUNTER,
+		       (time_stat_short / TIME_STAT_CPU));
+		printk(KERN_INFO "     %5ld us max, %ld us average per iteration.\n",
+		       (time_stat_long / TIME_STAT_CPU), loop_time);
+		printk(KERN_INFO "We want to use < 5,000 us for an iteration.\n");
+#else				/* TIME_STAT_VERBOSE */
+		printk(KERN_INFO "rp: %ld loops: %ld min, %ld max, %ld us/loop.\n",
+		       (long) TIME_COUNTER,
+		       (time_stat_short / TIME_STAT_CPU),
+		       (time_stat_long / TIME_STAT_CPU), loop_time);
+#endif				/* TIME_STAT_VERBOSE */
 		time_counter = time_stat = 0;
 		time_stat_short = time_stat_long = 0;
 	}
-#endif /* TIME_STAT */
+#endif				/* TIME_STAT */
 }
-/*
- * Here ends the interrupt/polling routine.
- */
-
 
 /*
- * This function initializes the r_port structure, as well as enabling
- * the port on the RocketPort board.
+ *  Initializes the r_port structure for a port, as well as enabling the port on 
+ *  the board.  
+ *  Inputs:  board, aiop, chan numbers
  */
-static void init_r_port(int board, int aiop, int chan)
+static void init_r_port(int board, int aiop, int chan, struct pci_dev *pci_dev)
 {
+	unsigned rocketMode;
 	struct r_port *info;
 	int line;
 	CONTROLLER_T *ctlp;
-	CHANNEL_t	*cp;
-	
-	line = (board << 5) | (aiop << 3) | chan;
 
-	ctlp= sCtlNumToCtlPtr(board);
+	/*  Get the next available line number */
+	line = SetLineNumber(board, aiop, chan);
 
-	info = kmalloc(sizeof(struct r_port), GFP_KERNEL);
+	ctlp = sCtlNumToCtlPtr(board);
+
+	/*  Get a r_port struct for the port, fill it in and save it globally, indexed by line number */
+	info = kmalloc(sizeof (struct r_port), GFP_KERNEL);
 	if (!info) {
-		printk("Couldn't allocate info struct for line #%d\n", line);
+		printk(KERN_INFO "Couldn't allocate info struct for line #%d\n", line);
 		return;
 	}
-	memset(info, 0, sizeof(struct r_port));
-	
+	memset(info, 0, sizeof (struct r_port));
+
 	info->magic = RPORT_MAGIC;
 	info->line = line;
 	info->ctlp = ctlp;
@@ -551,31 +722,73 @@ static void init_r_port(int board, int aiop, int chan)
 	info->normal_termios = rocket_driver.init_termios;
 	init_waitqueue_head(&info->open_wait);
 	init_waitqueue_head(&info->close_wait);
+	info->flags &= ~ROCKET_MODE_MASK;
+	switch (pc104[board][line]) {
+	case 422:
+		info->flags |= ROCKET_MODE_RS422;
+		break;
+	case 485:
+		info->flags |= ROCKET_MODE_RS485;
+		break;
+	case 232:
+	default:
+		info->flags |= ROCKET_MODE_RS232;
+		break;
+	}
 
-	info->intmask = RXF_TRIG | TXFIFO_MT | SRC_INT | DELTA_CD |
-		DELTA_CTS | DELTA_DSR;
+	info->intmask = RXF_TRIG | TXFIFO_MT | SRC_INT | DELTA_CD | DELTA_CTS | DELTA_DSR;
 	if (sInitChan(ctlp, &info->channel, aiop, chan) == 0) {
-		printk("Rocketport sInitChan(%d, %d, %d) failed!\n",
-		       board, aiop, chan);
+		printk(KERN_INFO "RocketPort sInitChan(%d, %d, %d) failed!\n", board, aiop, chan);
 		kfree(info);
 		return;
 	}
-	cp = &info->channel;
+
+	rocketMode = info->flags & ROCKET_MODE_MASK;
+
+	if ((info->flags & ROCKET_RTS_TOGGLE) || (rocketMode == ROCKET_MODE_RS485))
+		sEnRTSToggle(&info->channel);
+	else
+		sDisRTSToggle(&info->channel);
+
+	if (ctlp->boardType == ROCKET_TYPE_PC104) {
+		switch (rocketMode) {
+		case ROCKET_MODE_RS485:
+			sSetInterfaceMode(&info->channel, InterfaceModeRS485);
+			break;
+		case ROCKET_MODE_RS422:
+			sSetInterfaceMode(&info->channel, InterfaceModeRS422);
+			break;
+		case ROCKET_MODE_RS232:
+		default:
+			if (info->flags & ROCKET_RTS_TOGGLE)
+				sSetInterfaceMode(&info->channel, InterfaceModeRS232T);
+			else
+				sSetInterfaceMode(&info->channel, InterfaceModeRS232);
+			break;
+		}
+	}
+	spin_lock_init(&info->slock);
+	sema_init(&info->write_sem, 1);
 	rp_table[line] = info;
+#if LINUX_VERSION_CODE > VERSION_CODE(2,5,0)
+	if (pci_dev)
+		tty_register_device(&rocket_driver, line, &pci_dev->dev);
+#endif
 }
 
-
 /*
- * This routine configures a rocketport port so according to its
- * termio settings.
+ *  Configures a rocketport port according to its termio settings.  Called from 
+ *  user mode into the driver (exception handler).  *info CD manipulation is spinlock protected.
  */
-static void configure_r_port(struct r_port *info)
+static void configure_r_port(struct r_port *info,
+			     struct termios *old_termios)
 {
 	unsigned cflag;
-	unsigned long 	flags;
-	int	bits, baud;
-	CHANNEL_t	*cp;
-	
+	unsigned long flags;
+	unsigned rocketMode;
+	int bits, baud, divisor;
+	CHANNEL_t *cp;
+
 	if (!info->tty || !info->tty->termios)
 		return;
 	cp = &info->channel;
@@ -589,13 +802,13 @@ static void configure_r_port(struct r_port *info)
 		sSetData7(cp);
 		bits = 9;
 	}
-        if (cflag & CSTOPB) {
+	if (cflag & CSTOPB) {
 		sSetStop2(cp);
 		bits++;
 	} else {
 		sSetStop1(cp);
 	}
-	
+
 	if (cflag & PARENB) {
 		sEnParity(cp);
 		bits++;
@@ -607,14 +820,28 @@ static void configure_r_port(struct r_port *info)
 	} else {
 		sDisParity(cp);
 	}
-	
+
 	/* baud rate */
 	baud = tty_get_baud_rate(info->tty);
 	if (!baud)
 		baud = 9600;
+	divisor = ((rp_baud_base[info->board] + (baud >> 1)) / baud) - 1;
+	if ((divisor >= 8192 || divisor < 0) && old_termios) {
+		info->tty->termios->c_cflag &= ~CBAUD;
+		info->tty->termios->c_cflag |=
+		    (old_termios->c_cflag & CBAUD);
+		baud = tty_get_baud_rate(info->tty);
+		if (!baud)
+			baud = 9600;
+		divisor = (rp_baud_base[info->board] / baud) - 1;
+	}
+	if (divisor >= 8192 || divisor < 0) {
+		baud = 9600;
+		divisor = (rp_baud_base[info->board] / baud) - 1;
+	}
 	info->cps = baud / bits;
-	sSetBaud(cp, (rp_baud_base/baud) - 1);
-	
+	sSetBaud(cp, divisor);
+
 	if (cflag & CRTSCTS) {
 		info->intmask |= DELTA_CTS;
 		sEnCTSFlowCtl(cp);
@@ -622,17 +849,16 @@ static void configure_r_port(struct r_port *info)
 		info->intmask &= ~DELTA_CTS;
 		sDisCTSFlowCtl(cp);
 	}
-	sSetRTS(&info->channel);
-	if (cflag & CLOCAL)
+	if (cflag & CLOCAL) {
 		info->intmask &= ~DELTA_CD;
-	else {
-		save_flags(flags); cli();
+	} else {
+		spin_lock_irqsave(&info->slock, flags);
 		if (sGetChanStatus(cp) & CD_ACT)
 			info->cd_status = 1;
 		else
 			info->cd_status = 0;
 		info->intmask |= DELTA_CD;
-		restore_flags(flags);
+		spin_unlock_irqrestore(&info->slock, flags);
 	}
 
 	/*
@@ -654,7 +880,7 @@ static void configure_r_port(struct r_port *info)
 		sClrTxXOFF(cp);
 	}
 #endif
-	
+
 	/*
 	 * Set up ignore/read mask words
 	 */
@@ -679,263 +905,281 @@ static void configure_r_port(struct r_port *info)
 		if (I_IGNPAR(info->tty))
 			info->ignore_status_mask |= STMRCVROVRH;
 	}
+
+	rocketMode = info->flags & ROCKET_MODE_MASK;
+
+	if ((info->flags & ROCKET_RTS_TOGGLE)
+	    || (rocketMode == ROCKET_MODE_RS485))
+		sEnRTSToggle(cp);
+	else
+		sDisRTSToggle(cp);
+
+	sSetRTS(&info->channel);
+
+	if (cp->CtlP->boardType == ROCKET_TYPE_PC104) {
+		switch (rocketMode) {
+		case ROCKET_MODE_RS485:
+			sSetInterfaceMode(cp, InterfaceModeRS485);
+			break;
+		case ROCKET_MODE_RS422:
+			sSetInterfaceMode(cp, InterfaceModeRS422);
+			break;
+		case ROCKET_MODE_RS232:
+		default:
+			if (info->flags & ROCKET_RTS_TOGGLE)
+				sSetInterfaceMode(cp, InterfaceModeRS232T);
+			else
+				sSetInterfaceMode(cp, InterfaceModeRS232);
+			break;
+		}
+	}
 }
 
-static int block_til_ready(struct tty_struct *tty, struct file * filp,
+/*  info->count is considered critical, protected by spinlocks.  */
+static int block_til_ready(struct tty_struct *tty, struct file *filp,
 			   struct r_port *info)
 {
 	DECLARE_WAITQUEUE(wait, current);
-	int		retval;
-	int		do_clocal = 0, extra_count = 0;
-	unsigned long	flags;
+	int retval;
+	int do_clocal = 0, extra_count = 0;
+	unsigned long flags;
 
 	/*
 	 * If the device is in the middle of being closed, then block
 	 * until it's done, and then try again.
 	 */
 	if (tty_hung_up_p(filp))
-		return ((info->flags & ROCKET_HUP_NOTIFY) ? 
-			-EAGAIN : -ERESTARTSYS);
+		return ((info->flags & ROCKET_HUP_NOTIFY) ? -EAGAIN : -ERESTARTSYS);
 	if (info->flags & ROCKET_CLOSING) {
 		interruptible_sleep_on(&info->close_wait);
-		return ((info->flags & ROCKET_HUP_NOTIFY) ? 
-			-EAGAIN : -ERESTARTSYS);
+		return ((info->flags & ROCKET_HUP_NOTIFY) ? -EAGAIN : -ERESTARTSYS);
 	}
 
 	/*
 	 * If non-blocking mode is set, or the port is not enabled,
 	 * then make the check up front and then exit.
 	 */
-	if ((filp->f_flags & O_NONBLOCK) ||
-	    (tty->flags & (1 << TTY_IO_ERROR))) {
+	if ((filp->f_flags & O_NONBLOCK) || (tty->flags & (1 << TTY_IO_ERROR))) {
 		info->flags |= ROCKET_NORMAL_ACTIVE;
 		return 0;
 	}
-
 	if (tty->termios->c_cflag & CLOCAL)
 		do_clocal = 1;
 
 	/*
-	 * Block waiting for the carrier detect and the line to become
-	 * free (i.e., not in use by the callout).  While we are in
-	 * this loop, info->count is dropped by one, so that
-	 * rp_close() knows when to free things.  We restore it upon
-	 * exit, either normal or abnormal.
+	 * Block waiting for the carrier detect and the line to become free.  While we are in
+	 * this loop, info->count is dropped by one, so that rp_close() knows when to free things.  
+         * We restore it upon exit, either normal or abnormal.
 	 */
 	retval = 0;
 	add_wait_queue(&info->open_wait, &wait);
 #ifdef ROCKET_DEBUG_OPEN
-	printk("block_til_ready before block: ttyR%d, count = %d\n",
-	       info->line, info->count);
+	printk(KERN_INFO "block_til_ready before block: ttyR%d, count = %d\n", info->line, info->count);
 #endif
-	save_flags(flags); cli();
+	spin_lock_irqsave(&info->slock, flags);
+
+#ifdef ROCKET_DISABLE_SIMUSAGE
+	info->flags |= ROCKET_NORMAL_ACTIVE;
+#else
 	if (!tty_hung_up_p(filp)) {
 		extra_count = 1;
 		info->count--;
 	}
-	restore_flags(flags);
+#endif
 	info->blocked_open++;
+
+	spin_unlock_irqrestore(&info->slock, flags);
+
 	while (1) {
-		if ((tty->termios->c_cflag & CBAUD)) {
+		if (tty->termios->c_cflag & CBAUD) {
 			sSetDTR(&info->channel);
 			sSetRTS(&info->channel);
 		}
 		set_current_state(TASK_INTERRUPTIBLE);
-		if (tty_hung_up_p(filp) ||
-		    !(info->flags & ROCKET_INITIALIZED)) {
+		if (tty_hung_up_p(filp) || !(info->flags & ROCKET_INITIALIZED)) {
 			if (info->flags & ROCKET_HUP_NOTIFY)
 				retval = -EAGAIN;
 			else
-				retval = -ERESTARTSYS;	
+				retval = -ERESTARTSYS;
 			break;
 		}
-		if (!(info->flags & ROCKET_CLOSING) &&
-		    (do_clocal || (sGetChanStatusLo(&info->channel) &
-				   CD_ACT)))
+		if (!(info->flags & ROCKET_CLOSING) && (do_clocal || (sGetChanStatusLo(&info->channel) & CD_ACT)))
 			break;
 		if (signal_pending(current)) {
 			retval = -ERESTARTSYS;
 			break;
 		}
 #ifdef ROCKET_DEBUG_OPEN
-		printk("block_til_ready blocking: ttyR%d, count = %d, flags=0x%0x\n",
-		       info->line, info->count, info->flags);
+		printk(KERN_INFO "block_til_ready blocking: ttyR%d, count = %d, flags=0x%0x\n",
+		     info->line, info->count, info->flags);
 #endif
-		schedule();
+		schedule();	/*  Don't hold spinlock here, will hang PC */
 	}
 	current->state = TASK_RUNNING;
 	remove_wait_queue(&info->open_wait, &wait);
-	cli();
+
+	spin_lock_irqsave(&info->slock, flags);
+
 	if (extra_count)
 		info->count++;
-	restore_flags(flags);
 	info->blocked_open--;
+
+	spin_unlock_irqrestore(&info->slock, flags);
+
 #ifdef ROCKET_DEBUG_OPEN
-	printk("block_til_ready after blocking: ttyR%d, count = %d\n",
+	printk(KERN_INFO "block_til_ready after blocking: ttyR%d, count = %d\n",
 	       info->line, info->count);
 #endif
 	if (retval)
 		return retval;
 	info->flags |= ROCKET_NORMAL_ACTIVE;
 	return 0;
-}	
+}
 
 /*
- * This routine is called whenever a rocketport board is opened.
+ *  Exception handler that opens a serial port.  Creates xmit_buf storage, fills in 
+ *  port's r_port struct.  Initializes the port hardware.  
  */
-static int rp_open(struct tty_struct *tty, struct file * filp)
+static int rp_open(struct tty_struct *tty, struct file *filp)
 {
 	struct r_port *info;
-	int	line, retval;
-	CHANNEL_t	*cp;
+	int line = 0, retval;
+	CHANNEL_t *cp;
 	unsigned long page;
-	
-	line = tty->index;
-	if ((line < 0) || (line >= MAX_RP_PORTS))
-		return -ENODEV;
-	if (!tmp_buf) {
-		page = get_zeroed_page(GFP_KERNEL);
-		if (!page)
-			return -ENOMEM;
-		if (tmp_buf)
-			free_page(page);
-		else
-			tmp_buf = (unsigned char *) page;
-	}
-	page = get_zeroed_page(GFP_KERNEL);
+
+#if LINUX_VERSION_CODE > VERSION_CODE(2,5,0)
+	line = TTY_GET_LINE(tty);
+#else
+	line = MINOR(tty->device) - TTY_DRIVER_MINOR_START(tty);
+#endif
+
+	if ((line < 0) || (line >= MAX_RP_PORTS) || ((info = rp_table[line]) == NULL))
+		return -ENXIO;
+
+	page = __get_free_page(GFP_KERNEL);
 	if (!page)
 		return -ENOMEM;
 
-	tty->driver_data = info = rp_table[line];
-	
 	if (info->flags & ROCKET_CLOSING) {
 		interruptible_sleep_on(&info->close_wait);
 		free_page(page);
-		return ((info->flags & ROCKET_HUP_NOTIFY) ?
-			-EAGAIN : -ERESTARTSYS);
+		return ((info->flags & ROCKET_HUP_NOTIFY) ? -EAGAIN : -ERESTARTSYS);
 	}
-	
+
 	/*
-	 * We must not sleep from here until the port is marked fully
-	 * in use.
+	 * We must not sleep from here until the port is marked fully in use.
 	 */
-	if (rp_table[line] == NULL) {
-		tty->flags = (1 << TTY_IO_ERROR);
-		free_page(page);
-		return 0;
-	}
-	if (!info) {
-		printk("rp_open: rp_table[%d] is NULL!\n", line);
-		free_page(page);
-		return -EIO;
-	}
 	if (info->xmit_buf)
 		free_page(page);
 	else
 		info->xmit_buf = (unsigned char *) page;
+
+	tty->driver_data = info;
 	info->tty = tty;
 
-	if (info->flags & ROCKET_CLOSING) {
-		interruptible_sleep_on(&info->close_wait);
-		return ((info->flags & ROCKET_HUP_NOTIFY) ? 
-			-EAGAIN : -ERESTARTSYS);
-	}
-
 	if (info->count++ == 0) {
-		rp_num_ports_open++;
+#if ((LINUX_VERSION_CODE < VERSION_CODE(2,5,0)) && defined(MODULE))
+		MOD_INC_USE_COUNT;
+#endif
+		atomic_inc(&rp_num_ports_open);
+
 #ifdef ROCKET_DEBUG_OPEN
-		printk("rocket mod++ = %d...", rp_num_ports_open);
+		printk(KERN_INFO "rocket mod++ = %d...", atomic_read(&rp_num_ports_open));
 #endif
 	}
 #ifdef ROCKET_DEBUG_OPEN
-	printk("rp_open ttyR%d, count=%d\n", info->line, info->count);
+	printk(KERN_INFO "rp_open ttyR%d, count=%d\n", info->line, info->count);
 #endif
+
 	/*
 	 * Info->count is now 1; so it's safe to sleep now.
 	 */
-	
-	cp = &info->channel;
-	sSetRxTrigger(cp, TRIG_1);
-	if (sGetChanStatus(cp) & CD_ACT)
-		info->cd_status = 1;
-	else
-		info->cd_status = 0;
-	sDisRxStatusMode(cp);
-	sFlushRxFIFO(cp);	
-	sFlushTxFIFO(cp);	
+	info->session = current->session;
+	info->pgrp = current->pgrp;
 
-	sEnInterrupts(cp, (TXINT_EN|MCINT_EN|RXINT_EN|SRCINT_EN|CHANINT_EN));
-	sSetRxTrigger(cp, TRIG_1);
+	if ((info->flags & ROCKET_INITIALIZED) == 0) {
+		cp = &info->channel;
+		sSetRxTrigger(cp, TRIG_1);
+		if (sGetChanStatus(cp) & CD_ACT)
+			info->cd_status = 1;
+		else
+			info->cd_status = 0;
+		sDisRxStatusMode(cp);
+		sFlushRxFIFO(cp);
+		sFlushTxFIFO(cp);
 
-	sGetChanStatus(cp);
-	sDisRxStatusMode(cp);
-	sClrTxXOFF(cp);
+		sEnInterrupts(cp, (TXINT_EN | MCINT_EN | RXINT_EN | SRCINT_EN | CHANINT_EN));
+		sSetRxTrigger(cp, TRIG_1);
 
-	sDisCTSFlowCtl(cp);
-	sDisTxSoftFlowCtl(cp);
+		sGetChanStatus(cp);
+		sDisRxStatusMode(cp);
+		sClrTxXOFF(cp);
 
-	sEnRxFIFO(cp);
-	sEnTransmit(cp);
+		sDisCTSFlowCtl(cp);
+		sDisTxSoftFlowCtl(cp);
 
-	info->flags |= ROCKET_INITIALIZED;
+		sEnRxFIFO(cp);
+		sEnTransmit(cp);
 
-	/*
-	 * Set up the tty->alt_speed kludge
-	 */
-	if ((info->flags & ROCKET_SPD_MASK) == ROCKET_SPD_HI)
-		info->tty->alt_speed = 57600;
-	if ((info->flags & ROCKET_SPD_MASK) == ROCKET_SPD_VHI)
-		info->tty->alt_speed = 115200;
-	if ((info->flags & ROCKET_SPD_MASK) == ROCKET_SPD_SHI)
-		info->tty->alt_speed = 230400;
-	if ((info->flags & ROCKET_SPD_MASK) == ROCKET_SPD_WARP)
-		info->tty->alt_speed = 460800;
+		info->flags |= ROCKET_INITIALIZED;
 
-	configure_r_port(info);
-	if (tty->termios->c_cflag & CBAUD) {
-		sSetDTR(cp);
-		sSetRTS(cp);
+		/*
+		 * Set up the tty->alt_speed kludge
+		 */
+		if ((info->flags & ROCKET_SPD_MASK) == ROCKET_SPD_HI)
+			info->tty->alt_speed = 57600;
+		if ((info->flags & ROCKET_SPD_MASK) == ROCKET_SPD_VHI)
+			info->tty->alt_speed = 115200;
+		if ((info->flags & ROCKET_SPD_MASK) == ROCKET_SPD_SHI)
+			info->tty->alt_speed = 230400;
+		if ((info->flags & ROCKET_SPD_MASK) == ROCKET_SPD_WARP)
+			info->tty->alt_speed = 460800;
+
+		configure_r_port(info, NULL);
+		if (tty->termios->c_cflag & CBAUD) {
+			sSetDTR(cp);
+			sSetRTS(cp);
+		}
 	}
-	
-	mod_timer(&rocket_timer, jiffies + 1);
+	/*  Starts (or resets) the maint polling loop */
+	mod_timer(&rocket_timer, jiffies + POLL_PERIOD);
 
 	retval = block_til_ready(tty, filp, info);
 	if (retval) {
 #ifdef ROCKET_DEBUG_OPEN
-		printk("rp_open returning after block_til_ready with %d\n",
-		       retval);
+		printk(KERN_INFO "rp_open returning after block_til_ready with %d\n", retval);
 #endif
 		return retval;
 	}
 
 	if ((info->count == 1) && (info->flags & ROCKET_SPLIT_TERMIOS)) {
 		*tty->termios = info->normal_termios;
-		configure_r_port(info);
+		configure_r_port(info, NULL);
 	}
-
 	return 0;
 }
 
-static void rp_close(struct tty_struct *tty, struct file * filp)
+/*
+ *  Exception handler that closes a serial port. info->count is considered critical. 
+ */
+static void rp_close(struct tty_struct *tty, struct file *filp)
 {
-	struct r_port * info = (struct r_port *)tty->driver_data;
+	struct r_port *info = (struct r_port *) tty->driver_data;
 	unsigned long flags;
 	int timeout;
-	CHANNEL_t	*cp;
+	CHANNEL_t *cp;
 
-	if (rocket_paranoia_check(info, tty->name, "rp_close"))
+	if (rocket_paranoia_check(info, "rp_close"))
 		return;
 
 #ifdef ROCKET_DEBUG_OPEN
-	printk("rp_close ttyR%d, count = %d\n", info->line, info->count);
+	printk(KERN_INFO "rp_close ttyR%d, count = %d\n", info->line, info->count);
 #endif
-	
-	save_flags(flags); cli();
-	
-	if (tty_hung_up_p(filp)) {
-		restore_flags(flags);
+
+	if (tty_hung_up_p(filp))
 		return;
-	}
+	spin_lock_irqsave(&info->slock, flags);
+
 	if ((tty->count == 1) && (info->count != 1)) {
 		/*
 		 * Uh, oh.  tty->count is 1, which means that the tty
@@ -944,27 +1188,23 @@ static void rp_close(struct tty_struct *tty, struct file * filp)
 		 * one, we've got real problems, since it means the
 		 * serial port won't be shutdown.
 		 */
-		printk("rp_close: bad serial port count; tty->count is 1, "
+		printk(KERN_INFO "rp_close: bad serial port count; tty->count is 1, "
 		       "info->count is %d\n", info->count);
 		info->count = 1;
 	}
 	if (--info->count < 0) {
-		printk("rp_close: bad serial port count for ttyR%d: %d\n",
+		printk(KERN_INFO "rp_close: bad serial port count for ttyR%d: %d\n",
 		       info->line, info->count);
 		info->count = 0;
 	}
 	if (info->count) {
-		restore_flags(flags);
+		spin_unlock_irqrestore(&info->slock, flags);
 		return;
 	}
 	info->flags |= ROCKET_CLOSING;
-	/*
-	 * Save the termios structure, since this port may have
-	 * separate termios for callout and dialin.
-	 */
-	if (info->flags & ROCKET_NORMAL_ACTIVE)
-		info->normal_termios = *tty->termios;
-	
+	spin_unlock_irqrestore(&info->slock, flags);
+
+	info->normal_termios = *tty->termios;
 	cp = &info->channel;
 
 	/*
@@ -989,29 +1229,30 @@ static void rp_close(struct tty_struct *tty, struct file * filp)
 	 * has completely drained; this is especially
 	 * important if there is a transmit FIFO!
 	 */
-	timeout = (sGetTxCnt(cp)+1) * HZ / info->cps;
+	timeout = (sGetTxCnt(cp) + 1) * HZ / info->cps;
 	if (timeout == 0)
 		timeout = 1;
 	rp_wait_until_sent(tty, timeout);
-	
-	xmit_flags[info->line >> 5] &= ~(1 << (info->line & 0x1f));
+	clear_bit((info->aiop * 8) + info->chan, (void *) &xmit_flags[info->board]);
+
 	sDisTransmit(cp);
-	sDisInterrupts(cp, (TXINT_EN|MCINT_EN|RXINT_EN|SRCINT_EN|CHANINT_EN));
+	sDisInterrupts(cp, (TXINT_EN | MCINT_EN | RXINT_EN | SRCINT_EN | CHANINT_EN));
 	sDisCTSFlowCtl(cp);
 	sDisTxSoftFlowCtl(cp);
 	sClrTxXOFF(cp);
-	sFlushRxFIFO(cp);	
+	sFlushRxFIFO(cp);
 	sFlushTxFIFO(cp);
 	sClrRTS(cp);
-	if (C_HUPCL(tty)) {
+	if (C_HUPCL(tty))
 		sClrDTR(cp);
-	}
-	if (tty->driver->flush_buffer)
-		tty->driver->flush_buffer(tty);
+
+	if (TTY_DRIVER_FLUSH_BUFFER_EXISTS(tty))
+		TTY_DRIVER_FLUSH_BUFFER(tty);
 	if (tty->ldisc.flush_buffer)
 		tty->ldisc.flush_buffer(tty);
 
-	xmit_flags[info->line >> 5] &= ~(1 << (info->line & 0x1f));
+	clear_bit((info->aiop * 8) + info->chan, (void *) &xmit_flags[info->board]);
+
 	if (info->blocked_open) {
 		if (info->close_delay) {
 			current->state = TASK_INTERRUPTIBLE;
@@ -1027,27 +1268,27 @@ static void rp_close(struct tty_struct *tty, struct file * filp)
 	info->flags &= ~(ROCKET_INITIALIZED | ROCKET_CLOSING | ROCKET_NORMAL_ACTIVE);
 	tty->closing = 0;
 	wake_up_interruptible(&info->close_wait);
-	
-	rp_num_ports_open--;
-#ifdef ROCKET_DEBUG_OPEN
-	printk("rocket mod-- = %d...", rp_num_ports_open);
+
+#if ((LINUX_VERSION_CODE < VERSION_CODE(2,5,0)) && defined(MODULE))
+	MOD_DEC_USE_COUNT;
 #endif
-	restore_flags(flags);
-	
+	atomic_dec(&rp_num_ports_open);
+
 #ifdef ROCKET_DEBUG_OPEN
-	printk("rp_close ttyR%d complete shutdown\n", info->line);
+	printk(KERN_INFO "rocket mod-- = %d...", atomic_read(&rp_num_ports_open));
+	printk(KERN_INFO "rp_close ttyR%d complete shutdown\n", info->line);
 #endif
-	
+
 }
 
-static void rp_set_termios(struct tty_struct *tty, struct termios *old_termios)
+static void rp_set_termios(struct tty_struct *tty,
+			   struct termios *old_termios)
 {
-	struct r_port * info = (struct r_port *)tty->driver_data;
+	struct r_port *info = (struct r_port *) tty->driver_data;
 	CHANNEL_t *cp;
 	unsigned cflag;
-	
 
-	if (rocket_paranoia_check(info, tty->name, "rp_set_termios"))
+	if (rocket_paranoia_check(info, "rp_set_termios"))
 		return;
 
 	cflag = tty->termios->c_cflag;
@@ -1058,88 +1299,103 @@ static void rp_set_termios(struct tty_struct *tty, struct termios *old_termios)
 	/*
 	 * This driver doesn't support CS5 or CS6
 	 */
-	if (((cflag & CSIZE) == CS5) ||
-	    ((cflag & CSIZE) == CS6))
-		tty->termios->c_cflag = ((cflag & ~CSIZE) |
-					 (old_termios->c_cflag & CSIZE));
+	if (((cflag & CSIZE) == CS5) || ((cflag & CSIZE) == CS6))
+		tty->termios->c_cflag =
+		    ((cflag & ~CSIZE) | (old_termios->c_cflag & CSIZE));
 
-	configure_r_port(info);
+	configure_r_port(info, old_termios);
 
 	cp = &info->channel;
 
 	/* Handle transition to B0 status */
-	if ((old_termios->c_cflag & CBAUD) &&
-	    !(tty->termios->c_cflag & CBAUD)) {
+	if ((old_termios->c_cflag & CBAUD) && !(tty->termios->c_cflag & CBAUD)) {
 		sClrDTR(cp);
 		sClrRTS(cp);
 	}
-	
+
 	/* Handle transition away from B0 status */
-	if (!(old_termios->c_cflag & CBAUD) &&
-	    (tty->termios->c_cflag & CBAUD)) {
-		if (!tty->hw_stopped ||
-		    !(tty->termios->c_cflag & CRTSCTS)) {
+	if (!(old_termios->c_cflag & CBAUD) && (tty->termios->c_cflag & CBAUD)) {
+		if (!tty->hw_stopped || !(tty->termios->c_cflag & CRTSCTS))
 			sSetRTS(cp);
-		}
 		sSetDTR(cp);
 	}
-	
-	if ((old_termios->c_cflag & CRTSCTS) &&
-	    !(tty->termios->c_cflag & CRTSCTS)) {
+
+	if ((old_termios->c_cflag & CRTSCTS) && !(tty->termios->c_cflag & CRTSCTS)) {
 		tty->hw_stopped = 0;
 		rp_start(tty);
 	}
 }
 
-/*
- * Here are the routines used by rp_ioctl
- */
 static void rp_break(struct tty_struct *tty, int break_state)
 {
-	struct r_port * info = (struct r_port *)tty->driver_data;
+	struct r_port *info = (struct r_port *) tty->driver_data;
 	unsigned long flags;
-	
-	if (rocket_paranoia_check(info, tty->name, "rp_break"))
+
+	if (rocket_paranoia_check(info, "rp_break"))
 		return;
 
-	save_flags(flags); cli();
-	if (break_state == -1) {
+	spin_lock_irqsave(&info->slock, flags);
+	if (break_state == -1)
 		sSendBreak(&info->channel);
-	} else {
+	else
 		sClrBreak(&info->channel);
-	}
-	restore_flags(flags);
+	spin_unlock_irqrestore(&info->slock, flags);
 }
 
-static int get_modem_info(struct r_port * info, unsigned int *value)
+/*
+ * sGetChanRI used to be a macro in rocket_int.h. When the functionality for
+ * the UPCI boards was added, it was decided to make this a function because
+ * the macro was getting too complicated. All cases except the first one
+ * (UPCIRingInd) are taken directly from the original macro.
+ */
+static int sGetChanRI(CHANNEL_T * ChP)
+{
+	CONTROLLER_t *CtlP = ChP->CtlP;
+	int ChanNum = ChP->ChanNum;
+	int RingInd = 0;
+
+	if (CtlP->UPCIRingInd)
+		RingInd = !(sInB(CtlP->UPCIRingInd) & sBitMapSetTbl[ChanNum]);
+	else if (CtlP->AltChanRingIndicator)
+		RingInd = sInB((ByteIO_t) (ChP->ChanStat + 8)) & DSR_ACT;
+	else if (CtlP->boardType == ROCKET_TYPE_PC104)
+		RingInd = !(sInB(CtlP->AiopIO[3]) & sBitMapSetTbl[ChanNum]);
+
+	return RingInd;
+}
+
+/********************************************************************************************/
+/*  Here are the routines used by rp_ioctl.  These are all called from exception handlers.  */
+
+static int get_modem_info(struct r_port *info, unsigned int *value)
 {
 	unsigned int control, result, ChanStatus;
 
 	ChanStatus = sGetChanStatusLo(&info->channel);
-	
-	control = info->channel.TxControl[3];
-	result =  ((control & SET_RTS) ? TIOCM_RTS : 0)
-		| ((control & SET_DTR) ? TIOCM_DTR : 0)
-		| ((ChanStatus  & CD_ACT) ? TIOCM_CAR : 0)
-			/* TIOCM_RNG not supported */
-		| ((ChanStatus  & DSR_ACT) ? TIOCM_DSR : 0)
-		| ((ChanStatus  & CTS_ACT) ? TIOCM_CTS : 0);
 
-	if (copy_to_user(value, &result, sizeof(int)))
+	control = info->channel.TxControl[3];
+	result = ((control & SET_RTS) ? TIOCM_RTS : 0) | 
+		((control & SET_DTR) ?  TIOCM_DTR : 0) |
+		((ChanStatus & CD_ACT) ? TIOCM_CAR : 0) |
+		(sGetChanRI(&info->channel) ? TIOCM_RNG : 0) |
+		((ChanStatus & DSR_ACT) ? TIOCM_DSR : 0) |
+		((ChanStatus & CTS_ACT) ? TIOCM_CTS : 0);
+
+	if (copy_to_user(value, &result, sizeof (int)))
 		return -EFAULT;
 	return 0;
 }
 
-static int set_modem_info(struct r_port * info, unsigned int cmd,
+static int set_modem_info(struct r_port *info, unsigned int cmd,
 			  unsigned int *value)
 {
 	unsigned int arg;
 
-	if (copy_from_user(&arg, value, sizeof(int)))
+	if (copy_from_user(&arg, value, sizeof (int)))
 		return -EFAULT;
 
 	switch (cmd) {
-	case TIOCMBIS: 
+	case TIOCMBIS:
 		if (arg & TIOCM_RTS)
 			info->channel.TxControl[3] |= SET_RTS;
 		if (arg & TIOCM_DTR)
@@ -1152,59 +1408,103 @@ static int set_modem_info(struct r_port * info, unsigned int cmd,
 			info->channel.TxControl[3] &= ~SET_DTR;
 		break;
 	case TIOCMSET:
-		info->channel.TxControl[3] =
-			((info->channel.TxControl[3] & ~(SET_RTS | SET_DTR))
-			 | ((arg & TIOCM_RTS) ? SET_RTS : 0)
-			 | ((arg & TIOCM_DTR) ? SET_DTR : 0));
+		info->channel.TxControl[3] = ((info->channel.TxControl[3] & ~(SET_RTS | SET_DTR)) | 
+					      ((arg & TIOCM_RTS) ? SET_RTS : 0) | 
+					      ((arg & TIOCM_DTR) ? SET_DTR : 0));
 		break;
 	default:
 		return -EINVAL;
 	}
 
-	sOutDW(info->channel.IndexAddr,
-	       *(DWord_t *) &(info->channel.TxControl[0]));
-	
+	sOutDW(info->channel.IndexAddr, *(DWord_t *) & (info->channel.TxControl[0]));
 	return 0;
 }
 
-static int get_config(struct r_port * info, struct rocket_config * retinfo)
+#if LINUX_VERSION_CODE > VERSION_CODE(2,5,0)
+
+/*
+ *  Returns the state of the serial modem control lines.  These next 2 functions 
+ *  are the way kernel versions > 2.5 handle modem control lines rather than IOCTLs.
+ */
+static int rp_tiocmget(struct tty_struct *tty, struct file *file)
+{
+	struct r_port *info = (struct r_port *)tty->driver_data;
+	unsigned int control, result, ChanStatus;
+
+	ChanStatus = sGetChanStatusLo(&info->channel);
+	control = info->channel.TxControl[3];
+	result = ((control & SET_RTS) ? TIOCM_RTS : 0) | 
+		((control & SET_DTR) ?  TIOCM_DTR : 0) |
+		((ChanStatus & CD_ACT) ? TIOCM_CAR : 0) |
+		(sGetChanRI(&info->channel) ? TIOCM_RNG : 0) |
+		((ChanStatus & DSR_ACT) ? TIOCM_DSR : 0) |
+		((ChanStatus & CTS_ACT) ? TIOCM_CTS : 0);
+
+	return result;
+}
+
+/* 
+ *  Sets the modem control lines
+ */
+static int rp_tiocmset(struct tty_struct *tty, struct file *file,
+		    unsigned int set, unsigned int clear)
+{
+	struct r_port *info = (struct r_port *)tty->driver_data;
+
+	if (set & TIOCM_RTS)
+		info->channel.TxControl[3] |= SET_RTS;
+	if (set & TIOCM_DTR)
+		info->channel.TxControl[3] |= SET_DTR;
+	if (clear & TIOCM_RTS)
+		info->channel.TxControl[3] &= ~SET_RTS;
+	if (clear & TIOCM_DTR)
+		info->channel.TxControl[3] &= ~SET_DTR;
+
+	sOutDW(info->channel.IndexAddr, *(DWord_t *) & (info->channel.TxControl[0]));
+	return 0;
+}
+
+#endif /*  Linux > 2.5 */
+
+static int get_config(struct r_port *info, struct rocket_config *retinfo)
 {
 	struct rocket_config tmp;
-  
+
 	if (!retinfo)
 		return -EFAULT;
-	memset(&tmp, 0, sizeof(tmp));
+	memset(&tmp, 0, sizeof (tmp));
 	tmp.line = info->line;
 	tmp.flags = info->flags;
 	tmp.close_delay = info->close_delay;
 	tmp.closing_wait = info->closing_wait;
 	tmp.port = rcktpt_io_addr[(info->line >> 5) & 3];
-	
-	if (copy_to_user(retinfo,&tmp,sizeof(*retinfo)))
+
+	if (copy_to_user(retinfo, &tmp, sizeof (*retinfo)))
 		return -EFAULT;
 	return 0;
 }
 
-static int set_config(struct r_port * info, struct rocket_config * new_info)
+static int set_config(struct r_port *info, struct rocket_config *new_info)
 {
 	struct rocket_config new_serial;
 
-	if (copy_from_user(&new_serial, new_info, sizeof(new_serial)))
+	if (copy_from_user(&new_serial, new_info, sizeof (new_serial)))
 		return -EFAULT;
 
+#ifdef CAP_SYS_ADMIN
 	if (!capable(CAP_SYS_ADMIN))
+#else
+	if (!suser())
+#endif
 	{
-		if ((new_serial.flags & ~ROCKET_USR_MASK) !=
-		    (info->flags & ~ROCKET_USR_MASK))
+		if ((new_serial.flags & ~ROCKET_USR_MASK) != (info->flags & ~ROCKET_USR_MASK))
 			return -EPERM;
-		info->flags = ((info->flags & ~ROCKET_USR_MASK) |
-			       (new_serial.flags & ROCKET_USR_MASK));
-		configure_r_port(info);
+		info->flags = ((info->flags & ~ROCKET_USR_MASK) | (new_serial.flags & ROCKET_USR_MASK));
+		configure_r_port(info, 0);
 		return 0;
 	}
-	
-	info->flags = ((info->flags & ~ROCKET_FLAGS) |
-			(new_serial.flags & ROCKET_FLAGS));
+
+	info->flags = ((info->flags & ~ROCKET_FLAGS) | (new_serial.flags & ROCKET_FLAGS));
 	info->close_delay = new_serial.close_delay;
 	info->closing_wait = new_serial.closing_wait;
 
@@ -1216,117 +1516,162 @@ static int set_config(struct r_port * info, struct rocket_config * new_info)
 		info->tty->alt_speed = 230400;
 	if ((info->flags & ROCKET_SPD_MASK) == ROCKET_SPD_WARP)
 		info->tty->alt_speed = 460800;
-	
-	configure_r_port(info);
+
+	configure_r_port(info, 0);
 	return 0;
 }
 
-static int get_ports(struct r_port * info, struct rocket_ports * retports)
+/*
+ *  This function fills in a rocket_ports struct with information
+ *  about what boards/ports are in the system.  This info is passed
+ *  to user space.  See setrocket.c where the info is used to create
+ *  the /dev/ttyRx ports.
+ */
+static int get_ports(struct r_port *info, struct rocket_ports *retports)
 {
 	struct rocket_ports tmp;
-	int	board, port, index;
-  
+	int board;
+
 	if (!retports)
 		return -EFAULT;
-	memset(&tmp, 0, sizeof(tmp));
+	memset(&tmp, 0, sizeof (tmp));
 	tmp.tty_major = rocket_driver.major;
-	tmp.callout_major = 0;
+
 	for (board = 0; board < 4; board++) {
-		index = board << 5;
-		for (port = 0; port < 32; port++, index++) {
-			if (rp_table[index])
-				tmp.port_bitmap[board] |= 1 << port;
-		}
+		tmp.rocketModel[board].model = rocketModel[board].model;
+		strcpy(tmp.rocketModel[board].modelString, rocketModel[board].modelString);
+		tmp.rocketModel[board].numPorts = rocketModel[board].numPorts;
+		tmp.rocketModel[board].loadrm2 = rocketModel[board].loadrm2;
+		tmp.rocketModel[board].startingPortNumber = rocketModel[board].startingPortNumber;
 	}
-	if (copy_to_user(retports,&tmp,sizeof(*retports)))
+	if (copy_to_user(retports, &tmp, sizeof (*retports)))
 		return -EFAULT;
 	return 0;
 }
 
-static int rp_ioctl(struct tty_struct *tty, struct file * file,
-		    unsigned int cmd, unsigned long arg)
+static int reset_rm2(struct r_port *info, unsigned long arg)
 {
-	struct r_port * info = (struct r_port *)tty->driver_data;
+	int reset;
 
-	if (cmd != RCKP_GET_PORTS &&
-	    rocket_paranoia_check(info, tty->name, "rp_ioctl"))
-		return -ENODEV;
+	if (copy_from_user(&reset, (void *) arg, sizeof (int)))
+		return -EFAULT;
+	if (reset)
+		reset = 1;
 
-	switch (cmd) {
+	if (rcktpt_type[info->board] != ROCKET_TYPE_MODEMII &&
+            rcktpt_type[info->board] != ROCKET_TYPE_MODEMIII)
+		return -EINVAL;
 
-		case TIOCMGET:
-			return get_modem_info(info, (unsigned int *) arg);
-		case TIOCMBIS:
-		case TIOCMBIC:
-		case TIOCMSET:
-			return set_modem_info(info, cmd, (unsigned int *) arg);
-		case RCKP_GET_STRUCT:
-			if (copy_to_user((void *) arg, info,
-					 sizeof(struct r_port)))
-				return -EFAULT;
-			return 0;
+	if (info->ctlp->BusType == isISA)
+		sModemReset(info->ctlp, info->chan, reset);
+	else
+		sPCIModemReset(info->ctlp, info->chan, reset);
 
-		case RCKP_GET_CONFIG:
-			return get_config(info, (struct rocket_config *) arg);
-		case RCKP_SET_CONFIG:
-			return set_config(info, (struct rocket_config *) arg);
-			
-		case RCKP_GET_PORTS:
-			return get_ports(info, (struct rocket_ports *) arg);
-		default:
-			return -ENOIOCTLCMD;
-		}
 	return 0;
 }
+
+static int get_version(struct r_port *info, struct rocket_version *retvers)
+{
+	if (copy_to_user(retvers, &driver_version, sizeof (*retvers)))
+		return -EFAULT;
+	return 0;
+}
+
+/*  IOCTL call handler into the driver */
+static int rp_ioctl(struct tty_struct *tty, struct file *file,
+		    unsigned int cmd, unsigned long arg)
+{
+	struct r_port *info = (struct r_port *) tty->driver_data;
+
+	if (cmd != RCKP_GET_PORTS && rocket_paranoia_check(info, "rp_ioctl"))
+		return -ENXIO;
+
+	switch (cmd) {
+	case TIOCMGET:
+		return get_modem_info(info, (unsigned int *) arg);
+	case TIOCMBIS:
+	case TIOCMBIC:
+	case TIOCMSET:
+		return set_modem_info(info, cmd, (unsigned int *) arg);
+	case RCKP_GET_STRUCT:
+		if (copy_to_user((void *) arg, info, sizeof (struct r_port)))
+			return -EFAULT;
+		return 0;
+	case RCKP_GET_CONFIG:
+		return get_config(info, (struct rocket_config *) arg);
+	case RCKP_SET_CONFIG:
+		return set_config(info, (struct rocket_config *) arg);
+	case RCKP_GET_PORTS:
+		return get_ports(info, (struct rocket_ports *) arg);
+	case RCKP_RESET_RM2:
+		return reset_rm2(info, arg);
+	case RCKP_GET_VERSION:
+		return get_version(info, (struct rocket_version *) arg);
+	default:
+		return -ENOIOCTLCMD;
+	}
+	return 0;
+}
+
+#if (defined(ROCKET_DEBUG_FLOW) || defined(ROCKET_DEBUG_THROTTLE))
+static char *rp_tty_name(struct tty_struct *tty, char *buf)
+{
+	if (tty)
+		sprintf(buf, "%s%d", TTY_DRIVER_NAME(tty), MINOR(tty->device) - TTY_DRIVER_MINOR_START(tty) + TTY_DRIVER_NAME_BASE);
+	else
+		strcpy(buf, "NULL tty");
+	return buf;
+}
+#endif
 
 static void rp_send_xchar(struct tty_struct *tty, char ch)
 {
-	struct r_port *info = (struct r_port *)tty->driver_data;
+	struct r_port *info = (struct r_port *) tty->driver_data;
 	CHANNEL_t *cp;
 
-	if (rocket_paranoia_check(info, tty->name, "rp_send_xchar"))
+	if (rocket_paranoia_check(info, "rp_send_xchar"))
 		return;
 
 	cp = &info->channel;
-	if (sGetTxCnt(cp)) 
+	if (sGetTxCnt(cp))
 		sWriteTxPrioByte(cp, ch);
 	else
 		sWriteTxByte(sGetTxRxDataIO(cp), ch);
 }
 
-static void rp_throttle(struct tty_struct * tty)
+static void rp_throttle(struct tty_struct *tty)
 {
-	struct r_port *info = (struct r_port *)tty->driver_data;
+	struct r_port *info = (struct r_port *) tty->driver_data;
 	CHANNEL_t *cp;
 #ifdef ROCKET_DEBUG_THROTTLE
-	char	buf[64];
-	
-	printk("throttle %s: %d....\n", tty->name,
+	char buf[64];
+
+	printk(KERN_INFO "throttle %s: %d....\n", rp_tty_name(tty, buf),
 	       tty->ldisc.chars_in_buffer(tty));
 #endif
 
-	if (rocket_paranoia_check(info, tty->name, "rp_throttle"))
+	if (rocket_paranoia_check(info, "rp_throttle"))
 		return;
 
 	cp = &info->channel;
 	if (I_IXOFF(tty))
 		rp_send_xchar(tty, STOP_CHAR(tty));
-	
+
 	sClrRTS(&info->channel);
 }
 
-static void rp_unthrottle(struct tty_struct * tty)
+static void rp_unthrottle(struct tty_struct *tty)
 {
-	struct r_port *info = (struct r_port *)tty->driver_data;
+	struct r_port *info = (struct r_port *) tty->driver_data;
 	CHANNEL_t *cp;
 #ifdef ROCKET_DEBUG_THROTTLE
-	char	buf[64];
-	
-	printk("unthrottle %s: %d....\n", tty->name,
+	char buf[64];
+
+	printk(KERN_INFO "unthrottle %s: %d....\n", rp_tty_name(tty, buf),
 	       tty->ldisc.chars_in_buffer(tty));
 #endif
 
-	if (rocket_paranoia_check(info, tty->name, "rp_throttle"))
+	if (rocket_paranoia_check(info, "rp_throttle"))
 		return;
 
 	cp = &info->channel;
@@ -1346,15 +1691,15 @@ static void rp_unthrottle(struct tty_struct * tty)
  */
 static void rp_stop(struct tty_struct *tty)
 {
-	struct r_port * info = (struct r_port *)tty->driver_data;
+	struct r_port *info = (struct r_port *) tty->driver_data;
 #ifdef ROCKET_DEBUG_FLOW
-	char	buf[64];
-	
-	printk("stop %s: %d %d....\n", tty->name,
+	char buf[64];
+
+	printk(KERN_INFO "stop %s: %d %d....\n", rp_tty_name(tty, buf),
 	       info->xmit_cnt, info->xmit_fifo_room);
 #endif
 
-	if (rocket_paranoia_check(info, tty->name, "rp_stop"))
+	if (rocket_paranoia_check(info, "rp_stop"))
 		return;
 
 	if (sGetTxCnt(&info->channel))
@@ -1363,19 +1708,20 @@ static void rp_stop(struct tty_struct *tty)
 
 static void rp_start(struct tty_struct *tty)
 {
-	struct r_port * info = (struct r_port *)tty->driver_data;
+	struct r_port *info = (struct r_port *) tty->driver_data;
 #ifdef ROCKET_DEBUG_FLOW
-	char	buf[64];
-	
-	printk("start %s: %d %d....\n", tty->name,
+	char buf[64];
+
+	printk(KERN_INFO "start %s: %d %d....\n", rp_tty_name(tty, buf),
 	       info->xmit_cnt, info->xmit_fifo_room);
 #endif
 
-	if (rocket_paranoia_check(info, tty->name, "rp_stop"))
+	if (rocket_paranoia_check(info, "rp_stop"))
 		return;
 
 	sEnTransmit(&info->channel);
-	xmit_flags[info->line >> 5] |= (1 << (info->line & 0x1f));
+	set_bit((info->aiop * 8) + info->chan,
+		(void *) &xmit_flags[info->board]);
 }
 
 /*
@@ -1383,21 +1729,22 @@ static void rp_start(struct tty_struct *tty)
  */
 static void rp_wait_until_sent(struct tty_struct *tty, int timeout)
 {
-	struct r_port *info = (struct r_port *)tty->driver_data;
+	struct r_port *info = (struct r_port *) tty->driver_data;
 	CHANNEL_t *cp;
 	unsigned long orig_jiffies;
 	int check_time, exit_time;
 	int txcnt;
-	
-	if (rocket_paranoia_check(info, tty->name, "rp_wait_until_sent"))
+
+	if (rocket_paranoia_check(info, "rp_wait_until_sent"))
 		return;
 
 	cp = &info->channel;
 
 	orig_jiffies = jiffies;
 #ifdef ROCKET_DEBUG_WAIT_UNTIL_SENT
-	printk("In RP_wait_until_sent(%d) (jiff=%lu)...", timeout, jiffies);
-	printk("cps=%d...", info->cps);
+	printk(KERN_INFO "In RP_wait_until_sent(%d) (jiff=%lu)...", timeout,
+	       jiffies);
+	printk(KERN_INFO "cps=%d...", info->cps);
 #endif
 	while (1) {
 		txcnt = sGetTxCnt(cp);
@@ -1405,8 +1752,9 @@ static void rp_wait_until_sent(struct tty_struct *tty, int timeout)
 			if (sGetChanStatusLo(cp) & TXSHRMT)
 				break;
 			check_time = (HZ / info->cps) / 5;
-		} else
+		} else {
 			check_time = HZ * txcnt / info->cps;
+		}
 		if (timeout) {
 			exit_time = orig_jiffies + timeout - jiffies;
 			if (exit_time <= 0)
@@ -1417,8 +1765,7 @@ static void rp_wait_until_sent(struct tty_struct *tty, int timeout)
 		if (check_time == 0)
 			check_time = 1;
 #ifdef ROCKET_DEBUG_WAIT_UNTIL_SENT
-		printk("txcnt = %d (jiff=%lu,check=%d)...", txcnt,
-		       jiffies, check_time);
+		printk(KERN_INFO "txcnt = %d (jiff=%lu,check=%d)...", txcnt, jiffies, check_time);
 #endif
 		current->state = TASK_INTERRUPTIBLE;
 		schedule_timeout(check_time);
@@ -1427,7 +1774,7 @@ static void rp_wait_until_sent(struct tty_struct *tty, int timeout)
 	}
 	current->state = TASK_RUNNING;
 #ifdef ROCKET_DEBUG_WAIT_UNTIL_SENT
-	printk("txcnt = %d (jiff=%lu)...done\n", txcnt, jiffies);
+	printk(KERN_INFO "txcnt = %d (jiff=%lu)...done\n", txcnt, jiffies);
 #endif
 }
 
@@ -1436,32 +1783,26 @@ static void rp_wait_until_sent(struct tty_struct *tty, int timeout)
  */
 static void rp_hangup(struct tty_struct *tty)
 {
-	CHANNEL_t	*cp;
-	struct r_port * info = (struct r_port *)tty->driver_data;
-	
-	if (rocket_paranoia_check(info, tty->name, "rp_hangup"))
+	CHANNEL_t *cp;
+	struct r_port *info = (struct r_port *) tty->driver_data;
+
+	if (rocket_paranoia_check(info, "rp_hangup"))
 		return;
 
 #if (defined(ROCKET_DEBUG_OPEN) || defined(ROCKET_DEBUG_HANGUP))
-	printk("rp_hangup of ttyR%d...", info->line);
+	printk(KERN_INFO "rp_hangup of ttyR%d...", info->line);
 #endif
-	/*
-	 * If the port is in the process of being closed, just force
-	 * the transmit buffer to be empty, and let rp_close handle
-	 * the clean up.
-	 */
-	if (info->flags & ROCKET_CLOSING) {
-		cli();
-		info->xmit_cnt = info->xmit_head = info->xmit_tail = 0;
-		sti();
-		wake_up_interruptible(&tty->write_wait);
+	rp_flush_buffer(tty);
+	if (info->flags & ROCKET_CLOSING)
 		return;
-	}
 	if (info->count) {
-		rp_num_ports_open--;
+#if ((LINUX_VERSION_CODE < VERSION_CODE(2,5,0)) && defined(MODULE))
+		MOD_DEC_USE_COUNT;
+#endif
+		atomic_dec(&rp_num_ports_open);
 	}
-	
-	xmit_flags[info->line >> 5] &= ~(1 << (info->line & 0x1f));
+	clear_bit((info->aiop * 8) + info->chan, (void *) &xmit_flags[info->board]);
+
 	info->count = 0;
 	info->flags &= ~ROCKET_NORMAL_ACTIVE;
 	info->tty = 0;
@@ -1469,149 +1810,168 @@ static void rp_hangup(struct tty_struct *tty)
 	cp = &info->channel;
 	sDisRxFIFO(cp);
 	sDisTransmit(cp);
-	sDisInterrupts(cp, (TXINT_EN|MCINT_EN|RXINT_EN|SRCINT_EN|CHANINT_EN));
+	sDisInterrupts(cp, (TXINT_EN | MCINT_EN | RXINT_EN | SRCINT_EN | CHANINT_EN));
 	sDisCTSFlowCtl(cp);
 	sDisTxSoftFlowCtl(cp);
 	sClrTxXOFF(cp);
 	info->flags &= ~ROCKET_INITIALIZED;
-	
+
 	wake_up_interruptible(&info->open_wait);
 }
 
 /*
- * The Rocketport write routines.  The Rocketport driver uses a
- * double-buffering strategy, with the twist that if the in-memory CPU
- * buffer is empty, and there's space in the transmit FIFO, the
- * writing routines will write directly to transmit FIFO.
- *
- * This gets a little tricky, but I'm pretty sure I got it all right.
+ *  Exception handler - write char routine.  The RocketPort driver uses a
+ *  double-buffering strategy, with the twist that if the in-memory CPU
+ *  buffer is empty, and there's space in the transmit FIFO, the
+ *  writing routines will write directly to transmit FIFO.
+ *  Write buffer and counters protected by spinlocks
  */
 static void rp_put_char(struct tty_struct *tty, unsigned char ch)
 {
-	struct r_port * info = (struct r_port *)tty->driver_data;
-	CHANNEL_t	*cp;
+	struct r_port *info = (struct r_port *) tty->driver_data;
+	CHANNEL_t *cp;
+	unsigned long flags;
 
-	if (rocket_paranoia_check(info, tty->name, "rp_put_char"))
+	if (rocket_paranoia_check(info, "rp_put_char"))
 		return;
 
+	/*  Grab the port write semaphore, locking out other processes that try to write to this port */
+	down(&info->write_sem);
+
 #ifdef ROCKET_DEBUG_WRITE
-	printk("rp_put_char %c...", ch);
+	printk(KERN_INFO "rp_put_char %c...", ch);
 #endif
-	
+
+	spin_lock_irqsave(&info->slock, flags);
 	cp = &info->channel;
 
 	if (!tty->stopped && !tty->hw_stopped && info->xmit_fifo_room == 0)
 		info->xmit_fifo_room = TXFIFO_SIZE - sGetTxCnt(cp);
 
-	if (tty->stopped || tty->hw_stopped ||
-	    info->xmit_fifo_room == 0 || info->xmit_cnt != 0) {
+	if (tty->stopped || tty->hw_stopped || info->xmit_fifo_room == 0 || info->xmit_cnt != 0) {
 		info->xmit_buf[info->xmit_head++] = ch;
-		info->xmit_head &= XMIT_BUF_SIZE-1;
+		info->xmit_head &= XMIT_BUF_SIZE - 1;
 		info->xmit_cnt++;
-		xmit_flags[info->line >> 5] |= (1 << (info->line & 0x1f));
+		set_bit((info->aiop * 8) + info->chan, (void *) &xmit_flags[info->board]);
 	} else {
 		sOutB(sGetTxRxDataIO(cp), ch);
 		info->xmit_fifo_room--;
 	}
+	spin_unlock_irqrestore(&info->slock, flags);
+	up(&info->write_sem);
 }
 
-static int rp_write(struct tty_struct * tty, int from_user,
+/*
+ *  Exception handler - write routine, called when user app writes to the device.
+ *  A per port write semaphore is used to protect from another process writing to
+ *  this port at the same time.  This other process could be running on the other CPU
+ *  or get control of the CPU if the copy_from_user() blocks due to a page fault (swapped out). 
+ *  Spinlocks protect the info xmit members.
+ */
+static int rp_write(struct tty_struct *tty, int from_user,
 		    const unsigned char *buf, int count)
 {
-	struct r_port * info = (struct r_port *)tty->driver_data;
-	CHANNEL_t	*cp;
-	const unsigned char	*b;
-	int		c, retval = 0;
-	unsigned long	flags;
+	struct r_port *info = (struct r_port *) tty->driver_data;
+	CHANNEL_t *cp;
+	const unsigned char *b;
+	int c, retval = 0;
+	unsigned long flags;
 
-	if (count <= 0 || rocket_paranoia_check(info, tty->name, "rp_write"))
+	if (count <= 0 || rocket_paranoia_check(info, "rp_write"))
 		return 0;
 
+	down_interruptible(&info->write_sem);
+
 #ifdef ROCKET_DEBUG_WRITE
-	printk("rp_write %d chars...", count);
+	printk(KERN_INFO "rp_write %d chars...", count);
 #endif
 	cp = &info->channel;
 
-	if (!tty->stopped && !tty->hw_stopped && info->xmit_fifo_room == 0)
+	if (!tty->stopped && !tty->hw_stopped && info->xmit_fifo_room < count)
 		info->xmit_fifo_room = TXFIFO_SIZE - sGetTxCnt(cp);
 
-	if (!tty->stopped && !tty->hw_stopped && info->xmit_cnt == 0
-	    && info->xmit_fifo_room >= 0) {
+        /*
+	 *  If the write queue for the port is empty, and there is FIFO space, stuff bytes 
+	 *  into FIFO.  Use the write queue for temp storage.
+         */
+	if (!tty->stopped && !tty->hw_stopped && info->xmit_cnt == 0 && info->xmit_fifo_room > 0) {
 		c = MIN(count, info->xmit_fifo_room);
 		b = buf;
 		if (from_user) {
-			down(&tmp_buf_sem);
-			c -= copy_from_user(tmp_buf, buf, c);
-			b = tmp_buf;
-			up(&tmp_buf_sem);
-			/* In case we got pre-empted */
-			if (!c) {
+			if (copy_from_user(info->xmit_buf, buf, c)) {
 				retval = -EFAULT;
 				goto end;
 			}
 			if (info->tty == 0)
 				goto end;
+			b = info->xmit_buf;
 			c = MIN(c, info->xmit_fifo_room);
 		}
-		sOutStrW(sGetTxRxDataIO(cp), b, c/2);
+
+		/*  Push data into FIFO, 2 bytes at a time */
+		sOutStrW(sGetTxRxDataIO(cp), (unsigned short *) b, c / 2);
+
+		/*  If there is a byte remaining, write it */
 		if (c & 1)
-			sOutB(sGetTxRxDataIO(cp), b[c-1]);
+			sOutB(sGetTxRxDataIO(cp), b[c - 1]);
+
 		retval += c;
 		buf += c;
 		count -= c;
+
+		spin_lock_irqsave(&info->slock, flags);
 		info->xmit_fifo_room -= c;
+		spin_unlock_irqrestore(&info->slock, flags);
 	}
+
+	/* If count is zero, we wrote it all and are done */
 	if (!count)
 		goto end;
-	
-	save_flags(flags);
+
+	/*  Write remaining data into the port's xmit_buf */
 	while (1) {
-		if (info->tty == 0) {
-			restore_flags(flags);
+		if (info->tty == 0)	/*   Seemingly obligatory check... */
 			goto end;
-		}
-		c = MIN(count, MIN(XMIT_BUF_SIZE - info->xmit_cnt - 1,
-				   XMIT_BUF_SIZE - info->xmit_head));
+
+		c = MIN(count, MIN(XMIT_BUF_SIZE - info->xmit_cnt - 1, XMIT_BUF_SIZE - info->xmit_head));
 		if (c <= 0)
 			break;
 
 		b = buf;
 		if (from_user) {
-			down(&tmp_buf_sem);
-			c -= copy_from_user(tmp_buf, buf, c);
-			b = tmp_buf;
-			up(&tmp_buf_sem);
-			if (!c) {
-				if (retval == 0)
-					retval = -EFAULT;
+			if (copy_from_user(info->xmit_buf + info->xmit_head, b, c)) {
+				retval = -EFAULT;
 				goto end_intr;
+			} else {
+				memcpy(info->xmit_buf + info->xmit_head, b, c);
 			}
-			/* In case we got pre-empted */
-			if (info->tty == 0)
-				goto end_intr;
 		}
-		cli();
-		c = MIN(c, MIN(XMIT_BUF_SIZE - info->xmit_cnt - 1,
-			       XMIT_BUF_SIZE - info->xmit_head));
-		memcpy(info->xmit_buf + info->xmit_head, b, c);
-		info->xmit_head = (info->xmit_head + c) & (XMIT_BUF_SIZE-1);
+
+		spin_lock_irqsave(&info->slock, flags);
+		info->xmit_head =
+		    (info->xmit_head + c) & (XMIT_BUF_SIZE - 1);
 		info->xmit_cnt += c;
-		restore_flags(flags);
+		spin_unlock_irqrestore(&info->slock, flags);
+
 		buf += c;
 		count -= c;
 		retval += c;
 	}
+
 end_intr:
 	if ((retval > 0) && !tty->stopped && !tty->hw_stopped)
-		xmit_flags[info->line >> 5] |= (1 << (info->line & 0x1f));
-	restore_flags(flags);
+		set_bit((info->aiop * 8) + info->chan, (void *) &xmit_flags[info->board]);
+	
 end:
-	if (info->xmit_cnt < WAKEUP_CHARS) {
-		if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-		    tty->ldisc.write_wakeup)
-			(tty->ldisc.write_wakeup)(tty);
+ 	if (info->xmit_cnt < WAKEUP_CHARS) {
+		if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP))  && tty->ldisc.write_wakeup)
+			(tty->ldisc.write_wakeup) (tty);
 		wake_up_interruptible(&tty->write_wait);
+#ifdef ROCKETPORT_HAVE_POLL_WAIT
+		wake_up_interruptible(&tty->poll_wait);
+#endif
 	}
+	up(&info->write_sem);
 	return retval;
 }
 
@@ -1622,17 +1982,17 @@ end:
  */
 static int rp_write_room(struct tty_struct *tty)
 {
-	struct r_port * info = (struct r_port *)tty->driver_data;
-	int	ret;
+	struct r_port *info = (struct r_port *) tty->driver_data;
+	int ret;
 
-	if (rocket_paranoia_check(info, tty->name, "rp_write_room"))
+	if (rocket_paranoia_check(info, "rp_write_room"))
 		return 0;
 
 	ret = XMIT_BUF_SIZE - info->xmit_cnt - 1;
 	if (ret < 0)
 		ret = 0;
 #ifdef ROCKET_DEBUG_WRITE
-	printk("rp_write_room returns %d...", ret);
+	printk(KERN_INFO "rp_write_room returns %d...", ret);
 #endif
 	return ret;
 }
@@ -1643,279 +2003,523 @@ static int rp_write_room(struct tty_struct *tty)
  */
 static int rp_chars_in_buffer(struct tty_struct *tty)
 {
-	struct r_port * info = (struct r_port *)tty->driver_data;
-	CHANNEL_t	*cp;
+	struct r_port *info = (struct r_port *) tty->driver_data;
+	CHANNEL_t *cp;
 
-	if (rocket_paranoia_check(info, tty->name, "rp_chars_in_buffer"))
+	if (rocket_paranoia_check(info, "rp_chars_in_buffer"))
 		return 0;
 
 	cp = &info->channel;
 
 #ifdef ROCKET_DEBUG_WRITE
-	printk("rp_chars_in_buffer returns %d...", info->xmit_cnt);
+	printk(KERN_INFO "rp_chars_in_buffer returns %d...", info->xmit_cnt);
 #endif
 	return info->xmit_cnt;
 }
 
+/*
+ *  Flushes the TX fifo for a port, deletes data in the xmit_buf stored in the
+ *  r_port struct for the port.  Note that spinlock are used to protect info members,
+ *  do not call this function if the spinlock is already held.
+ */
 static void rp_flush_buffer(struct tty_struct *tty)
 {
-	struct r_port * info = (struct r_port *)tty->driver_data;
-	CHANNEL_t	*cp;
+	struct r_port *info = (struct r_port *) tty->driver_data;
+	CHANNEL_t *cp;
+	unsigned long flags;
 
-	if (rocket_paranoia_check(info, tty->name, "rp_flush_buffer"))
+	if (rocket_paranoia_check(info, "rp_flush_buffer"))
 		return;
 
-	cli();
+	spin_lock_irqsave(&info->slock, flags);
 	info->xmit_cnt = info->xmit_head = info->xmit_tail = 0;
-	sti();
+	spin_unlock_irqrestore(&info->slock, flags);
+
 	wake_up_interruptible(&tty->write_wait);
-	if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-	    tty->ldisc.write_wakeup)
-		(tty->ldisc.write_wakeup)(tty);
-	
+#ifdef ROCKETPORT_HAVE_POLL_WAIT
+	wake_up_interruptible(&tty->poll_wait);
+#endif
+	if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) && tty->ldisc.write_wakeup)
+		(tty->ldisc.write_wakeup) (tty);
+
 	cp = &info->channel;
-	
 	sFlushTxFIFO(cp);
 }
 
 #ifdef CONFIG_PCI
-     
-int __init register_PCI(int i, unsigned int bus, unsigned int device_fn)
+
+/*
+ *  Called when a PCI card is found.  Retrieves and stores model information,
+ *  init's aiopic and serial port hardware.
+ *  Inputs:  i is the board number (0-n)
+ */
+__init int register_PCI(int i, struct pci_dev *dev)
 {
-	int	num_aiops, aiop, max_num_aiops, num_chan, chan;
-	unsigned int	aiopio[MAX_AIOPS_PER_BOARD];
-	char *str;
-	CONTROLLER_t	*ctlp;
-	struct pci_dev *dev = pci_find_slot(bus, device_fn);
+	int num_aiops, aiop, max_num_aiops, num_chan, chan;
+	unsigned int aiopio[MAX_AIOPS_PER_BOARD];
+	char *str, *board_type;
+	CONTROLLER_t *ctlp;
 
-	if (!dev)
+	int fast_clock = 0;
+	int altChanRingIndicator = 0;
+	int ports_per_aiop = 8;
+	int ret;
+	unsigned int class_rev;
+	WordIO_t ConfigIO = 0;
+	ByteIO_t UPCIRingInd = 0;
+
+	if (!dev || pci_enable_device(dev))
 		return 0;
 
-	if (pci_enable_device(dev))
-		return 0;
+	rcktpt_io_addr[i] = pci_resource_start(dev, 0);
+	ret = pci_read_config_dword(dev, PCI_CLASS_REVISION, &class_rev);
 
-	rcktpt_io_addr[i] = pci_resource_start (dev, 0);
-	switch(dev->device) {
+	if (ret) {
+		printk(KERN_INFO "  Error during register_PCI(), unable to read config dword \n");
+		return 0;
+	}
+
+	rcktpt_type[i] = ROCKET_TYPE_NORMAL;
+	rocketModel[i].loadrm2 = 0;
+	rocketModel[i].startingPortNumber = nextLineNumber;
+
+	/*  Depending on the model, set up some config variables */
+	switch (dev->device) {
 	case PCI_DEVICE_ID_RP4QUAD:
 		str = "Quadcable";
 		max_num_aiops = 1;
+		ports_per_aiop = 4;
+		rocketModel[i].model = MODEL_RP4QUAD;
+		strcpy(rocketModel[i].modelString, "RocketPort 4 port w/quad cable");
+		rocketModel[i].numPorts = 4;
 		break;
 	case PCI_DEVICE_ID_RP8OCTA:
 		str = "Octacable";
 		max_num_aiops = 1;
+		rocketModel[i].model = MODEL_RP8OCTA;
+		strcpy(rocketModel[i].modelString, "RocketPort 8 port w/octa cable");
+		rocketModel[i].numPorts = 8;
+		break;
+	case PCI_DEVICE_ID_URP8OCTA:
+		str = "Octacable";
+		max_num_aiops = 1;
+		rocketModel[i].model = MODEL_UPCI_RP8OCTA;
+		strcpy(rocketModel[i].modelString, "RocketPort UPCI 8 port w/octa cable");
+		rocketModel[i].numPorts = 8;
 		break;
 	case PCI_DEVICE_ID_RP8INTF:
 		str = "8";
 		max_num_aiops = 1;
+		rocketModel[i].model = MODEL_RP8INTF;
+		strcpy(rocketModel[i].modelString, "RocketPort 8 port w/external I/F");
+		rocketModel[i].numPorts = 8;
+		break;
+	case PCI_DEVICE_ID_URP8INTF:
+		str = "8";
+		max_num_aiops = 1;
+		rocketModel[i].model = MODEL_UPCI_RP8INTF;
+		strcpy(rocketModel[i].modelString, "RocketPort UPCI 8 port w/external I/F");
+		rocketModel[i].numPorts = 8;
 		break;
 	case PCI_DEVICE_ID_RP8J:
 		str = "8J";
 		max_num_aiops = 1;
+		rocketModel[i].model = MODEL_RP8J;
+		strcpy(rocketModel[i].modelString, "RocketPort 8 port w/RJ11 connectors");
+		rocketModel[i].numPorts = 8;
+		break;
+	case PCI_DEVICE_ID_RP4J:
+		str = "4J";
+		max_num_aiops = 1;
+		ports_per_aiop = 4;
+		rocketModel[i].model = MODEL_RP4J;
+		strcpy(rocketModel[i].modelString, "RocketPort 4 port w/RJ45 connectors");
+		rocketModel[i].numPorts = 4;
+		break;
+	case PCI_DEVICE_ID_RP8SNI:
+		str = "8 (DB78 Custom)";
+		max_num_aiops = 1;
+		rocketModel[i].model = MODEL_RP8SNI;
+		strcpy(rocketModel[i].modelString, "RocketPort 8 port w/ custom DB78");
+		rocketModel[i].numPorts = 8;
+		break;
+	case PCI_DEVICE_ID_RP16SNI:
+		str = "16 (DB78 Custom)";
+		max_num_aiops = 2;
+		rocketModel[i].model = MODEL_RP16SNI;
+		strcpy(rocketModel[i].modelString, "RocketPort 16 port w/ custom DB78");
+		rocketModel[i].numPorts = 16;
 		break;
 	case PCI_DEVICE_ID_RP16INTF:
 		str = "16";
 		max_num_aiops = 2;
+		rocketModel[i].model = MODEL_RP16INTF;
+		strcpy(rocketModel[i].modelString, "RocketPort 16 port w/external I/F");
+		rocketModel[i].numPorts = 16;
+		break;
+	case PCI_DEVICE_ID_URP16INTF:
+		str = "16";
+		max_num_aiops = 2;
+		rocketModel[i].model = MODEL_UPCI_RP16INTF;
+		strcpy(rocketModel[i].modelString, "RocketPort UPCI 16 port w/external I/F");
+		rocketModel[i].numPorts = 16;
+		break;
+	case PCI_DEVICE_ID_CRP16INTF:
+		str = "16";
+		max_num_aiops = 2;
+		rocketModel[i].model = MODEL_CPCI_RP16INTF;
+		strcpy(rocketModel[i].modelString, "RocketPort Compact PCI 16 port w/external I/F");
+		rocketModel[i].numPorts = 16;
 		break;
 	case PCI_DEVICE_ID_RP32INTF:
 		str = "32";
 		max_num_aiops = 4;
+		rocketModel[i].model = MODEL_RP32INTF;
+		strcpy(rocketModel[i].modelString, "RocketPort 32 port w/external I/F");
+		rocketModel[i].numPorts = 32;
+		break;
+	case PCI_DEVICE_ID_URP32INTF:
+		str = "32";
+		max_num_aiops = 4;
+		rocketModel[i].model = MODEL_UPCI_RP32INTF;
+		strcpy(rocketModel[i].modelString, "RocketPort UPCI 32 port w/external I/F");
+		rocketModel[i].numPorts = 32;
 		break;
 	case PCI_DEVICE_ID_RPP4:
 		str = "Plus Quadcable";
 		max_num_aiops = 1;
+		ports_per_aiop = 4;
+		altChanRingIndicator++;
+		fast_clock++;
+		rocketModel[i].model = MODEL_RPP4;
+		strcpy(rocketModel[i].modelString, "RocketPort Plus 4 port");
+		rocketModel[i].numPorts = 4;
 		break;
 	case PCI_DEVICE_ID_RPP8:
 		str = "Plus Octacable";
-		max_num_aiops = 1;
+		max_num_aiops = 2;
+		ports_per_aiop = 4;
+		altChanRingIndicator++;
+		fast_clock++;
+		rocketModel[i].model = MODEL_RPP8;
+		strcpy(rocketModel[i].modelString, "RocketPort Plus 8 port");
+		rocketModel[i].numPorts = 8;
 		break;
-	case PCI_DEVICE_ID_RP8M:
-		str = "8-port Modem";
+	case PCI_DEVICE_ID_RP2_232:
+		str = "Plus 2 (RS-232)";
 		max_num_aiops = 1;
+		ports_per_aiop = 2;
+		altChanRingIndicator++;
+		fast_clock++;
+		rocketModel[i].model = MODEL_RP2_232;
+		strcpy(rocketModel[i].modelString, "RocketPort Plus 2 port RS232");
+		rocketModel[i].numPorts = 2;
 		break;
-	case 0x8:
-		str = "mysterious 8 port";
+	case PCI_DEVICE_ID_RP2_422:
+		str = "Plus 2 (RS-422)";
 		max_num_aiops = 1;
+		ports_per_aiop = 2;
+		altChanRingIndicator++;
+		fast_clock++;
+		rocketModel[i].model = MODEL_RP2_422;
+		strcpy(rocketModel[i].modelString, "RocketPort Plus 2 port RS422");
+		rocketModel[i].numPorts = 2;
+		break;
+	case PCI_DEVICE_ID_RP6M:
+
+		max_num_aiops = 1;
+		ports_per_aiop = 6;
+		str = "6-port";
+
+		/*  If class_rev is 1, the rocketmodem flash must be loaded.  If it is 2 it is a "socketed" version. */
+		if ((class_rev & 0xFF) == 1) {
+			rcktpt_type[i] = ROCKET_TYPE_MODEMII;
+			rocketModel[i].loadrm2 = 1;
+		} else {
+			rcktpt_type[i] = ROCKET_TYPE_MODEM;
+		}
+
+		rocketModel[i].model = MODEL_RP6M;
+		strcpy(rocketModel[i].modelString, "RocketModem 6 port");
+		rocketModel[i].numPorts = 6;
+		break;
+	case PCI_DEVICE_ID_RP4M:
+		max_num_aiops = 1;
+		ports_per_aiop = 4;
+		str = "4-port";
+		if ((class_rev & 0xFF) == 1) {
+			rcktpt_type[i] = ROCKET_TYPE_MODEMII;
+			rocketModel[i].loadrm2 = 1;
+		} else {
+			rcktpt_type[i] = ROCKET_TYPE_MODEM;
+		}
+
+		rocketModel[i].model = MODEL_RP4M;
+		strcpy(rocketModel[i].modelString, "RocketModem 4 port");
+		rocketModel[i].numPorts = 4;
 		break;
 	default:
 		str = "(unknown/unsupported)";
 		max_num_aiops = 0;
 		break;
 	}
-	for(aiop=0;aiop < max_num_aiops;aiop++)
+
+	/*
+	 * Check for UPCI boards.
+	 */
+
+	switch (dev->device) {
+	case PCI_DEVICE_ID_URP32INTF:
+	case PCI_DEVICE_ID_URP8INTF:
+	case PCI_DEVICE_ID_URP16INTF:
+	case PCI_DEVICE_ID_CRP16INTF:
+	case PCI_DEVICE_ID_URP8OCTA:
+		rcktpt_io_addr[i] = pci_resource_start(dev, 2);
+		ConfigIO = pci_resource_start(dev, 1);
+		if (dev->device == PCI_DEVICE_ID_URP8OCTA) {
+			UPCIRingInd = rcktpt_io_addr[i] + _PCI_9030_RING_IND;
+
+			/*
+			 * Check for octa or quad cable.
+			 */
+			if (!
+			    (sInW(ConfigIO + _PCI_9030_GPIO_CTRL) &
+			     PCI_GPIO_CTRL_8PORT)) {
+				str = "Quadcable";
+				ports_per_aiop = 4;
+				rocketModel[i].numPorts = 4;
+			}
+		}
+		break;
+	case PCI_DEVICE_ID_UPCI_RM3_8PORT:
+		str = "8 ports";
+		max_num_aiops = 1;
+		rocketModel[i].model = MODEL_UPCI_RM3_8PORT;
+		strcpy(rocketModel[i].modelString, "RocketModem III 8 port");
+		rocketModel[i].numPorts = 8;
+		rcktpt_io_addr[i] = pci_resource_start(dev, 2);
+		UPCIRingInd = rcktpt_io_addr[i] + _PCI_9030_RING_IND;
+		ConfigIO = pci_resource_start(dev, 1);
+		rcktpt_type[i] = ROCKET_TYPE_MODEMIII;
+		break;
+	case PCI_DEVICE_ID_UPCI_RM3_4PORT:
+		str = "4 ports";
+		max_num_aiops = 1;
+		rocketModel[i].model = MODEL_UPCI_RM3_4PORT;
+		strcpy(rocketModel[i].modelString, "RocketModem III 4 port");
+		rocketModel[i].numPorts = 4;
+		rcktpt_io_addr[i] = pci_resource_start(dev, 2);
+		UPCIRingInd = rcktpt_io_addr[i] + _PCI_9030_RING_IND;
+		ConfigIO = pci_resource_start(dev, 1);
+		rcktpt_type[i] = ROCKET_TYPE_MODEMIII;
+		break;
+	default:
+		break;
+	}
+
+	switch (rcktpt_type[i]) {
+	case ROCKET_TYPE_MODEM:
+		board_type = "RocketModem";
+		break;
+	case ROCKET_TYPE_MODEMII:
+		board_type = "RocketModem II";
+		break;
+	case ROCKET_TYPE_MODEMIII:
+		board_type = "RocketModem III";
+		break;
+	default:
+		board_type = "RocketPort";
+		break;
+	}
+
+	if (fast_clock) {
+		sClockPrescale = 0x12;	/* mod 2 (divide by 3) */
+		rp_baud_base[i] = 921600;
+	} else {
+		/*
+		 * If support_low_speed is set, use the slow clock
+		 * prescale, which supports 50 bps
+		 */
+		if (support_low_speed) {
+			/* mod 9 (divide by 10) prescale */
+			sClockPrescale = 0x19;
+			rp_baud_base[i] = 230400;
+		} else {
+			/* mod 4 (devide by 5) prescale */
+			sClockPrescale = 0x14;
+			rp_baud_base[i] = 460800;
+		}
+	}
+
+	for (aiop = 0; aiop < max_num_aiops; aiop++)
 		aiopio[aiop] = rcktpt_io_addr[i] + (aiop * 0x40);
 	ctlp = sCtlNumToCtlPtr(i);
-	num_aiops = sPCIInitController(ctlp, i,
-					aiopio, max_num_aiops, 0,
-					FREQ_DIS, 0);
-	printk("Rocketport controller #%d found at %02x:%02x, "
-	       "%d AIOP(s) (PCI Rocketport %s)\n", i, bus, device_fn,
-	       num_aiops, str);
-	if(num_aiops <= 0) {
-		rcktpt_io_addr[i] = 0;
-		return(0);
-	}
-	for(aiop = 0;aiop < num_aiops; aiop++) {
-		sResetAiopByNum(ctlp, aiop);
-		sEnAiop(ctlp, aiop);
-		num_chan = sGetAiopNumChan(ctlp, aiop);
-		for(chan=0;chan < num_chan; chan++)
-			init_r_port(i, aiop, chan);
-	}
-	return(1);
-}
+	num_aiops = sPCIInitController(ctlp, i, aiopio, max_num_aiops, ConfigIO, 0, FREQ_DIS, 0, altChanRingIndicator, UPCIRingInd);
+	for (aiop = 0; aiop < max_num_aiops; aiop++)
+		ctlp->AiopNumChan[aiop] = ports_per_aiop;
 
-static int __init init_PCI(int boards_found)
-{
-	unsigned char	bus, device_fn;
-	int	i, count = 0;
-
-	for(i=0; i < (NUM_BOARDS - boards_found); i++) {
-		if (!pcibios_find_device(PCI_VENDOR_ID_RP,
-			PCI_DEVICE_ID_RP4QUAD, i, &bus, &device_fn)) 
-			if (register_PCI(count+boards_found, bus, device_fn))
-				count++;
-		if (!pcibios_find_device(PCI_VENDOR_ID_RP,
-			PCI_DEVICE_ID_RP8J, i, &bus, &device_fn)) 
-			if (register_PCI(count+boards_found, bus, device_fn))
-				count++;
-		if(!pcibios_find_device(PCI_VENDOR_ID_RP,
-			PCI_DEVICE_ID_RP8OCTA, i, &bus, &device_fn)) 
-			if(register_PCI(count+boards_found, bus, device_fn))
-				count++;
-		if(!pcibios_find_device(PCI_VENDOR_ID_RP,
-			PCI_DEVICE_ID_RP8INTF, i, &bus, &device_fn)) 
-			if(register_PCI(count+boards_found, bus, device_fn))
-				count++;
-		if(!pcibios_find_device(PCI_VENDOR_ID_RP,
-			PCI_DEVICE_ID_RP16INTF, i, &bus, &device_fn)) 
-			if(register_PCI(count+boards_found, bus, device_fn))
-				count++;
-		if(!pcibios_find_device(PCI_VENDOR_ID_RP,
-			PCI_DEVICE_ID_RP32INTF, i, &bus, &device_fn)) 
-			if(register_PCI(count+boards_found, bus, device_fn))
-				count++;
-		if(!pcibios_find_device(PCI_VENDOR_ID_RP,
-			PCI_DEVICE_ID_RP4QUAD, i, &bus, &device_fn)) 
-			if(register_PCI(count+boards_found, bus, device_fn))
-				count++;
-		if(!pcibios_find_device(PCI_VENDOR_ID_RP,
-			PCI_DEVICE_ID_RP8J, i, &bus, &device_fn)) 
-			if(register_PCI(count+boards_found, bus, device_fn))
-				count++;
-		if(!pcibios_find_device(PCI_VENDOR_ID_RP,
-			PCI_DEVICE_ID_RPP4, i, &bus, &device_fn)) 
-			if(register_PCI(count+boards_found, bus, device_fn))
-				count++;
-		if(!pcibios_find_device(PCI_VENDOR_ID_RP,
-			PCI_DEVICE_ID_RPP8, i, &bus, &device_fn)) 
-			if(register_PCI(count+boards_found, bus, device_fn))
-				count++;
-		if(!pcibios_find_device(PCI_VENDOR_ID_RP,
-			PCI_DEVICE_ID_RP8M, i, &bus, &device_fn)) 
-			if(register_PCI(count+boards_found, bus, device_fn))
-				count++;
-		if(!pcibios_find_device(PCI_VENDOR_ID_RP,
-			0x8, i, &bus, &device_fn)) 
-			if(register_PCI(count+boards_found, bus, device_fn))
-				count++;
-	}
-	return(count);
-}
+#if LINUX_VERSION_CODE < VERSION_CODE(2,3,99)
+	printk(KERN_INFO "Comtrol PCI controller #%d ID 0x%x found at 0x%lx, "
+	       "%d AIOP(s) (%s)\n", i, dev->device, rcktpt_io_addr[i],
+	       num_aiops, rocketModel[i].modelString);
+#else
+	printk
+	    ("Comtrol PCI controller #%d ID 0x%x found in bus:slot:fn %s at address %04lx, "
+	     "%d AIOP(s) (%s)\n", i, dev->device, dev->slot_name,
+	     rcktpt_io_addr[i], num_aiops, rocketModel[i].modelString);
 #endif
 
-static int __init init_ISA(int i, int *reserved_controller)
-{
-	int	num_aiops, num_chan;
-	int	aiop, chan;
-	int     extent = 0;
-	unsigned int	aiopio[MAX_AIOPS_PER_BOARD];	
-	CONTROLLER_t	*ctlp;
+	printk(KERN_INFO "Installing %s, creating /dev/ttyR%d - %ld\n",
+	       rocketModel[i].modelString,
+	       rocketModel[i].startingPortNumber,
+	       rocketModel[i].startingPortNumber +
+	       rocketModel[i].numPorts - 1);
 
-	if (rcktpt_io_addr[i] == 0)
-		return(0);
-
-	if (rcktpt_io_addr[i] + 0x40 == controller) {
-		*reserved_controller = 1;
-		extent = 68;
-	} else {
-		extent = 64;
-	}
-	if (!request_region(rcktpt_io_addr[i], extent,
-			    "Comtrol Rocketport")) {
-		printk("RocketPort board address 0x%lx in use...\n",
-		       rcktpt_io_addr[i]);
-		rcktpt_io_addr[i] = 0;
-		return(0);
-	}
-	
-	for (aiop=0; aiop<MAX_AIOPS_PER_BOARD; aiop++)
-		aiopio[aiop]= rcktpt_io_addr[i] + (aiop * 0x400);
-	ctlp= sCtlNumToCtlPtr(i);
-	num_aiops = sInitController(ctlp, i, controller + (i*0x400),
-				    aiopio, MAX_AIOPS_PER_BOARD, 0,
-				    FREQ_DIS, 0);
 	if (num_aiops <= 0) {
-		release_region(rcktpt_io_addr[i], extent);
 		rcktpt_io_addr[i] = 0;
-		return(0);
+		return (0);
 	}
+	is_PCI[i] = 1;
+
+	/*  Reset the AIOPIC, init the serial ports */
 	for (aiop = 0; aiop < num_aiops; aiop++) {
 		sResetAiopByNum(ctlp, aiop);
-		sEnAiop(ctlp, aiop);
-		num_chan = sGetAiopNumChan(ctlp,aiop);
-		for (chan=0; chan < num_chan; chan++)
-			init_r_port(i, aiop, chan);
+		num_chan = ports_per_aiop;
+		for (chan = 0; chan < num_chan; chan++)
+			init_r_port(i, aiop, chan, dev);
 	}
-	printk("Rocketport controller #%d found at 0x%lx, "
-	       "%d AIOPs\n", i, rcktpt_io_addr[i],
-	       num_aiops);
-	return(1);
+
+	/*  Rocket modems must be reset */
+	if ((rcktpt_type[i] == ROCKET_TYPE_MODEM) ||
+	    (rcktpt_type[i] == ROCKET_TYPE_MODEMII) ||
+	    (rcktpt_type[i] == ROCKET_TYPE_MODEMIII)) {
+		num_chan = ports_per_aiop;
+		for (chan = 0; chan < num_chan; chan++)
+			sPCIModemReset(ctlp, chan, 1);
+		mdelay(500);
+		for (chan = 0; chan < num_chan; chan++)
+			sPCIModemReset(ctlp, chan, 0);
+		mdelay(500);
+		rmSpeakerReset(ctlp, rocketModel[i].model);
+	}
+	return (1);
 }
+
+#if LINUX_VERSION_CODE > VERSION_CODE(2,3,99)	/*  Linux version 2.4 and greater */
 
 
 /*
- * The module "startup" routine; it's run when the module is loaded.
+ *  Probes for PCI cards, inits them if found
+ *  Input:   board_found = number of ISA boards already found, or the
+ *           starting board number
+ *  Returns: Number of PCI boards found
  */
-int __init rp_init(void)
+static int __init init_PCI(int boards_found)
 {
-	int i, retval, pci_boards_found, isa_boards_found;
-	int	reserved_controller = 0;
+	struct pci_dev *dev = NULL;
+	int count = 0;
 
-	printk("Rocketport device driver module, version %s, %s\n",
-	       ROCKET_VERSION, ROCKET_DATE);
-
-	/*
-	 * Set up the timer channel.  If it is already in use by
-	 * some other driver, give up.
-	 */
-	if (rocket_timer.function) {
-		printk("rocket.o: Timer already in use!\n");
-		return -EBUSY;
+	/*  Work through the PCI device list, pulling out ours */
+	while ((dev = pci_find_device(PCI_VENDOR_ID_RP, PCI_ANY_ID, dev))) {
+		if (register_PCI(count + boards_found, dev))
+			count++;
 	}
-	init_timer(&rocket_timer);
-	rocket_timer.function = rp_do_poll;
-	
-	/*
-	 * Initialize the array of pointers to our own internal state
-	 * structures.
-	 */
-	memset(rp_table, 0, sizeof(rp_table));
-	memset(xmit_flags, 0, sizeof(xmit_flags));
+	return (count);
+}
 
-	if (board1 == 0)
-		board1 = 0x180;
-	if (controller == 0)
-		controller = board1 + 0x40;
+#else				/*  Linux version 2.2 */
 
-	if (check_region(controller, 4)) {
-		printk("Controller IO addresses in use, unloading driver.\n");
-		return -EBUSY;
+/*
+ *  Linux 2.2 pci_find_device() does not allow a search of all devices for a certain vendor,
+ *  you have to try each device ID.  Comtrol device ID's are 0x0000 -0x000F for the original
+ *  boards.  Newer board are 0x08xx (see upci_ids[]).
+ */
+static int __init init_PCI(int boards_found)
+{
+	int j, count = 0;
+	struct pci_dev *dev = NULL;
+
+	static int upci_ids[] = {
+		PCI_DEVICE_ID_URP32INTF,
+		PCI_DEVICE_ID_URP8INTF,
+		PCI_DEVICE_ID_URP16INTF,
+		PCI_DEVICE_ID_CRP16INTF,
+		PCI_DEVICE_ID_URP8OCTA,
+		PCI_DEVICE_ID_UPCI_RM3_8PORT,
+		PCI_DEVICE_ID_UPCI_RM3_4PORT
+	};
+
+#define NUM_UPCI_IDS	(sizeof(upci_ids) / sizeof(upci_ids[0]))
+
+	/*  Try finding devices with PCI ID's 0x0000 - 0x000F */
+	for (j = 0; j < 16; j++) {
+		while ((dev = pci_find_device(PCI_VENDOR_ID_RP, j, dev))) {
+			register_PCI(count + boards_found, dev);
+			count++;
+		}
 	}
-	
-	rcktpt_io_addr[0] = board1;
-	rcktpt_io_addr[1] = board2;
-	rcktpt_io_addr[2] = board3;
-	rcktpt_io_addr[3] = board4;
+
+	/*  Now try finding the UPCI devices,  which have PCI ID's 0x0800 - 0x080F */
+	for (j = 0; j < NUM_UPCI_IDS; j++) {
+		while ((dev =
+			pci_find_device(PCI_VENDOR_ID_RP, upci_ids[j], dev))) {
+			register_PCI(count + boards_found, dev);
+			count++;
+		}
+	}
+	return (count);
+}
+
+#endif				/*  Linux version 2.2/2.4 */
+
+#endif				/* CONFIG_PCI */
+
+/*
+ *  Probes for ISA cards
+ *  Input:   i = the board number to look for
+ *  Returns: 1 if board found, 0 else
+ */
+static int __init init_ISA(int i, int *reserved_controller)
+{
+	int num_aiops, num_chan = 0, total_num_chan = 0;
+	int aiop, chan;
+	unsigned int aiopio[MAX_AIOPS_PER_BOARD];
+	CONTROLLER_t *ctlp;
+	char *type_string;
+
+	if (rcktpt_io_addr[i] == 0 || controller == 0)
+		return (0);
+
+	if (check_region(rcktpt_io_addr[i], 64)) {
+		printk(KERN_INFO "RocketPort board address 0x%lx in use...\n", rcktpt_io_addr[i]);
+		rcktpt_io_addr[i] = 0;
+		return (0);
+	}
+	if (rcktpt_io_addr[i] + 0x40 == controller) {
+		*reserved_controller = 1;
+		request_region(rcktpt_io_addr[i], 68, "Comtrol RocketPort");
+	} else {
+		request_region(rcktpt_io_addr[i], 64, "Comtrol RocketPort");
+	}
+
+	ctlp = sCtlNumToCtlPtr(i);
+
+	ctlp->boardType = rcktpt_type[i];
+
+	switch (rcktpt_type[i]) {
+	case ROCKET_TYPE_PC104:
+		type_string = "(PC104)";
+		break;
+	case ROCKET_TYPE_MODEM:
+		type_string = "(RocketModem)";
+		break;
+	case ROCKET_TYPE_MODEMII:
+		type_string = "(RocketModem II)";
+		break;
+	default:
+		type_string = "";
+		break;
+	}
 
 	/*
 	 * If support_low_speed is set, use the slow clock prescale,
@@ -1923,52 +2527,131 @@ int __init rp_init(void)
 	 */
 	if (support_low_speed) {
 		sClockPrescale = 0x19;	/* mod 9 (divide by 10) prescale */
-		rp_baud_base = 230400;
+		rp_baud_base[i] = 230400;
 	} else {
-		sClockPrescale = 0x14; /* mod 4 (devide by 5) prescale */
-		rp_baud_base = 460800;
-	}
-	
-	/*
-	 * OK, let's probe each of the controllers looking for boards.
-	 */
-	isa_boards_found = 0;
-	pci_boards_found = 0;
-	for (i=0; i < NUM_BOARDS; i++) {
-		if(init_ISA(i, &reserved_controller))
-			isa_boards_found++;
-	}
-#ifdef CONFIG_PCI
-	if (pci_present()) {
-		if(isa_boards_found < NUM_BOARDS)
-			pci_boards_found = init_PCI(isa_boards_found);
-	} else {
-		printk("No PCI BIOS found\n");
-	}
-#endif
-	max_board = pci_boards_found + isa_boards_found;
-	
-	if (max_board == 0) {
-		printk("No rocketport ports found; unloading driver.\n");
-		rocket_timer.function = 0;
-		return -ENODEV;
+		sClockPrescale = 0x14;	/* mod 4 (devide by 5) prescale */
+		rp_baud_base[i] = 460800;
 	}
 
-	if (reserved_controller == 0)
-		request_region(controller, 4, "Comtrol Rocketport");
+	for (aiop = 0; aiop < MAX_AIOPS_PER_BOARD; aiop++)
+		aiopio[aiop] = rcktpt_io_addr[i] + (aiop * 0x400);
+
+	num_aiops =
+	    sInitController(ctlp, i, controller + (i * 0x400), aiopio,  MAX_AIOPS_PER_BOARD, 0, FREQ_DIS, 0);
+
+	if (ctlp->boardType == ROCKET_TYPE_PC104) {
+		sEnAiop(ctlp, 2);	/* only one AIOPIC, but these */
+		sEnAiop(ctlp, 3);	/* CSels used for other stuff */
+	}
+
+	if (num_aiops <= 0) {
+		if (rcktpt_io_addr[i] + 0x40 == controller) {
+			*reserved_controller = 0;
+			release_region(rcktpt_io_addr[i], 68);
+		} else {
+			release_region(rcktpt_io_addr[i], 64);
+		}
+		rcktpt_io_addr[i] = 0;
+		return (0);
+	}
+	for (aiop = 0; aiop < num_aiops; aiop++) {
+		sResetAiopByNum(ctlp, aiop);
+		sEnAiop(ctlp, aiop);
+		num_chan = sGetAiopNumChan(ctlp, aiop);
+		total_num_chan += num_chan;
+		for (chan = 0; chan < num_chan; chan++)
+			init_r_port(i, aiop, chan, NULL);
+	}
+	is_PCI[i] = 0;
+	if ((rcktpt_type[i] == ROCKET_TYPE_MODEM) || (rcktpt_type[i] == ROCKET_TYPE_MODEMII)) {
+		num_chan = sGetAiopNumChan(ctlp, 0);
+		total_num_chan = num_chan;
+		for (chan = 0; chan < num_chan; chan++)
+			sModemReset(ctlp, chan, 1);
+		mdelay(500);
+		for (chan = 0; chan < num_chan; chan++)
+			sModemReset(ctlp, chan, 0);
+		mdelay(500);
+		strcpy(rocketModel[i].modelString, "RocketModem ISA");
+	} else {
+		strcpy(rocketModel[i].modelString, "RocketPort ISA");
+	}
+	rocketModel[i].numPorts = total_num_chan;
+	rocketModel[i].model = MODEL_ISA;
+
+	printk(KERN_INFO "Comtrol ISA controller #%d found at 0x%lx, "
+	       "%d AIOPs %s\n", i, rcktpt_io_addr[i], num_aiops,
+	       type_string);
+	printk(KERN_INFO "Installing %s, creating /dev/ttyR%d - %ld\n",
+	       rocketModel[i].modelString,
+	       rocketModel[i].startingPortNumber,
+	       rocketModel[i].startingPortNumber +
+	       rocketModel[i].numPorts - 1);
+
+	return (1);
+}
+
+/*
+ * The module "startup" routine; it's run when the module is loaded.
+ */
+int __init rp_init(void)
+{
+	int retval, pci_boards_found, isa_boards_found, i;
+	int reserved_controller = 0;
+
+	printk(KERN_INFO "RocketPort device driver module, version %s, %s\n",
+	       ROCKET_VERSION, ROCKET_DATE);
+
+	/*
+	 * Set up the timer channel.
+	 */
+	init_timer(&rocket_timer);
+	rocket_timer.function = rp_do_poll;
+
+	/*
+	 * Initialize the array of pointers to our own internal state
+	 * structures.
+	 */
+	memset(rp_table, 0, sizeof (rp_table));
+	memset(xmit_flags, 0, sizeof (xmit_flags));
+
+	for (i = 0; i < MAX_RP_PORTS; i++)
+		lineNumbers[i] = 0;
+	nextLineNumber = 0;
+	memset(rocketModel, 0, sizeof (rocketModel));
+
+	if (board1 && controller == 0)
+		controller = board1 + 0x40;
+
+	if (controller && check_region(controller, 4)) {
+		printk(KERN_INFO "Controller IO addresses in use, unloading driver.\n");
+		return -EBUSY;
+	}
+
+	/*  Store ISA variable retrieved from command line or .conf file. */
+	rcktpt_io_addr[0] = board1;
+	rcktpt_io_addr[1] = board2;
+	rcktpt_io_addr[2] = board3;
+	rcktpt_io_addr[3] = board4;
+
+	rcktpt_type[0] = modem1 ? ROCKET_TYPE_MODEM : ROCKET_TYPE_NORMAL;
+	rcktpt_type[0] = pc104_1[0] ? ROCKET_TYPE_PC104 : rcktpt_type[0];
+	rcktpt_type[1] = modem2 ? ROCKET_TYPE_MODEM : ROCKET_TYPE_NORMAL;
+	rcktpt_type[1] = pc104_2[0] ? ROCKET_TYPE_PC104 : rcktpt_type[1];
+	rcktpt_type[2] = modem3 ? ROCKET_TYPE_MODEM : ROCKET_TYPE_NORMAL;
+	rcktpt_type[2] = pc104_3[0] ? ROCKET_TYPE_PC104 : rcktpt_type[2];
+	rcktpt_type[3] = modem4 ? ROCKET_TYPE_MODEM : ROCKET_TYPE_NORMAL;
+	rcktpt_type[3] = pc104_4[0] ? ROCKET_TYPE_PC104 : rcktpt_type[3];
 
 	/*
 	 * Set up the tty driver structure and then register this
 	 * driver with the tty layer.
 	 */
-	memset(&rocket_driver, 0, sizeof(struct tty_driver));
+	memset(&rocket_driver, 0, sizeof (struct tty_driver));
 	rocket_driver.magic = TTY_DRIVER_MAGIC;
-	rocket_driver.owner = THIS_MODULE;
-#ifdef CONFIG_DEVFS_FS
-	rocket_driver.name = "tts/R";
-#else
+	rocket_driver.flags = TTY_DRIVER_NO_DEVFS;
 	rocket_driver.name = "ttyR";
-#endif
+	rocket_driver.driver_name = "Comtrol RocketPort";
 	rocket_driver.major = TTY_ROCKET_MAJOR;
 	rocket_driver.minor_start = 0;
 	rocket_driver.num = MAX_RP_PORTS;
@@ -1976,8 +2659,10 @@ int __init rp_init(void)
 	rocket_driver.subtype = SERIAL_TYPE_NORMAL;
 	rocket_driver.init_termios = tty_std_termios;
 	rocket_driver.init_termios.c_cflag =
-		B9600 | CS8 | CREAD | HUPCL | CLOCAL;
-	rocket_driver.flags = TTY_DRIVER_REAL_RAW;
+	    B9600 | CS8 | CREAD | HUPCL | CLOCAL;
+#ifdef ROCKET_SOFT_FLOW
+	rocket_driver.flags |= TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS;
+#endif
 	rocket_driver.refcount = &rocket_refcount;
 	rocket_driver.table = rocket_table;
 	rocket_driver.termios = rocket_termios;
@@ -2001,58 +2686,93 @@ int __init rp_init(void)
 	rocket_driver.send_xchar = rp_send_xchar;
 	rocket_driver.wait_until_sent = rp_wait_until_sent;
 
+#if (LINUX_VERSION_CODE > VERSION_CODE(2,5,0))
+	rocket_driver.owner = THIS_MODULE;
+	rocket_driver.tiocmget = rp_tiocmget;
+	rocket_driver.tiocmset = rp_tiocmset;
+#endif /* Kernel > 2.5 */
+
 	retval = tty_register_driver(&rocket_driver);
 	if (retval < 0) {
-		printk("Couldn't install tty Rocketport driver "
-		       "(error %d)\n", -retval);
-		release_region(controller, 4);
+		printk(KERN_INFO "Couldn't install tty RocketPort driver (error %d)\n", -retval);
 		return -1;
 	}
+
 #ifdef ROCKET_DEBUG_OPEN
-	printk("Rocketport driver is major %d\n",
-	       rocket_driver.major);
+	printk(KERN_INFO "RocketPort driver is major %d\n", rocket_driver.major);
 #endif
+
+	/*
+	 *  OK, let's probe each of the controllers looking for boards.  Any boards found
+         *  will be initialized here.
+	 */
+	isa_boards_found = 0;
+	pci_boards_found = 0;
+
+	for (i = 0; i < NUM_BOARDS; i++) {
+		if (init_ISA(i, &reserved_controller))
+			isa_boards_found++;
+	}
+
+#ifdef CONFIG_PCI
+	if (pci_present()) {
+		if (isa_boards_found < NUM_BOARDS)
+			pci_boards_found = init_PCI(isa_boards_found);
+	} else {
+		printk(KERN_INFO "No PCI BIOS found\n");
+	}
+#endif
+
+	max_board = pci_boards_found + isa_boards_found;
+
+	if (max_board == 0) {
+		printk(KERN_INFO "No rocketport ports found; unloading driver.\n");
+		del_timer_sync(&rocket_timer);
+		return -ENXIO;
+	}
+
+	if (isa_boards_found) {
+		if (reserved_controller == 0)
+			request_region(controller, 4, "Comtrol RocketPort");
+	} else {
+		controller = 0;
+	}
 
 	return 0;
 }
 
 #ifdef MODULE
-int init_module(void)
-{
-	return rp_init();
-}
 
-void
-cleanup_module( void) {
-	int	retval;
-	int	i;
-	int	released_controller = 0;
+static void rp_cleanup_module(void)
+{
+	int retval;
+	int i;
+	int released_controller = 0;
 
 	del_timer_sync(&rocket_timer);
 
 	retval = tty_unregister_driver(&rocket_driver);
-	if (retval) {
-		printk("Error %d while trying to unregister "
+	if (retval)
+		printk(KERN_INFO "Error %d while trying to unregister "
 		       "rocketport driver\n", -retval);
-	}
+
 	for (i = 0; i < MAX_RP_PORTS; i++) {
 		if (rp_table[i])
 			kfree(rp_table[i]);
 	}
-	for (i=0; i < NUM_BOARDS; i++) {
-		if (rcktpt_io_addr[i] <= 0)
+
+	for (i = 0; i < NUM_BOARDS; i++) {
+		if (rcktpt_io_addr[i] <= 0 || is_PCI[i])
 			continue;
 		if (rcktpt_io_addr[i] + 0x40 == controller) {
 			released_controller++;
 			release_region(rcktpt_io_addr[i], 68);
-		} else
+		} else {
 			release_region(rcktpt_io_addr[i], 64);
-		if (released_controller == 0)
-			release_region(controller, 4);
+		}
 	}
-	if (tmp_buf)
-		free_page((unsigned long) tmp_buf);
-	rocket_timer.function = 0;
+	if (controller && released_controller == 0)
+		release_region(controller, 4);
 }
 #endif
 
@@ -2088,69 +2808,60 @@ work must bear Comtrol's copyright notice:
 #define FALSE 0
 #endif
 
-static Byte_t RData[RDATASIZE] =
-{
-   0x00, 0x09, 0xf6, 0x82,
-   0x02, 0x09, 0x86, 0xfb,
-   0x04, 0x09, 0x00, 0x0a,
-   0x06, 0x09, 0x01, 0x0a,
-   0x08, 0x09, 0x8a, 0x13,
-   0x0a, 0x09, 0xc5, 0x11,
-   0x0c, 0x09, 0x86, 0x85,
-   0x0e, 0x09, 0x20, 0x0a,
-   0x10, 0x09, 0x21, 0x0a,
-   0x12, 0x09, 0x41, 0xff,
-   0x14, 0x09, 0x82, 0x00,
-   0x16, 0x09, 0x82, 0x7b,
-   0x18, 0x09, 0x8a, 0x7d,
-   0x1a, 0x09, 0x88, 0x81,
-   0x1c, 0x09, 0x86, 0x7a,
-   0x1e, 0x09, 0x84, 0x81,
-   0x20, 0x09, 0x82, 0x7c,
-   0x22, 0x09, 0x0a, 0x0a 
+static Byte_t RData[RDATASIZE] = {
+	0x00, 0x09, 0xf6, 0x82,
+	0x02, 0x09, 0x86, 0xfb,
+	0x04, 0x09, 0x00, 0x0a,
+	0x06, 0x09, 0x01, 0x0a,
+	0x08, 0x09, 0x8a, 0x13,
+	0x0a, 0x09, 0xc5, 0x11,
+	0x0c, 0x09, 0x86, 0x85,
+	0x0e, 0x09, 0x20, 0x0a,
+	0x10, 0x09, 0x21, 0x0a,
+	0x12, 0x09, 0x41, 0xff,
+	0x14, 0x09, 0x82, 0x00,
+	0x16, 0x09, 0x82, 0x7b,
+	0x18, 0x09, 0x8a, 0x7d,
+	0x1a, 0x09, 0x88, 0x81,
+	0x1c, 0x09, 0x86, 0x7a,
+	0x1e, 0x09, 0x84, 0x81,
+	0x20, 0x09, 0x82, 0x7c,
+	0x22, 0x09, 0x0a, 0x0a
 };
 
-static Byte_t RRegData[RREGDATASIZE]=
-{
-   0x00, 0x09, 0xf6, 0x82,             /* 00: Stop Rx processor */
-   0x08, 0x09, 0x8a, 0x13,             /* 04: Tx software flow control */
-   0x0a, 0x09, 0xc5, 0x11,             /* 08: XON char */
-   0x0c, 0x09, 0x86, 0x85,             /* 0c: XANY */
-   0x12, 0x09, 0x41, 0xff,             /* 10: Rx mask char */
-   0x14, 0x09, 0x82, 0x00,             /* 14: Compare/Ignore #0 */
-   0x16, 0x09, 0x82, 0x7b,             /* 18: Compare #1 */
-   0x18, 0x09, 0x8a, 0x7d,             /* 1c: Compare #2 */
-   0x1a, 0x09, 0x88, 0x81,             /* 20: Interrupt #1 */
-   0x1c, 0x09, 0x86, 0x7a,             /* 24: Ignore/Replace #1 */
-   0x1e, 0x09, 0x84, 0x81,             /* 28: Interrupt #2 */
-   0x20, 0x09, 0x82, 0x7c,             /* 2c: Ignore/Replace #2 */
-   0x22, 0x09, 0x0a, 0x0a              /* 30: Rx FIFO Enable */
+static Byte_t RRegData[RREGDATASIZE] = {
+	0x00, 0x09, 0xf6, 0x82,	/* 00: Stop Rx processor */
+	0x08, 0x09, 0x8a, 0x13,	/* 04: Tx software flow control */
+	0x0a, 0x09, 0xc5, 0x11,	/* 08: XON char */
+	0x0c, 0x09, 0x86, 0x85,	/* 0c: XANY */
+	0x12, 0x09, 0x41, 0xff,	/* 10: Rx mask char */
+	0x14, 0x09, 0x82, 0x00,	/* 14: Compare/Ignore #0 */
+	0x16, 0x09, 0x82, 0x7b,	/* 18: Compare #1 */
+	0x18, 0x09, 0x8a, 0x7d,	/* 1c: Compare #2 */
+	0x1a, 0x09, 0x88, 0x81,	/* 20: Interrupt #1 */
+	0x1c, 0x09, 0x86, 0x7a,	/* 24: Ignore/Replace #1 */
+	0x1e, 0x09, 0x84, 0x81,	/* 28: Interrupt #2 */
+	0x20, 0x09, 0x82, 0x7c,	/* 2c: Ignore/Replace #2 */
+	0x22, 0x09, 0x0a, 0x0a	/* 30: Rx FIFO Enable */
 };
 
-CONTROLLER_T sController[CTL_SIZE] =
-{
-   {-1,-1,0,0,0,0,0,0,0,0,0,{0,0,0,0},{0,0,0,0},{-1,-1,-1,-1},{0,0,0,0}},
-   {-1,-1,0,0,0,0,0,0,0,0,0,{0,0,0,0},{0,0,0,0},{-1,-1,-1,-1},{0,0,0,0}},
-   {-1,-1,0,0,0,0,0,0,0,0,0,{0,0,0,0},{0,0,0,0},{-1,-1,-1,-1},{0,0,0,0}},
-   {-1,-1,0,0,0,0,0,0,0,0,0,{0,0,0,0},{0,0,0,0},{-1,-1,-1,-1},{0,0,0,0}}
+CONTROLLER_T sController[CTL_SIZE] = {
+	{-1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, {0, 0, 0, 0},
+	 {0, 0, 0, 0}, {-1, -1, -1, -1}, {0, 0, 0, 0}},
+	{-1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, {0, 0, 0, 0},
+	 {0, 0, 0, 0}, {-1, -1, -1, -1}, {0, 0, 0, 0}},
+	{-1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, {0, 0, 0, 0},
+	 {0, 0, 0, 0}, {-1, -1, -1, -1}, {0, 0, 0, 0}},
+	{-1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, {0, 0, 0, 0},
+	 {0, 0, 0, 0}, {-1, -1, -1, -1}, {0, 0, 0, 0}}
 };
 
-#if 0
-/* IRQ number to MUDBAC register 2 mapping */
-Byte_t sIRQMap[16] =
-{
-   0,0,0,0x10,0x20,0x30,0,0,0,0x40,0x50,0x60,0x70,0,0,0x80
-};
-#endif
-
-Byte_t sBitMapClrTbl[8] =
-{
-   0xfe,0xfd,0xfb,0xf7,0xef,0xdf,0xbf,0x7f
+Byte_t sBitMapClrTbl[8] = {
+	0xfe, 0xfd, 0xfb, 0xf7, 0xef, 0xdf, 0xbf, 0x7f
 };
 
-Byte_t sBitMapSetTbl[8] =
-{
-   0x01,0x02,0x04,0x08,0x10,0x20,0x40,0x80
+Byte_t sBitMapSetTbl[8] = {
+	0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 };
 
 int sClockPrescale = 0x14;
@@ -2225,76 +2936,68 @@ Warnings: No range checking on any of the parameters is done.
           After this function all AIOPs on the controller are disabled,
           they can be enabled with sEnAiop().
 */
-int sInitController(	CONTROLLER_T *CtlP,
-			int CtlNum,
-			ByteIO_t MudbacIO,
-			ByteIO_t *AiopIOList,
-			int AiopIOListSize,
-			int IRQNum,
-			Byte_t Frequency,
-			int PeriodicOnly)
+int sInitController(CONTROLLER_T * CtlP, int CtlNum, ByteIO_t MudbacIO,
+		    ByteIO_t * AiopIOList, int AiopIOListSize, int IRQNum,
+		    Byte_t Frequency, int PeriodicOnly)
 {
-	int		i;
-	ByteIO_t	io;
+	int i;
+	ByteIO_t io;
+	int done;
 
-   CtlP->CtlNum = CtlNum;
-   CtlP->CtlID = CTLID_0001;        /* controller release 1 */
-   CtlP->BusType = isISA;     
-   CtlP->MBaseIO = MudbacIO;
-   CtlP->MReg1IO = MudbacIO + 1;
-   CtlP->MReg2IO = MudbacIO + 2;
-   CtlP->MReg3IO = MudbacIO + 3;
+	CtlP->AiopIntrBits = aiop_intr_bits;
+	CtlP->AltChanRingIndicator = 0;
+	CtlP->CtlNum = CtlNum;
+	CtlP->CtlID = CTLID_0001;	/* controller release 1 */
+	CtlP->BusType = isISA;
+	CtlP->MBaseIO = MudbacIO;
+	CtlP->MReg1IO = MudbacIO + 1;
+	CtlP->MReg2IO = MudbacIO + 2;
+	CtlP->MReg3IO = MudbacIO + 3;
 #if 1
-   CtlP->MReg2 = 0;                 /* interrupt disable */
-   CtlP->MReg3 = 0;                 /* no periodic interrupts */
+	CtlP->MReg2 = 0;	/* interrupt disable */
+	CtlP->MReg3 = 0;	/* no periodic interrupts */
 #else
-   if(sIRQMap[IRQNum] == 0)            /* interrupts globally disabled */
-   {
-      CtlP->MReg2 = 0;                 /* interrupt disable */
-      CtlP->MReg3 = 0;                 /* no periodic interrupts */
-   }
-   else
-   {
-      CtlP->MReg2 = sIRQMap[IRQNum];   /* set IRQ number */
-      CtlP->MReg3 = Frequency;         /* set frequency */
-      if(PeriodicOnly)                 /* periodic interrupt only */
-      {
-         CtlP->MReg3 |= PERIODIC_ONLY;
-      }
-   }
+	if (sIRQMap[IRQNum] == 0) {	/* interrupts globally disabled */
+		CtlP->MReg2 = 0;	/* interrupt disable */
+		CtlP->MReg3 = 0;	/* no periodic interrupts */
+	} else {
+		CtlP->MReg2 = sIRQMap[IRQNum];	/* set IRQ number */
+		CtlP->MReg3 = Frequency;	/* set frequency */
+		if (PeriodicOnly) {	/* periodic interrupt only */
+			CtlP->MReg3 |= PERIODIC_ONLY;
+		}
+	}
 #endif
-   sOutB(CtlP->MReg2IO,CtlP->MReg2);
-   sOutB(CtlP->MReg3IO,CtlP->MReg3);
-   sControllerEOI(CtlP);               /* clear EOI if warm init */
-   /* Init AIOPs */
-   CtlP->NumAiop = 0;
-   for(i=0; i < AiopIOListSize; i++)
-   {
-      io = AiopIOList[i];
-      CtlP->AiopIO[i] = (WordIO_t)io;
-      CtlP->AiopIntChanIO[i] = io + _INT_CHAN;
-      sOutB(CtlP->MReg2IO,CtlP->MReg2 | (i & 0x03)); /* AIOP index */
-      sOutB(MudbacIO,(Byte_t)(io >> 6));	/* set up AIOP I/O in MUDBAC */
-      sEnAiop(CtlP,i);                         /* enable the AIOP */
+	sOutB(CtlP->MReg2IO, CtlP->MReg2);
+	sOutB(CtlP->MReg3IO, CtlP->MReg3);
+	sControllerEOI(CtlP);	/* clear EOI if warm init */
+	/* Init AIOPs */
+	CtlP->NumAiop = 0;
+	for (i = done = 0; i < AiopIOListSize; i++) {
+		io = AiopIOList[i];
+		CtlP->AiopIO[i] = (WordIO_t) io;
+		CtlP->AiopIntChanIO[i] = io + _INT_CHAN;
+		sOutB(CtlP->MReg2IO, CtlP->MReg2 | (i & 0x03));	/* AIOP index */
+		sOutB(MudbacIO, (Byte_t) (io >> 6));	/* set up AIOP I/O in MUDBAC */
+		if (done)
+			continue;
+		sEnAiop(CtlP, i);	/* enable the AIOP */
+		CtlP->AiopID[i] = sReadAiopID(io);	/* read AIOP ID */
+		if (CtlP->AiopID[i] == AIOPID_NULL)	/* if AIOP does not exist */
+			done = 1;	/* done looking for AIOPs */
+		else {
+			CtlP->AiopNumChan[i] = sReadAiopNumChan((WordIO_t) io);	/* num channels in AIOP */
+			sOutW((WordIO_t) io + _INDX_ADDR, _CLK_PRE);	/* clock prescaler */
+			sOutB(io + _INDX_DATA, sClockPrescale);
+			CtlP->NumAiop++;	/* bump count of AIOPs */
+		}
+		sDisAiop(CtlP, i);	/* disable AIOP */
+	}
 
-      CtlP->AiopID[i] = sReadAiopID(io);       /* read AIOP ID */
-      if(CtlP->AiopID[i] == AIOPID_NULL)       /* if AIOP does not exist */
-      {
-         sDisAiop(CtlP,i);                     /* disable AIOP */
-         break;                                /* done looking for AIOPs */
-      }
-
-      CtlP->AiopNumChan[i] = sReadAiopNumChan((WordIO_t)io); /* num channels in AIOP */
-      sOutW((WordIO_t)io + _INDX_ADDR,_CLK_PRE);      /* clock prescaler */
-      sOutB(io + _INDX_DATA,sClockPrescale);
-      CtlP->NumAiop++;                         /* bump count of AIOPs */
-      sDisAiop(CtlP,i);                        /* disable AIOP */
-   }
-
-   if(CtlP->NumAiop == 0)
-      return(-1);
-   else
-      return(CtlP->NumAiop);
+	if (CtlP->NumAiop == 0)
+		return (-1);
+	else
+		return (CtlP->NumAiop);
 }
 
 /***************************************************************************
@@ -2366,46 +3069,55 @@ Warnings: No range checking on any of the parameters is done.
           After this function all AIOPs on the controller are disabled,
           they can be enabled with sEnAiop().
 */
-int sPCIInitController(	CONTROLLER_T *CtlP,
-			int CtlNum,
-			ByteIO_t *AiopIOList,
-			int AiopIOListSize,
-			int IRQNum,
-			Byte_t Frequency,
-			int PeriodicOnly)
+int sPCIInitController(CONTROLLER_T * CtlP, int CtlNum,
+		       ByteIO_t * AiopIOList, int AiopIOListSize,
+		       WordIO_t ConfigIO, int IRQNum, Byte_t Frequency,
+		       int PeriodicOnly, int altChanRingIndicator,
+		       int UPCIRingInd)
 {
-	int		i;
-	ByteIO_t	io;
+	int i;
+	ByteIO_t io;
 
-   CtlP->CtlNum = CtlNum;
-   CtlP->CtlID = CTLID_0001;        /* controller release 1 */
-   CtlP->BusType = isPCI;        /* controller release 1 */
+	CtlP->AltChanRingIndicator = altChanRingIndicator;
+	CtlP->UPCIRingInd = UPCIRingInd;
+	CtlP->CtlNum = CtlNum;
+	CtlP->CtlID = CTLID_0001;	/* controller release 1 */
+	CtlP->BusType = isPCI;	/* controller release 1 */
 
-   CtlP->PCIIO = (WordIO_t)((ByteIO_t)AiopIOList[0] + _PCI_INT_FUNC);
+	if (ConfigIO) {
+		CtlP->isUPCI = 1;
+		CtlP->PCIIO = ConfigIO + _PCI_9030_INT_CTRL;
+		CtlP->PCIIO2 = ConfigIO + _PCI_9030_GPIO_CTRL;
+		CtlP->AiopIntrBits = upci_aiop_intr_bits;
+	} else {
+		CtlP->isUPCI = 0;
+		CtlP->PCIIO =
+		    (WordIO_t) ((ByteIO_t) AiopIOList[0] + _PCI_INT_FUNC);
+		CtlP->AiopIntrBits = aiop_intr_bits;
+	}
 
-   sPCIControllerEOI(CtlP);               /* clear EOI if warm init */
-   /* Init AIOPs */
-   CtlP->NumAiop = 0;
-   for(i=0; i < AiopIOListSize; i++)
-   {
-      io = AiopIOList[i];
-      CtlP->AiopIO[i] = (WordIO_t)io;
-      CtlP->AiopIntChanIO[i] = io + _INT_CHAN;
+	sPCIControllerEOI(CtlP);	/* clear EOI if warm init */
+	/* Init AIOPs */
+	CtlP->NumAiop = 0;
+	for (i = 0; i < AiopIOListSize; i++) {
+		io = AiopIOList[i];
+		CtlP->AiopIO[i] = (WordIO_t) io;
+		CtlP->AiopIntChanIO[i] = io + _INT_CHAN;
 
-      CtlP->AiopID[i] = sReadAiopID(io);       /* read AIOP ID */
-      if(CtlP->AiopID[i] == AIOPID_NULL)       /* if AIOP does not exist */
-         break;                                /* done looking for AIOPs */
+		CtlP->AiopID[i] = sReadAiopID(io);	/* read AIOP ID */
+		if (CtlP->AiopID[i] == AIOPID_NULL)	/* if AIOP does not exist */
+			break;	/* done looking for AIOPs */
 
-      CtlP->AiopNumChan[i] = sReadAiopNumChan((WordIO_t)io); /* num channels in AIOP */
-      sOutW((WordIO_t)io + _INDX_ADDR,_CLK_PRE);      /* clock prescaler */
-      sOutB(io + _INDX_DATA,sClockPrescale);
-      CtlP->NumAiop++;                         /* bump count of AIOPs */
-   }
+		CtlP->AiopNumChan[i] = sReadAiopNumChan((WordIO_t) io);	/* num channels in AIOP */
+		sOutW((WordIO_t) io + _INDX_ADDR, _CLK_PRE);	/* clock prescaler */
+		sOutB(io + _INDX_DATA, sClockPrescale);
+		CtlP->NumAiop++;	/* bump count of AIOPs */
+	}
 
-   if(CtlP->NumAiop == 0)
-      return(-1);
-   else
-      return(CtlP->NumAiop);
+	if (CtlP->NumAiop == 0)
+		return (-1);
+	else
+		return (CtlP->NumAiop);
 }
 
 /***************************************************************************
@@ -2421,15 +3133,15 @@ Warnings: No context switches are allowed while executing this function.
 */
 int sReadAiopID(ByteIO_t io)
 {
-   Byte_t AiopID;               /* ID byte from AIOP */
+	Byte_t AiopID;		/* ID byte from AIOP */
 
-   sOutB(io + _CMD_REG,RESET_ALL);     /* reset AIOP */
-   sOutB(io + _CMD_REG,0x0);
-   AiopID = sInB(io + _CHN_STAT0) & 0x07;
-   if(AiopID == 0x06)
-      return(1);
-   else                                /* AIOP does not exist */
-      return(-1);
+	sOutB(io + _CMD_REG, RESET_ALL);	/* reset AIOP */
+	sOutB(io + _CMD_REG, 0x0);
+	AiopID = sInW(io + _CHN_STAT0) & 0x07;
+	if (AiopID == 0x06)
+		return (1);
+	else			/* AIOP does not exist */
+		return (-1);
 }
 
 /***************************************************************************
@@ -2447,16 +3159,18 @@ Warnings: No context switches are allowed while executing this function.
 */
 int sReadAiopNumChan(WordIO_t io)
 {
-   Word_t x;
+	Word_t x;
+	static Byte_t R[4] = { 0x00, 0x00, 0x34, 0x12 };
 
-   sOutDW((DWordIO_t)io + _INDX_ADDR,0x12340000L); /* write to chan 0 SRAM */
-   sOutW(io + _INDX_ADDR,0);       /* read from SRAM, chan 0 */
-   x = sInW(io + _INDX_DATA);
-   sOutW(io + _INDX_ADDR,0x4000);  /* read from SRAM, chan 4 */
-   if(x != sInW(io + _INDX_DATA))  /* if different must be 8 chan */
-      return(8);
-   else
-      return(4);
+	/* write to chan 0 SRAM */
+	sOutDW((DWordIO_t) io + _INDX_ADDR, *((DWord_t *) & R[0]));
+	sOutW(io + _INDX_ADDR, 0);	/* read from SRAM, chan 0 */
+	x = sInW(io + _INDX_DATA);
+	sOutW(io + _INDX_ADDR, 0x4000);	/* read from SRAM, chan 4 */
+	if (x != sInW(io + _INDX_DATA))	/* if different must be 8 chan */
+		return (8);
+	else
+		return (4);
 }
 
 /***************************************************************************
@@ -2474,138 +3188,134 @@ Warnings: No range checking on any of the parameters is done.
 
           No context switches are allowed while executing this function.
 */
-int sInitChan(	CONTROLLER_T *CtlP,
-		CHANNEL_T *ChP,
-		int AiopNum,
-		int ChanNum)
+int sInitChan(CONTROLLER_T * CtlP, CHANNEL_T * ChP, int AiopNum,
+	      int ChanNum)
 {
-   int i;
-   WordIO_t AiopIO;
-   WordIO_t ChIOOff;
-   Byte_t *ChR;
-   Word_t ChOff;
-   static Byte_t R[4];
-   int brd9600;
+	int i;
+	WordIO_t AiopIO;
+	WordIO_t ChIOOff;
+	Byte_t *ChR;
+	Word_t ChOff;
+	static Byte_t R[4];
+	int brd9600;
 
-   if(ChanNum >= CtlP->AiopNumChan[AiopNum])
-      return(FALSE);                   /* exceeds num chans in AIOP */
+	if (ChanNum >= CtlP->AiopNumChan[AiopNum])
+		return (FALSE);	/* exceeds num chans in AIOP */
 
-   /* Channel, AIOP, and controller identifiers */
-   ChP->CtlP = CtlP;
-   ChP->ChanID = CtlP->AiopID[AiopNum];
-   ChP->AiopNum = AiopNum;
-   ChP->ChanNum = ChanNum;
+	/* Channel, AIOP, and controller identifiers */
+	ChP->CtlP = CtlP;
+	ChP->ChanID = CtlP->AiopID[AiopNum];
+	ChP->AiopNum = AiopNum;
+	ChP->ChanNum = ChanNum;
 
-   /* Global direct addresses */
-   AiopIO = CtlP->AiopIO[AiopNum];
-   ChP->Cmd = (ByteIO_t)AiopIO + _CMD_REG;
-   ChP->IntChan = (ByteIO_t)AiopIO + _INT_CHAN;
-   ChP->IntMask = (ByteIO_t)AiopIO + _INT_MASK;
-   ChP->IndexAddr = (DWordIO_t)AiopIO + _INDX_ADDR;
-   ChP->IndexData = AiopIO + _INDX_DATA;
+	/* Global direct addresses */
+	AiopIO = CtlP->AiopIO[AiopNum];
+	ChP->Cmd = (ByteIO_t) AiopIO + _CMD_REG;
+	ChP->IntChan = (ByteIO_t) AiopIO + _INT_CHAN;
+	ChP->IntMask = (ByteIO_t) AiopIO + _INT_MASK;
+	ChP->IndexAddr = (DWordIO_t) AiopIO + _INDX_ADDR;
+	ChP->IndexData = AiopIO + _INDX_DATA;
 
-   /* Channel direct addresses */
-   ChIOOff = AiopIO + ChP->ChanNum * 2;
-   ChP->TxRxData = ChIOOff + _TD0;
-   ChP->ChanStat = ChIOOff + _CHN_STAT0;
-   ChP->TxRxCount = ChIOOff + _FIFO_CNT0;
-   ChP->IntID = (ByteIO_t)AiopIO + ChP->ChanNum + _INT_ID0;
+	/* Channel direct addresses */
+	ChIOOff = AiopIO + ChP->ChanNum * 2;
+	ChP->TxRxData = ChIOOff + _TD0;
+	ChP->ChanStat = ChIOOff + _CHN_STAT0;
+	ChP->TxRxCount = ChIOOff + _FIFO_CNT0;
+	ChP->IntID = (ByteIO_t) AiopIO + ChP->ChanNum + _INT_ID0;
 
-   /* Initialize the channel from the RData array */
-   for(i=0; i < RDATASIZE; i+=4)
-   {
-      R[0] = RData[i];
-      R[1] = RData[i+1] + 0x10 * ChanNum;
-      R[2] = RData[i+2];
-      R[3] = RData[i+3];
-      sOutDW(ChP->IndexAddr,*((DWord_t *)&R[0]));
-   }
+	/* Initialize the channel from the RData array */
+	for (i = 0; i < RDATASIZE; i += 4) {
+		R[0] = RData[i];
+		R[1] = RData[i + 1] + 0x10 * ChanNum;
+		R[2] = RData[i + 2];
+		R[3] = RData[i + 3];
+		sOutDW(ChP->IndexAddr, *((DWord_t *) & R[0]));
+	}
 
-   ChR = ChP->R;
-   for(i=0; i < RREGDATASIZE; i+=4)
-   {
-      ChR[i] = RRegData[i];
-      ChR[i+1] = RRegData[i+1] + 0x10 * ChanNum;
-      ChR[i+2] = RRegData[i+2];
-      ChR[i+3] = RRegData[i+3];
-   }
+	ChR = ChP->R;
+	for (i = 0; i < RREGDATASIZE; i += 4) {
+		ChR[i] = RRegData[i];
+		ChR[i + 1] = RRegData[i + 1] + 0x10 * ChanNum;
+		ChR[i + 2] = RRegData[i + 2];
+		ChR[i + 3] = RRegData[i + 3];
+	}
 
-   /* Indexed registers */
-   ChOff = (Word_t)ChanNum * 0x1000;
+	/* Indexed registers */
+	ChOff = (Word_t) ChanNum *0x1000;
 
-   if (sClockPrescale == 0x14)
-	   brd9600 = 47;
-   else
-	   brd9600 = 23;
+	if (sClockPrescale == 0x14)
+		brd9600 = 47;
+	else
+		brd9600 = 23;
 
-   ChP->BaudDiv[0] = (Byte_t)(ChOff + _BAUD);
-   ChP->BaudDiv[1] = (Byte_t)((ChOff + _BAUD) >> 8);
-   ChP->BaudDiv[2] = (Byte_t)brd9600;
-   ChP->BaudDiv[3] = (Byte_t)(brd9600 >> 8);
-   sOutDW(ChP->IndexAddr,*(DWord_t *)&ChP->BaudDiv[0]);
+	ChP->BaudDiv[0] = (Byte_t) (ChOff + _BAUD);
+	ChP->BaudDiv[1] = (Byte_t) ((ChOff + _BAUD) >> 8);
+	ChP->BaudDiv[2] = (Byte_t) brd9600;
+	ChP->BaudDiv[3] = (Byte_t) (brd9600 >> 8);
+	sOutDW(ChP->IndexAddr, *(DWord_t *) & ChP->BaudDiv[0]);
 
-   ChP->TxControl[0] = (Byte_t)(ChOff + _TX_CTRL);
-   ChP->TxControl[1] = (Byte_t)((ChOff + _TX_CTRL) >> 8);
-   ChP->TxControl[2] = 0;
-   ChP->TxControl[3] = 0;
-   sOutDW(ChP->IndexAddr,*(DWord_t *)&ChP->TxControl[0]);
+	ChP->TxControl[0] = (Byte_t) (ChOff + _TX_CTRL);
+	ChP->TxControl[1] = (Byte_t) ((ChOff + _TX_CTRL) >> 8);
+	ChP->TxControl[2] = 0;
+	ChP->TxControl[3] = 0;
+	sOutDW(ChP->IndexAddr, *(DWord_t *) & ChP->TxControl[0]);
 
-   ChP->RxControl[0] = (Byte_t)(ChOff + _RX_CTRL);
-   ChP->RxControl[1] = (Byte_t)((ChOff + _RX_CTRL) >> 8);
-   ChP->RxControl[2] = 0;
-   ChP->RxControl[3] = 0;
-   sOutDW(ChP->IndexAddr,*(DWord_t *)&ChP->RxControl[0]);
+	ChP->RxControl[0] = (Byte_t) (ChOff + _RX_CTRL);
+	ChP->RxControl[1] = (Byte_t) ((ChOff + _RX_CTRL) >> 8);
+	ChP->RxControl[2] = 0;
+	ChP->RxControl[3] = 0;
+	sOutDW(ChP->IndexAddr, *(DWord_t *) & ChP->RxControl[0]);
 
-   ChP->TxEnables[0] = (Byte_t)(ChOff + _TX_ENBLS);
-   ChP->TxEnables[1] = (Byte_t)((ChOff + _TX_ENBLS) >> 8);
-   ChP->TxEnables[2] = 0;
-   ChP->TxEnables[3] = 0;
-   sOutDW(ChP->IndexAddr,*(DWord_t *)&ChP->TxEnables[0]);
+	ChP->TxEnables[0] = (Byte_t) (ChOff + _TX_ENBLS);
+	ChP->TxEnables[1] = (Byte_t) ((ChOff + _TX_ENBLS) >> 8);
+	ChP->TxEnables[2] = 0;
+	ChP->TxEnables[3] = 0;
+	sOutDW(ChP->IndexAddr, *(DWord_t *) & ChP->TxEnables[0]);
 
-   ChP->TxCompare[0] = (Byte_t)(ChOff + _TXCMP1);
-   ChP->TxCompare[1] = (Byte_t)((ChOff + _TXCMP1) >> 8);
-   ChP->TxCompare[2] = 0;
-   ChP->TxCompare[3] = 0;
-   sOutDW(ChP->IndexAddr,*(DWord_t *)&ChP->TxCompare[0]);
+	ChP->TxCompare[0] = (Byte_t) (ChOff + _TXCMP1);
+	ChP->TxCompare[1] = (Byte_t) ((ChOff + _TXCMP1) >> 8);
+	ChP->TxCompare[2] = 0;
+	ChP->TxCompare[3] = 0;
+	sOutDW(ChP->IndexAddr, *(DWord_t *) & ChP->TxCompare[0]);
 
-   ChP->TxReplace1[0] = (Byte_t)(ChOff + _TXREP1B1);
-   ChP->TxReplace1[1] = (Byte_t)((ChOff + _TXREP1B1) >> 8);
-   ChP->TxReplace1[2] = 0;
-   ChP->TxReplace1[3] = 0;
-   sOutDW(ChP->IndexAddr,*(DWord_t *)&ChP->TxReplace1[0]);
+	ChP->TxReplace1[0] = (Byte_t) (ChOff + _TXREP1B1);
+	ChP->TxReplace1[1] = (Byte_t) ((ChOff + _TXREP1B1) >> 8);
+	ChP->TxReplace1[2] = 0;
+	ChP->TxReplace1[3] = 0;
+	sOutDW(ChP->IndexAddr, *(DWord_t *) & ChP->TxReplace1[0]);
 
-   ChP->TxReplace2[0] = (Byte_t)(ChOff + _TXREP2);
-   ChP->TxReplace2[1] = (Byte_t)((ChOff + _TXREP2) >> 8);
-   ChP->TxReplace2[2] = 0;
-   ChP->TxReplace2[3] = 0;
-   sOutDW(ChP->IndexAddr,*(DWord_t *)&ChP->TxReplace2[0]);
+	ChP->TxReplace2[0] = (Byte_t) (ChOff + _TXREP2);
+	ChP->TxReplace2[1] = (Byte_t) ((ChOff + _TXREP2) >> 8);
+	ChP->TxReplace2[2] = 0;
+	ChP->TxReplace2[3] = 0;
+	sOutDW(ChP->IndexAddr, *(DWord_t *) & ChP->TxReplace2[0]);
 
-   ChP->TxFIFOPtrs = ChOff + _TXF_OUTP;
-   ChP->TxFIFO = ChOff + _TX_FIFO;
+	ChP->TxFIFOPtrs = ChOff + _TXF_OUTP;
+	ChP->TxFIFO = ChOff + _TX_FIFO;
 
-   sOutB(ChP->Cmd,(Byte_t)ChanNum | RESTXFCNT); /* apply reset Tx FIFO count */
-   sOutB(ChP->Cmd,(Byte_t)ChanNum);  /* remove reset Tx FIFO count */
-   sOutW((WordIO_t)ChP->IndexAddr,ChP->TxFIFOPtrs); /* clear Tx in/out ptrs */
-   sOutW(ChP->IndexData,0);
-   ChP->RxFIFOPtrs = ChOff + _RXF_OUTP;
-   ChP->RxFIFO = ChOff + _RX_FIFO;
+	sOutB(ChP->Cmd, (Byte_t) ChanNum | RESTXFCNT);	/* apply reset Tx FIFO count */
+	sOutB(ChP->Cmd, (Byte_t) ChanNum);	/* remove reset Tx FIFO count */
+	sOutW((WordIO_t) ChP->IndexAddr, ChP->TxFIFOPtrs);	/* clear Tx in/out ptrs */
+	sOutW(ChP->IndexData, 0);
+	ChP->RxFIFOPtrs = ChOff + _RXF_OUTP;
+	ChP->RxFIFO = ChOff + _RX_FIFO;
 
-   sOutB(ChP->Cmd,(Byte_t)ChanNum | RESRXFCNT); /* apply reset Rx FIFO count */
-   sOutB(ChP->Cmd,(Byte_t)ChanNum);  /* remove reset Rx FIFO count */
-   sOutW((WordIO_t)ChP->IndexAddr,ChP->RxFIFOPtrs); /* clear Rx out ptr */
-   sOutW(ChP->IndexData,0);
-   sOutW((WordIO_t)ChP->IndexAddr,ChP->RxFIFOPtrs + 2); /* clear Rx in ptr */
-   sOutW(ChP->IndexData,0);
-   ChP->TxPrioCnt = ChOff + _TXP_CNT;
-   sOutW((WordIO_t)ChP->IndexAddr,ChP->TxPrioCnt);
-   sOutB(ChP->IndexData,0);
-   ChP->TxPrioPtr = ChOff + _TXP_PNTR;
-   sOutW((WordIO_t)ChP->IndexAddr,ChP->TxPrioPtr);
-   sOutB(ChP->IndexData,0);
-   ChP->TxPrioBuf = ChOff + _TXP_BUF;
-   sEnRxProcessor(ChP);                /* start the Rx processor */
+	sOutB(ChP->Cmd, (Byte_t) ChanNum | RESRXFCNT);	/* apply reset Rx FIFO count */
+	sOutB(ChP->Cmd, (Byte_t) ChanNum);	/* remove reset Rx FIFO count */
+	sOutW((WordIO_t) ChP->IndexAddr, ChP->RxFIFOPtrs);	/* clear Rx out ptr */
+	sOutW(ChP->IndexData, 0);
+	sOutW((WordIO_t) ChP->IndexAddr, ChP->RxFIFOPtrs + 2);	/* clear Rx in ptr */
+	sOutW(ChP->IndexData, 0);
+	ChP->TxPrioCnt = ChOff + _TXP_CNT;
+	sOutW((WordIO_t) ChP->IndexAddr, ChP->TxPrioCnt);
+	sOutB(ChP->IndexData, 0);
+	ChP->TxPrioPtr = ChOff + _TXP_PNTR;
+	sOutW((WordIO_t) ChP->IndexAddr, ChP->TxPrioPtr);
+	sOutB(ChP->IndexData, 0);
+	ChP->TxPrioBuf = ChOff + _TXP_BUF;
+	sEnRxProcessor(ChP);	/* start the Rx processor */
 
-   return(TRUE);
+	return (TRUE);
 }
 
 /***************************************************************************
@@ -2626,15 +3336,15 @@ Warnings: No context switches are allowed while executing this function.
           After calling this function a delay of 4 uS is required to ensure
           that the receive processor is no longer processing this channel.
 */
-void sStopRxProcessor(CHANNEL_T *ChP)
+void sStopRxProcessor(CHANNEL_T * ChP)
 {
-   Byte_t R[4];
+	Byte_t R[4];
 
-   R[0] = ChP->R[0];
-   R[1] = ChP->R[1];
-   R[2] = 0x0a;
-   R[3] = ChP->R[3];
-   sOutDW(ChP->IndexAddr,*(DWord_t *)&R[0]);
+	R[0] = ChP->R[0];
+	R[1] = ChP->R[1];
+	R[2] = 0x0a;
+	R[3] = ChP->R[3];
+	sOutDW(ChP->IndexAddr, *(DWord_t *) & R[0]);
 }
 
 /***************************************************************************
@@ -2651,33 +3361,32 @@ Comments: To prevent data from being enqueued or dequeued in the Tx FIFO
           this function.
 Warnings: No context switches are allowed while executing this function.
 */
-void sFlushRxFIFO(CHANNEL_T *ChP)
+void sFlushRxFIFO(CHANNEL_T * ChP)
 {
-   int i;
-   Byte_t Ch;                   /* channel number within AIOP */
-   int RxFIFOEnabled;                  /* TRUE if Rx FIFO enabled */
+	int i;
+	Byte_t Ch;		/* channel number within AIOP */
+	int RxFIFOEnabled;	/* TRUE if Rx FIFO enabled */
 
-   if(sGetRxCnt(ChP) == 0)             /* Rx FIFO empty */
-      return;                          /* don't need to flush */
+	if (sGetRxCnt(ChP) == 0)	/* Rx FIFO empty */
+		return;		/* don't need to flush */
 
-   RxFIFOEnabled = FALSE;
-   if(ChP->R[0x32] == 0x08) /* Rx FIFO is enabled */
-   {
-      RxFIFOEnabled = TRUE;
-      sDisRxFIFO(ChP);                 /* disable it */
-      for(i=0; i < 2000/200; i++)	/* delay 2 uS to allow proc to disable FIFO*/
-         sInB(ChP->IntChan);		/* depends on bus i/o timing */
-   }
-   sGetChanStatus(ChP);          /* clear any pending Rx errors in chan stat */
-   Ch = (Byte_t)sGetChanNum(ChP);
-   sOutB(ChP->Cmd,Ch | RESRXFCNT);     /* apply reset Rx FIFO count */
-   sOutB(ChP->Cmd,Ch);                 /* remove reset Rx FIFO count */
-   sOutW((WordIO_t)ChP->IndexAddr,ChP->RxFIFOPtrs); /* clear Rx out ptr */
-   sOutW(ChP->IndexData,0);
-   sOutW((WordIO_t)ChP->IndexAddr,ChP->RxFIFOPtrs + 2); /* clear Rx in ptr */
-   sOutW(ChP->IndexData,0);
-   if(RxFIFOEnabled)
-      sEnRxFIFO(ChP);                  /* enable Rx FIFO */
+	RxFIFOEnabled = FALSE;
+	if (ChP->R[0x32] == 0x08) {	/* Rx FIFO is enabled */
+		RxFIFOEnabled = TRUE;
+		sDisRxFIFO(ChP);	/* disable it */
+		for (i = 0; i < 2000 / 200; i++)	/* delay 2 uS to allow proc to disable FIFO */
+			sInB(ChP->IntChan);	/* depends on bus i/o timing */
+	}
+	sGetChanStatus(ChP);	/* clear any pending Rx errors in chan stat */
+	Ch = (Byte_t) sGetChanNum(ChP);
+	sOutB(ChP->Cmd, Ch | RESRXFCNT);	/* apply reset Rx FIFO count */
+	sOutB(ChP->Cmd, Ch);	/* remove reset Rx FIFO count */
+	sOutW((WordIO_t) ChP->IndexAddr, ChP->RxFIFOPtrs);	/* clear Rx out ptr */
+	sOutW(ChP->IndexData, 0);
+	sOutW((WordIO_t) ChP->IndexAddr, ChP->RxFIFOPtrs + 2);	/* clear Rx in ptr */
+	sOutW(ChP->IndexData, 0);
+	if (RxFIFOEnabled)
+		sEnRxFIFO(ChP);	/* enable Rx FIFO */
 }
 
 /***************************************************************************
@@ -2694,32 +3403,31 @@ Comments: To prevent data from being enqueued or dequeued in the Tx FIFO
           this function.
 Warnings: No context switches are allowed while executing this function.
 */
-void sFlushTxFIFO(CHANNEL_T *ChP)
+void sFlushTxFIFO(CHANNEL_T * ChP)
 {
-   int i;
-   Byte_t Ch;                   /* channel number within AIOP */
-   int TxEnabled;                      /* TRUE if transmitter enabled */
+	int i;
+	Byte_t Ch;		/* channel number within AIOP */
+	int TxEnabled;		/* TRUE if transmitter enabled */
 
-   if(sGetTxCnt(ChP) == 0)             /* Tx FIFO empty */
-      return;                          /* don't need to flush */
+	if (sGetTxCnt(ChP) == 0)	/* Tx FIFO empty */
+		return;		/* don't need to flush */
 
-   TxEnabled = FALSE;
-   if(ChP->TxControl[3] & TX_ENABLE)
-   {
-      TxEnabled = TRUE;
-      sDisTransmit(ChP);               /* disable transmitter */
-   }
-   sStopRxProcessor(ChP);              /* stop Rx processor */
-   for(i = 0; i < 4000/200; i++)         /* delay 4 uS to allow proc to stop */
-      sInB(ChP->IntChan);	/* depends on bus i/o timing */
-   Ch = (Byte_t)sGetChanNum(ChP);
-   sOutB(ChP->Cmd,Ch | RESTXFCNT);     /* apply reset Tx FIFO count */
-   sOutB(ChP->Cmd,Ch);                 /* remove reset Tx FIFO count */
-   sOutW((WordIO_t)ChP->IndexAddr,ChP->TxFIFOPtrs); /* clear Tx in/out ptrs */
-   sOutW(ChP->IndexData,0);
-   if(TxEnabled)
-      sEnTransmit(ChP);                /* enable transmitter */
-   sStartRxProcessor(ChP);             /* restart Rx processor */
+	TxEnabled = FALSE;
+	if (ChP->TxControl[3] & TX_ENABLE) {
+		TxEnabled = TRUE;
+		sDisTransmit(ChP);	/* disable transmitter */
+	}
+	sStopRxProcessor(ChP);	/* stop Rx processor */
+	for (i = 0; i < 4000 / 200; i++)	/* delay 4 uS to allow proc to stop */
+		sInB(ChP->IntChan);	/* depends on bus i/o timing */
+	Ch = (Byte_t) sGetChanNum(ChP);
+	sOutB(ChP->Cmd, Ch | RESTXFCNT);	/* apply reset Tx FIFO count */
+	sOutB(ChP->Cmd, Ch);	/* remove reset Tx FIFO count */
+	sOutW((WordIO_t) ChP->IndexAddr, ChP->TxFIFOPtrs);	/* clear Tx in/out ptrs */
+	sOutW(ChP->IndexData, 0);
+	if (TxEnabled)
+		sEnTransmit(ChP);	/* enable transmitter */
+	sStartRxProcessor(ChP);	/* restart Rx processor */
 }
 
 /***************************************************************************
@@ -2735,36 +3443,34 @@ Comments: The priority byte is transmitted before any data in the Tx FIFO.
 
 Warnings: No context switches are allowed while executing this function.
 */
-int sWriteTxPrioByte(CHANNEL_T *ChP, Byte_t Data)
+int sWriteTxPrioByte(CHANNEL_T * ChP, Byte_t Data)
 {
-   Byte_t DWBuf[4];             /* buffer for double word writes */
-   Word_t *WordPtr;          /* must be far because Win SS != DS */
-   register DWordIO_t IndexAddr;
+	Byte_t DWBuf[4];	/* buffer for double word writes */
+	Word_t *WordPtr;	/* must be far because Win SS != DS */
+	register DWordIO_t IndexAddr;
 
-   if(sGetTxCnt(ChP) > 1)              /* write it to Tx priority buffer */
-   {
-      IndexAddr = ChP->IndexAddr;
-      sOutW((WordIO_t)IndexAddr,ChP->TxPrioCnt); /* get priority buffer status */
-      if(sInB((ByteIO_t)ChP->IndexData) & PRI_PEND) /* priority buffer busy */
-         return(0);                    /* nothing sent */
+	if (sGetTxCnt(ChP) > 1) {	/* write it to Tx priority buffer */
+		IndexAddr = ChP->IndexAddr;
+		sOutW((WordIO_t) IndexAddr, ChP->TxPrioCnt);	/* get priority buffer status */
+		if (sInB((ByteIO_t) ChP->IndexData) & PRI_PEND)	/* priority buffer busy */
+			return (0);	/* nothing sent */
 
-      WordPtr = (Word_t *)(&DWBuf[0]);
-      *WordPtr = ChP->TxPrioBuf;       /* data byte address */
+		WordPtr = (Word_t *) (&DWBuf[0]);
+		*WordPtr = ChP->TxPrioBuf;	/* data byte address */
 
-      DWBuf[2] = Data;                 /* data byte value */
-      sOutDW(IndexAddr,*((DWord_t *)(&DWBuf[0]))); /* write it out */
+		DWBuf[2] = Data;	/* data byte value */
+		sOutDW(IndexAddr, *((DWord_t *) (&DWBuf[0])));	/* write it out */
 
-      *WordPtr = ChP->TxPrioCnt;       /* Tx priority count address */
+		*WordPtr = ChP->TxPrioCnt;	/* Tx priority count address */
 
-      DWBuf[2] = PRI_PEND + 1;         /* indicate 1 byte pending */
-      DWBuf[3] = 0;                    /* priority buffer pointer */
-      sOutDW(IndexAddr,*((DWord_t *)(&DWBuf[0]))); /* write it out */
-   }
-   else                                /* write it to Tx FIFO */
-   {
-      sWriteTxByte(sGetTxRxDataIO(ChP),Data);
-   }
-   return(1);                          /* 1 byte sent */
+		DWBuf[2] = PRI_PEND + 1;	/* indicate 1 byte pending */
+		DWBuf[3] = 0;	/* priority buffer pointer */
+		sOutDW(IndexAddr, *((DWord_t *) (&DWBuf[0])));	/* write it out */
+	} else {		/* write it to Tx FIFO */
+
+		sWriteTxByte(sGetTxRxDataIO(ChP), Data);
+	}
+	return (1);		/* 1 byte sent */
 }
 
 /***************************************************************************
@@ -2799,24 +3505,23 @@ Comments: If an interrupt enable flag is set in Flags, that interrupt will be
           enable channel interrupts.  This would allow the global interrupt
           status register to be used to determine which AIOPs need service.
 */
-void sEnInterrupts(CHANNEL_T *ChP,Word_t Flags)
+void sEnInterrupts(CHANNEL_T * ChP, Word_t Flags)
 {
-   Byte_t Mask;                 /* Interrupt Mask Register */
+	Byte_t Mask;		/* Interrupt Mask Register */
 
-   ChP->RxControl[2] |=
-      ((Byte_t)Flags & (RXINT_EN | SRCINT_EN | MCINT_EN));
+	ChP->RxControl[2] |=
+	    ((Byte_t) Flags & (RXINT_EN | SRCINT_EN | MCINT_EN));
 
-   sOutDW(ChP->IndexAddr,*(DWord_t *)&ChP->RxControl[0]);
+	sOutDW(ChP->IndexAddr, *(DWord_t *) & ChP->RxControl[0]);
 
-   ChP->TxControl[2] |= ((Byte_t)Flags & TXINT_EN);
+	ChP->TxControl[2] |= ((Byte_t) Flags & TXINT_EN);
 
-   sOutDW(ChP->IndexAddr,*(DWord_t *)&ChP->TxControl[0]);
+	sOutDW(ChP->IndexAddr, *(DWord_t *) & ChP->TxControl[0]);
 
-   if(Flags & CHANINT_EN)
-   {
-      Mask = sInB(ChP->IntMask) | sBitMapSetTbl[ChP->ChanNum];
-      sOutB(ChP->IntMask,Mask);
-   }
+	if (Flags & CHANINT_EN) {
+		Mask = sInB(ChP->IntMask) | sBitMapSetTbl[ChP->ChanNum];
+		sOutB(ChP->IntMask, Mask);
+	}
 }
 
 /***************************************************************************
@@ -2844,19 +3549,98 @@ Comments: If an interrupt flag is set in Flags, that interrupt will be
           this channel's bit from being set in the AIOP's Interrupt Channel
           Register.
 */
-void sDisInterrupts(CHANNEL_T *ChP,Word_t Flags)
+void sDisInterrupts(CHANNEL_T * ChP, Word_t Flags)
 {
-   Byte_t Mask;                 /* Interrupt Mask Register */
+	Byte_t Mask;		/* Interrupt Mask Register */
 
-   ChP->RxControl[2] &=
-         ~((Byte_t)Flags & (RXINT_EN | SRCINT_EN | MCINT_EN));
-   sOutDW(ChP->IndexAddr,*(DWord_t *)&ChP->RxControl[0]);
-   ChP->TxControl[2] &= ~((Byte_t)Flags & TXINT_EN);
-   sOutDW(ChP->IndexAddr,*(DWord_t *)&ChP->TxControl[0]);
+	ChP->RxControl[2] &=
+	    ~((Byte_t) Flags & (RXINT_EN | SRCINT_EN | MCINT_EN));
+	sOutDW(ChP->IndexAddr, *(DWord_t *) & ChP->RxControl[0]);
+	ChP->TxControl[2] &= ~((Byte_t) Flags & TXINT_EN);
+	sOutDW(ChP->IndexAddr, *(DWord_t *) & ChP->TxControl[0]);
 
-   if(Flags & CHANINT_EN)
-   {
-      Mask = sInB(ChP->IntMask) & sBitMapClrTbl[ChP->ChanNum];
-      sOutB(ChP->IntMask,Mask);
-   }
+	if (Flags & CHANINT_EN) {
+		Mask = sInB(ChP->IntMask) & sBitMapClrTbl[ChP->ChanNum];
+		sOutB(ChP->IntMask, Mask);
+	}
+}
+
+void sSetInterfaceMode(CHANNEL_T * ChP, Byte_t mode)
+{
+	sOutB(ChP->CtlP->AiopIO[2], (mode & 0x18) | ChP->ChanNum);
+}
+
+/*
+ *  Not an official SSCI function, but how to reset RocketModems.
+ *  ISA bus version
+ */
+void sModemReset(CONTROLLER_T * CtlP, int chan, int on)
+{
+	ByteIO_t addr;
+	Byte_t val;
+
+	addr = CtlP->AiopIO[0] + 0x400;
+	val = sInB(CtlP->MReg3IO);
+	/* if AIOP[1] is not enabled, enable it */
+	if ((val & 2) == 0) {
+		val = sInB(CtlP->MReg2IO);
+		sOutB(CtlP->MReg2IO, (val & 0xfc) | (1 & 0x03));
+		sOutB(CtlP->MBaseIO, (unsigned char) (addr >> 6));
+	}
+
+	sEnAiop(CtlP, 1);
+	if (!on)
+		addr += 8;
+	sOutB(addr + chan, 0);	/* apply or remove reset */
+	sDisAiop(CtlP, 1);
+}
+
+/*
+ *  Not an official SSCI function, but how to reset RocketModems.
+ *  PCI bus version
+ */
+void sPCIModemReset(CONTROLLER_T * CtlP, int chan, int on)
+{
+	ByteIO_t addr;
+
+	addr = CtlP->AiopIO[0] + 0x40;	/* 2nd AIOP */
+	if (!on)
+		addr += 8;
+	sOutB(addr + chan, 0);	/* apply or remove reset */
+}
+
+/*  Resets the speaker controller on RocketModem II and III devices */
+static void rmSpeakerReset(CONTROLLER_T * CtlP, unsigned long model)
+{
+	ByteIO_t addr;
+
+	/* RocketModem II speaker control is at the 8th port location of offset 0x40 */
+	if ((model == MODEL_RP4M) || (model == MODEL_RP6M)) {
+		addr = CtlP->AiopIO[0] + 0x4F;
+		sOutB(addr, 0);
+	}
+
+	/* RocketModem III speaker control is at the 1st port location of offset 0x80 */
+	if ((model == MODEL_UPCI_RM3_8PORT)
+	    || (model == MODEL_UPCI_RM3_4PORT)) {
+		addr = CtlP->AiopIO[0] + 0x88;
+		sOutB(addr, 0);
+	}
+}
+
+/*  Returns the line number given the controller (board), aiop and channel number */
+static unsigned char GetLineNumber(int ctrl, int aiop, int ch)
+{
+	return lineNumbers[(ctrl << 5) | (aiop << 3) | ch];
+}
+
+/*
+ *  Stores the line number associated with a given controller (board), aiop
+ *  and channel number.  
+ *  Returns:  The line number assigned 
+ */
+static unsigned char SetLineNumber(int ctrl, int aiop, int ch)
+{
+	lineNumbers[(ctrl << 5) | (aiop << 3) | ch] = nextLineNumber++;
+	return (nextLineNumber - 1);
 }

@@ -3745,19 +3745,26 @@
 11fc  Silicon Magic
 11fd  High Street Consultants
 11fe  Comtrol Corporation
-	0001  RocketPort 8 Oct
-	0002  RocketPort 8 Intf
-	0003  RocketPort 16 Intf
-	0004  RocketPort 32 Intf
-	0005  RocketPort Octacable
-	0006  RocketPort 8J
-	0007  RocketPort 4-port
-	0008  RocketPort 8-port
-	0009  RocketPort 16-port
-	000a  RocketPort Plus Quadcable
-	000b  RocketPort Plus Octacable
-	000c  RocketPort 8-port Modem
-	8015  RocketPort 4-port UART 16954
+	0001  Rocketport 32 port w/external I/F
+	0002  Rocketport 8 port w/external I/F
+	0003  Rocketport 16 port w/external I/F
+	0004  Rocketport 4 port w/quad cable
+	0005  Rocketport 8 port w/octa cable
+	0006  Rocketport 8 port w/RJ11 connectors
+	0007  Rocketport 4 port w/RJ11 connectors
+	000a  Rocketport Plus 4 port
+	000b  Rocketport Plus 8 port
+	000c  RocketModem 6 port
+	000d  RocketModem 4-port
+	000e  Rocketport Plus 2 port RS232
+	000f  Rocketport Plus 2 port RS422
+	0801  Rocketport UPCI 32 port w/external I/F
+	0802  Rocketport UPCI 8 port w/external I/F
+	0803  Rocketport UPCI 16 port w/external I/F
+	0805  Rocketport UPCI 8 port w/octa cable
+	080C  RocketModem III 8 port
+	080D  RocketModem III 4 port
+	0903  Rocketport Compact PCI 16 port w/external I/F
 11ff  Scion Corporation
 1200  CSS Corporation
 1201  Vista Controls Corp
