@@ -31,6 +31,28 @@ config SECURITY_CAPABILITIES
 	  This enables the "default" Linux capabilities functionality.
 	  If you are unsure how to answer this question, answer Y.
 
+config SECURITY_CAPABILITIES_BOOTPARAM
+        bool "Capabilities boot parameter"
+        depends on SECURITY_CAPABILITIES
+        default n
+        help
+          This option adds a kernel parameter 'capabilities', which allows 
+	  Capabilities to be disabled at boot.  If this option is selected, 
+	  SECURITY_CAPABILITIES functionality can be disabled with 
+	  capabilities=0 on the kernel command line.  The purpose of this 
+	  option is to allow a single kernel image to be distributed with 
+	  Capabilities built in, but not necessarily enabled.  
+
+	  It is expected that capabilities will be disabled along with also 
+	  disabling SELinux (if configured, see SECURITY_SELINUX_BOOTPARAM) 
+	  thereby allowing a alternative security policy to be loaded via a 
+	  kernel module.  N.B. Any third party security modules loaded in this 
+	  manner should compose the functionality of the Capability module 
+	  (depend on the commoncap module).
+
+          If you are unsure how to answer this question, answer N.
+
+
 config SECURITY_ROOTPLUG
 	tristate "Root Plug Support"
 	depends on USB && SECURITY!=n

@@ -56,12 +56,30 @@ static struct security_operations capability_ops = {
 #define MY_NAME "capability"
 #endif
 
+#ifdef CONFIG_SECURITY_CAPABILITIES_BOOTPARAM
+int capability_enabled = 1;
+
+static int __init capability_enabled_setup(char *str)
+{
+        capability_enabled = simple_strtol(str, NULL, 0);
+        return 1;
+}
+__setup("capability=", capability_enabled_setup);
+#endif
+
 /* flag to keep track of how we were registered */
 static int secondary;
 
 
 static int __init capability_init (void)
 {
+#ifdef CONFIG_SECURITY_CAPABILITIES_BOOTPARAM
+	if (!capability_enabled){
+		printk(KERN_INFO "Capability: Disabled at boot.\n");
+		return 0;
+	}
+#endif
+
 	/* register ourselves with the security framework */
 	if (register_security (&capability_ops)) {
 		printk (KERN_INFO
