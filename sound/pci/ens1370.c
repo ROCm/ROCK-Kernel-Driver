@@ -573,24 +573,18 @@ static void snd_es1370_codec_write(ak4531_t *ak4531,
 				   unsigned short reg, unsigned short val)
 {
 	ensoniq_t *ensoniq = ak4531->private_data;
-	unsigned long flags;
 	unsigned long end_time = jiffies + HZ / 10;
 
 #if 0
 	printk("CODEC WRITE: reg = 0x%x, val = 0x%x (0x%x), creg = 0x%x\n", reg, val, ES_1370_CODEC_WRITE(reg, val), ES_REG(ensoniq, 1370_CODEC));
 #endif
 	do {
-		spin_lock_irqsave(&ensoniq->reg_lock, flags);
 		if (!(inl(ES_REG(ensoniq, STATUS)) & ES_1370_CSTAT)) {
 			outw(ES_1370_CODEC_WRITE(reg, val), ES_REG(ensoniq, 1370_CODEC));
-			spin_unlock_irqrestore(&ensoniq->reg_lock, flags);
 			return;
 		}
-		spin_unlock_irqrestore(&ensoniq->reg_lock, flags);
-#if 0
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule_timeout(1);
-#endif
 	} while (time_after(end_time, jiffies));
 	snd_printk("codec write timeout, status = 0x%x\n", inl(ES_REG(ensoniq, STATUS)));
 }
@@ -603,11 +597,10 @@ static void snd_es1371_codec_write(ac97_t *ac97,
 				   unsigned short reg, unsigned short val)
 {
 	ensoniq_t *ensoniq = ac97->private_data;
-	unsigned long flags;
 	unsigned int t, x;
 
+	down(&ensoniq->src_mutex);
 	for (t = 0; t < POLL_COUNT; t++) {
-		spin_lock_irqsave(&ensoniq->reg_lock, flags);
 		if (!(inl(ES_REG(ensoniq, 1371_CODEC)) & ES_1371_CODEC_WIP)) {
 			/* save the current state for latter */
 			x = snd_es1371_wait_src_ready(ensoniq);
@@ -629,11 +622,11 @@ static void snd_es1371_codec_write(ac97_t *ac97,
 			/* restore SRC reg */
 			snd_es1371_wait_src_ready(ensoniq);
 			outl(x, ES_REG(ensoniq, 1371_SMPRATE));
-			spin_unlock_irqrestore(&ensoniq->reg_lock, flags);
+			up(&ensoniq->src_mutex);
 			return;
 		}
-		spin_unlock_irqrestore(&ensoniq->reg_lock, flags);
 	}
+	up(&ensoniq->src_mutex);
 	snd_printk("codec write timeout at 0x%lx [0x%x]\n", ES_REG(ensoniq, 1371_CODEC), inl(ES_REG(ensoniq, 1371_CODEC)));
 }
 
@@ -641,12 +634,11 @@ static unsigned short snd_es1371_codec_read(ac97_t *ac97,
 					    unsigned short reg)
 {
 	ensoniq_t *ensoniq = ac97->private_data;
-	unsigned long flags;
 	unsigned int t, x, fail = 0;
 
       __again:
+	down(&ensoniq->src_mutex);
 	for (t = 0; t < POLL_COUNT; t++) {
-		spin_lock_irqsave(&ensoniq->reg_lock, flags);
 		if (!(inl(ES_REG(ensoniq, 1371_CODEC)) & ES_1371_CODEC_WIP)) {
 			/* save the current state for latter */
 			x = snd_es1371_wait_src_ready(ensoniq);
@@ -676,19 +668,19 @@ static unsigned short snd_es1371_codec_read(ac97_t *ac97,
 			/* now wait for the stinkin' data (RDY) */
 			for (t = 0; t < POLL_COUNT; t++) {
 				if ((x = inl(ES_REG(ensoniq, 1371_CODEC))) & ES_1371_CODEC_RDY) {
-					spin_unlock_irqrestore(&ensoniq->reg_lock, flags);
+					up(&ensoniq->src_mutex);
 					return ES_1371_CODEC_READ(x);
 				}
 			}
-			spin_unlock_irqrestore(&ensoniq->reg_lock, flags);
+			up(&ensoniq->src_mutex);
 			if (++fail > 10) {
 				snd_printk("codec read timeout (final) at 0x%lx, reg = 0x%x [0x%x]\n", ES_REG(ensoniq, 1371_CODEC), reg, inl(ES_REG(ensoniq, 1371_CODEC)));
 				return 0;
 			}
 			goto __again;
 		}
-		spin_unlock_irqrestore(&ensoniq->reg_lock, flags);
 	}
+	up(&ensoniq->src_mutex);
 	snd_printk("es1371: codec read timeout at 0x%lx [0x%x]\n", ES_REG(ensoniq, 1371_CODEC), inl(ES_REG(ensoniq, 1371_CODEC)));
 	return 0;
 }
@@ -1635,8 +1627,10 @@ static int snd_ensoniq_1371_mixer(ensoniq_t * ensoniq)
 		if (err < 0)
 			return err;
 	}
-	if ((ensoniq->subsystem_vendor_id == 0x1274) &&
-	    (ensoniq->subsystem_device_id == 0x2000)) { /* GA-7DXR */
+	if (((ensoniq->subsystem_vendor_id == 0x1274) &&
+	    (ensoniq->subsystem_device_id == 0x2000)) || /* GA-7DXR */
+	    ((ensoniq->subsystem_vendor_id == 0x1458) &&
+	    (ensoniq->subsystem_device_id == 0xa000))) { /* GA-8IEXP */
 		 err = snd_ctl_add(card, snd_ctl_new1(&snd_ens1373_line, ensoniq));
 		 if (err < 0)
 			 return err;
@@ -1930,7 +1924,6 @@ static int __devinit snd_ensoniq_create(snd_card_t * card,
 	ensoniq->subsystem_vendor_id = cmdw;
 	pci_read_config_word(pci, PCI_SUBSYSTEM_ID, &cmdw);
 	ensoniq->subsystem_device_id = cmdw;
-	snd_ensoniq_proc_init(ensoniq);
 #ifdef CHIP1370
 #if 0
 	ensoniq->ctrl = ES_1370_CDC_EN | ES_1370_SERR_DISABLE | ES_1370_PCLKDIVO(ES_1370_SRTODIV(8000));
@@ -2022,6 +2015,8 @@ static int __devinit snd_ensoniq_create(snd_card_t * card,
 		snd_ensoniq_free(ensoniq);
 		return err;
 	}
+
+	snd_ensoniq_proc_init(ensoniq);
 
 	snd_card_set_dev(card, &pci->dev);
 

@@ -1,7 +1,7 @@
 /*
  * Driver for Digigram miXart soundcards
  *
- * hwdep device manager
+ * DSP firmware management
  *
  * Copyright (c) 2003 by Digigram <alsa@digigram.com>
  *
@@ -22,6 +22,8 @@
 
 #include <sound/driver.h>
 #include <linux/interrupt.h>
+#include <linux/pci.h>
+#include <linux/firmware.h>
 #include <asm/io.h>
 #include <sound/core.h>
 #include "mixart.h"
@@ -29,19 +31,6 @@
 #include "mixart_core.h"
 #include "mixart_hwdep.h"
 
-
-/* miXart hwdep interface id string */
-#define SND_MIXART_HWDEP_ID       "miXart Loader"
-
-static int mixart_hwdep_open(snd_hwdep_t *hw, struct file *file)
-{
-	return 0;
-}
-
-static int mixart_hwdep_release(snd_hwdep_t *hw, struct file *file)
-{
-	return 0;
-}
 
 /**
  * wait for a value on a peudo register, exit with a timeout
@@ -109,52 +98,34 @@ struct snd_mixart_elf32_phdr {
 	u32     p_align;
 };
 
-static int mixart_load_elf(mixart_mgr_t *mgr, snd_hwdep_dsp_image_t *dsp )
+static int mixart_load_elf(mixart_mgr_t *mgr, const struct firmware *dsp )
 {
 	char                    elf32_magic_number[4] = {0x7f,'E','L','F'};
-	snd_mixart_elf32_ehdr_t elf_header;
+	snd_mixart_elf32_ehdr_t *elf_header;
 	int                     i;
 
-	if ( copy_from_user(&elf_header, dsp->image , sizeof(snd_mixart_elf32_ehdr_t)) )
-		return -EFAULT;
-
+	elf_header = (snd_mixart_elf32_ehdr_t *)dsp->data;
 	for( i=0; i<4; i++ )
-		if ( elf32_magic_number[i] != elf_header.e_ident[i] )
+		if ( elf32_magic_number[i] != elf_header->e_ident[i] )
 			return -EINVAL;
 
-	if( elf_header.e_phoff != 0 ) {
+	if( elf_header->e_phoff != 0 ) {
 		snd_mixart_elf32_phdr_t     elf_programheader;
 
-		for( i=0; i < be16_to_cpu(elf_header.e_phnum); i++ ) {
-			u32 pos = be32_to_cpu(elf_header.e_phoff) + (u32)(i * be16_to_cpu(elf_header.e_phentsize));
+		for( i=0; i < be16_to_cpu(elf_header->e_phnum); i++ ) {
+			u32 pos = be32_to_cpu(elf_header->e_phoff) + (u32)(i * be16_to_cpu(elf_header->e_phentsize));
 
-			if( copy_from_user( &elf_programheader, dsp->image + pos, sizeof(elf_programheader) ) )
-				return -EFAULT;
+			memcpy( &elf_programheader, dsp->data + pos, sizeof(elf_programheader) );
 
 			if(elf_programheader.p_type != 0) {
 				if( elf_programheader.p_filesz != 0 ) {
-					if(copy_from_user_toio( MIXART_MEM( mgr, be32_to_cpu(elf_programheader.p_vaddr)),
-								dsp->image + be32_to_cpu( elf_programheader.p_offset ),
-								be32_to_cpu( elf_programheader.p_filesz )))
-						return -EFAULT;
+					memcpy_toio( MIXART_MEM( mgr, be32_to_cpu(elf_programheader.p_vaddr)),
+						     dsp->data + be32_to_cpu( elf_programheader.p_offset ),
+						     be32_to_cpu( elf_programheader.p_filesz ));
 				}
 			}
 		}
 	}
-	return 0;
-}
-
-static int mixart_hwdep_dsp_status(snd_hwdep_t *hw, snd_hwdep_dsp_status_t *info)
-{
-	mixart_mgr_t *mgr = hw->private_data;
-
-	strcpy(info->id, "miXart");
-        info->num_dsps = MIXART_HARDW_FILES_MAX_INDEX;
-
-	if (mgr->hwdep->dsp_loaded & (1 <<  MIXART_MOTHERBOARD_ELF_INDEX))
-		info->chip_ready = 1;
-
-	info->version = MIXART_DRIVER_VERSION;
 	return 0;
 }
 
@@ -344,9 +315,8 @@ static int mixart_first_init(mixart_mgr_t *mgr)
 /* firmware base addresses (when hard coded) */
 #define MIXART_MOTHERBOARD_XLX_BASE_ADDRESS   0x00600000
 
-static int mixart_hwdep_dsp_load(snd_hwdep_t *hw, snd_hwdep_dsp_image_t *dsp)
+static int mixart_dsp_load(mixart_mgr_t* mgr, int index, const struct firmware *dsp)
 {
-	mixart_mgr_t* mgr = hw->private_data;
 	int           err, card_index;
 	u32           status_xilinx, status_elf, status_daught;
 	u32           val;
@@ -364,7 +334,7 @@ static int mixart_hwdep_dsp_load(snd_hwdep_t *hw, snd_hwdep_dsp_image_t *dsp)
 		return -EAGAIN; /* try again later */
 	}
 
-	switch (dsp->index)   {
+	switch (index)   {
 	case MIXART_MOTHERBOARD_XLX_INDEX:
 
 		/* xilinx already loaded ? */ 
@@ -379,8 +349,8 @@ static int mixart_hwdep_dsp_load(snd_hwdep_t *hw, snd_hwdep_dsp_image_t *dsp)
 		}
 
 		/* check xilinx validity */
-		snd_assert(((u32*)(dsp->image))[0]==0xFFFFFFFF, return -EINVAL);
-		snd_assert(dsp->length % 4 == 0, return -EINVAL);
+		snd_assert(((u32*)(dsp->data))[0]==0xFFFFFFFF, return -EINVAL);
+		snd_assert(dsp->size % 4 == 0, return -EINVAL);
 
 		/* set xilinx status to copying */
 		writel_be( 1, MIXART_MEM( mgr, MIXART_PSEUDOREG_MXLX_STATUS_OFFSET ));
@@ -388,11 +358,10 @@ static int mixart_hwdep_dsp_load(snd_hwdep_t *hw, snd_hwdep_dsp_image_t *dsp)
 		/* setup xilinx base address */
 		writel_be( MIXART_MOTHERBOARD_XLX_BASE_ADDRESS, MIXART_MEM( mgr,MIXART_PSEUDOREG_MXLX_BASE_ADDR_OFFSET ));
 		/* setup code size for xilinx file */
-		writel_be( dsp->length, MIXART_MEM( mgr, MIXART_PSEUDOREG_MXLX_SIZE_OFFSET ));
+		writel_be( dsp->size, MIXART_MEM( mgr, MIXART_PSEUDOREG_MXLX_SIZE_OFFSET ));
 
 		/* copy xilinx code */
-		if (copy_from_user_toio(  MIXART_MEM( mgr, MIXART_MOTHERBOARD_XLX_BASE_ADDRESS),  dsp->image,  dsp->length))
-			return -EFAULT;
+		memcpy_toio(  MIXART_MEM( mgr, MIXART_MOTHERBOARD_XLX_BASE_ADDRESS),  dsp->data,  dsp->size);
     
 		/* set xilinx status to copy finished */
 		writel_be( 2, MIXART_MEM( mgr, MIXART_PSEUDOREG_MXLX_STATUS_OFFSET ));
@@ -428,7 +397,7 @@ static int mixart_hwdep_dsp_load(snd_hwdep_t *hw, snd_hwdep_dsp_image_t *dsp)
 		writel_be( 1, MIXART_MEM( mgr, MIXART_PSEUDOREG_ELF_STATUS_OFFSET ));
 
 		/* process the copying of the elf packets */
-		err = mixart_load_elf( mgr, dsp);
+		err = mixart_load_elf( mgr, dsp );
 		if (err < 0) return err;
 
 		/* set elf status to copy finished */
@@ -479,11 +448,11 @@ static int mixart_hwdep_dsp_load(snd_hwdep_t *hw, snd_hwdep_dsp_image_t *dsp)
 		}
  
 		/* check daughterboard xilinx validity */
-		snd_assert(((u32*)(dsp->image))[0]==0xFFFFFFFF, return -EINVAL);
-		snd_assert(dsp->length % 4 == 0, return -EINVAL);
+		snd_assert(((u32*)(dsp->data))[0]==0xFFFFFFFF, return -EINVAL);
+		snd_assert(dsp->size % 4 == 0, return -EINVAL);
 
 		/* inform mixart about the size of the file */
-		writel_be( dsp->length, MIXART_MEM( mgr, MIXART_PSEUDOREG_DXLX_SIZE_OFFSET ));
+		writel_be( dsp->size, MIXART_MEM( mgr, MIXART_PSEUDOREG_DXLX_SIZE_OFFSET ));
 
 		/* set daughterboard status to 1 */
 		writel_be( 1, MIXART_MEM( mgr, MIXART_PSEUDOREG_DXLX_STATUS_OFFSET ));
@@ -500,8 +469,7 @@ static int mixart_hwdep_dsp_load(snd_hwdep_t *hw, snd_hwdep_dsp_image_t *dsp)
 		snd_assert(val != 0, return -EINVAL);
 
 		/* copy daughterboard xilinx code */
-		if (copy_from_user_toio(  MIXART_MEM( mgr, val),  dsp->image,  dsp->length))
-			return -EFAULT;
+		memcpy_toio(  MIXART_MEM( mgr, val),  dsp->data,  dsp->size);
 
 		/* set daughterboard status to 4 */
 		writel_be( 4, MIXART_MEM( mgr, MIXART_PSEUDOREG_DXLX_STATUS_OFFSET ));
@@ -549,7 +517,92 @@ static int mixart_hwdep_dsp_load(snd_hwdep_t *hw, snd_hwdep_dsp_image_t *dsp)
 }
 
 
-int snd_mixart_hwdep_new(mixart_mgr_t *mgr)
+#if defined(CONFIG_FW_LOADER) || defined(CONFIG_FW_LOADER_MODULE)
+#if !defined(CONFIG_USE_MIXARTLOADER) && !defined(CONFIG_SND_MIXART) /* built-in kernel */
+#define SND_MIXART_FW_LOADER	/* use the standard firmware loader */
+#endif
+#endif
+
+#ifdef SND_MIXART_FW_LOADER
+
+int snd_mixart_setup_firmware(mixart_mgr_t *mgr)
+{
+	static char *fw_files[3] = {
+		"miXart8.xlx", "miXart8.elf", "miXart8AES.xlx"
+	};
+	char path[32];
+
+	const struct firmware *fw_entry;
+	int i, err;
+
+	for (i = 0; i < 3; i++) {
+		sprintf(path, "mixart/%s", fw_files[i]);
+		if (request_firmware(&fw_entry, path, &mgr->pci->dev)) {
+			snd_printk(KERN_ERR "miXart: can't load firmware %s\n", path);
+			return -ENOENT;
+		}
+		/* fake hwdep dsp record */
+		err = mixart_dsp_load(mgr, i, fw_entry);
+		release_firmware(fw_entry);
+		if (err < 0)
+			return err;
+	}
+	return 0;
+}
+
+
+#else /* old style firmware loading */
+
+/* miXart hwdep interface id string */
+#define SND_MIXART_HWDEP_ID       "miXart Loader"
+
+static int mixart_hwdep_open(snd_hwdep_t *hw, struct file *file)
+{
+	return 0;
+}
+
+static int mixart_hwdep_release(snd_hwdep_t *hw, struct file *file)
+{
+	return 0;
+}
+
+static int mixart_hwdep_dsp_status(snd_hwdep_t *hw, snd_hwdep_dsp_status_t *info)
+{
+	mixart_mgr_t *mgr = hw->private_data;
+
+	strcpy(info->id, "miXart");
+        info->num_dsps = MIXART_HARDW_FILES_MAX_INDEX;
+
+	if (mgr->hwdep->dsp_loaded & (1 <<  MIXART_MOTHERBOARD_ELF_INDEX))
+		info->chip_ready = 1;
+
+	info->version = MIXART_DRIVER_VERSION;
+	return 0;
+}
+
+static int mixart_hwdep_dsp_load(snd_hwdep_t *hw, snd_hwdep_dsp_image_t *dsp)
+{
+	mixart_mgr_t* mgr = hw->private_data;
+	struct firmware fw;
+	int err;
+
+	fw.size = dsp->length;
+	fw.data = vmalloc(dsp->length);
+	if (! fw.data) {
+		snd_printk(KERN_ERR "miXart: cannot allocate image size %d\n",
+			   (int)dsp->length);
+		return -ENOMEM;
+	}
+	if (copy_from_user(fw.data, dsp->image, dsp->length)) {
+		vfree(fw.data);
+		return -EFAULT;
+	}
+	err = mixart_dsp_load(mgr, dsp->index, &fw);
+	vfree(fw.data);
+	return err;
+}
+
+int snd_mixart_setup_firmware(mixart_mgr_t *mgr)
 {
 	int err;
 	snd_hwdep_t *hw;
@@ -568,5 +621,8 @@ int snd_mixart_hwdep_new(mixart_mgr_t *mgr)
 	sprintf(hw->name,  SND_MIXART_HWDEP_ID);
 	mgr->hwdep = hw;
 	mgr->hwdep->dsp_loaded = 0;
-	return 0;
+
+	return snd_card_register(mgr->chip[0]->card);
 }
+
+#endif /* SND_MIXART_FW_LOADER */

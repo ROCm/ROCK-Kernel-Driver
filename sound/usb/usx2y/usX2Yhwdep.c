@@ -31,6 +31,8 @@
 #include "usbusx2y.h"
 #include "usX2Yhwdep.h"
 
+int usX2Y_hwdep_pcm_new(snd_card_t* card);
+
 
 static struct page * snd_us428ctls_vm_nopage(struct vm_area_struct *area, unsigned long address, int *type)
 {
@@ -195,6 +197,8 @@ static int usX2Y_create_alsa_devices(snd_card_t* card)
 			break;
 		}
 		if ((err = usX2Y_audio_create(card)) < 0) 
+			break;
+		if ((err = usX2Y_hwdep_pcm_new(card)) < 0)
 			break;
 		if ((err = snd_card_register(card)) < 0)
 			break;

@@ -229,21 +229,20 @@ int snd_opl4_create(snd_card_t *card,
 		return err;
 	}
 
-	err = snd_opl3_create(card, fm_port, fm_port + 2, opl4->hardware, 1, &opl3);
+	err = snd_device_new(card, SNDRV_DEV_CODEC, opl4, &ops);
 	if (err < 0) {
 		snd_opl4_free(opl4);
+		return err;
+	}
+
+	err = snd_opl3_create(card, fm_port, fm_port + 2, opl4->hardware, 1, &opl3);
+	if (err < 0) {
+		snd_device_free(card, opl4);
 		return err;
 	}
 
 	/* opl3 initialization disabled opl4, so reenable */
 	snd_opl4_enable_opl4(opl4);
-
-	err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, opl4, &ops);
-	if (err < 0) {
-		snd_device_free(card, opl3);
-		snd_opl4_free(opl4);
-		return err;
-	}
 
 	snd_opl4_create_mixer(opl4);
 #ifdef CONFIG_PROC_FS

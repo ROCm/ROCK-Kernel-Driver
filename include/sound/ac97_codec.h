@@ -423,7 +423,9 @@ struct snd_ac97_build_ops {
 	int (*build_specific) (ac97_t *ac97);
 	int (*build_spdif) (ac97_t *ac97);
 	int (*build_post_spdif) (ac97_t *ac97);
+#ifdef CONFIG_PM
 	void (*resume) (ac97_t *ac97);
+#endif
 };
 
 struct _snd_ac97_bus_ops {
@@ -478,8 +480,8 @@ struct _snd_ac97 {
 	snd_info_entry_t *proc_regs;
 	unsigned short subsystem_vendor;
 	unsigned short subsystem_device;
-	spinlock_t reg_lock;
-	struct semaphore mutex;	/* mutex for AD18xx multi-codecs and paging (2.3) */
+	struct semaphore reg_mutex;
+	struct semaphore page_mutex;	/* mutex for AD18xx multi-codecs and paging (2.3) */
 	unsigned short num;	/* number of codec: 0 = primary, 1 = secondary */
 	unsigned short addr;	/* physical address of codec [0-3] */
 	unsigned int id;	/* identification of codec */
@@ -552,6 +554,7 @@ enum {
 	AC97_TUNE_AD_SHARING,	/* for AD1985, turn on OMS bit and use headphone */
 	AC97_TUNE_ALC_JACK,	/* for Realtek, enable JACK detection */
 	AC97_TUNE_INV_EAPD,	/* inverted EAPD implementation */
+	AC97_TUNE_MUTE_LED,	/* EAPD bit works as mute LED */
 };
 
 struct ac97_quirk {
@@ -563,7 +566,7 @@ struct ac97_quirk {
 	int type;		/* quirk type above */
 };
 
-int snd_ac97_tune_hardware(ac97_t *ac97, struct ac97_quirk *quirk, int override);
+int snd_ac97_tune_hardware(ac97_t *ac97, struct ac97_quirk *quirk, const char *override);
 int snd_ac97_set_rate(ac97_t *ac97, int reg, unsigned int rate);
 
 int snd_ac97_pcm_assign(ac97_bus_t *ac97,

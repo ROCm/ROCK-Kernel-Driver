@@ -573,7 +573,7 @@ static struct usb_feature_control_info audio_feature_info[] = {
 static void usb_mixer_elem_free(snd_kcontrol_t *kctl)
 {
 	if (kctl->private_data) {
-		kfree((void *)kctl->private_data);
+		kfree(kctl->private_data);
 		kctl->private_data = NULL;
 	}
 }

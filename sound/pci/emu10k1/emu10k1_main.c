@@ -580,10 +580,8 @@ static int snd_emu10k1_free(emu10k1_t *emu)
 		snd_dma_free_pages(&emu->silent_page);
 	if (emu->ptb_pages.area)
 		snd_dma_free_pages(&emu->ptb_pages);
-	if (emu->page_ptr_table)
-		vfree(emu->page_ptr_table);
-	if (emu->page_addr_table)
-		vfree(emu->page_addr_table);
+	vfree(emu->page_ptr_table);
+	vfree(emu->page_addr_table);
 	if (emu->irq >= 0)
 		free_irq(emu->irq, (void *)emu);
 	if (emu->port)

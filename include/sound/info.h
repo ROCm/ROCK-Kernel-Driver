@@ -131,11 +131,6 @@ int snd_info_card_free(snd_card_t * card);
 int snd_info_register(snd_info_entry_t * entry);
 int snd_info_unregister(snd_info_entry_t * entry);
 
-struct proc_dir_entry *snd_create_proc_entry(const char *name, mode_t mode,
-					     struct proc_dir_entry *parent);
-void snd_remove_proc_entry(struct proc_dir_entry *parent,
-			   struct proc_dir_entry *de);
-
 /* for card drivers */
 int snd_card_proc_new(snd_card_t *card, const char *name, snd_info_entry_t **entryp);
 
@@ -170,10 +165,6 @@ static inline int snd_info_card_register(snd_card_t * card) { return 0; }
 static inline int snd_info_card_free(snd_card_t * card) { return 0; }
 static inline int snd_info_register(snd_info_entry_t * entry) { return 0; }
 static inline int snd_info_unregister(snd_info_entry_t * entry) { return 0; }
-
-static inline struct proc_dir_entry *snd_create_proc_entry(const char *name, mode_t mode, struct proc_dir_entry *parent) { return NULL; }
-static inline void snd_remove_proc_entry(struct proc_dir_entry *parent,
-					 struct proc_dir_entry *de) { ; }
 
 #define snd_card_proc_new(card,name,entryp)  0 /* always success */
 #define snd_info_set_text_ops(entry,private_data,read_size,read) /*NOP*/

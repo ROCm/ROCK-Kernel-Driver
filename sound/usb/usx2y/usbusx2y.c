@@ -1,6 +1,14 @@
 /*
  * usbusy2y.c - ALSA USB US-428 Driver
  *
+2004-12-14 Karsten Wiese
+	Version 0.8.7.1:
+	snd_pcm_open for rawusb pcm-devices now returns -EBUSY if called without rawusb's hwdep device being open.
+
+2004-12-02 Karsten Wiese
+	Version 0.8.7:
+	Use macro usb_maxpacket() for portability.
+
 2004-10-26 Karsten Wiese
 	Version 0.8.6:
 	wake_up() process waiting in usX2Y_urbs_start() on error.
@@ -135,7 +143,7 @@
 
 
 MODULE_AUTHOR("Karsten Wiese <annabellesgarden@yahoo.de>");
-MODULE_DESCRIPTION("TASCAM "NAME_ALLCAPS" Version 0.8.6");
+MODULE_DESCRIPTION("TASCAM "NAME_ALLCAPS" Version 0.8.7.1");
 MODULE_LICENSE("GPL");
 MODULE_SUPPORTED_DEVICE("{{TASCAM(0x1604), "NAME_ALLCAPS"(0x8001)(0x8005)(0x8007) }}");
 
@@ -301,8 +309,7 @@ static void usX2Y_unlinkSeq(snd_usX2Y_AsyncSeq_t* S)
 			S->urb[i] = NULL;
 		}
 	}
-	if (S->buffer)
-		kfree(S->buffer);
+	kfree(S->buffer);
 }
 
 
@@ -406,8 +413,7 @@ static struct usb_driver snd_usX2Y_usb_driver = {
 
 static void snd_usX2Y_card_private_free(snd_card_t *card)
 {
-	if (usX2Y(card)->In04Buf)
-		kfree(usX2Y(card)->In04Buf);
+	kfree(usX2Y(card)->In04Buf);
 	usb_free_urb(usX2Y(card)->In04urb);
 	if (usX2Y(card)->us428ctls_sharedmem)
 		snd_free_pages(usX2Y(card)->us428ctls_sharedmem, sizeof(*usX2Y(card)->us428ctls_sharedmem));

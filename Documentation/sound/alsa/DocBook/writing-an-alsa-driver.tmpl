@@ -462,6 +462,9 @@
                   snd_mychip_free(chip);
                   return err;
           }
+
+          snd_card_set_dev(card, &pci->dev);
+
           *rchip = chip;
           return 0;
   }
@@ -748,7 +751,7 @@
           </programlisting>
         </informalexample>
 
-	where the last twos are necessary only when module options are
+	where the last one is necessary only when module options are
       defined in the source file.  If the codes are split to several
       files, the file without module options don't need them.
       </para>
@@ -1168,6 +1171,9 @@
                   snd_mychip_free(chip);
                   return err;
           }
+
+          snd_card_set_dev(card, &pci->dev);
+
           *rchip = chip;
           return 0;
   }        
@@ -1481,7 +1487,7 @@
       When the chip-data is assigned to the card using
       <function>snd_device_new()</function> with
       <constant>SNDRV_DEV_LOWLELVEL</constant> , its destructor is 
-      called at the last.  that is, it is assured that all other
+      called at the last.  That is, it is assured that all other
       components like PCMs and controls have been already released.
       You don't have to call stopping PCMs, etc. explicitly, but just
       stop the hardware in the low-level.
@@ -1504,7 +1510,7 @@
           </programlisting>
         </informalexample>
 
-        and the allocation would be (assuming its size is 512 bytes):
+        and the allocation would be like below:
 
         <informalexample>
           <programlisting>
@@ -1539,6 +1545,30 @@
         </informalexample>
       </para>
 
+    </section>
+
+    <section id="pci-resource-device-struct">
+      <title>Registration of Device Struct</title>
+      <para>
+	At some point, typically after calling <function>snd_device_new()</function>,
+	you need to register the <structname>struct device</structname> of the chip
+	you're handling for udev and co.  ALSA provides a macro for compatibility with
+	older kernels.  Simply call like the following:
+        <informalexample>
+          <programlisting>
+<![CDATA[
+  snd_card_set_dev(card, &pci->dev);
+]]>
+          </programlisting>
+        </informalexample>
+	so that it stores the PCI's device pointer to the card.  This will be
+	referred by ALSA core functions later when the devices are registered.
+      </para>
+      <para>
+	In the case of non-PCI, pass the proper device struct pointer of the BUS
+	instead.  (In the case of legacy ISA without PnP, you don't have to do
+	anything.)
+      </para>
     </section>
 
     <section id="pci-resource-entries">
@@ -5153,7 +5183,7 @@ struct _snd_pcm_runtime {
         <listitem><para>Call <function>snd_pcm_suspend_all()</function> to suspend the running PCM streams.</para></listitem>
         <listitem><para>Save the register values if necessary.</para></listitem>
         <listitem><para>Stop the hardware if necessary.</para></listitem>
-        <listitem><para>Set the power-state as D3hot by calling <function>snd_power_change_state()</function>.</para></listitem>
+        <listitem><para>Disable the PCI device by calling <function>pci_disable_device()</function>.</para></listitem>
       </orderedlist>
     </para>
 
@@ -5174,7 +5204,7 @@ struct _snd_pcm_runtime {
           /* (4) */
           snd_mychip_stop_hardware(chip);
           /* (5) */
-          snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
+          pci_disable_device(chip->pci);
           return 0;
   }
 ]]>
@@ -5194,8 +5224,6 @@ struct _snd_pcm_runtime {
     <listitem><para>Resume the mixer, e.g. calling
     <function>snd_ac97_resume()</function>.</para></listitem>
     <listitem><para>Restart the hardware (if any).</para></listitem>
-    <listitem><para>Set the power-state as D0 by calling
-    <function>snd_power_change_state()</function>.</para></listitem>
     </orderedlist>
     </para>
 
@@ -5219,8 +5247,6 @@ struct _snd_pcm_runtime {
           snd_ac97_resume(chip->ac97);
           /* (6) */
           snd_mychip_restart_chip(chip);
-          /* (7) */
-          snd_power_change_state(card, SNDRV_CTL_POWER_D0);
           return 0;
   }
 ]]>
@@ -5441,7 +5467,10 @@ struct _snd_pcm_runtime {
           depends on SND
           select SND_PCM
           help
-            Say 'Y' or 'M' to include support for Foobar XYZ soundcard.
+            Say Y here to include support for Foobar XYZ soundcard.
+
+            To compile this driver as a module, choose M here: the module
+            will be called snd-xyz.
 ]]>
         </programlisting>
       </informalexample>

@@ -1624,7 +1624,6 @@ static int snd_es18xx_suspend(snd_card_t *card, unsigned int state)
 	snd_es18xx_write(chip, ES18XX_PM, chip->pm_reg);
 	snd_es18xx_write(chip, ES18XX_PM, chip->pm_reg ^= ES18XX_PM_SUS);
 
-	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return 0;
 }
 
@@ -1635,7 +1634,6 @@ static int snd_es18xx_resume(snd_card_t *card, unsigned int state)
 	/* restore PM register, we won't wake till (not 0x07) i/o activity though */
 	snd_es18xx_write(chip, ES18XX_PM, chip->pm_reg ^= ES18XX_PM_FM);
 
-	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
 	return 0;
 }
 #endif /* CONFIG_PM */
@@ -1849,7 +1847,7 @@ static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_ISAPNP; /* Enable this car
 static int isapnp[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 1};
 #endif
 static long port[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;	/* 0x220,0x240,0x260,0x280 */
-#ifndef CONFIG_PNP_
+#ifndef CONFIG_PNP
 static long mpu_port[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = -1};
 #else
 static long mpu_port[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;
@@ -1988,7 +1986,7 @@ static int __devinit snd_audiodrive_pnp(int dev, struct snd_audiodrive *acard,
 	kfree(cfg);
 	return 0;
 }
-#endif /* CONFIG_PNP_ */
+#endif /* CONFIG_PNP */
 
 static int __devinit snd_audiodrive_probe(int dev, struct pnp_card_link *pcard,
 					  const struct pnp_card_device_id *pid)

@@ -539,7 +539,6 @@ static int snd_opl3sa2_suspend(snd_card_t *card, unsigned int state)
 	/* power down */
 	snd_opl3sa2_write(chip, OPL3SA2_PM_CTRL, OPL3SA2_PM_D3);
 
-	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return 0;
 }
 
@@ -563,7 +562,6 @@ static int snd_opl3sa2_resume(snd_card_t *card, unsigned int state)
 	/* restore cs4231 */
 	chip->cs4231_resume(chip->cs4231);
 
-	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
 	return 0;
 }
 #endif /* CONFIG_PM */

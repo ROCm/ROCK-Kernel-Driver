@@ -530,6 +530,9 @@ static int __devinit snd_ice1712_delta_init(ice1712_t *ice)
 		ice->num_total_dacs = 8;
 		ice->num_total_adcs = 8;
 		break;
+	case ICE1712_SUBDEVICE_DELTADIO2496:
+		ice->num_total_dacs = 4;	/* two AK4324 codecs */
+		break;
 	case ICE1712_SUBDEVICE_VX442:
 		ice->num_total_dacs = 4;
 		ice->num_total_adcs = 4;

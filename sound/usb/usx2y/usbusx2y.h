@@ -20,6 +20,7 @@ typedef struct {
 } snd_usX2Y_urbSeq_t;
 
 typedef struct snd_usX2Y_substream snd_usX2Y_substream_t;
+#include "usx2yhwdeppcm.h"
 
 typedef struct {
 	snd_usb_audio_t 	chip;
@@ -38,6 +39,7 @@ typedef struct {
 	us428ctls_sharedmem_t	*us428ctls_sharedmem;
 	int			wait_iso_frame;
 	wait_queue_head_t	us428ctls_wait_queue_head;
+	snd_usX2Y_hwdep_pcm_shm_t	*hwdep_pcm_shm;
 	snd_usX2Y_substream_t	*subs[4];
 	snd_usX2Y_substream_t	* volatile  prepare_subs;
 	wait_queue_head_t	prepare_wait_queue;

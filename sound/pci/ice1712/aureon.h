@@ -38,10 +38,10 @@ extern struct snd_ice1712_card_info  snd_vt1724_aureon_cards[];
 
 /* GPIO bits */
 #define AUREON_CS8415_CS	(1 << 22)
-#define AUREON_CS8415_CDTO	(1 << 21)
+#define AUREON_SPI_MISO		(1 << 21)
 #define AUREON_WM_RESET		(1 << 20)
-#define AUREON_WM_CLK		(1 << 19)
-#define AUREON_WM_DATA		(1 << 18)
+#define AUREON_SPI_CLK		(1 << 19)
+#define AUREON_SPI_MOSI		(1 << 18)
 #define AUREON_WM_RW		(1 << 17)
 #define AUREON_AC97_RESET	(1 << 16)
 #define AUREON_DIGITAL_SEL1	(1 << 15)
@@ -52,9 +52,5 @@ extern struct snd_ice1712_card_info  snd_vt1724_aureon_cards[];
 #define AUREON_AC97_DATA_LOW	(1 << 9)
 #define AUREON_AC97_DATA_HIGH	(1 << 8)
 #define AUREON_AC97_DATA_MASK	0xFF
-
-/* Prodigy has different pin assignment for chip select */
-#define PRODIGY_CS8415_CS	(1 << 23)
-#define PRODIGY_CS8415_CDTO	(1 << 22)
 
 #endif /* __SOUND_AUREON_H */

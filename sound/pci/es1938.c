@@ -1395,7 +1395,6 @@ static int es1938_suspend(snd_card_t *card, unsigned int state)
 	outb(0x00, SLIO_REG(chip, IRQCONTROL)); /* disable irqs */
 
 	pci_disable_device(chip->pci);
-	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return 0;
 }
 
@@ -1415,7 +1414,6 @@ static int es1938_resume(snd_card_t *card, unsigned int state)
 			snd_es1938_write(chip, *s, *d);
 	}
 
-	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
 	return 0;
 }
 #endif /* CONFIG_PM */
@@ -1424,8 +1422,9 @@ static int snd_es1938_free(es1938_t *chip)
 {
 	/* disable irqs */
 	outb(0x00, SLIO_REG(chip, IRQCONTROL));
-	/*if (chip->rmidi)
-	  snd_es1938_mixer_bits(chip, ESSSB_IREG_MPU401CONTROL, 0x40, 0);*/
+	if (chip->rmidi)
+		snd_es1938_mixer_bits(chip, ESSSB_IREG_MPU401CONTROL, 0x40, 0);
+
 #if defined(CONFIG_GAMEPORT) || (defined(MODULE) && defined(CONFIG_GAMEPORT_MODULE))
 	if (chip->gameport.io)
 		gameport_unregister_port(&chip->gameport);
@@ -1576,6 +1575,9 @@ static irqreturn_t snd_es1938_interrupt(int irq, void *dev_id, struct pt_regs *r
 
 	/* MPU401 */
 	if (status & 0x80) {
+		// the following line is evil! It switches off MIDI interrupt handling after the first interrupt received.
+		// replacing the last 0 by 0x40 works for ESS-Solo1, but just doing nothing works as well!
+		// andreas@flying-snail.de
 		// snd_es1938_mixer_bits(chip, ESSSB_IREG_MPU401CONTROL, 0x40, 0); /* ack? */
 		if (chip->rmidi) {
 			handled = 1;
@@ -1690,8 +1692,11 @@ static int __devinit snd_es1938_probe(struct pci_dev *pci,
 	if (snd_mpu401_uart_new(card, 0, MPU401_HW_MPU401,
 				chip->mpu_port, 1, chip->irq, 0, &chip->rmidi) < 0) {
 		printk(KERN_ERR "es1938: unable to initialize MPU-401\n");
-	} /*else
-	    snd_es1938_mixer_bits(chip, ESSSB_IREG_MPU401CONTROL, 0x40, 0x40);*/
+	} else {
+		// this line is vital for MIDI interrupt handling on ess-solo1
+		// andreas@flying-snail.de
+		snd_es1938_mixer_bits(chip, ESSSB_IREG_MPU401CONTROL, 0x40, 0x40);
+	}
 
 #if defined(CONFIG_GAMEPORT) || (defined(MODULE) && defined(CONFIG_GAMEPORT_MODULE))
 	chip->gameport.io = chip->game_port;

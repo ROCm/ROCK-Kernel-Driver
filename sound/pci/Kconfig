@@ -172,6 +172,29 @@ config SND_EMU10K1
 	  To compile this driver as a module, choose M here: the module
 	  will be called snd-emu10k1.
 
+config SND_EMU10K1X
+	tristate "Emu10k1X (Dell OEM Version)"
+	depends on SND
+	select SND_AC97_CODEC
+	select SND_RAWMIDI
+	help
+	  Say Y here to include support for the Dell OEM version of the
+	  Sound Blaster Live!.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-emu10k1x.
+
+config SND_CA0106
+	tristate "SB Audigy LS / Live 24bit"
+	depends on SND
+	select SND_AC97_CODEC
+	help
+	  Say Y here to include support for the Sound Blaster Audigy LS
+	  and Live 24bit.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-ca0106.
+
 config SND_KORG1212
 	tristate "Korg 1212 IO"
 	depends on SND
@@ -469,6 +492,17 @@ config SND_VIA82XX
 
 	  To compile this driver as a module, choose M here: the module
 	  will be called snd-via82xx.
+
+config SND_VIA82XX_MODEM
+	tristate "VIA 82C686A/B, 8233 based Modems"
+	depends on SND
+	select SND_AC97_CODEC
+	help
+	  Say Y here to include support for the integrated MC97 modem on
+	  motherboards with VIA chipsets.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-via82xx-modem.
 
 config SND_VX222
 	tristate "Digigram VX222"

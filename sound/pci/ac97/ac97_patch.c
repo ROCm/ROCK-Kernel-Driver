@@ -55,12 +55,12 @@ static int ac97_update_bits_page(ac97_t *ac97, unsigned short reg, unsigned shor
 	unsigned short page_save;
 	int ret;
 
-	down(&ac97->mutex);
+	down(&ac97->page_mutex);
 	page_save = snd_ac97_read(ac97, AC97_INT_PAGING) & AC97_PAGE_MASK;
 	snd_ac97_update_bits(ac97, AC97_INT_PAGING, AC97_PAGE_MASK, page);
 	ret = snd_ac97_update_bits(ac97, reg, mask, value);
 	snd_ac97_update_bits(ac97, AC97_INT_PAGING, AC97_PAGE_MASK, page_save);
-	up(&ac97->mutex); /* unlock paging */
+	up(&ac97->page_mutex); /* unlock paging */
 	return ret;
 }
 
@@ -775,6 +775,7 @@ int patch_conexant(ac97_t * ac97)
 /*
  * Analog Device AD18xx, AD19xx codecs
  */
+#ifdef CONFIG_PM
 static void ad18xx_resume(ac97_t *ac97)
 {
 	static unsigned short setup_regs[] = {
@@ -837,6 +838,7 @@ static void ad18xx_resume(ac97_t *ac97)
 
 	snd_ac97_restore_iec958(ac97);
 }
+#endif
 
 int patch_ad1819(ac97_t * ac97)
 {
@@ -907,7 +909,9 @@ static void patch_ad1881_chained(ac97_t * ac97, int unchained_idx, int cidx1, in
 }
 
 static struct snd_ac97_build_ops patch_ad1881_build_ops = {
+#ifdef CONFIG_PM
 	.resume = &ad18xx_resume
+#endif
 };
 
 int patch_ad1881(ac97_t * ac97)
@@ -988,7 +992,9 @@ static int patch_ad1885_specific(ac97_t * ac97)
 
 static struct snd_ac97_build_ops patch_ad1885_build_ops = {
 	.build_specific = &patch_ad1885_specific,
+#ifdef CONFIG_PM
 	.resume = &ad18xx_resume
+#endif
 };
 
 int patch_ad1885(ac97_t * ac97)
@@ -1096,7 +1102,9 @@ static int patch_ad1981a_specific(ac97_t * ac97)
 static struct snd_ac97_build_ops patch_ad1981a_build_ops = {
 	.build_post_spdif = patch_ad198x_post_spdif,
 	.build_specific = patch_ad1981a_specific,
+#ifdef CONFIG_PM
 	.resume = ad18xx_resume
+#endif
 };
 
 int patch_ad1981a(ac97_t *ac97)
@@ -1125,7 +1133,9 @@ static int patch_ad1981b_specific(ac97_t *ac97)
 static struct snd_ac97_build_ops patch_ad1981b_build_ops = {
 	.build_post_spdif = patch_ad198x_post_spdif,
 	.build_specific = patch_ad1981b_specific,
+#ifdef CONFIG_PM
 	.resume = ad18xx_resume
+#endif
 };
 
 int patch_ad1981b(ac97_t *ac97)
@@ -1241,7 +1251,9 @@ static int patch_ad1888_specific(ac97_t *ac97)
 static struct snd_ac97_build_ops patch_ad1888_build_ops = {
 	.build_post_spdif = patch_ad198x_post_spdif,
 	.build_specific = patch_ad1888_specific,
+#ifdef CONFIG_PM
 	.resume = ad18xx_resume
+#endif
 };
 
 int patch_ad1888(ac97_t * ac97)
@@ -1276,7 +1288,9 @@ static int patch_ad1980_specific(ac97_t *ac97)
 static struct snd_ac97_build_ops patch_ad1980_build_ops = {
 	.build_post_spdif = patch_ad198x_post_spdif,
 	.build_specific = patch_ad1980_specific,
+#ifdef CONFIG_PM
 	.resume = ad18xx_resume
+#endif
 };
 
 int patch_ad1980(ac97_t * ac97)
@@ -1303,7 +1317,9 @@ static int patch_ad1985_specific(ac97_t *ac97)
 static struct snd_ac97_build_ops patch_ad1985_build_ops = {
 	.build_post_spdif = patch_ad198x_post_spdif,
 	.build_specific = patch_ad1985_specific,
+#ifdef CONFIG_PM
 	.resume = ad18xx_resume
+#endif
 };
 
 int patch_ad1985(ac97_t * ac97)
@@ -1387,7 +1403,7 @@ static const snd_kcontrol_new_t snd_ac97_controls_alc650[] = {
 	{
 		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 		.name = "Mic As Center/LFE",
-		.info = snd_ac97_info_single,
+		.info = snd_ac97_info_volsw,
 		.get = snd_ac97_alc650_mic_get,
 		.put = snd_ac97_alc650_mic_put,
 		.private_value = AC97_SINGLE_VALUE(0, 0, 1, 0) /* only mask needed */
@@ -1499,7 +1515,7 @@ static const snd_kcontrol_new_t snd_ac97_controls_alc655[] = {
 	{
 		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 		.name = "Mic As Center/LFE",
-		.info = snd_ac97_info_single,
+		.info = snd_ac97_info_volsw,
 		.get = snd_ac97_alc655_mic_get,
 		.put = snd_ac97_alc655_mic_put,
 		.private_value = AC97_SINGLE_VALUE(0, 0, 1, 0) /* only mask needed */
@@ -1652,7 +1668,7 @@ static const snd_kcontrol_new_t snd_ac97_controls_alc850[] = {
 	{
 		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 		.name = "Line-In As Surround",
-		.info = snd_ac97_info_single,
+		.info = snd_ac97_info_volsw,
 		.get = ac97_alc850_surround_get,
 		.put = ac97_alc850_surround_put,
 		.private_value = AC97_SINGLE_VALUE(0, 0, 1, 0) /* only mask needed */
@@ -1660,7 +1676,7 @@ static const snd_kcontrol_new_t snd_ac97_controls_alc850[] = {
 	{
 		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 		.name = "Mic As Center/LFE",
-		.info = snd_ac97_info_single,
+		.info = snd_ac97_info_volsw,
 		.get = ac97_alc850_mic_get,
 		.put = ac97_alc850_mic_put,
 		.private_value = AC97_SINGLE_VALUE(0, 0, 1, 0) /* only mask needed */
@@ -1815,7 +1831,7 @@ static const snd_kcontrol_new_t snd_ac97_cm9739_controls[] = {
 	{
 		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 		.name = "Mic As Center/LFE",
-		.info = snd_ac97_info_single,
+		.info = snd_ac97_info_volsw,
 		.get = snd_ac97_cm9739_center_mic_get,
 		.put = snd_ac97_cm9739_center_mic_put,
 		.private_value = AC97_SINGLE_VALUE(0, 0, 1, 0) /* only mask needed */
@@ -1861,8 +1877,12 @@ int patch_cm9739(ac97_t * ac97)
 	/* bit 12: disable center/lfe (swithable) */
 	/* bit 10: disable surround/line (switchable) */
 	/* bit 9: mix 2 surround off */
+	/* bit 4: undocumented; 0 mutes the CM9739A, which defaults to 1 */
+	/* bit 3: undocumented; surround? */
 	/* bit 0: dB */
-	val = (1 << 13);
+	val = snd_ac97_read(ac97, AC97_CM9739_MULTI_CHAN) & (1 << 4);
+	val |= (1 << 3);
+	val |= (1 << 13);
 	if (! (ac97->ext_id & AC97_EI_SPDIF))
 		val |= (1 << 14);
 	snd_ac97_write_cache(ac97, AC97_CM9739_MULTI_CHAN, val);
@@ -1925,7 +1945,7 @@ static const snd_kcontrol_new_t snd_ac97_cm9761_controls[] = {
 	{
 		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 		.name = "Line-In As Surround",
-		.info = snd_ac97_info_single,
+		.info = snd_ac97_info_volsw,
 		.get = snd_ac97_cm9761_linein_rear_get,
 		.put = snd_ac97_cm9761_linein_rear_put,
 		.private_value = AC97_SINGLE_VALUE(0, 0, 1, 0) /* only mask needed */
@@ -1933,7 +1953,7 @@ static const snd_kcontrol_new_t snd_ac97_cm9761_controls[] = {
 	{
 		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 		.name = "Mic As Center/LFE",
-		.info = snd_ac97_info_single,
+		.info = snd_ac97_info_volsw,
 		.get = snd_ac97_cm9761_center_mic_get,
 		.put = snd_ac97_cm9761_center_mic_put,
 		.private_value = AC97_SINGLE_VALUE(0, 0, 1, 0) /* only mask needed */

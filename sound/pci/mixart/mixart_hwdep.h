@@ -140,7 +140,6 @@
 #define MIXART_OIDI                             0x008   /* 0000 0000 1000 */
 
 
-/* exported */
-int snd_mixart_hwdep_new(mixart_mgr_t *mgr);
+int snd_mixart_setup_firmware(mixart_mgr_t *mgr);
 
 #endif /* __SOUND_MIXART_HWDEP_H */

@@ -584,7 +584,7 @@ struct snd_es1968 {
 	snd_rawmidi_t *rmidi;
 
 	spinlock_t reg_lock;
-	struct semaphore ac97_mutex;	/* ac97 lock */
+	spinlock_t ac97_lock;
 	struct tasklet_struct hwvol_tq;
 
 	/* Maestro Stuff */
@@ -686,35 +686,36 @@ static int snd_es1968_ac97_wait(es1968_t *chip)
 static void snd_es1968_ac97_write(ac97_t *ac97, unsigned short reg, unsigned short val)
 {
 	es1968_t *chip = ac97->private_data;
+	unsigned long flags;
 
-	down(&chip->ac97_mutex);
 	snd_es1968_ac97_wait(chip);
 
 	/* Write the bus */
+	spin_lock_irqsave(&chip->ac97_lock, flags);
 	outw(val, chip->io_port + ESM_AC97_DATA);
-	msleep(1);
+	/*msleep(1);*/
 	outb(reg, chip->io_port + ESM_AC97_INDEX);
-	msleep(1);
-
-	up(&chip->ac97_mutex);
+	/*msleep(1);*/
+	spin_unlock_irqrestore(&chip->ac97_lock, flags);
 }
 
 static unsigned short snd_es1968_ac97_read(ac97_t *ac97, unsigned short reg)
 {
 	u16 data = 0;
 	es1968_t *chip = ac97->private_data;
+	unsigned long flags;
 
-	down(&chip->ac97_mutex);
 	snd_es1968_ac97_wait(chip);
 
+	spin_lock_irqsave(&chip->ac97_lock, flags);
 	outb(reg | 0x80, chip->io_port + ESM_AC97_INDEX);
-	msleep(1);
+	/*msleep(1);*/
 
 	if (! snd_es1968_ac97_wait(chip)) {
 		data = inw(chip->io_port + ESM_AC97_DATA);
-		msleep(1);
+		/*msleep(1);*/
 	}
-	up(&chip->ac97_mutex);
+	spin_unlock_irqrestore(&chip->ac97_lock, flags);
 
 	return data;
 }
@@ -1925,6 +1926,7 @@ static void es1968_update_hw_volume(unsigned long private_data)
 {
 	es1968_t *chip = (es1968_t *) private_data;
 	int x, val;
+	unsigned long flags;
 
 	/* Figure out which volume control button was pushed,
 	   based on differences from the default register
@@ -1939,11 +1941,15 @@ static void es1968_update_hw_volume(unsigned long private_data)
 	if (! chip->master_switch || ! chip->master_volume)
 		return;
 
-	/* FIXME: more clean up is needed.. */
+	/* FIXME: we can't call snd_ac97_* functions since here is in tasklet. */
+	spin_lock_irqsave(&chip->ac97_lock, flags);
 	val = chip->ac97->regs[AC97_MASTER];
 	if (x & 1) {
 		/* mute */
-		snd_ac97_write_cache(chip->ac97, AC97_MASTER, val ^ 0x8000);
+		val ^= 0x8000;
+		chip->ac97->regs[AC97_MASTER] = val;
+		outw(val, chip->io_port + ESM_AC97_DATA);
+		outb(AC97_MASTER, chip->io_port + ESM_AC97_INDEX);
 		snd_ctl_notify(chip->card, SNDRV_CTL_EVENT_MASK_VALUE,
 			       &chip->master_switch->id);
 	} else {
@@ -1961,10 +1967,13 @@ static void es1968_update_hw_volume(unsigned long private_data)
 			if ((val & 0xff00) < 0x1f00)
 				val += 0x0100;
 		}
-		snd_ac97_write_cache(chip->ac97, AC97_MASTER, val);
+		chip->ac97->regs[AC97_MASTER] = val;
+		outw(val, chip->io_port + ESM_AC97_DATA);
+		outb(AC97_MASTER, chip->io_port + ESM_AC97_INDEX);
 		snd_ctl_notify(chip->card, SNDRV_CTL_EVENT_MASK_VALUE,
 			       &chip->master_volume->id);
 	}
+	spin_unlock_irqrestore(&chip->ac97_lock, flags);
 }
 
 /*
@@ -2406,7 +2415,6 @@ static int es1968_suspend(snd_card_t *card, unsigned int state)
 	snd_es1968_bob_stop(chip);
 	snd_es1968_set_acpi(chip, ACPI_D3);
 	pci_disable_device(chip->pci);
-	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return 0;
 }
 
@@ -2437,7 +2445,6 @@ static int es1968_resume(snd_card_t *card, unsigned int state)
 	if (chip->bobclient)
 		snd_es1968_bob_start(chip);
 
-	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
 	return 0;
 }
 #endif /* CONFIG_PM */
@@ -2531,7 +2538,7 @@ static int __devinit snd_es1968_create(snd_card_t * card,
 	spin_lock_init(&chip->substream_lock);
 	INIT_LIST_HEAD(&chip->buf_list);
 	INIT_LIST_HEAD(&chip->substream_list);
-	init_MUTEX(&chip->ac97_mutex);
+	spin_lock_init(&chip->ac97_lock);
 	init_MUTEX(&chip->memory_mutex);
 	tasklet_init(&chip->hwvol_tq, es1968_update_hw_volume, (unsigned long)chip);
 	chip->card = card;
