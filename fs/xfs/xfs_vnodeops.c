@@ -414,7 +414,7 @@ xfs_setattr(
 	} else {
 		if (DM_EVENT_ENABLED (vp->v_vfsp, ip, DM_EVENT_TRUNCATE) &&
 		    !(flags & ATTR_DMI)) {
-			code = XFS_SEND_DATA(mp, DM_EVENT_TRUNCATE, bdp,
+			code = XFS_SEND_DATA(mp, DM_EVENT_TRUNCATE, vp,
 				vap->va_size, 0, AT_DELAY_FLAG(flags), NULL);
 			if (code) {
 				lock_flags = 0;
@@ -4162,7 +4162,7 @@ xfs_alloc_file_space(
 		end_dmi_offset = offset+len;
 		if (end_dmi_offset > ip->i_d.di_size)
 			end_dmi_offset = ip->i_d.di_size;
-		error = XFS_SEND_DATA(mp, DM_EVENT_WRITE, XFS_ITOBHV(ip),
+		error = XFS_SEND_DATA(mp, DM_EVENT_WRITE, XFS_ITOV(ip),
 			offset, end_dmi_offset - offset,
 			0, NULL);
 		if (error)
@@ -4409,7 +4409,7 @@ xfs_free_file_space(
 	    DM_EVENT_ENABLED(XFS_MTOVFS(mp), ip, DM_EVENT_WRITE)) {
 		if (end_dmi_offset > ip->i_d.di_size)
 			end_dmi_offset = ip->i_d.di_size;
-		error = XFS_SEND_DATA(mp, DM_EVENT_WRITE, XFS_ITOBHV(ip),
+		error = XFS_SEND_DATA(mp, DM_EVENT_WRITE, XFS_ITOV(ip),
 				offset, end_dmi_offset - offset,
 				AT_DELAY_FLAG(attr_flags), NULL);
 		if (error)
