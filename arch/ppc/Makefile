@@ -22,9 +22,8 @@ endif
 LDFLAGS_vmlinux	= -Ttext $(KERNELLOAD) -Bstatic
 CPPFLAGS	:= $(CPPFLAGS) -I$(TOPDIR)/arch/$(ARCH)
 AFLAGS		:= $(AFLAGS) -I$(TOPDIR)/arch/$(ARCH)
-CFLAGS		:= $(CFLAGS) -I$(TOPDIR)/arch/$(ARCH) -fsigned-char \
-		-msoft-float -pipe -ffixed-r2 -Wno-uninitialized \
-		-mmultiple -mstring
+CFLAGS		:= $(CFLAGS) -I$(TOPDIR)/arch/$(ARCH) -msoft-float -pipe \
+		-ffixed-r2 -Wno-uninitialized -mmultiple -mstring
 CPP		= $(CC) -E $(CFLAGS)
 
 ifdef CONFIG_4xx
@@ -97,6 +96,8 @@ CORE_FILES += arch/ppc/iSeries/iSeries.o
 endif
 
 BOOT_TARGETS = zImage zImage.initrd znetboot znetboot.initrd pImage vmlinux.sm
+
+AFLAGS_vmlinux.lds.o	:= -Upowerpc
 
 # All the instructions talk about "make bzImage".
 bzImage: zImage
