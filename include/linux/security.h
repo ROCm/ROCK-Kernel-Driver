@@ -30,8 +30,6 @@
 #include <linux/shm.h>
 #include <linux/msg.h>
 #include <linux/sched.h>
-#include <linux/skbuff.h>
-#include <linux/netlink.h>
 
 struct ctl_table;
 
@@ -55,18 +53,14 @@ extern void cap_task_reparent_to_init (struct task_struct *p);
 extern int cap_syslog (int type);
 extern int cap_vm_enough_memory (long pages);
 
-static inline int cap_netlink_send (struct sock *sk, struct sk_buff *skb)
-{
-	NETLINK_CB (skb).eff_cap = current->cap_effective;
-	return 0;
-}
+struct msghdr;
+struct sk_buff;
+struct sock;
+struct sockaddr;
+struct socket;
 
-static inline int cap_netlink_recv (struct sk_buff *skb)
-{
-	if (!cap_raised (NETLINK_CB (skb).eff_cap, CAP_NET_ADMIN))
-		return -EPERM;
-	return 0;
-}
+extern int cap_netlink_send(struct sock *sk, struct sk_buff *skb);
+extern int cap_netlink_recv(struct sk_buff *skb);
 
 /*
  * Values used in the task_security_ops calls
@@ -2518,11 +2512,6 @@ static inline int security_setprocattr(struct task_struct *p, char *name, void *
 	return -EINVAL;
 }
 
-/*
- * The netlink capability defaults need to be used inline by default
- * (rather than hooking into the capability module) to reduce overhead
- * in the networking code.
- */
 static inline int security_netlink_send (struct sock *sk, struct sk_buff *skb)
 {
 	return cap_netlink_send (sk, skb);
