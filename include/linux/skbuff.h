@@ -226,7 +226,7 @@ struct sk_buff {
 	unsigned int		len,
 				data_len,
 				csum;
-	unsigned char		__unused,
+	unsigned char		local_df,
 				cloned,
 				pkt_type,
 				ip_summed;

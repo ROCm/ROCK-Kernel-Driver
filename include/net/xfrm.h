@@ -107,6 +107,7 @@ struct xfrm_state
 		u16		family;
 		xfrm_address_t	saddr;
 		int		header_len;
+		int		trailer_len;
 	} props;
 
 	struct xfrm_lifetime_cfg lft;
@@ -253,6 +254,11 @@ static inline void xfrm_state_put(struct xfrm_state *x)
 {
 	if (atomic_dec_and_test(&x->refcnt))
 		__xfrm_state_destroy(x);
+}
+
+static inline void xfrm_state_hold(struct xfrm_state *x)
+{
+	atomic_inc(&x->refcnt);
 }
 
 static inline int

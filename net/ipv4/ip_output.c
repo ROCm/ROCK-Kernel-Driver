@@ -440,7 +440,7 @@ int ip_fragment(struct sk_buff *skb, int (*output)(struct sk_buff*))
 
 	iph = skb->nh.iph;
 
-	if (unlikely(iph->frag_off & htons(IP_DF))) {
+	if (unlikely((iph->frag_off & htons(IP_DF)) && !skb->local_df)) {
 		icmp_send(skb, ICMP_DEST_UNREACH, ICMP_FRAG_NEEDED,
 			  htonl(dst_pmtu(&rt->u.dst)));
 		kfree_skb(skb);
@@ -793,6 +793,19 @@ int ip_append_data(struct sock *sk,
 
 	inet->cork.length += length;
 
+	/* So, what's going on in the loop below?
+	 *
+	 * We use calculated fragment length to generate chained skb,
+	 * each of segments is IP fragment ready for sending to network after
+	 * adding appropriate IP header.
+	 *
+	 * Mistake is:
+	 *
+	 *    If mtu-fragheaderlen is not 0 modulo 8, we generate additional
+	 *    small fragment of length (mtu-fragheaderlen)%8, even though
+	 *    it is not necessary. Not a big bug, but needs a fix.
+	 */
+
 	if ((skb = skb_peek_tail(&sk->write_queue)) == NULL)
 		goto alloc_new_skb;
 
@@ -815,6 +828,15 @@ alloc_new_skb:
 				alloclen = maxfraglen;
 			else
 				alloclen = datalen + fragheaderlen;
+
+			/* The last fragment gets additional space at tail.
+			 * Note, with MSG_MORE we overallocate on fragments,
+			 * because we have no idea what fragment will be
+			 * the last.
+			 */
+			if (datalen == length)
+				alloclen += rt->u.dst.trailer_len;
+
 			if (transhdrlen) {
 				skb = sock_alloc_send_skb(sk, 
 						alloclen + hh_len + 15,
@@ -1088,6 +1110,16 @@ int ip_push_pending_frames(struct sock *sk)
 #endif
 	}
 
+	/* Unless user demanded real pmtu discovery (IP_PMTUDISC_DO), we allow
+	 * to fragment the frame generated here. No matter, what transforms
+	 * how transforms change size of the packet, it will come out.
+	 */
+	if (inet->pmtudisc != IP_PMTUDISC_DO)
+		skb->local_df = 1;
+
+	/* DF bit is set when we want to see DF on outgoing frames.
+	 * If local_df is set too, we still allow to fragment this frame
+	 * locally. */
 	if (inet->pmtudisc == IP_PMTUDISC_DO ||
 	    (!skb_shinfo(skb)->frag_list && ip_dont_fragment(sk, &rt->u.dst)))
 		df = htons(IP_DF);

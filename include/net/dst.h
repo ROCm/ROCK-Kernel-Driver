@@ -50,7 +50,8 @@ struct dst_entry
 	unsigned long		lastuse;
 	unsigned long		expires;
 
-	unsigned		header_len;	/* more space at head required */
+	unsigned short		header_len;	/* more space at head required */
+	unsigned short		trailer_len;	/* space to reserve at tail */
 
 	u32			metrics[RTAX_MAX];
 	struct dst_entry	*path;

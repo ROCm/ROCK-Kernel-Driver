@@ -896,6 +896,7 @@ xfrm_bundle_create(struct xfrm_policy *policy, struct xfrm_state **xfrm, int nx,
 	int i;
 	int err;
 	int header_len = 0;
+	int trailer_len = 0;
 
 	dst = dst_prev = NULL;
 
@@ -921,6 +922,7 @@ xfrm_bundle_create(struct xfrm_policy *policy, struct xfrm_state **xfrm, int nx,
 			local  = xfrm[i]->props.saddr.xfrm4_addr;
 		}
 		header_len += xfrm[i]->props.header_len;
+		trailer_len += xfrm[i]->props.trailer_len;
 	}
 
 	if (remote != fl->fl4_dst) {
@@ -947,6 +949,7 @@ xfrm_bundle_create(struct xfrm_policy *policy, struct xfrm_state **xfrm, int nx,
 		dst_prev->flags	       |= DST_HOST;
 		dst_prev->lastuse	= jiffies;
 		dst_prev->header_len	= header_len;
+		dst_prev->trailer_len	= trailer_len;
 		memcpy(&dst_prev->metrics, &rt->u.dst.metrics, sizeof(dst_prev->metrics));
 		dst_prev->path		= &rt->u.dst;
 
@@ -966,6 +969,7 @@ xfrm_bundle_create(struct xfrm_policy *policy, struct xfrm_state **xfrm, int nx,
 		x->u.rt.rt_gateway = rt->rt_gateway;
 		x->u.rt.rt_spec_dst = rt0->rt_spec_dst;
 		header_len -= x->u.dst.xfrm->props.header_len;
+		trailer_len -= x->u.dst.xfrm->props.trailer_len;
 	}
 	*dst_p = dst;
 	return 0;
@@ -989,6 +993,7 @@ xfrm6_bundle_create(struct xfrm_policy *policy, struct xfrm_state **xfrm, int nx
 	int i;
 	int err = 0;
 	int header_len = 0;
+	int trailer_len = 0;
 
 	dst = dst_prev = NULL;
 
@@ -1014,6 +1019,7 @@ xfrm6_bundle_create(struct xfrm_policy *policy, struct xfrm_state **xfrm, int nx
 			local  = (struct in6_addr*)&xfrm[i]->props.saddr;
 		}
 		header_len += xfrm[i]->props.header_len;
+		trailer_len += xfrm[i]->props.trailer_len;
 	}
 
 	if (ipv6_addr_cmp(remote, fl->fl6_dst)) {
@@ -1040,6 +1046,7 @@ xfrm6_bundle_create(struct xfrm_policy *policy, struct xfrm_state **xfrm, int nx
 		dst_prev->flags	       |= DST_HOST;
 		dst_prev->lastuse	= jiffies;
 		dst_prev->header_len	= header_len;
+		dst_prev->trailer_len	= trailer_len;
 		memcpy(&dst_prev->metrics, &rt->u.dst.metrics, sizeof(dst_prev->metrics));
 		dst_prev->path		= &rt->u.dst;
 
@@ -1056,6 +1063,7 @@ xfrm6_bundle_create(struct xfrm_policy *policy, struct xfrm_state **xfrm, int nx
 		x->u.rt6.rt6i_gateway  = rt0->rt6i_gateway;
 		memcpy(&x->u.rt6.rt6i_gateway, &rt0->rt6i_gateway, sizeof(x->u.rt6.rt6i_gateway)); 
 		header_len -= x->u.dst.xfrm->props.header_len;
+		trailer_len -= x->u.dst.xfrm->props.trailer_len;
 	}
 	*dst_p = dst;
 	return 0;

@@ -259,7 +259,7 @@ static u32 esp4_get_max_size(struct xfrm_state *x, int mtu)
 	if (esp->conf.padlen)
 		mtu = (mtu + esp->conf.padlen-1)&~(esp->conf.padlen-1);
 
-	return mtu + x->props.header_len + esp->auth.icv_full_len;
+	return mtu + x->props.header_len + esp->auth.icv_trunc_len;
 }
 
 void esp4_err(struct sk_buff *skb, u32 info)
@@ -365,6 +365,7 @@ int esp_init_state(struct xfrm_state *x, void *args)
 	if (x->props.mode)
 		x->props.header_len += 20;
 	x->data = esp;
+	x->props.trailer_len = esp4_get_max_size(x, 0) - x->props.header_len;
 	return 0;
 
 error:
