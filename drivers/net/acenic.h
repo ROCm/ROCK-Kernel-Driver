@@ -417,7 +417,16 @@ struct cmd {
 #define BD_FLG_TCP_UDP_SUM	0x01
 #define BD_FLG_IP_SUM		0x02
 #define BD_FLG_END		0x04
+#define BD_FLG_MORE		0x08
 #define BD_FLG_JUMBO		0x10
+#define BD_FLG_UCAST		0x20
+#define BD_FLG_MCAST		0x40
+#define BD_FLG_BCAST		0x60
+#define BD_FLG_TYP_MASK		0x60
+#define BD_FLG_IP_FRAG		0x80
+#define BD_FLG_IP_FRAG_END	0x100
+#define BD_FLG_VLAN_TAG		0x200
+#define BD_FLG_FRAME_ERROR	0x400
 #define BD_FLG_COAL_NOW		0x800
 #define BD_FLG_MINI		0x1000
 
@@ -633,6 +642,10 @@ struct ace_private
 	struct ace_skb		*skb;
 	dma_addr_t		info_dma;	/* 32/64 bit */
 
+#if ACENIC_DO_VLAN
+	struct vlan_group	*vlgrp;
+#endif
+
 	int			version, link;
 	int			promisc, mcast_all;
 
@@ -760,5 +773,9 @@ static void ace_free_descriptors(struct net_device *dev);
 static void ace_init_cleanup(struct net_device *dev);
 static struct net_device_stats *ace_get_stats(struct net_device *dev);
 static int read_eeprom_byte(struct net_device *dev, unsigned long offset);
+#if ACENIC_DO_VLAN
+static void ace_vlan_rx_register(struct net_device *dev, struct vlan_group *grp);
+static void ace_vlan_rx_kill_vid(struct net_device *dev, unsigned short vid);
+#endif
 
 #endif /* _ACENIC_H_ */
