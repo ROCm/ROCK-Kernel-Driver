@@ -144,14 +144,25 @@ cmd_as_o_S = $(CC) $(a_flags) -c -o $@ $<
 %.o: %.S dummy
 	$(call if_changed,cmd_as_o_S)
 
-# ---------------------------------------------------------------------------
+# FIXME
 
 %.lst: %.c
 	$(CC) $(c_flags) -g -c -o $*.o $<
 	$(TOPDIR)/scripts/makelst $* $(TOPDIR) $(OBJDUMP)
-#
-#
-#
+
+
+# If a Makefile does define neither O_TARGET nor L_TARGET,
+# use a standard O_TARGET named "built-in.o"
+
+ifndef O_TARGET
+ifndef L_TARGET
+O_TARGET := built-in.o
+endif
+endif
+
+# Build the compiled-in targets
+# ---------------------------------------------------------------------------
+
 all_targets: $(O_TARGET) $(L_TARGET) sub_dirs
 
 # To build objects in subdirs, we need to descend into the directories
