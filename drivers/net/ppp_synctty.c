@@ -301,7 +301,7 @@ ppp_sync_read(struct tty_struct *tty, struct file *file,
  */
 static ssize_t
 ppp_sync_write(struct tty_struct *tty, struct file *file,
-		const unsigned char __user *buf, size_t count)
+		const unsigned char *buf, size_t count)
 {
 	return -EAGAIN;
 }
@@ -651,7 +651,7 @@ ppp_sync_push(struct syncppp *ap)
 			tty_stuffed = 0;
 		if (!tty_stuffed && ap->tpkt != 0) {
 			set_bit(TTY_DO_WRITE_WAKEUP, &tty->flags);
-			sent = tty->driver->write(tty, 0, ap->tpkt->data, ap->tpkt->len);
+			sent = tty->driver->write(tty, ap->tpkt->data, ap->tpkt->len);
 			if (sent < 0)
 				goto flush;	/* error, e.g. loss of CD */
 			if (sent < ap->tpkt->len) {

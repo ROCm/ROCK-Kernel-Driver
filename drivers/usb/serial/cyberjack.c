@@ -57,8 +57,7 @@ static int cyberjack_startup (struct usb_serial *serial);
 static void cyberjack_shutdown (struct usb_serial *serial);
 static int  cyberjack_open (struct usb_serial_port *port, struct file *filp);
 static void cyberjack_close (struct usb_serial_port *port, struct file *filp);
-static int cyberjack_write (struct usb_serial_port *port, int from_user,
-	const unsigned char *buf, int count);
+static int cyberjack_write (struct usb_serial_port *port, const unsigned char *buf, int count);
 static int cyberjack_write_room( struct usb_serial_port *port );
 static void cyberjack_read_int_callback (struct urb *urb, struct pt_regs *regs);
 static void cyberjack_read_bulk_callback (struct urb *urb, struct pt_regs *regs);
@@ -194,7 +193,7 @@ static void cyberjack_close (struct usb_serial_port *port, struct file *filp)
 	}
 }
 
-static int cyberjack_write (struct usb_serial_port *port, int from_user, const unsigned char *buf, int count)
+static int cyberjack_write (struct usb_serial_port *port, const unsigned char *buf, int count)
 {
 	struct usb_serial *serial = port->serial;
 	struct cyberjack_private *priv = usb_get_serial_port_data(port);
@@ -203,7 +202,6 @@ static int cyberjack_write (struct usb_serial_port *port, int from_user, const u
 	int wrexpected;
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
-	dbg("%s - from_user %d", __FUNCTION__, from_user);
 
 	if (count == 0) {
 		dbg("%s - write request of 0 bytes", __FUNCTION__);
@@ -225,14 +223,7 @@ static int cyberjack_write (struct usb_serial_port *port, int from_user, const u
 	}
 
 	/* Copy data */
-	if (from_user) {
-		if (copy_from_user(priv->wrbuf+priv->wrfilled, buf, count)) {
-			spin_unlock_irqrestore(&priv->lock, flags);
-			return -EFAULT;
-		}
-	} else {
-		memcpy (priv->wrbuf+priv->wrfilled, buf, count);
-	}  
+	memcpy (priv->wrbuf+priv->wrfilled, buf, count);
 
 	usb_serial_debug_data(debug, &port->dev, __FUNCTION__, count,
 		priv->wrbuf+priv->wrfilled);

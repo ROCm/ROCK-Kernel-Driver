@@ -528,8 +528,7 @@ static void uart_flush_chars(struct tty_struct *tty)
 }
 
 static int
-uart_write(struct tty_struct *tty, int from_user, const unsigned char * buf,
-	   int count)
+uart_write(struct tty_struct *tty, const unsigned char * buf, int count)
 {
 	struct uart_state *state = tty->driver_data;
 	int ret;
@@ -537,12 +536,8 @@ uart_write(struct tty_struct *tty, int from_user, const unsigned char * buf,
 	if (!state->info->xmit.buf)
 		return 0;
 
-	if (from_user)
-		ret = __uart_user_write(state->port, &state->info->xmit,
-				(const unsigned char __user *)buf, count);
-	else
-		ret = __uart_kern_write(state->port, &state->info->xmit,
-					buf, count);
+	ret = __uart_kern_write(state->port, &state->info->xmit,
+				buf, count);
 
 	uart_start(tty);
 	return ret;

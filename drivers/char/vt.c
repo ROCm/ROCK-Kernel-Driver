@@ -1889,8 +1889,7 @@ char con_buf[CON_BUF_SIZE];
 DECLARE_MUTEX(con_buf_sem);
 
 /* acquires console_sem */
-static int do_con_write(struct tty_struct *tty, int from_user,
-			const unsigned char *buf, int count)
+static int do_con_write(struct tty_struct *tty, const unsigned char *buf, int count)
 {
 #ifdef VT_BUF_VRAM_ONLY
 #define FLUSH do { } while(0);
@@ -1937,22 +1936,6 @@ static int do_con_write(struct tty_struct *tty, int from_user,
 
 	orig_buf = buf;
 	orig_count = count;
-
-	if (from_user) {
-
-		down(&con_buf_sem);
-
-again:
-		if (count > CON_BUF_SIZE)
-			count = CON_BUF_SIZE;
-		console_conditional_schedule();
-		if (copy_from_user(con_buf, buf, count)) {
-			n = 0; /* ?? are error codes legal here ?? */
-			goto out;
-		}
-
-		buf = con_buf;
-	}
 
 	/* At this point 'buf' is guaranteed to be a kernel buffer
 	 * and therefore no access to userspace (and therefore sleeping)
@@ -2094,22 +2077,6 @@ again:
 	release_console_sem();
 
 out:
-	if (from_user) {
-		/* If the user requested something larger than
-		 * the CON_BUF_SIZE, and the tty is not stopped,
-		 * keep going.
-		 */
-		if ((orig_count > CON_BUF_SIZE) && !tty->stopped) {
-			orig_count -= CON_BUF_SIZE;
-			orig_buf += CON_BUF_SIZE;
-			count = orig_count;
-			buf = orig_buf;
-			goto again;
-		}
-
-		up(&con_buf_sem);
-	}
-
 	return n;
 #undef FLUSH
 }
@@ -2382,13 +2349,12 @@ int tioclinux(struct tty_struct *tty, unsigned long arg)
  * /dev/ttyN handling
  */
 
-static int con_write(struct tty_struct *tty, int from_user,
-		     const unsigned char *buf, int count)
+static int con_write(struct tty_struct *tty, const unsigned char *buf, int count)
 {
 	int	retval;
 
 	pm_access(pm_con);
-	retval = do_con_write(tty, from_user, buf, count);
+	retval = do_con_write(tty, buf, count);
 	con_flush_chars(tty);
 
 	return retval;
@@ -2399,7 +2365,7 @@ static void con_put_char(struct tty_struct *tty, unsigned char ch)
 	if (in_interrupt())
 		return;	/* n_r3964 calls put_char() from interrupt context */
 	pm_access(pm_con);
-	do_con_write(tty, 0, &ch, 1);
+	do_con_write(tty, &ch, 1);
 }
 
 static int con_write_room(struct tty_struct *tty)

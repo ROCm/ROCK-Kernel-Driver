@@ -49,10 +49,9 @@ open()		-	Called when the line discipline is attached to
 			discipline for this tty will occur until it
 			completes successfully. Can sleep.
 
-write()		-	A process is writing data from user space
-			through the line discipline. Multiple write calls
-			are serialized by the tty layer for the ldisc. May
-			sleep.
+write()		-	A process is writing data through the line
+			discipline.  Multiple write calls are serialized
+			by the tty layer for the ldisc.  May sleep. 
 
 flush_buffer()	-	May be called at any point between open and close.
 

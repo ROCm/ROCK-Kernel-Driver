@@ -2855,8 +2855,7 @@ cy_close(struct tty_struct *tty, struct file *filp)
  *
  */
 static int
-cy_write(struct tty_struct * tty, int from_user,
-           const unsigned char *buf, int count)
+cy_write(struct tty_struct * tty, const unsigned char *buf, int count)
 {
   struct cyclades_port *info = (struct cyclades_port *)tty->driver_data;
   unsigned long flags;
@@ -2874,56 +2873,22 @@ cy_write(struct tty_struct * tty, int from_user,
         return 0;
     }
 
-    if (from_user) {
-	down(&tmp_buf_sem);
-	while (1) {
-	    int c1;
-	    
-	    c = min(count, min((int)(SERIAL_XMIT_SIZE - info->xmit_cnt - 1),
-				(int)(SERIAL_XMIT_SIZE - info->xmit_head)));
-	    if (c <= 0)
-		break;
-
-	    c -= copy_from_user(tmp_buf, buf, c);
-	    if (!c) {
-		if (!ret) {
-		    ret = -EFAULT;
-		}
-		break;
-	    }
-	    CY_LOCK(info, flags);
-	    c1 = min(c, min((int)(SERIAL_XMIT_SIZE - info->xmit_cnt - 1),
-			(int)(SERIAL_XMIT_SIZE - info->xmit_head)));
-			
-	    if (c1 < c)
-	    	c = c1;
-	    memcpy(info->xmit_buf + info->xmit_head, tmp_buf, c);
-	    info->xmit_head = ((info->xmit_head + c) & (SERIAL_XMIT_SIZE-1));
-	    info->xmit_cnt += c;
-            CY_UNLOCK(info, flags);
-	    buf += c;
-	    count -= c;
-	    ret += c;
-	}
-	up(&tmp_buf_sem);
-    } else {
-	CY_LOCK(info, flags);
-	while (1) {
-	    c = min(count, min((int)(SERIAL_XMIT_SIZE - info->xmit_cnt - 1),
+    CY_LOCK(info, flags);
+    while (1) {
+	c = min(count, min((int)(SERIAL_XMIT_SIZE - info->xmit_cnt - 1),
 			(int)(SERIAL_XMIT_SIZE - info->xmit_head)));
 	        
-	    if (c <= 0)
-		break;
+	if (c <= 0)
+	    break;
 
-	    memcpy(info->xmit_buf + info->xmit_head, buf, c);
-	    info->xmit_head = (info->xmit_head + c) & (SERIAL_XMIT_SIZE-1);
-	    info->xmit_cnt += c;
-	    buf += c;
-	    count -= c;
-	    ret += c;
-	}
-        CY_UNLOCK(info, flags);
+	memcpy(info->xmit_buf + info->xmit_head, buf, c);
+	info->xmit_head = (info->xmit_head + c) & (SERIAL_XMIT_SIZE-1);
+	info->xmit_cnt += c;
+	buf += c;
+	count -= c;
+	ret += c;
     }
+    CY_UNLOCK(info, flags);
 
     info->idle_stats.xmit_bytes += ret;
     info->idle_stats.xmit_idle   = jiffies;

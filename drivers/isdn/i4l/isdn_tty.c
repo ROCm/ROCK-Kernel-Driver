@@ -27,8 +27,8 @@
 
 /* Prototypes */
 
-static int isdn_tty_edit_at(const char *, int, modem_info *, int);
-static void isdn_tty_check_esc(const u_char *, u_char, int, int *, u_long *, int);
+static int isdn_tty_edit_at(const char *, int, modem_info *);
+static void isdn_tty_check_esc(const u_char *, u_char, int, int *, u_long *);
 static void isdn_tty_modem_reset_regs(modem_info *, int);
 static void isdn_tty_cmd_ATA(modem_info *);
 static void isdn_tty_flush_buffer(struct tty_struct *);
@@ -391,15 +391,12 @@ isdn_tty_handleDLEdown(modem_info * info, atemu * m, int len)
  * ^S or ^Q is sent.
  */
 static int
-isdn_tty_end_vrx(const char *buf, int c, int from_user)
+isdn_tty_end_vrx(const char *buf, int c)
 {
 	char ch;
 
 	while (c--) {
-		if (from_user)
-			get_user(ch, buf);
-		else
-			ch = *buf;
+		ch = *buf;
 		if ((ch != 0x11) && (ch != 0x13))
 			return 1;
 		buf++;
@@ -1127,7 +1124,7 @@ isdn_tty_shutdown(modem_info * info)
  *  - If dialing, abort dial.
  */
 static int
-isdn_tty_write(struct tty_struct *tty, int from_user, const u_char * buf, int count)
+isdn_tty_write(struct tty_struct *tty, const u_char * buf, int count)
 {
 	int c;
 	int total = 0;
@@ -1136,8 +1133,6 @@ isdn_tty_write(struct tty_struct *tty, int from_user, const u_char * buf, int co
 
 	if (isdn_tty_paranoia_check(info, tty->name, "isdn_tty_write"))
 		return 0;
-	if (from_user)
-		down(&info->write_sem);
 	/* See isdn_tty_senddown() */
 	atomic_inc(&info->xmit_lock);
 	while (1) {
@@ -1158,12 +1153,8 @@ isdn_tty_write(struct tty_struct *tty, int from_user, const u_char * buf, int co
 #endif
 				isdn_tty_check_esc(buf, m->mdmreg[REG_ESC], c,
 						   &(m->pluscount),
-						   &(m->lastplus),
-						   from_user);
-			if (from_user)
-				copy_from_user(&(info->xmit_buf[info->xmit_count]), buf, c);
-			else
-				memcpy(&(info->xmit_buf[info->xmit_count]), buf, c);
+						   &(m->lastplus));
+			memcpy(&(info->xmit_buf[info->xmit_count]), buf, c);
 #ifdef CONFIG_ISDN_AUDIO
 			if (info->vonline) {
 				int cc = isdn_tty_handleDLEdown(info, m, c);
@@ -1182,7 +1173,7 @@ isdn_tty_write(struct tty_struct *tty, int from_user, const u_char * buf, int co
 					/* Do NOT handle Ctrl-Q or Ctrl-S
 					 * when in full-duplex audio mode.
 					 */
-					if (isdn_tty_end_vrx(buf, c, from_user)) {
+					if (isdn_tty_end_vrx(buf, c)) {
 						info->vonline &= ~1;
 #ifdef ISDN_DEBUG_MODEM_VOICE
 						printk(KERN_DEBUG
@@ -1225,7 +1216,7 @@ isdn_tty_write(struct tty_struct *tty, int from_user, const u_char * buf, int co
 				isdn_tty_modem_result(RESULT_NO_CARRIER, info);
 				isdn_tty_modem_hup(info, 1);
 			} else
-				c = isdn_tty_edit_at(buf, c, info, from_user);
+				c = isdn_tty_edit_at(buf, c, info);
 		}
 		buf += c;
 		count -= c;
@@ -1239,8 +1230,6 @@ isdn_tty_write(struct tty_struct *tty, int from_user, const u_char * buf, int co
 		}
 		isdn_timer_ctrl(ISDN_TIMER_MODEMXMIT, 1);
 	}
-	if (from_user)
-		up(&info->write_sem);
 	return total;
 }
 
@@ -2467,20 +2456,14 @@ isdn_tty_off_hook(void)
  */
 static void
 isdn_tty_check_esc(const u_char * p, u_char plus, int count, int *pluscount,
-		   u_long *lastplus, int from_user)
+		   u_long *lastplus)
 {
-	char cbuf[3];
-
 	if (plus > 127)
 		return;
 	if (count > 3) {
 		p += count - 3;
 		count = 3;
 		*pluscount = 0;
-	}
-	if (from_user) {
-		copy_from_user(cbuf, p, count);
-		p = cbuf;
 	}
 	while (count > 0) {
 		if (*(p++) == plus) {
@@ -3761,10 +3744,9 @@ isdn_tty_parse_at(modem_info * info)
  *   p        inputbuffer
  *   count    length of buffer
  *   channel  index to line (minor-device)
- *   user     flag: buffer is in userspace
  */
 static int
-isdn_tty_edit_at(const char *p, int count, modem_info * info, int user)
+isdn_tty_edit_at(const char *p, int count, modem_info * info)
 {
 	atemu *m = &info->emu;
 	int total = 0;
@@ -3773,10 +3755,7 @@ isdn_tty_edit_at(const char *p, int count, modem_info * info, int user)
 	int cnt;
 
 	for (cnt = count; cnt > 0; p++, cnt--) {
-		if (user)
-			get_user(c, p);
-		else
-			c = *p;
+		c = *p;
 		total++;
 		if (c == m->mdmreg[REG_CR] || c == m->mdmreg[REG_LF]) {
 			/* Separator (CR or LF) */

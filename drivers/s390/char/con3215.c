@@ -983,7 +983,7 @@ tty3215_write_room(struct tty_struct *tty)
  * String write routine for 3215 ttys
  */
 static int
-tty3215_write(struct tty_struct * tty, int from_user,
+tty3215_write(struct tty_struct * tty,
 	      const unsigned char *buf, int count)
 {
 	struct raw3215_info *raw;
@@ -992,26 +992,8 @@ tty3215_write(struct tty_struct * tty, int from_user,
 	if (!tty)
 		return 0;
 	raw = (struct raw3215_info *) tty->driver_data;
-	if (!from_user) {
-		raw3215_write(raw, buf, count);
-		return count;
-	}
-	ret = 0;
-	while (count > 0) {
-		length = count < 80 ? count : 80;
-		length -= copy_from_user(raw->ubuffer,
-				(const unsigned char __user *)buf, length);
-		if (length == 0) {
-			if (!ret)
-				ret = -EFAULT;
-			break;
-		}
-		raw3215_write(raw, raw->ubuffer, count);
-		buf += length;
-		count -= length;
-		ret += length;
-	}
-	return ret;
+	raw3215_write(raw, buf, count);
+	return count;
 }
 
 /*

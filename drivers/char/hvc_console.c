@@ -344,62 +344,6 @@ static void hvc_push(struct hvc_struct *hp)
 		hp->do_wakeup = 1;
 }
 
-static inline int __hvc_write_user(struct hvc_struct *hp,
-				   const unsigned char *buf, int count)
-{
-	char *tbuf, *p;
-	int tbsize, rsize, written = 0;
-	unsigned long flags;
-
-	tbsize = min(count, (int)PAGE_SIZE);
-	if (!(tbuf = kmalloc(tbsize, GFP_KERNEL)))
-		return -ENOMEM;
-
-	while ((rsize = count - written) > 0) {
-		int wsize;
-		if (rsize > tbsize)
-			rsize = tbsize;
-
-		p = tbuf;
-		rsize -= copy_from_user(p, buf, rsize);
-		if (!rsize) {
-			if (written == 0)
-				written = -EFAULT;
-			break;
-		}
-		buf += rsize;
-
-		spin_lock_irqsave(&hp->lock, flags);
-
-		/* Push pending writes: make some room in buffer */
-		if (hp->n_outbuf > 0)
-			hvc_push(hp);
-
-		for (wsize = N_OUTBUF - hp->n_outbuf; rsize && wsize;
-		     wsize = N_OUTBUF - hp->n_outbuf) {
-			if (wsize > rsize)
-				wsize = rsize;
-			memcpy(hp->outbuf + hp->n_outbuf, p, wsize);
-			hp->n_outbuf += wsize;
-			hvc_push(hp);
-			rsize -= wsize;
-			p += wsize;
-			written += wsize;
-		}
-		spin_unlock_irqrestore(&hp->lock, flags);
-
-		if (rsize)
-			break;
-
-		if (count < tbsize)
-			tbsize = count;
-	}
-
-	kfree(tbuf);
-
-	return written;
-}
-
 static inline int __hvc_write_kernel(struct hvc_struct *hp,
 				   const unsigned char *buf, int count)
 {
@@ -426,8 +370,7 @@ static inline int __hvc_write_kernel(struct hvc_struct *hp,
 
 	return written;
 }
-static int hvc_write(struct tty_struct *tty, int from_user,
-		     const unsigned char *buf, int count)
+static int hvc_write(struct tty_struct *tty, const unsigned char *buf, int count)
 {
 	struct hvc_struct *hp = tty->driver_data;
 	int written;
@@ -439,10 +382,7 @@ static int hvc_write(struct tty_struct *tty, int from_user,
 	if (hp->count <= 0)
 		return -EIO;
 
-	if (from_user)
-		written = __hvc_write_user(hp, buf, count);
-	else
-		written = __hvc_write_kernel(hp, buf, count);
+	written = __hvc_write_kernel(hp, buf, count);
 
 	/*
 	 * Racy, but harmless, kick thread if there is still pending data.
@@ -641,7 +581,7 @@ char hvc_driver_name[] = "hvc_console";
 
 static struct vio_device_id hvc_driver_table[] __devinitdata= {
 	{"serial", "hvterm1"},
-	{ 0, }
+	{ NULL, }
 };
 MODULE_DEVICE_TABLE(vio, hvc_driver_table);
 

@@ -218,7 +218,7 @@ void epca_setup(char *, int *);
 void console_print(const char *);
 
 static int get_termio(struct tty_struct *, struct termio __user *);
-static int pc_write(struct tty_struct *, int, const unsigned char *, int);
+static int pc_write(struct tty_struct *, const unsigned char *, int);
 int pc_init(void);
 
 #ifdef ENABLE_PCI
@@ -669,7 +669,7 @@ static void pc_hangup(struct tty_struct *tty)
 
 /* ------------------ Begin pc_write  ------------------------- */
 
-static int pc_write(struct tty_struct * tty, int from_user,
+static int pc_write(struct tty_struct * tty,
                     const unsigned char *buf, int bytesAvailable)
 { /* Begin pc_write */
 
@@ -706,162 +706,6 @@ static int pc_write(struct tty_struct * tty, int from_user,
 
 	bc   = ch->brdchan;
 	size = ch->txbufsize;
-
-	if (from_user) 
-	{ /* Begin from_user */
-
-		save_flags(flags);
-		cli();
-
-		globalwinon(ch);
-
-		/* -----------------------------------------------------------------	
-			Anding against size will wrap the pointer back to its beginning 
-			position if it is necessary.  This will only work if size is
-			a power of 2 which should always be the case.  Size is determined 
-			by the cards on board FEP/OS.
-		-------------------------------------------------------------------- */	
-
-		/* head refers to the next empty location in which data may be stored */ 
-
-		head = bc->tin & (size - 1);
-
-		/* tail refers to the next data byte to be transmitted */ 
-
-		tail = bc->tout;
-
-		/* Consider changing this to a do statement to make sure */
-
-		if (tail != bc->tout)
-			tail = bc->tout;
-
-		/* ------------------------------------------------------------------	
-			Anding against size will wrap the pointer back to its beginning 
-			position if it is necessary.  This will only work if size is
-			a power of 2 which should always be the case.  Size is determined 
-			by the cards on board FEP/OS.
-		--------------------------------------------------------------------- */	
-
-		tail &= (size - 1);
-
-		/* -----------------------------------------------------------------
-			Two situations can affect how space in the transmit buffer
-			is calculated.  You can have a situation where the transmit
-			in pointer (tin) head has wrapped around and actually has a 
-			lower address than the transmit out pointer (tout) tail; or
-			the transmit in pointer (tin) head will not be wrapped around
-			yet, and have a higher address than the transmit out pointer
-			(tout) tail.  Obviously space available in the transmit buffer
-			is calculated differently for each case.
-
-			Example 1:
-			
-			Consider a 10 byte buffer where head is a pointer to the next
-			empty location in the buffer and tail is a pointer to the next 
-			byte to transmit.  In this example head will not have wrapped 
-			around and therefore head > tail.  
-
-			0      1      2      3      4      5      6      7      8      9   
-		                tail                               head
-
-			The above diagram shows that buffer locations 2,3,4,5 and 6 have
-			data to be transmitted, while head points at the next empty
-			location.  To calculate how much space is available first we have
-			to determine if the head pointer (tin) has wrapped.  To do this
-			compare the head pointer to the tail pointer,  If head is equal
-			or greater than tail; then it has not wrapped; and the space may
-			be calculated by subtracting tail from head and then subtracting
-			that value from the buffers size.  A one is subtracted from the
-			new value to indicate how much space is available between the 
-			head pointer and end of buffer; as well as the space between the
-			beginning of the buffer and the tail.  If the head is not greater
-			or equal to the tail this indicates that the head has wrapped
-			around to the beginning of the buffer.  To calculate the space 
-			available in this case simply subtract head from tail.  This new 
-			value minus one represents the space available betwwen the head 
-			and tail pointers.  In this example head (7) is greater than tail (2)
-			and therefore has not wrapped around.  We find the space by first
-			subtracting tail from head (7-2=5).  We then subtract this value
-			from the buffer size of ten and subtract one (10-5-1=4).  The space
-			remaining is 4 bytes. 
-
-			Example 2:
-			
-			Consider a 10 byte buffer where head is a pointer to the next
-			empty location in the buffer and tail is a pointer to the next 
-			byte to transmit.  In this example head will wrapped around and 
-			therefore head < tail.  
-
-			0      1      2      3      4      5      6      7      8      9   
-		                head                               tail
-
-			The above diagram shows that buffer locations 7,8,9,0 and 1 have
-			data to be transmitted, while head points at the next empty
-			location.  To find the space available we compare head to tail.  If
-			head is not equal to, or greater than tail this indicates that head
-			has wrapped around. In this case head (2) is not equal to, or
-			greater than tail (7) and therefore has already wrapped around.  To
-			calculate the available space between the two pointers we subtract
-			head from tail (7-2=5).  We then subtract one from this new value
-			(5-1=4).  We have 5 bytes empty remaining in the buffer.  Unlike the
-			previous example these five bytes are located between the head and
-			tail pointers. 
-
-		----------------------------------------------------------------------- */
-
-		dataLen = (head >= tail) ? (size - (head - tail) - 1) : (tail - head - 1);
-
-		/* ----------------------------------------------------------------------
-			In this case bytesAvailable has been passed into pc_write and
-			represents the amount of data that needs to be written.  dataLen
-			represents the amount of space available on the card.  Whichever
-			value is smaller will be the amount actually written. 
-			bytesAvailable will then take on this newly calculated value.
-		---------------------------------------------------------------------- */
-
-		bytesAvailable = min(dataLen, bytesAvailable);
-
-		/* First we read the data in from the file system into a temp buffer */
-
-		memoff(ch);
-		restore_flags(flags);
-
-		if (bytesAvailable) 
-		{ /* Begin bytesAvailable */
-			/* ---------------------------------------------------------------
-				The below function reads data from user memory.  This routine
-				can not be used in an interrupt routine. (Because it may 
-				generate a page fault)  It can only be called while we can the
-				user context is accessible. 
-
-				The prototype is :
-				inline void copy_from_user(void * to, const void * from,
-							  unsigned long count);
-
-				I also think (Check hackers guide) that optimization must
-				be turned ON.  (Which sounds strange to me...)
-
-				Remember copy_from_user WILL generate a page fault if the
-				user memory being accessed has been swapped out.  This can
-				cause this routine to temporarily sleep while this page
-				fault is occurring.
-			
-			----------------------------------------------------------------- */
-
-			if (copy_from_user(ch->tmp_buf, buf,
-					   bytesAvailable))
-				return -EFAULT;
-		} /* End bytesAvailable */
-
-		/* ------------------------------------------------------------------ 
-			Set buf to this address for the moment.  tmp_buf was allocated in
-			post_fep_init.
-		--------------------------------------------------------------------- */
-		buf = ch->tmp_buf;
-
-	} /* End from_user */
-
-	/* All data is now local */
 
 	amountCopied = 0;
 	save_flags(flags);
@@ -953,7 +797,7 @@ static void pc_put_char(struct tty_struct *tty, unsigned char c)
 { /* Begin pc_put_char */
 
    
-	pc_write(tty, 0, &c, 1);
+	pc_write(tty, &c, 1);
 	return;
 
 } /* End pc_put_char */

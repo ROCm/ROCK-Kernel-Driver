@@ -482,7 +482,7 @@ static unsigned long stl_atol(char *str);
 int		stl_init(void);
 static int	stl_open(struct tty_struct *tty, struct file *filp);
 static void	stl_close(struct tty_struct *tty, struct file *filp);
-static int	stl_write(struct tty_struct *tty, int from_user, const unsigned char *buf, int count);
+static int	stl_write(struct tty_struct *tty, const unsigned char *buf, int count);
 static void	stl_putchar(struct tty_struct *tty, unsigned char ch);
 static void	stl_flushchars(struct tty_struct *tty);
 static int	stl_writeroom(struct tty_struct *tty);
@@ -1220,7 +1220,7 @@ static void stl_close(struct tty_struct *tty, struct file *filp)
  *	If transmit interrupts are not running then start them.
  */
 
-static int stl_write(struct tty_struct *tty, int from_user, const unsigned char *buf, int count)
+static int stl_write(struct tty_struct *tty, const unsigned char *buf, int count)
 {
 	stlport_t	*portp;
 	unsigned int	len, stlen;
@@ -1228,8 +1228,8 @@ static int stl_write(struct tty_struct *tty, int from_user, const unsigned char 
 	char		*head, *tail;
 
 #ifdef DEBUG
-	printk("stl_write(tty=%x,from_user=%d,buf=%x,count=%d)\n",
-		(int) tty, from_user, (int) buf, count);
+	printk("stl_write(tty=%x,buf=%x,count=%d)\n",
+		(int) tty, (int) buf, count);
 #endif
 
 	if ((tty == (struct tty_struct *) NULL) ||
@@ -1248,18 +1248,6 @@ static int stl_write(struct tty_struct *tty, int from_user, const unsigned char 
  *	copy it into the TX buffer.
  */
 	chbuf = (unsigned char *) buf;
-	if (from_user) {
-		head = portp->tx.head;
-		tail = portp->tx.tail;
-		len = (head >= tail) ? (STL_TXBUFSIZE - (head - tail) - 1) :
-			(tail - head - 1);
-		count = MIN(len, count);
-		
-		down(&stl_tmpwritesem);
-		if (copy_from_user(stl_tmpwritebuf, chbuf, count)) 
-			return -EFAULT;
-		chbuf = &stl_tmpwritebuf[0];
-	}
 
 	head = portp->tx.head;
 	tail = portp->tx.tail;
@@ -1289,9 +1277,6 @@ static int stl_write(struct tty_struct *tty, int from_user, const unsigned char 
 
 	clear_bit(ASYI_TXLOW, &portp->istate);
 	stl_startrxtx(portp, -1, 1);
-
-	if (from_user)
-		up(&stl_tmpwritesem);
 
 	return(count);
 }

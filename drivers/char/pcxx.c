@@ -570,7 +570,7 @@ void pcxe_hangup(struct tty_struct *tty)
 
 
 
-static int pcxe_write(struct tty_struct * tty, int from_user, const unsigned char *buf, int count)
+static int pcxe_write(struct tty_struct * tty, const unsigned char *buf, int count)
 {
 	struct channel *ch;
 	volatile struct board_chan *bc;
@@ -584,33 +584,6 @@ static int pcxe_write(struct tty_struct * tty, int from_user, const unsigned cha
 
 	bc = ch->brdchan;
 	size = ch->txbufsize;
-
-	if (from_user) {
-
-		down(&ch->tmp_buf_sem);
-		save_flags(flags);
-		cli();
-		globalwinon(ch);
-		head = bc->tin & (size - 1);
-		/* It seems to be necessary to make sure that the value is stable here somehow
-		   This is a rather odd pice of code here. */
-		do
-		{
-			tail = bc->tout;
-		} while (tail != bc->tout);
-		
-		tail &= (size - 1);
-		stlen = (head >= tail) ? (size - (head - tail) - 1) : (tail - head - 1);
-		count = min(stlen, count);
-		memoff(ch);
-		restore_flags(flags);
-
-		if (count)
-			if (copy_from_user(ch->tmp_buf, buf, count))
-				count = 0;
-
-		buf = ch->tmp_buf;
-	}
 
 	/*
 	 * All data is now local
@@ -658,9 +631,6 @@ static int pcxe_write(struct tty_struct * tty, int from_user, const unsigned cha
 	memoff(ch);
 	restore_flags(flags);
 	
-	if(from_user)
-		up(&ch->tmp_buf_sem);
-
 	return(total);
 }
 

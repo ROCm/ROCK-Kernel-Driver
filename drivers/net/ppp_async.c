@@ -254,7 +254,7 @@ ppp_asynctty_read(struct tty_struct *tty, struct file *file,
  */
 static ssize_t
 ppp_asynctty_write(struct tty_struct *tty, struct file *file,
-		   const unsigned char __user *buf, size_t count)
+		   const unsigned char *buf, size_t count)
 {
 	return -EAGAIN;
 }
@@ -673,7 +673,7 @@ ppp_async_push(struct asyncppp *ap)
 		if (!tty_stuffed && ap->optr < ap->olim) {
 			avail = ap->olim - ap->optr;
 			set_bit(TTY_DO_WRITE_WAKEUP, &tty->flags);
-			sent = tty->driver->write(tty, 0, ap->optr, avail);
+			sent = tty->driver->write(tty, ap->optr, avail);
 			if (sent < 0)
 				goto flush;	/* error, e.g. loss of CD */
 			ap->optr += sent;
