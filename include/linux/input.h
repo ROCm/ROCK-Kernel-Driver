@@ -482,6 +482,9 @@ struct input_absinfo {
 #define REL_X			0x00
 #define REL_Y			0x01
 #define REL_Z			0x02
+#define REL_RX			0x03
+#define REL_RY			0x04
+#define REL_RZ			0x05
 #define REL_HWHEEL		0x06
 #define REL_DIAL		0x07
 #define REL_WHEEL		0x08

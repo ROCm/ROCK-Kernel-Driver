@@ -1313,7 +1313,7 @@ void hid_init_reports(struct hid_device *hid)
 	struct hid_report_enum *report_enum;
 	struct hid_report *report;
 	struct list_head *list;
-	int err, ret;
+	int err, ret, size;
 
 	/*
 	 * The Set_Idle request is supposed to affect only the
@@ -1336,6 +1336,10 @@ void hid_init_reports(struct hid_device *hid)
 	list = report_enum->report_list.next;
 	while (list != &report_enum->report_list) {
 		report = (struct hid_report *) list;
+		size = ((report->size - 1) >> 3) + 1 + report_enum->numbered;
+		if (size > HID_BUFFER_SIZE) size = HID_BUFFER_SIZE;
+		if (size > hid->urbin->transfer_buffer_length)
+			hid->urbin->transfer_buffer_length = size;
 		hid_submit_report(hid, report, USB_DIR_IN);
 		list = list->next;
 	}
@@ -1535,8 +1539,8 @@ static struct hid_blacklist {
 	{ USB_VENDOR_ID_ATEN, USB_DEVICE_ID_ATEN_4PORTKVMC, HID_QUIRK_NOGET },
 	{ USB_VENDOR_ID_TANGTOP, USB_DEVICE_ID_TANGTOP_USBPS2, HID_QUIRK_NOGET },
 
-	{ USB_VENDOR_ID_A4TECH, USB_DEVICE_ID_A4TECH_WCP32PU, HID_QUIRK_2WHEEL_MOUSE_HACK_BACK },
-	{ USB_VENDOR_ID_CYPRESS, USB_DEVICE_ID_CYPRESS_MOUSE, HID_QUIRK_2WHEEL_MOUSE_HACK_EXTRA },
+	{ USB_VENDOR_ID_A4TECH, USB_DEVICE_ID_A4TECH_WCP32PU, HID_QUIRK_2WHEEL_MOUSE_HACK_7 },
+	{ USB_VENDOR_ID_CYPRESS, USB_DEVICE_ID_CYPRESS_MOUSE, HID_QUIRK_2WHEEL_MOUSE_HACK_5 },
 
 	{ USB_VENDOR_ID_ALPS, USB_DEVICE_ID_IBM_GAMEPAD, HID_QUIRK_BADPAD },
 	{ USB_VENDOR_ID_CHIC, USB_DEVICE_ID_CHIC_GAMEPAD, HID_QUIRK_BADPAD },
@@ -1657,17 +1661,12 @@ static struct hid_device *usb_hid_configure(struct usb_interface *intf)
 			interval = 1 << (interval - 1);
 
 		if (endpoint->bEndpointAddress & USB_DIR_IN) {
-			int len;
-
 			if (hid->urbin)
 				continue;
 			if (!(hid->urbin = usb_alloc_urb(0, GFP_KERNEL)))
 				goto fail;
 			pipe = usb_rcvintpipe(dev, endpoint->bEndpointAddress);
-			len = usb_maxpacket(dev, pipe, 0);
-			if (len > HID_BUFFER_SIZE)
-				len = HID_BUFFER_SIZE;
-			usb_fill_int_urb(hid->urbin, dev, pipe, hid->inbuf, len,
+			usb_fill_int_urb(hid->urbin, dev, pipe, hid->inbuf, 0,
 					 hid_irq_in, hid, interval);
 			hid->urbin->transfer_dma = hid->inbuf_dma;
 			hid->urbin->transfer_flags |=(URB_NO_TRANSFER_DMA_MAP | URB_ASYNC_UNLINK);
