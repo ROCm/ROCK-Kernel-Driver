@@ -749,7 +749,7 @@ S:	Maintained
 
 DRIVER CORE, KOBJECTS, AND SYSFS
 P:	Greg Kroah-Hartman
-M:	greg@kroah.com
+M:	gregkh@suse.de
 L:	linux-kernel@vger.kernel.org
 S:	Supported
 
@@ -1744,14 +1744,14 @@ S:	Maintained
 
 PCI SUBSYSTEM
 P:	Greg Kroah-Hartman
-M:	greg@kroah.com
+M:	gregkh@suse.de
 L:	linux-kernel@vger.kernel.org
 L:	linux-pci@atrey.karlin.mff.cuni.cz
 S:	Supported
 
 PCI HOTPLUG CORE
 P:	Greg Kroah-Hartman
-M:	greg@kroah.com
+M:	gregkh@suse.de
 S:	Supported
 
 PCI HOTPLUG COMPAQ DRIVER
@@ -2386,11 +2386,10 @@ S:	Maintained
 
 USB SERIAL DRIVER
 P:	Greg Kroah-Hartman
-M:	greg@kroah.com
+M:	gregkh@suse.de
 L:	linux-usb-users@lists.sourceforge.net
 L:	linux-usb-devel@lists.sourceforge.net
-S:	Maintained
-W:	http://www.kroah.com/linux-usb/
+S:	Supported
 
 USB SERIAL BELKIN F5U103 DRIVER
 P:	William Greathouse
@@ -2452,7 +2451,7 @@ S:	Maintained
 
 USB SUBSYSTEM
 P:	Greg Kroah-Hartman
-M:	greg@kroah.com
+M:	gregkh@suse.de
 L:	linux-usb-users@lists.sourceforge.net
 L:	linux-usb-devel@lists.sourceforge.net
 W:	http://www.linux-usb.org
