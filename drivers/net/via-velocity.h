@@ -1733,8 +1733,7 @@ struct velocity_opt {
 };
 
 struct velocity_info {
-	struct velocity_info *next;
-	struct velocity_info *prev;
+	struct list_head list;
 
 	struct pci_dev *pdev;
 	struct net_device *dev;
