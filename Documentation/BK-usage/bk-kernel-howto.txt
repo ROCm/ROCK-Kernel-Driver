@@ -33,7 +33,7 @@ land at the right destination... but I'm getting ahead of myself.
 Let's start with this progression:
 Each BitKeeper source tree on disk is a repository unto itself.
 Each repository has a parent.
-Each repository contains a set of a changsets ("csets").
+Each repository contains a set of a changesets ("csets").
 Each cset is one or more changed files, bundled together.
 
 Each tree is a repository, so all changes are checked into the local
@@ -44,7 +44,7 @@ lines of development.  These changesets are the bread and butter of
 the BK system.
 
 After the concept of changesets, the next thing you need to get used
-to having multiple copies of source trees lying around.  This -really-
+to is having multiple copies of source trees lying around.  This -really-
 takes some getting used to, for some people.  Separate source trees
 are the means in BitKeeper by which you delineate parallel lines
 of development, both minor and major.  What would be branches in
@@ -155,7 +155,7 @@ Small development branches (clones) will appear and disappear:
 
 While long-term branches will parallel a tree (or trees), with period
 merge points.  In this first example, we pull from a tree (pulls,
-"\") periodically, such a what occurs when tracking changes in a
+"\") periodically, such as what occurs when tracking changes in a
 vendor tree, never pushing changes back up the line:
 
 	-------- A --------- B --------- C --------- D -------
@@ -187,7 +187,7 @@ course).
 
 0) Make sure your tree was originally cloned from the linux-2.5 tree
 created by Linus.  If your tree does not have this as its ancestor, it
-is impossible to reliably exchanges changesets.
+is impossible to reliably exchange changesets.
 
 
 
@@ -232,7 +232,7 @@ lessen any potential merge work Linus may need to do.
 4) Split up your changes.  Each maintainer<->Linus situation is likely
 to be slightly different here, so take this just as general advice.  The
 author splits up changes according to "themes" when merging with Linus.
-Simultaneous pushes from local development to goes special trees which
+Simultaneous pushes from local development go to special trees which
 exist solely to house changes "queued" for Linus.  Example of the trees:
 
 	net-drivers-2.5 -- on-going net driver maintenance
