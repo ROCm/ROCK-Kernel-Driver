@@ -178,10 +178,11 @@
 #define PF_HP_SBP		0x08000000
 
 /*
- * The following definitions are those for 32-bit ELF binaries on a 32-bit kernel
- * and for 64-bit binaries on a 64-bit kernel.  To run 32-bit binaries on a 64-bit
- * kernel, arch/parisc64/kernel/binfmt_elf32.c defines these macros appropriately
- * and then #includes binfmt_elf.c, which then includes this file.
+ * The following definitions are those for 32-bit ELF binaries on a 32-bit
+ * kernel and for 64-bit binaries on a 64-bit kernel.  To run 32-bit binaries
+ * on a 64-bit kernel, arch/parisc64/kernel/binfmt_elf32.c defines these
+ * macros appropriately and then #includes binfmt_elf.c, which then includes
+ * this file.
  */
 #ifndef ELF_CLASS
 
@@ -266,6 +267,8 @@ typedef elf_greg_t elf_gregset_t[ELF_NGREG];
 #define ELF_NFPREG 32
 typedef double elf_fpreg_t;
 typedef elf_fpreg_t elf_fpregset_t[ELF_NFPREG];
+
+struct task_struct;
 
 extern int dump_task_fpu (struct task_struct *, elf_fpregset_t *);
 #define ELF_CORE_COPY_FPREGS(tsk, elf_fpregs) dump_task_fpu(tsk, elf_fpregs)

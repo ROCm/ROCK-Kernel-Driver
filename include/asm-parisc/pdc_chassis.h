@@ -35,7 +35,7 @@
  */
 
 int pdc_chassis_send_status(int message);
-void __init parisc_pdc_chassis_init(void);
+void parisc_pdc_chassis_init(void);
 
 
 /*

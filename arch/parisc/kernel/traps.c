@@ -114,6 +114,12 @@ void show_regs(struct pt_regs *regs)
 	printk("%s CPU: %8d   CR30: " RFMT " CR31: " RFMT "\n",
 	       level, current_thread_info()->cpu, cr30, cr31);
 	printk("%s ORIG_R28: " RFMT "\n", level, regs->orig_r28);
+	printk(level);
+	print_symbol(" IAOQ[0]: %s\n", regs->iaoq[0]);
+	printk(level);
+	print_symbol(" IAOQ[1]: %s\n", regs->iaoq[1]);
+	printk(level);
+	print_symbol(" RP(r2): %s\n", regs->gr[2]);
 }
 
 
