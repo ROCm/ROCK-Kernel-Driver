@@ -194,9 +194,14 @@ nfsd4_putfh(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_putf
 static inline int
 nfsd4_putrootfh(struct svc_rqst *rqstp, struct svc_fh *current_fh)
 {
+	int status;
+
 	fh_put(current_fh);
-	return exp_pseudoroot(rqstp->rq_client, current_fh,
+	status = exp_pseudoroot(rqstp->rq_client, current_fh,
 			      &rqstp->rq_chandle);
+	if (!status)
+		status = nfsd_setuser(rqstp, current_fh->fh_export);
+	return status;
 }
 
 static inline int
