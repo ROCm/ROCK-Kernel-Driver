@@ -404,8 +404,7 @@ supported(struct module *mod)
 	char *line, *basename;
 
 	/* In a first shot, do a simple linear scan. */
-	while ((line = get_next_line(&pos, supp.file,
-				     supp.size))) {
+	while ((line = get_next_line(&pos, supp.file, supp.size))) {
 		basename = strrchr(mod->name, '/');
 		if (!basename)
 			basename = line;

@@ -327,8 +327,11 @@ can be ORed together:
 
 unsupported:
 
-If set to a zero, the kernel will refuse to load kernel
-modules without the supported flag.
+Allow to load unsupported kernel modules:
+
+  0 - refuse to load unsupported modules,
+  1 - warn when loading unsupported modules,
+  2 - don't warn.
 
 ==============================================================
 

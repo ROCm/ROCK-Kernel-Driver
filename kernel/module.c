@@ -58,15 +58,18 @@
 	(strcmp(MODULE_SYMBOL_PREFIX literal, (string)) == 0)
 
 /* Allow unsupported modules switch. */ 
-int unsupported = 1;  /* default to be permissive. */
+#ifdef UNSUPPORTED_MODULES
+int unsupported = UNSUPPORTED_MODULES;
+#else
+int unsupported = 2;  /* don't warn when loading unsupported modules. */
+#endif
 
-static int __init supported_setup(char *str)
+static int __init unsupported_setup(char *str)
 {
-	unsupported = 0;
-	printk("Allow loading of supported modules only.\n");
+	get_option(&str, &unsupported);
 	return 1;
 }
-__setup("supported", supported_setup);
+__setup("unsupported=", unsupported_setup);
 
 /* Protects module list */
 static spinlock_t modlist_lock = SPIN_LOCK_UNLOCKED;
@@ -1438,17 +1441,19 @@ static struct module *load_module(void __user *umod,
 
 	supported = get_modinfo(sechdrs, infoindex, "supported");
 	if (!supported || strcmp(supported, "yes")) {
-		if (!unsupported) {
+		if (unsupported == 0) {
 			printk(KERN_WARNING "%s: unsupported module, refusing "
 			       "to load. To override, echo "
-			       "1 > /proc/sys/kernel/unsupported.\n",
+			       "1 > /proc/sys/kernel/unsupported\n",
 			       mod->name);
 			err = -ENOEXEC;
 			goto free_hdr;
 		}
 		tainted |= TAINT_UNSUPPORTED;
-		printk(KERN_WARNING "%s: unsupported module, tainting "
-		       "kernel.\n", mod->name);
+		if (unsupported == 1) {
+			printk(KERN_WARNING "%s: unsupported module, tainting "
+			       "kernel.\n", mod->name);
+		}
 	}
 
 	/* Now copy in args */

@@ -318,21 +318,81 @@ prohibited_mr_events(
 	struct prio_tree_iter iter;
 	int		prohibited = 0;
 	dm_off_t	rgnbeg = rgn->rg_offset;
-	dm_off_t	rgnend = rgnbeg + rgn->rg_size;
-
-	if (prio_tree_empty(&ip->i_mapping->i_mmap))
-		return 0;
+	dm_off_t	rgnend = rgn->rg_size ? rgnbeg + rgn->rg_size
+					      : ip->i_size;
+	dm_off_t	mmbeg;
+	dm_off_t	mmend;
 
 	mapping = ip->i_mapping;
 
 	down(&mapping->i_shared_sem);
-	vma = __vma_prio_tree_first(&mapping->i_mmap_shared, &iter,
-				    rgnbeg, rgnend);
-	if (vma) {
-		prohibited = 1 << DM_EVENT_READ;
+	if (!prio_tree_empty(&mapping->i_mmap)) {
+		vma = __vma_prio_tree_first(&mapping->i_mmap, &iter,
+					    0, ip->i_size);
+
+		while (vma) {
+			/* SPECIAL CASE: all events prohibited if any mmap
+			 * areas with VM_EXEC
+			 */
+			if (vma->vm_flags & VM_EXEC) {
+				prohibited |= ((1 << DM_EVENT_READ) |
+					       (1 << DM_EVENT_WRITE) |
+					       (1 << DM_EVENT_TRUNCATE));
+				break;
+			}
+
+			mmbeg = vma->vm_pgoff * PAGE_SIZE;
+			mmend = mmbeg + (vma->vm_end - vma->vm_start);
+
+			/* Region intersects memory-mapped area */
+			if (((rgnbeg > mmbeg) && (rgnbeg < mmend)) || 
+			    ((rgnend > mmbeg) && (rgnend < mmend)) || 
+			    ((rgnbeg <= mmbeg) && (rgnend >= mmend))) {
+				if (vma->vm_flags & VM_READ) {
+					prohibited |= 1 << DM_EVENT_READ;
+				}
+				if (vma->vm_flags & VM_WRITE) {
+					prohibited |= 1 << DM_EVENT_WRITE;
+				}
+			}
+
+			vma = __vma_prio_tree_next(vma, &mapping->i_mmap, 
+						   &iter, 0, ip->i_size);
+		}
+	}
+	if (!prio_tree_empty(&mapping->i_mmap_shared)) {
+		vma = __vma_prio_tree_first(&mapping->i_mmap_shared, &iter,
+					    0, ip->i_size);
 		
-		if (!(vma->vm_flags & VM_DENYWRITE)) {
-			prohibited |= 1 << DM_EVENT_WRITE;
+		while (vma) {
+			/* SPECIAL CASE: all events prohibited if any mmap
+			 * areas with VM_EXEC
+			 */
+			if (vma->vm_flags & VM_EXEC) {
+				prohibited |= ((1 << DM_EVENT_READ) |
+					       (1 << DM_EVENT_WRITE) |
+					       (1 << DM_EVENT_TRUNCATE));
+				break;
+			}
+
+			mmbeg = vma->vm_pgoff * PAGE_SIZE;
+			mmend = mmbeg + (vma->vm_end - vma->vm_start);
+
+			/* Region intersects memory-mapped area */
+			if (((rgnbeg > mmbeg) && (rgnbeg < mmend)) || 
+			    ((rgnend > mmbeg) && (rgnend < mmend)) || 
+			    ((rgnbeg <= mmbeg) && (rgnend >= mmend))) {
+				if (vma->vm_flags & VM_READ) {
+					prohibited |= 1 << DM_EVENT_READ;
+				}
+				if (vma->vm_flags & VM_WRITE) {
+					prohibited |= 1 << DM_EVENT_WRITE;
+				}
+			}
+
+			vma = __vma_prio_tree_next(vma, 
+						   &mapping->i_mmap_shared, 
+						   &iter, 0, ip->i_size);
 		}
 	}
 	up(&mapping->i_shared_sem);
@@ -2391,14 +2451,21 @@ jfs_dm_punch_hole(
 	loff_t		realsize;
 	tid_t		tid;
 	int		error = 0;
+#ifndef DM_SUPPORT_ONE_MANAGED_REGION
+	dm_region_t	rgn = { .rg_offset = off, .rg_size = len };
+#endif
 
 	if (right < DM_RIGHT_EXCL)
 		return(-EACCES);
 
 	if (!S_ISREG(ip->i_mode))
 		return(-EINVAL);
-	if (!prio_tree_empty(&ip->i_mapping->i_mmap))
+#ifdef DM_SUPPORT_ONE_MANAGED_REGION
+	if (prohibited_mr_events(ip))
+#else		
+	if (prohibited_mr_events(ip, &rgn))
 		return(-EBUSY);
+#endif	
 
 	IWRITE_LOCK(ip);
 
