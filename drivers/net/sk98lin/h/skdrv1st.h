@@ -2,6 +2,8 @@
  *
  * Name:	skdrv1st.h
  * Project:	GEnesis, PCI Gigabit Ethernet Adapter
+ * Version:	$Revision: 1.4 $
+ * Date:	$Date: 2003/11/12 14:28:14 $
  * Purpose:	First header file for driver and all other modules
  *
  ******************************************************************************/

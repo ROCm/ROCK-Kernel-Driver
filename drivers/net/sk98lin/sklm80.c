@@ -2,6 +2,8 @@
  *
  * Name:	sklm80.c
  * Project:	Gigabit Ethernet Adapters, TWSI-Module
+ * Version:	$Revision: 1.22 $
+ * Date:	$Date: 2003/10/20 09:08:21 $
  * Purpose:	Functions to access Voltage and Temperature Sensor (LM80)
  *
  ******************************************************************************/

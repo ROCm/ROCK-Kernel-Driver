@@ -2,6 +2,8 @@
  *
  * Name:	skxmac2.c
  * Project:	Gigabit Ethernet Adapters, Common Modules
+ * Version:	$Revision: 1.102 $
+ * Date:	$Date: 2003/10/02 16:53:58 $
  * Purpose:	Contains functions to initialize the MACs and PHYs
  *
  ******************************************************************************/

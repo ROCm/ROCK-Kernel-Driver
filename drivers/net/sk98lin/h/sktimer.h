@@ -2,6 +2,8 @@
  *
  * Name:	sktimer.h
  * Project:	Gigabit Ethernet Adapters, Event Scheduler Module
+ * Version:	$Revision: 1.11 $
+ * Date:	$Date: 2003/09/16 12:58:18 $
  * Purpose:	Defines for the timer functions
  *
  ******************************************************************************/
