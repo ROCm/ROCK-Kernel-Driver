@@ -1872,6 +1872,7 @@ static int snd_cmipci_playback_open(snd_pcm_substream_t *substream)
 		return err;
 	runtime->hw = snd_cmipci_playback;
 	snd_pcm_hw_constraint_minmax(runtime, SNDRV_PCM_HW_PARAM_BUFFER_SIZE, 0, 0x10000);
+	cm->dig_pcm_status = cm->dig_status;
 	return 0;
 }
 
