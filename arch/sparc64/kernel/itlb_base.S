@@ -59,7 +59,7 @@ sparc64_realfault_common:				! Called by TL0 dtlb_miss too
 
 /* ITLB ** ICACHE line 3: Finish faults + window fixups	*/
 	call		do_sparc64_fault		! Call fault handler
-	 add		%sp, STACK_BIAS + REGWIN_SZ, %o0! Compute pt_regs arg
+	 add		%sp, PTREGS_OFF, %o0! Compute pt_regs arg
 	ba,pt		%xcc, rtrap_clr_l6		! Restore cpu state
 	 nop
 winfix_trampoline:

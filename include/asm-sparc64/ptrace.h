@@ -89,11 +89,9 @@ struct sparc_trapf {
 
 #define TRACEREG_SZ	sizeof(struct pt_regs)
 #define STACKFRAME_SZ	sizeof(struct sparc_stackf)
-#define REGWIN_SZ	sizeof(struct reg_window)
 
 #define TRACEREG32_SZ	sizeof(struct pt_regs32)
 #define STACKFRAME32_SZ	sizeof(struct sparc_stackf32)
-#define REGWIN32_SZ	sizeof(struct reg_window32)
 
 #ifdef __KERNEL__
 #define user_mode(regs) (!((regs)->tstate & TSTATE_PRIV))
@@ -105,11 +103,9 @@ extern void show_regs(struct pt_regs *);
 /* For assembly code. */
 #define TRACEREG_SZ		0xa0
 #define STACKFRAME_SZ		0xc0
-#define REGWIN_SZ		0x80
 
 #define TRACEREG32_SZ		0x50
 #define STACKFRAME32_SZ		0x60
-#define REGWIN32_SZ		0x40
 #endif
 
 #ifdef __KERNEL__

@@ -34,7 +34,7 @@ solaris_syscall_trace:
 	be,pt		%icc, 2f
 	 srl		%i2, 0, %o2
 	b,pt		%xcc, 2f
-	 add		%sp, STACK_BIAS + REGWIN_SZ, %o0
+	 add		%sp, PTREGS_OFF, %o0
 
 solaris_sucks:
 /* Solaris is a big system which needs to be able to do all the things
@@ -91,7 +91,7 @@ entry64_personality_patch:
 	 sethi		%hi(sys_call_table32), %l6
 	andcc		%l3, 1, %g0
 	bne,a,pn	%icc, 10f
-	 add		%sp, STACK_BIAS + REGWIN_SZ, %o0
+	 add		%sp, PTREGS_OFF, %o0
 10:	srl		%i2, 0, %o2
 	mov		%i5, %o5
 	andn		%l3, 3, %l7
@@ -101,11 +101,11 @@ entry64_personality_patch:
 2:	call		%l7
 	 srl		%i3, 0, %o3
 ret_from_solaris:
-	stx		%o0, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_I0]
+	stx		%o0, [%sp + PTREGS_OFF + PT_V9_I0]
 	ldx		[%g6 + TI_FLAGS], %l6
 	sra		%o0, 0, %o0
 	mov		%ulo(TSTATE_XCARRY | TSTATE_ICARRY), %g2
-	ldx		[%sp + STACK_BIAS + REGWIN_SZ + PT_V9_TSTATE], %g3
+	ldx		[%sp + PTREGS_OFF + PT_V9_TSTATE], %g3
 	cmp		%o0, -ENOIOCTLCMD
 	sllx		%g2, 32, %g2
 	bgeu,pn		%xcc, 1f
@@ -113,21 +113,21 @@ ret_from_solaris:
 
 	/* System call success, clear Carry condition code. */
 	andn		%g3, %g2, %g3
-	stx		%g3, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_TSTATE]	
+	stx		%g3, [%sp + PTREGS_OFF + PT_V9_TSTATE]	
 	bne,pn		%icc, solaris_syscall_trace2
-	 ldx		[%sp + STACK_BIAS + REGWIN_SZ + PT_V9_TNPC], %l1
+	 ldx		[%sp + PTREGS_OFF + PT_V9_TNPC], %l1
 	andcc		%l1, 1, %g0
 	bne,pn		%icc, 2f
 	 clr		%l6
 	add		%l1, 0x4, %l2				         
-	stx		%l1, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_TPC]	 ! pc = npc
+	stx		%l1, [%sp + PTREGS_OFF + PT_V9_TPC]	 ! pc = npc
 	call		rtrap
-	 stx		%l2, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_TNPC] !npc = npc+4
+	 stx		%l2, [%sp + PTREGS_OFF + PT_V9_TNPC] !npc = npc+4
 
 	/* When tnpc & 1, this comes from setcontext and we don't want to advance pc */
 2:	andn		%l1, 3, %l1
 	call		rtrap
-	 stx		%l1, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_TNPC] !npc = npc&~3
+	 stx		%l1, [%sp + PTREGS_OFF + PT_V9_TNPC] !npc = npc&~3
 
 1:
 	/* System call failure, set Carry condition code.
@@ -143,17 +143,17 @@ ret_from_solaris:
 	sll		%o0, 2, %o0
 	or		%l6, %lo(solaris_err_table), %l6
 	ldsw		[%l6 + %o0], %o0
-1:	stx		%o0, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_I0]
+1:	stx		%o0, [%sp + PTREGS_OFF + PT_V9_I0]
 	mov		1, %l6
-	stx		%g3, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_TSTATE]
+	stx		%g3, [%sp + PTREGS_OFF + PT_V9_TSTATE]
 	bne,pn		%icc, solaris_syscall_trace2
-	 ldx		[%sp + STACK_BIAS + REGWIN_SZ + PT_V9_TNPC], %l1
+	 ldx		[%sp + PTREGS_OFF + PT_V9_TNPC], %l1
 	andcc		%l1, 1, %g0
 	bne,pn		%icc, 2b
 	 add		%l1, 0x4, %l2
-	stx		%l1, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_TPC]  ! pc = npc
+	stx		%l1, [%sp + PTREGS_OFF + PT_V9_TPC]  ! pc = npc
 	call		rtrap
-	 stx		%l2, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_TNPC] !npc = npc+4 
+	 stx		%l2, [%sp + PTREGS_OFF + PT_V9_TNPC] !npc = npc+4 
 
 solaris_syscall_trace2:
 	call		syscall_trace
@@ -161,9 +161,9 @@ solaris_syscall_trace2:
 	andcc		%l1, 1, %g0
 	bne,pn		%icc, 2b
 	 nop
-	stx		%l1, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_TPC]
+	stx		%l1, [%sp + PTREGS_OFF + PT_V9_TPC]
 	call		rtrap
-	 stx		%l2, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_TNPC]
+	 stx		%l2, [%sp + PTREGS_OFF + PT_V9_TNPC]
 
 	/* This one is tricky, so that's why we do it in assembly */
 	.globl		solaris_sigsuspend
@@ -173,14 +173,14 @@ solaris_sigsuspend:
 	brlz,pn		%o0, ret_from_solaris
 	 nop
 	call		sys_sigsuspend
-	 stx		%o0, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_I0]
+	 stx		%o0, [%sp + PTREGS_OFF + PT_V9_I0]
 
 	.globl		solaris_getpid
 solaris_getpid:
 	call		sys_getppid
 	 nop
 	call		sys_getpid
-	 stx		%o0, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_I1]
+	 stx		%o0, [%sp + PTREGS_OFF + PT_V9_I1]
 	b,pt		%xcc, ret_from_solaris
 	 nop
 
@@ -189,7 +189,7 @@ solaris_getuid:
 	call		sys_geteuid
 	 nop
 	call		sys_getuid
-	 stx		%o1, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_I1]
+	 stx		%o1, [%sp + PTREGS_OFF + PT_V9_I1]
 	b,pt		%xcc, ret_from_solaris
 	 nop
 
@@ -198,14 +198,14 @@ solaris_getgid:
 	call		sys_getegid
 	 nop
 	call		sys_getgid
-	 stx		%o1, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_I1]
+	 stx		%o1, [%sp + PTREGS_OFF + PT_V9_I1]
 	b,pt		%xcc, ret_from_solaris
 	 nop
 
 	.globl		solaris_unimplemented
 solaris_unimplemented:
 	call		do_sol_unimplemented
-	 add		%sp, STACK_BIAS + REGWIN_SZ, %o0
+	 add		%sp, PTREGS_OFF, %o0
 	ba,pt		%xcc, ret_from_solaris
 	 nop
 

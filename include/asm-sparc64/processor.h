@@ -139,7 +139,7 @@ do { \
 	"stx		%%g0, [%0 + %2 + 0x78]\n\t" \
 	"wrpr		%%g0, (1 << 3), %%wstate\n\t" \
 	: \
-	: "r" (regs), "r" (sp - REGWIN_SZ - STACK_BIAS), \
+	: "r" (regs), "r" (sp - sizeof(struct reg_window) - STACK_BIAS), \
 	  "i" ((const unsigned long)(&((struct pt_regs *)0)->u_regs[0]))); \
 } while (0)
 
@@ -179,7 +179,7 @@ do { \
 	"stx		%%g0, [%0 + %2 + 0x78]\n\t" \
 	"wrpr		%%g0, (2 << 3), %%wstate\n\t" \
 	: \
-	: "r" (regs), "r" (sp - REGWIN32_SZ), \
+	: "r" (regs), "r" (sp - sizeof(struct reg_window32)), \
 	  "i" ((const unsigned long)(&((struct pt_regs *)0)->u_regs[0]))); \
 } while (0)
 
