@@ -72,9 +72,6 @@ so this is not actually a restriction.
 static u32 batps;	/* limit on the number of p states when on battery */
 			/* - set by BIOS in the PSB/PST                    */
 
-#define SEARCH_UP     1
-#define SEARCH_DOWN   0
-
  /* Return a frequency in MHz, given an input fid */
 static u32 find_freq_from_fid(u32 fid)
 {
@@ -494,14 +491,55 @@ check_supported_cpu(void)
 	return 1;
 }
 
+static int check_pst_table(struct pst_s *pst, u8 maxvid)
+{
+	unsigned int j;
+	u8 lastfid = 0xFF;
+
+	for (j = 0; j < numps; j++) {
+		if (pst[j].vid > LEAST_VID) {
+			printk(KERN_ERR PFX "vid %d invalid : 0x%x\n", j, pst[j].vid);
+			return -EINVAL;
+		}
+		if (pst[j].vid < rvo) {	/* vid + rvo >= 0 */
+			printk(KERN_ERR PFX
+			       "BIOS error - 0 vid exceeded with pstate %d\n",
+			       j);
+			return -ENODEV;
+		}
+		if (pst[j].vid < maxvid + rvo) {	/* vid + rvo >= maxvid */
+			printk(KERN_ERR PFX
+			       "BIOS error - maxvid exceeded with pstate %d\n",
+			       j);
+			return -ENODEV;
+		}
+		if ((pst[j].fid > MAX_FID)
+		    || (pst[j].fid & 1)
+		    || (pst[j].fid < HI_FID_TABLE_BOTTOM)){
+			printk(KERN_ERR PFX "fid %d invalid : 0x%x\n", j, pst[j].fid);
+			return -EINVAL;
+		}
+		if (pst[j].fid < lastfid)
+			lastfid = pst[j].fid;
+	}
+	if (lastfid & 1) {
+		printk(KERN_ERR PFX "lastfid invalid\n");
+		return -EINVAL;
+	}
+	if (lastfid > LO_FID_TABLE_TOP) {
+		printk(KERN_INFO PFX  "first fid not from lo freq table\n");
+	}
+
+	return 0;
+}
+
 /* Find and validate the PSB/PST table in BIOS. */
 static inline int
 find_psb_table(void)
 {
 	struct psb_s *psb;
 	struct pst_s *pst;
-	unsigned i, j;
-	u32 lastfid;
+	unsigned int i, j;
 	u32 mvs;
 	u8 maxvid;
 
@@ -597,40 +635,8 @@ find_psb_table(void)
 		}
 
 		pst = (struct pst_s *) (psb + 1);
-		lastfid = 0xFFFFFFFF;
-		for (j = 0; j < numps; j++) {
-			if (pst[j].vid > LEAST_VID) {
-				printk(KERN_ERR PFX "vid invalid : 0x%x\n", pst[j].vid);
-				return -EINVAL;
-			}
-			if (pst[j].vid < rvo) {	/* vid + rvo >= 0 */
-				printk(KERN_ERR PFX
-				       "BIOS error - 0 vid exceeded with pstate %d\n",
-				       j);
-				return -ENODEV;
-			}
-			if (pst[j].vid < maxvid + rvo) {	/* vid + rvo >= maxvid */
-				printk(KERN_ERR PFX
-				       "BIOS error - maxvid exceeded with pstate %d\n",
-				       j);
-				return -ENODEV;
-			}
-			if ((pst[j].fid > MAX_FID)
-			    || (pst[j].fid & 1)
-			    || (pst[j].fid < HI_FID_TABLE_BOTTOM)){
-				printk(KERN_ERR PFX "fid invalid : 0x%x\n", pst[j].fid);
-				return -EINVAL;
-			}
-			if (pst[j].fid < lastfid)
-				lastfid = pst[j].fid;
-		}
-		if (lastfid & 1) {
-			printk(KERN_ERR PFX "lastfid invalid\n");
+		if (check_pst_table(pst, maxvid))
 			return -EINVAL;
-		}
-		if (lastfid > LO_FID_TABLE_TOP) {
-			printk(KERN_INFO PFX  "first fid not from lo freq table\n");
-		}
 
 		powernow_table = kmalloc((sizeof(struct cpufreq_frequency_table) * (numps + 1)), GFP_KERNEL);
 		if (!powernow_table) {
