@@ -226,13 +226,15 @@ acpi_suspend (
 	if (state == ACPI_STATE_S4 && !acpi_gbl_FACS->S4bios_f)
 		return AE_ERROR;
 
+	pm_prepare_console();
+
 	/*
 	 * TBD: S1 can be done without device_suspend.  Make a CONFIG_XX
 	 * to handle however when S1 failed without device_suspend.
 	 */
 	if (freeze_processes()) {
-		thaw_processes();
-		return AE_ERROR;		/* device_suspend needs processes to be stopped */
+		status = AE_ERROR;
+		goto Done;
 	}
 
 	/* do we have a wakeup address for S2 and S3? */
@@ -269,8 +271,10 @@ acpi_suspend (
 
 	/* reset firmware waking vector */
 	acpi_set_firmware_waking_vector((acpi_physical_address) 0);
-	thaw_processes();
 
+ Done:
+	thaw_processes();
+	pm_restore_console();
 	return status;
 }
 
