@@ -21,6 +21,7 @@
 #include <linux/sysdev.h>
 #include <linux/pm.h>
 #include <linux/serio.h>
+#include <linux/err.h>
 
 #include <asm/io.h>
 
@@ -100,9 +101,9 @@ static unsigned char i8042_initial_ctr;
 static unsigned char i8042_ctr;
 static unsigned char i8042_mux_open;
 static unsigned char i8042_mux_present;
-static unsigned char i8042_sysdev_initialized;
 static struct pm_dev *i8042_pm_dev;
 static struct timer_list i8042_timer;
+static struct platform_device *i8042_platform_device;
 
 /*
  * Shared IRQ's require a device pointer, but this driver doesn't support
@@ -878,7 +879,7 @@ static int i8042_notify_sys(struct notifier_block *this, unsigned long code,
         return NOTIFY_DONE;
 }
 
-static struct notifier_block i8042_notifier=
+static struct notifier_block i8042_notifier =
 {
         i8042_notify_sys,
         NULL,
@@ -888,25 +889,27 @@ static struct notifier_block i8042_notifier=
 /*
  * Suspend/resume handlers for the new PM scheme (driver model)
  */
-static int i8042_suspend(struct sys_device *dev, u32 state)
+static int i8042_suspend(struct device *dev, u32 state, u32 level)
 {
-	return i8042_controller_suspend();
+	return level == SUSPEND_DISABLE ? i8042_controller_suspend() : 0;
 }
 
-static int i8042_resume(struct sys_device *dev)
+static int i8042_resume(struct device *dev, u32 level)
 {
-	return i8042_controller_resume();
+	return level == RESUME_ENABLE ? i8042_controller_resume() : 0;
 }
 
-static struct sysdev_class kbc_sysclass = {
-	set_kset_name("i8042"),
-	.suspend = i8042_suspend,
-	.resume = i8042_resume,
-};
+static void i8042_shutdown(struct device *dev)
+{
+	i8042_controller_cleanup();
+}
 
-static struct sys_device device_i8042 = {
-       .id     = 0,
-       .cls    = &kbc_sysclass,
+static struct device_driver i8042_driver = {
+	.name		= "i8042",
+	.bus		= &platform_bus_type,
+	.suspend	= i8042_suspend,
+	.resume		= i8042_resume,
+	.shutdown	= i8042_shutdown,
 };
 
 /*
@@ -937,6 +940,7 @@ static struct serio * __init i8042_allocate_kbd_port(void)
 		serio->open		= i8042_open,
 		serio->close		= i8042_close,
 		serio->port_data	= &i8042_kbd_values,
+		serio->dev.parent	= &i8042_platform_device->dev;
 		strlcpy(serio->name, "i8042 Kbd Port", sizeof(serio->name));
 		strlcpy(serio->phys, I8042_KBD_PHYS_DESC, sizeof(serio->phys));
 	}
@@ -956,6 +960,7 @@ static struct serio * __init i8042_allocate_aux_port(void)
 		serio->open		= i8042_open;
 		serio->close		= i8042_close;
 		serio->port_data	= &i8042_aux_values,
+		serio->dev.parent	= &i8042_platform_device->dev;
 		strlcpy(serio->name, "i8042 Aux Port", sizeof(serio->name));
 		strlcpy(serio->phys, I8042_AUX_PHYS_DESC, sizeof(serio->phys));
 	}
@@ -980,6 +985,7 @@ static struct serio * __init i8042_allocate_mux_port(int index)
 		serio->open		= i8042_open;
 		serio->close		= i8042_close;
 		serio->port_data	= values;
+		serio->dev.parent	= &i8042_platform_device->dev;
 		snprintf(serio->name, sizeof(serio->name), "i8042 Aux-%d Port", index);
 		snprintf(serio->phys, sizeof(serio->phys), I8042_MUX_PHYS_DESC, index + 1);
 	}
@@ -990,6 +996,7 @@ static struct serio * __init i8042_allocate_mux_port(int index)
 int __init i8042_init(void)
 {
 	int i;
+	int err;
 
 	dbg_init();
 
@@ -1004,6 +1011,16 @@ int __init i8042_init(void)
 
 	if (i8042_controller_init())
 		return -ENODEV;
+
+	err = driver_register(&i8042_driver);
+	if (err)
+		return err;
+
+	i8042_platform_device = platform_device_register_simple("i8042", -1, NULL, 0);
+	if (IS_ERR(i8042_platform_device)) {
+		driver_unregister(&i8042_driver);
+		return PTR_ERR(i8042_platform_device);
+	}
 
 	if (!i8042_noaux && !i8042_check_aux(&i8042_aux_values)) {
 		if (!i8042_nomux && !i8042_check_mux(&i8042_aux_values))
@@ -1025,13 +1042,6 @@ int __init i8042_init(void)
 
 	mod_timer(&i8042_timer, jiffies + I8042_POLL_PERIOD);
 
-        if (sysdev_class_register(&kbc_sysclass) == 0) {
-                if (sysdev_register(&device_i8042) == 0)
-			i8042_sysdev_initialized = 1;
-		else
-			sysdev_class_unregister(&kbc_sysclass);
-        }
-
 	i8042_pm_dev = pm_register(PM_SYS_DEV, PM_SYS_UNKNOWN, i8042_pm_callback);
 
 	register_reboot_notifier(&i8042_notifier);
@@ -1048,11 +1058,6 @@ void __exit i8042_exit(void)
 	if (i8042_pm_dev)
 		pm_unregister(i8042_pm_dev);
 
-	if (i8042_sysdev_initialized) {
-		sysdev_unregister(&device_i8042);
-		sysdev_class_unregister(&kbc_sysclass);
-	}
-
 	i8042_controller_cleanup();
 
 	if (i8042_kbd_values.exists)
@@ -1066,6 +1071,9 @@ void __exit i8042_exit(void)
 			serio_unregister_port(i8042_mux_port[i]);
 
 	del_timer_sync(&i8042_timer);
+
+	platform_device_unregister(i8042_platform_device);
+	driver_unregister(&i8042_driver);
 
 	i8042_platform_exit();
 }
