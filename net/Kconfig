@@ -374,7 +374,7 @@ source "net/llc/Kconfig"
 
 config IPX
 	tristate "The IPX protocol"
-	select LLC_CORE
+	select LLC
 	---help---
 	  This is support for the Novell networking protocol, IPX, commonly
 	  used for local networks of Windows machines.  You need it if you
@@ -411,7 +411,7 @@ source "net/ipx/Kconfig"
 
 config ATALK
 	tristate "Appletalk protocol support"
-	select LLC_CORE
+	select LLC
 	---help---
 	  AppleTalk is the protocol that Apple computers can use to communicate
 	  on a network.  If your Linux box is connected to such a network and you

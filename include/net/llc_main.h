@@ -11,6 +11,9 @@
  *
  * See the GNU General Public License for more details.
  */
+
+#include <linux/skbuff.h>
+
 #define LLC_EVENT		 1
 #define LLC_PACKET		 2
 #define LLC_TYPE_1		 1
@@ -40,25 +43,16 @@ struct llc_station {
 	u8			    maximum_retry;
 	u8			    mac_sa[6];
 	struct {
-		rwlock_t	    lock;
-		struct list_head    list;
-	} sap_list;
-	struct {
 		struct sk_buff_head list;
 		spinlock_t	    lock;
 	} ev_q;
 	struct sk_buff_head	    mac_pdu_q;
 };
 
-extern struct llc_sap *llc_sap_alloc(void);
-extern void llc_sap_save(struct llc_sap *sap);
-extern void llc_free_sap(struct llc_sap *sap);
-extern struct llc_sap *llc_sap_find(u8 lsap);
 extern void llc_station_state_process(struct llc_station *station,
 				      struct sk_buff *skb);
 extern void llc_station_send_pdu(struct llc_station *station,
 				 struct sk_buff *skb);
-extern struct sk_buff *llc_alloc_frame(void);
-
-extern struct llc_station llc_main_station;
+extern int __init llc_station_init(void);
+extern void __exit llc_station_exit(void);
 #endif /* LLC_MAIN_H */

@@ -43,44 +43,8 @@ static u16 llc_exec_station_trans_actions(struct llc_station *station,
 static struct llc_station_state_trans *
 			     llc_find_station_trans(struct llc_station *station,
 						    struct sk_buff *skb);
-struct llc_station llc_main_station;	/* only one of its kind */
 
-/**
- *	llc_sap_save - add sap to station list
- *	@sap: Address of the sap
- *
- *	Adds a sap to the LLC's station sap list.
- */
-void llc_sap_save(struct llc_sap *sap)
-{
-	write_lock_bh(&llc_main_station.sap_list.lock);
-	list_add_tail(&sap->node, &llc_main_station.sap_list.list);
-	write_unlock_bh(&llc_main_station.sap_list.lock);
-}
-
-/**
- *	llc_sap_find - searchs a SAP in station
- *	@sap_value: sap to be found
- *
- *	Searchs for a sap in the sap list of the LLC's station upon the sap ID.
- *	Returns the sap or %NULL if not found.
- */
-struct llc_sap *llc_sap_find(u8 sap_value)
-{
-	struct llc_sap* sap = NULL;
-	struct list_head *entry;
-
-	read_lock_bh(&llc_main_station.sap_list.lock);
-	list_for_each(entry, &llc_main_station.sap_list.list) {
-		sap = list_entry(entry, struct llc_sap, node);
-		if (sap->laddr.lsap == sap_value)
-			break;
-	}
-	if (entry == &llc_main_station.sap_list.list) /* not found */
-		sap = NULL;
-	read_unlock_bh(&llc_main_station.sap_list.lock);
-	return sap;
-}
+static struct llc_station llc_main_station;
 
 /**
  *	llc_station_state_process: queue event and try to process queue.
@@ -265,49 +229,12 @@ static void llc_station_rcv(struct sk_buff *skb)
 	llc_station_state_process(&llc_main_station, skb);
 }
 
-/**
- *	llc_alloc_frame - allocates sk_buff for frame
- *
- *	Allocates an sk_buff for frame and initializes sk_buff fields.
- *	Returns allocated skb or %NULL when out of memory.
- */
-struct sk_buff *llc_alloc_frame(void)
+int __init llc_station_init(void)
 {
-	struct sk_buff *skb = alloc_skb(128, GFP_ATOMIC);
-
-	if (skb) {
-		skb_reserve(skb, 50);
-		skb->nh.raw   = skb->h.raw = skb->data;
-		skb->protocol = htons(ETH_P_802_2);
-		skb->dev      = dev_base->next;
-		skb->mac.raw  = skb->head;
-	}
-	return skb;
-}
-
-static struct packet_type llc_packet_type = {
-	.type = __constant_htons(ETH_P_802_2),
-	.func = llc_rcv,
-	.data = (void *)1,
-};
-
-static struct packet_type llc_tr_packet_type = {
-	.type = __constant_htons(ETH_P_TR_802_2),
-	.func = llc_rcv,
-	.data = (void *)1,
-};
-
-static char llc_error_msg[] __initdata =
-		KERN_ERR "LLC install NOT successful.\n";
-
-static int __init llc_init(void)
-{
-	u16 rc = 0;
+	u16 rc = -ENOBUFS;
 	struct sk_buff *skb;
 	struct llc_station_state_ev *ev;
 
-	INIT_LIST_HEAD(&llc_main_station.sap_list.list);
-	rwlock_init(&llc_main_station.sap_list.lock);
 	skb_queue_head_init(&llc_main_station.mac_pdu_q);
 	skb_queue_head_init(&llc_main_station.ev_q.list);
 	spin_lock_init(&llc_main_station.ev_q.lock);
@@ -317,46 +244,22 @@ static int __init llc_init(void)
 
 	skb = alloc_skb(0, GFP_ATOMIC);
 	if (!skb)
-		goto err;
+		goto out;
+	rc = 0;
 	llc_set_station_handler(llc_station_rcv);
 	ev = llc_station_ev(skb);
 	memset(ev, 0, sizeof(*ev));
-	if (dev_base->next)
-		memcpy(llc_main_station.mac_sa,
-		       dev_base->next->dev_addr, ETH_ALEN);
-	else
-		memset(llc_main_station.mac_sa, 0, ETH_ALEN);
 	llc_main_station.ack_timer.expires = jiffies + 3 * HZ;
 	llc_main_station.maximum_retry	= 1;
 	llc_main_station.state		= LLC_STATION_STATE_DOWN;
 	ev->type	= LLC_STATION_EV_TYPE_SIMPLE;
 	ev->prim_type	= LLC_STATION_EV_ENABLE_WITHOUT_DUP_ADDR_CHECK;
 	rc = llc_station_next_state(&llc_main_station, skb);
-	dev_add_pack(&llc_packet_type);
-	dev_add_pack(&llc_tr_packet_type);
 out:
 	return rc;
-err:
-	printk(llc_error_msg);
-	rc = 1;
-	goto out;
 }
 
-static void __exit llc_exit(void)
+void __exit llc_station_exit(void)
 {
-	dev_remove_pack(&llc_packet_type);
-	dev_remove_pack(&llc_tr_packet_type);
 	llc_set_station_handler(NULL);
 }
-
-module_init(llc_init);
-module_exit(llc_exit);
-
-EXPORT_SYMBOL(llc_sap_find);
-EXPORT_SYMBOL(llc_alloc_frame);
-EXPORT_SYMBOL(llc_main_station);
-
-MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Procom 1997, Jay Schullist 2001, Arnaldo C. Melo 2001-2003");
-MODULE_DESCRIPTION("LLC IEEE 802.2 extended support");
-MODULE_ALIAS_NETPROTO(PF_LLC);

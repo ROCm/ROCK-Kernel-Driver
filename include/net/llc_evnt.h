@@ -45,6 +45,8 @@ static __inline__ struct llc_station_state_ev *
 	return (struct llc_station_state_ev *)skb->cb;
 }
 
+struct llc_station;
+
 typedef int (*llc_station_ev_t)(struct llc_station *station,
 				struct sk_buff *skb);
 

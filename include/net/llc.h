@@ -12,14 +12,54 @@
  * See the GNU General Public License for more details.
  */
 
+#include <linux/if.h>
+#include <linux/list.h>
+#include <linux/spinlock.h>
+
+struct net_device;
+struct packet_type;
+struct sk_buff;
+
+struct llc_addr {
+	unsigned char lsap;
+	unsigned char mac[IFHWADDRLEN];
+};
+
+#define LLC_SAP_STATE_INACTIVE	1
+#define LLC_SAP_STATE_ACTIVE	2
+
+/**
+ * struct llc_sap - Defines the SAP component
+ *
+ * @station - station this sap belongs to
+ * @state - sap state
+ * @p_bit - only lowest-order bit used
+ * @f_bit - only lowest-order bit used
+ * @laddr - SAP value in this 'lsap'
+ * @node - entry in station sap_list
+ * @sk_list - LLC sockets this one manages
+ */
+struct llc_sap {
+	unsigned char	 state;
+	unsigned char	 p_bit;
+	unsigned char	 f_bit;
+	int		 (*rcv_func)(struct sk_buff *skb,
+				     struct net_device *dev,
+				     struct packet_type *pt);
+	struct llc_addr	 laddr;
+	struct list_head node;
+	struct {
+		rwlock_t	  lock;
+		struct hlist_head list;
+	} sk_list;
+};
+
 #define LLC_DEST_INVALID         0      /* Invalid LLC PDU type */
 #define LLC_DEST_SAP             1      /* Type 1 goes here */
 #define LLC_DEST_CONN            2      /* Type 2 goes here */
 
-struct llc_sap;
-struct net_device;
-struct packet_type;
-struct sk_buff;
+extern struct list_head llc_sap_list;
+extern rwlock_t llc_sap_list_lock;
 
 extern int llc_rcv(struct sk_buff *skb, struct net_device *dev,
 		   struct packet_type *pt);
@@ -29,4 +69,13 @@ extern void llc_add_pack(int type, void (*handler)(struct llc_sap *sap,
 extern void llc_remove_pack(int type);
 
 extern void llc_set_station_handler(void (*handler)(struct sk_buff *skb));
+
+extern struct llc_sap *llc_sap_open(unsigned char lsap,
+				    int (*rcv)(struct sk_buff *skb,
+					       struct net_device *dev,
+					       struct packet_type *pt));
+extern void llc_sap_close(struct llc_sap *sap);
+
+extern int llc_build_and_send_ui_pkt(struct llc_sap *sap, struct sk_buff *skb,
+				     unsigned char *dmac, unsigned char dsap);
 #endif /* LLC_H */

@@ -20,12 +20,11 @@
 #include <linux/errno.h>
 #include <linux/seq_file.h>
 #include <net/sock.h>
+#include <net/llc.h>
 #include <net/llc_c_ac.h>
 #include <net/llc_c_ev.h>
 #include <net/llc_c_st.h>
 #include <net/llc_conn.h>
-#include <net/llc_main.h>
-#include <net/llc_sap.h>
 
 static void llc_ui_format_mac(struct seq_file *seq, unsigned char *mac)
 {
@@ -40,7 +39,7 @@ static struct sock *llc_get_sk_idx(loff_t pos)
 	struct hlist_node *node;
 	struct sock *sk = NULL;
 
-	list_for_each(sap_entry, &llc_main_station.sap_list.list) {
+	list_for_each(sap_entry, &llc_sap_list) {
 		sap = list_entry(sap_entry, struct llc_sap, node);
 
 		read_lock_bh(&sap->sk_list.lock);
@@ -65,7 +64,7 @@ static void *llc_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	loff_t l = *pos;
 
-	read_lock_bh(&llc_main_station.sap_list.lock);
+	read_lock_bh(&llc_sap_list_lock);
 	return l ? llc_get_sk_idx(--l) : SEQ_START_TOKEN;
 }
 
@@ -91,7 +90,7 @@ static void *llc_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 	read_unlock_bh(&sap->sk_list.lock);
 	sk = NULL;
 	for (;;) {
-		if (sap->node.next == &llc_main_station.sap_list.list)
+		if (sap->node.next == &llc_sap_list)
 			break;
 		sap = list_entry(sap->node.next, struct llc_sap, node);
 		read_lock_bh(&sap->sk_list.lock);
@@ -114,7 +113,7 @@ static void llc_seq_stop(struct seq_file *seq, void *v)
 
 		read_unlock_bh(&sap->sk_list.lock);
 	}
-	read_unlock_bh(&llc_main_station.sap_list.lock);
+	read_unlock_bh(&llc_sap_list_lock);
 }
 
 static int llc_seq_socket_show(struct seq_file *seq, void *v)

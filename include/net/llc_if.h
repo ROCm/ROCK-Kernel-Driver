@@ -16,6 +16,7 @@
 #include <linux/if.h>
 #include <linux/if_arp.h>
 #include <linux/llc.h>
+#include <net/llc.h>
 
 #define LLC_DATAUNIT_PRIM	1
 #define LLC_CONN_PRIM		2
@@ -59,13 +60,6 @@
 #define LLC_STATUS_REFUSE	6 /* data conn */
 #define LLC_STATUS_CONFLICT	7 /* disconnect conn */
 #define LLC_STATUS_RESET_DONE	8 /*  */
-
-/* Structures and types */
-/* SAP/MAC Address pair */
-struct llc_addr {
-	u8 lsap;
-	u8 mac[IFHWADDRLEN];
-};
 
 extern u8 llc_mac_null_var[IFHWADDRLEN];
 

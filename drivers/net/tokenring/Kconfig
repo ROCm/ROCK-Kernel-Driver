@@ -9,7 +9,7 @@ menu "Token Ring devices"
 config TR
 	bool "Token Ring driver support"
 	depends on (PCI || ISA || MCA || CCW)
-	select LLC_CORE
+	select LLC
 	help
 	  Token Ring is IBM's way of communication on a local network; the
 	  rest of the world uses Ethernet. To participate on a Token Ring
