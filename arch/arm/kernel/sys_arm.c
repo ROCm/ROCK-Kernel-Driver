@@ -56,7 +56,7 @@ asmlinkage int sys_pipe(unsigned long __user *fildes)
  * mapping to be mapped at.  This is particularly important for
  * non-high vector CPUs.
  */
-#define MIN_MAP_ADDR	(vectors_high() ? 0 : PAGE_SIZE)
+#define MIN_MAP_ADDR	(PAGE_SIZE)
 
 /* common code for old and new mmaps */
 inline long do_mmap2(
