@@ -18,7 +18,7 @@ struct kobject {
 	struct list_head	entry;
 	struct kobject		* parent;
 	struct subsystem	* subsys;
-	struct sysfs_dir	dir;
+	struct dentry		* dentry;
 };
 
 extern void kobject_init(struct kobject *);

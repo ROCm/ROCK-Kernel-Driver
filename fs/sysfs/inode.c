@@ -179,9 +179,8 @@ sysfs_read_file(struct file *file, char *buf, size_t count, loff_t *ppos)
 	ssize_t retval = 0;
 
 	kobj = file->f_dentry->d_parent->d_fsdata;
-	if (kobj)
-		ops = kobj->dir.ops;
-
+	if (kobj && kobj->subsys)
+		ops = kobj->subsys->sysfs_ops;
 	if (!ops || !ops->show)
 		return 0;
 
@@ -241,8 +240,8 @@ sysfs_write_file(struct file *file, const char *buf, size_t count, loff_t *ppos)
 	char * page;
 
 	kobj = file->f_dentry->d_parent->d_fsdata;
-	if (kobj)
-		ops = kobj->dir.ops;
+	if (kobj && kobj->subsys)
+		ops = kobj->subsys->sysfs_ops;
 	if (!ops || !ops->store)
 		return 0;
 
@@ -404,7 +403,7 @@ int sysfs_create_dir(struct kobject * kobj)
 		return -EINVAL;
 
 	if (kobj->parent)
-		parent = kobj->parent->dir.dentry;
+		parent = kobj->parent->dentry;
 	else if (sysfs_mount && sysfs_mount->mnt_sb)
 		parent = sysfs_mount->mnt_sb->s_root;
 	else
@@ -414,7 +413,7 @@ int sysfs_create_dir(struct kobject * kobj)
 	dentry = get_dentry(parent,kobj->name);
 	if (!IS_ERR(dentry)) {
 		dentry->d_fsdata = (void *)kobj;
-		kobj->dir.dentry = dentry;
+		kobj->dentry = dentry;
 		error = sysfs_mkdir(parent->d_inode,dentry,
 				    (S_IFDIR| S_IRWXU | S_IRUGO | S_IXUGO));
 	} else
@@ -440,10 +439,7 @@ int sysfs_create_file(struct kobject * kobj, struct attribute * attr)
 	if (!kobj || !attr)
 		return -EINVAL;
 
-	if (kobj->parent)
-		parent = kobj->parent->dir.dentry;
-	else
-		return -ENOENT;
+	parent = kobj->dentry;
 
 	down(&parent->d_inode->i_sem);
 	dentry = get_dentry(parent,attr->name);
@@ -499,7 +495,7 @@ static void fill_object_path(struct kobject * kobj, char * buffer, int length)
  */
 int sysfs_create_link(struct kobject * kobj, struct kobject * target, char * name)
 {
-	struct dentry * dentry = kobj->dir.dentry;
+	struct dentry * dentry = kobj->dentry;
 	struct dentry * d;
 	int error = 0;
 	int size;
@@ -562,7 +558,7 @@ static void hash_and_remove(struct dentry * dir, const char * name)
 
 void sysfs_remove_file(struct kobject * kobj, struct attribute * attr)
 {
-	hash_and_remove(kobj->dir.dentry,attr->name);
+	hash_and_remove(kobj->dentry,attr->name);
 }
 
 
@@ -574,7 +570,7 @@ void sysfs_remove_file(struct kobject * kobj, struct attribute * attr)
 
 void sysfs_remove_link(struct kobject * kobj, char * name)
 {
-	hash_and_remove(kobj->dir.dentry,name);
+	hash_and_remove(kobj->dentry,name);
 }
 
 
@@ -590,7 +586,7 @@ void sysfs_remove_link(struct kobject * kobj, char * name)
 void sysfs_remove_dir(struct kobject * kobj)
 {
 	struct list_head * node, * next;
-	struct dentry * dentry = kobj->dir.dentry;
+	struct dentry * dentry = kobj->dentry;
 	struct dentry * parent;
 
 	if (!dentry)

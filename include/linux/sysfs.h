@@ -18,11 +18,6 @@ struct sysfs_ops {
 	ssize_t	(*store)(struct kobject *,struct attribute *,const char *, size_t, loff_t);
 };
 
-struct sysfs_dir {
-	struct dentry		* dentry;
-	struct sysfs_ops	* ops;
-};
-
 struct attribute {
 	char			* name;
 	mode_t			mode;
