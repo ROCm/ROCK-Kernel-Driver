@@ -52,6 +52,7 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/version.h>
 #include <linux/types.h>
 #include <linux/errno.h>
@@ -425,13 +426,15 @@ static int dis_pci_mem_inval[ACE_MAX_MOD_PARMS] = {1, 1, 1, 1, 1, 1, 1, 1};
 MODULE_AUTHOR("Jes Sorensen <jes@trained-monkey.org>");
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("AceNIC/3C985/GA620 Gigabit Ethernet driver");
-MODULE_PARM(link, "1-" __MODULE_STRING(8) "i");
-MODULE_PARM(trace, "1-" __MODULE_STRING(8) "i");
-MODULE_PARM(tx_coal_tick, "1-" __MODULE_STRING(8) "i");
-MODULE_PARM(max_tx_desc, "1-" __MODULE_STRING(8) "i");
-MODULE_PARM(rx_coal_tick, "1-" __MODULE_STRING(8) "i");
-MODULE_PARM(max_rx_desc, "1-" __MODULE_STRING(8) "i");
-MODULE_PARM(tx_ratio, "1-" __MODULE_STRING(8) "i");
+
+static int num_params;
+module_param_array(link, int, num_params, 0);
+module_param_array(trace, int, num_params, 0);
+module_param_array(tx_coal_tick, int, num_params, 0);
+module_param_array(max_tx_desc, int, num_params, 0);
+module_param_array(rx_coal_tick, int, num_params, 0);
+module_param_array(max_rx_desc, int, num_params, 0);
+module_param_array(tx_ratio, int, num_params, 0);
 MODULE_PARM_DESC(link, "AceNIC/3C985/NetGear link state");
 MODULE_PARM_DESC(trace, "AceNIC/3C985/NetGear firmware trace level");
 MODULE_PARM_DESC(tx_coal_tick, "AceNIC/3C985/GA620 max clock ticks to wait from first tx descriptor arrives");
