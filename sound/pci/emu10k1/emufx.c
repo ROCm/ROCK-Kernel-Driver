@@ -29,6 +29,7 @@
 #include <sound/driver.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
+#include <linux/init.h>
 #include <sound/core.h>
 #include <sound/emu10k1.h>
 
