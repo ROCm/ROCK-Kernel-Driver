@@ -541,5 +541,5 @@ int sr_dev_ioctl(struct cdrom_device_info *cdi,
 		 unsigned int cmd, unsigned long arg)
 {
 	Scsi_CD *cd = cdi->handle;
-	return scsi_ioctl(cd->device, cmd, (void *)arg);
+	return scsi_ioctl(cd->device, cmd, (void __user *)arg);
 }

@@ -990,7 +990,7 @@ sg_ioctl(struct inode *inode, struct file *filp,
 			if (!sg_allow_access(opcode, sdp->device->type))
 				return -EPERM;
 		}
-		return scsi_ioctl_send_command(sdp->device, (void *) arg);
+		return scsi_ioctl_send_command(sdp->device, (void __user *) arg);
 	case SG_SET_DEBUG:
 		result = get_user(val, (int *) arg);
 		if (result)
@@ -1003,11 +1003,11 @@ sg_ioctl(struct inode *inode, struct file *filp,
 	case SG_GET_TRANSFORM:
 		if (sdp->detached)
 			return -ENODEV;
-		return scsi_ioctl(sdp->device, cmd_in, (void *) arg);
+		return scsi_ioctl(sdp->device, cmd_in, (void __user *)arg);
 	default:
 		if (read_only)
 			return -EPERM;	/* don't know so take safe approach */
-		return scsi_ioctl(sdp->device, cmd_in, (void *) arg);
+		return scsi_ioctl(sdp->device, cmd_in, (void __user *)arg);
 	}
 }
 

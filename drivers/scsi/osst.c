@@ -5040,7 +5040,7 @@ static int osst_ioctl(struct inode * inode,struct file * file,
 
 	up(&STp->lock);
 
-	return scsi_ioctl(STp->device, cmd_in, (void *) arg);
+	return scsi_ioctl(STp->device, cmd_in, p);
 
 out:
 	if (SRpnt) scsi_release_request(SRpnt);

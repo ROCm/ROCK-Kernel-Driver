@@ -499,7 +499,7 @@ static int sr_block_ioctl(struct inode *inode, struct file *file, unsigned cmd,
         switch (cmd) {
                 case SCSI_IOCTL_GET_IDLUN:
                 case SCSI_IOCTL_GET_BUS_NUMBER:
-                        return scsi_ioctl(sdev, cmd, (void *)arg);
+                        return scsi_ioctl(sdev, cmd, (void __user *)arg);
 	}
 	return cdrom_ioctl(&cd->cdi, inode, cmd, arg);
 }

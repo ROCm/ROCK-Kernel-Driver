@@ -3418,7 +3418,7 @@ static int st_ioctl(struct inode *inode, struct file *file,
 				return i;
 			break;
 	}
-	return scsi_ioctl(STp->device, cmd_in, (void *) arg);
+	return scsi_ioctl(STp->device, cmd_in, p);
 
  out:
 	up(&STp->lock);
