@@ -1396,7 +1396,7 @@ ppp_receive_frame(struct ppp *ppp, struct sk_buff *skb, struct channel *pch)
 
 			if (skb_tailroom(skb) < 124)
 				len += 128;
-			new_skb = dev_alloc_skb(len);
+			new_skb = dev_alloc_skb(len + 16);
 			if (!new_skb) {
 				printk(KERN_ERR"PPP: no memory (bad aligned SKB)\n");
 				goto err;
