@@ -625,11 +625,11 @@ int lm78_detect(struct i2c_adapter *adapter, int address, int kind)
 	}
 
 	if (kind == lm78) {
-		client_name = "LM78 chip";
+		client_name = "lm78";
 	} else if (kind == lm78j) {
-		client_name = "LM78-J chip";
+		client_name = "lm78-j";
 	} else if (kind == lm79) {
-		client_name = "LM79 chip";
+		client_name = "lm79";
 	} else {
 		dev_dbg(&adapter->dev, "Internal error: unknown kind (%d)?!?",
 			kind);

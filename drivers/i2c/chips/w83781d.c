@@ -1098,15 +1098,15 @@ w83781d_detect_subclients(struct i2c_adapter *adapter, int address, int kind,
 	}
 
 	if (kind == w83781d)
-		client_name = "W83781D subclient";
+		client_name = "w83781d subclient";
 	else if (kind == w83782d)
-		client_name = "W83782D subclient";
+		client_name = "w83782d subclient";
 	else if (kind == w83783s)
-		client_name = "W83783S subclient";
+		client_name = "w83783s subclient";
 	else if (kind == w83627hf)
-		client_name = "W83627HF subclient";
+		client_name = "w83627hf subclient";
 	else if (kind == as99127f)
-		client_name = "AS99127F subclient";
+		client_name = "as99127f subclient";
 	else
 		client_name = "unknown subclient?";
 
@@ -1304,20 +1304,20 @@ w83781d_detect(struct i2c_adapter *adapter, int address, int kind)
 	}
 
 	if (kind == w83781d) {
-		client_name = "W83781D chip";
+		client_name = "w83781d";
 	} else if (kind == w83782d) {
-		client_name = "W83782D chip";
+		client_name = "w83782d";
 	} else if (kind == w83783s) {
-		client_name = "W83783S chip";
+		client_name = "w83783s";
 	} else if (kind == w83627hf) {
 		if (val1 == 0x90)
-			client_name = "W83627THF chip";
+			client_name = "w83627thf";
 		else
-			client_name = "W83627HF chip";
+			client_name = "w83627hf";
 	} else if (kind == as99127f) {
-		client_name = "AS99127F chip";
+		client_name = "as99127f";
 	} else if (kind == w83697hf) {
-		client_name = "W83697HF chip";
+		client_name = "w83697hf";
 	} else {
 		dev_err(&new_client->dev, "Internal error: unknown "
 						"kind (%d)?!?", kind);

@@ -671,7 +671,7 @@ static int via686a_detect(struct i2c_adapter *adapter, int address, int kind)
 	struct i2c_client *new_client;
 	struct via686a_data *data;
 	int err = 0;
-	const char client_name[] = "via686a chip";
+	const char client_name[] = "via686a";
 	u16 val;
 
 	/* Make sure we are probing the ISA bus!!  */
