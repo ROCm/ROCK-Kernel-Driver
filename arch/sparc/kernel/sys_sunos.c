@@ -487,7 +487,7 @@ asmlinkage int sunos_uname(struct sunos_utsname *name)
 		ret |= __copy_to_user(&name->mach[0], &system_utsname.machine[0], sizeof(name->mach) - 1);
 	}
 	up_read(&uts_sem);
-	return ret;
+	return ret ? -EFAULT : 0;
 }
 
 asmlinkage int sunos_nosys(void)

@@ -81,7 +81,6 @@ enum rq_flag_bits {
 	/*
 	 * for ATA/ATAPI devices
 	 */
-	__REQ_DRIVE_CMD,
 	__REQ_DRIVE_ACB,
 
 	__REQ_PC,	/* packet command (special) */
@@ -101,7 +100,6 @@ enum rq_flag_bits {
 #define REQ_STARTED	(1 << __REQ_STARTED)
 #define REQ_DONTPREP	(1 << __REQ_DONTPREP)
 #define REQ_QUEUED	(1 << __REQ_QUEUED)
-#define REQ_DRIVE_CMD	(1 << __REQ_DRIVE_CMD)
 #define REQ_DRIVE_ACB	(1 << __REQ_DRIVE_ACB)
 #define REQ_PC		(1 << __REQ_PC)
 #define REQ_BLOCK_PC	(1 << __REQ_BLOCK_PC)

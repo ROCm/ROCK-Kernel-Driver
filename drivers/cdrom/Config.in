@@ -4,15 +4,6 @@
 tristate '  Aztech/Orchid/Okano/Wearnes/TXC/CyDROM  CDROM support' CONFIG_AZTCD
 tristate '  Goldstar R420 CDROM support' CONFIG_GSCD
 tristate '  Matsushita/Panasonic/Creative, Longshine, TEAC CDROM support' CONFIG_SBPCD
-if [ "$CONFIG_SBPCD" = "y" ]; then
-   bool '    Matsushita/Panasonic, ... second CDROM controller support' CONFIG_SBPCD2
-   if [ "$CONFIG_SBPCD2" = "y" ]; then
-      bool '    Matsushita/Panasonic, ... third CDROM controller support' CONFIG_SBPCD3
-      if [ "$CONFIG_SBPCD3" = "y" ]; then
-	 bool '    Matsushita/Panasonic, ... fourth CDROM controller support' CONFIG_SBPCD4
-      fi
-   fi
-fi
 tristate '  Mitsumi (standard) [no XA/Multisession] CDROM support' CONFIG_MCD
 if [ "$CONFIG_MCD" != "n" ]; then
    int 'MCD IRQ' CONFIG_MCD_IRQ 11

@@ -482,11 +482,11 @@ extern void add_hash_page(unsigned context, unsigned long va,
  * must not include the _PAGE_PRESENT bit, or the _PAGE_HASHPTE bit
  * (if used).  -- paulus
  */
-#define SWP_TYPE(entry)			((entry).val & 0x3f)
-#define SWP_OFFSET(entry)		((entry).val >> 6)
-#define SWP_ENTRY(type, offset)		((swp_entry_t) { (type) | ((offset) << 6) })
-#define pte_to_swp_entry(pte)		((swp_entry_t) { pte_val(pte) >> 2 })
-#define swp_entry_to_pte(x)		((pte_t) { (x).val << 2 })
+#define __swp_type(entry)		((entry).val & 0x3f)
+#define __swp_offset(entry)		((entry).val >> 6)
+#define __swp_entry(type, offset)	((swp_entry_t) { (type) | ((offset) << 6) })
+#define __pte_to_swp_entry(pte)		((swp_entry_t) { pte_val(pte) >> 2 })
+#define __swp_entry_to_pte(x)		((pte_t) { (x).val << 2 })
 
 /* CONFIG_APUS */
 /* For virtual address to physical address conversion */

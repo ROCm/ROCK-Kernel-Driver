@@ -799,11 +799,14 @@ int
 nfs_wait_on_inode(struct inode *inode, int flag)
 {
 	struct rpc_clnt	*clnt = NFS_CLIENT(inode);
+	struct nfs_inode *nfsi = NFS_I(inode);
+
 	int error;
 	if (!(NFS_FLAGS(inode) & flag))
 		return 0;
 	atomic_inc(&inode->i_count);
-	error = nfs_wait_event(clnt, inode->i_wait, !(NFS_FLAGS(inode) & flag));
+	error = nfs_wait_event(clnt, nfsi->nfs_i_wait,
+				!(NFS_FLAGS(inode) & flag));
 	iput(inode);
 	return error;
 }
@@ -922,7 +925,7 @@ __nfs_revalidate_inode(struct nfs_server *server, struct inode *inode)
 	NFS_FLAGS(inode) &= ~NFS_INO_STALE;
 out:
 	NFS_FLAGS(inode) &= ~NFS_INO_REVALIDATING;
-	wake_up(&inode->i_wait);
+	wake_up(&NFS_I(inode)->nfs_i_wait);
  out_nowait:
 	unlock_kernel();
 	return status;
@@ -1258,6 +1261,7 @@ static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
 		nfsi->ndirty = 0;
 		nfsi->ncommit = 0;
 		nfsi->npages = 0;
+		init_waitqueue_head(&nfsi->nfs_i_wait);
 	}
 }
  

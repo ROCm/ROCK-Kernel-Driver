@@ -106,27 +106,6 @@ CONFIG_SBPCD
   The module will be called sbpcd.o.  If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.
 
-CONFIG_SBPCD2
-  Say Y here only if you have two CD-ROM controller cards of this type
-  (usually only if you have more than four drives).  You should enter
-  the parameters for the second, third and fourth interface card into
-  <file:drivers/cdrom/sbpcd.h> before compiling the new kernel.  Read
-  the file <file:Documentation/cdrom/sbpcd>.
-
-CONFIG_SBPCD3
-  Say Y here only if you have three CD-ROM controller cards of this
-  type (usually only if you have more than six drives).  You should
-  enter the parameters for the second, third and fourth interface card
-  into <file:include/linux/sbpcd.h> before compiling the new kernel.
-  Read the file <file:Documentation/cdrom/sbpcd>.
-
-CONFIG_SBPCD4
-  Say Y here only if you have four CD-ROM controller cards of this
-  type (usually only if you have more than eight drives).  You should
-  enter the parameters for the second, third and fourth interface card
-  into <file:include/linux/sbpcd.h> before compiling the new kernel.
-  Read the file <file:Documentation/cdrom/sbpcd>.
-
 CONFIG_AZTCD
   This is your driver if you have an Aztech CDA268-01A, Orchid
   CD-3110, Okano or Wearnes CDD110, Conrad TXC, or CyCD-ROM CR520 or

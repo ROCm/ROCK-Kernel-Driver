@@ -315,7 +315,7 @@ void __init atari_stram_reserve_pages(void *start_mem)
 		   otherwise just use the end of kernel data (= start_mem) */
 		swap_start = !kernel_in_stram ? stram_start + PAGE_SIZE : start_mem;
 		/* decrement by one page, rest of kernel assumes that first swap page
-		 * is always reserved and maybe doesn't handle SWP_ENTRY == 0
+		 * is always reserved and maybe doesn't handle swp_entry == 0
 		 * correctly */
 		swap_start -= PAGE_SIZE;
 		swap_end = stram_end;
@@ -749,7 +749,7 @@ static int unswap_by_read(unsigned short *map, unsigned long max,
 		}
 
 		if (map[i]) {
-			entry = SWP_ENTRY(stram_swap_type, i);
+			entry = swp_entry(stram_swap_type, i);
 			DPRINTK("unswap: map[i=%lu]=%u nr_swap=%u\n",
 				i, map[i], nr_swap_pages);
 

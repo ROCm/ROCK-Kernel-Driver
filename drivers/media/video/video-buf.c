@@ -365,7 +365,7 @@ videobuf_vm_nopage(struct vm_area_struct *vma, unsigned long vaddr,
 	page = alloc_page(GFP_USER);
 	if (!page)
 		return NOPAGE_OOM;
-	clear_user_page(page_address(page), vaddr);
+	clear_user_page(page_address(page), vaddr, page);
 	return page;
 }
 

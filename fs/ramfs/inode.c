@@ -29,7 +29,6 @@
 #include <linux/init.h>
 #include <linux/string.h>
 #include <linux/smp_lock.h>
-#include <linux/buffer_head.h>		/* for block_symlink() */
 
 #include <asm/uaccess.h>
 
@@ -235,7 +234,7 @@ static int ramfs_symlink(struct inode * dir, struct dentry *dentry, const char *
 	inode = ramfs_get_inode(dir->i_sb, S_IFLNK|S_IRWXUGO, 0);
 	if (inode) {
 		int l = strlen(symname)+1;
-		error = block_symlink(inode, symname, l);
+		error = page_symlink(inode, symname, l);
 		if (!error) {
 			d_instantiate(dentry, inode);
 			dget(dentry);

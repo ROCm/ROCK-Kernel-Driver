@@ -298,16 +298,16 @@ extern inline pte_t mk_pte_io(unsigned long page, pgprot_t prot, int space)
 }
 
 /* Encode and de-code a swap entry */
-#define SWP_TYPE(entry)		(((entry).val >> PAGE_SHIFT) & 0xffUL)
-#define SWP_OFFSET(entry)	((entry).val >> (PAGE_SHIFT + 8UL))
-#define SWP_ENTRY(type, offset)	\
+#define __swp_type(entry)	(((entry).val >> PAGE_SHIFT) & 0xffUL)
+#define __swp_offset(entry)	((entry).val >> (PAGE_SHIFT + 8UL))
+#define __swp_entry(type, offset)	\
 	( (swp_entry_t) \
 	  { \
 		(((long)(type) << PAGE_SHIFT) | \
                  ((long)(offset) << (PAGE_SHIFT + 8UL))) \
 	  } )
-#define pte_to_swp_entry(pte)		((swp_entry_t) { pte_val(pte) })
-#define swp_entry_to_pte(x)		((pte_t) { (x).val })
+#define __pte_to_swp_entry(pte)		((swp_entry_t) { pte_val(pte) })
+#define __swp_entry_to_pte(x)		((pte_t) { (x).val })
 
 extern unsigned long prom_virt_to_phys(unsigned long, int *);
 

@@ -191,10 +191,18 @@ static int trm290_udma_stop(struct ata_device *drive)
 	return (inw(ch->dma_base + 2) != 0x00ff);
 }
 
-static int do_udma(unsigned int reading, struct ata_device *drive, struct request *rq)
+static int trm290_udma_init(struct ata_device *drive, struct request *rq)
 {
 	struct ata_channel *ch = drive->channel;
-	unsigned int count, writing;
+	unsigned int count;
+	int writing;
+	int reading;
+
+
+	if (rq_data_dir(rq) == READ)
+		reading = 1;
+	else
+		reading = 0;
 
 	if (!reading) {
 		reading = 0;
@@ -222,20 +230,10 @@ static int do_udma(unsigned int reading, struct ata_device *drive, struct reques
 	if (drive->type != ATA_DISK)
 		return 0;
 
-	ide_set_handler(drive, &ide_dma_intr, WAIT_CMD, NULL);
+	ide_set_handler(drive, ide_dma_intr, WAIT_CMD, NULL);
 	OUT_BYTE(reading ? WIN_READDMA : WIN_WRITEDMA, IDE_COMMAND_REG);
 
 	return 0;
-}
-
-static int trm290_udma_read(struct ata_device *drive, struct request *rq)
-{
-	return do_udma(1, drive, rq);
-}
-
-static int trm290_udma_write(struct ata_device *drive, struct request *rq)
-{
-	return do_udma(0, drive, rq);
 }
 
 static int trm290_udma_irq_status(struct ata_device *drive)
@@ -243,9 +241,9 @@ static int trm290_udma_irq_status(struct ata_device *drive)
 	return (inw(drive->channel->dma_base + 2) == 0x00ff);
 }
 
-static int trm290_dmaproc(struct ata_device *drive)
+static int trm290_udma_setup(struct ata_device *drive)
 {
-	return XXX_ide_dmaproc(drive);
+	return udma_pci_setup(drive);
 }
 #endif
 
@@ -301,10 +299,9 @@ static void __init trm290_init_channel(struct ata_channel *hwif)
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	hwif->udma_start = trm290_udma_start;
 	hwif->udma_stop = trm290_udma_stop;
-	hwif->udma_read = trm290_udma_read;
-	hwif->udma_write = trm290_udma_write;
+	hwif->udma_init = trm290_udma_init;
 	hwif->udma_irq_status = trm290_udma_irq_status;
-	hwif->XXX_udma = trm290_dmaproc;
+	hwif->udma_setup = trm290_udma_setup;
 #endif
 
 	hwif->selectproc = &trm290_selectproc;

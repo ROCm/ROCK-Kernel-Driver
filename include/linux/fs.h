@@ -306,7 +306,7 @@ struct address_space_operations {
 	int (*commit_write)(struct file *, struct page *, unsigned, unsigned);
 	/* Unfortunately this kludge is needed for FIBMAP. Don't use it */
 	int (*bmap)(struct address_space *, long);
-	int (*flushpage) (struct page *, unsigned long);
+	int (*invalidatepage) (struct page *, unsigned long);
 	int (*releasepage) (struct page *, int);
 #define KERNEL_HAS_O_DIRECT /* this is for modules out of the kernel */
 	int (*direct_IO)(int, struct inode *, struct kiobuf *, unsigned long, int);
@@ -383,7 +383,6 @@ struct inode {
 	struct inode_operations	*i_op;
 	struct file_operations	*i_fop;	/* former ->i_op->default_file_ops */
 	struct super_block	*i_sb;
-	wait_queue_head_t	i_wait;
 	struct file_lock	*i_flock;
 	struct address_space	*i_mapping;
 	struct address_space	i_data;
@@ -1245,6 +1244,7 @@ extern int vfs_readlink(struct dentry *, char *, int, const char *);
 extern int vfs_follow_link(struct nameidata *, const char *);
 extern int page_readlink(struct dentry *, char *, int);
 extern int page_follow_link(struct dentry *, struct nameidata *);
+extern int page_symlink(struct inode *inode, const char *symname, int len);
 extern struct inode_operations page_symlink_inode_operations;
 extern void generic_fillattr(struct inode *, struct kstat *);
 

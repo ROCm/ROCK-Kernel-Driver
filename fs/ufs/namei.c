@@ -143,7 +143,7 @@ static int ufs_symlink (struct inode * dir, struct dentry * dentry,
 		/* slow symlink */
 		inode->i_op = &page_symlink_inode_operations;
 		inode->i_mapping->a_ops = &ufs_aops;
-		err = block_symlink(inode, symname, l);
+		err = page_symlink(inode, symname, l);
 		if (err)
 			goto out_fail;
 	} else {

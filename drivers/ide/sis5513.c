@@ -466,12 +466,14 @@ static int config_chipset_for_dma(struct ata_device *drive, u8 udma)
 	return !sis5513_tune_chipset(drive, mode);
 }
 
-static int config_drive_xfer_rate(struct ata_device *drive)
+static int sis5513_udma_setup(struct ata_device *drive)
 {
 	struct hd_driveid *id = drive->id;
 	int on = 0;
 	int verbose = 1;
 
+	config_drive_art_rwp(drive);
+	config_art_rwp_pio(drive, 5);
 	config_chipset_for_pio(drive, 5);
 
 	if (id && (id->capability & 1) && drive->channel->autodma) {
@@ -519,14 +521,6 @@ no_dma_set:
 	udma_enable(drive, on, verbose);
 
 	return 0;
-}
-
-static int sis5513_dmaproc(struct ata_device *drive)
-{
-	config_drive_art_rwp(drive);
-	config_art_rwp_pio(drive, 5);
-
-	return config_drive_xfer_rate(drive);
 }
 #endif
 
@@ -633,7 +627,7 @@ static void __init ide_init_sis5513(struct ata_channel *hwif)
 		if (chipset_family > ATA_16) {
 			hwif->autodma = noautodma ? 0 : 1;
 			hwif->highmem = 1;
-			hwif->XXX_udma = sis5513_dmaproc;
+			hwif->udma_setup = sis5513_udma_setup;
 		} else {
 #endif
 			hwif->autodma = 0;

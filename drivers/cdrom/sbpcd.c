@@ -1,5 +1,3 @@
-
-
 /*
  *  sbpcd.c   CD-ROM device driver for the whole family of traditional,
  *            non-ATAPI IDE-style Matsushita/Panasonic CR-5xx drives.
@@ -341,16 +339,20 @@
 
 /*
  * Trying to merge requests breaks this driver horribly (as in it goes
- * boom and apparently has done so since 2.3.41).  As it is a legacy 
- * driver for a horribly slow double speed CD on a hideous interface 
- * designed for polled operation, I won't loose any sleep in simply 
+ * boom and apparently has done so since 2.3.41).  As it is a legacy
+ * driver for a horribly slow double speed CD on a hideous interface
+ * designed for polled operation, I won't loose any sleep in simply
  * disallowing merging.				Paul G.  02/2001
+ *
+ * Thu May 30 14:14:47 CEST 2002:
+ *
+ * I have presumably found the reson for the above - there was a bogous
+ * end_request substitute, which was manipulating the request queues
+ * incorrectly. If someone has access to the actual hardware, and it's
+ * still operations - well  please free to test it.
+ *
+ * Marcin Dalecki
  */
-#define DONT_MERGE_REQUESTS
-
-#ifndef SBPCD_ISSUE
-#define SBPCD_ISSUE 1
-#endif /* SBPCD_ISSUE */
 
 #include <linux/module.h>
 
@@ -364,7 +366,7 @@
 #include <linux/cdrom.h>
 #include <linux/ioport.h>
 #include <linux/devfs_fs_kernel.h>
-#include <linux/major.h> 
+#include <linux/major.h>
 #include <linux/string.h>
 #include <linux/vmalloc.h>
 #include <linux/init.h>
@@ -377,50 +379,19 @@
 #include <linux/config.h>
 #include "sbpcd.h"
 
-#if !(SBPCD_ISSUE-1)
 #define MAJOR_NR MATSUSHITA_CDROM_MAJOR
-#endif
-#if !(SBPCD_ISSUE-2)
-#define MAJOR_NR MATSUSHITA_CDROM2_MAJOR /* second driver issue */
-#endif
-#if !(SBPCD_ISSUE-3)
-#define MAJOR_NR MATSUSHITA_CDROM3_MAJOR /* third driver issue */
-#endif
-#if !(SBPCD_ISSUE-4)
-#define MAJOR_NR MATSUSHITA_CDROM4_MAJOR /* fourth driver issue */
-#endif
 
 #include <linux/blk.h>
 
 /*==========================================================================*/
-/*
- * provisions for more than 1 driver issues
- * currently up to 4 drivers, expandable
- */
-#if !(SBPCD_ISSUE-1)
-#define DO_SBPCD_REQUEST(a) do_sbpcd_request(a)
-#define SBPCD_INIT(a) sbpcd_init(a)
-#endif
-#if !(SBPCD_ISSUE-2)
-#define DO_SBPCD_REQUEST(a) do_sbpcd2_request(a)
-#define SBPCD_INIT(a) sbpcd2_init(a)
-#endif
-#if !(SBPCD_ISSUE-3)
-#define DO_SBPCD_REQUEST(a) do_sbpcd3_request(a)
-#define SBPCD_INIT(a) sbpcd3_init(a)
-#endif
-#if !(SBPCD_ISSUE-4)
-#define DO_SBPCD_REQUEST(a) do_sbpcd4_request(a)
-#define SBPCD_INIT(a) sbpcd4_init(a)
-#endif
-/*==========================================================================*/
 #if SBPCD_DIS_IRQ
-#define SBPCD_CLI cli()
-#define SBPCD_STI sti()
+# define SBPCD_CLI cli()
+# define SBPCD_STI sti()
 #else
-#define SBPCD_CLI
-#define SBPCD_STI
-#endif /* SBPCD_DIS_IRQ */
+# define SBPCD_CLI
+# define SBPCD_STI
+#endif
+
 /*==========================================================================*/
 /*
  * auto-probing address list
@@ -438,8 +409,7 @@
  * send mail to emoenke@gwdg.de if your interface card is not FULLY
  * represented here.
  */
-#if !(SBPCD_ISSUE-1)
-static int sbpcd[] = 
+static int sbpcd[] =
 {
 	CDROM_PORT, SBPRO, /* probe with user's setup first */
 #if DISTRIBUTION
@@ -482,29 +452,16 @@ static int sbpcd[] =
 #endif
 #endif /* DISTRIBUTION */
 };
-#else
-static int sbpcd[] = {CDROM_PORT, SBPRO}; /* probe with user's setup only */
-#endif
+
+/*
+ * Protects access to global structures etc.
+ */
+static spinlock_t sbpcd_lock __cacheline_aligned = SPIN_LOCK_UNLOCKED;
+
 MODULE_PARM(sbpcd, "2i");
 MODULE_PARM(max_drives, "i");
 
 #define NUM_PROBE  (sizeof(sbpcd) / sizeof(int))
-
-/*==========================================================================*/
-/*
- * the external references:
- */
-#if !(SBPCD_ISSUE-1)
-#ifdef CONFIG_SBPCD2
-extern int sbpcd2_init(void);
-#endif
-#ifdef CONFIG_SBPCD3
-extern int sbpcd3_init(void);
-#endif
-#ifdef CONFIG_SBPCD4
-extern int sbpcd4_init(void);
-#endif
-#endif
 
 /*==========================================================================*/
 
@@ -604,19 +561,7 @@ static const char *str_lm = "LaserMate";
 static const char *str_sp = "SPEA";
 static const char *str_t16 = "Teac16bit";
 static const char *type;
-
-#if !(SBPCD_ISSUE-1)
 static const char *major_name="sbpcd";
-#endif
-#if !(SBPCD_ISSUE-2)
-static const char *major_name="sbpcd2";
-#endif
-#if !(SBPCD_ISSUE-3)
-static const char *major_name="sbpcd3";
-#endif
-#if !(SBPCD_ISSUE-4)
-static const char *major_name="sbpcd4";
-#endif
 
 /*==========================================================================*/
 
@@ -4879,15 +4824,12 @@ static void sbp_transfer(struct request *req)
  *
  */
 #undef DEBUG_GTL
-static inline void sbpcd_end_request(struct request *req, int uptodate) {
-	list_add(&req->queue, &req->q->queue_head);
-	end_request(uptodate);
-}
+
 /*==========================================================================*/
 /*
  *  I/O request routine, called from Linux kernel.
  */
-static void DO_SBPCD_REQUEST(request_queue_t * q)
+static void do_sbpcd_request(request_queue_t * q)
 {
 	u_int block;
 	u_int nsect;
@@ -4921,11 +4863,11 @@ static void DO_SBPCD_REQUEST(request_queue_t * q)
 		return;
 	}
 
-	req=CURRENT;		/* take out our request so no other */
+	req = CURRENT;		/* take out our request so no other */
 	blkdev_dequeue_request(req);	/* task can fuck it up         GTL  */
 
 	if (req -> sector == -1)
-		sbpcd_end_request(req, 0);
+		end_request(0);
 	spin_unlock_irq(q->queue_lock);
 
 	down(&ioctl_read_sem);
@@ -4967,7 +4909,7 @@ static void DO_SBPCD_REQUEST(request_queue_t * q)
 #endif
 		up(&ioctl_read_sem);
 		spin_lock_irq(q->queue_lock);
-		sbpcd_end_request(req, 1);
+		end_request(1);
 		goto request_loop;
 	}
 
@@ -5008,7 +4950,7 @@ static void DO_SBPCD_REQUEST(request_queue_t * q)
 #endif
 			up(&ioctl_read_sem);
 			spin_lock_irq(q->queue_lock);
-			sbpcd_end_request(req, 1);
+			end_request(1);
 			goto request_loop;
 		}
 	}
@@ -5024,7 +4966,7 @@ static void DO_SBPCD_REQUEST(request_queue_t * q)
 	up(&ioctl_read_sem);
 	sbp_sleep(0);    /* wait a bit, try again */
 	spin_lock_irq(q->queue_lock);
-	sbpcd_end_request(req, 0);
+	end_request(0);
 	goto request_loop;
 }
 /*==========================================================================*/
@@ -5469,7 +5411,7 @@ static int sbpcd_open(struct cdrom_device_info *cdi, int purpose)
 static void sbpcd_release(struct cdrom_device_info * cdi)
 {
 	int i;
-	
+
 	i = minor(cdi->dev);
 	if ((i<0) || (i>=NR_SBPCD) || (D_S[i].drv_id==-1))
 	{
@@ -5488,7 +5430,6 @@ static void sbpcd_release(struct cdrom_device_info * cdi)
 		if (--D_S[d].open_count<=0) 
 		{
 			D_S[d].sbp_first_frame=D_S[d].sbp_last_frame=-1;
-			invalidate_buffers(cdi->dev);
 			if (D_S[d].audio_state!=audio_playing)
 				if (D_S[d].f_eject) cc_SpinDown();
 			D_S[d].diskstate_flags &= ~cd_size_bit;
@@ -5559,11 +5500,7 @@ static struct cdrom_device_info sbpcd_info = {
  *
  */
 
-#if (SBPCD_ISSUE-1)
-static int sbpcd_setup(char *s)
-#else
 int sbpcd_setup(char *s)
-#endif
 {
 #ifndef MODULE
 	int p[4];
@@ -5680,20 +5617,6 @@ static int __init config_spea(void)
 	return (0);
 }
 
-#ifdef DONT_MERGE_REQUESTS
-static int dont_merge_requests_fn(request_queue_t *q, struct request *req,
-                                struct request *next, int max_segments)
-{
-	return 0;
-}
-
-static int dont_bh_merge_fn(request_queue_t *q, struct request *req,
-                            struct buffer_head *bh, int max_segments)
-{
-	return 0;
-}
-#endif
-
 /*==========================================================================*/
 /*
  *  Test for presence of drive and initialize it.
@@ -5703,10 +5626,10 @@ static int dont_bh_merge_fn(request_queue_t *q, struct request *req,
 static devfs_handle_t devfs_handle;
 
 #ifdef MODULE
-int __init __SBPCD_INIT(void)
+int __init __sbpcd_init(void)
 #else
-int __init SBPCD_INIT(void)
-#endif /* MODULE */ 
+int __init sbpcd_init(void)
+#endif
 {
 	char nbuff[16];
 	int i=0, j=0;
@@ -5841,7 +5764,7 @@ int __init SBPCD_INIT(void)
 		i=SetSpeed();
 		if (i>=0) D_S[j].CD_changed=1;
 	}
-	
+
 	/*
 	 * Turn on the CD audio channels.
 	 * The addresses are obtained from SOUND_BASE (see sbpcd.h).
@@ -5849,8 +5772,8 @@ int __init SBPCD_INIT(void)
 #if SOUND_BASE
 	OUT(MIXER_addr,MIXER_CD_Volume); /* select SB Pro mixer register */
 	OUT(MIXER_data,0xCC); /* one nibble per channel, max. value: 0xFF */
-#endif /* SOUND_BASE */ 
-	
+#endif /* SOUND_BASE */
+
 	if (devfs_register_blkdev(MAJOR_NR, major_name, &sbpcd_bdops) != 0)
 	{
 		msg(DBG_INF, "Can't get MAJOR %d for Matsushita CDROM\n", MAJOR_NR);
@@ -5860,16 +5783,10 @@ int __init SBPCD_INIT(void)
 		goto init_done;
 #endif /* MODULE */
 	}
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DO_SBPCD_REQUEST, &sbpcd_lock);
-#ifdef DONT_MERGE_REQUESTS
-	(BLK_DEFAULT_QUEUE(MAJOR_NR))->back_merge_fn = dont_bh_merge_fn;
-	(BLK_DEFAULT_QUEUE(MAJOR_NR))->front_merge_fn = dont_bh_merge_fn;
-	(BLK_DEFAULT_QUEUE(MAJOR_NR))->merge_requests_fn = dont_merge_requests_fn;
-#endif
-	read_ahead[MAJOR_NR] = buffers * (CD_FRAMESIZE / 512);
-	
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_sbpcd_request, &sbpcd_lock);
+
 	request_region(CDo_command,4,major_name);
-	
+
 	devfs_handle = devfs_mk_dir (NULL, "sbp", NULL);
 	for (j=0;j<NR_SBPCD;j++)
 	{
@@ -5918,35 +5835,24 @@ int __init SBPCD_INIT(void)
 		}
 		D_S[j].sbpcd_infop = sbpcd_infop;
 		memcpy (sbpcd_infop, &sbpcd_info, sizeof(struct cdrom_device_info));
-		sbpcd_infop->dev = MKDEV(MAJOR_NR, j);
+		sbpcd_infop->dev = mk_kdev(MAJOR_NR, j);
 		strncpy(sbpcd_infop->name,major_name, sizeof(sbpcd_infop->name)); 
 
-		sprintf (nbuff, "c%dt%d/cd", SBPCD_ISSUE - 1, D_S[j].drv_id);
+		sprintf (nbuff, "c0t%d/cd", D_S[j].drv_id);
 		sbpcd_infop->de =
 		    devfs_register (devfs_handle, nbuff, DEVFS_FL_DEFAULT,
 				    MAJOR_NR, j, S_IFBLK | S_IRUGO | S_IWUGO,
 				    &sbpcd_bdops, NULL);
 		if (register_cdrom(sbpcd_infop))
 		{
-                	printk(" sbpcd: Unable to register with Uniform CD-ROm driver\n");
+			printk(" sbpcd: Unable to register with Uniform CD-ROm driver\n");
 		}
 	}
 	blk_queue_hardsect_size(BLK_DEFAULT_QUEUE(MAJOR_NR), CD_FRAMESIZE);
 
 #ifndef MODULE
  init_done:
-#if !(SBPCD_ISSUE-1)
-#ifdef CONFIG_SBPCD2
-	sbpcd2_init();
-#endif /* CONFIG_SBPCD2 */
-#ifdef CONFIG_SBPCD3
-	sbpcd3_init();
-#endif /* CONFIG_SBPCD3 */ 
-#ifdef CONFIG_SBPCD4
-	sbpcd4_init();
-#endif /* CONFIG_SBPCD4 */ 
-#endif /* !(SBPCD_ISSUE-1) */ 
-#endif /* MODULE */
+#endif
 	return 0;
 }
 /*==========================================================================*/
@@ -5978,14 +5884,11 @@ void sbpcd_exit(void)
 	msg(DBG_INF, "%s module released.\n", major_name);
 }
 
-
-#ifdef MODULE
-module_init(__SBPCD_INIT) /*HACK!*/;
-#endif
+module_init(__sbpcd_init) /*HACK!*/;
 module_exit(sbpcd_exit);
 
 
-#endif /* MODULE */ 
+#endif /* MODULE */
 /*==========================================================================*/
 /*
  * Check if the media has changed in the CD-ROM drive.
@@ -6003,7 +5906,7 @@ static int sbpcd_chk_disk_change(kdev_t full_dev)
                 D_S[i].CD_changed=0;
                 msg(DBG_CHK,"medium changed (drive %d)\n", i);
 		/* BUG! Should invalidate buffers! --AJK */
-		invalidate_buffers(full_dev);
+		/* Why should it do the above at all?! --mdcki */
 		D_S[d].diskstate_flags &= ~toc_bit;
 		D_S[d].diskstate_flags &= ~cd_size_bit;
 #if SAFE_MIXED

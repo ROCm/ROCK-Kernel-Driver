@@ -205,9 +205,8 @@ static void init_hwif_data(struct ata_channel *ch, unsigned int index)
 		struct ata_device *drive = &ch->drives[unit];
 
 		drive->type		= ATA_DISK;
-		drive->select.all	= (unit<<4)|0xa0;
+		drive->select.all	= (unit << 4) | 0xa0;
 		drive->channel		= ch;
-		drive->ctl		= 0x08;
 		drive->ready_stat	= READY_STAT;
 		drive->bad_wstat	= BAD_W_STAT;
 		sprintf(drive->name, "hd%c", 'a' + (index * MAX_DRIVES) + unit);
@@ -521,12 +520,11 @@ void ide_unregister(struct ata_channel *ch)
 	ch->ata_write = old.ata_write;
 	ch->atapi_read = old.atapi_read;
 	ch->atapi_write = old.atapi_write;
-	ch->XXX_udma = old.XXX_udma;
+	ch->udma_setup = old.udma_setup;
 	ch->udma_enable = old.udma_enable;
 	ch->udma_start = old.udma_start;
 	ch->udma_stop = old.udma_stop;
-	ch->udma_read = old.udma_read;
-	ch->udma_write = old.udma_write;
+	ch->udma_init = old.udma_init;
 	ch->udma_irq_status = old.udma_irq_status;
 	ch->udma_timeout = old.udma_timeout;
 	ch->udma_irq_lost = old.udma_irq_lost;
@@ -1093,7 +1091,7 @@ int ide_register_subdriver(struct ata_device *drive, struct ata_operations *driv
 	spin_unlock_irqrestore(&ide_lock, flags);
 	/* Default autotune or requested autotune */
 	if (drive->autotune != 2) {
-		if (drive->channel->XXX_udma) {
+		if (drive->channel->udma_setup) {
 
 			/*
 			 * Force DMAing for the beginning of the check.  Some
@@ -1104,7 +1102,7 @@ int ide_register_subdriver(struct ata_device *drive, struct ata_operations *driv
 			 */
 
 			udma_enable(drive, 0, 0);
-			drive->channel->XXX_udma(drive);
+			drive->channel->udma_setup(drive);
 #ifdef CONFIG_BLK_DEV_IDE_TCQ_DEFAULT
 			udma_tcq_enable(drive, 1);
 #endif
@@ -1481,13 +1479,6 @@ static int __init ata_module_init(void)
 #endif
 #ifdef CONFIG_BLK_DEV_IDEFLOPPY
 	idefloppy_init();
-#endif
-#ifdef CONFIG_BLK_DEV_IDESCSI
-# ifdef CONFIG_SCSI
-	idescsi_init();
-# else
-   #error ATA SCSI emulation selected but no SCSI-subsystem in kernel
-# endif
 #endif
 
 	initializing = 0;

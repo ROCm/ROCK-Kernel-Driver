@@ -173,9 +173,7 @@ static int qd_find_disk_type(struct ata_device *drive,
 
 	if (!*drive->id->model) return 0;
 
-	strncpy(model,drive->id->model,40);
-	ide_fixstring(model,40,1); /* byte-swap */
-
+	strncpy(model,drive->id->model, 40);
 	for (p = qd65xx_timing ; p->offset != -1 ; p++) {
 		if (!strncmp(p->model, model+p->offset, 4)) {
 			printk(KERN_DEBUG "%s: listed !\n", drive->name);

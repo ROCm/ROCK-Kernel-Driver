@@ -359,11 +359,11 @@ extern void paging_init(void);
 extern void update_mmu_cache(struct vm_area_struct *, unsigned long, pte_t);
 
 /* Encode and de-code a swap entry */
-#define SWP_TYPE(entry)			(((entry).val >> 1) & 0x3f)
-#define SWP_OFFSET(entry)		((entry).val >> 8)
-#define SWP_ENTRY(type, offset)		((swp_entry_t) { ((type) << 1) | ((offset) << 8) })
-#define pte_to_swp_entry(pte)		((swp_entry_t) { pte_val(pte) >> PTE_SHIFT })
-#define swp_entry_to_pte(x)		((pte_t) { (x).val << PTE_SHIFT })
+#define __swp_type(entry)		(((entry).val >> 1) & 0x3f)
+#define __swp_offset(entry)		((entry).val >> 8)
+#define __swp_entry(type, offset)	((swp_entry_t) { ((type) << 1) | ((offset) << 8) })
+#define __pte_to_swp_entry(pte)		((swp_entry_t) { pte_val(pte) >> PTE_SHIFT })
+#define __swp_entry_to_pte(x)		((pte_t) { (x).val << PTE_SHIFT })
 
 /*
  * kern_addr_valid is intended to indicate whether an address is a valid

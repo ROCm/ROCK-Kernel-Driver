@@ -145,27 +145,25 @@ extern inline void update_mmu_cache(struct vm_area_struct * vma,
 
 #ifdef CONFIG_SUN3
 /* Macros to (de)construct the fake PTEs representing swap pages. */
-#define SWP_TYPE(x)                ((x).val & 0x7F)
-#define SWP_OFFSET(x)      (((x).val) >> 7)
-#define SWP_ENTRY(type,offset) ((swp_entry_t) { ((type) | ((offset) << 7)) })
-#define pte_to_swp_entry(pte)		((swp_entry_t) { pte_val(pte) })
-#define swp_entry_to_pte(x)		((pte_t) { (x).val })
+#define __swp_type(x)		((x).val & 0x7F)
+#define __swp_offset(x)		(((x).val) >> 7)
+#define __swp_entry(type,offset) ((swp_entry_t) { ((type) | ((offset) << 7)) })
+#define __pte_to_swp_entry(pte)	((swp_entry_t) { pte_val(pte) })
+#define __swp_entry_to_pte(x)	((pte_t) { (x).val })
 
 #else
 
 /* Encode and de-code a swap entry (must be !pte_none(e) && !pte_present(e)) */
-#define SWP_TYPE(x)			(((x).val >> 1) & 0xff)
-#define SWP_OFFSET(x)			((x).val >> 10)
-#define SWP_ENTRY(type, offset)		((swp_entry_t) { ((type) << 1) | ((offset) << 10) })
-#define pte_to_swp_entry(pte)		((swp_entry_t) { pte_val(pte) })
-#define swp_entry_to_pte(x)		((pte_t) { (x).val })
+#define __swp_type(x)		(((x).val >> 1) & 0xff)
+#define __swp_offset(x)		((x).val >> 10)
+#define __swp_entry(type, offset) ((swp_entry_t) { ((type) << 1) | ((offset) << 10) })
+#define __pte_to_swp_entry(pte)	((swp_entry_t) { pte_val(pte) })
+#define __swp_entry_to_pte(x)	((pte_t) { (x).val })
 
 #endif /* CONFIG_SUN3 */
 
 #endif /* !__ASSEMBLY__ */
 
-/* Needs to be defined here and not in linux/mm.h, as it is arch dependent */
-#define PageSkip(page)		(0)
 #define kern_addr_valid(addr)	(1)
 
 #define io_remap_page_range remap_page_range

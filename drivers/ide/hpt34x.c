@@ -172,7 +172,7 @@ static int config_chipset_for_dma(struct ata_device *drive, u8 udma)
 	return !hpt34x_tune_chipset(drive, mode);
 }
 
-static int config_drive_xfer_rate(struct ata_device *drive)
+static int hpt34x_udma_setup(struct ata_device *drive)
 {
 	struct hd_driveid *id = drive->id;
 	int on = 1;
@@ -246,48 +246,33 @@ static int hpt34x_udma_stop(struct ata_device *drive)
 	return (dma_stat & 7) != 4;		/* verify good DMA status */
 }
 
-static int do_udma(unsigned int reading, struct ata_device *drive, struct request *rq)
+static int hpt34x_udma_init(struct ata_device *drive, struct request *rq)
 {
 	struct ata_channel *ch = drive->channel;
 	unsigned long dma_base = ch->dma_base;
 	unsigned int count;
+	u8 cmd;
 
 	if (!(count = udma_new_table(ch, rq)))
 		return 1;	/* try PIO instead of DMA */
 
-	outl(ch->dmatable_dma, dma_base + 4); /* PRD table */
-	reading |= 0x01;
-	outb(reading, dma_base);		/* specify r/w */
+	if (rq_data_dir(rq) == READ)
+		cmd = 0x09;
+	else
+		cmd = 0x01;
+
+	outl(ch->dmatable_dma, dma_base + 4);	/* PRD table */
+	outb(cmd, dma_base);			/* specify r/w */
 	outb(inb(dma_base+2)|6, dma_base+2);	/* clear INTR & ERROR flags */
 	drive->waiting_for_dma = 1;
 
 	if (drive->type != ATA_DISK)
 		return 0;
 
-	ide_set_handler(drive, &ide_dma_intr, WAIT_CMD, NULL);	/* issue cmd to drive */
-	OUT_BYTE((reading == 9) ? WIN_READDMA : WIN_WRITEDMA, IDE_COMMAND_REG);
+	ide_set_handler(drive, ide_dma_intr, WAIT_CMD, NULL);	/* issue cmd to drive */
+	OUT_BYTE((cmd == 0x09) ? WIN_READDMA : WIN_WRITEDMA, IDE_COMMAND_REG);
 
 	return 0;
-}
-
-static int hpt34x_udma_read(struct ata_device *drive, struct request *rq)
-{
-	return do_udma(1 << 3, drive, rq);
-}
-
-static int hpt34x_udma_write(struct ata_device *drive, struct request *rq)
-{
-	return do_udma(0, drive, rq);
-}
-
-/*
- * This is specific to the HPT343 UDMA bios-less chipset
- * and HPT345 UDMA bios chipset (stamped HPT363)
- * by HighPoint|Triones Technologies, Inc.
- */
-static int hpt34x_dmaproc(struct ata_device *drive)
-{
-	return config_drive_xfer_rate(drive);
 }
 #endif
 
@@ -356,9 +341,8 @@ static void __init ide_init_hpt34x(struct ata_channel *hwif)
 			hwif->autodma = 0;
 
 		hwif->udma_stop = hpt34x_udma_stop;
-		hwif->udma_read = hpt34x_udma_read;
-		hwif->udma_write = hpt34x_udma_write;
-		hwif->XXX_udma = hpt34x_dmaproc;
+		hwif->udma_init = hpt34x_udma_init;
+		hwif->udma_setup = hpt34x_udma_setup;
 		hwif->highmem = 1;
 	} else {
 		hwif->drives[0].autotune = 1;

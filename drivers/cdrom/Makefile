@@ -34,9 +34,6 @@ obj-$(CONFIG_MCD)		+= mcd.o        cdrom.o
 obj-$(CONFIG_MCDX)		+= mcdx.o       cdrom.o
 obj-$(CONFIG_OPTCD)		+= optcd.o
 obj-$(CONFIG_SBPCD)		+= sbpcd.o      cdrom.o
-obj-$(CONFIG_SBPCD2)		+= sbpcd2.o     cdrom.o
-obj-$(CONFIG_SBPCD3)		+= sbpcd3.o     cdrom.o
-obj-$(CONFIG_SBPCD4)		+= sbpcd4.o     cdrom.o
 obj-$(CONFIG_SJCD)		+= sjcd.o
 obj-$(CONFIG_CDU535)		+= sonycd535.o
 

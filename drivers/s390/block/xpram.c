@@ -59,25 +59,15 @@
 #include <linux/version.h>
 
 #ifdef MODULE
-char kernel_version [] = UTS_RELEASE; 
+char kernel_version [] = UTS_RELEASE;
 #endif
 
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,3,98))
-#  define XPRAM_VERSION 24
-#else
-#  define XPRAM_VERSION 22
-#endif 
-
-#if (XPRAM_VERSION == 24)
-#  include <linux/config.h>
-#  include <linux/init.h>
-#endif /* V24 */
+#include <linux/config.h>
+#include <linux/init.h>
 #include <linux/sched.h>
 #include <linux/kernel.h> /* printk() */
 #include <linux/slab.h> /* kmalloc() */
-#if (XPRAM_VERSION == 24)
-#  include <linux/devfs_fs_kernel.h>
-#endif /* V24 */
+#include <linux/devfs_fs_kernel.h>
 #include <linux/fs.h>     /* everything... */
 #include <linux/errno.h>  /* error codes */
 #include <linux/timer.h>
@@ -89,7 +79,6 @@ char kernel_version [] = UTS_RELEASE;
 #include <asm/system.h>   /* cli(), *_flags */
 #include <asm/uaccess.h>  /* put_user */
 
-#if (XPRAM_VERSION == 24)
 #define MAJOR_NR xpram_major /* force definitions on in blk.h */
 int xpram_major;   /* must be declared before including blk.h */
 devfs_handle_t xpram_devfs_handle;
@@ -105,7 +94,6 @@ devfs_handle_t xpram_devfs_handle;
 #include "xpram.h"        /* local definitions */
 
 __setup("xpram_parts=", xpram_setup);
-#endif /* V24 */
 
 /*
    define the debug levels:
@@ -133,26 +121,7 @@ __setup("xpram_parts=", xpram_setup);
 #define PRINT_WARN(x...) printk ( KERN_DEBUG PRINTK_HEADER "warning:" x )
 #define PRINT_ERR(x...) printk ( KERN_DEBUG PRINTK_HEADER "error:" x )
 #define PRINT_FATAL(x...) printk ( KERN_DEBUG PRINTK_HEADER "panic:" x )
-#endif	
-
-#if (XPRAM_VERSION == 22)
-#define MAJOR_NR xpram_major /* force definitions on in blk.h */
-int xpram_major;   /* must be declared before including blk.h */
-
-#define DEVICE_NR(device) MINOR(device)   /* xpram has no partition bits */
-#define DEVICE_NAME "xpram"               /* name for messaging */
-#define DEVICE_INTR xpram_intrptr         /* pointer to the bottom half */
-#define DEVICE_NO_RANDOM                  /* no entropy to contribute */
-
-
-#define DEVICE_OFF(d) /* do-nothing */
-
-#define DEVICE_REQUEST *xpram_dummy_device_request  /* dummy function variable 
-						     * to prevent warnings 
-						     */#include <linux/blk.h>
-
-#include "xpram.h"        /* local definitions */
-#endif /* V22 */
+#endif
 
 /*
  * Non-prefixed symbols are static. They are meant to be assigned at
@@ -659,13 +628,6 @@ int xpram_ioctl (struct inode *inode, struct file *filp,
 	case BLKRRPART: /* re-read partition table: can't do it, 0x1259 */
 		return -EINVAL;
 
-#if (XPRAM_VERSION == 22)
-		RO_IOCTLS(inode->i_rdev, arg); /* the default RO operations 
-                                                * BLKROSET
-						* BLKROGET
-                                                */
-#endif /* V22 */
-
 	case HDIO_GETGEO:
 		/*
 		 * get geometry: we have to fake one...  trim the size to a
@@ -695,27 +657,6 @@ int xpram_ioctl (struct inode *inode, struct file *filp,
 /*
  * The file operations
  */
-
-#if (XPRAM_VERSION == 22)
-struct file_operations xpram_fops = {
-	NULL,          /* lseek: default */
-	block_read,
-	block_write,
-	NULL,          /* xpram_readdir */
-	NULL,          /* xpram_select */
-	xpram_ioctl,
-	NULL,          /* xpram_mmap */
-	xpram_open,
-	NULL,          /* flush */
-	xpram_release,
-	block_fsync,
-	NULL,          /* xpram_fasync */
-        NULL,
-        NULL
-};
-#endif /* V22 */
-
-#if (XPRAM_VERSION == 24)
 struct block_device_operations xpram_devops =
 {
 	owner:   THIS_MODULE,
@@ -723,7 +664,6 @@ struct block_device_operations xpram_devops =
 	open:    xpram_open,
 	release: xpram_release,
 };
-#endif /* V24 */
 
 /*
  * Block-driver specific functions
@@ -740,11 +680,7 @@ void xpram_request(request_queue_t * queue)
         char * buffer;                 /* local pointer into buffer cache */
 	int dev_no;                    /* device number of request */
 	int fault;                     /* faulty access to expanded memory */
-#if ( XPRAM_VERSION == 24 )	
         struct request * current_req;      /* working request */
-#else 
-#       define current_req CURRENT
-#endif /* V24 */
 
 	while(1) {
 		if (blk_queue_empty(QUEUE)) {
@@ -753,10 +689,8 @@ void xpram_request(request_queue_t * queue)
 		}
 
 		fault=0;
-#if ( XPRAM_VERSION == 24 )
 		current_req = CURRENT;
-#endif /* V24 */
-		dev_no = DEVICE_NR(current_req->rq_dev); 
+		dev_no = DEVICE_NR(current_req->rq_dev);
 		/* Check if the minor number is in range */
 		if ( dev_no > xpram_devs ) {
 			static int count = 0;
@@ -872,26 +806,18 @@ void xpram_request(request_queue_t * queue)
  *           partition size (if provided). A parsing error of a value
  *           results in this value being set to -EINVAL.
  */
-#if (XPRAM_VERSION == 22)
-void xpram_setup (char *str, int *ints)
-#else 
 int xpram_setup (char *str)
-#endif /* V22 */
 {
 	devs = xpram_read_int(&str);
-	if ( devs != -EINVAL ) 
-	  if ( xpram_read_size_list_tail(&str,devs,sizes) < 0 ) {
+	if ( devs != -EINVAL )
+		if ( xpram_read_size_list_tail(&str,devs,sizes) < 0 ) {
 			PRINT_ERR("error while reading xpram parameters.\n");
-#if (XPRAM_VERSION == 24)
 			return -EINVAL;
-#endif /* V24 */
-			  }
-#if (XPRAM_VERSION == 24)
-	  else return 0;
-	else return -EINVAL;
-#elif (XPRAM_VERSION == 22)
-	return; 
-#endif /* V24/V22 */
+		}
+		else
+			return 0;
+	else
+		return -EINVAL;
 }
 
 /*
@@ -911,12 +837,10 @@ int xpram_init(void)
 
 	int mem_auto_no=0;    /* number of (implicit) zero parameters in sizes */
 	int mem_auto;         /* automatically determined device size          */
-#if (XPRAM_VERSION == 24)
 	int minor_length;     /* store the length of a minor (w/o '\0') */
         int minor_thresh;     /* threshhold for minor lenght            */
 
         request_queue_t *q;   /* request queue */
-#endif /* V24 */
 
 				/*
 				 * Copy the (static) cfg variables to public prefixed ones to allow
@@ -975,29 +899,23 @@ int xpram_init(void)
 	/*
 	 * Register your major, and accept a dynamic number
 	 */
-#if (XPRAM_VERSION == 22)
-	result = register_blkdev(xpram_major, "xpram", &xpram_fops);
-#elif (XPRAM_VERSION == 24)
 	result = devfs_register_blkdev(xpram_major, "xpram", &xpram_devops);
-#endif /* V22/V24 */
 	if (result < 0) {
 		PRINT_ERR("Can't get major %d\n",xpram_major);
                 PRINT_ERR("Giving up xpram\n");
 		return result;
 	}
-#if (XPRAM_VERSION == 24)
 	xpram_devfs_handle = devfs_mk_dir (NULL, "slram", NULL);
 	devfs_register_series (xpram_devfs_handle, "%u", XPRAM_MAX_DEVS,
 			       DEVFS_FL_DEFAULT, XPRAM_MAJOR, 0,
 			       S_IFBLK | S_IRUSR | S_IWUSR,
 			       &xpram_devops, NULL);
-#endif /* V22/V24 */
 	if (xpram_major == 0) xpram_major = result; /* dynamic */
 	major = xpram_major; /* Use `major' later on to save typing */
 
 	result = -ENOMEM; /* for the possible errors */
 
-	/* 
+	/*
 	 * measure expanded memory
 	 */
 
@@ -1018,13 +936,9 @@ int xpram_init(void)
 	 * arrays if it uses the default values.
 	 */
 
-#if (XPRAM_VERSION == 22)
-	blk_dev[major].request_fn = xpram_request;
-#elif (XPRAM_VERSION == 24)
-	q = BLK_DEFAULT_QUEUE (major);
+	q = BLK_DEFAULT_QUEUE(major);
 	blk_init_queue (q, xpram_request);
 	blk_queue_hardsect_size(q, xpram_hardsect);
-#endif /* V22/V24 */
 
 	/* we want to have XPRAM_UNUSED blocks security buffer between devices */
 	mem_usable=xpram_mem_avail-(XPRAM_UNUSED*(xpram_devs-1));
@@ -1076,15 +990,12 @@ int xpram_init(void)
 		goto fail_malloc_devices;
 	}
 	memset(xpram_devices, 0, xpram_devs * sizeof (Xpram_Dev));
-#if (XPRAM_VERSION == 24)
         minor_length = 1;
         minor_thresh = 10;
-#endif /* V24 */
 	for (i=0; i < xpram_devs; i++) {
 		/* data and usage remain zeroed */
 		xpram_devices[i].size = xpram_sizes[i];  /* size in kB not in bytes */
 		atomic_set(&(xpram_devices[i].usage),0);
-#if (XPRAM_VERSION == 24)
                 if (i == minor_thresh) {
 		  minor_length++;
 		  minor_thresh *= 10;
@@ -1119,27 +1030,20 @@ int xpram_init(void)
 		  goto fail_devfs_register;
 		}
 #endif  /* WHY? */
-#endif /* V24 */
-				 
 	}
 
 	return 0; /* succeed */
 
 	/* clean up memory in case of failures */
-#if (XPRAM_VERSION == 24)
  fail_devfs_register:
         for (i=0; i < xpram_devs; i++) {
 	  if ( xpram_devices[i].device_name )
 	    kfree(xpram_devices[i].device_name);
 	}
 	kfree(xpram_devices);
-#endif /* V24 */
 	kfree (xpram_offsets);
  fail_malloc_devices:
  fail_malloc:
-#if (XPRAM_VERSION == 22)
-	blk_dev[major].request_fn = NULL;
-#endif /* V22 */
 	/* ???	unregister_chrdev(major, "xpram"); */
 	unregister_blkdev(major, "xpram");
 	return result;
@@ -1168,20 +1072,12 @@ void cleanup_module(void)
 	int i;
 
 	/* first of all, reset all the data structures */
-
-#if (XPRAM_VERSION == 22)
-	blk_dev[major].request_fn = NULL;
-#endif /* V22 */
 	kfree(xpram_offsets);
 	blk_clear(major);
 
 				/* finally, the usual cleanup */
-#if (XPRAM_VERSION == 22)
-	unregister_blkdev(major, "xpram");
-#elif (XPRAM_VERSION == 24)
 	devfs_unregister(xpram_devfs_handle);
 	if (devfs_unregister_blkdev(MAJOR_NR, "xpram"))
 		printk(KERN_WARNING "xpram: cannot unregister blkdev\n");
-#endif /* V22/V24 */
 	kfree(xpram_devices);
 }

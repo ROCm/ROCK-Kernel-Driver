@@ -427,7 +427,6 @@ static ssize_t debug_output(struct file *file,	/* file descriptor */
 {
 	size_t count = 0;
 	size_t entry_offset, size = 0;
-	int rc;
 	file_private_info_t *p_info;
 
 	p_info = ((file_private_info_t *) file->private_data);
@@ -443,9 +442,9 @@ static ssize_t debug_output(struct file *file,	/* file descriptor */
 		size = MIN((len - count), (size - entry_offset));
 
 		if(size){
-			if ((rc = copy_to_user(user_buf + count, 
-					p_info->temp_buf + entry_offset, size)))
-			return rc;
+			if (copy_to_user(user_buf + count, 
+					p_info->temp_buf + entry_offset, size))
+			return -EFAULT;
 		}
 		count += size;
 		entry_offset = 0;

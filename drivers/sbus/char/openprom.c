@@ -408,9 +408,9 @@ static int openprom_bsd_ioctl(struct inode * inode, struct file * file,
 
 		tmp[len] = '\0';
 
-		error = __copy_to_user((void *)arg, &op, sizeof(op));
-		if (!error)
-			error = copy_to_user(op.op_buf, tmp, len);
+		if (__copy_to_user((void *)arg, &op, sizeof(op)) != 0
+		    || copy_to_user(op.op_buf, tmp, len) != 0)
+			error = -EFAULT;
 
 		kfree(tmp);
 		kfree(str);

@@ -116,14 +116,14 @@ int ptrace_usercopy(addr_t realuseraddr,addr_t copyaddr,int len,int tofromuser,i
 	{
 		if(writeuser)
 		{
-			retval=copy_from_user((void *)realuseraddr,(void *)copyaddr,len);
+			retval=copy_from_user((void *)realuseraddr,(void *)copyaddr,len) ? -EFAULT : 0;
 		}
 		else
 		{
 			if(realuseraddr==(addr_t)NULL)
-				retval=(clear_user((void *)copyaddr,len)==-EFAULT ? -EIO:0);
+				retval=(clear_user((void *)copyaddr,len) ? -EIO:0);
 			else
-				retval=(copy_to_user((void *)copyaddr,(void *)realuseraddr,len)==-EFAULT ? -EIO:0);
+				retval=(copy_to_user((void *)copyaddr,(void *)realuseraddr,len) ? -EIO:0);
 		}      
 	}
 	else

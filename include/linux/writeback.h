@@ -31,6 +31,7 @@ static inline int current_is_pdflush(void)
 
 void writeback_unlocked_inodes(int *nr_to_write, int sync_mode,
 				unsigned long *older_than_this);
+void wake_up_inode(struct inode *inode);
 void __wait_on_inode(struct inode * inode);
 void sync_inodes_sb(struct super_block *, int wait);
 void sync_inodes(int wait);

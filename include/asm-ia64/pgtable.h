@@ -402,14 +402,11 @@ pte_same (pte_t a, pte_t b)
 extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
 extern void paging_init (void);
 
-#define SWP_TYPE(entry)			(((entry).val >> 1) & 0xff)
-#define SWP_OFFSET(entry)		(((entry).val << 1) >> 10)
-#define SWP_ENTRY(type,offset)		((swp_entry_t) { ((type) << 1) | ((long) (offset) << 9) })
-#define pte_to_swp_entry(pte)		((swp_entry_t) { pte_val(pte) })
-#define swp_entry_to_pte(x)		((pte_t) { (x).val })
-
-/* Needs to be defined here and not in linux/mm.h, as it is arch dependent */
-#define PageSkip(page)		(0)
+#define __swp_type(entry)		(((entry).val >> 1) & 0xff)
+#define __swp_offset(entry)		(((entry).val << 1) >> 10)
+#define __swp_entry(type,offset)	((swp_entry_t) { ((type) << 1) | ((long) (offset) << 9) })
+#define __pte_to_swp_entry(pte)		((swp_entry_t) { pte_val(pte) })
+#define __swp_entry_to_pte(x)		((pte_t) { (x).val })
 
 #define io_remap_page_range remap_page_range	/* XXX is this right? */
 

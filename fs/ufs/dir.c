@@ -356,7 +356,7 @@ void ufs_set_link(struct inode *dir, struct ufs_dir_entry *de,
 	dir->i_version = ++event;
 	de->d_ino = cpu_to_fs32(dir->i_sb, inode->i_ino);
 	mark_buffer_dirty(bh);
-	if (IS_SYNC(dir)) {
+	if (IS_DIRSYNC(dir)) {
 		ll_rw_block (WRITE, 1, &bh);
 		wait_on_buffer(bh);
 	}
@@ -457,7 +457,7 @@ int ufs_add_link(struct dentry *dentry, struct inode *inode)
 	de->d_ino = cpu_to_fs32(sb, inode->i_ino);
 	ufs_set_de_type(sb, de, inode->i_mode);
 	mark_buffer_dirty(bh);
-	if (IS_SYNC(dir)) {
+	if (IS_DIRSYNC(dir)) {
 		ll_rw_block (WRITE, 1, &bh);
 		wait_on_buffer (bh);
 	}
@@ -508,7 +508,7 @@ int ufs_delete_entry (struct inode * inode, struct ufs_dir_entry * dir,
 			inode->i_ctime = inode->i_mtime = CURRENT_TIME;
 			mark_inode_dirty(inode);
 			mark_buffer_dirty(bh);
-			if (IS_SYNC(inode)) {
+			if (IS_DIRSYNC(inode)) {
 				ll_rw_block(WRITE, 1, &bh);
 				wait_on_buffer(bh);
 			}
