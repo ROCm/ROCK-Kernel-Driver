@@ -1,8 +1,6 @@
 #
 # USB Storage driver configuration
 #
-comment "SCSI support is needed for USB Storage"
-	depends on USB && SCSI=n
 
 config USB_STORAGE
 	tristate "USB Mass Storage support"

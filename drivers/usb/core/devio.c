@@ -430,19 +430,14 @@ static int findintfep(struct usb_device *dev, unsigned int ep)
 
 static int findintfif(struct usb_device *dev, unsigned int ifn)
 {
-	unsigned int i, j;
-        struct usb_interface *iface;
-	struct usb_host_interface *alts;
+	unsigned int i;
 
 	if (ifn & ~0xff)
 		return -EINVAL;
 	for (i = 0; i < dev->actconfig->desc.bNumInterfaces; i++) {
-		iface = dev->actconfig->interface[i];
-		for (j = 0; j < iface->num_altsetting; j++) {
-                        alts = &iface->altsetting[j];
-			if (alts->desc.bInterfaceNumber == ifn)
-				return i;
-		}
+		if (dev->actconfig->interface[i]->
+				altsetting[0].desc.bInterfaceNumber == ifn)
+			return i;
 	}
 	return -ENOENT; 
 }
@@ -688,9 +683,7 @@ static int proc_getdriver(struct dev_state *ps, void __user *arg)
 		return -EFAULT;
 	if ((ret = findintfif(ps->dev, gd.interface)) < 0)
 		return ret;
-	interface = usb_ifnum_to_if(ps->dev, gd.interface);
-	if (!interface)
-		return -EINVAL;
+	interface = ps->dev->actconfig->interface[ret];
 	if (!interface->driver)
 		return -ENODATA;
 	strcpy(gd.driver, interface->driver->name);
@@ -744,9 +737,7 @@ static int proc_setintf(struct dev_state *ps, void __user *arg)
 		return -EFAULT;
 	if ((ret = findintfif(ps->dev, setintf.interface)) < 0)
 		return ret;
-	interface = usb_ifnum_to_if(ps->dev, setintf.interface);
-	if (!interface)
-		return -EINVAL;
+	interface = ps->dev->actconfig->interface[ret];
 	if (interface->driver) {
 		if ((ret = checkintf(ps, ret)))
 			return ret;

@@ -563,9 +563,9 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 
 	/*
 	 * If we're running the CB transport, which is incapable
-	 * of determining status on its own, we need to auto-sense
+	 * of determining status on its own, we will auto-sense
 	 * unless the operation involved a data-in transfer.  Devices
-	 * can signal data-in errors by stalling the bulk-in pipe.
+	 * can signal most data-in errors by stalling the bulk-in pipe.
 	 */
 	if ((us->protocol == US_PR_CB || us->protocol == US_PR_DPCM_USB) &&
 			srb->sc_data_direction != SCSI_DATA_READ) {
@@ -698,7 +698,11 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 		 * out the sense buffer so the higher layers won't realize
 		 * we did an unsolicited auto-sense. */
 		if (result == USB_STOR_TRANSPORT_GOOD &&
-				(srb->sense_buffer[2] & 0xf) == 0x0) {
+			/* Filemark 0, ignore EOM, ILI 0, no sense */
+				(srb->sense_buffer[2] & 0xaf) == 0 &&
+			/* No ASC or ASCQ */
+				srb->sense_buffer[12] == 0 &&
+				srb->sense_buffer[13] == 0) {
 			srb->result = SAM_STAT_GOOD;
 			srb->sense_buffer[0] = 0x0;
 		}
@@ -809,15 +813,19 @@ int usb_stor_CBI_transport(Scsi_Cmnd *srb, struct us_data *us)
 	}
 
 	/* If not UFI, we interpret the data as a result code 
-	 * The first byte should always be a 0x0
-	 * The second byte & 0x0F should be 0x0 for good, otherwise error 
+	 * The first byte should always be a 0x0.
+	 *
+	 * Some bogus devices don't follow that rule.  They stuff the ASC
+	 * into the first byte -- so if it's non-zero, call it a failure.
 	 */
 	if (us->iobuf[0]) {
-		US_DEBUGP("CBI IRQ data showed reserved bType %d\n",
+		US_DEBUGP("CBI IRQ data showed reserved bType 0x%x\n",
 				us->iobuf[0]);
-		return USB_STOR_TRANSPORT_ERROR;
+		goto Failed;
+
 	}
 
+	/* The second byte & 0x0F should be 0x0 for good, otherwise error */
 	switch (us->iobuf[1] & 0x0F) {
 		case 0x00: 
 			return USB_STOR_TRANSPORT_GOOD;

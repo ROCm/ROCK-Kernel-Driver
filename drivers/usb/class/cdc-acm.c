@@ -595,12 +595,12 @@ static int acm_probe (struct usb_interface *intf,
 			 * is there it's not for call management ... so use
 			 * the cdc union descriptor whenever there is one.
 			 */
-			ifcom = intf->altsetting + 0;
+			ifcom = intf->cur_altsetting;
 			if (intf == cfacm->interface[j]) {
-				ifdata = cfacm->interface[j + 1]->altsetting + 0;
+				ifdata = cfacm->interface[j + 1]->cur_altsetting;
 				data = cfacm->interface[j + 1];
 			} else if (intf == cfacm->interface[j + 1]) {
-				ifdata = cfacm->interface[j]->altsetting + 0;
+				ifdata = cfacm->interface[j]->cur_altsetting;
 				data = cfacm->interface[j];
 			} else
 				continue;

@@ -589,7 +589,7 @@ static int usb_pcwd_probe(struct usb_interface *interface, const struct usb_devi
 	}
 
 	/* get the active interface descriptor */
-	iface_desc = &interface->altsetting[interface->act_altsetting];
+	iface_desc = interface->cur_altsetting;
 
 	/* check out that we have a HID device */
 	if (!(iface_desc->desc.bInterfaceClass == USB_CLASS_HID)) {

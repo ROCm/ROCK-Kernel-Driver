@@ -43,7 +43,8 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/usb.h>
-
+#include <asm/unaligned.h>
+#include <asm/byteorder.h>
 /*
  * Version Information
  */
@@ -160,9 +161,9 @@ aiptek_irq(struct urb *urb, struct pt_regs *regs)
 	proximity = data[5] & 0x01;
 	input_report_key(dev, BTN_TOOL_PEN, proximity);
 
-	x = ((__u32) data[1]) | ((__u32) data[2] << 8);
-	y = ((__u32) data[3]) | ((__u32) data[4] << 8);
-	pressure = ((__u32) data[6]) | ((__u32) data[7] << 8);
+	x = le16_to_cpu(get_unaligned((u16 *) &data[1]));
+	y = le16_to_cpu(get_unaligned((u16 *) &data[3]));
+	pressure = le16_to_cpu(*(u16 *) &data[6]);
 	pressure -= aiptek->features->pressure_min;
 
 	if (pressure < 0) {
@@ -209,8 +210,10 @@ aiptek_open(struct input_dev *dev)
 		return 0;
 
 	aiptek->irq->dev = aiptek->usbdev;
-	if (usb_submit_urb(aiptek->irq, GFP_KERNEL))
+	if (usb_submit_urb(aiptek->irq, GFP_KERNEL)) {
+		aiptek->open--;
 		return -EIO;
+	}
 
 	return 0;
 }
@@ -234,19 +237,27 @@ usb_set_report(struct usb_device *dev, struct usb_host_interface *inter, unsigne
 		(type << 8) + id, inter->desc.bInterfaceNumber, buf, size, HZ);
 }
 
-static void
+static int
 aiptek_command(struct usb_device *dev, struct usb_host_interface *inter,
 	       unsigned char command, unsigned char data)
 {
-	__u8 buf[3];
+	u8 *buf;
+	int err;
+	
+	buf = kmalloc(3, GFP_KERNEL);
+	if (!buf)
+		return -ENOMEM;
 
 	buf[0] = 4;
 	buf[1] = command;
 	buf[2] = data;
 
-	if (usb_set_report(dev, inter, 3, 2, buf, 3) != 3) {
+	if ((err = usb_set_report(dev, inter, 3, 2, buf, 3)) != 3) {
 		dbg("aiptek_command: 0x%x 0x%x\n", command, data);
 	}
+	
+	kfree(buf);
+	return err < 0 ? err : 0;
 }
 
 static int 
@@ -257,30 +268,32 @@ aiptek_probe(struct usb_interface *intf,
 	struct usb_host_interface *interface = intf->altsetting + 0;
 	struct usb_endpoint_descriptor *endpoint;
 	struct aiptek *aiptek;
+	int err = -ENOMEM;
 
 	if (!(aiptek = kmalloc(sizeof (struct aiptek), GFP_KERNEL)))
-		return -ENOMEM;
+		goto error_out_noalloc;
 
 	memset(aiptek, 0, sizeof (struct aiptek));
 
-	aiptek->data = usb_buffer_alloc(dev, 10, SLAB_ATOMIC, &aiptek->data_dma);
+	aiptek->data = usb_buffer_alloc(dev, 10, GFP_KERNEL, &aiptek->data_dma);
 	if (!aiptek->data) {
-		kfree(aiptek);
-		return -ENOMEM;
+		goto error_out_nobuf;
 	}
 
 	aiptek->irq = usb_alloc_urb(0, GFP_KERNEL);
 	if (!aiptek->irq) {
-		usb_buffer_free(dev, 10, aiptek->data, aiptek->data_dma);
-		kfree(aiptek);
-		return -ENOMEM;
+		goto error_out_nourb;
 	}
 
 	/* Resolution500LPI */
-	aiptek_command(dev, interface, 0x18, 0x04);
+	err = aiptek_command(dev, interface, 0x18, 0x04);
+	if (err)
+		goto error_out;
 
 	/* SwitchToTablet */
-	aiptek_command(dev, interface, 0x10, 0x01);
+	err = aiptek_command(dev, interface, 0x10, 0x01);
+	if (err)
+		goto error_out;
 
 	aiptek->features = aiptek_features + id->driver_info;
 
@@ -340,6 +353,16 @@ aiptek_probe(struct usb_interface *intf,
 
 	usb_set_intfdata(intf, aiptek);
 	return 0;
+
+error_out:
+	usb_free_urb(aiptek->irq);
+error_out_nourb:
+	usb_buffer_free(dev, 10, aiptek->data, aiptek->data_dma);
+error_out_nobuf:
+	kfree(aiptek);
+error_out_noalloc:
+	return err;
+	
 }
 
 static void

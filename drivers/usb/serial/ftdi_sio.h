@@ -30,6 +30,8 @@
 #define FTDI_NF_RIC_VID	0x0DCD	/* Vendor Id */
 #define FTDI_NF_RIC_PID	0x0001	/* Product Id */
 
+/* www.irtrans.de device */
+#define FTDI_IRTRANS_PID 0xFC60 /* Product Id */
 
 /* www.crystalfontz.com devices - thanx for providing free devices for evaluation ! */
 /* they use the ftdi chipset for the USB interface and the vendor id is the same */
