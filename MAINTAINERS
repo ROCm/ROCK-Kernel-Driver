@@ -777,6 +777,13 @@ P:	Tigran Aivazian
 M:	tigran@veritas.com
 S:	Maintained
 
+INTEL PRO/1000 GIGABIT ETHERNET SUPPORT
+P:	Chris Leech
+M:	christopher.leech@intel.com
+P:	Scott Feldman
+M:	scott.feldman@intel.com
+S:	Supported
+
 INTERMEZZO FILE SYSTEM
 P:	Peter J. Braam
 M:      braam@clusterfs.com

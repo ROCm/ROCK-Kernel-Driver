@@ -806,6 +806,42 @@ CONFIG_DL2K
   say M here and read <file:Documentation/modules.txt>.  This is
   recommended.  The module will be called dl2k.o.
 
+CONFIG_E1000
+  This driver supports Intel(R) PRO/1000 gigabit ethernet family of
+  adapters, which includes:
+
+     Controller  Adapter Name                     Board IDs
+     ----------  ------------                     ---------
+     82542       PRO/1000 Gigabit Server Adapter  700262-xxx,
+                                                  717037-xxx
+     82543       PRO/1000 F Server Adapter        738640-xxx,
+                                                  A38888-xxx,
+                                                  A06512-xxx
+     82543       PRO/1000 T Server Adapter        A19845-xxx,
+                                                  A33948-xxx
+     82544       PRO/1000 XT Server Adapter       A51580-xxx
+     82544       PRO/1000 XF Server Adapter       A50484-xxx
+     82544       PRO/1000 T Desktop Adapter       A62947-xxx
+
+  For more information on how to identify your adapter, go to the
+  Adapter & Driver ID Guide at:
+
+   <http://support.intel.com/support/network/adapter/pro100/21397.htm>
+
+  For general information and support, go to the Intel support
+  website at:
+
+   <http://support.intel.com>
+
+  More specific information on configuring the driver is in 
+  <file:Documentation/networking/e1000.txt>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called e1000.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> as well
+  as <file:Documentation/networking/net-modules.txt>.
+
 CONFIG_LANCE
   If you have a network (Ethernet) card of this type, say Y and read
   the Ethernet-HOWTO, available from
