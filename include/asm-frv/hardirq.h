@@ -22,19 +22,6 @@ typedef struct {
 
 #include <linux/irq_cpustat.h>	/* Standard mappings for irq_cpustat_t above */
 
-
-#define irq_enter()		(preempt_count() += HARDIRQ_OFFSET)
-#define nmi_enter()		(irq_enter())
-#define nmi_exit()		(preempt_count() -= HARDIRQ_OFFSET)
-
-#define irq_exit()							\
-do {									\
-	preempt_count() -= IRQ_EXIT_OFFSET;				\
-	if (!in_interrupt() && softirq_pending(smp_processor_id()))	\
-		do_softirq();						\
-	preempt_enable_no_resched();					\
-} while (0)
-
 #ifdef CONFIG_SMP
 #error SMP not available on FR-V
 #endif /* CONFIG_SMP */
