@@ -1,7 +1,6 @@
 #ifndef __LINUX__AIO_H
 #define __LINUX__AIO_H
 
-#include <linux/tqueue.h>
 #include <linux/list.h>
 #include <asm/atomic.h>
 
@@ -21,10 +20,14 @@ struct kioctx;
 #define KIOCB_C_CANCELLED	0x01
 #define KIOCB_C_COMPLETE	0x02
 
+#define KIOCB_SYNC_KEY		(~0U)
+
 #define KIOCB_PRIVATE_SIZE	(16 * sizeof(long))
 
 struct kiocb {
 	int			ki_users;
+	unsigned		ki_key;		/* id of this request */
+
 	struct file		*ki_filp;
 	struct kioctx		*ki_ctx;	/* may be NULL for sync ops */
 	int			(*ki_cancel)(struct kiocb *, struct io_event *);
@@ -34,17 +37,19 @@ struct kiocb {
 	void			*ki_data;	/* for use by the the file */
 	void			*ki_user_obj;	/* pointer to userland's iocb */
 	__u64			ki_user_data;	/* user's data for completion */
-	unsigned		ki_key;		/* id of this request */
 
 	long			private[KIOCB_PRIVATE_SIZE/sizeof(long)];
 };
 
-#define init_sync_kiocb(x, filp)	\
-	do {				\
-		(x)->ki_users = 1;	\
-		(x)->ki_filp = (filp);	\
-		(x)->ki_ctx = 0;	\
-		(x)->ki_cancel = NULL;	\
+#define init_sync_kiocb(x, filp)			\
+	do {						\
+		struct task_struct *tsk = current;	\
+		(x)->ki_users = 1;			\
+		(x)->ki_key = KIOCB_SYNC_KEY;		\
+		(x)->ki_filp = (filp);			\
+		(x)->ki_ctx = &tsk->active_mm->default_kioctx;	\
+		(x)->ki_cancel = NULL;			\
+		(x)->ki_user_obj = tsk;			\
 	} while (0)
 
 #define AIO_RING_MAGIC			0xa10a10a1
@@ -105,6 +110,7 @@ struct kioctx {
 /* prototypes */
 extern unsigned aio_max_size;
 
+extern ssize_t FASTCALL(wait_on_sync_kiocb(struct kiocb *iocb));
 extern int FASTCALL(aio_put_req(struct kiocb *iocb));
 extern int FASTCALL(aio_complete(struct kiocb *iocb, long res, long res2));
 extern void FASTCALL(__put_ioctx(struct kioctx *ctx));

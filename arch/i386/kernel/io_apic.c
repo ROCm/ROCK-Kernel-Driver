@@ -1490,7 +1490,7 @@ static struct hw_interrupt_type lapic_irq_type = {
 	end_lapic_irq
 };
 
-static void enable_NMI_through_LVT0 (void * dummy)
+void enable_NMI_through_LVT0 (void * dummy)
 {
 	unsigned int v, ver;
 

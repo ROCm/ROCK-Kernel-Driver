@@ -65,24 +65,14 @@ int llc_conn_ac_conn_ind(struct sock *sk, struct sk_buff *skb)
 	sap = llc_sap_find(dsap);
 	if (sap) {
 		struct llc_conn_state_ev *ev = llc_conn_ev(skb);
-		struct llc_prim_if_block *prim = &sap->llc_ind_prim;
-		union llc_u_prim_data *prim_data = prim->data;
 		struct llc_opt *llc = llc_sk(sk);
 
-		prim_data->conn.daddr.lsap = dsap;
 		llc_pdu_decode_sa(skb, llc->daddr.mac);
 		llc_pdu_decode_da(skb, llc->laddr.mac);
 		llc->dev = skb->dev;
-		prim_data->conn.pri = 0;
-		prim_data->conn.sk  = sk;
-		prim_data->conn.dev = skb->dev;
-		memcpy(&prim_data->conn.daddr, &llc->laddr, sizeof(llc->laddr));
-		memcpy(&prim_data->conn.saddr, &llc->daddr, sizeof(llc->daddr));
-		prim->data   = prim_data;
-		prim->prim   = LLC_CONN_PRIM;
-		prim->sap    = llc->sap;
-		ev->flag     = 1;
-		ev->ind_prim = prim;
+		/* FIXME: find better way to notify upper layer */
+		ev->flag     = LLC_CONN_PRIM + 1;
+		ev->ind_prim = (void *)1;
 		rc = 0;
 	}
 	return rc;
@@ -91,42 +81,22 @@ int llc_conn_ac_conn_ind(struct sock *sk, struct sk_buff *skb)
 int llc_conn_ac_conn_confirm(struct sock *sk, struct sk_buff *skb)
 {
 	struct llc_conn_state_ev *ev = llc_conn_ev(skb);
-	struct llc_opt *llc = llc_sk(sk);
-	struct llc_sap *sap = llc->sap;
-	struct llc_prim_if_block *prim = &sap->llc_cfm_prim;
-	union llc_u_prim_data *prim_data = prim->data;
 
-	prim_data->conn.sk     = sk;
-	prim_data->conn.pri    = 0;
-	prim_data->conn.status = ev->status;
-	prim_data->conn.link   = llc->link;
-	prim_data->conn.dev    = skb->dev;
-	prim->data   = prim_data;
-	prim->prim   = LLC_CONN_PRIM;
-	prim->sap    = sap;
-	ev->flag     = 1;
-	ev->cfm_prim = prim;
+	ev->flag     = LLC_CONN_PRIM + 1;
+	ev->cfm_prim = (void *)1;
 	return 0;
 }
 
 static int llc_conn_ac_data_confirm(struct sock *sk, struct sk_buff *skb)
 {
 	struct llc_conn_state_ev *ev = llc_conn_ev(skb);
-	struct llc_opt *llc = llc_sk(sk);
-	struct llc_sap *sap = llc->sap;
-	struct llc_prim_if_block *prim = &sap->llc_cfm_prim;
-	union llc_u_prim_data *prim_data = prim->data;
 
-	prim_data->data.sk     = sk;
-	prim_data->data.pri    = 0;
-	prim_data->data.link   = llc->link;
-	prim_data->data.status = LLC_STATUS_RECEIVED;
-	prim_data->data.skb    = NULL;
-	prim->data	       = prim_data;
-	prim->prim	       = LLC_DATA_PRIM;
-	prim->sap	       = sap;
-	ev->flag	       = 1;
-	ev->cfm_prim	       = prim;
+	/*
+	 * FIXME: find better way to tell upper layer that the packet was
+	 * confirmed by the other endpoint
+	 */
+	ev->flag     = LLC_DATA_PRIM + 1;
+	ev->cfm_prim = (void *)1;
 	return 0;
 }
 
@@ -164,19 +134,15 @@ int llc_conn_ac_disc_ind(struct sock *sk, struct sk_buff *skb)
 		rc = 1;
 	}
 	if (!rc) {
-		struct llc_opt *llc = llc_sk(sk);
-		struct llc_sap *sap = llc->sap;
-		struct llc_prim_if_block *prim = &sap->llc_ind_prim;
-		union llc_u_prim_data *prim_data = prim->data;
-
-		prim_data->disc.sk     = sk;
-		prim_data->disc.reason = reason;
-		prim_data->disc.link   = llc->link;
-		prim->data	       = prim_data;
-		prim->prim	       = LLC_DISC_PRIM;
-		prim->sap	       = llc->sap;
-		ev->flag	       = 1;
-		ev->ind_prim	       = prim;
+		/*
+		 * FIXME: ev needs reason field,
+		 * perhaps the ev->status is enough,
+		 * have to check,
+		 * better way to signal its a disc
+		 */
+		/* prim_data->disc.reason = reason; */
+		ev->flag     = LLC_DISC_PRIM + 1;
+		ev->ind_prim = (void *)1;
 	}
 	return rc;
 }
@@ -184,19 +150,11 @@ int llc_conn_ac_disc_ind(struct sock *sk, struct sk_buff *skb)
 int llc_conn_ac_disc_confirm(struct sock *sk, struct sk_buff *skb)
 {
 	struct llc_conn_state_ev *ev = llc_conn_ev(skb);
-	struct llc_opt *llc = llc_sk(sk);
-	struct llc_sap *sap = llc->sap;
-	struct llc_prim_if_block *prim = &sap->llc_cfm_prim;
-	union llc_u_prim_data *prim_data = prim->data;
 
-	prim_data->disc.sk     = sk;
-	prim_data->disc.reason = ev->status;
-	prim_data->disc.link   = llc->link;
-	prim->data	       = prim_data;
-	prim->prim	       = LLC_DISC_PRIM;
-	prim->sap	       = sap;
-	ev->flag	       = 1;
-	ev->cfm_prim	       = prim;
+	/* here we use the ev->status, humm */
+	/* prim_data->disc.reason = ev->status; */
+	ev->flag     = LLC_DISC_PRIM + 1;
+	ev->cfm_prim = (void *)1;
 	return 0;
 }
 
@@ -1342,12 +1300,15 @@ int llc_conn_ac_upd_nr_received(struct sock *sk, struct sk_buff *skb)
 int llc_conn_ac_upd_p_flag(struct sock *sk, struct sk_buff *skb)
 {
 	struct llc_pdu_sn *pdu = llc_pdu_sn_hdr(skb);
-	u8 f_bit;
 
-	if (!LLC_PDU_IS_RSP(pdu) &&
-	    !llc_pdu_decode_pf_bit(skb, &f_bit) && f_bit) {
-		llc_sk(sk)->p_flag = 0;
-		llc_conn_ac_stop_p_timer(sk, skb);
+	if (!LLC_PDU_IS_RSP(pdu)) {
+		u8 f_bit;
+
+		llc_pdu_decode_pf_bit(skb, &f_bit);
+		if (f_bit) {
+			llc_sk(sk)->p_flag = 0;
+			llc_conn_ac_stop_p_timer(sk, skb);
+		}
 	}
 	return 0;
 }
@@ -1459,61 +1420,73 @@ int llc_conn_ac_set_f_flag_p(struct sock *sk, struct sk_buff *skb)
 void llc_conn_pf_cycle_tmr_cb(unsigned long timeout_data)
 {
 	struct sock *sk = (struct sock *)timeout_data;
-	struct sk_buff *skb = alloc_skb(1, GFP_ATOMIC);
+	struct sk_buff *skb = alloc_skb(0, GFP_ATOMIC);
 
+	bh_lock_sock(sk);
 	llc_sk(sk)->pf_cycle_timer.running = 0;
 	if (skb) {
 		struct llc_conn_state_ev *ev = llc_conn_ev(skb);
 
+		skb->sk  = sk;
 		ev->type = LLC_CONN_EV_TYPE_P_TMR;
 		ev->data.tmr.timer_specific = NULL;
 		llc_process_tmr_ev(sk, skb);
 	}
+	bh_unlock_sock(sk);
 }
 
 static void llc_conn_busy_tmr_cb(unsigned long timeout_data)
 {
 	struct sock *sk = (struct sock *)timeout_data;
-	struct sk_buff *skb = alloc_skb(1, GFP_ATOMIC);
+	struct sk_buff *skb = alloc_skb(0, GFP_ATOMIC);
 
+	bh_lock_sock(sk);
 	llc_sk(sk)->busy_state_timer.running = 0;
 	if (skb) {
 		struct llc_conn_state_ev *ev = llc_conn_ev(skb);
 
+		skb->sk  = sk;
 		ev->type = LLC_CONN_EV_TYPE_BUSY_TMR;
 		ev->data.tmr.timer_specific = NULL;
 		llc_process_tmr_ev(sk, skb);
 	}
+	bh_unlock_sock(sk);
 }
 
 void llc_conn_ack_tmr_cb(unsigned long timeout_data)
 {
 	struct sock* sk = (struct sock *)timeout_data;
-	struct sk_buff *skb = alloc_skb(1, GFP_ATOMIC);
+	struct sk_buff *skb = alloc_skb(0, GFP_ATOMIC);
 
+	bh_lock_sock(sk);
 	llc_sk(sk)->ack_timer.running = 0;
 	if (skb) {
 		struct llc_conn_state_ev *ev = llc_conn_ev(skb);
 
+		skb->sk  = sk;
 		ev->type = LLC_CONN_EV_TYPE_ACK_TMR;
 		ev->data.tmr.timer_specific = NULL;
 		llc_process_tmr_ev(sk, skb);
 	}
+	bh_unlock_sock(sk);
 }
 
 static void llc_conn_rej_tmr_cb(unsigned long timeout_data)
 {
 	struct sock *sk = (struct sock *)timeout_data;
-	struct sk_buff *skb = alloc_skb(1, GFP_ATOMIC);
+	struct sk_buff *skb = alloc_skb(0, GFP_ATOMIC);
 
+	bh_lock_sock(sk);
 	llc_sk(sk)->rej_sent_timer.running = 0;
 	if (skb) {
 		struct llc_conn_state_ev *ev = llc_conn_ev(skb);
 
+		skb->sk  = sk;
 		ev->type = LLC_CONN_EV_TYPE_REJ_TMR;
 		ev->data.tmr.timer_specific = NULL;
 		llc_process_tmr_ev(sk, skb);
 	}
+	bh_unlock_sock(sk);
 }
 
 int llc_conn_ac_rst_vs(struct sock *sk, struct sk_buff *skb)
@@ -1541,14 +1514,11 @@ int llc_conn_ac_upd_vs(struct sock *sk, struct sk_buff *skb)
  *	llc_conn_disc - removes connection from SAP list and frees it
  *	@sk: closed connection
  *	@skb: occurred event
- *
- *	Returns 2, to indicate the state machine that the connection was freed.
  */
 int llc_conn_disc(struct sock *sk, struct sk_buff *skb)
 {
-	llc_sap_unassign_sock(llc_sk(sk)->sap, sk);
-	llc_sock_free(sk);
-	return 2;
+	/* FIXME: this thing seems to want to die */
+	return 0;
 }
 
 /**
@@ -1560,7 +1530,7 @@ int llc_conn_disc(struct sock *sk, struct sk_buff *skb)
  */
 int llc_conn_reset(struct sock *sk, struct sk_buff *skb)
 {
-	llc_sock_reset(sk);
+	llc_sk_reset(sk);
 	return 0;
 }
 
@@ -1589,24 +1559,21 @@ u8 llc_circular_between(u8 a, u8 b, u8 c)
  *	This function is called from timer callback functions. When connection
  *	is busy (during sending a data frame) timer expiration event must be
  *	queued. Otherwise this event can be sent to connection state machine.
- *	Queued events will process by process_rxframes_events function after
- *	sending data frame. Returns 0 for success, 1 otherwise.
+ *	Queued events will process by llc_backlog_rcv function after sending
+ *	data frame.
  */
 static void llc_process_tmr_ev(struct sock *sk, struct sk_buff *skb)
 {
-	bh_lock_sock(sk);
 	if (llc_sk(sk)->state == LLC_CONN_OUT_OF_SVC) {
 		printk(KERN_WARNING "%s: timer called on closed connection\n",
 		       __FUNCTION__);
 		llc_conn_free_ev(skb);
-		goto out;
+	} else {
+		if (!sk->lock.users)
+			llc_conn_state_process(sk, skb);
+		else {
+			llc_set_backlog_type(skb, LLC_EVENT);
+			sk_add_backlog(sk, skb);
+		}
 	}
-	if (!sk->lock.users)
-		llc_conn_send_ev(sk, skb);
-	else {
-		llc_set_backlog_type(skb, LLC_EVENT);
-		sk_add_backlog(sk, skb);
-	}
-out:
-	bh_unlock_sock(sk);
 }

@@ -237,35 +237,35 @@ struct llc_frmr_info {
 
 extern void llc_pdu_set_cmd_rsp(struct sk_buff *skb, u8 type);
 extern void llc_pdu_set_pf_bit(struct sk_buff *skb, u8 bit_value);
-extern int llc_pdu_decode_pf_bit(struct sk_buff *skb, u8 *pf_bit);
-extern int llc_pdu_decode_cr_bit(struct sk_buff *skb, u8 *cr_bit);
-extern int llc_pdu_decode_sa(struct sk_buff *skb, u8 *sa);
-extern int llc_pdu_decode_da(struct sk_buff *skb, u8 *ds);
-extern int llc_pdu_decode_dsap(struct sk_buff *skb, u8 *dsap);
-extern int llc_pdu_decode_ssap(struct sk_buff *skb, u8 *ssap);
-extern int llc_decode_pdu_type(struct sk_buff *skb, u8 *destination);
+extern void llc_pdu_decode_pf_bit(struct sk_buff *skb, u8 *pf_bit);
+extern void llc_pdu_decode_cr_bit(struct sk_buff *skb, u8 *cr_bit);
+extern void llc_pdu_decode_sa(struct sk_buff *skb, u8 *sa);
+extern void llc_pdu_decode_da(struct sk_buff *skb, u8 *ds);
+extern void llc_pdu_decode_dsap(struct sk_buff *skb, u8 *dsap);
+extern void llc_pdu_decode_ssap(struct sk_buff *skb, u8 *ssap);
+extern void llc_decode_pdu_type(struct sk_buff *skb, u8 *destination);
 extern void llc_pdu_header_init(struct sk_buff *skb, u8 pdu_type, u8 ssap,
 				u8 dsap, u8 cr);
-extern int llc_pdu_init_as_ui_cmd(struct sk_buff *skb);
-extern int llc_pdu_init_as_xid_cmd(struct sk_buff *skb, u8 svcs_supported,
+extern void llc_pdu_init_as_ui_cmd(struct sk_buff *skb);
+extern void llc_pdu_init_as_xid_cmd(struct sk_buff *skb, u8 svcs_supported,
 				   u8 rx_window);
-extern int llc_pdu_init_as_test_cmd(struct sk_buff *skb);
-extern int llc_pdu_init_as_disc_cmd(struct sk_buff *skb, u8 p_bit);
-extern int llc_pdu_init_as_i_cmd(struct sk_buff *skb, u8 p_bit, u8 ns, u8 nr);
-extern int llc_pdu_init_as_rej_cmd(struct sk_buff *skb, u8 p_bit, u8 nr);
-extern int llc_pdu_init_as_rnr_cmd(struct sk_buff *skb, u8 p_bit, u8 nr);
-extern int llc_pdu_init_as_rr_cmd(struct sk_buff *skb, u8 p_bit, u8 nr);
-extern int llc_pdu_init_as_sabme_cmd(struct sk_buff *skb, u8 p_bit);
-extern int llc_pdu_init_as_dm_rsp(struct sk_buff *skb, u8 f_bit);
-extern int llc_pdu_init_as_xid_rsp(struct sk_buff *skb, u8 svcs_supported,
-				   u8 rx_window);
-extern int llc_pdu_init_as_test_rsp(struct sk_buff *skb,
-				    struct sk_buff *ev_skb);
-extern int llc_pdu_init_as_frmr_rsp(struct sk_buff *skb,
-				    struct llc_pdu_sn *prev_pdu,
-				    u8 f_bit, u8 vs, u8 vr, u8 vzyxw);
-extern int llc_pdu_init_as_rr_rsp(struct sk_buff *skb, u8 f_bit, u8 nr);
-extern int llc_pdu_init_as_rej_rsp(struct sk_buff *skb, u8 f_bit, u8 nr);
-extern int llc_pdu_init_as_rnr_rsp(struct sk_buff *skb, u8 f_bit, u8 nr);
-extern int llc_pdu_init_as_ua_rsp(struct sk_buff *skb, u8 f_bit);
+extern void llc_pdu_init_as_test_cmd(struct sk_buff *skb);
+extern void llc_pdu_init_as_disc_cmd(struct sk_buff *skb, u8 p_bit);
+extern void llc_pdu_init_as_i_cmd(struct sk_buff *skb, u8 p_bit, u8 ns, u8 nr);
+extern void llc_pdu_init_as_rej_cmd(struct sk_buff *skb, u8 p_bit, u8 nr);
+extern void llc_pdu_init_as_rnr_cmd(struct sk_buff *skb, u8 p_bit, u8 nr);
+extern void llc_pdu_init_as_rr_cmd(struct sk_buff *skb, u8 p_bit, u8 nr);
+extern void llc_pdu_init_as_sabme_cmd(struct sk_buff *skb, u8 p_bit);
+extern void llc_pdu_init_as_dm_rsp(struct sk_buff *skb, u8 f_bit);
+extern void llc_pdu_init_as_xid_rsp(struct sk_buff *skb, u8 svcs_supported,
+				    u8 rx_window);
+extern void llc_pdu_init_as_test_rsp(struct sk_buff *skb,
+				     struct sk_buff *ev_skb);
+extern void llc_pdu_init_as_frmr_rsp(struct sk_buff *skb,
+				     struct llc_pdu_sn *prev_pdu,
+				     u8 f_bit, u8 vs, u8 vr, u8 vzyxw);
+extern void llc_pdu_init_as_rr_rsp(struct sk_buff *skb, u8 f_bit, u8 nr);
+extern void llc_pdu_init_as_rej_rsp(struct sk_buff *skb, u8 f_bit, u8 nr);
+extern void llc_pdu_init_as_rnr_rsp(struct sk_buff *skb, u8 f_bit, u8 nr);
+extern void llc_pdu_init_as_ua_rsp(struct sk_buff *skb, u8 f_bit);
 #endif /* LLC_PDU_H */

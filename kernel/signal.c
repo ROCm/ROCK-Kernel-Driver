@@ -73,12 +73,21 @@ int max_queued_signals = 1024;
 ----------------------------------------------------------
 */
 
+/* Some systems do not have a SIGSTKFLT and the kernel never
+ * generates such signals anyways.
+ */
+#ifdef SIGSTKFLT
+#define M_SIGSTKFLT	M(SIGSTKFLT)
+#else
+#define M_SIGSTKFLT	0
+#endif
+
 #define M(sig) (1UL << (sig))
 
 #define SIG_USER_SPECIFIC_MASK (\
 	M(SIGILL)    |  M(SIGTRAP)   |  M(SIGABRT)   |  M(SIGBUS)    | \
 	M(SIGFPE)    |  M(SIGSEGV)   |  M(SIGPIPE)   |  M(SIGXFSZ)   | \
-	M(SIGPROF)   |  M(SIGSYS)    |  M(SIGSTKFLT) |  M(SIGCONT)   )
+	M(SIGPROF)   |  M(SIGSYS)    |  M_SIGSTKFLT |  M(SIGCONT)   )
 
 #define SIG_USER_LOAD_BALANCE_MASK (\
         M(SIGHUP)    |  M(SIGINT)    |  M(SIGQUIT)   |  M(SIGUSR1)   | \
@@ -95,7 +104,7 @@ int max_queued_signals = 1024;
 	M(SIGKILL)   |  M(SIGUSR1)   |  M(SIGSEGV)   |  M(SIGUSR2)   | \
 	M(SIGPIPE)   |  M(SIGALRM)   |  M(SIGTERM)   |  M(SIGXCPU)   | \
 	M(SIGXFSZ)   |  M(SIGVTALRM) |  M(SIGPROF)   |  M(SIGPOLL)   | \
-	M(SIGSYS)    |  M(SIGSTKFLT) |  M(SIGPWR)    |  M(SIGCONT)   | \
+	M(SIGSYS)    |  M_SIGSTKFLT  |  M(SIGPWR)    |  M(SIGCONT)   | \
         M(SIGSTOP)   |  M(SIGTSTP)   |  M(SIGTTIN)   |  M(SIGTTOU)   )
 
 #define SIG_KERNEL_ONLY_MASK (\

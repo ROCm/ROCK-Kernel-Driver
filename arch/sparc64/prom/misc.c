@@ -14,6 +14,7 @@
 #include <linux/delay.h>
 #include <asm/openprom.h>
 #include <asm/oplib.h>
+#include <asm/system.h>
 
 /* Reset and reboot the machine with the command 'bcommand'. */
 void prom_reboot(char *bcommand)
@@ -33,7 +34,6 @@ void prom_feval(char *fstring)
 
 /* We want to do this more nicely some day. */
 extern void (*prom_palette)(int);
-extern int serial_console;
 
 #ifdef CONFIG_SMP
 extern void smp_capture(void);

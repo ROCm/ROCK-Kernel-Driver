@@ -46,6 +46,8 @@ struct file_operations ext2_file_operations = {
 	.open		= generic_file_open,
 	.release	= ext2_release_file,
 	.fsync		= ext2_sync_file,
+	.readv		= generic_file_readv,
+	.writev		= generic_file_writev,
 	.sendfile	= generic_file_sendfile,
 };
 

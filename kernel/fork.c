@@ -296,12 +296,16 @@ int mmlist_nr;
 #define allocate_mm()	(kmem_cache_alloc(mm_cachep, SLAB_KERNEL))
 #define free_mm(mm)	(kmem_cache_free(mm_cachep, (mm)))
 
+#include <linux/init_task.h>
+
 static struct mm_struct * mm_init(struct mm_struct * mm)
 {
 	atomic_set(&mm->mm_users, 1);
 	atomic_set(&mm->mm_count, 1);
 	init_rwsem(&mm->mmap_sem);
 	mm->page_table_lock = SPIN_LOCK_UNLOCKED;
+	mm->ioctx_list_lock = RW_LOCK_UNLOCKED;
+	mm->default_kioctx = (struct kioctx)INIT_KIOCTX(mm->default_kioctx, *mm);
 	mm->pgd = pgd_alloc(mm);
 	if (mm->pgd)
 		return mm;

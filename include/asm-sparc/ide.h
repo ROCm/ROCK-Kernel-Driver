@@ -81,92 +81,30 @@ static __inline__ void ide_init_default_hwifs(void)
  * The following are not needed for the non-m68k ports
  */
 #define ide_ack_intr(hwif)		(1)
-#define ide_fix_driveid(id)		do {} while (0)
 #define ide_release_lock(lock)		do {} while (0)
 #define ide_get_lock(lock, hdlr, data)	do {} while (0)
 
-/* From m68k code... */
+/* XXX Known to be broken.  Axboe will fix the problems this
+ * XXX has by making seperate IN/OUT macros for IDE_DATA
+ * XXX register and rest of IDE regs and also using
+ * XXX ide_ioreg_t instead of u32 for ports. -DaveM
+ */
 
-#ifdef insl
-#undef insl
-#endif
-#ifdef outsl
-#undef outsl
-#endif
-#ifdef insw
-#undef insw
-#endif
-#ifdef outsw
-#undef outsw
-#endif
+#define HAVE_ARCH_IN_BYTE
+#define IN_BYTE(p)		(*((volatile u8 *)(p)))
+#define IN_WORD(p)		(*((volatile u16 *)(p)))
+#define IN_LONG(p)		(*((volatile u32 *)(p)))
+#define IN_BYTE_P		IN_BYTE
+#define IN_WORD_P		IN_WORD
+#define IN_LONG_P		IN_LONG
 
-#define insl(data_reg, buffer, wcount) insw(data_reg, buffer, (wcount)<<1)
-#define outsl(data_reg, buffer, wcount) outsw(data_reg, buffer, (wcount)<<1)
-
-#define insw(port, buf, nr) ide_insw((port), (buf), (nr))
-#define outsw(port, buf, nr) ide_outsw((port), (buf), (nr))
-
-static __inline__ void ide_insw(unsigned long port,
-				void *dst,
-				unsigned long count)
-{
-	volatile unsigned short *data_port;
-	/* unsigned long end = (unsigned long)dst + (count << 1); */ /* P3 */
-	u16 *ps = dst;
-	u32 *pi;
-
-	data_port = (volatile unsigned short *)port;
-
-	if(((unsigned long)ps) & 0x2) {
-		*ps++ = *data_port;
-		count--;
-	}
-	pi = (u32 *)ps;
-	while(count >= 2) {
-		u32 w;
-
-		w  = (*data_port) << 16;
-		w |= (*data_port);
-		*pi++ = w;
-		count -= 2;
-	}
-	ps = (u16 *)pi;
-	if(count)
-		*ps++ = *data_port;
-
-	/* __flush_dcache_range((unsigned long)dst, end); */ /* P3 see hme */
-}
-
-static __inline__ void ide_outsw(unsigned long port,
-				 const void *src,
-				 unsigned long count)
-{
-	volatile unsigned short *data_port;
-	/* unsigned long end = (unsigned long)src + (count << 1); */
-	const u16 *ps = src;
-	const u32 *pi;
-
-	data_port = (volatile unsigned short *)port;
-
-	if(((unsigned long)src) & 0x2) {
-		*data_port = *ps++;
-		count--;
-	}
-	pi = (const u32 *)ps;
-	while(count >= 2) {
-		u32 w;
-
-		w = *pi++;
-		*data_port = (w >> 16);
-		*data_port = w;
-		count -= 2;
-	}
-	ps = (const u16 *)pi;
-	if(count)
-		*data_port = *ps;
-
-	/* __flush_dcache_range((unsigned long)src, end); */ /* P3 see hme */
-}
+#define HAVE_ARCH_OUT_BYTE
+#define OUT_BYTE(b,p)		((*((volatile u8 *)(p))) = (b))
+#define OUT_WORD(w,p)		((*((volatile u16 *)(p))) = (w))
+#define OUT_LONG(l,p)		((*((volatile u32 *)(p))) = (l))
+#define OUT_BYTE_P		OUT_BYTE
+#define OUT_WORD_P		OUT_WORD
+#define OUT_LONG_P		OUT_LONG
 
 #endif /* __KERNEL__ */
 

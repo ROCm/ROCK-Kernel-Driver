@@ -382,13 +382,6 @@ static void sunzilog_receive_chars(struct uart_sunzilog_port *up,
 			sun_do_break();
 			return;
 		}
-#ifndef CONFIG_SPARC64
-		/* Look for kgdb 'stop' character.  */
-		if (ZS_IS_KGDB(up) && (ch == '\003')) {
-			breakpoint();
-			return;
-		}
-#endif
 
 		/* A real serial line, record the character and status.  */
 		*tty->flip.char_buf_ptr = ch;
@@ -1152,11 +1145,11 @@ static struct zilog_layout * __init get_zs_sun4u(int chip)
 static struct zilog_layout * __init get_zs_sun4cmd(int chip)
 {
 	struct linux_prom_irqs irq_info[2];
-	unsigned long mapped_addr;
-	int zsnode, chipid, cpunode;
+	unsigned long mapped_addr = 0;
+	int zsnode, chipid, cpunode, bbnode;
 
 	if (sparc_cpu_model == sun4d) {
-		int bbnode, walk, no;
+		int walk, no;
 
 		zsnode = 0;
 		bbnode = 0;
@@ -1249,7 +1242,7 @@ static struct zilog_layout * __init get_zs_sun4cmd(int chip)
 		} else if (zilog_irq != irq_info[0].pri) {
 			prom_printf("SunZilog: Inconsistent IRQ layout for Zilog %d.\n",
 				    chip);
-			promt_halt();
+			prom_halt();
 		}
 		break;
 	}
@@ -1290,7 +1283,7 @@ static struct zilog_layout * __init get_zs(int chip)
 		zilog_irq = 12;
 		res.end = (res.start + (8 - 1));
 		res.flags = IORESOURCE_IO;
-		return sbus_ioremap(&res, 0, 8, "SunZilog");
+		return (struct zilog_layout *) sbus_ioremap(&res, 0, 8, "SunZilog");
 	}
 
 	return get_zs_sun4cmd(chip);
@@ -1649,13 +1642,10 @@ static int __init sunzilog_init(void)
 	/* Sun4 Zilog setup is hard coded, no probing to do.  */
 	if (sparc_cpu_model == sun4) {
 		NUM_SUNZILOG = 2;
-		goto no_probe;
-	}
-
-	node = prom_getchild(prom_root_node);
-	if (sparc_cpu_model == sun4d) {
+	} else if (sparc_cpu_model == sun4d) {
 		int bbnode;
 
+		node = prom_getchild(prom_root_node);
 		NUM_SUNZILOG = 0;
 		while (node &&
 		       (node = prom_searchsiblings(node, "cpu-unit"))) {
@@ -1664,7 +1654,6 @@ static int __init sunzilog_init(void)
 				NUM_SUNZILOG += 2;
 			node = prom_getsibling(node);
 		}
-		goto no_probe;
 	} else if (sparc_cpu_model == sun4u) {
 		int central_node;
 
@@ -1675,26 +1664,27 @@ static int __init sunzilog_init(void)
 		if (central_node != 0 && central_node != -1)
 			node = prom_searchsiblings(prom_getchild(central_node), "fhc");
 		else
-			node = prom_searchsiblings(node, "sbus");
+			node = prom_searchsiblings(prom_getchild(prom_root_node), "sbus");
 		if (node != 0 && node != -1)
 			node = prom_getchild(node);
 		if (node == 0 || node == -1)
 			return -ENODEV;
+
+		node = prom_searchsiblings(node, "zs");
+		if (!node)
+			return -ENODEV;
+		
+		NUM_SUNZILOG = 2;
 	} else {
+		node = prom_getchild(prom_root_node);
 		node = prom_searchsiblings(node, "obio");
 		if (node)
 			node = prom_getchild(node);
+		if (!node)
+			return -ENODEV;
+
 		NUM_SUNZILOG = 2;
-		goto no_probe;
 	}
-
-	node = prom_searchsiblings(node, "zs");
-	if (!node)
-		return -ENODEV;
-		
-	NUM_SUNZILOG = 2;
-
-no_probe:
 
 	sunzilog_alloc_tables();
 
