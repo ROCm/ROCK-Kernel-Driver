@@ -330,11 +330,8 @@ setup_arch (char **cmdline_p)
 		setup_serial_hcdp(efi.hcdp);
 	}
 #endif
-	{
-		extern unsigned char acpi_legacy_devices;
-		if (!efi.hcdp)
-			setup_serial_legacy();
-	}
+	if (!efi.hcdp)
+		setup_serial_legacy();
 #endif
 
 #ifdef CONFIG_VT
