@@ -27,7 +27,7 @@
 int scons_pwroff = 1; 
 
 #ifdef CONFIG_PCI
-static unsigned long power_reg = 0UL;
+static void __iomem *power_reg;
 
 static DECLARE_WAIT_QUEUE_HEAD(powerd_wait);
 static int button_pressed;
@@ -52,7 +52,7 @@ void machine_power_off(void)
 {
 	if (!serial_console || scons_pwroff) {
 #ifdef CONFIG_PCI
-		if (power_reg != 0UL) {
+		if (power_reg) {
 			/* Both register bits seem to have the
 			 * same effect, so until I figure out
 			 * what the difference is...
@@ -130,8 +130,8 @@ void __init power_init(void)
 	return;
 
 found:
-	power_reg = (unsigned long)ioremap(edev->resource[0].start, 0x4);
-	printk("power: Control reg at %016lx ... ", power_reg);
+	power_reg = ioremap(edev->resource[0].start, 0x4);
+	printk("power: Control reg at %p ... ", power_reg);
 	poweroff_method = machine_halt;  /* able to use the standard halt */
 	if (has_button_interrupt(edev)) {
 		if (kernel_thread(powerd, NULL, CLONE_FS) < 0) {
