@@ -79,11 +79,11 @@
 /*
  * These are the 'tuning knobs' of the scheduler:
  *
- * Minimum timeslice is 10 msecs, default timeslice is 100 msecs,
- * maximum timeslice is 200 msecs. Timeslices get refilled after
- * they expire.
+ * Minimum timeslice is 5 msecs (or 1 jiffy, whichever is larger),
+ * default timeslice is 100 msecs, maximum timeslice is 200 msecs.
+ * Timeslices get refilled after they expire.
  */
-#define MIN_TIMESLICE		( 10 * HZ / 1000)
+#define MIN_TIMESLICE		max(5 * HZ / 1000, 1)
 #define MAX_TIMESLICE		(200 * HZ / 1000)
 #define ON_RUNQUEUE_WEIGHT	 30
 #define CHILD_PENALTY		 95
@@ -171,9 +171,9 @@
  * task_timeslice() is the interface that is used by the scheduler.
  */
 
-#define BASE_TIMESLICE(p) (MIN_TIMESLICE + \
-		((MAX_TIMESLICE - MIN_TIMESLICE) * \
-			(MAX_PRIO-1 - (p)->static_prio) / (MAX_USER_PRIO-1)))
+#define BASE_TIMESLICE(p) \
+	max(MAX_TIMESLICE * (MAX_PRIO - (p)->static_prio) / (MAX_USER_PRIO), \
+		MIN_TIMESLICE)
 
 static unsigned int task_timeslice(task_t *p)
 {
