@@ -58,8 +58,6 @@ MODULE_PARM_DESC(jfsloglevel, "Specify JFS loglevel (0, 1 or 2)");
 /*
  * External declarations
  */
-extern struct inode *jfs_iget(struct super_block *, ino_t);
-
 extern int jfs_mount(struct super_block *);
 extern int jfs_mount_rw(struct super_block *, int);
 extern int jfs_umount(struct super_block *);
@@ -69,6 +67,7 @@ extern int jfsIOWait(void *);
 extern int jfs_lazycommit(void *);
 extern int jfs_sync(void *);
 
+extern void jfs_read_inode(struct inode *inode);
 extern void jfs_dirty_inode(struct inode *inode);
 extern void jfs_delete_inode(struct inode *inode);
 extern void jfs_write_inode(struct inode *inode, int wait);
@@ -313,7 +312,7 @@ static int jfs_fill_super(struct super_block *sb, void *data, int silent)
 
 	sb->s_magic = JFS_SUPER_MAGIC;
 
-	inode = jfs_iget(sb, ROOT_I);
+	inode = iget(sb, ROOT_I);
 	if (!inode || is_bad_inode(inode))
 		goto out_no_root;
 	sb->s_root = d_alloc_root(inode);
@@ -397,6 +396,7 @@ static int jfs_sync_fs(struct super_block *sb, int wait)
 static struct super_operations jfs_super_operations = {
 	.alloc_inode	= jfs_alloc_inode,
 	.destroy_inode	= jfs_destroy_inode,
+	.read_inode	= jfs_read_inode,
 	.dirty_inode	= jfs_dirty_inode,
 	.write_inode	= jfs_write_inode,
 	.delete_inode	= jfs_delete_inode,
