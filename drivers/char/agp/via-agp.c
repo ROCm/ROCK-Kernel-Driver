@@ -332,7 +332,7 @@ static struct agp_device_ids via_agp_device_ids[] __initdata =
 
 	/* VT8753A */
 	{
-		.device_id	= PCI_DEVICE_ID_VIA_8753_0,	// 0x3128
+		.device_id	= PCI_DEVICE_ID_VIA_8753_0,
 		.chipset_name	= "P4X266",
 	},
 
@@ -350,13 +350,13 @@ static struct agp_device_ids via_agp_device_ids[] __initdata =
 
 	/* KM266 / PM266 */
 	{
-		.device_id	= PCI_DEVICE_ID_VIA_KM266,	// 0x3116
+		.device_id	= PCI_DEVICE_ID_VIA_KM266,
 		.chipset_name	= "KM266/PM266",
 	},
 
 	/* CLE266 */
 	{
-		.device_id	= PCI_DEVICE_ID_VIA_CLE266,	// 0x3123
+		.device_id	= PCI_DEVICE_ID_VIA_CLE266,
 		.chipset_name	= "CLE266",
 	},
 
@@ -375,13 +375,13 @@ static struct agp_device_ids via_agp_device_ids[] __initdata =
 
 	/* VT8752*/
 	{
-		.device_id	= PCI_DEVICE_ID_VIA_8752,	// 0x3148
+		.device_id	= PCI_DEVICE_ID_VIA_8752,
 		.chipset_name	= "ProSavage DDR P4M266",
 	},
 
 	/* KN266/PN266 */
 	{
-		.device_id	= PCI_DEVICE_ID_KN266,	// 0x3156
+		.device_id	= PCI_DEVICE_ID_VIA_KN266,
 		.chipset_name	= "KN266/PN266",
 	},
 
@@ -393,25 +393,25 @@ static struct agp_device_ids via_agp_device_ids[] __initdata =
 
 	/* P4N333 */
 	{
-		.device_id	= PCI_DEVICE_ID_VIA_P4N333,	// 0x3178
+		.device_id	= PCI_DEVICE_ID_VIA_P4N333,
 		.chipset_name	= "P4N333",
 	},
 
 	/* P4X600 */
 	{
-		.device_id	= PCI_DEVICE_ID_VIA_P4X600,	// 0x0198
+		.device_id	= PCI_DEVICE_ID_VIA_P4X600,
 		.chipset_name	= "P4X600",
 	},
 
 	/* KM400 */
 	{
-		.device_id	= PCI_DEVICE_ID_VIA_KM400,	// 0x3205
+		.device_id	= PCI_DEVICE_ID_VIA_KM400,
 		.chipset_name	= "KM400",
 	},
 
 	/* P4M400 */
 	{
-		.device_id	= PCI_DEVICE_ID_VIA_P4M400,	// 0x3209
+		.device_id	= PCI_DEVICE_ID_VIA_P4M400,
 		.chipset_name	= "PM400",
 	},
 
