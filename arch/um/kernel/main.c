@@ -147,7 +147,21 @@ int main(int argc, char **argv, char **envp)
 
 	/* Reboot */
 	if(ret){
+		int err;
+
 		printf("\n");
+
+		/* Let any pending signals fire, then disable them.  This
+		 * ensures that they won't be delivered after the exec, when
+		 * they are definitely not expected.
+		 */
+		unblock_signals();
+		disable_timer();
+		err = deactivate_all_fds();
+		if(err)
+			printf("deactivate_all_fds failed, errno = %d\n",
+			       -err);
+
 		execvp(new_argv[0], new_argv);
 		perror("Failed to exec kernel");
 		ret = 1;
