@@ -1898,7 +1898,7 @@ int snd_ac97_mixer(ac97_bus_t *bus, ac97_template_t *template, ac97_t **rac97)
 		else {
 			err = ac97_reset_wait(ac97, HZ/2, 0);
 			if (err < 0)
-				err = ac97_reset_wait(ac97, 0, 1);
+				err = ac97_reset_wait(ac97, HZ/2, 1);
 		}
 		if (err < 0) {
 			snd_printk(KERN_WARNING "AC'97 %d does not respond - RESET\n", ac97->num);
