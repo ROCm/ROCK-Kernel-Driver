@@ -28,6 +28,7 @@
 #include <linux/kernel.h>
 #include <linux/pci.h>
 #include <linux/proc_fs.h>
+#include "../pci.h"
 #include "pci_hotplug.h"
 #include "cpci_hotplug.h"
 

@@ -129,6 +129,5 @@ void pci_enable_bridges(struct pci_bus *bus)
 	}
 }
 
-EXPORT_SYMBOL(pci_bus_alloc_resource);
 EXPORT_SYMBOL(pci_bus_add_devices);
 EXPORT_SYMBOL(pci_enable_bridges);

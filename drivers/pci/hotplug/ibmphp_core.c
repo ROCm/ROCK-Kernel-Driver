@@ -35,6 +35,7 @@
 #include <linux/delay.h>
 #include <linux/wait.h>
 #include <linux/smp_lock.h>
+#include "../pci.h"
 #include "../../../arch/i386/pci/pci.h"	/* for struct irq_routing_table */
 #include "ibmphp.h"
 

@@ -34,6 +34,7 @@
 #include <linux/init.h>
 #include <asm/semaphore.h>
 
+#include "../pci.h"
 #include "pci_hotplug.h"
 #include "acpiphp.h"
 
