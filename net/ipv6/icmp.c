@@ -385,23 +385,28 @@ void icmpv6_send(struct sk_buff *skb, int type, int code, __u32 info,
 	msg.skb = skb;
 	msg.offset = skb->nh.raw - skb->data;
 
-	/* KK : Following two from MIPL */
-	plen = msg.offset;
-	__skb_pull(skb, plen);
-	msg.offset = 0;
-
 	len = skb->len - msg.offset;
 	len = min_t(unsigned int, len, IPV6_MIN_MTU - sizeof(struct ipv6hdr) -sizeof(struct icmp6hdr));
 	if (len < 0) {
 		if (net_ratelimit())
 			printk(KERN_DEBUG "icmp: len problem\n");
-		__skb_push(skb, plen);	/* KK: MIPL */
 		goto out_dst_release;
 	}
 
 	idev = in6_dev_get(skb->dev);
 
-	// icmpv6_handle_mipv6_homeaddr(skb);
+	if (0) {
+		plen = msg.offset;
+		if (plen < 0)
+			__skb_push(skb, -plen);
+		else
+			__skb_pull(skb, plen);
+		// icmpv6_handle_mipv6_homeaddr(skb);
+		if (plen < 0)
+			__skb_pull(skb, -plen);
+		else
+			__skb_push(skb, plen);
+	}
 
 	err = ip6_append_data(sk, icmpv6_getfrag, &msg,
 			      len + sizeof(struct icmp6hdr),
@@ -413,7 +418,6 @@ void icmpv6_send(struct sk_buff *skb, int type, int code, __u32 info,
 		goto out_put;
 	}
 	err = icmpv6_push_pending_frames(sk, &fl, &tmp_hdr, len + sizeof(struct icmp6hdr));
-	__skb_push(skb, plen);	/* KK : MIPL */
 
 	if (type >= ICMPV6_DEST_UNREACH && type <= ICMPV6_PARAMPROB)
 		ICMP6_INC_STATS_OFFSET_BH(idev, Icmp6OutDestUnreachs, type - ICMPV6_DEST_UNREACH);
