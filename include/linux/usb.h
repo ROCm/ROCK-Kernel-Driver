@@ -471,8 +471,10 @@ struct usb_device_id {
 
 /**
  * struct usb_driver - identifies USB driver to usbcore
- * @owner: pointer to the module owner of this driver
- * @name: The driver name should be unique among USB drivers
+ * @owner: Pointer to the module owner of this driver; initialize
+ *	it using THIS_MODULE.
+ * @name: The driver name should be unique among USB drivers,
+ *	and should normally be the same as the module name.
  * @probe: Called to see if the driver is willing to manage a particular
  *	interface on a device.  The probe routine returns a handle that 
  *	will later be provided to disconnect(), or a null pointer to
@@ -507,7 +509,7 @@ struct usb_device_id {
  * is used by both user and kernel mode hotplugging support.
  *
  * The probe() and disconnect() methods are called in a context where
- * they can sleep, but they should avoid abusing the privilage.  Most
+ * they can sleep, but they should avoid abusing the privilege.  Most
  * work to connect to a device should be done when the device is opened,
  * and undone at the last close.  The disconnect code needs to address
  * concurrency issues with respect to open() and close() methods, as
