@@ -256,7 +256,7 @@ struct sctp_association *sctp_association_init(struct sctp_association *asoc,
 				      sctp_packet_transmit_chunk,
 				      sctp_packet_transmit);
 
-	if (NULL == sctp_ulpq_init(&asoc->ulpq, asoc))
+	if (!sctp_ulpq_init(&asoc->ulpq, asoc))
 		goto fail_init;
 
 	/* Set up the tsn tracking. */
@@ -266,7 +266,6 @@ struct sctp_association *sctp_association_init(struct sctp_association *asoc,
 
 	asoc->need_ecne = 0;
 
-	asoc->debug_name = "unnamedasoc";
 	asoc->eyecatcher = SCTP_ASSOC_EYECATCHER;
 
 	/* Assume that peer would support both address types unless we are
@@ -380,6 +379,30 @@ void sctp_assoc_set_primary(struct sctp_association *asoc,
 	 */
 	if (transport->active)
 		asoc->peer.active_path = transport;
+
+	/* 
+	 * SFR-CACC algorithm:
+	 * Upon the receipt of a request to change the primary
+	 * destination address, on the data structure for the new
+	 * primary destination, the sender MUST do the following:
+	 *
+	 * 1) If CHANGEOVER_ACTIVE is set, then there was a switch
+	 * to this destination address earlier. The sender MUST set
+	 * CYCLING_CHANGEOVER to indicate that this switch is a
+	 * double switch to the same destination address.
+	 */
+	if (transport->cacc.changeover_active)
+		transport->cacc.cycling_changeover = 1;
+
+	/* 2) The sender MUST set CHANGEOVER_ACTIVE to indicate that
+	 * a changeover has occurred.
+	 */
+	transport->cacc.changeover_active = 1;
+
+	/* 3) The sender MUST store the next TSN to be sent in
+	 * next_tsn_at_change.
+	 */
+	transport->cacc.next_tsn_at_change = asoc->next_tsn;
 }
 
 /* Add a transport address to an association.  */
@@ -479,7 +502,7 @@ struct sctp_transport *sctp_assoc_add_peer(struct sctp_association *asoc,
 	list_add_tail(&peer->transports, &asoc->peer.transport_addr_list);
 
 	/* If we do not yet have a primary path, set one.  */
-	if (NULL == asoc->peer.primary_path) {
+	if (!asoc->peer.primary_path) {
 		sctp_assoc_set_primary(asoc, peer);
 		asoc->peer.retran_path = peer;
 	}
@@ -592,7 +615,7 @@ void sctp_assoc_control_transport(struct sctp_association *asoc,
 	/* If we failed to find a usable transport, just camp on the
 	 * primary, even if it is inactive.
 	 */
-	if (NULL == first) {
+	if (!first) {
 		first = asoc->peer.primary_path;
 		second = asoc->peer.primary_path;
 	}

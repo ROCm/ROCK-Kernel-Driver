@@ -804,9 +804,6 @@ struct sctp_transport {
 	 */
 	int max_retrans;
 
-	/* We use this name for debugging output... */
-	char *debug_name;
-
 	/* Per         : A timer used by each destination.
 	 * Destination :
 	 * Timer       :
@@ -832,6 +829,35 @@ struct sctp_transport {
 	struct list_head send_ready;
 
 	int malloced; /* Is this structure kfree()able? */
+
+	/* State information saved for SFR_CACC algorithm. The key
+	 * idea in SFR_CACC is to maintain state at the sender on a
+	 * per-destination basis when a changeover happens.
+	 * 	char changeover_active;
+	 * 	char cycling_changeover;
+	 * 	__u32 next_tsn_at_change;
+	 * 	char cacc_saw_newack;
+	 */
+	struct {
+		/* An unsigned integer, which stores the next TSN to be
+		 * used by the sender, at the moment of changeover.
+		 */
+		__u32 next_tsn_at_change;
+
+		/* A flag which indicates the occurrence of a changeover */
+		char changeover_active;
+	
+		/* A glag which indicates whether the change of primary is
+		 * the first switch to this destination address during an
+		 * active switch.
+		 */
+		char cycling_changeover;
+
+		/* A temporary flag, which is used during the processing of
+		 * a SACK to estimate the causative TSN(s)'s group.
+		 */
+		char cacc_saw_newack;
+	} cacc;
 };
 
 struct sctp_transport *sctp_transport_new(const union sctp_addr *, int);

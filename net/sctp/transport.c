@@ -116,8 +116,6 @@ struct sctp_transport *sctp_transport_init(struct sctp_transport *peer,
 	peer->error_threshold = 0;
 	peer->error_count = 0;
 
-	peer->debug_name = "unnamedtransport";
-
 	INIT_LIST_HEAD(&peer->transmitted);
 	INIT_LIST_HEAD(&peer->send_ready);
 	INIT_LIST_HEAD(&peer->transports);
@@ -137,6 +135,13 @@ struct sctp_transport *sctp_transport_init(struct sctp_transport *peer,
 	peer->dead = 0;
 
 	peer->malloced = 0;
+
+	/* Initialize the state information for SFR-CACC */
+	peer->cacc.changeover_active = 0;
+	peer->cacc.cycling_changeover = 0;
+	peer->cacc.next_tsn_at_change = 0;
+	peer->cacc.cacc_saw_newack = 0;
+
 	return peer;
 }
 
