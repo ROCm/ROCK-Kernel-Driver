@@ -310,7 +310,7 @@ static int config_aec6210_chipset_for_dma (ide_drive_t *drive, byte ultra)
 	byte speed		= -1;
 
 	if (drive->type != ATA_DISK)
-		return ide_dma_off_quietly;
+		return 0;
 
 	if (((id->dma_ultra & 0x0010) ||
 	     (id->dma_ultra & 0x0008) ||
@@ -333,17 +333,17 @@ static int config_aec6210_chipset_for_dma (ide_drive_t *drive, byte ultra)
 	} else if (id->dma_1word & 0x0001) {
 		speed = XFER_SW_DMA_0;
 	} else {
- 		return ((int) ide_dma_off_quietly);
- 	}
+		return 0;
+	}
 
 	outb(inb(dma_base+2) & ~(1<<(5+unit)), dma_base+2);
 	(void) aec6210_tune_chipset(drive, speed);
 
-	return ((int)	((id->dma_ultra >> 11) & 3) ? ide_dma_off :
-			((id->dma_ultra >> 8) & 7) ? ide_dma_on :
-			((id->dma_mword >> 8) & 7) ? ide_dma_on :
-			((id->dma_1word >> 8) & 7) ? ide_dma_on :
-						     ide_dma_off_quietly);
+	return ((int)	((id->dma_ultra >> 11) & 3) ? 0 :
+			((id->dma_ultra >> 8) & 7) ? 1 :
+			((id->dma_mword >> 8) & 7) ? 1 :
+			((id->dma_1word >> 8) & 7) ? 1 :
+						     0);
 }
 
 static int config_aec6260_chipset_for_dma (ide_drive_t *drive, byte ultra)
@@ -356,7 +356,7 @@ static int config_aec6260_chipset_for_dma (ide_drive_t *drive, byte ultra)
 	byte ultra66		= eighty_ninty_three(drive);
 
 	if (drive->type != ATA_DISK)
-		return ((int) ide_dma_off_quietly);
+		return 0;
 
 	if ((id->dma_ultra & 0x0010) && (ultra) && (ultra66)) {
 		speed = XFER_UDMA_4;
@@ -381,17 +381,17 @@ static int config_aec6260_chipset_for_dma (ide_drive_t *drive, byte ultra)
 	} else if (id->dma_1word & 0x0001) {
 		speed = XFER_SW_DMA_0;
 	} else {
-		return ((int) ide_dma_off_quietly);
+		return 0;
 	}
 
 	outb(inb(dma_base+2) & ~(1<<(5+unit)), dma_base+2);
 	(void) aec6260_tune_chipset(drive, speed);
 
-	return ((int)	((id->dma_ultra >> 11) & 3) ? ide_dma_on :
-			((id->dma_ultra >> 8) & 7) ? ide_dma_on :
-			((id->dma_mword >> 8) & 7) ? ide_dma_on :
-			((id->dma_1word >> 8) & 7) ? ide_dma_on :
-						     ide_dma_off_quietly);
+	return ((int)	((id->dma_ultra >> 11) & 3) ? 1 :
+			((id->dma_ultra >> 8) & 7) ? 1 :
+			((id->dma_mword >> 8) & 7) ? 1 :
+			((id->dma_1word >> 8) & 7) ? 1 :
+						     0);
 }
 
 static int config_chipset_for_dma (ide_drive_t *drive, byte ultra)
@@ -403,7 +403,7 @@ static int config_chipset_for_dma (ide_drive_t *drive, byte ultra)
 		case PCI_DEVICE_ID_ARTOP_ATP860R:
 			return config_aec6260_chipset_for_dma(drive, ultra);
 		default:
-			return ((int) ide_dma_off_quietly);
+			return 0;
 	}
 }
 
@@ -433,21 +433,23 @@ static void aec62xx_tune_drive (ide_drive_t *drive, byte pio)
 static int config_drive_xfer_rate (ide_drive_t *drive)
 {
 	struct hd_driveid *id = drive->id;
-	ide_dma_action_t dma_func = ide_dma_on;
+	int on = 1;
+	int verbose = 1;
 
 	if (id && (id->capability & 1) && drive->channel->autodma) {
 		/* Consult the list of known "bad" drives */
-		if (ide_dmaproc(ide_dma_bad_drive, drive, NULL)) {
-			dma_func = ide_dma_off;
+		if (udma_black_list(drive)) {
+			on = 0;
 			goto fast_ata_pio;
 		}
-		dma_func = ide_dma_off_quietly;
+		on = 0;
+		verbose = 0;
 		if (id->field_valid & 4) {
 			if (id->dma_ultra & 0x001F) {
 				/* Force if Capable UltraDMA */
-				dma_func = config_chipset_for_dma(drive, 1);
+				on = config_chipset_for_dma(drive, 1);
 				if ((id->field_valid & 2) &&
-				    (dma_func != ide_dma_on))
+				    (!on))
 					goto try_dma_modes;
 			}
 		} else if (id->field_valid & 2) {
@@ -455,62 +457,38 @@ try_dma_modes:
 			if ((id->dma_mword & 0x0007) ||
 			    (id->dma_1word & 0x0007)) {
 				/* Force if Capable regular DMA modes */
-				dma_func = config_chipset_for_dma(drive, 0);
-				if (dma_func != ide_dma_on)
+				on = config_chipset_for_dma(drive, 0);
+				if (!on)
 					goto no_dma_set;
 			}
-		} else if (ide_dmaproc(ide_dma_good_drive, drive, NULL)) {
+		} else if (udma_white_list(drive)) {
 			if (id->eide_dma_time > 150) {
 				goto no_dma_set;
 			}
 			/* Consult the list of known "good" drives */
-			dma_func = config_chipset_for_dma(drive, 0);
-			if (dma_func != ide_dma_on)
+			on = config_chipset_for_dma(drive, 0);
+			if (!on)
 				goto no_dma_set;
 		} else {
 			goto fast_ata_pio;
 		}
 	} else if ((id->capability & 8) || (id->field_valid & 2)) {
 fast_ata_pio:
-		dma_func = ide_dma_off_quietly;
+		on = 0;
+		verbose = 0;
 no_dma_set:
 		aec62xx_tune_drive(drive, 5);
 	}
-	return drive->channel->udma(dma_func, drive, NULL);
+	udma_enable(drive, on, verbose);
+	return 0;
 }
 
-/*
- * aec62xx_dmaproc() initiates/aborts (U)DMA read/write operations on a drive.
- */
-int aec62xx_dmaproc (ide_dma_action_t func, struct ata_device *drive, struct request *rq)
+int aec62xx_dmaproc(struct ata_device *drive)
 {
-	switch (func) {
-		case ide_dma_check:
-			return config_drive_xfer_rate(drive);
-		case ide_dma_lostirq:
-		case ide_dma_timeout:
-			switch(drive->channel->pci_dev->device) {
-				case PCI_DEVICE_ID_ARTOP_ATP860:
-				case PCI_DEVICE_ID_ARTOP_ATP860R:
-//					{
-//						int i = 0;
-//						byte reg49h = 0;
-//						pci_read_config_byte(drive->channel->pci_dev, 0x49, &reg49h);
-//						for (i=0;i<256;i++)
-//							pci_write_config_byte(drive->channel->pci_dev, 0x49, reg49h|0x10);
-//						pci_write_config_byte(drive->channel->pci_dev, 0x49, reg49h & ~0x10);
-//					}
-//					return 0;
-				default:
-					break;
-			}
-		default:
-			break;
-	}
-	return ide_dmaproc(func, drive, rq);	/* use standard DMA stuff */
+	return config_drive_xfer_rate(drive);
 }
-#endif /* CONFIG_BLK_DEV_IDEDMA */
-#endif /* CONFIG_AEC62XX_TUNING */
+#endif
+#endif
 
 unsigned int __init pci_init_aec62xx (struct pci_dev *dev)
 {
@@ -546,7 +524,7 @@ void __init ide_init_aec62xx(struct ata_channel *hwif)
 	hwif->speedproc = aec62xx_tune_chipset;
 # ifdef CONFIG_BLK_DEV_IDEDMA
 	if (hwif->dma_base)
-		hwif->udma = aec62xx_dmaproc;
+		hwif->XXX_udma = aec62xx_dmaproc;
 	hwif->highmem = 1;
 # else
 	hwif->drives[0].autotune = 1;

@@ -105,9 +105,9 @@ inline void make_le_item_head (struct item_head * ih, const struct cpu_key * key
 }
 
 static void add_to_flushlist(struct inode *inode, struct buffer_head *bh) {
-    struct list_head *list = &(SB_JOURNAL(inode->i_sb)->j_dirty_buffers) ;
+    struct reiserfs_journal *j = SB_JOURNAL(inode->i_sb) ;
 
-    buffer_insert_list(NULL, bh, list) ;
+    buffer_insert_list(&j->j_dirty_buffers_lock, bh, &j->j_dirty_buffers) ;
 }
 
 //
@@ -1916,7 +1916,7 @@ static inline void submit_bh_for_writepage(struct buffer_head **bhp, int nr) {
     for(i = 0 ; i < nr ; i++) {
         bh = bhp[i] ;
 	lock_buffer(bh) ;
-	set_buffer_async_io(bh) ;
+	mark_buffer_async_write(bh) ;
 	/* submit_bh doesn't care if the buffer is dirty, but nobody
 	** later on in the call chain will be cleaning it.  So, we
 	** clean the buffer here, it still gets written either way.

@@ -58,15 +58,11 @@ extern char *ide_xfer_verbose (byte xfer_rate);
 /*
  * This initiates/aborts (U)DMA read/write operations on a drive.
  */
-int pdcadma_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct request *rq)
+static int pdcadma_dmaproc(struct ata_device *drive)
 {
-	switch (func) {
-		case ide_dma_check:
-			func = ide_dma_off_quietly;
-		default:
-			break;
-	}
-	return ide_dmaproc(func, drive, rq);	/* use standard DMA stuff */
+	udma_enable(drive, 0, 0);
+
+	return 0;
 }
 #endif
 
@@ -96,7 +92,7 @@ void __init ide_init_pdcadma(struct ata_channel *hwif)
 //	hwif->speedproc = &pdcadma_tune_chipset;
 
 //	if (hwif->dma_base) {
-//		hwif->dmaproc = &pdcadma_dmaproc;
+//		hwif->XXX_dmaproc = &pdcadma_dmaproc;
 //		hwif->autodma = 1;
 //	}
 }

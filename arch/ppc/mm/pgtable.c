@@ -237,7 +237,7 @@ map_page(unsigned long va, unsigned long pa, int flags)
 	pg = pte_alloc_kernel(&init_mm, pd, va);
 	if (pg != 0) {
 		err = 0;
-		set_pte(pg, mk_pte_phys(pa & PAGE_MASK, __pgprot(flags)));
+		set_pte(pg, pfn_pte(pa >> PAGE_SHIFT, __pgprot(flags)));
 		if (mem_init_done)
 			flush_HPTE(0, va, pmd_val(*pd));
 	}

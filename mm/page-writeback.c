@@ -354,6 +354,8 @@ int generic_writeback_mapping(struct address_space *mapping, int *nr_to_write)
 		lock_page(page);
 
 		if (TestClearPageDirty(page)) {
+			if (current->flags & PF_MEMALLOC)
+				SetPageLaunder(page);
 			err = writepage(page);
 			if (!ret)
 				ret = err;
@@ -454,6 +456,9 @@ EXPORT_SYMBOL(write_one_page);
  *
  * FIXME: may need to call ->reservepage here as well.  That's rather up to the
  * address_space though.
+ *
+ * For now, we treat swapper_space specially.  It doesn't use the normal
+ * block a_ops.
  */
 int __set_page_dirty_buffers(struct page *page)
 {
@@ -470,13 +475,15 @@ int __set_page_dirty_buffers(struct page *page)
 
 	spin_lock(&inode->i_bufferlist_lock);
 
-	if (page_has_buffers(page)) {
+	if (page_has_buffers(page) && !PageSwapCache(page)) {
 		struct buffer_head *head = page_buffers(page);
 		struct buffer_head *bh = head;
 
 		do {
 			if (buffer_uptodate(bh))
 				set_buffer_dirty(bh);
+			else
+				buffer_error();
 			bh = bh->b_this_page;
 		} while (bh != head);
 	}

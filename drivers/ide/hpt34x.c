@@ -210,7 +210,7 @@ static int config_chipset_for_dma (ide_drive_t *drive, byte ultra)
 	byte speed		= 0x00;
 
 	if (drive->type != ATA_DISK)
-		return ((int) ide_dma_off_quietly);
+		return 0;
 
 	hpt34x_clear_chipset(drive);
 
@@ -237,36 +237,38 @@ static int config_chipset_for_dma (ide_drive_t *drive, byte ultra)
 	} else if (id->dma_1word & 0x0001) {
 		speed = XFER_SW_DMA_0;
         } else {
-		return ((int) ide_dma_off_quietly);
+		return 0;
 	}
 
 	(void) hpt34x_tune_chipset(drive, speed);
 
-	return ((int)	((id->dma_ultra >> 11) & 3) ? ide_dma_off :
-			((id->dma_ultra >> 8) & 7) ? ide_dma_on :
-			((id->dma_mword >> 8) & 7) ? ide_dma_on :
-			((id->dma_1word >> 8) & 7) ? ide_dma_on :
-						     ide_dma_off_quietly);
+	return ((int)	((id->dma_ultra >> 11) & 3) ? 0 :
+			((id->dma_ultra >> 8) & 7) ? 1 :
+			((id->dma_mword >> 8) & 7) ? 1 :
+			((id->dma_1word >> 8) & 7) ? 1 :
+						     0);
 }
 
-static int config_drive_xfer_rate (ide_drive_t *drive)
+static int config_drive_xfer_rate(struct ata_device *drive)
 {
 	struct hd_driveid *id = drive->id;
-	ide_dma_action_t dma_func = ide_dma_on;
+	int on = 1;
+	int verbose = 1;
 
 	if (id && (id->capability & 1) && drive->channel->autodma) {
 		/* Consult the list of known "bad" drives */
-		if (ide_dmaproc(ide_dma_bad_drive, drive)) {
-			dma_func = ide_dma_off;
+		if (udma_black_list(drive)) {
+			on = 0;
 			goto fast_ata_pio;
 		}
-		dma_func = ide_dma_off_quietly;
+		on = 0;
+		verbose = 0;
 		if (id->field_valid & 4) {
 			if (id->dma_ultra & 0x0007) {
 				/* Force if Capable UltraDMA */
-				dma_func = config_chipset_for_dma(drive, 1);
+				on = config_chipset_for_dma(drive, 1);
 				if ((id->field_valid & 2) &&
-				    (dma_func != ide_dma_on))
+				    (!on))
 					goto try_dma_modes;
 			}
 		} else if (id->field_valid & 2) {
@@ -274,82 +276,97 @@ try_dma_modes:
 			if ((id->dma_mword & 0x0007) ||
 			    (id->dma_1word & 0x0007)) {
 				/* Force if Capable regular DMA modes */
-				dma_func = config_chipset_for_dma(drive, 0);
-				if (dma_func != ide_dma_on)
+				on = config_chipset_for_dma(drive, 0);
+				if (!on)
 					goto no_dma_set;
 			}
-		} else if (ide_dmaproc(ide_dma_good_drive, drive)) {
+		} else if (udma_white_list(drive)) {
 			if (id->eide_dma_time > 150) {
 				goto no_dma_set;
 			}
 			/* Consult the list of known "good" drives */
-			dma_func = config_chipset_for_dma(drive, 0);
-			if (dma_func != ide_dma_on)
+			on = config_chipset_for_dma(drive, 0);
+			if (!on)
 				goto no_dma_set;
 		} else {
 			goto fast_ata_pio;
 		}
 	} else if ((id->capability & 8) || (id->field_valid & 2)) {
 fast_ata_pio:
-		dma_func = ide_dma_off_quietly;
+		on = 0;
+		verbose = 0;
 no_dma_set:
 		config_chipset_for_pio(drive);
 	}
 
 #ifndef CONFIG_HPT34X_AUTODMA
-	if (dma_func == ide_dma_on)
-		dma_func = ide_dma_off;
-#endif /* CONFIG_HPT34X_AUTODMA */
+	if (on)
+		on = 0;
+#endif
+	udma_enable(drive, on, verbose);
 
-	return drive->channel->dmaproc(dma_func, drive);
+	return 0;
+}
+
+static int hpt34x_udma_stop(struct ata_device *drive)
+{
+	struct ata_channel *ch = drive->channel;
+	unsigned long dma_base = ch->dma_base;
+	u8 dma_stat;
+
+	drive->waiting_for_dma = 0;
+	outb(inb(dma_base)&~1, dma_base);	/* stop DMA */
+	dma_stat = inb(dma_base+2);		/* get DMA status */
+	outb(dma_stat|6, dma_base+2);		/* clear the INTR & ERROR bits */
+	udma_destroy_table(ch);			/* purge DMA mappings */
+
+	return (dma_stat & 7) != 4;		/* verify good DMA status */
+}
+
+static int do_udma(unsigned int reading, struct ata_device *drive, struct request *rq)
+{
+	struct ata_channel *ch = drive->channel;
+	unsigned long dma_base = ch->dma_base;
+	unsigned int count;
+
+	if (!(count = udma_new_table(ch, rq)))
+		return 1;	/* try PIO instead of DMA */
+
+	outl(ch->dmatable_dma, dma_base + 4); /* PRD table */
+	reading |= 0x01;
+	outb(reading, dma_base);		/* specify r/w */
+	outb(inb(dma_base+2)|6, dma_base+2);	/* clear INTR & ERROR flags */
+	drive->waiting_for_dma = 1;
+
+	if (drive->type != ATA_DISK)
+		return 0;
+
+	ide_set_handler(drive, &ide_dma_intr, WAIT_CMD, NULL);	/* issue cmd to drive */
+	OUT_BYTE((reading == 9) ? WIN_READDMA : WIN_WRITEDMA, IDE_COMMAND_REG);
+
+	return 0;
+}
+
+static int hpt34x_udma_read(struct ata_device *drive, struct request *rq)
+{
+	return do_udma(1 << 3, drive, rq);
+}
+
+static int hpt34x_udma_write(struct ata_device *drive, struct request *rq)
+{
+	return do_udma(0, drive, rq);
 }
 
 /*
- * hpt34x_dmaproc() initiates/aborts (U)DMA read/write operations on a drive.
- *
  * This is specific to the HPT343 UDMA bios-less chipset
  * and HPT345 UDMA bios chipset (stamped HPT363)
  * by HighPoint|Triones Technologies, Inc.
  */
-
-int hpt34x_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
+static int hpt34x_dmaproc(struct ata_device *drive)
 {
-	struct ata_channel *hwif = drive->channel;
-	unsigned long dma_base = hwif->dma_base;
-	unsigned int count, reading = 0;
-	byte dma_stat;
-
-	switch (func) {
-		case ide_dma_check:
-			return config_drive_xfer_rate(drive);
-		case ide_dma_read:
-			reading = 1 << 3;
-		case ide_dma_write:
-			if (!(count = ide_build_dmatable(drive, func)))
-				return 1;	/* try PIO instead of DMA */
-			outl(hwif->dmatable_dma, dma_base + 4); /* PRD table */
-			reading |= 0x01;
-			outb(reading, dma_base);		/* specify r/w */
-			outb(inb(dma_base+2)|6, dma_base+2);	/* clear INTR & ERROR flags */
-			drive->waiting_for_dma = 1;
-			if (drive->type != ATA_DISK)
-				return 0;
-			ide_set_handler(drive, &ide_dma_intr, WAIT_CMD, NULL);	/* issue cmd to drive */
-			OUT_BYTE((reading == 9) ? WIN_READDMA : WIN_WRITEDMA, IDE_COMMAND_REG);
-			return 0;
-		case ide_dma_end:	/* returns 1 on error, 0 otherwise */
-			drive->waiting_for_dma = 0;
-			outb(inb(dma_base)&~1, dma_base);	/* stop DMA */
-			dma_stat = inb(dma_base+2);		/* get DMA status */
-			outb(dma_stat|6, dma_base+2);		/* clear the INTR & ERROR bits */
-			ide_destroy_dmatable(drive);		/* purge DMA mappings */
-			return (dma_stat & 7) != 4;		/* verify good DMA status */
-		default:
-			break;
-	}
-	return ide_dmaproc(func, drive);	/* use standard DMA stuff */
+	return config_drive_xfer_rate(drive);
 }
-#endif /* CONFIG_BLK_DEV_IDEDMA */
+#endif
 
 /*
  * If the BIOS does not set the IO base addaress to XX00, 343 will fail.
@@ -423,7 +440,10 @@ void __init ide_init_hpt34x(struct ata_channel *hwif)
 		else
 			hwif->autodma = 0;
 
-		hwif->dmaproc = &hpt34x_dmaproc;
+		hwif->udma_stop = hpt34x_udma_stop;
+		hwif->udma_read = hpt34x_udma_read;
+		hwif->udma_write = hpt34x_udma_write;
+		hwif->XXX_udma = hpt34x_dmaproc;
 		hwif->highmem = 1;
 	} else {
 		hwif->drives[0].autotune = 1;

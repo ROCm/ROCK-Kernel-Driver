@@ -153,6 +153,14 @@ static __inline__ void list_splice(struct list_head *list, struct list_head *hea
 #define list_for_each(pos, head) \
 	for (pos = (head)->next, prefetch(pos->next); pos != (head); \
         	pos = pos->next, prefetch(pos->next))
+/**
+ * list_for_each_prev	-	iterate over a list backwards
+ * @pos:	the &struct list_head to use as a loop counter.
+ * @head:	the head for your list.
+ */
+#define list_for_each_prev(pos, head) \
+	for (pos = (head)->prev, prefetch(pos->prev); pos != (head); \
+        	pos = pos->prev, prefetch(pos->prev))
         	
 /**
  * list_for_each_safe	-	iterate over a list safe against removal of list entry

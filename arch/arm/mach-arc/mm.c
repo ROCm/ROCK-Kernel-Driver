@@ -138,7 +138,7 @@ void __init memtable_init(struct meminfo *mi)
 	page_nr = max_low_pfn;
 
 	pte = alloc_bootmem_low_pages(PTRS_PER_PTE * sizeof(pte_t));
-	pte[0] = mk_pte_phys(PAGE_OFFSET + 491520, PAGE_READONLY);
+	pte[0] = pfn_pte((PAGE_OFFSET + 491520) >> PAGE_SHIFT, PAGE_READONLY);
 	pmd_populate(&init_mm, pmd_offset(swapper_pg_dir, 0), pte);
 
 	for (i = 1; i < PTRS_PER_PGD; i++)

@@ -10,7 +10,7 @@
 
 O_TARGET := idedriver.o
 
-export-objs		:= ide-taskfile.o ide.o ide-features.o ide-probe.o ataraid.o
+export-objs	:= ide-taskfile.o ide.o ide-features.o ide-probe.o ide-dma.o ataraid.o
 
 obj-y		:=
 obj-m		:=
@@ -44,6 +44,7 @@ ide-obj-$(CONFIG_BLK_DEV_HPT366)	+= hpt366.o
 ide-obj-$(CONFIG_BLK_DEV_HT6560B)	+= ht6560b.o
 ide-obj-$(CONFIG_BLK_DEV_IDE_ICSIDE)	+= icside.o
 ide-obj-$(CONFIG_BLK_DEV_IDEDMA_PCI)	+= ide-dma.o
+ide-obj-$(CONFIG_BLK_DEV_IDE_TCQ)	+= tcq.o
 ide-obj-$(CONFIG_BLK_DEV_IDEPCI)	+= ide-pci.o
 ide-obj-$(CONFIG_BLK_DEV_ISAPNP)	+= ide-pnp.o
 ide-obj-$(CONFIG_BLK_DEV_IDE_PMAC)	+= ide-pmac.o

@@ -198,7 +198,7 @@ alloc_init_page(unsigned long virt, unsigned long phys, int domain, int prot)
 	}
 	ptep = pte_offset_kernel(pmdp, virt);
 
-	set_pte(ptep, mk_pte_phys(phys, __pgprot(prot)));
+	set_pte(ptep, pfn_pte(phys >> PAGE_SHIFT, __pgprot(prot)));
 }
 
 /*

@@ -297,7 +297,7 @@ static void ali15x3_tune_drive (ide_drive_t *drive, byte pio)
 			pci_write_config_byte(dev, portFIFO, cd_dma_fifo & 0xF0);
 		}
 	}
-	
+
 	pci_write_config_byte(dev, port, s_clc);
 	pci_write_config_byte(dev, port+drive->select.b.unit+2, (a_clc << 4) | r_clc);
 	__restore_flags(flags);
@@ -391,7 +391,7 @@ static int config_chipset_for_dma (ide_drive_t *drive, byte ultra33)
 	} else if (id->dma_1word & 0x0001) {
 		speed = XFER_SW_DMA_0;
 	} else {
-		return ((int) ide_dma_off_quietly);
+		return 0;
 	}
 
 	(void) ali15x3_tune_chipset(drive, speed);
@@ -399,11 +399,11 @@ static int config_chipset_for_dma (ide_drive_t *drive, byte ultra33)
 	if (!drive->init_speed)
 		drive->init_speed = speed;
 
-	rval = (int)(	((id->dma_ultra >> 11) & 3) ? ide_dma_on :
-			((id->dma_ultra >> 8) & 7) ? ide_dma_on :
-			((id->dma_mword >> 8) & 7) ? ide_dma_on :
-			((id->dma_1word >> 8) & 7) ? ide_dma_on :
-						     ide_dma_off_quietly);
+	rval = (int)(	((id->dma_ultra >> 11) & 3) ? 1:
+			((id->dma_ultra >> 8) & 7) ? 1:
+			((id->dma_mword >> 8) & 7) ? 1:
+			((id->dma_1word >> 8) & 7) ? 1:
+						     0);
 
 	return rval;
 }
@@ -433,25 +433,29 @@ static int ali15x3_config_drive_for_dma(ide_drive_t *drive)
 {
 	struct hd_driveid *id = drive->id;
 	struct ata_channel *hwif = drive->channel;
-	ide_dma_action_t dma_func = ide_dma_on;
+	int on = 1;
+	int verbose = 1;
 	byte can_ultra_dma = ali15x3_can_ultra(drive);
 
-	if ((m5229_revision<=0x20) && (drive->type != ATA_DISK))
-		return hwif->udma(ide_dma_off_quietly, drive, NULL);
+	if ((m5229_revision<=0x20) && (drive->type != ATA_DISK)) {
+		udma_enable(drive, 0, 0);
+		return 0;
+	}
 
 	if ((id != NULL) && ((id->capability & 1) != 0) && hwif->autodma) {
 		/* Consult the list of known "bad" drives */
-		if (ide_dmaproc(ide_dma_bad_drive, drive, NULL)) {
-			dma_func = ide_dma_off;
+		if (udma_black_list(drive)) {
+			on = 0;
 			goto fast_ata_pio;
 		}
-		dma_func = ide_dma_off_quietly;
+		on = 0;
+		verbose = 0;
 		if ((id->field_valid & 4) && (m5229_revision >= 0xC2)) {
 			if (id->dma_ultra & 0x003F) {
 				/* Force if Capable UltraDMA */
-				dma_func = config_chipset_for_dma(drive, can_ultra_dma);
+				on = config_chipset_for_dma(drive, can_ultra_dma);
 				if ((id->field_valid & 2) &&
-				    (dma_func != ide_dma_on))
+				    (!on))
 					goto try_dma_modes;
 			}
 		} else if (id->field_valid & 2) {
@@ -459,45 +463,47 @@ try_dma_modes:
 			if ((id->dma_mword & 0x0007) ||
 			    (id->dma_1word & 0x0007)) {
 				/* Force if Capable regular DMA modes */
-				dma_func = config_chipset_for_dma(drive, can_ultra_dma);
-				if (dma_func != ide_dma_on)
+				on = config_chipset_for_dma(drive, can_ultra_dma);
+				if (!on)
 					goto no_dma_set;
 			}
-		} else if (ide_dmaproc(ide_dma_good_drive, drive, NULL)) {
+		} else if (udma_white_list(drive)) {
 			if (id->eide_dma_time > 150) {
 				goto no_dma_set;
 			}
 			/* Consult the list of known "good" drives */
-			dma_func = config_chipset_for_dma(drive, can_ultra_dma);
-			if (dma_func != ide_dma_on)
+			on = config_chipset_for_dma(drive, can_ultra_dma);
+			if (!on)
 				goto no_dma_set;
 		} else {
 			goto fast_ata_pio;
 		}
 	} else if ((id->capability & 8) || (id->field_valid & 2)) {
 fast_ata_pio:
-		dma_func = ide_dma_off_quietly;
+		on = 0;
+		verbose = 0;
 no_dma_set:
 		config_chipset_for_pio(drive);
 	}
-	return hwif->udma(dma_func, drive, NULL);
+
+	udma_enable(drive, on, verbose);
+
+	return 0;
 }
 
-static int ali15x3_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct request *rq)
+static int ali15x3_udma_write(struct ata_device *drive, struct request *rq)
 {
-	switch(func) {
-		case ide_dma_check:
-			return ali15x3_config_drive_for_dma(drive);
-		case ide_dma_write:
-			if ((m5229_revision < 0xC2) && (drive->type != ATA_DISK))
-				return 1;	/* try PIO instead of DMA */
-			break;
-		default:
-			break;
-	}
-	return ide_dmaproc(func, drive, rq);	/* use standard DMA stuff */
+	if ((m5229_revision < 0xC2) && (drive->type != ATA_DISK))
+		return 1;	/* try PIO instead of DMA */
+
+	return ata_do_udma(0, drive, rq);
 }
-#endif /* CONFIG_BLK_DEV_IDEDMA */
+
+static int ali15x3_dmaproc(struct ata_device *drive)
+{
+	return ali15x3_config_drive_for_dma(drive);
+}
+#endif
 
 unsigned int __init pci_init_ali15x3(struct pci_dev *dev)
 {
@@ -679,7 +685,8 @@ void __init ide_init_ali15x3(struct ata_channel *hwif)
 		/*
 		 * M1543C or newer for DMAing
 		 */
-		hwif->udma = ali15x3_dmaproc;
+		hwif->udma_write = ali15x3_udma_write;
+		hwif->XXX_udma = ali15x3_dmaproc;
 		hwif->autodma = 1;
 	}
 

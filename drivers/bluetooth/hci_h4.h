@@ -23,40 +23,21 @@
 */
 
 /*
- * $Id: hci_uart.h,v 1.2 2001/06/02 01:40:08 maxk Exp $
+ * $Id: hci_h4.h,v 1.1.1.1 2002/03/08 21:03:15 maxk Exp $
  */
 
-#ifndef N_HCI
-#define N_HCI	15
-#endif
-
 #ifdef __KERNEL__
-
-#define tty2n_hci(tty)  ((struct n_hci *)((tty)->disc_data))
-#define n_hci2tty(n_hci) ((n_hci)->tty)
-
-struct n_hci {
-	struct tty_struct *tty;
-	struct hci_dev hdev;
-
-	struct sk_buff_head txq;
-	unsigned long tx_state;
-
-	spinlock_t rx_lock;
+struct h4_struct {
 	unsigned long rx_state;
 	unsigned long rx_count;
 	struct sk_buff *rx_skb;
 };
 
-/* Transmit states  */
-#define TRANS_SENDING		1
-#define TRANS_WAKEUP		2
-
-/* Receiver States */
-#define WAIT_PACKET_TYPE	0
-#define WAIT_EVENT_HDR	 	1
-#define WAIT_ACL_HDR		2
-#define WAIT_SCO_HDR		3
-#define WAIT_DATA	        4
+/* H4 receiver States */
+#define H4_W4_PACKET_TYPE 0
+#define H4_W4_EVENT_HDR	  1
+#define H4_W4_ACL_HDR     2
+#define H4_W4_SCO_HDR     3
+#define H4_W4_DATA        4
 
 #endif /* __KERNEL__ */

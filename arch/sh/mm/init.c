@@ -48,9 +48,6 @@ pg_data_t discontig_page_data[NR_NODES];
 bootmem_data_t discontig_node_bdata[NR_NODES];
 #endif
 
-static unsigned long totalram_pages;
-static unsigned long totalhigh_pages;
-
 void show_mem(void)
 {
 	int i, total = 0, reserved = 0;
@@ -203,15 +200,3 @@ void free_initrd_mem(unsigned long start, unsigned long end)
 	printk ("Freeing initrd memory: %ldk freed\n", (end - start) >> 10);
 }
 #endif
-
-void si_meminfo(struct sysinfo *val)
-{
-	val->totalram = totalram_pages;
-	val->sharedram = 0;
-	val->freeram = nr_free_pages();
-	val->bufferram = atomic_read(&buffermem_pages);
-	val->totalhigh = totalhigh_pages;
-	val->freehigh = nr_free_highpages();
-	val->mem_unit = PAGE_SIZE;
-	return;
-}

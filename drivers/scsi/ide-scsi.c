@@ -328,7 +328,7 @@ static ide_startstop_t idescsi_pc_intr(struct ata_device *drive, struct request 
 		printk ("ide-scsi: %s: DMA complete\n", drive->name);
 #endif /* IDESCSI_DEBUG_LOG */
 		pc->actually_transferred=pc->request_transfer;
-		(void) drive->channel->udma(ide_dma_end, drive, NULL);
+		udma_stop(drive);
 	}
 
 	status = GET_STAT();						/* Clear the interrupt */
@@ -429,8 +429,12 @@ static ide_startstop_t idescsi_issue_pc(struct ata_device *drive, struct request
 	pc->current_position=pc->buffer;
 	bcount = min(pc->request_transfer, 63 * 1024);		/* Request to transfer the entire buffer at once */
 
-	if (drive->using_dma && rq->bio)
-		dma_ok = !drive->channel->udma(test_bit (PC_WRITING, &pc->flags) ? ide_dma_write : ide_dma_read, drive, rq);
+	if (drive->using_dma && rq->bio) {
+		if (test_bit (PC_WRITING, &pc->flags))
+			dma_ok = !udma_write(drive, rq);
+		else
+			dma_ok = !udma_read(drive, rq);
+	}
 
 	SELECT_DRIVE(drive->channel, drive);
 	if (IDE_CONTROL_REG)
@@ -441,7 +445,7 @@ static ide_startstop_t idescsi_issue_pc(struct ata_device *drive, struct request
 
 	if (dma_ok) {
 		set_bit(PC_DMA_IN_PROGRESS, &pc->flags);
-		(void) drive->channel->udma(ide_dma_begin, drive, NULL);
+		udma_start(drive, rq);
 	}
 	if (test_bit (IDESCSI_DRQ_INTERRUPT, &scsi->flags)) {
 		ide_set_handler(drive, idescsi_transfer_pc, get_timeout(pc), NULL);

@@ -130,12 +130,12 @@ static void ata_write_slow(struct ata_device *drive, void *buffer, unsigned int 
 }
 #endif
 
-static void ata_read_16(ide_drive_t *drive, void *buffer, unsigned int wcount)
+static void ata_read_16(struct ata_device *drive, void *buffer, unsigned int wcount)
 {
 	insw(IDE_DATA_REG, buffer, wcount<<1);
 }
 
-static void ata_write_16(ide_drive_t *drive, void *buffer, unsigned int wcount)
+static void ata_write_16(struct ata_device *drive, void *buffer, unsigned int wcount)
 {
 	outsw(IDE_DATA_REG, buffer, wcount<<1);
 }
@@ -143,7 +143,7 @@ static void ata_write_16(ide_drive_t *drive, void *buffer, unsigned int wcount)
 /*
  * This is used for most PIO data transfers *from* the device.
  */
-void ata_read(ide_drive_t *drive, void *buffer, unsigned int wcount)
+void ata_read(struct ata_device *drive, void *buffer, unsigned int wcount)
 {
 	int io_32bit;
 
@@ -178,7 +178,7 @@ void ata_read(ide_drive_t *drive, void *buffer, unsigned int wcount)
 /*
  * This is used for most PIO data transfers *to* the device interface.
  */
-void ata_write(ide_drive_t *drive, void *buffer, unsigned int wcount)
+void ata_write(struct ata_device *drive, void *buffer, unsigned int wcount)
 {
 	int io_32bit;
 
@@ -202,7 +202,7 @@ void ata_write(ide_drive_t *drive, void *buffer, unsigned int wcount)
 			ata_write_slow(drive, buffer, wcount);
 		else
 #endif
-			ata_write_16(drive, buffer, wcount<<1);
+			ata_write_16(drive, buffer, wcount);
 	}
 }
 
@@ -213,7 +213,7 @@ void ata_write(ide_drive_t *drive, void *buffer, unsigned int wcount)
  * so if an odd bytecount is specified, be sure that there's at least one
  * extra byte allocated for the buffer.
  */
-void atapi_read(ide_drive_t *drive, void *buffer, unsigned int bytecount)
+void atapi_read(struct ata_device *drive, void *buffer, unsigned int bytecount)
 {
 	if (drive->channel->atapi_read) {
 		drive->channel->atapi_read(drive, buffer, bytecount);
@@ -233,7 +233,7 @@ void atapi_read(ide_drive_t *drive, void *buffer, unsigned int bytecount)
 		insw(IDE_DATA_REG, ((byte *)buffer) + (bytecount & ~0x03), 1);
 }
 
-void atapi_write(ide_drive_t *drive, void *buffer, unsigned int bytecount)
+void atapi_write(struct ata_device *drive, void *buffer, unsigned int bytecount)
 {
 	if (drive->channel->atapi_write) {
 		drive->channel->atapi_write(drive, buffer, bytecount);
@@ -256,11 +256,11 @@ void atapi_write(ide_drive_t *drive, void *buffer, unsigned int bytecount)
 /*
  * Needed for PCI irq sharing
  */
-int drive_is_ready(ide_drive_t *drive)
+int drive_is_ready(struct ata_device *drive)
 {
 	byte stat = 0;
 	if (drive->waiting_for_dma)
-		return drive->channel->udma(ide_dma_test_irq, drive, NULL);
+		return udma_irq_status(drive);
 #if 0
 	/* need to guarantee 400ns since last command was issued */
 	udelay(1);
@@ -290,7 +290,7 @@ int drive_is_ready(ide_drive_t *drive)
  * Stuff the first sector(s) by implicitly calling the handler driectly
  * therafter.
  */
-void ata_poll_drive_ready(ide_drive_t *drive)
+void ata_poll_drive_ready(struct ata_device *drive)
 {
 	int i;
 
@@ -399,7 +399,7 @@ static ide_startstop_t task_mulout_intr(struct ata_device *drive, struct request
 	return ide_started;
 }
 
-ide_startstop_t ata_taskfile(ide_drive_t *drive,
+ide_startstop_t ata_taskfile(struct ata_device *drive,
 		struct ata_taskfile *args, struct request *rq)
 {
 	struct hd_driveid *id = drive->id;
@@ -456,11 +456,33 @@ ide_startstop_t ata_taskfile(ide_drive_t *drive,
 		if (args->prehandler != NULL)
 			return args->prehandler(drive, rq);
 	} else {
-		/* for dma commands we down set the handler */
-		if (drive->using_dma &&
-		!(drive->channel->udma(((args->taskfile.command == WIN_WRITEDMA)
-					|| (args->taskfile.command == WIN_WRITEDMA_EXT))
-					? ide_dma_write : ide_dma_read, drive, rq)));
+		/*
+		 * FIXME: this is a gross hack, need to unify tcq dma proc and
+		 * regular dma proc -- basically split stuff that needs to act
+		 * on a request from things like ide_dma_check etc.
+		 */
+
+		if (!drive->using_dma)
+			return ide_started;
+
+		/* for dma commands we don't set the handler */
+		if (args->taskfile.command == WIN_WRITEDMA
+		 || args->taskfile.command == WIN_WRITEDMA_EXT)
+			udma_write(drive, rq);
+		else if (args->taskfile.command == WIN_READDMA
+		      || args->taskfile.command == WIN_READDMA_EXT)
+			udma_read(drive, rq);
+#ifdef CONFIG_BLK_DEV_IDE_TCQ
+		else if (args->taskfile.command == WIN_WRITEDMA_QUEUED
+		      || args->taskfile.command == WIN_WRITEDMA_QUEUED_EXT
+		      || args->taskfile.command == WIN_READDMA_QUEUED
+		      || args->taskfile.command == WIN_READDMA_QUEUED_EXT)
+			return udma_tcq_taskfile(drive, rq);
+#endif
+		else {
+			printk("ata_taskfile: unknown command %x\n", args->taskfile.command);
+			return ide_stopped;
+		}
 	}
 
 	return ide_started;
@@ -523,7 +545,7 @@ ide_startstop_t task_no_data_intr(struct ata_device *drive, struct request *rq)
 	ide__sti();	/* local CPU only */
 
 	if (!OK_STAT(stat = GET_STAT(), READY_STAT, BAD_STAT)) {
-		/* Keep quite for NOP becouse they are expected to fail. */
+		/* Keep quiet for NOP because it is expected to fail. */
 		if (args && args->taskfile.command != WIN_NOP)
 			return ide_error(drive, "task_no_data_intr", stat);
 	}
@@ -872,7 +894,7 @@ void ide_cmd_type_parser(struct ata_taskfile *args)
 	}
 }
 
-int ide_raw_taskfile(ide_drive_t *drive, struct ata_taskfile *args, byte *buf)
+int ide_raw_taskfile(struct ata_device *drive, struct ata_taskfile *args, byte *buf)
 {
 	struct request rq;
 
@@ -898,7 +920,7 @@ int ide_raw_taskfile(ide_drive_t *drive, struct ata_taskfile *args, byte *buf)
  * interface.
  */
 
-int ide_cmd_ioctl(ide_drive_t *drive, unsigned long arg)
+int ide_cmd_ioctl(struct ata_device *drive, unsigned long arg)
 {
 	int err = 0;
 	u8 vals[4];

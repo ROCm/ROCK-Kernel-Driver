@@ -416,6 +416,7 @@ static inline void statm_pte_range(pmd_t * pmd, unsigned long address, unsigned 
 	do {
 		pte_t page = *pte;
 		struct page *ptpage;
+		unsigned long pfn;
 
 		address += PAGE_SIZE;
 		pte++;
@@ -424,8 +425,11 @@ static inline void statm_pte_range(pmd_t * pmd, unsigned long address, unsigned 
 		++*total;
 		if (!pte_present(page))
 			continue;
-		ptpage = pte_page(page);
-		if ((!VALID_PAGE(ptpage)) || PageReserved(ptpage))
+		pfn = pte_pfn(page);
+		if (!pfn_valid(pfn))
+			continue;
+		ptpage = pfn_to_page(pfn);
+		if (PageReserved(ptpage))
 			continue;
 		++*pages;
 		if (pte_dirty(page))

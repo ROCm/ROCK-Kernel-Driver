@@ -174,6 +174,7 @@ extern void get_page_state(struct page_state *ret);
 
 #define PageLaunder(page)	test_bit(PG_launder, &(page)->flags)
 #define SetPageLaunder(page)	set_bit(PG_launder, &(page)->flags)
+#define ClearPageLaunder(page)	clear_bit(PG_launder, &(page)->flags)
 
 #define SetPagePrivate(page)	set_bit(PG_private, &(page)->flags)
 #define ClearPagePrivate(page)	clear_bit(PG_private, &(page)->flags)

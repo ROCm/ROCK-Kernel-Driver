@@ -225,7 +225,7 @@ static struct fb_ops controlfb_ops = {
 	fb_set_var:	control_set_var,
 	fb_get_cmap:	control_get_cmap,
 	fb_set_cmap:	gen_set_cmap,
-	fb_setcolreg:	control_setcolreg,
+	fb_setcolreg:	controlfb_setcolreg,
 	fb_pan_display:	control_pan_display,
 	fb_blank:	controlfb_blank,
 	fb_mmap:	control_mmap,
@@ -1238,7 +1238,7 @@ static void control_cfb16_revc(struct display *p, int xx, int yy)
     u8 *dest;
     int bytes = p->next_line, rows;
 
-    dest = p->info.screen_base + yy * fontheight(p) * bytes + xx * fontwidth(p)*2;
+    dest = p->fb_info->screen_base + yy * fontheight(p) * bytes + xx * fontwidth(p)*2;
     for (rows = fontheight(p); rows--; dest += bytes) {
        switch (fontwidth(p)) {
        case 16:
@@ -1261,7 +1261,7 @@ static void control_cfb32_revc(struct display *p, int xx, int yy)
     u8 *dest;
     int bytes = p->next_line, rows;
 
-    dest = p->info.screen_base + yy * fontheight(p) * bytes + xx * fontwidth(p) * 4;
+    dest = p->fb_info->screen_base + yy * fontheight(p) * bytes + xx * fontwidth(p) * 4;
     for (rows = fontheight(p); rows--; dest += bytes) {
        switch (fontwidth(p)) {
        case 16:

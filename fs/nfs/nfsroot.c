@@ -374,8 +374,8 @@ static int __init root_nfs_getport(int program, int version, int proto)
 {
 	struct sockaddr_in sin;
 
-	printk(KERN_NOTICE "Looking up port of RPC %d/%d on %s\n",
-		program, version, in_ntoa(servaddr));
+	printk(KERN_NOTICE "Looking up port of RPC %d/%d on %u.%u.%u.%u\n",
+		program, version, NIPQUAD(servaddr));
 	set_sockaddr(&sin, servaddr, 0);
 	return rpc_getport_external(&sin, program, version, proto);
 }

@@ -120,6 +120,11 @@ struct rpc_rqst {
 #define rq_rnr			rq_rcv_buf.io_nr
 #define rq_rlen			rq_rcv_buf.io_len
 
+#define XPRT_LAST_FRAG		(1 << 0)
+#define XPRT_COPY_RECM		(1 << 1)
+#define XPRT_COPY_XID		(1 << 2)
+#define XPRT_COPY_DATA		(1 << 3)
+
 struct rpc_xprt {
 	struct socket *		sock;		/* BSD socket layer */
 	struct sock *		inet;		/* INET layer */
@@ -140,18 +145,17 @@ struct rpc_xprt {
 	unsigned long		sockstate;	/* Socket state */
 	unsigned char		shutdown   : 1,	/* being shut down */
 				nocong	   : 1,	/* no congestion control */
-				stream     : 1,	/* TCP */
-				tcp_more   : 1;	/* more record fragments */
+				stream     : 1;	/* TCP */
 
 	/*
 	 * State of TCP reply receive stuff
 	 */
-	u32			tcp_recm;	/* Fragment header */
-	u32			tcp_xid;	/* Current XID */
-	unsigned int		tcp_reclen,	/* fragment length */
-				tcp_offset,	/* fragment offset */
-				tcp_copied;	/* copied to request */
-	struct list_head	rx_pending;	/* receive pending list */
+	u32			tcp_recm,	/* Fragment header */
+				tcp_xid,	/* Current XID */
+				tcp_reclen,	/* fragment length */
+				tcp_offset;	/* fragment offset */
+	unsigned long		tcp_copied,	/* copied to request */
+				tcp_flags;
 
 	/*
 	 * Send stuff
@@ -185,8 +189,6 @@ int			xprt_adjust_timeout(struct rpc_timeout *);
 void			xprt_release(struct rpc_task *);
 void			xprt_reconnect(struct rpc_task *);
 int			xprt_clear_backlog(struct rpc_xprt *);
-int			xprt_tcp_pending(void);
-void			__rpciod_tcp_dispatcher(void);
 
 #define XPRT_WSPACE	0
 #define XPRT_CONNECT	1
@@ -199,13 +201,6 @@ void			__rpciod_tcp_dispatcher(void);
 #define xprt_set_connected(xp)		(set_bit(XPRT_CONNECT, &(xp)->sockstate))
 #define xprt_test_and_set_connected(xp)	(test_and_set_bit(XPRT_CONNECT, &(xp)->sockstate))
 #define xprt_clear_connected(xp)	(clear_bit(XPRT_CONNECT, &(xp)->sockstate))
-
-static inline
-void rpciod_tcp_dispatcher(void)
-{
-	if (xprt_tcp_pending())
-		__rpciod_tcp_dispatcher();
-}
 
 #endif /* __KERNEL__*/
 

@@ -1312,10 +1312,8 @@ void cheetah_deferred_handler(struct pt_regs *regs, unsigned long afsr, unsigned
 			}
 
 			if (recoverable) {
-				struct page *page = virt_to_page(__va(afar));
-
-				if (VALID_PAGE(page))
-					get_page(page);
+				if (pfn_valid(afar >> PAGE_SHIFT))
+					get_page(pfn_to_page(afar >> PAGE_SHIFT));
 				else
 					recoverable = 0;
 

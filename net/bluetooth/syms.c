@@ -25,7 +25,7 @@
 /*
  * BlueZ symbols.
  *
- * $Id: syms.c,v 1.1 2001/07/12 19:31:24 maxk Exp $
+ * $Id: syms.c,v 1.1 2002/03/08 21:06:59 maxk Exp $
  */
 
 #include <linux/config.h>
@@ -39,7 +39,6 @@
 #include <linux/socket.h>
 
 #include <net/bluetooth/bluetooth.h>
-#include <net/bluetooth/bluez.h>
 #include <net/bluetooth/hci_core.h>
 
 /* HCI Core */
@@ -47,17 +46,18 @@ EXPORT_SYMBOL(hci_register_dev);
 EXPORT_SYMBOL(hci_unregister_dev);
 EXPORT_SYMBOL(hci_register_proto);
 EXPORT_SYMBOL(hci_unregister_proto);
-EXPORT_SYMBOL(hci_register_notifier);
-EXPORT_SYMBOL(hci_unregister_notifier);
 
+EXPORT_SYMBOL(hci_get_route);
 EXPORT_SYMBOL(hci_connect);
-EXPORT_SYMBOL(hci_disconnect);
 EXPORT_SYMBOL(hci_dev_get);
+EXPORT_SYMBOL(hci_conn_auth);
+EXPORT_SYMBOL(hci_conn_encrypt);
 
 EXPORT_SYMBOL(hci_recv_frame);
 EXPORT_SYMBOL(hci_send_acl);
 EXPORT_SYMBOL(hci_send_sco);
 EXPORT_SYMBOL(hci_send_raw);
+EXPORT_SYMBOL(hci_si_event);
 
 /* BlueZ lib */
 EXPORT_SYMBOL(bluez_dump);
@@ -68,5 +68,11 @@ EXPORT_SYMBOL(bterr);
 /* BlueZ sockets */
 EXPORT_SYMBOL(bluez_sock_register);
 EXPORT_SYMBOL(bluez_sock_unregister);
+EXPORT_SYMBOL(bluez_sock_alloc);
 EXPORT_SYMBOL(bluez_sock_link);
 EXPORT_SYMBOL(bluez_sock_unlink);
+EXPORT_SYMBOL(bluez_sock_recvmsg);
+EXPORT_SYMBOL(bluez_sock_poll);
+EXPORT_SYMBOL(bluez_accept_enqueue);
+EXPORT_SYMBOL(bluez_accept_dequeue);
+EXPORT_SYMBOL(bluez_sock_w4_connect);

@@ -905,8 +905,8 @@ out:
  * The buffer is placed on the transaction's data list and is marked as
  * belonging to the transaction.
  *
- * If `async' is set then the writebask will be initiated by the caller
- * using submit_bh -> end_buffer_io_async.  We put the buffer onto
+ * If `async' is set then the writebabk will be initiated by the caller
+ * using submit_bh -> end_buffer_async_write.  We put the buffer onto
  * t_async_datalist.
  * 
  * Returns error number or 0 on success.  
@@ -1548,7 +1548,7 @@ void __journal_unfile_buffer(struct journal_head *jh)
 	__blist_del_buffer(list, jh);
 	jh->b_jlist = BJ_None;
 	if (test_and_clear_bit(BH_JBDDirty, &jh2bh(jh)->b_state))
-		set_buffer_dirty(jh2bh(jh));
+		mark_buffer_dirty(jh2bh(jh));	/* Expose it to the VM */
 }
 
 void journal_unfile_buffer(struct journal_head *jh)
@@ -1587,7 +1587,7 @@ static int __journal_try_to_free_buffer(struct buffer_head *bh,
 		goto out;
 	}
 
-	if (!buffer_uptodate(bh))
+	if (!buffer_uptodate(bh))	/* AKPM: why? */
 		goto out;
 
 	if (jh->b_next_transaction != 0)
@@ -1775,9 +1775,6 @@ static int journal_unmap_buffer(journal_t *journal, struct buffer_head *bh)
 
 	BUFFER_TRACE(bh, "entry");
 
-	if (!buffer_mapped(bh))
-		return 1;
-
 	/* It is safe to proceed here without the
 	 * journal_datalist_spinlock because the buffers cannot be
 	 * stolen by try_to_free_buffers as long as we are holding the
@@ -1854,8 +1851,7 @@ static int journal_unmap_buffer(journal_t *journal, struct buffer_head *bh)
 	}
 
 zap_buffer:	
-	if (buffer_dirty(bh))
-		clear_buffer_dirty(bh);
+	clear_buffer_dirty(bh);
 	J_ASSERT_BH(bh, !buffer_jdirty(bh));
 	clear_buffer_mapped(bh);
 	clear_buffer_req(bh);

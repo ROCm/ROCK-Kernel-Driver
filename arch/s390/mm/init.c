@@ -39,8 +39,6 @@
 
 mmu_gather_t mmu_gathers[NR_CPUS];
 
-static unsigned long totalram_pages;
-
 pgd_t swapper_pg_dir[PTRS_PER_PGD] __attribute__((__aligned__(PAGE_SIZE)));
 char  empty_zero_page[PAGE_SIZE] __attribute__((__aligned__(PAGE_SIZE)));
 
@@ -118,9 +116,8 @@ void __init paging_init(void)
         pte_t   pte;
 	int     i;
         unsigned long tmp;
-        unsigned long address=0;
+        unsigned long pfn = 0;
         unsigned long pgdir_k = (__pa(swapper_pg_dir) & PAGE_MASK) | _KERNSEG_TABLE;
-	unsigned long end_mem = (unsigned long) __va(max_low_pfn*PAGE_SIZE);
         static const int ssm_mask = 0x04000000L;
 
 	/* unmap whole virtual address space */
@@ -136,7 +133,7 @@ void __init paging_init(void)
 
         pg_dir = swapper_pg_dir;
 
-        while (address < end_mem) {
+        while (pfn < max_low_pfn) {
                 /*
                  * pg_table is physical at this point
                  */
@@ -149,11 +146,11 @@ void __init paging_init(void)
                 pg_dir++;
 
                 for (tmp = 0 ; tmp < PTRS_PER_PTE ; tmp++,pg_table++) {
-                        pte = mk_pte_phys(address, PAGE_KERNEL);
-                        if (address >= end_mem)
+                        pte = pfn_pte(pfn, PAGE_KERNEL);
+                        if (pfn >= max_low_pfn)
                                 pte_clear(&pte);
                         set_pte(pg_table, pte);
-                        address += PAGE_SIZE;
+                        pfn++;
                 }
         }
 
@@ -231,14 +228,3 @@ void free_initrd_mem(unsigned long start, unsigned long end)
         }
 }
 #endif
-
-void si_meminfo(struct sysinfo *val)
-{
-	val->totalram = totalram_pages;
-	val->sharedram = 0;
-	val->freeram = nr_free_pages();
-	val->bufferram = atomic_read(&buffermem_pages);
-	val->totalhigh = 0;
-	val->freehigh = 0;
-	val->mem_unit = PAGE_SIZE;
-}

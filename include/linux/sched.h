@@ -369,6 +369,7 @@ do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
 #define PF_MEMDIE	0x00001000	/* Killed for out-of-memory */
 #define PF_FREE_PAGES	0x00002000	/* per process page freeing */
 #define PF_FLUSHER	0x00004000	/* responsible for disk writeback */
+#define PF_RADIX_TREE	0x00008000	/* debug: performing radix tree alloc */
 
 /*
  * Ptrace flags

@@ -73,7 +73,6 @@ int mem_init_done;
 unsigned long ioremap_bot = IMALLOC_BASE;
 
 static int boot_mapsize;
-static unsigned long totalram_pages;
 
 extern pgd_t swapper_pg_dir[];
 extern char __init_begin, __init_end;
@@ -136,17 +135,6 @@ void show_mem(void)
 	printk("%d pages shared\n",shared);
 	printk("%d pages swap cached\n",cached);
 	printk("%ld buffermem pages\n", nr_buffermem_pages());
-}
-
-void si_meminfo(struct sysinfo *val)
-{
- 	val->totalram = totalram_pages;
-	val->sharedram = 0;
-	val->freeram = nr_free_pages();
-	val->bufferram = atomic_read(&buffermem_pages);
-	val->totalhigh = 0;
-	val->freehigh = 0;
-	val->mem_unit = PAGE_SIZE;
 }
 
 void *
@@ -240,7 +228,7 @@ static void map_io_page(unsigned long ea, unsigned long pa, int flags)
 		ptep = pte_alloc_kernel(&ioremap_mm, pmdp, ea);
 
 		pa = absolute_to_phys(pa);
-		set_pte(ptep, mk_pte_phys(pa & PAGE_MASK, __pgprot(flags)));
+		set_pte(ptep, pfn_pte(pa >> PAGE_SHIFT, __pgprot(flags)));
 		spin_unlock(&ioremap_mm.page_table_lock);
 	} else {
 		/* If the mm subsystem is not fully up, we cannot create a

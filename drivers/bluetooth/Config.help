@@ -1,11 +1,23 @@
+HCI UART driver
 CONFIG_BLUEZ_HCIUART
   Bluetooth HCI UART driver.
   This driver is required if you want to use Bluetooth devices with
-  serial port interface.
+  serial port interface. You will also need this driver if you have 
+  UART based Bluetooth PCMCIA and CF devices like Xircom Credit Card 
+  adapter and BrainBoxes Bluetooth PC Card.
 
   Say Y here to compile support for Bluetooth UART devices into the
   kernel or say M to compile it as module (hci_uart.o).
 
+HCI UART (H4) protocol support 
+CONFIG_BLUEZ_HCIUART_H4
+  UART (H4) is serial protocol for communication between Bluetooth 
+  device and host. This protocol is required for most UART based 
+  Bluetooth device (including PCMCIA and CF). 
+
+  Say Y here to compile support for HCI UART (H4) protocol.
+
+HCI USB driver
 CONFIG_BLUEZ_HCIUSB
   Bluetooth HCI USB driver.
   This driver is required if you want to use Bluetooth devices with
@@ -14,6 +26,24 @@ CONFIG_BLUEZ_HCIUSB
   Say Y here to compile support for Bluetooth USB devices into the
   kernel or say M to compile it as module (hci_usb.o).
 
+HCI USB firmware download support
+CONFIG_BLUEZ_USB_FW_LOAD
+  Firmware download support for Bluetooth USB devices.
+  This support is required for devices like Broadcom BCM2033.
+
+  HCI USB driver uses external firmware downloader program provided 
+  in BlueFW package.
+  For more information, see <http://bluez.sf.net/>.
+
+HCI USB zero packet support
+CONFIG_BLUEZ_USB_ZERO_PACKET
+  Support for USB zero packets. 
+  This option is provided only as a work around for buggy Bluetooth USB 
+  devices. Do _not_ enable it unless you know for sure that your device 
+  requires zero packets.
+  Most people should say N here.
+
+HCI VHCI Virtual HCI device driver
 CONFIG_BLUEZ_HCIVHCI
   Bluetooth Virtual HCI device driver.
   This driver is required if you want to use HCI Emulation software.
@@ -21,3 +51,24 @@ CONFIG_BLUEZ_HCIVHCI
   Say Y here to compile support for virtual HCI devices into the
   kernel or say M to compile it as module (hci_vhci.o).
 
+HCI DTL1 (PC Card) device driver
+CONFIG_BLUEZ_HCIDTL1
+  Bluetooth HCI DTL1 (PC Card) driver.
+  This driver provides support for Bluetooth PCMCIA devices with
+  Nokia DTL1 interface:
+     Nokia Bluetooth Card
+     Socket Bluetooth CF Card
+
+  Say Y here to compile support for HCI DTL1 devices into the
+  kernel or say M to compile it as module (dtl1_cs.o).
+
+HCI BlueCard (PC Card) device driver
+CONFIG_BLUEZ_HCIBLUECARD
+  Bluetooth HCI BlueCard (PC Card) driver.
+  This driver provides support for Bluetooth PCMCIA devices with
+  Anycom BlueCard interface:
+     Anycom Bluetooth PC Card
+     Anycom Bluetooth CF Card
+
+  Say Y here to compile support for HCI BlueCard devices into the
+  kernel or say M to compile it as module (bluecard_cs.o).

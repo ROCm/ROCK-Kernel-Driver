@@ -2058,7 +2058,7 @@ static ide_startstop_t idetape_pc_intr(struct ata_device *drive, struct request 
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (test_bit (PC_DMA_IN_PROGRESS, &pc->flags)) {
-		if (drive->channel->udma(ide_dma_end, drive, NULL)) {
+		if (udma_stop(drive)) {
 			/*
 			 * A DMA error is sometimes expected. For example,
 			 * if the tape is crossing a filemark during a
@@ -2132,7 +2132,8 @@ static ide_startstop_t idetape_pc_intr(struct ata_device *drive, struct request 
 	if (test_and_clear_bit (PC_DMA_IN_PROGRESS, &pc->flags)) {
 		printk (KERN_ERR "ide-tape: The tape wants to issue more interrupts in DMA mode\n");
 		printk (KERN_ERR "ide-tape: DMA disabled, reverting to PIO\n");
-		drive->channel->udma(ide_dma_off, drive, NULL);
+		udma_enable(drive, 0, 1);
+
 		return ide_stopped;
 	}
 #endif /* CONFIG_BLK_DEV_IDEDMA */
@@ -2309,11 +2310,15 @@ static ide_startstop_t idetape_issue_packet_command(struct ata_device *drive, st
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (test_and_clear_bit (PC_DMA_ERROR, &pc->flags)) {
 		printk (KERN_WARNING "ide-tape: DMA disabled, reverting to PIO\n");
-		(void) drive->channel->udma(ide_dma_off, drive, NULL);
+		udma_enable(drive, 0, 1);
 	}
-	if (test_bit (PC_DMA_RECOMMENDED, &pc->flags) && drive->using_dma)
-		dma_ok = !drive->channel->udma(test_bit (PC_WRITING, &pc->flags) ? ide_dma_write : ide_dma_read, drive, rq);
-#endif /* CONFIG_BLK_DEV_IDEDMA */
+	if (test_bit (PC_DMA_RECOMMENDED, &pc->flags) && drive->using_dma) {
+		if (test_bit (PC_WRITING, &pc->flags))
+			dma_ok = !udma_write(drive, rq);
+		else
+			dma_ok = !udma_read(drive, rq);
+	}
+#endif
 
 	if (IDE_CONTROL_REG)
 		OUT_BYTE (drive->ctl, IDE_CONTROL_REG);
@@ -2324,7 +2329,7 @@ static ide_startstop_t idetape_issue_packet_command(struct ata_device *drive, st
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (dma_ok) {						/* Begin DMA, if necessary */
 		set_bit (PC_DMA_IN_PROGRESS, &pc->flags);
-		(void) drive->channel->udma(ide_dma_begin, drive, NULL);
+		udma_start(drive, rq);
 	}
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 	if (test_bit(IDETAPE_DRQ_INTERRUPT, &tape->flags)) {

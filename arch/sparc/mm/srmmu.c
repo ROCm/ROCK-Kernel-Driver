@@ -1105,7 +1105,6 @@ static inline void map_kernel(void)
 extern void sparc_context_init(int);
 
 extern int linux_num_cpus;
-extern unsigned long totalhigh_pages;
 
 void (*poke_srmmu)(void) __initdata = NULL;
 
@@ -2043,7 +2042,7 @@ void __init ld_mmu_srmmu(void)
 	BTFIXUPSET_CALL(pgd_clear, srmmu_pgd_clear, BTFIXUPCALL_SWAPO0G0);
 
 	BTFIXUPSET_CALL(mk_pte, srmmu_mk_pte, BTFIXUPCALL_NORM);
-	BTFIXUPSET_CALL(mk_pte_phys, srmmu_mk_pte_phys, BTFIXUPCALL_NORM);
+	BTFIXUPSET_CALL(pfn_pte, srmmu_pfn_pte, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(mk_pte_io, srmmu_mk_pte_io, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(pgd_set, srmmu_pgd_set, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(pmd_set, srmmu_pmd_set, BTFIXUPCALL_NORM);

@@ -5087,22 +5087,35 @@
 		11d4 0048  SoundMAX Integrated Digital Audio
 	2426  82801AB AC'97 Modem
 	2428  82801AB PCI Bridge
-	2440  82820 820 (Camino 2) Chipset ISA Bridge (ICH2)
-	2442  82820 820 (Camino 2) Chipset USB (Hub A)
-	2443  82820 820 (Camino 2) Chipset SMBus
-	2444  82820 820 (Camino 2) Chipset USB (Hub B)
-	2445  82820 820 (Camino 2) Chipset AC'97 Audio Controller
-	2446  82820 820 (Camino 2) Chipset AC'97 Modem Controller
-	2448  82820 820 (Camino 2) Chipset PCI (-M)
-	2449  82820 (ICH2) Chipset Ethernet Controller
-	244a  82820 820 (Camino 2) Chipset IDE U100 (-M)
-	244b  82820 820 (Camino 2) Chipset IDE U100
-	244c  82820 820 (Camino 2) Chipset ISA Bridge (ICH2-M)
-	244e  82820 820 (Camino 2) Chipset PCI
-	245b  82801E C-ICH IDE
-	2485  AC'97 Audio Controller
-	248a  82801CAM ICH3-M IDE
-	248b  82801CA ICH3 IDE
+	2440  82801BA ISA Bridge (LPC)
+	2442  82801BA/BAM USB (Hub #1)
+	2443  82801BA/BAM SMBus
+	2444  82801BA/BAM USB (Hub #2)
+	2445  82801BA/BAM AC'97 Audio
+	2446  82801BA/BAM AC'97 Modem
+	2448  82801BAM/CAM PCI Bridge
+	2449  82801BA/BAM/CA/CAM Ethernet Controller
+	244a  82801BAM IDE U100
+	244b  82801BA IDE U100
+	244c  82801BAM ISA Bridge (LPC)
+	244e  82801BA/CA PCI Bridge
+	2450  82801E ISA Bridge (LPC)
+	2452  82801E USB
+	2453  82801E SMBus
+	2459  82801E Ethernet Controller 0
+	245b  82801E IDE U100
+	245d  82801E Ethernet Controller 1
+	245e  82801E PCI Bridge
+	2480  82801CA ISA Bridge (LPC)
+	2482  82801CA/CAM USB (Hub #1)
+	2483  82801CA/CAM SMBus
+	2484  82801CA/CAM USB (Hub #2)
+	2485  82801CA/CAM AC'97 Audio
+	2486  82801CA/CAM AC'97 Modem
+	2487  82801CA/CAM USB (Hub #3)
+	248a  82801CAM IDE U100
+	248b  82801CA IDE U100
+	248c  82801CAM ISA Bridge (LPC)
 	24cb  82801DB ICH4 IDE
 	2500  82820 820 (Camino) Chipset Host Bridge (MCH)
 		1043 801c  P3C-2000 system chipset

@@ -242,9 +242,9 @@ static int ide_build_sglist(struct ata_channel *hwif, struct request *rq)
 }
 
 static int
-icside_build_dmatable(ide_drive_t *drive, int reading)
+icside_udma_new_table(struct ata_channel *ch, struct request *rq)
 {
-	return drive->channel->sg_nents = ide_build_sglist(drive->channel, HWGROUP(drive)->rq);
+	return ch->sg_nents = ide_build_sglist(ch, rq);
 }
 
 /* Teardown mappings after DMA has completed.  */
@@ -332,7 +332,7 @@ static ide_startstop_t icside_dmaintr(struct ata_device *drive, struct request *
 	int i;
 	byte stat, dma_stat;
 
-	dma_stat = drive->channel->dmaproc(ide_dma_end, drive);
+	dma_stat = drive->channel->udma(ide_dma_end, drive, rq);
 	stat = GET_STAT();			/* get drive status */
 	if (OK_STAT(stat,DRIVE_READY,drive->bad_wstat|DRQ_STAT)) {
 		if (!dma_stat) {
@@ -350,7 +350,7 @@ static ide_startstop_t icside_dmaintr(struct ata_device *drive, struct request *
 
 
 static int
-icside_dma_check(ide_drive_t *drive)
+icside_dma_check(struct ata_device *drive, struct request *rq)
 {
 	struct hd_driveid *id = drive->id;
 	struct ata_channel *hwif = drive->channel;
@@ -381,14 +381,7 @@ icside_dma_check(ide_drive_t *drive)
 out:
 	func = icside_config_if(drive, xfer_mode);
 
-	return hwif->dmaproc(func, drive);
-}
-
-static int
-icside_dma_verbose(ide_drive_t *drive)
-{
-	printk(", DMA");
-	return 1;
+	return hwif->udma(func, drive, rq);
 }
 
 static int
@@ -413,12 +406,12 @@ icside_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 		return 0;
 
 	case ide_dma_check:
-		return icside_dma_check(drive);
+		return icside_dma_check(drive, rq);
 
 	case ide_dma_read:
 		reading = 1;
 	case ide_dma_write:
-		count = icside_build_dmatable(drive, reading);
+		count = icside_udma_new_table(hwif, rq);
 		if (!count)
 			return 1;
 		disable_dma(hwif->hw.dma);
@@ -457,9 +450,6 @@ icside_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 
 	case ide_dma_test_irq:
 		return inb((unsigned long)hwif->hw.priv) & 1;
-
-	case ide_dma_verbose:
-		return icside_dma_verbose(drive);
 
 	case ide_dma_timeout:
 	default:

@@ -1164,9 +1164,9 @@ pmac_ide_build_dmatable(struct ata_device *drive, struct request *rq, int ix, in
 
 /* Teardown mappings after DMA has completed.  */
 static void
-pmac_ide_destroy_dmatable (ide_drive_t *drive, int ix)
+pmac_ide_destroy_dmatable(struct ata_channel *ch, int ix)
 {
-	struct pci_dev *dev = drive->channel->pci_dev;
+	struct pci_dev *dev = ch->pci_dev;
 	struct scatterlist *sg = pmac_ide[ix].sg_table;
 	int nents = pmac_ide[ix].sg_nents;
 
@@ -1367,10 +1367,6 @@ static int pmac_ide_dmaproc(ide_dma_action_t func, struct ata_device *drive, str
 		break;
 	case ide_dma_read:
 	case ide_dma_write:
-		/* this almost certainly isn't needed since we don't
-		   appear to have a rwproc */
-		if (drive->channel->rwproc)
-			drive->channel->rwproc(drive, func);
 		reading = (func == ide_dma_read);
 		if (!pmac_ide_build_dmatable(drive, rq, ix, !reading))
 			return 1;
@@ -1404,7 +1400,7 @@ static int pmac_ide_dmaproc(ide_dma_action_t func, struct ata_device *drive, str
 		drive->waiting_for_dma = 0;
 		dstat = in_le32(&dma->status);
 		out_le32(&dma->control, ((RUN|WAKE|DEAD) << 16));
-		pmac_ide_destroy_dmatable(drive, ix);
+		pmac_ide_destroy_dmatable(drive->channel, ix);
 		/* verify good dma status */
 		return (dstat & (RUN|DEAD|ACTIVE)) != RUN;
 	case ide_dma_test_irq: /* returns 1 if dma irq issued, 0 otherwise */
@@ -1453,9 +1449,6 @@ static int pmac_ide_dmaproc(ide_dma_action_t func, struct ata_device *drive, str
 	case ide_dma_bad_drive:
 	case ide_dma_good_drive:
 		return check_drive_lists(drive, (func == ide_dma_good_drive));
-	case ide_dma_verbose:
-		return report_drive_dmaing(drive);
-	case ide_dma_retune:
 	case ide_dma_lostirq:
 	case ide_dma_timeout:
 		printk(KERN_WARNING "ide_pmac_dmaproc: chipset supported func only: %d\n", func);

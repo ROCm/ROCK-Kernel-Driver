@@ -374,7 +374,7 @@ static void __init change_floppy(char *fmt, ...)
 	va_start(args, fmt);
 	vsprintf(buf, fmt, args);
 	va_end(args);
-	fd = open("/dev/root", O_RDWR, 0);
+	fd = open("/dev/root", O_RDWR | O_NDELAY, 0);
 	if (fd >= 0) {
 		sys_ioctl(fd, FDEJECT, 0);
 		close(fd);
@@ -791,7 +791,7 @@ static void __init handle_initrd(void)
 			error = sys_ioctl(fd, BLKFLSBUF, 0);
 			close(fd);
 		}
-		printk(error ? "okay\n" : "failed\n");
+		printk(!error ? "okay\n" : "failed\n");
 	}
 #endif
 }

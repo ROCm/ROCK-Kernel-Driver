@@ -43,8 +43,7 @@
  *  pagemap_lru_lock
  *  ->i_shared_lock		(vmtruncate)
  *    ->i_bufferlist_lock	(__free_pte->__set_page_dirty_buffers)
- *      ->unused_list_lock	(try_to_free_buffers)
- *        ->mapping->page_lock
+ *      ->mapping->page_lock
  *      ->inode_lock		(__mark_inode_dirty)
  *        ->sb_lock		(fs/fs-writeback.c)
  */
@@ -201,18 +200,18 @@ static int truncate_list_pages(struct address_space *mapping,
 			int failed;
 
 			page_cache_get(page);
-			if (PageWriteback(page)) {
-				/*
-				 * urgggh. This function is utterly foul,
-				 * and this addition doesn't help.  Kill.
-				 */
+			failed = TestSetPageLocked(page);
+			if (!failed && PageWriteback(page)) {
+				unlock_page(page);
+				list_del(head);
+				list_add_tail(head, curr);
 				write_unlock(&mapping->page_lock);
 				wait_on_page_writeback(page);
+				page_cache_release(page);
 				unlocked = 1;
 				write_lock(&mapping->page_lock);
 				goto restart;
 			}
-			failed = TestSetPageLocked(page);
 
 			list_del(head);
 			if (!failed)
@@ -287,11 +286,11 @@ void truncate_inode_pages(struct address_space * mapping, loff_t lstart)
 	clean_list_pages(mapping, &mapping->io_pages, start);
 	clean_list_pages(mapping, &mapping->dirty_pages, start);
 	do {
-		unlocked |= truncate_list_pages(mapping,
+		unlocked = truncate_list_pages(mapping,
 				&mapping->io_pages, start, &partial);
 		unlocked |= truncate_list_pages(mapping,
 				&mapping->dirty_pages, start, &partial);
-		unlocked = truncate_list_pages(mapping,
+		unlocked |= truncate_list_pages(mapping,
 				&mapping->clean_pages, start, &partial);
 		unlocked |= truncate_list_pages(mapping,
 				&mapping->locked_pages, start, &partial);
@@ -659,7 +658,6 @@ EXPORT_SYMBOL(wait_on_page_writeback);
 void unlock_page(struct page *page)
 {
 	wait_queue_head_t *waitqueue = page_waitqueue(page);
-	clear_bit(PG_launder, &(page)->flags);
 	smp_mb__before_clear_bit();
 	if (!TestClearPageLocked(page))
 		BUG();
@@ -674,7 +672,7 @@ void unlock_page(struct page *page)
 void end_page_writeback(struct page *page)
 {
 	wait_queue_head_t *waitqueue = page_waitqueue(page);
-	clear_bit(PG_launder, &(page)->flags);
+	ClearPageLaunder(page);
 	smp_mb__before_clear_bit();
 	if (!TestClearPageWriteback(page))
 		BUG();

@@ -17,6 +17,7 @@
 #include <linux/spinlock.h>
 #include <linux/sched.h>
 #include <linux/fs.h>
+#include <linux/mm.h>
 #include <linux/writeback.h>
 
 /**
@@ -135,7 +136,7 @@ static void __sync_single_inode(struct inode *inode, int wait, int *nr_to_write)
 	if (mapping->a_ops->writeback_mapping)
 		mapping->a_ops->writeback_mapping(mapping, nr_to_write);
 	else
-		filemap_fdatawrite(mapping);
+		generic_writeback_mapping(mapping, NULL);
 
 	/* Don't write the inode if only I_DIRTY_PAGES was set */
 	if (dirty & (I_DIRTY_SYNC | I_DIRTY_DATASYNC))
