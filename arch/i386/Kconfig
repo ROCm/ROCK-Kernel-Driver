@@ -183,7 +183,7 @@ config MPENTIUMII
 	  optimizations.
 
 config MPENTIUMIII
-	bool "Pentium-III/Celeron(Coppermine)"
+	bool "Pentium-III/Celeron(Coppermine)/Pentium-III Xeon"
 	help
 	  Select this for Intel chips based on the Pentium-III and
 	  Celeron-Coppermine core.  This option enables use of some
@@ -191,7 +191,7 @@ config MPENTIUMIII
 	  extensions.
 
 config MPENTIUM4
-	bool "Pentium-4/Celeron(P4-based)"
+	bool "Pentium-4/Celeron(P4-based)/Xeon"
 	help
 	  Select this for Intel Pentium 4 chips.  This includes both
 	  the Pentium 4 and P4-based Celeron chips.  This option
