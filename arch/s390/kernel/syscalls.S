@@ -283,5 +283,6 @@ SYSCALL(sys_mq_open,sys_mq_open,compat_sys_mq_open_wrapper)
 SYSCALL(sys_mq_unlink,sys_mq_unlink,sys32_mq_unlink_wrapper)
 SYSCALL(sys_mq_timedsend,sys_mq_timedsend,compat_sys_mq_timedsend_wrapper)
 SYSCALL(sys_mq_timedreceive,sys_mq_timedreceive,compat_sys_mq_timedreceive_wrapper)
-SYSCALL(sys_mq_notify,sys_mq_notify,compat_sys_mq_notify_wrapper)
+SYSCALL(sys_mq_notify,sys_mq_notify,compat_sys_mq_notify_wrapper) /* 275 */
 SYSCALL(sys_mq_getsetattr,sys_mq_getsetattr,compat_sys_mq_getsetattr_wrapper)
+NI_SYSCALL							/* reserved for kexec */
