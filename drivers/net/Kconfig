@@ -2132,7 +2132,7 @@ config TIGON3
 	  will be called tg3.  This is recommended.
 
 config MV64340_ETH
-	bool "MV-64340 Ethernet support"
+	tristate "MV-64340 Ethernet support"
 	depends on MOMENCO_OCELOT_C || MOMENCO_JAGUAR_ATX
 	help
 	  This driver supports the gigabit Ethernet on the Marvell MV64340

@@ -1316,7 +1316,7 @@ static struct net_device_stats *mv64340_eth_get_stats(struct net_device *dev)
  * Input : number of port to initialize
  * Output : -ENONMEM if failed , 0 if success
  */
-static int mv64340_eth_init(int port_num)
+static struct net_device *mv64340_eth_init(int port_num)
 {
 	struct mv64340_private *mp;
 	struct net_device *dev;
@@ -1324,7 +1324,7 @@ static int mv64340_eth_init(int port_num)
 
 	dev = alloc_etherdev(sizeof(struct mv64340_private));
 	if (!dev)
-		return -ENOMEM;
+		return NULL;
 
 	mp = netdev_priv(dev);
 
@@ -1395,13 +1395,26 @@ static int mv64340_eth_init(int port_num)
 	printk("RX NAPI Enabled \n");
 #endif
 
-	return 0;
+	return dev;
 
 out_free_dev:
 	free_netdev(dev);
 
-	return err;
+	return NULL;
 }
+
+static void mv64340_eth_remove(struct net_device *dev)
+{
+	struct mv64340_private *mp = netdev_priv(dev);
+
+	unregister_netdev(dev);
+	flush_scheduled_work();
+	free_netdev(dev);
+}
+
+static struct net_device *mv64340_dev0;
+static struct net_device *mv64340_dev1;
+static struct net_device *mv64340_dev2;
 
 /*
  * mv64340_init_module
@@ -1415,20 +1428,24 @@ out_free_dev:
 static int __init mv64340_init_module(void)
 {
 	printk(KERN_NOTICE "MV-64340 10/100/1000 Ethernet Driver\n");
+
 #ifdef CONFIG_MV64340_ETH_0
-	if (mv64340_eth_init(0)) {
+	mv64340_dev0 = mv64340_eth_init(0);
+	if (!mv64340_dev0) {
 		printk(KERN_ERR
 		       "Error registering MV-64360 ethernet port 0\n");
 	}
 #endif
 #ifdef CONFIG_MV64340_ETH_1
-	if (mv64340_eth_init(1)) {
+	mv64340_dev1 = mv64340_eth_init(1);
+	if (!mv64340_dev1) {
 		printk(KERN_ERR
 		       "Error registering MV-64360 ethernet port 1\n");
 	}
 #endif
 #ifdef CONFIG_MV64340_ETH_2
-	if (mv64340_eth_init(2)) {
+	mv64340_dev2 = mv64340_eth_init(2);
+	if (!mv64340_dev2) {
 		printk(KERN_ERR
 		       "Error registering MV-64360 ethernet port 2\n");
 	}
@@ -1445,9 +1462,14 @@ static int __init mv64340_init_module(void)
  *
  * Output : N/A
  */
-static void __init mv64340_cleanup_module(void)
+static void __exit mv64340_cleanup_module(void)
 {
-	/* Nothing to do here ! it's not a removable module */
+	if (mv64340_dev2)
+		mv64340_eth_remove(mv64340_dev2);
+	if (mv64340_dev1)
+		mv64340_eth_remove(mv64340_dev1);
+	if (mv64340_dev0)
+		mv64340_eth_remove(mv64340_dev0);
 }
 
 module_init(mv64340_init_module);
