@@ -109,9 +109,8 @@ static void device_detach(struct device * dev)
 		spin_unlock(&device_lock);
 
 		/* detach from driver */
-		if (drv->remove)
+		if (drv && drv->remove)
 			drv->remove(dev);
-		put_driver(drv);
 	}
 }
 
@@ -132,20 +131,6 @@ int driver_attach(struct device_driver * drv)
 	return bus_for_each_dev(drv->bus,drv,do_driver_attach);
 }
 
-static int do_driver_detach(struct device * dev, struct device_driver * drv)
-{
-	spin_lock(&device_lock);
-	if (dev->driver == drv) {
-		dev->driver = NULL;
-		spin_unlock(&device_lock);
-
-		if (drv->remove)
-			drv->remove(dev);
-	} else
-		spin_unlock(&device_lock);
-	return 0;
-}
-
 void driver_detach(struct device_driver * drv)
 {
 	struct list_head * node;
@@ -155,9 +140,10 @@ void driver_detach(struct device_driver * drv)
 	list_for_each(node,&drv->devices) {
 		struct device * dev = get_device_locked(to_dev(node));
 		if (dev) {
-			list_del_init(node);
+			if (prev)
+				list_del_init(&prev->driver_list);
 			spin_unlock(&device_lock);
-			do_driver_detach(dev,drv);
+			device_detach(dev);
 			if (prev)
 				put_device(prev);
 			prev = dev;
