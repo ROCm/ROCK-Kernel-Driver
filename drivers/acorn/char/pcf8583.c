@@ -73,6 +73,7 @@ static int
 pcf8583_detach(struct i2c_client *client)
 {
 	i2c_detach_client(client);
+	kfree(client);
 	return 0;
 }
 
