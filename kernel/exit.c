@@ -790,6 +790,12 @@ fastcall NORET_TYPE void do_exit(long code)
 		panic("Attempted to kill init!");
 	if (tsk->io_context)
 		exit_io_context();
+
+	if (unlikely(current->ptrace & PT_TRACE_EXIT)) {
+		current->ptrace_message = code;
+		ptrace_notify((PTRACE_EVENT_EXIT << 8) | SIGTRAP);
+	}
+
 	tsk->flags |= PF_EXITING;
 	del_timer_sync(&tsk->real_timer);
 
@@ -797,11 +803,6 @@ fastcall NORET_TYPE void do_exit(long code)
 		printk(KERN_INFO "note: %s[%d] exited with preempt_count %d\n",
 				current->comm, current->pid,
 				preempt_count());
-
-	if (unlikely(current->ptrace & PT_TRACE_EXIT)) {
-		current->ptrace_message = code;
-		ptrace_notify((PTRACE_EVENT_EXIT << 8) | SIGTRAP);
-	}
 
 	acct_update_integrals();
 	update_mem_hiwater();
