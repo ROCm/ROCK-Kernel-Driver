@@ -20,6 +20,7 @@
 #include <linux/if_arp.h>
 #include <linux/delay.h>
 #include <linux/ioport.h>
+#include <linux/init.h>
 #include <net/arp.h>
 
 #include <asm/io.h>

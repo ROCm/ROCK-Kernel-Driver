@@ -4,7 +4,8 @@ net-3-driver for the IBM LAN Adapter/A
 This is an extension to the Linux operating system, and is covered by the
 same GNU General Public License that covers that work.
 
-Copyright 1999 by Alfred Arnold (alfred@ccac.rwth-aachen.de, aarnold@elsa.de)
+Copyright 1999 by Alfred Arnold (alfred@ccac.rwth-aachen.de,
+                                 alfred.arnold@lancom.de)
 
 This driver is based both on the SK_MCA driver, which is itself based on the
 SK_G16 and 3C523 driver.
