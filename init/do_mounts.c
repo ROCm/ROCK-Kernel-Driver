@@ -71,13 +71,19 @@ static dev_t __init try_name(char *name, int part)
 	if (len <= 0 || len == 32 || buf[len - 1] != '\n')
 		goto fail;
 	buf[len - 1] = '\0';
-	/*
-	 * The format of dev is now %u:%u -- see print_dev_t()
-	 */
-	if (sscanf(buf, "%u:%u", &maj, &min) == 2)
+	if (sscanf(buf, "%u:%u", &maj, &min) == 2) {
+		/*
+		 * Try the %u:%u format -- see print_dev_t()
+		 */
 		res = MKDEV(maj, min);
-	else
-		goto fail;
+	} else {
+		/*
+		 * Nope.  Try old-style "0321"
+		 */
+		res = (dev_t)simple_strtoul(buf, &s, 16);
+		if (*s)
+			goto fail;
+	}
 
 	/* if it's there and we are not looking for a partition - that's it */
 	if (!part)
@@ -135,9 +141,15 @@ dev_t name_to_dev_t(char *name)
 		goto out;
 
 	if (strncmp(name, "/dev/", 5) != 0) {
-		res = (dev_t) simple_strtoul(name, &p, 16);
-		if (*p)
-			goto fail;
+		unsigned maj, min;
+
+		if (sscanf(name, "%u:%u", &maj, &min) == 2) {
+			res = MKDEV(maj, min);
+		} else {
+			res = (dev_t)simple_strtoul(name, &p, 16);
+			if (*p)
+				goto fail;
+		}
 		goto done;
 	}
 	name += 5;
