@@ -749,15 +749,19 @@ void ndisc_recv_ns(struct sk_buff *skb)
 				printk(KERN_WARNING "ICMP NS: bad lladdr length.\n");
 			return;
 		}
+
+		/* XXX: RFC2461 7.1.1:
+	 	 *	If the IP source address is the unspecified address, 
+		 *	there MUST NOT be source link-layer address option 
+		 *	in the message.
+		 */
+		if (addr_type == IPV6_ADDR_ANY) {
+			if (net_ratelimit())
+				printk(KERN_WARNING "ICMP6 NS: bad DAD packet (link-layer address option)\n");
+			return;
+		}
 	}
 
-	/* XXX: RFC2461 7.1.1:
-	 * 	If the IP source address is the unspecified address, there
-	 *	MUST NOT be source link-layer address option in the message.
-	 *
-	 *	NOTE! Linux kernel < 2.4.4 broke this rule.
-	 */
-		 	
 	if ((ifp = ipv6_get_ifaddr(&msg->target, dev)) != NULL) {
 		if (ifp->flags & IFA_F_TENTATIVE) {
 			/* Address is tentative. If the source
