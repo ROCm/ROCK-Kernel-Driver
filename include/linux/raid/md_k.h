@@ -160,16 +160,6 @@ struct mdk_rdev_s
 	int desc_nr;			/* descriptor index in the superblock */
 };
 
-
-/*
- * disk operations in a working array:
- */
-#define DISKOP_SPARE_INACTIVE	0
-#define DISKOP_SPARE_WRITE	1
-#define DISKOP_SPARE_ACTIVE	2
-#define DISKOP_HOT_REMOVE_DISK	3
-#define DISKOP_HOT_ADD_DISK	4
-
 typedef struct mdk_personality_s mdk_personality_t;
 
 struct mddev_s
@@ -214,18 +204,11 @@ struct mdk_personality_s
 	int (*stop)(mddev_t *mddev);
 	int (*status)(char *page, mddev_t *mddev);
 	int (*error_handler)(mddev_t *mddev, struct block_device *bdev);
-
-/*
- * Some personalities (RAID-1, RAID-5) can have disks hot-added and
- * hot-removed. Hot removal is different from failure. (failure marks
- * a disk inactive, but the disk is still part of the array) The interface
- * to such operations is the 'pers->diskop()' function, can be NULL.
- *
- * the diskop function can change the pointer pointing to the incoming
- * descriptor, but must do so very carefully. (currently only
- * SPARE_ACTIVE expects such a change)
- */
-	int (*diskop) (mddev_t *mddev, mdp_disk_t **descriptor, int state);
+	int (*hot_add_disk) (mddev_t *mddev, mdp_disk_t *descriptor, mdk_rdev_t *rdev);
+	int (*hot_remove_disk) (mddev_t *mddev, int number);
+	int (*spare_write) (mddev_t *mddev, int number);
+	int (*spare_inactive) (mddev_t *mddev);
+	int (*spare_active) (mddev_t *mddev, mdp_disk_t **descriptor);
 	int (*sync_request)(mddev_t *mddev, sector_t sector_nr, int go_faster);
 };
 

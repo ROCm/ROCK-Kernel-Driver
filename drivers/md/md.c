@@ -1741,8 +1741,7 @@ static int do_md_stop(mddev_t * mddev, int ro)
 			md_unregister_thread(mddev->sync_thread);
 			mddev->sync_thread = NULL;
 			if (mddev->spare) {
-				mddev->pers->diskop(mddev, &mddev->spare,
-						    DISKOP_SPARE_INACTIVE);
+				mddev->pers->spare_inactive(mddev);
 				mddev->spare = NULL;
 			}
 		}
@@ -2250,7 +2249,7 @@ static int hot_remove_disk(mddev_t * mddev, kdev_t dev)
 	printk(KERN_INFO "md: trying to remove %s from md%d ... \n",
 		partition_name(dev), mdidx(mddev));
 
-	if (!mddev->pers->diskop) {
+	if (!mddev->pers->hot_remove_disk) {
 		printk(KERN_WARNING "md%d: personality does not support diskops!\n",
 		       mdidx(mddev));
 		return -EINVAL;
@@ -2274,7 +2273,7 @@ static int hot_remove_disk(mddev_t * mddev, kdev_t dev)
 		return -EINVAL;
 	}
 
-	err = mddev->pers->diskop(mddev, &disk, DISKOP_HOT_REMOVE_DISK);
+	err = mddev->pers->hot_remove_disk(mddev, disk->number);
 	if (err == -EBUSY) {
 		MD_BUG();
 		goto busy;
@@ -2308,7 +2307,7 @@ static int hot_add_disk(mddev_t * mddev, kdev_t dev)
 	printk(KERN_INFO "md: trying to hot-add %s to md%d ... \n",
 		partition_name(dev), mdidx(mddev));
 
-	if (!mddev->pers->diskop) {
+	if (!mddev->pers->hot_add_disk) {
 		printk(KERN_WARNING "md%d: personality does not support diskops!\n",
 		       mdidx(mddev));
 		return -EINVAL;
@@ -2388,7 +2387,7 @@ static int hot_add_disk(mddev_t * mddev, kdev_t dev)
 	disk->major = major(dev);
 	disk->minor = minor(dev);
 
-	if (mddev->pers->diskop(mddev, &disk, DISKOP_HOT_ADD_DISK)) {
+	if (mddev->pers->hot_add_disk(mddev, disk, rdev)) {
 		MD_BUG();
 		err = -EINVAL;
 		goto abort_unbind_export;
@@ -3370,7 +3369,7 @@ void md_do_recovery(void *data)
 
 	ITERATE_MDDEV(mddev,tmp) if (mddev_lock(mddev)==0) {
 		sb = mddev->sb;
-		if (!sb || !mddev->pers || !mddev->pers->diskop || mddev->ro)
+		if (!sb || !mddev->pers || mddev->ro)
 			goto unlock;
 		if (mddev->recovery_running > 0)
 			/* resync/recovery still happening */
@@ -3384,16 +3383,19 @@ void md_do_recovery(void *data)
 				 * If we were doing a reconstruction,
 				 * we need to retrieve the spare
 				 */
+				if (!mddev->pers->spare_inactive)
+					goto unlock;
 				if (mddev->spare) {
-					mddev->pers->diskop(mddev, &mddev->spare,
-							    DISKOP_SPARE_INACTIVE);
+					mddev->pers->spare_inactive(mddev);
 					mddev->spare = NULL;
 				}
 			} else {
+				if (!mddev->pers->spare_active)
+					goto unlock;
 				/* success...*/
 				if (mddev->spare) {
-					mddev->pers->diskop(mddev, &mddev->spare,
-							    DISKOP_SPARE_ACTIVE);
+					mddev->pers->spare_active(mddev,
+								&mddev->spare);
 					mark_disk_sync(mddev->spare);
 					mark_disk_active(mddev->spare);
 					sb->active_disks++;
@@ -3432,12 +3434,13 @@ void md_do_recovery(void *data)
 			if (!mddev->sync_thread) {
 				printk(KERN_ERR "md%d: could not start resync thread...\n", mdidx(mddev));
 				if (mddev->spare)
-					mddev->pers->diskop(mddev, &mddev->spare, DISKOP_SPARE_INACTIVE);
+					mddev->pers->spare_inactive(mddev);
 				mddev->spare = NULL;
 				mddev->recovery_running = 0;
 			} else {
 				if (mddev->spare)
-					mddev->pers->diskop(mddev, &mddev->spare, DISKOP_SPARE_WRITE);
+					mddev->pers->spare_write(mddev,
+						mddev->spare->number);
 				mddev->recovery_running = 1;
 				md_wakeup_thread(mddev->sync_thread);
 			}

@@ -55,9 +55,8 @@ static mdk_personality_t multipath_personality;
 static spinlock_t retry_list_lock = SPIN_LOCK_UNLOCKED;
 struct multipath_bh *multipath_retry_list = NULL, **multipath_retry_tail;
 
-static int multipath_diskop(mddev_t *mddev, mdp_disk_t **d, int state);
-
-
+static int multipath_spare_write(mddev_t *, int);
+static int multipath_spare_active(mddev_t *mddev, mdp_disk_t **d);
 
 static struct multipath_bh *multipath_alloc_mpbh(multipath_conf_t *conf)
 {
@@ -366,11 +365,11 @@ static int multipath_error (mddev_t *mddev, struct block_device *bdev)
 
 			spare = get_spare(mddev);
 			if (spare) {
-				err = multipath_diskop(mddev, &spare, DISKOP_SPARE_WRITE);
+				err = multipath_spare_write(mddev, spare->number);
 				printk("got DISKOP_SPARE_WRITE err: %d. (spare_faulty(): %d)\n", err, disk_faulty(spare));
 			}
 			if (!err && !disk_faulty(spare)) {
-				multipath_diskop(mddev, &spare, DISKOP_SPARE_ACTIVE);
+				multipath_spare_active(mddev, &spare);
 				mark_disk_sync(spare);
 				mark_disk_active(spare);
 				sb->active_disks++;
@@ -410,255 +409,168 @@ static void print_multipath_conf (multipath_conf_t *conf)
 	}
 }
 
-static int multipath_diskop(mddev_t *mddev, mdp_disk_t **d, int state)
+/*
+ * Find the spare disk ... (can only be in the 'high' area of the array)
+ */
+static struct multipath_info *find_spare(mddev_t *mddev, int number)
+{
+	multipath_conf_t *conf = mddev->private;
+	int i;
+	for (i = conf->raid_disks; i < MD_SB_DISKS; i++) {
+		struct multipath_info *p = conf->multipaths + i;
+		if (p->spare && p->number == number)
+			return p;
+	}
+	return NULL;
+}
+
+static int multipath_spare_inactive(mddev_t *mddev)
+{
+	multipath_conf_t *conf = mddev->private;
+	struct multipath_info *p;
+	int err = 0;
+
+	print_multipath_conf(conf);
+	spin_lock_irq(&conf->device_lock);
+	p = find_spare(mddev, mddev->spare->number);
+	if (p) {
+		p->operational = 0;
+	} else {
+		MD_BUG();
+		err = 1;
+	}
+	spin_unlock_irq(&conf->device_lock);
+
+	print_multipath_conf(conf);
+	return err;
+}
+
+static int multipath_spare_write(mddev_t *mddev, int number)
+{
+	multipath_conf_t *conf = mddev->private;
+	struct multipath_info *p;
+	int err = 0;
+
+	print_multipath_conf(conf);
+	spin_lock_irq(&conf->device_lock);
+	p = find_spare(mddev, number);
+	if (p) {
+		p->operational = 1;
+	} else {
+		MD_BUG();
+		err = 1;
+	}
+	spin_unlock_irq(&conf->device_lock);
+
+	print_multipath_conf(conf);
+	return err;
+}
+
+static int multipath_spare_active(mddev_t *mddev, mdp_disk_t **d)
 {
 	int err = 0;
-	int i, failed_disk=-1, spare_disk=-1, removed_disk=-1, added_disk=-1;
+	int i, failed_disk=-1, spare_disk=-1;
 	multipath_conf_t *conf = mddev->private;
-	struct multipath_info *tmp, *sdisk, *fdisk, *rdisk, *adisk;
+	struct multipath_info *tmp, *sdisk, *fdisk;
 	mdp_super_t *sb = mddev->sb;
-	mdp_disk_t *failed_desc, *spare_desc, *added_desc;
+	mdp_disk_t *failed_desc, *spare_desc;
 	mdk_rdev_t *spare_rdev, *failed_rdev;
-	struct block_device *bdev;
 
 	print_multipath_conf(conf);
 	spin_lock_irq(&conf->device_lock);
 	/*
-	 * find the disk ...
+	 * Find the failed disk within the MULTIPATH configuration ...
+	 * (this can only be in the first conf->working_disks part)
 	 */
-	switch (state) {
-
-	case DISKOP_SPARE_ACTIVE:
-
-		/*
-		 * Find the failed disk within the MULTIPATH configuration ...
-		 * (this can only be in the first conf->working_disks part)
-		 */
-		for (i = 0; i < conf->raid_disks; i++) {
-			tmp = conf->multipaths + i;
-			if ((!tmp->operational && !tmp->spare) ||
-					!tmp->used_slot) {
-				failed_disk = i;
-				break;
-			}
+	for (i = 0; i < conf->raid_disks; i++) {
+		tmp = conf->multipaths + i;
+		if ((!tmp->operational && !tmp->spare) ||
+				!tmp->used_slot) {
+			failed_disk = i;
+			break;
 		}
-		/*
-		 * When we activate a spare disk we _must_ have a disk in
-		 * the lower (active) part of the array to replace. 
-		 */
-		if ((failed_disk == -1) || (failed_disk >= conf->raid_disks)) {
-			MD_BUG();
-			err = 1;
-			goto abort;
-		}
-		/* fall through */
-
-	case DISKOP_SPARE_WRITE:
-	case DISKOP_SPARE_INACTIVE:
-
-		/*
-		 * Find the spare disk ... (can only be in the 'high'
-		 * area of the array)
-		 */
-		for (i = conf->raid_disks; i < MD_SB_DISKS; i++) {
-			tmp = conf->multipaths + i;
-			if (tmp->spare && tmp->number == (*d)->number) {
-				spare_disk = i;
-				break;
-			}
-		}
-		if (spare_disk == -1) {
-			MD_BUG();
-			err = 1;
-			goto abort;
-		}
-		break;
-
-	case DISKOP_HOT_REMOVE_DISK:
-
-		for (i = 0; i < MD_SB_DISKS; i++) {
-			tmp = conf->multipaths + i;
-			if (tmp->used_slot && (tmp->number == (*d)->number)) {
-				if (tmp->operational) {
-					printk(KERN_ERR "hot-remove-disk, slot %d is identified to be the requested disk (number %d), but is still operational!\n", i, (*d)->number);
-					err = -EBUSY;
-					goto abort;
-				}
-				removed_disk = i;
-				break;
-			}
-		}
-		if (removed_disk == -1) {
-			MD_BUG();
-			err = 1;
-			goto abort;
-		}
-		break;
-
-	case DISKOP_HOT_ADD_DISK:
-
-		for (i = conf->raid_disks; i < MD_SB_DISKS; i++) {
-			tmp = conf->multipaths + i;
-			if (!tmp->used_slot) {
-				added_disk = i;
-				break;
-			}
-		}
-		if (added_disk == -1) {
-			MD_BUG();
-			err = 1;
-			goto abort;
-		}
-		break;
 	}
-
-	switch (state) {
 	/*
-	 * Switch the spare disk to write-only mode:
+	 * When we activate a spare disk we _must_ have a disk in
+	 * the lower (active) part of the array to replace. 
 	 */
-	case DISKOP_SPARE_WRITE:
-		sdisk = conf->multipaths + spare_disk;
-		sdisk->operational = 1;
-		break;
-	/*
-	 * Deactivate a spare disk:
-	 */
-	case DISKOP_SPARE_INACTIVE:
-		sdisk = conf->multipaths + spare_disk;
-		sdisk->operational = 0;
-		break;
-	/*
-	 * Activate (mark read-write) the (now sync) spare disk,
-	 * which means we switch it's 'raid position' (->raid_disk)
-	 * with the failed disk. (only the first 'conf->nr_disks'
-	 * slots are used for 'real' disks and we must preserve this
-	 * property)
-	 */
-	case DISKOP_SPARE_ACTIVE:
-		sdisk = conf->multipaths + spare_disk;
-		fdisk = conf->multipaths + failed_disk;
-
-		spare_desc = &sb->disks[sdisk->number];
-		failed_desc = &sb->disks[fdisk->number];
-
-		if (spare_desc != *d) {
-			MD_BUG();
-			err = 1;
-			goto abort;
-		}
-
-		if (spare_desc->raid_disk != sdisk->raid_disk) {
-			MD_BUG();
-			err = 1;
-			goto abort;
-		}
-			
-		if (sdisk->raid_disk != spare_disk) {
-			MD_BUG();
-			err = 1;
-			goto abort;
-		}
-
-		if (failed_desc->raid_disk != fdisk->raid_disk) {
-			MD_BUG();
-			err = 1;
-			goto abort;
-		}
-
-		if (fdisk->raid_disk != failed_disk) {
-			MD_BUG();
-			err = 1;
-			goto abort;
-		}
-
-		/*
-		 * do the switch finally
-		 */
-		spare_rdev = find_rdev_nr(mddev, spare_desc->number);
-		failed_rdev = find_rdev_nr(mddev, failed_desc->number);
-		xchg_values(spare_rdev->desc_nr, failed_rdev->desc_nr);
-		spare_rdev->alias_device = 0;
-		failed_rdev->alias_device = 1;
-
-		xchg_values(*spare_desc, *failed_desc);
-		xchg_values(*fdisk, *sdisk);
-
-		/*
-		 * (careful, 'failed' and 'spare' are switched from now on)
-		 *
-		 * we want to preserve linear numbering and we want to
-		 * give the proper raid_disk number to the now activated
-		 * disk. (this means we switch back these values)
-		 */
-	
-		xchg_values(spare_desc->raid_disk, failed_desc->raid_disk);
-		xchg_values(sdisk->raid_disk, fdisk->raid_disk);
-		xchg_values(spare_desc->number, failed_desc->number);
-		xchg_values(sdisk->number, fdisk->number);
-
-		*d = failed_desc;
-
-		if (!sdisk->bdev)
-			sdisk->used_slot = 0;
-		/*
-		 * this really activates the spare.
-		 */
-		fdisk->spare = 0;
-
-		/*
-		 * if we activate a spare, we definitely replace a
-		 * non-operational disk slot in the 'low' area of
-		 * the disk array.
-		 */
-
-		conf->working_disks++;
-
-		break;
-
-	case DISKOP_HOT_REMOVE_DISK:
-		rdisk = conf->multipaths + removed_disk;
-
-		if (rdisk->spare && (removed_disk < conf->raid_disks)) {
-			MD_BUG();	
-			err = 1;
-			goto abort;
-		}
-		bdev = rdisk->bdev;
-		rdisk->dev = NODEV;
-		rdisk->bdev = NULL;
-		rdisk->used_slot = 0;
-		conf->nr_disks--;
-		bdput(bdev);
-		break;
-
-	case DISKOP_HOT_ADD_DISK:
-		adisk = conf->multipaths + added_disk;
-		added_desc = *d;
-
-		if (added_disk != added_desc->number) {
-			MD_BUG();	
-			err = 1;
-			goto abort;
-		}
-
-		adisk->number = added_desc->number;
-		adisk->raid_disk = added_desc->raid_disk;
-		adisk->dev = mk_kdev(added_desc->major,added_desc->minor);
-		/* it will be held open by rdev */
-		adisk->bdev = bdget(kdev_t_to_nr(adisk->dev));
-
-		adisk->operational = 0;
-		adisk->spare = 1;
-		adisk->used_slot = 1;
-		conf->nr_disks++;
-
-		break;
-
-	default:
+	if (failed_disk == -1) {
 		MD_BUG();
 		err = 1;
 		goto abort;
 	}
+	/*
+	 * Find the spare disk ... (can only be in the 'high'
+	 * area of the array)
+	 */
+	for (i = conf->raid_disks; i < MD_SB_DISKS; i++) {
+		tmp = conf->multipaths + i;
+		if (tmp->spare && tmp->number == (*d)->number) {
+			spare_disk = i;
+			break;
+		}
+	}
+	if (spare_disk == -1) {
+		MD_BUG();
+		err = 1;
+		goto abort;
+	}
+
+	sdisk = conf->multipaths + spare_disk;
+	fdisk = conf->multipaths + failed_disk;
+
+	spare_desc = &sb->disks[sdisk->number];
+	failed_desc = &sb->disks[fdisk->number];
+
+	if (spare_desc != *d || spare_desc->raid_disk != sdisk->raid_disk ||
+	    sdisk->raid_disk != spare_disk || fdisk->raid_disk != failed_disk ||
+	    failed_desc->raid_disk != fdisk->raid_disk) {
+		MD_BUG();
+		err = 1;
+		goto abort;
+	}
+
+	/*
+	 * do the switch finally
+	 */
+	spare_rdev = find_rdev_nr(mddev, spare_desc->number);
+	failed_rdev = find_rdev_nr(mddev, failed_desc->number);
+	xchg_values(spare_rdev->desc_nr, failed_rdev->desc_nr);
+	spare_rdev->alias_device = 0;
+	failed_rdev->alias_device = 1;
+
+	xchg_values(*spare_desc, *failed_desc);
+	xchg_values(*fdisk, *sdisk);
+
+	/*
+	 * (careful, 'failed' and 'spare' are switched from now on)
+	 *
+	 * we want to preserve linear numbering and we want to
+	 * give the proper raid_disk number to the now activated
+	 * disk. (this means we switch back these values)
+	 */
+
+	xchg_values(spare_desc->raid_disk, failed_desc->raid_disk);
+	xchg_values(sdisk->raid_disk, fdisk->raid_disk);
+	xchg_values(spare_desc->number, failed_desc->number);
+	xchg_values(sdisk->number, fdisk->number);
+
+	*d = failed_desc;
+
+	if (!sdisk->bdev)
+		sdisk->used_slot = 0;
+	/*
+	 * this really activates the spare.
+	 */
+	fdisk->spare = 0;
+
+	/*
+	 * if we activate a spare, we definitely replace a
+	 * non-operational disk slot in the 'low' area of
+	 * the disk array.
+	 */
+
+	conf->working_disks++;
 abort:
 	spin_unlock_irq(&conf->device_lock);
 
@@ -666,6 +578,75 @@ abort:
 	return err;
 }
 
+static int multipath_add_disk(mddev_t *mddev, mdp_disk_t *added_desc,
+	mdk_rdev_t *rdev)
+{
+	multipath_conf_t *conf = mddev->private;
+	int err = 1;
+	int i;
+
+	print_multipath_conf(conf);
+	spin_lock_irq(&conf->device_lock);
+	for (i = conf->raid_disks; i < MD_SB_DISKS; i++) {
+		struct multipath_info *p = conf->multipaths + i;
+		if (!p->used_slot) {
+			if (added_desc->number != i)
+				break;
+			p->number = added_desc->number;
+			p->raid_disk = added_desc->raid_disk;
+			p->dev = rdev->dev;
+			p->bdev = rdev->bdev;
+			p->operational = 0;
+			p->spare = 1;
+			p->used_slot = 1;
+			conf->nr_disks++;
+			err = 0;
+			break;
+		}
+	}
+	if (err)
+		MD_BUG();
+	spin_unlock_irq(&conf->device_lock);
+
+	print_multipath_conf(conf);
+	return err;
+}
+
+static int multipath_remove_disk(mddev_t *mddev, int number)
+{
+	multipath_conf_t *conf = mddev->private;
+	int err = 1;
+	int i;
+
+	print_multipath_conf(conf);
+	spin_lock_irq(&conf->device_lock);
+
+	for (i = 0; i < MD_SB_DISKS; i++) {
+		struct multipath_info *p = conf->multipaths + i;
+		if (p->used_slot && (p->number == number)) {
+			if (p->operational) {
+				printk(KERN_ERR "hot-remove-disk, slot %d is identified to be the requested disk (number %d), but is still operational!\n", i, number);
+				err = -EBUSY;
+				goto abort;
+			}
+			if (p->spare && i < conf->raid_disks)
+				break;
+			p->dev = NODEV;
+			p->bdev = NULL;
+			p->used_slot = 0;
+			conf->nr_disks--;
+			err = 0;
+			break;
+		}
+	}
+	if (err)
+		MD_BUG();
+abort:
+	spin_unlock_irq(&conf->device_lock);
+
+	print_multipath_conf(conf);
+	return err;
+}
 
 #define IO_ERROR KERN_ALERT \
 "multipath: %s: unrecoverable IO read error for block %lu\n"
@@ -1074,7 +1055,11 @@ static mdk_personality_t multipath_personality=
 	stop:		multipath_stop,
 	status:		multipath_status,
 	error_handler:	multipath_error,
-	diskop:		multipath_diskop,
+	hot_add_disk:	multipath_add_disk,
+	hot_remove_disk:multipath_remove_disk,
+	spare_inactive:	multipath_spare_inactive,
+	spare_active:	multipath_spare_active,
+	spare_write:	multipath_spare_write,
 };
 
 static int __init multipath_init (void)
