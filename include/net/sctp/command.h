@@ -85,6 +85,7 @@ typedef enum {
 	SCTP_CMD_UPDATE_ASSOC,   /* Update association information. */
 	SCTP_CMD_PURGE_OUTQUEUE, /* Purge all data waiting to be sent. */
 	SCTP_CMD_SETUP_T2,       /* Hi-level, setup T2-shutdown parms.  */
+	SCTP_CMD_RTO_PENDING,	 /* Set transport's rto_pending. */
 
 	SCTP_CMD_LAST
 } sctp_verb_t;

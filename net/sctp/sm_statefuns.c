@@ -680,16 +680,17 @@ sctp_disposition_t sctp_sf_heartbeat(const sctp_endpoint_t *ep,
 	hbinfo.daddr = transport->ipaddr;
 	hbinfo.sent_at = jiffies;
 
-	/* Set rto_pending indicating that an RTT measurement
-	 * is started with this heartbeat chunk.
-	 */
-	transport->rto_pending = 1;
-
 	/* Send a heartbeat to our peer.  */
 	paylen = sizeof(sctp_sender_hb_info_t);
 	reply = sctp_make_heartbeat(asoc, transport, &hbinfo, paylen);
 	if (!reply)
 		return SCTP_DISPOSITION_NOMEM;
+
+	/* Set rto_pending indicating that an RTT measurement
+	 * is started with this heartbeat chunk.
+	 */
+	sctp_add_cmd_sf(commands, SCTP_CMD_RTO_PENDING,
+			SCTP_TRANSPORT(transport));
 
 	sctp_add_cmd_sf(commands, SCTP_CMD_REPLY, SCTP_CHUNK(reply));
 	return SCTP_DISPOSITION_CONSUME;

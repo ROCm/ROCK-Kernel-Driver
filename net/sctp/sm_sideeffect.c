@@ -595,6 +595,11 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 			chunk->pdiscard = 1;
 			break;
 
+		case SCTP_CMD_RTO_PENDING:
+			t = command->obj.transport;
+			t->rto_pending = 1;	
+			break;
+
 		default:
 			printk(KERN_WARNING "Impossible command: %u, %p\n",
 			       command->verb, command->obj.ptr);
