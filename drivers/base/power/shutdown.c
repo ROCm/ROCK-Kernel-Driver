@@ -8,7 +8,10 @@
  *
  */
 
-#undef DEBUG
+#include <linux/config.h>
+#ifdef CONFIG_DEBUG_DRIVER
+#define DEBUG	1
+#endif
 
 #include <linux/device.h>
 #include <asm/semaphore.h>
@@ -54,7 +57,7 @@ void device_shutdown(void)
 	
 	down_write(&devices_subsys.rwsem);
 	list_for_each_entry_reverse(dev,&devices_subsys.kset.list,kobj.entry) {
-		pr_debug("shutting down %s: ",dev->name);
+		pr_debug("shutting down %s: ",dev->bus_id);
 		if (dev->driver && dev->driver->shutdown) {
 			pr_debug("Ok\n");
 			dev->driver->shutdown(dev);
