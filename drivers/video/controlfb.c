@@ -646,7 +646,7 @@ try_again:
 	if (register_framebuffer(&p->info) < 0)
 		return -ENXIO;
 	
-	printk(KERN_INFO "fb%d: control display adapter\n", GET_FB_IDX(p->info.node));	
+	printk(KERN_INFO "fb%d: control display adapter\n", minor(p->info.node));	
 
 	return 0;
 }

@@ -2309,14 +2309,7 @@ endmenu
 
 source "fs/Kconfig"
 
-
-menu "Console drivers"
-	depends on VT
-
 source "drivers/video/Kconfig"
-
-endmenu
-
 
 menu "Kernel hacking"
 

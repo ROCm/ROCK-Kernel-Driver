@@ -816,7 +816,7 @@ static int matroxfb_dh_registerfb(struct matroxfb_dh_fb_info* m2info) {
 		return -1;
 	}
 	printk(KERN_INFO "matroxfb_crtc2: secondary head of fb%u was registered as fb%u\n",
-		GET_FB_IDX(ACCESS_FBINFO(fbcon.node)), GET_FB_IDX(m2info->fbcon.node));
+		minor(ACCESS_FBINFO(fbcon.node)), minor(m2info->fbcon.node));
 	m2info->fbcon_registered = 1;
 	return 0;
 #undef minfo
@@ -839,7 +839,7 @@ static void matroxfb_dh_deregisterfb(struct matroxfb_dh_fb_info* m2info) {
 			printk(KERN_ERR "matroxfb_crtc2: Expect kernel crash after module unload.\n");
 			return;
 		}
-		id = GET_FB_IDX(m2info->fbcon.node);
+		id = minor(m2info->fbcon.node);
 		unregister_framebuffer(&m2info->fbcon);
 		kfree(m2info->fbcon.disp);
 		/* return memory back to primary head */
