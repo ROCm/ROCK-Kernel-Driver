@@ -37,7 +37,7 @@
 #include "uml-config.h"
 #include "choose-mode.h"
 #include "mode.h"
-#ifdef CONFIG_MODE_SKAS
+#ifdef UML_CONFIG_MODE_SKAS
 #include "skas_ptrace.h"
 #include "skas.h"
 #endif
@@ -251,7 +251,7 @@ void forward_pending_sigio(int target)
 
 int can_do_skas(void)
 {
-#ifdef CONFIG_MODE_SKAS
+#ifdef UML_CONFIG_MODE_SKAS
 	struct ptrace_faultinfo fi;
 	void *stack;
 	int pid, n, ret = 1;
