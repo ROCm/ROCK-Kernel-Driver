@@ -2885,7 +2885,7 @@ static int sg_proc_seq_show_dev(struct seq_file *s, void *v)
 		seq_printf(s, "%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n",
 			      scsidp->host->host_no, scsidp->channel,
 			      scsidp->id, scsidp->lun, (int) scsidp->type,
-			      (int) atomic_read(&scsidp->access_count),
+			      1,
 			      (int) scsidp->queue_depth,
 			      (int) scsidp->device_busy,
 			      (int) scsidp->online);
