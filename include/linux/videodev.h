@@ -63,6 +63,12 @@ video_device_create_file(struct video_device *vfd,
 {
 	class_device_create_file(&vfd->class_dev, attr);
 }
+static inline void
+video_device_remove_file(struct video_device *vfd,
+			 struct class_device_attribute *attr)
+{
+	class_device_remove_file(&vfd->class_dev, attr);
+}
 
 /* helper functions to alloc / release struct video_device, the
    later can be used for video_device->release() */
