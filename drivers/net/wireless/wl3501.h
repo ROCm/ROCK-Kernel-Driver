@@ -234,6 +234,14 @@ struct iw_mgmt_ds_pset {
 	u8 			    chan;
 } __attribute__ ((packed));
 
+struct iw_mgmt_cf_pset {
+	struct iw_mgmt_info_element el;
+	u8 			    cfp_count;
+	u8 			    cfp_period;
+	u16 			    cfp_max_duration;
+	u16 			    cfp_dur_remaining;
+} __attribute__ ((packed));
+
 struct iw_mgmt_ibss_pset {
 	struct iw_mgmt_info_element el;
 	u16 			    atim_window;
@@ -288,7 +296,7 @@ struct wl3501_start_req {
 	struct iw_mgmt_essid_pset   ssid;
 	u8			    bss_basic_rate_set[10];
 	u8			    operational_rate_set[10];
-	u8			    cf_pset[8];
+	struct iw_mgmt_cf_pset	    cf_pset;
 	struct iw_mgmt_ds_pset	    ds_pset;
 	struct iw_mgmt_ibss_pset    ibss_pset;
 };
@@ -367,7 +375,7 @@ struct wl3501_join_req {
 	u8			    bssid[ETH_ALEN];
 	struct iw_mgmt_essid_pset   ssid;
 	struct iw_mgmt_ds_pset	    ds_pset;
-	u8			    cf_pset[8];
+	struct iw_mgmt_cf_pset	    cf_pset;
 	struct iw_mgmt_ibss_pset    ibss_pset;
 	u8			    bss_basic_rate_set[10];
 };
@@ -421,7 +429,7 @@ struct wl3501_scan_confirm {
 	u8			    bssid[ETH_ALEN];
 	struct iw_mgmt_essid_pset   ssid;
 	struct iw_mgmt_ds_pset	    ds_pset;
-	u8			    cf_pset[8];
+	struct iw_mgmt_cf_pset	    cf_pset;
 	struct iw_mgmt_ibss_pset    ibss_pset;
 	u8			    bss_basic_rate_set[10];
 	u8			    rssi;
