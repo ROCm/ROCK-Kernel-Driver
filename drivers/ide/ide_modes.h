@@ -31,17 +31,17 @@ typedef struct ide_pio_timings_s {
 } ide_pio_timings_t;
 
 typedef struct ide_pio_data_s {
-	byte pio_mode;
-	byte use_iordy;
-	byte overridden;
-	byte blacklisted;
+	u8 pio_mode;
+	u8 use_iordy;
+	u8 overridden;
+	u8 blacklisted;
 	unsigned int cycle_time;
 } ide_pio_data_t;
 	
 #ifndef _IDE_C
 
 int ide_scan_pio_blacklist (char *model);
-byte ide_get_best_pio_mode (ide_drive_t *drive, byte mode_wanted, byte max_mode, ide_pio_data_t *d);
+u8 ide_get_best_pio_mode (ide_drive_t *drive, u8 mode_wanted, u8 max_mode, ide_pio_data_t *d);
 extern const ide_pio_timings_t ide_pio_timings[6];
 
 #else /* _IDE_C */
@@ -159,7 +159,7 @@ int ide_scan_pio_blacklist (char *model)
 /*
  * Drive PIO mode auto selection
  */
-byte ide_get_best_pio_mode (ide_drive_t *drive, byte mode_wanted, byte max_mode, ide_pio_data_t *d)
+u8 ide_get_best_pio_mode (ide_drive_t *drive, u8 mode_wanted, u8 max_mode, ide_pio_data_t *d)
 {
 	int pio_mode;
 	int cycle_time = 0;

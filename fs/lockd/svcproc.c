@@ -69,15 +69,6 @@ nlmsvc_retrieve_args(struct svc_rqst *rqstp, struct nlm_args *argp,
 	if (!nlmsvc_ops)
 		return nlm_lck_denied_nolocks;
 
-	/* Obtain handle for client host */
-	if (rqstp->rq_client == NULL) {
-		printk(KERN_NOTICE
-			"lockd: unauthenticated request from (%08x:%d)\n",
-			ntohl(rqstp->rq_addr.sin_addr.s_addr),
-			ntohs(rqstp->rq_addr.sin_port));
-		return nlm_lck_denied_nolocks;
-	}
-
 	/* Obtain host handle */
 	if (!(host = nlmsvc_lookup_host(rqstp))
 	 || (argp->monitor && !host->h_monitored && nsm_monitor(host) < 0))
@@ -448,8 +439,8 @@ nlmsvc_proc_sm_notify(struct svc_rqst *rqstp, struct nlm_reboot *argp,
 					      void	        *resp)
 {
 	struct sockaddr_in	saddr = rqstp->rq_addr;
-	int			vers = rqstp->rq_vers;
-	int			prot = rqstp->rq_prot;
+	int			vers = argp->vers;
+	int			prot = argp->proto >> 1;
 	struct nlm_host		*host;
 
 	dprintk("lockd: SM_NOTIFY     called\n");
@@ -466,22 +457,17 @@ nlmsvc_proc_sm_notify(struct svc_rqst *rqstp, struct nlm_reboot *argp,
 	 * reclaim all locks we hold on this server.
 	 */
 	saddr.sin_addr.s_addr = argp->addr;
-	if ((host = nlmclnt_lookup_host(&saddr, prot, vers)) != NULL) {
-		nlmclnt_recovery(host, argp->state);
-		nlm_release_host(host);
-	}
-
-	/* If we run on an NFS server, delete all locks held by the client */
-	if (nlmsvc_ops != NULL) {
-		struct svc_client	*clnt;
-		saddr.sin_addr.s_addr = argp->addr;	
-		nlmsvc_ops->exp_readlock();
-		if ((clnt = nlmsvc_ops->exp_getclient(&saddr)) != NULL 
-		 && (host = nlm_lookup_host(clnt, &saddr, 0, 0)) != NULL) {
-			nlmsvc_free_host_resources(host);
+	if ((argp->proto & 1)==0) {
+		if ((host = nlmclnt_lookup_host(&saddr, prot, vers)) != NULL) {
+			nlmclnt_recovery(host, argp->state);
+			nlm_release_host(host);
 		}
-		nlm_release_host(host);
-		nlmsvc_ops->exp_unlock();
+	} else {
+		/* If we run on an NFS server, delete all locks held by the client */
+		if ((host = nlm_lookup_host(1, &saddr, prot, vers)) != NULL) {
+			nlmsvc_free_host_resources(host);
+			nlm_release_host(host);
+		}
 	}
 
 	return rpc_success;
@@ -555,15 +541,13 @@ nlmsvc_callback_exit(struct rpc_task *task)
 struct nlm_void			{ int dummy; };
 
 #define PROC(name, xargt, xrest, argt, rest, respsize)	\
- { (svc_procfunc) nlmsvc_proc_##name,	\
-   (kxdrproc_t) nlmsvc_decode_##xargt,	\
-   (kxdrproc_t) nlmsvc_encode_##xrest,	\
-   NULL,				\
-   sizeof(struct nlm_##argt),		\
-   sizeof(struct nlm_##rest),		\
-   0,					\
-   0,					\
-   respsize,				\
+ { .pc_func	= (svc_procfunc) nlmsvc_proc_##name,	\
+   .pc_decode	= (kxdrproc_t) nlmsvc_decode_##xargt,	\
+   .pc_encode	= (kxdrproc_t) nlmsvc_encode_##xrest,	\
+   .pc_release	= NULL,					\
+   .pc_argsize	= sizeof(struct nlm_##argt),		\
+   .pc_ressize	= sizeof(struct nlm_##rest),		\
+   .pc_xdrressize = respsize,				\
  }
 
 #define	Ck	(1+8)	/* cookie */

@@ -64,11 +64,11 @@ typedef struct xad {
 #define lengthXAD(xad)  __le24_to_cpu((xad)->len)
 
 /* xad list */
-typedef struct {
+struct xadlist {
 	s16 maxnxad;
 	s16 nxad;
 	xad_t *xad;
-} xadlist_t;
+};
 
 /* xad_t flags */
 #define XAD_NEW         0x01	/* new */
@@ -110,8 +110,8 @@ typedef union {
  */
 extern int xtLookup(struct inode *ip, s64 lstart, s64 llen,
 		    int *pflag, s64 * paddr, int *plen, int flag);
-extern int xtLookupList(struct inode *ip, lxdlist_t * lxdlist,
-			xadlist_t * xadlist, int flag);
+extern int xtLookupList(struct inode *ip, struct lxdlist * lxdlist,
+			struct xadlist * xadlist, int flag);
 extern void xtInitRoot(tid_t tid, struct inode *ip);
 extern int xtInsert(tid_t tid, struct inode *ip,
 		    int xflag, s64 xoff, int xlen, s64 * xaddrp, int flag);

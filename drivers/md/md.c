@@ -56,11 +56,8 @@
 #include <linux/blk.h>
 
 #define DEBUG 0
-#if DEBUG
-# define dprintk(x...) printk(x)
-#else
-# define dprintk(x...) do { } while(0)
-#endif
+#define dprintk(x...) ((void)(DEBUG && printk(x)))
+
 
 #ifndef MODULE
 static void autostart_arrays (void);
@@ -602,18 +599,6 @@ static void export_array(mddev_t *mddev)
 	if (!list_empty(&mddev->disks))
 		MD_BUG();
 	mddev->raid_disks = 0;
-}
-
-static void free_mddev(mddev_t *mddev)
-{
-	if (!mddev) {
-		MD_BUG();
-		return;
-	}
-
-	export_array(mddev);
-	md_size[mdidx(mddev)] = 0;
-	set_capacity(disks[mdidx(mddev)], 0);
 }
 
 #undef BAD_CSUM
@@ -1533,7 +1518,6 @@ static int do_md_stop(mddev_t * mddev, int ro)
 {
 	int err = 0;
 	kdev_t dev = mddev_to_kdev(mddev);
-	struct gendisk *disk;
 
 	if (atomic_read(&mddev->active)>1) {
 		printk(STILL_IN_USE, mdidx(mddev));
@@ -1582,21 +1566,25 @@ static int do_md_stop(mddev_t * mddev, int ro)
 		if (ro)
 			set_device_ro(dev, 1);
 	}
-	disk = disks[mdidx(mddev)];
-	disks[mdidx(mddev)] = NULL;
-
-	if (disk) {
-		del_gendisk(disk);
-		kfree(disk->major_name);
-		kfree(disk);
-	}
-
 	/*
 	 * Free resources if final stop
 	 */
 	if (!ro) {
+		struct gendisk *disk;
 		printk(KERN_INFO "md: md%d stopped.\n", mdidx(mddev));
-		free_mddev(mddev);
+
+		export_array(mddev);
+
+		md_size[mdidx(mddev)] = 0;
+		disk = disks[mdidx(mddev)];
+		disks[mdidx(mddev)] = NULL;
+
+		if (disk) {
+			del_gendisk(disk);
+			kfree(disk->major_name);
+			kfree(disk);
+		}
+
 	} else
 		printk(KERN_INFO "md: md%d switched to read-only mode.\n", mdidx(mddev));
 	err = 0;
@@ -2593,7 +2581,7 @@ static void md_recover_arrays(void)
 void md_error(mddev_t *mddev, mdk_rdev_t *rdev)
 {
 	dprintk("md_error dev:(%d:%d), rdev:(%d:%d), (caller: %p,%p,%p,%p).\n",
-		MD_MAJOR,mdidx(mddev),MAJOR(bdev->bd_dev),MINOR(bdev->bd_dev),
+		MD_MAJOR,mdidx(mddev),MAJOR(rdev->bdev->bd_dev),MINOR(rdev->bdev->bd_dev),
 		__builtin_return_address(0),__builtin_return_address(1),
 		__builtin_return_address(2),__builtin_return_address(3));
 
@@ -3149,11 +3137,11 @@ request_queue_t * md_queue_proc(kdev_t dev)
 {
 	mddev_t *mddev = mddev_find(minor(dev));
 	request_queue_t *q = BLK_DEFAULT_QUEUE(MAJOR_NR);
-	if (!mddev || atomic_read(&mddev->active)<2)
-		BUG();
-	if (mddev->pers)
-		q = &mddev->queue;
-	mddev_put(mddev); /* the caller must hold a reference... */
+	if (mddev) {
+		if (mddev->pers)
+			q = &mddev->queue;
+		mddev_put(mddev);
+	}
 	return q;
 }
 

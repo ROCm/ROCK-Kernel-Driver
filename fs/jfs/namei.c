@@ -63,10 +63,10 @@ int jfs_create(struct inode *dip, struct dentry *dentry, int mode)
 	tid_t tid;		/* transaction id */
 	struct inode *ip = NULL;	/* child directory inode */
 	ino_t ino;
-	component_t dname;	/* child directory name */
-	btstack_t btstack;
+	struct component_name dname;	/* child directory name */
+	struct btstack btstack;
 	struct inode *iplist[2];
-	tblock_t *tblk;
+	struct tblock *tblk;
 
 	jFYI(1, ("jfs_create: dip:0x%p name:%s\n", dip, dentry->d_name.name));
 
@@ -178,10 +178,10 @@ int jfs_mkdir(struct inode *dip, struct dentry *dentry, int mode)
 	tid_t tid;		/* transaction id */
 	struct inode *ip = NULL;	/* child directory inode */
 	ino_t ino;
-	component_t dname;	/* child directory name */
-	btstack_t btstack;
+	struct component_name dname;	/* child directory name */
+	struct btstack btstack;
 	struct inode *iplist[2];
-	tblock_t *tblk;
+	struct tblock *tblk;
 
 	jFYI(1, ("jfs_mkdir: dip:0x%p name:%s\n", dip, dentry->d_name.name));
 
@@ -306,9 +306,9 @@ int jfs_rmdir(struct inode *dip, struct dentry *dentry)
 	tid_t tid;		/* transaction id */
 	struct inode *ip = dentry->d_inode;
 	ino_t ino;
-	component_t dname;
+	struct component_name dname;
 	struct inode *iplist[2];
-	tblock_t *tblk;
+	struct tblock *tblk;
 
 	jFYI(1, ("jfs_rmdir: dip:0x%p name:%s\n", dip, dentry->d_name.name));
 
@@ -429,9 +429,9 @@ int jfs_unlink(struct inode *dip, struct dentry *dentry)
 	tid_t tid;		/* transaction id */
 	struct inode *ip = dentry->d_inode;
 	ino_t ino;
-	component_t dname;	/* object name */
+	struct component_name dname;	/* object name */
 	struct inode *iplist[2];
-	tblock_t *tblk;
+	struct tblock *tblk;
 	s64 new_size = 0;
 	int commit_flag;
 
@@ -580,7 +580,7 @@ int jfs_unlink(struct inode *dip, struct dentry *dentry)
 s64 commitZeroLink(tid_t tid, struct inode *ip)
 {
 	int filetype;
-	tblock_t *tblk;
+	struct tblock *tblk;
 
 	jFYI(1, ("commitZeroLink: tid = %d, ip = 0x%p\n", tid, ip));
 
@@ -675,15 +675,15 @@ int freeZeroLink(struct inode *ip)
 	if (JFS_IP(ip)->ea.flag & DXD_EXTENT) {
 		s64 xaddr = addressDXD(&JFS_IP(ip)->ea);
 		int xlen = lengthDXD(&JFS_IP(ip)->ea);
-		maplock_t maplock;	/* maplock for COMMIT_WMAP */
-		pxdlock_t *pxdlock;	/* maplock for COMMIT_WMAP */
+		struct maplock maplock;	/* maplock for COMMIT_WMAP */
+		struct pxd_lock *pxdlock;	/* maplock for COMMIT_WMAP */
 
 		/* free EA pages from cache */
 		invalidate_dxd_metapages(ip, JFS_IP(ip)->ea);
 
 		/* free EA extent from working block map */
 		maplock.index = 1;
-		pxdlock = (pxdlock_t *) & maplock;
+		pxdlock = (struct pxd_lock *) & maplock;
 		pxdlock->flag = mlckFREEPXD;
 		PXDaddress(&pxdlock->pxd, xaddr);
 		PXDlength(&pxdlock->pxd, xlen);
@@ -696,14 +696,14 @@ int freeZeroLink(struct inode *ip)
 	if (JFS_IP(ip)->acl.flag & DXD_EXTENT) {
 		s64 xaddr = addressDXD(&JFS_IP(ip)->acl);
 		int xlen = lengthDXD(&JFS_IP(ip)->acl);
-		maplock_t maplock;	/* maplock for COMMIT_WMAP */
-		pxdlock_t *pxdlock;	/* maplock for COMMIT_WMAP */
+		struct maplock maplock;	/* maplock for COMMIT_WMAP */
+		struct pxd_lock *pxdlock;	/* maplock for COMMIT_WMAP */
 
 		invalidate_dxd_metapages(ip, JFS_IP(ip)->acl);
 
 		/* free ACL extent from working block map */
 		maplock.index = 1;
-		pxdlock = (pxdlock_t *) & maplock;
+		pxdlock = (struct pxd_lock *) & maplock;
 		pxdlock->flag = mlckFREEPXD;
 		PXDaddress(&pxdlock->pxd, xaddr);
 		PXDlength(&pxdlock->pxd, xlen);
@@ -752,8 +752,8 @@ int jfs_link(struct dentry *old_dentry,
 	tid_t tid;
 	struct inode *ip = old_dentry->d_inode;
 	ino_t ino;
-	component_t dname;
-	btstack_t btstack;
+	struct component_name dname;
+	struct btstack btstack;
 	struct inode *iplist[2];
 
 	jFYI(1,
@@ -830,17 +830,17 @@ int jfs_symlink(struct inode *dip, struct dentry *dentry, const char *name)
 	int rc;
 	tid_t tid;
 	ino_t ino = 0;
-	component_t dname;
+	struct component_name dname;
 	int ssize;		/* source pathname size */
-	btstack_t btstack;
+	struct btstack btstack;
 	struct inode *ip = dentry->d_inode;
 	unchar *i_fastsymlink;
 	s64 xlen = 0;
 	int bmask = 0, xsize;
 	s64 xaddr;
-	metapage_t *mp;
+	struct metapage *mp;
 	struct super_block *sb;
-	tblock_t *tblk;
+	struct tblock *tblk;
 
 	struct inode *iplist[2];
 
@@ -1030,20 +1030,20 @@ int jfs_symlink(struct inode *dip, struct dentry *dentry, const char *name)
 int jfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	       struct inode *new_dir, struct dentry *new_dentry)
 {
-	btstack_t btstack;
+	struct btstack btstack;
 	ino_t ino;
-	component_t new_dname;
+	struct component_name new_dname;
 	struct inode *new_ip;
-	component_t old_dname;
+	struct component_name old_dname;
 	struct inode *old_ip;
 	int rc;
 	tid_t tid;
-	tlock_t *tlck;
-	dtlock_t *dtlck;
-	lv_t *lv;
+	struct tlock *tlck;
+	struct dt_lock *dtlck;
+	struct lv *lv;
 	int ipcount;
 	struct inode *iplist[4];
-	tblock_t *tblk;
+	struct tblock *tblk;
 	s64 new_size = 0;
 	int commit_flag;
 
@@ -1194,11 +1194,11 @@ int jfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 
 			/* Linelock header of dtree */
 			tlck = txLock(tid, old_ip,
-				      (metapage_t *) & JFS_IP(old_ip)->bxflag,
+				    (struct metapage *) &JFS_IP(old_ip)->bxflag,
 				      tlckDTREE | tlckBTROOT);
-			dtlck = (dtlock_t *) & tlck->lock;
+			dtlck = (struct dt_lock *) & tlck->lock;
 			ASSERT(dtlck->index == 0);
-			lv = (lv_t *) & dtlck->lv[0];
+			lv = & dtlck->lv[0];
 			lv->offset = 0;
 			lv->length = 1;
 			dtlck->index++;
@@ -1301,14 +1301,14 @@ int jfs_rename(struct inode *old_dir, struct dentry *old_dentry,
  */
 int jfs_mknod(struct inode *dir, struct dentry *dentry, int mode, int rdev)
 {
-	btstack_t btstack;
-	component_t dname;
+	struct btstack btstack;
+	struct component_name dname;
 	ino_t ino;
 	struct inode *ip;
 	struct inode *iplist[2];
 	int rc;
 	tid_t tid;
-	tblock_t *tblk;
+	struct tblock *tblk;
 
 	jFYI(1, ("jfs_mknod: %s\n", dentry->d_name.name));
 
@@ -1371,10 +1371,10 @@ int jfs_mknod(struct inode *dir, struct dentry *dentry, int mode, int rdev)
 
 static struct dentry *jfs_lookup(struct inode *dip, struct dentry *dentry)
 {
-	btstack_t btstack;
+	struct btstack btstack;
 	ino_t inum;
 	struct inode *ip;
-	component_t key;
+	struct component_name key;
 	const char *name = dentry->d_name.name;
 	int len = dentry->d_name.len;
 	int rc;

@@ -44,11 +44,11 @@ typedef union {
 /*
  *	directory page slot
  */
-typedef struct {
+struct dtslot {
 	s8 next;		/* 1: */
 	s8 cnt;			/* 1: */
 	wchar_t name[15];	/* 30: */
-} dtslot_t;			/* (32) */
+};				/* (32) */
 
 
 #define DATASLOTSIZE	16
@@ -62,13 +62,13 @@ typedef struct {
 /*
  *	 internal node entry head/only segment
  */
-typedef struct {
+struct idtentry {
 	pxd_t xd;		/* 8: child extent descriptor */
 
 	s8 next;		/* 1: */
 	u8 namlen;		/* 1: */
 	wchar_t name[11];	/* 22: 2-byte aligned */
-} idtentry_t;			/* (32) */
+};				/* (32) */
 
 #define DTIHDRSIZE	10
 #define DTIHDRDATALEN	11
@@ -82,13 +82,13 @@ typedef struct {
  *
  * 	For legacy filesystems, name contains 13 wchars -- no index field
  */
-typedef struct {
+struct ldtentry {
 	u32 inumber;		/* 4: 4-byte aligned */
 	s8 next;		/* 1: */
 	u8 namlen;		/* 1: */
 	wchar_t name[11];	/* 22: 2-byte aligned */
 	u32 index;		/* 4: index into dir_table */
-} ldtentry_t;			/* (32) */
+};				/* (32) */
 
 #define DTLHDRSIZE	6
 #define DTLHDRDATALEN_LEGACY	13	/* Old (OS/2) format */
@@ -108,14 +108,14 @@ typedef struct {
  */
 #define MAX_INLINE_DIRTABLE_ENTRY 13
 
-typedef struct dir_table_slot {
+struct dir_table_slot {
 	u8 rsrvd;		/* 1: */
 	u8 flag;		/* 1: 0 if free */
 	u8 slot;		/* 1: slot within leaf page of entry */
 	u8 addr1;		/* 1: upper 8 bits of leaf page address */
 	u32 addr2;		/* 4: lower 32 bits of leaf page address -OR-
 				   index of next entry when this entry was deleted */
-} dir_table_slot_t;		/* (8) */
+};				/* (8) */
 
 /*
  * flag values
@@ -144,7 +144,7 @@ typedef struct dir_table_slot {
  */
 typedef union {
 	struct {
-		dasd_t DASD;	/* 16: DASD limit/usage info  F226941 */
+		struct dasd DASD; /* 16: DASD limit/usage info */
 
 		u8 flag;	/* 1: */
 		u8 nextindex;	/* 1: next free entry in stbl */
@@ -156,7 +156,7 @@ typedef union {
 		s8 stbl[8];	/* 8: sorted entry index table */
 	} header;		/* (32) */
 
-	dtslot_t slot[9];
+	struct dtslot slot[9];
 } dtroot_t;
 
 #define PARENT(IP) \
@@ -207,7 +207,7 @@ typedef union {
 		pxd_t self;	/* 8: self pxd */
 	} header;		/* (32) */
 
-	dtslot_t slot[128];
+	struct dtslot slot[128];
 } dtpage_t;
 
 #define DTPAGEMAXSLOT        128
@@ -256,20 +256,20 @@ typedef union {
  */
 extern void dtInitRoot(tid_t tid, struct inode *ip, u32 idotdot);
 
-extern int dtSearch(struct inode *ip, component_t * key,
-		    ino_t * data, btstack_t * btstack, int flag);
+extern int dtSearch(struct inode *ip, struct component_name * key,
+		    ino_t * data, struct btstack * btstack, int flag);
 
-extern int dtInsert(tid_t tid, struct inode *ip,
-		    component_t * key, ino_t * ino, btstack_t * btstack);
+extern int dtInsert(tid_t tid, struct inode *ip, struct component_name * key,
+		    ino_t * ino, struct btstack * btstack);
 
-extern int dtDelete(tid_t tid,
-		    struct inode *ip, component_t * key, ino_t * data, int flag);
+extern int dtDelete(tid_t tid, struct inode *ip, struct component_name * key,
+		    ino_t * data, int flag);
 
 extern int dtRelocate(tid_t tid,
 		      struct inode *ip, s64 lmxaddr, pxd_t * opxd, s64 nxaddr);
 
-extern int dtModify(tid_t tid, struct inode *ip,
-		    component_t * key, ino_t * orig_ino, ino_t new_ino, int flag);
+extern int dtModify(tid_t tid, struct inode *ip, struct component_name * key,
+		    ino_t * orig_ino, ino_t new_ino, int flag);
 
 extern int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir);
 

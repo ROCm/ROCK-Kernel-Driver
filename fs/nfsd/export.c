@@ -35,10 +35,6 @@
 typedef struct svc_client	svc_client;
 typedef struct svc_export	svc_export;
 
-static svc_export *	exp_parent(svc_client *clp, struct super_block *sb,
-					struct dentry *dentry);
-static svc_export *	exp_child(svc_client *clp, struct super_block *sb,
-					struct dentry *dentry);
 static void		exp_unexport_all(svc_client *clp);
 static void		exp_do_unexport(svc_export *unexp);
 static svc_client *	exp_getclientbyname(char *name);
@@ -51,9 +47,25 @@ static int		exp_verify_string(char *cp, int max);
 #define CLIENT_HASHMASK		(CLIENT_HASHMAX - 1)
 #define CLIENT_HASH(a) \
 		((((a)>>24) ^ ((a)>>16) ^ ((a)>>8) ^(a)) & CLIENT_HASHMASK)
-/* XXX: is this adequate for 32bit kdev_t ? */
-#define EXPORT_HASH(dev)	(MINOR(dev) & (NFSCLNT_EXPMAX - 1))
-#define EXPORT_FSID_HASH(fsid)	((fsid) & (NFSCLNT_EXPMAX - 1))
+
+#define	EXPKEY_HASHBITS		8
+#define	EXPKEY_HASHMAX		(1 << EXPKEY_HASHBITS)
+#define	EXPKEY_HASHMASK		(EXPKEY_HASHMAX -1)
+static struct list_head expkey_table[EXPKEY_HASHMAX];
+
+static inline int expkey_hash(struct svc_client *clp, int type, u32 *fsidv)
+{
+	int hash = type;
+	char * cp = (char*)fsidv;
+	int len = (type==0)?8:4;
+	while (len--)
+		hash += *cp++;
+	cp = (char*)&clp;
+	len = sizeof(clp);
+	while (len--)
+		hash += *cp++;
+	return hash & EXPKEY_HASHMASK;
+}
 
 struct svc_clnthash {
 	struct svc_clnthash *	h_next;
@@ -63,123 +75,131 @@ struct svc_clnthash {
 static struct svc_clnthash *	clnt_hash[CLIENT_HASHMAX];
 static svc_client *		clients;
 
+/* hash table of exports indexed by dentry+client */
+#define	EXPORT_HASHBITS		8
+#define	EXPORT_HASHMAX		(1<< EXPORT_HASHBITS)
+#define	EXPORT_HASHMASK		(EXPORT_HASHMAX -1)
 
-/*
- * Find the client's export entry matching xdev/xino.
- */
-svc_export *
-exp_get(svc_client *clp, dev_t dev, ino_t ino)
+struct list_head	export_table[EXPORT_HASHMAX];
+
+static int export_hash(svc_client *clp, struct dentry *dentry)
 {
-	struct list_head *head, *p;
+	void *k[2];
+	unsigned char *cp;
+	int rv, i;
+	k[0] = clp;
+	k[1] = dentry;
+
+	cp = (char*)k;
+	rv = 0;
+	for (i=0; i<sizeof(k); i++)
+		rv ^= cp[i];
+	return rv & EXPORT_HASHMASK;
+}
+
+struct svc_expkey *
+exp_find_key(svc_client *clp, int fsid_type, u32 *fsidv)
+{
+	struct list_head *head;
+	struct svc_expkey *ek;
 	
 	if (!clp)
 		return NULL;
 
-	head = &clp->cl_export[EXPORT_HASH(dev)];
-	list_for_each(p, head) {
-		svc_export *exp = list_entry(p, svc_export, ex_hash);
-		if (exp->ex_ino == ino && exp->ex_dev ==  dev)
-			return exp;
-	}
+	head = &expkey_table[expkey_hash(clp, fsid_type, fsidv)];
+	list_for_each_entry(ek, head, ek_hash)
+		if (ek->ek_fsidtype == fsid_type &&
+		    fsidv[0] == ek->ek_fsid[0] &&
+		    (fsid_type == 1 || fsidv[1] == ek->ek_fsid[1]) &&
+		    clp      == ek->ek_client)
+			return ek;
+
 	return NULL;
+}
+
+/*
+ * Find the client's export entry matching xdev/xino.
+ */
+static inline struct svc_expkey *
+exp_get_key(svc_client *clp, dev_t dev, ino_t ino)
+{
+	u32 fsidv[2];
+	
+	mk_fsid_v0(fsidv, dev, ino);
+	return exp_find_key(clp, 0, fsidv);
+}
+
+static inline svc_export *
+exp_get(svc_client *clp, dev_t dev, ino_t ino)
+{
+	struct svc_expkey *ek;
+
+	ek = exp_get_key(clp, dev, ino);
+	if (ek)
+		return ek->ek_export;
+	else
+		return NULL;
 }
 
 /*
  * Find the client's export entry matching fsid
  */
-svc_export *
+static inline struct svc_expkey *
+exp_get_fsid_key(svc_client *clp, int fsid)
+{
+	u32 fsidv[2];
+
+	mk_fsid_v1(fsidv, fsid);
+
+	return exp_find_key(clp, 1, fsidv);
+}
+
+static inline svc_export *
 exp_get_fsid(svc_client *clp, int fsid)
 {
-	struct list_head *head, *p;
+	struct svc_expkey *ek;
 
-
-	if (!clp)
+	ek = exp_get_fsid_key(clp, fsid);
+	if (ek)
+		return ek->ek_export;
+	else
 		return NULL;
-
-	head = &clp->cl_expfsid[EXPORT_FSID_HASH(fsid)];
-	list_for_each(p, head) {
-		svc_export *exp = list_entry(p, svc_export, ex_fsid_hash);
-		if (exp->ex_fsid == fsid)
-			return exp;
-	}
-	return NULL;
 }
 
 svc_export *
 exp_get_by_name(svc_client *clp, struct vfsmount *mnt, struct dentry *dentry)
 {
-	struct list_head *head, *p;
-	int hash = EXPORT_HASH(mnt->mnt_sb->s_dev);
+	svc_export *exp;
+	struct list_head *head = &export_table[export_hash(clp, dentry)];
 
 	if (!clp)
 		return NULL;
 
-	head = &clp->cl_export[hash];
-	list_for_each(p, head) {
-		svc_export *exp = list_entry(p, svc_export, ex_hash);
-		if (exp->ex_dentry == dentry && exp->ex_mnt == mnt)
-			break;
+	list_for_each_entry(exp, head, ex_hash) {
+		if (exp->ex_dentry == dentry && 
+		    exp->ex_mnt    == mnt &&
+		    exp->ex_client == clp)
+			return exp;
 	}
 	return NULL;
 }
 
 /*
- * Find the export entry for a given dentry.  <gam3@acm.org>
+ * Find the export entry for a given dentry.
  */
-static svc_export *
-exp_parent(svc_client *clp, struct super_block *sb, struct dentry *dentry)
+struct svc_export *
+exp_parent(svc_client *clp, struct vfsmount *mnt, struct dentry *dentry)
 {
-	struct list_head *head = &clp->cl_export[EXPORT_HASH(sb->s_dev)];
-	struct list_head *p;
+	svc_export *exp;
 
-	spin_lock(&dcache_lock);
-	list_for_each(p, head) {
-		svc_export *exp = list_entry(p, svc_export, ex_hash);
-		if (is_subdir(dentry, exp->ex_dentry)) {
-			spin_unlock(&dcache_lock);
-			return exp;
-		}
+	read_lock(&dparent_lock);
+	exp = exp_get_by_name(clp, mnt, dentry);
+	while (exp == NULL && dentry != dentry->d_parent) {
+		dentry = dentry->d_parent;
+		exp = exp_get_by_name(clp, mnt, dentry);
 	}
-	spin_unlock(&dcache_lock);
-	return NULL;
-}
-
-/*
- * Find the child export entry for a given fs. This function is used
- * only by the export syscall to keep the export tree consistent.
- * <gam3@acm.org>
- */
-static svc_export *
-exp_child(svc_client *clp, struct super_block *sb, struct dentry *dentry)
-{
-	struct list_head *head = &clp->cl_export[EXPORT_HASH(sb->s_dev)];
-	struct list_head *p;
-	struct dentry *ndentry;
-
-	spin_lock(&dcache_lock);
-	list_for_each(p, head) {
-		svc_export *exp = list_entry(p, svc_export, ex_hash);
-		ndentry = exp->ex_dentry;
-		if (ndentry && is_subdir(ndentry->d_parent, dentry)) {
-			spin_unlock(&dcache_lock);
-			return exp;
-		}
-	}
-	spin_unlock(&dcache_lock);
-	return NULL;
-}
-
-/* Update parent pointers of all exports */
-static void exp_change_parents(svc_client *clp, svc_export *old, svc_export *new)
-{
-	struct list_head *head = &clp->cl_list;
-	struct list_head *p;
-
-	list_for_each(p, head) {
-		svc_export *exp = list_entry(p, svc_export, ex_list);
-		if (exp->ex_parent == old)
-			exp->ex_parent = new;
-	}
+	read_unlock(&dparent_lock);
+	return exp;
 }
 
 /*
@@ -217,23 +237,75 @@ exp_writeunlock(void)
 
 static void exp_fsid_unhash(struct svc_export *exp)
 {
+	struct svc_expkey *ek;
 
 	if ((exp->ex_flags & NFSEXP_FSID) == 0)
 		return;
 
-	list_del_init(&exp->ex_fsid_hash);
+	ek = exp_get_fsid_key(exp->ex_client, exp->ex_fsid);
+	if (ek) {
+		list_del(&ek->ek_hash);
+		kfree(ek);
+	}
 }
 
-static void exp_fsid_hash(struct svc_client *clp, struct svc_export *exp)
+static int exp_fsid_hash(struct svc_client *clp, struct svc_export *exp)
 {
 	struct list_head *head;
-
+	struct svc_expkey *ek;
+ 
 	if ((exp->ex_flags & NFSEXP_FSID) == 0)
-		return;
-	head = clp->cl_expfsid + EXPORT_FSID_HASH(exp->ex_fsid);
-	list_add(&exp->ex_fsid_hash, head);
+		return 0;
+
+	ek = kmalloc(sizeof(*ek), GFP_KERNEL);
+	if (ek == NULL)
+		return -ENOMEM;
+
+	ek->ek_fsidtype = 1;
+	ek->ek_export = exp;
+	ek->ek_client = clp;
+
+	mk_fsid_v1(ek->ek_fsid, exp->ex_fsid);
+	
+	head = &expkey_table[expkey_hash(clp, 1, ek->ek_fsid)];
+	list_add(&ek->ek_hash, head);
+	return 0;
 }
 
+static int exp_hash(struct svc_client *clp, struct svc_export *exp)
+{
+	struct list_head *head;
+	struct svc_expkey *ek;
+	struct inode *inode;
+ 
+	ek = kmalloc(sizeof(*ek), GFP_KERNEL);
+	if (ek == NULL)
+		return -ENOMEM;
+
+	ek->ek_fsidtype = 0;
+	ek->ek_export = exp;
+	ek->ek_client = clp;
+
+	inode = exp->ex_dentry->d_inode;
+	mk_fsid_v0(ek->ek_fsid, inode->i_sb->s_dev, inode->i_ino);
+	
+	head = &expkey_table[expkey_hash(clp, 0, ek->ek_fsid)];
+	list_add(&ek->ek_hash, head);
+	return 0;
+}
+
+static void exp_unhash(struct svc_export *exp)
+{
+	struct svc_expkey *ek;
+	struct inode *inode = exp->ex_dentry->d_inode;
+
+	ek = exp_get_key(exp->ex_client, inode->i_sb->s_dev, inode->i_ino);
+	if (ek) {
+		list_del(&ek->ek_hash);
+		kfree(ek);
+	}
+}
+	
 extern struct dentry *
 find_exported_dentry(struct super_block *sb, void *obj, void *parent,
 		     int (*acceptable)(void *context, struct dentry *de),
@@ -245,13 +317,11 @@ int
 exp_export(struct nfsctl_export *nxp)
 {
 	svc_client	*clp;
-	svc_export	*exp = NULL, *parent;
+	svc_export	*exp = NULL;
 	svc_export	*fsid_exp;
 	struct nameidata nd;
 	struct inode	*inode = NULL;
 	int		err;
-	dev_t		dev;
-	ino_t		ino;
 
 	/* Consistency check */
 	err = -EINVAL;
@@ -276,11 +346,9 @@ exp_export(struct nfsctl_export *nxp)
 	if (err)
 		goto out_unlock;
 	inode = nd.dentry->d_inode;
-	dev = inode->i_sb->s_dev;
-	ino = inode->i_ino;
 	err = -EINVAL;
 
-	exp = exp_get(clp, dev, ino);
+	exp = exp_get_by_name(clp, nd.mnt, nd.dentry);
 
 	/* must make sure there wont be an ex_fsid clash */
 	if ((nxp->ex_flags & NFSEXP_FSID) &&
@@ -296,8 +364,8 @@ exp_export(struct nfsctl_export *nxp)
 		exp->ex_anon_uid = nxp->ex_anon_uid;
 		exp->ex_anon_gid = nxp->ex_anon_gid;
 		exp->ex_fsid     = nxp->ex_dev;
-		exp_fsid_hash(clp, exp);
-		err = 0;
+
+		err = exp_fsid_hash(clp, exp);
 		goto finish;
 	}
 
@@ -332,44 +400,29 @@ exp_export(struct nfsctl_export *nxp)
 		inode->i_sb->s_export_op->find_exported_dentry =
 			find_exported_dentry;
 
-	if ((parent = exp_child(clp, inode->i_sb, nd.dentry)) != NULL) {
-		dprintk("exp_export: export not valid (Rule 3).\n");
-		goto finish;
-	}
-	/* Is this is a sub-export, must be a proper subset of FS */
-	if ((parent = exp_parent(clp, inode->i_sb, nd.dentry)) != NULL) {
-		dprintk("exp_export: sub-export not valid (Rule 2).\n");
-		goto finish;
-	}
-
 	err = -ENOMEM;
 	if (!(exp = kmalloc(sizeof(*exp), GFP_USER)))
 		goto finish;
 	dprintk("nfsd: created export entry %p for client %p\n", exp, clp);
 
-	strcpy(exp->ex_path, nxp->ex_path);
 	exp->ex_client = clp;
-	exp->ex_parent = parent;
 	exp->ex_mnt = mntget(nd.mnt);
 	exp->ex_dentry = dget(nd.dentry);
 	exp->ex_flags = nxp->ex_flags;
-	exp->ex_dev = dev;
-	exp->ex_ino = ino;
 	exp->ex_anon_uid = nxp->ex_anon_uid;
 	exp->ex_anon_gid = nxp->ex_anon_gid;
 	exp->ex_fsid = nxp->ex_dev;
 
-
-	/* Update parent pointers of all exports */
-	if (parent)
-		exp_change_parents(clp, parent, exp);
-
-	list_add(&exp->ex_hash, clp->cl_export + EXPORT_HASH(dev));
-	list_add_tail(&exp->ex_list, &clp->cl_list);
-
-	exp_fsid_hash(clp, exp);
-
+	list_add_tail(&exp->ex_hash,
+		      &export_table[export_hash(clp, nd.dentry)]);
 	err = 0;
+
+	if (exp_hash(clp, exp) ||
+	    exp_fsid_hash(clp, exp)) {
+		/* failed to create at least one index */
+		exp_do_unexport(exp);
+		err = -ENOMEM;
+	}
 
 finish:
 	path_release(&nd);
@@ -390,16 +443,12 @@ exp_do_unexport(svc_export *unexp)
 	struct vfsmount *mnt;
 	struct inode	*inode;
 
-	list_del(&unexp->ex_list);
 	list_del(&unexp->ex_hash);
+	exp_unhash(unexp);
 	exp_fsid_unhash(unexp);
-	/* Update parent pointers. */
-	exp_change_parents(unexp->ex_client, unexp, unexp->ex_parent);
 	dentry = unexp->ex_dentry;
 	mnt = unexp->ex_mnt;
 	inode = dentry->d_inode;
-	if (unexp->ex_dev != inode->i_sb->s_dev || unexp->ex_ino != inode->i_ino)
-		printk(KERN_WARNING "nfsd: bad dentry in unexport!\n");
 	dput(dentry);
 	mntput(mnt);
 
@@ -412,14 +461,17 @@ exp_do_unexport(svc_export *unexp)
 static void
 exp_unexport_all(svc_client *clp)
 {
-	struct list_head *p = &clp->cl_list;
+	struct list_head *lp, *tmp;
+	int index;
 
 	dprintk("unexporting all fs's for clnt %p\n", clp);
 
-	while (!list_empty(p)) {
-		svc_export *exp = list_entry(p->next, svc_export, ex_list);
-		exp_do_unexport(exp);
-	}
+	for (index=0; index<EXPORT_HASHMAX; index++)
+		list_for_each_safe(lp, tmp, &export_table[index]) {
+			svc_export *exp = list_entry(lp, struct svc_export, ex_hash);
+			if (exp->ex_client == clp)
+				exp_do_unexport(exp);
+		}
 }
 
 /*
@@ -476,7 +528,7 @@ exp_rootfh(struct svc_client *clp, char *path, struct knfsd_fh *f, int maxsize)
 	dprintk("nfsd: exp_rootfh(%s [%p] %s:%s/%ld)\n",
 		 path, nd.dentry, clp->cl_ident,
 		 inode->i_sb->s_id, inode->i_ino);
-	exp = exp_parent(clp, inode->i_sb, nd.dentry);
+	exp = exp_parent(clp, nd.mnt, nd.dentry);
 	if (!exp) {
 		dprintk("nfsd: exp_rootfh export not found.\n");
 		goto out;
@@ -555,56 +607,52 @@ exp_getclientbyname(char *ident)
 static void *e_start(struct seq_file *m, loff_t *pos)
 {
 	loff_t n = *pos;
-	unsigned client, export;
-	svc_client *clp;
-	struct list_head *p;
+	unsigned hash, export;
+	svc_export  *exp;
 	
 	exp_readlock();
 	if (!n--)
 		return (void *)1;
-	client = n >> 32;
+	hash = n >> 32;
 	export = n & ((1LL<<32) - 1);
-	for (clp = clients; client && clp; clp = clp->cl_next, client--)
-		;
-	if (!clp)
-		return NULL;
-	list_for_each(p, &clp->cl_list)
+
+	list_for_each_entry(exp, &export_table[hash], ex_hash)
 		if (!export--)
-			return list_entry(p, svc_export, ex_list);
+			return exp;
 	n &= ~((1LL<<32) - 1);
 	do {
-		clp = clp->cl_next;
+		hash++;
 		n += 1LL<<32;
-	} while(clp && list_empty(&clp->cl_list));
-	if (!clp)
+	} while(hash < EXPORT_HASHMAX && list_empty(&export_table[hash]));
+	if (hash >= EXPORT_HASHMAX)
 		return NULL;
 	*pos = n+1;
-	return list_entry(clp->cl_list.next, svc_export, ex_list);
+	return list_entry(export_table[hash].next, svc_export, ex_hash);
 }
 
 static void *e_next(struct seq_file *m, void *p, loff_t *pos)
 {
 	svc_export *exp = p;
-	svc_client *clp;
+	int hash = (*pos >> 32);
 
 	if (p == (void *)1)
-		clp = clients;
-	else if (exp->ex_list.next == &exp->ex_client->cl_list) {
-		clp = exp->ex_client->cl_next;
+		hash = 0;
+	else if (exp->ex_hash.next == &export_table[hash]) {
+		hash++;
 		*pos += 1LL<<32;
 	} else {
 		++*pos;
-		return list_entry(exp->ex_list.next, svc_export, ex_list);
+		return list_entry(exp->ex_hash.next, svc_export, ex_hash);
 	}
 	*pos &= ~((1LL<<32) - 1);
-	while (clp && list_empty(&clp->cl_list)) {
-		clp = clp->cl_next;
+	while (hash < EXPORT_HASHMAX && list_empty(&export_table[hash])) {
+		hash++;
 		*pos += 1LL<<32;
 	}
-	if (!clp)
+	if (hash >= EXPORT_HASHMAX)
 		return NULL;
 	++*pos;
-	return list_entry(clp->cl_list.next, svc_export, ex_list);
+	return list_entry(export_table[hash].next, svc_export, ex_hash);
 }
 
 static void e_stop(struct seq_file *m, void *p)
@@ -634,7 +682,7 @@ struct flags {
 	{ 0, {"", ""}}
 };
 
-static void exp_flags(struct seq_file *m, int flag, int fsid)
+static void exp_flags(struct seq_file *m, int flag, int fsid, uid_t anonu, uid_t anong)
 {
 	int first = 0;
 	struct flags *flg;
@@ -646,6 +694,10 @@ static void exp_flags(struct seq_file *m, int flag, int fsid)
 	}
 	if (flag & NFSEXP_FSID)
 		seq_printf(m, "%sfsid=%d", first++?",":"", fsid);
+	if (anonu != (uid_t)-2 && anonu != (0x10000-2))
+		seq_printf(m, "%sanonuid=%d", first++?",":"", anonu);
+	if (anong != (gid_t)-2 && anong != (0x10000-2))
+		seq_printf(m, "%sanongid=%d", first++?",":"", anong);
 }
 
 static inline void mangle(struct seq_file *m, const char *s)
@@ -657,7 +709,7 @@ static int e_show(struct seq_file *m, void *p)
 {
 	struct svc_export *exp = p;
 	struct svc_client *clp;
-	int j, first = 0;
+	char *pbuf;
 
 	if (p == (void *)1) {
 		seq_puts(m, "# Version 1.1\n");
@@ -667,36 +719,16 @@ static int e_show(struct seq_file *m, void *p)
 
 	clp = exp->ex_client;
 
-	mangle(m, exp->ex_path);
+	pbuf = m->private;
+	mangle(m, d_path(exp->ex_dentry, exp->ex_mnt,
+			 pbuf, PAGE_SIZE));
+
 	seq_putc(m, '\t');
 	mangle(m, clp->cl_ident);
 	seq_putc(m, '(');
-	exp_flags(m, exp->ex_flags, exp->ex_fsid);
-	seq_puts(m, ") # ");
-	for (j = 0; j < clp->cl_naddr; j++) {
-		struct svc_clnthash **hp, **head, *tmp;
-		struct in_addr addr = clp->cl_addr[j]; 
-
-		head = &clnt_hash[CLIENT_HASH(addr.s_addr)];
-		for (hp = head; (tmp = *hp) != NULL; hp = &(tmp->h_next)) {
-			if (tmp->h_addr.s_addr == addr.s_addr)
-				break;
-		}
-		if (tmp) {
-			if (first++)
-				seq_putc(m, ' ');
-			if (tmp->h_client != clp)
-				seq_putc(m, '(');
-			seq_printf(m, "%d.%d.%d.%d",
-				htonl(addr.s_addr) >> 24 & 0xff,
-				htonl(addr.s_addr) >> 16 & 0xff,
-				htonl(addr.s_addr) >>  8 & 0xff,
-				htonl(addr.s_addr) >>  0 & 0xff);
-			if (tmp->h_client != clp)
-				seq_putc(m, ')');
-		}
-	}
-	seq_putc(m, '\n');
+	exp_flags(m, exp->ex_flags, exp->ex_fsid, 
+		  exp->ex_anon_uid, exp->ex_anon_gid);
+	seq_puts(m, ")\n");
 	return 0;
 }
 
@@ -741,16 +773,10 @@ exp_addclient(struct nfsctl_client *ncp)
 		if (!(clp = kmalloc(sizeof(*clp), GFP_KERNEL)))
 			goto out_unlock;
 		memset(clp, 0, sizeof(*clp));
-		for (i = 0; i < NFSCLNT_EXPMAX; i++) {
-			INIT_LIST_HEAD(&clp->cl_export[i]);
-			INIT_LIST_HEAD(&clp->cl_expfsid[i]);
-		}
-		INIT_LIST_HEAD(&clp->cl_list);
 
 		dprintk("created client %s (%p)\n", ncp->cl_ident, clp);
 
 		strcpy(clp->cl_ident, ncp->cl_ident);
-		clp->cl_idlen = ilen;
 	}
 
 	/* Allocate hash buckets */
@@ -765,19 +791,13 @@ exp_addclient(struct nfsctl_client *ncp)
 		}
 	}
 
-	/* Copy addresses. */
-	for (i = 0; i < ncp->cl_naddr; i++) {
-		clp->cl_addr[i] = ncp->cl_addrlist[i];
-	}
-	clp->cl_naddr = ncp->cl_naddr;
-
 	/* Remove old client hash entries. */
 	if (change)
 		exp_unhashclient(clp);
 
 	/* Insert client into hashtable. */
 	for (i = 0; i < ncp->cl_naddr; i++) {
-		struct in_addr	addr = clp->cl_addr[i];
+		struct in_addr	addr = ncp->cl_addrlist[i];
 		int		hash;
 
 		hash = CLIENT_HASH(addr.s_addr);
@@ -838,9 +858,7 @@ exp_freeclient(svc_client *clp)
 {
 	exp_unhashclient(clp);
 
-	/* umap_free(&(clp->cl_umap)); */
 	exp_unexport_all(clp);
-	nfsd_lockd_unexport(clp);
 	kfree (clp);
 }
 
@@ -869,24 +887,10 @@ again:
 			}
 		}
 	}
-	if (count != clp->cl_naddr)
-		printk(KERN_WARNING "nfsd: bad address count in freeclient!\n");
 	if (err)
 		goto again;
 	for (i = 0; i < count; i++)
 		kfree (ch[i]);
-}
-
-/*
- * Lockd is shutting down and tells us to unregister all clients
- */
-void
-exp_nlmdetach(void)
-{
-	struct svc_client	*clp;
-
-	for (clp = clients; clp; clp = clp->cl_next)
-		nfsd_lockd_unexport(clp);
 }
 
 /*
@@ -918,6 +922,12 @@ nfsd_export_init(void)
 	for (i = 0; i < CLIENT_HASHMAX; i++)
 		clnt_hash[i] = NULL;
 	clients = NULL;
+
+	for (i = 0; i < EXPORT_HASHMAX ; i++)
+		INIT_LIST_HEAD(&export_table[i]);
+
+	for (i = 0; i < EXPKEY_HASHMAX; i++)
+		INIT_LIST_HEAD(&expkey_table[i]);
 
 }
 

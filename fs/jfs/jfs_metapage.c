@@ -40,7 +40,7 @@ struct {
 
 #define HASH_BITS 10		/* This makes hash_table 1 4K page */
 #define HASH_SIZE (1 << HASH_BITS)
-static metapage_t **hash_table = NULL;
+static struct metapage **hash_table = NULL;
 static unsigned long hash_order;
 
 
@@ -92,7 +92,7 @@ static mempool_t *metapage_mempool;
 
 static void init_once(void *foo, kmem_cache_t *cachep, unsigned long flags)
 {
-	metapage_t *mp = (metapage_t *)foo;
+	struct metapage *mp = (struct metapage *)foo;
 
 	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
 	    SLAB_CTOR_CONSTRUCTOR) {
@@ -107,12 +107,12 @@ static void init_once(void *foo, kmem_cache_t *cachep, unsigned long flags)
 	}
 }
 
-static inline metapage_t *alloc_metapage(int no_wait)
+static inline struct metapage *alloc_metapage(int no_wait)
 {
 	return mempool_alloc(metapage_mempool, no_wait ? GFP_ATOMIC : GFP_NOFS);
 }
 
-static inline void free_metapage(metapage_t *mp)
+static inline void free_metapage(struct metapage *mp)
 {
 	mp->flag = 0;
 	set_bit(META_free, &mp->flag);
@@ -134,8 +134,8 @@ int __init metapage_init(void)
 	/*
 	 * Allocate the metapage structures
 	 */
-	metapage_cache = kmem_cache_create("jfs_mp", sizeof(metapage_t), 0, 0,
-					   init_once, NULL);
+	metapage_cache = kmem_cache_create("jfs_mp", sizeof(struct metapage),
+					   0, 0, init_once, NULL);
 	if (metapage_cache == NULL)
 		return -ENOMEM;
 
@@ -153,7 +153,7 @@ int __init metapage_init(void)
 	     ((PAGE_SIZE << hash_order) / sizeof(void *)) < HASH_SIZE;
 	     hash_order++);
 	hash_table =
-	    (metapage_t **) __get_free_pages(GFP_KERNEL, hash_order);
+	    (struct metapage **) __get_free_pages(GFP_KERNEL, hash_order);
 	assert(hash_table);
 	memset(hash_table, 0, PAGE_SIZE << hash_order);
 
@@ -169,8 +169,8 @@ void metapage_exit(void)
 /*
  * Basically same hash as in pagemap.h, but using our hash table
  */
-static metapage_t **meta_hash(struct address_space *mapping,
-			      unsigned long index)
+static struct metapage **meta_hash(struct address_space *mapping,
+				   unsigned long index)
 {
 #define i (((unsigned long)mapping)/ \
 	   (sizeof(struct inode) & ~(sizeof(struct inode) -1 )))
@@ -180,11 +180,11 @@ static metapage_t **meta_hash(struct address_space *mapping,
 #undef s
 }
 
-static metapage_t *search_hash(metapage_t ** hash_ptr,
-			       struct address_space *mapping,
+static struct metapage *search_hash(struct metapage ** hash_ptr,
+				    struct address_space *mapping,
 			       unsigned long index)
 {
-	metapage_t *ptr;
+	struct metapage *ptr;
 
 	for (ptr = *hash_ptr; ptr; ptr = ptr->hash_next) {
 		if ((ptr->mapping == mapping) && (ptr->index == index))
@@ -194,7 +194,7 @@ static metapage_t *search_hash(metapage_t ** hash_ptr,
 	return NULL;
 }
 
-static void add_to_hash(metapage_t * mp, metapage_t ** hash_ptr)
+static void add_to_hash(struct metapage * mp, struct metapage ** hash_ptr)
 {
 	if (*hash_ptr)
 		(*hash_ptr)->hash_prev = mp;
@@ -204,7 +204,7 @@ static void add_to_hash(metapage_t * mp, metapage_t ** hash_ptr)
 	*hash_ptr = mp;
 }
 
-static void remove_from_hash(metapage_t * mp, metapage_t ** hash_ptr)
+static void remove_from_hash(struct metapage * mp, struct metapage ** hash_ptr)
 {
 	if (mp->hash_prev)
 		mp->hash_prev->hash_next = mp->hash_next;
@@ -217,15 +217,15 @@ static void remove_from_hash(metapage_t * mp, metapage_t ** hash_ptr)
 		mp->hash_next->hash_prev = mp->hash_prev;
 }
 
-metapage_t *__get_metapage(struct inode *inode,
-			   unsigned long lblock, unsigned int size,
-			   int absolute, unsigned long new)
+struct metapage *__get_metapage(struct inode *inode, unsigned long lblock,
+				unsigned int size, int absolute,
+				unsigned long new)
 {
-	metapage_t **hash_ptr;
+	struct metapage **hash_ptr;
 	int l2BlocksPerPage;
 	int l2bsize;
 	struct address_space *mapping;
-	metapage_t *mp;
+	struct metapage *mp;
 	unsigned long page_index;
 	unsigned long page_offset;
 
@@ -289,7 +289,7 @@ metapage_t *__get_metapage(struct inode *inode,
 			}
 		}
 		if (!mp) {
-			metapage_t *mp2;
+			struct metapage *mp2;
 
 			spin_unlock(&meta_lock);
 			mp =  mempool_alloc(metapage_mempool, GFP_NOFS);
@@ -358,7 +358,7 @@ freeit:
 	return NULL;
 }
 
-void hold_metapage(metapage_t * mp, int force)
+void hold_metapage(struct metapage * mp, int force)
 {
 	spin_lock(&meta_lock);
 
@@ -374,7 +374,7 @@ void hold_metapage(metapage_t * mp, int force)
 	spin_unlock(&meta_lock);
 }
 
-static void __write_metapage(metapage_t * mp)
+static void __write_metapage(struct metapage * mp)
 {
 	int l2bsize = mp->mapping->host->i_blkbits;
 	int l2BlocksPerPage = PAGE_CACHE_SHIFT - l2bsize;
@@ -420,7 +420,7 @@ static void __write_metapage(metapage_t * mp)
 	jFYI(1, ("__write_metapage done\n"));
 }
 
-static inline void sync_metapage(metapage_t *mp)
+static inline void sync_metapage(struct metapage *mp)
 {
 	struct page *page = mp->page;
 
@@ -435,9 +435,9 @@ static inline void sync_metapage(metapage_t *mp)
 	page_cache_release(page);
 }
 
-void release_metapage(metapage_t * mp)
+void release_metapage(struct metapage * mp)
 {
-	log_t *log;
+	struct jfs_log *log;
 
 	jFYI(1,
 	     ("release_metapage: mp = 0x%p, flag = 0x%lx\n", mp,
@@ -502,11 +502,11 @@ void release_metapage(metapage_t * mp)
 
 void __invalidate_metapages(struct inode *ip, s64 addr, int len)
 {
-	metapage_t **hash_ptr;
+	struct metapage **hash_ptr;
 	unsigned long lblock;
 	int l2BlocksPerPage = PAGE_CACHE_SHIFT - ip->i_blkbits;
 	struct address_space *mapping = ip->i_mapping;
-	metapage_t *mp;
+	struct metapage *mp;
 	struct page *page;
 
 	/*
@@ -538,11 +538,11 @@ void __invalidate_metapages(struct inode *ip, s64 addr, int len)
 void invalidate_inode_metapages(struct inode *inode)
 {
 	struct list_head *ptr;
-	metapage_t *mp;
+	struct metapage *mp;
 
 	spin_lock(&meta_lock);
 	list_for_each(ptr, &JFS_IP(inode)->mp_list) {
-		mp = list_entry(ptr, metapage_t, inode_list);
+		mp = list_entry(ptr, struct metapage, inode_list);
 		clear_bit(META_dirty, &mp->flag);
 		set_bit(META_discard, &mp->flag);
 		kunmap(mp->page);

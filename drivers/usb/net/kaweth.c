@@ -464,7 +464,7 @@ static int kaweth_reset(struct kaweth_device *kaweth)
 }
 
 static void kaweth_usb_receive(struct urb *);
-static void kaweth_resubmit_rx_urb(struct kaweth_device *, int);
+static int kaweth_resubmit_rx_urb(struct kaweth_device *, int);
 
 /****************************************************************
 	int_callback
@@ -493,7 +493,7 @@ static void int_callback(struct urb *u)
 /****************************************************************
  *     kaweth_resubmit_rx_urb
  ****************************************************************/
-static void kaweth_resubmit_rx_urb(struct kaweth_device *kaweth,
+static int kaweth_resubmit_rx_urb(struct kaweth_device *kaweth,
 						int mem_flags)
 {
 	int result;
@@ -513,6 +513,8 @@ static void kaweth_resubmit_rx_urb(struct kaweth_device *kaweth,
 	} else {
 		kaweth->suspend_lowmem = 0;
 	}
+	
+	return result;
 }
 
 static void kaweth_async_set_rx_mode(struct kaweth_device *kaweth);
@@ -592,14 +594,15 @@ static void kaweth_usb_receive(struct urb *urb)
 static int kaweth_open(struct net_device *net)
 {
 	struct kaweth_device *kaweth = (struct kaweth_device *)net->priv;
+	int res;
 
 	kaweth_dbg("Dev usage: %d", kaweth->dev->refcnt.counter);
 
 	kaweth_dbg("Opening network device.");
 
-	MOD_INC_USE_COUNT;
-
-	kaweth_resubmit_rx_urb(kaweth, GFP_KERNEL);
+	res = kaweth_resubmit_rx_urb(kaweth, GFP_KERNEL);
+	if (res)
+		return -EIO;
 
 	FILL_INT_URB(
 		kaweth->irq_urb,
@@ -611,7 +614,11 @@ static int kaweth_open(struct net_device *net)
 		kaweth,
 		HZ/4);
 
-	usb_submit_urb(kaweth->irq_urb, GFP_KERNEL);
+	res = usb_submit_urb(kaweth->irq_urb, GFP_KERNEL);
+	if (res) {
+		usb_unlink_urb(kaweth->rx_urb);
+		return -EIO;
+	}
 
 	netif_start_queue(net);
 
@@ -635,7 +642,6 @@ static int kaweth_close(struct net_device *net)
 
 	kaweth->status &= ~KAWETH_STATUS_CLOSING;
 
-	MOD_DEC_USE_COUNT;
 
 	printk("Dev usage: %d", kaweth->dev->refcnt.counter);
 
@@ -848,6 +854,7 @@ static void *kaweth_probe(
 	)
 {
 	struct kaweth_device *kaweth;
+	struct net_device *netdev;
 	const eth_addr_t bcast_addr = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
 	int result = 0;
 
@@ -863,10 +870,8 @@ static void *kaweth_probe(
 		 (int)dev->descriptor.bLength,
 		 (int)dev->descriptor.bDescriptorType);
 
-	if(!(kaweth = kmalloc(sizeof(struct kaweth_device), GFP_KERNEL))) {
-		kaweth_dbg("out of memory allocating device structure\n");
+	if(!(kaweth = kmalloc(sizeof(struct kaweth_device), GFP_KERNEL)))
 		return NULL;
-	}
 
 	memset(kaweth, 0, sizeof(struct kaweth_device));
 
@@ -992,10 +997,16 @@ static void *kaweth_probe(
 
 	if(result < 0) {
 		kaweth_err("Error setting receive filter");
-		return kaweth;
+		kfree(kaweth);
+		return NULL;
 	}
 
 	kaweth_dbg("Initializing net device.");
+
+	if(!(netdev = kmalloc(sizeof(struct net_device), GFP_KERNEL))) {
+		kfree(kaweth);
+		return NULL;
+	}
 
 	kaweth->tx_urb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!kaweth->tx_urb)
@@ -1007,12 +1018,7 @@ static void *kaweth_probe(
 	if (!kaweth->irq_urb)
 		goto err_tx_and_rx;
 
-	kaweth->net = init_etherdev(0, 0);
-	if (!kaweth->net) {
-		kaweth_err("Error calling init_etherdev.");
-		return kaweth;
-	}
-
+	kaweth->net = netdev;
 	memcpy(kaweth->net->broadcast, &bcast_addr, sizeof(bcast_addr));
 	memcpy(kaweth->net->dev_addr,
                &kaweth->configuration.hw_addr,
@@ -1032,6 +1038,13 @@ static void *kaweth_probe(
 	kaweth->net->mtu = le16_to_cpu(kaweth->configuration.segment_size);
 
 	memset(&kaweth->stats, 0, sizeof(kaweth->stats));
+	
+	SET_MODULE_OWNER(netdev);
+
+	if (!init_etherdev(netdev, 0)) {
+		kaweth_err("Error calling init_etherdev.");
+		goto err_tx_and_rx;
+	}
 
 	kaweth_info("kaweth interface created at %s", kaweth->net->name);
 
@@ -1045,6 +1058,7 @@ err_only_tx:
 	usb_free_urb(kaweth->tx_urb);
 err_no_urb:
 	kfree(kaweth);
+	kfree(netdev);
 	return NULL;
 }
 

@@ -81,11 +81,11 @@ typedef struct {
 	( ((s64)((lxd)->off1)) << 32 | (lxd)->off2 )
 
 /* lxd list */
-typedef struct {
+struct lxdlist {
 	s16 maxnlxd;
 	s16 nlxd;
 	lxd_t *lxd;
-} lxdlist_t;
+};
 
 /*
  *	physical xd (pxd)
@@ -111,11 +111,11 @@ typedef struct {
 	( ((s64)((pxd)->addr1)) << 32 | __le32_to_cpu((pxd)->addr2))
 
 /* pxd list */
-typedef struct {
+struct pxdlist {
 	s16 maxnpxd;
 	s16 npxd;
 	pxd_t pxd[8];
-} pxdlist_t;
+};
 
 
 /*
@@ -150,16 +150,16 @@ typedef struct {
 /*
  *      directory entry argument
  */
-typedef struct component_name {
+struct component_name {
 	int namlen;
 	wchar_t *name;
-} component_t;
+};
 
 
 /*
  *	DASD limit information - stored in directory inode
  */
-typedef struct dasd {
+struct dasd {
 	u8 thresh;		/* Alert Threshold (in percent) */
 	u8 delta;		/* Alert Threshold delta (in percent)   */
 	u8 rsrvd1;
@@ -168,7 +168,7 @@ typedef struct dasd {
 	u8 rsrvd2[3];
 	u8 used_hi;		/* DASD usage (in logical blocks)       */
 	u32 used_lo;		/* DASD usage (in logical blocks)       */
-} dasd_t;
+};
 
 #define DASDLIMIT(dasdp) \
 	(((u64)((dasdp)->limit_hi) << 32) + __le32_to_cpu((dasdp)->limit_lo))

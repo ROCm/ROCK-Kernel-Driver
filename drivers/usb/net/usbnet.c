@@ -16,6 +16,7 @@
  *
  *	- AnchorChip 2720
  *	- Belkin, eTEK (interops with Win32 drivers)
+ *	- EPSON USB clients
  *	- GeneSys GL620USB-A
  *	- "Linux Devices" (like iPaq and similar SA-1100 based PDAs)
  *	- NetChip 1080 (interoperates with NetChip Win32 drivers)
@@ -23,7 +24,7 @@
  *
  * USB devices can implement their side of this protocol at the cost
  * of two bulk endpoints; it's not restricted to "cable" applications.
- * See the LINUXDEV support.
+ * See the LINUXDEV or EPSON device/client support.
  *
  * 
  * Status:
@@ -57,7 +58,7 @@
  *
  * Need smarter hotplug policy scripts ... ones that know how to arrange
  * bridging with "brctl", and can handle static and dynamic ("pump") setups.
- * Use those eventual "peer connected" events.
+ * Use those eventual "peer connected" events, and zeroconf.
  *
  *
  * CHANGELOG:
@@ -128,6 +129,7 @@
 /* minidrivers _could_ be individually configured */
 #define	CONFIG_USB_AN2720
 #define	CONFIG_USB_BELKIN
+#define	CONFIG_USB_EPSON2888
 #define	CONFIG_USB_GENESYS
 #define	CONFIG_USB_LINUXDEV
 #define	CONFIG_USB_NET1080
@@ -329,6 +331,29 @@ static const struct driver_info	belkin_info = {
 
 
 
+#ifdef	CONFIG_USB_EPSON2888
+
+/*-------------------------------------------------------------------------
+ *
+ * EPSON USB clients
+ *
+ * This is the same idea as "linuxdev" (below) except the firmware in the
+ * device might not be Tux-powered.  Epson provides reference firmware that
+ * implements this interface.  Product developers can reuse or modify that
+ * code, such as by using their own product and vendor codes.
+ *
+ *-------------------------------------------------------------------------*/
+
+static const struct driver_info	epson2888_info = {
+	.description =	"Epson USB Device",
+
+	.in = 4, .out = 3,
+	.epsize = 64,
+};
+
+#endif	/* CONFIG_USB_EPSON2888 */
+
+
 #ifdef CONFIG_USB_GENESYS
 
 /*-------------------------------------------------------------------------
@@ -337,6 +362,15 @@ static const struct driver_info	belkin_info = {
  *
  * ... should partially interop with the Win32 driver for this hardware
  * The GeneSys docs imply there's some NDIS issue motivating this framing.
+ *
+ * Some info from GeneSys:
+ *  - GL620USB-A is full duplex; GL620USB is only half duplex for bulk.
+ *    (Some cables, like the BAFO-100c, use the half duplex version.)
+ *  - For the full duplex model, the low bit of the version code says
+ *    which side is which ("left/right").
+ *  - For the half duplex type, a control/interrupt handshake settles
+ *    the transfer direction.  (That's disabled here, partially coded.)
+ *    A control URB would block until other side writes an interrupt.
  *
  *-------------------------------------------------------------------------*/
 
@@ -504,13 +538,6 @@ static int genelink_free (struct usbnet *dev)
 
 #endif
 
-// reset the device status
-static int genelink_reset (struct usbnet *dev)
-{
-	// we don't need to reset, just return 0
-	return 0;
-}
-
 static int genelink_rx_fixup (struct usbnet *dev, struct sk_buff *skb)
 {
 	struct gl_header	*header;
@@ -632,7 +659,6 @@ genelink_tx_fixup (struct usbnet *dev, struct sk_buff *skb, int flags)
 static const struct driver_info	genelink_info = {
 	.description =	"Genesys GeneLink",
 	.flags =	FLAG_FRAMING_GL | FLAG_NO_SETINT,
-	.reset =	genelink_reset,
 	.rx_fixup =	genelink_rx_fixup,
 	.tx_fixup =	genelink_tx_fixup,
 
@@ -662,24 +688,18 @@ static const struct driver_info	genelink_info = {
  *
  * One example is Intel's SA-1100 chip, which integrates basic USB
  * support (arch/arm/sa1100/usb-eth.c); it's used in the iPaq PDA.
+ * And others too, like the Yopy.
  *
  *-------------------------------------------------------------------------*/
 
-static int linuxdev_check_connect (struct usbnet *dev)
-{
-	return 0;		// by definition, always connected
-}
-
 static const struct driver_info	linuxdev_info = {
 	.description =	"Linux Device",
-	// no reset defined (yet?)
-	.check_connect =linuxdev_check_connect,
+
 	.in = 2, .out = 1,
-	.epsize =64,
+	.epsize = 64,
 };
 
 #endif	/* CONFIG_USB_LINUXDEV */
-
 
 
 #ifdef	CONFIG_USB_NET1080
@@ -2049,9 +2069,7 @@ static const struct usb_device_id	products [] = {
 {
 	USB_DEVICE (0x0547, 0x2720),	// AnchorChips defaults
 	.driver_info =	(unsigned long) &an2720_info,
-},
-
-{
+}, {
 	USB_DEVICE (0x0547, 0x2727),	// Xircom PGUNET
 	.driver_info =	(unsigned long) &an2720_info,
 },
@@ -2070,11 +2088,21 @@ static const struct usb_device_id	products [] = {
 },
 #endif
 
+#ifdef	CONFIG_USB_EPSON2888
+{
+	USB_DEVICE (0x0525, 0x2888),	// EPSON USB client
+	driver_info:	(unsigned long) &epson2888_info,
+},
+#endif
+
 #ifdef	CONFIG_USB_GENESYS
 {
 	USB_DEVICE (0x05e3, 0x0502),	// GL620USB-A
 	.driver_info =	(unsigned long) &genelink_info,
 },
+	/* NOT: USB_DEVICE (0x05e3, 0x0501),	// GL620USB
+	 * that's half duplex, not currently supported
+	 */
 #endif
 
 #ifdef	CONFIG_USB_LINUXDEV
@@ -2098,8 +2126,7 @@ static const struct usb_device_id	products [] = {
 {
 	USB_DEVICE (0x0525, 0x1080),	// NetChip ref design
 	.driver_info =	(unsigned long) &net1080_info,
-},
-{
+}, {
 	USB_DEVICE (0x06D0, 0x0622),	// Laplink Gold
 	.driver_info =	(unsigned long) &net1080_info,
 },

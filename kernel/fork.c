@@ -181,7 +181,6 @@ inside:
 		for_each_task(p) {
 			if (p->pid == last_pid	||
 			   p->pgrp == last_pid	||
-			   p->tgid == last_pid	||
 			   p->session == last_pid) {
 				if (++last_pid >= next_safe) {
 					if (last_pid >= pid_max)
@@ -194,8 +193,6 @@ inside:
 				next_safe = p->pid;
 			if (p->pgrp > last_pid && next_safe > p->pgrp)
 				next_safe = p->pgrp;
-			if (p->tgid > last_pid && next_safe > p->tgid)
-				next_safe = p->tgid;
 			if (p->session > last_pid && next_safe > p->session)
 				next_safe = p->session;
 		}
@@ -629,7 +626,10 @@ static inline int copy_sighand(unsigned long clone_flags, struct task_struct * t
 		return -1;
 	spin_lock_init(&sig->siglock);
 	atomic_set(&sig->count, 1);
-	memcpy(tsk->sig->action, current->sig->action, sizeof(tsk->sig->action));
+	sig->group_exit = 0;
+	sig->group_exit_code = 0;
+	init_completion(&sig->group_exit_done);
+	memcpy(sig->action, current->sig->action, sizeof(sig->action));
 	sig->curr_target = NULL;
 	init_sigpending(&sig->shared_pending);
 
@@ -853,6 +853,16 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 
 	if (clone_flags & CLONE_THREAD) {
 		spin_lock(&current->sig->siglock);
+		/*
+		 * Important: if an exit-all has been started then
+		 * do not create this new thread - the whole thread
+		 * group is supposed to exit anyway.
+		 */
+		if (current->sig->group_exit) {
+			spin_unlock(&current->sig->siglock);
+			write_unlock_irq(&tasklist_lock);
+			goto bad_fork_cleanup_namespace;
+		}
 		p->tgid = current->tgid;
 		list_add(&p->thread_group, &current->thread_group);
 		spin_unlock(&current->sig->siglock);

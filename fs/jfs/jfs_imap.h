@@ -59,7 +59,7 @@
 /*
  *	inode allocation group page (per 4096 inodes of an AG)
  */
-typedef struct {
+struct iag {
 	s64 agstart;		/* 8: starting block of ag              */
 	s32 iagnum;		/* 4: inode allocation group number     */
 	s32 inofreefwd;		/* 4: ag inode free list forward        */
@@ -87,22 +87,22 @@ typedef struct {
 	u32 wmap[EXTSPERIAG];	/* 512: working allocation map  */
 	u32 pmap[EXTSPERIAG];	/* 512: persistent allocation map */
 	pxd_t inoext[EXTSPERIAG];	/* 1024: inode extent addresses */
-} iag_t;			/* (4096) */
+};				/* (4096) */
 
 /*
  *	per AG control information (in inode map control page)
  */
-typedef struct {
+struct iagctl {
 	s32 inofree;		/* 4: free inode list anchor            */
 	s32 extfree;		/* 4: free extent list anchor           */
 	s32 numinos;		/* 4: number of backed inodes           */
 	s32 numfree;		/* 4: number of free inodes             */
-} iagctl_t;			/* (16) */
+};				/* (16) */
 
 /*
  *	per fileset/aggregate inode map control page
  */
-typedef struct {
+struct dinomap {
 	s32 in_freeiag;		/* 4: free iag list anchor     */
 	s32 in_nextiag;		/* 4: next free iag number     */
 	s32 in_numinos;		/* 4: num of backed inodes */
@@ -112,22 +112,22 @@ typedef struct {
 	s32 in_diskblock;	/* 4: for standalone test driver  */
 	s32 in_maxag;		/* 4: for standalone test driver  */
 	u8 pad[2016];		/* 2016: pad to 2048 */
-	iagctl_t in_agctl[MAXAG];	/* 2048: AG control information */
-} dinomap_t;			/* (4096) */
+	struct iagctl in_agctl[MAXAG];	/* 2048: AG control information */
+};				/* (4096) */
 
 
 /*
  *	In-core inode map control page
  */
-typedef struct inomap {
-	dinomap_t im_imap;	/* 4096: inode allocation control */
+struct inomap {
+	struct dinomap im_imap;		/* 4096: inode allocation control */
 	struct inode *im_ipimap;	/* 4: ptr to inode for imap   */
 	struct semaphore im_freelock;	/* 4: iag free list lock      */
 	struct semaphore im_aglock[MAXAG];	/* 512: per AG locks          */
 	u32 *im_DBGdimap;
 	atomic_t im_numinos;	/* num of backed inodes */
 	atomic_t im_numfree;	/* num of free backed inodes */
-} imap_t;
+};
 
 #define	im_freeiag	im_imap.in_freeiag
 #define	im_nextiag	im_imap.in_nextiag
@@ -145,7 +145,7 @@ extern int diAlloc(struct inode *, boolean_t, struct inode *);
 extern int diSync(struct inode *);
 /* external references */
 extern int diUpdatePMap(struct inode *ipimap, unsigned long inum,
-			boolean_t is_free, tblock_t * tblk);
+			boolean_t is_free, struct tblock * tblk);
 extern int diExtendFS(struct inode *ipimap, struct inode *ipbmap);
 extern int diMount(struct inode *);
 extern int diUnmount(struct inode *, int);

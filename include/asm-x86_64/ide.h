@@ -1,5 +1,5 @@
 /*
- *  linux/include/asm-i386/ide.h
+ *  linux/include/asm-x86_64/ide.h
  *
  *  Copyright (C) 1994-1996  Linus Torvalds & authors
  */
@@ -8,8 +8,8 @@
  *  This file contains the i386 architecture specific IDE code.
  */
 
-#ifndef __ASMi386_IDE_H
-#define __ASMi386_IDE_H
+#ifndef __ASMx86_64_IDE_H
+#define __ASMx86_64_IDE_H
 
 #ifdef __KERNEL__
 
@@ -79,4 +79,4 @@ static __inline__ void ide_init_default_hwifs(void)
 
 #endif /* __KERNEL__ */
 
-#endif /* __ASMi386_IDE_H */
+#endif /* __ASMx86_64_IDE_H */

@@ -30,9 +30,9 @@
 /*
  *	transaction block
  */
-typedef struct tblock {
+struct tblock {
 	/*
-	 * tblock_t and jbuf_t common area: struct logsyncblk
+	 * tblock and jbuf_t common area: struct logsyncblk
 	 *
 	 * the following 5 fields are the same as struct logsyncblk
 	 * which is common to tblock and jbuf to form logsynclist
@@ -44,28 +44,26 @@ typedef struct tblock {
 	struct list_head synclist;	/* logsynclist link */
 
 	/* lock management */
-	struct super_block *sb;	/* 4: super block */
-	lid_t next;		/* 2: index of first tlock of tid */
-	lid_t last;		/* 2: index of last tlock of tid */
-	wait_queue_head_t waitor;	/* 4: tids waiting on this tid */
+	struct super_block *sb;	/* super block */
+	lid_t next;		/* index of first tlock of tid */
+	lid_t last;		/* index of last tlock of tid */
+	wait_queue_head_t waitor;	/* tids waiting on this tid */
 
 	/* log management */
-	u32 logtid;		/* 4: log transaction id */
-				/* (32) */
+	u32 logtid;		/* log transaction id */
 
 	/* commit management */
-	struct tblock *cqnext;	/* 4: commit queue link */
-	s32 clsn;		/* 4: commit lsn */
-	struct lbuf *bp;	/* 4: */
-	s32 pn;			/* 4: commit record log page number */
-	s32 eor;		/* 4: commit record eor */
-	wait_queue_head_t gcwait;	/* 4: group commit event list:
-					 *    ready transactions wait on this
-					 *    event for group commit completion.
+	struct tblock *cqnext;	/* commit queue link */
+	s32 clsn;		/* commit lsn */
+	struct lbuf *bp;
+	s32 pn;			/* commit record log page number */
+	s32 eor;		/* commit record eor */
+	wait_queue_head_t gcwait;	/* group commit event list:
+					 * ready transactions wait on this
+					 * event for group commit completion.
 					 */
-	struct inode *ip;	/* 4: inode being created or deleted */
-	s32 rsrvd;		/* 4: */
-} tblock_t;			/* (64) */
+	struct inode *ip;	/* inode being created or deleted */
+};
 
 extern struct tblock *TxBlock;	/* transaction block table */
 
@@ -90,7 +88,7 @@ extern struct tblock *TxBlock;	/* transaction block table */
 /*
  *	transaction lock
  */
-typedef struct tlock {
+struct tlock {
 	lid_t next;		/* index next lockword on tid locklist
 				 *          next lockword on freelist
 				 */
@@ -104,7 +102,7 @@ typedef struct tlock {
 	/* (16) */
 
 	s16 lock[24];		/* 48: overlay area */
-} tlock_t;			/* (64) */
+};				/* (64) */
 
 extern struct tlock *TxLock;	/* transaction lock table */
 
@@ -153,18 +151,18 @@ extern struct tlock *TxLock;	/* transaction lock table */
 /*
  *	linelock for lmLog()
  *
- * note: linelock_t and its variations are overlaid
+ * note: linelock and its variations are overlaid
  * at tlock.lock: watch for alignment;
  */
-typedef struct {
+struct lv {
 	u8 offset;		/* 1: */
 	u8 length;		/* 1: */
-} lv_t;				/* (2) */
+};				/* (2) */
 
 #define	TLOCKSHORT	20
 #define	TLOCKLONG	28
 
-typedef struct {
+struct linelock {
 	u16 next;		/* 2: next linelock */
 
 	s8 maxcnt;		/* 1: */
@@ -175,13 +173,12 @@ typedef struct {
 	u8 l2linesize;		/* 1: log2 of linesize */
 	/* (8) */
 
-	lv_t lv[20];		/* 40: */
-} linelock_t;			/* (48) */
+	struct lv lv[20];	/* 40: */
+}; 				/* (48) */
 
-#define dtlock_t	linelock_t
-#define itlock_t	linelock_t
+#define dt_lock	linelock
 
-typedef struct {
+struct xtlock {
 	u16 next;		/* 2: */
 
 	s8 maxcnt;		/* 1: */
@@ -192,27 +189,27 @@ typedef struct {
 	u8 l2linesize;		/* 1: log2 of linesize */
 				/* (8) */
 
-	lv_t header;		/* 2: */
-	lv_t lwm;		/* 2: low water mark */
-	lv_t hwm;		/* 2: high water mark */
-	lv_t twm;		/* 2: */
+	struct lv header;	/* 2: */
+	struct lv lwm;		/* 2: low water mark */
+	struct lv hwm;		/* 2: high water mark */
+	struct lv twm;		/* 2: */
 				/* (16) */
 
 	s32 pxdlock[8];		/* 32: */
-} xtlock_t;			/* (48) */
+};				/* (48) */
 
 
 /*
  *	maplock for txUpdateMap()
  *
- * note: maplock_t and its variations are overlaid
+ * note: maplock and its variations are overlaid
  * at tlock.lock/linelock: watch for alignment;
  * N.B. next field may be set by linelock, and should not
  * be modified by maplock;
  * N.B. index of the first pxdlock specifies index of next 
  * free maplock (i.e., number of maplock) in the tlock; 
  */
-typedef struct {
+struct maplock {
 	u16 next;		/* 2: */
 
 	u8 maxcnt;		/* 2: */
@@ -224,7 +221,7 @@ typedef struct {
 				/* (8) */
 
 	pxd_t pxd;		/* 8: */
-} maplock_t;			/* (16): */
+};				/* (16): */
 
 /* maplock flag */
 #define	mlckALLOC		0x00f0
@@ -238,9 +235,9 @@ typedef struct {
 #define	mlckFREEXAD		0x0002
 #define	mlckFREEPXD		0x0001
 
-#define	pxdlock_t	maplock_t
+#define	pxd_lock	maplock
 
-typedef struct {
+struct xdlistlock {
 	u16 next;		/* 2: */
 
 	u8 maxcnt;		/* 2: */
@@ -252,14 +249,14 @@ typedef struct {
 				/* (8) */
 
 	/*
-	 * We need xdlistlock_t to be 64 bits (8 bytes), regardless of
+	 * We need xdlist to be 64 bits (8 bytes), regardless of
 	 * whether void * is 32 or 64 bits
 	 */
 	union {
 		void *_xdlist;	/* pxd/xad list */
 		s64 pad;	/* 8: Force 64-bit xdlist size */
 	} union64;
-} xdlistlock_t;			/* (16): */
+};				/* (16): */
 
 #define xdlist union64._xdlist
 
@@ -268,26 +265,26 @@ typedef struct {
  *
  * parameter to the commit manager routines
  */
-typedef struct commit {
-	tid_t tid;		/* 4: tid = index of tblock */
-	int flag;		/* 4: flags */
-	log_t *log;		/* 4: log */
-	struct super_block *sb;	/* 4: superblock */
+struct commit {
+	tid_t tid;		/* tid = index of tblock */
+	int flag;		/* flags */
+	struct jfs_log *log;	/* log */
+	struct super_block *sb;	/* superblock */
 
-	int nip;		/* 4: number of entries in iplist */
-	struct inode **iplist;	/* 4: list of pointers to inodes */
-				/* (32) */
+	int nip;		/* number of entries in iplist */
+	struct inode **iplist;	/* list of pointers to inodes */
 
 	/* log record descriptor on 64-bit boundary */
-	lrd_t lrd;		/* : log record descriptor */
-} commit_t;
+	struct lrd lrd;		/* : log record descriptor */
+};
 
 /*
  * external declarations
  */
-extern tlock_t *txLock(tid_t tid, struct inode *ip, struct metapage *mp, int flag);
+extern struct tlock *txLock(tid_t tid, struct inode *ip, struct metapage *mp,
+			    int flag);
 
-extern tlock_t *txMaplock(tid_t tid, struct inode *ip, int flag);
+extern struct tlock *txMaplock(tid_t tid, struct inode *ip, int flag);
 
 extern int txCommit(tid_t tid, int nip, struct inode **iplist, int flag);
 
@@ -299,16 +296,17 @@ extern void txEnd(tid_t tid);
 
 extern void txAbort(tid_t tid, int dirty);
 
-extern linelock_t *txLinelock(linelock_t * tlock);
+extern struct linelock *txLinelock(struct linelock * tlock);
 
-extern void txFreeMap(struct inode *ip,
-		      maplock_t * maplock, tblock_t * tblk, int maptype);
+extern void txFreeMap(struct inode *ip, struct maplock * maplock,
+		      struct tblock * tblk, int maptype);
 
 extern void txEA(tid_t tid, struct inode *ip, dxd_t * oldea, dxd_t * newea);
 
 extern void txFreelock(struct inode *ip);
 
-extern int lmLog(log_t * log, tblock_t * tblk, lrd_t * lrd, tlock_t * tlck);
+extern int lmLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
+		 struct tlock * tlck);
 
 extern void txQuiesce(struct super_block *sb);
 
