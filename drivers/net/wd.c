@@ -281,7 +281,7 @@ static int __init wd_probe1(struct net_device *dev, int ioaddr)
 	ei_status.rx_start_page = WD_START_PG + TX_PAGES;
 
 	/* Don't map in the shared memory until the board is actually opened. */
-	dev->rmem_start = dev->mem_start + TX_PAGES*256;
+	ei_status.rmem_start = dev->mem_start + TX_PAGES*256;
 
 	/* Some cards (eg WD8003EBT) can be jumpered for more (32k!) memory. */
 	if (dev->mem_end != 0) {
@@ -290,7 +290,7 @@ static int __init wd_probe1(struct net_device *dev, int ioaddr)
 		ei_status.stop_page = word16 ? WD13_STOP_PG : WD03_STOP_PG;
 		dev->mem_end = dev->mem_start + (ei_status.stop_page - WD_START_PG)*256;
 	}
-	dev->rmem_end = dev->mem_end;
+	ei_status.rmem_end = dev->mem_end;
 
 	printk(" %s, IRQ %d, shared memory at %#lx-%#lx.\n",
 		   model_name, dev->irq, dev->mem_start, dev->mem_end-1);
@@ -384,12 +384,12 @@ wd_block_input(struct net_device *dev, int count, struct sk_buff *skb, int ring_
 	int wd_cmdreg = dev->base_addr - WD_NIC_OFFSET; /* WD_CMDREG */
 	unsigned long xfer_start = dev->mem_start + ring_offset - (WD_START_PG<<8);
 
-	if (xfer_start + count > dev->rmem_end) {
+	if (xfer_start + count > ei_status.rmem_end) {
 		/* We must wrap the input move. */
-		int semi_count = dev->rmem_end - xfer_start;
+		int semi_count = ei_status.rmem_end - xfer_start;
 		isa_memcpy_fromio(skb->data, xfer_start, semi_count);
 		count -= semi_count;
-		isa_memcpy_fromio(skb->data + semi_count, dev->rmem_start, count);
+		isa_memcpy_fromio(skb->data + semi_count, ei_status.rmem_start, count);
 	} else {
 		/* Packet is in one chunk -- we can copy + cksum. */
 		isa_eth_io_copy_and_sum(skb, xfer_start, count, 0);

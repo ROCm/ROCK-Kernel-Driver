@@ -51,8 +51,6 @@ extern int ei_open(struct net_device *dev);
 extern int ei_close(struct net_device *dev);
 extern void ei_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 
-/* Most of these entries should be in 'struct net_device' (or most of the
-   things in there should be here!) */
 /* You have one of these per-board */
 struct ei_device {
 	const char *name;
@@ -60,6 +58,8 @@ struct ei_device {
 	void (*get_8390_hdr)(struct net_device *, struct e8390_pkt_hdr *, int);
 	void (*block_output)(struct net_device *, int, const unsigned char *, int);
 	void (*block_input)(struct net_device *, int, struct sk_buff *, int);
+	unsigned long rmem_start;
+	unsigned long rmem_end;
 	unsigned char mcfilter[8];
 	unsigned open:1;
 	unsigned word16:1;  		/* We have the 16-bit (vs 8-bit) version of the card. */

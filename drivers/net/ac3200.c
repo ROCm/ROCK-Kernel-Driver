@@ -226,8 +226,8 @@ static int __init ac_probe1(int ioaddr, struct net_device *dev)
 				AC_STOP_PG/4, dev->mem_start);
 	}
 
-	dev->rmem_start = dev->mem_start + TX_PAGES*256;
-	dev->mem_end = dev->rmem_end = dev->mem_start
+	ei_status.rmem_start = dev->mem_start + TX_PAGES*256;
+	dev->mem_end = ei_status.rmem_end = dev->mem_start
 		+ (AC_STOP_PG - AC_START_PG)*256;
 
 	ei_status.name = "AC3200";
@@ -302,12 +302,12 @@ static void ac_block_input(struct net_device *dev, int count, struct sk_buff *sk
 {
 	unsigned long xfer_start = dev->mem_start + ring_offset - (AC_START_PG<<8);
 
-	if (xfer_start + count > dev->rmem_end) {
+	if (xfer_start + count > ei_status.rmem_end) {
 		/* We must wrap the input move. */
-		int semi_count = dev->rmem_end - xfer_start;
+		int semi_count = ei_status.rmem_end - xfer_start;
 		isa_memcpy_fromio(skb->data, xfer_start, semi_count);
 		count -= semi_count;
-		isa_memcpy_fromio(skb->data + semi_count, dev->rmem_start, count);
+		isa_memcpy_fromio(skb->data + semi_count, ei_status.rmem_start, count);
 	} else {
 		/* Packet is in one chunk -- we can copy + cksum. */
 		isa_eth_io_copy_and_sum(skb, xfer_start, count, 0);

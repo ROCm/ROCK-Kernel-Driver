@@ -234,8 +234,8 @@ static int __init e21_probe1(struct net_device *dev, int ioaddr)
 #ifdef notdef
 	/* These values are unused.  The E2100 has a 2K window into the packet
 	   buffer.  The window can be set to start on any page boundary. */
-	dev->rmem_start = dev->mem_start + TX_PAGES*256;
-	dev->mem_end = dev->rmem_end = dev->mem_start + 2*1024;
+	ei_status.rmem_start = dev->mem_start + TX_PAGES*256;
+	dev->mem_end = ei_status.rmem_end = dev->mem_start + 2*1024;
 #endif
 
 	printk(", IRQ %d, %s media, memory @ %#lx.\n", dev->irq,
