@@ -596,9 +596,15 @@ static int init(void * unused)
 	do_pre_smp_initcalls();
 
 	smp_init();
+
+	/*
+	 * Do this before initcalls, because some drivers want to access
+	 * firmware files.
+	 */
+	populate_rootfs();
+
 	do_basic_setup();
 
-	populate_rootfs();
 	/*
 	 * check if there is an early userspace init.  If yes, let it do all
 	 * the work
