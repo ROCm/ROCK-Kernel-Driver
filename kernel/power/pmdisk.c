@@ -93,7 +93,7 @@ static const char name_resume[] = "Resume Machine: ";
  * Saving part...
  */
 
-static __inline__ int fill_suspend_header(struct suspend_header *sh)
+static void fill_suspend_header(struct suspend_header *sh)
 {
 	memset((char *)sh, 0, sizeof(*sh));
 
@@ -111,8 +111,8 @@ static __inline__ int fill_suspend_header(struct suspend_header *sh)
 	 * [so they haven't been mounted since last suspend.
 	 * Maybe it isn't.] [we'd need to do this for _all_ fs-es]
 	 */
-	return 0;
 }
+
 
 /* We memorize in swapfile_used what swap devices are used for suspension */
 #define SWAPFILE_UNUSED    0
@@ -126,23 +126,25 @@ static int mark_swapfiles(swp_entry_t prev)
 {
 	swp_entry_t entry;
 	union diskpage *cur;
-	struct page *page;
+	int error;
+
+	printk( "S" );
 
 	if (root_swap == 0xFFFF)  /* ignored */
 		return -EINVAL;
 
-	page = alloc_page(GFP_ATOMIC);
-	if (!page)
+	cur = (union diskpage *)get_zeroed_page(GFP_ATOMIC);
+	if (!cur)
 		return -ENOMEM;
-	cur = page_address(page);
+
 	/* XXX: this is dirty hack to get first page of swap file */
 	entry = swp_entry(root_swap, 0);
-	rw_swap_page_sync(READ, entry, page);
+	rw_swap_page_sync(READ, entry, virt_to_page((unsigned long)cur));
 
 	if ((!memcmp("SWAP-SPACE",cur->swh.magic.magic,10)))
-		memcpy(cur->swh.magic.magic,"S1SUSP....",10);
+		memcpy(cur->swh.magic.magic,"P1DISK....",10);
 	else if ((!memcmp("SWAPSPACE2",cur->swh.magic.magic,10)))
-		memcpy(cur->swh.magic.magic,"S2SUSP....",10);
+		memcpy(cur->swh.magic.magic,"P2DISK....",10);
 	else {
 		pr_debug("pmdisk: Partition is not swap space.\n");
 		return -ENODEV;
@@ -153,9 +155,10 @@ static int mark_swapfiles(swp_entry_t prev)
 
 	/* link.next lies *no more* in last 4/8 bytes of magic */
 
-	rw_swap_page_sync(WRITE, entry, page);
-	__free_page(page);
-	return 0;
+	error = rw_swap_page_sync(WRITE, entry, 
+				  virt_to_page((unsigned long)cur));
+	free_page((unsigned long)cur);
+	return error;
 }
 
 static void read_swapfiles(void) /* This is called before saving image */
@@ -207,220 +210,460 @@ static void lock_swapdevices(void)
 	swap_list_unlock();
 }
 
-static int write_suspend_image(void)
+
+
+/**
+ *	write_swap_page - Write one page to a fresh swap location.
+ *	@addr:	Address we're writing.
+ *	@loc:	Place to store the entry we used.
+ *
+ *	Allocate a new swap entry and 'sync' it. Note we discard -EIO
+ *	errors. That is an artifact left over from swsusp. It did not 
+ *	check the return of rw_swap_page_sync() at all, since most pages
+ *	written back to swap would return -EIO.
+ *	This is a partial improvement, since we will at least return other
+ *	errors, though we need to eventually fix the damn code.
+ */
+
+static int write_swap_page(unsigned long addr, swp_entry_t * loc)
 {
+	swp_entry_t entry;
+	int error = 0;
+
+	entry = get_swap_page();
+	if (swp_offset(entry) && 
+	    swapfile_used[swp_type(entry)] == SWAPFILE_SUSPEND) {
+		error = rw_swap_page_sync(WRITE, entry,
+					  virt_to_page(addr));
+		if (error == -EIO)
+			error = 0;
+		if (!error)
+			*loc = entry;
+	} else
+		error = -ENOSPC;
+	return error;
+}
+
+
+/**
+ *	free_data - Free the swap entries used by the saved image.
+ *
+ *	Walk the list of used swap entries and free each one. 
+ */
+
+static void free_data(void)
+{
+	swp_entry_t entry;
 	int i;
-	swp_entry_t entry, prev = { 0 };
-	int nr_pgdir_pages = SUSPEND_PD_PAGES(pmdisk_pages);
-	union diskpage *cur,  *buffer = (union diskpage *)get_zeroed_page(GFP_ATOMIC);
-	unsigned long address;
-	struct page *page;
+
+	for (i = 0; i < pmdisk_pages; i++) {
+		entry = (pm_pagedir_nosave + i)->swap_address;
+		if (entry.val)
+			swap_free(entry);
+		else
+			break;
+		(pm_pagedir_nosave + i)->swap_address = (swp_entry_t){0};
+	}
+}
+
+
+/**
+ *	write_data - Write saved image to swap.
+ *
+ *	Walk the list of pages in the image and sync each one to swap.
+ */
+
+static int write_data(void)
+{
+	int error = 0;
+	int i;
 
 	printk( "Writing data to swap (%d pages): ", pmdisk_pages );
-	for (i=0; i<pmdisk_pages; i++) {
+	for (i = 0; i < pmdisk_pages && !error; i++) {
 		if (!(i%100))
 			printk( "." );
-		if (!(entry = get_swap_page()).val)
-			panic("\nNot enough swapspace when writing data" );
-		
-		if (swapfile_used[swp_type(entry)] != SWAPFILE_SUSPEND)
-			panic("\nPage %d: not enough swapspace on suspend device", i );
-	    
-		address = (pm_pagedir_nosave+i)->address;
-		page = virt_to_page(address);
-		rw_swap_page_sync(WRITE, entry, page);
-		(pm_pagedir_nosave+i)->swap_address = entry;
+		error = write_swap_page((pm_pagedir_nosave+i)->address,
+					&((pm_pagedir_nosave+i)->swap_address));
 	}
 	printk( "|\n" );
+	return error;
+}
+
+
+/**
+ *	free_pagedir - Free pages used by the page directory.
+ */
+
+static void free_pagedir_entries(void)
+{
+	int num = SUSPEND_PD_PAGES(pmdisk_pages);
+	union diskpage * cur;
+	swp_entry_t entry;
+	int i;
+
+	for (i = 0; i < num; i++) {
+		cur = (union diskpage *)((char *) pm_pagedir_nosave)+i;
+		entry = cur->link.next;
+		if (entry.val)
+			swap_free(entry);
+	}
+}
+
+
+/**
+ *	write_pagedir - Write the array of pages holding the page directory.
+ *	@last:	Last swap entry we write (needed for header).
+ */
+
+static int write_pagedir(swp_entry_t * last)
+{
+	int nr_pgdir_pages = SUSPEND_PD_PAGES(pmdisk_pages);
+	union diskpage *cur;
+	swp_entry_t prev = {0};
+	int error = 0;
+	int i;
+
 	printk( "Writing pagedir (%d pages): ", nr_pgdir_pages);
-	for (i=0; i<nr_pgdir_pages; i++) {
+	for (i = 0; i < nr_pgdir_pages && !error; i++) {
 		cur = (union diskpage *)((char *) pm_pagedir_nosave)+i;
 		BUG_ON ((char *) cur != (((char *) pm_pagedir_nosave) + i*PAGE_SIZE));
 		printk( "." );
-		if (!(entry = get_swap_page()).val) {
-			printk(KERN_CRIT "Not enough swapspace when writing pgdir\n" );
-			panic("Don't know how to recover");
-			free_page((unsigned long) buffer);
-			return -ENOSPC;
-		}
 
-		if(swapfile_used[swp_type(entry)] != SWAPFILE_SUSPEND)
-			panic("\nNot enough swapspace for pagedir on suspend device" );
-
-		BUG_ON (sizeof(swp_entry_t) != sizeof(long));
-		BUG_ON (PAGE_SIZE % sizeof(struct pbe));
-
-		cur->link.next = prev;				
-		page = virt_to_page((unsigned long)cur);
-		rw_swap_page_sync(WRITE, entry, page);
-		prev = entry;
+		cur->link.next = prev;
+		error = write_swap_page((unsigned long)cur,&prev);
 	}
+	*last = prev;
+	return error;
+}
+
+
+/**
+ *	write_header - Fill and write the suspend header.
+ *	@entry:	Location of the last swap entry used.
+ *
+ *	Allocate a page, fill header, write header. 
+ *
+ *	@entry is the location of the last pagedir entry written on 
+ *	entrance. On exit, it contains the location of the header. 
+ */
+
+static int write_header(swp_entry_t * entry)
+{
+	union diskpage * buffer;
+	int error;
+
+	buffer = (union diskpage *)get_zeroed_page(GFP_ATOMIC);
+	if (!buffer)
+		return -ENOMEM;
+
 	printk("H");
-	BUG_ON (sizeof(struct suspend_header) > PAGE_SIZE-sizeof(swp_entry_t));
-	BUG_ON (sizeof(union diskpage) != PAGE_SIZE);
-	if (!(entry = get_swap_page()).val)
-		panic( "\nNot enough swapspace when writing header" );
-	if (swapfile_used[swp_type(entry)] != SWAPFILE_SUSPEND)
-		panic("\nNot enough swapspace for header on suspend device" );
-
-	cur = (void *) buffer;
-	if (fill_suspend_header(&cur->sh))
-		panic("\nOut of memory while writing header");
-		
-	cur->link.next = prev;
-
-	page = virt_to_page((unsigned long)cur);
-	rw_swap_page_sync(WRITE, entry, page);
-	prev = entry;
-
-	printk( "S" );
-	mark_swapfiles(prev);
-	printk( "|\n" );
-
+	fill_suspend_header(&buffer->sh);
+	buffer->link.next = *entry;
+	error = write_swap_page((unsigned long)buffer,entry);
 	free_page((unsigned long) buffer);
+	return error;
+}
+
+
+/**
+ *	write_suspend_image - Write entire image and metadata.
+ *
+ */
+
+static int write_suspend_image(void)
+{
+	int error;
+	swp_entry_t prev = { 0 };
+
+	if ((error = write_data()))
+		goto FreeData;
+
+	if ((error = write_pagedir(&prev)))
+		goto FreePagedir;
+
+	if ((error = write_header(&prev)))
+		goto FreePagedir;
+
+	error = mark_swapfiles(prev);
+	printk( "|\n" );
+ Done:
+	return error;
+ FreePagedir:
+	free_pagedir_entries();
+ FreeData:
+	free_data();
+	goto Done;
+}
+
+
+
+/**
+ *	saveable - Determine whether a page should be cloned or not.
+ *	@pfn:	The page
+ *
+ *	We save a page if it's Reserved, and not in the range of pages
+ *	statically defined as 'unsaveable', or if it isn't reserved, and
+ *	isn't part of a free chunk of pages.
+ *	If it is part of a free chunk, we update @pfn to point to the last 
+ *	page of the chunk.
+ */
+
+static int saveable(unsigned long * pfn)
+{
+	struct page * page = pfn_to_page(*pfn);
+
+	if (PageNosave(page))
+		return 0;
+
+	if (!PageReserved(page)) {
+		int chunk_size;
+
+		if ((chunk_size = is_head_of_free_region(page))) {
+			*pfn += chunk_size - 1;
+			return 0;
+		}
+	} else if (PageReserved(page)) {
+		/* Just copy whole code segment. 
+		 * Hopefully it is not that big.
+		 */
+		if ((ADDRESS(*pfn) >= (unsigned long) ADDRESS2(&__nosave_begin)) && 
+		    (ADDRESS(*pfn) <  (unsigned long) ADDRESS2(&__nosave_end))) {
+			pr_debug("[nosave %lx]\n", ADDRESS(*pfn));
+			return 0;
+		}
+		/* Hmm, perhaps copying all reserved pages is not 
+		 * too healthy as they may contain 
+		 * critical bios data? 
+		 */
+	}
+	return 1;
+}
+
+
+
+/**
+ *	count_pages - Determine size of page directory.
+ *	
+ *	Iterate over all the pages in the system and tally the number
+ *	we need to clone.
+ */
+
+static void count_pages(void)
+{
+	unsigned long pfn;
+	int n = 0;
+	
+	for (pfn = 0; pfn < max_pfn; pfn++) {
+		if (saveable(&pfn))
+			n++;
+	}
+	pmdisk_pages = n;
+}
+
+
+/**
+ *	copy_pages - Atmoically snapshot memory.
+ *
+ *	Iterate over all the pages in the system and copy each one 
+ *	into its corresponding location in the pagedir.
+ *	We rely on the fact that the number of pages that we're snap-
+ *	shotting hasn't changed since we counted them. 
+ */
+
+static void copy_pages(void)
+{
+	struct pbe * p = pagedir_save;
+	unsigned long pfn;
+	int n = 0;
+
+	for (pfn = 0; pfn < max_pfn; pfn++) {
+		if (saveable(&pfn)) {
+			n++;
+			p->orig_address = ADDRESS(pfn);
+			copy_page((void *) p->address, 
+				  (void *) p->orig_address);
+			p++;
+		}
+	}
+	BUG_ON(n != pmdisk_pages);
+}
+
+
+/**
+ *	free_image_pages - Free each page allocated for snapshot.
+ */
+
+static void free_image_pages(void)
+{
+	struct pbe * p;
+	int i, n;
+
+	n = 1 << pagedir_order;
+	for (i = 0, p = pagedir_save; i < n; i++, p++) {
+		ClearPageNosave(virt_to_page(p->address));
+		free_page(p->address);
+	}
+}
+
+
+/**
+ *	free_pagedir - Free the page directory.
+ */
+
+static void free_pagedir(void)
+{
+	free_image_pages();
+	free_pages((unsigned long)pagedir_save, pagedir_order);
+}
+
+
+/**
+ *	alloc_pagedir - Allocate the page directory.
+ *
+ *	First, determine exactly how many contiguous pages we need, 
+ *	allocate them, then mark each 'unsavable'.
+ */
+
+static int alloc_pagedir(void)
+{
+	struct page *page;
+	int i, n;
+
+	pagedir_order = get_bitmask_order(SUSPEND_PD_PAGES(pmdisk_pages));
+	n = 1 << pagedir_order;
+
+	pagedir_save = (suspend_pagedir_t *)__get_free_pages(GFP_ATOMIC, 
+							     pagedir_order);
+	if(!pagedir_save)
+		return -ENOMEM;
+	memset(pagedir_save,0,n * PAGE_SIZE);
+	for(i = 0, page = virt_to_page(pagedir_save); i < n; i++, page++)
+		SetPageNosave(page);
+	pm_pagedir_nosave = pagedir_save;
 	return 0;
 }
 
-/* if pagedir_p != NULL it also copies the counted pages */
-static int count_and_copy_data_pages(struct pbe *pagedir_p)
+
+/**
+ *	alloc_image_pages - Allocate pages for the snapshot.
+ *
+ */
+
+static int alloc_image_pages(void)
 {
-	int chunk_size;
-	int nr_copy_pages = 0;
-	int pfn;
-	struct page *page;
-	
-	BUG_ON (max_pfn != num_physpages);
-
-	for (pfn = 0; pfn < max_pfn; pfn++) {
-		page = pfn_to_page(pfn);
-
-		if (!PageReserved(page)) {
-			if (PageNosave(page))
-				continue;
-
-			if ((chunk_size=is_head_of_free_region(page))!=0) {
-				pfn += chunk_size - 1;
-				continue;
-			}
-		} else if (PageReserved(page)) {
-			BUG_ON (PageNosave(page));
-
-			/*
-			 * Just copy whole code segment. Hopefully it is not that big.
-			 */
-			if ((ADDRESS(pfn) >= (unsigned long) ADDRESS2(&__nosave_begin)) && 
-			    (ADDRESS(pfn) <  (unsigned long) ADDRESS2(&__nosave_end))) {
-				pr_debug("[nosave %lx]", ADDRESS(pfn));
-				continue;
-			}
-			/* Hmm, perhaps copying all reserved pages is not too healthy as they may contain 
-			   critical bios data? */
-		} else	BUG();
-
-		nr_copy_pages++;
-		if (pagedir_p) {
-			pagedir_p->orig_address = ADDRESS(pfn);
-			copy_page((void *) pagedir_p->address, (void *) pagedir_p->orig_address);
-			pagedir_p++;
-		}
-	}
-	return nr_copy_pages;
-}
-
-static void free_suspend_pagedir(unsigned long this_pagedir)
-{
-	struct page *page;
-	int pfn;
-	unsigned long this_pagedir_end = this_pagedir +
-		(PAGE_SIZE << pagedir_order);
-
-	for(pfn = 0; pfn < num_physpages; pfn++) {
-		page = pfn_to_page(pfn);
-		if (!TestClearPageNosave(page))
-			continue;
-
-		if (ADDRESS(pfn) >= this_pagedir && ADDRESS(pfn) < this_pagedir_end)
-			continue; /* old pagedir gets freed in one */
-		
-		free_page(ADDRESS(pfn));
-	}
-	free_pages(this_pagedir, pagedir_order);
-}
-
-static suspend_pagedir_t *create_suspend_pagedir(int nr_copy_pages)
-{
+	struct pbe * p;
 	int i;
-	suspend_pagedir_t *pagedir;
-	struct pbe *p;
-	struct page *page;
 
-	pagedir_order = get_bitmask_order(SUSPEND_PD_PAGES(nr_copy_pages));
-
-	p = pagedir = (suspend_pagedir_t *)__get_free_pages(GFP_ATOMIC | __GFP_COLD, pagedir_order);
-	if(!pagedir)
-		return NULL;
-
-	page = virt_to_page(pagedir);
-	for(i=0; i < 1<<pagedir_order; i++)
-		SetPageNosave(page++);
-		
-	while(nr_copy_pages--) {
-		p->address = get_zeroed_page(GFP_ATOMIC | __GFP_COLD);
-		if(!p->address) {
-			free_suspend_pagedir((unsigned long) pagedir);
-			return NULL;
-		}
+	for (i = 0, p = pagedir_save; i < pmdisk_pages; i++, p++) {
+		p->address = get_zeroed_page(GFP_ATOMIC);
+		if(!p->address)
+			goto Error;
 		SetPageNosave(virt_to_page(p->address));
-		p->orig_address = 0;
-		p++;
 	}
-	return pagedir;
+	return 0;
+ Error:
+	do { 
+		if (p->address)
+			free_page(p->address);
+		p->address = 0;
+	} while (p-- > pagedir_save);
+	return -ENOMEM;
 }
 
+
+/**
+ *	enough_free_mem - Make sure we enough free memory to snapshot.
+ *
+ *	Returns TRUE or FALSE after checking the number of available 
+ *	free pages.
+ */
+
+static int enough_free_mem(void)
+{
+	if(nr_free_pages() < (pmdisk_pages + PAGES_FOR_IO)) {
+		pr_debug("pmdisk: Not enough free pages: Have %d\n",
+			 nr_free_pages());
+		return 0;
+	}
+	return 1;
+}
+
+
+/**
+ *	enough_swap - Make sure we have enough swap to save the image.
+ *
+ *	Returns TRUE or FALSE after checking the total amount of swap 
+ *	space avaiable.
+ *
+ *	FIXME: si_swapinfo(&i) returns all swap devices information.
+ *	We should only consider resume_device. 
+ */
+
+static int enough_swap(void)
+{
+	struct sysinfo i;
+
+	si_swapinfo(&i);
+	if (i.freeswap < (pmdisk_pages + PAGES_FOR_IO))  {
+		pr_debug("pmdisk: Not enough swap. Need %d\n",i.freeswap);
+		return 0;
+	}
+	return 1;
+}
+
+
+/**
+ *	pmdisk_suspend - Atomically snapshot the system.
+ *
+ *	This must be called with interrupts disabled, to prevent the 
+ *	system changing at all from underneath us. 
+ *
+ *	To do this, we count the number of pages in the system that we 
+ *	need to save; make sure	we have enough memory and swap to clone
+ *	the pages and save them in swap, allocate the space to hold them,
+ *	and then snapshot them all.
+ */
 
 int pmdisk_suspend(void)
 {
-	struct sysinfo i;
-	unsigned int nr_needed_pages = 0;
+	int error = 0;
 
 	read_swapfiles();
 	drain_local_pages();
 
 	pm_pagedir_nosave = NULL;
-	pr_debug("pmdisk: /critical section: Counting pages to copy.\n" );
-	pmdisk_pages = count_and_copy_data_pages(NULL);
-	nr_needed_pages = pmdisk_pages + PAGES_FOR_IO;
+	pr_debug("pmdisk: Counting pages to copy.\n" );
+	count_pages();
 	
-	pr_debug("pmdisk: (pages needed: %d+%d=%d free: %d)\n",
-		 pmdisk_pages,PAGES_FOR_IO,nr_needed_pages,nr_free_pages());
-	if(nr_free_pages() < nr_needed_pages) {
-		pr_debug("pmdisk: Not enough free pages: Need %d, Have %d\n",
-			 nr_needed_pages,nr_free_pages());
-		root_swap = 0xFFFF;
+	pr_debug("pmdisk: (pages needed: %d + %d free: %d)\n",
+		 pmdisk_pages,PAGES_FOR_IO,nr_free_pages());
+
+	if (!enough_free_mem())
 		return -ENOMEM;
-	}
-	si_swapinfo(&i);	/* FIXME: si_swapinfo(&i) returns all swap devices information.
-				   We should only consider resume_device. */
-	if (i.freeswap < nr_needed_pages)  {
-		pr_debug("pmdisk: Not enough swap space. Need %d, Have %d\n",
-		       nr_needed_pages,i.freeswap);
+
+	if (!enough_swap())
 		return -ENOSPC;
+
+	if ((error = alloc_pagedir())) {
+		pr_debug("pmdisk: Allocating pagedir failed.\n");
+		return error;
+	}
+	if ((error = alloc_image_pages())) {
+		pr_debug("pmdisk: Allocating image pages failed.\n");
+		free_pagedir();
+		return error;
 	}
 
-	pr_debug( "Alloc pagedir\n" ); 
-	pagedir_save = pm_pagedir_nosave = create_suspend_pagedir(pmdisk_pages);
-	if(!pm_pagedir_nosave) {
-		/* Shouldn't happen */
-		pr_debug("pmdisk: Couldn't allocate pagedir\n");
-		panic("pmdisk: Couldn't allocate pagedir\n");
-		return -ENOMEM;
-	}
 	nr_copy_pages_check = pmdisk_pages;
 	pagedir_order_check = pagedir_order;
 
-	drain_local_pages();	/* During allocating of suspend pagedir, new cold pages may appear. Kill them */
-	if (pmdisk_pages != count_and_copy_data_pages(pm_pagedir_nosave))	/* copy */
-		BUG();
+	/* During allocating of suspend pagedir, new cold pages may appear. 
+	 * Kill them 
+	 */
+	drain_local_pages();
+
+	/* copy */
+	copy_pages();
 
 	/*
 	 * End of critical section. From now on, we can write to memory,
@@ -428,8 +671,7 @@ int pmdisk_suspend(void)
 	 * touch swap space! Except we must write out our image of course.
 	 */
 
-	pr_debug("pmdisk: critical section/: done (%d pages copied)\n", 
-		 pmdisk_pages );
+	pr_debug("pmdisk: %d pages copied\n", pmdisk_pages );
 	return 0;
 }
 
@@ -728,9 +970,9 @@ static int __init read_suspend_image(void)
 	 */
 	next = next_entry(cur);
 
-	if (!memcmp("S1",cur->swh.magic.magic,2))
+	if (!memcmp("P1",cur->swh.magic.magic,2))
 		memcpy(cur->swh.magic.magic,"SWAP-SPACE",10);
-	else if (!memcmp("S2",cur->swh.magic.magic,2))
+	else if (!memcmp("P2",cur->swh.magic.magic,2))
 		memcpy(cur->swh.magic.magic,"SWAPSPACE2",10);
 	else if ((!memcmp("SWAP-SPACE",cur->swh.magic.magic,10)) ||
 		 (!memcmp("SWAPSPACE2",cur->swh.magic.magic,10))) {
@@ -896,7 +1138,7 @@ int __init pmdisk_restore(void)
 int pmdisk_free(void)
 {
 	pr_debug( "Freeing prev allocated pagedir\n" );
-	free_suspend_pagedir((unsigned long) pagedir_save);
+	free_pagedir();
 	return 0;
 }
 
