@@ -131,6 +131,7 @@ if [ "$CONFIG_6xx" = "y" -a "$CONFIG_8260" = "n" ]; then
 	 Motorola-Sandpoint	CONFIG_SANDPOINT	\
 	 SBS-Adirondack		CONFIG_ADIR		\
 	 SBS-K2			CONFIG_K2		\
+	 SBS-Palomar4		CONFIG_PAL4		\
 	 Synergy-Gemini		CONFIG_GEMINI		\
 	 Zynx-ZX4500		CONFIG_ZX4500"		CHRP/PowerMac/PReP
 
