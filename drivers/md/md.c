@@ -311,8 +311,8 @@ static unsigned int calc_dev_size(struct block_device *bdev, mddev_t *mddev)
 		size = calc_dev_sboffset(bdev);
 	else
 		size = bdev->bd_inode->i_size >> BLOCK_SIZE_BITS;
-	if (mddev->sb->chunk_size)
-		size &= ~(mddev->sb->chunk_size/1024 - 1);
+	if (mddev->chunk_size)
+		size &= ~(mddev->chunk_size/1024 - 1);
 	return size;
 }
 
@@ -322,14 +322,10 @@ static unsigned int zoned_raid_size(mddev_t *mddev)
 	mdk_rdev_t * rdev;
 	struct list_head *tmp;
 
-	if (!mddev->sb) {
-		MD_BUG();
-		return -EINVAL;
-	}
 	/*
 	 * do size and offset calculations.
 	 */
-	mask = ~(mddev->sb->chunk_size/1024 - 1);
+	mask = ~(mddev->chunk_size/1024 - 1);
 
 	ITERATE_RDEV(mddev,rdev,tmp) {
 		rdev->size &= mask;
@@ -859,7 +855,31 @@ static int sync_sbs(mddev_t * mddev)
 	int active=0, working=0,failed=0,spare=0,nr_disks=0;
 
 	sb = mddev->sb;
+	memset(sb, 0, sizeof(*sb));
+
+	sb->md_magic = MD_SB_MAGIC;
+	sb->major_version = mddev->major_version;
+	sb->minor_version = mddev->minor_version;
+	sb->patch_version = mddev->patch_version;
+	sb->gvalid_words  = 0; /* ignored */
+	memcpy(&sb->set_uuid0, mddev->uuid+0, 4);
+	memcpy(&sb->set_uuid1, mddev->uuid+4, 4);
+	memcpy(&sb->set_uuid2, mddev->uuid+8, 4);
+	memcpy(&sb->set_uuid3, mddev->uuid+12,4);
+
+	sb->ctime = mddev->ctime;
+	sb->level = mddev->level;
+	sb->size  = mddev->size;
+	sb->raid_disks = mddev->raid_disks;
+	sb->md_minor = mddev->__minor;
 	sb->not_persistent = !mddev->persistent;
+	sb->utime = mddev->utime;
+	sb->state = mddev->state;
+	sb->events_hi = (mddev->events>>32);
+	sb->events_lo = (u32)mddev->events;
+
+	sb->layout = mddev->layout;
+	sb->chunk_size = mddev->chunk_size;
 
 	sb->disks[0].state = (1<<MD_DISK_REMOVED);
 	ITERATE_RDEV(mddev,rdev,tmp) {
@@ -920,18 +940,17 @@ static void md_update_sb(mddev_t * mddev)
 
 	mddev->sb_dirty = 0;
 repeat:
-	mddev->sb->utime = CURRENT_TIME;
-	if (!(++mddev->sb->events_lo))
-		++mddev->sb->events_hi;
+	mddev->utime = CURRENT_TIME;
+	mddev->events ++;
 
-	if (!(mddev->sb->events_lo | mddev->sb->events_hi)) {
+	if (!mddev->events) {
 		/*
 		 * oops, this 64-bit counter should never wrap.
 		 * Either we are in around ~1 trillion A.C., assuming
 		 * 1 reboot per second, or we have a bug:
 		 */
 		MD_BUG();
-		mddev->sb->events_lo = mddev->sb->events_hi = 0xffffffff;
+		mddev->events --;
 	}
 	sync_sbs(mddev);
 
@@ -1150,7 +1169,25 @@ static int analyze_sbs(mddev_t * mddev)
 	}
 	memcpy (sb, freshest->sb, sizeof(*sb));
 
+	mddev->major_version = sb->major_version;
+	mddev->minor_version = sb->minor_version;
+	mddev->patch_version = sb->patch_version;
 	mddev->persistent = ! sb->not_persistent;
+	mddev->chunk_size = sb->chunk_size;
+	mddev->ctime = sb->ctime;
+	mddev->utime = sb->utime;
+	mddev->level = sb->level;
+	mddev->layout = sb->layout;
+	mddev->raid_disks = sb->raid_disks;
+	mddev->state = sb->state;
+	mddev->size = sb->size;
+	mddev->events = md_event(sb);
+	
+	memcpy(mddev->uuid+0, &sb->set_uuid0, 4);
+	memcpy(mddev->uuid+4, &sb->set_uuid1, 4);
+	memcpy(mddev->uuid+8, &sb->set_uuid2, 4);
+	memcpy(mddev->uuid+12,&sb->set_uuid3, 4);
+
 	/*
 	 * at this point we have picked the 'best' superblock
 	 * from all available superblocks.
@@ -1161,11 +1198,10 @@ static int analyze_sbs(mddev_t * mddev)
 		/*
 		 * Kick all non-fresh devices
 		 */
-		__u64 ev1, ev2;
+		__u64 ev1;
 		ev1 = md_event(rdev->sb);
-		ev2 = md_event(sb);
 		++ev1;
-		if (ev1 < ev2) {
+		if (ev1 < mddev->events) {
 			printk(KERN_WARNING "md: kicking non-fresh %s from array!\n",
 						partition_name(rdev->dev));
 			kick_rdev_from_array(rdev);
@@ -1179,7 +1215,7 @@ static int analyze_sbs(mddev_t * mddev)
 	 */
 	i = 0;
 	ITERATE_RDEV(mddev,rdev,tmp) {
-		if (sb->level == LEVEL_MULTIPATH) {
+		if (mddev->level == LEVEL_MULTIPATH) {
 			rdev->alias_device = !!i;
 			rdev->desc_nr = i++;
 			rdev->raid_disk = rdev->desc_nr;
@@ -1195,7 +1231,7 @@ static int analyze_sbs(mddev_t * mddev)
 				rdev->faulty = 1;
 				kick_rdev_from_array(rdev);
 			} else if (desc->state & (1<<MD_DISK_SYNC) &&
-				 rdev->raid_disk < mddev->sb->raid_disks)
+				 rdev->raid_disk < mddev->raid_disks)
 				rdev->in_sync = 1;
 		}
 	}
@@ -1204,16 +1240,16 @@ static int analyze_sbs(mddev_t * mddev)
 	/*
 	 * Check if we can support this RAID array
 	 */
-	if (sb->major_version != MD_MAJOR_VERSION ||
-			sb->minor_version > MD_MINOR_VERSION) {
+	if (mddev->major_version != MD_MAJOR_VERSION ||
+			mddev->minor_version > MD_MINOR_VERSION) {
 
-		printk(OLD_VERSION, mdidx(mddev), sb->major_version,
-				sb->minor_version, sb->patch_version);
+		printk(OLD_VERSION, mdidx(mddev), mddev->major_version,
+				mddev->minor_version, mddev->patch_version);
 		goto abort;
 	}
 
-	if ((sb->state != (1 << MD_SB_CLEAN)) && ((sb->level == 1) ||
-			(sb->level == 4) || (sb->level == 5)))
+	if ((mddev->state != (1 << MD_SB_CLEAN)) && ((mddev->level == 1) ||
+			(mddev->level == 4) || (mddev->level == 5)))
 		printk(NOT_CLEAN_IGNORE, mdidx(mddev));
 
 	return 0;
@@ -1230,7 +1266,6 @@ static int device_size_calculation(mddev_t * mddev)
 {
 	int data_disks = 0;
 	unsigned int readahead;
-	mdp_super_t *sb = mddev->sb;
 	struct list_head *tmp;
 	mdk_rdev_t *rdev;
 
@@ -1248,16 +1283,16 @@ static int device_size_calculation(mddev_t * mddev)
 			continue;
 		}
 		rdev->size = calc_dev_size(rdev->bdev, mddev);
-		if (rdev->size < sb->chunk_size / 1024) {
+		if (rdev->size < mddev->chunk_size / 1024) {
 			printk(KERN_WARNING
 				"md: Dev %s smaller than chunk_size: %ldk < %dk\n",
 				partition_name(rdev->dev),
-				rdev->size, sb->chunk_size / 1024);
+				rdev->size, mddev->chunk_size / 1024);
 			return -EINVAL;
 		}
 	}
 
-	switch (sb->level) {
+	switch (mddev->level) {
 		case LEVEL_MULTIPATH:
 			data_disks = 1;
 			break;
@@ -1273,30 +1308,30 @@ static int device_size_calculation(mddev_t * mddev)
 			break;
 		case 0:
 			zoned_raid_size(mddev);
-			data_disks = sb->raid_disks;
+			data_disks = mddev->raid_disks;
 			break;
 		case 1:
 			data_disks = 1;
 			break;
 		case 4:
 		case 5:
-			data_disks = sb->raid_disks-1;
+			data_disks = mddev->raid_disks-1;
 			break;
 		default:
-			printk(UNKNOWN_LEVEL, mdidx(mddev), sb->level);
+			printk(UNKNOWN_LEVEL, mdidx(mddev), mddev->level);
 			goto abort;
 	}
 	if (!md_size[mdidx(mddev)])
-		md_size[mdidx(mddev)] = sb->size * data_disks;
+		md_size[mdidx(mddev)] = mddev->size * data_disks;
 
 	readahead = (VM_MAX_READAHEAD * 1024) / PAGE_SIZE;
-	if (!sb->level || (sb->level == 4) || (sb->level == 5)) {
-		readahead = (mddev->sb->chunk_size>>PAGE_SHIFT) * 4 * data_disks;
+	if (!mddev->level || (mddev->level == 4) || (mddev->level == 5)) {
+		readahead = (mddev->chunk_size>>PAGE_SHIFT) * 4 * data_disks;
 		if (readahead < data_disks * (MAX_SECTORS>>(PAGE_SHIFT-9))*2)
 			readahead = data_disks * (MAX_SECTORS>>(PAGE_SHIFT-9))*2;
 	} else {
 		// (no multipath branch - it uses the default setting)
-		if (sb->level == -3)
+		if (mddev->level == -3)
 			readahead = 0;
 	}
 
@@ -1351,8 +1386,8 @@ static int do_md_run(mddev_t * mddev)
 		return -EINVAL;
 	}
 
-	chunk_size = mddev->sb->chunk_size;
-	pnum = level_to_pers(mddev->sb->level);
+	chunk_size = mddev->chunk_size;
+	pnum = level_to_pers(mddev->level);
 
 	if ((pnum != MULTIPATH) && (pnum != RAID1)) {
 		if (!chunk_size) {
@@ -1383,7 +1418,7 @@ static int do_md_run(mddev_t * mddev)
 	} else
 		if (chunk_size)
 			printk(KERN_INFO "md: RAID level %d does not need chunksize! Continuing anyway.\n",
-			       mddev->sb->level);
+			       mddev->level);
 
 	if (pnum >= MAX_PERSONALITY) {
 		MD_BUG();
@@ -1443,12 +1478,12 @@ static int do_md_run(mddev_t * mddev)
 		return -EINVAL;
 	}
 
-	mddev->in_sync = (mddev->sb->state & (1<<MD_SB_CLEAN));
+	mddev->in_sync = (mddev->state & (1<<MD_SB_CLEAN));
 	/* if personality doesn't have "sync_request", then
 	 * a dirty array doesn't mean anything
 	 */
 	if (mddev->pers->sync_request)
-		mddev->sb->state &= ~(1 << MD_SB_CLEAN);
+		mddev->state &= ~(1 << MD_SB_CLEAN);
 	md_update_sb(mddev);
 
 	md_recover_arrays();
@@ -1556,7 +1591,7 @@ static int do_md_stop(mddev_t * mddev, int ro)
 			 */
 			if (mddev->in_sync) {
 				printk(KERN_INFO "md: marking sb clean...\n");
-				mddev->sb->state |= 1 << MD_SB_CLEAN;
+				mddev->state |= 1 << MD_SB_CLEAN;
 			}
 			md_update_sb(mddev);
 		}
@@ -1812,7 +1847,6 @@ static int get_version(void * arg)
 	return 0;
 }
 
-#define SET_FROM_SB(x) info.x = mddev->sb->x
 static int get_array_info(mddev_t * mddev, void * arg)
 {
 	mdu_array_info_t info;
@@ -1820,10 +1854,6 @@ static int get_array_info(mddev_t * mddev, void * arg)
 	mdk_rdev_t *rdev;
 	struct list_head *tmp;
 
-	if (!mddev->sb) {
-		MD_BUG();
-		return -EINVAL;
-	}
 	nr=working=active=failed=spare=0;
 	ITERATE_RDEV(mddev,rdev,tmp) {
 		nr++;
@@ -1838,26 +1868,27 @@ static int get_array_info(mddev_t * mddev, void * arg)
 		}
 	}
 
-	SET_FROM_SB(major_version);
-	SET_FROM_SB(minor_version);
-	SET_FROM_SB(patch_version);
-	SET_FROM_SB(ctime);
-	SET_FROM_SB(level);
-	SET_FROM_SB(size);
-	SET_FROM_SB(nr_disks);
-	SET_FROM_SB(raid_disks);
-	SET_FROM_SB(md_minor);
+	info.major_version = mddev->major_version;
+	info.major_version = mddev->major_version;
+	info.minor_version = mddev->minor_version;
+	info.patch_version = mddev->patch_version;
+	info.ctime         = mddev->ctime;
+	info.level         = mddev->level;
+	info.size          = mddev->size;
+	info.nr_disks      = nr;
+	info.raid_disks    = mddev->raid_disks;
+	info.md_minor      = mddev->__minor;
 	info.not_persistent= !mddev->persistent;
 
-	SET_FROM_SB(utime);
-	SET_FROM_SB(state);
+	info.utime         = mddev->utime;
+	info.state         = mddev->state;
 	info.active_disks  = active;
 	info.working_disks = working;
 	info.failed_disks  = failed;
 	info.spare_disks   = spare;
 
-	SET_FROM_SB(layout);
-	SET_FROM_SB(chunk_size);
+	info.layout        = mddev->layout;
+	info.chunk_size    = mddev->chunk_size;
 
 	if (copy_to_user(arg, &info, sizeof(info)))
 		return -EFAULT;
@@ -1872,9 +1903,6 @@ static int get_disk_info(mddev_t * mddev, void * arg)
 	mdu_disk_info_t info;
 	unsigned int nr;
 	mdk_rdev_t *rdev;
-
-	if (!mddev->sb)
-		return -EINVAL;
 
 	if (copy_from_user(&info, arg, sizeof(info)))
 		return -EFAULT;
@@ -1949,7 +1977,7 @@ static int add_new_disk(mddev_t * mddev, mdu_disk_info_t *info)
 		rdev->desc_nr = info->number;
 		rdev->raid_disk = info->raid_disk;
 		rdev->faulty = 0;
-		if (rdev->raid_disk < mddev->sb->raid_disks)
+		if (rdev->raid_disk < mddev->raid_disks)
 			rdev->in_sync = (info->state & (1<<MD_DISK_SYNC));
 		else
 			rdev->in_sync = 0;
@@ -1962,8 +1990,8 @@ static int add_new_disk(mddev_t * mddev, mdu_disk_info_t *info)
 		size = calc_dev_size(rdev->bdev, mddev);
 		rdev->sb_offset = calc_dev_sboffset(rdev->bdev);
 
-		if (!mddev->sb->size || (mddev->sb->size > size))
-			mddev->sb->size = size;
+		if (!mddev->size || (mddev->size > size))
+			mddev->size = size;
 	}
 
 	return 0;
@@ -2074,9 +2102,9 @@ static int hot_add_disk(mddev_t * mddev, kdev_t dev)
 
 	size = calc_dev_size(rdev->bdev, mddev);
 
-	if (size < mddev->sb->size) {
-		printk(KERN_WARNING "md%d: disk size %d blocks < array size %d\n",
-				mdidx(mddev), size, mddev->sb->size);
+	if (size < mddev->size) {
+		printk(KERN_WARNING "md%d: disk size %d blocks < array size %ld\n",
+				mdidx(mddev), size, mddev->size);
 		err = -ENOSPC;
 		goto abort_export;
 	}
@@ -2097,7 +2125,7 @@ static int hot_add_disk(mddev_t * mddev, kdev_t dev)
 	rdev->size = size;
 	rdev->sb_offset = calc_dev_sboffset(rdev->bdev);
 
-	for (i = mddev->sb->raid_disks; i < MD_SB_DISKS; i++)
+	for (i = mddev->raid_disks; i < MD_SB_DISKS; i++)
 		if (find_rdev_nr(mddev,i)==NULL)
 			break;
 
@@ -2135,43 +2163,38 @@ abort_export:
 	return err;
 }
 
-#define SET_SB(x) mddev->sb->x = info->x
 static int set_array_info(mddev_t * mddev, mdu_array_info_t *info)
 {
 
 	if (alloc_array_sb(mddev))
 		return -ENOMEM;
 
-	mddev->sb->major_version = MD_MAJOR_VERSION;
-	mddev->sb->minor_version = MD_MINOR_VERSION;
-	mddev->sb->patch_version = MD_PATCHLEVEL_VERSION;
-	mddev->sb->ctime = CURRENT_TIME;
+	mddev->major_version = MD_MAJOR_VERSION;
+	mddev->minor_version = MD_MINOR_VERSION;
+	mddev->patch_version = MD_PATCHLEVEL_VERSION;
+	mddev->ctime         = CURRENT_TIME;
 
-	SET_SB(level);
-	SET_SB(size);
-	SET_SB(nr_disks);
-	SET_SB(raid_disks);
-	SET_SB(md_minor);
+	mddev->level         = info->level;
+	mddev->size          = info->size;
+	mddev->raid_disks    = info->raid_disks;
+	/* don't set __minor, it is determined by which /dev/md* was
+	 * openned
+	 */
+	mddev->state         = info->state;
 	mddev->persistent    = ! info->not_persistent;
 
-	SET_SB(state);
+	mddev->layout        = info->layout;
+	mddev->chunk_size    = info->chunk_size;
 
-	SET_SB(layout);
-	SET_SB(chunk_size);
 
-	mddev->sb->md_magic = MD_SB_MAGIC;
 
 	/*
 	 * Generate a 128 bit UUID
 	 */
-	get_random_bytes(&mddev->sb->set_uuid0, 4);
-	get_random_bytes(&mddev->sb->set_uuid1, 4);
-	get_random_bytes(&mddev->sb->set_uuid2, 4);
-	get_random_bytes(&mddev->sb->set_uuid3, 4);
+	get_random_bytes(mddev->uuid, 16);
 
 	return 0;
 }
-#undef SET_SB
 
 static int set_disk_faulty(mddev_t *mddev, kdev_t dev)
 {
@@ -2680,7 +2703,7 @@ static int status_resync(char * page, mddev_t * mddev)
 	unsigned long max_blocks, resync, res, dt, db, rt;
 
 	resync = (mddev->curr_resync - atomic_read(&mddev->recovery_active))/2;
-	max_blocks = mddev->sb->size;
+	max_blocks = mddev->size;
 
 	/*
 	 * Should not happen.
@@ -2939,7 +2962,7 @@ static void md_do_sync(void *data)
 		}
 	} while (mddev->curr_resync < 2);
 
-	max_sectors = mddev->sb->size << 1;
+	max_sectors = mddev->size << 1;
 
 	printk(KERN_INFO "md: syncing RAID array md%d\n", mdidx(mddev));
 	printk(KERN_INFO "md: minimum _guaranteed_ reconstruction speed: %d KB/sec/disc.\n", sysctl_speed_limit_min);
@@ -3491,7 +3514,7 @@ void __init md_setup_drive(void)
 				dinfo.state = (1<<MD_DISK_ACTIVE)|(1<<MD_DISK_SYNC);
 				dinfo.major = major(dev);
 				dinfo.minor = minor(dev);
-				mddev->sb->raid_disks++;
+				mddev->raid_disks++;
 				err = add_new_disk (mddev, &dinfo);
 			}
 		} else {

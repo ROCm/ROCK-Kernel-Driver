@@ -55,7 +55,7 @@ static int linear_run (mddev_t *mddev)
 		int j = rdev->raid_disk;
 		dev_info_t *disk = conf->disks + j;
 
-		if (j < 0 || j > mddev->sb->raid_disks || disk->bdev) {
+		if (j < 0 || j > mddev->raid_disks || disk->bdev) {
 			printk("linear: disk numbering problem. Aborting!\n");
 			goto out;
 		}
@@ -67,7 +67,7 @@ static int linear_run (mddev_t *mddev)
 			conf->smallest = disk;
 		cnt++;
 	}
-	if (cnt != mddev->sb->raid_disks) {
+	if (cnt != mddev->raid_disks) {
 		printk("linear: not enough drives present. Aborting!\n");
 		goto out;
 	}
@@ -186,7 +186,7 @@ static int linear_status (char *page, mddev_t *mddev)
 	}
 	sz += sprintf(page+sz, "\n");
 #endif
-	sz += sprintf(page+sz, " %dk rounding", mddev->sb->chunk_size/1024);
+	sz += sprintf(page+sz, " %dk rounding", mddev->chunk_size/1024);
 	return sz;
 }
 

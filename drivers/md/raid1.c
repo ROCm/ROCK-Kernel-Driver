@@ -1060,7 +1060,7 @@ static int sync_request(mddev_t *mddev, sector_t sector_nr, int go_faster)
 		if (init_resync(conf))
 			return -ENOMEM;
 
-	max_sector = mddev->sb->size << 1;
+	max_sector = mddev->size << 1;
 	if (sector_nr >= max_sector) {
 		close_sync(conf);
 		return 0;
@@ -1180,14 +1180,13 @@ static int run(mddev_t *mddev)
 	conf_t *conf;
 	int i, j, disk_idx;
 	mirror_info_t *disk;
-	mdp_super_t *sb = mddev->sb;
 	mdk_rdev_t *rdev;
 	struct list_head *tmp;
 
 	MOD_INC_USE_COUNT;
 
-	if (sb->level != 1) {
-		printk(INVALID_LEVEL, mdidx(mddev), sb->level);
+	if (mddev->level != 1) {
+		printk(INVALID_LEVEL, mdidx(mddev), mddev->level);
 		goto out;
 	}
 	/*
@@ -1266,7 +1265,7 @@ static int run(mddev_t *mddev)
 			disk->head_position = 0;
 		}
 	}
-	conf->raid_disks = sb->raid_disks;
+	conf->raid_disks = mddev->raid_disks;
 	conf->mddev = mddev;
 	conf->device_lock = SPIN_LOCK_UNLOCKED;
 
@@ -1316,7 +1315,7 @@ static int run(mddev_t *mddev)
 		}
 	}
 
-	printk(ARRAY_IS_ACTIVE, mdidx(mddev), sb->raid_disks - mddev->degraded, sb->raid_disks);
+	printk(ARRAY_IS_ACTIVE, mdidx(mddev), mddev->raid_disks - mddev->degraded, mddev->raid_disks);
 	/*
 	 * Ok, everything is just fine now
 	 */

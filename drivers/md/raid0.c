@@ -89,7 +89,7 @@ static int create_strip_zones (mddev_t *mddev)
 	ITERATE_RDEV(mddev, rdev1, tmp1) {
 		int j = rdev1->sb->this_disk.raid_disk;
 
-		if (j < 0 || j >= mddev->sb->raid_disks) {
+		if (j < 0 || j >= mddev->raid_disks) {
 			printk("raid0: bad disk number %d - aborting!\n", j);
 			goto abort;
 		}
@@ -102,9 +102,9 @@ static int create_strip_zones (mddev_t *mddev)
 			smallest = rdev1;
 		cnt++;
 	}
-	if (cnt != mddev->sb->raid_disks) {
+	if (cnt != mddev->raid_disks) {
 		printk("raid0: too few disks (%d of %d) - aborting!\n", cnt, 
-		       mddev->sb->raid_disks);
+		       mddev->raid_disks);
 		goto abort;
 	}
 	zone->nb_dev = cnt;
@@ -271,7 +271,7 @@ static int raid0_make_request (request_queue_t *q, struct bio *bio)
 	mdk_rdev_t *tmp_dev;
 	unsigned long chunk, block, rsect;
 
-	chunk_size = mddev->sb->chunk_size >> 10;
+	chunk_size = mddev->chunk_size >> 10;
 	chunksize_bits = ffz(~chunk_size);
 	block = bio->bi_sector >> 1;
 	hash = conf->hash_table + block / conf->smallest->size;
@@ -360,7 +360,7 @@ static int raid0_status (char *page, mddev_t *mddev)
 				conf->strip_zone[j].size);
 	}
 #endif
-	sz += sprintf(page + sz, " %dk chunks", mddev->sb->chunk_size/1024);
+	sz += sprintf(page + sz, " %dk chunks", mddev->chunk_size/1024);
 	return sz;
 }
 

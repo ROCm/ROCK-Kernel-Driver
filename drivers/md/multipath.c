@@ -424,7 +424,7 @@ static void multipathd (void *data)
 "multipath: detected IO path differences!\n"
 
 #define ARRAY_IS_ACTIVE KERN_INFO \
-"multipath: array md%d active with %d out of %d IO paths (%d spare IO paths)\n"
+"multipath: array md%d active with %d out of %d IO paths\n"
 
 #define THREAD_ERROR KERN_ERR \
 "multipath: couldn't allocate thread for md%d\n"
@@ -434,15 +434,14 @@ static int multipath_run (mddev_t *mddev)
 	multipath_conf_t *conf;
 	int disk_idx;
 	struct multipath_info *disk;
-	mdp_super_t *sb = mddev->sb;
 	mdk_rdev_t *rdev;
 	struct list_head *tmp;
 	int num_rdevs = 0;
 
 	MOD_INC_USE_COUNT;
 
-	if (sb->level != LEVEL_MULTIPATH) {
-		printk(INVALID_LEVEL, mdidx(mddev), sb->level);
+	if (mddev->level != LEVEL_MULTIPATH) {
+		printk(INVALID_LEVEL, mdidx(mddev), mddev->level);
 		goto out;
 	}
 	/*
@@ -492,7 +491,7 @@ static int multipath_run (mddev_t *mddev)
 		num_rdevs++;
 	}
 
-	conf->raid_disks = sb->raid_disks = num_rdevs;
+	conf->raid_disks = mddev->raid_disks = num_rdevs;
 	mddev->sb_dirty = 1;
 	conf->mddev = mddev;
 	conf->device_lock = SPIN_LOCK_UNLOCKED;
@@ -520,8 +519,8 @@ static int multipath_run (mddev_t *mddev)
 		}
 	}
 
-	printk(ARRAY_IS_ACTIVE, mdidx(mddev), sb->active_disks,
-			sb->raid_disks, sb->spare_disks);
+	printk(ARRAY_IS_ACTIVE, mdidx(mddev), conf->working_disks,
+			mddev->raid_disks);
 	/*
 	 * Ok, everything is just fine now
 	 */

@@ -1290,7 +1290,7 @@ static int sync_request (mddev_t *mddev, sector_t sector_nr, int go_faster)
 	int raid_disks = conf->raid_disks;
 	int data_disks = raid_disks-1;
 
-	if (sector_nr >= mddev->sb->size <<1)
+	if (sector_nr >= mddev->size <<1)
 		/* just being told to finish up .. nothing to do */
 		return 0;
 
@@ -1364,15 +1364,14 @@ static int run (mddev_t *mddev)
 {
 	raid5_conf_t *conf;
 	int i, raid_disk, memory;
-	mdp_super_t *sb = mddev->sb;
 	mdk_rdev_t *rdev;
 	struct disk_info *disk;
 	struct list_head *tmp;
 
 	MOD_INC_USE_COUNT;
 
-	if (sb->level != 5 && sb->level != 4) {
-		printk("raid5: md%d: raid level not set to 4/5 (%d)\n", mdidx(mddev), sb->level);
+	if (mddev->level != 5 && mddev->level != 4) {
+		printk("raid5: md%d: raid level not set to 4/5 (%d)\n", mdidx(mddev), mddev->level);
 		MOD_DEC_USE_COUNT;
 		return -EIO;
 	}
@@ -1444,7 +1443,7 @@ static int run (mddev_t *mddev)
 		}
 	}
 
-	for (i = 0; i < sb->raid_disks; i++) {
+	for (i = 0; i < conf->raid_disks; i++) {
 		disk = conf->disks + i;
 
 		if (!disk->used_slot) {
@@ -1457,15 +1456,15 @@ static int run (mddev_t *mddev)
 		}
 	}
 
-	conf->raid_disks = sb->raid_disks;
+	conf->raid_disks = mddev->raid_disks;
 	/*
 	 * 0 for a fully functional array, 1 for a degraded array.
 	 */
 	mddev->degraded = conf->failed_disks = conf->raid_disks - conf->working_disks;
 	conf->mddev = mddev;
-	conf->chunk_size = sb->chunk_size;
-	conf->level = sb->level;
-	conf->algorithm = sb->layout;
+	conf->chunk_size = mddev->chunk_size;
+	conf->level = mddev->level;
+	conf->algorithm = mddev->layout;
 	conf->max_nr_stripes = NR_STRIPES;
 
 #if 0
@@ -1490,7 +1489,7 @@ static int run (mddev_t *mddev)
 	}
 
 	if (mddev->degraded == 1 &&
-	    !(sb->state & (1<<MD_SB_CLEAN))) {
+	    !(mddev->state & (1<<MD_SB_CLEAN))) {
 		printk(KERN_ERR "raid5: cannot start dirty degraded array for md%d\n", mdidx(mddev));
 		goto abort;
 	}
@@ -1515,10 +1514,12 @@ static int run (mddev_t *mddev)
 	} else
 		printk(KERN_INFO "raid5: allocated %dkB for md%d\n", memory, mdidx(mddev));
 
-	if (conf->working_disks == conf->raid_disks)
-		printk("raid5: raid level %d set md%d active with %d out of %d devices, algorithm %d\n", conf->level, mdidx(mddev), sb->active_disks, sb->raid_disks, conf->algorithm);
+	if (mddev->degraded == 0)
+		printk("raid5: raid level %d set md%d active with %d out of %d devices, algorithm %d\n", conf->level, mdidx(mddev), 
+		       mddev->raid_disks-mddev->degraded, mddev->raid_disks, conf->algorithm);
 	else
-		printk(KERN_ALERT "raid5: raid level %d set md%d active with %d out of %d devices, algorithm %d\n", conf->level, mdidx(mddev), sb->active_disks, sb->raid_disks, conf->algorithm);
+		printk(KERN_ALERT "raid5: raid level %d set md%d active with %d out of %d devices, algorithm %d\n", conf->level, mdidx(mddev),
+		       mddev->raid_disks = mddev->degraded, mddev->raid_disks, conf->algorithm);
 
 	print_raid5_conf(conf);
 
@@ -1590,10 +1591,9 @@ static void printall (raid5_conf_t *conf)
 static int status (char *page, mddev_t *mddev)
 {
 	raid5_conf_t *conf = (raid5_conf_t *) mddev->private;
-	mdp_super_t *sb = mddev->sb;
 	int sz = 0, i;
 
-	sz += sprintf (page+sz, " level %d, %dk chunk, algorithm %d", sb->level, sb->chunk_size >> 10, sb->layout);
+	sz += sprintf (page+sz, " level %d, %dk chunk, algorithm %d", mddev->level, mddev->chunk_size >> 10, mddev->layout);
 	sz += sprintf (page+sz, " [%d/%d] [", conf->raid_disks, conf->working_disks);
 	for (i = 0; i < conf->raid_disks; i++)
 		sz += sprintf (page+sz, "%s", conf->disks[i].operational ? "U" : "_");

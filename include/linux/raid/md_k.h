@@ -175,7 +175,20 @@ struct mddev_s
 	int				sb_dirty;
 	int				ro;
 
+	/* Superblock information */
+	int				major_version,
+					minor_version,
+					patch_version;
 	int				persistent;
+	int				chunk_size;
+	time_t				ctime, utime;
+	int				level, layout;
+	int				raid_disks;
+	unsigned long			state;
+	sector_t			size; /* used size of component devices */
+	__u64				events;
+
+	char				uuid[16];
 
 	struct mdk_thread_s		*sync_thread;	/* doing resync or reconstruct */
 	unsigned long			curr_resync;	/* blocks scheduled */
