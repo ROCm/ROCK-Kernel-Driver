@@ -196,7 +196,7 @@ static int suni_ioctl(struct atm_dev *dev,unsigned int cmd,void __user *arg)
 		case SONET_GETFRSENSE:
 			return -EINVAL;
 		case ATM_SETLOOP:
-			return set_loopback(dev,(int) (long) arg);
+			return set_loopback(dev,(int)(unsigned long)arg);
 		case ATM_GETLOOP:
 			return put_user(PRIV(dev)->loop_mode,(int __user *)arg) ?
 			    -EFAULT : 0;

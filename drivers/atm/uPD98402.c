@@ -140,14 +140,14 @@ static int uPD98402_ioctl(struct atm_dev *dev,unsigned int cmd,void __user *arg)
                 case SONET_GETSTAT:
 			return fetch_stats(dev,arg, cmd == SONET_GETSTATZ);
 		case SONET_SETFRAMING:
-			return set_framing(dev,(int) (long) arg);
+			return set_framing(dev, (int)(unsigned long)arg);
 		case SONET_GETFRAMING:
 			return put_user(PRIV(dev)->framing,(int __user *)arg) ?
 			    -EFAULT : 0;
 		case SONET_GETFRSENSE:
 			return get_sense(dev,arg);
 		case ATM_SETLOOP:
-			return set_loopback(dev,(int) (long) arg);
+			return set_loopback(dev, (int)(unsigned long)arg);
 		case ATM_GETLOOP:
 			return put_user(PRIV(dev)->loop_mode,(int __user *)arg) ?
 			    -EFAULT : 0;

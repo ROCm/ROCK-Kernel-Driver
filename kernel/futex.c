@@ -704,7 +704,7 @@ asmlinkage long sys_futex(u32 __user *uaddr, int op, int val,
 	 * requeue parameter in 'utime' if op == FUTEX_REQUEUE.
 	 */
 	if (op >= FUTEX_REQUEUE)
-		val2 = (int) (long) utime;
+		val2 = (int) (unsigned long) utime;
 
 	return do_futex((unsigned long)uaddr, op, val, timeout,
 			(unsigned long)uaddr2, val2, val3);
