@@ -208,8 +208,8 @@ static __inline__ struct rt6_info *rt6_device_match(struct rt6_info *rt,
 /*
  *	pointer to the last default router chosen. BH is disabled locally.
  */
-static struct rt6_info *rt6_dflt_pointer;
-static spinlock_t rt6_dflt_lock = SPIN_LOCK_UNLOCKED;
+struct rt6_info *rt6_dflt_pointer;
+spinlock_t rt6_dflt_lock = SPIN_LOCK_UNLOCKED;
 
 /* Default Router Selection (RFC 2461 6.3.6) */
 static struct rt6_info *rt6_best_dflt(struct rt6_info *rt, int oif)
@@ -227,7 +227,7 @@ static struct rt6_info *rt6_best_dflt(struct rt6_info *rt, int oif)
 		     sprt->rt6i_dev->ifindex == oif))
 			m += 8;
 
-		if (sprt->rt6i_expires &&
+		if ((sprt->rt6i_flags & RTF_EXPIRES) &&
 		    time_after(jiffies, sprt->rt6i_expires))
 			continue;
 
@@ -1265,7 +1265,7 @@ struct rt6_info *rt6_add_dflt_router(struct in6_addr *gwaddr,
 	rtmsg.rtmsg_type = RTMSG_NEWROUTE;
 	ipv6_addr_copy(&rtmsg.rtmsg_gateway, gwaddr);
 	rtmsg.rtmsg_metric = 1024;
-	rtmsg.rtmsg_flags = RTF_GATEWAY | RTF_ADDRCONF | RTF_DEFAULT | RTF_UP;
+	rtmsg.rtmsg_flags = RTF_GATEWAY | RTF_ADDRCONF | RTF_DEFAULT | RTF_UP | RTF_EXPIRES;
 
 	rtmsg.rtmsg_ifindex = dev->ifindex;
 
