@@ -417,6 +417,7 @@ static void ip_copy_metadata(struct sk_buff *to, struct sk_buff *from)
 	to->nfct = from->nfct;
 	nf_conntrack_get(to->nfct);
 #ifdef CONFIG_BRIDGE_NETFILTER
+	nf_bridge_put(to->nf_bridge);
 	to->nf_bridge = from->nf_bridge;
 	nf_bridge_get(to->nf_bridge);
 #endif
