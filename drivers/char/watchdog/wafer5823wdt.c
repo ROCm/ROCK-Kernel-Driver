@@ -66,7 +66,7 @@ MODULE_PARM_DESC(wdt_start, "Wafer 5823 WDT 'start' io port (default 0x443)");
 
 static int timeout = WD_TIMO;  /* in seconds */
 module_param(timeout, int, 0);
-MODULE_PARM_DESC(timeout, "Watchdog timeout in seconds. 1<= timeout <=255, default=" __MODULE_STRING(WATCHDOG_TIMEOUT) ".");
+MODULE_PARM_DESC(timeout, "Watchdog timeout in seconds. 1<= timeout <=255, default=" __MODULE_STRING(WD_TIMO) ".");
 
 #ifdef CONFIG_WATCHDOG_NOWAYOUT
 static int nowayout = 1;
@@ -165,6 +165,26 @@ static int wafwdt_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 		/* Fall */
 	case WDIOC_GETTIMEOUT:
 		return put_user(timeout, (int *)arg);
+
+	case WDIOC_SETOPTIONS:
+	{
+		int options, retval = -EINVAL;
+
+		if (get_user(options, (int *)arg))
+			return -EFAULT;
+
+		if (options & WDIOS_DISABLECARD) {
+			wafwdt_start();
+			retval = 0;
+		}
+
+		if (options & WDIOS_ENABLECARD) {
+			wafwdt_stop();
+			retval = 0;
+		}
+
+		return retval;
+	}
 
 	default:
 		return -ENOTTY;
