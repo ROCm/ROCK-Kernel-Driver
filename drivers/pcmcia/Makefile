@@ -75,6 +75,7 @@ sa1100_cs-objs-$(CONFIG_SA1100_H3600)		+= sa1100_h3600.o
 sa1100_cs-objs-$(CONFIG_SA1100_JORNADA720)	+= sa1100_jornada720.o sa1111_generic.o
 sa1100_cs-objs-$(CONFIG_SA1100_PANGOLIN)	+= sa1100_pangolin.o
 sa1100_cs-objs-$(CONFIG_SA1100_PFS168)		+= sa1100_pfs168.o sa1111_generic.o
+sa1100_cs-objs-$(CONFIG_SA1100_PT_SYSTEM3)	+= sa1100_system3.o sa1111_generic.o
 sa1100_cs-objs-$(CONFIG_SA1100_SHANNON)		+= sa1100_shannon.o
 sa1100_cs-objs-$(CONFIG_SA1100_SIMPAD)		+= sa1100_simpad.o
 sa1100_cs-objs-$(CONFIG_SA1100_STORK)		+= sa1100_stork.o

@@ -234,6 +234,9 @@ extern void pcmcia_simpad_exit(void);
 extern int pcmcia_stork_init(void);
 extern void pcmcia_stork_exit(void);
 
+extern int pcmcia_system3_init(void);
+extern void pcmcia_system3_exit(void);
+
 extern int pcmcia_xp860_init(void);
 extern void pcmcia_xp860_exit(void);
 
