@@ -141,7 +141,7 @@ static void __init init_amd(struct cpuinfo_x86 *c)
 			 * here.
 			 */
 			if (c->x86_model == 6 || c->x86_model == 7) {
-				if (!test_bit(X86_FEATURE_XMM, c->x86_capability)) {
+				if (!cpu_has(c, X86_FEATURE_XMM)) {
 					printk(KERN_INFO "Enabling disabled K7/SSE Support.\n");
 					rdmsr(MSR_K7_HWCR, l, h);
 					l &= ~0x00008000;

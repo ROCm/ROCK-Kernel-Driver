@@ -66,7 +66,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	else
 		seq_printf(m, "stepping\t: unknown\n");
 
-	if ( test_bit(X86_FEATURE_TSC, c->x86_capability) ) {
+	if ( cpu_has(c, X86_FEATURE_TSC) ) {
 		seq_printf(m, "cpu MHz\t\t: %lu.%03lu\n",
 			cpu_khz / 1000, (cpu_khz % 1000));
 	}

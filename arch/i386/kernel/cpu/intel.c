@@ -62,8 +62,7 @@ int __init ppro_with_ram_bug(void)
 	
 static void __init squash_the_stupid_serial_number(struct cpuinfo_x86 *c)
 {
-	if( test_bit(X86_FEATURE_PN, c->x86_capability) &&
-	    disable_x86_serial_nr ) {
+	if (cpu_has(c, X86_FEATURE_PN) && disable_x86_serial_nr ) {
 		/* Disable processor serial number */
 		unsigned long lo,hi;
 		rdmsr(MSR_IA32_BBL_CR_CTL,lo,hi);
@@ -292,7 +291,7 @@ static void __init init_intel(struct cpuinfo_x86 *c)
 		strcpy(c->x86_model_id, p);
 	
 #ifdef CONFIG_X86_HT
-	if (test_bit(X86_FEATURE_HT, c->x86_capability) && !disable_P4_HT) {
+	if (cpu_has(c, X86_FEATURE_HT) && !disable_P4_HT) {
 		extern	int phys_proc_id[NR_CPUS];
 		
 		u32 	eax, ebx, ecx, edx;
