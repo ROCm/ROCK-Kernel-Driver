@@ -777,6 +777,12 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			NO_MATCH, NO_MATCH
 			} },
 
+	{ local_apic_kills_bios, "ASUS L3C", {
+			MATCH(DMI_BOARD_VENDOR, "ASUSTeK Computer INC."),
+			MATCH(DMI_BOARD_NAME, "P4_L3C"),
+			NO_MATCH, NO_MATCH
+			} },
+
 	/* Problem Intel 440GX bioses */
 
 	{ broken_pirq, "SABR1 Bios", {			/* Bad $PIR */
