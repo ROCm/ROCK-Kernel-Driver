@@ -446,7 +446,9 @@ static void __devexit tlan_remove_one( struct pci_dev *pdev)
 		pci_free_consistent(priv->pciDev, priv->dmaSize, priv->dmaStorage, priv->dmaStorageDMA );
 	}
 
+#ifdef CONFIG_PCI
 	pci_release_regions(pdev);
+#endif
 	
 	free_netdev( dev );
 		
@@ -673,8 +675,10 @@ err_out_uninit:
 err_out_free_dev:
 	free_netdev(dev);
 err_out_regions:
+#ifdef CONFIG_PCI
 	if (pdev)
 		pci_release_regions(pdev);
+#endif
 err_out:
 	if (pdev)
 		pci_disable_device(pdev);
