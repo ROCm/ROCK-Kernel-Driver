@@ -503,8 +503,13 @@ static void __split_bio(struct mapped_device *md, struct bio *bio)
 {
 	struct clone_info ci;
 
-	ci.md = md;
 	ci.map = dm_get_table(md);
+	if (!ci.map) {
+		bio_io_error(bio, bio->bi_size);
+		return;
+	}
+
+	ci.md = md;
 	ci.bio = bio;
 	ci.io = alloc_io(md);
 	ci.io->error = 0;
@@ -526,17 +531,6 @@ static void __split_bio(struct mapped_device *md, struct bio *bio)
 /*-----------------------------------------------------------------
  * CRUD END
  *---------------------------------------------------------------*/
-
-
-static inline void __dm_request(struct mapped_device *md, struct bio *bio)
-{
-	if (!md->map) {
-		bio_io_error(bio, bio->bi_size);
-		return;
-	}
-
-	__split_bio(md, bio);
-}
 
 /*
  * The request function that just remaps the bio built up by
@@ -576,7 +570,7 @@ static int dm_request(request_queue_t *q, struct bio *bio)
 		down_read(&md->lock);
 	}
 
-	__dm_request(md, bio);
+	__split_bio(md, bio);
 	up_read(&md->lock);
 	return 0;
 }
@@ -588,7 +582,6 @@ static int dm_any_congested(void *congested_data, int bdi_bits)
 	struct dm_table *map = dm_get_table(md);
 
 	if (!map || test_bit(DMF_BLOCK_IO, &md->flags))
-		/* FIXME: shouldn't suspended count a congested ? */
 		r = bdi_bits;
 	else
 		r = dm_table_any_congested(map, bdi_bits);
@@ -847,7 +840,7 @@ static void __flush_deferred_io(struct mapped_device *md, struct bio *c)
 	while (c) {
 		n = c->bi_next;
 		c->bi_next = NULL;
-		__dm_request(md, c);
+		__split_bio(md, c);
 		c = n;
 	}
 }
