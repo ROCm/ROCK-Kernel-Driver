@@ -41,12 +41,12 @@
 
 #include <scsi/scsicam.h>
 
-#define CUMANASCSI2_STATUS		(0)
+#define CUMANASCSI2_STATUS		(0x0000)
 #define STATUS_INT			(1 << 0)
 #define STATUS_DRQ			(1 << 1)
 #define STATUS_LATCHED			(1 << 3)
 
-#define CUMANASCSI2_ALATCH		(5)
+#define CUMANASCSI2_ALATCH		(0x0014)
 #define ALATCH_ENA_INT			(3)
 #define ALATCH_DIS_INT			(2)
 #define ALATCH_ENA_TERM			(5)
@@ -58,11 +58,10 @@
 #define ALATCH_DMA_OUT			(15)
 #define ALATCH_DMA_IN			(14)
 
-#define CUMANASCSI2_PSEUDODMA		(0x80)
+#define CUMANASCSI2_PSEUDODMA		(0x0200)
 
-#define CUMANASCSI2_FAS216_OFFSET	(0xc0)
-#define CUMANASCSI2_FAS216_SHIFT	0
-#define CUMANASCSI2_FAS216_SIZE		(16)
+#define CUMANASCSI2_FAS216_OFFSET	(0x0300)
+#define CUMANASCSI2_FAS216_SHIFT	2
 
 /*
  * Version
@@ -77,13 +76,14 @@ static int term[MAX_ECARDS] = { 1, 1, 1, 1, 1, 1, 1, 1 };
 #define NR_SG	256
 
 struct cumanascsi2_info {
-	FAS216_Info info;
+	FAS216_Info		info;
+	struct expansion_card	*ec;
 
-	unsigned int	status;		/* card status register	*/
-	unsigned int	alatch;		/* Control register	*/
-	unsigned int	terms;		/* Terminator state	*/
-	unsigned int	dmaarea;	/* Pseudo DMA area	*/
-	struct scatterlist sg[NR_SG];	/* Scatter DMA list	*/
+	void			*status;	/* card status register	*/
+	void			*alatch;	/* Control register	*/
+	unsigned int		terms;		/* Terminator state	*/
+	void			*dmaarea;	/* Pseudo DMA area	*/
+	struct scatterlist	sg[NR_SG];	/* Scatter DMA list	*/
 };
 
 #define CSTATUS_IRQ	(1 << 0)
@@ -97,8 +97,7 @@ struct cumanascsi2_info {
 static void
 cumanascsi_2_irqenable(struct expansion_card *ec, int irqnr)
 {
-	unsigned int port = (unsigned int)ec->irq_data;
-	outb(ALATCH_ENA_INT, port);
+	writeb(ALATCH_ENA_INT, ec->irq_data);
 }
 
 /* Prototype: void cumanascsi_2_irqdisable(ec, irqnr)
@@ -109,8 +108,7 @@ cumanascsi_2_irqenable(struct expansion_card *ec, int irqnr)
 static void
 cumanascsi_2_irqdisable(struct expansion_card *ec, int irqnr)
 {
-	unsigned int port = (unsigned int)ec->irq_data;
-	outb(ALATCH_DIS_INT, port);
+	writeb(ALATCH_DIS_INT, ec->irq_data);
 }
 
 static const expansioncard_ops_t cumanascsi_2_ops = {
@@ -130,10 +128,10 @@ cumanascsi_2_terminator_ctl(struct Scsi_Host *host, int on_off)
 
 	if (on_off) {
 		info->terms = 1;
-		outb (ALATCH_ENA_TERM, info->alatch);
+		writeb(ALATCH_ENA_TERM, info->alatch);
 	} else {
 		info->terms = 0;
-		outb (ALATCH_DIS_TERM, info->alatch);
+		writeb(ALATCH_DIS_TERM, info->alatch);
 	}
 }
 
@@ -146,9 +144,9 @@ cumanascsi_2_terminator_ctl(struct Scsi_Host *host, int on_off)
 static void
 cumanascsi_2_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
-	struct Scsi_Host *host = (struct Scsi_Host *)dev_id;
+	struct cumanascsi2_info *info = dev_id;
 
-	fas216_intr(host);
+	fas216_intr(&info->info);
 }
 
 /* Prototype: fasdmatype_t cumanascsi_2_dma_setup(host, SCpnt, direction, min_type)
@@ -167,7 +165,7 @@ cumanascsi_2_dma_setup(struct Scsi_Host *host, Scsi_Pointer *SCp,
 	struct device *dev = scsi_get_device(host);
 	int dmach = host->dma_channel;
 
-	outb(ALATCH_DIS_DMA, info->alatch);
+	writeb(ALATCH_DIS_DMA, info->alatch);
 
 	if (dmach != NO_DMA &&
 	    (min_type == fasdma_real_all || SCp->this_residual >= 512)) {
@@ -188,11 +186,11 @@ cumanascsi_2_dma_setup(struct Scsi_Host *host, Scsi_Pointer *SCp,
 
 		disable_dma(dmach);
 		set_dma_sg(dmach, info->sg, bufs + 1);
-		outb(alatch_dir, info->alatch);
+		writeb(alatch_dir, info->alatch);
 		set_dma_mode(dmach, dma_dir);
 		enable_dma(dmach);
-		outb(ALATCH_ENA_DMA, info->alatch);
-		outb(ALATCH_DIS_BIT32, info->alatch);
+		writeb(ALATCH_ENA_DMA, info->alatch);
+		writeb(ALATCH_DIS_BIT32, info->alatch);
 		return fasdma_real_all;
 	}
 
@@ -226,7 +224,7 @@ cumanascsi_2_dma_pseudo(struct Scsi_Host *host, Scsi_Pointer *SCp,
 #if 0
 		while (length > 1) {
 			unsigned long word;
-			unsigned int status = inb(info->status);
+			unsigned int status = readb(info->status);
 
 			if (status & STATUS_INT)
 				goto end;
@@ -235,7 +233,7 @@ cumanascsi_2_dma_pseudo(struct Scsi_Host *host, Scsi_Pointer *SCp,
 				continue;
 
 			word = *addr | *(addr + 1) << 8;
-			outw (info->dmaarea);
+			writew(word, info->dmaarea);
 			addr += 2;
 			length -= 2;
 		}
@@ -245,15 +243,15 @@ cumanascsi_2_dma_pseudo(struct Scsi_Host *host, Scsi_Pointer *SCp,
 	else {
 		if (transfer && (transfer & 255)) {
 			while (length >= 256) {
-				unsigned int status = inb(info->status);
+				unsigned int status = readb(info->status);
 
 				if (status & STATUS_INT)
-					goto end;
+					return;
 	    
 				if (!(status & STATUS_DRQ))
 					continue;
 
-				insw(info->dmaarea, addr, 256 >> 1);
+				readsw(info->dmaarea, addr, 256 >> 1);
 				addr += 256;
 				length -= 256;
 			}
@@ -261,15 +259,15 @@ cumanascsi_2_dma_pseudo(struct Scsi_Host *host, Scsi_Pointer *SCp,
 
 		while (length > 0) {
 			unsigned long word;
-			unsigned int status = inb(info->status);
+			unsigned int status = readb(info->status);
 
 			if (status & STATUS_INT)
-				goto end;
+				return;
 
 			if (!(status & STATUS_DRQ))
 				continue;
 
-			word = inw (info->dmaarea);
+			word = readw(info->dmaarea);
 			*addr++ = word;
 			if (--length > 0) {
 				*addr++ = word >> 8;
@@ -277,8 +275,6 @@ cumanascsi_2_dma_pseudo(struct Scsi_Host *host, Scsi_Pointer *SCp,
 			}
 		}
 	}
-
-end:
 }
 
 /* Prototype: int cumanascsi_2_dma_stop(host, SCpnt)
@@ -291,7 +287,7 @@ cumanascsi_2_dma_stop(struct Scsi_Host *host, Scsi_Pointer *SCp)
 {
 	struct cumanascsi2_info *info = (struct cumanascsi2_info *)host->hostdata;
 	if (host->dma_channel != NO_DMA) {
-		outb(ALATCH_DIS_DMA, info->alatch);
+		writeb(ALATCH_DIS_DMA, info->alatch);
 		disable_dma(host->dma_channel);
 	}
 }
@@ -304,13 +300,11 @@ cumanascsi_2_dma_stop(struct Scsi_Host *host, Scsi_Pointer *SCp)
 const char *cumanascsi_2_info(struct Scsi_Host *host)
 {
 	struct cumanascsi2_info *info = (struct cumanascsi2_info *)host->hostdata;
-	static char string[150], *p;
+	static char string[150];
 
-	p = string;
-	p += sprintf(p, "%s ", host->hostt->name);
-	p += fas216_info(&info->info, p);
-	p += sprintf(p, "v%s terminators o%s",
-		     VERSION, info->terms ? "n" : "ff");
+	sprintf(string, "%s (%s) in slot %d v%s terminators o%s",
+		host->hostt->name, info->info.scsi.type, info->ec->slot_no,
+		VERSION, info->terms ? "n" : "ff");
 
 	return string;
 }
@@ -377,10 +371,7 @@ int cumanascsi_2_proc_info (char *buffer, char **start, off_t offset,
 	info = (struct cumanascsi2_info *)host->hostdata;
 
 	begin = 0;
-	pos = sprintf(buffer,
-			"Cumana SCSI II driver version v%s\n",
-			VERSION);
-
+	pos = sprintf(buffer, "Cumana SCSI II driver v%s\n", VERSION);
 	pos += fas216_print_host(&info->info, buffer + pos);
 	pos += sprintf(buffer + pos, "Term    : o%s\n",
 			info->terms ? "n" : "ff");
@@ -440,38 +431,52 @@ static int __devinit
 cumanascsi2_probe(struct expansion_card *ec, const struct ecard_id *id)
 {
 	struct Scsi_Host *host;
-    	struct cumanascsi2_info *info;
-    	int ret = -ENOMEM;
+	struct cumanascsi2_info *info;
+	unsigned long resbase, reslen;
+	unsigned char *base;
+	int ret;
 
-	host = scsi_register(&cumanascsi2_template, sizeof (struct cumanascsi2_info));
-	if (!host)
-		goto out;
+	resbase = ecard_resource_start(ec, ECARD_RES_MEMC);
+	reslen = ecard_resource_len(ec, ECARD_RES_MEMC);
 
-	host->io_port = ecard_address(ec, ECARD_MEMC, 0);
-	host->irq = ec->irq;
-	host->dma_channel = ec->dma;
-
-	if (!request_region(host->io_port + CUMANASCSI2_FAS216_OFFSET,
-			    CUMANASCSI2_FAS216_SIZE, "cumanascsi2-fas")) {
+	if (!request_mem_region(resbase, reslen, "cumanascsi2")) {
 		ret = -EBUSY;
-		goto out_free;
+		goto out;
 	}
+
+	base = ioremap(resbase, reslen);
+	if (!base) {
+		ret = -ENOMEM;
+		goto out_region;
+	}
+
+	host = scsi_register(&cumanascsi2_template,
+			     sizeof(struct cumanascsi2_info));
+	if (!host) {
+		ret = -ENOMEM;
+		goto out_unmap;
+	}
+
+	host->base	  = (unsigned long)base;
+	host->irq	  = ec->irq;
+	host->dma_channel = ec->dma;
 
 	ecard_set_drvdata(ec, host);
 
 	info = (struct cumanascsi2_info *)host->hostdata;
-	info->dmaarea	= host->io_port + CUMANASCSI2_PSEUDODMA;
-	info->status	= host->io_port + CUMANASCSI2_STATUS;
-	info->alatch	= host->io_port + CUMANASCSI2_ALATCH;
+	info->ec	= ec;
+	info->dmaarea	= base + CUMANASCSI2_PSEUDODMA;
+	info->status	= base + CUMANASCSI2_STATUS;
+	info->alatch	= base + CUMANASCSI2_ALATCH;
 
-	ec->irqaddr	= (unsigned char *)ioaddr(info->status);
+	ec->irqaddr	= info->status;
 	ec->irqmask	= STATUS_INT;
-	ec->irq_data	= (void *)info->alatch;
-	ec->ops		= (expansioncard_ops_t *)&cumanascsi_2_ops;
+	ec->irq_data	= base + CUMANASCSI2_ALATCH;
+	ec->ops		= &cumanascsi_2_ops;
 
 	cumanascsi_2_terminator_ctl(host, term[ec->slot_no]);
 
-	info->info.scsi.io_port		= host->io_port + CUMANASCSI2_FAS216_OFFSET;
+	info->info.scsi.io_base		= base + CUMANASCSI2_FAS216_OFFSET;
 	info->info.scsi.io_shift	= CUMANASCSI2_FAS216_SHIFT;
 	info->info.scsi.irq		= host->irq;
 	info->info.ifcfg.clockrate	= 40; /* MHz */
@@ -481,16 +486,21 @@ cumanascsi2_probe(struct expansion_card *ec, const struct ecard_id *id)
 	info->info.ifcfg.cntl3		= CNTL3_BS8 | CNTL3_FASTSCSI | CNTL3_FASTCLK;
 	info->info.ifcfg.disconnect_ok	= 1;
 	info->info.ifcfg.wide_max_size	= 0;
+	info->info.ifcfg.capabilities	= FASCAP_PSEUDODMA;
 	info->info.dma.setup		= cumanascsi_2_dma_setup;
 	info->info.dma.pseudo		= cumanascsi_2_dma_pseudo;
 	info->info.dma.stop		= cumanascsi_2_dma_stop;
 
+	ret = fas216_init(host);
+	if (ret)
+		goto out_free;
+
 	ret = request_irq(host->irq, cumanascsi_2_intr,
-			  SA_INTERRUPT, "cumanascsi2", host);
+			  SA_INTERRUPT, "cumanascsi2", info);
 	if (ret) {
 		printk("scsi%d: IRQ%d not free: %d\n",
 		       host->host_no, host->irq, ret);
-		goto out_region;
+		goto out_release;
 	}
 
 	if (host->dma_channel != NO_DMA) {
@@ -500,25 +510,29 @@ cumanascsi2_probe(struct expansion_card *ec, const struct ecard_id *id)
 			host->dma_channel = NO_DMA;
 		} else {
 			set_dma_speed(host->dma_channel, 180);
+			info->info.ifcfg.capabilities |= FASCAP_DMA;
 		}
 	}
 
-	fas216_init(host);
-
-	ret = scsi_add_host(host, &ec->dev);
+	ret = fas216_add(host, &ec->dev);
 	if (ret == 0)
 		goto out;
-
-	fas216_release(host);
 
 	if (host->dma_channel != NO_DMA)
 		free_dma(host->dma_channel);
 	free_irq(host->irq, host);
- out_region:
-	release_region(host->io_port + CUMANASCSI2_FAS216_OFFSET,
-		       CUMANASCSI2_FAS216_SIZE);
+
+ out_release:
+	fas216_release(host);
+
  out_free:
 	scsi_unregister(host);
+
+ out_unmap:
+	iounmap(base);
+
+ out_region:
+	release_mem_region(resbase, reslen);
 
  out:
 	return ret;
@@ -527,17 +541,24 @@ cumanascsi2_probe(struct expansion_card *ec, const struct ecard_id *id)
 static void __devexit cumanascsi2_remove(struct expansion_card *ec)
 {
 	struct Scsi_Host *host = ecard_get_drvdata(ec);
+	struct cumanascsi2_info *info = (struct cumanascsi2_info *)host->hostdata;
+	unsigned long resbase, reslen;
 
 	ecard_set_drvdata(ec, NULL);
-	scsi_remove_host(host);
-	fas216_release(host);
+	fas216_remove(host);
 
 	if (host->dma_channel != NO_DMA)
 		free_dma(host->dma_channel);
-	free_irq(host->irq, host);
-	release_region(host->io_port + CUMANASCSI2_FAS216_OFFSET,
-		       CUMANASCSI2_FAS216_SIZE);
+	free_irq(host->irq, info);
 
+	iounmap((void *)host->base);
+
+	resbase = ecard_resource_start(ec, ECARD_RES_MEMC);
+	reslen = ecard_resource_len(ec, ECARD_RES_MEMC);
+
+	release_mem_region(resbase, reslen);
+
+	fas216_release(host);
 	scsi_unregister(host);
 }
 
@@ -551,7 +572,8 @@ static struct ecard_driver cumanascsi2_driver = {
 	.remove		= __devexit_p(cumanascsi2_remove),
 	.id_table	= cumanascsi2_cids,
 	.drv = {
-		.name	= "cumanascsi2",
+		.devclass	= &shost_devclass,
+		.name		= "cumanascsi2",
 	},
 };
 
