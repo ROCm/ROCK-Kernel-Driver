@@ -4,7 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (c) 2001 Silicon Graphics, Inc.  All rights reserved.
+ * Copyright (c) 2001-2003 Silicon Graphics, Inc.  All rights reserved.
  */
 
 
@@ -25746,14 +25746,14 @@
 /*                           Real-time Clock                            */
 /* ==================================================================== */
 
-#define SH_RTC                                   0x00000001101c0000
-#define SH_RTC_MASK                              0x007fffffffffffff
+#define SH_RTC                                   0x00000001101c0000UL
+#define SH_RTC_MASK                              0x007fffffffffffffUL
 #define SH_RTC_INIT                              0x0000000000000000
 
 /*   SH_RTC_REAL_TIME_CLOCK                                             */
 /*   Description:  Real-time Clock                                      */
 #define SH_RTC_REAL_TIME_CLOCK_SHFT              0
-#define SH_RTC_REAL_TIME_CLOCK_MASK              0x007fffffffffffff
+#define SH_RTC_REAL_TIME_CLOCK_MASK              0x007fffffffffffffUL
 
 /* ==================================================================== */
 /*                        Register "SH_SCRATCH0"                        */

@@ -56,7 +56,7 @@ struct sigcontext {
 	unsigned long		sc_rbs_base;	/* NULL or new base of sighandler's rbs */
 	unsigned long		sc_loadrs;	/* see description above */
 
-	unsigned long		sc_ar25;	/* rsvd for scratch use */
+	unsigned long		sc_ar25;	/* cmp8xchg16 uses this */
 	unsigned long		sc_ar26;	/* rsvd for scratch use */
 	unsigned long		sc_rsvd[12];	/* reserved for future use */
 	/*

@@ -1,9 +1,14 @@
 /*
  * arch/ia64/kernel/ivt.S
  *
- * Copyright (C) 1998-2001 Hewlett-Packard Co
+ * Copyright (C) 1998-2001, 2003 Hewlett-Packard Co
  *	Stephane Eranian <eranian@hpl.hp.com>
  *	David Mosberger <davidm@hpl.hp.com>
+ * Copyright (C) 2000, 2002-2003 Intel Co
+ *	Asit Mallick <asit.k.mallick@intel.com>
+ *      Suresh Siddha <suresh.b.siddha@intel.com>
+ *      Kenneth Chen <kenneth.w.chen@intel.com>
+ *      Fenghua Yu <fenghua.yu@intel.com>
  *
  * 00/08/23 Asit Mallick <asit.k.mallick@intel.com> TLB handling for SMP
  * 00/12/20 David Mosberger-Tang <davidm@hpl.hp.com> DTLB/ITLB handler now uses virtual PT.
@@ -122,8 +127,11 @@ ENTRY(vhpt_miss)
 	shr.u r18=r22,PGDIR_SHIFT		// get bits 33-63 of the faulting address
 	;;
 (p7)	dep r17=r17,r19,(PAGE_SHIFT-3),3	// put region number bits in place
-	srlz.d					// ensure "rsm psr.dt" has taken effect
-(p6)	movl r19=__pa(swapper_pg_dir)		// region 5 is rooted at swapper_pg_dir
+
+	srlz.d
+	LOAD_PHYSICAL(p6, r19, swapper_pg_dir)	// region 5 is rooted at swapper_pg_dir
+
+	.pred.rel "mutex", p6, p7
 (p6)	shr.u r21=r21,PGDIR_SHIFT+PAGE_SHIFT
 (p7)	shr.u r21=r21,PGDIR_SHIFT+PAGE_SHIFT-3
 	;;
@@ -415,8 +423,11 @@ ENTRY(nested_dtlb_miss)
 	shr.u r18=r16,PGDIR_SHIFT		// get bits 33-63 of faulting address
 	;;
 (p7)	dep r17=r17,r19,(PAGE_SHIFT-3),3	// put region number bits in place
+
 	srlz.d
-(p6)	movl r19=__pa(swapper_pg_dir)		// region 5 is rooted at swapper_pg_dir
+	LOAD_PHYSICAL(p6, r19, swapper_pg_dir)	// region 5 is rooted at swapper_pg_dir
+
+	.pred.rel "mutex", p6, p7
 (p6)	shr.u r21=r21,PGDIR_SHIFT+PAGE_SHIFT
 (p7)	shr.u r21=r21,PGDIR_SHIFT+PAGE_SHIFT-3
 	;;
@@ -622,102 +633,94 @@ END(daccess_bit)
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x2c00 Entry 11 (size 64 bundles) Break instruction (33)
 ENTRY(break_fault)
+	/*
+	 * The streamlined system call entry/exit paths only save/restore the initial part
+	 * of pt_regs.  This implies that the callers of system-calls must adhere to the
+	 * normal procedure calling conventions.
+	 *
+	 *   Registers to be saved & restored:
+	 *	CR registers: cr.ipsr, cr.iip, cr.ifs
+	 *	AR registers: ar.unat, ar.pfs, ar.rsc, ar.rnat, ar.bspstore, ar.fpsr
+	 * 	others: pr, b0, b6, loadrs, r1, r11, r12, r13, r15
+	 *   Registers to be restored only:
+	 * 	r8-r11: output value from the system call.
+	 *
+	 * During system call exit, scratch registers (including r15) are modified/cleared
+	 * to prevent leaking bits from kernel to user level.
+	 */
 	DBG_FAULT(11)
-	mov r16=cr.iim
-	mov r17=__IA64_BREAK_SYSCALL
-	mov r31=pr		// prepare to save predicates
+	mov r16=IA64_KR(CURRENT)		// r16 = current task; 12 cycle read lat.
+	mov r17=cr.iim
+	mov r18=__IA64_BREAK_SYSCALL
+	mov r21=ar.fpsr
+	mov r29=cr.ipsr
+	mov r19=b6
+	mov r25=ar.unat
+	mov r27=ar.rsc
+	mov r26=ar.pfs
+	mov r28=cr.iip
+	mov r31=pr				// prepare to save predicates
+	mov r20=r1
 	;;
-	cmp.eq p0,p7=r16,r17	// is this a system call? (p7 <- false, if so)
+	adds r16=IA64_TASK_THREAD_ON_USTACK_OFFSET,r16
+	cmp.eq p0,p7=r18,r17			// is this a system call? (p7 <- false, if so)
 (p7)	br.cond.spnt non_syscall
+	;;
+	ld1 r17=[r16]				// load current->thread.on_ustack flag
+	st1 [r16]=r0				// clear current->thread.on_ustack flag
+	add r1=-IA64_TASK_THREAD_ON_USTACK_OFFSET,r16	// set r1 for MINSTATE_START_SAVE_MIN_VIRT
+	;;
+	invala
 
-	SAVE_MIN				// uses r31; defines r2:
+	/* adjust return address so we skip over the break instruction: */
 
+	extr.u r8=r29,41,2			// extract ei field from cr.ipsr
+	;;
+	cmp.eq p6,p7=2,r8			// isr.ei==2?
+	mov r2=r1				// setup r2 for ia64_syscall_setup
+	;;
+(p6)	mov r8=0				// clear ei to 0
+(p6)	adds r28=16,r28				// switch cr.iip to next bundle cr.ipsr.ei wrapped
+(p7)	adds r8=1,r8				// increment ei to next slot
+	;;
+	cmp.eq pKStk,pUStk=r0,r17		// are we in kernel mode already?
+	dep r29=r8,r29,41,2			// insert new ei into cr.ipsr
+	;;
+
+	// switch from user to kernel RBS:
+	MINSTATE_START_SAVE_MIN_VIRT
+	br.call.sptk.many b7=ia64_syscall_setup
+	;;
+	MINSTATE_END_SAVE_MIN_VIRT		// switch to bank 1
 	ssm psr.ic | PSR_DEFAULT_BITS
 	;;
 	srlz.i					// guarantee that interruption collection is on
-	cmp.eq pSys,pNonSys=r0,r0		// set pSys=1, pNonSys=0
 	;;
-(p15)	ssm psr.i		// restore psr.i
-	adds r8=(IA64_PT_REGS_R8_OFFSET-IA64_PT_REGS_R16_OFFSET),r2
+(p15)	ssm psr.i				// restore psr.i
 	;;
-	stf8 [r8]=f1		// ensure pt_regs.r8 != 0 (see handle_syscall_error)
-	adds r3=8,r2		// set up second base pointer for SAVE_REST
-	;;
-	SAVE_REST
-	br.call.sptk.many rp=demine_args	// clear NaT bits in (potential) syscall args
-
-	mov r3=255
-	adds r15=-1024,r15			// r15 contains the syscall number---subtract 1024
-	;;
-	cmp.geu p6,p7=r3,r15		// (syscall > 0 && syscall <= 1024+255) ?
+	mov r3=NR_syscalls - 1
 	movl r16=sys_call_table
-	;;
-(p6)	shladd r16=r15,3,r16
-	movl r15=ia64_ret_from_syscall
-(p7)	adds r16=(__NR_ni_syscall-1024)*8,r16	// force __NR_ni_syscall
-	;;
-	ld8 r16=[r16]				// load address of syscall entry point
-	mov rp=r15				// set the real return addr
-	;;
-	mov b6=r16
 
-	// arrange things so we skip over break instruction when returning:
-
-	adds r16=16,sp				// get pointer to cr_ipsr
-	adds r17=24,sp				// get pointer to cr_iip
+	adds r15=-1024,r15			// r15 contains the syscall number---subtract 1024
+	movl r2=ia64_ret_from_syscall
+	;;
+	shladd r20=r15,3,r16			// r20 = sys_call_table + 8*(syscall-1024)
+	cmp.geu p0,p7=r3,r15			// (syscall > 0 && syscall < 1024 + NR_syscalls) ?
+	mov rp=r2				// set the real return addr
+	;;
+(p7)	add r20=(__NR_ni_syscall-1024)*8,r16	// force __NR_ni_syscall
 	add r2=TI_FLAGS+IA64_TASK_SIZE,r13
 	;;
-	ld8 r18=[r16]				// fetch cr_ipsr
+	ld8 r20=[r20]				// load address of syscall entry point
 	ld4 r2=[r2]				// r2 = current_thread_info()->flags
 	;;
-	ld8 r19=[r17]				// fetch cr_iip
-	extr.u r20=r18,41,2			// extract ei field
-	;;
-	cmp.eq p6,p7=2,r20			// isr.ei==2?
-	adds r19=16,r19				// compute address of next bundle
-	;;
-(p6)	mov r20=0				// clear ei to 0
-(p7)	adds r20=1,r20				// increment ei to next slot
-	;;
-(p6)	st8 [r17]=r19				// store new cr.iip if cr.isr.ei wrapped around
-	dep r18=r20,r18,41,2			// insert new ei into cr.isr
 	tbit.z p8,p0=r2,TIF_SYSCALL_TRACE
+	mov b6=r20
 	;;
-	st8 [r16]=r18				// store new value for cr.isr
-
 (p8)	br.call.sptk.many b6=b6			// ignore this return addr
 	br.cond.sptk ia64_trace_syscall
 	// NOT REACHED
 END(break_fault)
-
-ENTRY_MIN_ALIGN(demine_args)
-	alloc r2=ar.pfs,8,0,0,0
-	tnat.nz p8,p0=in0
-	tnat.nz p9,p0=in1
-	;;
-(p8)	mov in0=-1
-	tnat.nz p10,p0=in2
-	tnat.nz p11,p0=in3
-
-(p9)	mov in1=-1
-	tnat.nz p12,p0=in4
-	tnat.nz p13,p0=in5
-	;;
-(p10)	mov in2=-1
-	tnat.nz p14,p0=in6
-	tnat.nz p15,p0=in7
-
-(p11)	mov in3=-1
-	tnat.nz p8,p0=r15	// demining r15 is not a must, but it is safer
-
-(p12)	mov in4=-1
-(p13)	mov in5=-1
-	;;
-(p14)	mov in6=-1
-(p15)	mov in7=-1
-(p8)	mov r15=-1
-	br.ret.sptk.many rp
-END(demine_args)
 
 	.org ia64_ivt+0x3000
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -726,7 +729,6 @@ ENTRY(interrupt)
 	DBG_FAULT(12)
 	mov r31=pr		// prepare to save predicates
 	;;
-
 	SAVE_MIN_WITH_COVER	// uses r31; defines r2 and r3
 	ssm psr.ic | PSR_DEFAULT_BITS
 	;;
@@ -739,7 +741,7 @@ ENTRY(interrupt)
 	mov out0=cr.ivr		// pass cr.ivr as first arg
 	add out1=16,sp		// pass pointer to pt_regs as second arg
 	;;
-	srlz.d			// make  sure we see the effect of cr.ivr
+	srlz.d			// make sure we see the effect of cr.ivr
 	movl r14=ia64_leave_kernel
 	;;
 	mov rp=r14
@@ -757,6 +759,131 @@ END(interrupt)
 // 0x3800 Entry 14 (size 64 bundles) Reserved
 	DBG_FAULT(14)
 	FAULT(14)
+
+	/*
+	 * There is no particular reason for this code to be here, other than that
+	 * there happens to be space here that would go unused otherwise.  If this
+	 * fault ever gets "unreserved", simply moved the following code to a more
+	 * suitable spot...
+	 *
+	 * ia64_syscall_setup() is a separate subroutine so that it can
+	 *	allocate stacked registers so it can safely demine any
+	 *	potential NaT values from the input registers.
+	 *
+	 * On entry:
+	 *	- executing on bank 0 or bank 1 register set (doesn't matter)
+	 *	-  r1: stack pointer
+	 *	-  r2: current task pointer
+	 *	-  r3: preserved
+	 *	- r11: original contents (saved ar.pfs to be saved)
+	 *	- r12: original contents (sp to be saved)
+	 *	- r13: original contents (tp to be saved)
+	 *	- r15: original contents (syscall # to be saved)
+	 *	- r18: saved bsp (after switching to kernel stack)
+	 *	- r19: saved b6
+	 *	- r20: saved r1 (gp)
+	 *	- r21: saved ar.fpsr
+	 *	- r22: kernel's register backing store base (krbs_base)
+	 *	- r23: saved ar.bspstore
+	 *	- r24: saved ar.rnat
+	 *	- r25: saved ar.unat
+	 *	- r26: saved ar.pfs
+	 *	- r27: saved ar.rsc
+	 *	- r28: saved cr.iip
+	 *	- r29: saved cr.ipsr
+	 *	- r31: saved pr
+	 *	-  b0: original contents (to be saved)
+	 * On exit:
+	 *	- executing on bank 1 registers
+	 *	- psr.ic enabled, interrupts restored
+	 *	-  r1: kernel's gp
+	 *	-  r3: preserved (same as on entry)
+	 *	- r12: points to kernel stack
+	 *	- r13: points to current task
+	 *	- p15: TRUE if interrupts need to be re-enabled
+	 *	- ar.fpsr: set to kernel settings
+	 */
+GLOBAL_ENTRY(ia64_syscall_setup)
+#if PT(B6) != 0
+# error This code assumes that b6 is the first field in pt_regs.
+#endif
+	st8 [r1]=r19				// save b6
+	add r16=PT(CR_IPSR),r1			// initialize first base pointer
+	add r17=PT(R11),r1			// initialize second base pointer
+	;;
+	alloc r19=ar.pfs,8,0,0,0		// ensure in0-in7 are writable
+	st8 [r16]=r29,PT(CR_IFS)-PT(CR_IPSR)	// save cr.ipsr
+	tnat.nz p8,p0=in0
+
+	st8.spill [r17]=r11,PT(CR_IIP)-PT(R11)	// save r11
+	tnat.nz p9,p0=in1
+(pKStk)	mov r18=r0				// make sure r18 isn't NaT
+	;;
+
+	st8 [r17]=r28,PT(AR_UNAT)-PT(CR_IIP)	// save cr.iip
+	mov r28=b0				// save b0 (2 cyc)
+(p8)	mov in0=-1
+	;;
+
+	st8 [r16]=r0,PT(AR_PFS)-PT(CR_IFS)	// clear cr.ifs
+	st8 [r17]=r25,PT(AR_RSC)-PT(AR_UNAT)	// save ar.unat
+(p9)	mov in1=-1
+	;;
+
+	st8 [r16]=r26,PT(AR_RNAT)-PT(AR_PFS)	// save ar.pfs
+	st8 [r17]=r27,PT(AR_BSPSTORE)-PT(AR_RSC)// save ar.rsc
+	tnat.nz p10,p0=in2
+
+(pUStk) sub r18=r18,r22				// r18=RSE.ndirty*8
+	tbit.nz p15,p0=r29,IA64_PSR_I_BIT
+	tnat.nz p11,p0=in3
+	;;
+(pKStk) adds r16=PT(PR)-PT(AR_RNAT),r16		// skip over ar_rnat field
+(pKStk) adds r17=PT(B0)-PT(AR_BSPSTORE),r17	// skip over ar_bspstore field
+(p10)	mov in2=-1
+
+(p11)	mov in3=-1
+	tnat.nz p12,p0=in4
+	tnat.nz p13,p0=in5
+	;;
+(pUStk) st8 [r16]=r24,PT(PR)-PT(AR_RNAT)	// save ar.rnat
+(pUStk) st8 [r17]=r23,PT(B0)-PT(AR_BSPSTORE)	// save ar.bspstore
+	shl r18=r18,16				// compute ar.rsc to be used for "loadrs"
+	;;
+	st8 [r16]=r31,PT(LOADRS)-PT(PR)		// save predicates
+	st8 [r17]=r28,PT(R1)-PT(B0)		// save b0
+(p12)	mov in4=-1
+	;;
+	st8 [r16]=r18,PT(R12)-PT(LOADRS)	// save ar.rsc value for "loadrs"
+	st8.spill [r17]=r20,PT(R13)-PT(R1)	// save original r1
+(p13)	mov in5=-1
+	;;
+
+.mem.offset 0,0; st8.spill [r16]=r12,PT(AR_FPSR)-PT(R12)	// save r12
+.mem.offset 8,0; st8.spill [r17]=r13,PT(R15)-PT(R13)		// save r13
+	tnat.nz p14,p0=in6
+	;;
+	st8 [r16]=r21,PT(R8)-PT(AR_FPSR)	// save ar.fpsr
+	st8.spill [r17]=r15			// save r15
+	tnat.nz p8,p0=in7
+	;;
+	stf8 [r16]=f1		// ensure pt_regs.r8 != 0 (see handle_syscall_error)
+	adds r12=-16,r1		// switch to kernel memory stack (with 16 bytes of scratch)
+(p14)	mov in6=-1
+
+	mov r13=r2				// establish `current'
+	movl r1=__gp				// establish kernel global pointer
+	;;
+(p8)	mov in7=-1
+	tnat.nz p9,p0=r15
+
+	cmp.eq pSys,pNonSys=r0,r0		// set pSys=1, pNonSys=0
+	movl r17=FPSR_DEFAULT
+	;;
+	mov.m ar.fpsr=r17			// set ar.fpsr to kernel default value
+(p9)	mov r15=-1
+	br.ret.sptk.many b7
+END(ia64_syscall_setup)
 
 	.org ia64_ivt+0x3c00
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -808,90 +935,6 @@ END(dispatch_illegal_op_fault)
 // 0x4000 Entry 16 (size 64 bundles) Reserved
 	DBG_FAULT(16)
 	FAULT(16)
-
-#ifdef CONFIG_IA32_SUPPORT
-
-	/*
-	 * There is no particular reason for this code to be here, other than that
-	 * there happens to be space here that would go unused otherwise.  If this
-	 * fault ever gets "unreserved", simply moved the following code to a more
-	 * suitable spot...
-	 */
-
-	// IA32 interrupt entry point
-
-ENTRY(dispatch_to_ia32_handler)
-	SAVE_MIN
-	;;
-	mov r14=cr.isr
-	ssm psr.ic | PSR_DEFAULT_BITS
-	;;
-	srlz.i					// guarantee that interruption collection is on
-	;;
-(p15)	ssm psr.i
-	adds r3=8,r2            // Base pointer for SAVE_REST
-	;;
-	SAVE_REST
-	;;
-	mov r15=0x80
-	shr r14=r14,16          // Get interrupt number
-	;;
-	cmp.ne p6,p0=r14,r15
-(p6)    br.call.dpnt.many b6=non_ia32_syscall
-
-	adds r14=IA64_PT_REGS_R8_OFFSET + 16,sp	// 16 byte hole per SW conventions
-	adds r15=IA64_PT_REGS_R1_OFFSET + 16,sp
-	;;
-	cmp.eq pSys,pNonSys=r0,r0 // set pSys=1, pNonSys=0
-	st8 [r15]=r8		// save original EAX in r1 (IA32 procs don't use the GP)
-	;;
-	alloc r15=ar.pfs,0,0,6,0	// must first in an insn group
-	;;
-	ld4 r8=[r14],8		// r8 == eax (syscall number)
-	mov r15=250		// number of entries in ia32 system call table
-	;;
-	cmp.ltu.unc p6,p7=r8,r15
-	ld4 out1=[r14],8	// r9 == ecx
-	;;
-	ld4 out2=[r14],8	// r10 == edx
-	;;
-	ld4 out0=[r14]		// r11 == ebx
-	adds r14=(IA64_PT_REGS_R8_OFFSET-(8*3)) + 16,sp
-	;;
-	ld4 out5=[r14],8	// r13 == ebp
-	;;
-	ld4 out3=[r14],8	// r14 == esi
-	adds r2=TI_FLAGS+IA64_TASK_SIZE,r13
-	;;
-	ld4 out4=[r14]		// r15 == edi
-	movl r16=ia32_syscall_table
-	;;
-(p6)    shladd r16=r8,3,r16	// force ni_syscall if not valid syscall number
-	ld4 r2=[r2]		// r2 = current_thread_info()->flags
-	;;
-	ld8 r16=[r16]
-	tbit.z p8,p0=r2,TIF_SYSCALL_TRACE
-	;;
-	mov b6=r16
-	movl r15=ia32_ret_from_syscall
-	;;
-	mov rp=r15
-(p8)	br.call.sptk.many b6=b6
-	br.cond.sptk ia32_trace_syscall
-
-non_ia32_syscall:
-	alloc r15=ar.pfs,0,0,2,0
-	mov out0=r14				// interrupt #
-	add out1=16,sp				// pointer to pt_regs
-	;;			// avoid WAW on CFM
-	br.call.sptk.many rp=ia32_bad_interrupt
-.ret1:	movl r15=ia64_leave_kernel
-	;;
-	mov rp=r15
-	br.ret.sptk.many rp
-END(dispatch_to_ia32_handler)
-
-#endif /* CONFIG_IA32_SUPPORT */
 
 	.org ia64_ivt+0x4400
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -1428,3 +1471,89 @@ END(ia32_interrupt)
 // 0x7f00 Entry 67 (size 16 bundles) Reserved
 	DBG_FAULT(67)
 	FAULT(67)
+
+#ifdef CONFIG_IA32_SUPPORT
+
+	/*
+	 * There is no particular reason for this code to be here, other than that
+	 * there happens to be space here that would go unused otherwise.  If this
+	 * fault ever gets "unreserved", simply moved the following code to a more
+	 * suitable spot...
+	 */
+
+	// IA32 interrupt entry point
+
+ENTRY(dispatch_to_ia32_handler)
+	SAVE_MIN
+	;;
+	mov r14=cr.isr
+	ssm psr.ic | PSR_DEFAULT_BITS
+	;;
+	srlz.i					// guarantee that interruption collection is on
+	;;
+(p15)	ssm psr.i
+	adds r3=8,r2		// Base pointer for SAVE_REST
+	;;
+	SAVE_REST
+	;;
+	mov r15=0x80
+	shr r14=r14,16		// Get interrupt number
+	;;
+	cmp.ne p6,p0=r14,r15
+(p6)	br.call.dpnt.many b6=non_ia32_syscall
+
+	adds r14=IA64_PT_REGS_R8_OFFSET + 16,sp	// 16 byte hole per SW conventions
+	adds r15=IA64_PT_REGS_R1_OFFSET + 16,sp
+	;;
+	cmp.eq pSys,pNonSys=r0,r0 // set pSys=1, pNonSys=0
+	ld8 r8=[r14]		// get r8
+	;;
+	st8 [r15]=r8		// save original EAX in r1 (IA32 procs don't use the GP)
+	;;
+	alloc r15=ar.pfs,0,0,6,0	// must first in an insn group
+	;;
+	ld4 r8=[r14],8		// r8 == eax (syscall number)
+	mov r15=250		// number of entries in ia32 system call table
+	;;
+	cmp.ltu.unc p6,p7=r8,r15
+	ld4 out1=[r14],8	// r9 == ecx
+	;;
+	ld4 out2=[r14],8	// r10 == edx
+	;;
+	ld4 out0=[r14]		// r11 == ebx
+	adds r14=(IA64_PT_REGS_R13_OFFSET) + 16,sp
+	;;
+	ld4 out5=[r14],PT(R14)-PT(R13)	// r13 == ebp
+	;;
+	ld4 out3=[r14],PT(R15)-PT(R14)	// r14 == esi
+	adds r2=TI_FLAGS+IA64_TASK_SIZE,r13
+	;;
+	ld4 out4=[r14]		// r15 == edi
+	movl r16=ia32_syscall_table
+	;;
+(p6)	shladd r16=r8,3,r16	// force ni_syscall if not valid syscall number
+	ld4 r2=[r2]		// r2 = current_thread_info()->flags
+	;;
+	ld8 r16=[r16]
+	tbit.z p8,p0=r2,TIF_SYSCALL_TRACE
+	;;
+	mov b6=r16
+	movl r15=ia32_ret_from_syscall
+	;;
+	mov rp=r15
+(p8)	br.call.sptk.many b6=b6
+	br.cond.sptk ia32_trace_syscall
+
+non_ia32_syscall:
+	alloc r15=ar.pfs,0,0,2,0
+	mov out0=r14				// interrupt #
+	add out1=16,sp				// pointer to pt_regs
+	;;			// avoid WAW on CFM
+	br.call.sptk.many rp=ia32_bad_interrupt
+.ret1:	movl r15=ia64_leave_kernel
+	;;
+	mov rp=r15
+	br.ret.sptk.many rp
+END(dispatch_to_ia32_handler)
+
+#endif /* CONFIG_IA32_SUPPORT */

@@ -1,7 +1,7 @@
 /*
  * Initialize MMU support.
  *
- * Copyright (C) 1998-2002 Hewlett-Packard Co
+ * Copyright (C) 1998-2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 #include <linux/config.h>
@@ -9,13 +9,14 @@
 #include <linux/init.h>
 
 #include <linux/bootmem.h>
+#include <linux/efi.h>
+#include <linux/elf.h>
 #include <linux/mm.h>
+#include <linux/mmzone.h>
 #include <linux/personality.h>
 #include <linux/reboot.h>
 #include <linux/slab.h>
 #include <linux/swap.h>
-#include <linux/efi.h>
-#include <linux/mmzone.h>
 
 #include <asm/a.out.h>
 #include <asm/bitops.h>
@@ -23,13 +24,15 @@
 #include <asm/ia32.h>
 #include <asm/io.h>
 #include <asm/machvec.h>
+#include <asm/patch.h>
 #include <asm/pgalloc.h>
 #include <asm/sal.h>
 #include <asm/system.h>
-#include <asm/uaccess.h>
 #include <asm/tlb.h>
+#include <asm/uaccess.h>
+#include <asm/unistd.h>
 
-struct mmu_gather mmu_gathers[NR_CPUS];
+DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
 
 /* References to section boundaries: */
 extern char _stext, _etext, _edata, __init_begin, __init_end, _end;
@@ -46,6 +49,8 @@ unsigned long MAX_DMA_ADDRESS = PAGE_OFFSET + 0x100000000UL;
 #endif
 
 static int pgt_cache_water[2] = { 25, 50 };
+
+struct page *zero_page_memmap_ptr;		/* map entry for zero page */
 
 void
 check_pgt_cache (void)
@@ -65,6 +70,36 @@ check_pgt_cache (void)
 	}
 }
 
+void
+update_mmu_cache (struct vm_area_struct *vma, unsigned long vaddr, pte_t pte)
+{
+	unsigned long addr;
+	struct page *page;
+
+	if (!pte_exec(pte))
+		return;				/* not an executable page... */
+
+	page = pte_page(pte);
+	/* don't use VADDR: it may not be mapped on this CPU (or may have just been flushed): */
+	addr = (unsigned long) page_address(page);
+
+	if (test_bit(PG_arch_1, &page->flags))
+		return;				/* i-cache is already coherent with d-cache */
+
+	flush_icache_range(addr, addr + PAGE_SIZE);
+	set_bit(PG_arch_1, &page->flags);	/* mark page as clean */
+}
+
+inline void
+ia64_set_rbs_bot (void)
+{
+	unsigned long stack_size = current->rlim[RLIMIT_STACK].rlim_max & -16;
+
+	if (stack_size > MAX_USER_STACK_SIZE)
+		stack_size = MAX_USER_STACK_SIZE;
+	current->thread.rbs_bot = STACK_TOP - stack_size;
+}
+
 /*
  * This performs some platform-dependent address space initialization.
  * On IA-64, we want to setup the VM area for the register backing
@@ -76,6 +111,8 @@ ia64_init_addr_space (void)
 {
 	struct vm_area_struct *vma;
 
+	ia64_set_rbs_bot();
+
 	/*
 	 * If we're out of memory and kmem_cache_alloc() returns NULL, we simply ignore
 	 * the problem.  When the process attempts to write to the register backing store
@@ -84,7 +121,7 @@ ia64_init_addr_space (void)
 	vma = kmem_cache_alloc(vm_area_cachep, SLAB_KERNEL);
 	if (vma) {
 		vma->vm_mm = current->mm;
-		vma->vm_start = IA64_RBS_BOT;
+		vma->vm_start = current->thread.rbs_bot;
 		vma->vm_end = vma->vm_start + PAGE_SIZE;
 		vma->vm_page_prot = protection_map[VM_DATA_DEFAULT_FLAGS & 0x7];
 		vma->vm_flags = VM_READ|VM_WRITE|VM_MAYREAD|VM_MAYWRITE|VM_GROWSUP;
@@ -112,14 +149,16 @@ ia64_init_addr_space (void)
 void
 free_initmem (void)
 {
-	unsigned long addr;
+	unsigned long addr, eaddr;
 
-	addr = (unsigned long) &__init_begin;
-	for (; addr < (unsigned long) &__init_end; addr += PAGE_SIZE) {
+	addr = (unsigned long) ia64_imva(&__init_begin);
+	eaddr = (unsigned long) ia64_imva(&__init_end);
+	while (addr < eaddr) {
 		ClearPageReserved(virt_to_page(addr));
 		set_page_count(virt_to_page(addr), 1);
 		free_page(addr);
 		++totalram_pages;
+		addr += PAGE_SIZE;
 	}
 	printk(KERN_INFO "Freeing unused kernel memory: %ldkB freed\n",
 	       (&__init_end - &__init_begin) >> 10);
@@ -230,18 +269,17 @@ show_mem(void)
 }
 
 /*
- * This is like put_dirty_page() but installs a clean page with PAGE_GATE protection
- * (execute-only, typically).
+ * This is like put_dirty_page() but installs a clean page in the kernel's page table.
  */
 struct page *
-put_gate_page (struct page *page, unsigned long address)
+put_kernel_page (struct page *page, unsigned long address, pgprot_t pgprot)
 {
 	pgd_t *pgd;
 	pmd_t *pmd;
 	pte_t *pte;
 
 	if (!PageReserved(page))
-		printk(KERN_ERR "put_gate_page: gate page at 0x%p not in reserved memory\n",
+		printk(KERN_ERR "put_kernel_page: page at 0x%p not in reserved memory\n",
 		       page_address(page));
 
 	pgd = pgd_offset_k(address);		/* note: this is NOT pgd_offset()! */
@@ -258,7 +296,7 @@ put_gate_page (struct page *page, unsigned long address)
 			pte_unmap(pte);
 			goto out;
 		}
-		set_pte(pte, mk_pte(page, PAGE_GATE));
+		set_pte(pte, mk_pte(page, pgprot));
 		pte_unmap(pte);
 	}
   out:	spin_unlock(&init_mm.page_table_lock);
@@ -266,10 +304,31 @@ put_gate_page (struct page *page, unsigned long address)
 	return page;
 }
 
+static void
+setup_gate (void)
+{
+	struct page *page;
+	extern char __start_gate_section[];
+
+	/*
+	 * Map the gate page twice: once read-only to export the ELF headers etc. and once
+	 * execute-only page to enable privilege-promotion via "epc":
+	 */
+	page = virt_to_page(ia64_imva(__start_gate_section));
+	put_kernel_page(page, GATE_ADDR, PAGE_READONLY);
+#ifdef HAVE_BUGGY_SEGREL
+	page = virt_to_page(ia64_imva(__start_gate_section + PAGE_SIZE));
+	put_kernel_page(page, GATE_ADDR + PAGE_SIZE, PAGE_GATE);
+#else
+	put_kernel_page(page, GATE_ADDR + PERCPU_PAGE_SIZE, PAGE_GATE);
+#endif
+	ia64_patch_gate();
+}
+
 void __init
 ia64_mmu_init (void *my_cpu_data)
 {
-	unsigned long psr, rid, pta, impl_va_bits;
+	unsigned long psr, pta, impl_va_bits;
 	extern void __init tlb_init (void);
 #ifdef CONFIG_DISABLE_VHPT
 #	define VHPT_ENABLE_BIT	0
@@ -277,21 +336,8 @@ ia64_mmu_init (void *my_cpu_data)
 #	define VHPT_ENABLE_BIT	1
 #endif
 
-	/*
-	 * Set up the kernel identity mapping for regions 6 and 5.  The mapping for region
-	 * 7 is setup up in _start().
-	 */
+	/* Pin mapping for percpu area into TLB */
 	psr = ia64_clear_ic();
-
-	rid = ia64_rid(IA64_REGION_ID_KERNEL, __IA64_UNCACHED_OFFSET);
-	ia64_set_rr(__IA64_UNCACHED_OFFSET, (rid << 8) | (IA64_GRANULE_SHIFT << 2));
-
-	rid = ia64_rid(IA64_REGION_ID_KERNEL, VMALLOC_START);
-	ia64_set_rr(VMALLOC_START, (rid << 8) | (PAGE_SHIFT << 2) | 1);
-
-	/* ensure rr6 is up-to-date before inserting the PERCPU_ADDR translation: */
-	ia64_srlz_d();
-
 	ia64_itr(0x2, IA64_TR_PERCPU_DATA, PERCPU_ADDR,
 		 pte_val(pfn_pte(__pa(my_cpu_data) >> PAGE_SHIFT, PAGE_KERNEL)),
 		 PERCPU_PAGE_SHIFT);
@@ -489,6 +535,7 @@ paging_init (void)
 
 	discontig_paging_init();
 	efi_memmap_walk(count_pages, &num_physpages);
+	zero_page_memmap_ptr = virt_to_page(ia64_imva(empty_zero_page));
 }
 #else /* !CONFIG_DISCONTIGMEM */
 void
@@ -560,6 +607,7 @@ paging_init (void)
 	}
 	free_area_init(zones_size);
 #  endif /* !CONFIG_VIRTUAL_MEM_MAP */
+	zero_page_memmap_ptr = virt_to_page(ia64_imva(empty_zero_page));
 }
 #endif /* !CONFIG_DISCONTIGMEM */
 
@@ -576,13 +624,32 @@ count_reserved_pages (u64 start, u64 end, void *arg)
 	return 0;
 }
 
+/*
+ * Boot command-line option "nolwsys" can be used to disable the use of any light-weight
+ * system call handler.  When this option is in effect, all fsyscalls will end up bubbling
+ * down into the kernel and calling the normal (heavy-weight) syscall handler.  This is
+ * useful for performance testing, but conceivably could also come in handy for debugging
+ * purposes.
+ */
+
+static int nolwsys;
+
+static int __init
+nolwsys_setup (char *s)
+{
+	nolwsys = 1;
+	return 1;
+}
+
+__setup("nolwsys", nolwsys_setup);
+
 void
 mem_init (void)
 {
-	extern char __start_gate_section[];
 	long reserved_pages, codesize, datasize, initsize;
 	unsigned long num_pgt_pages;
 	pg_data_t *pgdat;
+	int i;
 	static struct kcore_list kcore_mem, kcore_vmem, kcore_kernel;
 
 #ifdef CONFIG_PCI
@@ -634,8 +701,19 @@ mem_init (void)
 	if (num_pgt_pages > (u64) pgt_cache_water[1])
 		pgt_cache_water[1] = num_pgt_pages;
 
-	/* install the gate page in the global page table: */
-	put_gate_page(virt_to_page(__start_gate_section), GATE_ADDR);
+	/*
+	 * For fsyscall entrpoints with no light-weight handler, use the ordinary
+	 * (heavy-weight) handler, but mark it by setting bit 0, so the fsyscall entry
+	 * code can tell them apart.
+	 */
+	for (i = 0; i < NR_syscalls; ++i) {
+		extern unsigned long fsyscall_table[NR_syscalls];
+		extern unsigned long sys_call_table[NR_syscalls];
+
+		if (!fsyscall_table[i] || nolwsys)
+			fsyscall_table[i] = sys_call_table[i] | 1;
+	}
+	setup_gate();	/* setup gate pages before we free up boot memory... */
 
 #ifdef CONFIG_IA32_SUPPORT
 	ia32_gdt_init();

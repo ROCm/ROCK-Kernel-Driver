@@ -23,6 +23,18 @@
  *                      (plus examples of platform error info structures from smariset @ Intel)
  */
 
+#define IA64_SAL_PLATFORM_FEATURE_BUS_LOCK_BIT		0
+#define IA64_SAL_PLATFORM_FEATURE_IRQ_REDIR_HINT_BIT	1
+#define IA64_SAL_PLATFORM_FEATURE_IPI_REDIR_HINT_BIT	2
+#define IA64_SAL_PLATFORM_FEATURE_ITC_DRIFT_BIT	 	3
+
+#define IA64_SAL_PLATFORM_FEATURE_BUS_LOCK	  (1<<IA64_SAL_PLATFORM_FEATURE_BUS_LOCK_BIT)
+#define IA64_SAL_PLATFORM_FEATURE_IRQ_REDIR_HINT (1<<IA64_SAL_PLATFORM_FEATURE_IRQ_REDIR_HINT_BIT)
+#define IA64_SAL_PLATFORM_FEATURE_IPI_REDIR_HINT (1<<IA64_SAL_PLATFORM_FEATURE_IPI_REDIR_HINT_BIT)
+#define IA64_SAL_PLATFORM_FEATURE_ITC_DRIFT	  (1<<IA64_SAL_PLATFORM_FEATURE_ITC_DRIFT_BIT)
+
+#ifndef __ASSEMBLY__
+
 #include <linux/spinlock.h>
 #include <linux/efi.h>
 
@@ -161,11 +173,6 @@ typedef struct ia64_sal_desc_memory {
 	u32 reserved2;
 	u8 oem_reserved[8];
 } ia64_sal_desc_memory_t;
-
-#define IA64_SAL_PLATFORM_FEATURE_BUS_LOCK		(1 << 0)
-#define IA64_SAL_PLATFORM_FEATURE_IRQ_REDIR_HINT	(1 << 1)
-#define IA64_SAL_PLATFORM_FEATURE_IPI_REDIR_HINT	(1 << 2)
-#define IA64_SAL_PLATFORM_FEATURE_ITC_DRIFT	 	(1 << 3)
 
 typedef struct ia64_sal_desc_platform_feature {
 	u8 type;
@@ -789,5 +796,7 @@ ia64_sal_update_pal (u64 param_buf, u64 scratch_buf, u64 scratch_buf_size,
 }
 
 extern unsigned long sal_platform_features;
+
+#endif /* __ASSEMBLY__ */
 
 #endif /* _ASM_IA64_PAL_H */

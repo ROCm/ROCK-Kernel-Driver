@@ -4,7 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc. All rights reserved.
+ * Copyright (C) 1992 - 1997, 2000-2003 Silicon Graphics, Inc. All rights reserved.
  */
 #ifndef _ASM_IA64_SN_IOERROR_H
 #define _ASM_IA64_SN_IOERROR_H
@@ -108,7 +108,7 @@
  *        we have a single structure, and the appropriate fields get filled in
  *        at each layer.
  *      - This provides a way to dump all error related information in any layer
- *        of error handling (debugging aid).
+ *        of erorr handling (debugging aid).
  *
  * A second possibility is to allow each layer to define its own error
  * data structure, and fill in the proper fields. This has the advantage

@@ -4,8 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000-2001 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992-1997,2000-2003 Silicon Graphics, Inc. All Rights Reserved.
  */
 #ifndef _ASM_SN_SN_XTALK_XBOW_H
 #define _ASM_SN_SN_XTALK_XBOW_H
@@ -405,12 +404,6 @@ typedef struct xbow_cfg_s {
 
 /* XBOW_WID_ARB_RELOAD */
 #define	XBOW_WID_ARB_RELOAD_INT	0x3f	/* GBR reload interval */
-
-
-#ifdef	CONFIG_IA64_SGI_SN1
-#define nasid_has_xbridge(nasid)        \
-        (XWIDGET_PART_NUM(XWIDGET_ID_READ(nasid, 0)) == XXBOW_WIDGET_PART_NUM)
-#endif
 
 #define IS_XBRIDGE_XBOW(wid) \
         (XWIDGET_PART_NUM(wid) == XXBOW_WIDGET_PART_NUM && \

@@ -11,4 +11,4 @@
 
 EXTRA_CFLAGS := -DLITTLE_ENDIAN
 
-obj-y += kernel/ # io/
+obj-y += kernel/ io/

@@ -247,16 +247,17 @@ disabled_fph_fault (struct pt_regs *regs)
 	psr->dfh = 0;
 #ifndef CONFIG_SMP
 	{
-		struct task_struct *fpu_owner = ia64_get_fpu_owner();
+		struct task_struct *fpu_owner
+			= (struct task_struct *)ia64_get_kr(IA64_KR_FPU_OWNER);
 
-		if (fpu_owner == current)
+		if (ia64_is_local_fpu_owner(current))
 			return;
 
 		if (fpu_owner)
 			ia64_flush_fph(fpu_owner);
 	}
 #endif /* !CONFIG_SMP */
-	ia64_set_fpu_owner(current);
+	ia64_set_local_fpu_owner(current);
 	if ((current->thread.flags & IA64_THREAD_FPH_VALID) != 0) {
 		__ia64_load_fpu(current->thread.fph);
 		psr->mfh = 0;
@@ -274,7 +275,6 @@ static inline int
 fp_emulate (int fp_fault, void *bundle, long *ipsr, long *fpsr, long *isr, long *pr, long *ifs,
 	    struct pt_regs *regs)
 {
-	struct ia64_fpreg f6_11[6];
 	fp_state_t fp_state;
 	fpswa_ret_t ret;
 
@@ -289,11 +289,8 @@ fp_emulate (int fp_fault, void *bundle, long *ipsr, long *fpsr, long *isr, long 
 	 * pointer to point to these registers.
 	 */
 	fp_state.bitmask_low64 = 0xfc0;  /* bit6..bit11 */
-	f6_11[0] = regs->f6; f6_11[1] = regs->f7;
-	f6_11[2] = regs->f8; f6_11[3] = regs->f9;
-	__asm__ ("stf.spill %0=f10%P0" : "=m"(f6_11[4]));
-	__asm__ ("stf.spill %0=f11%P0" : "=m"(f6_11[5]));
-	fp_state.fp_state_low_volatile = (fp_state_low_volatile_t *) f6_11;
+
+	fp_state.fp_state_low_volatile = (fp_state_low_volatile_t *) &regs->f6;
 	/*
 	 * unsigned long (*EFI_FPSWA) (
 	 *      unsigned long    trap_type,
@@ -309,10 +306,7 @@ fp_emulate (int fp_fault, void *bundle, long *ipsr, long *fpsr, long *isr, long 
 					(unsigned long *) ipsr, (unsigned long *) fpsr,
 					(unsigned long *) isr, (unsigned long *) pr,
 					(unsigned long *) ifs, &fp_state);
-	regs->f6 = f6_11[0]; regs->f7 = f6_11[1];
-	regs->f8 = f6_11[2]; regs->f9 = f6_11[3];
-	__asm__ ("ldf.fill f10=%0%P0" :: "m"(f6_11[4]));
-	__asm__ ("ldf.fill f11=%0%P0" :: "m"(f6_11[5]));
+
 	return ret.status;
 }
 
@@ -336,8 +330,9 @@ handle_fpu_swa (int fp_fault, struct pt_regs *regs, unsigned long isr)
 
 	if (jiffies - last_time > 5*HZ)
 		fpu_swa_count = 0;
-	if ((++fpu_swa_count < 5) && !(current->thread.flags & IA64_THREAD_FPEMU_NOPRINT)) {
+	if ((fpu_swa_count < 4) && !(current->thread.flags & IA64_THREAD_FPEMU_NOPRINT)) {
 		last_time = jiffies;
+		++fpu_swa_count;
 		printk(KERN_WARNING "%s(%d): floating-point assist fault at ip %016lx, isr %016lx\n",
 		       current->comm, current->pid, regs->cr_iip + ia64_psr(regs)->ri, isr);
 	}
@@ -533,9 +528,8 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 	      case 29: /* Debug */
 	      case 35: /* Taken Branch Trap */
 	      case 36: /* Single Step Trap */
-#ifdef CONFIG_FSYS
 		if (fsys_mode(current, regs)) {
-			extern char syscall_via_break[], __start_gate_section[];
+			extern char __kernel_syscall_via_break[];
 			/*
 			 * Got a trap in fsys-mode: Taken Branch Trap and Single Step trap
 			 * need special handling; Debug trap is not supposed to happen.
@@ -546,12 +540,11 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 				return;
 			}
 			/* re-do the system call via break 0x100000: */
-			regs->cr_iip = GATE_ADDR + (syscall_via_break - __start_gate_section);
+			regs->cr_iip = (unsigned long) __kernel_syscall_via_break;
 			ia64_psr(regs)->ri = 0;
 			ia64_psr(regs)->cpl = 3;
 			return;
 		}
-#endif
 		switch (vector) {
 		      case 29:
 			siginfo.si_code = TRAP_HWBKPT;

@@ -11,11 +11,5 @@
 
 EXTRA_CFLAGS    := -DLITTLE_ENDIAN
 
-ifdef CONFIG_IA64_SGI_SN2
-EXTRA_CFLAGS    += -DSHUB_SWAP_WAR
-endif
-
-obj-$(CONFIG_IA64_SGI_SN2)	+= pcibr_dvr.o pcibr_ate.o pcibr_config.o \
-                                   pcibr_dvr.o pcibr_hints.o \
-				   pcibr_intr.o pcibr_rrb.o pcibr_slot.o \
-				   pcibr_error.o
+obj-y += pcibr_ate.o pcibr_config.o pcibr_dvr.o pcibr_hints.o pcibr_intr.o pcibr_rrb.o \
+	 pcibr_slot.o pcibr_error.o

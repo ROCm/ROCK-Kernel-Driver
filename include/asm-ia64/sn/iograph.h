@@ -4,7 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000-2001 Silicon Graphics, Inc. All rights reserved.
+ * Copyright (C) 1992-1997,2000-2003 Silicon Graphics, Inc. All rights reserved.
  */
 #ifndef _ASM_IA64_SN_IOGRAPH_H
 #define _ASM_IA64_SN_IOGRAPH_H
@@ -77,7 +77,7 @@
 #define EDGE_LBL_IOC3			"ioc3"
 #define EDGE_LBL_LUN                    "lun"
 #define EDGE_LBL_LINUX                  "linux"
-#define EDGE_LBL_LINUX_BUS              EDGE_LBL_LINUX "/busnum"
+#define EDGE_LBL_LINUX_BUS              EDGE_LBL_LINUX "/bus/pci-x"
 #define EDGE_LBL_MACE                   "mace" 		/* O2 mace */
 #define EDGE_LBL_MACHDEP                "machdep"       /* Platform depedent devices */
 #define EDGE_LBL_MASTER			".master"
@@ -127,8 +127,12 @@
 #define EDGE_LBL_XBOX_RPS               "xbox_rps"      /* redundant power supply for xbox unit */ 
 #define EDGE_LBL_IOBRICK		"iobrick"
 #define EDGE_LBL_PBRICK			"Pbrick"
+#define EDGE_LBL_PEBRICK		"PEbrick"
+#define EDGE_LBL_PXBRICK		"PXbrick"
+#define EDGE_LBL_IXBRICK		"IXbrick"
 #define EDGE_LBL_IBRICK			"Ibrick"
 #define EDGE_LBL_XBRICK			"Xbrick"
+#define EDGE_LBL_CGBRICK		"CGbrick"
 #define EDGE_LBL_CPUBUS			"cpubus"	/* CPU Interfaces (SysAd) */
 
 /* vertex info labels in hwgraph */
@@ -211,7 +215,7 @@ void init_all_devices(void);
 #include <asm/sn/xtalk/xbow.h>	/* For get MAX_PORT_NUM */
 
 int io_brick_map_widget(int, int);
-int io_path_map_widget(devfs_handle_t);
+int io_path_map_widget(vertex_hdl_t);
 
 /*
  * Map a brick's widget number to a meaningful int

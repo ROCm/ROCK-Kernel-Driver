@@ -9,11 +9,13 @@
 #include <asm/processor.h>
 #include <asm/ptrace.h>
 
-#define TI_EXEC_DOMAIN	0x00
-#define TI_FLAGS	0x08
-#define TI_CPU		0x0c
-#define TI_ADDR_LIMIT	0x10
-#define TI_PRE_COUNT	0x18
+#define TI_TASK			0x00
+#define TI_EXEC_DOMAIN		0x08
+#define TI_FLAGS		0x10
+#define TI_CPU			0x14
+#define TI_ADDR_LIMIT		0x18
+#define TI_PRE_COUNT		0x20
+#define TI_RESTART_BLOCK	0x28
 
 #define PREEMPT_ACTIVE_BIT 30
 #define PREEMPT_ACTIVE	(1 << PREEMPT_ACTIVE_BIT)
@@ -26,6 +28,7 @@
  * without having to do pointer masking.
  */
 struct thread_info {
+	struct task_struct *task;	/* XXX not really needed, except for dup_task_struct() */
 	struct exec_domain *exec_domain;/* execution domain */
 	__u32 flags;			/* thread_info flags (see TIF_*) */
 	__u32 cpu;			/* current CPU */
@@ -37,8 +40,9 @@ struct thread_info {
 #define INIT_THREAD_SIZE		/* tell sched.h not to declare the thread_union */
 #define THREAD_SIZE			KERNEL_STACK_SIZE
 
-#define INIT_THREAD_INFO(ti)			\
+#define INIT_THREAD_INFO(tsk)			\
 {						\
+	.task		= &tsk,			\
 	.exec_domain	= &default_exec_domain,	\
 	.flags		= 0,			\
 	.cpu		= 0,			\
@@ -50,8 +54,13 @@ struct thread_info {
 }
 
 /* how to get the thread information struct from C */
-#define current_thread_info() ((struct thread_info *) ((char *) current + IA64_TASK_SIZE))
+#define current_thread_info()	((struct thread_info *) ((char *) current + IA64_TASK_SIZE))
+#define alloc_thread_info(tsk)	((struct thread_info *) ((char *) (tsk) + IA64_TASK_SIZE))
 #define free_thread_info(ti)	/* nothing */
+
+#define __HAVE_ARCH_TASK_STRUCT_ALLOCATOR
+#define alloc_task_struct()	((task_t *)__get_free_pages(GFP_KERNEL, KERNEL_STACK_SIZE_ORDER))
+#define free_task_struct(tsk)	free_pages((unsigned long) (tsk), KERNEL_STACK_SIZE_ORDER)
 
 #endif /* !__ASSEMBLY */
 

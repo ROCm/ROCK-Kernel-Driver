@@ -14,7 +14,8 @@
 #include <linux/vmalloc.h>
 
 #include <asm/uaccess.h>
-#include <asm/ia32.h>
+
+#include "ia32priv.h"
 
 #define P(p)	((void *) (unsigned long) (p))
 
