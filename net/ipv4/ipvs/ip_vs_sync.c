@@ -23,7 +23,7 @@
 #include <linux/slab.h>
 #include <linux/net.h>
 #include <linux/completion.h>
-
+#include <linux/delay.h>
 #include <linux/skbuff.h>
 #include <linux/in.h>
 #include <linux/igmp.h>                 /* for ip_mc_join_group */
@@ -647,8 +647,7 @@ static void sync_master_loop(void)
 		if (stop_master_sync)
 			break;
 
-		__set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(HZ);
+		ssleep(1);
 	}
 
 	/* clean up the sync_buff queue */
@@ -705,8 +704,7 @@ static void sync_backup_loop(void)
 		if (stop_backup_sync)
 			break;
 
-		__set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(HZ);
+		ssleep(1);
 	}
 
 	/* release the sending multicast socket */
@@ -818,8 +816,7 @@ static int fork_sync_thread(void *startup)
 	if ((pid = kernel_thread(sync_thread, startup, 0)) < 0) {
 		IP_VS_ERR("could not create sync_thread due to %d... "
 			  "retrying.\n", pid);
-		current->state = TASK_UNINTERRUPTIBLE;
-		schedule_timeout(HZ);
+		ssleep(1);
 		goto repeat;
 	}
 
@@ -853,8 +850,7 @@ int start_sync_thread(int state, char *mcast_ifn, __u8 syncid)
 	if ((pid = kernel_thread(fork_sync_thread, &startup, 0)) < 0) {
 		IP_VS_ERR("could not create fork_sync_thread due to %d... "
 			  "retrying.\n", pid);
-		current->state = TASK_UNINTERRUPTIBLE;
-		schedule_timeout(HZ);
+		ssleep(1);
 		goto repeat;
 	}
 
