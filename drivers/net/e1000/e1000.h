@@ -124,6 +124,11 @@ struct e1000_adapter;
 #define AUTO_ALL_MODES       0
 #define E1000_EEPROM_APME    0x0400
 
+#ifndef E1000_MASTER_SLAVE
+/* Switch to override PHY master/slave setting */
+#define E1000_MASTER_SLAVE	e1000_ms_hw_default
+#endif
+
 /* only works for sizes that are powers of 2 */
 #define E1000_ROUNDUP(i, size) ((i) = (((i) + (size) - 1) & ~((size) - 1)))
 

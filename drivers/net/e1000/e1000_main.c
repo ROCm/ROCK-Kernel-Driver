@@ -641,6 +641,7 @@ e1000_sw_init(struct e1000_adapter *adapter)
 	if(hw->media_type == e1000_media_type_copper) {
 		hw->mdix = AUTO_ALL_MODES;
 		hw->disable_polarity_correction = FALSE;
+		hw->master_slave = E1000_MASTER_SLAVE;
 	}
 
 	atomic_set(&adapter->irq_sem, 1);
