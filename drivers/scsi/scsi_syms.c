@@ -19,6 +19,7 @@
 #include <asm/dma.h>
 
 #include "scsi.h"
+#include <scsi/scsi_driver.h>
 #include <scsi/scsi_ioctl.h>
 #include "hosts.h"
 #include "scsi_logging.h"
@@ -85,6 +86,9 @@ EXPORT_SYMBOL(scsi_device_put);
 EXPORT_SYMBOL(scsi_add_device);
 EXPORT_SYMBOL(scsi_remove_device);
 EXPORT_SYMBOL(scsi_set_device_offline);
+
+EXPORT_SYMBOL(__scsi_mode_sense);
+EXPORT_SYMBOL(scsi_mode_sense);
 
 /*
  * This symbol is for the highlevel drivers (e.g. sg) only.

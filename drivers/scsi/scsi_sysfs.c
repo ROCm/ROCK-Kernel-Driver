@@ -195,19 +195,13 @@ sdev_rd_attr (rev, "%.4s\n");
 sdev_rw_attr_bit (online);
 
 static ssize_t
-show_rescan_field (struct device *dev, char *buf)
-{
-	return 0; 
-}
-
-static ssize_t
 store_rescan_field (struct device *dev, const char *buf, size_t count) 
 {
 	scsi_rescan_device(dev);
-	return 0;
+	return count;
 }
 
-static DEVICE_ATTR(rescan, S_IRUGO | S_IWUSR, show_rescan_field, store_rescan_field)
+static DEVICE_ATTR(rescan, S_IWUSR, NULL, store_rescan_field)
 
 /* Default template for device attributes.  May NOT be modified */
 struct device_attribute *scsi_sysfs_sdev_attrs[] = {
@@ -388,30 +382,36 @@ void scsi_sysfs_remove_host(struct Scsi_Host *shost)
  *
  * returns zero if successful or error if not
  **/
-int scsi_sysfs_modify_shost_attribute(struct class_device_attribute ***class_attrs,
-				      struct class_device_attribute *attr)
+int scsi_sysfs_modify_shost_attribute(
+			struct class_device_attribute ***class_attrs,
+			struct class_device_attribute *attr)
 {
-	int modify = 0;
+	int modify = -1;
 	int num_attrs;
 
 	if(*class_attrs == NULL)
 		*class_attrs = scsi_sysfs_shost_attrs;
 
 	for(num_attrs=0; (*class_attrs)[num_attrs] != NULL; num_attrs++)
-		if(strcmp((*class_attrs)[num_attrs]->attr.name, attr->attr.name) == 0)
+		if(strcmp((*class_attrs)[num_attrs]->attr.name,
+				attr->attr.name) == 0)
 			modify = num_attrs;
 
-	if(*class_attrs == scsi_sysfs_shost_attrs || !modify) {
+	if(*class_attrs == scsi_sysfs_shost_attrs || modify < 0) {
 		/* note: need space for null at the end as well */
-		struct class_device_attribute **tmp_attrs = kmalloc(sizeof(struct class_device_attribute)*(num_attrs + (modify ? 1 : 2)), GFP_KERNEL);
+		struct class_device_attribute **tmp_attrs =
+				kmalloc(sizeof(*tmp_attrs) *
+					  (num_attrs + (modify >= 0 ? 1 : 2)),
+					GFP_KERNEL);
 		if(tmp_attrs == NULL)
 			return -ENOMEM;
-		memcpy(tmp_attrs, *class_attrs, sizeof(struct class_device_attribute)*num_attrs);
+		memcpy(tmp_attrs, *class_attrs, sizeof(*tmp_attrs) *
+				(num_attrs + 1));
 		if(*class_attrs != scsi_sysfs_shost_attrs)
 			kfree(*class_attrs);
 		*class_attrs = tmp_attrs;
 	}
-	if(modify) {
+	if(modify >= 0) {
 		/* spare the caller from having to copy things it's
 		 * not interested in */
 		struct class_device_attribute *old_attr =
@@ -444,27 +444,32 @@ EXPORT_SYMBOL(scsi_sysfs_modify_shost_attribute);
 int scsi_sysfs_modify_sdev_attribute(struct device_attribute ***dev_attrs,
 				     struct device_attribute *attr)
 {
-	int modify = 0;
+	int modify = -1;
 	int num_attrs;
 
 	if(*dev_attrs == NULL)
 		*dev_attrs = scsi_sysfs_sdev_attrs;
 
 	for(num_attrs=0; (*dev_attrs)[num_attrs] != NULL; num_attrs++)
-		if(strcmp((*dev_attrs)[num_attrs]->attr.name, attr->attr.name) == 0)
+		if(strcmp((*dev_attrs)[num_attrs]->attr.name,
+				attr->attr.name) == 0)
 			modify = num_attrs;
 
-	if(*dev_attrs == scsi_sysfs_sdev_attrs || !modify) {
+	if(*dev_attrs == scsi_sysfs_sdev_attrs || modify < 0) {
 		/* note: need space for null at the end as well */
-		struct device_attribute **tmp_attrs = kmalloc(sizeof(struct device_attribute)*(num_attrs + (modify ? 1 : 2)), GFP_KERNEL);
+		struct device_attribute **tmp_attrs =
+				kmalloc(sizeof(*tmp_attrs) *
+					  (num_attrs + (modify >= 0 ? 1 : 2)),
+					GFP_KERNEL);
 		if(tmp_attrs == NULL)
 			return -ENOMEM;
-		memcpy(tmp_attrs, *dev_attrs, sizeof(struct device_attribute)*num_attrs);
+		memcpy(tmp_attrs, *dev_attrs, sizeof(*tmp_attrs) *
+				(num_attrs + 1));
 		if(*dev_attrs != scsi_sysfs_sdev_attrs)
 			kfree(*dev_attrs);
 		*dev_attrs = tmp_attrs;
 	}
-	if(modify) {
+	if(modify >= 0) {
 		/* spare the caller from having to copy things it's
 		 * not interested in */
 		struct device_attribute *old_attr =

@@ -85,7 +85,7 @@
 /*
  *	No more an option, enabled by default.
  */
-#ifndef ENABLE_SCSI_ZALON
+#ifndef CONFIG_SCSI_NCR53C8XX_NO_NVRAM
 # ifndef CONFIG_SCSI_NCR53C8XX_NVRAM_DETECT
 #  define CONFIG_SCSI_NCR53C8XX_NVRAM_DETECT
 # endif
@@ -188,10 +188,6 @@
 #define	SCSI_NCR_IOMAPPED
 #define SCSI_NCR_PCI_MEM_NOT_SUPPORTED
 #endif
-#elif defined(__sparc__)
-#undef SCSI_NCR_IOMAPPED
-#elif defined(__hppa__) && defined(ENABLE_SCSI_ZALON)
-#undef SCSI_NCR_IOMAPPED
 #endif
 
 /*
@@ -532,7 +528,6 @@
  */
 
 #if defined(SCSI_NCR_IOMAPPED)
-
 /*
  *  IO mapped only input / ouput
  */
@@ -593,7 +588,7 @@
 
 #else
 
-#ifdef ENABLE_SCSI_ZALON
+#ifdef CONFIG_SCSI_NCR53C8XX_NO_WORD_TRANSFERS
 /* Only 8 or 32 bit transfers allowed */
 #define INW_OFF(o)		(readb((char *)np->reg + ncr_offw(o)) << 8 | readb((char *)np->reg + ncr_offw(o) + 1))
 #else
@@ -601,7 +596,7 @@
 #endif
 #define INL_OFF(o)		readl_raw((char *)np->reg + (o))
 
-#ifdef ENABLE_SCSI_ZALON
+#ifdef CONFIG_SCSI_NCR53C8XX_NO_WORD_TRANSFERS
 /* Only 8 or 32 bit transfers allowed */
 #define OUTW_OFF(o, val)	do { writeb((char)((val) >> 8), (char *)np->reg + ncr_offw(o)); writeb((char)(val), (char *)np->reg + ncr_offw(o) + 1); } while (0)
 #else
@@ -654,8 +649,8 @@
 **	NCR53C8XX Device Ids
 */
 
-#ifndef PSEUDO_ZALON_720_ID
-#define PSEUDO_ZALON_720_ID 0x5a00
+#ifndef PSEUDO_720_ID
+#define PSEUDO_720_ID 0x5a00
 #endif
 
 #ifndef PCI_DEVICE_ID_NCR_53C810
@@ -785,7 +780,7 @@ typedef struct {
 
 #define SCSI_NCR_CHIP_TABLE						\
 {									\
- {PSEUDO_ZALON_720_ID, 0x0f, "720",  3,  8, 4,				\
+ {PSEUDO_720_ID, 0x0f, "720",  3,  8, 4,				\
  FE_WIDE|FE_DIFF|FE_EHP|FE_MUX|FE_EA}					\
  ,									\
  {PCI_DEVICE_ID_NCR_53C810, 0x0f, "810",  4,  8, 4,			\
@@ -860,7 +855,7 @@ typedef struct {
  */
 #define SCSI_NCR_CHIP_IDS		\
 {					\
-	PSEUDO_ZALON_720_ID,		\
+	PSEUDO_720_ID,		\
 	PCI_DEVICE_ID_NCR_53C810,	\
 	PCI_DEVICE_ID_NCR_53C815,	\
 	PCI_DEVICE_ID_NCR_53C820,	\

@@ -139,7 +139,7 @@ struct scsi_request *scsi_allocate_request(struct scsi_device *sdev)
 		sreq->sr_device = sdev;
 		sreq->sr_host = sdev->host;
 		sreq->sr_magic = SCSI_REQ_MAGIC;
-		sreq->sr_data_direction = SCSI_DATA_UNKNOWN;
+		sreq->sr_data_direction = DMA_BIDIRECTIONAL;
 	}
 
 	return sreq;

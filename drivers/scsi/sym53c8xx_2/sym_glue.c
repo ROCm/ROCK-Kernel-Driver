@@ -295,11 +295,7 @@ struct host_data {
 #ifndef SYM_LINUX_DYNAMIC_DMA_MAPPING
 typedef u_long		bus_addr_t;
 #else
-#if	SYM_CONF_DMA_ADDRESSING_MODE > 0
-typedef dma64_addr_t	bus_addr_t;
-#else
 typedef dma_addr_t	bus_addr_t;
-#endif
 #endif
 
 /*
@@ -1863,7 +1859,7 @@ static int sym_setup_bus_dma_mask(hcb_p np)
 #if   SYM_CONF_DMA_ADDRESSING_MODE == 1
 #define	PciDmaMask	0xffffffffff
 #elif SYM_CONF_DMA_ADDRESSING_MODE == 2
-#define	PciDmaMask	0xffffffffffffffff
+#define	PciDmaMask	0xffffffffffffffffULL
 #endif
 	if (np->features & FE_DAC) {
 		if (!pci_set_dma_mask(np->s.device, PciDmaMask)) {
@@ -2752,14 +2748,6 @@ if (sym53c8xx)
 		}
 		/* This one is guaranteed by AC to do nothing :-) */
 		if (pci_enable_device(pcidev))
-			continue;
-		/* Some HW as the HP LH4 may report twice PCI devices */
-		for (i = 0; i < count ; i++) {
-			if (devtbl[i].s.bus       == PciBusNumber(pcidev) && 
-			    devtbl[i].s.device_fn == PciDeviceFn(pcidev))
-				break;
-		}
-		if (i != count)	/* Ignore this device if we already have it */
 			continue;
 		devp = &devtbl[count];
 		devp->host_id = SYM_SETUP_HOST_ID;

@@ -12,11 +12,6 @@
 
 #include <linux/types.h>
 
-/* Eisa Enhanced mode operation - slot locating and addressing */
-#define MINEISA 1		/* I don't have an EISA Spec to know these ranges, so I */
-#define MAXEISA 8		/* Just took my machine's specifications.  Adjust to fit. */
-		    /* I just saw an ad, and bumped this from 6 to 8 */
-#define	SLOTBASE(x)	((x << 12) + 0xc80)
 #define SLOTSIZE	0x5c
 
 /* EISA configuration registers & values */
@@ -151,11 +146,6 @@ struct ecb {			/* Enhanced Control Block 6.1 */
 #define AHA1740CMD_DOWN  0x09	/* Download Firmware (yeah, I bet!) */
 #define AHA1740CMD_RINQ  0x0a	/* Read Host Adapter Inquiry Data */
 #define AHA1740CMD_TARG  0x10	/* Target SCSI Command */
-
-static int aha1740_detect(Scsi_Host_Template *);
-static int aha1740_command(Scsi_Cmnd *);
-static int aha1740_queuecommand(Scsi_Cmnd *, void (*done) (Scsi_Cmnd *));
-static int aha1740_biosparam(struct scsi_device *, struct block_device *, sector_t, int *);
 
 #define AHA1740_ECBS 32
 #define AHA1740_SCATTER 16

@@ -4641,7 +4641,10 @@ static void sym_int_sir (hcb_p np)
 		case M_IGN_RESIDUE:
 			if (DEBUG_FLAGS & DEBUG_POINTER)
 				sym_print_msg(cp,"ign wide residue", np->msgin);
-			sym_modify_dp(np, tp, cp, -1);
+			if (cp->host_flags & HF_SENSE)
+				OUTL_DSP (SCRIPTA_BA (np, clrack));
+			else
+				sym_modify_dp(np, tp, cp, -1);
 			return;
 		case M_REJECT:
 			if (INB (HS_PRT) == HS_NEGOTIATE)
