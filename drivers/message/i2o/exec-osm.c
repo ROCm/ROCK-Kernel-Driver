@@ -29,6 +29,7 @@
 
 #include <linux/module.h>
 #include <linux/i2o.h>
+#include <linux/delay.h>
 
 struct i2o_driver i2o_exec_driver;
 
@@ -151,7 +152,7 @@ int i2o_msg_post_wait_mem(struct i2o_controller *c, u32 m, unsigned long
 		prepare_to_wait(&wq, &wait, TASK_INTERRUPTIBLE);
 
 		if (!iwait->complete)
-			schedule_timeout(timeout * HZ);
+			msleep_interruptible(timeout * 1000);
 
 		finish_wait(&wq, &wait);
 
