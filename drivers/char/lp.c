@@ -270,7 +270,7 @@ static int lp_check_status(int minor)
 	return error;
 }
 
-static int lp_wait_ready(int minor)
+static int lp_wait_ready(int minor, int nonblock)
 {
 	int error = 0;
 
@@ -281,7 +281,7 @@ static int lp_wait_ready(int minor)
 
 	do {
 		error = lp_check_status (minor);
-		if (error && (LP_F(minor) & LP_ABORT))
+		if (error && (nonblock || (LP_F(minor) & LP_ABORT)))
 			break;
 		if (signal_pending (current)) {
 			error = -EINTR;
@@ -300,6 +300,8 @@ static ssize_t lp_write(struct file * file, const char * buf,
 	ssize_t retv = 0;
 	ssize_t written;
 	size_t copy_size = count;
+	int nonblock = ((file->f_flags & O_NONBLOCK) ||
+			(LP_F(minor) & LP_ABORT));
 
 #ifdef LP_STATS
 	if (jiffies-lp_table[minor].lastcall > LP_TIME(minor))
@@ -326,9 +328,10 @@ static ssize_t lp_write(struct file * file, const char * buf,
 						     lp_table[minor].best_mode);
 
 	parport_set_timeout (lp_table[minor].dev,
-			     lp_table[minor].timeout);
+			     (nonblock ? PARPORT_INACTIVITY_O_NONBLOCK
+			      : lp_table[minor].timeout));
 
-	if ((retv = lp_wait_ready (minor)) == 0)
+	if ((retv = lp_wait_ready (minor, nonblock)) == 0)
 	do {
 		/* Write the data. */
 		written = parport_write (port, kbuf, copy_size);
@@ -354,11 +357,15 @@ static ssize_t lp_write(struct file * file, const char * buf,
 					   IEEE1284_MODE_COMPAT);
 			lp_table[minor].current_mode = IEEE1284_MODE_COMPAT;
 
-			error = lp_wait_ready (minor);
+			error = lp_wait_ready (minor, nonblock);
 
 			if (error) {
 				if (retv == 0)
 					retv = error;
+				break;
+			} else if (nonblock) {
+				if (retv == 0)
+					retv = -EAGAIN;
 				break;
 			}
 
@@ -407,6 +414,8 @@ static ssize_t lp_read(struct file * file, char * buf,
 	struct parport *port = lp_table[minor].dev->port;
 	ssize_t retval = 0;
 	char *kbuf = lp_table[minor].lp_buffer;
+	int nonblock = ((file->f_flags & O_NONBLOCK) ||
+			(LP_F(minor) & LP_ABORT));
 
 	if (count > LP_BUFFER_SIZE)
 		count = LP_BUFFER_SIZE;
@@ -415,7 +424,53 @@ static ssize_t lp_read(struct file * file, char * buf,
 		return -EINTR;
 
 	lp_claim_parport_or_block (&lp_table[minor]);
-	retval = parport_read (port, kbuf, count);
+
+	parport_set_timeout (lp_table[minor].dev,
+			     (nonblock ? PARPORT_INACTIVITY_O_NONBLOCK
+			      : lp_table[minor].timeout));
+
+	parport_negotiate (lp_table[minor].dev->port, IEEE1284_MODE_COMPAT);
+	if (parport_negotiate (lp_table[minor].dev->port,
+			       IEEE1284_MODE_NIBBLE)) {
+		retval = -EIO;
+		goto out;
+	}
+
+	while (retval == 0) {
+		retval = parport_read (port, kbuf, count);
+
+		if (retval > 0)
+			break;
+
+		if (nonblock) {
+			retval = -EAGAIN;
+			break;
+		}
+
+		/* Wait for data. */
+
+		if (lp_table[minor].dev->port->irq == PARPORT_IRQ_NONE) {
+			parport_negotiate (lp_table[minor].dev->port,
+					   IEEE1284_MODE_COMPAT);
+			lp_error (minor);
+			if (parport_negotiate (lp_table[minor].dev->port,
+					       IEEE1284_MODE_NIBBLE)) {
+				retval = -EIO;
+				goto out;
+			}
+		} else
+			interruptible_sleep_on_timeout (&lp_table[minor].waitq,
+							LP_TIMEOUT_POLLED);
+
+		if (signal_pending (current)) {
+			retval = -ERESTARTSYS;
+			break;
+		}
+
+		cond_resched ();
+	}
+	parport_negotiate (lp_table[minor].dev->port, IEEE1284_MODE_COMPAT);
+ out:
 	lp_release_parport (&lp_table[minor]);
 
 	if (retval > 0 && copy_to_user (buf, kbuf, retval))
@@ -476,7 +531,6 @@ static int lp_open(struct inode * inode, struct file * file)
 		printk (KERN_INFO "lp%d: ECP mode\n", minor);
 		lp_table[minor].best_mode = IEEE1284_MODE_ECP;
 	} else {
-		printk (KERN_INFO "lp%d: compatibility mode\n", minor);
 		lp_table[minor].best_mode = IEEE1284_MODE_COMPAT;
 	}
 	/* Leave peripheral in compatibility mode */

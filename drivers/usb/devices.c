@@ -4,8 +4,6 @@
  * (C) Copyright 1999,2000 Thomas Sailer <sailer@ife.ee.ethz.ch>. (proc file per device)
  * (C) Copyright 1999 Deti Fliegl (new USB architecture)
  *
- * $id$
- *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -60,6 +58,8 @@
 #include <linux/smp_lock.h>
 #include <linux/usbdevice_fs.h>
 #include <asm/uaccess.h>
+
+#include "hcd.h"
 
 #define MAX_TOPO_LEVEL		6
 
@@ -429,6 +429,10 @@ static ssize_t usb_device_dump(char **buffer, size_t *nbytes, loff_t *skip_bytes
 	 * count = device count at this level
 	 */
 	/* If this is the root hub, display the bandwidth information */
+	    /* FIXME high speed reserves 20% frametime for non-periodic,
+	     * while full/low speed reserves only 10% ... so this is wrong
+	     * for high speed busses.  also, change how bandwidth is recorded.
+	     */
 	if (level == 0)
 		data_end += sprintf(data_end, format_bandwidth, bus->bandwidth_allocated,
 				FRAME_TIME_MAX_USECS_ALLOC,

@@ -1,3 +1,21 @@
+2001-11-14  Tim Waugh  <twaugh@redhat.com>
+
+	* parport_pc.c (parport_pc_pci_probe): Hooks for PCI cards before
+	and after probing for ports.
+	* parport_serial.c (parport_register): Likewise.
+
+2002-01-20  Tim Waugh  <twaugh@redhat.com>
+
+	* parport_pc.c (parport_pc_compat_write_block_pio,
+	parport_pc_ecp_write_block_pio, parport_pc_ecp_read_block_pio):
+	Use the default implementations if the caller wants to use
+	O_NONBLOCK.
+
+2002-02-25  Tim Waugh  <twaugh@redhat.com>
+
+	* parport_pc.c: Make sure that priv->ctr_writable includes IntEn
+	even if IRQ is given as a parameter.
+
 2002-01-21  Tim Waugh  <twaugh@redhat.com>
 
 	* daisy.c: Apply patch from Max Vorobiev to make parport_daisy_select

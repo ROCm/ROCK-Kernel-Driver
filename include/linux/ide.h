@@ -1,9 +1,7 @@
 #ifndef _IDE_H
 #define _IDE_H
 /*
- *  linux/include/linux/ide.h
- *
- *  Copyright (C) 1994-1998  Linus Torvalds & authors
+ *  Copyright (C) 1994-2002  Linus Torvalds & authors
  */
 
 #include <linux/config.h>
@@ -13,6 +11,7 @@
 #include <linux/hdsmart.h>
 #include <linux/blkdev.h>
 #include <linux/proc_fs.h>
+#include <linux/device.h>
 #include <linux/devfs_fs_kernel.h>
 #include <asm/hdreg.h>
 
@@ -349,12 +348,13 @@ void ide_setup_ports(	hw_regs_t *hw,
  * Now for the data we need to maintain per-drive:  ide_drive_t
  */
 
-#define ide_scsi	0x21
-#define ide_disk	0x20
-#define ide_optical	0x7
-#define ide_cdrom	0x5
-#define ide_tape	0x1
-#define ide_floppy	0x0
+#define ATA_DISK        0x20
+#define ATA_TAPE        0x01
+#define ATA_ROM         0x05	/* CD-ROM */
+#define ATA_MOD		0x07    /* optical */
+#define ATA_FLOPPY	0x00
+#define ATA_SCSI	0x21
+#define ATA_NO_LUN      0x7f
 
 typedef union {
 	unsigned all			: 8;	/* all of the bits together */
@@ -370,7 +370,14 @@ typedef union {
 struct ide_settings_s;
 
 typedef struct ide_drive_s {
-	request_queue_t		 queue;	/* request queue */
+	char type; /* distingiush different devices: disk, cdrom, tape, floppy, ... */
+
+	/* NOTE: If we had proper separation between channel and host chip, we
+	 * could move this to the chanell and many sync problems would
+	 * magically just go away.
+	 */
+	request_queue_t		 queue;	/* per device request queue */
+
 	struct ide_drive_s	*next;	/* circular list of hwgroup drives */
 	unsigned long sleep;		/* sleep until this time */
 	unsigned long service_start;	/* time we started last request */
@@ -405,7 +412,6 @@ typedef struct ide_drive_s {
 	unsigned ata_flash	: 1;	/* 1=present, 0=default */
 	unsigned	addressing;	/* : 2; 0=28-bit, 1=48-bit, 2=64-bit */
 	byte		scsi;		/* 0=default, 1=skip current ide-subdriver for ide-scsi emulation */
-	byte		media;		/* disk, cdrom, tape, floppy, ... */
 	select_t	select;		/* basic drive/head select reg value */
 	byte		ctl;		/* "normal" value for IDE_CONTROL_REG */
 	byte		ready_stat;	/* min status value for drive ready */
@@ -426,12 +432,12 @@ typedef struct ide_drive_s {
 	unsigned long	capacity;	/* total number of sectors */
 	unsigned long long capacity48;	/* total number of sectors */
 	unsigned int	drive_data;	/* for use by tuneproc/selectproc as needed */
-	struct hwif_s   *hwif;		/* actually (ide_hwif_t *) */
+	struct hwif_s   *hwif;		/* parent pointer to the interface we are attached to  */
 	wait_queue_head_t wqueue;	/* used to wait for drive in open() */
 	struct hd_driveid *id;		/* drive model identification info */
 	struct hd_struct  *part;	/* drive partition table */
 	char		name[4];	/* drive name, such as "hda" */
-	struct ide_driver_s *driver;	/* (ide_driver_t *) */
+	struct ata_operations *driver;
 	void		*driver_data;	/* extra driver data */
 	devfs_handle_t	de;		/* directory for device */
 	struct proc_dir_entry *proc;	/* /proc/ide/ directory entry */
@@ -450,6 +456,7 @@ typedef struct ide_drive_s {
 	byte		acoustic;	/* acoustic management */
 	unsigned int	failures;	/* current failure count */
 	unsigned int	max_failures;	/* maximum allowed failure count */
+	struct device	device;		/* global device tree handle */
 } ide_drive_t;
 
 /*
@@ -519,16 +526,6 @@ typedef void (ide_rw_proc_t) (ide_drive_t *, ide_dma_action_t);
  */
 typedef int (ide_busproc_t) (ide_drive_t *, int);
 
-#ifdef CONFIG_BLK_DEV_IDEPCI
-typedef struct ide_pci_devid_s {
-	unsigned short	vid;
-	unsigned short	did;
-} ide_pci_devid_t;
-
-#define IDE_PCI_DEVID_NULL	((ide_pci_devid_t){0,0})
-#define IDE_PCI_DEVID_EQ(a,b)	(a.vid == b.vid && a.did == b.did)
-#endif /* CONFIG_BLK_DEV_IDEPCI */
-
 typedef struct hwif_s {
 	struct hwif_s	*next;		/* for linked-list in ide_hwgroup_t */
 	struct hwgroup_s *hwgroup;	/* actually (ide_hwgroup_t *) */
@@ -559,7 +556,7 @@ typedef struct hwif_s {
 	struct proc_dir_entry *proc;	/* /proc/ide/ directory entry */
 	int		irq;		/* our irq number */
 	byte		major;		/* our major number */
-	char 		name[6];	/* name of interface, eg. "ide0" */
+	char 		name[80];	/* name of interface */
 	byte		index;		/* 0 for ide0; 1 for ide1; ... */
 	hwif_chipset_t	chipset;	/* sub-module for tuning.. */
 	unsigned	noprobe    : 1;	/* don't probe for this interface */
@@ -573,15 +570,14 @@ typedef struct hwif_s {
 	byte		channel;	/* for dual-port chips: 0=primary, 1=secondary */
 #ifdef CONFIG_BLK_DEV_IDEPCI
 	struct pci_dev	*pci_dev;	/* for pci chipsets */
-	ide_pci_devid_t	pci_devid;	/* for pci chipsets: {VID,DID} */
-#endif /* CONFIG_BLK_DEV_IDEPCI */
+#endif
 #if (DISK_RECOVERY_TIME > 0)
 	unsigned long	last_time;	/* time when previous rq was done */
 #endif
 	byte		straight8;	/* Alan's straight 8 check */
-	void		*hwif_data;	/* extra hwif data */
 	ide_busproc_t	*busproc;	/* driver soft-power interface */
 	byte		bus_state;	/* power state of the IDE bus */
+	struct device	device;		/* global device tree handle */
 } ide_hwif_t;
 
 /*
@@ -671,8 +667,6 @@ typedef struct {
 #ifdef CONFIG_PROC_FS
 void proc_ide_create(void);
 void proc_ide_destroy(void);
-void recreate_proc_ide_device(ide_hwif_t *, ide_drive_t *);
-void destroy_proc_ide_device(ide_hwif_t *, ide_drive_t *);
 void destroy_proc_ide_drives(ide_hwif_t *);
 void create_proc_ide_interfaces(void);
 void ide_add_proc_entries(struct proc_dir_entry *dir, ide_proc_entry_t *p, void *data);
@@ -700,37 +694,54 @@ read_proc_t proc_ide_read_geometry;
 #endif
 
 /*
- * Subdrivers support.
+ * This structure describes the operations possible on a particular device type
+ * (CD-ROM, tape, DISK and so on).
+ *
+ * This is the main hook for device type support submodules.
  */
-typedef struct ide_driver_s {
-	const char			*name;
-	byte				media;
-	unsigned busy			: 1;
-	unsigned supports_dma		: 1;
-	unsigned supports_dsc_overlap	: 1;
+
+struct ata_operations {
+	struct module *owner;
+	unsigned busy: 1; /* FIXME: this will go soon away... */
 	int (*cleanup)(ide_drive_t *);
 	int (*standby)(ide_drive_t *);
 	int (*flushcache)(ide_drive_t *);
 	ide_startstop_t	(*do_request)(ide_drive_t *, struct request *, unsigned long);
 	int (*end_request)(ide_drive_t *drive, int uptodate);
+
 	int (*ioctl)(ide_drive_t *, struct inode *, struct file *, unsigned int, unsigned long);
 	int (*open)(struct inode *, struct file *, ide_drive_t *);
 	void (*release)(struct inode *, struct file *, ide_drive_t *);
 	int (*media_change)(ide_drive_t *);
 	void (*revalidate)(ide_drive_t *);
+
 	void (*pre_reset)(ide_drive_t *);
 	unsigned long (*capacity)(ide_drive_t *);
 	ide_startstop_t	(*special)(ide_drive_t *);
 	ide_proc_entry_t		*proc;
-	int (*driver_init)(void);
 	int (*driver_reinit)(ide_drive_t *);
+};
 
-	/* FIXME: Single linked list of drivers for iteration.
-	 */
-	struct ide_driver_s *next;
-} ide_driver_t;
+/* Alas, no aliases. Too much hassle with bringing module.h everywhere */
+#define ata_get(ata) \
+	(((ata) && (ata)->owner)	\
+		? ( try_inc_mod_count((ata)->owner) ? (ata) : NULL ) \
+		: (ata))
 
-#define DRIVER(drive)		((drive)->driver)
+#define ata_put(ata) \
+do {	\
+	if ((ata) && (ata)->owner) \
+		__MOD_DEC_USE_COUNT((ata)->owner);	\
+} while(0)
+
+
+/* FIXME: Actually implement and use them as soon as possible!  to make the
+ * ide_scan_devices() go away! */
+
+extern int unregister_ata_driver(unsigned int type, struct ata_operations *driver);
+extern int register_ata_driver(unsigned int type, struct ata_operations *driver);
+
+#define ata_ops(drive)		((drive)->driver)
 
 /*
  * ide_hwifs[] is the master data structure used to keep track
@@ -740,10 +751,7 @@ typedef struct ide_driver_s {
  * structure directly (the allocation/layout may change!).
  *
  */
-#ifndef _IDE_C
 extern struct hwif_s ide_hwifs[];		/* master data repository */
-extern struct ide_driver_s *ide_drivers;
-#endif
 extern int noautodma;
 
 /*
@@ -818,7 +826,7 @@ unsigned long current_capacity (ide_drive_t *drive);
 /*
  * Revalidate (read partition tables)
  */
-void ide_revalidate_drive (ide_drive_t *drive);
+extern void ide_revalidate_drive (ide_drive_t *drive);
 
 /*
  * Start a reset operation for an IDE interface.
@@ -854,34 +862,6 @@ typedef enum {
 
 #define task_rq_offset(rq) \
 	(((rq)->nr_sectors - (rq)->current_nr_sectors) * SECTOR_SIZE)
-
-extern inline void *ide_map_buffer(struct request *rq, unsigned long *flags)
-{
-	return bio_kmap_irq(rq->bio, flags) + ide_rq_offset(rq);
-}
-
-extern inline void ide_unmap_buffer(char *buffer, unsigned long *flags)
-{
-	bio_kunmap_irq(buffer, flags);
-}
-
-/*
- * for now, taskfile requests are special :/
- */
-extern inline char *ide_map_rq(struct request *rq, unsigned long *flags)
-{
-	if (rq->bio)
-		return ide_map_buffer(rq, flags);
-	else
-		return rq->buffer + task_rq_offset(rq);
-}
-
-extern inline void ide_unmap_rq(struct request *rq, char *buf,
-				unsigned long *flags)
-{
-	if (rq->bio)
-		ide_unmap_buffer(buf, flags);
-}
 
 /*
  * This function issues a special IDE device request
@@ -959,7 +939,6 @@ void do_taskfile (ide_drive_t *drive, struct hd_drive_task_hdr *taskfile, struct
 /*
  * Special Flagged Register Validation Caller
  */
-// ide_startstop_t flagged_taskfile (ide_drive_t *drive, ide_task_t *task);
 
 ide_startstop_t set_multmode_intr (ide_drive_t *drive);
 ide_startstop_t set_geometry_intr (ide_drive_t *drive);
@@ -990,7 +969,6 @@ int pkt_taskfile_ioctl (ide_drive_t *drive, struct inode *inode, struct file *fi
 #endif /* CONFIG_PKT_TASK_IOCTL */
 
 void ide_delay_50ms (void);
-int system_bus_clock(void);
 
 byte ide_auto_reduce_xfer (ide_drive_t *drive);
 int ide_driveid_update (ide_drive_t *drive);
@@ -999,13 +977,7 @@ int ide_config_drive_speed (ide_drive_t *drive, byte speed);
 byte eighty_ninty_three (ide_drive_t *drive);
 int set_transfer (ide_drive_t *drive, ide_task_t *args);
 
-/*
- * ide_system_bus_speed() returns what we think is the system VESA/PCI
- * bus speed (in MHz).  This is used for calculating interface PIO timings.
- * The default is 40 for known PCI systems, 50 otherwise.
- * The "idebus=xx" parameter can be used to override this value.
- */
-int ide_system_bus_speed (void);
+extern int system_bus_speed;
 
 /*
  * idedisk_input_data() is a wrapper around ide_input_data() which copes
@@ -1037,47 +1009,33 @@ void ide_intr (int irq, void *dev_id, struct pt_regs *regs);
 void do_ide_request (request_queue_t * q);
 void ide_init_subdrivers (void);
 
-#ifndef _IDE_C
 extern struct block_device_operations ide_fops[];
 extern ide_proc_entry_t generic_subdriver_entries[];
-#endif
 
-int ide_reinit_drive (ide_drive_t *drive);
-
-#ifdef _IDE_C
-# ifdef CONFIG_BLK_DEV_IDE
+#ifdef CONFIG_BLK_DEV_IDE
 /* Probe for devices attached to the systems host controllers.
  */
 extern int ideprobe_init (void);
-# endif
+#endif
 #ifdef CONFIG_BLK_DEV_IDEDISK
-int idedisk_reinit (ide_drive_t *drive);
-int idedisk_init (void);
-#endif /* CONFIG_BLK_DEV_IDEDISK */
+extern int idedisk_init (void);
+#endif
 #ifdef CONFIG_BLK_DEV_IDECD
-int ide_cdrom_reinit (ide_drive_t *drive);
-int ide_cdrom_init (void);
-#endif /* CONFIG_BLK_DEV_IDECD */
+extern int ide_cdrom_init (void);
+#endif
 #ifdef CONFIG_BLK_DEV_IDETAPE
-int idetape_reinit (ide_drive_t *drive);
-int idetape_init (void);
-#endif /* CONFIG_BLK_DEV_IDETAPE */
+extern int idetape_init (void);
+#endif
 #ifdef CONFIG_BLK_DEV_IDEFLOPPY
-int idefloppy_reinit (ide_drive_t *drive);
-int idefloppy_init (void);
-#endif /* CONFIG_BLK_DEV_IDEFLOPPY */
+extern int idefloppy_init (void);
+#endif
 #ifdef CONFIG_BLK_DEV_IDESCSI
-int idescsi_reinit (ide_drive_t *drive);
-int idescsi_init (void);
-#endif /* CONFIG_BLK_DEV_IDESCSI */
-#endif /* _IDE_C */
+extern int idescsi_init (void);
+#endif
 
-extern int ide_register_module (struct ide_driver_s *d);
-extern void ide_unregister_module (struct ide_driver_s *d);
-ide_drive_t *ide_scan_devices (byte media, const char *name, ide_driver_t *driver, int n);
-extern int ide_register_subdriver(ide_drive_t *drive, ide_driver_t *driver);
+ide_drive_t *ide_scan_devices (byte media, const char *name, struct ata_operations *driver, int n);
+extern int ide_register_subdriver(ide_drive_t *drive, struct ata_operations *driver);
 extern int ide_unregister_subdriver(ide_drive_t *drive);
-extern int ide_replace_subdriver(ide_drive_t *drive, const char *driver);
 
 #ifdef CONFIG_BLK_DEV_IDEPCI
 #define ON_BOARD		1
@@ -1088,7 +1046,7 @@ extern int ide_replace_subdriver(ide_drive_t *drive, const char *driver);
 #  define OFF_BOARD		NEVER_BOARD
 #endif /* CONFIG_BLK_DEV_OFFBOARD */
 
-void ide_scan_pcibus (int scan_direction) __init;
+void __init ide_scan_pcibus(int scan_direction);
 #endif
 #ifdef CONFIG_BLK_DEV_IDEDMA
 #define BAD_DMA_DRIVE		0
@@ -1108,5 +1066,6 @@ extern unsigned long ide_get_or_set_dma_base (ide_hwif_t *hwif, int extra, const
 extern spinlock_t ide_lock;
 
 extern int drive_is_ready(ide_drive_t *drive);
+extern void revalidate_drives(void);
 
 #endif /* _IDE_H */

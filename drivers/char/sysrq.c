@@ -161,7 +161,7 @@ static void go_sync(struct super_block *sb, int remount_flag)
 		}
 		file_list_unlock();
 		DQUOT_OFF(sb);
-		fsync_dev(sb->s_dev);
+		fsync_bdev(sb->s_bdev);
 		flags = MS_RDONLY;
 		if (sb->s_op && sb->s_op->remount_fs) {
 			ret = sb->s_op->remount_fs(sb, &flags, NULL);
@@ -174,7 +174,7 @@ static void go_sync(struct super_block *sb, int remount_flag)
 		} else
 			printk("nothing to do\n");
 	} else { /* Sync only */
-		fsync_dev(sb->s_dev);
+		fsync_bdev(sb->s_bdev);
 		printk("OK\n");
 	}
 	console_loglevel = orig_loglevel;

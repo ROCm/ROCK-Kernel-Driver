@@ -63,7 +63,6 @@
 
 static int pdc202xx_get_info(char *, char **, off_t, int);
 extern int (*pdc202xx_display_info)(char *, char **, off_t, int); /* ide-proc.c */
-extern char *ide_media_verbose(ide_drive_t *);
 static struct pci_dev *bmide_dev;
 
 char *pdc202xx_pio_verbose (u32 drive_pci)
@@ -412,7 +411,8 @@ static int pdc202xx_tune_chipset (ide_drive_t *drive, byte speed)
 		default: return -1;
 	}
 
-	if ((drive->media != ide_disk) && (speed < XFER_SW_DMA_0))	return -1;
+	if ((drive->type != ATA_DISK) && (speed < XFER_SW_DMA_0))
+		return -1;
 
 	pci_read_config_dword(dev, drive_pci, &drive_conf);
 	pci_read_config_byte(dev, (drive_pci), &AP);
@@ -820,7 +820,8 @@ static int config_chipset_for_dma (ide_drive_t *drive, byte ultra)
 	}
 
 	if (jumpbit) {
-		if (drive->media != ide_disk)	return ide_dma_off_quietly;
+		if (drive->type != ATA_DISK)
+			return ide_dma_off_quietly;
 		if (id->capability & 4) {	/* IORDY_EN & PREFETCH_EN */
 			OUT_BYTE((iordy + adj), indexreg);
 			OUT_BYTE((IN_BYTE(datareg)|0x03), datareg);
@@ -869,13 +870,14 @@ static int config_chipset_for_dma (ide_drive_t *drive, byte ultra)
 
 chipset_is_set:
 
-	if (drive->media != ide_disk)	return ide_dma_off_quietly;
+	if (drive->type != ATA_DISK)
+		return ide_dma_off_quietly;
 
 	pci_read_config_byte(dev, (drive_pci), &AP);
 	if (id->capability & 4)	/* IORDY_EN */
 		pci_write_config_byte(dev, (drive_pci), AP|IORDY_EN);
 	pci_read_config_byte(dev, (drive_pci), &AP);
-	if (drive->media == ide_disk)	/* PREFETCH_EN */
+	if (drive->type == ATA_DISK)	/* PREFETCH_EN */
 		pci_write_config_byte(dev, (drive_pci), AP|PREFETCH_EN);
 
 jumpbit_is_set:
@@ -1102,7 +1104,7 @@ static int pdc202xx_tristate (ide_drive_t * drive, int state)
 	return 0;
 }
 
-unsigned int __init pci_init_pdc202xx (struct pci_dev *dev, const char *name)
+unsigned int __init pci_init_pdc202xx(struct pci_dev *dev)
 {
 	unsigned long high_16	= pci_resource_start(dev, 4);
 	byte udma_speed_flag	= IN_BYTE(high_16 + 0x001f);
@@ -1112,7 +1114,7 @@ unsigned int __init pci_init_pdc202xx (struct pci_dev *dev, const char *name)
 
 	if (dev->resource[PCI_ROM_RESOURCE].start) {
 		pci_write_config_dword(dev, PCI_ROM_ADDRESS, dev->resource[PCI_ROM_RESOURCE].start | PCI_ROM_ADDRESS_ENABLE);
-		printk("%s: ROM enabled at 0x%08lx\n", name, dev->resource[PCI_ROM_RESOURCE].start);
+		printk("%s: ROM enabled at 0x%08lx\n", dev->name, dev->resource[PCI_ROM_RESOURCE].start);
 	}
 
 	switch (dev->device) {
@@ -1151,7 +1153,7 @@ unsigned int __init pci_init_pdc202xx (struct pci_dev *dev, const char *name)
 				pci_read_config_byte(dev, (PCI_INTERRUPT_LINE)|0x80, &irq2);	/* 0xbc */
 				if (irq != irq2) {
 					pci_write_config_byte(dev, (PCI_INTERRUPT_LINE)|0x80, irq);	/* 0xbc */
-					printk("%s: pci-config space interrupt mirror fixed.\n", name);
+					printk("%s: pci-config space interrupt mirror fixed.\n", dev->name);
 				}
 			}
 			break;
@@ -1163,14 +1165,14 @@ unsigned int __init pci_init_pdc202xx (struct pci_dev *dev, const char *name)
 	printk("%s: (U)DMA Burst Bit %sABLED " \
 		"Primary %s Mode " \
 		"Secondary %s Mode.\n",
-		name,
+		dev->name,
 		(udma_speed_flag & 1) ? "EN" : "DIS",
 		(primary_mode & 1) ? "MASTER" : "PCI",
 		(secondary_mode & 1) ? "MASTER" : "PCI" );
 
 #ifdef CONFIG_PDC202XX_BURST
 	if (!(udma_speed_flag & 1)) {
-		printk("%s: FORCING BURST BIT 0x%02x -> 0x%02x ", name, udma_speed_flag, (udma_speed_flag|1));
+		printk("%s: FORCING BURST BIT 0x%02x -> 0x%02x ", dev->name, udma_speed_flag, (udma_speed_flag|1));
 		OUT_BYTE(udma_speed_flag|1, high_16 + 0x001f);
 		printk("%sCTIVE\n", (IN_BYTE(high_16 + 0x001f) & 1) ? "A" : "INA");
 	}
@@ -1179,14 +1181,14 @@ unsigned int __init pci_init_pdc202xx (struct pci_dev *dev, const char *name)
 #ifdef CONFIG_PDC202XX_MASTER
 	if (!(primary_mode & 1)) {
 		printk("%s: FORCING PRIMARY MODE BIT 0x%02x -> 0x%02x ",
-			name, primary_mode, (primary_mode|1));
+			dev->name, primary_mode, (primary_mode|1));
 		OUT_BYTE(primary_mode|1, high_16 + 0x001a);
 		printk("%s\n", (IN_BYTE(high_16 + 0x001a) & 1) ? "MASTER" : "PCI");
 	}
 
 	if (!(secondary_mode & 1)) {
 		printk("%s: FORCING SECONDARY MODE BIT 0x%02x -> 0x%02x ",
-			name, secondary_mode, (secondary_mode|1));
+			dev->name, secondary_mode, (secondary_mode|1));
 		OUT_BYTE(secondary_mode|1, high_16 + 0x001b);
 		printk("%s\n", (IN_BYTE(high_16 + 0x001b) & 1) ? "MASTER" : "PCI");
 	}

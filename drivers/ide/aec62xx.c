@@ -48,7 +48,6 @@
 
 static int aec62xx_get_info(char *, char **, off_t, int);
 extern int (*aec62xx_display_info)(char *, char **, off_t, int); /* ide-proc.c */
-extern char *ide_media_verbose(ide_drive_t *);
 static struct pci_dev *bmide_dev;
 
 static int aec62xx_get_info (char *buffer, char **addr, off_t offset, int count)
@@ -203,22 +202,18 @@ extern char *ide_xfer_verbose (byte xfer_rate);
 
 static byte pci_bus_clock_list (byte speed, struct chipset_bus_clock_list_entry * chipset_table)
 {
-	int bus_speed = system_bus_clock();
-
 	for ( ; chipset_table->xfer_speed ; chipset_table++)
 		if (chipset_table->xfer_speed == speed) {
-			return ((byte) ((bus_speed <= 33) ? chipset_table->chipset_settings_33 : chipset_table->chipset_settings_34));
+			return ((byte) ((system_bus_speed <= 33) ? chipset_table->chipset_settings_33 : chipset_table->chipset_settings_34));
 		}
 	return 0x00;
 }
 
 static byte pci_bus_clock_list_ultra (byte speed, struct chipset_bus_clock_list_entry * chipset_table)
 {
-	int bus_speed = system_bus_clock();
-
 	for ( ; chipset_table->xfer_speed ; chipset_table++)
 		if (chipset_table->xfer_speed == speed) {
-			return ((byte) ((bus_speed <= 33) ? chipset_table->ultra_settings_33 : chipset_table->ultra_settings_34));
+			return ((byte) ((system_bus_speed <= 33) ? chipset_table->ultra_settings_33 : chipset_table->ultra_settings_34));
 		}
 	return 0x00;
 }
@@ -314,8 +309,8 @@ static int config_aec6210_chipset_for_dma (ide_drive_t *drive, byte ultra)
 	unsigned long dma_base	= hwif->dma_base;
 	byte speed		= -1;
 
-	if (drive->media != ide_disk)
-		return ((int) ide_dma_off_quietly);
+	if (drive->type != ATA_DISK)
+		return ide_dma_off_quietly;
 
 	if (((id->dma_ultra & 0x0010) ||
 	     (id->dma_ultra & 0x0008) ||
@@ -360,7 +355,7 @@ static int config_aec6260_chipset_for_dma (ide_drive_t *drive, byte ultra)
 	byte speed		= -1;
 	byte ultra66		= eighty_ninty_three(drive);
 
-	if (drive->media != ide_disk)
+	if (drive->type != ATA_DISK)
 		return ((int) ide_dma_off_quietly);
 
 	if ((id->dma_ultra & 0x0010) && (ultra) && (ultra66)) {
@@ -522,11 +517,11 @@ int aec62xx_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 #endif /* CONFIG_AEC62XX_TUNING */
 
-unsigned int __init pci_init_aec62xx (struct pci_dev *dev, const char *name)
+unsigned int __init pci_init_aec62xx (struct pci_dev *dev)
 {
 	if (dev->resource[PCI_ROM_RESOURCE].start) {
 		pci_write_config_dword(dev, PCI_ROM_ADDRESS, dev->resource[PCI_ROM_RESOURCE].start | PCI_ROM_ADDRESS_ENABLE);
-		printk("%s: ROM enabled at 0x%08lx\n", name, dev->resource[PCI_ROM_RESOURCE].start);
+		printk("%s: ROM enabled at 0x%08lx\n", dev->name, dev->resource[PCI_ROM_RESOURCE].start);
 	}
 
 #if defined(DISPLAY_AEC62XX_TIMINGS) && defined(CONFIG_PROC_FS)

@@ -1434,7 +1434,7 @@ int __openfirmware powerbook_sleep_G3(void)
 	 * BenH: Moved to _after_ sleep request and changed video
 	 * drivers to vmalloc() during sleep request. This way, all
 	 * vmalloc's are done before actual sleep of block drivers */
-	fsync_dev(0);
+	sys_sync();
 
 	/* Sleep can fail now. May not be very robust but useful for debugging */
 	ret = broadcast_sleep(PBOOK_SLEEP_NOW, PBOOK_WAKE);
@@ -1589,7 +1589,7 @@ int __openfirmware powerbook_sleep_Core99(void)
 	 * BenH: Moved to _after_ sleep request and changed video
 	 * drivers to vmalloc() during sleep request. This way, all
 	 * vmalloc's are done before actual sleep of block drivers */
-	fsync_dev(0);
+	sys_sync();
 
 	/* Sleep can fail now. May not be very robust but useful for debugging */
 	ret = broadcast_sleep(PBOOK_SLEEP_NOW, PBOOK_WAKE);
@@ -1764,7 +1764,7 @@ int __openfirmware powerbook_sleep_3400(void)
 	 * BenH: Moved to _after_ sleep request and changed video
 	 * drivers to vmalloc() during sleep request. This way, all
 	 * vmalloc's are done before actual sleep of block drivers */
-	fsync_dev(0);
+	sys_sync();
 
 	/* Sleep can fail now. May not be very robust but useful for debugging */
 	ret = broadcast_sleep(PBOOK_SLEEP_NOW, PBOOK_WAKE);

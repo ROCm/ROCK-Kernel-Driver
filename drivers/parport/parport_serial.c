@@ -53,6 +53,15 @@ static struct parport_pc_pci {
 		int hi; /* -1 if not there, >6 for offset-method (max
                            BAR is 6) */
 	} addr[4];
+
+	/* If set, this is called immediately after pci_enable_device.
+	 * If it returns non-zero, no probing will take place and the
+	 * ports will not be used. */
+	int (*preinit_hook) (struct pci_dev *pdev, int autoirq, int autodma);
+
+	/* If set, this is called after probing for ports.  If 'failed'
+	 * is non-zero we couldn't use any of the ports. */
+	void (*postinit_hook) (struct pci_dev *pdev, int failed);
 } cards[] __devinitdata = {
 	/* titan_110l */		{ 1, { { 3, -1 }, } },
 	/* titan_210l */		{ 1, { { 3, -1 }, } },
@@ -239,6 +248,10 @@ static int __devinit parport_register (struct pci_dev *dev,
 	int i = id->driver_data, n;
 	int success = 0;
 
+	if (cards[i].preinit_hook &&
+	    cards[i].preinit_hook (dev, PARPORT_IRQ_NONE, PARPORT_DMA_NONE))
+		return -ENODEV;
+
 	for (n = 0; n < cards[i].numports; n++) {
 		struct parport *port;
 		int lo = cards[i].addr[n].lo;
@@ -264,6 +277,9 @@ static int __devinit parport_register (struct pci_dev *dev,
 			success = 1;
 		}
 	}
+
+	if (cards[i].postinit_hook)
+		cards[i].postinit_hook (dev, !success);
 
 	return success ? 0 : 1;
 }

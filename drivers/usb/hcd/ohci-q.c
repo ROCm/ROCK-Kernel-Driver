@@ -8,8 +8,6 @@
  * $Id: ohci-q.c,v 1.6 2002/01/19 00:23:15 dbrownell Exp $
  */
 
-#include <asm/byteorder.h>
- 
 static void urb_free_priv (struct ohci_hcd *hc, urb_priv_t *urb_priv)
 {
 	int		last = urb_priv->length - 1;

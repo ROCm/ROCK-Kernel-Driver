@@ -1,93 +1,15 @@
 /*
  * linux/drivers/ide/ide-geometry.c
+ *
+ * Sun Feb 24 23:13:03 CET 2002: Patch by Andries Brouwer to remove the
+ * confused CMOS probe applied. This is solving more problems then it my
+ * (unexpectedly) introduce.
  */
+
 #include <linux/config.h>
 #include <linux/ide.h>
 #include <linux/mc146818rtc.h>
 #include <asm/io.h>
-
-#ifdef CONFIG_BLK_DEV_IDE
-
-/*
- * We query CMOS about hard disks : it could be that we have a SCSI/ESDI/etc
- * controller that is BIOS compatible with ST-506, and thus showing up in our
- * BIOS table, but not register compatible, and therefore not present in CMOS.
- *
- * Furthermore, we will assume that our ST-506 drives <if any> are the primary
- * drives in the system -- the ones reflected as drive 1 or 2.  The first
- * drive is stored in the high nibble of CMOS byte 0x12, the second in the low
- * nibble.  This will be either a 4 bit drive type or 0xf indicating use byte
- * 0x19 for an 8 bit type, drive 1, 0x1a for drive 2 in CMOS.  A non-zero value
- * means we have an AT controller hard disk for that drive.
- *
- * Of course, there is no guarantee that either drive is actually on the
- * "primary" IDE interface, but we don't bother trying to sort that out here.
- * If a drive is not actually on the primary interface, then these parameters
- * will be ignored.  This results in the user having to supply the logical
- * drive geometry as a boot parameter for each drive not on the primary i/f.
- */
-/*
- * The only "perfect" way to handle this would be to modify the setup.[cS] code
- * to do BIOS calls Int13h/Fn08h and Int13h/Fn48h to get all of the drive info
- * for us during initialization.  I have the necessary docs -- any takers?  -ml
- */
-/*
- * I did this, but it doesnt work - there is no reasonable way to find the
- * correspondence between the BIOS numbering of the disks and the Linux
- * numbering. -aeb
- *
- * The code below is bad. One of the problems is that drives 1 and 2
- * may be SCSI disks (even when IDE disks are present), so that
- * the geometry we read here from BIOS is attributed to the wrong disks.
- * Consequently, also the former "drive->present = 1" below was a mistake.
- *
- * Eventually the entire routine below should be removed.
- *
- * 17-OCT-2000 rjohnson@analogic.com Added spin-locks for reading CMOS
- * chip.
- */
-
-void probe_cmos_for_drives (ide_hwif_t *hwif)
-{
-#ifdef __i386__
-	extern struct drive_info_struct drive_info;
-	byte cmos_disks, *BIOS = (byte *) &drive_info;
-	int unit;
-	unsigned long flags;
-
-#ifdef CONFIG_BLK_DEV_PDC4030
-	if (hwif->chipset == ide_pdc4030 && hwif->channel != 0)
-		return;
-#endif /* CONFIG_BLK_DEV_PDC4030 */
-	spin_lock_irqsave(&rtc_lock, flags);
-	cmos_disks = CMOS_READ(0x12);
-	spin_unlock_irqrestore(&rtc_lock, flags);
-	/* Extract drive geometry from CMOS+BIOS if not already setup */
-	for (unit = 0; unit < MAX_DRIVES; ++unit) {
-		ide_drive_t *drive = &hwif->drives[unit];
-
-		if ((cmos_disks & (0xf0 >> (unit*4)))
-		   && !drive->present && !drive->nobios) {
-			unsigned short cyl = *(unsigned short *)BIOS;
-			unsigned char head = *(BIOS+2);
-			unsigned char sect = *(BIOS+14);
-			if (cyl > 0 && head > 0 && sect > 0 && sect < 64) {
-				drive->cyl   = drive->bios_cyl  = cyl;
-				drive->head  = drive->bios_head = head;
-				drive->sect  = drive->bios_sect = sect;
-				drive->ctl   = *(BIOS+8);
-			} else {
-				printk("hd%c: C/H/S=%d/%d/%d from BIOS ignored\n",
-				       unit+'a', cyl, head, sect);
-			}
-		}
-
-		BIOS += 16;
-	}
-#endif
-}
-#endif /* CONFIG_BLK_DEV_IDE */
-
 
 #if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
 
@@ -105,14 +27,14 @@ ontrack(ide_drive_t *drive, int heads, unsigned int *c, int *h, int *s) {
 	unsigned long total;
 
 	/*
-	 * The specs say: take geometry as obtained from Identify,
-	 * compute total capacity C*H*S from that, and truncate to
-	 * 1024*255*63. Now take S=63, H the first in the sequence
-	 * 4, 8, 16, 32, 64, 128, 255 such that 63*H*1024 >= total.
-	 * [Please tell aeb@cwi.nl in case this computes a
-	 * geometry different from what OnTrack uses.]
+	 * The specs say: take geometry as obtained from Identify, compute
+	 * total capacity C*H*S from that, and truncate to 1024*255*63. Now
+	 * take S=63, H the first in the sequence 4, 8, 16, 32, 64, 128, 255
+	 * such that 63*H*1024 >= total.  [Please tell aeb@cwi.nl in case this
+	 * computes a geometry different from what OnTrack uses.]
 	 */
-	total = DRIVER(drive)->capacity(drive);
+
+	total = ata_ops(drive)->capacity(drive);
 
 	*s = 63;
 

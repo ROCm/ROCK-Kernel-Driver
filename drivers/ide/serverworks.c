@@ -105,7 +105,6 @@ static byte svwks_revision = 0;
 
 static int svwks_get_info(char *, char **, off_t, int);
 extern int (*svwks_display_info)(char *, char **, off_t, int); /* ide-proc.c */
-extern char *ide_media_verbose(ide_drive_t *);
 
 static int svwks_get_info (char *buffer, char **addr, off_t offset, int count)
 {
@@ -547,7 +546,7 @@ static int svwks_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 }
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 
-unsigned int __init pci_init_svwks (struct pci_dev *dev, const char *name)
+unsigned int __init pci_init_svwks(struct pci_dev *dev)
 {
 	unsigned int reg;
 	byte btr;

@@ -924,143 +924,65 @@ asmlinkage int ppc32_select(u32 n, u32* inp, u32* outp, u32* exp, u32 tvp_x)
 
 
 
-static int cp_new_stat32(struct inode *inode, struct stat32 *statbuf)
+static int cp_new_stat32(struct kstat *stat, struct stat32 *statbuf)
 {
-	unsigned long ino, blksize, blocks;
-	kdev_t dev, rdev;
-	umode_t mode;
-	nlink_t nlink;
-	uid_t uid;
-	gid_t gid;
-	off_t size;
-	time_t atime, mtime, ctime;
 	int err;
 
-	/* Stream the loads of inode data into the load buffer,
-	 * then we push it all into the store buffer below.  This
-	 * should give optimal cache performance.
-	 */
-	ino = inode->i_ino;
-	dev = inode->i_dev;
-	mode = inode->i_mode;
-	nlink = inode->i_nlink;
-	uid = inode->i_uid;
-	gid = inode->i_gid;
-	rdev = inode->i_rdev;
-	size = inode->i_size;
-	atime = inode->i_atime;
-	mtime = inode->i_mtime;
-	ctime = inode->i_ctime;
-	blksize = inode->i_blksize;
-	blocks = inode->i_blocks;
-
-	err  = put_user(kdev_t_to_nr(dev), &statbuf->st_dev);
-	err |= put_user(ino, &statbuf->st_ino);
-	err |= put_user(mode, &statbuf->st_mode);
-	err |= put_user(nlink, &statbuf->st_nlink);
-	err |= put_user(uid, &statbuf->st_uid);
-	err |= put_user(gid, &statbuf->st_gid);
-	err |= put_user(kdev_t_to_nr(rdev), &statbuf->st_rdev);
-	err |= put_user(size, &statbuf->st_size);
-	err |= put_user(atime, &statbuf->st_atime);
+	err  = put_user(stat->dev, &statbuf->st_dev);
+	err |= put_user(stat->ino, &statbuf->st_ino);
+	err |= put_user(stat->mode, &statbuf->st_mode);
+	err |= put_user(stat->nlink, &statbuf->st_nlink);
+	err |= put_user(high2lowuid(stat->uid), &statbuf->st_uid);
+	err |= put_user(high2lowgid(stat->gid), &statbuf->st_gid);
+	err |= put_user(stat->rdev, &statbuf->st_rdev);
+	if (stat->size > MAX_NON_LFS)
+		return -EOVERFLOW;
+	err |= put_user(stat->size, &statbuf->st_size);
+	err |= put_user(stat->atime, &statbuf->st_atime);
 	err |= put_user(0, &statbuf->__unused1);
-	err |= put_user(mtime, &statbuf->st_mtime);
+	err |= put_user(stat->mtime, &statbuf->st_mtime);
 	err |= put_user(0, &statbuf->__unused2);
-	err |= put_user(ctime, &statbuf->st_ctime);
+	err |= put_user(stat->ctime, &statbuf->st_ctime);
 	err |= put_user(0, &statbuf->__unused3);
-	if (blksize) {
-		err |= put_user(blksize, &statbuf->st_blksize);
-		err |= put_user(blocks, &statbuf->st_blocks);
-	} else {
-		unsigned int tmp_blocks;
-
-#define D_B   7
-#define I_B   (BLOCK_SIZE / sizeof(unsigned short))
-		tmp_blocks = (size + BLOCK_SIZE - 1) / BLOCK_SIZE;
-		if (tmp_blocks > D_B) {
-			unsigned int indirect;
-
-			indirect = (tmp_blocks - D_B + I_B - 1) / I_B;
-			tmp_blocks += indirect;
-			if (indirect > 1) {
-				indirect = (indirect - 1 + I_B - 1) / I_B;
-				tmp_blocks += indirect;
-				if (indirect > 1)
-					tmp_blocks++;
-			}
-		}
-		err |= put_user(BLOCK_SIZE, &statbuf->st_blksize);
-		err |= put_user((BLOCK_SIZE / 512) * tmp_blocks, &statbuf->st_blocks);
-#undef D_B
-#undef I_B
-	}
+	err |= put_user(stat->blksize, &statbuf->st_blksize);
+	err |= put_user(stat->blocks, &statbuf->st_blocks);
 	err |= put_user(0, &statbuf->__unused4[0]);
 	err |= put_user(0, &statbuf->__unused4[1]);
 
 	return err;
 }
 
-static __inline__ int
-do_revalidate(struct dentry *dentry)
-{
-	struct inode * inode = dentry->d_inode;
-	if (inode->i_op && inode->i_op->revalidate)
-		return inode->i_op->revalidate(dentry);
-	return 0;
-}
-
 asmlinkage long sys32_newstat(char* filename, struct stat32* statbuf)
 {
-	struct nameidata nd;
-	int error;
+	struct kstat stat;
+	int error = vfs_stat(filename, &stat);
 	
-	PPCDBG(PPCDBG_SYS32X, "sys32_newstat - running - filename=%s, statbuf=%p, pid=%ld, comm=%s\n", filename, statbuf, current->pid, current->comm);
+	if (!error)
+		error = cp_new_stat32(&stat, statbuf);
 
-	error = user_path_walk(filename, &nd);
-	if (!error) {
-		error = do_revalidate(nd.dentry);
-		if (!error)
-			error = cp_new_stat32(nd.dentry->d_inode, statbuf);
-		path_release(&nd);
-	}
 	return error;
 }
 
 asmlinkage long sys32_newlstat(char * filename, struct stat32 *statbuf)
 {
-	struct nameidata nd;
-	int error;
+	struct kstat stat;
+	int error = vfs_lstat(filename, &stat);
 	
-	PPCDBG(PPCDBG_SYS32X, "sys32_newlstat - running - fn=%s, pid=%ld, comm=%s\n", filename, current->pid, current->comm);
+	if (!error)
+		error = cp_new_stat32(&stat, statbuf);
 
-	error = user_path_walk_link(filename, &nd);
-	if (!error) {
-		error = do_revalidate(nd.dentry);
-		if (!error)
-			error = cp_new_stat32(nd.dentry->d_inode, statbuf);
-
-		path_release(&nd);
-	}
 	return error;
 }
 
 asmlinkage long sys32_newfstat(unsigned int fd, struct stat32 *statbuf)
 {
-	struct file *f;
-	int err = -EBADF;
+	struct kstat stat;
+	int error = vfs_fstat(fd, &stat);
 	
-	PPCDBG(PPCDBG_SYS32X, "sys32_newfstat - running - fd=%x, pid=%ld, comm=%s\n", fd, current->pid, current->comm);
+	if (!error)
+		error = cp_new_stat32(&stat, statbuf);
 
-	f = fget(fd);
-	if (f) {
-		struct dentry * dentry = f->f_dentry;
-
-		err = do_revalidate(dentry);
-		if (!err)
-			err = cp_new_stat32(dentry->d_inode, statbuf);
-		fput(f);
-	}
-	return err;
+	return error;
 }
 
 static inline int put_statfs (struct statfs32 *ubuf, struct statfs *kbuf)
@@ -3104,7 +3026,7 @@ asmlinkage long sys32_ipc(u32 call, u32 first_parm, u32 second_parm, u32 third_p
 /* stat syscall methods. */
 extern asmlinkage int sys_stat(char* filename, struct __old_kernel_stat* statbuf);
 
-static int cp_old_stat32(struct inode* inode, struct __old_kernel_stat32* statbuf)
+static int cp_old_stat32(struct kstat *stat, struct __old_kernel_stat32* statbuf)
 {
 	static int warncount = 5;
 	struct __old_kernel_stat32 tmp;
@@ -3115,79 +3037,51 @@ static int cp_old_stat32(struct inode* inode, struct __old_kernel_stat32* statbu
 			current->comm);
 	}
 
-	tmp.st_dev = kdev_t_to_nr(inode->i_dev);
-	tmp.st_ino = inode->i_ino;
-	tmp.st_mode = inode->i_mode;
-	tmp.st_nlink = inode->i_nlink;
-	SET_OLDSTAT_UID(tmp, inode->i_uid);
-	SET_OLDSTAT_GID(tmp, inode->i_gid);
-	tmp.st_rdev = kdev_t_to_nr(inode->i_rdev);
-	tmp.st_size = inode->i_size;
-	tmp.st_atime = inode->i_atime;
-	tmp.st_mtime = inode->i_mtime;
-	tmp.st_ctime = inode->i_ctime;
+	tmp.st_dev = stat->dev;
+	tmp.st_ino = stat->ino;
+	tmp.st_mode = stat->mode;
+	tmp.st_nlink = stat->nlink;
+	SET_OLDSTAT_UID(tmp, stat->uid);
+	SET_OLDSTAT_GID(tmp, stat->gid);
+	tmp.st_rdev = stat->rdev;
+	if (stat->size > MAX_NON_LFS)
+		return -EOVERFLOW;
+	tmp.st_size = stat->size;
+	tmp.st_atime = stat->atime;
+	tmp.st_mtime = stat->mtime;
+	tmp.st_ctime = stat->ctime;
 	return copy_to_user(statbuf,&tmp,sizeof(tmp)) ? -EFAULT : 0;
 }
 
 asmlinkage long sys32_stat(char* filename, struct __old_kernel_stat32* statbuf)
 {
-	struct nameidata nd;
-	int error;
+	struct kstat stat;
+	int error = vfs_stat(filename, &stat);
 	
-	PPCDBG(PPCDBG_SYS32X, "sys32_stat - entered - pid=%ld current=%lx comm=%s \n", current->pid, current, current->comm);
-
-	error = user_path_walk(filename, &nd);
-	if (!error) {
-		error = do_revalidate(nd.dentry);
-		if (!error)
-			error = cp_old_stat32(nd.dentry->d_inode, statbuf);
-		path_release(&nd);
-	}
-	
-	PPCDBG(PPCDBG_SYS32X, "sys32_stat - exited - pid=%ld current=%lx comm=%s \n", current->pid, current, current->comm);
+	if (!error)
+		error = cp_old_stat32(&stat, statbuf);
 
 	return error;
 }
 
 asmlinkage long sys32_fstat(unsigned int fd, struct __old_kernel_stat32* statbuf)
 {
-	struct file *f;
-	int err = -EBADF;
+	struct kstat stat;
+	int error = vfs_fstat(fd, &stat);
 	
-	PPCDBG(PPCDBG_SYS32X, "sys32_fstat - entered - pid=%ld current=%lx comm=%s \n", current->pid, current, current->comm);
+	if (!error)
+		error = cp_old_stat32(&stat, statbuf);
 
-	f = fget(fd);
-	if (f) {
-		struct dentry * dentry = f->f_dentry;
-
-		err = do_revalidate(dentry);
-		if (!err)
-			err = cp_old_stat32(dentry->d_inode, statbuf);
-		fput(f);
-	}
-	
-	PPCDBG(PPCDBG_SYS32X, "sys32_fstat - exited - pid=%ld current=%lx comm=%s \n", current->pid, current, current->comm);
-
-	return err;
+	return error;
 }
 
 asmlinkage long sys32_lstat(char* filename, struct __old_kernel_stat32* statbuf)
 {
-	struct nameidata nd;
-	int error;
+	struct kstat stat;
+	int error = vfs_lstat(filename, &stat);
 	
-	PPCDBG(PPCDBG_SYS32X, "sys32_lstat - entered - pid=%ld current=%lx comm=%s \n", current->pid, current, current->comm);
-
-	error = user_path_walk_link(filename, &nd);
-	if (!error) {
-		error = do_revalidate(nd.dentry);
-		if (!error)
-			error = cp_old_stat32(nd.dentry->d_inode, statbuf);
-
-		path_release(&nd);
-	}
-	
-	PPCDBG(PPCDBG_SYS32X, "sys32_lstat - exited - pid=%ld current=%lx comm=%s \n", current->pid, current, current->comm);
+	if (!error)
+		error = cp_old_stat32(&stat, statbuf);
 
 	return error;
 }

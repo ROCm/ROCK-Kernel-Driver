@@ -88,7 +88,6 @@
 static int cmd64x_get_info(char *, char **, off_t, int);
 static int cmd680_get_info(char *, char **, off_t, int);
 extern int (*cmd64x_display_info)(char *, char **, off_t, int); /* ide-proc.c */
-extern char *ide_media_verbose(ide_drive_t *);
 static struct pci_dev *bmide_dev;
 
 static int cmd64x_get_info (char *buffer, char **addr, off_t offset, int count)
@@ -283,8 +282,6 @@ static void cmd64x_tuneproc (ide_drive_t *drive, byte mode_wanted)
 	int setup_time, active_time, recovery_time, clock_time, pio_mode, cycle_time;
 	byte recovery_count2, cycle_count;
 	int setup_count, active_count, recovery_count;
-	int bus_speed = system_bus_clock();
-	/*byte b;*/
 	ide_pio_data_t  d;
 
 	switch (mode_wanted) {
@@ -309,7 +306,7 @@ static void cmd64x_tuneproc (ide_drive_t *drive, byte mode_wanted)
 	setup_time  = ide_pio_timings[pio_mode].setup_time;
 	active_time = ide_pio_timings[pio_mode].active_time;
 	recovery_time = cycle_time - (setup_time + active_time);
-	clock_time = 1000 / bus_speed;
+	clock_time = 1000 / system_bus_speed;
 	cycle_count = (cycle_time + clock_time - 1) / clock_time;
 
 	setup_count = (setup_time + clock_time - 1) / clock_time;
@@ -450,7 +447,8 @@ static int cmd64x_tune_chipset (ide_drive_t *drive, byte speed)
 	u8 regU			= 0;
 	u8 regD			= 0;
 
-	if ((drive->media != ide_disk) && (speed < XFER_SW_DMA_0))	return 1;
+	if ((drive->type != ATA_DISK) && (speed < XFER_SW_DMA_0))
+		return 1;
 
 	(void) pci_read_config_byte(dev, pciD, &regD);
 	(void) pci_read_config_byte(dev, pciU, &regU);
@@ -643,8 +641,8 @@ static int config_cmd64x_chipset_for_dma (ide_drive_t *drive, unsigned int rev, 
 			break;
 	}
 
-	if (drive->media != ide_disk) {
-		cmdprintk("CMD64X: drive->media != ide_disk at double check, inital check failed!!\n");
+	if (drive->type != ATA_DISK) {
+		cmdprintk("CMD64X: drive is not a disk at double check, inital check failed!!\n");
 		return ((int) ide_dma_off);
 	}
 
@@ -790,7 +788,7 @@ static int cmd64x_config_drive_for_dma (ide_drive_t *drive)
 	}
 
 	if ((id != NULL) && ((id->capability & 1) != 0) &&
-	    hwif->autodma && (drive->media == ide_disk)) {
+	    hwif->autodma && (drive->type == ATA_DISK)) {
 		/* Consult the list of known "bad" drives */
 		if (ide_dmaproc(ide_dma_bad_drive, drive)) {
 			dma_func = ide_dma_off;
@@ -956,7 +954,7 @@ static int cmd680_busproc (ide_drive_t * drive, int state)
 	return 0;
 }
 
-void cmd680_reset (ide_drive_t *drive)
+static void cmd680_reset (ide_drive_t *drive)
 {
 #if 0
 	ide_hwif_t *hwif	= HWIF(drive);
@@ -968,9 +966,9 @@ void cmd680_reset (ide_drive_t *drive)
 #endif
 }
 
-unsigned int cmd680_pci_init (struct pci_dev *dev, const char *name)
+static unsigned int cmd680_pci_init(struct pci_dev *dev)
 {
-	u8 tmpbyte	= 0;	
+	u8 tmpbyte	= 0;
 	pci_write_config_byte(dev, 0x80, 0x00);
 	pci_write_config_byte(dev, 0x84, 0x00);
 	pci_read_config_byte(dev, 0x8A, &tmpbyte);
@@ -994,7 +992,7 @@ unsigned int cmd680_pci_init (struct pci_dev *dev, const char *name)
 	return 0;
 }
 
-unsigned int cmd64x_pci_init (struct pci_dev *dev, const char *name)
+static unsigned int cmd64x_pci_init(struct pci_dev *dev)
 {
 	unsigned char mrdmode;
 	unsigned int class_rev;
@@ -1005,7 +1003,7 @@ unsigned int cmd64x_pci_init (struct pci_dev *dev, const char *name)
 #ifdef __i386__
 	if (dev->resource[PCI_ROM_RESOURCE].start) {
 		pci_write_config_byte(dev, PCI_ROM_ADDRESS, dev->resource[PCI_ROM_RESOURCE].start | PCI_ROM_ADDRESS_ENABLE);
-		printk("%s: ROM enabled at 0x%08lx\n", name, dev->resource[PCI_ROM_RESOURCE].start);
+		printk("%s: ROM enabled at 0x%08lx\n", dev->name, dev->resource[PCI_ROM_RESOURCE].start);
 	}
 #endif
 
@@ -1013,7 +1011,7 @@ unsigned int cmd64x_pci_init (struct pci_dev *dev, const char *name)
 		case PCI_DEVICE_ID_CMD_643:
 			break;
 		case PCI_DEVICE_ID_CMD_646:
-			printk("%s: chipset revision 0x%02X, ", name, class_rev);
+			printk("%s: chipset revision 0x%02X, ", dev->name, class_rev);
 			switch(class_rev) {
 				case 0x07:
 				case 0x05:
@@ -1083,11 +1081,11 @@ unsigned int cmd64x_pci_init (struct pci_dev *dev, const char *name)
 	return 0;
 }
 
-unsigned int __init pci_init_cmd64x (struct pci_dev *dev, const char *name)
+unsigned int __init pci_init_cmd64x(struct pci_dev *dev)
 {
 	if (dev->device == PCI_DEVICE_ID_CMD_680)
-		return cmd680_pci_init (dev, name);
-	return cmd64x_pci_init (dev, name);
+		return cmd680_pci_init (dev);
+	return cmd64x_pci_init (dev);
 }
 
 unsigned int cmd680_ata66 (ide_hwif_t *hwif)

@@ -358,8 +358,6 @@ static int  klsi_105_open (struct usb_serial_port *port, struct file *filp)
 
 	dbg(__FUNCTION__" port %d", port->number);
 
-	down (&port->sem);
-	
 	++port->open_count;
 
 	if (port->open_count == 1) {
@@ -437,8 +435,6 @@ static int  klsi_105_open (struct usb_serial_port *port, struct file *filp)
 	}
 
 exit:
-	up (&port->sem);
-	
 	return retval;
 } /* klsi_105_open */
 
@@ -454,8 +450,6 @@ static void klsi_105_close (struct usb_serial_port *port, struct file *filp)
 
 	if(!serial)
 		return;
-
-	down (&port->sem);
 
 	--port->open_count;
 
@@ -482,8 +476,6 @@ static void klsi_105_close (struct usb_serial_port *port, struct file *filp)
 		port->open_count = 0;
 		info("kl5kusb105 port stats: %ld bytes in, %ld bytes out", priv->bytes_in, priv->bytes_out);
 	}
-	
-	up (&port->sem);
 } /* klsi_105_close */
 
 
@@ -504,9 +496,6 @@ static int klsi_105_write (struct usb_serial_port *port, int from_user,
 	int bytes_sent=0;
 
 	dbg(__FUNCTION__ " - port %d", port->number);
-
-	down (&port->sem);	/* to lock against someone else trying to
-				   take an URB we just selected from the pool */
 
 	while (count > 0) {
 		/* try to find a free urb (write 0 bytes if none) */
@@ -543,7 +532,6 @@ static int klsi_105_write (struct usb_serial_port *port, int from_user,
 		if (from_user) {
 			if (copy_from_user(urb->transfer_buffer
 					   + KLSI_105_DATA_OFFSET, buf, size)) {
-				up (&port->sem);
 				return -EFAULT;
 			}
 		} else {
@@ -578,7 +566,6 @@ static int klsi_105_write (struct usb_serial_port *port, int from_user,
 		count -= size;
 	}
 exit:
-	up (&port->sem);
 	priv->bytes_out+=bytes_sent;
 
 	return bytes_sent;	/* that's how much we wrote */
@@ -1021,34 +1008,21 @@ static int klsi_105_ioctl (struct usb_serial_port *port, struct file * file,
 
 static void klsi_105_throttle (struct usb_serial_port *port)
 {
-
 	dbg(__FUNCTION__ " - port %d", port->number);
-
-	down (&port->sem);
-
 	usb_unlink_urb (port->read_urb);
-
-	up (&port->sem);
-
-	return;
 }
+
 static void klsi_105_unthrottle (struct usb_serial_port *port)
 {
 	int result;
 
 	dbg(__FUNCTION__ " - port %d", port->number);
 
-	down (&port->sem);
-
 	port->read_urb->dev = port->serial->dev;
 	result = usb_submit_urb(port->read_urb, GFP_KERNEL);
 	if (result)
 		err(__FUNCTION__ " - failed submitting read urb, error %d",
 		    result);
-
-	up (&port->sem);
-
-	return;
 }
 
 

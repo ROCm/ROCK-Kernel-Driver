@@ -68,7 +68,7 @@ struct  kml_fsdata
 };
 
 /* super.c */
-struct presto_cache *presto_find_cache(kdev_t dev) ;
+struct presto_cache *presto_find_cache(struct super_block *sb) ;
 extern struct file_system_type presto_fs_type;
 extern int init_intermezzo_fs(void);
 
@@ -89,7 +89,6 @@ struct presto_cache {
         int   cache_flags;
         char *cache_root_fileset;  /* fileset mounted on cache "/"  */
 
-        kdev_t cache_dev;            /* underlying block device */
 	struct super_block *cache_sb;
         struct dentry *cache_mtde;  /* unix mtpt of cache XXX NOT VALID XXX */
         char *cache_mtpt;           /*  again */

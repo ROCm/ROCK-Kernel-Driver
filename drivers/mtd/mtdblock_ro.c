@@ -221,7 +221,7 @@ static int mtdblock_ioctl(struct inode * inode, struct file * file,
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,2,0)
 		if(!capable(CAP_SYS_ADMIN))  return -EACCES;
 #endif
-		fsync_dev(inode->i_rdev);
+		fsync_bdev(inode->i_bdev);
 		invalidate_buffers(inode->i_rdev);
 		if (mtd->sync)
 			mtd->sync(mtd);

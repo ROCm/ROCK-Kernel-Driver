@@ -878,7 +878,7 @@ static int lvm_blk_ioctl(struct inode *inode, struct file *file,
 
 		P_IOCTL("BLKFLSBUF\n");
 
-		fsync_dev(inode->i_rdev);
+		fsync_bdev(inode->i_bdev);
 		invalidate_buffers(inode->i_rdev);
 		break;
 

@@ -12,7 +12,7 @@ fi
 # msdos and Joliet want NLS
 if [ "$CONFIG_JOLIET" = "y" -o "$CONFIG_FAT_FS" != "n" \
 	-o "$CONFIG_NTFS_FS" != "n" -o "$CONFIG_NCPFS_NLS" = "y" \
-	-o "$CONFIG_SMB_NLS" = "y" ]; then
+	-o "$CONFIG_SMB_NLS" = "y" -o "$CONFIG_JFS_FS" != "n" ]; then
   define_bool CONFIG_NLS y
 else
   define_bool CONFIG_NLS n

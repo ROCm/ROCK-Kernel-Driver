@@ -859,6 +859,25 @@ CONFIG_ADFS_FS_RW
   hard drives and ADFS-formatted floppy disks. This is experimental
   codes, so if you're unsure, say N.
 
+JFS filesystem support
+CONFIG_JFS_FS
+  This is a port of IBM's Journaled Filesystem .  More information is
+  available in the file Documentation/filesystems/jfs.txt.
+
+  If you do not intend to use the JFS filesystem, say N.
+
+JFS Debugging
+CONFIG_JFS_DEBUG
+  If you are experiencing any problems with the JFS filesystem, say
+  Y here.  This will result in additional debugging messages to be
+  written to the system log.  Under normal circumstances, this
+  results in very little overhead.
+
+JFS Statistics
+CONFIG_JFS_STATISTICS
+  Enabling this option will cause statistics from the JFS file system
+  to be made available to the user in the /proc/fs/jfs/ directory.
+
 CONFIG_DEVPTS_FS
   You should say Y here if you said Y to "Unix98 PTY support" above.
   You'll then get a virtual file system which can be mounted on

@@ -34,7 +34,6 @@
 
 static int amd74xx_get_info(char *, char **, off_t, int);
 extern int (*amd74xx_display_info)(char *, char **, off_t, int); /* ide-proc.c */
-extern char *ide_media_verbose(ide_drive_t *);
 static struct pci_dev *bmide_dev;
 
 static int amd74xx_get_info (char *buffer, char **addr, off_t offset, int count)
@@ -406,13 +405,13 @@ int amd74xx_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 }
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 
-unsigned int __init pci_init_amd74xx (struct pci_dev *dev, const char *name)
+unsigned int __init pci_init_amd74xx(struct pci_dev *dev)
 {
 	unsigned long fixdma_base = pci_resource_start(dev, 4);
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (!amd74xx_swdma_check(dev))
-		printk("%s: disabling single-word DMA support (revision < C4)\n", name);
+		printk("%s: disabling single-word DMA support (revision < C4)\n", dev->name);
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 
 	if (!fixdma_base) {
@@ -426,7 +425,7 @@ unsigned int __init pci_init_amd74xx (struct pci_dev *dev, const char *name)
 		outb(inb(fixdma_base+2) & 0x60, fixdma_base+2);
 
 		if (inb(fixdma_base+2) & 0x80)
-			printk("%s: simplex device: DMA will fail!!\n", name);
+			printk("%s: simplex device: DMA will fail!!\n", dev->name);
 	}
 #if defined(DISPLAY_VIPER_TIMINGS) && defined(CONFIG_PROC_FS)
 	if (!amd74xx_proc) {

@@ -332,14 +332,14 @@ read_next:
 	if (nsect > sectors_avail)
 		nsect = sectors_avail;
 	sectors_avail -= nsect;
-	to = ide_map_buffer(rq, &flags);
+	to = bio_kmap_irq(rq->bio, &flags) + ide_rq_offset(rq);
 	ata_input_data(drive, to, nsect * SECTOR_WORDS);
 #ifdef DEBUG_READ
 	printk(KERN_DEBUG "%s:  promise_read: sectors(%ld-%ld), "
 	       "buf=0x%08lx, rem=%ld\n", drive->name, rq->sector,
 	       rq->sector+nsect-1, (unsigned long) to, rq->nr_sectors-nsect);
 #endif
-	ide_unmap_buffer(to, &flags);
+	bio_kunmap_irq(to, &flags);
 	rq->sector += nsect;
 	rq->errors = 0;
 	rq->nr_sectors -= nsect;
@@ -437,7 +437,7 @@ int promise_multwrite (ide_drive_t *drive, unsigned int mcount)
 			nsect = mcount;
 		mcount -= nsect;
 
-		buffer = ide_map_buffer(rq, &flags);
+		buffer = bio_kmap_irq(rq->bio, flags) + ide_rq_offset(rq);
 		rq->sector += nsect;
 		rq->nr_sectors -= nsect;
 		rq->current_nr_sectors -= nsect;
@@ -461,7 +461,7 @@ int promise_multwrite (ide_drive_t *drive, unsigned int mcount)
 		 * re-entering us on the last transfer.
 		 */
 		taskfile_output_data(drive, buffer, nsect<<7);
-		ide_unmap_buffer(buffer, &flags);
+		bio_kunmap_irq(buffer, &flags);
 	} while (mcount);
 
 	return 0;
