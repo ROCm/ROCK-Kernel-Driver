@@ -299,6 +299,7 @@ struct ethtool_stats {
 #define SUPPORTED_MII			(1 << 9)
 #define SUPPORTED_FIBRE			(1 << 10)
 #define SUPPORTED_BNC			(1 << 11)
+#define SUPPORTED_10000baseT_Full	(1 << 12)
 
 /* Indicates what features are advertised by the interface. */
 #define ADVERTISED_10baseT_Half		(1 << 0)
@@ -313,6 +314,7 @@ struct ethtool_stats {
 #define ADVERTISED_MII			(1 << 9)
 #define ADVERTISED_FIBRE		(1 << 10)
 #define ADVERTISED_BNC			(1 << 11)
+#define ADVERTISED_10000baseT_Full	(1 << 12)
 
 /* The following are all involved in forcing a particular link
  * mode for the device for setting things.  When getting the
@@ -320,10 +322,11 @@ struct ethtool_stats {
  * it was foced up into this mode or autonegotiated.
  */
 
-/* The forced speed, 10Mb, 100Mb, gigabit. */
+/* The forced speed, 10Mb, 100Mb, gigabit, 10GbE. */
 #define SPEED_10		10
 #define SPEED_100		100
 #define SPEED_1000		1000
+#define SPEED_10000		10000
 
 /* Duplex, half or full. */
 #define DUPLEX_HALF		0x00
