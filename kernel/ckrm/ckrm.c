@@ -459,7 +459,7 @@ ckrm_init_core_class(struct ckrm_classtype  *clstype,
 	write_lock(&ckrm_class_lock);
 
 	INIT_LIST_HEAD(&dcore->objlist);
-	list_add(&dcore->clslist,&clstype->classes);
+	list_add_tail(&dcore->clslist,&clstype->classes);
 
 	clstype->num_classes++;
 	set_callbacks_active(clstype);

@@ -298,6 +298,7 @@ sock_alloc_class(struct ckrm_core_class *parent, const char *name)
 	sockcls = kmalloc(sizeof(struct ckrm_sock_class), GFP_KERNEL);
 	if (sockcls == NULL) 
 		return NULL;
+	memset(sockcls, 0, sizeof(struct ckrm_sock_class));
 
 	ckrm_init_core_class(&CT_sockclass,class_core(sockcls),parent,name);
 

@@ -628,6 +628,7 @@ ckrm_alloc_task_class(struct ckrm_core_class *parent, const char *name)
 	taskcls = kmalloc(sizeof(struct ckrm_task_class), GFP_KERNEL);
 	if (taskcls == NULL) 
 		return NULL;
+	memset(taskcls, 0, sizeof(struct ckrm_task_class));
 
 	ckrm_init_core_class(&CT_taskclass,
 			     class_core(taskcls),parent,name);

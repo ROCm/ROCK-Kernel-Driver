@@ -208,6 +208,7 @@ numtasks_res_alloc(struct ckrm_core_class *core, struct ckrm_core_class *parent)
 	res = kmalloc(sizeof(ckrm_numtasks_t), GFP_ATOMIC);
 	
 	if (res) {
+		memset(res, 0, sizeof(ckrm_numtasks_t));
 		res->core = core;
 		res->parent = parent;
 		numtasks_res_initcls_one(res);
