@@ -245,6 +245,9 @@ static void sunkbd_connect(struct serio *serio, struct serio_dev *dev)
 	sunkbd->tq.data = sunkbd;
 
 	sunkbd->dev.keycode = sunkbd->keycode;
+	sunkbd->dev.keycodesize = sizeof(unsigned char);
+	sunkbd->dev.keycodemax = ARRAY_SIZE(sunkbd_keycode);
+
 	sunkbd->dev.event = sunkbd_event;
 	sunkbd->dev.private = sunkbd;
 

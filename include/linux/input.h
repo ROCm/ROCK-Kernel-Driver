@@ -570,6 +570,7 @@ struct input_absinfo {
 
 #define SND_CLICK		0x00
 #define SND_BELL		0x01
+#define SND_TONE		0x02
 #define SND_MAX			0x07
 
 /*

@@ -80,7 +80,7 @@ static fn_handler_fn FN_HANDLERS;
 static fn_handler_fn *fn_handler[] = { FN_HANDLERS };
 
 /*
- * Variables/functions exported for vt_ioctl.c
+ * Variables exported for vt_ioctl.c
  */
 
 /* maximum values each key_handler can handle */
@@ -98,21 +98,7 @@ static struct kbd_struct *kbd = kbd_table;
 int spawnpid, spawnsig;
 
 /*
- * Translation of scancodes to keycodes.
- */
-
-int getkeycode(unsigned int scancode)
-{
-	return 0; /* FIXME */
-}
-
-int setkeycode(unsigned int scancode, unsigned int keycode)
-{
-	return 0; /* FIXME */
-}
-
-/*
- * Variables/function exported for vt.c
+ * Variables exported for vt.c
  */
 
 int shift_state = 0;
@@ -137,6 +123,114 @@ static struct ledptr {
 	unsigned int mask;
 	unsigned char valid:1;
 } ledptrs[3];
+
+/*
+ * Translation of scancodes to keycodes. We set them on only the first attached
+ * keyboard - for per-keyboard setting, /dev/input/event is more useful.
+ */
+int getkeycode(unsigned int scancode)
+{
+	struct input_handle *handle;
+	unsigned int keycode;
+
+	for (handle = kbd_handler.handle; handle; handle = handle->hnext) 
+		if (handle->dev->keycodesize) break;
+
+	if (!handle->dev->keycodesize)
+		return -ENODEV;
+
+	switch (handle->dev->keycodesize) {
+		case 1: keycode = *(u8*)(handle->dev->keycode + scancode); break;
+		case 2: keycode = *(u16*)(handle->dev->keycode + scancode * 2); break;
+		case 4: keycode = *(u32*)(handle->dev->keycode + scancode * 4); break;
+		default: return -EINVAL;
+	}
+
+	return keycode;
+}
+
+int setkeycode(unsigned int scancode, unsigned int keycode)
+{
+	struct input_handle *handle;
+
+	for (handle = kbd_handler.handle; handle; handle = handle->hnext) 
+		if (handle->dev->keycodesize) break;
+
+	if (!handle->dev->keycodesize)
+		return -ENODEV;
+
+	switch (handle->dev->keycodesize) {
+		case 1: *(u8*)(handle->dev->keycode + scancode) = keycode; break;
+		case 2: *(u16*)(handle->dev->keycode + scancode * 2) = keycode; break;
+		case 4: *(u32*)(handle->dev->keycode + scancode * 4) = keycode; break;
+	}
+	
+	return 0;
+}
+
+/*
+ * Making beeps and bells. 
+ */
+static void kd_nosound(unsigned long ignored)
+{
+	struct input_handle *handle;
+
+	for (handle = kbd_handler.handle; handle; handle = handle->hnext)
+		if (test_bit(EV_SND, handle->dev->evbit)) {
+			if (test_bit(SND_TONE, handle->dev->sndbit))
+				input_event(handle->dev, EV_SND, SND_TONE, 0);
+			if (test_bit(SND_BELL, handle->dev->sndbit))
+				input_event(handle->dev, EV_SND, SND_BELL, 0);
+		}
+}
+
+static struct timer_list kd_mksound_timer = { function: kd_nosound };
+
+void kd_mksound(unsigned int hz, unsigned int ticks)
+{
+	struct input_handle *handle;
+
+	del_timer(&kd_mksound_timer);
+
+	if (hz) {
+		for (handle = kbd_handler.handle; handle; handle = handle->hnext)
+			if (test_bit(EV_SND, handle->dev->evbit)) {
+				if (test_bit(SND_TONE, handle->dev->sndbit)) {
+					input_event(handle->dev, EV_SND, SND_TONE, hz);
+					break;
+				}
+				if (test_bit(SND_BELL, handle->dev->sndbit)) {
+					input_event(handle->dev, EV_SND, SND_BELL, 1);
+					break;
+				}
+			}
+		if (ticks)
+			mod_timer(&kd_mksound_timer, jiffies + ticks);
+	} else
+		kd_nosound(0);
+}
+
+/*
+ * Setting the keyboard rate.
+ */
+int kbd_rate(struct kbd_repeat *rep)
+{
+	struct input_handle *handle;
+
+	if (rep->rate < 0 || rep->delay < 0)
+		return -EINVAL;
+
+	for (handle = kbd_handler.handle; handle; handle = handle->hnext)
+		if (test_bit(EV_REP, handle->dev->evbit)) {
+			if (rep->rate > HZ) rep->rate = HZ;
+			handle->dev->rep[REP_PERIOD] = rep->rate ? (HZ / rep->rate) : 0;
+			handle->dev->rep[REP_DELAY] = rep->delay * HZ / 1000;
+			if (handle->dev->rep[REP_DELAY] < handle->dev->rep[REP_PERIOD])
+				handle->dev->rep[REP_DELAY] = handle->dev->rep[REP_PERIOD];
+		}
+	
+	return 0;
+}
 
 /*
  * Helper Functions.

@@ -114,6 +114,8 @@ static int __init amikbd_init(void)
 
 	amikbd_dev.evbit[0] = BIT(EV_KEY) | BIT(EV_REP);
 	amikbd_dev.keycode = amikbd_keycode;
+	amikbd_dev.keycodesize = sizeof(unsigned char);
+	amikbd_dev.keycodemax = ARRAY_SIZE(amikbd_keycode);
 
 	for (i = 0; i < 0x78; i++)
 		if (amikbd_keycode[i])

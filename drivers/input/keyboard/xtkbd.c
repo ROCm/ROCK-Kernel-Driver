@@ -101,6 +101,8 @@ void xtkbd_connect(struct serio *serio, struct serio_dev *dev)
 	xtkbd->serio = serio;
 
 	xtkbd->dev.keycode = xtkbd->keycode;
+	xtkbd->dev.keycodesize = sizeof(unsigned char);
+	xtkbd->dev.keycodemax = ARRAY_SIZE(xtkbd_keycode);
 	xtkbd->dev.private = xtkbd;
 
 	serio->private = xtkbd;
