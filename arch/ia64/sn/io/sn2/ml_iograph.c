@@ -587,11 +587,14 @@ io_init_node(cnodeid_t cnodeid)
 		npdap->basew_id = 0;
 
 	} else {
-		npdap->basew_id = (((*(volatile int32_t *)(NODE_SWIN_BASE(COMPACT_TO_NASID_NODEID(cnodeid), 0) + BRIDGE_WID_CONTROL))) & WIDGET_WIDGET_ID);
+		void	*bridge;
+		extern uint64_t pcireg_control_get(void *);
 
-		panic(" ****io_init_node: Unknown Widget Part Number 0x%x Widget ID 0x%x attached to Hubv 0x%p ****\n", widget_partnum, npdap->basew_id, (void *)hubv);
+		bridge = (void *)NODE_SWIN_BASE(COMPACT_TO_NASID_NODEID(cnodeid), 0);
+		npdap->basew_id = pcireg_control_get(bridge) & WIDGET_WIDGET_ID;
 
-		/*NOTREACHED*/
+		printk(" ****io_init_node: Unknown Widget Part Number 0x%x Widget ID 0x%x attached to Hubv 0x%p ****\n", widget_partnum, npdap->basew_id, (void *)hubv);
+		return;
 	}
 	{
 		char widname[10];

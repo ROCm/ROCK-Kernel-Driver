@@ -17,6 +17,25 @@
 
 #define IS_IOADDR(ptr) (!(((uint64_t)(ptr) & CAC_BASE) == CAC_BASE))
 
+/*
+ * Control Register Access -- Read/Write                            0000_0020
+ */
+
+uint64_t
+pcireg_control_get(void *ptr)
+{
+	uint64_t    ret = 0;
+	pic_t       *bridge;
+
+	if ( IS_IOADDR(ptr) )
+		bridge = (pic_t *)ptr;
+	else
+		bridge = (pic_t *)((pcibr_soft_t)(ptr))->bs_base;
+
+	ret = ((pic_t *)bridge)->p_wid_control;
+	return ret;
+}
+
 void
 pcireg_intr_enable_bit_clr(void *ptr, uint64_t bits)
 {
