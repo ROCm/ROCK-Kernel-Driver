@@ -100,17 +100,6 @@ static struct board_info boards[MAXBOARDS];
 struct tty_driver pc_driver;
 struct tty_driver pc_info;
 
-/* The below structures are used to initialize the tty_driver structures. */
-
-/*	-------------------------------------------------------------------------
-	Note : MAX_ALLOC is currently limited to 0x100.  This restriction is 
-	placed on us by Linux not Digi.
-----------------------------------------------------------------------------*/
-static struct tty_struct *pc_table[MAX_ALLOC];
-static struct termios *pc_termios[MAX_ALLOC];
-static struct termios *pc_termios_locked[MAX_ALLOC];
-
-
 /* ------------------ Begin Digi specific structures -------------------- */
 
 /* ------------------------------------------------------------------------
@@ -1663,12 +1652,6 @@ int __init pc_init(void)
 	pc_driver.init_termios.c_cflag = B9600 | CS8 | CREAD | CLOCAL | HUPCL;
 	pc_driver.init_termios.c_lflag = 0;
 	pc_driver.flags = TTY_DRIVER_REAL_RAW;
-	pc_driver.table = pc_table;
-	
-	/* pc_termios is an array of pointers pointing at termios structs */
-	/* The below should get the first pointer */
-	pc_driver.termios = pc_termios;
-	pc_driver.termios_locked = pc_termios_locked;
 
 	/* ------------------------------------------------------------------
 		Setup entry points for the driver.  These are primarily called by 

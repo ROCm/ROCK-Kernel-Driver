@@ -177,9 +177,6 @@ DECLARE_TASK_QUEUE(tq_specialix);
 #define RS_EVENT_WRITE_WAKEUP	0
 
 static struct tty_driver specialix_driver;
-static struct tty_struct * specialix_table[SX_NBOARD * SX_NPORT];
-static struct termios * specialix_termios[SX_NBOARD * SX_NPORT];
-static struct termios * specialix_termios_locked[SX_NBOARD * SX_NPORT];
 static unsigned char * tmp_buf;
 static DECLARE_MUTEX(tmp_buf_sem);
 
@@ -2190,9 +2187,6 @@ static int sx_init_drivers(void)
 	specialix_driver.init_termios.c_cflag =
 		B9600 | CS8 | CREAD | HUPCL | CLOCAL;
 	specialix_driver.flags = TTY_DRIVER_REAL_RAW;
-	specialix_driver.table = specialix_table;
-	specialix_driver.termios = specialix_termios;
-	specialix_driver.termios_locked = specialix_termios_locked;
 
 	specialix_driver.open  = sx_open;
 	specialix_driver.close = sx_close;

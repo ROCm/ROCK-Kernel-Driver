@@ -2017,9 +2017,6 @@ isdn_tty_init(void)
 	m->tty_modem.init_termios = tty_std_termios;
 	m->tty_modem.init_termios.c_cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
 	m->tty_modem.flags = TTY_DRIVER_REAL_RAW;
-	m->tty_modem.table = m->modem_table;
-	m->tty_modem.termios = m->modem_termios;
-	m->tty_modem.termios_locked = m->modem_termios_locked;
 	m->tty_modem.open = isdn_tty_open;
 	m->tty_modem.close = isdn_tty_close;
 	m->tty_modem.write = isdn_tty_write;

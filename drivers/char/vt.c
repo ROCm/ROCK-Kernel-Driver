@@ -139,9 +139,6 @@ extern int mda_console_init(void);
 extern int fb_console_init(void);
 #endif
 
-static struct tty_struct *console_table[MAX_NR_CONSOLES];
-static struct termios *console_termios[MAX_NR_CONSOLES];
-static struct termios *console_termios_locked[MAX_NR_CONSOLES];
 struct vc vc_cons [MAX_NR_CONSOLES];
 
 #ifndef VT_SINGLE_DRIVER
@@ -2539,9 +2536,6 @@ int __init vty_init(void)
 	console_driver.type = TTY_DRIVER_TYPE_CONSOLE;
 	console_driver.init_termios = tty_std_termios;
 	console_driver.flags = TTY_DRIVER_REAL_RAW | TTY_DRIVER_RESET_TERMIOS;
-	console_driver.table = console_table;
-	console_driver.termios = console_termios;
-	console_driver.termios_locked = console_termios_locked;
 
 	console_driver.open = con_open;
 	console_driver.close = con_close;

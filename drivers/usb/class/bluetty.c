@@ -242,9 +242,6 @@ static struct usb_driver usb_bluetooth_driver = {
 };
 
 static struct tty_driver	bluetooth_tty_driver;
-static struct tty_struct *	bluetooth_tty[BLUETOOTH_TTY_MINORS];
-static struct termios *		bluetooth_termios[BLUETOOTH_TTY_MINORS];
-static struct termios *		bluetooth_termios_locked[BLUETOOTH_TTY_MINORS];
 static struct usb_bluetooth	*bluetooth_table[BLUETOOTH_TTY_MINORS];
 
 
@@ -1305,10 +1302,6 @@ static struct tty_driver bluetooth_tty_driver = {
 	.type =			TTY_DRIVER_TYPE_SERIAL,
 	.subtype =		SERIAL_TYPE_NORMAL,
 	.flags =		TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS,
-
-	.table =		bluetooth_tty,
-	.termios =		bluetooth_termios,
-	.termios_locked =	bluetooth_termios_locked,
 
 	.open =			bluetooth_open,
 	.close =		bluetooth_close,

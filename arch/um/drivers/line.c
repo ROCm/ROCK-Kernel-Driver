@@ -403,7 +403,7 @@ void line_register_devfs(struct lines *set, struct line_driver *line_driver,
 			 struct tty_driver *driver, struct line *lines,
 			 int nlines)
 {
-	int err, i, n;
+	int err, i;
 	char *from, *to;
 
 	driver->driver_name = line_driver->name;
@@ -414,22 +414,7 @@ void line_register_devfs(struct lines *set, struct line_driver *line_driver,
 	driver->subtype = line_driver->subtype;
 	driver->magic = TTY_DRIVER_MAGIC;
 	driver->flags = TTY_DRIVER_REAL_RAW;
-
-	n = set->num;
-	driver->num = n;
-	driver->table = kmalloc(n * sizeof(driver->table[0]), GFP_KERNEL);
-	driver->termios = kmalloc(n * sizeof(driver->termios[0]), GFP_KERNEL);
-	driver->termios_locked = kmalloc(n * sizeof(driver->termios_locked[0]),
-					 GFP_KERNEL);
-	if((driver->table == NULL) || (driver->termios == NULL) ||
-	   (driver->termios_locked == NULL))
-		panic("Failed to allocate driver table");
-
-	memset(driver->table, 0, n * sizeof(driver->table[0]));
-	memset(driver->termios, 0, n * sizeof(driver->termios[0]));
-	memset(driver->termios_locked, 0, 
-	       n * sizeof(driver->termios_locked[0]));
-
+	driver->num = set->num;
 	driver->write_room = line_write_room;
 	driver->init_termios = tty_std_termios;
 

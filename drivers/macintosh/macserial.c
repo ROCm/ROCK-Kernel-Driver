@@ -158,10 +158,6 @@ static void dma_init(struct mac_serial * info);
 static void rxdma_start(struct mac_serial * info, int current);
 static void rxdma_to_tty(struct mac_serial * info);
 
-static struct tty_struct *serial_table[NUM_CHANNELS];
-static struct termios *serial_termios[NUM_CHANNELS];
-static struct termios *serial_termios_locked[NUM_CHANNELS];
-
 #ifndef MIN
 #define MIN(a,b)	((a) < (b) ? (a) : (b))
 #endif
@@ -2579,9 +2575,6 @@ no_dma:
 	serial_driver.init_termios.c_cflag =
 		B38400 | CS8 | CREAD | HUPCL | CLOCAL;
 	serial_driver.flags = TTY_DRIVER_REAL_RAW;
-	serial_driver.table = serial_table;
-	serial_driver.termios = serial_termios;
-	serial_driver.termios_locked = serial_termios_locked;
 
 	serial_driver.open = rs_open;
 	serial_driver.close = rs_close;

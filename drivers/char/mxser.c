@@ -290,9 +290,6 @@ static int mxserBoardCAP[MXSER_BOARDS] =
 
 static struct tty_driver mxvar_sdriver;
 static struct mxser_struct mxvar_table[MXSER_PORTS];
-static struct tty_struct *mxvar_tty[MXSER_PORTS + 1];
-static struct termios *mxvar_termios[MXSER_PORTS + 1];
-static struct termios *mxvar_termios_locked[MXSER_PORTS + 1];
 static struct mxser_log mxvar_log;
 static int mxvar_diagflag;
 /*
@@ -501,9 +498,6 @@ static int __init mxser_module_init(void)
 	mxvar_sdriver.init_termios = tty_std_termios;
 	mxvar_sdriver.init_termios.c_cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
 	mxvar_sdriver.flags = TTY_DRIVER_REAL_RAW;
-	mxvar_sdriver.table = mxvar_tty;
-	mxvar_sdriver.termios = mxvar_termios;
-	mxvar_sdriver.termios_locked = mxvar_termios_locked;
 
 	mxvar_sdriver.open = mxser_open;
 	mxvar_sdriver.close = mxser_close;

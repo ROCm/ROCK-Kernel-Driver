@@ -505,10 +505,6 @@ static struct tty_driver serial_driver;
 static void mgslpc_change_params(MGSLPC_INFO *info);
 static void mgslpc_wait_until_sent(struct tty_struct *tty, int timeout);
 
-static struct tty_struct *serial_table[MAX_DEVICE_COUNT];
-static struct termios *serial_termios[MAX_DEVICE_COUNT];
-static struct termios *serial_termios_locked[MAX_DEVICE_COUNT];
-
 #ifndef MIN
 #define MIN(a,b)	((a) < (b) ? (a) : (b))
 #endif
@@ -609,10 +605,6 @@ static dev_link_t *mgslpc_attach(void)
     }
 
     mgslpc_add_device(info);
-
-    memset(serial_table,0,sizeof(struct tty_struct*)*MAX_DEVICE_COUNT);
-    memset(serial_termios,0,sizeof(struct termios*)*MAX_DEVICE_COUNT);
-    memset(serial_termios_locked,0,sizeof(struct termios*)*MAX_DEVICE_COUNT);
 
     info->normal_termios  = serial_driver.init_termios;
 
@@ -3170,9 +3162,6 @@ static int __init synclink_cs_init(void)
     serial_driver.init_termios.c_cflag =
 	    B9600 | CS8 | CREAD | HUPCL | CLOCAL;
     serial_driver.flags = TTY_DRIVER_REAL_RAW;
-    serial_driver.table = serial_table;
-    serial_driver.termios = serial_termios;
-    serial_driver.termios_locked = serial_termios_locked;
 
     serial_driver.open = mgslpc_open;
     serial_driver.close = mgslpc_close;

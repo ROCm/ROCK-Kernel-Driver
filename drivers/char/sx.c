@@ -310,10 +310,6 @@ static int sx_init_drivers(void);
 
 static struct tty_driver sx_driver;
 
-static struct tty_struct * sx_table[SX_NPORTS];
-static struct termios ** sx_termios;
-static struct termios ** sx_termios_locked;
-
 static struct sx_board boards[SX_NBOARDS];
 static struct sx_port *sx_ports;
 static int sx_initialized;
@@ -2239,9 +2235,6 @@ static int sx_init_drivers(void)
 	sx_driver.init_termios.c_cflag =
 	  B9600 | CS8 | CREAD | HUPCL | CLOCAL;
 	sx_driver.flags = TTY_DRIVER_REAL_RAW;
-	sx_driver.table = sx_table;
-	sx_driver.termios = sx_termios;
-	sx_driver.termios_locked = sx_termios_locked;
 	sx_driver.break_ctl = sx_break;
 
 	sx_driver.open	= sx_open;
@@ -2296,23 +2289,6 @@ static int sx_init_portstructs (int nboards, int nports)
 	sx_ports          = ckmalloc(nports * sizeof (struct sx_port));
 	if (!sx_ports)
 		return -ENOMEM;
-
-	sx_termios        = ckmalloc(nports * sizeof (struct termios *));
-	if (!sx_termios) {
-		kfree (sx_ports);
-		return -ENOMEM;
-	}
-
-	sx_termios_locked = ckmalloc(nports * sizeof (struct termios *));
-	if (!sx_termios_locked) {
-		kfree (sx_ports);
-		kfree (sx_termios);
-		return -ENOMEM;
-	}
-
-	/* Adjust the values in the "driver" */
-	sx_driver.termios = sx_termios;
-	sx_driver.termios_locked = sx_termios_locked;
 
 	port = sx_ports;
 	for (i = 0; i < nboards; i++) {
@@ -2638,8 +2614,6 @@ static void __exit sx_exit (void)
 		sx_release_drivers ();
 
 	kfree (sx_ports);
-	kfree (sx_termios);
-	kfree (sx_termios_locked);
 	func_exit();
 }
 

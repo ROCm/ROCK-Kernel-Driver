@@ -943,10 +943,6 @@ static struct tty_driver serial_driver;
 static void mgsl_change_params(struct mgsl_struct *info);
 static void mgsl_wait_until_sent(struct tty_struct *tty, int timeout);
 
-static struct tty_struct *serial_table[MAX_TOTAL_DEVICES];
-static struct termios *serial_termios[MAX_TOTAL_DEVICES];
-static struct termios *serial_termios_locked[MAX_TOTAL_DEVICES];
-
 #ifndef MIN
 #define MIN(a,b)	((a) < (b) ? (a) : (b))
 #endif
@@ -4456,11 +4452,6 @@ int mgsl_init_tty(void);
 int mgsl_init_tty()
 {
 	struct mgsl_struct *info;
-
-	memset(serial_table,0,sizeof(struct tty_struct*)*MAX_TOTAL_DEVICES);
-	memset(serial_termios,0,sizeof(struct termios*)*MAX_TOTAL_DEVICES);
-	memset(serial_termios_locked,0,sizeof(struct termios*)*MAX_TOTAL_DEVICES);
-
 	/* Initialize the tty_driver structure */
 	
 	memset(&serial_driver, 0, sizeof(struct tty_driver));
@@ -4477,9 +4468,6 @@ int mgsl_init_tty()
 	serial_driver.init_termios.c_cflag =
 		B9600 | CS8 | CREAD | HUPCL | CLOCAL;
 	serial_driver.flags = TTY_DRIVER_REAL_RAW;
-	serial_driver.table = serial_table;
-	serial_driver.termios = serial_termios;
-	serial_driver.termios_locked = serial_termios_locked;
 
 	serial_driver.open = mgsl_open;
 	serial_driver.close = mgsl_close;

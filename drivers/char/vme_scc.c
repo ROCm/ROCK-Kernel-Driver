@@ -92,9 +92,6 @@ static void scc_break_ctl(struct tty_struct *tty, int break_state);
 
 static struct tty_driver scc_driver;
 
-static struct tty_struct *scc_table[2] = { NULL, };
-static struct termios * scc_termios[2];
-static struct termios * scc_termios_locked[2];
 struct scc_port scc_ports[2];
 
 int scc_initialized = 0;
@@ -141,9 +138,6 @@ static int scc_init_drivers(void)
 	scc_driver.init_termios.c_cflag =
 	  B9600 | CS8 | CREAD | HUPCL | CLOCAL;
 	scc_driver.flags = TTY_DRIVER_REAL_RAW;
-	scc_driver.table = scc_table;
-	scc_driver.termios = scc_termios;
-	scc_driver.termios_locked = scc_termios_locked;
 
 	scc_driver.open	= scc_open;
 	scc_driver.close = gs_close;

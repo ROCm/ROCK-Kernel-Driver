@@ -759,10 +759,6 @@ static struct cyclades_port cy_port[NR_PORTS];
 
 static int cy_next_channel; /* next minor available */
 
-static struct tty_struct *serial_table[NR_PORTS];
-static struct termios *serial_termios[NR_PORTS];
-static struct termios *serial_termios_locked[NR_PORTS];
-
 /*
  * tmp_buf is used as a temporary buffer by serial_write.  We need to
  * lock it in case the copy_from_user blocks while swapping in a page,
@@ -5455,9 +5451,6 @@ cy_init(void)
     cy_serial_driver.init_termios.c_cflag =
             B9600 | CS8 | CREAD | HUPCL | CLOCAL;
     cy_serial_driver.flags = TTY_DRIVER_REAL_RAW;
-    cy_serial_driver.table = serial_table;
-    cy_serial_driver.termios = serial_termios;
-    cy_serial_driver.termios_locked = serial_termios_locked;
 
     cy_serial_driver.open = cy_open;
     cy_serial_driver.close = cy_close;

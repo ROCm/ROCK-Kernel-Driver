@@ -108,10 +108,6 @@ static struct mcf_serial mcfrs_table[] = {
 
 #define	NR_PORTS	(sizeof(mcfrs_table) / sizeof(struct mcf_serial))
 
-static struct tty_struct	*mcfrs_serial_table[NR_PORTS];
-static struct termios		*mcfrs_serial_termios[NR_PORTS];
-static struct termios		*mcfrs_serial_termios_locked[NR_PORTS];
-
 /*
  * This is used to figure out the divisor speeds and the timeouts.
  */
@@ -1595,9 +1591,6 @@ mcfrs_init(void)
 	mcfrs_serial_driver.init_termios.c_cflag =
 		mcfrs_console_cbaud | CS8 | CREAD | HUPCL | CLOCAL;
 	mcfrs_serial_driver.flags = TTY_DRIVER_REAL_RAW;
-	mcfrs_serial_driver.table = mcfrs_serial_table;
-	mcfrs_serial_driver.termios = mcfrs_serial_termios;
-	mcfrs_serial_driver.termios_locked = mcfrs_serial_termios_locked;
 
 	mcfrs_serial_driver.open = mcfrs_open;
 	mcfrs_serial_driver.close = mcfrs_close;

@@ -487,10 +487,6 @@ static struct e100_serial rs_table[] = {
 
 
 #define NR_PORTS (sizeof(rs_table)/sizeof(struct e100_serial))
-  
-static struct tty_struct *serial_table[NR_PORTS]; 
-static struct termios *serial_termios[NR_PORTS];
-static struct termios *serial_termios_locked[NR_PORTS];
 
 #ifdef CONFIG_ETRAX_SERIAL_PROC_ENTRY
 #define PROCSTAT(x) x
@@ -3469,9 +3465,6 @@ rs_init(void)
 	serial_driver.init_termios.c_cflag =
 		B115200 | CS8 | CREAD | HUPCL | CLOCAL; /* is normally B9600 default... */
 	serial_driver.flags = TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS;
-	serial_driver.table = serial_table;
-	serial_driver.termios = serial_termios;
-	serial_driver.termios_locked = serial_termios_locked;
   
 	serial_driver.open = rs_open;
 	serial_driver.close = rs_close;

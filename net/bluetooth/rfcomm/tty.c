@@ -852,9 +852,6 @@ static int rfcomm_tty_read_proc(char *buf, char **start, off_t offset, int len, 
 }
 
 /* ---- TTY structure ---- */
-static struct tty_struct *rfcomm_tty_table[RFCOMM_TTY_PORTS];
-static struct termios *rfcomm_tty_termios[RFCOMM_TTY_PORTS];
-static struct termios *rfcomm_tty_termios_locked[RFCOMM_TTY_PORTS];
 
 static struct tty_driver rfcomm_tty_driver = {
 	.owner			= THIS_MODULE,
@@ -869,10 +866,6 @@ static struct tty_driver rfcomm_tty_driver = {
 	.type			= TTY_DRIVER_TYPE_SERIAL,
 	.subtype		= SERIAL_TYPE_NORMAL,
 	.flags			= TTY_DRIVER_REAL_RAW,
-
-	.table			= rfcomm_tty_table,
-	.termios		= rfcomm_tty_termios,
-	.termios_locked		= rfcomm_tty_termios_locked,
 
 	.open			= rfcomm_tty_open,
 	.close			= rfcomm_tty_close,
@@ -895,10 +888,6 @@ static struct tty_driver rfcomm_tty_driver = {
 int rfcomm_init_ttys(void)
 {
 	int i;
-
-	/* Initialize our global data */
-	for (i = 0; i < RFCOMM_TTY_PORTS; i++)
-		rfcomm_tty_table[i] = NULL;
 
 	/* Register the TTY driver */
 	rfcomm_tty_driver.init_termios = tty_std_termios;

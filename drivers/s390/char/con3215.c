@@ -108,9 +108,6 @@ static struct raw3215_req *raw3215_freelist;
 static spinlock_t raw3215_freelist_lock;
 
 static struct tty_driver tty3215_driver;
-static struct tty_struct *tty3215_table[NR_3215];
-static struct termios *tty3215_termios[NR_3215];
-static struct termios *tty3215_termios_locked[NR_3215];
 
 /*
  * Get a request structure from the free list
@@ -1191,9 +1188,6 @@ tty3215_init(void)
 	tty3215_driver.init_termios.c_oflag = ONLCR | XTABS;
 	tty3215_driver.init_termios.c_lflag = ISIG;
 	tty3215_driver.flags = TTY_DRIVER_REAL_RAW;
-	tty3215_driver.table = tty3215_table;
-	tty3215_driver.termios = tty3215_termios;
-	tty3215_driver.termios_locked = tty3215_termios_locked;
 
 	tty3215_driver.open = tty3215_open;
 	tty3215_driver.close = tty3215_close;

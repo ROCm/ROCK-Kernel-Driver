@@ -60,9 +60,6 @@ static struct real_driver rs_real_driver = {
  * Structures and such for TTY sessions and usage counts
  */
 static struct tty_driver rs_driver;
-static struct tty_struct * rs_table[TX3912_UART_NPORTS] = { NULL, };
-static struct termios ** rs_termios;
-static struct termios ** rs_termios_locked;
 struct rs_port *rs_ports;
 int rs_initialized = 0;
 
@@ -747,23 +744,6 @@ static int rs_init_portstructs(void)
 	if (!rs_ports)
 		return -ENOMEM;
 
-	rs_termios        = ckmalloc(TX3912_UART_NPORTS * sizeof (struct termios *));
-	if (!rs_termios) {
-		kfree (rs_ports);
-		return -ENOMEM;
-	}
-
-	rs_termios_locked = ckmalloc(TX3912_UART_NPORTS * sizeof (struct termios *));
-	if (!rs_termios_locked) {
-		kfree (rs_ports);
-		kfree (rs_termios);
-		return -ENOMEM;
-	}
-
-	/* Adjust the values in the "driver" */
-	rs_driver.termios = rs_termios;
-	rs_driver.termios_locked = rs_termios_locked;
-
 	port = rs_ports;
 	for (i=0; i < TX3912_UART_NPORTS;i++) {
 		rs_dprintk (TX3912_UART_DEBUG_INIT, "initing port %d\n", i);
@@ -809,9 +789,6 @@ static int rs_init_drivers(void)
 	rs_driver.init_termios = tty_std_termios;
 	rs_driver.init_termios.c_cflag =
 		B115200 | CS8 | CREAD | HUPCL | CLOCAL;
-	rs_driver.table = rs_table;
-	rs_driver.termios = rs_termios;
-	rs_driver.termios_locked = rs_termios_locked;
 
 	rs_driver.open	= rs_open;
 	rs_driver.close = gs_close;

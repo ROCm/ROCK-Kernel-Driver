@@ -79,9 +79,6 @@ static int sci_init_drivers(void);
 static struct tty_driver sci_driver;
 
 static struct sci_port sci_ports[SCI_NPORTS] = SCI_INIT;
-static struct tty_struct *sci_table[SCI_NPORTS] = { NULL, };
-static struct termios *sci_termios[SCI_NPORTS];
-static struct termios *sci_termios_locked[SCI_NPORTS];
 
 static int sci_debug = 0;
 
@@ -1004,9 +1001,6 @@ static int sci_init_drivers(void)
 	sci_driver.init_termios.c_cflag =
 		B9600 | CS8 | CREAD | HUPCL | CLOCAL | CRTSCTS;
 	sci_driver.flags = TTY_DRIVER_REAL_RAW;
-	sci_driver.table = sci_table;
-	sci_driver.termios = sci_termios;
-	sci_driver.termios_locked = sci_termios_locked;
 
 	sci_driver.open	= sci_open;
 	sci_driver.close = gs_close;

@@ -198,9 +198,6 @@
  * Things needed by tty driver
  */
 static struct tty_driver siccnormal_driver;
-static struct tty_struct *siccuart_table[SERIAL_SICC_NR];
-static struct termios *siccuart_termios[SERIAL_SICC_NR];
-static struct termios *siccuart_termios_locked[SERIAL_SICC_NR];
 
 #if defined(CONFIG_SERIAL_SICC_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
 #define SUPPORT_SYSRQ
@@ -1789,9 +1786,6 @@ int __init siccuart_init(void)
     siccnormal_driver.init_termios = tty_std_termios;
     siccnormal_driver.init_termios.c_cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
     siccnormal_driver.flags = TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS;
-    siccnormal_driver.table = siccuart_table;
-    siccnormal_driver.termios = siccuart_termios;
-    siccnormal_driver.termios_locked = siccuart_termios_locked;
 
     siccnormal_driver.open = siccuart_open;
     siccnormal_driver.close = siccuart_close;

@@ -173,11 +173,6 @@ static struct a2232_port a2232_ports[MAX_A2232_BOARDS*NUMLINES];
 /* TTY driver structs */
 static struct tty_driver a2232_driver;
 
-/* Variables used by the TTY driver */
-static struct tty_struct *a2232_table[MAX_A2232_BOARDS*NUMLINES] = { NULL, };
-static struct termios *a2232_termios[MAX_A2232_BOARDS*NUMLINES];
-static struct termios *a2232_termios_locked[MAX_A2232_BOARDS*NUMLINES];
-
 /* nr of cards completely (all ports) and correctly configured */
 static int nr_a2232; 
 
@@ -703,9 +698,6 @@ static int a2232_init_drivers(void)
 	a2232_driver.init_termios.c_cflag =
 		B9600 | CS8 | CREAD | HUPCL | CLOCAL;
 	a2232_driver.flags = TTY_DRIVER_REAL_RAW;
-	a2232_driver.table = a2232_table;
-	a2232_driver.termios = a2232_termios;
-	a2232_driver.termios_locked = a2232_termios_locked;
 
 	a2232_driver.open = a2232_open;
 	a2232_driver.close = gs_close;

@@ -736,10 +736,6 @@ static struct usb_driver acm_driver = {
  * TTY driver structures.
  */
 
-static struct tty_struct *acm_tty_table[ACM_TTY_MINORS];
-static struct termios *acm_tty_termios[ACM_TTY_MINORS];
-static struct termios *acm_tty_termios_locked[ACM_TTY_MINORS];
-
 static struct tty_driver acm_tty_driver = {
 	.magic =		TTY_DRIVER_MAGIC,
 	.owner =		THIS_MODULE,
@@ -751,10 +747,6 @@ static struct tty_driver acm_tty_driver = {
 	.type =			TTY_DRIVER_TYPE_SERIAL,
 	.subtype =		SERIAL_TYPE_NORMAL,
 	.flags =		TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS,
-
-	.table =		acm_tty_table,
-	.termios =		acm_tty_termios,
-	.termios_locked =	acm_tty_termios_locked,
 
 	.open =			acm_tty_open,
 	.close =		acm_tty_close,

@@ -76,10 +76,6 @@ static int ircomm_tty_read_proc(char *buf, char **start, off_t offset, int len,
 #endif /* CONFIG_PROC_FS */
 static struct tty_driver driver;
 
-static struct tty_struct *ircomm_tty_table[NR_PTYS];
-static struct termios *ircomm_tty_termios[NR_PTYS];
-static struct termios *ircomm_tty_termios_locked[NR_PTYS];
-
 hashbin_t *ircomm_tty = NULL;
 
 /*
@@ -108,9 +104,6 @@ int __init ircomm_tty_init(void)
 	driver.init_termios    = tty_std_termios;
 	driver.init_termios.c_cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
 	driver.flags           = TTY_DRIVER_REAL_RAW;
-	driver.table           = ircomm_tty_table;
-	driver.termios         = ircomm_tty_termios;
-	driver.termios_locked  = ircomm_tty_termios_locked;
 	driver.open            = ircomm_tty_open;
 	driver.close           = ircomm_tty_close;
 	driver.write           = ircomm_tty_write;

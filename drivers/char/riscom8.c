@@ -85,9 +85,6 @@ static DECLARE_TASK_QUEUE(tq_riscom);
 
 static struct riscom_board * IRQ_to_board[16];
 static struct tty_driver riscom_driver;
-static struct tty_struct * riscom_table[RC_NBOARD * RC_NPORT];
-static struct termios * riscom_termios[RC_NBOARD * RC_NPORT];
-static struct termios * riscom_termios_locked[RC_NBOARD * RC_NPORT];
 static unsigned char * tmp_buf;
 static DECLARE_MUTEX(tmp_buf_sem);
 
@@ -1717,9 +1714,6 @@ static inline int rc_init_drivers(void)
 	riscom_driver.init_termios.c_cflag =
 		B9600 | CS8 | CREAD | HUPCL | CLOCAL;
 	riscom_driver.flags = TTY_DRIVER_REAL_RAW;
-	riscom_driver.table = riscom_table;
-	riscom_driver.termios = riscom_termios;
-	riscom_driver.termios_locked = riscom_termios_locked;
 
 	riscom_driver.open  = rc_open;
 	riscom_driver.close = rc_close;

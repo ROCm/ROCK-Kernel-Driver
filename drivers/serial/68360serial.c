@@ -215,10 +215,6 @@ static struct serial_state rs_table[] = {
 
 #define NR_PORTS	(sizeof(rs_table)/sizeof(struct serial_state))
 
-static struct tty_struct *serial_table[NR_PORTS];
-static struct termios *serial_termios[NR_PORTS];
-static struct termios *serial_termios_locked[NR_PORTS];
-
 /* The number of buffer descriptors and their sizes.
  */
 #define RX_NUM_FIFO	4
@@ -2549,9 +2545,6 @@ int rs_360_init(void)
 	serial_driver.init_termios.c_cflag =
 		baud_idx | CS8 | CREAD | HUPCL | CLOCAL;
 	serial_driver.flags = TTY_DRIVER_REAL_RAW;
-	serial_driver.table = serial_table;
-	serial_driver.termios = serial_termios;
-	serial_driver.termios_locked = serial_termios_locked;
 
 	serial_driver.open = rs_360_open;
 	serial_driver.close = rs_360_close;

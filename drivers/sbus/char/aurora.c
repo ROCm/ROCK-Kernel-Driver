@@ -97,9 +97,6 @@ static struct Aurora_port aurora_port[AURORA_TNPORTS] =  {
 /* no longer used. static struct Aurora_board * IRQ_to_board[16] = { NULL, } ;*/
 static unsigned char * tmp_buf = NULL;
 static DECLARE_MUTEX(tmp_buf_sem);
-static struct tty_struct * aurora_table[AURORA_TNPORTS] = { NULL, };
-static struct termios * aurora_termios[AURORA_TNPORTS] = { NULL, };
-static struct termios * aurora_termios_locked[AURORA_TNPORTS] = { NULL, };
 
 DECLARE_TASK_QUEUE(tq_aurora);
 
@@ -2295,9 +2292,6 @@ static int aurora_init_drivers(void)
 	aurora_driver.init_termios.c_cflag =
 		B9600 | CS8 | CREAD | HUPCL | CLOCAL;
 	aurora_driver.flags = TTY_DRIVER_REAL_RAW;
-	aurora_driver.table = aurora_table;
-	aurora_driver.termios = aurora_termios;
-	aurora_driver.termios_locked = aurora_termios_locked;
 
 	aurora_driver.open  = aurora_open;
 	aurora_driver.close = aurora_close;

@@ -152,10 +152,6 @@ static void rs_wait_until_sent(struct tty_struct *, int);
 /* Standard COM flags (except for COM4, because of the 8514 problem) */
 #define STD_COM_FLAGS (ASYNC_BOOT_AUTOCONF | ASYNC_SKIP_TEST)
 
-static struct tty_struct *serial_table[NR_PORTS];
-static struct termios *serial_termios[NR_PORTS];
-static struct termios *serial_termios_locked[NR_PORTS];
-
 #ifndef MIN
 #define MIN(a,b)	((a) < (b) ? (a) : (b))
 #endif
@@ -2518,9 +2514,6 @@ int __init espserial_init(void)
 	esp_driver.init_termios.c_cflag =
 		B9600 | CS8 | CREAD | HUPCL | CLOCAL;
 	esp_driver.flags = TTY_DRIVER_REAL_RAW;
-	esp_driver.table = serial_table;
-	esp_driver.termios = serial_termios;
-	esp_driver.termios_locked = serial_termios_locked;
 
 	esp_driver.open = esp_open;
 	esp_driver.close = rs_close;

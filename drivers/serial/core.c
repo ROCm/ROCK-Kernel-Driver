@@ -2077,7 +2077,6 @@ uart_unconfigure_port(struct uart_driver *drv, struct uart_state *state)
 int uart_register_driver(struct uart_driver *drv)
 {
 	struct tty_driver *normal = NULL;
-	struct termios **termios = NULL;
 	int i, retval;
 
 	BUG_ON(drv->state);
@@ -2092,14 +2091,6 @@ int uart_register_driver(struct uart_driver *drv)
 		goto out;
 
 	memset(drv->state, 0, sizeof(struct uart_state) * drv->nr);
-
-	termios = kmalloc(sizeof(struct termios *) * drv->nr * 2 +
-			  sizeof(struct tty_struct *) * drv->nr, GFP_KERNEL);
-	if (!termios)
-		goto out;
-
-	memset(termios, 0, sizeof(struct termios *) * drv->nr * 2 +
-			   sizeof(struct tty_struct *) * drv->nr);
 
 	normal  = kmalloc(sizeof(struct tty_driver), GFP_KERNEL);
 	if (!normal)
@@ -2122,9 +2113,6 @@ int uart_register_driver(struct uart_driver *drv)
 	normal->init_termios	= tty_std_termios;
 	normal->init_termios.c_cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
 	normal->flags		= TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS;
-	normal->termios		= termios;
-	normal->termios_locked	= termios + drv->nr;
-	normal->table		= (struct tty_struct **)(termios + drv->nr * 2);
 	normal->driver_state    = drv;
 
 	normal->open		= uart_open;
@@ -2168,7 +2156,6 @@ int uart_register_driver(struct uart_driver *drv)
 	if (retval < 0) {
 		kfree(normal);
 		kfree(drv->state);
-		kfree(termios);
 	}
 	return retval;
 }
@@ -2187,7 +2174,6 @@ void uart_unregister_driver(struct uart_driver *drv)
 	struct tty_driver *p = drv->tty_driver;
 	tty_unregister_driver(p);
 	kfree(drv->state);
-	kfree(p->termios);
 	kfree(p);
 	drv->tty_driver = NULL;
 }

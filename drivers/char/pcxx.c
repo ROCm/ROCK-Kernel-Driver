@@ -129,9 +129,6 @@ static int numcards = 1;
 static int nbdevs = 0;
  
 static struct channel    *digi_channels;
-static struct tty_struct **pcxe_table;
-static struct termios    **pcxe_termios;
-static struct termios    **pcxe_termios_locked;
  
 int pcxx_ncook=sizeof(pcxx_cook);
 int pcxx_nbios=sizeof(pcxx_bios);
@@ -240,9 +237,6 @@ void cleanup_module()
 
 	cleanup_board_resources();
 	kfree(digi_channels);
-	kfree(pcxe_termios_locked);
-	kfree(pcxe_termios);
-	kfree(pcxe_table);
 	restore_flags(flags);
 }
 #endif
@@ -1152,27 +1146,6 @@ int __init pcxe_init(void)
 	}
 	memset(digi_channels, 0, sizeof(struct channel) * nbdevs);
 
-	pcxe_table =  kmalloc(sizeof(struct tty_struct *) * nbdevs, GFP_KERNEL);
-	if (!pcxe_table) {
-		printk(KERN_ERR "Unable to allocate pcxe_table struct\n");
-		goto cleanup_digi_channels;
-	}
-	memset(pcxe_table, 0, sizeof(struct tty_struct *) * nbdevs);
-
-	pcxe_termios = kmalloc(sizeof(struct termios *) * nbdevs, GFP_KERNEL);
-	if (!pcxe_termios) {
-		printk(KERN_ERR "Unable to allocate pcxe_termios struct\n");
-		goto cleanup_pcxe_table;
-	}
-	memset(pcxe_termios,0,sizeof(struct termios *)*nbdevs);
-
-	pcxe_termios_locked = kmalloc(sizeof(struct termios *) * nbdevs, GFP_KERNEL);
-	if (!pcxe_termios_locked) {
-		printk(KERN_ERR "Unable to allocate pcxe_termios_locked struct\n");
-		goto cleanup_pcxe_termios;
-	}
-	memset(pcxe_termios_locked,0,sizeof(struct termios *)*nbdevs);
-
 	init_bh(DIGI_BH,do_pcxe_bh);
 
 	init_timer(&pcxx_timer);
@@ -1192,10 +1165,6 @@ int __init pcxe_init(void)
 	pcxe_driver.init_termios = tty_std_termios;
 	pcxe_driver.init_termios.c_cflag = B9600 | CS8 | CREAD | HUPCL;
 	pcxe_driver.flags = TTY_DRIVER_REAL_RAW;
-
-	pcxe_driver.table = pcxe_table;
-	pcxe_driver.termios = pcxe_termios;
-	pcxe_driver.termios_locked = pcxe_termios_locked;
 
 	pcxe_driver.open = pcxe_open;
 	pcxe_driver.close = pcxe_close;
@@ -1611,10 +1580,7 @@ load_fep:
 	return 0;
 cleanup_pcxe_driver:	tty_unregister_driver(&pcxe_driver);
 cleanup_boards:		cleanup_board_resources();
-			kfree(pcxe_termios_locked);
-cleanup_pcxe_termios:	kfree(pcxe_termios);
-cleanup_pcxe_table:	kfree(pcxe_table);
-cleanup_digi_channels:	kfree(digi_channels);
+			kfree(digi_channels);
 	return ret;
 }
 

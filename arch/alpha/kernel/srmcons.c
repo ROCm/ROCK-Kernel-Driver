@@ -30,10 +30,6 @@ static int srm_is_registered_console = 0;
  */
 #define MAX_SRM_CONSOLE_DEVICES 1	/* only support 1 console device */
 
-static struct tty_struct *srmcons_table[MAX_SRM_CONSOLE_DEVICES];
-static struct termios *srmcons_termios[MAX_SRM_CONSOLE_DEVICES];
-static struct termios *srmcons_termios_locked[MAX_SRM_CONSOLE_DEVICES];
-
 struct srmcons_private {
 	struct tty_struct *tty;
 	struct timer_list timer;
@@ -277,10 +273,6 @@ static struct tty_driver srmcons_driver = {
 	.num		= MAX_SRM_CONSOLE_DEVICES,
 	.type		= TTY_DRIVER_TYPE_SYSTEM,
 	.subtype	= SYSTEM_TYPE_SYSCONS,
-
-	.table		= srmcons_table,
-	.termios	= srmcons_termios,
-	.termios_locked	= srmcons_termios_locked,
 
 	.open		= srmcons_open,
 	.close		= srmcons_close,

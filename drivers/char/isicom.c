@@ -76,9 +76,6 @@ MODULE_DEVICE_TABLE(pci, isicom_pci_tbl);
 static int prev_card = 3;	/*	start servicing isi_card[0]	*/
 static struct isi_board * irq_to_board[16];
 static struct tty_driver isicom_normal;
-static struct tty_struct * isicom_table[PORT_COUNT];
-static struct termios * isicom_termios[PORT_COUNT];
-static struct termios * isicom_termios_locked[PORT_COUNT];
 
 static struct isi_board isi_card[BOARD_COUNT];
 static struct isi_port  isi_ports[PORT_COUNT];
@@ -1675,10 +1672,6 @@ static int register_drivers(void)
 	isicom_normal.init_termios.c_cflag	= 
 				B9600 | CS8 | CREAD | HUPCL |CLOCAL;
 	isicom_normal.flags	= TTY_DRIVER_REAL_RAW;
-	
-	isicom_normal.table	= isicom_table;
-	isicom_normal.termios	= isicom_termios;
-	isicom_normal.termios_locked	= isicom_termios_locked;
 	
 	isicom_normal.open	= isicom_open;
 	isicom_normal.close	= isicom_close;

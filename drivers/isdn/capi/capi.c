@@ -1264,9 +1264,6 @@ static int capinc_tty_read_proc(char *page, char **start, off_t off,
 
 #define CAPINC_NR_PORTS 256
 static struct tty_driver capinc_tty_driver;
-static struct tty_struct *capinc_tty_table[CAPINC_NR_PORTS];
-static struct termios *capinc_tty_termios[CAPINC_NR_PORTS];
-static struct termios *capinc_tty_termios_locked[CAPINC_NR_PORTS];
 
 static int capinc_tty_init(void)
 {
@@ -1290,9 +1287,6 @@ static int capinc_tty_init(void)
 	drv->init_termios.c_cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
 	drv->init_termios.c_lflag = 0;
 	drv->flags = TTY_DRIVER_REAL_RAW|TTY_DRIVER_RESET_TERMIOS;
-	drv->table = capinc_tty_table;
-	drv->termios = capinc_tty_termios;
-	drv->termios_locked = capinc_tty_termios_locked;
 
 	drv->open = capinc_tty_open;
 	drv->close = capinc_tty_close;

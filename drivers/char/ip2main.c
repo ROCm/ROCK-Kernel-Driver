@@ -308,10 +308,6 @@ static i2ChanStrPtr  DevTable[IP2_MAX_PORTS];
 //DevTableMem just used to save addresses for kfree
 static void  *DevTableMem[IP2_MAX_BOARDS];
 
-static struct tty_struct * TtyTable[IP2_MAX_PORTS];
-static struct termios    * Termios[IP2_MAX_PORTS];
-static struct termios    * TermiosLocked[IP2_MAX_PORTS];
-
 /* This is the driver descriptor for the ip2ipl device, which is used to
  * download the loadware to the boards.
  */
@@ -615,9 +611,6 @@ ip2_loadmain(int *iop, int *irqp, unsigned char *firmware, int firmsize)
 	/* Initialize arrays. */
 	memset( i2BoardPtrTable, 0, sizeof i2BoardPtrTable );
 	memset( DevTable, 0, sizeof DevTable );
-	memset( TtyTable, 0, sizeof TtyTable );
-	memset( Termios, 0, sizeof Termios );
-	memset( TermiosLocked, 0, sizeof TermiosLocked );
 
 	/* Initialise all the boards we can find (up to the maximum). */
 	for ( i = 0; i < IP2_MAX_BOARDS; ++i ) {
@@ -786,9 +779,6 @@ ip2_loadmain(int *iop, int *irqp, unsigned char *firmware, int firmsize)
 	ip2_tty_driver.init_termios         = tty_std_termios;
 	ip2_tty_driver.init_termios.c_cflag = B9600|CS8|CREAD|HUPCL|CLOCAL;
 	ip2_tty_driver.flags                = TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS;
-	ip2_tty_driver.table                = TtyTable;
-	ip2_tty_driver.termios              = Termios;
-	ip2_tty_driver.termios_locked       = TermiosLocked;
 
 	/* Setup the pointers to the implemented functions. */
 	ip2_tty_driver.open            = ip2_open;

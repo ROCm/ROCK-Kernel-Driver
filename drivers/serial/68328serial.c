@@ -104,10 +104,6 @@ struct tty_driver serial_driver;
 
 static void change_speed(struct m68k_serial *info);
 
-static struct tty_struct *serial_table[NR_PORTS];
-static struct termios *serial_termios[NR_PORTS];
-static struct termios *serial_termios_locked[NR_PORTS];
-
 /*
  *	Setup for console. Argument comes from the boot command line.
  */
@@ -1459,9 +1455,6 @@ rs68328_init(void)
 	serial_driver.init_termios.c_cflag = 
 			m68328_console_cbaud | CS8 | CREAD | HUPCL | CLOCAL;
 	serial_driver.flags = TTY_DRIVER_REAL_RAW;
-	serial_driver.table = serial_table;
-	serial_driver.termios = serial_termios;
-	serial_driver.termios_locked = serial_termios_locked;
 
 	serial_driver.open = rs_open;
 	serial_driver.close = rs_close;

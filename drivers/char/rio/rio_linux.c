@@ -203,10 +203,6 @@ void my_hd (void *addr, int len);
 
 static struct tty_driver rio_driver, rio_driver2;
 
-static struct tty_struct * rio_table[RIO_NPORTS];
-static struct termios ** rio_termios;
-static struct termios ** rio_termios_locked;
-
 /* The name "p" is a bit non-descript. But that's what the rio-lynxos
 sources use all over the place. */
 struct rio_info *p;
@@ -365,13 +361,13 @@ int RIODelay_ni (struct Port *PortP, int njiffies)
 
 int rio_minor(struct tty_struct *tty)
 {
-	return tty->index + (tty->driver->termios - rio_termios);
+	return tty->index + (tty->driver == &rio_driver) ? 0 : 256;
 }
 
 
 int rio_ismodem(struct tty_struct *tty)
 {
-	return tty->driver == &rio_driver || tty->driver == &rio_driver2;
+	return 1;
 }
 
 
@@ -885,9 +881,6 @@ static int rio_init_drivers(void)
   rio_driver.init_termios.c_cflag =
     B9600 | CS8 | CREAD | HUPCL | CLOCAL;
   rio_driver.flags = TTY_DRIVER_REAL_RAW;
-  rio_driver.table = rio_table;
-  rio_driver.termios = rio_termios;
-  rio_driver.termios_locked = rio_termios_locked;
 
   rio_driver.open  = riotopen;
   rio_driver.close = gs_close;
@@ -907,8 +900,6 @@ static int rio_init_drivers(void)
 
   rio_driver2 = rio_driver;
   rio_driver2.major = RIO_NORMAL_MAJOR1;
-  rio_driver2.termios += 256;
-  rio_driver2.termios_locked += 256;
 
   rio_dprintk (RIO_DEBUG_INIT, "set_termios = %p\n", gs_set_termios);
 
@@ -964,16 +955,10 @@ static int rio_init_datastructures (void)
   if (!(p                  = ckmalloc (              RI_SZ))) goto free0;
   if (!(p->RIOHosts        = ckmalloc (RIO_HOSTS * HOST_SZ))) goto free1;
   if (!(p->RIOPortp        = ckmalloc (RIO_PORTS * PORT_SZ))) goto free2;
-  if (!(rio_termios        = ckmalloc (RIO_PORTS * TMIO_SZ))) goto free3;
-  if (!(rio_termios_locked = ckmalloc (RIO_PORTS * TMIO_SZ))) goto free4;
   p->RIOConf = RIOConf;
-  rio_dprintk (RIO_DEBUG_INIT, "Got : %p %p %p %p %p\n", 
-               p, p->RIOHosts, p->RIOPortp, rio_termios, rio_termios);
+  rio_dprintk (RIO_DEBUG_INIT, "Got : %p %p %p\n", 
+               p, p->RIOHosts, p->RIOPortp);
 
-  /* Adjust the values in the "driver" */
-  rio_driver.termios = rio_termios;
-  rio_driver.termios_locked = rio_termios_locked;
-  
 #if 1
   for (i = 0; i < RIO_PORTS; i++) {
     port = p->RIOPortp[i] = ckmalloc (sizeof (struct Port));
@@ -1011,13 +996,12 @@ static int rio_init_datastructures (void)
  free6:for (i--;i>=0;i--)
         kfree (p->RIOPortp[i]);
 /*free5: */
-       kfree (rio_termios_locked); 
- free4:kfree (rio_termios);
+ free4:
  free3:kfree (p->RIOPortp);
  free2:kfree (p->RIOHosts);
  free1:
-  rio_dprintk (RIO_DEBUG_INIT, "Not enough memory! %p %p %p %p %p\n", 
-        	       p, p->RIOHosts, p->RIOPortp, rio_termios, rio_termios);
+  rio_dprintk (RIO_DEBUG_INIT, "Not enough memory! %p %p %p\n", 
+        	       p, p->RIOHosts, p->RIOPortp);
   kfree(p);        	      
  free0:
   return -ENOMEM;
@@ -1395,8 +1379,6 @@ static void __exit rio_exit (void)
   rio_release_drivers ();
 
   /* Release dynamically allocated memory */
-  kfree (rio_termios_locked); 
-  kfree (rio_termios);
   kfree (p->RIOPortp);
   kfree (p->RIOHosts);
   kfree (p);

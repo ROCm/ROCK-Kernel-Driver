@@ -382,9 +382,6 @@ static struct usb_driver usb_serial_driver = {
    drivers depend on it.
 */
 
-static struct tty_struct *	serial_tty[SERIAL_TTY_MINORS];
-static struct termios *		serial_termios[SERIAL_TTY_MINORS];
-static struct termios *		serial_termios_locked[SERIAL_TTY_MINORS];
 static struct usb_serial	*serial_table[SERIAL_TTY_MINORS];	/* initially all NULL */
 static LIST_HEAD(usb_serial_driver_list);
 
@@ -1311,10 +1308,6 @@ struct tty_driver usb_serial_tty_driver = {
 	.type =			TTY_DRIVER_TYPE_SERIAL,
 	.subtype =		SERIAL_TYPE_NORMAL,
 	.flags =		TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS,
-
-	.table =		serial_tty,
-	.termios =		serial_termios,
-	.termios_locked =	serial_termios_locked,
 
 	.open =			serial_open,
 	.close =		serial_close,

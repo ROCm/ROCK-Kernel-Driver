@@ -41,12 +41,6 @@ struct pty_struct {
 static struct tty_driver pty_driver, pty_slave_driver;
 
 /* Note: one set of tables for BSD and one for Unix98 */
-static struct tty_struct *pty_table[NR_PTYS];
-static struct termios *pty_termios[NR_PTYS];
-static struct termios *pty_termios_locked[NR_PTYS];
-static struct tty_struct *ttyp_table[NR_PTYS];
-static struct termios *ttyp_termios[NR_PTYS];
-static struct termios *ttyp_termios_locked[NR_PTYS];
 static struct pty_struct pty_state[NR_PTYS];
 
 #ifdef CONFIG_UNIX98_PTYS
@@ -54,12 +48,6 @@ static struct pty_struct pty_state[NR_PTYS];
 struct tty_driver ptm_driver;
 struct tty_driver pts_driver;
 
-static struct tty_struct *ptm_table[UNIX98_NR_MAJORS*NR_PTYS];
-static struct termios *ptm_termios[UNIX98_NR_MAJORS*NR_PTYS];
-static struct termios *ptm_termios_locked[UNIX98_NR_MAJORS*NR_PTYS];
-static struct tty_struct *pts_table[UNIX98_NR_MAJORS*NR_PTYS];
-static struct termios *pts_termios[UNIX98_NR_MAJORS*NR_PTYS];
-static struct termios *pts_termios_locked[UNIX98_NR_MAJORS*NR_PTYS];
 static struct pty_struct ptm_state[UNIX98_NR_MAJORS*NR_PTYS];
 #endif
 
@@ -359,9 +347,6 @@ int __init pty_init(void)
 	pty_driver.init_termios.c_cflag = B38400 | CS8 | CREAD;
 	pty_driver.init_termios.c_lflag = 0;
 	pty_driver.flags = TTY_DRIVER_RESET_TERMIOS | TTY_DRIVER_REAL_RAW;
-	pty_driver.table = pty_table;
-	pty_driver.termios = pty_termios;
-	pty_driver.termios_locked = pty_termios_locked;
 	pty_driver.driver_state = pty_state;
 	pty_driver.other = &pty_slave_driver;
 
@@ -388,9 +373,6 @@ int __init pty_init(void)
 	 * is opened, and unregistered when the pair is closed.
 	 */
 	pty_slave_driver.flags |= TTY_DRIVER_NO_DEVFS;
-	pty_slave_driver.table = ttyp_table;
-	pty_slave_driver.termios = ttyp_termios;
-	pty_slave_driver.termios_locked = ttyp_termios_locked;
 	pty_slave_driver.driver_state = pty_state;
 	pty_slave_driver.other = &pty_driver;
 
@@ -418,9 +400,6 @@ int __init pty_init(void)
 	ptm_driver.num = UNIX98_NR_MAJORS * NR_PTYS;
 	ptm_driver.other = &pts_driver;
 	ptm_driver.flags |= TTY_DRIVER_NO_DEVFS;
-	ptm_driver.table = ptm_table;
-	ptm_driver.termios = ptm_termios;
-	ptm_driver.termios_locked = ptm_termios_locked;
 	ptm_driver.driver_state = ptm_state;
 
 	for (i = 0; i < UNIX98_NR_MAJORS*NR_PTYS; i++)
@@ -434,9 +413,6 @@ int __init pty_init(void)
 	pts_driver.num = UNIX98_NR_MAJORS * NR_PTYS;
 	pts_driver.other = &ptm_driver;
 	pts_driver.flags |= TTY_DRIVER_NO_DEVFS;
-	pts_driver.table = pts_table;
-	pts_driver.termios = pts_termios;
-	pts_driver.termios_locked = pts_termios_locked;
 	pts_driver.driver_state = ptm_state;
 	
 	ptm_driver.ioctl = pty_unix98_ioctl;

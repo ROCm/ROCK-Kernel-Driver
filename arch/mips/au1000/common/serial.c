@@ -186,11 +186,6 @@ static struct serial_state rs_table[RS_TABLE_SIZE] = {
 
 #define HIGH_BITS_OFFSET ((sizeof(long)-sizeof(int))*8)
 
-static struct tty_struct *serial_table[NR_PORTS];
-static struct termios *serial_termios[NR_PORTS];
-static struct termios *serial_termios_locked[NR_PORTS];
-
-
 #if defined(MODULE) && defined(SERIAL_DEBUG_MCOUNT)
 #define DBG_CNT(s) printk("(%s): [%x], refc=%d, serc=%d, ttyc=%d -> %s\n", \
  tty->name, (info->flags), serial_driver.refcount, info->count,tty->count,s)
@@ -2559,9 +2554,6 @@ static int __init rs_init(void)
 	serial_driver.init_termios.c_cflag =
 		B9600 | CS8 | CREAD | HUPCL | CLOCAL;
 	serial_driver.flags = TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS;
-	serial_driver.table = serial_table;
-	serial_driver.termios = serial_termios;
-	serial_driver.termios_locked = serial_termios_locked;
 
 	serial_driver.open = rs_open;
 	serial_driver.close = rs_close;

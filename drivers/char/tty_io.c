@@ -810,7 +810,7 @@ static int init_dev(struct tty_driver *driver, int idx,
 	down_tty_sem(idx);
 
 	/* check whether we're reopening an existing tty */
-	tty = driver->table[idx];
+	tty = driver->ttys[idx];
 	if (tty) goto fast_track;
 
 	/*
@@ -889,7 +889,7 @@ static int init_dev(struct tty_driver *driver, int idx,
 		/*
 		 * Everything allocated ... set up the o_tty structure.
 		 */
-		driver->other->table[idx] = o_tty;
+		driver->other->ttys[idx] = o_tty;
 		if (!*o_tp_loc)
 			*o_tp_loc = o_tp;
 		if (!*o_ltp_loc)
@@ -910,7 +910,7 @@ static int init_dev(struct tty_driver *driver, int idx,
 	 * Failures after this point use release_mem to clean up, so 
 	 * there's no need to null out the local pointers.
 	 */
-	driver->table[idx] = tty;
+	driver->ttys[idx] = tty;
 	
 	if (!*tp_loc)
 		*tp_loc = tp;
@@ -1010,7 +1010,7 @@ static void release_mem(struct tty_struct *tty, int idx)
 	struct termios *tp;
 
 	if ((o_tty = tty->link) != NULL) {
-		o_tty->driver->table[idx] = NULL;
+		o_tty->driver->ttys[idx] = NULL;
 		if (o_tty->driver->flags & TTY_DRIVER_RESET_TERMIOS) {
 			tp = o_tty->driver->termios[idx];
 			o_tty->driver->termios[idx] = NULL;
@@ -1024,7 +1024,7 @@ static void release_mem(struct tty_struct *tty, int idx)
 		free_tty_struct(o_tty);
 	}
 
-	tty->driver->table[idx] = NULL;
+	tty->driver->ttys[idx] = NULL;
 	if (tty->driver->flags & TTY_DRIVER_RESET_TERMIOS) {
 		tp = tty->driver->termios[idx];
 		tty->driver->termios[idx] = NULL;
@@ -1073,7 +1073,7 @@ static void release_dev(struct file * filp)
 				  "free (%s)\n", tty->name);
 		return;
 	}
-	if (tty != tty->driver->table[idx]) {
+	if (tty != tty->driver->ttys[idx]) {
 		printk(KERN_DEBUG "release_dev: driver.table[%d] not tty "
 				  "for (%s)\n", idx, tty->name);
 		return;
@@ -1099,7 +1099,7 @@ static void release_dev(struct file * filp)
 
 #ifdef TTY_PARANOIA_CHECK
 	if (tty->driver->other) {
-		if (o_tty != tty->driver->other->table[idx]) {
+		if (o_tty != tty->driver->other->ttys[idx]) {
 			printk(KERN_DEBUG "release_dev: other->table[%d] "
 					  "not o_tty for (%s)\n",
 			       idx, tty->name);
@@ -2222,9 +2222,15 @@ int tty_register_driver(struct tty_driver *driver)
         int i;
 	dev_t dev;
 	char *s;
+	void **p;
 
 	if (driver->flags & TTY_DRIVER_INSTALLED)
 		return 0;
+
+	p = kmalloc(driver->num * 3 * sizeof(void *), GFP_KERNEL);
+	if (!p)
+		return -ENOMEM;
+	memset(p, 0, driver->num * 3 * sizeof(void *));
 
 	if (!driver->major) {
 		error = alloc_chrdev_region(&dev, driver->minor_start, driver->num,
@@ -2238,8 +2244,14 @@ int tty_register_driver(struct tty_driver *driver)
 		error = register_chrdev_region(dev, driver->num,
 						(char*)driver->name);
 	}
-	if (error < 0)
+	if (error < 0) {
+		kfree(p);
 		return error;
+	}
+
+	driver->ttys = (struct tty_struct **)p;
+	driver->termios = (struct termios **)(p + driver->num);
+	driver->termios_locked = (struct termios **)(p + driver->num * 2);
 
 	driver->cdev.kobj.parent = &tty_kobj;
 	strcpy(driver->cdev.kobj.name, driver->name);
@@ -2251,6 +2263,9 @@ int tty_register_driver(struct tty_driver *driver)
 	if (error) {
 		kobject_del(&driver->cdev.kobj);
 		unregister_chrdev_region(dev, driver->num);
+		driver->ttys = NULL;
+		driver->termios = driver->termios_locked = NULL;
+		kfree(p);
 		return error;
 	}
 
@@ -2274,6 +2289,7 @@ int tty_unregister_driver(struct tty_driver *driver)
 {
 	int i;
 	struct termios *tp;
+	void *p;
 
 	if (driver->refcount)
 		return -EBUSY;
@@ -2303,7 +2319,11 @@ int tty_unregister_driver(struct tty_driver *driver)
 		if (!(driver->flags & TTY_DRIVER_NO_DEVFS))
 			tty_unregister_device(driver, i);
 	}
+	p = driver->ttys;
 	proc_tty_unregister_driver(driver);
+	driver->ttys = NULL;
+	driver->termios = driver->termios_locked = NULL;
+	kfree(p);
 	cdev_del(&driver->cdev);
 	return 0;
 }

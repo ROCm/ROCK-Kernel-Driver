@@ -138,9 +138,6 @@ static char	*stl_drvname = "stallion";
 static char	*stl_drvversion = "5.6.0";
 
 static struct tty_driver	stl_serial;
-static struct tty_struct	*stl_ttys[STL_MAXDEVS];
-static struct termios		*stl_termios[STL_MAXDEVS];
-static struct termios		*stl_termioslocked[STL_MAXDEVS];
 
 /*
  *	We will need to allocate a temporary write buffer for chars that
@@ -3178,9 +3175,6 @@ int __init stl_init(void)
 	stl_serial.subtype = SERIAL_TYPE_NORMAL;
 	stl_serial.init_termios = stl_deftermios;
 	stl_serial.flags = TTY_DRIVER_REAL_RAW;
-	stl_serial.table = stl_ttys;
-	stl_serial.termios = stl_termios;
-	stl_serial.termios_locked = stl_termioslocked;
 	
 	stl_serial.open = stl_open;
 	stl_serial.close = stl_close;

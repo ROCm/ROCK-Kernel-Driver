@@ -526,10 +526,6 @@ static struct tty_driver serial_driver;
 /* number of characters left in xmit buffer before we ask for more */
 #define WAKEUP_CHARS 256
 
-static struct tty_struct *serial_table[MAX_DEVICES];
-static struct termios *serial_termios[MAX_DEVICES];
-static struct termios *serial_termios_locked[MAX_DEVICES];
-
 #ifndef MIN
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
 #endif
@@ -3786,10 +3782,6 @@ static int __init synclinkmp_init(void)
 		return -ENODEV;
 	}
 
-	memset(serial_table,0,sizeof(struct tty_struct*)*MAX_DEVICES);
-	memset(serial_termios,0,sizeof(struct termios*)*MAX_DEVICES);
-	memset(serial_termios_locked,0,sizeof(struct termios*)*MAX_DEVICES);
-
 	/* Initialize the tty_driver structure */
 
 	memset(&serial_driver, 0, sizeof(struct tty_driver));
@@ -3806,9 +3798,6 @@ static int __init synclinkmp_init(void)
 	serial_driver.init_termios.c_cflag =
 		B9600 | CS8 | CREAD | HUPCL | CLOCAL;
 	serial_driver.flags = TTY_DRIVER_REAL_RAW;
-	serial_driver.table = serial_table;
-	serial_driver.termios = serial_termios;
-	serial_driver.termios_locked = serial_termios_locked;
 
 	serial_driver.open = open;
 	serial_driver.close = close;

@@ -110,9 +110,6 @@ typedef	struct _st_cpc_tty_area {
 	} st_cpc_tty_area;
 
 /* TTY data structures */
-static struct tty_struct *cpc_tty_serial_table[CPC_TTY_NPORTS];
-static struct termios *cpc_tty_serial_termios[CPC_TTY_NPORTS];
-static struct termios *cpc_tty_serial_termios_locked[CPC_TTY_NPORTS];
 static struct tty_driver serial_drv;
 
 /* local variables */
@@ -226,11 +223,6 @@ void cpc_tty_init(pc300dev_t *pc300dev)
 		serial_drv.init_termios = tty_std_termios;
 		serial_drv.init_termios.c_cflag = B9600|CS8|CREAD|HUPCL|CLOCAL;
 		serial_drv.flags = TTY_DRIVER_REAL_RAW;
-
-		/* tty data structures */
-		serial_drv.table = cpc_tty_serial_table;
-		serial_drv.termios = cpc_tty_serial_termios;
-		serial_drv.termios_locked = cpc_tty_serial_termios_locked;
 
 		/* interface routines from the upper tty layer to the tty driver */
 		serial_drv.open = cpc_tty_open;

@@ -141,7 +141,7 @@ struct tty_driver {
 	/*
 	 * Pointer to the tty data structures
 	 */
-	struct tty_struct **table;
+	struct tty_struct **ttys;
 	struct termios **termios;
 	struct termios **termios_locked;
 	void *driver_state;	/* only used for the PTY driver */

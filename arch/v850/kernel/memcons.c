@@ -82,9 +82,6 @@ void memcons_setup (void)
 
 /* Higher level TTY interface.  */
 
-static struct tty_struct *tty_table[1] = { 0 };
-static struct termios *tty_termios[1] = { 0 };
-static struct termios *tty_termios_locked[1] = { 0 };
 static struct tty_driver tty_driver = { 0 };
 
 int memcons_tty_open (struct tty_struct *tty, struct file *filp)
@@ -116,10 +113,6 @@ int __init memcons_tty_init (void)
 	tty_driver.minor_start = 64;
 	tty_driver.num = 1;
 	tty_driver.type = TTY_DRIVER_TYPE_SYSCONS;
-
-	tty_driver.table = tty_table;
-	tty_driver.termios = tty_termios;
-	tty_driver.termios_locked = tty_termios_locked;
 
 	tty_driver.init_termios = tty_std_termios;
 

@@ -288,9 +288,6 @@ static struct tty_driver serial_driver;
 static int tty_init_cnt=0;
 
 static struct serial_state rs_table[NR_PORTS];
-static struct tty_struct *serial_table[NR_PORTS];
-static struct termios *serial_termios[NR_PORTS];
-static struct termios *serial_termios_locked[NR_PORTS];
 
 static char tty_driver_mode=WANOPT_TTY_SYNC;
 
@@ -4415,9 +4412,6 @@ int wanpipe_tty_init(sdla_t *card)
 		serial_driver.flags = TTY_DRIVER_REAL_RAW;
 		
 		serial_driver.refcount = 1;	/* !@!@^#^&!! */
-		serial_driver.table = serial_table;
-		serial_driver.termios = serial_termios;
-		serial_driver.termios_locked = serial_termios_locked;
 
 		serial_driver.open = wanpipe_tty_open;
 		serial_driver.close = wanpipe_tty_close;
