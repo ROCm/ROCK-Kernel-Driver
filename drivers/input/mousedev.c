@@ -48,6 +48,10 @@ static int yres = CONFIG_INPUT_MOUSEDEV_SCREEN_Y;
 module_param(yres, uint, 0);
 MODULE_PARM_DESC(yres, "Vertical screen resolution");
 
+static unsigned tap_time = 200;
+module_param(tap_time, uint, 0);
+MODULE_PARM_DESC(tap_time, "Tap time for touchpads in absolute mode (msecs)");
+
 struct mousedev_motion {
 	int dx, dy, dz;
 	unsigned long buttons;
@@ -65,7 +69,7 @@ struct mousedev {
 	struct mousedev_motion packet;
 	unsigned int pkt_count;
 	int old_x[4], old_y[4];
-	unsigned int touch;
+	unsigned long touch;
 };
 
 enum mousedev_emul {
@@ -216,6 +220,30 @@ static void mousedev_notify_readers(struct mousedev *mousedev, struct mousedev_m
 	wake_up_interruptible(&mousedev->wait);
 }
 
+static void mousedev_touchpad_touch(struct mousedev *mousedev, int value)
+{
+	if (!value) {
+		if (mousedev->touch &&
+		    !time_after(jiffies, mousedev->touch + msecs_to_jiffies(tap_time))) {
+			/*
+			 * Toggle left button to emulate tap.
+			 * We rely on the fact that mousedev_mix always has 0
+			 * motion packet so we won't mess current position.
+			 */
+			set_bit(0, &mousedev->packet.buttons);
+			set_bit(0, &mousedev_mix.packet.buttons);
+			mousedev_notify_readers(mousedev, &mousedev_mix.packet);
+			mousedev_notify_readers(&mousedev_mix, &mousedev_mix.packet);
+			clear_bit(0, &mousedev->packet.buttons);
+			clear_bit(0, &mousedev_mix.packet.buttons);
+		}
+		mousedev->touch = mousedev->pkt_count = 0;
+	}
+	else
+		if (!mousedev->touch)
+			mousedev->touch = jiffies;
+}
+
 static void mousedev_event(struct input_handle *handle, unsigned int type, unsigned int code, int value)
 {
 	struct mousedev *mousedev = handle->private;
@@ -239,12 +267,8 @@ static void mousedev_event(struct input_handle *handle, unsigned int type, unsig
 
 		case EV_KEY:
 			if (value != 2) {
-				if (code == BTN_TOUCH && test_bit(BTN_TOOL_FINGER, handle->dev->keybit)) {
-					/* Handle touchpad data */
-					mousedev->touch = value;
-					if (!mousedev->touch)
-						mousedev->pkt_count = 0;
-				}
+				if (code == BTN_TOUCH && test_bit(BTN_TOOL_FINGER, handle->dev->keybit))
+					mousedev_touchpad_touch(mousedev, value);
 				else
 					mousedev_key_event(mousedev, code, value);
 			}
