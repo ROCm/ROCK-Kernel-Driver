@@ -368,6 +368,11 @@ void tcp_time_wait(struct sock *sk, int state, int timeo)
 
 			ipv6_addr_copy(&tw->tw_v6_daddr, &np->daddr);
 			ipv6_addr_copy(&tw->tw_v6_rcv_saddr, &np->rcv_saddr);
+			tw->tw_v6_ipv6only = np->ipv6only;
+		} else {
+			memset(&tw->tw_v6_daddr, 0, sizeof(tw->tw_v6_daddr));
+			memset(&tw->tw_v6_rcv_saddr, 0, sizeof(tw->tw_v6_rcv_saddr));
+			tw->tw_v6_ipv6only = 0;
 		}
 #endif
 		/* Linkage updates. */
