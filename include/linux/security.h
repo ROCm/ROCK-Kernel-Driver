@@ -488,16 +488,15 @@ struct swap_info_struct;
  *	@file contains the file structure to update.
  *	Return 0 on success.
  * @file_send_sigiotask:
- *	Check permission for the file owner @fown to send SIGIO to the process
- *	@tsk.  Note that this hook is always called from interrupt.  Note that
- *	the fown_struct, @fown, is never outside the context of a struct file,
- *	so the file structure (and associated security information) can always
- *	be obtained:
+ *	Check permission for the file owner @fown to send SIGIO or SIGURG to the
+ *	process @tsk.  Note that this hook is sometimes called from interrupt.
+ *	Note that the fown_struct, @fown, is never outside the context of a
+ *	struct file, so the file structure (and associated security information)
+ *	can always be obtained:
  *		(struct file *)((long)fown - offsetof(struct file,f_owner));
  * 	@tsk contains the structure of task receiving signal.
  *	@fown contains the file owner information.
- *	@fd contains the file descriptor.
- *	@reason contains the operational flags.
+ *	@sig is the signal that will be sent.  When 0, kernel sends SIGIO.
  *	Return 0 if permission is granted.
  * @file_receive:
  *	This hook allows security modules to control the ability of a process
@@ -1135,8 +1134,7 @@ struct security_operations {
 			   unsigned long arg);
 	int (*file_set_fowner) (struct file * file);
 	int (*file_send_sigiotask) (struct task_struct * tsk,
-				    struct fown_struct * fown,
-				    int fd, int reason);
+				    struct fown_struct * fown, int sig);
 	int (*file_receive) (struct file * file);
 
 	int (*task_create) (unsigned long clone_flags);
@@ -1657,9 +1655,9 @@ static inline int security_file_set_fowner (struct file *file)
 
 static inline int security_file_send_sigiotask (struct task_struct *tsk,
 						struct fown_struct *fown,
-						int fd, int reason)
+						int sig)
 {
-	return security_ops->file_send_sigiotask (tsk, fown, fd, reason);
+	return security_ops->file_send_sigiotask (tsk, fown, sig);
 }
 
 static inline int security_file_receive (struct file *file)
@@ -2299,7 +2297,7 @@ static inline int security_file_set_fowner (struct file *file)
 
 static inline int security_file_send_sigiotask (struct task_struct *tsk,
 						struct fown_struct *fown,
-						int fd, int reason)
+						int sig)
 {
 	return 0;
 }
