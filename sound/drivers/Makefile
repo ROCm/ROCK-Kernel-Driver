@@ -3,7 +3,7 @@
 # Copyright (c) 2001 by Jaroslav Kysela <perex@suse.cz>
 #
 
-O_TARGET     := drivers.o
+O_TARGET     := _drivers.o
 
 mod-subdirs  := opl3 mpu401
 

@@ -11,18 +11,18 @@ obj-$(CONFIG_SOUND) += soundcore.o
 
 subdir-$(CONFIG_SOUND_PRIME) += oss
 ifeq ($(CONFIG_SOUND_PRIME),y)
-  obj-y += oss/sounddrivers.o
+  obj-y += oss/_oss.o
 endif
 
 subdir-$(CONFIG_SND) += core i2c drivers isa pci ppc arm synth
 ifeq ($(CONFIG_SND),y)
-  obj-y += core/core.o i2c/_i2c.o
-  obj-y += drivers/drivers.o
-  obj-y += isa/isa.o
-  obj-y += pci/pci.o
-  obj-y += arm/arm.o
-  obj-y += ppc/ppc.o
-  obj-y += synth/synth.o
+  obj-y += core/_core.o i2c/_i2c.o
+  obj-y += drivers/_drivers.o
+  obj-y += isa/_isa.o
+  obj-y += pci/_pci.o
+  obj-y += arm/_arm.o
+  obj-y += ppc/_ppc.o
+  obj-y += synth/_synth.o
   obj-y += last.o
 endif
 

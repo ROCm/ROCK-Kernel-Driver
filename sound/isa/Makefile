@@ -3,7 +3,7 @@
 # Copyright (c) 2001 by Jaroslav Kysela <perex@suse.cz>
 #
 
-O_TARGET     := isa.o
+O_TARGET     := _isa.o
 
 mod-subdirs  := ad1816a ad1848 cs423x es1688 gus opti9xx sb wavefront
 

@@ -3,7 +3,7 @@
 # Copyright (c) 2001 by Jaroslav Kysela <perex@suse.cz>
 #
 
-O_TARGET     := synth.o
+O_TARGET     := _synth.o
 
 mod-subdirs  := emux
 

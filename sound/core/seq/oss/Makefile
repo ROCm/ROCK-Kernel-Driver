@@ -3,7 +3,7 @@
 # Copyright (c) 1999 by Jaroslav Kysela <perex@suse.cz>
 #
 
-O_TARGET     := oss.o
+O_TARGET     := _oss.o
 
 snd-seq-oss-objs  := seq_oss.o seq_oss_init.o seq_oss_timer.o seq_oss_ioctl.o \
 		     seq_oss_event.o seq_oss_rw.o seq_oss_synth.o \
