@@ -80,11 +80,11 @@ int scsicam_bios_param(struct block_device *bdev, sector_t capacity, int *ip)
 	if (ret || ip[0] > 255 || ip[1] > 63) {
 		ip[0] = 64;
 		ip[1] = 32;
-		if ((capacity / (ip[0] * ip[1])) > 65534) {
+		if (sector_div(capacity, ip[0] * ip[1]) > 65534) {
 			ip[0] = 255;
 			ip[1] = 63;
 		}
-		ip[2] = capacity / (ip[0] * ip[1]);
+		ip[2] = sector_div(capacity, ip[0] * ip[1]);
 	}
 
 	return 0;
