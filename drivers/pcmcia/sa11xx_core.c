@@ -120,7 +120,6 @@ sa1100_pcmcia_set_mecr(struct sa1100_pcmcia_socket *skt, unsigned int cpu_clock)
 	unsigned long flags;
 	unsigned short speed;
 	unsigned int bs_io, bs_mem, bs_attr;
-	int i;
 
 	speed = calc_speed(skt->spd_io, MAX_IO_WIN, SA1100_PCMCIA_IO_ACCESS);
 	bs_io = skt->ops->socket_get_timing(skt, cpu_clock, speed);
@@ -324,13 +323,15 @@ static void sa1100_pcmcia_poll_event(unsigned long dummy)
  * handling code performs scheduling operations which cannot be
  * executed from within an interrupt context.
  */
-static void sa1100_pcmcia_interrupt(int irq, void *dev, struct pt_regs *regs)
+static irqreturn_t sa1100_pcmcia_interrupt(int irq, void *dev, struct pt_regs *regs)
 {
 	struct sa1100_pcmcia_socket *skt = dev;
 
 	DEBUG(3, "%s(): servicing IRQ %d\n", __FUNCTION__, irq);
 
 	schedule_work(&skt->work);
+
+	return IRQ_HANDLED;
 }
 
 /* sa1100_pcmcia_register_callback()

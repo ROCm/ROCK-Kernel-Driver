@@ -35,15 +35,19 @@ struct amba_kmi_port {
 	char			phys[16];
 };
 
-static void amba_kmi_int(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t amba_kmi_int(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct amba_kmi_port *kmi = dev_id;
 	unsigned int status = __raw_readb(KMIIR);
+	int handled = IRQ_NONE;
 
 	while (status & KMIIR_RXINTR) {
 		serio_interrupt(&kmi->io, __raw_readb(KMIDATA), 0, regs);
 		status = __raw_readb(KMIIR);
+		handled = IRQ_HANDLED;
 	}
+
+	return handled;
 }
 
 static int amba_kmi_write(struct serio *io, unsigned char val)

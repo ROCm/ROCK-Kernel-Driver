@@ -278,7 +278,7 @@ static void ambauart_modem_status(struct uart_port *port)
 	wake_up_interruptible(&uap->port.info->delta_msr_wait);
 }
 
-static void ambauart_int(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t ambauart_int(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct uart_port *port = dev_id;
 	unsigned int status, pass_counter = AMBA_ISR_PASS_LIMIT;
@@ -302,6 +302,8 @@ static void ambauart_int(int irq, void *dev_id, struct pt_regs *regs)
 		status = UART_GET_INT_STATUS(port);
 	} while (status & (AMBA_UARTIIR_RTIS | AMBA_UARTIIR_RIS |
 			   AMBA_UARTIIR_TIS));
+
+	return IRQ_HANDLED;
 }
 
 static unsigned int ambauart_tx_empty(struct uart_port *port)

@@ -154,7 +154,7 @@ static void dc21285_enable_error(unsigned long __data)
 /*
  * Warn on PCI errors.
  */
-static void dc21285_abort_irq(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t dc21285_abort_irq(int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned int cmd;
 	unsigned int status;
@@ -180,9 +180,11 @@ static void dc21285_abort_irq(int irq, void *dev_id, struct pt_regs *regs)
 	}
 
 	*CSR_PCICMD = cmd;
+
+	return IRQ_HANDLED;
 }
 
-static void dc21285_serr_irq(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t dc21285_serr_irq(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct timer_list *timer = dev_id;
 	unsigned int cntl;
@@ -200,15 +202,19 @@ static void dc21285_serr_irq(int irq, void *dev_id, struct pt_regs *regs)
 	disable_irq(irq);
 	timer->expires = jiffies + HZ;
 	add_timer(timer);
+
+	return IRQ_HANDLED;
 }
 
-static void dc21285_discard_irq(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t dc21285_discard_irq(int irq, void *dev_id, struct pt_regs *regs)
 {
 	printk(KERN_DEBUG "PCI: discard timer expired\n");
 	*CSR_SA110_CNTL &= 0xffffde07;
+
+	return IRQ_HANDLED;
 }
 
-static void dc21285_dparity_irq(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t dc21285_dparity_irq(int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned int cmd;
 
@@ -218,9 +224,11 @@ static void dc21285_dparity_irq(int irq, void *dev_id, struct pt_regs *regs)
 
 	cmd = *CSR_PCICMD & 0xffff;
 	*CSR_PCICMD = cmd | 1 << 24;
+
+	return IRQ_HANDLED;
 }
 
-static void dc21285_parity_irq(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t dc21285_parity_irq(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct timer_list *timer = dev_id;
 	unsigned int cmd;
@@ -238,6 +246,8 @@ static void dc21285_parity_irq(int irq, void *dev_id, struct pt_regs *regs)
 	disable_irq(irq);
 	timer->expires = jiffies + HZ;
 	add_timer(timer);
+
+	return IRQ_HANDLED;
 }
 
 int __init dc21285_setup(int nr, struct pci_sys_data *sys)

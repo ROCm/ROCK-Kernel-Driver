@@ -2466,17 +2466,13 @@ intr_ret_t acornscsi_sbicintr(AS_Host *host, int in_irq)
  *	      dev_id - device specific data (AS_Host structure)
  *	      regs   - processor registers when interrupt occurred
  */
-static
-void acornscsi_intr(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t
+acornscsi_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
     AS_Host *host = (AS_Host *)dev_id;
     intr_ret_t ret;
     int iostatus;
     int in_irq = 0;
-
-    if (host->scsi.interrupt)
-	printk("scsi%d: interrupt re-entered\n", host->host->host_no);
-    host->scsi.interrupt = 1;
 
     do {
 	ret = INTR_IDLE;
@@ -2505,7 +2501,7 @@ void acornscsi_intr(int irq, void *dev_id, struct pt_regs *regs)
 	in_irq = 1;
     } while (ret != INTR_IDLE);
 
-    host->scsi.interrupt = 0;
+    return IRQ_HANDLED;
 }
 
 /*=============================================================================================
