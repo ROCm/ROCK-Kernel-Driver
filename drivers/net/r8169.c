@@ -915,11 +915,13 @@ rtl8169_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	struct rtl8169_private *tp = dev->priv;
 	void *ioaddr = tp->mmio_addr;
 	int entry = tp->cur_tx % NUM_TX_DESC;
+	u32 len = skb->len;
 
-	if (skb->len < ETH_ZLEN) {
+	if (unlikely(skb->len < ETH_ZLEN)) {
 		skb = skb_padto(skb, ETH_ZLEN);
-		if (skb == NULL)
-			return 0;
+		if (!skb)
+			goto err_update_stats;
+		len = ETH_ZLEN;
 	}
 	
 	spin_lock_irq(&tp->lock);
@@ -927,29 +929,32 @@ rtl8169_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	if ((tp->TxDescArray[entry].status & OWNbit) == 0) {
 		tp->Tx_skbuff[entry] = skb;
 		tp->TxDescArray[entry].buf_addr = virt_to_bus(skb->data);
-		if (entry != (NUM_TX_DESC - 1))
-			tp->TxDescArray[entry].status =
-			    (OWNbit | FSbit | LSbit) | ((skb->len > ETH_ZLEN) ?
-							skb->len : ETH_ZLEN);
-		else
-			tp->TxDescArray[entry].status =
-			    (OWNbit | EORbit | FSbit | LSbit) |
-			    ((skb->len > ETH_ZLEN) ? skb->len : ETH_ZLEN);
 
+		tp->TxDescArray[entry].status = OWNbit | FSbit | LSbit | len |
+				(EORbit * !((entry + 1) % NUM_TX_DESC));
+			
 		RTL_W8(TxPoll, 0x40);	//set polling bit
 
 		dev->trans_start = jiffies;
 
 		tp->cur_tx++;
-	}
+	} else
+		goto err_drop;
 
-	spin_unlock_irq(&tp->lock);
 
 	if ((tp->cur_tx - NUM_TX_DESC) == tp->dirty_tx) {
 		netif_stop_queue(dev);
 	}
+out:
+	spin_unlock_irq(&tp->lock);
 
 	return 0;
+
+err_drop:
+	dev_kfree_skb(skb);
+err_update_stats:
+	tp->stats.tx_dropped++;
+	goto out;
 }
 
 static void
