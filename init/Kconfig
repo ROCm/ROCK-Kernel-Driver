@@ -43,6 +43,11 @@ config BROKEN
 
 	  If unsure, say N.
 
+config BROKEN_ON_SMP
+	bool
+	depends on BROKEN || !SMP
+	default y
+
 endmenu
 
 
