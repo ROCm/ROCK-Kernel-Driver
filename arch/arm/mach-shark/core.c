@@ -93,8 +93,6 @@ static struct irqaction shark_timer_irq = {
  */
 static void __init shark_timer_init(void)
 {
-        unsigned long flags;
-
 	outb(0x34, 0x43);               /* binary, mode 0, LSB/MSB, Ch 0 */
 	outb(HZ_TIME & 0xff, 0x40);     /* LSB of count */
 	outb(HZ_TIME >> 8, 0x40);
