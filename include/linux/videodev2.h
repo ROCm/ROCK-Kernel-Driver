@@ -95,20 +95,20 @@ enum v4l2_colorspace {
 
 	/* HD and modern captures. */
 	V4L2_COLORSPACE_REC709        = 3,
-	
+
 	/* broken BT878 extents (601, luma range 16-253 instead of 16-235) */
 	V4L2_COLORSPACE_BT878         = 4,
-	
+
 	/* These should be useful.  Assume 601 extents. */
 	V4L2_COLORSPACE_470_SYSTEM_M  = 5,
 	V4L2_COLORSPACE_470_SYSTEM_BG = 6,
-	
+
 	/* I know there will be cameras that send this.  So, this is
 	 * unspecified chromaticities and full 0-255 on each of the
 	 * Y'CbCr components
 	 */
 	V4L2_COLORSPACE_JPEG          = 7,
-	
+
 	/* For RGB colourspaces, this is probably a good start. */
 	V4L2_COLORSPACE_SRGB          = 8,
 };
@@ -334,10 +334,10 @@ struct v4l2_jpegcompression
 				 * must be 0..15 */
 	int  APP_len;           /* Length of data in JPEG APPn segment */
 	char APP_data[60];      /* Data in the JPEG APPn segment. */
-	
+
 	int  COM_len;           /* Length of data in JPEG COM segment */
 	char COM_data[60];      /* Data in JPEG COM segment */
-	
+
 	__u32 jpeg_markers;     /* Which markers should go into the JPEG
 				 * output. Unless you exactly know what
 				 * you do, leave them untouched.
@@ -347,7 +347,7 @@ struct v4l2_jpegcompression
 				 * The presence of the APP and COM marker
 				 * is influenced by APP_len and COM_len
 				 * ONLY, not by this property! */
-	
+
 #define V4L2_JPEG_MARKER_DHT (1<<3)    /* Define Huffman Tables */
 #define V4L2_JPEG_MARKER_DQT (1<<4)    /* Define Quantization Tables */
 #define V4L2_JPEG_MARKER_DRI (1<<5)    /* Define Restart Interval */
@@ -470,7 +470,7 @@ struct v4l2_outputparm
  */
 
 struct v4l2_cropcap {
-	enum v4l2_buf_type      type;	
+	enum v4l2_buf_type      type;
         struct v4l2_rect        bounds;
         struct v4l2_rect        defrect;
         struct v4l2_fract       pixelaspect;
