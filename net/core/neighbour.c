@@ -1094,6 +1094,7 @@ struct neigh_parms *neigh_parms_alloc(struct net_device *dev,
 			kfree(p);
 			return NULL;
 		}
+		p->sysctl_table = NULL;
 		write_lock_bh(&tbl->lock);
 		p->next		= tbl->parms.next;
 		tbl->parms.next = p;
