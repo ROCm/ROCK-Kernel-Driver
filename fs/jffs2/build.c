@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: build.c,v 1.60 2004/11/17 17:13:13 dedekind Exp $
+ * $Id: build.c,v 1.64 2004/11/20 10:44:07 dwmw2 Exp $
  *
  */
 
@@ -89,6 +89,7 @@ static int jffs2_build_filesystem(struct jffs2_sb_info *c)
 	int ret;
 	int i;
 	struct jffs2_inode_cache *ic;
+	struct jffs2_full_dirent *fd;
 	struct jffs2_full_dirent *dead_fds = NULL;
 
 	/* First, scan the medium and build all the inode caches with
@@ -97,7 +98,7 @@ static int jffs2_build_filesystem(struct jffs2_sb_info *c)
 	c->flags |= JFFS2_SB_FLAG_MOUNTING;
 	ret = jffs2_scan_medium(c);
 	if (ret)
-		return ret;
+		goto exit;
 
 	D1(printk(KERN_DEBUG "Scanned flash completely\n"));
 	D2(jffs2_dump_block_lists(c));
@@ -136,9 +137,7 @@ static int jffs2_build_filesystem(struct jffs2_sb_info *c)
 	D1(printk(KERN_DEBUG "Pass 2a starting\n"));
 
 	while (dead_fds) {
-		struct jffs2_inode_cache *ic;
-		struct jffs2_full_dirent *fd = dead_fds;
-
+		fd = dead_fds;
 		dead_fds = fd->next;
 
 		ic = jffs2_get_ino_cache(c, fd->ino);
@@ -153,7 +152,6 @@ static int jffs2_build_filesystem(struct jffs2_sb_info *c)
 	
 	/* Finally, we can scan again and free the dirent structs */
 	for_each_inode(i, c, ic) {
-		struct jffs2_full_dirent *fd;
 		D1(printk(KERN_DEBUG "Pass 3: ino #%u, ic %p, nodes %p\n", ic->ino, ic, ic->nodes));
 
 		while(ic->scan_dents) {
@@ -169,6 +167,19 @@ static int jffs2_build_filesystem(struct jffs2_sb_info *c)
 
 	/* Rotate the lists by some number to ensure wear levelling */
 	jffs2_rotate_lists(c);
+
+	ret = 0;
+
+exit:
+	if (ret) {
+		for_each_inode(i, c, ic) {
+			while(ic->scan_dents) {
+				fd = ic->scan_dents;
+				ic->scan_dents = fd->next;
+				jffs2_free_full_dirent(fd);
+			}
+		}
+	}
 
 	return ret;
 }
