@@ -50,7 +50,7 @@
   
 #if defined(MODULE) && defined(SERIAL_DEBUG_MCOUNT)
 #define DBG_CNT(s) printk("(%s): [%x] refc=%d, serc=%d, ttyc=%d -> %s\n", \
- tty->name, (info->flags), serial_driver.refcount,info->count,tty->count,s)
+ tty->name, (info->flags), serial_driver->refcount,info->count,tty->count,s)
 #else
 #define DBG_CNT(s)
 #endif
@@ -102,12 +102,7 @@ static char *serial_version = "4.30";
 
 static char *serial_name = "Amiga-builtin serial driver";
 
-static struct tty_driver serial_driver;
-
-/* serial subtype definitions */
-#ifndef SERIAL_TYPE_NORMAL
-#define SERIAL_TYPE_NORMAL	1
-#endif
+static struct tty_driver *serial_driver;
 
 /* number of characters left in xmit buffer before we ask for more */
 #define WAKEUP_CHARS 256
@@ -2031,6 +2026,28 @@ int register_serial(struct serial_struct *req);
 void unregister_serial(int line);
 
 
+static struct tty_operations serial_ops = {
+	.open = rs_open,
+	.close = rs_close,
+	.write = rs_write,
+	.put_char = rs_put_char,
+	.flush_chars = rs_flush_chars,
+	.write_room = rs_write_room,
+	.chars_in_buffer = rs_chars_in_buffer,
+	.flush_buffer = rs_flush_buffer,
+	.ioctl = rs_ioctl,
+	.throttle = rs_throttle,
+	.unthrottle = rs_unthrottle,
+	.set_termios = rs_set_termios,
+	.stop = rs_stop,
+	.start = rs_start,
+	.hangup = rs_hangup,
+	.break_ctl = rs_break,
+	.send_xchar = rs_send_xchar,
+	.wait_until_sent = rs_wait_until_sent,
+	.read_proc = rs_read_proc,
+};
+
 /*
  * The serial driver boot-time initialization code!
  */
@@ -2041,6 +2058,10 @@ static int __init rs_init(void)
 
 	if (!MACH_IS_AMIGA || !AMIGAHW_PRESENT(AMI_SERIAL))
 		return -ENODEV;
+
+	serial_driver = alloc_tty_driver(1);
+	if (!serial_driver)
+		return -ENOMEM;
 
 	/*
 	 *  We request SERDAT and SERPER only, because the serial registers are
@@ -2055,42 +2076,20 @@ static int __init rs_init(void)
 
 	/* Initialize the tty_driver structure */
 
-	memset(&serial_driver, 0, sizeof(struct tty_driver));
-	serial_driver.magic = TTY_DRIVER_MAGIC;
-	serial_driver.owner = THIS_MODULE;
-	serial_driver.driver_name = "amiserial";
-	serial_driver.name = "ttyS";
-	serial_driver.major = TTY_MAJOR;
-	serial_driver.minor_start = 64;
-	serial_driver.num = 1;
-	serial_driver.type = TTY_DRIVER_TYPE_SERIAL;
-	serial_driver.subtype = SERIAL_TYPE_NORMAL;
-	serial_driver.init_termios = tty_std_termios;
-	serial_driver.init_termios.c_cflag =
+	serial_driver->owner = THIS_MODULE;
+	serial_driver->driver_name = "amiserial";
+	serial_driver->name = "ttyS";
+	serial_driver->major = TTY_MAJOR;
+	serial_driver->minor_start = 64;
+	serial_driver->type = TTY_DRIVER_TYPE_SERIAL;
+	serial_driver->subtype = SERIAL_TYPE_NORMAL;
+	serial_driver->init_termios = tty_std_termios;
+	serial_driver->init_termios.c_cflag =
 		B9600 | CS8 | CREAD | HUPCL | CLOCAL;
-	serial_driver.flags = TTY_DRIVER_REAL_RAW;
+	serial_driver->flags = TTY_DRIVER_REAL_RAW;
+	tty_set_operations(serial_driver, &serial_ops);
 
-	serial_driver.open = rs_open;
-	serial_driver.close = rs_close;
-	serial_driver.write = rs_write;
-	serial_driver.put_char = rs_put_char;
-	serial_driver.flush_chars = rs_flush_chars;
-	serial_driver.write_room = rs_write_room;
-	serial_driver.chars_in_buffer = rs_chars_in_buffer;
-	serial_driver.flush_buffer = rs_flush_buffer;
-	serial_driver.ioctl = rs_ioctl;
-	serial_driver.throttle = rs_throttle;
-	serial_driver.unthrottle = rs_unthrottle;
-	serial_driver.set_termios = rs_set_termios;
-	serial_driver.stop = rs_stop;
-	serial_driver.start = rs_start;
-	serial_driver.hangup = rs_hangup;
-	serial_driver.break_ctl = rs_break;
-	serial_driver.send_xchar = rs_send_xchar;
-	serial_driver.wait_until_sent = rs_wait_until_sent;
-	serial_driver.read_proc = rs_read_proc;
-
-	if (tty_register_driver(&serial_driver))
+	if (tty_register_driver(serial_driver))
 		panic("Couldn't register serial driver\n");
 
 	state = rs_table;
@@ -2151,9 +2150,10 @@ static __exit void rs_exit(void)
 
 	/* printk("Unloading %s: version %s\n", serial_name, serial_version); */
 	tasklet_kill(&info->tlet);
-	if ((e1 = tty_unregister_driver(&serial_driver)))
+	if ((e1 = tty_unregister_driver(serial_driver)))
 		printk("SERIAL: failed to unregister serial driver (%d)\n",
 		       e1);
+	put_tty_driver(serial_driver);
 
 	if (info) {
 	  rs_table[0].info = NULL;
@@ -2211,7 +2211,7 @@ static void serial_console_write(struct console *co, const char *s,
 static struct tty_driver *serial_console_device(struct console *c, int *index)
 {
 	*index = 0;
-	return &serial_driver;
+	return serial_driver;
 }
 
 static struct console sercons = {
