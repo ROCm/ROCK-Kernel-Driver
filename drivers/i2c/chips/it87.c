@@ -343,7 +343,6 @@ static ssize_t show_temp(struct device *dev, char *buf, int nr)
 	it87_update_client(client);
 	return sprintf(buf, "%d\n", TEMP_FROM_REG(data->temp[nr])*100 );
 }
-/* more like overshoot temperature */
 static ssize_t show_temp_max(struct device *dev, char *buf, int nr)
 {
 	struct i2c_client *client = to_i2c_client(dev);
@@ -351,7 +350,6 @@ static ssize_t show_temp_max(struct device *dev, char *buf, int nr)
 	it87_update_client(client);
 	return sprintf(buf, "%d\n", TEMP_FROM_REG(data->temp_high[nr])*100);
 }
-/* more like hysteresis temperature */
 static ssize_t show_temp_min(struct device *dev, char *buf, int nr)
 {
 	struct i2c_client *client = to_i2c_client(dev);

@@ -496,21 +496,19 @@ static ssize_t show_temp(struct device *dev, char *buf, int nr) {
 	via686a_update_client(client);
 	return sprintf(buf, "%ld\n", TEMP_FROM_REG10(data->temp[nr])*100 );
 }
-/* more like overshoot temperature */
-static ssize_t show_temp_max(struct device *dev, char *buf, int nr) {
+static ssize_t show_temp_over(struct device *dev, char *buf, int nr) {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct via686a_data *data = i2c_get_clientdata(client);
 	via686a_update_client(client);
 	return sprintf(buf, "%ld\n", TEMP_FROM_REG(data->temp_over[nr])*100);
 }
-/* more like hysteresis temperature */
-static ssize_t show_temp_min(struct device *dev, char *buf, int nr) {
+static ssize_t show_temp_hyst(struct device *dev, char *buf, int nr) {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct via686a_data *data = i2c_get_clientdata(client);
 	via686a_update_client(client);
 	return sprintf(buf, "%ld\n", TEMP_FROM_REG(data->temp_hyst[nr])*100);
 }
-static ssize_t set_temp_max(struct device *dev, const char *buf, 
+static ssize_t set_temp_over(struct device *dev, const char *buf, 
 		size_t count, int nr) {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct via686a_data *data = i2c_get_clientdata(client);
@@ -519,7 +517,7 @@ static ssize_t set_temp_max(struct device *dev, const char *buf,
 	via686a_write_value(client, VIA686A_REG_TEMP_OVER(nr), data->temp_over[nr]);
 	return count;
 }
-static ssize_t set_temp_min(struct device *dev, const char *buf, 
+static ssize_t set_temp_hyst(struct device *dev, const char *buf, 
 		size_t count, int nr) {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct via686a_data *data = i2c_get_clientdata(client);
@@ -534,30 +532,30 @@ static ssize_t show_temp_##offset (struct device *dev, char *buf)	\
 	return show_temp(dev, buf, 0x##offset - 1);			\
 }									\
 static ssize_t								\
-show_temp_##offset##_max (struct device *dev, char *buf)		\
+show_temp_##offset##_over (struct device *dev, char *buf)		\
 {									\
-	return show_temp_max(dev, buf, 0x##offset - 1);			\
+	return show_temp_over(dev, buf, 0x##offset - 1);			\
 }									\
 static ssize_t								\
-show_temp_##offset##_min (struct device *dev, char *buf)		\
+show_temp_##offset##_hyst (struct device *dev, char *buf)		\
 {									\
-	return show_temp_min(dev, buf, 0x##offset - 1);			\
+	return show_temp_hyst(dev, buf, 0x##offset - 1);			\
 }									\
-static ssize_t set_temp_##offset##_max (struct device *dev, 		\
+static ssize_t set_temp_##offset##_over (struct device *dev, 		\
 		const char *buf, size_t count) 				\
 {									\
-	return set_temp_max(dev, buf, count, 0x##offset - 1);		\
+	return set_temp_over(dev, buf, count, 0x##offset - 1);		\
 }									\
-static ssize_t set_temp_##offset##_min (struct device *dev, 		\
+static ssize_t set_temp_##offset##_hyst (struct device *dev, 		\
 		const char *buf, size_t count) 				\
 {									\
-	return set_temp_min(dev, buf, count, 0x##offset - 1);		\
+	return set_temp_hyst(dev, buf, count, 0x##offset - 1);		\
 }									\
 static DEVICE_ATTR(temp_input##offset, S_IRUGO, show_temp_##offset, NULL) \
 static DEVICE_ATTR(temp_max##offset, S_IRUGO | S_IWUSR, 		\
-		show_temp_##offset##_max, set_temp_##offset##_max) 	\
-static DEVICE_ATTR(temp_min##offset, S_IRUGO | S_IWUSR, 		\
-		show_temp_##offset##_min, set_temp_##offset##_min)	
+		show_temp_##offset##_over, set_temp_##offset##_over) 	\
+static DEVICE_ATTR(temp_hyst##offset, S_IRUGO | S_IWUSR, 		\
+		show_temp_##offset##_hyst, set_temp_##offset##_hyst)	
 
 show_temp_offset(1);
 show_temp_offset(2);
@@ -760,9 +758,9 @@ static int via686a_detect(struct i2c_adapter *adapter, int address, int kind)
 	device_create_file(&new_client->dev, &dev_attr_temp_max1);
 	device_create_file(&new_client->dev, &dev_attr_temp_max2);
 	device_create_file(&new_client->dev, &dev_attr_temp_max3);
-	device_create_file(&new_client->dev, &dev_attr_temp_min1);
-	device_create_file(&new_client->dev, &dev_attr_temp_min2);
-	device_create_file(&new_client->dev, &dev_attr_temp_min3);
+	device_create_file(&new_client->dev, &dev_attr_temp_hyst1);
+	device_create_file(&new_client->dev, &dev_attr_temp_hyst2);
+	device_create_file(&new_client->dev, &dev_attr_temp_hyst3);
 	device_create_file(&new_client->dev, &dev_attr_fan_input1);
 	device_create_file(&new_client->dev, &dev_attr_fan_input2);
 	device_create_file(&new_client->dev, &dev_attr_fan_min1);

@@ -309,11 +309,11 @@ struct w83781d_data {
 	u8 fan[3];		/* Register value */
 	u8 fan_min[3];		/* Register value */
 	u8 temp;
-	u8 temp_min;		/* Register value */
 	u8 temp_max;		/* Register value */
+	u8 temp_hyst;		/* Register value */
 	u16 temp_add[2];	/* Register value */
 	u16 temp_max_add[2];	/* Register value */
-	u16 temp_min_add[2];	/* Register value */
+	u16 temp_hyst_add[2];	/* Register value */
 	u8 fan_div[3];		/* Register encoding, shifted right */
 	u8 vid;			/* Register encoding, combined */
 	u32 alarms;		/* Register encoding, combined */
@@ -510,8 +510,8 @@ static ssize_t show_##reg (struct device *dev, char *buf, int nr) \
 	} \
 }
 show_temp_reg(temp);
-show_temp_reg(temp_min);
 show_temp_reg(temp_max);
+show_temp_reg(temp_hyst);
 
 #define store_temp_reg(REG, reg) \
 static ssize_t store_temp_##reg (struct device *dev, const char *buf, size_t count, int nr) \
@@ -538,8 +538,8 @@ static ssize_t store_temp_##reg (struct device *dev, const char *buf, size_t cou
 	 \
 	return count; \
 }
-store_temp_reg(OVER, min);
-store_temp_reg(HYST, max);
+store_temp_reg(OVER, max);
+store_temp_reg(HYST, hyst);
 
 #define sysfs_temp_offset(offset) \
 static ssize_t \
@@ -562,8 +562,8 @@ static DEVICE_ATTR(temp_##reg##offset, S_IRUGO| S_IWUSR, show_regs_temp_##reg##o
 
 #define sysfs_temp_offsets(offset) \
 sysfs_temp_offset(offset); \
-sysfs_temp_reg_offset(min, offset); \
-sysfs_temp_reg_offset(max, offset);
+sysfs_temp_reg_offset(max, offset); \
+sysfs_temp_reg_offset(hyst, offset);
 
 sysfs_temp_offsets(1);
 sysfs_temp_offsets(2);
@@ -573,7 +573,7 @@ sysfs_temp_offsets(3);
 do { \
 device_create_file(&client->dev, &dev_attr_temp_input##offset); \
 device_create_file(&client->dev, &dev_attr_temp_max##offset); \
-device_create_file(&client->dev, &dev_attr_temp_min##offset); \
+device_create_file(&client->dev, &dev_attr_temp_hyst##offset); \
 } while (0)
 
 static ssize_t
@@ -1865,15 +1865,15 @@ w83781d_update_client(struct i2c_client *client)
 		}
 
 		data->temp = w83781d_read_value(client, W83781D_REG_TEMP(1));
-		data->temp_min =
-		    w83781d_read_value(client, W83781D_REG_TEMP_OVER(1));
 		data->temp_max =
+		    w83781d_read_value(client, W83781D_REG_TEMP_OVER(1));
+		data->temp_hyst =
 		    w83781d_read_value(client, W83781D_REG_TEMP_HYST(1));
 		data->temp_add[0] =
 		    w83781d_read_value(client, W83781D_REG_TEMP(2));
 		data->temp_max_add[0] =
 		    w83781d_read_value(client, W83781D_REG_TEMP_OVER(2));
-		data->temp_min_add[0] =
+		data->temp_hyst_add[0] =
 		    w83781d_read_value(client, W83781D_REG_TEMP_HYST(2));
 		if (data->type != w83783s && data->type != w83697hf) {
 			data->temp_add[1] =
@@ -1881,7 +1881,7 @@ w83781d_update_client(struct i2c_client *client)
 			data->temp_max_add[1] =
 			    w83781d_read_value(client,
 					       W83781D_REG_TEMP_OVER(3));
-			data->temp_min_add[1] =
+			data->temp_hyst_add[1] =
 			    w83781d_read_value(client,
 					       W83781D_REG_TEMP_HYST(3));
 		}
