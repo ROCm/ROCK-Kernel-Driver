@@ -351,14 +351,20 @@ void timer_tick(struct pt_regs *regs)
 static int timer_suspend(struct sys_device *dev, u32 state)
 {
 	struct sys_timer *timer = container_of(dev, struct sys_timer, dev);
-	timer->suspend();
+
+	if (timer->suspend != NULL)
+		timer->suspend();
+
 	return 0;
 }
 
 static int timer_resume(struct sys_device *dev)
 {
 	struct sys_timer *timer = container_of(dev, struct sys_timer, dev);
-	timer->resume();
+
+	if (timer->resume != NULL)
+		timer->resume();
+
 	return 0;
 }
 #else
