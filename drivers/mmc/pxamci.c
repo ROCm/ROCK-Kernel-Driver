@@ -570,7 +570,7 @@ static int pxamci_resume(struct device *dev, u32 level)
 }
 
 static struct device_driver pxamci_driver = {
-	.name		= "pxamci",
+	.name		= "pxa2xx-mci",
 	.bus		= &platform_bus_type,
 	.probe		= pxamci_probe,
 	.remove		= pxamci_remove,
