@@ -2833,8 +2833,6 @@ static int s_show(struct seq_file *m, void *p)
 	unsigned long	num_slabs;
 	const char *name; 
 	char *error = NULL;
-	mm_segment_t old_fs;
-	char tmp; 
 
 	check_irq_on();
 	spin_lock_irq(&cachep->spinlock);
@@ -2868,17 +2866,6 @@ static int s_show(struct seq_file *m, void *p)
 		error = "free_objects accounting error";
 
 	name = cachep->name; 
-
-	/*
-	 * Check to see if `name' resides inside a module which has been
-	 * unloaded (someone forgot to destroy their cache)
-	 */
-	old_fs = get_fs();
-	set_fs(KERNEL_DS);
-	if (__get_user(tmp, name)) 
-		name = "broken"; 
-	set_fs(old_fs);
-
 	if (error)
 		printk(KERN_ERR "slab: cache %s error: %s\n", name, error);
 
