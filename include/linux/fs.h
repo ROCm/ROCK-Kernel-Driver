@@ -504,6 +504,10 @@ struct file {
 
 	/* needed for tty driver, and maybe others */
 	void			*private_data;
+
+	/* file callback list */
+	rwlock_t f_cblock;
+	struct list_head f_cblist;
 };
 extern spinlock_t files_lock;
 #define file_list_lock() spin_lock(&files_lock);

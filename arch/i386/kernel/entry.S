@@ -737,6 +737,10 @@ ENTRY(sys_call_table)
 	.long sys_free_hugepages
 	.long sys_exit_group
 	.long sys_lookup_dcookie
+	.long sys_epoll_create
+	.long sys_epoll_ctl	/* 255 */
+	.long sys_epoll_wait
+
 
 	.rept NR_syscalls-(.-sys_call_table)/4
 		.long sys_ni_syscall

@@ -8,6 +8,7 @@
 #include <linux/string.h>
 #include <linux/slab.h>
 #include <linux/file.h>
+#include <linux/fcblist.h>
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/smp_lock.h>
@@ -58,6 +59,7 @@ struct file * get_empty_filp(void)
 		f->f_gid = current->fsgid;
 		f->f_owner.lock = RW_LOCK_UNLOCKED;
 		list_add(&f->f_list, &anon_list);
+		file_notify_init(f);
 		file_list_unlock();
 		return f;
 	}
@@ -102,6 +104,7 @@ int init_private_file(struct file *filp, struct dentry *dentry, int mode)
 	filp->f_uid    = current->fsuid;
 	filp->f_gid    = current->fsgid;
 	filp->f_op     = dentry->d_inode->i_fop;
+	file_notify_init(filp);
 	if (filp->f_op->open)
 		return filp->f_op->open(dentry->d_inode, filp);
 	else
@@ -123,6 +126,7 @@ void __fput(struct file * file)
 	struct vfsmount * mnt = file->f_vfsmnt;
 	struct inode * inode = dentry->d_inode;
 
+	file_notify_cleanup(file);
 	locks_remove_flock(file);
 
 	if (file->f_op && file->f_op->release)

@@ -11,6 +11,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/fs.h>
+#include <linux/fcblist.h>
 
 #include <asm/uaccess.h>
 #include <asm/ioctls.h>
@@ -47,7 +48,7 @@ static ssize_t
 pipe_read(struct file *filp, char *buf, size_t count, loff_t *ppos)
 {
 	struct inode *inode = filp->f_dentry->d_inode;
-	int do_wakeup;
+	int do_wakeup, pfull;
 	ssize_t ret;
 
 	/* pread is not allowed on pipes. */
@@ -63,6 +64,7 @@ pipe_read(struct file *filp, char *buf, size_t count, loff_t *ppos)
 	down(PIPE_SEM(*inode));
 	for (;;) {
 		int size = PIPE_LEN(*inode);
+		pfull = PIPE_FULL(*inode);
 		if (size) {
 			char *pipebuf = PIPE_BASE(*inode) + PIPE_START(*inode);
 			ssize_t chars = PIPE_MAX_RCHUNK(*inode);
@@ -108,12 +110,18 @@ pipe_read(struct file *filp, char *buf, size_t count, loff_t *ppos)
 			if (!ret) ret = -ERESTARTSYS;
 			break;
 		}
+		/* Send notification message */
+		if (pfull && !PIPE_FULL(*inode) && PIPE_WRITEFILE(*inode))
+			file_send_notify(PIPE_WRITEFILE(*inode), ION_OUT, POLLOUT | POLLWRNORM | POLLWRBAND);
 		if (do_wakeup) {
 			wake_up_interruptible_sync(PIPE_WAIT(*inode));
  			kill_fasync(PIPE_FASYNC_WRITERS(*inode), SIGIO, POLL_OUT);
 		}
 		pipe_wait(inode);
 	}
+	/* Send notification message */
+	if (pfull && !PIPE_FULL(*inode) && PIPE_WRITEFILE(*inode))
+		file_send_notify(PIPE_WRITEFILE(*inode), ION_OUT, POLLOUT | POLLWRNORM | POLLWRBAND);
 	up(PIPE_SEM(*inode));
 	/* Signal writers asynchronously that there is more room.  */
 	if (do_wakeup) {
@@ -131,7 +139,7 @@ pipe_write(struct file *filp, const char *buf, size_t count, loff_t *ppos)
 	struct inode *inode = filp->f_dentry->d_inode;
 	ssize_t ret;
 	size_t min;
-	int do_wakeup;
+	int do_wakeup, pempty;
 
 	/* pwrite is not allowed on pipes. */
 	if (unlikely(ppos != &filp->f_pos))
@@ -149,6 +157,7 @@ pipe_write(struct file *filp, const char *buf, size_t count, loff_t *ppos)
 	down(PIPE_SEM(*inode));
 	for (;;) {
 		int free;
+		pempty = PIPE_EMPTY(*inode);
 		if (!PIPE_READERS(*inode)) {
 			send_sig(SIGPIPE, current, 0);
 			if (!ret) ret = -EPIPE;
@@ -194,6 +203,9 @@ pipe_write(struct file *filp, const char *buf, size_t count, loff_t *ppos)
 			if (!ret) ret = -ERESTARTSYS;
 			break;
 		}
+		/* Send notification message */
+		if (pempty && !PIPE_EMPTY(*inode) && PIPE_READFILE(*inode))
+			file_send_notify(PIPE_READFILE(*inode), ION_IN, POLLIN | POLLRDNORM);
 		if (do_wakeup) {
 			wake_up_interruptible_sync(PIPE_WAIT(*inode));
 			kill_fasync(PIPE_FASYNC_READERS(*inode), SIGIO, POLL_IN);
@@ -203,6 +215,9 @@ pipe_write(struct file *filp, const char *buf, size_t count, loff_t *ppos)
 		pipe_wait(inode);
 		PIPE_WAITING_WRITERS(*inode)--;
 	}
+	/* Send notification message */
+	if (pempty && !PIPE_EMPTY(*inode) && PIPE_READFILE(*inode))
+		file_send_notify(PIPE_READFILE(*inode), ION_IN, POLLIN | POLLRDNORM);
 	up(PIPE_SEM(*inode));
 	if (do_wakeup) {
 		wake_up_interruptible(PIPE_WAIT(*inode));
@@ -266,9 +281,22 @@ pipe_poll(struct file *filp, poll_table *wait)
 static int
 pipe_release(struct inode *inode, int decr, int decw)
 {
+	struct file *rdfile, *wrfile;
 	down(PIPE_SEM(*inode));
 	PIPE_READERS(*inode) -= decr;
 	PIPE_WRITERS(*inode) -= decw;
+	rdfile = PIPE_READFILE(*inode);
+	wrfile = PIPE_WRITEFILE(*inode);
+ 	if (decr && !PIPE_READERS(*inode)) {
+		PIPE_READFILE(*inode) = NULL;
+		if (wrfile)
+			file_send_notify(wrfile, ION_HUP, POLLHUP);
+	}
+	if (decw && !PIPE_WRITERS(*inode)) {
+		PIPE_WRITEFILE(*inode) = NULL;
+		if (rdfile)
+			file_send_notify(rdfile, ION_HUP, POLLHUP);
+	}
 	if (!PIPE_READERS(*inode) && !PIPE_WRITERS(*inode)) {
 		struct pipe_inode_info *info = inode->i_pipe;
 		inode->i_pipe = NULL;
@@ -488,6 +516,7 @@ struct inode* pipe_new(struct inode* inode)
 	PIPE_READERS(*inode) = PIPE_WRITERS(*inode) = 0;
 	PIPE_WAITING_WRITERS(*inode) = 0;
 	PIPE_RCOUNTER(*inode) = PIPE_WCOUNTER(*inode) = 1;
+	PIPE_READFILE(*inode) = PIPE_WRITEFILE(*inode) = NULL;
 	*PIPE_FASYNC_READERS(*inode) = *PIPE_FASYNC_WRITERS(*inode) = NULL;
 
 	return inode;
@@ -595,6 +624,9 @@ int do_pipe(int *fd)
 	f2->f_op = &write_pipe_fops;
 	f2->f_mode = 2;
 	f2->f_version = 0;
+
+	PIPE_READFILE(*inode) = f1;
+	PIPE_WRITEFILE(*inode) = f2;
 
 	fd_install(i, f1);
 	fd_install(j, f2);
