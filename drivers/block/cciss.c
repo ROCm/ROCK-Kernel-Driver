@@ -147,7 +147,7 @@ static void cciss_procinit(int i) {}
 #endif /* CONFIG_PROC_FS */
 
 #ifdef CONFIG_COMPAT
-static int cciss_compat_ioctl(struct file *f, unsigned cmd, unsigned long arg);
+static long cciss_compat_ioctl(struct file *f, unsigned cmd, unsigned long arg);
 #endif
 
 static struct block_device_operations cciss_fops  = {
