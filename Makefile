@@ -501,7 +501,7 @@ include/linux/version.h: Makefile
 
 .PHONY: depend dep
 depend dep:
-	@echo'*** Warning: make $@ is unnecessary now.'
+	@echo '*** Warning: make $@ is unnecessary now.'
 
 # ---------------------------------------------------------------------------
 # Modules

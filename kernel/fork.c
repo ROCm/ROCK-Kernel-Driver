@@ -26,6 +26,7 @@
 #include <linux/mman.h>
 #include <linux/fs.h>
 #include <linux/security.h>
+#include <linux/jiffies.h>
 #include <linux/futex.h>
 #include <linux/ptrace.h>
 #include <linux/mount.h>
@@ -814,7 +815,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	p->cutime = p->cstime = 0;
 	p->array = NULL;
 	p->lock_depth = -1;		/* -1 = no lock */
-	p->start_time = jiffies;
+	p->start_time = get_jiffies_64();
 	p->security = NULL;
 
 	retval = -ENOMEM;

@@ -97,17 +97,11 @@ td_alloc (struct ohci_hcd *hc, int mem_flags)
 
 	td = pci_pool_alloc (hc->td_cache, mem_flags, &dma);
 	if (td) {
-		int	hash;
-
 		/* in case hc fetches it, make it look dead */
 		memset (td, 0, sizeof *td);
 		td->hwNextTD = cpu_to_le32 (dma);
 		td->td_dma = dma;
-
-		/* hash it for later reverse mapping */
-		hash = TD_HASH_FUNC (dma);
-		td->td_hash = hc->td_hash [hash];
-		hc->td_hash [hash] = td;
+		/* hashed in td_fill */
 	}
 	return td;
 }

@@ -20,6 +20,7 @@
 #include <linux/types.h>
 
 #include <asm/hardware.h>
+#include <asm/parisc-device.h>
 #include <asm/io.h>
 #include <asm/serial.h>
 
@@ -32,6 +33,7 @@ static void setup_parisc_serial(struct serial_struct *serial,
 	serial->type = PORT_16550A;
 
 	serial->line = line;
+	serial->iomap_base = address;
 	serial->iomem_base = ioremap(address, 0x8);
 
 	serial->irq = irq;
@@ -91,11 +93,13 @@ static struct parisc_device_id serial_tbl[] = {
 	{ 0 }
 };
 
-/* Hack.  Dino's serial port will get listed first on some machines.
- * So we register this driver first which knows about Lasi's serial port.
- * This needs to get fixed properly somehow.
+/* Hack.  Some machines have SERIAL_0 attached to Lasi and SERIAL_1
+ * attached to Dino.  Unfortunately, Dino appears before Lasi in the device
+ * tree.  To ensure that ttyS0 == SERIAL_0, we register two drivers; one
+ * which only knows about Lasi and then a second which will find all the
+ * other serial ports.  HPUX ignores this problem.
  */
-static struct parisc_device_id serial1_tbl[] = {
+static struct parisc_device_id lasi_tbl[] = {
 	{ HPHW_FIO, HVERSION_REV_ANY_ID, 0x03B, 0x0008C }, /* C1xx/C1xxL */
 	{ HPHW_FIO, HVERSION_REV_ANY_ID, 0x03C, 0x0008C }, /* B132L */
 	{ HPHW_FIO, HVERSION_REV_ANY_ID, 0x03D, 0x0008C }, /* B160L */
@@ -111,9 +115,9 @@ static struct parisc_device_id serial1_tbl[] = {
 
 MODULE_DEVICE_TABLE(parisc, serial_tbl);
 
-static struct parisc_driver serial1_driver = {
-	.name		= "Serial RS232",
-	.id_table	= serial1_tbl,
+static struct parisc_driver lasi_driver = {
+	.name		= "Lasi RS232",
+	.id_table	= lasi_tbl,
 	.probe		= serial_init_chip,
 };
 
@@ -125,7 +129,7 @@ static struct parisc_driver serial_driver = {
 
 int __init probe_serial_gsc(void)
 {
-	register_parisc_driver(&serial1_driver);
+	register_parisc_driver(&lasi_driver);
 	register_parisc_driver(&serial_driver);
 	return 0;
 }

@@ -1004,16 +1004,16 @@ static inline void cmd_frob(struct Command_Entry *cmd, Scsi_Cmnd *Cmnd,
 	memset(cmd, 0, sizeof(struct Command_Entry));
 	cmd->hdr.entry_cnt = 1;
 	cmd->hdr.entry_type = ENTRY_COMMAND;
-	cmd->target_id = Cmnd->target;
-	cmd->target_lun = Cmnd->lun;
+	cmd->target_id = Cmnd->device->id;
+	cmd->target_lun = Cmnd->device->lun;
 	cmd->cdb_length = Cmnd->cmd_len;
 	cmd->control_flags = 0;
 	if (Cmnd->device->tagged_supported) {
-		if (qpti->cmd_count[Cmnd->target] == 0)
-			qpti->tag_ages[Cmnd->target] = jiffies;
-		if ((jiffies - qpti->tag_ages[Cmnd->target]) > (5*HZ)) {
+		if (qpti->cmd_count[Cmnd->device->id] == 0)
+			qpti->tag_ages[Cmnd->device->id] = jiffies;
+		if ((jiffies - qpti->tag_ages[Cmnd->device->id]) > (5*HZ)) {
 			cmd->control_flags = CFLAG_ORDERED_TAG;
-			qpti->tag_ages[Cmnd->target] = jiffies;
+			qpti->tag_ages[Cmnd->device->id] = jiffies;
 		} else
 			cmd->control_flags = CFLAG_SIMPLE_TAG;
 	}
@@ -1097,7 +1097,7 @@ static inline int load_cmd(Scsi_Cmnd *Cmnd, struct Command_Entry *cmd,
 	cmd->handle = in_ptr;
 	qpti->cmd_slots[in_ptr] = Cmnd;
 
-	qpti->cmd_count[Cmnd->target]++;
+	qpti->cmd_count[Cmnd->device->id]++;
 	sbus_writew(in_ptr, qpti->qregs + MBOX4);
 	qpti->req_in_ptr = in_ptr;
 
@@ -1118,8 +1118,8 @@ static inline void update_can_queue(struct Scsi_Host *host, u_int in_ptr, u_int 
  */
 static void ourdone(Scsi_Cmnd *Cmnd)
 {
-	struct qlogicpti *qpti = (struct qlogicpti *) Cmnd->host->hostdata;
-	int tgt = Cmnd->target;
+	struct qlogicpti *qpti = (struct qlogicpti *) Cmnd->device->host->hostdata;
+	int tgt = Cmnd->device->id;
 	void (*done) (Scsi_Cmnd *);
 
 	/* This grot added by DaveM, blame him for ugliness.
@@ -1170,7 +1170,7 @@ static int qlogicpti_queuecommand(Scsi_Cmnd *Cmnd, void (*done)(Scsi_Cmnd *));
 static int qlogicpti_queuecommand_slow(Scsi_Cmnd *Cmnd,
 				       void (*done)(Scsi_Cmnd *))
 {
-	struct qlogicpti *qpti = (struct qlogicpti *) Cmnd->host->hostdata;
+	struct qlogicpti *qpti = (struct qlogicpti *) Cmnd->device->host->hostdata;
 	unsigned long flags;
 
 	/*
@@ -1229,7 +1229,7 @@ static int qlogicpti_queuecommand_slow(Scsi_Cmnd *Cmnd,
 	 * and can rock on..
 	 */
 	if (qpti == NULL)
-		Cmnd->host->hostt->queuecommand = qlogicpti_queuecommand;
+		Cmnd->device->host->hostt->queuecommand = qlogicpti_queuecommand;
 
 	spin_unlock_irqrestore(&qpti->lock, flags);
 
@@ -1246,7 +1246,7 @@ static int qlogicpti_queuecommand_slow(Scsi_Cmnd *Cmnd,
  */
 static int qlogicpti_queuecommand(Scsi_Cmnd *Cmnd, void (*done)(Scsi_Cmnd *))
 {
-	struct Scsi_Host *host = Cmnd->host;
+	struct Scsi_Host *host = Cmnd->device->host;
 	struct qlogicpti *qpti = (struct qlogicpti *) host->hostdata;
 	struct Command_Entry *cmd;
 	unsigned long flags;
@@ -1431,7 +1431,7 @@ static Scsi_Cmnd *qlogicpti_intr_handler(struct qlogicpti *qpti)
 					  Cmnd->request_bufflen,
 					  scsi_to_sbus_dma_dir(Cmnd->sc_data_direction));
 		}
-		qpti->cmd_count[Cmnd->target]--;
+		qpti->cmd_count[Cmnd->device->id]--;
 		sbus_writew(out_ptr, qpti->qregs + MBOX5);
 		Cmnd->host_scribble = (unsigned char *) done_queue;
 		done_queue = Cmnd;
@@ -1468,7 +1468,7 @@ static void qpti_intr(int irq, void *dev_id, struct pt_regs *regs)
 static int qlogicpti_abort(Scsi_Cmnd *Cmnd)
 {
 	u_short param[6];
-	struct Scsi_Host *host = Cmnd->host;
+	struct Scsi_Host *host = Cmnd->device->host;
 	struct qlogicpti *qpti = (struct qlogicpti *) host->hostdata;
 	int return_status = SUCCESS;
 	unsigned long flags;
@@ -1476,7 +1476,7 @@ static int qlogicpti_abort(Scsi_Cmnd *Cmnd)
 	int i;
 
 	printk(KERN_WARNING "qlogicpti : Aborting cmd for tgt[%d] lun[%d]\n",
-	       (int)Cmnd->target, (int)Cmnd->lun);
+	       (int)Cmnd->device->id, (int)Cmnd->device->lun);
 
 	spin_lock_irqsave(&qpti->lock, flags);
 
@@ -1491,7 +1491,7 @@ static int qlogicpti_abort(Scsi_Cmnd *Cmnd)
 	cmd_cookie = i;
 
 	param[0] = MBOX_ABORT;
-	param[1] = (((u_short) Cmnd->target) << 8) | Cmnd->lun;
+	param[1] = (((u_short) Cmnd->device->id) << 8) | Cmnd->device->lun;
 	param[2] = cmd_cookie >> 16;
 	param[3] = cmd_cookie & 0xffff;
 	if (qlogicpti_mbox_command(qpti, param, 0) ||
@@ -1510,7 +1510,7 @@ static int qlogicpti_abort(Scsi_Cmnd *Cmnd)
 static int qlogicpti_reset(Scsi_Cmnd *Cmnd)
 {
 	u_short param[6];
-	struct Scsi_Host *host = Cmnd->host;
+	struct Scsi_Host *host = Cmnd->device->host;
 	struct qlogicpti *qpti = (struct qlogicpti *) host->hostdata;
 	int return_status = SUCCESS;
 	unsigned long flags;

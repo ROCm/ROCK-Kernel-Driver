@@ -2,14 +2,34 @@
 #define _LINUX_JIFFIES_H
 
 #include <linux/types.h>
+#include <linux/spinlock.h>
+#include <asm/system.h>
 #include <asm/param.h>			/* for HZ */
 
 /*
  * The 64-bit value is not volatile - you MUST NOT read it
- * without holding read_lock_irq(&xtime_lock)
+ * without holding read_lock_irq(&xtime_lock).
+ * get_jiffies_64() will do this for you as appropriate.
  */
 extern u64 jiffies_64;
 extern unsigned long volatile jiffies;
+
+static inline u64 get_jiffies_64(void)
+{
+#if BITS_PER_LONG < 64
+	extern rwlock_t xtime_lock;
+	unsigned long flags;
+	u64 tmp;
+
+	read_lock_irqsave(&xtime_lock, flags);
+	tmp = jiffies_64;
+	read_unlock_irqrestore(&xtime_lock, flags);
+	return tmp;
+#else
+	return (u64)jiffies;
+#endif
+}
+
 
 /*
  *	These inlines deal with timer wrapping correctly. You are 

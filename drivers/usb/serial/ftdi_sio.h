@@ -17,11 +17,14 @@
  * Bill Ryder - bryder@sgi.com of Silicon Graphics, Inc.- wrote the 
  * FTDI_SIO implementation.
  *
+ * Philipp Gühring - pg@futureware.at - added the Device ID of the USB relais
+ * from Rudolf Gugler
  */
 
 #define FTDI_VID	0x0403	/* Vendor Id */
 #define FTDI_SIO_PID	0x8372	/* Product Id SIO application of 8U100AX  */
 #define FTDI_8U232AM_PID 0x6001 /* Similar device to SIO above */
+#define FTDI_RELAIS_PID	0xFA10  /* Relais device from Rudolf Gugler */
 #define FTDI_NF_RIC_VID	0x0DCD	/* Vendor Id */
 #define FTDI_NF_RIC_PID	0x0001	/* Product Id */
 

@@ -13,7 +13,7 @@ struct i386_node {
 extern struct i386_node node_devices[MAX_NUMNODES];
 
 static inline int arch_register_node(int num){
-	int p_node = __parent_node(num);
+	int p_node = parent_node(num);
 	struct node *parent = NULL;
 
 	if (p_node != num)

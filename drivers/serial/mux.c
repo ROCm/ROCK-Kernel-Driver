@@ -23,7 +23,9 @@
 #include <linux/init.h>
 #include <linux/serial.h>
 #include <linux/console.h>
+#include <linux/slab.h>
 #include <asm/io.h>
+#include <asm/parisc-device.h>
 
 #ifdef CONFIG_MAGIC_SYSRQ
 #include <linux/sysrq.h>
@@ -32,34 +34,35 @@
 
 #include <linux/serial_core.h>
 
-#define MUX_NR 1
-
 #define MUX_OFFSET 0x800
 #define MUX_LINE_OFFSET 0x80
 
 #define MUX_FIFO_SIZE 255
-#define MUX_MIN_FREE_SIZE 32
+#define MUX_POLL_DELAY (30 * HZ / 1000)
 
-#define MUX_FIFO_DRAIN_DELAY 1
-#define MUX_POLL_DELAY (30 * HZ / 1000) 
-
-#define IO_COMMAND_REG_OFFSET 0x30
-#define IO_STATUS_REG_OFFSET 0x34
 #define IO_DATA_REG_OFFSET 0x3c
 #define IO_DCOUNT_REG_OFFSET 0x40
-#define IO_UCOUNT_REG_OFFSET 0x44
-#define IO_FIFOS_REG_OFFSET 0x48
 
 #define MUX_EOFIFO(status) ((status & 0xF000) == 0xF000)
 #define MUX_STATUS(status) ((status & 0xF000) == 0x8000)
 #define MUX_BREAK(status) ((status & 0xF000) == 0x2000)
 
+#define UART_NR 8
+struct mux_card {
+	struct uart_port ports[UART_NR];
+	struct uart_driver drv;
+	struct mux_card *next;
+};
 
-static struct uart_port mux_ports[MUX_NR];
+static struct mux_card mux_card_head = {
+	.next = NULL,
+};
+
 static struct timer_list mux_timer;
 
 #define UART_PUT_CHAR(p, c) __raw_writel((c), (unsigned long)(p)->membase + IO_DATA_REG_OFFSET)
 #define UART_GET_FIFO_CNT(p) __raw_readl((unsigned long)(p)->membase + IO_DCOUNT_REG_OFFSET)
+#define GET_MUX_PORTS(iodc_data) ((((iodc_data)[4] & 0xf0) >> 4) * 8) + 8
 
 /**
  * mux_tx_empty - Check if the transmitter fifo is empty.
@@ -205,8 +208,8 @@ static void mux_write(struct uart_port *port)
 static void mux_read(struct uart_port *port)
 {
 	int data;
-	__u32 start_count = port->icount.rx;
 	struct tty_struct *tty = port->info->tty;
+	__u32 start_count = port->icount.rx;
 
 	while(1) {
 		data = __raw_readl((unsigned long)port->membase
@@ -294,7 +297,7 @@ static const char *mux_type(struct uart_port *port)
 }
 
 /**
- * release_port - Release memory and IO regions.
+ * mux_release_port - Release memory and IO regions.
  * @port: Ptr to the uart_port.
  * 
  * Release any memory and IO region resources currently in use by
@@ -350,17 +353,26 @@ static int mux_verify_port(struct uart_port *port, struct serial_struct *ser)
 }
 
 /**
- * mux_drv_poll - Mux poll function.   
+ * mux_drv_poll - Mux poll function.
  * @unused: Unused variable
  *
  * This function periodically polls the Serial MUX to check for new data.
  */
 static void mux_poll(unsigned long unused)
 {  
-	struct uart_port *port = &mux_ports[0];
+	int i;
+	struct mux_card *card = &mux_card_head;
 
-	mux_read(port);
-	mux_write(port);
+	while(card) {
+		for(i = 0; i < UART_NR; ++i) {
+			if(!card->ports[i].info)
+				continue;
+
+			mux_read(&card->ports[i]);
+			mux_write(&card->ports[i]);
+		}
+		card = card->next;
+	}
 	mod_timer(&mux_timer, jiffies + MUX_POLL_DELAY);
 }
 
@@ -395,20 +407,6 @@ static struct uart_ops mux_pops = {
 	.verify_port =		mux_verify_port,
 };
 
-static struct uart_driver mux_reg = {
-	.owner =		THIS_MODULE,
-	.driver_name =		"ttyB",
-#ifdef CONFIG_DEVFS_FS
-	.dev_name =		"ttyB%d",
-#else
-	.dev_name =		"ttyB%d",
-#endif
-	.major =		MUX_MAJOR,
-	.minor =		0,
-	.nr =			MUX_NR, 
-	.cons =			MUX_CONSOLE,
-};
-
 /**
  * mux_probe - Determine if the Serial Mux should claim this device.
  * @dev: The parisc device.
@@ -418,36 +416,77 @@ static struct uart_driver mux_reg = {
  */
 static int __init mux_probe(struct parisc_device *dev)
 {
-	int i, ret;
-	struct uart_port *port = &mux_ports[0];
+	int i, j, ret, ports, port_cnt = 0;
+	u8 iodc_data[8];
+	unsigned long bytecnt;
+	struct uart_port *port;
+	struct mux_card *card = &mux_card_head;
 
-	init_timer(&mux_timer);
-	mux_timer.function = mux_poll;
-
-	printk(KERN_INFO "Serial mux driver Revision: 0.1\n");
-
-	ret = uart_register_driver(&mux_reg);
-	if (ret)
-		return ret;
-
-	for (i = 0; i < MUX_NR; i++) {
-		port = &mux_ports[i];
-
-		port->iobase	= 0;
-		port->mapbase	= dev->hpa + MUX_OFFSET + (i * MUX_LINE_OFFSET);
-		port->membase	= ioremap(port->mapbase, MUX_LINE_OFFSET);
-		port->iotype	= SERIAL_IO_MEM;
-		port->type	= PORT_MUX;
-		port->irq	= SERIAL_IRQ_NONE;
-		port->uartclk	= 0;
-		port->fifosize	= MUX_FIFO_SIZE;
-		port->ops	= &mux_pops;
-		port->flags	= UPF_BOOT_AUTOCONF;
-		port->line	= 0;
-
-		uart_add_one_port(&mux_reg, port);
+	ret = pdc_iodc_read(&bytecnt, dev->hpa, 0, iodc_data, 8);
+	if(ret != PDC_OK) {
+		printk(KERN_ERR "Serial mux: Unable to read IODC.\n");
+		return 1;
 	}
 
+	ports = GET_MUX_PORTS(iodc_data);
+ 	printk(KERN_INFO "Serial mux driver (%d ports) Revision: 0.2\n",
+		ports);
+
+	if(!card->drv.nr) {
+		init_timer(&mux_timer);
+		mux_timer.function = mux_poll;
+	} else {
+		port_cnt += UART_NR;
+		while(card->next) {
+			card = card->next;
+			port_cnt += UART_NR;
+		} 
+	}
+
+	for(i = 0; i < ports / UART_NR; ++i) {
+		if(card->drv.nr) {
+			card->next = kmalloc(sizeof(struct mux_card), GFP_KERNEL);
+			if(!card->next) {
+				printk(KERN_ERR "Serial mux: Unable to allocate memory.\n");
+				return 1;
+			}
+			memset(card->next, '\0', sizeof(struct mux_card));
+			card = card->next;
+		}
+
+		card->drv.owner = THIS_MODULE;
+		card->drv.driver_name = "ttyB";
+		card->drv.dev_name = "ttyB%d";
+		card->drv.major = MUX_MAJOR;
+		card->drv.minor = port_cnt;
+		card->drv.nr = UART_NR;
+		card->drv.cons = MUX_CONSOLE;
+
+		ret = uart_register_driver(&card->drv);
+		if(ret) {
+			printk(KERN_ERR "Serial mux: Unable to register driver.\n");
+			return 1;
+		}
+
+		for(j = 0; j < UART_NR; ++j) {
+			port = &card->ports[j];
+
+			port->iobase	= 0;
+			port->mapbase	= dev->hpa + MUX_OFFSET + (j * MUX_LINE_OFFSET);
+			port->membase	= ioremap(port->mapbase, MUX_LINE_OFFSET);
+			port->iotype	= SERIAL_IO_MEM;
+			port->type	= PORT_MUX;
+			port->irq	= SERIAL_IRQ_NONE;
+			port->uartclk	= 0;
+			port->fifosize	= MUX_FIFO_SIZE;
+			port->ops	= &mux_pops;
+			port->flags	= UPF_BOOT_AUTOCONF;
+			port->line	= j;
+			ret = uart_add_one_port(&card->drv, port);
+			BUG_ON(ret);
+		}
+		port_cnt += UART_NR;
+	}
 	return 0;
 }
 
@@ -459,9 +498,9 @@ static struct parisc_device_id mux_tbl[] = {
 MODULE_DEVICE_TABLE(parisc, mux_tbl);
 
 static struct parisc_driver mux_driver = {
-	.name     = "Serial MUX driver",
-	.id_table = mux_tbl,
-	.probe    = mux_probe,
+	.name =		"Serial MUX",
+	.id_table =	mux_tbl,
+	.probe =	mux_probe,
 };
 
 /**
@@ -482,12 +521,13 @@ static int __init mux_init(void)
 static void __exit mux_exit(void)
 {
 	int i;
+	struct mux_card *card = &mux_card_head;
 
-	for (i = 0; i < MUX_NR; i++) {
-		uart_remove_one_port(&mux_reg, &mux_ports[i]);
+	for (i = 0; i < UART_NR; i++) {
+		uart_remove_one_port(&card->drv, &card->ports[i]);
 	}
 
-	uart_unregister_driver(&mux_reg);
+	uart_unregister_driver(&card->drv);
 }
 
 module_init(mux_init);

@@ -213,7 +213,7 @@ __init void node_nr_running_init(void)
 	int i;
 
 	for (i = 0; i < NR_CPUS; i++)
-		cpu_rq(i)->node_nr_running = &node_nr_running[__cpu_to_node(i)];
+		cpu_rq(i)->node_nr_running = &node_nr_running[cpu_to_node(i)];
 }
 
 #else /* !CONFIG_NUMA */
@@ -715,7 +715,7 @@ static int sched_best_cpu(struct task_struct *p)
 	}
 
 	minload = 10000000;
-	cpumask = __node_to_cpu_mask(node);
+	cpumask = node_to_cpumask(node);
 	for (i = 0; i < NR_CPUS; ++i) {
 		if (!(cpumask & (1UL << i)))
 			continue;
@@ -767,7 +767,7 @@ static int find_busiest_node(int this_node)
 
 static inline unsigned long cpus_to_balance(int this_cpu, runqueue_t *this_rq)
 {
-	int this_node = __cpu_to_node(this_cpu);
+	int this_node = cpu_to_node(this_cpu);
 	/*
 	 * Avoid rebalancing between nodes too often.
 	 * We rebalance globally once every NODE_BALANCE_RATE load balances.
@@ -776,9 +776,9 @@ static inline unsigned long cpus_to_balance(int this_cpu, runqueue_t *this_rq)
 		int node = find_busiest_node(this_node);
 		this_rq->nr_balanced = 0;
 		if (node >= 0)
-			return (__node_to_cpu_mask(node) | (1UL << this_cpu));
+			return (node_to_cpumask(node) | (1UL << this_cpu));
 	}
-	return __node_to_cpu_mask(this_node);
+	return node_to_cpumask(this_node);
 }
 
 #else /* !CONFIG_NUMA */

@@ -379,7 +379,8 @@ xfs_buf_item_pin(
  */
 void
 xfs_buf_item_unpin(
-	xfs_buf_log_item_t	*bip)
+	xfs_buf_log_item_t	*bip,
+	int			stale)
 {
 	xfs_mount_t	*mp;
 	xfs_buf_t	*bp;
@@ -396,7 +397,8 @@ xfs_buf_item_unpin(
 	freed = atomic_dec_and_test(&bip->bli_refcount);
 	mp = bip->bli_item.li_mountp;
 	xfs_bunpin(bp);
-	if (freed && (bip->bli_flags & XFS_BLI_STALE)) {
+	if (freed && stale) {
+		ASSERT(bip->bli_flags & XFS_BLI_STALE);
 		ASSERT(XFS_BUF_VALUSEMA(bp) <= 0);
 		ASSERT(!(XFS_BUF_ISDELAYWRITE(bp)));
 		ASSERT(XFS_BUF_ISSTALE(bp));
@@ -418,7 +420,6 @@ xfs_buf_item_unpin(
 		ASSERT(XFS_BUF_FSPRIVATE(bp, void *) == NULL);
 		xfs_buf_relse(bp);
 	}
-
 }
 
 /*
@@ -435,6 +436,7 @@ xfs_buf_item_unpin_remove(
 {
 	xfs_buf_t		*bp;
 	xfs_log_item_desc_t	*lidp;
+	int			stale = 0;
 
 	bp = bip->bli_buf;
 	/*
@@ -454,6 +456,7 @@ xfs_buf_item_unpin_remove(
 		 * will be able to bump up the refcount.
 		 */
 		lidp = xfs_trans_find_item(tp, (xfs_log_item_t *) bip);
+		stale = lidp->lid_flags & XFS_LID_BUF_STALE;
 		xfs_trans_free_item(tp, lidp);
 		/*
 		 * Since the transaction no longer refers to the buffer,
@@ -462,7 +465,7 @@ xfs_buf_item_unpin_remove(
 		XFS_BUF_SET_FSPRIVATE2(bp, NULL);
 	}
 
-	xfs_buf_item_unpin(bip);
+	xfs_buf_item_unpin(bip, stale);
 
 	return;
 }
@@ -686,7 +689,7 @@ struct xfs_item_ops xfs_buf_item_ops = {
 	.iop_format	= (void(*)(xfs_log_item_t*, xfs_log_iovec_t*))
 					xfs_buf_item_format,
 	.iop_pin	= (void(*)(xfs_log_item_t*))xfs_buf_item_pin,
-	.iop_unpin	= (void(*)(xfs_log_item_t*))xfs_buf_item_unpin,
+	.iop_unpin	= (void(*)(xfs_log_item_t*, int))xfs_buf_item_unpin,
 	.iop_unpin_remove = (void(*)(xfs_log_item_t*, xfs_trans_t *))
 					xfs_buf_item_unpin_remove,
 	.iop_trylock	= (uint(*)(xfs_log_item_t*))xfs_buf_item_trylock,

@@ -17,59 +17,6 @@ struct k_sigaction32 {
 	struct sigaction32 sa;
 };
 
-typedef unsigned int old_sigset_t32;
-
-static int
-put_old_sigset32(old_sigset_t32 *up, old_sigset_t *set)
-{
-	old_sigset_t32 set32 = *set;
-	return put_user(set32, up);
-}
-
-static int
-get_old_segset32(old_sigset_t32 *up, old_sigset_t *set)
-{
-	old_sigset_t32 set32;
-	int r;
-
-	if ((r = get_user(set32, up)) == 0)
-		*set = set32;
-
-	return r;
-}
-
-long
-sys32_sigpending(old_sigset_t32 *set)
-{
-	extern long sys_sigpending(old_sigset_t *set);
-	old_sigset_t pending;
-	int ret;
-
-	KERNEL_SYSCALL(ret, sys_sigpending, &pending);
-
-	/* can't put_user an old_sigset_t -- it is too big */
-	if (put_old_sigset32(set, &pending))
-		return -EFAULT;
-
-	return ret;
-}
-
-int sys32_sigprocmask(int how, old_sigset_t32 *set, 
-				 old_sigset_t32 *oset)
-{
-	extern int sys_sigprocmask(int how, old_sigset_t *set, 
-				 old_sigset_t *oset);
-	old_sigset_t s;
-	int ret;
-
-	if (set && get_old_segset32 (set, &s))
-		return -EFAULT;
-	KERNEL_SYSCALL(ret, sys_sigprocmask, how, set ? &s : NULL, oset ? &s : NULL);
-	if (!ret && oset && put_old_sigset32(oset, &s))
-		return -EFAULT;
-	return ret;
-}
-
 static inline void
 sigset_32to64(sigset_t *s64, sigset_t32 *s32)
 {

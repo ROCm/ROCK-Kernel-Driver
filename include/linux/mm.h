@@ -491,7 +491,9 @@ extern int do_munmap(struct mm_struct *, unsigned long, size_t);
 
 extern unsigned long do_brk(unsigned long, unsigned long);
 
-static inline void __vma_unlink(struct mm_struct * mm, struct vm_area_struct * vma, struct vm_area_struct * prev)
+static inline void
+__vma_unlink(struct mm_struct *mm, struct vm_area_struct *vma,
+		struct vm_area_struct *prev)
 {
 	prev->vm_next = vma->vm_next;
 	rb_erase(&vma->vm_rb, &mm->mm_rb);
@@ -499,7 +501,8 @@ static inline void __vma_unlink(struct mm_struct * mm, struct vm_area_struct * v
 		mm->mmap_cache = prev;
 }
 
-static inline int can_vma_merge(struct vm_area_struct * vma, unsigned long vm_flags)
+static inline int
+can_vma_merge(struct vm_area_struct *vma, unsigned long vm_flags)
 {
 	if (!vma->vm_file && vma->vm_flags == vm_flags)
 		return 1;

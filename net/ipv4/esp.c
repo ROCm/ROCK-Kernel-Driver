@@ -10,6 +10,9 @@
 
 #define MAX_SG_ONSTACK 4
 
+typedef void (icv_update_fn_t)(struct crypto_tfm *,
+                               struct scatterlist *, unsigned int);
+
 /* BUGS:
  * - we assume replay seqno is always present.
  */
@@ -30,37 +33,40 @@ struct esp_data
 		struct crypto_tfm	*tfm;		/* crypto handle */
 	} conf;
 
-	/* Integrity. It is active when authlen != 0 */
+	/* Integrity. It is active when icv_full_len != 0 */
 	struct {
 		u8			*key;		/* Key */
 		int			key_len;	/* Length of the key */
-		u8			*work_digest;
-		/* authlen is length of trailer containing auth token.
-		 * If it is not zero it is assumed to be
-		 * >= crypto_tfm_alg_digestsize(atfm) */
-		int			authlen;
-		void			(*digest)(struct esp_data*,
-						  struct sk_buff *skb,
-						  int offset,
-						  int len,
-						  u8 *digest);
+		u8			*work_icv;
+		int			icv_full_len;
+		int			icv_trunc_len;
+		void			(*icv)(struct esp_data*,
+		                               struct sk_buff *skb,
+		                               int offset, int len, u8 *icv);
 		struct crypto_tfm	*tfm;
 	} auth;
 };
 
 /* Move to common area: it is shared with AH. */
 
-void skb_digest_walk(const struct sk_buff *skb, struct crypto_tfm *tfm,
-		     int offset, int len)
+void skb_icv_walk(const struct sk_buff *skb, struct crypto_tfm *tfm,
+		  int offset, int len, icv_update_fn_t icv_update)
 {
 	int start = skb->len - skb->data_len;
 	int i, copy = start - offset;
+	struct scatterlist sg;
 
 	/* Checksum header. */
 	if (copy > 0) {
 		if (copy > len)
 			copy = len;
-		tfm->__crt_alg->cra_digest.dia_update(tfm->crt_ctx, skb->data+offset, copy);
+		
+		sg.page = virt_to_page(skb->data + offset);
+		sg.offset = (unsigned long)(skb->data + offset) % PAGE_SIZE;
+		sg.length = copy;
+		
+		icv_update(tfm, &sg, 1);
+		
 		if ((len -= copy) == 0)
 			return;
 		offset += copy;
@@ -73,14 +79,17 @@ void skb_digest_walk(const struct sk_buff *skb, struct crypto_tfm *tfm,
 
 		end = start + skb_shinfo(skb)->frags[i].size;
 		if ((copy = end - offset) > 0) {
-			u8 *vaddr;
 			skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
 
 			if (copy > len)
 				copy = len;
-			vaddr = kmap_skb_frag(frag);
-			tfm->__crt_alg->cra_digest.dia_update(tfm->crt_ctx, vaddr+frag->page_offset+offset-start, copy);
-			kunmap_skb_frag(vaddr);
+			
+			sg.page = frag->page;
+			sg.offset = frag->page_offset + offset-start;
+			sg.length = copy;
+			
+			icv_update(tfm, &sg, 1);
+
 			if (!(len -= copy))
 				return;
 			offset += copy;
@@ -100,7 +109,7 @@ void skb_digest_walk(const struct sk_buff *skb, struct crypto_tfm *tfm,
 			if ((copy = end - offset) > 0) {
 				if (copy > len)
 					copy = len;
-				skb_digest_walk(list, tfm, offset-start, copy);
+				skb_icv_walk(list, tfm, offset-start, copy, icv_update);
 				if ((len -= copy) == 0)
 					return;
 				offset += copy;
@@ -188,12 +197,13 @@ esp_hmac_digest(struct esp_data *esp, struct sk_buff *skb, int offset,
 		int len, u8 *auth_data)
 {
 	struct crypto_tfm *tfm = esp->auth.tfm;
-	char *digest = esp->auth.work_digest;
+	char *icv = esp->auth.work_icv;
 
+	memset(auth_data, 0, esp->auth.icv_trunc_len);
  	crypto_hmac_init(tfm, esp->auth.key, &esp->auth.key_len);
-	skb_digest_walk(skb, tfm, offset, len);
-	crypto_hmac_final(tfm, esp->auth.key, &esp->auth.key_len, digest);
-	memcpy(auth_data, digest, esp->auth.authlen);
+	skb_icv_walk(skb, tfm, offset, len, crypto_hmac_update);
+	crypto_hmac_final(tfm, esp->auth.key, &esp->auth.key_len, icv);
+	memcpy(auth_data, icv, esp->auth.icv_trunc_len);
 }
 
 /* Check that skb data bits are writable. If they are not, copy data
@@ -317,6 +327,7 @@ int esp_output(struct sk_buff *skb)
 	struct sk_buff *trailer;
 	int blksize;
 	int clen;
+	int alen;
 	int nfrags;
 	union {
 		struct iphdr	iph;
@@ -347,13 +358,14 @@ int esp_output(struct sk_buff *skb)
 	clen = skb->len;
 
 	esp = x->data;
+	alen = esp->auth.icv_trunc_len;
 	tfm = esp->conf.tfm;
 	blksize = crypto_tfm_alg_blocksize(tfm);
 	clen = (clen + 2 + blksize-1)&~(blksize-1);
 	if (esp->conf.padlen)
 		clen = (clen + esp->conf.padlen-1)&~(esp->conf.padlen-1);
 
-	if ((nfrags = skb_cow_data(skb, clen-skb->len+esp->auth.authlen, &trailer)) < 0)
+	if ((nfrags = skb_cow_data(skb, clen-skb->len+alen, &trailer)) < 0)
 		goto error;
 
 	/* Fill padding... */
@@ -373,7 +385,7 @@ int esp_output(struct sk_buff *skb)
 		top_iph->ihl = 5;
 		top_iph->version = 4;
 		top_iph->tos = iph->tos;	/* DS disclosed */
-		top_iph->tot_len = htons(skb->len + esp->auth.authlen);
+		top_iph->tot_len = htons(skb->len + alen);
 		top_iph->frag_off = iph->frag_off&htons(IP_DF);
 		if (!(top_iph->frag_off))
 			ip_select_ident(top_iph, dst, 0);
@@ -388,7 +400,7 @@ int esp_output(struct sk_buff *skb)
 		top_iph = (struct iphdr*)skb_push(skb, iph->ihl*4);
 		memcpy(top_iph, &tmp_iph, iph->ihl*4);
 		iph = &tmp_iph.iph;
-		top_iph->tot_len = htons(skb->len + esp->auth.authlen);
+		top_iph->tot_len = htons(skb->len + alen);
 		top_iph->protocol = IPPROTO_ESP;
 		top_iph->check = 0;
 		top_iph->frag_off = iph->frag_off;
@@ -411,7 +423,7 @@ int esp_output(struct sk_buff *skb)
 				goto error;
 		}
 		skb_to_sgvec(skb, sg, esph->enc_data+esp->conf.ivlen-skb->data, clen);
-		crypto_cipher_encrypt(tfm, sg, nfrags);
+		crypto_cipher_encrypt(tfm, sg, sg, clen);
 		if (unlikely(sg != sgbuf))
 			kfree(sg);
 	} while (0);
@@ -421,10 +433,10 @@ int esp_output(struct sk_buff *skb)
 		crypto_cipher_get_iv(tfm, esp->conf.ivec, crypto_tfm_alg_ivsize(tfm));
 	}
 
-	if (esp->auth.authlen) {
-		esp->auth.digest(esp, skb, (u8*)esph-skb->data,
-				 8+esp->conf.ivlen+clen, trailer->tail);
-		pskb_put(skb, trailer, esp->auth.authlen);
+	if (esp->auth.icv_full_len) {
+		esp->auth.icv(esp, skb, (u8*)esph-skb->data,
+		              8+esp->conf.ivlen+clen, trailer->tail);
+		pskb_put(skb, trailer, alen);
 	}
 
 	ip_send_check(top_iph);
@@ -445,6 +457,11 @@ error_nolock:
 	return err;
 }
 
+/*
+ * Note: detecting truncated vs. non-truncated authentication data is very
+ * expensive, so we only support truncated data, which is the recommended
+ * and common case.
+ */
 int esp_input(struct xfrm_state *x, struct sk_buff *skb)
 {
 	struct iphdr *iph;
@@ -452,7 +469,8 @@ int esp_input(struct xfrm_state *x, struct sk_buff *skb)
 	struct esp_data *esp = x->data;
 	struct sk_buff *trailer;
 	int blksize = crypto_tfm_alg_blocksize(esp->conf.tfm);
-	int elen = skb->len - 8 - esp->conf.ivlen - esp->auth.authlen;
+	int alen = esp->auth.icv_trunc_len;
+	int elen = skb->len - 8 - esp->conf.ivlen - alen;
 	int nfrags;
 
 	if (!pskb_may_pull(skb, sizeof(struct ip_esp_hdr)))
@@ -462,17 +480,16 @@ int esp_input(struct xfrm_state *x, struct sk_buff *skb)
 		goto out;
 
 	/* If integrity check is required, do this. */
-	if (esp->auth.authlen) {
-		u8 sum[esp->auth.authlen];
-		u8 sum1[esp->auth.authlen];
+	if (esp->auth.icv_full_len) {
+		u8 sum[esp->auth.icv_full_len];
+		u8 sum1[alen];
+		
+		esp->auth.icv(esp, skb, 0, skb->len-alen, sum);
 
-		esp->auth.digest(esp, skb, 0, skb->len-esp->auth.authlen, sum);
-
-		if (skb_copy_bits(skb, skb->len-esp->auth.authlen, sum1, 
-				esp->auth.authlen))
+		if (skb_copy_bits(skb, skb->len-alen, sum1, alen))
 			BUG();
 
-		if (unlikely(memcmp(sum, sum1, esp->auth.authlen))) {
+		if (unlikely(memcmp(sum, sum1, alen))) {
 			x->stats.integrity_failed++;
 			goto out;
 		}
@@ -503,12 +520,11 @@ int esp_input(struct xfrm_state *x, struct sk_buff *skb)
 				goto out;
 		}
 		skb_to_sgvec(skb, sg, 8+esp->conf.ivlen, elen);
-		crypto_cipher_decrypt(esp->conf.tfm, sg, nfrags);
+		crypto_cipher_decrypt(esp->conf.tfm, sg, sg, elen);
 		if (unlikely(sg != sgbuf))
 			kfree(sg);
 
-		if (skb_copy_bits(skb, skb->len-esp->auth.authlen-2,
-				  nexthdr, 2))
+		if (skb_copy_bits(skb, skb->len-alen-2, nexthdr, 2))
 			BUG();
 
 		padlen = nexthdr[0];
@@ -518,7 +534,7 @@ int esp_input(struct xfrm_state *x, struct sk_buff *skb)
 		/* ... check padding bits here. Silly. :-) */ 
 
 		iph->protocol = nexthdr[1];
-		pskb_trim(skb, skb->len - esp->auth.authlen - padlen - 2);
+		pskb_trim(skb, skb->len - alen - padlen - 2);
 		memcpy(workbuf, skb->nh.raw, iph->ihl*4);
 		skb->h.raw = skb_pull(skb, 8 + esp->conf.ivlen);
 		skb->nh.raw += 8 + esp->conf.ivlen;
@@ -546,7 +562,7 @@ static u32 esp4_get_max_size(struct xfrm_state *x, int mtu)
 	if (esp->conf.padlen)
 		mtu = (mtu + esp->conf.padlen-1)&~(esp->conf.padlen-1);
 
-	return mtu + x->props.header_len + esp->auth.authlen;
+	return mtu + x->props.header_len + esp->auth.icv_full_len;
 }
 
 void esp4_err(struct sk_buff *skb, u32 info)
@@ -583,9 +599,9 @@ void esp_destroy(struct xfrm_state *x)
 		crypto_free_tfm(esp->auth.tfm);
 		esp->auth.tfm = NULL;
 	}
-	if (esp->auth.work_digest) {
-		kfree(esp->auth.work_digest);
-		esp->auth.work_digest = NULL;
+	if (esp->auth.work_icv) {
+		kfree(esp->auth.work_icv);
+		esp->auth.work_icv = NULL;
 	}
 }
 
@@ -593,11 +609,12 @@ int esp_init_state(struct xfrm_state *x, void *args)
 {
 	struct esp_data *esp = NULL;
 
+	/* null auth and encryption can have zero length keys */
 	if (x->aalg) {
-		if (x->aalg->alg_key_len == 0 || x->aalg->alg_key_len > 512)
+		if (x->aalg->alg_key_len > 512)
 			goto error;
 	}
-	if (x->ealg == NULL || x->ealg->alg_key_len == 0)
+	if (x->ealg == NULL)
 		goto error;
 
 	esp = kmalloc(sizeof(*esp), GFP_KERNEL);
@@ -607,21 +624,32 @@ int esp_init_state(struct xfrm_state *x, void *args)
 	memset(esp, 0, sizeof(*esp));
 
 	if (x->aalg) {
-		int digestsize;
+		struct xfrm_algo_desc *aalg_desc;
 
 		esp->auth.key = x->aalg->alg_key;
 		esp->auth.key_len = (x->aalg->alg_key_len+7)/8;
 		esp->auth.tfm = crypto_alloc_tfm(x->aalg->alg_name, 0);
 		if (esp->auth.tfm == NULL)
 			goto error;
-		esp->auth.digest = esp_hmac_digest;
-		digestsize = crypto_tfm_alg_digestsize(esp->auth.tfm);
-		/* XXX RFC2403 and RFC 2404 truncate auth to 96 bit */
-		esp->auth.authlen = 12;
-		if (esp->auth.authlen > digestsize) /* XXX */
-			BUG();
-		esp->auth.work_digest = kmalloc(digestsize, GFP_KERNEL);
-		if (!esp->auth.work_digest)
+		esp->auth.icv = esp_hmac_digest;
+
+		aalg_desc = xfrm_aalg_get_byname(x->aalg->alg_name);
+		BUG_ON(!aalg_desc);
+
+		if (aalg_desc->uinfo.auth.icv_fullbits/8 !=
+		    crypto_tfm_alg_digestsize(esp->auth.tfm)) {
+			printk(KERN_INFO "ESP: %s digestsize %u != %hu\n",
+			       x->aalg->alg_name,
+			       crypto_tfm_alg_digestsize(esp->auth.tfm),
+			       aalg_desc->uinfo.auth.icv_fullbits/8);
+			goto error;
+		}
+
+		esp->auth.icv_full_len = aalg_desc->uinfo.auth.icv_fullbits/8;
+		esp->auth.icv_trunc_len = aalg_desc->uinfo.auth.icv_truncbits/8;
+
+		esp->auth.work_icv = kmalloc(esp->auth.icv_full_len, GFP_KERNEL);
+		if (!esp->auth.work_icv)
 			goto error;
 	}
 	esp->conf.key = x->ealg->alg_key;
@@ -639,7 +667,6 @@ int esp_init_state(struct xfrm_state *x, void *args)
 	x->props.header_len = 8 + esp->conf.ivlen;
 	if (x->props.mode)
 		x->props.header_len += 20;
-	x->props.trailer_len = esp->auth.authlen + crypto_tfm_alg_blocksize(esp->conf.tfm);
 	x->data = esp;
 	return 0;
 
@@ -647,8 +674,8 @@ error:
 	if (esp) {
 		if (esp->auth.tfm)
 			crypto_free_tfm(esp->auth.tfm);
-		if (esp->auth.work_digest)
-			kfree(esp->auth.work_digest);
+		if (esp->auth.work_icv)
+			kfree(esp->auth.work_icv);
 		if (esp->conf.tfm)
 			crypto_free_tfm(esp->conf.tfm);
 		kfree(esp);

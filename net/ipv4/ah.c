@@ -361,7 +361,7 @@ static int ah_init_state(struct xfrm_state *x, void *args)
 	ahp->icv = ah_hmac_digest;
 	
 	/*
-	 * Lookup the algorithm description maintained by pfkey,
+	 * Lookup the algorithm description maintained by xfrm_algo,
 	 * verify crypto transform properties, and store information
 	 * we need for AH processing.  This lookup cannot fail here
 	 * after a successful crypto_alloc_tfm().

@@ -33,10 +33,10 @@ FINAL_LD=$(CROSS_COMPILE)ld --warn-common --warn-section-align
 
 OBJCOPY_FLAGS =-O binary -R .note -R .comment -S
 
-cflags-y	:= -D__linux__ -pipe -fno-strength-reduce
+cflags-y	:= -pipe
 
-# These should be on for older toolchains or SOM toolchains that don't
-# enable them by default.
+# These flags should be implied by an hppa-linux configuration, but they
+# are not in gcc 3.2.
 cflags-y	+= -mno-space-regs -mfast-indirect-calls
 
 # No fixed-point multiply

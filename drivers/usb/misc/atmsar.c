@@ -381,6 +381,83 @@ void atmsar_close (struct atmsar_vcc_data **list, struct atmsar_vcc_data *vcc)
  **
  ***********************/
 
+/* encapsulate in an AAL5 frame, which is then split into ATM cells */
+unsigned int atmsar_encode (struct atmsar_vcc_data *ctx, char *source, char *target, unsigned int pdu_length)
+{
+	unsigned int num_cells = (pdu_length + ATM_AAL5_TRAILER + ATM_CELL_PAYLOAD - 1) / ATM_CELL_PAYLOAD;
+	unsigned int num_pdu_cells = pdu_length / ATM_CELL_PAYLOAD + 1;
+	unsigned int aal5_length = num_cells * ATM_CELL_PAYLOAD;
+	unsigned int zero_padding = aal5_length - pdu_length - ATM_AAL5_TRAILER;
+	unsigned int final_length = num_cells * ATM_CELL_SIZE;
+	unsigned char aal5_trailer [ATM_AAL5_TRAILER];
+	unsigned char cell_header [ATM_CELL_HEADER];
+	u32 crc;
+	int i;
+
+	PDEBUG ("atmsar_encode entered\n");
+
+	PDEBUG ("pdu_length %d, num_cells %d, num_pdu_cells %d, aal5_length %d, zero_padding %d, final_length %d\n", pdu_length, num_cells, num_pdu_cells, aal5_length, zero_padding, final_length);
+
+	PDEBUG ("source 0x=%p, target 0x%p\n", source, target);
+
+	aal5_trailer [0] = 0; /* UU = 0 */
+	aal5_trailer [1] = 0; /* CPI = 0 */
+	aal5_trailer [2] = pdu_length >> 8;
+	aal5_trailer [3] = pdu_length;
+
+	crc = crc32 (~0, source, pdu_length);
+	for (i = 0; i < zero_padding; i++)
+		crc = CRC32 (0, crc);
+	crc = crc32 (crc, aal5_trailer, 4);
+	crc = ~crc;
+
+	aal5_trailer [4] = crc >> 24;
+	aal5_trailer [5] = crc >> 16;
+	aal5_trailer [6] = crc >> 8;
+	aal5_trailer [7] = crc;
+
+	cell_header [0] = ctx->atmHeader >> 24;
+	cell_header [1] = ctx->atmHeader >> 16;
+	cell_header [2] = ctx->atmHeader >> 8;
+	cell_header [3] = ctx->atmHeader;
+	cell_header [4] = 0xec;
+
+	for (i = 1; i < num_pdu_cells; i++) {
+		memcpy (target, cell_header, ATM_CELL_HEADER);
+		target += ATM_CELL_HEADER;
+		memcpy (target, source, ATM_CELL_PAYLOAD);
+		target += ATM_CELL_PAYLOAD;
+		source += ATM_CELL_PAYLOAD;
+		PDEBUG ("source 0x=%p, target 0x%p\n", source, target);
+	}
+	memcpy (target, cell_header, ATM_CELL_HEADER);
+	target += ATM_CELL_HEADER;
+	memcpy (target, source, pdu_length % ATM_CELL_PAYLOAD);
+	target += pdu_length % ATM_CELL_PAYLOAD;
+	if (num_pdu_cells < num_cells) {
+		memset (target, 0, zero_padding + ATM_AAL5_TRAILER - ATM_CELL_PAYLOAD);
+		target += zero_padding + ATM_AAL5_TRAILER - ATM_CELL_PAYLOAD;
+		memcpy (target, cell_header, ATM_CELL_HEADER);
+		target += ATM_CELL_HEADER;
+		zero_padding = ATM_CELL_PAYLOAD - ATM_AAL5_TRAILER;
+	}
+	memset (target, 0, zero_padding);
+	target += zero_padding;
+	memcpy (target, aal5_trailer, ATM_AAL5_TRAILER);
+
+	/* set pti bit in last cell */
+	*(target + ATM_AAL5_TRAILER + 3 - ATM_CELL_SIZE) |= 0x2;
+
+	/* update stats */
+	if (ctx->stats)
+		atomic_inc (&ctx->stats->tx);
+
+	if (ctx->stats && (ctx->type <= ATMSAR_TYPE_AAL1))
+		atomic_add (num_cells, &(ctx->stats->tx));
+
+	return final_length;
+}
+
 struct sk_buff *atmsar_encode_rawcell (struct atmsar_vcc_data *ctx, struct sk_buff *skb)
 {
 	int number_of_cells = (skb->len) / 48;
@@ -624,9 +701,8 @@ struct sk_buff *atmsar_decode_rawcell (struct atmsar_vcc_data *list, struct sk_b
 		} else {
 			/* If data is corrupt and skb doesn't hold a whole cell, flush the lot */
 			if (skb_pull (skb, (list->flags & ATMSAR_USE_53BYTE_CELL ? 53 : 52)) ==
-			    NULL) {
-				skb_trim (skb, 0);
-			}
+			    NULL)
+				return NULL;
 		}
 	}
 
