@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: gc.c,v 1.136 2004/05/27 19:06:09 gleixner Exp $
+ * $Id: gc.c,v 1.137 2004/07/20 13:44:55 dwmw2 Exp $
  *
  */
 
@@ -359,10 +359,14 @@ int jffs2_garbage_collect_pass(struct jffs2_sb_info *c)
 	spin_unlock(&c->inocache_lock);
 
 	f = jffs2_gc_fetch_inode(c, inum, nlink);
-	if (IS_ERR(f))
-		return PTR_ERR(f);
-	if (!f)
-		return 0;
+	if (IS_ERR(f)) {
+		ret = PTR_ERR(f);
+		goto release_sem;
+	}
+	if (!f) {
+		ret = 0;
+		goto release_sem;
+	}
 
 	ret = jffs2_garbage_collect_live(c, jeb, raw, f);
 
@@ -824,7 +828,7 @@ static int jffs2_garbage_collect_deletion_dirent(struct jffs2_sb_info *c, struct
 				continue;
 			}
 			if (retlen != rawlen) {
-				printk(KERN_WARNING "jffs2_g_c_deletion_dirent(): Short read (%zd not %u) reading header from obsolete node at %08x\n",
+				printk(KERN_WARNING "jffs2_g_c_deletion_dirent(): Short read (%zd not %zd) reading header from obsolete node at %08x\n",
 				       retlen, rawlen, ref_offset(raw));
 				continue;
 			}

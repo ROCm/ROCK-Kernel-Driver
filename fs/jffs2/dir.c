@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: dir.c,v 1.82 2003/10/11 11:47:23 dwmw2 Exp $
+ * $Id: dir.c,v 1.83 2004/10/19 07:48:44 havasi Exp $
  *
  */
 
@@ -217,7 +217,6 @@ static int jffs2_create(struct inode *dir_i, struct dentry *dentry, int mode,
 			      dentry->d_name.name, dentry->d_name.len);
 
 	if (ret) {
-		jffs2_clear_inode(inode);
 		make_bad_inode(inode);
 		iput(inode);
 		jffs2_free_raw_inode(ri);
