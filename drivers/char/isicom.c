@@ -129,6 +129,7 @@ static int ISILoad_ioctl(struct inode *inode, struct file *filp,
 		         unsigned int cmd, unsigned long arg)
 {
 	unsigned int card, i, j, signature, status, portcount = 0;
+	unsigned long t;
 	unsigned short word_count, base;
 	bin_frame frame;
 	/* exec_record exec_rec; */
@@ -152,12 +153,12 @@ static int ISILoad_ioctl(struct inode *inode, struct file *filp,
 								
 			inw(base+0x8);
 			
-			for(i=jiffies+HZ/100;time_before(jiffies, i););
+			for(t=jiffies+HZ/100;time_before(jiffies, t););
 				
 			outw(0,base+0x8); /* Reset */
 			
 			for(j=1;j<=3;j++) {
-				for(i=jiffies+HZ;time_before(jiffies, i););
+				for(t=jiffies+HZ;time_before(jiffies, t););
 				printk(".");
 			}	
 			signature=(inw(base+0x4)) & 0xff;	
