@@ -233,8 +233,8 @@ salinfo_log_wakeup(int type, u8 *buffer, u64 size, int irqsafe)
 	}
 }
 
-/* Check for outstanding MCA/INIT records every 5 minutes (arbitrary) */
-#define SALINFO_TIMER_DELAY (5*60*HZ)
+/* Check for outstanding MCA/INIT records every minute (arbitrary) */
+#define SALINFO_TIMER_DELAY (60*HZ)
 static struct timer_list salinfo_timer;
 
 static void
