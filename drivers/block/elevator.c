@@ -37,7 +37,7 @@
 
 #include <asm/uaccess.h>
 
-static spinlock_t elv_list_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(elv_list_lock);
 static LIST_HEAD(elv_list);
 
 /*

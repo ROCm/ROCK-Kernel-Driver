@@ -336,7 +336,7 @@ MODULE_DEVICE_TABLE(usb, ub_usb_ids);
  */
 #define UB_MAX_HOSTS  26
 static char ub_hostv[UB_MAX_HOSTS];
-static spinlock_t ub_lock = SPIN_LOCK_UNLOCKED;	/* Locks globals and ->openc */
+static DEFINE_SPINLOCK(ub_lock);	/* Locks globals and ->openc */
 
 /*
  * The SCSI command tracing procedures.
