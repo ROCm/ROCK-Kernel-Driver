@@ -827,7 +827,7 @@ extern int drive_is_flashcard(ide_drive_t *drive);
 
 int ide_spin_wait_hwgroup (ide_drive_t *drive);
 void ide_timer_expiry (unsigned long data);
-void ide_intr (int irq, void *dev_id, struct pt_regs *regs);
+extern void ata_irq_request(int irq, void *data, struct pt_regs *regs);
 void do_ide_request (request_queue_t * q);
 void ide_init_subdrivers (void);
 

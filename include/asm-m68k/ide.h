@@ -103,64 +103,6 @@ typedef union {
 	} b;
 } control_t;
 
-static __inline__ int ide_request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *),
-			unsigned long flags, const char *device, void *dev_id)
-{
-#ifdef CONFIG_AMIGA
-	if (MACH_IS_AMIGA)
-		return request_irq(irq, handler, 0, device, dev_id);
-#endif /* CONFIG_AMIGA */
-#ifdef CONFIG_Q40
-	if (MACH_IS_Q40)
-	  	return request_irq(irq, handler, 0, device, dev_id);
-#endif /* CONFIG_Q40*/
-#ifdef CONFIG_MAC
-	if (MACH_IS_MAC)
-		return request_irq(irq, handler, 0, device, dev_id);
-#endif /* CONFIG_MAC */
-	return 0;
-}
-
-static __inline__ void ide_free_irq(unsigned int irq, void *dev_id)
-{
-#ifdef CONFIG_AMIGA
-	if (MACH_IS_AMIGA)
-		free_irq(irq, dev_id);
-#endif /* CONFIG_AMIGA */
-#ifdef CONFIG_Q40
-	if (MACH_IS_Q40)
-	  	free_irq(irq, dev_id);
-#endif /* CONFIG_Q40*/
-#ifdef CONFIG_MAC
-	if (MACH_IS_MAC)
-		free_irq(irq, dev_id);
-#endif /* CONFIG_MAC */
-}
-
-/*
- * We should really implement those some day.
- */
-static __inline__ int ide_check_region (ide_ioreg_t from, unsigned int extent)
-{
-	return 0;
-}
-
-static __inline__ void ide_request_region (ide_ioreg_t from, unsigned int extent, const char *name)
-{
-#ifdef CONFIG_Q40
-        if (MACH_IS_Q40)
-            request_region((q40ide_ioreg_t)from,extent,name);
-#endif
-}
-
-static __inline__ void ide_release_region (ide_ioreg_t from, unsigned int extent)
-{
-#ifdef CONFIG_Q40
-        if (MACH_IS_Q40)
-            release_region((q40ide_ioreg_t)from,extent);
-#endif
-}
-
 #undef SUPPORT_SLOW_DATA_PORTS
 #define SUPPORT_SLOW_DATA_PORTS 0
 
