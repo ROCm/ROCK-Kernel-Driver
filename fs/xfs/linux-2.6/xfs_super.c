@@ -852,6 +852,10 @@ init_xfs_fs( void )
 	vfs_initquota();
 
 	xfs_inode_shaker = kmem_shake_register(xfs_inode_shake);
+	if (!xfs_inode_shaker) {
+		error = -ENOMEM;
+		goto undo_shaker;
+	}
 
 	error = register_filesystem(&xfs_fs_type);
 	if (error)
@@ -860,6 +864,9 @@ init_xfs_fs( void )
 	return 0;
 
 undo_register:
+	kmem_shake_deregister(xfs_inode_shaker);
+
+undo_shaker:
 	pagebuf_terminate();
 
 undo_pagebuf:

@@ -33,6 +33,7 @@
 #include <linux/sched.h>
 #include <linux/mm.h>
 #include <linux/vmalloc.h>
+#include <linux/highmem.h>
 #include <linux/swap.h>
 
 #include "time.h"
