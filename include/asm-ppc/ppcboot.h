@@ -30,20 +30,6 @@
 #ifndef __ASSEMBLY__
 #include <linux/types.h>
 
-typedef void (interrupt_handler_t)(void *);
-
-typedef struct monitor_functions {
-	int	(*getc)(void);
-	int	(*tstc)(void);
-	void	(*putc)(const char c);
-	void	(*puts)(const char *s);
-	void	(*printf)(const char *fmt, ...);
-	void	(*install_hdlr)(int, interrupt_handler_t *, void *);
-	void	(*free_hdlr)(int);
-	void	*(*malloc)(size_t);
-	void	(*free)(void *);
-} mon_fnc_t;
-
 typedef struct bd_info {
 	unsigned long	bi_memstart;	/* start of DRAM memory */
 	unsigned long	bi_memsize;	/* size	 of DRAM memory in bytes */
@@ -75,7 +61,7 @@ typedef struct bd_info {
 	unsigned long   bi_pcifreq;     /* PCI Bus Freq, in MHz */
 #endif
 	unsigned long	bi_baudrate;	/* Console Baudrate */
-#if defined(CONFIG_405GP)
+#if defined(CONFIG_4xx)
 	unsigned char	bi_s_version[4];	/* Version of this structure */
 	unsigned char	bi_r_version[32];	/* Version of the ROM (IBM) */
 	unsigned int	bi_procfreq;	/* CPU (Internal) Freq, in Hz */
@@ -86,12 +72,26 @@ typedef struct bd_info {
 #if defined(CONFIG_HYMOD)
 	hymod_conf_t	bi_hymod_conf;	/* hymod configuration information */
 #endif
-#if defined(CONFIG_EVB64260) || defined(CONFIG_85xx)
-	/* the board has three onboard ethernet ports */
+#if defined(CONFIG_EVB64260) || defined(CONFIG_44x) || defined(CONFIG_85xx)
+	/* second onboard ethernet port */
 	unsigned char	bi_enet1addr[6];
+#endif
+#if defined(CONFIG_EVB64260) || defined(CONFIG_440GX) || defined(CONFIG_85xx)
+	/* third onboard ethernet ports */
 	unsigned char	bi_enet2addr[6];
 #endif
-	mon_fnc_t	*bi_mon_fnc;	/* Pointer to monitor functions	*/
+#if defined(CONFIG_440GX)
+	/* fourth onboard ethernet ports */
+	unsigned char	bi_enet3addr[6];
+#endif
+#if defined(CONFIG_4xx)
+	unsigned int	bi_opbfreq;		/* OB clock in Hz */
+	int		bi_iic_fast[2];		/* Use fast i2c mode */
+#endif
+#if defined(CONFIG_440GX)
+	int		bi_phynum[4];		/* phy mapping */
+	int		bi_phymode[4];		/* phy mode */
+#endif
 } bd_t;
 
 #endif /* __ASSEMBLY__ */
