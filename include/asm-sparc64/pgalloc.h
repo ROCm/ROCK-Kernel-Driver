@@ -38,11 +38,12 @@ static __inline__ void free_pgd_fast(pgd_t *pgd)
 
 	preempt_disable();
 	if (!page->lru.prev) {
-		(unsigned long *)page->lru.next = pgd_quicklist;
+		page->lru.next = (void *) pgd_quicklist;
 		pgd_quicklist = (unsigned long *)page;
 	}
-	(unsigned long)page->lru.prev |=
-		(((unsigned long)pgd & (PAGE_SIZE / 2)) ? 2 : 1);
+	page->lru.prev = (void *)
+	  (((unsigned long)page->lru.prev) |
+	   (((unsigned long)pgd & (PAGE_SIZE / 2)) ? 2 : 1));
 	pgd_cache_size++;
 	preempt_enable();
 }
@@ -62,7 +63,7 @@ static __inline__ pgd_t *get_pgd_fast(void)
 			off = PAGE_SIZE / 2;
 			mask &= ~2;
 		}
-		(unsigned long)ret->lru.prev = mask;
+		ret->lru.prev = (void *) mask;
 		if (!mask)
 			pgd_quicklist = (unsigned long *)ret->lru.next;
                 ret = (struct page *)(__page_address(ret) + off);
@@ -76,10 +77,10 @@ static __inline__ pgd_t *get_pgd_fast(void)
 		if (page) {
 			ret = (struct page *)page_address(page);
 			clear_page(ret);
-			(unsigned long)page->lru.prev = 2;
+			page->lru.prev = (void *) 2UL;
 
 			preempt_disable();
-			(unsigned long *)page->lru.next = pgd_quicklist;
+			page->lru.next = (void *) pgd_quicklist;
 			pgd_quicklist = (unsigned long *)page;
 			pgd_cache_size++;
 			preempt_enable();
