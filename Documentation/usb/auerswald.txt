@@ -19,9 +19,9 @@ your system. This library is available from
 auerswald and shipped as part of the java software.
 
 You may create the devices with:
-	mknod -m 666 /dev/usb/auer0 c 180 80
+	mknod -m 666 /dev/usb/auer0 c 180 112
 	...
-	mknod -m 666 /dev/usb/auer15 c 180 95
+	mknod -m 666 /dev/usb/auer15 c 180 127
 
 Future plans
 ============
