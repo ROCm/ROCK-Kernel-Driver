@@ -319,7 +319,7 @@ static void start_request(struct floppy_state *fs)
 #if 0
 		printk("do_fd_req: dev=%s cmd=%d sec=%ld nr_sec=%ld buf=%p\n",
 		       req->rq_disk->disk_name, req->cmd,
-		       req->sector, req->nr_sectors, req->buffer);
+		       (long)req->sector, req->nr_sectors, req->buffer);
 		printk("           rq_status=%d errors=%d current_nr_sectors=%ld\n",
 		       req->rq_status, req->errors, req->current_nr_sectors);
 #endif
@@ -346,8 +346,13 @@ static void start_request(struct floppy_state *fs)
 			}
 		}
 
-		fs->req_cyl = req->sector / fs->secpercyl;
-		x = req->sector % fs->secpercyl;
+		/* Do not remove the cast. req->sector is now a sector_t and
+		 * can be 64 bits, but it will never go past 32 bits for this
+		 * driver anyway, so we can safely cast it down and not have
+		 * to do a 64/32 division
+		 */
+		fs->req_cyl = ((long)req->sector) / fs->secpercyl;
+		x = ((long)req->sector) % fs->secpercyl;
 		fs->head = x / fs->secpertrack;
 		fs->req_sector = x % fs->secpertrack + 1;
 		fd_req = req;
@@ -614,7 +619,7 @@ static void xfer_timeout(unsigned long data)
 	fd_req->sector += s;
 	fd_req->current_nr_sectors -= s;
 	printk(KERN_ERR "swim3: timeout %sing sector %ld\n",
-	       (rq_data_dir(fd_req)==WRITE? "writ": "read"), fd_req->sector);
+	       (rq_data_dir(fd_req)==WRITE? "writ": "read"), (long)fd_req->sector);
 	end_request(fd_req, 0);
 	fs->state = idle;
 	start_request(fs);
@@ -730,7 +735,7 @@ static irqreturn_t swim3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			} else {
 				printk("swim3: error %sing block %ld (err=%x)\n",
 				       rq_data_dir(fd_req) == WRITE? "writ": "read",
-				       fd_req->sector, err);
+				       (long)fd_req->sector, err);
 				end_request(fd_req, 0);
 				fs->state = idle;
 			}
