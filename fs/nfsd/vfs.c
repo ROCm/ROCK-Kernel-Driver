@@ -173,7 +173,7 @@ nfsd_lookup(struct svc_rqst *rqstp, struct svc_fh *fhp, const char *name,
 				err = PTR_ERR(exp2);
 				dput(dentry);
 				mntput(mnt);
-				goto out;
+				goto out_nfserr;
 			}
 			if (!exp2) {
 				dput(dentry);
