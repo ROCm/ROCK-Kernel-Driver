@@ -1288,7 +1288,7 @@ static void uart_close(struct tty_struct *tty, struct file *filp)
 	wake_up_interruptible(&info->open_wait);
 
  done:
-	module_put(drv->owner);
+	;
 }
 
 static void uart_wait_until_sent(struct tty_struct *tty, int timeout)
@@ -1572,28 +1572,13 @@ static int uart_open(struct tty_struct *tty, struct file *filp)
 		goto fail;
 
 	/*
-	 * If we fail to increment the module use count, we can't have
-	 * any other users of this tty (since this implies that the module
-	 * is about to be unloaded).  Therefore, it is safe to set
-	 * tty->driver_data to be NULL, so uart_close() doesn't bite us.
-	 */
-	if (!try_module_get(drv->owner)) {
-		tty->driver_data = NULL;
-		goto fail;
-	}
-
-	/*
 	 * FIXME: This one isn't fun.  We can't guarantee that the tty isn't
 	 * already in open, nor can we guarantee the state of tty->driver_data
 	 */
 	info = uart_get(drv, line);
 	retval = -ENOMEM;
-	if (!info) {
-		if (tty->driver_data)
-			goto fail;
-		else
-			goto out;
-	}
+	if (!info)
+		goto fail;
 
 	/*
 	 * Once we set tty->driver_data here, we are guaranteed that
@@ -1656,8 +1641,6 @@ static int uart_open(struct tty_struct *tty, struct file *filp)
 
 	return retval;
 
- out:
-	module_put(drv->owner);
  fail:
 	return retval;
 }
@@ -2186,6 +2169,7 @@ int uart_register_driver(struct uart_driver *drv)
 	drv->tty_driver = normal;
 
 	normal->magic		= TTY_DRIVER_MAGIC;
+	normal->owner		= drv->owner;
 	normal->driver_name	= drv->driver_name;
 	normal->name		= drv->dev_name;
 	normal->major		= drv->major;
