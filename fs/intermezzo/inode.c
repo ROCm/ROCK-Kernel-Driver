@@ -167,7 +167,6 @@ static void presto_put_super(struct super_block *sb)
 exit:
         CDEBUG(D_MALLOC, "after umount: kmem %ld, vmem %ld\n",
                presto_kmemory, presto_vmemory);
-        MOD_DEC_USE_COUNT;
         return ;
 }
 
