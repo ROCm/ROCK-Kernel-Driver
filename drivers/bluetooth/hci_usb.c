@@ -341,6 +341,14 @@ static int hci_usb_flush(struct hci_dev *hdev)
 	return 0;
 }
 
+static inline void hci_usb_wait_for_urb(struct urb *urb)
+{
+	while (atomic_read(&urb->count) > 1) {
+		current->state = TASK_UNINTERRUPTIBLE;
+		schedule_timeout((5 * HZ + 999) / 1000);
+	}
+}
+
 static void hci_usb_unlink_urbs(struct hci_usb *husb)
 {
 	int i;
@@ -357,6 +365,7 @@ static void hci_usb_unlink_urbs(struct hci_usb *husb)
 			BT_DBG("%s unlinking _urb %p type %d urb %p", 
 					husb->hdev->name, _urb, _urb->type, urb);
 			usb_unlink_urb(urb);
+			hci_usb_wait_for_urb(urb);
 			_urb_queue_tail(__completed_q(husb, _urb->type), _urb);
 		}
 
