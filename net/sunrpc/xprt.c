@@ -82,7 +82,7 @@
  */
 static void	xprt_request_init(struct rpc_task *, struct rpc_xprt *);
 static inline void	do_xprt_reserve(struct rpc_task *);
-static void	xprt_disconnect(struct rpc_xprt *);
+static void	xprt_disconnect(struct rpc_xprt *, int);
 static void	xprt_connect_status(struct rpc_task *task);
 static struct rpc_xprt * xprt_setup(int proto, struct sockaddr_in *ap,
 						struct rpc_timeout *to);
@@ -387,7 +387,7 @@ xprt_adjust_timeout(struct rpc_timeout *to)
  * Close down a transport socket
  */
 static void
-xprt_close(struct rpc_xprt *xprt)
+xprt_close(struct rpc_xprt *xprt, int reconnecting)
 {
 	struct socket	*sock = xprt->sock;
 	struct sock	*sk = xprt->inet;
@@ -405,7 +405,7 @@ xprt_close(struct rpc_xprt *xprt)
 	sk->sk_write_space  = xprt->old_write_space;
 	write_unlock_bh(&sk->sk_callback_lock);
 
-	xprt_disconnect(xprt);
+	xprt_disconnect(xprt, reconnecting);
 	sk->sk_no_check	 = 0;
 
 	sock_release(sock);
@@ -416,7 +416,7 @@ xprt_socket_autoclose(void *args)
 {
 	struct rpc_xprt *xprt = (struct rpc_xprt *)args;
 
-	xprt_close(xprt);
+	xprt_close(xprt, 0);
 	xprt_release_write(xprt, NULL);
 }
 
@@ -424,12 +424,13 @@ xprt_socket_autoclose(void *args)
  * Mark a transport as disconnected
  */
 static void
-xprt_disconnect(struct rpc_xprt *xprt)
+xprt_disconnect(struct rpc_xprt *xprt, int reconnecting)
 {
 	dprintk("RPC:      disconnected transport %p\n", xprt);
 	spin_lock_bh(&xprt->sock_lock);
 	xprt_clear_connected(xprt);
-	rpc_wake_up_status(&xprt->pending, -ENOTCONN);
+	if (!reconnecting)
+		rpc_wake_up_status(&xprt->pending, -ENOTCONN);
 	spin_unlock_bh(&xprt->sock_lock);
 }
 
@@ -469,8 +470,10 @@ static void xprt_socket_connect(void *args)
 
 	/*
 	 * Start by resetting any existing state
+	 * Close any sockets, but sshhh: don't wake up the tasks
+	 * on the pending queue.
 	 */
-	xprt_close(xprt);
+	xprt_close(xprt, 1);
 	sock = xprt_create_socket(xprt, xprt->prot, xprt->resvport);
 	if (sock == NULL) {
 		/* couldn't create socket or bind to reserved port;
@@ -828,7 +831,7 @@ tcp_read_fraghdr(struct rpc_xprt *xprt, skb_reader_t *desc)
 	/* Sanity check of the record length */
 	if (xprt->tcp_reclen < 4) {
 		printk(KERN_ERR "RPC: Invalid TCP record fragment length\n");
-		xprt_disconnect(xprt);
+		xprt_disconnect(xprt, 0);
 	}
 	dprintk("RPC:      reading TCP record fragment of length %d\n",
 			xprt->tcp_reclen);
@@ -1044,7 +1047,7 @@ tcp_state_change(struct sock *sk)
 					NIPQUAD(xprt->addr.sin_addr.s_addr),
 					xprt_connected(xprt)? "closed" : "refused");
 		}
-		xprt_disconnect(xprt);
+		xprt_disconnect(xprt, 0);
 		break;
 	}
  out:
@@ -1256,7 +1259,7 @@ xprt_transmit(struct rpc_task *task)
 		return;
 	default:
 		if (xprt->stream)
-			xprt_disconnect(xprt);
+			xprt_disconnect(xprt, 0);
 	}
 	xprt_release_write(xprt, task);
 	return;
@@ -1655,7 +1658,7 @@ xprt_destroy(struct rpc_xprt *xprt)
 {
 	dprintk("RPC:      destroying transport %p\n", xprt);
 	xprt_shutdown(xprt);
-	xprt_close(xprt);
+	xprt_close(xprt, 0);
 	kfree(xprt->slot);
 	kfree(xprt);
 
