@@ -542,6 +542,11 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 			acpi_ht = 1;
 			if (!acpi_force) acpi_disabled = 1;
 		}
+
+		/* disable IO-APIC */
+		else if (!memcmp(from, "noapic", 6)) {
+			skip_ioapic_setup = 1;
+		}
 #endif
 
 		/*
