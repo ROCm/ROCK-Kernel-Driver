@@ -211,6 +211,22 @@ config RWSEM_XCHGADD_ALGORITHM
 	bool
 	default y
 
+choice
+	prompt "SPARC64 Huge TLB Page Size"
+	depends on HUGETLB_PAGE
+	default HUGETLB_PAGE_SIZE_4MB
+
+config HUGETLB_PAGE_SIZE_4MB
+	bool "4MB"
+
+config HUGETLB_PAGE_SIZE_512K
+	bool "512K"
+
+config HUGETLB_PAGE_SIZE_64K
+	bool "64K"
+
+endchoice
+
 config GENERIC_ISA_DMA
 	bool
 	default y
