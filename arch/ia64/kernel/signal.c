@@ -354,6 +354,15 @@ setup_sigcontext (struct sigcontext *sc, sigset_t *mask, struct sigscratch *scr)
 	return err;
 }
 
+/*
+ * Check whether the register-backing store is already on the signal stack.
+ */
+static inline int
+rbs_on_sig_stack (unsigned long bsp)
+{
+	return (bsp - current->sas_ss_sp < current->sas_ss_size);
+}
+
 static long
 setup_frame (int sig, struct k_sigaction *ka, siginfo_t *info, sigset_t *set,
 	     struct sigscratch *scr)
@@ -366,10 +375,17 @@ setup_frame (int sig, struct k_sigaction *ka, siginfo_t *info, sigset_t *set,
 
 	frame = (void *) scr->pt.r12;
 	tramp_addr = GATE_ADDR + (ia64_sigtramp - __start_gate_section);
-	if ((ka->sa.sa_flags & SA_ONSTACK) != 0 && !on_sig_stack((unsigned long) frame)) {
-		new_rbs  = (current->sas_ss_sp + sizeof(long) - 1) & ~(sizeof(long) - 1);
-		frame = (void *) ((current->sas_ss_sp + current->sas_ss_size)
-				  & ~(STACK_ALIGN - 1));
+	if (ka->sa.sa_flags & SA_ONSTACK) {
+		/*
+		 * We need to check the memory and register stacks separately, because
+		 * they're switched separately (memory stack is switched in the kernel,
+		 * register stack is switched in the signal trampoline).
+		 */
+		if (!on_sig_stack((unsigned long) frame))
+			frame = (void *) ((current->sas_ss_sp + current->sas_ss_size)
+					  & ~(STACK_ALIGN - 1));
+		if (!rbs_on_sig_stack(scr->pt.ar_bspstore))
+			new_rbs  = (current->sas_ss_sp + sizeof(long) - 1) & ~(sizeof(long) - 1);
 	}
 	frame = (void *) frame - ((sizeof(*frame) + STACK_ALIGN - 1) & ~(STACK_ALIGN - 1));
 
@@ -460,7 +476,6 @@ handle_signal (unsigned long sig, struct k_sigaction *ka, siginfo_t *info, sigse
 long
 ia64_do_signal (sigset_t *oldset, struct sigscratch *scr, long in_syscall)
 {
-	struct signal_struct *sig;
 	struct k_sigaction *ka;
 	siginfo_t info;
 	long restart = in_syscall;
@@ -487,7 +502,7 @@ ia64_do_signal (sigset_t *oldset, struct sigscratch *scr, long in_syscall)
 		}
 	} else
 #endif
-	if (scr->pt.r10 != -1) {
+	if (scr->pt.r10 != -1)
 		/*
 		 * A system calls has to be restarted only if one of the error codes
 		 * ERESTARTNOHAND, ERESTARTSYS, or ERESTARTNOINTR is returned.  If r10
@@ -495,101 +510,14 @@ ia64_do_signal (sigset_t *oldset, struct sigscratch *scr, long in_syscall)
 		 * restart the syscall, so we can clear the "restart" flag here.
 		 */
 		restart = 0;
-	}
 
-	for (;;) {
-		unsigned long signr;
+	while (1) {
+		int signr = get_signal_to_deliver(&info, &scr->pt);
 
-		spin_lock_irq(&current->sigmask_lock);
-		signr = dequeue_signal(&current->blocked, &info);
-		spin_unlock_irq(&current->sigmask_lock);
-
-		if (!signr)
+		if (signr <= 0)
 			break;
 
-		if ((current->ptrace & PT_PTRACED) && signr != SIGKILL) {
-			/* Let the debugger run.  */
-			current->exit_code = signr;
-			current->thread.siginfo = &info;
-			current->state = TASK_STOPPED;
-			notify_parent(current, SIGCHLD);
-			schedule();
-
-			signr = current->exit_code;
-			current->thread.siginfo = 0;
-
-			/* We're back.  Did the debugger cancel the sig?  */
-			if (!signr)
-				continue;
-			current->exit_code = 0;
-
-			/* The debugger continued.  Ignore SIGSTOP.  */
-			if (signr == SIGSTOP)
-				continue;
-
-			/* Update the siginfo structure.  Is this good?  */
-			if (signr != info.si_signo) {
-				info.si_signo = signr;
-				info.si_errno = 0;
-				info.si_code = SI_USER;
-				info.si_pid = current->parent->pid;
-				info.si_uid = current->parent->uid;
-			}
-
-			/* If the (new) signal is now blocked, requeue it.  */
-			if (sigismember(&current->blocked, signr)) {
-				send_sig_info(signr, &info, current);
-				continue;
-			}
-		}
-
 		ka = &current->sig->action[signr - 1];
-		if (ka->sa.sa_handler == SIG_IGN) {
-			if (signr != SIGCHLD)
-				continue;
-			/* Check for SIGCHLD: it's special.  */
-			while (sys_wait4(-1, NULL, WNOHANG, NULL) > 0)
-				/* nothing */;
-			continue;
-		}
-
-		if (ka->sa.sa_handler == SIG_DFL) {
-			int exit_code = signr;
-
-			/* Init gets no signals it doesn't want.  */
-			if (current->pid == 1)
-				continue;
-
-			switch (signr) {
-			      case SIGCONT: case SIGCHLD: case SIGWINCH: case SIGURG:
-				continue;
-
-			      case SIGTSTP: case SIGTTIN: case SIGTTOU:
-				if (is_orphaned_pgrp(current->pgrp))
-					continue;
-				/* FALLTHRU */
-
-			      case SIGSTOP:
-				current->state = TASK_STOPPED;
-				current->exit_code = signr;
-				sig = current->parent->sig;
-				if (sig && !(sig->action[SIGCHLD-1].sa.sa_flags & SA_NOCLDSTOP))
-					notify_parent(current, SIGCHLD);
-				schedule();
-				continue;
-
-			      case SIGQUIT: case SIGILL: case SIGTRAP:
-			      case SIGABRT: case SIGFPE: case SIGSEGV:
-			      case SIGBUS: case SIGSYS: case SIGXCPU: case SIGXFSZ:
-				if (do_coredump(signr, &scr->pt))
-					exit_code |= 0x80;
-				/* FALLTHRU */
-
-			      default:
-				sig_exit(signr, exit_code, &info);
-				/* NOTREACHED */
-			}
-		}
 
 		if (restart) {
 			switch (errno) {
@@ -601,7 +529,7 @@ ia64_do_signal (sigset_t *oldset, struct sigscratch *scr, long in_syscall)
 						scr->pt.r8 = -EINTR;
 					else
 #endif
-					scr->pt.r8 = EINTR;
+						scr->pt.r8 = EINTR;
 					/* note: scr->pt.r10 is already -1 */
 					break;
 				}
@@ -612,13 +540,14 @@ ia64_do_signal (sigset_t *oldset, struct sigscratch *scr, long in_syscall)
 					scr->pt.cr_iip -= 2;
 				} else
 #endif
-				ia64_decrement_ip(&scr->pt);
+					ia64_decrement_ip(&scr->pt);
 			}
 		}
 
-		/* Whee!  Actually deliver the signal.  If the
-		   delivery failed, we need to continue to iterate in
-		   this loop so we can deliver the SIGSEGV... */
+		/*
+		 * Whee!  Actually deliver the signal.  If the delivery failed, we need to
+		 * continue to iterate in this loop so we can deliver the SIGSEGV...
+		 */
 		if (handle_signal(signr, ka, &info, oldset, scr))
 			return 1;
 	}
@@ -634,9 +563,8 @@ ia64_do_signal (sigset_t *oldset, struct sigscratch *scr, long in_syscall)
 			} else
 #endif
 			/*
-			 * Note: the syscall number is in r15 which is
-			 * saved in pt_regs so all we need to do here
-			 * is adjust ip so that the "break"
+			 * Note: the syscall number is in r15 which is saved in pt_regs so
+			 * all we need to do here is adjust ip so that the "break"
 			 * instruction gets re-executed.
 			 */
 			ia64_decrement_ip(&scr->pt);

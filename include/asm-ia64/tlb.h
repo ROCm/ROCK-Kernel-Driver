@@ -199,4 +199,8 @@ tlb_remove_page (mmu_gather_t *tlb, struct page *page)
 #define tlb_start_vma(tlb, vma)			do { } while (0)
 #define tlb_end_vma(tlb, vma)			do { } while (0)
 
+#define tlb_remove_tlb_entry(tlb, ptep, addr)	__tlb_remove_tlb_entry(tlb, ptep, addr)
+#define pte_free_tlb(tlb, ptep)			__pte_free_tlb(tlb, ptep)
+#define pmd_free_tlb(tlb, ptep)			__pmd_free_tlb(tlb, ptep)
+
 #endif /* _ASM_IA64_TLB_H */

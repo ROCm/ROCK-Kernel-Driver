@@ -2,7 +2,7 @@
  * This file contains the code that gets mapped at the upper end of each task's text
  * region.  For now, it contains the signal trampoline code only.
  *
- * Copyright (C) 1999-2001 Hewlett-Packard Co
+ * Copyright (C) 1999-2002 Hewlett-Packard Co
  * 	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
@@ -135,7 +135,7 @@ back_from_setup_rbs:
 	;;
 	ld8 r8=[base0]				// restore (perhaps modified) CFM0, EC0, and CPL0
 	cmp.ne p8,p0=r14,r15			// do we need to restore the rbs?
-(p8)	br.cond.spnt restore_rbs		// yup -> (clobbers r14 and r16)
+(p8)	br.cond.spnt restore_rbs		// yup -> (clobbers r14-r18, f6 & f7)
 	;;
 back_from_restore_rbs:
 	adds base0=(FR6_OFF+SIGCONTEXT_OFF),sp
@@ -189,20 +189,69 @@ setup_rbs:
 	.spillsp ar.rnat, RNAT_OFF+SIGCONTEXT_OFF
 	.body
 restore_rbs:
+	// On input:
+	//	r14 = bsp1 (bsp at the time of return from signal handler)
+	//	r15 = bsp0 (bsp at the time the signal occurred)
+	//
+	// Here, we need to calculate bspstore0, the value that ar.bspstore needs
+	// to be set to, based on bsp0 and the size of the dirty partition on
+	// the alternate stack (sc_loadrs >> 16).  This can be done with the
+	// following algorithm:
+	//
+	//  bspstore0 = rse_skip_regs(bsp0, -rse_num_regs(bsp1 - (loadrs >> 19), bsp1));
+	//
+	// This is what the code below does.
+	//
 	alloc r2=ar.pfs,0,0,0,0			// alloc null frame
 	adds r16=(LOADRS_OFF+SIGCONTEXT_OFF),sp
+	adds r18=(RNAT_OFF+SIGCONTEXT_OFF),sp
 	;;
-	ld8 r14=[r16]
-	adds r16=(RNAT_OFF+SIGCONTEXT_OFF),sp
+	ld8 r17=[r16]
+	ld8 r16=[r18]			// get new rnat
+	extr.u r18=r15,3,6	// r18 <- rse_slot_num(bsp0)
 	;;
-	mov ar.rsc=r14				// put RSE into enforced lazy mode
-	ld8 r14=[r16]				// get new rnat
+	mov ar.rsc=r17			// put RSE into enforced lazy mode
+	shr.u r17=r17,16
 	;;
-	loadrs					// restore dirty partition
+	sub r14=r14,r17		// r14 (bspstore1) <- bsp1 - (sc_loadrs >> 16)
+	shr.u r17=r17,3		// r17 <- (sc_loadrs >> 19)
+	;;
+	loadrs			// restore dirty partition
+	extr.u r14=r14,3,6	// r14 <- rse_slot_num(bspstore1)
+	;;
+	add r14=r14,r17		// r14 <- rse_slot_num(bspstore1) + (sc_loadrs >> 19)
+	;;
+	shr.u r14=r14,6		// r14 <- (rse_slot_num(bspstore1) + (sc_loadrs >> 19))/0x40
+	;;
+	sub r14=r14,r17		// r14 <- -rse_num_regs(bspstore1, bsp1)
+	movl r17=0x8208208208208209
+	;;
+	add r18=r18,r14		// r18 (delta) <- rse_slot_num(bsp0) - rse_num_regs(bspstore1,bsp1)
+	setf.sig f7=r17
+	cmp.lt p7,p0=r14,r0	// p7 <- (r14 < 0)?
+	;;
+(p7)	adds r18=-62,r18	// delta -= 62
+	;;
+	setf.sig f6=r18
+	;;
+	xmpy.h f6=f6,f7
+	;;
+	getf.sig r17=f6
+	;;
+	add r17=r17,r18
+	shr r18=r18,63
+	;;
+	shr r17=r17,5
+	;;
+	sub r17=r17,r18		// r17 = delta/63
+	;;
+	add r17=r14,r17		// r17 <- delta/63 - rse_num_regs(bspstore1, bsp1)
+	;;
+	shladd r15=r17,3,r15	// r15 <- bsp0 + 8*(delta/63 - rse_num_regs(bspstore1, bsp1))
 	;;
 	mov ar.bspstore=r15			// switch back to old register backing store area
 	;;
-	mov ar.rnat=r14				// restore RNaT
+	mov ar.rnat=r16				// restore RNaT
 	mov ar.rsc=0xf				// (will be restored later on from sc_ar_rsc)
 	// invala not necessary as that will happen when returning to user-mode
 	br.cond.sptk back_from_restore_rbs

@@ -38,9 +38,12 @@ extern spinlock_t sal_lock;
 
 # define SAL_CALL(result,args...) do {			\
 	unsigned long flags;				\
+	struct ia64_fpreg fr[6];                        \
+	ia64_save_scratch_fpregs(fr);                   \
 	spin_lock_irqsave(&sal_lock, flags);		\
 	__SAL_CALL(result,args);			\
 	spin_unlock_irqrestore(&sal_lock, flags);	\
+	ia64_load_scratch_fpregs(fr);                   \
 } while (0)
 
 #define SAL_SET_VECTORS			0x01000000
