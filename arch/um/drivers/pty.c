@@ -1,5 +1,5 @@
 /* 
- * Copyright (C) 2001 Jeff Dike (jdike@karaya.com)
+ * Copyright (C) 2001, 2002 Jeff Dike (jdike@karaya.com)
  * Licensed under the GPL
  */
 
@@ -86,34 +86,15 @@ int getmaster(char *line)
 	return(-1);
 }
 
-struct grantpt_info {
-	int fd;
-	int res;
-	int err;
-};
-
-static void grantpt_cb(void *arg)
-{
-	struct grantpt_info *info = arg;
-
-	info->res = grantpt(info->fd);
-	info->err = errno;
-}
-
 int pty_open(int input, int output, int primary, void *d, char **dev_out)
 {
 	struct pty_chan *data = d;
 	int fd;
 	char dev[sizeof("/dev/ptyxx\0")] = "/dev/ptyxx";
-	struct grantpt_info info;
 
 	fd = getmaster(dev);
 	if(fd < 0) return(-errno);
 	
-	info.fd = fd;
-	initial_thread_cb(grantpt_cb, &info);
-	unlockpt(fd);
-
 	if(data->raw) raw(fd, 0);
 	if(data->announce) (*data->announce)(dev, data->dev);
 
