@@ -52,8 +52,6 @@ struct NS16550 {
 
 volatile struct NS16550 *udbg_comport;
 
-spinlock_t udbg_lock = SPIN_LOCK_UNLOCKED;
-
 void
 udbg_init_uart(void *comport)
 {
@@ -84,9 +82,6 @@ udbg_putc(unsigned char c)
 				/* wait for idle */;
 			udbg_comport->thr = '\r'; eieio();
 		}
-	} else if (naca->platform == PLATFORM_ISERIES_LPAR) {
-		/* ToDo: switch this via ppc_md */
-		printk("%c", c);
 	}
 }
 
@@ -161,6 +156,12 @@ udbg_read(char *buf, int buflen) {
 }
 
 void
+udbg_console_write(struct console *con, const char *s, unsigned int n)
+{
+	udbg_write(s, n);
+}
+
+void
 udbg_puthex(unsigned long val)
 {
 	int i, nibbles = sizeof(val)*2;
@@ -190,16 +191,13 @@ udbg_printSP(const char *s)
 void
 udbg_printf(const char *fmt, ...)
 {
-	unsigned long flags;
 	unsigned char buf[256];
 
 	va_list args;
 	va_start(args, fmt);
 
-	spin_lock_irqsave(&udbg_lock, flags);
 	vsprintf(buf, fmt, args);
 	udbg_puts(buf);
-	spin_unlock_irqrestore(&udbg_lock, flags);
 
 	va_end(args);
 }
@@ -208,7 +206,6 @@ udbg_printf(const char *fmt, ...)
 void
 udbg_ppcdbg(unsigned long debug_flags, const char *fmt, ...)
 {
-	unsigned long flags;
 	unsigned long active_debugs = debug_flags & naca->debug_switch;
 
 	if ( active_debugs ) {
@@ -216,7 +213,6 @@ udbg_ppcdbg(unsigned long debug_flags, const char *fmt, ...)
 		unsigned char buf[256];
 		unsigned long i, len = 0;
 
-		spin_lock_irqsave(&udbg_lock, flags);
 		for(i=0; i < PPCDBG_NUM_FLAGS ;i++) {
 			if (((1U << i) & active_debugs) && 
 			    trace_names[i]) {
@@ -237,7 +233,6 @@ udbg_ppcdbg(unsigned long debug_flags, const char *fmt, ...)
 		va_start(ap, fmt);
 		vsprintf(buf, fmt, ap);
 		udbg_puts(buf);
-		spin_unlock_irqrestore(&udbg_lock, flags);
 		
 		va_end(ap);
 	}

@@ -35,7 +35,7 @@
 #define PTRS_PER_PMD	(1 << PMD_INDEX_SIZE)
 #define PTRS_PER_PGD	(1 << PGD_INDEX_SIZE)
 
-#define USER_PTRS_PER_PGD	(TASK_SIZE_USER64 / PGDIR_SIZE)
+#define USER_PTRS_PER_PGD	(1024)
 #define FIRST_USER_PGD_NR	0
 
 #define EADDR_SIZE (PTE_INDEX_SIZE + PMD_INDEX_SIZE + \
@@ -198,7 +198,8 @@ extern unsigned long empty_zero_page[PAGE_SIZE/sizeof(unsigned long)];
  * Find an entry in a page-table-directory.  We combine the address region 
  * (the high order N bits) and the pgd portion of the address.
  */
-#define pgd_index(address) (((address) >> (PGDIR_SHIFT)) & (PTRS_PER_PGD -1))
+/* to avoid overflow in free_pgtables we dont use PTRS_PER_PGD here */
+#define pgd_index(address) (((address) >> (PGDIR_SHIFT)) & 0x7ff)
 
 #define pgd_offset(mm, address)	 ((mm)->pgd + pgd_index(address))
 

@@ -210,50 +210,68 @@ int sys_ptrace(long request, long pid, long addr, long data)
 		break;
 
 	case PPC_PTRACE_GETREGS: { /* Get GPRs 0 - 31. */
-		u64 tmp;
-		u64 cntr;
+		int i;
+		unsigned long *reg = &((unsigned long *)child->thread.regs)[0];
+		unsigned long *tmp = (unsigned long *)addr;
 
-		ret = 0; 
-		for (cntr=0; cntr<32 && ret==0; ++cntr) {
-			tmp = ((u64*)child->thread.regs)[cntr];
-			ret = put_user(tmp, (u64*)(data+cntr));
+		for (i = 0; i < 32; i++) {
+			ret = put_user(*reg, tmp);
+			if (ret)
+				break;
+			reg++;
+			tmp++;
 		}
 		break;
 	}
 
 	case PPC_PTRACE_SETREGS: { /* Set GPRs 0 - 31. */
-		u64 cntr;
+		int i;
+		unsigned long *reg = &((unsigned long *)child->thread.regs)[0];
+		unsigned long *tmp = (unsigned long *)addr;
 
-		ret = 0; 
-		for (cntr=0; cntr<32 && ret==0; ++cntr)
-			ret = put_reg(child, cntr, *(u64*)(data+cntr));
+		for (i = 0; i < 32; i++) {
+			ret = get_user(*reg, tmp);
+			if (ret)
+				break;
+			reg++;
+			tmp++;
+		}
 		break;
 	}
 
 	case PPC_PTRACE_GETFPREGS: { /* Get FPRs 0 - 31. */
-		u64 tmp;
-		u64 cntr;
+		int i;
+		unsigned long *reg = &((unsigned long *)child->thread.fpr)[0];
+		unsigned long *tmp = (unsigned long *)addr;
 
-		ret = -EIO;
 		if (child->thread.regs->msr & MSR_FP)
 			giveup_fpu(child);
-		ret = 0; 
-		for (cntr=0; cntr<32 && ret==0; ++cntr) {
-			tmp = ((u64*)child->thread.fpr)[cntr];
-			ret = put_user(tmp, (u64*)(data+cntr));
+
+		for (i = 0; i < 32; i++) {
+			ret = put_user(*reg, tmp);
+			if (ret)
+				break;
+			reg++;
+			tmp++;
 		}
 		break;
 	}
 
 	case PPC_PTRACE_SETFPREGS: { /* Get FPRs 0 - 31. */
-		u64 cntr;
+		int i;
+		unsigned long *reg = &((unsigned long *)child->thread.fpr)[0];
+		unsigned long *tmp = (unsigned long *)addr;
 
-		ret = -EIO;
 		if (child->thread.regs->msr & MSR_FP)
 			giveup_fpu(child);
-		for (cntr=0; cntr<32; ++cntr)
-			((u64*)child->thread.fpr)[cntr] = *(u64*)(data+cntr);
-		ret = 0; 
+
+		for (i = 0; i < 32; i++) {
+			ret = get_user(*reg, tmp);
+			if (ret)
+				break;
+			reg++;
+			tmp++;
+		}
 		break;
 	}
 

@@ -477,7 +477,7 @@
 #define	PVR_REV(pvr)  (((pvr) >>   0) & 0xFFFF)	/* Revison field */
 
 /* Processor Version Numbers */
-#define PV_NORTHSTAR	0x0033
+#define	PV_NORTHSTAR	0x0033
 #define	PV_PULSAR	0x0034
 #define	PV_POWER4	0x0035
 #define	PV_ICESTAR	0x0036
