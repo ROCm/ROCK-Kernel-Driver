@@ -549,7 +549,8 @@ static int vx_stop_stream(vx_core_t *chip, vx_pipe_t *pipe)
 
 static snd_pcm_hardware_t vx_pcm_playback_hw = {
 	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
-				 SNDRV_PCM_INFO_PAUSE | SNDRV_PCM_INFO_MMAP_VALID),
+				 SNDRV_PCM_INFO_PAUSE | SNDRV_PCM_INFO_MMAP_VALID |
+				 SNDRV_PCM_INFO_RESUME),
 	.formats =		/*SNDRV_PCM_FMTBIT_U8 |*/ SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S24_3LE,
 	.rates =		SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
 	.rate_min =		5000,
@@ -802,6 +803,7 @@ static int vx_pcm_trigger(snd_pcm_substream_t *subs, int cmd)
 		
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
+	case SNDRV_PCM_TRIGGER_RESUME:
 		if (! pipe->is_capture)
 			vx_pcm_playback_transfer(chip, subs, pipe, 2);
 		/* FIXME:
@@ -813,6 +815,7 @@ static int vx_pcm_trigger(snd_pcm_substream_t *subs, int cmd)
 		pipe->running = 1;
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:
+	case SNDRV_PCM_TRIGGER_SUSPEND:
 		vx_toggle_pipe(chip, pipe, 0);
 		vx_stop_pipe(chip, pipe);
 		vx_stop_stream(chip, pipe);
@@ -946,7 +949,8 @@ static snd_pcm_ops_t vx_pcm_playback_ops = {
 
 static snd_pcm_hardware_t vx_pcm_capture_hw = {
 	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
-				 SNDRV_PCM_INFO_PAUSE | SNDRV_PCM_INFO_MMAP_VALID),
+				 SNDRV_PCM_INFO_PAUSE | SNDRV_PCM_INFO_MMAP_VALID |
+				 SNDRV_PCM_INFO_RESUME),
 	.formats =		/*SNDRV_PCM_FMTBIT_U8 |*/ SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S24_3LE,
 	.rates =		SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
 	.rate_min =		5000,

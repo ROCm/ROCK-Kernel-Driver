@@ -67,13 +67,13 @@
 MODULE_DESCRIPTION("fmvj18x and compatible PCMCIA ethernet driver");
 MODULE_LICENSE("GPL");
 
-#define INT_MODULE_PARM(n, v) static int n = v; MODULE_PARM(n, "i")
+#define INT_MODULE_PARM(n, v) static int n = v; module_param(n, int, 0)
 
 /* Bit map of interrupts to choose from */
 /* This means pick from 15, 14, 12, 11, 10, 9, 7, 5, 4, and 3 */
 INT_MODULE_PARM(irq_mask, 0xdeb8);
 static int irq_list[4] = { -1 };
-MODULE_PARM(irq_list, "1-4i");
+module_param_array(irq_list, int, NULL, 0);
 
 /* SRAM configuration */
 /* 0:4KB*2 TX buffer   else:8KB*2 TX buffer */
@@ -623,7 +623,7 @@ static int fmvj18x_get_hwinfo(dev_link_t *link, u_char *node_id)
 {
     win_req_t req;
     memreq_t mem;
-    u_char *base;
+    u_char __iomem *base;
     int i, j;
 
     /* Allocate a small memory window */
@@ -676,7 +676,7 @@ static int fmvj18x_setup_mfc(dev_link_t *link)
 {
     win_req_t req;
     memreq_t mem;
-    u_char *base;
+    u_char __iomem *base;
     int i, j;
     struct net_device *dev = link->priv;
     ioaddr_t ioaddr;

@@ -62,7 +62,7 @@
 
 
 static unsigned long doc_config_location = CONFIG_MTD_DOCPROBE_ADDRESS;
-MODULE_PARM(doc_config_location, "l");
+module_param(doc_config_location, ulong, 0);
 MODULE_PARM_DESC(doc_config_location, "Physical memory address at which to probe for DiskOnChip");
 
 static unsigned long __initdata doc_locations[] = {

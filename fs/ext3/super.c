@@ -1266,6 +1266,8 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 	sbi->s_resuid = EXT3_DEF_RESUID;
 	sbi->s_resgid = EXT3_DEF_RESGID;
 
+	unlock_kernel();
+
 	blocksize = sb_min_blocksize(sb, EXT3_MIN_BLOCK_SIZE);
 	if (!blocksize) {
 		printk(KERN_ERR "EXT3-fs: unable to set blocksize\n");
@@ -1622,6 +1624,7 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 	percpu_counter_mod(&sbi->s_dirs_counter,
 		ext3_count_dirs(sb));
 
+	lock_kernel();
 	return 0;
 
 cantfind_ext3:
@@ -1646,6 +1649,7 @@ failed_mount:
 out_fail:
 	sb->s_fs_info = NULL;
 	kfree(sbi);
+	lock_kernel();
 	return -EINVAL;
 }
 
@@ -2170,9 +2174,11 @@ int ext3_statfs (struct super_block * sb, struct kstatfs * buf)
 		 * block group descriptors.  If the sparse superblocks
 		 * feature is turned on, then not all groups have this.
 		 */
-		for (i = 0; i < ngroups; i++)
+		for (i = 0; i < ngroups; i++) {
 			overhead += ext3_bg_has_super(sb, i) +
 				ext3_bg_num_gdb(sb, i);
+			cond_resched();
+		}
 
 		/*
 		 * Every block group has an inode bitmap, a block

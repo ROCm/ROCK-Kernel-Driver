@@ -451,13 +451,16 @@ static int scsi_id[IM_MAX_HOSTS] = { 7, 7, 7, 7, 7, 7, 7, 7 };
    (that is kernel version 2.1.x) */
 #if defined(MODULE)
 static char *boot_options = NULL;
-MODULE_PARM(boot_options, "s");
-MODULE_PARM(io_port, "1-" __MODULE_STRING(IM_MAX_HOSTS) "i");
-MODULE_PARM(scsi_id, "1-" __MODULE_STRING(IM_MAX_HOSTS) "i");
+module_param(boot_options, charp, 0);
+module_param_array(io_port, int, NULL, 0);
+module_param_array(scsi_id, int, NULL, 0);
+
+#if 0 /* FIXME: No longer exist? --RR */
 MODULE_PARM(display, "1i");
 MODULE_PARM(adisplay, "1i");
 MODULE_PARM(normal, "1i");
 MODULE_PARM(ansi, "1i");
+#endif
 #endif
 /*counter of concurrent disk read/writes, to turn on/off disk led */
 static int disk_rw_in_progress = 0;

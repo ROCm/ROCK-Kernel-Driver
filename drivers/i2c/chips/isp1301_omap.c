@@ -934,13 +934,14 @@ static void otg_unbind(struct isp1301 *isp)
 
 static void b_peripheral(struct isp1301 *isp)
 {
-	enable_vbus_draw(isp, 8);
 	OTG_CTRL_REG = OTG_CTRL_REG & OTG_XCEIV_OUTPUTS;
 	usb_gadget_vbus_connect(isp->otg.gadget);
 
 #ifdef	CONFIG_USB_OTG
+	enable_vbus_draw(isp, 8);
 	otg_update_isp(isp);
 #else
+	enable_vbus_draw(isp, 100);
 	/* UDC driver just set OTG_BSESSVLD */
 	isp1301_set_bits(isp, ISP1301_OTG_CONTROL_1, OTG1_DP_PULLUP);
 	isp1301_clear_bits(isp, ISP1301_OTG_CONTROL_1, OTG1_DP_PULLDOWN);
@@ -950,7 +951,7 @@ static void b_peripheral(struct isp1301 *isp)
 #endif
 }
 
-static int isp_update_otg(struct isp1301 *isp, u8 stat)
+static void isp_update_otg(struct isp1301 *isp, u8 stat)
 {
 	u8			isp_stat, isp_bstat;
 	enum usb_otg_state	state = isp->otg.state;
@@ -1489,11 +1490,9 @@ static int isp1301_probe(struct i2c_adapter *bus, int address, int kind)
 	if (the_transceiver)
 		return 0;
 
-	isp = kmalloc(sizeof *isp, GFP_KERNEL);
+	isp = kcalloc(1, sizeof *isp, GFP_KERNEL);
 	if (!isp)
 		return 0;
-
-	memset(isp, 0, sizeof *isp);
 
 	INIT_WORK(&isp->work, isp1301_work, isp);
 	init_timer(&isp->timer);

@@ -31,14 +31,15 @@
 #define	HPET_MINOR	     228
 
 struct device;
+struct class_device;
 
-struct miscdevice 
-{
+struct miscdevice  {
 	int minor;
 	const char *name;
 	struct file_operations *fops;
 	struct list_head list;
 	struct device *dev;
+	struct class_device *class;
 	char devfs_name[64];
 };
 

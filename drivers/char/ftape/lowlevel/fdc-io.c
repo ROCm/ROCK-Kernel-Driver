@@ -50,7 +50,7 @@
 
 /*      Global vars.
  */
-int ftape_motor;
+static int ftape_motor;
 volatile int ftape_current_cylinder = -1;
 volatile fdc_mode_enum fdc_mode = fdc_idle;
 fdc_config_info fdc;
@@ -86,6 +86,8 @@ static __u8 fdc_prec_code;	/* fdc precomp. select code */
 
 static char ftape_id[] = "ftape";  /* used by request irq and free irq */
 
+static int fdc_set_seek_rate(int seek_rate);
+
 void fdc_catch_stray_interrupts(int count)
 {
 	unsigned long flags;
@@ -103,7 +105,7 @@ void fdc_catch_stray_interrupts(int count)
  *  If usecs == 0 then just test status, else wait at least for usecs.
  *  Returns -ETIME on timeout. Function must be calibrated first !
  */
-int fdc_wait(unsigned int usecs, __u8 mask, __u8 state)
+static int fdc_wait(unsigned int usecs, __u8 mask, __u8 state)
 {
 	int count_1 = (fdc_calibr_count * usecs +
                        fdc_calibr_count - 1) / fdc_calibr_time;
@@ -129,16 +131,10 @@ static void fdc_usec_wait(unsigned int usecs)
 	fdc_wait(usecs, 0, 1);	/* will always timeout ! */
 }
 
-int fdc_ready_out_wait(unsigned int usecs)
+static int fdc_ready_out_wait(unsigned int usecs)
 {
 	fdc_usec_wait(FT_RQM_DELAY);	/* wait for valid RQM status */
 	return fdc_wait(usecs, FDC_DATA_OUT_READY, FDC_DATA_OUT_READY);
-}
-
-int fdc_ready_in_wait(unsigned int usecs)
-{
-	fdc_usec_wait(FT_RQM_DELAY);	/* wait for valid RQM status */
-	return fdc_wait(usecs, FDC_DATA_OUT_READY, FDC_DATA_IN_READY);
 }
 
 void fdc_wait_calibrate(void)
@@ -341,7 +337,7 @@ int fdc_result(__u8 * res_data, int res_len)
 /*      Handle command and result phases for
  *      commands without data phase.
  */
-int fdc_issue_command(const __u8 * out_data, int out_count,
+static int fdc_issue_command(const __u8 * out_data, int out_count,
 		      __u8 * in_data, int in_count)
 {
 	TRACE_FUN(ft_t_any);
@@ -497,7 +493,7 @@ void fdc_set_write_precomp(int precomp)
 
 /*  Reprogram the 82078 registers to use Data Rate Table 1 on all drives.
  */
-void fdc_set_drive_specs(void)
+static void fdc_set_drive_specs(void)
 {
 	__u8 cmd[] = { FDC_DRIVE_SPEC, 0x00, 0x00, 0x00, 0x00, 0xc0};
 	int result;
@@ -705,7 +701,7 @@ void fdc_disable(void)
 
 /*      Specify FDC seek-rate (milliseconds)
  */
-int fdc_set_seek_rate(int seek_rate)
+static int fdc_set_seek_rate(int seek_rate)
 {
 	/* set step rate, dma mode, and minimal head load and unload times
 	 */
@@ -800,49 +796,6 @@ int fdc_seek(int track)
 		TRACE_ABORT(-EIO, ft_t_err, "bad seek..");
 	}
 	ftape_current_cylinder = track;
-	TRACE_EXIT 0;
-}
-
-/*      Recalibrate and wait until home.
- */
-int fdc_recalibrate(void)
-{
-	__u8 out[2];
-	int st0;
-	int pcn;
-	int retry;
-	int old_seek_rate = fdc_seek_rate;
-	TRACE_FUN(ft_t_any);
-
-	TRACE_CATCH(fdc_set_seek_rate(6),);
-	out[0] = FDC_RECAL;
-	out[1] = ft_drive_sel;
-	ft_seek_completed = 0;
-	TRACE_CATCH(fdc_command(out, 2),);
-	/*    Handle interrupts until ft_seek_completed or timeout.
-	 */
-	for (retry = 0;; ++retry) {
-		TRACE_CATCH(fdc_interrupt_wait(2 * FT_SECOND),);
-		if (ft_seek_completed) {
-			TRACE_CATCH(fdc_sense_interrupt_status(&st0, &pcn),);
-			if ((st0 & ST0_SEEK_END) == 0) {
-				if (retry < 1) {
-					continue; /* some drives/fdc's
-						   * give an extra interrupt
-						   */
-				} else {
-					TRACE_ABORT(-EIO, ft_t_err,
-				    "no seek-end after seek completion !??");
-				}
-			}
-			break;
-		}
-	}
-	ftape_current_cylinder = pcn;
-	if (pcn != 0) {
-		TRACE(ft_t_err, "failed: resulting track = %d", pcn);
-	}
-	TRACE_CATCH(fdc_set_seek_rate(old_seek_rate),);
 	TRACE_EXIT 0;
 }
 
@@ -1079,7 +1032,7 @@ static int fdc_fifo_enable(void)
  */
 static __u8 fdc_save_state[2];
 
-int fdc_probe(void)
+static int fdc_probe(void)
 {
 	__u8 cmd[1];
 	__u8 stat[16]; /* must be able to hold dumpregs & save results */
@@ -1308,7 +1261,7 @@ static irqreturn_t ftape_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	TRACE_EXIT IRQ_RETVAL(handled);
 }
 
-int fdc_grab_irq_and_dma(void)
+static int fdc_grab_irq_and_dma(void)
 {
 	TRACE_FUN(ft_t_any);
 

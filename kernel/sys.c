@@ -23,6 +23,7 @@
 #include <linux/security.h>
 #include <linux/dcookies.h>
 #include <linux/suspend.h>
+#include <linux/tty.h>
 
 #include <linux/compat.h>
 #include <linux/syscalls.h>
@@ -88,7 +89,7 @@ int cad_pid = 1;
  */
 
 static struct notifier_block *reboot_notifier_list;
-rwlock_t notifier_lock = RW_LOCK_UNLOCKED;
+DEFINE_RWLOCK(notifier_lock);
 
 /**
  *	notifier_chain_register	- Add notifier to a notifier chain
@@ -1075,6 +1076,7 @@ asmlinkage long sys_setsid(void)
 	if (!thread_group_leader(current))
 		return -EINVAL;
 
+	down(&tty_sem);
 	write_lock_irq(&tasklist_lock);
 
 	pid = find_pid(PIDTYPE_PGID, current->pid);
@@ -1088,6 +1090,7 @@ asmlinkage long sys_setsid(void)
 	err = process_group(current);
 out:
 	write_unlock_irq(&tasklist_lock);
+	up(&tty_sem);
 	return err;
 }
 

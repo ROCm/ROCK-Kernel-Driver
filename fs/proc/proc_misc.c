@@ -318,7 +318,7 @@ static struct file_operations proc_slabinfo_operations = {
 	.release	= seq_release,
 };
 
-int show_stat(struct seq_file *p, void *v)
+static int show_stat(struct seq_file *p, void *v)
 {
 	int i;
 	unsigned long jif;
@@ -461,7 +461,7 @@ static struct seq_operations int_seq_ops = {
 	.show  = show_interrupts
 };
 
-int interrupts_open(struct inode *inode, struct file *filp)
+static int interrupts_open(struct inode *inode, struct file *filp)
 {
 	return seq_open(filp, &int_seq_ops);
 }

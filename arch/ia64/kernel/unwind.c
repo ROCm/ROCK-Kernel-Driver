@@ -2256,7 +2256,7 @@ unw_init (void)
 		if (i > 0)
 			unw.cache[i].lru_chain = (i - 1);
 		unw.cache[i].coll_chain = -1;
-		unw.cache[i].lock = RW_LOCK_UNLOCKED;
+		rwlock_init(&unw.cache[i].lock);
 	}
 	unw.lru_head = UNW_CACHE_SIZE - 1;
 	unw.lru_tail = 0;

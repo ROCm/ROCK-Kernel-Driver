@@ -41,7 +41,7 @@ MODULE_LICENSE("GPL");
 */
 #ifdef PCMCIA_DEBUG
 static int pc_debug = PCMCIA_DEBUG;
-MODULE_PARM(pc_debug, "i");
+module_param(pc_debug, int, 0);
 #define DEBUG(n, args...) if (pc_debug>(n)) printk(KERN_DEBUG args);
 static char *version =
 "avma1_cs.c 1.00 1998/01/23 10:00:00 (Carsten Paeth)";
@@ -57,8 +57,8 @@ static int default_irq_list[11] = { 15, 13, 12, 11, 10, 9, 7, 5, 4, 3, -1 };
 static int irq_list[11] = { -1 };
 static int isdnprot = 2;
 
-MODULE_PARM(irq_list, "1-11i");
-MODULE_PARM(isdnprot, "1-4i");
+module_param_array(irq_list, int, NULL, 0);
+module_param(isdnprot, int, 0);
 
 /*====================================================================*/
 

@@ -268,8 +268,7 @@ struct udp6_sock {
 };
 
 struct tcp6_sock {
-	struct inet_sock  inet;
-	struct tcp_opt	  tcp;
+	struct tcp_sock	  tcp;
 	struct ipv6_pinfo inet6;
 };
 

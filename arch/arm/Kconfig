@@ -234,6 +234,11 @@ config SHARP_LOCOMO
 	depends on SA1100_COLLIE
 	default y
 
+config SHARP_SCOOP
+	bool
+	depends on PXA_SHARPSL
+	default y
+
 config FORCE_MAX_ZONEORDER
 	int
 	depends on SA1111
@@ -257,6 +262,33 @@ endmenu
 menu "General setup"
 
 # Select various configuration options depending on the machine type
+
+config SMP
+	bool "Symmetric Multi-Processing (EXPERIMENTAL)"
+	depends on EXPERIMENTAL && n
+	help
+	  This enables support for systems with more than one CPU. If you have
+	  a system with only one CPU, like most personal computers, say N. If
+	  you have a system with more than one CPU, say Y.
+
+	  If you say N here, the kernel will run on single and multiprocessor
+	  machines, but will use only one CPU of a multiprocessor machine. If
+	  you say Y here, the kernel will run on many, but not all, single
+	  processor machines. On a single processor machine, the kernel will
+	  run faster if you say N here.
+
+	  See also the <file:Documentation/smp.tex>,
+	  <file:Documentation/smp.txt>, <file:Documentation/i386/IO-APIC.txt>,
+	  <file:Documentation/nmi_watchdog.txt> and the SMP-HOWTO available at
+	  <http://www.linuxdoc.org/docs.html#howto>.
+
+	  If you don't know what to do here, say N.
+
+config NR_CPUS
+	int "Maximum number of CPUs (2-32)"
+	depends on SMP
+	default "4"
+
 config DISCONTIGMEM
 	bool
 	depends on ARCH_EDB7211 || ARCH_SA1100 || (ARCH_LH7A40X && !LH7A40X_CONTIGMEM)

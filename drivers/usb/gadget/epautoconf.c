@@ -55,6 +55,9 @@ static __initdata unsigned in_epnum;
  *
  * Type suffixes are "-bulk", "-iso", or "-int".  Numbers are decimal.
  * Less common restrictions are implied by gadget_is_*().
+ *
+ * NOTE:  each endpoint is unidirectional, as specified by its USB
+ * descriptor; and isn't specific to a configuration or altsetting.
  */
 static int __init
 ep_matches (

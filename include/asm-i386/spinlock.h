@@ -19,6 +19,9 @@ typedef struct {
 #ifdef CONFIG_DEBUG_SPINLOCK
 	unsigned magic;
 #endif
+#ifdef CONFIG_PREEMPT
+	unsigned int break_lock;
+#endif
 } spinlock_t;
 
 #define SPINLOCK_MAGIC	0xdead4ead
@@ -166,6 +169,9 @@ typedef struct {
 #ifdef CONFIG_DEBUG_SPINLOCK
 	unsigned magic;
 #endif
+#ifdef CONFIG_PREEMPT
+	unsigned int break_lock;
+#endif
 } rwlock_t;
 
 #define RWLOCK_MAGIC	0xdeaf1eed
@@ -211,6 +217,16 @@ static inline void _raw_write_lock(rwlock_t *rw)
 
 #define _raw_read_unlock(rw)		asm volatile("lock ; incl %0" :"=m" ((rw)->lock) : : "memory")
 #define _raw_write_unlock(rw)	asm volatile("lock ; addl $" RW_LOCK_BIAS_STR ",%0":"=m" ((rw)->lock) : : "memory")
+
+static inline int _raw_read_trylock(rwlock_t *lock)
+{
+	atomic_t *count = (atomic_t *)lock;
+	atomic_dec(count);
+	if (atomic_read(count) >= 0)
+		return 1;
+	atomic_inc(count);
+	return 0;
+}
 
 static inline int _raw_write_trylock(rwlock_t *lock)
 {

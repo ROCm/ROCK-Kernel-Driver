@@ -304,6 +304,8 @@ do {	unsigned long flags; \
 
 #endif /* CONFIG_DEBUG_SPINLOCK */
 
+#define _raw_read_trylock(lock) generic_raw_read_trylock(lock)
+
 #endif /* !(__ASSEMBLY__) */
 
 #endif /* !(__SPARC64_SPINLOCK_H) */

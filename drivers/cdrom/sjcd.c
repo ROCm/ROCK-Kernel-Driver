@@ -116,7 +116,7 @@ static struct sjcd_play_msf sjcd_playing;
 
 static int sjcd_base = SJCD_BASE_ADDR;
 
-MODULE_PARM(sjcd_base, "i");
+module_param(sjcd_base, int, 0);
 
 static DECLARE_WAIT_QUEUE_HEAD(sjcd_waitq);
 

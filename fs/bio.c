@@ -91,7 +91,7 @@ static inline struct bio_vec *bvec_alloc(int gfp_mask, int nr, unsigned long *id
 /*
  * default destructor for a bio allocated with bio_alloc()
  */
-void bio_destructor(struct bio *bio)
+static void bio_destructor(struct bio *bio)
 {
 	const int pool_idx = BIO_POOL_IDX(bio);
 	struct biovec_pool *bp = bvec_array + pool_idx;

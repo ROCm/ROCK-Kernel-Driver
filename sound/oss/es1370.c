@@ -2525,9 +2525,9 @@ static int micbias[NR_DEVICE];
 
 static unsigned int devindex;
 
-MODULE_PARM(lineout, "1-" __MODULE_STRING(NR_DEVICE) "i");
+module_param_array(lineout, bool, NULL, 0);
 MODULE_PARM_DESC(lineout, "if 1 the LINE input is converted to LINE out");
-MODULE_PARM(micbias, "1-" __MODULE_STRING(NR_DEVICE) "i");
+module_param_array(micbias, bool, NULL, 0);
 MODULE_PARM_DESC(micbias, "sets the +5V bias for an electret microphone");
 
 MODULE_AUTHOR("Thomas M. Sailer, sailer@ife.ee.ethz.ch, hb9jnx@hb9w.che.eu");

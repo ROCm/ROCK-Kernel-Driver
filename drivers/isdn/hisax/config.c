@@ -354,20 +354,18 @@ static int irq[HISAX_MAX_CARDS] __devinitdata = { 0, };
 static int mem[HISAX_MAX_CARDS] __devinitdata = { 0, };
 static char *id = HiSaxID;
 
-#define PARM_PARA "1-" __MODULE_STRING(HISAX_MAX_CARDS) "i"
-
 MODULE_DESCRIPTION("ISDN4Linux: Driver for passive ISDN cards");
 MODULE_AUTHOR("Karsten Keil");
 MODULE_LICENSE("GPL");
-MODULE_PARM(type, PARM_PARA);
-MODULE_PARM(protocol, PARM_PARA);
-MODULE_PARM(io, PARM_PARA);
-MODULE_PARM(irq, PARM_PARA);
-MODULE_PARM(mem, PARM_PARA);
-MODULE_PARM(id, "s");
+module_param_array(type, int, NULL, 0);
+module_param_array(protocol, int, NULL, 0);
+module_param_array(io, int, NULL, 0);
+module_param_array(irq, int, NULL, 0);
+module_param_array(mem, int, NULL, 0);
+module_param(id, charp, 0);
 #ifdef IO0_IO1
-MODULE_PARM(io0, PARM_PARA);
-MODULE_PARM(io1, PARM_PARA);
+module_param_array(io0, int, NULL, 0);
+module_param_array(io1, int, NULL, 0);
 #endif
 #endif /* MODULE */
 

@@ -142,7 +142,7 @@ void local_bh_enable(void)
 	 * Keep preemption disabled until we are done with
 	 * softirq processing:
  	 */
-	preempt_count() -= SOFTIRQ_OFFSET - 1;
+ 	sub_preempt_count(SOFTIRQ_OFFSET - 1);
 
 	if (unlikely(!in_interrupt() && local_softirq_pending()))
 		do_softirq();
@@ -163,7 +163,7 @@ EXPORT_SYMBOL(local_bh_enable);
  */
 void irq_exit(void)
 {
-	preempt_count() -= IRQ_EXIT_OFFSET;
+	sub_preempt_count(IRQ_EXIT_OFFSET);
 	if (!in_interrupt() && local_softirq_pending())
 		invoke_softirq();
 	preempt_enable_no_resched();

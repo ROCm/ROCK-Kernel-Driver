@@ -111,12 +111,7 @@ static struct i2c_adapter hydra_adap = {
 };
 
 static struct pci_device_id hydra_ids[] = {
-	{
-		.vendor		= PCI_VENDOR_ID_APPLE,
-		.device		= PCI_DEVICE_ID_APPLE_HYDRA,
-		.subvendor	= PCI_ANY_ID,
-		.subdevice	= PCI_ANY_ID,
-	},
+	{ PCI_DEVICE(PCI_VENDOR_ID_APPLE, PCI_DEVICE_ID_APPLE_HYDRA) },
 	{ 0, }
 };
 

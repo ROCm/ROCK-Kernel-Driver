@@ -17,7 +17,7 @@
  * 2002-05-12   Tomas Kasparek  another code cleanup
  */
 
-/* $Id: uda1341.c,v 1.13 2004/07/20 15:54:13 cladisch Exp $ */
+/* $Id: uda1341.c,v 1.15 2005/01/03 12:05:20 tiwai Exp $ */
 
 #include <sound/driver.h>
 #include <linux/module.h>
@@ -679,7 +679,7 @@ int __init snd_chip_uda1341_mixer_new(snd_card_t *card, struct l3_client **clnt)
 		return err;
 	}
 
-	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, uda1341, &ops)) < 0) {
+	if ((err = snd_device_new(card, SNDRV_DEV_CODEC, uda1341, &ops)) < 0) {
 		l3_detach_client(uda1341);
 		kfree(uda1341);
 		return err;
@@ -730,8 +730,7 @@ static int uda1341_attach(struct l3_client *clnt)
 
 static void uda1341_detach(struct l3_client *clnt)
 {
-	if (clnt->driver_data)
-		kfree(clnt->driver_data);
+	kfree(clnt->driver_data);
 }
 
 static int

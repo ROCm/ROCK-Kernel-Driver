@@ -13,6 +13,9 @@ typedef struct {
 	volatile unsigned long owner_pc;
 	volatile unsigned long owner_cpu;
 #endif
+#ifdef CONFIG_PREEMPT
+	unsigned int break_lock;
+#endif
 } spinlock_t;
 
 #ifdef __KERNEL__
@@ -82,6 +85,9 @@ typedef struct {
 	volatile unsigned long lock;
 #ifdef CONFIG_DEBUG_SPINLOCK
 	volatile unsigned long owner_pc;
+#endif
+#ifdef CONFIG_PREEMPT
+	unsigned int break_lock;
 #endif
 } rwlock_t;
 
@@ -191,6 +197,8 @@ extern void _raw_write_unlock(rwlock_t *rw);
 extern int _raw_write_trylock(rwlock_t *rw);
 
 #endif
+
+#define _raw_read_trylock(lock) generic_raw_read_trylock(lock)
 
 #endif /* __ASM_SPINLOCK_H */
 #endif /* __KERNEL__ */

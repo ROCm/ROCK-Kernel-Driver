@@ -92,7 +92,7 @@ int snd_sbdsp_reset(sb_t *chip)
 	return -ENODEV;
 }
 
-int snd_sbdsp_version(sb_t * chip)
+static int snd_sbdsp_version(sb_t * chip)
 {
 	unsigned int result = -ENODEV;
 

@@ -46,9 +46,6 @@ typedef void (*route_channel_f)(snd_pcm_plugin_t *plugin,
 typedef struct {
 	int channel;
 	int as_int;
-#if ROUTE_PLUGIN_USE_FLOAT
-	float as_float;
-#endif
 } ttable_src_t;
 
 struct ttable_dst {
@@ -59,7 +56,7 @@ struct ttable_dst {
 };
 
 struct route_private_data {
-	enum {R_UINT32=0, R_UINT64=1, R_FLOAT=2} sum_type;
+	enum {R_UINT32=0, R_UINT64=1} sum_type;
 	int get, put;
 	int conv;
 	int src_sample_size;
@@ -69,9 +66,6 @@ struct route_private_data {
 typedef union {
 	u_int32_t as_uint32;
 	u_int64_t as_uint64;
-#if ROUTE_PLUGIN_USE_FLOAT
-	float as_float;
-#endif
 } sum_t;
 
 
@@ -136,20 +130,13 @@ static void route_to_channel(snd_pcm_plugin_t *plugin,
 #include "plugin_ops.h"
 #undef GET_U_LABELS
 #undef PUT_U32_LABELS
-	static void *zero_labels[3] = { &&zero_int32, &&zero_int64,
-#if ROUTE_PLUGIN_USE_FLOAT
-				 &&zero_float
-#endif
-	};
+	static void *zero_labels[2] = { &&zero_int32, &&zero_int64 };
 	/* sum_type att */
-	static void *add_labels[3 * 2] = { &&add_int32_noatt, &&add_int32_att,
+	static void *add_labels[2 * 2] = { &&add_int32_noatt, &&add_int32_att,
 				    &&add_int64_noatt, &&add_int64_att,
-#if ROUTE_PLUGIN_USE_FLOAT
-				    &&add_float_noatt, &&add_float_att
-#endif
 	};
 	/* sum_type att shift */
-	static void *norm_labels[3 * 2 * 4] = { NULL,
+	static void *norm_labels[2 * 2 * 4] = { NULL,
 					 &&norm_int32_8_noatt,
 					 &&norm_int32_16_noatt,
 					 &&norm_int32_24_noatt,
@@ -165,16 +152,6 @@ static void route_to_channel(snd_pcm_plugin_t *plugin,
 					 &&norm_int64_8_att,
 					 &&norm_int64_16_att,
 					 &&norm_int64_24_att,
-#if ROUTE_PLUGIN_USE_FLOAT
-					 &&norm_float_0,
-					 &&norm_float_8,
-					 &&norm_float_16,
-					 &&norm_float_24,
-					 &&norm_float_0,
-					 &&norm_float_8,
-					 &&norm_float_16,
-					 &&norm_float_24,
-#endif
 	};
 	route_t *data = (route_t *)plugin->extra_data;
 	void *zero, *get, *add, *norm, *put_u32;
@@ -225,11 +202,6 @@ static void route_to_channel(snd_pcm_plugin_t *plugin,
 	zero_int64: 
 		sum.as_uint64 = 0;
 		goto zero_end;
-#if ROUTE_PLUGIN_USE_FLOAT
-	zero_float:
-		sum.as_float = 0.0;
-		goto zero_end;
-#endif
 	zero_end:
 		for (srcidx = 0; srcidx < nsrcs; ++srcidx) {
 			char *src = srcs[srcidx];
@@ -257,15 +229,6 @@ static void route_to_channel(snd_pcm_plugin_t *plugin,
 			if (ttp->as_int)
 				sum.as_uint64 += sample;
 			goto after_sum;
-#if ROUTE_PLUGIN_USE_FLOAT
-		add_float_att:
-			sum.as_float += sample * ttp->as_float;
-			goto after_sum;
-		add_float_noatt:
-			if (ttp->as_int)
-				sum.as_float += sample;
-			goto after_sum;
-#endif
 		after_sum:
 			srcs[srcidx] += src_steps[srcidx];
 			ttp++;
@@ -321,25 +284,6 @@ static void route_to_channel(snd_pcm_plugin_t *plugin,
 			sample = sum.as_uint64;
 		goto after_norm;
 
-#if ROUTE_PLUGIN_USE_FLOAT
-	norm_float_8:
-		sum.as_float *= 1 << 8;
-		goto norm_float;
-	norm_float_16:
-		sum.as_float *= 1 << 16;
-		goto norm_float;
-	norm_float_24:
-		sum.as_float *= 1 << 24;
-		goto norm_float;
-	norm_float_0:
-	norm_float:
-		sum.as_float = floor(sum.as_float + 0.5);
-		if (sum.as_float > (u_int32_t)0xffffffff)
-			sample = (u_int32_t)0xffffffff;
-		else
-			sample = sum.as_float;
-		goto after_norm;
-#endif
 	after_norm:
 		
 		/* Put sample */
@@ -353,9 +297,9 @@ static void route_to_channel(snd_pcm_plugin_t *plugin,
 	}
 }
 
-int route_src_channels_mask(snd_pcm_plugin_t *plugin,
-			  bitset_t *dst_vmask,
-			  bitset_t **src_vmask)
+static int route_src_channels_mask(snd_pcm_plugin_t *plugin,
+				   bitset_t *dst_vmask,
+				   bitset_t **src_vmask)
 {
 	route_t *data = (route_t *)plugin->extra_data;
 	int schannels = plugin->src_format.channels;
@@ -377,9 +321,9 @@ int route_src_channels_mask(snd_pcm_plugin_t *plugin,
 	return 0;
 }
 
-int route_dst_channels_mask(snd_pcm_plugin_t *plugin,
-			  bitset_t *src_vmask,
-			  bitset_t **dst_vmask)
+static int route_dst_channels_mask(snd_pcm_plugin_t *plugin,
+				   bitset_t *src_vmask,
+				   bitset_t **dst_vmask)
 {
 	route_t *data = (route_t *)plugin->extra_data;
 	int dchannels = plugin->dst_format.channels;
@@ -407,8 +351,7 @@ static void route_free(snd_pcm_plugin_t *plugin)
 	route_t *data = (route_t *)plugin->extra_data;
 	unsigned int dst_channel;
 	for (dst_channel = 0; dst_channel < plugin->dst_format.channels; ++dst_channel) {
-		if (data->ttable[dst_channel].srcs != NULL)
-			kfree(data->ttable[dst_channel].srcs);
+		kfree(data->ttable[dst_channel].srcs);
 	}
 }
 
@@ -434,13 +377,7 @@ static int route_load_ttable(snd_pcm_plugin_t *plugin,
 			snd_assert(*sptr >= 0 || *sptr <= FULL, return -ENXIO);
 			if (*sptr != 0) {
 				srcs[nsrcs].channel = src_channel;
-#if ROUTE_PLUGIN_USE_FLOAT
-				/* Also in user space for non attenuated */
-				srcs[nsrcs].as_int = (*sptr == FULL ? ROUTE_PLUGIN_RESOLUTION : 0);
-				srcs[nsrcs].as_float = *sptr;
-#else
 				srcs[nsrcs].as_int = *sptr;
-#endif
 				if (*sptr != FULL)
 					att = 1;
 				t += *sptr;
@@ -559,17 +496,15 @@ int snd_pcm_plugin_build_route(snd_pcm_plug_t *plug,
 	data = (route_t *) plugin->extra_data;
 
 	data->get = getput_index(src_format->format);
+	snd_assert(data->get >= 0 && data->get < 4*2*2, return -EINVAL);
 	data->put = getput_index(dst_format->format);
+	snd_assert(data->get >= 0 && data->get < 4*2*2, return -EINVAL);
 	data->conv = conv_index(src_format->format, dst_format->format);
 
-#if ROUTE_PLUGIN_USE_FLOAT
-	data->sum_type = R_FLOAT;
-#else
 	if (snd_pcm_format_width(src_format->format) == 32)
 		data->sum_type = R_UINT64;
 	else
 		data->sum_type = R_UINT32;
-#endif
 	data->src_sample_size = snd_pcm_format_width(src_format->format) / 8;
 
 	if ((err = route_load_ttable(plugin, ttable)) < 0) {

@@ -302,7 +302,7 @@ static int nmi_create_files(struct super_block * sb, struct dentry * root)
  
 static int __init p4_init(char ** cpu_type)
 {
-	__u8 cpu_model = current_cpu_data.x86_model;
+	__u8 cpu_model = boot_cpu_data.x86_model;
 
 	if (cpu_model > 3)
 		return 0;
@@ -333,7 +333,7 @@ static int __init p4_init(char ** cpu_type)
 
 static int __init ppro_init(char ** cpu_type)
 {
-	__u8 cpu_model = current_cpu_data.x86_model;
+	__u8 cpu_model = boot_cpu_data.x86_model;
 
 	if (cpu_model > 0xd)
 		return 0;
@@ -357,8 +357,8 @@ static int using_nmi;
 
 int __init nmi_init(struct oprofile_operations *ops)
 {
-	__u8 vendor = current_cpu_data.x86_vendor;
-	__u8 family = current_cpu_data.x86;
+	__u8 vendor = boot_cpu_data.x86_vendor;
+	__u8 family = boot_cpu_data.x86;
 	char *cpu_type;
 
 	if (!cpu_has_apic)

@@ -482,7 +482,7 @@ static int rng_dev_open (struct inode *inode, struct file *filp)
 static ssize_t rng_dev_read (struct file *filp, char __user *buf, size_t size,
 				loff_t * offp)
 {
-	static spinlock_t rng_lock = SPIN_LOCK_UNLOCKED;
+	static DEFINE_SPINLOCK(rng_lock);
 	unsigned int have_data;
 	u32 data = 0;
 	ssize_t ret = 0;

@@ -797,7 +797,7 @@ struct sa1111_save_data {
 	unsigned int	wakeen1;
 };
 
-#ifdef	CONFIG_PM
+#ifdef CONFIG_PM
 
 static int sa1111_suspend(struct device *dev, u32 state, u32 level)
 {
@@ -922,11 +922,10 @@ static int sa1111_resume(struct device *dev, u32 level)
 	return 0;
 }
 
-#else	/* !CONFIG_PM */
-#define sa1111_resume	NULL
-#define sa1111_suspend	NULL
-#endif	/* !CONFIG_PM */
-
+#else
+#define sa1111_suspend NULL
+#define sa1111_resume  NULL
+#endif
 
 static int sa1111_probe(struct device *dev)
 {

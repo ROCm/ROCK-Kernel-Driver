@@ -118,7 +118,6 @@
 #define	PERIODIC_SIZE		(1 << LOG2_PERIODIC_SIZE)
 
 struct sl811 {
-	struct usb_hcd		hcd;
 	spinlock_t		lock;
 	void __iomem		*addr_reg;
 	void __iomem		*data_reg;
@@ -158,11 +157,16 @@ struct sl811 {
 
 static inline struct sl811 *hcd_to_sl811(struct usb_hcd *hcd)
 {
-	return container_of(hcd, struct sl811, hcd);
+	return (struct sl811 *) (hcd->hcd_priv);
+}
+
+static inline struct usb_hcd *sl811_to_hcd(struct sl811 *sl811)
+{
+	return container_of((void *) sl811, struct usb_hcd, hcd_priv);
 }
 
 struct sl811h_ep {
-	struct list_head	queue;
+	struct usb_host_endpoint *hep;
 	struct usb_device	*udev;
 
 	u8			defctrl;
@@ -182,14 +186,6 @@ struct sl811h_ep {
 
 	/* async schedule */
 	struct list_head	schedule;
-};
-
-struct sl811h_req {
-	/* FIXME usbcore should maintain endpoints' urb queues
-	 * directly in 'struct usb_host_endpoint'
-	 */
-	struct urb		*urb;
-	struct list_head	queue;
 };
 
 /*-------------------------------------------------------------------------*/

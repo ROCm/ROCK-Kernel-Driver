@@ -247,7 +247,6 @@ struct snd_atiixp {
 	ac97_t *ac97[NUM_ATI_CODECS];
 
 	spinlock_t reg_lock;
-	spinlock_t ac97_lock;
 
 	atiixp_dma_t dmas[NUM_ATI_DMAS];
 	struct ac97_pcm *pcms[NUM_ATI_PCMS];
@@ -457,20 +456,14 @@ static void snd_atiixp_codec_write(atiixp_t *chip, unsigned short codec, unsigne
 static unsigned short snd_atiixp_ac97_read(ac97_t *ac97, unsigned short reg)
 {
 	atiixp_t *chip = ac97->private_data;
-	unsigned short data;
-	spin_lock(&chip->ac97_lock);
-	data = snd_atiixp_codec_read(chip, ac97->num, reg);
-	spin_unlock(&chip->ac97_lock);
-	return data;
+	return snd_atiixp_codec_read(chip, ac97->num, reg);
     
 }
 
 static void snd_atiixp_ac97_write(ac97_t *ac97, unsigned short reg, unsigned short val)
 {
 	atiixp_t *chip = ac97->private_data;
-	spin_lock(&chip->ac97_lock);
 	snd_atiixp_codec_write(chip, ac97->num, reg, val);
-	spin_unlock(&chip->ac97_lock);
 }
 
 /*
@@ -1131,7 +1124,6 @@ static int snd_atiixp_suspend(snd_card_t *card, unsigned int state)
 
 	pci_set_power_state(chip->pci, 3);
 	pci_disable_device(chip->pci);
-	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return 0;
 }
 
@@ -1151,7 +1143,6 @@ static int snd_atiixp_resume(snd_card_t *card, unsigned int state)
 		if (chip->ac97[i])
 			snd_ac97_resume(chip->ac97[i]);
 
-	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
 	return 0;
 }
 #endif /* CONFIG_PM */
@@ -1230,7 +1221,6 @@ static int __devinit snd_atiixp_create(snd_card_t *card,
 	}
 
 	spin_lock_init(&chip->reg_lock);
-	spin_lock_init(&chip->ac97_lock);
 	init_MUTEX(&chip->open_mutex);
 	chip->card = card;
 	chip->pci = pci;

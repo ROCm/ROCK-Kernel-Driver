@@ -413,16 +413,16 @@ static int __initdata sb_irq	= -1;
 static int __initdata mpu_io	= -1;
 static int __initdata mpu_irq	= -1;
 
-MODULE_PARM(io,"i");
-MODULE_PARM(irq,"i");
-MODULE_PARM(dma,"i");
-MODULE_PARM(dma2,"i");
-MODULE_PARM(sb_io,"i");
-MODULE_PARM(sb_dma,"i");
-MODULE_PARM(sb_irq,"i");
-MODULE_PARM(mpu_io,"i");
-MODULE_PARM(mpu_irq,"i");
-MODULE_PARM(joystick, "i");
+module_param(io, int, 0);
+module_param(irq, int, 0);
+module_param(dma, int, 0);
+module_param(dma2, int, 0);
+module_param(sb_io, int, 0);
+module_param(sb_dma, int, 0);
+module_param(sb_irq, int, 0);
+module_param(mpu_io, int, 0);
+module_param(mpu_irq, int, 0);
+module_param(joystick, bool, 0);
 
 static int __init init_trix(void)
 {

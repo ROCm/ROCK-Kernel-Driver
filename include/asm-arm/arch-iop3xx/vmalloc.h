@@ -13,4 +13,7 @@
 #define VMALLOC_OFFSET	  (8*1024*1024)
 #define VMALLOC_START	  (((unsigned long)high_memory + VMALLOC_OFFSET) & ~(VMALLOC_OFFSET-1))
 #define VMALLOC_VMADDR(x) ((unsigned long)(x))
-#define VMALLOC_END       (0xe8000000)
+//#define VMALLOC_END       (0xe8000000)
+/* increase usable physical RAM to ~992M per RMK */
+#define VMALLOC_END       (0xfe000000)
+

@@ -420,8 +420,8 @@ static struct address_info cfg;
 static int __initdata io = -1;
 static int __initdata irq = -1;
 
-MODULE_PARM(io,"i");
-MODULE_PARM(irq,"i");
+module_param(io, int, 0);
+module_param(irq, int, 0);
 
 /*
  *	Install a Maui card. Needs mpu401 loaded already.

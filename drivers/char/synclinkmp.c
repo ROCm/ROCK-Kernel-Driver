@@ -480,11 +480,11 @@ static int debug_level = 0;
 static int maxframe[MAX_DEVICES] = {0,};
 static int dosyncppp[MAX_DEVICES] = {0,};
 
-MODULE_PARM(break_on_load,"i");
-MODULE_PARM(ttymajor,"i");
-MODULE_PARM(debug_level,"i");
-MODULE_PARM(maxframe,"1-" __MODULE_STRING(MAX_DEVICES) "i");
-MODULE_PARM(dosyncppp,"1-" __MODULE_STRING(MAX_DEVICES) "i");
+module_param(break_on_load, bool, 0);
+module_param(ttymajor, int, 0);
+module_param(debug_level, int, 0);
+module_param_array(maxframe, int, NULL, 0);
+module_param_array(dosyncppp, int, NULL, 0);
 
 static char *driver_name = "SyncLink MultiPort driver";
 static char *driver_version = "$Revision: 4.29 $";

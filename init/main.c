@@ -373,6 +373,12 @@ static void noinline rest_init(void)
 {
 	kernel_thread(init, NULL, CLONE_FS | CLONE_SIGHAND);
 	numa_default_policy();
+	/*
+	 * Re-enable preemption but disable interrupts to make sure
+	 * we dont get preempted until we schedule() in cpu_idle().
+	 */
+	local_irq_disable();
+	preempt_enable_no_resched();
 	unlock_kernel();
  	cpu_idle();
 } 
@@ -438,6 +444,11 @@ asmlinkage void __init start_kernel(void)
 	 * time - but meanwhile we still have a functioning scheduler.
 	 */
 	sched_init();
+	/*
+	 * Disable preemption - early bootup scheduling is extremely
+	 * fragile until we cpu_idle() for the first time.
+	 */
+	preempt_disable();
 	build_all_zonelists();
 	page_alloc_init();
 	printk("Kernel command line: %s\n", saved_command_line);
@@ -688,16 +699,3 @@ static int init(void * unused)
 
 	panic("No init found.  Try passing init= option to kernel.");
 }
-
-static int early_param_test(char *rest)
-{
-	printk("early_parm_test: %s\n", rest ?: "(null)");
-	return rest ? 0 : -EINVAL;
-}
-early_param("testsetup", early_param_test);
-static int early_setup_test(char *rest)
-{
-	printk("early_setup_test: %s\n", rest ?: "(null)");
-	return 0;
-}
-__setup("testsetup_long", early_setup_test);

@@ -17,6 +17,9 @@
 
 typedef struct {
 	volatile unsigned int lock;
+#ifdef CONFIG_PREEMPT
+	unsigned int break_lock;
+#endif
 } spinlock_t;
 
 #define SPIN_LOCK_UNLOCKED (spinlock_t) { 0 }
@@ -127,6 +130,9 @@ static inline unsigned int _raw_spin_trylock(spinlock_t *lock)
 
 typedef struct {
 	volatile unsigned int lock;
+#ifdef CONFIG_PREEMPT
+	unsigned int break_lock;
+#endif
 } rwlock_t;
 
 #define RW_LOCK_UNLOCKED (rwlock_t) { 0 }
@@ -245,6 +251,8 @@ static inline void _raw_write_unlock(rwlock_t *rw)
 	: "m" (rw->lock)
 	: "memory");
 }
+
+#define _raw_read_trylock(lock) generic_raw_read_trylock(lock)
 
 static inline int _raw_write_trylock(rwlock_t *rw)
 {

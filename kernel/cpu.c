@@ -132,7 +132,8 @@ int cpu_down(unsigned int cpu)
 	__cpu_die(cpu);
 
 	/* Move it here so it can run. */
-	kthread_bind(p, smp_processor_id());
+	kthread_bind(p, get_cpu());
+	put_cpu();
 
 	/* CPU is completely dead: tell everyone.  Too late to complain. */
 	if (notifier_call_chain(&cpu_chain, CPU_DEAD, (void *)(long)cpu)

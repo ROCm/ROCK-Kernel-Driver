@@ -53,7 +53,7 @@ static void nrpn(snd_midi_op_t *ops, void *drv, snd_midi_channel_t *chan, snd_mi
 static void sysex(snd_midi_op_t *ops, void *private, unsigned char *sysex, int len, snd_midi_channel_set_t *chset);
 static void all_sounds_off(snd_midi_op_t *ops, void *private, snd_midi_channel_t *chan);
 static void all_notes_off(snd_midi_op_t *ops, void *private, snd_midi_channel_t *chan);
-void snd_midi_reset_controllers(snd_midi_channel_t *chan);
+static void snd_midi_reset_controllers(snd_midi_channel_t *chan);
 static void reset_all_channels(snd_midi_channel_set_t *chset);
 
 
@@ -549,12 +549,12 @@ sysex(snd_midi_op_t *ops, void *private, unsigned char *buf, int len, snd_midi_c
 
 		} else if (buf[5] == 0x01 && buf[6] == 0x30) {
 			/* reverb mode */
-			parsed = SNDRV_MIDI_SYSEX_GS_CHORUS_MODE;
+			parsed = SNDRV_MIDI_SYSEX_GS_REVERB_MODE;
 			chset->gs_reverb_mode = buf[7];
 
 		} else if (buf[5] == 0x01 && buf[6] == 0x38) {
 			/* chorus mode */
-			parsed = SNDRV_MIDI_SYSEX_GS_REVERB_MODE;
+			parsed = SNDRV_MIDI_SYSEX_GS_CHORUS_MODE;
 			chset->gs_chorus_mode = buf[7];
 
 		} else if (buf[5] == 0x00 && buf[6] == 0x04) {
@@ -621,7 +621,7 @@ all_notes_off(snd_midi_op_t *ops, void *drv, snd_midi_channel_t *chan)
 /*
  * Initialise a single midi channel control block.
  */
-void snd_midi_channel_init(snd_midi_channel_t *p, int n)
+static void snd_midi_channel_init(snd_midi_channel_t *p, int n)
 {
 	if (p == NULL)
 		return;
@@ -642,7 +642,7 @@ void snd_midi_channel_init(snd_midi_channel_t *p, int n)
 /*
  * Allocate and initialise a set of midi channel control blocks.
  */
-snd_midi_channel_t *snd_midi_channel_init_set(int n)
+static snd_midi_channel_t *snd_midi_channel_init_set(int n)
 {
 	snd_midi_channel_t *chan;
 	int  i;
@@ -697,7 +697,7 @@ snd_midi_channel_set_t *snd_midi_channel_alloc_set(int n)
 /*
  * Reset the midi controllers on a particular channel to default values.
  */
-void snd_midi_reset_controllers(snd_midi_channel_t *chan)
+static void snd_midi_reset_controllers(snd_midi_channel_t *chan)
 {
 	memset(chan->control, 0, sizeof(chan->control));
 	chan->gm_volume = 127;
@@ -713,8 +713,7 @@ void snd_midi_channel_free_set(snd_midi_channel_set_t *chset)
 {
 	if (chset == NULL)
 		return;
-	if (chset->channels != NULL)
-		kfree(chset->channels);
+	kfree(chset->channels);
 	kfree(chset);
 }
 
@@ -732,7 +731,5 @@ module_exit(alsa_seq_midi_emul_exit)
 
 EXPORT_SYMBOL(snd_midi_process_event);
 EXPORT_SYMBOL(snd_midi_channel_set_clear);
-EXPORT_SYMBOL(snd_midi_channel_init);
-EXPORT_SYMBOL(snd_midi_channel_init_set);
 EXPORT_SYMBOL(snd_midi_channel_alloc_set);
 EXPORT_SYMBOL(snd_midi_channel_free_set);

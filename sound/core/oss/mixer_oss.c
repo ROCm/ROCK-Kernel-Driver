@@ -360,8 +360,8 @@ static int snd_mixer_oss_ioctl1(snd_mixer_oss_file_t *fmixer, unsigned int cmd, 
 }
 
 /* FIXME: need to unlock BKL to allow preemption */
-int snd_mixer_oss_ioctl(struct inode *inode, struct file *file,
-			unsigned int cmd, unsigned long arg)
+static int snd_mixer_oss_ioctl(struct inode *inode, struct file *file,
+			       unsigned int cmd, unsigned long arg)
 {
 	int err;
 	/* FIXME: need to unlock BKL to allow preemption */
@@ -527,10 +527,8 @@ static void snd_mixer_oss_get_volume1_vol(snd_mixer_oss_file_t *fmixer,
 		*right = snd_mixer_oss_conv1(uctl->value.integer.value[1], uinfo->value.integer.min, uinfo->value.integer.max, &pslot->volume[1]);
       __unalloc:
 	up_read(&card->controls_rwsem);
-      	if (uctl)
-      		kfree(uctl);
-      	if (uinfo)
-      		kfree(uinfo);
+      	kfree(uctl);
+      	kfree(uinfo);
 }
 
 static void snd_mixer_oss_get_volume1_sw(snd_mixer_oss_file_t *fmixer,
@@ -566,10 +564,8 @@ static void snd_mixer_oss_get_volume1_sw(snd_mixer_oss_file_t *fmixer,
 		*right = 0;
       __unalloc:
 	up_read(&card->controls_rwsem);
-      	if (uctl)
-      		kfree(uctl);
-      	if (uinfo)
-		kfree(uinfo);
+      	kfree(uctl);
+	kfree(uinfo);
 }
 
 static int snd_mixer_oss_get_volume1(snd_mixer_oss_file_t *fmixer,
@@ -628,10 +624,8 @@ static void snd_mixer_oss_put_volume1_vol(snd_mixer_oss_file_t *fmixer,
 		snd_ctl_notify(card, SNDRV_CTL_EVENT_MASK_VALUE, &kctl->id);
       __unalloc:
 	up_read(&card->controls_rwsem);
-      	if (uctl)
-      		kfree(uctl);
-      	if (uinfo)
-		kfree(uinfo);
+      	kfree(uctl);
+	kfree(uinfo);
 }
 
 static void snd_mixer_oss_put_volume1_sw(snd_mixer_oss_file_t *fmixer,
@@ -673,10 +667,8 @@ static void snd_mixer_oss_put_volume1_sw(snd_mixer_oss_file_t *fmixer,
 		snd_ctl_notify(card, SNDRV_CTL_EVENT_MASK_VALUE, &kctl->id);
       __unalloc:
 	up_read(&card->controls_rwsem);
-      	if (uctl)
-      		kfree(uctl);
-      	if (uinfo)
-		kfree(uinfo);
+      	kfree(uctl);
+	kfree(uinfo);
 }
 
 static int snd_mixer_oss_put_volume1(snd_mixer_oss_file_t *fmixer,
@@ -802,10 +794,8 @@ static int snd_mixer_oss_get_recsrc2(snd_mixer_oss_file_t *fmixer, unsigned int 
 	err = 0;
       __unlock:
      	up_read(&card->controls_rwsem);
-      	if (uctl)
-      		kfree(uctl);
-      	if (uinfo)
-      		kfree(uinfo);
+      	kfree(uctl);
+      	kfree(uinfo);
       	return err;
 }
 
@@ -853,10 +843,8 @@ static int snd_mixer_oss_put_recsrc2(snd_mixer_oss_file_t *fmixer, unsigned int 
 	err = 0;
       __unlock:
 	up_read(&card->controls_rwsem);
-	if (uctl)
-		kfree(uctl);
-	if (uinfo)
-		kfree(uinfo);
+	kfree(uctl);
+	kfree(uinfo);
 	return err;
 }
 

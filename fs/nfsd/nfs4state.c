@@ -802,9 +802,8 @@ nfsd4_setclientid_confirm(struct svc_rqst *rqstp, struct nfsd4_setclientid_confi
 	clientid_t * clid = &setclientid_confirm->sc_clientid;
 	int status;
 
-	status = nfserr_stale_clientid;
 	if (STALE_CLIENTID(clid))
-		goto out;
+		return nfserr_stale_clientid;
 	/* 
 	 * XXX The Duplicate Request Cache (DRC) has been checked (??)
 	 * We get here on a DRC miss.

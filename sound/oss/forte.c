@@ -238,7 +238,7 @@ forte_ac97_wait (struct forte_chip *chip)
  * @reg:	register to read
  */
 
-u16
+static u16
 forte_ac97_read (struct ac97_codec *codec, u8 reg)
 {
 	u16 ret = 0;
@@ -283,7 +283,7 @@ forte_ac97_read (struct ac97_codec *codec, u8 reg)
  * @val:	value to write
  */
 
-void
+static void
 forte_ac97_write (struct ac97_codec *codec, u8 reg, u16 val)
 {
 	struct forte_chip *chip = codec->private_data;

@@ -2026,7 +2026,7 @@ static int __devinit cx8800_initdev(struct pci_dev *pci_dev,
 
 	/* initialize driver struct */
         init_MUTEX(&dev->lock);
-	dev->slock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&dev->slock);
 	core->tvnorm = tvnorms;
 
 	/* init video dma queues */

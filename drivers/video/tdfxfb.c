@@ -210,39 +210,19 @@ static char *mode_option __initdata = NULL;
 
 #ifdef VGA_REG_IO 
 static inline  u8 vga_inb(struct tdfx_par *par, u32 reg) { return inb(reg); }
-static inline u16 vga_inw(struct tdfx_par *par, u32 reg) { return inw(reg); }
-static inline u16 vga_inl(struct tdfx_par *par, u32 reg) { return inl(reg); }
 
 static inline void vga_outb(struct tdfx_par *par, u32 reg,  u8 val) { outb(val, reg); }
-static inline void vga_outw(struct tdfx_par *par, u32 reg, u16 val) { outw(val, reg); }
-static inline void vga_outl(struct tdfx_par *par, u32 reg, u32 val) { outl(val, reg); }
 #else
 static inline  u8 vga_inb(struct tdfx_par *par, u32 reg) { 
 	return inb(par->iobase + reg - 0x300); 
 }
-static inline u16 vga_inw(struct tdfx_par *par, u32 reg) { 
-	return inw(par->iobase + reg - 0x300); 
-}
-static inline u16 vga_inl(struct tdfx_par *par, u32 reg) { 
-	return inl(par->iobase + reg - 0x300); 
-}
 static inline void vga_outb(struct tdfx_par *par, u32 reg,  u8 val) { 
 	outb(val, par->iobase + reg - 0x300); 
-}
-static inline void vga_outw(struct tdfx_par *par, u32 reg, u16 val) { 
-	outw(val, par->iobase + reg - 0x300); 
-}
-static inline void vga_outl(struct tdfx_par *par, u32 reg, u32 val) { 
-	outl(val, par->iobase + reg - 0x300); 
 }
 #endif
 
 static inline void gra_outb(struct tdfx_par *par, u32 idx, u8 val) {
 	vga_outb(par, GRA_I, idx); vga_outb(par, GRA_D, val);
-}
-
-static inline u8 gra_inb(struct tdfx_par *par, u32 idx) {
-	vga_outb(par, GRA_I, idx); return vga_inb(par, GRA_D);
 }
 
 static inline void seq_outb(struct tdfx_par *par, u32 idx, u8 val) {
@@ -270,15 +250,6 @@ static inline void att_outb(struct tdfx_par *par, u32 idx, u8 val)
 	vga_outb(par, ATT_IW, val);
 }
 
-static inline u8 att_inb(struct tdfx_par *par, u32 idx) 
-{
-	unsigned char tmp;
-
-	tmp = vga_inb(par, IS1_R);
-	vga_outb(par, ATT_IW, idx);
-	return vga_inb(par, ATT_IW);
-}
-
 static inline void vga_disable_video(struct tdfx_par *par)
 {
 	unsigned char s;
@@ -297,12 +268,6 @@ static inline void vga_enable_video(struct tdfx_par *par)
 	seq_outb(par, 0x00, 0x01);
 	seq_outb(par, 0x01, s);
 	seq_outb(par, 0x00, 0x03);
-}
-
-static inline void vga_disable_palette(struct tdfx_par *par)
-{
-	vga_inb(par, IS1_R);
-	vga_outb(par, ATT_IW, 0x00);
 }
 
 static inline void vga_enable_palette(struct tdfx_par *par)

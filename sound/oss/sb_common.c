@@ -81,7 +81,7 @@ static int      smw_ucodeLen;
 
 #endif
 
-sb_devc *last_sb;		/* Last sb loaded */
+static sb_devc *last_sb;		/* Last sb loaded */
 
 int sb_dsp_command(sb_devc * devc, unsigned char val)
 {
@@ -521,7 +521,7 @@ int sb_dsp_detect(struct address_info *hw_config, int pci, int pciio, struct sb_
 	
 	DDB(printk("sb_dsp_detect(%x) entered\n", hw_config->io_base));
 
-	devc->lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&devc->lock);
 	devc->type = hw_config->card_subtype;
 
 	devc->base = hw_config->io_base;
@@ -874,14 +874,6 @@ int sb_dsp_init(struct address_info *hw_config, struct module *owner)
 		MDB(printk("Sound Blaster:  no audio devices found.\n"));
 	}
 	return 1;
-}
-
-void sb_dsp_disable_midi(int io_base)
-{
-}
-
-void sb_dsp_disable_recording(int io_base)
-{
 }
 
 /* if (sbmpu) below we allow mpu401 to manage the midi devs
@@ -1292,7 +1284,6 @@ void unload_sbmpu(struct address_info *hw_config)
 EXPORT_SYMBOL(sb_dsp_init);
 EXPORT_SYMBOL(sb_dsp_detect);
 EXPORT_SYMBOL(sb_dsp_unload);
-EXPORT_SYMBOL(sb_dsp_disable_midi);
 EXPORT_SYMBOL(sb_be_quiet);
 EXPORT_SYMBOL(probe_sbmpu);
 EXPORT_SYMBOL(unload_sbmpu);

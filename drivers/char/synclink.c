@@ -886,16 +886,16 @@ static int dosyncppp[MAX_TOTAL_DEVICES];
 static int txdmabufs[MAX_TOTAL_DEVICES];
 static int txholdbufs[MAX_TOTAL_DEVICES];
 	
-MODULE_PARM(break_on_load,"i");
-MODULE_PARM(ttymajor,"i");
-MODULE_PARM(io,"1-" __MODULE_STRING(MAX_ISA_DEVICES) "i");
-MODULE_PARM(irq,"1-" __MODULE_STRING(MAX_ISA_DEVICES) "i");
-MODULE_PARM(dma,"1-" __MODULE_STRING(MAX_ISA_DEVICES) "i");
-MODULE_PARM(debug_level,"i");
-MODULE_PARM(maxframe,"1-" __MODULE_STRING(MAX_TOTAL_DEVICES) "i");
-MODULE_PARM(dosyncppp,"1-" __MODULE_STRING(MAX_TOTAL_DEVICES) "i");
-MODULE_PARM(txdmabufs,"1-" __MODULE_STRING(MAX_TOTAL_DEVICES) "i");
-MODULE_PARM(txholdbufs,"1-" __MODULE_STRING(MAX_TOTAL_DEVICES) "i");
+module_param(break_on_load, bool, 0);
+module_param(ttymajor, int, 0);
+module_param_array(io, int, NULL, 0);
+module_param_array(irq, int, NULL, 0);
+module_param_array(dma, int, NULL, 0);
+module_param(debug_level, int, 0);
+module_param_array(maxframe, int, NULL, 0);
+module_param_array(dosyncppp, int, NULL, 0);
+module_param_array(txdmabufs, int, NULL, 0);
+module_param_array(txholdbufs, int, NULL, 0);
 
 static char *driver_name = "SyncLink serial driver";
 static char *driver_version = "$Revision: 4.28 $";

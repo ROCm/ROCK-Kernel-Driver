@@ -198,16 +198,6 @@ MODULE_AUTHOR("Maintainer: Samuel Chessman <chessman@tux.org>");
 MODULE_DESCRIPTION("Driver for TI ThunderLAN based ethernet PCI adapters");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(aui, "1-" __MODULE_STRING(MAX_TLAN_BOARDS) "i");
-MODULE_PARM(duplex, "1-" __MODULE_STRING(MAX_TLAN_BOARDS) "i");
-MODULE_PARM(speed, "1-" __MODULE_STRING(MAX_TLAN_BOARDS) "i");
-MODULE_PARM(debug, "i");
-MODULE_PARM(bbuf, "i");
-MODULE_PARM_DESC(aui, "ThunderLAN use AUI port(s) (0-1)");
-MODULE_PARM_DESC(duplex, "ThunderLAN duplex setting(s) (0-default, 1-half, 2-full)");
-MODULE_PARM_DESC(speed, "ThunderLAN port speen setting(s) (0,10,100)");
-MODULE_PARM_DESC(debug, "ThunderLAN debug mask");
-MODULE_PARM_DESC(bbuf, "ThunderLAN use big buffer (0-1)");
 
 /* Define this to enable Link beat monitoring */
 #undef MONITOR

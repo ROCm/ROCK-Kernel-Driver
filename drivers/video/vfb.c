@@ -35,7 +35,7 @@
 
 static void *videomemory;
 static u_long videomemorysize = VIDEOMEMSIZE;
-MODULE_PARM(videomemorysize, "l");
+module_param(videomemorysize, ulong, 0);
 
 static struct fb_var_screeninfo vfb_default __initdata = {
 	.xres =		640,
@@ -70,7 +70,7 @@ static struct fb_fix_screeninfo vfb_fix __initdata = {
 };
 
 static int vfb_enable __initdata = 0;	/* disabled by default */
-MODULE_PARM(vfb_enable, "i");
+module_param(vfb_enable, bool, 0);
 
     /*
      *  Interface used by the world

@@ -45,6 +45,23 @@ static inline int pending_resume_signal(struct sigpending *pending)
 }
 
 /*
+ * Turn a tracing stop into a normal stop now, since with no tracer there
+ * would be no way to wake it up with SIGCONT or SIGKILL.  If there was a
+ * signal sent that would resume the child, but didn't because it was in
+ * TASK_TRACED, resume it now.
+ */
+void ptrace_untrace(task_t *child)
+{
+	spin_lock(&child->sighand->siglock);
+	child->state = TASK_STOPPED;
+	if (pending_resume_signal(&child->pending) ||
+	    pending_resume_signal(&child->signal->shared_pending)) {
+		signal_wake_up(child, 1);
+	}
+	spin_unlock(&child->sighand->siglock);
+}
+
+/*
  * unptrace a task: move it back to its original parent and
  * remove it from the ptrace list.
  *
@@ -55,29 +72,15 @@ void __ptrace_unlink(task_t *child)
 	if (!child->ptrace)
 		BUG();
 	child->ptrace = 0;
-	if (list_empty(&child->ptrace_list))
-		return;
-	list_del_init(&child->ptrace_list);
-	REMOVE_LINKS(child);
-	child->parent = child->real_parent;
-	SET_LINKS(child);
-
-	if (child->state == TASK_TRACED) {
-		/*
-		 * Turn a tracing stop into a normal stop now,
-		 * since with no tracer there would be no way
-		 * to wake it up with SIGCONT or SIGKILL.
-		 * If there was a signal sent that would resume the child,
-		 * but didn't because it was in TASK_TRACED, resume it now.
-		 */
-		spin_lock(&child->sighand->siglock);
-		child->state = TASK_STOPPED;
-		if (pending_resume_signal(&child->pending) ||
-		    pending_resume_signal(&child->signal->shared_pending)) {
-			signal_wake_up(child, 1);
-		}
-		spin_unlock(&child->sighand->siglock);
+	if (!list_empty(&child->ptrace_list)) {
+		list_del_init(&child->ptrace_list);
+		REMOVE_LINKS(child);
+		child->parent = child->real_parent;
+		SET_LINKS(child);
 	}
+
+	if (child->state == TASK_TRACED)
+		ptrace_untrace(child);
 }
 
 /*

@@ -200,7 +200,6 @@ static int __init b1pcmcia_init(void)
 {
 	char *p;
 	char rev[32];
-	int err;
 
 	if ((p = strchr(revision, ':')) != 0 && p[1]) {
 		strlcpy(rev, p + 2, 32);

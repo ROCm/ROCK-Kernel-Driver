@@ -19,7 +19,6 @@
 #include <asm/assembler.h>
 #include <asm/constants.h>
 #include <asm/pgtable.h>
-#include <asm/domain.h>
 #include <asm/procinfo.h>
 #include <asm/ptrace.h>
 
@@ -390,37 +389,29 @@ __arm1026_setup:
 	mov	r0, #4				@ explicitly disable writeback
 	mcr	p15, 7, r0, c15, c0, 0
 #endif
-	mov	r0, #(domain_val(DOMAIN_USER, DOMAIN_MANAGER) | \
-		      domain_val(DOMAIN_KERNEL, DOMAIN_MANAGER) | \
-		      domain_val(DOMAIN_TABLE, DOMAIN_MANAGER) | \
-		      domain_val(DOMAIN_IO, DOMAIN_CLIENT))
-	mcr	p15, 0, r0, c3, c0		@ load domain access register
 	mrc	p15, 0, r0, c1, c0		@ get control register v4
-/*
- * Clear out 'unwanted' bits (then put them in if we need them)
- */
-	bic	r0, r0, #0x1e00 		@ ...i??r.........
-	bic	r0, r0, #0x000e 		@ ............wca.
-/*
- * Turn on what we want
- */
-	orr	r0, r0, #0x0031 		@ ..........DP...M
-	orr	r0, r0, #0x2100 		@ ..V....S........
-
+	ldr	r5, arm1026_cr1_clear
+	bic	r0, r0, r5
+	ldr	r5, arm1026_cr1_set
+	orr	r0, r0, r5
 #ifdef CONFIG_CPU_CACHE_ROUND_ROBIN
-	orr	r0, r0, #0x4000 		@ .R..............
-#endif
-#ifndef CONFIG_CPU_BPREDICT_DISABLE
-	orr	r0, r0, #0x0800 		@ ....Z...........
-#endif
-#ifndef CONFIG_CPU_DCACHE_DISABLE
-	orr	r0, r0, #0x0004 		@ .............C..
-#endif
-#ifndef CONFIG_CPU_ICACHE_DISABLE
-	orr	r0, r0, #0x1000 		@ ...I............
+	orr	r0, r0, #0x4000 		@ .R.. .... .... ....
 #endif
 	mov	pc, lr
 	.size	__arm1026_setup, . - __arm1026_setup
+
+	/*
+	 *  R
+	 * .RVI ZFRS BLDP WCAM
+	 * .011 1001 ..11 0101
+	 * 
+	 */
+	.type	arm1026_cr1_clear, #object
+	.type	arm1026_cr1_set, #object
+arm1026_cr1_clear:
+	.word	0x7f3f
+arm1026_cr1_set:
+	.word	0x3935
 
 	__INITDATA
 

@@ -41,7 +41,4 @@ struct emu10k1_wavedevice
         u16 enablebits;
 };
 
-void emu10k1_waveout_bh(unsigned long);
-void emu10k1_wavein_bh(unsigned long);
-
 #endif /* _AUDIO_H */

@@ -32,7 +32,7 @@
 #include <asm/tlbflush.h>
 #include <linux/swapops.h>
 
-spinlock_t swaplock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(swaplock);
 unsigned int nr_swapfiles;
 long total_swap_pages;
 static int swap_overflow;

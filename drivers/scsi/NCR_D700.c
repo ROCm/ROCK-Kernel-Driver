@@ -111,7 +111,7 @@ char *NCR_D700;			/* command line from insmod */
 MODULE_AUTHOR("James Bottomley");
 MODULE_DESCRIPTION("NCR Dual700 SCSI Driver");
 MODULE_LICENSE("GPL");
-MODULE_PARM(NCR_D700, "s");
+module_param(NCR_D700, charp, 0);
 
 static __u8 __initdata id_array[2*(MCA_MAX_SLOT_NR + 1)] =
 	{ [0 ... 2*(MCA_MAX_SLOT_NR + 1)-1] = 7 };

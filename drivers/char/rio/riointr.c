@@ -84,83 +84,10 @@ static char *_riointr_c_sccs_ = "@(#)riointr.c	1.2";
 #include "rioioctl.h"
 
 
+static void RIOReceive(struct rio_info *, struct Port *);
 
 
-/*
-** riopoll is called every clock tick. Once the /dev/rio device has been
-** opened, and polldistributed( ) has been called, this routine is called
-** every clock tick *by every cpu*. The 'interesting' piece of code that
-** manipulates 'RIONumCpus' and 'RIOCpuCountdown' is used to fair-share
-** the work between the CPUs. If there are 'N' cpus, then each poll time
-** we increment a counter, modulo 'N-1'. When this counter is 0, we call
-** the interrupt handler. This has the effect that polls are serviced
-** by processor 'N', 'N-1', 'N-2', ... '0', round and round. Neat.
-*/
-void
-riopoll(p)
-struct rio_info *	p;
-{
-	int   host;
-
-	/*
-	** Here's the deal. We try to fair share as much as possible amongst
-	** all the processors that are available. Since each processor 
-	** should generate HZ ticks per second and since we only need HZ ticks
-	** in total for proper operation we simply attempt to cycle round each
-	** processor in turn, using RIOCpuCountdown to decide whether to call
-	** the interrupt routine. ( In fact the count zeroes when it reaches
-	** one less than the total number of processors - so e.g. on a two
-	** processor system RIOService will get called 2*HZ times per second. )
-	** this_cpu (cur_cpu()) tells us the number of the current processor
-	** as follows:
-	**
-	**		0 - default CPU
-	**		1 - first extra CPU
-	**		2 - second extra CPU
-	**		etc.
-	*/
-
-	/*
-	** okay, we've got a cpu that hasn't had a go recently 
-	** - lets check to see what needs doing.
-	*/
-	for ( host=0; host<p->RIONumHosts; host++ ) {
-		struct Host *HostP = &p->RIOHosts[host];
-
-		rio_spin_lock( &HostP->HostLock );
-
-		if ( ( (HostP->Flags & RUN_STATE) != RC_RUNNING ) ||
-		     HostP->InIntr ) {
-			rio_spin_unlock (&HostP->HostLock); 
-			continue;
-		}
-
-		if ( RWORD( HostP->ParmMapP->rup_intr ) ||
-			 RWORD( HostP->ParmMapP->rx_intr  ) ||
-			 RWORD( HostP->ParmMapP->tx_intr  ) ) {
-			HostP->InIntr = 1;
-
-#ifdef FUTURE_RELEASE
-			if( HostP->Type == RIO_EISA )
-				INBZ( HostP->Slot, EISA_INTERRUPT_RESET );
-			else
-#endif
-				WBYTE( HostP->ResetInt , 0xff );
-
-			rio_spin_lock(&HostP->HostLock); 
-
-			p->_RIO_Polled++;
-			RIOServiceHost(p, HostP, 'p' );
-			rio_spin_lock( &HostP->HostLock); 
-			HostP->InIntr = 0;
-			rio_spin_unlock (&HostP->HostLock);
-		}
-	}
-	rio_spin_unlock (&p->RIOIntrSem); 
-}
-
-
-char *firstchars (char *p, int nch)
+static char *firstchars (char *p, int nch)
 {
   static char buf[2][128];
   static int t=0;
@@ -256,93 +183,6 @@ char *		en;
 
 }
 
-
-/*
-** When a real-life interrupt comes in here, we try to find out
-** which host card it belongs to, and then service only that host
-** Notice the cunning way that, once we've found a candidate, we
-** continue just in case we are sharing interrupts.
-*/
-void
-riointr(p)
-struct rio_info *	p;
-{
-	int host;
-
-	for ( host=0; host<p->RIONumHosts; host++ ) {
-		struct Host *HostP = &p->RIOHosts[host];
-
-		rio_dprintk (RIO_DEBUG_INTR,  "riointr() doing host %d type %d\n", host, HostP->Type);
-
-		switch( HostP->Type ) {
-			case RIO_AT:
-			case RIO_MCA:
-			case RIO_PCI:
-			  	rio_spin_lock(&HostP->HostLock);
-				WBYTE(HostP->ResetInt , 0xff);
-				if ( !HostP->InIntr ) {
-					HostP->InIntr = 1;
-					rio_spin_unlock (&HostP->HostLock);
-					p->_RIO_Interrupted++;
-					RIOServiceHost(p, HostP, 'i');
-					rio_spin_lock(&HostP->HostLock);
-					HostP->InIntr = 0;
-				}
-				rio_spin_unlock(&HostP->HostLock); 
-				break;
-#ifdef FUTURE_RELEASE
-		case RIO_EISA:
-			if ( ivec == HostP->Ivec )
-			{
-				OldSpl = LOCKB( &HostP->HostLock );
-				INBZ( HostP->Slot, EISA_INTERRUPT_RESET );
-				if ( !HostP->InIntr )
-				{
-					HostP->InIntr = 1;
-					UNLOCKB( &HostP->HostLock, OldSpl );
-					if ( this_cpu < RIO_CPU_LIMIT )
-					{
-						int intrSpl = LOCKB( &RIOIntrLock );
-						UNLOCKB( &RIOIntrLock, intrSpl );
-					}
-						p->_RIO_Interrupted++;
-					RIOServiceHost( HostP, 'i' );
-					OldSpl = LOCKB( &HostP->HostLock );
-					HostP->InIntr = 0;
-				}
-				UNLOCKB( &HostP->HostLock, OldSpl );
-				done++;
-			}
-			break;
-#endif
-		}
-
-		HostP->IntSrvDone++;
-	}
-
-#ifdef FUTURE_RELEASE
-	if ( !done )
-	{
-		cmn_err( CE_WARN, "RIO: Interrupt received with vector 0x%x\n", ivec );
-		cmn_err( CE_CONT, "	 Valid vectors are:\n");
-		for ( host=0; host<RIONumHosts; host++ )
-		{
-			switch( RIOHosts[host].Type )
-			{
-				case RIO_AT:
-				case RIO_MCA:
-				case RIO_EISA:
-						cmn_err( CE_CONT, "0x%x ", RIOHosts[host].Ivec );
-						break;
-				case RIO_PCI:
-						cmn_err( CE_CONT, "0x%x ", get_intr_arg( RIOHosts[host].PciDevInfo.busnum, IDIST_PCI_IRQ( RIOHosts[host].PciDevInfo.slotnum, RIOHosts[host].PciDevInfo.funcnum ) ));
-						break;
-			}
-		}
-		cmn_err( CE_CONT, "\n" );
-	}
-#endif
-}
 
 /*
 ** RIO Host Service routine. Does all the work traditionally associated with an
@@ -710,7 +550,7 @@ int From;
 ** NB: Called with the tty locked. The spl from the lockb( ) is passed.
 ** we return the ttySpl level that we re-locked at.
 */
-void
+static void
 RIOReceive(p, PortP)
 struct rio_info *	p;
 struct Port *		PortP;

@@ -343,7 +343,7 @@ int cx8802_init_common(struct cx8802_dev *dev)
 
 	/* initialize driver struct */
         init_MUTEX(&dev->lock);
-	dev->slock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&dev->slock);
 
 	/* init dma queue */
 	INIT_LIST_HEAD(&dev->mpegq.active);

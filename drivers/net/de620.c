@@ -190,12 +190,12 @@ static unsigned int de620_debug = DE620_DEBUG;
 
 static spinlock_t de620_lock;
 
-MODULE_PARM(bnc, "i");
-MODULE_PARM(utp, "i");
-MODULE_PARM(io, "i");
-MODULE_PARM(irq, "i");
-MODULE_PARM(clone, "i");
-MODULE_PARM(de620_debug, "i");
+module_param(bnc, int, 0);
+module_param(utp, int, 0);
+module_param(io, int, 0);
+module_param(irq, int, 0);
+module_param(clone, int, 0);
+module_param(de620_debug, int, 0);
 MODULE_PARM_DESC(bnc, "DE-620 set BNC medium (0-1)");
 MODULE_PARM_DESC(utp, "DE-620 set UTP medium (0-1)");
 MODULE_PARM_DESC(io, "DE-620 I/O base address,required");

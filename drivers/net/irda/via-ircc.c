@@ -73,7 +73,7 @@ static int qos_mtt_bits = 0x07;	/* 1 ms or more */
 static int dongle_id = 0;	/* default: probe */
 
 /* We can't guess the type of connected dongle, user *must* supply it. */
-MODULE_PARM(dongle_id, "i");
+module_param(dongle_id, int, 0);
 
 /* FIXME : we should not need this, because instances should be automatically
  * managed by the PCI layer. Especially that we seem to only be using the

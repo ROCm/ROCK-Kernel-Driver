@@ -99,8 +99,8 @@ static Scsi_Host_Template qlogicfas_driver_template = {
 static unsigned int irq_mask = 0xdeb8;
 static int irq_list[4] = { -1 };
 
-MODULE_PARM(irq_mask, "i");
-MODULE_PARM(irq_list, "1-4i");
+module_param(irq_mask, int, 0);
+module_param_array(irq_list, int, NULL, 0);
 
 /*====================================================================*/
 

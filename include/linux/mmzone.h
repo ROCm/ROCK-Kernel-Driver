@@ -22,7 +22,6 @@
 
 struct free_area {
 	struct list_head	free_list;
-	unsigned long		*map;
 	unsigned long		nr_free;
 };
 
@@ -272,7 +271,6 @@ typedef struct pglist_data {
 #define node_present_pages(nid)	(NODE_DATA(nid)->node_present_pages)
 #define node_spanned_pages(nid)	(NODE_DATA(nid)->node_spanned_pages)
 
-extern int numnodes;
 extern struct pglist_data *pgdat_list;
 
 void __get_zone_counts(unsigned long *active, unsigned long *inactive,
@@ -311,7 +309,7 @@ static inline struct zone *next_zone(struct zone *zone)
 {
 	pg_data_t *pgdat = zone->zone_pgdat;
 
-	if (zone - pgdat->node_zones < MAX_NR_ZONES - 1)
+	if (zone < pgdat->node_zones + MAX_NR_ZONES - 1)
 		zone++;
 	else if (pgdat->pgdat_next) {
 		pgdat = pgdat->pgdat_next;
@@ -357,12 +355,12 @@ static inline int is_normal_idx(int idx)
  */
 static inline int is_highmem(struct zone *zone)
 {
-	return (is_highmem_idx(zone - zone->zone_pgdat->node_zones));
+	return zone == zone->zone_pgdat->node_zones + ZONE_HIGHMEM;
 }
 
 static inline int is_normal(struct zone *zone)
 {
-	return (is_normal_idx(zone - zone->zone_pgdat->node_zones));
+	return zone == zone->zone_pgdat->node_zones + ZONE_NORMAL;
 }
 
 /* These two functions are used to setup the per zone pages min values */
@@ -375,7 +373,7 @@ int lower_zone_protection_sysctl_handler(struct ctl_table *, int, struct file *,
 
 #include <linux/topology.h>
 /* Returns the number of the current Node. */
-#define numa_node_id()		(cpu_to_node(smp_processor_id()))
+#define numa_node_id()		(cpu_to_node(_smp_processor_id()))
 
 #ifndef CONFIG_DISCONTIGMEM
 

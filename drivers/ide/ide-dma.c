@@ -116,7 +116,6 @@ static const struct drive_list_entry drive_blacklist [] = {
 	{ "Compaq CRD-8241B"	,	"ALL"		},
 	{ "CRD-8400B"		,	"ALL"		},
 	{ "CRD-8480B",			"ALL"		},
-	{ "CRD-8480C",			"ALL"		},
 	{ "CRD-8482B",			"ALL"		},
  	{ "CRD-84"		,	"ALL"		},
 	{ "SanDisk SDP3B"	,	"ALL"		},
@@ -184,7 +183,7 @@ ide_startstop_t ide_dma_intr (ide_drive_t *drive)
 		printk(KERN_ERR "%s: dma_intr: bad DMA status (dma_stat=%x)\n", 
 		       drive->name, dma_stat);
 	}
-	return DRIVER(drive)->error(drive, "dma_intr", stat);
+	return ide_error(drive, "dma_intr", stat);
 }
 
 EXPORT_SYMBOL_GPL(ide_dma_intr);

@@ -1603,24 +1603,6 @@ MODULE_AUTHOR				("Andrew Veliath <andrewtv@usa.net>");
 MODULE_DESCRIPTION			("Turtle Beach " LONGNAME " Linux Driver");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM				(io, "i");
-MODULE_PARM				(irq, "i");
-MODULE_PARM				(mem, "i");
-MODULE_PARM				(write_ndelay, "i");
-MODULE_PARM				(fifosize, "i");
-MODULE_PARM				(calibrate_signal, "i");
-#ifndef MSND_CLASSIC
-MODULE_PARM				(digital, "i");
-MODULE_PARM				(cfg, "i");
-MODULE_PARM				(reset, "i");
-MODULE_PARM				(mpu_io, "i");
-MODULE_PARM				(mpu_irq, "i");
-MODULE_PARM				(ide_io0, "i");
-MODULE_PARM				(ide_io1, "i");
-MODULE_PARM				(ide_irq, "i");
-MODULE_PARM				(joystick_io, "i");
-#endif
-
 static int io __initdata =		-1;
 static int irq __initdata =		-1;
 static int mem __initdata =		-1;
@@ -1726,6 +1708,23 @@ static int
 calibrate_signal __initdata =		CONFIG_MSND_CALSIGNAL;
 #endif /* MODULE */
 
+module_param				(io, int, 0);
+module_param				(irq, int, 0);
+module_param				(mem, int, 0);
+module_param				(write_ndelay, int, 0);
+module_param				(fifosize, int, 0);
+module_param				(calibrate_signal, int, 0);
+#ifndef MSND_CLASSIC
+module_param				(digital, bool, 0);
+module_param				(cfg, int, 0);
+module_param				(reset, int, 0);
+module_param				(mpu_io, int, 0);
+module_param				(mpu_irq, int, 0);
+module_param				(ide_io0, int, 0);
+module_param				(ide_io1, int, 0);
+module_param				(ide_irq, int, 0);
+module_param				(joystick_io, int, 0);
+#endif
 
 static int __init msnd_init(void)
 {

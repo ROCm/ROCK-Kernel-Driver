@@ -246,36 +246,36 @@ MODULE_DESCRIPTION("Support for Cisco/Aironet 802.11 wireless ethernet \
 		   for PCMCIA when used with airo_cs.");
 MODULE_LICENSE("Dual BSD/GPL");
 MODULE_SUPPORTED_DEVICE("Aironet 4500, 4800 and Cisco 340/350");
-MODULE_PARM(io,"1-4i");
-MODULE_PARM(irq,"1-4i");
-MODULE_PARM(basic_rate,"i");
-MODULE_PARM(rates,"1-8i");
-MODULE_PARM(ssids,"1-3s");
-MODULE_PARM(auto_wep,"i");
+module_param_array(io, int, NULL, 0);
+module_param_array(irq, int, NULL, 0);
+module_param(basic_rate, int, 0);
+module_param_array(rates, int, NULL, 0);
+module_param_array(ssids, charp, NULL, 0);
+module_param(auto_wep, int, 0);
 MODULE_PARM_DESC(auto_wep, "If non-zero, the driver will keep looping through \
 the authentication options until an association is made.  The value of \
 auto_wep is number of the wep keys to check.  A value of 2 will try using \
 the key at index 0 and index 1.");
-MODULE_PARM(aux_bap,"i");
+module_param(aux_bap, int, 0);
 MODULE_PARM_DESC(aux_bap, "If non-zero, the driver will switch into a mode \
 than seems to work better for older cards with some older buses.  Before \
 switching it checks that the switch is needed.");
-MODULE_PARM(maxencrypt, "i");
+module_param(maxencrypt, int, 0);
 MODULE_PARM_DESC(maxencrypt, "The maximum speed that the card can do \
 encryption.  Units are in 512kbs.  Zero (default) means there is no limit. \
 Older cards used to be limited to 2mbs (4).");
-MODULE_PARM(adhoc, "i");
+module_param(adhoc, int, 0);
 MODULE_PARM_DESC(adhoc, "If non-zero, the card will start in adhoc mode.");
-MODULE_PARM(probe, "i");
+module_param(probe, int, 0);
 MODULE_PARM_DESC(probe, "If zero, the driver won't start the card.");
 
-MODULE_PARM(proc_uid, "i");
+module_param(proc_uid, int, 0);
 MODULE_PARM_DESC(proc_uid, "The uid that the /proc files will belong to.");
-MODULE_PARM(proc_gid, "i");
+module_param(proc_gid, int, 0);
 MODULE_PARM_DESC(proc_gid, "The gid that the /proc files will belong to.");
-MODULE_PARM(airo_perm, "i");
+module_param(airo_perm, int, 0);
 MODULE_PARM_DESC(airo_perm, "The permission bits of /proc/[driver/]aironet.");
-MODULE_PARM(proc_perm, "i");
+module_param(proc_perm, int, 0);
 MODULE_PARM_DESC(proc_perm, "The permission bits of the files in /proc");
 
 /* This is a kind of sloppy hack to get this information to OUT4500 and

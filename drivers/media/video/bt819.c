@@ -61,7 +61,7 @@ MODULE_LICENSE("GPL");
 #include <linux/video_decoder.h>
 
 static int debug = 0;
-MODULE_PARM(debug, "i");
+module_param(debug, int, 0);
 MODULE_PARM_DESC(debug, "Debug level (0-1)");
 
 #define dprintk(num, format, args...) \
@@ -95,7 +95,7 @@ struct timing {
 };
 
 /* for values, see the bt819 datasheet */
-struct timing timing_data[] = {
+static struct timing timing_data[] = {
 	{864 - 24, 20, 625 - 2, 1, 0x0504, 0x0000},
 	{858 - 24, 20, 525 - 2, 1, 0x00f8, 0x0000},
 };

@@ -990,7 +990,7 @@ config SYSCLK_100
 
 endchoice
 
-config AU1000_USB_DEVICE
+config AU1X00_USB_DEVICE
 	bool
 	depends on MIPS_PB1500 || MIPS_PB1100 || MIPS_PB1000
 	default n

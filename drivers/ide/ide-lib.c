@@ -445,6 +445,114 @@ int ide_set_xfer_rate(ide_drive_t *drive, u8 rate)
 
 EXPORT_SYMBOL_GPL(ide_set_xfer_rate);
 
+static void ide_dump_opcode(ide_drive_t *drive)
+{
+	struct request *rq;
+	u8 opcode = 0;
+	int found = 0;
+
+	spin_lock(&ide_lock);
+	rq = NULL;
+	if (HWGROUP(drive))
+		rq = HWGROUP(drive)->rq;
+	spin_unlock(&ide_lock);
+	if (!rq)
+		return;
+	if (rq->flags & (REQ_DRIVE_CMD | REQ_DRIVE_TASK)) {
+		char *args = rq->buffer;
+		if (args) {
+			opcode = args[0];
+			found = 1;
+		}
+	} else if (rq->flags & REQ_DRIVE_TASKFILE) {
+		ide_task_t *args = rq->special;
+		if (args) {
+			task_struct_t *tf = (task_struct_t *) args->tfRegister;
+			opcode = tf->command;
+			found = 1;
+		}
+	}
+
+	printk("ide: failed opcode was: ");
+	if (!found)
+		printk("unknown\n");
+	else
+		printk("0x%02x\n", opcode);
+}
+
+static u8 ide_dump_ata_status(ide_drive_t *drive, const char *msg, u8 stat)
+{
+	ide_hwif_t *hwif = HWIF(drive);
+	unsigned long flags;
+	u8 err = 0;
+
+	local_irq_set(flags);
+	printk("%s: %s: status=0x%02x", drive->name, msg, stat);
+	printk(" { ");
+	if (stat & BUSY_STAT)
+		printk("Busy ");
+	else {
+		if (stat & READY_STAT)	printk("DriveReady ");
+		if (stat & WRERR_STAT)	printk("DeviceFault ");
+		if (stat & SEEK_STAT)	printk("SeekComplete ");
+		if (stat & DRQ_STAT)	printk("DataRequest ");
+		if (stat & ECC_STAT)	printk("CorrectedError ");
+		if (stat & INDEX_STAT)	printk("Index ");
+		if (stat & ERR_STAT)	printk("Error ");
+	}
+	printk("}");
+	printk("\n");
+	if ((stat & (BUSY_STAT|ERR_STAT)) == ERR_STAT) {
+		err = hwif->INB(IDE_ERROR_REG);
+		printk("%s: %s: error=0x%02x", drive->name, msg, err);
+		printk(" { ");
+		if (err & ABRT_ERR)	printk("DriveStatusError ");
+		if (err & ICRC_ERR)
+			printk("Bad%s ", (err & ABRT_ERR) ? "CRC" : "Sector");
+		if (err & ECC_ERR)	printk("UncorrectableError ");
+		if (err & ID_ERR)	printk("SectorIdNotFound ");
+		if (err & TRK0_ERR)	printk("TrackZeroNotFound ");
+		if (err & MARK_ERR)	printk("AddrMarkNotFound ");
+		printk("}");
+		if ((err & (BBD_ERR | ABRT_ERR)) == BBD_ERR ||
+		    (err & (ECC_ERR|ID_ERR|MARK_ERR))) {
+			if (drive->addressing == 1) {
+				__u64 sectors = 0;
+				u32 low = 0, high = 0;
+				low = ide_read_24(drive);
+				hwif->OUTB(drive->ctl|0x80, IDE_CONTROL_REG);
+				high = ide_read_24(drive);
+				sectors = ((__u64)high << 24) | low;
+				printk(", LBAsect=%llu, high=%d, low=%d",
+				       (unsigned long long) sectors,
+				       high, low);
+			} else {
+				u8 cur = hwif->INB(IDE_SELECT_REG);
+				if (cur & 0x40) {	/* using LBA? */
+					printk(", LBAsect=%ld", (unsigned long)
+					 ((cur&0xf)<<24)
+					 |(hwif->INB(IDE_HCYL_REG)<<16)
+					 |(hwif->INB(IDE_LCYL_REG)<<8)
+					 | hwif->INB(IDE_SECTOR_REG));
+				} else {
+					printk(", CHS=%d/%d/%d",
+					 (hwif->INB(IDE_HCYL_REG)<<8) +
+					  hwif->INB(IDE_LCYL_REG),
+					  cur & 0xf,
+					  hwif->INB(IDE_SECTOR_REG));
+				}
+			}
+			if (HWGROUP(drive) && HWGROUP(drive)->rq)
+				printk(", sector=%llu",
+					(unsigned long long)HWGROUP(drive)->rq->sector);
+		}
+	}
+	printk("\n");
+	ide_dump_opcode(drive);
+	local_irq_restore(flags);
+	return err;
+}
+
 /**
  *	ide_dump_atapi_status       -       print human readable atapi status
  *	@drive: drive that status applies to
@@ -453,7 +561,8 @@ EXPORT_SYMBOL_GPL(ide_set_xfer_rate);
  *
  *	Error reporting, in human readable form (luxurious, but a memory hog).
  */
-byte ide_dump_atapi_status (ide_drive_t *drive, const char *msg, byte stat)
+
+static u8 ide_dump_atapi_status(ide_drive_t *drive, const char *msg, u8 stat)
 {
 	unsigned long flags;
 
@@ -488,8 +597,27 @@ byte ide_dump_atapi_status (ide_drive_t *drive, const char *msg, byte stat)
 						error.b.sense_key);
 		printk("\n");
 	}
+	ide_dump_opcode(drive);
 	local_irq_restore(flags);
 	return error.all;
 }
 
-EXPORT_SYMBOL(ide_dump_atapi_status);
+/**
+ *	ide_dump_status		-	translate ATA/ATAPI error
+ *	@drive: drive the error occured on
+ *	@msg: information string
+ *	@stat: status byte
+ *
+ *	Error reporting, in human readable form (luxurious, but a memory hog).
+ *	Combines the drive name, message and status byte to provide a
+ *	user understandable explanation of the device error.
+ */
+
+u8 ide_dump_status(ide_drive_t *drive, const char *msg, u8 stat)
+{
+	if (drive->media == ide_disk)
+		return ide_dump_ata_status(drive, msg, stat);
+	return ide_dump_atapi_status(drive, msg, stat);
+}
+
+EXPORT_SYMBOL(ide_dump_status);

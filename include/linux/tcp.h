@@ -214,7 +214,9 @@ enum tcp_congestion_algo {
 	TCP_BIC,
 };
 
-struct tcp_opt {
+struct tcp_sock {
+	/* inet_sock has to be the first member of tcp_sock */
+	struct inet_sock	inet;
 	int	tcp_header_len;	/* Bytes of tcp header to send		*/
 
 /*
@@ -438,15 +440,9 @@ struct tcp_opt {
 	} bictcp;
 };
 
-/* WARNING: don't change the layout of the members in tcp_sock! */
-struct tcp_sock {
-	struct inet_sock  inet;
-	struct tcp_opt	  tcp;
-};
-
-static inline struct tcp_opt * tcp_sk(const struct sock *__sk)
+static inline struct tcp_sock *tcp_sk(const struct sock *sk)
 {
-	return &((struct tcp_sock *)__sk)->tcp;
+	return (struct tcp_sock *)sk;
 }
 
 #endif

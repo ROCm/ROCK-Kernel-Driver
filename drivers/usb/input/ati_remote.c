@@ -672,9 +672,9 @@ static void ati_remote_input_init(struct ati_remote *ati_remote)
 	idev->phys = ati_remote->phys;
 	
 	idev->id.bustype = BUS_USB;		
-	idev->id.vendor = ati_remote->udev->descriptor.idVendor;
-	idev->id.product = ati_remote->udev->descriptor.idProduct;
-	idev->id.version = ati_remote->udev->descriptor.bcdDevice;
+	idev->id.vendor = le16_to_cpu(ati_remote->udev->descriptor.idVendor);
+	idev->id.product = le16_to_cpu(ati_remote->udev->descriptor.idProduct);
+	idev->id.version = le16_to_cpu(ati_remote->udev->descriptor.bcdDevice);
 }
 
 static int ati_remote_initialize(struct ati_remote *ati_remote)
@@ -729,13 +729,6 @@ static int ati_remote_probe(struct usb_interface *interface, const struct usb_de
 	char path[64];
 	char *buf = NULL;
 
-	/* See if the offered device matches what we can accept */
-	if ((udev->descriptor.idVendor != ATI_REMOTE_VENDOR_ID) ||
-		( (udev->descriptor.idProduct != ATI_REMOTE_PRODUCT_ID) &&
-		  (udev->descriptor.idProduct != LOLA_REMOTE_PRODUCT_ID) &&
-		  (udev->descriptor.idProduct != MEDION_REMOTE_PRODUCT_ID) ))
-		return -ENODEV;
-
 	/* Allocate and clear an ati_remote struct */
 	if (!(ati_remote = kmalloc(sizeof (struct ati_remote), GFP_KERNEL)))
 		return -ENOMEM;
@@ -763,7 +756,7 @@ static int ati_remote_probe(struct usb_interface *interface, const struct usb_de
 		retval = -ENODEV;
 		goto error;
 	}
-	if (ati_remote->endpoint_in->wMaxPacketSize == 0) {
+	if (le16_to_cpu(ati_remote->endpoint_in->wMaxPacketSize) == 0) {
 		err("%s: endpoint_in message size==0? \n", __FUNCTION__);
 		retval = -ENODEV;
 		goto error;
@@ -803,8 +796,8 @@ static int ati_remote_probe(struct usb_interface *interface, const struct usb_de
 
 	if (!strlen(ati_remote->name))
 		sprintf(ati_remote->name, DRIVER_DESC "(%04x,%04x)",
-			ati_remote->udev->descriptor.idVendor, 
-			ati_remote->udev->descriptor.idProduct);
+			le16_to_cpu(ati_remote->udev->descriptor.idVendor), 
+			le16_to_cpu(ati_remote->udev->descriptor.idProduct));
 
 	/* Device Hardware Initialization - fills in ati_remote->idev from udev. */
 	retval = ati_remote_initialize(ati_remote);

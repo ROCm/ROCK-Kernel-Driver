@@ -95,7 +95,7 @@ static int load_em86(struct linux_binprm *bprm,struct pt_regs *regs)
 	return search_binary_handler(bprm, regs);
 }
 
-struct linux_binfmt em86_format = {
+static struct linux_binfmt em86_format = {
 	.module		= THIS_MODULE,
 	.load_binary	= load_em86,
 };

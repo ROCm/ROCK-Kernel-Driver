@@ -1401,8 +1401,8 @@ mpt_register_lan_device (MPT_ADAPTER *mpt_dev, int pnum)
 			priv->max_buckets_out));
 
 	priv->bucketthresh = priv->max_buckets_out * 2 / 3;
-	priv->txfidx_lock = SPIN_LOCK_UNLOCKED;
-	priv->rxfidx_lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&priv->txfidx_lock);
+	spin_lock_init(&priv->rxfidx_lock);
 
 	memset(&priv->stats, 0, sizeof(priv->stats));
 

@@ -845,6 +845,11 @@ void __devinit pcibios_fixup_bus(struct pci_bus *bus)
 		pcibios_fixup_device_resources(dev, bus);
 	}
 
+	ppc_md.iommu_bus_setup(bus);
+
+	list_for_each_entry(dev, &bus->devices, bus_list)
+		ppc_md.iommu_dev_setup(dev);
+
 	if (!pci_probe_only)
 		return;
 

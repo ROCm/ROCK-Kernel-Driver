@@ -127,7 +127,7 @@ config MTD_BLKMTD
 
 config MTD_BLOCK2MTD
 	tristate "MTD using block device (rewrite)"
-	depends on MTD || EXPERIMENTAL
+	depends on MTD && EXPERIMENTAL
 	help
 	  This driver is basically the same at MTD_BLKMTD above, but
 	  experienced some interface changes plus serious speedups.  In

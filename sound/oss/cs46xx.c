@@ -175,24 +175,24 @@
 
 #if CSDEBUG
 static unsigned long cs_debuglevel=1;			/* levels range from 1-9 */
-MODULE_PARM(cs_debuglevel, "i");
+module_param(cs_debuglevel, ulong, 0644);
 static unsigned long cs_debugmask=CS_INIT | CS_ERROR;	/* use CS_DBGOUT with various mask values */
-MODULE_PARM(cs_debugmask, "i");
+module_param(cs_debugmask, ulong, 0644);
 #endif
 static unsigned long hercules_egpio_disable;  /* if non-zero set all EGPIO to 0 */
-MODULE_PARM(hercules_egpio_disable, "i");
+module_param(hercules_egpio_disable, ulong, 0);
 static unsigned long initdelay=700;  /* PM delay in millisecs */
-MODULE_PARM(initdelay, "i");
+module_param(initdelay, ulong, 0);
 static unsigned long powerdown=-1;  /* turn on/off powerdown processing in driver */
-MODULE_PARM(powerdown, "i");
+module_param(powerdown, ulong, 0);
 #define DMABUF_DEFAULTORDER 3
 static unsigned long defaultorder=DMABUF_DEFAULTORDER;
-MODULE_PARM(defaultorder, "i");
+module_param(defaultorder, ulong, 0);
 
 static int external_amp;
-MODULE_PARM(external_amp, "i");
+module_param(external_amp, bool, 0);
 static int thinkpad;
-MODULE_PARM(thinkpad, "i");
+module_param(thinkpad, bool, 0);
 
 /*
 * set the powerdown module parm to 0 to disable all 
@@ -219,7 +219,7 @@ struct cs_channel
 #define CS46XX_ARCH	     	"32"	//architecture key
 #endif
 
-struct list_head cs46xx_devs = { &cs46xx_devs, &cs46xx_devs };
+static struct list_head cs46xx_devs = { &cs46xx_devs, &cs46xx_devs };
 
 /* magic numbers to protect our data structures */
 #define CS_CARD_MAGIC		0x43525553 /* "CRUS" */
@@ -391,30 +391,9 @@ static void cs461x_clear_serial_FIFOs(struct cs_card *card, int type);
 static int cs46xx_suspend_tbl(struct pci_dev *pcidev, u32 state);
 static int cs46xx_resume_tbl(struct pci_dev *pcidev);
 
-static inline unsigned ld2(unsigned int x)
-{
-	unsigned r = 0;
-	
-	if (x >= 0x10000) {
-		x >>= 16;
-		r += 16;
-	}
-	if (x >= 0x100) {
-		x >>= 8;
-		r += 8;
-	}
-	if (x >= 0x10) {
-		x >>= 4;
-		r += 4;
-	}
-	if (x >= 4) {
-		x >>= 2;
-		r += 2;
-	}
-	if (x >= 2)
-		r++;
-	return r;
-}
+#ifndef CS46XX_ACPI_SUPPORT
+static int cs46xx_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data);
+#endif
 
 #if CSDEBUG
 
@@ -426,7 +405,7 @@ static inline unsigned ld2(unsigned int x)
 #define SOUND_MIXER_CS_SETDBGMASK 	_SIOWR('M',123, int)
 #define SOUND_MIXER_CS_APM	 	_SIOWR('M',124, int)
 
-void printioctl(unsigned int x)
+static void printioctl(unsigned int x)
 {
     unsigned int i;
     unsigned char vidx;
@@ -964,7 +943,7 @@ static struct InitStruct
  * "SetCaptureSPValues()" -- Initialize record task values before each
  * 	capture startup.  
  */
-void SetCaptureSPValues(struct cs_card *card)
+static void SetCaptureSPValues(struct cs_card *card)
 {
 	unsigned i, offset;
 	CS_DBGOUT(CS_FUNCTION, 8, printk("cs46xx: SetCaptureSPValues()+\n") );
@@ -3490,7 +3469,7 @@ static void printpm(struct cs_card *s)
 *  Suspend - save the ac97 regs, mute the outputs and power down the part.  
 *
 ****************************************************************************/
-void cs46xx_ac97_suspend(struct cs_card *card)
+static void cs46xx_ac97_suspend(struct cs_card *card)
 {
 	int Count,i;
 	struct ac97_codec *dev=card->ac97_codec[0];
@@ -3561,7 +3540,7 @@ void cs46xx_ac97_suspend(struct cs_card *card)
 *  Resume - power up the part and restore its registers..  
 *
 ****************************************************************************/
-void cs46xx_ac97_resume(struct cs_card *card)
+static void cs46xx_ac97_resume(struct cs_card *card)
 {
 	int Count,i;
 	struct ac97_codec *dev=card->ac97_codec[0];
@@ -4149,7 +4128,6 @@ match:
 	return 0;
 }
 
-void __exit cs46xx_cleanup_module(void);
 static int cs_ioctl_mixdev(struct inode *inode, struct file *file, unsigned int cmd,
 				unsigned long arg)
 {
@@ -5719,7 +5697,7 @@ static struct pci_device_id cs46xx_pci_tbl[] = {
 
 MODULE_DEVICE_TABLE(pci, cs46xx_pci_tbl);
 
-struct pci_driver cs46xx_pci_driver = {
+static struct pci_driver cs46xx_pci_driver = {
 	.name	  = "cs46xx",
 	.id_table = cs46xx_pci_tbl,
 	.probe	  = cs46xx_probe,
@@ -5728,7 +5706,7 @@ struct pci_driver cs46xx_pci_driver = {
 	.resume	  = CS46XX_RESUME_TBL,
 };
 
-int __init cs46xx_init_module(void)
+static int __init cs46xx_init_module(void)
 {
 	int rtn = 0;
 	CS_DBGOUT(CS_INIT | CS_FUNCTION, 2, printk(KERN_INFO 
@@ -5746,7 +5724,7 @@ int __init cs46xx_init_module(void)
 	return rtn;
 }
 
-void __exit cs46xx_cleanup_module(void)
+static void __exit cs46xx_cleanup_module(void)
 {
 	pci_unregister_driver(&cs46xx_pci_driver);
 	cs_pm_unregister_all(cs46xx_pm_callback);
@@ -5757,7 +5735,8 @@ void __exit cs46xx_cleanup_module(void)
 module_init(cs46xx_init_module);
 module_exit(cs46xx_cleanup_module);
 
-int cs46xx_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data)
+#ifndef CS46XX_ACPI_SUPPORT
+static int cs46xx_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data)
 {
 	struct cs_card *card;
 
@@ -5792,6 +5771,7 @@ int cs46xx_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data)
 
 	return 0;
 }
+#endif
 
 #if CS46XX_ACPI_SUPPORT
 static int cs46xx_suspend_tbl(struct pci_dev *pcidev, u32 state)

@@ -116,7 +116,7 @@ static void debug(int debug_this, const char* fmt, ...)
 
 #define optcd_port optcd			/* Needed for the modutils. */
 static short optcd_port = OPTCD_PORTBASE;	/* I/O base of drive. */
-MODULE_PARM(optcd_port, "h");
+module_param(optcd_port, short, 0);
 /* Drive registers, read */
 #define DATA_PORT	optcd_port	/* Read data/status */
 #define STATUS_PORT	optcd_port+1	/* Indicate data/status availability */

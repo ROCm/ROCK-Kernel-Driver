@@ -231,13 +231,8 @@ extern struct proc_dir_entry proc_root;
 static inline void kclist_add(struct kcore_list *new, void *addr, size_t size)
 {
 }
-static inline struct kcore_list * kclist_del(void *addr)
-{
-	return NULL;
-}
 #else
 extern void kclist_add(struct kcore_list *, void *, size_t);
-extern struct kcore_list *kclist_del(void *);
 #endif
 
 struct proc_inode {

@@ -34,10 +34,6 @@
 extern int mca_find_adapter(int id, int start);
 extern int mca_find_unused_adapter(int id, int start);
 
-/* adapter state info - returns 0 if no */
-extern int mca_isadapter(int slot);
-extern int mca_isenabled(int slot);
-
 extern int mca_is_adapter_used(int slot);
 extern int mca_mark_as_used(int slot);
 extern void mca_mark_as_unused(int slot);
@@ -50,7 +46,6 @@ extern unsigned char mca_read_stored_pos(int slot, int reg);
  * so we can have a more interesting /proc/mca.
  */
 extern void mca_set_adapter_name(int slot, char* name);
-extern char* mca_get_adapter_name(int slot);
 
 /* These routines actually mess with the hardware POS registers.  They
  * temporarily disable the device (and interrupts), so make sure you know

@@ -39,6 +39,9 @@ config USB_GADGET
 	   If in doubt, say "N" and don't enable these drivers; most people
 	   don't have this kind of hardware (except maybe inside Linux PDAs).
 
+	   For more information, see <http://www.linux-usb.org/gadget> and
+	   the kernel DocBook documentation for this API.
+
 config USB_GADGET_DEBUG_FILES
 	boolean "Debugging information files"
 	depends on USB_GADGET && PROC_FS
@@ -59,6 +62,8 @@ choice
 	help
 	   A USB device uses a controller to talk to its host.
 	   Systems should have only one such upstream link.
+	   Many controller drivers are platform-specific; these
+	   often need board-specific hooks.
 
 config USB_GADGET_NET2280
 	boolean "NetChip 2280"
@@ -234,6 +239,21 @@ choice
 	tristate "USB Gadget Drivers"
 	depends on USB_GADGET
 	default USB_ETH
+	help
+	  A Linux "Gadget Driver" talks to the USB Peripheral Controller
+	  driver through the abstract "gadget" API.  Some other operating
+	  systems call these "client" drivers, of which "class drivers"
+	  are a subset (implementing a USB device class specification).
+	  A gadget driver implements one or more USB functions using
+	  the peripheral hardware.
+
+	  Gadget drivers are hardware-neutral, or "platform independent",
+	  except that they sometimes must understand quirks or limitations
+	  of the particular controllers they work with.  For example, when
+	  a controller doesn't support alternate configurations or provide
+	  enough of the right types of endpoints, the gadget driver might
+	  not be able work with that controller, or might need to implement
+	  a less common variant of a device class protocol.
 
 # this first set of drivers all depend on bulk-capable hardware.
 
@@ -273,7 +293,7 @@ config USB_ZERO_HNPTEST
 	  one serve as the USB host instead (in the "B-Host" role).
 
 config USB_ETH
-	tristate "Ethernet Gadget"
+	tristate "Ethernet Gadget (with CDC Ethernet support)"
 	depends on NET
 	help
 	  This driver implements Ethernet style communication, in either
@@ -314,6 +334,11 @@ config USB_ETH_RNDIS
 	   If you say "y" here, the Ethernet gadget driver will try to provide
 	   a second device configuration, supporting RNDIS to talk to such
 	   Microsoft USB hosts.
+	   
+	   To make MS-Windows work with this, use Documentation/usb/linux.inf
+	   as the "driver info file".  For versions of MS-Windows older than
+	   XP, you'll need to download drivers from Microsoft's website; a URL
+	   is given in comments found in that info file.
 
 config USB_GADGETFS
 	tristate "Gadget Filesystem (EXPERIMENTAL)"
@@ -352,13 +377,19 @@ config USB_FILE_STORAGE_TEST
 	  normal operation.
 
 config USB_G_SERIAL
-	tristate "Serial Gadget"
+	tristate "Serial Gadget (with CDC ACM support)"
 	help
 	  The Serial Gadget talks to the Linux-USB generic serial driver.
+	  This driver supports a CDC-ACM module option, which can be used
+	  to interoperate with MS-Windows hosts or with the Linux-USB
+	  "cdc-acm" driver.
 
 	  Say "y" to link the driver statically, or "m" to build a
 	  dynamically linked module called "g_serial".
 
+	  For more information, see Documentation/usb/gadget_serial.txt
+	  which includes instructions and a "driver info file" needed to
+	  make MS-Windows work with this driver.
 
 
 # put drivers that need isochronous transfer support (for audio

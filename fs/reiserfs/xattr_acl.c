@@ -9,6 +9,8 @@
 #include <linux/reiserfs_acl.h>
 #include <asm/uaccess.h>
 
+static int reiserfs_set_acl(struct inode *inode, int type, struct posix_acl *acl);
+
 static int
 xattr_set_acl(struct inode *inode, int type, const void *value, size_t size)
 {
@@ -243,7 +245,7 @@ reiserfs_get_acl(struct inode *inode, int type)
  * inode->i_sem: down
  * BKL held [before 2.5.x]
  */
-int
+static int
 reiserfs_set_acl(struct inode *inode, int type, struct posix_acl *acl)
 {
         char *name;

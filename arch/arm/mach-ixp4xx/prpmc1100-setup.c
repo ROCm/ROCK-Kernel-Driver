@@ -79,7 +79,9 @@ static struct platform_device *prpmc1100_devices[] __initdata = {
 
 static void __init prpmc1100_init(void)
 {
-	platform_add_devices(&prpmc1100_devices, ARRAY_SIZE(prpmc1100_devices));
+	ixp4xx_sys_init();
+
+	platform_add_devices(prpmc1100_devices, ARRAY_SIZE(prpmc1100_devices));
 }
 
 MACHINE_START(PRPMC1100, "Motorola PrPMC1100")

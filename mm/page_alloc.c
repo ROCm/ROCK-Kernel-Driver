@@ -37,13 +37,13 @@
 #include <asm/tlbflush.h>
 #include "internal.h"
 
-nodemask_t node_online_map = NODE_MASK_NONE;
+/* MCD - HACK: Find somewhere to initialize this EARLY, or make this initializer cleaner */
+nodemask_t node_online_map = { { [0] = 1UL } };
 nodemask_t node_possible_map = NODE_MASK_ALL;
 struct pglist_data *pgdat_list;
 unsigned long totalram_pages;
 unsigned long totalhigh_pages;
 long nr_swap_pages;
-int numnodes = 1;
 int sysctl_lower_zone_protection = 0;
 
 EXPORT_SYMBOL(totalram_pages);
@@ -71,6 +71,10 @@ static int bad_range(struct zone *zone, struct page *page)
 		return 1;
 	if (page_to_pfn(page) < zone->zone_start_pfn)
 		return 1;
+#ifdef CONFIG_HOLES_IN_ZONE
+	if (!pfn_valid(page_to_pfn(page)))
+		return 1;
+#endif
 	if (zone != page_zone(page))
 		return 1;
 	return 0;
@@ -159,6 +163,45 @@ static void destroy_compound_page(struct page *page, unsigned long order)
 #endif		/* CONFIG_HUGETLB_PAGE */
 
 /*
+ * function for dealing with page's order in buddy system.
+ * zone->lock is already acquired when we use these.
+ * So, we don't need atomic page->flags operations here.
+ */
+static inline unsigned long page_order(struct page *page) {
+	return page->private;
+}
+
+static inline void set_page_order(struct page *page, int order) {
+	page->private = order;
+	__SetPagePrivate(page);
+}
+
+static inline void rmv_page_order(struct page *page)
+{
+	__ClearPagePrivate(page);
+	page->private = 0;
+}
+
+/*
+ * This function checks whether a page is free && is the buddy
+ * we can do coalesce a page and its buddy if
+ * (a) the buddy is free &&
+ * (b) the buddy is on the buddy system &&
+ * (c) a page and its buddy have the same order.
+ * for recording page's order, we use page->private and PG_private.
+ *
+ */
+static inline int page_is_buddy(struct page *page, int order)
+{
+       if (PagePrivate(page)           &&
+           (page_order(page) == order) &&
+           !PageReserved(page)         &&
+            page_count(page) == 0)
+               return 1;
+       return 0;
+}
+
+/*
  * Freeing function for a buddy system allocator.
  *
  * The concept of a buddy system is to maintain direct-mapped table
@@ -170,9 +213,10 @@ static void destroy_compound_page(struct page *page, unsigned long order)
  * at the bottom level available, and propagating the changes upward
  * as necessary, plus some accounting needed to play nicely with other
  * parts of the VM system.
- * At each level, we keep one bit for each pair of blocks, which
- * is set to 1 iff only one of the pair is allocated.  So when we
- * are allocating or freeing one, we can derive the state of the
+ * At each level, we keep a list of pages, which are heads of continuous
+ * free pages of length of (1 << order) and marked with PG_Private.Page's
+ * order is recorded in page->private field.
+ * So when we are allocating or freeing one, we can derive the state of the
  * other.  That is, if we allocate a small block, and both were   
  * free, the remainder of the region must be split into blocks.   
  * If a block is freed, and its buddy is also free, then this
@@ -182,44 +226,44 @@ static void destroy_compound_page(struct page *page, unsigned long order)
  */
 
 static inline void __free_pages_bulk (struct page *page, struct page *base,
-		struct zone *zone, struct free_area *area, unsigned int order)
+		struct zone *zone, unsigned int order)
 {
-	unsigned long page_idx, index, mask;
+	unsigned long page_idx;
+	struct page *coalesced;
+	int order_size = 1 << order;
 
-	if (order)
+	if (unlikely(order))
 		destroy_compound_page(page, order);
-	mask = (~0UL) << order;
+
 	page_idx = page - base;
-	if (page_idx & ~mask)
-		BUG();
-	index = page_idx >> (1 + order);
 
-	zone->free_pages += 1 << order;
+	BUG_ON(page_idx & (order_size - 1));
+	BUG_ON(bad_range(zone, page));
+
+	zone->free_pages += order_size;
 	while (order < MAX_ORDER-1) {
-		struct page *buddy1, *buddy2;
+		struct free_area *area;
+		struct page *buddy;
+		int buddy_idx;
 
-		BUG_ON(area >= zone->free_area + MAX_ORDER);
-		if (!__test_and_change_bit(index, area->map))
-			/*
-			 * the buddy page is still allocated.
-			 */
+		buddy_idx = (page_idx ^ (1 << order));
+		buddy = base + buddy_idx;
+		if (bad_range(zone, buddy))
 			break;
-
+		if (!page_is_buddy(buddy, order))
+			break;
 		/* Move the buddy up one level. */
-		buddy1 = base + (page_idx ^ (1 << order));
-		buddy2 = base + page_idx;
-		BUG_ON(bad_range(zone, buddy1));
-		BUG_ON(bad_range(zone, buddy2));
-		list_del(&buddy1->lru);
+		list_del(&buddy->lru);
+		area = zone->free_area + order;
 		area->nr_free--;
-		mask <<= 1;
+		rmv_page_order(buddy);
+		page_idx &= buddy_idx;
 		order++;
-		area++;
-		index >>= 1;
-		page_idx &= mask;
 	}
-	list_add(&(base + page_idx)->lru, &area->free_list);
-	area->nr_free++;
+	coalesced = base + page_idx;
+	set_page_order(coalesced, order);
+	list_add(&coalesced->lru, &zone->free_area[order].free_list);
+	zone->free_area[order].nr_free++;
 }
 
 static inline void free_pages_check(const char *function, struct page *page)
@@ -257,12 +301,10 @@ free_pages_bulk(struct zone *zone, int count,
 		struct list_head *list, unsigned int order)
 {
 	unsigned long flags;
-	struct free_area *area;
 	struct page *base, *page = NULL;
 	int ret = 0;
 
 	base = zone->zone_mem_map;
-	area = zone->free_area + order;
 	spin_lock_irqsave(&zone->lock, flags);
 	zone->all_unreclaimable = 0;
 	zone->pages_scanned = 0;
@@ -270,7 +312,7 @@ free_pages_bulk(struct zone *zone, int count,
 		page = list_entry(list->prev, struct page, lru);
 		/* have to delete it as __free_pages_bulk list manipulates */
 		list_del(&page->lru);
-		__free_pages_bulk(page, base, zone, area, order);
+		__free_pages_bulk(page, base, zone, order);
 		ret++;
 	}
 	spin_unlock_irqrestore(&zone->lock, flags);
@@ -299,8 +341,6 @@ void __free_pages_ok(struct page *page, unsigned int order)
 	free_pages_bulk(page_zone(page), 1, &list, order);
 }
 
-#define MARK_USED(index, order, area) \
-	__change_bit((index) >> (1+(order)), (area)->map)
 
 /*
  * The order of subdivision here is critical for the IO subsystem.
@@ -318,7 +358,7 @@ void __free_pages_ok(struct page *page, unsigned int order)
  */
 static inline struct page *
 expand(struct zone *zone, struct page *page,
-	 unsigned long index, int low, int high, struct free_area *area)
+ 	int low, int high, struct free_area *area)
 {
 	unsigned long size = 1 << high;
 
@@ -329,7 +369,7 @@ expand(struct zone *zone, struct page *page,
 		BUG_ON(bad_range(zone, &page[size]));
 		list_add(&page[size].lru, &area->free_list);
 		area->nr_free++;
-		MARK_USED(index + size, high, area);
+		set_page_order(&page[size], high);
 	}
 	return page;
 }
@@ -373,6 +413,7 @@ static void prep_new_page(struct page *page, int order)
 			1 << PG_checked | 1 << PG_mappedtodisk);
 	page->private = 0;
 	set_page_refs(page, order);
+	kernel_map_pages(page, 1 << order, 1);
 }
 
 /* 
@@ -384,7 +425,6 @@ static struct page *__rmqueue(struct zone *zone, unsigned int order)
 	struct free_area * area;
 	unsigned int current_order;
 	struct page *page;
-	unsigned int index;
 
 	for (current_order = order; current_order < MAX_ORDER; ++current_order) {
 		area = zone->free_area + current_order;
@@ -393,12 +433,10 @@ static struct page *__rmqueue(struct zone *zone, unsigned int order)
 
 		page = list_entry(area->free_list.next, struct page, lru);
 		list_del(&page->lru);
+		rmv_page_order(page);
 		area->nr_free--;
-		index = page - zone->zone_mem_map;
-		if (current_order != MAX_ORDER-1)
-			MARK_USED(index, current_order, area);
 		zone->free_pages -= 1UL << order;
-		return expand(zone, page, index, order, current_order, area);
+		return expand(zone, page, order, current_order, area);
 	}
 
 	return NULL;
@@ -553,19 +591,20 @@ void fastcall free_cold_page(struct page *page)
 	free_hot_cold_page(page, 1);
 }
 
+static inline void prep_zero_page(struct page *page, int order, int gfp_flags)
+{
+	int i;
+
+	BUG_ON((gfp_flags & (__GFP_WAIT | __GFP_HIGHMEM)) == __GFP_HIGHMEM);
+	for(i = 0; i < (1 << order); i++)
+		clear_highpage(page + i);
+}
+
 /*
  * Really, prep_compound_page() should be called from __rmqueue_bulk().  But
  * we cheat by calling it from here, in the order > 0 path.  Saves a branch
  * or two.
  */
-static inline void prep_zero_page(struct page *page, int order)
-{
-	int i;
-
-	for(i = 0; i < (1 << order); i++)
-		clear_highpage(page + i);
-}
-
 static struct page *
 buffered_rmqueue(struct zone *zone, int order, int gfp_flags)
 {
@@ -602,7 +641,7 @@ buffered_rmqueue(struct zone *zone, int order, int gfp_flags)
 		prep_new_page(page, order);
 
 		if (gfp_flags & __GFP_ZERO)
-			prep_zero_page(page, order);
+			prep_zero_page(page, order, gfp_flags);
 
 		if (order && (gfp_flags & __GFP_COMP))
 			prep_compound_page(page, order);
@@ -786,7 +825,6 @@ nopage:
 	return NULL;
 got_pg:
 	zone_statistics(zonelist, z);
-	kernel_map_pages(page, 1 << order, 1);
 	return page;
 }
 
@@ -1220,13 +1258,13 @@ static int __init build_zonelists_node(pg_data_t *pgdat, struct zonelist *zoneli
 }
 
 #ifdef CONFIG_NUMA
-#define MAX_NODE_LOAD (numnodes)
+#define MAX_NODE_LOAD (num_online_nodes())
 static int __initdata node_load[MAX_NUMNODES];
 /**
  * find_next_best_node - find the next node that should appear in a given
  *    node's fallback list
  * @node: node whose fallback list we're appending
- * @used_node_mask: pointer to the bitmap of already used nodes
+ * @used_node_mask: nodemask_t of already used nodes
  *
  * We use a number of factors to determine which is the next node that should
  * appear on a given node's fallback list.  The node should not have appeared
@@ -1237,24 +1275,24 @@ static int __initdata node_load[MAX_NUMNODES];
  * on them otherwise.
  * It returns -1 if no node is found.
  */
-static int __init find_next_best_node(int node, void *used_node_mask)
+static int __init find_next_best_node(int node, nodemask_t *used_node_mask)
 {
 	int i, n, val;
 	int min_val = INT_MAX;
 	int best_node = -1;
 
-	for (i = 0; i < numnodes; i++) {
+	for_each_online_node(i) {
 		cpumask_t tmp;
 
 		/* Start from local node */
-		n = (node+i)%numnodes;
+		n = (node+i) % num_online_nodes();
 
 		/* Don't want a node to appear more than once */
-		if (test_bit(n, used_node_mask))
+		if (node_isset(n, *used_node_mask))
 			continue;
 
 		/* Use the local node if we haven't already */
-		if (!test_bit(node, used_node_mask)) {
+		if (!node_isset(node, *used_node_mask)) {
 			best_node = node;
 			break;
 		}
@@ -1278,7 +1316,7 @@ static int __init find_next_best_node(int node, void *used_node_mask)
 	}
 
 	if (best_node >= 0)
-		set_bit(best_node, used_node_mask);
+		node_set(best_node, *used_node_mask);
 
 	return best_node;
 }
@@ -1288,7 +1326,7 @@ static void __init build_zonelists(pg_data_t *pgdat)
 	int i, j, k, node, local_node;
 	int prev_node, load;
 	struct zonelist *zonelist;
-	DECLARE_BITMAP(used_mask, MAX_NUMNODES);
+	nodemask_t used_mask;
 
 	/* initialize zonelists */
 	for (i = 0; i < GFP_ZONETYPES; i++) {
@@ -1299,10 +1337,10 @@ static void __init build_zonelists(pg_data_t *pgdat)
 
 	/* NUMA-aware ordering of nodes */
 	local_node = pgdat->node_id;
-	load = numnodes;
+	load = num_online_nodes();
 	prev_node = local_node;
-	bitmap_zero(used_mask, MAX_NUMNODES);
-	while ((node = find_next_best_node(local_node, used_mask)) >= 0) {
+	nodes_clear(used_mask);
+	while ((node = find_next_best_node(local_node, &used_mask)) >= 0) {
 		/*
 		 * We don't want to pressure a particular node.
 		 * So adding penalty to the first node in same
@@ -1358,11 +1396,17 @@ static void __init build_zonelists(pg_data_t *pgdat)
  		 * zones coming right after the local ones are those from
  		 * node N+1 (modulo N)
  		 */
- 		for (node = local_node + 1; node < numnodes; node++)
- 			j = build_zonelists_node(NODE_DATA(node), zonelist, j, k);
- 		for (node = 0; node < local_node; node++)
- 			j = build_zonelists_node(NODE_DATA(node), zonelist, j, k);
- 
+		for (node = local_node + 1; node < MAX_NUMNODES; node++) {
+			if (!node_online(node))
+				continue;
+			j = build_zonelists_node(NODE_DATA(node), zonelist, j, k);
+		}
+		for (node = 0; node < local_node; node++) {
+			if (!node_online(node))
+				continue;
+			j = build_zonelists_node(NODE_DATA(node), zonelist, j, k);
+		}
+
 		zonelist->zones[j] = NULL;
 	}
 }
@@ -1373,9 +1417,9 @@ void __init build_all_zonelists(void)
 {
 	int i;
 
-	for(i = 0 ; i < numnodes ; i++)
+	for_each_online_node(i)
 		build_zonelists(NODE_DATA(i));
-	printk("Built %i zonelists\n", numnodes);
+	printk("Built %i zonelists\n", num_online_nodes());
 }
 
 /*
@@ -1467,49 +1511,12 @@ void __init memmap_init_zone(unsigned long size, int nid, unsigned long zone,
 	}
 }
 
-/*
- * Page buddy system uses "index >> (i+1)", where "index" is
- * at most "size-1".
- *
- * The extra "+3" is to round down to byte size (8 bits per byte
- * assumption). Thus we get "(size-1) >> (i+4)" as the last byte
- * we can access.
- *
- * The "+1" is because we want to round the byte allocation up
- * rather than down. So we should have had a "+7" before we shifted
- * down by three. Also, we have to add one as we actually _use_ the
- * last bit (it's [0,n] inclusive, not [0,n[).
- *
- * So we actually had +7+1 before we shift down by 3. But
- * (n+8) >> 3 == (n >> 3) + 1 (modulo overflows, which we do not have).
- *
- * Finally, we LONG_ALIGN because all bitmap operations are on longs.
- */
-unsigned long pages_to_bitmap_size(unsigned long order, unsigned long nr_pages)
-{
-	unsigned long bitmap_size;
-
-	bitmap_size = (nr_pages-1) >> (order+4);
-	bitmap_size = LONG_ALIGN(bitmap_size+1);
-
-	return bitmap_size;
-}
-
-void zone_init_free_lists(struct pglist_data *pgdat, struct zone *zone, unsigned long size)
+void zone_init_free_lists(struct pglist_data *pgdat, struct zone *zone,
+				unsigned long size)
 {
 	int order;
-	for (order = 0; ; order++) {
-		unsigned long bitmap_size;
-
+	for (order = 0; order < MAX_ORDER ; order++) {
 		INIT_LIST_HEAD(&zone->free_area[order].free_list);
-		if (order == MAX_ORDER-1) {
-			zone->free_area[order].map = NULL;
-			break;
-		}
-
-		bitmap_size = pages_to_bitmap_size(order, size);
-		zone->free_area[order].map =
-		  (unsigned long *) alloc_bootmem_node(pgdat, bitmap_size);
 		zone->free_area[order].nr_free = 0;
 	}
 }

@@ -98,8 +98,8 @@ static struct sock *audit_sock;
  * The second list is a list of pre-allocated audit buffers (if more
  * than AUDIT_MAXFREE are in use, the audit buffer is freed instead of
  * being placed on the freelist). */
-static spinlock_t  audit_txlist_lock = SPIN_LOCK_UNLOCKED;
-static spinlock_t  audit_freelist_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(audit_txlist_lock);
+static DEFINE_SPINLOCK(audit_freelist_lock);
 static int	   audit_freelist_count = 0;
 static LIST_HEAD(audit_txlist);
 static LIST_HEAD(audit_freelist);
@@ -169,7 +169,7 @@ static inline int audit_rate_check(void)
 {
 	static unsigned long	last_check = 0;
 	static int		messages   = 0;
-	static spinlock_t	lock	   = SPIN_LOCK_UNLOCKED;
+	static DEFINE_SPINLOCK(lock);
 	unsigned long		flags;
 	unsigned long		now;
 	unsigned long		elapsed;
@@ -199,7 +199,7 @@ static inline int audit_rate_check(void)
 void audit_log_lost(const char *message)
 {
 	static unsigned long	last_msg = 0;
-	static spinlock_t	lock     = SPIN_LOCK_UNLOCKED;
+	static DEFINE_SPINLOCK(lock);
 	unsigned long		flags;
 	unsigned long		now;
 	int			print;

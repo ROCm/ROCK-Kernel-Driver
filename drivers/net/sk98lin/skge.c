@@ -109,6 +109,7 @@
 #include	"h/skversion.h"
 
 #include	<linux/module.h>
+#include	<linux/moduleparam.h>
 #include	<linux/init.h>
 #include 	<linux/proc_fs.h>
 
@@ -233,17 +234,33 @@ static int      SkDrvDeInitAdapter(SK_AC *pAC, int devNbr);
  * Extern Function Prototypes
  *
  ******************************************************************************/
-
-#ifdef CONFIG_PROC_FS
-static const char 	SK_Root_Dir_entry[] = "sk98lin";
+static const char 	SKRootName[] = "sk98lin";
 static struct		proc_dir_entry *pSkRootDir;
 extern struct	file_operations sk_proc_fops;
-#endif
+
+static inline void SkGeProcCreate(struct net_device *dev)
+{
+	struct proc_dir_entry *pe;
+
+	if (pSkRootDir && 
+	    (pe = create_proc_entry(dev->name, S_IRUGO, pSkRootDir))) {
+		pe->proc_fops = &sk_proc_fops;
+		pe->data = dev;
+		pe->owner = THIS_MODULE;
+	}
+}
+ 
+static inline void SkGeProcRemove(struct net_device *dev)
+{
+	if (pSkRootDir)
+		remove_proc_entry(dev->name, pSkRootDir);
+}
 
 extern void SkDimEnableModerationIfNeeded(SK_AC *pAC);	
 extern void SkDimDisplayModerationSettings(SK_AC *pAC);
 extern void SkDimStartModerationTimer(SK_AC *pAC);
 extern void SkDimModerate(SK_AC *pAC);
+extern void SkGeBlinkTimer(unsigned long data);
 
 #ifdef DEBUG
 static void	DumpMsg(struct sk_buff*, char*);
@@ -252,8 +269,8 @@ static void	DumpLong(char*, int);
 #endif
 
 /* global variables *********************************************************/
-struct SK_NET_DEVICE *SkGeRootDev = NULL;
 static SK_BOOL DoPrintInterfaceChange = SK_TRUE;
+extern  struct ethtool_ops SkGeEthtoolOps;
 
 /* local variables **********************************************************/
 static uintptr_t TxQueueAddr[SK_MAX_MACS][2] = {{0x680, 0x600},{0x780, 0x700}};
@@ -337,22 +354,20 @@ SK_U32 AllocFlag;
 DEV_NET		*pNet;
 SK_AC		*pAC;
 
-	if (dev->priv) {
-		pNet = (DEV_NET*) dev->priv;
-		pAC = pNet->pAC;
-		AllocFlag = pAC->AllocFlag;
-		if (pAC->PciDev) {
-			pci_release_regions(pAC->PciDev);
-		}
-		if (AllocFlag & SK_ALLOC_IRQ) {
-			free_irq(dev->irq, dev);
-		}
-		if (pAC->IoBase) {
-			iounmap(pAC->IoBase);
-		}
-		if (pAC->pDescrMem) {
-			BoardFreeMem(pAC);
-		}
+	pNet = netdev_priv(dev);
+	pAC = pNet->pAC;
+	AllocFlag = pAC->AllocFlag;
+	if (pAC->PciDev) {
+		pci_release_regions(pAC->PciDev);
+	}
+	if (AllocFlag & SK_ALLOC_IRQ) {
+		free_irq(dev->irq, dev);
+	}
+	if (pAC->IoBase) {
+		iounmap(pAC->IoBase);
+	}
+	if (pAC->pDescrMem) {
+		BoardFreeMem(pAC);
 	}
 	
 } /* FreeResources */
@@ -360,26 +375,6 @@ SK_AC		*pAC;
 MODULE_AUTHOR("Mirko Lindner <mlindner@syskonnect.de>");
 MODULE_DESCRIPTION("SysKonnect SK-NET Gigabit Ethernet SK-98xx driver");
 MODULE_LICENSE("GPL");
-MODULE_PARM(Speed_A,    "1-" __MODULE_STRING(SK_MAX_CARD_PARAM) "s");
-MODULE_PARM(Speed_B,    "1-" __MODULE_STRING(SK_MAX_CARD_PARAM) "s");
-MODULE_PARM(AutoNeg_A,  "1-" __MODULE_STRING(SK_MAX_CARD_PARAM) "s");
-MODULE_PARM(AutoNeg_B,  "1-" __MODULE_STRING(SK_MAX_CARD_PARAM) "s");
-MODULE_PARM(DupCap_A,   "1-" __MODULE_STRING(SK_MAX_CARD_PARAM) "s");
-MODULE_PARM(DupCap_B,   "1-" __MODULE_STRING(SK_MAX_CARD_PARAM) "s");
-MODULE_PARM(FlowCtrl_A, "1-" __MODULE_STRING(SK_MAX_CARD_PARAM) "s");
-MODULE_PARM(FlowCtrl_B, "1-" __MODULE_STRING(SK_MAX_CARD_PARAM) "s");
-MODULE_PARM(Role_A,	"1-" __MODULE_STRING(SK_MAX_CARD_PARAM) "s");
-MODULE_PARM(Role_B,	"1-" __MODULE_STRING(SK_MAX_CARD_PARAM) "s");
-MODULE_PARM(ConType,	"1-" __MODULE_STRING(SK_MAX_CARD_PARAM) "s");
-MODULE_PARM(PrefPort,   "1-" __MODULE_STRING(SK_MAX_CARD_PARAM) "s");
-MODULE_PARM(RlmtMode,   "1-" __MODULE_STRING(SK_MAX_CARD_PARAM) "s");
-/* used for interrupt moderation */
-MODULE_PARM(IntsPerSec,     "1-" __MODULE_STRING(SK_MAX_CARD_PARAM) "i");
-MODULE_PARM(Moderation,     "1-" __MODULE_STRING(SK_MAX_CARD_PARAM) "s");
-MODULE_PARM(Stats,          "1-" __MODULE_STRING(SK_MAX_CARD_PARAM) "s");
-MODULE_PARM(ModerationMask, "1-" __MODULE_STRING(SK_MAX_CARD_PARAM) "s");
-MODULE_PARM(AutoSizing,     "1-" __MODULE_STRING(SK_MAX_CARD_PARAM) "s");
-
 
 #ifdef LINK_SPEED_A
 static char *Speed_A[SK_MAX_CARD_PARAM] = LINK_SPEED;
@@ -465,6 +460,26 @@ static char *ModerationMask[SK_MAX_CARD_PARAM];
 static char *AutoSizing[SK_MAX_CARD_PARAM];
 static char *Stats[SK_MAX_CARD_PARAM];
 
+module_param_array(Speed_A, charp, NULL, 0);
+module_param_array(Speed_B, charp, NULL, 0);
+module_param_array(AutoNeg_A, charp, NULL, 0);
+module_param_array(AutoNeg_B, charp, NULL, 0);
+module_param_array(DupCap_A, charp, NULL, 0);
+module_param_array(DupCap_B, charp, NULL, 0);
+module_param_array(FlowCtrl_A, charp, NULL, 0);
+module_param_array(FlowCtrl_B, charp, NULL, 0);
+module_param_array(Role_A, charp, NULL, 0);
+module_param_array(Role_B, charp, NULL, 0);
+module_param_array(ConType, charp, NULL, 0);
+module_param_array(PrefPort, charp, NULL, 0);
+module_param_array(RlmtMode, charp, NULL, 0);
+/* used for interrupt moderation */
+module_param_array(IntsPerSec, int, NULL, 0);
+module_param_array(Moderation, charp, NULL, 0);
+module_param_array(Stats, charp, NULL, 0);
+module_param_array(ModerationMask, charp, NULL, 0);
+module_param_array(AutoSizing, charp, NULL, 0);
+
 /*****************************************************************************
  *
  * 	SkGeBoardInit - do level 0 and 1 initialization
@@ -502,6 +517,11 @@ SK_BOOL	DualNet;
 		spin_lock_init(&pAC->RxPort[i].RxDesRingLock);
 	}
 	spin_lock_init(&pAC->SlowPathLock);
+
+	/* setup phy_id blink timer */
+	pAC->BlinkTimer.function = SkGeBlinkTimer;
+	pAC->BlinkTimer.data = (unsigned long) dev;
+	init_timer(&pAC->BlinkTimer);
 
 	/* level 0 init common modules here */
 	
@@ -600,12 +620,6 @@ SK_BOOL	DualNet;
 		printk("sk98lin: SkGeInitAssignRamToQueues failed.\n");
 		return(-EAGAIN);
 	}
-
-	/*
-	 * Register the device here
-	 */
-	pAC->Next = SkGeRootDev;
-	SkGeRootDev = dev;
 
 	return (0);
 } /* SkGeBoardInit */
@@ -887,7 +901,7 @@ DEV_NET		*pNet;
 SK_AC		*pAC;
 SK_U32		IntSrc;		/* interrupts source register contents */	
 
-	pNet = (DEV_NET*) dev->priv;
+	pNet = netdev_priv(dev);
 	pAC = pNet->pAC;
 	
 	/*
@@ -1036,7 +1050,7 @@ DEV_NET		*pNet;
 SK_AC		*pAC;
 SK_U32		IntSrc;		/* interrupts source register contents */	
 
-	pNet = (DEV_NET*) dev->priv;
+	pNet = netdev_priv(dev);
 	pAC = pNet->pAC;
 	
 	/*
@@ -1126,6 +1140,24 @@ SK_U32		IntSrc;		/* interrupts source register contents */
 		return SkIsrRetHandled;
 } /* SkGeIsrOnePort */
 
+#ifdef CONFIG_NET_POLL_CONTROLLER
+/****************************************************************************
+ *
+ * 	SkGePollController - polling receive, for netconsole
+ *
+ * Description:
+ *	Polling receive - used by netconsole and other diagnostic tools
+ *	to allow network i/o with interrupts disabled.
+ *
+ * Returns: N/A
+ */
+static void SkGePollController(struct net_device *dev)
+{
+	disable_irq(dev->irq);
+	SkGeIsr(dev->irq, dev, NULL);
+	enable_irq(dev->irq);
+}
+#endif
 
 /****************************************************************************
  *
@@ -1152,7 +1184,7 @@ struct SK_NET_DEVICE	*dev)
 	int				i;
 	SK_EVPARA		EvPara;		/* an event parameter union */
 
-	pNet = (DEV_NET*) dev->priv;
+	pNet = netdev_priv(dev);
 	pAC = pNet->pAC;
 	
 	SK_DBG_MSG(NULL, SK_DBGMOD_DRV, SK_DBGCAT_DRV_ENTRY,
@@ -1166,10 +1198,6 @@ struct SK_NET_DEVICE	*dev)
 	}
 #endif
 
-	if (!try_module_get(THIS_MODULE)) {
-		return (-1);	/* increase of usage count not possible */
-	}
-
 	/* Set blink mode */
 	if ((pAC->PciDev->vendor == 0x1186) || (pAC->PciDev->vendor == 0x11ab ))
 		pAC->GIni.GILedBlinkCtrl = OEM_CONFIG_VALUE;
@@ -1177,7 +1205,6 @@ struct SK_NET_DEVICE	*dev)
 	if (pAC->BoardLevel == SK_INIT_DATA) {
 		/* level 1 init common modules here */
 		if (SkGeInit(pAC, pAC->IoBase, SK_INIT_IO) != 0) {
-			module_put(THIS_MODULE); /* decrease usage count */
 			printk("%s: HWInit (1) failed.\n", pAC->dev[pNet->PortNr]->name);
 			return (-1);
 		}
@@ -1193,7 +1220,6 @@ struct SK_NET_DEVICE	*dev)
 	if (pAC->BoardLevel != SK_INIT_RUN) {
 		/* tschilling: Level 2 init modules here, check return value. */
 		if (SkGeInit(pAC, pAC->IoBase, SK_INIT_RUN) != 0) {
-			module_put(THIS_MODULE); /* decrease usage count */
 			printk("%s: HWInit (2) failed.\n", pAC->dev[pNet->PortNr]->name);
 			return (-1);
 		}
@@ -1279,19 +1305,18 @@ struct SK_NET_DEVICE	*dev)
 	SK_DBG_MSG(NULL, SK_DBGMOD_DRV, SK_DBGCAT_DRV_ENTRY,
 		("SkGeClose: pAC=0x%lX ", (unsigned long)pAC));
 
-	pNet = (DEV_NET*) dev->priv;
+	pNet = netdev_priv(dev);
 	pAC = pNet->pAC;
 
 #ifdef SK_DIAG_SUPPORT
 	if (pAC->DiagModeActive == DIAG_ACTIVE) {
 		if (pAC->DiagFlowCtrl == SK_FALSE) {
-			module_put(THIS_MODULE);
 			/* 
 			** notify that the interface which has been closed
 			** by operator interaction must not be started up 
 			** again when the DIAG has finished. 
 			*/
-			newPtrNet = (DEV_NET *) pAC->dev[0]->priv;
+			newPtrNet = netdev_priv(pAC->dev[0]);
 			if (newPtrNet == pNet) {
 				pAC->WasIfUp[0] = SK_FALSE;
 			} else {
@@ -1376,7 +1401,6 @@ struct SK_NET_DEVICE	*dev)
 	pAC->MaxPorts--;
 	pNet->Up = 0;
 
-	module_put(THIS_MODULE);
 	return (0);
 } /* SkGeClose */
 
@@ -1402,7 +1426,7 @@ DEV_NET		*pNet;
 SK_AC		*pAC;
 int			Rc;	/* return code of XmitFrame */
 
-	pNet = (DEV_NET*) dev->priv;
+	pNet = netdev_priv(dev);
 	pAC = pNet->pAC;
 
 	if ((!skb_shinfo(skb)->nr_frags) ||
@@ -2498,7 +2522,7 @@ unsigned long	Flags;
 static int SkGeSetMacAddr(struct SK_NET_DEVICE *dev, void *p)
 {
 
-DEV_NET *pNet = (DEV_NET*) dev->priv;
+DEV_NET *pNet = netdev_priv(dev);
 SK_AC	*pAC = pNet->pAC;
 
 struct sockaddr	*addr = p;
@@ -2555,7 +2579,7 @@ unsigned long		Flags;
 	SK_DBG_MSG(NULL, SK_DBGMOD_DRV, SK_DBGCAT_DRV_ENTRY,
 		("SkGeSetRxMode starts now... "));
 
-	pNet = (DEV_NET*) dev->priv;
+	pNet = netdev_priv(dev);
 	pAC = pNet->pAC;
 	if (pAC->RlmtNets == 1)
 		PortIdx = pAC->ActivePort;
@@ -2627,7 +2651,7 @@ SK_EVPARA 	EvPara;
 	SK_DBG_MSG(NULL, SK_DBGMOD_DRV, SK_DBGCAT_DRV_ENTRY,
 		("SkGeChangeMtu starts now...\n"));
 
-	pNet = (DEV_NET*) dev->priv;
+	pNet = netdev_priv(dev);
 	pAC  = pNet->pAC;
 
 	if ((NewMtu < 68) || (NewMtu > SK_JUMBO_MTU)) {
@@ -2649,7 +2673,7 @@ SK_EVPARA 	EvPara;
 #endif
 
 	pNet->Mtu = NewMtu;
-	pOtherNet = (DEV_NET*)pAC->dev[1 - pNet->NetNr]->priv;
+	pOtherNet = netdev_priv(pAC->dev[1 - pNet->NetNr]);
 	if ((pOtherNet->Mtu>1500) && (NewMtu<=1500) && (pOtherNet->Up==1)) {
 		return(0);
 	}
@@ -2855,7 +2879,7 @@ SK_EVPARA 	EvPara;
  */
 static struct net_device_stats *SkGeStats(struct SK_NET_DEVICE *dev)
 {
-DEV_NET *pNet = (DEV_NET*) dev->priv;
+DEV_NET *pNet = netdev_priv(dev);
 SK_AC	*pAC = pNet->pAC;
 SK_PNMI_STRUCT_DATA *pPnmiStruct;       /* structure for all Pnmi-Data */
 SK_PNMI_STAT    *pPnmiStat;             /* pointer to virtual XMAC stat. data */
@@ -2953,7 +2977,7 @@ int		HeaderLength = sizeof(SK_U32) + sizeof(SK_U32);
 	SK_DBG_MSG(NULL, SK_DBGMOD_DRV, SK_DBGCAT_DRV_ENTRY,
 		("SkGeIoctl starts now...\n"));
 
-	pNet = (DEV_NET*) dev->priv;
+	pNet = netdev_priv(dev);
 	pAC = pNet->pAC;
 	
 	if(copy_from_user(&Ioctl, rq->ifr_data, sizeof(SK_GE_IOCTL))) {
@@ -4539,11 +4563,8 @@ char	ClassStr[80];
 int SkDrvEnterDiagMode(
 SK_AC   *pAc)   /* pointer to adapter context */
 {
-	SK_AC   *pAC  = NULL;
-	DEV_NET *pNet = NULL;
-
-	pNet = (DEV_NET *) pAc->dev[0]->priv;
-	pAC = pNet->pAC;
+	DEV_NET *pNet = netdev_priv(pAc->dev[0]);
+	SK_AC   *pAC  = pNet->pAC;
 
 	SK_MEMCPY(&(pAc->PnmiBackup), &(pAc->PnmiStruct), 
 			sizeof(SK_PNMI_STRUCT_DATA));
@@ -4558,8 +4579,8 @@ SK_AC   *pAc)   /* pointer to adapter context */
 		} else {
 			pAC->WasIfUp[0] = SK_FALSE;
 		}
-		if (pNet != (DEV_NET *) pAc->dev[1]->priv) {
-			pNet = (DEV_NET *) pAc->dev[1]->priv;
+		if (pNet != netdev_priv(pAC->dev[1])) {
+			pNet = netdev_priv(pAC->dev[1]);
 			if (pNet->Up) {
 				pAC->WasIfUp[1] = SK_TRUE;
 				pAC->DiagFlowCtrl = SK_TRUE; /* for SkGeClose */
@@ -4681,20 +4702,11 @@ int      devNbr)	/* what device is to be handled */
 
 	dev = pAC->dev[devNbr];
 
-	/*
-	** Function SkGeClose() uses MOD_DEC_USE_COUNT (2.2/2.4)
-	** or module_put() (2.6) to decrease the number of users for
-	** a device, but if a device is to be put under control of 
-	** the DIAG, that count is OK already and does not need to 
-	** be adapted! Hence the opposite MOD_INC_USE_COUNT or 
-	** try_module_get() needs to be used again to correct that.
+	/* On Linux 2.6 the network driver does NOT mess with reference
+	** counts.  The driver MUST be able to be unloaded at any time
+	** due to the possibility of hotplug.
 	*/
-	if (!try_module_get(THIS_MODULE)) {
-		return (-1);
-	}
-
 	if (SkGeClose(dev) != 0) {
-		module_put(THIS_MODULE);
 		return (-1);
 	}
 	return (0);
@@ -4723,17 +4735,6 @@ int      devNbr)	/* what device is to be handled */
 
 	if (SkGeOpen(dev) != 0) {
 		return (-1);
-	} else {
-		/*
-		** Function SkGeOpen() uses MOD_INC_USE_COUNT (2.2/2.4) 
-		** or try_module_get() (2.6) to increase the number of 
-		** users for a device, but if a device was just under 
-		** control of the DIAG, that count is OK already and 
-		** does not need to be adapted! Hence the opposite 
-		** MOD_DEC_USE_COUNT or module_put() needs to be used 
-		** again to correct that.
-		*/
-		module_put(THIS_MODULE);
 	}
 
 	/*
@@ -4904,9 +4905,6 @@ static int __devinit skge_probe_one(struct pci_dev *pdev,
 	SK_AC			*pAC;
 	DEV_NET			*pNet = NULL;
 	struct net_device	*dev = NULL;
-#ifdef CONFIG_PROC_FS
-	struct proc_dir_entry	*pProcFile;
-#endif
 	static int boards_found = 0;
 	int error = -ENODEV;
 
@@ -4925,7 +4923,7 @@ static int __devinit skge_probe_one(struct pci_dev *pdev,
 		goto out_disable_device;
 	}
 
-	pNet = dev->priv;
+	pNet = netdev_priv(dev);
 	pNet->pAC = kmalloc(sizeof(SK_AC), GFP_KERNEL);
 	if (!pNet->pAC) {
 		printk(KERN_ERR "Unable to allocate adapter "
@@ -4960,8 +4958,12 @@ static int __devinit skge_probe_one(struct pci_dev *pdev,
 	dev->set_mac_address =	&SkGeSetMacAddr;
 	dev->do_ioctl =		&SkGeIoctl;
 	dev->change_mtu =	&SkGeChangeMtu;
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	dev->poll_controller =	&SkGePollController;
+#endif
 	dev->flags &= 		~IFF_RUNNING;
 	SET_NETDEV_DEV(dev, &pdev->dev);
+	SET_ETHTOOL_OPS(dev, &SkGeEthtoolOps);
 
 #ifdef SK_ZEROCOPY
 #ifdef USE_SK_TX_CHECKSUM
@@ -5002,14 +5004,7 @@ static int __devinit skge_probe_one(struct pci_dev *pdev,
 
 	memcpy(&dev->dev_addr, &pAC->Addr.Net[0].CurrentMacAddress, 6);
 
-#ifdef CONFIG_PROC_FS
-	pProcFile = create_proc_entry(dev->name, S_IRUGO, pSkRootDir);
-	if (pProcFile) {
-		pProcFile->proc_fops = &sk_proc_fops;
-		pProcFile->data = dev;
-		pProcFile->owner = THIS_MODULE;
-	}
-#endif
+	SkGeProcCreate(dev);
 
 	pNet->PortNr = 0;
 	pNet->NetNr  = 0;
@@ -5025,7 +5020,7 @@ static int __devinit skge_probe_one(struct pci_dev *pdev,
 		}
 
 		pAC->dev[1]   = dev;
-		pNet          = dev->priv;
+		pNet          = netdev_priv(dev);
 		pNet->PortNr  = 1;
 		pNet->NetNr   = 1;
 		pNet->pAC     = pAC;
@@ -5041,6 +5036,8 @@ static int __devinit skge_probe_one(struct pci_dev *pdev,
 		dev->do_ioctl           = &SkGeIoctl;
 		dev->change_mtu         = &SkGeChangeMtu;
 		dev->flags             &= ~IFF_RUNNING;
+		SET_NETDEV_DEV(dev, &pdev->dev);
+		SET_ETHTOOL_OPS(dev, &SkGeEthtoolOps);
 
 #ifdef SK_ZEROCOPY
 #ifdef USE_SK_TX_CHECKSUM
@@ -5056,16 +5053,7 @@ static int __devinit skge_probe_one(struct pci_dev *pdev,
 			free_netdev(dev);
 			pAC->dev[1] = pAC->dev[0];
 		} else {
-#ifdef CONFIG_PROC_FS
-			pProcFile = create_proc_entry(dev->name, S_IRUGO,
-					pSkRootDir);
-			if (pProcFile) {
-				pProcFile->proc_fops = &sk_proc_fops;
-				pProcFile->data = dev;
-				pProcFile->owner = THIS_MODULE;
-			}
-#endif
-
+			SkGeProcCreate(dev);
 			memcpy(&dev->dev_addr,
 					&pAC->Addr.Net[1].CurrentMacAddress, 6);
 	
@@ -5101,19 +5089,14 @@ static int __devinit skge_probe_one(struct pci_dev *pdev,
 static void __devexit skge_remove_one(struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
-	DEV_NET *pNet = (DEV_NET *) dev->priv;
+	DEV_NET *pNet = netdev_priv(dev);
 	SK_AC *pAC = pNet->pAC;
-	int have_second_mac = 0;
+	struct net_device *otherdev = pAC->dev[1];
 
-	if ((pAC->GIni.GIMacsFound == 2) && pAC->RlmtNets == 2)
-		have_second_mac = 1;
-
-	remove_proc_entry(dev->name, pSkRootDir);
+	SkGeProcRemove(dev);
 	unregister_netdev(dev);
-	if (have_second_mac) {
-		remove_proc_entry(pAC->dev[1]->name, pSkRootDir);
-		unregister_netdev(pAC->dev[1]);
-	}
+	if (otherdev != dev)
+		SkGeProcRemove(otherdev);
 
 	SkGeYellowLED(pAC, pAC->IoBase, 0);
 
@@ -5146,8 +5129,8 @@ static void __devexit skge_remove_one(struct pci_dev *pdev)
 
 	FreeResources(dev);
 	free_netdev(dev);
-	if (have_second_mac)
-		free_netdev(pAC->dev[1]);
+	if (otherdev != dev)
+		free_netdev(otherdev);
 	kfree(pAC);
 }
 
@@ -5180,34 +5163,21 @@ static int __init skge_init(void)
 {
 	int error;
 
-#ifdef CONFIG_PROC_FS
-	memcpy(&SK_Root_Dir_entry, BOOT_STRING, sizeof(SK_Root_Dir_entry) - 1);
-
-	pSkRootDir = proc_mkdir(SK_Root_Dir_entry, proc_net);
-	if (!pSkRootDir) {
-		printk(KERN_WARNING "Unable to create /proc/net/%s",
-				SK_Root_Dir_entry);
-		return -ENOMEM;
-	}
-	pSkRootDir->owner = THIS_MODULE;
-#endif
-
-	error = pci_module_init(&skge_driver);
-	if (error) {
-#ifdef CONFIG_PROC_FS
-		remove_proc_entry(pSkRootDir->name, proc_net);
-#endif
-	}
-
+	pSkRootDir = proc_mkdir(SKRootName, proc_net);
+	if (pSkRootDir) 
+		pSkRootDir->owner = THIS_MODULE;
+	
+	error = pci_register_driver(&skge_driver);
+	if (error)
+		proc_net_remove(SKRootName);
 	return error;
 }
 
 static void __exit skge_exit(void)
 {
-	 pci_unregister_driver(&skge_driver);
-#ifdef CONFIG_PROC_FS
-	remove_proc_entry(pSkRootDir->name, proc_net);
-#endif
+	pci_unregister_driver(&skge_driver);
+	proc_net_remove(SKRootName);
+
 }
 
 module_init(skge_init);

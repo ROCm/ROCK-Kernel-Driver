@@ -80,7 +80,7 @@ static snd_opl3_drum_voice_t cymbal = {8, 1, 0x04, 0x03, 0xf0, 0x06, 0x10, 0x00}
 /*
  * set drum voice characteristics
  */
-void snd_opl3_drum_voice_set(opl3_t *opl3, snd_opl3_drum_voice_t *data)
+static void snd_opl3_drum_voice_set(opl3_t *opl3, snd_opl3_drum_voice_t *data)
 {
 	unsigned char op_offset = snd_opl3_regmap[data->voice][data->op];
 	unsigned char voice_offset = data->voice;
@@ -114,7 +114,7 @@ void snd_opl3_drum_voice_set(opl3_t *opl3, snd_opl3_drum_voice_t *data)
 /*
  * Set drum voice pitch
  */
-void snd_opl3_drum_note_set(opl3_t *opl3, snd_opl3_drum_note_t *data)
+static void snd_opl3_drum_note_set(opl3_t *opl3, snd_opl3_drum_note_t *data)
 {
 	unsigned char voice_offset = data->voice;
 	unsigned short opl3_reg;
@@ -131,8 +131,8 @@ void snd_opl3_drum_note_set(opl3_t *opl3, snd_opl3_drum_note_t *data)
 /*
  * Set drum voice volume and position
  */
-void snd_opl3_drum_vol_set(opl3_t *opl3, snd_opl3_drum_voice_t *data, int vel,
-			   snd_midi_channel_t *chan)
+static void snd_opl3_drum_vol_set(opl3_t *opl3, snd_opl3_drum_voice_t *data,
+				  int vel, snd_midi_channel_t *chan)
 {
 	unsigned char op_offset = snd_opl3_regmap[data->voice][data->op];
 	unsigned char voice_offset = data->voice;

@@ -1548,8 +1548,7 @@ xprt_bind_socket(struct rpc_xprt *xprt, struct socket *sock)
 		sk->sk_no_check = UDP_CSUM_NORCV;
 		xprt_set_connected(xprt);
 	} else {
-		struct tcp_opt *tp = tcp_sk(sk);
-		tp->nonagle = 1;	/* disable Nagle's algorithm */
+		tcp_sk(sk)->nonagle = 1;	/* disable Nagle's algorithm */
 		sk->sk_data_ready = tcp_data_ready;
 		sk->sk_state_change = tcp_state_change;
 		xprt_clear_connected(xprt);

@@ -5,6 +5,7 @@
  *
  * Author: Rory Bolt <rorybolt@pacbell.net>
  * Copyright (C) 2002 Rory Bolt
+ * Copyright (C) 2004 Intel Corp.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -30,21 +31,30 @@
 /*
  * IOP321 I/O and Mem space regions for PCI autoconfiguration
  */
-#define IOP321_PCI_LOWER_IO             0x90000000
-#define IOP321_PCI_UPPER_IO             0x9000ffff
-#define IOP321_PCI_LOWER_MEM            0x80000000
-#define IOP321_PCI_UPPER_MEM            0x83ffffff
+#define IOP321_PCI_IO_WINDOW_SIZE   0x10000
+#define IOP321_PCI_LOWER_IO_PA      0x90000000
+#define IOP321_PCI_LOWER_IO_VA      0xfe000000
+#define IOP321_PCI_LOWER_IO_BA      (*IOP321_OIOWTVR)
+#define IOP321_PCI_UPPER_IO_PA      (IOP321_PCI_LOWER_IO_PA + IOP321_PCI_IO_WINDOW_SIZE - 1)
+#define IOP321_PCI_UPPER_IO_VA      (IOP321_PCI_LOWER_IO_VA + IOP321_PCI_IO_WINDOW_SIZE - 1)
+#define IOP321_PCI_UPPER_IO_BA      (IOP321_PCI_LOWER_IO_BA + IOP321_PCI_IO_WINDOW_SIZE - 1)
+#define IOP321_PCI_IO_OFFSET        (IOP321_PCI_LOWER_IO_VA - IOP321_PCI_LOWER_IO_BA)
 
-#define IOP321_PCI_WINDOW_SIZE          64 * 0x100000
+#define IOP321_PCI_MEM_WINDOW_SIZE  (~*IOP321_IALR1 + 1)
+#define IOP321_PCI_LOWER_MEM_PA     0x80000000
+#define IOP321_PCI_LOWER_MEM_VA     0x80000000
+#define IOP321_PCI_LOWER_MEM_BA     (*IOP321_OMWTVR0)
+#define IOP321_PCI_UPPER_MEM_PA     (IOP321_PCI_LOWER_MEM_PA + IOP321_PCI_MEM_WINDOW_SIZE - 1)
+#define IOP321_PCI_UPPER_MEM_VA     (IOP321_PCI_LOWER_MEM_VA + IOP321_PCI_MEM_WINDOW_SIZE - 1)
+#define IOP321_PCI_UPPER_MEM_BA     (IOP321_PCI_LOWER_MEM_BA + IOP321_PCI_MEM_WINDOW_SIZE - 1)
+#define IOP321_PCI_MEM_OFFSET       (IOP321_PCI_LOWER_MEM_VA - IOP321_PCI_LOWER_MEM_BA)
 
 
 /*
  * IOP321 chipset registers
  */
 #define IOP321_VIRT_MEM_BASE 0xfeffe000  /* chip virtual mem address*/
-//#define IOP321_VIRT_MEM_BASE 0xfff00000  /* chip virtual mem address*/
-
-#define IOP321_PHY_MEM_BASE  0xffffe000  /* chip physical memory address */
+#define IOP321_PHYS_MEM_BASE 0xffffe000  /* chip physical memory address */
 #define IOP321_REG_ADDR(reg) (IOP321_VIRT_MEM_BASE | (reg))
 
 /* Reserved 0x00000000 through 0x000000FF */

@@ -180,7 +180,7 @@ static char *usb_dump_endpoint_descriptor (
 	in = (desc->bEndpointAddress & USB_DIR_IN);
 	dir = in ? 'I' : 'O';
 	if (speed == USB_SPEED_HIGH) {
-		switch (desc->wMaxPacketSize & (0x03 << 11)) {
+		switch (le16_to_cpu(desc->wMaxPacketSize) & (0x03 << 11)) {
 		case 1 << 11:	bandwidth = 2; break;
 		case 2 << 11:	bandwidth = 3; break;
 		}
@@ -227,7 +227,7 @@ static char *usb_dump_endpoint_descriptor (
 
 	start += sprintf(start, format_endpt, desc->bEndpointAddress, dir,
 			 desc->bmAttributes, type,
-			 (desc->wMaxPacketSize & 0x07ff) * bandwidth,
+			 (le16_to_cpu(desc->wMaxPacketSize) & 0x07ff) * bandwidth,
 			 interval, unit);
 	return start;
 }
@@ -335,10 +335,13 @@ static char *usb_dump_config (
  */
 static char *usb_dump_device_descriptor(char *start, char *end, const struct usb_device_descriptor *desc)
 {
+	u16 bcdUSB = le16_to_cpu(desc->bcdUSB);
+	u16 bcdDevice = le16_to_cpu(desc->bcdDevice);
+
 	if (start > end)
 		return start;
 	start += sprintf (start, format_device1,
-			  desc->bcdUSB >> 8, desc->bcdUSB & 0xff,
+			  bcdUSB >> 8, bcdUSB & 0xff,
 			  desc->bDeviceClass,
 			  class_decode (desc->bDeviceClass),
 			  desc->bDeviceSubClass,
@@ -348,8 +351,9 @@ static char *usb_dump_device_descriptor(char *start, char *end, const struct usb
 	if (start > end)
 		return start;
 	start += sprintf(start, format_device2,
-			 desc->idVendor, desc->idProduct,
-			 desc->bcdDevice >> 8, desc->bcdDevice & 0xff);
+			 le16_to_cpu(desc->idVendor),
+			 le16_to_cpu(desc->idProduct),
+			 bcdDevice >> 8, bcdDevice & 0xff);
 	return start;
 }
 

@@ -13,7 +13,7 @@
 #include <asm/sstep.h>
 #include <asm/processor.h>
 
-extern char SystemCall_common[];
+extern char system_call_common[];
 
 /* Bits in SRR1 that are copied from MSR */
 #define MSR_MASK	0xffffffff87c0ffff
@@ -76,7 +76,7 @@ int emulate_step(struct pt_regs *regs, unsigned int instr)
 		regs->gpr[11] = regs->nip + 4;
 		regs->gpr[12] = regs->msr & MSR_MASK;
 		regs->gpr[13] = (unsigned long) get_paca();
-		regs->nip = (unsigned long) &SystemCall_common;
+		regs->nip = (unsigned long) &system_call_common;
 		regs->msr = MSR_KERNEL;
 		return 1;
 	case 18:	/* b */

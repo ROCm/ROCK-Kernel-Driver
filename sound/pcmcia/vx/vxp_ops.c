@@ -22,6 +22,7 @@
 
 #include <sound/driver.h>
 #include <linux/delay.h>
+#include <linux/firmware.h>
 #include <sound/core.h>
 #include <asm/io.h>
 #include "vxpocket.h"
@@ -144,13 +145,13 @@ static void vxp_reset_codec(vx_core_t *_chip)
  * vx_load_xilinx_binary - load the xilinx binary image
  * the binary image is the binary array converted from the bitstream file.
  */
-static int vxp_load_xilinx_binary(vx_core_t *_chip, const snd_hwdep_dsp_image_t *xilinx)
+static int vxp_load_xilinx_binary(vx_core_t *_chip, const struct firmware *fw)
 {
 	struct snd_vxpocket *chip = (struct snd_vxpocket *)_chip;
 	unsigned int i;
 	int c;
 	int regCSUER, regRUER;
-	unsigned char __user *image;
+	unsigned char *image;
 	unsigned char data;
 
 	/* Switch to programmation mode */
@@ -171,9 +172,9 @@ static int vxp_load_xilinx_binary(vx_core_t *_chip, const snd_hwdep_dsp_image_t 
 
 	/* set HF1 for loading xilinx binary */
 	vx_outb(chip, ICR, ICR_HF1);
-	image = xilinx->image;
-	for (i = 0; i < xilinx->length; i++, image++) {
-		__get_user(data, image);
+	image = fw->data;
+	for (i = 0; i < fw->size; i++, image++) {
+		data = *image;
 		if (vx_wait_isr_bit(_chip, ISR_TX_EMPTY) < 0)
 			goto _error;
 		vx_outb(chip, TXL, data);
@@ -200,7 +201,7 @@ static int vxp_load_xilinx_binary(vx_core_t *_chip, const snd_hwdep_dsp_image_t 
 	c |= (int)vx_inb(chip, RXM) << 8;
 	c |= vx_inb(chip, RXL);
 
-	snd_printdd(KERN_DEBUG "xilinx: dsp size received 0x%x, orig 0x%x\n", c, xilinx->length);
+	snd_printdd(KERN_DEBUG "xilinx: dsp size received 0x%x, orig 0x%x\n", c, fw->size);
 
 	vx_outb(chip, ICR, ICR_HF0);
 
@@ -242,30 +243,27 @@ static int vxp_load_xilinx_binary(vx_core_t *_chip, const snd_hwdep_dsp_image_t 
 /*
  * vxp_load_dsp - load_dsp callback
  */
-static int vxp_load_dsp(vx_core_t *vx, const snd_hwdep_dsp_image_t *dsp)
+static int vxp_load_dsp(vx_core_t *vx, int index, const struct firmware *fw)
 {
 	int err;
 
-	if (*dsp->name)
-		snd_printdd("loading dsp [%d] %s, size = %d\n", dsp->index, dsp->name, dsp->length);
-
-	switch (dsp->index) {
+	switch (index) {
 	case 0:
 		/* xilinx boot */
 		if ((err = vx_check_magic(vx)) < 0)
 			return err;
-		if ((err = snd_vx_load_boot_image(vx, dsp)) < 0)
+		if ((err = snd_vx_load_boot_image(vx, fw)) < 0)
 			return err;
 		return 0;
 	case 1:
 		/* xilinx image */
-		return vxp_load_xilinx_binary(vx, dsp);
+		return vxp_load_xilinx_binary(vx, fw);
 	case 2:
 		/* DSP boot */
-		return snd_vx_dsp_boot(vx, dsp);
+		return snd_vx_dsp_boot(vx, fw);
 	case 3:
 		/* DSP image */
-		return snd_vx_dsp_load(vx, dsp);
+		return snd_vx_dsp_load(vx, fw);
 	default:
 		snd_BUG();
 		return -EINVAL;

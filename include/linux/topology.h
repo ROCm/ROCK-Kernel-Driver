@@ -43,16 +43,9 @@
 	})
 #endif
 
-static inline int __next_node_with_cpus(int node)
-{
-	do
-		++node;
-	while (node < numnodes && !nr_cpus_node(node));
-	return node;
-}
-
-#define for_each_node_with_cpus(node) \
-	for (node = 0; node < numnodes; node = __next_node_with_cpus(node))
+#define for_each_node_with_cpus(node)						\
+	for_each_online_node(node)						\
+		if (nr_cpus_node(node))
 
 #ifndef node_distance
 /* Conform to ACPI 2.0 SLIT distance definitions */
@@ -116,13 +109,14 @@ static inline int __next_node_with_cpus(int node)
 	.max_interval		= 4,			\
 	.busy_factor		= 64,			\
 	.imbalance_pct		= 125,			\
-	.cache_hot_time		= (5*1000/2),		\
+	.cache_hot_time		= (5*1000000/2),	\
 	.cache_nice_tries	= 1,			\
 	.per_cpu_gain		= 100,			\
 	.flags			= SD_LOAD_BALANCE	\
 				| SD_BALANCE_NEWIDLE	\
 				| SD_BALANCE_EXEC	\
 				| SD_WAKE_AFFINE	\
+				| SD_WAKE_IDLE		\
 				| SD_WAKE_BALANCE,	\
 	.last_balance		= jiffies,		\
 	.balance_interval	= 1,			\

@@ -186,12 +186,9 @@
 #define CS8427_VERSHIFT		0
 #define CS8427_VER8427A		0x71
 
-int snd_cs8427_detect(snd_i2c_bus_t *bus, unsigned char addr);
 int snd_cs8427_create(snd_i2c_bus_t *bus, unsigned char addr,
 		      unsigned int reset_timeout, snd_i2c_device_t **r_cs8427);
-void snd_cs8427_reset(snd_i2c_device_t *cs8427);
 int snd_cs8427_reg_write(snd_i2c_device_t *device, unsigned char reg, unsigned char val);
-int snd_cs8427_reg_read(snd_i2c_device_t *device, unsigned char reg);
 int snd_cs8427_iec958_build(snd_i2c_device_t *cs8427, snd_pcm_substream_t *playback_substream, snd_pcm_substream_t *capture_substream);
 int snd_cs8427_iec958_active(snd_i2c_device_t *cs8427, int active);
 int snd_cs8427_iec958_pcm(snd_i2c_device_t *cs8427, unsigned int rate);

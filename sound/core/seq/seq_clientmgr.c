@@ -751,8 +751,8 @@ static int multicast_event(client_t *client, snd_seq_event_t *event,
  *               n == 0 : the event was not passed to any client.
  *               n < 0  : error - event was not processed.
  */
-int snd_seq_deliver_event(client_t *client, snd_seq_event_t *event,
-			  int atomic, int hop)
+static int snd_seq_deliver_event(client_t *client, snd_seq_event_t *event,
+				 int atomic, int hop)
 {
 	int result;
 
@@ -904,7 +904,7 @@ static int snd_seq_client_enqueue_event(client_t *client,
 		return -ENXIO; /* queue is not allocated */
 
 	/* allocate an event cell */
-	err = snd_seq_event_dup(client->pool, event, &cell, !blocking && !atomic, file);
+	err = snd_seq_event_dup(client->pool, event, &cell, !blocking || atomic, file);
 	if (err < 0)
 		return err;
 

@@ -444,6 +444,14 @@ static int cp_clcd_setup(struct clcd_fb *fb)
 	return 0;
 }
 
+static int cp_clcd_mmap(struct clcd_fb *fb, struct vm_area_struct *vma)
+{
+	return dma_mmap_writecombine(&fb->dev->dev, vma,
+				     fb->fb.screen_base,
+				     fb->fb.fix.smem_start,
+				     fb->fb.fix.smem_len);
+}
+
 static void cp_clcd_remove(struct clcd_fb *fb)
 {
 	dma_free_writecombine(&fb->dev->dev, fb->fb.fix.smem_len,
@@ -456,6 +464,7 @@ static struct clcd_board clcd_data = {
 	.decode		= clcdfb_decode,
 	.enable		= cp_clcd_enable,
 	.setup		= cp_clcd_setup,
+	.mmap		= cp_clcd_mmap,
 	.remove		= cp_clcd_remove,
 };
 

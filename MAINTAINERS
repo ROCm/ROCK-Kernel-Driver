@@ -287,6 +287,11 @@ P:	Dave Gilbert
 M:	linux@treblig.org
 S:	Maintained
 
+ARM/CORGI MACHINE SUPPORT
+P:	Richard Purdie
+M:	rpurdie@rpsys.net
+S:	Maintained
+
 ARM/PLEB SUPPORT
 P:	Peter Chubb
 M:	pleb@gelato.unsw.edu.au
@@ -341,6 +346,12 @@ L:	acpi4asus-user@lists.sourceforge.net
 W:	http://sourceforge.net/projects/acpi4asus
 W:	http://julien.lerouge.free.fr
 S:	Maintained
+
+ATA OVER ETHERNET DRIVER
+P:	Ed L. Cashin
+M:	ecashin@coraid.com
+W:	http://www.coraid.com/support/linux
+S:	Supported
 
 ATM
 P:	Chas Williams
@@ -972,6 +983,11 @@ P:	Oliver Neukum
 M:	oliver@neukum.name
 S:	Maintained
 
+HUGETLB FILESYSTEM
+P:	William Irwin
+M:	wli@holomorphy.com
+S:	Maintained
+
 I2C AND SENSORS DRIVERS
 P:	Greg Kroah-Hartman
 M:	greg@kroah.com
@@ -1007,8 +1023,8 @@ W:	http://www.kernelconcepts.de/
 S:	Maintained
 
 IA64 (Itanium) PLATFORM
-P:	David Mosberger-Tang
-M:	davidm@hpl.hp.com
+P:	Tony Luck
+M:	tony.luck@intel.com
 L:	linux-ia64@vger.kernel.org
 W:	http://www.ia64-linux.org/
 S:	Maintained
@@ -1742,7 +1758,6 @@ S:	Supported
 PCI HOTPLUG CORE
 P:	Greg Kroah-Hartman
 M:	greg@kroah.com
-M:	gregkh@us.ibm.com
 S:	Supported
 
 PCI HOTPLUG COMPAQ DRIVER
@@ -1871,9 +1886,7 @@ L:	linux-hams@vger.kernel.org
 S:	Maintained
 
 RISCOM8 DRIVER
-P:	Dmitry Gorodchanin
-L:	linux-kernel@vger.kernel.org
-S:	Maintained
+S:	Orphan
 
 RTLINUX  REALTIME  LINUX
 P:	Victor Yodaiken
@@ -2082,7 +2095,6 @@ S:	Maintained
 SPECIALIX IO8+ MULTIPORT SERIAL CARD DRIVER
 P:	Roger Wolff
 M:	R.E.Wolff@BitWizard.nl
-M:	io8-linux@specialix.co.uk
 L:	linux-kernel@vger.kernel.org ?
 S:	Supported
 

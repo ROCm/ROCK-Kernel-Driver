@@ -155,7 +155,8 @@ find_memend_and_nodes(struct meminfo *mi, struct node_info *np)
 {
 	unsigned int memend_pfn = 0;
 
-	numnodes = 1;
+	nodes_clear(node_online_map);
+	node_set_online(0);
 
 	np->bootmap_pages = 0;
 

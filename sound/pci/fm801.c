@@ -208,15 +208,16 @@ static int snd_fm801_update_bits(fm801_t *chip, unsigned short reg,
 				 unsigned short mask, unsigned short value)
 {
 	int change;
+	unsigned long flags;
 	unsigned short old, new;
 
-	spin_lock(&chip->reg_lock);
+	spin_lock_irqsave(&chip->reg_lock, flags);
 	old = inw(chip->port + reg);
 	new = (old & ~mask) | value;
 	change = old != new;
 	if (change)
 		outw(new, chip->port + reg);
-	spin_unlock(&chip->reg_lock);
+	spin_unlock_irqrestore(&chip->reg_lock, flags);
 	return change;
 }
 
@@ -415,13 +416,12 @@ static int snd_fm801_hw_free(snd_pcm_substream_t * substream)
 
 static int snd_fm801_playback_prepare(snd_pcm_substream_t * substream)
 {
-	unsigned long flags;
 	fm801_t *chip = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
 
 	chip->ply_size = snd_pcm_lib_buffer_bytes(substream);
 	chip->ply_count = snd_pcm_lib_period_bytes(substream);
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock_irq(&chip->reg_lock);
 	chip->ply_ctrl &= ~(FM801_START | FM801_16BIT |
 			     FM801_STEREO | FM801_RATE_MASK |
 			     FM801_CHANNELS_MASK);
@@ -442,19 +442,18 @@ static int snd_fm801_playback_prepare(snd_pcm_substream_t * substream)
 	chip->ply_pos = 0;
 	outl(chip->ply_buffer, FM801_REG(chip, PLY_BUF1));
 	outl(chip->ply_buffer + (chip->ply_count % chip->ply_size), FM801_REG(chip, PLY_BUF2));
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock_irq(&chip->reg_lock);
 	return 0;
 }
 
 static int snd_fm801_capture_prepare(snd_pcm_substream_t * substream)
 {
-	unsigned long flags;
 	fm801_t *chip = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
 
 	chip->cap_size = snd_pcm_lib_buffer_bytes(substream);
 	chip->cap_count = snd_pcm_lib_period_bytes(substream);
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock_irq(&chip->reg_lock);
 	chip->cap_ctrl &= ~(FM801_START | FM801_16BIT |
 			     FM801_STEREO | FM801_RATE_MASK);
 	if (snd_pcm_format_width(runtime->format) == 16)
@@ -469,7 +468,7 @@ static int snd_fm801_capture_prepare(snd_pcm_substream_t * substream)
 	chip->cap_pos = 0;
 	outl(chip->cap_buffer, FM801_REG(chip, CAP_BUF1));
 	outl(chip->cap_buffer + (chip->cap_count % chip->cap_size), FM801_REG(chip, CAP_BUF2));
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock_irq(&chip->reg_lock);
 	return 0;
 }
 

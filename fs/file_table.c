@@ -82,7 +82,7 @@ static int old_max;
 			atomic_set(&f->f_count, 1);
 			f->f_uid = current->fsuid;
 			f->f_gid = current->fsgid;
-			f->f_owner.lock = RW_LOCK_UNLOCKED;
+			rwlock_init(&f->f_owner.lock);
 			/* f->f_version: 0 */
 			INIT_LIST_HEAD(&f->f_list);
 			return f;

@@ -36,7 +36,11 @@ CFLAGS		+= -msoft-float -pipe -mminimal-toc -mtraceback=none \
 		   -mcall-aixdesc
 
 ifeq ($(CONFIG_POWER4_ONLY),y)
+ifeq ($(CONFIG_ALTIVEC),y)
+	CFLAGS += $(call cc-option,-mcpu=970)
+else
 	CFLAGS += $(call cc-option,-mcpu=power4)
+endif
 else
 	CFLAGS += $(call cc-option,-mtune=power4)
 endif

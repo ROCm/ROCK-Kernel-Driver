@@ -225,7 +225,7 @@ static void dump_statusregs(struct saa7134_dev *dev)
 /* ------------------------------------------------------------------ */
 
 /* nr of (saa7134-)pages for the given buffer size */
-int saa7134_buffer_pages(int size)
+static int saa7134_buffer_pages(int size)
 {
 	size  = PAGE_ALIGN(size);
 	size += PAGE_SIZE; /* for non-page-aligned buffers */
@@ -630,7 +630,7 @@ static int saa7134_hwinit1(struct saa7134_dev *dev)
 	saa_writel(SAA7134_IRQ1, 0);
 	saa_writel(SAA7134_IRQ2, 0);
         init_MUTEX(&dev->lock);
-	dev->slock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&dev->slock);
 
 	saa7134_track_gpio(dev,"pre-init");
 	saa7134_video_init1(dev);

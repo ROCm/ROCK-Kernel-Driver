@@ -359,30 +359,47 @@ config BLK_DEV_INITRD
 	  for details.
 
 config INITRAMFS_SOURCE
-	string "Source directory of cpio_list"
+	string "Initramfs source file(s)"
 	default ""
 	help
-	  This can be set to either a directory containing files, etc to be
-	  included in the initramfs archive, or a file containing newline
-	  separated entries.
+	  This can be either a single cpio archive with a .cpio suffix or a
+	  space-separated list of directories and files for building the
+	  initramfs image.  A cpio archive should contain a filesystem archive
+	  to be used as an initramfs image.  Directories should contain a
+	  filesystem layout to be included in the initramfs image.  Files
+	  should contain entries according to the format described by the
+	  "usr/gen_init_cpio" program in the kernel tree.
 
-	  If it is a file, it should be in the following format:
-	    # a comment
-	    file <name> <location> <mode> <uid> <gid>
-	    dir <name> <mode> <uid> <gid>
-	    nod <name> <mode> <uid> <gid> <dev_type> <maj> <min>
+	  When multiple directories and files are specified then the
+	  initramfs image will be the aggregate of all of them.
 
-	  Where:
-	    <name>      name of the file/dir/nod in the archive
-	    <location>  location of the file in the current filesystem
-	    <mode>      mode/permissions of the file
-	    <uid>       user id (0=root)
-	    <gid>       group id (0=root)
-	    <dev_type>  device type (b=block, c=character)
-	    <maj>       major number of nod
-	    <min>       minor number of nod
+	  See <file:Documentation/early-userspace/README for more details.
 
 	  If you are not sure, leave it blank.
+
+config INITRAMFS_ROOT_UID
+	int "User ID to map to 0 (user root)"
+	depends on INITRAMFS_SOURCE!=""
+	default "0"
+	help
+	  This setting is only meaningful if the INITRAMFS_SOURCE is
+	  contains a directory.  Setting this user ID (UID) to something
+	  other than "0" will cause all files owned by that UID to be
+	  owned by user root in the initial ramdisk image.
+
+	  If you are not sure, leave it set to "0".
+
+config INITRAMFS_ROOT_GID
+	int "Group ID to map to 0 (group root)"
+	depends on INITRAMFS_SOURCE!=""
+	default "0"
+	help
+	  This setting is only meaningful if the INITRAMFS_SOURCE is
+	  contains a directory.  Setting this group ID (GID) to something
+	  other than "0" will cause all files owned by that GID to be
+	  owned by group root in the initial ramdisk image.
+
+	  If you are not sure, leave it set to "0".
 
 config LBD
 	bool "Support for Large Block Devices"
@@ -428,5 +445,13 @@ config CDROM_PKTCDVD_WCACHE
 source "drivers/s390/block/Kconfig"
 
 source "drivers/block/Kconfig.iosched"
+
+config ATA_OVER_ETH
+	tristate "ATA over Ethernet support"
+	depends on NET
+	default m
+	help
+	This driver provides Support for ATA over Ethernet block
+	devices like the Coraid EtherDrive (R) Storage Blade.
 
 endmenu

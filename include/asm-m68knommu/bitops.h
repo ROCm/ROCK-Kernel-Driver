@@ -113,26 +113,20 @@ static __inline__ unsigned long ffz(unsigned long word)
 
 static __inline__ void set_bit(int nr, volatile unsigned long * addr)
 {
-	int 	* a = (int *) addr;
-	int	mask;
-	unsigned long flags;
-
-	a += nr >> 5;
-	mask = 1 << (nr & 0x1f);
-	local_irq_save(flags);
-	*a |= mask;
-	local_irq_restore(flags);
+#ifdef CONFIG_COLDFIRE
+	__asm__ __volatile__ ("lea %0,%%a0; bset %1,(%%a0)"
+	     : "+m" (((volatile char *)addr)[(nr^31) >> 3])
+	     : "d" (nr)
+	     : "%a0", "cc");
+#else
+	__asm__ __volatile__ ("bset %1,%0"
+	     : "+m" (((volatile char *)addr)[(nr^31) >> 3])
+	     : "di" (nr)
+	     : "cc");
+#endif
 }
 
-static __inline__ void __set_bit(int nr, volatile unsigned long * addr)
-{
-	int 	* a = (int *) addr;
-	int	mask;
-
-	a += nr >> 5;
-	mask = 1 << (nr & 0x1f);
-	*a |= mask;
-}
+#define __set_bit(nr, addr) set_bit(nr, addr)
 
 /*
  * clear_bit() doesn't provide any barrier for the compiler.
@@ -142,132 +136,100 @@ static __inline__ void __set_bit(int nr, volatile unsigned long * addr)
 
 static __inline__ void clear_bit(int nr, volatile unsigned long * addr)
 {
-	int 	* a = (int *) addr;
-	int	mask;
-	unsigned long flags;
-
-	a += nr >> 5;
-	mask = 1 << (nr & 0x1f);
-	local_irq_save(flags);
-	*a &= ~mask;
-	local_irq_restore(flags);
+#ifdef CONFIG_COLDFIRE
+	__asm__ __volatile__ ("lea %0,%%a0; bclr %1,(%%a0)"
+	     : "+m" (((volatile char *)addr)[(nr^31) >> 3])
+	     : "d" (nr)
+	     : "%a0", "cc");
+#else
+	__asm__ __volatile__ ("bclr %1,%0"
+	     : "+m" (((volatile char *)addr)[(nr^31) >> 3])
+	     : "di" (nr)
+	     : "cc");
+#endif
 }
 
-static __inline__ void __clear_bit(int nr, volatile unsigned long * addr)
-{
-	int 	* a = (int *) addr;
-	int	mask;
-
-	a += nr >> 5;
-	mask = 1 << (nr & 0x1f);
-	*a &= ~mask;
-}
+#define __clear_bit(nr, addr) clear_bit(nr, addr)
 
 static __inline__ void change_bit(int nr, volatile unsigned long * addr)
 {
-	int mask, flags;
-	unsigned long *ADDR = (unsigned long *) addr;
-
-	ADDR += nr >> 5;
-	mask = 1 << (nr & 31);
-	local_irq_save(flags);
-	*ADDR ^= mask;
-	local_irq_restore(flags);
+#ifdef CONFIG_COLDFIRE
+	__asm__ __volatile__ ("lea %0,%%a0; bchg %1,(%%a0)"
+	     : "+m" (((volatile char *)addr)[(nr^31) >> 3])
+	     : "d" (nr)
+	     : "%a0", "cc");
+#else
+	__asm__ __volatile__ ("bchg %1,%0"
+	     : "+m" (((volatile char *)addr)[(nr^31) >> 3])
+	     : "di" (nr)
+	     : "cc");
+#endif
 }
 
-static __inline__ void __change_bit(int nr, volatile unsigned long * addr)
-{
-	int mask;
-	unsigned long *ADDR = (unsigned long *) addr;
-
-	ADDR += nr >> 5;
-	mask = 1 << (nr & 31);
-	*ADDR ^= mask;
-}
+#define __change_bit(nr, addr) change_bit(nr, addr)
 
 static __inline__ int test_and_set_bit(int nr, volatile unsigned long * addr)
 {
-	int	mask, retval;
-	volatile unsigned int *a = (volatile unsigned int *) addr;
-	unsigned long flags;
+	char retval;
 
-	a += nr >> 5;
-	mask = 1 << (nr & 0x1f);
-	local_irq_save(flags);
-	retval = (mask & *a) != 0;
-	*a |= mask;
-	local_irq_restore(flags);
+#ifdef CONFIG_COLDFIRE
+	__asm__ __volatile__ ("lea %1,%%a0; bset %2,(%%a0); sne %0"
+	     : "=d" (retval), "+m" (((volatile char *)addr)[(nr^31) >> 3])
+	     : "d" (nr)
+	     : "%a0");
+#else
+	__asm__ __volatile__ ("bset %2,%1; sne %0"
+	     : "=d" (retval), "+m" (((volatile char *)addr)[(nr^31) >> 3])
+	     : "di" (nr)
+	     /* No clobber */);
+#endif
 
 	return retval;
 }
 
-static __inline__ int __test_and_set_bit(int nr, volatile unsigned long * addr)
-{
-	int	mask, retval;
-	volatile unsigned int *a = (volatile unsigned int *) addr;
-
-	a += nr >> 5;
-	mask = 1 << (nr & 0x1f);
-	retval = (mask & *a) != 0;
-	*a |= mask;
-	return retval;
-}
+#define __test_and_set_bit(nr, addr) test_and_set_bit(nr, addr)
 
 static __inline__ int test_and_clear_bit(int nr, volatile unsigned long * addr)
 {
-	int	mask, retval;
-	volatile unsigned int *a = (volatile unsigned int *) addr;
-	unsigned long flags;
+	char retval;
 
-	a += nr >> 5;
-	mask = 1 << (nr & 0x1f);
-	local_irq_save(flags);
-	retval = (mask & *a) != 0;
-	*a &= ~mask;
-	local_irq_restore(flags);
+#ifdef CONFIG_COLDFIRE
+	__asm__ __volatile__ ("lea %1,%%a0; bclr %2,(%%a0); sne %0"
+	     : "=d" (retval), "+m" (((volatile char *)addr)[(nr^31) >> 3])
+	     : "d" (nr)
+	     : "%a0");
+#else
+	__asm__ __volatile__ ("bclr %2,%1; sne %0"
+	     : "=d" (retval), "+m" (((volatile char *)addr)[(nr^31) >> 3])
+	     : "di" (nr)
+	     /* No clobber */);
+#endif
 
 	return retval;
 }
 
-static __inline__ int __test_and_clear_bit(int nr, volatile unsigned long * addr)
-{
-	int	mask, retval;
-	volatile unsigned int *a = (volatile unsigned int *) addr;
-
-	a += nr >> 5;
-	mask = 1 << (nr & 0x1f);
-	retval = (mask & *a) != 0;
-	*a &= ~mask;
-	return retval;
-}
+#define __test_and_clear_bit(nr, addr) test_and_clear_bit(nr, addr)
 
 static __inline__ int test_and_change_bit(int nr, volatile unsigned long * addr)
 {
-	int	mask, retval;
-	volatile unsigned int *a = (volatile unsigned int *) addr;
-	unsigned long flags;
+	char retval;
 
-	a += nr >> 5;
-	mask = 1 << (nr & 0x1f);
-	local_irq_save(flags);
-	retval = (mask & *a) != 0;
-	*a ^= mask;
-	local_irq_restore(flags);
+#ifdef CONFIG_COLDFIRE
+	__asm__ __volatile__ ("lea %1,%%a0\n\tbchg %2,(%%a0)\n\tsne %0"
+	     : "=d" (retval), "+m" (((volatile char *)addr)[(nr^31) >> 3])
+	     : "d" (nr)
+	     : "%a0");
+#else
+	__asm__ __volatile__ ("bchg %2,%1; sne %0"
+	     : "=d" (retval), "+m" (((volatile char *)addr)[(nr^31) >> 3])
+	     : "di" (nr)
+	     /* No clobber */);
+#endif
 
 	return retval;
 }
 
-static __inline__ int __test_and_change_bit(int nr, volatile unsigned long * addr)
-{
-	int	mask, retval;
-	volatile unsigned int *a = (volatile unsigned int *) addr;
-
-	a += nr >> 5;
-	mask = 1 << (nr & 0x1f);
-	retval = (mask & *a) != 0;
-	*a ^= mask;
-	return retval;
-}
+#define __test_and_change_bit(nr, addr) test_and_change_bit(nr, addr)
 
 /*
  * This routine doesn't need to be atomic.
@@ -294,6 +256,8 @@ static __inline__ int __test_bit(int nr, const volatile unsigned long * addr)
 
 #define find_first_zero_bit(addr, size) \
         find_next_zero_bit((addr), (size), 0)
+#define find_first_bit(addr, size) \
+        find_next_bit((addr), (size), 0)
 
 static __inline__ int find_next_zero_bit (void * addr, int size, int offset)
 {
@@ -385,31 +349,39 @@ found_middle:
 
 static __inline__ int ext2_set_bit(int nr, volatile void * addr)
 {
-	int		mask, retval;
-	unsigned long	flags;
-	volatile unsigned char	*ADDR = (unsigned char *) addr;
+	char retval;
 
-	ADDR += nr >> 3;
-	mask = 1 << (nr & 0x07);
-	local_irq_save(flags);
-	retval = (mask & *ADDR) != 0;
-	*ADDR |= mask;
-	local_irq_restore(flags);
+#ifdef CONFIG_COLDFIRE
+	__asm__ __volatile__ ("lea %1,%%a0; bset %2,(%%a0); sne %0"
+	     : "=d" (retval), "+m" (((volatile char *)addr)[nr >> 3])
+	     : "d" (nr)
+	     : "%a0");
+#else
+	__asm__ __volatile__ ("bset %2,%1; sne %0"
+	     : "=d" (retval), "+m" (((volatile char *)addr)[nr >> 3])
+	     : "di" (nr)
+	     /* No clobber */);
+#endif
+
 	return retval;
 }
 
 static __inline__ int ext2_clear_bit(int nr, volatile void * addr)
 {
-	int		mask, retval;
-	unsigned long	flags;
-	volatile unsigned char	*ADDR = (unsigned char *) addr;
+	char retval;
 
-	ADDR += nr >> 3;
-	mask = 1 << (nr & 0x07);
-	local_irq_save(flags);
-	retval = (mask & *ADDR) != 0;
-	*ADDR &= ~mask;
-	local_irq_restore(flags);
+#ifdef CONFIG_COLDFIRE
+	__asm__ __volatile__ ("lea %1,%%a0; bclr %2,(%%a0); sne %0"
+	     : "=d" (retval), "+m" (((volatile char *)addr)[nr >> 3])
+	     : "d" (nr)
+	     : "%a0");
+#else
+	__asm__ __volatile__ ("bclr %2,%1; sne %0"
+	     : "=d" (retval), "+m" (((volatile char *)addr)[nr >> 3])
+	     : "di" (nr)
+	     /* No clobber */);
+#endif
+
 	return retval;
 }
 
@@ -433,12 +405,21 @@ static __inline__ int ext2_clear_bit(int nr, volatile void * addr)
 
 static __inline__ int ext2_test_bit(int nr, const volatile void * addr)
 {
-	int	mask;
-	const volatile unsigned char	*ADDR = (const unsigned char *) addr;
+	char retval;
 
-	ADDR += nr >> 3;
-	mask = 1 << (nr & 0x07);
-	return ((mask & *ADDR) != 0);
+#ifdef CONFIG_COLDFIRE
+	__asm__ __volatile__ ("lea %1,%%a0; btst %2,(%%a0); sne %0"
+	     : "=d" (retval)
+	     : "m" (((const volatile char *)addr)[nr >> 3]), "d" (nr)
+	     : "%a0");
+#else
+	__asm__ __volatile__ ("btst %2,%1; sne %0"
+	     : "=d" (retval)
+	     : "m" (((const volatile char *)addr)[nr >> 3]), "di" (nr)
+	     /* No clobber */);
+#endif
+
+	return retval;
 }
 
 #define ext2_find_first_zero_bit(addr, size) \

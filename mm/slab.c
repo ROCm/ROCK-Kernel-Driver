@@ -2836,7 +2836,7 @@ static void cache_reap(void *unused)
 next_unlock:
 		spin_unlock_irq(&searchp->spinlock);
 next:
-		;
+		cond_resched();
 	}
 	check_irq_on();
 	up(&cache_chain_sem);

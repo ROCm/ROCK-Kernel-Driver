@@ -32,9 +32,9 @@
 
 #include "sir-dev.h"
 
-MODULE_PARM(tekram_delay, "i");
-MODULE_PARM_DESC(tekram_delay, "tekram dongle write complete delay");
 static int tekram_delay = 150;		/* default is 150 ms */
+module_param(tekram_delay, int, 0);
+MODULE_PARM_DESC(tekram_delay, "tekram dongle write complete delay");
 
 static int tekram_open(struct sir_dev *);
 static int tekram_close(struct sir_dev *);

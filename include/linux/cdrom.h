@@ -1186,8 +1186,6 @@ struct media_event_desc {
 };
 
 extern int cdrom_get_media_event(struct cdrom_device_info *cdi, struct media_event_desc *med);
-extern int cdrom_is_mrw(struct cdrom_device_info *cdi, int *write);
-extern int cdrom_is_random_writable(struct cdrom_device_info *cdi, int *write);
 
 #endif  /* End of kernel only stuff */ 
 

@@ -56,7 +56,7 @@ static void __init ixdp2400_timer_init(void)
 	ixp2000_init_time(((3125000 * numerator) / (denominator)) / 2);
 }
 
-static struct timer ixdp2400_timer = {
+static struct sys_timer ixdp2400_timer = {
 	.init		= ixdp2400_timer_init,
 	.offset		= ixp2000_gettimeoffset,
 };

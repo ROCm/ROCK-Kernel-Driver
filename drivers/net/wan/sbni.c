@@ -1485,14 +1485,12 @@ set_multicast_list( struct net_device  *dev )
 
 
 #ifdef MODULE
-
-MODULE_PARM(	io,	"1-" __MODULE_STRING( SBNI_MAX_NUM_CARDS ) "i" );
-MODULE_PARM(	irq,	"1-" __MODULE_STRING( SBNI_MAX_NUM_CARDS ) "i" );
-MODULE_PARM(	baud,	"1-" __MODULE_STRING( SBNI_MAX_NUM_CARDS ) "i" );
-MODULE_PARM(	rxl,	"1-" __MODULE_STRING( SBNI_MAX_NUM_CARDS ) "i" );
-MODULE_PARM(	mac,	"1-" __MODULE_STRING( SBNI_MAX_NUM_CARDS ) "i" );
-
-MODULE_PARM(	skip_pci_probe,	"i" );
+module_param_array(io, int, NULL, 0);
+module_param_array(irq, int, NULL, 0);
+module_param_array(baud, int, NULL, 0);
+module_param_array(rxl, int, NULL, 0);
+module_param_array(mac, int, NULL, 0);
+module_param(skip_pci_probe, bool, 0);
 
 MODULE_LICENSE("GPL");
 

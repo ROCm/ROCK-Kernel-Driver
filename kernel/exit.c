@@ -332,7 +332,9 @@ void daemonize(const char *name, ...)
 	exit_mm(current);
 
 	set_special_pids(1, 1);
+	down(&tty_sem);
 	current->signal->tty = NULL;
+	up(&tty_sem);
 
 	/* Block and flush all signals */
 	sigfillset(&blocked);
@@ -555,7 +557,7 @@ static inline void reparent_thread(task_t *p, task_t *father, int traced)
 			 * a normal stop since it's no longer being
 			 * traced.
 			 */
-			p->state = TASK_STOPPED;
+			ptrace_untrace(p);
 		}
 	}
 

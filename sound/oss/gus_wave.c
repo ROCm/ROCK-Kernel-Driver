@@ -94,7 +94,7 @@ static int      recording_active;
 static int      only_read_access;
 static int      only_8_bits;
 
-int             iw_mode = 0;
+static int      iw_mode = 0;
 int             gus_wave_volume = 60;
 int             gus_pcm_volume = 80;
 int             have_gus_max = 0;

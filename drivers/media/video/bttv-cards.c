@@ -2158,7 +2158,7 @@ struct tvcard bttv_tvcards[] = {
 	// .has_remote     = 1,
 }};
 
-const unsigned int bttv_num_tvcards = ARRAY_SIZE(bttv_tvcards);
+static const unsigned int bttv_num_tvcards = ARRAY_SIZE(bttv_tvcards);
 
 /* ----------------------------------------------------------------------- */
 
@@ -2327,10 +2327,10 @@ static void flyvideo_gpio(struct bttv *btv)
 	//todo: if(has_tda9874) btv->audio_hook = fv2000s_audio;
 }
 
-int miro_tunermap[] = { 0,6,2,3,   4,5,6,0,  3,0,4,5,  5,2,16,1,
-			14,2,17,1, 4,1,4,3,  1,2,16,1, 4,4,4,4 };
-int miro_fmtuner[]  = { 0,0,0,0,   0,0,0,0,  0,0,0,0,  0,0,0,1,
-			1,1,1,1,   1,1,1,0,  0,0,0,0,  0,1,0,0 };
+static int miro_tunermap[] = { 0,6,2,3,   4,5,6,0,  3,0,4,5,  5,2,16,1,
+			       14,2,17,1, 4,1,4,3,  1,2,16,1, 4,4,4,4 };
+static int miro_fmtuner[]  = { 0,0,0,0,   0,0,0,0,  0,0,0,0,  0,0,0,1,
+			       1,1,1,1,   1,1,1,0,  0,0,0,0,  0,1,0,0 };
 
 static void miro_pinnacle_gpio(struct bttv *btv)
 {
@@ -3072,7 +3072,7 @@ static void __devinit osprey_eeprom(struct bttv *btv)
 /* ----------------------------------------------------------------------- */
 /* AVermedia specific stuff, from  bktr_card.c                             */
 
-int tuner_0_table[] = {
+static int tuner_0_table[] = {
         TUNER_PHILIPS_NTSC,  TUNER_PHILIPS_PAL /* PAL-BG*/,
         TUNER_PHILIPS_PAL,   TUNER_PHILIPS_PAL /* PAL-I*/,
         TUNER_PHILIPS_PAL,   TUNER_PHILIPS_PAL,
@@ -3087,7 +3087,7 @@ int tuner_0_fm_table[] = {
         PHILIPS_FR1236_SECAM, PHILIPS_FR1216_PAL};
 #endif
 
-int tuner_1_table[] = {
+static int tuner_1_table[] = {
         TUNER_TEMIC_NTSC,  TUNER_TEMIC_PAL,
 	TUNER_TEMIC_PAL,   TUNER_TEMIC_PAL,
 	TUNER_TEMIC_PAL,   TUNER_TEMIC_PAL,
@@ -3281,7 +3281,7 @@ static void __devinit init_PXC200(struct bttv *btv)
  * Brutally hacked by Dan Sheridan <dan.sheridan@contact.org.uk> djs52 8/3/00
  */
 
-void bus_low(struct bttv *btv, int bit)
+static void bus_low(struct bttv *btv, int bit)
 {
 	if (btv->mbox_ior) {
 		gpio_bits(btv->mbox_ior | btv->mbox_iow | btv->mbox_csel,
@@ -3298,7 +3298,7 @@ void bus_low(struct bttv *btv, int bit)
 	}
 }
 
-void bus_high(struct bttv *btv, int bit)
+static void bus_high(struct bttv *btv, int bit)
 {
 	if (btv->mbox_ior) {
 		gpio_bits(btv->mbox_ior | btv->mbox_iow | btv->mbox_csel,
@@ -3315,7 +3315,7 @@ void bus_high(struct bttv *btv, int bit)
 	}
 }
 
-int bus_in(struct bttv *btv, int bit)
+static int bus_in(struct bttv *btv, int bit)
 {
 	if (btv->mbox_ior) {
 		gpio_bits(btv->mbox_ior | btv->mbox_iow | btv->mbox_csel,

@@ -67,9 +67,9 @@ module_param(init, bool, 0);
 MODULE_PARM_DESC(init, "Set to zero to bypass chip initialization");
 
 /* modified from kernel/include/traps.c */
-#define	REG	0x2e	/* The register to read/write */
+static int REG;		/* The register to read/write */
 #define	DEV	0x07	/* Register: Logical device select */
-#define	VAL	0x2f	/* The value to read/write */
+static int VAL;		/* The value to read/write */
 
 /* logical device numbers for superio_select (below) */
 #define W83627HF_LD_FDC		0x00
@@ -90,9 +90,9 @@ MODULE_PARM_DESC(init, "Set to zero to bypass chip initialization");
 
 #define	DEVID	0x20	/* Register: Device ID */
 
+#define W83627THF_GPIO5_EN	0x30 /* w83627thf only */
 #define W83627THF_GPIO5_IOSR	0xf3 /* w83627thf only */
 #define W83627THF_GPIO5_DR	0xf4 /* w83627thf only */
-#define W83627THF_GPIO5_INVR	0xf5 /* w83627thf only */
 
 static inline void
 superio_outb(int reg, int val)
@@ -938,9 +938,12 @@ static int w83627hf_attach_adapter(struct i2c_adapter *adapter)
 	return i2c_detect(adapter, &addr_data, w83627hf_detect);
 }
 
-static int w83627hf_find(int *address)
+static int w83627hf_find(int sioaddr, int *address)
 {
 	u16 val;
+
+	REG = sioaddr;
+	VAL = sioaddr + 1;
 
 	superio_enter();
 	val= superio_inb(DEVID);
@@ -984,7 +987,7 @@ int w83627hf_detect(struct i2c_adapter *adapter, int address,
 	if(force_addr)
 		address = force_addr & ~(WINB_EXTENT - 1);
 
-	if (!request_region(address, WINB_EXTENT, "w83627hf")) {
+	if (!request_region(address, WINB_EXTENT, w83627hf_driver.name)) {
 		err = -EBUSY;
 		goto ERROR0;
 	}
@@ -1187,16 +1190,31 @@ static int w83627hf_read_value(struct i2c_client *client, u16 reg)
 
 static int w83627thf_read_gpio5(struct i2c_client *client)
 {
-	struct w83627hf_data *data = i2c_get_clientdata(client);
-	int res, inv;
+	int res = 0xff, sel;
 
-	down(&data->lock);
 	superio_enter();
 	superio_select(W83627HF_LD_GPIO5);
-	res = superio_inb(W83627THF_GPIO5_DR);
-	inv = superio_inb(W83627THF_GPIO5_INVR);
+
+	/* Make sure these GPIO pins are enabled */
+	if (!(superio_inb(W83627THF_GPIO5_EN) & (1<<3))) {
+		dev_dbg(&client->dev, "GPIO5 disabled, no VID function\n");
+		goto exit;
+	}
+
+	/* Make sure the pins are configured for input
+	   There must be at least five (VRM 9), and possibly 6 (VRM 10) */
+	sel = superio_inb(W83627THF_GPIO5_IOSR);
+	if ((sel & 0x1f) != 0x1f) {
+		dev_dbg(&client->dev, "GPIO5 not configured for VID "
+			"function\n");
+		goto exit;
+	}
+
+	dev_info(&client->dev, "Reading VID from GPIO5\n");
+	res = superio_inb(W83627THF_GPIO5_DR) & sel;
+
+exit:
 	superio_exit();
-	up(&data->lock);
 	return res;
 }
 
@@ -1269,7 +1287,7 @@ static void w83627hf_init_client(struct i2c_client *client)
 		int hi = w83627hf_read_value(client, W83781D_REG_CHIPID);
 		data->vid = (lo & 0x0f) | ((hi & 0x01) << 4);
 	} else if (w83627thf == data->type) {
-		data->vid = w83627thf_read_gpio5(client) & 0x1f;
+		data->vid = w83627thf_read_gpio5(client) & 0x3f;
 	}
 
 	/* Read VRM & OVT Config only once */
@@ -1422,7 +1440,8 @@ static int __init sensors_w83627hf_init(void)
 {
 	int addr;
 
-	if (w83627hf_find(&addr)) {
+	if (w83627hf_find(0x2e, &addr)
+	 && w83627hf_find(0x4e, &addr)) {
 		return -ENODEV;
 	}
 	normal_isa[0] = addr;

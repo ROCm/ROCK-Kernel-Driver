@@ -920,13 +920,13 @@ static Scsi_Host_Template driver_template = {
 #include <linux/module.h>
 #include "scsi_module.c"
 
-MODULE_PARM(ncr_irq, "i");
-MODULE_PARM(ncr_dma, "i");
-MODULE_PARM(ncr_addr, "i");
-MODULE_PARM(ncr_5380, "i");
-MODULE_PARM(ncr_53c400, "i");
-MODULE_PARM(ncr_53c400a, "i");
-MODULE_PARM(dtc_3181e, "i");
+module_param(ncr_irq, int, 0);
+module_param(ncr_dma, int, 0);
+module_param(ncr_addr, int, 0);
+module_param(ncr_5380, int, 0);
+module_param(ncr_53c400, int, 0);
+module_param(ncr_53c400a, int, 0);
+module_param(dtc_3181e, int, 0);
 MODULE_LICENSE("GPL");
 
 

@@ -899,9 +899,9 @@ set_rx_mode(struct net_device *dev)
 #ifdef MODULE
 static struct net_device *dev_at1700;
 
-MODULE_PARM(io, "i");
-MODULE_PARM(irq, "i");
-MODULE_PARM(net_debug, "i");
+module_param(io, int, 0);
+module_param(irq, int, 0);
+module_param(net_debug, int, 0);
 MODULE_PARM_DESC(io, "AT1700/FMV18X I/O base address");
 MODULE_PARM_DESC(irq, "AT1700/FMV18X IRQ number");
 MODULE_PARM_DESC(net_debug, "AT1700/FMV18X debug level (0-6)");

@@ -37,7 +37,6 @@ extern void  zft_memory_stats(void);
 extern int   zft_vmalloc_once(void *new, size_t size);
 extern int   zft_vcalloc_once(void *new, size_t size);
 extern int   zft_vmalloc_always(void *new, size_t size);
-extern int   zft_vcalloc_always(void *new, size_t size);
 extern void  zft_vfree(void *old, size_t size);
 extern void *zft_kmalloc(size_t size);
 extern void  zft_kfree(void *old, size_t size);

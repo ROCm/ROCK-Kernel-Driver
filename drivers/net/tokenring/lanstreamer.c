@@ -182,20 +182,19 @@ static char *open_min_error[] = {
 
 static int ringspeed[STREAMER_MAX_ADAPTERS] = { 0, };
 
-MODULE_PARM(ringspeed, "1-" __MODULE_STRING(STREAMER_MAX_ADAPTERS) "i");
+module_param_array(ringspeed, int, NULL, 0);
 
 /* Packet buffer size */
 
 static int pkt_buf_sz[STREAMER_MAX_ADAPTERS] = { 0, };
 
-MODULE_PARM(pkt_buf_sz, "1-" __MODULE_STRING(STREAMER_MAX_ADAPTERS) "i");
+module_param_array(pkt_buf_sz, int, NULL, 0);
 
 /* Message Level */
 
 static int message_level[STREAMER_MAX_ADAPTERS] = { 1, };
 
-MODULE_PARM(message_level,
-	    "1-" __MODULE_STRING(STREAMER_MAX_ADAPTERS) "i");
+module_param_array(message_level, int, NULL, 0);
 
 #if STREAMER_IOCTL
 static int streamer_ioctl(struct net_device *, struct ifreq *, int);

@@ -8,16 +8,15 @@
  * warranty of any kind, whether express or implied.
  */
 
-		.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
 
-30000:
+	.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
+
 		mov	\tmp, #S3C2410_VA_IRQ
 		ldr	\irqnr, [ \tmp, #0x14 ]		@ get irq no
+30000:
 		teq	\irqnr, #4
 		teqne	\irqnr, #5
 		beq	1002f				@ external irq reg
-		teq	\irqnr, #16
-		beq	1003f				@ lcd controller
 
 		@ debug check to see if interrupt reported is the same
 		@ as the offset....
@@ -29,15 +28,17 @@
 		tst	\irqstat, #1
 		bne	20002f
 
+		/* debug/warning if we get an invalud response from the
+		 * INTOFFSET register */
 #if 1
-		stmfd	r13!, { r0 - r4 , r14 }
-		ldr	r1,	[ \tmp, #0x14 ]		@ intoffset
+		stmfd	r13!, { r0 - r4 , r8-r12, r14 }
+		ldr	r1,	[ \tmp, #0x14 ]		@ INTOFFSET
 		ldr	r2,	[ \tmp, #0x10 ]		@ INTPND
 		ldr	r3,	[ \tmp, #0x00 ]		@ SRCPND
 		adr	r0, 20003f
 		bl	printk
 		b	20004f
-#endif
+
 20003:
 		.ascii	"<7>irq: err - bad offset %d, intpnd=%08x, srcpnd=%08x\n"
 		.byte	0
@@ -45,9 +46,10 @@
 20004:
 		mov	r1, #1
 		mov	\tmp, #S3C2410_VA_IRQ
-		ldmfd	r13!, { r0 - r4 , r14 }
+		ldmfd	r13!, { r0 - r4 , r8-r12, r14 }
+#endif
 
-		@ try working out interript number for ourselves
+		@ try working out interrupt number for ourselves
 		mov	\irqnr, #0
 		ldr	\irqstat, [ \tmp, #0x10 ]	@ INTPND
 10021:
@@ -98,19 +100,6 @@
 
 		@ found no interrupt, set Z flag and leave
 		movs	\irqnr, #0
-		b	1001f
-
-1003:
-		@ lcd interrupt has been asserted...
-		add	\tmp, \tmp, #S3C2410_VA_LCD - S3C2410_VA_IRQ
-		ldr	\irqstat, [ \tmp, # 0x54 ]	@ lcd int pending
-
-		tst	\irqstat, #2
-		movne	\irqnr, #IRQ_LCD_FRAME
-		tst	\irqstat, #1
-		movne	\irqnr, #IRQ_LCD_FIFO
-
-		@ fall through to exit with flags updated
 
 1004:		@ ensure Z flag clear in case our MOVS shifted out the last bit
 		teq	\irqnr, #0

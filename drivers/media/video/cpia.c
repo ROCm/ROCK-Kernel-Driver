@@ -57,7 +57,7 @@ extern int cpia_usb_init(void);
 static int video_nr = -1;
 
 #ifdef MODULE
-MODULE_PARM(video_nr,"i");
+module_param(video_nr, int, 0);
 MODULE_AUTHOR("Scott J. Bertin <sbertin@securenym.net> & Peter Pregler <Peter_Pregler@email.com> & Johannes Erdfelt <johannes@erdfeld.com>");
 MODULE_DESCRIPTION("V4L-driver for Vision CPiA based cameras");
 MODULE_LICENSE("GPL");

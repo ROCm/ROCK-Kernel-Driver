@@ -1133,7 +1133,7 @@ snd_emu8000_new(snd_card_t *card, int index, long port, int seq_ports, snd_seq_d
 		return err;
 	}
 	
-	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, hw, &ops)) < 0) {
+	if ((err = snd_device_new(card, SNDRV_DEV_CODEC, hw, &ops)) < 0) {
 		snd_emu8000_free(hw);
 		return err;
 	}
