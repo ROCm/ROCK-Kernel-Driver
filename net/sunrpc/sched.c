@@ -762,11 +762,6 @@ void rpc_init_task(struct rpc_task *task, struct rpc_clnt *clnt, rpc_action call
 	if (!RPC_IS_ASYNC(task))
 		init_waitqueue_head(&task->u.tk_wait.waitq);
 
-	/* Add to global list of all tasks */
-	spin_lock(&rpc_sched_lock);
-	list_add(&task->tk_task, &all_tasks);
-	spin_unlock(&rpc_sched_lock);
-
 	if (clnt) {
 		atomic_inc(&clnt->cl_users);
 		if (clnt->cl_softrtry)
@@ -779,6 +774,11 @@ void rpc_init_task(struct rpc_task *task, struct rpc_clnt *clnt, rpc_action call
 	task->tk_magic = 0xf00baa;
 	task->tk_pid = rpc_task_id++;
 #endif
+	/* Add to global list of all tasks */
+	spin_lock(&rpc_sched_lock);
+	list_add_tail(&task->tk_task, &all_tasks);
+	spin_unlock(&rpc_sched_lock);
+
 	dprintk("RPC: %4d new task procpid %d\n", task->tk_pid,
 				current->pid);
 }
@@ -952,12 +952,15 @@ void rpc_killall_tasks(struct rpc_clnt *clnt)
 	 * Spin lock all_tasks to prevent changes...
 	 */
 	spin_lock(&rpc_sched_lock);
-	alltask_for_each(rovr, le, &all_tasks)
+	alltask_for_each(rovr, le, &all_tasks) {
+		if (! RPC_IS_ACTIVATED(rovr))
+			continue;
 		if (!clnt || rovr->tk_client == clnt) {
 			rovr->tk_flags |= RPC_TASK_KILLED;
 			rpc_exit(rovr, -EIO);
 			rpc_wake_up_task(rovr);
 		}
+	}
 	spin_unlock(&rpc_sched_lock);
 }
 
