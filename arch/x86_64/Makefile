@@ -54,7 +54,7 @@ CFLAGS += -finline-limit=2000
 
 HEAD := arch/x86_64/kernel/head.o arch/x86_64/kernel/head64.o arch/x86_64/kernel/init_task.o
 
-SUBDIRS := arch/x86_64/tools $(SUBDIRS) arch/x86_64/kernel arch/x86_64/mm arch/x86_64/lib
+SUBDIRS += arch/x86_64/kernel arch/x86_64/mm arch/x86_64/lib
 CORE_FILES := arch/x86_64/kernel/kernel.o $(CORE_FILES)
 CORE_FILES +=  arch/x86_64/mm/mm.o
 LIBS := $(TOPDIR)/arch/x86_64/lib/lib.a $(LIBS)
@@ -78,36 +78,44 @@ vmlinux: arch/x86_64/vmlinux.lds
 .PHONY: zImage bzImage compressed zlilo bzlilo zdisk bzdisk install \
 		clean archclean archmrproper archdep checkoffset
 
-checkoffset: FORCE include/asm
-	make -C arch/$(ARCH)/tools $(TOPDIR)/include/asm-x86_64/offset.h
-
-bzImage: checkoffset vmlinux
+bzImage: vmlinux
 	@$(MAKEBOOT) bzImage
 
-bzImage-padded: checkoffset vmlinux
+bzImage-padded: vmlinux
 	@$(MAKEBOOT) bzImage-padded
 
 tmp:
 	@$(MAKEBOOT) BOOTIMAGE=bzImage zlilo
 
-bzlilo: checkoffset vmlinux
+bzlilo: vmlinux
 	@$(MAKEBOOT) BOOTIMAGE=bzImage zlilo
 
-bzdisk: checkoffset vmlinux
+bzdisk: vmlinux
 	@$(MAKEBOOT) BOOTIMAGE=bzImage zdisk
 
-install: checkoffset vmlinux
+install: vmlinux
 	@$(MAKEBOOT) BOOTIMAGE=bzImage install
 
 archclean:
 	@$(MAKEBOOT) clean
-	@$(MAKE) -C $(TOPDIR)/arch/x86_64/tools clean
 
 archmrproper:
-	rm -f $(TOPDIR)/arch/x86_64/tools/offset.h
-	rm -f $(TOPDIR)/arch/x86_64/tools/offset.tmp
-	rm -f $(TOPDIR)/include/asm-x86_64/offset.h
 
 archdep:
-	@$(MAKE) -C $(TOPDIR)/arch/x86_64/tools all
 	@$(MAKEBOOT) dep
+
+
+prepare: include/asm-$(ARCH)/offset.h
+
+arch/$(ARCH)/kernel/asm-offsets.s: include/asm include/linux/version.h \
+				   include/config/MARKER
+
+include/asm-$(ARCH)/offset.h.tmp: arch/$(ARCH)/kernel/asm-offsets.s
+	@$(generate-asm-offsets.h) < $< > $@
+
+include/asm-$(ARCH)/offset.h: include/asm-$(ARCH)/offset.h.tmp
+	@echo -n '  Generating $@'
+	@$(update-if-changed)
+
+CLEAN_FILES += include/asm-$(ARCH)/offset.h.tmp \
+	       include/asm-$(ARCH)/offset.h
