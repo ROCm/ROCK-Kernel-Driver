@@ -59,7 +59,7 @@
 asmlinkage extern void ret_from_fork(void);
 int sys_arch_prctl(int code, unsigned long addr);
 
-unsigned long kernel_thread_flags = CLONE_VM;
+unsigned long kernel_thread_flags = CLONE_VM | CLONE_UNTRACED;
 
 int hlt_counter;
 

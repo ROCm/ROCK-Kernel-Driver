@@ -22,6 +22,7 @@ void foo(void)
 	BLANK();
 	DEFINE(PT_PTRACED, PT_PTRACED);
 	DEFINE(CLONE_VM, CLONE_VM);
+	DEFINE(CLONE_UNTRACED, CLONE_UNTRACED);
 	DEFINE(SIGCHLD, SIGCHLD);
 	BLANK();
 	DEFINE(HAE_CACHE, offsetof(struct alpha_machine_vector, hae_cache));
