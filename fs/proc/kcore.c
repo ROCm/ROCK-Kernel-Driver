@@ -35,9 +35,10 @@ struct file_operations proc_kcore_operations = {
 };
 
 #ifdef CONFIG_KCORE_AOUT
-static ssize_t read_kcore(struct file *file, char *buf, size_t count, loff_t *ppos)
+static ssize_t read_kcore(struct file *file, char *buf,
+				size_t count, loff_t *ppos)
 {
-	unsigned long long p = *ppos, memsize;
+	loff_t p = *ppos, memsize;
 	ssize_t read;
 	ssize_t count1;
 	char * pnt;
@@ -90,7 +91,8 @@ static ssize_t read_kcore(struct file *file, char *buf, size_t count, loff_t *pp
 		read += count1;
 	}
 	if (count > 0) {
-		if (copy_to_user(buf, (void *) (PAGE_OFFSET+p-PAGE_SIZE), count))
+		if (copy_to_user(buf,
+			(void *)(PAGE_OFFSET + (long)p - PAGE_SIZE), count))
 			return -EFAULT;
 		read += count;
 	}
