@@ -1045,7 +1045,7 @@ asmlinkage long sys32_rt_sigpending(compat_sigset_t __user *set,
 }
 
 asmlinkage long sys32_rt_sigtimedwait(compat_sigset_t __user *uthese,
-				      siginfo_t32 __user *uinfo,
+				      struct siginfo32 __user *uinfo,
 				      struct compat_timespec __user *uts,
 				      compat_size_t sigsetsize)
 {
@@ -1130,15 +1130,15 @@ asmlinkage long sys32_rt_sigtimedwait(compat_sigset_t __user *uthese,
 }
 
 asmlinkage long compat_sys_rt_sigqueueinfo(int pid, int sig,
-					   siginfo_t32 __user *uinfo)
+					   struct siginfo32 __user *uinfo)
 {
 	siginfo_t info;
 	int ret;
 	mm_segment_t old_fs = get_fs();
 	
-	if (copy_from_user (&info, uinfo, 3*sizeof(int)) ||
-	    copy_from_user (info._sifields._pad, uinfo->_sifields._pad, SI_PAD_SIZE))
+	if (copy_siginfo_to_kernel32(&info, uinfo))
 		return -EFAULT;
+
 	set_fs (KERNEL_DS);
 	ret = sys_rt_sigqueueinfo(pid, sig, (siginfo_t __user *) &info);
 	set_fs (old_fs);
@@ -1736,3 +1736,23 @@ sys32_timer_create(u32 clock, struct sigevent32 __user *se32,
 	return err;
 }
 
+asmlinkage long compat_sys_waitid(u32 which, u32 pid,
+				  struct siginfo32 __user *uinfo, u32 options)
+{
+	siginfo_t info;
+	long ret;
+	mm_segment_t old_fs = get_fs();
+
+	memset(&info, 0, sizeof(info));
+
+	set_fs (KERNEL_DS);
+	ret = sys_waitid((int)which, (compat_pid_t) pid,
+			 (siginfo_t __user *) &info, (int) options);
+	set_fs (old_fs);
+
+	if (ret < 0 || info.si_signo == 0)
+		return ret;
+	BUG_ON(info.si_code & __SI_MASK);
+	info.si_code |= __SI_CHLD;
+	return copy_siginfo_to_user32(uinfo, &info);
+}
