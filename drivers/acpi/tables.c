@@ -509,8 +509,7 @@ acpi_table_get_sdt (
 
 
 int __init
-acpi_table_init (
-	char			*cmdline)
+acpi_table_init (void)
 {
 	struct acpi_table_rsdp	*rsdp = NULL;
 	unsigned long		rsdp_phys = 0;
