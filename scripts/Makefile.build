@@ -15,8 +15,12 @@ include $(obj)/Makefile
 
 include scripts/Makefile.lib
 
+ifdef export-objs
+$(warning kbuild: $(obj)/Makefile - Usage of export-objs is obsolete in 2.5. Please fix!)
+endif
+
 ifdef O_TARGET
-$(error kbuild: $(obj)/Makefile - Usage of O_TARGET := $(O_TARGET) is obsolete in 2.5. Please fix!)
+$(warning kbuild: $(obj)/Makefile - Usage of O_TARGET := $(O_TARGET) is obsolete in 2.5. Please fix!)
 endif
 
 ifdef L_TARGET
