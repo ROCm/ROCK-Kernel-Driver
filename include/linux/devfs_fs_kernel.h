@@ -86,8 +86,6 @@ extern int devfs_set_info (devfs_handle_t de, void *info);
 extern devfs_handle_t devfs_get_parent (devfs_handle_t de);
 extern devfs_handle_t devfs_get_first_child (devfs_handle_t de);
 extern devfs_handle_t devfs_get_next_sibling (devfs_handle_t de);
-extern void devfs_auto_unregister (devfs_handle_t master,devfs_handle_t slave);
-extern devfs_handle_t devfs_get_unregister_slave (devfs_handle_t master);
 extern const char *devfs_get_name (devfs_handle_t de, unsigned int *namelen);
 extern int devfs_only (void);
 extern int devfs_register_tape (devfs_handle_t de);
@@ -215,15 +213,6 @@ static inline devfs_handle_t devfs_get_first_child (devfs_handle_t de)
     return NULL;
 }
 static inline devfs_handle_t devfs_get_next_sibling (devfs_handle_t de)
-{
-    return NULL;
-}
-static inline void devfs_auto_unregister (devfs_handle_t master,
-					  devfs_handle_t slave)
-{
-    return;
-}
-static inline devfs_handle_t devfs_get_unregister_slave (devfs_handle_t master)
 {
     return NULL;
 }

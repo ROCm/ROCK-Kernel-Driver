@@ -825,7 +825,6 @@ struct devfs_entry
     struct devfs_entry *prev;    /*  Previous entry in the parent directory  */
     struct devfs_entry *next;    /*  Next entry in the parent directory      */
     struct devfs_entry *parent;  /*  The parent directory                    */
-    struct devfs_entry *slave;   /*  Another entry to unregister             */
     struct devfs_inode inode;
     umode_t mode;
     unsigned short namelen;      /*  I think 64k+ filenames are a way off... */
@@ -1697,7 +1696,6 @@ static void _devfs_unregister (struct devfs_entry *dir, struct devfs_entry *de)
     write_unlock (&dir->u.dir.lock);
     if (!unhooked) return;
     devfs_get (dir);
-    devfs_unregister (de->slave);  /*  Let it handle the locking  */
     devfsd_notify (de, DEVFSD_NOTIFY_UNREGISTERED, 0);
     free_dentry (de);
     devfs_put (dir);
@@ -2188,47 +2186,6 @@ devfs_handle_t devfs_get_next_sibling (devfs_handle_t de)
     return de->next;
 }   /*  End Function devfs_get_next_sibling  */
 
-
-/**
- *	devfs_auto_unregister - Configure a devfs entry to be automatically unregistered.
- *	@master: The master devfs entry. Only one slave may be registered.
- *	@slave: The devfs entry which will be automatically unregistered when the
- *		master entry is unregistered. It is illegal to call devfs_unregister()
- *		on this entry.
- */
-
-void devfs_auto_unregister (devfs_handle_t master, devfs_handle_t slave)
-{
-    if (master == NULL) return;
-    VERIFY_ENTRY (master);
-    VERIFY_ENTRY (slave);
-    if (master->slave != NULL)
-    {
-	/*  Because of the dumbness of the layers above, ignore duplicates  */
-	if (master->slave == slave) return;
-	PRINTK ("(%s): only one slave allowed\n", master->name);
-	OOPS ("():  old slave: \"%s\"  new slave: \"%s\"\n",
-	      master->slave->name, slave->name);
-    }
-    master->slave = slave;
-}   /*  End Function devfs_auto_unregister  */
-
-
-/**
- *	devfs_get_unregister_slave - Get the slave entry which will be automatically unregistered.
- *	@master: The master devfs entry.
- *
- *	Returns the slave which will be unregistered when @master is unregistered.
- */
-
-devfs_handle_t devfs_get_unregister_slave (devfs_handle_t master)
-{
-    if (master == NULL) return NULL;
-    VERIFY_ENTRY (master);
-    return master->slave;
-}   /*  End Function devfs_get_unregister_slave  */
-
-
 /**
  *	devfs_get_name - Get the name for a device entry in its parent directory.
  *	@de: The handle to the device entry.
@@ -2344,8 +2301,6 @@ EXPORT_SYMBOL(devfs_set_info);
 EXPORT_SYMBOL(devfs_get_parent);
 EXPORT_SYMBOL(devfs_get_first_child);
 EXPORT_SYMBOL(devfs_get_next_sibling);
-EXPORT_SYMBOL(devfs_auto_unregister);
-EXPORT_SYMBOL(devfs_get_unregister_slave);
 EXPORT_SYMBOL(devfs_get_name);
 EXPORT_SYMBOL(devfs_only);
 
