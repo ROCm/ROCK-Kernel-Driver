@@ -223,10 +223,10 @@ static int fragmentation_open(struct inode *inode, struct file *file)
 }
 
 static struct file_operations fragmentation_file_operations = {
-	open:		fragmentation_open,
-	read:		seq_read,
-	llseek:		seq_lseek,
-	release:	seq_release,
+	.open		= fragmentation_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= seq_release,
 };
 
 static int version_read_proc(char *page, char **start, off_t off,
@@ -258,10 +258,10 @@ static int vmstat_open(struct inode *inode, struct file *file)
 	return seq_open(file, &vmstat_op);
 }
 static struct file_operations proc_vmstat_file_operations = {
-	open:		vmstat_open,
-	read:		seq_read,
-	llseek:		seq_lseek,
-	release:	seq_release,
+	.open		= vmstat_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= seq_release,
 };
 
 #ifdef CONFIG_PROC_HARDWARE
