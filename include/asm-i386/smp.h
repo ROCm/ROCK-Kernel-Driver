@@ -21,17 +21,10 @@
 #endif
 #endif
 
-#ifdef CONFIG_SMP
-# ifdef CONFIG_CLUSTERED_APIC
-#  define TARGET_CPUS 0xf     /* all CPUs in *THIS* quad */
-#  define INT_DELIVERY_MODE 0     /* physical delivery on LOCAL quad */
-# else
-#  define TARGET_CPUS cpu_online_map
-#  define INT_DELIVERY_MODE 1     /* logical delivery broadcast to all procs */
-# endif
+#ifdef CONFIG_CLUSTERED_APIC
+ #define INT_DELIVERY_MODE 0     /* physical delivery on LOCAL quad */
 #else
-# define INT_DELIVERY_MODE 1     /* logical delivery */
-# define TARGET_CPUS 0x01
+ #define INT_DELIVERY_MODE 1     /* logical delivery broadcast to all procs */
 #endif
 
 #ifndef clustered_apic_mode
