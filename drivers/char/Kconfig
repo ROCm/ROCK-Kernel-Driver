@@ -59,7 +59,7 @@ config VT_CONSOLE
 
 config HW_CONSOLE
 	bool
-	depends on VT && !S390 && !USERMODE
+	depends on VT && !S390
 	default y
 
 config ECC
@@ -1011,4 +1011,6 @@ config MMTIMER
 	  Altix system timer.
 
 endmenu
+
+source "drivers/char/lirc/Kconfig"
 

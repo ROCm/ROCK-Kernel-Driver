@@ -49,6 +49,17 @@ static void handle_segv(int pid)
 		panic("handle_segv - PTRACE_FAULTINFO failed, errno = %d\n",
 		      errno);
 
+	if (!(fault.is_write & 4)) {
+		/*
+		    kernel fault -- likely that was general
+ 		    protection fault (trap_no = 13), not a
+		    page fault (trap_no = 14).  But we don't
+		    know for sure as PTRACE_FAULTINFO doesn't
+		    tell us :-/
+		*/
+		bad_segv(fault.addr, 0, fault.is_write);
+		return;
+	}
 	segv(fault.addr, 0, FAULT_WRITE(fault.is_write), 1, NULL);
 }
 

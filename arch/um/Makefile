@@ -118,12 +118,17 @@ CPPFLAGS_vmlinux.lds = $(shell echo -U$(SUBARCH) \
 #The wrappers will select whether using "malloc" or the kernel allocator.
 LINK_WRAPS = -Wl,--wrap,malloc -Wl,--wrap,free -Wl,--wrap,calloc
 
+UML_LIBS := -L/usr/lib -lutil
+ifeq ($(CONFIG_X11_FB),y)
+UML_LIBS += -L/usr/X11R6/lib -lX11 -lXext
+endif
+
 CFLAGS_vmlinux = $(LINK-y) $(LINK_WRAPS)
 define cmd_vmlinux__
 	$(CC) $(CFLAGS_vmlinux) -o $@ \
 	-Wl,-T,$(vmlinux-lds) $(vmlinux-init) \
 	-Wl,--start-group $(vmlinux-main) -Wl,--end-group \
-	-L/usr/lib -lutil \
+	$(UML_LIBS) \
 	$(filter-out $(vmlinux-lds) $(vmlinux-init) $(vmlinux-main) \
 	FORCE ,$^) ; rm -f linux
 endef
