@@ -75,7 +75,6 @@
 #define TIOCSETD	_IOW('T', 35, int) /* 0x5423 */
 #define TIOCGETD	_IOR('T', 36, int) /* 0x5424 */
 #define TCSBRKP		_IOW('T', 37, int) /* 0x5425 */	/* Needed for POSIX tcsendbreak() */
-#define TIOCTTYGSTRUCT	_IOR('T', 38, struct tty_struct) /* 0x5426 */ /* For debugging only */
 #define TIOCSBRK	_IO('T', 39) /* 0x5427 */ /* BSD compatibility */
 #define TIOCCBRK	_IO('T', 40) /* 0x5428 */ /* BSD compatibility */
 #define TIOCGSID	_IOR('T', 41, pid_t) /* 0x5429 */ /* Return the session ID of FD */

@@ -1662,13 +1662,6 @@ static int tiocgsid(struct tty_struct *tty, struct tty_struct *real_tty, pid_t *
 	return put_user(real_tty->session, arg);
 }
 
-static int tiocttygstruct(struct tty_struct *tty, struct tty_struct *arg)
-{
-	if (copy_to_user(arg, tty, sizeof(*arg)))
-		return -EFAULT;
-	return 0;
-}
-
 static int tiocsetd(struct tty_struct *tty, int *arg)
 {
 	int ldisc;
@@ -1795,9 +1788,6 @@ int tty_ioctl(struct inode * inode, struct file * file,
 		case TIOCLINUX:
 			return tioclinux(tty, arg);
 #endif
-		case TIOCTTYGSTRUCT:
-			return tiocttygstruct(tty, (struct tty_struct *) arg);
-
 		/*
 		 * Break handling
 		 */
