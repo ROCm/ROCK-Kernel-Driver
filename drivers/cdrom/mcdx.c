@@ -60,7 +60,7 @@ static const char *mcdx_c_version
 #include <linux/module.h>
 
 #include <linux/errno.h>
-#include <linux/sched.h>
+#include <linux/interrupt.h>
 #include <linux/fs.h>
 #include <linux/kernel.h>
 #include <linux/cdrom.h>
@@ -69,6 +69,7 @@ static const char *mcdx_c_version
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <asm/io.h>
+#include <asm/current.h>
 #include <asm/uaccess.h>
 
 #include <linux/major.h>
