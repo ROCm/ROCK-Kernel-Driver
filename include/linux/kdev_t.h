@@ -133,6 +133,15 @@ static inline kdev_t to_kdev_t(int dev)
 	return mk_kdev(MAJOR(dev),MINOR(dev));
 }
 
+#define print_dev_t(buffer, dev)					\
+	sprintf((buffer), "%u:%u\n", MAJOR(dev), MINOR(dev))
+
+#define format_dev_t(buffer, dev)					\
+	({								\
+		sprintf(buffer, "%u:%u", MAJOR(dev), MINOR(dev));	\
+		buffer;							\
+	})
+
 #else /* __KERNEL__ */
 
 /*
